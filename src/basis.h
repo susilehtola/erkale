@@ -37,9 +37,9 @@
 #endif
 
 /// Angular momentum notation for shells
-const char shell_types[]={'S','P','D','F','G','H','I'};
+const char shell_types[]={'S','P','D','F','G','H','I','K','L','M'};
 /// Maximum angular momentum supported in current version of ERKALE
-const int maxam=6;
+const int maxam=9;
 
 /// Structure for defining shells of functions
 typedef struct {
