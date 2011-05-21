@@ -1,0 +1,384 @@
+/*
+  Routines for computing ERIs. The same algorithm is used both for
+  conventional and direct calculations.
+*/
+
+/* Function definitions */
+
+#ifdef ERITABLE
+void ERItable::fill(const BasisSet * basp) {
+  // Don't do anything with a dummy argument.
+  if(basp==NULL)
+    return;
+#else
+
+#if defined(CALCJKab)
+void ERIscreen::calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
+  // Compute total density for Coulomb matrix
+  arma::mat R=Ra+Rb;
+#elif defined(CALCJK)
+void ERIscreen::calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff) const {
+#elif defined(CALCK)
+arma::mat ERIscreen::calcK(const arma::mat & R, double tol, double *eff) const {
+#else
+arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
+#endif
+
+#endif
+
+  // Amount of basis functions
+  size_t Nbf=basp->get_Nbf();
+
+  /* Check sizes of input and output */
+
+#ifdef CALCJKab
+  MAT_SIZE_CHECK(Ra,Nbf,Nbf,"Ra is not square!\n");
+  MAT_SIZE_CHECK(Rb,Nbf,Nbf,"Rb is not square!\n");
+
+  MAT_RESIZE(J,Nbf,Nbf);
+  MAT_RESIZE(Ka,Nbf,Nbf);
+  MAT_RESIZE(Kb,Nbf,Nbf);
+
+  J.zeros();
+  Ka.zeros();
+  Kb.zeros();
+#elif defined(CALCJK)
+  MAT_SIZE_CHECK(R,Nbf,Nbf,"R is not square!\n");
+  MAT_RESIZE(J,Nbf,Nbf);
+  MAT_RESIZE(K,Nbf,Nbf);
+
+  J.zeros();
+  K.zeros();
+#elif defined(CALCK)
+  MAT_SIZE_CHECK(R,Nbf,Nbf,"R is not square!\n");
+
+  arma::mat K(Nbf,Nbf);
+  K.zeros();
+#elif defined(CALCJ)
+  MAT_SIZE_CHECK(R,Nbf,Nbf,"R is not square!\n");
+
+  arma::mat J(Nbf,Nbf);
+  J.zeros();
+#endif
+
+  /* Allocate memory for table of integrals */
+
+#ifdef ERITABLE
+  // Make index helper
+  iidx=i_idx(Nbf*(Nbf+1)/2);
+
+  // Compute memory requirements
+  size_t N;
+  N=N_ints(basp);
+
+  // Don't do DOS
+  if(N*sizeof(double)>2*1e9) {
+    ERROR_INFO();
+    throw std::out_of_range("Cowardly refusing to allocate more than two gigs of memory.\n");
+  }
+
+  try {
+    ints.reserve(N);
+    ints.resize(N);
+  }
+  catch(std::bad_alloc err) {
+    std::ostringstream oss;
+
+    ERROR_INFO();
+    oss << "Was unable to reserve " << memory_size(N*sizeof(double)) << " of memory.\n";
+    throw std::runtime_error(oss.str());
+  }
+#else
+  // Number of calculated and skipped integrals
+  size_t intskip=0, denskip=0, calcd=0;
+
+  // Arrays of identical integrals
+  size_t iarr[8], jarr[8], karr[8], larr[8];
+  size_t nid; // Number of identical integrals in this batch
+#endif
+
+  /* The filling algorithm may seem a bit complicated. This is because the ERIs
+     are computed on a shell basis, and because the same algorithm is used here
+     to form the ERIs as for direct calculations.
+
+     In order to determine if the filling algorithm works perfectly, there is
+     the CHECKFILL option to count the number each integral has been
+     calculated.
+  */
+
+#ifdef CHECKFILL
+  // Debug number of accesses
+  printf("Allocating memory for checking table.\n");
+
+#ifndef ERITABLE
+  // Number of integrals is 
+  size_t N=Nbf*(Nbf+1)*(Nbf*Nbf+Nbf+2)/8;
+#endif
+  std::vector<short int> nacc(N);
+  for(size_t i=0;i<N;i++)
+    nacc[i]=0;
+
+#endif
+
+  // Get list of unique shell pairs
+  std::vector<shellpair_t> pairs=basp->get_unique_shellpairs();
+  // Get number of shell pairs
+  const size_t Npairs=pairs.size();
+
+
+  // Loop over first pairs
+#ifdef _OPENMP
+#pragma omp parallel reduction(+:calcd,intskip,denskip)
+  {
+    /*
+    if(omp_get_thread_num()==0)
+      printf("Computing ERIs with %i threads.\n",omp_get_num_threads());
+    */
+    
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t ip=0;ip<Npairs;ip++) {
+      
+      // Shells are
+      size_t ks=pairs[ip].is;
+      size_t ls=pairs[ip].js;
+      // First functions on shells are
+      size_t k0=basp->get_first_ind(ks);
+      size_t l0=basp->get_first_ind(ls);
+      // and amounts of functions on shells are
+      size_t Nk=basp->get_Nbf(ks);
+      size_t Nl=basp->get_Nbf(ls);
+      
+#ifndef ERITABLE
+      // Indices of last functions on shells
+      size_t klast=basp->get_last_ind(ks);
+      size_t llast=basp->get_last_ind(ls);
+#endif
+      
+      // Loop over second pairs
+      for(size_t jp=0;jp<=ip;jp++) {
+	
+	// Shells are
+	size_t is=pairs[jp].is;
+	size_t js=pairs[jp].js;
+	// First functions on shells are
+	size_t i0=basp->get_first_ind(is);
+	size_t j0=basp->get_first_ind(js);
+      // and amounts of functions on shells are
+	size_t Ni=basp->get_Nbf(is);
+	size_t Nj=basp->get_Nbf(js);
+	
+#ifndef ERITABLE
+	// Indices of last functions on shells
+	size_t ilast=basp->get_last_ind(is);
+	size_t jlast=basp->get_last_ind(js);
+#endif
+	
+	/* Perform screening of integrals */
+#ifndef ERITABLE
+	// Maximum value of the 2-electron integrals on this shell pair
+	double intmax=screen(is,js)*screen(ks,ls);
+	
+	if(intmax<tol) {
+	  // Skip integral due to small value of integral
+	  intskip++;
+	  continue;
+	  
+	} else {
+	  // Compute maximum density
+	  
+	  // Maximum value of density
+	  double maxR, maxR_arr[6], maxR_red[2];
+	  maxR_arr[0]=max_abs(R.submat(i0,j0,ilast,jlast));
+	  maxR_arr[1]=max_abs(R.submat(i0,k0,ilast,klast));
+	  maxR_arr[2]=max_abs(R.submat(i0,l0,ilast,llast));
+	  maxR_arr[3]=max_abs(R.submat(j0,k0,jlast,klast));
+	  maxR_arr[4]=max_abs(R.submat(j0,l0,jlast,llast));
+	  maxR_arr[5]=max_abs(R.submat(k0,l0,klast,llast));
+	  
+	  maxR_red[0]=max(maxR_arr[0],maxR_arr[1],maxR_arr[2],maxR_arr[3]);
+	  maxR_red[1]=max(maxR_arr[4],maxR_arr[5]);
+	  maxR=max(maxR_red[0],maxR_red[1]);
+	  
+	  if(maxR*intmax<tol) {
+	    // Skip integral due to small product of density and integral
+	    denskip++;
+	    continue;
+	  } else
+	    // Need to calculate integral.
+	    calcd++;
+	}
+	
+#endif
+	
+	// Compute integrals
+	std::vector<double> tmp=basp->ERI(is,js,ks,ls);
+#ifdef _OPENMP
+	//	printf("Thread %i computed (%i %i %i %i)\n",omp_get_thread_num(),is,js,ks,ls);
+#endif
+	
+	
+	/*
+	  printf("\nShells (%i %i | %i %i)\n",is,js,ks,ls);
+	  printf("Integrals are:");
+	  for(size_t in=0;in<tmp.size();in++)
+	  printf(" % e",tmp[in]);
+	  printf("\n");
+	*/
+
+	/* Fill table, or increment matrices */
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+	{
+	  // Helpers
+	  size_t i, j, k, l;
+	  size_t iimax, jjmax, kkmax, llmax;
+	  
+	  if(is==js && ks==ls && is==ks) {
+	    // All shells are the same: (is is | is is)
+	    
+	    iimax=Ni-1;
+	    for(size_t ii=0;ii<=iimax;ii++) {
+	      i=i0+ii;
+	      
+	      jjmax=ii;
+	      for(size_t jj=0;jj<=jjmax;jj++) {
+		j=j0+jj;
+		
+		kkmax=ii;
+		for(size_t kk=0;kk<=kkmax;kk++) {
+		  k=k0+kk;
+		  
+		  // jj if kk and ii are same, otherwise kk
+		  llmax = (kk==ii) ? jj : kk ; 
+		  for(size_t ll=0;ll<=llmax;ll++) {
+		    l=l0+ll;
+		    
+		    // Store integral or increment matrices
+#include "eri-routines-increment.cpp.in"
+		    
+		  }
+		}
+	      }
+	    }
+	  } else if(is==ks && js==ls) {
+	    // Two shells are the same: (is js | is js)
+	    
+	    iimax=Ni-1;
+	    jjmax=Nj-1;
+	    
+	    for(size_t ii=0;ii<=iimax;ii++) {
+	      i=i0+ii;
+	      for(size_t jj=0;jj<=jjmax;jj++) {
+		j=j0+jj;
+		
+		kkmax=ii;
+		for(size_t kk=0;kk<=kkmax;kk++) {
+		  k=k0+kk;
+		  
+		  llmax = (kk==ii) ? jj : Nl-1 ;
+		  for(size_t ll=0;ll<=llmax;ll++) {
+		    l=l0+ll;
+		    
+		    // Store integral or increment matrices
+#include "eri-routines-increment.cpp.in"
+		    
+		  }
+		}
+	      }
+	    }
+	  } else {
+	    // (is js | ks ls) case
+	    
+	    iimax=Ni-1;
+	    kkmax=Nk-1;
+	    for(size_t ii=0;ii<=iimax;ii++) {
+	      i=i0+ii;
+	      
+	      jjmax= (is==js) ? ii : Nj-1;
+	      for(size_t jj=0;jj<=jjmax;jj++) {
+		j=j0+jj;
+		
+		for(size_t kk=0;kk<=kkmax;kk++) {
+		  k=k0+kk;
+		  
+		  llmax = (ks==ls) ? kk : Nl-1 ;
+		  for(size_t ll=0;ll<=llmax;ll++) {
+		    l=l0+ll;
+		    
+		    // Store integral or increment matrices
+#include "eri-routines-increment.cpp.in"
+		    
+		  }
+		}
+	      }
+	    }
+	  }
+	} // end critical region
+      }
+    }
+#ifdef _OPENMP
+  } // end parallel region
+#endif
+  
+#ifdef CHECKFILL  
+  size_t ndupl=0, nmiss=0;
+  bool print;
+  for(size_t i=0;i<N;i++) {
+    print=0;
+    if(nacc[i]==0) {
+      printf("Integral %i has not been calculated.\n",(int) i);
+      nmiss++;
+      print=1;
+    } else if(nacc[i]>1) {
+      printf("Integral %i has been calculated %i times.\n",(int) i,nacc[i]);
+      ndupl++;
+      print=1;
+    }
+    if(print) {
+      // Find out index
+      bool found=0;
+      for(size_t ii=0;ii<Nbf;ii++) {
+	for(size_t jj=0;jj<Nbf;jj++) {
+	  for(size_t kk=0;kk<Nbf;kk++) {
+	    for(size_t ll=0;ll<Nbf;ll++) {
+	      
+	      if(i==idx(ii,jj,kk,ll)) {
+		printf("It is %i %i %i %i.\n",ii,jj,kk,ll);
+		found=1;
+		break;
+	      }
+	    }
+	    
+	    if(found)
+	      break;
+	  }
+	  if(found)
+	    break;
+	}
+	if(found)
+	  break;
+      }
+      
+    }
+  }
+  
+  printf("%lu are missing and %lu are duplicates.\n", nmiss, ndupl);
+#endif
+
+#ifndef ERITABLE
+  // Compute screening efficiency
+  //  printf("Computed %lu shells, skipped %lu due to small absolute value and %lu due to small product.\n",calcd,intskip,denskip);
+
+  if(eff!=NULL) {
+    *eff=calcd*100.0/(calcd+intskip+denskip);
+  }
+#endif
+
+#ifdef CALCJ
+  return J;
+#elif defined(CALCK)
+  return K;
+#endif
+}

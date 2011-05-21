@@ -1,0 +1,80 @@
+2011-05-21
+Jussi Lehtola
+
+
+** Prerequisites **
+
+To compile ERKALE you need
+
+* The GNU Scientific Library ( http://www.gnu.org/s/gsl/ )
+* libint ( http://sourceforge.net/p/libint/home )
+* libxc ( http://www.tddft.org/programs/octopus/wiki/index.php/Libxc )
+* Armadillo ( http://arma.sourceforge.net/ )
+
+When the prerequisites are installed, compiling ERKALE should be as
+easy as running
+ $ make
+
+In addition, if you wish to create the developer documentation, you
+need a working installation of doxygen and LaTeX. The documentation
+can be created by running
+ $ make doc
+
+** Flavors of ERKALE **
+
+The compilation creates two versions of ERKALE: a serial version and
+an OpenMP parallellized version suitable for running on shared memory
+computers. The parallellization is quite trivial, but should still
+give about 80% of speedup.
+
+In addition, there are currently two flavors of executables: the
+Hartree-Fock executable 'hf.x' and the density-functional theory
+executable 'dft.x'.
+
+
+** Usage **
+
+The usage of both is the following:
+    $ hf.x/dft.x atoms.xyz basis.gbs (settings)
+in which
+   * atoms.xyz contains the system in xyz format
+   * basis.gbs is the basis set to be used in Gaussian '94 format
+   * settings is an optional Settings file; if one isn't given default
+     values are used
+
+Here is an example of an xyz file
+
+     3
+     B3LYP aug-cc-pVTZ optimized water molecule
+     O	    0.000000    0.117030    0.000000
+     H	    0.763404   -0.468123    0.000000
+     H	   -0.763404   -0.468115    0.000000
+
+A selection of commonly used basis sets is shipped alongside ERKALE.
+
+
+** Settings **
+
+ERKALE prints the settings used for the calculation, along with the
+keywords, right at the beginning.
+
+Some settings are only applicable to DFT, for instance DFT_X and DFT_C
+that specify the exchange and correlation functionals to be
+used. These can be given either directly as libxc functional numbers
+(e.g. 7 for VWN correlation), or as case-independent strings
+(lda_c_vwn for VWN correlation).
+
+To use a hybrid functional such as B3LYP, specify
+   DFT_X HYB_GGA_XC_B3LYP
+   DFT_C None
+since B3LYP already includes correlation.
+
+** Contact information **
+
+Mr Jussi Lehtola
+Department of Physics
+P. O. Box 64 (Gustaf Hällströmin katu 2) 
+FI-00014 University of Helsinki
+FINLAND
+
+jussi (dot) lehtola (at) helsinki (dot) fi

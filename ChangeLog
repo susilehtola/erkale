@@ -1,0 +1,45 @@
+2011-05-21 Jussi Lehtola
+	* Published project on Google Code.
+
+2011-05-14 Jussi Lehtola
+	* Changed header filex to use doxygen format.
+
+2011-05-11 Jussi Lehtola
+	* Rewrote DFT code to use memory more continguously by not having
+	separate objects for radial shells.
+	* Implemented meta-GGA in principle (needs debugging).
+	* Implemented Lebedev grids.
+
+2011-05-09 Jussi Lehtola
+	* Broyden mixing of density matrices leads in convergence to wrong result.
+	* Broyden mixing of Fock matrices leads in convergence to wrong result.
+	* Implemented ADIIS instead, which seems to work quite well.
+
+2011-04-27 Jussi Lehtola
+	* Implemented Broyden mixing.
+
+2011-03-31 Jussi Lehtola
+	* GGA works now.
+
+2011-03-19 Jussi Lehtola
+	* LDA DFT is now implemented.
+
+2011-03-07 Jussi Lehtola
+	* Implemented electron momentum density calculations.
+
+2011-01-10 Jussi Lehtola
+	* Implemented UHF.
+	* Implemented Settings class.
+
+2011-01-08 Jussi Lehtola
+	* Basis sets with mixed use of cartesians and spherical harmonics
+	work now.
+
+2011-01-07 Jussi Lehtola
+	* Transformation of integrals into spherical basis.
+
+2011-01-05 Jussi Lehtola
+	* Code supports Gaussian basis sets of arbitrary size.
+	* 1-electron integrals are computed with Obara-Saika routines.
+	* 2-electron integrals are computed with libint.
+	* Only RHF currently implemented.
