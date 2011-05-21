@@ -74,21 +74,21 @@ void ERIscreen::fill(const BasisSet * basisv) {
   // Allocate storage
   screen=arma::mat(Nsh,Nsh);
 
-  // Helper array
-  std::vector<double> ints;
-
   // Get list of unique shell pairs
   std::vector<shellpair_t> pairs=basp->get_unique_shellpairs();
   // Get number of shell pairs
   const size_t Npairs=pairs.size();
 
   // Loop over shell pairs
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic,1)
+#endif
   for(size_t ip=0;ip<Npairs;ip++) {
     size_t i=pairs[ip].is;
     size_t j=pairs[ip].js;
-
+    
     // Compute integrals
-    ints=basp->ERI(i,j,i,j);
+    std::vector<double> ints=basp->ERI(i,j,i,j);
     // Get maximum value
     double m=0.0;
     for(size_t k=0;k<ints.size();k++)
