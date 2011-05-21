@@ -1,0 +1,837 @@
+/* Restricted case */
+#ifdef RESTRICTED
+
+#ifdef DFT
+double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
+#else
+  double SCF::RHF(arma::mat & C, arma::vec & E)
+#endif
+
+#else
+/* Unrestricted case */
+#ifdef DFT
+  double SCF::UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, int x_func, int c_func)
+#else
+  double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb)
+#endif
+#endif
+{
+  
+  Timer t;
+  Timer ttot;
+  
+  // Amount of occupied states
+  Nel_alpha=Nel/2+mult-1;
+  Nel_beta=Nel-Nel_alpha;
+  
+#ifdef RESTRICTED
+  if(Nel_alpha!=Nel_beta) {
+    ERROR_INFO();
+    throw std::runtime_error("Refusing to perform restricted calculation with Na != Nb.\n");
+  }
+  
+  // Amount of occupied states
+  int nocc=Nel/2;
+  
+  if(verbose) {
+    printf("There are %i electrons, thus %i spatial states are occupied.\n",Nel,nocc);
+  }
+#else
+  if(verbose) {
+    printf("There are %i spin up and %i spin down electrons.\n",Nel_alpha,Nel_beta);
+  }
+#endif
+  
+  // DIIS error
+  double diiserr;
+#ifndef RESTRICTED
+  double diiserra, diiserrb;
+#endif
+  // Was DIIS succesfull?
+  bool diissucc=0;
+  
+#ifdef RESTRICTED
+  // Eigenvectors and energies
+  arma::vec en;
+  arma::mat orbs;
+  
+  // DIIS iterator
+  DIIS diis(S,diisorder);
+  
+  // ADIIS
+  ADIIS adiis;
+  // Broyden
+  Broyden broyd(Nbf*Nbf);
+  
+  // Coulomb and exchange matrices
+  arma::mat J, K;
+  // Density matrix
+  arma::mat P;
+  arma::mat Pold(Nbf,Nbf);
+  Pold.zeros();
+  
+  // Full Hamiltonian
+  arma::mat H;
+  arma::mat Hold(Nbf,Nbf);
+  Hold.zeros();
+
+  arma::mat Horth;
+#else
+  // Eigenvectors and energies
+  arma::vec ena, enb;
+  arma::mat orbsa, orbsb;
+  
+  // DIIS iterator
+  DIIS diisa(S,diisorder);
+  DIIS diisb(S,diisorder);
+
+  // Broyden
+  Broyden broyd_sum(Nbf*Nbf);
+  Broyden broyd_diff(Nbf*Nbf);
+  
+  // Coulomb and exchange matrices
+  arma::mat J;
+  arma::mat Ka, Kb;
+  // Density matrix
+  arma::mat P, Pa, Pb;
+  arma::mat Paold(Nbf,Nbf);
+  arma::mat Pbold(Nbf,Nbf);
+  Paold.zeros();
+  Pbold.zeros();
+  
+  // Full Hamiltonian
+  arma::mat Ha, Hb;
+  arma::mat Horth;
+#endif
+  
+  // Mixing factor if DIIS not used
+  double mix=INITMIX;
+  
+  // Tolerance for screening and screening efficiency
+  double tol=ROUGHTOL;
+  double screeneff;
+  
+  double Ecoul, Eh, Exc, Eone, Etot=0.0, Etote=0.0;
+  
+  // Change in energy from last iteration
+  double deltaE;
+  
+  double Ekin, Enuca;
+  double Eold=0, Eold2=0;
+  
+  // Maximum and RMS differences of AO density matrix
+  double rmsdiff=0.0, maxdiff=0.0;
+#ifndef RESTRICTED
+  double rmsdiffa=0.0, maxdiffa=0.0;
+  double rmsdiffb=0.0, maxdiffb=0.0;
+#endif
+  
+  
+#ifdef RESTRICTED
+  if(C.n_rows!=Nbf) {
+#else
+    if(Ca.n_rows!=Nbf || Cb.n_rows!=Nbf) {
+#endif
+      if(verbose) {
+	printf("\nNo input guess given, forming initial guess by diagonalizing core hamiltonian.\n");
+	t.set();
+      }
+    
+#ifdef RESTRICTED    
+      Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
+      eig_sym_ordered(en,orbs,Horth); // Solve in orthogonal basis
+    
+      // Transform back to non-orthogonal basis
+      orbs=Sinvh*orbs;
+#else
+      Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
+      eig_sym_ordered(ena,orbsa,Horth); // Solve in orthogonal basis
+    
+      // Transform back to non-orthogonal basis
+      orbsa=Sinvh*orbsa;
+
+      // Copy orbitals
+      enb=ena;
+      orbsb=orbsa;
+#endif
+
+      if(verbose)
+	printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
+    } else {
+      if(verbose)
+	printf("\nUsing input guess for orbitals.\n");
+
+#ifdef RESTRICTED
+      orbs=C;
+      en=E;
+#else
+      orbsa=Ca;
+      orbsb=Cb;
+      ena=Ea;
+      enb=Eb;
+#endif
+    }
+  
+#ifdef RESTRICTED
+    form_density(P,orbs,nocc);
+    // Closed-shell: all orbitals doubly occupied
+    P*=2.0;
+#else
+    form_density(Pa,orbsa,Nel_alpha);
+    form_density(Pb,orbsb,Nel_beta);
+    P=Pa+Pb;
+#endif
+
+#ifdef DFT
+    // Fraction of exact exchange
+    double kfrac=exact_exchange(x_func);
+
+    if(verbose) {
+      if(kfrac!=0.0)
+	printf("Using hybrid exchange with % .3f of exact exchange.\n",kfrac*100);
+      else
+	printf("A pure exchange functional used, no exact exchange.\n");
+    }
+
+    // Has grid been converged?
+    bool gridconv;
+    // Only reconverge if final tolerance (i.e. error) is smaller than
+    // initial one
+    if(dft_initialtol>dft_finaltol)
+      gridconv=0;
+    else
+      gridconv=1;
+
+    if(verbose) {
+      printf("Switching to finer grid once deltaE<%e, deltaPrms<%e and deltaPmax<%e.\n",dft_switch*deltaEmax,dft_switch*deltaPrms,dft_switch*deltaPmax);
+      printf("Creating initial DFT grid.\n");
+    }
+
+    if(verbose)
+      t.set();
+
+    DFTGrid grid(basisp,dft_direct,verbose,dft_lobatto);
+
+#ifdef RESTRICTED
+    // Exchange-correlation functional
+    arma::mat XC(Nbf,Nbf);
+    // Form DFT quadrature grid
+    grid.construct(P,dft_initialtol,x_func,c_func);
+#else
+    // Exchange-correlation functional
+    arma::mat XCa(Nbf,Nbf), XCb(Nbf,Nbf);
+    // Form DFT quadrature grid
+    grid.construct(Pa,Pb,dft_initialtol,x_func,c_func);
+#endif
+
+    if(verbose) {
+      printf("Construction of grid took %s.\n",t.elapsed().c_str());
+      printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
+      grid.print_memory_req();
+      printf("\n");
+    }
+#endif
+
+    // Loop:
+    bool converged=0;
+    for(int iiter=0;iiter<maxiter;iiter++) {
+      Timer titer;
+    
+      if(verbose) {
+	printf("\n ******* Iteration %4i ********\n",iiter);
+
+#ifdef RESTRICTED
+	printf("Energies of lowest lying states:\n");
+	print_E(nocc,en);
+#else
+	printf("Energies of lowest lying states:\n");
+	printf("alpha\n");
+	print_E(Nel_alpha,ena);
+	printf("beta\n");
+	print_E(Nel_beta,enb);
+#endif
+      }
+    
+      // Form Coulomb and exchange matrices
+#ifdef DFT
+      if(densityfit) {
+	if(verbose) {
+	  printf("\nForming density fitted Coulomb matrix ... ");
+	  fflush(stdout);
+	  t.set();
+	}
+	dfit.update_density(P);
+	J=dfit.calc_J();
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	}
+      } else {
+#endif
+	if(direct) {
+#ifdef RESTRICTED
+
+#ifdef DFT
+	  if(kfrac!=0.0) {
+#endif
+	    if(verbose) {
+	      printf("\nComputing HF Coulomb and exchange matrices on the fly ... ");
+	      fflush(stdout);
+	      t.set();
+	    }
+
+	    scr.calcJK(P,J,K,tol,&screeneff);
+#ifdef DFT
+	  } else {
+
+	    if(verbose) {
+	      printf("\nComputing HF Coulomb matrix on the fly ... ");
+	      fflush(stdout);
+	      t.set();
+	    }
+
+	    J=scr.calcJ(P,tol,&screeneff);
+	  }
+#endif
+	
+
+#else
+	  // Unrestricted case
+#ifdef DFT
+	  if(kfrac!=0.0) {
+#endif	
+	    if(verbose) {
+	      printf("\nComputing HF Coulomb and exchange matrices on the fly ... ");
+	      fflush(stdout);
+	      t.set();
+	    }
+
+	    scr.calcJK(Pa,Pb,J,Ka,Kb,tol,&screeneff);
+#ifdef DFT
+	  } else {
+
+	    if(verbose) {
+	      printf("\nComputing HF Coulomb matrix on the fly ... ");
+	      fflush(stdout);
+	      t.set();
+	    }
+
+	    J=scr.calcJ(P,tol,&screeneff);
+	  }
+#endif
+
+#endif
+	} else {
+	
+	  // Conventional mode - use tabled integrals
+
+	  if(verbose) {
+
+#ifdef DFT
+	    if(kfrac!=0.0)
+#endif
+	      printf("\nForming HF Coulomb and exchange matrices ... ");
+#ifdef DFT
+	    else
+	      printf("\nForming HF Coulomb matrix ... ");
+#endif
+
+	    fflush(stdout);
+	    t.set();
+	  }
+
+	  J=tab.calcJ(P);
+	
+#ifdef DFT
+	  if(kfrac!=0.0) {
+#endif
+	  
+#ifdef RESTRICTED
+	    K=tab.calcK(P);
+#else
+	    Ka=tab.calcK(Pa);
+	    Kb=tab.calcK(Pb);
+#endif
+
+#ifdef DFT
+	  } // End kfrac clause
+#endif
+
+	}
+
+#ifdef DFT
+      }
+#endif
+    
+    
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+#ifdef DFT
+	if(direct && !densityfit)
+#else
+	  if(direct)
+#endif
+	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+      }
+    
+    
+    
+#ifdef DFT
+    if(verbose) {
+      printf("Computing DFT exchange and correlation ... ");
+      fflush(stdout);
+      t.set();
+    }
+    
+    double Nelnum; // Numerically integrated density
+#ifdef RESTRICTED
+    grid.eval_Fxc(x_func,c_func,P,XC,Exc,Nelnum);
+#else
+    grid.eval_Fxc(x_func,c_func,Pa,Pb,XCa,XCb,Exc,Nelnum);
+#endif
+
+    double rel_diff=(Nelnum-Nel)*100.0/Nel;
+
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      printf("Numerically integrated density is %.5f (%+.4f %%).\n",Nelnum,rel_diff);
+    }
+
+    if(fabs(rel_diff)>1e-2) {
+      std::ostringstream oss;
+      //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
+      oss << "Warning - numerically integrated density seems inaccurate.\n";
+      std::cout << oss.str();
+      //      throw std::runtime_error(oss.str());
+    }
+#endif
+
+
+    // Update Hamiltonian
+#ifdef RESTRICTED    
+    Hold=H;
+#ifdef DFT
+    H=Hcore+J+XC;
+    // Add exact exchange if necessary
+    if(kfrac!=0.0)
+      H-=0.5*kfrac*K;
+#else
+
+    /*
+    // Debug - save matrices to file
+    FILE *out;
+
+    out=fopen("J.dat","w");
+    for(size_t i=0;i<J.n_rows;i++) {
+    for(size_t j=0;j<J.n_cols;j++)
+    fprintf(out," %lu\t%lu\t% e\n",i,j,J(i,j));
+    fprintf(out,"\n");
+    }
+    fclose(out);
+
+    out=fopen("P.dat","w");
+    for(size_t i=0;i<P.n_rows;i++) {
+    for(size_t j=0;j<P.n_cols;j++)
+    fprintf(out," %lu\t%lu\t% e\n",i,j,P(i,j));
+    fprintf(out,"\n");
+    }
+    fclose(out);
+
+    out=fopen("K.dat","w");
+    for(size_t i=0;i<K.n_rows;i++) {
+    for(size_t j=0;j<K.n_cols;j++)
+    fprintf(out," %lu\t%lu\t% e\n",i,j,K(i,j));
+    fprintf(out,"\n");
+    }
+    fclose(out);
+    printf("Coulomb and exchange matrices saved to J.dat and K.dat.\n");
+    */
+
+    H=Hcore+J-0.5*K;
+#endif
+
+    // Calculate energies
+    Eh=arma::trace(P*H);
+#ifdef DFT
+    if(kfrac!=0.0)
+      Exc-=0.25*kfrac*arma::trace(P*K);
+#else
+    Exc=-0.25*arma::trace(P*K);
+#endif
+
+#else
+    // Unrestricted case
+#ifdef DFT
+    Ha=Hcore+J+XCa;
+    Hb=Hcore+J+XCb;
+    if(kfrac!=0) {
+      Ha-=kfrac*Ka; 
+      Hb-=kfrac*Kb;
+    }
+#else
+    Ha=Hcore+J-Ka;
+    Hb=Hcore+J-Kb;
+#endif
+
+    // Calculate energies
+    Eh=arma::trace(Pa*Ha)+arma::trace(Pb*Hb);
+#ifdef DFT
+    if(kfrac!=0.0)
+      Exc-=0.5*kfrac*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
+#else
+    Exc=-0.5*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
+#endif
+    
+#endif // End unrestricted case
+
+    // Energies
+    Ekin=arma::trace(P*T);
+    Enuca=arma::trace(P*Vnuc);
+    Eone=arma::trace(P*Hcore);
+    Ecoul=0.5*arma::trace(P*J);
+    
+    // Compute total energies
+    Eold2=Eold;
+    Eold=Etot;
+    Etote=Ecoul+Exc+Eone;
+    Etot=Etote+Enuc;
+
+    deltaE=Etot-Eold;
+
+    // Sanity check
+    if(!std::isfinite(Etot)) {
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "\nSomething wrong with total energy " << Etot <<"?\nEnding program.\n";
+      throw std::runtime_error(oss.str());
+    }
+
+    /*    printf("Eone=%e, Ecoul=%e, Exc=%e, Etote=%e, Enuc=%e, Etot=%e.\n",Eone,Ecoul,Exc,Etote,Enuc,Etot);
+	  printf("Eh=%e, Ekin=%e, Enucatt=%e.\n",Eh,Ekin,Enuca);*/
+
+    if(dynamicmix && iiter>2)
+      update_mixing(mix,Etot,Eold,Eold2);
+
+    // Update ADIIS stacks
+    if(useadiis) {
+#ifdef RESTRICTED    
+      adiis.push(Etot,P,H);
+#else
+      throw std::runtime_error("Unrestricted ADIIS not yet implemented.\n");
+#endif
+    }
+
+    // Solve DIIS
+    if(usediis) {
+
+#ifdef RESTRICTED
+      // Update DIIS stack of matrices
+      diis.update(H,P,diiserr);
+#else
+      // Update DIIS stacks of matrices
+      diisa.update(Ha,Pa,diiserra);
+      diisb.update(Hb,Pb,diiserrb);
+      diiserr=max(diiserra,diiserrb);
+#endif
+
+      if(diiserr<diisthr) {
+	if(verbose)
+	  printf("\nUsing DIIS extrapolated Fock operator.\n");
+
+#ifdef RESTRICTED
+	// Solve new matrix
+	diis.solve(H,diis_c1);
+#else
+        // Solve new matrices
+	diisa.solve(Ha,diis_c1);
+        diisb.solve(Hb,diis_c1);
+#endif
+	
+	diissucc=1;
+      } else {
+        if(verbose)
+          printf("\nDIIS error too large, not using DIIS extrapolation.\n");
+	diissucc=0;
+      }
+    }
+
+    // Perform ADIIS interpolation
+    if(useadiis && ((usediis && !diissucc) || !usediis)) {
+      
+      if(verbose) {
+	printf("Using ADIIS interpolated Fock operator.\n");
+      }
+      
+      diissucc=1;
+#ifdef RESTRICTED
+      H=adiis.get_H();
+#else
+      // TODO - FIXME
+#endif
+    }
+
+    if(iiter>1 && usebroyden) {
+#ifdef RESTRICTED
+      // Update Broyden mixer
+      broyd.push_x(MatToVec(Hold));
+      broyd.push_f(MatToVec(Hold-H));
+      // Update Hamiltonian
+      H=VecToMat(broyd.update_x(),Nbf,Nbf);
+#else
+      // TODO - FIXME
+#endif
+    }
+
+    if(direct) {
+      // Determine wanted accuracy for integrals
+      
+      if(fabs(deltaE)<1e-2) {
+	// Rough convergence reached, so we can increase integral accuracy
+	tol=min(fabs(deltaE)*1e-2,1e-9);
+      }
+      
+      if(verbose)
+	printf("Screening integrals with tolerance %.3e.\n",tol);
+    }
+    
+    if(verbose) {
+      printf("\nEnergy:\telectronic\ttotal\t\tvirial\t\tchange\n");
+      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",Etote,Etot,-Etot/Ekin,deltaE);
+
+      printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tXC\n");
+      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% 08.8f\n",Ekin,Enuca,Ecoul,Exc);
+
+#ifdef RESTRICTED
+      if(usediis) {
+	printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
+	printf("\t% e\t% e\t% e\n",maxdiff,rmsdiff,diiserr);
+      } else {
+	printf("Errors:\tMax dens\tRMS dens\n");
+	printf("\t% e\t% e\n",maxdiff,rmsdiff);
+      }
+#else
+      if(usediis) {
+        printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
+        printf("alpha\t%e\t%e\t%e\n",maxdiffa,rmsdiffa,diiserra);
+        printf("beta\t%e\t%e\t%e\n",maxdiffb,rmsdiffb,diiserrb);
+      } else {
+        printf("Errors:\tMax dens\tRMS dens\n");
+        printf("alpha\t%e\t%e\n",maxdiffa,rmsdiffa);
+        printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
+      }
+#endif
+    }
+
+    // Solve FC=ESC
+    if(verbose) {
+      printf("\nSolving SCF equations ... ");
+      fflush(stdout);
+      t.set();
+    }
+
+#ifdef RESTRICTED
+    // Transform Hamiltonian into orthogonal basis
+    Horth=arma::trans(Sinvh)*H*Sinvh;
+    // Update orbitals and energies
+    eig_sym_ordered(en,orbs,Horth);
+    // Transform back to non-orthogonal basis
+    orbs=Sinvh*orbs;
+#else
+    Horth=trans(Sinvh)*Ha*Sinvh;
+    eig_sym_ordered(ena,orbsa,Horth);
+    orbsa=Sinvh*orbsa;
+
+    Horth=trans(Sinvh)*Hb*Sinvh;
+    eig_sym_ordered(enb,orbsb,Horth);
+    orbsb=Sinvh*orbsb;
+#endif
+
+    if(verbose)
+      printf("done (%s)\n",t.elapsed().c_str());
+
+#ifdef RESTRICTED
+    // Form new density matrix
+    form_density(P,orbs,nocc);
+    // All orbitals are doubly occupied
+    P*=2.0;
+#else
+    form_density(Pa,orbsa,Nel_alpha);
+    form_density(Pb,orbsb,Nel_beta);
+    P=Pa+Pb;
+#endif
+
+    // Compute convergence criteria
+#ifdef RESTRICTED
+    maxdiff=max_diff(P,Pold);
+    rmsdiff=rms_diff(P,Pold);
+#else
+    maxdiffa=max_diff(Pa,Paold);
+    maxdiffb=max_diff(Pb,Pbold);
+
+    rmsdiffa=rms_diff(Pa,Paold);
+    rmsdiffb=rms_diff(Pb,Pbold);
+
+    maxdiff=max(maxdiffa,maxdiffb);
+    rmsdiff=max(rmsdiffa,rmsdiffb);
+    //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
+#endif
+
+    
+    if(!mixdensity || (mixdensity && mix==1.0)) {
+      
+#ifdef DFT
+      // Check whether to converge grid
+      if(!gridconv) {
+	if(fabs(deltaE)<dft_switch*deltaEmax && maxdiff<dft_switch*deltaPmax && rmsdiff<dft_switch*deltaPrms) {
+
+	  // Reconverge grid
+	  if(verbose) {
+	    printf("\nInitial convergence achieved.\n");
+	    const char *fmt="%20s:\t% e < %e\n"; // Format to print in
+	    printf(fmt,"deltaE",deltaE,dft_switch*deltaEmax);
+	    printf(fmt,"deltaPrms",rmsdiff,dft_switch*deltaPrms);
+	    printf(fmt,"deltaPmax",maxdiff,dft_switch*deltaPmax);
+	    printf("\nRecreating DFT grid.\n");
+	    t.set();
+	  }
+	  
+#if RESTRICTED          
+	  grid.construct(P,dft_finaltol,x_func,c_func);
+#else
+	  grid.construct(Pa,Pb,dft_finaltol,x_func,c_func);
+#endif
+	  gridconv=1;
+          
+	  if(verbose) {
+	    printf("Reconstruction of grid took %s.\n",t.elapsed().c_str());
+	    printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
+	    grid.print_memory_req();
+	    printf("\n");
+	  }
+
+	  // Accuracy of Fock matrices is changed, clear accelerators.
+	  if(usediis) {
+#ifdef RESTRICTED
+	    diis.clear();
+#else
+	    diisa.clear();
+	    diisb.clear();
+#endif
+	    printf("DIIS stack cleared due to change of precision.\n");
+	  }
+
+	  if(useadiis) {
+#ifdef RESTRICTED
+	    adiis.clear();
+#else
+	    // TODO - FIXME
+#endif
+	    printf("ADIIS stack cleared due to change of precision.\n");
+	  }
+	    
+	}
+      } else {
+	// Grid has been converged, check if final convergence has
+	// been achieved
+#endif
+	
+	if(fabs(deltaE)<deltaEmax && maxdiff<deltaPmax && rmsdiff<deltaPrms) {
+
+	  if(usebroyden) {
+	    printf("\nConvergence seems to have been achieved. Turning off Broyden mixing.\n");
+	    usebroyden=0;
+	    continue;
+	  }
+	  
+	  if(verbose) {
+	    printf("\nIteration took %s.",titer.elapsed().c_str());
+
+	    printf("\nConvergence achieved:\n");
+	    const char *fmt="%20s:\t% e < %e\n"; // Format to print in
+	    printf(fmt,"deltaE",deltaE,deltaEmax);
+	    printf(fmt,"deltaPrms",rmsdiff,deltaPrms);
+	    printf(fmt,"deltaPmax",maxdiff,deltaPmax);
+	  }
+	  converged=1;
+	  break;
+	} 
+#ifdef DFT
+      } // End grid convergence clause
+#endif
+    } // End convergence check clause
+
+    if(mixdensity) {
+      if(verbose)
+	printf("Mixing density matrices with mixing factor %g.\n",mix);
+      
+#ifdef RESTRICTED      
+      arma::mat Pnew=(1.0-mix)*Pold+mix*P;
+#else
+      arma::mat Panew=(1.0-mix)*Paold+mix*Pa;
+      arma::mat Pbnew=(1.0-mix)*Pbold+mix*Pb;
+      arma::mat Pnew;
+#endif
+    
+#ifdef RESTRICTED
+      // Save old density matrix
+      Pold=P;
+      // Update density matrix
+      P=Pnew;
+#else
+      Paold=Pa;
+      Pbold=Pb;
+      Pa=Panew;
+      Pb=Pbnew;
+#endif
+    } else {
+#ifdef RESTRICTED
+      // Save old density matrix
+      Pold=P;
+#else
+      Paold=Pa;
+      Pbold=Pb;
+#endif
+    }
+  
+    if(verbose)
+      printf("\nIteration took %s.\n",titer.elapsed().c_str());
+  } // End SCF cycle
+  
+#ifdef RESTRICTED  
+  C=orbs;
+  E=en;
+
+  if(converged) {
+#ifdef DFT 
+    if(verbose)
+      printf("Solution of RDFT took %s.\n",ttot.elapsed().c_str());
+#else
+    if(verbose)
+      printf("Solution of RHF took %s.\n",ttot.elapsed().c_str());
+#endif
+  } else {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "\nSCF did not converge in "<<maxiter<<" iterations!\n";
+    throw std::runtime_error(oss.str());
+  }
+  
+#else
+  // Unrestricted case
+  Ca=orbsa;
+  Cb=orbsb;
+  Ea=ena;
+  Eb=enb;
+  
+#ifdef DFT 
+  if(verbose)
+    printf("Solution of UDFT took %s.\n",ttot.elapsed().c_str());
+#else
+  if(verbose)
+    printf("Solution of UHF took %s.\n",ttot.elapsed().c_str());
+#endif
+  
+#endif // End unrestricted case
+  
+  return Etot;
+}
+  
