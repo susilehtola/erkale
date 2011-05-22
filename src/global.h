@@ -61,9 +61,7 @@
  * - <a href="http://sourceforge.net/p/libint/home">libint</a>
  * - <a href="http://www.tddft.org/programs/octopus/wiki/index.php/Libxc">libxc</a>
  * - <a href="http://arma.sourceforge.net/">Armadillo</a>
- * 
- * When these are available, compiling ERKALE should be as easy as
- * running make.
+ * and a LAPACK library. See the INSTALL document for more information.
  *
  * \author Jussi Lehtola
  * \date 2011/05/14 19:11
