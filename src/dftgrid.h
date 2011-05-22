@@ -96,7 +96,10 @@ int SG1_order(double r, int Z);
  * theory calculations.
  *
  * The actual values of exchange-correlation functionals are computed
- * by libxc.
+ * by libxc. The Fock matrix is formed as described in
+ * J. A. Pople, P. M. W. Gill and B. G. Johnson, "Kohn-Sham
+ * density-functional theory within a finite basis set",
+ * Chem. Phys. Lett. 199 (1992), pp. 557 - 560.
  *
  * For speed and to guarantee the accuracy of the results, the
  * integration grid is formed adaptively as described in 
