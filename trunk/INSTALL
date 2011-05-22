@@ -11,6 +11,9 @@ To compile ERKALE you need
 * libxc ( http://www.tddft.org/programs/octopus/wiki/index.php/Libxc )
 * Armadillo ( http://arma.sourceforge.net/ )
 
+Naturally, you also need a decent LAPACK library installed. The use of
+an optimized library such as ATLAS, Intel MKL or AMD ACML is recommended.
+
 When the prerequisites are installed, compiling ERKALE should be as
 easy as running
  $ make
