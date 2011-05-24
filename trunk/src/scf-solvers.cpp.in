@@ -776,7 +776,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #else
       arma::mat Panew=(1.0-mix)*Paold+mix*Pa;
       arma::mat Pbnew=(1.0-mix)*Pbold+mix*Pb;
-      arma::mat Pnew;
+      arma::mat Pnew=Panew+Pbnew;
 #endif
     
 #ifdef RESTRICTED
@@ -789,6 +789,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
       Pbold=Pb;
       Pa=Panew;
       Pb=Pbnew;
+      P=Pa+Pb;
 #endif
     } else {
 #ifdef RESTRICTED
