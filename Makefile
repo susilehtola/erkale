@@ -39,7 +39,6 @@ LIBERKALE_EMD=$(LIBERKALE_EMD_STATIC)
 
 HF=hf.x
 DFT=dft.x
-BASGEN=basgen.x
 SLATER=slaterfit.x
 
 $(HF):		hf.o $(LIBERKALE) $(LIBERKALE_EMD)
@@ -50,16 +49,12 @@ $(DFT):	dft.o $(LIBERKALE) $(LIBERKALE_EMD)
 #	$(CXX) $(CXXFLAGS) $(LDFLAGS) -lerkale -o $(DFT) dft.o 
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(DFT) dft.o liberkale.a liberkale_emd.a
 
-$(BASGEN):	optimize_basis.o $(LIBERKALE) tempered.o
-#	$(CXX) $(CXXFLAGS) $(LDFLAGS) -lerkale -o $(BASGEN) optimize_basis.o 
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BASGEN) optimize_basis.o liberkale.a tempered.o
-
 $(SLATER):	form_exponents.o solve_coefficients.o tempered.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(SLATER) form_exponents.o solve_coefficients.o tempered.o
 
-EXEOBJS=hf.o dft.o optimize_basis.o
+EXEOBJS=hf.o dft.o
 
-OBJS=basis.o basislibrary.o stringutil.o mathf.o integrals.o eritable.o eriscreen.o timer.o linalg.o obara-saika.o solidharmonics.o diis.o scf.o elements.o xyzutils.o settings.o lobatto.o dftgrid.o dftfuncs.o chebyshev.o density_fitting.o broyden.o adiis.o lebedev.o
+OBJS=basis.o basislibrary.o stringutil.o mathf.o integrals.o eritable.o eriscreen.o timer.o linalg.o obara-saika.o solidharmonics.o diis.o scf.o elements.o xyzutils.o settings.o lobatto.o dftgrid.o dftfuncs.o chebyshev.o density_fitting.o broyden.o adiis.o lebedev.o tempered.o
 
 EMDOBJS=complex.o emd.o gto_fourier.o spherical_expansion.o spherical_harmonics.o
 
