@@ -22,8 +22,8 @@
  * 
  * This class contains a Broyden convergence accelerator, as described in
  *
- * K. Baarman, T. Eirola and V. Havu, Robust acceleration of self
- * consistent field calculations for density functional theory
+ * K. Baarman, T. Eirola and V. Havu, "Robust acceleration of self
+ * consistent field calculations for density functional theory",
  * J. Chem. Phys. 134 (2011), 134109.
  *
  * The dimension of the problem is Nbas^2. The jacobian would thus be
