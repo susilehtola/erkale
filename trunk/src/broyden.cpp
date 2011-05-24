@@ -42,10 +42,10 @@ void Broyden::push_f(const arma::vec & fv) {
     double oldnorm=norm(f[f.size()-2],2);
 
     if( newnorm > oldnorm) {
-      printf("\nBad update detected - norm increased by %e from %e to %e.\nFalling back to older solution.\n",newnorm-oldnorm,oldnorm,newnorm);
+      printf("Bad update detected: norm increased by %e from %e to %e.\n",newnorm-oldnorm,oldnorm,newnorm);
       
-      x.erase(x.begin()+x.size()-1);
-      f.erase(f.begin()+f.size()-1);
+      //      x.erase(x.begin()+x.size()-1);
+      //      f.erase(f.begin()+f.size()-1);
       difficult=1;
     }
   }
@@ -69,8 +69,14 @@ arma::vec Broyden::update_x() {
   }
 
   // Compute approximate solution
-  // \tilde{x}_{k+1} = x_k - G_k f_k
-  arma::vec xtilde=x[x.size()-1]-operate_G(f[f.size()-1],f.size()-1);
+  // \tilde{x}_{k+1}
+  arma::vec xtilde;
+  if(!difficult)
+    // Normal case: \tilde{x}_{k+1} = x_k - G_k f_k
+    xtilde=x[x.size()-1] - operate_G(f[f.size()-1],f.size()-1);
+  else
+    // Difficult case: \tilde{x}_{k+1} = x_{k-1} - G_k f_{k-1}
+    xtilde=x[x.size()-2] - operate_G(f[f.size()-2],f.size()-1);
 
   // and damp it with
   // x_{k+1} = (1-\beta) x_k + \beta \tilde{x}_{k+1}
@@ -78,7 +84,7 @@ arma::vec Broyden::update_x() {
     return (1.0-beta)*x[x.size()-1] + beta*xtilde;
   else {
     difficult=0;
-    return (1.0-0.5*beta)*x[x.size()-1] + 0.5*beta*xtilde;
+    return (1.0-0.5*beta)*x[x.size()-2] + 0.5*beta*xtilde;
   }
 }
 
@@ -98,4 +104,9 @@ arma::vec Broyden::operate_G(const arma::vec & v, size_t ind) const {
 
     return xnm1*fv/fnm1sq + operate_G(Garg,ind-1);
   }
+}
+
+void Broyden::clear() {
+  x.clear();
+  f.clear();
 }

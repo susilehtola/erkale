@@ -569,18 +569,6 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #endif
     }
 
-    if(iiter>1 && usebroyden) {
-#ifdef RESTRICTED
-      // Update Broyden mixer
-      broyd.push_x(MatToVec(Hold));
-      broyd.push_f(MatToVec(Hold-H));
-      // Update Hamiltonian
-      H=VecToMat(broyd.update_x(),Nbf,Nbf);
-#else
-      // TODO - FIXME
-#endif
-    }
-
     if(direct) {
       // Determine wanted accuracy for integrals
       
@@ -675,6 +663,41 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
     //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
 #endif
 
+
+    if(usebroyden) {
+#ifdef RESTRICTED
+      // Update Broyden mixer
+      broyd.push_x(MatToVec(Pold));
+      broyd.push_f(MatToVec(Pold-P));
+      // Update Hamiltonian
+      P=VecToMat(broyd.update_x(),Nbf,Nbf);
+#else
+      // Compute sum and difference
+      arma::mat Ps=Pa+Pb;
+      arma::mat Pd=Pa-Pb;
+
+      arma::mat Psold=Paold+Pbold;
+      arma::mat Pdold=Paold-Pbold;
+
+      // Update Broyden mixers
+      broyd_sum.push_x(MatToVec(Ps));
+      broyd_sum.push_f(MatToVec(Psold));
+      Ps=VecToMat(broyd_sum.update_x(),Nbf,Nbf);
+
+      broyd_diff.push_x(MatToVec(Pd));
+      broyd_diff.push_f(MatToVec(Pdold));
+      Pd=VecToMat(broyd_diff.update_x(),Nbf,Nbf);
+
+      // Update density matrices
+      Pa=0.5*(Ps+Pd);
+      Pb=0.5*(Ps-Pd);
+      P=Pa+Pb;
+#endif
+
+      if(verbose)
+	printf("Broyden mixing of density matrices performed.\n");
+    }
+
     
     if(!mixdensity || (mixdensity && mix==1.0)) {
       
@@ -726,6 +749,17 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	    // TODO - FIXME
 #endif
 	    printf("ADIIS stack cleared due to change of precision.\n");
+	  }
+
+	  if(usebroyden) {
+#ifdef RESTRICTED
+	    broyd.clear();
+#else
+	    broyd_sum.clear();
+	    broyd_diff.clear();
+#endif
+
+	    printf("Broyden stack cleared due to change of precision.\n");
 	  }
 	    
 	}

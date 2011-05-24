@@ -72,7 +72,7 @@ class Broyden {
   void push_f(const arma::vec & f);
 
   /// Clean old matrices from memory
-  void clean();
+  void clear();
 
   /// Get estimate for solution
   arma::vec update_x();
