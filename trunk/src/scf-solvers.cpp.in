@@ -67,14 +67,17 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
   arma::mat J, K;
   // Density matrix
   arma::mat P;
+  // Density matrix of last iteration
   arma::mat Pold(Nbf,Nbf);
   Pold.zeros();
   
   // Full Hamiltonian
   arma::mat H;
+  // Hamiltonian of last iteration
   arma::mat Hold(Nbf,Nbf);
   Hold.zeros();
 
+  // Hamiltonian in orthogonal basis
   arma::mat Horth;
 #else
   // Eigenvectors and energies
@@ -101,6 +104,12 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
   
   // Full Hamiltonian
   arma::mat Ha, Hb;
+
+  // Hamiltonians of last iteration
+  arma::mat Haold(Nbf,Nbf), Hbold(Nbf,Nbf);
+  Haold.zeros();
+  Hbold.zeros();
+
   arma::mat Horth;
 #endif
   
@@ -409,78 +418,43 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
     // Update Hamiltonian
 #ifdef RESTRICTED    
     Hold=H;
+
 #ifdef DFT
     H=Hcore+J+XC;
     // Add exact exchange if necessary
-    if(kfrac!=0.0)
+    if(kfrac!=0.0) {
       H-=0.5*kfrac*K;
-#else
-
-    /*
-    // Debug - save matrices to file
-    FILE *out;
-
-    out=fopen("J.dat","w");
-    for(size_t i=0;i<J.n_rows;i++) {
-    for(size_t j=0;j<J.n_cols;j++)
-    fprintf(out," %lu\t%lu\t% e\n",i,j,J(i,j));
-    fprintf(out,"\n");
-    }
-    fclose(out);
-
-    out=fopen("P.dat","w");
-    for(size_t i=0;i<P.n_rows;i++) {
-    for(size_t j=0;j<P.n_cols;j++)
-    fprintf(out," %lu\t%lu\t% e\n",i,j,P(i,j));
-    fprintf(out,"\n");
-    }
-    fclose(out);
-
-    out=fopen("K.dat","w");
-    for(size_t i=0;i<K.n_rows;i++) {
-    for(size_t j=0;j<K.n_cols;j++)
-    fprintf(out," %lu\t%lu\t% e\n",i,j,K(i,j));
-    fprintf(out,"\n");
-    }
-    fclose(out);
-    printf("Coulomb and exchange matrices saved to J.dat and K.dat.\n");
-    */
-
-    H=Hcore+J-0.5*K;
-#endif
-
-    // Calculate energies
-    Eh=arma::trace(P*H);
-#ifdef DFT
-    if(kfrac!=0.0)
       Exc-=0.25*kfrac*arma::trace(P*K);
+    }
 #else
+    H=Hcore+J-0.5*K;
     Exc=-0.25*arma::trace(P*K);
 #endif
+    // Calculate energies
+    Eh=arma::trace(P*H);
 
-#else
-    // Unrestricted case
+#else // Unrestricted case
+
+    // Store Hamiltonians of last iteration
+    Haold=Ha;
+    Hbold=Hb;
+
 #ifdef DFT
     Ha=Hcore+J+XCa;
     Hb=Hcore+J+XCb;
     if(kfrac!=0) {
-      Ha-=kfrac*Ka; 
+      Ha-=kfrac*Ka;
       Hb-=kfrac*Kb;
+      Exc-=0.5*kfrac*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
     }
 #else
     Ha=Hcore+J-Ka;
     Hb=Hcore+J-Kb;
+    Exc=-0.5*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
 #endif
 
     // Calculate energies
     Eh=arma::trace(Pa*Ha)+arma::trace(Pb*Hb);
-#ifdef DFT
-    if(kfrac!=0.0)
-      Exc-=0.5*kfrac*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
-#else
-    Exc=-0.5*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
-#endif
-    
 #endif // End unrestricted case
 
     // Energies
@@ -519,6 +493,41 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
       throw std::runtime_error("Unrestricted ADIIS not yet implemented.\n");
 #endif
     }
+
+    if(iiter>0 && usebroyden) {
+#ifdef RESTRICTED
+      // Update Broyden mixer
+      broyd.push_x(MatToVec(Hold));
+      broyd.push_f(MatToVec(Hold-H));
+      // Update Hamiltonian
+      H=VecToMat(broyd.update_x(),Nbf,Nbf);
+#else
+      // Compute sum and difference
+      arma::mat Hs=Ha+Hb;
+      arma::mat Hd=Ha-Hb;
+
+      arma::mat Hsold=Haold+Hbold;
+      arma::mat Hdold=Haold-Hbold;
+
+      // Update Broyden mixers
+      broyd_sum.push_x(MatToVec(Hs));
+      broyd_sum.push_f(MatToVec(Hsold));
+      Hs=VecToMat(broyd_sum.update_x(),Nbf,Nbf);
+
+      broyd_diff.push_x(MatToVec(Hd));
+      broyd_diff.push_f(MatToVec(Hdold));
+      Hd=VecToMat(broyd_diff.update_x(),Nbf,Nbf);
+
+      // Update Hamiltonians
+      Ha=0.5*(Hs+Hd);
+      Hb=0.5*(Hs-Hd);
+#endif
+
+      if(verbose)
+	printf("Broyden update of Fock operator performed.\n");
+    }
+
+
 
     // Solve DIIS
     if(usediis) {
@@ -662,41 +671,6 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
     rmsdiff=max(rmsdiffa,rmsdiffb);
     //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
 #endif
-
-
-    if(usebroyden) {
-#ifdef RESTRICTED
-      // Update Broyden mixer
-      broyd.push_x(MatToVec(Pold));
-      broyd.push_f(MatToVec(Pold-P));
-      // Update Hamiltonian
-      P=VecToMat(broyd.update_x(),Nbf,Nbf);
-#else
-      // Compute sum and difference
-      arma::mat Ps=Pa+Pb;
-      arma::mat Pd=Pa-Pb;
-
-      arma::mat Psold=Paold+Pbold;
-      arma::mat Pdold=Paold-Pbold;
-
-      // Update Broyden mixers
-      broyd_sum.push_x(MatToVec(Ps));
-      broyd_sum.push_f(MatToVec(Psold));
-      Ps=VecToMat(broyd_sum.update_x(),Nbf,Nbf);
-
-      broyd_diff.push_x(MatToVec(Pd));
-      broyd_diff.push_f(MatToVec(Pdold));
-      Pd=VecToMat(broyd_diff.update_x(),Nbf,Nbf);
-
-      // Update density matrices
-      Pa=0.5*(Ps+Pd);
-      Pb=0.5*(Ps-Pd);
-      P=Pa+Pb;
-#endif
-
-      if(verbose)
-	printf("Broyden mixing of density matrices performed.\n");
-    }
 
     
     if(!mixdensity || (mixdensity && mix==1.0)) {
