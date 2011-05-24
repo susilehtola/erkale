@@ -81,7 +81,7 @@ scf.o:	scf-base.cpp scf-solvers.cpp.in
 
 eritable.o:	eritable-base.cpp eri-routines.cpp.in eri-routines-increment.cpp.in
 	cat ../src/eritable-base.cpp > eritable.cpp
-	$(CPP) -E $(INCLUDE) -x c++ -DERITABLE ../src/eri-routines.cpp.in >> eritable.cpp
+	$(CPP) -E $(INCLUDE) $(OMP) -x c++ -DERITABLE ../src/eri-routines.cpp.in >> eritable.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDE) -c eritable.cpp -o eritable.o
 	#\rm eritable.cpp
 
