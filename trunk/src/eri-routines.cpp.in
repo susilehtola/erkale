@@ -128,7 +128,12 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 
   // Loop over first pairs
 #ifdef _OPENMP
+
+#ifdef ERITABLE
+#pragma omp parallel
+#else
 #pragma omp parallel reduction(+:calcd,intskip,denskip)
+#endif
   {
     /*
     if(omp_get_thread_num()==0)
