@@ -29,9 +29,9 @@
  * \brief This class contains the ADIIS convergence accelerator.
  *
  * The ADIIS algorithm is described in
- * X. Hu and W. Yang, Accelerating self-consistent field convergence
- * with the augmented Roothaan–Hall energy function,
- * J. Chem. Phys. 132 (2010, 054109.
+ * X. Hu and W. Yang, "Accelerating self-consistent field convergence
+ * with the augmented Roothaan–Hall energy function",
+ * J. Chem. Phys. 132 (2010), 054109.
  *
  * \author Jussi Lehtola
  * \date 2011/05/08 19:32
