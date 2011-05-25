@@ -147,7 +147,7 @@ std::vector<FunctionShell> ElementBasisSet::get_shells() const {
   return bf;
 }
 
-void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am) {
+void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am) const {
   // Count number of exponents and shells that have angular momentum am
   int nsh=0;
   // Clear current exponents
@@ -179,10 +179,11 @@ void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coe
 
   // Allocate returned contractions
   coeffs=arma::mat(exps.size(),nsh);
-  int iish=0;
 
-  // Collect contraction coefficients
-  for(size_t iexp=0;iexp<exps.size();iexp++)
+  // Collect contraction coefficients. Loop over exponents
+  for(size_t iexp=0;iexp<exps.size();iexp++) {
+    int iish=0;
+    // Loop over shells
     for(size_t ish=0;ish<bf.size();ish++)
       if(bf[ish].get_am()==am) {
 
@@ -197,7 +198,7 @@ void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coe
 	    // Found exponent!
 	    found=1;
 	    // Store contraction coefficient.
-	    coeffs(iexp,iish)=shc[iexp];
+	    coeffs(iexp,iish)=shc[i];
 	    // Exit for loop
 	    break;
 	  }
@@ -209,6 +210,7 @@ void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coe
 	// Increment shell index
 	iish++;
       }
+  }
 }
 
 int ElementBasisSet::get_max_am() const {
