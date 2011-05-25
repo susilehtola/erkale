@@ -93,6 +93,14 @@ int FunctionShell::get_am() const {
   return am;
 }
 
+std::vector<double> FunctionShell::get_exps() const {
+  return z;
+}
+
+std::vector<double> FunctionShell::get_contr() const {
+  return C;
+}
+
 ElementBasisSet::ElementBasisSet() {
 }
 
@@ -133,6 +141,74 @@ bool ElementBasisSet::operator<(const ElementBasisSet &rhs) const {
 
 size_t ElementBasisSet::get_Nshells() const {
   return bf.size();
+}
+
+std::vector<FunctionShell> ElementBasisSet::get_shells() const {
+  return bf;
+}
+
+void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am) {
+  // Count number of exponents and shells that have angular momentum am
+  int nsh=0;
+  // Clear current exponents
+  exps.clear();
+  
+  for(size_t ish=0;ish<bf.size();ish++)
+    if(bf[ish].get_am()==am) {
+      // Increment number of shells
+      nsh++;
+
+      // Get exponents on shell
+      std::vector<double> shexp=bf[ish].get_exps();
+
+      // Loop over exponents
+      for(size_t iexp=0;iexp<shexp.size();iexp++) {
+	// First, check if exponent is already on list
+	bool found=0;
+	for(size_t i=0;i<exps.size();i++)
+	  if(exps[i]==shexp[iexp]) {
+	    found=1;
+	    break;
+	  }
+	
+	// If exponent was not found, add it to the list.
+	if(!found)
+	  exps.push_back(shexp[iexp]);
+      }
+    }
+
+  // Allocate returned contractions
+  coeffs=arma::mat(exps.size(),nsh);
+  int iish=0;
+
+  // Collect contraction coefficients
+  for(size_t iexp=0;iexp<exps.size();iexp++)
+    for(size_t ish=0;ish<bf.size();ish++)
+      if(bf[ish].get_am()==am) {
+
+	// Get exponents and contraction on shell
+	std::vector<double> shexp=bf[ish].get_exps();
+	std::vector<double> shc=bf[ish].get_contr();
+
+	// Find current exponent
+	bool found=0;
+	for(size_t i=0;i<shexp.size();i++)
+	  if(shexp[i]==exps[iexp]) {
+	    // Found exponent!
+	    found=1;
+	    // Store contraction coefficient.
+	    coeffs(iexp,iish)=shc[iexp];
+	    // Exit for loop
+	    break;
+	  }
+
+	if(!found)
+	  // Exponent not used on this shell.
+	  coeffs(iexp,iish)=0.0;
+
+	// Increment shell index
+	iish++;
+      }
 }
 
 int ElementBasisSet::get_max_am() const {
