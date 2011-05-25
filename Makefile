@@ -26,7 +26,7 @@ dirs:
 	-mkdir build-ser build-par
 
 execs:	$(OBJS) $(EXEOBJS) $(EMDOBJS)
-	+make -f ../Makefile $(HF) $(DFT) $(BASGEN) $(SLATER)
+	+make -f ../Makefile $(HF) $(DFT) $(BASGEN) $(SLATER) $(COPROF)
 
 LIBERKALE_SHARED=liberkale.so
 LIBERKALE_EMD_SHARED=liberkale_emd.so
@@ -39,6 +39,7 @@ LIBERKALE_EMD=$(LIBERKALE_EMD_STATIC)
 
 HF=hf.x
 DFT=dft.x
+COPROF=coprof.x
 SLATER=slaterfit.x
 
 $(HF):		hf.o $(LIBERKALE) $(LIBERKALE_EMD)
@@ -52,9 +53,12 @@ $(DFT):	dft.o $(LIBERKALE) $(LIBERKALE_EMD)
 $(SLATER):	form_exponents.o solve_coefficients.o tempered.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(SLATER) form_exponents.o solve_coefficients.o tempered.o
 
-EXEOBJS=hf.o dft.o
+$(COPROF):	print_completeness.o $(LIBERKALE)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(COPROF) print_completeness.o liberkale.a
 
-OBJS=basis.o basislibrary.o stringutil.o mathf.o integrals.o eritable.o eriscreen.o timer.o linalg.o obara-saika.o solidharmonics.o diis.o scf.o elements.o xyzutils.o settings.o lobatto.o dftgrid.o dftfuncs.o chebyshev.o density_fitting.o broyden.o adiis.o lebedev.o tempered.o
+EXEOBJS=hf.o dft.o print_completeness.o
+
+OBJS=basis.o basislibrary.o stringutil.o mathf.o integrals.o eritable.o eriscreen.o timer.o linalg.o obara-saika.o solidharmonics.o diis.o scf.o elements.o xyzutils.o settings.o lobatto.o dftgrid.o dftfuncs.o chebyshev.o density_fitting.o broyden.o adiis.o lebedev.o tempered.o completeness_profile.o
 
 EMDOBJS=complex.o emd.o gto_fourier.o spherical_expansion.o spherical_harmonics.o
 
@@ -98,7 +102,7 @@ clean:
 	rm -f build-ser/* build-par/*
 
 # Look for source in
-VPATH=../src ../src/emd ../src/slaterfit
+VPATH=../src ../src/emd ../src/slaterfit ../src/completeness
 
 # Compilation rules
 %.o: %.c %.h

@@ -124,7 +124,7 @@ class ElementBasisSet {
   std::vector<FunctionShell> get_shells() const;  
 
   /// Get exponents and contraction coefficients of angular momentum shell am
-  void get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am);
+  void get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am) const;
 
   /// Get maximum angular momentum used in the shells
   int get_max_am() const;
