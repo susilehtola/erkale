@@ -20,6 +20,7 @@
 #ifndef ERKALE_BASISLIB
 #define ERKALE_BASISLIB
 
+#include <armadillo>
 #include <vector>
 #include <string>
 
@@ -62,6 +63,11 @@ class FunctionShell {
 
   /// Get angular momentum
   int get_am() const;
+
+  /// Get exponents
+  std::vector<double> get_exps() const;
+  /// Get contraction coefficients
+  std::vector<double> get_contr() const;
 
   /// Sort exponents in decreasing order
   void sort();
@@ -114,6 +120,11 @@ class ElementBasisSet {
 
   /// Get number of shells
   size_t get_Nshells() const;
+  /// Get the shells
+  std::vector<FunctionShell> get_shells() const;  
+
+  /// Get exponents and contraction coefficients of angular momentum shell am
+  void get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am);
 
   /// Get maximum angular momentum used in the shells
   int get_max_am() const;
