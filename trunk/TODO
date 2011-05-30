@@ -1,0 +1,18 @@
+30 May 2011
+
+* Rewrite the SCF solver in a clearer, more object-oriented form.
+
+* Speed up direct computation of Coulomb and exchange by only computing differences.
+
+* Debug meta-GGA & meta-GGA functionals (in collaboration with libxc upstream).
+
+* Speed up ERI computation by precomputing shell pair data.
+
+* Add failsafes to settings, e.g., thresholds must be positive.
+
+* Implement ROHF.
+
+* Implement possibility to use mixed basis sets (e.g. use a larger basis set for a single atom in a calculation)
+
+* Implement checkpointing / saving of results.
+
