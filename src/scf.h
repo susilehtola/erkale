@@ -100,9 +100,6 @@ class SCF {
   /// Dynamically change mixing factor?
   bool dynamicmix;
 
-  /// Purify density matrix?
-  bool purifydensity;
-
   /// Convergence criterion for change of energy
   double deltaEmax;
   /// Convergence criterion for maximum change of an element of the density matrix

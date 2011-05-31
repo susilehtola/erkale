@@ -70,8 +70,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
   mixdensity=set.get_bool("MixDensity");
   dynamicmix=set.get_bool("DynamicMixing");
   
-  purifydensity=set.get_bool("PurifyDensity");
-
   // Check update scheme
   if((usediis || useadiis) && usebroyden) {
     ERROR_INFO();
