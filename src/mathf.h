@@ -45,11 +45,6 @@ double choose(int m, int n);
 /// Find index of basis function with indices l, m, n
 int getind(int l, int m, int n);
 
-/// Compute RMS difference of matrices
-double rms_diff(const arma::mat & R, const arma::mat & Rold);
-/// Compute maximum difference of matrices
-double max_diff(const arma::mat & R, const arma::mat & Rold);
-
 /// Get maximum
 template <class T> T max(const T & a, const T & b) {
   return (b<a ?a:b);
@@ -64,6 +59,8 @@ template <class T> T max(const T & a, const T & b, const T & c, const T & d) {
 double max(std::vector<double> x);
 /// Get element with maximum absolute value
 double max_abs(const arma::mat & R);
+/// Compute rms norm of matrix
+double rms_norm(const arma::mat & R);
 
 /// Get minimum
 template <class T> T min(const T & a, const T & b) {

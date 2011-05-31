@@ -142,39 +142,6 @@ int getind(int l, int m, int n) {
   return 0;
 }
 
-double rms_diff(const arma::mat & R, const arma::mat & Rold) {
-  if((R.n_cols != Rold.n_cols) || (R.n_rows != Rold.n_rows)) {
-    ERROR_INFO();
-    throw std::runtime_error("Trying to compute RMS difference of matrices of different sizes!\n");
-  }
-
-  double rms=0.0;
-  double diff;
-  for(size_t i=0;i<R.n_rows;i++)
-    for(size_t j=0;j<R.n_cols;j++) {
-      diff=R(i,j)-Rold(i,j);
-      rms+=diff*diff;
-    }
-  return sqrt(rms/(R.n_rows*R.n_cols));
-}
-
-double max_diff(const arma::mat & R, const arma::mat & Rold) {
-  if((R.n_cols != Rold.n_cols) || (R.n_rows != Rold.n_rows)) {
-    ERROR_INFO();
-    throw std::runtime_error("Trying to compute maximum difference of matrices of different sizes!\n");
-  }
-
-  double max=0.0;
-  double diff;
-  for(size_t i=0;i<R.n_rows;i++)
-    for(size_t j=0;j<R.n_cols;j++) {
-      diff=fabs(R(i,j)-Rold(i,j));
-      if(diff>max)
-	max=diff;
-    }
-  return max;
-}
-
 double max(std::vector<double> x) {
   if(x.size()==0) {
     ERROR_INFO();
@@ -200,6 +167,17 @@ double max_abs(const arma::mat & R) {
     }
   return m;
 }
+
+double rms_norm(const arma::mat & R) {
+  double rms=0.0;
+  for(size_t i=0;i<R.n_rows;i++)
+    for(size_t j=0;j<R.n_cols;j++) {
+      rms+=R(i,j)*R(i,j);
+    }
+  return sqrt(rms/(R.n_rows*R.n_cols));
+}
+
+
 
 void zero(std::vector<double> & x) {
   for(size_t i=0;i<x.size();i++)
