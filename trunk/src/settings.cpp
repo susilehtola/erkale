@@ -83,7 +83,13 @@ Settings::Settings(bool usedft) {
   // Calculate EMD properties?
   bset.push_back(genb("DoEMD", "Perform EMD calculation (moments of EMD, Compton profile)", 0));
 
-  if(usedft) {
+  if(!usedft) {
+    // Initialize HF calculation with a SVWN calculation
+    sset.push_back(gens("InitMethod","Method of initializing calculation","lda_x-lda_c_vwn"));
+  } else {
+    // We probably don't want to initialize a DFT calculation (core guess is fine)
+    sset.push_back(gens("InitMethod","Method of initializing calculation","none"));
+
     // Store full DFT grid in memory?
     bset.push_back(genb("DFTDirect", "Save memory by not storing values of basis functions in memory", 0));
     // Store full DFT grid in memory?
@@ -96,8 +102,7 @@ Settings::Settings(bool usedft) {
     dset.push_back(gend("DFTSwitch", "When to switch to final grid (relative to deltaE, deltaP)?", 50.0));
     
     // Default DFT exchange and correlation functionals
-    sset.push_back(gens("DFT_X", "DFT exchange (or exchange-correlation) functional", "gga_x_rpbe"));
-    sset.push_back(gens("DFT_C", "DFT correlation functional", "gga_c_pbe"));
+    sset.push_back(gens("DFT_XC", "DFT exchange and correlation (or exchange-correlation) functional", "gga_x_rpbe-gga_c_pbe"));
     
     // Use density fitting if possible?
     bset.push_back(genb("DensityFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));

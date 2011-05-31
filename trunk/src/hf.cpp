@@ -18,6 +18,7 @@
 
 #include "basislibrary.h"
 #include "basis.h"
+#include "dftfuncs.h"
 #include "elements.h"
 #include "emd/emd.h"
 #include "linalg.h"
@@ -104,13 +105,12 @@ int main(int argc, char **argv) {
   // Finalize basis set
   basis.finalize();
 
-  // Solve problem. 
   // Number of electrons is
-
   int Nel=basis.Ztot()-set.get_int("Charge");
 
-  // Solver
-  SCF solver(basis,set);
+  // Get wanted initialization method
+  int x_init, c_init;
+  parse_xc_func(x_init,c_init,set.get_string("InitMethod"));
 
   // Density matrix
   arma::mat P;
@@ -119,6 +119,28 @@ int main(int argc, char **argv) {
     // Closed shell case
     arma::mat C;
     arma::vec E;
+
+    if(x_init>0 || c_init>0) {
+      // Initialize with DFT
+      Settings initset(1);
+      initset.set_double("DFTInitialTol",1e-3);
+      initset.set_double("DFTFinalTol",1e-3);
+
+      initset.set_double("DeltaPrms",1e-6);
+      initset.set_double("DeltaPmax",1e-4);
+      initset.set_double("DeltaEmax",1e-4);     
+
+      printf("\nInitializing calculation with a DFT run.\n");
+      print_info(x_init,c_init);
+
+      SCF initsolver(basis,initset);
+      initsolver.RDFT(C,E,x_init,c_init);
+
+      printf("\nInitialization complete.\n\n\n\n");
+    }    
+
+    // Solver
+    SCF solver(basis,set);
     solver.RHF(C,E);
 
     // Form density matrix
@@ -128,6 +150,27 @@ int main(int argc, char **argv) {
   } else {
     arma::mat Ca, Cb;
     arma::vec Ea, Eb;
+
+    if(x_init>0 || c_init>0) {
+      // Initialize with DFT
+      Settings initset(1);
+      initset.set_double("DFTInitialTol",1e-3);
+      initset.set_double("DFTFinalTol",1e-3);
+
+      initset.set_double("DeltaPrms",1e-6);
+      initset.set_double("DeltaPmax",1e-4);
+      initset.set_double("DeltaEmax",1e-4);     
+
+      printf("\nInitializing calculation with a DFT run.\n");
+      print_info(x_init,c_init);
+
+      SCF initsolver(basis,initset);
+      initsolver.UDFT(Ca,Cb,Ea,Eb,x_init,c_init);
+
+      printf("\nInitialization complete.\n\n\n\n");
+    }    
+
+    SCF solver(basis,set);
     solver.UHF(Ca,Cb,Ea,Eb);
 
     // Form density matrix
