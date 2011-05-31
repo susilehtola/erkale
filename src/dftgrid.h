@@ -337,22 +337,4 @@ class DFTGrid {
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel);
 };
 
-/// Is gradient necessary to use given functional?
-bool gradient_needed(int func);
-/// Is laplacian necessary to use given functional?
-bool laplacian_needed(int func);
-
-/// Print info about functional
-bool print_info(int func_id);
-
-/// Is functional for exchange?
-bool is_exchange(int func_id);
-/// Is functional for correlation?
-bool is_correlation(int func_id);
-/// Is functional for both exchange and correlation?
-bool is_exchange_correlation(int func_id);
-
-/// Get fraction of exact exchange
-double exact_exchange(int func_id);
-
 #endif

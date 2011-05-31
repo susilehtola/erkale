@@ -19,7 +19,6 @@
 #include "basislibrary.h"
 #include "basis.h"
 #include "emd/emd.h"
-#include "dftgrid.h"
 #include "dftfuncs.h"
 #include "elements.h"
 #include "linalg.h"
@@ -38,7 +37,6 @@
 #include <omp.h>
 #endif
 
-//#define INITIALGUESS
 
 int main(int argc, char **argv) {
   
@@ -64,11 +62,6 @@ int main(int argc, char **argv) {
   BasisSetLibrary baslib;
   baslib.load_gaussian94(argv[2]);
 
-#ifdef INITIALGUESS
-  // Initial guess
-  BasisSetLibrary smbaslib;
-  smbaslib.load_gaussian94("cc-pVDZ.gbs");
-#endif
 
   // Parse settings
   Settings set(1); // DFT settings
@@ -85,38 +78,14 @@ int main(int argc, char **argv) {
     throw std::runtime_error("Invalid value of fsam!\n");
   }
 
-
   // Print out settings
   if(set.get_bool("Verbose")) {
     set.print();
   }
 
-  // Exchange and correlation functional
-  int x_func=find_func(set.get_string("DFT_X"));
-  int c_func=find_func(set.get_string("DFT_C"));
-
-  // Check functionals
-  if(is_correlation(x_func) && !is_exchange_correlation(x_func)) {
-    ERROR_INFO();
-    throw std::runtime_error("Refusing to use a correlation functional as exchange.\n");
-  }
-  if(is_exchange(c_func)) {
-    ERROR_INFO();
-    throw std::runtime_error("Refusing to use an exchange functional as correlation.\n");
-  }
-
-  if(is_exchange(x_func)) {
-    printf("Used exchange functional is %s, ",get_keyword(x_func).c_str());
-    print_info(x_func);
-  } else
-    printf("No exchange functional.\n");
-
-  if(is_correlation(c_func)) {
-    printf("\nUsed correlation functional is %s, ",get_keyword(c_func).c_str());
-    print_info(c_func);
-    printf("\n");
-  } else
-    printf("\nNo correlation functional.\n\n");
+  // Get exchange and correlation functionals
+  int x_func, c_func;
+  parse_xc_func(x_func,c_func,set.get_string("DFT_XC"));
 
   // Check consistency of parameters
   if(set.get_bool("DensityFitting") && exact_exchange(x_func)!=0.0) {
@@ -129,9 +98,6 @@ int main(int argc, char **argv) {
 
   // Create basis set
   BasisSet basis(Nat,set);
-#ifdef INITIALGUESS
-  BasisSet smbas(Nat,set);
-#endif
   // and add atoms to basis set
   for(size_t i=0;i<Nat;i++) {
 
@@ -155,57 +121,80 @@ int main(int argc, char **argv) {
     basis.add_functions(i,cen,baslib.get_element(el));
     // and the nucleus
     basis.add_nucleus(i,cen,get_Z(el),el,bsse);
-
-#ifdef INITIALGUESS
-    smbas.add_functions(i,cen,smbaslib.get_element(el));
-    smbas.add_nucleus(i,cen,get_Z(el),el,bsse);
-#endif
   }
 
   // Finalize basis set
   basis.finalize();
-#ifdef INITIALGUESS
-  smbas.finalize();
-#endif
 
-  // Solve problem. 
   // Number of electrons is
   int Nel=basis.Ztot()-set.get_int("Charge");
-  
+
+  // Get wanted initialization method
+  int x_init, c_init;
+  parse_xc_func(x_init,c_init,set.get_string("InitMethod"));
+
   // Density matrix
   arma::mat P;
-
 
   if(set.get_int("Multiplicity")==1 && Nel%2==0) {
     // Closed shell case
     arma::mat C;
     arma::vec E;
 
-#ifdef INITIALGUESS
-    {
-      // Do initial guess
-      arma::mat smC;
-      arma::vec smE;
-      
-      // Solve in small basis
-      SCF smsolver(smbas,set);
-      smsolver.RDFT(smC,smE,x_func,c_func);
-      
-      // Project to big basis
-      basis.projectMOs(smbas,smE,smC,E,C);
+    if(x_init>0 || c_init>0) {
+      // Initialize calculation
+      Settings initset(1);
+      initset.set_double("DFTInitialTol",1e-3);
+      initset.set_double("DFTFinalTol",1e-3);
+
+      initset.set_double("DeltaPrms",1e-6);
+      initset.set_double("DeltaPmax",1e-4);
+      initset.set_double("DeltaEmax",1e-4);
+
+      printf("\nInitializing calculation with a DFT run.\n");
+      print_info(x_init,c_init);
+      printf("\n\n");
+
+      SCF initsolver(basis,initset);
+      initsolver.RDFT(C,E,x_init,c_init);
+
+      printf("\nInitialization complete.\n\n");
     }
-#endif
-      
-    // Solver
+
+    // Print information about used functionals
+    print_info(x_func,c_func);
+
     SCF solver(basis,set);
     solver.RDFT(C,E,x_func,c_func);
 
-    // Form DM
     form_density(P,C,Nel/2);
     P*=2.0;    
   } else {
     arma::mat Ca, Cb;
     arma::vec Ea, Eb;
+
+    if(x_init>0 || c_init>0) {
+      // Initialize calculation
+      Settings initset(1);
+      initset.set_double("DFTInitialTol",1e-3);
+      initset.set_double("DFTFinalTol",1e-3);
+
+      initset.set_double("DeltaPrms",1e-6);
+      initset.set_double("DeltaPmax",1e-4);
+      initset.set_double("DeltaEmax",1e-4);
+
+      printf("\nInitializing calculation with a DFT run.\n");
+      print_info(x_init,c_init);
+      printf("\n\n");
+
+      SCF initsolver(basis,initset);
+      initsolver.UDFT(Ca,Cb,Ea,Eb,x_init,c_init);
+
+      printf("\nInitialization complete.\n\n");
+    }
+
+    // Print information about used functionals
+    print_info(x_func,c_func);
     
     SCF solver(basis,set);
     solver.UDFT(Ca,Cb,Ea,Eb,x_func,c_func);
@@ -237,7 +226,6 @@ int main(int argc, char **argv) {
       printf("Calculating EMD properties took %s.\n",temd.elapsed().c_str());
   }    
   
-
   if(set.get_bool("Verbose"))
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
 
