@@ -52,9 +52,6 @@ Settings::Settings(bool usedft) {
   // Dynamically update mixing factor?
   bset.push_back(genb("DynamicMixing","Dynamically change mixing factor", 1));
   
-  // Purify density matrix?
-  bset.push_back(genb("PurifyDensity","Purify density matrix?", 0));
-
   // Total charge of system
   iset.push_back(geni("Charge", "Total charge of system", 0));
   // Multiplicity
