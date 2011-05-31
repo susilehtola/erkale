@@ -64,12 +64,14 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
   Broyden broyd(Nbf*Nbf);
   
   // Coulomb and exchange matrices
-  arma::mat J, K;
+  arma::mat J(Nbf,Nbf), K(Nbf,Nbf);
+  J.zeros();
+  K.zeros();
+  
   // Density matrix
   arma::mat P;
-  // Density matrix of last iteration
-  arma::mat Pold(Nbf,Nbf);
-  Pold.zeros();
+  // Change of density matrix from last iteration
+  arma::mat deltaP(Nbf,Nbf);
   
   // Full Hamiltonian
   arma::mat H;
@@ -93,14 +95,21 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
   Broyden broyd_diff(Nbf*Nbf);
   
   // Coulomb and exchange matrices
-  arma::mat J;
-  arma::mat Ka, Kb;
+  arma::mat J(Nbf,Nbf);
+  J.zeros();
+
+  arma::mat Ka(Nbf,Nbf);
+  arma::mat Kb(Nbf,Nbf);
+  Ka.zeros();
+  Kb.zeros();
+
   // Density matrix
   arma::mat P, Pa, Pb;
-  arma::mat Paold(Nbf,Nbf);
-  arma::mat Pbold(Nbf,Nbf);
-  Paold.zeros();
-  Pbold.zeros();
+  arma::mat deltaP(Nbf,Nbf);
+  arma::mat deltaPa(Nbf,Nbf);
+  arma::mat deltaPb(Nbf,Nbf);
+  deltaPa.zeros();
+  deltaPb.zeros();
   
   // Full Hamiltonian
   arma::mat Ha, Hb;
@@ -189,6 +198,13 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
     form_density(Pa,orbsa,Nel_alpha);
     form_density(Pb,orbsb,Nel_beta);
     P=Pa+Pb;
+#endif
+
+    // Initialize change of density matrix
+    deltaP=P;
+#ifndef RESTRICTED
+    deltaPa=Pa;
+    deltaPb=Pb;
 #endif
 
 #ifdef DFT
@@ -288,7 +304,15 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	      t.set();
 	    }
 
-	    scr.calcJK(P,J,K,tol,&screeneff);
+	    // Calculates everything 
+	    //	    scr.calcJK(P,J,K,tol,&screeneff);
+
+	    // Only calculate the changed part
+	    arma::mat dJ, dK;
+	    scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
+	    J+=dJ;
+	    K+=dK;
+	    
 #ifdef DFT
 	  } else {
 
@@ -298,7 +322,8 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	      t.set();
 	    }
 
-	    J=scr.calcJ(P,tol,&screeneff);
+	    //	    J=scr.calcJ(P,tol,&screeneff);
+	    J+=scr.calcJ(deltaP,tol,&screeneff);
 	  }
 #endif
 	
@@ -314,7 +339,15 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	      t.set();
 	    }
 
-	    scr.calcJK(Pa,Pb,J,Ka,Kb,tol,&screeneff);
+	    //	    scr.calcJK(Pa,Pb,J,Ka,Kb,tol,&screeneff);
+
+	    // Only calculate the changed part
+	    arma::mat dJ, dKa, dKb;
+	    scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
+	    J+=dJ;
+	    Ka+=dKa;
+	    Kb+=dKb;
+	    
 #ifdef DFT
 	  } else {
 
@@ -324,7 +357,8 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	      t.set();
 	    }
 
-	    J=scr.calcJ(P,tol,&screeneff);
+	    //	    J=scr.calcJ(P,tol,&screeneff);
+	    J+=scr.calcJ(deltaP,tol,&screeneff);
 	  }
 #endif
 
@@ -645,33 +679,55 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
     if(verbose)
       printf("done (%s)\n",t.elapsed().c_str());
 
-#ifdef RESTRICTED
     // Form new density matrix
-    form_density(P,orbs,nocc);
+    arma::mat Pnew;
+#ifdef RESTRICTED
+    form_density(Pnew,orbs,nocc);
     // All orbitals are doubly occupied
-    P*=2.0;
+    Pnew*=2.0;
 #else
-    form_density(Pa,orbsa,Nel_alpha);
-    form_density(Pb,orbsb,Nel_beta);
-    P=Pa+Pb;
+    arma::mat Panew, Pbnew;
+    form_density(Panew,orbsa,Nel_alpha);
+    form_density(Pbnew,orbsb,Nel_beta);
+    Pnew=Panew+Pbnew;
 #endif
+
+    // Compute change of (total) density
+    deltaP=Pnew-P;
 
     // Compute convergence criteria
 #ifdef RESTRICTED
-    maxdiff=max_diff(P,Pold);
-    rmsdiff=rms_diff(P,Pold);
+    maxdiff=max_abs(deltaP);
+    rmsdiff=rms_norm(deltaP);
 #else
-    maxdiffa=max_diff(Pa,Paold);
-    maxdiffb=max_diff(Pb,Pbold);
+    maxdiffa=max_abs(deltaPa);
+    maxdiffb=max_abs(deltaPb);
 
-    rmsdiffa=rms_diff(Pa,Paold);
-    rmsdiffb=rms_diff(Pb,Pbold);
+    rmsdiffa=rms_norm(deltaPa);
+    rmsdiffb=rms_norm(deltaPb);
 
     maxdiff=max(maxdiffa,maxdiffb);
     rmsdiff=max(rmsdiffa,rmsdiffb);
     //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
 #endif
 
+
+    if(mixdensity) {
+      if(verbose)
+	printf("Mixing density matrices with mixing factor %g.\n",mix);
+      
+      P=(1.0-mix)*P+mix*Pnew;
+#ifndef RESTRICTED      
+      Pa=(1.0-mix)*Pa+mix*Panew;
+      Pb=(1.0-mix)*Pb+mix*Pbnew;
+#endif
+    } else {
+      P=Pnew;
+#ifndef RESTRICTED      
+      Pa=Panew;
+      Pb=Pbnew;
+#endif
+    }
     
     if(!mixdensity || (mixdensity && mix==1.0)) {
       
@@ -767,40 +823,6 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #endif
     } // End convergence check clause
 
-    if(mixdensity) {
-      if(verbose)
-	printf("Mixing density matrices with mixing factor %g.\n",mix);
-      
-#ifdef RESTRICTED      
-      arma::mat Pnew=(1.0-mix)*Pold+mix*P;
-#else
-      arma::mat Panew=(1.0-mix)*Paold+mix*Pa;
-      arma::mat Pbnew=(1.0-mix)*Pbold+mix*Pb;
-      arma::mat Pnew=Panew+Pbnew;
-#endif
-    
-#ifdef RESTRICTED
-      // Save old density matrix
-      Pold=P;
-      // Update density matrix
-      P=Pnew;
-#else
-      Paold=Pa;
-      Pbold=Pb;
-      Pa=Panew;
-      Pb=Pbnew;
-      P=Pa+Pb;
-#endif
-    } else {
-#ifdef RESTRICTED
-      // Save old density matrix
-      Pold=P;
-#else
-      Paold=Pa;
-      Pbold=Pb;
-#endif
-    }
-  
     if(verbose)
       printf("\nIteration took %s.\n",titer.elapsed().c_str());
   } // End SCF cycle
