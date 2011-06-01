@@ -1,8 +1,6 @@
 30 May 2011
 
-* Rewrite the SCF solver in a clearer, more object-oriented form.
-
-* Speed up direct computation of Coulomb and exchange by only computing differences.
+* Rewrite the SCF solver in a clearer, more object-oriented form. (?)
 
 * Debug meta-GGA & meta-GGA functionals (in collaboration with libxc upstream).
 
@@ -16,3 +14,4 @@
 
 * Implement checkpointing / saving of results.
 
+* Implement calculation of electrostatic molecular potential.
