@@ -159,6 +159,14 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
   // Memory taken up by  ( \alpha | \mu \nu)
   if(!direct)
     Nmem+=(Na*No*(Norb+1)/2)*sizeof(double);
+#ifdef SCREENING
+  else {
+    // Memory taken up by screening matrix
+    size_t Nsh=orbbas.get_Nshells();
+    Nmem+=Nsh*Nsh*sizeof(double);
+  }
+#endif
+
   // Memory taken by (\alpha | \beta) and its inverse
   Nmem+=2*Na*Na*sizeof(double);
   // Memory taken by gamma and expansion coefficients
