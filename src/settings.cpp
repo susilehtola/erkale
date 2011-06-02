@@ -25,10 +25,8 @@
 #include <stdexcept>
 
 
-Settings::Settings(bool usedft) {
+Settings::Settings() {
   // Set default Settings
-
-  dft=usedft;
 
   // Use spherical harmonics.
   bset.push_back(genb("UseLM", "Use a spherical harmonics basis set by default?", 1));
@@ -63,9 +61,6 @@ Settings::Settings(bool usedft) {
   // Direct calculation?
   bset.push_back(genb("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", 0));
 
-  // Freeze core orbitals?
-  bset.push_back(genb("FrozenCore", "Freeze core orbitals? (For XRS calculations)", 0));
-
   // Default orthogonalization method
   sset.push_back(gens("BasisOrth", "Method of orthonormalization of basis set", "Can"));
 
@@ -83,34 +78,34 @@ Settings::Settings(bool usedft) {
   // Calculate EMD properties?
   bset.push_back(genb("DoEMD", "Perform EMD calculation (moments of EMD, Compton profile)", 0));
 
-  if(!usedft) {
-    // Initialize HF calculation with a SVWN calculation
-    sset.push_back(gens("InitMethod","Method of initializing calculation","lda_x-lda_c_vwn"));
-  } else {
-    // We probably don't want to initialize a DFT calculation (core guess is fine)
-    sset.push_back(gens("InitMethod","Method of initializing calculation","none"));
-
-    // Store full DFT grid in memory?
-    bset.push_back(genb("DFTDirect", "Save memory by not storing values of basis functions in memory", 0));
-    // Store full DFT grid in memory?
-    bset.push_back(genb("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", 0));
-    
-    // Initial and final tolerances of DFT grid
-    dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-3));
-    dset.push_back(gend("DFTFinalTol", "Tolerance of final DFT grid", 5e-5));
-    // When to switch to final grid?
-    dset.push_back(gend("DFTSwitch", "When to switch to final grid (relative to deltaE, deltaP)?", 50.0));
-    
-    // Default DFT exchange and correlation functionals
-    sset.push_back(gens("DFT_XC", "DFT exchange and correlation (or exchange-correlation) functional", "gga_x_rpbe-gga_c_pbe"));
-    
-    // Use density fitting if possible?
-    bset.push_back(genb("DensityFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
-  }
+  // Initialize HF calculation with a SVWN calculation
+  sset.push_back(gens("InitMethod","Method of initializing calculation","lda_x-lda_c_vwn"));
 }
 
 
 Settings::~Settings() {
+}
+
+void Settings::add_dft_settings() {
+  // We probably don't want to initialize a DFT calculation (core guess is fine)
+  set_string("InitMethod","none");
+  
+  // Store full DFT grid in memory?
+  bset.push_back(genb("DFTDirect", "Save memory by not storing values of basis functions in memory", 0));
+  // Store full DFT grid in memory?
+  bset.push_back(genb("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", 0));
+  
+  // Initial and final tolerances of DFT grid
+  dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-3));
+  dset.push_back(gend("DFTFinalTol", "Tolerance of final DFT grid", 5e-5));
+  // When to switch to final grid?
+  dset.push_back(gend("DFTSwitch", "When to switch to final grid (relative to deltaE, deltaP)?", 50.0));
+  
+  // Default DFT exchange and correlation functionals
+  sset.push_back(gens("DFT_XC", "DFT exchange and correlation (or exchange-correlation) functional", "gga_x_rpbe-gga_c_pbe"));
+  
+  // Use density fitting if possible?
+  bset.push_back(genb("DensityFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
 }
 
 void Settings::set_double(std::string name, double val) {
