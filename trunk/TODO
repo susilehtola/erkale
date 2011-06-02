@@ -2,6 +2,8 @@
 
 * Rewrite the SCF solver in a clearer, more object-oriented form. (?)
 
+* Implement screening in the density fitting routines.
+
 * Debug meta-GGA & meta-GGA functionals (in collaboration with libxc upstream).
 
 * Speed up ERI computation by precomputing shell pair data.
