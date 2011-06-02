@@ -409,7 +409,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #ifdef DFT
 	if(direct && !densityfit)
 #else
-	  if(direct)
+	if(direct)
 #endif
 	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
       }
@@ -610,9 +610,14 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #endif
     }
 
-    if(direct) {
+#ifndef DFT
+    if(direct)
+#else
+    if(direct && !densityfit)
+#endif
+    {
       // Determine wanted accuracy for integrals
-      
+	
       if(fabs(deltaE)<1e-2) {
 	// Rough convergence reached, so we can increase integral accuracy
 	tol=min(fabs(deltaE)*1e-2,1e-9);
