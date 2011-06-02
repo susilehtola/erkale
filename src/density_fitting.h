@@ -31,8 +31,6 @@
  *  "Auxiliary basis sets to approximate Coulomb potentials",
  * Chem. Phys. Lett. 240 (1995), 283-290.
  * 
- * Integral screening has not yet been implemented.
- *
  * \author Jussi Lehtola
  * \date 2011/04/12 17:52
  */
