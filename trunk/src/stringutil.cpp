@@ -102,24 +102,48 @@ double readdouble(std::string num) {
 void print_E(size_t N, const arma::vec & E) {
   // Print first N elements of E
   
-  // Print nline elements per line
+  // Print nelem entries per line
   size_t nelem=5;
-  // Print two first virtual orbitals
+  // Total amount of lines to print. Always print one additional line
+  // of energies.
   size_t Ntot=(size_t) ceil(N*1.0/nelem+1)*nelem;
+
+  // Skip additional line at the end?
+  bool skipline=0; 
+
+  // Safety check:
+  if(E.n_elem<Ntot) {
+    Ntot=E.n_elem;
+    if(E.n_elem%nelem!=0)
+      skipline=1;
+  }
 
   char fmt[]="% 13.6f*";
   char fmtv[]="% 13.6f ";
+
+  if(N<E.n_elem) {
+    // Compute gap
+    double gap=E(N)-E(N-1);
+    // Convert it into eV
+    gap*=HARTREEINEV;
+
+    printf("Band gap is %7.2f eV. ",gap);
+  } 
+  
+  printf("Energies of lowest lying states:\n");
 
   // Loop over states
   for(size_t i=0;i<Ntot;i++) {
     if(i<N)
       printf(fmt,E(i));
-    else if(i<E.n_elem)
+    else
       printf(fmtv,E(i));
     // Return line if necessary
     if(i%nelem==nelem-1)
       printf("\n");
   }
+  if(skipline)
+    printf("\n");
 }
 
 std::string memory_size(size_t size) {
