@@ -1,5 +1,7 @@
 30 May 2011
 
+* Debug unrestricted calculations, which seem to have broken.
+
 * Rewrite the SCF solver in a clearer, more object-oriented form. (?)
 
 * Debug meta-GGA & meta-GGA functionals (in collaboration with libxc upstream).
