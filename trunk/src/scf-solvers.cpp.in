@@ -540,11 +540,11 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
       arma::mat Hdold=Haold-Hbold;
 
       // Update Broyden mixers
-      broyd_sum.push_x(MatToVec(Hs));
+      broyd_sum.push_x(MatToVec(Hsold));
       broyd_sum.push_f(MatToVec(Hsold-Hs));
       Hs=VecToMat(broyd_sum.update_x(),Nbf,Nbf);
 
-      broyd_diff.push_x(MatToVec(Hd));
+      broyd_diff.push_x(MatToVec(Hdold));
       broyd_diff.push_f(MatToVec(Hdold-Hd));
       Hd=VecToMat(broyd_diff.update_x(),Nbf,Nbf);
 
