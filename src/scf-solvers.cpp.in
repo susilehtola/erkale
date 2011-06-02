@@ -266,13 +266,11 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	printf("\n ******* Iteration %4i ********\n",iiter);
 
 #ifdef RESTRICTED
-	printf("Energies of lowest lying states:\n");
 	print_E(nocc,en);
 #else
-	printf("Energies of lowest lying states:\n");
-	printf("alpha\n");
+	printf("alpha: ");
 	print_E(Nel_alpha,ena);
-	printf("beta\n");
+	printf("beta:  ");
 	print_E(Nel_beta,enb);
 #endif
       }
