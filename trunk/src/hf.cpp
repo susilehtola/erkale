@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
   BasisSetLibrary baslib;
   baslib.load_gaussian94(argv[2]);
   // Parse settings
-  Settings set(0); // HF settings
+  Settings set;
   if(argc>=4)
     set.parse(std::string(argv[3]));
   else
@@ -122,13 +122,14 @@ int main(int argc, char **argv) {
 
     if(x_init>0 || c_init>0) {
       // Initialize with DFT
-      Settings initset(1);
+      Settings initset=set;
+      initset.add_dft_settings();
       initset.set_double("DFTInitialTol",1e-3);
       initset.set_double("DFTFinalTol",1e-3);
 
       initset.set_double("DeltaPrms",1e-6);
       initset.set_double("DeltaPmax",1e-4);
-      initset.set_double("DeltaEmax",1e-4);     
+      initset.set_double("DeltaEmax",1e-4);
 
       printf("\nInitializing calculation with a DFT run.\n");
       print_info(x_init,c_init);
@@ -153,7 +154,8 @@ int main(int argc, char **argv) {
 
     if(x_init>0 || c_init>0) {
       // Initialize with DFT
-      Settings initset(1);
+      Settings initset=set; // Use same settings as for production calculation
+      initset.add_dft_settings(); // Add DFT related settings
       initset.set_double("DFTInitialTol",1e-3);
       initset.set_double("DFTFinalTol",1e-3);
 

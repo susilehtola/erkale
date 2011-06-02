@@ -2307,7 +2307,8 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
   // Coulomb fitting basis sets: Design and accuracy for systems
   // containing H to Kr", J. Chem. Phys. 127 (2007), 074102
 
-  Settings set(1);
+  Settings set;
+  set.add_dft_settings();
   // Density fitting basis set
   BasisSet dfit(1,set);
 

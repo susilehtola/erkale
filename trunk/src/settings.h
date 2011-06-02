@@ -82,9 +82,12 @@ class Settings {
 
  public:
   /// Constructor
-  Settings(bool dft);
+  Settings();
   /// Destructor
   ~Settings();
+
+  /// Add DFT related settings
+  void add_dft_settings();
 
   /// Set a double valued setting
   void set_double(std::string name, double val);

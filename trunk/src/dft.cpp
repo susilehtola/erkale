@@ -64,7 +64,8 @@ int main(int argc, char **argv) {
 
 
   // Parse settings
-  Settings set(1); // DFT settings
+  Settings set;
+  set.add_dft_settings();
   if(argc>=4)
     set.parse(std::string(argv[3]));
   else
@@ -143,7 +144,7 @@ int main(int argc, char **argv) {
 
     if(x_init>0 || c_init>0) {
       // Initialize calculation
-      Settings initset(1);
+      Settings initset=set;
       initset.set_double("DFTInitialTol",1e-3);
       initset.set_double("DFTFinalTol",1e-3);
 
@@ -175,7 +176,7 @@ int main(int argc, char **argv) {
 
     if(x_init>0 || c_init>0) {
       // Initialize calculation
-      Settings initset(1);
+      Settings initset=set;
       initset.set_double("DFTInitialTol",1e-3);
       initset.set_double("DFTFinalTol",1e-3);
 
