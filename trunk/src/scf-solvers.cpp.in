@@ -287,9 +287,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	}
 	dfit.update_density(P);
 	J=dfit.calc_J();
-	if(verbose) {
-	  printf("done (%s)\n",t.elapsed().c_str());
-	}
+
       } else {
 #endif
 	if(direct) {
