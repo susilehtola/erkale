@@ -4,7 +4,7 @@
 #ifdef DFT
 double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #else
-  double SCF::RHF(arma::mat & C, arma::vec & E)
+double SCF::RHF(arma::mat & C, arma::vec & E)
 #endif
 
 #else
@@ -200,6 +200,20 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
     P=Pa+Pb;
 #endif
 
+      if(verbose) {
+	printf("\n ******* Iteration %4i ********\n",0);
+
+#ifdef RESTRICTED
+	print_E(nocc,en);
+#else
+	printf("alpha: ");
+	print_E(Nel_alpha,ena);
+	printf("beta:  ");
+	print_E(Nel_beta,enb);
+#endif
+      }
+
+
     // Initialize change of density matrix
     deltaP=P;
 #ifndef RESTRICTED
@@ -213,9 +227,9 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 
     if(verbose) {
       if(kfrac!=0.0)
-	printf("Using hybrid exchange with % .3f of exact exchange.\n",kfrac*100);
+	printf("\nUsing hybrid exchange with % .3f of exact exchange.\n",kfrac*100);
       else
-	printf("A pure exchange functional used, no exact exchange.\n");
+	printf("\nA pure exchange functional used, no exact exchange.\n");
     }
 
     // Has grid been converged?
@@ -228,8 +242,8 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
       gridconv=1;
 
     if(verbose) {
-      printf("Switching to finer grid once deltaE<%e, deltaPrms<%e and deltaPmax<%e.\n",dft_switch*deltaEmax,dft_switch*deltaPrms,dft_switch*deltaPmax);
-      printf("Creating initial DFT grid.\n");
+      printf("Switching to finer grid once deltaE<%.2e, deltaPrms<%.2e and deltaPmax<%.2e.\n",dft_switch*deltaEmax,dft_switch*deltaPrms,dft_switch*deltaPmax);
+      printf("\nCreating initial DFT grid.\n");
     }
 
     if(verbose)
@@ -259,27 +273,17 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 
     // Loop:
     bool converged=0;
-    for(int iiter=0;iiter<maxiter;iiter++) {
+    for(int iiter=1;iiter<=maxiter;iiter++) {
       Timer titer;
     
-      if(verbose) {
+      if(verbose)
 	printf("\n ******* Iteration %4i ********\n",iiter);
-
-#ifdef RESTRICTED
-	print_E(nocc,en);
-#else
-	printf("alpha: ");
-	print_E(Nel_alpha,ena);
-	printf("beta:  ");
-	print_E(Nel_beta,enb);
-#endif
-      }
-    
+      
       // Form Coulomb and exchange matrices
 #ifdef DFT
       if(densityfit) {
 	if(verbose) {
-	  printf("\nForming density fitted Coulomb matrix ... ");
+	  printf("Forming density fitted Coulomb matrix ... ");
 	  fflush(stdout);
 	  t.set();
 	}
@@ -295,7 +299,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	  if(kfrac!=0.0) {
 #endif
 	    if(verbose) {
-	      printf("\nComputing HF Coulomb and exchange matrices on the fly ... ");
+	      printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
 	      fflush(stdout);
 	      t.set();
 	    }
@@ -313,7 +317,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	  } else {
 
 	    if(verbose) {
-	      printf("\nComputing HF Coulomb matrix on the fly ... ");
+	      printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
 	      fflush(stdout);
 	      t.set();
 	    }
@@ -330,7 +334,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	  if(kfrac!=0.0) {
 #endif	
 	    if(verbose) {
-	      printf("\nComputing HF Coulomb and exchange matrices on the fly ... ");
+	      printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
 	      fflush(stdout);
 	      t.set();
 	    }
@@ -348,7 +352,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	  } else {
 
 	    if(verbose) {
-	      printf("\nComputing HF Coulomb matrix on the fly ... ");
+	      printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
 	      fflush(stdout);
 	      t.set();
 	    }
@@ -368,10 +372,10 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #ifdef DFT
 	    if(kfrac!=0.0)
 #endif
-	      printf("\nForming HF Coulomb and exchange matrices ... ");
+	      printf("Forming HF Coulomb and exchange matrices ... ");
 #ifdef DFT
 	    else
-	      printf("\nForming HF Coulomb matrix ... ");
+	      printf("Forming HF Coulomb matrix ... ");
 #endif
 
 	    fflush(stdout);
@@ -412,6 +416,23 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
       }
     
+
+
+#ifndef DFT
+    if(direct)
+#else
+    if(direct && !densityfit)
+#endif
+    {
+      // Determine wanted accuracy for integrals
+	
+      if(fabs(deltaE)<1e-2) {
+	// Rough convergence reached, so we can increase integral accuracy
+      }
+      
+    }
+    
+
     
     
 #ifdef DFT
@@ -499,7 +520,11 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
     Etote=Ecoul+Exc+Eone;
     Etot=Etote+Enuc;
 
+    // Compute change of energy since last iteration
     deltaE=Etot-Eold;
+
+    // Update screening value
+    tol=min(fabs(deltaE)*1e-2,1e-9);
 
     // Sanity check
     if(!std::isfinite(Etot)) {
@@ -613,51 +638,6 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 	printf("done (%s)\n",t.elapsed().c_str());
     }
 
-#ifndef DFT
-    if(direct)
-#else
-    if(direct && !densityfit)
-#endif
-    {
-      // Determine wanted accuracy for integrals
-	
-      if(fabs(deltaE)<1e-2) {
-	// Rough convergence reached, so we can increase integral accuracy
-	tol=min(fabs(deltaE)*1e-2,1e-9);
-      }
-      
-      if(verbose)
-	printf("Screening integrals with tolerance %.3e.\n",tol);
-    }
-    
-    if(verbose) {
-      printf("\nEnergy:\telectronic\ttotal\t\tvirial\t\tchange\n");
-      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",Etote,Etot,-Etot/Ekin,deltaE);
-
-      printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tXC\n");
-      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% 08.8f\n",Ekin,Enuca,Ecoul,Exc);
-
-#ifdef RESTRICTED
-      if(usediis) {
-	printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
-	printf("\t% e\t% e\t% e\n",maxdiff,rmsdiff,diiserr);
-      } else {
-	printf("Errors:\tMax dens\tRMS dens\n");
-	printf("\t% e\t% e\n",maxdiff,rmsdiff);
-      }
-#else
-      if(usediis) {
-        printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
-        printf("alpha\t%e\t%e\t%e\n",maxdiffa,rmsdiffa,diiserra);
-        printf("beta\t%e\t%e\t%e\n",maxdiffb,rmsdiffb,diiserrb);
-      } else {
-        printf("Errors:\tMax dens\tRMS dens\n");
-        printf("alpha\t%e\t%e\n",maxdiffa,rmsdiffa);
-        printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
-      }
-#endif
-    }
-
     // Solve FC=ESC
     if(verbose) {
       printf("\nSolving SCF equations ... ");
@@ -734,7 +714,49 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
       Pb=Pbnew;
 #endif
     }
-    
+
+    // Print out status information
+    if(verbose) {
+
+#ifdef RESTRICTED
+      print_E(nocc,en);
+#else
+      printf("alpha: ");
+      print_E(Nel_alpha,ena);
+      printf("beta:  ");
+      print_E(Nel_beta,enb);
+#endif
+
+      printf("\nEnergy:\telectronic\ttotal\t\tvirial\t\tchange\n");
+      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",Etote,Etot,-Etot/Ekin,deltaE);
+
+      printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tXC\n");
+      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% 08.8f\n",Ekin,Enuca,Ecoul,Exc);
+
+#ifdef RESTRICTED
+      if(usediis) {
+	printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
+	printf("\t% e\t% e\t% e\n",maxdiff,rmsdiff,diiserr);
+      } else {
+	printf("Errors:\tMax dens\tRMS dens\n");
+	printf("\t% e\t% e\n",maxdiff,rmsdiff);
+      }
+#else
+      if(usediis) {
+        printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
+        printf("alpha\t%e\t%e\t%e\n",maxdiffa,rmsdiffa,diiserra);
+        printf("beta\t%e\t%e\t%e\n",maxdiffb,rmsdiffb,diiserrb);
+      } else {
+        printf("Errors:\tMax dens\tRMS dens\n");
+        printf("alpha\t%e\t%e\n",maxdiffa,rmsdiffa);
+        printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
+      }
+#endif
+    }
+
+    if(verbose)
+      printf("\nIteration took %s.\n",titer.elapsed().c_str());
+
     if(!mixdensity || (mixdensity && mix==1.0)) {
       
 #ifdef DFT
@@ -805,22 +827,15 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #endif
 	
 	if(fabs(deltaE)<deltaEmax && maxdiff<deltaPmax && rmsdiff<deltaPrms) {
-
+	  
 	  if(usebroyden) {
-	    printf("\nConvergence seems to have been achieved. Turning off Broyden mixing.\n");
+	    printf("\nConvergence achieved. Turning off Broyden mixing.\n");
 	    usebroyden=0;
 	    continue;
 	  }
 	  
-	  if(verbose) {
-	    printf("\nIteration took %s.",titer.elapsed().c_str());
-
-	    printf("\nConvergence achieved:\n");
-	    const char *fmt="%20s:\t% e < %e\n"; // Format to print in
-	    printf(fmt,"deltaE",deltaE,deltaEmax);
-	    printf(fmt,"deltaPrms",rmsdiff,deltaPrms);
-	    printf(fmt,"deltaPmax",maxdiff,deltaPmax);
-	  }
+	  if(verbose)
+	    printf("\nConvergence achieved.\n");
 	  converged=1;
 	  break;
 	} 
@@ -828,9 +843,6 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
       } // End grid convergence clause
 #endif
     } // End convergence check clause
-
-    if(verbose)
-      printf("\nIteration took %s.\n",titer.elapsed().c_str());
   } // End SCF cycle
   
 #ifdef RESTRICTED  
