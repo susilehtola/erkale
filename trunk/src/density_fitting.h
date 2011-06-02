@@ -90,6 +90,9 @@ class DensityFit {
   /// Compute index in integral table
   size_t idx(size_t ia, size_t imu, size_t inu) const;
 
+  /// Compute estimate of necessary memory
+  size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, bool direct) const;
+
   /// Update density
   void update_density(const arma::mat & P);
 
