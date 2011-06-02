@@ -24,6 +24,7 @@
 #include "basis.h"
 #include "broyden.h"
 #include "elements.h"
+#include "dftfuncs.h"
 #include "dftgrid.h"
 #include "diis.h"
 #include "linalg.h"
