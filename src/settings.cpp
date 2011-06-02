@@ -80,6 +80,9 @@ Settings::Settings() {
 
   // Initialize HF calculation with a SVWN calculation
   sset.push_back(gens("InitMethod","Method of initializing calculation","lda_x-lda_c_vwn"));
+
+  // No DFT settings by default.
+  dft=0;
 }
 
 
@@ -87,6 +90,9 @@ Settings::~Settings() {
 }
 
 void Settings::add_dft_settings() {
+  // DFT settings
+  dft=1;
+
   // We probably don't want to initialize a DFT calculation (core guess is fine)
   set_string("InitMethod","none");
   
