@@ -167,11 +167,21 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
   }
 
   if(densityfit) {
-    // Density fitting
-    t.set();
-    printf("Computing density fitting integrals ... ");
+    // Density fitting.
+
+    // Form density fitting basis
+    BasisSet dfitbas=basisp->density_fitting();
+
+    // Compute memory estimate
+    std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,direct));
+
+    if(direct)
+      printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
+    else
+      printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
     fflush(stdout);
-    dfit.fill(*basisp,basisp->density_fitting(),direct);
+    t.set();
+    dfit.fill(*basisp,dfitbas,direct);
   } else {
     // Compute ERIs
     if(direct) {

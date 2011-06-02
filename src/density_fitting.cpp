@@ -42,12 +42,6 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   Naux=auxbas.get_Nbf();
   direct=dir;
 
-  size_t Nmem=Norb*sizeof(size_t)+(Naux*Norb*(Norb+1)/2)*sizeof(double)+2*Naux*Naux*sizeof(double)+2*Naux*sizeof(double);
-  if(!direct)
-    printf("Density fitting integrals will take %lu bytes of memory, i.e. %i G %i M.\n",Nmem,(int) (Nmem/1000000000),(int) ((Nmem%1000000000)/1000000));
-  else
-    printf("Computing density fitting integrals on the fly.\n");
-  
   // Fill index helper
   iidx=i_idx(Norb);
   
@@ -149,6 +143,28 @@ size_t DensityFit::idx(size_t ia, size_t imu, size_t inu) const {
     std::swap(imu,inu);
 
   return Naux*(iidx[imu]+inu)+ia;
+}
+
+size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, bool direct) const {
+
+  // Amount of orbital basis functions
+  size_t No=orbbas.get_Nbf();
+  // Amount of auxiliary functions (for representing the electron density)
+  size_t Na=auxbas.get_Nbf();
+  // Amount of memory required for calculation
+  size_t Nmem=0;
+
+  // Memory taken up by index helper
+  Nmem+=No*sizeof(size_t);
+  // Memory taken up by  ( \alpha | \mu \nu)
+  if(!direct)
+    Nmem+=(Na*No*(Norb+1)/2)*sizeof(double);
+  // Memory taken by (\alpha | \beta) and its inverse
+  Nmem+=2*Na*Na*sizeof(double);
+  // Memory taken by gamma and expansion coefficients
+  Nmem+=2*Na*sizeof(double);
+
+  return Nmem;
 }
 
 void DensityFit::update_density(const arma::mat & P) {
