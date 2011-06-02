@@ -599,7 +599,9 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
     if(useadiis && ((usediis && !diissucc) || !usediis)) {
       
       if(verbose) {
-	printf("Using ADIIS interpolated Fock operator.\n");
+	printf("Performing ADIIS interpolation of Fock operator ... ");
+	fflush(stdout);
+	t.set();
       }
       
       diissucc=1;
@@ -608,6 +610,9 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
 #else
       // TODO - FIXME
 #endif
+
+      if(verbose)
+	printf("done (%s)\n",t.elapsed().c_str());
     }
 
 #ifndef DFT
