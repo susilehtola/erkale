@@ -23,8 +23,8 @@
 // THR parameter in Eichkorn et al
 #define THR 1e-10
 
-// Screen integrals?
-//#define SCREENING
+// Screen integrals? (Direct calculations)
+#define SCREENING
 
 
 DensityFit::DensityFit() {
