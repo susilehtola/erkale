@@ -144,6 +144,11 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   double rmsdiffb=0.0, maxdiffb=0.0;
 #endif
   
+
+  
+  if(verbose)
+    printf("\n ******* Initialization of run ********\n");
+    
   
 #ifdef RESTRICTED
   if(C.n_rows!=Nbf) {
@@ -189,6 +194,18 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
       enb=Eb;
 #endif
     }
+
+    // Print orbital energies
+    if(verbose) {
+#ifdef RESTRICTED
+      print_E(nocc,en);
+#else
+      printf("alpha: ");
+      print_E(Nel_alpha,ena);
+      printf("beta:  ");
+      print_E(Nel_beta,enb);
+#endif
+    }
   
 #ifdef RESTRICTED
     form_density(P,orbs,nocc);
@@ -199,20 +216,6 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     form_density(Pb,orbsb,Nel_beta);
     P=Pa+Pb;
 #endif
-
-      if(verbose) {
-	printf("\n ******* Iteration %4i ********\n",0);
-
-#ifdef RESTRICTED
-	print_E(nocc,en);
-#else
-	printf("alpha: ");
-	print_E(Nel_alpha,ena);
-	printf("beta:  ");
-	print_E(Nel_beta,enb);
-#endif
-      }
-
 
     // Initialize change of density matrix
     deltaP=P;
@@ -465,7 +468,6 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     }
 #endif
 
-
     // Update Hamiltonian
 #ifdef RESTRICTED    
     Hold=H;
@@ -537,7 +539,7 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     /*    printf("Eone=%e, Ecoul=%e, Exc=%e, Etote=%e, Enuc=%e, Etot=%e.\n",Eone,Ecoul,Exc,Etote,Enuc,Etot);
 	  printf("Eh=%e, Ekin=%e, Enucatt=%e.\n",Eh,Ekin,Enuca);*/
 
-    if(dynamicmix && iiter>2)
+    if(dynamicmix && iiter>3)
       update_mixing(mix,Etot,Eold,Eold2);
 
     // Update ADIIS stacks
@@ -549,7 +551,8 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 #endif
     }
 
-    if(iiter>0 && usebroyden) {
+
+    if(iiter>1 && usebroyden) {
 #ifdef RESTRICTED
       // Update Broyden mixer
       broyd.push_x(MatToVec(Hold));
@@ -581,7 +584,6 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
       if(verbose)
 	printf("Broyden update of Fock operator performed.\n");
     }
-
 
 
     // Solve DIIS
@@ -835,7 +837,7 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 	  }
 	  
 	  if(verbose)
-	    printf("\nConvergence achieved.\n");
+	    printf("\n ******* Convergence achieved ********\n");
 	  converged=1;
 	  break;
 	} 
@@ -871,6 +873,7 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   Ea=ena;
   Eb=enb;
   
+  if(converged) {
 #ifdef DFT 
   if(verbose)
     printf("Solution of UDFT took %s.\n",ttot.elapsed().c_str());
@@ -878,6 +881,12 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   if(verbose)
     printf("Solution of UHF took %s.\n",ttot.elapsed().c_str());
 #endif
+  } else {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "\nSCF did not converge in "<<maxiter<<" iterations!\n";
+    throw std::runtime_error(oss.str());
+  }
   
 #endif // End unrestricted case
   
