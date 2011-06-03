@@ -1700,7 +1700,7 @@ void DFTGrid::print_memory_req() const {
 
   printf("Grid points take %s of memory.\n",memory_size(grid).c_str());
   printf("Basis functions take %s of memory.\n",memory_size(bf).c_str());
-  printf("All in all memory consumption is %s.\n",memory_size(grid+bf).c_str());
+  printf("All in all DFT grid memory consumption is %s.\n",memory_size(grid+bf).c_str());
 }
 
 #ifdef CONSISTENCYCHECK
