@@ -2,11 +2,16 @@
 
 * Debug unrestricted calculations, which seem to have broken.
 
-* Write pretty-printing routine for making bars such as *** text *** or --- text ---.
+* Write pretty-printing routine for making bars such as *** text ***
+  or --- text ---.
+
+* Implement writing of cube files, for visualization of e.g. electron
+  density and molecular orbitals.
 
 * Rewrite the SCF solver in a clearer, more object-oriented form. (?)
 
-* Debug meta-GGA & meta-GGA functionals (in collaboration with libxc upstream).
+* Debug meta-GGA & meta-GGA functionals (in collaboration with libxc
+  upstream).
 
 * Speed up ERI computation by precomputing shell pair data.
 
@@ -14,7 +19,8 @@
 
 * Implement ROHF.
 
-* Implement possibility to use mixed basis sets (e.g. use a larger basis set for a single atom in a calculation)
+* Implement possibility to use mixed basis sets (e.g. use a larger
+  basis set for a single atom in a calculation)
 
 * Implement checkpointing / saving of results.
 
