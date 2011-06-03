@@ -8,6 +8,10 @@
 * Implement writing of cube files, for visualization of e.g. electron
   density and molecular orbitals.
 
+* Implement a compile-time defineable default basis set directory.
+
+* Start using a real build system such as CMake or SCons.
+
 * Rewrite the SCF solver in a clearer, more object-oriented form. (?)
 
 * Debug meta-GGA & meta-GGA functionals (in collaboration with libxc
