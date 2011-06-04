@@ -66,13 +66,13 @@ $(LIBERKALE_SHARED):	$(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(LIBERKALE) -shared $(OBJS)
 
 $(LIBERKALE_STATIC):	$(OBJS)
-	ar rcs $(LIBERKALE_STATIC) $(OBJS)
+	$(AR) rcs $(LIBERKALE_STATIC) $(OBJS)
 
 $(LIBERKALE_EMD_SHARED):	$(LIBERKALE_SHARED) $(EMDOBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(LIBERKALE_EMD) -lerkale -shared $(EMDOBJS)
 
 $(LIBERKALE_EMD_STATIC):	$(EMDOBJS)
-	ar rcs $(LIBERKALE_EMD_STATIC) $(EMDOBJS) 
+	$(AR) rcs $(LIBERKALE_EMD_STATIC) $(EMDOBJS) 
 
 scf.o:	scf-base.cpp scf-solvers.cpp.in
 	cat ../src/scf-base.cpp > scf.cpp
