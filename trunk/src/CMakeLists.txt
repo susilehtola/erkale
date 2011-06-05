@@ -1,3 +1,20 @@
+# make sure cmake addes the binary directory for the project to
+# the include path, since some sources are generated on-the-fly
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+
+# Add the armadillo include directory
+INCLUDE_DIRECTORIES(${ARMADILLO_INCLUDE_DIRS})
+# Add the GSL include directory
+INCLUDE_DIRECTORIES(${GSL_INCLUDE_DIRS})
+# Add libxc include directory if necessary
+if(xc_FOUND)
+ INCLUDE_DIRECTORIES(${xc_INCLUDE_DIRS})
+endif()
+# Add libint include directory if necessary
+if(int_FOUND)
+ INCLUDE_DIRECTORIES(${int_INCLUDE_DIRS})
+endif()
+
 # Create the ERKALE base library "liberkale" which includes the following sources
 add_library (erkale 
 basis.cpp basislibrary.cpp stringutil.cpp mathf.cpp integrals.cpp
@@ -10,9 +27,6 @@ completeness/completeness_profile.cpp )
 add_library (erkale_dft
 lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp )
-
-# make sure cmake addes the binary directory for the project to the include path
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Recipe for building ERITable
 add_custom_command(

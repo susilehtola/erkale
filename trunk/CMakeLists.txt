@@ -6,6 +6,12 @@ project (ERKALE)
 # Require CMake version 2.8 (might work with older ones, too)
 cmake_minimum_required(VERSION 2.8)
 
+# Cmake modules/macros are in a subdirectory to keep this file cleaner
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+# Configuration where to find libint is in current directory
+set(libint_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
+set(Armadillo_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
+
 # Compile SMP version?
 option(USE_OPENMP "Compile OpenMP enabled version (for parallel calculations)?" ON)
 # Find OpenMP support
@@ -20,14 +26,50 @@ endif()
 # Find cat
 find_program(CAT cat)
 
+# Find LAPACK
+find_package(LAPACK REQUIRED)
+message("LAPACK headers are in ${LAPACK_INCLUDE_DIRS}")
+message("LAPACK library is ${LAPACK_LIBRARIES}")
+message("")
+
+# Find Armadillo
+find_package(Armadillo REQUIRED)
+message("ARMADILLO headers are in ${ARMADILLO_INCLUDE_DIRS}")
+message("ARMADILLO library is ${ARMADILLO_LIBRARIES}")
+message("")
+
+# Find GSL
+find_package(GSL REQUIRED)
+message("GSL headers are in ${GSL_INCLUDE_DIRS}")
+message("GSL library is ${GSL_LIBRARIES}")
+message("")
+
+# Find libxc
+find_package(libxc)
+if(LIBXC_FOUND)
+ message("libxc support enabled.")
+ message("libxc headers are in ${LIBXC_INCLUDE_DIRS}")
+ message("libxc linker flags are ${LIBXC_LIBRARIES}")
+message("")
+endif()
+
+# Find libint
+find_package(libint)
+if(libint_FOUND)
+ message("libint support enabled.")
+ message("libint headers are in ${LIBINT_INCLUDE_DIRS}")
+ message("libint linker flags are ${LIBINT_LIBRARIES}")
+ message("")
+endif()
+
 # Find out how to preprocess C++ source code files
 if(CMAKE_COMPILER_IS_GNUCXX)
  set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E )
-else( CMAKE_CXX_COMPILER_ID strequal "PGI" )
+elseif( CMAKE_CXX_COMPILER_ID strequal "PGI" )
  set( PPROC ${CMAKE_CXX_COMPILER} -E )
-else( CMAKE_CXX_COMPILER_ID strequal "PathScale" )
+elseif( CMAKE_CXX_COMPILER_ID strequal "PathScale" )
  set( PPROC ${CMAKE_CXX_COMPILER} -E )
-else( CMAKE_CXX_COMPILER_ID strequal "Intel" )
+elseif( CMAKE_CXX_COMPILER_ID strequal "Intel" )
  set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E )
 else()
  set( PPROC "" )
