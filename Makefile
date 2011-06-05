@@ -5,6 +5,7 @@ CXX=g++
 CPP=cpp
 
 INCLUDE=-I../armadillo-1.1.92/include -I../src
+#CXXFLAGS=-O2 -ansi -g -Wall -DDFT_ENABLED -fPIC $(INCLUDE)
 CXXFLAGS=-O2 -ansi -g -Wall -fPIC $(INCLUDE)
 CFLAGS=$(CXXFLAGS)
 #LDFLAGS=-L/usr/lib64/atlas -llapack -latlas -lgsl -lint -lxc -lprofiler -ltcmalloc -L.
@@ -26,7 +27,7 @@ dirs:
 	-mkdir build-ser build-par
 
 execs:	$(OBJS) $(EXEOBJS) $(EMDOBJS)
-	+make -f ../Makefile $(HF) $(DFT) $(BASGEN) $(SLATER) $(COPROF)
+	+make -f ../Makefile $(ERKALE) $(BASGEN) $(SLATER) $(COPROF)
 
 LIBERKALE_SHARED=liberkale.so
 LIBERKALE_EMD_SHARED=liberkale_emd.so
@@ -37,18 +38,13 @@ LIBERKALE_EMD_STATIC=liberkale_emd.a
 LIBERKALE=$(LIBERKALE_STATIC)
 LIBERKALE_EMD=$(LIBERKALE_EMD_STATIC)
 
-HF=hf.x
-DFT=dft.x
+ERKALE=erkale.x
 COPROF=coprof.x
 SLATER=slaterfit.x
 
-$(HF):		hf.o $(LIBERKALE) $(LIBERKALE_EMD)
-#	$(CXX) $(CXXFLAGS) $(LDFLAGS) -lerkale -o $(HF) hf.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(HF) hf.o liberkale.a liberkale_emd.a
-
-$(DFT):	dft.o $(LIBERKALE) $(LIBERKALE_EMD)
-#	$(CXX) $(CXXFLAGS) $(LDFLAGS) -lerkale -o $(DFT) dft.o 
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(DFT) dft.o liberkale.a liberkale_emd.a
+$(ERKALE):	main.o $(LIBERKALE) $(LIBERKALE_EMD)
+#	$(CXX) $(CXXFLAGS) $(LDFLAGS) -lerkale -o $(ERKALE) main.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(ERKALE) main.o liberkale.a liberkale_emd.a
 
 $(SLATER):	form_exponents.o solve_coefficients.o tempered.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(SLATER) form_exponents.o solve_coefficients.o tempered.o

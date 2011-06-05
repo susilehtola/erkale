@@ -90,8 +90,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
   deltaPmax=set.get_double("DeltaPmax");
   deltaPrms=set.get_double("DeltaPrms");
 
+#if DFT_ENABLED
   if(set.dft_enabled()) {
-    densityfit=set.get_bool("DensityFitting");
+    densityfit=set.get_bool("DFTFitting");
     
     // Initial and final tolerance of DFT grid
     dft_initialtol=set.get_double("DFTInitialTol");
@@ -104,6 +105,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
     // Hartree-Fock
     densityfit=0;
   }
+#endif
 
   // Timer
   Timer t;
@@ -166,6 +168,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
     printf("\n");
   }
 
+#if DFT_ENABLED
   if(densityfit) {
     // Density fitting.
 
@@ -182,7 +185,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
     fflush(stdout);
     t.set();
     dfit.fill(*basisp,dfitbas,direct);
-  } else {
+  } else
+#endif
+  {
     // Compute ERIs
     if(direct) {
       if(verbose) {

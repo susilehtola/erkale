@@ -23,6 +23,8 @@
 #include <algorithm>
 #include <fstream>
 #include <cstdio>
+#include <cstdlib>
+#include <vector>
 // For exceptions
 #include <sstream>
 #include <stdexcept>
@@ -41,7 +43,51 @@ int find_am(char am) {
   return -1;
 }
 
+std::string find_basis(const std::string & filename) {
+  // Directories where the basis set file might be found
+  std::vector<std::string> dirs;
 
+  // First, check if there is an environmental variable called
+  // ERKALE_LIBRARY
+  char * libloc=getenv("ERKALE_LIBRARY");
+  if(libloc!=NULL) {
+    // Variable exists! Add location to array
+    dirs.push_back(libloc);
+  }
+
+  // Next, try local directory.
+  dirs.push_back("");
+  // Finally, try system wide directory.
+  dirs.push_back(ERKALE_LIBRARY);
+
+  // Loop over directories.
+  for(size_t id=0;id<dirs.size();id++) {
+    // Trial names
+    std::vector<std::string> trialnames;
+
+    // Try without extension
+    trialnames.push_back(dirs[id]+"/"+filename);
+    // and with extension
+    trialnames.push_back(dirs[id]+"/"+filename+".gbs");
+
+    // Loop over trial names
+    for(size_t i=0;i<trialnames.size();i++) {
+      // Try to open file for reading
+      std::ifstream in(trialnames[i].c_str());
+      if(in.is_open()) {
+	// Found basis set!
+	printf("Basis set ""%s"" found in %s.\n",filename.c_str(),dirs[id].c_str());
+	return trialnames[i];
+      }
+    }
+  }
+
+  // Error handling
+  std::ostringstream oss;
+  ERROR_INFO();
+  oss << "Could not find basis set " << filename << "!\n";
+  throw std::runtime_error(oss.str());
+}
 
 FunctionShell::FunctionShell(int amval) {
   am=amval;
@@ -235,8 +281,10 @@ void BasisSetLibrary::load_gaussian94(const char * filename) {
   load_gaussian94(std::string(filename));
 }
 
-void BasisSetLibrary::load_gaussian94(std::string filename) {
-  
+void BasisSetLibrary::load_gaussian94(std::string basis) {
+  // First, find out file where basis set is
+  std::string filename=find_basis(basis);
+
   // Input file
   std::ifstream in(filename.c_str());
 

@@ -159,6 +159,7 @@ class BasisSet {
   /// Destructor
   ~BasisSet();
 
+#ifdef DFT_ENABLED
   /**
    * Generate density fitting basis
    *
@@ -169,6 +170,7 @@ class BasisSet {
    * containing H to Kr", J. Chem. Phys. 127 (2007), 074102.
    */
   BasisSet density_fitting(double fsam=1.5, int lmaxinc=1) const;
+#endif
   
   /// Add functions for element el at cen
   void add_functions(int atind, coords_t cen, ElementBasisSet el);

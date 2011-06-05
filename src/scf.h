@@ -92,8 +92,10 @@ class SCF {
 
   /// Direct calculation?
   bool direct;
+#if DFT_ENABLED
   /// Density fitting calculation? (Pure DFT XC functionals)
   bool densityfit;
+#endif
 
   /// Mix density matrices?
   bool mixdensity;
@@ -107,11 +109,11 @@ class SCF {
   /// Convergence criterion for the RMS change of the density matrix
   double deltaPrms;
 
+#if DFT_ENABLED
   /// Initial tolerance for the DFT grid
   double dft_initialtol;
   /// Final tolerance for the DFT grid
   double dft_finaltol;
-
   /// When to switch to final DFT grid? Indicates fraction of deltaE and deltaP of above criteria.
   double dft_switch;
 
@@ -119,6 +121,7 @@ class SCF {
   bool dft_lobatto;
   /// Save memory by reforming DFT grid on every iteration?
   bool dft_direct;
+#endif
 
   /// Nuclear repulsion energy
   double Enuc;
@@ -127,8 +130,10 @@ class SCF {
   ERItable tab;
   /// Electron repulsion screening table (for direct calculations)
   ERIscreen scr;
+#if DFT_ENABLED
   /// Density fitting table
   DensityFit dfit;
+#endif
 
  public:
   /// Constructor
@@ -140,10 +145,12 @@ class SCF {
   /// Calculate unrestricted Hartree-Fock solution
   double UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb);
 
+#if DFT_ENABLED
   /// Calculate restricted density-functional theory solution
   double RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func);
   /// Calculate unrestricted density-functional theory solution
   double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, int x_func, int c_func);
+#endif
 
   /// Get number of electrons
   int get_Nel() const;

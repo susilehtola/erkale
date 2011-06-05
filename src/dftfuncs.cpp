@@ -57,21 +57,16 @@ std::string get_keyword(int func_id) {
 
 // Find out ID of functional
 int find_func(std::string name) {
-
-  // Convert string to lower case
-  name=tolower(name);
-
   // Was functional given as a number? If so, use it.
   if(isdigit(name[0]))
     return atoi(name.c_str());
-
 
   // Otherwise we need to search the list for the functional.
   size_t Nfuncs=sizeof(funcs_list)/sizeof(funcs_list[0]);
   
   // Find functional in list
   for(size_t i=0;i<Nfuncs;i++)
-    if(funcs_list[i].name==name)
+    if(stricmp(funcs_list[i].name,name)==0)
       return funcs_list[i].func_id;
 
   // If we are still here, functional was not found.
@@ -88,7 +83,7 @@ void parse_xc_func(int & x_func, int & c_func, const std::string & xc) {
   c_func=0;
 
   // Check if there is a dash in the input.
-  size_t dpos=xc.find_first_of('-',0);
+  size_t dpos=xc.find('-',0);
 
   if(dpos!=std::string::npos) {
     // OK, there is a dash.

@@ -30,6 +30,9 @@
 std::string tolower(const std::string & in);
 std::string toupper(const std::string & in);
 
+// Case insensitive comparison of two strings
+int stricmp(const std::string & str1, const std::string & str2);
+
 // Read line from input (skip empty lines)
 std::string readline(std::istream & in);
 

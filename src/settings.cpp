@@ -28,6 +28,15 @@
 Settings::Settings() {
   // Set default Settings
 
+  // Dummy functional: this will be set to HF or a X-C combination
+  sset.push_back(gens("Method", "Method used in calculation (HF or a DFT functional)", "Dummy"));
+
+  // Default basis set
+  sset.push_back(gens("Basis", "Basis set used in calculation", "aug-cc-pVTZ"));
+
+  // Input system
+  sset.push_back(gens("System", "System as an xyz file", "atoms.xyz"));
+
   // Use spherical harmonics.
   bset.push_back(genb("UseLM", "Use a spherical harmonics basis set by default?", 1));
 
@@ -78,24 +87,24 @@ Settings::Settings() {
   // Calculate EMD properties?
   bset.push_back(genb("DoEMD", "Perform EMD calculation (moments of EMD, Compton profile)", 0));
 
-  // Initialize HF calculation with a SVWN calculation
-  sset.push_back(gens("InitMethod","Method of initializing calculation","lda_x-lda_c_vwn"));
+  // How to initialize calculation
+  sset.push_back(gens("InitMethod","Method of initializing calculation","none"));
 
+#ifdef DFT_ENABLED
   // No DFT settings by default.
   dft=0;
+#endif
 }
 
 
 Settings::~Settings() {
 }
 
+#ifdef DFT_ENABLED
 void Settings::add_dft_settings() {
   // DFT settings
   dft=1;
 
-  // We probably don't want to initialize a DFT calculation (core guess is fine)
-  set_string("InitMethod","none");
-  
   // Store full DFT grid in memory?
   bset.push_back(genb("DFTDirect", "Save memory by not storing values of basis functions in memory", 0));
   // Store full DFT grid in memory?
@@ -107,17 +116,36 @@ void Settings::add_dft_settings() {
   // When to switch to final grid?
   dset.push_back(gend("DFTSwitch", "When to switch to final grid (relative to deltaE, deltaP)?", 50.0));
   
-  // Default DFT exchange and correlation functionals
-  sset.push_back(gens("DFT_XC", "DFT exchange and correlation (or exchange-correlation) functional", "gga_x_rpbe-gga_c_pbe"));
-  
   // Use density fitting if possible?
-  bset.push_back(genb("DensityFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
+  bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
 }
 
+void Settings::remove_dft_settings() {
+  dft=0;
+
+  // Remove all settings that contain DFT in the keyword
+  for(size_t i=dset.size()-1;i<dset.size();i--)
+    if(dset[i].name.find("DFT")!=std::string::npos)
+      dset.erase(dset.begin()+i);
+
+  for(size_t i=bset.size()-1;i<bset.size();i--)
+    if(bset[i].name.find("DFT")!=std::string::npos)
+      bset.erase(bset.begin()+i);
+
+  for(size_t i=iset.size()-1;i<iset.size();i--)
+    if(iset[i].name.find("DFT")!=std::string::npos)
+      iset.erase(iset.begin()+i);
+
+  for(size_t i=sset.size()-1;i<sset.size();i--)
+    if(sset[i].name.find("DFT")!=std::string::npos)
+      sset.erase(sset.begin()+i);
+}
+#endif
+  
 void Settings::set_double(std::string name, double val) {
   // Find setting in table
   for(size_t i=0;i<dset.size();i++)
-    if(name==dset[i].name) {
+    if(stricmp(name,dset[i].name)==0) {
       dset[i].val=val;
       return;
     }
@@ -131,7 +159,7 @@ void Settings::set_double(std::string name, double val) {
 void Settings::set_bool(std::string name, bool val) {
   // Find setting in table
   for(size_t i=0;i<bset.size();i++)
-    if(name==bset[i].name) {
+    if(stricmp(name,bset[i].name)==0) {
       bset[i].val=val;
       return;
     }
@@ -145,7 +173,7 @@ void Settings::set_bool(std::string name, bool val) {
 void Settings::set_int(std::string name, int val) {
   // Find setting in table
   for(size_t i=0;i<iset.size();i++)
-    if(name==iset[i].name) {
+    if(stricmp(name,iset[i].name)==0) {
       iset[i].val=val;
       return;
     }
@@ -160,7 +188,7 @@ void Settings::set_int(std::string name, int val) {
 void Settings::set_string(std::string name, std::string val) {
   // Find setting in table
   for(size_t i=0;i<sset.size();i++)
-    if(name==sset[i].name) {
+    if(stricmp(name,sset[i].name)==0) {
       sset[i].val=val;
       return;
     }
@@ -203,8 +231,6 @@ bool Settings::get_bool(std::string name) const {
   return 0;
 }
 
-
-
 int Settings::get_int(std::string name) const {
   // Find setting in table
   for(size_t i=0;i<iset.size();i++)
@@ -235,13 +261,15 @@ std::string Settings::get_string(std::string name) const {
   return "";
 }
 
+#ifdef DFT_ENABLED
 bool Settings::dft_enabled() const {
   return dft;
 }
+#endif
 
 bool Settings::is_double(std::string name) const {
   for(size_t i=0;i<dset.size();i++)
-    if(name==dset[i].name)
+    if(stricmp(name,dset[i].name)==0)
       return 1;
 
   return 0;
@@ -249,7 +277,7 @@ bool Settings::is_double(std::string name) const {
 
 bool Settings::is_int(std::string name) const {
   for(size_t i=0;i<iset.size();i++)
-    if(name==iset[i].name)
+    if(stricmp(name,iset[i].name)==0)
       return 1;
 
   return 0;
@@ -257,14 +285,14 @@ bool Settings::is_int(std::string name) const {
 
 bool Settings::is_bool(std::string name) const {
   for(size_t i=0;i<bset.size();i++)
-    if(name==bset[i].name)
+    if(stricmp(name,bset[i].name)==0)
       return 1;
   return 0;
 }
 
 bool Settings::is_string(std::string name) const {
   for(size_t i=0;i<sset.size();i++)
-    if(name==sset[i].name)
+    if(stricmp(name,sset[i].name)==0)
       return 1;
   return 0;
 }
@@ -284,19 +312,41 @@ void Settings::parse(std::string filename) {
 
       if(words.size()) {
 	// Parse keywords
-	if(is_double(words[0]))
-	  set_double(words[0],readdouble(words[1]));
-	else if(is_int(words[0]))
-	  set_int(words[0],readint(words[1]));
-	else if(is_bool(words[0]))
-	  set_bool(words[0],readint(words[1]));
-	else if(is_string(words[0]))
-	  set_string(words[0],words[1]);
-	else {
+
+	if(words.size()==1) {
 	  ERROR_INFO();
 	  std::ostringstream oss;
-	  oss << "\nCannot recognize keyword "<<words[0]<<"!\n"; 
+	  oss << "\nParse error: "<<words[0]<<" has no value!\n"; 
 	  throw std::runtime_error(oss.str());
+	}
+	
+	if(stricmp(words[0],"Method")==0) {
+	  // Hartree-Fock or DFT?
+	  if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0)
+	    set_string("Method","HF");
+#ifdef DFT_ENABLED
+	  else {
+	    // Add dft related settings
+	    add_dft_settings();
+	    set_string("Method",words[1]);
+	  }
+#endif
+
+	} else {
+	  if(is_double(words[0])) {
+	    set_double(words[0],readdouble(words[1]));
+	  } else if(is_int(words[0])) {
+	    set_int(words[0],readint(words[1]));
+	  } else if(is_bool(words[0])) {
+	    set_bool(words[0],readint(words[1]));
+	  } else if(is_string(words[0])) {
+	    set_string(words[0],words[1]);
+	  } else {
+	    ERROR_INFO();
+	    std::ostringstream oss;
+	    oss << "\nCannot recognize keyword "<<words[0]<<"!\n"; 
+	    throw std::runtime_error(oss.str());
+	  }
 	}
       }
     }

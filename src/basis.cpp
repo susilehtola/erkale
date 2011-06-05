@@ -2300,6 +2300,7 @@ bool exponent_compare(const GaussianShell & lhs, const GaussianShell & rhs) {
 }
 
 
+#ifdef DFT_ENABLED
 BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
   // Automatically generate density fitting basis.
 
@@ -2451,6 +2452,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 
   return dfit;
 }
+#endif
 
 
 size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl) {
