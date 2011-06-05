@@ -7,16 +7,32 @@ project (ERKALE)
 cmake_minimum_required(VERSION 2.8)
 
 # Compile SMP version?
-option(USE_OPENMP "Compile OpenMP enabled version (for parallel calculations)?" OFF)
+option(USE_OPENMP "Compile OpenMP enabled version (for parallel calculations)?" ON)
 # Find OpenMP support
 if(USE_OPENMP)
  find_package( OpenMP )
+else()
+ # No flags
+ set(OpenMP_C_FLAGS "" )
+ set(OpenMP_CXX_FLAGS "" )
 endif()
 
 # Find cat
 find_program(CAT cat)
 
 # Find out how to preprocess C++ source code files
+if(CMAKE_COMPILER_IS_GNUCXX)
+ set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E )
+else( CMAKE_CXX_COMPILER_ID strequal "PGI" )
+ set( PPROC ${CMAKE_CXX_COMPILER} -E )
+else( CMAKE_CXX_COMPILER_ID strequal "PathScale" )
+ set( PPROC ${CMAKE_CXX_COMPILER} -E )
+else( CMAKE_CXX_COMPILER_ID strequal "Intel" )
+ set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E )
+else()
+ set( PPROC "" )
+ message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER_ID} not supported." )
+endif()
 
 
 # Recurse into the "src" subdirectory.
