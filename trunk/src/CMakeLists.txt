@@ -11,12 +11,14 @@ add_library (erkale_dft
 lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp )
 
+# make sure cmake addes the binary directory for the project to the include path
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+
 # Recipe for building ERITable
 add_custom_command(
  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
- COMMAND ${CMAKE_COMMAND} ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eritable-base.cpp > ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
-# COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >> ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
-# COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
+ COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eritable-base.cpp > ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E -DERITABLE ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >> ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in ${CMAKE_CURRENT_SOURCE_DIR}/eritable-base.cpp
 )
 
@@ -25,11 +27,11 @@ add_custom_command(
  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in ${CMAKE_CURRENT_SOURCE_DIR}/eriscreen-base.cpp
 
- COMMAND ${CMAKE_COMMAND} ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eriscreen-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E -DCALCJKab ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E -DCALCJK ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E -DCALCJ ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E -DCALCK ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
+ COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eriscreen-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E -DCALCJKab ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E -DCALCJK ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E -DCALCJ ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E -DCALCK ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
 )
 
 
@@ -38,9 +40,9 @@ add_custom_command(
  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
 
- COMMAND ${CMAKE_COMMAND} ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
- COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
- COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
- COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
- COMMAND ${CMAKE_COMMAND} ${CMAKE_C_COMPILER} -E -DDFT -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
+ COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
+ COMMAND ${CMAKE_C_COMPILER} -x c++ -E -DDFT -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
 )
