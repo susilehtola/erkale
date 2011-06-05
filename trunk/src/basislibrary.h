@@ -29,6 +29,14 @@
 /// Find angular momentum
 int find_am(char am);
 
+/// Find basis set file
+std::string find_basis(const std::string & filename);
+
+/// System default location for basis sets
+#ifndef ERKALE_LIBRARY
+#define ERKALE_LIBRARY "/usr/share/erkale/basis"
+#endif
+
 /**
  * \class FunctionShell
  *

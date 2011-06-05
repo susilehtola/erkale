@@ -77,8 +77,10 @@ class Settings {
   /// String value settings
   std::vector<stringset_t> sset;
 
+#ifdef DFT_ENABLED
   /// DFT run?
   bool dft;
+#endif
 
  public:
   /// Constructor
@@ -86,8 +88,14 @@ class Settings {
   /// Destructor
   ~Settings();
 
+#ifdef DFT_ENABLED
   /// Add DFT related settings
   void add_dft_settings();
+  /// Remove DFT related settings
+  void remove_dft_settings();
+  /// Are these settings meant for a DFT run?
+  bool dft_enabled() const;
+#endif
 
   /// Set a double valued setting
   void set_double(std::string name, double val);
@@ -106,9 +114,6 @@ class Settings {
   int get_int(std::string name) const;
   /// Get a string valued setting
   std::string get_string(std::string name) const;
-
-  /// Are these settings meant for a DFT run?
-  bool dft_enabled() const;
 
   /// Is "name" a setting of double type?
   bool is_double(std::string name) const;

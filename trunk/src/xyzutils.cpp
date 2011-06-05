@@ -55,7 +55,9 @@ std::vector<atom_t> load_xyz(std::string filename) {
       
       if(!in.good()) {
 	ERROR_INFO();
-	throw std::domain_error("XYZ file ended unexpectedly!\n");
+	std::ostringstream oss;
+	oss << "File \""<<filename<<"\" ended unexpectedly!\n";
+	throw std::runtime_error(oss.str());
       }
 
       // Get line containing the input
@@ -65,7 +67,9 @@ std::vector<atom_t> load_xyz(std::string filename) {
       
       if(!words.size()) {
 	ERROR_INFO();
-	throw std::domain_error("XYZ file ended unexpectedly!\n");
+	std::ostringstream oss;
+	oss << "File \""<<filename<<"\" ended unexpectedly!\n";
+	throw std::runtime_error(oss.str());
       }
       
       // and extract the information
@@ -78,12 +82,16 @@ std::vector<atom_t> load_xyz(std::string filename) {
     }
   } else {
     ERROR_INFO();
-    throw std::runtime_error("Could not open xyz file!\n");
+    std::ostringstream oss;
+    oss << "Could not open xyz file \""<<filename<<"\"!\n";
+    throw std::runtime_error(oss.str());
   }
 
   if(atoms.size()==0) {
     ERROR_INFO();
-    throw std::domain_error("No atoms found in xyz file!\n");
+    std::ostringstream oss;
+    oss << "File \""<<filename<<"\" contains no atoms!\n";
+    throw std::runtime_error(oss.str());
   }
 
   return atoms;

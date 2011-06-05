@@ -19,6 +19,7 @@
 #include "stringutil.h"
 
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 
 std::string tolower(const std::string & in) {
@@ -33,6 +34,10 @@ std::string toupper(const std::string & in) {
   for(size_t i=0;i<ret.size();i++)
     ret[i]=toupper(ret[i]);
   return ret;
+}
+
+int stricmp(const std::string &str1, const std::string& str2) {
+  return strcasecmp(str1.c_str(),str2.c_str());
 }
 
 std::string readline(std::istream & in) {
