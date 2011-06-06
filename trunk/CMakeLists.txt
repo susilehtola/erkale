@@ -4,7 +4,9 @@
 project (ERKALE)
 
 # Require CMake version 2.8 (might work with older ones, too)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.6)
+# Enable Fortran for LAPACK
+enable_language (Fortran)
 
 # Cmake modules/macros are in a subdirectory to keep this file cleaner
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
