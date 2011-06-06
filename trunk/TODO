@@ -4,6 +4,8 @@
   - Compilation with cmake
   - Usage of unified executable
 
+* Fix densityfitting memory estimate.
+
 * Debug unrestricted calculations, which seem to have broken.
 
 * Write pretty-printing routine for making bars such as *** text ***
