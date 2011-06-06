@@ -58,7 +58,7 @@ std::string find_basis(const std::string & filename) {
   // Next, try local directory.
   dirs.push_back("");
   // Finally, try system wide directory.
-  dirs.push_back(ERKALE_LIBRARY);
+  dirs.push_back(ERKALE_SYSTEM_LIBRARY);
 
   // Loop over directories.
   for(size_t id=0;id<dirs.size();id++) {
@@ -66,12 +66,16 @@ std::string find_basis(const std::string & filename) {
     std::vector<std::string> trialnames;
 
     // Try without extension
+    trialnames.push_back(dirs[id]+filename);
     trialnames.push_back(dirs[id]+"/"+filename);
     // and with extension
+    trialnames.push_back(dirs[id]+filename+".gbs");
     trialnames.push_back(dirs[id]+"/"+filename+".gbs");
 
     // Loop over trial names
     for(size_t i=0;i<trialnames.size();i++) {
+      printf("Trying %s\n",trialnames[i].c_str());
+
       // Try to open file for reading
       std::ifstream in(trialnames[i].c_str());
       if(in.is_open()) {
