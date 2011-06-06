@@ -125,13 +125,12 @@ int main(int argc, char **argv) {
   bool hf= (stricmp(set.get_string("Method"),"HF")==0);
 
   // Initialize calculation?
-  bool init= (stricmp(set.get_string("InitMethod"),"none")!=0);
-  init = init || ( stricmp(set.get_string("InitMethod"),"none-none")!=0);
+  bool noinit=(stricmp(set.get_string("InitMethod"),"none")==0);
+  noinit = noinit || ( stricmp(set.get_string("InitMethod"),"none-none")==0);
+  bool init=!noinit;
 
   // Initialize with Hartree-Fock? (Even though there's not much sense in it)
   bool hfinit= (stricmp(set.get_string("InitMethod"),"HF")==0);
-
-  printf("hf=%i, init=%i, hfinit=%i.\n",hf,init,hfinit);
 
   // Settings used for initialization
   Settings initset=set;
@@ -213,15 +212,16 @@ int main(int argc, char **argv) {
       if(hfinit) {
       	// Solve restricted Hartree-Fock
 	initsolver.RHF(C,E);
-      }
+      } else {
 #ifdef DFT_ENABLED
-      else {
 	// Print information about used functionals
 	print_info(x_init,c_init);
 	// Solve restricted DFT problem
 	initsolver.RDFT(C,E,x_init,c_init);
-      }
+#else
+	throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif
+      }
 
       printf("\nInitialization complete.\n\n\n\n");
     }
@@ -232,15 +232,17 @@ int main(int argc, char **argv) {
     if(hf) {
       // Solve restricted Hartree-Fock
       solver.RHF(C,E);
-    }
+    } else {
 #ifdef DFT_ENABLED
-    else {
       // Print information about used functionals
       print_info(x_func,c_func);
       // Solve restricted DFT problem
       solver.RDFT(C,E,x_func,c_func);
-    }
+#else
+      throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif
+    }
+
 
     // Form density matrix
     form_density(P,C,Nel/2);
@@ -258,15 +260,16 @@ int main(int argc, char **argv) {
       if(hfinit) {
 	// Solve restricted Hartree-Fock
 	initsolver.UHF(Ca,Cb,Ea,Eb);
-      }
+      } else {
 #ifdef DFT_ENABLED
-      else {
 	// Print information about used functionals
 	print_info(x_init,c_init);
 	// Solve restricted DFT problem
 	initsolver.UDFT(Ca,Cb,Ea,Eb,x_init,c_init);
-      }
+#else
+	throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif
+      }
       
       printf("\nInitialization complete.\n\n\n\n");
     }
@@ -277,15 +280,16 @@ int main(int argc, char **argv) {
     if(hf) {
       // Solve restricted Hartree-Fock
       solver.UHF(Ca,Cb,Ea,Eb);
-    }
+    } else {
 #ifdef DFT_ENABLED
-    else {
       // Print information about used functionals
       print_info(x_func,c_func);
       // Solve restricted DFT problem
       solver.UDFT(Ca,Cb,Ea,Eb,x_func,c_func);
-    }
+#else
+      throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif
+    }
 
     // Form density matrix
     arma::mat Pa, Pb;
