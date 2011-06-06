@@ -33,8 +33,8 @@ int find_am(char am);
 std::string find_basis(const std::string & filename);
 
 /// System default location for basis sets
-#ifndef ERKALE_LIBRARY
-#define ERKALE_LIBRARY "/usr/share/erkale/basis"
+#ifndef ERKALE_SYSTEM_LIBRARY
+#define ERKALE_SYSTEM_LIBRARY "/usr/share/erkale/basis"
 #endif
 
 /**

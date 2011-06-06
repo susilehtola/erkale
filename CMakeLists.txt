@@ -12,6 +12,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(libint_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
 set(Armadillo_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
+# System default basis set repository (need not exist)
+option(ERKALE_SYSTEM_LIBRARY "System default basis set repository (need not exist)" OFF)
+if(ERKALE_SYSTEM_LIBRARY)
+ message("Using ${ERKALE_SYSTEM_LIBRARY} as default basis set repository.")
+ set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -DERKALE_SYSTEM_LIBRARY=\\"${ERKALE_SYSTEM_LIBRARY}\\" )
+else()
+ message("Using default location for basis set repository.")
+endif()
+
 # Compile SMP version?
 option(USE_OPENMP "Compile OpenMP enabled version (for parallel calculations)?" ON)
 # Find OpenMP support
@@ -19,7 +28,7 @@ if(USE_OPENMP)
  find_package( OpenMP )
  if(OPENMP_FOUND)
   # Add flags to CXX flags
-  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
  endif()
 else()
  # No flags
@@ -84,7 +93,6 @@ else()
  set( PPROC "" )
  message(FATAL_ERROR "Compiler ${CMAKE_CXX_COMPILER_ID} not supported." )
 endif()
-
 
 # Recurse into the "src" subdirectory.
 add_subdirectory (src)
