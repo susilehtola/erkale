@@ -17,6 +17,10 @@ option(USE_OPENMP "Compile OpenMP enabled version (for parallel calculations)?" 
 # Find OpenMP support
 if(USE_OPENMP)
  find_package( OpenMP )
+ if(OPENMP_FOUND)
+  # Add flags to CXX flags
+  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS})
+ endif()
 else()
  # No flags
  set(OpenMP_C_FLAGS "" )
