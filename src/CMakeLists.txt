@@ -9,12 +9,19 @@ INCLUDE_DIRECTORIES(${ARMADILLO_INCLUDE_DIRS})
 # Add the GSL include directory
 INCLUDE_DIRECTORIES(${GSL_INCLUDE_DIRS})
 # Add libxc include directory if necessary
-if(xc_FOUND)
- INCLUDE_DIRECTORIES(${xc_INCLUDE_DIRS})
+if(LIBXC_FOUND)
+ INCLUDE_DIRECTORIES(${LIBXC_INCLUDE_DIRS})
 endif()
 # Add libint include directory if necessary
-if(int_FOUND)
- INCLUDE_DIRECTORIES(${int_INCLUDE_DIRS})
+if(FOUND)
+ INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
+endif()
+
+# Create the ERKALE DFT library "erkale_dft"
+if(USEDFT)
+ add_library (erkale_dft
+ lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
+ density_fitting.cpp lebedev.cpp )
 endif()
 
 # Create the ERKALE base library "erkale" which includes the following sources
@@ -25,18 +32,25 @@ solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
 settings.cpp broyden.cpp adiis.cpp tempered.cpp
 completeness/completeness_profile.cpp )
 
+# If we build shared libraries, they must be linked to the other libraries
+if(BUILD_SHARED_LIBS)
+ set_target_properties(erkale PROPERTIES
+  VERSION ${VERSION} SOVERSION ${VERSION} )
+ target_link_libraries(erkale ${GSL_LIBRARIES})
+ target_link_libraries(erkale ${LAPACK_LIBRARIES})
+ if(LIBINT_FOUND)
+  target_link_libraries(erkale ${LIBINT_LIBRARIES})
+ endif()
+ if(USEDFT)
+  set_target_properties(erkale_dft PROPERTIES
+   VERSION ${VERSION} SOVERSION ${SOVERSION} )
+  target_link_libraries(erkale_dft ${LIBXC_LIBRARIES})
+  target_link_libraries(erkale erkale_dft)
+ endif()
+endif()
+
 # Create the ERKALE electron momentum density library
 add_subdirectory(emd)
-#add_library (erkale_emd
-#emd/complex.cpp emd/emd.cpp emd/gto_fourier.cpp
-#emd/spherical_expansion.cpp emd/spherical_harmonics.cpp )
-
-# Create the ERKALE DFT library "erkale_dft" which contains the sources
-if(USEDFT)
- add_library (erkale_dft
- lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
- density_fitting.cpp lebedev.cpp )
-endif()
 
 # Create the ERKALE main executable
 add_executable (erkale.x main.cpp)
@@ -44,20 +58,22 @@ add_executable (erkale.x main.cpp)
 set_target_properties(erkale.x PROPERTIES OUTPUT_NAME erkale)
 target_link_libraries(erkale.x erkale)
 target_link_libraries(erkale.x erkale_emd)
-target_link_libraries(erkale.x ${GSL_LIBRARIES})
-target_link_libraries(erkale.x ${LAPACK_LIBRARIES})
-# Compile with DFT support?
-if(USEDFT)
- target_link_libraries(erkale.x erkale_dft)
- target_link_libraries(erkale.x ${LIBXC_LIBRARIES})
-endif()
-# Compile with libint support?
-if(LIBINT_FOUND)
- target_link_libraries(erkale.x ${LIBINT_LIBRARIES})
+if(!BUILD_SHARED_LIBS)
+ target_link_libraries(erkale.x ${GSL_LIBRARIES})
+ target_link_libraries(erkale.x ${LAPACK_LIBRARIES})
+ if(USEDFT)
+  target_link_libraries(erkale.x ${LIBXC_LIBRARIES})
+ endif()
+ if(LIBINT_FOUND)
+  target_link_libraries(erkale.x ${LIBINT_LIBRARIES})
+ endif()
 endif()
 
 # Install targets
 install (TARGETS erkale DESTINATION lib)
+if(USEDFT)
+ install (TARGETS erkale_dft DESTINATION lib)
+endif()
 install (TARGETS erkale.x DESTINATION bin)
 
 # Create the completeness profile tool
