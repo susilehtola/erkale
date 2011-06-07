@@ -1,8 +1,6 @@
 30 May 2011
 
-* Update documentation
-  - Compilation with cmake
-  - Usage of unified executable
+* Installed headers need to be preprocessed.
 
 * Fix densityfitting memory estimate.
 
