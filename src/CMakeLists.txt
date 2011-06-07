@@ -70,11 +70,15 @@ if(!BUILD_SHARED_LIBS)
 endif()
 
 # Install targets
-install (TARGETS erkale DESTINATION lib)
+install (TARGETS erkale DESTINATION lib${LIB_SUFFIX})
 if(USEDFT)
- install (TARGETS erkale_dft DESTINATION lib)
+ install (TARGETS erkale_dft DESTINATION lib${LIB_SUFFIX})
 endif()
 install (TARGETS erkale.x DESTINATION bin)
+
+# Install headers
+file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+install(FILES ${headers} DESTINATION include/erkale)
 
 # Create the completeness profile tool
 add_subdirectory(completeness)
