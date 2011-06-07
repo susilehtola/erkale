@@ -1,4 +1,4 @@
-2011-05-21
+2011-06-07
 Jussi Lehtola
 
 
@@ -6,6 +6,7 @@ Jussi Lehtola
 
 To compile ERKALE you need
 
+* CMake ( http://cmake.org )
 * The GNU Scientific Library ( http://www.gnu.org/s/gsl/ )
 * libint ( http://sourceforge.net/p/libint/home )
 * libxc ( http://www.tddft.org/programs/octopus/wiki/index.php/Libxc )
@@ -14,63 +15,87 @@ To compile ERKALE you need
 Naturally, you also need a decent LAPACK library installed. The use of
 an optimized library such as ATLAS, Intel MKL or AMD ACML is recommended.
 
-When the prerequisites are installed, compiling ERKALE should be as
-easy as running
- $ make
+To compile, please use the attached script compile.sh and modify it to
+suit your needs. Note that by default the build system creates an
+OpenMP parallellized version of ERKALE. The parallellization is quite
+trivial, but should still give about 80% of speedup. If you don't want
+ERKALE to be parallellized, give the argument "-DUSE_OPENMP=OFF" to
+cmake.
 
-In addition, if you wish to create the developer documentation, you
-need a working installation of doxygen and LaTeX. The documentation
-can be created by running
- $ make doc
-
-** Flavors of ERKALE **
-
-The compilation creates two versions of ERKALE: a serial version and
-an OpenMP parallellized version suitable for running on shared memory
-computers. The parallellization is quite trivial, but should still
-give about 80% of speedup.
-
-In addition, there are currently two flavors of executables: the
-Hartree-Fock executable 'hf.x' and the density-functional theory
-executable 'dft.x'.
-
+If you wish to create the developer documentation, you need a working
+installation of doxygen and LaTeX. The documentation can be created by
+running
+ $ doxygen
 
 ** Usage **
 
-The usage of both is the following:
-    $ hf.x/dft.x atoms.xyz basis.gbs (settings)
-in which
-   * atoms.xyz contains the system in xyz format
-   * basis.gbs is the basis set to be used in Gaussian '94 format
-   * settings is an optional Settings file; if one isn't given default
-     values are used
+ERKALE is used in the following manner
+    $ erkale input
 
-Here is an example of an xyz file
+Here "input" is a file, that contains at least the directive "Method",
+which can be either "HF" for a Hartree-Fock calculation or a
+specification of a DFT exchange-correlation functional. For example
+ Method gga_x_pbe-gga_c_pbe
+will run a calculation with PBE exchange and PBE correlation, and
+ Method hyb_gga_xc_b3lyp
+will run a B3LYP calculation.
 
+Please consult the libxc documentation for valid functional keywords.
+
+Upon startup, ERKALE will print out the current settings, along with
+valid keywords.
+
+** Example **
+
+Here is an example input file:
+ Method HF
+ InitMethod lda_x-lda_c_vwn
+ Basis aug-cc-pVTZ
+ System ethanol.xyz
+ Direct  1
+ UseADIIS 0
+ UseDIIS 0
+ UseBroyden 1
+
+The first line specifies that a Hartree-Fock calculation is requested.
+
+The second line requests that the calculation be initialized with a
+S-VWN calculation. The idea behind this is to speed up the
+calculation: by default a core guess is used, which completely ignores
+electron-electron repulsion. By running a simple calculation with
+rough accuracy the necessary number of costly Hartree-Fock iterations
+can be brought down.
+
+The third line specifies that the aug-cc-pVTZ basis is to be used in
+the calculation. ERKALE searches for the basis set in the following order:
+ 1. A basis set library location specified by the environmental
+ variable ERKALE_LIBRARY.
+ 2. In the current directory.
+ 3. In the system wide basis set library repository, which is by
+ default /usr/share/erkale/basis. The value can be changed via a
+ compile-time option (add to cmake flags), e.g.,
+ -DERKALE_SYSTEM_LIBRARY=/usr/local/share/erkale/basis.
+The .gbs extension is automatically added, if necessary.
+
+The fourth line states that the atoms in the system are to be read
+from the file "ethanol.xyz". The file must be in xyz format, for
+example:
      3
      B3LYP aug-cc-pVTZ optimized water molecule
-     O	    0.000000    0.117030    0.000000
-     H	    0.763404   -0.468123    0.000000
-     H	   -0.763404   -0.468115    0.000000
+     O      0.000000    0.117030    0.000000
+     H      0.763404   -0.468123    0.000000
+     H     -0.763404   -0.468115    0.000000
 
-A selection of commonly used basis sets is shipped alongside ERKALE.
+The fourth line states that two-electron (and density-fitting)
+integrals are to be computed on the fly. By default, the integrals are
+tabled in memory.
 
+The fifth line turns off ADIIS acceleration (incompatible with Broyden).
 
-** Settings **
+The sixth line turns off DIIS acceleration (incompatible with Broyden).
 
-ERKALE prints the settings used for the calculation, along with the
-keywords, right at the beginning.
+The seventh line turns on Broyden acceleration.
 
-Some settings are only applicable to DFT, for instance DFT_X and DFT_C
-that specify the exchange and correlation functionals to be
-used. These can be given either directly as libxc functional numbers
-(e.g. 7 for VWN correlation), or as case-independent strings
-(lda_c_vwn for VWN correlation).
-
-To use a hybrid functional such as B3LYP, specify
-   DFT_X HYB_GGA_XC_B3LYP
-   DFT_C None
-since B3LYP already includes correlation.
 
 ** Contact information **
 
