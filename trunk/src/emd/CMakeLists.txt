@@ -6,4 +6,4 @@ if(BUILD_SHARED_LIBS)
   VERSION ${VERSION} SOVERSION ${SOVERSION} )
 endif()
 
-install (TARGETS erkale_emd DESTINATION lib)
+install (TARGETS erkale_emd DESTINATION lib${LIB_SUFFIX})
