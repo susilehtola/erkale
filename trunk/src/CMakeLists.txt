@@ -56,8 +56,15 @@ if(LIBINT_FOUND)
  target_link_libraries(erkale.x ${LIBINT_LIBRARIES})
 endif()
 
+# Install targets
+install (TARGETS erkale DESTINATION lib)
+install (TARGETS erkale.x DESTINATION bin)
+
 # Create the completeness profile tool
 add_subdirectory(completeness)
+# Create the Slater fit tool
+add_subdirectory(slaterfit)
+
 
 # Recipe for building ERITable
 add_custom_command(

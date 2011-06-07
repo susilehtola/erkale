@@ -14,15 +14,19 @@
  * of the License, or (at your option) any later version.
  */
 
-
-
 #ifndef ERKALE_SLATER_COEFF
 #define ERKALE_SLATER_COEFF
 
 #include <armadillo>
 #include <vector>
 
-/// Solve optimal coefficients to fit STO with exponent zeta with given Gaussian exponents
+/**
+ * Solve optimal coefficients to fit STO with exponent zeta with given
+ * Gaussian exponents
+ *
+ * K. O-ohata, H. Taketa and S. Huzinaga, "Gaussian Expansions of
+ * Atomic Orbitals", J. Phys. Soc. Japan 21 (1966), pp. 2036 - 2313.
+ */
 arma::vec solve_coefficients(std::vector<double> expns, double zeta, int l);
 
 /// Compute self-overlap of difference 
