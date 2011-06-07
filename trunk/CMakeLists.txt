@@ -8,6 +8,11 @@ cmake_minimum_required(VERSION 2.6)
 # Enable Fortran for LAPACK
 enable_language (Fortran)
 
+# Set version
+set(VERSION 0.1.0)
+# Version of libraries
+set(SOVERSION 0.1.0)
+
 # Cmake modules/macros are in a subdirectory to keep this file cleaner
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # Configuration where to find libint is in current directory
