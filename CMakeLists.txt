@@ -36,11 +36,17 @@ if(USE_OPENMP)
  if(OPENMP_FOUND)
   # Add flags to CXX flags
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  # Set suffix
+  set(SUFFIX "_omp")
+ else()
+  set(SUFFIX "")
  endif()
 else()
  # No flags
  set(OpenMP_C_FLAGS "" )
  set(OpenMP_CXX_FLAGS "" )
+ # No suffix
+ set(SUFFIX "")
 endif()
 
 # Find cat
