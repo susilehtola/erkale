@@ -2,6 +2,8 @@
 
 * Installed headers need to be preprocessed.
 
+* Add -doc to precompiled packages.
+
 * Fix densityfitting memory estimate.
 
 * Debug unrestricted calculations, which seem to have broken.
