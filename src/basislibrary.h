@@ -102,6 +102,8 @@ class ElementBasisSet {
 
   /// Symbol of element
   std::string symbol;
+  /// Atom id for which the basis is for (0 for all atoms)
+  size_t number;
   /// List of shells
   std::vector<FunctionShell> bf;
 
@@ -109,7 +111,7 @@ class ElementBasisSet {
   /// Dummy constructor
   ElementBasisSet();
   /// Constructor
-  ElementBasisSet(std::string sym);
+  ElementBasisSet(std::string sym, size_t number=0);
   /// Destructor
   ~ElementBasisSet();
   
@@ -122,6 +124,8 @@ class ElementBasisSet {
 
   /// Get the symbol of the element
   std::string get_symbol() const;
+  /// Get the number 
+  size_t get_number() const;
 
   /// Comparison operator for sorting
   bool operator<(const ElementBasisSet &rhs) const;
@@ -193,7 +197,7 @@ class BasisSetLibrary {
   int get_max_am() const;
 
   /// Get basis set for wanted element
-  ElementBasisSet get_element(std::string el) const;
+  ElementBasisSet get_element(std::string el, size_t number=0) const;
 
   /// Print out library
   void print() const;

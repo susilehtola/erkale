@@ -154,8 +154,9 @@ std::vector<double> FunctionShell::get_contr() const {
 ElementBasisSet::ElementBasisSet() {
 }
 
-ElementBasisSet::ElementBasisSet(std::string sym) {
+ElementBasisSet::ElementBasisSet(std::string sym, size_t num) {
   symbol=sym;
+  number=num;
 }
 
 ElementBasisSet::~ElementBasisSet() {
@@ -183,6 +184,10 @@ void ElementBasisSet::print() const {
 
 std::string ElementBasisSet::get_symbol() const {
   return symbol;
+}
+
+size_t ElementBasisSet::get_number() const {
+  return number;
 }
 
 bool ElementBasisSet::operator<(const ElementBasisSet &rhs) const {
@@ -316,14 +321,27 @@ void BasisSetLibrary::load_gaussian94(std::string basis) {
       std::vector<std::string> line_split;
       line_split=splitline(line);
 
-      if(line_split.size()==2 && readint(line_split[1])==0) {
+      if(line_split.size()==2) {
 	// OK, found an element entry.
 
 	// The symbol of the element is
 	std::string sym=line_split[0];
+	// and the atom number the basis is for is
+	size_t num=readint(line_split[1]);
+
+	// Check that there is no duplicate entry
+	bool found=0;
+	for(size_t i=0;i<elements.size();i++)
+	  if(elements[i].get_symbol()==el && elements[i].get_number()==num)
+	    found=1;
+	if(found) {
+	  ERROR_INFO();
+	  oss << "Error: multiple basis set definitions found for element " << el << " in file " << filename << "!\n";
+	  throw std::runtime_error(oss.str());
+	}
 
 	// Create basis set structure for the element
-	el=ElementBasisSet(sym);
+	el=ElementBasisSet(sym,num);
 
 	// Now, proceed by reading in the basis functions
 	while(1) {
@@ -446,20 +464,20 @@ void BasisSetLibrary::print() const {
     elements[i].print();
 }
 
-ElementBasisSet BasisSetLibrary::get_element(std::string el) const {
+ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) const {
   // Get element from library
   
   // Go through library to find element
   for(size_t i=0;i<elements.size();i++)
-    if(elements[i].get_symbol()==el)
+    if(elements[i].get_symbol()==el && elements[i].get_number()==number)
       return elements[i];
 
   // If we are still here, it means the element was not found.
-  ERROR_INFO();
+  //  ERROR_INFO(); // Don't print info, since we normally catch the error.
   std::ostringstream oss;
-  oss << "Could not find element "<<el<<" in library!\n";
+  oss << "Could not find basis for element " << el << " with atom number " << num << " in library!\n";
   throw std::runtime_error(oss.str());
-
+  
   // Dummy return clause
   return ElementBasisSet();
 }
