@@ -682,6 +682,11 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 
     // Compute change of (total) density
     deltaP=Pnew-P;
+#ifndef RESTRICTED
+    // Compute change of polarized densities
+    deltaPa=Panew-Pa;
+    deltaPb=Pbnew-Pb;
+#endif
 
     // Compute convergence criteria
 #ifdef RESTRICTED
