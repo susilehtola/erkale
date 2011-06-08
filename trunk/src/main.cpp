@@ -109,8 +109,17 @@ int main(int argc, char **argv) {
       el=el.substr(0,el.size()-3);
     }
 
-    // Add basis functions
-    basis.add_functions(i,cen,baslib.get_element(el));
+    // Get functions belonging to nucleus
+    ElementBasisSet elbas;
+    // Check first if a special set is wanted
+    try {
+      elbas=baslib.get_element(el,i+1);
+    } catch(std::runtime_error err) {
+      // Did not find a special basis, use the general one instead.
+      elbas=baslib.get_element(el,0);
+    }
+
+    basis.add_functions(i,cen,elbas);
     // and the nucleus
     basis.add_nucleus(i,cen,get_Z(el),el,bsse);
   }
