@@ -737,7 +737,12 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
       printf("\nEnergy:\telectronic\ttotal\t\tvirial\t\tchange\n");
       printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",Etote,Etot,-Etot/Ekin,deltaE);
 
+#ifdef DFT
       printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tXC\n");
+#else
+      // No correlation in Hartree-Fock!
+      printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tExchange\n");
+#endif
       printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% 08.8f\n",Ekin,Enuca,Ecoul,Exc);
 
 #ifdef RESTRICTED
