@@ -132,7 +132,7 @@ void print_E(size_t N, const arma::vec & E) {
     // Convert it into eV
     gap*=HARTREEINEV;
 
-    printf("Band gap is %7.2f eV. ",gap);
+    printf("HOMO-LUMO gap is %7.2f eV. ",gap);
   } 
   
   printf("Energies of lowest lying states:\n");
