@@ -332,11 +332,12 @@ void BasisSetLibrary::load_gaussian94(std::string basis) {
 	// Check that there is no duplicate entry
 	bool found=0;
 	for(size_t i=0;i<elements.size();i++)
-	  if(elements[i].get_symbol()==el && elements[i].get_number()==num)
+	  if( (elements[i].get_symbol()==sym) && (elements[i].get_number()==num))
 	    found=1;
 	if(found) {
+	  std::ostringstream oss;
 	  ERROR_INFO();
-	  oss << "Error: multiple basis set definitions found for element " << el << " in file " << filename << "!\n";
+	  oss << "Error: multiple basis set definitions found for element " << sym << " in file " << filename << "!\n";
 	  throw std::runtime_error(oss.str());
 	}
 
@@ -475,7 +476,7 @@ ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) cons
   // If we are still here, it means the element was not found.
   //  ERROR_INFO(); // Don't print info, since we normally catch the error.
   std::ostringstream oss;
-  oss << "Could not find basis for element " << el << " with atom number " << num << " in library!\n";
+  oss << "Could not find basis for element " << el << " with atom number " << number << " in library!\n";
   throw std::runtime_error(oss.str());
   
   // Dummy return clause
