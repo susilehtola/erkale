@@ -17,7 +17,6 @@
 
 
 #include "adiis.h"
-#include <gsl/gsl_blas.h>
 #include <gsl/gsl_rng.h>
 
 ADIIS::ADIIS(size_t m) {
@@ -113,67 +112,6 @@ std::vector<double> ADIIS::get_c() const {
 
   // Initial estimate
   double E_initial=get_E(x);
-
-  /*
-  // Gradient vector
-  gsl_vector *g=gsl_vector_alloc(N);
-  
-  // Step size and test vector
-  double step=1.0;
-  gsl_vector *test=gsl_vector_alloc(N);
-  
-  // New and old energy
-  double E, Etest, dE;
-
-  size_t iiter=0;
-  do {
-    dE=0.0;
-    iiter++;
-    // Compute energy and gradient
-    get_E_dEdx(x,&E,g);
-
-    //    printf("x\tg\n");
-    //    for(size_t i=0;i<N;i++)
-    //      printf("%e\t%e\n",gsl_vector_get(x,i),gsl_vector_get(g,i));
-
-    // Compute norms
-    double xnorm=gsl_blas_dnrm2(x);
-    double gnorm=gsl_blas_dnrm2(g);
-
-    if(gnorm<1e-10) {
-      printf("Converged due to small gradient.\n");
-      break;
-    } 
-
-    // Otherwise, try moves in direction opposite to gradient
-    while(step>DBL_EPSILON) {
-      // Move
-      for(size_t i=0;i<N;i++)
-	gsl_vector_set(test,i,gsl_vector_get(x,i)-step*xnorm/gnorm*gsl_vector_get(g,i));
-      // calculate energy
-      Etest=get_E(test);
-      if(Etest<E) {
-	// Accept move.
-	dE=Etest-E;
-	gsl_vector_memcpy(x,test);
-	E=Etest;
-
-	step*=1.2;
-	//	printf("step=%e, dE=%e accepted.\n",step,Etest-E);
-	break;
-      } else {
-	//	printf("step=%e, dE=%e rejected.\n",step,Etest-E);
-	step/=2.0;
-      }
-    }
-
-    if(dE<0.0)
-      printf("%lu\t%e\t%e\t%e\n",iiter,step,E,dE);
-  } while(step>DBL_EPSILON);
-
-  gsl_vector_free(test);
-  gsl_vector_free(g);
-  */
 
   // Step size 0.01, stop optimization with tolerance 1e-4
   gsl_multimin_fdfminimizer_set(s, &minfunc, x, 0.01, 1e-4);
