@@ -81,6 +81,9 @@ endif()
 # Find libint
 find_package(libint)
 if(libint_FOUND)
+ # Add to flags
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLIBINT")
+
  message("libint support enabled.")
  message("libint headers are in ${LIBINT_INCLUDE_DIRS}")
  message("libint linker flags are ${LIBINT_LIBRARIES}")

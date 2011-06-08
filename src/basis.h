@@ -22,8 +22,8 @@
 /// Use Obara-Saika for computing 1-electron integrals?
 #define OBARASAIKA
 
-/// Use libint for computing two-electron integrals?
-#define LIBINT
+/// Use libint for computing two-electron integrals? (Set by CMake)
+//#define LIBINT
 
 #include <armadillo>
 #include <vector>
@@ -151,6 +151,9 @@ class BasisSet {
 #ifdef LIBINT
   /// Libint initialized?
   bool libintok;
+#else
+  // This variable only exists if LIBINT support has been enabled
+  //  bool libintok;
 #endif
 
  public:
@@ -170,6 +173,9 @@ class BasisSet {
    * containing H to Kr", J. Chem. Phys. 127 (2007), 074102.
    */
   BasisSet density_fitting(double fsam=1.5, int lmaxinc=1) const;
+#else
+  // This function only exists when DFT support has been enabled
+  //  BasisSet density_fitting(double fsam=1.5, int lmaxinc=1) const;
 #endif
   
   /// Add functions for element el at cen
@@ -213,7 +219,12 @@ class BasisSet {
   void libint_init();
   /// Libint has already been initialized elsewhere
   void set_libint_ok();
+#else
+  // These functions only exist when LIBINT support has been enabled
+  //  void libint_init();
+  //  void set_libint_ok();
 #endif
+
   /// Do all of the above
   void finalize(bool libintok=0);
 
@@ -502,6 +513,10 @@ class GaussianShell {
   friend void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
   /// Compute data for LIBINT
   friend void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+#else
+  // These functions only exist when LIBINT support has been enabled
+  //  friend void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
+  //  friend void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 #endif
 };
 
