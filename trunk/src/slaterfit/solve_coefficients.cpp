@@ -79,7 +79,7 @@ double compute_difference(std::vector<double> expns, double zeta, int l) {
   arma::vec c=invS*P;
 
   // Compute difference from unity
-  double delta=1.0-2*dot(c,P);
+  double delta=1.0-2.0*arma::dot(c,P);
   delta+=arma::as_scalar(arma::trans(c)*S*c);
   return delta;
 }
