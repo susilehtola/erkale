@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
   print_license();
 
   if(argc!=2) {
-    printf("Usage: %s runfile\n",argv[0]);
+    printf("Usage: $ %s runfile\n",argv[0]);
     return 0;
   }
 
