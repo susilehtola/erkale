@@ -158,7 +158,7 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
   Nmem+=No*sizeof(size_t);
   // Memory taken up by  ( \alpha | \mu \nu)
   if(!direct)
-    Nmem+=(Na*No*(Norb+1)/2)*sizeof(double);
+    Nmem+=(Na*No*(No+1)/2)*sizeof(double);
 #ifdef SCREENING
   else {
     // Memory taken up by screening matrix
