@@ -1,5 +1,3 @@
-30 May 2011
-
 * Installed headers need to be preprocessed.
 
 * Write pretty-printing routine for making bars such as *** text ***
