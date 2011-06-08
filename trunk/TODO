@@ -2,8 +2,6 @@
 
 * Installed headers need to be preprocessed.
 
-* Add -doc to precompiled packages.
-
 * Fix densityfitting memory estimate.
 
 * Debug unrestricted calculations, which seem to have broken.
@@ -11,10 +9,10 @@
 * Write pretty-printing routine for making bars such as *** text ***
   or --- text ---.
 
-* Implement writing of cube files, for visualization of e.g. electron
-  density and molecular orbitals.
-
-* Rewrite the SCF solver in a clearer, more object-oriented form. (?)
+* Implement writing of cube files, for visualization of e.g.
+  - electron density
+  - molecular orbitals.
+  - electrostatic potential
 
 * Debug meta-GGA & meta-GGA functionals (in collaboration with libxc
   upstream).
@@ -25,9 +23,6 @@
 
 * Implement ROHF.
 
-* Implement possibility to use mixed basis sets (e.g. use a larger
-  basis set for a single atom in a calculation)
-
 * Implement checkpointing / saving of results.
 
-* Implement calculation of electrostatic molecular potential.
+? Rewrite the SCF solver in a clearer, more object-oriented form.
