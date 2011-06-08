@@ -22,6 +22,8 @@ if(USEDFT)
  add_library (erkale_dft
  lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
  density_fitting.cpp lebedev.cpp )
+ # The name of the library is
+ set_target_properties(erkale_dft PROPERTIES OUTPUT_NAME "erkale_dft${SUFFIX}")
 endif()
 
 # Create the ERKALE base library "erkale" which includes the following sources
@@ -31,6 +33,8 @@ eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
 solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
 settings.cpp broyden.cpp adiis.cpp tempered.cpp
 completeness/completeness_profile.cpp )
+# The name of the executable is
+set_target_properties(erkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
 
 # If we build shared libraries, they must be linked to the other libraries
 if(BUILD_SHARED_LIBS)
@@ -55,7 +59,7 @@ add_subdirectory(emd)
 # Create the ERKALE main executable
 add_executable (erkale.x main.cpp)
 # The name of the executable is
-set_target_properties(erkale.x PROPERTIES OUTPUT_NAME erkale)
+set_target_properties(erkale.x PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
 target_link_libraries(erkale.x erkale)
 target_link_libraries(erkale.x erkale_emd)
 
