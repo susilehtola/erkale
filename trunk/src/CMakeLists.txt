@@ -13,8 +13,8 @@ if(LIBXC_FOUND)
  INCLUDE_DIRECTORIES(${LIBXC_INCLUDE_DIRS})
 endif()
 # Add libint include directory if necessary
-if(FOUND)
- INCLUDE_DIRECTORIES(${INCLUDE_DIRS})
+if(LIBINT_FOUND)
+ INCLUDE_DIRECTORIES(${LIBINT_INCLUDE_DIRS})
 endif()
 
 # Create the ERKALE DFT library "erkale_dft"
