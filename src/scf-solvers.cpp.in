@@ -463,7 +463,8 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
       std::ostringstream oss;
       //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
       oss << "Warning - numerically integrated density seems inaccurate.\n";
-      std::cout << oss.str();
+      if(verbose)
+	std::cout << oss.str();
       //      throw std::runtime_error(oss.str());
     }
 #endif
@@ -809,7 +810,8 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 	    diisa.clear();
 	    diisb.clear();
 #endif
-	    printf("DIIS stack cleared due to change of precision.\n");
+	    if(verbose)
+	      printf("DIIS stack cleared due to change of precision.\n");
 	  }
 
 	  if(useadiis) {
@@ -818,7 +820,8 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 #else
 	    // TODO - FIXME
 #endif
-	    printf("ADIIS stack cleared due to change of precision.\n");
+	    if(verbose)
+	      printf("ADIIS stack cleared due to change of precision.\n");
 	  }
 
 	  if(usebroyden) {
@@ -829,7 +832,8 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 	    broyd_diff.clear();
 #endif
 
-	    printf("Broyden stack cleared due to change of precision.\n");
+	    if(verbose)
+	      printf("Broyden stack cleared due to change of precision.\n");
 	  }
 	    
 	}
