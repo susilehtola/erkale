@@ -278,9 +278,9 @@ int main(int argc, char **argv) {
 	    molat.push_back(atoms[mols[imol][iat]]);
 
 	  if(verbose) {
-	    printf("Molecule %i contains the atoms: ",(int) imol+1);
+	    printf("Molecule %3i contains the atoms: ",(int) imol+1);
 	    for(size_t iat=0;iat<molat.size();iat++)
-	      printf("%i ",(int) molat[iat].num+1);
+	      printf("%3i ",(int) molat[iat].num+1);
 	    fflush(stdout);
 	  }
 	  
@@ -330,7 +330,7 @@ int main(int argc, char **argv) {
 	    iorb++;
 	  }
 	  if(verbose)
-	    printf("%s\n",tmol.elapsed().c_str());
+	    printf("done (%s)\n",tmol.elapsed().c_str());
 	}
       }
       
