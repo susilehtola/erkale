@@ -20,6 +20,7 @@
 #include "basis.h"
 #include "elements.h"
 #include "emd/emd.h"
+#include "find_molecules.h"
 #include "linalg.h"
 #include "xyzutils.h"
 #include "scf.h"
@@ -39,6 +40,60 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
+#ifdef LIBINT
+BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set, bool libintok=0)
+#else
+BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set)
+#endif
+{
+  // Number of atoms is
+  size_t Nat=atoms.size();
+
+  // Create basis set
+  BasisSet basis(Nat,set);
+  // and add atoms to basis set
+  for(size_t i=0;i<Nat;i++) {
+    // Get center
+    coords_t cen;
+    cen.x=atoms[i].x;
+    cen.y=atoms[i].y;
+    cen.z=atoms[i].z;
+
+    // Determine if nucleus is BSSE or not
+    bool bsse=0;
+    std::string el=atoms[i].el;
+
+    if(el.size()>3 && el.substr(el.size()-3,3)=="-Bq") {
+      // Yes, this is a BSSE nucleus
+      bsse=1;
+      el=el.substr(0,el.size()-3);
+    }
+
+    // Get functions belonging to nucleus
+    ElementBasisSet elbas;
+    // Check first if a special set is wanted
+    try {
+      elbas=baslib.get_element(el,atoms[i].num+1);
+    } catch(std::runtime_error err) {
+      // Did not find a special basis, use the general one instead.
+      elbas=baslib.get_element(el,0);
+    }
+
+    basis.add_functions(i,cen,elbas);
+    // and the nucleus
+    basis.add_nucleus(i,cen,get_Z(el),el,bsse);
+  }
+
+  // Finalize basis set
+#ifdef LIBINT
+  basis.finalize(libintok);
+#else
+  basis.finalize();
+#endif
+
+  return basis;
+}
 
 
 int main(int argc, char **argv) {
@@ -70,10 +125,11 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.parse(std::string(argv[1]));
+  bool verbose=set.get_bool("Verbose");
+
   // Print out settings
-  if(set.get_bool("Verbose")) {
+  if(verbose)
     set.print();
-  }
 
   // Read in atoms.
   std::vector<atom_t> atoms;
@@ -84,48 +140,10 @@ int main(int argc, char **argv) {
   BasisSetLibrary baslib;
   std::string basfile=set.get_string("Basis");
   baslib.load_gaussian94(basfile);
+  printf("\n");
 
-  // Number of atoms is
-  size_t Nat=atoms.size();
-
-  // Create basis set
-  BasisSet basis(Nat,set);
-  // and add atoms to basis set
-  for(size_t i=0;i<Nat;i++) {
-
-    // Get center
-    coords_t cen;
-    cen.x=atoms[i].x;
-    cen.y=atoms[i].y;
-    cen.z=atoms[i].z;
-
-    // Determine if nucleus is BSSE or not
-    bool bsse=0;
-    std::string el=atoms[i].el;
-
-    if(el.size()>3 && el.substr(el.size()-3,3)=="-Bq") {
-      // Yes, this is a BSSE nucleus
-      bsse=1;
-      el=el.substr(0,el.size()-3);
-    }
-
-    // Get functions belonging to nucleus
-    ElementBasisSet elbas;
-    // Check first if a special set is wanted
-    try {
-      elbas=baslib.get_element(el,i+1);
-    } catch(std::runtime_error err) {
-      // Did not find a special basis, use the general one instead.
-      elbas=baslib.get_element(el,0);
-    }
-
-    basis.add_functions(i,cen,elbas);
-    // and the nucleus
-    basis.add_nucleus(i,cen,get_Z(el),el,bsse);
-  }
-
-  // Finalize basis set
-  basis.finalize();
+  // Construct basis set
+  BasisSet basis=construct_basis(atoms,baslib,set);
 
   // Number of electrons is
   int Nel=basis.Ztot()-set.get_int("Charge");
@@ -140,6 +158,10 @@ int main(int argc, char **argv) {
 
   // Initialize with Hartree-Fock? (Even though there's not much sense in it)
   bool hfinit= (stricmp(set.get_string("InitMethod"),"HF")==0);
+  // Initialize by divide-and-conquer?
+  bool dncinit= (stricmp(set.get_string("InitMethod"),"DnC")==0);
+  // Initialize with DFT?
+  bool dftinit= (!hfinit && !dncinit);
 
   // Settings used for initialization
   Settings initset=set;
@@ -170,16 +192,16 @@ int main(int argc, char **argv) {
 
   // Get wanted initialization method
   int x_init=0, c_init=0;
-  if(init && !hfinit)
+  if(init && dftinit)
     parse_xc_func(x_init,c_init,set.get_string("InitMethod"));
 
-  if(hf && !hfinit) {
+  if(init && hf && dftinit) {
     // Need to add DFT settings to initset
     printf("Adding DFT settings to initset.\n");
     initset.add_dft_settings();
   }
 
-  if(!hf && hfinit) {
+  if(init && !hf && hfinit) {
     // Need to remove DFT settings from initset
     printf("Removing DFT settings from initset.\n");
     initset.remove_dft_settings();
@@ -192,14 +214,14 @@ int main(int argc, char **argv) {
       set.set_bool("DFTFitting",0);
     }
   
-  if(init && !hfinit && exact_exchange(x_init)!=0.0)
+  if(init && dftinit && exact_exchange(x_init)!=0.0)
     if(initset.get_bool("DFTFitting")) {
       printf("A hybrid functional is used in initialization, turning off density fitting.\n");
       initset.set_bool("DFTFitting",0);
     }
 
   // Make initialization parameters more relaxed
-  if(init && !hfinit) {
+  if(init && dftinit) {
     initset.set_double("DFTInitialTol",1e-3);
     initset.set_double("DFTFinalTol",1e-3);
   }
@@ -207,7 +229,7 @@ int main(int argc, char **argv) {
   
   // Density matrix (for momentum density calculations)
   arma::mat P;
-  
+
   if(set.get_int("Multiplicity")==1 && Nel%2==0) {
     // Closed shell case
     arma::mat C;
@@ -216,12 +238,106 @@ int main(int argc, char **argv) {
     if(init) {
       // Initialize calculation
 
-      SCF initsolver(basis,initset);
-
       if(hfinit) {
+	SCF initsolver(basis,initset);
+
       	// Solve restricted Hartree-Fock
 	initsolver.RHF(C,E);
-      } else {
+      }
+
+      if(dncinit) {
+	// Initialize with divide-and-conquer algorithm.
+
+	// Initialize C and E
+	size_t Nbf=basis.get_Nbf();
+	C=arma::mat(Nbf,Nbf);
+	E=arma::vec(Nbf);
+
+	C.zeros();
+	E.zeros();
+
+	// Non-verbose solution.
+	initset.set_bool("Verbose",0);
+	
+	// First, find out molecules in input.
+	std::vector< std::vector<size_t> > mols;
+	mols=find_molecules(atoms);
+	if(verbose)
+	  printf("Found %i molecules in system.\n",mols.size());
+
+	size_t iorb=0;
+	
+	// Now, solve the states of the molecules.
+	for(size_t imol=0;imol<mols.size();imol++) {
+	  // Timer
+	  Timer tmol;
+
+	  // Get the atoms in the molecule
+	  std::vector<atom_t> molat;
+	  for(size_t iat=0;iat<mols[imol].size();iat++)
+	    molat.push_back(atoms[mols[imol][iat]]);
+
+	  if(verbose) {
+	    printf("Molecule %i contains the atoms: ",(int) imol+1);
+	    for(size_t iat=0;iat<molat.size();iat++)
+	      printf("%i ",(int) molat[iat].num+1);
+	    fflush(stdout);
+	  }
+	  
+	  // Construct a basis set for the molecule.  
+#ifdef LIBINT
+	  // Libint was already initialized above.
+	  BasisSet molbas=construct_basis(molat,baslib,initset,1);
+#else
+	  BasisSet molbas=construct_basis(molat,baslib,initset);
+#endif
+
+	  // Solve states
+	  arma::mat Cmol;
+	  arma::vec Emol;
+
+	  // Solver
+	  SCF molsolver(molbas,initset);
+
+	  if(hf) {
+	    // Solve restricted Hartree-Fock
+	    molsolver.RHF(Cmol,Emol);
+	  } else {
+#ifdef DFT_ENABLED
+	    // Solve restricted DFT problem
+	    molsolver.RDFT(Cmol,Emol,x_func,c_func);
+#else
+	    throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
+#endif  
+	  }
+
+	  // Now we should have the occupied states of the
+	  // molecule. However, the basis set was different, so we
+	  // need to project the occupied orbitals onto the full basis
+	  // set.
+	  arma::mat Cfull;
+	  arma::vec Efull;
+	  basis.projectMOs(molbas,Emol,Cmol,Efull,Cfull);
+
+	  // Now we have the orbitals, and the orbital energies, so we
+	  // can just plant them in the initial guess.
+	  for(size_t i=0;i<molsolver.get_Nel()/2;i++) {
+	    // Orbital coefficients
+	    C.col(iorb)=Cfull.col(i);
+	    // Orbital energy
+	    E(iorb)=Efull(i);
+	    // Increment orbital number
+	    iorb++;
+	  }
+	  if(verbose)
+	    printf("%s\n",tmol.elapsed().c_str());
+	}
+      }
+      
+      if(dftinit) {
+	
+	SCF initsolver(basis,initset);
+	
 #ifdef DFT_ENABLED
 	// Print information about used functionals
 	print_info(x_init,c_init);
@@ -324,11 +440,11 @@ int main(int argc, char **argv) {
     emd.moments("moments.txt");
     emd.compton_profile("compton.txt","compton-interp.txt");
     
-    if(set.get_bool("Verbose"))
+    if(verbose)
       printf("Calculating EMD properties took %s.\n",temd.elapsed().c_str());
   }  
 
-  if(set.get_bool("Verbose"))
+  if(verbose)
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
   
   return 0;

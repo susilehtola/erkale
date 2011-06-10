@@ -74,6 +74,7 @@ std::vector<atom_t> load_xyz(std::string filename) {
       
       // and extract the information
       tmp.el=words[0]; // Element type
+      tmp.num=i; // Number of atom
       tmp.x=readdouble(words[1])*ANGSTROMINBOHR;
       tmp.y=readdouble(words[2])*ANGSTROMINBOHR;
       tmp.z=readdouble(words[3])*ANGSTROMINBOHR;
