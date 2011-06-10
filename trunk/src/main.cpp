@@ -121,6 +121,7 @@ int main(int argc, char **argv) {
   }
 
   Timer t;
+  t.print_time();
 
   // Parse settings
   Settings set;
@@ -221,7 +222,7 @@ int main(int argc, char **argv) {
     }
 
   // Make initialization parameters more relaxed
-  if(init && dftinit) {
+  if(init && (dftinit || (!hf && dncinit))) {
     initset.set_double("DFTInitialTol",1e-3);
     initset.set_double("DFTFinalTol",1e-3);
   }
@@ -263,7 +264,7 @@ int main(int argc, char **argv) {
 	std::vector< std::vector<size_t> > mols;
 	mols=find_molecules(atoms);
 	if(verbose)
-	  printf("Found %i molecules in system.\n",mols.size());
+	  printf("Found %i molecules in system. Performing divide-and-conquer.\n",mols.size());
 
 	size_t iorb=0;
 	
@@ -332,6 +333,9 @@ int main(int argc, char **argv) {
 	  if(verbose)
 	    printf("done (%s)\n",tmol.elapsed().c_str());
 	}
+
+	// Sort orbitals and energies
+	sort_eigvec(E,C);
       }
       
       if(dftinit) {
@@ -348,7 +352,11 @@ int main(int argc, char **argv) {
 #endif
       }
 
-      printf("\nInitialization complete.\n\n\n\n");
+      if(verbose) {
+	printf("\nInitialization complete.\n");
+	t.print_time();
+	printf("\n\n\n");
+      }
     }
 
     // Solver
@@ -425,6 +433,8 @@ int main(int argc, char **argv) {
 
   // Form momentum density
   if(set.get_bool("DoEMD")) {
+    t.print_time();
+
     printf("\nCalculating EMD properties.\n");
     printf("Please read and cite the reference:\n%s\n%s\n%s\n",\
    "J. Lehtola, M. Hakala, J. Vaara and K. Hämäläinen",\
@@ -442,10 +452,12 @@ int main(int argc, char **argv) {
     
     if(verbose)
       printf("Calculating EMD properties took %s.\n",temd.elapsed().c_str());
-  }  
+  }
 
-  if(verbose)
+  if(verbose) {
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
+    t.print_time();
+  }
   
   return 0;
 }
