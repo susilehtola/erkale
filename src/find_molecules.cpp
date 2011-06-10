@@ -1,5 +1,7 @@
 #include "find_molecules.h"
+#include "global.h"
 #include <cmath>
+#include <cstdio>
 
 std::vector< std::vector<size_t> > find_molecules(const std::vector<atom_t> & atoms) {
   // List of molecules, atoms in molecules
@@ -21,7 +23,7 @@ std::vector< std::vector<size_t> > find_molecules(const std::vector<atom_t> & at
 	d+=(atoms[i].x-atoms[j].x)*(atoms[i].x-atoms[j].x);
 	d+=(atoms[i].y-atoms[j].y)*(atoms[i].y-atoms[j].y);
 	d+=(atoms[i].z-atoms[j].z)*(atoms[i].z-atoms[j].z);
-	d=sqrt(d);
+	d=sqrt(d)/ANGSTROMINBOHR;
 	
 	// Check if bond exists
 	if(check_bonds(d,atoms[i].el,atoms[j].el)) {
@@ -230,21 +232,22 @@ bool check_bonds(double d, const std::string & at1, const std::string & at2, dou
   // Pb-I
   bond=(bond || check_bond(at1,at2,d,"Pb","I",2.79+tol));
 
-
+  return bond;
 }
 
 bool check_bond(const std::string & atom1, const std::string & atom2, double d,const std::string & test1, const std::string & test2, double maxlen) {
-
   // First, check if atoms 1 and 2 are of types test1 and test2.
+
+  bool bond=0;
+
   if( ((atom1==test1) && (atom2==test2)) || ((atom1==test2) && (atom2==test1))) {
     // Check if bond distance is within maximum allowed
     if(d<=maxlen)
       // Bond exists
-      return 1;
-    else
-      // Bond does not exist
-      return 0;
-  } else
-    // Atoms not of the given types.
-    return 0;
+      bond=1;
+
+    //    printf("%e vs %e, bond=%i.\n",d,maxlen,bond);
+  }
+
+  return bond;
 }
