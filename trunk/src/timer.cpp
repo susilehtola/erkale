@@ -59,6 +59,22 @@ void Timer::print() const {
   printf("Time elapsed is %s.\n",elapsed().c_str());
 }
 
+void Timer::print_time() const {
+  // Get time
+  time_t t;
+  time(&t);
+
+  // Convert it into struct tm
+  struct tm tm;
+  gmtime_r(&t,&tm);
+
+  const char * days[]={"Mon","Tue","Wed","Thu","Fri","Sat","Sun"};
+  const char * months[]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+
+  // Print time
+  printf("Current time is %s %02i %s %4i %02i:%02i:%02i.\n",days[tm.tm_wday],tm.tm_mday,months[tm.tm_mon],1900+tm.tm_year,tm.tm_hour,tm.tm_min,tm.tm_sec);
+}
+
 double Timer::get() const {
   time_t stop;
   struct timeval tstop;

@@ -65,6 +65,9 @@ class Timer {
 
   /// Print elapsed time
   void print() const;
+  /// Print current time
+  void print_time() const;
+
   /// Get elapsed time
   double get() const;
   /// Get pretty-printed elapsed time
