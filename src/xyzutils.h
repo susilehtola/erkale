@@ -26,6 +26,8 @@
 typedef struct {
   /// Type of atom
   std::string el;
+  /// Atom number
+  size_t num;
   /// x coordinate;
   double x;
   /// y coordinate

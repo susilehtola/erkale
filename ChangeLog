@@ -1,13 +1,20 @@
 This file contains a brief development changelog. The full changelog is
 available in the version control system on the project homepage.
 
+2011-06-10 Jussi Lehtola
+	* Closed shell calculations can now be initialized also with a
+	divide-and-conquer calculation by specifying
+	   Method DnC
+	This should find all the molecules in the system, and initialize
+	them with a gas-phase calculation.
+
 2011-06-08 Jussi Lehtola
 	* Fixed again unrestricted calculations.
 	* Parallel and serial versions of the binaries and libraries can now
 	be installed simultaneously.
 
 2011-06-05 Jussi Lehtola
-	* Switch to using CMake to make implementing different build options 
+	* Switch to using CMake to make implementing different build options
 	easier.
 	* Unified user interface to a single binary (no more separate DFT and
 	HF executables).
