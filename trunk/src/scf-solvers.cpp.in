@@ -856,13 +856,6 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 #endif
 	
 	if(fabs(deltaE)<deltaEmax && maxdiff<deltaPmax && rmsdiff<deltaPrms) {
-	  
-	  if(usebroyden) {
-	    printf("\nConvergence achieved. Turning off Broyden mixing.\n");
-	    usebroyden=0;
-	    continue;
-	  }
-	  
 	  if(verbose)
 	    printf("\n ******* Convergence achieved ********\n");
 	  converged=1;
