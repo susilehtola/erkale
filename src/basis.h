@@ -31,6 +31,7 @@
 
 #include "basislibrary.h"
 #include "settings.h"
+#include "xyzutils.h"
 
 #ifdef LIBINT
 #include <libint/libint.h>
@@ -104,6 +105,7 @@ bool operator<(const shellpair_t & lhs, const shellpair_t & rhs);
 // Forward declarations
 class GaussianShell;
 class ElementBasisSet;
+class BasisSetLibrary;
 
 /// Order shells solely on merit of exponents (for forming density fitting basis)
 bool exponent_compare(const GaussianShell & lhs, const GaussianShell & rhs);
@@ -525,6 +527,15 @@ size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_
 
 /// Form index helper table: i*(i+1)/2
 std::vector<size_t> i_idx(size_t N);
+
+#ifdef LIBINT
+/// Construct basis set from input
+BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set, bool libintok=0);
+#else
+/// Construct basis set from input
+BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set);
+#endif
+
 
 
 #endif

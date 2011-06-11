@@ -41,60 +41,6 @@
 #include <omp.h>
 #endif
 
-#ifdef LIBINT
-BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set, bool libintok=0)
-#else
-BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set)
-#endif
-{
-  // Number of atoms is
-  size_t Nat=atoms.size();
-
-  // Create basis set
-  BasisSet basis(Nat,set);
-  // and add atoms to basis set
-  for(size_t i=0;i<Nat;i++) {
-    // Get center
-    coords_t cen;
-    cen.x=atoms[i].x;
-    cen.y=atoms[i].y;
-    cen.z=atoms[i].z;
-
-    // Determine if nucleus is BSSE or not
-    bool bsse=0;
-    std::string el=atoms[i].el;
-
-    if(el.size()>3 && el.substr(el.size()-3,3)=="-Bq") {
-      // Yes, this is a BSSE nucleus
-      bsse=1;
-      el=el.substr(0,el.size()-3);
-    }
-
-    // Get functions belonging to nucleus
-    ElementBasisSet elbas;
-    // Check first if a special set is wanted
-    try {
-      elbas=baslib.get_element(el,atoms[i].num+1);
-    } catch(std::runtime_error err) {
-      // Did not find a special basis, use the general one instead.
-      elbas=baslib.get_element(el,0);
-    }
-
-    basis.add_functions(i,cen,elbas);
-    // and the nucleus
-    basis.add_nucleus(i,cen,get_Z(el),el,bsse);
-  }
-
-  // Finalize basis set
-#ifdef LIBINT
-  basis.finalize(libintok);
-#else
-  basis.finalize();
-#endif
-
-  return basis;
-}
-
 
 int main(int argc, char **argv) {
 
