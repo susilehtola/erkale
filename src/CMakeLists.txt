@@ -92,7 +92,8 @@ install(FILES ${headers} DESTINATION include/erkale)
 add_subdirectory(completeness)
 # Create the Slater fit tool
 add_subdirectory(slaterfit)
-
+# Create test tool
+add_subdirectory(test)
 
 # Recipe for building ERITable
 add_custom_command(
