@@ -42,7 +42,7 @@ void Broyden::push_f(const arma::vec & fv) {
     double oldnorm=norm(f[f.size()-2],2);
 
     if( newnorm > oldnorm) {
-      printf("Bad update detected: norm increased by %e from %e to %e.\n",newnorm-oldnorm,oldnorm,newnorm);
+      printf("Broyden: bad update detected - norm increased by %e from %e to %e.\n",newnorm-oldnorm,oldnorm,newnorm);
       
       //      x.erase(x.begin()+x.size()-1);
       //      f.erase(f.begin()+f.size()-1);

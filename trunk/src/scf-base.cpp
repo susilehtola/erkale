@@ -72,9 +72,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
   dynamicmix=set.get_bool("DynamicMixing");
   
   // Check update scheme
-  if((usediis || useadiis) && usebroyden) {
+  if(useadiis && usebroyden) {
     ERROR_INFO();
-    throw std::runtime_error("(A)DIIS and Broyden mixing cannot be used at the same time.\n");
+    throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   } 
 
   if(!usediis && !mixdensity && !useadiis && !usebroyden) {

@@ -552,14 +552,11 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 #endif
     }
 
-
     if(iiter>1 && usebroyden) {
 #ifdef RESTRICTED
       // Update Broyden mixer
       broyd.push_x(MatToVec(Hold));
       broyd.push_f(MatToVec(Hold-H));
-      // Update Hamiltonian
-      H=VecToMat(broyd.update_x(),Nbf,Nbf);
 #else
       // Compute sum and difference
       arma::mat Hs=Ha+Hb;
@@ -571,22 +568,13 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
       // Update Broyden mixers
       broyd_sum.push_x(MatToVec(Hsold));
       broyd_sum.push_f(MatToVec(Hsold-Hs));
-      Hs=VecToMat(broyd_sum.update_x(),Nbf,Nbf);
 
       broyd_diff.push_x(MatToVec(Hdold));
       broyd_diff.push_f(MatToVec(Hdold-Hd));
-      Hd=VecToMat(broyd_diff.update_x(),Nbf,Nbf);
-
-      // Update Hamiltonians
-      Ha=0.5*(Hs+Hd);
-      Hb=0.5*(Hs-Hd);
 #endif
-
-      if(verbose)
-	printf("Broyden update of Fock operator performed.\n");
     }
 
-
+   
     // Solve DIIS
     if(usediis) {
 
@@ -641,13 +629,38 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 	printf("done (%s)\n",t.elapsed().c_str());
     }
 
+    // Perform Broyden interpolation
+    if(usebroyden && ((usediis && !diissucc) || !usediis) && iiter>1) {
+     
+      if(verbose) {
+	printf("Performing Broyden interpolation of Fock operator ... ");
+	fflush(stdout);
+	t.set();
+      }
+      
+#ifdef RESTRICTED
+      // Update Hamiltonian
+      H=VecToMat(broyd.update_x(),Nbf,Nbf);
+#else
+      arma::mat Hs=VecToMat(broyd_sum.update_x(),Nbf,Nbf);
+      arma::mat Hd=VecToMat(broyd_diff.update_x(),Nbf,Nbf);
+      
+      // Update Hamiltonians
+      Ha=0.5*(Hs+Hd);
+      Hb=0.5*(Hs-Hd);
+#endif
+      
+      if(verbose)
+	printf("done (%s)\n",t.elapsed().c_str());
+    }
+      
     // Solve FC=ESC
     if(verbose) {
       printf("\nSolving SCF equations ... ");
       fflush(stdout);
       t.set();
     }
-
+  
 #ifdef RESTRICTED
     // Transform Hamiltonian into orthogonal basis
     Horth=arma::trans(Sinvh)*H*Sinvh;
