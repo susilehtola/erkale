@@ -61,7 +61,7 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   // ADIIS
   ADIIS adiis;
   // Broyden
-  Broyden broyd(Nbf*Nbf);
+  Broyden broyd(Nbf*Nbf,verbose);
   
   // Coulomb and exchange matrices
   arma::mat J(Nbf,Nbf), K(Nbf,Nbf);
@@ -91,8 +91,8 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   DIIS diisb(S,diisorder);
 
   // Broyden
-  Broyden broyd_sum(Nbf*Nbf);
-  Broyden broyd_diff(Nbf*Nbf);
+  Broyden broyd_sum(Nbf*Nbf,verbose);
+  Broyden broyd_diff(Nbf*Nbf,verbose);
   
   // Coulomb and exchange matrices
   arma::mat J(Nbf,Nbf);

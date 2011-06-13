@@ -52,6 +52,8 @@ class Broyden {
 
   /// Difficulties encountered? (Halve mixing parameter for this step)
   bool difficult;
+  /// Verbose operation? (Complain about bad updates?)
+  bool verbose;
 
   /// Number of matrices to keep in memory
   size_t m;
@@ -62,7 +64,7 @@ class Broyden {
 
  public:
   /// Construct accelerator of problem dimension N, storing m iterations and with mixing parameters beta and sigma.
-  Broyden(size_t N, size_t m=10, double beta=0.8, double sigma=0.25);
+  Broyden(size_t N, bool verbose=1, size_t m=10, double beta=0.8, double sigma=0.25);
   /// Destructor
   ~Broyden();
 

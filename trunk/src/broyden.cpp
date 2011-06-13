@@ -18,11 +18,12 @@
 
 #include "broyden.h"
 
-Broyden::Broyden(size_t N, size_t max, double b, double s) {
+Broyden::Broyden(size_t N, bool verb, size_t max, double b, double s) {
   m=max;
   beta=b;
   sigma=s;
   difficult=0;
+  verbose=verb;
 }
 
 Broyden::~Broyden() {
@@ -42,7 +43,8 @@ void Broyden::push_f(const arma::vec & fv) {
     double oldnorm=norm(f[f.size()-2],2);
 
     if( newnorm > oldnorm) {
-      printf("Broyden: bad update detected - norm increased by %e from %e to %e.\n",newnorm-oldnorm,oldnorm,newnorm);
+      if(verbose)
+	printf("Broyden: bad update detected - norm increased by %e from %e to %e.\n",newnorm-oldnorm,oldnorm,newnorm);
       
       //      x.erase(x.begin()+x.size()-1);
       //      f.erase(f.begin()+f.size()-1);
