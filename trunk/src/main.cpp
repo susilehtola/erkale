@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
 	std::vector< std::vector<size_t> > mols;
 	mols=find_molecules(atoms);
 	if(verbose)
-	  printf("Found %i molecules in system. Performing divide-and-conquer.\n",mols.size());
+	  printf("Found %i molecules in system. Performing divide-and-conquer.\n",(int) mols.size());
 
 	size_t iorb=0;
 	
@@ -268,7 +268,7 @@ int main(int argc, char **argv) {
 
 	  // Now we have the orbitals, and the orbital energies, so we
 	  // can just plant them in the initial guess.
-	  for(size_t i=0;i<molsolver.get_Nel()/2;i++) {
+	  for(int i=0;i<molsolver.get_Nel()/2;i++) {
 	    // Orbital coefficients
 	    C.col(iorb)=Cfull.col(i);
 	    // Orbital energy
