@@ -792,7 +792,8 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 
 	  // Reconverge grid
 	  if(verbose) {
-	    printf("\nInitial convergence achieved.\n");
+	    printf("Initial convergence achieved. ");
+	    t.print_time(); // Print current time
 	    const char *fmt="%20s:\t% e < %e\n"; // Format to print in
 	    printf(fmt,"deltaE",deltaE,dft_switch*deltaEmax);
 	    printf(fmt,"deltaPrms",rmsdiff,dft_switch*deltaPrms);
