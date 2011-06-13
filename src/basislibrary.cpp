@@ -43,7 +43,7 @@ int find_am(char am) {
   return -1;
 }
 
-std::string find_basis(const std::string & filename) {
+std::string find_basis(const std::string & basisname) {
   // Directories where the basis set file might be found
   std::vector<std::string> dirs;
 
@@ -52,36 +52,34 @@ std::string find_basis(const std::string & filename) {
   char * libloc=getenv("ERKALE_LIBRARY");
   if(libloc!=NULL) {
     // Variable exists! Add location to array
-    dirs.push_back(libloc);
+    dirs.push_back(libloc+std::string("/"));
   }
 
   // Next, try local directory.
   dirs.push_back("");
   // Finally, try system wide directory.
-  dirs.push_back(ERKALE_SYSTEM_LIBRARY);
+  dirs.push_back(ERKALE_SYSTEM_LIBRARY + std::string("/"));
+
+  // Trial names
+  std::vector<std::string> trialnames;
+  // Try without extension
+  trialnames.push_back(basisname);
+  // Try with extension
+  trialnames.push_back(basisname+".gbs");
 
   // Loop over directories.
   for(size_t id=0;id<dirs.size();id++) {
-    // Trial names
-    std::vector<std::string> trialnames;
-
-    // Try without extension
-    trialnames.push_back(dirs[id]+filename);
-    trialnames.push_back(dirs[id]+"/"+filename);
-    // and with extension
-    trialnames.push_back(dirs[id]+filename+".gbs");
-    trialnames.push_back(dirs[id]+"/"+filename+".gbs");
-
     // Loop over trial names
-    for(size_t i=0;i<trialnames.size();i++) {
-      printf("Trying %s\n",trialnames[i].c_str());
-
+    for(size_t it=0;it<trialnames.size();it++) {
+      // Full file name is
+      std::string fname=dirs[id]+trialnames[it];
       // Try to open file for reading
-      std::ifstream in(trialnames[i].c_str());
+      //printf("Trying %s\n",fname.c_str());
+      std::ifstream in(fname.c_str());
       if(in.is_open()) {
 	// Found basis set!
-	printf("Basis set ""%s"" found in %s.\n",filename.c_str(),dirs[id].c_str());
-	return trialnames[i];
+	printf("Basis set ""%s"" found in file %s in %s.\n",basisname.c_str(),trialnames[it].c_str(),dirs[id].c_str());
+	return fname;
       }
     }
   }
@@ -89,7 +87,7 @@ std::string find_basis(const std::string & filename) {
   // Error handling
   std::ostringstream oss;
   ERROR_INFO();
-  oss << "Could not find basis set " << filename << "!\n";
+  oss << "Could not find basis set " << basisname << "!\n";
   throw std::runtime_error(oss.str());
 }
 
