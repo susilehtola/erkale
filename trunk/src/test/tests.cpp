@@ -11,7 +11,7 @@
 /// Relative tolerance in total energy
 double tol=1e-7;
 /// Absolute tolerance in orbital energies
-double otol=8e-5;
+double otol=5e-3;
 
 /// To compute references instead of running tests
 //#define COMPUTE_REFERENCE
