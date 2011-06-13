@@ -11,7 +11,7 @@
 /// Relative tolerance in total energy
 double tol=1e-7;
 /// Absolute tolerance in orbital energies
-double otol=5e-3;
+double otol=1e-5;
 
 /// To compute references instead of running tests
 //#define COMPUTE_REFERENCE
@@ -115,8 +115,7 @@ void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   ok=compare(Et,Etot,tol); // Compare total energies
   printf("E=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[ok],(int) nsucc, (int) nfail,t.elapsed().c_str());
   printf("Relative difference of total energy is %e, maximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),max_diff(E,Eorb));
-  if(nfail!=0)
-    ok=0;
+
   if(!ok) {
     std::ostringstream oss;
     ERROR_INFO();
@@ -164,8 +163,7 @@ void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   ok=compare(Et,Etot,tol); // Compare total energies
   printf("E=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[ok],(int) nsucc, (int) nfail,t.elapsed().c_str());
   printf("Relative difference of total energy is %e, maximum difference of orbital energies are %e and %e.\n",rel_diff(Et,Etot),max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
-  if(nfail!=0)
-    ok=0;
+
   if(!ok) {
     std::ostringstream oss;
     ERROR_INFO();
@@ -203,8 +201,7 @@ void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   ok=compare(Et,Etot,tol); // Compare total energies
   printf("E=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[ok],(int) nsucc, (int) nfail,t.elapsed().c_str());
   printf("Relative difference of total energy is %e, maximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),max_diff(E,Eorb));
-  if(nfail!=0)
-    ok=0;
+
   if(!ok) {
     std::ostringstream oss;
     ERROR_INFO();
@@ -251,8 +248,7 @@ void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   ok=compare(Et,Etot,tol); // Compare total energies
   printf("E=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[ok],(int) nsucc, (int) nfail,t.elapsed().c_str());
   printf("Relative difference of total energy is %e, maximum difference of orbital energies are %e and %e.\n",rel_diff(Et,Etot),max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
-  if(nfail!=0)
-    ok=0;
+
   if(!ok) {
     std::ostringstream oss;
     ERROR_INFO();
