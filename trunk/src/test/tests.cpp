@@ -9,7 +9,7 @@
 #include <cstdio>
 
 /// Relative tolerance in total energy
-double tol=1e-7;
+double tol=5e-7;
 /// Absolute tolerance in orbital energies
 double otol=1e-5;
 
