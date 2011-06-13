@@ -60,6 +60,9 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   ab=arma::mat(Naux,Naux);
   ab.zeros();
 
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic,1)
+#endif
   for(size_t is=0;is<auxshells.size();is++) {
     for(size_t js=0;js<=is;js++) {
       // Compute (a|b)
@@ -81,6 +84,9 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   // Then, form the screening matrix
   screen=arma::mat(orbshells.size(),orbshells.size());
   screen.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic,1)
+#endif
   for(size_t is=0;is<orbshells.size();is++) {
     for(size_t js=0;js<=is;js++) {
 
@@ -105,6 +111,9 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   if(!direct) {
     a_munu.resize(Naux*Norb*(Norb+1)/2);
     
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic,1)
+#endif
     for(size_t ia=0;ia<auxshells.size();ia++) {
       size_t Na=auxshells[ia].get_Nbf();
       
