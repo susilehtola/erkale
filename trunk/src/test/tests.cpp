@@ -494,7 +494,7 @@ int main(void) {
   rdft_test(decanol,DZPd,dftcart,Etot,Eorb,"1-decanol, SVWN/DZP+diffuse",1,7);
 #endif
 
-  printf("****** Tests complete in %s *******\n",t.elapsed().c_str());
+  printf("****** Tests completed in %s *******\n",t.elapsed().c_str());
   
   return 0;
 }
