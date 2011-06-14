@@ -34,6 +34,9 @@ double overlap_int_1d(double xa, double xb, double zetaa, double zetab, int la, 
 /// Get array of overlap integrals
 arma::mat overlap_ints_1d(double xa, double xb, double zetaa, double zetab, int la, int lb);
 
+/// Compute three-center overlap integral over unnormalized functions
+arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, double yc, double zc, double xb, double yb, double zb, double zetaa, double zetac, double zetab, int am_a, int am_c, int am_b);
+
 /// Compute shell of kinetic energy integrals
 arma::mat kinetic_int_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb);
 /// Compute kinetic energy integral of unnormalized primitives at r_A and r_B
