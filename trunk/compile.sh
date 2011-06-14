@@ -75,7 +75,8 @@ if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
  cd ${builddir}/gsl-${GSLVER}/
  ./configure --enable-static --disable-shared --prefix=${topdir}/gsl --exec-prefix=${topdir}/gsl &>configure.log
  make -j ${nprocs} &> make.log
- make install && make clean
+ make install &> install.log
+ make clean &> clean.log
  cd ..
 
  echo " done"
@@ -92,12 +93,26 @@ if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
   fi
   cd ${builddir}
   tar zxf ${srcdir}/libxc-${XCVER}.tar.gz
+
+  # Patch to conform to standards
+  patch libxc-${XCVER}/src/libxc_master.F90 &> patch.log <<EOF 
+21c21
+< #  define XC_F90(x) xc_s_f90_ ## x
+---
+> #  define XC_F90(x) xc_s_f90_/**/x  
+23c23
+< #  define XC_F90(x) xc_f90_ ## x
+---
+> #  define XC_F90(x) xc_f90_/**/x  
+EOF
+
  fi
 
  cd ${builddir}/libxc-${XCVER}
  ./configure --enable-static --disable-shared --prefix=${topdir}/libxc --exec-prefix=${topdir}/libxc &>configure.log
  make -j ${nprocs} &> make.log
- make install && make clean
+ make install &> install.log
+ make clean &> clean.log
  cd ..
 
  echo " done"
@@ -107,7 +122,7 @@ fi
 if [ ! -f ${topdir}/libint/lib/libint.a ]; then
  echo -n "Compiling libint ..."
 
- if [ ! -d ${nuilddir}/libint-${INTVER} ]; then
+ if [ ! -d ${builddir}/libint-${INTVER} ]; then
   if [ ! -f ${srcdir}/libint-${INTVER}.tar.gz ]; then
    cd ${srcdir}
    wget "http://sourceforge.net/projects/libint/files/v1-releases/libint-1.1.4.tar.gz/download"
@@ -127,8 +142,9 @@ if [ ! -f ${topdir}/libint/lib/libint.a ]; then
   --with-cc="${CC}" --with-cxx="${CXX}" --with-ar=${AR} \
   --with-cc-optflags="${ICFLAGS}" \
   --with-cxx-optflags="${ICXXFLAGS}" &>configure.log
- make -j ${nprocs}  &> make.log
- make install && make clean
+ make -j ${nprocs} &> make.log
+ make install &> install.log
+ make clean &> clean.log
  cd ..
 
  echo " done"
