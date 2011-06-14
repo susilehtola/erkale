@@ -42,6 +42,7 @@ export GSLVER="1.15"
 export XCVER="1.1.0"
 export INTVER="1.1.4"
 export ARMAVER="1.2.0"
+export CMAKEVER="2.8.4"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -77,8 +78,6 @@ if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
  make -j ${nprocs} &> make.log
  make install &> install.log
  make clean &> clean.log
- cd ..
-
  echo " done"
 fi 
 
@@ -113,8 +112,6 @@ EOF
  make -j ${nprocs} &> make.log
  make install &> install.log
  make clean &> clean.log
- cd ..
-
  echo " done"
 fi
 
@@ -145,8 +142,6 @@ if [ ! -f ${topdir}/libint/lib/libint.a ]; then
  make -j ${nprocs} &> make.log
  make install &> install.log
  make clean &> clean.log
- cd ..
-
  echo " done"
 fi
 
@@ -169,11 +164,29 @@ if [ ! -d ${topdir}/armadillo-${ARMAVER} ]; then
  sed -i 's|// #define ARMA_USE_BLAS|#define ARMA_USE_BLAS|g' include/armadillo_bits/config.hpp 
  sed -i 's|// #define ARMA_USE_LAPACK|#define ARMA_USE_LAPACK|g' include/armadillo_bits/config.hpp 
  sed -i 's|// #define ARMA_NO_DEBUG|#define ARMA_NO_DEBUG|g' include/armadillo_bits/config.hpp
- cd ..
 fi
 
 
 echo "Done compiling libraries."
+
+if [ ! -f ${topdir}/cmake/bin/cmake ]; then
+ echo -n "Compiling CMake ..."
+ if [ ! -d ${builddir}/cmake-${CMAKEVER} ]; then
+  if [ ! -f ${srcdir}/cmake-${CMAKEVER}.tar.gz ]; then
+   cd ${srcdir}
+   wget http://www.cmake.org/files/v2.8/cmake-${CMAKEVER}.tar.gz
+  fi
+  cd ${builddir}
+  tar zxf ${srcdir}/cmake-${CMAKEVER}.tar.gz
+ fi
+
+ cd ${builddir}/cmake-${CMAKEVER}
+ ./bootstrap --prefix=${topdir}/cmake &> bootstrap.log
+ make -j ${nprocs} &> make.log
+ make install &> install.log
+ echo " done"
+fi
+
 
 # Check out ERKALE
 echo "Checking out source"
@@ -197,11 +210,13 @@ echo "set(LIBINT_LIBRARIES \"${topdir}/libint/lib/libint.a\")"  >> erkale/config
 cd ${builddir}/erkale
 export PKG_CONFIG_PATH=${topdir}/libxc/lib/pkgconfig/:${topdir}/gsl/lib/pkgconfig/:${PKG_CONFIG_PATH}
 
-mkdir objdir
+if [ ! -d objdir ]; then
+ mkdir objdir
+fi
 cd objdir
 FC=${FC} CC=${CC} CXX=${CXX} \
  FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
- cmake .. \
+ ${topdir}/cmake/bin/cmake .. \
  -DLAPACK_LIBRARIES="${LAPACK}" \
  -DBLAS_LIBRARIES="${BLAS}"
 make -j ${nprocs} VERBOSE=1
