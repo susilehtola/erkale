@@ -357,8 +357,10 @@ class BasisSet {
 /// Compute a shell of ERIs, transformed into spherical basis if necessary
 std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 
+#ifdef LIBINT
 /// Compute data necessary for libint
 void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+#endif
 
 /// Compute ERI over cartesian Gaussians
 std::vector<double> ERI_cart(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
