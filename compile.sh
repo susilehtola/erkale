@@ -179,16 +179,13 @@ echo "set(LIBINT_LIBRARIES \"${topdir}/libint/lib/libint.a\")"  >> erkale/config
 ## Build erkale
 
 cd ${builddir}/erkale
+export PKG_CONFIG_PATH=${topdir}/libxc/lib/pkgconfig/:${topdir}/gsl/lib/pkgconfig/:${PKG_CONFIG_PATH}
 
 mkdir objdir
 cd objdir
 FC=${FC} CC=${CC} CXX=${CXX} \
  FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  cmake .. \
- -DLIBXC_INCLUDE_DIRS=${topdir}/libxc/include \
- -DLIBXC_LIBRARIES=${topdir}/libxc/lib/libxc.a \
- -DGSL_INCLUDE_DIRS=${topdir}/gsl/include \
- -DGSL_LIBRARIES=${topdir}/gsl/lib/libgsl.a \
  -DLAPACK_LIBRARIES="${LAPACK}" \
  -DBLAS_LIBRARIES="${BLAS}"
 make -j ${nprocs} VERBOSE=1
