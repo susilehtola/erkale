@@ -1,7 +1,24 @@
+/*
+ *                This source code is part of
+ * 
+ *                     E  R  K  A  L  E
+ *                             -
+ *                       HF/DFT from Hel
+ *
+ * Written by Jussi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Jussi Lehtola
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ */
+
 #include "completeness_profile.h"
 #include "../basis.h"
 #include "../linalg.h"
 
+/// Compute overlap of normalized Gaussian primitives
 arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> & jexps, int am) {
   arma::mat S(iexps.size(),jexps.size());
   for(size_t i=0;i<iexps.size();i++)
@@ -16,6 +33,7 @@ arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> &
   return S;
 }
 
+/// Compute completeness profile for given element
 compprof_t compute_completeness(const ElementBasisSet & bas, double min, double max, size_t Np) {
   // Returned completeness profile
   compprof_t ret;
