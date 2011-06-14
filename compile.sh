@@ -1,7 +1,7 @@
+#!/bin/bash
 # This is a script for downloading, compiling and 
 # installing ERKALE with all of its prerequisite libraries.
 # However, CMake needs to be installed on your system, first.
-
 # 2011-06-06 Jussi Lehtola
 
 # Set this to the number of cores +1
