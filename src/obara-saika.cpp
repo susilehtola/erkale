@@ -837,7 +837,6 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
   // Now am=(0,0,0). Increase LHS angular momentum.
   // Loop over total angular momentum
   for(int lambdaa=1;lambdaa<=am_a;lambdaa++)
-    
     // Loop over angular momentum functions belonging to this shell
     for(int ii=0; ii<=lambdaa; ii++) {
       int la=lambdaa - ii;
@@ -849,26 +848,31 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
 	int aind = la*Nal+ma*Nam+na*Nan;
 	
 	// Compute integral
-	if(la>0)
+	if(la>0) {
+
 	  ints(aind,0,0)+=gax*ints(aind-Nal,0,0);
-	if(la>1)
-	  ints(aind,0,0)+=0.5/(zeta+zetac)*(la-1)*ints(aind-2*Nal,0,0);
+	  if(la>1)
+	    ints(aind,0,0)+=0.5/(zeta+zetac)*(la-1)*ints(aind-2*Nal,0,0);
 
-	if(ma>0)
+	} else if(ma>0) {
+
 	  ints(aind,0,0)+=gay*ints(aind-Nam,0,0);
-	if(ma>1)
-	  ints(aind,0,0)+=0.5/(zeta+zetac)*(ma-1)*ints(aind-2*Nam,0,0);
+	  if(ma>1)
+	    ints(aind,0,0)+=0.5/(zeta+zetac)*(ma-1)*ints(aind-2*Nam,0,0);
 
-	if(na>0)
+	} else if(na>0) {
+
 	  ints(aind,0,0)+=gaz*ints(aind-Nan,0,0);
-	if(na>1)
-	  ints(aind,0,0)+=0.5/(zeta+zetac)*(na-1)*ints(aind-2*Nan,0,0);
+	  if(na>1)
+	    ints(aind,0,0)+=0.5/(zeta+zetac)*(na-1)*ints(aind-2*Nan,0,0);
+
+	}
       }
     }
 
   // Increase total angular momentum on right-hand side
   // Loop over total angular momentum of LHS
-  for(int lambdaa=1;lambdaa<=am_a;lambdaa++)
+  for(int lambdaa=0;lambdaa<=am_a;lambdaa++)
     
     // Loop over angular momentum of second shell
     for(int kk=0; kk<=lambdaa; kk++) {
@@ -882,7 +886,7 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
 	int aind = la*Nal + ma*Nam + na*Nan;
 	
 	// Loop over total angular momentum of RHS
-	for(int lambdab=0;lambdab<=am_b;lambdab++)
+	for(int lambdab=1;lambdab<=am_b;lambdab++)
 	  
 	  // Loop over the functions belonging to the shell
 	  for(int ii=0; ii<=lambdab; ii++) {
@@ -893,17 +897,16 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
 	      
 	      // RHS index is
 	      int bind = lb*Nbl + mb*Nbm + nb*Nbn;
-
+	
 	      // Compute integral
 	      if(lb>0) {
 
 		ints(aind,0,bind)+=gbx*ints(aind,0,bind-Nbl);
-
 		if(lb>1)
 		  ints(aind,0,bind)+=0.5/(zeta+zetac)*(lb-1)*ints(aind,0,bind-2*Nbl);
-
 		if(la>0)
 		  ints(aind,0,bind)+=0.5/(zeta+zetac)*la*ints(aind-Nal,0,bind-Nbl);
+
 	      } else if(mb>0) {
 
 		ints(aind,0,bind)+=gby*ints(aind,0,bind-Nbm);
@@ -911,12 +914,15 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
 		  ints(aind,0,bind)+=0.5/(zeta+zetac)*(mb-1)*ints(aind,0,bind-2*Nbm);
 		if(ma>0)
 		  ints(aind,0,bind)+=0.5/(zeta+zetac)*ma*ints(aind-Nam,0,bind-Nbm);
+
 	      } else if(nb>0) {
+
 		ints(aind,0,bind)+=gbz*ints(aind,0,bind-Nbn);
 		if(nb>1)
-		  ints(aind,0,bind)+=0.5/(zeta+zetac)*(nb-1)*ints(aind,0,bind-2*Nbn);	      
+		  ints(aind,0,bind)+=0.5/(zeta+zetac)*(nb-1)*ints(aind,0,bind-2*Nbn);
 		if(na>0)
 		  ints(aind,0,bind)+=0.5/(zeta+zetac)*na*ints(aind-Nan,0,bind-Nbn);
+
 	      } else {
 		ERROR_INFO();
 		throw std::runtime_error("Something went haywire in the Obara-Saika three-center overlap algorithm.\n");
@@ -925,10 +931,10 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
 	  }
       }
     }
-  
+
   // Finally, increase angular momentum in the middle
   // Loop over total angular momentum of LHS
-  for(int lambdaa=1;lambdaa<=am_a;lambdaa++)
+  for(int lambdaa=0;lambdaa<=am_a;lambdaa++)
     
     // Loop over angular momentum of second shell
     for(int kk=0; kk<=lambdaa; kk++) {
@@ -955,49 +961,48 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
 	      int bind = lb*Nbl + mb*Nbm + nb*Nbn;  
 	      
 	      // Loop over total angular momentum of middle
-	      for(int lambdac=0;lambdac<=am_c;lambdac++)
-		
+	      for(int lambdac=1;lambdac<=am_c;lambdac++)    
 		// Loop over the functions belonging to the shell
 		for(int mm=0; mm<=lambdac; mm++) {
 		  int lc=lambdac - mm;
 		  for(int nn=0; nn<=mm; nn++) {
 		    int mc=mm - nn;
 		    int nc=nn;
-	      
+		    
 		    // RHS index is
 		    int cind = lc*Ncl + mc*Ncm + nc*Ncn;  
 		    
 		    // Calculate integral
 		    if(lc>0) {
+
 		      ints(aind,cind,bind)+=gcx*ints(aind,cind-Ncl,bind);
-	      
 		      if(lc>1)
 			ints(aind,cind,bind)+=0.5/(zeta+zetac)*(lc-1)*ints(aind,cind-2*Ncl,bind);
-		      
 		      if(la>0)
-			ints(aind,bind,0)+=0.5/(zeta+zetac)*la*ints(aind-Nal,cind-Ncl,bind);
+			ints(aind,cind,bind)+=0.5/(zeta+zetac)*la*ints(aind-Nal,cind-Ncl,bind);
 		      if(lb>0)
-			ints(aind,bind,0)+=0.5/(zeta+zetac)*lb*ints(aind,cind-Ncl,bind-Nbl);
+			ints(aind,cind,bind)+=0.5/(zeta+zetac)*lb*ints(aind,cind-Ncl,bind-Nbl);
+
 		    } else if(mc>0) {
+
 		      ints(aind,cind,bind)+=gcy*ints(aind,cind-Ncm,bind);
-	      
 		      if(mc>1)
 			ints(aind,cind,bind)+=0.5/(zeta+zetac)*(mc-1)*ints(aind,cind-2*Ncm,bind);
-		      
 		      if(ma>0)
-			ints(aind,bind,0)+=0.5/(zeta+zetac)*ma*ints(aind-Nam,cind-Ncm,bind);
+			ints(aind,cind,bind)+=0.5/(zeta+zetac)*ma*ints(aind-Nam,cind-Ncm,bind);
 		      if(mb>0)
-			ints(aind,bind,0)+=0.5/(zeta+zetac)*mb*ints(aind,cind-Ncm,bind-Nbm);
+			ints(aind,cind,bind)+=0.5/(zeta+zetac)*mb*ints(aind,cind-Ncm,bind-Nbm);
+
 		    } else if(nc>0) {
+
 		      ints(aind,cind,bind)+=gcz*ints(aind,cind-Ncn,bind);
-	      
 		      if(nc>1)
 			ints(aind,cind,bind)+=0.5/(zeta+zetac)*(nc-1)*ints(aind,cind-2*Ncn,bind);
-		      
 		      if(na>0)
-			ints(aind,bind,0)+=0.5/(zeta+zetac)*na*ints(aind-Nan,cind-Ncn,bind);
+			ints(aind,cind,bind)+=0.5/(zeta+zetac)*na*ints(aind-Nan,cind-Ncn,bind);
 		      if(nb>0)
-			ints(aind,bind,0)+=0.5/(zeta+zetac)*nb*ints(aind,cind-Ncn,bind-Nbn);
+			ints(aind,cind,bind)+=0.5/(zeta+zetac)*nb*ints(aind,cind-Ncn,bind-Nbn);
+
 		    } else {
 		      ERROR_INFO();
 		      throw std::runtime_error("Something went haywire in the Obara-Saika three-center overlap algorithm.\n");
@@ -1008,8 +1013,66 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
 	  }
       }
     }
+  
+  // Size of returned array
+  int Na=(am_a+1)*(am_a+2)/2;
+  int Nc=(am_c+1)*(am_c+2)/2;
+  int Nb=(am_b+1)*(am_b+2)/2;
 
-  return ints;
+  // Fill in returned array
+  arma::cube S(Na,Nc,Nb);
+  int ia, ic, ib; // Indices in return array
+  ia=0; ic=0; ib=0;
+
+  // Loop over basis functions on this shell
+  for(int ii=0; ii<=am_a; ii++) {
+    int la=am_a - ii;
+    for(int jj=0; jj<=ii; jj++) {
+      int ma=ii - jj;
+      int na=jj;
+      
+      // LHS index in worker array
+      int aind=la*Nal+ma*Nam+na;
+      
+      // Index of right basis function
+      ib=0;
+      
+      // Loop over angular momentum of second shell
+      for(int kk=0; kk<=am_b; kk++) {
+        int lb=am_b - kk;
+        
+        for(int ll=0; ll<=kk; ll++) {
+          int mb=kk-ll;
+          int nb=ll;
+          
+          // RHS index in worker array
+          int bind=lb*Nbl+mb*Nbm+nb;
+	  
+	  ic=0;
+	  // Loop over the functions belonging to the shell                                                                                                     
+	  for(int mm=0; mm<=am_c; mm++) {
+	    int lc=am_c - mm;
+	    for(int nn=0; nn<=mm; nn++) {
+	      int mc=mm - nn;
+	      int nc=nn;
+	      
+	      // RHS index is                                                                                                                                   
+	      int cind = lc*Ncl + mc*Ncm + nc*Ncn;
+	      
+	      // Store result
+	      S(ia,ic,ib)=ints(aind,cind,bind);
+	      
+	      ic++;
+	    }
+	  }
+	  
+	  ib++;
+	}
+      }
+      
+      ia++;
+    }
+  }
+
+  return S;
 }
-
-
