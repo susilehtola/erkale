@@ -53,6 +53,23 @@ coords_t operator+(const coords_t & lhs, const coords_t& rhs) {
   return ret;
 }
 
+coords_t operator/(const coords_t & lhs, double fac) {
+  coords_t ret;
+  ret.x=lhs.x/fac;
+  ret.y=lhs.y/fac;
+  ret.z=lhs.z/fac;
+  return ret;
+}
+
+coords_t operator*(const coords_t & lhs, double fac) {
+  coords_t ret;
+  ret.x=lhs.x*fac;
+  ret.y=lhs.y*fac;
+  ret.z=lhs.z*fac;
+  return ret;
+}
+
+
 double normsq(const coords_t & r) {
   return r.x*r.x + r.y*r.y + r.z*r.z;
 }
@@ -805,6 +822,78 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   return Vnuc;
 }
 
+std::vector<arma::mat> GaussianShell::moment(int am, double x, double y, double z, const GaussianShell & rhs) const {
+  // Calculate moment integrals around (x,y,z) between shells
+
+  // Amount of moments is
+  size_t Nmom=(am+1)*(am+2)/2;
+
+  // Moments to compute:
+  std::vector<shellf_t> mom;
+  mom.reserve(Nmom);
+  for(int ii=0; ii<=am; ii++) {
+    int lc=am - ii;
+    for(int jj=0; jj<=ii; jj++) {
+      int mc=ii - jj;
+      int nc=jj;
+
+      shellf_t tmp;
+      tmp.l=lc;
+      tmp.m=mc;
+      tmp.n=nc;
+      tmp.relnorm=1.0;
+      mom.push_back(tmp);
+    }
+  }
+
+  // Temporary array, place moment last so we can use slice()
+  arma::cube wrk(cart.size(),rhs.cart.size(),Nmom);
+  wrk.zeros();
+  
+  // Coordinates
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
+
+  // Compute moment integrals
+  for(size_t ixl=0;ixl<zeta.size();ixl++) {
+    double ca=c[ixl];
+    double zetaa=zeta[ixl];
+    
+    for(size_t ixr=0;ixr<rhs.zeta.size();ixr++) {
+      double cb=rhs.c[ixr];
+      double zetab=rhs.zeta[ixr];
+      
+      wrk+=ca*cb*three_overlap_int_os(xa,ya,za,xb,yb,zb,x,y,z,zetaa,zetab,0.0,cart,rhs.cart,mom);
+    }
+  }
+  
+  // Collect the results
+  std::vector<arma::mat> ret;
+  ret.reserve(Nmom);
+  for(size_t m=0;m<Nmom;m++) {
+    // The matrix for this moment is
+    arma::mat momval=wrk.slice(m);
+
+    // Convert to spherical basis if necessary
+    if(uselm) {
+      momval=transmat*momval;
+    }
+    // Right side
+    if(rhs.uselm) {
+      momval=momval*trans(rhs.transmat);
+    }
+
+    // Add it to the stack
+    ret.push_back(momval);
+  }
+
+  return ret;    
+}
+
 
 BasisSet::BasisSet(size_t Nat, const Settings & set) {
   // Use spherical harmonics?
@@ -1446,6 +1535,51 @@ arma::mat BasisSet::nuclear() const {
   
   return Vnuc;
 }
+
+std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) const {
+  // Compute moment integrals around (x,y,z);
+
+  // Number of moments to compute is
+  size_t Nmom=(mom+1)*(mom+2)/2;
+  // Amount of basis functions is
+  size_t Nbf=get_Nbf();
+
+  // Returned array, holding the moment integrals
+  std::vector<arma::mat> ret;
+  ret.reserve(Nmom);
+
+  // Initialize arrays
+  for(size_t i=0;i<Nmom;i++) {
+    ret.push_back(arma::mat(Nbf,Nbf));
+    ret[i].zeros();
+  }
+
+  // Loop over shells
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic,1)
+#endif
+  for(size_t i=0;i<shells.size();i++) {
+    // Off-diagonal
+    for(size_t j=0;j<i;j++) {
+      // Compute moment integral over shells
+      std::vector<arma::mat> ints=shells[i].moment(mom,x,y,z,shells[j]);
+      
+      // Store moments
+      for(size_t m=0;m<Nmom;m++) {
+	ret[m].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=ints[m];
+	ret[m].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(ints[m]);
+      }
+    }
+    
+    // Diagonal
+    std::vector<arma::mat> ints=shells[i].moment(mom,x,y,z,shells[i]);
+    for(size_t m=0;m<Nmom;m++)
+      ret[m].submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=ints[m];
+  }
+
+  return ret;
+}
+
 
 double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks, size_t kk, size_t ls, size_t ll) const {
   // Calculate cartesian ERI from functions ii, jj, kk, and ll on shells is, js, ks and ls.
