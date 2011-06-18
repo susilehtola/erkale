@@ -68,7 +68,7 @@ void Timer::print_time() const {
   struct tm tm;
   gmtime_r(&t,&tm);
 
-  const char * days[]={"Mon","Tue","Wed","Thu","Fri","Sat","Sun"};
+  const char * days[]={"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
   const char * months[]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
 
   // Print time
