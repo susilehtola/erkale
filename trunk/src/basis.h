@@ -114,6 +114,11 @@ bool exponent_compare(const GaussianShell & lhs, const GaussianShell & rhs);
 coords_t operator-(const coords_t & lhs, const coords_t & rhs);
 /// Compute sum
 coords_t operator+(const coords_t & lhs, const coords_t & rhs);
+/// Compute scaling by division
+coords_t operator/(const coords_t & lhs, double fac);
+/// Compute scaling by multiplication
+coords_t operator*(const coords_t & lhs, double fac);
+
 
 /// Compute squared norm
 double normsq(const coords_t & r);
@@ -335,6 +340,9 @@ class BasisSet {
   /// Calculate nuclear repulsion matrix
   arma::mat nuclear() const;
 
+  /// Compute moment integral around (x,y,z)
+  std::vector<arma::mat> moment(int mom, double x=0.0, double y=0.0, double z=0.0) const;
+
   /// Compute a shell of ERIs, transformed into spherical basis if necessary
   std::vector<double> ERI(size_t is, size_t js, size_t ks, size_t ls) const;
 
@@ -505,6 +513,9 @@ class GaussianShell {
   arma::mat kinetic(const GaussianShell & rhs) const;
   /// Calculate nuclear repulsion matrix between shells
   arma::mat nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const;
+
+  /// Calculate moment integrals around (x,y,z) between shells
+  std::vector<arma::mat> moment(int mom, double x, double y, double z, const GaussianShell & rhs) const;
 
   /// Compute ERI over cartesian functions
   friend std::vector<double> ERI_cart(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
