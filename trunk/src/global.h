@@ -81,6 +81,8 @@
 #define ANGSTROMINBOHR 1.8897261
 // Atomic unit in eV
 #define HARTREEINEV 27.21138386
+// Atomic unit in debye
+#define AUINDEBYE 0.393456
 
 // Error info
 #define ERROR_INFO() printf("Error in function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__)
