@@ -39,9 +39,23 @@ double rel_diff(double x, double y) {
 }
 
 /// Check if \f$ | (x - y)/y | < \tau \f$
-bool compare(double x, double y, double tau) {
+bool rel_compare(double x, double y, double tau) {
   // Compute relative difference
   double d=rel_diff(x,y);
+  
+  if(fabs(d)<tau) {
+    //    printf("%e vs %e, difference %e, ok\n",x,y,d);
+    return 1;
+  } else {
+    //    printf("%e vs %e, difference %e, fail\n",x,y,d);
+    return 0;
+  }
+}
+
+/// Check if \f$ | (x - y) | < \tau \f$
+bool abs_compare(double x, double y, double tau) {
+  // Compute relative difference
+  double d=fabs(x-y);
   
   if(fabs(d)<tau) {
     //    printf("%e vs %e, difference %e, ok\n",x,y,d);
@@ -148,8 +162,8 @@ void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   bool Eok=1, Dok=1, ok=1;
   size_t nsucc=0, nfail=0;
   compare(E,Eorb,otol,nsucc,nfail); // Compare orbital energies
-  Eok=compare(Et,Etot,tol); // Compare total energies
-  Dok=compare(dip,dipmom,dtol); // Compare dipole moments
+  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
   printf("Relative difference of total energy is %e, maximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),max_diff(E,Eorb));
@@ -202,8 +216,8 @@ void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   size_t nsucc=nsucca+nsuccb;
   size_t nfail=nfaila+nfailb;
 
-  Eok=compare(Et,Etot,tol); // Compare total energies
-  Dok=compare(dip,dipmom,dtol); // Compare dipole moments
+  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
   printf("Relative difference of total energy is %e, maximum difference of orbital energies are %e and %e.\n",rel_diff(Et,Etot),max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
@@ -247,8 +261,8 @@ void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   size_t nsucc=0, nfail=0;
   compare(E,Eorb,otol,nsucc,nfail); // Compare orbital energies
 
-  Eok=compare(Et,Etot,tol); // Compare total energies
-  Dok=compare(dip,dipmom,dtol); // Compare dipole moments
+  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
   printf("Relative difference of total energy is %e, maximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),max_diff(E,Eorb));
@@ -300,8 +314,8 @@ void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   size_t nsucc=nsucca+nsuccb;
   size_t nfail=nfaila+nfailb;
 
-  Eok=compare(Et,Etot,tol); // Compare total energies
-  Dok=compare(dip,dipmom,dtol); // Compare dipole moments
+  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
   printf("Relative difference of total energy is %e, maximum difference of orbital energies are %e and %e.\n",rel_diff(Et,Etot),max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
