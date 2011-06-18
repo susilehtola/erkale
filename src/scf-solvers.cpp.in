@@ -124,12 +124,16 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   
   // Mixing factor if DIIS not used
   double mix=INITMIX;
+
+  // Dipole moment
+  arma::vec dipmom;
+  double olddip;
   
   // Tolerance for screening and screening efficiency
   double tol=ROUGHTOL;
   double screeneff;
   
-  double Ecoul, Eh, Exc, Eone, Etot=0.0, Etote=0.0;
+  double Ecoul, Exc, Eone, Etot=0.0, Etote=0.0;
   
   // Change in energy from last iteration
   double deltaE;
@@ -144,46 +148,49 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   double rmsdiffb=0.0, maxdiffb=0.0;
 #endif
   
-
   
   if(verbose)
     printf("\n ******* Initialization of run ********\n");
     
   
 #ifdef RESTRICTED
-  if(C.n_rows!=Nbf) {
+  if(C.n_rows!=Nbf)
 #else
-    if(Ca.n_rows!=Nbf || Cb.n_rows!=Nbf) {
+  if(Ca.n_rows!=Nbf || Cb.n_rows!=Nbf)
 #endif
+    {
       if(verbose) {
 	printf("\nNo input guess given, forming initial guess by diagonalizing core hamiltonian.\n");
 	t.set();
       }
-    
+      
 #ifdef RESTRICTED    
       Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
       eig_sym_ordered(en,orbs,Horth); // Solve in orthogonal basis
-    
+      
       // Transform back to non-orthogonal basis
       orbs=Sinvh*orbs;
 #else
       Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
       eig_sym_ordered(ena,orbsa,Horth); // Solve in orthogonal basis
-    
+      
       // Transform back to non-orthogonal basis
       orbsa=Sinvh*orbsa;
-
+      
       // Copy orbitals
       enb=ena;
       orbsb=orbsa;
 #endif
-
+      
       if(verbose)
 	printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
+      
     } else {
+      // Got correctly sized input guess.
+    
       if(verbose)
-	printf("\nUsing input guess for orbitals.\n");
-
+        printf("\nUsing input guess for orbitals.\n");
+      
 #ifdef RESTRICTED
       orbs=C;
       en=E;
@@ -195,8 +202,8 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 #endif
     }
 
-    // Print orbital energies
-    if(verbose) {
+  // Print orbital energies
+  if(verbose) {
 #ifdef RESTRICTED
       print_E(nocc,en);
 #else
@@ -484,8 +491,6 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     H=Hcore+J-0.5*K;
     Exc=-0.25*arma::trace(P*K);
 #endif
-    // Calculate energies
-    Eh=arma::trace(P*H);
 
 #else // Unrestricted case
 
@@ -507,8 +512,6 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     Exc=-0.5*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
 #endif
 
-    // Calculate energies
-    Eh=arma::trace(Pa*Ha)+arma::trace(Pb*Hb);
 #endif // End unrestricted case
 
     // Energies
@@ -516,6 +519,11 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     Enuca=arma::trace(P*Vnuc);
     Eone=arma::trace(P*Hcore);
     Ecoul=0.5*arma::trace(P*J);
+#ifdef RESTRICTED
+    // double Eh=arma::trace(P*H);
+#else
+    // double Eh=arma::trace(Pa*Ha)+arma::trace(Pb*Hb);
+#endif
     
     // Compute total energies
     Eold2=Eold;
@@ -702,6 +710,10 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     deltaPb=Pbnew-Pb;
 #endif
 
+    // Compute dipole moment
+    olddip=norm(dipmom);
+    dipmom=dipole_moment(P,*basisp);
+
     // Compute convergence criteria
 #ifdef RESTRICTED
     maxdiff=max_abs(deltaP);
@@ -748,7 +760,10 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
       print_E(Nel_beta,enb);
 #endif
 
-      printf("\nEnergy:\telectronic\ttotal\t\tvirial\t\tchange\n");
+      printf("\nDipole:\tx\t\ty\t\tz\tdipole change\n");
+      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% e\n",dipmom(0),dipmom(1),dipmom(2),norm(dipmom)-olddip);
+
+      printf("Energy:\telectronic\ttotal\t\tvirial\t\tenergy change\n");
       printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",Etote,Etot,-Etot/Ekin,deltaE);
 
 #ifdef DFT
@@ -778,10 +793,10 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
         printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
       }
 #endif
+
+      printf("\nIteration took %s.\n",titer.elapsed().c_str());
     }
 
-    if(verbose)
-      printf("\nIteration took %s.\n",titer.elapsed().c_str());
 
     if(!mixdensity || (mixdensity && mix==1.0)) {
       
@@ -867,6 +882,12 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 #endif
     } // End convergence check clause
   } // End SCF cycle
+
+  // Compute dipole moment
+  if(verbose) {
+    arma::vec dp=dipole_moment(P,*basisp);
+    printf("Dipole moment is (%f,%f,%f) D, |mu|=%f D.\n",dp[0]/AUINDEBYE,dp[1]/AUINDEBYE,dp[2]/AUINDEBYE,norm(dp)/AUINDEBYE);
+  }
   
 #ifdef RESTRICTED  
   C=orbs;
@@ -913,4 +934,3 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   
   return Etot;
 }
-  
