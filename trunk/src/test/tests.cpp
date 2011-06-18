@@ -29,11 +29,12 @@ double tol=5e-7;
 /// Absolute tolerance in orbital energies
 double otol=1e-5;
 /// Absolute tolerance for dipole moment
-double dtol=1e-5;
+double dtol=1e-6;
 
 /// To compute references instead of running tests
 //#define COMPUTE_REFERENCE
 
+/// Compute relative difference \f$ (x-y)/y \f$
 double rel_diff(double x, double y) {
   return (x-y)/y;
 }
@@ -66,6 +67,7 @@ bool abs_compare(double x, double y, double tau) {
   }
 }
 
+/// Check that x == y within precision tau.
 bool compare(const arma::vec & x, const arma::vec & y, double tau, size_t & nsucc, size_t & nfail) {
   if(x.n_elem!=y.n_elem)
     throw std::runtime_error("Error - differing amount of computed and reference orbital energies!\n");
@@ -92,6 +94,7 @@ bool compare(const arma::vec & x, const arma::vec & y, double tau, size_t & nsuc
   return ok;
 }
 
+/// Compute maximum difference of elements of x and y
 double max_diff(const arma::vec & x, const arma::vec & y) {
   if(x.n_elem!=y.n_elem)
     throw std::runtime_error("Error - differing amount of computed and reference orbital energies!\n");
@@ -106,6 +109,7 @@ double max_diff(const arma::vec & x, const arma::vec & y) {
   return m;
 }
 
+/// Convert units from Ångström to a.u.
 atom_t convert_to_bohr(const atom_t & in) {
   atom_t ret=in;
 
@@ -119,6 +123,7 @@ atom_t convert_to_bohr(const atom_t & in) {
 // Possible statuses
 const char * stat[]={"fail","ok"};
 
+/// Form density matrix from given orbitals
 arma::mat form_dens(const arma::mat & C, int nocc) {
   arma::mat P;
   form_density(P,C,nocc);
@@ -126,6 +131,7 @@ arma::mat form_dens(const arma::mat & C, int nocc) {
   return P;
 }
 
+/// Form density matrix from given orbitals
 arma::mat form_dens(const arma::mat & Ca, const arma::mat & Cb, int nocca, int noccb) {
   arma::mat Pa, Pb;
   form_density(Pa,Ca,nocca);
@@ -133,6 +139,7 @@ arma::mat form_dens(const arma::mat & Ca, const arma::mat & Cb, int nocca, int n
   return Pa+Pb;
 }
 
+/// Test RHF solution
 void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom) {
   Timer t;
 
@@ -166,7 +173,7 @@ void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, maximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),max_diff(E,Eorb));
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(E,Eorb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -178,6 +185,7 @@ void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
 #endif
 }
 
+/// Test UHF solution
 void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom) {
   Timer t;
 
@@ -220,7 +228,7 @@ void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, maximum difference of orbital energies are %e and %e.\n",rel_diff(Et,Etot),max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -231,6 +239,7 @@ void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
 #endif
 }
 
+/// Test RDFT solution
 void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom, int xfunc, int cfunc) {
   Timer t;
 
@@ -265,7 +274,7 @@ void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, maximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),max_diff(E,Eorb));
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(E,Eorb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -276,6 +285,7 @@ void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
 #endif
 }
 
+/// Test UDFT solution
 void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom, int xfunc, int cfunc) {
   Timer t;
 
@@ -318,7 +328,7 @@ void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, maximum difference of orbital energies are %e and %e.\n",rel_diff(Et,Etot),max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
 
   if(!ok) {
     std::ostringstream oss;
