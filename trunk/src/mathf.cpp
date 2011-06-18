@@ -177,7 +177,12 @@ double rms_norm(const arma::mat & R) {
   return sqrt(rms/(R.n_rows*R.n_cols));
 }
 
-
+double norm(const arma::vec & v) {
+  double n=0;
+  for(size_t i=0;i<v.n_elem;i++)
+    n+=v(i)*v(i);
+  return sqrt(n);
+}
 
 void zero(std::vector<double> & x) {
   for(size_t i=0;i<x.size();i++)
