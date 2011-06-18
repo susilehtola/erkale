@@ -62,6 +62,9 @@ double max_abs(const arma::mat & R);
 /// Compute rms norm of matrix
 double rms_norm(const arma::mat & R);
 
+/// Compute norm of vector
+double norm(const arma::vec & v);
+
 /// Get minimum
 template <class T> T min(const T & a, const T & b) {
   return (b>a ? a:b);
