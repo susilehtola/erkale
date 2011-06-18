@@ -774,7 +774,14 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 }
 
 
-arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, double yc, double zc, double xb, double yb, double zb, double zetaa, double zetac, double zetab, int am_a, int am_c, int am_b) {
+arma::cube three_overlap_int_os(double xa, double ya, double za, double xc, double yc, double zc, double xb, double yb, double zb, double zetaa, double zetac, double zetab, const std::vector<shellf_t> & carta, const std::vector<shellf_t> & cartc, const std::vector<shellf_t> & cartb) {
+
+  // Angular momenta of shells
+  const int am_a=carta[0].l+carta[0].m+carta[0].n;
+  const int am_b=cartb[0].l+cartb[0].m+cartb[0].n;
+  const int am_c=cartc[0].l+cartc[0].m+cartc[0].n;
+
+  //  printf("am_a = %i, am_b = %i, am_c = %i.\n",am_a,am_b,am_c);
 
   // Necessary size for work array
   const int size_a=(am_a+1)*(am_a+1)*am_a+1;
@@ -1013,66 +1020,57 @@ arma::cube three_overlap_ints_os(double xa, double ya, double za, double xc, dou
 	  }
       }
     }
-  
+
   // Size of returned array
-  int Na=(am_a+1)*(am_a+2)/2;
-  int Nc=(am_c+1)*(am_c+2)/2;
-  int Nb=(am_b+1)*(am_b+2)/2;
+  const int Na=carta.size();
+  const int Nc=cartc.size();
+  const int Nb=cartb.size();
 
   // Fill in returned array
   arma::cube S(Na,Nc,Nb);
-  int ia, ic, ib; // Indices in return array
-  ia=0; ic=0; ib=0;
+  S.zeros();
 
-  // Loop over basis functions on this shell
-  for(int ii=0; ii<=am_a; ii++) {
-    int la=am_a - ii;
-    for(int jj=0; jj<=ii; jj++) {
-      int ma=ii - jj;
-      int na=jj;
-      
-      // LHS index in worker array
-      int aind=la*Nal+ma*Nam+na;
-      
-      // Index of right basis function
-      ib=0;
-      
-      // Loop over angular momentum of second shell
-      for(int kk=0; kk<=am_b; kk++) {
-        int lb=am_b - kk;
-        
-        for(int ll=0; ll<=kk; ll++) {
-          int mb=kk-ll;
-          int nb=ll;
-          
-          // RHS index in worker array
-          int bind=lb*Nbl+mb*Nbm+nb;
-	  
-	  ic=0;
-	  // Loop over the functions belonging to the shell                                                                                                     
-	  for(int mm=0; mm<=am_c; mm++) {
-	    int lc=am_c - mm;
-	    for(int nn=0; nn<=mm; nn++) {
-	      int mc=mm - nn;
-	      int nc=nn;
-	      
-	      // RHS index is                                                                                                                                   
-	      int cind = lc*Ncl + mc*Ncm + nc*Ncn;
-	      
-	      // Store result
-	      S(ia,ic,ib)=ints(aind,cind,bind);
-	      
-	      ic++;
-	    }
-	  }
-	  
-	  ib++;
-	}
+  for(size_t i=0;i<carta.size();i++) {
+    int la=carta[i].l;
+    int ma=carta[i].m;
+    int na=carta[i].n;
+
+    double ca=carta[i].relnorm;
+
+    // LHS index in worker array
+    int aind=la*Nal+ma*Nam+na;
+
+    for(size_t j=0;j<cartb.size();j++) {
+      int lb=cartb[j].l;
+      int mb=cartb[j].m;
+      int nb=cartb[j].n;
+
+      double cb=cartb[j].relnorm;
+
+      // RHS index in worker array
+      int bind=lb*Nbl+mb*Nbm+nb;
+
+      for(size_t k=0;k<cartc.size();k++) {
+	int lc=cartc[k].l;
+	int mc=cartc[k].m;
+	int nc=cartc[k].n;
+
+	double cc=cartc[k].relnorm;
+	
+	// Middle index in worker array
+	int cind = lc*Ncl + mc*Ncm + nc*Ncn;
+
+	/*
+	printf("(%i,%i,%i) (%i,%i,%i) (%i,%i,%i)\n",la,ma,na,lb,mb,nb,lc,mc,nc);
+	printf("S is (%i,%i,%i), accessing element (%i,%i,%i).\n",Na,Nc,Nb,i,k,j);
+	printf("ints is (%i,%i,%i), accessing element (%i,%i,%i).\n",size_a,size_c,size_b,aind,cind,bind);
+	fflush(stdout);
+	*/
+
+	S(i,k,j)=ca*cb*cc*ints(aind,cind,bind);
       }
-      
-      ia++;
     }
   }
-
+  
   return S;
 }
