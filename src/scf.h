@@ -171,5 +171,12 @@ void form_density(arma::mat & R, const arma::mat & C, const arma::vec & nocc);
 /// Dynamical update of mixing factor
 void update_mixing(double & mix, double Ecur, double Eold, double Eold2);
 
+/// Compute magnitude of dipole moment
+double dip_mom(const arma::mat & P, const BasisSet & basis);
+/// Compute dipole moment
+arma::vec dipole_moment(const arma::mat & P, const BasisSet & basis);
+/// Compute spread of electrons: \f$ r = \sqrt{ \langle \hat{\bf r}^2 \rangle - \langle \hat{\bf r} \rangle^2 \f$
+double electron_spread(const arma::mat & P, const BasisSet & basis);
+
 
 #endif

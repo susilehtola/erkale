@@ -318,3 +318,71 @@ void update_mixing(double & mix, double Ecur, double Eold, double Eold2) {
   if(mix>1.0)
     mix=1.0;
 }
+
+
+double dip_mom(const arma::mat & P, const BasisSet & basis) {
+  // Compute magnitude of dipole moment
+  
+  arma::vec dp=dipole_moment(P,basis);
+  return norm(dp);
+}
+
+arma::vec dipole_moment(const arma::mat & P, const BasisSet & basis) {
+  // Get moment matrix
+  std::vector<arma::mat> mommat=basis.moment(1);
+
+  // Electronic part
+  arma::vec el(3);
+  // Compute dipole moments
+  for(int i=0;i<3;i++) {
+    // Electrons have negative charge
+    el[i]=arma::trace(-P*mommat[i]);
+  }
+
+  //  printf("Electronic dipole moment is %e %e %e.\n",el(0),el(1),el(2));
+
+  // Compute center of nuclear charge
+  arma::vec nc(3);
+  nc.zeros();
+  for(size_t i=0;i<basis.get_Nnuc();i++) {
+    // Get nucleus
+    nucleus_t nuc=basis.get_nuc(i);
+    // Increment
+    nc(0)+=nuc.Z*nuc.x;
+    nc(1)+=nuc.Z*nuc.y;
+    nc(2)+=nuc.Z*nuc.z;
+  }
+  //  printf("Nuclear dipole moment is %e %e %e.\n",nc(0),nc(1),nc(2));
+
+  arma::vec ret=el+nc;
+
+  return ret;
+}
+
+double electron_spread(const arma::mat & P, const BasisSet & basis) {
+  // Compute <r^2> of density
+
+  // Get number of electrons.
+  std::vector<arma::mat> mom0=basis.moment(0);
+  double Nel=arma::trace(P*mom0[0]);
+
+  // Normalize P
+  arma::mat Pnorm=P/Nel;
+
+  // First, get <r>.
+  std::vector<arma::mat> mom1=basis.moment(1);
+  arma::vec r(3);
+  r(0)=arma::trace(Pnorm*mom1[getind(1,0,0)]);
+  r(1)=arma::trace(Pnorm*mom1[getind(0,1,0)]);
+  r(2)=arma::trace(Pnorm*mom1[getind(0,0,1)]);
+
+  //  printf("Center of electron cloud is at %e %e %e.\n",r(0),r(1),r(2));
+
+  // Then, get <r^2> around r
+  std::vector<arma::mat> mom2=basis.moment(2,r(0),r(1),r(2));
+  double r2=arma::trace(Pnorm*(mom2[getind(2,0,0)]+mom2[getind(0,2,0)]+mom2[getind(0,0,2)]));
+  
+  double dr=sqrt(r2);
+
+  return dr;  
+}
