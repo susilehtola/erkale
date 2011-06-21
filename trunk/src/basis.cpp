@@ -2069,10 +2069,21 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
   // doing all at once would be an N^8 operation.
 
   // Transformation matrices
-  const arma::mat trans_i=is->get_trans();
-  const arma::mat trans_j=js->get_trans();
-  const arma::mat trans_k=ks->get_trans();
-  const arma::mat trans_l=ls->get_trans();
+  arma::mat trans_i;
+  if(is_lm)
+    trans_i=is->get_trans();
+
+  arma::mat trans_j;
+  if(js_lm)
+    trans_j=js->get_trans();
+
+  arma::mat trans_k;
+  if(ks_lm)
+    trans_k=ks->get_trans();
+
+  arma::mat trans_l;
+  if(ls_lm)
+    trans_l=ls->get_trans();
   
   // Amount of cartesians on shells (input)
   const size_t Ni_cart=is->get_Ncart();
