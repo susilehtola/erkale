@@ -175,7 +175,7 @@ void update_mixing(double & mix, double Ecur, double Eold, double Eold2);
 double dip_mom(const arma::mat & P, const BasisSet & basis);
 /// Compute dipole moment
 arma::vec dipole_moment(const arma::mat & P, const BasisSet & basis);
-/// Compute spread of electrons: \f$ r = \sqrt{ \langle \hat{\bf r}^2 \rangle - \langle \hat{\bf r} \rangle^2 \f$
+/// Compute spread of electrons: \f$ r = \sqrt{ \left\langle \hat{\bf r}^2 \right\rangle - \left\langle \hat{\bf r} \right\rangle^2 } \f$
 double electron_spread(const arma::mat & P, const BasisSet & basis);
 
 
