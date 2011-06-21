@@ -967,8 +967,6 @@ void BasisSet::add_functions(int atind, coords_t cen, int am, std::vector<double
 }
 
 void BasisSet::add_shell(GaussianShell sh) {
-  // Check that spherical harmonics are used consistently
-  sh.set_lm(uselm);
   // Add shell
   shells.push_back(sh);
 }
