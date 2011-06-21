@@ -496,6 +496,8 @@ class GaussianShell {
 
   /// Set index of first basis function
   void set_first_ind(size_t ind);
+  /// Set index of center
+  void set_center_ind(size_t inuc);
   
   /// Print out information about shell
   void print() const;

@@ -760,7 +760,7 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
       print_E(Nel_beta,enb);
 #endif
 
-      printf("\nDipole:\tx\t\ty\t\tz\tdipole change\n");
+      printf("\nDipole:\tx\t\ty\t\tz\t\tdipole change\n");
       printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% e\n",dipmom(0),dipmom(1),dipmom(2),norm(dipmom)-olddip);
 
       printf("Energy:\telectronic\ttotal\t\tvirial\t\tenergy change\n");

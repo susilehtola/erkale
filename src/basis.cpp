@@ -385,6 +385,10 @@ void GaussianShell::set_first_ind(size_t ind) {
   indstart=ind;
 }
 
+void GaussianShell::set_center_ind(size_t inuc) {
+  atind=inuc;
+}
+
 void GaussianShell::print() const {
 
   printf("\t%c shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[am],(int) atind+1,(int) get_first_ind()+1,(int) get_last_ind()+1);
