@@ -688,7 +688,7 @@ arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
   }
   // Right side
   if(rhs.uselm) {
-    S=S*trans(rhs.transmat);
+    S=S*arma::trans(rhs.transmat);
   }
 
   return S;
@@ -748,7 +748,7 @@ arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
   }
   // Right side
   if(rhs.uselm) {
-    T=T*trans(rhs.transmat);
+    T=T*arma::trans(rhs.transmat);
   }
 
   return T;
@@ -820,7 +820,7 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   }
   // Right side
   if(rhs.uselm) {
-    Vnuc=Vnuc*trans(rhs.transmat);
+    Vnuc=Vnuc*arma::trans(rhs.transmat);
   }  
 
   return Vnuc;
@@ -888,7 +888,7 @@ std::vector<arma::mat> GaussianShell::moment(int am, double x, double y, double 
     }
     // Right side
     if(rhs.uselm) {
-      momval=momval*trans(rhs.transmat);
+      momval=momval*arma::trans(rhs.transmat);
     }
 
     // Add it to the stack
@@ -1091,7 +1091,12 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   return shellpairs;
 }
 
-void BasisSet::finalize(bool libintok) {
+#ifdef LIBINT
+void BasisSet::finalize(bool convert, bool libintok)
+#else
+void BasisSet::finalize(bool convert)
+#endif
+{
   // Finalize basis set structure for use.
 
   // Compute nuclear distances.
@@ -1101,7 +1106,8 @@ void BasisSet::finalize(bool libintok) {
   compute_shell_ranges();
 
   // Convert contractions
-  convert_contractions();
+  if(convert)
+    convert_contractions();
   // Normalize contractions
   normalize();
 
@@ -1445,12 +1451,12 @@ arma::mat BasisSet::overlap(const BasisSet & rhs) const {
   S12.zeros();
 
   // Loop over shells
-  for(size_t i=0;i<shells.size();i++)
-    for(size_t j=0;j<rhs.shells.size();j++)
+  for(size_t i=0;i<shells.size();i++) {
+    for(size_t j=0;j<rhs.shells.size();j++) {
       S12.submat(shells[i].get_first_ind(),rhs.shells[j].get_first_ind(),
-		 shells[i].get_last_ind(),rhs.shells[j].get_last_ind())=
-	shells[i].overlap(rhs.shells[j]);
-
+		 shells[i].get_last_ind() ,rhs.shells[j].get_last_ind() )=shells[i].overlap(rhs.shells[j]);;
+    }
+  }
   return S12;
 }
       
@@ -2354,10 +2360,11 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
 
   // Get overlap matrix
   arma::mat S11=overlap();
+
   // and form orthogonalizing matrix
   arma::mat Sinvh=CanonicalOrth(S11);
   // and the real S^-1
-  arma::mat Sinv=Sinvh*trans(Sinvh);
+  arma::mat Sinv=Sinvh*arma::trans(Sinvh);
 
   // Get overlap with old basis
   arma::mat S12=overlap(oldbas);
@@ -2371,8 +2378,6 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   if(Nbfn<Nmo)
     Nmo=Nbfn;
 
-  //  printf("Old basis has %i independent functions, new has %i independent functions, so we get %i orbitals.\n",(int) Nbfo, (int) Nbfn, (int) Nmo);
-
   // OK, now we are ready to calculate the projections.
 
   // Initialize MO matrix
@@ -2382,64 +2387,38 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   E=arma::colvec(Nmo);
   // and fill them
   for(size_t i=0;i<Nmo;i++) {
-    // We project the old orbitals with the (approximate identity) operator
-    // \sum_G |G> S^-1 <G|, where {G} are the basis functions of the new basis
+
+    // We have the orbitals as |a> = \sum_n c_n |b_n>, where |b_n> are
+    // the basis functions of the old basis.
+
+    // We project the old orbitals with the (approximate identity)
+    // operator \sum_N |B_N> S^-1 <B_N|, where {B_N} are the basis
+    // functions of the new basis.
+
+    // This gives
+    // \sum_N |B_N> S^-1 <B_N| [\sum_n c_n |b_n>]
+    // = \sum_N |B_N> S^-1 \sum_n <B_N|b_n> c_n
+
     MOs.col(i)=Sinv*S12*oldMOs.col(i);
     E(i)=oldE(i);
   }
 
-
-  /* New version */
-
-  /*
-  // Overlap matrix in new basis
-  arma::mat S=overlap();
-  // Orthogonalizing matrix
-  arma::mat Sinvh=CanonicalOrth(S);
-  // Overlaps of old basis and new one
-  arma::mat SgG=oldbas.overlap(*this);
-
-  // Sizes of linearly independent basis sets
-  const size_t Nmo_o=oldMOs.n_cols;
-  const size_t Nmo_n=Sinvh.n_cols;
-  // Size of new basis set
-  const size_t Nbf_o=oldMOs.n_rows;
-  const size_t Nbf_n=Sinvh.n_rows;
-
-  // How many MOs do we transform?
-  size_t Nmo=Nmo_n;
-  if(Nmo_o<Nmo)
-    Nmo=Nmo_o;
-
-  // Initialize MO matrix
-  MOs=arma::mat(Nbf_n,Nmo_n);
-  MOs.zeros();
-  // and energy
-  E=arma::colvec(Nmo_n);
-  E.zeros();
-  // and fill them
+  // This is probably not necessary in sane cases, but we do it anyway;
+  // it may be important if spilling occurs.
   for(size_t i=0;i<Nmo;i++) {
-    MOs.col(i)=oldMOs.col(i)*SgG*trans(Sinvh);
-    E(i)=oldE(i);
+    arma::vec mo=MOs.col(i);
+
+    // Remove overlap with other orbitals
+    arma::vec hlp=S11*mo;
+    for(size_t j=0;j<i;j++)
+      mo-=arma::dot(MOs.col(j),hlp)*MOs.col(j);
+    // Calculate norm
+    double norm=sqrt(arma::as_scalar(arma::trans(mo)*S11*mo));
+    // Normalize
+    mo/=norm;
+    // and store
+    MOs.col(i)=mo;
   }
-  */
-
-
-  /*
-
-  arma::mat s=oldbas.overlap();
-
-  printf("MO overlap in old basis:\n");
-  arma::mat ov=(trans(oldMOs)*s*oldMOs);
-  ov=ov.submat(0,0,Nmo-1,Nmo-1);
-  ov.print();
-
-  printf("MO overlap in new basis:\n");
-  //  ov=(trans(MOs)*S*MOs);
-  ov=(trans(MOs)*S11*MOs);
-  ov=ov.submat(0,0,Nmo-1,Nmo-1);
-  ov.print();
-  */
 }
 
 bool exponent_compare(const GaussianShell & lhs, const GaussianShell & rhs) {
@@ -2684,9 +2663,9 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
 
   // Finalize basis set
 #ifdef LIBINT
-  basis.finalize(libintok);
+  basis.finalize(1,libintok);
 #else
-  basis.finalize();
+  basis.finalize(1);
 #endif
 
   return basis;

@@ -233,7 +233,11 @@ class BasisSet {
 #endif
 
   /// Do all of the above
-  void finalize(bool libintok=0);
+#ifdef LIBINT
+  void finalize(bool convert=0, bool libintok=0);
+#else
+  void finalize(bool convert=0);
+#endif
 
   /// Get distance of nuclei
   double nuclear_distance(size_t i, size_t j) const;
