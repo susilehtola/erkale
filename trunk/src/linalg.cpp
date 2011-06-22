@@ -48,7 +48,6 @@ void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec) {
 
       size_t j=i;
       while((j>=incr) && (eigval[j-incr]>tmpval)) {
-	printf("j=%i\n",(int) j);
 	eigval(j)=eigval(j-incr);
 	eigvec.col(j)=eigvec.col(j-incr);
 	j=j-incr;
