@@ -221,18 +221,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
 SCF::~SCF() {
 }
 
-int SCF::get_Nel() const {
-  return Nel;
-}
-
-int SCF::get_Nel_alpha() const {
-  return Nel_alpha;
-}
-
-int SCF::get_Nel_beta() const {
-  return Nel_beta;
-}
-
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S) {
   nocc.zeros();
 
@@ -282,25 +270,98 @@ void form_density(arma::mat & R, const arma::mat & C, size_t nocc) {
     R+=C.col(n)*trans(C.col(n));
 }
 
-void form_density(arma::mat & R, const arma::mat & C, const arma::vec & nocc) {
+void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> & nocc) {
   // Check dimensions of R
   if(R.n_rows!=C.n_rows)
     R=arma::mat(C.n_rows,C.n_rows);
   else if(R.n_cols!=C.n_rows)
     R=arma::mat(C.n_rows,C.n_rows);
 
-  if(nocc.n_elem!=C.n_cols) {
+  if(nocc.size()>C.n_cols) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "There should be " << nocc << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
+    oss << "There should be " << nocc.size() << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
     throw std::runtime_error(oss.str());
   }
-
+  
   // Zero matrix
   R.zeros();
   // Formulate density
-  for(size_t n=0;n<nocc.n_elem;n++)
-    R+=nocc(n)*C.col(n)*trans(C.col(n));
+  for(size_t n=0;n<nocc.size();n++)
+    if(nocc[n]>0.0)
+      R+=nocc[n]*C.col(n)*trans(C.col(n));
+}
+
+std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis) {
+  // Returned value
+  std::vector<double> ret;
+
+  // Occupancies
+  std::string occs=set.get_string("Occupancies");
+
+  // Parse occupancies
+  if(occs.size()) {
+    // Split input
+    std::vector<std::string> occvals=splitline(occs);
+    // Resize output
+    ret.resize(occvals.size());
+    // Parse occupancies
+    for(size_t i=0;i<occvals.size();i++)
+      ret[i]=readdouble(occvals[i]);
+  } else {
+    // Aufbau principle.
+    int Nel=basis.Ztot()-set.get_int("Charge");
+    if(Nel%2!=0) {
+      throw std::runtime_error("Refusing to run restricted calculation on unrestricted system!\n");
+    }
+    // Resize output
+    ret.resize(Nel/2);
+    for(size_t i=0;i<ret.size();i++)
+      ret[i]=1.0;
+  }
+    
+  return ret;
+}
+
+void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb) {
+  // Occupancies
+  std::string occs=set.get_string("Occupancies");
+
+  // Parse occupancies
+  if(occs.size()) {
+    // Split input
+    std::vector<std::string> occvals=splitline(occs);
+    if(occvals.size()%2!=0) {
+      throw std::runtime_error("Error - specify both alpha and beta occupancies for all states!\n");
+    }
+    
+    // Resize output vectors
+    occa.resize(occvals.size()/2);
+    occb.resize(occvals.size()/2);
+    // Parse occupancies
+    for(size_t i=0;i<occvals.size();i++) {
+      occa[i]=readdouble(occvals[2*i]);
+      occb[i]=readdouble(occvals[2*i+1]);
+    } 
+
+  } else {
+    // Aufbau principle.
+    int Nel=basis.Ztot()-set.get_int("Charge");
+    int mult=set.get_int("Multiplicity");
+    
+    // Amount of occupied states
+    int Nel_alpha=Nel/2+mult-1;
+    int Nel_beta=Nel-Nel_alpha;
+    
+    // Resize output
+    occa.resize(Nel_alpha);
+    for(size_t i=0;i<occa.size();i++)
+      occa[i]=1.0;
+    
+    occb.resize(Nel_beta);
+    for(size_t i=0;i<occb.size();i++)
+      occb[i]=1.0;
+  }
 }
 
 void update_mixing(double & mix, double Ecur, double Eold, double Eold2) {

@@ -64,6 +64,8 @@ double rms_norm(const arma::mat & R);
 
 /// Compute norm of vector
 double norm(const arma::vec & v);
+/// Compute squared norm of vector
+double normsq(const arma::vec & v);
 
 /// Get minimum
 template <class T> T min(const T & a, const T & b) {
@@ -84,5 +86,15 @@ template <class T> void reverse(std::vector<T> & a) {
     a[n-1-i]=temp;
   }
 }
+
+/// Sum over array
+template <class T> T sum(const std::vector<T> & a) {
+  T sum=0;
+  for(size_t i=0;i<a.size();i++) {
+    sum+=a[i];
+  }
+  return sum;
+}
+
 
 #endif

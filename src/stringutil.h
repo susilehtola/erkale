@@ -45,8 +45,8 @@ int readint(std::string num);
 // Read a number in double precision
 double readdouble(std::string num);
 
-// Print the first n elements of a vector
-void print_E(size_t n, const arma::vec & E);
+// Print the energies wrt occupancies
+void print_E(const arma::vec & E, const std::vector<double> & occ);
 
 // Convert memory requirement to readable text
 std::string memory_size(size_t size);

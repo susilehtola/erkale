@@ -63,10 +63,6 @@ class SCF {
 
   /// Total number of electrons
   int Nel;
-  /// Number of spin-up electrons
-  int Nel_alpha;
-  /// Number of spin-down electrons
-  int Nel_beta;
 
   /// Multiplicity
   int mult;
@@ -141,23 +137,16 @@ class SCF {
   ~SCF();
 
   /// Calculate restricted Hartree-Fock solution
-  double RHF(arma::mat & C, arma::vec & E);
+  double RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs);
   /// Calculate unrestricted Hartree-Fock solution
-  double UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb);
+  double UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb);
 
 #if DFT_ENABLED
   /// Calculate restricted density-functional theory solution
-  double RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func);
+  double RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, int x_func, int c_func);
   /// Calculate unrestricted density-functional theory solution
-  double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, int x_func, int c_func);
+  double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, int x_func, int c_func);
 #endif
-
-  /// Get number of electrons
-  int get_Nel() const;
-  /// Get number of spin up electrons
-  int get_Nel_alpha() const;  
-  /// Get number of spin down electrons
-  int get_Nel_beta() const;
 };
 
 /// Update occupations by occupying states with maximum overlap
@@ -166,7 +155,12 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
 /// Form density matrix by occupying nocc lowest lying states
 void form_density(arma::mat & R, const arma::mat & C, size_t nocc);
 /// Form density matrix with occupations nocc
-void form_density(arma::mat & R, const arma::mat & C, const arma::vec & nocc);
+void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> & nocc);
+
+/// Generate orbital occupancies
+std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis);
+/// Generate orbital occupancies
+void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb);
 
 /// Dynamical update of mixing factor
 void update_mixing(double & mix, double Ecur, double Eold, double Eold2);
