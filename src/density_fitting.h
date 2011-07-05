@@ -27,7 +27,7 @@
  *
  * The implementation is based on the procedure described in
  *
- * K. Eichkorn, O. Treutler, H. Öhm, M. Häser and R. Alrichs,
+ * K. Eichkorn, O. Treutler, H. Öhm, M. Häser and R. Ahlrichs,
  *  "Auxiliary basis sets to approximate Coulomb potentials",
  * Chem. Phys. Lett. 240 (1995), 283-290.
  * 

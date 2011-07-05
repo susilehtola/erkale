@@ -119,7 +119,7 @@ int SG1_order(double r, int Z);
  * integrals of density functional theory", Mol. Phys. 78, pp. 997 -
  * 1014 (1993).
  *
- * O. Treutler and R. Alrichs, "Efficient molecular integration
+ * O. Treutler and R. Ahlrichs, "Efficient molecular integration
  * schemes", J. Chem. Phys. 102, pp. 346 - 354 (1994).
  *
  * \author Jussi Lehtola
