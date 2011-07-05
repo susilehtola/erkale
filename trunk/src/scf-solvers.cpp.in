@@ -2,17 +2,17 @@
 #ifdef RESTRICTED
 
 #ifdef DFT
-double SCF::RDFT(arma::mat & C, arma::vec & E, int x_func, int c_func)
+double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, int x_func, int c_func)
 #else
-double SCF::RHF(arma::mat & C, arma::vec & E)
+  double SCF::RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs)
 #endif
 
 #else
 /* Unrestricted case */
 #ifdef DFT
-  double SCF::UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, int x_func, int c_func)
+  double SCF::UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, int x_func, int c_func)
 #else
-  double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb)
+  double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb)
 #endif
 #endif
 {
@@ -20,34 +20,12 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   Timer t;
   Timer ttot;
   
-  // Amount of occupied states
-  Nel_alpha=Nel/2+mult-1;
-  Nel_beta=Nel-Nel_alpha;
-  
-#ifdef RESTRICTED
-  if(Nel_alpha!=Nel_beta) {
-    ERROR_INFO();
-    throw std::runtime_error("Refusing to perform restricted calculation with Na != Nb.\n");
-  }
-  
-  // Amount of occupied states
-  int nocc=Nel/2;
-  
-  if(verbose) {
-    printf("There are %i electrons, thus %i spatial states are occupied.\n",Nel,nocc);
-  }
-#else
-  if(verbose) {
-    printf("There are %i spin up and %i spin down electrons.\n",Nel_alpha,Nel_beta);
-  }
-#endif
-  
   // DIIS error
   double diiserr;
 #ifndef RESTRICTED
   double diiserra, diiserrb;
 #endif
-  // Was DIIS succesfull?
+  // Was DIIS succesful?
   bool diissucc=0;
   
 #ifdef RESTRICTED
@@ -156,36 +134,36 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
 #ifdef RESTRICTED
   if(C.n_rows!=Nbf)
 #else
-  if(Ca.n_rows!=Nbf || Cb.n_rows!=Nbf)
+    if(Ca.n_rows!=Nbf || Cb.n_rows!=Nbf)
 #endif
-    {
-      if(verbose) {
-	printf("\nNo input guess given, forming initial guess by diagonalizing core hamiltonian.\n");
-	t.set();
-      }
+      {
+	if(verbose) {
+	  printf("\nNo input guess given, forming initial guess by diagonalizing core hamiltonian.\n");
+	  t.set();
+	}
       
 #ifdef RESTRICTED    
-      Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-      eig_sym_ordered(en,orbs,Horth); // Solve in orthogonal basis
+	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
+	eig_sym_ordered(en,orbs,Horth); // Solve in orthogonal basis
       
-      // Transform back to non-orthogonal basis
-      orbs=Sinvh*orbs;
+	// Transform back to non-orthogonal basis
+	orbs=Sinvh*orbs;
 #else
-      Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-      eig_sym_ordered(ena,orbsa,Horth); // Solve in orthogonal basis
+	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
+	eig_sym_ordered(ena,orbsa,Horth); // Solve in orthogonal basis
       
-      // Transform back to non-orthogonal basis
-      orbsa=Sinvh*orbsa;
+	// Transform back to non-orthogonal basis
+	orbsa=Sinvh*orbsa;
       
-      // Copy orbitals
-      enb=ena;
-      orbsb=orbsa;
+	// Copy orbitals
+	enb=ena;
+	orbsb=orbsa;
 #endif
       
-      if(verbose)
-	printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
+	if(verbose)
+	  printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
       
-    } else {
+      } else {
       // Got correctly sized input guess.
     
       if(verbose)
@@ -205,242 +183,243 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   // Print orbital energies
   if(verbose) {
 #ifdef RESTRICTED
-      print_E(nocc,en);
+    print_E(en,occs);
 #else
-      printf("alpha: ");
-      print_E(Nel_alpha,ena);
-      printf("beta:  ");
-      print_E(Nel_beta,enb);
+    printf("alpha: ");
+    print_E(ena,occa);
+    printf("beta:  ");
+    print_E(enb,occb);
 #endif
-    }
+  }
   
 #ifdef RESTRICTED
-    form_density(P,orbs,nocc);
-    // Closed-shell: all orbitals doubly occupied
-    P*=2.0;
+  //  form_density(P,orbs,occs);
+  form_density(P,orbs,sum(occs)/2.0);
+  // Closed-shell: all orbitals doubly occupied
+  P*=2.0;
 #else
-    form_density(Pa,orbsa,Nel_alpha);
-    form_density(Pb,orbsb,Nel_beta);
-    P=Pa+Pb;
+  form_density(Pa,orbsa,occa);
+  form_density(Pb,orbsb,occb);
+  P=Pa+Pb;
 #endif
-
-    // Initialize change of density matrix
-    deltaP=P;
+  
+  // Initialize change of density matrix
+  deltaP=P;
 #ifndef RESTRICTED
-    deltaPa=Pa;
-    deltaPb=Pb;
+  deltaPa=Pa;
+  deltaPb=Pb;
 #endif
-
+  
 #ifdef DFT
-    // Fraction of exact exchange
-    double kfrac=exact_exchange(x_func);
+  // Fraction of exact exchange
+  double kfrac=exact_exchange(x_func);
 
-    if(verbose) {
-      if(kfrac!=0.0)
-	printf("\nUsing hybrid exchange with % .3f of exact exchange.\n",kfrac*100);
-      else
-	printf("\nA pure exchange functional used, no exact exchange.\n");
-    }
-
-    // Has grid been converged?
-    bool gridconv;
-    // Only reconverge if final tolerance (i.e. error) is smaller than
-    // initial one
-    if(dft_initialtol>dft_finaltol)
-      gridconv=0;
+  if(verbose) {
+    if(kfrac!=0.0)
+      printf("\nUsing hybrid exchange with % .3f of exact exchange.\n",kfrac*100);
     else
-      gridconv=1;
+      printf("\nA pure exchange functional used, no exact exchange.\n");
+  }
 
-    if(verbose) {
-      printf("Switching to finer grid once deltaE<%.2e, deltaPrms<%.2e and deltaPmax<%.2e.\n",dft_switch*deltaEmax,dft_switch*deltaPrms,dft_switch*deltaPmax);
-      printf("\nCreating initial DFT grid.\n");
-    }
+  // Has grid been converged?
+  bool gridconv;
+  // Only reconverge if final tolerance (i.e. error) is smaller than
+  // initial one
+  if(dft_initialtol>dft_finaltol)
+    gridconv=0;
+  else
+    gridconv=1;
 
-    if(verbose)
-      t.set();
+  if(verbose) {
+    printf("Switching to finer grid once deltaE<%.2e, deltaPrms<%.2e and deltaPmax<%.2e.\n",dft_switch*deltaEmax,dft_switch*deltaPrms,dft_switch*deltaPmax);
+    printf("\nCreating initial DFT grid.\n");
+  }
 
-    DFTGrid grid(basisp,dft_direct,verbose,dft_lobatto);
+  if(verbose)
+    t.set();
+
+  DFTGrid grid(basisp,dft_direct,verbose,dft_lobatto);
 
 #ifdef RESTRICTED
-    // Exchange-correlation functional
-    arma::mat XC(Nbf,Nbf);
-    // Form DFT quadrature grid
-    grid.construct(P,dft_initialtol,x_func,c_func);
+  // Exchange-correlation functional
+  arma::mat XC(Nbf,Nbf);
+  // Form DFT quadrature grid
+  grid.construct(P,dft_initialtol,x_func,c_func);
 #else
-    // Exchange-correlation functional
-    arma::mat XCa(Nbf,Nbf), XCb(Nbf,Nbf);
-    // Form DFT quadrature grid
-    grid.construct(Pa,Pb,dft_initialtol,x_func,c_func);
+  // Exchange-correlation functional
+  arma::mat XCa(Nbf,Nbf), XCb(Nbf,Nbf);
+  // Form DFT quadrature grid
+  grid.construct(Pa,Pb,dft_initialtol,x_func,c_func);
 #endif
 
-    if(verbose) {
-      printf("Construction of grid took %s.\n",t.elapsed().c_str());
-      printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
-      grid.print_memory_req();
-      printf("\n");
-    }
+  if(verbose) {
+    printf("Construction of grid took %s.\n",t.elapsed().c_str());
+    printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
+    grid.print_memory_req();
+    printf("\n");
+  }
 #endif
 
-    // Loop:
-    bool converged=0;
-    for(int iiter=1;iiter<=maxiter;iiter++) {
-      Timer titer;
+  // Loop:
+  bool converged=0;
+  for(int iiter=1;iiter<=maxiter;iiter++) {
+    Timer titer;
     
-      if(verbose)
-	printf("\n ******* Iteration %4i ********\n",iiter);
+    if(verbose)
+      printf("\n ******* Iteration %4i ********\n",iiter);
       
-      // Form Coulomb and exchange matrices
+    // Form Coulomb and exchange matrices
 #ifdef DFT
-      if(densityfit) {
-	if(verbose) {
-	  printf("Forming density fitted Coulomb matrix ... ");
-	  fflush(stdout);
-	  t.set();
-	}
-	dfit.update_density(P);
-	J=dfit.calc_J();
+    if(densityfit) {
+      if(verbose) {
+	printf("Forming density fitted Coulomb matrix ... ");
+	fflush(stdout);
+	t.set();
+      }
+      dfit.update_density(P);
+      J=dfit.calc_J();
 
-      } else {
+    } else {
 #endif
-	if(direct) {
+      if(direct) {
 #ifdef RESTRICTED
 
 #ifdef DFT
-	  if(kfrac!=0.0) {
+	if(kfrac!=0.0) {
 #endif
-	    if(verbose) {
-	      printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
-	      fflush(stdout);
-	      t.set();
-	    }
-
-	    // Calculates everything 
-	    //	    scr.calcJK(P,J,K,tol,&screeneff);
-
-	    // Only calculate the changed part
-	    arma::mat dJ, dK;
-	    scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
-	    J+=dJ;
-	    K+=dK;
-	    
-#ifdef DFT
-	  } else {
-
-	    if(verbose) {
-	      printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
-	      fflush(stdout);
-	      t.set();
-	    }
-
-	    //	    J=scr.calcJ(P,tol,&screeneff);
-	    J+=scr.calcJ(deltaP,tol,&screeneff);
-	  }
-#endif
-	
-
-#else
-	  // Unrestricted case
-#ifdef DFT
-	  if(kfrac!=0.0) {
-#endif	
-	    if(verbose) {
-	      printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
-	      fflush(stdout);
-	      t.set();
-	    }
-
-	    //	    scr.calcJK(Pa,Pb,J,Ka,Kb,tol,&screeneff);
-
-	    // Only calculate the changed part
-	    arma::mat dJ, dKa, dKb;
-	    scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
-	    J+=dJ;
-	    Ka+=dKa;
-	    Kb+=dKb;
-	    
-#ifdef DFT
-	  } else {
-
-	    if(verbose) {
-	      printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
-	      fflush(stdout);
-	      t.set();
-	    }
-
-	    //	    J=scr.calcJ(P,tol,&screeneff);
-	    J+=scr.calcJ(deltaP,tol,&screeneff);
-	  }
-#endif
-
-#endif
-	} else {
-	
-	  // Conventional mode - use tabled integrals
-
 	  if(verbose) {
-
-#ifdef DFT
-	    if(kfrac!=0.0)
-#endif
-	      printf("Forming HF Coulomb and exchange matrices ... ");
-#ifdef DFT
-	    else
-	      printf("Forming HF Coulomb matrix ... ");
-#endif
-
+	    printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
 	    fflush(stdout);
 	    t.set();
 	  }
 
-	  J=tab.calcJ(P);
+	  // Calculates everything 
+	  //	    scr.calcJK(P,J,K,tol,&screeneff);
+
+	  // Only calculate the changed part
+	  arma::mat dJ, dK;
+	  scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
+	  J+=dJ;
+	  K+=dK;
+	    
+#ifdef DFT
+	} else {
+
+	  if(verbose) {
+	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
+	    fflush(stdout);
+	    t.set();
+	  }
+
+	  //	    J=scr.calcJ(P,tol,&screeneff);
+	  J+=scr.calcJ(deltaP,tol,&screeneff);
+	}
+#endif
+	
+
+#else
+	// Unrestricted case
+#ifdef DFT
+	if(kfrac!=0.0) {
+#endif	
+	  if(verbose) {
+	    printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
+	    fflush(stdout);
+	    t.set();
+	  }
+
+	  //	    scr.calcJK(Pa,Pb,J,Ka,Kb,tol,&screeneff);
+
+	  // Only calculate the changed part
+	  arma::mat dJ, dKa, dKb;
+	  scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
+	  J+=dJ;
+	  Ka+=dKa;
+	  Kb+=dKb;
+	    
+#ifdef DFT
+	} else {
+
+	  if(verbose) {
+	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
+	    fflush(stdout);
+	    t.set();
+	  }
+
+	  //	    J=scr.calcJ(P,tol,&screeneff);
+	  J+=scr.calcJ(deltaP,tol,&screeneff);
+	}
+#endif
+
+#endif
+      } else {
+	
+	// Conventional mode - use tabled integrals
+
+	if(verbose) {
+
+#ifdef DFT
+	  if(kfrac!=0.0)
+#endif
+	    printf("Forming HF Coulomb and exchange matrices ... ");
+#ifdef DFT
+	  else
+	    printf("Forming HF Coulomb matrix ... ");
+#endif
+
+	  fflush(stdout);
+	  t.set();
+	}
+
+	J=tab.calcJ(P);
 	
 #ifdef DFT
-	  if(kfrac!=0.0) {
+	if(kfrac!=0.0) {
 #endif
 	  
 #ifdef RESTRICTED
-	    K=tab.calcK(P);
+	  K=tab.calcK(P);
 #else
-	    Ka=tab.calcK(Pa);
-	    Kb=tab.calcK(Pb);
+	  Ka=tab.calcK(Pa);
+	  Kb=tab.calcK(Pb);
 #endif
 
 #ifdef DFT
-	  } // End kfrac clause
+	} // End kfrac clause
 #endif
 
-	}
-
-#ifdef DFT
       }
+
+#ifdef DFT
+    }
 #endif
     
     
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
 #ifdef DFT
-	if(direct && !densityfit)
+      if(direct && !densityfit)
 #else
 	if(direct)
 #endif
-	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
-      }
+	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+    }
     
 
 
 #ifndef DFT
     if(direct)
 #else
-    if(direct && !densityfit)
+      if(direct && !densityfit)
 #endif
-    {
-      // Determine wanted accuracy for integrals
+	{
+	  // Determine wanted accuracy for integrals
 	
-      if(fabs(deltaE)<1e-2) {
-	// Rough convergence reached, so we can increase integral accuracy
-      }
+	  if(fabs(deltaE)<1e-2) {
+	    // Rough convergence reached, so we can increase integral accuracy
+	  }
       
-    }
+	}
     
 
     
@@ -692,13 +671,13 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     // Form new density matrix
     arma::mat Pnew;
 #ifdef RESTRICTED
-    form_density(Pnew,orbs,nocc);
+    form_density(Pnew,orbs,occs);
     // All orbitals are doubly occupied
     Pnew*=2.0;
 #else
     arma::mat Panew, Pbnew;
-    form_density(Panew,orbsa,Nel_alpha);
-    form_density(Pbnew,orbsb,Nel_beta);
+    form_density(Panew,orbsa,occa);
+    form_density(Pbnew,orbsb,occb);
     Pnew=Panew+Pbnew;
 #endif
 
@@ -752,12 +731,12 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
     if(verbose) {
 
 #ifdef RESTRICTED
-      print_E(nocc,en);
+      print_E(en,occs);
 #else
       printf("alpha: ");
-      print_E(Nel_alpha,ena);
+      print_E(ena,occa);
       printf("beta:  ");
-      print_E(Nel_beta,enb);
+      print_E(enb,occb);
 #endif
 
       printf("\nDipole:\tx\t\ty\t\tz\t\tdipole change\n");
@@ -917,11 +896,11 @@ double SCF::RHF(arma::mat & C, arma::vec & E)
   
   if(converged) {
 #ifdef DFT 
-  if(verbose)
-    printf("Solution of UDFT took %s.\n",ttot.elapsed().c_str());
+    if(verbose)
+      printf("Solution of UDFT took %s.\n",ttot.elapsed().c_str());
 #else
-  if(verbose)
-    printf("Solution of UHF took %s.\n",ttot.elapsed().c_str());
+    if(verbose)
+      printf("Solution of UHF took %s.\n",ttot.elapsed().c_str());
 #endif
   } else {
     ERROR_INFO();

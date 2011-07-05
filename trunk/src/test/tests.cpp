@@ -124,15 +124,15 @@ atom_t convert_to_bohr(const atom_t & in) {
 const char * stat[]={"fail","ok"};
 
 /// Form density matrix from given orbitals
-arma::mat form_dens(const arma::mat & C, int nocc) {
+arma::mat form_dens(const arma::mat & C, const std::vector<double> & occs) {
   arma::mat P;
-  form_density(P,C,nocc);
+  form_density(P,C,occs);
   P*=2.0;
   return P;
 }
 
 /// Form density matrix from given orbitals
-arma::mat form_dens(const arma::mat & Ca, const arma::mat & Cb, int nocca, int noccb) {
+arma::mat form_dens(const arma::mat & Ca, const arma::mat & Cb, const std::vector<double> & nocca, const std::vector<double> & noccb) {
   arma::mat Pa, Pb;
   form_density(Pa,Ca,nocca);
   form_density(Pb,Cb,noccb);
@@ -149,11 +149,15 @@ void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   arma::vec E;
   arma::mat C;
 
+  // Construct basis set
   BasisSet bas=construct_basis(at,baslib,set);
+  // Get orbital occupancies
+  std::vector<double> occs=get_restricted_occupancy(set,bas);
+  // Solve SCF equations
   SCF solver=SCF(bas,set);
-  double Et=solver.RHF(C,E);
+  double Et=solver.RHF(C,E,occs);
   // Compute dipole moment
-  double dip=dip_mom(form_dens(C,solver.get_Nel()/2),bas);
+  double dip=dip_mom(form_dens(C,occs),bas);
 
 #ifdef COMPUTE_REFERENCE
   printf("done (%s)\n",t.elapsed().c_str());
@@ -195,11 +199,16 @@ void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   arma::vec Ea, Eb;
   arma::mat Ca, Cb;
 
+  // Construct basis set
   BasisSet bas=construct_basis(at,baslib,set);
+  // Get orbital occupancies
+  std::vector<double> occa, occb;
+  get_unrestricted_occupancy(set,bas,occa,occb);
+  // Solve SCF equations
   SCF solver=SCF(bas,set);
-  double Et=solver.UHF(Ca,Cb,Ea,Eb);
+  double Et=solver.UHF(Ca,Cb,Ea,Eb,occa,occb);
   // Compute dipole moment
-  double dip=dip_mom(form_dens(Ca,Cb,solver.get_Nel_alpha(),solver.get_Nel_beta()),bas);
+  double dip=dip_mom(form_dens(Ca,Cb,occa,occb),bas);
 
 #ifdef COMPUTE_REFERENCE
   printf("done (%s)\n",t.elapsed().c_str());
@@ -249,11 +258,16 @@ void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   arma::vec E;
   arma::mat C;
 
+
+  // Construct basis set
   BasisSet bas=construct_basis(at,baslib,set);
+  // Get orbital occupancies
+  std::vector<double> occs=get_restricted_occupancy(set,bas);
+  // Solve SCF equations
   SCF solver=SCF(bas,set);
-  double Et=solver.RDFT(C,E,xfunc,cfunc);
+  double Et=solver.RDFT(C,E,occs,xfunc,cfunc);
   // Compute dipole moment
-  double dip=dip_mom(form_dens(C,solver.get_Nel()/2),bas);
+  double dip=dip_mom(form_dens(C,occs),bas);
 
 #ifdef COMPUTE_REFERENCE
   printf("done (%s)\n",t.elapsed().c_str());
@@ -295,11 +309,16 @@ void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   arma::vec Ea, Eb;
   arma::mat Ca, Cb;
 
+  // Construct basis set
   BasisSet bas=construct_basis(at,baslib,set);
+  // Get orbital occupancies
+  std::vector<double> occa, occb;
+  get_unrestricted_occupancy(set,bas,occa,occb);
+  // Solve SCF equations
   SCF solver=SCF(bas,set);
-  double Et=solver.UDFT(Ca,Cb,Ea,Eb,xfunc,cfunc);
+  double Et=solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,xfunc,cfunc);
   // Compute dipole moment
-  double dip=dip_mom(form_dens(Ca,Cb,solver.get_Nel_alpha(),solver.get_Nel_beta()),bas);
+  double dip=dip_mom(form_dens(Ca,Cb,occa,occb),bas);
 
 #ifdef COMPUTE_REFERENCE
   printf("done (%s)\n",t.elapsed().c_str());

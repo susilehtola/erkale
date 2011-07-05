@@ -104,14 +104,14 @@ double readdouble(std::string num) {
   return no;
 }
 
-void print_E(size_t N, const arma::vec & E) {
+void print_E(const arma::vec & E, const std::vector<double> & occ) {
   // Print first N elements of E
   
   // Print nelem entries per line
   size_t nelem=5;
   // Total amount of lines to print. Always print one additional line
   // of energies.
-  size_t Ntot=(size_t) ceil(N*1.0/nelem+1)*nelem;
+  size_t Ntot=(size_t) ceil(occ.size()*1.0/nelem+1)*nelem;
 
   // Skip additional line at the end?
   bool skipline=0; 
@@ -123,23 +123,29 @@ void print_E(size_t N, const arma::vec & E) {
       skipline=1;
   }
 
-  char fmt[]="% 13.6f*";
+  char fmt[] ="% 13.6f*";
   char fmtv[]="% 13.6f ";
 
-  if(N<E.n_elem) {
-    // Compute gap
-    double gap=E(N)-E(N-1);
-    // Convert it into eV
-    gap*=HARTREEINEV;
+  // Compute gap. Find HOMO and LUMO
+  size_t homo, lumo;
+  for(homo=occ.size()-1;homo<occ.size();homo--)
+    if(occ[homo]>0.0)
+      break;
+  for(lumo=0;lumo<occ.size();lumo++)
+    if(occ[lumo]==0.0)
+      break;  
 
-    printf("HOMO-LUMO gap is %7.2f eV. ",gap);
-  } 
+  double gap=E(lumo)-E(homo);
+  // Convert it into eV
+  gap*=HARTREEINEV;
   
+  printf("HOMO-LUMO gap is %7.2f eV. ",gap);
   printf("Energies of lowest lying states:\n");
 
   // Loop over states
   for(size_t i=0;i<Ntot;i++) {
-    if(i<N)
+    // Is state occupied?
+    if(i<occ.size() && occ[i]>0.0)
       printf(fmt,E(i));
     else
       printf(fmtv,E(i));

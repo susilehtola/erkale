@@ -63,6 +63,8 @@ Settings::Settings() {
   iset.push_back(geni("Charge", "Total charge of system", 0));
   // Multiplicity
   iset.push_back(geni("Multiplicity", "Spin multiplicity", 1));
+  // Occupancies
+  sset.push_back(gens("Occupancies", "Orbital occupancies", ""));
 
   // Verbose run?
   bset.push_back(genb("Verbose", "Verbose calculation?", 1));
@@ -340,7 +342,12 @@ void Settings::parse(std::string filename) {
 	  } else if(is_bool(words[0])) {
 	    set_bool(words[0],readint(words[1]));
 	  } else if(is_string(words[0])) {
-	    set_string(words[0],words[1]);
+	    // Concatenate value
+	    std::string val=words[1];
+	    for(size_t i=2;i<words.size();i++)
+	      val+=" "+words[i];
+	    // Store value
+	    set_string(words[0],val);
 	  } else {
 	    ERROR_INFO();
 	    std::ostringstream oss;
