@@ -50,6 +50,7 @@ if(BUILD_SHARED_LIBS)
    VERSION ${VERSION} SOVERSION ${SOVERSION} )
   target_link_libraries(erkale_dft ${LIBXC_LIBRARIES})
   target_link_libraries(erkale erkale_dft)
+#  target_link_libraries(erkale_dft erkale)
  endif()
 endif()
 
