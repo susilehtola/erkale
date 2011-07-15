@@ -29,7 +29,7 @@ double tol=1e-6;
 /// Absolute tolerance in orbital energies
 double otol=1e-5;
 /// Absolute tolerance for dipole moment
-double dtol=1e-6;
+double dtol=1e-5;
 
 /// To compute references instead of running tests
 //#define COMPUTE_REFERENCE
