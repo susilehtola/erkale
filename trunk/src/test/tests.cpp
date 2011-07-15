@@ -25,7 +25,7 @@
 #include <cstdio>
 
 /// Relative tolerance in total energy
-double tol=5e-7;
+double tol=1e-6;
 /// Absolute tolerance in orbital energies
 double otol=1e-5;
 /// Absolute tolerance for dipole moment
