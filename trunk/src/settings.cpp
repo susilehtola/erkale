@@ -144,6 +144,22 @@ void Settings::remove_dft_settings() {
 }
 #endif
   
+void Settings::add_double(std::string name, std::string comment, double val) {
+  dset.push_back(gend(name,comment,val));
+}
+
+void Settings::add_bool(std::string name, std::string comment, bool val) {
+  bset.push_back(genb(name,comment,val));
+}
+
+void Settings::add_int(std::string name, std::string comment, int val) {
+  iset.push_back(geni(name,comment,val));
+}
+
+void Settings::add_string(std::string name, std::string comment, std::string val) {
+  sset.push_back(gens(name,comment,val));
+}
+
 void Settings::set_double(std::string name, double val) {
   // Find setting in table
   for(size_t i=0;i<dset.size();i++)
