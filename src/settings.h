@@ -105,6 +105,15 @@ class Settings {
   //  bool dft_enabled() const;
 #endif
 
+  /// Add a double valued setting
+  void add_double(std::string name, std::string comment, double val);
+  /// Add a boolean valued setting
+  void add_bool(std::string name, std::string comment, bool val);
+  /// Add an integer valued setting
+  void add_int(std::string name, std::string comment, int val);
+  /// Add a string valued setting
+  void add_string(std::string name, std::string comment, std::string val);
+
   /// Set a double valued setting
   void set_double(std::string name, double val);
   /// Set a boolean valued setting
