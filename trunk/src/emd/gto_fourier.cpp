@@ -216,6 +216,13 @@ GTO_Fourier GTO_Fourier::operator+(const GTO_Fourier & rhs) const {
   return ret;
 }
 
+GTO_Fourier & GTO_Fourier::operator+=(const GTO_Fourier & rhs) {
+  for(size_t i=0;i<rhs.trans.size();i++)
+    addterm(rhs.trans[i].c,rhs.trans[i].l,rhs.trans[i].m,rhs.trans[i].n,rhs.trans[i].z);
+
+  return *this;
+}
+
 std::vector<trans3d_t> GTO_Fourier::get() const {
   return trans;
 }
