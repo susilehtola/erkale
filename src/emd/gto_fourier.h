@@ -148,6 +148,8 @@ class GTO_Fourier {
 
   /// Addition operator
   GTO_Fourier operator+(const GTO_Fourier & rhs) const;
+  /// Addition operator
+  GTO_Fourier & operator+=(const GTO_Fourier & rhs);
 
   /// Get the expansion in terms
   std::vector<trans3d_t> get() const;
