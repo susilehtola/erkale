@@ -21,7 +21,7 @@
 #include <vector>
 #include "../basis.h"
 
-/// One-center term in electron momentum density
+/// One-center terms in spherical integral
 typedef struct {
   /// Expansion coefficient
   double c;
@@ -31,12 +31,28 @@ typedef struct {
   double z;
 } onecenter_t;
 
-/// Two-center term in electron momentum density \f$ c_i j_l (p \Delta r_i) p^{m} exp(-z p^2) \f$
+/// Sorting operator
+bool operator<(const onecenter_t & lhs, const onecenter_t & rhs);
+/// Addition operator
+bool operator==(const onecenter_t & lhs, const onecenter_t & rhs);
+
+/// Two-center contraction
 typedef struct {
-  /// List of contraction coefficients \f$ c_i \f$
-  std::vector<double> c;
-  /// List of displacements \f$ \Delta r_i \f$
-  std::vector<double> dr;
+  /// Delta r_i
+  double dr;
+  /// Coefficient
+  double c;
+} twocenter_contr_t;
+
+/// Sorting operator
+bool operator<(const twocenter_contr_t & lhs, const twocenter_contr_t & rhs);
+/// Addition operator
+bool operator==(const twocenter_contr_t & lhs, const twocenter_contr_t & rhs);
+
+/// Two-center terms
+typedef struct {
+  /// List of contractions
+  std::vector<twocenter_contr_t> c;
   /// j_l (p * dr_i)
   int l;
   /// p^pm
@@ -45,14 +61,9 @@ typedef struct {
   double z;
 } twocenter_t;
 
-/// Comparison operator for one-center terms
-bool operator<(const onecenter_t & lhs, const onecenter_t & rhs);
-/// Equivalence operator for one-center term
-bool operator==(const onecenter_t & lhs, const onecenter_t & rhs);
-
-/// Comparison operator for two-center terms
+/// Sorting operator
 bool operator<(const twocenter_t & lhs, const twocenter_t & rhs);
-/// Equivalence operator for two-center term
+/// Addition operator
 bool operator==(const twocenter_t & lhs, const twocenter_t & rhs);
 
 /// Find out basis functions of the same type
@@ -81,11 +92,11 @@ class EMDEvaluator {
   std::vector<onecenter_t> onec;
 
   /// Add one-center term
-  void add_1c(double c, int pm, double z);
+  void add_term(const onecenter_t & one);
   /// Add two-center term
-  void add_2c(double c, double dr, int l, int pm, double z);
+  void add_term(const twocenter_t & two);
   /// Add contraction in two-center term
-  void add_2c_contr(double c, double dr, size_t ind);
+  void add_contr(size_t ind, const twocenter_contr_t & twoc);
 
   /// Evaluate one-center terms at p
   double eval_onec(double p) const;

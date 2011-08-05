@@ -47,60 +47,52 @@ extern "C" {
 #define MAXPRINTFREQ 5
 
 bool operator<(const onecenter_t & lhs, const onecenter_t & rhs) {
-  // Determine order of lhs and rhs, ordering first by pm, then by l and then by z
-
-  // First order wrt pm.
-  if(lhs.pm<rhs.pm) {
+  // Sort first by exponent
+  if(lhs.z<rhs.z)
     return 1;
-  } else if(lhs.pm==rhs.pm && lhs.z<rhs.z) {
-    // Then wrt exponent
-    return 1;
-  } else {
-    // Otherwise, nothing
-    return 0;
+  else if(lhs.z==rhs.z) {
+    // then by power of p
+    return lhs.pm<rhs.pm;
   }
+
+  return 0;
 }
 
 bool operator==(const onecenter_t & lhs, const onecenter_t & rhs) {
-  // Determine order of lhs and rhs, ordering first by pm, then by l and then by z
+  return (lhs.z==rhs.z) && (lhs.pm==rhs.pm);
+}
 
-  // First order wrt pm.
-  if(lhs.pm!=rhs.pm)
-    return 0;
-  // Then wrt exponent
-  else if(lhs.z!=rhs.z)
-    return 0;
-  else
-    return 1;
+bool operator<(const twocenter_contr_t & lhs, const twocenter_contr_t & rhs) {
+  return lhs.dr<rhs.dr;
+}
+
+bool operator==(const twocenter_contr_t & lhs, const twocenter_contr_t & rhs) {
+  return lhs.dr==rhs.dr;
 }
 
 bool operator<(const twocenter_t & lhs, const twocenter_t & rhs) {
-  // Determine order of lhs and rhs, ordering first by pm, then by l and then by z
+  /// Sort first by exponent
+  if(lhs.z<rhs.z)
+    return 1;
+  else if(lhs.z==rhs.z) {
 
-  // First order wrt pm.
-  if(lhs.pm<rhs.pm)
-    return 1;
-  else if(lhs.pm == rhs.pm && lhs.l<rhs.l)
-    return 1;
-  else if(lhs.pm == rhs.pm && lhs.l == rhs.l && lhs.z<rhs.z)
-    return 1;
-  else
-    return 0;
+    // then by power of p
+    if(lhs.pm<rhs.pm)
+      return 1;
+    else if(lhs.pm==rhs.pm) {
+
+      // then by index of Bessel function
+      return lhs.l<rhs.l;
+    }
+  }
+
+  return 0;
 }
 
 bool operator==(const twocenter_t & lhs, const twocenter_t & rhs) {
-  // Determine order of lhs and rhs, ordering first by pm, then by l and then by z
-
-  // First order wrt pm.
-  if(lhs.pm!=rhs.pm)
-    return 0;
-  else if(lhs.l!=rhs.l)
-    return 0;
-  else if(lhs.z!=rhs.z)
-    return 0;
-  else
-    return 1;
+  return (lhs.z==rhs.z) && (lhs.pm==rhs.pm) && (lhs.l==rhs.l);
 }
+
 
 std::vector< std::vector<size_t> > find_identical_shells(const BasisSet & bas) {
   // Returned list of identical basis functions
@@ -310,13 +302,20 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 		    if(sph[iang].l==0 && sph[iang].m==0) {
 		      // Found contributing term
 		      
+		      onecenter_t hlp;
+		      hlp.pm=prodexp[icomb].pm;
+		      hlp.z=prodexp[icomb].z;
+
 		      // If we're off-diagonal, we get the real part twice
 		      // (two different shells on same atom, or different functions on same shell)
 		      if(ibas!=jbas)
-			add_1c(2.0*sph[iang].c.re*P(ibas,jbas)*sqrt(4.0*M_PI),prodexp[icomb].pm,prodexp[icomb].z);
-		      // On the diagonal we get it just once.
+			hlp.c=2.0*sph[iang].c.re*P(ibas,jbas)*sqrt(4.0*M_PI);
 		      else
-			add_1c(sph[iang].c.re*P(ibas,jbas)*sqrt(4.0*M_PI),prodexp[icomb].pm,prodexp[icomb].z);
+			// On the diagonal we get it just once.
+			hlp.c=sph[iang].c.re*P(ibas,jbas)*sqrt(4.0*M_PI);
+
+		      add_term(hlp);
+		      
 		      break;
 		    }
 		}
@@ -355,8 +354,18 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 		    complex c=cmult(cmult(Ylm,il),sph[iang].c);
 		    // Add the term. We are bound to be off-diagonal,
 		    // so we get the real part twice.
-		    add_2c(8.0*M_PI*c.re*P(ibas,jbas),dr,sph[iang].l,prodexp[icomb].pm,prodexp[icomb].z);
-		    
+
+		    twocenter_contr_t tmp;
+		    tmp.dr=dr;
+		    tmp.c=8.0*M_PI*c.re*P(ibas,jbas);
+
+		    twocenter_t hlp;
+		    hlp.c.push_back(tmp);
+		    hlp.z=prodexp[icomb].z;
+		    hlp.pm=prodexp[icomb].pm;
+		    hlp.l=sph[iang].l;
+		      
+		    add_term(hlp);
 		  }
 		}
 		
@@ -375,107 +384,64 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 EMDEvaluator::~EMDEvaluator() {
 }
 
-void EMDEvaluator::add_1c(double c, int pm, double z) {
-  // Add one-center term
-
-  onecenter_t help;
-  help.c=c;
-  help.pm=pm;
-  help.z=z;
-
-  // Empty case
-  if(!onec.size()) {
-    onec.push_back(help);
-  } else if(onec[onec.size()-1]<help)
-    onec.push_back(help);
-  else {
-    // Otherwise, use binary search to determine location to insert new term.
-
+void EMDEvaluator::add_term(const onecenter_t & t) {
+  if(onec.size()==0) {
+    onec.push_back(t);
+  } else {
     // Get upper bound
     std::vector<onecenter_t>::iterator high;
-    high=std::upper_bound(onec.begin(),onec.end(),help);
+    high=std::upper_bound(onec.begin(),onec.end(),t);
 
-    // Check if term already exists
-    size_t ind=high-onec.begin(); // Position of upper bound
-    //   printf("ind=%lu\n",ind);
+    // Corresponding index is
+    size_t ind=high-onec.begin();
 
-    if(ind>0 && onec[ind-1]==help)
-      onec[ind-1].c+=c;
-    else
-      // Nope, doesn't exist - add it.
-      onec.insert(high,help);
-  }  
-
-  /*
-  printf("Added one-center term with pm=%i, z=%e, c=%e.\n",pm,z,c);
-  print();
-  printf("\n");
-  */
-}
-
-void EMDEvaluator::add_2c_contr(double c, double dr, size_t loc) {
-  // Add contraction to two-center term
-
-  if(twoc[loc].dr[twoc[loc].dr.size()-1]<dr) {
-    twoc[loc].dr.push_back(dr);
-    twoc[loc].c.push_back(c);
-  } else {
-    // Otherwise, use binary search to determine location to insert new term.
-
-    // Get upper bound
-    std::vector<double>::iterator high;
-    high=std::upper_bound(twoc[loc].dr.begin(),twoc[loc].dr.end(),dr);
-
-    // Check if term already exists
-    size_t ind=high-twoc[loc].dr.begin(); // Position of upper bound
-    if(ind>0 && twoc[loc].dr[ind-1]==dr)
-      twoc[loc].c[ind-1]+=c;
+    if(ind>0 && onec[ind-1]==t)
+      // Found it.
+      onec[ind-1].c+=t.c;
     else {
-      // Nope, doesn't exist - add it.
-      twoc[loc].dr.insert(twoc[loc].dr.begin()+ind,dr);
-      twoc[loc].c.insert(twoc[loc].c.begin()+ind,c);
+      // Term does not exist, add it
+      onec.insert(high,t);
     }
   }
 }
 
-void EMDEvaluator::add_2c(double c, double dr, int l, int pm, double z) {
-  twocenter_t help;
-  help.c.push_back(c);
-  help.dr.push_back(dr);
-  help.l=l;
-  help.pm=pm;
-  help.z=z;
-
-  // Empty case
-  if(!twoc.size()) {
-    twoc.push_back(help);
-  } else if(twoc[twoc.size()-1]<help)
-    twoc.push_back(help);
-  else {
-    // Otherwise, use binary search to determine location to insert new term.
-
+void EMDEvaluator::add_term(const twocenter_t & t) {
+  if(twoc.size()==0) {
+    twoc.push_back(t);
+  } else {
     // Get upper bound
     std::vector<twocenter_t>::iterator high;
-    high=std::upper_bound(twoc.begin(),twoc.end(),help);
+    high=std::upper_bound(twoc.begin(),twoc.end(),t);
+    // Corresponding index is
+    size_t ind=high-twoc.begin();
+    
+    if(ind>0 && twoc[ind-1]==t)
+      // Loop over terms in t
+      for(size_t it=0;it<t.c.size();it++)
+        add_contr(ind-1,t.c[it]);
+    else {
+      // Term does not exist, add it
+      twoc.insert(high,t);
+    }
+  }
+}
 
-    // Check if term already exists
-    size_t ind=high-twoc.begin(); // Position of upper bound
-    //    printf("ind=%lu\n",ind);
+void EMDEvaluator::add_contr(size_t ind, const twocenter_contr_t & t) {
+  if(twoc[ind].c.size()==0) {
+    twoc[ind].c.push_back(t);
+  } else {
+    // Get upper bound
+    std::vector<twocenter_contr_t>::iterator hi;
+    hi=std::upper_bound(twoc[ind].c.begin(),twoc[ind].c.end(),t);
 
-    if(ind>0 && twoc[ind-1]==help) {
-      //      printf("Adding two-center term with dr=%e, l=%i, pm=%i, z=%e, c=%e.\n",dr,l,pm,z,c);
-      add_2c_contr(c,dr,ind-1);
-    } else
-      // Nope, doesn't exist - add it.
-      twoc.insert(high,help);
-  }  
-
-
-  /*
-  printf("Added two-center term with dr=%e, l=%i, pm=%i, z=%e, c=%e.\n",dr,l,pm,z,c);
-  print();
-  printf("\n");
-  */
+    size_t indt=hi-twoc[ind].c.begin();
+    if(indt>0 && twoc[ind].c[indt-1] == t)
+      // Found it!
+      twoc[ind].c[indt-1].c+=t.c;
+    else
+      // Need to add the term.
+      twoc[ind].c.insert(hi,t);
+  }
 }
 
 double EMDEvaluator::eval_onec(double p) const {
@@ -494,7 +460,7 @@ double EMDEvaluator::eval_twoc(double p) const {
   for(size_t i=0;i<twoc.size();i++) {
     jlcontr=0.0;
     for(size_t j=0;j<twoc[i].c.size();j++)
-      jlcontr+=twoc[i].c[j]*gsl_sf_bessel_jl(twoc[i].l,p*twoc[i].dr[j]);
+      jlcontr+=twoc[i].c[j].c*gsl_sf_bessel_jl(twoc[i].l,p*twoc[i].c[j].dr);
     d_twoc+=jlcontr*pow(p,twoc[i].pm)*exp(-twoc[i].z*p*p);
   }
   return d_twoc;
@@ -519,17 +485,16 @@ size_t EMDEvaluator::getN_twoc() const {
 size_t EMDEvaluator::getN_twoc_total() const {
   size_t N=0;
   for(size_t i=0;i<twoc.size();i++)
-    N+=twoc[i].dr.size();
+    N+=twoc[i].c.size();
   return N;
 }
 
 void EMDEvaluator::clean() {
   // Two-center terms
   for(size_t i=0;i<twoc.size();i++)
-    for(size_t j=twoc[i].dr.size()-1;j<twoc[i].dr.size();j--)
-      if(twoc[i].c[j]==0) {
+    for(size_t j=twoc[i].c.size()-1;j<twoc[i].c.size();j--)
+      if(twoc[i].c[j].c==0) {
 	twoc[i].c.erase(twoc[i].c.begin()+j);
-	twoc[i].dr.erase(twoc[i].dr.begin()+j);
       }
 
   // One-center terms
