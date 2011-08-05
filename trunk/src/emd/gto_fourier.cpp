@@ -251,3 +251,9 @@ void GTO_Fourier::print() const {
   for(size_t i=0;i<trans.size();i++)
     printf("(%e,%e) px^%i py^%i pz^%i exp(-%e p^2)\n",trans[i].c.re,trans[i].c.im,trans[i].l,trans[i].m,trans[i].n,trans[i].z);
 }
+
+void GTO_Fourier::clean() {
+  for(size_t i=trans.size()-1;i<trans.size();i--)
+    if(trans[i].c.re==0 && trans[i].c.im==0.0)
+      trans.erase(trans.begin()+i);
+}

@@ -157,6 +157,9 @@ class GTO_Fourier {
   /// Print Fourier transform
   void print() const;
 
+  // Clean out the expansion
+  void clean();
+
   friend GTO_Fourier operator*(complex fac, const GTO_Fourier & rhs);
   friend GTO_Fourier operator*(double fac, const GTO_Fourier & rhs);
 };
