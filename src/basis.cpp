@@ -1193,6 +1193,10 @@ size_t BasisSet::get_Nbf(size_t ind) const {
   return shells[ind].get_Nbf();
 }
 
+size_t BasisSet::get_Ncart(size_t ind) const {
+  return shells[ind].get_Ncart();
+}
+
 size_t BasisSet::get_last_ind() const {
   if(shells.size())
     return shells[shells.size()-1].get_last_ind();
@@ -2541,8 +2545,8 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	  ltrial=lmax_abs;
 
 	// Form list of angular momentum already used in ABS
-	std::vector<int> lvals(maxam+1);
-	for(int i=0;i<=maxam;i++)
+	std::vector<int> lvals(max_am+1);
+	for(int i=0;i<=max_am;i++)
 	  lvals[i]=0;
 
 	// Maximum angular momentum of trial functions is
@@ -2566,7 +2570,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	std::vector<double> C, z;
 	C.push_back(1.0);
 	z.push_back(geomav);
-	for(int l=0;l<=maxam;l++)
+	for(int l=0;l<=max_am;l++)
 	  if(lvals[l]>0)
 	    dfit.add_functions(in,cen,l,C,z);
       }

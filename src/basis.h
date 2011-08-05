@@ -40,7 +40,7 @@
 /// Angular momentum notation for shells
 const char shell_types[]={'S','P','D','F','G','H','I','K','L','M'};
 /// Maximum angular momentum supported in current version of ERKALE
-const int maxam=9;
+const int max_am=9;
 
 /// Structure for defining shells of functions
 typedef struct {
@@ -296,6 +296,8 @@ class BasisSet {
   size_t get_Nshells() const;
   /// Get number of basis functions on shell
   size_t get_Nbf(size_t ind) const;
+  /// Get number of cartesians on shell
+  size_t get_Ncart(size_t ind) const;
 
   /// Get range of shell (distance at which functions have dropped below epsilon)
   void compute_shell_ranges(double eps=1e-10);
