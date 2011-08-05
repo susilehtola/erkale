@@ -31,7 +31,7 @@
 
 
 int find_am(char am) {
-  for(int i=0;i<=maxam;i++)
+  for(int i=0;i<=max_am;i++)
     if(shell_types[i]==am)
       return i;
 
