@@ -57,15 +57,14 @@ class SphericalExpansion {
   /// Linear combination of spherical harmonics
   std::vector<ylmcoeff_t> comb;
 
-  /// Add new Ylm with coefficient c to the linear combination
-  void add(const ylmcoeff_t & c);
-
  public:
   /// Constructor
   SphericalExpansion();
   /// Destructor
   ~SphericalExpansion();
 
+  /// Add new Ylm with coefficient c to the linear combination
+  void add(const ylmcoeff_t & c);
   /// Add new Ylm with coefficient c to the linear combination
   void addylm(int l, int m, complex c);
   /// Add new Ylm with coefficient c to the linear combination
