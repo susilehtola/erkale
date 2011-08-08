@@ -20,6 +20,7 @@
 #define ERKALE_SPHEXP
 
 #include <vector>
+#include "basis.h"
 #include "complex.h"
 
 /// Coefficient of expansion in spherical harmonics \f$ \sum_{lm} c_{lm} Y_{lm} \f$
@@ -227,5 +228,24 @@ class GTO_Fourier_Ylm {
 GTO_Fourier_Ylm operator*(complex fac, const GTO_Fourier_Ylm & func);
 /// Scale expansion by factor fac
 GTO_Fourier_Ylm operator*(double fac, const GTO_Fourier_Ylm & func);
+
+
+/// Spherical expansion of px^l py^m pz^n
+class CartesianExpansion {
+  std::vector<SphericalExpansion> table;
+
+  /// Length of side (am+1)
+  int N;
+
+  /// Get index of element at (l,m,n)
+  size_t ind(int l, int m, int n) const;
+  
+ public:
+  CartesianExpansion(int max=2*max_am);
+  ~CartesianExpansion();
+  
+  /// Get expansion of px^l py^m pz^n
+  SphericalExpansion get(int l, int m, int n) const;
+};
 
 #endif

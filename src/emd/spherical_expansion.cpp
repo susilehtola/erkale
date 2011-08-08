@@ -546,3 +546,65 @@ GTO_Fourier_Ylm operator*(double fac, const GTO_Fourier_Ylm & func) {
 
   return ret;
 }
+
+
+CartesianExpansion::CartesianExpansion(int maxam) {
+  // Amount of elements per side of table is
+  N=maxam+1;
+  // Reserve space for elements
+  table.resize(N*N*N);
+
+  // Compute spherical harmonics expansions of px^l, py^m and pz^n
+  std::vector<SphericalExpansion> px, py, pz;
+
+  px.resize(maxam+1);
+  py.resize(maxam+1);
+  pz.resize(maxam+1);
+
+  // p_i^0 = 1 = \sqrt{4 \pi} Y_0^0
+  px[0].addylm(0,0,sqrt(4.0*M_PI));
+  py[0].addylm(0,0,sqrt(4.0*M_PI));
+  pz[0].addylm(0,0,sqrt(4.0*M_PI));
+
+  // px = p * sqrt{ 2 \pi / 3} * ( Y_1^{-1} - Y_1^1)
+  if(maxam>0) {
+    px[1].addylm(1,-1,sqrt(2.0*M_PI/3.0));
+    px[1].addylm(1,1,-sqrt(2.0*M_PI/3.0));
+  }
+  // py = ip * sqrt{ 2 \pi / 3} * ( Y_1^{-1} + Y_1^1 )
+  if(maxam>0) {
+    complex hlp;
+    hlp.re=0.0;
+    hlp.im=sqrt(2.0*M_PI/3.0);
+    py[1].addylm(1,-1,hlp);
+    py[1].addylm(1,1,hlp);
+  }
+  // pz = p * sqrt{4 \pi / 3} Y_1^0
+  if(maxam>0)
+    pz[1].addylm(1,0,sqrt(4.0*M_PI/3.0));
+
+  // Form the rest of the transforms
+  for(int il=2;il<=maxam;il++)
+    px[il]=px[il-1]*px[1];
+  for(int im=2;im<=maxam;im++)
+    py[im]=py[im-1]*py[1];
+  for(int in=2;in<=maxam;in++)
+    pz[in]=pz[in-1]*pz[1];
+
+  // Fill table
+  for(int l=0;l<=maxam;l++)
+    for(int m=0;m<=maxam;m++)
+      for(int n=0;n<=maxam;n++)
+	table[ind(l,m,n)]=px[l]*py[m]*pz[n];
+}
+
+size_t CartesianExpansion::ind(int l, int m, int n) const {
+  return (l*N+m)*N+n;
+}
+
+CartesianExpansion::~CartesianExpansion() {
+}
+
+SphericalExpansion CartesianExpansion::get(int l, int m, int n) const {
+  return table[ind(l,m,n)];
+}
