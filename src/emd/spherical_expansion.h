@@ -32,6 +32,11 @@ typedef struct {
   complex c;
 } ylmcoeff_t;
 
+/// Sorting operator
+bool operator<(const ylmcoeff_t & lhs, const ylmcoeff_t & rhs);
+/// Addition operator
+bool operator==(const ylmcoeff_t & lhs, const ylmcoeff_t & rhs);
+
 // Forward declaration
 class SphericalExpansionMultiplicationTable;
 
@@ -51,6 +56,10 @@ class SphericalExpansionMultiplicationTable;
 class SphericalExpansion {
   /// Linear combination of spherical harmonics
   std::vector<ylmcoeff_t> comb;
+
+  /// Add new Ylm with coefficient c to the linear combination
+  void add(const ylmcoeff_t & c);
+
  public:
   /// Constructor
   SphericalExpansion();

@@ -15,7 +15,7 @@
  */
 
 
-
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 // For exceptions
@@ -35,36 +35,51 @@ extern "C" {
 // Location in multiplication table
 #define multloc(l1,m1,l2,m2) (lmind(maxam+1,maxam+1)*lmind(l1,m1)+lmind(l2,m2))
 
+bool operator<(const ylmcoeff_t & lhs, const ylmcoeff_t & rhs) {
+  if(lhs.l<rhs.l)
+    return 1;
+  else if(lhs.l==rhs.l)
+    return lhs.m<rhs.m;
+  
+  return 0;
+}
+
+bool operator==(const ylmcoeff_t & lhs, const ylmcoeff_t & rhs) {
+  return (lhs.l==rhs.l) && (lhs.m==rhs.m);
+}
+
 SphericalExpansion::SphericalExpansion() {
 }
 
 SphericalExpansion::~SphericalExpansion() {
 }
 
-void SphericalExpansion::addylm(int l, int m, complex c) {
-  // Check first that the combination doesn't appear already on the list
-  int found=0;
-
-  /*  if(l<0) {
-    printf("Error! l<0! Letting l=-l.\n");
-    l=-l;
-    } */
-
-  for(size_t i=0;i<comb.size();i++)
-    if(comb[i].l==l && comb[i].m==m) {
-      found=1;
-      comb[i].c=cadd(comb[i].c,c); // Increase the value of the weight factor
-    }
-
-  // If it wasn't on the list, add it
-  if(!found) {
-    ylmcoeff_t newc;
-    newc.l=l;
-    newc.m=m;
-    newc.c=c;
+void SphericalExpansion::add(const ylmcoeff_t & t) {
+  if(comb.size()==0) {
+    comb.push_back(t);
+  } else {
+    // Get upper bound
+    std::vector<ylmcoeff_t>::iterator high;
+    high=std::upper_bound(comb.begin(),comb.end(),t);
     
-    comb.push_back(newc);
+    // Corresponding index is
+    size_t ind=high-comb.begin();
+    
+    if(ind>0 && comb[ind-1]==t)
+      comb[ind-1].c=cadd(comb[ind-1].c,t.c);
+    else {
+      // Term does not exist, add it
+      comb.insert(high,t);
+    }
   }
+}
+
+void SphericalExpansion::addylm(int l, int m, complex c) {
+  ylmcoeff_t hlp;
+  hlp.l=l;
+  hlp.m=m;
+  hlp.c=c;
+  add(hlp);
 }
 
 void SphericalExpansion::addylm(int l, int m, double d) {
