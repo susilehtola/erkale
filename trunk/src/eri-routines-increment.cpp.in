@@ -46,21 +46,35 @@ printf("\n");
 		  // Loop over symmetry equivalent integrals
 		  for(size_t inid=0;inid<nid;inid++) {
 
-#if defined(CALCK)
-		    // Increment exchange
-		    K(iarr[inid],larr[inid])+=R(jarr[inid],karr[inid])*res;
-#else
+#ifndef CALCK
 		    // Increment Coulomb
+#ifdef _OPENMP
+		    Jwrk[thid](iarr[inid],jarr[inid])+=R(karr[inid],larr[inid])*res;
+#else
 		    J(iarr[inid],jarr[inid])+=R(karr[inid],larr[inid])*res;
+#endif
+#endif // ifndef CALCK
 
-//		    printf("J(%i,%i) += %e * %e\t(%i %i %i %i)\n",iarr[inid],jarr[inid],R(karr[inid],larr[inid]),res,iarr[inid],jarr[inid],karr[inid],larr[inid]);
+
+#if defined(CALCK) || defined(CALCJK)
+		    // Increment exchange
+#ifdef _OPENMP
+		    Kwrk[thid](iarr[inid],larr[inid])+=R(jarr[inid],karr[inid])*res;
+#else
+		    K(iarr[inid],larr[inid])+=R(jarr[inid],karr[inid])*res;
+#endif
+#endif // if defined(CALCK) || defined(CALCJK)
+
 
 #ifdef CALCJKab
+		    // Increment exchange
+#ifdef _OPENMP
+		    Kawrk[thid](iarr[inid],larr[inid])+=Ra(jarr[inid],karr[inid])*res;
+		    Kbwrk[thid](iarr[inid],larr[inid])+=Rb(jarr[inid],karr[inid])*res;
+#else
 		    Ka(iarr[inid],larr[inid])+=Ra(jarr[inid],karr[inid])*res;
 		    Kb(iarr[inid],larr[inid])+=Rb(jarr[inid],karr[inid])*res;
-#elif defined(CALCJK)
-		    K(iarr[inid],larr[inid])+=R(jarr[inid],karr[inid])*res;
 #endif
-#endif
+#endif // ifdef CALCJKab
 		  }
 #endif

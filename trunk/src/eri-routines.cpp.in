@@ -7,59 +7,97 @@
 
 #ifdef ERITABLE
 void ERItable::fill(const BasisSet * basp) {
-  // Don't do anything with a dummy argument.
+// Don't do anything with a dummy argument.
   if(basp==NULL)
     return;
 #else
 
 #if defined(CALCJKab)
 void ERIscreen::calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
-  // Compute total density for Coulomb matrix
+// Compute total density for Coulomb matrix
   arma::mat R=Ra+Rb;
 #elif defined(CALCJK)
 void ERIscreen::calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff) const {
 #elif defined(CALCK)
 arma::mat ERIscreen::calcK(const arma::mat & R, double tol, double *eff) const {
+  arma::mat K;
 #else
 arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
-#endif
+  arma::mat J;
+#endif // if defined(CALCJKab)
 
-#endif
+#endif // ifdef ERITABLE
 
   // Amount of basis functions
   size_t Nbf=basp->get_Nbf();
 
-  /* Check sizes of input and output */
+  /* Check sizes of input */
 
-#ifdef CALCJKab
+#if defined(CALCK) || defined(CALCJK)
+  MAT_SIZE_CHECK(R,Nbf,Nbf,"R is not square!\n");
+#endif
+
+#if defined(CALCJKab)
   MAT_SIZE_CHECK(Ra,Nbf,Nbf,"Ra is not square!\n");
   MAT_SIZE_CHECK(Rb,Nbf,Nbf,"Rb is not square!\n");
+#endif
 
+  /* Check size of output */
+#ifndef ERITABLE
+
+#ifndef CALCK
   MAT_RESIZE(J,Nbf,Nbf);
-  MAT_RESIZE(Ka,Nbf,Nbf);
-  MAT_RESIZE(Kb,Nbf,Nbf);
-
-  J.zeros();
-  Ka.zeros();
-  Kb.zeros();
-#elif defined(CALCJK)
-  MAT_SIZE_CHECK(R,Nbf,Nbf,"R is not square!\n");
-  MAT_RESIZE(J,Nbf,Nbf);
-  MAT_RESIZE(K,Nbf,Nbf);
-
-  J.zeros();
-  K.zeros();
-#elif defined(CALCK)
-  MAT_SIZE_CHECK(R,Nbf,Nbf,"R is not square!\n");
-
-  arma::mat K(Nbf,Nbf);
-  K.zeros();
-#elif defined(CALCJ)
-  MAT_SIZE_CHECK(R,Nbf,Nbf,"R is not square!\n");
-
-  arma::mat J(Nbf,Nbf);
   J.zeros();
 #endif
+
+#if defined(CALCK) || defined(CALCJK)
+  MAT_RESIZE(K,Nbf,Nbf);
+  K.zeros();
+#endif
+
+#if defined(CALCJKab)
+  MAT_RESIZE(Ka,Nbf,Nbf);
+  MAT_RESIZE(Kb,Nbf,Nbf);
+  Ka.zeros();
+  Kb.zeros(); 
+#endif
+
+  /* Allocate worker memory */
+#ifdef _OPENMP
+  // Get (maximum) number of threads
+  int nth=omp_get_max_threads();
+
+#ifndef CALCK
+  std::vector<arma::mat> Jwrk;
+  for(int i=0;i<nth;i++) {
+    arma::mat zeros(Nbf,Nbf);
+    zeros.zeros();
+    Jwrk.push_back(zeros);
+  }
+#endif
+
+#if defined(CALCK) || defined(CALCJK)
+  std::vector<arma::mat> Kwrk;
+  for(int i=0;i<nth;i++) {
+    arma::mat zeros(Nbf,Nbf);
+    zeros.zeros();
+    Kwrk.push_back(zeros);
+  }
+#endif
+
+#ifdef CALCJKab
+  std::vector<arma::mat> Kawrk, Kbwrk;
+  for(int i=0;i<nth;i++) {
+    arma::mat zeros(Nbf,Nbf);
+    zeros.zeros();
+    Kawrk.push_back(zeros);
+    Kbwrk.push_back(zeros);
+  }
+#endif
+
+#endif // ifdef _OPENMP
+
+#endif // ifndef ERITABLE
 
   /* Allocate memory for table of integrals */
 
@@ -91,10 +129,6 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 #else
   // Number of calculated and skipped integrals
   size_t intskip=0, denskip=0, calcd=0;
-
-  // Arrays of identical integrals
-  size_t iarr[8], jarr[8], karr[8], larr[8];
-  size_t nid; // Number of identical integrals in this batch
 #endif
 
   /* The filling algorithm may seem a bit complicated. This is because the ERIs
@@ -134,14 +168,24 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 #else
 #pragma omp parallel reduction(+:calcd,intskip,denskip)
 #endif
+
+#endif // ifdef _OPENMP
   {
-    /*
-    if(omp_get_thread_num()==0)
-      printf("Computing ERIs with %i threads.\n",omp_get_num_threads());
-    */
-    
-#pragma omp for schedule(dynamic,1)
+
+#ifndef ERITABLE
+    // Arrays of identical integrals
+    size_t iarr[8], jarr[8], karr[8], larr[8];
+    size_t nid; // Number of identical integrals in this batch
 #endif
+
+#ifdef _OPENMP
+
+#ifndef ERITABLE
+    int thid=omp_get_thread_num();
+#endif
+
+#pragma omp for schedule(dynamic,1)
+#endif // ifdef _OPENMP
     for(size_t ip=0;ip<Npairs;ip++) {
       
       // Shells are
@@ -169,7 +213,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	// First functions on shells are
 	size_t i0=basp->get_first_ind(is);
 	size_t j0=basp->get_first_ind(js);
-      // and amounts of functions on shells are
+	// and amounts of functions on shells are
 	size_t Ni=basp->get_Nbf(is);
 	size_t Nj=basp->get_Nbf(js);
 	
@@ -213,7 +257,6 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	    // Need to calculate integral.
 	    calcd++;
 	}
-	
 #endif
 	
 	// Compute integrals
@@ -232,9 +275,6 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	*/
 
 	/* Fill table, or increment matrices */
-#ifdef _OPENMP
-#pragma omp critical
-#endif
 	{
 	  // Helpers
 	  size_t i, j, k, l;
@@ -323,9 +363,32 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	} // end critical region
       }
     }
-#ifdef _OPENMP
   } // end parallel region
+
+  /* Sum results together */
+#if defined(_OPENMP) && !defined(ERITABLE)
+
+#ifndef CALCK
+  for(int i=0;i<nth;i++) {
+    J+=Jwrk[i];
+  }
 #endif
+
+#if defined(CALCK) || defined(CALCJK)
+  for(int i=0;i<nth;i++) {
+    K+=Kwrk[i];
+  }
+#endif
+
+#ifdef CALCJKab
+  for(int i=0;i<nth;i++) {
+    Ka+=Kawrk[i];
+    Kb+=Kbwrk[i];
+  }
+#endif
+
+#endif
+
   
 #ifdef CHECKFILL  
   size_t ndupl=0, nmiss=0;
