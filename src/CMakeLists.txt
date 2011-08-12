@@ -101,13 +101,17 @@ add_custom_command(
  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eritable-base.cpp > ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
  COMMAND ${PPROC} -DERITABLE ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >> ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
- DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in ${CMAKE_CURRENT_SOURCE_DIR}/eritable-base.cpp
+ DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in
+ DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines-increment.cpp.in
+ DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eritable-base.cpp
 )
 
 # Recipe for building ERIScreen
 add_custom_command(
  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in ${CMAKE_CURRENT_SOURCE_DIR}/eriscreen-base.cpp
+ DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in
+ DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines-increment.cpp.in
+ DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eriscreen-base.cpp
 
  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eriscreen-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
  COMMAND ${PPROC} -DCALCJKab ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
@@ -120,7 +124,8 @@ add_custom_command(
 if(USEDFT)
  add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
  
   COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   COMMAND ${PPROC} ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
@@ -131,7 +136,8 @@ if(USEDFT)
 else()
  add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
  
   COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   COMMAND ${PPROC} ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
