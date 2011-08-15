@@ -37,6 +37,9 @@ Settings::Settings() {
   // Input system
   sset.push_back(gens("System", "System as an xyz file", "atoms.xyz"));
 
+  // Log file
+  sset.push_back(gens("Logfile", "File to print out full information, stdout for screen", "erkale.log"));
+
   // Use spherical harmonics.
   bset.push_back(genb("UseLM", "Use a spherical harmonics basis set by default?", 1));
 

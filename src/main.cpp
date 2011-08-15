@@ -73,6 +73,19 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.parse(std::string(argv[1]));
+
+  // Redirect output?
+  std::string logfile=set.get_string("Logfile");
+  if(stricmp(logfile,"stdout")!=0) {
+    // Redirect stdout to file
+    FILE *outstream=freopen(logfile.c_str(),"w",stdout);
+    if(outstream==NULL) {
+      ERROR_INFO();
+      throw std::runtime_error("Unable to redirect output!\n");
+    } else
+      fprintf(stderr,"\n");
+  }
+
   bool verbose=set.get_bool("Verbose");
 
   // Print out settings
