@@ -260,6 +260,9 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
   }
 #endif
 
+  // Sparse output to stderr
+  fprintf(stderr,"%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
+
   // Loop:
   bool converged=0;
   for(int iiter=1;iiter<=maxiter;iiter++) {
@@ -776,6 +779,8 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
       printf("\nIteration took %s.\n",titer.elapsed().c_str());
     }
 
+    // Sparse output
+    fprintf(stderr,"%4i % 16.6f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,Etot,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
 
     if(!mixdensity || (mixdensity && mix==1.0)) {
       
