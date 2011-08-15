@@ -261,6 +261,30 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
 #endif
 
   // Sparse output to stderr
+  fprintf(stderr,"Running ");
+#ifdef RESTRICTED
+  fprintf(stderr,"restricted ");
+#else
+  fprintf(stderr,"unrestricted ");
+#endif
+
+#ifndef DFT
+  fprintf(stderr,"HF ");
+#else
+  if(c_func>0) {
+    // Correlation exists.
+    fprintf(stderr,"%s-%s ",get_keyword(x_func).c_str(),get_keyword(c_func).c_str());
+  } else
+    fprintf(stderr,"%s ",get_keyword(x_func).c_str());
+#endif
+
+  fprintf(stderr,"calculation");
+#ifdef DFT
+  if(c_func>0 && densityfit)
+    fprintf(stderr," with density fitting");
+#endif
+  fprintf(stderr,".\n");
+
   fprintf(stderr,"%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
 
   // Loop:
