@@ -68,4 +68,15 @@ complex cscale(const complex no, const double fac);
 /// Print number
 void cprint(const complex no);
 
+
+complex operator+(const complex & lhs, const complex & rhs);
+complex & operator+=(complex & lhs, const complex & rhs);
+
+complex operator*(const complex & lhs, const complex & rhs);
+complex & operator*=(complex & lhs, const complex & rhs);
+
+complex operator*(const double & lhs, const complex & rhs);
+complex operator*(const complex & lhs, const double & rhs);
+complex & operator*=(complex & lhs, const double & rhs);
+
 #endif
