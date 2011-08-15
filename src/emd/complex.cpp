@@ -144,3 +144,36 @@ complex cscale(const complex no, const double fac) {
 void cprint(const complex no) {
   printf("(%g,%g)",no.re,no.im);
 }
+
+complex operator+(const complex & lhs, const complex & rhs) {
+  return cadd(lhs,rhs);
+}
+
+complex & operator+=(complex & lhs, const complex & rhs) {
+  lhs.re+=rhs.re;
+  lhs.im+=rhs.im;
+  return lhs;
+}
+
+complex operator*(const complex & lhs, const complex & rhs) {
+  return cmult(lhs,rhs);
+}
+
+complex & operator*=(complex & lhs, const complex & rhs) {
+  lhs=cmult(lhs,rhs);
+  return lhs;
+}
+
+complex operator*(const double & lhs, const complex & rhs) {
+  return cscale(rhs,lhs);
+}
+
+complex operator*(const complex & lhs, const double & rhs) {
+  return cscale(lhs,rhs);
+}
+  
+complex & operator*=(complex & lhs, const double & rhs) {
+  lhs.re*=rhs;
+  lhs.im*=rhs;
+  return lhs;
+}  
