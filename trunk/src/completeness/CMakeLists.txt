@@ -34,3 +34,4 @@ endif()
 
 install (TARGETS erkale_cprof DESTINATION bin)
 install (TARGETS erkale_copt DESTINATION bin)
+install (TARGETS erkale_cmp DESTINATION lib${LIB_SUFFIX})
