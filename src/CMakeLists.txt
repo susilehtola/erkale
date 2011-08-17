@@ -31,8 +31,7 @@ add_library (erkale
 basis.cpp basislibrary.cpp stringutil.cpp mathf.cpp integrals.cpp
 eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
 solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
-settings.cpp broyden.cpp adiis.cpp tempered.cpp
-completeness/completeness_profile.cpp find_molecules.cpp)
+settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp)
 # The name of the executable is
 set_target_properties(erkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
 
