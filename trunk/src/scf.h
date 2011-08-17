@@ -42,6 +42,7 @@
  */
 
 class SCF {
+ protected:
   /// Overlap matrix
   arma::mat S;
 
