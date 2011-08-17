@@ -17,21 +17,28 @@ if(LIBINT_FOUND)
  INCLUDE_DIRECTORIES(${LIBINT_INCLUDE_DIRS})
 endif()
 
-# Create the ERKALE DFT library "erkale_dft"
-if(USEDFT)
- add_library (erkale_dft
- lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
- density_fitting.cpp lebedev.cpp )
- # The name of the library is
- set_target_properties(erkale_dft PROPERTIES OUTPUT_NAME "erkale_dft${SUFFIX}")
-endif()
-
 # Create the ERKALE base library "erkale" which includes the following sources
+if(USEDFT)
 add_library (erkale 
 basis.cpp basislibrary.cpp stringutil.cpp mathf.cpp integrals.cpp
 eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
 solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
-settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp)
+settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
+# DFT stuff
+lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
+density_fitting.cpp lebedev.cpp)
+else()
+add_library (erkale 
+basis.cpp basislibrary.cpp stringutil.cpp mathf.cpp integrals.cpp
+eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
+solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
+settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
+# DFT stuff
+lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
+density_fitting.cpp lebedev.cpp)
+endif()
+
+
 # The name of the executable is
 set_target_properties(erkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
 
@@ -45,11 +52,7 @@ if(BUILD_SHARED_LIBS)
   target_link_libraries(erkale ${LIBINT_LIBRARIES})
  endif()
  if(USEDFT)
-  set_target_properties(erkale_dft PROPERTIES
-   VERSION ${VERSION} SOVERSION ${SOVERSION} )
-  target_link_libraries(erkale_dft ${LIBXC_LIBRARIES})
-  target_link_libraries(erkale erkale_dft)
-#  target_link_libraries(erkale_dft erkale)
+  target_link_libraries(erkale ${LIBXC_LIBRARIES})
  endif()
 endif()
 
@@ -69,7 +72,6 @@ else()
  target_link_libraries(erkale.x ${GSL_LIBRARIES})
  target_link_libraries(erkale.x ${LAPACK_LIBRARIES})
  if(USEDFT)
-  target_link_libraries(erkale.x erkale_dft)
   target_link_libraries(erkale.x ${LIBXC_LIBRARIES})
  endif()
  if(LIBINT_FOUND)
@@ -79,9 +81,6 @@ endif()
 
 # Install targets
 install (TARGETS erkale DESTINATION lib${LIB_SUFFIX})
-if(USEDFT)
- install (TARGETS erkale_dft DESTINATION lib${LIB_SUFFIX})
-endif()
 install (TARGETS erkale.x DESTINATION bin)
 
 # Install headers
@@ -121,19 +120,19 @@ add_custom_command(
 
 # Recipe for building SCF
 if(USEDFT)
- add_custom_command(
+add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
  
   COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   COMMAND ${PPROC} ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
+  COMMAND ${PPROC} -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   COMMAND ${PPROC} -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   COMMAND ${PPROC} -DDFT -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
- )
+)
 else()
- add_custom_command(
+add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
@@ -141,6 +140,5 @@ else()
   COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   COMMAND ${PPROC} ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
   COMMAND ${PPROC} -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
- )
+)
 endif()
-
