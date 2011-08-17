@@ -45,6 +45,20 @@ double choose(int m, int n);
 /// Find index of basis function with indices l, m, n
 int getind(int l, int m, int n);
 
+/// Get maximum element of x
+template <class T> T max(const std::vector<T> & x) {
+  if(x.size()==0) {
+    ERROR_INFO();
+    throw std::runtime_error("Trying to get maximum value of empty array!\n");
+  }
+
+  T m=x[0];
+  for(size_t i=1;i<x.size();i++)
+    if(m<x[i])
+      m=x[i];
+  return m;
+}
+
 /// Get maximum
 template <class T> T max(const T & a, const T & b) {
   return (b<a ?a:b);
@@ -55,8 +69,6 @@ template <class T> T max(const T & a, const T & b, const T & c, const T & d) {
   return max(max(a,b),max(c,d));
 }
 
-/// Get maximum element of x
-double max(std::vector<double> x);
 /// Get element with maximum absolute value
 double max_abs(const arma::mat & R);
 /// Compute rms norm of matrix
