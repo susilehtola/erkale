@@ -36,6 +36,17 @@ typedef struct {
   std::vector<compprof_am_t> shells;
 } compprof_t;
 
+/// Get scanning exponents
+std::vector<double> get_scanning_exponents(double min, double max, size_t Np);
+
+/**
+ * Compute completeness profile for element with given scanning exponents
+ *
+ * D. P. Chong, "Completeness profiles of one-electron basis sets",
+ * Can. J. Chem. 73 (1995), pp. 79 - 83.
+ */
+compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scanexps);
+
 /**
  * Compute completeness profile for element from \f$ \alpha = 10^{min}
  * \f$ to \f$ \alpha = 10^{max} \f$ with \f$ N_p \f$ points
