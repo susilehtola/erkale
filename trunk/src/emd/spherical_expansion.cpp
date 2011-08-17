@@ -66,7 +66,7 @@ void SphericalExpansion::add(const ylmcoeff_t & t) {
     size_t ind=high-comb.begin();
     
     if(ind>0 && comb[ind-1]==t)
-      comb[ind-1].c=cadd(comb[ind-1].c,t.c);
+      comb[ind-1].c+=t.c;
     else {
       // Term does not exist, add it
       comb.insert(high,t);
@@ -74,7 +74,7 @@ void SphericalExpansion::add(const ylmcoeff_t & t) {
   }
 }
 
-void SphericalExpansion::addylm(int l, int m, complex c) {
+void SphericalExpansion::addylm(int l, int m, std::complex<double> c) {
   ylmcoeff_t hlp;
   hlp.l=l;
   hlp.m=m;
@@ -83,10 +83,7 @@ void SphericalExpansion::addylm(int l, int m, complex c) {
 }
 
 void SphericalExpansion::addylm(int l, int m, double d) {
-  complex c;
-  c.re=d;
-  c.im=0;
-
+  std::complex<double> c(d,0);
   addylm(l,m,c);
 }
 
@@ -99,7 +96,7 @@ void SphericalExpansion::clean() {
     ok=1;
 
     for(size_t i=0;i<comb.size();i++)
-      if(comb[i].c.re==0 && comb[i].c.im==0) { // If there is an element with no weight
+      if(norm(comb[i].c) == 0.0) { // If there is an element with no weight
 	comb.erase(comb.begin()+i); // Erase the element
 	ok=0; // Redo while loop
 	break; // Break for loop
@@ -120,7 +117,7 @@ SphericalExpansion SphericalExpansion::conjugate() const {
 
   for(size_t i=0;i<ret.comb.size();i++) {
     // The expansion coefficient changes to (-1)^m times its complex conjugate
-    ret.comb[i].c=cscale(cconj(ret.comb[i].c),pow(-1.0,ret.comb[i].m));
+    ret.comb[i].c=conj(ret.comb[i].c)*pow(-1.0,ret.comb[i].m);
     // and the sign of m changes
     ret.comb[i].m=-ret.comb[i].m;
   }
@@ -134,7 +131,7 @@ SphericalExpansion SphericalExpansion::conjugate() const {
 void SphericalExpansion::print() const {
   // Print out the list of combinations
   for(size_t i=0;i<comb.size();i++) {
-    printf("\t%i\t%i\t(%e, %e)\n",comb[i].l,comb[i].m,comb[i].c.re,comb[i].c.im);
+    printf("\t%i\t%i\t(%e, %e)\n",comb[i].l,comb[i].m,comb[i].c.real(),comb[i].c.imag());
   }
 }
 
@@ -197,7 +194,7 @@ SphericalExpansion & SphericalExpansion::operator+=(const SphericalExpansion & r
 SphericalExpansion SphericalExpansion::operator-() const {
   SphericalExpansion ret=*this;
   for(size_t i=0;i<comb.size();i++)
-    ret.comb[i].c=cneg(ret.comb[i].c);
+    ret.comb[i].c*=-1.0;
   return ret;
 }
 
@@ -205,7 +202,7 @@ SphericalExpansion SphericalExpansion::operator-(const SphericalExpansion & rhs)
   // Substraction of linear combinations of spherical harmonics
   SphericalExpansion ret=*this;
   for(size_t i=0;i<rhs.comb.size();i++) {
-    ret.addylm(rhs.comb[i].l,rhs.comb[i].m,cneg(rhs.comb[i].c));
+    ret.addylm(rhs.comb[i].l,rhs.comb[i].m,-rhs.comb[i].c);
   }
   return ret;
 }
@@ -213,7 +210,7 @@ SphericalExpansion SphericalExpansion::operator-(const SphericalExpansion & rhs)
 SphericalExpansion & SphericalExpansion::operator-=(const SphericalExpansion & rhs) {
   // Substraction of linear combinations of spherical harmonics
   for(size_t i=0;i<rhs.comb.size();i++) {
-    addylm(rhs.comb[i].l,rhs.comb[i].m,cneg(rhs.comb[i].c));
+    addylm(rhs.comb[i].l,rhs.comb[i].m,-rhs.comb[i].c);
   }
   return *this;
 }
@@ -231,7 +228,7 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
 
   // New coefficient
   double dc;
-  complex c;
+  std::complex<double> c;
 
   // Loop over combinations
   for(size_t i=0;i<comb.size();i++)
@@ -251,10 +248,10 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
 	// Loop over z component values
 	for(int m=-l;m<=l;m++) {
 	  // Calculate new coefficient
-	  c=cmult(comb[i].c,rhs.comb[j].c); // Complex part
+	  c=comb[i].c*rhs.comb[j].c;
 
 	  // If coefficient is zero don't do anything
-	  if(!c.re && !c.im)
+	  if(norm(c)==0.0)
 	    continue;
 
 	  // Real scaling factor: \sqrt{ \frac {(2j_1+1)(2j_2+1)(2j+1)} {4 \pi} } (-1)^m
@@ -265,7 +262,7 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
 
 	  // Add it to the list if the scaling factor is not zero
 	  if(dc!=0)
-	    newcomb.addylm(l,m,cscale(c,dc));
+	    newcomb.addylm(l,m,c*dc);
 	}
     }
   
@@ -284,37 +281,33 @@ SphericalExpansion & SphericalExpansion::operator*=(const SphericalExpansion & r
   return *this;
 }
 
-SphericalExpansion & SphericalExpansion::operator*=(complex fac) {
+SphericalExpansion & SphericalExpansion::operator*=(std::complex<double> fac) {
   // Scale the combination
   for(size_t i=0;i<comb.size();i++)
-    comb[i].c=cmult(comb[i].c,fac);
+    comb[i].c*=fac;
   return *this;
 }
 
 SphericalExpansion & SphericalExpansion::operator*=(double fac) {
   // Scale the combination
-  for(size_t i=0;i<comb.size();i++) {
-    comb[i].c.im*=fac;
-    comb[i].c.re*=fac;
-  }
+  for(size_t i=0;i<comb.size();i++)
+    comb[i].c*=fac;
   return *this;
 }
 
-SphericalExpansion operator*(complex fac, const SphericalExpansion & func) {
+SphericalExpansion operator*(std::complex<double> fac, const SphericalExpansion & func) {
   // Scale the combination
-  SphericalExpansion ret=func;
+  SphericalExpansion ret(func);
   for(size_t i=0;i<ret.comb.size();i++)
-    ret.comb[i].c=cmult(ret.comb[i].c,fac);
+    ret.comb[i].c*=fac;
   return ret;
 }
 
 SphericalExpansion operator*(double fac, const SphericalExpansion & func) {
   // Scale the combination
   SphericalExpansion ret=func;
-  for(size_t i=0;i<ret.comb.size();i++) {
-    ret.comb[i].c.re*=fac;
-    ret.comb[i].c.im*=fac;
-  }
+  for(size_t i=0;i<ret.comb.size();i++)
+    ret.comb[i].c*=fac;
   return ret;
 }
 
@@ -363,7 +356,7 @@ SphericalExpansion SphericalExpansionMultiplicationTable::mult(const SphericalEx
   // Continue with multiplication. Loop over terms:
   for(size_t i=0;i<lhs.comb.size();i++)
     for(size_t j=0;j<rhs.comb.size();j++) {
-      ret+=cmult(lhs.comb[i].c,rhs.comb[j].c)*table[multloc(lhs.comb[i].l,lhs.comb[i].m,rhs.comb[j].l,rhs.comb[j].m)];
+      ret+=lhs.comb[i].c*rhs.comb[j].c*table[multloc(lhs.comb[i].l,lhs.comb[i].m,rhs.comb[j].l,rhs.comb[j].m)];
     }
 
   return ret;
@@ -408,9 +401,7 @@ GTO_Fourier_Ylm::GTO_Fourier_Ylm(int l, int m, int n, double zeta) {
   }
   // py = ip * sqrt{ 2 \pi / 3} * ( Y_1^{-1} + Y_1^1 )
   if(m>0) {
-    complex hlp;
-    hlp.re=0.0;
-    hlp.im=sqrt(2.0*M_PI/3.0);
+    std::complex<double> hlp(0.0,sqrt(2.0*M_PI/3.0));
     py[1].addylm(1,-1,hlp);
     py[1].addylm(1,1,hlp);
   }
@@ -527,7 +518,7 @@ GTO_Fourier_Ylm & GTO_Fourier_Ylm::operator+=(const GTO_Fourier_Ylm & rhs) {
   return *this;
 }
 
-GTO_Fourier_Ylm operator*(complex fac, const GTO_Fourier_Ylm & func) {
+GTO_Fourier_Ylm operator*(std::complex<double> fac, const GTO_Fourier_Ylm & func) {
   // Returned value
   GTO_Fourier_Ylm ret(func);
 
@@ -573,9 +564,7 @@ CartesianExpansion::CartesianExpansion(int maxam) {
   }
   // py = ip * sqrt{ 2 \pi / 3} * ( Y_1^{-1} + Y_1^1 )
   if(maxam>0) {
-    complex hlp;
-    hlp.re=0.0;
-    hlp.im=sqrt(2.0*M_PI/3.0);
+    std::complex<double> hlp(0.0,sqrt(2.0*M_PI/3.0));
     py[1].addylm(1,-1,hlp);
     py[1].addylm(1,1,hlp);
   }

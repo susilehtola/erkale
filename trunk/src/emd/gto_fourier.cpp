@@ -28,9 +28,7 @@ FourierPoly_1D::FourierPoly_1D(int l, double zeta) {
   *this=formpoly(l,zeta);
 
   // Now, add in the normalization factor
-  complex normfac;
-  normfac.re=pow(2.0*zeta,-0.5-l);
-  normfac.im=0.0;
+  std::complex<double> normfac(pow(2.0*zeta,-0.5-l),0.0);
   *this=normfac*(*this);
 }
 
@@ -43,17 +41,14 @@ FourierPoly_1D FourierPoly_1D::formpoly(int l, double zeta) {
 
   if(l==0) {
     // R_0 (p_i, zeta) = 1.0
-
-    term.c.re=1.0;
-    term.c.im=0.0;
+    term.c=1.0;
     term.l=0;
 
     ret.poly.push_back(term);
   } else if(l==1) {
     // R_1 (p_i, zeta) = - i p_i
 
-    term.c.re=0.0;
-    term.c.im=-1.0;
+    term.c=std::complex<double>(0.0,-1.0);
     term.l=1;
 
     ret.poly.push_back(term);
@@ -63,18 +58,16 @@ FourierPoly_1D FourierPoly_1D::formpoly(int l, double zeta) {
     FourierPoly_1D lm1=formpoly(l-1,zeta);
     FourierPoly_1D lm2=formpoly(l-2,zeta);
 
-    complex fac;
+    std::complex<double> fac;
 
     // Add first the second term
-    fac.re=2*zeta*(l-1);
-    fac.im=0.0;
+    fac=std::complex<double>(2*zeta*(l-1),0.0);
     ret=fac*lm2;
 
     // We add the first term separately, since it conserves the value of angular momentum.
-    fac.re=0.0;
-    fac.im=-1.0;
+    fac=std::complex<double>(0.0,-1.0);
     for(size_t i=0;i<lm1.getN();i++)
-      ret.addterm(cmult(fac,lm1.getc(i)),lm1.getl(i)+1);
+      ret.addterm(fac*lm1.getc(i),lm1.getl(i)+1);
   }
   
   return ret;
@@ -83,13 +76,13 @@ FourierPoly_1D FourierPoly_1D::formpoly(int l, double zeta) {
 FourierPoly_1D::~FourierPoly_1D() {
 }
 
-void FourierPoly_1D::addterm(complex c, int l) {
+void FourierPoly_1D::addterm(std::complex<double> c, int l) {
   bool found=0;
   // First, see if the term is already in the contraction.
   for(size_t i=0;i<poly.size();i++)
     if(poly[i].l==l) {
       found=1;
-      poly[i].c=cadd(poly[i].c,c);
+      poly[i].c+=c;
       break;
     }
   
@@ -117,7 +110,7 @@ size_t FourierPoly_1D::getN() const {
   return poly.size();
 }
 
-complex FourierPoly_1D::getc(size_t i) const {
+std::complex<double> FourierPoly_1D::getc(size_t i) const {
   return poly[i].c;
 }
 
@@ -127,19 +120,18 @@ int FourierPoly_1D::getl(size_t i) const {
 
 void FourierPoly_1D::print() const {
   for(size_t i=0;i<poly.size();i++) {
-    printf("(%e,%e)p^%i\n",poly[i].c.re,poly[i].c.im,poly[i].l);
+    printf("(%e,%e)p^%i\n",poly[i].c.real(),poly[i].c.imag(),poly[i].l);
     if(i<poly.size()-1)
       printf(" + ");
   }
   printf("\n");
 }
 
-FourierPoly_1D operator*(complex fac, const FourierPoly_1D & rhs) {
+FourierPoly_1D operator*(std::complex<double> fac, const FourierPoly_1D & rhs) {
   FourierPoly_1D ret(rhs);
   
-  for(size_t i=0;i<ret.poly.size();i++) {
-    ret.poly[i].c=cmult(fac,ret.poly[i].c);
-  }
+  for(size_t i=0;i<ret.poly.size();i++)
+    ret.poly[i].c*=fac;
   
   return ret;
 }
@@ -152,10 +144,10 @@ GTO_Fourier::GTO_Fourier(int l, int m, int n, double zeta) {
   // Create polynomials in px, py and pz
   FourierPoly_1D px(l,zeta), py(m,zeta), pz(n,zeta);
 
-  complex facx, facy, facz;
+  std::complex<double> facx, facy, facz;
   int lx, ly, lz;
 
-  complex facxy;
+  std::complex<double> facxy;
 
   // Loop over the individual polynomials
   for(size_t ix=0;ix<px.getN();ix++) {
@@ -166,14 +158,14 @@ GTO_Fourier::GTO_Fourier(int l, int m, int n, double zeta) {
       facy=py.getc(iy);
       ly=py.getl(iy);
 
-      facxy=cmult(facx,facy);
+      facxy=facx*facy;
 
       for(size_t iz=0;iz<pz.getN();iz++) {
 	facz=pz.getc(iz);
 	lz=pz.getl(iz);
 
          // Add the term
-	addterm(cmult(facxy,facz),lx,ly,lz,1.0/(4.0*zeta));
+	addterm(facxy*facz,lx,ly,lz,1.0/(4.0*zeta));
       }
     }
   }
@@ -182,14 +174,14 @@ GTO_Fourier::GTO_Fourier(int l, int m, int n, double zeta) {
 GTO_Fourier::~GTO_Fourier() {
 }
 
-void GTO_Fourier::addterm(complex c, int l, int m, int n, double z) {
+void GTO_Fourier::addterm(std::complex<double> c, int l, int m, int n, double z) {
   // Add term to transform
 
   bool found=0;
   // First, check if the same kind of term already exists
   for(size_t i=0;i<trans.size();i++)
     if(trans[i].l==l && trans[i].m==m && trans[i].n==n && trans[i].z==z) {
-      trans[i].c=cadd(trans[i].c,c);
+      trans[i].c+=c;
       found=1;
       break;
     }
@@ -227,11 +219,11 @@ std::vector<trans3d_t> GTO_Fourier::get() const {
   return trans;
 }
 
-GTO_Fourier operator*(complex fac, const GTO_Fourier & rhs) {
+GTO_Fourier operator*(std::complex<double> fac, const GTO_Fourier & rhs) {
   GTO_Fourier ret=rhs;
 
   for(size_t i=0;i<ret.trans.size();i++)
-    ret.trans[i].c=cmult(fac,ret.trans[i].c);
+    ret.trans[i].c*=fac;
 
   return ret;
 }
@@ -239,21 +231,19 @@ GTO_Fourier operator*(complex fac, const GTO_Fourier & rhs) {
 GTO_Fourier operator*(double fac, const GTO_Fourier & rhs) {
   GTO_Fourier ret=rhs;
 
-  for(size_t i=0;i<ret.trans.size();i++) {
-    ret.trans[i].c.re*=fac;
-    ret.trans[i].c.im*=fac;
-  }
+  for(size_t i=0;i<ret.trans.size();i++)
+    ret.trans[i].c*=fac;
 
   return ret;
 }
 
 void GTO_Fourier::print() const {
   for(size_t i=0;i<trans.size();i++)
-    printf("(%e,%e) px^%i py^%i pz^%i exp(-%e p^2)\n",trans[i].c.re,trans[i].c.im,trans[i].l,trans[i].m,trans[i].n,trans[i].z);
+    printf("(%e,%e) px^%i py^%i pz^%i exp(-%e p^2)\n",trans[i].c.real(),trans[i].c.imag(),trans[i].l,trans[i].m,trans[i].n,trans[i].z);
 }
 
 void GTO_Fourier::clean() {
   for(size_t i=trans.size()-1;i<trans.size();i--)
-    if(trans[i].c.re==0 && trans[i].c.im==0.0)
+    if(norm(trans[i].c) == 0.0)
       trans.erase(trans.begin()+i);
 }
