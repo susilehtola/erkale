@@ -19,14 +19,14 @@
 #ifndef ERKALE_FOURIER
 #define ERKALE_FOURIER
 
+#include <complex>
 #include <vector>
 #include <cstddef>
-#include "complex.h"
 
 /// Helper for 1D Fourier polynomials
 typedef struct {
   /// Full polynomial is of the form \f$ \sum_l c_l p_x^l \f$
-  complex c;
+  std::complex<double> c;
   /// Full polynomial is of the form \f$ \sum_l c_l p_x^l \f$
   int l;
 } poly1d_t;
@@ -80,7 +80,7 @@ class FourierPoly_1D {
   ~FourierPoly_1D();
 
   /// Add a term in the contraction
-  void addterm(complex c, int l);
+  void addterm(std::complex<double> c, int l);
 
   /// Addition operator
   FourierPoly_1D operator+(const FourierPoly_1D & rhs) const;
@@ -88,18 +88,18 @@ class FourierPoly_1D {
   /// Get number of terms in the polynomial
   size_t getN() const;
   /// Get the i:th contraction coefficient
-  complex getc(size_t i) const;
+  std::complex<double> getc(size_t i) const;
   /// Get the exponent of p in the i:th term
   int getl(size_t i) const;
 
   /// Print polynomial
   void print() const;
 
-  friend FourierPoly_1D operator*(complex fac, const FourierPoly_1D & rhs);
+  friend FourierPoly_1D operator*(std::complex<double> fac, const FourierPoly_1D & rhs);
 };
 
 /// Multiply the polynomial with a complex factor
-FourierPoly_1D operator*(complex fac, const FourierPoly_1D & rhs);
+FourierPoly_1D operator*(std::complex<double> fac, const FourierPoly_1D & rhs);
 
 
 /* Then, the full three-dimensional transform */
@@ -108,7 +108,7 @@ FourierPoly_1D operator*(complex fac, const FourierPoly_1D & rhs);
 /// Fourier transform of GTO is of the form \f$ c_{l,m,n} p_x^l p_y^m p_z^n exp(-z p^2) \f$
 typedef struct {
   /// Expansion coefficient
-  complex c;
+  std::complex<double> c;
   /// px^l
   int l;
   /// py^m
@@ -144,7 +144,7 @@ class GTO_Fourier {
   ~GTO_Fourier();
 
   /// Add a term in the contraction
-  void addterm(complex c, int k, int l, int m, double z);
+  void addterm(std::complex<double> c, int k, int l, int m, double z);
 
   /// Addition operator
   GTO_Fourier operator+(const GTO_Fourier & rhs) const;
@@ -160,12 +160,12 @@ class GTO_Fourier {
   // Clean out the expansion
   void clean();
 
-  friend GTO_Fourier operator*(complex fac, const GTO_Fourier & rhs);
+  friend GTO_Fourier operator*(std::complex<double> fac, const GTO_Fourier & rhs);
   friend GTO_Fourier operator*(double fac, const GTO_Fourier & rhs);
 };
 
 /// Scale Fourier transform of GTO by factor fac
-GTO_Fourier operator*(complex fac, const GTO_Fourier & rhs);
+GTO_Fourier operator*(std::complex<double> fac, const GTO_Fourier & rhs);
 /// Scale Fourier transform of GTO by factor fac
 GTO_Fourier operator*(double fac, const GTO_Fourier & rhs);
 

@@ -19,9 +19,9 @@
 #ifndef ERKALE_SPHHARM
 #define ERKALE_SPHHARM
 
-#include "complex.h"
+#include <complex>
 
 /// Calculate value of \f$ Y_{l}^{m} (\cos \theta, \phi) \f$
-complex spherical_harmonics(int l, int m, double cth, double phi);
+std::complex<double> spherical_harmonics(int l, int m, double cth, double phi);
 
 #endif

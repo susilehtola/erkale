@@ -24,27 +24,24 @@ extern "C" {
 #include <gsl/gsl_sf_legendre.h>
 }
 
-complex spherical_harmonics(int l, int m, double cth, double phi) {
+std::complex<double> spherical_harmonics(int l, int m, double cth, double phi) {
   /* Calculate value of spherical harmonic Y_{lm} = N_{lm} P_{lm} (\cos \theta) e^{i m \phi} */
-  complex ylm;
+  std::complex<double> ylm;
 
   if(m<0) { // GSL doesn't handle m<0
     //    printf("m<0 ");
     ylm=spherical_harmonics(l,-m,cth,phi);
-    ylm=cscale(ylm,pow(-1.0,m));
-    return cconj(ylm);
+    ylm*=pow(-1.0,m);
+    return conj(ylm);
   }
 
   //  printf("Calculating spherical harmonic Y_{%i,%i} at (%f,%f), cth=%f:",l,m,acos(cth),phi,cth);
   //  fflush(stdout);
   // First, calculate the exponential
-  ylm.re=0.0;
-  ylm.im=m*phi;
-  ylm=cexp(ylm);
+  ylm=pow(M_E,std::complex<double>(0.0,m*phi)); // e^(im phi)
   
   //  Then add in the normalized associated Legendre polynomial
-  ylm=cscale(ylm,gsl_sf_legendre_sphPlm(l,m,cth));
-  //   printf(" (%e, %e)\n",ylm.re,ylm.im);
+  ylm*=gsl_sf_legendre_sphPlm(l,m,cth);
  
   return ylm;
 }

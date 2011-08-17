@@ -19,9 +19,9 @@
 #ifndef ERKALE_SPHEXP
 #define ERKALE_SPHEXP
 
+#include <complex>
 #include <vector>
 #include "basis.h"
-#include "complex.h"
 
 /// Coefficient of expansion in spherical harmonics \f$ \sum_{lm} c_{lm} Y_{lm} \f$
 typedef struct {
@@ -30,7 +30,7 @@ typedef struct {
   /// Angular number m of term in expansion
   int m;
   /// Expansion coefficient
-  complex c;
+  std::complex<double> c;
 } ylmcoeff_t;
 
 /// Sorting operator
@@ -67,7 +67,7 @@ class SphericalExpansion {
   /// Add new Ylm with coefficient c to the linear combination
   void add(const ylmcoeff_t & c);
   /// Add new Ylm with coefficient c to the linear combination
-  void addylm(int l, int m, complex c);
+  void addylm(int l, int m, std::complex<double> c);
   /// Add new Ylm with coefficient c to the linear combination
   void addylm(int l, int m, double c);
 
@@ -109,17 +109,17 @@ class SphericalExpansion {
   /// Multiplication operator
   SphericalExpansion & operator*=(const SphericalExpansion & rhs);
   /// Scale expansion by fac
-  SphericalExpansion & operator*=(complex fac);
+  SphericalExpansion & operator*=(std::complex<double> fac);
   /// Scale expansion by fac
   SphericalExpansion & operator*=(double fac);
 
-  friend SphericalExpansion operator*(complex fac, const SphericalExpansion & func);
+  friend SphericalExpansion operator*(std::complex<double> fac, const SphericalExpansion & func);
   friend SphericalExpansion operator*(double fac, const SphericalExpansion & func);
   friend class SphericalExpansionMultiplicationTable;
 };
 
 /// Scale expansion by fac
-SphericalExpansion operator*(complex fac, const SphericalExpansion & func);
+SphericalExpansion operator*(std::complex<double> fac, const SphericalExpansion & func);
 /// Scale expansion by fac
 SphericalExpansion operator*(double fac, const SphericalExpansion & func);
 
@@ -219,13 +219,13 @@ class GTO_Fourier_Ylm {
   /// Increment operator
   GTO_Fourier_Ylm & operator+=(const GTO_Fourier_Ylm & rhs);
 
-  friend GTO_Fourier_Ylm operator*(complex fac, const GTO_Fourier_Ylm & func);
+  friend GTO_Fourier_Ylm operator*(std::complex<double> fac, const GTO_Fourier_Ylm & func);
   friend GTO_Fourier_Ylm operator*(double fac, const GTO_Fourier_Ylm & func);
   friend class SphericalExpansionMultiplicationTable;
 };
 
 /// Scale expansion by factor fac
-GTO_Fourier_Ylm operator*(complex fac, const GTO_Fourier_Ylm & func);
+GTO_Fourier_Ylm operator*(std::complex<double> fac, const GTO_Fourier_Ylm & func);
 /// Scale expansion by factor fac
 GTO_Fourier_Ylm operator*(double fac, const GTO_Fourier_Ylm & func);
 

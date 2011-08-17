@@ -17,6 +17,7 @@
 
 
 #include <algorithm>
+#include <complex>
 
 #include "../timer.h"
 #include "emd.h"
@@ -241,9 +242,7 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
   SphericalExpansionMultiplicationTable mult(bas.get_max_am());
 
   // Imaginary unit
-  complex im;
-  im.re=0;
-  im.im=1.0;
+  std::complex<double> im(0.0,1.0);
 	
   // Loop over shells of identical basis functions
   for(size_t iidsh=0;iidsh<idents.size();iidsh++)
@@ -309,10 +308,10 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 		      // If we're off-diagonal, we get the real part twice
 		      // (two different shells on same atom, or different functions on same shell)
 		      if(ibas!=jbas)
-			hlp.c=2.0*sph[iang].c.re*P(ibas,jbas)*sqrt(4.0*M_PI);
+			hlp.c=2.0*sph[iang].c.real()*P(ibas,jbas)*sqrt(4.0*M_PI);
 		      else
 			// On the diagonal we get it just once.
-			hlp.c=sph[iang].c.re*P(ibas,jbas)*sqrt(4.0*M_PI);
+			hlp.c=sph[iang].c.real()*P(ibas,jbas)*sqrt(4.0*M_PI);
 
 		      add_term(hlp);
 		      
@@ -320,24 +319,6 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 		    }
 		}
 	      } else {
-
-		/*
-		EMDEvaluator ijres;
-		for(size_t icomb=0;icomb<prodexp.size();icomb++) {                                                                                                                                            
-		  std::vector<ylmcoeff_t> sph=prodexp[icomb].ang.getcoeffs();
-		  for(size_t iang=0;iang<sph.size();iang++) {
-                    complex Ylm=spherical_harmonics(sph[iang].l,sph[iang].m,cth,phi);
-                    complex il=cpow(im,sph[iang].l);
-                    complex c=cmult(cmult(Ylm,il),sph[iang].c);
-                    ijres.add_2c(8.0*M_PI*c.re*P(ibas,jbas),dr,sph[iang].l,prodexp[icomb].l,prodexp[icomb].z);
-		  }
-		}
-		for(size_t i=0;i<ijres.twoc.size();i++)
-		  for(size_t j=0;j<ijres.twoc[i].c.size();j++) {
-		    add_2c(ijres.twoc[i].c[j],ijres.twoc[i].dr[j],ijres.twoc[i].l,ijres.twoc[i].pm,ijres.twoc[i].z);
-		    printf("Added two-center term with dr=%e, l=%i, pm=%i, z=%e, c=%e.\n",ijres.twoc[i].dr[j],ijres.twoc[i].l,ijres.twoc[i].pm,ijres.twoc[i].z,ijres.twoc[i].c[j]);
-		}
-		*/
 
 		// Two-center case
 		for(size_t icomb=0;icomb<prodexp.size();icomb++) {
@@ -347,17 +328,17 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 		  // Loop over angular part
 		  for(size_t iang=0;iang<sph.size();iang++) {
 		    // Compute value of spherical harmonics
-		    complex Ylm=spherical_harmonics(sph[iang].l,sph[iang].m,cth,phi);
+		    std::complex<double> Ylm=spherical_harmonics(sph[iang].l,sph[iang].m,cth,phi);
 		    // i^l
-		    complex il=cpow(im,sph[iang].l);
+		    std::complex<double> il=pow(im,sph[iang].l);
 		    // Full expansion coefficient is
-		    complex c=cmult(cmult(Ylm,il),sph[iang].c);
+		    std::complex<double> c=Ylm*il*sph[iang].c;
 		    // Add the term. We are bound to be off-diagonal,
 		    // so we get the real part twice.
 
 		    twocenter_contr_t tmp;
 		    tmp.dr=dr;
-		    tmp.c=8.0*M_PI*c.re*P(ibas,jbas);
+		    tmp.c=8.0*M_PI*c.real()*P(ibas,jbas);
 
 		    twocenter_t hlp;
 		    hlp.c.push_back(tmp);
