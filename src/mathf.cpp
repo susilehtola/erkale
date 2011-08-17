@@ -142,19 +142,6 @@ int getind(int l, int m, int n) {
   return 0;
 }
 
-double max(std::vector<double> x) {
-  if(x.size()==0) {
-    ERROR_INFO();
-    throw std::runtime_error("Trying to get maximum value of empty array!\n");
-  }
-
-  double m=x[0];
-  for(size_t i=1;i<x.size();i++)
-    if(x[i]>m)
-      m=x[i];
-  return m;
-}
-
 double max_abs(const arma::mat & R) {
   // Find maximum absolute value of matrix
   double m=0;
