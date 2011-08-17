@@ -677,7 +677,9 @@ void lobatto_compute (int n, std::vector<double> & x, std::vector<double> & w)
   if ( n < 2 )
   {
     ERROR_INFO();
-    throw std::domain_error("Must have n>=2 for lobatto_compute.\n");
+    std::ostringstream oss;
+    oss << "Lobatto called with n="<<n<<", but n>=2 is required.\n";
+    throw std::runtime_error(oss.str());
   }
 
   if(n<20) {
