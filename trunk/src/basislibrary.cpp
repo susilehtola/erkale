@@ -328,20 +328,34 @@ void BasisSetLibrary::load_gaussian94(std::string basis) {
 	size_t num=readint(line_split[1]);
 
 	// Check that there is no duplicate entry
-	bool found=0;
-	for(size_t i=0;i<elements.size();i++)
-	  if( (elements[i].get_symbol()==sym) && (elements[i].get_number()==num))
-	    found=1;
-	if(found) {
+	bool dupl=0, numfound=0;
+	for(size_t i=0;i<elements.size();i++) {
+
+	  if(elements[i].get_number()==num) {
+	    // Already an element with this index!
+	    numfound=1;
+	    
+	    if(elements[i].get_symbol()==sym)
+	      // And the entry is even duplicate!
+	      dupl++;
+	  }
+	}
+	
+	if(dupl) {
 	  std::ostringstream oss;
 	  ERROR_INFO();
 	  oss << "Error: multiple basis set definitions found for element " << sym << " in file " << filename << "!\n";
 	  throw std::runtime_error(oss.str());
+	} else if(num>0 && numfound) {
+	  std::ostringstream oss;
+	  ERROR_INFO();
+	  oss << "Error: a special basis set given multiple times for center " << num;
+	  throw std::runtime_error(oss.str());
 	}
-
+	  
 	// Create basis set structure for the element
 	el=ElementBasisSet(sym,num);
-
+	
 	// Now, proceed by reading in the basis functions
 	while(1) {
 	  // Get next line
@@ -360,7 +374,7 @@ void BasisSetLibrary::load_gaussian94(std::string basis) {
 	  } else {
 	    // Nope, there is a shell.
 	    std::vector<std::string> words=splitline(line);
-
+	    
 	    // The shell type is
 	    std::string shelltype=words[0];
 	    // The amount of exponents is
@@ -465,11 +479,28 @@ void BasisSetLibrary::print() const {
 
 ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) const {
   // Get element from library
-  
-  // Go through library to find element
-  for(size_t i=0;i<elements.size();i++)
-    if(elements[i].get_symbol()==el && elements[i].get_number()==number)
-      return elements[i];
+
+  if(number==0) {
+    // General basis requested
+    for(size_t i=0;i<elements.size();i++)
+      if((elements[i].get_number()==number) && (elements[i].get_symbol()==el))
+	return elements[i];
+  } else {
+    // Special basis requested.
+    for(size_t i=0;i<elements.size();i++)
+      if(elements[i].get_number()==number) {
+	// Check that this is actually of the wanted type!
+	if(elements[i].get_symbol()==el)
+	  return elements[i];
+	else {
+	  // The wanted index, but a nucleus of the wrong type!
+	  std::ostringstream oss;
+	  oss << "Requested basis for nucleus " << el << " with index " <<number<<" but in the basis definition the given element is " << elements[i].get_symbol() << "!\n";
+	  throw std::runtime_error(oss.str());
+	}
+      }
+  }
+
 
   // If we are still here, it means the element was not found.
   //  ERROR_INFO(); // Don't print info, since we normally catch the error.
