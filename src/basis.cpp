@@ -2652,13 +2652,16 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
 
     // Get functions belonging to nucleus
     ElementBasisSet elbas;
-    // Check first if a special set is wanted
     try {
+      // Check first if a special set is wanted for given center
       elbas=baslib.get_element(el,atoms[i].num+1);
     } catch(std::runtime_error err) {
       // Did not find a special basis, use the general one instead.
       elbas=baslib.get_element(el,0);
     }
+
+    printf("Adding functions on atom %i\n",i+1);
+    elbas.print();
 
     basis.add_functions(i,cen,elbas);
     // and the nucleus
