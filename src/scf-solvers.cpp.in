@@ -218,44 +218,9 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
       printf("\nA pure exchange functional used, no exact exchange.\n");
   }
 
-  // Has grid been converged?
-  bool gridconv;
-  // Only reconverge if final tolerance (i.e. error) is smaller than
-  // initial one
-  if(dft_initialtol>dft_finaltol)
-    gridconv=0;
-  else
-    gridconv=1;
-
-  if(verbose) {
-    printf("Switching to finer grid once deltaE<%.2e, deltaPrms<%.2e and deltaPmax<%.2e.\n",dft_switch*deltaEmax,dft_switch*deltaPrms,dft_switch*deltaPmax);
-    printf("\nCreating initial DFT grid.\n");
-  }
-
-  if(verbose)
-    t.set();
-
   DFTGrid grid(basisp,dft_direct,verbose,dft_lobatto);
-
-#ifdef RESTRICTED
-  // Exchange-correlation functional
-  arma::mat XC(Nbf,Nbf);
-  // Form DFT quadrature grid
-  grid.construct(P,dft_initialtol,x_func,c_func);
-#else
-  // Exchange-correlation functional
-  arma::mat XCa(Nbf,Nbf), XCb(Nbf,Nbf);
-  // Form DFT quadrature grid
-  grid.construct(Pa,Pb,dft_initialtol,x_func,c_func);
 #endif
 
-  if(verbose) {
-    printf("Construction of grid took %s.\n",t.elapsed().c_str());
-    printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
-    grid.print_memory_req();
-    printf("\n");
-  }
-#endif
 
   // Sparse output to stderr
   fprintf(stderr,"Running ");
@@ -280,9 +245,47 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
   if(c_func>0 && densityfit)
     fprintf(stderr," with density fitting");
 #endif
-  fprintf(stderr,".\n");
+  fprintf(stderr,".\n%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
 
-  fprintf(stderr,"%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
+
+#ifdef DFT
+  // Has grid been converged?
+  bool gridconv;
+  // Only reconverge if final tolerance (i.e. error) is smaller than
+  // initial one
+  if(dft_initialtol>dft_finaltol)
+    gridconv=0;
+  else
+    gridconv=1;
+
+  if(verbose) {
+    printf("Switching to finer grid once deltaE<%.2e, deltaPrms<%.2e and deltaPmax<%.2e.\n",dft_switch*deltaEmax,dft_switch*deltaPrms,dft_switch*deltaPmax);
+    printf("\nCreating initial DFT grid.\n");
+  }
+
+  t.set();
+
+
+#ifdef RESTRICTED
+  // Exchange-correlation functional
+  arma::mat XC(Nbf,Nbf);
+  // Form DFT quadrature grid
+  grid.construct(P,dft_initialtol,x_func,c_func);
+#else
+  // Exchange-correlation functional
+  arma::mat XCa(Nbf,Nbf), XCb(Nbf,Nbf);
+  // Form DFT quadrature grid
+  grid.construct(Pa,Pb,dft_initialtol,x_func,c_func);
+#endif
+
+  if(verbose) {
+    printf("Construction of grid took %s.\n",t.elapsed().c_str());
+    printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
+    grid.print_memory_req();
+    printf("\n");
+  }
+  fprintf(stderr,"%-61s %10.3f\n","    DFT grid formation",t.get());
+#endif
 
   // Loop:
   bool converged=0;
@@ -817,8 +820,8 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
 	    printf(fmt,"deltaPrms",rmsdiff,dft_switch*deltaPrms);
 	    printf(fmt,"deltaPmax",maxdiff,dft_switch*deltaPmax);
 	    printf("\nRecreating DFT grid.\n");
-	    t.set();
 	  }
+	  t.set();
 	  
 #if RESTRICTED          
 	  grid.construct(P,dft_finaltol,x_func,c_func);
@@ -833,6 +836,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
 	    grid.print_memory_req();
 	    printf("\n");
 	  }
+	  fprintf(stderr,"%-61s %10.3f\n","    DFT grid formation",t.get());
 
 	  // Accuracy of Fock matrices is changed, clear accelerators.
 	  if(usediis) {
