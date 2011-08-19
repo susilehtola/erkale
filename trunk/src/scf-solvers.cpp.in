@@ -193,10 +193,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
   }
   
 #ifdef RESTRICTED
-  //  form_density(P,orbs,occs);
-  form_density(P,orbs,sum(occs)/2.0);
-  // Closed-shell: all orbitals doubly occupied
-  P*=2.0;
+  form_density(P,orbs,occs);
 #else
   form_density(Pa,orbsa,occa);
   form_density(Pb,orbsb,occb);
@@ -699,8 +696,6 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
     arma::mat Pnew;
 #ifdef RESTRICTED
     form_density(Pnew,orbs,occs);
-    // All orbitals are doubly occupied
-    Pnew*=2.0;
 #else
     arma::mat Panew, Pbnew;
     form_density(Panew,orbsa,occa);
