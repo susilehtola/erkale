@@ -119,7 +119,7 @@ void Settings::add_dft_settings() {
   dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-3));
   dset.push_back(gend("DFTFinalTol", "Tolerance of final DFT grid", 5e-5));
   // When to switch to final grid?
-  dset.push_back(gend("DFTSwitch", "When to switch to final grid (relative to deltaE, deltaP)?", 50.0));
+  dset.push_back(gend("DFTSwitch", "When to switch to final grid (relative to deltaE, deltaP)?", 100.0));
   
   // Use density fitting if possible?
   bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
