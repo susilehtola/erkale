@@ -122,6 +122,11 @@ GaussianShell::GaussianShell(size_t indstartv, int amv, bool lm, int atindv, coo
   // If spherical harmonics are used, fill transformation matrix
   if(uselm)
     transmat=Ylm_transmat(am);
+  else {
+    // Do away with uninitialized value warnings in valgrind
+    transmat=arma::mat(1,1);
+    transmat(0,0)=1.0/0.0; // Initialize to NaN
+  }
 
   // Compute necessary amount of Cartesians
   size_t Ncart=(am+1)*(am+2)/2;
