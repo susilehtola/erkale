@@ -137,7 +137,7 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
 
   if(homo>E.n_elem) {
     std::ostringstream oss;
-    oss << "Orbital " << homo+1 << " is occupied but only " << E.size() << " energies given!\n";
+    oss << "Orbital " << homo+1 << " is occupied but only " << E.n_elem << " energies given!\n";
     throw std::runtime_error(oss.str());
   }
 
