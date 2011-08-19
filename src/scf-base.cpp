@@ -317,7 +317,7 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
     // Resize output
     ret.resize(Nel/2);
     for(size_t i=0;i<ret.size();i++)
-      ret[i]=1.0;
+      ret[i]=2.0; // All orbitals doubly occupied
   }
     
   return ret;
