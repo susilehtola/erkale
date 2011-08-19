@@ -45,7 +45,7 @@ std::vector<double> get_scanning_exponents(double min, double max, size_t Np);
  * D. P. Chong, "Completeness profiles of one-electron basis sets",
  * Can. J. Chem. 73 (1995), pp. 79 - 83.
  */
-compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scanexps);
+compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scanexps, bool chol=0);
 
 /**
  * Compute completeness profile for element from \f$ \alpha = 10^{min}
