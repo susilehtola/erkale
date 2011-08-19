@@ -37,8 +37,8 @@ double evaluate_completeness(const gsl_vector *v, void *params) {
   if(Npoints%2==0)
     Npoints++;
 
-  // Now we can compute the completeness profile.
-  compprof_t prof=compute_completeness(el, par->scanexp);
+  // Now we can compute the completeness profile. Use Cholesky factorization.
+  compprof_t prof=compute_completeness(el, par->scanexp, 1);
 
   // Evaluate the mean square difference from completeness
   double cpl=0.0;

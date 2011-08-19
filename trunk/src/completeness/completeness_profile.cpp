@@ -113,7 +113,7 @@ compprof_t compute_completeness(const ElementBasisSet & bas, double min, double 
 
 
 /// Compute completeness profile for given element
-compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scan_exp) {
+compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scan_exp, bool chol) {
   // Returned completeness profile
   compprof_t ret;
 
@@ -134,27 +134,35 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
     arma::mat S;
     S=arma::trans(contr)*overlap(exps,exps,am)*contr;
 
-    // Form Choleksky inverse of S
+    /*
+    // Form Cholesky inverse of S
     arma::mat Sinvh=CholeskyOrth(S);
-
     // Helper matrix
     arma::mat K=contr*Sinvh;
-
     // Compute completeness overlaps
     arma::mat J=arma::trans(K)*scanov;
+    */
+
+    // Compute completeness overlaps
+    arma::mat J;
+    if(chol)
+      J=arma::trans(scanov)*contr*arma::inv(arma::trimatu(arma::chol(S)));
+    else
+      J=arma::trans(scanov)*contr*CanonicalOrth(S);
 
     // Compute completeness profile
     compprof_am_t profile;
     profile.am=am;
+    profile.Y.resize(J.n_rows);
 
     // Loop over scanning exponents
-    for(size_t ip=0;ip<J.n_cols;ip++) {
+    for(size_t ip=0;ip<J.n_rows;ip++) {
       double Y=0.0;
       // Loop over functions
-      for(size_t ifunc=0;ifunc<J.n_rows;ifunc++)
-	Y+=J(ifunc,ip)*J(ifunc,ip);
+      for(size_t ifunc=0;ifunc<J.n_cols;ifunc++)
+	Y+=J(ip,ifunc)*J(ip,ifunc);
 
-      profile.Y.push_back(Y);
+      profile.Y[ip]=Y;
     }
     
     ret.shells.push_back(profile);
