@@ -2665,9 +2665,6 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
       elbas=baslib.get_element(el,0);
     }
 
-    printf("Adding functions on atom %i\n",i+1);
-    elbas.print();
-
     basis.add_functions(i,cen,elbas);
     // and the nucleus
     basis.add_nucleus(i,cen,get_Z(el),el,bsse);
