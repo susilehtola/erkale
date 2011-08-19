@@ -135,11 +135,21 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
     if(occ[lumo]==0.0)
       break;  
 
-  double gap=E(lumo)-E(homo);
-  // Convert it into eV
-  gap*=HARTREEINEV;
-  
-  printf("HOMO-LUMO gap is %7.2f eV. ",gap);
+  if(homo>E.size()) {
+    std::ostringstream oss;
+    oss << "Orbital " << homo+1 << " is occupied but only " << E.size() << " energies given!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  if(lumo<E.size()) {
+    
+    double gap=E(lumo)-E(homo);
+    // Convert it into eV
+    gap*=HARTREEINEV;
+    
+    printf("HOMO-LUMO gap is %7.2f eV. ",gap);
+  }
+
   printf("Energies of lowest lying states:\n");
 
   // Loop over states
