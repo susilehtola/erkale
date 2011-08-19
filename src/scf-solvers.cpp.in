@@ -180,6 +180,14 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
 #endif
     }
 
+#ifdef RESTRICTED
+  form_density(P,orbs,occs);
+#else
+  form_density(Pa,orbsa,occa);
+  form_density(Pb,orbsb,occb);
+  P=Pa+Pb;
+#endif
+
   // Print orbital energies
   if(verbose) {
 #ifdef RESTRICTED
@@ -191,14 +199,6 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
     print_E(enb,occb);
 #endif
   }
-  
-#ifdef RESTRICTED
-  form_density(P,orbs,occs);
-#else
-  form_density(Pa,orbsa,occa);
-  form_density(Pb,orbsb,occb);
-  P=Pa+Pb;
-#endif
   
   // Initialize change of density matrix
   deltaP=P;
