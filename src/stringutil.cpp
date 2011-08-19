@@ -135,13 +135,13 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
     if(occ[lumo]==0.0)
       break;  
 
-  if(homo>E.size()) {
+  if(homo>E.n_elem) {
     std::ostringstream oss;
     oss << "Orbital " << homo+1 << " is occupied but only " << E.size() << " energies given!\n";
     throw std::runtime_error(oss.str());
   }
 
-  if(lumo<E.size()) {
+  if(lumo<E.n_elem) {
     
     double gap=E(lumo)-E(homo);
     // Convert it into eV
