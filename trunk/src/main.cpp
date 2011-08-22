@@ -74,6 +74,9 @@ int main(int argc, char **argv) {
   Settings set;
   set.parse(std::string(argv[1]));
 
+  // Settings used for initialization
+  Settings initset=set;
+
   // Redirect output?
   std::string logfile=set.get_string("Logfile");
   if(stricmp(logfile,"stdout")!=0) {
@@ -124,18 +127,19 @@ int main(int argc, char **argv) {
   // Initialize with DFT?
   bool dftinit= (!hfinit && !dncinit);
 
-  // Settings used for initialization
-  Settings initset=set;
+  // Convergence settings for initialization
+  convergence_t init_conv;
   // Make initialization parameters more relaxed
-  if(init) {
-    double dPr=100.0*set.get_double("DeltaPrms");
-    double dPm=100.0*set.get_double("DeltaPmax");
-    double dEm=100.0*set.get_double("DeltaEmax");
+  init_conv.deltaEmax=100.0*set.get_double("DeltaEmax");
+  init_conv.deltaPmax=100.0*set.get_double("DeltaPmax");
+  init_conv.deltaPrms=100.0*set.get_double("DeltaPrms");
 
-    initset.set_double("DeltaPrms",dPr);
-    initset.set_double("DeltaPmax",dPm);
-    initset.set_double("DeltaEmax",dEm);
-  }
+  // Final convergence settings
+  convergence_t conv;
+  // Make initialization parameters more relaxed
+  conv.deltaEmax=set.get_double("DeltaEmax");
+  conv.deltaPmax=set.get_double("DeltaPmax");
+  conv.deltaPrms=set.get_double("DeltaPrms");  
 
   if(hfinit) {
     printf("\nHartree-Fock has been specified for initialization.\n");
@@ -147,14 +151,11 @@ int main(int argc, char **argv) {
 
 #ifdef DFT_ENABLED
   // Get exchange and correlation functionals
-  int x_func=0, c_func=0;
-  if(!hf)
-    parse_xc_func(x_func,c_func,set.get_string("Method"));
-
-  // Get wanted initialization method
-  int x_init=0, c_init=0;
-  if(init && dftinit)
-    parse_xc_func(x_init,c_init,set.get_string("InitMethod"));
+  dft_t dft;
+  if(!hf) {
+    parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
+    dft.gridtol=set.get_double("DFTFinalTol");
+  }  
 
   if(init && hf && dftinit) {
     // Need to add DFT settings to initset
@@ -169,23 +170,28 @@ int main(int argc, char **argv) {
   }
 
   // Check consistency of parameters
-  if(!hf && exact_exchange(x_func)!=0.0)
+  if(!hf && exact_exchange(dft.x_func)!=0.0)
     if(set.get_bool("DFTFitting")) {
       printf("A hybrid functional is used, turning off density fitting.\n");
       set.set_bool("DFTFitting",0);
     }
   
-  if(init && dftinit && exact_exchange(x_init)!=0.0)
+  // Get wanted initialization method
+  dft_t dft_init;
+  if(init && dftinit) {
+    parse_xc_func(dft_init.x_func,dft_init.c_func,set.get_string("InitMethod"));
+    dft_init.gridtol=initset.get_double("DFTInitialTol");
+  } else if(!hf && dncinit) {
+    dft_init=dft;
+    dft_init.gridtol=set.get_double("DFTInitialTol");
+  }
+
+  if(init && dftinit && exact_exchange(dft_init.x_func)!=0.0)
     if(initset.get_bool("DFTFitting")) {
       printf("A hybrid functional is used in initialization, turning off density fitting.\n");
       initset.set_bool("DFTFitting",0);
     }
 
-  // Make initialization parameters more relaxed
-  if(init && (dftinit || (!hf && dncinit))) {
-    initset.set_double("DFTInitialTol",1e-3);
-    initset.set_double("DFTFinalTol",1e-3);
-  }
 #endif
 
   // Density matrix (for momentum density calculations)
@@ -206,7 +212,7 @@ int main(int argc, char **argv) {
 	SCF initsolver(basis,initset);
 
       	// Solve restricted Hartree-Fock
-	initsolver.RHF(C,E,occs);
+	initsolver.RHF(C,E,occs,init_conv);
       }
 
       if(dncinit) {
@@ -268,11 +274,11 @@ int main(int argc, char **argv) {
 
 	  if(hf) {
 	    // Solve restricted Hartree-Fock
-	    molsolver.RHF(Cmol,Emol,molocc);
+	    molsolver.RHF(Cmol,Emol,molocc,init_conv);
 	  } else {
 #ifdef DFT_ENABLED
 	    // Solve restricted DFT problem
-	    molsolver.RDFT(Cmol,Emol,molocc,x_func,c_func);
+	    molsolver.RDFT(Cmol,Emol,molocc,init_conv,dft_init);
 #else
 	    throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif  
@@ -309,9 +315,9 @@ int main(int argc, char **argv) {
 	
 #ifdef DFT_ENABLED
 	// Print information about used functionals
-	print_info(x_init,c_init);
+	print_info(dft_init.x_func,dft_init.c_func);
 	// Solve restricted DFT problem
-	initsolver.RDFT(C,E,occs,x_init,c_init);
+	initsolver.RDFT(C,E,occs,init_conv,dft_init);
 #else
 	throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif
@@ -330,13 +336,18 @@ int main(int argc, char **argv) {
 
     if(hf) {
       // Solve restricted Hartree-Fock
-      solver.RHF(C,E,occs);
+      solver.RHF(C,E,occs,conv);
     } else {
 #ifdef DFT_ENABLED
       // Print information about used functionals
-      print_info(x_func,c_func);
+      print_info(dft.x_func,dft.c_func);
       // Solve restricted DFT problem
-      solver.RDFT(C,E,occs,x_func,c_func);
+      if(!init) {
+	// Starting density was probably bad. Do an initial
+	// calculation first with a low-density grid.
+	solver.RDFT(C,E,occs,init_conv,dft);
+      }
+      solver.RDFT(C,E,occs,conv,dft);
 #else
       throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif
@@ -361,13 +372,13 @@ int main(int argc, char **argv) {
 
       if(hfinit) {
 	// Solve restricted Hartree-Fock
-	initsolver.UHF(Ca,Cb,Ea,Eb,occa,occb);
+	initsolver.UHF(Ca,Cb,Ea,Eb,occa,occb,init_conv);
       } else {
 #ifdef DFT_ENABLED
 	// Print information about used functionals
-	print_info(x_init,c_init);
+	print_info(dft_init.x_func,dft_init.c_func);
 	// Solve restricted DFT problem
-	initsolver.UDFT(Ca,Cb,Ea,Eb,occa,occb,x_init,c_init);
+	initsolver.UDFT(Ca,Cb,Ea,Eb,occa,occb,init_conv,dft_init);
 #else
 	throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif
@@ -381,13 +392,18 @@ int main(int argc, char **argv) {
 
     if(hf) {
       // Solve restricted Hartree-Fock
-      solver.UHF(Ca,Cb,Ea,Eb,occa,occb);
+      solver.UHF(Ca,Cb,Ea,Eb,occa,occb,conv);
     } else {
 #ifdef DFT_ENABLED
       // Print information about used functionals
-      print_info(x_func,c_func);
+      print_info(dft.x_func,dft.c_func);
       // Solve restricted DFT problem
-      solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,x_func,c_func);
+      if(!init) {
+	// Starting density was probably bad. Do an initial
+	// calculation first with a low-density grid.
+	solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,init_conv,dft);
+      }
+      solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,conv,dft);
 #else
       throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
 #endif

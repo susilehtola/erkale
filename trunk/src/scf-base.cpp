@@ -85,19 +85,11 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
   // Nuclear repulsion
   Enuc=basis.Enuc();
 
-  // Convergence criteria
-  deltaEmax=set.get_double("DeltaEmax");
-  deltaPmax=set.get_double("DeltaPmax");
-  deltaPrms=set.get_double("DeltaPrms");
-
 #if DFT_ENABLED
   if(set.dft_enabled()) {
+    // Use density fitting?
     densityfit=set.get_bool("DFTFitting");
-    
-    // Initial and final tolerance of DFT grid
-    dft_initialtol=set.get_double("DFTInitialTol");
-    dft_finaltol=set.get_double("DFTFinalTol");
-    dft_switch=set.get_double("DFTSwitch");
+    // Use Lobatto angular grid? (Lebedev is default)
     dft_lobatto=set.get_bool("DFTLobatto");
     // Direct DFT calculation?
     dft_direct=set.get_bool("DFTDirect");
