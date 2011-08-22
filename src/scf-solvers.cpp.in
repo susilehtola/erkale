@@ -2,17 +2,17 @@
 #ifdef RESTRICTED
 
 #ifdef DFT
-double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, int x_func, int c_func)
+double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv, const dft_t dft)
 #else
-  double SCF::RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs)
+double SCF::RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv) const
 #endif
 
 #else
 /* Unrestricted case */
 #ifdef DFT
-  double SCF::UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, int x_func, int c_func)
+double SCF::UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft)
 #else
-  double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb)
+double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
 #endif
 #endif
 {
@@ -209,7 +209,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
   
 #ifdef DFT
   // Fraction of exact exchange
-  double kfrac=exact_exchange(x_func);
+  double kfrac=exact_exchange(dft.x_func);
 
   if(verbose) {
     if(kfrac!=0.0)
@@ -233,49 +233,32 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
 #ifndef DFT
   fprintf(stderr,"HF ");
 #else
-  if(c_func>0) {
+  if(dft.c_func>0) {
     // Correlation exists.
-    fprintf(stderr,"%s-%s ",get_keyword(x_func).c_str(),get_keyword(c_func).c_str());
+    fprintf(stderr,"%s-%s ",get_keyword(dft.x_func).c_str(),get_keyword(dft.c_func).c_str());
   } else
-    fprintf(stderr,"%s ",get_keyword(x_func).c_str());
+    fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
 #endif
 
   fprintf(stderr,"calculation");
 #ifdef DFT
-  if(c_func>0 && densityfit)
+  if(densityfit)
     fprintf(stderr," with density fitting");
 #endif
   fprintf(stderr,".\n%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
 
 
 #ifdef DFT
-  // Has grid been converged?
-  bool gridconv;
-  // Only reconverge if final tolerance (i.e. error) is smaller than
-  // initial one
-  if(dft_initialtol>dft_finaltol)
-    gridconv=0;
-  else
-    gridconv=1;
-
-  if(verbose) {
-    printf("Switching to finer grid once deltaE<%.2e, deltaPrms<%.2e and deltaPmax<%.2e.\n",dft_switch*deltaEmax,dft_switch*deltaPrms,dft_switch*deltaPmax);
-    printf("\nCreating initial DFT grid.\n");
-  }
-
-  t.set();
-
-
 #ifdef RESTRICTED
   // Exchange-correlation functional
   arma::mat XC(Nbf,Nbf);
   // Form DFT quadrature grid
-  grid.construct(P,dft_initialtol,x_func,c_func);
+  grid.construct(P,dft.gridtol,dft.x_func,dft.c_func);
 #else
   // Exchange-correlation functional
   arma::mat XCa(Nbf,Nbf), XCb(Nbf,Nbf);
   // Form DFT quadrature grid
-  grid.construct(Pa,Pb,dft_initialtol,x_func,c_func);
+  grid.construct(Pa,Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
 
   if(verbose) {
@@ -431,25 +414,7 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
 #endif
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
     }
-    
 
-
-#ifndef DFT
-    if(direct)
-#else
-      if(direct && !densityfit)
-#endif
-	{
-	  // Determine wanted accuracy for integrals
-	
-	  if(fabs(deltaE)<1e-2) {
-	    // Rough convergence reached, so we can increase integral accuracy
-	  }
-      
-	}
-    
-
-    
     
 #ifdef DFT
     if(verbose) {
@@ -460,9 +425,9 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
     
     double Nelnum; // Numerically integrated density
 #ifdef RESTRICTED
-    grid.eval_Fxc(x_func,c_func,P,XC,Exc,Nelnum);
+    grid.eval_Fxc(dft.x_func,dft.c_func,P,XC,Exc,Nelnum);
 #else
-    grid.eval_Fxc(x_func,c_func,Pa,Pb,XCa,XCb,Exc,Nelnum);
+    grid.eval_Fxc(dft.x_func,dft.c_func,Pa,Pb,XCa,XCb,Exc,Nelnum);
 #endif
 
     double rel_diff=(Nelnum-Nel)*100.0/Nel;
@@ -806,87 +771,12 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
 
     if(!mixdensity || (mixdensity && mix==1.0)) {
       
-#ifdef DFT
-      // Check whether to converge grid
-      if(!gridconv) {
-	if(fabs(deltaE)<dft_switch*deltaEmax && maxdiff<dft_switch*deltaPmax && rmsdiff<dft_switch*deltaPrms) {
-
-	  // Reconverge grid
-	  if(verbose) {
-	    printf("Initial convergence achieved. ");
-	    t.print_time(); // Print current time
-	    const char *fmt="%20s:\t% e < %e\n"; // Format to print in
-	    printf(fmt,"deltaE",deltaE,dft_switch*deltaEmax);
-	    printf(fmt,"deltaPrms",rmsdiff,dft_switch*deltaPrms);
-	    printf(fmt,"deltaPmax",maxdiff,dft_switch*deltaPmax);
-	    printf("\nRecreating DFT grid.\n");
-	  }
-	  t.set();
-	  
-#if RESTRICTED          
-	  grid.construct(P,dft_finaltol,x_func,c_func);
-#else
-	  grid.construct(Pa,Pb,dft_finaltol,x_func,c_func);
-#endif
-	  gridconv=1;
-          
-	  if(verbose) {
-	    printf("Reconstruction of grid took %s.\n",t.elapsed().c_str());
-	    printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
-	    grid.print_memory_req();
-	    printf("\n");
-	  }
-	  fprintf(stderr,"%-61s %10.3f\n","    DFT grid formation",t.get());
-
-	  // Accuracy of Fock matrices is changed, clear accelerators.
-	  if(usediis) {
-#ifdef RESTRICTED
-	    diis.clear();
-#else
-	    diisa.clear();
-	    diisb.clear();
-#endif
-	    if(verbose)
-	      printf("DIIS stack cleared due to change of precision.\n");
-	  }
-
-	  if(useadiis) {
-#ifdef RESTRICTED
-	    adiis.clear();
-#else
-	    // TODO - FIXME
-#endif
-	    if(verbose)
-	      printf("ADIIS stack cleared due to change of precision.\n");
-	  }
-
-	  if(usebroyden) {
-#ifdef RESTRICTED
-	    broyd.clear();
-#else
-	    broyd_sum.clear();
-	    broyd_diff.clear();
-#endif
-
-	    if(verbose)
-	      printf("Broyden stack cleared due to change of precision.\n");
-	  }
-	    
-	}
-      } else {
-	// Grid has been converged, check if final convergence has
-	// been achieved
-#endif
-	
-	if(fabs(deltaE)<deltaEmax && maxdiff<deltaPmax && rmsdiff<deltaPrms) {
-	  if(verbose)
-	    printf("\n ******* Convergence achieved ********\n");
-	  converged=1;
-	  break;
-	} 
-#ifdef DFT
-      } // End grid convergence clause
-#endif
+      if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
+	if(verbose)
+	  printf("\n ******* Convergence achieved ********\n");
+	converged=1;
+	break;
+      } 
     } // End convergence check clause
   } // End SCF cycle
 

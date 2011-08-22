@@ -41,6 +41,26 @@
  * \date 2011/05/12 00:54
  */
 
+/// Convergence criteria
+typedef struct {
+  /// Convergence criterion for change of energy
+  double deltaEmax;
+  /// Convergence criterion for maximum change of an element of the density matrix
+  double deltaPmax;
+  /// Convergence criterion for the RMS change of the density matrix
+  double deltaPrms;
+} convergence_t;
+
+/// DFT settings
+typedef struct {
+  /// Used exchange functional
+  int x_func;
+  /// Used correlation functional
+  int c_func;
+  /// Integration grid tolerance
+  double gridtol;
+} dft_t;
+
 class SCF {
  protected:
   /// Overlap matrix
@@ -99,21 +119,7 @@ class SCF {
   /// Dynamically change mixing factor?
   bool dynamicmix;
 
-  /// Convergence criterion for change of energy
-  double deltaEmax;
-  /// Convergence criterion for maximum change of an element of the density matrix
-  double deltaPmax;
-  /// Convergence criterion for the RMS change of the density matrix
-  double deltaPrms;
-
 #if DFT_ENABLED
-  /// Initial tolerance for the DFT grid
-  double dft_initialtol;
-  /// Final tolerance for the DFT grid
-  double dft_finaltol;
-  /// When to switch to final DFT grid? Indicates fraction of deltaE and deltaP of above criteria.
-  double dft_switch;
-
   /// Use Lobatto angular grid instead of Lebedev grid (DFT)
   bool dft_lobatto;
   /// Save memory by reforming DFT grid on every iteration?
@@ -138,15 +144,15 @@ class SCF {
   ~SCF();
 
   /// Calculate restricted Hartree-Fock solution
-  double RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs);
+  double RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv) const;
   /// Calculate unrestricted Hartree-Fock solution
-  double UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb);
+  double UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occ, const convergence_t conv) const;
 
 #if DFT_ENABLED
   /// Calculate restricted density-functional theory solution
-  double RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, int x_func, int c_func);
+  double RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv, const dft_t dft);
   /// Calculate unrestricted density-functional theory solution
-  double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, int x_func, int c_func);
+  double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
 #endif
 };
 

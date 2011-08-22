@@ -25,11 +25,20 @@
 #include <cstdio>
 
 /// Relative tolerance in total energy
-double tol=1e-6;
+const double tol=1e-6;
 /// Absolute tolerance in orbital energies
-double otol=1e-5;
+const double otol=1e-5;
 /// Absolute tolerance for dipole moment
-double dtol=1e-5;
+const double dtol=1e-5;
+
+/// DFT grid tolerance
+const double dft_initialtol=1e-3;
+const double dft_finaltol=5e-5;
+
+/// Initial convergence settings (for DFT)
+const convergence_t init_conv={1e-4, 1e-4, 1e-6};
+/// Final convergence settings
+const convergence_t final_conv={1e-6, 1e-6, 1e-8};
 
 /// To compute references instead of running tests
 //#define COMPUTE_REFERENCE
@@ -127,7 +136,6 @@ const char * stat[]={"fail","ok"};
 arma::mat form_dens(const arma::mat & C, const std::vector<double> & occs) {
   arma::mat P;
   form_density(P,C,occs);
-  P*=2.0;
   return P;
 }
 
@@ -140,11 +148,18 @@ arma::mat form_dens(const arma::mat & Ca, const arma::mat & Cb, const std::vecto
 }
 
 /// Test RHF solution
-void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom) {
+#ifdef COMPUTE_REFERENCE
+#define rhf_test(at,baslib,set,Etot,Eorb,label,dipmom) rhf_test_run(at,baslib,set,Etot,Eorb,label,dipmom); printf("rhf_test(" #at "," #baslib "," #set "," #Etot "," #Eorb "," #label "," #dipmom ");\n\n");
+#else
+#define rhf_test(at,baslib,set,Etot,Eorb,label,dipmom) rhf_test_run(at,baslib,set,Etot,Eorb,label,dipmom);
+#endif
+void rhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom) {
   Timer t;
 
+#ifndef COMPUTE_REFERENCE
   printf("%s, ",label.c_str());
   fflush(stdout);
+#endif
 
   arma::vec E;
   arma::mat C;
@@ -155,19 +170,17 @@ void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   std::vector<double> occs=get_restricted_occupancy(set,bas);
   // Solve SCF equations
   SCF solver=SCF(bas,set);
-  double Et=solver.RHF(C,E,occs);
+  double Et=solver.RHF(C,E,occs,final_conv);
   // Compute dipole moment
   double dip=dip_mom(form_dens(C,occs),bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("done (%s)\n",t.elapsed().c_str());
   printf("Etot=%.16e;\n",Et);
   printf("dip=%.16e;\n",dip);
   printf("Eorb=\"");
   for(size_t i=0;i<E.n_elem;i++)
     printf("%.16e ",E(i));
   printf("\";\n");
-  printf("\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
@@ -190,11 +203,18 @@ void rhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
 }
 
 /// Test UHF solution
-void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom) {
+#ifdef COMPUTE_REFERENCE
+#define uhf_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) uhf_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom); printf("uhf_test(" #at "," #baslib "," #set "," #Etot "," #Eorba "," #Eorbb "," #label "," #dipmom ");\n\n");
+#else
+#define uhf_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) uhf_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom);
+#endif
+void uhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom) {
   Timer t;
 
+#ifndef COMPUTE_REFERENCE
   printf("%s, ",label.c_str());
   fflush(stdout);
+#endif
 
   arma::vec Ea, Eb;
   arma::mat Ca, Cb;
@@ -206,12 +226,11 @@ void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   get_unrestricted_occupancy(set,bas,occa,occb);
   // Solve SCF equations
   SCF solver=SCF(bas,set);
-  double Et=solver.UHF(Ca,Cb,Ea,Eb,occa,occb);
+  double Et=solver.UHF(Ca,Cb,Ea,Eb,occa,occb,final_conv);
   // Compute dipole moment
   double dip=dip_mom(form_dens(Ca,Cb,occa,occb),bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("done (%s)\n",t.elapsed().c_str());
   printf("Etot=%.16e;\n",Et);
   printf("dip=%.16e;\n",dip);
   printf("Eorba=\"");
@@ -222,7 +241,6 @@ void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
   for(size_t i=0;i<Eb.n_elem;i++)
     printf("%.16e ",Eb(i));
   printf("\";\n");
-  printf("\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
@@ -249,11 +267,18 @@ void uhf_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, co
 }
 
 /// Test RDFT solution
-void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom, int xfunc, int cfunc) {
+#ifdef COMPUTE_REFERENCE
+#define rdft_test(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc) rdft_test_run(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc); printf("rdft_test(" #at "," #baslib "," #set "," #Etot "," #Eorb "," #label "," #dipmom "," #xfunc "," #cfunc ");\n\n");
+#else
+#define rdft_test(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc) rdft_test_run(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc);
+#endif
+void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom, int xfunc, int cfunc) {
   Timer t;
 
+#ifndef COMPUTE_REFERENCE
   printf("%s, ",label.c_str());
   fflush(stdout);
+#endif
 
   arma::vec E;
   arma::mat C;
@@ -265,19 +290,29 @@ void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   std::vector<double> occs=get_restricted_occupancy(set,bas);
   // Solve SCF equations
   SCF solver=SCF(bas,set);
-  double Et=solver.RDFT(C,E,occs,xfunc,cfunc);
+
+  // Final dft settings
+  dft_t dft_f;
+  dft_f.x_func=xfunc;
+  dft_f.c_func=cfunc;
+  dft_f.gridtol=dft_finaltol;
+
+  // Initial dft settings
+  dft_t dft_i(dft_f);
+  dft_i.gridtol=dft_initialtol;
+
+  solver.RDFT(C,E,occs,init_conv,dft_i);
+  double Et=solver.RDFT(C,E,occs,final_conv,dft_f);
   // Compute dipole moment
   double dip=dip_mom(form_dens(C,occs),bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("done (%s)\n",t.elapsed().c_str());
   printf("Etot=%.16e;\n",Et);
   printf("dip=%.16e;\n",dip);
   printf("Eorb=\"");
   for(size_t i=0;i<E.n_elem;i++)
     printf("%.16e ",E(i));
   printf("\";\n");
-  printf("\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
@@ -300,14 +335,31 @@ void rdft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
 }
 
 /// Test UDFT solution
-void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom, int xfunc, int cfunc) {
+#ifdef COMPUTE_REFERENCE
+#define udft_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc) udft_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc); printf("udft_test(" #at "," #baslib "," #set "," #Etot "," #Eorba "," #Eorbb "," #label "," #dipmom "," #xfunc "," #cfunc ");\n\n");
+#else
+#define udft_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc) udft_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc);
+#endif
+void udft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom, int xfunc, int cfunc) {
   Timer t;
 
+#ifndef COMPUTE_REFERENCE
   printf("%s, ",label.c_str());
   fflush(stdout);
+#endif
 
   arma::vec Ea, Eb;
   arma::mat Ca, Cb;
+
+  // Final dft settings
+  dft_t dft_f;
+  dft_f.x_func=xfunc;
+  dft_f.c_func=cfunc;
+  dft_f.gridtol=dft_finaltol;
+
+  // Initial dft settings
+  dft_t dft_i(dft_f);
+  dft_i.gridtol=dft_initialtol;
 
   // Construct basis set
   BasisSet bas=construct_basis(at,baslib,set);
@@ -316,12 +368,12 @@ void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   get_unrestricted_occupancy(set,bas,occa,occb);
   // Solve SCF equations
   SCF solver=SCF(bas,set);
-  double Et=solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,xfunc,cfunc);
+  solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,init_conv,dft_i);
+  double Et=solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,final_conv,dft_f);
   // Compute dipole moment
   double dip=dip_mom(form_dens(Ca,Cb,occa,occb),bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("done (%s)\n",t.elapsed().c_str());
   printf("Etot=%.16e;\n",Et);
   printf("dip=%.16e;\n",dip);
   printf("Eorba=\"");
@@ -332,7 +384,6 @@ void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
   for(size_t i=0;i<Eb.n_elem;i++)
     printf("%.16e ",Eb(i));
   printf("\";\n");
-  printf("\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
@@ -361,6 +412,11 @@ void udft_test(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, c
 /// Run unit tests by comparing calculations to ones that should be OK
 int main(void) {
   // Load basis sets
+
+  // Redirect stderr to file, since scf routines print out info there.
+#ifdef COMPUTE_REFERENCE
+  FILE *outstream=freopen("errors.log","w",stderr);
+#endif
 
   printf("****** Loading basis sets *******\n");
 
@@ -648,7 +704,9 @@ int main(void) {
  rdft_test(decanol,b6_31Gpp,dftcart,Etot,Eorb,"1-decanol, SVWN(RPA)/6-31G**",dip,1,8);
 #endif
 
+#ifndef COMPUTE_REFERENCE
   printf("****** Tests completed in %s *******\n",t.elapsed().c_str());
-  
+#endif
+
   return 0;
 }
