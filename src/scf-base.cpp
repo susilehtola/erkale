@@ -216,8 +216,6 @@ SCF::~SCF() {
 void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta) {
   // Form natural orbitals.
 
-  const size_t Nbf=Fa_AO.n_cols;
-
   // First, get eigenvectors and eigenvalues of S so that we can go to
   // an orthonormal basis.
   arma::vec Sval;
@@ -247,7 +245,10 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   eig_sym_ordered(Pval,Pvec,P_orth);
 
   printf("Occupations\n");
-  Pval.print();
+  for(size_t i=0;i<Pval.n_elem;i++)
+    printf("% .16e\n",Pval(i));
+
+
 
   // Amount of core orbitals is
   size_t Nc=min(Nel_alpha,Nel_beta);
@@ -255,6 +256,28 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   size_t Na=max(Nel_alpha,Nel_beta)-Nc;
   // Amount of virtual orbitals (in NO space) is
   size_t Nv=Nind-Na-Nc;
+
+  /*
+  // Determine amount of core orbitals
+  size_t Nc=0;
+  for(size_t i=Nind-1;i<Nind;i--)
+    if(Pval(i)>=1.5)
+      Nc++;
+    else
+      break;
+  // and of active orbitals
+  size_t Na=0;
+  for(size_t i=Nind-1;i<Nind;i--) {
+    if(Pval(i)<1e-7)
+      break;
+    else
+      Na++;
+  }
+  Na-=Nc;
+  // so number of virtuals is
+  size_t Nv=Nind-Nc-Na;
+  */
+
 
   double tot=0.0;
   printf("Core orbital occupations:");
@@ -271,9 +294,10 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   }
   printf("\n");
   printf("Total occupancy of core and active is %f.\n",tot);
+  
 
   // Construct \Delta matrix in AO basis
-  arma::mat Delta_AO=(Fa_AO-Fb_AO)/2;
+  arma::mat Delta_AO=(Fa_AO-Fb_AO)/2.0;
   // Calculate it in the orthonormal basis
   arma::mat Delta_orth(Nind,Nind);
   for(size_t i=0;i<Nind;i++)
@@ -287,7 +311,8 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
     for(size_t j=0;j<Nind;j++)
       Delta_NO(i,j)=arma::as_scalar(arma::trans(Pvec.col(i))*Delta_orth*Pvec.col(j));
 
-  // Form lambda by flipping the signs of the cv and vc blocks
+  // Form lambda by flipping the signs of the cv and vc blocks and
+  // zeroing out everything else.
   arma::mat lambda_NO(Delta_NO);
   /*
     eig_sym_ordered puts the NOs in the order of increasing
@@ -295,19 +320,21 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
     space, the following Na to the active space and the last Nc to the
     core orbitals.
   */
+  // Zero everything
+  lambda_NO.zeros();
+  // and flip signs of cv and vc blocks from Delta
   for(size_t v=0;v<Nv;v++) // Loop over virtuals
     for(size_t c=Nind-Nc;c<Nind;c++) { // Loop over core orbitals
-      lambda_NO(c,v)*=-1.0;
-      lambda_NO(v,c)*=-1.0;
+      lambda_NO(c,v)=-Delta_NO(c,v);
+      lambda_NO(v,c)=-Delta_NO(v,c);
     }
 
-  // back-transform it to the orthonormal basis
+  // Back-transform lambda to the orthonormal basis
   arma::mat lambda_orth(Nind,Nind);
   lambda_orth.zeros();
   for(size_t i=0;i<Nind;i++)
     for(size_t j=0;j<Nind;j++)
       lambda_orth+=Pvec.col(i)*arma::trans(Pvec.col(j))*lambda_NO(i,j);
-
   // and then to the AO basis
   arma::mat lambda_AO(Fa_AO.n_rows,Fa_AO.n_cols);
   lambda_AO.zeros();
@@ -321,7 +348,7 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   dl.print();
   printf("and its norm is %e.\n",norm(dl,2));
   */
-  
+
   // Update Fa and Fb
   Fa_AO+=lambda_AO;
   Fb_AO-=lambda_AO;
@@ -451,14 +478,11 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     } 
 
   } else {
-    // Aufbau principle.
-    int Nel=basis.Ztot()-set.get_int("Charge");
-    int mult=set.get_int("Multiplicity");
-    
-    // Amount of occupied states
-    int Nel_alpha=Nel/2+mult-1;
-    int Nel_beta=Nel-Nel_alpha;
-    
+    // Aufbau principle. Get amount of alpha and beta electrons.
+
+    int Nel_alpha, Nel_beta;
+    get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+
     // Resize output
     occa.resize(Nel_alpha);
     for(size_t i=0;i<occa.size();i++)
@@ -552,4 +576,20 @@ double electron_spread(const arma::mat & P, const BasisSet & basis) {
   double dr=sqrt(r2);
 
   return dr;  
+}
+
+void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
+  // Check sanity of arguments
+  if(mult<1)
+    throw std::runtime_error("Invalid value for multiplicity, which must be >=1.\n");
+  else if(Nel%2==0 && mult%2!=1)
+    throw std::runtime_error("Incorrect multiplicity for even number of electrons.\n");
+  else if(Nel%2==1 && mult%2!=0)
+    throw std::runtime_error("Incorrect multiplicity for odd number of electrons.\n");
+
+  // Compute amount of "extra" spin up electrons
+  int Nx=mult-1;
+  // so there are
+  Nel_alpha=Nel/2+Nx; // spin up
+  Nel_beta=Nel-Nel_alpha; // spin down
 }

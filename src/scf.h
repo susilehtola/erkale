@@ -191,5 +191,7 @@ arma::vec dipole_moment(const arma::mat & P, const BasisSet & basis);
 /// Compute spread of electrons: \f$ r = \sqrt{ \left\langle \hat{\bf r}^2 \right\rangle - \left\langle \hat{\bf r} \right\rangle^2 } \f$
 double electron_spread(const arma::mat & P, const BasisSet & basis);
 
+/// Determine amount of alpha and beta electrons based on multiplicity
+void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta);
 
 #endif

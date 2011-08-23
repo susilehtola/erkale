@@ -399,14 +399,17 @@ int main(int argc, char **argv) {
     } else if(rohf) {
       // Solve restricted open-shell Hartree-Fock
 
-      // Determine amount of electrons
-      int Nel=basis.Ztot()-set.get_int("Charge");
-      int mult=set.get_int("Multiplicity");
+      /*
+      std::vector<double> occa, occb;
+      get_unrestricted_occupancy(set,basis,occa,occb);
+      solver.UHF(Ca,Cb,Ea,Eb,occa,occb,init_conv);
+      */
 
       // Amount of occupied states
-      int Nel_alpha=Nel/2+mult-1;
-      int Nel_beta=Nel-Nel_alpha;
-
+      int Nel_alpha;
+      int Nel_beta;
+      get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+      // Solve ROHF
       solver.ROHF(Ca,Cb,Ea,Eb,Nel_alpha,Nel_beta,conv);
     } else {
 #ifdef DFT_ENABLED
