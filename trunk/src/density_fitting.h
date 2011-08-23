@@ -71,12 +71,6 @@ class DensityFit {
   /// \f$ ( \alpha | \beta)^-1 \f$
   arma::mat ab_inv;
 
-  /// Gamma
-  arma::vec gamma;
-
-  /// Expansion coefficients
-  arma::vec c;
-
  public:
   /// Constructor
   DensityFit();	 
@@ -91,11 +85,11 @@ class DensityFit {
   /// Compute estimate of necessary memory
   size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, bool direct) const;
 
-  /// Update density
-  void update_density(const arma::mat & P);
+  /// Compute expansion coefficients c
+  arma::vec compute_expansion(const arma::mat & P) const;
 
-  /// Get Coulomb matrix
-  arma::mat calc_J() const;
+  /// Get Coulomb matrix from P
+  arma::mat calc_J(const arma::mat & P) const;
 };
 
 

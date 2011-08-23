@@ -152,9 +152,9 @@ class SCF {
 
 #if DFT_ENABLED
   /// Calculate restricted density-functional theory solution
-  double RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv, const dft_t dft);
+  double RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
   /// Calculate unrestricted density-functional theory solution
-  double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
+  double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
 #endif
 };
 
