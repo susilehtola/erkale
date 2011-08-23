@@ -145,6 +145,8 @@ class SCF {
 
   /// Calculate restricted Hartree-Fock solution
   double RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv) const;
+  /// Calculate restricted open-shell Hartree-Fock solution
+  double ROHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, int Nel_alpha, int Nel_beta, const convergence_t conv) const;
   /// Calculate unrestricted Hartree-Fock solution
   double UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occ, const convergence_t conv) const;
 
@@ -155,6 +157,16 @@ class SCF {
   double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
 #endif
 };
+
+/*
+ * Make ROHF / CUHF update to (Hartree-)Fock operators Fa and Fb,
+ * using total density matrix P and overlap matrix S.
+ *
+ * T. Tsuchimochi and G. E. Scuseria, "Constrained active space
+ * unrestricted mean-field methods for controlling
+ * spin-contamination", J. Chem. Phys. 134, 064101 (2011).
+ */
+void ROHF_update(arma::mat & Fa, arma::mat & Fb, const arma::mat & P, const arma::mat & S, int Nel_alpha, int Nel_beta);
 
 /// Update occupations by occupying states with maximum overlap
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S);

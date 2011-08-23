@@ -7,15 +7,26 @@ double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs,
 double SCF::RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv) const
 #endif
 
-#else
+#else // not restricted
+
 /* Unrestricted case */
 #ifdef DFT
 double SCF::UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft)
+#elif defined(_ROHF)
+/* ROHF */
+double SCF::ROHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, int Nel_alpha, int Nel_beta, const convergence_t conv) const
 #else
 double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
-#endif
-#endif
+#endif // not DFT
+#endif // not restricted
 {
+
+
+#ifdef _ROHF
+  // Occupations
+  std::vector<double> occa(Nel_alpha,1.0);
+  std::vector<double> occb(Nel_beta,1.0);
+#endif
   
   Timer t;
   Timer ttot;
@@ -151,7 +162,6 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #else
 	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
 	eig_sym_ordered(ena,orbsa,Horth); // Solve in orthogonal basis
-      
 	// Transform back to non-orthogonal basis
 	orbsa=Sinvh*orbsa;
       
@@ -224,13 +234,16 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 
   // Sparse output to stderr
   fprintf(stderr,"Running ");
-#ifdef RESTRICTED
+#if defined(RESTRICTED) || defined(_ROHF)
   fprintf(stderr,"restricted ");
 #else
   fprintf(stderr,"unrestricted ");
 #endif
 
 #ifndef DFT
+#ifdef _ROHF
+  fprintf(stderr,"open-shell ");
+#endif
   fprintf(stderr,"HF ");
 #else
   if(dft.c_func>0) {
@@ -481,6 +494,11 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     Ha=Hcore+J-Ka;
     Hb=Hcore+J-Kb;
     Exc=-0.5*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
+#endif
+
+#ifdef _ROHF
+    // Constrain Fock operators to correspond to ROHF
+    ROHF_update(Ha,Hb,Pa+Pb,S,Nel_alpha,Nel_beta);
 #endif
 
 #endif // End unrestricted case

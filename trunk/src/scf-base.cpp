@@ -213,6 +213,120 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
 SCF::~SCF() {
 }
 
+void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta) {
+  // Form natural orbitals.
+
+  const size_t Nbf=Fa_AO.n_cols;
+
+  // First, get eigenvectors and eigenvalues of S so that we can go to
+  // an orthonormal basis.
+  arma::vec Sval;
+  arma::mat Svec;
+  eig_sym_ordered(Sval,Svec,S);
+
+  // Count number of linearly independent vectors
+  size_t Nind=0;
+  for(size_t i=0;i<Sval.n_elem;i++)
+    if(Sval[i]>1e-5)
+      Nind++;
+
+  // Get rid of linearly dependent vectors
+  Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem);
+  Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
+
+  // Form P in orthonormal basis
+  arma::mat P_orth(Nind,Nind);
+  P_orth.zeros();
+  for(size_t i=0;i<Nind;i++)
+    for(size_t j=0;j<Nind;j++)
+      P_orth(i,j)=arma::as_scalar(arma::trans(Svec.col(i))*P_AO*Svec.col(j))*sqrt(Sval(i)*Sval(j));
+
+  // Diagonalize P.
+  arma::vec Pval;
+  arma::mat Pvec;
+  eig_sym_ordered(Pval,Pvec,P_orth);
+
+  printf("Occupations\n");
+  Pval.print();
+
+  // Amount of core orbitals is
+  size_t Nc=min(Nel_alpha,Nel_beta);
+  // Amount of active space orbitals is
+  size_t Na=max(Nel_alpha,Nel_beta)-Nc;
+  // Amount of virtual orbitals (in NO space) is
+  size_t Nv=Nind-Na-Nc;
+
+  double tot=0.0;
+  printf("Core orbital occupations:");
+  for(size_t c=Nind-1;c>=Nind-Nc && c<Nind;c--) {
+    printf(" %f",Pval(c));
+    tot+=Pval(c);
+  }
+  printf("\n");
+
+  printf("Active orbital occupations:");
+  for(size_t a=Nind-Nc-1;a>=Nind-Nc-Na && a<Nind;a--) {
+    printf(" %f",Pval(a));
+    tot+=Pval(a);
+  }
+  printf("\n");
+  printf("Total occupancy of core and active is %f.\n",tot);
+
+  // Construct \Delta matrix in AO basis
+  arma::mat Delta_AO=(Fa_AO-Fb_AO)/2;
+  // Calculate it in the orthonormal basis
+  arma::mat Delta_orth(Nind,Nind);
+  for(size_t i=0;i<Nind;i++)
+    for(size_t j=0;j<Nind;j++)
+      Delta_orth(i,j)=arma::as_scalar(arma::trans(Svec.col(i))*Delta_AO*Svec.col(j))*sqrt(Sval(i)*Sval(j));
+
+  // after which it can be transformed in the NO basis.
+  arma::mat Delta_NO(Nind,Nind);
+  Delta_NO.zeros();
+  for(size_t i=0;i<Nind;i++)
+    for(size_t j=0;j<Nind;j++)
+      Delta_NO(i,j)=arma::as_scalar(arma::trans(Pvec.col(i))*Delta_orth*Pvec.col(j));
+
+  // Form lambda by flipping the signs of the cv and vc blocks
+  arma::mat lambda_NO(Delta_NO);
+  /*
+    eig_sym_ordered puts the NOs in the order of increasing
+    occupation. Thus, the lowest Nv orbitals belong to the virtual
+    space, the following Na to the active space and the last Nc to the
+    core orbitals.
+  */
+  for(size_t v=0;v<Nv;v++) // Loop over virtuals
+    for(size_t c=Nind-Nc;c<Nind;c++) { // Loop over core orbitals
+      lambda_NO(c,v)*=-1.0;
+      lambda_NO(v,c)*=-1.0;
+    }
+
+  // back-transform it to the orthonormal basis
+  arma::mat lambda_orth(Nind,Nind);
+  lambda_orth.zeros();
+  for(size_t i=0;i<Nind;i++)
+    for(size_t j=0;j<Nind;j++)
+      lambda_orth+=Pvec.col(i)*arma::trans(Pvec.col(j))*lambda_NO(i,j);
+
+  // and then to the AO basis
+  arma::mat lambda_AO(Fa_AO.n_rows,Fa_AO.n_cols);
+  lambda_AO.zeros();
+  for(size_t i=0;i<Nind;i++)
+    for(size_t j=0;j<Nind;j++)
+      lambda_AO+=Svec.col(i)*arma::trans(Svec.col(j))*lambda_orth(i,j)/sqrt(Sval(i)*Sval(j));
+
+  /*
+  arma::mat dl=Delta_AO-lambda_AO;
+  printf("Difference of Delta and lambda is\n");
+  dl.print();
+  printf("and its norm is %e.\n",norm(dl,2));
+  */
+  
+  // Update Fa and Fb
+  Fa_AO+=lambda_AO;
+  Fb_AO-=lambda_AO;
+}
+
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S) {
   nocc.zeros();
 
@@ -259,7 +373,7 @@ void form_density(arma::mat & R, const arma::mat & C, size_t nocc) {
   R.zeros();
   // Formulate density
   for(size_t n=0;n<nocc;n++)
-    R+=C.col(n)*trans(C.col(n));
+    R+=C.col(n)*arma::trans(C.col(n));
 }
 
 void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> & nocc) {
@@ -281,7 +395,7 @@ void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> 
   // Formulate density
   for(size_t n=0;n<nocc.size();n++)
     if(nocc[n]>0.0)
-      R+=nocc[n]*C.col(n)*trans(C.col(n));
+      R+=nocc[n]*C.col(n)*arma::trans(C.col(n));
 }
 
 std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis) {

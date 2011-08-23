@@ -81,10 +81,12 @@ Settings::Settings() {
   // Default cutoff for orthogonalization
   dset.push_back(gend("BasisLinTol", "Cutoff for linearly dependent basis functions", 1e-5));
 
-  // Density matrix convergence criteria
+  // Convergence criteria
   dset.push_back(gend("DeltaPrms", "Maximum allowed RMS difference of density matrix", 1e-8));
   dset.push_back(gend("DeltaPmax", "Maximum allowed maximum difference of density matrix", 1e-6));
   dset.push_back(gend("DeltaEmax", "Maximum allowed change of energy", 1e-6));
+  // Relative factor for initialization
+  dset.push_back(gend("DeltaInit", "When to switch to final calculation (mostly DFT), relative to Delta parameters", 100.0));
 
   // Maximum iterations
   iset.push_back(geni("MaxIter", "Maximum number of iterations in SCF cycle", 100));
@@ -118,8 +120,6 @@ void Settings::add_dft_settings() {
   // Initial and final tolerances of DFT grid
   dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-3));
   dset.push_back(gend("DFTFinalTol", "Tolerance of final DFT grid", 5e-5));
-  // When to switch to final grid?
-  dset.push_back(gend("DFTSwitch", "When to switch to final grid (relative to deltaE, deltaP)?", 100.0));
   
   // Use density fitting if possible?
   bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
@@ -345,6 +345,8 @@ void Settings::parse(std::string filename) {
 	  // Hartree-Fock or DFT?
 	  if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0)
 	    set_string("Method","HF");
+	  else if(stricmp(words[1],"ROHF")==0)
+	    set_string("Method","ROHF");
 #ifdef DFT_ENABLED
 	  else {
 	    // Add dft related settings

@@ -114,6 +114,7 @@ int main(int argc, char **argv) {
 
   // Do a plain Hartree-Fock calculation?
   bool hf= (stricmp(set.get_string("Method"),"HF")==0);
+  bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
 
   // Initialize calculation?
   bool noinit=(stricmp(set.get_string("InitMethod"),"none")==0);
@@ -127,19 +128,21 @@ int main(int argc, char **argv) {
   // Initialize with DFT?
   bool dftinit= (!hfinit && !dncinit);
 
-  // Convergence settings for initialization
-  convergence_t init_conv;
-  // Make initialization parameters more relaxed
-  init_conv.deltaEmax=100.0*set.get_double("DeltaEmax");
-  init_conv.deltaPmax=100.0*set.get_double("DeltaPmax");
-  init_conv.deltaPrms=100.0*set.get_double("DeltaPrms");
-
   // Final convergence settings
   convergence_t conv;
   // Make initialization parameters more relaxed
   conv.deltaEmax=set.get_double("DeltaEmax");
   conv.deltaPmax=set.get_double("DeltaPmax");
   conv.deltaPrms=set.get_double("DeltaPrms");  
+
+  // Convergence settings for initialization
+  convergence_t init_conv(conv);
+  // Make initialization parameters more relaxed
+  double initfac=set.get_double("DeltaInit");
+  init_conv.deltaEmax*=initfac;
+  init_conv.deltaPmax*=initfac;
+  init_conv.deltaPrms*=initfac;
+
 
   if(hfinit) {
     printf("\nHartree-Fock has been specified for initialization.\n");
@@ -152,25 +155,25 @@ int main(int argc, char **argv) {
 #ifdef DFT_ENABLED
   // Get exchange and correlation functionals
   dft_t dft;
-  if(!hf) {
+  if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
     dft.gridtol=set.get_double("DFTFinalTol");
   }  
 
-  if(init && hf && dftinit) {
+  if(init && (hf||rohf) && dftinit) {
     // Need to add DFT settings to initset
     printf("Adding DFT settings to initset.\n");
     initset.add_dft_settings();
   }
 
-  if(init && !hf && hfinit) {
+  if(init && !hf && !rohf && hfinit) {
     // Need to remove DFT settings from initset
     printf("Removing DFT settings from initset.\n");
     initset.remove_dft_settings();
   }
 
   // Check consistency of parameters
-  if(!hf && exact_exchange(dft.x_func)!=0.0)
+  if(!hf && !rohf && exact_exchange(dft.x_func)!=0.0)
     if(set.get_bool("DFTFitting")) {
       printf("A hybrid functional is used, turning off density fitting.\n");
       set.set_bool("DFTFitting",0);
@@ -181,7 +184,7 @@ int main(int argc, char **argv) {
   if(init && dftinit) {
     parse_xc_func(dft_init.x_func,dft_init.c_func,set.get_string("InitMethod"));
     dft_init.gridtol=initset.get_double("DFTInitialTol");
-  } else if(!hf && dncinit) {
+  } else if(!hf && !rohf && dncinit) {
     dft_init=dft;
     dft_init.gridtol=set.get_double("DFTInitialTol");
   }
@@ -393,6 +396,18 @@ int main(int argc, char **argv) {
     if(hf) {
       // Solve restricted Hartree-Fock
       solver.UHF(Ca,Cb,Ea,Eb,occa,occb,conv);
+    } else if(rohf) {
+      // Solve restricted open-shell Hartree-Fock
+
+      // Determine amount of electrons
+      int Nel=basis.Ztot()-set.get_int("Charge");
+      int mult=set.get_int("Multiplicity");
+
+      // Amount of occupied states
+      int Nel_alpha=Nel/2+mult-1;
+      int Nel_beta=Nel-Nel_alpha;
+
+      solver.ROHF(Ca,Cb,Ea,Eb,Nel_alpha,Nel_beta,conv);
     } else {
 #ifdef DFT_ENABLED
       // Print information about used functionals
