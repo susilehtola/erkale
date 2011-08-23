@@ -184,9 +184,8 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
   return Nmem;
 }
 
-void DensityFit::update_density(const arma::mat & P) {
-  if(gamma.n_elem!=Naux)
-    gamma=arma::vec(Naux);
+arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
+  arma::vec gamma(Naux);
   gamma.zeros();
 
   // Compute gamma
@@ -203,8 +202,6 @@ void DensityFit::update_density(const arma::mat & P) {
       }
     }
   } else {
-    gamma.zeros();
-
     // Dummy shell, helper for computing ERIs
     coords_t cen={0.0, 0.0, 0.0};
     std::vector<double> C, z;
@@ -256,11 +253,14 @@ void DensityFit::update_density(const arma::mat & P) {
 
   // Compute x0
   arma::vec x0=ab_inv*gamma;
-  // Compute c
-  c=x0+ab_inv*(gamma-ab*x0);
+  // Compute and return c
+  return x0+ab_inv*(gamma-ab*x0);
 }
 
-arma::mat DensityFit::calc_J() const {
+arma::mat DensityFit::calc_J(const arma::mat & P) const {
+  // Get the expansion coefficients
+  arma::vec c=compute_expansion(P);
+
   arma::mat J(Norb,Norb);
   J.zeros();
 
