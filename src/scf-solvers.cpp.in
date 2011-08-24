@@ -493,12 +493,13 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     Ha=Hcore+J-Ka;
     Hb=Hcore+J-Kb;
     Exc=-0.5*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
-#endif
 
 #ifdef _ROHF
     // Constrain Fock operators to correspond to ROHF
     ROHF_update(Ha,Hb,Pa+Pb,S,Nel_alpha,Nel_beta);
 #endif
+
+#endif // end DFT clause
 
 #endif // End unrestricted case
 
@@ -784,7 +785,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     }
 
     // Sparse output
-    fprintf(stderr,"%4i % 16.6f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,Etot,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
+    fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,Etot,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
 
     if(!mixdensity || (mixdensity && mix==1.0)) {
       
@@ -833,6 +834,9 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #ifdef DFT 
     if(verbose)
       printf("Solution of UDFT took %s.\n",ttot.elapsed().c_str());
+#elif defined(_ROHF)
+    if(verbose)
+      printf("Solution of ROHF took %s.\n",ttot.elapsed().c_str());
 #else
     if(verbose)
       printf("Solution of UHF took %s.\n",ttot.elapsed().c_str());
