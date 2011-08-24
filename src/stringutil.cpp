@@ -17,6 +17,7 @@
 
 
 #include "stringutil.h"
+#include "mathf.h"
 
 #include <cstdio>
 #include <cstring>
@@ -212,4 +213,52 @@ std::string memory_size(size_t size) {
   return std::string(ret.str());
 }
 
-  
+void print_sym(const arma::mat &mat, double cutoff) {
+  // Determine cutoff
+  cutoff*=max_abs(mat);
+
+  for(size_t row=0;row<mat.n_rows;row++) {
+    printf("%7i ",(int) row+1);
+    for(size_t col=0;col<=row;col++) {
+      if(fabs(mat(row,col))>=cutoff)
+	printf(" % 13.5e",mat(row,col));
+      else
+	printf(" % 13.5e",0.0);
+    }
+    printf("\n");
+  }
+}
+
+void print_orb(const arma::mat & C, const arma::vec & E) {
+  // How many orbitals to print per block?
+  const int norb=5;
+  // Amount of blocks to print
+  const int nblocks=(int) ceil(E.n_elem*1.0/norb);
+
+  for(int iblock=0;iblock<nblocks;iblock++) {
+    // Get number of orbitals in this block
+    int no=min(norb,(int) E.n_elem-iblock*norb);
+
+    // Print orbital indices
+    //    printf("%11s ","Orbital");
+    printf("%11s ","");
+    for(int io=0;io<no;io++)
+      printf("% 12i ",iblock*norb+io+1);
+    printf("\n");
+
+    // Print eigenvalues
+    printf("%11s ","Eigenvalue");
+    for(int io=0;io<no;io++)
+      printf("% 12.5e ",E(iblock*norb+io));
+    printf("\n");
+
+    // Print coefficients
+    for(size_t ibf=0;ibf<C.n_rows;ibf++) {
+      // Index of basis function
+      printf("%11i ",(int) ibf+1);
+      for(int io=0;io<no;io++)
+	printf("% 12.5f ",C(ibf,iblock*norb+io));
+      printf("\n");
+    }
+  }
+}
