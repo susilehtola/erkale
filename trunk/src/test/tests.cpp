@@ -266,6 +266,73 @@ void uhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
 #endif
 }
 
+/// Test ROHF solution
+#ifdef COMPUTE_REFERENCE
+#define rohf_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) rohf_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom); printf("rohf_test(" #at "," #baslib "," #set "," #Etot "," #Eorba "," #Eorbb "," #label "," #dipmom ");\n\n");
+#else
+#define rohf_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) rohf_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom);
+#endif
+void rohf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom) {
+  Timer t;
+
+#ifndef COMPUTE_REFERENCE
+  printf("%s, ",label.c_str());
+  fflush(stdout);
+#endif
+
+  arma::vec Ea, Eb;
+  arma::mat Ca, Cb;
+
+  // Construct basis set
+  BasisSet bas=construct_basis(at,baslib,set);
+  // Get orbital occupancies
+  int Nel_alpha;
+  int Nel_beta;
+  get_Nel_alpha_beta(bas.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+  // Solve SCF equations
+  SCF solver=SCF(bas,set);
+  double Et=solver.ROHF(Ca,Cb,Ea,Eb,Nel_alpha,Nel_beta,final_conv);
+  // Compute dipole moment
+  std::vector<double> occa, occb;
+  get_unrestricted_occupancy(set,bas,occa,occb);
+  double dip=dip_mom(form_dens(Ca,Cb,occa,occb),bas);
+
+#ifdef COMPUTE_REFERENCE
+  printf("Etot=%.16e;\n",Et);
+  printf("dip=%.16e;\n",dip);
+  printf("Eorba=\"");
+  for(size_t i=0;i<Ea.n_elem;i++)
+    printf("%.16e ",Ea(i));
+  printf("\";\n");
+  printf("Eorbb=\"");
+  for(size_t i=0;i<Eb.n_elem;i++)
+    printf("%.16e ",Eb(i));
+  printf("\";\n");
+#else
+  // Compare results
+  bool Eok=1, Dok=1, ok=1;
+  size_t nsucca=0, nfaila=0;
+  size_t nsuccb=0, nfailb=0;
+  compare(Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
+  compare(Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
+  size_t nsucc=nsucca+nsuccb;
+  size_t nfail=nfaila+nfailb;
+
+  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
+  ok=(Eok && Dok);
+  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
+
+  if(!ok) {
+    std::ostringstream oss;
+    ERROR_INFO();
+    oss << "Test " << label << " failed.\n";
+    throw std::runtime_error(oss.str());
+  }  
+#endif
+}
+
 /// Test RDFT solution
 #ifdef COMPUTE_REFERENCE
 #define rdft_test(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc) rdft_test_run(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc); printf("rdft_test(" #at "," #baslib "," #set "," #Etot "," #Eorb "," #label "," #dipmom "," #xfunc "," #cfunc ");\n\n");
@@ -622,6 +689,14 @@ int main(void) {
   Eorba="-1.0487192732495824e+02 -1.0607731456916534e+01 -8.0945436505354653e+00 -8.0689331675307958e+00 -8.0689331675307781e+00 -1.1333591389956215e+00 -5.7594515800480972e-01 -5.0142033910584072e-01 -5.0142033910583150e-01 5.0038031102824110e-01 5.6758173166975023e-01 6.0901878014412858e-01 6.0901878014416266e-01 1.0467140711056362e+00 1.0627766420431100e+00 1.0627766420431282e+00 1.1177569478757050e+00 1.1177569478757194e+00 ";
   Eorbb="-1.0486051335060348e+02 -1.0596350522410871e+01 -8.0629607486960353e+00 -8.0629607486960229e+00 -8.0461999518581084e+00 -1.0112316861757684e+00 -4.7613922577244949e-01 -4.7613922577244805e-01 -3.7645620135944476e-02 5.2464097650703956e-01 6.1785774580383201e-01 6.1785774580384689e-01 6.6235446209432691e-01 1.1278252059342930e+00 1.1278252059342986e+00 1.1604788425159802e+00 1.1604788425159864e+00 1.1734238950977001e+00 ";
   uhf_test(Cl,b6_31Gpp,pol,Etot,Eorba,Eorbb,"Chlorine, HF/6-31G** polarized",dip);
+
+  Etot=-4.5944278096727612e+02;
+  dip=7.0090932824453482e-16;
+  Eorba="-1.0487302831574709e+02 -1.0608495662325550e+01 -8.0951291015495777e+00 -8.0696309800107802e+00 -8.0696309800107731e+00 -1.1298658044427727e+00 -5.6816410791988337e-01 -5.0428469389427422e-01 -5.0428469389427233e-01 5.0036388892020800e-01 5.6967746969977351e-01 6.0847085717999871e-01 6.0847085718001703e-01 1.0477281890196122e+00 1.0645036184690844e+00 1.0645036184691088e+00 1.1152515027775189e+00 1.1152515027775249e+00 ";
+  Eorbb="-1.0486248004895859e+02 -1.0598189498391704e+01 -8.0647978854622870e+00 -8.0647978854622764e+00 -8.0481964071440277e+00 -1.0119816525363763e+00 -4.7452860595709051e-01 -4.7452860595708729e-01 -4.4311873785400233e-02 5.2403725517101241e-01 6.1759764253060523e-01 6.1759764253061722e-01 6.5850375934815786e-01 1.1291203963033460e+00 1.1291203963033514e+00 1.1573546698285953e+00 1.1573546698286017e+00 1.1669379293461675e+00 ";
+  rohf_test(Cl,b6_31Gpp,pol,Etot,Eorba,Eorbb,"Chlorine, ROHF/6-31G**",dip);
+
+
 #ifdef DFT_ENABLED
   // Polarized calculation
   Etot=-4.6013019223191941e+02;
