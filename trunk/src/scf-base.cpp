@@ -587,9 +587,13 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
   else if(Nel%2==1 && mult%2!=0)
     throw std::runtime_error("Incorrect multiplicity for odd number of electrons.\n");
 
-  // Compute amount of "extra" spin up electrons
-  int Nx=mult-1;
-  // so there are
-  Nel_alpha=Nel/2+Nx; // spin up
-  Nel_beta=Nel-Nel_alpha; // spin down
+  if(Nel%2==0)
+    // Even number of electrons, the amount of spin up is 
+    Nel_alpha=Nel/2+(mult-1)/2;
+  else
+    // Odd number of electrons, the amount of spin up is
+    Nel_alpha=Nel/2+mult/2;
+
+  // The rest are spin down
+  Nel_beta=Nel-Nel_alpha;
 }
