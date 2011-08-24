@@ -2679,3 +2679,108 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
 
   return basis;
 }
+
+
+
+std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r) {
+  // Get ranges of shells
+  std::vector<double> shran=bas.get_shell_ranges();
+
+  // Indices of shells to compute
+  std::vector<size_t> compute_shells;
+
+  // Determine which shells might contribute
+  for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
+    // Determine distance of nucleus
+    double dist=norm(r-bas.get_nuclear_coords(inuc));
+    // Get indices of shells centered on nucleus
+    std::vector<size_t> shellinds=bas.get_shell_inds(inuc);
+    
+    // Loop over shells on nucleus
+    for(size_t ish=0;ish<shellinds.size();ish++) {
+      // Shell is relevant if range is larger than minimal distance
+      if(dist<shran[shellinds[ish]]) {
+        // Add shell to list of shells to compute
+        compute_shells.push_back(shellinds[ish]);
+      }
+    }
+  }
+
+  // Values of orbitals
+  std::vector<double> orbs(C.n_cols);  
+  for(size_t io=0;io<C.n_cols;io++)
+    orbs[io]=0.0;
+
+  // Loop over shells
+  for(size_t ish=0;ish<compute_shells.size();ish++) {
+    // Index of first function on shell is
+    size_t ind0=bas.get_first_ind(compute_shells[ish]);
+    // Compute values of basis functions on shell
+    arma::vec fval=bas.eval_func(compute_shells[ish],r.x,r.y,r.z);
+
+    // Loop over orbitals
+    for(size_t io=0;io<C.n_cols;io++)
+      // Loop over functions
+      for(size_t ibf=0;ibf<fval.n_elem;ibf++)
+        orbs[io]+=C(ind0+ibf,io)*fval(ibf);
+  }
+
+  return orbs;
+}
+
+double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t & r) {
+  // Get ranges of shells
+  std::vector<double> shran=bas.get_shell_ranges();
+
+  // Indices of shells to compute
+  std::vector<size_t> compute_shells;
+
+  // Determine which shells might contribute
+  for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
+    // Determine distance of nucleus
+    double dist=norm(r-bas.get_nuclear_coords(inuc));
+    // Get indices of shells centered on nucleus
+    std::vector<size_t> shellinds=bas.get_shell_inds(inuc);
+    
+    // Loop over shells on nucleus
+    for(size_t ish=0;ish<shellinds.size();ish++) {
+      // Shell is relevant if range is larger than minimal distance
+      if(dist<shran[shellinds[ish]]) {
+        // Add shell to list of shells to compute
+        compute_shells.push_back(shellinds[ish]);
+      }
+    }
+  }
+
+  // Compute necessary function values
+  std::vector<double> f; // Value of function
+  std::vector<size_t> ind; // Index of function
+
+  // Loop over shells
+  for(size_t ish=0;ish<compute_shells.size();ish++) {
+    // Compute values of functions on this shell
+    arma::vec fval=bas.eval_func(compute_shells[ish],r.x,r.y,r.z);
+    // Index of first function on shell is
+    size_t i0=bas.get_first_ind(compute_shells[ish]);
+    
+    // Store values and indices
+    for(size_t ibf=0;ibf<fval.n_elem;ibf++) {
+      f.push_back(fval(ibf));
+      ind.push_back(i0+ibf);
+    }
+  }
+
+  // Value of density at point
+  double dens=0.0;
+
+  // Loop over function values
+  for(size_t ii=0;ii<f.size();ii++) {
+    // Do off-diagonal first
+    for(size_t jj=0;jj<ii;jj++)
+      dens+=2.0*P(ind[ii],ind[jj])*f[ii]*f[jj];
+    // and then diagonal
+    dens+=P(ind[ii],ind[ii])*f[ii]*f[ii];
+  }
+
+  return dens;
+}
