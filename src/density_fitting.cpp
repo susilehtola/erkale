@@ -82,27 +82,29 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 
 #ifdef SCREENING
   // Then, form the screening matrix
-  screen=arma::mat(orbshells.size(),orbshells.size());
-  screen.zeros();
+  if(direct) {
+    screen=arma::mat(orbshells.size(),orbshells.size());
+    screen.zeros();
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
 #endif
-  for(size_t is=0;is<orbshells.size();is++) {
-    for(size_t js=0;js<=is;js++) {
-
-      // Compute ERIs
-      std::vector<double> eris=ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
-
-      // Find out maximum value
-      double max=0.0;
-      for(size_t i=0;i<eris.size();i++)
-	if(fabs(eris[i])>max)
-	  max=eris[i];
-      max=sqrt(max);
-
-      // Store value
-      screen(is,js)=max;
-      screen(js,is)=max;
+    for(size_t is=0;is<orbshells.size();is++) {
+      for(size_t js=0;js<=is;js++) {
+	
+	// Compute ERIs
+	std::vector<double> eris=ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
+	
+	// Find out maximum value
+	double max=0.0;
+	for(size_t i=0;i<eris.size();i++)
+	  if(fabs(eris[i])>max)
+	    max=eris[i];
+	max=sqrt(max);
+	
+	// Store value
+	screen(is,js)=max;
+	screen(js,is)=max;
+      }
     }
   }
 #endif
