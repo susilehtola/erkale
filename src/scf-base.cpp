@@ -282,6 +282,7 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   // and the one that takes us from NO to AO is
   arma::mat NO_to_AO=arma::trans(Sm*Pvec);
 
+  /*
   double tot=0.0;
   printf("Core orbital occupations:");
   for(size_t c=Nind-1;c>=Nind-Nc && c<Nind;c--) {
@@ -297,6 +298,7 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   }
   printf("\n");
   printf("Total occupancy of core and active is %f.\n",tot);
+  */
 
   // Construct \Delta matrix in AO basis
   arma::mat Delta_AO=(Fa_AO-Fb_AO)/2.0;
