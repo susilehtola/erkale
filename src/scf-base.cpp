@@ -214,7 +214,11 @@ SCF::~SCF() {
 }
 
 void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta) {
-  // Form natural orbitals.
+  /*
+   * T. Tsuchimochi and G. E. Scuseria, "Constrained active space
+   * unrestricted mean-field methods for controlling
+   * spin-contamination", J. Chem. Phys. 134, 064101 (2011).
+   */
 
   // First, get eigenvectors and eigenvalues of S so that we can go to
   // an orthonormal basis.
@@ -222,62 +226,61 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   arma::mat Svec;
   eig_sym_ordered(Sval,Svec,S);
 
-  // Count number of linearly independent vectors
+  // Count the number of linearly independent vectors
   size_t Nind=0;
   for(size_t i=0;i<Sval.n_elem;i++)
     if(Sval[i]>1e-5)
       Nind++;
-
-  // Get rid of linearly dependent vectors
-  Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem);
+  // ... and get rid of the linearly dependent ones. The eigenvalues
+  // and vectors are in the order of increasing eigenvalue, so we want
+  // the tail.
+  Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
   Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
 
-  // Form P in orthonormal basis
-  arma::mat P_orth(Nind,Nind);
-  P_orth.zeros();
-  for(size_t i=0;i<Nind;i++)
-    for(size_t j=0;j<Nind;j++)
-      P_orth(i,j)=arma::as_scalar(arma::trans(Svec.col(i))*P_AO*Svec.col(j))*sqrt(Sval(i)*Sval(j));
+  // Amount of core orbitals is
+  const size_t Nc=min(Nel_alpha,Nel_beta);
+  // Amount of active space orbitals is
+  const size_t Na=max(Nel_alpha,Nel_beta)-Nc;
+  // Amount of virtual orbitals (in NO space) is
+  const size_t Nv=Nind-Na-Nc;
 
-  // Diagonalize P.
+  /* Transformation to get matrix M in orthonormal basis is 
+     M_ij = <i|M_AO|j> \sqrt{l_i l_j},
+     where l_i and l_j are the corresponding eigenvalues of
+     eigenvectors i and j.
+
+     This can be written as
+     M_ij = Sm(i,k) M(k,l) Sm(j,l)
+  */
+
+  // Form scaled vectors
+  arma::mat Sm(Svec);
+  arma::vec Sd(Svec);
+  for(size_t i=0;i<Sval.n_elem;i++) {
+    double ss=sqrt(Sval(i));
+    Sm.col(i)*=ss;
+    Sd.col(i)/=ss;
+  }
+
+  // P in orthonormal basis is
+  arma::mat P_orth=arma::trans(Sm)*P_AO*Sm;
+
+  // Diagonalize P to get NOs in orthonormal basis.
   arma::vec Pval;
   arma::mat Pvec;
   eig_sym_ordered(Pval,Pvec,P_orth);
 
-  printf("Occupations\n");
-  for(size_t i=0;i<Pval.n_elem;i++)
-    printf("% .16e\n",Pval(i));
+  /* Get NOs in AO basis. The natural orbital is written in the
+     orthonormal basis as
 
-
-
-  // Amount of core orbitals is
-  size_t Nc=min(Nel_alpha,Nel_beta);
-  // Amount of active space orbitals is
-  size_t Na=max(Nel_alpha,Nel_beta)-Nc;
-  // Amount of virtual orbitals (in NO space) is
-  size_t Nv=Nind-Na-Nc;
-
-  /*
-  // Determine amount of core orbitals
-  size_t Nc=0;
-  for(size_t i=Nind-1;i<Nind;i--)
-    if(Pval(i)>=1.5)
-      Nc++;
-    else
-      break;
-  // and of active orbitals
-  size_t Na=0;
-  for(size_t i=Nind-1;i<Nind;i--) {
-    if(Pval(i)<1e-7)
-      break;
-    else
-      Na++;
-  }
-  Na-=Nc;
-  // so number of virtuals is
-  size_t Nv=Nind-Nc-Na;
+     |i> = x_ai |a> = x_ai s_ja |j>
+                    = s_ja x_ai |j>
   */
 
+  // The matrix that takes us from AO to NO is
+  arma::mat AO_to_NO=Sd*Pvec;
+  // and the one that takes us from NO to AO is
+  arma::mat NO_to_AO=arma::trans(Sm*Pvec);
 
   double tot=0.0;
   printf("Core orbital occupations:");
@@ -294,22 +297,12 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   }
   printf("\n");
   printf("Total occupancy of core and active is %f.\n",tot);
-  
 
   // Construct \Delta matrix in AO basis
   arma::mat Delta_AO=(Fa_AO-Fb_AO)/2.0;
-  // Calculate it in the orthonormal basis
-  arma::mat Delta_orth(Nind,Nind);
-  for(size_t i=0;i<Nind;i++)
-    for(size_t j=0;j<Nind;j++)
-      Delta_orth(i,j)=arma::as_scalar(arma::trans(Svec.col(i))*Delta_AO*Svec.col(j))*sqrt(Sval(i)*Sval(j));
 
-  // after which it can be transformed in the NO basis.
-  arma::mat Delta_NO(Nind,Nind);
-  Delta_NO.zeros();
-  for(size_t i=0;i<Nind;i++)
-    for(size_t j=0;j<Nind;j++)
-      Delta_NO(i,j)=arma::as_scalar(arma::trans(Pvec.col(i))*Delta_orth*Pvec.col(j));
+  // and take it to the NO basis.
+  arma::mat Delta_NO=arma::trans(AO_to_NO)*Delta_AO*AO_to_NO;
 
   // Form lambda by flipping the signs of the cv and vc blocks and
   // zeroing out everything else.
@@ -329,25 +322,8 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
       lambda_NO(v,c)=-Delta_NO(v,c);
     }
 
-  // Back-transform lambda to the orthonormal basis
-  arma::mat lambda_orth(Nind,Nind);
-  lambda_orth.zeros();
-  for(size_t i=0;i<Nind;i++)
-    for(size_t j=0;j<Nind;j++)
-      lambda_orth+=Pvec.col(i)*arma::trans(Pvec.col(j))*lambda_NO(i,j);
-  // and then to the AO basis
-  arma::mat lambda_AO(Fa_AO.n_rows,Fa_AO.n_cols);
-  lambda_AO.zeros();
-  for(size_t i=0;i<Nind;i++)
-    for(size_t j=0;j<Nind;j++)
-      lambda_AO+=Svec.col(i)*arma::trans(Svec.col(j))*lambda_orth(i,j)/sqrt(Sval(i)*Sval(j));
-
-  /*
-  arma::mat dl=Delta_AO-lambda_AO;
-  printf("Difference of Delta and lambda is\n");
-  dl.print();
-  printf("and its norm is %e.\n",norm(dl,2));
-  */
+  // Lambda in AO is
+  arma::mat lambda_AO=arma::trans(NO_to_AO)*lambda_NO*NO_to_AO;
 
   // Update Fa and Fb
   Fa_AO+=lambda_AO;
