@@ -17,8 +17,6 @@
 
 * Add failsafes to settings, e.g., thresholds must be positive.
 
-* Implement ROHF.
-
 * Implement checkpointing / saving of results.
 
 ? Rewrite the SCF solver in a clearer, more object-oriented form.
