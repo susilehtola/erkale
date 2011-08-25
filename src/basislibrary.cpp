@@ -315,7 +315,7 @@ ElementBasisSet ElementBasisSet::decontract() const {
   }
 
   // Create new basis set
-  ElementBasisSet decontr;
+  ElementBasisSet decontr(symbol);
   for(int am=0;am<=get_max_am();am++)
     for(size_t iexp=0;iexp<zeta[am].size();iexp++) {
       // Create new shell
