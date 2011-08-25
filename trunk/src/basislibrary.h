@@ -143,6 +143,9 @@ class ElementBasisSet {
   /// Get angular momentum of i:th shell
   int get_am(size_t ind) const;
 
+  // Decontract set
+  ElementBasisSet decontract() const;
+
   friend class BasisSet;
   friend class BasisSetLibrary;
 };
@@ -200,6 +203,9 @@ class BasisSetLibrary {
 
   /// Get basis set for wanted element
   ElementBasisSet get_element(std::string el, size_t number=0) const;
+
+  /// Decontract basis set
+  BasisSetLibrary decontract() const;
 
   /// Print out library
   void print() const;

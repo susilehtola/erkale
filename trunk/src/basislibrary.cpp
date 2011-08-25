@@ -278,6 +278,56 @@ int ElementBasisSet::get_am(size_t ind) const {
   return bf[ind].get_am();
 }
 
+ElementBasisSet ElementBasisSet::decontract() const {
+  // Create list of exponents: zeta[l][1,..,nx]
+  std::vector< std::vector<double> > zeta;
+  zeta.resize(get_max_am()+1);
+
+  // Loop over shells
+  for(size_t ish=0;ish<bf.size();ish++) {
+    // Angular momentum of the shell is
+    int am=bf[ish].get_am();
+
+    // Get exponents
+    std::vector<double> exps=bf[ish].get_exps();
+
+    // See if these need to be added to the list.
+    for(size_t iexp=0;iexp<exps.size();iexp++) {
+      if(zeta[am].size()==0)
+	zeta[am].push_back(exps[iexp]);
+      else {
+	// Get upper bound
+	std::vector<double>::iterator high;
+	high=std::upper_bound(zeta[am].begin(),zeta[am].end(),exps[iexp]);
+	
+	// Corresponding index is
+	size_t ind=high-zeta[am].begin();
+	
+	if(ind>0 && zeta[am][ind-1]==exps[iexp])
+	  // Already on list. Don't do anything.
+	  ;
+	else {
+	  // Term does not exist, add it
+	  zeta[am].insert(high,exps[iexp]);
+	}
+      }
+    }
+  }
+
+  // Create new basis set
+  ElementBasisSet decontr;
+  for(int am=0;am<=get_max_am();am++)
+    for(size_t iexp=0;iexp<zeta[am].size();iexp++) {
+      // Create new shell
+      FunctionShell tmp(am);
+      tmp.add_exponent(1.0,zeta[am][iexp]);
+      decontr.add_function(tmp);
+    }
+
+  return decontr;
+}
+
+
 BasisSetLibrary::BasisSetLibrary() {
 }
 
@@ -516,3 +566,13 @@ ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) cons
   return ElementBasisSet();
 }
 
+BasisSetLibrary BasisSetLibrary::decontract() const {
+  BasisSetLibrary decontr;
+  decontr.name="Decontracted "+name;
+  decontr.elements.resize(elements.size());
+
+  for(size_t iel=0;iel<elements.size();iel++)
+    decontr.elements[iel]=elements[iel].decontract();
+
+  return decontr;
+}
