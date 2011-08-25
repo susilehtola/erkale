@@ -127,45 +127,48 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
     arma::mat contr;
     bas.get_primitives(exps,contr,am);
 
-    // Compute overlaps of scanning functions and primitives
-    arma::mat scanov=overlap(exps,scan_exp,am);
+    // Do we need to calculate something?
+    if(exps.size()) {
+      
+      // Compute overlaps of scanning functions and primitives
+      arma::mat scanov=overlap(exps,scan_exp,am);
+      
+      // Compute overlap matrix in used basis set
+      arma::mat S;
+      S=arma::trans(contr)*overlap(exps,exps,am)*contr;
+      
+      // Compute completeness overlaps
+      arma::mat J;
+      if(chol)
+	J=arma::trans(scanov)*contr*arma::inv(arma::trimatu(arma::chol(S)));
+      else
+	J=arma::trans(scanov)*contr*CanonicalOrth(S);
+      
+      // Compute completeness profile
+      compprof_am_t profile;
+      profile.am=am;
+      profile.Y.resize(J.n_rows);
+      
+      // Loop over scanning exponents
+      for(size_t ip=0;ip<J.n_rows;ip++) {
+	double Y=0.0;
+	// Loop over functions
+	for(size_t ifunc=0;ifunc<J.n_cols;ifunc++)
+	  Y+=J(ip,ifunc)*J(ip,ifunc);
+	
+	profile.Y[ip]=Y;
+      }
 
-    // Compute overlap matrix in used basis set
-    arma::mat S;
-    S=arma::trans(contr)*overlap(exps,exps,am)*contr;
-
-    /*
-    // Form Cholesky inverse of S
-    arma::mat Sinvh=CholeskyOrth(S);
-    // Helper matrix
-    arma::mat K=contr*Sinvh;
-    // Compute completeness overlaps
-    arma::mat J=arma::trans(K)*scanov;
-    */
-
-    // Compute completeness overlaps
-    arma::mat J;
-    if(chol)
-      J=arma::trans(scanov)*contr*arma::inv(arma::trimatu(arma::chol(S)));
-    else
-      J=arma::trans(scanov)*contr*CanonicalOrth(S);
-
-    // Compute completeness profile
-    compprof_am_t profile;
-    profile.am=am;
-    profile.Y.resize(J.n_rows);
-
-    // Loop over scanning exponents
-    for(size_t ip=0;ip<J.n_rows;ip++) {
-      double Y=0.0;
-      // Loop over functions
-      for(size_t ifunc=0;ifunc<J.n_cols;ifunc++)
-	Y+=J(ip,ifunc)*J(ip,ifunc);
-
-      profile.Y[ip]=Y;
+      ret.shells.push_back(profile);
+    } else {
+      // No exponents, create dummy profile.
+      compprof_am_t profile;
+      profile.am=am;
+      profile.Y.resize(scan_exp.size());
+      for(size_t i=0;i<scan_exp.size();i++)
+	profile.Y[i]=0.0;
+      ret.shells.push_back(profile);      
     }
-    
-    ret.shells.push_back(profile);
   }
 
   return ret;
