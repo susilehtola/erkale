@@ -44,9 +44,9 @@ double evaluate_completeness(const gsl_vector *v, void *params) {
   double cpl=0.0;
   for(size_t i=1;i<Npoints-1;i+=2) {
     // Compute differences from unity
-    double ld=prof.shells[0].Y[i-1]-1.0;
-    double md=prof.shells[0].Y[i]-1.0;
-    double rd=prof.shells[0].Y[i+1]-1.0;
+    double ld=prof.shells[par->am].Y[i-1]-1.0;
+    double md=prof.shells[par->am].Y[i]-1.0;
+    double rd=prof.shells[par->am].Y[i+1]-1.0;
     // Increment profile measure
     cpl+=ld*ld+4.0*md*md+rd*rd;
   }
@@ -297,7 +297,7 @@ std::vector<double> optimize_completeness_gsl(int am, double min, double max, in
   else
     printf ("Failed to find a minimum, current guess is %e at:\n",s->fval);
   
-  for(size_t i=0;i<Nf;i++)
+  for(int i=0;i<Nf;i++)
     printf(" %f",gsl_vector_get(s->x,i));
   printf("\n");      
 
