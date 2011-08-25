@@ -464,6 +464,10 @@ std::string BasisSetLibrary::get_symbol(size_t ind) const {
   return elements[ind].get_symbol();
 }
 
+std::vector<ElementBasisSet> BasisSetLibrary::get_elements() const {
+  return elements;
+}
+
 int BasisSetLibrary::get_max_am() const {
   int maxam=elements[0].get_max_am();
   for(size_t i=1;i<elements.size();i++)
@@ -511,3 +515,4 @@ ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) cons
   // Dummy return clause
   return ElementBasisSet();
 }
+

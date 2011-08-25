@@ -192,6 +192,8 @@ class BasisSetLibrary {
   size_t get_Nel() const;
   /// Get symbol of ind'th element
   std::string get_symbol(size_t ind) const;
+  /// Get elements
+  std::vector<ElementBasisSet> get_elements() const;
 
   /// Get maximum angular momentum used in basis set
   int get_max_am() const;
