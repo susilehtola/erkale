@@ -79,6 +79,10 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
   DIIS diisa(S,diisorder);
   DIIS diisb(S,diisorder);
 
+  // ADIIS
+  ADIIS adiisa;
+  ADIIS adiisb;
+
   // Broyden
   Broyden broyd_sum(Nbf*Nbf,verbose);
   Broyden broyd_diff(Nbf*Nbf,verbose);
@@ -545,7 +549,8 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #ifdef RESTRICTED    
       adiis.push(Etot,P,H);
 #else
-      throw std::runtime_error("Unrestricted ADIIS not yet implemented.\n");
+      adiisa.push(Etot,Pa,Ha);
+      adiisb.push(Etot,Pb,Hb);
 #endif
     }
 
@@ -619,7 +624,8 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #ifdef RESTRICTED
       H=adiis.get_H();
 #else
-      // TODO - FIXME
+      Ha=adiisa.get_H();
+      Hb=adiisb.get_H();
 #endif
 
       if(verbose)
