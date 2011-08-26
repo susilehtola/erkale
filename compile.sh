@@ -9,12 +9,15 @@ nprocs=9
 # Archiver
 export AR="ar"
 # C compiler
-export CC="gcc44"
+export CC="gcc"
 # C++ compiler
-export CXX="g++44"
+export CXX="g++"
 # Fortran compiler
-export F77="gfortran44"
+export F77="gfortran"
 export FC="${F77}"
+
+# Patch libxc? Set to 1 if you use gfortran, otherwise 0.
+libxc_patch=1
 
 # C preprosessor
 export CPP="${CC} -E"
@@ -40,7 +43,7 @@ MAXAM="6"
 export GSLVER="1.15"
 export XCVER="1.1.0"
 export INTVER="1.1.4"
-export ARMAVER="1.2.0"
+export ARMAVER="2.2.2"
 export CMAKEVER="2.8.4"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
@@ -93,7 +96,8 @@ if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
   tar zxf ${srcdir}/libxc-${XCVER}.tar.gz
 
   # Patch to conform to standards
-  patch libxc-${XCVER}/src/libxc_master.F90 &> patch.log <<EOF 
+  if(( $libxc_patch )); then
+   patch libxc-${XCVER}/src/libxc_master.F90 &> patch.log <<EOF 
 21c21
 < #  define XC_F90(x) xc_s_f90_ ## x
 ---
@@ -103,6 +107,7 @@ if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
 ---
 > #  define XC_F90(x) xc_f90_/**/x  
 EOF
+  fi
 
  fi
 
@@ -217,5 +222,7 @@ FC=${FC} CC=${CC} CXX=${CXX} \
  FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  ${topdir}/cmake/bin/cmake .. \
  -DLAPACK_LIBRARIES="${LAPACK}" \
- -DBLAS_LIBRARIES="${BLAS}"
+ -DBLAS_LIBRARIES="${BLAS}" \
+ -DCMAKE_INSTALL_PREFIX=${topdir}/erkale
 make -j ${nprocs} VERBOSE=1
+make install
