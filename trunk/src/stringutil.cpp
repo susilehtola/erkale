@@ -174,14 +174,14 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
 std::string memory_size(size_t memsize) {
   std::ostringstream ret;
   
-  // Need to use signed integers. Otherwise we get funny results. (G++ bug?)
-  const long int kilo=1024;
-  const long int mega=kilo*kilo;
-  const long int giga=mega*kilo;
-  long int size=(long int) memsize;
+  // We need long unsigned integers, since 2GB is already over INT_MAX.
+  const long unsigned int kilo=1024;
+  const long unsigned int mega=kilo*kilo;
+  const long unsigned int giga=mega*kilo;
+  long unsigned int size=(long unsigned int) memsize;
 
   // Number of gigabytes
-  int gigs=size/giga;
+  long unsigned int gigs=size/giga;
   if(gigs>0) {
     size-=gigs*giga;
     ret << gigs;
@@ -189,7 +189,7 @@ std::string memory_size(size_t memsize) {
   }
 
   // Number of megabytes
-  int megs=size/mega;
+  long unsigned int megs=size/mega;
   if(megs>0) {
     size-=megs*mega;
 
@@ -202,7 +202,7 @@ std::string memory_size(size_t memsize) {
   }
 
   // Number of kilobytes
-  int kilos=size/kilo;
+  long unsigned int kilos=size/kilo;
   if(kilos>0) {
     // Check that there is a space at the end
     std::string tmp=ret.str();
