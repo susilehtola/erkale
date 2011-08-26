@@ -171,17 +171,21 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
     printf("\n");
 }
 
-std::string memory_size(size_t size) {
+std::string memory_size(size_t memsize) {
   std::ostringstream ret;
   
-  int kilo=1024;
-  int mega=kilo*kilo;
-  int giga=mega*kilo;
+  // Need to use signed integers. Otherwise we get funny results. (G++ bug?)
+  const long int kilo=1024;
+  const long int mega=kilo*kilo;
+  const long int giga=mega*kilo;
+  long int size=(long int) memsize;
 
   // Number of gigabytes
   int gigs=size/giga;
   if(gigs>0) {
+    printf("Size was %li, and ",size);
     size-=gigs*giga;
+    printf("it is now %li.\n",size);
     ret << gigs;
     ret << " Gi";
   }
