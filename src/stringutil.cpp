@@ -183,9 +183,7 @@ std::string memory_size(size_t memsize) {
   // Number of gigabytes
   int gigs=size/giga;
   if(gigs>0) {
-    printf("Size was %li, and ",size);
     size-=gigs*giga;
-    printf("it is now %li.\n",size);
     ret << gigs;
     ret << " Gi";
   }
