@@ -3,7 +3,7 @@ add_library(erkale_cmp completeness_profile.cpp optimize_completeness.cpp)
 set_target_properties(erkale_cmp PROPERTIES OUTPUT_NAME "erkale_cmp${SUFFIX}")
 if(BUILD_SHARED_LIBS)
  set_target_properties(erkale_cmp PROPERTIES
-  VERSION ${VERSION} SOVERSION ${VERSION} )
+  VERSION ${VERSION} SOVERSION ${SOVERSION} )
  target_link_libraries(erkale_cmp ${GSL_LIBRARIES})
 endif()
 

@@ -45,7 +45,7 @@ set_target_properties(erkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
 # If we build shared libraries, they must be linked to the other libraries
 if(BUILD_SHARED_LIBS)
  set_target_properties(erkale PROPERTIES
-  VERSION ${VERSION} SOVERSION ${VERSION} )
+  VERSION ${VERSION} SOVERSION ${SOVERSION} )
  target_link_libraries(erkale ${GSL_LIBRARIES})
  target_link_libraries(erkale ${LAPACK_LIBRARIES})
  if(LIBINT_FOUND)
