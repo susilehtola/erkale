@@ -21,77 +21,23 @@
 /// Compute overlap of normalized Gaussian primitives
 arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> & jexps, int am) {
   arma::mat S(iexps.size(),jexps.size());
-  //	S(i,j)=pow(eta,am/2.0+0.75);
-  if(am==0) {
-    // S type
-    for(size_t i=0;i<iexps.size();i++)
-      for(size_t j=0;j<jexps.size();j++) {
-	// Sum of exponents
-	double zeta=iexps[i] + jexps[j];
-	// Helpers
-	double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
-	double s_eta=sqrt(eta);
-	double q_eta=sqrt(s_eta);
 
-	// Compute overlap
-	S(i,j)=s_eta*q_eta;
-      }
-  } else if(am==1) {
-    // P type
-        for(size_t i=0;i<iexps.size();i++)
-      for(size_t j=0;j<jexps.size();j++) {
-	// Sum of exponents
-	double zeta=iexps[i] + jexps[j];
-	// Helpers
-	double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
-	double s_eta=sqrt(eta);
-	double q_eta=sqrt(s_eta);
-
-	// Compute overlap
-	S(i,j)=eta*q_eta;
-      }
-  } else if(am==2) {
-    // D type
-    for(size_t i=0;i<iexps.size();i++)
-      for(size_t j=0;j<jexps.size();j++) {
-	// Sum of exponents
-	double zeta=iexps[i] + jexps[j];
-	// Helpers
-	double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
-	double s_eta=sqrt(eta);
-	double q_eta=sqrt(s_eta);
-	
-	// Compute overlap
-	S(i,j)=eta*s_eta*q_eta;
-      }
-  } else {
-    // Other types
-    for(size_t i=0;i<iexps.size();i++)
-      for(size_t j=0;j<jexps.size();j++) {
-	// Sum of exponents
-	double zeta=iexps[i] + jexps[j];
-	// Helpers
-	double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
-	double s_eta=sqrt(eta);
-	double q_eta=sqrt(s_eta);
-
-	// Result
-	double res;
-	// Initialize with S or P type
-	if(am%2==0)
-	  res=s_eta*q_eta;
-	else
-	  res=eta*q_eta;
-
-	// Plug in the rest
-	for(int l=am;l>1;l-=2)
-	  res*=eta;
-
-	// Store result
-	S(i,j)=res;
-      }
-  }
-
+  for(size_t i=0;i<iexps.size();i++)
+    for(size_t j=0;j<jexps.size();j++) {
+      // Sum of exponents
+      double zeta=iexps[i] + jexps[j];
+      // Helpers
+      double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
+      double s_eta=sqrt(eta);
+      double q_eta=sqrt(s_eta);
+      
+      // Compute overlap
+      // S(i,j)=pow(eta,am/2.0+0.75)
+      
+      // Calls pow(double,int) which should be pretty fast.
+      S(i,j)=pow(s_eta,am+1)*q_eta;
+    }
+  
   return S;
 }
 
