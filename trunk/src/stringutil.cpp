@@ -215,19 +215,32 @@ std::string memory_size(size_t memsize) {
   return std::string(ret.str());
 }
 
-void print_sym(const arma::mat &mat, double cutoff) {
+void print_sym(const arma::mat &mat, bool floatformat, double cutoff) {
   // Determine cutoff
   cutoff*=max_abs(mat);
 
-  for(size_t row=0;row<mat.n_rows;row++) {
-    printf("%7i ",(int) row+1);
-    for(size_t col=0;col<=row;col++) {
-      if(fabs(mat(row,col))>=cutoff)
-	printf(" % 13.5e",mat(row,col));
-      else
-	printf(" % 13.5e",0.0);
+  if(!floatformat) {
+    for(size_t row=0;row<mat.n_rows;row++) {
+      printf("%7i ",(int) row+1);
+      for(size_t col=0;col<=row;col++) {
+	if(fabs(mat(row,col))>=cutoff)
+	  printf(" % 13.5e",mat(row,col));
+	else
+	  printf(" % 13.5e",0.0);
+      }
+      printf("\n");
     }
-    printf("\n");
+  } else {
+    for(size_t row=0;row<mat.n_rows;row++) {
+      printf("%7i ",(int) row+1);
+      for(size_t col=0;col<=row;col++) {
+	if(fabs(mat(row,col))>=cutoff)
+	  printf(" % 8.5f",mat(row,col));
+	else
+	  printf(" % 8.5f",0.0);
+      }
+      printf("\n");
+    }
   }
 }
 
