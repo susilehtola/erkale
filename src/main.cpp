@@ -24,6 +24,7 @@
 #include "linalg.h"
 #include "mathf.h"
 #include "xyzutils.h"
+#include "population.h"
 #include "scf.h"
 #include "settings.h"
 #include "stringutil.h"
@@ -360,6 +361,10 @@ int main(int argc, char **argv) {
     form_density(P,C,occs);
     // All states are occupied by two electrons
     P*=2.0;
+
+    // Do population analysis
+    population_analysis(basis,P);
+
   } else {
     arma::mat Ca, Cb;
     arma::vec Ea, Eb;
@@ -429,7 +434,10 @@ int main(int argc, char **argv) {
     form_density(Pa,Ca,occa);
     form_density(Pb,Cb,occb);
     P=Pa+Pb;
+
+    population_analysis(basis,Pa,Pb);
   }    
+
 
   // Form momentum density
   if(set.get_bool("DoEMD")) {
