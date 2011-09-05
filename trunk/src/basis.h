@@ -164,6 +164,8 @@ class BasisSet {
 #endif
 
  public:
+  /// Dummy constructor
+  BasisSet();
   /// Construct basis set with Nat atoms, using given settings
   BasisSet(size_t Nat, const Settings & set);
   /// Destructor

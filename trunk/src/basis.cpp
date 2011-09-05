@@ -904,6 +904,9 @@ std::vector<arma::mat> GaussianShell::moment(int am, double x, double y, double 
 }
 
 
+BasisSet::BasisSet() {
+}
+
 BasisSet::BasisSet(size_t Nat, const Settings & set) {
   // Use spherical harmonics?
   uselm=set.get_bool("UseLM");
