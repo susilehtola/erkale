@@ -237,33 +237,34 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 
 
   // Sparse output to stderr
-  fprintf(stderr,"Running ");
+  if(verbose) {
+    fprintf(stderr,"Running ");
 #if defined(RESTRICTED) || defined(_ROHF)
-  fprintf(stderr,"restricted ");
+    fprintf(stderr,"restricted ");
 #else
-  fprintf(stderr,"unrestricted ");
+    fprintf(stderr,"unrestricted ");
 #endif
-
+    
 #ifndef DFT
 #ifdef _ROHF
-  fprintf(stderr,"open-shell ");
+    fprintf(stderr,"open-shell ");
 #endif
-  fprintf(stderr,"HF ");
+    fprintf(stderr,"HF ");
 #else
-  if(dft.c_func>0) {
-    // Correlation exists.
-    fprintf(stderr,"%s-%s ",get_keyword(dft.x_func).c_str(),get_keyword(dft.c_func).c_str());
-  } else
-    fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
+    if(dft.c_func>0) {
+      // Correlation exists.
+      fprintf(stderr,"%s-%s ",get_keyword(dft.x_func).c_str(),get_keyword(dft.c_func).c_str());
+    } else
+      fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
 #endif
-
-  fprintf(stderr,"calculation");
+    
+    fprintf(stderr,"calculation");
 #ifdef DFT
-  if(densityfit)
-    fprintf(stderr," with density fitting");
+    if(densityfit)
+      fprintf(stderr," with density fitting");
 #endif
-  fprintf(stderr,".\n%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
-
+    fprintf(stderr,".\n%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
+  }
 
 #ifdef DFT
 #ifdef RESTRICTED
@@ -283,8 +284,9 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
     grid.print_memory_req();
     printf("\n");
+
+    fprintf(stderr,"%-61s %10.3f\n","    DFT grid formation",t.get());
   }
-  fprintf(stderr,"%-61s %10.3f\n","    DFT grid formation",t.get());
 #endif
 
   // Loop:
@@ -791,7 +793,8 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     }
 
     // Sparse output
-    fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,Etot,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
+    if(verbose)
+      fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,Etot,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
 
     if(!mixdensity || (mixdensity && mix==1.0)) {
       
