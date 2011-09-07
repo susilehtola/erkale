@@ -255,7 +255,7 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
 
   // Form scaled vectors
   arma::mat Sm(Svec);
-  arma::vec Sd(Svec);
+  arma::mat Sd(Svec);
   for(size_t i=0;i<Sval.n_elem;i++) {
     double ss=sqrt(Sval(i));
     Sm.col(i)*=ss;
