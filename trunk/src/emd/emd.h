@@ -169,16 +169,19 @@ class EMD {
   void add4(size_t ind);
  public:
   /// Constructor
-  EMD(const BasisSet & bas, const arma::mat & P);
+  EMD(const BasisSet & bas, const arma::mat & P, bool verbose=1);
   /// Destructor
   ~EMD();
 
   /// Initial filling of grid
-  void initial_fill();
+  void initial_fill(bool verbose=1);
   /// Continue filling until number of electrons is reproduced within tolerance
-  void find_electrons(double tol=1e-4);
+  void find_electrons(bool verbose=1, double tol=1e-4);
   /// Optimize physical moments of EMD within tolerance
-  void optimize_moments(double tol=1e-10);
+  void optimize_moments(bool verbose=1, double tol=1e-10);
+
+  /// Get EMD
+  std::vector<emd_t> get() const;
 
   /// Save values of momentum density
   void save(const char * fname) const;
