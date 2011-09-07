@@ -504,16 +504,17 @@ void EMDEvaluator::print() const {
   }
   */
   
-  printf("EMD has %lu one-center and %lu two-center terms, that contain %lu contractions.\n",getN_onec(),getN_twoc(),getN_twoc_total());
+  //  printf("EMD has %lu one-center and %lu two-center terms, that contain %lu contractions.\n",getN_onec(),getN_twoc(),getN_twoc_total());
 }
 
-EMD::EMD(const BasisSet & bas, const arma::mat & P) {
+EMD::EMD(const BasisSet & bas, const arma::mat & P, bool verbose) {
   // Calculate norm of density matrix
   dmnorm=arma::trace(P*bas.overlap());
   // Number of electrons is (probably)
   Nel=(int) round(dmnorm);
 
-  printf("\nNumber of electrons is %i, from which norm of DM differs by %e.\n",Nel,dmnorm-Nel);
+  if(verbose)
+    printf("\nNumber of electrons is %i, from which norm of DM differs by %e.\n",Nel,dmnorm-Nel);
   
   // Initialize evaluator
   eval=EMDEvaluator(bas,P);
@@ -522,15 +523,17 @@ EMD::EMD(const BasisSet & bas, const arma::mat & P) {
 EMD::~EMD() {
 }
 
-void EMD::initial_fill() {
+void EMD::initial_fill(bool verbose) {
   
   // Initial dp
   double idp=0.25;
   // Helpers
   double p, dp;
 
-  printf("\nFilling in initial grid ... ");
-  fflush(stdout);
+  if(verbose) {
+    printf("\nFilling in initial grid ... ");
+    fflush(stdout);
+  }
 
   emd_t hlp;
   emd_t hlparr[4];
@@ -558,7 +561,8 @@ void EMD::initial_fill() {
     }
   } while(dens[dens.size()-1].d>0.0);
 
-  printf("done.\n");
+  if(verbose)
+    printf("done.\n");
 }
 
 void EMD::add4(size_t loc) {
@@ -583,7 +587,7 @@ void EMD::add4(size_t loc) {
   }
 }
 
-void EMD::find_electrons(double tol) {
+void EMD::find_electrons(bool verbose, double tol) {
   // Integral and its estimated error
   double integral, error;
   // Integral slices
@@ -592,8 +596,10 @@ void EMD::find_electrons(double tol) {
   double maxerror=0;
   size_t maxind=0;
 
-  printf("Continuing fill of grid to find electrons ... ");
-  fflush(stdout);
+  if(verbose) {
+    printf("Continuing fill of grid to find electrons ... ");
+    fflush(stdout);
+  }
 
   size_t iter=0;
 
@@ -632,10 +638,12 @@ void EMD::find_electrons(double tol) {
     }
     
   } while(fabs(1.0*Nel-integral)>tol);
-  printf("done.\n");
+
+  if(verbose)
+    printf("done.\n");
 }
 
-void EMD::optimize_moments(double tol) {
+void EMD::optimize_moments(bool verbose, double tol) {
   // Integrals
   double rough, fine;
   
@@ -658,7 +666,9 @@ void EMD::optimize_moments(double tol) {
   Timer t;
   size_t iter=0;
   
-  printf("Optimizing the moments of the EMD.\n");
+  if(verbose)
+    printf("Optimizing the moments of the EMD.\n");
+
   do {
     iter++;
     
@@ -697,7 +707,7 @@ void EMD::optimize_moments(double tol) {
       }
 
     // Print out current values if necessary
-    if(iter==1 || t.get()>MAXPRINTFREQ || errel<=tol) {
+    if(verbose && (iter==1 || t.get()>MAXPRINTFREQ || errel<=tol)) {
       t.set();
       printf("\nUsing %lu points, charge differs from norm of DM by %e.\n",dens.size(),momval[2]-dmnorm);
       printf("Current values of moments are:\n");
@@ -711,6 +721,10 @@ void EMD::optimize_moments(double tol) {
         add4(mommaxerrloc[errelind]);
 
   } while(errel>tol);
+}
+
+std::vector<emd_t> EMD::get() const {
+  return dens;
 }
 
 void EMD::save(const char * fname) const {
