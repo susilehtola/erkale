@@ -1,4 +1,4 @@
-#include "population.h"
+#include "properties.h"
 #include "stringutil.h"
 
 arma::mat mulliken_overlap(const BasisSet & basis, const arma::mat & P) {
@@ -120,6 +120,7 @@ arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
 }
 
 void population_analysis(const BasisSet & basis, const arma::mat & P) {
+
   // Mulliken overlap
   arma::mat mulov=mulliken_overlap(basis,P);
   // Mulliken charges
@@ -162,4 +163,32 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
   mulq.print("Mulliken charges");
   bord.print("Bond order");
   nucd.print("Electron density at nuclei: alpha, beta, total");
+}
+
+
+double darwin_1e(const BasisSet & basis, const arma::mat & P) {
+  // Energy
+  double E=0.0;
+  nucleus_t nuc;
+
+  // Loop over nuclei
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Get nucleus
+    nuc=basis.get_nuc(inuc);
+
+    if(!nuc.bsse)
+      // Don't do correction for BSSE nuclei
+      E+=nuc.Z*compute_density(P,basis,basis.get_nuclear_coords(inuc));
+  }
+
+  // Plug in the constant terms
+  E*=0.5*M_PI*FINESTRUCT*FINESTRUCT;
+
+  return E;
+}
+
+double mass_velocity(const BasisSet & basis, const arma::mat & P) {
+  throw std::runtime_error("mass-velocity not implemented yet.\n");
+
+  return 0.0;
 }
