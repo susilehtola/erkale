@@ -24,7 +24,7 @@ basis.cpp basislibrary.cpp stringutil.cpp mathf.cpp integrals.cpp
 eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
 solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
 settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
-population.cpp
+properties.cpp
 # DFT stuff
 lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp)
@@ -34,7 +34,7 @@ basis.cpp basislibrary.cpp stringutil.cpp mathf.cpp integrals.cpp
 eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
 solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
 settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
-population.cpp)
+properties.cpp)
 endif()
 
 

@@ -24,7 +24,7 @@
 #include "linalg.h"
 #include "mathf.h"
 #include "xyzutils.h"
-#include "population.h"
+#include "properties.h"
 #include "scf.h"
 #include "settings.h"
 #include "stringutil.h"

@@ -59,4 +59,14 @@ arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P);
 void population_analysis(const BasisSet & basis, const arma::mat & P);
 void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
+/**
+ * Get Darwin one-electron term.
+ */
+double darwin_1e(const BasisSet & basis, const arma::mat & P);
+
+/**
+ * Get mass-velocity term.
+ */
+double mass_velocity(const BasisSet & basis, const arma::mat & P);
+
 #endif
