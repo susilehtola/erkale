@@ -89,7 +89,7 @@
 
 
 // Error info
-#define ERROR_INFO() printf("Error in function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__)
+#define ERROR_INFO() printf("\nError in function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__)
 
 // Check that matrix is of wanted size
 #define MAT_SIZE_CHECK(M,NR,NC,MSG) if(M.n_rows != NR || M.n_cols != NC) { \
