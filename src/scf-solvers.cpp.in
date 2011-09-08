@@ -817,47 +817,40 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
   C=orbs;
   E=en;
 
-  if(converged) {
-#ifdef DFT 
-    if(verbose)
-      printf("Solution of RDFT took %s.\n",ttot.elapsed().c_str());
-#else
-    if(verbose)
-      printf("Solution of RHF took %s.\n",ttot.elapsed().c_str());
-#endif
-  } else {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "\nSCF did not converge in "<<maxiter<<" iterations!\n";
-    throw std::runtime_error(oss.str());
-  }
-  
 #else
   // Unrestricted case
   Ca=orbsa;
   Cb=orbsb;
   Ea=ena;
   Eb=enb;
+#endif
   
   if(converged) {
-#ifdef DFT 
-    if(verbose)
-      printf("Solution of UDFT took %s.\n",ttot.elapsed().c_str());
+    if(verbose) {
+      std::string method=
+#ifdef RESTRICTED
+	     "R"
 #elif defined(_ROHF)
-    if(verbose)
-      printf("Solution of ROHF took %s.\n",ttot.elapsed().c_str());
+	     "RO"
 #else
-    if(verbose)
-      printf("Solution of UHF took %s.\n",ttot.elapsed().c_str());
+	     "U"
 #endif
+#ifdef DFT
+	     "DFT"
+#else
+	     "HF"
+#endif
+	;
+      
+      printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
+      fprintf(stderr,"%s converged in %s.\n\n",method.c_str(),ttot.elapsed().c_str());
+    }
   } else {
     ERROR_INFO();
     std::ostringstream oss;
     oss << "\nSCF did not converge in "<<maxiter<<" iterations!\n";
     throw std::runtime_error(oss.str());
   }
-  
-#endif // End unrestricted case
   
   return Etot;
 }
