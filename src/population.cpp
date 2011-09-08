@@ -120,14 +120,13 @@ arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
 }
 
 void population_analysis(const BasisSet & basis, const arma::mat & P) {
-
   // Mulliken overlap
-  arma::mat mulov=mulliken_overlap(basis,P/2.0);
+  arma::mat mulov=mulliken_overlap(basis,P);
   // Mulliken charges
   arma::vec mulq=sum(mulov);
 
   // Bond order
-  arma::mat bord=bond_order(basis,P/2.0);
+  arma::mat bord=bond_order(basis,P);
 
   // Electron density at nuclei
   arma::vec nucd=nuclear_density(basis,P);
@@ -142,7 +141,7 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
   arma::mat P=Pa+Pb;
 
   // Mulliken overlap
-  arma::mat mulov=mulliken_overlap(basis,P/2.0);
+  arma::mat mulov=mulliken_overlap(basis,P);
   // Mulliken charges
   arma::vec mulq=sum(mulov);
 

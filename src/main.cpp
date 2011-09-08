@@ -359,8 +359,6 @@ int main(int argc, char **argv) {
 
     // Form density matrix
     form_density(P,C,occs);
-    // All states are occupied by two electrons
-    P*=2.0;
 
     // Do population analysis
     population_analysis(basis,P);
