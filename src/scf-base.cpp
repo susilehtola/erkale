@@ -368,9 +368,8 @@ void form_density(arma::mat & R, const arma::mat & C, size_t nocc) {
     R=arma::mat(C.n_rows,C.n_rows);
 
   if(nocc>C.n_cols) {
-    ERROR_INFO();
     std::ostringstream oss;
-    oss << "There should be " << nocc << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
+    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): there should be " << nocc << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
     throw std::runtime_error(oss.str());
   }
 
@@ -389,9 +388,8 @@ void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> 
     R=arma::mat(C.n_rows,C.n_rows);
 
   if(nocc.size()>C.n_cols) {
-    ERROR_INFO();
     std::ostringstream oss;
-    oss << "There should be " << nocc.size() << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
+    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): there should be " << nocc.size() << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
     throw std::runtime_error(oss.str());
   }
   
