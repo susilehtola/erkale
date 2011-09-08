@@ -79,10 +79,14 @@
 
 // Ångström in atomic units
 #define ANGSTROMINBOHR 1.8897261
-// Atomic unit in eV
-#define HARTREEINEV 27.21138386
-// Atomic unit in debye
-#define AUINDEBYE 0.393456
+// Atomic unit in eV, http://physics.nist.gov/cgi-bin/cuu/Value?threv
+#define HARTREEINEV 27.21138505
+// Atomic unit in debye, http://en.wikipedia.org/wiki/Debye
+#define AUINDEBYE 0.393430307
+// Fine structure constant
+#define FINESTRUCT 7.2973525540510957E-3
+
+
 
 // Error info
 #define ERROR_INFO() printf("Error in function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__)
