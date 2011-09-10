@@ -846,9 +846,8 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
       fprintf(stderr,"%s converged in %s.\n\n",method.c_str(),ttot.elapsed().c_str());
     }
   } else {
-    ERROR_INFO();
     std::ostringstream oss;
-    oss << "\nSCF did not converge in "<<maxiter<<" iterations!\n";
+    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): SCF did not converge in "<<maxiter<<" iterations!\n";
     throw std::runtime_error(oss.str());
   }
   
