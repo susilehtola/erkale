@@ -1716,14 +1716,14 @@ std::vector<double> BasisSet::ERI_cart(size_t is, size_t js, size_t ks, size_t l
       for(size_t ki=0;ki<Nk;ki++)
 	for(size_t li=0;li<Nl;li++) {
 	  // and compare it with the libint result
-	  if(fabs(huz[ind]-ret[ind])>100*DBL_EPSILON*max(fabs(huz[ind]),fabs(ret[ind])) && max(fabs(ret[ind]),fabs(huz[ind]))>=DBL_EPSILON*10) {
+	  if(fabs(huz[ind]-ret[ind])>100*DBL_EPSILON*std::max(fabs(huz[ind]),fabs(ret[ind])) && std::max(fabs(ret[ind]),fabs(huz[ind]))>=DBL_EPSILON*10) {
 
 	    int indi=shells[is].get_first_ind()+ii;
 	    int indj=shells[js].get_first_ind()+ji;
 	    int indk=shells[ks].get_first_ind()+ki;
 	    int indl=shells[ls].get_first_ind()+li;
 	        
-	    printf("Integral %i %i %i %i gives %.16e with Huzinaga and %.16e with libint, relative difference is %e.\n",indi,indj,indk,indl,huz[ind],ret[ind],(huz[ind]-ret[ind])/max(huz[ind],ret[ind]));
+	    printf("Integral %i %i %i %i gives %.16e with Huzinaga and %.16e with libint, relative difference is %e.\n",indi,indj,indk,indl,huz[ind],ret[ind],(huz[ind]-ret[ind])/std::max(huz[ind],ret[ind]));
 	  }
 
 	  ind++;
@@ -1750,7 +1750,7 @@ std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *
   const GaussianShell *ls=ls_orig;
 
   // Figure out maximum angular momentum
-  int max_am=max(is->get_am(),js->get_am(),ks->get_am(),ls->get_am());
+  int max_am=max4(is->get_am(),js->get_am(),ks->get_am(),ls->get_am());
   // and the sum of angular momenta
   int mmax=is->get_am()+js->get_am()+ks->get_am()+ls->get_am();
 
@@ -2510,7 +2510,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
     for(size_t i=0;i<shells.size();i++)
       if(shells[i].get_am()>lmax_obs)
 	lmax_obs=shells[i].get_am();
-    int lmax_abs=max(lmax_obs+lmaxinc,2*lval);
+    int lmax_abs=std::max(lmax_obs+lmaxinc,2*lval);
     
     // (6) was already above.
 

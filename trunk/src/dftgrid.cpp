@@ -1107,7 +1107,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
   tol=toler;
 
   // Compute necessary number of radial points
-  size_t nrad=max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(atind)])));
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(atind)])));
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> xc, wc;
@@ -1252,7 +1252,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
   tol=toler;
 
   // Compute necessary number of radial points
-  size_t nrad=max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(atind)])));
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(atind)])));
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> xc, wc;
@@ -1355,7 +1355,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
       // Compute maximum difference of diagonal elements of Fock matrix
       maxdiff=0.0;
       for(size_t i=0;i<Nbf;i++) {
-	double tmp=max(fabs(Hanew[i]-Haold[i]),fabs(Hbnew[i]-Hbold[i]));
+	double tmp=std::max(fabs(Hanew[i]-Haold[i]),fabs(Hbnew[i]-Hbold[i]));
 	if(tmp>maxdiff)
 	  maxdiff=tmp;
       }
@@ -1445,7 +1445,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
   // Determine which shells might contribute
   for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
     // Determine closest distance of nucleus
-    double dist=max(0.0,nucdist[inuc]-rad);
+    double dist=std::max(0.0,nucdist[inuc]-rad);
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=bas.get_shell_inds(inuc);
 

@@ -245,9 +245,9 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	  maxR_arr[4]=max_abs(R.submat(j0,l0,jlast,llast));
 	  maxR_arr[5]=max_abs(R.submat(k0,l0,klast,llast));
 	  
-	  maxR_red[0]=max(maxR_arr[0],maxR_arr[1],maxR_arr[2],maxR_arr[3]);
-	  maxR_red[1]=max(maxR_arr[4],maxR_arr[5]);
-	  maxR=max(maxR_red[0],maxR_red[1]);
+	  maxR_red[0]=max4(maxR_arr[0],maxR_arr[1],maxR_arr[2],maxR_arr[3]);
+	  maxR_red[1]=std::max(maxR_arr[4],maxR_arr[5]);
+	  maxR=std::max(maxR_red[0],maxR_red[1]);
 	  
 	  if(maxR*intmax<tol) {
 	    // Skip integral due to small product of density and integral
