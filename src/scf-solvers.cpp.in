@@ -530,7 +530,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     deltaE=Etot-Eold;
 
     // Update screening value
-    tol=min(fabs(deltaE)*1e-2,1e-9);
+    tol=std::min(fabs(deltaE)*1e-2,1e-9);
 
     // Sanity check
     if(!std::isfinite(Etot)) {
@@ -589,7 +589,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
       // Update DIIS stacks of matrices
       diisa.update(Ha,Pa,diiserra);
       diisb.update(Hb,Pb,diiserrb);
-      diiserr=max(diiserra,diiserrb);
+      diiserr=std::max(diiserra,diiserrb);
 #endif
 
       if(diiserr<diisthr) {
@@ -720,8 +720,8 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     rmsdiffa=rms_norm(deltaPa);
     rmsdiffb=rms_norm(deltaPb);
 
-    maxdiff=max(maxdiffa,maxdiffb);
-    rmsdiff=max(rmsdiffa,rmsdiffb);
+    maxdiff=std::max(maxdiffa,maxdiffb);
+    rmsdiff=std::max(rmsdiffa,rmsdiffb);
     //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
 #endif
 

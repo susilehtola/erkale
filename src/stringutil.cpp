@@ -252,7 +252,7 @@ void print_orb(const arma::mat & C, const arma::vec & E) {
 
   for(int iblock=0;iblock<nblocks;iblock++) {
     // Get number of orbitals in this block
-    int no=min(norb,(int) E.n_elem-iblock*norb);
+    int no=std::min(norb,(int) E.n_elem-iblock*norb);
 
     // Print orbital indices
     //    printf("%11s ","Orbital");

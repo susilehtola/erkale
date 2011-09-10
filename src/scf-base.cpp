@@ -238,9 +238,9 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
 
   // Amount of core orbitals is
-  const size_t Nc=min(Nel_alpha,Nel_beta);
+  const size_t Nc=std::min(Nel_alpha,Nel_beta);
   // Amount of active space orbitals is
-  const size_t Na=max(Nel_alpha,Nel_beta)-Nc;
+  const size_t Na=std::max(Nel_alpha,Nel_beta)-Nc;
   // Amount of virtual orbitals (in NO space) is
   const size_t Nv=Nind-Na-Nc;
 

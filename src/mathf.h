@@ -60,13 +60,8 @@ template <class T> T max(const std::vector<T> & x) {
 }
 
 /// Get maximum
-template <class T> T max(const T & a, const T & b) {
-  return (b<a ?a:b);
-}
-
-/// Get maximum
-template <class T> T max(const T & a, const T & b, const T & c, const T & d) {
-  return max(max(a,b),max(c,d));
+template <class T> T max4(const T & a, const T & b, const T & c, const T & d) {
+  return std::max(std::max(a,b),std::max(c,d));
 }
 
 /// Get element with maximum absolute value
@@ -78,11 +73,6 @@ double rms_norm(const arma::mat & R);
 double norm(const arma::vec & v);
 /// Compute squared norm of vector
 double normsq(const arma::vec & v);
-
-/// Get minimum
-template <class T> T min(const T & a, const T & b) {
-  return (b>a ? a:b);
-}
 
 /// Zero array
 void zero(std::vector<double> & x);

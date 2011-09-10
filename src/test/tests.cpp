@@ -81,7 +81,7 @@ bool compare(const arma::vec & x, const arma::vec & y, double tau, size_t & nsuc
   if(x.n_elem!=y.n_elem)
     throw std::runtime_error("Error - differing amount of computed and reference orbital energies!\n");
 
-  size_t N=min(x.n_elem,y.n_elem);
+  size_t N=std::min(x.n_elem,y.n_elem);
 
   nsucc=0;
   nfail=0;
