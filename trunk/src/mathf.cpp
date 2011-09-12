@@ -26,7 +26,10 @@
 
 
 extern "C" {
+  // For factorials and so on
 #include <gsl/gsl_sf_gamma.h>
+  // For spline interpolation
+#include <gsl/gsl_spline.h>
 }
 
 double doublefact(int n) {
@@ -178,4 +181,32 @@ double norm(const arma::vec & v) {
 void zero(std::vector<double> & x) {
   for(size_t i=0;i<x.size();i++)
     x[i]=0;
+}
+
+std::vector<double> spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, const std::vector<double> & x) {
+  if(xt.size()!=yt.size()) {
+    ERROR_INFO();
+    throw std::runtime_error("xt and yt are of different lengths!\n");
+  }
+
+  // Returned data
+  std::vector<double> y(x.size());
+
+  // Index accelerator
+  gsl_interp_accel *acc=gsl_interp_accel_alloc();
+  // Interpolant
+  gsl_interp *interp=gsl_interp_alloc(gsl_interp_cspline,xt.size());
+
+  // Initialize interpolant
+  gsl_interp_init(interp,&(xt[0]),&(yt[0]),xt.size());
+  
+  // Perform interpolation.
+  for(size_t i=0;i<x.size();i++)
+    y[i]=gsl_interp_eval(interp,&(xt[0]),&(yt[0]),x[i],acc);
+
+  // Free memory
+  gsl_interp_accel_free(acc);
+  gsl_interp_free(interp);
+
+  return y;
 }
