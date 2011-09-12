@@ -98,5 +98,7 @@ template <class T> T sum(const std::vector<T> & a) {
   return sum;
 }
 
+/// Spline interpolate data (xt,yt) to points in x.
+std::vector<double> spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, const std::vector<double> & x);
 
 #endif
