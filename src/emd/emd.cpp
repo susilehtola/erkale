@@ -21,14 +21,13 @@
 
 #include "../timer.h"
 #include "emd.h"
+#include "mathf.h"
 #include "spherical_expansion.h"
 #include "spherical_harmonics.h"
 
 extern "C" {
 // For bessel functions
 #include <gsl/gsl_sf_bessel.h>
-// For splines
-#include <gsl/gsl_spline.h>
 }
 
 // Value of moment of electron density in Fourier space
@@ -790,9 +789,9 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
   double integrand[dens.size()];
 
   size_t N=(dens.size()-1)/4;
-  double p[N];
-  double J[N];
-  double dJ[N];
+  std::vector<double> p(N);
+  std::vector<double> J(N);
+  std::vector<double> dJ(N);
   
   // Calculate integrand
   for(size_t i=0;i<dens.size();i++)
@@ -827,10 +826,10 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
   fclose(out);
 
   // Interpolate profile to p = 0 .. pmax with spacing dp
-  int Nreg=2;
-  double pmax[2]={10.0, 40.0};
-  double dp[2]={0.01, 0.5};
-  int Npoints[2];
+  const int Nreg=2;
+  double pmax[Nreg]={10.0, 40.0};
+  double dp[Nreg]={0.01, 0.5};
+  int Npoints[Nreg];
   
   Npoints[0]=(int) round(pmax[0]/dp[0]);
   for(int i=1;i<Nreg;i++)
@@ -838,48 +837,24 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
   // Add one final point for "safety"
   Npoints[Nreg-1]++;
 
-  // Index accelerator
-  gsl_interp_accel *pracc, *erracc;
-  // Interpolant
-  gsl_interp *printerp, *errinterp;
-
-  // Allocate interpolant
-  pracc=gsl_interp_accel_alloc();
-  erracc=gsl_interp_accel_alloc();
-
-  // Spline interpolation
-  printerp=gsl_interp_alloc(gsl_interp_cspline,N);
-  errinterp=gsl_interp_alloc(gsl_interp_cspline,N);
-
-  // Initialize interpolant
-  gsl_interp_init(printerp,p,J,N);
-  gsl_interp_init(errinterp,p,dJ,N);
-
-  // Open output file
-  out=fopen(fname_interp,"w");
-
-  // Loop over accuracy regions
-  for(int i=0;i<Nreg;i++) {
-    // Value of p to interpolate profile at
-    double interp=0;
-    // Write the necessary number of points in this region
+  // Interpolated p values.
+  std::vector<double> p_interp;
+  for(int i=0;i<Nreg;i++)
     for(int j=0;j<Npoints[i];j++) {
-      interp=0;
-      // Go to end of last interval
       if(i>0)
-        interp+=pmax[i-1];
-      // and add the necessary displacement
-      interp+=j*dp[i];
-      // and finally write out the interpolated value
-      fprintf(out,"%.12e\t%.12e\t%.12e\n",interp,gsl_interp_eval(printerp,p,J,interp,pracc),gsl_interp_eval(errinterp,p,dJ,interp,erracc));
+	p_interp.push_back(pmax[i-1]+j*dp[i]);
+      else
+	p_interp.push_back(j*dp[i]);
     }
-  }
+
+  // Get interpolated Compton profile and its error
+  std::vector<double> J_interp=spline_interpolation(p,J,p_interp);
+  std::vector<double> dJ_interp=spline_interpolation(p,dJ,p_interp);
+  
+  // Save output
+  out=fopen(fname_interp,"w");
+  for(size_t i=0;i<p_interp.size();i++)
+    fprintf(out,"%.12e\t%.12e\t%.12e\n",p_interp[i],J_interp[i],dJ_interp[i]);
   fclose(out);
-
-  gsl_interp_free(printerp);
-  gsl_interp_free(errinterp);
-
-  gsl_interp_accel_free(pracc);
-  gsl_interp_accel_free(erracc);
 }
 
