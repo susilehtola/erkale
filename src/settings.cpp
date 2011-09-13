@@ -42,6 +42,9 @@ Settings::Settings() {
 
   // Use spherical harmonics.
   bset.push_back(genb("UseLM", "Use a spherical harmonics basis set by default?", 1));
+  
+  // Decontract basis set?
+  bset.push_back(genb("Decontract","Decontract basis set?",0));
 
   // Use DIIS.
   bset.push_back(genb("UseDIIS", "Use Pulay's Direct Inversion in the Iterative Subspace?", 1));
