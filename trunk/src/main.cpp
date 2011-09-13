@@ -106,6 +106,9 @@ int main(int argc, char **argv) {
   std::string basfile=set.get_string("Basis");
   baslib.load_gaussian94(basfile);
   printf("\n");
+  // Decontract basis set?
+  if(set.get_bool("Decontract"))
+    baslib=baslib.decontract();
 
   // Construct basis set
   BasisSet basis=construct_basis(atoms,baslib,set);
