@@ -296,9 +296,10 @@ void Casida::absorption() const {
 	  // Compute |x| = x^T S^{-1/2} F_i
 	  tr(it,ic)+=dipmat[ispin][ic](pairs[ispin][jt].i,pairs[ispin][jt].f)*F_i[ispin](jt,it)/fe(pairs[ispin][jt],ispin);
 	
-	// Normalize, see Eq. 4.40 of Casida (1994), or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
-	/// FIXME - Check this!
-	tr(it,ic)/=w_i[ispin](it);
+	// Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
+	// \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
+	// or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
+	tr(it,ic)/=sqrt(w_i[ispin](it));
       }
     
     // Oscillator strengths, 2/3 * E * ( |x|^2 + |y|^2 + |z|^2 )
