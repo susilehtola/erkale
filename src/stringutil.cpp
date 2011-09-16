@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -60,7 +60,7 @@ std::string readline(std::istream & in) {
   // Reached end of file
   return std::string();
 }
-    
+
 
 std::vector<std::string> splitline(std::string line) {
   // Split line into words.
@@ -107,7 +107,7 @@ double readdouble(std::string num) {
 
 void print_E(const arma::vec & E, const std::vector<double> & occ) {
   // Print first N elements of E
-  
+
   // Print nelem entries per line
   size_t nelem=5;
   // Total amount of lines to print. Always print one additional line
@@ -115,7 +115,7 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
   size_t Ntot=(size_t) ceil(occ.size()*1.0/nelem+1)*nelem;
 
   // Skip additional line at the end?
-  bool skipline=0; 
+  bool skipline=0;
 
   // Safety check:
   if(E.n_elem<Ntot) {
@@ -135,21 +135,21 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
 	break;
     for(lumo=0;lumo<occ.size();lumo++)
       if(occ[lumo]==0.0)
-	break;  
-    
+	break;
+
     if(homo>E.n_elem) {
       //    ERROR_INFO();
       std::ostringstream oss;
       oss << "Orbital " << homo+1 << " is occupied but only " << E.n_elem << " energies given!\n";
       throw std::runtime_error(oss.str());
     }
-    
+
     if(lumo<E.n_elem) {
-      
+
       double gap=E(lumo)-E(homo);
       // Convert it into eV
       gap*=HARTREEINEV;
-      
+
       printf("HOMO-LUMO gap is %7.2f eV. ",gap);
     }
   }
@@ -173,7 +173,7 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
 
 std::string memory_size(size_t memsize) {
   std::ostringstream ret;
-  
+
   // We need long unsigned integers, since 2GB is already over INT_MAX.
   const long unsigned int kilo=1024;
   const long unsigned int mega=kilo*kilo;
@@ -276,4 +276,69 @@ void print_orb(const arma::mat & C, const arma::vec & E) {
       printf("\n");
     }
   }
+}
+
+std::vector<std::string> parse(std::string in, const std::string & separator) {
+  // Parse the input for separator
+
+  // Returned variable
+  std::vector<std::string> ret;
+  
+  size_t ind;
+  while((ind=in.find_first_of(separator))!=std::string::npos) {
+    // Add it to the stack
+    ret.push_back(in.substr(0,ind));
+    // and remove that part from the string
+    in=in.substr(ind+1,in.size()-ind-1);
+  }
+
+  // If there is still something in in, add it to the stack.
+  if(in.size())
+    ret.push_back(in);
+  
+  return ret;
+}
+
+
+std::vector<size_t> parse_range(const std::string & in) {
+  std::vector<size_t> ret;
+
+  // First break this wrt commas
+  std::vector<std::string> comma=parse(in,",");
+  for(size_t ic=0;ic<comma.size();ic++) {
+    // Now we can break wrt dashes.
+    std::vector<std::string> dash=parse(comma[ic],"-");
+
+    if(dash.size()>2) {
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Only one dash allowed in number range.\n";
+      throw std::runtime_error(oss.str());
+    }
+
+    if(dash.size()==1) {
+      // Only a single number given.
+      ret.push_back(readint(dash[0]));
+    } else {
+      // We are dealing with a range. Read upper and lower limits
+      size_t low=readint(dash[0]);
+      size_t up=readint(dash[1]);
+      
+      if(low>up) {
+	ERROR_INFO();
+	std::ostringstream oss;
+      oss << "Range is not monotonically increasing!\n";
+      throw std::runtime_error(oss.str());
+      }
+      
+      // Fill the range.
+      for(size_t i=low;i<=up;i++)
+	ret.push_back(i);
+    }
+  }
+
+  // Sort in increasing order
+  sort(ret.begin(),ret.end());
+
+  return ret;
 }
