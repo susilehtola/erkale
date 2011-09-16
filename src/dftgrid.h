@@ -127,6 +127,7 @@ int SG1_order(double r, int Z);
  */
 
 class AtomGrid {
+ protected:
   /// Integration points
   std::vector<gridpoint_t> grid;
   /// Structure of grid
@@ -294,7 +295,6 @@ class AtomGrid {
  */
 
 class DFTGrid {
-
   /// Atomic grids
   std::vector<AtomGrid> atoms;
   /// Basis set
