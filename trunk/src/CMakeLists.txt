@@ -55,15 +55,13 @@ if(BUILD_SHARED_LIBS)
  endif()
 endif()
 
-# Create the ERKALE electron momentum density library
-add_subdirectory(emd)
-
 # Create the ERKALE main executable
 add_executable (erkale.x main.cpp)
 # The name of the executable is
 set_target_properties(erkale.x PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
 target_link_libraries(erkale.x erkale)
 target_link_libraries(erkale.x erkale_emd)
+
 
 # Link libraries
 if(BUILD_SHARED_LIBS)
@@ -86,8 +84,12 @@ install (TARGETS erkale.x DESTINATION bin)
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 install(FILES ${headers} DESTINATION include/erkale)
 
+# Create the ERKALE electron momentum density library
+add_subdirectory(emd)
 # Create the completeness profile tool
 add_subdirectory(completeness)
+# Create the Casida executable
+add_subdirectory(casida)
 # Create the Slater fit tool
 add_subdirectory(slaterfit)
 # Create test tool
