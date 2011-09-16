@@ -90,6 +90,13 @@ class DensityFit {
 
   /// Get Coulomb matrix from P
   arma::mat calc_J(const arma::mat & P) const;
+  
+  /// Get the number of auxiliary functions
+  size_t get_Naux() const;
+  /// Get the three-electron integral
+  double get_a_munu(size_t ia, size_t imu, size_t inu) const;
+  /// Get ab_inv
+  arma::mat get_ab_inv() const;
 };
 
 
