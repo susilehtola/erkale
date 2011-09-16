@@ -349,6 +349,6 @@ double DensityFit::get_a_munu(size_t ia, size_t imu, size_t inu) const {
   return 0.0;
 }
 
-arma::mat get_ab_inv() const {
+arma::mat DensityFit::get_ab_inv() const {
   return ab_inv;
 }
