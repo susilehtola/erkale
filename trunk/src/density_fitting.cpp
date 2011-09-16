@@ -332,3 +332,23 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 
   return J;
 }
+
+size_t DensityFit::get_Naux() const {
+  return Naux;
+}
+
+double DensityFit::get_a_munu(size_t ia, size_t imu, size_t inu) const {
+  if(!direct)
+    return a_munu[idx(ia,imu,inu)]; 
+  else {
+    ERROR_INFO();
+    throw std::runtime_error("get_a_munu not implemented for direct calculations!\n");
+  }
+
+  // Dummy return clause
+  return 0.0;
+}
+
+arma::mat get_ab_inv() const {
+  return ab_inv;
+}
