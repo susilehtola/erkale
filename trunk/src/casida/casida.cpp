@@ -241,32 +241,22 @@ void Casida::solve() {
   F_i.resize(pairs.size());
 
   for(size_t ispin=0;ispin<pairs.size();ispin++) {
-    // Generate the coupling matrix (eqn 2.11)
-    arma::mat Omega(pairs[ispin].size(),pairs[ispin].size());
-    Omega.zeros();
+    // Generate the coupling matrix (eqn 2.11), but use the K array to
+    // save memory.
 
-    for(size_t ip=0;ip<pairs[ispin].size();ip++) {
-      if(coupling!=IPA) {
-	// Plug in K terms
-	
-	double term;
-	// Do off-diagonal first
-	for(size_t jp=0;jp<ip;jp++) {
-	  term=2.0*fe(pairs[ispin][ip],ispin)*K[ispin](ip,jp)*fe(pairs[ispin][jp],ispin);
-	  Omega(ip,jp)+=term;
-	  Omega(jp,ip)+=term;
-	}
-	// Plug in diagonal
-	Omega(ip,ip)+=2.0*fe(pairs[ispin][ip],ispin)*K[ispin](ip,ip)*fe(pairs[ispin][ip],ispin);
-      }
-      
-      // Add IPA contribution to diagonal
-      Omega(ip,ip)+=esq(pairs[ispin][ip],ispin);
+    if(coupling!=IPA) {
+      for(size_t ip=0;ip<pairs[ispin].size();ip++)
+	// Plug in the relevant factors
+	for(size_t jp=0;jp<pairs[ispin].size();jp++)
+	  K[ispin](ip,jp)*=2.0*fe(pairs[ispin][ip],ispin)*fe(pairs[ispin][jp],ispin);
     }
-
+    // Add IPA contribution to diagonal
+    for(size_t ip=0;ip<pairs[ispin].size();ip++)
+      K[ispin](ip,ip)+=esq(pairs[ispin][ip],ispin);
+    
     // Solve eigenvalues and eigenvectors using direct linear algebraic methods
-    eig_sym_ordered(w_i[ispin], F_i[ispin], Omega);
-
+    eig_sym_ordered(w_i[ispin], F_i[ispin], K[ispin]);
+    
     // The eigenvalues are the squares of the excitation energies
     for(size_t i=0;i<w_i[ispin].n_elem;i++)
       w_i[ispin](i) = sqrt(w_i[ispin](i));
