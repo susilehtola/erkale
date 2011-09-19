@@ -34,7 +34,8 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   C.push_back(Cv);
   P.push_back(Pv);
 
-  fprintf(stderr,"*** Warning! The Casida implementation is still experimental.\n");
+  printf("\n*** Warning! The Casida implementation is still experimental.\n");
+  fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental.\n");
 
   // Parse parameters and form K
   parse_args(set, basis, Cv.n_cols);
@@ -54,7 +55,8 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   P.push_back(Pa);
   P.push_back(Pb);
 
-  fprintf(stderr,"*** Warning! The Casida implementation is still experimental.\n");
+  printf("\n*** Warning! The Casida implementation is still experimental.\n");
+  fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental.\n");
 
   // Parse parameters and form K
   parse_args(set, basis, Ca.n_cols);
@@ -99,20 +101,23 @@ void Casida::calc_K(const Settings & set, const BasisSet & basis) {
   int c_func=set.get_int("CasidaC");
   double tol=set.get_double("CasidaTol");
 
+  // Allocate memory
+  if(pairs.size()==1)
+    // Restricted case
+    K.zeros(pairs[0].size(),pairs[0].size());
+  else
+    // Unrestricted case
+    K.zeros(pairs[0].size()+pairs[1].size(),pairs[0].size()+pairs[1].size());
+  
   // Do we need to form K?
   if(coupling!=IPA) {
-    
-    // Allocate memory
-    K.resize(pairs.size());
-    for(size_t is=0;is<pairs.size();is++)
-      K[is].zeros(pairs[is].size(),pairs[is].size());
-    
     // Compute Coulomb coupling
     Kcoul(basis);
-    
+
     // Compute XC coupling if necessary
-    if(coupling==TDLDA)
+    if(coupling==TDLDA) {
       Kxc(basis,tol,x_func,c_func);
+    }
   }
 }
 
@@ -132,7 +137,6 @@ void Casida::calc_dipole(const BasisSet & bas) {
       dipmat[ispin][ic]=arma::trans(C[ispin])*dm[ic]*C[ispin];
   }
 }
-
 
 void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb, bool pol) {
   if(pol) {
@@ -240,88 +244,131 @@ double Casida::fe(states_pair_t ip, bool ispin) const {
   return sqrt((f[ispin](ip.i)-f[ispin](ip.f))*(E[ispin](ip.f)-E[ispin](ip.i)));
 }
 
-
 void Casida::solve() {
   Timer t;
 
-  w_i.resize(pairs.size());
-  F_i.resize(pairs.size());
+  K.print("K matrix");
 
-  for(size_t ispin=0;ispin<pairs.size();ispin++) {
-    // Generate the coupling matrix (eqn 2.11), but use the K array to
-    // save memory.
+  w_i.zeros(K.n_rows);
+  F_i.zeros(K.n_rows,K.n_cols);
 
-    if(coupling!=IPA) {
-      for(size_t ip=0;ip<pairs[ispin].size();ip++)
-	// Plug in the relevant factors
-	for(size_t jp=0;jp<pairs[ispin].size();jp++)
-	  K[ispin](ip,jp)*=2.0*fe(pairs[ispin][ip],ispin)*fe(pairs[ispin][jp],ispin);
-    }
-    // Add IPA contribution to diagonal
-    for(size_t ip=0;ip<pairs[ispin].size();ip++)
-      K[ispin](ip,ip)+=esq(pairs[ispin][ip],ispin);
-    
-    // Solve eigenvalues and eigenvectors using direct linear algebraic methods
-    eig_sym_ordered(w_i[ispin], F_i[ispin], K[ispin]);
-    
-    // The eigenvalues are the squares of the excitation energies
-    for(size_t i=0;i<w_i[ispin].n_elem;i++)
-      w_i[ispin](i) = sqrt(w_i[ispin](i));
+  // Generate the coupling matrix (eqn 2.11), but use the K array to
+  // save memory.
+  
+  if(coupling!=IPA) {
+    // Add relevant factors to Coulomb / exchange-correlation terms
+    for(size_t ispin=0;ispin<pairs.size();ispin++)
+      for(size_t jspin=0;jspin<pairs.size();jspin++) {
+	// Offset in i
+	const size_t ioff=ispin*pairs[0].size();
+	// Offset in j
+	const size_t joff=jspin*pairs[0].size();
+	
+	for(size_t ip=0;ip<pairs[ispin].size();ip++)
+	  for(size_t jp=0;jp<pairs[jspin].size();jp++)
+	    K(ioff+ip,joff+jp)*=2.0*fe(pairs[ispin][ip],ispin)*fe(pairs[jspin][jp],jspin);
+      }
   }
-
+ 
+  
+  // Add IPA contribution to diagonal
+  for(size_t ispin=0;ispin<pairs.size();ispin++) {
+    // Offset in i
+    const size_t ioff=ispin*pairs[0].size();
+    for(size_t ip=0;ip<pairs[ispin].size();ip++)
+      K(ioff+ip,ioff+ip)+=esq(pairs[ispin][ip],ispin);
+  }
+  
+  // Solve eigenvalues and eigenvectors using direct linear algebraic methods
+  eig_sym_ordered(w_i, F_i, K);
+  
+  // The eigenvalues are the squares of the excitation energies
+  for(size_t i=0;i<w_i.n_elem;i++)
+    w_i(i) = sqrt(w_i(i));
+  
   printf("Casida equations solved in %s.\n",t.elapsed().c_str());
   fprintf(stderr,"Solution %s.\n",t.elapsed().c_str());
 }
 
 // This calculates the photoabsorption transition rates
 void Casida::absorption() const {
-  for(size_t ispin=0;ispin<C.size();ispin++) {
-    
-    printf("\n ******* Casida Photoabsorption Spectrum, spin %i ********\n",(int) ispin);
-    
-    // Transition rates for every transition
-    arma::mat tr(pairs[ispin].size(),3);
-    tr.zeros();
-    
-    // Loop over transitions
-    for(size_t it=0;it<pairs[ispin].size();it++)
-      // Loop over cartesian coordinates
-      for(size_t ic=0;ic<3;ic++) {
-	
-	// Loop over coupled transitions
-	for(size_t jt=0;jt<pairs[ispin].size();jt++)
-	  // Compute |x| = x^T S^{-1/2} F_i
-	  tr(it,ic)+=dipmat[ispin][ic](pairs[ispin][jt].i,pairs[ispin][jt].f)*F_i[ispin](jt,it)/fe(pairs[ispin][jt],ispin);
-	
-	// Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
-	// \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
-	// or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
-	tr(it,ic)/=sqrt(w_i[ispin](it));
-      }
-    
-    // Oscillator strengths, 2/3 * E * ( |x|^2 + |y|^2 + |z|^2 )
-    arma::vec osc(pairs[ispin].size());
-    for(size_t it=0; it<pairs[ispin].size();it++)
-      osc(it) = 2.0/3.0 * w_i[ispin](it) * arma::dot(tr.row(it),tr.row(it));
-    
-    // Write output
-    printf(  " Photoabsorption transition energies and rates\n");
-    printf(  " %6s   %12s   %12s   %12s %12s %12s\n", "nn", "E [eV]", "osc.str.", "<x>", "<y>", "<z>");
-    for(size_t it=0; it<pairs[ispin].size(); it++) {
-      printf(" %6i    %12.6f   %12.6f   %12.6f %12.6f %12.6f\n", (int) it+1, w_i[ispin](it)*HARTREEINEV, osc(it), tr(it, 0), tr(it, 1), tr(it, 2));
-    }
+  printf("\n ******* Casida Photoabsorption Spectrum ********\n");
+  
+  // Transition rates for every transition
+  arma::mat tr(w_i.n_elem,3);
+  tr.zeros();
+  
+  // Loop over transitions
+  for(size_t it=0;it<w_i.n_elem;it++) {
+    // Loop over cartesian coordinates
+    for(size_t ic=0;ic<3;ic++) {
 
-    char fname[80];
-    sprintf(fname,"casida%i.dat",(int) ispin);
-    FILE *out=fopen(fname,"w");
-    for(size_t it=0; it<pairs[ispin].size(); it++)
-      fprintf(out,"%e %e % e % e % e\n",w_i[ispin](it)*HARTREEINEV, osc(it), tr(it, 0), tr(it, 1), tr(it, 2));
-    fclose(out);
+      // Loop over spins
+      for(size_t jspin=0;jspin<pairs.size();jspin++) {
+	// Offset in F
+	size_t joff=jspin*pairs[0].size();
+	// Loop over pairs
+	for(size_t jp=0;jp<pairs[jspin].size();jp++) {
+	  
+	  // Compute |x| = x^T S^{-1/2} F_i
+	  tr(it,ic)+=dipmat[jspin][ic](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)/fe(pairs[jspin][jp],jspin);
+	}
+      }
+      
+      // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
+      // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
+      // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
+      tr(it,ic)/=sqrt(w_i(it));
+    }
   }
+  
+  // Oscillator strengths, 2/3 * E * ( |x|^2 + |y|^2 + |z|^2 )
+  arma::vec osc(w_i.n_elem);
+  for(size_t it=0; it<w_i.n_elem;it++)
+    osc(it) = 2.0/3.0 * w_i(it) * arma::dot(tr.row(it),tr.row(it));
+  
+  // Write output
+  printf(  " Photoabsorption transition energies and rates\n");
+  printf(  " %6s   %12s   %12s   %12s %12s %12s\n", "nn", "E [eV]", "osc.str.", "<x>", "<y>", "<z>");
+  for(size_t it=0; it<osc.n_elem; it++) {
+    printf(" %6i    %12.6f   %12.6f   %12.6f %12.6f %12.6f\n", (int) it+1, w_i(it)*HARTREEINEV, osc(it), tr(it, 0), tr(it, 1), tr(it, 2));
+  }
+    
+  FILE *out=fopen("casida.dat","w");
+  for(size_t it=0; it<osc.n_elem; it++)
+    fprintf(out,"%e %e % e % e % e\n",w_i(it)*HARTREEINEV, osc(it), tr(it, 0), tr(it, 1), tr(it, 2));
+  fclose(out);
+}
+
+void Casida::coulomb_transform(const DensityFit & dfit, arma::mat & munu, bool ispin) const {
+  // Amount of basis functions
+  const size_t Nbf=C[ispin].n_rows;
+  // Amount of active orbitals
+  const size_t Norb=C[ispin].n_cols;
+  // Amount of auxiliary functions
+  const size_t Naux=dfit.get_Naux();
+
+  // Work memory
+  arma::mat tmp(Nbf*Norb,Naux);
+
+  // First transform integrals wrt nu.
+  tmp.zeros();
+  for(size_t imu=0;imu<Nbf;imu++)
+    for(size_t inu=0;inu<Nbf;inu++)
+      for(size_t nu=0;nu<Norb;nu++) 
+	for(size_t iaux=0;iaux<Naux;iaux++)
+	  tmp(imu*Norb+nu,iaux)+=C[ispin](inu,nu)*dfit.get_a_munu(iaux,imu,inu);
+  
+  // and then wrt mu.
+  munu.zeros(Norb*Norb,Naux);
+  for(size_t nu=0;nu<Norb;nu++)
+    for(size_t mu=0;mu<Norb;mu++)
+      for(size_t imu=0;imu<Nbf;imu++)
+	for(size_t iaux=0;iaux<Naux;iaux++)
+	  munu(mu*Norb+nu,iaux)+=C[ispin](imu,mu)*tmp(imu*Norb+nu,iaux);
 }
 
 void Casida::Kcoul(const BasisSet & basis) {
-
   Timer t;
   
   // Form density fitting basis
@@ -330,58 +377,58 @@ void Casida::Kcoul(const BasisSet & basis) {
   // Compute all integrals in memory.
   dfit.fill(basis,dfitbas,0);
   
-  const size_t Nbf=basis.get_Nbf();
-  const size_t Naux=dfitbas.get_Nbf();
-
   if(!C.size())
     throw std::runtime_error("Error - no orbitals!\n");
 
-  // Number of active orbitals for spin alpha and beta
-  std::vector<size_t> Norbs;
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    Norbs.push_back(C[ispin].n_cols);  
-
   // Inverse Coulomb overlap matrix of fitting basis
   arma::mat ab_inv=dfit.get_ab_inv();
+  
+  // The [\mu \nu|I] matrices in Jamorski (4.16).
+  std::vector<arma::mat> munu_I;
+  munu_I.resize(C.size());
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    coulomb_transform(dfit,munu_I[ispin],ispin);
+  
+  // Construct K
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    for(size_t jspin=0;jspin<=ispin;jspin++) {
+      // Amount of active orbitals
+      const size_t Norbi=C[ispin].n_cols;
+      const size_t Norbj=C[jspin].n_cols;
 
-  for(size_t ispin=0;ispin<C.size();ispin++) {
-    // Amount of actieve orbitals
-    const size_t Norb=Norbs[ispin];
-
-    // The [\mu \nu|I] matrix in Jamorski (4.16).
-    arma::mat munu_I(Norb*Norb,Naux);
-    // Work memory
-    arma::mat tmp(Nbf*Norb,Naux);
-
-    // We need to calculate the integrals in the MO basis 
-    // (which is different for alpha and beta electrons)
-    
-    // First transform integrals wrt nu.
-    tmp.zeros();
-    for(size_t imu=0;imu<Nbf;imu++)
-      for(size_t inu=0;inu<Nbf;inu++)
-	for(size_t nu=0;nu<Norb;nu++) 
-	  for(size_t iaux=0;iaux<Naux;iaux++)
-	    tmp(imu*Norb+nu,iaux)+=C[ispin](inu,nu)*dfit.get_a_munu(iaux,imu,inu);
-    
-    // and then wrt mu.
-    munu_I.zeros();
-    for(size_t nu=0;nu<Norb;nu++)
-      for(size_t mu=0;mu<Norb;mu++)
-	for(size_t imu=0;imu<Nbf;imu++)
-	  for(size_t iaux=0;iaux<Naux;iaux++)
-	    munu_I(mu*Norb+nu,iaux)+=C[ispin](imu,mu)*tmp(imu*Norb+nu,iaux);
-
-    // Now we can calculate K.
-    for(size_t ip=0;ip<pairs[ispin].size();ip++) {
-      for(size_t jp=0;jp<ip;jp++) {
-	double tmp=arma::as_scalar(munu_I.row(pairs[ispin][ip].i*Norb+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I.row(pairs[ispin][jp].i*Norb+pairs[ispin][jp].f)));
-	K[ispin](ip,jp)+=tmp;
-	K[ispin](jp,ip)+=tmp;
+      // Offset in i
+      const size_t ioff=ispin*pairs[0].size();
+      // Offset in j
+      const size_t joff=jspin*pairs[0].size();
+      
+      if(ispin==jspin) {
+	for(size_t ip=0;ip<pairs[ispin].size();ip++) {
+	  // Off-diagonal, symmetrization is done later
+	  for(size_t jp=0;jp<ip;jp++) {
+	    double tmp=arma::as_scalar(munu_I[ispin].row(pairs[ispin][ip].i*Norbi+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I[ispin].row(pairs[ispin][jp].i*Norbi+pairs[ispin][jp].f)));
+	    K(ioff+ip,joff+jp)+=tmp;
+	    K(joff+jp,ioff+ip)+=tmp;
+	  }
+	  // Diagonal
+	  K(ioff+ip,ioff+ip)+=arma::as_scalar(munu_I[ispin].row(pairs[ispin][ip].i*Norbi+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I[ispin].row(pairs[ispin][ip].i*Norbi+pairs[ispin][ip].f)));
+	}
+      } else {
+	for(size_t ip=0;ip<pairs[ispin].size();ip++)
+	  for(size_t jp=0;jp<pairs[jspin].size();jp++) {
+	    // Offset in i
+	    const size_t ioff=ispin*pairs[0].size();
+	    // Offset in j
+	    const size_t joff=jspin*pairs[0].size();
+	    
+	    K(ioff+ip,joff+jp)=arma::as_scalar(munu_I[ispin].row(pairs[ispin][ip].i*Norbi+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I[jspin].row(pairs[jspin][jp].i*Norbj+pairs[jspin][jp].f)));
+	  }
       }
-      K[ispin](ip,ip)+=arma::as_scalar(munu_I.row(pairs[ispin][ip].i*Norb+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I.row(pairs[ispin][ip].i*Norb+pairs[ispin][ip].f)));
+
+      if(ispin!=jspin) {
+	// Symmetrize
+	K.submat(joff,ioff,joff+pairs[jspin].size()-1,ioff+pairs[ispin].size()-1)=arma::trans(K.submat(ioff,joff,ioff+pairs[ispin].size()-1,joff+pairs[jspin].size()-1));
+      }
     }
-  }
 
   printf("Coulomb coupling matrix computed in %s.\n",t.elapsed().c_str());
   fprintf(stderr,"KCoul %s.\n",t.elapsed().c_str());
@@ -389,12 +436,12 @@ void Casida::Kcoul(const BasisSet & basis) {
 
 void Casida::Kxc(const BasisSet & bas, double tol, int x_func, int c_func) {
   Timer t;
-
+  
   // Make grid
   CasidaGrid grid(&bas);
   // Evaluate Kxc
   grid.Kxc(P,tol,x_func,c_func,C,pairs,K);
-
+  
   printf("XC coupling matrix computed in %s.\n",t.elapsed().c_str());
   fprintf(stderr,"KXC %s.\n",t.elapsed().c_str());
 }

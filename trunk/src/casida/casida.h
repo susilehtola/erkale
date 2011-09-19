@@ -99,13 +99,13 @@ class Casida {
   /// Dipole matrix elements: [nspin][3][norb,norb]
   std::vector< std::vector<arma::mat> > dipmat;
 
-  // K matrices
-  std::vector<arma::mat> K;
+  // K matrix
+  arma::mat K;
 
   /// Eigenvalues of Casidas equation (and later on, the excitation energies)
-  std::vector<arma::vec> w_i;
+  arma::vec w_i;
   /// Eigenvectors of Casidas equation
-  std::vector<arma::mat> F_i;
+  arma::mat F_i;
 
   /**
    * This routine constructs the Coulomb coupling matrix
@@ -149,6 +149,9 @@ class Casida {
 
   /// Construct the K matrices
   void calc_K(const Settings & set, const BasisSet & bas);
+
+  /// Transform the Coulomb fitting integrals from AO to MO basis
+  void coulomb_transform(const DensityFit & dfit, arma::mat & munu, bool ispin) const;
 
  public:
   /// Constructor for spin-unpolarized calculation
