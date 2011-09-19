@@ -34,6 +34,8 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   C.push_back(Cv);
   P.push_back(Pv);
 
+  fprintf(stderr,"*** Warning! The Casida implementation is still experimental.\n");
+
   // Parse parameters and form K
   parse_args(set, basis, Cv.n_cols);
   printf("Casida calculation has %u pairs.\n",(unsigned int) pairs[0].size());
@@ -51,6 +53,8 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   C.push_back(Cb);
   P.push_back(Pa);
   P.push_back(Pb);
+
+  fprintf(stderr,"*** Warning! The Casida implementation is still experimental.\n");
 
   // Parse parameters and form K
   parse_args(set, basis, Ca.n_cols);
@@ -195,28 +199,31 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
 
       // Convert to C++ indexing
       for(size_t i=0;i<idx.size();i++)
-	idx[i]--;	
+	idx[i]--;
+
+      // Get active orbitals
+      arma::mat newC(C[ispin].n_rows,idx.size());
+      for(size_t i=0;i<idx.size();i++)
+	newC.col(i)=C[ispin].col(idx[i]);
+      C[ispin]=newC;
 
       // Loop over indices
-      for(size_t iiocc=0;iiocc<idx.size();iiocc++) {
-	// Index of orbital is
-	size_t iocc=idx[iiocc];
+      for(size_t iocc=0;iocc<idx.size();iocc++) {
 	// Check that it truly is occupied.
-	if(iocc>=nocc[ispin])
+	if(idx[iocc]>=nocc[ispin])
 	  continue;
-
-	for(size_t jjvirt=iiocc+1;jjvirt<idx.size();jjvirt++) {
-	  // Index of virtual is
-	  size_t jvirt=idx[jjvirt];
+	
+	for(size_t jvirt=iocc+1;jvirt<idx.size();jvirt++) {
 	  // Check that it truly is virtual.
-	  if(jvirt<nocc[ispin])
+	  if(idx[jvirt]<nocc[ispin])
 	    continue;
-
-	  // Create state pair
+	  
+	  // Create state pair (no idx needed here since we have
+	  // already dropped inactive orbitals from C)
 	  states_pair_t tmp;
           tmp.i=iocc;
           tmp.f=jvirt;
-
+	  
           pairs[ispin].push_back(tmp);
         }
       }
@@ -328,16 +335,24 @@ void Casida::Kcoul(const BasisSet & basis) {
 
   if(!C.size())
     throw std::runtime_error("Error - no orbitals!\n");
-  const size_t Norb=C[0].n_cols;
-  
-  // The [\mu \nu|I] matrix in Jamorski (4.16).
-  arma::mat munu_I(Norb*Norb,Naux);
-  // Work memory
-  arma::mat tmp(Nbf*Norb,Naux);
+
+  // Number of active orbitals for spin alpha and beta
+  std::vector<size_t> Norbs;
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    Norbs.push_back(C[ispin].n_cols);  
+
   // Inverse Coulomb overlap matrix of fitting basis
   arma::mat ab_inv=dfit.get_ab_inv();
 
   for(size_t ispin=0;ispin<C.size();ispin++) {
+    // Amount of actieve orbitals
+    const size_t Norb=Norbs[ispin];
+
+    // The [\mu \nu|I] matrix in Jamorski (4.16).
+    arma::mat munu_I(Norb*Norb,Naux);
+    // Work memory
+    arma::mat tmp(Nbf*Norb,Naux);
+
     // We need to calculate the integrals in the MO basis 
     // (which is different for alpha and beta electrons)
     
