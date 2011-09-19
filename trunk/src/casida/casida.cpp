@@ -374,7 +374,7 @@ void Casida::Kcoul(const BasisSet & basis) {
 
     // Now we can calculate K.
     for(size_t ip=0;ip<pairs[ispin].size();ip++) {
-      for(size_t jp=0;jp<pairs[ispin].size();jp++) {
+      for(size_t jp=0;jp<ip;jp++) {
 	double tmp=arma::as_scalar(munu_I.row(pairs[ispin][ip].i*Norb+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I.row(pairs[ispin][jp].i*Norb+pairs[ispin][jp].f)));
 	K[ispin](ip,jp)+=tmp;
 	K[ispin](jp,ip)+=tmp;
