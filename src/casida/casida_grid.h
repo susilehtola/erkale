@@ -52,7 +52,7 @@ class CasidaAtom : public AtomGrid {
   void eval_fxc(int x_func, int c_func);
 
   /// Evaluate Kxc
-  arma::mat Kxc(const std::vector<states_pair_t> & pairs, bool spin) const;
+  void Kxc(const std::vector< std::vector<states_pair_t> > & pairs, arma::mat & K) const;
 
   void free();
 };
@@ -78,7 +78,7 @@ class CasidaGrid {
   ~CasidaGrid();
 
   /// Evaluate Kxc
-  void Kxc(const std::vector<arma::mat> & P, double tol, int x_func, int c_func, const std::vector<arma::mat> & C, const std::vector < std::vector<states_pair_t> > & pairs, std::vector<arma::mat> & Kx);
+  void Kxc(const std::vector<arma::mat> & P, double tol, int x_func, int c_func, const std::vector<arma::mat> & C, const std::vector < std::vector<states_pair_t> > & pairs, arma::mat & Kx);
 };
 
 #endif

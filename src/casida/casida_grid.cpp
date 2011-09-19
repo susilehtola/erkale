@@ -141,53 +141,65 @@ void CasidaAtom::eval_fxc(int x_func, int c_func) {
   }
 }
 
-arma::mat CasidaAtom::Kxc(const std::vector<states_pair_t> & pairs, bool ispin) const {
-  const size_t N=pairs.size();
-  
-  // Allocate matrix
-  arma::mat Kxc(N,N);
-  Kxc.zeros();
-  
+void CasidaAtom::Kxc(const std::vector< std::vector<states_pair_t> > & pairs, arma::mat & K) const {
   double wxc;
-  
-  // Perform the integration.
-  if(polarized) {
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Factor in common
-      wxc=grid[ip].w*(fx[3*ip+2*ispin]+fc[3*ip+2*ispin]);
-      
-      for(size_t ipair=0;ipair<N;ipair++) {
-	for(size_t jpair=0;jpair<=ipair;jpair++) {
-	  Kxc(ipair,jpair)+=wxc*orbs[ispin][ip][pairs[ipair].i]*orbs[ispin][ip][pairs[ipair].f]
-	    *orbs[ispin][ip][pairs[jpair].i]*orbs[ispin][ip][pairs[jpair].f];
-	}
-	Kxc(ipair,ipair)+=wxc*orbs[ispin][ip][pairs[ipair].i]*orbs[ispin][ip][pairs[ipair].f]
-	  *orbs[ispin][ip][pairs[ipair].i]*orbs[ispin][ip][pairs[ipair].f];
-      }
-    }
-  } else {
-    // Perform the integration.
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Factor in common
-      wxc=grid[ip].w*(fx[ip]+fc[ip]);
-      
-      for(size_t ipair=0;ipair<N;ipair++) {
-	for(size_t jpair=0;jpair<=ipair;jpair++) {
-	  Kxc(ipair,jpair)+=wxc*orbs[ispin][ip][pairs[ipair].i]*orbs[ispin][ip][pairs[ipair].f]
-	    *orbs[ispin][ip][pairs[jpair].i]*orbs[ispin][ip][pairs[jpair].f];
-	}
-	Kxc(ipair,ipair)+=wxc*orbs[ispin][ip][pairs[ipair].i]*orbs[ispin][ip][pairs[ipair].f]
-	  *orbs[ispin][ip][pairs[ipair].i]*orbs[ispin][ip][pairs[ipair].f];
-      }
-    }
+
+  if(polarized && pairs.size()!=2) {
+    ERROR_INFO();
+    throw std::runtime_error("Running with polarized grid but non-polarized pairs!\n");
+  } else if(!polarized && pairs.size()==2) {
+    ERROR_INFO();
+    throw std::runtime_error("Running with unpolarized grid but polarized pairs!\n");
   }
   
-  // Symmetricize
-  for(size_t ipair=0;ipair<N;ipair++)
-    for(size_t jpair=0;jpair<=ipair;jpair++)
-      Kxc(jpair,ipair)=Kxc(ipair,jpair);
+  // Perform the integration. Loop over spins
+  for(size_t ispin=0;ispin<pairs.size();ispin++)
+    for(size_t jspin=0;jspin<=ispin;jspin++) {
+      
+      // Offset in i
+      const size_t ioff=ispin*pairs[0].size();
+      // Offset in j
+      const size_t joff=jspin*pairs[0].size();
+      
+      if(ispin==jspin) {
+	// Loop over grid points
+	for(size_t ip=0;ip<grid.size();ip++) {
+	  // Factor in common for all orbitals. First case is polarized (up-up or down-down), second case is unpolarized
+	  wxc=polarized ? grid[ip].w*(fx[3*ip+2*ispin]+fc[3*ip+2*ispin]) : grid[ip].w*(fx[ip]+fc[ip]);
+	  
+	  // Loop over pairs
+	  for(size_t ipair=0;ipair<pairs[ispin].size();ipair++) {
+	    for(size_t jpair=0;jpair<ipair;jpair++) {
 
-  return Kxc;
+	      double term=wxc*orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f]
+		*orbs[ispin][ip][pairs[jspin][jpair].i]*orbs[ispin][ip][pairs[jspin][jpair].f];
+	      K(ioff+ipair,joff+jpair)+=term;
+	      K(joff+jpair,ioff+ipair)+=term;
+	    }
+	    K(ioff+ipair,ioff+ipair)+=wxc*orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f]
+	      *orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f];
+	  }
+	}
+      } else {
+	// Loop over grid points
+	for(size_t ip=0;ip<grid.size();ip++) {
+	  // Factor in common for all orbitals
+	  wxc=grid[ip].w*(fx[3*ip+1]+fc[3*ip+1]); // up-down and down-up
+	  
+	  // Loop over pairs
+	  for(size_t ipair=0;ipair<pairs[ispin].size();ipair++) {
+	    for(size_t jpair=0;jpair<ipair;jpair++) {
+	      double term=wxc*orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f]
+		*orbs[ispin][ip][pairs[jspin][jpair].i]*orbs[ispin][ip][pairs[jspin][jpair].f];
+	      K(ioff+ipair,joff+jpair)+=term;
+	      K(joff+jpair,ioff+ipair)+=term;
+	    }
+	    K(ioff+ipair,ioff+ipair)+=wxc*orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f]
+	      *orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f];
+	  }
+	}
+      }  
+    }
 }
 
 void CasidaAtom::free() {
@@ -244,7 +256,7 @@ void CasidaGrid::construct(const std::vector<arma::mat> & P, double tol, int x_f
     }
 }
 
-void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, int c_func, const std::vector<arma::mat> & C, const std::vector< std::vector<states_pair_t> > & pairs, std::vector<arma::mat> & Kx) {
+void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, int c_func, const std::vector<arma::mat> & C, const std::vector< std::vector<states_pair_t> > & pairs, arma::mat & Kx) {
   // First, we need to construct the grid.
   construct(P,tol,x_func,c_func);
   
@@ -258,18 +270,6 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
     throw std::runtime_error("Sizes of P and pairs are inconsistent!\n");
   }
 
-  if(Kx.size()!=P.size()) {
-    ERROR_INFO();
-    throw std::runtime_error("Sizes of K and P are inconsistent!\n");
-  }
-
-  for(size_t i=0;i<Kx.size();i++)
-    if(Kx[i].n_rows!=pairs[i].size() || Kx[i].n_cols!=pairs[i].size()) {
-      ERROR_INFO();
-      throw std::runtime_error("Sizes of K and pairs are inconsistent!\n");
-    }
-
-
   // Now, loop over the atoms.
   for(size_t i=0;i<atoms.size();i++) {
     // Compute functions if necessary.
@@ -280,24 +280,35 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
       atoms[i].compute_bf(*basp);
     }
 
+    // Compute the values of the orbitals
+    atoms[i].compute_orbs(C);
+
     // Update the density
     if(P.size()==1)
       atoms[i].update_density(P[0]);
     else 
       atoms[i].update_density(P[0],P[1]);
-
-    // Compute the values of the orbitals
-    atoms[i].compute_orbs(C);
-
-    // Compute fxc
+    // and compute fxc
     atoms[i].eval_fxc(x_func,c_func);
 
-    // and compute the atomic Kxc
-    for(size_t is=0;is<pairs.size();is++)
-      Kx[is]+=atoms[i].Kxc(pairs[is],is);
-
+    // Compute Kxc's
+    atoms[i].Kxc(pairs, Kx);
+    
     // Free the memory
     if(direct)
       atoms[i].free();
   }
+
+  // Symmetrize K if necessary
+  for(size_t ispin=0;ispin<pairs.size();ispin++)
+    for(size_t jspin=0;jspin<=ispin;jspin++) {
+      // Offset in i
+      const size_t ioff=ispin*pairs[0].size();
+      // Offset in j
+      const size_t joff=jspin*pairs[0].size();
+      
+      if(ispin!=jspin) {
+	Kx.submat(joff,ioff,joff+pairs[jspin].size()-1,ioff+pairs[ispin].size()-1)=arma::trans(Kx.submat(ioff,joff,ioff+pairs[ispin].size()-1,joff+pairs[jspin].size()-1));
+      }
+    }
 }
