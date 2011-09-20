@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
   printf("\n");
   // Decontract basis set?
   if(set.get_bool("Decontract"))
-    baslib=baslib.decontract();
+    baslib.decontract();
 
   // Construct basis set
   BasisSet basis=construct_basis(atoms,baslib,set);
