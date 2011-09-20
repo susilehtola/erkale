@@ -29,6 +29,9 @@
 #include <cstdlib>
 #include <cfloat>
 
+// \delta parameter in Eichkorn et al
+#define DELTA 1e-9
+
 Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ev, const arma::mat & Cv, const arma::mat & Pv) {
   E.push_back(Ev);
   C.push_back(Cv);
@@ -340,55 +343,159 @@ void Casida::absorption() const {
   fclose(out);
 }
 
-void Casida::coulomb_transform(const DensityFit & dfit, arma::mat & munu, bool ispin) const {
-  // Amount of basis functions
-  const size_t Nbf=C[ispin].n_rows;
-  // Amount of active orbitals
-  const size_t Norb=C[ispin].n_cols;
+void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const {
+  // Form density fitting basis
+  BasisSet dfitbas=basis.density_fitting();
+
   // Amount of auxiliary functions
-  const size_t Naux=dfit.get_Naux();
+  const size_t Naux=dfitbas.get_Nbf();
 
-  // Work memory
-  arma::mat tmp(Nbf*Norb,Naux);
+  // Get shells from basis sets
+  std::vector<GaussianShell> orbshells=basis.get_shells();
+  std::vector<GaussianShell> auxshells=dfitbas.get_shells();
 
-  // First transform integrals wrt nu.
-  tmp.zeros();
-  for(size_t imu=0;imu<Nbf;imu++)
-    for(size_t inu=0;inu<Nbf;inu++)
-      for(size_t nu=0;nu<Norb;nu++) 
-	for(size_t iaux=0;iaux<Naux;iaux++)
-	  tmp(imu*Norb+nu,iaux)+=C[ispin](inu,nu)*dfit.get_a_munu(iaux,imu,inu);
-  
-  // and then wrt mu.
-  munu.zeros(Norb*Norb,Naux);
-  for(size_t nu=0;nu<Norb;nu++)
-    for(size_t mu=0;mu<Norb;mu++)
-      for(size_t imu=0;imu<Nbf;imu++)
-	for(size_t iaux=0;iaux<Naux;iaux++)
-	  munu(mu*Norb+nu,iaux)+=C[ispin](imu,mu)*tmp(imu*Norb+nu,iaux);
+  // Dummy shell, helper for computing ERIs
+  coords_t cen={0.0, 0.0, 0.0};
+  std::vector<double> Cd, zd;
+  Cd.push_back(1.0);
+  zd.push_back(0.0);
+  GaussianShell dummyshell(0,0,0,0,cen,Cd,zd);
+
+  // First, compute the two-center integrals
+  arma::mat ab(Naux,Naux);
+  ab.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic,1)
+#endif
+  for(size_t is=0;is<auxshells.size();is++) {
+    for(size_t js=0;js<=is;js++) {
+      // Compute (a|b)
+      std::vector<double> eris=ERI(&auxshells[is],&dummyshell,&auxshells[js],&dummyshell);
+      
+      // Store integrals
+      for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
+        for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
+          ab(auxshells[is].get_first_ind()+ii,auxshells[js].get_first_ind()+jj)=eris[ii*auxshells[js].get_Nbf()+jj];
+          ab(auxshells[js].get_first_ind()+jj,auxshells[is].get_first_ind()+ii)=eris[ii*auxshells[js].get_Nbf()+jj];
+        }
+    }
+  }
+
+  // Form ab_inv
+  ab_inv=arma::inv(ab+DELTA);
+
+  // Allocate memory for the three-center integrals.
+  munu.resize(C.size());
+  for(size_t ispin=0;ispin<C.size();ispin++) {
+    munu[ispin].zeros(C[ispin].n_cols*C[ispin].n_cols,Naux);
+  }
+
+  // Compute the three-center integrals.
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    
+#ifdef _OPENMP
+    // Worker stack for each thread
+    std::vector<arma::mat> munu_wrk=munu;
+    
+#pragma omp for
+#endif
+    for(size_t ia=0;ia<auxshells.size();ia++) {
+      // Amount of functions on shell
+      size_t Na=auxshells[ia].get_Nbf();
+      // Index of first function on shell
+      size_t a0=auxshells[ia].get_first_ind();
+      
+      for(size_t imu=0;imu<orbshells.size();imu++) {
+	// Amount of functions on shell
+	size_t Nmu=orbshells[imu].get_Nbf();
+	// Index of first function on shell
+	size_t mu0=orbshells[imu].get_first_ind();
+	
+	for(size_t inu=0;inu<=imu;inu++) {
+	  // Amount of functions on shell
+	  size_t Nnu=orbshells[inu].get_Nbf();
+	  // Index of first function on shell
+	  size_t nu0=orbshells[inu].get_first_ind();
+	  
+	  // Compute the integral over the AOs
+	  std::vector<double> eris=ERI(&auxshells[ia],&dummyshell,&orbshells[imu],&orbshells[inu]);
+	  
+	  // Transform integrals to spin orbitals.
+	  for(size_t ispin=0;ispin<C.size();ispin++) {
+	    // Amount of active orbitals.
+	    size_t Norb=C[ispin].n_cols;
+	    
+	    // First, transform the integrals wrt nu.
+	    arma::mat tmp(Nnu*Norb,Naux);
+	    tmp.zeros();
+	    
+	    size_t inda, indmu, indnu;
+	    // Loop over basis functions
+	    for(size_t muf=0;muf<Nmu;muf++) {
+	      indmu=mu0+muf;
+	      for(size_t nuf=0;nuf<Nnu;nuf++) {
+		indnu=nu0+nuf;
+		// Loop over MOs
+		for(size_t nu=0;nu<Norb;nu++)
+		  // Loop over computed auxiliary functions 
+		  for(size_t af=0;af<Na;af++) {
+		    // Global index is
+		    inda=a0+af;
+		    
+		    tmp(muf*Norb+nu,inda)+=C[ispin](indnu,nu)*eris[(af*Nmu+muf)*Nnu+nuf];
+		  }
+	      }
+	    } // End nu transform
+	    
+	    // Now we transform over mu.
+	    for(size_t nu=0;nu<Norb;nu++) {
+	      for(size_t mu=0;mu<Norb;mu++)
+		for(size_t muf=0;muf<Nmu;muf++) {
+		  indmu=mu0+muf;
+		  for(size_t af=0;af<Na;af++) {
+		    inda=a0+af;
+		    
+#ifdef _OPENMP
+		    munu_wrk[ispin](mu*Norb+nu,inda)+=C[ispin](indmu,mu)*tmp(muf*Norb+nu,inda);
+#else
+		    munu[ispin](mu*Norb+nu,inda)+=C[ispin](indmu,mu)*tmp(muf*Norb+nu,inda);
+#endif
+		  }
+		}
+	    } // End mu transform
+	  } // End loop over spins
+	}
+      }
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+    // Sum the results together
+    for(size_t ispin=0;ispin<C.n_cols;ispin++)
+      munu[ispin]+=munu_wrk[ispin];
+#endif
+
+  } // end parallel region
 }
 
 void Casida::Kcoul(const BasisSet & basis) {
   Timer t;
   
-  // Form density fitting basis
-  BasisSet dfitbas=basis.density_fitting();
-  DensityFit dfit;
-  // Compute all integrals in memory.
-  dfit.fill(basis,dfitbas,0);
-  
   if(!C.size())
     throw std::runtime_error("Error - no orbitals!\n");
 
-  // Inverse Coulomb overlap matrix of fitting basis
-  arma::mat ab_inv=dfit.get_ab_inv();
-  
+  // Inverse Coulomb overlap matrix in fitting basis
+  arma::mat ab_inv;
   // The [\mu \nu|I] matrices in Jamorski (4.16).
   std::vector<arma::mat> munu_I;
-  munu_I.resize(C.size());
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    coulomb_transform(dfit,munu_I[ispin],ispin);
-  
+
+  // Form munu_I and ab_inv
+  coulomb_fit(basis,munu_I,ab_inv);
+
   // Construct K
   for(size_t ispin=0;ispin<C.size();ispin++)
     for(size_t jspin=0;jspin<=ispin;jspin++) {
