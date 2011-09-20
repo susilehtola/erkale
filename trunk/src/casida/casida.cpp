@@ -5,7 +5,7 @@
  *
  *
  *                   This file is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -79,7 +79,7 @@ void Casida::parse_args(const Settings & set, const BasisSet & basis, size_t Nor
     // IPA.
     coupling=IPA;
     break;
-    
+
   case(1):
     // RPA.
     coupling=RPA;
@@ -108,7 +108,7 @@ void Casida::calc_K(const Settings & set, const BasisSet & basis) {
   else
     // Unrestricted case
     K.zeros(pairs[0].size()+pairs[1].size(),pairs[0].size()+pairs[1].size());
-  
+
   // Do we need to form K?
   if(coupling!=IPA) {
     // Compute Coulomb coupling
@@ -127,7 +127,7 @@ Casida::~Casida() {
 void Casida::calc_dipole(const BasisSet & bas) {
   // Dipole matrix elements in AO basis
   std::vector<arma::mat> dm=bas.moment(1);
-  
+
   dipmat.resize(C.size());
   for(size_t ispin=0;ispin<C.size();ispin++) {
     dipmat[ispin].resize(3);
@@ -143,7 +143,7 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
     // Polarized calculation. Get number of alpha and beta electrons.
     int Nel_alpha, Nel_beta;
     get_Nel_alpha_beta(bas.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
-    
+
     // Amount of occupied and virtual states is
     nocc.push_back(Nel_alpha);
     nvirt.push_back(Norb-nocc[0]);
@@ -155,10 +155,10 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
     // Store occupation numbers
     f.push_back(arma::zeros(Norb));
     f[0].subvec(0,Nel_alpha-1)=arma::ones(Nel_alpha);
-    
+
     f.push_back(arma::zeros(Norb));
     f[1].subvec(0,Nel_beta-1)=arma::ones(Nel_beta);
-    
+
   } else {
     // Amount of occupied states is
     nocc.push_back((bas.Ztot()-set.get_int("Charge"))/2);
@@ -216,18 +216,18 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
 	// Check that it truly is occupied.
 	if(idx[iocc]>=nocc[ispin])
 	  continue;
-	
+
 	for(size_t jvirt=iocc+1;jvirt<idx.size();jvirt++) {
 	  // Check that it truly is virtual.
 	  if(idx[jvirt]<nocc[ispin])
 	    continue;
-	  
+
 	  // Create state pair (no idx needed here since we have
 	  // already dropped inactive orbitals from C)
 	  states_pair_t tmp;
           tmp.i=iocc;
           tmp.f=jvirt;
-	  
+
           pairs[ispin].push_back(tmp);
         }
       }
@@ -254,7 +254,7 @@ void Casida::solve() {
 
   // Generate the coupling matrix (eqn 2.11), but use the K array to
   // save memory.
-  
+
   if(coupling!=IPA) {
     // Add relevant factors to Coulomb / exchange-correlation terms
     for(size_t ispin=0;ispin<pairs.size();ispin++)
@@ -263,14 +263,14 @@ void Casida::solve() {
 	const size_t ioff=ispin*pairs[0].size();
 	// Offset in j
 	const size_t joff=jspin*pairs[0].size();
-	
+
 	for(size_t ip=0;ip<pairs[ispin].size();ip++)
 	  for(size_t jp=0;jp<pairs[jspin].size();jp++)
 	    K(ioff+ip,joff+jp)*=2.0*fe(pairs[ispin][ip],ispin)*fe(pairs[jspin][jp],jspin);
       }
   }
- 
-  
+
+
   // Add IPA contribution to diagonal
   for(size_t ispin=0;ispin<pairs.size();ispin++) {
     // Offset in i
@@ -278,14 +278,14 @@ void Casida::solve() {
     for(size_t ip=0;ip<pairs[ispin].size();ip++)
       K(ioff+ip,ioff+ip)+=esq(pairs[ispin][ip],ispin);
   }
-  
+
   // Solve eigenvalues and eigenvectors using direct linear algebraic methods
   eig_sym_ordered(w_i, F_i, K);
-  
+
   // The eigenvalues are the squares of the excitation energies
   for(size_t i=0;i<w_i.n_elem;i++)
     w_i(i) = sqrt(w_i(i));
-  
+
   printf("Casida equations solved in %s.\n",t.elapsed().c_str());
   fprintf(stderr,"Solution %s.\n",t.elapsed().c_str());
 }
@@ -293,11 +293,11 @@ void Casida::solve() {
 // This calculates the photoabsorption transition rates
 void Casida::absorption() const {
   printf("\n ******* Casida Photoabsorption Spectrum ********\n");
-  
+
   // Transition rates for every transition
   arma::mat tr(w_i.n_elem,3);
   tr.zeros();
-  
+
   // Loop over transitions
   for(size_t it=0;it<w_i.n_elem;it++) {
     // Loop over cartesian coordinates
@@ -309,31 +309,31 @@ void Casida::absorption() const {
 	size_t joff=jspin*pairs[0].size();
 	// Loop over pairs
 	for(size_t jp=0;jp<pairs[jspin].size();jp++) {
-	  
+
 	  // Compute |x| = x^T S^{-1/2} F_i
 	  tr(it,ic)+=dipmat[jspin][ic](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)/fe(pairs[jspin][jp],jspin);
 	}
       }
-      
+
       // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
       // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
       // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
       tr(it,ic)/=sqrt(w_i(it));
     }
   }
-  
+
   // Oscillator strengths, 2/3 * E * ( |x|^2 + |y|^2 + |z|^2 )
   arma::vec osc(w_i.n_elem);
   for(size_t it=0; it<w_i.n_elem;it++)
     osc(it) = 2.0/3.0 * w_i(it) * arma::dot(tr.row(it),tr.row(it));
-  
+
   // Write output
   printf(  " Photoabsorption transition energies and rates\n");
   printf(  " %6s   %12s   %12s   %12s %12s %12s\n", "nn", "E [eV]", "osc.str.", "<x>", "<y>", "<z>");
   for(size_t it=0; it<osc.n_elem; it++) {
     printf(" %6i    %12.6f   %12.6f   %12.6f %12.6f %12.6f\n", (int) it+1, w_i(it)*HARTREEINEV, osc(it), tr(it, 0), tr(it, 1), tr(it, 2));
   }
-    
+
   FILE *out=fopen("casida.dat","w");
   for(size_t it=0; it<osc.n_elem; it++)
     fprintf(out,"%e %e % e % e % e\n",w_i(it)*HARTREEINEV, osc(it), tr(it, 0), tr(it, 1), tr(it, 2));
@@ -351,26 +351,136 @@ void Casida::coulomb_transform(const DensityFit & dfit, arma::mat & munu, bool i
   // Work memory
   arma::mat tmp(Nbf*Norb,Naux);
 
-  // First transform integrals wrt nu.
-  tmp.zeros();
-  for(size_t imu=0;imu<Nbf;imu++)
-    for(size_t inu=0;inu<Nbf;inu++)
-      for(size_t nu=0;nu<Norb;nu++) 
-	for(size_t iaux=0;iaux<Naux;iaux++)
-	  tmp(imu*Norb+nu,iaux)+=C[ispin](inu,nu)*dfit.get_a_munu(iaux,imu,inu);
-  
-  // and then wrt mu.
-  munu.zeros(Norb*Norb,Naux);
-  for(size_t nu=0;nu<Norb;nu++)
+  // Dummy shell, helper for computing ERIs
+  coords_t cen={0.0, 0.0, 0.0};
+  std::vector<double> Cd, zd;
+  Cd.push_back(1.0);
+  zd.push_back(0.0);
+  GaussianShell dummyshell(0,0,0,0,cen,Cd,zd);
+
+  // First, compute the two-center integrals
+  arma::mat ab(Naux,Naux);
+  ab.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic,1)
+#endif
+  for(size_t is=0;is<auxshells.size();is++) {
+    for(size_t js=0;js<=is;js++) {
+      // Compute (a|b)
+      std::vector<double> eris=ERI(&auxshells[is],&dummyshell,&auxshells[js],&dummyshell);
+
+      // Store integrals
+      for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
+        for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
+          ab(auxshells[is].get_first_ind()+ii,auxshells[js].get_first_ind()+jj)=eris[ii*auxshells[js].get_Nbf()+jj];
+          ab(auxshells[js].get_first_ind()+jj,auxshells[is].get_first_ind()+ii)=eris[ii*auxshells[js].get_Nbf()+jj];
+        }
+    }
+  }
+
+  // Form ab_inv
+  ab_inv=arma::inv(ab+DELTA);
+
+  // Allocate memory for the three-center integrals.
+  munu.resize(C.size());
+  for(size_t ispin=0;ispin<C.size();ispin++) {
+    munu[ispin].zeros(C[ispin].n_cols*C[ispin].n_cols,Naux);
+  }
+
+  // Compute the three-center integrals.
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+
+#ifdef _OPENMP
+    // Worker stack for each thread
+    std::vector<arma::mat> munu_wrk=munu;
+
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t ia=0;ia<auxshells.size();ia++) {
+      // Amount of functions on shell
+      size_t Na=auxshells[ia].get_Nbf();
+      // Index of first function on shell
+      size_t a0=auxshells[ia].get_first_ind();
+
+      for(size_t imu=0;imu<orbshells.size();imu++) {
+	// Amount of functions on shell
+	size_t Nmu=orbshells[imu].get_Nbf();
+	// Index of first function on shell
+	size_t mu0=orbshells[imu].get_first_ind();
+
+	for(size_t inu=0;inu<=imu;inu++) {
+	  // Amount of functions on shell
+	  size_t Nnu=orbshells[inu].get_Nbf();
+	  // Index of first function on shell
+	  size_t nu0=orbshells[inu].get_first_ind();
+
+	  // Compute the integral over the AOs
+	  std::vector<double> eris=ERI(&auxshells[ia],&dummyshell,&orbshells[imu],&orbshells[inu]);
+
+	  // Transform integrals to spin orbitals.
+	  for(size_t ispin=0;ispin<C.size();ispin++) {
+	    // Amount of active orbitals with current spin.
+	    size_t Norb=C[ispin].n_cols;
+
+	    size_t indmu, indnu, inda;
+	    // Loop over orbitals
+	    for(size_t mu=0;mu<Norb;mu++)
+	      for(size_t nu=0;nu<=mu;nu++) {
+		// Loop over functions
+		for(size_t muf=0;muf<Nmu;muf++) {
+		  indmu=mu0+muf;
+		  for(size_t nuf=0;nuf<Nnu;nuf++) {
+		    indnu=nu0+nuf;
+		    
+		    // Coefficient of integral is
+		    double c=C[ispin](indmu,mu)*C[ispin](indnu,nu);
+		    if(imu!=inu)
+		      // inu<imu, use symmetry of ERIs
+		      c+=C[ispin](indmu,nu)*C[ispin](indnu,mu);
+		    
+		    // Loop over auxiliary functions
+		    for(size_t af=0;af<Na;af++) {
+		      inda=a0+af;
+		      
+#ifdef _OPENMP
+		      munu_wrk[ispin](mu*Norb+nu,inda)+=c*eris[(af*Nmu+muf)*Nnu+nuf];
+#else
+		      munu[ispin](mu*Norb+nu,inda)+=c*eris[(af*Nmu+muf)*Nnu+nuf];
+#endif
+		    }
+		  }
+		}
+	      }
+	    
+	  } // end loop over spins
+	}
+      }
+    }
+    
+#ifdef _OPENMP
+#pragma omp critical
+    // Sum the results together
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      munu[ispin]+=munu_wrk[ispin];
+#endif
+  } // end parallel region
+
+  // Symmetrize munu
+  for(size_t ispin=0;ispin<C.size();ispin++) {
+    size_t Norb=C[ispin].n_cols;
     for(size_t mu=0;mu<Norb;mu++)
-      for(size_t imu=0;imu<Nbf;imu++)
-	for(size_t iaux=0;iaux<Naux;iaux++)
-	  munu(mu*Norb+nu,iaux)+=C[ispin](imu,mu)*tmp(imu*Norb+nu,iaux);
+      for(size_t nu=0;nu<=mu;nu++)
+	munu[ispin].row(nu*Norb+mu)=munu[ispin].row(mu*Norb+nu);
+  }
 }
 
 void Casida::Kcoul(const BasisSet & basis) {
   Timer t;
-  
+
   // Form density fitting basis
   BasisSet dfitbas=basis.density_fitting();
   DensityFit dfit;
@@ -400,8 +510,11 @@ void Casida::Kcoul(const BasisSet & basis) {
       const size_t ioff=ispin*pairs[0].size();
       // Offset in j
       const size_t joff=jspin*pairs[0].size();
-      
+
       if(ispin==jspin) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
 	for(size_t ip=0;ip<pairs[ispin].size();ip++) {
 	  // Off-diagonal, symmetrization is done later
 	  for(size_t jp=0;jp<ip;jp++) {
@@ -413,13 +526,16 @@ void Casida::Kcoul(const BasisSet & basis) {
 	  K(ioff+ip,ioff+ip)+=arma::as_scalar(munu_I[ispin].row(pairs[ispin][ip].i*Norbi+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I[ispin].row(pairs[ispin][ip].i*Norbi+pairs[ispin][ip].f)));
 	}
       } else {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
 	for(size_t ip=0;ip<pairs[ispin].size();ip++)
 	  for(size_t jp=0;jp<pairs[jspin].size();jp++) {
 	    // Offset in i
 	    const size_t ioff=ispin*pairs[0].size();
 	    // Offset in j
 	    const size_t joff=jspin*pairs[0].size();
-	    
+
 	    K(ioff+ip,joff+jp)=arma::as_scalar(munu_I[ispin].row(pairs[ispin][ip].i*Norbi+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I[jspin].row(pairs[jspin][jp].i*Norbj+pairs[jspin][jp].f)));
 	  }
       }
@@ -436,12 +552,12 @@ void Casida::Kcoul(const BasisSet & basis) {
 
 void Casida::Kxc(const BasisSet & bas, double tol, int x_func, int c_func) {
   Timer t;
-  
+
   // Make grid
   CasidaGrid grid(&bas);
   // Evaluate Kxc
   grid.Kxc(P,tol,x_func,c_func,C,pairs,K);
-  
+
   printf("XC coupling matrix computed in %s.\n",t.elapsed().c_str());
   fprintf(stderr,"KXC %s.\n",t.elapsed().c_str());
 }
