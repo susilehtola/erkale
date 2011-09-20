@@ -150,8 +150,8 @@ class Casida {
   /// Construct the K matrices
   void calc_K(const Settings & set, const BasisSet & bas);
 
-  /// Compute the Coulomb fitting integrals \lf$ (\mu \nu | a) \lf$ and the matrix \lf$ (a|b)^{-1} \lf$
-  void coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const;
+  /// Transform the Coulomb fitting integrals from AO to MO basis
+  void coulomb_transform(const DensityFit & dfit, arma::mat & munu, bool ispin) const;
 
  public:
   /// Constructor for spin-unpolarized calculation
