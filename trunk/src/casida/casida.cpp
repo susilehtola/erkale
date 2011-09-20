@@ -29,6 +29,9 @@
 #include <cstdlib>
 #include <cfloat>
 
+// \delta parameter in Eichkorn et al
+#define DELTA 1e-9
+
 Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ev, const arma::mat & Cv, const arma::mat & Pv) {
   E.push_back(Ev);
   C.push_back(Cv);
@@ -340,16 +343,15 @@ void Casida::absorption() const {
   fclose(out);
 }
 
-void Casida::coulomb_transform(const DensityFit & dfit, arma::mat & munu, bool ispin) const {
-  // Amount of basis functions
-  const size_t Nbf=C[ispin].n_rows;
-  // Amount of active orbitals
-  const size_t Norb=C[ispin].n_cols;
+void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const {
+  // Get density fitting basis
+  BasisSet dfitbas=basis.density_fitting();
   // Amount of auxiliary functions
-  const size_t Naux=dfit.get_Naux();
+  const size_t Naux=dfitbas.get_Nbf();
 
-  // Work memory
-  arma::mat tmp(Nbf*Norb,Naux);
+  // Get the shells
+  std::vector<GaussianShell> orbshells=basis.get_shells();
+  std::vector<GaussianShell> auxshells=dfitbas.get_shells();
 
   // Dummy shell, helper for computing ERIs
   coords_t cen={0.0, 0.0, 0.0};
@@ -481,24 +483,17 @@ void Casida::coulomb_transform(const DensityFit & dfit, arma::mat & munu, bool i
 void Casida::Kcoul(const BasisSet & basis) {
   Timer t;
 
-  // Form density fitting basis
-  BasisSet dfitbas=basis.density_fitting();
-  DensityFit dfit;
-  // Compute all integrals in memory.
-  dfit.fill(basis,dfitbas,0);
-  
   if(!C.size())
     throw std::runtime_error("Error - no orbitals!\n");
 
   // Inverse Coulomb overlap matrix of fitting basis
-  arma::mat ab_inv=dfit.get_ab_inv();
-  
+  arma::mat ab_inv;
   // The [\mu \nu|I] matrices in Jamorski (4.16).
   std::vector<arma::mat> munu_I;
-  munu_I.resize(C.size());
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    coulomb_transform(dfit,munu_I[ispin],ispin);
-  
+
+  // Get density fitting integrals
+  coulomb_fit(basis,munu_I,ab_inv);
+
   // Construct K
   for(size_t ispin=0;ispin<C.size();ispin++)
     for(size_t jspin=0;jspin<=ispin;jspin++) {
