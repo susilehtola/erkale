@@ -278,7 +278,7 @@ int ElementBasisSet::get_am(size_t ind) const {
   return bf[ind].get_am();
 }
 
-ElementBasisSet ElementBasisSet::decontract() const {
+void ElementBasisSet::decontract() {
   // Create list of exponents: zeta[l][1,..,nx]
   std::vector< std::vector<double> > zeta;
   zeta.resize(get_max_am()+1);
@@ -323,8 +323,10 @@ ElementBasisSet ElementBasisSet::decontract() const {
       tmp.add_exponent(1.0,zeta[am][iexp]);
       decontr.add_function(tmp);
     }
+  decontr.sort();
 
-  return decontr;
+  // Change to decontracted set
+  *this=decontr;
 }
 
 
@@ -338,7 +340,7 @@ void BasisSetLibrary::load_gaussian94(const char * filename) {
   load_gaussian94(std::string(filename));
 }
 
-void BasisSetLibrary::load_gaussian94(std::string basis) {
+void BasisSetLibrary::load_gaussian94(const std::string & basis) {
   // First, find out file where basis set is
   std::string filename=find_basis(basis);
 
@@ -494,6 +496,10 @@ void BasisSetLibrary::save_gaussian94(const char * filename) const {
   fclose(out);
 }
 
+void BasisSetLibrary::save_gaussian94(const std::string & filename) const {
+  save_gaussian94(filename.c_str());
+}
+
 void BasisSetLibrary::add_element(const ElementBasisSet & el) {
   elements.push_back(el);
 }
@@ -566,13 +572,8 @@ ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) cons
   return ElementBasisSet();
 }
 
-BasisSetLibrary BasisSetLibrary::decontract() const {
-  BasisSetLibrary decontr;
-  decontr.name="Decontracted "+name;
-  decontr.elements.resize(elements.size());
-
+void BasisSetLibrary::decontract(){
+  name="Decontracted "+name;
   for(size_t iel=0;iel<elements.size();iel++)
-    decontr.elements[iel]=elements[iel].decontract();
-
-  return decontr;
+    elements[iel].decontract();
 }

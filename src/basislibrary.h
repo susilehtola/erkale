@@ -144,7 +144,7 @@ class ElementBasisSet {
   int get_am(size_t ind) const;
 
   // Decontract set
-  ElementBasisSet decontract() const;
+  void decontract();
 
   friend class BasisSet;
   friend class BasisSetLibrary;
@@ -180,10 +180,12 @@ class BasisSetLibrary {
   /// Load basis set from file
   void load_gaussian94(const char * filename);
   /// Load basis set from file
-  void load_gaussian94(std::string filename);
+  void load_gaussian94(const std::string & filename);
 
   /// Save basis set to file
   void save_gaussian94(const char * filename) const;
+  /// Save basis set to file
+  void save_gaussian94(const std::string & filename) const;
 
   /// Add element to basis set
   void add_element(const ElementBasisSet & el);
@@ -205,7 +207,7 @@ class BasisSetLibrary {
   ElementBasisSet get_element(std::string el, size_t number=0) const;
 
   /// Decontract basis set
-  BasisSetLibrary decontract() const;
+  void decontract();
 
   /// Print out library
   void print() const;
