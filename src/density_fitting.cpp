@@ -46,11 +46,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   iidx=i_idx(Norb);
   
   // Dummy shell, helper for computing ERIs
-  coords_t cen={0.0, 0.0, 0.0};
-  std::vector<double> C, z;
-  C.push_back(1.0);
-  z.push_back(0.0);
-  GaussianShell dummyshell(0,0,0,0,cen,C,z);
+  GaussianShell dummy=dummyshell();
 
   // Store shell data
   auxshells=auxbas.get_shells();
@@ -66,7 +62,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   for(size_t is=0;is<auxshells.size();is++) {
     for(size_t js=0;js<=is;js++) {
       // Compute (a|b)
-      std::vector<double> eris=ERI(&auxshells[is],&dummyshell,&auxshells[js],&dummyshell);
+      std::vector<double> eris=ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
       
       // Store integrals
       for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
@@ -126,7 +122,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 	  size_t Nnu=orbshells[inu].get_Nbf();
 	  
 	  // Compute (a|mn)
-	  std::vector<double> eris=ERI(&auxshells[ia],&dummyshell,&orbshells[imu],&orbshells[inu]);
+	  std::vector<double> eris=ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
 	  
 	  // Store integrals
 	  for(size_t af=0;af<Na;af++) {
@@ -205,11 +201,8 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
     }
   } else {
     // Dummy shell, helper for computing ERIs
-    coords_t cen={0.0, 0.0, 0.0};
-    std::vector<double> C, z;
-    C.push_back(1.0);
-    z.push_back(0.0);
-    GaussianShell dummyshell(0,0,0,0,cen,C,z);
+    GaussianShell dummy=dummyshell();
+
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
 #endif
@@ -228,7 +221,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 	  size_t Nnu=orbshells[inus].get_Nbf();
 
 	  // Compute (a|mn)
-	  std::vector<double> eris=ERI(&auxshells[ias],&dummyshell,&orbshells[imus],&orbshells[inus]);
+	  std::vector<double> eris=ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
 
 	  // Increment gamma
 #ifdef _OPENMP
@@ -279,11 +272,7 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 
   } else {
     // Dummy shell, helper for computing ERIs
-    coords_t cen={0.0, 0.0, 0.0};
-    std::vector<double> C, z;
-    C.push_back(1.0);
-    z.push_back(0.0);
-    GaussianShell dummyshell(0,0,0,0,cen,C,z);
+    GaussianShell dummy=dummyshell();
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
@@ -303,7 +292,7 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 	  size_t Nnu=orbshells[inus].get_Nbf();
 	  
 	  // Compute (a|mn)
-	  std::vector<double> eris=ERI(&auxshells[ias],&dummyshell,&orbshells[imus],&orbshells[inus]);
+	  std::vector<double> eris=ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
 
 	  // Increment J
 #ifdef _OPENMP

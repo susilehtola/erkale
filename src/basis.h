@@ -29,7 +29,6 @@
 #include <vector>
 #include <string>
 
-#include "basislibrary.h"
 #include "settings.h"
 #include "xyzutils.h"
 
@@ -119,11 +118,25 @@ coords_t operator/(const coords_t & lhs, double fac);
 /// Compute scaling by multiplication
 coords_t operator*(const coords_t & lhs, double fac);
 
-
 /// Compute squared norm
 double normsq(const coords_t & r);
 /// Compute norm
 double norm(const coords_t & r);
+
+/// Structure for contractions
+typedef struct {
+  /// Coefficient
+  double c;
+  /// Exponent
+  double z;
+} contr_t;
+/// Comparison for contractions
+bool operator<(const contr_t & lhs, const contr_t & rhs);
+/// Comparison for contractions
+bool operator==(const contr_t & lhs, const contr_t & rhs);
+
+#include "basislibrary.h"
+
 
 /**
  * \class BasisSet
@@ -186,11 +199,21 @@ class BasisSet {
   // This function only exists when DFT support has been enabled
   //  BasisSet density_fitting(double fsam=1.5, int lmaxinc=1) const;
 #endif
+
+  /**
+   * Generate Coulomb and exchange fitting basis
+   *
+   * The procedure has been documented in the article
+   *
+   * O. Vahtras, J. Almlöf and M. W. Feyereisen, "Integral approximations
+   * for LCAO-SCF calculations", Chem. Phys. Lett. 213, p. 514 - 518 (1993).
+   */
+  BasisSet exchange_fitting() const;
   
   /// Add functions for element el at cen
   void add_functions(int atind, coords_t cen, ElementBasisSet el);
   /// Add functions at cen
-  void add_functions(int atind, coords_t cen, int am, std::vector<double> C, std::vector<double> zeta);
+  void add_functions(int atind, coords_t cen, int am, const std::vector<contr_t> & C);
   /// Add nucleus
   void add_nucleus(nucleus_t nuc);
   /// Add nucleus
@@ -200,8 +223,8 @@ class BasisSet {
 
   /// Check numbering
   void check_numbering();
-  /// Sort shells in increasing order of angular momentum
-  void sort_am();
+  /// Sort shells in nuclear order, then by angular momentum, then by exponents
+  void sort();
 
   /* Finalization routines */
   /// Compute nuclear distance table
@@ -267,10 +290,8 @@ class BasisSet {
   /// Get coordinates of center of ind'th shell
   coords_t get_shell_coords(size_t ind) const;
 
-  /// Get exponents on the ind:th shell
-  std::vector<double> get_zetas(size_t ind) const;
-  /// Get contraction coefficients of the ind:th shell
-  std::vector<double> get_contr(size_t ind) const;
+  /// Get exponential contraction of the ind:th shell
+  std::vector<contr_t> get_contr(size_t ind) const;
   /// Get the cartesian functions on the ind:th shell
   std::vector<shellf_t> get_cart(size_t ind) const;
 
@@ -389,7 +410,6 @@ std::vector<double> ERI_wrap(const GaussianShell *is, const GaussianShell *js, c
 /// Compatibility function (G++ 4.5.1 refuses to use the above functions) "invalid conversion from ‘const GaussianShell*’ to ‘size_t’"
 std::vector<double> ERI_cart_wrap(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 
-
 /**
  * \class GaussianShell
  *
@@ -399,7 +419,6 @@ std::vector<double> ERI_cart_wrap(const GaussianShell *is, const GaussianShell *
  * \author Jussi Lehtola
  * \date 2011/05/05 20:17
  */
-
 class GaussianShell {
 
   /// Number of first function on shell
@@ -416,13 +435,12 @@ class GaussianShell {
   arma::mat transmat;
 
   /**
-   * Contraction coefficients of unnormalized primitives. 
-   * N.B. Normalization is wrt first function of shell.*/
-  std::vector<double> c;
-  /// Exponents of primitives
-  std::vector<double> zeta;
+   * Contraction of unnormalized primitives. 
+   * N.B. Normalization is wrt first function of shell.
+   */
+  std::vector<contr_t> c;
 
-  /// Angular momentum functions
+  /// Angular momentum of shell
   int am;
 
   /**
@@ -435,7 +453,7 @@ class GaussianShell {
   /// Construct shell, use spherical harmonics by default
   GaussianShell(bool lm=1);
   /// Construct a shell
-  GaussianShell(size_t indstart, int am, bool lm, int atind, coords_t cen, std::vector<double> C, std::vector<double> zeta);
+  GaussianShell(size_t indstart, int am, bool lm, int atind, coords_t cen, const std::vector<contr_t> & C);
   /// Destructor
   ~GaussianShell();
 
@@ -450,10 +468,8 @@ class GaussianShell {
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
 
-  /// Get exponents
-  std::vector<double> get_zetas() const;
-  /// Get contraction coefficients
-  std::vector<double> get_contr() const;
+  /// Get the exponential conraction
+  std::vector<contr_t> get_contr() const;
   /// Get cartesians
   std::vector<shellf_t> get_cart() const;
 
@@ -463,7 +479,7 @@ class GaussianShell {
    * cc-pVXZ basis set data from the ESML basis set exchange.  Maybe
    * the input isn't really normalized..?
    */
-  std::vector<double> get_contr_normalized() const;
+  std::vector<contr_t> get_contr_normalized() const;
 
   /// Number of functions on shell
   size_t get_Nbf() const;
@@ -544,6 +560,9 @@ class GaussianShell {
   //  friend void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 #endif
 };
+
+/// Get dummy shell
+GaussianShell dummyshell();
 
 /// Compute index of swapped integral
 size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl);

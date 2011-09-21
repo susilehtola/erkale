@@ -78,6 +78,15 @@ double norm(const coords_t & r) {
   return sqrt(normsq(r));
 }
 
+bool operator<(const contr_t & lhs, const contr_t & rhs) {
+  // Decreasing order of exponents.
+  return lhs.z>rhs.z;
+}
+
+bool operator==(const contr_t & lhs, const contr_t & rhs) {
+  return (lhs.z==rhs.z) && (lhs.c==rhs.c);
+}
+
 GaussianShell::GaussianShell(bool lm) {
   // Dummy constructor
   indstart=(size_t) -1;
@@ -85,7 +94,7 @@ GaussianShell::GaussianShell(bool lm) {
   uselm=lm;
 }
 
-GaussianShell::GaussianShell(size_t indstartv, int amv, bool lm, int atindv, coords_t cenv, std::vector<double> cv, std::vector<double> zetav) {
+GaussianShell::GaussianShell(size_t indstartv, int amv, bool lm, int atindv, coords_t cenv, const std::vector<contr_t> & cv) {
   // Construct shell of basis functions
 
   indstart=indstartv;
@@ -93,26 +102,9 @@ GaussianShell::GaussianShell(size_t indstartv, int amv, bool lm, int atindv, coo
   atind=atindv;
   cen=cenv;
 
-  if(cv.size()!=zetav.size()) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Sizes of C and zeta does not match!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  // Store array size
-  size_t Nprim=cv.size();
-  // Allocate memory
-  c.reserve(Nprim);
-  c.resize(Nprim);
-  zeta.reserve(Nprim);
-  zeta.resize(Nprim);
-
-  // Copy values
-  for(size_t i=0;i<Nprim;i++) {
-    c[i]=cv[i];
-    zeta[i]=zetav[i];
-  }
+  // Store contraction
+  c=cv;
+  std::sort(c.begin(),c.end());
 
   // Set angular momentum
   am=amv;
@@ -156,12 +148,13 @@ GaussianShell::~GaussianShell() {
 }
 
 void GaussianShell::convert_contraction() {
-  // Normalize contraction with respect to the first function on the shell
+  // Convert contraction from contraction of normalized gaussians to
+  // contraction of unnormalized gaussians.
 
   double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
 
   for(size_t i=0;i<c.size();i++)
-    c[i]*=fac*pow(zeta[i],am/2.0+0.75);
+    c[i].c*=fac*pow(c[i].z,am/2.0+0.75);
 }
 
 void GaussianShell::normalize() {
@@ -172,7 +165,7 @@ void GaussianShell::normalize() {
   // Calculate overlap of exponents
   for(size_t i=0;i<c.size();i++)
     for(size_t j=0;j<c.size();j++)
-      fact+=c[i]*c[j]/pow(zeta[i]+zeta[j],am+1.5);
+      fact+=c[i].c*c[j].c/pow(c[i].z+c[j].z,am+1.5);
 
   // Add constant part
   fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
@@ -180,7 +173,7 @@ void GaussianShell::normalize() {
   // The coefficients must be scaled by 1/sqrt(fact)
   fact=1.0/sqrt(fact);
   for(size_t i=0;i<c.size();i++)
-    c[i]*=fact;
+    c[i].c*=fact;
 
   // Compute relative normalization factors
   for(size_t i=0;i<cart.size();i++)
@@ -196,11 +189,11 @@ void GaussianShell::coulomb_normalize() {
 
   // Dummy shell
   coords_t cen={0.0, 0.0, 0.0};
-  std::vector<double> C, z;
-  C.push_back(1.0);
-  z.push_back(0.0);
+  std::vector<contr_t> C(1);
+  C[0].c=1.0;
+  C[0].z=0.0;
 	      
-  GaussianShell dummyshell(0,0,0,0,cen,C,z);
+  GaussianShell dummyshell(0,0,0,0,cen,C);
 
   // Compute ERI
   eris=ERI(this,&dummyshell,this,&dummyshell);
@@ -248,11 +241,7 @@ void GaussianShell::coulomb_normalize() {
   */
 }
 
-std::vector<double> GaussianShell::get_zetas() const {
-  return zeta;
-}
-
-std::vector<double> GaussianShell::get_contr() const {
+std::vector<contr_t> GaussianShell::get_contr() const {
   return c;
 }
 
@@ -260,15 +249,15 @@ std::vector<shellf_t> GaussianShell::get_cart() const {
   return cart;
 }
 
-std::vector<double> GaussianShell::get_contr_normalized() const {
+std::vector<contr_t> GaussianShell::get_contr_normalized() const {
   // Returned array
-  std::vector<double> cn=c;
+  std::vector<contr_t> cn=c;
 
   double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
   
   // Convert coefficients to those of normalized primitives
   for(size_t i=0;i<cn.size();i++)
-    cn[i]/=fac*pow(zeta[i],am/2.0+0.75);
+    cn[i].c/=fac*pow(cn[i].z,am/2.0+0.75);
 
   return cn;
 }
@@ -285,26 +274,22 @@ size_t GaussianShell::get_Nlm() const {
 }
 
 double GaussianShell::range(double eps) const {
-  double oldr=0.0, r=2.0;
+  double oldr;
+  // Start at
+  double r=1.0;
 
-  double val=0.0;
-  // Compute value of exponential contraction
-  for(size_t i=0;i<c.size();i++)
-    val+=c[i]*exp(-zeta[i]*r*r);
-  // Plug in the cartesian part
-  val*=pow(r,am);
-
+  double val;
   // Increase r so that value certainly has dropped below.
-  while(fabs(val)>eps) {
+  do {
     // Increase value of r.
     oldr=r;
     r*=2.0;
 
     val=0.0;
     for(size_t i=0;i<c.size();i++)
-      val+=c[i]*exp(-zeta[i]*r*r);
+      val+=c[i].c*exp(-c[i].z*r*r);
     val*=pow(r,am);
-  }
+  } while(fabs(val)>eps);
   
   // OK, now the range lies in the range [oldr,r]. Use binary search to refine
   double left=oldr, right=r;
@@ -317,7 +302,7 @@ double GaussianShell::range(double eps) const {
     // Compute value in the middle
     val=0.0;
     for(size_t i=0;i<c.size();i++)
-      val+=c[i]*exp(-zeta[i]*middle*middle);
+      val+=c[i].c*exp(-c[i].z*middle*middle);
     val*=pow(middle,am);
 
     // Switch values
@@ -370,12 +355,19 @@ coords_t GaussianShell::get_coords() const {
 }
 
 bool GaussianShell::operator<(const GaussianShell & rhs) const {
-  if(am<rhs.am)
+  if(atind<rhs.atind)
     return 1;
-  else if(am==rhs.am)
-    return zeta[0]<rhs.zeta[0];
-  else
-    return 0;
+  else if(atind==rhs.atind) {
+    if(am<rhs.am)
+      return 1;
+    else if(am==rhs.am) {
+      // Decreasing order of exponents.
+      if(c.size() && rhs.c.size())
+	return c[0].z>rhs.c[0].z;
+    }
+  }
+
+  return 0;
 }
 
 size_t GaussianShell::get_first_ind() const {
@@ -400,12 +392,12 @@ void GaussianShell::print() const {
   printf("\t\tCenter of shell is at % 0.4f % 0.4f % 0.4f Å.\n",cen.x/ANGSTROMINBOHR,cen.y/ANGSTROMINBOHR,cen.z/ANGSTROMINBOHR);
 
   // Get contraction of normalized primitives
-  std::vector<double> cn=get_contr_normalized();
+  std::vector<contr_t> cn=get_contr_normalized();
 
   printf("\t\tExponential contraction is\n");
   printf("\t\t\tzeta\t\tprimitive coeff\ttotal coeff\n");
   for(size_t i=0;i<c.size();i++)
-    printf("\t\t\t%e\t%e\t%e\n",zeta[i],cn[i],c[i]);
+    printf("\t\t\t%e\t%e\t%e\n",c[i].z,cn[i].c,c[i].c);
   if(uselm) {
     printf("\t\tThe functions on this shell are:\n\t\t\t");
     for(int m=-am;m<=am;m++)
@@ -449,7 +441,7 @@ arma::vec GaussianShell::eval_func(double x, double y, double z) const {
   // Evaluate exponential factor
   double expfac=0;
   for(size_t i=0;i<c.size();i++)
-    expfac+=c[i]*exp(-zeta[i]*rrelsq);
+    expfac+=c[i].c*exp(-c[i].z*rrelsq);
 
   // Power arrays, x^l, y^l, z^l
   double xr[am+1], yr[am+1], zr[am+1];
@@ -530,22 +522,22 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
     // Loop over exponential contraction
     for(size_t iexp=0;iexp<c.size();iexp++) {
       // Contracted exponent
-      expf=c[iexp]*exp(-zeta[iexp]*rrelsq);
+      expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
       // x component of gradient:
-      tmp=-2.0*zeta[iexp]*xr[l+1];
+      tmp=-2.0*c[iexp].z*xr[l+1];
       if(l>0)
 	tmp+=l*xr[l-1];
       ret(icart,0)+=tmp*yr[m]*zr[n]*expf;
 
       // y component
-      tmp=-2.0*zeta[iexp]*yr[m+1];
+      tmp=-2.0*c[iexp].z*yr[m+1];
       if(m>0)
 	tmp+=m*yr[m-1];
       ret(icart,1)+=tmp*xr[l]*zr[n]*expf;
       
       // z component
-      tmp=-2.0*zeta[iexp]*zr[n+1];
+      tmp=-2.0*c[iexp].z*zr[n+1];
       if(n>0)
 	tmp+=n*zr[n-1];
       ret(icart,2)+=tmp*xr[l]*yr[m]*expf;
@@ -609,22 +601,22 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
     // Loop over exponential contraction
     for(size_t iexp=0;iexp<c.size();iexp++) {
       // Contracted exponent
-      expf=c[iexp]*exp(-zeta[iexp]*rrelsq);
+      expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
       // Derivative wrt x
-      tmp=4.0*zeta[iexp]*zeta[iexp]*xr[l+2]-2.0*(2*l+1)*zeta[iexp]*xr[l];
+      tmp=4.0*c[iexp].z*c[iexp].z*xr[l+2]-2.0*(2*l+1)*c[iexp].z*xr[l];
       if(l>1)
 	tmp+=l*(l-1)*xr[l-2];
       ret(icart)+=tmp*yr[m]*zr[n]*expf;
 
       // Derivative wrt y
-      tmp=4.0*zeta[iexp]*zeta[iexp]*yr[m+2]-2.0*(2*m+1)*zeta[iexp]*yr[m];
+      tmp=4.0*c[iexp].z*c[iexp].z*yr[m+2]-2.0*(2*m+1)*c[iexp].z*yr[m];
       if(m>1)
 	tmp+=m*(m-1)*yr[m-2];
       ret(icart)+=tmp*xr[l]*zr[n]*expf;
 
       // Derivative wrt z
-      tmp=4.0*zeta[iexp]*zeta[iexp]*zr[n+2]-2.0*(2*n+1)*zeta[iexp]*zr[n];
+      tmp=4.0*c[iexp].z*c[iexp].z*zr[n+2]-2.0*(2*n+1)*c[iexp].z*zr[n];
       if(n>1)
 	tmp+=n*(n-1)*zr[n-2];
       ret(icart)+=tmp*xr[l]*yr[m]*expf;
@@ -658,9 +650,9 @@ arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
   double zb=rhs.cen.z;
 
 #ifdef OBARASAIKA
-  for(size_t ixl=0;ixl<zeta.size();ixl++)
-    for(size_t ixr=0;ixr<rhs.zeta.size();ixr++)
-      S+=c[ixl]*rhs.c[ixr]*overlap_int_os(xa,ya,za,zeta[ixl],cart,xb,yb,zb,rhs.zeta[ixr],rhs.cart);
+  for(size_t ixl=0;ixl<c.size();ixl++)
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++)
+      S+=c[ixl].c*rhs.c[ixr].c*overlap_int_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
 #else
   // Loop over shells
   for(size_t icl=0;icl<cart.size();icl++)
@@ -717,9 +709,9 @@ arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
 
 
 #ifdef OBARASAIKA
-  for(size_t ixl=0;ixl<zeta.size();ixl++)
-    for(size_t ixr=0;ixr<rhs.zeta.size();ixr++)
-      T+=c[ixl]*rhs.c[ixr]*kinetic_int_os(xa,ya,za,zeta[ixl],cart,xb,yb,zb,rhs.zeta[ixr],rhs.cart);
+  for(size_t ixl=0;ixl<c.size();ixl++)
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++)
+      T+=c[ixl].c*rhs.c[ixr].c*kinetic_int_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
 
 #else
   // Loop over shells
@@ -777,9 +769,9 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   double zb=rhs.cen.z;
 
 #ifdef OBARASAIKA
-  for(size_t ixl=0;ixl<zeta.size();ixl++)
-    for(size_t ixr=0;ixr<rhs.zeta.size();ixr++)
-      Vnuc+=c[ixl]*rhs.c[ixr]*nuclear_int_os(xa,ya,za,zeta[ixl],cart,cx,cy,cz,xb,yb,zb,rhs.zeta[ixr],rhs.cart);
+  for(size_t ixl=0;ixl<c.size();ixl++)
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++)
+      Vnuc+=c[ixl].c*rhs.c[ixr].c*nuclear_int_os(xa,ya,za,c[ixl].z,cart,cx,cy,cz,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
 #else
 
   // Loop over shells
@@ -868,13 +860,13 @@ std::vector<arma::mat> GaussianShell::moment(int am, double x, double y, double 
   double zb=rhs.cen.z;
 
   // Compute moment integrals
-  for(size_t ixl=0;ixl<zeta.size();ixl++) {
-    double ca=c[ixl];
-    double zetaa=zeta[ixl];
+  for(size_t ixl=0;ixl<c.size();ixl++) {
+    double ca=c[ixl].c;
+    double zetaa=c[ixl].z;
     
-    for(size_t ixr=0;ixr<rhs.zeta.size();ixr++) {
-      double cb=rhs.c[ixr];
-      double zetab=rhs.zeta[ixr];
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
+      double cb=rhs.c[ixr].c;
+      double zetab=rhs.c[ixr].z;
       
       wrk+=ca*cb*three_overlap_int_os(xa,ya,za,xb,yb,zb,x,y,z,zetaa,zetab,0.0,cart,rhs.cart,mom);
     }
@@ -924,14 +916,17 @@ BasisSet::~BasisSet() {
 void BasisSet::add_functions(int atind, coords_t cen, ElementBasisSet el) {
   // Add basis functions at cen
 
+  // Get the shells on the element
+  std::vector<FunctionShell> bf=el.get_shells();
+
   // Allocate memory for basis functions
-  shells.reserve(shells.size()+el.bf.size());
+  shells.reserve(shells.size()+bf.size());
 
   // Index for basis function
   size_t ind;
 
   // Loop over shells in element basis
-  for(size_t i=0;i<el.bf.size();i++) {
+  for(size_t i=0;i<bf.size();i++) {
 
     // Determine index of next basis function
     try {
@@ -941,20 +936,22 @@ void BasisSet::add_functions(int atind, coords_t cen, ElementBasisSet el) {
       ind=0;
     }
 
+    // Get contraction
+
     // Use spherical harmonics even if the number of functions is not reduced
     // (unnecessary transformations of integrals)
     //    shells.push_back(GaussianShell(ind,el.bf[i].am,uselm,atind,cen,el.bf[i].C,el.bf[i].z));
 
     // Add functions. Use spherical harmonics only when it's beneficial, i.e. if am>=2
-    if(el.bf[i].am>=2)
-      shells.push_back(GaussianShell(ind,el.bf[i].am,uselm,atind,cen,el.bf[i].C,el.bf[i].z));
+    if(bf[i].get_am()>=2)
+      shells.push_back(GaussianShell(ind,bf[i].get_am(),uselm,atind,cen,bf[i].get_contr()));
     else
-      shells.push_back(GaussianShell(ind,el.bf[i].am,0,atind,cen,el.bf[i].C,el.bf[i].z));
+      shells.push_back(GaussianShell(ind,bf[i].get_am(),false,atind,cen,bf[i].get_contr()));
 
   }
 }
 
-void BasisSet::add_functions(int atind, coords_t cen, int am, std::vector<double> C, std::vector<double> zeta) {
+void BasisSet::add_functions(int atind, coords_t cen, int am, const std::vector<contr_t> & C) {
   // Add basis functions at cen
 
   // Index for basis function
@@ -969,14 +966,21 @@ void BasisSet::add_functions(int atind, coords_t cen, int am, std::vector<double
   }
 
   if(am>=2)
-    shells.push_back(GaussianShell(ind,am,uselm,atind,cen,C,zeta));
+    shells.push_back(GaussianShell(ind,am,uselm,atind,cen,C));
   else
-    shells.push_back(GaussianShell(ind,am,0,atind,cen,C,zeta));
+    shells.push_back(GaussianShell(ind,am,0,atind,cen,C));
+
+  // Sort basis set.
+  sort();
 }
 
 void BasisSet::add_shell(GaussianShell sh) {
   // Add shell
   shells.push_back(sh);
+  // Check numbering
+  check_numbering();
+  // Sort basis set
+  sort();
 }
 
 void BasisSet::add_nucleus(nucleus_t nuc) {
@@ -1005,8 +1009,9 @@ void BasisSet::check_numbering() {
   }
 }
 
-void BasisSet::sort_am() {
-  // Sort shells in increasing angular momentum
+void BasisSet::sort() {
+  // Sort shells in increasing nuclear number, then in increasing
+  // angular momentum, then in decreasing exponent
   stable_sort(shells.begin(),shells.end());
 
   // Check numbering
@@ -1239,11 +1244,7 @@ coords_t BasisSet::get_shell_coords(size_t num) const {
   return shells[num].get_coords();
 }
 
-std::vector<double> BasisSet::get_zetas(size_t ind) const {
-  return shells[ind].get_zetas();
-}
-
-std::vector<double> BasisSet::get_contr(size_t ind) const {
+std::vector<contr_t> BasisSet::get_contr(size_t ind) const {
   return shells[ind].get_contr();
 }
 
@@ -1636,21 +1637,21 @@ double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks,
 
   // Loop over exponential contractions
   for(size_t ix=0;ix<shells[is].c.size();ix++) {
-    za=shells[is].zeta[ix];
-    ca=shells[is].c[ix];
+    za=shells[is].c[ix].z;
+    ca=shells[is].c[ix].c;
 
     for(size_t jx=0;jx<shells[js].c.size();jx++) {
-      zb=shells[js].zeta[jx];
-      cb=shells[js].c[jx];
+      zb=shells[js].c[jx].z;
+      cb=shells[js].c[jx].c;
 
       for(size_t kx=0;kx<shells[ks].c.size();kx++) {
-	zc=shells[ks].zeta[kx];
-	cc=shells[ks].c[kx];
+	zc=shells[ks].c[kx].z;
+	cc=shells[ks].c[kx].c;
 
 	for(size_t lx=0;lx<shells[ls].c.size();lx++) {
 
-	  zd=shells[ls].zeta[lx];
-	  cd=shells[ls].c[lx];
+	  zd=shells[ls].c[lx].z;
+	  cd=shells[ls].c[lx].c;
 	  
 	  // ERI of these functions is
 	  eri+=ca*cb*cc*cd*ERI_int(la,ma,na,cena.x,cena.y,cena.z,za,
@@ -1893,25 +1894,25 @@ void compute_libint_data(Libint_t & libint, const GaussianShell *is, const Gauss
 
   // Compute primitive data
   for(size_t p=0;p<is->c.size();p++) {
-    zetaa=is->zeta[p];
-    c_p=is->c[p];
+    zetaa=is->c[p].z;
+    c_p=is->c[p].c;
 
     for(size_t r=0;r<js->c.size();r++) {
-      zetab=js->zeta[r];
-      c_pr=c_p*js->c[r];
+      zetab=js->c[r].z;
+      c_pr=c_p*js->c[r].c;
 
       // Reduced exponent
       double zeta=zetaa+zetab;
 
       for(size_t s=0;s<ks->c.size();s++) {
-	zetac=ks->zeta[s];
-	c_prs=c_pr*ks->c[s];
+	zetac=ks->c[s].z;
+	c_prs=c_pr*ks->c[s].c;
 
 	for(size_t t=0;t<ls->c.size();t++) {
-	  zetad=ls->zeta[t];
+	  zetad=ls->c[t].z;
 
 	  // Product of contraction coefficients
-	  c=c_prs*ls->c[t];
+	  c=c_prs*ls->c[t].c;
 
 	  // Reduced exponents
 	  double eta=zetac+zetad;
@@ -2434,7 +2435,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
 }
 
 bool exponent_compare(const GaussianShell & lhs, const GaussianShell & rhs) {
-  return lhs.get_zetas()[0]>rhs.get_zetas()[0];
+  return lhs.get_contr()[0].z>rhs.get_contr()[0].z;
 }
 
 
@@ -2476,27 +2477,27 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
       // Get angular momentum
       int am=2*shells[i].get_am();
       // Get exponents
-      std::vector<double> exps=shells[i].get_zetas();
+      std::vector<contr_t> contr=shells[i].get_contr();
 
-      // Dummy contraction and exponent
-      std::vector<double> C(1), z(1);
-      C[0]=1.0;
+      // Dummy contraction
+      std::vector<contr_t> C(1);
+      C[0].c=1.0;
 
-      for(size_t j=0;j<exps.size();j++) {
+      for(size_t j=0;j<contr.size();j++) {
 	// Set exponent
-	z[0]=2.0*exps[j];
+	C[0].z=2.0*contr[j].z;
 
 	// Check that candidate set doesn't already contain the same function
 	bool found=0;
 	for(size_t k=0;k<cand.size();k++)
-	  if((cand[k].get_am()==am) && (cand[k].get_zetas()[0]==z[0])) {
+	  if((cand[k].get_am()==am) && (cand[k].get_contr()[0]==C[0])) {
 	    found=1;
 	    break;
 	  }
 
 	// Add function
 	if(!found)
-	  cand.push_back(GaussianShell(0,am,1,in,cen,C,z));
+	  cand.push_back(GaussianShell(0,am,true,in,cen,C));
       }
     }
 
@@ -2520,7 +2521,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
       
       // Function with largest exponent is moved to the trial set and
       // its exponent is set as the reference value - (7) in YRF
-      double ref=(cand[0].get_zetas())[0];
+      double ref=(cand[0].get_contr())[0].z;
       trial.push_back(cand[0]);
       cand.erase(cand.begin());
 
@@ -2528,7 +2529,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	// More functions remaining, move all for which ratio of
 	// reference to exponent is smaller than fsam - (8) in YRF
 	for(size_t i=cand.size()-1;i<cand.size();i--)
-	  if(ref/((cand[i].get_zetas())[0])<fsam) {
+	  if(ref/((cand[i].get_contr())[0].z)<fsam) {
 	    trial.push_back(cand[i]);
 	    cand.erase(cand.begin()+i);
 	  }
@@ -2536,7 +2537,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	// Compute geometric average of exponents - (9) in YRF
 	double geomav=1.0;
 	for(size_t i=0;i<trial.size();i++)
-	  geomav*=trial[i].get_zetas()[0];
+	  geomav*=trial[i].get_contr()[0].z;
 	geomav=pow(geomav,1.0/trial.size());
 
 	//	printf("Geometric average of %i functions is %e.\n",(int) trial.size(),geomav);
@@ -2575,12 +2576,12 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	}
 
 	// Add density fitting functions
-	std::vector<double> C, z;
-	C.push_back(1.0);
-	z.push_back(geomav);
+	std::vector<contr_t> C(1);
+	C[0].c=1.0;
+	C[0].z=geomav;
 	for(int l=0;l<=max_am;l++)
 	  if(lvals[l]>0)
-	    dfit.add_functions(in,cen,l,C,z);
+	    dfit.add_functions(in,cen,l,C);
       }
     } // (10) in YRF
   } // (11) in YRF
@@ -2592,6 +2593,97 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 }
 #endif
 
+BasisSet BasisSet::exchange_fitting() const {
+  // Exchange fitting basis set
+
+  Settings set;
+  BasisSet fit(nuclei.size(),set);
+
+  const int maxam=get_max_am();
+
+  // Loop over nuclei
+  for(size_t in=0;in<nuclei.size();in++) {
+    // Center of nucleus
+    coords_t cen=get_nuclear_coords(in);
+
+    // Get shells corresponding to this nucleus
+    std::vector<GaussianShell> shells=get_funcs(in);
+
+    // Sort shells in increasing angular momentum
+    std::sort(shells.begin(),shells.end());
+
+    // Determine amount of functions on current atom and minimum and maximum exponents
+    std::vector<int> nfunc(maxam+1);
+    std::vector<double> mine(maxam+1);
+    std::vector<double> maxe(maxam+1);
+    int lmax=0;
+
+    // Initialize arrays
+    for(int l=0;l<=maxam;l++) {
+      nfunc[l]=0;
+      mine[l]=DBL_MAX;
+      maxe[l]=0.0;
+    }
+
+    // Loop over shells of current nucleus
+    for(size_t ish=0;ish<shells.size();ish++) {
+      // Current angular momentum
+      int l=shells[ish].get_am();
+
+      // Update maximum value
+      if(l>lmax)
+	lmax=l;
+
+      // Increase amount of functions
+      nfunc[l]++;
+
+      // Get exponential contraction
+      std::vector<contr_t> contr=shells[ish].get_contr();
+
+      // Check exponent ranges
+      if(mine[l]>contr[contr.size()-1].z)
+	mine[l]=contr[contr.size()-1].z;
+      
+      if(maxe[l]<contr[0].z)
+	maxe[l]=contr[0].z;
+    }
+
+    // Add functions to fitting basis set
+    for(int l=0;l<=lmax;l++) {
+      // Add density fitting functions                                                                                                                                                      
+      std::vector<contr_t> C(1);
+      C[0].c=1.0;
+
+      // Compute even-tempered formula
+      double alpha=mine[l];
+      double beta;
+      if(nfunc[l]>1)
+	beta=pow(maxe[l]/mine[l],1.0/(nfunc[l]-1));
+      else
+	beta=1.0;
+      
+      // Add even-tempered functions
+      for(int n=0;n<nfunc[l];n++) {
+	// Compute exponent
+	C[0].z=alpha*pow(beta,n);
+	fit.add_functions(in,cen,l,C);
+      }
+    }
+  }
+ 
+  // Normalize basis set
+  fit.coulomb_normalize();
+
+  return fit;
+}
+
+GaussianShell dummyshell() {
+  coords_t cen={0.0, 0.0, 0.0};
+  std::vector<contr_t> C(1);
+  C[0].c=1.0;
+  C[0].z=0.0;
+  return GaussianShell(0,0,0,0,cen,C);
+}
 
 size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl) {
   // Compute indices of swapped integrals.

@@ -363,11 +363,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   std::vector<GaussianShell> auxshells=dfitbas.get_shells();
 
   // Dummy shell, helper for computing ERIs
-  coords_t cen={0.0, 0.0, 0.0};
-  std::vector<double> Cd, zd;
-  Cd.push_back(1.0);
-  zd.push_back(0.0);
-  GaussianShell dummyshell(0,0,0,0,cen,Cd,zd);
+  GaussianShell dummy=dummyshell();
 
   // First, compute the two-center integrals
   arma::mat ab(Naux,Naux);
@@ -379,7 +375,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   for(size_t is=0;is<auxshells.size();is++) {
     for(size_t js=0;js<=is;js++) {
       // Compute (a|b)
-      std::vector<double> eris=ERI(&auxshells[is],&dummyshell,&auxshells[js],&dummyshell);
+      std::vector<double> eris=ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
 
       // Store integrals
       for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
@@ -430,7 +426,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 	  size_t nu0=orbshells[inu].get_first_ind();
 
 	  // Compute the integral over the AOs
-	  std::vector<double> eris=ERI(&auxshells[ia],&dummyshell,&orbshells[imu],&orbshells[inu]);
+	  std::vector<double> eris=ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
 
 	  // Transform integrals to spin orbitals.
 	  for(size_t ispin=0;ispin<C.size();ispin++) {

@@ -94,6 +94,8 @@ add_subdirectory(casida)
 add_subdirectory(slaterfit)
 # Create test tool
 add_subdirectory(test)
+# Create basis set tool
+add_subdirectory(basistool)
 
 # Recipe for building ERITable
 add_custom_command(

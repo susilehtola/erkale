@@ -38,18 +38,6 @@ typedef struct {
   int Nf;
 } sto_params_t;
 
-/// Write \f$ \exp(-\zeta r) \approx \sum_i c_i \exp (-z_i r^2) \f$
-typedef struct {
-  /// Contraction coefficient
-  double c;
-  /// Exponent
-  double z;
-} contr_t;
-
-bool operator<(const contr_t & lhs, const contr_t & rhs) {
-  return lhs.z<rhs.z;
-}
-
 std::vector<double> get_exps_full(const gsl_vector *v, size_t Nf) {
   // Helper array
   std::vector<double> exps;
