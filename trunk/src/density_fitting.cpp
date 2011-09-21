@@ -57,7 +57,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   ab.zeros();
 
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic) collapse(2)
+#pragma omp parallel for schedule(dynamic)
 #endif
   for(size_t is=0;is<auxshells.size();is++) {
     for(size_t js=0;js<=is;js++) {
@@ -82,7 +82,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     screen=arma::mat(orbshells.size(),orbshells.size());
     screen.zeros();
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic) collapse(2)
+#pragma omp parallel for schedule(dynamic)
 #endif
     for(size_t is=0;is<orbshells.size();is++) {
       for(size_t js=0;js<=is;js++) {
@@ -110,7 +110,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     a_munu.resize(Naux*Norb*(Norb+1)/2);
     
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic) collapse(3)
+#pragma omp parallel for schedule(dynamic)
 #endif
     for(size_t ia=0;ia<auxshells.size();ia++)
       for(size_t imu=0;imu<orbshells.size();imu++)
@@ -209,7 +209,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
       // Worker stack for each matrix
       arma::vec gammawrk(gamma);
 
-#pragma omp for schedule(dynamic) collapse(2)
+#pragma omp for schedule(dynamic)
 #endif
       for(size_t imus=0;imus<orbshells.size();imus++)
 	for(size_t inus=0;inus<=imus;inus++) {
