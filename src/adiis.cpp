@@ -111,7 +111,7 @@ std::vector<double> ADIIS::get_c() const {
   gsl_vector_set_all(x,1.0/N);
 
   // Initial estimate
-  double E_initial=get_E(x);
+  //  double E_initial=get_E(x);
 
   // Step size 0.01, stop optimization with tolerance 1e-4
   gsl_multimin_fdfminimizer_set(s, &minfunc, x, 0.01, 1e-4);
@@ -143,7 +143,7 @@ std::vector<double> ADIIS::get_c() const {
   while (status == GSL_CONTINUE && iter < 1000);
 
   // Final estimate
-  double E_final=get_E(s->x);
+  //double E_final=get_E(s->x);
 
   // Form minimum
   std::vector<double> c=compute_c(s->x);
