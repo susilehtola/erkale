@@ -184,30 +184,29 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
     int thid=omp_get_thread_num();
 #endif
 
-#pragma omp for schedule(dynamic,1)
+#pragma omp for schedule(dynamic) collapse(2)
 #endif // ifdef _OPENMP
     for(size_t ip=0;ip<Npairs;ip++) {
-      
-      // Shells are
-      size_t ks=pairs[ip].is;
-      size_t ls=pairs[ip].js;
-      // First functions on shells are
-      size_t k0=basp->get_first_ind(ks);
-      size_t l0=basp->get_first_ind(ls);
-      // and amounts of functions on shells are
-      size_t Nk=basp->get_Nbf(ks);
-      size_t Nl=basp->get_Nbf(ls);
-      
-#ifndef ERITABLE
-      // Indices of last functions on shells
-      size_t klast=basp->get_last_ind(ks);
-      size_t llast=basp->get_last_ind(ls);
-#endif
-      
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++) {
+
+	// Shells on first pair are
+	size_t ks=pairs[ip].is;
+	size_t ls=pairs[ip].js;
+	// First functions on shells are
+	size_t k0=basp->get_first_ind(ks);
+	size_t l0=basp->get_first_ind(ls);
+	// and amounts of functions on shells are
+	size_t Nk=basp->get_Nbf(ks);
+	size_t Nl=basp->get_Nbf(ls);
 	
-	// Shells are
+#ifndef ERITABLE
+	// Indices of last functions on shells
+	size_t klast=basp->get_last_ind(ks);
+	size_t llast=basp->get_last_ind(ls);
+#endif
+      
+	// Shells on second pair are
 	size_t is=pairs[jp].is;
 	size_t js=pairs[jp].js;
 	// First functions on shells are
