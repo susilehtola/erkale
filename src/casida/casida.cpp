@@ -323,7 +323,7 @@ void Casida::absorption() const {
 	for(size_t jp=0;jp<pairs[jspin].size();jp++) {
 
 	  // Compute |x| = x^T S^{-1/2} F_i
-	  tr(it,ic)+=dipmat[jspin][ic](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)/fe(pairs[jspin][jp],jspin);
+	  tr(it,ic)+=dipmat[jspin][ic](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
 	}
       }
 
