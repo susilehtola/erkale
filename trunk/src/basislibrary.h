@@ -50,13 +50,10 @@ std::string find_basis(const std::string & filename);
  */
 
 class FunctionShell {
-
   /// Angular momentum
   int am;
-  /// Coefficients of normalized primitives in contraction
-  std::vector<double> C;
-  /// Exponents of primitives
-  std::vector<double> z;
+  /// Exponential contraction
+  std::vector<contr_t> C;
 
  public:
   /// Construct a shell with angular momentum am
@@ -72,17 +69,14 @@ class FunctionShell {
   /// Get angular momentum
   int get_am() const;
 
-  /// Get exponents
-  std::vector<double> get_exps() const;
   /// Get contraction coefficients
-  std::vector<double> get_contr() const;
+  std::vector<contr_t> get_contr() const;
 
   /// Sort exponents in decreasing order
   void sort();
   /// Print out info
   void print() const;
 
-  friend class BasisSet;
   friend class BasisSetLibrary;
 };
 
@@ -130,8 +124,6 @@ class ElementBasisSet {
   /// Comparison operator for sorting
   bool operator<(const ElementBasisSet &rhs) const;
 
-  /// Get number of shells
-  size_t get_Nshells() const;
   /// Get the shells
   std::vector<FunctionShell> get_shells() const;  
 
@@ -146,7 +138,6 @@ class ElementBasisSet {
   // Decontract set
   void decontract();
 
-  friend class BasisSet;
   friend class BasisSetLibrary;
 };
 

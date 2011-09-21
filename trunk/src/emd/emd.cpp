@@ -101,8 +101,7 @@ std::vector< std::vector<size_t> > find_identical_shells(const BasisSet & bas) {
   // Loop over shells
   for(size_t ish=0;ish<bas.get_Nshells();ish++) {
     // Get exponents, contractions and cartesian functions on shell
-    std::vector<double> shell_z=bas.get_zetas(ish);
-    std::vector<double> shell_c=bas.get_contr(ish);
+    std::vector<contr_t> shell_contr=bas.get_contr(ish);
     std::vector<shellf_t> shell_cart=bas.get_cart(ish);
 
     // Try to find the shell on the current list of identicals
@@ -127,17 +126,12 @@ std::vector< std::vector<size_t> > find_identical_shells(const BasisSet & bas) {
 	// If cartesian parts match, check also exponents and contraction coefficients
 	if(found) {
 	  // Get exponents
-	  std::vector<double> cmp_z=bas.get_zetas(ret[iident][0]);
-	  std::vector<double> cmp_c=bas.get_contr(ret[iident][0]);
+	  std::vector<contr_t> cmp_contr=bas.get_contr(ret[iident][0]);
 
 	  // Check exponents
-	  if(shell_z.size()==cmp_z.size()) {
-	    for(size_t iexp=0;iexp<shell_z.size();iexp++)
-	      if(shell_z[iexp]!=cmp_z[iexp])
-		found=0;
-
-	    for(size_t iexp=0;iexp<shell_z.size();iexp++)
-	      if(shell_c[iexp]!=cmp_c[iexp])
+	  if(shell_contr.size()==cmp_contr.size()) {
+	    for(size_t ic=0;ic<shell_contr.size();ic++)
+	      if(!(shell_contr[ic]==cmp_contr[ic]))
 		found=0;
 	  } else
 	    found=0;
@@ -174,8 +168,7 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
   std::vector< std::vector<GTO_Fourier_Ylm> > ylmexp;
   for(size_t i=0;i<idents.size();i++) {
     // Get exponents, contraction coefficients and cartesians
-    std::vector<double> zetas=bas.get_zetas(idents[i][0]);
-    std::vector<double> contr=bas.get_contr(idents[i][0]);
+    std::vector<contr_t> contr=bas.get_contr(idents[i][0]);
     std::vector<shellf_t> cart=bas.get_cart(idents[i][0]);
 
     // Form expansions of cartesian functions
@@ -184,7 +177,7 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
       // Expansion of current function
       GTO_Fourier_Ylm func;
       for(size_t iexp=0;iexp<contr.size();iexp++)
-	func+=contr[iexp]*GTO_Fourier_Ylm(cart[icart].l,cart[icart].m,cart[icart].n,zetas[iexp]);
+	func+=contr[iexp].c*GTO_Fourier_Ylm(cart[icart].l,cart[icart].m,cart[icart].n,contr[iexp].z);
       // Plug in the normalization factor
       func=cart[icart].relnorm*func;
       // Clean out terms with zero contribution

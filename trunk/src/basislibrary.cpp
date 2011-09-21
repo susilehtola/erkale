@@ -1,4 +1,4 @@
-/*
+/**
  *                This source code is part of
  * 
  *                     E  R  K  A  L  E
@@ -13,7 +13,6 @@
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
  */
-
 
 
 #include "basislibrary.h"
@@ -99,33 +98,23 @@ FunctionShell::~FunctionShell() {
 }
 
 void FunctionShell::add_exponent(double Cv, double zv) {
-  C.push_back(Cv);
-  z.push_back(zv);
+  contr_t tmp;
+  tmp.c=Cv;
+  tmp.z=zv;
+  C.push_back(tmp);
+  sort();
 }
 
 void FunctionShell::sort() {
   // Sort exponents in decreasing order
 
-  size_t i, j;
-
-  for(i=1;i<z.size();i++) {
-    double chelp=C[i];
-    double zhelp=z[i];
-    for(j=i;j>=2;j--) {
-      if(z[j-1] >= zhelp)
-	break;
-      z[j]=z[j-1];
-      C[j]=C[j-1];
-    }
-    z[j]=zhelp;
-    C[j]=chelp;
-  }
+  std::stable_sort(C.begin(),C.end());
 }
 
 void FunctionShell::print() const {
   printf("\tam = %i, %i functions\n",am, (int) C.size());
   for(size_t i=0;i<C.size();i++)
-    printf("\t\t%e\t%e\n",C[i],z[i]);
+    printf("\t\t%e\t%e\n",C[i].c,C[i].z);
 }
 
 bool FunctionShell::operator<(const FunctionShell & rhs) const {
@@ -134,18 +123,14 @@ bool FunctionShell::operator<(const FunctionShell & rhs) const {
     return am<rhs.am;
   else
     // Same angular momentum, sort by first exponent.
-    return z[0]>rhs.z[0];
+    return C[0]<rhs.C[0];
 }
 
 int FunctionShell::get_am() const {
   return am;
 }
 
-std::vector<double> FunctionShell::get_exps() const {
-  return z;
-}
-
-std::vector<double> FunctionShell::get_contr() const {
+std::vector<contr_t> FunctionShell::get_contr() const {
   return C;
 }
 
@@ -192,10 +177,6 @@ bool ElementBasisSet::operator<(const ElementBasisSet &rhs) const {
   return get_Z(symbol)<get_Z(rhs.symbol);
 }
 
-size_t ElementBasisSet::get_Nshells() const {
-  return bf.size();
-}
-
 std::vector<FunctionShell> ElementBasisSet::get_shells() const {
   return bf;
 }
@@ -211,22 +192,22 @@ void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coe
       // Increment number of shells
       nsh++;
 
-      // Get exponents on shell
-      std::vector<double> shexp=bf[ish].get_exps();
+      // Get contraction on shell
+      std::vector<contr_t> shc=bf[ish].get_contr();
 
       // Loop over exponents
-      for(size_t iexp=0;iexp<shexp.size();iexp++) {
+      for(size_t iexp=0;iexp<shc.size();iexp++) {
 	// First, check if exponent is already on list
 	bool found=0;
 	for(size_t i=0;i<exps.size();i++)
-	  if(exps[i]==shexp[iexp]) {
+	  if(exps[i]==shc[iexp].z) {
 	    found=1;
 	    break;
 	  }
 	
 	// If exponent was not found, add it to the list.
 	if(!found)
-	  exps.push_back(shexp[iexp]);
+	  exps.push_back(shc[iexp].z);
       }
     }
 
@@ -241,17 +222,16 @@ void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coe
       if(bf[ish].get_am()==am) {
 
 	// Get exponents and contraction on shell
-	std::vector<double> shexp=bf[ish].get_exps();
-	std::vector<double> shc=bf[ish].get_contr();
+	std::vector<contr_t> shc=bf[ish].get_contr();
 
 	// Find current exponent
 	bool found=0;
-	for(size_t i=0;i<shexp.size();i++)
-	  if(shexp[i]==exps[iexp]) {
+	for(size_t i=0;i<shc.size();i++)
+	  if(shc[i].z==exps[iexp]) {
 	    // Found exponent!
 	    found=1;
 	    // Store contraction coefficient.
-	    coeffs(iexp,iish)=shc[i];
+	    coeffs(iexp,iish)=shc[i].c;
 	    // Exit for loop
 	    break;
 	  }
@@ -289,26 +269,26 @@ void ElementBasisSet::decontract() {
     int am=bf[ish].get_am();
 
     // Get exponents
-    std::vector<double> exps=bf[ish].get_exps();
+    std::vector<contr_t> c=bf[ish].get_contr();
 
     // See if these need to be added to the list.
-    for(size_t iexp=0;iexp<exps.size();iexp++) {
+    for(size_t iexp=0;iexp<c.size();iexp++) {
       if(zeta[am].size()==0)
-	zeta[am].push_back(exps[iexp]);
+	zeta[am].push_back(c[iexp].z);
       else {
 	// Get upper bound
 	std::vector<double>::iterator high;
-	high=std::upper_bound(zeta[am].begin(),zeta[am].end(),exps[iexp]);
+	high=std::upper_bound(zeta[am].begin(),zeta[am].end(),c[iexp].z);
 	
 	// Corresponding index is
 	size_t ind=high-zeta[am].begin();
 	
-	if(ind>0 && zeta[am][ind-1]==exps[iexp])
+	if(ind>0 && zeta[am][ind-1]==c[iexp].z)
 	  // Already on list. Don't do anything.
 	  ;
 	else {
 	  // Term does not exist, add it
-	  zeta[am].insert(high,exps[iexp]);
+	  zeta[am].insert(high,c[iexp].z);
 	}
       }
     }
@@ -487,7 +467,7 @@ void BasisSetLibrary::save_gaussian94(const char * filename) const {
       fprintf(out,"%c   %i   1.00\n",shell_types[elements[iel].bf[ish].am],(int) elements[iel].bf[ish].C.size());
       // Print out contraction
       for(size_t iexp=0;iexp<elements[iel].bf[ish].C.size();iexp++)
-	fprintf(out,"\t%.16e\t\t%.16e\n",elements[iel].bf[ish].z[iexp],elements[iel].bf[ish].C[iexp]);
+	fprintf(out,"\t%.16e\t\t%.16e\n",elements[iel].bf[ish].C[iexp].z,elements[iel].bf[ish].C[iexp].c);
     }
     // Close entry
     fprintf(out,"****\n");
