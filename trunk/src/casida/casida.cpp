@@ -37,8 +37,8 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   C.push_back(Cv);
   P.push_back(Pv);
 
-  printf("\n*** Warning! The Casida implementation is still experimental.\n");
-  fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental.\n");
+  printf("\n*** Warning! The Casida implementation is still experimental. ***\n");
+  fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental. ***\n");
 
   // Parse parameters and form K
   parse_args(set, basis, Cv.n_cols);
@@ -58,8 +58,8 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   P.push_back(Pa);
   P.push_back(Pb);
 
-  printf("\n*** Warning! The Casida implementation is still experimental.\n");
-  fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental.\n");
+  printf("\n*** Warning! The Casida implementation is still experimental. ***\n");
+  fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental. ***\n");
 
   // Parse parameters and form K
   parse_args(set, basis, Ca.n_cols);
@@ -154,27 +154,17 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
     // Amount of occupied and virtual states is
     nocc.push_back(Nel_beta);
     nvirt.push_back(Norb-nocc[1]);
-
-    // Store occupation numbers
-    f.push_back(arma::zeros(Norb));
-    f[0].subvec(0,Nel_alpha-1)=arma::ones(Nel_alpha);
-
-    f.push_back(arma::zeros(Norb));
-    f[1].subvec(0,Nel_beta-1)=arma::ones(Nel_beta);
-
   } else {
     // Amount of occupied states is
     nocc.push_back((bas.Ztot()-set.get_int("Charge"))/2);
     // Amount of virtual states is
     nvirt.push_back(Norb-nocc[0]);
-
-    // Store occupation numbers
-    f.push_back(arma::zeros(Norb));
-    f[0].subvec(0,nocc[0]-1)=2.0*arma::ones(nocc[0]);
   }
 
   // Resize pairs
   pairs.resize(nocc.size());
+  // Resize occupation numbers
+  f.resize(nocc.size());
 
   // What orbitals are included in the calculation?
   std::vector<std::string> states=splitline(set.get_string("CasidaStates"));
@@ -188,6 +178,13 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
 	  tmp.f=nocc[ispin]+ivirt;
 	  pairs[ispin].push_back(tmp);
 	}
+    }
+
+    // Form f.
+    for(size_t ispin=0;ispin<nocc.size();ispin++) {
+      f[ispin].zeros(nocc[ispin]+nvirt[ispin]);
+      for(size_t iocc=0;iocc<nocc[ispin];iocc++)
+	f[ispin](iocc)=pol ? 1.0 : 2.0;
     }
   } else {
     // Loop over spins
@@ -214,6 +211,15 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
 	newC.col(i)=C[ispin].col(idx[i]);
       C[ispin]=newC;
 
+      // Form f
+      f[ispin].zeros(idx.size());
+      for(size_t i=0;i<idx.size();i++)
+	if(idx[i]<nocc[ispin])
+	  // Occupied orbital
+	  f[ispin](i)=pol ? 1.0 : 2.0;
+	else
+	  break;
+      
       // Loop over indices
       for(size_t iocc=0;iocc<idx.size();iocc++) {
 	// Check that it truly is occupied.
@@ -249,8 +255,6 @@ double Casida::fe(states_pair_t ip, bool ispin) const {
 
 void Casida::solve() {
   Timer t;
-
-  K.print("K matrix");
 
   w_i.zeros(K.n_rows);
   F_i.zeros(K.n_rows,K.n_cols);
