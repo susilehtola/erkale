@@ -57,7 +57,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   ab.zeros();
 
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel for schedule(dynamic) collapse(2)
 #endif
   for(size_t is=0;is<auxshells.size();is++) {
     for(size_t js=0;js<=is;js++) {
@@ -82,7 +82,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     screen=arma::mat(orbshells.size(),orbshells.size());
     screen.zeros();
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel for schedule(dynamic) collapse(2)
 #endif
     for(size_t is=0;is<orbshells.size();is++) {
       for(size_t js=0;js<=is;js++) {
@@ -110,15 +110,13 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     a_munu.resize(Naux*Norb*(Norb+1)/2);
     
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel for schedule(dynamic) collapse(3)
 #endif
-    for(size_t ia=0;ia<auxshells.size();ia++) {
-      size_t Na=auxshells[ia].get_Nbf();
-      
-      for(size_t imu=0;imu<orbshells.size();imu++) {
-	size_t Nmu=orbshells[imu].get_Nbf();
-	
+    for(size_t ia=0;ia<auxshells.size();ia++)
+      for(size_t imu=0;imu<orbshells.size();imu++)
 	for(size_t inu=0;inu<=imu;inu++) {
+	  size_t Na=auxshells[ia].get_Nbf();
+	  size_t Nmu=orbshells[imu].get_Nbf();
 	  size_t Nnu=orbshells[inu].get_Nbf();
 	  
 	  // Compute (a|mn)
@@ -139,9 +137,8 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 	    }
 	  }
 	}
-      }
-    }
   }
+
 }
 
 
@@ -204,47 +201,69 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
     GaussianShell dummy=dummyshell();
 
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel
 #endif
-    for(size_t ias=0;ias<auxshells.size();ias++)
+    {
+
+#ifdef _OPENMP
+      // Worker stack for each matrix
+      arma::vec gammawrk(gamma);
+
+#pragma omp for schedule(dynamic) collapse(2)
+#endif
       for(size_t imus=0;imus<orbshells.size();imus++)
 	for(size_t inus=0;inus<=imus;inus++) {
-
+	  
 #ifdef SCREENING
 	  // Do we need to compute the integral?
 	  if(screen(imus,inus)<THR)
 	    continue;
 #endif
 
-	  size_t Na=auxshells[ias].get_Nbf();
 	  size_t Nmu=orbshells[imus].get_Nbf();
 	  size_t Nnu=orbshells[inus].get_Nbf();
 
-	  // Compute (a|mn)
-	  std::vector<double> eris=ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-
-	  // Increment gamma
-#ifdef _OPENMP
-#pragma omp critical
-#endif
-	  for(size_t iia=0;iia<Na;iia++) {
-	    size_t ia=auxshells[ias].get_first_ind()+iia;
-
-	    for(size_t iimu=0;iimu<Nmu;iimu++) {
-	      size_t imu=orbshells[imus].get_first_ind()+iimu;
-
-	      for(size_t iinu=0;iinu<Nnu;iinu++) {
-		size_t inu=orbshells[inus].get_first_ind()+iinu;
+	  for(size_t ias=0;ias<auxshells.size();ias++) {
+	    
+	    size_t Na=auxshells[ias].get_Nbf();
+	    
+	    // Compute (a|mn)
+	    std::vector<double> eris=ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	    
+	    // Increment gamma
+	    for(size_t iia=0;iia<Na;iia++) {
+	      size_t ia=auxshells[ias].get_first_ind()+iia;
+	      
+	      for(size_t iimu=0;iimu<Nmu;iimu++) {
+		size_t imu=orbshells[imus].get_first_ind()+iimu;
 		
-		if(imu>inu)
-		  gamma(ia)+=2.0*eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
-		else if(imu==inu)
-		  gamma(ia)+=eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,imu);
+		for(size_t iinu=0;iinu<Nnu;iinu++) {
+		  size_t inu=orbshells[inus].get_first_ind()+iinu;
+
+#ifdef _OPENMP
+		  if(imu>inu)
+		    gammawrk(ia)+=2.0*eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
+		  else if(imu==inu)
+		    gammawrk(ia)+=eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,imu);
+#else
+		  if(imu>inu)
+		    gamma(ia)+=2.0*eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
+		  else if(imu==inu)
+		    gamma(ia)+=eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,imu);
+#endif
+		}
 	      }
 	    }
 	  }
 	}
-  }    
+      
+#ifdef _OPENMP
+#pragma omp critical
+      // Sum results together
+      gamma+=gammawrk;
+#endif
+    } // end parallel section
+  }
 
   // Compute x0
   arma::vec x0=ab_inv*gamma;
