@@ -1510,12 +1510,11 @@ arma::mat BasisSet::nuclear() const {
   Vnuc.zeros();
 
   // Loop over shells
-  size_t i, j;
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic) collapse(2)
+#pragma omp parallel for schedule(dynamic)
 #endif
-  for(i=0;i<shells.size();i++)
-    for(j=0;j<=i;j++) {
+  for(size_t i=0;i<shells.size();i++)
+    for(size_t j=0;j<=i;j++) {
       for(size_t inuc=0;inuc<nuclei.size();inuc++) {
 	// If BSSE nucleus, do nothing
 	if(nuclei[inuc].bsse)
@@ -1565,7 +1564,7 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
 
   // Loop over shells
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic) collapse(2)
+#pragma omp parallel for schedule(dynamic)
 #endif
   for(size_t i=0;i<shells.size();i++) {
     for(size_t j=0;j<=i;j++) {

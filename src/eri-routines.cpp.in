@@ -184,7 +184,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
     int thid=omp_get_thread_num();
 #endif
 
-#pragma omp for schedule(dynamic) collapse(2)
+#pragma omp for schedule(dynamic)
 #endif // ifdef _OPENMP
     for(size_t ip=0;ip<Npairs;ip++) {
       // Loop over second pairs
