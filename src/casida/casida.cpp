@@ -205,11 +205,16 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
       for(size_t i=0;i<idx.size();i++)
 	idx[i]--;
 
-      // Get active orbitals
+      // Get active orbitals and energies
       arma::mat newC(C[ispin].n_rows,idx.size());
       for(size_t i=0;i<idx.size();i++)
 	newC.col(i)=C[ispin].col(idx[i]);
       C[ispin]=newC;
+
+      arma::vec newE(C[ispin].n_elem);
+      for(size_t i=0;i<idx.size();i++)
+	newE(i)=E[ispin](idx[i]);
+      E[ispin]=newE;
 
       // Form f
       f[ispin].zeros(idx.size());
