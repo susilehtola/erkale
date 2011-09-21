@@ -1509,50 +1509,38 @@ arma::mat BasisSet::nuclear() const {
   arma::mat Vnuc(N,N);
   Vnuc.zeros();
 
-  // Loop over nuclei
+  // Loop over shells
+  size_t i, j;
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel for schedule(dynamic) collapse(2)
 #endif
-  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
-    // If BSSE nucleus, do nothing
-    if(nuclei[inuc].bsse)
-      continue;
-    
-    // Nuclear charge
-    int Z=nuclei[inuc].Z;
-    
-    // Coordinates of nucleus
-    double cx=nuclei[inuc].x;
-    double cy=nuclei[inuc].y;
-    double cz=nuclei[inuc].z;
-    
-    // Loop over shells
-    for(size_t i=0;i<shells.size();i++) {
-      for(size_t j=0;j<i;j++) {
+  for(i=0;i<shells.size();i++)
+    for(j=0;j<=i;j++) {
+      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+	// If BSSE nucleus, do nothing
+	if(nuclei[inuc].bsse)
+	  continue;
+	
+	// Nuclear charge
+	int Z=nuclei[inuc].Z;
+	
+	// Coordinates of nucleus
+	double cx=nuclei[inuc].x;
+	double cy=nuclei[inuc].y;
+	double cz=nuclei[inuc].z;
 	
 	// Get subblock
 	arma::mat tmp=Z*shells[i].nuclear(cx,cy,cz,shells[j]);
+
 	// On the off diagonal we fill out both sides of the matrix
-	//	Vnuc.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())+=tmp;
-	//	Vnuc.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
-#ifdef _OPENMP
-#pragma omp critical
-#endif
-	{
+	if(i!=j) {
 	  Vnuc.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())+=tmp;
 	  Vnuc.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
-	}
+	} else
+	  // On the diagonal we just get it once
+	  Vnuc.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
       }
-      
-      arma::mat tmp=Z*shells[i].nuclear(cx,cy,cz,shells[i]); 
-      // Add only once on diagonal
-      //      Vnuc.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())+=tmp;
-#ifdef _OPENMP
-#pragma omp critical
-#endif
-      Vnuc.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())+=tmp;
     }
-  }
   
   return Vnuc;
 }
@@ -1577,27 +1565,26 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
 
   // Loop over shells
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel for schedule(dynamic) collapse(2)
 #endif
   for(size_t i=0;i<shells.size();i++) {
-    // Off-diagonal
-    for(size_t j=0;j<i;j++) {
+    for(size_t j=0;j<=i;j++) {
       // Compute moment integral over shells
       std::vector<arma::mat> ints=shells[i].moment(mom,x,y,z,shells[j]);
       
       // Store moments
-      for(size_t m=0;m<Nmom;m++) {
-	ret[m].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=ints[m];
-	ret[m].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(ints[m]);
+      if(i!=j) {
+	for(size_t m=0;m<Nmom;m++) {
+	  ret[m].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=ints[m];
+	  ret[m].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(ints[m]);
+	}
+      } else {
+	for(size_t m=0;m<Nmom;m++)
+	  ret[m].submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=ints[m];
       }
     }
-    
-    // Diagonal
-    std::vector<arma::mat> ints=shells[i].moment(mom,x,y,z,shells[i]);
-    for(size_t m=0;m<Nmom;m++)
-      ret[m].submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=ints[m];
   }
-
+  
   return ret;
 }
 
