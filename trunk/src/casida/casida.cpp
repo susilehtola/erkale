@@ -32,6 +32,11 @@
 // \delta parameter in Eichkorn et al
 #define DELTA 1e-9
 
+// Screen Coulomb integrals?
+#define SCREENING
+// Screening threshold
+#define SCREENTHR 1e-10
+
 Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ev, const arma::mat & Cv, const arma::mat & Pv) {
   E.push_back(Ev);
   C.push_back(Cv);
@@ -362,6 +367,10 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   std::vector<GaussianShell> orbshells=basis.get_shells();
   std::vector<GaussianShell> auxshells=dfitbas.get_shells();
 
+  // Get list of pairs
+  std::vector<shellpair_t> orbpairs=basis.get_unique_shellpairs();
+  std::vector<shellpair_t> auxpairs=dfitbas.get_unique_shellpairs();
+
   // Dummy shell, helper for computing ERIs
   GaussianShell dummy=dummyshell();
 
@@ -370,101 +379,135 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   ab.zeros();
 
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t is=0;is<auxshells.size();is++) {
-    for(size_t js=0;js<=is;js++) {
-      // Compute (a|b)
-      std::vector<double> eris=ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
+  for(size_t ip=0;ip<auxpairs.size();ip++) {
+    // Shells in question are
+    size_t is=auxpairs[ip].is;
+    size_t js=auxpairs[ip].js;
 
-      // Store integrals
-      for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
-        for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
-          ab(auxshells[is].get_first_ind()+ii,auxshells[js].get_first_ind()+jj)=eris[ii*auxshells[js].get_Nbf()+jj];
-          ab(auxshells[js].get_first_ind()+jj,auxshells[is].get_first_ind()+ii)=eris[ii*auxshells[js].get_Nbf()+jj];
-        }
-    }
+    // Compute (a|b)
+    std::vector<double> eris=ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
+    
+    // Store integrals
+    for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
+      for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
+	ab(auxshells[is].get_first_ind()+ii,auxshells[js].get_first_ind()+jj)=eris[ii*auxshells[js].get_Nbf()+jj];
+	ab(auxshells[js].get_first_ind()+jj,auxshells[is].get_first_ind()+ii)=eris[ii*auxshells[js].get_Nbf()+jj];
+      }
   }
 
   // Form ab_inv
   ab_inv=arma::inv(ab+DELTA);
-
+  
   // Allocate memory for the three-center integrals.
   munu.resize(C.size());
   for(size_t ispin=0;ispin<C.size();ispin++) {
     munu[ispin].zeros(C[ispin].n_cols*C[ispin].n_cols,Naux);
   }
 
+#ifdef SCREENING
+  // Screen the integrals.
+  arma::mat screen(orbshells.size(),orbshells.size());
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ip=0;ip<orbpairs.size();ip++) {
+    // The shells in question are
+    size_t is=orbpairs[ip].is;
+    size_t js=orbpairs[ip].js;
+    
+    // Compute ERIs
+    std::vector<double> eris=ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
+    
+    // Find out maximum value
+    double max=0.0;
+    for(size_t i=0;i<eris.size();i++)
+      if(fabs(eris[i])>max)
+	max=eris[i];
+    max=sqrt(max);
+    
+    // Store value
+    screen(is,js)=max;
+    screen(js,is)=max;
+  }
+#endif
+  
   // Compute the three-center integrals.
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-
+    
 #ifdef _OPENMP
     // Worker stack for each thread
     std::vector<arma::mat> munu_wrk=munu;
-
-#pragma omp for schedule(dynamic,1)
+    
+#pragma omp for schedule(dynamic)
 #endif
-    for(size_t ia=0;ia<auxshells.size();ia++) {
+    for(size_t ip=0;ip<orbpairs.size();ip++) {
+      // Shells in question are
+      size_t imu=orbpairs[ip].is;
+      size_t inu=orbpairs[ip].js;
+
+#ifdef SCREENING
+      // Do we need to compute the integral?
+      if(screen(imu,inu)<SCREENTHR)
+	continue;
+#endif
+      
       // Amount of functions on shell
-      size_t Na=auxshells[ia].get_Nbf();
+      size_t Nmu=orbshells[imu].get_Nbf();
       // Index of first function on shell
-      size_t a0=auxshells[ia].get_first_ind();
+      size_t mu0=orbshells[imu].get_first_ind();
+      
+      // Amount of functions on shell
+      size_t Nnu=orbshells[inu].get_Nbf();
+      // Index of first function on shell
+      size_t nu0=orbshells[inu].get_first_ind();
 
-      for(size_t imu=0;imu<orbshells.size();imu++) {
+      for(size_t ia=0;ia<auxshells.size();ia++) {
 	// Amount of functions on shell
-	size_t Nmu=orbshells[imu].get_Nbf();
+	size_t Na=auxshells[ia].get_Nbf();
 	// Index of first function on shell
-	size_t mu0=orbshells[imu].get_first_ind();
-
-	for(size_t inu=0;inu<=imu;inu++) {
-	  // Amount of functions on shell
-	  size_t Nnu=orbshells[inu].get_Nbf();
-	  // Index of first function on shell
-	  size_t nu0=orbshells[inu].get_first_ind();
-
-	  // Compute the integral over the AOs
-	  std::vector<double> eris=ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
-
-	  // Transform integrals to spin orbitals.
-	  for(size_t ispin=0;ispin<C.size();ispin++) {
-	    // Amount of active orbitals with current spin.
-	    size_t Norb=C[ispin].n_cols;
-
-	    size_t indmu, indnu, inda;
-	    // Loop over orbitals
-	    for(size_t mu=0;mu<Norb;mu++)
-	      for(size_t nu=0;nu<=mu;nu++) {
-		// Loop over functions
-		for(size_t muf=0;muf<Nmu;muf++) {
-		  indmu=mu0+muf;
-		  for(size_t nuf=0;nuf<Nnu;nuf++) {
-		    indnu=nu0+nuf;
+	size_t a0=auxshells[ia].get_first_ind();
+	
+	// Compute the integral over the AOs
+	std::vector<double> eris=ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
+	
+	// Transform integrals to spin orbitals.
+	for(size_t ispin=0;ispin<C.size();ispin++) {
+	  // Amount of active orbitals with current spin.
+	  size_t Norb=C[ispin].n_cols;
+	  
+	  size_t indmu, indnu, inda;
+	  // Loop over orbitals
+	  for(size_t mu=0;mu<Norb;mu++)
+	    for(size_t nu=0;nu<=mu;nu++) {
+	      // Loop over functions
+	      for(size_t muf=0;muf<Nmu;muf++) {
+		indmu=mu0+muf;
+		for(size_t nuf=0;nuf<Nnu;nuf++) {
+		  indnu=nu0+nuf;
+		  
+		  // Coefficient of integral is
+		  double c= (imu!=inu) ? C[ispin](indmu,mu)*C[ispin](indnu,nu) + C[ispin](indmu,nu)*C[ispin](indnu,mu) : C[ispin](indmu,mu)*C[ispin](indnu,nu);
+		  
+		  // Loop over auxiliary functions
+		  for(size_t af=0;af<Na;af++) {
+		    inda=a0+af;
 		    
-		    // Coefficient of integral is
-		    double c=C[ispin](indmu,mu)*C[ispin](indnu,nu);
-		    if(imu!=inu)
-		      // inu<imu, use symmetry of ERIs
-		      c+=C[ispin](indmu,nu)*C[ispin](indnu,mu);
-		    
-		    // Loop over auxiliary functions
-		    for(size_t af=0;af<Na;af++) {
-		      inda=a0+af;
-		      
 #ifdef _OPENMP
-		      munu_wrk[ispin](mu*Norb+nu,inda)+=c*eris[(af*Nmu+muf)*Nnu+nuf];
+		    munu_wrk[ispin](mu*Norb+nu,inda)+=c*eris[(af*Nmu+muf)*Nnu+nuf];
 #else
-		      munu[ispin](mu*Norb+nu,inda)+=c*eris[(af*Nmu+muf)*Nnu+nuf];
+		    munu[ispin](mu*Norb+nu,inda)+=c*eris[(af*Nmu+muf)*Nnu+nuf];
 #endif
-		    }
 		  }
 		}
 	      }
-	    
-	  } // end loop over spins
-	}
+	    }
+	  
+	} // end loop over spins
       }
     }
     
@@ -475,7 +518,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       munu[ispin]+=munu_wrk[ispin];
 #endif
   } // end parallel region
-
+  
   // Symmetrize munu
   for(size_t ispin=0;ispin<C.size();ispin++) {
     size_t Norb=C[ispin].n_cols;
