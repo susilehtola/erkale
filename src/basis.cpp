@@ -1053,7 +1053,7 @@ void BasisSet::form_unique_shellpairs() {
   // Now, form list of unique shell pairs
   for(size_t i=0;i<shells.size();i++) {
     for(size_t j=0;j<=i;j++) {
-      // Have to set these in every iteartion due to swap below
+      // Have to set these in every iteration due to swap below
       tmp.is=i;
       tmp.js=j;
 
@@ -1101,6 +1101,10 @@ size_t BasisSet::find_pair(size_t is, size_t js) const {
 }    
 
 std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
+  if(shells.size() && !shellpairs.size()) {
+    throw std::runtime_error("shellpairs not initialized! Maybe you forgot to finalize?\n");
+  }
+
   return shellpairs;
 }
 
@@ -1509,14 +1513,11 @@ arma::mat BasisSet::nuclear() const {
   arma::mat Vnuc(N,N);
   Vnuc.zeros();
 
-  // Get list of unique shell pairs
-  std::vector<shellpair_t> pairs=get_unique_shellpairs();
-
   // Loop over shells
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t ip=0;ip<pairs.size();ip++)
+  for(size_t ip=0;ip<shellpairs.size();ip++)
     for(size_t inuc=0;inuc<nuclei.size();inuc++) {
       // If BSSE nucleus, do nothing
       if(nuclei[inuc].bsse)
@@ -1531,8 +1532,8 @@ arma::mat BasisSet::nuclear() const {
       double cz=nuclei[inuc].z;
 
       // Shells in pair
-      size_t i=pairs[ip].is;
-      size_t j=pairs[ip].js;
+      size_t i=shellpairs[ip].is;
+      size_t j=shellpairs[ip].js;
       
       // Get subblock
       arma::mat tmp=Z*shells[i].nuclear(cx,cy,cz,shells[j]);
@@ -1567,17 +1568,14 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
     ret[i].zeros();
   }
 
-  // Get list of unique shell pairs
-  std::vector<shellpair_t> pairs=get_unique_shellpairs();
-
   // Loop over shells
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t ip=0;ip<pairs.size();ip++) {
+  for(size_t ip=0;ip<shellpairs.size();ip++) {
     // Shells in pair
-    size_t i=pairs[ip].is;
-    size_t j=pairs[ip].js;
+    size_t i=shellpairs[ip].is;
+    size_t j=shellpairs[ip].js;
     
     
     // Compute moment integral over shells
@@ -2582,9 +2580,11 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
       }
     } // (10) in YRF
   } // (11) in YRF
- 
+
   // Normalize basis set
   dfit.coulomb_normalize();
+  // Form list of unique shell pairs
+  dfit.form_unique_shellpairs();
 
   return dfit;
 }
@@ -2670,6 +2670,8 @@ BasisSet BasisSet::exchange_fitting() const {
  
   // Normalize basis set
   fit.coulomb_normalize();
+  // Form list of unique shell pairs
+  fit.form_unique_shellpairs();
 
   return fit;
 }
