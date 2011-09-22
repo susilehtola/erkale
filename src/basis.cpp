@@ -1509,36 +1509,41 @@ arma::mat BasisSet::nuclear() const {
   arma::mat Vnuc(N,N);
   Vnuc.zeros();
 
+  // Get list of unique shell pairs
+  std::vector<shellpair_t> pairs=get_unique_shellpairs();
+
   // Loop over shells
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t i=0;i<shells.size();i++)
-    for(size_t j=0;j<=i;j++) {
-      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
-	// If BSSE nucleus, do nothing
-	if(nuclei[inuc].bsse)
-	  continue;
-	
-	// Nuclear charge
-	int Z=nuclei[inuc].Z;
-	
-	// Coordinates of nucleus
-	double cx=nuclei[inuc].x;
-	double cy=nuclei[inuc].y;
-	double cz=nuclei[inuc].z;
-	
-	// Get subblock
-	arma::mat tmp=Z*shells[i].nuclear(cx,cy,cz,shells[j]);
+  for(size_t ip=0;ip<pairs.size();ip++)
+    for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+      // If BSSE nucleus, do nothing
+      if(nuclei[inuc].bsse)
+	continue;
+      
+      // Nuclear charge
+      int Z=nuclei[inuc].Z;
+      
+      // Coordinates of nucleus
+      double cx=nuclei[inuc].x;
+      double cy=nuclei[inuc].y;
+      double cz=nuclei[inuc].z;
 
-	// On the off diagonal we fill out both sides of the matrix
-	if(i!=j) {
-	  Vnuc.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())+=tmp;
-	  Vnuc.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
-	} else
-	  // On the diagonal we just get it once
-	  Vnuc.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
-      }
+      // Shells in pair
+      size_t i=pairs[ip].is;
+      size_t j=pairs[ip].js;
+      
+      // Get subblock
+      arma::mat tmp=Z*shells[i].nuclear(cx,cy,cz,shells[j]);
+      
+      // On the off diagonal we fill out both sides of the matrix
+      if(i!=j) {
+	Vnuc.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())+=tmp;
+	Vnuc.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
+      } else
+	// On the diagonal we just get it once
+	Vnuc.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
     }
   
   return Vnuc;
@@ -1562,25 +1567,31 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
     ret[i].zeros();
   }
 
+  // Get list of unique shell pairs
+  std::vector<shellpair_t> pairs=get_unique_shellpairs();
+
   // Loop over shells
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t i=0;i<shells.size();i++) {
-    for(size_t j=0;j<=i;j++) {
-      // Compute moment integral over shells
-      std::vector<arma::mat> ints=shells[i].moment(mom,x,y,z,shells[j]);
-      
-      // Store moments
-      if(i!=j) {
-	for(size_t m=0;m<Nmom;m++) {
-	  ret[m].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=ints[m];
-	  ret[m].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(ints[m]);
-	}
-      } else {
-	for(size_t m=0;m<Nmom;m++)
-	  ret[m].submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=ints[m];
+  for(size_t ip=0;ip<pairs.size();ip++) {
+    // Shells in pair
+    size_t i=pairs[ip].is;
+    size_t j=pairs[ip].js;
+    
+    
+    // Compute moment integral over shells
+    std::vector<arma::mat> ints=shells[i].moment(mom,x,y,z,shells[j]);
+    
+    // Store moments
+    if(i!=j) {
+      for(size_t m=0;m<Nmom;m++) {
+	ret[m].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=ints[m];
+	ret[m].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(ints[m]);
       }
+    } else {
+      for(size_t m=0;m<Nmom;m++)
+	ret[m].submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=ints[m];
     }
   }
   
