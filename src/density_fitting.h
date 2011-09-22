@@ -57,6 +57,9 @@ class DensityFit {
   std::vector<GaussianShell> orbshells;
   /// Density fitting shells
   std::vector<GaussianShell> auxshells;
+
+  /// List of unique orbital shell pairs
+  std::vector<shellpair_t> orbpairs;
   
   /// Index helper
   std::vector<size_t> iidx;
