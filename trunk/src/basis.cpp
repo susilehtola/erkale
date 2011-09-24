@@ -2610,44 +2610,51 @@ BasisSet BasisSet::exchange_fitting() const {
     std::sort(shells.begin(),shells.end());
 
     // Determine amount of functions on current atom and minimum and maximum exponents
-    std::vector<int> nfunc(maxam+1);
-    std::vector<double> mine(maxam+1);
-    std::vector<double> maxe(maxam+1);
+    std::vector<int> nfunc(2*maxam+1);
+    std::vector<double> mine(2*maxam+1);
+    std::vector<double> maxe(2*maxam+1);
     int lmax=0;
 
     // Initialize arrays
-    for(int l=0;l<=maxam;l++) {
+    for(int l=0;l<=2*maxam;l++) {
       nfunc[l]=0;
       mine[l]=DBL_MAX;
       maxe[l]=0.0;
     }
 
     // Loop over shells of current nucleus
-    for(size_t ish=0;ish<shells.size();ish++) {
-      // Current angular momentum
-      int l=shells[ish].get_am();
+    for(size_t ish=0;ish<shells.size();ish++)
+      // Second loop over shells of current nucleus
+      for(size_t jsh=0;jsh<shells.size();jsh++) {
+	
+	// Current angular momentum
+	int l=shells[ish].get_am()+shells[jsh].get_am();
+	
+	// Update maximum value
+	if(l>lmax)
+	  lmax=l;
+	
+	// Increase amount of functions
+	nfunc[l]++;
+	
+	// Get exponential contractions
+	std::vector<contr_t> icontr=shells[ish].get_contr();
+	std::vector<contr_t> jcontr=shells[jsh].get_contr();
 
-      // Update maximum value
-      if(l>lmax)
-	lmax=l;
-
-      // Increase amount of functions
-      nfunc[l]++;
-
-      // Get exponential contraction
-      std::vector<contr_t> contr=shells[ish].get_contr();
-
-      // Check exponent ranges
-      if(mine[l]>contr[contr.size()-1].z)
-	mine[l]=contr[contr.size()-1].z;
-      
-      if(maxe[l]<contr[0].z)
-	maxe[l]=contr[0].z;
-    }
-
+	// Minimum exponent
+	double mi=icontr[icontr.size()-1].z+jcontr[jcontr.size()-1].z;
+	// Maximum exponent
+	double ma=icontr[0].z+jcontr[0].z;
+	
+	// Check global minimum and maximum
+	if(mi<mine[l])
+	  mine[l]=mi;	
+	if(ma>maxe[l])
+	  maxe[l]=ma;
+      }
+    
     // Add functions to fitting basis set
     for(int l=0;l<=lmax;l++) {
-      // Add density fitting functions                                                                                                                                                      
       std::vector<contr_t> C(1);
       C[0].c=1.0;
 
