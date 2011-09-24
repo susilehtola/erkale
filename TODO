@@ -1,5 +1,9 @@
 * Optimize AtomGrid::eval_Fxc.
 
+* Modify AtomGrid to evaluate Ex and Ec simultaneously.
+
+* The number of executables is growing rapidly => identify common code and place in parser routines.
+
 * Installed headers need to be preprocessed.
 
 * Write pretty-printing routine for making bars such as *** text ***
@@ -13,10 +17,10 @@
 * Debug meta-GGA & meta-GGA functionals (in collaboration with libxc
   upstream).
 
-* Speed up ERI computation by precomputing shell pair data.
-
 * Add failsafes to settings, e.g., thresholds must be positive.
 
-* Implement checkpointing / saving of results.
+* Implement checkpointing / saving of results (using HDF5?).
 
 ? Rewrite the SCF solver in a clearer, more object-oriented form.
+
+? Speed up ERI computation by precomputing shell pair data.
