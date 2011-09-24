@@ -27,6 +27,14 @@
 // Forward declaration
 class BasisSet;
 
+/// Helper for parallellizing loops
+typedef struct {
+  /// First basis function
+  size_t i;
+  /// Second basis function
+  size_t j;
+} bfpair_t;
+
 /**
  * \class ERItable
  *
@@ -39,13 +47,15 @@ class BasisSet;
  * \author Jussi Lehtola
  * \date 2011/05/12 18:35
  */
-
 class ERItable {
   /// Table of integrals
   std::vector<double> ints;
 
   /// Index helper
   std::vector<size_t> iidx;
+  /// List of pairs
+  std::vector<bfpair_t> pairs;
+
   /// Calculate index in integral table
   size_t idx(size_t i, size_t j, size_t k, size_t l) const;
  public:
@@ -78,10 +88,6 @@ class ERItable {
   arma::mat calcJ(const arma::mat & R) const;
   /// Form exchange matrix
   arma::mat calcK(const arma::mat & R) const;
-  /// Form Coulomb and exchange matrices at the same time
-  void calcJK(const arma::mat & R, arma::mat & J, arma::mat & K) const;
-  /// Form Coulomb and exchange matrices at the same time, unrestricted case
-  void calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const;
 };
 
 #include "basis.h"

@@ -104,7 +104,15 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 #ifdef ERITABLE
   // Make index helper
   iidx=i_idx(Nbf*(Nbf+1)/2);
-
+  // Make pairs helper
+  for(size_t i=0;i<Nbf;i++)
+    for(size_t j=0;j<=i;j++) {
+      bfpair_t tmp;
+      tmp.i=i;
+      tmp.j=j;
+      pairs.push_back(tmp);
+    }
+  
   // Compute memory requirements
   size_t N;
   N=N_ints(basp);

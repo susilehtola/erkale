@@ -103,25 +103,34 @@ arma::mat ERItable::calcJ(const arma::mat & R) const {
   arma::mat J(N,N);
   J.zeros();
 
+  // Index helpers
+  size_t i, j;
+  // The (ij) element in the J array
+  double tmp;
+  
   // Loop over matrix elements
-  for(size_t i=0;i<N;i++)
-    for(size_t j=0;j<=i;j++) {
-      // The (ij) element in the J array
-      double tmp=0.0;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic) private(i,j,tmp)
+#endif
+  for(size_t ip=0;ip<pairs.size();ip++) {
+    // The relevant indices are
+    i=pairs[ip].i;
+    j=pairs[ip].j;
 
-      // Loop over density matrix
-      for(size_t k=0;k<N;k++)
-	for(size_t l=0;l<N;l++) {
-	  tmp+=R(k,l)*getERI(i,j,k,l);
-	  //	  printf("J(%i,%i) += %e * %e\t(%i %i %i %i)\n",i,j,R(k,l),getERI(i,j,k,l),i,j,k,l);
-	}
-      
-      // Store result 
-      J(i,j)=tmp;
-      J(j,i)=tmp;
-      //      J[i,j]=tmp;
-    }
-
+    // Loop over density matrix
+    tmp=0.0;
+    for(size_t k=0;k<N;k++)
+      for(size_t l=0;l<N;l++) {
+	tmp+=R(k,l)*getERI(i,j,k,l);
+	//	  printf("J(%i,%i) += %e * %e\t(%i %i %i %i)\n",i,j,R(k,l),getERI(i,j,k,l),i,j,k,l);
+      }
+    
+    // Store result 
+    J(i,j)=tmp;
+    J(j,i)=tmp;
+    //      J[i,j]=tmp;
+  }
+  
   return J;
 }
 
@@ -135,113 +144,32 @@ arma::mat ERItable::calcK(const arma::mat & R) const {
   arma::mat K(N,N);
   K.zeros();
 
+  // Helpers
+  size_t i, l;
+  double tmp;
+
   // Loop over matrix elements
-  for(size_t i=0;i<N;i++)
-    for(size_t l=0;l<=i;l++) {
-      // The (ij) element in the J array
-      double tmp=0.0;
-
-      // Loop over density matrix
-      for(size_t j=0;j<N;j++)
-	for(size_t k=0;k<N;k++) {
-	  tmp+=R(j,k)*getERI(i,j,k,l);
-	}
-
-      // Store result
-      K(i,l)=tmp;
-      K(l,i)=tmp;
-    }
-
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic) private(i,l,tmp)
+#endif
+  for(size_t ip=0;ip<pairs.size();ip++) {
+    // The relevant indices are
+    i=pairs[ip].i;
+    l=pairs[ip].j;
+    
+    // The (il) element in the K array
+    tmp=0.0;
+    
+    // Loop over density matrix
+    for(size_t j=0;j<N;j++)
+      for(size_t k=0;k<N;k++) {
+	tmp+=R(j,k)*getERI(i,j,k,l);
+      }
+    
+    // Store result
+    K(i,l)=tmp;
+    K(l,i)=tmp;
+  }
+  
   return K;
-}
-
-void ERItable::calcJK(const arma::mat & R, arma::mat & J, arma::mat & K) const {
-  // Calculate Coulomb and exchange at the same time
-
-  // Size of basis set
-  const size_t Rc=R.n_cols, Rr=R.n_rows;
-
-  if(Rc!=Rr) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Density matrix not square!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  const size_t N=R.n_cols;
-
-  J=arma::mat(N,N);
-  K=arma::mat(N,N);
-
-  // Initialize output
-  J.zeros();
-  K.zeros();
-
-  double res;
-
-  // Loops
-  for(size_t i=0;i<N;i++)
-    for(size_t j=0;j<N;j++) 
-      for(size_t k=0;k<N;k++)
-	for(size_t l=0;l<N;l++) {
-	  // Get integral
-	  res=getERI(i,j,k,l);
-	  // Increment Coulomb and exchange
-	  //J[i,j]+=R[k,l]*res;
-	  //K[i,l]+=R[j,k]*res;
-	  J(i,j)+=R(k,l)*res;
-	  K(i,l)+=R(j,k)*res;
-	}
-}
-
-
-void ERItable::calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb) const {
-  // Calculate Coulomb and exchange at the same time
-
-  // Size of basis set
-  const size_t Rc=Ra.n_cols, Rr=Ra.n_rows;
-
-  if(Rc!=Rr) {
-    ERROR_INFO();
-    throw std::runtime_error("Density matrix not square!\n");
-  }
-
-  if(Rb.n_cols != Rc || Rb.n_rows != Rc) {
-    ERROR_INFO();
-    throw std::runtime_error("Alpha and beta density matrices are not of the same size!\n");
-  }
-
-  const size_t N=Ra.n_cols;
-
-  if(J.n_cols!=N || J.n_rows!=N)
-    J=arma::mat(N,N);
-  if(Ka.n_cols!=N || Ka.n_rows!=N)
-    Ka=arma::mat(N,N);
-  if(Kb.n_cols!=N || Kb.n_rows!=N)
-    Kb=arma::mat(N,N);
-
-  // Initialize output
-  J.zeros();
-  Ka.zeros();
-  Kb.zeros();
-
-  // Compute total density matrix
-  arma::mat R=Ra+Rb;
-
-  double res;
-
-  // Loops
-  for(size_t i=0;i<N;i++)
-    for(size_t j=0;j<N;j++) 
-      for(size_t k=0;k<N;k++)
-	for(size_t l=0;l<N;l++) {
-	  // Get integral
-	  res=getERI(i,j,k,l);
-	  // Increment Coulomb and exchange
-	  //J[i,j]+=R[k,l]*res;
-	  //K[i,l]+=R[j,k]*res;
-	  J(i,j)+=R(k,l)*res;
-	  Ka(i,l)+=Ra(j,k)*res;
-	  Kb(i,l)+=Rb(j,k)*res;
-	}
 }
