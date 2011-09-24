@@ -73,13 +73,14 @@
 */
 
 /*
-  Converted into C++ by Jussi Lehtola. Original MATLAB routine
-  distributed at 
+  The original MATLAB routine, obtained via email directly from Rob
+  Parrish, was translated into C++ by Jussi Lehtola.
+  The original version was under the BSD license, but the C++ version
+  has been relicensed to the General Public License version 2 (or
+  later).
 
+  The original MATLAB routine is also available at
   http://www.mathworks.com/matlabcentral/fileexchange/27097-getlebedevsphere
-
-  was under the BSD license, but the C++ version has been relicensed to
-  the General Public License version 2 (or later).
 */
 
 #include "global.h"
