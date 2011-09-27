@@ -625,6 +625,65 @@ size_t AtomGrid::memory_req() const {
   return memory_req_grid() + memory_req_bf();
 }    
 
+void AtomGrid::init_xc() {
+  // Size of grid.
+  const size_t N=grid.size();
+
+  // Check allocation of arrays.
+  if(exc.size()!=N)
+    exc.resize(N);
+
+  if(!polarized) {
+    // Restricted case - all arrays of length N
+
+    if(vxc.size()!=N)
+      vxc.resize(N);
+
+    if(do_grad) {
+      if(vsigma.size()!=N)
+	vsigma.resize(N);
+    }
+
+    if(do_lapl) {
+      if(vtau.size()!=N)
+	vtau.resize(N);
+      if(vlapl_rho.size()!=N)
+	vlapl_rho.resize(N);
+    }
+  } else {
+    // Unrestricted case - arrays of length 2N or 3N
+    if(vxc.size()!=2*N)
+      vxc.resize(2*N);
+
+    if(do_grad) {
+      if(vsigma.size()!=3*N)
+	vsigma.resize(3*N);
+    }
+
+    if(do_lapl) {
+      if(vlapl_rho.size()!=2*N)
+	vlapl_rho.resize(2*N);
+      if(vtau.size()!=2*N)
+	vtau.resize(2*N);
+    }
+  }
+
+  // Fill arrays with zeros.
+  do_gga=0;
+  do_mgga=0;
+
+  for(size_t i=0;i<exc.size();i++)
+    exc[i]=0.0;
+  for(size_t i=0;i<vxc.size();i++)
+    vxc[i]=0.0;
+  for(size_t i=0;i<vsigma.size();i++)
+    vsigma[i]=0.0;
+  for(size_t i=0;i<vlapl_rho.size();i++)
+    vlapl_rho[i]=0.0;
+  for(size_t i=0;i<vtau.size();i++)
+    vtau[i]=0.0;  
+}
+
 void AtomGrid::compute_xc(int func_id) {
   // Compute exchange-correlation functional
 
@@ -643,75 +702,97 @@ void AtomGrid::compute_xc(int func_id) {
     throw std::runtime_error(oss.str());
   }
 
-  // Check allocation of arrays
-  if(exc.size()!=grid.size())
-    exc.resize(grid.size());
+  // Which functional is in question?
+  bool gga=0, mgga=0;
   
-  if(!polarized) {
-    if(vxc.size()!=grid.size())
-      vxc.resize(grid.size());
-  } else {
-    if(vxc.size()!=2*grid.size())
-      vxc.resize(2*grid.size());
-  }
-
-  // Compute functional
+  // Determine the family
   switch(func.info->family)
     {
     case XC_FAMILY_LDA:
-      // vsigma is for GGA
-      //      vsigma.clear();
-      // Compute XC functional
-      xc_lda_exc_vxc(&func, grid.size(), &rho[0], &exc[0], &vxc[0]);
-      // Not a GGA calculation.
-      do_gga=0;
-      do_mgga=0;
+      gga=0;
+      mgga=0;
       break;
-
+      
     case XC_FAMILY_GGA:
     case XC_FAMILY_HYB_GGA:
-      // Check allocation of arrays
-      if(!polarized) {
-	if(vsigma.size()!=grid.size())
-	  vsigma.resize(grid.size());
-      } else {
-	if(vsigma.size()!=3*grid.size())
-	  vsigma.resize(3*grid.size());
-      }
-
-      // Compute XC functional
-      xc_gga_exc_vxc(&func, grid.size(), &rho[0], &sigma[0], &exc[0], &vxc[0], &vsigma[0]);
-      // Is a GGA calculation.
-      do_gga=1;
-      do_mgga=0;
+      gga=1;
+      mgga=0;
       break;
-
+      
     case XC_FAMILY_MGGA:
-      if(!polarized) {
-	if(vsigma.size()!=grid.size())
-	  vsigma.resize(grid.size());
-	if(vlapl_rho.size()!=grid.size())
-	  vlapl_rho.resize(grid.size());
-	if(vtau.size()!=grid.size())
-	  vtau.resize(grid.size());
-      } else {
-	if(vsigma.size()!=3*grid.size())
-	  vsigma.resize(3*grid.size());
-	if(vlapl_rho.size()!=2*grid.size())
-	  vlapl_rho.resize(2*grid.size());
-	if(vtau.size()!=2*grid.size())
-	  vtau.resize(2*grid.size());
-      }
-
-      // Compute XC functional
-      xc_mgga_exc_vxc(&func, grid.size(), &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc[0], &vxc[0], &vsigma[0], &vlapl_rho[0], &vtau[0]);
-      // Is a meta-GGA calculation.
-      do_gga=1;
-      do_mgga=1;
+      gga=0;
+      mgga=1;
       break;
+
+    default:
+      {
+	ERROR_INFO();
+	std::ostringstream oss;
+	oss << "Functional family " << func.info->family << " not currently supported in ERKALE!\n";
+	throw std::runtime_error(oss.str());
+      }
     }
   
-  // Free functionals
+  // Update controlling flags for eval_Fxc.
+  do_gga=do_gga || gga || mgga;
+  do_mgga=do_mgga || mgga;
+
+  /* Work arrays. */
+  const size_t N=grid.size();
+
+  // Energy density
+  std::vector<double> excwrk(N);
+
+  // LDA term
+  std::vector<double> vxcwrk;
+  // GGA term
+  std::vector<double> vsigmawrk;
+  // mGGA terms
+  std::vector<double> vlapl_rhowrk;
+  std::vector<double> vtauwrk;
+
+  // Allocate memory
+  if(!polarized) {
+    vxcwrk.resize(N);
+    if(gga||mgga)
+      vsigmawrk.resize(N);
+    if(mgga) {
+      vlapl_rhowrk.resize(N);
+      vtauwrk.resize(N);
+    }
+  } else {
+    vxcwrk.resize(2*N);
+    if(gga||mgga)
+      vsigmawrk.resize(3*N);
+    if(mgga) {
+      vlapl_rhowrk.resize(2*N);
+      vtauwrk.resize(2*N);
+    }
+  }
+
+  // Evaluate functionals.
+  if(mgga) // meta-GGA
+    xc_mgga_exc_vxc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &excwrk[0], &vxcwrk[0], &vsigmawrk[0], &vlapl_rhowrk[0], &vtauwrk[0]);
+  else if(gga) // GGA
+    xc_gga_exc_vxc(&func, N, &rho[0], &sigma[0], &excwrk[0], &vxcwrk[0], &vsigmawrk[0]);
+  else // LDA
+    xc_lda_exc_vxc(&func, N, &rho[0], &excwrk[0], &vxcwrk[0]);
+
+  // Sum results
+  for(size_t i=0;i<excwrk.size();i++)
+    exc[i]+=excwrk[i];
+  for(size_t i=0;i<vxcwrk.size();i++)
+    vxc[i]+=vxcwrk[i];
+  if(gga || mgga)
+    for(size_t i=0;i<vsigmawrk.size();i++)
+      vsigma[i]+=vsigmawrk[i];
+  if(mgga)
+    for(size_t i=0;i<vtau.size();i++) {
+      vtau[i]+=vtauwrk[i];
+      vlapl_rho[i]+=vlapl_rho[i];
+    }
+  
+  // Free functional
   xc_func_end(&func);
 }
 
@@ -1191,15 +1272,15 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
       // Clean out Hamiltonian
       zero(Hnew);
 
-      // Compute exchange and correlation
-      if(x_func>0) {
+      // Compute exchange and correlation.
+      init_xc();
+      // Compute the functionals
+      if(x_func>0)
 	compute_xc(x_func);
-	eval_Fxc(Hnew);
-      }
-      if(c_func>0) {
+      if(c_func>0)
 	compute_xc(c_func);
-	eval_Fxc(Hnew);
-      }
+      // and construct the Fock matrix
+      eval_Fxc(Hnew);
       
       // Compute maximum difference of diagonal elements of Fock matrix
       maxdiff=0.0;
@@ -1342,15 +1423,15 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
       zero(Hanew);
       zero(Hbnew);
 
-      // Compute exchange and correlation
-      if(x_func>0) {
+      // Compute exchange and correlation.
+      init_xc();
+      // Compute the functionals
+      if(x_func>0)
 	compute_xc(x_func);
-	eval_Fxc(Hanew,Hbnew);
-      }
-      if(c_func>0) {
+      if(c_func>0)
 	compute_xc(c_func);
-	eval_Fxc(Hanew,Hbnew);
-      }
+      // and construct the Fock matrices
+      eval_Fxc(Hanew,Hbnew);
       
       // Compute maximum difference of diagonal elements of Fock matrix
       maxdiff=0.0;
@@ -1762,24 +1843,18 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       // Update number of electrons
       Nelwrk[ith]+=atoms[i].compute_Nel();
       
-      // Compute exchange
-      if(x_func>0) {
-	// Compute functional
+      // Initialize the arrays
+      atoms[i].init_xc();
+      // Compute the functionals
+      if(x_func>0)
 	atoms[i].compute_xc(x_func);
-	// Evaluate exchange energy
-	Excwrk[ith]+=atoms[i].eval_Exc();
-	// Evaluate exchange contribution to Fock matrix
-	atoms[i].eval_Fxc(Hwrk[ith]);
-      }
-      // Compute correlation
-      if(c_func>0) {
-	// Compute functional
+      if(c_func>0)
 	atoms[i].compute_xc(c_func);
-	// Evaluate correlation energy
-	Excwrk[ith]+=atoms[i].eval_Exc();
-	// Evaluate correlation contribution to Fock matrix
-	atoms[i].eval_Fxc(Hwrk[ith]);
-      }
+
+      // Evaluate the energy
+      Excwrk[ith]+=atoms[i].eval_Exc();
+      // and construct the Fock matrices
+      atoms[i].eval_Fxc(Hwrk[ith]);
       
       if(direct) {
 	// Free memory
@@ -1808,24 +1883,18 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
     // Update number of electrons
     Nel+=atoms[i].compute_Nel();
     
-    // Compute exchange
-    if(x_func>0) {
-      // Compute functional
+    // Initialize the arrays
+    atoms[i].init_xc();
+    // Compute the functionals
+    if(x_func>0)
       atoms[i].compute_xc(x_func);
-      // Evaluate exchange energy
-      Exc+=atoms[i].eval_Exc();
-      // Evaluate exchange contribution to Fock matrix
-      atoms[i].eval_Fxc(H);
-    }
-    // Compute correlation
-    if(c_func>0) {
-      // Compute functional
+    if(c_func>0)
       atoms[i].compute_xc(c_func);
-      // Evaluate correlation energy
-      Exc+=atoms[i].eval_Exc();
-      // Evaluate correlation contribution to Fock matrix
-      atoms[i].eval_Fxc(H);
-    }
+
+    // Evaluate the energy
+    Exc+=atoms[i].eval_Exc();
+    // and construct the Fock matrices
+    atoms[i].eval_Fxc(H);
 
     if(direct) {
       // Free memory
@@ -1885,26 +1954,20 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       atoms[i].update_density(Pa,Pb);
       // Update number of electrons
       Nel+=atoms[i].compute_Nel();
-      
-      // Compute exchange
-      if(x_func>0) {
-	// Compute functional
-	atoms[i].compute_xc(x_func);
-	// Evaluate exchange energy
-	Excwrk[ith]+=atoms[i].eval_Exc();
-	// Evaluate exchange contribution to Fock matrix
-	atoms[i].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
-      }
-      // Compute correlation
-      if(c_func>0) {
-	// Compute functional
-	atoms[i].compute_xc(c_func);
-	// Evaluate correlation energy
-	Excwrk[ith]+=atoms[i].eval_Exc();
-	// Evaluate correlation contribution to Fock matrix
-	atoms[i].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
-      }
-      
+
+      // Initialize the arrays
+      atoms[i].init_xc();
+      // Compute the functionals
+      if(x_func>0)
+        atoms[i].compute_xc(x_func);
+      if(c_func>0)
+        atoms[i].compute_xc(c_func);
+
+      // Evaluate the energy
+      Exc+=atoms[i].eval_Exc();
+      // and construct the Fock matrices
+      atoms[i].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
+           
       if(direct) {
 	// Free memory
 	atoms[i].free();
@@ -1933,25 +1996,20 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
     atoms[i].update_density(Pa,Pb);
     // Update number of electrons
     Nel+=atoms[i].compute_Nel();
-    
-    // Compute exchange
-    if(x_func>0) {
-      // Compute functional
+
+    // Initialize the arrays
+    atoms[i].init_xc();
+    // Compute the functionals
+    if(x_func>0)
       atoms[i].compute_xc(x_func);
-      // Evaluate exchange energy
-      Exc+=atoms[i].eval_Exc();
-      // Evaluate exchange contribution to Fock matrix
-      atoms[i].eval_Fxc(Ha,Hb);
-    }
-    // Compute correlation
-    if(c_func>0) {
-      // Compute functional
+    if(c_func>0)
       atoms[i].compute_xc(c_func);
-      // Evaluate correlation energy
-      Exc+=atoms[i].eval_Exc();
-      // Evaluate correlation contribution to Fock matrix
-      atoms[i].eval_Fxc(Ha,Hb);
-    }
+
+    // Evaluate the energy
+    Exc+=atoms[i].eval_Exc();
+    // and construct the Fock matrices
+    atoms[i].eval_Fxc(Ha,Hb);
+ 
 
     if(direct) {
       // Free memory

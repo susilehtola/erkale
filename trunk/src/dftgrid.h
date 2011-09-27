@@ -154,9 +154,9 @@ class AtomGrid {
   /// Spin-polarized calculation?
   bool polarized;
 
-  /// GGA functional used? (Only affects eval_Fxc)
+  /// GGA functional used? (Set in compute_xc, only affects eval_Fxc)
   bool do_gga;
-  /// Meta-GGA used? (Only affects eval_Fxc)
+  /// Meta-GGA used? (Set in compute_xc, only affects eval_Fxc)
   bool do_mgga;
 
   // LDA stuff:
@@ -256,7 +256,9 @@ class AtomGrid {
   /// Compute total memory requirements
   size_t memory_req() const;
 
-  /// Compute XC functional from density
+  /// Initialize XC arrays
+  void init_xc();
+  /// Compute XC functional from density and add to total XC array
   void compute_xc(int func_id);
   /// Evaluate exchange/correlation energy
   double eval_Exc() const;
