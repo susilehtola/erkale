@@ -37,6 +37,9 @@
 // Screening threshold
 #define SCREENTHR 1e-10
 
+Casida::Casida() {
+}
+
 Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ev, const arma::mat & Cv, const arma::mat & Pv) {
   E.push_back(Ev);
   C.push_back(Cv);
@@ -52,6 +55,8 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
 
   // Calculate K matrix
   calc_K(set,basis);
+  // and solve Casida equation
+  solve();
 }
 
 Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb) {
@@ -73,6 +78,8 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
 
   // Calculate K matrix
   calc_K(set,basis);
+  // and solve Casida equation
+  solve();
 }
 
 void Casida::parse_args(const Settings & set, const BasisSet & basis, size_t Norbs) {
