@@ -76,6 +76,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_int("CasidaX","Exchange functional for Casida",1);
   set.add_int("CasidaC","Correlation functional for Casida",7);
+  set.add_bool("CasidaPol","Perform polarized Casida calculation (when using restricted wf)",0);
   set.add_int("CasidaCoupling","Coupling mode: 0 for IPA, 1 for RPA and 2 for TDLDA",2);
   set.add_double("CasidaTol","Tolerance for Casida grid",1e-3);
   set.add_string("CasidaStates","States to include in Casida calculation, eg ""1,3-4,10,13"" ","");
@@ -376,8 +377,11 @@ int main(int argc, char **argv) {
     // Do Casida calculation
     Timer tcas;
 
-    Casida cas(set,basis,E,C,P);
-    cas.solve();
+    Casida cas;
+    if(set.get_bool("CasidaPol"))
+      cas=Casida(set,basis,E,E,C,C,P/2.0,P/2.0);
+    else
+      cas=Casida(set,basis,E,C,P);
     cas.absorption();
 
   } else {
@@ -456,7 +460,6 @@ int main(int argc, char **argv) {
     Timer tcas;
 
     Casida cas(set,basis,Ea,Eb,Ca,Cb,Pa,Pb);
-    cas.solve();
     cas.absorption();
   }    
 

@@ -154,6 +154,8 @@ class Casida {
   void coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const;
 
  public:
+  /// Dummy constructor
+  Casida();
   /// Constructor for spin-unpolarized calculation
   Casida(const Settings & set, const BasisSet & basis, const arma::vec & E, const arma::mat & C, const arma::mat & P);
   /// Constructor for spin-polarized calculation
