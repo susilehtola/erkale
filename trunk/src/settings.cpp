@@ -167,6 +167,12 @@ void Settings::add_string(std::string name, std::string comment, std::string val
 }
 
 void Settings::set_double(std::string name, double val) {
+  if(val<0.0) {
+    std::ostringstream oss;
+    oss << "Error: settings must have positive value.\n";
+    throw std::runtime_error(oss.str());
+  }
+
   // Find setting in table
   for(size_t i=0;i<dset.size();i++)
     if(stricmp(name,dset[i].name)==0) {
