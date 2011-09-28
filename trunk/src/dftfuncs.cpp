@@ -110,6 +110,21 @@ void parse_xc_func(int & x_func, int & c_func, const std::string & xc) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to use an exchange functional as correlation.\n");
   }
+
+  // Sanity check: don't try to use kinetic energy functionals.
+  if(is_kinetic(x_func)) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "The wanted functional "<< get_keyword(x_func) << " is a kinetic energy functional.\n";
+    throw std::runtime_error(oss.str());
+  }
+  if(is_kinetic(c_func)) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "The wanted functional "<< get_keyword(c_func) << " is a kinetic energy functional.\n";
+    throw std::runtime_error(oss.str());
+  }
+
 }
 
 void print_info(int x_func, int c_func) {
@@ -212,7 +227,6 @@ bool is_exchange_correlation(int func_id) {
   return ans;
 }
 
-
 bool is_correlation(int func_id) {
   bool ans=0;
   
@@ -231,6 +245,38 @@ bool is_correlation(int func_id) {
 	   the exchange functional, since we check whether the
 	   exchange part includes exact exchange. */
       case XC_CORRELATION:
+	ans=1;
+	break;
+      default:
+	ans=0;
+      }
+    // Free functional
+    xc_func_end(&func);
+  } else
+    // Dummy correlation
+    ans=0;
+
+  return ans;
+}
+
+bool is_kinetic(int func_id) {
+  bool ans=0;
+  
+  if(func_id>0) {
+    xc_func_type func;
+    if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Functional "<<func_id<<" not found!";
+      throw std::runtime_error(oss.str());
+    }
+    
+    switch(func.info->kind)
+      {
+	/* By default we assign exchange-correlation functionals as
+	   the exchange functional, since we check whether the
+	   exchange part includes exact exchange. */
+      case XC_KINETIC:
 	ans=1;
 	break;
       default:
