@@ -1,6 +1,4 @@
-* Optimize AtomGrid::eval_Fxc.
-
-* Modify AtomGrid to evaluate Ex and Ec simultaneously.
+* Implement checkpointing / saving of results (using HDF5?).
 
 * The number of executables is growing rapidly => identify common code and place in parser routines.
 
@@ -14,12 +12,14 @@
   - molecular orbitals.
   - electrostatic potential
 
-* Debug meta-GGA & meta-GGA functionals (in collaboration with libxc
-  upstream).
+* Find out why kinetic energy functionals don't work, in collaboration
+  with libxc upstream.
+
+? Implement GGA in Casida.
+
+? Implement better starting guesses, e.g. Harris functional.
 
 * Add failsafes to settings, e.g., thresholds must be positive.
-
-* Implement checkpointing / saving of results (using HDF5?).
 
 ? Rewrite the SCF solver in a clearer, more object-oriented form.
 
