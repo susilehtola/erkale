@@ -110,11 +110,12 @@ std::vector<double> ADIIS::get_c() const {
   x=gsl_vector_alloc(N);
   gsl_vector_set_all(x,1.0/N);
 
-  // Initial estimate
-  //  double E_initial=get_E(x);
+  // Initial energy estimate
+  // double E_initial=get_E(x);
 
-  // Step size 0.01, stop optimization with tolerance 1e-4
-  gsl_multimin_fdfminimizer_set(s, &minfunc, x, 0.01, 1e-4);
+  // Initialize the optimizer. Use initial step size 0.02, and an
+  // orthogonality tolerance of 0.01 in the line searches.
+  gsl_multimin_fdfminimizer_set(s, &minfunc, x, 0.02, 0.01);
 
   size_t iter=0;
   int status;
@@ -143,7 +144,7 @@ std::vector<double> ADIIS::get_c() const {
   while (status == GSL_CONTINUE && iter < 1000);
 
   // Final estimate
-  //double E_final=get_E(s->x);
+  // double E_final=get_E(s->x);
 
   // Form minimum
   std::vector<double> c=compute_c(s->x);
