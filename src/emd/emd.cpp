@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -24,6 +24,10 @@
 #include "mathf.h"
 #include "spherical_expansion.h"
 #include "spherical_harmonics.h"
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 extern "C" {
 // For bessel functions
@@ -114,15 +118,15 @@ std::vector< std::vector<size_t> > find_identical_shells(const BasisSet & bas) {
       if(shell_cart.size()==cmp_cart.size()) {
 	// Default value
 	found=1;
-	
+
 	for(size_t icart=0;icart<shell_cart.size();icart++)
 	  if(shell_cart[icart].l!=cmp_cart[icart].l || shell_cart[icart].m!=cmp_cart[icart].m || shell_cart[icart].n!=cmp_cart[icart].n)
 	    found=0;
-	
+
 	// Check that usage of spherical harmonics matches, too
 	if(bas.lm_in_use(ish) != bas.lm_in_use(ret[iident][0]))
 	  found=0;
-	
+
 	// If cartesian parts match, check also exponents and contraction coefficients
 	if(found) {
 	  // Get exponents
@@ -235,7 +239,7 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 
   // Imaginary unit
   std::complex<double> im(0.0,1.0);
-	
+
   // Loop over shells of identical basis functions
   for(size_t iidsh=0;iidsh<idents.size();iidsh++)
     for(size_t jidsh=0;jidsh<idents.size();jidsh++) {
@@ -256,7 +260,7 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 	  // angular part.
 	  for(size_t ibf=0;ibf<idents[iidsh].size();ibf++)
 	    for(size_t jbf=0;jbf<idents[jidsh].size();jbf++) {
-	      
+
 	      // The global indices of the basis functions under
 	      // consideration are
 	      size_t ibas=bas.get_first_ind(idents[iidsh][ibf])+ifunc;
@@ -265,7 +269,7 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 	      // Only do off-diagonal once
 	      if(jbas>ibas)
 		continue;
-	
+
 	      // Calculate the displacement between the basis functions
 	      coords_t dr_vec=bas.get_shell_coords(idents[iidsh][ibf])-bas.get_shell_coords(idents[jidsh][jbf]);
 
@@ -288,11 +292,11 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 		for(size_t icomb=0;icomb<prodexp.size();icomb++) {
 		  // Get the spherical harmonics coefficients
 		  std::vector<ylmcoeff_t> sph=prodexp[icomb].ang.getcoeffs();
-	  
+
 		  for(size_t iang=0;iang<sph.size();iang++)
 		    if(sph[iang].l==0 && sph[iang].m==0) {
 		      // Found contributing term
-		      
+
 		      onecenter_t hlp;
 		      hlp.pm=prodexp[icomb].pm;
 		      hlp.z=prodexp[icomb].z;
@@ -306,7 +310,7 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 			hlp.c=sph[iang].c.real()*P(ibas,jbas)*sqrt(4.0*M_PI);
 
 		      add_term(hlp);
-		      
+
 		      break;
 		    }
 		}
@@ -337,16 +341,16 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 		    hlp.z=prodexp[icomb].z;
 		    hlp.pm=prodexp[icomb].pm;
 		    hlp.l=sph[iang].l;
-		      
+
 		    add_term(hlp);
 		  }
 		}
-		
+
 	      }
 	    }
 	}
     }
-  
+
   // Clean
   clean();
 
@@ -387,7 +391,7 @@ void EMDEvaluator::add_term(const twocenter_t & t) {
     high=std::upper_bound(twoc.begin(),twoc.end(),t);
     // Corresponding index is
     size_t ind=high-twoc.begin();
-    
+
     if(ind>0 && twoc[ind-1]==t)
       // Loop over terms in t
       for(size_t it=0;it<t.c.size();it++)
@@ -495,7 +499,7 @@ void EMDEvaluator::print() const {
     }
   }
   */
-  
+
   //  printf("EMD has %lu one-center and %lu two-center terms, that contain %lu contractions.\n",getN_onec(),getN_twoc(),getN_twoc_total());
 }
 
@@ -507,7 +511,7 @@ EMD::EMD(const BasisSet & bas, const arma::mat & P, bool verbose) {
 
   if(verbose)
     printf("\nNumber of electrons is %i, from which norm of DM differs by %e.\n",Nel,dmnorm-Nel);
-  
+
   // Initialize evaluator
   eval=EMDEvaluator(bas,P);
 }
@@ -516,7 +520,7 @@ EMD::~EMD() {
 }
 
 void EMD::initial_fill(bool verbose) {
-  
+
   // Initial dp
   double idp=0.25;
   // Helpers
@@ -562,7 +566,7 @@ void EMD::add4(size_t loc) {
   emd_t integ[4];
 
   //  printf("Adding more points at %lu.\n",loc);
-  
+
 #ifdef _OPENMP
 #pragma omp parallel for ordered
 #endif
@@ -600,7 +604,7 @@ void EMD::find_electrons(bool verbose, double tol) {
     iter++;
     integral=0;
     error=0;
-    
+
     maxerror=0;
     // Calculate integral and find maximum error
     for(size_t i=dens.size()-3;i<dens.size();i-=4) {
@@ -608,11 +612,11 @@ void EMD::find_electrons(bool verbose, double tol) {
       rough=roughdens(i);
       // The fine value is (5-point Simpson)
       fine=finedens(i);
-      
+
       // Increment total integrals
       integral+=fine;
       error+=fabs(fine-rough)/15.0;
-      
+
       // Is the maximum error here?
       if(fabs(rough-fine)>maxerror) {
         maxerror=fabs(rough-fine);
@@ -628,7 +632,7 @@ void EMD::find_electrons(bool verbose, double tol) {
       // Add points to area of maximum error
       add4(maxind);
     }
-    
+
   } while(fabs(1.0*Nel-integral)>tol);
 
   if(verbose)
@@ -638,7 +642,7 @@ void EMD::find_electrons(bool verbose, double tol) {
 void EMD::optimize_moments(bool verbose, double tol) {
   // Integrals
   double rough, fine;
-  
+
   // Moments of density
   int mom;
   int Nmom=7;
@@ -646,10 +650,10 @@ void EMD::optimize_moments(bool verbose, double tol) {
   double momval[Nmom];
   double momerr[Nmom];
   size_t mommaxerrloc[Nmom];
-  
+
   // Temporary helper
   double maxerr;
-  
+
   // Maximum relative error
   double errel;
   int errelind;
@@ -657,19 +661,19 @@ void EMD::optimize_moments(bool verbose, double tol) {
   // Timer for printouts
   Timer t;
   size_t iter=0;
-  
+
   if(verbose)
     printf("Optimizing the moments of the EMD.\n");
 
   do {
     iter++;
-    
+
     // Calculate momentums and error estimates
     for(int imom=0;imom<Nmom;imom++) {
       mom=moms[imom];
       momval[imom]=0.0;
       momerr[imom]=0.0;
-      
+
       maxerr=0;
       mommaxerrloc[imom]=-1;
 
@@ -677,7 +681,7 @@ void EMD::optimize_moments(bool verbose, double tol) {
       for(size_t i=dens.size()-3;i<dens.size();i-=4) {
 	rough=roughmom(i);
 	fine=finemom(i);
-	
+
 	momval[imom]+=fine;
 	momerr[imom]+=fabs(fine-rough)/15.0;
 
@@ -729,15 +733,15 @@ void EMD::save(const char * fname) const {
 void EMD::moments(const char * fname) const {
   // Three and five point Simpson
   double rough, fine;
-  
+
   // Moments calculated by Hart & Thakkar
   int Nm=7;
   int m[]={-2, -1, 0, 1, 2, 3, 4};
-  
+
   // Moments and errors
   double moms[Nm];
   double err[Nm];
-  
+
   // Helper variables
   const size_t N=dens.size();
   double p[N], integrand[N];
@@ -751,11 +755,11 @@ void EMD::moments(const char * fname) const {
     // Fill in helper grid
     for(size_t i=0;i<N;i++)
       integrand[i]=pow(p[i],2+m[mi])*dens[i].d;
-    
+
     // Zero out old values
     moms[mi]=0;
     err[mi]=0;
-    
+
     // Calculate moments & errors
     rough=0;
     fine=0;
@@ -763,12 +767,12 @@ void EMD::moments(const char * fname) const {
       // Sum from infinity to get more accurate integrals
       rough=(integrand[i-2]+4.0*integrand[i]+integrand[i+2])/6.0*(p[i+2]-p[i-2]);
       fine=(integrand[i-2]+4.0*integrand[i-1]+2.0*integrand[i]+4.0*integrand[i+1]+integrand[i+2])/12.0*(p[i+2]-p[i-2]);
-      
+
       moms[mi]+=fine;
       err[mi]+=fabs(fine-rough)/15.0;
     }
   }
-  
+
   // Print out the moments
   FILE *out=fopen(fname,"w");
   for(int mi=0;mi<Nm;mi++)
@@ -785,11 +789,11 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
   std::vector<double> p(N);
   std::vector<double> J(N);
   std::vector<double> dJ(N);
-  
+
   // Calculate integrand
   for(size_t i=0;i<dens.size();i++)
     integrand[i]=dens[i].p*dens[i].d;
-  
+
   // Calculate the Compton profile
   rough=0.0;
   fine=0.0;
@@ -807,7 +811,7 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
 
     // Save profile
     p[n]=dens[i-2].p; // Must be i-1 to get J(0) = 1st moment of density / 2
-    J[n]=0.5*Jint; // J = 1/2 \int_{|q|}^\infty 
+    J[n]=0.5*Jint; // J = 1/2 \int_{|q|}^\infty
     dJ[n]=0.5*Jerr;
     n--;
   }
@@ -823,7 +827,7 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
   double pmax[Nreg]={10.0, 40.0};
   double dp[Nreg]={0.01, 0.5};
   int Npoints[Nreg];
-  
+
   Npoints[0]=(int) round(pmax[0]/dp[0]);
   for(int i=1;i<Nreg;i++)
     Npoints[i]=(int) round((pmax[i]-pmax[i-1])/dp[i]);
@@ -843,7 +847,7 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
   // Get interpolated Compton profile and its error
   std::vector<double> J_interp=spline_interpolation(p,J,p_interp);
   std::vector<double> dJ_interp=spline_interpolation(p,dJ,p_interp);
-  
+
   // Save output
   out=fopen(fname_interp,"w");
   for(size_t i=0;i<p_interp.size();i++)
@@ -851,3 +855,218 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
   fclose(out);
 }
 
+void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & px_arr, const std::vector<double> & py_arr, const std::vector<double> & pz_arr) {
+  // Find out identical shells in basis set.
+  std::vector< std::vector<size_t> > idents=find_identical_shells(bas);
+
+  // Compute the expansions of the non-identical shells
+  std::vector< std::vector<GTO_Fourier> > fourier;
+  for(size_t i=0;i<idents.size();i++) {
+    // Get exponents, contraction coefficients and cartesians
+    std::vector<contr_t> contr=bas.get_contr(idents[i][0]);
+    std::vector<shellf_t> cart=bas.get_cart(idents[i][0]);
+
+    // Compute expansion of basis functions on shell
+    // Form expansions of cartesian functions
+    std::vector<GTO_Fourier> cart_expansion;
+    for(size_t icart=0;icart<cart.size();icart++) {
+      // Expansion of current function
+      GTO_Fourier func;
+      for(size_t iexp=0;iexp<contr.size();iexp++)
+        func+=contr[iexp].c*GTO_Fourier(cart[icart].l,cart[icart].m,cart[icart].n,contr[iexp].z);
+      // Plug in the normalization factor
+      func=cart[icart].relnorm*func;
+      // Clean out terms with zero contribution
+      func.clean();
+      // Add to cartesian expansion
+      cart_expansion.push_back(func);
+    }
+
+    // If spherical harmonics are used, we need to transform the
+    // functions into the spherical harmonics basis.
+    if(bas.lm_in_use(idents[i][0])) {
+      std::vector<GTO_Fourier> sph_expansion;
+      // Get transformation matrix
+      arma::mat transmat=bas.get_trans(idents[i][0]);
+      // Form expansion
+      int l=bas.get_am(idents[i][0]);
+      for(int m=-l;m<=l;m++) {
+        // Expansion for current term
+        GTO_Fourier mcomp;
+        // Form expansion
+        for(size_t icart=0;icart<transmat.n_cols;icart++)
+          mcomp+=transmat(l+m,icart)*cart_expansion[icart];
+        // clean it
+        mcomp.clean();
+        // and add it to the stack
+        sph_expansion.push_back(mcomp);
+      }
+      // Now we have all components, add everything to the stack
+      fourier.push_back(sph_expansion);
+    } else
+      // No need to transform, cartesians are used.
+      fourier.push_back(cart_expansion);
+  }
+
+  // Open output file.
+  FILE *out=fopen("emdcube.dat","w");
+
+  // Compute the norm (assumes evenly spaced grid!)
+  double norm=0.0;
+  
+  // Compute the momentum densities in batches, allowing
+  // parallellization.
+#ifdef _OPENMP
+  // The number of used threads
+  const int nth=omp_get_max_threads();
+  // The number of points per batch
+  const size_t Nbatch_p=100*nth;
+#else
+  const int nth=1;
+  const size_t Nbatch_p=100;
+#endif
+
+  // The total number of point is
+  const size_t N=px_arr.size()*py_arr.size()*pz_arr.size();
+  // The necessary amount of batches is
+  size_t Nbatch=N/Nbatch_p;
+  if(N%Nbatch_p!=0)
+    Nbatch++;
+
+  // The values of momentum in the batch
+  coords_t p[Nbatch_p];
+  // The values of EMD in the batch
+  double emd[Nbatch_p];
+
+  // Number of points to compute in the batch
+  size_t np;
+  // Total number of points computed
+  size_t ntot=0;
+  // Indices of x, y and z
+  size_t xind=0, yind=0, zind=0;
+
+  // Values of the Fourier polynomial part of the basis functions: [nth][nident][nfuncs]
+  std::vector< std::vector< std::vector< std::complex<double> > > > fpoly(nth);
+  for(int ith=0;ith<nth;ith++) {
+    fpoly[ith].resize(idents.size());
+    for(size_t i=0;i<fourier.size();i++)
+      fpoly[ith][i].resize(fourier[i].size());
+  }
+
+  // Amount of basis functions
+  const size_t Nbf=bas.get_Nbf();
+  // Values of the basis functions, i.e. the above with the additional phase factor
+  std::vector< std::vector< std::complex<double> > > fvals(nth);
+  for(int ith=0;ith<nth;ith++)
+    fvals[ith].resize(Nbf);
+
+  // Loop over batches.
+  for(size_t i=0;i<Nbatch;i++) {
+    // Zero amount of points in current batch.
+    np=0;
+    
+    // Form list of points to compute.
+    while(np<Nbatch_p && ntot+np<N) {
+      p[np].x=px_arr[xind];
+      p[np].y=py_arr[yind];
+      p[np].z=pz_arr[zind];
+      
+      // Increment number of points
+      np++;
+      
+      // Determine next point.
+      if(zind+1<pz_arr.size())
+	zind++;
+      else {
+	zind=0;
+	
+	if(yind+1<py_arr.size())
+	  yind++;
+	else {
+	  yind=0;
+	  xind++;
+	}
+      }
+    }
+
+    // Begin parallel section
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+
+#ifdef _OPENMP
+      // Get thread index
+      int ith=omp_get_thread_num();
+#else
+      int ith=0;
+#endif
+      
+#ifdef _OPENMP
+#pragma omp for
+#endif
+      // Loop over the points in the batch
+      for(size_t ip=0;ip<np;ip++) {
+	// Current value of p is
+	double px=p[ip].x;
+	double py=p[ip].y;
+	double pz=p[ip].z;
+	
+	// Compute values of Fourier polynomials at current value of p.
+	for(size_t iid=0;iid<idents.size();iid++)
+	  // Loop over the functions on the identical shells.
+	  for(size_t fi=0;fi<fourier[iid].size();fi++)
+	    fpoly[ith][iid][fi]=fourier[iid][fi].eval(px,py,pz);
+	
+	// Compute the values of the basis functions themselves.
+	// Loop over list of groups of identical shells
+	for(size_t ii=0;ii<idents.size();ii++)
+	  // and over the shells of this type
+	  for(size_t jj=0;jj<idents[ii].size();jj++) {
+	    // The current shell is
+	    size_t is=idents[ii][jj];
+	    // and it is centered at
+	    coords_t cen=bas.get_shell_coords(is);
+	    // thus the phase factor we get is
+	    std::complex<double> phase=exp(std::complex<double>(0.0,-(px*cen.x+py*cen.y+pz*cen.z)));
+	    
+	    // Now we just store the individual function values.
+	    size_t i0=bas.get_first_ind(is);
+	    size_t Ni=bas.get_Nbf(is);
+	    for(size_t fi=0;fi<Ni;fi++)
+	      fvals[ith][i0+fi]=phase*fpoly[ith][ii][fi];
+	  }
+
+	// and now it's only a simple matter to compute the momentum density.
+	emd[ip]=0.0;
+	for(size_t i=0;i<Nbf;i++) {
+	  // Off-diagonal
+	  for(size_t j=0;j<i;j++)
+	    emd[ip]+=2.0*std::real(P(i,j)*std::conj(fvals[ith][i])*fvals[ith][j]);
+	  // Diagonal
+	  emd[ip]+=std::real(P(i,i)*std::conj(fvals[ith][i])*fvals[ith][i]);
+	}
+      }
+    } // end parallel region
+    
+    // Save computed value of EMD and increment norm
+    for(size_t ip=0;ip<np;ip++) {
+      fprintf(out,"%e\t%e\t%e\t%e\n",p[ip].x,p[ip].y,p[ip].z,emd[ip]);
+      norm+=emd[ip];
+    }
+
+    // Increment number of computed points
+    ntot+=np;
+  }
+  // Close output file.
+  fclose(out);
+
+  // Plug in the spacing in the integral
+  double dx=(px_arr[px_arr.size()-1]-px_arr[0])/px_arr.size();
+  double dy=(py_arr[py_arr.size()-1]-py_arr[0])/py_arr.size();
+  double dz=(pz_arr[pz_arr.size()-1]-pz_arr[0])/pz_arr.size();
+  norm*=dx*dy*dz;
+
+  // Print norm
+  printf("The norm of the EMD on the cube is %e.\n",norm);
+}

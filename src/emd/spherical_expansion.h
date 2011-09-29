@@ -168,6 +168,11 @@ typedef struct {
   double z;
 } GTO_Fourier_Ylm_t;
 
+/// Comparison operator for sorting
+bool operator<(const GTO_Fourier_Ylm_t & lhs, const GTO_Fourier_Ylm_t & rhs);
+/// Comparison operator for addition
+bool operator==(const GTO_Fourier_Ylm_t & lhs, const GTO_Fourier_Ylm_t & rhs);
+
 
 /**
  * \class GTO_Fourier_Ylm
@@ -201,7 +206,7 @@ class GTO_Fourier_Ylm {
   ~GTO_Fourier_Ylm();
 
   /// Add term to expansion
-  void addterm(const SphericalExpansion & ang, int pm, double z);
+  void addterm(const GTO_Fourier_Ylm_t & term);
   /// Clean expansion by dropping terms with zero contribution
   void clean();
   /// Print out expansion

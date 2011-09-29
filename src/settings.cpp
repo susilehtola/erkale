@@ -95,7 +95,9 @@ Settings::Settings() {
   iset.push_back(geni("MaxIter", "Maximum number of iterations in SCF cycle", 100));
 
   // Calculate EMD properties?
-  bset.push_back(genb("DoEMD", "Perform EMD calculation (moments of EMD, Compton profile)", 0));
+  bset.push_back(genb("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", 0));
+  // Calculate EMD on a cube?
+  sset.push_back(gens("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", ""));
 
   // How to initialize calculation
   sset.push_back(gens("InitMethod","Method of initializing calculation","none"));
