@@ -15,7 +15,6 @@
  */
 
 
-
 #include "stringutil.h"
 #include "mathf.h"
 
@@ -327,8 +326,8 @@ std::vector<size_t> parse_range(const std::string & in) {
       if(low>up) {
 	ERROR_INFO();
 	std::ostringstream oss;
-      oss << "Range is not monotonically increasing!\n";
-      throw std::runtime_error(oss.str());
+	oss << "Range is not monotonically increasing!\n";
+	throw std::runtime_error(oss.str());
       }
       
       // Fill the range.
@@ -341,4 +340,83 @@ std::vector<size_t> parse_range(const std::string & in) {
   sort(ret.begin(),ret.end());
 
   return ret;
+}
+
+void parse_cube(const std::string & sizes, std::vector<double> & x, std::vector<double> & y, std::vector<double> & z) {
+  // Clear the arrays of any existing content.
+  x.clear();
+  y.clear();
+  z.clear();
+
+  // Minimum, maximum and spacing
+  double min[3];
+  double max[3];
+  double dr[3];
+
+  // Split output in x, y and z
+  std::vector<std::string> info=splitline(sizes);
+  // If only one specification was given, triple it.
+  if(info.size()==1) {
+    info.push_back(info[0]);
+    info.push_back(info[0]);
+  }
+
+  // Check that we have the right amount of info
+  if(info.size()!=3) {
+    std::ostringstream oss;
+    oss << "The given input \"" << sizes << "\" is not a valid cube definition.\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
+
+  // Read data.
+  for(int i=0;i<3;i++) {
+    // Break at :
+    std::vector<std::string> lim=parse(info[i],":");
+    
+    if(lim.size()!=3) {
+      std::ostringstream oss;
+      oss << "The given input \"" << info[i] << "\" is not a valid definition for the grid on an axis.\n";
+      ERROR_INFO();
+      throw std::runtime_error(oss.str());
+    }
+
+    // Read minimum, maximum and spacing.
+    min[i]=readdouble(lim[0]);
+    dr[i]=readdouble(lim[1]);
+    max[i]=readdouble(lim[2]);
+
+    if(dr[i]<=0.0) {
+      ERROR_INFO();
+      throw std::runtime_error("Grid spacing must be positive.\n");
+    }
+    if(max[i]<min[i]) {
+      ERROR_INFO();
+      throw std::runtime_error("Grid maximum cannot be smaller than minimum!\n");
+    }
+  }
+
+  size_t N;
+
+  // Form points in x.
+  N=(size_t) ((max[0]-min[0])/dr[0]);
+  if(N==0)
+    // Minimum and maximum were probably the same.
+    N++;
+
+  x.resize(N);
+  for(size_t i=0;i<N;i++)
+    x[i]=min[0]+i*dr[0];
+
+  // Form points in y.
+  N=(size_t) ((max[1]-min[1])/dr[1]);
+  y.resize(N);
+  for(size_t i=0;i<N;i++)
+    y[i]=min[1]+i*dr[1];
+
+  // Form points in z
+  N=(size_t) ((max[2]-min[2])/dr[2]);
+  z.resize(N);
+  for(size_t i=0;i<N;i++)
+    z[i]=min[2]+i*dr[2];
 }

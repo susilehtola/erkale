@@ -64,5 +64,7 @@ std::vector<std::string> parse(std::string in, const std::string & separator);
 /// Parse input for a range of indices, e.g. 0,2-5,9,11-15,20
 std::vector<size_t> parse_range(const std::string & in);
 
+/// Form wanted cube
+void parse_cube(const std::string & sizes, std::vector<double> & x, std::vector<double> & y, std::vector<double> & z);
 
 #endif
