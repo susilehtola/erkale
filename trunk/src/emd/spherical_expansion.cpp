@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -40,7 +40,7 @@ bool operator<(const ylmcoeff_t & lhs, const ylmcoeff_t & rhs) {
     return 1;
   else if(lhs.l==rhs.l)
     return lhs.m<rhs.m;
-  
+
   return 0;
 }
 
@@ -61,10 +61,10 @@ void SphericalExpansion::add(const ylmcoeff_t & t) {
     // Get upper bound
     std::vector<ylmcoeff_t>::iterator high;
     high=std::upper_bound(comb.begin(),comb.end(),t);
-    
+
     // Corresponding index is
     size_t ind=high-comb.begin();
-    
+
     if(ind>0 && comb[ind-1]==t)
       comb[ind-1].c+=t.c;
     else {
@@ -233,7 +233,7 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
   // Loop over combinations
   for(size_t i=0;i<comb.size();i++)
     for(size_t j=0;j<rhs.comb.size();j++) {
-      
+
       // Lower and upper limit for l in loop
       if(comb[i].l>rhs.comb[j].l)
 	lmin=comb[i].l-rhs.comb[j].l;
@@ -265,7 +265,7 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
 	    newcomb.addylm(l,m,c*dc);
 	}
     }
-  
+
   // Clean out the new combination table (in case of cancellations)
   newcomb.clean();
 
@@ -315,18 +315,18 @@ SphericalExpansion operator*(double fac, const SphericalExpansion & func) {
 SphericalExpansionMultiplicationTable::SphericalExpansionMultiplicationTable(int am) {
   maxam=am;
   table.resize(multloc(maxam,maxam,maxam,maxam)+1);
-  
+
   // Left and right values
   for(int lleft=0;lleft<=maxam;lleft++)
     for(int mleft=-lleft;mleft<=lleft;mleft++) {
       SphericalExpansion left;
       left.addylm(lleft,mleft,1.0);
-      
-      for(int lright=0;lright<=maxam;lright++) 
+
+      for(int lright=0;lright<=maxam;lright++)
         for(int mright=-lright;mright<=lright;mright++) {
           SphericalExpansion right;
           right.addylm(lright,mright,1.0);
-	  
+
           table[multloc(lleft,mleft,lright,mright)]=left*right;
         }
     }
@@ -338,7 +338,7 @@ SphericalExpansionMultiplicationTable::~SphericalExpansionMultiplicationTable() 
 void SphericalExpansionMultiplicationTable::print() const {
   for(int lleft=0;lleft<=maxam;lleft++)
     for(int mleft=-lleft;mleft<=lleft;mleft++)
-      for(int lright=0;lright<=maxam;lright++) 
+      for(int lright=0;lright<=maxam;lright++)
         for(int mright=-lright;mright<=lright;mright++) {
           printf("The product of (%i,%i) with (%i,%i) is:\n",lleft,mleft,lright,mright);
           table[multloc(lleft,mleft,lright,mright)].print();
@@ -367,10 +367,30 @@ GTO_Fourier_Ylm SphericalExpansionMultiplicationTable::mult(const GTO_Fourier_Yl
   GTO_Fourier_Ylm ret;
 
   for(size_t i=0;i<lhs.sphexp.size();i++)
-    for(size_t j=0;j<rhs.sphexp.size();j++)
-      ret.addterm(mult(lhs.sphexp[i].ang,rhs.sphexp[j].ang),lhs.sphexp[i].pm+rhs.sphexp[j].pm,lhs.sphexp[i].z+rhs.sphexp[j].z);
+    for(size_t j=0;j<rhs.sphexp.size();j++) {
+      GTO_Fourier_Ylm_t hlp;
+      hlp.ang=mult(lhs.sphexp[i].ang,rhs.sphexp[j].ang);
+      hlp.pm=lhs.sphexp[i].pm+rhs.sphexp[j].pm;
+      hlp.z=lhs.sphexp[i].z+rhs.sphexp[j].z;
+      ret.addterm(hlp);
+    }
   return ret;
 }
+
+
+bool operator<(const GTO_Fourier_Ylm_t & lhs, const GTO_Fourier_Ylm_t & rhs) {
+  if(lhs.pm<rhs.pm)
+    return 1;
+  else if(lhs.pm==rhs.pm)
+    return lhs.z<rhs.z;
+
+  return 0;
+}
+
+bool operator==(const GTO_Fourier_Ylm_t & lhs, const GTO_Fourier_Ylm_t & rhs) {
+  return (lhs.pm==rhs.pm) && (lhs.z==rhs.z);
+}
+
 
 GTO_Fourier_Ylm::GTO_Fourier_Ylm() {
 }
@@ -378,7 +398,7 @@ GTO_Fourier_Ylm::GTO_Fourier_Ylm() {
 GTO_Fourier_Ylm::GTO_Fourier_Ylm(int l, int m, int n, double zeta) {
   // The Fourier transform of the basis function
   GTO_Fourier transform(l,m,n,zeta);
-  
+
   // Get the result of the Fourier transform
   std::vector<trans3d_t> trans(transform.get());
 
@@ -417,42 +437,43 @@ GTO_Fourier_Ylm::GTO_Fourier_Ylm(int l, int m, int n, double zeta) {
   for(int in=2;in<=n;in++)
     pz[in]=pz[in-1]*pz[1];
 
-  // Now, add all necessary terms
+  // Now, add all necessary terms. Helper
+  GTO_Fourier_Ylm_t hlp;
+
   for(size_t i=0;i<trans.size();i++) {
+    // Radial part is
+    hlp.pm=trans[i].l+trans[i].m+trans[i].n;
+    hlp.z=trans[i].z;
     // Angular part is
-    SphericalExpansion ang=trans[i].c*px[trans[i].l]*py[trans[i].m]*pz[trans[i].n];
-    // Add the relevant term
-    addterm(ang,trans[i].l+trans[i].m+trans[i].n,trans[i].z);
+    hlp.ang=trans[i].c*px[trans[i].l]*py[trans[i].m]*pz[trans[i].n];
+    // Add the term
+    addterm(hlp);
   }
 }
 
 GTO_Fourier_Ylm::~GTO_Fourier_Ylm() {
 }
 
-void GTO_Fourier_Ylm::addterm(const SphericalExpansion & ang, int pm, double z) {
-  // Add term to contraction
-
-  bool found=0;
-  // See first, if there is a corresponding term yet
-  for(size_t i=0;i<sphexp.size();i++)
-    if(sphexp[i].pm==pm && sphexp[i].z==z) {
-      sphexp[i].ang+=ang;
-      found=1;
-      break;
+void GTO_Fourier_Ylm::addterm(const GTO_Fourier_Ylm_t & t) {
+  if(sphexp.size()==0) {
+    sphexp.push_back(t);
+  } else {
+    // Get upper bound
+    std::vector<GTO_Fourier_Ylm_t>::iterator high;
+    high=std::upper_bound(sphexp.begin(),sphexp.end(),t);
+    
+    // Corresponding index is
+    size_t ind=high-sphexp.begin();
+    
+    if(ind>0 && sphexp[ind-1]==t)
+      // Found it.
+      sphexp[ind-1].ang+=t.ang;
+    else {
+      // Term does not exist, add it
+      sphexp.insert(high,t);
     }
-
-  if(!found) {
-    // Not on the list, add it
-
-    GTO_Fourier_Ylm_t help;
-    help.ang=ang;
-    help.pm=pm;
-    help.z=z;
-   
-    sphexp.push_back(help);
   }
 }
-
 
 void GTO_Fourier_Ylm::clean() {
   for(size_t i=sphexp.size()-1;i<sphexp.size();i--) {
@@ -493,8 +514,13 @@ GTO_Fourier_Ylm GTO_Fourier_Ylm::operator*(const GTO_Fourier_Ylm & rhs) const {
 
   // Do multiplication
   for(size_t i=0;i<sphexp.size();i++)
-    for(size_t j=0;j<rhs.sphexp.size();j++) 
-      ret.addterm(sphexp[i].ang*rhs.sphexp[j].ang,sphexp[i].pm+rhs.sphexp[j].pm,sphexp[i].z+rhs.sphexp[j].z);
+    for(size_t j=0;j<rhs.sphexp.size();j++) {
+      GTO_Fourier_Ylm_t hlp;
+      hlp.ang=sphexp[i].ang*rhs.sphexp[j].ang;
+      hlp.pm=sphexp[i].pm+rhs.sphexp[j].pm;
+      hlp.z=sphexp[i].z+rhs.sphexp[j].z;
+      ret.addterm(hlp);
+    }
 
   return ret;
 }
@@ -502,10 +528,7 @@ GTO_Fourier_Ylm GTO_Fourier_Ylm::operator*(const GTO_Fourier_Ylm & rhs) const {
 GTO_Fourier_Ylm GTO_Fourier_Ylm::operator+(const GTO_Fourier_Ylm & rhs) const {
   // Returned combination
   GTO_Fourier_Ylm ret(*this);
-
-  // Add terms
-  for(size_t i=0;i<rhs.sphexp.size();i++)
-    ret.addterm(rhs.sphexp[i].ang,rhs.sphexp[i].pm,rhs.sphexp[i].z);
+  ret+=rhs;
 
   return ret;
 }
@@ -513,7 +536,7 @@ GTO_Fourier_Ylm GTO_Fourier_Ylm::operator+(const GTO_Fourier_Ylm & rhs) const {
 GTO_Fourier_Ylm & GTO_Fourier_Ylm::operator+=(const GTO_Fourier_Ylm & rhs) {
   // Add terms
   for(size_t i=0;i<rhs.sphexp.size();i++)
-    addterm(rhs.sphexp[i].ang,rhs.sphexp[i].pm,rhs.sphexp[i].z);
+    addterm(rhs.sphexp[i]);
 
   return *this;
 }

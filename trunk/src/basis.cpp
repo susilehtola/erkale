@@ -1360,12 +1360,11 @@ void BasisSet::print() const {
   }
   printf("\nList of basis functions:\n");
 
-  /*
   for(size_t i=0;i<shells.size();i++) {
     printf("Shell %4i",(int) i);
     shells[i].print();
   }
-  */
+  /*
 
   for(size_t i=0;i<shells.size();i++) {
     // Type of shell - spherical harmonics or cartesians
@@ -1378,6 +1377,7 @@ void BasisSet::print() const {
     printf("Shell %4i",(int) i+1);
     printf("\t%c %4s shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) shells[i].get_inuc()+1,(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
   }
+  */
 
 
   printf("\nBasis set contains %i functions, maximum angular momentum is %i.\\

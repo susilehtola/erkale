@@ -20,6 +20,7 @@
 #include <cstdio>
 #include <vector>
 #include "../basis.h"
+#include "gto_fourier.h"
 
 /// One-center terms in spherical integral
 typedef struct {
@@ -190,5 +191,11 @@ class EMD {
   /// Calculate Compton profile in "raw" and interpolated form, input are filenames
   void compton_profile(const char * raw, const char * interp) const;
 };
+
+/**
+ * Compute the EMD in a cube, save output to emdcube.dat
+ */
+void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & px, const std::vector<double> & py, const std::vector<double> & pz);
+
 
 #endif

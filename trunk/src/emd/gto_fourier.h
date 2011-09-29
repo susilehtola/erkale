@@ -31,6 +31,11 @@ typedef struct {
   int l;
 } poly1d_t;
 
+/// Comparison operator for sorting
+bool operator<(const poly1d_t & lhs, const poly1d_t & rhs);
+/// Comparison for addition
+bool operator==(const poly1d_t & lhs, const poly1d_t & rhs);
+
 /**
  *
  * \class FourierPoly_1D
@@ -80,7 +85,7 @@ class FourierPoly_1D {
   ~FourierPoly_1D();
 
   /// Add a term in the contraction
-  void addterm(std::complex<double> c, int l);
+  void addterm(const poly1d_t & term);
 
   /// Addition operator
   FourierPoly_1D operator+(const FourierPoly_1D & rhs) const;
@@ -119,6 +124,11 @@ typedef struct {
   double z;
 } trans3d_t;
 
+/// Comparison operator for sorting
+bool operator<(const trans3d_t & lhs, const trans3d_t& rhs);
+/// Comparison operator for addition
+bool operator==(const trans3d_t & lhs, const trans3d_t& rhs);
+
 /**
  *
  * \class GTO_Fourier
@@ -144,7 +154,7 @@ class GTO_Fourier {
   ~GTO_Fourier();
 
   /// Add a term in the contraction
-  void addterm(std::complex<double> c, int k, int l, int m, double z);
+  void addterm(const trans3d_t & term);
 
   /// Addition operator
   GTO_Fourier operator+(const GTO_Fourier & rhs) const;
@@ -159,6 +169,9 @@ class GTO_Fourier {
 
   // Clean out the expansion
   void clean();
+
+  // Evaluate the expansion at p
+  std::complex<double> eval(double px, double py, double pz) const;
 
   friend GTO_Fourier operator*(std::complex<double> fac, const GTO_Fourier & rhs);
   friend GTO_Fourier operator*(double fac, const GTO_Fourier & rhs);

@@ -438,9 +438,8 @@ int main(int argc, char **argv) {
 
     population_analysis(basis,Pa,Pb);
   }    
-
-
-  // Form momentum density
+  
+  // Form isotropic momentum density
   if(set.get_bool("DoEMD")) {
     t.print_time();
 
@@ -460,8 +459,25 @@ int main(int argc, char **argv) {
     emd.compton_profile("compton.txt","compton-interp.txt");
     
     if(verbose)
-      printf("Calculating EMD properties took %s.\n",temd.elapsed().c_str());
+      printf("Calculating isotropic EMD properties took %s.\n",temd.elapsed().c_str());
   }
+  // Do EMD on a cube?
+  if(stricmp(set.get_string("EMDCube"),"")!=0) {
+    t.print_time();
+    Timer temd;
+
+    // Form grid in p space.
+    std::vector<double> px, py, pz;
+    parse_cube(set.get_string("EMDCube"),px,py,pz);
+
+    // Calculate EMD on cube
+    emd_cube(basis,P,px,py,pz);
+
+    if(verbose)
+      printf("Calculating EMD on a cube took %s.\n",temd.elapsed().c_str());
+  }
+
+
 
   if(verbose) {
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
