@@ -47,6 +47,9 @@ bool is_exchange(int func_id);
 bool is_correlation(int func_id);
 /// Is functional for both exchange and correlation?
 bool is_exchange_correlation(int func_id);
+/// Is the functional for kinetic energy? (Not used in ERKALE)
+bool is_kinetic(int func_id);
+
 
 /// Get fraction of exact exchange
 double exact_exchange(int func_id);
