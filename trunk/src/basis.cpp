@@ -2723,7 +2723,7 @@ std::vector<size_t> i_idx(size_t N) {
   ret.reserve(N);
   ret.resize(N);
   for(size_t i=0;i<N;i++)
-    ret[i]=i*(i+1)/2;
+    ret[i]=(i*(i+1))/2;
   return ret;
 }
 
