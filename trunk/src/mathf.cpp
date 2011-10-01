@@ -62,6 +62,10 @@ double fact_ratio(int i, int r) {
   return gsl_sf_fact(i)/(gsl_sf_fact(r)*gsl_sf_fact(i-2*r));
 }
 
+double gamma(double x) {
+  return gsl_sf_gamma(x);
+}
+
 double sinc(double x) {
   if(fabs(x)<100*DBL_EPSILON) {
     double x2=x*x;
