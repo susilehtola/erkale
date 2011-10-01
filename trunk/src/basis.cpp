@@ -969,9 +969,6 @@ void BasisSet::add_functions(int atind, coords_t cen, int am, const std::vector<
     shells.push_back(GaussianShell(ind,am,uselm,atind,cen,C));
   else
     shells.push_back(GaussianShell(ind,am,0,atind,cen,C));
-
-  // Sort basis set.
-  sort();
 }
 
 void BasisSet::add_shell(GaussianShell sh) {
@@ -979,8 +976,6 @@ void BasisSet::add_shell(GaussianShell sh) {
   shells.push_back(sh);
   // Check numbering
   check_numbering();
-  // Sort basis set
-  sort();
 }
 
 void BasisSet::add_nucleus(nucleus_t nuc) {
