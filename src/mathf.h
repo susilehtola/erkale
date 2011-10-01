@@ -31,6 +31,9 @@ double fact(int n);
 /// Computes the ratio i!/(r!*(i-2r)!)
 double fact_ratio(int i, int r);
 
+/// Compute the Gamma function
+double gamma(double x);
+
 /// Compute sinc = sin(x)/x
 double sinc(double x);
 
