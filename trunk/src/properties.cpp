@@ -115,7 +115,7 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & Pa, const arma::m
 arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
   arma::vec ret(basis.get_Nnuc());
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++)
-    ret(inuc)=compute_density(P,basis,basis.get_nuclear_coords(inuc));
+    ret(inuc)=compute_density(P,basis,basis.get_coords(inuc));
   return ret;
 }
 
@@ -178,7 +178,7 @@ double darwin_1e(const BasisSet & basis, const arma::mat & P) {
 
     if(!nuc.bsse)
       // Don't do correction for BSSE nuclei
-      E+=nuc.Z*compute_density(P,basis,basis.get_nuclear_coords(inuc));
+      E+=nuc.Z*compute_density(P,basis,basis.get_coords(inuc));
   }
 
   // Plug in the constant terms

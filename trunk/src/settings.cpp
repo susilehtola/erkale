@@ -102,17 +102,14 @@ Settings::Settings() {
   // How to initialize calculation
   sset.push_back(gens("InitMethod","Method of initializing calculation","none"));
 
-#ifdef DFT_ENABLED
   // No DFT settings by default.
   dft=0;
-#endif
 }
 
 
 Settings::~Settings() {
 }
 
-#ifdef DFT_ENABLED
 void Settings::add_dft_settings() {
   // DFT settings
   dft=1;
@@ -150,7 +147,6 @@ void Settings::remove_dft_settings() {
     if(sset[i].name.find("DFT")!=std::string::npos)
       sset.erase(sset.begin()+i);
 }
-#endif
   
 void Settings::add_double(std::string name, std::string comment, double val) {
   dset.push_back(gend(name,comment,val));
@@ -293,11 +289,9 @@ std::string Settings::get_string(std::string name) const {
   return "";
 }
 
-#ifdef DFT_ENABLED
 bool Settings::dft_enabled() const {
   return dft;
 }
-#endif
 
 bool Settings::is_double(std::string name) const {
   for(size_t i=0;i<dset.size();i++)
@@ -358,13 +352,11 @@ void Settings::parse(std::string filename) {
 	    set_string("Method","HF");
 	  else if(stricmp(words[1],"ROHF")==0)
 	    set_string("Method","ROHF");
-#ifdef DFT_ENABLED
 	  else {
 	    // Add dft related settings
 	    add_dft_settings();
 	    set_string("Method",words[1]);
 	  }
-#endif
 
 	} else {
 	  if(is_double(words[0])) {

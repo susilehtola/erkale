@@ -379,7 +379,8 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   std::vector<shellpair_t> auxpairs=dfitbas.get_unique_shellpairs();
 
   // Dummy shell, helper for computing ERIs
-  GaussianShell dummy=dummyshell();
+  nucleus_t dumnuc;
+  GaussianShell dummy=dummyshell(dumnuc);
 
   // First, compute the two-center integrals
   arma::mat ab(Naux,Naux);

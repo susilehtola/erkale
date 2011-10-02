@@ -71,30 +71,23 @@ message("GSL library is ${GSL_LIBRARIES}")
 message("")
 
 # Find libxc
-find_package(libxc)
-if(LIBXC_FOUND)
- set(USEDFT 1)
- set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDFT_ENABLED")
- set(DFTFLAGS "-DDFT_ENABLED")
- message("libxc support enabled.")
- message("libxc headers are in ${LIBXC_INCLUDE_DIRS}")
- message("libxc linker flags are ${LIBXC_LIBRARIES}")
+find_package(libxc REQUIRED)
+message("libxc headers are in ${LIBXC_INCLUDE_DIRS}")
+message("libxc linker flags are ${LIBXC_LIBRARIES}")
 message("")
-else()
- set(USEDFT 0)
-endif()
 
 # Find libint
-find_package(libint)
-if(libint_FOUND)
- # Add to flags
- set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DLIBINT")
+find_package(libint REQUIRED)
+message("libint headers are in ${LIBINT_INCLUDE_DIRS}")
+message("libint linker flags are ${LIBINT_LIBRARIES}")
+message("")
 
- message("libint support enabled.")
- message("libint headers are in ${LIBINT_INCLUDE_DIRS}")
- message("libint linker flags are ${LIBINT_LIBRARIES}")
- message("")
-endif()
+# Find HDF5
+find_package(HDF5 REQUIRED)
+message("HDF5 headers are in ${HDF5_INCLUDE_DIRS}")
+message("HDF5 linker flags are ${HDF5_LIBRARIES}")
+message("")
+
 
 # Find out how to preprocess C++ source code files
 if(CMAKE_COMPILER_IS_GNUCXX)

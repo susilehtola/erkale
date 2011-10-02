@@ -48,7 +48,8 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   orbpairs=orbbas.get_unique_shellpairs();
   
   // Dummy shell, helper for computing ERIs
-  GaussianShell dummy=dummyshell();
+  nucleus_t dumnuc;
+  GaussianShell dummy=dummyshell(dumnuc);
 
   // Store shell data
   auxshells=auxbas.get_shells();
@@ -214,7 +215,8 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
     }
   } else {
     // Dummy shell, helper for computing ERIs
-    GaussianShell dummy=dummyshell();
+    nucleus_t dumnuc;
+    GaussianShell dummy=dummyshell(dumnuc);
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -311,7 +313,8 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 
   } else {
     // Dummy shell, helper for computing ERIs
-    GaussianShell dummy=dummyshell();
+    nucleus_t dumnuc;
+    GaussianShell dummy=dummyshell(dumnuc);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)

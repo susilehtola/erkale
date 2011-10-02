@@ -22,9 +22,6 @@
 /// Use Obara-Saika for computing 1-electron integrals?
 #define OBARASAIKA
 
-/// Use libint for computing two-electron integrals? (Set by CMake)
-//#define LIBINT
-
 #include <armadillo>
 #include <vector>
 #include <string>
@@ -32,9 +29,7 @@
 #include "settings.h"
 #include "xyzutils.h"
 
-#ifdef LIBINT
 #include <libint/libint.h>
-#endif
 
 /// Angular momentum notation for shells
 const char shell_types[]={'S','P','D','F','G','H','I','K','L','M'};
@@ -63,22 +58,25 @@ typedef struct {
   double z;
 } coords_t;
 
+// Forward declaration
+class GaussianShell;
+
 /// Nucleus structure
 typedef struct {
-  /// x coordinate of nucleus
-  double x;
-  /// y coordinate of nucleus
-  double y;
-  /// z coordinate of nucleus
-  double z;
-  /// Index of atom in system
-  int atind;
-  /// Charge
-  int Z;
+  /// Index of nucleus
+  size_t ind;
+  /// Location of nucleus
+  coords_t r;
   /// Counterpoise nucleus..?
   bool bsse;
+
   /// Type of nucleus
   std::string symbol;
+  /// Charge
+  int Z;
+
+  /// List of shells located on nucleus
+  std::vector<const GaussianShell *> shells;
 } nucleus_t;
 
 /// Structure for unique shell pairs
@@ -102,7 +100,6 @@ typedef struct {
 bool operator<(const shellpair_t & lhs, const shellpair_t & rhs);
 
 // Forward declarations
-class GaussianShell;
 class ElementBasisSet;
 class BasisSetLibrary;
 
@@ -152,10 +149,10 @@ bool operator==(const contr_t & lhs, const contr_t & rhs);
 
 /// Basis set
 class BasisSet {
-  /// Shells of basis functions
-  std::vector<GaussianShell> shells;
   /// Nuclei
   std::vector<nucleus_t> nuclei;
+  /// Basis functions
+  std::vector<GaussianShell> shells;
 
   /// Use spherical harmonics by default as basis?
   bool uselm;
@@ -168,13 +165,8 @@ class BasisSet {
   /// Ranges of shells
   std::vector<double> shell_ranges;
 
-#ifdef LIBINT
   /// Libint initialized?
   bool libintok;
-#else
-  // This variable only exists if LIBINT support has been enabled
-  //  bool libintok;
-#endif
 
  public:
   /// Dummy constructor
@@ -184,7 +176,6 @@ class BasisSet {
   /// Destructor
   ~BasisSet();
 
-#ifdef DFT_ENABLED
   /**
    * Generate density fitting basis
    *
@@ -195,10 +186,6 @@ class BasisSet {
    * containing H to Kr", J. Chem. Phys. 127 (2007), 074102.
    */
   BasisSet density_fitting(double fsam=1.5, int lmaxinc=1) const;
-#else
-  // This function only exists when DFT support has been enabled
-  //  BasisSet density_fitting(double fsam=1.5, int lmaxinc=1) const;
-#endif
 
   /**
    * Generate Coulomb and exchange fitting basis
@@ -210,31 +197,29 @@ class BasisSet {
    */
   BasisSet exchange_fitting() const;
   
-  /// Add functions for element el at cen
-  void add_functions(int atind, coords_t cen, ElementBasisSet el);
-  /// Add functions at cen
-  void add_functions(int atind, coords_t cen, int am, const std::vector<contr_t> & C);
   /// Add nucleus
-  void add_nucleus(nucleus_t nuc);
-  /// Add nucleus
-  void add_nucleus(int atind, coords_t cen, int Z, std::string symbol, bool bsse=0);
-  /// Add a shell
-  void add_shell(GaussianShell sh);
+  void add_nucleus(const nucleus_t & nuc);
+  /// Add a shell to a nucleus
+  void add_shell(size_t nucind, const GaussianShell & sh);
+  /// Add a shell to a nucleus
+  void add_shell(size_t nucind, int am, const std::vector<contr_t> & C);
+  /// Add all shells to a nucleus
+  void add_shells(size_t nucind, ElementBasisSet el);
 
-  /// Check numbering
-  void check_numbering();
   /// Sort shells in nuclear order, then by angular momentum, then by exponents
   void sort();
+  /// Check numbering of basis functions
+  void check_numbering();
+  /// Update the nuclear list of shells
+  void update_nuclear_shell_list();
 
   /* Finalization routines */
+
   /// Compute nuclear distance table
   void compute_nuclear_distances();   
 
   /// Form list of unique shell pairs
   void form_unique_shellpairs();
-  /// Find shell pair
-  size_t find_pair(size_t is, size_t js) const;
-
   /// Get list of unique shell pairs
   std::vector<shellpair_t> get_unique_shellpairs() const;
 
@@ -246,29 +231,19 @@ class BasisSet {
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
 
-#ifdef LIBINT
   /// Initialize libint
   void libint_init();
   /// Libint has already been initialized elsewhere
   void set_libint_ok();
-#else
-  // These functions only exist when LIBINT support has been enabled
-  //  void libint_init();
-  //  void set_libint_ok();
-#endif
 
   /// Do all of the above
-#ifdef LIBINT
   void finalize(bool convert=0, bool libintok=0);
-#else
-  void finalize(bool convert=0);
-#endif
 
   /// Get distance of nuclei
   double nuclear_distance(size_t i, size_t j) const;
 
   /// Get angular momentum of shell
-  int get_am(size_t ind) const;  
+  int get_am(size_t shind) const;  
   /// Get maximum angular momentum in basis set
   int get_max_am() const;
   /// Get maximum number of contractions
@@ -277,18 +252,18 @@ class BasisSet {
   /// Get index of last function, throws an exception if no functions exist
   size_t get_last_ind() const;
   /// Get index of first function on shell
-  size_t get_first_ind(size_t ind) const;
+  size_t get_first_ind(size_t shind) const;
   /// Get index of last function on shell
-  size_t get_last_ind(size_t ind) const;
-  /// Get center of ind'th shell
-  size_t get_center_ind(size_t ind) const;
+  size_t get_last_ind(size_t shind) const;
 
   /// Get shells in basis set
   std::vector<GaussianShell> get_shells() const;
   /// Get ind:th shell
-  GaussianShell get_shell(size_t ind) const;
+  GaussianShell get_shell(size_t shind) const;
+  /// Get index of the center of the ind'th shell
+  size_t get_center_ind(size_t shind) const;
   /// Get coordinates of center of ind'th shell
-  coords_t get_shell_coords(size_t ind) const;
+  coords_t get_center(size_t shind) const;
 
   /// Get exponential contraction of the ind:th shell
   std::vector<contr_t> get_contr(size_t ind) const;
@@ -335,7 +310,7 @@ class BasisSet {
   /// Get nucleus
   nucleus_t get_nuc(size_t inuc) const;
   /// Get coordinates of nucleus
-  coords_t get_nuclear_coords(size_t inuc) const;
+  coords_t get_coords(size_t inuc) const;
   /// Get charge of nucleus
   int get_Z(size_t inuc) const;
   /// Get symbol of nucleus
@@ -394,10 +369,8 @@ class BasisSet {
 /// Compute a shell of ERIs, transformed into spherical basis if necessary
 std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 
-#ifdef LIBINT
 /// Compute data necessary for libint
 void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-#endif
 
 /// Compute ERI over cartesian Gaussians
 std::vector<double> ERI_cart(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
@@ -420,14 +393,11 @@ std::vector<double> ERI_cart_wrap(const GaussianShell *is, const GaussianShell *
  * \date 2011/05/05 20:17
  */
 class GaussianShell {
-
   /// Number of first function on shell
   size_t indstart;
 
-  /// Coordinates of center
-  coords_t cen;
-  /// Index of atom
-  size_t atind;
+  /// Pointer to nucleus where shell is located
+  const nucleus_t * cen;
 
   /// Use spherical harmonics?
   bool uselm;
@@ -450,12 +420,20 @@ class GaussianShell {
   std::vector<shellf_t> cart; 
 
  public:
-  /// Construct shell, use spherical harmonics by default
-  GaussianShell(bool lm=1);
-  /// Construct a shell
-  GaussianShell(size_t indstart, int am, bool lm, int atind, coords_t cen, const std::vector<contr_t> & C);
+  /// Dummy constructor
+  GaussianShell();
+  /// Constructor, need also to set index of first function and nucleus (see below)
+  GaussianShell(int am, bool lm, const std::vector<contr_t> & C);
   /// Destructor
   ~GaussianShell();
+
+  /// Set index of first basis function
+  void set_first_ind(size_t ind);
+  /// Set center
+  void set_nucleus(const nucleus_t * cen);
+
+  /// Sort exponents in decreasing order
+  void sort();
 
   /**
    * Convert contraction from coefficients of normalized primitives to
@@ -468,7 +446,7 @@ class GaussianShell {
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
 
-  /// Get the exponential conraction
+  /// Get the exponential contraction
   std::vector<contr_t> get_contr() const;
   /// Get cartesians
   std::vector<shellf_t> get_cart() const;
@@ -506,9 +484,9 @@ class GaussianShell {
   /// Get angular momentum
   int get_am() const;
   /// Get nucleus index
-  size_t get_inuc() const;
+  size_t get_center_ind() const;
   /// Get coordinates
-  coords_t get_coords() const;
+  coords_t get_center() const;
 
   /// Comparison operator for angular momentum ordering
   bool operator<(const GaussianShell & rhs) const;
@@ -518,11 +496,6 @@ class GaussianShell {
   /// Get index of last function on shell
   size_t get_last_ind() const;
 
-  /// Set index of first basis function
-  void set_first_ind(size_t ind);
-  /// Set index of center
-  void set_center_ind(size_t inuc);
-  
   /// Print out information about shell
   void print() const;
 
@@ -549,20 +522,15 @@ class GaussianShell {
   friend double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks, size_t kk, size_t ls, size_t ll) const;
   /// Compute ERI over cartesian functions
   friend std::vector<double> BasisSet::ERI_cart(size_t is, size_t js, size_t ks, size_t ls) const;
-#ifdef LIBINT
+
   /// Normalize libint integrals
   friend void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
   /// Compute data for LIBINT
   friend void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-#else
-  // These functions only exist when LIBINT support has been enabled
-  //  friend void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
-  //  friend void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-#endif
 };
 
 /// Get dummy shell
-GaussianShell dummyshell();
+GaussianShell dummyshell(nucleus_t & dummynuc);
 
 /// Compute index of swapped integral
 size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl);
@@ -570,13 +538,9 @@ size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_
 /// Form index helper table: i*(i+1)/2
 std::vector<size_t> i_idx(size_t N);
 
-#ifdef LIBINT
 /// Construct basis set from input
 BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set, bool libintok=0);
-#else
-/// Construct basis set from input
-BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set);
-#endif
+
 
 /// Compute values of orbitals at given point
 std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r);

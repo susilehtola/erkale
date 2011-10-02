@@ -289,7 +289,7 @@ void AtomGrid::becke_weights(const BasisSet & bas, size_t irad) {
     
     // Compute distance of point to atoms
     for(size_t iat=0;iat<Nat;iat++)
-      atom_dist[iat]=norm(bas.get_nuclear_coords(iat)-coord_p);
+      atom_dist[iat]=norm(bas.get_coords(iat)-coord_p);
     
     // Compute mu_ab
     for(size_t iat=0;iat<Nat;iat++) {
@@ -1179,7 +1179,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
   // Store index of center
   atind=cenind;
   // and its coordinates
-  cen=bas.get_nuclear_coords(cenind);
+  cen=bas.get_coords(cenind);
 
   // Use Lobatto quadrature?
   use_lobatto=lobatto;
@@ -1324,7 +1324,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
   // Store index of center
   atind=cenind;
   // and its coordinates
-  cen=bas.get_nuclear_coords(cenind);
+  cen=bas.get_coords(cenind);
 
   // Use Lobatto quadrature?
   use_lobatto=lobatto;
@@ -1552,7 +1552,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
       // Loop over shells
       for(size_t ish=0;ish<compute_shells.size();ish++) {
 	// Center of shell is
-	coords_t shell_center=bas.get_shell_coords(compute_shells[ish]);
+	coords_t shell_center=bas.get_center(compute_shells[ish]);
 	// Compute distance of point to center of shell
 	double shell_dist=norm(shell_center-grid[ip].r);
 	// Add shell to point if it is within the range of the shell
@@ -1599,7 +1599,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
       // Loop over shells
       for(size_t ish=0;ish<compute_shells.size();ish++) {
 	// Center of shell is
-	coords_t shell_center=bas.get_shell_coords(compute_shells[ish]);
+	coords_t shell_center=bas.get_center(compute_shells[ish]);
 	// Compute distance of point to center of shell
 	double shell_dist=norm(shell_center-grid[ip].r);
 	// Add shell to point if it is within the range of the shell
@@ -1642,7 +1642,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
       // Loop over shells
       for(size_t ish=0;ish<compute_shells.size();ish++) {
 	// Center of shell is
-	coords_t shell_center=bas.get_shell_coords(compute_shells[ish]);
+	coords_t shell_center=bas.get_center(compute_shells[ish]);
 	// Compute distance of point to center of shell
 	double shell_dist=norm(shell_center-grid[ip].r);
 	// Add shell to point if it is within the range of the shell
