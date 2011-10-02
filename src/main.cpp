@@ -30,9 +30,7 @@
 #include "stringutil.h"
 #include "timer.h"
 
-#ifdef DFT_ENABLED
 #include "dftfuncs.h"
-#endif
 
 #include <armadillo>
 #include <cstdio>
@@ -46,18 +44,10 @@
 
 int main(int argc, char **argv) {
 
-#ifdef DFT_ENABLED
 #ifdef _OPENMP
   printf("ERKALE - HF/DFT from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
   printf("ERKALE - HF/DFT from Hel, serial version.\n");
-#endif
-#else
-#ifdef _OPENMP
-  printf("ERKALE - HF from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
-#else
-  printf("ERKALE - HF from Hel, serial version.\n");
-#endif
 #endif
   printf("(c) Jussi Lehtola, 2010-2011.\n");
 
@@ -150,13 +140,10 @@ int main(int argc, char **argv) {
 
   if(hfinit) {
     printf("\nHartree-Fock has been specified for initialization.\n");
-#ifdef DFT_ENABLED
     printf("You might want to initialize with a pure DFT functional instead.\n");
-#endif
     printf("\n");
   }
 
-#ifdef DFT_ENABLED
   // Get exchange and correlation functionals
   dft_t dft;
   if(!hf && !rohf) {
@@ -198,8 +185,6 @@ int main(int argc, char **argv) {
       printf("A hybrid functional is used in initialization, turning off density fitting.\n");
       initset.set_bool("DFTFitting",0);
     }
-
-#endif
 
   // Density matrix (for momentum density calculations)
   arma::mat P;
@@ -262,12 +247,8 @@ int main(int argc, char **argv) {
 	  }
 	  
 	  // Construct a basis set for the molecule.  
-#ifdef LIBINT
 	  // Libint was already initialized above.
 	  BasisSet molbas=construct_basis(molat,baslib,initset,1);
-#else
-	  BasisSet molbas=construct_basis(molat,baslib,initset);
-#endif
 
 	  // Solve states
 	  arma::mat Cmol;
@@ -283,12 +264,8 @@ int main(int argc, char **argv) {
 	    // Solve restricted Hartree-Fock
 	    molsolver.RHF(Cmol,Emol,molocc,init_conv);
 	  } else {
-#ifdef DFT_ENABLED
 	    // Solve restricted DFT problem
 	    molsolver.RDFT(Cmol,Emol,molocc,init_conv,dft_init);
-#else
-	    throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
-#endif  
 	  }
 
 	  // Now we should have the occupied states of the
@@ -320,14 +297,10 @@ int main(int argc, char **argv) {
       if(dftinit) {	
 	SCF initsolver(basis,initset);
 	
-#ifdef DFT_ENABLED
 	// Print information about used functionals
 	print_info(dft_init.x_func,dft_init.c_func);
 	// Solve restricted DFT problem
 	initsolver.RDFT(C,E,occs,init_conv,dft_init);
-#else
-	throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
-#endif
       }
 
       if(verbose) {
@@ -345,7 +318,6 @@ int main(int argc, char **argv) {
       // Solve restricted Hartree-Fock
       solver.RHF(C,E,occs,conv);
     } else {
-#ifdef DFT_ENABLED
       // Print information about used functionals
       print_info(dft.x_func,dft.c_func);
       // Solve restricted DFT problem
@@ -355,9 +327,6 @@ int main(int argc, char **argv) {
 	solver.RDFT(C,E,occs,init_conv,dft);
       }
       solver.RDFT(C,E,occs,conv,dft);
-#else
-      throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
-#endif
     }
 
     // Form density matrix
@@ -383,14 +352,10 @@ int main(int argc, char **argv) {
 	// Solve restricted Hartree-Fock
 	initsolver.UHF(Ca,Cb,Ea,Eb,occa,occb,init_conv);
       } else {
-#ifdef DFT_ENABLED
 	// Print information about used functionals
 	print_info(dft_init.x_func,dft_init.c_func);
 	// Solve restricted DFT problem
 	initsolver.UDFT(Ca,Cb,Ea,Eb,occa,occb,init_conv,dft_init);
-#else
-	throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
-#endif
       }
       
       printf("\nInitialization complete.\n\n\n\n");
@@ -415,7 +380,6 @@ int main(int argc, char **argv) {
       // Set occupancies right
       get_unrestricted_occupancy(set,basis,occa,occb);
     } else {
-#ifdef DFT_ENABLED
       // Print information about used functionals
       print_info(dft.x_func,dft.c_func);
       // Solve restricted DFT problem
@@ -425,9 +389,6 @@ int main(int argc, char **argv) {
 	solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,init_conv,dft);
       }
       solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,conv,dft);
-#else
-      throw std::runtime_error("DFT support was not compiled in this version of ERKALE.\n");
-#endif
     }
 
     // Form density matrix

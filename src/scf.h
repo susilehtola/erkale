@@ -109,22 +109,18 @@ class SCF {
 
   /// Direct calculation?
   bool direct;
-#if DFT_ENABLED
   /// Density fitting calculation? (Pure DFT XC functionals)
   bool densityfit;
-#endif
 
   /// Mix density matrices?
   bool mixdensity;
   /// Dynamically change mixing factor?
   bool dynamicmix;
 
-#if DFT_ENABLED
   /// Use Lobatto angular grid instead of Lebedev grid (DFT)
   bool dft_lobatto;
   /// Save memory by reforming DFT grid on every iteration?
   bool dft_direct;
-#endif
 
   /// Nuclear repulsion energy
   double Enuc;
@@ -133,10 +129,8 @@ class SCF {
   ERItable tab;
   /// Electron repulsion screening table (for direct calculations)
   ERIscreen scr;
-#if DFT_ENABLED
   /// Density fitting table
   DensityFit dfit;
-#endif
 
  public:
   /// Constructor
@@ -150,12 +144,10 @@ class SCF {
   /// Calculate unrestricted Hartree-Fock solution
   double UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occ, const convergence_t conv) const;
 
-#if DFT_ENABLED
   /// Calculate restricted density-functional theory solution
   double RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
   /// Calculate unrestricted density-functional theory solution
   double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
-#endif
 };
 
 /*

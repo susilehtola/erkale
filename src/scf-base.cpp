@@ -515,9 +515,9 @@ arma::vec dipole_moment(const arma::mat & P, const BasisSet & basis) {
     // Get nucleus
     nucleus_t nuc=basis.get_nuc(i);
     // Increment
-    nc(0)+=nuc.Z*nuc.x;
-    nc(1)+=nuc.Z*nuc.y;
-    nc(2)+=nuc.Z*nuc.z;
+    nc(0)+=nuc.Z*nuc.r.x;
+    nc(1)+=nuc.Z*nuc.r.y;
+    nc(2)+=nuc.Z*nuc.r.z;
   }
   //  printf("Nuclear dipole moment is %e %e %e.\n",nc(0),nc(1),nc(2));
 

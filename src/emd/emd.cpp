@@ -271,7 +271,7 @@ EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
 		continue;
 
 	      // Calculate the displacement between the basis functions
-	      coords_t dr_vec=bas.get_shell_coords(idents[iidsh][ibf])-bas.get_shell_coords(idents[jidsh][jbf]);
+	      coords_t dr_vec=bas.get_center(idents[iidsh][ibf])-bas.get_center(idents[jidsh][jbf]);
 
 	      // Express displacement in spherical coordinates
 	      // (to compute value of spherical harmonic)
@@ -1026,7 +1026,7 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
 	    // The current shell is
 	    size_t is=idents[ii][jj];
 	    // and it is centered at
-	    coords_t cen=bas.get_shell_coords(is);
+	    coords_t cen=bas.get_center(is);
 	    // thus the phase factor we get is
 	    std::complex<double> phase=exp(std::complex<double>(0.0,-(px*cen.x+py*cen.y+pz*cen.z)));
 	    
