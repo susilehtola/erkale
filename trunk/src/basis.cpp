@@ -1305,9 +1305,12 @@ void BasisSet::print() const {
 
   printf("List of nuclei, geometry in Ångström with three decimal places:\n");
 
-  printf("ind\tZ\t    x\t    y\t    z\n");
+  printf("\t\t Z\t    x\t    y\t    z\n");
   for(size_t i=0;i<nuclei.size();i++) {
-    printf("%i\t%i\t% 7.3f\t% 7.3f\t% 7.3f\n",(int) i+1,nuclei[i].Z,nuclei[i].r.x/ANGSTROMINBOHR,nuclei[i].r.y/ANGSTROMINBOHR,nuclei[i].r.z/ANGSTROMINBOHR);
+    if(nuclei[i].bsse)
+      printf("%i\t%s\t*%i\t% 7.3f\t% 7.3f\t% 7.3f\n",(int) i+1,nuclei[i].symbol.c_str(),nuclei[i].Z,nuclei[i].r.x/ANGSTROMINBOHR,nuclei[i].r.y/ANGSTROMINBOHR,nuclei[i].r.z/ANGSTROMINBOHR);
+    else
+      printf("%i\t%s\t %i\t% 7.3f\t% 7.3f\t% 7.3f\n",(int) i+1,nuclei[i].symbol.c_str(),nuclei[i].Z,nuclei[i].r.x/ANGSTROMINBOHR,nuclei[i].r.y/ANGSTROMINBOHR,nuclei[i].r.z/ANGSTROMINBOHR);
   }
   printf("\nList of basis functions:\n");
 
@@ -1327,7 +1330,7 @@ void BasisSet::print() const {
       type="cart";
 
     printf("Shell %4i",(int) i+1);
-    printf("\t%c %4s shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) shells[i].get_inuc()+1,(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
+    printf("\t%c %4s shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) (shells[i].get_center_ind()+1),(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
   }
 
   printf("\nBasis set contains %i functions, maximum angular momentum is %i.\\
