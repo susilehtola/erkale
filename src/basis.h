@@ -308,7 +308,7 @@ class BasisSet {
   /// Get number of nuclei
   size_t get_Nnuc() const;
   /// Get nucleus
-  nucleus_t get_nuc(size_t inuc) const;
+  nucleus_t get_nucleus(size_t inuc) const;
   /// Get coordinates of nucleus
   coords_t get_coords(size_t inuc) const;
   /// Get charge of nucleus
@@ -396,8 +396,10 @@ class GaussianShell {
   /// Number of first function on shell
   size_t indstart;
 
-  /// Pointer to nucleus where shell is located
-  const nucleus_t * cen;
+  /// Coordinates of center
+  coords_t cen;
+  /// Index of center
+  size_t cenind;
 
   /// Use spherical harmonics?
   bool uselm;
@@ -430,7 +432,7 @@ class GaussianShell {
   /// Set index of first basis function
   void set_first_ind(size_t ind);
   /// Set center
-  void set_nucleus(const nucleus_t * cen);
+  void set_center(const coords_t & cenv, size_t cenindv);
 
   /// Sort exponents in decreasing order
   void sort();
@@ -530,7 +532,7 @@ class GaussianShell {
 };
 
 /// Get dummy shell
-GaussianShell dummyshell(nucleus_t & dummynuc);
+GaussianShell dummyshell();
 
 /// Compute index of swapped integral
 size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl);
