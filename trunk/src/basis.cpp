@@ -2482,7 +2482,6 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	C[0].z=geomav;
 	for(int l=0;l<=max_am;l++)
 	  if(lvals[l]>0) {
-	    fprintf(stderr,"Adding shell %i with exponent %e on nucleus %i.\n",l,geomav,(int) in);
 	    dfit.add_shell(in,l,C);
 	  }
       }
