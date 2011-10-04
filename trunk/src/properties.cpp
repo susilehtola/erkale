@@ -174,11 +174,11 @@ double darwin_1e(const BasisSet & basis, const arma::mat & P) {
   // Loop over nuclei
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     // Get nucleus
-    nuc=basis.get_nuc(inuc);
+    nuc=basis.get_nucleus(inuc);
 
     if(!nuc.bsse)
       // Don't do correction for BSSE nuclei
-      E+=nuc.Z*compute_density(P,basis,basis.get_coords(inuc));
+      E+=nuc.Z*compute_density(P,basis,nuc.r);
   }
 
   // Plug in the constant terms
