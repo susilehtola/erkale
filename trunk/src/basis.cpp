@@ -143,8 +143,9 @@ void GaussianShell::set_first_ind(size_t ind) {
   indstart=ind;
 }
 
-void GaussianShell::set_nucleus(const nucleus_t * c) {
-  cen=c;
+void GaussianShell::set_center(const coords_t & cenv, size_t cenindv) {
+  cen=cenv;
+  cenind=cenindv;
 }
 
 void GaussianShell::sort() {
@@ -193,8 +194,7 @@ void GaussianShell::coulomb_normalize() {
 
   // Dummy shell
   GaussianShell dummy;
-  nucleus_t dumnuc;
-  dummy=dummyshell(dumnuc);
+  dummy=dummyshell();
 
   // Compute ERI
   eris=ERI(this,&dummy,this,&dummy);
@@ -338,18 +338,19 @@ int GaussianShell::get_am() const {
 }
 
 size_t GaussianShell::get_center_ind() const {
-  return cen->ind;
+  //  return cen->ind;
+  return cenind;
 }
 
 coords_t GaussianShell::get_center() const {
-  return cen->r;
+  return cen;
 }
 
 bool GaussianShell::operator<(const GaussianShell & rhs) const {
   // Sort first by nucleus
-  if(cen->ind < rhs.cen->ind)
+  if(cenind < rhs.cenind)
     return 1;
-  else if(cen->ind == rhs.cen->ind) {
+  else if(cenind == rhs.cenind) {
     // Then by angular momentum
     if(am<rhs.am)
       return 1;
@@ -374,7 +375,7 @@ size_t GaussianShell::get_last_ind() const {
 void GaussianShell::print() const {
 
   printf("\t%c shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[am],(int) (get_center_ind()+1),(int) get_first_ind()+1,(int) get_last_ind()+1);
-  printf("\t\tCenter of shell is at % 0.4f % 0.4f % 0.4f Å.\n",cen->r.x/ANGSTROMINBOHR,cen->r.y/ANGSTROMINBOHR,cen->r.z/ANGSTROMINBOHR);
+  printf("\t\tCenter of shell is at % 0.4f % 0.4f % 0.4f Å.\n",cen.x/ANGSTROMINBOHR,cen.y/ANGSTROMINBOHR,cen.z/ANGSTROMINBOHR);
 
   // Get contraction of normalized primitives
   std::vector<contr_t> cn=get_contr_normalized();
@@ -417,9 +418,9 @@ arma::vec GaussianShell::eval_func(double x, double y, double z) const {
   // Evaluate basis functions at (x,y,z)
 
   // Compute coordinates relative to center
-  double xrel=x-cen->r.x;
-  double yrel=y-cen->r.y;
-  double zrel=z-cen->r.z;
+  double xrel=x-cen.x;
+  double yrel=y-cen.y;
+  double zrel=z-cen.z;
 
   double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
 
@@ -467,9 +468,9 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
   // Evaluate gradients of functions at (x,y,z)
 
   // Compute coordinates relative to center
-  double xrel=x-cen->r.x;
-  double yrel=y-cen->r.y;
-  double zrel=z-cen->r.z;
+  double xrel=x-cen.x;
+  double yrel=y-cen.y;
+  double zrel=z-cen.z;
 
   double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
 
@@ -546,9 +547,9 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
   // Evaluate laplacian of basis functions at (x,y,z)
 
   // Compute coordinates relative to center
-  double xrel=x-cen->r.x;
-  double yrel=y-cen->r.y;
-  double zrel=z-cen->r.z;
+  double xrel=x-cen.x;
+  double yrel=y-cen.y;
+  double zrel=z-cen.z;
 
   double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
 
@@ -626,13 +627,13 @@ arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
   S.zeros();
 
   // Coordinates
-  double xa=cen->r.x;
-  double ya=cen->r.y;
-  double za=cen->r.z;
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
   
-  double xb=rhs.cen->r.x;
-  double yb=rhs.cen->r.y;
-  double zb=rhs.cen->r.z;
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
 
 #ifdef OBARASAIKA
   for(size_t ixl=0;ixl<c.size();ixl++)
@@ -684,13 +685,13 @@ arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
   T.zeros();
 
   // Coordinates
-  double xa=cen->r.x;
-  double ya=cen->r.y;
-  double za=cen->r.z;
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
   
-  double xb=rhs.cen->r.x;
-  double yb=rhs.cen->r.y;
-  double zb=rhs.cen->r.z;
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
 
 
 #ifdef OBARASAIKA
@@ -745,13 +746,13 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   Vnuc.zeros();
 
   // Coordinates
-  double xa=cen->r.x;
-  double ya=cen->r.y;
-  double za=cen->r.z;
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
   
-  double xb=rhs.cen->r.x;
-  double yb=rhs.cen->r.y;
-  double zb=rhs.cen->r.z;
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
 
 #ifdef OBARASAIKA
   for(size_t ixl=0;ixl<c.size();ixl++)
@@ -837,12 +838,12 @@ std::vector<arma::mat> GaussianShell::moment(int am, double x, double y, double 
   wrk.zeros();
   
   // Coordinates
-  double xa=cen->r.x;
-  double ya=cen->r.y;
-  double za=cen->r.z;
-  double xb=rhs.cen->r.x;
-  double yb=rhs.cen->r.y;
-  double zb=rhs.cen->r.z;
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
 
   // Compute moment integrals
   for(size_t ixl=0;ixl<c.size();ixl++) {
@@ -913,11 +914,9 @@ void BasisSet::add_shell(size_t nucind, const GaussianShell & sh) {
   // Add shell
   shells.push_back(sh);
   // Set pointer to nucleus
-  shells[shells.size()-1].set_nucleus(&(nuclei[nucind]));
-  // Add shell to stack of functions on nucleus
-  nuclei[nucind].shells.push_back(&(shells[shells.size()-1]));
+  shells[shells.size()-1].set_center(nuclei[nucind].r,nucind);
 
-  // Sort the basis set
+  // Sort the basis set, updating the nuclear list and basis function indices as well
   sort();
 }
 
@@ -930,6 +929,7 @@ void BasisSet::add_shell(size_t nucind, int am, const std::vector<contr_t> & C) 
   else
     sh=GaussianShell(am,false,C);
 
+  // Do the rest here
   add_shell(nucind,sh);
 }
 
@@ -977,14 +977,9 @@ void BasisSet::update_nuclear_shell_list() {
 }
 
 void BasisSet::sort() {
-  // First sort the exponents on the shells in decreasing order.
-  for(size_t i=0;i<shells.size();i++)
-    shells[i].sort();
-
-  // Then sort the shells themselves; first by increasing index of
-  // center, then by increasing angular momentum and last by
-  // decreasing exponent.
-  stable_sort(shells.begin(),shells.end());
+  // Sort the shells first by increasing index of center, then by
+  // increasing angular momentum and last by decreasing exponent.
+  std::stable_sort(shells.begin(),shells.end());
 
   // Check the numbering of the basis functions
   check_numbering();
@@ -1240,7 +1235,7 @@ size_t BasisSet::get_Nnuc() const {
   return nuclei.size();
 }
 
-nucleus_t BasisSet::get_nuc(size_t inuc) const {
+nucleus_t BasisSet::get_nucleus(size_t inuc) const {
   return nuclei[inuc];
 }
 
@@ -1257,7 +1252,6 @@ std::string BasisSet::get_symbol(size_t inuc) const {
 }
 
 std::vector<GaussianShell> BasisSet::get_funcs(size_t inuc) const {
-
   std::vector<GaussianShell> ret;
   for(size_t i=0;i<nuclei[inuc].shells.size();i++)
     ret.push_back(*(nuclei[inuc].shells[i]));
@@ -1314,12 +1308,12 @@ void BasisSet::print() const {
   }
   printf("\nList of basis functions:\n");
 
-  /*
   for(size_t i=0;i<shells.size();i++) {
     printf("Shell %4i",(int) i);
     shells[i].print();
   }
-  */
+
+  /*
 
   for(size_t i=0;i<shells.size();i++) {
     // Type of shell - spherical harmonics or cartesians
@@ -1329,9 +1323,13 @@ void BasisSet::print() const {
     else
       type="cart";
 
+
     printf("Shell %4i",(int) i+1);
     printf("\t%c %4s shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) (shells[i].get_center_ind()+1),(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
   }
+
+  */
+
 
   printf("\nBasis set contains %i functions, maximum angular momentum is %i.\\
 n",(int) get_Nbf(),get_max_am());
@@ -1571,10 +1569,10 @@ double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks,
   int nd=shells[ls].cart[ll].n;
 
   // Coordinates of centers
-  coords_t cena=shells[is].cen->r;
-  coords_t cenb=shells[js].cen->r;
-  coords_t cenc=shells[ks].cen->r;
-  coords_t cend=shells[ls].cen->r;
+  coords_t cena=shells[is].cen;
+  coords_t cenb=shells[js].cen;
+  coords_t cenc=shells[ks].cen;
+  coords_t cend=shells[ls].cen;
 
   // Result
   double eri=0.0;
@@ -1799,21 +1797,21 @@ void compute_libint_data(Libint_t & libint, const GaussianShell *is, const Gauss
   // Coordinates of centers
   double A[3], B[3], C[3], D[3];
   
-  A[0]=is->cen->r.x;
-  A[1]=is->cen->r.y;
-  A[2]=is->cen->r.z;
+  A[0]=is->cen.x;
+  A[1]=is->cen.y;
+  A[2]=is->cen.z;
   
-  B[0]=js->cen->r.x;
-  B[1]=js->cen->r.y;
-  B[2]=js->cen->r.z;
+  B[0]=js->cen.x;
+  B[1]=js->cen.y;
+  B[2]=js->cen.z;
   
-  C[0]=ks->cen->r.x;
-  C[1]=ks->cen->r.y;
-  C[2]=ks->cen->r.z;
+  C[0]=ks->cen.x;
+  C[1]=ks->cen.y;
+  C[2]=ks->cen.z;
   
-  D[0]=ls->cen->r.x;
-  D[1]=ls->cen->r.y;
-  D[2]=ls->cen->r.z;
+  D[0]=ls->cen.x;
+  D[1]=ls->cen.y;
+  D[2]=ls->cen.z;
 
   // Store AB and CD
   for(int i=0;i<3;i++) {
@@ -2353,6 +2351,11 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 
   // Loop over nuclei
   for(size_t in=0;in<nuclei.size();in++) {
+    // Add nucleus to fitting set
+    dfit.add_nucleus(nuclei[in]);
+    // Dummy nucleus
+    nucleus_t nuc=nuclei[in];
+
     // Define lval - (1) in YRF
     int lval;
     if(nuclei[in].Z<3)
@@ -2392,8 +2395,10 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	  }
 
 	// Add function
-	if(!found)
+	if(!found) {
 	  cand.push_back(GaussianShell(am,true,C));
+	  cand[cand.size()-1].set_center(nuc.r,in);
+	}
       }
     }
     
@@ -2476,8 +2481,10 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	C[0].c=1.0;
 	C[0].z=geomav;
 	for(int l=0;l<=max_am;l++)
-	  if(lvals[l]>0)
+	  if(lvals[l]>0) {
+	    fprintf(stderr,"Adding shell %i with exponent %e on nucleus %i.\n",l,geomav,(int) in);
 	    dfit.add_shell(in,l,C);
+	  }
       }
     } // (10) in YRF
   } // (11) in YRF
@@ -2486,6 +2493,8 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
   dfit.coulomb_normalize();
   // Form list of unique shell pairs
   dfit.form_unique_shellpairs();
+
+  dfit.print();
 
   return dfit;
 }
@@ -2581,18 +2590,19 @@ BasisSet BasisSet::exchange_fitting() const {
   return fit;
 }
 
-GaussianShell dummyshell(nucleus_t & dummynuc) {
+GaussianShell dummyshell() {
   // Set center
-  dummynuc.r.x=0.0;
-  dummynuc.r.y=0.0;
-  dummynuc.r.z=0.0;
+  coords_t r;
+  r.x=0.0;
+  r.y=0.0;
+  r.z=0.0;
 
   std::vector<contr_t> C(1);
   C[0].c=1.0;
   C[0].z=0.0;
   
   GaussianShell sh(0,false,C);
-  sh.set_nucleus(&dummynuc);
+  sh.set_center(r,0);
 
   return sh;
 }
@@ -2664,7 +2674,6 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
     nuc.symbol=el;
     // Set charge
     nuc.Z=get_Z(el);
-
     // and add the nucleus.
     basis.add_nucleus(nuc);
 

@@ -85,7 +85,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
   // Nuclear repulsion
   Enuc=basis.Enuc();
 
-#if DFT_ENABLED
   if(set.dft_enabled()) {
     // Use density fitting?
     densityfit=set.get_bool("DFTFitting");
@@ -97,7 +96,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
     // Hartree-Fock
     densityfit=0;
   }
-#endif
 
   // Timer
   Timer t;
@@ -160,7 +158,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
     printf("\n");
   }
 
-#if DFT_ENABLED
   if(densityfit) {
     // Density fitting.
 
@@ -180,9 +177,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
     }
 
     dfit.fill(*basisp,dfitbas,direct);
-  } else
-#endif
-  {
+  } else  {
     // Compute ERIs
     if(direct) {
       if(verbose) {
@@ -513,7 +508,7 @@ arma::vec dipole_moment(const arma::mat & P, const BasisSet & basis) {
   nc.zeros();
   for(size_t i=0;i<basis.get_Nnuc();i++) {
     // Get nucleus
-    nucleus_t nuc=basis.get_nuc(i);
+    nucleus_t nuc=basis.get_nucleus(i);
     // Increment
     nc(0)+=nuc.Z*nuc.r.x;
     nc(1)+=nuc.Z*nuc.r.y;
