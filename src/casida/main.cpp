@@ -41,6 +41,12 @@
 #include <omp.h>
 #endif
 
+void print_spectrum(const std::string & fname, const arma::mat & m) {
+  FILE *out=fopen(fname.c_str(),"w");
+  for(size_t it=0; it<m.n_rows; it++)
+    fprintf(out,"%e %e\n",m(it,0)*HARTREEINEV, m(it,1));
+  fclose(out);
+}
 
 int main(int argc, char **argv) {
 
@@ -69,7 +75,12 @@ int main(int argc, char **argv) {
   set.add_int("CasidaCoupling","Coupling mode: 0 for IPA, 1 for RPA and 2 for TDLDA",2);
   set.add_double("CasidaTol","Tolerance for Casida grid",1e-3);
   set.add_string("CasidaStates","States to include in Casida calculation, eg ""1,3-4,10,13"" ","");
+  set.add_string("CasidaQval","Values of Q to compute spectrum for","");
+
   set.parse(std::string(argv[1]));
+  
+  // Get values of q to compute spectrum for
+  std::vector<double> qvals=parse_range_double(set.get_string("CasidaQval"));
 
   // Settings used for initialization
   Settings initset=set;
@@ -341,7 +352,17 @@ int main(int argc, char **argv) {
       cas=Casida(set,basis,sol.E,sol.E,sol.C,sol.C,sol.P/2.0,sol.P/2.0);
     else
       cas=Casida(set,basis,sol.E,sol.C,sol.P);
-    cas.absorption();
+
+    // Dipole transition
+    print_spectrum("casida.dat",cas.dipole_transition(basis));
+    // Q dependent stuff
+    for(size_t iq=0;iq<qvals.size();iq++) {
+      // File to save output
+      char fname[80];
+      sprintf(fname,"casida-%.2f.dat",qvals[iq]);
+      
+      print_spectrum(fname,cas.transition(basis,qvals[iq]));
+    }
 
   } else {
     uscf_t sol;
@@ -404,7 +425,17 @@ int main(int argc, char **argv) {
     population_analysis(basis,sol.Pa,sol.Pb);
 
     Casida cas(set,basis,sol.Ea,sol.Eb,sol.Ca,sol.Cb,sol.Pa,sol.Pb);
-    cas.absorption();
+
+    // Dipole transition
+    print_spectrum("casida.dat",cas.dipole_transition(basis));
+    // Q dependent stuff
+    for(size_t iq=0;iq<qvals.size();iq++) {
+      // File to save output
+      char fname[80];
+      sprintf(fname,"casida-%.2f.dat",qvals[iq]);
+      
+      print_spectrum(fname,cas.transition(basis,qvals[iq]));
+    }
   }    
   
   if(verbose) {

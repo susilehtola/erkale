@@ -47,6 +47,7 @@
 #include "linalg.h"
 #include "scf.h"
 #include "settings.h"
+#include "../xrs/fourierprod.h"
 
 #include <armadillo>
 #include <cstdio>
@@ -102,9 +103,9 @@ class Casida {
   // K matrix
   arma::mat K;
 
-  /// Eigenvalues of Casidas equation (and later on, the excitation energies)
+  /// Eigenvalues of Casida's equation (and later on, the excitation energies)
   arma::vec w_i;
-  /// Eigenvectors of Casidas equation
+  /// Eigenvectors of Casida's equation
   arma::mat F_i;
 
   /**
@@ -141,8 +142,11 @@ class Casida {
   /// Form pairs and occupations
   void form_pairs(const Settings & set, const BasisSet & bas, size_t Norb, bool pol);
 
-  /// Form dipole matrix
-  void calc_dipole(const BasisSet & bas);
+  /// Transform given AO matrix to MO
+  arma::mat matrix_transform(bool ispin, const arma::mat & m) const;
+  /// Transform given AO matrix to MO
+  arma::cx_mat matrix_transform(bool ispin, const arma::cx_mat & m) const;
+  
 
   /// Common routines for constructors
   void parse_args(const Settings & set, const BasisSet & basis, size_t Norbs);
@@ -152,6 +156,9 @@ class Casida {
 
   /// Compute the Coulomb fitting integrals \lf$ (\mu \nu | a) \lf$ and the matrix \lf$ (a|b)^{-1} \lf$
   void coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const;
+
+  /// Solve the Casida equation
+  void solve();
 
  public:
   /// Dummy constructor
@@ -163,11 +170,14 @@ class Casida {
   /// Destructor
   ~Casida();
 
-  /// Solve the Casida equation
-  void solve();
+  /// Compute the q-dependent transition
+  arma::mat transition(const BasisSet & bas, const arma::vec & q) const;
 
-  // Routines for calculating and outputting the actual spectra
-  void absorption() const;
+  /// Compute the spherically averaged, q-dependent transition
+  arma::mat transition(const BasisSet & bas, double q) const;
+
+  /// Compute the dipole transition spectrum
+  arma::mat dipole_transition(const BasisSet & bas) const;
 };
 
 

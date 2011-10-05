@@ -22,6 +22,7 @@
 
 #include "casida.h"
 #include "casida_grid.h"
+#include "../xrs/lmgrid.h"
 #include "stringutil.h"
 #include "timer.h"
 
@@ -85,8 +86,6 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
 void Casida::parse_args(const Settings & set, const BasisSet & basis, size_t Norbs) {
   // Form pairs and occupations
   form_pairs(set,basis,Norbs,C.size()==2); // polarized calculation?
-  // Form dipole matrix
-  calc_dipole(basis);
 
   // Determine coupling
   switch(set.get_int("CasidaCoupling")) {
@@ -139,18 +138,12 @@ void Casida::calc_K(const Settings & set, const BasisSet & basis) {
 Casida::~Casida() {
 };
 
-void Casida::calc_dipole(const BasisSet & bas) {
-  // Dipole matrix elements in AO basis
-  std::vector<arma::mat> dm=bas.moment(1);
+arma::mat Casida::matrix_transform(bool ispin, const arma::mat & m) const {
+  return arma::trans(C[ispin])*m*C[ispin];
+}
 
-  dipmat.resize(C.size());
-  for(size_t ispin=0;ispin<C.size();ispin++) {
-    dipmat[ispin].resize(3);
-    // Loop over cartesian directions
-    for(int ic=0;ic<3;ic++)
-      // Compute dipole matrix in MO basis
-      dipmat[ispin][ic]=arma::trans(C[ispin])*dm[ic]*C[ispin];
-  }
+arma::cx_mat Casida::matrix_transform(bool ispin, const arma::cx_mat & m) const {
+  return arma::trans(C[ispin])*m*C[ispin];
 }
 
 void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb, bool pol) {
@@ -314,9 +307,16 @@ void Casida::solve() {
   fprintf(stderr,"Solution %s.\n",t.elapsed().c_str());
 }
 
-// This calculates the photoabsorption transition rates
-void Casida::absorption() const {
-  printf("\n ******* Casida Photoabsorption Spectrum ********\n");
+arma::mat Casida::dipole_transition(const BasisSet & bas) const {
+  // Form dipole matrix
+  std::vector<arma::mat> dm=bas.moment(1);
+  std::vector< std::vector<arma::mat> > dipmat(C.size());
+  
+  for(size_t ispin=0;ispin<C.size();ispin++) {
+    dipmat[ispin].resize(3);
+    for(int ic=0;ic<3;ic++)
+      dipmat[ispin][ic]=matrix_transform(ispin,dm[ic]);
+  }
 
   // Transition rates for every transition
   arma::mat tr(w_i.n_elem,3);
@@ -346,22 +346,138 @@ void Casida::absorption() const {
     }
   }
 
-  // Oscillator strengths, 2/3 * E * ( |x|^2 + |y|^2 + |z|^2 )
-  arma::vec osc(w_i.n_elem);
-  for(size_t it=0; it<w_i.n_elem;it++)
-    osc(it) = 2.0/3.0 * w_i(it) * arma::dot(tr.row(it),tr.row(it));
-
-  // Write output
-  printf(  " Photoabsorption transition energies and rates\n");
-  printf(  " %6s   %12s   %12s   %12s %12s %12s\n", "nn", "E [eV]", "osc.str.", "<x>", "<y>", "<z>");
-  for(size_t it=0; it<osc.n_elem; it++) {
-    printf(" %6i    %12.6f   %12.6f   %12.6f %12.6f %12.6f\n", (int) it+1, w_i(it)*HARTREEINEV, osc(it), tr(it, 0), tr(it, 1), tr(it, 2));
+  // Transition energies and oscillator strengths, 2/3 * ( |x|^2 + |y|^2 + |z|^2 )
+  arma::mat osc(w_i.n_elem,2);
+  for(size_t it=0; it<w_i.n_elem;it++) {
+    osc(it,0) = w_i(it);
+    osc(it,1) = 2.0/3.0 * arma::dot(tr.row(it),tr.row(it));
   }
 
-  FILE *out=fopen("casida.dat","w");
-  for(size_t it=0; it<osc.n_elem; it++)
-    fprintf(out,"%e %e % e % e % e\n",w_i(it)*HARTREEINEV, osc(it), tr(it, 0), tr(it, 1), tr(it, 2));
-  fclose(out);
+  return osc;
+}
+
+arma::mat Casida::transition(const BasisSet & basis, const arma::vec & q) const {
+  if(q.n_elem!=3) {
+    ERROR_INFO();
+    throw std::runtime_error("Momentum transfer should have 3 coordinates!\n");
+  }
+
+  // Form products of basis functions.
+  const size_t Nbf=basis.get_Nbf();
+  std::vector<prod_gaussian_3d> bfprod=compute_products(basis);
+
+  // and their Fourier transforms
+  std::vector<prod_fourier> bffour=fourier_transform(bfprod);
+
+  // Get the momentum transfer matrix
+  arma::cx_mat momtrans=momentum_transfer(bffour,Nbf,q);
+  // and transform it to the MO basis
+  std::vector< arma::cx_mat > mtrans(C.size());
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    mtrans[ispin]=matrix_transform(ispin,momtrans);
+
+  // Transition rates for every transition
+  arma::cx_vec tr(w_i.n_elem);
+  tr.zeros();
+
+  // Loop over transitions
+  for(size_t it=0;it<w_i.n_elem;it++) {
+    // Loop over spins
+    for(size_t jspin=0;jspin<pairs.size();jspin++) {
+      // Offset in F
+      size_t joff=jspin*pairs[0].size();
+      // Loop over pairs
+      for(size_t jp=0;jp<pairs[jspin].size();jp++) {
+	
+	// Compute |x| = x^T S^{-1/2} F_i
+	tr(it)+=mtrans[jspin](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
+      }
+    }
+    
+    // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
+    // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
+    // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
+    tr(it)/=sqrt(w_i(it));
+  }
+  
+  // Transition energies and oscillators
+  arma::mat osc(w_i.n_elem,2);
+  for(size_t it=0; it<w_i.n_elem;it++) {
+    osc(it,0) = w_i(it);
+    osc(it,1) = std::norm(tr(it));
+  }
+  
+  return osc;
+}
+
+arma::mat Casida::transition(const BasisSet & basis, double qr) const {
+  // Form products of basis functions.
+  const size_t Nbf=basis.get_Nbf();
+  std::vector<prod_gaussian_3d> bfprod=compute_products(basis);
+
+  // and their Fourier transforms
+  std::vector<prod_fourier> bffour=fourier_transform(bfprod);
+
+  // Get the grid for computing the spherical averages.
+  std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
+  for(size_t i=0;i<grid.size();i++)
+    // Renormalize weights by 4\pi, since otherwise sum of weights is 4\pi
+    grid[i].w/=4.0*M_PI;
+
+  // Transition energies and oscillator strengths
+  arma::mat osc(w_i.n_elem,2);
+  for(size_t it=0; it<w_i.n_elem;it++) {
+    osc(it,0) = w_i(it);
+    osc(it,1) = 0.0;
+  }
+  
+  // Loop over the angular mesh
+  for(size_t ig=0;ig<grid.size();ig++) {
+    // Transition rates for every transition
+    arma::cx_vec tr(w_i.n_elem);
+    tr.zeros();
+    
+    // Current value of q is
+    arma::vec q(3);
+    q(0)=qr*grid[ig].r.x;
+    q(1)=qr*grid[ig].r.y;
+    q(2)=qr*grid[ig].r.z;
+    // and the weight is
+    double w=grid[ig].w;
+
+    // Get the momentum transfer matrix
+    arma::cx_mat momtrans=momentum_transfer(bffour,Nbf,q);
+    // and transform it to the MO basis
+    std::vector< arma::cx_mat > mtrans(C.size());
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      mtrans[ispin]=matrix_transform(ispin,momtrans);
+
+    // Loop over transitions
+    for(size_t it=0;it<w_i.n_elem;it++) {
+      // Loop over spins
+      for(size_t jspin=0;jspin<pairs.size();jspin++) {
+	// Offset in F
+	size_t joff=jspin*pairs[0].size();
+	// Loop over pairs
+	for(size_t jp=0;jp<pairs[jspin].size();jp++) {
+	  
+	  // Compute |x| = x^T S^{-1/2} F_i
+	  tr(it)+=mtrans[jspin](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
+	}
+      }
+    }
+
+    for(size_t it=0;it<w_i.n_elem;it++) {
+      // Normalize transition speeds
+      tr(it)/=sqrt(w_i(it));
+      // Increment total transition speeds
+      osc(it,1)+=w*std::norm(tr(it));
+    }
+    
+  }
+
+
+  return osc;
 }
 
 void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const {
