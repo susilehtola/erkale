@@ -1,7 +1,7 @@
 # Create the basis set tool
 add_executable (erkale_bastool main.cpp)
-target_link_libraries(erkale_bastool erkale)
-target_link_libraries(erkale_bastool erkale_cmp)
+target_link_libraries(erkale_bastool liberkale)
+target_link_libraries(erkale_bastool liberkale_cmp)
 # Link other libraries if necessary
 if(BUILD_SHARED_LIBS)
 else()
