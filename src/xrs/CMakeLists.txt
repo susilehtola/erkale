@@ -5,13 +5,13 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 add_library (liberkale_xrs
 bfprod.cpp fourierprod.cpp gaunt.cpp lmgrid.cpp lmtrans.cpp momentum_series.cpp xrsscf.cpp )
 # The name of the library is
-set_target_properties(liberkale_xrs PROPERTIES OUTPUT_NAME "liberkale_xrs${SUFFIX}")
+set_target_properties(liberkale_xrs PROPERTIES OUTPUT_NAME "erkale_xrs${SUFFIX}")
 
 if(BUILD_SHARED_LIBS)
  set_target_properties(liberkale_xrs PROPERTIES
   VERSION ${VERSION} SOVERSION ${SOVERSION} )
- target_link_libraries(liberkale_xrs erkale)
- target_link_libraries(liberkale_xrs erkale_emd)
+ target_link_libraries(liberkale_xrs liberkale)
+ target_link_libraries(liberkale_xrs liberkale_emd)
 endif()
 
 add_executable(erkale_xrs main.cpp)
@@ -19,8 +19,8 @@ target_link_libraries(erkale_xrs liberkale_xrs)
 
 if(BUILD_SHARED_LIBS)
 else()
- target_link_libraries(erkale_xrs erkale)
- target_link_libraries(erkale_xrs erkale_emd)
+ target_link_libraries(erkale_xrs liberkale)
+ target_link_libraries(erkale_xrs liberkale_emd)
  target_link_libraries(erkale_xrs ${GSL_LIBRARIES})
  target_link_libraries(erkale_xrs ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_xrs ${LIBXC_LIBRARIES})

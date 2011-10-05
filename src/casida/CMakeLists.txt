@@ -1,5 +1,7 @@
 add_executable(erkale_casida main.cpp casida.cpp casida_grid.cpp)
-target_link_libraries(erkale_casida erkale)
+target_link_libraries(erkale_casida liberkale)
+target_link_libraries(erkale_casida liberkale_xrs)
+target_link_libraries(erkale_casida liberkale_emd)
 # Link libraries
 if(BUILD_SHARED_LIBS)
 else()

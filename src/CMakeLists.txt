@@ -15,7 +15,7 @@ INCLUDE_DIRECTORIES(${LIBINT_INCLUDE_DIRS})
 
 
 # Create the ERKALE base library "erkale" which includes the following sources
-add_library (erkale 
+add_library (liberkale 
 basis.cpp basislibrary.cpp stringutil.cpp mathf.cpp integrals.cpp
 eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
 solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
@@ -26,38 +26,38 @@ lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp)
 
 # The name of the executable is
-set_target_properties(erkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
+set_target_properties(liberkale PROPERTIES OUTPUT_NAME "liberkale${SUFFIX}")
 
 # If we build shared libraries, they must be linked to the other libraries
 if(BUILD_SHARED_LIBS)
- set_target_properties(erkale PROPERTIES
+ set_target_properties(liberkale PROPERTIES
   VERSION ${VERSION} SOVERSION ${SOVERSION} )
- target_link_libraries(erkale ${GSL_LIBRARIES})
- target_link_libraries(erkale ${LAPACK_LIBRARIES})
- target_link_libraries(erkale ${LIBINT_LIBRARIES})
- target_link_libraries(erkale ${LIBXC_LIBRARIES})
+ target_link_libraries(liberkale ${GSL_LIBRARIES})
+ target_link_libraries(liberkale ${LAPACK_LIBRARIES})
+ target_link_libraries(liberkale ${LIBINT_LIBRARIES})
+ target_link_libraries(liberkale ${LIBXC_LIBRARIES})
 endif()
 
 # Create the ERKALE main executable
-add_executable (erkale.x main.cpp)
+add_executable (erkale main.cpp)
 # The name of the executable is
-set_target_properties(erkale.x PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
-target_link_libraries(erkale.x erkale)
-target_link_libraries(erkale.x erkale_emd)
+set_target_properties(erkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
+target_link_libraries(erkale liberkale)
+target_link_libraries(erkale liberkale_emd)
 
 
 # Link libraries
 if(BUILD_SHARED_LIBS)
 else()
- target_link_libraries(erkale.x ${GSL_LIBRARIES})
- target_link_libraries(erkale.x ${LAPACK_LIBRARIES})
- target_link_libraries(erkale.x ${LIBXC_LIBRARIES})
- target_link_libraries(erkale.x ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale ${GSL_LIBRARIES})
+ target_link_libraries(erkale ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale ${LIBINT_LIBRARIES})
 endif()
 
 # Install targets
-install (TARGETS erkale DESTINATION lib${LIB_SUFFIX})
-install (TARGETS erkale.x DESTINATION bin)
+install (TARGETS liberkale DESTINATION lib${LIB_SUFFIX})
+install (TARGETS erkale DESTINATION bin)
 
 # Install headers
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
