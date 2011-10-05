@@ -64,6 +64,9 @@ std::vector<std::string> parse(std::string in, const std::string & separator);
 /// Parse input for a range of indices, e.g. 0,2-5,9,11-15,20
 std::vector<size_t> parse_range(const std::string & in);
 
+/// Parse input for a range of double precision numbers, e.g. 0:.01:10,20:30
+std::vector<double> parse_range_double(const std::string & in);
+
 /// Form wanted cube
 void parse_cube(const std::string & sizes, std::vector<double> & x, std::vector<double> & y, std::vector<double> & z);
 

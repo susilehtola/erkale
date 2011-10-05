@@ -342,16 +342,57 @@ std::vector<size_t> parse_range(const std::string & in) {
   return ret;
 }
 
+std::vector<double> parse_range_double(const std::string & in) {
+  std::vector<double> ret;
+
+  // First break this wrt commas
+  std::vector<std::string> comma=parse(in,",");
+  for(size_t ic=0;ic<comma.size();ic++) {
+    // Now we can break wrt the semicolon
+    std::vector<std::string> lim=parse(comma[ic],":");
+      
+    if(lim.size()!=3) {
+      std::ostringstream oss;
+      oss << "The given input with " << lim.size() << "entries is not a valid range of numbers.\n";
+      ERROR_INFO();
+      throw std::runtime_error(oss.str());
+    }
+    
+    // Read minimum, maximum and spacing.
+    double min=readdouble(lim[0]);
+    double dx=readdouble(lim[1]);
+    double max=readdouble(lim[2]);
+    
+    if(dx<=0.0) {
+      ERROR_INFO();
+      throw std::runtime_error("Grid spacing must be positive.\n");
+    }
+    if(max<min) {
+      ERROR_INFO();
+      throw std::runtime_error("Grid maximum cannot be smaller than minimum!\n");
+    }
+
+    // Form the points
+    size_t N=(size_t) ((max-min)/dx);
+    if(N==0)
+      // Minimum and maximum were probably the same. We still want a number
+      N++;
+    
+    for(size_t i=0;i<N;i++)
+      ret.push_back(min+i*dx);
+  }
+
+  // Sort in increasing order
+  sort(ret.begin(),ret.end());
+
+  return ret;
+}
+
 void parse_cube(const std::string & sizes, std::vector<double> & x, std::vector<double> & y, std::vector<double> & z) {
   // Clear the arrays of any existing content.
   x.clear();
   y.clear();
   z.clear();
-
-  // Minimum, maximum and spacing
-  double min[3];
-  double max[3];
-  double dr[3];
 
   // Split output in x, y and z
   std::vector<std::string> info=splitline(sizes);
@@ -370,53 +411,7 @@ void parse_cube(const std::string & sizes, std::vector<double> & x, std::vector<
   }
 
   // Read data.
-  for(int i=0;i<3;i++) {
-    // Break at :
-    std::vector<std::string> lim=parse(info[i],":");
-    
-    if(lim.size()!=3) {
-      std::ostringstream oss;
-      oss << "The given input \"" << info[i] << "\" is not a valid definition for the grid on an axis.\n";
-      ERROR_INFO();
-      throw std::runtime_error(oss.str());
-    }
-
-    // Read minimum, maximum and spacing.
-    min[i]=readdouble(lim[0]);
-    dr[i]=readdouble(lim[1]);
-    max[i]=readdouble(lim[2]);
-
-    if(dr[i]<=0.0) {
-      ERROR_INFO();
-      throw std::runtime_error("Grid spacing must be positive.\n");
-    }
-    if(max[i]<min[i]) {
-      ERROR_INFO();
-      throw std::runtime_error("Grid maximum cannot be smaller than minimum!\n");
-    }
-  }
-
-  size_t N;
-
-  // Form points in x.
-  N=(size_t) ((max[0]-min[0])/dr[0]);
-  if(N==0)
-    // Minimum and maximum were probably the same.
-    N++;
-
-  x.resize(N);
-  for(size_t i=0;i<N;i++)
-    x[i]=min[0]+i*dr[0];
-
-  // Form points in y.
-  N=(size_t) ((max[1]-min[1])/dr[1]);
-  y.resize(N);
-  for(size_t i=0;i<N;i++)
-    y[i]=min[1]+i*dr[1];
-
-  // Form points in z
-  N=(size_t) ((max[2]-min[2])/dr[2]);
-  z.resize(N);
-  for(size_t i=0;i<N;i++)
-    z[i]=min[2]+i*dr[2];
+  x=parse_range_double(info[0]);
+  y=parse_range_double(info[1]);
+  z=parse_range_double(info[2]);
 }
