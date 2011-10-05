@@ -350,38 +350,44 @@ std::vector<double> parse_range_double(const std::string & in) {
   for(size_t ic=0;ic<comma.size();ic++) {
     // Now we can break wrt the semicolon
     std::vector<std::string> lim=parse(comma[ic],":");
+
+    if(lim.size()==1) {
+      // Only single number given, add it to the stack.
+      ret.push_back(readdouble(lim[0]));
+    } else {
       
-    if(lim.size()!=3) {
-      std::ostringstream oss;
-      oss << "The given input with " << lim.size() << "entries is not a valid range of numbers.\n";
-      ERROR_INFO();
-      throw std::runtime_error(oss.str());
+      if(lim.size()!=3) {
+	std::ostringstream oss;
+	oss << "The given input with " << lim.size() << "entries is not a valid range of numbers.\n";
+	ERROR_INFO();
+	throw std::runtime_error(oss.str());
+      }
+      
+      // Read minimum, maximum and spacing.
+      double min=readdouble(lim[0]);
+      double dx=readdouble(lim[1]);
+      double max=readdouble(lim[2]);
+      
+      if(dx<=0.0) {
+	ERROR_INFO();
+	throw std::runtime_error("Grid spacing must be positive.\n");
+      }
+      if(max<min) {
+	ERROR_INFO();
+	throw std::runtime_error("Grid maximum cannot be smaller than minimum!\n");
+      }
+      
+      // Form the points
+      size_t N=(size_t) ((max-min)/dx);
+      if(N==0)
+	// Minimum and maximum were probably the same. We still want a number
+	N++;
+      
+      for(size_t i=0;i<N;i++)
+	ret.push_back(min+i*dx);
     }
-    
-    // Read minimum, maximum and spacing.
-    double min=readdouble(lim[0]);
-    double dx=readdouble(lim[1]);
-    double max=readdouble(lim[2]);
-    
-    if(dx<=0.0) {
-      ERROR_INFO();
-      throw std::runtime_error("Grid spacing must be positive.\n");
-    }
-    if(max<min) {
-      ERROR_INFO();
-      throw std::runtime_error("Grid maximum cannot be smaller than minimum!\n");
-    }
-
-    // Form the points
-    size_t N=(size_t) ((max-min)/dx);
-    if(N==0)
-      // Minimum and maximum were probably the same. We still want a number
-      N++;
-    
-    for(size_t i=0;i<N;i++)
-      ret.push_back(min+i*dx);
   }
-
+    
   // Sort in increasing order
   sort(ret.begin(),ret.end());
 
