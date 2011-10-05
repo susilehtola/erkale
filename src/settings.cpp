@@ -293,33 +293,35 @@ bool Settings::dft_enabled() const {
   return dft;
 }
 
-bool Settings::is_double(std::string name) const {
+size_t Settings::is_double(std::string name) const {
   for(size_t i=0;i<dset.size();i++)
     if(stricmp(name,dset[i].name)==0)
-      return 1;
+      return i+1;
 
   return 0;
 }
 
-bool Settings::is_int(std::string name) const {
+size_t Settings::is_int(std::string name) const {
   for(size_t i=0;i<iset.size();i++)
     if(stricmp(name,iset[i].name)==0)
-      return 1;
+      return i+1;
 
   return 0;
 }
 
-bool Settings::is_bool(std::string name) const {
+size_t Settings::is_bool(std::string name) const {
   for(size_t i=0;i<bset.size();i++)
     if(stricmp(name,bset[i].name)==0)
-      return 1;
+      return i+1;
+
   return 0;
 }
 
-bool Settings::is_string(std::string name) const {
+size_t Settings::is_string(std::string name) const {
   for(size_t i=0;i<sset.size();i++)
     if(stricmp(name,sset[i].name)==0)
-      return 1;
+      return i+1;
+
   return 0;
 }
 
@@ -387,20 +389,40 @@ void Settings::parse(std::string filename) {
 void Settings::print() const {
   printf("\nCurrent Settings used by ERKALE:\n");
 
-  std::string bvals[]={"false","true"};
+  const std::string bvals[]={"false","true"};
 
+  // First, sort the keywords alphabetically.
+  std::vector<std::string> kw;
   for(size_t i=0;i<bset.size();i++)
-    printf("%20s\t%20s\t%s\n",bset[i].name.c_str(),bvals[bset[i].val].c_str(),bset[i].comment.c_str());
-  
+    kw.push_back(bset[i].name);
   for(size_t i=0;i<iset.size();i++)
-    printf("%20s\t%20i\t%s\n",iset[i].name.c_str(),iset[i].val,iset[i].comment.c_str());
-  
+    kw.push_back(iset[i].name);
   for(size_t i=0;i<dset.size();i++)
-    printf("%20s\t%20.3e\t%s\n",dset[i].name.c_str(),dset[i].val,dset[i].comment.c_str());
-  
+    kw.push_back(dset[i].name);
   for(size_t i=0;i<sset.size();i++)
-    printf("%20s\t%20s\t%s\n",sset[i].name.c_str(),sset[i].val.c_str(),sset[i].comment.c_str());
+    kw.push_back(sset[i].name);
+  std::stable_sort(kw.begin(),kw.end());
 
+  // and then print the list in alphabetic order.
+  for(size_t i=0;i<kw.size();i++) {
+    size_t is=is_string(kw[i]);
+    size_t id=is_double(kw[i]);
+    size_t ii=is_int(kw[i]);
+    size_t ib=is_bool(kw[i]);
+
+    if(is>0)
+      // Is string!
+      printf("%20s\t%20s\t%s\n",sset[is-1].name.c_str(),sset[is-1].val.c_str(),sset[is-1].comment.c_str());      
+    if(id>0)
+      // Is double!
+      printf("%20s\t%20.3e\t%s\n",dset[id-1].name.c_str(),dset[id-1].val,dset[id-1].comment.c_str());
+    if(ii>0)
+      // Is integer!
+      printf("%20s\t%20i\t%s\n",iset[ii-1].name.c_str(),iset[ii-1].val,iset[ii-1].comment.c_str());
+    if(ib>0)
+      // Is boolean!
+      printf("%20s\t%20s\t%s\n",bset[ib-1].name.c_str(),bvals[bset[ib-1].val].c_str(),bset[ib-1].comment.c_str());
+  }
   printf("\n");
 }
 

@@ -120,14 +120,14 @@ class Settings {
   /// Get a string valued setting
   std::string get_string(std::string name) const;
 
-  /// Is "name" a setting of double type?
-  bool is_double(std::string name) const;
-  /// Is "name" a setting of boolean type?
-  bool is_bool(std::string name) const;
-  /// Is "name" a setting of integer type?
-  bool is_int(std::string name) const;
-  /// Is "name" a setting of string type?
-  bool is_string(std::string name) const;
+  /// Is "name" a setting of double type? Returns index + 1 if found, else 0.
+  size_t is_double(std::string name) const;
+  /// Is "name" a setting of boolean type? Returns index + 1 if found, else 0.
+  size_t is_bool(std::string name) const;
+  /// Is "name" a setting of integer type? Returns index + 1 if found, else 0.
+  size_t is_int(std::string name) const;
+  /// Is "name" a setting of string type? Returns index + 1 if found, else 0.
+  size_t is_string(std::string name) const;
 
   /// Parse file containing settings to use
   void parse(std::string filename);
