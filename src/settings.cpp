@@ -412,16 +412,16 @@ void Settings::print() const {
 
     if(is>0)
       // Is string!
-      printf("%20s\t%20s\t%s\n",sset[is-1].name.c_str(),sset[is-1].val.c_str(),sset[is-1].comment.c_str());      
+      printf("%5s%-15s\t%20s\t%s\n","",sset[is-1].name.c_str(),sset[is-1].val.c_str(),sset[is-1].comment.c_str());      
     if(id>0)
       // Is double!
-      printf("%20s\t%20.3e\t%s\n",dset[id-1].name.c_str(),dset[id-1].val,dset[id-1].comment.c_str());
+      printf("%5s%-15s\t%20.3e\t%s\n","",dset[id-1].name.c_str(),dset[id-1].val,dset[id-1].comment.c_str());
     if(ii>0)
       // Is integer!
-      printf("%20s\t%20i\t%s\n",iset[ii-1].name.c_str(),iset[ii-1].val,iset[ii-1].comment.c_str());
+      printf("%5s%-15s\t%20i\t%s\n","",iset[ii-1].name.c_str(),iset[ii-1].val,iset[ii-1].comment.c_str());
     if(ib>0)
       // Is boolean!
-      printf("%20s\t%20s\t%s\n",bset[ib-1].name.c_str(),bvals[bset[ib-1].val].c_str(),bset[ib-1].comment.c_str());
+      printf("%5s%-15s\t%20s\t%s\n","",bset[ib-1].name.c_str(),bvals[bset[ib-1].val].c_str(),bset[ib-1].comment.c_str());
   }
   printf("\n");
 }
