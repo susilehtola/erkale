@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       HF/DFT from Hel
@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
   // Make initialization parameters more relaxed
   conv.deltaEmax=set.get_double("DeltaEmax");
   conv.deltaPmax=set.get_double("DeltaPmax");
-  conv.deltaPrms=set.get_double("DeltaPrms");  
+  conv.deltaPrms=set.get_double("DeltaPrms");
 
   // Convergence settings for initialization
   convergence_t init_conv(conv);
@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
     dft.gridtol=set.get_double("DFTFinalTol");
-  }  
+  }
 
   if(init && (hf||rohf) && dftinit) {
     // Need to add DFT settings to initset
@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
       printf("A hybrid functional is used, turning off density fitting.\n");
       set.set_bool("DFTFitting",0);
     }
-  
+
   // Get wanted initialization method
   dft_t dft_init;
   if(init && dftinit) {
@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
 
 	// Non-verbose solution.
 	initset.set_bool("Verbose",0);
-	
+
 	// First, find out molecules in input.
 	std::vector< std::vector<size_t> > mols;
 	mols=find_molecules(atoms);
@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
 	  printf("Found %i molecules in system. Performing divide-and-conquer.\n",(int) mols.size());
 
 	size_t iorb=0;
-	
+
 	// Now, solve the states of the molecules.
 	for(size_t imol=0;imol<mols.size();imol++) {
 	  // Timer
@@ -241,8 +241,8 @@ int main(int argc, char **argv) {
 	      printf("%3i ",(int) molat[iat].num+1);
 	    fflush(stdout);
 	  }
-	  
-	  // Construct a basis set for the molecule.  
+
+	  // Construct a basis set for the molecule.
 	  // Libint was already initialized above.
 	  BasisSet molbas=construct_basis(molat,baslib,initset,1);
 
@@ -288,10 +288,10 @@ int main(int argc, char **argv) {
 	// Sort orbitals and energies
 	sort_eigvec(sol.E,sol.C);
       }
-      
-      if(dftinit) {	
+
+      if(dftinit) {
 	SCF initsolver(basis,initset);
-	
+
 	// Print information about used functionals
 	print_info(dft_init.x_func,dft_init.c_func);
 	// Solve restricted DFT problem
@@ -351,7 +351,7 @@ int main(int argc, char **argv) {
 	// Solve restricted DFT problem
 	initsolver.UDFT(sol,occa,occb,init_conv,dft_init);
       }
-      
+
       printf("\nInitialization complete.\n\n\n\n");
     }
 
@@ -389,8 +389,8 @@ int main(int argc, char **argv) {
     P=sol.P;
 
     population_analysis(basis,sol.Pa,sol.Pb);
-  }    
-  
+  }
+
   // Form isotropic momentum density
   if(set.get_bool("DoEMD")) {
     t.print_time();
@@ -409,7 +409,7 @@ int main(int argc, char **argv) {
     emd.save("emd.txt");
     emd.moments("moments.txt");
     emd.compton_profile("compton.txt","compton-interp.txt");
-    
+
     if(verbose)
       printf("Calculating isotropic EMD properties took %s.\n",temd.elapsed().c_str());
   }
@@ -435,6 +435,6 @@ int main(int argc, char **argv) {
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
     t.print_time();
   }
-  
+
   return 0;
 }

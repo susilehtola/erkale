@@ -69,6 +69,9 @@ add_subdirectory(emd)
 add_subdirectory(completeness)
 # Create the Casida executable
 add_subdirectory(casida)
+# Create the XRS executable
+add_subdirectory(xrs)
+
 # Create the Slater fit tool
 add_subdirectory(slaterfit)
 # Create test tool
