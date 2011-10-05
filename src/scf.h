@@ -61,6 +61,55 @@ typedef struct {
   double gridtol;
 } dft_t;
 
+/// Energy info
+typedef struct {
+  /// Coulombic energy
+  double Ecoul;
+  /// Kinetic energy
+  double Ekin;
+  /// Nuclear attraction energy
+  double Enuca;
+  /// Exchange(-correlation) energy
+  double Exc;
+  /// One-electron contribution
+  double Eone;
+
+  /// Total electronic energy
+  double Eel;
+  /// Nuclear repulsion energy
+  double Enucr;
+  /// Total energy
+  double E;
+} energy_t;
+
+/// Restricted solver info
+typedef struct {
+  /// Orbitals
+  arma::mat C;
+  /// Orbital energies
+  arma::vec E;
+  /// Fock operator
+  arma::mat H;
+  /// Density matrix
+  arma::mat P;
+  /// Energy information
+  energy_t en;
+} rscf_t;
+
+/// Unrestricted solver info
+typedef struct {
+  /// Orbitals
+  arma::mat Ca, Cb;
+  /// Orbital energies
+  arma::vec Ea, Eb;
+  /// Fock operators
+  arma::mat Ha, Hb;
+  /// Density matrices
+  arma::mat P, Pa, Pb;
+  /// Energy information
+  energy_t en;
+} uscf_t;
+
 class SCF {
  protected:
   /// Overlap matrix
@@ -138,16 +187,16 @@ class SCF {
   ~SCF();
 
   /// Calculate restricted Hartree-Fock solution
-  double RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv) const;
+  void RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const;
   /// Calculate restricted open-shell Hartree-Fock solution
-  double ROHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, int Nel_alpha, int Nel_beta, const convergence_t conv) const;
+  void ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const;
   /// Calculate unrestricted Hartree-Fock solution
-  double UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occ, const convergence_t conv) const;
+  void UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occ, const convergence_t conv) const;
 
   /// Calculate restricted density-functional theory solution
-  double RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
+  void RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
   /// Calculate unrestricted density-functional theory solution
-  double UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
+  void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
 };
 
 /*
