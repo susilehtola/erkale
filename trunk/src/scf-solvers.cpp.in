@@ -180,7 +180,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef RESTRICTED
   form_density(sol.P,sol.C,occs);
-#elif defined(UNRESTRICTED)
+#else
 
 #if defined(FULLHOLE)
   size_t ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
