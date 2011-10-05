@@ -2491,8 +2491,6 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
   // Form list of unique shell pairs
   dfit.form_unique_shellpairs();
 
-  dfit.print();
-
   return dfit;
 }
 
