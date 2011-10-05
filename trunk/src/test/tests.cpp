@@ -132,21 +132,6 @@ atom_t convert_to_bohr(const atom_t & in) {
 // Possible statuses
 const char * stat[]={"fail","ok"};
 
-/// Form density matrix from given orbitals
-arma::mat form_dens(const arma::mat & C, const std::vector<double> & occs) {
-  arma::mat P;
-  form_density(P,C,occs);
-  return P;
-}
-
-/// Form density matrix from given orbitals
-arma::mat form_dens(const arma::mat & Ca, const arma::mat & Cb, const std::vector<double> & nocca, const std::vector<double> & noccb) {
-  arma::mat Pa, Pb;
-  form_density(Pa,Ca,nocca);
-  form_density(Pb,Cb,noccb);
-  return Pa+Pb;
-}
-
 /// Test RHF solution
 #ifdef COMPUTE_REFERENCE
 #define rhf_test(at,baslib,set,Etot,Eorb,label,dipmom) rhf_test_run(at,baslib,set,Etot,Eorb,label,dipmom); printf("rhf_test(" #at "," #baslib "," #set "," #Etot "," #Eorb "," #label "," #dipmom ");\n\n");
@@ -169,28 +154,29 @@ void rhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
   // Get orbital occupancies
   std::vector<double> occs=get_restricted_occupancy(set,bas);
   // Solve SCF equations
+  rscf_t sol;
   SCF solver=SCF(bas,set);
-  double Et=solver.RHF(C,E,occs,final_conv);
+  solver.RHF(sol,occs,final_conv);
   // Compute dipole moment
-  double dip=dip_mom(form_dens(C,occs),bas);
+  double dip=dip_mom(sol.P,bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",Et);
+  printf("Etot=%.16e;\n",sol.en.E);
   printf("dip=%.16e;\n",dip);
   printf("Eorb=\"");
-  for(size_t i=0;i<E.n_elem;i++)
-    printf("%.16e ",E(i));
+  for(size_t i=0;i<sol.E.n_elem;i++)
+    printf("%.16e ",sol.E(i));
   printf("\";\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
   size_t nsucc=0, nfail=0;
-  compare(E,Eorb,otol,nsucc,nfail); // Compare orbital energies
-  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  compare(sol.E,Eorb,otol,nsucc,nfail); // Compare orbital energies
+  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(E,Eorb));
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.E,Eorb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -225,37 +211,38 @@ void uhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
   std::vector<double> occa, occb;
   get_unrestricted_occupancy(set,bas,occa,occb);
   // Solve SCF equations
+  uscf_t sol;
   SCF solver=SCF(bas,set);
-  double Et=solver.UHF(Ca,Cb,Ea,Eb,occa,occb,final_conv);
+  solver.UHF(sol,occa,occb,final_conv);
   // Compute dipole moment
-  double dip=dip_mom(form_dens(Ca,Cb,occa,occb),bas);
+  double dip=dip_mom(sol.P,bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",Et);
+  printf("Etot=%.16e;\n",sol.en.E);
   printf("dip=%.16e;\n",dip);
   printf("Eorba=\"");
-  for(size_t i=0;i<Ea.n_elem;i++)
-    printf("%.16e ",Ea(i));
+  for(size_t i=0;i<sol.Ea.n_elem;i++)
+    printf("%.16e ",sol.Ea(i));
   printf("\";\n");
   printf("Eorbb=\"");
-  for(size_t i=0;i<Eb.n_elem;i++)
-    printf("%.16e ",Eb(i));
+  for(size_t i=0;i<sol.Eb.n_elem;i++)
+    printf("%.16e ",sol.Eb(i));
   printf("\";\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
   size_t nsucca=0, nfaila=0;
   size_t nsuccb=0, nfailb=0;
-  compare(Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
-  compare(Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
+  compare(sol.Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
+  compare(sol.Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
   size_t nsucc=nsucca+nsuccb;
   size_t nfail=nfaila+nfailb;
 
-  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
-  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
+  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",sol.en.E,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.Ea,Eorba),max_diff(sol.Eb,Eorbb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -285,44 +272,42 @@ void rohf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
 
   // Construct basis set
   BasisSet bas=construct_basis(at,baslib,set);
-  // Get orbital occupancies
   int Nel_alpha;
   int Nel_beta;
   get_Nel_alpha_beta(bas.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
   // Solve SCF equations
+  uscf_t sol;
   SCF solver=SCF(bas,set);
-  double Et=solver.ROHF(Ca,Cb,Ea,Eb,Nel_alpha,Nel_beta,final_conv);
+  solver.ROHF(sol,Nel_alpha,Nel_beta,final_conv);
   // Compute dipole moment
-  std::vector<double> occa, occb;
-  get_unrestricted_occupancy(set,bas,occa,occb);
-  double dip=dip_mom(form_dens(Ca,Cb,occa,occb),bas);
+  double dip=dip_mom(sol.P,bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",Et);
+  printf("Etot=%.16e;\n",sol.en.E);
   printf("dip=%.16e;\n",dip);
   printf("Eorba=\"");
-  for(size_t i=0;i<Ea.n_elem;i++)
-    printf("%.16e ",Ea(i));
+  for(size_t i=0;i<sol.Ea.n_elem;i++)
+    printf("%.16e ",sol.Ea(i));
   printf("\";\n");
   printf("Eorbb=\"");
-  for(size_t i=0;i<Eb.n_elem;i++)
-    printf("%.16e ",Eb(i));
+  for(size_t i=0;i<sol.Eb.n_elem;i++)
+    printf("%.16e ",sol.Eb(i));
   printf("\";\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
   size_t nsucca=0, nfaila=0;
   size_t nsuccb=0, nfailb=0;
-  compare(Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
-  compare(Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
+  compare(sol.Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
+  compare(sol.Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
   size_t nsucc=nsucca+nsuccb;
   size_t nfail=nfaila+nfailb;
 
-  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
-  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
+  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",sol.en.E,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.Ea,Eorba),max_diff(sol.Eb,Eorbb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -356,6 +341,7 @@ void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
   // Get orbital occupancies
   std::vector<double> occs=get_restricted_occupancy(set,bas);
   // Solve SCF equations
+  rscf_t sol;
   SCF solver=SCF(bas,set);
 
   // Final dft settings
@@ -368,29 +354,29 @@ void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
   dft_t dft_i(dft_f);
   dft_i.gridtol=dft_initialtol;
 
-  solver.RDFT(C,E,occs,init_conv,dft_i);
-  double Et=solver.RDFT(C,E,occs,final_conv,dft_f);
+  solver.RDFT(sol,occs,init_conv,dft_i);
+  solver.RDFT(sol,occs,final_conv,dft_f);
   // Compute dipole moment
-  double dip=dip_mom(form_dens(C,occs),bas);
+  double dip=dip_mom(sol.P,bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",Et);
+  printf("Etot=%.16e;\n",sol.en.E);
   printf("dip=%.16e;\n",dip);
   printf("Eorb=\"");
-  for(size_t i=0;i<E.n_elem;i++)
-    printf("%.16e ",E(i));
+  for(size_t i=0;i<sol.E.n_elem;i++)
+    printf("%.16e ",sol.E(i));
   printf("\";\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
   size_t nsucc=0, nfail=0;
-  compare(E,Eorb,otol,nsucc,nfail); // Compare orbital energies
+  compare(sol.E,Eorb,otol,nsucc,nfail); // Compare orbital energies
 
-  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
   printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(E,Eorb));
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.E,Eorb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -434,38 +420,39 @@ void udft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
   std::vector<double> occa, occb;
   get_unrestricted_occupancy(set,bas,occa,occb);
   // Solve SCF equations
+  uscf_t sol;
   SCF solver=SCF(bas,set);
-  solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,init_conv,dft_i);
-  double Et=solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,final_conv,dft_f);
+  solver.UDFT(sol,occa,occb,init_conv,dft_i);
+  solver.UDFT(sol,occa,occb,final_conv,dft_f);
   // Compute dipole moment
-  double dip=dip_mom(form_dens(Ca,Cb,occa,occb),bas);
+  double dip=dip_mom(sol.P,bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",Et);
+  printf("Etot=%.16e;\n",sol.en.E);
   printf("dip=%.16e;\n",dip);
   printf("Eorba=\"");
-  for(size_t i=0;i<Ea.n_elem;i++)
-    printf("%.16e ",Ea(i));
+  for(size_t i=0;i<sol.Ea.n_elem;i++)
+    printf("%.16e ",sol.Ea(i));
   printf("\";\n");
   printf("Eorbb=\"");
-  for(size_t i=0;i<Eb.n_elem;i++)
-    printf("%.16e ",Eb(i));
+  for(size_t i=0;i<sol.Eb.n_elem;i++)
+    printf("%.16e ",sol.Eb(i));
   printf("\";\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
   size_t nsucca=0, nfaila=0;
   size_t nsuccb=0, nfailb=0;
-  compare(Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
-  compare(Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
+  compare(sol.Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
+  compare(sol.Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
   size_t nsucc=nsucca+nsuccb;
   size_t nfail=nfaila+nfailb;
 
-  Eok=rel_compare(Et,Etot,tol); // Compare total energies
+  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
-  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(Et,Etot),dip-dipmom,max_diff(Ea,Eorba),max_diff(Eb,Eorbb));
+  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",sol.en.E,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.Ea,Eorba),max_diff(sol.Eb,Eorbb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -609,7 +596,6 @@ int main(void) {
   //pol.set_bool("UseDIIS",0);
   //  pol.set_bool("UseBroyden",1);
 
-#ifdef DFT_ENABLED
   // DFT tests
 
   // Settings for DFT
@@ -634,7 +620,6 @@ int main(void) {
 
   Settings dftpol_nofit=dftpol; // Polarized calculation, no density fitting
   dftpol_nofit.set_bool("DFTFitting",0);
-#endif
 
   printf("****** Running calculations *******\n");  
   Timer t;
@@ -697,14 +682,12 @@ int main(void) {
   rohf_test(Cl,b6_31Gpp,pol,Etot,Eorba,Eorbb,"Chlorine, ROHF/6-31G**",dip);
 
 
-#ifdef DFT_ENABLED
   // Polarized calculation
   Etot=-4.6013019223191941e+02;
   dip=2.3962741402637484e-15;
   Eorba="-1.0170623791272868e+02 -9.6270662826494711e+00 -7.4215076416483248e+00 -7.3996667087414103e+00 -7.3996666727794542e+00 -8.8859992510415953e-01 -4.5634331389943239e-01 -4.0418355532833150e-01 -4.0418351168250466e-01 2.5059971789131175e-01 3.1405361695712558e-01 3.4410439171939605e-01 3.4410448009785694e-01 7.4272144749599700e-01 7.5561747993506567e-01 7.5561751983895209e-01 7.9852268986681385e-01 7.9852269056944303e-01 ";
   Eorbb="-1.0170198876430835e+02 -9.6221172071317103e+00 -7.4057928719978250e+00 -7.3958859923334241e+00 -7.3958859823844865e+00 -8.4902814482539635e-01 -3.8947786681371932e-01 -3.8947722187956629e-01 -3.3073282781126112e-01 2.5640444527682960e-01 3.2911710473175754e-01 3.4938941034189586e-01 3.4939124508323255e-01 7.8952672672295898e-01 7.9789820787481780e-01 7.9790126784876736e-01 8.1007372883211459e-01 8.1007392066009898e-01 ";
   udft_test(Cl,b6_31Gpp,dftpol_nofit,Etot,Eorba,Eorbb,"Chlorine, B3LYP/6-31G** polarized",dip,402,0);
-#endif
 
   printf("\n");
 
@@ -713,7 +696,7 @@ int main(void) {
   dip=1.3589652627408088e-15;
   Eorb="-5.9241098912997037e-01 1.9744005747008161e-01 4.7932104727503055e-01 9.3732369228734513e-01 1.2929037097205383e+00 1.2929037097205385e+00 1.9570226089461711e+00 2.0435200542857599e+00 2.0435200542857648e+00 3.6104742345559311e+00 ";
   rhf_test(H2,cc_pVDZ,sph,Etot,Eorb,"Hydrogen molecule, HF/cc-pVDZ",dip);
-#ifdef DFT_ENABLED
+
   Etot=-1.1676136201569758e+00;
   dip=5.3341051865077310e-14;
   Eorb="-3.9201366065784427e-01 3.6521249130926178e-02 2.9071950323739204e-01 6.5833748123070401e-01 9.7502260955131670e-01 9.7502260955132081e-01 1.6066114003824421e+00 1.7001805168332509e+00 1.7001805168332547e+00 3.1926407112280497e+00 ";
@@ -723,7 +706,6 @@ int main(void) {
   dip=4.7454134530222485e-14;
   Eorb="-3.7849076504350060e-01 5.3524954821963011e-02 3.0277496332444026e-01 6.6375297922053600e-01 9.9246470651630048e-01 9.9246470651630514e-01 1.6235395220308566e+00 1.7198888927811349e+00 1.7198888927811393e+00 3.2019339351714096e+00 ";
   rdft_test(H2,cc_pVDZ,dftsph,Etot,Eorb,"Hydrogen molecule, PBEPBE/cc-pVDZ",dip,101,130);
-#endif
 
   printf("\n");
 
@@ -742,7 +724,7 @@ int main(void) {
   // Direct calculation should yield same energies
   rhf_test(h2o,cc_pVQZ,direct,Etot,Eorb,"Water, HF/cc-pVQZ direct",dip);
 
-#ifdef DFT_ENABLED
+
   Etot=-7.6373040009500770e+01;
   dip=7.3243773848080218e-01;
   Eorb="-1.8739146525693975e+01 -9.1595065597589542e-01 -4.7162284405333393e-01 -3.2513104405574061e-01 -2.4828714200439703e-01 8.4276128445114010e-03 8.1122977366280144e-02 3.3805164054406173e-01 3.7944648406266185e-01 4.6504842295281890e-01 5.4462136743131939e-01 5.9069528371916213e-01 5.9681283986707245e-01 6.4396655512979972e-01 7.4405281784716026e-01 8.8494888818218331e-01 9.7376011862068412e-01 1.2410363479392439e+00 1.2604540810485065e+00 1.6998172345465494e+00 1.7260935783940679e+00 1.7619284021055013e+00 1.8253710949927187e+00 1.8994331383844969e+00 2.1868858210209599e+00 2.5299527223858291e+00 2.9877813026023081e+00 3.1249811502112261e+00 3.1891644380140449e+00 3.2804949383455866e+00 3.2904628564588512e+00 3.4371365948765060e+00 3.5077601951324304e+00 3.5697562870657911e+00 3.5997943202057714e+00 3.6362619221314998e+00 3.6870227572294509e+00 3.9239594681597749e+00 3.9460276797462828e+00 4.1576872075676645e+00 4.1640517413974703e+00 4.4333440047457131e+00 4.6494746194233709e+00 4.7623256364669606e+00 5.0045959007370726e+00 5.4886730319968384e+00 5.9727737547176449e+00 6.2826198041846535e+00 6.2900360499917349e+00 6.3851200642384311e+00 6.3900587200860288e+00 6.5556519291461282e+00 6.5918883465913147e+00 6.6592868900688256e+00 6.8085957269625634e+00 7.1135678783311809e+00 7.6305909909586340e+00 1.1915705878437169e+01 ";
@@ -759,14 +741,13 @@ int main(void) {
   dip=7.3270504143624482e-01;
   Eorb="-1.8741666893928429e+01 -9.1790290316294820e-01 -4.7348415912142705e-01 -3.2745957242391310e-01 -2.5054880361686738e-01 2.7876125466591473e-03 7.8040086378478729e-02 3.2383112174569850e-01 3.5923673950966140e-01 4.5242306017652040e-01 5.1412624401441476e-01 5.7766754520628372e-01 5.8424025024115245e-01 6.4253359834079782e-01 6.5974120849671625e-01 7.4241304776397665e-01 9.7186888943375793e-01 1.1822037411877988e+00 1.2023200108379661e+00 1.5759088395858551e+00 1.6360767195364074e+00 1.6982101163244860e+00 1.7245074761683494e+00 1.8628528872030010e+00 1.9081245211343227e+00 2.1641861462034160e+00 2.3473067502656701e+00 2.7893216684377840e+00 3.0049300409812623e+00 3.0831639213612134e+00 3.1876646754386697e+00 3.2328104451780968e+00 3.4169088729957089e+00 3.4579477186008849e+00 3.5050274089952889e+00 3.5282602598814883e+00 3.5683135416562348e+00 3.5772243290908379e+00 3.8378984399703153e+00 3.9226495504935941e+00 4.0867147723272881e+00 4.0926848574676189e+00 4.3310798407195445e+00 4.4154577012445317e+00 4.4322762577386063e+00 4.6027416845369054e+00 5.1266039075906997e+00 5.2200769943536338e+00 5.4840374147540762e+00 6.1494454235288689e+00 6.2799558526560837e+00 6.2885259462743823e+00 6.3502454303291795e+00 6.4058759390252540e+00 6.4358349324376514e+00 6.6570016411612789e+00 6.7152835832869533e+00 6.7372127758238163e+00 6.9398690736349584e+00 7.3406543149374350e+00 8.2789554883406264e+00 8.3551813327367945e+00 9.3390509783959867e+00 1.4480073175258985e+01 1.5822735165759308e+01 ";
   rdft_test(h2o,cc_pVTZ,dftcart,Etot,Eorb,"Water, PBEPBE/cc-pVTZ cart",dip,101,130);
-#endif
 
   printf("\n");
   Etot=-5.6637319431552542e+03;
   dip=4.1660090619805059e+00;
   Eorb="-9.4985623404724640e+02 -1.4146635099481537e+02 -1.3119294655790947e+02 -1.3119287270980476e+02 -1.3119259497155753e+02 -2.7676547723307586e+01 -2.3232980824791177e+01 -2.3232722839059900e+01 -2.3231117124621701e+01 -1.6049049318195593e+01 -1.6049045559494157e+01 -1.6047827661237889e+01 -1.6047724030585371e+01 -1.6047713461698791e+01 -1.5604531096175771e+01 -1.5532249495339656e+01 -1.1296661975779381e+01 -1.1249243893110558e+01 -1.1232665103576455e+01 -4.3970789623268498e+00 -2.8992752356968392e+00 -2.8986598491756888e+00 -2.8951187013127626e+00 -1.4177740920679858e+00 -1.2312596773475406e+00 -1.0610694272332577e+00 -8.7645299171191615e-01 -8.5303382986580056e-01 -8.1305176302358773e-01 -7.2468346087412472e-01 -7.1752261085064628e-01 -7.1751287553314735e-01 -7.1453927281242291e-01 -7.1369023915374641e-01 -6.5649508080456487e-01 -6.5484508950431364e-01 -6.4819561332649445e-01 -6.1951446998987547e-01 -5.1149277555337280e-01 -4.5694083032695021e-01 -3.6925756150072292e-01 -1.8059223164171517e-01 6.9314372645446695e-02 7.4011357792932359e-02 1.1409014903119051e-01 1.4993230304771982e-01 1.8266978390123689e-01 1.9355783526532955e-01 2.1197841084614730e-01 2.5237134980523557e-01 2.7656209454278885e-01 2.8532363500255348e-01 3.0336608143599647e-01 3.3343210153511638e-01 3.3688908925909111e-01 3.9652956711664084e-01 4.2174259963986660e-01 5.4893795783883570e-01 5.6113636035921555e-01 6.8232569332609239e-01 8.8548528956161354e-01 9.2615820687312378e-01 9.2670940567220006e-01 9.6328468546665924e-01 9.8346702031833988e-01 9.9887404085382081e-01 1.0364505452793376e+00 1.0834412263203919e+00 1.0936564413194840e+00 1.1989337425113284e+00 1.2617670086600381e+00 1.2818433273954613e+00 1.3193949782396717e+00 1.3895935373116759e+00 1.4308892993946829e+00 1.4702798441260581e+00 1.4945329125555009e+00 1.5683750074308811e+00 1.5822512314622954e+00 1.6271531755736810e+00 1.6323132908024358e+00 1.6700777143042629e+00 1.7294530352661555e+00 1.8374560573356020e+00 1.9460156096804855e+00 1.9779608208018149e+00 2.0568938354858832e+00 2.2440133806995215e+00 2.9829355623500020e+00 3.0788481987182283e+00 5.2757403427864542e+00 2.1121787318755844e+02 ";
   rhf_test(cdcplx,b3_21G,cart,Etot,Eorb,"Cadmium complex, HF/3-21G",dip);
-#ifdef DFT_ENABLED
+
   Etot=-5.6676693040108521e+03;
   dip=3.3440241655134439e+00;
   Eorb="-9.3989949630777653e+02 -1.3767085566884194e+02 -1.2795628115848666e+02 -1.2795617703962785e+02 -1.2795597246351552e+02 -2.5984513230392327e+01 -2.1817821867966586e+01 -2.1817579989651602e+01 -2.1816497141585881e+01 -1.5092697750898502e+01 -1.5092685475195312e+01 -1.5092039961894534e+01 -1.5091894480680356e+01 -1.5091849706585810e+01 -1.4451997411414936e+01 -1.4376772096004634e+01 -1.0301646276571871e+01 -1.0271591424733591e+01 -1.0254324778758805e+01 -3.7636150617162669e+00 -2.4165974821986707e+00 -2.4159566370877319e+00 -2.4131649118380043e+00 -1.1211327312539410e+00 -9.6404423700905140e-01 -8.2564383266872376e-01 -7.0330635825666288e-01 -6.8267276098233920e-01 -6.4807232963941908e-01 -5.4367335440912368e-01 -5.3720703164543648e-01 -5.2553076265084553e-01 -5.2468512038316606e-01 -5.2442769409718004e-01 -5.1974327080402816e-01 -5.1950507258617451e-01 -5.1476736328884964e-01 -4.9177264492963846e-01 -3.8454257590911212e-01 -3.8028019254527695e-01 -3.2170840064505718e-01 -1.8693874986382264e-01 -5.9081491633645879e-02 -5.6813400532874973e-02 -4.6509529933826808e-02 -4.3796957420039834e-02 -1.6268007322999919e-02 -1.5559973979324449e-02 3.4351142983196609e-02 5.9147172501492623e-02 6.8897615577252588e-02 9.1042104072634578e-02 1.0205943465032943e-01 1.2425801181611794e-01 1.3807721356573649e-01 1.5836554692570415e-01 1.8698799354523893e-01 3.0351791252041793e-01 3.0990400106102722e-01 3.9883575135214178e-01 5.8814212059025350e-01 5.9392870388159724e-01 6.1272091412542262e-01 6.5247360340961869e-01 6.6254328091868164e-01 6.7303431267175606e-01 6.9271694904580372e-01 7.7762481970709441e-01 7.9855435035795252e-01 8.6965866139509196e-01 8.9909697373911457e-01 9.3737136134920651e-01 9.6540094972240853e-01 9.9998288887657705e-01 1.0476134865257727e+00 1.1414373172392103e+00 1.1555321083025583e+00 1.2222114665422974e+00 1.2400112735313158e+00 1.2657747893799614e+00 1.2729558315267144e+00 1.3149191529077382e+00 1.3519184036423351e+00 1.4869465150991110e+00 1.6022996827170741e+00 1.6213851499170890e+00 1.7041812321525001e+00 1.8439074177811228e+00 2.6031529393680573e+00 2.7024442958321506e+00 4.7145830216863231e+00 2.0804442116265670e+02 ";
@@ -777,7 +758,7 @@ int main(void) {
   dip=5.6554045414292597e-01;
   Eorb="-1.8627160618579857e+01 -9.8468913225497907e+00 -9.8000444995770337e+00 -9.7984994023896483e+00 -9.7964421810294624e+00 -9.7961832486110776e+00 -9.7961575410898032e+00 -9.7957638797653406e+00 -9.7955871058619355e+00 -9.7955290707145419e+00 -9.7901930268443422e+00 -9.4290382125178995e-01 -7.5220423770661227e-01 -7.3523835454190090e-01 -7.0339560800953027e-01 -6.7054475348342391e-01 -6.3196604708554860e-01 -5.8307347307891277e-01 -5.5339073142974393e-01 -5.4222347900014767e-01 -5.1586286549118954e-01 -5.0988816284001692e-01 -4.8254124104179963e-01 -4.3597527860546864e-01 -4.3185246270427824e-01 -4.1614586353246885e-01 -4.0901313649111221e-01 -4.0310405023892848e-01 -3.8729796952892548e-01 -3.7610221514194236e-01 -3.7081714137483074e-01 -3.4983450170469360e-01 -3.4595424881009995e-01 -3.3597616048471413e-01 -3.2455716592894673e-01 -3.2107118208099167e-01 -3.1361284918795801e-01 -2.9876392741220825e-01 -2.9369246085466189e-01 -2.9084628480198921e-01 -2.8883667205108543e-01 -2.8097182575457730e-01 -2.7633927025036792e-01 -2.6485460106769293e-01 -2.2609632806373114e-01 2.9806269344380406e-02 4.3513650367088277e-02 4.7432025536249402e-02 5.3708161390239643e-02 6.2799573739704184e-02 6.8711854740801978e-02 7.6072842314436784e-02 8.0543588749803940e-02 9.0740587137554216e-02 1.0571249207625363e-01 1.1202749158537995e-01 1.1623555619972997e-01 1.2071977551948453e-01 1.3140537232939617e-01 1.3642960468215548e-01 1.3881991651168135e-01 1.4088835007125391e-01 1.4347481890774244e-01 1.4890175933193187e-01 1.5393183364427507e-01 1.6458410849968069e-01 1.7000640041268841e-01 1.7439066765879821e-01 1.8134332134479716e-01 1.9192207586801288e-01 1.9908172104566643e-01 2.0636476817206503e-01 2.1897290489887597e-01 2.2824324944455437e-01 2.4035131863817782e-01 2.4855206090316906e-01 2.5464930872902708e-01 4.2494632417760148e-01 4.2851670083892629e-01 4.4064005578504556e-01 4.5736515611467921e-01 4.6333624857924055e-01 4.6892488548559680e-01 4.7903433807396811e-01 4.8942994454684546e-01 5.0244608425564374e-01 5.1195186633798184e-01 5.1905123144654219e-01 5.3633582914298894e-01 5.4652898950651974e-01 5.7351232724728851e-01 5.9413717744822991e-01 6.0274026584641294e-01 6.0615698945095930e-01 6.1191819679498149e-01 6.1544675107058211e-01 6.3139801598747536e-01 6.4954256480018857e-01 6.7503754855642573e-01 6.8566986752039805e-01 6.9676173259717111e-01 7.1482706700159848e-01 7.2342081643846723e-01 7.4572907415223366e-01 7.5078024860734816e-01 7.6086405353374087e-01 7.7072417055495224e-01 7.7610480309271412e-01 7.8186593431584583e-01 7.9605209548835421e-01 8.0733181828422329e-01 8.1699733928969942e-01 8.2988488342651967e-01 8.3746954857779565e-01 8.3872015210598294e-01 8.4332343588174530e-01 8.4898952610275391e-01 8.5771801108715706e-01 8.6351539870014893e-01 8.6889062799420891e-01 8.7767937557317321e-01 8.8612146901482136e-01 8.9531850394028745e-01 9.0580188753675406e-01 9.1529622197973204e-01 9.2211552016569021e-01 9.4122671982881567e-01 9.6566442732217261e-01 9.7153233956427132e-01 9.8202947574376120e-01 1.0177340869517977e+00 1.0490647393333790e+00 1.0974968663904356e+00 1.1473850765003775e+00 1.1642819843872845e+00 1.2116493287417176e+00 1.2321557709028614e+00 1.2665573825001251e+00 1.2725642082198882e+00 1.3173837452423711e+00 1.3344538361184934e+00 1.3696810404173876e+00 1.4032291855855110e+00 1.4066970512336281e+00 1.4522692408851694e+00 1.4859490103184807e+00 1.4994197352291139e+00 1.5182876491384976e+00 1.5407638830930812e+00 1.5551926765748403e+00 1.5718394985642383e+00 1.5854184608164086e+00 1.6035576901085817e+00 1.6248651982588473e+00 1.6295984046635825e+00 1.6386335427162928e+00 1.6518587809906651e+00 1.6708671503663652e+00 1.7082473974920513e+00 1.7241037716180572e+00 1.7310039954049297e+00 1.7768204602086948e+00 1.7799438398895646e+00 1.7966958429956399e+00 1.7986848911927458e+00 1.8208933535857927e+00 1.8372040482834400e+00 1.8486200322542545e+00 1.8627436485765863e+00 1.8684089652163440e+00 1.8910581892605929e+00 1.9068277499061539e+00 1.9273999918177549e+00 1.9366460591377772e+00 1.9518012795194517e+00 1.9711854952519661e+00 1.9748121118739372e+00 1.9784542106357592e+00 2.0029267669498636e+00 2.0163952627079693e+00 2.0242130832360439e+00 2.0282114395015274e+00 2.0446481718356710e+00 2.0506328943157168e+00 2.0622362579787166e+00 2.0764536620016285e+00 2.0982720962997643e+00 2.1124504928226564e+00 2.1473887707654349e+00 2.1546302415211351e+00 2.1669122198878550e+00 2.1723465360679022e+00 2.1811765086415345e+00 2.1987684165944898e+00 2.2110817616585630e+00 2.2190091205617395e+00 2.2523935845290075e+00 2.2601863732449230e+00 2.2680783135507490e+00 2.2959485112011824e+00 2.3105491811003045e+00 2.3159969825042284e+00 2.3268617106622353e+00 2.3486712830980894e+00 2.3828964663910881e+00 2.3876851123818672e+00 2.4069237877026950e+00 2.4220219813004755e+00 2.4322430956049477e+00 2.4627687685107809e+00 2.4929227058747516e+00 2.5133868433523898e+00 2.5312881599903041e+00 2.5380548228491984e+00 2.5674717233448248e+00 2.5816431572859160e+00 2.5894774396793143e+00 2.6092032218949588e+00 2.6302194965401116e+00 2.6355319264408990e+00 2.6434918130177629e+00 2.6604238249178209e+00 2.6727736109178113e+00 2.6917624189988612e+00 2.6953016329145489e+00 2.7073953832892088e+00 2.7113431228161624e+00 2.7285906263504867e+00 2.7487933889129117e+00 2.7749411869195271e+00 2.7823829336140706e+00 2.7848202772994401e+00 2.7958613463120439e+00 2.8014837067103251e+00 2.8080227107125597e+00 2.8118739930958982e+00 2.8150044326037338e+00 2.8202144957458373e+00 2.8419189785367012e+00 2.8601404074896992e+00 2.8723583002379467e+00 2.9059083834614627e+00 3.0865723015587911e+00 3.1217752947387161e+00 3.1464509345805283e+00 3.1676601274444569e+00 3.1811730776939235e+00 3.1906320275858437e+00 3.1946232055315660e+00 3.2130852013420688e+00 3.2280245974215838e+00 3.2455276291118258e+00 3.2647992521600089e+00 3.2857800041065297e+00 3.3101565347945590e+00 3.3528837952236104e+00 3.3823732023908675e+00 3.3896336504841638e+00 3.3912070172848545e+00 3.4239186078881620e+00 3.4639853231504261e+00 3.4735407254663522e+00 3.4830943212562526e+00 3.4844479190687689e+00 3.8198758587280714e+00 4.1566357404952532e+00 4.2134282511937204e+00 4.2756045924079435e+00 4.3733092979332211e+00 4.4240297038448109e+00 4.4487183777125736e+00 4.5001091249726777e+00 4.5663108131926871e+00 4.6276072342650059e+00 4.7060107846949073e+00 ";
  rdft_test(decanol,b6_31Gpp,dftcart,Etot,Eorb,"1-decanol, SVWN(RPA)/6-31G**",dip,1,8);
-#endif
+
 
 #ifndef COMPUTE_REFERENCE
   printf("****** Tests completed in %s *******\n",t.elapsed().c_str());

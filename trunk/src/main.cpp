@@ -191,8 +191,7 @@ int main(int argc, char **argv) {
 
   if(set.get_int("Multiplicity")==1 && Nel%2==0) {
     // Closed shell case
-    arma::mat C;
-    arma::vec E;
+    rscf_t sol;
 
     // Get orbital occupancies
     std::vector<double> occs=get_restricted_occupancy(set,basis);
@@ -204,7 +203,7 @@ int main(int argc, char **argv) {
 	SCF initsolver(basis,initset);
 
       	// Solve restricted Hartree-Fock
-	initsolver.RHF(C,E,occs,init_conv);
+	initsolver.RHF(sol,occs,init_conv);
       }
 
       if(dncinit) {
@@ -212,11 +211,8 @@ int main(int argc, char **argv) {
 
 	// Initialize C and E
 	size_t Nbf=basis.get_Nbf();
-	C=arma::mat(Nbf,Nbf);
-	E=arma::vec(Nbf);
-
-	C.zeros();
-	E.zeros();
+	sol.C.zeros(Nbf,Nbf);
+	sol.E.zeros(Nbf);
 
 	// Non-verbose solution.
 	initset.set_bool("Verbose",0);
@@ -251,8 +247,7 @@ int main(int argc, char **argv) {
 	  BasisSet molbas=construct_basis(molat,baslib,initset,1);
 
 	  // Solve states
-	  arma::mat Cmol;
-	  arma::vec Emol;
+	  rscf_t molsol;
 
 	  // Solver
 	  SCF molsolver(molbas,initset);
@@ -262,10 +257,10 @@ int main(int argc, char **argv) {
 
 	  if(hf) {
 	    // Solve restricted Hartree-Fock
-	    molsolver.RHF(Cmol,Emol,molocc,init_conv);
+	    molsolver.RHF(molsol,molocc,init_conv);
 	  } else {
 	    // Solve restricted DFT problem
-	    molsolver.RDFT(Cmol,Emol,molocc,init_conv,dft_init);
+	    molsolver.RDFT(molsol,molocc,init_conv,dft_init);
 	  }
 
 	  // Now we should have the occupied states of the
@@ -274,15 +269,15 @@ int main(int argc, char **argv) {
 	  // set.
 	  arma::mat Cfull;
 	  arma::vec Efull;
-	  basis.projectMOs(molbas,Emol,Cmol,Efull,Cfull);
+	  basis.projectMOs(molbas,molsol.E,molsol.C,Efull,Cfull);
 
 	  // Now we have the orbitals, and the orbital energies, so we
 	  // can just plant them in the initial guess.
 	  for(int i=0;i<sum(molocc)/2;i++) {
 	    // Orbital coefficients
-	    C.col(iorb)=Cfull.col(i);
+	    sol.C.col(iorb)=Cfull.col(i);
 	    // Orbital energy
-	    E(iorb)=Efull(i);
+	    sol.E(iorb)=Efull(i);
 	    // Increment orbital number
 	    iorb++;
 	  }
@@ -291,7 +286,7 @@ int main(int argc, char **argv) {
 	}
 
 	// Sort orbitals and energies
-	sort_eigvec(E,C);
+	sort_eigvec(sol.E,sol.C);
       }
       
       if(dftinit) {	
@@ -300,7 +295,7 @@ int main(int argc, char **argv) {
 	// Print information about used functionals
 	print_info(dft_init.x_func,dft_init.c_func);
 	// Solve restricted DFT problem
-	initsolver.RDFT(C,E,occs,init_conv,dft_init);
+	initsolver.RDFT(sol,occs,init_conv,dft_init);
       }
 
       if(verbose) {
@@ -316,7 +311,7 @@ int main(int argc, char **argv) {
 
     if(hf) {
       // Solve restricted Hartree-Fock
-      solver.RHF(C,E,occs,conv);
+      solver.RHF(sol,occs,conv);
     } else {
       // Print information about used functionals
       print_info(dft.x_func,dft.c_func);
@@ -324,20 +319,19 @@ int main(int argc, char **argv) {
       if(!init) {
 	// Starting density was probably bad. Do an initial
 	// calculation first with a low-density grid.
-	solver.RDFT(C,E,occs,init_conv,dft);
+	solver.RDFT(sol,occs,init_conv,dft);
       }
-      solver.RDFT(C,E,occs,conv,dft);
+      solver.RDFT(sol,occs,conv,dft);
     }
 
-    // Form density matrix
-    form_density(P,C,occs);
+    // Get density matrix
+    P=sol.P;
 
     // Do population analysis
     population_analysis(basis,P);
 
   } else {
-    arma::mat Ca, Cb;
-    arma::vec Ea, Eb;
+    uscf_t sol;
 
     // Get orbital occupancies
     std::vector<double> occa, occb;
@@ -350,12 +344,12 @@ int main(int argc, char **argv) {
 
       if(hfinit) {
 	// Solve restricted Hartree-Fock
-	initsolver.UHF(Ca,Cb,Ea,Eb,occa,occb,init_conv);
+	initsolver.UHF(sol,occa,occb,init_conv);
       } else {
 	// Print information about used functionals
 	print_info(dft_init.x_func,dft_init.c_func);
 	// Solve restricted DFT problem
-	initsolver.UDFT(Ca,Cb,Ea,Eb,occa,occb,init_conv,dft_init);
+	initsolver.UDFT(sol,occa,occb,init_conv,dft_init);
       }
       
       printf("\nInitialization complete.\n\n\n\n");
@@ -366,7 +360,7 @@ int main(int argc, char **argv) {
 
     if(hf) {
       // Solve restricted Hartree-Fock
-      solver.UHF(Ca,Cb,Ea,Eb,occa,occb,conv);
+      solver.UHF(sol,occa,occb,conv);
     } else if(rohf) {
       // Solve restricted open-shell Hartree-Fock
 
@@ -375,7 +369,7 @@ int main(int argc, char **argv) {
       int Nel_beta;
       get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
       // Solve ROHF
-      solver.ROHF(Ca,Cb,Ea,Eb,Nel_alpha,Nel_beta,conv);
+      solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
 
       // Set occupancies right
       get_unrestricted_occupancy(set,basis,occa,occb);
@@ -386,18 +380,15 @@ int main(int argc, char **argv) {
       if(!init) {
 	// Starting density was probably bad. Do an initial
 	// calculation first with a low-density grid.
-	solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,init_conv,dft);
+	solver.UDFT(sol,occa,occb,init_conv,dft);
       }
-      solver.UDFT(Ca,Cb,Ea,Eb,occa,occb,conv,dft);
+      solver.UDFT(sol,occa,occb,conv,dft);
     }
 
-    // Form density matrix
-    arma::mat Pa, Pb;
-    form_density(Pa,Ca,occa);
-    form_density(Pb,Cb,occb);
-    P=Pa+Pb;
+    // Get density matrix
+    P=sol.P;
 
-    population_analysis(basis,Pa,Pb);
+    population_analysis(basis,sol.Pa,sol.Pb);
   }    
   
   // Form isotropic momentum density

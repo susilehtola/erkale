@@ -1,36 +1,46 @@
 /* Restricted case */
-#ifdef RESTRICTED
+#if defined(RESTRICTED) && defined(DFT)
+void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const
 
-#ifdef DFT
-double SCF::RDFT(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const
-#else
-double SCF::RHF(arma::mat & C, arma::vec & E, const std::vector<double> & occs, const convergence_t conv) const
+#elif defined(RESTRICTED) && defined(HF)
+void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const
+
+#elif defined(UNRESTRICTED) && defined(DFT)
+void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
+
+#elif defined(UNRESTRICTED) && defined(HF)
+void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
+
+#elif defined(UNRESTRICTED) && defined(_ROHF)
+void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
+
+#elif defined(DFT) && defined(FULLHOLE)
+size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
+
+#elif defined(DFT) && defined(HALFHOLE)
+size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
 #endif
-
-#else // not restricted
-
-/* Unrestricted case */
-#ifdef DFT
-double SCF::UDFT(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
-#elif defined(_ROHF)
-/* ROHF */
-double SCF::ROHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, int Nel_alpha, int Nel_beta, const convergence_t conv) const
-#else
-double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
-#endif // not DFT
-#endif // not restricted
 {
 
-
-#ifdef _ROHF
+#if defined(UNRESTRICTED) && defined(_ROHF)
   // Occupations
   std::vector<double> occa(Nel_alpha,1.0);
   std::vector<double> occb(Nel_beta,1.0);
+#elif ( defined(HALFHOLE) || defined(FULLHOLE) )
+  // Occupation vector of spin up and spin down
+  std::vector<double> occa;
+  std::vector<double> occb;
+
+  // Number of occupied states
+  int nocc=basisp->Ztot()/2;
+  if(basisp->Ztot()%2==1) {
+    throw std::runtime_error("XRS SCF calculation routine can only handle non-polarized ground state.\n");
+  }
 #endif
-  
+
   Timer t;
   Timer ttot;
-  
+
   // DIIS error
   double diiserr;
 #ifndef RESTRICTED
@@ -38,43 +48,33 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #endif
   // Was DIIS succesful?
   bool diissucc=0;
-  
-#ifdef RESTRICTED
-  // Eigenvectors and energies
-  arma::vec en;
+
+  // Helper arrays
   arma::mat orbs;
-  
+  arma::mat Horth;
+
+
+#ifdef RESTRICTED
   // DIIS iterator
   DIIS diis(S,diisorder);
-  
+
   // ADIIS
   ADIIS adiis;
   // Broyden
   Broyden broyd(Nbf*Nbf,verbose);
-  
+
   // Coulomb and exchange matrices
   arma::mat J(Nbf,Nbf), K(Nbf,Nbf);
   J.zeros();
   K.zeros();
-  
-  // Density matrix
-  arma::mat P;
+
   // Change of density matrix from last iteration
   arma::mat deltaP(Nbf,Nbf);
-  
-  // Full Hamiltonian
-  arma::mat H;
+
   // Hamiltonian of last iteration
   arma::mat Hold(Nbf,Nbf);
   Hold.zeros();
-
-  // Hamiltonian in orthogonal basis
-  arma::mat Horth;
 #else
-  // Eigenvectors and energies
-  arma::vec ena, enb;
-  arma::mat orbsa, orbsb;
-  
   // DIIS iterator
   DIIS diisa(S,diisorder);
   DIIS diisb(S,diisorder);
@@ -86,7 +86,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
   // Broyden
   Broyden broyd_sum(Nbf*Nbf,verbose);
   Broyden broyd_diff(Nbf*Nbf,verbose);
-  
+
   // Coulomb and exchange matrices
   arma::mat J(Nbf,Nbf);
   J.zeros();
@@ -97,13 +97,12 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
   Kb.zeros();
 
   // Density matrix
-  arma::mat P, Pa, Pb;
   arma::mat deltaP(Nbf,Nbf);
   arma::mat deltaPa(Nbf,Nbf);
   arma::mat deltaPb(Nbf,Nbf);
   deltaPa.zeros();
   deltaPb.zeros();
-  
+
   // Full Hamiltonian
   arma::mat Ha, Hb;
 
@@ -111,116 +110,112 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
   arma::mat Haold(Nbf,Nbf), Hbold(Nbf,Nbf);
   Haold.zeros();
   Hbold.zeros();
-
-  arma::mat Horth;
 #endif
-  
+
   // Mixing factor if DIIS not used
   double mix=INITMIX;
 
   // Dipole moment
   arma::vec dipmom;
   double olddip;
-  
+
   // Tolerance for screening and screening efficiency
   double tol=ROUGHTOL;
   double screeneff;
-  
-  double Ecoul, Exc, Eone, Etot=0.0, Etote=0.0;
-  
+
   // Change in energy from last iteration
   double deltaE;
-  
-  double Ekin, Enuca;
+
   double Eold=0, Eold2=0;
-  
+
   // Maximum and RMS differences of AO density matrix
   double rmsdiff=0.0, maxdiff=0.0;
 #ifndef RESTRICTED
   double rmsdiffa=0.0, maxdiffa=0.0;
   double rmsdiffb=0.0, maxdiffb=0.0;
 #endif
-  
-  
+
+
   if(verbose)
     printf("\n ******* Initialization of run ********\n");
-    
-  
+
+
 #ifdef RESTRICTED
-  if(C.n_rows!=Nbf)
+  if(sol.C.n_rows!=Nbf)
 #else
-    if(Ca.n_rows!=Nbf || Cb.n_rows!=Nbf)
+    if(sol.Ca.n_rows!=Nbf || sol.Cb.n_rows!=Nbf)
 #endif
       {
 	if(verbose) {
 	  printf("\nNo input guess given, forming initial guess by diagonalizing core hamiltonian.\n");
 	  t.set();
 	}
-      
-#ifdef RESTRICTED    
+
+#ifdef RESTRICTED
 	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-	eig_sym_ordered(en,orbs,Horth); // Solve in orthogonal basis
-      
+	eig_sym_ordered(sol.E,orbs,Horth); // Solve in orthogonal basis
+
 	// Transform back to non-orthogonal basis
-	orbs=Sinvh*orbs;
+	sol.C=Sinvh*orbs;
 #else
 	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-	eig_sym_ordered(ena,orbsa,Horth); // Solve in orthogonal basis
+	eig_sym_ordered(sol.Ea,orbs,Horth); // Solve in orthogonal basis
 	// Transform back to non-orthogonal basis
-	orbsa=Sinvh*orbsa;
-      
+	sol.Ca=Sinvh*orbs;
+
 	// Copy orbitals
-	enb=ena;
-	orbsb=orbsa;
+	sol.Eb=sol.Ea;
+	sol.Cb=sol.Ca;
 #endif
-      
+
 	if(verbose)
 	  printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
-      
+
       } else {
       // Got correctly sized input guess.
-    
+
       if(verbose)
         printf("\nUsing input guess for orbitals.\n");
-      
-#ifdef RESTRICTED
-      orbs=C;
-      en=E;
-#else
-      orbsa=Ca;
-      orbsb=Cb;
-      ena=Ea;
-      enb=Eb;
-#endif
     }
 
 #ifdef RESTRICTED
-  form_density(P,orbs,occs);
-#else
-  form_density(Pa,orbsa,occa);
-  form_density(Pb,orbsb,occb);
-  P=Pa+Pb;
+  form_density(sol.P,sol.C,occs);
+#elif defined(UNRESTRICTED)
+
+#if defined(FULLHOLE)
+  size_t ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
+  occa=exc_occ(ixc_orb,nocc); // Move alpha occupied states up by a notch
+  occb=norm_occ(nocc); // Normal occupation in beta
+#elif defined(HALFHOLE)
+  size_t ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
+  occa=frac_occ(ixc_orb,nocc); // Fractional occupation on alpha orbitals
+  occb=norm_occ(nocc); // Normal occupation in beta
+#endif
+
+  form_density(sol.Pa,sol.Ca,occa);
+  form_density(sol.Pb,sol.Cb,occb);
+  sol.P=sol.Pa+sol.Pb;
 #endif
 
   // Print orbital energies
   if(verbose) {
 #ifdef RESTRICTED
-    print_E(en,occs);
+    print_E(sol.E,occs);
 #else
     printf("alpha: ");
-    print_E(ena,occa);
+    print_E(sol.Ea,occa);
     printf("beta:  ");
-    print_E(enb,occb);
+    print_E(sol.Eb,occb);
 #endif
   }
-  
+
   // Initialize change of density matrix
-  deltaP=P;
+  deltaP=sol.P;
 #ifndef RESTRICTED
-  deltaPa=Pa;
-  deltaPb=Pb;
+  deltaPa=sol.Pa;
+  deltaPb=sol.Pb;
 #endif
-  
+
 #ifdef DFT
   // Fraction of exact exchange
   double kfrac=exact_exchange(dft.x_func);
@@ -244,7 +239,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #else
     fprintf(stderr,"unrestricted ");
 #endif
-    
+
 #ifndef DFT
 #ifdef _ROHF
     fprintf(stderr,"open-shell ");
@@ -257,12 +252,25 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     } else
       fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
 #endif
-    
+
     fprintf(stderr,"calculation");
 #ifdef DFT
     if(densityfit)
       fprintf(stderr," with density fitting");
+
+#if (defined(FULLHOLE) || defined(HALFHOLE))
+    if(densityfit)
+      fprintf(stderr," and ");
+    else
+      fprintf(stderr," with ");
+#ifdef FULLHOLE
+    fprintf(stderr,"full core hole");
+#else HALFHOLE
+    fprintf(stderr,"half core hole");
 #endif
+#endif
+
+#endif // end DFT clause
     fprintf(stderr,".\n%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
   }
 
@@ -271,12 +279,12 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
   // Exchange-correlation functional
   arma::mat XC(Nbf,Nbf);
   // Form DFT quadrature grid
-  grid.construct(P,dft.gridtol,dft.x_func,dft.c_func);
+  grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
 #else
   // Exchange-correlation functional
   arma::mat XCa(Nbf,Nbf), XCb(Nbf,Nbf);
   // Form DFT quadrature grid
-  grid.construct(Pa,Pb,dft.gridtol,dft.x_func,dft.c_func);
+  grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
 
   if(verbose) {
@@ -293,10 +301,10 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
   bool converged=0;
   for(int iiter=1;iiter<=maxiter;iiter++) {
     Timer titer;
-    
+
     if(verbose)
       printf("\n ******* Iteration %4i ********\n",iiter);
-      
+
     // Form Coulomb and exchange matrices
 #ifdef DFT
     if(densityfit) {
@@ -305,7 +313,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 	fflush(stdout);
 	t.set();
       }
-      J=dfit.calc_J(P);
+      J=dfit.calc_J(sol.P);
 
     } else {
 #endif
@@ -321,15 +329,15 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 	    t.set();
 	  }
 
-	  // Calculates everything 
-	  //	    scr.calcJK(P,J,K,tol,&screeneff);
+	  // Calculates everything
+	  //	    scr.calcJK(sol.P,J,K,tol,&screeneff);
 
 	  // Only calculate the changed part
 	  arma::mat dJ, dK;
 	  scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
 	  J+=dJ;
 	  K+=dK;
-	    
+
 #ifdef DFT
 	} else {
 
@@ -339,24 +347,24 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 	    t.set();
 	  }
 
-	  //	    J=scr.calcJ(P,tol,&screeneff);
+	  //	    J=scr.calcJ(sol.P,tol,&screeneff);
 	  J+=scr.calcJ(deltaP,tol,&screeneff);
 	}
 #endif
-	
+
 
 #else
 	// Unrestricted case
 #ifdef DFT
 	if(kfrac!=0.0) {
-#endif	
+#endif
 	  if(verbose) {
 	    printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
 	    fflush(stdout);
 	    t.set();
 	  }
 
-	  //	    scr.calcJK(Pa,Pb,J,Ka,Kb,tol,&screeneff);
+	  //	    scr.calcJK(sol.Pa,sol.Pb,J,Ka,Kb,tol,&screeneff);
 
 	  // Only calculate the changed part
 	  arma::mat dJ, dKa, dKb;
@@ -364,7 +372,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 	  J+=dJ;
 	  Ka+=dKa;
 	  Kb+=dKb;
-	    
+
 #ifdef DFT
 	} else {
 
@@ -374,14 +382,14 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 	    t.set();
 	  }
 
-	  //	    J=scr.calcJ(P,tol,&screeneff);
+	  //	    J=scr.calcJ(sol.P,tol,&screeneff);
 	  J+=scr.calcJ(deltaP,tol,&screeneff);
 	}
 #endif
 
 #endif
       } else {
-	
+
 	// Conventional mode - use tabled integrals
 
 	if(verbose) {
@@ -399,17 +407,17 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 	  t.set();
 	}
 
-	J=tab.calcJ(P);
-	
+	J=tab.calcJ(sol.P);
+
 #ifdef DFT
 	if(kfrac!=0.0) {
 #endif
-	  
+
 #ifdef RESTRICTED
-	  K=tab.calcK(P);
+	  K=tab.calcK(sol.P);
 #else
-	  Ka=tab.calcK(Pa);
-	  Kb=tab.calcK(Pb);
+	  Ka=tab.calcK(sol.Pa);
+	  Kb=tab.calcK(sol.Pb);
 #endif
 
 #ifdef DFT
@@ -421,8 +429,8 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #ifdef DFT
     }
 #endif
-    
-    
+
+
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
 #ifdef DFT
@@ -433,19 +441,19 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
     }
 
-    
+
 #ifdef DFT
     if(verbose) {
       printf("Computing DFT exchange and correlation ... ");
       fflush(stdout);
       t.set();
     }
-    
+
     double Nelnum; // Numerically integrated density
 #ifdef RESTRICTED
-    grid.eval_Fxc(dft.x_func,dft.c_func,P,XC,Exc,Nelnum);
+    grid.eval_Fxc(dft.x_func,dft.c_func,sol.P,XC,sol.en.Exc,Nelnum);
 #else
-    grid.eval_Fxc(dft.x_func,dft.c_func,Pa,Pb,XCa,XCb,Exc,Nelnum);
+    grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,XCa,XCb,sol.en.Exc,Nelnum);
 #endif
 
     double rel_diff=(Nelnum-Nel)*100.0/Nel;
@@ -466,43 +474,43 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #endif
 
     // Update Hamiltonian
-#ifdef RESTRICTED    
-    Hold=H;
+#ifdef RESTRICTED
+    Hold=sol.H;
 
 #ifdef DFT
-    H=Hcore+J+XC;
+    sol.H=Hcore+J+XC;
     // Add exact exchange if necessary
     if(kfrac!=0.0) {
-      H-=0.5*kfrac*K;
-      Exc-=0.25*kfrac*arma::trace(P*K);
+      sol.H-=0.5*kfrac*K;
+      sol.en.Exc-=0.25*kfrac*arma::trace(sol.P*K);
     }
 #else
-    H=Hcore+J-0.5*K;
-    Exc=-0.25*arma::trace(P*K);
+    sol.H=Hcore+J-0.5*K;
+    sol.en.Exc=-0.25*arma::trace(sol.P*K);
 #endif
 
 #else // Unrestricted case
 
     // Store Hamiltonians of last iteration
-    Haold=Ha;
-    Hbold=Hb;
+    Haold=sol.Ha;
+    Hbold=sol.Hb;
 
 #ifdef DFT
-    Ha=Hcore+J+XCa;
-    Hb=Hcore+J+XCb;
+    sol.Ha=Hcore+J+XCa;
+    sol.Hb=Hcore+J+XCb;
     if(kfrac!=0) {
-      Ha-=kfrac*Ka;
-      Hb-=kfrac*Kb;
-      Exc-=0.5*kfrac*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
+      sol.Ha-=kfrac*Ka;
+      sol.Hb-=kfrac*Kb;
+      sol.en.Exc-=0.5*kfrac*(arma::trace(sol.Pa*Ka)+arma::trace(sol.Pb*Kb));
     }
 #else
-    Ha=Hcore+J-Ka;
-    Hb=Hcore+J-Kb;
-    Exc=-0.5*(arma::trace(Pa*Ka)+arma::trace(Pb*Kb));
+    sol.Ha=Hcore+J-Ka;
+    sol.Hb=Hcore+J-Kb;
+    sol.en.Exc=-0.5*(arma::trace(sol.Pa*Ka)+arma::trace(sol.Pb*Kb));
 
 #ifdef _ROHF
     // Constrain Fock operators to correspond to ROHF
-    ROHF_update(Ha,Hb,Pa+Pb,S,Nel_alpha,Nel_beta);
+    ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta);
 #endif
 
 #endif // end DFT clause
@@ -510,49 +518,42 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #endif // End unrestricted case
 
     // Energies
-    Ekin=arma::trace(P*T);
-    Enuca=arma::trace(P*Vnuc);
-    Eone=arma::trace(P*Hcore);
-    Ecoul=0.5*arma::trace(P*J);
-#ifdef RESTRICTED
-    // double Eh=arma::trace(P*H);
-#else
-    // double Eh=arma::trace(Pa*Ha)+arma::trace(Pb*Hb);
-#endif
-    
+    sol.en.Ekin=arma::trace(sol.P*T);
+    sol.en.Enuca=arma::trace(sol.P*Vnuc);
+    sol.en.Enucr=Enuc;
+    sol.en.Eone=arma::trace(sol.P*Hcore);
+    sol.en.Ecoul=0.5*arma::trace(sol.P*J);
+
     // Compute total energies
     Eold2=Eold;
-    Eold=Etot;
-    Etote=Ecoul+Exc+Eone;
-    Etot=Etote+Enuc;
+    Eold=sol.en.E;
+    sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone;
+    sol.en.E=sol.en.Eel+sol.en.Enucr;
 
     // Compute change of energy since last iteration
-    deltaE=Etot-Eold;
+    deltaE=sol.en.E-Eold;
 
     // Update screening value
     tol=std::min(fabs(deltaE)*1e-2,1e-9);
 
     // Sanity check
-    if(!std::isfinite(Etot)) {
+    if(!std::isfinite(sol.en.E)) {
       ERROR_INFO();
       std::ostringstream oss;
-      oss << "\nSomething wrong with total energy " << Etot <<"?\nEnding program.\n";
+      oss << "\nSomething wrong with total energy " << sol.en.E <<"?\nEnding program.\n";
       throw std::runtime_error(oss.str());
     }
 
-    /*    printf("Eone=%e, Ecoul=%e, Exc=%e, Etote=%e, Enuc=%e, Etot=%e.\n",Eone,Ecoul,Exc,Etote,Enuc,Etot);
-	  printf("Eh=%e, Ekin=%e, Enucatt=%e.\n",Eh,Ekin,Enuca);*/
-
     if(dynamicmix && iiter>3)
-      update_mixing(mix,Etot,Eold,Eold2);
+      update_mixing(mix,sol.en.E,Eold,Eold2);
 
     // Update ADIIS stacks
     if(useadiis) {
-#ifdef RESTRICTED    
-      adiis.push(Etot,P,H);
+#ifdef RESTRICTED
+      adiis.push(sol.en.E,sol.P,sol.H);
 #else
-      adiisa.push(Etot,Pa,Ha);
-      adiisb.push(Etot,Pb,Hb);
+      adiisa.push(sol.en.E,sol.Pa,sol.Ha);
+      adiisb.push(sol.en.E,sol.Pb,sol.Hb);
 #endif
     }
 
@@ -560,11 +561,11 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #ifdef RESTRICTED
       // Update Broyden mixer
       broyd.push_x(MatToVec(Hold));
-      broyd.push_f(MatToVec(Hold-H));
+      broyd.push_f(MatToVec(Hold-sol.H));
 #else
       // Compute sum and difference
-      arma::mat Hs=Ha+Hb;
-      arma::mat Hd=Ha-Hb;
+      arma::mat Hs=sol.Ha+sol.Hb;
+      arma::mat Hd=sol.Ha-sol.Hb;
 
       arma::mat Hsold=Haold+Hbold;
       arma::mat Hdold=Haold-Hbold;
@@ -578,17 +579,17 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 #endif
     }
 
-   
+
     // Solve DIIS
     if(usediis) {
 
 #ifdef RESTRICTED
       // Update DIIS stack of matrices
-      diis.update(H,P,diiserr);
+      diis.update(sol.H,sol.P,diiserr);
 #else
       // Update DIIS stacks of matrices
-      diisa.update(Ha,Pa,diiserra);
-      diisb.update(Hb,Pb,diiserrb);
+      diisa.update(sol.Ha,sol.Pa,diiserra);
+      diisb.update(sol.Hb,sol.Pb,diiserrb);
       diiserr=std::max(diiserra,diiserrb);
 #endif
 
@@ -598,13 +599,13 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 
 #ifdef RESTRICTED
 	// Solve new matrix
-	diis.solve(H,diis_c1);
+	diis.solve(sol.H,diis_c1);
 #else
         // Solve new matrices
-	diisa.solve(Ha,diis_c1);
-        diisb.solve(Hb,diis_c1);
+	diisa.solve(sol.Ha,diis_c1);
+        diisb.solve(sol.Hb,diis_c1);
 #endif
-	
+
 	diissucc=1;
       } else {
         if(verbose)
@@ -615,19 +616,19 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 
     // Perform ADIIS interpolation
     if(useadiis && ((usediis && !diissucc) || !usediis)) {
-      
+
       if(verbose) {
 	printf("Performing ADIIS interpolation of Fock operator ... ");
 	fflush(stdout);
 	t.set();
       }
-      
+
       diissucc=1;
 #ifdef RESTRICTED
-      H=adiis.get_H();
+      sol.H=adiis.get_H();
 #else
-      Ha=adiisa.get_H();
-      Hb=adiisb.get_H();
+      sol.Ha=adiisa.get_H();
+      sol.Hb=adiisb.get_H();
 #endif
 
       if(verbose)
@@ -636,51 +637,51 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 
     // Perform Broyden interpolation
     if(usebroyden && ((usediis && !diissucc) || !usediis) && iiter>1) {
-     
+
       if(verbose) {
 	printf("Performing Broyden interpolation of Fock operator ... ");
 	fflush(stdout);
 	t.set();
       }
-      
+
 #ifdef RESTRICTED
       // Update Hamiltonian
-      H=VecToMat(broyd.update_x(),Nbf,Nbf);
+      sol.H=VecToMat(broyd.update_x(),Nbf,Nbf);
 #else
       arma::mat Hs=VecToMat(broyd_sum.update_x(),Nbf,Nbf);
       arma::mat Hd=VecToMat(broyd_diff.update_x(),Nbf,Nbf);
-      
+
       // Update Hamiltonians
-      Ha=0.5*(Hs+Hd);
-      Hb=0.5*(Hs-Hd);
+      sol.Ha=0.5*(Hs+Hd);
+      sol.Hb=0.5*(Hs-Hd);
 #endif
-      
+
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
     }
-      
+
     // Solve FC=ESC
     if(verbose) {
       printf("\nSolving SCF equations ... ");
       fflush(stdout);
       t.set();
     }
-  
+
 #ifdef RESTRICTED
     // Transform Hamiltonian into orthogonal basis
-    Horth=arma::trans(Sinvh)*H*Sinvh;
+    Horth=arma::trans(Sinvh)*sol.H*Sinvh;
     // Update orbitals and energies
-    eig_sym_ordered(en,orbs,Horth);
+    eig_sym_ordered(sol.E,orbs,Horth);
     // Transform back to non-orthogonal basis
-    orbs=Sinvh*orbs;
+    sol.C=Sinvh*orbs;
 #else
-    Horth=trans(Sinvh)*Ha*Sinvh;
-    eig_sym_ordered(ena,orbsa,Horth);
-    orbsa=Sinvh*orbsa;
+    Horth=trans(Sinvh)*sol.Ha*Sinvh;
+    eig_sym_ordered(sol.Ea,orbs,Horth);
+    sol.Ca=Sinvh*orbs;
 
-    Horth=trans(Sinvh)*Hb*Sinvh;
-    eig_sym_ordered(enb,orbsb,Horth);
-    orbsb=Sinvh*orbsb;
+    Horth=trans(Sinvh)*sol.Hb*Sinvh;
+    eig_sym_ordered(sol.Eb,orbs,Horth);
+    sol.Cb=Sinvh*orbs;
 #endif
 
     if(verbose)
@@ -689,25 +690,36 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     // Form new density matrix
     arma::mat Pnew;
 #ifdef RESTRICTED
-    form_density(Pnew,orbs,occs);
+    form_density(Pnew,sol.C,occs);
 #else
     arma::mat Panew, Pbnew;
-    form_density(Panew,orbsa,occa);
-    form_density(Pbnew,orbsb,occb);
+
+#if defined(FULLHOLE)
+    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
+    occa=exc_occ(ixc_orb,nocc); // Move alpha occupied states up by a notch
+    occb=norm_occ(nocc); // Normal occupation in beta
+#elif defined(HALFHOLE)
+    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
+    occa=frac_occ(ixc_orb,nocc); // Fractional occupation on alpha orbitals
+    occb=norm_occ(nocc); // Normal occupation in beta
+#endif
+    
+    form_density(Panew,sol.Ca,occa);
+    form_density(Pbnew,sol.Cb,occb);
     Pnew=Panew+Pbnew;
 #endif
 
     // Compute change of (total) density
-    deltaP=Pnew-P;
+    deltaP=Pnew-sol.P;
 #ifndef RESTRICTED
     // Compute change of polarized densities
-    deltaPa=Panew-Pa;
-    deltaPb=Pbnew-Pb;
+    deltaPa=Panew-sol.Pa;
+    deltaPb=Pbnew-sol.Pb;
 #endif
 
     // Compute dipole moment
     olddip=norm(dipmom);
-    dipmom=dipole_moment(P,*basisp);
+    dipmom=dipole_moment(Pnew,*basisp);
 
     // Compute convergence criteria
 #ifdef RESTRICTED
@@ -729,17 +741,17 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     if(mixdensity) {
       if(verbose)
 	printf("Mixing density matrices with mixing factor %g.\n",mix);
-      
-      P=(1.0-mix)*P+mix*Pnew;
-#ifndef RESTRICTED      
-      Pa=(1.0-mix)*Pa+mix*Panew;
-      Pb=(1.0-mix)*Pb+mix*Pbnew;
+
+      sol.P=(1.0-mix)*sol.P+mix*Pnew;
+#ifndef RESTRICTED
+      sol.Pa=(1.0-mix)*sol.Pa+mix*Panew;
+      sol.Pb=(1.0-mix)*sol.Pb+mix*Pbnew;
 #endif
     } else {
-      P=Pnew;
-#ifndef RESTRICTED      
-      Pa=Panew;
-      Pb=Pbnew;
+      sol.P=Pnew;
+#ifndef RESTRICTED
+      sol.Pa=Panew;
+      sol.Pb=Pbnew;
 #endif
     }
 
@@ -747,19 +759,19 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     if(verbose) {
 
 #ifdef RESTRICTED
-      print_E(en,occs);
+      print_E(sol.E,occs);
 #else
       printf("alpha: ");
-      print_E(ena,occa);
+      print_E(sol.Ea,occa);
       printf("beta:  ");
-      print_E(enb,occb);
+      print_E(sol.Eb,occb);
 #endif
 
       printf("\nDipole:\tx\t\ty\t\tz\t\tdipole change\n");
       printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% e\n",dipmom(0),dipmom(1),dipmom(2),norm(dipmom)-olddip);
 
       printf("Energy:\telectronic\ttotal\t\tvirial\t\tenergy change\n");
-      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",Etote,Etot,-Etot/Ekin,deltaE);
+      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",sol.en.Eel,sol.en.E,-sol.en.E/sol.en.Ekin,deltaE);
 
 #ifdef DFT
       printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tXC\n");
@@ -767,7 +779,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
       // No correlation in Hartree-Fock!
       printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tExchange\n");
 #endif
-      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% 08.8f\n",Ekin,Enuca,Ecoul,Exc);
+      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% 08.8f\n",sol.en.Ekin,sol.en.Enuca,sol.en.Ecoul,sol.en.Exc);
 
 #ifdef RESTRICTED
       if(usediis) {
@@ -794,37 +806,25 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 
     // Sparse output
     if(verbose)
-      fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,Etot,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
+      fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,sol.en.E,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
 
     if(!mixdensity || (mixdensity && mix==1.0)) {
-      
+
       if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
 	if(verbose)
 	  printf("\n ******* Convergence achieved ********\n");
 	converged=1;
 	break;
-      } 
+      }
     } // End convergence check clause
   } // End SCF cycle
 
   // Compute dipole moment
   if(verbose) {
-    arma::vec dp=dipole_moment(P,*basisp);
+    arma::vec dp=dipole_moment(sol.P,*basisp);
     printf("Dipole moment is (%f,%f,%f) D, |mu|=%f D.\n",dp[0]/AUINDEBYE,dp[1]/AUINDEBYE,dp[2]/AUINDEBYE,norm(dp)/AUINDEBYE);
   }
-  
-#ifdef RESTRICTED  
-  C=orbs;
-  E=en;
 
-#else
-  // Unrestricted case
-  Ca=orbsa;
-  Cb=orbsb;
-  Ea=ena;
-  Eb=enb;
-#endif
-  
   if(converged) {
     if(verbose) {
       std::string method=
@@ -841,7 +841,7 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
 	     "HF"
 #endif
 	;
-      
+
       printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
       fprintf(stderr,"%s converged in %s.\n\n",method.c_str(),ttot.elapsed().c_str());
     }
@@ -850,6 +850,8 @@ double SCF::UHF(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, 
     oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): SCF did not converge in "<<maxiter<<" iterations!\n";
     throw std::runtime_error(oss.str());
   }
-  
-  return Etot;
+
+#if defined(HALFHOLE) || defined(FULLHOLE)
+  return ixc_orb;
+#endif
 }
