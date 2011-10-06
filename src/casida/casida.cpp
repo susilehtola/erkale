@@ -307,52 +307,99 @@ void Casida::solve() {
   fprintf(stderr,"Solution %s.\n",t.elapsed().c_str());
 }
 
-arma::mat Casida::dipole_transition(const BasisSet & bas) const {
-  // Form dipole matrix
-  std::vector<arma::mat> dm=bas.moment(1);
-  std::vector< std::vector<arma::mat> > dipmat(C.size());
-  
-  for(size_t ispin=0;ispin<C.size();ispin++) {
-    dipmat[ispin].resize(3);
-    for(int ic=0;ic<3;ic++)
-      dipmat[ispin][ic]=matrix_transform(ispin,dm[ic]);
-  }
-
+arma::mat Casida::transition(const std::vector<arma::mat> & m) const {
   // Transition rates for every transition
-  arma::mat tr(w_i.n_elem,3);
+  arma::vec tr(w_i.n_elem,3);
   tr.zeros();
 
   // Loop over transitions
   for(size_t it=0;it<w_i.n_elem;it++) {
-    // Loop over cartesian coordinates
-    for(size_t ic=0;ic<3;ic++) {
-
-      // Loop over spins
-      for(size_t jspin=0;jspin<pairs.size();jspin++) {
-	// Offset in F
-	size_t joff=jspin*pairs[0].size();
-	// Loop over pairs
-	for(size_t jp=0;jp<pairs[jspin].size();jp++) {
-
-	  // Compute |x| = x^T S^{-1/2} F_i
-	  tr(it,ic)+=dipmat[jspin][ic](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
-	}
+    // Loop over spins
+    for(size_t jspin=0;jspin<pairs.size();jspin++) {
+      // Offset in F
+      size_t joff=jspin*pairs[0].size();
+      // Loop over pairs
+      for(size_t jp=0;jp<pairs[jspin].size();jp++) {
+	// Compute |x| = x^T S^{-1/2} F_i
+	tr(it)+=m[jspin](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
       }
-
-      // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
-      // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
-      // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
-      tr(it,ic)/=sqrt(w_i(it));
     }
+    
+    // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
+    // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
+    // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
+    tr(it)/=sqrt(w_i(it));
   }
-
-  // Transition energies and oscillator strengths, 2/3 * ( |x|^2 + |y|^2 + |z|^2 )
+  
+  // Transition energies and oscillator strengths
   arma::mat osc(w_i.n_elem,2);
   for(size_t it=0; it<w_i.n_elem;it++) {
     osc(it,0) = w_i(it);
-    osc(it,1) = 2.0/3.0 * arma::dot(tr.row(it),tr.row(it));
+    osc(it,1) = tr(it)*tr(it);
   }
+  
+  return osc;
+}
 
+arma::mat Casida::transition(const std::vector<arma::cx_mat> & m) const {
+  // Transition rates for every transition
+  arma::cx_vec tr(w_i.n_elem,3);
+  tr.zeros();
+
+  // Loop over transitions
+  for(size_t it=0;it<w_i.n_elem;it++) {
+    // Loop over spins
+    for(size_t jspin=0;jspin<pairs.size();jspin++) {
+      // Offset in F
+      size_t joff=jspin*pairs[0].size();
+      // Loop over pairs
+      for(size_t jp=0;jp<pairs[jspin].size();jp++) {
+	  // Compute |x| = x^T S^{-1/2} F_i
+	tr(it)+=m[jspin](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
+      }
+    }
+    
+    // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
+    // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
+    // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
+    tr(it)/=sqrt(w_i(it));
+  }
+  
+  // Transition energies and oscillator strengths
+  arma::mat osc(w_i.n_elem,2);
+  for(size_t it=0; it<w_i.n_elem;it++) {
+    osc(it,0) = w_i(it);
+    osc(it,1) = std::norm(tr(it));
+  }
+  
+  return osc;
+}
+
+arma::mat Casida::dipole_transition(const BasisSet & bas) const {
+  // Form dipole matrix
+  std::vector<arma::mat> dm=bas.moment(1);
+
+  // and convert it to the MO basis
+  std::vector< std::vector<arma::mat> > dipmat(3);
+  for(int ic=0;ic<3;ic++)
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      dipmat[ic].resize(C.size());
+      dipmat[ic][ispin]=matrix_transform(ispin,dm[ic]);
+    }
+  
+  // Compute the oscillator strengths.
+  arma::mat osc(w_i.n_elem,2);
+  osc.zeros();
+  for(int ic=0;ic<3;ic++) {
+    // Compute the transitions in the current direction
+    arma::mat hlp=transition(dipmat[ic]);
+
+    // Store the energies
+    osc.col(0)=hlp.col(0);
+    // and increment the transition speeds
+    osc.col(1)+=2.0/3.0*hlp.col(1);
+  }
+  
   return osc;
 }
 
@@ -376,38 +423,8 @@ arma::mat Casida::transition(const BasisSet & basis, const arma::vec & q) const 
   for(size_t ispin=0;ispin<C.size();ispin++)
     mtrans[ispin]=matrix_transform(ispin,momtrans);
 
-  // Transition rates for every transition
-  arma::cx_vec tr(w_i.n_elem);
-  tr.zeros();
-
-  // Loop over transitions
-  for(size_t it=0;it<w_i.n_elem;it++) {
-    // Loop over spins
-    for(size_t jspin=0;jspin<pairs.size();jspin++) {
-      // Offset in F
-      size_t joff=jspin*pairs[0].size();
-      // Loop over pairs
-      for(size_t jp=0;jp<pairs[jspin].size();jp++) {
-	
-	// Compute |x| = x^T S^{-1/2} F_i
-	tr(it)+=mtrans[jspin](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
-      }
-    }
-    
-    // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
-    // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
-    // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
-    tr(it)/=sqrt(w_i(it));
-  }
-  
-  // Transition energies and oscillators
-  arma::mat osc(w_i.n_elem,2);
-  for(size_t it=0; it<w_i.n_elem;it++) {
-    osc(it,0) = w_i(it);
-    osc(it,1) = std::norm(tr(it));
-  }
-  
-  return osc;
+  // Compute the transitions
+  return transition(mtrans);
 }
 
 arma::mat Casida::transition(const BasisSet & basis, double qr) const {
@@ -420,23 +437,19 @@ arma::mat Casida::transition(const BasisSet & basis, double qr) const {
 
   // Get the grid for computing the spherical averages.
   std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
-  for(size_t i=0;i<grid.size();i++)
-    // Renormalize weights by 4\pi, since otherwise sum of weights is 4\pi
-    grid[i].w/=4.0*M_PI;
+  // We normalize the weights so that for purely dipolar transitions we
+  // get the same output as with using the dipole matrix.
+  for(size_t i=0;i<grid.size();i++) {
+    // Dipole integral is only wrt theta - divide off phi part.
+    grid[i].w/=2.0*M_PI;
+  }
 
   // Transition energies and oscillator strengths
   arma::mat osc(w_i.n_elem,2);
-  for(size_t it=0; it<w_i.n_elem;it++) {
-    osc(it,0) = w_i(it);
-    osc(it,1) = 0.0;
-  }
+  osc.zeros();
   
   // Loop over the angular mesh
   for(size_t ig=0;ig<grid.size();ig++) {
-    // Transition rates for every transition
-    arma::cx_vec tr(w_i.n_elem);
-    tr.zeros();
-    
     // Current value of q is
     arma::vec q(3);
     q(0)=qr*grid[ig].r.x;
@@ -452,30 +465,13 @@ arma::mat Casida::transition(const BasisSet & basis, double qr) const {
     for(size_t ispin=0;ispin<C.size();ispin++)
       mtrans[ispin]=matrix_transform(ispin,momtrans);
 
-    // Loop over transitions
-    for(size_t it=0;it<w_i.n_elem;it++) {
-      // Loop over spins
-      for(size_t jspin=0;jspin<pairs.size();jspin++) {
-	// Offset in F
-	size_t joff=jspin*pairs[0].size();
-	// Loop over pairs
-	for(size_t jp=0;jp<pairs[jspin].size();jp++) {
-	  
-	  // Compute |x| = x^T S^{-1/2} F_i
-	  tr(it)+=mtrans[jspin](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
-	}
-      }
-    }
-
-    for(size_t it=0;it<w_i.n_elem;it++) {
-      // Normalize transition speeds
-      tr(it)/=sqrt(w_i(it));
-      // Increment total transition speeds
-      osc(it,1)+=w*std::norm(tr(it));
-    }
-    
+    // Compute the transitions
+    arma::mat hlp=transition(mtrans);
+    // Store the energies
+    osc.col(0)=hlp.col(0);
+    // and increment the transition speeds
+    osc.col(1)+=w*hlp.col(1);
   }
-
 
   return osc;
 }

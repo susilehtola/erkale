@@ -160,6 +160,11 @@ class Casida {
   /// Solve the Casida equation
   void solve();
 
+  /// Compute the transition speeds using the matrix elements given by M
+  arma::mat transition(const std::vector<arma::mat> & M) const;
+  /// Compute the transition speeds using the matrix elements given by M
+  arma::mat transition(const std::vector<arma::cx_mat> & M) const;
+
  public:
   /// Dummy constructor
   Casida();
