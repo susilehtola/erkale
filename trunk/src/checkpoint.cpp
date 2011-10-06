@@ -25,6 +25,7 @@ Checkpoint::Checkpoint(const std::string & fname, bool write) {
 }
 
 Checkpoint::~Checkpoint() {
+  H5Fclose(file);
 }
 
 void Checkpoint::write(const std::string & name, const arma::mat & m) {
@@ -93,6 +94,71 @@ void Checkpoint::read(const std::string & name, arma::mat & m) const {
   H5Dclose(dataset);
 }
 
-void Checkpoint::write(const BasisSet & basis) {
+void Checkpoint::write(const std::string & name, const std::vector<double> & v) {
+  // Dimensions of the vector
+  hsize_t dims[1];
+  dims[0]=v.size();
 
+  // Create a dataspace.
+  hid_t dataspace=H5Screate_simple(1,dims,NULL);
+
+  // Create a datatype.
+  hid_t datatype=H5Tcopy(H5T_NATIVE_DOUBLE);
+  // Set little endian data order
+  //  herr_t status=H5Tset_order(datatype, H5T_ORDER_LE);
+  H5Tset_order(datatype, H5T_ORDER_LE);
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties.
+  hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Write the data to the file.
+  //  status=H5Dwrite(dataset,H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,m.memptr());
+  H5Dwrite(dataset,H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,&(v[0]));
+
+  // Close everything.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+}
+
+void Checkpoint::read(const std::string & name, std::vector<double> & v) const {
+  // Open the dataset.
+  hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
+
+  // Get the data type
+  hid_t datatype  = H5Dget_type(dataset);
+
+  // Get the class info
+  hid_t hclass=H5Tget_class(datatype);
+
+  if(hclass!=H5T_FLOAT)
+    throw std::runtime_error("Error - dataspace is not floating point!\n");
+
+  // Get dataspace
+  hid_t dataspace = H5Dget_space(dataset);
+  // Get number of dimensions
+  int ndim = H5Sget_simple_extent_ndims(dataspace);
+  if(ndim!=1)
+    throw std::runtime_error("Error - dataspace does not have dimension 1!\n");
+
+  // Get the size of the matrix
+  hsize_t dims[ndim];
+  H5Sget_simple_extent_dims(dataspace,dims,NULL);
+
+  // Allocate memory
+  v.resize(dims[0]);
+  //  herr_t status=H5Dread(dataset,H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, m.memptr());
+  H5Dread(dataset,H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &(v[0]));
+
+  // Close dataspace
+  H5Sclose(dataspace);
+  // Close datatype
+  H5Tclose(datatype);
+  // Close dataset
+  H5Dclose(dataset);
+}
+
+void Checkpoint::write(const BasisSet & basis) {
+  
 }
