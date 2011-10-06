@@ -44,6 +44,11 @@ class Checkpoint {
   /// Read matrix
   void read(const std::string & name, arma::mat & mat) const;
 
+  /// Save array
+  void write(const std::string & name, const std::vector<double> & v);
+  /// Load array
+  void read(const std::string & name, std::vector<double> & v) const;
+
   /// Save basis set
   void write(const BasisSet & basis);
 };
