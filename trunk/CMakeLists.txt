@@ -82,13 +82,6 @@ message("libint headers are in ${LIBINT_INCLUDE_DIRS}")
 message("libint linker flags are ${LIBINT_LIBRARIES}")
 message("")
 
-# Find HDF5
-find_package(HDF5 REQUIRED)
-message("HDF5 headers are in ${HDF5_INCLUDE_DIRS}")
-message("HDF5 linker flags are ${HDF5_LIBRARIES}")
-message("")
-
-
 # Find out how to preprocess C++ source code files
 if(CMAKE_COMPILER_IS_GNUCXX)
  set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${DFTFLAGS} ${OpenMP_CXX_FLAGS})

@@ -5,7 +5,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 add_library (liberkale_xrs
 bfprod.cpp fourierprod.cpp gaunt.cpp lmgrid.cpp lmtrans.cpp momentum_series.cpp xrsscf.cpp )
 # The name of the library is
-set_target_properties(liberkale_xrs PROPERTIES OUTPUT_NAME "liberkale_xrs${SUFFIX}")
+set_target_properties(liberkale_xrs PROPERTIES OUTPUT_NAME "erkale_xrs${SUFFIX}")
 
 if(BUILD_SHARED_LIBS)
  set_target_properties(liberkale_xrs PROPERTIES
