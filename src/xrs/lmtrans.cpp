@@ -241,6 +241,13 @@ std::vector<double> lmtrans::transition_velocity(size_t i, size_t f, const besse
   //  std::vector<angular_grid_t> mesh=form_angular_grid(lmax);
   std::vector<angular_grid_t> mesh=form_angular_grid(2*lmax);
 
+  // We normalize the weights so that for purely dipolar transitions we
+  // get the same output as with using the dipole matrix.
+  for(size_t i=0;i<mesh.size();i++) {
+    // Dipole integral is only wrt theta - divide off phi part.
+    mesh[i].w/=2.0*M_PI;
+  }
+
   // Transition velocities.
   std::vector<double> t(lmax+2);
   for(size_t i=0;i<t.size();i++)
