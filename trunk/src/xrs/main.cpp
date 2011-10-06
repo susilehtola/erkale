@@ -318,6 +318,12 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_series(const Bas
 
   // Get the grid for computing the spherical averages.
   std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
+  // We normalize the weights so that for purely dipolar transitions we
+  // get the same output as with using the dipole matrix.
+  for(size_t i=0;i<grid.size();i++) {
+    // Dipole integral is only wrt theta - divide off phi part.
+    grid[i].w/=2.0*M_PI;
+  }
 
   // Amount of transitions is
   size_t Ntrans=C.n_cols-nocc;
@@ -409,6 +415,12 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_fourier(const Ba
 
   // Get the grid for computing the spherical averages.
   std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
+  // We normalize the weights so that for purely dipolar transitions we
+  // get the same output as with using the dipole matrix.
+  for(size_t i=0;i<grid.size();i++) {
+    // Dipole integral is only wrt theta - divide off phi part.
+    grid[i].w/=2.0*M_PI;
+  }
 
   // Amount of transitions is
   size_t Ntrans=C.n_cols-nocc;
