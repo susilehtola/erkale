@@ -12,3 +12,5 @@ else()
  target_link_libraries(erkale_casida ${LIBXC_LIBRARIES})
  target_link_libraries(erkale_casida ${LIBINT_LIBRARIES})
 endif()
+
+install (TARGETS erkale_casida DESTINATION bin)
