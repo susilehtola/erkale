@@ -1,3 +1,19 @@
+/*
+ *                This source code is part of
+ *
+ *                     E  R  K  A  L  E
+ *                             -
+ *                       HF/DFT from Hel
+ *
+ * Written by Jussi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Jussi Lehtola
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ */
+
 #include "../basislibrary.h"
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
@@ -40,7 +56,7 @@ int main(int argc, char **argv) {
 
     // Get wanted element from basis
     ElementBasisSet elbas=bas.get_element(el);
-    
+
     // Compute completeness profile
     compprof_t prof=compute_completeness(elbas);
 
