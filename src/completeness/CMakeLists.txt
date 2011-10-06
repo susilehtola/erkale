@@ -1,6 +1,6 @@
 # Create the completeness profile library
 add_library(liberkale_cmp completeness_profile.cpp optimize_completeness.cpp)
-set_target_properties(liberkale_cmp PROPERTIES OUTPUT_NAME "liberkale_cmp${SUFFIX}")
+set_target_properties(liberkale_cmp PROPERTIES OUTPUT_NAME "erkale_cmp${SUFFIX}")
 if(BUILD_SHARED_LIBS)
  set_target_properties(liberkale_cmp PROPERTIES
   VERSION ${VERSION} SOVERSION ${SOVERSION} )

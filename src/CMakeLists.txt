@@ -26,7 +26,7 @@ lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp)
 
 # The name of the executable is
-set_target_properties(liberkale PROPERTIES OUTPUT_NAME "liberkale${SUFFIX}")
+set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
 
 # If we build shared libraries, they must be linked to the other libraries
 if(BUILD_SHARED_LIBS)
@@ -36,6 +36,7 @@ if(BUILD_SHARED_LIBS)
  target_link_libraries(liberkale ${LAPACK_LIBRARIES})
  target_link_libraries(liberkale ${LIBINT_LIBRARIES})
  target_link_libraries(liberkale ${LIBXC_LIBRARIES})
+ target_link_libraries(liberkale ${HDF5_LIBRARIES})
 endif()
 
 # Create the ERKALE main executable
@@ -53,6 +54,7 @@ else()
  target_link_libraries(erkale ${LAPACK_LIBRARIES})
  target_link_libraries(erkale ${LIBXC_LIBRARIES})
  target_link_libraries(erkale ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale ${HDF5_LIBRARIES})
 endif()
 
 # Install targets
