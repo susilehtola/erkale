@@ -241,10 +241,6 @@ std::vector<double> lmtrans::transition_velocity(size_t i, size_t f, const besse
   //  std::vector<angular_grid_t> mesh=form_angular_grid(lmax);
   std::vector<angular_grid_t> mesh=form_angular_grid(2*lmax);
 
-  for(size_t i=0;i<mesh.size();i++)
-    // Renormalize weights by 4\pi, since otherwise sum of weights is 4\pi
-    mesh[i].w/=4.0*M_PI;
-
   // Transition velocities.
   std::vector<double> t(lmax+2);
   for(size_t i=0;i<t.size();i++)

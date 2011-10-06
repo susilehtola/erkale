@@ -300,7 +300,7 @@ std::vector<spectrum_t> compute_transitions(const BasisSet & basis, const arma::
     double wz=arma::dot(rhs_z,C.col(ix));
 
     // Spherical average of oscillator strength in XRS is
-    sp.w=1.0/3.0*(wx*wx + wy*wy + wz*wz);
+    sp.w=2.0/3.0*(wx*wx + wy*wy + wz*wz);
     // Store decomposition
     sp.wdec.push_back(wx);
     sp.wdec.push_back(wy);
@@ -318,9 +318,6 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_series(const Bas
 
   // Get the grid for computing the spherical averages.
   std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
-  for(size_t i=0;i<grid.size();i++)
-    // Renormalize weights by 4\pi, since otherwise sum of weights is 4\pi
-    grid[i].w/=4.0*M_PI;
 
   // Amount of transitions is
   size_t Ntrans=C.n_cols-nocc;
@@ -395,6 +392,8 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_fourier(const Ba
 {
   Timer t;
 
+  printf("Computing transitions using Fourier method.\n");
+
   // Form products of basis functions.
   const size_t Nbf=basis.get_Nbf();
 
@@ -403,18 +402,6 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_fourier(const Ba
   printf("Products done in %s.\n",t.elapsed().c_str());
   t.set();
 
-  // Check the products
-  arma::mat S=basis.overlap();
-  for(size_t i=0;i<Nbf;i++)
-    for(size_t j=0;j<=i;j++) {
-      double s=S(i,j);
-      double intg=bfprod[(i*(i+1))/2+j].integral();
-
-      if(fabs(s-intg)>std::max(DBL_EPSILON,10*DBL_EPSILON*std::max(fabs(s),fabs(intg))))
-	fprintf(stderr,"Products differ by %e at (%i,%i): %e %e\n",fabs(s-intg),(int) i, (int) j, s,intg);
-    }
-
-
   // Form Fourier transforms of the products.
   std::vector<prod_fourier> bffour=fourier_transform(bfprod);
   printf("Fourier transform done in %s.\n",t.elapsed().c_str());
@@ -422,9 +409,6 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_fourier(const Ba
 
   // Get the grid for computing the spherical averages.
   std::vector<angular_grid_t> grid=form_angular_grid(2*basis.get_max_am());
-  for(size_t i=0;i<grid.size();i++)
-    // Renormalize weights by 4\pi, since otherwise sum of weights is 4\pi
-    grid[i].w/=4.0*M_PI;
 
   // Amount of transitions is
   size_t Ntrans=C.n_cols-nocc;
@@ -448,7 +432,6 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_fourier(const Ba
       Cm(ir,ix-nocc)=C(ir,ix);
 
   // Loop over q values.
-  printf("Computing transitions using Fourier method.\n");
   arma::cx_vec tmp;
 
   for(size_t iq=0;iq<qval.size();iq++) {
