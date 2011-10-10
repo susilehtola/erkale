@@ -12,7 +12,8 @@ INCLUDE_DIRECTORIES(${GSL_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${LIBXC_INCLUDE_DIRS})
 # Add libint include directory
 INCLUDE_DIRECTORIES(${LIBINT_INCLUDE_DIRS})
-
+# Add HDF5 include directory
+INCLUDE_DIRECTORIES(${HDF5_INCLUDE_DIRS})
 
 # Create the ERKALE base library "erkale" which includes the following sources
 add_library (liberkale 
