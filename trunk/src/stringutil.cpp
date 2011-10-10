@@ -378,10 +378,7 @@ std::vector<double> parse_range_double(const std::string & in) {
       }
       
       // Form the points
-      size_t N=(size_t) ((max-min)/dx);
-      if(N==0)
-	// Minimum and maximum were probably the same. We still want a number
-	N++;
+      size_t N=(size_t) ((max-min)/dx)+1;
       
       for(size_t i=0;i<N;i++)
 	ret.push_back(min+i*dx);
