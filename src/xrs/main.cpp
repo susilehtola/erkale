@@ -84,6 +84,14 @@ bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
 
 /// Use converged SCF potential Ha to solve orbitals in augmented basis.
 void augmented_solution(const BasisSet & basis, const Settings & set, const arma::mat & H, arma::mat & C, arma::vec & E, size_t xcatom, size_t & ixc_orb, size_t nocc) {
+  /*
+   * FIXME
+   * TODO: this needs to be done using a singular-value decomposition.
+   */
+  fprintf(stderr,"The double basis set method is not yet implemented.\n");
+  return;
+
+
   // Get indices of atoms to augment
   std::vector<size_t> augind=parse_range(splitline(set.get_string("XRSAugment"))[0]);
   // Convert to C++ indexing
