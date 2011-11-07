@@ -906,7 +906,7 @@ void BasisSet::add_nucleus(const nucleus_t & nuc) {
   nuclei[nuclei.size()-1].ind=nuclei.size()-1;
 }
 
-void BasisSet::add_shell(size_t nucind, const GaussianShell & sh) {
+void BasisSet::add_shell(size_t nucind, const GaussianShell & sh, bool dosort) {
   if(nucind>=nuclei.size()) {
     ERROR_INFO();
     throw std::runtime_error("Cannot add functions to nonexisting nucleus!\n");
@@ -918,10 +918,16 @@ void BasisSet::add_shell(size_t nucind, const GaussianShell & sh) {
   shells[shells.size()-1].set_center(nuclei[nucind].r,nucind);
 
   // Sort the basis set, updating the nuclear list and basis function indices as well
-  sort();
+  if(dosort)
+    sort();
+  else {
+    // Just do the numbering and shell list updates.
+    check_numbering();
+    update_nuclear_shell_list();
+  }
 }
 
-void BasisSet::add_shell(size_t nucind, int am, const std::vector<contr_t> & C) {
+void BasisSet::add_shell(size_t nucind, int am, const std::vector<contr_t> & C, bool dosort) {
   // Create new shell.
   GaussianShell sh;
 
@@ -931,10 +937,10 @@ void BasisSet::add_shell(size_t nucind, int am, const std::vector<contr_t> & C) 
     sh=GaussianShell(am,false,C);
 
   // Do the rest here
-  add_shell(nucind,sh);
+  add_shell(nucind,sh,dosort);
 }
 
-void BasisSet::add_shells(size_t nucind, ElementBasisSet el) {
+void BasisSet::add_shells(size_t nucind, ElementBasisSet el, bool dosort) {
   // Add basis functions at cen
 
   // Get the shells on the element
@@ -950,7 +956,7 @@ void BasisSet::add_shells(size_t nucind, ElementBasisSet el) {
       sh=GaussianShell(bf[i].get_am(),false,bf[i].get_contr());
 
     // and add it
-    add_shell(nucind,sh);
+    add_shell(nucind,sh,dosort);
   }
 }
 
