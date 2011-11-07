@@ -17,6 +17,8 @@
 #include "checkpoint.h"
 
 Checkpoint::Checkpoint(const std::string & fname, bool write) {
+  writemode=write;
+
   if(write)
     // Truncate existing file, using default creation and access properties.
     file=H5Fcreate(fname.c_str(),H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
@@ -28,7 +30,19 @@ Checkpoint::~Checkpoint() {
   H5Fclose(file);
 }
 
+void Checkpoint::remove(const std::string & name) {
+  if(H5Lexists(file, name.c_str(), H5P_DEFAULT)) {
+    // Remove the entry from the file.
+    H5Ldelete(file, name.c_str(), H5P_DEFAULT);
+  }
+}
+
 void Checkpoint::write(const std::string & name, const arma::mat & m) {
+  if(!writemode)
+    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+
+  remove(name);
+
   // Dimensions of the matrix
   hsize_t dims[2];
   dims[0]=m.n_rows;
@@ -48,8 +62,7 @@ void Checkpoint::write(const std::string & name, const arma::mat & m) {
   hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
   // Write the data to the file.
-  //  status=H5Dwrite(dataset,H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,m.memptr());
-  H5Dwrite(dataset,H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,m.memptr());
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, m.memptr());
 
   // Close everything.
   H5Dclose(dataset);
@@ -67,15 +80,23 @@ void Checkpoint::read(const std::string & name, arma::mat & m) const {
   // Get the class info
   hid_t hclass=H5Tget_class(datatype);
 
-  if(hclass!=H5T_FLOAT)
-    throw std::runtime_error("Error - dataspace is not floating point!\n");
+  if(hclass!=H5T_FLOAT) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " is not a floating point value!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
 
   // Get dataspace
   hid_t dataspace = H5Dget_space(dataset);
   // Get number of dimensions
   int ndim = H5Sget_simple_extent_ndims(dataspace);
-  if(ndim!=2)
-    throw std::runtime_error("Error - dataspace does not have dimension 2!\n");
+  if(ndim!=2) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " should have dimension 2, instead dimension is " << ndim << "!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
 
   // Get the size of the matrix
   hsize_t dims[ndim];
@@ -83,8 +104,7 @@ void Checkpoint::read(const std::string & name, arma::mat & m) const {
 
   // Allocate memory
   m.zeros(dims[0],dims[1]);
-  //  herr_t status=H5Dread(dataset,H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, m.memptr());
-  H5Dread(dataset,H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, m.memptr());
+  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, m.memptr());
 
   // Close dataspace
   H5Sclose(dataspace);
@@ -95,6 +115,12 @@ void Checkpoint::read(const std::string & name, arma::mat & m) const {
 }
 
 void Checkpoint::write(const std::string & name, const std::vector<double> & v) {
+  if(!writemode)
+    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+
+  // Remove possible existing entry
+  remove(name);
+
   // Dimensions of the vector
   hsize_t dims[1];
   dims[0]=v.size();
@@ -105,7 +131,6 @@ void Checkpoint::write(const std::string & name, const std::vector<double> & v) 
   // Create a datatype.
   hid_t datatype=H5Tcopy(H5T_NATIVE_DOUBLE);
   // Set little endian data order
-  //  herr_t status=H5Tset_order(datatype, H5T_ORDER_LE);
   H5Tset_order(datatype, H5T_ORDER_LE);
 
   // Create the dataset using the defined dataspace and datatype, and
@@ -113,8 +138,7 @@ void Checkpoint::write(const std::string & name, const std::vector<double> & v) 
   hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
   // Write the data to the file.
-  //  status=H5Dwrite(dataset,H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,m.memptr());
-  H5Dwrite(dataset,H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,&(v[0]));
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &(v[0]));
 
   // Close everything.
   H5Dclose(dataset);
@@ -132,15 +156,23 @@ void Checkpoint::read(const std::string & name, std::vector<double> & v) const {
   // Get the class info
   hid_t hclass=H5Tget_class(datatype);
 
-  if(hclass!=H5T_FLOAT)
-    throw std::runtime_error("Error - dataspace is not floating point!\n");
-
+  if(hclass!=H5T_FLOAT) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " is not a floating point value!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
+   
   // Get dataspace
   hid_t dataspace = H5Dget_space(dataset);
   // Get number of dimensions
   int ndim = H5Sget_simple_extent_ndims(dataspace);
-  if(ndim!=1)
-    throw std::runtime_error("Error - dataspace does not have dimension 1!\n");
+  if(ndim!=1) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " should have dimension 1, instead dimension is " << ndim << "!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
 
   // Get the size of the matrix
   hsize_t dims[ndim];
@@ -148,8 +180,7 @@ void Checkpoint::read(const std::string & name, std::vector<double> & v) const {
 
   // Allocate memory
   v.resize(dims[0]);
-  //  herr_t status=H5Dread(dataset,H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, m.memptr());
-  H5Dread(dataset,H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &(v[0]));
+  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &(v[0]));
 
   // Close dataspace
   H5Sclose(dataspace);
@@ -160,5 +191,437 @@ void Checkpoint::read(const std::string & name, std::vector<double> & v) const {
 }
 
 void Checkpoint::write(const BasisSet & basis) {
+  if(!writemode)
+    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+
+  // Remove possible existing entries
+  remove("basis.nucs");
+  remove("basis.contr");
+  remove("basis.data");
+
+  // Get number of shells
+  size_t Nsh=basis.get_Nshells();
+  // Get number of nuclei
+  size_t Nnuc=basis.get_Nnuc();
+
+  // Initialize dataspace
+  hsize_t dimsf[1];
+  hid_t dataspace;
+  hid_t datatype;
+  hid_t dataset;
+
+  /* First, write out nuclei. */
+
+  nuc_t nucs[Nnuc];
+  for(size_t i=0;i<Nnuc;i++) {
+    // Get nucleus
+    nucleus_t n=basis.get_nucleus(i);
+
+    // Store data
+    nucs[i].ind=n.ind;
+    nucs[i].rx=n.r.x;
+    nucs[i].ry=n.r.y;
+    nucs[i].rz=n.r.z;
+    nucs[i].Z=n.Z;
+    nucs[i].bsse=n.bsse;
+    strncpy(nucs[i].sym,n.symbol.c_str(),SYMLEN-1);
+  }
+
+  datatype = H5Tcreate(H5T_COMPOUND, sizeof(nuc_t));
+  H5Tinsert(datatype, "ind", HOFFSET(nuc_t, ind), H5T_NATIVE_HSIZE);
+  H5Tinsert(datatype, "rx", HOFFSET(nuc_t, rx), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "ry", HOFFSET(nuc_t, ry), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "rz", HOFFSET(nuc_t, rz), H5T_NATIVE_DOUBLE);
+
+  H5Tinsert(datatype, "bsse", HOFFSET(nuc_t, bsse), H5T_NATIVE_HBOOL);
+  H5Tinsert(datatype, "Z", HOFFSET(nuc_t, Z), H5T_NATIVE_INT);
+
+  // Symbol
+  hid_t symtype=H5Tcopy(H5T_C_S1);
+  H5Tset_size(symtype,SYMLEN);
+  H5Tinsert(datatype, "sym", HOFFSET(nuc_t, sym), symtype);
+
+  dimsf[0]=Nnuc;
+  // Create dataspace
+  dataspace = H5Screate_simple(1,dimsf,NULL);
+  // Create dataset
+  dataset=H5Dcreate(file,"basis.nucs",datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  // Write out the data
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, nucs);
+
+  // Free dataset
+  H5Dclose(dataset);
+  H5Sclose(dataspace);
+  H5Tclose(datatype);
+
+  /* Write shell data, contractions first */
+
+  dimsf[0]=Nsh;
+  dataspace = H5Screate_simple(1,dimsf,NULL);
+
+  // Create array holding exponents and contraction coefficients of shells.
+  hvl_t contrs[Nsh];
+
+  // Initialize data.
+  for(size_t i=0;i<Nsh;i++) {
+    // Get contraction on shell
+    std::vector<contr_t> cntr=basis.get_contr(i);
+
+    // Allocate memory
+    contrs[i].p=malloc(cntr.size()*sizeof(contr_t));
+    contrs[i].len=cntr.size();
+
+    // Store contractions
+    for(size_t j=0;j<cntr.size();j++)
+      ((contr_t *) contrs[i].p)[j]=cntr[j];
+  }
+
+  // Create compound datatype
+  hid_t contrdata = H5Tcreate (H5T_COMPOUND, sizeof(contr_t));
+  H5Tinsert(contrdata, "c", HOFFSET(contr_t, c), H5T_NATIVE_DOUBLE);
+  H5Tinsert(contrdata, "z", HOFFSET(contr_t, z), H5T_NATIVE_DOUBLE);
+  // Create datatype
+  datatype = H5Tvlen_create(contrdata);
+
+  // and the dataspace is
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties
+  dataset=H5Dcreate(file,"basis.contr",datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  // Write the data.
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, contrs);
+
+  // Free memory.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Tclose(contrdata);
+  for(size_t i=0;i<Nsh;i++)
+    free(contrs[i].p);
+
+  /* Done with contractions, write other (fixed-length) data. */
+
+  shell_data_t shdata[Nsh];
+  for(size_t i=0;i<Nsh;i++) {
+    shdata[i].indstart=basis.get_first_ind(i);
+    shdata[i].am=basis.get_am(i);
+    shdata[i].uselm=basis.lm_in_use(i);
+    shdata[i].cenind=basis.get_center_ind(i);
+  }
+
+  // Create dataset for shared data
+  datatype = H5Tcreate(H5T_COMPOUND, sizeof(shell_data_t));
+
+  H5Tinsert(datatype, "indstart", HOFFSET(shell_data_t, indstart), H5T_NATIVE_HSIZE);
+  H5Tinsert(datatype, "am", HOFFSET(shell_data_t, am), H5T_NATIVE_INT);
+  H5Tinsert(datatype, "uselm", HOFFSET(shell_data_t, uselm), H5T_NATIVE_HBOOL);
+
+  H5Tinsert(datatype, "cenind", HOFFSET(shell_data_t, cenind), H5T_NATIVE_HSIZE);
+
+  // Write the data.
+  dataset=H5Dcreate(file,"basis.data",datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, shdata);
+
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+}
+
+
+void Checkpoint::read(BasisSet & basis) const {
+  hid_t dataset, datatype, dataspace;
+  hsize_t dims[1];
+
+  // ***** First, read in the nuclei *****
+
+  // Open the dataset.
+  dataset = H5Dopen (file, "basis.nucs", H5P_DEFAULT);
+  // Get the data type
+  datatype = H5Dget_type(dataset);
+  // Get dataspace
+  dataspace = H5Dget_space(dataset);
+  // Get the number of nuclei
+  H5Sget_simple_extent_dims(dataspace,dims,NULL);
+  size_t Nnuc=dims[0];
+
+  // Read the data.
+  nuc_t nucs[Nnuc];
+  H5Dread(dataset,datatype,H5S_ALL,H5S_ALL,H5P_DEFAULT,nucs);
+
+  // Free memory.
+  H5Sclose(dataspace);
+  H5Tclose(datatype);
+  H5Dclose(dataset);
+
+  // ***** Then, read the contrations *****
+
+  // Open the dataset.
+  dataset = H5Dopen (file, "basis.contr", H5P_DEFAULT);
+  // Get the data type
+  datatype  = H5Dget_type(dataset);
+
+  // Get dataspace
+  dataspace = H5Dget_space(dataset);
+  // Get the number of shells
+  H5Sget_simple_extent_dims(dataspace,dims,NULL);
+  size_t Nsh=dims[0];
+
+  // Read the data.
+  hvl_t cntrs[Nsh];
+  H5Dread(dataset,datatype,H5S_ALL,H5S_ALL,H5P_DEFAULT,cntrs);
+
+  // Free memory.
+  H5Sclose(dataspace);
+  H5Tclose(datatype);
+  H5Dclose(dataset);
+
+  // ***** and the shell info *****
+
+  // Open the dataset.
+  dataset = H5Dopen (file, "basis.data", H5P_DEFAULT);
+  // Get the data type
+  datatype  = H5Dget_type(dataset);
+
+  // Get dataspace
+  dataspace = H5Dget_space(dataset);
+  // Get the number of shells
+  H5Sget_simple_extent_dims(dataspace,dims,NULL);
+  if(Nsh!=dims[0])
+    throw std::runtime_error("Number of shells does not equal amount of contractions!\n");
+
+  shell_data_t shdata[Nsh];
+  H5Dread(dataset,datatype,H5S_ALL,H5S_ALL,H5P_DEFAULT,shdata);
+
+  // Free memory.
+  H5Sclose(dataspace);
+  H5Tclose(datatype);
+  H5Dclose(dataset);
+
+  // ***** Store the data *****
+
+  std::vector< std::vector<contr_t> > contrs(Nsh);
+  // Store data
+  for(size_t i=0;i<Nsh;i++) {
+    // Pointer to entry
+    contr_t *p=(contr_t *) cntrs[i].p;
+    for(size_t j=0;j<cntrs[i].len;j++) {
+      contr_t hlp;
+      hlp.z=p[j].z;
+      hlp.c=p[j].c;
+      contrs[i].push_back(hlp);
+    }
+  }
+  for(size_t i=0;i<Nsh;i++)
+    free(cntrs[i].p);
+
+  // Initialize the basis set
+  basis=BasisSet();
+  // Add the nuclei
+  for(size_t i=0;i<Nnuc;i++) {
+    nucleus_t nuc;
+
+    nuc.ind=nucs[i].ind;
+    nuc.r.x=nucs[i].rx;
+    nuc.r.y=nucs[i].ry;
+    nuc.r.z=nucs[i].rz;
+    nuc.Z=nucs[i].Z;
+    nuc.bsse=nucs[i].bsse;
+    nuc.symbol=nucs[i].sym;
+
+    basis.add_nucleus(nuc);
+  }
+
+  // Add the shells
+  for(size_t i=0;i<Nsh;i++) 
+    basis.add_shell(shdata[i].cenind,shdata[i].am,contrs[i]);
   
+  // Finalize the basis
+  basis.finalize();
+}
+
+
+void Checkpoint::write(const std::string & name, double val) {
+  if(!writemode)
+    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+
+  // Remove possible existing entry
+  remove(name);
+
+  // Create a dataspace.
+  hid_t dataspace=H5Screate(H5S_SCALAR);
+
+  // Create a datatype.
+  hid_t datatype=H5Tcopy(H5T_NATIVE_DOUBLE);
+  // Set little endian data order
+  H5Tset_order(datatype, H5T_ORDER_LE);
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties.
+  hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Write the data to the file.
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &val);
+
+  // Close everything.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+}
+
+void Checkpoint::read(const std::string & name, double & v) const {
+  // Open the dataset.
+  hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
+
+  // Get the data type
+  hid_t datatype  = H5Dget_type(dataset);
+
+  // Get the class info
+  hid_t hclass=H5Tget_class(datatype);
+
+  if(hclass!=H5T_FLOAT) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " is not a floating point value!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
+
+  // Get dataspace
+  hid_t dataspace = H5Dget_space(dataset);
+  // Get type
+  H5S_class_t type = H5Sget_simple_extent_type(dataspace);
+  if(type!=H5S_SCALAR)
+    throw std::runtime_error("Error - dataspace is not of scalar type!\n");
+
+  // Read
+  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
+  
+  // Close dataspace
+  H5Sclose(dataspace);
+  // Close datatype
+  H5Tclose(datatype);
+  // Close dataset
+  H5Dclose(dataset);
+}
+
+
+void Checkpoint::write(const std::string & name, int val) {
+  if(!writemode)
+    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+  
+  // Remove possible existing entry
+  remove(name);
+
+  // Create a dataspace.
+  hid_t dataspace=H5Screate(H5S_SCALAR);
+
+  // Create a datatype.
+  hid_t datatype=H5Tcopy(H5T_NATIVE_INT);
+  // Set little endian data order
+  H5Tset_order(datatype, H5T_ORDER_LE);
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties.
+  hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Write the data to the file.
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &val);
+
+  // Close everything.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+}
+
+void Checkpoint::read(const std::string & name, int & v) const {
+  // Open the dataset.
+  hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
+
+  // Get the data type
+  hid_t datatype  = H5Dget_type(dataset);
+
+  // Get dataspace
+  hid_t dataspace = H5Dget_space(dataset);
+
+  // Get the class info
+  hid_t hclass=H5Tget_class(datatype);
+  if(hclass!=H5T_INTEGER)
+    throw std::runtime_error("Error - datatype is not integer!\n");
+
+  // Get type
+  H5S_class_t type = H5Sget_simple_extent_type(dataspace);
+  if(type!=H5S_SCALAR)
+    throw std::runtime_error("Error - dataspace is not of scalar type!\n");
+
+  // Read
+  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
+  
+  // Close dataspace
+  H5Sclose(dataspace);
+  // Close datatype
+  H5Tclose(datatype);
+  // Close dataset
+  H5Dclose(dataset);
+}
+
+void Checkpoint::write(const std::string & name, bool val) {
+  hbool_t tmp;
+  tmp=val;
+  write(name,tmp);
+}
+
+void Checkpoint::write(const std::string & name, hbool_t val) {
+  if(!writemode)
+    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+
+  // Remove possibly existing entry
+  remove(name);
+
+  // Create a dataspace.
+  hid_t dataspace=H5Screate(H5S_SCALAR);
+
+  // Create a datatype.
+  hid_t datatype=H5Tcopy(H5T_NATIVE_HBOOL);
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties.
+  hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Write the data to the file.
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &val);
+
+  // Close everything.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+}
+
+void Checkpoint::read(const std::string & name, bool & v) const {
+  hbool_t tmp;
+  read(name,tmp);
+  v=tmp;
+}
+
+void Checkpoint::read(const std::string & name, hbool_t & v) const {
+  // Open the dataset.
+  hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
+
+  // Get the data type
+  hid_t datatype  = H5Dget_type(dataset);
+
+  // Get dataspace
+  hid_t dataspace = H5Dget_space(dataset);
+
+  // Get type
+  H5S_class_t type = H5Sget_simple_extent_type(dataspace);
+  if(type!=H5S_SCALAR)
+    throw std::runtime_error("Error - dataspace is not of scalar type!\n");
+
+  // Read
+  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
+  
+  // Close dataspace
+  H5Sclose(dataspace);
+  // Close datatype
+  H5Tclose(datatype);
+  // Close dataset
+  H5Dclose(dataset);
 }

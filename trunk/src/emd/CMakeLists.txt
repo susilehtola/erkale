@@ -10,3 +10,20 @@ if(BUILD_SHARED_LIBS)
 endif()
 
 install (TARGETS liberkale_emd DESTINATION lib${LIB_SUFFIX})
+
+
+# EMD executable
+add_executable (erkale_emd main.cpp)
+set_target_properties(erkale_emd PROPERTIES OUTPUT_NAME "erkale_emd${SUFFIX}")
+
+target_link_libraries(erkale_emd liberkale)
+target_link_libraries(erkale_emd liberkale_emd)
+if(BUILD_SHARED_LIBS)
+else()
+ target_link_libraries(erkale_emd ${GSL_LIBRARIES})
+ target_link_libraries(erkale_emd ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_emd ${HDF5_LIBRARIES})
+ target_link_libraries(erkale_emd ${LIBINT_LIBRARIES})
+endif()
+
+install (TARGETS erkale_emd DESTINATION bin)

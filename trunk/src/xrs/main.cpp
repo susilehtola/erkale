@@ -14,32 +14,6 @@
  * of the License, or (at your option) any later version.
  */
 
-
-/*
- *                This source code is part of
- *
- *                     E  R  K  A  L  E
- *                             -
- *                       HF/DFT from Hel
- *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- */
-
-// Do fractional occupation on alpha spin
-#define FRACOCC
-
-// Mix Fock matrices (otherwise: mix density)
-#define MIXFOCK
-
-// Precision for energy shift: 0.01 eV
-#define ESHIFTTOL 3.675e-4
-
 #include "bfprod.h"
 #include "fourierprod.h"
 
@@ -614,8 +588,11 @@ int main(int argc, char **argv) {
 
   // Parse settings
   Settings set;
-  set.add_bool("XRSInit","Do ground state calculation first?",1);
-  set.add_bool("XRSEnergyCor","Correct for excitation energy",0);
+  set.add_scf_settings();
+  set.add_string("LoadChk","Initialize with ground state calculation from file","");
+  set.add_string("SaveChk","Save results to ","");
+ 
+  set.add_bool("XRSFullhole","Run full core-hole calculation",0);
   set.add_string("XRSAugment","(EXPERIMENTAL) Which atoms to augment with diffuse functions? E.g. 1,3-5,10","");
 
   set.add_string("XRSQval","List or range of Q values to compute","");
@@ -641,14 +618,7 @@ int main(int argc, char **argv) {
 
   // Get used settings
   const bool verbose=set.get_bool("Verbose");
-  const bool enercor=set.get_bool("XRSEnergyCor");
-  bool init=set.get_bool("XRSInit");
-
-  if(enercor && !init) {
-    fprintf(stderr,"Energy correction requested. Turning on ground state calculation.\n");
-    set.set_bool("XRSInit",1);
-    init=1;
-  }
+  const bool fullhole=set.get_bool("XRSFullhole");
 
   // Print out settings
   if(verbose)
@@ -727,49 +697,67 @@ int main(int argc, char **argv) {
   // Index of excited orbital
   size_t xcorb;
 
-  // Ground state
-  rscf_t gsol;
-  // 1st excited state
-  uscf_t esol;
-
   if(!loadok) {
+    Checkpoint chkpt(set.get_string("SaveChk"),true);
+
     // Initialize solver
-    XRSSCF solver(basis,set);
+    XRSSCF solver(basis,set,chkpt);
 
     // Initialize calculation with ground state if necessary
-    if(init) {
-      // Get occupancies
-      std::vector<double> occs=get_restricted_occupancy(set,basis);
-      // Solve ground state
-      solver.RDFT(gsol,occs,init_conv,dft_init);
+    if(stricmp(set.get_string("LoadChk"),"")==0) {
+      // Read checkpoint file
+      Checkpoint load(set.get_string("LoadChk"),false);
 
-      // Copy solution
-      sol.Ca=gsol.C;
-      sol.Cb=gsol.C;
-      sol.Ea=gsol.E;
-      sol.Eb=gsol.E;
+      // Restricted calculation?
+      bool restr;
+      load.read("Restricted",restr);
+
+      // Load basis
+      BasisSet oldbas;
+      load.read(oldbas);
+
+      // Read orbitals
+      if(restr) {
+	arma::mat Cold;
+	arma::vec Eold;
+
+	load.read("C",Cold);
+	load.read("E",Eold);
+
+	// Project
+	basis.projectMOs(oldbas,Eold,Cold,sol.Ea,sol.Ca);
+	sol.Eb=sol.Ea;
+	sol.Cb=sol.Ca;
+      } else {
+        // Load energies and orbitals
+	arma::vec Eaold, Ebold;
+	arma::mat Caold, Cbold;
+        load.read("Ca",Caold);
+        load.read("Ea",Eaold);
+        load.read("Cb",Cbold);
+        load.read("Eb",Ebold);
+	
+        // Project to new basis.
+        basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca);
+        basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
+      }
 
       // Find localized orbital
-      size_t ixc_orb=find_excited_orb(gsol.C,basis,xcatom,basis.Ztot()/2);
+      size_t ixc_orb=find_excited_orb(sol.Ca,basis,xcatom,basis.Ztot()/2);
       // Expand localized orbital
-      lmtrans lmground(gsol.C.submat(0,ixc_orb,gsol.C.n_rows,ixc_orb),basis,basis.get_coords(xcatom));
+      lmtrans lmground(sol.Ca.submat(0,ixc_orb,sol.Ca.n_rows,ixc_orb),basis,basis.get_coords(xcatom));
       // and save it
       lmground.write_prob(0,"ground_orb.dat");
-
-      // Do energy correction?
-      if(enercor) {
-	esol.Ca=gsol.C;
-	esol.Cb=gsol.C;
-	esol.Ea=gsol.E;
-	esol.Eb=gsol.E;
-
-	solver.full_hole(xcatom,esol,conv,dft);
-      }
     }
 
     // Proceed with TPA calculation
-    xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
-    xcorb=solver.half_hole(xcatom,sol,conv,dft);
+    if(fullhole) {
+      xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init);
+      xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init);
+    } else {      
+      xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
+      xcorb=solver.half_hole(xcatom,sol,conv,dft);
+    }
 
     // Save orbitals and energies
     save(sol.Ca,sol.Cb,sol.Ea,sol.Eb,sol.Ha,sol.Hb);
@@ -797,19 +785,6 @@ int main(int argc, char **argv) {
   std::vector<spectrum_t> sp=compute_transitions(basis,sol.Ca,sol.Ea,xcatom,xcorb,nocc);
   // Save spectrum
   save_spectrum(sp);
-
-  double shift=0.0;
-  // Correct energies if necessary
-  if(enercor) {
-    shift=(esol.en.E-gsol.en.E)-sp[0].E;
-    printf("Energy shift is %e.\n",shift);
-
-    // Compute shifted energies
-    std::vector<spectrum_t> sp_cor(sp);
-    for(size_t i=0;i<sp.size();i++)
-      sp_cor[i].E+=shift;
-    save_spectrum(sp_cor,"dipole_cor.dat");
-  }
 
   // Get values of q to compute for
   std::vector<double> qvals=parse_range_double(set.get_string("XRSQval"));
@@ -843,15 +818,6 @@ int main(int argc, char **argv) {
     char fname[80];
     sprintf(fname,"%s-%.2f.dat",spname.c_str(),qvals[i]);
     save_spectrum(qsp[i],fname);
-
-    // and the energy corrected one if necessary
-    if(enercor) {
-      sprintf(fname,"%s_cor-%.2f.dat",spname.c_str(),qvals[i]);
-      std::vector<spectrum_t> tmp(qsp[i]);
-      for(size_t j=0;j<tmp.size();j++)
-        tmp[j].E+=shift;
-      save_spectrum(tmp,fname);
-    }
   }
 
   if(verbose) {

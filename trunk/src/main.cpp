@@ -14,10 +14,10 @@
  * of the License, or (at your option) any later version.
  */
 
-
-
 #include "basislibrary.h"
 #include "basis.h"
+#include "checkpoint.h"
+#include "dftfuncs.h"
 #include "elements.h"
 #include "emd/emd.h"
 #include "find_molecules.h"
@@ -29,8 +29,6 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
-
-#include "dftfuncs.h"
 
 #include <armadillo>
 #include <cstdio>
@@ -58,16 +56,24 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  // Initialize libint
+  init_libint_base();
+
   Timer t;
   t.print_time();
 
   // Parse settings
   Settings set;
+  set.add_scf_settings();
+  set.add_string("SaveChk","File to use as checkpoint","erkale.chk");
+  set.add_string("LoadChk","File to load old results from","");
+  set.add_bool("ForcePol","Force polarized calculation",0);
   set.parse(std::string(argv[1]));
 
-  // Settings used for initialization
-  Settings initset=set;
-
+  // Checkpoint files to load and save
+  std::string loadname=set.get_string("LoadChk");
+  std::string savename=set.get_string("SaveChk");
+  
   // Redirect output?
   std::string logfile=set.get_string("Logfile");
   if(stricmp(logfile,"stdout")!=0) {
@@ -110,39 +116,17 @@ int main(int argc, char **argv) {
   bool hf= (stricmp(set.get_string("Method"),"HF")==0);
   bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
 
-  // Initialize calculation?
-  bool noinit=(stricmp(set.get_string("InitMethod"),"none")==0);
-  noinit = noinit || ( stricmp(set.get_string("InitMethod"),"none-none")==0);
-  bool init=!noinit;
-
-  // Initialize with Hartree-Fock? (Even though there's not much sense in it)
-  bool hfinit= (stricmp(set.get_string("InitMethod"),"HF")==0);
-  // Initialize by divide-and-conquer?
-  bool dncinit= (stricmp(set.get_string("InitMethod"),"DnC")==0);
-  // Initialize with DFT?
-  bool dftinit= (!hfinit && !dncinit);
-
   // Final convergence settings
   convergence_t conv;
-  // Make initialization parameters more relaxed
   conv.deltaEmax=set.get_double("DeltaEmax");
   conv.deltaPmax=set.get_double("DeltaPmax");
   conv.deltaPrms=set.get_double("DeltaPrms");
 
-  // Convergence settings for initialization
-  convergence_t init_conv(conv);
-  // Make initialization parameters more relaxed
-  double initfac=set.get_double("DeltaInit");
-  init_conv.deltaEmax*=initfac;
-  init_conv.deltaPmax*=initfac;
-  init_conv.deltaPrms*=initfac;
-
-
-  if(hfinit) {
-    printf("\nHartree-Fock has been specified for initialization.\n");
-    printf("You might want to initialize with a pure DFT functional instead.\n");
-    printf("\n");
-  }
+  // Initial convergence settings
+  convergence_t initconv(conv);
+  initconv.deltaEmax*=set.get_double("DeltaInit");
+  initconv.deltaPmax*=set.get_double("DeltaInit");
+  initconv.deltaPrms*=set.get_double("DeltaInit");
 
   // Get exchange and correlation functionals
   dft_t dft;
@@ -151,17 +135,8 @@ int main(int argc, char **argv) {
     dft.gridtol=set.get_double("DFTFinalTol");
   }
 
-  if(init && (hf||rohf) && dftinit) {
-    // Need to add DFT settings to initset
-    printf("Adding DFT settings to initset.\n");
-    initset.add_dft_settings();
-  }
-
-  if(init && !hf && !rohf && hfinit) {
-    // Need to remove DFT settings from initset
-    printf("Removing DFT settings from initset.\n");
-    initset.remove_dft_settings();
-  }
+  dft_t initdft(dft);
+  initdft.gridtol=set.get_double("DFTInitialTol");
 
   // Check consistency of parameters
   if(!hf && !rohf && exact_exchange(dft.x_func)!=0.0)
@@ -170,144 +145,57 @@ int main(int argc, char **argv) {
       set.set_bool("DFTFitting",0);
     }
 
-  // Get wanted initialization method
-  dft_t dft_init;
-  if(init && dftinit) {
-    parse_xc_func(dft_init.x_func,dft_init.c_func,set.get_string("InitMethod"));
-    dft_init.gridtol=initset.get_double("DFTInitialTol");
-  } else if(!hf && !rohf && dncinit) {
-    dft_init=dft;
-    dft_init.gridtol=set.get_double("DFTInitialTol");
-  }
+  // Write checkpoint.
+  Checkpoint chkpt(savename,true);
+  chkpt.write(basis);
 
-  if(init && dftinit && exact_exchange(dft_init.x_func)!=0.0)
-    if(initset.get_bool("DFTFitting")) {
-      printf("A hybrid functional is used in initialization, turning off density fitting.\n");
-      initset.set_bool("DFTFitting",0);
-    }
-
-  // Density matrix (for momentum density calculations)
-  arma::mat P;
-
-  if(set.get_int("Multiplicity")==1 && Nel%2==0) {
+  if(set.get_int("Multiplicity")==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
     // Closed shell case
     rscf_t sol;
+
+    // Load starting guess?
+    if(stricmp(loadname,"")!=0) {
+      Checkpoint load(loadname,false);
+
+      // Basis set
+      BasisSet oldbas;
+      load.read(oldbas);
+      
+      // Restricted calculation?
+      bool restr;
+      load.read("Restricted",restr);
+
+      if(restr) {
+	// Load energies and orbitals
+	arma::vec Eold;
+	arma::mat Cold;
+	load.read("C",Cold);
+	load.read("E",Eold);
+
+	// Project to new basis.
+	basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
+      } else {
+	// Load old density matrix
+	arma::vec Pold;
+	load.read("P",Pold);
+	// Find out natural orbitals
+	arma::mat Cold;
+	arma::mat hlp;
+	form_NOs(Pold,oldbas.overlap(),Cold,hlp);
+
+	arma::vec Eold;
+	load.read("Ea",Eold);
+
+	// Project natural orbitals to new basis
+	basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
+      }
+    }	
 
     // Get orbital occupancies
     std::vector<double> occs=get_restricted_occupancy(set,basis);
 
-    if(init) {
-      // Initialize calculation
-
-      if(hfinit) {
-	SCF initsolver(basis,initset);
-
-      	// Solve restricted Hartree-Fock
-	initsolver.RHF(sol,occs,init_conv);
-      }
-
-      if(dncinit) {
-	// Initialize with divide-and-conquer algorithm.
-
-	// Initialize C and E
-	size_t Nbf=basis.get_Nbf();
-	sol.C.zeros(Nbf,Nbf);
-	sol.E.zeros(Nbf);
-
-	// Non-verbose solution.
-	initset.set_bool("Verbose",0);
-
-	// First, find out molecules in input.
-	std::vector< std::vector<size_t> > mols;
-	mols=find_molecules(atoms);
-	if(verbose)
-	  printf("Found %i molecules in system. Performing divide-and-conquer.\n",(int) mols.size());
-
-	size_t iorb=0;
-
-	// Now, solve the states of the molecules.
-	for(size_t imol=0;imol<mols.size();imol++) {
-	  // Timer
-	  Timer tmol;
-
-	  // Get the atoms in the molecule
-	  std::vector<atom_t> molat;
-	  for(size_t iat=0;iat<mols[imol].size();iat++)
-	    molat.push_back(atoms[mols[imol][iat]]);
-
-	  if(verbose) {
-	    printf("Molecule %3i contains the atoms: ",(int) imol+1);
-	    for(size_t iat=0;iat<molat.size();iat++)
-	      printf("%3i ",(int) molat[iat].num+1);
-	    fflush(stdout);
-	  }
-
-	  // Construct a basis set for the molecule.
-	  // Libint was already initialized above.
-	  BasisSet molbas=construct_basis(molat,baslib,initset,1);
-
-	  // Solve states
-	  rscf_t molsol;
-
-	  // Solver
-	  SCF molsolver(molbas,initset);
-
-	  // Make occupancies
-	  std::vector<double> molocc=get_restricted_occupancy(initset,molbas);
-
-	  if(hf) {
-	    // Solve restricted Hartree-Fock
-	    molsolver.RHF(molsol,molocc,init_conv);
-	  } else {
-	    // Solve restricted DFT problem
-	    molsolver.RDFT(molsol,molocc,init_conv,dft_init);
-	  }
-
-	  // Now we should have the occupied states of the
-	  // molecule. However, the basis set was different, so we
-	  // need to project the occupied orbitals onto the full basis
-	  // set.
-	  arma::mat Cfull;
-	  arma::vec Efull;
-	  basis.projectMOs(molbas,molsol.E,molsol.C,Efull,Cfull);
-
-	  // Now we have the orbitals, and the orbital energies, so we
-	  // can just plant them in the initial guess.
-	  for(int i=0;i<sum(molocc)/2;i++) {
-	    // Orbital coefficients
-	    sol.C.col(iorb)=Cfull.col(i);
-	    // Orbital energy
-	    sol.E(iorb)=Efull(i);
-	    // Increment orbital number
-	    iorb++;
-	  }
-	  if(verbose)
-	    printf("done (%s)\n",tmol.elapsed().c_str());
-	}
-
-	// Sort orbitals and energies
-	sort_eigvec(sol.E,sol.C);
-      }
-
-      if(dftinit) {
-	SCF initsolver(basis,initset);
-
-	// Print information about used functionals
-	print_info(dft_init.x_func,dft_init.c_func);
-	// Solve restricted DFT problem
-	initsolver.RDFT(sol,occs,init_conv,dft_init);
-      }
-
-      if(verbose) {
-	printf("\nInitialization complete.\n");
-	t.print_time();
-	printf("\n\n\n");
-      }
-    }
-
     // Solver
-    SCF solver(basis,set);
-
+    SCF solver(basis,set,chkpt);
 
     if(hf) {
       // Solve restricted Hartree-Fock
@@ -315,48 +203,62 @@ int main(int argc, char **argv) {
     } else {
       // Print information about used functionals
       print_info(dft.x_func,dft.c_func);
-      // Solve restricted DFT problem
-      if(!init) {
-	// Starting density was probably bad. Do an initial
-	// calculation first with a low-density grid.
-	solver.RDFT(sol,occs,init_conv,dft);
-      }
+      // Solve restricted DFT problem first on a rough grid
+      solver.RDFT(sol,occs,initconv,initdft);
+      // .. and then on the final grid
       solver.RDFT(sol,occs,conv,dft);
     }
 
-    // Get density matrix
-    P=sol.P;
-
     // Do population analysis
-    population_analysis(basis,P);
+    population_analysis(basis,sol.P);
 
   } else {
     uscf_t sol;
+
+    // Load starting guess?
+    if(stricmp(loadname,"")!=0) {
+      Checkpoint load(loadname,false);
+
+      // Basis set
+      BasisSet oldbas;
+      load.read(oldbas);
+      
+      // Restricted calculation?
+      bool restr;
+      load.read("Restricted",restr);
+
+      if(restr) {
+	// Load energies and orbitals
+	arma::vec Eold;
+	arma::mat Cold;
+	load.read("C",Cold);
+	load.read("E",Eold);
+
+	// Project to new basis.
+	basis.projectMOs(oldbas,Eold,Cold,sol.Ea,sol.Ca);
+	sol.Eb=sol.Ea;
+	sol.Cb=sol.Ca;
+      } else {
+	// Load energies and orbitals
+	arma::vec Eaold, Ebold;
+	arma::mat Caold, Cbold;
+	load.read("Ca",Caold);
+	load.read("Ea",Eaold);
+	load.read("Cb",Cbold);
+	load.read("Eb",Ebold);
+
+	// Project to new basis.
+	basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca);
+	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
+      }
+    }
 
     // Get orbital occupancies
     std::vector<double> occa, occb;
     get_unrestricted_occupancy(set,basis,occa,occb);
 
-    if(init) {
-      // Initialize calculation
-
-      SCF initsolver(basis,initset);
-
-      if(hfinit) {
-	// Solve restricted Hartree-Fock
-	initsolver.UHF(sol,occa,occb,init_conv);
-      } else {
-	// Print information about used functionals
-	print_info(dft_init.x_func,dft_init.c_func);
-	// Solve restricted DFT problem
-	initsolver.UDFT(sol,occa,occb,init_conv,dft_init);
-      }
-
-      printf("\nInitialization complete.\n\n\n\n");
-    }
-
     // Solver
-    SCF solver(basis,set);
+    SCF solver(basis,set,chkpt);
 
     if(hf) {
       // Solve restricted Hartree-Fock
@@ -376,60 +278,14 @@ int main(int argc, char **argv) {
     } else {
       // Print information about used functionals
       print_info(dft.x_func,dft.c_func);
-      // Solve restricted DFT problem
-      if(!init) {
-	// Starting density was probably bad. Do an initial
-	// calculation first with a low-density grid.
-	solver.UDFT(sol,occa,occb,init_conv,dft);
-      }
+      // Solve restricted DFT problem first on a rough grid
+      solver.UDFT(sol,occa,occb,initconv,initdft);
+      // ... and then on the more accurate grid
       solver.UDFT(sol,occa,occb,conv,dft);
     }
 
-    // Get density matrix
-    P=sol.P;
-
     population_analysis(basis,sol.Pa,sol.Pb);
   }
-
-  // Form isotropic momentum density
-  if(set.get_bool("DoEMD")) {
-    t.print_time();
-
-    printf("\nCalculating EMD properties.\n");
-    printf("Please read and cite the reference:\n%s\n%s\n%s\n",\
-   "J. Lehtola, M. Hakala, J. Vaara and K. Hämäläinen",\
-   "Calculation of isotropic Compton profiles with Gaussian basis sets",\
-   "Phys. Chem. Chem. Phys 13 (2011), pp. 5630 - 5641.");
-
-    Timer temd;
-    EMD emd(basis,P);
-    emd.initial_fill();
-    emd.find_electrons();
-    emd.optimize_moments();
-    emd.save("emd.txt");
-    emd.moments("moments.txt");
-    emd.compton_profile("compton.txt","compton-interp.txt");
-
-    if(verbose)
-      printf("Calculating isotropic EMD properties took %s.\n",temd.elapsed().c_str());
-  }
-  // Do EMD on a cube?
-  if(stricmp(set.get_string("EMDCube"),"")!=0) {
-    t.print_time();
-    Timer temd;
-
-    // Form grid in p space.
-    std::vector<double> px, py, pz;
-    parse_cube(set.get_string("EMDCube"),px,py,pz);
-
-    // Calculate EMD on cube
-    emd_cube(basis,P,px,py,pz);
-
-    if(verbose)
-      printf("Calculating EMD on a cube took %s.\n",temd.elapsed().c_str());
-  }
-
-
 
   if(verbose) {
     printf("\nRunning program took %s.\n",t.elapsed().c_str());

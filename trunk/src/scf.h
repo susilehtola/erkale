@@ -23,6 +23,7 @@
 
 #include <armadillo>
 #include <vector>
+#include "checkpoint.h"
 #include "eritable.h"
 #include "eriscreen.h"
 #include "density_fitting.h"
@@ -124,6 +125,8 @@ class SCF {
 
   /// Basis set to use (needed for DFT grid operation)
   const BasisSet * basisp;
+  /// Checkpoint file
+  Checkpoint * chkptp;
 
   /// Basis orthogonalizing matrix
   arma::mat Sinvh;
@@ -183,7 +186,7 @@ class SCF {
 
  public:
   /// Constructor
-  SCF(const BasisSet & basis, const Settings & set);
+  SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt);
   ~SCF();
 
   /// Calculate restricted Hartree-Fock solution
@@ -199,7 +202,12 @@ class SCF {
   void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
 };
 
-/*
+/**
+ * Find natural orbitals from P.
+ */
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO);
+
+/**
  * Make ROHF / CUHF update to (Hartree-)Fock operators Fa and Fb,
  * using total density matrix P and overlap matrix S.
  *

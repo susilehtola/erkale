@@ -41,7 +41,7 @@
 Casida::Casida() {
 }
 
-Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ev, const arma::mat & Cv, const arma::mat & Pv) {
+Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ev, const arma::mat & Cv, const arma::mat & Pv, const std::vector<double> & occs) {
   E.push_back(Ev);
   C.push_back(Cv);
   P.push_back(Pv);
@@ -49,10 +49,15 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   printf("\n*** Warning! The Casida implementation is still experimental. ***\n");
   fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental. ***\n");
 
-  // Parse parameters and form K
-  parse_args(set, basis, Cv.n_cols);
+  // Form pairs
+  std::vector< std::vector<double> > occ;
+  occ.push_back(occs);
+  form_pairs(set,occ);
   printf("Casida calculation has %u pairs.\n",(unsigned int) pairs[0].size());
   fprintf(stderr,"Casida calculation has %u pairs.\n",(unsigned int) pairs[0].size());
+
+  // Parse coupling mode
+  parse_coupling(set);
 
   // Calculate K matrix
   calc_K(set,basis);
@@ -60,7 +65,7 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   solve();
 }
 
-Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb) {
+Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb, const std::vector<double> & occa, const std::vector<double> & occb) {
 
   E.push_back(Ea);
   E.push_back(Eb);
@@ -72,10 +77,16 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   printf("\n*** Warning! The Casida implementation is still experimental. ***\n");
   fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental. ***\n");
 
-  // Parse parameters and form K
-  parse_args(set, basis, Ca.n_cols);
+  // Form pairs
+  std::vector< std::vector<double> > occ;
+  occ.push_back(occa);
+  occ.push_back(occb);
+  form_pairs(set,occ);
   printf("Casida calculation has %u spin up and %u spin down pairs.\n",(unsigned int) pairs[0].size(),(unsigned int) pairs[1].size());
   fprintf(stderr,"Casida calculation has %u spin up and %u spin down pairs.\n",(unsigned int) pairs[0].size(),(unsigned int) pairs[1].size());
+
+  // Parse coupling mode
+  parse_coupling(set);
 
   // Calculate K matrix
   calc_K(set,basis);
@@ -83,10 +94,7 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   solve();
 }
 
-void Casida::parse_args(const Settings & set, const BasisSet & basis, size_t Norbs) {
-  // Form pairs and occupations
-  form_pairs(set,basis,Norbs,C.size()==2); // polarized calculation?
-
+void Casida::parse_coupling(const Settings & set) {
   // Determine coupling
   switch(set.get_int("CasidaCoupling")) {
   case(0):
@@ -111,8 +119,8 @@ void Casida::parse_args(const Settings & set, const BasisSet & basis, size_t Nor
 
 void Casida::calc_K(const Settings & set, const BasisSet & basis) {
   // Exchange and correlation functionals
-  int x_func=set.get_int("CasidaX");
-  int c_func=set.get_int("CasidaC");
+  int x_func=set.get_int("CasidaXfunc");
+  int c_func=set.get_int("CasidaCfunc");
   double tol=set.get_double("CasidaTol");
 
   // Allocate memory
@@ -146,24 +154,32 @@ arma::cx_mat Casida::matrix_transform(bool ispin, const arma::cx_mat & m) const 
   return arma::trans(C[ispin])*m*C[ispin];
 }
 
-void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb, bool pol) {
-  if(pol) {
-    // Polarized calculation. Get number of alpha and beta electrons.
-    int Nel_alpha, Nel_beta;
-    get_Nel_alpha_beta(bas.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+void Casida::form_pairs(const Settings & set, const std::vector< std::vector<double> > occs) {
+  // First, determine amount of occupied and virtual states.
 
-    // Amount of occupied and virtual states is
-    nocc.push_back(Nel_alpha);
-    nvirt.push_back(Norb-nocc[0]);
+  nocc.resize(occs.size());
+  nvirt.resize(occs.size());
 
-    // Amount of occupied and virtual states is
-    nocc.push_back(Nel_beta);
-    nvirt.push_back(Norb-nocc[1]);
-  } else {
-    // Amount of occupied states is
-    nocc.push_back((bas.Ztot()-set.get_int("Charge"))/2);
-    // Amount of virtual states is
-    nvirt.push_back(Norb-nocc[0]);
+  for(size_t ispin=0;ispin<nocc.size();ispin++) {
+    // Count number of occupied states.
+    nocc[ispin]=0;
+    while(occs[ispin][nocc[ispin]]>0)
+      nocc[ispin]++;
+
+    // Check that all values are equal.
+    for(size_t i=0;i<nocc[ispin];i++)
+      if(occs[ispin][i]!=occs[ispin][0]) {
+	ERROR_INFO();
+	throw std::runtime_error("Error - occupancies of occupied orbitals differ!\n");
+      }
+
+    // Count number of unoccupied states.
+    nvirt[ispin]=occs[ispin].size()-nocc[ispin];
+    for(size_t i=nocc[ispin];i<occs[ispin].size();i++)
+      if(occs[ispin][i]!=0.0) {
+	ERROR_INFO();
+	throw std::runtime_error("Gaps in occupancy not allowed!\n");
+      }
   }
 
   // Resize pairs
@@ -185,7 +201,8 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
 	}
     }
 
-    // Form f.
+    // Form f. Polarized calculation?
+    bool pol=(nocc.size() == 2);
     for(size_t ispin=0;ispin<nocc.size();ispin++) {
       f[ispin].zeros(nocc[ispin]+nvirt[ispin]);
       for(size_t iocc=0;iocc<nocc[ispin];iocc++)
@@ -199,10 +216,10 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
       std::vector<size_t> idx=parse_range(states[ispin]);
 
       // Check that we don't run over states
-      if(idx[idx.size()-1]>Norb) {
+      if(idx[idx.size()-1]>nocc[ispin]+nvirt[ispin]) {
 	ERROR_INFO();
 	std::ostringstream oss;
-	oss << "Orbital " << idx[idx.size()-1] << " was requested in calculation, but only " << Norb << " orbitals exist!\n";
+	oss << "Orbital " << idx[idx.size()-1] << " was requested in calculation, but only " << nocc[ispin]+nvirt[ispin] << " orbitals exist!\n";
 	throw std::runtime_error(oss.str());
       }
 
@@ -221,7 +238,8 @@ void Casida::form_pairs(const Settings & set, const BasisSet & bas, size_t Norb,
 	newE(i)=E[ispin](idx[i]);
       E[ispin]=newE;
 
-      // Form f
+      // Form f. Polarized calculation?
+      bool pol=(nocc.size()==2);
       f[ispin].zeros(idx.size());
       for(size_t i=0;i<idx.size();i++)
 	if(idx[i]<nocc[ispin])

@@ -77,21 +77,16 @@ class Settings {
   /// String value settings
   std::vector<stringset_t> sset;
 
-  /// DFT run?
-  bool dft;
-
  public:
   /// Constructor
   Settings();
   /// Destructor
   ~Settings();
 
+  /// Add SCF related settings
+  void add_scf_settings();
   /// Add DFT related settings
   void add_dft_settings();
-  /// Remove DFT related settings
-  void remove_dft_settings();
-  /// Are these settings meant for a DFT run?
-  bool dft_enabled() const;
 
   /// Add a double valued setting
   void add_double(std::string name, std::string comment, double val);
