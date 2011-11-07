@@ -196,12 +196,12 @@ class BasisSet {
   
   /// Add nucleus
   void add_nucleus(const nucleus_t & nuc);
-  /// Add a shell to a nucleus
-  void add_shell(size_t nucind, const GaussianShell & sh);
-  /// Add a shell to a nucleus
-  void add_shell(size_t nucind, int am, const std::vector<contr_t> & C);
-  /// Add all shells to a nucleus
-  void add_shells(size_t nucind, ElementBasisSet el);
+  /// Add a shell to a nucleus and sort functions if wanted
+  void add_shell(size_t nucind, const GaussianShell & sh, bool sort=1);
+  /// Add a shell to a nucleus and sort functions if wanted
+  void add_shell(size_t nucind, int am, const std::vector<contr_t> & C, bool sort=1);
+  /// Add all shells to a nucleus and sort functions if wanted
+  void add_shells(size_t nucind, ElementBasisSet el, bool sort=1);
 
   /// Sort shells in nuclear order, then by angular momentum, then by exponents
   void sort();
