@@ -883,6 +883,8 @@ std::vector<arma::mat> GaussianShell::moment(int am, double x, double y, double 
 
 
 BasisSet::BasisSet() {
+  // Use spherical harmonics by default.
+  uselm=1;
 }
 
 BasisSet::BasisSet(size_t Nat, const Settings & set) {
@@ -891,7 +893,6 @@ BasisSet::BasisSet(size_t Nat, const Settings & set) {
 
   shells.reserve(Nat);
   nuclei.reserve(Nat);
-  libintok=0;
 }
 
 BasisSet::~BasisSet() {
@@ -1066,7 +1067,7 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   return shellpairs;
 }
 
-void BasisSet::finalize(bool convert, bool libintok) {
+void BasisSet::finalize(bool convert) {
   // Finalize basis set structure for use.
 
   // Compute nuclear distances.
@@ -1080,12 +1081,6 @@ void BasisSet::finalize(bool convert, bool libintok) {
     convert_contractions();
   // Normalize contractions
   normalize();
-
-  // Initialize libint if necessary
-  if(libintok)
-    set_libint_ok();
-  else
-    libint_init();
 
   // Form list of unique shell pairs
   form_unique_shellpairs();
@@ -1294,7 +1289,7 @@ void BasisSet::coulomb_normalize() {
     shells[i].coulomb_normalize();
 }
 
-void BasisSet::print() const {
+void BasisSet::print(bool verbose) const {
   printf("There are %i shells and %i nuclei in the basis set.\n\n",(int) shells.size(),(int) nuclei.size());
 
   printf("List of nuclei, geometry in Ångström with three decimal places:\n");
@@ -1308,24 +1303,24 @@ void BasisSet::print() const {
   }
   printf("\nList of basis functions:\n");
 
-  /*
-  for(size_t i=0;i<shells.size();i++) {
-    printf("Shell %4i",(int) i);
-    shells[i].print();
-  }
-  */
-
-  for(size_t i=0;i<shells.size();i++) {
-    // Type of shell - spherical harmonics or cartesians
-    std::string type;
-    if(shells[i].lm_in_use())
-      type="sph";
-    else
-      type="cart";
-
-
-    printf("Shell %4i",(int) i+1);
-    printf("\t%c %4s shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) (shells[i].get_center_ind()+1),(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
+  if(verbose) {
+    for(size_t i=0;i<shells.size();i++) {
+      printf("Shell %4i",(int) i);
+      shells[i].print();
+    }
+  } else {
+    for(size_t i=0;i<shells.size();i++) {
+      // Type of shell - spherical harmonics or cartesians
+      std::string type;
+      if(shells[i].lm_in_use())
+	type="sph";
+      else
+	type="cart";
+      
+      
+      printf("Shell %4i",(int) i+1);
+      printf("\t%c %4s shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) (shells[i].get_center_ind()+1),(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
+    }
   }
 
 
@@ -1611,17 +1606,6 @@ double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks,
   eri*=shells[is].cart[ii].relnorm*shells[js].cart[jj].relnorm*shells[ks].cart[kk].relnorm*shells[ls].cart[ll].relnorm;
 
   return eri;
-}
-
-void BasisSet::libint_init() {
-  if(!libintok) {
-    libintok=1;
-    init_libint_base();
-  }
-}
-
-void BasisSet::set_libint_ok() {
-  libintok=1;
 }
 
 std::vector<double> BasisSet::ERI_cart(size_t is, size_t js, size_t ks, size_t ls) const {
@@ -2343,6 +2327,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
   // containing H to Kr", J. Chem. Phys. 127 (2007), 074102
 
   Settings set;
+  set.add_scf_settings();
   set.add_dft_settings();
   // Density fitting basis set
   BasisSet dfit(1,set);
@@ -2638,7 +2623,7 @@ std::vector<size_t> i_idx(size_t N) {
   return ret;
 }
 
-BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set, bool libintok) {
+BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set) {
   // Number of atoms is
   size_t Nat=atoms.size();
 
@@ -2686,7 +2671,7 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
   }
 
   // Finalize basis set
-  basis.finalize(1,libintok);
+  basis.finalize(1);
 
   return basis;
 }

@@ -33,7 +33,7 @@
 #define ROUGHTOL 1e-8
 
 
-XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set) : SCF(basis,set) {
+XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) : SCF(basis,set,chkpt) {
 }
 
 XRSSCF::~XRSSCF() {

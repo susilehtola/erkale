@@ -24,7 +24,7 @@
 
 class XRSSCF : public SCF {
  public:
-  XRSSCF(const BasisSet & basis, const Settings & set);
+  XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt);
   ~XRSSCF();
 
   size_t full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;

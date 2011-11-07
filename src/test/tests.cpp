@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "checkpoint.h"
 #include "basislibrary.h"
 #include "global.h"
 #include "mathf.h"
@@ -155,7 +156,8 @@ void rhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
   std::vector<double> occs=get_restricted_occupancy(set,bas);
   // Solve SCF equations
   rscf_t sol;
-  SCF solver=SCF(bas,set);
+  Checkpoint chkpt("test.chk",1);
+  SCF solver=SCF(bas,set,chkpt);
   solver.RHF(sol,occs,final_conv);
   // Compute dipole moment
   double dip=dip_mom(sol.P,bas);
@@ -212,7 +214,8 @@ void uhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
   get_unrestricted_occupancy(set,bas,occa,occb);
   // Solve SCF equations
   uscf_t sol;
-  SCF solver=SCF(bas,set);
+  Checkpoint chkpt("test.chk",1);
+  SCF solver=SCF(bas,set,chkpt);
   solver.UHF(sol,occa,occb,final_conv);
   // Compute dipole moment
   double dip=dip_mom(sol.P,bas);
@@ -277,7 +280,8 @@ void rohf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
   get_Nel_alpha_beta(bas.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
   // Solve SCF equations
   uscf_t sol;
-  SCF solver=SCF(bas,set);
+  Checkpoint chkpt("test.chk",1);
+  SCF solver=SCF(bas,set,chkpt);
   solver.ROHF(sol,Nel_alpha,Nel_beta,final_conv);
   // Compute dipole moment
   double dip=dip_mom(sol.P,bas);
@@ -342,7 +346,8 @@ void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
   std::vector<double> occs=get_restricted_occupancy(set,bas);
   // Solve SCF equations
   rscf_t sol;
-  SCF solver=SCF(bas,set);
+  Checkpoint chkpt("test.chk",1);
+  SCF solver=SCF(bas,set,chkpt);
 
   // Final dft settings
   dft_t dft_f;
@@ -421,7 +426,8 @@ void udft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
   get_unrestricted_occupancy(set,bas,occa,occb);
   // Solve SCF equations
   uscf_t sol;
-  SCF solver=SCF(bas,set);
+  Checkpoint chkpt("test.chk",1);
+  SCF solver=SCF(bas,set,chkpt);
   solver.UDFT(sol,occa,occb,init_conv,dft_i);
   solver.UDFT(sol,occa,occb,final_conv,dft_f);
   // Compute dipole moment

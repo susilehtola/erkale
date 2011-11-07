@@ -140,7 +140,7 @@ class Casida {
   double fe(states_pair_t ip, bool ispin) const;
 
   /// Form pairs and occupations
-  void form_pairs(const Settings & set, const BasisSet & bas, size_t Norb, bool pol);
+  void form_pairs(const Settings & set, const std::vector< std::vector<double> > occs);
 
   /// Transform given AO matrix to MO
   arma::mat matrix_transform(bool ispin, const arma::mat & m) const;
@@ -149,7 +149,7 @@ class Casida {
   
 
   /// Common routines for constructors
-  void parse_args(const Settings & set, const BasisSet & basis, size_t Norbs);
+  void parse_coupling(const Settings & set);
 
   /// Construct the K matrices
   void calc_K(const Settings & set, const BasisSet & bas);
@@ -169,9 +169,9 @@ class Casida {
   /// Dummy constructor
   Casida();
   /// Constructor for spin-unpolarized calculation
-  Casida(const Settings & set, const BasisSet & basis, const arma::vec & E, const arma::mat & C, const arma::mat & P);
+  Casida(const Settings & set, const BasisSet & basis, const arma::vec & E, const arma::mat & C, const arma::mat & P, const std::vector<double> & occs);
   /// Constructor for spin-polarized calculation
-  Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb);
+  Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb, const std::vector<double> & occa, const std::vector<double> & occb);
   /// Destructor
   ~Casida();
 

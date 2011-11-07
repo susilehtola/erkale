@@ -44,11 +44,12 @@
 // matrices separately?
 #define MIX_SUMDIFF
 
-SCF::SCF(const BasisSet & basis, const Settings & set) {
+SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Amount of basis functions
   Nbf=basis.get_Nbf();
   
   basisp=&basis;
+  chkptp=&chkpt;
 
   // Multiplicity
   mult=set.get_int("Multiplicity");
@@ -85,14 +86,14 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
   // Nuclear repulsion
   Enuc=basis.Enuc();
 
-  if(set.dft_enabled()) {
+  try {
     // Use density fitting?
     densityfit=set.get_bool("DFTFitting");
     // Use Lobatto angular grid? (Lebedev is default)
     dft_lobatto=set.get_bool("DFTLobatto");
     // Direct DFT calculation?
     dft_direct=set.get_bool("DFTDirect");
-  } else {
+  } catch(...) {
     // Hartree-Fock
     densityfit=0;
   }
@@ -208,12 +209,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set) {
 SCF::~SCF() {
 }
 
-void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta) {
-  /*
-   * T. Tsuchimochi and G. E. Scuseria, "Constrained active space
-   * unrestricted mean-field methods for controlling
-   * spin-contamination", J. Chem. Phys. 134, 064101 (2011).
-   */
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO) {
 
   // First, get eigenvectors and eigenvalues of S so that we can go to
   // an orthonormal basis.
@@ -231,13 +227,6 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   // the tail.
   Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
   Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
-
-  // Amount of core orbitals is
-  const size_t Nc=std::min(Nel_alpha,Nel_beta);
-  // Amount of active space orbitals is
-  const size_t Na=std::max(Nel_alpha,Nel_beta)-Nc;
-  // Amount of virtual orbitals (in NO space) is
-  const size_t Nv=Nind-Na-Nc;
 
   /* Transformation to get matrix M in orthonormal basis is 
      M_ij = <i|M_AO|j> \sqrt{l_i l_j},
@@ -258,7 +247,7 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   }
 
   // P in orthonormal basis is
-  arma::mat P_orth=arma::trans(Sm)*P_AO*Sm;
+  arma::mat P_orth=arma::trans(Sm)*P*Sm;
 
   // Diagonalize P to get NOs in orthonormal basis.
   arma::vec Pval;
@@ -273,9 +262,21 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   */
 
   // The matrix that takes us from AO to NO is
-  arma::mat AO_to_NO=Sd*Pvec;
+  AO_to_NO=Sd*Pvec;
   // and the one that takes us from NO to AO is
-  arma::mat NO_to_AO=arma::trans(Sm*Pvec);
+  NO_to_AO=arma::trans(Sm*Pvec);
+}
+
+void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta) {
+  /*
+   * T. Tsuchimochi and G. E. Scuseria, "Constrained active space
+   * unrestricted mean-field methods for controlling
+   * spin-contamination", J. Chem. Phys. 134, 064101 (2011).
+   */
+
+  arma::mat AO_to_NO;
+  arma::mat NO_to_AO;
+  form_NOs(P_AO,S,AO_to_NO,NO_to_AO);
 
   /*
   double tot=0.0;
@@ -300,6 +301,15 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
 
   // and take it to the NO basis.
   arma::mat Delta_NO=arma::trans(AO_to_NO)*Delta_AO*AO_to_NO;
+
+  // Amount of independent orbitals is
+  const size_t Nind=AO_to_NO.n_cols;
+  // Amount of core orbitals is
+  const size_t Nc=std::min(Nel_alpha,Nel_beta);
+  // Amount of active space orbitals is
+  const size_t Na=std::max(Nel_alpha,Nel_beta)-Nc;
+  // Amount of virtual orbitals (in NO space) is
+  const size_t Nv=Nind-Na-Nc;
 
   // Form lambda by flipping the signs of the cv and vc blocks and
   // zeroing out everything else.
@@ -412,6 +422,11 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
     // Parse occupancies
     for(size_t i=0;i<occvals.size();i++)
       ret[i]=readdouble(occvals[i]);
+
+    printf("Occupancies\n");
+    for(size_t i=0;i<ret.size();i++)
+      printf("%.2f ",ret[i]);
+    printf("\n");
   } else {
     // Aufbau principle.
     int Nel=basis.Ztot()-set.get_int("Charge");
@@ -443,11 +458,19 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     occa.resize(occvals.size()/2);
     occb.resize(occvals.size()/2);
     // Parse occupancies
-    for(size_t i=0;i<occvals.size();i++) {
+    for(size_t i=0;i<occvals.size()/2;i++) {
       occa[i]=readdouble(occvals[2*i]);
       occb[i]=readdouble(occvals[2*i+1]);
-    } 
+    }
 
+    printf("Occupancies\n");
+    printf("alpha\t");
+    for(size_t i=0;i<occa.size();i++)
+      printf("%.2f ",occa[i]);
+    printf("\nbeta\t");
+    for(size_t i=0;i<occb.size();i++)
+      printf("%.2f ",occb[i]);
+    printf("\n");
   } else {
     // Aufbau principle. Get amount of alpha and beta electrons.
 

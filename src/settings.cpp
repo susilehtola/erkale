@@ -27,7 +27,13 @@
 
 Settings::Settings() {
   // Set default Settings
+}
 
+
+Settings::~Settings() {
+}
+
+void Settings::add_scf_settings() {
   // Dummy functional: this will be set to HF or a X-C combination
   sset.push_back(gens("Method", "Method used in calculation (HF or a DFT functional)", "Dummy"));
 
@@ -93,27 +99,9 @@ Settings::Settings() {
 
   // Maximum iterations
   iset.push_back(geni("MaxIter", "Maximum number of iterations in SCF cycle", 100));
-
-  // Calculate EMD properties?
-  bset.push_back(genb("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", 0));
-  // Calculate EMD on a cube?
-  sset.push_back(gens("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", ""));
-
-  // How to initialize calculation
-  sset.push_back(gens("InitMethod","Method of initializing calculation","none"));
-
-  // No DFT settings by default.
-  dft=0;
-}
-
-
-Settings::~Settings() {
 }
 
 void Settings::add_dft_settings() {
-  // DFT settings
-  dft=1;
-
   // Store full DFT grid in memory?
   bset.push_back(genb("DFTDirect", "Save memory by not storing values of basis functions in memory", 0));
   // Store full DFT grid in memory?
@@ -125,27 +113,6 @@ void Settings::add_dft_settings() {
   
   // Use density fitting if possible?
   bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
-}
-
-void Settings::remove_dft_settings() {
-  dft=0;
-
-  // Remove all settings that contain DFT in the keyword
-  for(size_t i=dset.size()-1;i<dset.size();i--)
-    if(dset[i].name.find("DFT")!=std::string::npos)
-      dset.erase(dset.begin()+i);
-
-  for(size_t i=bset.size()-1;i<bset.size();i--)
-    if(bset[i].name.find("DFT")!=std::string::npos)
-      bset.erase(bset.begin()+i);
-
-  for(size_t i=iset.size()-1;i<iset.size();i--)
-    if(iset[i].name.find("DFT")!=std::string::npos)
-      iset.erase(iset.begin()+i);
-
-  for(size_t i=sset.size()-1;i<sset.size();i--)
-    if(sset[i].name.find("DFT")!=std::string::npos)
-      sset.erase(sset.begin()+i);
 }
   
 void Settings::add_double(std::string name, std::string comment, double val) {
@@ -287,10 +254,6 @@ std::string Settings::get_string(std::string name) const {
   throw std::runtime_error(oss.str());
 
   return "";
-}
-
-bool Settings::dft_enabled() const {
-  return dft;
 }
 
 size_t Settings::is_double(std::string name) const {

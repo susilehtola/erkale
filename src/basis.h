@@ -165,9 +165,6 @@ class BasisSet {
   /// Ranges of shells
   std::vector<double> shell_ranges;
 
-  /// Libint initialized?
-  bool libintok;
-
  public:
   /// Dummy constructor
   BasisSet();
@@ -231,13 +228,8 @@ class BasisSet {
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
 
-  /// Initialize libint
-  void libint_init();
-  /// Libint has already been initialized elsewhere
-  void set_libint_ok();
-
   /// Do all of the above
-  void finalize(bool convert=0, bool libintok=0);
+  void finalize(bool convert=0);
 
   /// Get distance of nuclei
   double nuclear_distance(size_t i, size_t j) const;
@@ -328,7 +320,7 @@ class BasisSet {
   arma::vec eval_lapl(size_t ish, double x, double y, double z) const;
 
   /// Print out basis set
-  void print() const;
+  void print(bool verbose=0) const;
 
   /// Calculate transformation matrix from cartesians to spherical harmonics
   arma::mat cart_to_sph_trans() const;
@@ -541,7 +533,7 @@ size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_
 std::vector<size_t> i_idx(size_t N);
 
 /// Construct basis set from input
-BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set, bool libintok=0);
+BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set);
 
 
 /// Compute values of orbitals at given point
