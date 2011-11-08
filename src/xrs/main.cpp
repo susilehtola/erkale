@@ -19,8 +19,10 @@
 
 #include "basis.h"
 #include "basislibrary.h"
+#include "dftgrid.h"
 #include "dftfuncs.h"
 #include "elements.h"
+#include "density_fitting.h"
 #include "linalg.h"
 #include "lmgrid.h"
 #include "lmtrans.h"
@@ -55,17 +57,8 @@ bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
 }
 
 
-
 /// Use converged SCF potential Ha to solve orbitals in augmented basis.
-void augmented_solution(const BasisSet & basis, const Settings & set, const arma::mat & H, arma::mat & C, arma::vec & E, size_t xcatom, size_t & ixc_orb, size_t nocc) {
-  /*
-   * FIXME
-   * TODO: this needs to be done using a singular-value decomposition.
-   */
-  fprintf(stderr,"The double basis set method is not yet implemented.\n");
-  return;
-
-
+void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t xcatom, size_t & ixc_orb, size_t nocca, size_t noccb, const dft_t & dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin) {
   // Get indices of atoms to augment
   std::vector<size_t> augind=parse_range(splitline(set.get_string("XRSAugment"))[0]);
   // Convert to C++ indexing
@@ -76,9 +69,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const arma
   }
 
   // Form augmented basis
-  BasisSet augbas(basis);
-
-  printf("\n\nAugmenting\n");
+  augbas=basis;
 
   // Loop over excited atoms
   for(size_t iaug=0;iaug<augind.size();iaug++) {
@@ -114,138 +105,219 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const arma
     for(size_t iexp=0;iexp<exps.size();iexp++) {
       C[0].z=exps[iexp];
       for(int am=0;am<=2;am++)
-	augbas.add_shell(ind,am,C);
+	augbas.add_shell(ind,am,C,false);
     }
   }
-
-  augbas.sort();
 
   // Finalize augmentation basis
   augbas.finalize();
 
-  // Amount of independent functions in augmented basis set is
-  const size_t Naug=augbas.get_Nbf();
-  printf("Original basis had %i functions, augmented basis has %i.\n",(int) basis.get_Nbf(),(int) augbas.get_Nbf());
+  // Amount of functions in original basis set is
+  const size_t Nbf=basis.get_Nbf();
+  // Total number of functions in augmented set is
+  const size_t Ntot=augbas.get_Nbf();
+  // Amount of augmentation functions is
+  const size_t Naug=Ntot-Nbf;
 
-  // Overlap matrix in original basis
-  arma::mat ss=basis.overlap();
-  // Overlap matrix between normal and augmented basis
-  arma::mat Ss=augbas.overlap(basis);
+  printf("\nAugmented original basis (%i functions) with %i diffuse functions.\n",(int) Nbf,(int) Naug);
+
+  Timer taug;
+  
   // Overlap matrix in augmented basis
-  arma::mat SS=augbas.overlap();
-
-  arma::vec sval;
-  arma::mat svec;
-  eig_sym_ordered(sval,svec,ss);
-  arma::mat sinv(ss);
-  sinv.zeros();
-  for(size_t i=0;i<sval.n_elem;i++)
-    sinv+=svec.col(i)*arma::trans(svec.col(i))/sval(i);
-  arma::mat ssinv=ss*sinv;
-  for(size_t i=0;i<ssinv.n_rows;i++)
-    for(size_t j=0;j<ssinv.n_cols;j++)
-      if(i!=j) {
-        if(fabs(ssinv(i,j))>=1e-12)
-          printf("ssinv(%i,%i)=%e\n",(int) i,(int) j,ssinv(i,j));
-      } else if(fabs(ssinv(i,j)-1.0)>=1e-9)
-        printf("ssinv(%i,%i)=%e\n",(int) i,(int) j,ssinv(i,j));
-
-  // Do eigendecomposition of S
+  arma::mat S=augbas.overlap();
   arma::vec Sval;
   arma::mat Svec;
-  eig_sym_ordered(Sval,Svec,SS);
+  eig_sym_ordered(Sval,Svec,S);
+
   printf("Condition number of overlap matrix is %e.\n",Sval(0)/Sval(Sval.n_elem-1));
 
-  // Count the number of linearly independent functions
+  printf("Diagonalization of basis took %s.\n",taug.elapsed().c_str());
+  taug.set();
+
+  // Count number of independent functions
   size_t Nind=0;
-  for(size_t i=0;i<Naug;i++)
+  for(size_t i=0;i<Ntot;i++)
     if(Sval(i)>=1e-5)
       Nind++;
-  // ... and get rid of the linearly dependent ones. The eigenvalues
-  // and vectors are in the order of increasing eigenvalue, so we want
-  // the tail.
+
+  printf("Augmented basis has %i linearly independent and %i dependent functions.\n",(int) Nind,(int) (Ntot-Nind));
+
+  // Drop linearly dependent ones.
   Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
   Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
 
-  // Form inverse matrix
-  arma::mat Sinv(Naug,Naug);
-  Sinv.zeros();
-  for(size_t i=0;i<Sval.n_elem;i++)
-    Sinv+=Svec.col(i)*arma::trans(Svec.col(i))/Sval(i);
+  // Form the matrix which takes from the AO basis to an orthonormal basis.
+  arma::mat AOtoO(Ntot,Nind);
+  AOtoO.zeros();
 
-  printf("Augmented basis has %i linearly independent and %i dependent functions.\n",(int) Nind,(int) (Naug-Nind));
-
-  // Amount of orbitals is
-  const size_t Norb=C.n_cols;
-
-  // Project SCF orbitals to orthogonal augmented basis
-  arma::mat Caug(Naug,Nind);
-  Caug.submat(0,0,Naug-1,Norb-1)=Sinv*Ss*C;
-  // Initialize the rest of the orbitals
-  Caug.submat(0,Norb,Naug-1,Nind-1).ones();
-
-
-  // Test inverse matrix
-  arma::mat SSinv=SS*Sinv;
-  for(size_t i=0;i<SSinv.n_rows;i++)
-    for(size_t j=0;j<SSinv.n_cols;j++)
-      if(i!=j) {
-	if(fabs(SSinv(i,j))>=1e-9)
-	  printf("SSinv(%i,%i)=%e\n",(int) i,(int) j,SSinv(i,j));
-      } else
-	if(fabs(SSinv(i,j)-1.0)>=1e-9)
-	  printf("SSinv(%i,%i)=%e\n",(int) i,(int) j,SSinv(i,j));
-
-
-  /*
-  // Form scaled vectors
-  arma::mat Sm(Svec);
-  arma::mat Sd(Svec);
-  for(size_t i=0;i<Sval.n_elem;i++) {
-    double ss=sqrt(Sval(i));
-    Sm.col(i)*=ss;
-    Sd.col(i)/=ss;
-  }
-  */
-
-  /* Transform orbital coefficients to augmented basis */
-
-  // Form the rest of the orbitals with Gram-Schmidt method
-  for(size_t io=0;io<Nind;io++) {
-    // Compute product with S
-    arma::vec tmp=SS*Caug.col(io);
-
-    // Orthogonalize with respect to all preceding orbitals.
-    for(size_t jo=0;jo<io;jo++)
-      Caug.col(io)-=arma::dot(tmp,Caug.col(jo))*Caug.col(jo);
-
-    // Compute norm
-    double norm=arma::as_scalar(arma::trans(C.col(io))*SS*C.col(io));
-    printf("Orbital %i norm %e.\n",(int) io,norm);
-
-    // and normalize.
-    Caug.col(io)/=sqrt(norm);
+  // The first nocc vectors are simply the occupied states.
+  size_t nocc;
+  if(!spin) {
+    nocc=nocca;
+    AOtoO.submat(0,0,Nbf-1,nocc-1)=sol.Ca.submat(0,0,Nbf-1,nocc-1);
+  } else {
+    nocc=noccb;
+    AOtoO.submat(0,0,Nbf-1,nocc-1)=sol.Cb.submat(0,0,Nbf-1,nocc-1);
   }
 
-  // Check orthonormality
-  arma::mat Saugorb=arma::trans(Caug)*SS*Caug;
+  // Do a Gram-Schmidt orthogonalization to find the rest of the
+  // orthonormal vectors. But first we need to drop the eigenvectors
+  // of S with the largest projection to the occupied orbitals, in
+  // order to avoid linear dependency problems with the Gram-Schmidt
+  // method.
+
+  // Indices to keep in the treatment
+  std::vector<size_t> keepidx;
   for(size_t i=0;i<Nind;i++)
-    for(size_t j=0;j<Nind;j++)
-      if(i!=j) {
-	if(fabs(Saugorb(i,j))>=1e-14)
-	  printf("Saugorb(%i,%i)=%e\n",(int) i,(int) j,Saugorb(i,j));
-      } else if(fabs(Saugorb(i,j)-1.0)>=1e-9)
-	printf("Saugorb(%i,%i)=%e\n",(int) i,(int) j,Saugorb(i,j));
+    keepidx.push_back(i);
+  
+  // Drop the nocc largest eigenvalues
+  for(size_t j=0;j<nocc;j++) {
+    // Find maximum overlap
+    double maxovl=0.0;
+    size_t maxind=-1;
+
+    // Helper vector
+    arma::vec hlp=S*AOtoO.col(j);
+    
+    for(size_t ii=0;ii<keepidx.size();ii++) {
+      // Index of eigenvector is
+      size_t i=keepidx[ii];
+      // Compute projection
+      double ovl=fabs(arma::dot(Svec.col(i),hlp))/sqrt(Sval(i));
+      // Check if it has the maximal value
+      if(fabs(ovl>maxovl)) {
+	maxovl=ovl;
+	maxind=ii;
+      }
+    }
+    
+    // Delete the index
+    printf("Deleted function %i with overlap %e.\n",(int) keepidx[maxind],maxovl);
+    keepidx.erase(keepidx.begin()+maxind);
+  }
+  
+  // Fill in the rest of the vectors
+  for(size_t i=0;i<keepidx.size();i++) {
+    // The index of the vector to use is
+    size_t ind=keepidx[i];
+    // Normalize it, too
+    AOtoO.col(nocc+i)=Svec.col(ind)/sqrt(Sval(ind));
+  }
+
+  // Run the orthonormalization of the set
+  for(size_t i=0;i<Nind;i++) {
+    double norm=arma::as_scalar(arma::trans(AOtoO.col(i))*S*AOtoO.col(i));
+    // printf("Initial norm of vector %i is %e.\n",(int) i,norm);
+    
+    // Remove projections of already orthonormalized set
+    for(size_t j=0;j<i;j++) {
+      double proj=arma::as_scalar(arma::trans(AOtoO.col(j))*S*AOtoO.col(i));
+
+      //    printf("%i - %i was %e\n",(int) i, (int) j, proj);
+      AOtoO.col(i)-=proj*AOtoO.col(j);
+    }
+    
+    norm=arma::as_scalar(arma::trans(AOtoO.col(i))*S*AOtoO.col(i));
+    // printf("Norm of vector %i is %e.\n",(int) i,norm);
+    
+    // and normalize
+    AOtoO.col(i)/=sqrt(norm);
+  }
 
   /*
-  // Estimate energies of the orbitals.
-  arma::vec Evals=arma::trans(Caug)*Haug*Caug;
-  for(size_t i=0;i<Caug.n_cols;i++)
-    printf("Orbital %i: energy % .10e\testimated % .10e\n",(int) i+1,Eaug(i),Evals(i,i));
-
-  // Find excited orbital
-  //  ixc_orb=find_excited_orb(C,basis,xcatom,nocc);
+  arma::mat ovl=arma::trans(AOtoO)*S*AOtoO;
+  printf("MO overlap\n");
+  ovl.print();
   */
+
+
+  // Form density matrix.
+  arma::mat Paaug(Ntot,Ntot), Pbaug(Ntot,Ntot), Paug(Ntot,Ntot);
+
+  Paaug.zeros();
+  Paaug.submat(0,0,Nbf-1,Nbf-1)=sol.Pa;
+
+  Pbaug.zeros();
+  Pbaug.submat(0,0,Nbf-1,Nbf-1)=sol.Pb;
+
+  Paug=Paaug+Pbaug;
+
+  // Form Fock matrix.
+  taug.set();
+  arma::mat T=augbas.kinetic();
+  arma::mat V=augbas.nuclear();
+  printf("Hcore formed in %s.\n",taug.elapsed().c_str());
+
+  // Coulomb matrix
+  taug.set();
+  arma::mat J(Ntot,Ntot);
+  J.zeros();
+  {
+    // We use the original basis' density fitting basis, since it's
+    // enough to represent the density.
+    BasisSet dfitbas=basis.density_fitting();
+    DensityFit dfit;
+    // We do the formation directly.
+    dfit.fill(augbas,dfitbas,true);
+    J=dfit.calc_J(Paug);
+  }
+  printf("J formed in %s.\n",taug.elapsed().c_str());
+
+
+  // DFT grid
+  taug.set();
+  arma::mat XCa(Ntot,Ntot), XCb(Ntot,Ntot);
+  XCa.zeros();
+  XCb.zeros();
+  {
+    double Exc, Nelnum;
+    DFTGrid grid(&augbas,true,true,false);
+    grid.construct(Paaug,Pbaug,dft.gridtol,dft.x_func,dft.c_func);
+    printf("XC grid constructed in %s.\n",taug.elapsed().c_str());
+    taug.set();
+    grid.eval_Fxc(dft.x_func,dft.c_func,Paaug,Pbaug,XCa,XCb,Exc,Nelnum);
+  }
+  printf("XC evaluated in %s.\n",taug.elapsed().c_str());
+
+  // Form Fock operator  
+  arma::mat H;
+  if(!spin)
+    H=T+V+J+XCa;
+  else
+    H=T+V+J+XCb;
+
+  // Amount of virtual orbitals
+  //size_t Nvirt=Nind-nocc;
+
+  // Convert Fock operator to unoccupied MO basis.
+  taug.set();
+  arma::mat H_MO=arma::trans(AOtoO.submat(0,nocc,Ntot-1,Nind-1))*H*AOtoO.submat(0,nocc,Ntot-1,Nind-1);
+  printf("H_MO formed in %s.\n",taug.elapsed().c_str());
+  
+  // Diagonalize Fockian to find orbitals and energies
+  taug.set();
+  arma::vec Eval;
+  arma::mat Evec;
+  eig_sym_ordered(Eval,Evec,H_MO);
+  printf("H_MO diagonalized in unoccupied space in %s.\n",taug.elapsed().c_str());
+  
+  // Store energies
+  Eaug.zeros(Nind);
+  // Occupied orbitals
+  if(!spin)
+    Eaug.subvec(0,nocc-1)=sol.Ea.subvec(0,nocc-1);
+  else
+    Eaug.subvec(0,nocc-1)=sol.Eb.subvec(0,nocc-1);
+  // Virtuals
+  Eaug.subvec(nocc,Nind-1)=Eval;
+
+  // Back-transform orbitals to AO basis
+  Caug.zeros(Ntot,Nind);
+  // Occupied orbitals, padded with zeros
+  Caug.submat(0,0,Nbf-1,nocc-1)=AOtoO.submat(0,0,Nbf-1,nocc-1);
+  // Unoccupied orbitals
+  Caug.submat(0,nocc,Ntot-1,Nind-1)=AOtoO.submat(0,nocc,Ntot-1,Nind-1)*Evec;
 }
 
 typedef struct {
@@ -547,24 +619,28 @@ void save_spectrum(const std::vector<spectrum_t> & sp, const char *fname="dipole
   fclose(out);
 }
 
-bool load(arma::mat & Ca, arma::mat & Cb, arma::vec & Ea, arma::vec & Eb, arma::mat & Ha, arma::mat & Hb) {
-  bool caok=Ca.quiet_load(".erkale_Ca",arma::arma_binary);
-  bool cbok=Cb.quiet_load(".erkale_Cb",arma::arma_binary);
-  bool Eaok=Ea.quiet_load(".erkale_Ea",arma::arma_binary);
-  bool Ebok=Eb.quiet_load(".erkale_Eb",arma::arma_binary);
-  bool Haok=Ha.quiet_load(".erkale_Ha",arma::arma_binary);
-  bool Hbok=Hb.quiet_load(".erkale_Hb",arma::arma_binary);
+bool load(uscf_t & sol) {
+  bool caok=sol.Ca.quiet_load(".erkale_Ca",arma::arma_binary);
+  bool cbok=sol.Cb.quiet_load(".erkale_Cb",arma::arma_binary);
+  bool Eaok=sol.Ea.quiet_load(".erkale_Ea",arma::arma_binary);
+  bool Ebok=sol.Eb.quiet_load(".erkale_Eb",arma::arma_binary);
+  bool Haok=sol.Ha.quiet_load(".erkale_Ha",arma::arma_binary);
+  bool Hbok=sol.Hb.quiet_load(".erkale_Hb",arma::arma_binary);
+  bool Paok=sol.Pa.quiet_load(".erkale_Pa",arma::arma_binary);
+  bool Pbok=sol.Pb.quiet_load(".erkale_Pb",arma::arma_binary);
 
-  return caok && cbok && Eaok && Ebok && Haok && Hbok;
+  return caok && cbok && Eaok && Ebok && Haok && Hbok && Paok && Pbok;
 }
 
-void save(const arma::mat & Ca, const arma::mat & Cb, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ha, const arma::mat & Hb) {
-  Ca.save(".erkale_Ca",arma::arma_binary);
-  Cb.save(".erkale_Cb",arma::arma_binary);
-  Ea.save(".erkale_Ea",arma::arma_binary);
-  Eb.save(".erkale_Eb",arma::arma_binary);
-  Ha.save(".erkale_Ha",arma::arma_binary);
-  Hb.save(".erkale_Hb",arma::arma_binary);
+void save(const uscf_t & sol) {
+  sol.Ca.save(".erkale_Ca",arma::arma_binary);
+  sol.Cb.save(".erkale_Cb",arma::arma_binary);
+  sol.Ea.save(".erkale_Ea",arma::arma_binary);
+  sol.Eb.save(".erkale_Eb",arma::arma_binary);
+  sol.Ha.save(".erkale_Ha",arma::arma_binary);
+  sol.Hb.save(".erkale_Hb",arma::arma_binary);
+  sol.Pa.save(".erkale_Pa",arma::arma_binary);
+  sol.Pb.save(".erkale_Pb",arma::arma_binary);
 }
 
 int main(int argc, char **argv) {
@@ -583,6 +659,9 @@ int main(int argc, char **argv) {
     return 0;
   }
 
+  // Initialize libint
+  init_libint_base();
+
   Timer t;
   t.print_time();
 
@@ -590,8 +669,9 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_scf_settings();
   set.add_string("LoadChk","Initialize with ground state calculation from file","");
-  set.add_string("SaveChk","Save results to ","");
- 
+  set.add_string("SaveChk","Save results to ","erkale_xrs.chk");
+
+  set.add_bool("XRSSpin","Spin to excite (0 for alpha, 1 for beta)",0); 
   set.add_bool("XRSFullhole","Run full core-hole calculation",0);
   set.add_string("XRSAugment","(EXPERIMENTAL) Which atoms to augment with diffuse functions? E.g. 1,3-5,10","");
 
@@ -619,6 +699,7 @@ int main(int argc, char **argv) {
   // Get used settings
   const bool verbose=set.get_bool("Verbose");
   const bool fullhole=set.get_bool("XRSFullhole");
+  const bool spin=set.get_bool("XRSSpin");
 
   // Print out settings
   if(verbose)
@@ -670,7 +751,7 @@ int main(int argc, char **argv) {
   uscf_t sol;
 
   // Try to load orbitals and energies
-  bool loadok=load(sol.Ca,sol.Cb,sol.Ea,sol.Eb,sol.Ha,sol.Hb);
+  bool loadok=load(sol);
 
   if(loadok) {
     printf("Loaded orbitals from file.\n");
@@ -701,10 +782,12 @@ int main(int argc, char **argv) {
     Checkpoint chkpt(set.get_string("SaveChk"),true);
 
     // Initialize solver
-    XRSSCF solver(basis,set,chkpt);
+    XRSSCF solver(basis,set,chkpt,spin);
 
     // Initialize calculation with ground state if necessary
-    if(stricmp(set.get_string("LoadChk"),"")==0) {
+    if(stricmp(set.get_string("LoadChk"),"")!=0) {
+      printf("Initializing with calculation from %s.\n",set.get_string("LoadChk").c_str());
+      
       // Read checkpoint file
       Checkpoint load(set.get_string("LoadChk"),false);
 
@@ -760,7 +843,7 @@ int main(int argc, char **argv) {
     }
 
     // Save orbitals and energies
-    save(sol.Ca,sol.Cb,sol.Ea,sol.Eb,sol.Ha,sol.Hb);
+    save(sol);
 
     printf("\n\n");
   } else {
@@ -768,21 +851,39 @@ int main(int argc, char **argv) {
     xcorb=find_excited_orb(sol.Ca,basis,xcatom,nocc);
   }
 
-  /*
-  // Print info about alpha orbitals
-  print_info(sol.Ca,sol.Ea,basis);
-  printf("\n\n");
-  */
-
-  // Number of occupied states is
-  size_t nocc=basis.Ztot()/2.0;
+  // Number of occupied states
+  int nocca, noccb;
+  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),nocca,noccb);
 
   // Augment the solutions if necessary
+  BasisSet augbas;
+  arma::mat C_aug;
+  arma::vec E_aug;
+
   if(stricmp(set.get_string("XRSAugment"),"")!=0)
-    augmented_solution(basis,set,sol.Ha,sol.Ca,sol.Ea,xcatom,xcorb,nocc);
+    augmented_solution(basis,set,sol,xcatom,xcorb,nocca,noccb,dft,augbas,C_aug,E_aug,spin);
+  else {
+    // No augmentation necessary, just copy the solutions
+    augbas=basis;
+    if(spin) {
+      C_aug=sol.Cb;
+      E_aug=sol.Eb;
+    } else {
+      C_aug=sol.Ca;
+      E_aug=sol.Ea;
+    }
+  }
+
+  // Number of occupied states
+  size_t nocc;
+  if(spin)
+    nocc=noccb;
+  else
+    nocc=nocca;
+
 
   // Compute dipole transitions
-  std::vector<spectrum_t> sp=compute_transitions(basis,sol.Ca,sol.Ea,xcatom,xcorb,nocc);
+  std::vector<spectrum_t> sp=compute_transitions(augbas,C_aug,E_aug,xcatom,xcorb,nocc);
   // Save spectrum
   save_spectrum(sp);
 
@@ -794,30 +895,31 @@ int main(int argc, char **argv) {
   // The filename
   std::string spname;
 
-  // Series method
-  if(stricmp(set.get_string("XRSQMethod"),"Series")==0) {
-    qsp=compute_qdep_transitions_series(basis,sol.Ca,sol.Ea,xcorb,nocc,qvals);
-    spname="trans_ser";
-  }
-
-  // Fourier method
-  if(stricmp(set.get_string("XRSQMethod"),"Fourier")==0) {
-    qsp=compute_qdep_transitions_fourier(basis,sol.Ca,sol.Ea,xcorb,nocc,qvals);
-    spname="trans_four";
-  }
-
-  // Local method (Sakko et al)
-  if(stricmp(set.get_string("XRSQMethod"),"Local")==0) {
-    qsp=compute_qdep_transitions_local(basis,set,sol.Ca,sol.Ea,xcatom,xcorb,nocc,qvals);
-    spname="trans_loc";
-  }
-
-
-  // Save transitions
-  for(size_t i=0;i<qvals.size();i++) {
-    char fname[80];
-    sprintf(fname,"%s-%.2f.dat",spname.c_str(),qvals[i]);
-    save_spectrum(qsp[i],fname);
+  if(qvals.size()) {
+    // Series method
+    if(stricmp(set.get_string("XRSQMethod"),"Series")==0) {
+      qsp=compute_qdep_transitions_series(augbas,C_aug,E_aug,xcorb,nocc,qvals);
+      spname="trans_ser";
+    }
+    
+    // Fourier method
+    if(stricmp(set.get_string("XRSQMethod"),"Fourier")==0) {
+      qsp=compute_qdep_transitions_fourier(augbas,C_aug,E_aug,xcorb,nocc,qvals);
+      spname="trans_four";
+    }
+    
+    // Local method (Sakko et al)
+    if(stricmp(set.get_string("XRSQMethod"),"Local")==0) {
+      qsp=compute_qdep_transitions_local(augbas,set,C_aug,E_aug,xcatom,xcorb,nocc,qvals);
+      spname="trans_loc";
+    }
+    
+    // Save transitions
+    for(size_t i=0;i<qvals.size();i++) {
+      char fname[80];
+      sprintf(fname,"%s-%.2f.dat",spname.c_str(),qvals[i]);
+      save_spectrum(qsp[i],fname);
+    }
   }
 
   if(verbose) {

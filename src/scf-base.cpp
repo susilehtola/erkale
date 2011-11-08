@@ -366,31 +366,14 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
 }
       
 void form_density(arma::mat & R, const arma::mat & C, size_t nocc) {
-  // Check dimensions of R
-  if(R.n_rows!=C.n_rows)
-    R=arma::mat(C.n_rows,C.n_rows);
-  else if(R.n_cols!=C.n_rows)
-    R=arma::mat(C.n_rows,C.n_rows);
-
-  if(nocc>C.n_cols) {
-    std::ostringstream oss;
-    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): there should be " << nocc << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  // Zero matrix
-  R.zeros();
-  // Formulate density
-  for(size_t n=0;n<nocc;n++)
-    R+=C.col(n)*arma::trans(C.col(n));
+  std::vector<double> occs(nocc,1.0);
+  form_density(R,C,occs);
 }
 
 void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> & nocc) {
   // Check dimensions of R
-  if(R.n_rows!=C.n_rows)
-    R=arma::mat(C.n_rows,C.n_rows);
-  else if(R.n_cols!=C.n_rows)
-    R=arma::mat(C.n_rows,C.n_rows);
+  if(R.n_rows!=C.n_rows || R.n_cols!=C.n_rows)
+    R.zeros(C.n_rows,C.n_rows);
 
   if(nocc.size()>C.n_cols) {
     std::ostringstream oss;

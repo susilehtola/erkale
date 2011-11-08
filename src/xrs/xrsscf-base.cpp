@@ -33,7 +33,11 @@
 #define ROUGHTOL 1e-8
 
 
-XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) : SCF(basis,set,chkpt) {
+XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool sp) : SCF(basis,set,chkpt) {
+  spin=sp;
+
+  // Get number of alpha and beta electrons
+  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),nocca,noccb);
 }
 
 XRSSCF::~XRSSCF() {
@@ -102,7 +106,7 @@ size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom
   // Measures of goodness for orbitals.
   arma::vec mog(nocc);
   // Compute centers and widths
-  arma::vec cenwidth=compute_center_width(C,basis,nocc);
+  arma::mat cenwidth=compute_center_width(C,basis,nocc);
 
   for(size_t io=0;io<nocc;io++) {
     double dx=xccoord.x-cenwidth(io,0);
@@ -163,7 +167,7 @@ size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom
     throw std::runtime_error("Error - could not localize core orbital!\n");
   } else if(loc_idx.size()>1)
     printf("Warning - there is more than one orbital localized on wanted atom.\n");
-
+  
   // Return index of orbital localized on atom
   return minind;
 }

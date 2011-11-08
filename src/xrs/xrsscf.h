@@ -23,8 +23,14 @@
 #include "scf.h"
 
 class XRSSCF : public SCF {
+  // Excite beta spin?
+  bool spin;
+  // Number of alpha and beta electrons
+  int nocca;
+  int noccb;
+  
  public:
-  XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt);
+  XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool spin);
   ~XRSSCF();
 
   size_t full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;

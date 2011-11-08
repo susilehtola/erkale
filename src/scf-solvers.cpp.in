@@ -30,12 +30,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // Occupation vector of spin up and spin down
   std::vector<double> occa;
   std::vector<double> occb;
-
-  // Number of occupied states
-  int nocc=basisp->Ztot()/2;
-  if(basisp->Ztot()%2==1) {
-    throw std::runtime_error("XRS SCF calculation routine can only handle non-polarized ground state.\n");
-  }
 #endif
 
   Timer t;
@@ -178,24 +172,43 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
         printf("\nUsing input guess for orbitals.\n");
     }
 
+
 #ifdef RESTRICTED
   form_density(sol.P,sol.C,occs);
 #else
 
+#if defined(FULLHOLE) || defined(HALFHOLE)
+  size_t ixc_orb;
+  if(spin)
+    ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
+  else
+    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
+
+  if(spin) {
 #if defined(FULLHOLE)
-  size_t ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
-  occa=exc_occ(ixc_orb,nocc); // Move alpha occupied states up by a notch
-  occb=norm_occ(nocc); // Normal occupation in beta
-#elif defined(HALFHOLE)
-  size_t ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
-  occa=frac_occ(ixc_orb,nocc); // Fractional occupation on alpha orbitals
-  occb=norm_occ(nocc); // Normal occupation in beta
+    occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
+#else
+    occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
+#endif
+    occa=norm_occ(nocca); // Normal occupation in beta
+  } else {
+#if defined(FULLHOLE)
+    occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
+#else
+    occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
+#endif
+    occb=norm_occ(noccb); // Normal occupation in beta
+  }
+
+  // End HALFHOLE || FULLHOLE
 #endif
 
   form_density(sol.Pa,sol.Ca,occa);
   form_density(sol.Pb,sol.Cb,occb);
   sol.P=sol.Pa+sol.Pb;
 #endif
+
+  printf("Density matrix formed.\n");
 
   // Print orbital energies
   if(verbose) {
@@ -484,6 +497,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       sol.H-=0.5*kfrac*K;
       sol.en.Exc-=0.25*kfrac*arma::trace(sol.P*K);
     }
+    
 #else
     sol.H=Hcore+J-0.5*K;
     sol.en.Exc=-0.25*arma::trace(sol.P*K);
@@ -694,15 +708,32 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #else
     arma::mat Panew, Pbnew;
 
+#if defined(FULLHOLE) || defined(HALFHOLE)
+  size_t ixc_orb;
+  if(spin)
+    ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
+  else
+    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
+
+  if(spin) {
 #if defined(FULLHOLE)
-    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
-    occa=exc_occ(ixc_orb,nocc); // Move alpha occupied states up by a notch
-    occb=norm_occ(nocc); // Normal occupation in beta
-#elif defined(HALFHOLE)
-    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocc);
-    occa=frac_occ(ixc_orb,nocc); // Fractional occupation on alpha orbitals
-    occb=norm_occ(nocc); // Normal occupation in beta
+    occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
+#else
+    occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
 #endif
+    occa=norm_occ(nocca); // Normal occupation in beta
+  } else {
+#if defined(FULLHOLE)
+    occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
+#else
+    occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
+#endif
+    occb=norm_occ(noccb); // Normal occupation in beta
+  }
+
+  // End HALFHOLE || FULLHOLE
+#endif
+
     
     form_density(Panew,sol.Ca,occa);
     form_density(Pbnew,sol.Cb,occb);
