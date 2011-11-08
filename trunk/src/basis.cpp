@@ -1025,6 +1025,9 @@ bool operator<(const shellpair_t & lhs, const shellpair_t & rhs) {
 }
 
 void BasisSet::form_unique_shellpairs() {
+  // Drop list of existing pairs.
+  shellpairs.clear();
+
   // Form list of unique shell pairs.
   shellpair_t tmp;
 

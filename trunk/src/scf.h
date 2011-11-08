@@ -93,6 +93,7 @@ typedef struct {
   arma::mat H;
   /// Density matrix
   arma::mat P;
+
   /// Energy information
   energy_t en;
 } rscf_t;
@@ -107,6 +108,7 @@ typedef struct {
   arma::mat Ha, Hb;
   /// Density matrices
   arma::mat P, Pa, Pb;
+
   /// Energy information
   energy_t en;
 } uscf_t;
