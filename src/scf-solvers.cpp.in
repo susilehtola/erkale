@@ -593,7 +593,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
     }
 
-
     // Solve DIIS
     if(usediis) {
 
