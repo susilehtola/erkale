@@ -56,7 +56,7 @@ void DIIS::update(const arma::mat & F, const arma::mat & D, double & error) {
     // Index is
     icur=(icur+1)%imax;
     Fs[icur]=F;
-    errs[icur]=err;
+    errs[icur]=MatToVec(err);
   }
 }
 
