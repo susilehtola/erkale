@@ -58,7 +58,7 @@ bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
 
 
 /// Use converged SCF potential Ha to solve orbitals in augmented basis.
-void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t xcatom, size_t & ixc_orb, size_t nocca, size_t noccb, const dft_t & dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin) {
+void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t xcatom, size_t & ixc_orb, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin) {
   // Get indices of atoms to augment
   std::vector<size_t> augind=parse_range(splitline(set.get_string("XRSAugment"))[0]);
   // Convert to C++ indexing
@@ -251,8 +251,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
   // Coulomb matrix
   taug.set();
-  arma::mat J(Ntot,Ntot);
-  J.zeros();
+  arma::mat J;
   {
     // We use the original basis' density fitting basis, since it's
     // enough to represent the density.
@@ -265,11 +264,10 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   printf("J formed in %s.\n",taug.elapsed().c_str());
 
 
-  // DFT grid
+  // DFT grid. Get used tolerance
+  dft.gridtol=set.get_double("XRSGridTol");
   taug.set();
-  arma::mat XCa(Ntot,Ntot), XCb(Ntot,Ntot);
-  XCa.zeros();
-  XCb.zeros();
+  arma::mat XCa, XCb;
   {
     double Exc, Nelnum;
     DFTGrid grid(&augbas,true,true,false);
@@ -673,7 +671,8 @@ int main(int argc, char **argv) {
 
   set.add_bool("XRSSpin","Spin to excite (0 for alpha, 1 for beta)",0); 
   set.add_bool("XRSFullhole","Run full core-hole calculation",0);
-  set.add_string("XRSAugment","(EXPERIMENTAL) Which atoms to augment with diffuse functions? E.g. 1,3-5,10","");
+  set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3-5,10","");
+  set.add_double("XRSGridTol","DFT grid tolerance in double basis set calculation",1e-4);
 
   set.add_string("XRSQval","List or range of Q values to compute","");
   set.add_string("XRSQMethod","Method of computing momentum transfer matrix: Local, Fourier or Series","Fourier");

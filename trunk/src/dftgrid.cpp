@@ -1791,8 +1791,8 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
   Ha=H;
   Hb=H;
 
-  Ha.zeros();
-  Hb.zeros();
+  Ha.zeros(P.n_rows,P.n_cols);
+  Hb.zeros(P.n_rows,P.n_cols);
 
   eval_Fxc(x_func,c_func,P/2.0,P/2.0,Ha,Hb,Exc,Nel);
   H=(Ha+Hb)/2.0;
@@ -1800,7 +1800,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 #else
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel) {
   // Clear Hamiltonian
-  H.zeros();
+  H.zeros(P.n_rows,P.n_cols);
   // Clear exchange-correlation energy
   Exc=0.0;
   // Clear number of electrons
@@ -1907,8 +1907,8 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel) {
   // Clear Hamiltonian
-  Ha.zeros();
-  Hb.zeros();
+  Ha.zeros(Pa.n_rows,Pa.n_cols);
+  Hb.zeros(Pb.n_rows,Pb.n_cols);
   // Clear exchange-correlation energy
   Exc=0.0;
   // Clear number of electrons
