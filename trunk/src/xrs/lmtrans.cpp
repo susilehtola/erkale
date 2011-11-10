@@ -29,6 +29,9 @@ extern "C" {
 // Tolerance for differing value of Q in Bessel table
 #define QTOL (1.01*q*DBL_EPSILON)
 
+lmtrans::lmtrans() {
+}
+
 lmtrans::lmtrans(const arma::mat & C, const BasisSet & bas, const coords_t & cen, size_t Nrad, int l, int lquad) {
   exp=expand_orbitals(C,bas,cen,Nrad,l,lquad);
 

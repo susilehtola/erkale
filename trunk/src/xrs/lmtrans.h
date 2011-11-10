@@ -62,6 +62,8 @@ class lmtrans {
   arma::cx_mat radial_integral(size_t i, size_t f, int l, const bessel_t & bes) const;
 
  public:
+  /// Dummy constructor
+  lmtrans();
   /// Generate expansion for given orbitals
   lmtrans(const arma::mat & C, const BasisSet & bas, const coords_t & cen, size_t Nrad=200, int lmax=5, int lquad=30);
   /// Destructor
