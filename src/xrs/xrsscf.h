@@ -28,10 +28,15 @@ class XRSSCF : public SCF {
   // Number of alpha and beta electrons
   int nocca;
   int noccb;
+
+  /// List of frozen orbitals
+  std::vector<arma::vec> freeze;
   
  public:
   XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool spin);
   ~XRSSCF();
+
+  void set_frozen(const arma::mat & C);
 
   size_t full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;
   size_t half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;
@@ -55,5 +60,25 @@ std::vector<double> norm_occ(size_t nocc);
 std::vector<double> frac_occ(size_t excited, size_t nocc);
 /// First excited state; core orbital is not occupied
 std::vector<double> exc_occ(size_t excited, size_t nocc);
+
+/// Helper structure for localization 
+typedef struct {
+  /// Index of center
+  size_t ind;
+  /// Distance from excited nucleus
+  double dist;
+} locdist_t;
+
+/// Operator for sorts
+bool operator<(const locdist_t & lhs, const locdist_t & rhs);
+
+/// Localize orbitals, returns number of localized orbitals.
+size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C); 
+
+/// Get symmetry groups of orbitals
+std::vector<int> symgroups(const arma::mat & C, const arma::mat & S, const std::vector<arma::vec> & freeze);
+
+/// Freeze orbitals
+void freeze_orbs(const std::vector<arma::vec> & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H);
 
 #endif

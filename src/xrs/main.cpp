@@ -669,6 +669,8 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","Initialize with ground state calculation from file","");
   set.add_string("SaveChk","Save results to ","erkale_xrs.chk");
 
+  set.add_bool("XRSLocalize","Localize and freeze orbitals? (Needs ground-state calculation)",0);
+
   set.add_bool("XRSSpin","Spin to excite (0 for alpha, 1 for beta)",0); 
   set.add_bool("XRSFullhole","Run full core-hole calculation",0);
   set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3-5,10","");
@@ -746,7 +748,7 @@ int main(int argc, char **argv) {
   init_conv.deltaPmax*=initfac;
   init_conv.deltaPrms*=initfac;
 
-  // TPA solution
+  // TP solution
   uscf_t sol;
 
   // Try to load orbitals and energies
@@ -777,12 +779,16 @@ int main(int argc, char **argv) {
   // Index of excited orbital
   size_t xcorb;
 
+  // Number of occupied states
+  int nocca, noccb;
+  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),nocca,noccb);
+
   if(!loadok) {
     Checkpoint chkpt(set.get_string("SaveChk"),true);
 
-    // Initialize solver
-    XRSSCF solver(basis,set,chkpt,spin);
-
+    // Amount of (orbital rotation) localized orbitals (nloc-1 are then frozen)
+    size_t nloc=0;
+      
     // Initialize calculation with ground state if necessary
     if(stricmp(set.get_string("LoadChk"),"")!=0) {
       printf("Initializing with calculation from %s.\n",set.get_string("LoadChk").c_str());
@@ -824,15 +830,42 @@ int main(int argc, char **argv) {
         basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
       }
 
-      // Find localized orbital
-      size_t ixc_orb=find_excited_orb(sol.Ca,basis,xcatom,basis.Ztot()/2);
-      // Expand localized orbital
-      lmtrans lmground(sol.Ca.submat(0,ixc_orb,sol.Ca.n_rows,ixc_orb),basis,basis.get_coords(xcatom));
-      // and save it
+      if(set.get_bool("XRSLocalize")) {
+	if(spin)
+	  nloc=localize(basis,noccb,xcatom,sol.Cb);
+	else
+	  nloc=localize(basis,nocca,xcatom,sol.Ca);
+      }
+      
+      // Find excited orbital 
+      size_t ixc_orb;
+      lmtrans lmground;
+      if(spin) {
+	ixc_orb=find_excited_orb(sol.Cb,basis,xcatom,noccb);
+	// Do local expansion
+	lmground=lmtrans(sol.Cb.submat(0,ixc_orb,sol.Cb.n_rows,ixc_orb),basis,basis.get_coords(xcatom));
+      }
+      else {
+	ixc_orb=find_excited_orb(sol.Ca,basis,xcatom,nocca);
+	// Do local expansion
+	lmground=lmtrans(sol.Ca.submat(0,ixc_orb,sol.Ca.n_rows,ixc_orb),basis,basis.get_coords(xcatom));
+      }
+      // Save localized orbital
       lmground.write_prob(0,"ground_orb.dat");
     }
 
-    // Proceed with TPA calculation
+    // Proceed with TP calculation. Initialize solver
+    XRSSCF solver(basis,set,chkpt,spin);
+
+    // Set frozen orbitals
+    if(nloc>0) {
+      if(spin)
+	solver.set_frozen(sol.Cb.submat(0,1,sol.Cb.n_rows-1,nloc-1));
+      else
+	solver.set_frozen(sol.Ca.submat(0,1,sol.Ca.n_rows-1,nloc-1));
+    }
+    
+    // Do TP calculation.
     if(fullhole) {
       xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init);
       xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init);
@@ -846,13 +879,11 @@ int main(int argc, char **argv) {
 
     printf("\n\n");
   } else {
-    int nocc=basis.Ztot()/2;
-    xcorb=find_excited_orb(sol.Ca,basis,xcatom,nocc);
+    if(spin)
+      xcorb=find_excited_orb(sol.Cb,basis,xcatom,noccb);
+    else
+      xcorb=find_excited_orb(sol.Ca,basis,xcatom,nocca);
   }
-
-  // Number of occupied states
-  int nocca, noccb;
-  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),nocca,noccb);
 
   // Augment the solutions if necessary
   BasisSet augbas;

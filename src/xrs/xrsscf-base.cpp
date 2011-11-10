@@ -43,6 +43,12 @@ XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt,
 XRSSCF::~XRSSCF() {
 }
 
+void XRSSCF::set_frozen(const arma::mat & C) {
+  freeze.resize(C.n_cols);
+  for(size_t i=0;i<C.n_cols;i++)
+    freeze[i]=C.col(i);
+}
+
 /// Get excited atom from atomlist
 size_t get_excited_atom_idx(std::vector<atom_t> & at) {
   // Indices of atoms with frozen core
@@ -215,3 +221,130 @@ std::vector<double> exc_occ(size_t excited, size_t nocc) {
   return ret;
 }
 
+bool operator<(const locdist_t & lhs, const locdist_t & rhs) {
+  // Sort in increasing value
+  return lhs.dist < rhs.dist;
+}
+
+size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) {
+  // First, figure out which centers need to be localized upon.
+
+  std::vector<locdist_t> locind;
+  // Localize on all the atoms of the same type than the excited atom
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    if(stricmp(basis.get_symbol(i),basis.get_symbol(xcatom))==0) {
+      locdist_t tmp;
+      tmp.ind=i;
+      tmp.dist=norm(basis.get_coords(i)-basis.get_coords(xcatom));
+      locind.push_back(tmp);
+    }
+  // Sort in increasing distance
+  std::stable_sort(locind.begin(),locind.end());
+
+  printf("Localizing on centers:");
+  for(size_t i=0;i<locind.size();i++)
+    printf(" %i",(int) locind[i].ind+1);
+  printf("\n");
+
+  // Amount of orbitals already localized
+  size_t locd=0;
+  // Amount of basis functions
+  size_t Nbf=basis.get_Nbf();
+
+  // Perform the localization.
+  for(size_t i=0;i<locind.size();i++) {
+    // The nucleus is
+    size_t inuc=locind[i].ind;
+    // and it is located at
+    coords_t cen=basis.get_coords(inuc);
+
+    // Compute moment integrals around the nucleus
+    std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
+    // Get matrix which transforms into occupied MO basis
+    arma::mat transmat=C.submat(0,locd,Nbf-1,locd+nocc-1);
+
+    // Sum together to get x^2 + y^2 + z^2
+    arma::mat rsqmat=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
+    // and transform into the occupied MO basis
+    rsqmat=arma::trans(transmat)*rsqmat*transmat;
+
+    // Diagonalize rsq_mo
+    arma::vec reig;
+    arma::mat rvec;
+    eig_sym_ordered(reig,rvec,rsqmat);
+
+    // Rotate occupied orbitals
+    C.submat(0,locd,Nbf-1,locd+nocc-1)=transmat*rvec;
+
+    // Increase number of localized orbitals
+    locd++;
+    // and decrease that of occupied orbitals yet to localize
+
+    nocc--;
+
+    printf("Localized orbital around (%e,%e,%e) with Rrms=%e Å.\n",cen.x,cen.y,cen.z,sqrt(reig(0))/ANGSTROMINBOHR);
+  }
+
+  /*
+  // Check orthonormality
+  arma::mat MOovl=arma::trans(C)*basis.overlap()*C;
+  printf("MO orthonormality\n");
+  print_sym(MOovl);
+  */
+
+  return locd;
+}
+
+std::vector<int> symgroups(const arma::mat & C, const arma::mat& S, const std::vector<arma::vec> & freeze) {
+  // Initialize groups.
+  std::vector<int> gp(C.n_cols,0);
+
+  // Loop over frozen orbitals.
+  for(size_t ifz=0;ifz<freeze.size();ifz++) {
+    // Figure out maximum overlap.
+
+    double maxovl=0.0;
+    size_t maxind=-1;
+
+    // Helper vector
+    arma::vec hlp=S*freeze[ifz];
+
+    for(size_t i=0;i<C.n_cols;i++) {
+      double ovl=fabs(arma::dot(C.col(i),hlp));
+      if(ovl>maxovl) {
+	maxind=i;
+	maxovl=ovl;
+      }
+    }
+
+    // Change symmetry of orbital with maximum overlap
+    gp[maxind]=ifz+1;
+
+    //    printf("Set symmetry of orbital %i with overlap %e to %i.\n",(int) maxind,maxovl,gp[maxind]);
+  }
+
+  return gp;
+}
+
+void freeze_orbs(const std::vector<arma::vec> & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H) {
+  // Freezes the orbitals corresponding to different symmetry groups.
+
+  // Form H_MO
+  arma::mat H_MO=arma::trans(C)*H*C;
+
+  // Get symmetry groups
+  std::vector<int> sg=symgroups(C,S,freeze);
+  
+  // Loop over H_MO and zero out elements where symmetry groups differ
+  for(size_t i=0;i<H_MO.n_rows;i++)
+    for(size_t j=0;j<=i;j++)
+      if(sg[i]!=sg[j]) {
+	H_MO(i,j)=0;
+	H_MO(j,i)=0;
+      }
+  
+  // Back-transform to AO
+  arma::mat SC=S*C;
+
+  H=SC*H_MO*arma::trans(SC);
+}
