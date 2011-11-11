@@ -106,9 +106,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   Hbold.zeros();
 #endif
 
-  // Mixing factor if DIIS not used
-  double mix=INITMIX;
-
   // Dipole moment
   arma::vec dipmom;
   double olddip;
@@ -120,7 +117,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // Change in energy from last iteration
   double deltaE;
 
-  double Eold=0, Eold2=0;
+  double Eold=0;
 
   // Maximum and RMS differences of AO density matrix
   double rmsdiff=0.0, maxdiff=0.0;
@@ -128,7 +125,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   double rmsdiffa=0.0, maxdiffa=0.0;
   double rmsdiffb=0.0, maxdiffb=0.0;
 #endif
-
 
   if(verbose)
     printf("\n ******* Initialization of run ********\n");
@@ -548,7 +544,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     sol.en.Ecoul=0.5*arma::trace(sol.P*J);
 
     // Compute total energies
-    Eold2=Eold;
     Eold=sol.en.E;
     sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone;
     sol.en.E=sol.en.Eel+sol.en.Enucr;
@@ -566,9 +561,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       oss << "\nSomething wrong with total energy " << sol.en.E <<"?\nEnding program.\n";
       throw std::runtime_error(oss.str());
     }
-
-    if(dynamicmix && iiter>3)
-      update_mixing(mix,sol.en.E,Eold,Eold2);
 
     // Update ADIIS stacks
     if(useadiis) {
@@ -776,24 +768,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
 #endif
 
-
-    if(mixdensity) {
-      if(verbose)
-	printf("Mixing density matrices with mixing factor %g.\n",mix);
-
-      sol.P=(1.0-mix)*sol.P+mix*Pnew;
+    // Update density matrices
+    sol.P=Pnew;
 #ifndef RESTRICTED
-      sol.Pa=(1.0-mix)*sol.Pa+mix*Panew;
-      sol.Pb=(1.0-mix)*sol.Pb+mix*Pbnew;
+    sol.Pa=Panew;
+    sol.Pb=Pbnew;
 #endif
-    } else {
-      sol.P=Pnew;
-#ifndef RESTRICTED
-      sol.Pa=Panew;
-      sol.Pb=Pbnew;
-#endif
-    }
-
+    
     // Print out status information
     if(verbose) {
 
@@ -847,13 +828,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(verbose)
       fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,sol.en.E,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
 
-    if(!mixdensity || (mixdensity && mix==1.0)) {
-
-      if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
-	if(verbose)
-	  printf("\n ******* Convergence achieved ********\n");
-	converged=1;
-      }
+    if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
+      if(verbose)
+	printf("\n ******* Convergence achieved ********\n");
+      converged=1;
     } // End convergence check clause
 
     // Pad occupancies with zeros (needed e.g. in Casida routines)

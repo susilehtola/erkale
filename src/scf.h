@@ -166,11 +166,6 @@ class SCF {
   /// Density fitting calculation? (Pure DFT XC functionals)
   bool densityfit;
 
-  /// Mix density matrices?
-  bool mixdensity;
-  /// Dynamically change mixing factor?
-  bool dynamicmix;
-
   /// Use Lobatto angular grid instead of Lebedev grid (DFT)
   bool dft_lobatto;
   /// Save memory by reforming DFT grid on every iteration?
@@ -231,9 +226,6 @@ void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> 
 std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis);
 /// Generate orbital occupancies
 void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb);
-
-/// Dynamical update of mixing factor
-void update_mixing(double & mix, double Ecur, double Eold, double Eold2);
 
 /// Compute magnitude of dipole moment
 double dip_mom(const arma::mat & P, const BasisSet & basis);

@@ -66,11 +66,6 @@ void Settings::add_scf_settings() {
   // Use Broyden mixing?
   bset.push_back(genb("UseBroyden", "Use Broyden mixing of Fock matrices?", 0));
   
-  // Mix density matrices
-  bset.push_back(genb("MixDensity", "Mix density matrices?", 0));
-  // Dynamically update mixing factor?
-  bset.push_back(genb("DynamicMixing","Dynamically change mixing factor", 1));
-  
   // Total charge of system
   iset.push_back(geni("Charge", "Total charge of system", 0));
   // Multiplicity

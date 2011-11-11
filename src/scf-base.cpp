@@ -35,15 +35,6 @@
 
 #define ROUGHTOL 1e-8
 
-// If not using DIIS, allow an energy increase of OSCTOL without reducing mixing factor.
-#define OSCTOL 1e-2
-// Initial mixing factor
-#define INITMIX 0.25
-
-// Broyden mix sum and difference of spin density matrices instead of
-// matrices separately?
-#define MIX_SUMDIFF
-
 SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Amount of basis functions
   Nbf=basis.get_Nbf();
@@ -69,16 +60,13 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
   direct=set.get_bool("Direct");
 
-  mixdensity=set.get_bool("MixDensity");
-  dynamicmix=set.get_bool("DynamicMixing");
-  
   // Check update scheme
   if(useadiis && usebroyden) {
     ERROR_INFO();
     throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   } 
 
-  if(!usediis && !mixdensity && !useadiis && !usebroyden) {
+  if(!usediis && !useadiis && !usebroyden) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to run calculation without an update scheme.\n");
   }
@@ -470,23 +458,6 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
       occb[i]=1.0;
   }
 }
-
-void update_mixing(double & mix, double Ecur, double Eold, double Eold2) {
-  // Determine mixing factor
-
-  if(Ecur-Eold>OSCTOL)
-    // Oscillation - reduce mixing factor
-    mix/=2.0;
-  else if( (Ecur-Eold<=OSCTOL) && (Eold-Eold2<=OSCTOL) && (mix<1.0)) {
-    // Converging to a minimum, increase mixing factor
-    mix*=cbrt(2.0);
-  }
-  
-  // Sanity check
-  if(mix>1.0)
-    mix=1.0;
-}
-
 
 double dip_mom(const arma::mat & P, const BasisSet & basis) {
   // Compute magnitude of dipole moment
