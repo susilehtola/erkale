@@ -1313,7 +1313,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
   free();
   
   if(verbose)
-    printf("\t%lu\t%lu\t%lu\n",atind,ngrid,nfunc);
+    printf("\t%u\t%u\t%u\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc);
 }
 
 AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, double toler, int x_func, int c_func, bool lobatto, bool verbose) {
@@ -1468,7 +1468,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
   free();
   
   if(verbose)
-    printf("\t%lu\t%lu\t%lu\n",atind,ngrid,nfunc);
+    printf("\t%u\t%u\t%u\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc);
 }
 
 
