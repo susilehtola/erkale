@@ -32,9 +32,10 @@ const double otol=1e-5;
 /// Absolute tolerance for dipole moment
 const double dtol=1e-5;
 
-/// DFT grid tolerance
+/// Initial DFT grid tolerance
 const double dft_initialtol=1e-3;
-const double dft_finaltol=1e-5;
+/// Final DFT grid tolerance
+const double dft_finaltol=1e-6;
 
 /// Initial convergence settings (for DFT)
 const convergence_t init_conv={1e-4, 1e-4, 1e-6};
