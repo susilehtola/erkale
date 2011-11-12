@@ -13,8 +13,8 @@ set(VERSION 0.1.0)
 # Version of libraries
 set(SOVERSION 0.1.0)
 
-# Cmake modules/macros are in a subdirectory to keep this file cleaner
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+# Cmake modules/macros are in a subdirectory to keep the root directory cleaner
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 # Configuration where to find libint is in current directory
 set(libint_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
 set(Armadillo_DIR ${CMAKE_CURRENT_SOURCE_DIR}/config)
