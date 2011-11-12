@@ -63,16 +63,22 @@ typedef struct {
 
 /// Checkpointing class.
 class Checkpoint {
+  /// Name of the file
+  std::string filename;
+  /// Is file open for writing?
+  bool writemode;
+
+  /// Is the file open
+  bool opend;
   /// The checkpoint file
   hid_t file;
 
-  /// Is file open for writing?
-  bool writemode;
+  // *** Helper functions ***
 
   /// Save value
   void write(const std::string & name, hbool_t val);
   /// Read value
-  void read(const std::string & name, hbool_t & val) const;
+  void read(const std::string & name, hbool_t & val);
 
  public:
   /// Create checkpoint file
@@ -80,38 +86,57 @@ class Checkpoint {
   /// Destructor
   ~Checkpoint();
 
-  /// Remove entry if exists
+  /// Open the file
+  void open();
+  /// Close the file
+  void close();
+
+  /// Is the file open?
+  bool is_open() const;
+
+  /**
+   * Remove entry if exists. File needs to be opened beforehand. HDF5
+   * doesn't reclaim any used space after the file has been closed, so
+   * this is only useful when you want to replace an existing entry
+   * with something new.
+   */
   void remove(const std::string & name);
+
+  /**
+   * Access routines.
+   *
+   * An open file will be left open, a closed file will be left closed.
+   */
 
   /// Save matrix
   void write(const std::string & name, const arma::mat & mat);
   /// Read matrix
-  void read(const std::string & name, arma::mat & mat) const;
+  void read(const std::string & name, arma::mat & mat);
 
   /// Save array
   void write(const std::string & name, const std::vector<double> & v);
   /// Load array
-  void read(const std::string & name, std::vector<double> & v) const;
+  void read(const std::string & name, std::vector<double> & v);
 
   /// Save basis set
   void write(const BasisSet & basis);
   /// Load basis set
-  void read(BasisSet & basis) const;
+  void read(BasisSet & basis);
 
   /// Save value
   void write(const std::string & name, double val);
   /// Read value
-  void read(const std::string & name, double & val) const;
+  void read(const std::string & name, double & val);
 
   /// Save value
   void write(const std::string & name, int val);
   /// Read value
-  void read(const std::string & name, int & val) const;
+  void read(const std::string & name, int & val);
 
   /// Save value
   void write(const std::string & name, bool val);
   /// Read value
-  void read(const std::string & name, bool & val) const;
+  void read(const std::string & name, bool & val);
 };
 
 
