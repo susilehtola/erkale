@@ -198,7 +198,7 @@ double Settings::get_double(std::string name) const {
       return dset[i].val;
     }
 
-  ERROR_INFO();
+  //  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe setting "<<name<<" was not found!\n"; 
   throw std::runtime_error(oss.str());
@@ -213,7 +213,7 @@ bool Settings::get_bool(std::string name) const {
       return bset[i].val;
     }
 
-  ERROR_INFO();
+  //  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe setting "<<name<<" was not found!\n"; 
   throw std::runtime_error(oss.str());
@@ -228,7 +228,7 @@ int Settings::get_int(std::string name) const {
       return iset[i].val;
     }
 
-  ERROR_INFO();
+  //  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe setting "<<name<<" was not found!\n"; 
   throw std::runtime_error(oss.str());
@@ -243,7 +243,7 @@ std::string Settings::get_string(std::string name) const {
       return sset[i].val;
     }
 
-  ERROR_INFO();
+  //  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe setting "<<name<<" was not found!\n"; 
   throw std::runtime_error(oss.str());
