@@ -16,21 +16,57 @@
 
 #include "checkpoint.h"
 
+// Helper macros
+#define CHECK_OPEN() {if(!opend) {ERROR_INFO(); throw std::runtime_error("Cannot access checkpoint file that has not been opened!\n");}}
+#define CHECK_WRITE() {if(!writemode) {throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");}}
+
 Checkpoint::Checkpoint(const std::string & fname, bool write) {
   writemode=write;
+  filename=fname;
+  opend=false;
 
-  if(write)
+  if(writemode) {
     // Truncate existing file, using default creation and access properties.
     file=H5Fcreate(fname.c_str(),H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
-  else
-    file=H5Fopen(fname.c_str(),H5F_ACC_RDONLY,H5P_DEFAULT);
+    opend=true;
+    // Close the file
+    close();
+  }
 }
 
 Checkpoint::~Checkpoint() {
-  H5Fclose(file);
+}
+
+void Checkpoint::open() {
+  if(!opend) {
+    if(writemode)
+      // Open in read-write mode
+      file=H5Fopen(filename.c_str(),H5F_ACC_RDWR  ,H5P_DEFAULT);
+    else
+      // Open in read-only mode
+      file=H5Fopen(filename.c_str(),H5F_ACC_RDONLY,H5P_DEFAULT);
+    
+    // File has been opened
+    opend=true;
+  } else
+    throw std::runtime_error("Trying to open checkpoint file that has already been opened!\n");
+}
+
+void Checkpoint::close() {
+  if(opend) {
+    H5Fclose(file);
+    opend=false;
+  } else
+    throw std::runtime_error("Trying to close file that has already been closed!\n");
+}
+
+bool Checkpoint::is_open() const {
+  return opend;
 }
 
 void Checkpoint::remove(const std::string & name) {
+  CHECK_WRITE();
+
   if(H5Lexists(file, name.c_str(), H5P_DEFAULT)) {
     // Remove the entry from the file.
     H5Ldelete(file, name.c_str(), H5P_DEFAULT);
@@ -38,9 +74,15 @@ void Checkpoint::remove(const std::string & name) {
 }
 
 void Checkpoint::write(const std::string & name, const arma::mat & m) {
-  if(!writemode)
-    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+  CHECK_WRITE();
 
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
+  // Remove possible existing entry
   remove(name);
 
   // Dimensions of the matrix
@@ -68,9 +110,16 @@ void Checkpoint::write(const std::string & name, const arma::mat & m) {
   H5Dclose(dataset);
   H5Tclose(datatype);
   H5Sclose(dataspace);
+  if(cl) close();
 }
 
-void Checkpoint::read(const std::string & name, arma::mat & m) const {
+void Checkpoint::read(const std::string & name, arma::mat & m) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
 
@@ -112,12 +161,18 @@ void Checkpoint::read(const std::string & name, arma::mat & m) const {
   H5Tclose(datatype);
   // Close dataset
   H5Dclose(dataset);
+
+  if(cl) close();
 }
 
 void Checkpoint::write(const std::string & name, const std::vector<double> & v) {
-  if(!writemode)
-    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
-
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+  
   // Remove possible existing entry
   remove(name);
 
@@ -144,9 +199,16 @@ void Checkpoint::write(const std::string & name, const std::vector<double> & v) 
   H5Dclose(dataset);
   H5Tclose(datatype);
   H5Sclose(dataspace);
+  if(cl) close();
 }
 
-void Checkpoint::read(const std::string & name, std::vector<double> & v) const {
+void Checkpoint::read(const std::string & name, std::vector<double> & v) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
 
@@ -188,11 +250,16 @@ void Checkpoint::read(const std::string & name, std::vector<double> & v) const {
   H5Tclose(datatype);
   // Close dataset
   H5Dclose(dataset);
+  if(cl) close();
 }
 
 void Checkpoint::write(const BasisSet & basis) {
-  if(!writemode)
-    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
 
   // Remove possible existing entries
   remove("basis.nucs");
@@ -324,10 +391,17 @@ void Checkpoint::write(const BasisSet & basis) {
   H5Dclose(dataset);
   H5Tclose(datatype);
   H5Sclose(dataspace);
+  if(cl) close();
 }
 
 
-void Checkpoint::read(BasisSet & basis) const {
+void Checkpoint::read(BasisSet & basis) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
   hid_t dataset, datatype, dataspace;
   hsize_t dims[1];
 
@@ -436,12 +510,18 @@ void Checkpoint::read(BasisSet & basis) const {
   
   // Finalize the basis
   basis.finalize();
+
+  if(cl) close();
 }
 
 
 void Checkpoint::write(const std::string & name, double val) {
-  if(!writemode)
-    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
 
   // Remove possible existing entry
   remove(name);
@@ -465,9 +545,16 @@ void Checkpoint::write(const std::string & name, double val) {
   H5Dclose(dataset);
   H5Tclose(datatype);
   H5Sclose(dataspace);
+  if(cl) close();
 }
 
-void Checkpoint::read(const std::string & name, double & v) const {
+void Checkpoint::read(const std::string & name, double & v) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
 
@@ -500,12 +587,17 @@ void Checkpoint::read(const std::string & name, double & v) const {
   H5Tclose(datatype);
   // Close dataset
   H5Dclose(dataset);
+  if(cl) close();
 }
 
 
 void Checkpoint::write(const std::string & name, int val) {
-  if(!writemode)
-    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
   
   // Remove possible existing entry
   remove(name);
@@ -529,9 +621,16 @@ void Checkpoint::write(const std::string & name, int val) {
   H5Dclose(dataset);
   H5Tclose(datatype);
   H5Sclose(dataspace);
+  if(cl) close();
 }
 
-void Checkpoint::read(const std::string & name, int & v) const {
+void Checkpoint::read(const std::string & name, int & v) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
 
@@ -560,6 +659,7 @@ void Checkpoint::read(const std::string & name, int & v) const {
   H5Tclose(datatype);
   // Close dataset
   H5Dclose(dataset);
+  if(cl) close();
 }
 
 void Checkpoint::write(const std::string & name, bool val) {
@@ -569,8 +669,12 @@ void Checkpoint::write(const std::string & name, bool val) {
 }
 
 void Checkpoint::write(const std::string & name, hbool_t val) {
-  if(!writemode)
-    throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
 
   // Remove possibly existing entry
   remove(name);
@@ -592,15 +696,22 @@ void Checkpoint::write(const std::string & name, hbool_t val) {
   H5Dclose(dataset);
   H5Tclose(datatype);
   H5Sclose(dataspace);
+  if(cl) close();
 }
 
-void Checkpoint::read(const std::string & name, bool & v) const {
+void Checkpoint::read(const std::string & name, bool & v) {
   hbool_t tmp;
   read(name,tmp);
   v=tmp;
 }
 
-void Checkpoint::read(const std::string & name, hbool_t & v) const {
+void Checkpoint::read(const std::string & name, hbool_t & v) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
 
@@ -624,4 +735,6 @@ void Checkpoint::read(const std::string & name, hbool_t & v) const {
   H5Tclose(datatype);
   // Close dataset
   H5Dclose(dataset);
+
+  if(cl) close();
 }

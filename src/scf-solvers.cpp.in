@@ -847,7 +847,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       occr.push_back(0.0);
 #endif
     
-    // Write current matrices to checkpoint.
+    // Write current matrices to checkpoint. 
+    // To use the file effectively, we keep it open for the whole shebang.
+    chkptp->open();
     chkptp->write("P",sol.P);
 #if !defined(RESTRICTED)
     chkptp->write("Ca",sol.Ca);
@@ -872,6 +874,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     chkptp->write("Restricted",1);
 #endif
     chkptp->write("Converged",converged);
+    chkptp->close();
 
     if(converged)
       break;
