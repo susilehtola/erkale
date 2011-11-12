@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and 
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2011-06-06 Jussi Lehtola
+# 2011-11-12 Jussi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -26,6 +26,7 @@ export FCCPP="${FC} -E"
 
 # C flags to use
 export CFLAGS="-Wall -O2 -funroll-loops -march=native -mssse3 -fPIC"
+
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
 # Fortran flags to use
@@ -37,14 +38,17 @@ LAPACK="-L/usr/lib64/atlas -llapack -latlas"
 BLAS="-L/usr/lib64/atlas -latlas"
 
 # Maximum supported angular momentum (affects libint)
+# If this is very high, libint compilation will take ages and the
+# resulting libraries will be HUGE.
 MAXAM="6"
 
 # Current versions of libraries
 export GSLVER="1.15"
 export XCVER="1.1.0"
 export INTVER="1.1.4"
-export ARMAVER="2.2.2"
-export CMAKEVER="2.8.4"
+export ARMAVER="2.2.3"
+export CMAKEVER="2.8.6"
+export HDF5VER="1.8.7"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -78,6 +82,27 @@ if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
  cd ${builddir}/gsl-${GSLVER}/
  ./configure --enable-static --disable-shared --prefix=${topdir}/gsl --exec-prefix=${topdir}/gsl &>configure.log
  make -j ${nprocs} &> make.log
+ make install &> install.log
+ make clean &> clean.log
+ echo " done"
+fi 
+
+# HDF5
+if [ ! -f ${topdir}/hdf5/lib/libhdf5.a ]; then
+ echo -n "Compiling HDF5 ..."
+ 
+ if [ ! -d ${builddir}/hdf5-${HDF5VER} ]; then
+  if [ ! -f ${srcdir}/hdf5-${HDF5VER}.tar.gz ]; then
+   cd ${srcdir}
+   wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-${HDF5VER}.tar.gz
+  fi
+  cd ${builddir}
+  tar zxf ${srcdir}/hdf5-${HDF5VER}.tar.gz
+ fi
+ 
+ cd ${builddir}/hdf5-${HDF5VER}/
+ ./configure --enable-static --disable-shared --prefix=${topdir}/hdf5 --exec-prefix=${topdir}/hdf5 &>configure.log
+ make -j ${nprocs} VERBOSE=1 &> make.log
  make install &> install.log
  make clean &> clean.log
  echo " done"
@@ -201,13 +226,20 @@ echo "Done"
 ### Create config files
 
 # Armadillo
-echo "set(ARMADILLO_INCLUDE_DIRS \"${topdir}/armadillo/include\")" > erkale/config/ArmadilloConfig.cmake
+echo "set(ARMADILLO_FOUND 1)" > erkale/cmake/FindArmadillo.cmake
+echo "set(ARMADILLO_INCLUDE_DIRS \"${topdir}/armadillo/include\")" >> erkale/cmake/FindArmadillo.cmake
+
+# HDF5
+echo "set(HDF5_FOUND 1)" > erkale/cmake/FindHDF5.cmake
+echo "set(HDF5_INCLUDE_DIRS \"${topdir}/hdf5/include\")" >> erkale/cmake/FindHDF5.cmake
+echo "set(HDF5_LIBRARY_DIRS \"${topdir}/hdf5/lib\")" >> erkale/cmake/FindHDF5.cmake
+echo "set(HDF5_LIBRARIES ${topdir}/hdf5/lib/libhdf5.a -lz)" >> erkale/cmake/FindHDF5.cmake
 
 # Libint
 echo "set(LIBINT_FOUND 1)" > erkale/config/libintConfig.cmake
 echo "set(LIBINT_INCLUDE_DIRS \"${topdir}/libint/include\")" >> erkale/config/libintConfig.cmake
 #echo "set(LIBINT_LIBRARY_DIRS \"${topdir}/libint/lib\")"  >> erkale/config/libintConfig.cmake
-echo "set(LIBINT_LIBRARIES \"${topdir}/libint/lib/libint.a\")"  >> erkale/config/libintConfig.cmake
+echo "set(LIBINT_LIBRARIES ${topdir}/libint/lib/libint.a)"  >> erkale/config/libintConfig.cmake
 
 ## Build erkale
 
