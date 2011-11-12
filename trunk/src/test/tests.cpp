@@ -585,6 +585,7 @@ int main(void) {
 
   // Construct settings
   Settings sph;
+  sph.add_scf_settings();
   sph.set_bool("Verbose",0);
 
   // No spherical harmonics
@@ -598,8 +599,7 @@ int main(void) {
   // Polarized calculation
   Settings pol=sph;
   pol.set_int("Multiplicity",2);
-  pol.set_bool("UseADIIS",0);
-  //pol.set_bool("UseDIIS",0);
+  // pol.set_bool("UseDIIS",0);
   //  pol.set_bool("UseBroyden",1);
 
   // DFT tests
