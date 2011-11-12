@@ -24,8 +24,8 @@
 #include "chebyshev.h"
 #include "lobatto.h"
 
-/// Index of (l,m) in tables
-#define lmind(l,m) ((l)*(l)+l+m)
+/// Index of (l,m) in tables: l^2 + l + m
+#define lmind(l,m) ( ((size_t) (l))*(size_t (l)) + (size_t) (l) + (size_t) (m))
 
 /// Structure for radial integration
 typedef struct {
