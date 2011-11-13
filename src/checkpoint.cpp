@@ -19,6 +19,7 @@
 // Helper macros
 #define CHECK_OPEN() {if(!opend) {ERROR_INFO(); throw std::runtime_error("Cannot access checkpoint file that has not been opened!\n");}}
 #define CHECK_WRITE() {if(!writemode) {throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");}}
+#define CHECK_EXIST() {if(!exist(name)) { std::ostringstream oss; oss << "The entry " << name << " does not exist in the checkpoint file!\n"; throw std::runtime_error(oss.str()); } }
 
 Checkpoint::Checkpoint(const std::string & fname, bool write) {
   writemode=write;
@@ -64,10 +65,25 @@ bool Checkpoint::is_open() const {
   return opend;
 }
 
+bool Checkpoint::exist(const std::string & name) {
+  bool cl=false;
+  if(!opend) {
+    cl=true;
+    open();
+  }
+
+  bool ret=H5Lexists(file, name.c_str(), H5P_DEFAULT);
+
+  if(cl) close();
+
+  return ret;
+}
+
 void Checkpoint::remove(const std::string & name) {
   CHECK_WRITE();
+  CHECK_OPEN();
 
-  if(H5Lexists(file, name.c_str(), H5P_DEFAULT)) {
+  if(exist(name)) {
     // Remove the entry from the file.
     H5Ldelete(file, name.c_str(), H5P_DEFAULT);
   }
@@ -119,6 +135,7 @@ void Checkpoint::read(const std::string & name, arma::mat & m) {
     open();
     cl=true;
   }
+  CHECK_EXIST();
 
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
@@ -208,6 +225,7 @@ void Checkpoint::read(const std::string & name, std::vector<double> & v) {
     open();
     cl=true;
   }
+  CHECK_EXIST();
 
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
@@ -401,6 +419,12 @@ void Checkpoint::read(BasisSet & basis) {
     open();
     cl=true;
   }
+  if(!exist("basis.nucs"))
+    throw std::runtime_error("Checkpoint does not have nuclei!\n");
+  if(!exist("basis.contr"))
+    throw std::runtime_error("Checkpoint does not have contractions!\n");
+  if(!exist("basis.data"))
+    throw std::runtime_error("Checkpoint does not have shell data!\n");
 
   hid_t dataset, datatype, dataspace;
   hsize_t dims[1];
@@ -554,6 +578,7 @@ void Checkpoint::read(const std::string & name, double & v) {
     open();
     cl=true;
   }
+  CHECK_EXIST();
 
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
@@ -630,6 +655,7 @@ void Checkpoint::read(const std::string & name, int & v) {
     open();
     cl=true;
   }
+  CHECK_EXIST();
 
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
@@ -711,6 +737,7 @@ void Checkpoint::read(const std::string & name, hbool_t & v) {
     open();
     cl=true;
   }
+  CHECK_EXIST();
 
   // Open the dataset.
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);

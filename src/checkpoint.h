@@ -93,6 +93,9 @@ class Checkpoint {
 
   /// Is the file open?
   bool is_open() const;
+  /// Does the entry exist in the file?
+  bool exist(const std::string & name);
+
 
   /**
    * Remove entry if exists. File needs to be opened beforehand. HDF5
