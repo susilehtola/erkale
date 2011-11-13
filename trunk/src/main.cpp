@@ -130,13 +130,15 @@ int main(int argc, char **argv) {
 
   // Get exchange and correlation functionals
   dft_t dft;
+  dft_t initdft;
+
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
     dft.gridtol=set.get_double("DFTFinalTol");
-  }
 
-  dft_t initdft(dft);
-  initdft.gridtol=set.get_double("DFTInitialTol");
+    initdft=dft;
+    initdft.gridtol=set.get_double("DFTInitialTol");
+  }
 
   // Check consistency of parameters
   if(!hf && !rohf && exact_exchange(dft.x_func)!=0.0)
