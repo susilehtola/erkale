@@ -57,7 +57,13 @@ bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
 }
 
 
-/// Use converged SCF potential Ha to solve orbitals in augmented basis.
+/**
+ * Double basis set method
+ *
+ * Augment the basis with diffuse functions and diagonalize the Fock
+ * matrix in the unoccupied space. The occupied orbitals and their
+ * energies stay the same in the approximation.
+ */
 void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t xcatom, size_t & ixc_orb, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin) {
   // Get indices of atoms to augment
   std::vector<size_t> augind=parse_range(splitline(set.get_string("XRSAugment"))[0]);
@@ -230,7 +236,6 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   printf("MO overlap\n");
   ovl.print();
   */
-
 
   // Form density matrix.
   arma::mat Paaug(Ntot,Ntot), Pbaug(Ntot,Ntot), Paug(Ntot,Ntot);
@@ -617,28 +622,78 @@ void save_spectrum(const std::vector<spectrum_t> & sp, const char *fname="dipole
   fclose(out);
 }
 
-bool load(uscf_t & sol) {
-  bool caok=sol.Ca.quiet_load(".erkale_Ca",arma::arma_binary);
-  bool cbok=sol.Cb.quiet_load(".erkale_Cb",arma::arma_binary);
-  bool Eaok=sol.Ea.quiet_load(".erkale_Ea",arma::arma_binary);
-  bool Ebok=sol.Eb.quiet_load(".erkale_Eb",arma::arma_binary);
-  bool Haok=sol.Ha.quiet_load(".erkale_Ha",arma::arma_binary);
-  bool Hbok=sol.Hb.quiet_load(".erkale_Hb",arma::arma_binary);
-  bool Paok=sol.Pa.quiet_load(".erkale_Pa",arma::arma_binary);
-  bool Pbok=sol.Pb.quiet_load(".erkale_Pb",arma::arma_binary);
+bool load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol) {
+  // Was the load a success?
+  bool ok=true;
 
-  return caok && cbok && Eaok && Ebok && Haok && Hbok && Paok && Pbok;
-}
+  // Basis set used in the checkpoint file
+  BasisSet loadbas;
 
-void save(const uscf_t & sol) {
-  sol.Ca.save(".erkale_Ca",arma::arma_binary);
-  sol.Cb.save(".erkale_Cb",arma::arma_binary);
-  sol.Ea.save(".erkale_Ea",arma::arma_binary);
-  sol.Eb.save(".erkale_Eb",arma::arma_binary);
-  sol.Ha.save(".erkale_Ha",arma::arma_binary);
-  sol.Hb.save(".erkale_Hb",arma::arma_binary);
-  sol.Pa.save(".erkale_Pa",arma::arma_binary);
-  sol.Pb.save(".erkale_Pb",arma::arma_binary);
+  try {
+    chkpt.read("Ca",sol.Ca);
+    chkpt.read("Cb",sol.Cb);
+    chkpt.read("Ea",sol.Ea);
+    chkpt.read("Eb",sol.Eb);
+    chkpt.read("Pa",sol.Pa);
+    chkpt.read("Pb",sol.Pb);
+
+    chkpt.read(loadbas);
+  } catch(...) {
+    ok=false;
+  }
+
+
+  if(ok) {
+    // Check consistency
+    if(!(basis==loadbas))
+      ok=false;
+  }
+
+  if(ok) {
+    // Get number of basis functions
+    size_t Nbf=basis.get_Nbf();
+    
+    if(sol.Ca.n_rows != Nbf)
+      ok=false;
+
+    if(sol.Cb.n_rows != Nbf)
+      ok=false;
+
+    if(sol.Ea.n_elem != sol.Ca.n_cols)
+      ok=false;
+
+    if(sol.Eb.n_elem != sol.Cb.n_cols)
+      ok=false;
+
+    if(sol.Ea.n_elem != sol.Eb.n_elem)
+      ok=false;
+
+    if(sol.Pa.n_rows != Nbf || sol.Pa.n_cols != Nbf)
+      ok=false;
+
+    if(sol.Pb.n_rows != Nbf || sol.Pb.n_cols != Nbf)
+      ok=false;
+  }
+
+  if(!ok) {
+    // Failed to load or solution was not consistent.
+    sol.Ca=arma::mat();
+    sol.Cb=arma::mat();
+    sol.Ea=arma::vec();
+    sol.Eb=arma::vec();
+    sol.Pa=arma::mat();
+    sol.Pb=arma::mat();
+  }
+
+  if(ok) {
+    // Was the calculation converged?
+
+    bool conv;
+    chkpt.read("Converged",conv);
+    ok=conv;
+  }
+
+  return ok;
 }
 
 int main(int argc, char **argv) {
@@ -752,8 +807,9 @@ int main(int argc, char **argv) {
   uscf_t sol;
 
   // Try to load orbitals and energies
-  bool loadok=load(sol);
-
+  Checkpoint testload(set.get_string("SaveChk"),false);
+  bool loadok=load(basis,testload,sol);
+  
   if(loadok) {
     printf("Loaded orbitals from file.\n");
 
@@ -873,9 +929,6 @@ int main(int argc, char **argv) {
       xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
       xcorb=solver.half_hole(xcatom,sol,conv,dft);
     }
-
-    // Save orbitals and energies
-    save(sol);
 
     printf("\n\n");
   } else {
