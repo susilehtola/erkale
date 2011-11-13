@@ -32,12 +32,22 @@
 #include "mathf.h"
 #include "obara-saika.h"
 #include "solidharmonics.h"
+#include "stringutil.h"
 
 // Debug LIBINT routines against Huzinaga integrals?
 //#define LIBINTDEBUG
 
+bool operator==(const nucleus_t & lhs, const nucleus_t & rhs) {
+  return (lhs.ind == rhs.ind) && (lhs.r == rhs.r) && (lhs.Z == rhs.Z) && \
+    (lhs.bsse == rhs.bsse) && (stricmp(lhs.symbol,rhs.symbol)==0);
+}
+
+bool operator==(const coords_t & lhs, const coords_t & rhs) {
+  return (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z);
+}
+
 // Operators for computing displacements
-coords_t operator-(const coords_t & lhs, const coords_t& rhs) {
+coords_t operator-(const coords_t & lhs, const coords_t & rhs) {
   coords_t ret;
   ret.x=lhs.x-rhs.x;
   ret.y=lhs.y-rhs.y;
@@ -349,11 +359,11 @@ coords_t GaussianShell::get_center() const {
 bool GaussianShell::operator<(const GaussianShell & rhs) const {
   // Sort first by nucleus
   if(cenind < rhs.cenind)
-    return 1;
+    return true;
   else if(cenind == rhs.cenind) {
     // Then by angular momentum
     if(am<rhs.am)
-      return 1;
+      return true;
     else if(am==rhs.am) {
       // Then by decreasing order of exponents
       if(c.size() && rhs.c.size())
@@ -361,7 +371,28 @@ bool GaussianShell::operator<(const GaussianShell & rhs) const {
     }
   }
 
-  return 0;
+  return false;
+}
+
+
+bool GaussianShell::operator==(const GaussianShell & rhs) const {
+  // Check first nucleus
+  if(cenind != rhs.cenind)
+    return false;
+  
+  // Then, angular momentum
+  if(am!=rhs.am)
+    return false;
+
+  // Then, by exponents
+  if(c.size() != rhs.c.size())
+    return false;
+
+  for(size_t i=0;i<c.size();i++)
+    if(!(c[i]==rhs.c[i]))
+      return false;
+
+  return true;
 }
 
 size_t GaussianShell::get_first_ind() const {
@@ -2577,6 +2608,24 @@ BasisSet BasisSet::exchange_fitting() const {
   fit.form_unique_shellpairs();
 
   return fit;
+}
+
+bool BasisSet::operator==(const BasisSet & rhs) const {
+  if(nuclei.size() != rhs.nuclei.size())
+    return false;
+
+  for(size_t i=0;i<nuclei.size();i++)
+    if(!(nuclei[i]==rhs.nuclei[i]))
+      return false;
+
+  if(shells.size() != rhs.shells.size())
+    return false;
+
+  for(size_t i=0;i<shells.size();i++)
+    if(!(shells[i]==rhs.shells[i]))
+      return false;
+
+  return true;
 }
 
 GaussianShell dummyshell() {
