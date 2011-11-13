@@ -79,6 +79,9 @@ typedef struct {
   std::vector<const GaussianShell *> shells;
 } nucleus_t;
 
+/// Comparison operator
+bool operator==(const nucleus_t & lhs, const nucleus_t & rhs);
+
 /// Structure for unique shell pairs
 typedef struct {
   /// Index of first shell
@@ -106,6 +109,8 @@ class BasisSetLibrary;
 /// Order shells solely on merit of exponents (for forming density fitting basis)
 bool exponent_compare(const GaussianShell & lhs, const GaussianShell & rhs);
 
+/// Comparison operator
+bool operator==(const coords_t & lhs, const coords_t & rhs);
 /// Compute displacement
 coords_t operator-(const coords_t & lhs, const coords_t & rhs);
 /// Compute sum
@@ -356,6 +361,9 @@ class BasisSet {
 
   /// Project MOs from other basis set
   void projectMOs(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const;
+
+  /// Are the basis sets the same?
+  bool operator==(const BasisSet & rhs) const;
 };
 
 /// Compute a shell of ERIs, transformed into spherical basis if necessary
@@ -484,6 +492,8 @@ class GaussianShell {
 
   /// Comparison operator for angular momentum ordering
   bool operator<(const GaussianShell & rhs) const;
+  /// Are the two the same?
+  bool operator==(const GaussianShell & rhs) const;
 
   /// Get index of first function on shell
   size_t get_first_ind() const;
