@@ -15,6 +15,7 @@
  */
 
 #include "checkpoint.h"
+#include <istream>
 
 // Helper macros
 #define CHECK_OPEN() {if(!opend) {ERROR_INFO(); throw std::runtime_error("Cannot access checkpoint file that has not been opened!\n");}}
@@ -32,10 +33,17 @@ Checkpoint::Checkpoint(const std::string & fname, bool write) {
     opend=true;
     // Close the file
     close();
+  } else {
+    // Check existence of file
+    std::ifstream chkpt(fname.c_str());
+    if(!chkpt.good())
+      throw std::runtime_error("Trying to load a non-existent checkpoint file!\n");
   }
 }
 
 Checkpoint::~Checkpoint() {
+  if(opend)
+    close();
 }
 
 void Checkpoint::open() {
@@ -764,4 +772,9 @@ void Checkpoint::read(const std::string & name, hbool_t & v) {
   H5Dclose(dataset);
 
   if(cl) close();
+}
+
+bool file_exists(const std::string & name) {
+  std::ifstream file(name.c_str());
+  return file.good();
 }

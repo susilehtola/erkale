@@ -40,6 +40,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cfloat>
+#include <istream>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -55,7 +56,6 @@ typedef struct {
 bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
   return lhs.E<rhs.E;
 }
-
 
 /**
  * Double basis set method
@@ -721,6 +721,7 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_scf_settings();
+  set.set_string("Logfile","erkale_xrs.log");
   set.add_string("LoadChk","Initialize with ground state calculation from file","");
   set.add_string("SaveChk","Save results to ","erkale_xrs.chk");
 
@@ -807,8 +808,12 @@ int main(int argc, char **argv) {
   uscf_t sol;
 
   // Try to load orbitals and energies
-  Checkpoint testload(set.get_string("SaveChk"),false);
-  bool loadok=load(basis,testload,sol);
+  bool loadok=false;
+  if(file_exists(set.get_string("SaveChk"))) {
+    Checkpoint testload(set.get_string("SaveChk"),false);
+    loadok=load(basis,testload,sol);
+    if(loadok) fprintf(stderr,"Loaded existing checkpoint file.\n");
+  }
   
   if(loadok) {
     printf("Loaded orbitals from file.\n");
