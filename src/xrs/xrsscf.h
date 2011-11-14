@@ -23,22 +23,28 @@
 #include "scf.h"
 
 class XRSSCF : public SCF {
-  // Excite beta spin?
+  /// Excite beta spin?
   bool spin;
-  // Number of alpha and beta electrons
+  /// Number of alpha electrons
   int nocca;
+  /// Number of beta electrons 
   int noccb;
 
   /// List of frozen orbitals
-  std::vector<arma::vec> freeze;
+  std::vector< std::vector<arma::vec> > freeze;
   
  public:
+  /// Constructor
   XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool spin);
+  /// Destructor
   ~XRSSCF();
 
-  void set_frozen(const arma::mat & C);
+  /// Set frozen orbitals in ind:th symmetry group
+  void set_frozen(const arma::mat & C, size_t ind);
 
+  /// Compute 1st core-excited state
   size_t full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;
+  /// Compute TP solution
   size_t half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;
 };
 
@@ -76,9 +82,9 @@ bool operator<(const locdist_t & lhs, const locdist_t & rhs);
 size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C); 
 
 /// Get symmetry groups of orbitals
-std::vector<int> symgroups(const arma::mat & C, const arma::mat & S, const std::vector<arma::vec> & freeze);
+std::vector<int> symgroups(const arma::mat & C, const arma::mat & S, const std::vector< std::vector<arma::vec> > & freeze);
 
 /// Freeze orbitals
-void freeze_orbs(const std::vector<arma::vec> & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H);
+void freeze_orbs(const std::vector< std::vector<arma::vec> > & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H);
 
 #endif
