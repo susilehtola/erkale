@@ -43,10 +43,13 @@ XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt,
 XRSSCF::~XRSSCF() {
 }
 
-void XRSSCF::set_frozen(const arma::mat & C) {
-  freeze.resize(C.n_cols);
+void XRSSCF::set_frozen(const arma::mat & C, size_t ind) {
+  if(ind-1>=freeze.size())
+    freeze.resize(ind+1);
+
+  freeze[ind].resize(C.n_cols);
   for(size_t i=0;i<C.n_cols;i++)
-    freeze[i]=C.col(i);
+    freeze[ind][i]=C.col(i);
 }
 
 /// Get excited atom from atomlist
@@ -295,38 +298,53 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
   return locd;
 }
 
-std::vector<int> symgroups(const arma::mat & C, const arma::mat& S, const std::vector<arma::vec> & freeze) {
+std::vector<int> symgroups(const arma::mat & C, const arma::mat& S, const std::vector< std::vector<arma::vec> > & freeze) {
   // Initialize groups.
   std::vector<int> gp(C.n_cols,0);
 
-  // Loop over frozen orbitals.
-  for(size_t ifz=0;ifz<freeze.size();ifz++) {
-    // Figure out maximum overlap.
-
-    double maxovl=0.0;
-    size_t maxind=-1;
-
-    // Helper vector
-    arma::vec hlp=S*freeze[ifz];
-
+  // Loop over frozen core groups
+  for(size_t igp=0;igp<freeze.size();igp++) {
+    
+    // Compute overlap of orbitals with frozen core orbitals
+    std::vector<locdist_t> ovl(C.n_cols);
     for(size_t i=0;i<C.n_cols;i++) {
-      double ovl=fabs(arma::dot(C.col(i),hlp));
-      if(ovl>maxovl) {
-	maxind=i;
-	maxovl=ovl;
+      
+      // Store index
+      ovl[i].ind=i;
+      // Initialize overlap
+      ovl[i].dist=0.0;
+      
+      // Helper vector
+      arma::vec hlp=S*C.col(i);
+      
+      // Loop over frozen orbitals.
+      for(size_t ifz=0;ifz<freeze[igp].size();ifz++) {
+	// Compute projection
+	double proj=arma::dot(hlp,freeze[igp][ifz]);
+	// Increment overlap
+	ovl[i].dist+=proj*proj;
       }
     }
 
-    // Change symmetry of orbital with maximum overlap
-    gp[maxind]=ifz+1;
+    // Sort the projections
+    std::sort(ovl.begin(),ovl.end());
+    
+    // Store the symmetries
+    for(size_t i=0;i<freeze[igp].size();i++) {
+      // The orbital with the maximum overlap is (remember ovl is now in increasing order)
+      size_t maxind=ovl[C.n_cols-1-i].ind;
+      // Change symmetry of orbital with maximum overlap
+      gp[maxind]=igp+1;
 
-    //    printf("Set symmetry of orbital %i with overlap %e to %i.\n",(int) maxind,maxovl,gp[maxind]);
+      printf("Set symmetry of orbital %i to %i.\n",(int) maxind+1,gp[maxind]);
+    }
+    
   }
-
+  
   return gp;
 }
 
-void freeze_orbs(const std::vector<arma::vec> & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H) {
+void freeze_orbs(const std::vector< std::vector<arma::vec> > & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H) {
   // Freezes the orbitals corresponding to different symmetry groups.
 
   // Form H_MO

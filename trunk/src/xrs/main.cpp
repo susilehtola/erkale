@@ -638,15 +638,17 @@ bool load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol) {
     chkpt.read("Pb",sol.Pb);
 
     chkpt.read(loadbas);
-  } catch(...) {
+  } catch(std::runtime_error err) {
     ok=false;
+    fprintf(stderr,"Loading failed due to \"%s\".\n",err.what());
   }
-
 
   if(ok) {
     // Check consistency
-    if(!(basis==loadbas))
+    if(!(basis==loadbas)) {
       ok=false;
+      fprintf(stderr,"Basis sets differ!\n");
+    }
   }
 
   if(ok) {
@@ -673,8 +675,11 @@ bool load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol) {
 
     if(sol.Pb.n_rows != Nbf || sol.Pb.n_cols != Nbf)
       ok=false;
+    
+    if(!ok)
+      fprintf(stderr,"Dimensions do not match!\n");
   }
-
+  
   if(!ok) {
     // Failed to load or solution was not consistent.
     sol.Ca=arma::mat();
@@ -691,6 +696,9 @@ bool load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol) {
     bool conv;
     chkpt.read("Converged",conv);
     ok=conv;
+
+    if(!ok)
+      fprintf(stderr,"Calculation was not converged.\n");
   }
 
   return ok;
@@ -721,7 +729,14 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_scf_settings();
+
+  // Change defaults
+  set.set_bool("UseDIIS",0);
+  set.set_bool("UseADIIS",0);
+  set.set_bool("UseBroyden",1);
   set.set_string("Logfile","erkale_xrs.log");
+
+  // Add xrs specific settings
   set.add_string("LoadChk","Initialize with ground state calculation from file","");
   set.add_string("SaveChk","Save results to ","erkale_xrs.chk");
 
@@ -806,36 +821,7 @@ int main(int argc, char **argv) {
 
   // TP solution
   uscf_t sol;
-
-  // Try to load orbitals and energies
-  bool loadok=false;
-  if(file_exists(set.get_string("SaveChk"))) {
-    Checkpoint testload(set.get_string("SaveChk"),false);
-    loadok=load(basis,testload,sol);
-    if(loadok) fprintf(stderr,"Loaded existing checkpoint file.\n");
-  }
-  
-  if(loadok) {
-    printf("Loaded orbitals from file.\n");
-
-    // Check sizes of matrices
-    double Sratio;
-    arma::mat Sinvh=BasOrth(basis.overlap(),set,Sratio);
-    // Number of orbitals
-    size_t Norb=Sinvh.n_cols;
-    // Number of basis functions
-    size_t Nbf=Sinvh.n_rows;
-
-    bool Eok=(sol.Ea.n_elem==Norb) && (sol.Eb.n_elem==Norb);
-    bool Caok=(sol.Ca.n_rows==Nbf) && (sol.Ca.n_cols==Norb);
-    bool Cbok=(sol.Cb.n_rows==Nbf) && (sol.Cb.n_cols==Norb);
-    bool Haok=(sol.Ha.n_rows==Nbf) && (sol.Ha.n_cols==Nbf);
-    bool Hbok=(sol.Hb.n_rows==Nbf) && (sol.Hb.n_cols==Nbf);
-
-    loadok=Eok && Caok && Cbok && Haok && Hbok;
-    if(!loadok)
-      printf("Inconsistency in loaded orbitals. Performing calculation.\n");
-  }
+  sol.en.E=0.0;
 
   // Index of excited orbital
   size_t xcorb;
@@ -844,8 +830,18 @@ int main(int argc, char **argv) {
   int nocca, noccb;
   get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),nocca,noccb);
 
+  // Try to load orbitals and energies
+  bool loadok=false;
+  if(file_exists(set.get_string("SaveChk"))) {
+    Checkpoint testload(set.get_string("SaveChk"),false);
+    loadok=load(basis,testload,sol);
+    if(loadok) fprintf(stderr,"Loaded existing checkpoint file.\n");
+  }
+
+  // No existing calculation found or system was different => perform calculation
   if(!loadok) {
     Checkpoint chkpt(set.get_string("SaveChk"),true);
+    chkpt.write(basis);
 
     // Amount of (orbital rotation) localized orbitals (nloc-1 are then frozen)
     size_t nloc=0;
@@ -921,9 +917,9 @@ int main(int argc, char **argv) {
     // Set frozen orbitals
     if(nloc>0) {
       if(spin)
-	solver.set_frozen(sol.Cb.submat(0,1,sol.Cb.n_rows-1,nloc-1));
+	solver.set_frozen(sol.Cb.submat(0,1,sol.Cb.n_rows-1,nloc-1),0);
       else
-	solver.set_frozen(sol.Ca.submat(0,1,sol.Ca.n_rows-1,nloc-1));
+	solver.set_frozen(sol.Ca.submat(0,1,sol.Ca.n_rows-1,nloc-1),0);
     }
     
     // Do TP calculation.
