@@ -142,5 +142,7 @@ class Checkpoint {
   void read(const std::string & name, bool & val);
 };
 
+/// Check for existence of file
+bool file_exists(const std::string & name);
 
 #endif
