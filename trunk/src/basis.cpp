@@ -94,7 +94,12 @@ bool operator<(const contr_t & lhs, const contr_t & rhs) {
 }
 
 bool operator==(const contr_t & lhs, const contr_t & rhs) {
-  return (lhs.z==rhs.z) && (lhs.c==rhs.c);
+  //  return (lhs.z==rhs.z) && (lhs.c==rhs.c);
+
+  // Since this also needs to work for saved and reloaded basis sets, we need to relax the comparison.
+  const double tol=10*DBL_EPSILON;
+
+  return (fabs(lhs.z-rhs.z)<tol) && (fabs(lhs.c-rhs.c)<tol);
 }
 
 GaussianShell::GaussianShell() {
@@ -2615,15 +2620,19 @@ bool BasisSet::operator==(const BasisSet & rhs) const {
     return false;
 
   for(size_t i=0;i<nuclei.size();i++)
-    if(!(nuclei[i]==rhs.nuclei[i]))
+    if(!(nuclei[i]==rhs.nuclei[i])) {
+      //      fprintf(stderr,"Nuclei %i differ!\n",(int) i);
       return false;
+    }
 
   if(shells.size() != rhs.shells.size())
     return false;
 
   for(size_t i=0;i<shells.size();i++)
-    if(!(shells[i]==rhs.shells[i]))
+    if(!(shells[i]==rhs.shells[i])) {
+      //      fprintf(stderr,"Shells %i differ!\n",(int) i);
       return false;
+    }
 
   return true;
 }
