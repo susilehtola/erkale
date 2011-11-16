@@ -178,7 +178,7 @@ void Checkpoint::read(const std::string & name, arma::mat & m) {
 
   // Allocate memory
   m.zeros(dims[0],dims[1]);
-  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, m.memptr());
+  H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, m.memptr());
 
   // Close dataspace
   H5Sclose(dataspace);
@@ -268,7 +268,7 @@ void Checkpoint::read(const std::string & name, std::vector<double> & v) {
 
   // Allocate memory
   v.resize(dims[0]);
-  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &(v[0]));
+  H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &(v[0]));
 
   // Close dataspace
   H5Sclose(dataspace);
@@ -346,6 +346,7 @@ void Checkpoint::write(const BasisSet & basis) {
   H5Dclose(dataset);
   H5Sclose(dataspace);
   H5Tclose(datatype);
+  H5Tclose(symtype);
 
   /* Write shell data, contractions first */
 
@@ -441,8 +442,21 @@ void Checkpoint::read(BasisSet & basis) {
 
   // Open the dataset.
   dataset = H5Dopen (file, "basis.nucs", H5P_DEFAULT);
-  // Get the data type
-  datatype = H5Dget_type(dataset);
+
+  // Create the datatype
+  datatype = H5Tcreate(H5T_COMPOUND, sizeof(nuc_t));
+  H5Tinsert(datatype, "ind", HOFFSET(nuc_t, ind), H5T_NATIVE_HSIZE);
+  H5Tinsert(datatype, "rx", HOFFSET(nuc_t, rx), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "ry", HOFFSET(nuc_t, ry), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "rz", HOFFSET(nuc_t, rz), H5T_NATIVE_DOUBLE);
+
+  H5Tinsert(datatype, "bsse", HOFFSET(nuc_t, bsse), H5T_NATIVE_HBOOL);
+  H5Tinsert(datatype, "Z", HOFFSET(nuc_t, Z), H5T_NATIVE_INT);
+
+  hid_t symtype=H5Tcopy(H5T_C_S1);
+  H5Tset_size(symtype,SYMLEN);
+  H5Tinsert(datatype, "sym", HOFFSET(nuc_t, sym), symtype);
+
   // Get dataspace
   dataspace = H5Dget_space(dataset);
   // Get the number of nuclei
@@ -456,15 +470,20 @@ void Checkpoint::read(BasisSet & basis) {
   // Free memory.
   H5Sclose(dataspace);
   H5Tclose(datatype);
+  H5Tclose(symtype);
   H5Dclose(dataset);
 
   // ***** Then, read the contrations *****
 
   // Open the dataset.
   dataset = H5Dopen (file, "basis.contr", H5P_DEFAULT);
-  // Get the data type
-  datatype  = H5Dget_type(dataset);
 
+  // Create datatype
+  hid_t contrdata = H5Tcreate (H5T_COMPOUND, sizeof(contr_t));
+  H5Tinsert(contrdata, "c", HOFFSET(contr_t, c), H5T_NATIVE_DOUBLE);
+  H5Tinsert(contrdata, "z", HOFFSET(contr_t, z), H5T_NATIVE_DOUBLE);
+  datatype = H5Tvlen_create(contrdata);
+  
   // Get dataspace
   dataspace = H5Dget_space(dataset);
   // Get the number of shells
@@ -478,14 +497,21 @@ void Checkpoint::read(BasisSet & basis) {
   // Free memory.
   H5Sclose(dataspace);
   H5Tclose(datatype);
+  H5Tclose(contrdata);
   H5Dclose(dataset);
 
   // ***** and the shell info *****
 
   // Open the dataset.
   dataset = H5Dopen (file, "basis.data", H5P_DEFAULT);
-  // Get the data type
-  datatype  = H5Dget_type(dataset);
+
+  // and the data type
+  datatype = H5Tcreate(H5T_COMPOUND, sizeof(shell_data_t));
+
+  H5Tinsert(datatype, "indstart", HOFFSET(shell_data_t, indstart), H5T_NATIVE_HSIZE);
+  H5Tinsert(datatype, "am", HOFFSET(shell_data_t, am), H5T_NATIVE_INT);
+  H5Tinsert(datatype, "uselm", HOFFSET(shell_data_t, uselm), H5T_NATIVE_HBOOL);
+  H5Tinsert(datatype, "cenind", HOFFSET(shell_data_t, cenind), H5T_NATIVE_HSIZE);
 
   // Get dataspace
   dataspace = H5Dget_space(dataset);
@@ -612,7 +638,7 @@ void Checkpoint::read(const std::string & name, double & v) {
     throw std::runtime_error("Error - dataspace is not of scalar type!\n");
 
   // Read
-  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
+  H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
   
   // Close dataspace
   H5Sclose(dataspace);
@@ -685,7 +711,7 @@ void Checkpoint::read(const std::string & name, int & v) {
     throw std::runtime_error("Error - dataspace is not of scalar type!\n");
 
   // Read
-  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
+  H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
   
   // Close dataspace
   H5Sclose(dataspace);
@@ -762,7 +788,7 @@ void Checkpoint::read(const std::string & name, hbool_t & v) {
     throw std::runtime_error("Error - dataspace is not of scalar type!\n");
 
   // Read
-  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
+  H5Dread(dataset, H5T_NATIVE_HBOOL, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
   
   // Close dataspace
   H5Sclose(dataspace);
