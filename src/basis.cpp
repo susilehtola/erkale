@@ -2694,6 +2694,14 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
   // Number of atoms is
   size_t Nat=atoms.size();
 
+  // Indices of atoms to decontract basis set for
+  std::vector<size_t> dec;
+  if(stricmp(set.get_string("Decontract"),"")!=0)
+    dec=parse_range(set.get_string("Decontract"));
+  // Convert to C++ indexing
+  for(size_t i=0;i<dec.size();i++)
+    dec[i]--;
+
   // Create basis set
   BasisSet basis(Nat,set);
   // and add atoms to basis set
@@ -2733,6 +2741,14 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
       // Did not find a special basis, use the general one instead.
       elbas=baslib.get_element(el,0);
     }
+
+    // Decontract set?
+    bool decon=false;
+    for(size_t j=0;j<dec.size();j++)
+      if(i==dec[j])
+	decon=true;
+    if(decon)
+      elbas.decontract();
 
     basis.add_shells(i,elbas);
   }
