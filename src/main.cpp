@@ -119,15 +119,11 @@ int main(int argc, char **argv) {
   conv.deltaPmax=set.get_double("DeltaPmax");
   conv.deltaPrms=set.get_double("DeltaPrms");
 
-  // Initial convergence settings
-  convergence_t initconv(conv);
-  initconv.deltaEmax*=set.get_double("DeltaInit");
-  initconv.deltaPmax*=set.get_double("DeltaInit");
-  initconv.deltaPrms*=set.get_double("DeltaInit");
-
   // Get exchange and correlation functionals
   dft_t dft;
   dft_t initdft;
+  // Initial convergence settings
+  convergence_t initconv;
 
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
@@ -135,6 +131,11 @@ int main(int argc, char **argv) {
 
     initdft=dft;
     initdft.gridtol=set.get_double("DFTInitialTol");
+
+    initconv=conv;
+    initconv.deltaEmax*=set.get_double("DFTDelta");
+    initconv.deltaPmax*=set.get_double("DFTDelta");
+    initconv.deltaPrms*=set.get_double("DFTDelta");
   }
 
   // Check consistency of parameters

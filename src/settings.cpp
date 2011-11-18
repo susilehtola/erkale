@@ -89,8 +89,6 @@ void Settings::add_scf_settings() {
   dset.push_back(gend("DeltaPrms", "Maximum allowed RMS difference of density matrix", 1e-8));
   dset.push_back(gend("DeltaPmax", "Maximum allowed maximum difference of density matrix", 1e-6));
   dset.push_back(gend("DeltaEmax", "Maximum allowed change of energy", 1e-6));
-  // Relative factor for initialization
-  dset.push_back(gend("DeltaInit", "When to switch to final calculation (mostly DFT), relative to Delta parameters", 100.0));
 
   // Maximum iterations
   iset.push_back(geni("MaxIter", "Maximum number of iterations in SCF cycle", 100));
@@ -105,6 +103,8 @@ void Settings::add_dft_settings() {
   // Initial and final tolerances of DFT grid
   dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-3));
   dset.push_back(gend("DFTFinalTol", "Tolerance of final DFT grid", 1e-5));
+  // Relative factor for initialization
+  dset.push_back(gend("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 100.0));
   
   // Use density fitting if possible?
   bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
