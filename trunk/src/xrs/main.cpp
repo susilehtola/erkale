@@ -811,7 +811,7 @@ int main(int argc, char **argv) {
   // Convergence settings for initialization
   convergence_t init_conv(conv);
   // Make initialization parameters more relaxed
-  double initfac=set.get_double("DeltaInit");
+  double initfac=set.get_double("DFTDelta");
   init_conv.deltaEmax*=initfac;
   init_conv.deltaPmax*=initfac;
   init_conv.deltaPrms*=initfac;
