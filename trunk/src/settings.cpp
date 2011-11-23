@@ -324,7 +324,26 @@ void Settings::parse(std::string filename) {
 	  } else if(is_int(words[0])) {
 	    set_int(words[0],readint(words[1]));
 	  } else if(is_bool(words[0])) {
-	    set_bool(words[0],readint(words[1]));
+	    // Was the value given as a number or as a string?
+	    if(isalpha(words[1][0])) {
+
+	      // As a string - parse it
+	      bool value;
+	      if(stricmp(words[1],"true")==0)
+		value=true;
+	      else if(stricmp(words[1],"false")==0)
+		value=false;
+	      else {
+		value=false;
+
+		std::ostringstream oss;
+		oss << "Could not parse the truth value " << words[1] << " for setting "<<words[0]<<"!\n";
+		throw std::runtime_error(oss.str());
+	      }
+
+	      set_bool(words[0],value);
+	    } else
+	      set_bool(words[0],readint(words[1]));
 	  } else if(is_string(words[0])) {
 	    // Concatenate value
 	    std::string val=words[1];
