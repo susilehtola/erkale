@@ -1,8 +1,4 @@
-* Implement checkpointing / saving of results (using HDF5?).
-
 * The number of executables is growing rapidly => identify common code and place in parser routines.
-
-* Installed headers need to be preprocessed.
 
 * Write pretty-printing routine for making bars such as *** text ***
   or --- text ---.
