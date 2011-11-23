@@ -39,8 +39,8 @@ int main(int argc, char **argv) {
   printf("(c) Jussi Lehtola, 2010-2011.\n");
   print_license();
 
-  if(argc!=2) {
-    printf("Usage: $ %s runfile\n",argv[0]);
+  if(argc!=1 && argc!=2) {
+    printf("Usage: $ %s (runfile)\n",argv[0]);
     return 0;
   }
 
@@ -50,9 +50,13 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
-  set.add_bool("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", 1);
+  set.add_bool("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", true);
   set.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
-  set.parse(argv[1]);
+
+  if(argc==2)
+    set.parse(argv[1]);
+  else
+    printf("Using default settings.\n");
 
   // Load checkpoint
   Checkpoint chkpt(set.get_string("LoadChk"),false);
