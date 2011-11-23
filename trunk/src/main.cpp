@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   dft_t dft;
   dft_t initdft;
   // Initial convergence settings
-  convergence_t initconv;
+  convergence_t initconv(conv);
 
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
@@ -132,7 +132,6 @@ int main(int argc, char **argv) {
     initdft=dft;
     initdft.gridtol=set.get_double("DFTInitialTol");
 
-    initconv=conv;
     initconv.deltaEmax*=set.get_double("DFTDelta");
     initconv.deltaPmax*=set.get_double("DFTDelta");
     initconv.deltaPrms*=set.get_double("DFTDelta");
