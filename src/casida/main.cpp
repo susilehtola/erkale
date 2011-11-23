@@ -75,8 +75,20 @@ int main(int argc, char **argv) {
   // Get functional strings
   int xfunc=find_func(set.get_string("CasidaX"));
   int cfunc=find_func(set.get_string("CasidaC"));
+  
+  if(is_correlation(xfunc))
+    throw std::runtime_error("Refusing to use a correlation functional as exchange.\n");
+  if(is_kinetic(xfunc))
+    throw std::runtime_error("Refusing to use a kinetic energy functional as exchange.\n");
+  if(is_exchange(cfunc))
+    throw std::runtime_error("Refusing to use an exchange functional as correlation.\n");
+  if(is_kinetic(cfunc))
+    throw std::runtime_error("Refusing to use a kinetic energy functional as correlation.\n");
   set.add_int("CasidaXfunc","Internal variable",xfunc);
   set.add_int("CasidaCfunc","Internal variable",cfunc);
+
+  // Print information about used functionals
+  print_info(xfunc,cfunc);
 
   // Get values of q to compute spectrum for
   std::vector<double> qvals=parse_range_double(set.get_string("CasidaQval"));

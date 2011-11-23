@@ -46,15 +46,11 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   C.push_back(Cv);
   P.push_back(Pv);
 
-  printf("\n*** Warning! The Casida implementation is still experimental. ***\n");
-  fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental. ***\n");
-
   // Form pairs
   std::vector< std::vector<double> > occ;
   occ.push_back(occs);
   form_pairs(set,occ);
   printf("Casida calculation has %u pairs.\n",(unsigned int) pairs[0].size());
-  fprintf(stderr,"Casida calculation has %u pairs.\n",(unsigned int) pairs[0].size());
 
   // Parse coupling mode
   parse_coupling(set);
@@ -74,16 +70,12 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   P.push_back(Pa);
   P.push_back(Pb);
 
-  printf("\n*** Warning! The Casida implementation is still experimental. ***\n");
-  fprintf(stderr,"\n*** Warning! The Casida implementation is still experimental. ***\n");
-
   // Form pairs
   std::vector< std::vector<double> > occ;
   occ.push_back(occa);
   occ.push_back(occb);
   form_pairs(set,occ);
   printf("Casida calculation has %u spin up and %u spin down pairs.\n",(unsigned int) pairs[0].size(),(unsigned int) pairs[1].size());
-  fprintf(stderr,"Casida calculation has %u spin up and %u spin down pairs.\n",(unsigned int) pairs[0].size(),(unsigned int) pairs[1].size());
 
   // Parse coupling mode
   parse_coupling(set);
@@ -322,7 +314,6 @@ void Casida::solve() {
     w_i(i) = sqrt(w_i(i));
 
   printf("Casida equations solved in %s.\n",t.elapsed().c_str());
-  fprintf(stderr,"Solution %s.\n",t.elapsed().c_str());
 }
 
 arma::mat Casida::transition(const std::vector<arma::mat> & m) const {
@@ -727,7 +718,6 @@ void Casida::Kcoul(const BasisSet & basis) {
     }
 
   printf("Coulomb coupling matrix computed in %s.\n",t.elapsed().c_str());
-  fprintf(stderr,"KCoul %s.\n",t.elapsed().c_str());
 }
 
 void Casida::Kxc(const BasisSet & bas, double tol, int x_func, int c_func) {
@@ -739,5 +729,4 @@ void Casida::Kxc(const BasisSet & bas, double tol, int x_func, int c_func) {
   grid.Kxc(P,tol,x_func,c_func,C,pairs,K);
 
   printf("XC coupling matrix computed in %s.\n",t.elapsed().c_str());
-  fprintf(stderr,"KXC %s.\n",t.elapsed().c_str());
 }
