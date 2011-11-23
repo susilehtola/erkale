@@ -24,8 +24,11 @@ export CPP="${CC} -E"
 # Fortran preprocessor
 export FCCPP="${FC} -E"
 
-# C flags to use
-export CFLAGS="-Wall -O2 -funroll-loops -march=native -mssse3 -fPIC"
+# C flags to use. 
+#For new versions of GCC on modern x86 hardware
+#export CFLAGS="-Wall -O2 -funroll-loops -fPIC -march=native -msse3"
+#For older versions
+export CFLAGS="-Wall -O2 -funroll-loops -fPIC"
 
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
@@ -48,7 +51,7 @@ export XCVER="1.1.0"
 export INTVER="1.1.4"
 export ARMAVER="2.2.3"
 export CMAKEVER="2.8.6"
-export HDF5VER="1.8.7"
+export HDF5VER="1.8.8"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -73,7 +76,7 @@ if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
  if [ ! -d ${builddir}/gsl-${GSLVER} ]; then
   if [ ! -f ${srcdir}/gsl-${GSLVER}.tar.gz ]; then
    cd ${srcdir}
-   wget ftp://ftp.gnu.org/gnu/gsl/gsl-${GSLVER}.tar.gz
+   wget -O gsl-${GSLVER}.tar.gz ftp://ftp.gnu.org/gnu/gsl/gsl-${GSLVER}.tar.gz
   fi
   cd ${builddir}
   tar zxf ${srcdir}/gsl-${GSLVER}.tar.gz
@@ -94,7 +97,7 @@ if [ ! -f ${topdir}/hdf5/lib/libhdf5.a ]; then
  if [ ! -d ${builddir}/hdf5-${HDF5VER} ]; then
   if [ ! -f ${srcdir}/hdf5-${HDF5VER}.tar.gz ]; then
    cd ${srcdir}
-   wget http://www.hdfgroup.org/ftp/HDF5/current/src/hdf5-${HDF5VER}.tar.gz
+   wget -O hdf5-${HDF5VER}.tar.gz http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-${HDF5VER}/src/hdf5-${HDF5VER}.tar.gz
   fi
   cd ${builddir}
   tar zxf ${srcdir}/hdf5-${HDF5VER}.tar.gz
@@ -115,7 +118,7 @@ if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
  if [ ! -d ${builddir}/libxc-${XCVER} ]; then
   if [ ! -f ${srcdir}/libxc-${XCVER}.tar.gz ]; then
    cd ${srcdir}
-   wget "http://www.tddft.org/programs/octopus/down.php?file=libxc/libxc-${XCVER}.tar.gz"
+   wget -O libxc-${XCVER}.tar.gz "http://www.tddft.org/programs/octopus/down.php?file=libxc/libxc-${XCVER}.tar.gz"
   fi
   cd ${builddir}
   tar zxf ${srcdir}/libxc-${XCVER}.tar.gz
@@ -151,7 +154,7 @@ if [ ! -f ${topdir}/libint/lib/libint.a ]; then
  if [ ! -d ${builddir}/libint-${INTVER} ]; then
   if [ ! -f ${srcdir}/libint-${INTVER}.tar.gz ]; then
    cd ${srcdir}
-   wget "http://sourceforge.net/projects/libint/files/v1-releases/libint-1.1.4.tar.gz/download"
+   wget -O libint-${INTVER}.tar.gz "http://sourceforge.net/projects/libint/files/v1-releases/libint-${INTVER}.tar.gz/download"
   fi
   cd ${builddir}
   tar zxf ${srcdir}/libint-${INTVER}.tar.gz
@@ -178,7 +181,7 @@ fi
 if [ ! -d ${topdir}/armadillo-${ARMAVER} ]; then
  if [ ! -f ${srcdir}/armadillo-${ARMAVER}.tar.gz ]; then
   cd ${srcdir}
-  wget http://sourceforge.net/projects/arma/files/armadillo-${ARMAVER}.tar.gz
+  wget -O armadillo-${ARMAVER}.tar.gz http://sourceforge.net/projects/arma/files/armadillo-${ARMAVER}.tar.gz
  fi
  cd ${topdir}
  tar zxf ${srcdir}/armadillo-${ARMAVER}.tar.gz
@@ -203,7 +206,7 @@ if [ ! -f ${topdir}/cmake/bin/cmake ]; then
  if [ ! -d ${builddir}/cmake-${CMAKEVER} ]; then
   if [ ! -f ${srcdir}/cmake-${CMAKEVER}.tar.gz ]; then
    cd ${srcdir}
-   wget http://www.cmake.org/files/v2.8/cmake-${CMAKEVER}.tar.gz
+   wget -O cmake-${CMAKEVER}.tar.gz http://www.cmake.org/files/v2.8/cmake-${CMAKEVER}.tar.gz
   fi
   cd ${builddir}
   tar zxf ${srcdir}/cmake-${CMAKEVER}.tar.gz
