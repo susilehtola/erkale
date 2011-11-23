@@ -49,8 +49,8 @@ int main(int argc, char **argv) {
 
   print_license();
 
-  if(argc!=2) {
-    printf("Usage: $ %s runfile\n",argv[0]);
+  if(argc!=1 && argc!=2) {
+    printf("Usage: $ %s (runfile)\n",argv[0]);
     return 0;
   }
 
@@ -70,7 +70,14 @@ int main(int argc, char **argv) {
   set.add_string("CasidaStates","States to include in Casida calculation, eg ""1,3-4,10,13"" ","");
   set.add_string("CasidaQval","Values of Q to compute spectrum for","");
   set.add_string("LoadChk","Checkpoint to load","erkale.chk");
-  set.parse(std::string(argv[1]));
+
+  if(argc==2)
+    set.parse(std::string(argv[1]));
+  else
+    printf("\nDefault settings used.");
+
+  // Print settings
+  set.print();
 
   // Get functional strings
   int xfunc=find_func(set.get_string("CasidaX"));
