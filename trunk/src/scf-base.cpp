@@ -255,12 +255,14 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   NO_to_AO=arma::trans(Sm*Pvec);
 }
 
-void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta) {
+void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose) {
   /*
    * T. Tsuchimochi and G. E. Scuseria, "Constrained active space
    * unrestricted mean-field methods for controlling
    * spin-contamination", J. Chem. Phys. 134, 064101 (2011).
    */
+
+  Timer t;
 
   arma::mat AO_to_NO;
   arma::mat NO_to_AO;
@@ -323,6 +325,9 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   // Update Fa and Fb
   Fa_AO+=lambda_AO;
   Fb_AO-=lambda_AO;
+
+  if(verbose)
+    printf("Performed CUHF update of Fock operators in %s.\n",t.elapsed().c_str());
 }
 
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S) {
