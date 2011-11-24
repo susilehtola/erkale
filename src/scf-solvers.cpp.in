@@ -116,7 +116,6 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 
   // Change in energy from last iteration
   double deltaE=0;
-  double deltaEold;
 
   double Eold=0;
 
@@ -324,8 +323,12 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   }
 #endif
 
-  // Loop:
+  // Has calculation been converged?
   bool converged=0;
+  // How many consecutive iterations have seemed converged
+  int convd=0;
+
+  // Loop:
   for(int iiter=1;iiter<=maxiter;iiter++) {
     Timer titer;
 
@@ -577,7 +580,6 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     sol.en.E=sol.en.Eel+sol.en.Enucr;
 
     // Compute change of energy since last iteration
-    deltaEold=deltaE;
     deltaE=sol.en.E-Eold;
 
     // Update screening value
@@ -860,10 +862,16 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     if(verbose)
       fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,sol.en.E,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
 
-    if(fabs(deltaE)<conv.deltaEmax && fabs(deltaEold)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
-      if(verbose)
-	printf("\n ******* Convergence achieved ********\n");
-      converged=1;
+    if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
+      // Increment amount of converged iterations
+      convd++;
+
+      if(convd>=2) {
+	converged=true;
+
+	if(verbose)
+	  printf("\n ******* Convergence achieved ********\n");
+      }
     } // End convergence check clause
 
       // Pad occupancies with zeros (needed e.g. in Casida routines)
