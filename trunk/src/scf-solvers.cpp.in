@@ -872,9 +872,12 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	if(verbose)
 	  printf("\n ******* Convergence achieved ********\n");
       }
-    } // End convergence check clause
+    } else {
+      // Reset number of consecutive converged iterations
+      convd=0;
+    }
 
-      // Pad occupancies with zeros (needed e.g. in Casida routines)
+    // Pad occupancies with zeros (needed e.g. in Casida routines)
 #if !defined(RESTRICTED)
     std::vector<double> occar(occa), occbr(occb);
     while(occar.size()<Sinvh.n_cols)
