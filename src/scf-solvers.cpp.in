@@ -216,7 +216,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   } else {
     // Do atomic guess.
 
-    sol.P=atomic_density(*basisp);
+    sol.P=atomic_density(*basisp,verbose);
 #ifndef RESTRICTED
     sol.Pa=sol.P/2.0;
     sol.Pb=sol.P/2.0;

@@ -20,7 +20,7 @@
 #include "timer.h"
 #include <algorithm>
 
-arma::mat atomic_density(const BasisSet & basis) {
+arma::mat atomic_density(const BasisSet & basis, bool verbose) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -40,11 +40,13 @@ arma::mat atomic_density(const BasisSet & basis) {
   set.set_bool("Verbose",false);
   set.set_bool("CoreGuess",true);
 
-  printf("Performing atomic guess for atoms:\n");
-  Timer ttot;
+  if(verbose) {
+    printf("Performing atomic guess for atoms:\n");
+    fprintf(stderr,"Calculating initial atomic guess ... ");
+    fflush(stderr);
+  }
 
-  fprintf(stderr,"Calculating initial atomic guess ... ");
-  fflush(stderr);
+  Timer ttot;
   
   // Loop over list of identical nuclei
   for(size_t i=0;i<idnuc.size();i++) {
@@ -120,11 +122,13 @@ arma::mat atomic_density(const BasisSet & basis) {
 	}
       }
 
-    printf(" (%s)\n",tsol.elapsed().c_str());
+    if(verbose)
+      printf(" (%s)\n",tsol.elapsed().c_str());
   }
 
-  fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
-
+  if(verbose)
+    fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
+  
   return P;
 }
 
