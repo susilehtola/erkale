@@ -594,15 +594,17 @@ int main(void) {
   // Construct settings
   Settings sph;
   sph.add_scf_settings();
-  sph.set_bool("Verbose",0);
+  sph.set_bool("Verbose",false);
+  // Use core guess for tests.
+  sph.set_bool("CoreGuess",true);
 
   // No spherical harmonics
   Settings cart=sph;
-  cart.set_bool("UseLM",0);
+  cart.set_bool("UseLM",false);
 
   // Direct calculation
   Settings direct=sph;
-  direct.set_bool("Direct",1);
+  direct.set_bool("Direct",true);
 
   // Polarized calculation
   Settings pol=sph;
@@ -618,20 +620,20 @@ int main(void) {
   dftcart.add_dft_settings();
 
   Settings dftnofit=dftsph; // No density fitting
-  dftnofit.set_bool("DFTFitting",0);
+  dftnofit.set_bool("DFTFitting",false);
 
   Settings dftcart_nofit=dftcart;
-  dftcart_nofit.set_bool("DFTFitting",0);
+  dftcart_nofit.set_bool("DFTFitting",false);
 
   Settings dftdirect=dftsph; // Direct calculation
-  dftdirect.set_bool("Direct",1);
-  dftdirect.set_bool("DFTDirect",1);
+  dftdirect.set_bool("Direct",true);
+  dftdirect.set_bool("DFTDirect",true);
 
   Settings dftpol=pol; // Polarized calculation
   dftpol.add_dft_settings();
 
   Settings dftpol_nofit=dftpol; // Polarized calculation, no density fitting
-  dftpol_nofit.set_bool("DFTFitting",0);
+  dftpol_nofit.set_bool("DFTFitting",false);
 
   printf("****** Running calculations *******\n");  
   Timer t;
