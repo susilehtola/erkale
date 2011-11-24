@@ -306,6 +306,9 @@ class BasisSet {
   size_t get_Nnuc() const;
   /// Get nucleus
   nucleus_t get_nucleus(size_t inuc) const;
+  /// Get nuclei
+  std::vector<nucleus_t> get_nuclei() const;
+
   /// Get coordinates of nucleus
   coords_t get_coords(size_t inuc) const;
   /// Get charge of nucleus

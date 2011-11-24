@@ -1279,6 +1279,10 @@ nucleus_t BasisSet::get_nucleus(size_t inuc) const {
   return nuclei[inuc];
 }
 
+std::vector<nucleus_t> BasisSet::get_nuclei() const {
+  return nuclei;
+}
+
 coords_t BasisSet::get_coords(size_t inuc) const {
   return nuclei[inuc].r;
 }
@@ -2753,8 +2757,8 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
     basis.add_shells(i,elbas);
   }
 
-  // Finalize basis set
-  basis.finalize(1);
+  // Finalize basis set and convert contractions
+  basis.finalize(true);
 
   return basis;
 }
