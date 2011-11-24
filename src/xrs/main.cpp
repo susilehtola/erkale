@@ -551,6 +551,11 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_local(const Basi
   int Lmax=set.get_int("XRSLmax");
   int Lquad=set.get_int("XRSLquad");
 
+  if(Lquad<Lmax) {
+    Lquad=Lmax;
+    fprintf(stderr,"Increasing the quadrature order to Lmax.\n");
+  }
+
   // Do lm expansion of orbitals
   lmtrans lm(C,basis,basis.get_coords(iat),Nrad,Lmax,Lquad);
 
@@ -622,7 +627,7 @@ void save_spectrum(const std::vector<spectrum_t> & sp, const char *fname="dipole
   fclose(out);
 }
 
-bool load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol) {
+bool load(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, uscf_t & sol) {
   // Was the load a success?
   bool ok=true;
 
@@ -678,6 +683,25 @@ bool load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol) {
     
     if(!ok)
       fprintf(stderr,"Dimensions do not match!\n");
+  }
+
+  // Check consistency of spin and hole
+  if(ok) {
+    bool hole;
+    chkpt.read("XRSFullhole",hole);
+    if(hole!=set.get_bool("XRSFullhole")) {
+      ok=false;
+      fprintf(stderr,"Hole character does not match.\n");
+    }
+  }
+
+  if(ok) {    
+    bool spin;
+    chkpt.read("XRSSpin",spin);
+    if(spin!=set.get_bool("XRSSpin")) {
+      ok=false;
+      fprintf(stderr,"Excited spin does not match.\n");
+    }
   }
   
   if(!ok) {
@@ -831,7 +855,7 @@ int main(int argc, char **argv) {
   bool loadok=false;
   if(file_exists(set.get_string("SaveChk"))) {
     Checkpoint testload(set.get_string("SaveChk"),false);
-    loadok=load(basis,testload,sol);
+    loadok=load(basis,set,testload,sol);
     if(loadok) fprintf(stderr,"Loaded existing checkpoint file.\n");
   }
 
@@ -839,6 +863,8 @@ int main(int argc, char **argv) {
   if(!loadok) {
     Checkpoint chkpt(set.get_string("SaveChk"),true);
     chkpt.write(basis);
+    chkpt.write("XRSSpin",set.get_bool("XRSSpin"));
+    chkpt.write("XRSFullhole",set.get_bool("XRSFullhole"));
 
     // Amount of (orbital rotation) localized orbitals (nloc-1 are then frozen)
     size_t nloc=0;
@@ -906,6 +932,9 @@ int main(int argc, char **argv) {
       }
       // Save localized orbital
       lmground.write_prob(0,"ground_orb.dat");
+    } else {
+      if(set.get_bool("XRSLocalize"))
+	throw std::runtime_error("Need a ground-state calculation in LoadChk to perform localization!\n");
     }
 
     // Proceed with TP calculation. Initialize solver
