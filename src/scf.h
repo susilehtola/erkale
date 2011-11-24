@@ -23,6 +23,7 @@
 
 #include <armadillo>
 #include <vector>
+#include "atomguess.h"
 #include "checkpoint.h"
 #include "eritable.h"
 #include "eriscreen.h"
@@ -141,6 +142,9 @@ class SCF {
 
   /// Multiplicity
   int mult;
+
+  /// Use core guess?
+  bool coreguess;
 
   /// Use DIIS?
   bool usediis;

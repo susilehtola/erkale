@@ -47,24 +47,24 @@ void Settings::add_scf_settings() {
   sset.push_back(gens("Logfile", "File to print out full information, stdout for screen", "erkale.log"));
 
   // Use spherical harmonics.
-  bset.push_back(genb("UseLM", "Use a spherical harmonics basis set by default?", 1));
+  bset.push_back(genb("UseLM", "Use a spherical harmonics basis set by default?", true));
   
   // Decontract basis set?
   sset.push_back(gens("Decontract","Indices of atoms to decontract basis set for",""));
 
   // Use DIIS.
-  bset.push_back(genb("UseDIIS", "Use Pulay's Direct Inversion in the Iterative Subspace?", 1));
+  bset.push_back(genb("UseDIIS", "Use Pulay's Direct Inversion in the Iterative Subspace?", true));
   // Use old version of DIIS?
-  bset.push_back(genb("C1-DIIS", "Use older version of DIIS (C1-DIIS instead of C2-DIIS)?", 0));
+  bset.push_back(genb("C1-DIIS", "Use older version of DIIS (C1-DIIS instead of C2-DIIS)?", false));
   // Number of DIIS matrices to use?
   iset.push_back(geni("DIISOrder", "How many DIIS iterations to keep in memory?", 20));
   // DIIS threshold
   dset.push_back(gend("DIISThr", "DIIS error threshold for DIIS updates", 0.05));
 
   // Use ADIIS?
-  bset.push_back(genb("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", 1));
+  bset.push_back(genb("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", true));
   // Use Broyden mixing?
-  bset.push_back(genb("UseBroyden", "Use Broyden mixing of Fock matrices?", 0));
+  bset.push_back(genb("UseBroyden", "Use Broyden mixing of Fock matrices?", false));
   
   // Total charge of system
   iset.push_back(geni("Charge", "Total charge of system", 0));
@@ -73,11 +73,14 @@ void Settings::add_scf_settings() {
   // Occupancies
   sset.push_back(gens("Occupancies", "Orbital occupancies", ""));
 
+  // Use core guess? Default is atomic.
+  bset.push_back(genb("CoreGuess","Use core guess instead of atomic guess",false));
+
   // Verbose run?
-  bset.push_back(genb("Verbose", "Verbose calculation?", 1));
+  bset.push_back(genb("Verbose", "Verbose calculation?", true));
 
   // Direct calculation?
-  bset.push_back(genb("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", 0));
+  bset.push_back(genb("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false));
 
   // Default orthogonalization method
   sset.push_back(gens("BasisOrth", "Method of orthonormalization of basis set", "Can"));
@@ -96,9 +99,9 @@ void Settings::add_scf_settings() {
 
 void Settings::add_dft_settings() {
   // Store full DFT grid in memory?
-  bset.push_back(genb("DFTDirect", "Save memory by not storing values of basis functions in memory", 0));
+  bset.push_back(genb("DFTDirect", "Save memory by not storing values of basis functions in memory", false));
   // Store full DFT grid in memory?
-  bset.push_back(genb("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", 0));
+  bset.push_back(genb("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false));
   
   // Initial and final tolerances of DFT grid
   dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-3));
@@ -107,7 +110,7 @@ void Settings::add_dft_settings() {
   dset.push_back(gend("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 100.0));
   
   // Use density fitting if possible?
-  bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", 1));
+  bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", true));
 }
   
 void Settings::add_double(std::string name, std::string comment, double val) {

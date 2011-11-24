@@ -48,6 +48,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Amount of electrons
   Nel=basis.Ztot()-set.get_int("Charge");
 
+  coreguess=set.get_bool("CoreGuess");
+
   usediis=set.get_bool("UseDIIS");
   diis_c1=set.get_bool("C1-DIIS");
   diisorder=set.get_int("DIISOrder");

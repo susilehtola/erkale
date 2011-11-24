@@ -3,22 +3,22 @@
 void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const
 
 #elif defined(RESTRICTED) && defined(HF)
-void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const
+  void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
+  void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
 
 #elif defined(UNRESTRICTED) && defined(HF)
-void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
+  void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
+  void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
+  size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
 
 #elif defined(DFT) && defined(HALFHOLE)
-size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
+  size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
 #endif
 {
 
@@ -129,6 +129,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   if(verbose)
     printf("\n ******* Initialization of run ********\n");
 
+  bool atomicguess=false;
 
 #ifdef RESTRICTED
   if(sol.C.n_rows!=Nbf)
@@ -136,76 +137,94 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(sol.Ca.n_rows!=Nbf || sol.Cb.n_rows!=Nbf)
 #endif
       {
-	if(verbose) {
-	  printf("\nNo input guess given, forming initial guess by diagonalizing core hamiltonian.\n");
-	  t.set();
-	}
 
+	if(coreguess) {
+	  if(verbose) {
+	    printf("\nNo input guess given, forming initial guess by diagonalizing core hamiltonian.\n");
+	    t.set();
+	  }
+	  
 #ifdef RESTRICTED
-	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-	eig_sym_ordered(sol.E,orbs,Horth); // Solve in orthogonal basis
-
-	// Transform back to non-orthogonal basis
-	sol.C=Sinvh*orbs;
+	  Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
+	  eig_sym_ordered(sol.E,orbs,Horth); // Solve in orthogonal basis
+	  
+	  // Transform back to non-orthogonal basis
+	  sol.C=Sinvh*orbs;
 #else
-	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-	eig_sym_ordered(sol.Ea,orbs,Horth); // Solve in orthogonal basis
-	// Transform back to non-orthogonal basis
-	sol.Ca=Sinvh*orbs;
-
-	// Copy orbitals
-	sol.Eb=sol.Ea;
-	sol.Cb=sol.Ca;
+	  Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
+	  eig_sym_ordered(sol.Ea,orbs,Horth); // Solve in orthogonal basis
+	  // Transform back to non-orthogonal basis
+	  sol.Ca=Sinvh*orbs;
+	  
+	  // Copy orbitals
+	  sol.Eb=sol.Ea;
+	  sol.Cb=sol.Ca;
 #endif
 
-	if(verbose)
-	  printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
-
+	  if(verbose)
+	    printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
+	} else
+	  atomicguess=true;
+	
       } else {
       // Got correctly sized input guess.
-
+      
       if(verbose)
         printf("\nUsing input guess for orbitals.\n");
     }
 
-
-#ifdef RESTRICTED
-  form_density(sol.P,sol.C,occs);
-#else
-
+  
 #if defined(FULLHOLE) || defined(HALFHOLE)
-  size_t ixc_orb;
-  if(spin)
-    ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
-  else
-    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
-
-  if(spin) {
-#if defined(FULLHOLE)
-    occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
-#else
-    occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
+  size_t ixc_orb=0;
 #endif
-    occa=norm_occ(nocca); // Normal occupation in beta
+    
+  if(!atomicguess) {
+      
+#ifdef RESTRICTED
+    form_density(sol.P,sol.C,occs);
+#else
+    
+#if defined(FULLHOLE) || defined(HALFHOLE)
+    if(spin)
+      ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
+    else
+      ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
+    
+    if(spin) {
+#if defined(FULLHOLE)
+      occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
+#else
+      occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
+#endif
+      occa=norm_occ(nocca); // Normal occupation in beta
+    } else {
+#if defined(FULLHOLE)
+      occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
+#else
+      occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
+#endif
+      occb=norm_occ(noccb); // Normal occupation in beta
+    }
+    
+    // End HALFHOLE || FULLHOLE
+#endif
+
+    form_density(sol.Pa,sol.Ca,occa);
+    form_density(sol.Pb,sol.Cb,occb);
+    sol.P=sol.Pa+sol.Pb;
+#endif
   } else {
-#if defined(FULLHOLE)
-    occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
-#else
-    occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
+    // Do atomic guess.
+
+    sol.P=atomic_density(*basisp);
+#ifndef RESTRICTED
+    sol.Pa=sol.P/2.0;
+    sol.Pb=sol.P/2.0;
 #endif
-    occb=norm_occ(noccb); // Normal occupation in beta
   }
-
-  // End HALFHOLE || FULLHOLE
-#endif
-
-  form_density(sol.Pa,sol.Ca,occa);
-  form_density(sol.Pb,sol.Cb,occb);
-  sol.P=sol.Pa+sol.Pb;
-#endif
-
+  
   // Print orbital energies
-  if(verbose) {
+  if(verbose && !atomicguess) {
 #ifdef RESTRICTED
     print_E(sol.E,occs);
 #else
@@ -518,7 +537,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef _ROHF
     // Constrain Fock operators to correspond to ROHF
-    ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta);
+    if(!atomicguess)
+      ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose);
+    else if(verbose)
+      printf("Not doing ROHF update in first iteration since atomic guess was used.\n");
 #endif
 
 #endif // end DFT clause
@@ -528,6 +550,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     
 #if defined(FULLHOLE) || defined(HALFHOLE)
     if(freeze.size()>0) {
+      if(atomicguess) {
+	ERROR_INFO();
+	throw std::runtime_error("Atomic guess not supported with orbital freezing!\n");
+      }
+      
       // Freeze orbitals.
       if(spin)
 	freeze_orbs(freeze,sol.Cb,S,sol.Hb);
@@ -615,15 +642,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	// Solve new matrix
 	diis.solve(sol.H,diis_c1);
 #else
-        // Solve new matrices
+	// Solve new matrices
 	diisa.solve(sol.Ha,diis_c1);
-        diisb.solve(sol.Hb,diis_c1);
+	diisb.solve(sol.Hb,diis_c1);
 #endif
 
 	diissucc=1;
       } else {
-        if(verbose)
-          printf("\nDIIS error too large, not using DIIS extrapolation.\n");
+	if(verbose)
+	  printf("\nDIIS error too large, not using DIIS extrapolation.\n");
 	diissucc=0;
       }
     }
@@ -709,29 +736,28 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     arma::mat Panew, Pbnew;
 
 #if defined(FULLHOLE) || defined(HALFHOLE)
-  size_t ixc_orb;
-  if(spin)
-    ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
-  else
-    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
+    if(spin)
+      ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
+    else
+      ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
 
-  if(spin) {
+    if(spin) {
 #if defined(FULLHOLE)
-    occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
+      occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
 #else
-    occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
+      occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
 #endif
-    occa=norm_occ(nocca); // Normal occupation in beta
-  } else {
+      occa=norm_occ(nocca); // Normal occupation in beta
+    } else {
 #if defined(FULLHOLE)
-    occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
+      occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
 #else
-    occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
+      occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
 #endif
-    occb=norm_occ(noccb); // Normal occupation in beta
-  }
+      occb=norm_occ(noccb); // Normal occupation in beta
+    }
 
-  // End HALFHOLE || FULLHOLE
+    // End HALFHOLE || FULLHOLE
 #endif
 
     
@@ -739,6 +765,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     form_density(Pbnew,sol.Cb,occb);
     Pnew=Panew+Pbnew;
 #endif
+
+    // Atomic guess is no longer used; now we have orbitals.
+    if(atomicguess)
+      atomicguess=false;
 
     // Compute change of (total) density
     deltaP=Pnew-sol.P;
@@ -811,13 +841,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       }
 #else
       if(usediis) {
-        printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
-        printf("alpha\t%e\t%e\t%e\n",maxdiffa,rmsdiffa,diiserra);
-        printf("beta\t%e\t%e\t%e\n",maxdiffb,rmsdiffb,diiserrb);
+	printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
+	printf("alpha\t%e\t%e\t%e\n",maxdiffa,rmsdiffa,diiserra);
+	printf("beta\t%e\t%e\t%e\n",maxdiffb,rmsdiffb,diiserrb);
       } else {
-        printf("Errors:\tMax dens\tRMS dens\n");
-        printf("alpha\t%e\t%e\n",maxdiffa,rmsdiffa);
-        printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
+	printf("Errors:\tMax dens\tRMS dens\n");
+	printf("alpha\t%e\t%e\n",maxdiffa,rmsdiffa);
+	printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
       }
 #endif
 
@@ -834,7 +864,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       converged=1;
     } // End convergence check clause
 
-    // Pad occupancies with zeros (needed e.g. in Casida routines)
+      // Pad occupancies with zeros (needed e.g. in Casida routines)
 #if !defined(RESTRICTED)
     std::vector<double> occar(occa), occbr(occb);
     while(occar.size()<Sinvh.n_cols)
@@ -880,7 +910,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       break;
   } // End SCF cycle
 
-  // Compute dipole moment
+    // Compute dipole moment
   if(verbose) {
     arma::vec dp=dipole_moment(sol.P,*basisp);
     printf("Dipole moment is (%f,%f,%f) D, |mu|=%f D.\n",dp[0]/AUINDEBYE,dp[1]/AUINDEBYE,dp[2]/AUINDEBYE,norm(dp)/AUINDEBYE);
@@ -890,16 +920,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(verbose) {
       std::string method=
 #ifdef RESTRICTED
-	     "R"
+	"R"
 #elif defined(_ROHF)
-	     "RO"
+	"RO"
 #else
-	     "U"
+	"U"
 #endif
 #ifdef DFT
-	     "DFT"
+	"DFT"
 #else
-	     "HF"
+	"HF"
 #endif
 	;
 
