@@ -1,0 +1,4 @@
+LoadChk ../scf/hf.chk
+
+# Calculate isotropic EMD properties
+DoEMD true

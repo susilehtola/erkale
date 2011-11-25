@@ -1,0 +1,8 @@
+System ../h2o-dimer.xyz
+Method HF
+Basis aug-cc-pVTZ
+SaveChk hf.chk
+
+# Instead of a core or an atomic guess, initialize with
+# the calculation from lda.chk
+LoadChk lda.chk

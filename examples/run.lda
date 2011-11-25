@@ -1,0 +1,13 @@
+# This is a comment
+! This is a comment as well
+
+# Coordinates are given in the file
+System ../h2o-dimer.xyz
+# Use LDA exchange and VWN correlation
+Method lda_x-lda_c_vwn
+# Use the cc-pVDZ basis set
+Basis cc-pVDZ
+# Save the results in the checkpoint file
+SaveChk lda.chk
+# Use the core guess to initialize the calculation
+CoreGuess true

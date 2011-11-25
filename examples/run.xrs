@@ -1,0 +1,13 @@
+System ../h2o-dimer-xrs.xyz
+Method lda_x-lda_c_vwn
+Basis cc-pVDZ
+
+# Force localization of the core hole
+XRSLocalize true
+# ... with the ground-state density given by
+LoadChk ../scf/lda.chk
+
+# After SCF convergence has been achieved, add diffuse functions to
+# the 4th atom (the excited donor) to improve description of virtual
+# orbitals.
+XRSAugment 4
