@@ -20,7 +20,7 @@
  * 
  * ERKALE is a code for Hartree-Fock and density-functional theory
  * calculations for atoms and molecules. It uses a Gaussian basis set
- * for representing the molecular orbitals.
+ * for representing the molecular orbitals and the electron density.
  * 
  * ERKALE is written in C++ and uses the Armadillo template library
  * for linear algebra operations.
@@ -41,9 +41,11 @@
  *
  * Being free is also important because scientific results need to be
  * reproducible. The path from equations to results is often very long
- * in computational science; the code used to implement the equations
- * is (at least!) as important as the equations themselves. Thus, the
- * GNU General Public Licence is as if it were made for this purpose.
+ * in computational science; a working code used to implement the
+ * equations is (at least!) as important as the equations or the
+ * algorithms themselves. To guarantee that the code stays available,
+ * I have chosen the GNU General public license, which is commonly
+ * used in other scientific software as well.
  *
  * As I did not find suitable existing programs on the market, I
  * decided to write my own program. This would mean spending more time
@@ -54,17 +56,8 @@
  * (libxc), which meant that most of the dull stuff was already done
  * by others.
  *
- * \section Reqs Requirements
- *
- * To compile ERKALE you need
- * - <a href="http://www.gnu.org/s/gsl/">The GNU Scientific Library</a>
- * - <a href="http://sourceforge.net/p/libint/home">libint</a>
- * - <a href="http://www.tddft.org/programs/octopus/wiki/index.php/Libxc">libxc</a>
- * - <a href="http://arma.sourceforge.net/">Armadillo</a>
- * and a LAPACK library. See the INSTALL document for more information.
- *
  * \author Jussi Lehtola
- * \date 2011/05/14 19:11
+ * \date 2011/11/25 13:16
  */
 
 
