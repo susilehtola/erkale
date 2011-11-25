@@ -227,6 +227,8 @@ class BasisSet {
 
   /// Convert contractions from normalized primitives to unnormalized primitives
   void convert_contractions();
+  /// Convert contraction on given shell
+  void convert_contraction(size_t ish);
 
   /// Normalize contractions
   void normalize();

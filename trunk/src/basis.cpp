@@ -1328,6 +1328,10 @@ void BasisSet::convert_contractions() {
     shells[i].convert_contraction();
 }
 
+void BasisSet::convert_contraction(size_t ind) {
+  shells[ind].convert_contraction();
+}
+
 void BasisSet::normalize() {
   for(size_t i=0;i<shells.size();i++)
     shells[i].normalize();
