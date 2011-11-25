@@ -57,6 +57,31 @@ bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
   return lhs.E<rhs.E;
 }
 
+/// X-FIRST and X-SECOND by L. G. M. Pettersson, taken from StoBe basis
+ElementBasisSet stobe_augset(const std::string & el, bool second) {
+  // The even-tempered parameters
+  double alpha=0.0029;
+  double beta=1.4;
+  
+  // X-SECOND has 25 exponents, X-FIRST has 19
+  int nf=second ? 25 : 19;
+  
+  // Get exponents
+  std::vector<double> exps=eventempered_set(alpha,beta,nf);
+
+  // Returned basis
+  ElementBasisSet ret(el);
+  // Add functions
+  for(int am=0;am<=2;am++)
+    for(size_t iexp=0;iexp<exps.size();iexp++) {
+      FunctionShell sh(am);
+      sh.add_exponent(1.0,exps[iexp]);
+      ret.add_function(sh);
+    }
+  
+  return ret;
+}
+
 /**
  * Double basis set method
  *
@@ -77,6 +102,22 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   // Form augmented basis
   augbas=basis;
 
+  // Basis set for augmentation functions
+  BasisSetLibrary augbaslib;
+
+  // Do automatic augmentation?
+  bool autobas=(stricmp(set.get_string("DoubleBasis"),"Auto")==0);
+  // Use X-FIRST for all atoms?
+  bool usefirst=(stricmp(set.get_string("DoubleBasis"),"X-FIRST")==0);
+  // Use X-SECOND for all atoms?
+  bool usesecond=(stricmp(set.get_string("DoubleBasis"),"X-SECOND")==0);
+
+  if(!autobas && !usefirst && !usesecond) {
+    // Manually defined basis set.
+    augbaslib.load_gaussian94(set.get_string("DoubleBasis"));
+  }
+
+
   // Loop over excited atoms
   for(size_t iaug=0;iaug<augind.size();iaug++) {
     // Index of atom is
@@ -84,35 +125,53 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     // and its charge is
     const int Z=basis.get_Z(ind);
 
+    // The symbol of the atom
+    std::string el=basis.get_symbol(ind);
+
+    // The basis to use for the atom.
+    ElementBasisSet elbas;
+
     // Determine which augmentation to use for atom in question.
-    double alpha=0.0029;
-    double beta=1.4;
-    int nf;
+    if(autobas) {
+      // X-FIRST for first row, X-SECOND for second row
 
-    if(Z>2 && Z<11) {
-      // X-FIRST by L. G. M. Pettersson, taken from StoBe basis
-      nf=19;
-    } else if(Z>10 && Z<19) {
-      // X-SECOND by L. G. M. Pettersson, taken from StoBe basis
-      nf=25;
+      if(Z>2 && Z<11) {
+	// X-FIRST by L. G. M. Pettersson, taken from StoBe basis
+	elbas=stobe_augset(el,false);
+      } else if(Z>10 && Z<19) {
+	// X-SECOND by L. G. M. Pettersson, taken from StoBe basis
+	elbas=stobe_augset(el,true);
+      } else {
+	ERROR_INFO();
+	std::ostringstream oss;
+	oss << "Augmentation basis not defined for " << basis.get_symbol(ind) << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+    } else if(usefirst) {
+      // X-FIRST for all
+      elbas=stobe_augset(el,false);
+    } else if(usesecond) {
+      // X-SECOND for all
+      elbas=stobe_augset(el,true);
     } else {
-      ERROR_INFO();
-      std::ostringstream oss;
-      oss << "Augmentation basis not defined for " << basis.get_symbol(ind) << "!\n";
-      throw std::runtime_error(oss.str());
+      // Check if a special basis is available
+      
+      try {
+	// Check first if a special set is wanted for given center
+	elbas=augbaslib.get_element(el,ind+1);
+      } catch(std::runtime_error err) {
+	// Did not find a special basis, use the general one instead.
+	elbas=augbaslib.get_element(el,0);
+      }
     }
 
-    // Get exponents
-    std::vector<double> exps=eventempered_set(alpha,beta,nf);
-
-    // Add functions
-    std::vector<contr_t> C(1);
-    C[0].c=1.0;
-    for(size_t iexp=0;iexp<exps.size();iexp++) {
-      C[0].z=exps[iexp];
-      for(int am=0;am<=2;am++)
-	augbas.add_shell(ind,am,C,false);
-    }
+    // Get original number of shells
+    size_t Nsh_orig=augbas.get_Nshells();
+    // Add shells, no sorting.
+    augbas.add_shells(ind,elbas,false);
+    // Convert contractions on the added shells
+    for(size_t ish=Nsh_orig;ish<augbas.get_Nshells();ish++)
+      augbas.convert_contraction(ish);
   }
 
   // Finalize augmentation basis
@@ -755,19 +814,20 @@ int main(int argc, char **argv) {
   set.add_scf_settings();
 
   // Change defaults
-  set.set_bool("UseDIIS",0);
-  set.set_bool("UseADIIS",0);
-  set.set_bool("UseBroyden",1);
+  set.set_bool("UseDIIS",false);
+  set.set_bool("UseADIIS",false);
+  set.set_bool("UseBroyden",true);
   set.set_string("Logfile","erkale_xrs.log");
 
   // Add xrs specific settings
   set.add_string("LoadChk","Initialize with ground state calculation from file","");
   set.add_string("SaveChk","Save results to ","erkale_xrs.chk");
 
-  set.add_bool("XRSLocalize","Localize and freeze orbitals? (Needs ground-state calculation)",0);
+  set.add_string("DoubleBasis","The augmentation basis to use for double-basis set calculations","Auto");
+  set.add_bool("XRSLocalize","Localize and freeze orbitals? (Needs ground-state calculation)",false);
 
-  set.add_bool("XRSSpin","Spin to excite (0 for alpha, 1 for beta)",0); 
-  set.add_bool("XRSFullhole","Run full core-hole calculation",0);
+  set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false); 
+  set.add_bool("XRSFullhole","Run full core-hole calculation",false);
   set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3-5,10","");
   set.add_double("XRSGridTol","DFT grid tolerance in double basis set calculation",1e-4);
 
