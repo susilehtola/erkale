@@ -39,14 +39,6 @@
  * fast for "production" use - and be free, so that I and others could
  * use the code anywhere they liked.
  *
- * Being free is also important because scientific results need to be
- * reproducible. The path from equations to results is often very long
- * in computational science; a working code used to implement the
- * equations is (at least!) as important as the equations or the
- * algorithms themselves. To guarantee that the code stays available,
- * I have chosen the GNU General public license, which is commonly
- * used in other scientific software as well.
- *
  * As I did not find suitable existing programs on the market, I
  * decided to write my own program. This would mean spending more time
  * in development, although with the benefit of getting to grips with
@@ -55,6 +47,14 @@
  * repulsion integrals (libint) and exchange-correlation functionals
  * (libxc), which meant that most of the dull stuff was already done
  * by others.
+ *
+ * Being free is also important because scientific results need to be
+ * reproducible. The path from equations to results is often very long
+ * in computational science; a working code used to implement the
+ * equations is (at least!) as important as the equations or the
+ * algorithms themselves. To guarantee that the code stays available,
+ * I have chosen the GNU General public license, which is commonly
+ * used in other scientific software as well.
  *
  * \author Jussi Lehtola
  * \date 2011/11/25 13:16
