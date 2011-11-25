@@ -119,9 +119,6 @@ void Checkpoint::write(const std::string & name, const arma::mat & m) {
 
   // Create a datatype.
   hid_t datatype=H5Tcopy(H5T_NATIVE_DOUBLE);
-  // Set little endian data order
-  //  herr_t status=H5Tset_order(datatype, H5T_ORDER_LE);
-  H5Tset_order(datatype, H5T_ORDER_LE);
 
   // Create the dataset using the defined dataspace and datatype, and
   // default dataset creation properties.
@@ -210,8 +207,6 @@ void Checkpoint::write(const std::string & name, const std::vector<double> & v) 
 
   // Create a datatype.
   hid_t datatype=H5Tcopy(H5T_NATIVE_DOUBLE);
-  // Set little endian data order
-  H5Tset_order(datatype, H5T_ORDER_LE);
 
   // Create the dataset using the defined dataspace and datatype, and
   // default dataset creation properties.
@@ -589,8 +584,6 @@ void Checkpoint::write(const std::string & name, double val) {
 
   // Create a datatype.
   hid_t datatype=H5Tcopy(H5T_NATIVE_DOUBLE);
-  // Set little endian data order
-  H5Tset_order(datatype, H5T_ORDER_LE);
 
   // Create the dataset using the defined dataspace and datatype, and
   // default dataset creation properties.
@@ -666,8 +659,6 @@ void Checkpoint::write(const std::string & name, int val) {
 
   // Create a datatype.
   hid_t datatype=H5Tcopy(H5T_NATIVE_INT);
-  // Set little endian data order
-  H5Tset_order(datatype, H5T_ORDER_LE);
 
   // Create the dataset using the defined dataspace and datatype, and
   // default dataset creation properties.
