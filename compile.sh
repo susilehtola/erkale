@@ -249,10 +249,12 @@ echo "set(LIBINT_LIBRARIES ${topdir}/libint/lib/libint.a)"  >> erkale/config/lib
 cd ${builddir}/erkale
 export PKG_CONFIG_PATH=${topdir}/libxc/lib/pkgconfig/:${topdir}/gsl/lib/pkgconfig/:${PKG_CONFIG_PATH}
 
-if [ ! -d objdir ]; then
- mkdir objdir
+
+
+if [ ! -d openmp ]; then
+ mkdir openmp
 fi
-cd objdir
+cd openmp
 FC=${FC} CC=${CC} CXX=${CXX} \
  FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  ${topdir}/cmake/bin/cmake .. \
@@ -261,3 +263,19 @@ FC=${FC} CC=${CC} CXX=${CXX} \
  -DCMAKE_INSTALL_PREFIX=${topdir}/erkale
 make -j ${nprocs} VERBOSE=1
 make install
+cd ..
+
+if [ ! -d serial ]; then
+ mkdir serial
+fi
+cd serial
+FC=${FC} CC=${CC} CXX=${CXX} \
+ FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
+ ${topdir}/cmake/bin/cmake .. \
+ -DLAPACK_LIBRARIES="${LAPACK}" \
+ -DBLAS_LIBRARIES="${BLAS}" \
+ -DCMAKE_INSTALL_PREFIX=${topdir}/erkale \
+ -DUSE_OPENMP=OFF
+make -j ${nprocs} VERBOSE=1
+make install
+cd ..
