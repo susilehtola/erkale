@@ -593,8 +593,8 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
       throw std::runtime_error(oss.str());
     }
 
-    // Update ADIIS stacks
-    if(useadiis) {
+    // Update ADIIS stacks. Don't update with first atomic density matrix.
+    if(useadiis && !atomicguess) {
 #ifdef RESTRICTED
       adiis.push(sol.en.E,sol.P,sol.H);
 #else
@@ -660,7 +660,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     }
 
     // Perform ADIIS interpolation
-    if(useadiis && ((usediis && !diissucc) || !usediis)) {
+    if(useadiis && !atomicguess && ((usediis && !diissucc) || !usediis)) {
 
       if(verbose) {
 	printf("Performing ADIIS interpolation of Fock operator ... ");
@@ -866,7 +866,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
       // Increment amount of converged iterations
       convd++;
 
-      if(convd>=2) {
+      if(convd>=3) {
 	converged=true;
 
 	if(verbose)
