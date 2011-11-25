@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
   set.add_scf_settings();
   set.add_string("SaveChk","File to use as checkpoint","erkale.chk");
   set.add_string("LoadChk","File to load old results from","");
-  set.add_bool("ForcePol","Force polarized calculation",0);
+  set.add_bool("ForcePol","Force polarized calculation",false);
   set.parse(std::string(argv[1]));
 
   // Checkpoint files to load and save
@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
   if(!hf && !rohf && exact_exchange(dft.x_func)!=0.0)
     if(set.get_bool("DFTFitting")) {
       printf("A hybrid functional is used, turning off density fitting.\n");
-      set.set_bool("DFTFitting",0);
+      set.set_bool("DFTFitting",false);
     }
 
   // Write checkpoint.

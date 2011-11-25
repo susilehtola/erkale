@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("CasidaX","Exchange functional for Casida","lda_x");
   set.add_string("CasidaC","Correlation functional for Casida","lda_c_vwn");
-  set.add_bool("CasidaPol","Perform polarized Casida calculation (when using restricted wf)",0);
+  set.add_bool("CasidaPol","Perform polarized Casida calculation (when using restricted wf)",false);
   set.add_int("CasidaCoupling","Coupling mode: 0 for IPA, 1 for RPA and 2 for TDLDA",2);
   set.add_double("CasidaTol","Tolerance for Casida grid",1e-3);
   set.add_string("CasidaStates","States to include in Casida calculation, eg ""1,3-4,10,13"" ","");
