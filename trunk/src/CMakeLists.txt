@@ -82,6 +82,9 @@ add_subdirectory(test)
 # Create basis set tool
 add_subdirectory(basistool)
 
+# Compile support programs for external programs
+add_subdirectory(external)
+
 # Recipe for building ERITable
 add_custom_command(
  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
