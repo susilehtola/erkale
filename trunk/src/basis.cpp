@@ -97,9 +97,17 @@ bool operator==(const contr_t & lhs, const contr_t & rhs) {
   //  return (lhs.z==rhs.z) && (lhs.c==rhs.c);
 
   // Since this also needs to work for saved and reloaded basis sets, we need to relax the comparison.
-  const double tol=10*DBL_EPSILON;
+  const double tol=50*DBL_EPSILON;
 
-  return (fabs(lhs.z-rhs.z)<tol) && (fabs(lhs.c-rhs.c)<tol);
+  bool same=(fabs(lhs.z-rhs.z)<tol) && (fabs(lhs.c-rhs.c)<tol);
+  
+  /*
+  if(!same) {
+       fprintf(stderr,"Contractions differ: %e %e vs %e %e, diff %e %e!\n",lhs.c,lhs.z,rhs.c,rhs.z,rhs.c-lhs.c,rhs.z-lhs.z);
+  }
+  */
+
+  return same;
 }
 
 GaussianShell::GaussianShell() {
@@ -391,20 +399,29 @@ bool GaussianShell::operator<(const GaussianShell & rhs) const {
 
 bool GaussianShell::operator==(const GaussianShell & rhs) const {
   // Check first nucleus
-  if(cenind != rhs.cenind)
+  if(cenind != rhs.cenind) {
+    //    fprintf(stderr,"Center indices differ!\n");
     return false;
+  }
   
   // Then, angular momentum
-  if(am!=rhs.am)
+  if(am!=rhs.am) {
+    //    fprintf(stderr,"Angular momentum differs!\n");
     return false;
+  }
 
   // Then, by exponents
-  if(c.size() != rhs.c.size())
+  if(c.size() != rhs.c.size()) {
+    //    fprintf(stderr,"Contraction size differs!\n");
     return false;
+  }
 
-  for(size_t i=0;i<c.size();i++)
-    if(!(c[i]==rhs.c[i]))
+  for(size_t i=0;i<c.size();i++) {
+    if(!(c[i]==rhs.c[i])) {
+      //      fprintf(stderr,"%i:th contraction differs!\n",(int) i+1);
       return false;
+    }
+  }
 
   return true;
 }
