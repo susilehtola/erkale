@@ -28,6 +28,9 @@ extern "C" {
 #include <hdf5.h>
 }
 
+/// Checkpoint version.
+#define ERKALE_CHKVER 1
+
 /// Fixed-length data for shell
 typedef struct {
   /// Angular momentum of shell
