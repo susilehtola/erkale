@@ -140,7 +140,12 @@ void population_analysis(const BasisSet & basis, const arma::mat & P) {
   // Mulliken overlap
   arma::mat mulov=mulliken_overlap(basis,P);
   // Mulliken charges
-  arma::vec mulq=sum(mulov);
+  arma::vec mulq=-sum(mulov);
+  for(size_t i=0;i<basis.get_Nnuc();i++) {
+    nucleus_t nuc=basis.get_nucleus(i);
+    if(!nuc.bsse)
+      mulq(i)+=nuc.Z;
+  }
 
   // Bond order
   arma::mat bord=bond_order(basis,P);
