@@ -28,6 +28,7 @@
 #include "solidharmonics.h"
 
 // Uncomment to print out the solid harmonics
+//#define DEBUG
 
 // Uncomment to compile this as the main program
 //#define YLMDEBUG
@@ -65,9 +66,7 @@ std::vector<double> calcYlm_coeff(int l, int mval) {
   int m=abs(mval);
 
   // Compute prefactor
-  //  double prefac=sqrt((2*l+1)/(4.0*M_PI))*pow(2.0,-l); 
-  double prefac=pow(2.0,-l);
-
+  double prefac=sqrt((2*l+1)/(4.0*M_PI))*pow(2.0,-l); 
   if(m!=0)
     prefac*=sqrt(fact(l-m)*2.0/fact(l+m));
 
@@ -170,10 +169,9 @@ std::vector<double> calcYlm_coeff(int l, int mval) {
   } // End loop over k
 
 #ifdef DEBUG
-  printf("Y %i %i\n",l,m);
-  size_t i=0;
-  for(int ii=0; ii<=am_a; ii++) {
-    int nx=am_a - ii;
+  printf("Y %i %i\n",l,mval);
+  for(int ii=0; ii<=l; ii++) {
+    int nx=l - ii;
     for(int jj=0; jj<=ii; jj++) {
       int ny=ii - jj;
       int nz=jj;

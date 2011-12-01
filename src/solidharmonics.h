@@ -27,7 +27,12 @@
 /// Get transformation matrix (Y_lm, cart)
 arma::mat Ylm_transmat(int l);
 
-/// Compute cartesian coefficients of Y_lm
+/**
+ * Computes cartesian coefficients of Y_lm.
+ *
+ * Based on the article
+ * http://en.wikipedia.org/wiki/Solid_spherical_harmonics
+ */
 std::vector<double> calcYlm_coeff(int l, int m);
 
 #endif

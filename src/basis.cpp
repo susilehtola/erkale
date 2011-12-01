@@ -179,25 +179,34 @@ void GaussianShell::convert_contraction() {
 
 void GaussianShell::normalize() {
   // Normalize contraction of unnormalized primitives wrt first function on shell
-  
+
   double fact=0.0;
   
   // Calculate overlap of exponents
   for(size_t i=0;i<c.size();i++)
     for(size_t j=0;j<c.size();j++)
       fact+=c[i].c*c[j].c/pow(c[i].z+c[j].z,am+1.5);
-
+  
   // Add constant part
   fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
-
+  
   // The coefficients must be scaled by 1/sqrt(fact)
   fact=1.0/sqrt(fact);
   for(size_t i=0;i<c.size();i++)
     c[i].c*=fact;
 
-  // Compute relative normalization factors
-  for(size_t i=0;i<cart.size();i++)
-    cart[i].relnorm=sqrt(doublefact(2*am-1)/(doublefact(2*cart[i].l-1)*doublefact(2*cart[i].m-1)*doublefact(2*cart[i].n-1)));
+  // FIXME: Do something more clever here.    
+  if(!uselm) {
+    // Compute relative normalization factors
+    for(size_t i=0;i<cart.size();i++)
+      cart[i].relnorm=sqrt(doublefact(2*am-1)/(doublefact(2*cart[i].l-1)*doublefact(2*cart[i].m-1)*doublefact(2*cart[i].n-1)));
+  } else {
+    // Compute self-overlap
+    arma::mat S=overlap(*this);
+    // and scale coefficients.
+    for(size_t i=0;i<cart.size();i++)
+      cart[i].relnorm/=sqrt(S(0,0));
+  }
 }
 
 void GaussianShell::coulomb_normalize() {
