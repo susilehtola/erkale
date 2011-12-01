@@ -104,26 +104,12 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
   // Basis set for augmentation functions
   BasisSetLibrary augbaslib;
-
-  // Do automatic augmentation?
-  bool autobas=(stricmp(set.get_string("DoubleBasis"),"Auto")==0);
-  // Use X-FIRST for all atoms?
-  bool usefirst=(stricmp(set.get_string("DoubleBasis"),"X-FIRST")==0);
-  // Use X-SECOND for all atoms?
-  bool usesecond=(stricmp(set.get_string("DoubleBasis"),"X-SECOND")==0);
-
-  if(!autobas && !usefirst && !usesecond) {
-    // Manually defined basis set.
-    augbaslib.load_gaussian94(set.get_string("DoubleBasis"));
-  }
-
+  augbaslib.load_gaussian94(set.get_string("XRSDoubleBasis"));
 
   // Loop over excited atoms
   for(size_t iaug=0;iaug<augind.size();iaug++) {
     // Index of atom is
     const size_t ind=augind[iaug];
-    // and its charge is
-    const int Z=basis.get_Z(ind);
 
     // The symbol of the atom
     std::string el=basis.get_symbol(ind);
@@ -131,38 +117,12 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     // The basis to use for the atom.
     ElementBasisSet elbas;
 
-    // Determine which augmentation to use for atom in question.
-    if(autobas) {
-      // X-FIRST for first row, X-SECOND for second row
-
-      if(Z>2 && Z<11) {
-	// X-FIRST by L. G. M. Pettersson, taken from StoBe basis
-	elbas=stobe_augset(el,false);
-      } else if(Z>10 && Z<19) {
-	// X-SECOND by L. G. M. Pettersson, taken from StoBe basis
-	elbas=stobe_augset(el,true);
-      } else {
-	ERROR_INFO();
-	std::ostringstream oss;
-	oss << "Augmentation basis not defined for " << basis.get_symbol(ind) << "!\n";
-	throw std::runtime_error(oss.str());
-      }
-    } else if(usefirst) {
-      // X-FIRST for all
-      elbas=stobe_augset(el,false);
-    } else if(usesecond) {
-      // X-SECOND for all
-      elbas=stobe_augset(el,true);
-    } else {
-      // Check if a special basis is available
-      
-      try {
-	// Check first if a special set is wanted for given center
-	elbas=augbaslib.get_element(el,ind+1);
-      } catch(std::runtime_error err) {
-	// Did not find a special basis, use the general one instead.
-	elbas=augbaslib.get_element(el,0);
-      }
+    try {
+      // Check first if a special set is wanted for given center
+      elbas=augbaslib.get_element(el,ind+1);
+    } catch(std::runtime_error err) {
+      // Did not find a special basis, use the general one instead.
+      elbas=augbaslib.get_element(el,0);
     }
 
     // Get original number of shells
@@ -823,7 +783,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","Initialize with ground state calculation from file","");
   set.add_string("SaveChk","Save results to ","erkale_xrs.chk");
 
-  set.add_string("DoubleBasis","The augmentation basis to use for double-basis set calculations","Auto");
+  set.add_string("XRSDoubleBasis","The augmentation basis to use for double-basis set calculations","X-AUTO");
   set.add_bool("XRSLocalize","Localize and freeze orbitals? (Needs ground-state calculation)",false);
 
   set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false); 
