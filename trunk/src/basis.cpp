@@ -419,7 +419,7 @@ void GaussianShell::print() const {
   printf("\t\tExponential contraction is\n");
   printf("\t\t\tzeta\t\tprimitive coeff\ttotal coeff\n");
   for(size_t i=0;i<c.size();i++)
-    printf("\t\t\t%e\t%e\t%e\n",c[i].z,cn[i].c,c[i].c);
+    printf("\t\t\t%e\t% e\t% e\n",c[i].z,cn[i].c,c[i].c);
   if(uselm) {
     printf("\t\tThe functions on this shell are:\n\t\t\t");
     for(int m=-am;m<=am;m++)
