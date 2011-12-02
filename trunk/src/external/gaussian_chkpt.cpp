@@ -32,13 +32,6 @@
 
 /// Parse formatted checkpoint file
 Storage parse_fchk(const std::string & name) {
-  // Initial maximum length of input line
-  size_t maxlen=1024;
-  // Input line
-  char *tmp=(char *) malloc(maxlen*sizeof(char));
-  // Location on input line array
-  size_t itmp=0;
-
   // Returned storage
   Storage ret;
 
@@ -90,9 +83,6 @@ Storage parse_fchk(const std::string & name) {
     throw std::runtime_error("Unable to open input file.\n");
   }
 
-  // Input variable
-  int c;
-
   // Line number
   size_t iline=0;
 
@@ -109,121 +99,111 @@ Storage parse_fchk(const std::string & name) {
   bool doublevec=false;
   std::vector<double> dblv;
 
-  while((c=getc(in))!=EOF) {
-    if(c=='\n') {
+  while(true) {
+    // Input line
+    std::string line;
+
+    try {
+      // Get line from input file
+      line=readline(in);
       // Increment line number
       iline++;
-      // Pad string with zeros
-      tmp[itmp++]='\0';
-      // and reset location
-      itmp=0;
+    } catch(std::runtime_error) {
+      break;
+    }
+			       
+    // Split the input into fields
+    std::vector<std::string> words=splitline(line);
+
+    // Skip first two lines.
+    if(iline<3)
+      continue;
+    
+    // Read in numbers?
+    if(intvec) {
+      for(size_t i=0;i<words.size();i++)
+	intv.push_back(readint(words[i]));
       
-      // Convert line into string
-      std::string line(tmp);
-      // and split it into fields
-      std::vector<std::string> words=splitline(line);
-
-      // Skip first two lines.
-      if(iline<3)
-	continue;
-
-      // Read in numbers?
-      if(intvec) {
-	for(size_t i=0;i<words.size();i++)
-	  intv.push_back(readint(words[i]));
-
-	N-=words.size();
-	if(N==0) {
-	  intvec=false;
-	  // Add to stack
-	  int_vec_st_t help;
-	  help.name=entryname;
-	  help.val=intv;
-	  ret.add(help);
-	  // Clear vector
-	  intv.clear();
-	}
-      } else if(doublevec) {
-	for(size_t i=0;i<words.size();i++)
-	  dblv.push_back(readdouble(words[i]));
-	N-=words.size();
-	if(N==0) {
-	  doublevec=false;
-	  // Add to stack
-	  double_vec_st_t help;
-	  help.name=entryname;
-	  help.val=dblv;
-	  ret.add(help);
-	  // Clear vector
-	  dblv.clear();
-	}
-      } else {
-	// New entry. Is it a vector?
-
-	if(words[words.size()-2]=="N=") {
-	  // Yes, it is. Number of entries to read in is
-	  N=readint(words[words.size()-1]);
-	  // Read integers or doubles?
-	  if(words[words.size()-3]=="R")
-	    doublevec=true;
-	  else if(words[words.size()-3]=="I")
-	    intvec=true;
-	  else {
-	    ERROR_INFO();
-	    throw std::runtime_error("Should not end up here!\n");
-	  }
-
-	  // Entry name is
-	  entryname="";
-	  for(size_t i=0;i<words.size()-3;i++) {
-	    entryname+=words[i];
-	    if(i<words.size()-4)
-	      entryname+=" ";
-	  }
-	} else {
-	  // Not reading a vector.
-
-	  // Entry name is
-	  entryname="";
-          for(size_t i=0;i<words.size()-2;i++) {
-            entryname+=words[i];
-            if(i<words.size()-3)
-              entryname+=" ";
-          }
-
-	  // Read integer or double?
-	  if(words[words.size()-2]=="I") {
-	    // Integer.
-	    int_st_t help;
-	    help.val=readint(words[words.size()-1]);
-	    help.name=entryname;
-	    ret.add(help);
-	  } else if(words[words.size()-2]=="R") {
-	    // Double.
-	    double_st_t help;
-	    help.val=readdouble(words[words.size()-1]);
-	    help.name=entryname;
-	    ret.add(help);
-	  } else {
-	    ERROR_INFO();
-	    throw std::runtime_error("Should have not ended up here!\n");
-	  }
-	}
+      N-=words.size();
+      if(N==0) {
+	intvec=false;
+	// Add to stack
+	int_vec_st_t help;
+	help.name=entryname;
+	help.val=intv;
+	ret.add(help);
+	// Clear vector
+	intv.clear();
+      }
+    } else if(doublevec) {
+      for(size_t i=0;i<words.size();i++)
+	dblv.push_back(readdouble(words[i]));
+      N-=words.size();
+      if(N==0) {
+	doublevec=false;
+	// Add to stack
+	double_vec_st_t help;
+	help.name=entryname;
+	help.val=dblv;
+	ret.add(help);
+	// Clear vector
+	dblv.clear();
       }
     } else {
-      // Store the line
-      if(itmp==maxlen-2) {
-        maxlen*=2;
-        //      printf("Increasing memory allocation to %i.\n",maxlen);
-        tmp=(char *)realloc(tmp,maxlen*sizeof(char));
+      // New entry. Is it a vector?
+
+      if(words[words.size()-2]=="N=") {
+	// Yes, it is. Number of entries to read in is
+	N=readint(words[words.size()-1]);
+	// Read integers or doubles?
+	if(words[words.size()-3]=="R")
+	  doublevec=true;
+	else if(words[words.size()-3]=="I")
+	  intvec=true;
+	else {
+	  ERROR_INFO();
+	  throw std::runtime_error("Should not end up here!\n");
+	}
+
+	// Entry name is
+	entryname="";
+	for(size_t i=0;i<words.size()-3;i++) {
+	  entryname+=words[i];
+	  if(i<words.size()-4)
+	    entryname+=" ";
+	}
+      } else {
+	// Not reading a vector.
+
+	// Entry name is
+	entryname="";
+	for(size_t i=0;i<words.size()-2;i++) {
+	  entryname+=words[i];
+	  if(i<words.size()-3)
+	    entryname+=" ";
+	}
+
+	// Read integer or double?
+	if(words[words.size()-2]=="I") {
+	  // Integer.
+	  int_st_t help;
+	  help.val=readint(words[words.size()-1]);
+	  help.name=entryname;
+	  ret.add(help);
+	} else if(words[words.size()-2]=="R") {
+	  // Double.
+	  double_st_t help;
+	  help.val=readdouble(words[words.size()-1]);
+	  help.name=entryname;
+	  ret.add(help);
+	} else {
+	  ERROR_INFO();
+	  throw std::runtime_error("Should have not ended up here!\n");
+	}
       }
-      tmp[itmp++]=c;
     }
   }
   
-  // Free memory
-  free(tmp);
-
   // Close input
   if(usegz || usexz || usebz2 || uselzma)
     pclose(in);
@@ -252,7 +232,7 @@ std::vector<size_t> eg_indarr(const Storage & stor) {
     // Determine shell type.
 
     
-      // S shell
+    // S shell
     if(shtype[ish]==0) {
       idx[e_idx++]=g_idx++;
 
@@ -457,8 +437,8 @@ arma::mat form_density(const Storage & stor) {
       keys.erase(keys.begin()+i);
 
   /*
-  printf("Available densities\n");
-  for(size_t i=0;i<keys.size();i++)
+    printf("Available densities\n");
+    for(size_t i=0;i<keys.size();i++)
     printf("\t%s\n",keys[i].c_str());
   */
 
@@ -500,9 +480,9 @@ arma::mat form_density(const Storage & stor) {
   }
 
   /*
-  printf("\n\n");
-  printf("Indices\nGaussian\tERKALE\n");
-  for(size_t i=0;i<idx.size();i++)
+    printf("\n\n");
+    printf("Indices\nGaussian\tERKALE\n");
+    for(size_t i=0;i<idx.size();i++)
     printf("\t%3i -> %3i\n",(int) i+1,(int) idx[i]+1);
   */
 

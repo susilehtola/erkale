@@ -22,6 +22,9 @@
 #include <cstring>
 #include <sstream>
 
+/// Maximum length of lines in input file
+#define MAXLEN 1024
+
 std::string tolower(const std::string & in) {
   std::string ret=in;
   for(size_t i=0;i<ret.size();i++)
@@ -60,6 +63,32 @@ std::string readline(std::istream & in) {
   return std::string();
 }
 
+std::string readline(FILE *in) {
+  // Input array
+  char tmp[MAXLEN];
+  // Location on input line array
+  size_t itmp=0;
+  // Input character
+  int c;
+
+  while((c=getc(in))!=EOF) {
+    if(c=='\n') {
+      // Pad string with zeros
+      tmp[itmp++]='\0';
+      return std::string(tmp);
+    } else {
+
+      // Store the line
+      tmp[itmp++]=c;
+    }
+  }
+
+  if(c==EOF)
+    throw std::runtime_error("End of file!\n");
+
+  std::string ret;
+  return ret;
+}
 
 std::vector<std::string> splitline(std::string line) {
   // Split line into words.
@@ -282,7 +311,7 @@ std::vector<std::string> parse(std::string in, const std::string & separator) {
 
   // Returned variable
   std::vector<std::string> ret;
-  
+
   size_t ind;
   while((ind=in.find_first_of(separator))!=std::string::npos) {
     // Add it to the stack
@@ -294,7 +323,7 @@ std::vector<std::string> parse(std::string in, const std::string & separator) {
   // If there is still something in in, add it to the stack.
   if(in.size())
     ret.push_back(in);
-  
+
   return ret;
 }
 
@@ -322,14 +351,14 @@ std::vector<size_t> parse_range(const std::string & in) {
       // We are dealing with a range. Read upper and lower limits
       size_t low=readint(dash[0]);
       size_t up=readint(dash[1]);
-      
+
       if(low>up) {
 	ERROR_INFO();
 	std::ostringstream oss;
 	oss << "Range is not monotonically increasing!\n";
 	throw std::runtime_error(oss.str());
       }
-      
+
       // Fill the range.
       for(size_t i=low;i<=up;i++)
 	ret.push_back(i);
@@ -355,19 +384,19 @@ std::vector<double> parse_range_double(const std::string & in) {
       // Only single number given, add it to the stack.
       ret.push_back(readdouble(lim[0]));
     } else {
-      
+
       if(lim.size()!=3) {
 	std::ostringstream oss;
 	oss << "The given input with " << lim.size() << "entries is not a valid range of numbers.\n";
 	ERROR_INFO();
 	throw std::runtime_error(oss.str());
       }
-      
+
       // Read minimum, maximum and spacing.
       double min=readdouble(lim[0]);
       double dx=readdouble(lim[1]);
       double max=readdouble(lim[2]);
-      
+
       if(dx<=0.0) {
 	ERROR_INFO();
 	throw std::runtime_error("Grid spacing must be positive.\n");
@@ -376,15 +405,15 @@ std::vector<double> parse_range_double(const std::string & in) {
 	ERROR_INFO();
 	throw std::runtime_error("Grid maximum cannot be smaller than minimum!\n");
       }
-      
+
       // Form the points
       size_t N=(size_t) ((max-min)/dx)+1;
-      
+
       for(size_t i=0;i<N;i++)
 	ret.push_back(min+i*dx);
     }
   }
-    
+
   // Sort in increasing order
   sort(ret.begin(),ret.end());
 

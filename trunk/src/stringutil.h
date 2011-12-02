@@ -37,6 +37,9 @@ int stricmp(const std::string & str1, const std::string & str2);
 /// Read line from input (skip empty lines)
 std::string readline(std::istream & in);
 
+/// Get a line from the file (not skipping anything)
+std::string readline(FILE *in);
+
 /// Split line into words
 std::vector<std::string> splitline(std::string line);
 
