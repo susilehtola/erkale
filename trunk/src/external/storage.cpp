@@ -160,15 +160,18 @@ std::vector<std::string> Storage::find_string(const std::string & name) const {
 }
 
 void Storage::print(bool vals) const {
-  printf("Integers:\n");
+  if(ints.size())
+    printf("Integers:\n");
   for(size_t i=0;i<ints.size();i++)
     printf("\t%s\t%i\n",ints[i].name.c_str(),ints[i].val);
 
-  printf("\nDoubles:\n");
+  if(doubles.size())
+    printf("\nDoubles:\n");
   for(size_t i=0;i<doubles.size();i++)
     printf("\t%s\t%e\n",doubles[i].name.c_str(),doubles[i].val);
 
-  printf("\nInteger vectors:\n");
+  if(intvec.size())
+    printf("\nInteger vectors:\n");
   for(size_t i=0;i<intvec.size();i++) {
     printf("\t%s\t",intvec[i].name.c_str());
     if(vals) {
@@ -180,7 +183,8 @@ void Storage::print(bool vals) const {
     }
   }
 
-  printf("\nDouble vectors:\n");
+  if(doublevec.size())
+    printf("\nDouble vectors:\n");
   for(size_t i=0;i<doublevec.size();i++) {
     printf("\t%s\t",doublevec[i].name.c_str());
     if(vals) {
