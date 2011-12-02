@@ -90,7 +90,7 @@ std::string readline(FILE *in) {
   return ret;
 }
 
-std::vector<std::string> splitline(std::string line) {
+std::vector<std::string> splitline(const std::string & line) {
   // Split line into words.
 
   // The words found on the line
@@ -112,6 +112,49 @@ std::vector<std::string> splitline(std::string line) {
 
   return words;
 }
+
+std::string trim(const std::string & line) {
+  // Find start.
+  size_t start;
+  for(start=0;start<line.size();start++)
+    if(!isblank(line[start]))
+      break;
+
+  // Find end.
+  size_t end;
+  for(end=line.size()-1;end<line.size();end--)
+    if(!isblank(line[end]))
+      break;
+
+  if(end>line.size()) {
+    // Empty line!
+    std::string ret;
+    return ret;
+  } else {
+    // Get substring.
+    return line.substr(start,end-start+1);
+  }
+}
+
+std::string rem_dbl_whitespace(const std::string & line) {
+  std::string ret;
+
+  // Did we already encounter whitespace?
+  bool white=false;
+  for(size_t i=0;i<line.size();i++) {
+    if(isblank(line[i]) && !white) {
+      // We did not encounter whitespace yet. Add one.
+      ret+=" ";
+      white=true;
+    } else if(!isblank(line[i])) {
+      white=false;
+      ret+=line[i];
+    }
+  }
+
+  return ret;
+}
+      
 
 int readint(std::string num) {
   int no;
