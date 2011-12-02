@@ -54,6 +54,14 @@ typedef struct {
   std::vector<int> val;
 } int_vec_st_t;
 
+/// String value
+typedef struct {
+  /// Name of entry
+  std::string name;
+  /// Value
+  std::string val;
+} string_st_t;
+
 /// Class for storing input data
 class Storage {
   /// Stack of integers
@@ -64,6 +72,8 @@ class Storage {
   std::vector<int_vec_st_t> intvec;
   /// Stack of double precision arrays
   std::vector<double_vec_st_t> doublevec;
+  /// String array
+  std::vector<string_st_t> strings;
   
  public:
   /// Constructor
@@ -79,6 +89,8 @@ class Storage {
   void add(const int_vec_st_t & val);
   /// Add double precision vector
   void add(const double_vec_st_t & val);
+  /// Add string
+  void add(const string_st_t & val);
 
   /// Get integer value
   int get_int(const std::string & name) const;
@@ -88,6 +100,8 @@ class Storage {
   std::vector<int> get_int_vec(const std::string & name) const;
   /// Get double precision vector
   std::vector<double> get_double_vec(const std::string & name) const;
+  /// Get string
+  std::string get_string(const std::string & name) const;
 
   /// Get possible integer keywords
   std::vector<std::string> find_int(const std::string & name) const;
@@ -97,6 +111,9 @@ class Storage {
   std::vector<std::string> find_int_vec(const std::string & name) const;
   /// Get possible double vector keywords
   std::vector<std::string> find_double_vec(const std::string & name) const;
+  /// Get possible string keywords
+  std::vector<std::string> find_string(const std::string & name) const;
+
 
   /// Print contents (vector values, too?)
   void print(bool vals=false) const;

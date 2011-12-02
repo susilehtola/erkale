@@ -40,6 +40,11 @@ void Storage::add(const double_vec_st_t & val) {
   doublevec.push_back(val);
 }
 
+void Storage::add(const string_st_t & val) {
+  strings.push_back(val);
+}
+
+
 int Storage::get_int(const std::string & name) const {
   for(size_t i=0;i<ints.size();i++)
     if(ints[i].name==name)
@@ -90,6 +95,20 @@ std::vector<double> Storage::get_double_vec(const std::string & name) const {
   return ret;
 }
 
+std::string Storage::get_string(const std::string & name) const {
+  for(size_t i=0;i<strings.size();i++)
+    if(strings[i].name==name)
+      return strings[i].val;
+
+  std::ostringstream oss;
+  oss << "\nThe entry "<<name<<" was not found!\n";
+  throw std::runtime_error(oss.str());
+
+  std::string ret;
+  return ret;
+}
+
+
 std::vector<std::string> Storage::find_int(const std::string & name) const {
   std::vector<std::string> ret;
 
@@ -126,6 +145,16 @@ std::vector<std::string> Storage::find_double_vec(const std::string & name) cons
   for(size_t i=0;i<doublevec.size();i++)
     if(doublevec[i].name.find(name)!=std::string::npos)
       ret.push_back(doublevec[i].name);
+
+  return ret;
+}
+
+std::vector<std::string> Storage::find_string(const std::string & name) const {
+  std::vector<std::string> ret;
+
+  for(size_t i=0;i<strings.size();i++)
+    if(strings[i].name.find(name)!=std::string::npos)
+      ret.push_back(strings[i].name);
 
   return ret;
 }
