@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       HF/DFT from Hel
@@ -19,9 +19,11 @@
 #include "global.h"
 #include "mathf.h"
 #include "scf.h"
+#include "solidharmonics.h"
 #include "timer.h"
 #include "xyzutils.h"
 
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 
@@ -57,7 +59,7 @@ double rel_diff(double x, double y) {
 bool rel_compare(double x, double y, double tau) {
   // Compute relative difference
   double d=rel_diff(x,y);
-  
+
   if(fabs(d)<tau) {
     //    printf("%e vs %e, difference %e, ok\n",x,y,d);
     return 1;
@@ -71,7 +73,7 @@ bool rel_compare(double x, double y, double tau) {
 bool abs_compare(double x, double y, double tau) {
   // Compute relative difference
   double d=fabs(x-y);
-  
+
   if(fabs(d)<tau) {
     //    printf("%e vs %e, difference %e, ok\n",x,y,d);
     return 1;
@@ -104,7 +106,7 @@ bool compare(const arma::vec & x, const arma::vec & y, double tau, size_t & nsuc
       nsucc++;
     }
   }
- 
+
   return ok;
 }
 
@@ -112,7 +114,7 @@ bool compare(const arma::vec & x, const arma::vec & y, double tau, size_t & nsuc
 double max_diff(const arma::vec & x, const arma::vec & y) {
   if(x.n_elem!=y.n_elem)
     throw std::runtime_error("Error - differing amount of computed and reference orbital energies!\n");
-  
+
   double m=0;
   for(size_t i=0;i<x.n_elem;i++) {
     double d=fabs(x(i)-y(i));
@@ -151,6 +153,55 @@ void check_norm(const BasisSet & bas) {
       throw std::runtime_error(oss.str());
     }
 }
+
+// Check normalization of spherical harmonics
+double cartint(int l, int m, int n) {
+  // J. Comput. Chem. 27, 1009-1019 (2006)
+  // \int x^l y^m z^n d\Omega =
+  // 4 \pi (l-1)!! (m-1)!! (n-1)!! / (l+m+n+1)!! if l,m,n even,
+  // 0 otherwise
+
+  if(l%2==1 || m%2==1 || n%2==1)
+    return 0.0;
+
+  return 4.0*M_PI*doublefact(l-1)*doublefact(m-1)*doublefact(n-1)/doublefact(l+m+n+1);
+}
+
+// Check norm of Y_{l,m}
+void check_sph_norm(int l, int m) {
+  // Get the coefficients
+  std::vector<double> c=calcYlm_coeff(l,m);
+
+  // Form the list of cartesian functions
+  std::vector<shellf_t> cart(((l+1)*(l+2))/2);
+  size_t n=0;
+  for(int i=0; i<=l; i++) {
+    int nx = l - i;
+    for(int j=0; j<=i; j++) {
+      int ny = i-j;
+      int nz = j;
+
+      cart[n].l=nx;
+      cart[n].m=ny;
+      cart[n].n=nz;
+      cart[n].relnorm=c[n];
+      n++;
+    }
+  }
+
+  // Compute norm
+  double norm=0.0;
+  for(size_t i=0;i<cart.size();i++)
+    for(size_t j=0;j<cart.size();j++)
+      norm+=cart[i].relnorm*cart[j].relnorm*cartint(cart[i].l+cart[j].l,cart[i].m+cart[j].m,cart[i].n+cart[j].n);
+  norm=sqrt(norm);
+
+  if(fabs(norm-1.0)>20*DBL_EPSILON) {
+    fprintf(stderr,"Norm of (%i,%i) is %e!\n",l,m,norm);
+    throw std::runtime_error("Wrong norm.\n");
+  }
+}
+
 
 /// Test RHF solution
 #ifdef COMPUTE_REFERENCE
@@ -208,7 +259,7 @@ void rhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
     fflush(stdout);
     oss << "Test " << label << " failed.\n";
     throw std::runtime_error(oss.str());
-  }  
+  }
 #endif
 }
 
@@ -274,7 +325,7 @@ void uhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
     ERROR_INFO();
     oss << "Test " << label << " failed.\n";
     throw std::runtime_error(oss.str());
-  }  
+  }
 #endif
 }
 
@@ -340,7 +391,7 @@ void rohf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
     ERROR_INFO();
     oss << "Test " << label << " failed.\n";
     throw std::runtime_error(oss.str());
-  }  
+  }
 #endif
 }
 
@@ -412,7 +463,7 @@ void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
     ERROR_INFO();
     oss << "Test " << label << " failed.\n";
     throw std::runtime_error(oss.str());
-  }  
+  }
 #endif
 }
 
@@ -489,7 +540,7 @@ void udft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
     ERROR_INFO();
     oss << "Test " << label << " failed.\n";
     throw std::runtime_error(oss.str());
-  }  
+  }
 #endif
 }
 
@@ -498,6 +549,14 @@ int main(void) {
 
   // Initialize libint
   init_libint_base();
+
+  // First, check norms of spherical harmonics.
+  for(int l=0;l<=max_am;l++)
+    for(int m=-l;m<=l;m++)
+      check_sph_norm(l,m);
+#ifndef COMPUTE_REFERENCE
+  printf("Solid harmonics OK.\n");
+#endif
 
   // Load basis sets
 
@@ -542,7 +601,7 @@ int main(void) {
   BasisSetLibrary aug_cc_pVQZ;
   aug_cc_pVQZ.load_gaussian94("aug-cc-pVQZ");
   */
-  
+
   // Helper structure
   atom_t at;
 
@@ -658,7 +717,7 @@ int main(void) {
   Settings dftpol_nofit=dftpol; // Polarized calculation, no density fitting
   dftpol_nofit.set_bool("DFTFitting",false);
 
-  printf("****** Running calculations *******\n");  
+  printf("****** Running calculations *******\n");
   Timer t;
 
   // Reference total energy
