@@ -297,7 +297,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 #endif
 
 #endif // end DFT clause
-    fprintf(stderr,".\n%4s %16s %10s %9s %9s %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
+    fprintf(stderr,".\n%4s %16s %10s  %9s  %9s  %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
   }
 
 #ifdef DFT
@@ -859,8 +859,26 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     }
 
     // Sparse output
-    if(verbose)
-      fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %8.3f %10.3f\n",iiter,sol.en.E,deltaE,rmsdiff,maxdiff,norm(dipmom),titer.get());
+    if(verbose) {
+      fprintf(stderr,"%4i % 16.8f",iiter,sol.en.E);
+
+      if(fabs(deltaE)<conv.deltaEmax)
+	fprintf(stderr," % 10.3e*",deltaE);
+      else
+	fprintf(stderr," % 10.3e ",deltaE);
+
+      if(rmsdiff<conv.deltaPrms)
+	fprintf(stderr," %9.3e*",rmsdiff);
+      else
+	fprintf(stderr," %9.3e ",rmsdiff);
+
+      if(maxdiff<conv.deltaPmax)
+	fprintf(stderr," %9.3e*",maxdiff);
+      else
+	fprintf(stderr," %9.3e ",maxdiff);
+
+      fprintf(stderr," %8.3f %10.3f\n",norm(dipmom),titer.get());
+    }
 
     if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
       // Increment amount of converged iterations
