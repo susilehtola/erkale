@@ -41,7 +41,13 @@ std::string readline(std::istream & in);
 std::string readline(FILE *in);
 
 /// Split line into words
-std::vector<std::string> splitline(std::string line);
+std::vector<std::string> splitline(const std::string & line);
+
+/// Trim the line (remove whitespace from start and end)
+std::string trim(const std::string & line);
+
+/// Get rid of double white space.
+std::string rem_dbl_whitespace(const std::string & line);
 
 /// Read integer
 int readint(std::string num);
