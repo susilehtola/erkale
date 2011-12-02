@@ -1,4 +1,4 @@
-* The number of executables is growing rapidly => identify common code and place in parser routines.
+* Figure out the correct normalization of spherical harmonics.
 
 * Write pretty-printing routine for making bars such as *** text ***
   or --- text ---.
