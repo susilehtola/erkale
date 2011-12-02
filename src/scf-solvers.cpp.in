@@ -884,7 +884,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
       // Increment amount of converged iterations
       convd++;
 
-      if(convd>=3) {
+      if(convd>=2) {
 	converged=true;
 
 	if(verbose)
