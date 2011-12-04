@@ -15,3 +15,6 @@ else()
 endif()
 
 install (TARGETS erkale_casida DESTINATION bin)
+# Install headers
+file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+install(FILES ${headers} DESTINATION include/erkale/casida)
