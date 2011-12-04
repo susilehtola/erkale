@@ -24,3 +24,6 @@ endif()
 
 install (TARGETS erkale_copt DESTINATION bin)
 install (TARGETS liberkale_cmp DESTINATION lib${LIB_SUFFIX})
+# Install headers
+file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+install(FILES ${headers} DESTINATION include/erkale/completeness)

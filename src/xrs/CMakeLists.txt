@@ -33,6 +33,10 @@ endif()
 install (TARGETS liberkale_xrs DESTINATION lib${LIB_SUFFIX})
 install (TARGETS erkale_xrs DESTINATION bin)
 
+# Install headers
+file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+install(FILES ${headers} DESTINATION include/erkale/xrs)
+
 
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xrsscf.cpp

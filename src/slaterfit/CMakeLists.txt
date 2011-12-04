@@ -8,3 +8,6 @@ target_link_libraries(erkale_slaterfit ${GSL_LIBRARIES})
 target_link_libraries(erkale_slaterfit ${LAPACK_LIBRARIES})
 
 install (TARGETS erkale_slaterfit DESTINATION bin)
+# Install headers
+file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+install(FILES ${headers} DESTINATION include/erkale/slaterfit)
