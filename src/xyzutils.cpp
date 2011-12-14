@@ -105,7 +105,7 @@ void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const
   out=fopen(fname.c_str(),"w");
 
   // Print out number of atoms
-  fprintf(out,"%lu\n",at.size());
+  fprintf(out,"%u\n",(unsigned int) at.size());
   // Print comment
   fprintf(out,"%s\n",comment.c_str());
   // Print atoms

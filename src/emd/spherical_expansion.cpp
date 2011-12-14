@@ -488,7 +488,7 @@ void GTO_Fourier_Ylm::clean() {
 
 void GTO_Fourier_Ylm::print() const {
   for(size_t i=0;i<sphexp.size();i++) {
-    printf("Term %lu: p^%i exp(-%e p^2), angular part\n",i,sphexp[i].pm,sphexp[i].z);
+    printf("Term %u: p^%i exp(-%e p^2), angular part\n",(unsigned int) i,sphexp[i].pm,sphexp[i].z);
     sphexp[i].ang.print();
   }
 }

@@ -315,7 +315,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 
   if(verbose) {
     printf("Construction of grid took %s.\n",t.elapsed().c_str());
-    printf("DFT grid has %lu points (%lu function values).\n",grid.get_Npoints(),grid.get_Nfuncs());
+    printf("DFT grid has %u points (%u function values).\n",(unsigned int) grid.get_Npoints(),(unsigned int) grid.get_Nfuncs());
     grid.print_memory_req();
     printf("\n");
 
