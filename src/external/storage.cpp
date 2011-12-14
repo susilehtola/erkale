@@ -195,4 +195,16 @@ void Storage::print(bool vals) const {
       printf("%i values\n",(int) doublevec[i].val.size());
     }
   }
+
+  if(strings.size())
+    printf("\nStrings:\n");
+  for(size_t i=0;i<strings.size();i++) {
+    printf("\t%s\t",strings[i].name.c_str());
+    if(vals) {
+      printf("%s ",strings[i].val.c_str());
+    } else {
+      printf("%i chars\n",(int) strings[i].val.size());
+    }
+  }
+
 }
