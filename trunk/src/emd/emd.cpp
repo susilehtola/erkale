@@ -705,7 +705,7 @@ void EMD::optimize_moments(bool verbose, double tol) {
     // Print out current values if necessary
     if(verbose && (iter==1 || t.get()>MAXPRINTFREQ || errel<=tol)) {
       t.set();
-      printf("\nUsing %lu points, charge differs from norm of DM by %e.\n",dens.size(),momval[2]-dmnorm);
+      printf("\nUsing %u points, charge differs from norm of DM by %e.\n",(unsigned int) dens.size(),momval[2]-dmnorm);
       printf("Current values of moments are:\n");
       printf("\tk\t<p^k>\t\t\\Delta <p^k>\t \\Delta <p^k> / <p^k>\n");
       for(int imom=0;imom<Nmom;imom++)
