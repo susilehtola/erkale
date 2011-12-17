@@ -37,6 +37,11 @@ const double dtol=1e-5;
 /// Absolute tolerance for normalization of basis functions
 const double normtol=1e-10;
 
+/// Check orthogonality of spherical harmonics up to
+const int Lmax=10;
+/// Tolerance for orthonormality
+const double orthtol=500*DBL_EPSILON;
+
 /// Initial DFT grid tolerance
 const double dft_initialtol=1e-3;
 /// Final DFT grid tolerance
@@ -143,7 +148,7 @@ const char * stat[]={"fail","ok"};
 void check_norm(const BasisSet & bas) {
   size_t Nbf=bas.get_Nbf();
   arma::mat S=bas.overlap();
-
+  
   for(size_t i=0;i<Nbf;i++)
     if(fabs(S(i,i)-1.0)>=normtol) {
       std::ostringstream oss;
@@ -154,7 +159,8 @@ void check_norm(const BasisSet & bas) {
     }
 }
 
-// Check normalization of spherical harmonics
+
+  // Check normalization of spherical harmonics
 double cartint(int l, int m, int n) {
   // J. Comput. Chem. 27, 1009-1019 (2006)
   // \int x^l y^m z^n d\Omega =
@@ -167,39 +173,77 @@ double cartint(int l, int m, int n) {
   return 4.0*M_PI*doublefact(l-1)*doublefact(m-1)*doublefact(n-1)/doublefact(l+m+n+1);
 }
 
-// Check norm of Y_{l,m}
-void check_sph_norm(int l, int m) {
-  // Get the coefficients
-  std::vector<double> c=calcYlm_coeff(l,m);
+// Check norm of Y_{l,m}.
+void check_sph_orthonorm(int lmax) {
+  
+  // Left hand value of l
+  for(int ll=0;ll<=lmax;ll++)
+    // Right hand value of l
+    for(int lr=ll;lr<=lmax;lr++) {
 
-  // Form the list of cartesian functions
-  std::vector<shellf_t> cart(((l+1)*(l+2))/2);
-  size_t n=0;
-  for(int i=0; i<=l; i++) {
-    int nx = l - i;
-    for(int j=0; j<=i; j++) {
-      int ny = i-j;
-      int nz = j;
+      // Loop over m values
+      for(int ml=-ll;ml<=ll;ml++) {
+	// Get the coefficients
+	std::vector<double> cl=calcYlm_coeff(ll,ml);
+	
+	// Form the list of cartesian functions
+	std::vector<shellf_t> cartl(((ll+1)*(ll+2))/2);
+	size_t n=0;
+	for(int i=0; i<=ll; i++) {
+	  int nx = ll - i;
+	  for(int j=0; j<=i; j++) {
+	    int ny = i-j;
+	    int nz = j;
+	    
+	    cartl[n].l=nx;
+	    cartl[n].m=ny;
+	    cartl[n].n=nz;
+	    cartl[n].relnorm=cl[n];
+	    n++;
+	  }
+	}
+	
+	for(int mr=-lr;mr<=lr;mr++) {
+	  // Get the coefficients
+	  std::vector<double> cr=calcYlm_coeff(lr,mr);
+	  
+	  // Form the list of cartesian functions
+	  std::vector<shellf_t> cartr(((lr+1)*(lr+2))/2);
+	  size_t n=0;
+	  for(int i=0; i<=lr; i++) {
+	    int nx = lr - i;
+	    for(int j=0; j<=i; j++) {
+	      int ny = i-j;
+	      int nz = j;
+	      
+	      cartr[n].l=nx;
+	      cartr[n].m=ny;
+	      cartr[n].n=nz;
+	      cartr[n].relnorm=cr[n];
+	      n++;
+	    }
+	  }
+	  
+	  // Compute dot product
+	  double norm=0.0;
+	  for(size_t i=0;i<cartl.size();i++)
+	    for(size_t j=0;j<cartr.size();j++)
+	      norm+=cartl[i].relnorm*cartr[j].relnorm*cartint(cartl[i].l+cartr[j].l,cartl[i].m+cartr[j].m,cartl[i].n+cartr[j].n);
 
-      cart[n].l=nx;
-      cart[n].m=ny;
-      cart[n].n=nz;
-      cart[n].relnorm=c[n];
-      n++;
+	  if( (ll==lr) && (ml==mr) ) {
+	    if(fabs(norm-1.0)>orthtol) {
+	      fprintf(stderr,"Square norm of (%i,%i) is %e, deviation %e from unity!\n",ll,ml,norm,norm-1.0);
+	      throw std::runtime_error("Wrong norm.\n");
+	    }
+	  } else {
+	    if(fabs(norm)>orthtol) {
+	      fprintf(stderr,"Inner product of (%i,%i) and (%i,%i) is %e!\n",ll,ml,lr,mr,norm);
+	      throw std::runtime_error("Functions not orthogonal.\n");
+	    }
+	  }
+	}
+      }
     }
-  }
-
-  // Compute norm
-  double norm=0.0;
-  for(size_t i=0;i<cart.size();i++)
-    for(size_t j=0;j<cart.size();j++)
-      norm+=cart[i].relnorm*cart[j].relnorm*cartint(cart[i].l+cart[j].l,cart[i].m+cart[j].m,cart[i].n+cart[j].n);
-  norm=sqrt(norm);
-
-  if(fabs(norm-1.0)>20*DBL_EPSILON) {
-    fprintf(stderr,"Norm of (%i,%i) is %e!\n",l,m,norm);
-    throw std::runtime_error("Wrong norm.\n");
-  }
 }
 
 
@@ -551,12 +595,8 @@ int main(void) {
   init_libint_base();
 
   // First, check norms of spherical harmonics.
-  for(int l=0;l<=max_am;l++)
-    for(int m=-l;m<=l;m++)
-      check_sph_norm(l,m);
-#ifndef COMPUTE_REFERENCE
+  check_sph_orthonorm(Lmax);
   printf("Solid harmonics OK.\n");
-#endif
 
   // Load basis sets
 
