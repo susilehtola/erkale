@@ -463,8 +463,8 @@ arma::mat form_density(const Storage & stor) {
       keys.erase(keys.begin()+i);
 
   /*
-    printf("Available densities\n");
-    for(size_t i=0;i<keys.size();i++)
+  printf("Available densities\n");
+  for(size_t i=0;i<keys.size();i++)
     printf("\t%s\n",keys[i].c_str());
   */
 
@@ -860,17 +860,14 @@ void write_basis(const BasisSet & basis, FILE *out) {
   std::vector<double> contr;
   std::vector<int> nprim(shells.size());
   for(size_t i=0;i<shells.size();i++) {
-    // Get the contraction
-    std::vector<contr_t> c=shells[i].get_contr();
+    // Get the contraction of *normalized* primitives
+    std::vector<contr_t> c=shells[i].get_contr_normalized();
     nprim[i]=(int) c.size();
-
-    // Angular momentum
-    int am=shells[i].get_am();
 
     // Save exponents and *primitive* contraction coefficients
     for(size_t j=0;j<c.size();j++) {
       exps.push_back(c[j].z);
-      contr.push_back(c[j].c*pow(c[j].z,am/2.0+0.75));
+      contr.push_back(c[j].c);
     }
   }
   print("Number of primitives per shell",nprim,out);
@@ -889,20 +886,20 @@ void load_fchk(const Settings & set) {
 
   // Construct basis set
   BasisSet basis=form_basis(stor);
-  // basis.print(true);
+  //  basis.print(true);
 
   // Construct density matrix
   arma::mat P=form_density(stor);
 
   // Form orbitals
   arma::mat Ca, Cb;
-  bool restr=1;
+  bool restr=false;
   Ca=form_orbital(stor,"Alpha MO coefficients");
   try {
     Cb=form_orbital(stor,"Beta MO coefficients");
   } catch(std::runtime_error) {
     // Restricted checkpoint
-    restr=0;
+    restr=true;
   }
 
   // Check that everything is OK
@@ -912,14 +909,12 @@ void load_fchk(const Settings & set) {
 
   double neldiff=arma::trace(P*S);
   neldiff-=stor.get_int("Number of electrons");
-
   if(fabs(neldiff)>1e-8) {
     std::ostringstream oss;
     oss << "\nNumber of electrons and trace of density matrix differ by " << neldiff << "!\n";
     throw std::runtime_error(oss.str());
   }
   printf("tr PS - Nel = %.e\n",neldiff);
-
 
   // Save the result
   t.set();
@@ -949,6 +944,7 @@ void save_fchk(const Settings & set) {
   // Construct basis
   BasisSet basis;
   chkpt.read(basis);
+  //  basis.print(true);
 
   // Open output file.
   FILE *out=fopen(set.get_string("SaveFchk").c_str(),"w");
@@ -976,6 +972,8 @@ void save_fchk(const Settings & set) {
     for(size_t i=0;i<E.n_elem;i++)
       Ev[i]=E(i);
     print("Alpha Orbital Energies",Ev,out);
+
+    print("Number of independent functions",(int) C.n_cols,out);
   } else {
     arma::mat Ca;
     chkpt.read("Ca",Ca);
@@ -997,12 +995,23 @@ void save_fchk(const Settings & set) {
     for(size_t i=0;i<Eb.n_elem;i++)
       Ev[i]=Eb(i);
     print("Beta Orbital Energies",Ev,out);
+
+    print("Number of independent functions",(int) Ca.n_cols,out);
   }
+
+  // Write the number of electrons
+  int Nel;
+  chkpt.read("Nel",Nel);
+  print("Number of electrons",Nel,out);
+  chkpt.read("Nel-a",Nel);
+  print("Number of alpha electrons",Nel,out);
+  chkpt.read("Nel-b",Nel);
+  print("Number of beta electrons",Nel,out);
 
   // Save density matrix
   arma::mat P;
   chkpt.read("P",P);
-  write_density("Total SCF density",basis,P,out);
+  write_density("Total SCF Density",basis,P,out);
 
   // Close output file
   fclose(out);

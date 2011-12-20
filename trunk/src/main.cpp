@@ -148,6 +148,14 @@ int main(int argc, char **argv) {
   Checkpoint chkpt(savename,true);
   chkpt.write(basis);
 
+  // Write number of electrons
+  int Nel_alpha;
+  int Nel_beta;
+  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+  chkpt.write("Nel",Nel);
+  chkpt.write("Nel-a",Nel_alpha);
+  chkpt.write("Nel-b",Nel_beta);
+
   if(set.get_int("Multiplicity")==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
     // Closed shell case
     rscf_t sol;
