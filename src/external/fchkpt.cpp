@@ -14,6 +14,15 @@
  * of the License, or (at your option) any later version.
  */
 
+/**
+ * This file contains routines for reading and writing formatted
+ * checkpoint files. These are provided to provide interoperability
+ * with other software, e.g., for visualizing orbitals and densities
+ * computed with ERKALE with other software such as Avogadro, and to
+ * enable momentum density computations with calculations made with
+ * other program suites.
+ */
+
 #include "basis.h"
 #include "checkpoint.h"
 #include "mathf.h"
@@ -111,19 +120,19 @@ Storage parse_fchk(const std::string & name) {
     } catch(std::runtime_error) {
       break;
     }
-			       
+
     // Split the input into fields
     std::vector<std::string> words=splitline(line);
 
     // Skip first two lines.
     if(iline<3)
       continue;
-    
+
     // Read in numbers?
     if(intvec) {
       for(size_t i=0;i<words.size();i++)
 	intv.push_back(readint(words[i]));
-      
+
       N-=words.size();
       if(N==0) {
 	intvec=false;
@@ -203,26 +212,20 @@ Storage parse_fchk(const std::string & name) {
       }
     }
   }
-  
+
   // Close input
   if(usegz || usexz || usebz2 || uselzma)
     pclose(in);
   else
     fclose(in);
-  
+
   return ret;
 }
 
 /// Form the ERKALE to Gaussian index conversion array
-std::vector<size_t> eg_indarr(const Storage & stor) {
-  // Amount of basis functions
-  size_t Nbf=stor.get_int("Number of basis functions");
-
-  // Form index list
+std::vector<size_t> eg_indarr(const std::vector<int> shtype, size_t Nbf) {
+  // Returned index list
   std::vector<size_t> idx(Nbf,0);
-
-  // Get shell types
-  std::vector<int> shtype=stor.get_int_vec("Shell types");
 
   // Loop over shells
   size_t g_idx=0; // Index of Gaussian function
@@ -231,20 +234,20 @@ std::vector<size_t> eg_indarr(const Storage & stor) {
   for(size_t ish=0;ish<shtype.size();ish++) {
     // Determine shell type.
 
-    
+
     // S shell
     if(shtype[ish]==0) {
       idx[e_idx++]=g_idx++;
 
-  
+
       // (Cartesian) P shell. px, py and pz
     } else if(shtype[ish]==1) {
-      
+
       for(size_t i=0;i<3;i++) {
 	idx[e_idx++]=g_idx++;
       }
 
-      
+
       // SP shell: first S, then px, py and pz
     } else if(shtype[ish]==-1) {
 
@@ -288,31 +291,31 @@ std::vector<size_t> eg_indarr(const Storage & stor) {
 
       if(shtype[ish]==2) {
 	// Cartesian D shell.
-	
+
 	// x^2
 	hlp.l=2;
 	hlp.m=0;
 	hlp.n=0;
 	sh.push_back(hlp);
-	
+
 	// y^2
 	hlp.l=0;
 	hlp.m=2;
 	hlp.n=0;
 	sh.push_back(hlp);
-	
+
 	// z^2
 	hlp.l=0;
 	hlp.m=0;
 	hlp.n=2;
 	sh.push_back(hlp);
-	
+
 	// xy
 	hlp.l=1;
 	hlp.m=1;
 	hlp.n=0;
 	sh.push_back(hlp);
-	
+
 	// xz
 	hlp.l=1;
 	hlp.m=0;
@@ -368,7 +371,7 @@ std::vector<size_t> eg_indarr(const Storage & stor) {
 	hlp.m=0;
 	hlp.n=2;
 	sh.push_back(hlp);
-	
+
 	// yz^2
 	hlp.l=0;
 	hlp.m=1;
@@ -404,7 +407,7 @@ std::vector<size_t> eg_indarr(const Storage & stor) {
 	  }
 	}
       }
-      
+
       // Add shells
       for(size_t i=0;i<sh.size();i++)
 	idx[e_idx+getind(sh[i].l,sh[i].m,sh[i].n)]=g_idx++;
@@ -416,10 +419,21 @@ std::vector<size_t> eg_indarr(const Storage & stor) {
   return idx;
 }
 
+/// Form the ERKALE to Gaussian index conversion array
+std::vector<size_t> eg_indarr(const Storage & stor) {
+  // Amount of basis functions
+  size_t Nbf=stor.get_int("Number of basis functions");
+
+  // Get shell types
+  std::vector<int> shtype=stor.get_int_vec("Shell types");
+
+  return eg_indarr(shtype,Nbf);
+}
+
 /// Form the Gaussian to ERKALE index conversion array
-std::vector<size_t> ge_indarr(const Storage & stor) {
+std::vector<size_t> ge_indarr(const std::vector<int> shtype, size_t Nbf) {
   // Erkale to Gaussian
-  std::vector<size_t> eg=eg_indarr(stor);
+  std::vector<size_t> eg=eg_indarr(shtype, Nbf);
 
   // Gaussian to ERKALE
   std::vector<size_t> ret(eg.size());
@@ -428,6 +442,18 @@ std::vector<size_t> ge_indarr(const Storage & stor) {
 
   return ret;
 }
+
+/// Form the Gaussian to ERKALE index conversion array
+std::vector<size_t> ge_indarr(const Storage & stor) {
+  // Amount of basis functions
+  size_t Nbf=stor.get_int("Number of basis functions");
+
+  // Get shell types
+  std::vector<int> shtype=stor.get_int_vec("Shell types");
+
+  return ge_indarr(shtype,Nbf);
+}
+
 
 arma::mat form_density(const Storage & stor) {
   // Check what kind of densities are available
@@ -490,7 +516,7 @@ arma::mat form_density(const Storage & stor) {
 }
 
 /// Get orbital matrix
-arma::mat form_Ca(const Storage & stor) {
+arma::mat form_orbital(const Storage & stor, const std::string & name) {
   // Amount of basis functions
   size_t Nbf=stor.get_int("Number of basis functions");
   // Amount of orbitals
@@ -500,10 +526,10 @@ arma::mat form_Ca(const Storage & stor) {
   std::vector<size_t> idx=ge_indarr(stor);
 
   // Get orbital coefficients
-  std::vector<double> c=stor.get_double_vec("Alpha MO coefficients");
+  std::vector<double> c=stor.get_double_vec(name);
 
-  arma::mat Ca(Nbf,Nmo);
-  Ca.zeros();
+  arma::mat C(Nbf,Nmo);
+  C.zeros();
 
   if(c.size()!=Nmo*Nbf) {
     ERROR_INFO();
@@ -514,12 +540,12 @@ arma::mat form_Ca(const Storage & stor) {
     for(size_t ibf=0;ibf<Nbf;ibf++) {
       // ERKALE index of basis function is
       size_t ie=idx[ibf];
-      
+
       // Store coefficient
-      Ca(ie,imo)=c[imo*Nbf+ibf];
+      C(ie,imo)=c[imo*Nbf+ibf];
     }
-  
-  return Ca;
+
+  return C;
 }
 
 
@@ -576,7 +602,7 @@ BasisSet form_basis(const Storage & stor) {
   // Add the shells.
   for(size_t ish=0;ish<shtypes.size();ish++) {
     // Construct contraction
-    
+
     // Nuclear index is
     size_t nucind=shatom[ish]-1;
 
@@ -585,23 +611,23 @@ BasisSet form_basis(const Storage & stor) {
       C[ip].z=exps[iprim+ip];
       C[ip].c=coeff[iprim+ip];
     }
-    
+
     if(shtypes[ish]==-1) {
       // SP shell. Add S shell first.
-      
+
       std::vector<contr_t> Cs(C);
       for(int ip=0;ip<nprim[ish];ip++) {
 	Cs[ip].c=spcoeff[iprim+ip];
       }
-      
+
       bas.add_shell(nucind,0,Cs,false);
     }
-    
+
     // Add shell. Angular momentum is
     int am=abs(shtypes[ish]);
     // Use spherical harmonics on shell?
     bool lm=(shtypes[ish]<-1);
-    
+
     GaussianShell sh(am,lm,C);
     bas.add_shell(nucind,sh,false);
 
@@ -622,36 +648,244 @@ BasisSet form_basis(const Storage & stor) {
   return bas;
 }
 
+void print(const std::string & entry, int val, FILE *out) {
+  fprintf(out,"%-42s I   %3s %11i\n",entry.c_str(),"",val);
+  fflush(out);
+}
 
-int main(int argc, char **argv) {
-#ifdef _OPENMP
-  printf("ERKALE - HF/DFT from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
-#else
-  printf("ERKALE - HF/DFT from Hel, serial version.\n");
-#endif
-  printf("(c) Jussi Lehtola, 2010-2011.\n");
+void print(const std::string & entry, double val, FILE *out) {
+  fprintf(out,"%-42s R   %3s %11e\n",entry.c_str(),"",val);
+  fflush(out);
+}
 
-  print_license();
+void print(const std::string & entry, const std::vector<int> & val, FILE *out) {
+  fprintf(out,"%-42s I   %3s %11i\n",entry.c_str(),"N=",(int) val.size());
 
-  if(argc>2) {
-    printf("Usage: %s runfile\n",argv[0]);
-    return 1;
+  short int N=0;
+  for(size_t i=0;i<val.size();i++) {
+    fprintf(out," % 11i",val[i]);
+    N++;
+    if(N==6) {
+      N=0;
+      fprintf(out,"\n");
+    }
+  }
+  if(N!=0)
+    fprintf(out,"\n");
+
+  fflush(out);
+}
+
+void print(const std::string & entry, const std::vector<double> & val, FILE *out) {
+  fprintf(out,"%-42s R   %3s %11i\n",entry.c_str(),"N=",(int) val.size());
+
+  short int N=0;
+  for(size_t i=0;i<val.size();i++) {
+    fprintf(out," % 15.8e",val[i]);
+    N++;
+    if(N==5) {
+      N=0;
+      fprintf(out,"\n");
+    }
+  }
+  if(N!=0)
+    fprintf(out,"\n");
+
+  fflush(out);
+}
+
+std::vector<int> form_shelltypes(const BasisSet & basis) {
+  // Get the shells
+  std::vector<GaussianShell> shells=basis.get_shells();
+
+  // Get shell types.
+  std::vector<int> shtypes(shells.size());
+  for(size_t i=0;i<shells.size();i++) {
+    // Get angular momentum
+    int am=shells[i].get_am();
+
+    // Use spherical harmonics?
+    if(shells[i].lm_in_use())
+      shtypes[i]=-am;
+    else
+      shtypes[i]=am;
   }
 
+  return shtypes;
+}
+
+void write_mo(const std::string & entry, const BasisSet & basis, const arma::mat & C, FILE *out) {
+  // Print MO matrix
+  fprintf(out,"%-42s R   %s %11i\n",entry.c_str(),"N=",(int) (C.n_rows*C.n_cols));
+
+  // Get amount of basis functions
+  size_t Nbf=basis.get_Nbf();
+  if(Nbf!=C.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Orbitals do not correspond to basis set!\n");
+  }
+
+  // Get shell types
+  std::vector<int> shtype=form_shelltypes(basis);
+
+  // Get index converter
+  std::vector<size_t> idx=ge_indarr(shtype,Nbf);
+
+  size_t N=0;
+
+  // Print output
+  for(size_t imo=0;imo<C.n_cols;imo++)
+    for(size_t ibf=0;ibf<Nbf;ibf++) {
+      // Get ERKALE index
+      size_t ie=idx[ibf];
+
+      fprintf(out," % 15.8e",C(ie,imo));
+      N++;
+      if(N==5) {
+	N=0;
+	fprintf(out,"\n");
+      }
+    }
+  if(N!=0)
+    fprintf(out,"\n");
+
+  fflush(out);
+}
+
+void write_density(const std::string & entry, const BasisSet & basis, const arma::mat & P, FILE *out) {
+  // Get amount of basis functions
+  size_t Nbf=basis.get_Nbf();
+  if(Nbf!=P.n_rows || Nbf!=P.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Density matrix does not correspond to basis set!\n");
+  }
+
+  // Amount of non-equivalent entries is
+  size_t Nind=Nbf*(Nbf+1)/2;
+
+  // Print density matrix
+  fprintf(out,"%-42s R   %s %11i\n",entry.c_str(),"N=",(int) (Nind));
+
+  // Get shell types
+  std::vector<int> shtype=form_shelltypes(basis);
+
+  // Get index converter
+  std::vector<size_t> idx=ge_indarr(shtype,Nbf);
+
+  size_t N=0;
+  size_t ntot=0;
+
+  // Loop over functions
+  for(size_t i=0;i<Nbf;i++) {
+    // ERKALE index
+    size_t ie=idx[i];
+
+    for(size_t j=0;j<=i;j++) {
+      // ERKALE index
+      size_t je=idx[j];
+
+      fprintf(out," % 15.8e",P(ie,je));
+      N++;
+      ntot++;
+
+      if(N==5) {
+	N=0;
+	fprintf(out,"\n");
+      }
+    }
+  }
+  if(N!=0)
+    fprintf(out,"\n");
+  
+  if(ntot!=Nind)
+    throw std::runtime_error("Wrong amount!\n");
+
+  fflush(out);
+}
+
+void write_basis(const BasisSet & basis, FILE *out) {
+  // Print number of atoms.
+  print("Number of atoms", (int) basis.get_Nnuc(), out);
+  // Print number of basis functions.
+  print("Number of basis functions", (int) basis.get_Nbf(), out);
+
+  /* Nuclei */
+
+  // Get the nuclei.
+  std::vector<nucleus_t> nucs=basis.get_nuclei();
+
+  // Print atomic numbers.
+  std::vector<int> atnum(nucs.size());
+  for(size_t i=0;i<atnum.size();i++)
+    atnum[i]=nucs[i].Z;
+  print("Atomic numbers",atnum,out);
+
+  // Print coordinates of nuclei.
+  std::vector<double> coords(3*nucs.size());
+  for(size_t i=0;i<nucs.size();i++) {
+    coords[3*i]=nucs[i].r.x;
+    coords[3*i+1]=nucs[i].r.y;
+    coords[3*i+2]=nucs[i].r.z;
+  }
+  print("Current cartesian coordinates",coords,out);
+
+  /* Basis set */
+
+  // Get the shells
+  std::vector<GaussianShell> shells=basis.get_shells();
+
+  // Print shell types.
+  std::vector<int> shtypes=form_shelltypes(basis);
+  print("Shell types",shtypes,out);
+
+  // Print shell to atom map
+  std::vector<int> shmap(shells.size());
+  for(size_t i=0;i<shells.size();i++)
+    shmap[i]=(int) shells[i].get_center_ind()+1;
+  print("Shell to atom map",shmap,out);
+
+  // Print the coordinates of the shells
+  std::vector<double> shcoords(3*shells.size());
+  for(size_t i=0;i<shells.size();i++) {
+    coords_t r=shells[i].get_center();
+
+    shcoords[3*i]=r.x;
+    shcoords[3*i+1]=r.y;
+    shcoords[3*i+2]=r.z;
+  }
+  print("Coordinates of each shell",shcoords,out);
+
+  // Print number of primitives per shell, exponents and contraction coefficients.
+  std::vector<double> exps;
+  std::vector<double> contr;
+  std::vector<int> nprim(shells.size());
+  for(size_t i=0;i<shells.size();i++) {
+    // Get the contraction
+    std::vector<contr_t> c=shells[i].get_contr();
+    nprim[i]=(int) c.size();
+
+    // Angular momentum
+    int am=shells[i].get_am();
+
+    // Save exponents and *primitive* contraction coefficients
+    for(size_t j=0;j<c.size();j++) {
+      exps.push_back(c[j].z);
+      contr.push_back(c[j].c*pow(c[j].z,am/2.0+0.75));
+    }
+  }
+  print("Number of primitives per shell",nprim,out);
+  print("Primitive exponents",exps,out);
+  print("Contraction coefficients",contr,out);
+}
+
+
+void load_fchk(const Settings & set) {
   Timer t;
 
-  Settings set;
-  set.add_string("GaussianFchk","Gaussian formatted checkpoint file to load","chkpt.fchk");
-  set.add_string("SaveChk","Save results to ERKALE checkpoint","erkale.chk");
-
-  // Parse settings
-  if(argc==2)
-    set.parse(argv[1]);
-
   // Read in checkpoint
-  Storage stor=parse_fchk(set.get_string("GaussianFchk"));
+  Storage stor=parse_fchk(set.get_string("LoadFchk"));
   //  stor.print(false);
-  printf("Read in checkpoint in %s.\n",t.elapsed().c_str());
+  printf("Read in formatted checkpoint in %s.\n",t.elapsed().c_str());
 
   // Construct basis set
   BasisSet basis=form_basis(stor);
@@ -659,6 +893,17 @@ int main(int argc, char **argv) {
 
   // Construct density matrix
   arma::mat P=form_density(stor);
+
+  // Form orbitals
+  arma::mat Ca, Cb;
+  bool restr=1;
+  Ca=form_orbital(stor,"Alpha MO coefficients");
+  try {
+    Cb=form_orbital(stor,"Beta MO coefficients");
+  } catch(std::runtime_error) {
+    // Restricted checkpoint
+    restr=0;
+  }
 
   // Check that everything is OK
   t.set();
@@ -677,12 +922,130 @@ int main(int argc, char **argv) {
 
 
   // Save the result
-
   t.set();
   Checkpoint chkpt(set.get_string("SaveChk"),true);
   chkpt.write(basis);
   chkpt.write("P",P);
-  printf("\nCheckpoint saved in %s.\n",t.elapsed().c_str());
+
+  chkpt.write("Restricted",restr);
+  if(restr) {
+    chkpt.write("C",Ca);
+  } else {
+    chkpt.write("Ca",Ca);
+    chkpt.write("Cb",Cb);
+  }
+
+  chkpt.write("Converged",1);
+
+  printf("\nERKALE checkpoint saved in %s.\n",t.elapsed().c_str());
+}
+
+void save_fchk(const Settings & set) {
+  Timer t;
+
+  // Load checkpoint
+  Checkpoint chkpt(set.get_string("LoadChk"),false);
+
+  // Construct basis
+  BasisSet basis;
+  chkpt.read(basis);
+
+  // Open output file.
+  FILE *out=fopen(set.get_string("SaveFchk").c_str(),"w");
+
+  // Write comment
+  fprintf(out,"%-80s\n","ERKALE formatted checkpoint for visualization purposes");
+  char line[80];
+  sprintf(line,"Created on %s.",t.current_time().c_str());
+  fprintf(out,"%-80s\n",line);
+
+  // Write the basis set info.
+  write_basis(basis,out);
+
+  // Write the orbitals
+  bool restr;
+  chkpt.read("Restricted",restr);
+  if(restr) {
+    arma::mat C;
+    chkpt.read("C",C);
+    write_mo("Alpha MO coefficients",basis,C,out);
+
+    arma::vec E;
+    chkpt.read("E",E);
+    std::vector<double> Ev(E.n_elem);
+    for(size_t i=0;i<E.n_elem;i++)
+      Ev[i]=E(i);
+    print("Alpha Orbital Energies",Ev,out);
+  } else {
+    arma::mat Ca;
+    chkpt.read("Ca",Ca);
+    write_mo("Alpha MO coefficients",basis,Ca,out);
+
+    arma::vec Ea;
+    chkpt.read("Ea",Ea);
+    std::vector<double> Ev(Ea.n_elem);
+    for(size_t i=0;i<Ea.n_elem;i++)
+      Ev[i]=Ea(i);
+    print("Alpha Orbital Energies",Ev,out);
+
+    arma::mat Cb;
+    chkpt.read("Cb",Cb);
+    write_mo("Beta MO coefficients",basis,Cb,out);
+
+    arma::vec Eb;
+    chkpt.read("Eb",Eb);
+    for(size_t i=0;i<Eb.n_elem;i++)
+      Ev[i]=Eb(i);
+    print("Beta Orbital Energies",Ev,out);
+  }
+
+  // Save density matrix
+  arma::mat P;
+  chkpt.read("P",P);
+  write_density("Total SCF density",basis,P,out);
+
+  // Close output file
+  fclose(out);
+
+  printf("Formatted checkpoint file created in %s.\n",t.elapsed().c_str());
+}
+
+int main(int argc, char **argv) {
+#ifdef _OPENMP
+  printf("ERKALE - HF/DFT from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
+#else
+  printf("ERKALE - HF/DFT from Hel, serial version.\n");
+#endif
+  printf("(c) Jussi Lehtola, 2010-2011.\n");
+
+  print_license();
+
+  if(argc>2) {
+    printf("Usage: %s runfile\n",argv[0]);
+    return 1;
+  }
+
+  Settings set;
+  set.add_string("LoadFchk","Gaussian formatted checkpoint file to load","");
+  set.add_string("SaveFchk","Gaussian formatted checkpoint file to load","");
+  set.add_string("LoadChk","Save results to ERKALE checkpoint","");
+  set.add_string("SaveChk","Save results to ERKALE checkpoint","");
+
+  // Parse settings
+  if(argc==2)
+    set.parse(argv[1]);
+
+  bool loadfchk=(set.get_string("LoadFchk")!="");
+  bool savefchk=(set.get_string("SaveFchk")!="");
+  bool loadchk=(set.get_string("LoadChk")!="");
+  bool savechk=(set.get_string("SaveChk")!="");
+
+  if(loadfchk && savechk && !loadchk && !savefchk)
+    load_fchk(set);
+  else if(!loadfchk && !savechk && loadchk && savefchk)
+    save_fchk(set);
+  else
+    throw std::runtime_error("Conflicting settings!\n");
 
   return 0;
 }

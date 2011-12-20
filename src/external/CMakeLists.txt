@@ -1,17 +1,17 @@
 # Gaussian EMD executable
-add_executable (erkale_chkpt_gaussian gaussian_chkpt.cpp )
-set_target_properties(erkale_chkpt_gaussian PROPERTIES OUTPUT_NAME "erkale_chkpt_gaussian${SUFFIX}")
+add_executable (erkale_fchkpt fchkpt.cpp )
+set_target_properties(erkale_fchkpt PROPERTIES OUTPUT_NAME "erkale_fchkpt${SUFFIX}")
 
-target_link_libraries(erkale_chkpt_gaussian liberkale)
+target_link_libraries(erkale_fchkpt liberkale)
 if(BUILD_SHARED_LIBS)
 else()
- target_link_libraries(erkale_chkpt_gaussian ${GSL_LIBRARIES})
- target_link_libraries(erkale_chkpt_gaussian ${LAPACK_LIBRARIES})
- target_link_libraries(erkale_chkpt_gaussian ${HDF5_LIBRARIES})
- target_link_libraries(erkale_chkpt_gaussian ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_fchkpt ${GSL_LIBRARIES})
+ target_link_libraries(erkale_fchkpt ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_fchkpt ${HDF5_LIBRARIES})
+ target_link_libraries(erkale_fchkpt ${LIBINT_LIBRARIES})
 endif()
 
-install (TARGETS erkale_chkpt_gaussian DESTINATION bin)
+install (TARGETS erkale_fchkpt DESTINATION bin)
 # Install headers
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 install(FILES ${headers} DESTINATION include/erkale/external)
