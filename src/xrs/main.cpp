@@ -960,6 +960,11 @@ int main(int argc, char **argv) {
     // Proceed with TP calculation. Initialize solver
     XRSSCF solver(basis,set,chkpt,spin);
 
+    // Write number of electrons to file
+    chkpt.write("Nel",nocca+noccb);
+    chkpt.write("Nel-a",nocca);
+    chkpt.write("Nel-b",noccb);
+
     // Set frozen orbitals
     if(nloc>0) {
       if(spin)
