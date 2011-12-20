@@ -63,6 +63,9 @@ class Timer {
   /// Continue timing
   void cont();
 
+  /// Get current time
+  std::string current_time() const;
+
   /// Print elapsed time
   void print() const;
   /// Print current time

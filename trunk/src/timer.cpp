@@ -59,7 +59,9 @@ void Timer::print() const {
   printf("Time elapsed is %s.\n",elapsed().c_str());
 }
 
-void Timer::print_time() const {
+std::string Timer::current_time() const {
+  char out[256];
+
   // Get time
   time_t t;
   time(&t);
@@ -72,7 +74,12 @@ void Timer::print_time() const {
   const char * months[]={"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
 
   // Print time
-  printf("Current time is %s %02i %s %4i %02i:%02i:%02i.\n",days[tm.tm_wday],tm.tm_mday,months[tm.tm_mon],1900+tm.tm_year,tm.tm_hour,tm.tm_min,tm.tm_sec);
+  sprintf(out,"%s %02i %s %4i %02i:%02i:%02i",days[tm.tm_wday],tm.tm_mday,months[tm.tm_mon],1900+tm.tm_year,tm.tm_hour,tm.tm_min,tm.tm_sec);
+  return std::string(out);
+}
+
+void Timer::print_time() const {
+  printf("Current time is %s.\n",current_time().c_str());
 }
 
 double Timer::get() const {
