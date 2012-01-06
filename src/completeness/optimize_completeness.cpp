@@ -17,6 +17,7 @@
 #include "completeness_profile.h"
 #include "optimize_completeness.h"
 #include "../linalg.h"
+#include "../timer.h"
 
 extern "C" {
 #include <gsl/gsl_multimin.h>
@@ -294,6 +295,9 @@ void compl_mog_fdf(const gsl_vector * x, void * params, double *f, gsl_vector *g
 }
 
 std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n) {
+  // Time minimization
+  Timer tmin;
+
   // Parameters for the optimization.
   completeness_scan_t pars;
   // Angular momentum
@@ -321,9 +325,9 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
     // Need to convert to natural logarithm
     gsl_vector_set(x,i,log(10.0)*(min + (i+0.5)*(max-min)/Nf));
   
-  /* Set initial step sizes to 0.1 */
+  /* Set initial step sizes to 0.45 times the spacing */
   gsl_vector *ss = gsl_vector_alloc (Nf);
-  gsl_vector_set_all (ss, 0.1);
+  gsl_vector_set_all (ss, 0.45*log(10.0)*(max-min)/Nf);
   
   /* Initialize method and iterate */
   minfunc.n = Nf;
@@ -332,6 +336,15 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   
   s = gsl_multimin_fminimizer_alloc (T, Nf);
   gsl_multimin_fminimizer_set (s, &minfunc, x, ss);
+
+  // Progress timer
+  Timer t;
+
+  // Legend
+  printf("iter ");
+  for(int i=0;i<Nf;i++)
+    printf(" e%-3i ",i+1);
+  printf("mog\n");
   
   do
     {
@@ -349,10 +362,14 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
 	  printf ("converged to minimum at\n");
 	}
 
-      printf("%4u ",(unsigned int) iter);
-      for(int i=0;i<Nf;i++)
-	printf("%.2f ",gsl_vector_get(s->x,i));
-      printf("%e\n",pow(s->fval,1.0/n));
+      if(iter==1 || status == GSL_SUCCESS || t.get()>=1.0) {
+	t.set();
+	printf("%4u ",(unsigned int) iter);
+	for(int i=0;i<Nf;i++)
+	  // Convert to 10-base logarithm
+	  printf("% 2.2f ",log10(M_E)*gsl_vector_get(s->x,i));
+	printf("%e\n",pow(s->fval,1.0/n));
+      }
     }
   while (status == GSL_CONTINUE && iter < maxiter);
 
@@ -363,10 +380,15 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   gsl_vector_free(ss);
   gsl_multimin_fminimizer_free (s);
 
+  printf("\nMinimization completed in %s.\n",tmin.elapsed().c_str());
+
   return ret;
 }
 
 std::vector<double> optimize_completeness_df(int am, double min, double max, int Nf, int n) {
+  // Time minimization
+  Timer tmin;
+
 
   // Parameters for the optimization.
   completeness_scan_t pars;
@@ -415,6 +437,15 @@ std::vector<double> optimize_completeness_df(int am, double min, double max, int
   // Set minimizer
   gsl_multimin_fdfminimizer_set (s, &minfunc, x, 0.01, 1e-4);
 
+  // Progress timer
+  Timer t;
+
+  // Legend
+  printf("iter ");
+  for(int i=0;i<Nf;i++)
+    printf(" e%-3i ",i+1);
+  printf("mog\n");
+  
   do
     {
       iter++;
@@ -425,14 +456,17 @@ std::vector<double> optimize_completeness_df(int am, double min, double max, int
 
       status = gsl_multimin_test_gradient (s->gradient, 1e-10);
 
-
       if (status == GSL_SUCCESS)
 	printf ("Minimum found at:\n");
 
-      printf("%4u ",(unsigned int) iter);
-      for(int i=0;i<Nf;i++)
-	printf("%.2f ",gsl_vector_get(s->x,i));
-      printf("%e\n",pow(s->f,1.0/n));
+      if(iter==1 || status == GSL_SUCCESS || t.get()>=1.0) {
+	t.set();
+	printf("%4u ",(unsigned int) iter);
+	for(int i=0;i<Nf;i++)
+	  // Convert to 10-base logarithm
+	  printf("% 2.2f ",log10(M_E)*gsl_vector_get(s->x,i));
+	printf("%e\n",pow(s->f,1.0/n));
+      }
     }
   while (status == GSL_CONTINUE && iter < maxiter);
 
@@ -459,6 +493,8 @@ std::vector<double> optimize_completeness_df(int am, double min, double max, int
 
   gsl_multimin_fdfminimizer_free (s);
   gsl_vector_free (x);
+
+  printf("\nMinimization completed in %s.\n",tmin.elapsed().c_str());
 
   return ret;
 }
