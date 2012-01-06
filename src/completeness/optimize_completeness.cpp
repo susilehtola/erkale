@@ -5,8 +5,8 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Jussi Lehtola, 2010-2012
+ * Copyright (c) 2010-2012, Jussi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -14,318 +14,451 @@
  * of the License, or (at your option) any later version.
  */
 
-#include <cfloat>
-#include "optimize_completeness.h"
 #include "completeness_profile.h"
-#include "../basislibrary.h"
-#include "../mathf.h"
+#include "optimize_completeness.h"
+#include "../linalg.h"
 
 extern "C" {
 #include <gsl/gsl_multimin.h>
 }
 
-// Maximum number of iterations
-#define MAXITER 500
-// Tolerance for optimization
-#define OPTTOL 1e-15
-
-double evaluate_completeness(const gsl_vector *v, void *params) {
-  // Create element basis set.
-
-  // Angular momentum of shell to optimize is
-  completeness_scan_t *par=(completeness_scan_t *) params;
-
-  // Helper structure
-  ElementBasisSet el;
-  for(size_t i=0;i<v->size;i++) {
-    // Create shell of functions
-    FunctionShell tmp(par->am);
-    tmp.add_exponent(1.0,pow(10.0,gsl_vector_get(v,i)));
-    // and add it to the basis set
-    el.add_function(tmp);
+std::vector<double> get_exponents(const gsl_vector *x) {
+  // Get exponents
+  size_t N=x->size;
+  std::vector<double> z(N);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<N;i++) {
+    z[i]=exp(gsl_vector_get(x,i));
   }
-
-  // Number of points to use in scan
-  size_t Npoints;
-  //  Npoints=(int) ceil((par->max-par->min)/0.01);
-  Npoints=2000;
-  // and it needs to be odd for the Simpson rule to work
-  if(Npoints%2==0)
-    Npoints++;
-
-  // Now we can compute the completeness profile. Use Cholesky factorization.
-  compprof_t prof=compute_completeness(el, par->scanexp, 1);
-
-  // Evaluate the mean square difference from completeness
-  double cpl=0.0;
-  for(size_t i=1;i<Npoints-1;i+=2) {
-    // Compute differences from unity
-    double ld=prof.shells[par->am].Y[i-1]-1.0;
-    double md=prof.shells[par->am].Y[i]-1.0;
-    double rd=prof.shells[par->am].Y[i+1]-1.0;
-    // Increment profile measure
-    cpl+=ld*ld+4.0*md*md+rd*rd;
-  }
-  // Plug in normalization factors (this should also hold the length of the integration interval, but we drop it out)
-  cpl/=6.0*prof.lga.size();
-
-  return sqrt(cpl);
+  return z;
 }
 
-double evaluate_completeness(const std::vector<double> & v, completeness_scan_t p) {
-  // Make helper variable
-  gsl_vector *x = gsl_vector_alloc(v.size());
-  for(size_t i=0;i<v.size();i++)
-    gsl_vector_set(x,i,v[i]);
-  
-  // Calculate result
-  double res=evaluate_completeness(x,(void *) &p);
-  // Free memory
-  gsl_vector_free(x);
-
-  return res;
-}  
-
-
-std::vector<double> optimize_completeness(int am, double pmin, double pmax, int Nf) {
-  // Logarithms of exponents
-  std::vector<double> loge(Nf);
-  // Step sizes
-  std::vector<double> ss(Nf);
-
-  // Parameters for minimization
-  completeness_scan_t par;
-  par.am=am;
-  // Scanning exponents
-  par.scanexp=get_scanning_exponents(pmin,pmax,2000);
-
-  // Starting point: spread exponents evenly
-  double dx=(pmax-pmin)/(Nf-1);
-  for(int i=0;i<Nf;i++) {
-    loge[i]=pmin+(i+0.5)*dx;
-    // Initialize step size to one tenth of the spacing
-    ss[i]=0.1*dx;
-    //    ss[i]=1.0;
-  }
-
-  // Loop order of trials
-  std::vector<size_t> order;
-  order.reserve(Nf);
-  for(int i=0;i<Nf/2;i++) {
-    // Do the borderline exponents first, since they should be a lot
-    // easier to move.
-    order[2*i]=i;
-    order[2*i+1]=Nf-1-i;
-  }
-  // Handle case of odd number of functions
-  if(Nf%2==1)
-    order[Nf-1]=Nf/2+1;
-
-  // Current cost
-  double cost=evaluate_completeness(loge,par);
-  // Old value of cost
-  double oldcost=DBL_MAX;
-
-  // Loop until maximal step size is smaller than epsilon.
-  printf("\tIter\tcost\n");
-  for(unsigned int iter=0;iter<MAXITER;iter++) {
-    // Compute rms step size
-    double rmsstep=0;
-    for(int i=0;i<Nf;i++)
-      rmsstep+=ss[i]*ss[i];
-    //    rmsstep=sqrt(rmsstep/Nf);
-    rmsstep=sqrt(rmsstep)/Nf;
-    
-    // Store value of cost
-    oldcost=cost;
-
-    // Increase all step sizes.
-    for(int i=0;i<Nf;i++)
-      ss[i]*=1.2;
-
-    // Loop over functions
-    for(int i=0;i<Nf;i++) {
-      // Exponent to optimize is
-      int ix=order[i];
-      
-      while(ss[ix]>DBL_EPSILON) {
-	// Compute trial exponents
-	std::vector<double> left(loge);
-	left[ix]-=ss[ix];
-	
-	std::vector<double> right(loge);
-	right[ix]+=ss[ix];
-	
-	// and trial costs
-	double ly;
-	try {
-	  // Evaluate completeness
-	  ly=evaluate_completeness(left,par);
-	} catch(...) {
-	  // Catch errors caused by badly behaving matrix
-	  ly=DBL_MAX;
-	}
-
-	double ry;
-	try {
-	  ry=evaluate_completeness(right,par);
-	} catch(...) {
-	  ry=DBL_MAX;
-	}
-	
-	// Was optimal value already used?
-	bool opt_ok=0; // Optimal
-	bool opt_l=0; // Left value
-	bool opt_r=0; // Right value
-
-	/*
-	// Now we can do a parabola fit.
-	double my=cost;
-	double lx=left[order[i]];
-	double mx=loge[order[i]];
-	double rx=right[order[i]];	
-
-        // Parabola fit parameters
-	double p=(mx-lx)*(my-ry);
-	double q=(mx-rx)*(my-ly);
-
-	if(fabs(p-q)>100*DBL_EPSILON) {
-	  // The optimal value should be at
-	  double xopt=mx-0.5*((mx-lx)*p-(mx-rx)*q)/(p-q);
-
-	  // Compute cost at optimal exponent
-	  std::vector<double> opt(loge);
-	  opt[order[i]]=xopt;
-	  double yopt=evaluate_completeness(opt,par);
-
-	  // Does move result in a minimization?
-	  if(yopt<cost) {
-	    // Yes, accept it.
-	    opt_ok=1;
-	    loge=opt;
-	    cost=yopt;
-	  }
-	}
-	*/
-
-	// Check left and right end.
-	if(ly<cost) {
-	  opt_l=1;
-	  cost=ly;
-	  loge=left;
-	}
-
-	if(ry<cost) {
-	  opt_r=1;
-	  cost=ry;
-	  loge=right;
-	}
-
-	// Decrease step size due to failed try?
-	if(!opt_ok && !opt_l && !opt_r)
-	  ss[ix]/=2.0;
-	else
-	  // Exit while loop
-	  break;
-      }
+arma::mat self_overlap(const std::vector<double> & z, int am) {
+  // Compute self-overlap
+  size_t N=z.size();
+  arma::mat Suv(N,N);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<N;i++)
+    for(size_t j=0;j<=i;j++) {
+      Suv(i,j)=pow(4.0*z[i]*z[j]/pow(z[i]+z[j],2),am/2.0+0.75);
+      Suv(j,i)=Suv(i,j);
     }
 
-    // Print info
-    printf("\t%u\t%e\t%e\t%e\n",iter,cost,cost-oldcost,rmsstep);	
-
-    // Check if cost was decreased in meaningful way
-    if(oldcost-cost<OPTTOL)
-      break;
-
-    // Break due to small step size
-    if(max(ss)<DBL_EPSILON)
-      break;
-  }
-
-  // Returned exponents
-  std::vector<double> exps(Nf);
-  for(int i=0;i<Nf;i++)
-    exps[i]=pow(10.0,loge[i]);
-
-  return exps;    
+  return Suv;
 }
 
+std::vector<arma::mat> self_inv_overlap_logder(const arma::mat & Sinv, const arma::mat & D) {
+  size_t N=Sinv.n_rows;
 
-std::vector<double> optimize_completeness_gsl(int am, double min, double max, int Nf) {
-  const gsl_multimin_fminimizer_type *T;
-  gsl_multimin_fminimizer *s;
-     
-  gsl_vector *x;
-  gsl_vector *step;
-  gsl_multimin_function minf;
+  // Returned stack of matrices
+  std::vector<arma::mat> Ik(N);
+  for(size_t k=0;k<N;k++)
+    Ik[k].zeros(N,N);
 
-  // Parameters for minimization
-  completeness_scan_t par;
-  par.am=am;
-  // Scanning exponents
-  par.scanexp=get_scanning_exponents(min,max,2000);
-     
-  minf.n = Nf;
-  minf.f = &evaluate_completeness;
-  minf.params =(void *) &par;
-     
-  // Starting point: spread exponents evenly
-  double dx=(max-min)/(Nf-1);
-  x = gsl_vector_alloc (Nf);
-  for(int i=0;i<Nf;i++) {
-    // Set value of exponent to
-    double expn=min+(i+0.5)*dx;
-    gsl_vector_set(x,i,expn);
-  }
+  arma::mat DS=D*Sinv;
 
-  // Set all step sizes to a tenth of the initial spacing
-  step = gsl_vector_alloc(Nf);
-  for(int i=0;i<Nf;i++)
-    gsl_vector_set(step,i,0.1*dx);
+  // Form matrices
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t k=0;k<N;k++)
+    for(size_t mu=0;mu<N;mu++)
+      for(size_t nu=0;nu<N;nu++)
+	Ik[k](mu,nu)=(-Sinv(mu,k)*DS(k,nu)+DS(k,mu)*Sinv(k,nu));
 
-  // Use Nead-Miller simplex algorithm
-  T = gsl_multimin_fminimizer_nmsimplex2;
-  s = gsl_multimin_fminimizer_alloc (T, Nf);
+  return Ik;
+}
 
-  // Initialize the minimizer, use a tenth of the spacing as initial step size
-  gsl_multimin_fminimizer_set (s, &minf, x, step);
+arma::mat overlap_logder(const std::vector<double> & z, const std::vector<double> & zp, int am) {
+  // Computes self-overlap derivative matrix
+  size_t N=z.size();
+  size_t Np=zp.size();
 
-  // Iteration index
-  size_t iter = 0;
-  // Status of algorithm
-  int status;
-  // "Size" of the minimizer
-  double size;
-  
-  do {
-    iter++;
-    status = gsl_multimin_fminimizer_iterate (s);
-    
-    if (status)
-      break;
-    
-    size = gsl_multimin_fminimizer_size (s);
-    status = gsl_multimin_test_size (size, 1e-2);
-  } while (status == GSL_CONTINUE && iter < MAXITER);
-  
-  if(status == GSL_SUCCESS)
-    printf ("Minimum %e found at:\n",s->fval);
-  else
-    printf ("Failed to find a minimum, current guess is %e at:\n",s->fval);
-  
-  for(int i=0;i<Nf;i++)
-    printf(" %f",gsl_vector_get(s->x,i));
-  printf("\n");      
+  arma::mat Sd(N,Np);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<N;i++)
+    for(size_t j=0;j<Np;j++) {
+      Sd(i,j)=(2*am+3)*z[i]*zp[j]*pow(4.0*z[i]*zp[j]/pow(z[i]+zp[j],2),am/2.0-0.25)*(zp[j]-z[i])/pow(z[i]+zp[j],3);
+    }
+
+  return Sd;
+}
+
+std::vector<double> completeness_profile(const gsl_vector * x, void * params) {
+  // Get parameters
+  completeness_scan_t *par=(completeness_scan_t *) params;
 
   // Get exponents
-  std::vector<double> ret(Nf);
-  for(int i=0;i<Nf;i++)
-    ret[i]=pow(10.0,gsl_vector_get(s->x,i));
-  
-  // Free memory
-  gsl_multimin_fminimizer_free (s);
-  gsl_vector_free (x);
+  std::vector<double> z=get_exponents(x);
+
+  // Get self-overlap
+  arma::mat Suv=self_overlap(z,par->am);
+  // and its half inverse matrix
+  arma::mat Sinvh=CanonicalOrth(Suv);
+
+  // Get overlap of primitives with scanning terms
+  arma::mat amu=overlap(par->scanexp,z,par->am);
+
+  // Compute intermediary result, Np x N
+  arma::mat J=amu*Sinvh;
+
+  // The completeness profile
+  size_t N=par->scanexp.size();
+  std::vector<double> Y(N);
+
+  for(size_t i=0;i<N;i++)
+    Y[i]=arma::dot(J.row(i),J.row(i));
+
+  FILE *out=fopen("Y.dat","w");
+  for(size_t ia=0;ia<par->scanexp.size();ia++) {
+    fprintf(out,"% e %e\n",log10(par->scanexp[ia]),Y[ia]);
+  }
+  fclose(out);
+
+
+  return Y;
+}
+
+std::vector< std::vector<double> > completeness_profile_logder(const gsl_vector * x, void * params) {
+  // Get parameters
+  completeness_scan_t *par=(completeness_scan_t *) params;
+
+  // Get exponents
+  std::vector<double> z=get_exponents(x);
+
+  // Get self-overlap
+  arma::mat Suv=self_overlap(z,par->am);
+  // and its inverse matrix
+  arma::mat Sinv=arma::inv(Suv);
+
+  // Get overlap of primitives with scanning terms
+  arma::mat Ss=overlap(par->scanexp,z,par->am);
+  // Compute derivative of scanning overlap
+  arma::mat Ds=overlap_logder(z,par->scanexp,par->am);
+
+  // Compute M matrix
+  arma::mat M=Sinv*arma::trans(Ss);
+
+  // Compute derivative of overlap matrix
+  arma::mat D=overlap_logder(z,z,par->am);
+
+  // Compute stack of derivatives of inverse overlap
+  std::vector<arma::mat> Sk=self_inv_overlap_logder(Sinv,D);
+
+  // Output
+  std::vector< std::vector<double> > ret(par->scanexp.size());
+  for(size_t i=0;i<par->scanexp.size();i++)
+    ret[i].resize(z.size());
+
+  // Loop over k
+  for(size_t ik=0;ik<z.size();ik++) {
+    arma::mat SSS=Ss*Sk[ik]*arma::trans(Ss);
+
+    // Loop over scanning exponents
+    for(size_t ia=0;ia<par->scanexp.size();ia++)
+      ret[ia][ik]=2*Ds(ik,ia)*M(ik,ia)+SSS(ia,ia);
+  }
+
+  FILE *out=fopen("Yder.dat","w");
+  for(size_t ia=0;ia<par->scanexp.size();ia++) {
+    fprintf(out,"% e ",log10(par->scanexp[ia]));
+
+    // Print derivatives
+    for(size_t fi=0;fi<z.size();fi++)
+      fprintf(out,"% e ",ret[ia][fi]);
+    fprintf(out,"\n");
+  }
+  fclose(out);
 
   return ret;
 }
 
+double compl_mog(const gsl_vector * x, void * params) {
+  // Get parameters
+  completeness_scan_t *p=(completeness_scan_t *) params;
+
+  // Get completeness profile
+  std::vector<double> Y=completeness_profile(x,params);
+
+  // Compute MOG.
+  double phi=0.0;
+
+  switch(p->n) {
+
+  case(1):
+    for(size_t i=1;i<Y.size()-1;i+=2) {
+      // Compute differences from unity
+      double ld=1.0-Y[i-1];
+      double md=1.0-Y[i];
+      double rd=1.0-Y[i+1];
+      // Increment profile measure
+      phi+=ld+4.0*md+rd;
+    }
+    break;
+
+  case(2):
+    for(size_t i=1;i<Y.size()-1;i+=2) {
+      // Compute differences from unity
+      double ld=1.0-Y[i-1];
+      double md=1.0-Y[i];
+      double rd=1.0-Y[i+1];
+      // Increment profile measure
+      phi+=ld*ld+4.0*md*md+rd*rd;
+    }
+    break;
+
+  default:
+    ERROR_INFO();
+    throw std::runtime_error("Value of k not supported!\n");
+  }
+  // Plug in normalization factors
+  phi/=6.0*(p->scanexp.size());
+
+  //  printf("MOG is %e.\n",phi);
+
+  return phi;
+}
+
+void compl_mog_df(const gsl_vector * x, void * params, gsl_vector *gv) {
+  // Get parameters
+  completeness_scan_t *p=(completeness_scan_t *) params;
+  size_t Nf=x->size;
+
+  // Get completeness profile
+  std::vector<double> Y=completeness_profile(x,params);
+  // and its derivative
+  std::vector< std::vector<double> > Yd=completeness_profile_logder(x,params);
+
+  // Values of the gradients
+  std::vector<double> g(Nf,0.0);
+
+  // Compute gradients
+  switch(p->n) {
+
+  case(1):
+    // Loop over points
+    for(size_t i=1;i<Y.size()-1;i+=2) {
+      // Loop over functions'
+      for(size_t fi=0;fi<Nf;fi++) {
+	// Compute derivatives in the points
+	double ld=Yd[i-1][fi];
+	double md=Yd[i  ][fi];
+	double rd=Yd[i+1][fi];
+	// Increment total derivative
+	g[fi]+=ld+4.0*md+rd;
+      }
+    }
+    break;
+
+  case(2):
+    // Loop over points
+    for(size_t i=1;i<Y.size()-1;i+=2) {
+      // Loop over functions'
+      for(size_t fi=0;fi<Nf;fi++) {
+	// Compute derivatives in the points
+	double ld=2.0*(Y[i-1]-1.0)*Yd[i-1][fi];
+	double md=2.0*(Y[i  ]-1.0)*Yd[i  ][fi];
+	double rd=2.0*(Y[i+1]-1.0)*Yd[i+1][fi];
+	// Increment total derivative
+	g[fi]+=ld+4.0*md+rd;
+      }
+    }
+    break;
+
+  default:
+    ERROR_INFO();
+    throw std::runtime_error("Value of k not supported!\n");
+  }
+
+  // Plug in normalization factors
+  for(size_t fi=0;fi<Nf;fi++)
+    gsl_vector_set(gv,fi,-g[fi]/(6.0*(p->scanexp.size())));
+
+  /*
+  printf("Gradient vector is ");
+  for(size_t fi=0;fi<Nf;fi++)
+    printf("% e ",gsl_vector_get(gv,fi));
+  printf("\n");
+  */
+}
+
+void compl_mog_fdf(const gsl_vector * x, void * params, double *f, gsl_vector *g) {
+  *f=compl_mog(x,params);
+  compl_mog_df(x,params,g);
+}
+
+std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n) {
+  // Parameters for the optimization.
+  completeness_scan_t pars;
+  // Angular momentum
+  pars.am=am;
+  // Moment to optimize
+  pars.n=n;
+  // Scanning exponents
+  pars.scanexp=get_scanning_exponents(min,max,50*Nf);
+
+  // Maximum number of iterations
+  size_t maxiter = 10000;
+
+  // GSL stuff
+  const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
+  gsl_multimin_fminimizer *s = NULL;
+  gsl_multimin_function minfunc;
+  
+  size_t iter = 0;
+  int status;
+  double size;
+
+  /* Starting point: even tempered set */
+  gsl_vector *x = gsl_vector_alloc (Nf);
+  for(int i=0;i<Nf;i++)
+    // Need to convert to natural logarithm
+    gsl_vector_set(x,i,log(10.0)*(min + (i+0.5)*(max-min)/Nf));
+  
+  /* Set initial step sizes to 0.1 */
+  gsl_vector *ss = gsl_vector_alloc (Nf);
+  gsl_vector_set_all (ss, 0.1);
+  
+  /* Initialize method and iterate */
+  minfunc.n = Nf;
+  minfunc.f = compl_mog;
+  minfunc.params = (void *) &pars;
+  
+  s = gsl_multimin_fminimizer_alloc (T, Nf);
+  gsl_multimin_fminimizer_set (s, &minfunc, x, ss);
+  
+  do
+    {
+      iter++;
+      status = gsl_multimin_fminimizer_iterate(s);
+      
+      if (status)
+	break;
+      
+      size = gsl_multimin_fminimizer_size (s);
+      status = gsl_multimin_test_size (size, 1e-2);
+      
+      if (status == GSL_SUCCESS)
+	{
+	  printf ("converged to minimum at\n");
+	}
+
+      printf("%4u ",(unsigned int) iter);
+      for(int i=0;i<Nf;i++)
+	printf("%.2f ",gsl_vector_get(s->x,i));
+      printf("%e\n",pow(s->fval,1.0/n));
+    }
+  while (status == GSL_CONTINUE && iter < maxiter);
+
+  // The returned exponents
+  std::vector<double> ret=get_exponents(s->x);
+  
+  gsl_vector_free(x);
+  gsl_vector_free(ss);
+  gsl_multimin_fminimizer_free (s);
+
+  return ret;
+}
+
+std::vector<double> optimize_completeness_df(int am, double min, double max, int Nf, int n) {
+
+  // Parameters for the optimization.
+  completeness_scan_t pars;
+  // Angular momentum
+  pars.am=am;
+  // Moment to optimize
+  pars.n=n;
+  // Scanning exponents
+  pars.scanexp=get_scanning_exponents(min,max,50*Nf);
+
+  // Maximum number of iterations
+  size_t maxiter = 10000;
+
+  // GSL stuff
+  size_t iter = 0;
+  int status;
+
+  const gsl_multimin_fdfminimizer_type *T;
+  gsl_multimin_fdfminimizer *s;
+
+  gsl_multimin_function_fdf minfunc;
+
+  minfunc.n = Nf;
+  minfunc.f = &compl_mog;
+  minfunc.df = &compl_mog_df;
+  minfunc.fdf = &compl_mog_fdf;
+  minfunc.params = (void *) &pars;
+
+  /* Starting point: even tempered set */
+  gsl_vector *x = gsl_vector_alloc (Nf);
+  for(int i=0;i<Nf;i++)
+    // Need to convert to natural logarithm
+    gsl_vector_set(x,i,log(10.0)*(min + (i+0.5)*(max-min)/Nf));
+
+  // Use conjugate gradient minimizer
+  // T = gsl_multimin_fdfminimizer_conjugate_fr;
+
+  // Use steepest descent
+  T = gsl_multimin_fdfminimizer_steepest_descent;
+
+  // Use BFGS
+  //  T = gsl_multimin_fdfminimizer_vector_bfgs2;
+
+  s = gsl_multimin_fdfminimizer_alloc (T, Nf);
+
+  // Set minimizer
+  gsl_multimin_fdfminimizer_set (s, &minfunc, x, 0.01, 1e-4);
+
+  do
+    {
+      iter++;
+      status = gsl_multimin_fdfminimizer_iterate (s);
+
+      if (status)
+	break;
+
+      status = gsl_multimin_test_gradient (s->gradient, 1e-10);
+
+
+      if (status == GSL_SUCCESS)
+	printf ("Minimum found at:\n");
+
+      printf("%4u ",(unsigned int) iter);
+      for(int i=0;i<Nf;i++)
+	printf("%.2f ",gsl_vector_get(s->x,i));
+      printf("%e\n",pow(s->f,1.0/n));
+    }
+  while (status == GSL_CONTINUE && iter < maxiter);
+
+  if(status!=GSL_CONTINUE && status!= GSL_SUCCESS) {
+    printf("Error encountered in minimization.\n");
+
+    // Compute gradient
+    gsl_vector *gv=gsl_vector_alloc(Nf);
+    compl_mog_df(s->x,(void *) &pars, gv);
+
+    printf("MOG is %e, gradient is:",compl_mog(s->x,(void *) &pars));
+    for(int i=0;i<Nf;i++)
+      printf(" % e",gsl_vector_get(gv,i));
+    printf("\n");
+
+    gsl_vector_free(gv);
+  }
+
+  if(iter==maxiter)
+    printf("Maximum number of iterations reached.\n");
+
+  // The returned exponents
+  std::vector<double> ret=get_exponents(s->x);
+
+  gsl_multimin_fdfminimizer_free (s);
+  gsl_vector_free (x);
+
+  return ret;
+}

@@ -17,6 +17,8 @@
 #ifndef ERKALE_OPTCOMP
 #define ERKALE_OPTCOMP
 
+#include "../global.h"
+#include <armadillo>
 #include <vector>
 
 extern "C" {
@@ -25,21 +27,64 @@ extern "C" {
 
 /// Parameters for completeness scan
 typedef struct {
-  /// Angular momentum of shell
+  /// Angular momentum of shell to optimize
   int am;
-  /// Scanning exponents
+  /// Which moment to optimize
+  int n;
+
+  /// Scanning exponents to optimize against
   std::vector<double> scanexp;
 } completeness_scan_t;
 
-/// Helper function - evaluate completeness. v holds logarithms of exponents, params is pointer to completeness_scan_t
-double evaluate_completeness(const gsl_vector *v, void *params);
-/// Wrapper for the above
-double evaluate_completeness(const std::vector<double> & v, completeness_scan_t p);
+/// Get exponents. x contains the natural logarithms
+std::vector<double> get_exponents(const gsl_vector *x);
 
-/// Find out exponents in completeness optimized basis set.
-std::vector<double> optimize_completeness(int am, double min, double max, int Nf);
-/// Same, using algorithms in GSL
-std::vector<double> optimize_completeness_gsl(int am, double min, double max, int Nf);
+/// Compute self-overlap \lf$ S_{ij} \lf$
+arma::mat self_overlap(const std::vector<double> & z, int am);
 
+/// Compute derivative of inverse overlap
+std::vector<arma::mat> self_inv_overlap_logder(const arma::mat & Sinv, const arma::mat & D);
+
+/**
+ * Compute overlap derivative matrix \lf$ D_{\mu \nu} =
+ * \partial_{\log \zeta_\mu} S_{\mu \nu } = \partial_{\log \zeta_\mu} S_{\nu \mu} \lf$
+ * (this also works for M)
+ */
+arma::mat overlap_logder(const std::vector<double> & z, const std::vector<double> & zp, int am);
+
+/// Compute completeness profile
+std::vector<double> completeness_profile(const gsl_vector * x, void * params);
+
+/// Compute derivative of completeness profile
+std::vector< std::vector<double> > completeness_profile_logder(const gsl_vector * x, void * params);
+
+/// Evaluate measure of goodness
+double compl_mog(const gsl_vector * x, void * params);
+/// Evaluate derivative of measure of goodness
+void compl_mog_df(const gsl_vector * x, void * params, gsl_vector *g);
+/// Evaluate mog and its derivative
+void compl_mog_fdf(const gsl_vector * x, void * params, double *f, gsl_vector *g);
+
+/**
+ * Optimize completeness profile for angular momentum am in exponent
+ * range from 10^{min} to 10^{max}. n gives the moment to optimize for
+ * (1 for maximal area, 2 for minimal rms deviation from unity).
+ *
+ * This routine uses the Nead-Miller algorithm.
+ */
+std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n=2);
+
+/**
+ * Optimize completeness profile for angular momentum am in exponent
+ * range from 10^{min} to 10^{max}. n gives the moment to optimize for
+ * (1 for maximal area, 2 for minimal rms deviation from unity).
+ *
+ * This routine uses steepest descent using quasianalytical
+ * derivatives. However, this really doesn't seem to bring any added
+ * benefit compared to the above, as first of all the derivatives are
+ * expensive to calculate and GSL routines have trouble minimizing the
+ * problem.
+ */
+std::vector<double> optimize_completeness_df(int am, double min, double max, int Nf, int n=2);
 
 #endif
