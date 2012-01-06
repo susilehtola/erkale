@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   print_license();
 
   if(argc!=6) {
-    printf("Usage: %s am sd min max Nf\n",argv[0]);
+    printf("Usage: %s am n min max Nf\n",argv[0]);
     printf("am:  angular momentum of shell to optimize for\n");
     printf("n:   moment to optimize for.\n");
     printf("     1 for maximal area, 2 for minimal rms deviation from unity.\n");
