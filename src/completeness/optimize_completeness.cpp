@@ -116,12 +116,13 @@ std::vector<double> completeness_profile(const gsl_vector * x, void * params) {
   for(size_t i=0;i<N;i++)
     Y[i]=arma::dot(J.row(i),J.row(i));
 
+  /*
   FILE *out=fopen("Y.dat","w");
   for(size_t ia=0;ia<par->scanexp.size();ia++) {
     fprintf(out,"% e %e\n",log10(par->scanexp[ia]),Y[ia]);
   }
   fclose(out);
-
+  */
 
   return Y;
 }
@@ -166,6 +167,7 @@ std::vector< std::vector<double> > completeness_profile_logder(const gsl_vector 
       ret[ia][ik]=2*Ds(ik,ia)*M(ik,ia)+SSS(ia,ia);
   }
 
+  /*
   FILE *out=fopen("Yder.dat","w");
   for(size_t ia=0;ia<par->scanexp.size();ia++) {
     fprintf(out,"% e ",log10(par->scanexp[ia]));
@@ -176,6 +178,7 @@ std::vector< std::vector<double> > completeness_profile_logder(const gsl_vector 
     fprintf(out,"\n");
   }
   fclose(out);
+  */
 
   return ret;
 }
