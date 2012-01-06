@@ -17,22 +17,43 @@
 #include <cstdio>
 #include "optimize_completeness.h"
 #include "../basislibrary.h"
+#include "../global.h"
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 int main(int argc, char **argv) {
+#ifdef _OPENMP
+  printf("ERKALE - Completeness optimization from Hel. OpenMP version, running on %i cores.\n",omp_get_max_threads());
+#else
+  printf("ERKALE - Completeness optimization from Hel. Serial version.\n");
+#endif
+  printf("(c) Jussi Lehtola, 2010-2012.\n");
 
-  if(argc!=5) {
-    printf("Usage: %s am min max Nf\n",argv[0]);
+  print_license();
+
+  if(argc!=6) {
+    printf("Usage: %s am sd min max Nf\n",argv[0]);
+    printf("am:  angular momentum of shell to optimize for\n");
+    printf("n:   moment to optimize for.\n");
+    printf("     1 for maximal area, 2 for minimal rms deviation from unity.\n");
+    printf("min: lower limit of exponent range to optimize, in log10\n");
+    printf("max: upper limit of exponent range to optimize, in log10\n");
+    printf("Nf:  number of functions to place on shell\n");
     return 1;
   }
 
   // Get parameters
   int am=atoi(argv[1]);
-  double min=atof(argv[2]);
-  double max=atof(argv[3]);
-  int Nf=atoi(argv[4]);
+  int n=atoi(argv[2]);
+  double min=atof(argv[3]);
+  double max=atof(argv[4]);
+  int Nf=atoi(argv[5]);
 
   // Form optimized set of primitives
-  std::vector<double> exps=optimize_completeness(am,min,max,Nf);
+  std::vector<double> exps;
+  exps=optimize_completeness(am,min,max,Nf,n);
   
   // Create a basis set out of it
   ElementBasisSet el("El");

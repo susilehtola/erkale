@@ -17,8 +17,11 @@
 #ifndef ERKALE_COMPPROF
 #define ERKALE_COMPPROF
 
-#include <vector>
+#include "../global.h"
 #include "../basislibrary.h"
+
+#include <armadillo>
+#include <vector>
 
 /// Structure for completeness profile
 typedef struct {
@@ -39,13 +42,16 @@ typedef struct {
 /// Get scanning exponents
 std::vector<double> get_scanning_exponents(double min, double max, size_t Np);
 
+/// Compute overlap of normalized Gaussian primitives
+arma::mat overlap(const std::vector<double> & z, const std::vector<double> & zp, int am);
+
 /**
  * Compute completeness profile for element with given scanning exponents
  *
  * D. P. Chong, "Completeness profiles of one-electron basis sets",
  * Can. J. Chem. 73 (1995), pp. 79 - 83.
  */
-compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scanexps, bool chol=0);
+compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scanexps, bool chol=false);
 
 /**
  * Compute completeness profile for element from \f$ \alpha = 10^{min}
@@ -54,6 +60,6 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
  * D. P. Chong, "Completeness profiles of one-electron basis sets",
  * Can. J. Chem. 73 (1995), pp. 79 - 83.
  */
-compprof_t compute_completeness(const ElementBasisSet & bas, double min=-10, double max=10, size_t Np=2000);
+compprof_t compute_completeness(const ElementBasisSet & bas, double min=-10.0, double max=10.0, size_t Np=2001);
 
 #endif
