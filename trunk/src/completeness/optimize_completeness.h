@@ -50,7 +50,7 @@ std::vector<arma::mat> self_inv_overlap_logder(const arma::mat & Sinv, const arm
  * \partial_{\log \zeta_\mu} S_{\mu \nu } = \partial_{\log \zeta_\mu} S_{\nu \mu} \lf$
  * (this also works for M)
  */
-arma::mat overlap_logder(const std::vector<double> & z, const std::vector<double> & zp, int am);
+arma::mat overlap_logder(const std::vector<double> & z, const std::vector<double> & zp, const arma::mat & S, int am);
 
 /// Compute completeness profile
 std::vector<double> completeness_profile(const gsl_vector * x, void * params);
