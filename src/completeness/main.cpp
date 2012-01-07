@@ -53,7 +53,11 @@ int main(int argc, char **argv) {
 
   // Form optimized set of primitives
   std::vector<double> exps;
+  // Nelder-Mead method
   exps=optimize_completeness(am,min,max,Nf,n);
+
+  // Minimization with derivatives
+  //  exps=optimize_completeness_df(am,min,max,Nf,n);
   
   // Create a basis set out of it
   ElementBasisSet el("El");
