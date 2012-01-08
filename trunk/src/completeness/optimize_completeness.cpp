@@ -189,7 +189,8 @@ std::vector< std::vector<double> > completeness_profile_logder(const gsl_vector 
   // Get self-overlap
   arma::mat S=self_overlap(z,par->am);
   // and its inverse matrix
-  arma::mat Sinv=arma::inv(S);
+  arma::mat Sinvh=CanonicalOrth(S);
+  arma::mat Sinv=Sinvh*Sinvh;
 
   // Get overlap of primitives with scanning terms
   arma::mat Ss=overlap(z,par->scanexp,par->am);
