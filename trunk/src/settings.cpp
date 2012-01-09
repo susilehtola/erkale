@@ -107,7 +107,7 @@ void Settings::add_dft_settings() {
   dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-3));
   dset.push_back(gend("DFTFinalTol", "Tolerance of final DFT grid", 1e-5));
   // Relative factor for initialization
-  dset.push_back(gend("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 100.0));
+  dset.push_back(gend("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0));
   
   // Use density fitting if possible?
   bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", true));
