@@ -731,7 +731,6 @@ int main(void) {
   // Polarized calculation
   Settings pol=sph;
   pol.set_int("Multiplicity",2);
-  pol.set_double("DFTInitialTol",1e-4);
 
   // DFT tests
 
@@ -754,6 +753,7 @@ int main(void) {
 
   Settings dftpol=pol; // Polarized calculation
   dftpol.add_dft_settings();
+  dftpol.set_double("DFTInitialTol",1e-4);
 
   Settings dftpol_nofit=dftpol; // Polarized calculation, no density fitting
   dftpol_nofit.set_bool("DFTFitting",false);
