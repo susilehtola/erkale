@@ -43,7 +43,7 @@ const int Lmax=10;
 const double orthtol=500*DBL_EPSILON;
 
 /// Initial DFT grid tolerance
-const double dft_initialtol=1e-3;
+const double dft_initialtol=1e-4;
 /// Final DFT grid tolerance
 const double dft_finaltol=1e-6;
 
