@@ -104,7 +104,7 @@ void Settings::add_dft_settings() {
   bset.push_back(genb("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false));
   
   // Initial and final tolerances of DFT grid
-  dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-3));
+  dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-4));
   dset.push_back(gend("DFTFinalTol", "Tolerance of final DFT grid", 1e-5));
   // Relative factor for initialization
   dset.push_back(gend("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0));
