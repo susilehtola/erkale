@@ -731,6 +731,7 @@ int main(void) {
   // Polarized calculation
   Settings pol=sph;
   pol.set_int("Multiplicity",2);
+  pol.set_double("DFTInitialTol",1e-4);
 
   // DFT tests
 
