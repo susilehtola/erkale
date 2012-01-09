@@ -486,7 +486,11 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,XCa,XCb,sol.en.Exc,Nelnum);
 #endif
 
+#ifndef HALFHOLE
     double rel_diff=(Nelnum-Nel)*100.0/Nel;
+#else
+    double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
+#endif
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
