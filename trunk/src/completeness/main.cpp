@@ -58,10 +58,13 @@ int main(int argc, char **argv) {
 
   // Minimization with derivatives
   //  exps=optimize_completeness_df(am,min,max,Nf,n);
+
+  // Sort into ascending order
+  std::sort(exps.begin(),exps.end());
   
-  // Create a basis set out of it
+  // Create a basis set out of it. Print exponents in descending order
   ElementBasisSet el("El");
-  for(size_t i=0;i<exps.size();i++) {
+  for(size_t i=exps.size()-1;i<exps.size();i--) {
     // Create shell of functions
     FunctionShell tmp(am);
     tmp.add_exponent(1.0,exps[i]);
