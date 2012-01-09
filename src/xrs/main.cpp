@@ -976,7 +976,7 @@ int main(int argc, char **argv) {
     // Do TP calculation.
     if(fullhole) {
       xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init);
-      xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init);
+      xcorb=solver.full_hole(xcatom,sol,conv,dft);
     } else {      
       xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
       xcorb=solver.half_hole(xcatom,sol,conv,dft);
