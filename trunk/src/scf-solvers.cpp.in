@@ -172,6 +172,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
       if(verbose)
         printf("\nUsing input guess for orbitals.\n");
     }
+  fflush(stdout);
 
   
 #if defined(FULLHOLE) || defined(HALFHOLE)
@@ -233,6 +234,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     printf("beta:  ");
     print_E(sol.Eb,occb);
 #endif
+    fflush(stdout);
   }
 
   // Initialize change of density matrix
@@ -299,6 +301,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 #endif // end DFT clause
     fprintf(stderr,".\n%4s %16s %10s  %9s  %9s  %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
   }
+  fflush(stdout);
 
 #ifdef DFT
 #ifdef RESTRICTED
@@ -312,6 +315,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   // Form DFT quadrature grid
   grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
+  fflush(stdout);
 
   if(verbose) {
     printf("Construction of grid took %s.\n",t.elapsed().c_str());
@@ -470,6 +474,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 #endif
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
     }
+    fflush(stdout);
 
 
 #ifdef DFT
@@ -570,6 +575,8 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	freeze_orbs(freeze,sol.Ca,S,sol.Ha);
     } 
 #endif // end TP clause
+
+    fflush(stdout);
 
     // Energies
     sol.en.Ekin=arma::trace(sol.P*T);
@@ -860,6 +867,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 #endif
 
       printf("\nIteration took %s.\n",titer.elapsed().c_str());
+      fflush(stdout);
     }
 
     // Sparse output
