@@ -314,7 +314,6 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     double Exc, Nelnum;
     DFTGrid grid(&augbas,true,true,false);
     grid.construct(Paaug,Pbaug,dft.gridtol,dft.x_func,dft.c_func);
-    printf("XC grid constructed in %s.\n",taug.elapsed().c_str());
     taug.set();
     grid.eval_Fxc(dft.x_func,dft.c_func,Paaug,Pbaug,XCa,XCb,Exc,Nelnum);
   }
