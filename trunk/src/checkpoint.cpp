@@ -71,7 +71,7 @@ void Checkpoint::open() {
     else
       // Open in read-only mode
       file=H5Fopen(filename.c_str(),H5F_ACC_RDONLY,H5P_DEFAULT);
-    
+
     // File has been opened
     opend=true;
   } else
@@ -211,7 +211,7 @@ void Checkpoint::write(const std::string & name, const std::vector<double> & v) 
     open();
     cl=true;
   }
-  
+
   // Remove possible existing entry
   remove(name);
 
@@ -262,7 +262,7 @@ void Checkpoint::read(const std::string & name, std::vector<double> & v) {
     ERROR_INFO();
     throw std::runtime_error(oss.str());
   }
-   
+
   // Get dataspace
   hid_t dataspace = H5Dget_space(dataset);
   // Get number of dimensions
@@ -495,7 +495,7 @@ void Checkpoint::read(BasisSet & basis) {
   H5Tinsert(contrdata, "c", HOFFSET(contr_t, c), H5T_NATIVE_DOUBLE);
   H5Tinsert(contrdata, "z", HOFFSET(contr_t, z), H5T_NATIVE_DOUBLE);
   datatype = H5Tvlen_create(contrdata);
-  
+
   // Get dataspace
   dataspace = H5Dget_space(dataset);
   // Get the number of shells
@@ -575,12 +575,96 @@ void Checkpoint::read(BasisSet & basis) {
   }
 
   // Add the shells
-  for(size_t i=0;i<Nsh;i++) 
+  for(size_t i=0;i<Nsh;i++)
     basis.add_shell(shdata[i].cenind,shdata[i].am,contrs[i]);
-  
+
   // Finalize the basis
   basis.finalize();
 
+  if(cl) close();
+}
+
+void Checkpoint::write(const energy_t & en) {
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
+  // Remove possible existing entry
+  remove("Energy");
+
+  // Create a dataspace.
+  hid_t dataspace=H5Screate(H5S_SCALAR);
+
+  // Create a datatype.
+  hid_t datatype;
+  datatype = H5Tcreate(H5T_COMPOUND, sizeof(energy_t));
+  H5Tinsert(datatype, "Ecoul", HOFFSET(energy_t, Ecoul), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Ekin" , HOFFSET(energy_t, Ekin) , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Enuca", HOFFSET(energy_t, Enuca), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Exc"  , HOFFSET(energy_t, Exc)  , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Eone" , HOFFSET(energy_t, Eone) , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Eel"  , HOFFSET(energy_t, Eel)  , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Enucr", HOFFSET(energy_t, Enucr), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "E"    , HOFFSET(energy_t, E)    , H5T_NATIVE_DOUBLE);
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties.
+  hid_t dataset=H5Dcreate(file,"Energy",datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Write the data to the file.
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &en);
+
+  // Close everything.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+  if(cl) close();
+}
+
+void Checkpoint::read(energy_t & en) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+  std::string name="Energy";
+  CHECK_EXIST();
+
+  // Open the dataset.
+  hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
+
+  // Get the data type
+  hid_t datatype;
+  datatype = H5Tcreate(H5T_COMPOUND, sizeof(energy_t));
+  H5Tinsert(datatype, "Ecoul", HOFFSET(energy_t, Ecoul), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Ekin" , HOFFSET(energy_t, Ekin) , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Enuca", HOFFSET(energy_t, Enuca), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Exc"  , HOFFSET(energy_t, Exc)  , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Eone" , HOFFSET(energy_t, Eone) , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Eel"  , HOFFSET(energy_t, Eel)  , H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Enucr", HOFFSET(energy_t, Enucr), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "E"    , HOFFSET(energy_t, E)    , H5T_NATIVE_DOUBLE);
+
+  // Get dataspace
+  hid_t dataspace = H5Dget_space(dataset);
+
+  // Get type
+  H5S_class_t type = H5Sget_simple_extent_type(dataspace);
+  if(type!=H5S_SCALAR)
+    throw std::runtime_error("Error - dataspace is not of scalar type!\n");
+
+  // Read
+  H5Dread(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &en);
+
+  // Close dataspace
+  H5Sclose(dataspace);
+  // Close datatype
+  H5Tclose(datatype);
+  // Close dataset
+  H5Dclose(dataset);
   if(cl) close();
 }
 
@@ -649,7 +733,7 @@ void Checkpoint::read(const std::string & name, double & v) {
 
   // Read
   H5Dread(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
-  
+
   // Close dataspace
   H5Sclose(dataspace);
   // Close datatype
@@ -667,7 +751,7 @@ void Checkpoint::write(const std::string & name, int val) {
     open();
     cl=true;
   }
-  
+
   // Remove possible existing entry
   remove(name);
 
@@ -720,7 +804,7 @@ void Checkpoint::read(const std::string & name, int & v) {
 
   // Read
   H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
-  
+
   // Close dataspace
   H5Sclose(dataspace);
   // Close datatype
@@ -797,7 +881,7 @@ void Checkpoint::read(const std::string & name, hbool_t & v) {
 
   // Read
   H5Dread(dataset, H5T_NATIVE_HBOOL, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
-  
+
   // Close dataspace
   H5Sclose(dataspace);
   // Close datatype

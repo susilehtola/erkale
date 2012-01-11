@@ -19,6 +19,7 @@
 
 #include "global.h"
 #include "basis.h"
+#include "scf.h"
 
 #include <armadillo>
 #include <string>
@@ -128,6 +129,11 @@ class Checkpoint {
   void write(const BasisSet & basis);
   /// Load basis set
   void read(BasisSet & basis);
+
+  /// Save energies
+  void write(const energy_t & en);
+  /// Load energies
+  void read(energy_t & en);
 
   /// Save value
   void write(const std::string & name, double val);
