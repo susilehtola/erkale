@@ -20,6 +20,9 @@
 #include "timer.h"
 #include <algorithm>
 
+// Temporary checkpoint file to use
+#define TEMPFILE ".erkale.at"
+
 arma::mat atomic_density(const BasisSet & basis, bool verbose) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
@@ -84,7 +87,7 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
     set.set_int("Multiplicity",gs.mult);
 
     // Checkpoint
-    Checkpoint chkpt("erkale.at",true);
+    Checkpoint chkpt(TEMPFILE,true);
 
     // Solver
     SCF solver(atbas,set,chkpt);
@@ -126,6 +129,9 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
 
   if(verbose)
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
+
+  // Remove the temporary file
+  remove(TEMPFILE);
   
   return P;
 }
