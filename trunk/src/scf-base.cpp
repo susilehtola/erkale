@@ -153,7 +153,18 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     // Density fitting.
 
     // Form density fitting basis
-    BasisSet dfitbas=basisp->density_fitting();
+    BasisSet dfitbas;
+
+    if(stricmp(set.get_string("DFTFittingBasis"),"Auto")==0)
+      dfitbas=basisp->density_fitting();
+    else {
+      // Load basis library
+      BasisSetLibrary fitlib;
+      fitlib.load_gaussian94(set.get_string("DFTFittingBasis"));
+
+      // Construct fitting basis
+      dfitbas=construct_basis(basisp->get_nuclei(),fitlib,set);
+    }
 
     // Compute memory estimate
     std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,direct));

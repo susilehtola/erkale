@@ -2724,6 +2724,19 @@ std::vector<size_t> i_idx(size_t N) {
   return ret;
 }
 
+BasisSet construct_basis(const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib, const Settings & set) {
+  std::vector<atom_t> atoms(nuclei.size());
+  for(size_t i=0;i<nuclei.size();i++) {
+    atoms[i].x=nuclei[i].r.x;
+    atoms[i].y=nuclei[i].r.y;
+    atoms[i].z=nuclei[i].r.z;
+    atoms[i].num=nuclei[i].ind;
+    atoms[i].el=nuclei[i].symbol;
+  }
+
+  return construct_basis(atoms,baslib,set);
+}
+
 BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set) {
   // Number of atoms is
   size_t Nat=atoms.size();

@@ -126,7 +126,7 @@ void Casida::calc_K(const Settings & set, const BasisSet & basis) {
   // Do we need to form K?
   if(coupling!=IPA) {
     // Compute Coulomb coupling
-    Kcoul(basis);
+    Kcoul(basis,set);
 
     // Compute XC coupling if necessary
     if(coupling==TDLDA) {
@@ -485,9 +485,21 @@ arma::mat Casida::transition(const BasisSet & basis, double qr) const {
   return osc;
 }
 
-void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const {
+void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv, const Settings & set) const {
   // Get density fitting basis
-  BasisSet dfitbas=basis.density_fitting();
+  BasisSet dfitbas;
+
+  if(stricmp(set.get_string("DFTFittingBasis"),"Auto")==0)
+    dfitbas=basis.density_fitting();
+  else {
+    // Load basis library
+    BasisSetLibrary fitlib;
+    fitlib.load_gaussian94(set.get_string("DFTFittingBasis"));
+
+    // Construct fitting basis
+    dfitbas=construct_basis(basis.get_nuclei(),fitlib,set);
+  }
+
   // Amount of auxiliary functions
   const size_t Naux=dfitbas.get_Nbf();
 
@@ -656,7 +668,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   }
 }
 
-void Casida::Kcoul(const BasisSet & basis) {
+void Casida::Kcoul(const BasisSet & basis, const Settings & set) {
   Timer t;
 
   if(!C.size())
@@ -668,7 +680,7 @@ void Casida::Kcoul(const BasisSet & basis) {
   std::vector<arma::mat> munu_I;
 
   // Get density fitting integrals
-  coulomb_fit(basis,munu_I,ab_inv);
+  coulomb_fit(basis,munu_I,ab_inv,set);
 
   // Construct K
   for(size_t ispin=0;ispin<C.size();ispin++)
