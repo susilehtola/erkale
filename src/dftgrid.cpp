@@ -1312,8 +1312,10 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
   // Free memory once more
   free();
   
-  if(verbose)
+  if(verbose) {
     printf("\t%u\t%u\t%u\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc);
+    fflush(stdout);
+  }
 }
 
 AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, double toler, int x_func, int c_func, bool lobatto, bool verbose) {
@@ -1467,8 +1469,10 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
   // Free memory once more
   free();
   
-  if(verbose)
+  if(verbose) {
     printf("\t%u\t%u\t%u\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc);
+    fflush(stdout);
+  }
 }
 
 
@@ -1782,6 +1786,7 @@ void DFTGrid::print_memory_req() const {
   printf("Grid points take %s of memory.\n",memory_size(grid).c_str());
   printf("Basis functions take %s of memory.\n",memory_size(bf).c_str());
   printf("All in all DFT grid memory consumption is %s.\n",memory_size(grid+bf).c_str());
+  fflush(stdout);
 }
 
 #ifdef CONSISTENCYCHECK

@@ -99,6 +99,9 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     augind[i]--;
   }
 
+  Timer ttot;
+  fprintf(stderr,"Augmenting basis set with diffuse functions.\n");
+
   // Form augmented basis
   augbas=basis;
 
@@ -219,6 +222,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     
     // Delete the index
     printf("Deleted function %i with overlap %e.\n",(int) keepidx[maxind],maxovl);
+    fflush(stdout);
     keepidx.erase(keepidx.begin()+maxind);
   }
   
@@ -272,6 +276,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   arma::mat T=augbas.kinetic();
   arma::mat V=augbas.nuclear();
   printf("Hcore formed in %s.\n",taug.elapsed().c_str());
+  fflush(stdout);
 
   // Coulomb matrix
   taug.set();
@@ -299,7 +304,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     J=dfit.calc_J(Paug);
   }
   printf("J formed in %s.\n",taug.elapsed().c_str());
-
+  fflush(stdout);
 
   // DFT grid. Get used tolerance
   dft.gridtol=set.get_double("XRSGridTol");
@@ -314,6 +319,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     grid.eval_Fxc(dft.x_func,dft.c_func,Paaug,Pbaug,XCa,XCb,Exc,Nelnum);
   }
   printf("XC evaluated in %s.\n",taug.elapsed().c_str());
+  fflush(stdout);
 
   // Form Fock operator  
   arma::mat H;
@@ -329,14 +335,16 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   taug.set();
   arma::mat H_MO=arma::trans(AOtoO.submat(0,nocc,Ntot-1,Nind-1))*H*AOtoO.submat(0,nocc,Ntot-1,Nind-1);
   printf("H_MO formed in %s.\n",taug.elapsed().c_str());
+  fflush(stdout);
   
   // Diagonalize Fockian to find orbitals and energies
   taug.set();
   arma::vec Eval;
   arma::mat Evec;
   eig_sym_ordered(Eval,Evec,H_MO);
-  printf("H_MO diagonalized in unoccupied space in %s.\n",taug.elapsed().c_str());
-  
+  printf("H_MO diagonalized in unoccupied subspace in %s.\n",taug.elapsed().c_str());
+  fflush(stdout);  
+
   // Store energies
   Eaug.zeros(Nind);
   // Occupied orbitals
@@ -353,6 +361,8 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   Caug.submat(0,0,Nbf-1,nocc-1)=AOtoO.submat(0,0,Nbf-1,nocc-1);
   // Unoccupied orbitals
   Caug.submat(0,nocc,Ntot-1,Nind-1)=AOtoO.submat(0,nocc,Ntot-1,Nind-1)*Evec;
+
+  fprintf(stderr,"Augmentation done in %s.\n",ttot.elapsed().c_str());
 }
 
 typedef struct {
