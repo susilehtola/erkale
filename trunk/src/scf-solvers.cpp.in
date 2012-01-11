@@ -318,12 +318,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   fflush(stdout);
 
   if(verbose) {
-    printf("Construction of grid took %s.\n",t.elapsed().c_str());
-    printf("DFT grid has %u points (%u function values).\n",(unsigned int) grid.get_Npoints(),(unsigned int) grid.get_Nfuncs());
-    grid.print_memory_req();
-    printf("\n");
-
-    fprintf(stderr,"%-61s %10.3f\n","    DFT grid formation",t.get());
+    fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",t.get());
   }
 #endif
 

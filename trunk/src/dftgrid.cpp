@@ -32,6 +32,7 @@
 #include "chebyshev.h"
 
 #include "stringutil.h"
+#include "timer.h"
 
 // OpenMP parallellization for XC calculations
 #ifdef _OPENMP
@@ -1176,6 +1177,8 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
   // with nrad radial shells                         
   // See Köster et al for specifics.
 
+  Timer t;
+
   // Store index of center
   atind=cenind;
   // and its coordinates
@@ -1313,7 +1316,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
   free();
   
   if(verbose) {
-    printf("\t%u\t%u\t%u\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc);
+    printf("\t%4u %7u %8u %s\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -1322,6 +1325,8 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells                         
   // See Köster et al for specifics.
+
+  Timer t;
 
   // Store index of center
   atind=cenind;
@@ -1470,7 +1475,7 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
   free();
   
   if(verbose) {
-    printf("\t%u\t%u\t%u\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc);
+    printf("\t%4u %7u %8u %s\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -1700,8 +1705,11 @@ void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func)
 
   // Add all atoms
   if(verbose) {
-    printf("\tatom\tNpoints\tNfuncs\n");
+    printf("Constructing DFT grid.\n");
+    printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
   }
+
+  Timer t;
 
   size_t Nat=basp->get_Nnuc();
 
@@ -1710,9 +1718,13 @@ void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func)
 #endif  
   for(size_t i=0;i<Nat;i++)
     atoms[i]=AtomGrid(*basp,P,i,tol,x_func,c_func,use_lobatto,verbose);
+  if(verbose)
+    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
 
   // If we are not running a direct calculation, compute grids and basis functions.
-  if(!direct)
+  if(!direct) {
+    t.set();
+
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
 #endif
@@ -1720,13 +1732,19 @@ void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func)
       atoms[i].form_grid(*basp);
       atoms[i].compute_bf(*basp);
     }
+    
+    if(verbose)
+      printf("Basis functions computed on grid in %s.\n",t.elapsed().c_str());
+  }
 }
 
 void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, int x_func, int c_func) {
   // Add all atoms
   if(verbose) {
-    printf("\tatom\tNpoints\tNfuncs\n");
+    printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
   }
+
+  Timer t;
 
   size_t Nat=basp->get_Nnuc();
 
@@ -1735,9 +1753,12 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
 #endif  
   for(size_t i=0;i<Nat;i++)
     atoms[i]=AtomGrid(*basp,Pa,Pb,i,tol,x_func,c_func,use_lobatto,verbose);
+    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
 
   // If we are not running a direct calculation, compute grids and basis functions.
-  if(!direct)
+  if(!direct) {
+    t.set();
+
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
 #endif
@@ -1745,6 +1766,10 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
       atoms[i].form_grid(*basp);
       atoms[i].compute_bf(*basp);
     }
+
+    if(verbose)
+      printf("Basis functions computed on grid in %s.\n",t.elapsed().c_str());
+  }
 }
 
 size_t DFTGrid::get_Npoints() const {
