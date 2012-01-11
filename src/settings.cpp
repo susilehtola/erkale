@@ -111,6 +111,8 @@ void Settings::add_dft_settings() {
   
   // Use density fitting if possible?
   bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", true));
+  // Which basis to use as density fitting basis
+  sset.push_back(gens("DFTFittingBasis", "Basis to use for density fitting (Auto for automatic)","Auto"));
 }
   
 void Settings::add_double(std::string name, std::string comment, double val) {

@@ -118,7 +118,7 @@ class Casida {
    *
    * To save memory, the result is stored in the K matrix.
    */
-  void Kcoul(const BasisSet & basis);
+  void Kcoul(const BasisSet & basis, const Settings & set);
 
   /**
    * This routine constructs the exchange-correlation coupling matrix
@@ -155,7 +155,7 @@ class Casida {
   void calc_K(const Settings & set, const BasisSet & bas);
 
   /// Compute the Coulomb fitting integrals \lf$ (\mu \nu | a) \lf$ and the matrix \lf$ (a|b)^{-1} \lf$
-  void coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const;
+  void coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv, const Settings & set) const;
 
   /// Solve the Casida equation
   void solve();

@@ -549,7 +549,8 @@ std::vector<size_t> i_idx(size_t N);
 
 /// Construct basis set from input
 BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set);
-
+/// Constuct basis set from input
+BasisSet construct_basis(const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib, const Settings & set);
 
 /// Compute values of orbitals at given point
 std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r);

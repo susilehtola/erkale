@@ -277,9 +277,22 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   taug.set();
   arma::mat J;
   {
-    // We use the original basis' density fitting basis, since it's
-    // enough to represent the density.
-    BasisSet dfitbas=basis.density_fitting();
+    // We naturally use the original basis' density fitting basis,
+    // since it's enough to represent the density (augmentation
+    // functions carry by definition no electron density)
+    BasisSet dfitbas;
+
+    if(stricmp(set.get_string("DFTFittingBasis"),"Auto")==0)
+      dfitbas=basis.density_fitting();
+    else {
+      // Load basis library
+      BasisSetLibrary fitlib;
+      fitlib.load_gaussian94(set.get_string("DFTFittingBasis"));
+
+      // Construct fitting basis
+      dfitbas=construct_basis(basis.get_nuclei(),fitlib,set);
+    }
+
     DensityFit dfit;
     // We do the formation directly.
     dfit.fill(augbas,dfitbas,true);
