@@ -1,7 +1,7 @@
-* Figure out the correct normalization of spherical harmonics.
-
 * Write pretty-printing routine for making bars such as *** text ***
   or --- text ---.
+
+* Improve DFT grid performance by using static work arrays.
 
 * Implement writing of cube files, for visualization of e.g.
   - electron density
@@ -13,8 +13,6 @@
 * Write geometry optimization routines.
 
 * Implement computation of two-electron completeness profiles.
-
-? Implement better starting guesses, e.g. Harris functional.
 
 ? Rewrite the SCF solver in a clearer, more object-oriented form.
 
