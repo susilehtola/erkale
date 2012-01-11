@@ -911,6 +911,9 @@ int main(int argc, char **argv) {
 
     // Amount of (orbital rotation) localized orbitals (nloc-1 are then frozen)
     size_t nloc=0;
+
+    // Ground state energy
+    energy_t gsen;
       
     // Initialize calculation with ground state if necessary
     if(stricmp(set.get_string("LoadChk"),"")!=0) {
@@ -922,6 +925,9 @@ int main(int argc, char **argv) {
       // Restricted calculation?
       bool restr;
       load.read("Restricted",restr);
+
+      // Load ground-state energy
+      load.read(gsen);
 
       // Load basis
       BasisSet oldbas;
@@ -1000,6 +1006,13 @@ int main(int argc, char **argv) {
     if(fullhole) {
       xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init);
       xcorb=solver.full_hole(xcatom,sol,conv,dft);
+
+      // Get excited state energy
+      energy_t excen;
+      chkpt.read(excen);
+
+      printf("\nAbsolute energy correction: first peak should be at %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
+      fprintf(stderr,"\nAbsolute energy correction: first peak should be at %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
     } else {      
       xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
       xcorb=solver.half_hole(xcatom,sol,conv,dft);
