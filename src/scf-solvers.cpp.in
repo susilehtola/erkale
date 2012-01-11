@@ -924,6 +924,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     // To use the file effectively, we keep it open for the whole shebang.
     chkptp->open();
     chkptp->write("P",sol.P);
+    chkptp->write(sol.en);
 #if !defined(RESTRICTED)
     chkptp->write("Ca",sol.Ca);
     chkptp->write("Cb",sol.Cb);

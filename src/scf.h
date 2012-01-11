@@ -24,11 +24,12 @@
 #include <armadillo>
 #include <vector>
 #include "atomguess.h"
-#include "checkpoint.h"
 #include "eritable.h"
 #include "eriscreen.h"
 #include "density_fitting.h"
 #include "settings.h"
+
+class Checkpoint;
 
 /**
  * \class SCF
@@ -240,5 +241,8 @@ double electron_spread(const arma::mat & P, const BasisSet & basis);
 
 /// Determine amount of alpha and beta electrons based on multiplicity
 void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta);
+
+#include "checkpoint.h"
+
 
 #endif
