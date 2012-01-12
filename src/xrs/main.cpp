@@ -794,12 +794,20 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_scf_settings();
+  set.add_dft_settings();
 
   // Change defaults
   set.set_bool("UseDIIS",false);
   set.set_bool("UseADIIS",false);
   set.set_bool("UseBroyden",true);
   set.set_string("Logfile","erkale_xrs.log");
+
+  // Use convergence settings similar to StoBe. Full hole calculations
+  // are hard to converge to the otherwise default settings.
+  set.set_double("DeltaEmax",1e-6);
+  set.set_double("DeltaPmax",1e-5);
+  set.set_double("DeltaPrms",1e-6);
+  set.set_double("DFTDelta",100);
 
   // Add xrs specific settings
   set.add_string("LoadChk","Initialize with ground state calculation from file","");
