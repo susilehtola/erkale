@@ -230,8 +230,12 @@ bool operator<(const locdist_t & lhs, const locdist_t & rhs) {
 }
 
 size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) {
-  // First, figure out which centers need to be localized upon.
+  // Check orthonormality
+  arma::mat S=basis.overlap();
+  printf("Before localization\n");
+  check_orth(C,S,true);
 
+  // First, figure out which centers need to be localized upon.
   std::vector<locdist_t> locind;
   // Localize on all the atoms of the same type than the excited atom
   for(size_t i=0;i<basis.get_Nnuc();i++)
@@ -248,6 +252,8 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
   for(size_t i=0;i<locind.size();i++)
     printf(" %i",(int) locind[i].ind+1);
   printf("\n");
+  printf("There are %i occupied states.\n",(int) nocc);
+  fflush(stdout);
 
   // Amount of orbitals already localized
   size_t locd=0;
@@ -264,7 +270,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
     // Compute moment integrals around the nucleus
     std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
     // Get matrix which transforms into occupied MO basis
-    arma::mat transmat=C.submat(0,locd,Nbf-1,locd+nocc-1);
+    arma::mat transmat=C.submat(0,locd,Nbf-1,nocc-1);
 
     // Sum together to get x^2 + y^2 + z^2
     arma::mat rsqmat=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
@@ -276,24 +282,27 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
     arma::mat rvec;
     eig_sym_ordered(reig,rvec,rsqmat);
 
+    /*    
+    printf("\nLocalization around center %i, eigenvalues (Å):",(int) locind[i].ind+1);
+    for(size_t ii=0;ii<reig.n_elem;ii++)
+      printf(" %e",sqrt(reig(ii))/ANGSTROMINBOHR);
+    printf("\n");
+    fflush(stdout);
+    */    
+
     // Rotate occupied orbitals
-    C.submat(0,locd,Nbf-1,locd+nocc-1)=transmat*rvec;
+    C.submat(0,locd,Nbf-1,nocc-1)=transmat*rvec;
 
     // Increase number of localized orbitals
     locd++;
-    // and decrease that of occupied orbitals yet to localize
 
-    nocc--;
-
-    printf("Localized orbital around (%e,%e,%e) with Rrms=%e Å.\n",cen.x,cen.y,cen.z,sqrt(reig(0))/ANGSTROMINBOHR);
+    printf("Localized orbital around (%e,%e,%e) with Rrms=%e Å.\n",cen.x/ANGSTROMINBOHR,cen.y/ANGSTROMINBOHR,cen.z/ANGSTROMINBOHR,sqrt(reig(0))/ANGSTROMINBOHR);
+    fflush(stdout);
   }
 
-  /*
   // Check orthonormality
-  arma::mat MOovl=arma::trans(C)*basis.overlap()*C;
-  printf("MO orthonormality\n");
-  print_sym(MOovl);
-  */
+  printf("After localization\n");
+  check_orth(C,S,true);
 
   return locd;
 }

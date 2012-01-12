@@ -150,11 +150,13 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	  
 	  // Transform back to non-orthogonal basis
 	  sol.C=Sinvh*orbs;
+	  check_orth(sol.C,S,false);
 #else
 	  Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
 	  eig_sym_ordered(sol.Ea,orbs,Horth); // Solve in orthogonal basis
 	  // Transform back to non-orthogonal basis
 	  sol.Ca=Sinvh*orbs;
+	  check_orth(sol.Ca,S,false);
 	  
 	  // Copy orbitals
 	  sol.Eb=sol.Ea;
@@ -725,14 +727,19 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     eig_sym_ordered(sol.E,orbs,Horth);
     // Transform back to non-orthogonal basis
     sol.C=Sinvh*orbs;
+
+    // Check orthonormality
+    check_orth(sol.C,S,false);
 #else
     Horth=trans(Sinvh)*sol.Ha*Sinvh;
     eig_sym_ordered(sol.Ea,orbs,Horth);
     sol.Ca=Sinvh*orbs;
+    check_orth(sol.Ca,S,false);
 
     Horth=trans(Sinvh)*sol.Hb*Sinvh;
     eig_sym_ordered(sol.Eb,orbs,Horth);
     sol.Cb=Sinvh*orbs;
+    check_orth(sol.Cb,S,false);
 #endif
 
     if(verbose)
