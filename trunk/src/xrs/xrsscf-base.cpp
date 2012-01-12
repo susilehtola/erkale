@@ -232,8 +232,7 @@ bool operator<(const locdist_t & lhs, const locdist_t & rhs) {
 size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) {
   // Check orthonormality
   arma::mat S=basis.overlap();
-  printf("Before localization\n");
-  check_orth(C,S,true);
+  check_orth(C,S,false);
 
   // First, figure out which centers need to be localized upon.
   std::vector<locdist_t> locind;
@@ -296,13 +295,12 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
     // Increase number of localized orbitals
     locd++;
 
-    printf("Localized orbital around (%e,%e,%e) with Rrms=%e Å.\n",cen.x/ANGSTROMINBOHR,cen.y/ANGSTROMINBOHR,cen.z/ANGSTROMINBOHR,sqrt(reig(0))/ANGSTROMINBOHR);
+    printf("Localized orbital around nucleus %i with Rrms=%e Å.\n",(int) inuc+1,sqrt(reig(0))/ANGSTROMINBOHR);
     fflush(stdout);
   }
 
   // Check orthonormality
-  printf("After localization\n");
-  check_orth(C,S,true);
+  check_orth(C,S,false);
 
   return locd;
 }
