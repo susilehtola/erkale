@@ -989,15 +989,9 @@ void BasisSet::add_shell(size_t nucind, const GaussianShell & sh, bool dosort) {
   }
 }
 
-void BasisSet::add_shell(size_t nucind, int am, const std::vector<contr_t> & C, bool dosort) {
+void BasisSet::add_shell(size_t nucind, int am, bool lm, const std::vector<contr_t> & C, bool dosort) {
   // Create new shell.
-  GaussianShell sh;
-
-  if(am>=2)
-    sh=GaussianShell(am,uselm,C);
-  else
-    sh=GaussianShell(am,false,C);
-
+  GaussianShell sh=GaussianShell(am,lm,C);
   // Do the rest here
   add_shell(nucind,sh,dosort);
 }
@@ -2544,7 +2538,8 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	C[0].z=geomav;
 	for(int l=0;l<=max_am;l++)
 	  if(lvals[l]>0) {
-	    dfit.add_shell(in,l,C);
+	    // Pure spherical functions used
+	    dfit.add_shell(in,l,true,C);
 	  }
       }
     } // (10) in YRF
@@ -2636,7 +2631,7 @@ BasisSet BasisSet::exchange_fitting() const {
       for(int n=0;n<nfunc[l];n++) {
 	// Compute exponent
 	C[0].z=alpha*pow(beta,n);
-	fit.add_shell(in,l,C);
+	fit.add_shell(in,l,true,C);
       }
     }
   }
