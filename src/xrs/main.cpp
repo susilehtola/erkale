@@ -934,7 +934,8 @@ int main(int argc, char **argv) {
       load.read("Restricted",restr);
 
       // Load ground-state energy
-      load.read(gsen);
+      if(fullhole)
+	load.read(gsen);
 
       // Load basis
       BasisSet oldbas;
