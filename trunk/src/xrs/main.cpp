@@ -941,30 +941,22 @@ int main(int argc, char **argv) {
       BasisSet oldbas;
       load.read(oldbas);
 
+      // Check that basis sets are the same
+      if(!(basis == oldbas))
+	throw std::runtime_error("Must use the same basis for all phases of XRS calculation!\n");
+      
       // Read orbitals
       if(restr) {
-	arma::mat Cold;
-	arma::vec Eold;
-
-	load.read("C",Cold);
-	load.read("E",Eold);
-
-	// Project
-	basis.projectMOs(oldbas,Eold,Cold,sol.Ea,sol.Ca);
+	load.read("C",sol.Ca);
+	load.read("E",sol.Ea);
 	sol.Eb=sol.Ea;
 	sol.Cb=sol.Ca;
       } else {
         // Load energies and orbitals
-	arma::vec Eaold, Ebold;
-	arma::mat Caold, Cbold;
-        load.read("Ca",Caold);
-        load.read("Ea",Eaold);
-        load.read("Cb",Cbold);
-        load.read("Eb",Ebold);
-	
-        // Project to new basis.
-        basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca);
-        basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
+        load.read("Ca",sol.Ca);
+        load.read("Ea",sol.Ea);
+        load.read("Cb",sol.Cb);
+        load.read("Eb",sol.Eb);
       }
 
       if(set.get_bool("XRSLocalize")) {
