@@ -163,7 +163,7 @@ void Checkpoint::read(const std::string & name, arma::mat & m) {
   hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
 
   // Get the data type
-  hid_t datatype  = H5Dget_type(dataset);
+  hid_t datatype = H5Dget_type(dataset);
 
   // Get the class info
   hid_t hclass=H5Tget_class(datatype);
@@ -575,8 +575,9 @@ void Checkpoint::read(BasisSet & basis) {
   }
 
   // Add the shells
-  for(size_t i=0;i<Nsh;i++)
-    basis.add_shell(shdata[i].cenind,shdata[i].am,contrs[i]);
+  for(size_t i=0;i<Nsh;i++) {
+    basis.add_shell(shdata[i].cenind,shdata[i].am,shdata[i].uselm,contrs[i],false);
+  }
 
   // Finalize the basis
   basis.finalize();

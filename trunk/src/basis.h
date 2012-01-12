@@ -202,11 +202,11 @@ class BasisSet {
   /// Add nucleus
   void add_nucleus(const nucleus_t & nuc);
   /// Add a shell to a nucleus and sort functions if wanted
-  void add_shell(size_t nucind, const GaussianShell & sh, bool sort=1);
+  void add_shell(size_t nucind, const GaussianShell & sh, bool sort=true);
   /// Add a shell to a nucleus and sort functions if wanted
-  void add_shell(size_t nucind, int am, const std::vector<contr_t> & C, bool sort=1);
+  void add_shell(size_t nucind, int am, bool uselm, const std::vector<contr_t> & C, bool sort=true);
   /// Add all shells to a nucleus and sort functions if wanted
-  void add_shells(size_t nucind, ElementBasisSet el, bool sort=1);
+  void add_shells(size_t nucind, ElementBasisSet el, bool sort=true);
 
   /// Sort shells in nuclear order, then by angular momentum, then by exponents
   void sort();
@@ -236,7 +236,7 @@ class BasisSet {
   void coulomb_normalize();
 
   /// Do all of the above
-  void finalize(bool convert=0);
+  void finalize(bool convert=false);
 
   /// Get distance of nuclei
   double nuclear_distance(size_t i, size_t j) const;
@@ -330,7 +330,7 @@ class BasisSet {
   arma::vec eval_lapl(size_t ish, double x, double y, double z) const;
 
   /// Print out basis set
-  void print(bool verbose=0) const;
+  void print(bool verbose=false) const;
 
   /// Calculate transformation matrix from cartesians to spherical harmonics
   arma::mat cart_to_sph_trans() const;

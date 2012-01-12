@@ -620,7 +620,7 @@ BasisSet form_basis(const Storage & stor) {
 	Cs[ip].c=spcoeff[iprim+ip];
       }
 
-      bas.add_shell(nucind,0,Cs,false);
+      bas.add_shell(nucind,0,false,Cs,false);
     }
 
     // Add shell. Angular momentum is
