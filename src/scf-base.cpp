@@ -563,3 +563,34 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
   // The rest are spin down
   Nel_beta=Nel-Nel_alpha;
 }
+
+double check_orth(const arma::mat & C, const arma::mat & S, bool verbose) {
+  double maxerr=0.0;
+  size_t maxi=0, maxj=0;
+  arma::mat MOovl=arma::trans(C)*S*C;
+  for(size_t i=0;i<MOovl.n_cols;i++) {
+    for(size_t j=0;j<i;j++)
+      if(fabs(MOovl(i,j))>maxerr) {
+        maxerr=fabs(MOovl(i,j));
+        maxi=i;
+        maxj=j;
+      }
+    if(fabs(MOovl(i,i)-1)>maxerr) {
+      maxerr=fabs(MOovl(i,i)-1);
+      maxi=i;
+      maxj=i;
+    }
+  }
+  if(verbose) {
+    printf("Maximum deviation from orthogonality is %e, occurring at %i %i.\n",maxerr,(int) maxi, (int) maxj);
+    fflush(stdout);
+  }
+
+  if(maxerr>=1e-10) {
+    std::ostringstream oss;
+    oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality at " << maxi+1 << "," << maxj+1 <<": " << maxerr <<".\nCheck the used LAPACK implementation.\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  return maxerr;
+}
