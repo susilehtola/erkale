@@ -1535,7 +1535,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
   // Determine which shells might contribute
   for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
     // Determine closest distance of nucleus
-    double dist=std::max(0.0,nucdist[inuc]-rad);
+    double dist=fabs(nucdist[inuc]-rad);
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=bas.get_shell_inds(inuc);
 
@@ -1543,7 +1543,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
     for(size_t ish=0;ish<shellinds.size();ish++) {
       
       // Shell is relevant if range is larger than minimal distance
-      if(dist<shran[shellinds[ish]]) {
+      if(dist<=shran[shellinds[ish]]) {
 	// Add shell to list of shells to compute
 	compute_shells.push_back(shellinds[ish]);
       }
@@ -1753,6 +1753,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
 #endif  
   for(size_t i=0;i<Nat;i++)
     atoms[i]=AtomGrid(*basp,Pa,Pb,i,tol,x_func,c_func,use_lobatto,verbose);
+  if(verbose)
     printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
 
   // If we are not running a direct calculation, compute grids and basis functions.
