@@ -296,7 +296,14 @@ class BasisSet {
   /// Get number of cartesians on shell
   size_t get_Ncart(size_t ind) const;
 
-  /// Get range of shell (distance at which functions have dropped below epsilon)
+  /**
+   * Get range of shell (distance at which functions have dropped below epsilon)
+   *
+   * The default parameter is from the reference R. E. Stratmann,
+   * G. E. Scuseria, and M. J. Frisch, "Achieving linear scaling in
+   * exchage-correlation density functional quadratures",
+   * Chem. Phys. Lett. 257 (1993), pp. 213-223.
+   */
   void compute_shell_ranges(double eps=1e-10);
   /// Get range of shells (distance at which functions have dropped below epsilon)
   std::vector<double> get_shell_ranges() const;
