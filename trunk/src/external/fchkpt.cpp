@@ -907,9 +907,10 @@ void load_fchk(const Settings & set) {
   arma::mat S=basis.overlap();
   printf("\nComputed overlap matrix in %s.\n",t.elapsed().c_str());
 
+  int Nel=stor.get_int("Number of electrons");
   double neldiff=arma::trace(P*S);
-  neldiff-=stor.get_int("Number of electrons");
-  if(fabs(neldiff)>1e-8) {
+  neldiff-=Nel;
+  if(fabs(neldiff)/Nel>1e-8) {
     std::ostringstream oss;
     oss << "\nNumber of electrons and trace of density matrix differ by " << neldiff << "!\n";
     throw std::runtime_error(oss.str());
@@ -931,6 +932,13 @@ void load_fchk(const Settings & set) {
   }
 
   chkpt.write("Converged",1);
+
+  // Write number of electrons
+  int Nela=stor.get_int("Number of alpha electrons");
+  int Nelb=stor.get_int("Number of beta electrons");
+  chkpt.write("Nel",Nel);
+  chkpt.write("Nel-a",Nela);
+  chkpt.write("Nel-b",Nelb);
 
   printf("\nERKALE checkpoint saved in %s.\n",t.elapsed().c_str());
 }
@@ -1012,6 +1020,16 @@ void save_fchk(const Settings & set) {
   arma::mat P;
   chkpt.read("P",P);
   write_density("Total SCF Density",basis,P,out);
+
+  // Save spin density
+  if(!restr) {
+    arma::mat Pa, Pb;
+    chkpt.read("Pa",Pa);
+    chkpt.read("Pb",Pb);
+
+    arma::mat S=Pa-Pb;
+    write_density("Spin SCF Density",basis,S,out);
+  }
 
   // Close output file
   fclose(out);
