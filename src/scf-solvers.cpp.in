@@ -591,7 +591,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     deltaE=sol.en.E-Eold;
 
     // Update screening value
-    tol=std::min(fabs(deltaE)*1e-2,1e-9);
+    tol=std::min(std::min(fabs(deltaE)*1e-2,1e-9),tol);
 
     // Sanity check
     if(!std::isfinite(sol.en.E)) {
