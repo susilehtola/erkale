@@ -19,7 +19,7 @@
 #include "mathf.h"
 #include "lmtrans.h"
 #include "timer.h"
-#include "emd/spherical_harmonics.h"
+#include "spherical_harmonics.h"
 
 // Bessel functions
 extern "C" {
