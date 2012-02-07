@@ -14,25 +14,19 @@
  * of the License, or (at your option) any later version.
  */
 
-
-
-#include <algorithm>
-#include <complex>
-
-#include "../timer.h"
 #include "emd.h"
-#include "mathf.h"
-#include "spherical_expansion.h"
+#include "../gaunt.h"
+#include "../lmgrid.h"
+#include "../mathf.h"
+#include "../stringutil.h"
+#include "../timer.h"
 #include "spherical_harmonics.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 extern "C" {
-// For bessel functions
 #include <gsl/gsl_sf_bessel.h>
 }
+
+#include <cfloat>
 
 // Value of moment of electron density in Fourier space
 #define moment(i) (pow(dens[i].p,2+mom)*dens[i].d)
@@ -46,474 +40,588 @@ extern "C" {
 #define finemom(i)   ((moment(i-2)+4.0*moment(i-1)+2.0*moment(i)+4.0*moment(i+1)+moment(i+2))*(dens[i+2].p-dens[i-2].p)/12.0)
 
 // Maximum number of points allowed for converging number of electrons
-#define MAXPOINTS 10000
+#define MAXPOINTS 700
+
 // Print out moments at maximum every N seconds
 #define MAXPRINTFREQ 5
+//#define MAXPRINTFREQ 1e-10
 
-bool operator<(const onecenter_t & lhs, const onecenter_t & rhs) {
-  // Sort first by exponent
-  if(lhs.z<rhs.z)
-    return 1;
-  else if(lhs.z==rhs.z) {
-    // then by power of p
-    return lhs.pm<rhs.pm;
-  }
+/// Index of (l,m) in tables: l^2 + l + m
+#define lmind(l,m) ( ((size_t) (l))*(size_t (l)) + (size_t) (l) + (size_t) (m))
 
-  return 0;
+/// Number of radial points when checking norm of radial functions
+#define NRAD 1000
+/// Normality tolerance
+#define NORMTOL 1e-10
+
+//#define DEBUG
+
+RadialFourier::RadialFourier(int lv) {
+  l=lv;
 }
 
-bool operator==(const onecenter_t & lhs, const onecenter_t & rhs) {
-  return (lhs.z==rhs.z) && (lhs.pm==rhs.pm);
+RadialFourier::~RadialFourier() {
 }
 
-bool operator<(const twocenter_contr_t & lhs, const twocenter_contr_t & rhs) {
-  return lhs.dr<rhs.dr;
+int RadialFourier::getl() const {
+  return l;
 }
 
-bool operator==(const twocenter_contr_t & lhs, const twocenter_contr_t & rhs) {
-  return lhs.dr==rhs.dr;
-}
+bool operator<(const coupl_coeff_t & lhs, const coupl_coeff_t & rhs) {
+  // Sort first by l
+  if(lhs.l<rhs.l)
+    return true;
+  else if(lhs.l==rhs.l) {
+    // Then by l'
 
-bool operator<(const twocenter_t & lhs, const twocenter_t & rhs) {
-  /// Sort first by exponent
-  if(lhs.z<rhs.z)
-    return 1;
-  else if(lhs.z==rhs.z) {
+    if(lhs.lp<rhs.lp)
+      return true;
+    else if(lhs.lp==rhs.lp) {
 
-    // then by power of p
-    if(lhs.pm<rhs.pm)
-      return 1;
-    else if(lhs.pm==rhs.pm) {
+      // Then by L
+      if(lhs.L<rhs.L)
+	return true;
 
-      // then by index of Bessel function
-      return lhs.l<rhs.l;
+      else if(lhs.L==rhs.L)
+	// Finally by M
+	return lhs.M<rhs.M;
     }
   }
 
-  return 0;
+  return false;
 }
 
-bool operator==(const twocenter_t & lhs, const twocenter_t & rhs) {
-  return (lhs.z==rhs.z) && (lhs.pm==rhs.pm) && (lhs.l==rhs.l);
+bool operator==(const coupl_coeff_t & lhs, const coupl_coeff_t & rhs) {
+  return (lhs.l==rhs.l) && (lhs.lp==rhs.lp) && (lhs.L==rhs.L) && (lhs.M==rhs.M);
 }
 
+bool operator<(const total_coupl_t & lhs, const total_coupl_t & rhs) {
+  if(lhs.L<rhs.L)
+    return true;
+  else if(lhs.L==rhs.L)
+    return lhs.M<rhs.M;
+  
+  return false;
+}
 
-std::vector< std::vector<size_t> > find_identical_shells(const BasisSet & bas) {
-  // Returned list of identical basis functions
-  std::vector< std::vector<size_t> > ret;
+bool operator==(const total_coupl_t & lhs, const total_coupl_t & rhs) {
+  return (lhs.L==rhs.L) && (lhs.M==rhs.M);
+}
 
-  // Loop over shells
-  for(size_t ish=0;ish<bas.get_Nshells();ish++) {
-    // Get exponents, contractions and cartesian functions on shell
-    std::vector<contr_t> shell_contr=bas.get_contr(ish);
-    std::vector<shellf_t> shell_cart=bas.get_cart(ish);
+void add_coupling_term(std::vector<total_coupl_t> & v, total_coupl_t & t) {
+  if(v.size()==0) {
+    v.push_back(t);
+  } else {
+    // Get upper bound
+    std::vector<total_coupl_t>::iterator high;
+    high=std::upper_bound(v.begin(),v.end(),t);
 
-    // Try to find the shell on the current list of identicals
-    bool found=0;
-    for(size_t iident=0;iident<ret.size();iident++) {
+    // Corresponding index is
+    size_t ind=high-v.begin();
 
-      // Check first cartesian part.
-      std::vector<shellf_t> cmp_cart=bas.get_cart(ret[iident][0]);
-
-      if(shell_cart.size()==cmp_cart.size()) {
-	// Default value
-	found=1;
-
-	for(size_t icart=0;icart<shell_cart.size();icart++)
-	  if(shell_cart[icart].l!=cmp_cart[icart].l || shell_cart[icart].m!=cmp_cart[icart].m || shell_cart[icart].n!=cmp_cart[icart].n)
-	    found=0;
-
-	// Check that usage of spherical harmonics matches, too
-	if(bas.lm_in_use(ish) != bas.lm_in_use(ret[iident][0]))
-	  found=0;
-
-	// If cartesian parts match, check also exponents and contraction coefficients
-	if(found) {
-	  // Get exponents
-	  std::vector<contr_t> cmp_contr=bas.get_contr(ret[iident][0]);
-
-	  // Check exponents
-	  if(shell_contr.size()==cmp_contr.size()) {
-	    for(size_t ic=0;ic<shell_contr.size();ic++)
-	      if(!(shell_contr[ic]==cmp_contr[ic]))
-		found=0;
-	  } else
-	    found=0;
-	}
-
-	// If everything matches, add the function to the current list.
-	if(found) {
-	  ret[iident].push_back(ish);
-	  // Stop iteration over list of identical functions
-	  break;
-	}
-      }
-    }
-
-    // If the shell was not found on the list of identicals, add it
-    if(!found) {
-      std::vector<size_t> hlp;
-      hlp.push_back(ish);
-      ret.push_back(hlp);
+    if(ind>0 && v[ind-1]==t)
+      // Found it.
+      v[ind-1].c+=t.c;
+    else {
+      // Term does not exist, add it
+      v.insert(high,t);
     }
   }
-
-  return ret;
 }
 
 EMDEvaluator::EMDEvaluator() {
 }
 
-EMDEvaluator::EMDEvaluator(const BasisSet & bas, const arma::mat & P) {
-  // First, get list of identical shells.
-  std::vector< std::vector<size_t> > idents=find_identical_shells(bas);
+EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv) {
+  
+  idfuncs=idfuncsv;
+  loc=locv;
+  P=Pv;
 
-  // Form Fourier expansions of non-identical functions, [shell][function]
-  std::vector< std::vector<GTO_Fourier_Ylm> > ylmexp;
-  for(size_t i=0;i<idents.size();i++) {
-    // Get exponents, contraction coefficients and cartesians
-    std::vector<contr_t> contr=bas.get_contr(idents[i][0]);
-    std::vector<shellf_t> cart=bas.get_cart(idents[i][0]);
+  if(P.n_rows!=P.n_cols)
+    throw std::runtime_error("Density matrix not square!\n");
 
-    // Form expansions of cartesian functions
-    std::vector<GTO_Fourier_Ylm> cart_expansion;
-    for(size_t icart=0;icart<cart.size();icart++) {
-      // Expansion of current function
-      GTO_Fourier_Ylm func;
-      for(size_t iexp=0;iexp<contr.size();iexp++)
-	func+=contr[iexp].c*GTO_Fourier_Ylm(cart[icart].l,cart[icart].m,cart[icart].n,contr[iexp].z);
-      // Plug in the normalization factor
-      func=cart[icart].relnorm*func;
-      // Clean out terms with zero contribution
-      func.clean();
-      // Add to list of cartesian expansions
-      cart_expansion.push_back(func);
-    }
+  // Compute the coupling coefficients.
+  compute_coefficients(clm);
 
-    // If spherical harmonics are used, we need to transform the
-    // functions into the spherical harmonics basis.
-    if(bas.lm_in_use(idents[i][0])) {
-      std::vector<GTO_Fourier_Ylm> sph_expansion;
-      // Get transformation matrix
-      arma::mat transmat=bas.get_trans(idents[i][0]);
-      // Form expansion
-      int l=bas.get_am(idents[i][0]);
-      for(int m=-l;m<=l;m++) {
-	// Expansion for current term
-	GTO_Fourier_Ylm mcomp;
-	// Form expansion
-	for(size_t icart=0;icart<transmat.n_cols;icart++)
-	  mcomp+=transmat(l+m,icart)*cart_expansion[icart];
-	// clean it
-	mcomp.clean();
-	// and add it to the stack
-	sph_expansion.push_back(mcomp);
+  // Compute the distance table (must be done after Lmax has been set)
+  distance_table(coord);
+}
+
+void EMDEvaluator::distance_table(const std::vector<coords_t> & coord) {
+  Nat=coord.size();
+  dist.resize((Nat*(Nat+1))/2);
+  YLM.resize((Nat*(Nat+1))/2);
+
+  for(size_t i=0;i<YLM.size();i++)
+    YLM[i].resize(lmind(Lmax,Lmax)+1);
+
+  for(size_t i=0;i<coord.size();i++)
+    for(size_t j=0;j<=i;j++) {
+
+      // Index in array
+      size_t ind=i*(i+1)/2+j;
+
+      if(i==j) {
+	// Same atom.
+	dist[ind]=0.0;
+
+	// Initialize array
+	for(int L=0;L<=Lmax;L++)
+	  for(int M=-L;M<=L;M++)
+	    YLM[ind][lmind(L,M)]=0.0;
+	// However, Y_0^0 is 1/sqrt(4*pi)
+	YLM[ind][lmind(0,0)]=1.0/sqrt(4.0*M_PI);
+      } else {
+	// Displacement vector 
+	coords_t dr_vec=coord[i]-coord[j];
+	
+	// Compute distance
+	double dr=norm(dr_vec);
+	dist[ind]=dr;
+
+	// Phi and cos(theta)
+	double phi, cth;
+	if(dr>0) {
+	  phi=atan2(dr_vec.y,dr_vec.x);
+	  cth=dr_vec.z/dr;
+	} else {
+	  phi=-1;
+	  cth=-1;
+	}
+	
+	// Loop over L and M
+	for(int L=0;L<=Lmax;L++)
+	  for(int M=-L;M<=L;M++)
+	    YLM[ind][lmind(L,M)]=std::conj(spherical_harmonics(L,M,cth,phi));
       }
-      // Now we have all components, add everything to the stack
-      ylmexp.push_back(sph_expansion);
-    } else
-      // No need to transform, cartesians are used.
-      ylmexp.push_back(cart_expansion);
-  }
-
-  /*
-  for(size_t iident=0;iident<idents.size();iident++) {
-    printf("\nIdentical group %lu:\n",iident);
-    printf("Consists of shells: ");
-    for(size_t i=0;i<idents[iident].size();i++)
-      printf(" %lu",idents[iident][i]);
-    printf("\n");
-    printf("Transformation matrix:\n");
-    bas.gettrans(idents[iident][0]).print();
-    printf("Transforms of functions:\n");
-    for(size_t i=0;i<ylmexp[iident].size();i++) {
-      printf("Function %lu\n",i);
-      ylmexp[iident][i].print();
     }
-    printf("\n");
-  }
-  */
+}
 
-  // Get multiplication table
-  SphericalExpansionMultiplicationTable mult(bas.get_max_am());
+void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_t> > & clm) {
+  if(clm.size()!=idfuncs.size())
+    throw std::runtime_error("Sizes of clm and idfuncs do not match!\n");
 
-  // Imaginary unit
-  std::complex<double> im(0.0,1.0);
+  // Number of nonequivalent functions
+  size_t N=clm.size();
 
-  // Loop over shells of identical basis functions
-  for(size_t iidsh=0;iidsh<idents.size();iidsh++)
-    for(size_t jidsh=0;jidsh<idents.size();jidsh++) {
+  // Resize coupling coefficient array
+  //  cc.resize(N*(N+1)/2);
+  cc.resize(N*N);
 
-      // Loop over the basis functions on the shells to calculate the
-      // angular part of the product
-      for(size_t ifunc=0;ifunc<ylmexp[iidsh].size();ifunc++)
-	for(size_t jfunc=0;jfunc<ylmexp[jidsh].size();jfunc++) {
+  // Determine the maximum value of L we need
+  int lmax=0;
+  for(size_t i=0;i<clm.size();i++)
+    for(size_t j=0;j<clm[i].size();j++)
+      if(lmax<clm[i][j].l)
+	lmax=clm[i][j].l;
 
-	  // Calculate the product
-	  GTO_Fourier_Ylm prod=mult.mult(ylmexp[iidsh][ifunc].conjugate(),ylmexp[jidsh][jfunc]);
-	  //	  GTO_Fourier_Ylm prod=ylmexp[iidsh][ifunc].conjugate()*ylmexp[jidsh][jfunc];
+  // We can thus couple up to
+  Lmax=2*lmax;
 
-	  // Get the expansion
-	  std::vector<GTO_Fourier_Ylm_t> prodexp=prod.getexp();
+  // Compute Gaunt coefficient table.
+  Gaunt gaunt(lmax,Lmax,lmax);
 
-	  // Now, loop over the identical shells, which share the same
-	  // angular part.
-	  for(size_t ibf=0;ibf<idents[iidsh].size();ibf++)
-	    for(size_t jbf=0;jbf<idents[jidsh].size();jbf++) {
+  // Form the coefficients. Loop over groups of equivalent functions.
+  for(size_t iig=0;iig<clm.size();iig++) {
+    if(!clm[iig].size())
+      throw std::runtime_error("clm[iig] is empty!\n");
 
-	      // The global indices of the basis functions under
-	      // consideration are
-	      size_t ibas=bas.get_first_ind(idents[iidsh][ibf])+ifunc;
-	      size_t jbas=bas.get_first_ind(idents[jidsh][jbf])+jfunc;
+    for(size_t jjg=0;jjg<clm.size();jjg++) {
 
-	      // Only do off-diagonal once
-	      if(jbas>ibas)
-		continue;
-
-	      // Calculate the displacement between the basis functions
-	      coords_t dr_vec=bas.get_center(idents[iidsh][ibf])-bas.get_center(idents[jidsh][jbf]);
-
-	      // Express displacement in spherical coordinates
-	      // (to compute value of spherical harmonic)
-	      double dr=norm(dr_vec);
-
-	      // Phi and cos(theta)
-	      double phi, cth;
-	      if(dr>0) {
-		phi=atan2(dr_vec.y,dr_vec.x);
-		cth=dr_vec.z/dr;
-	      } else {
-		phi=-1;
-		cth=-1;
-	      }
-
-	      if(dr==0.0) {
-		// One-center case
-		for(size_t icomb=0;icomb<prodexp.size();icomb++) {
-		  // Get the spherical harmonics coefficients
-		  std::vector<ylmcoeff_t> sph=prodexp[icomb].ang.getcoeffs();
-
-		  for(size_t iang=0;iang<sph.size();iang++)
-		    if(sph[iang].l==0 && sph[iang].m==0) {
-		      // Found contributing term
-
-		      onecenter_t hlp;
-		      hlp.pm=prodexp[icomb].pm;
-		      hlp.z=prodexp[icomb].z;
-
-		      // If we're off-diagonal, we get the real part twice
-		      // (two different shells on same atom, or different functions on same shell)
-		      if(ibas!=jbas)
-			hlp.c=2.0*sph[iang].c.real()*P(ibas,jbas)*sqrt(4.0*M_PI);
-		      else
-			// On the diagonal we get it just once.
-			hlp.c=sph[iang].c.real()*P(ibas,jbas)*sqrt(4.0*M_PI);
-
-		      add_term(hlp);
-
-		      break;
-		    }
-		}
-	      } else {
-
-		// Two-center case
-		for(size_t icomb=0;icomb<prodexp.size();icomb++) {
-
-                  // Get the angular expansion
-		  std::vector<ylmcoeff_t> sph=prodexp[icomb].ang.getcoeffs();
-		  // Loop over angular part
-		  for(size_t iang=0;iang<sph.size();iang++) {
-		    // Compute value of spherical harmonics
-		    std::complex<double> Ylm=spherical_harmonics(sph[iang].l,sph[iang].m,cth,phi);
-		    // i^l
-		    std::complex<double> il=pow(im,sph[iang].l);
-		    // Full expansion coefficient is
-		    std::complex<double> c=Ylm*il*sph[iang].c;
-		    // Add the term. We are bound to be off-diagonal,
-		    // so we get the real part twice.
-
-		    twocenter_contr_t tmp;
-		    tmp.dr=dr;
-		    tmp.c=8.0*M_PI*c.real()*P(ibas,jbas);
-
-		    twocenter_t hlp;
-		    hlp.c.push_back(tmp);
-		    hlp.z=prodexp[icomb].z;
-		    hlp.pm=prodexp[icomb].pm;
-		    hlp.l=sph[iang].l;
-
-		    add_term(hlp);
-		  }
-		}
-
-	      }
+      if(!clm[jjg].size())
+	throw std::runtime_error("clm[jjg] is empty!\n");
+      
+      // Loop over l, l' and m, m'
+      for(size_t il=0;il<clm[iig].size();il++)
+	for(size_t ilp=0;ilp<clm[jjg].size();ilp++) {
+	  // l and l' are
+	  int l=clm[iig][il].l;
+	  int lp=clm[jjg][ilp].l;
+	  
+	  // m and m' are
+	  int m=clm[iig][il].m;
+	  int mp=clm[jjg][ilp].m;
+	  
+	  // and the expansion coefficients are
+	  std::complex<double> cmu=clm[iig][il].c;
+	  std::complex<double> cnu=clm[jjg][ilp].c;
+	  
+	  // Loop over L
+	  for(int L=std::max(abs(l-lp),abs(m-mp));L<=l+lp;L++) {
+	    // Coupling coefficient
+	    coupl_coeff_t tmp;
+	      
+	    // Set l indices
+	    tmp.l=l;
+	    tmp.lp=lp;
+	      
+	    // Coupled values
+	    tmp.L=L;
+	    tmp.M=m-mp;
+	    
+	    // Compute coefficient
+	    double g=gaunt.coeff(l,m,tmp.L,tmp.M,lp,mp);
+	    tmp.c=4.0*M_PI*pow(std::complex<double>(0.0,1.0),L)*std::conj(cmu)*cnu*g;
+	      
+	    // Store coefficient
+	    if(std::norm(tmp.c)>0.0) {
+	      add_coupling(iig,jjg,tmp);
 	    }
+	  }
 	}
     }
-
-  // Clean
-  clean();
-
-  // Print out structure
-  print();
+  }
+  
+  // Clear coefficients with zero weight
+  size_t nclean=0;
+  for(size_t i=0;i<cc.size();i++) {
+    for(size_t j=cc[i].size()-1;j<cc[i].size();j--)
+      if(norm(cc[i][j].c)==0.0) {
+	cc[i].erase(cc[i].begin()+j);
+	nclean++;
+      }
+  }
+  //  printf("%i terms cleaned.\n",(int) nclean);
+  
 }
 
 EMDEvaluator::~EMDEvaluator() {
 }
 
-void EMDEvaluator::add_term(const onecenter_t & t) {
-  if(onec.size()==0) {
-    onec.push_back(t);
+std::vector<radf_val_t> EMDEvaluator::get_radial(size_t ig, double p) const {
+  std::vector<radf_val_t> ret;
+
+  for(size_t j=0;j<rad[ig].size();j++) {
+    radf_val_t hlp;
+    hlp.l=rad[ig][j]->getl();
+    hlp.f=rad[ig][j]->get(p);
+    if(norm(hlp.f)>0.0)
+      ret.push_back(hlp);
+  }
+
+  return ret;
+}
+
+void EMDEvaluator::add_coupling(size_t ig, size_t jg, coupl_coeff_t t) {
+  // Index is
+  size_t ijdx=ig*idfuncs.size()+jg;
+
+#ifdef DEBUG  
+  if(ijdx>=cc.size()) {
+    std::ostringstream oss;
+    oss << "Error in add_coupling: requested element " << ijdx << " while size of cc is " << cc.size() <<"!\n";
+    throw std::runtime_error(oss.str());
+  }
+#endif
+
+  if(cc[ijdx].size()==0) {
+    cc[ijdx].push_back(t);
   } else {
     // Get upper bound
-    std::vector<onecenter_t>::iterator high;
-    high=std::upper_bound(onec.begin(),onec.end(),t);
+    std::vector<coupl_coeff_t>::iterator high;
+    high=std::upper_bound(cc[ijdx].begin(),cc[ijdx].end(),t);
 
     // Corresponding index is
-    size_t ind=high-onec.begin();
+    size_t ind=high-cc[ijdx].begin();
 
-    if(ind>0 && onec[ind-1]==t)
+    if(ind>0 && cc[ijdx][ind-1]==t)
       // Found it.
-      onec[ind-1].c+=t.c;
+      cc[ijdx][ind-1].c+=t.c;
     else {
       // Term does not exist, add it
-      onec.insert(high,t);
+      cc[ijdx].insert(high,t);
     }
   }
 }
 
-void EMDEvaluator::add_term(const twocenter_t & t) {
-  if(twoc.size()==0) {
-    twoc.push_back(t);
-  } else {
-    // Get upper bound
-    std::vector<twocenter_t>::iterator high;
-    high=std::upper_bound(twoc.begin(),twoc.end(),t);
-    // Corresponding index is
-    size_t ind=high-twoc.begin();
+std::vector<total_coupl_t> EMDEvaluator::get_coupling(size_t ig, size_t jg, int l, int lp) const {
+  // Find coupling coefficients with the wanted l and l'
 
-    if(ind>0 && twoc[ind-1]==t)
-      // Loop over terms in t
-      for(size_t it=0;it<t.c.size();it++)
-        add_contr(ind-1,t.c[it]);
-    else {
-      // Term does not exist, add it
-      twoc.insert(high,t);
-    }
-  }
-}
-
-void EMDEvaluator::add_contr(size_t ind, const twocenter_contr_t & t) {
-  if(twoc[ind].c.size()==0) {
-    twoc[ind].c.push_back(t);
-  } else {
-    // Get upper bound
-    std::vector<twocenter_contr_t>::iterator hi;
-    hi=std::upper_bound(twoc[ind].c.begin(),twoc[ind].c.end(),t);
-
-    size_t indt=hi-twoc[ind].c.begin();
-    if(indt>0 && twoc[ind].c[indt-1] == t)
-      // Found it!
-      twoc[ind].c[indt-1].c+=t.c;
-    else
-      // Need to add the term.
-      twoc[ind].c.insert(hi,t);
-  }
-}
-
-double EMDEvaluator::eval_onec(double p) const {
-  // Evaluate one-center terms
-  double d_onec=0.0;
-  for(size_t i=0;i<onec.size();i++)
-    d_onec+=onec[i].c*pow(p,onec[i].pm)*exp(-onec[i].z*p*p);
-
-  return d_onec;
-}
-
-double EMDEvaluator::eval_twoc(double p) const {
-  // Evaluate two-center terms
-  double jlcontr;
-  double d_twoc=0.0;
-  for(size_t i=0;i<twoc.size();i++) {
-    jlcontr=0.0;
-    for(size_t j=0;j<twoc[i].c.size();j++)
-      jlcontr+=twoc[i].c[j].c*gsl_sf_bessel_jl(twoc[i].l,p*twoc[i].c[j].dr);
-    d_twoc+=jlcontr*pow(p,twoc[i].pm)*exp(-twoc[i].z*p*p);
-  }
-  return d_twoc;
-}
-
-double EMDEvaluator::eval(double p) const {
-  double dens=eval_onec(p)+eval_twoc(p);
-  if(dens<0) {
-    throw std::domain_error("Error - negative momentum density encountered!\n");
-  }
-  return dens;
-}
-
-size_t EMDEvaluator::getN_onec() const {
-  return onec.size();
-}
-
-size_t EMDEvaluator::getN_twoc() const {
-  return twoc.size();
-}
-
-size_t EMDEvaluator::getN_twoc_total() const {
-  size_t N=0;
-  for(size_t i=0;i<twoc.size();i++)
-    N+=twoc[i].c.size();
-  return N;
-}
-
-void EMDEvaluator::clean() {
-  // Two-center terms
-  for(size_t i=0;i<twoc.size();i++)
-    for(size_t j=twoc[i].c.size()-1;j<twoc[i].c.size();j--)
-      if(twoc[i].c[j].c==0) {
-	twoc[i].c.erase(twoc[i].c.begin()+j);
-      }
-
-  // One-center terms
-  for(size_t i=onec.size()-1;i<onec.size();i--)
-    if(onec[i].c==0)
-      onec.erase(onec.begin()+i);
-}
-
-void EMDEvaluator::print() const {
-  // Print out terms
+  // The index in the cc list is
+  size_t ijidx=ig*idfuncs.size()+jg;
 
   /*
-  if(onec.size()) {
-    printf("One-center terms:\n");
-    for(size_t i=0;i<onec.size();i++) {
-      printf("%lu\tpm=%i, z=%e, c=%e\n",i,onec[i].pm,onec[i].z,onec[i].c);
-    }
-  }
-  if(twoc.size()) {
-    printf("Two-center terms\n");
-    for(size_t i=0;i<twoc.size();i++) {
-      printf("%lu\tl=%i, pm=%i, z=%e\n",i,twoc[i].l,twoc[i].pm,twoc[i].z);
-      for(size_t j=0;j<twoc[i].c.size();j++)
-	printf("\tdr=%e, c=%e\n",twoc[i].dr[j],twoc[i].c[j]);
-    }
+  // Lower limit
+  coupl_coeff_t lot;
+  lot.l=l;
+  lot.lp=lp;
+  lot.L=abs(l-lp);
+
+  // Upper limit
+  coupl_coeff_t hit;
+  hit.l=l;
+  hit.lp=lp;
+  hit.L=l+lp;
+  
+  // Find upper limit
+  std::vector<coupl_coeff_t>::iterator high;
+  high=std::upper_bound(cc[ijidx].begin(),cc[ijidx].end(),hit);
+
+  // Find lower limit
+  std::vector<coupl_coeff_t>::iterator low;
+  low=std::upper_bound(cc[ijidx].begin(),cc[ijidx].end(),lot);
+
+  // Corresponding indices are
+  size_t hiind=high-cc[ijidx].begin();
+  size_t loind=low-cc[ijidx].begin();
+
+  // Collect results
+  std::vector<total_coupl_t> ret;
+  for(size_t i=loind;i<=hiind;i++)
+  if((cc[ijidx][i].l==l) && (cc[ijidx][i].lp==lp)) {
+      
+  total_coupl_t hlp;
+  hlp.L=cc[ijidx][i].L;
+  hlp.c=cc[ijidx][i].c;
+  ret.push_back(hlp);
   }
   */
 
-  //  printf("EMD has %lu one-center and %lu two-center terms, that contain %lu contractions.\n",getN_onec(),getN_twoc(),getN_twoc_total());
+  std::vector<total_coupl_t> ret;
+  for(size_t i=0;i<cc[ijidx].size();i++)
+    if((cc[ijidx][i].l==l) && (cc[ijidx][i].lp==lp)) {
+      
+      total_coupl_t hlp;
+      hlp.L=cc[ijidx][i].L;
+      hlp.M=cc[ijidx][i].M;
+      hlp.c=cc[ijidx][i].c;
+      ret.push_back(hlp);
+    }
+
+  return ret;
 }
 
-EMD::EMD(const BasisSet & bas, const arma::mat & P, bool verbose) {
-  // Calculate norm of density matrix
-  dmnorm=arma::trace(P*bas.overlap());
-  // Number of electrons is (probably)
-  Nel=(int) round(dmnorm);
+std::vector<total_coupl_t> EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p) const {
+  // Get the radial parts
+  std::vector<radf_val_t> ri=get_radial(ig,p);
+  std::vector<radf_val_t> rj=get_radial(jg,p);
 
-  if(verbose)
-    printf("\nNumber of electrons is %i, from which norm of DM differs by %e.\n",Nel,dmnorm-Nel);
+  // Returned array
+  std::vector<total_coupl_t> ret;
+  
+  // Loop over factors
+  for(size_t il=0;il<ri.size();il++) {
+    // l is
+    int l=ri[il].l;
 
-  // Initialize evaluator
-  eval=EMDEvaluator(bas,P);
+    for(size_t ilp=0;ilp<rj.size();ilp++) {
+      // l' is
+      int lp=rj[ilp].l;
+
+      // Get the coupling constants
+      std::vector<total_coupl_t> c=get_coupling(ig,jg,l,lp);
+
+      // Increment total value
+      for(size_t ic=0;ic<c.size();ic++) {
+
+	// Term to add
+	total_coupl_t hlp;
+	hlp.L=c[ic].L;
+	hlp.M=c[ic].M;
+	hlp.c=std::conj(ri[il].f)*rj[ilp].f*c[ic].c;
+
+	// Add term
+	add_coupling_term(ret,hlp);
+      }
+    }
+  }
+
+  // Clear coefficients with zero weight
+  for(size_t i=ret.size()-1;i<ret.size();i--)
+    if(ret[i].c==0.0)
+      ret.erase(ret.begin()+i);
+
+#ifdef DEBUG
+  printf("Total coupling between functions %i and %i at p=%e\n",(int) ig,(int) jg,p);
+  for(size_t i=0;i<ret.size();i++)
+    printf("\t%i\t%i\t(% e,% e)\n",ret[i].L,ret[i].M,ret[i].c.real(),ret[i].c.imag());
+#endif
+
+  return ret;
+}
+
+void EMDEvaluator::print() const {
+  printf("Radial parts\n");
+  for(size_t i=0;i<rad.size();i++) {
+    printf("Function %i / %i\n",(int) i+1, (int) rad.size());
+    for(size_t j=0;j<rad[i].size();j++) {
+      printf("%2i ",(int) j);
+      rad[i][j]->print();
+    }
+  }
+}
+
+void EMDEvaluator::check_norm() const {
+  // Get radial grid
+  std::vector<radial_grid_t> grid=form_radial_grid(NRAD);
+  
+  for(size_t i=0;i<rad.size();i++) {
+    for(size_t j=0;j<rad[i].size();j++) {
+      // Calculate norm
+      double norm=0.0;
+      for(size_t ip=0;ip<grid.size();ip++)
+	norm+=grid[ip].w*std::norm(rad[i][j]->get(grid[ip].r));
+      norm=sqrt(norm);
+      
+#ifdef DEBUG
+      printf("Function %i %i has norm %e, difference by % e.\n",(int) i+1, (int) j, norm, norm-1.0);
+#else
+      if(fabs(norm-1.0)>=NORMTOL) {
+	printf("Function %i %i has norm %e, difference by % e.\n",(int) i+1, (int) j, norm, norm-1.0);
+      }
+#endif
+    }
+  }
+  printf("Norms of the functions checked.\n");
+}
+
+double EMDEvaluator::get(double p) const {
+  // Arguments of Bessel functions are
+  std::vector<double> args(dist);
+  for(size_t i=0;i<args.size();i++)
+    args[i]*=p;
+  // Evaluate Bessel functions
+  arma::mat jl=bessel_array(args,Lmax);
+
+  // Continue by computing the radial EMD
+  double np=0.0;
+
+  // Loop over groups of equivalent functions
+  for(size_t iig=0;iig<idfuncs.size();iig++) {
+
+    // Do off-diagonal first
+    for(size_t jjg=0;jjg<iig;jjg++) {
+      
+      // Get the total coupling coefficient
+      std::vector<total_coupl_t> totc=get_total_coupling(iig,jjg,p);
+      if(totc.size()==0)
+	continue;
+
+      // Loop over the individual functions
+      for(size_t ii=0;ii<idfuncs[iig].size();ii++)
+	for(size_t jj=0;jj<idfuncs[jjg].size();jj++) {
+	  // The indices are
+	  size_t mu=idfuncs[iig][ii];
+	  size_t nu=idfuncs[jjg][jj];
+	  
+	  // and the functions are centered on
+	  size_t iat=loc[mu];
+	  size_t jat=loc[nu];
+	  
+	  // so the corresponding index in the Bessel and spherical harmonics arrays is
+	  size_t ibes;
+	  // Sign of spherical harmonics
+	  int ylmsign=1;
+	  
+	  //	  ibes=iat*Nat+jat;
+	  if(iat>jat)
+	    ibes=iat*(iat+1)/2+jat;
+	  else {
+	    // Reverse sign of Ylm
+	    ibes=jat*(jat+1)/2+iat;
+	    ylmsign=-1;
+	  }
+
+	  // Loop over coupling coefficient
+	  for(size_t ic=0;ic<totc.size();ic++) {
+	    // L and M are
+	    int L=totc[ic].L;
+	    int M=totc[ic].M;
+
+	    // Increment EMD; we get the increment twice since we are off-diagonal.
+	    std::complex<double> incr=2.0*P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
+	    np+=incr.real();
+	  }      
+	}
+    }
+
+    // Then, do diagonal. Get the total coupling coefficient
+    std::vector<total_coupl_t> totc=get_total_coupling(iig,iig,p);
+    if(totc.size()==0)
+      continue;
+
+    // Loop over the individual functions
+    for(size_t ii=0;ii<idfuncs[iig].size();ii++)
+      for(size_t jj=0;jj<idfuncs[iig].size();jj++) {
+	  
+	// The indices are
+	size_t mu=idfuncs[iig][ii];
+	size_t nu=idfuncs[iig][jj];
+	  
+	// and the functions are centered on
+	size_t iat=loc[mu];
+	size_t jat=loc[nu];
+	  
+	// so the corresponding index in the Bessel and spherical harmonics arrays is
+	size_t ibes;
+	// Sign of spherical harmonics
+	int ylmsign=1;
+	  
+	//	  ibes=iat*Nat+jat;
+	if(iat>jat)
+	  ibes=iat*(iat+1)/2+jat;
+	else {
+	  // Reverse sign of Ylm
+	  ibes=jat*(jat+1)/2+iat;
+	  ylmsign=-1;
+	}
+	  
+	// Loop over coupling coefficient
+	for(size_t ic=0;ic<totc.size();ic++) {
+	  // L and M are
+	  int L=totc[ic].L;
+	  int M=totc[ic].M;
+	    
+	  // Increment EMD
+	  std::complex<double> incr=P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
+	  np+=incr.real();
+	}      
+      }
+  }
+
+  return np;
+}
+
+
+arma::mat bessel_array(const std::vector<double> & args, int lmax) {
+  // Returned array.
+  arma::mat j(args.size(),lmax+1);
+  j.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    // Work space for functions
+    double wrk[lmax+1];
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t i=0;i<args.size();i++) {
+      // Evaluate Bessel functions
+      gsl_sf_bessel_jl_array(lmax,args[i],wrk);
+      // or with more stable Steed recursion
+      //      gsl_sf_bessel_jl_steed_array(lmax,args[i],wrk);
+
+      // Copy the values
+      for(int l=0;l<=lmax;l++)
+	j(i,l)=wrk[l];
+    }
+  }
+
+#ifdef DEBUG
+  j.print("Bessel array");
+#endif
+
+  return j;
+}
+
+
+EMD::EMD(const EMDEvaluator * evalp, int Nelv) {
+  Nel=Nelv;
+  eval=evalp;
 }
 
 EMD::~EMD() {
@@ -536,7 +644,7 @@ void EMD::initial_fill(bool verbose) {
 
   // Add origin
   hlp.p=0.0;
-  hlp.d=eval.eval(hlp.p);
+  hlp.d=eval->get(hlp.p);
   dens.push_back(hlp);
 
   do {
@@ -549,7 +657,7 @@ void EMD::initial_fill(bool verbose) {
 #endif
     for(int ipoint=0;ipoint<4;ipoint++) {
       hlparr[ipoint].p=p+(ipoint+1)*dp;
-      hlparr[ipoint].d=eval.eval(hlparr[ipoint].p);
+      hlparr[ipoint].d=eval->get(hlparr[ipoint].p);
 #ifdef _OPENMP
 #pragma omp ordered
 #endif
@@ -559,6 +667,46 @@ void EMD::initial_fill(bool verbose) {
 
   if(verbose)
     printf("done.\n");
+}
+
+void EMD::complete_fill() {
+  // Work around pathological cases (very few exponents)
+
+  // Accept a decay by a factor up to
+  const double thr=20.0;
+
+  bool done;
+  do {
+    done=true;
+    for(size_t i=dens.size()-3;i<dens.size();i-=4) {
+      // Check that the density decreases at maximum by one order of
+      // magnitude per grid point.
+      if((dens[i-1].d>0.0) && (dens[i-2].d>0.0) && fabs(dens[i-1].d/dens[i-2].d)>=thr) {
+	add4(i);
+	done=false;
+	break;
+      }
+
+      if((dens[i].d>0.0) && (dens[i-1].d>0.0) && fabs(dens[i].d/dens[i-1].d)>=thr) {
+	add4(i);
+	done=false;
+	break;
+      }
+
+      if((dens[i+1].d>0.0) && (dens[i].d>0.0) && fabs(dens[i+1].d/dens[i].d)>=thr) {
+	add4(i);
+	done=false;
+	break;
+      }
+
+      if((dens[i+2].d>0.0) && (dens[i+1].d>0.0) && fabs(dens[i+2].d/dens[i+1].d)>=thr) {
+	add4(i);
+	done=false;
+	break;
+      }
+
+    }
+  } while(!done);
 }
 
 void EMD::add4(size_t loc) {
@@ -574,7 +722,7 @@ void EMD::add4(size_t loc) {
     // Value of p is
     integ[2-ipoint].p=0.5*(dens[loc+ipoint].p+dens[loc+ipoint-1].p);
     // Value of the density at this point is
-    integ[2-ipoint].d=eval.eval(integ[2-ipoint].p);
+    integ[2-ipoint].d=eval->get(integ[2-ipoint].p);
     // Add value to the list
 #ifdef _OPENMP
 #pragma omp ordered
@@ -624,16 +772,25 @@ void EMD::find_electrons(bool verbose, double tol) {
       }
     }
 
-    if(fabs(dmnorm-integral)>tol) {
+    if(fabs(Nel-integral)>tol) {
       // Check that the calculation will actually converge at some point..
-      if(dens.size()>MAXPOINTS)
-	throw std::domain_error("Error in find_electrons: maximum allowed number of points reached.\n");
+      if(dens.size()>MAXPOINTS) {
+	ERROR_INFO();
+	std::ostringstream oss;
+	oss << "Error in find_electrons: maximum allowed number of points reached. int=" << integral << ", Nel=" << Nel <<".\n";
+	throw std::runtime_error(oss.str());
+      }
 
       // Add points to area of maximum error
+      if(maxind==0) {
+	ERROR_INFO();
+	throw std::runtime_error("Unable to find location of maximum error!\n");
+      }
+
       add4(maxind);
     }
 
-  } while(fabs(1.0*Nel-integral)>tol);
+  } while(fabs(Nel-integral)>tol);
 
   if(verbose)
     printf("done.\n");
@@ -705,7 +862,7 @@ void EMD::optimize_moments(bool verbose, double tol) {
     // Print out current values if necessary
     if(verbose && (iter==1 || t.get()>MAXPRINTFREQ || errel<=tol)) {
       t.set();
-      printf("\nUsing %u points, charge differs from norm of DM by %e.\n",(unsigned int) dens.size(),momval[2]-dmnorm);
+      printf("\nUsing %u points, charge differs from Nel by %e.\n",(unsigned int) dens.size(),momval[2]-Nel);
       printf("Current values of moments are:\n");
       printf("\tk\t<p^k>\t\t\\Delta <p^k>\t \\Delta <p^k> / <p^k>\n");
       for(int imom=0;imom<Nmom;imom++)
@@ -714,9 +871,12 @@ void EMD::optimize_moments(bool verbose, double tol) {
 
     // If tolerance has not been reached, add more points
     if(errel>tol)
-        add4(mommaxerrloc[errelind]);
+      add4(mommaxerrloc[errelind]);
 
   } while(errel>tol);
+
+  // Try to work around pathological cases
+  //  complete_fill();  
 }
 
 std::vector<emd_t> EMD::get() const {
@@ -726,11 +886,11 @@ std::vector<emd_t> EMD::get() const {
 void EMD::save(const char * fname) const {
   FILE *out=fopen(fname,"w");
   for(size_t i=0;i<dens.size();i++)
-    fprintf(out,"%.16e\t%.16e\n",dens[i].p,dens[i].d);
+    fprintf(out,"%.15e\t%.15e\n",dens[i].p,dens[i].d);
   fclose(out);
 }
 
-void EMD::moments(const char * fname) const {
+arma::mat EMD::moments() const {
   // Three and five point Simpson
   double rough, fine;
 
@@ -739,8 +899,7 @@ void EMD::moments(const char * fname) const {
   int m[]={-2, -1, 0, 1, 2, 3, 4};
 
   // Moments and errors
-  double moms[Nm];
-  double err[Nm];
+  arma::mat moms(Nm,3);
 
   // Helper variables
   const size_t N=dens.size();
@@ -757,8 +916,9 @@ void EMD::moments(const char * fname) const {
       integrand[i]=pow(p[i],2+m[mi])*dens[i].d;
 
     // Zero out old values
-    moms[mi]=0;
-    err[mi]=0;
+    moms(mi,0)=m[mi];
+    moms(mi,1)=0;
+    moms(mi,2)=0;
 
     // Calculate moments & errors
     rough=0;
@@ -768,27 +928,29 @@ void EMD::moments(const char * fname) const {
       rough=(integrand[i-2]+4.0*integrand[i]+integrand[i+2])/6.0*(p[i+2]-p[i-2]);
       fine=(integrand[i-2]+4.0*integrand[i-1]+2.0*integrand[i]+4.0*integrand[i+1]+integrand[i+2])/12.0*(p[i+2]-p[i-2]);
 
-      moms[mi]+=fine;
-      err[mi]+=fabs(fine-rough)/15.0;
+      moms(mi,1)+=fine;
+      moms(mi,2)+=fabs(fine-rough)/15.0;
     }
   }
 
+  return moms;
+}
+
+void EMD::moments(const char * fname) const {
+  arma::mat moms=moments();
   // Print out the moments
   FILE *out=fopen(fname,"w");
-  for(int mi=0;mi<Nm;mi++)
-    fprintf(out,"\t%i\t%.12e\t%.12e\n",m[mi],moms[mi],err[mi]);
+  for(size_t mi=0;mi<moms.n_rows;mi++)
+    fprintf(out,"\t%i\t%.12e\t%.12e\n",(int) moms(mi,0),moms(mi,1),moms(mi,2));
   fclose(out);
 }
 
-void EMD::compton_profile(const char * fname_raw, const char * fname_interp) const {
-
+arma::mat EMD::compton_profile() const {
   double rough, fine, Jint, Jerr;
   double integrand[dens.size()];
 
   size_t N=(dens.size()-1)/4;
-  std::vector<double> p(N);
-  std::vector<double> J(N);
-  std::vector<double> dJ(N);
+  arma::mat J(N,3);
 
   // Calculate integrand
   for(size_t i=0;i<dens.size();i++)
@@ -810,17 +972,36 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
     Jerr+=fabs(fine-rough)/15.0;
 
     // Save profile
-    p[n]=dens[i-2].p; // Must be i-1 to get J(0) = 1st moment of density / 2
-    J[n]=0.5*Jint; // J = 1/2 \int_{|q|}^\infty
-    dJ[n]=0.5*Jerr;
+    J(n,0)=dens[i-2].p; // Must be i-1 to get J(0) = 1st moment of density / 2
+    J(n,1)=0.5*Jint; // J = 1/2 \int_{|q|}^\infty
+    J(n,2)=0.5*Jerr;
     n--;
   }
 
+  return J;
+}
+
+void EMD::compton_profile(const char * fname_raw) const {
+  arma::mat J=compton_profile();
+
   // Print out profile
   FILE *out=fopen(fname_raw,"w");
-  for(size_t n=0;n<N;n++)
-    fprintf(out,"%.12e\t%.12e\t%.12e\n",p[n],J[n],dJ[n]);
+  for(size_t n=0;n<J.n_rows;n++)
+    fprintf(out,"%.12e\t%.12e\t%.12e\n",J(n,0),J(n,1),J(n,2));
   fclose(out);
+}
+
+void EMD::compton_profile_interp(const char * fname_interp) const {
+  // Get the profile.
+  arma::mat Jv=compton_profile();
+
+  // Momentum transfer, profile and its error
+  std::vector<double> p, J, dJ;
+  for(size_t i=0;i<Jv.n_rows;i++) {
+    p.push_back(Jv(i,0));
+    J.push_back(Jv(i,1));
+    dJ.push_back(Jv(i,2));
+  }
 
   // Interpolate profile to p = 0 .. pmax with spacing dp
   const int Nreg=2;
@@ -849,224 +1030,8 @@ void EMD::compton_profile(const char * fname_raw, const char * fname_interp) con
   std::vector<double> dJ_interp=spline_interpolation(p,dJ,p_interp);
 
   // Save output
-  out=fopen(fname_interp,"w");
+  FILE *out=fopen(fname_interp,"w");
   for(size_t i=0;i<p_interp.size();i++)
     fprintf(out,"%.12e\t%.12e\t%.12e\n",p_interp[i],J_interp[i],dJ_interp[i]);
   fclose(out);
-}
-
-void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & px_arr, const std::vector<double> & py_arr, const std::vector<double> & pz_arr) {
-  // Find out identical shells in basis set.
-  std::vector< std::vector<size_t> > idents=find_identical_shells(bas);
-
-  // Compute the expansions of the non-identical shells
-  std::vector< std::vector<GTO_Fourier> > fourier;
-  for(size_t i=0;i<idents.size();i++) {
-    // Get exponents, contraction coefficients and cartesians
-    std::vector<contr_t> contr=bas.get_contr(idents[i][0]);
-    std::vector<shellf_t> cart=bas.get_cart(idents[i][0]);
-
-    // Compute expansion of basis functions on shell
-    // Form expansions of cartesian functions
-    std::vector<GTO_Fourier> cart_expansion;
-    for(size_t icart=0;icart<cart.size();icart++) {
-      // Expansion of current function
-      GTO_Fourier func;
-      for(size_t iexp=0;iexp<contr.size();iexp++)
-        func+=contr[iexp].c*GTO_Fourier(cart[icart].l,cart[icart].m,cart[icart].n,contr[iexp].z);
-      // Plug in the normalization factor
-      func=cart[icart].relnorm*func;
-      // Clean out terms with zero contribution
-      func.clean();
-      // Add to cartesian expansion
-      cart_expansion.push_back(func);
-    }
-
-    // If spherical harmonics are used, we need to transform the
-    // functions into the spherical harmonics basis.
-    if(bas.lm_in_use(idents[i][0])) {
-      std::vector<GTO_Fourier> sph_expansion;
-      // Get transformation matrix
-      arma::mat transmat=bas.get_trans(idents[i][0]);
-      // Form expansion
-      int l=bas.get_am(idents[i][0]);
-      for(int m=-l;m<=l;m++) {
-        // Expansion for current term
-        GTO_Fourier mcomp;
-        // Form expansion
-        for(size_t icart=0;icart<transmat.n_cols;icart++)
-          mcomp+=transmat(l+m,icart)*cart_expansion[icart];
-        // clean it
-        mcomp.clean();
-        // and add it to the stack
-        sph_expansion.push_back(mcomp);
-      }
-      // Now we have all components, add everything to the stack
-      fourier.push_back(sph_expansion);
-    } else
-      // No need to transform, cartesians are used.
-      fourier.push_back(cart_expansion);
-  }
-
-  // Open output file.
-  FILE *out=fopen("emdcube.dat","w");
-
-  // Compute the norm (assumes evenly spaced grid!)
-  double norm=0.0;
-  
-  // Compute the momentum densities in batches, allowing
-  // parallellization.
-#ifdef _OPENMP
-  // The number of used threads
-  const int nth=omp_get_max_threads();
-  // The number of points per batch
-  const size_t Nbatch_p=100*nth;
-#else
-  const int nth=1;
-  const size_t Nbatch_p=100;
-#endif
-
-  // The total number of point is
-  const size_t N=px_arr.size()*py_arr.size()*pz_arr.size();
-  // The necessary amount of batches is
-  size_t Nbatch=N/Nbatch_p;
-  if(N%Nbatch_p!=0)
-    Nbatch++;
-
-  // The values of momentum in the batch
-  coords_t p[Nbatch_p];
-  // The values of EMD in the batch
-  double emd[Nbatch_p];
-
-  // Number of points to compute in the batch
-  size_t np;
-  // Total number of points computed
-  size_t ntot=0;
-  // Indices of x, y and z
-  size_t xind=0, yind=0, zind=0;
-
-  // Values of the Fourier polynomial part of the basis functions: [nth][nident][nfuncs]
-  std::vector< std::vector< std::vector< std::complex<double> > > > fpoly(nth);
-  for(int ith=0;ith<nth;ith++) {
-    fpoly[ith].resize(idents.size());
-    for(size_t i=0;i<fourier.size();i++)
-      fpoly[ith][i].resize(fourier[i].size());
-  }
-
-  // Amount of basis functions
-  const size_t Nbf=bas.get_Nbf();
-  // Values of the basis functions, i.e. the above with the additional phase factor
-  std::vector< std::vector< std::complex<double> > > fvals(nth);
-  for(int ith=0;ith<nth;ith++)
-    fvals[ith].resize(Nbf);
-
-  // Loop over batches.
-  for(size_t i=0;i<Nbatch;i++) {
-    // Zero amount of points in current batch.
-    np=0;
-    
-    // Form list of points to compute.
-    while(np<Nbatch_p && ntot+np<N) {
-      p[np].x=px_arr[xind];
-      p[np].y=py_arr[yind];
-      p[np].z=pz_arr[zind];
-      
-      // Increment number of points
-      np++;
-      
-      // Determine next point.
-      if(zind+1<pz_arr.size())
-	zind++;
-      else {
-	zind=0;
-	
-	if(yind+1<py_arr.size())
-	  yind++;
-	else {
-	  yind=0;
-	  xind++;
-	}
-      }
-    }
-
-    // Begin parallel section
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-
-#ifdef _OPENMP
-      // Get thread index
-      int ith=omp_get_thread_num();
-#else
-      int ith=0;
-#endif
-      
-#ifdef _OPENMP
-#pragma omp for
-#endif
-      // Loop over the points in the batch
-      for(size_t ip=0;ip<np;ip++) {
-	// Current value of p is
-	double px=p[ip].x;
-	double py=p[ip].y;
-	double pz=p[ip].z;
-	
-	// Compute values of Fourier polynomials at current value of p.
-	for(size_t iid=0;iid<idents.size();iid++)
-	  // Loop over the functions on the identical shells.
-	  for(size_t fi=0;fi<fourier[iid].size();fi++)
-	    fpoly[ith][iid][fi]=fourier[iid][fi].eval(px,py,pz);
-	
-	// Compute the values of the basis functions themselves.
-	// Loop over list of groups of identical shells
-	for(size_t ii=0;ii<idents.size();ii++)
-	  // and over the shells of this type
-	  for(size_t jj=0;jj<idents[ii].size();jj++) {
-	    // The current shell is
-	    size_t is=idents[ii][jj];
-	    // and it is centered at
-	    coords_t cen=bas.get_center(is);
-	    // thus the phase factor we get is
-	    std::complex<double> phase=exp(std::complex<double>(0.0,-(px*cen.x+py*cen.y+pz*cen.z)));
-	    
-	    // Now we just store the individual function values.
-	    size_t i0=bas.get_first_ind(is);
-	    size_t Ni=bas.get_Nbf(is);
-	    for(size_t fi=0;fi<Ni;fi++)
-	      fvals[ith][i0+fi]=phase*fpoly[ith][ii][fi];
-	  }
-
-	// and now it's only a simple matter to compute the momentum density.
-	emd[ip]=0.0;
-	for(size_t i=0;i<Nbf;i++) {
-	  // Off-diagonal
-	  for(size_t j=0;j<i;j++)
-	    emd[ip]+=2.0*std::real(P(i,j)*std::conj(fvals[ith][i])*fvals[ith][j]);
-	  // Diagonal
-	  emd[ip]+=std::real(P(i,i)*std::conj(fvals[ith][i])*fvals[ith][i]);
-	}
-      }
-    } // end parallel region
-    
-    // Save computed value of EMD and increment norm
-    for(size_t ip=0;ip<np;ip++) {
-      fprintf(out,"%e\t%e\t%e\t%e\n",p[ip].x,p[ip].y,p[ip].z,emd[ip]);
-      norm+=emd[ip];
-    }
-
-    // Increment number of computed points
-    ntot+=np;
-  }
-  // Close output file.
-  fclose(out);
-
-  // Plug in the spacing in the integral
-  double dx=(px_arr[px_arr.size()-1]-px_arr[0])/px_arr.size();
-  double dy=(py_arr[py_arr.size()-1]-py_arr[0])/py_arr.size();
-  double dz=(pz_arr[pz_arr.size()-1]-pz_arr[0])/pz_arr.size();
-  norm*=dx*dy*dz;
-
-  // Print norm
-  printf("The norm of the EMD on the cube is %e.\n",norm);
 }

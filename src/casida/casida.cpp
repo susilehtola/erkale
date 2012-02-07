@@ -22,7 +22,7 @@
 
 #include "casida.h"
 #include "casida_grid.h"
-#include "../xrs/lmgrid.h"
+#include "../lmgrid.h"
 #include "stringutil.h"
 #include "timer.h"
 

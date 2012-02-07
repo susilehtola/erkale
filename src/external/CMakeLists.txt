@@ -11,7 +11,20 @@ else()
  target_link_libraries(erkale_fchkpt ${LIBINT_LIBRARIES})
 endif()
 
-install (TARGETS erkale_fchkpt DESTINATION bin)
+# ADF EMD executable
+add_executable (erkale_adf_emd adf/main.cpp adf/emd_sto.cpp)
+set_target_properties(erkale_adf_emd PROPERTIES OUTPUT_NAME "erkale_adf_emd${SUFFIX}")
+target_link_libraries(erkale_adf_emd liberkale_emd)
+target_link_libraries(erkale_adf_emd liberkale)
+if(BUILD_SHARED_LIBS)
+else()
+ target_link_libraries(erkale_adf_emd ${GSL_LIBRARIES})
+ target_link_libraries(erkale_adf_emd ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_adf_emd ${HDF5_LIBRARIES})
+ target_link_libraries(erkale_adf_emd ${LIBINT_LIBRARIES})
+endif()
+
+install (TARGETS erkale_fchkpt erkale_adf_emd DESTINATION bin)
 # Install headers
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 install(FILES ${headers} DESTINATION include/erkale/external)

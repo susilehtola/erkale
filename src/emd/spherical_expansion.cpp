@@ -25,6 +25,9 @@
 #include "gto_fourier.h"
 #include "spherical_expansion.h"
 
+#include "../mathf.h"
+#include "../timer.h"
+
 extern "C" {
 // 3j symbols
 #include <gsl/gsl_sf_coupling.h>
@@ -350,8 +353,12 @@ SphericalExpansion SphericalExpansionMultiplicationTable::mult(const SphericalEx
   SphericalExpansion ret;
 
   // Check that table is big enough
-  if(lhs.getmaxl()>maxam || rhs.getmaxl()>maxam)
-    throw std::domain_error("Multiplication table is not big enough for computing the wanted multiplication!\n");
+  if(lhs.getmaxl()>maxam || rhs.getmaxl()>maxam) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Table not big enough: maxam = " << maxam << " but am_lhs = " << lhs.getmaxl() << " and am_rhs = " << rhs.getmaxl() << "!\n";
+    throw std::runtime_error(oss.str());
+  }
 
   // Continue with multiplication. Loop over terms:
   for(size_t i=0;i<lhs.comb.size();i++)
@@ -362,219 +369,20 @@ SphericalExpansion SphericalExpansionMultiplicationTable::mult(const SphericalEx
   return ret;
 }
 
-GTO_Fourier_Ylm SphericalExpansionMultiplicationTable::mult(const GTO_Fourier_Ylm & lhs, const GTO_Fourier_Ylm & rhs) const {
-  // Calculate product of two expansions
-  GTO_Fourier_Ylm ret;
-
-  for(size_t i=0;i<lhs.sphexp.size();i++)
-    for(size_t j=0;j<rhs.sphexp.size();j++) {
-      GTO_Fourier_Ylm_t hlp;
-      hlp.ang=mult(lhs.sphexp[i].ang,rhs.sphexp[j].ang);
-      hlp.pm=lhs.sphexp[i].pm+rhs.sphexp[j].pm;
-      hlp.z=lhs.sphexp[i].z+rhs.sphexp[j].z;
-      ret.addterm(hlp);
-    }
-  return ret;
-}
-
-
-bool operator<(const GTO_Fourier_Ylm_t & lhs, const GTO_Fourier_Ylm_t & rhs) {
-  if(lhs.pm<rhs.pm)
-    return 1;
-  else if(lhs.pm==rhs.pm)
-    return lhs.z<rhs.z;
-
-  return 0;
-}
-
-bool operator==(const GTO_Fourier_Ylm_t & lhs, const GTO_Fourier_Ylm_t & rhs) {
-  return (lhs.pm==rhs.pm) && (lhs.z==rhs.z);
-}
-
-
-GTO_Fourier_Ylm::GTO_Fourier_Ylm() {
-}
-
-GTO_Fourier_Ylm::GTO_Fourier_Ylm(int l, int m, int n, double zeta) {
-  // The Fourier transform of the basis function
-  GTO_Fourier transform(l,m,n,zeta);
-
-  // Get the result of the Fourier transform
-  std::vector<trans3d_t> trans(transform.get());
-
-  // Compute spherical harmonics expansions of px^l, py^m and pz^n
-  std::vector<SphericalExpansion> px, py, pz;
-
-  px.resize(l+1);
-  py.resize(m+1);
-  pz.resize(n+1);
-
-  // p_i^0 = 1 = \sqrt{4 \pi} Y_0^0
-  px[0].addylm(0,0,sqrt(4.0*M_PI));
-  py[0].addylm(0,0,sqrt(4.0*M_PI));
-  pz[0].addylm(0,0,sqrt(4.0*M_PI));
-
-  // px = p * sqrt{ 2 \pi / 3} * ( Y_1^{-1} - Y_1^1)
-  if(l>0) {
-    px[1].addylm(1,-1,sqrt(2.0*M_PI/3.0));
-    px[1].addylm(1,1,-sqrt(2.0*M_PI/3.0));
-  }
-  // py = ip * sqrt{ 2 \pi / 3} * ( Y_1^{-1} + Y_1^1 )
-  if(m>0) {
-    std::complex<double> hlp(0.0,sqrt(2.0*M_PI/3.0));
-    py[1].addylm(1,-1,hlp);
-    py[1].addylm(1,1,hlp);
-  }
-  // pz = p * sqrt{4 \pi / 3} Y_1^0
-  if(n>0)
-    pz[1].addylm(1,0,sqrt(4.0*M_PI/3.0));
-
-  // Form the rest of the transforms
-  for(int il=2;il<=l;il++)
-    px[il]=px[il-1]*px[1];
-  for(int im=2;im<=m;im++)
-    py[im]=py[im-1]*py[1];
-  for(int in=2;in<=n;in++)
-    pz[in]=pz[in-1]*pz[1];
-
-  // Now, add all necessary terms. Helper
-  GTO_Fourier_Ylm_t hlp;
-
-  for(size_t i=0;i<trans.size();i++) {
-    // Radial part is
-    hlp.pm=trans[i].l+trans[i].m+trans[i].n;
-    hlp.z=trans[i].z;
-    // Angular part is
-    hlp.ang=trans[i].c*px[trans[i].l]*py[trans[i].m]*pz[trans[i].n];
-    // Add the term
-    addterm(hlp);
-  }
-}
-
-GTO_Fourier_Ylm::~GTO_Fourier_Ylm() {
-}
-
-void GTO_Fourier_Ylm::addterm(const GTO_Fourier_Ylm_t & t) {
-  if(sphexp.size()==0) {
-    sphexp.push_back(t);
-  } else {
-    // Get upper bound
-    std::vector<GTO_Fourier_Ylm_t>::iterator high;
-    high=std::upper_bound(sphexp.begin(),sphexp.end(),t);
-    
-    // Corresponding index is
-    size_t ind=high-sphexp.begin();
-    
-    if(ind>0 && sphexp[ind-1]==t)
-      // Found it.
-      sphexp[ind-1].ang+=t.ang;
-    else {
-      // Term does not exist, add it
-      sphexp.insert(high,t);
-    }
-  }
-}
-
-void GTO_Fourier_Ylm::clean() {
-  for(size_t i=sphexp.size()-1;i<sphexp.size();i--) {
-    sphexp[i].ang.clean();
-    if(sphexp[i].ang.getN()==0) {
-      // Empty term, remove it.
-      sphexp.erase(sphexp.begin()+i);
-    }
-  }
-}
-
-
-void GTO_Fourier_Ylm::print() const {
-  for(size_t i=0;i<sphexp.size();i++) {
-    printf("Term %u: p^%i exp(-%e p^2), angular part\n",(unsigned int) i,sphexp[i].pm,sphexp[i].z);
-    sphexp[i].ang.print();
-  }
-}
-
-GTO_Fourier_Ylm GTO_Fourier_Ylm::conjugate() const {
-  // Returned combination
-  GTO_Fourier_Ylm ret(*this);
-
-  // Complex conjugate everything
-  for(size_t i=0;i<ret.sphexp.size();i++)
-    ret.sphexp[i].ang=ret.sphexp[i].ang.conjugate();
-
-  return ret;
-}
-
-std::vector<GTO_Fourier_Ylm_t> GTO_Fourier_Ylm::getexp() const {
-  return sphexp;
-}
-
-GTO_Fourier_Ylm GTO_Fourier_Ylm::operator*(const GTO_Fourier_Ylm & rhs) const {
-  // Returned object
-  GTO_Fourier_Ylm ret;
-
-  // Do multiplication
-  for(size_t i=0;i<sphexp.size();i++)
-    for(size_t j=0;j<rhs.sphexp.size();j++) {
-      GTO_Fourier_Ylm_t hlp;
-      hlp.ang=sphexp[i].ang*rhs.sphexp[j].ang;
-      hlp.pm=sphexp[i].pm+rhs.sphexp[j].pm;
-      hlp.z=sphexp[i].z+rhs.sphexp[j].z;
-      ret.addterm(hlp);
-    }
-
-  return ret;
-}
-
-GTO_Fourier_Ylm GTO_Fourier_Ylm::operator+(const GTO_Fourier_Ylm & rhs) const {
-  // Returned combination
-  GTO_Fourier_Ylm ret(*this);
-  ret+=rhs;
-
-  return ret;
-}
-
-GTO_Fourier_Ylm & GTO_Fourier_Ylm::operator+=(const GTO_Fourier_Ylm & rhs) {
-  // Add terms
-  for(size_t i=0;i<rhs.sphexp.size();i++)
-    addterm(rhs.sphexp[i]);
-
-  return *this;
-}
-
-GTO_Fourier_Ylm operator*(std::complex<double> fac, const GTO_Fourier_Ylm & func) {
-  // Returned value
-  GTO_Fourier_Ylm ret(func);
-
-  for(size_t i=0;i<ret.sphexp.size();i++)
-    ret.sphexp[i].ang*=fac;
-
-  return ret;
-}
-
-GTO_Fourier_Ylm operator*(double fac, const GTO_Fourier_Ylm & func) {
-  // Returned value
-  GTO_Fourier_Ylm ret(func);
-
-  for(size_t i=0;i<ret.sphexp.size();i++)
-    ret.sphexp[i].ang*=fac;
-
-  return ret;
-}
-
-
 CartesianExpansion::CartesianExpansion(int maxam) {
-  // Amount of elements per side of table is
-  N=maxam+1;
-  // Reserve space for elements
-  table.resize(N*N*N);
+  // Reserve memory for table
+  table.resize(maxam+1);
+  // and for individual results
+  for(int am=0;am<=maxam;am++)
+    table[am].resize((am+1)*(am+2)/2);
 
   // Compute spherical harmonics expansions of px^l, py^m and pz^n
   std::vector<SphericalExpansion> px, py, pz;
-
+  
   px.resize(maxam+1);
   py.resize(maxam+1);
   pz.resize(maxam+1);
-
+  
   // p_i^0 = 1 = \sqrt{4 \pi} Y_0^0
   px[0].addylm(0,0,sqrt(4.0*M_PI));
   py[0].addylm(0,0,sqrt(4.0*M_PI));
@@ -582,14 +390,14 @@ CartesianExpansion::CartesianExpansion(int maxam) {
 
   // px = p * sqrt{ 2 \pi / 3} * ( Y_1^{-1} - Y_1^1)
   if(maxam>0) {
-    px[1].addylm(1,-1,sqrt(2.0*M_PI/3.0));
-    px[1].addylm(1,1,-sqrt(2.0*M_PI/3.0));
+    px[1].addylm(1,-1, sqrt(2.0*M_PI/3.0));
+    px[1].addylm(1, 1,-sqrt(2.0*M_PI/3.0));
   }
   // py = ip * sqrt{ 2 \pi / 3} * ( Y_1^{-1} + Y_1^1 )
   if(maxam>0) {
     std::complex<double> hlp(0.0,sqrt(2.0*M_PI/3.0));
     py[1].addylm(1,-1,hlp);
-    py[1].addylm(1,1,hlp);
+    py[1].addylm(1, 1,hlp);
   }
   // pz = p * sqrt{4 \pi / 3} Y_1^0
   if(maxam>0)
@@ -598,25 +406,40 @@ CartesianExpansion::CartesianExpansion(int maxam) {
   // Form the rest of the transforms
   for(int il=2;il<=maxam;il++)
     px[il]=px[il-1]*px[1];
+
   for(int im=2;im<=maxam;im++)
     py[im]=py[im-1]*py[1];
+
   for(int in=2;in<=maxam;in++)
     pz[in]=pz[in-1]*pz[1];
 
-  // Fill table
-  for(int l=0;l<=maxam;l++)
-    for(int m=0;m<=maxam;m++)
-      for(int n=0;n<=maxam;n++)
-	table[ind(l,m,n)]=px[l]*py[m]*pz[n];
-}
+  // Fill table. Loop over angular momentum
+  for(int am=0;am<=maxam;am++) {
 
-size_t CartesianExpansion::ind(int l, int m, int n) const {
-  return (l*N+m)*N+n;
+    // Loop over functions
+    size_t ind=0;
+    for(int ii=0; ii<=am; ii++) {
+      int l = am - ii;
+      for(int jj=0; jj<=ii; jj++) {
+	int m = ii-jj;
+	int n = jj;
+
+	table[am][ind++]=px[l]*py[m]*pz[n];
+      }
+    }
+  }
 }
 
 CartesianExpansion::~CartesianExpansion() {
 }
 
 SphericalExpansion CartesianExpansion::get(int l, int m, int n) const {
-  return table[ind(l,m,n)];
+  if(l+m+n >= (int) table.size()) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Cartesian expansion table not big enough: maxam = " << (int) table.size()-1 << " am = " << l+m+n << " requested!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  return table[l+m+n][getind(l,m,n)];
 }
