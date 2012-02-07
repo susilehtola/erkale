@@ -17,7 +17,7 @@
 
 
 #include "spherical_harmonics.h"
-#include "../solidharmonics.h"
+#include "solidharmonics.h"
 
 #include <cmath>
 #include <cfloat>

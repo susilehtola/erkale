@@ -22,7 +22,7 @@ eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
 solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
 settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
 properties.cpp checkpoint.cpp atomguess.cpp external/storage.cpp
-gaunt.cpp lmgrid.cpp
+gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 # DFT stuff
 lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp)

@@ -20,7 +20,7 @@
 #include "lmgrid.h"
 
 // Compute values of spherical harmonics
-#include "emd/spherical_harmonics.h"
+#include "spherical_harmonics.h"
 #include "timer.h"
 
 // Check orthogonality of spherical harmonics
