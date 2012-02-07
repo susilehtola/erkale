@@ -5,8 +5,8 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Jussi Lehtola, 2010-2012
+ * Copyright (c) 2010-2012, Jussi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -15,6 +15,12 @@
  */
 
 #include "emd.h"
+#include "emd_gto.h"
+#include "emdcube.h"
+//include "gto_fourier_ylm.h"
+#include "spherical_expansion.h"
+#include "../solidharmonics.h"
+#include "spherical_harmonics.h"
 #include "checkpoint.h"
 #include "settings.h"
 #include "stringutil.h"
@@ -36,7 +42,7 @@ int main(int argc, char **argv) {
 #else
   printf("ERKALE - EMD from Hel, serial version.\n");
 #endif
-  printf("(c) Jussi Lehtola, 2010-2011.\n");
+  printf("(c) Jussi Lehtola, 2010-2012.\n");
   print_license();
 
   if(argc!=1 && argc!=2) {
@@ -45,7 +51,6 @@ int main(int argc, char **argv) {
   }
 
   Timer t;
-  t.print_time();
 
   // Parse settings
   Settings set;
@@ -77,18 +82,29 @@ int main(int argc, char **argv) {
 	   "J. Lehtola, M. Hakala, J. Vaara and K. Hämäläinen",		\
 	   "Calculation of isotropic Compton profiles with Gaussian basis sets", \
 	   "Phys. Chem. Chem. Phys 13 (2011), pp. 5630 - 5641.");
-    
+
+    // Construct EMD evaluator
     Timer temd;
-    EMD emd(basis,P);
+    GaussianEMDEvaluator eval(basis,P);
+    //    eval.print();
+
+    // and the EMD class
+    int Nel;
+    chkpt.read("Nel",Nel);
+
+    temd.set();
+    EMD emd(&eval, Nel);
     emd.initial_fill();
     emd.find_electrons();
     emd.optimize_moments();
     emd.save("emd.txt");
     emd.moments("moments.txt");
-    emd.compton_profile("compton.txt","compton-interp.txt");
+    emd.compton_profile("compton.txt");
+    emd.compton_profile_interp("compton-interp.txt");
     
     printf("Calculating isotropic EMD properties took %s.\n",temd.elapsed().c_str());
   }
+
   // Do EMD on a cube?
   if(stricmp(set.get_string("EMDCube"),"")!=0) {
     t.print_time();

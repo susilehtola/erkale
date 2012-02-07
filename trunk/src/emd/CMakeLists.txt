@@ -1,5 +1,5 @@
 add_library (liberkale_emd
-emd.cpp gto_fourier.cpp spherical_expansion.cpp spherical_harmonics.cpp )
+emd.cpp emd_gto.cpp emdcube.cpp gto_fourier.cpp spherical_expansion.cpp spherical_harmonics.cpp )
 # The name of the library is
 set_target_properties(liberkale_emd PROPERTIES OUTPUT_NAME "erkale_emd${SUFFIX}")
 
@@ -11,13 +11,11 @@ endif()
 
 install (TARGETS liberkale_emd DESTINATION lib${LIB_SUFFIX})
 
-
 # EMD executable
 add_executable (erkale_emd main.cpp)
 set_target_properties(erkale_emd PROPERTIES OUTPUT_NAME "erkale_emd${SUFFIX}")
-
-target_link_libraries(erkale_emd liberkale)
 target_link_libraries(erkale_emd liberkale_emd)
+target_link_libraries(erkale_emd liberkale)
 if(BUILD_SHARED_LIBS)
 else()
  target_link_libraries(erkale_emd ${GSL_LIBRARIES})

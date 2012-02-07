@@ -30,6 +30,8 @@ extern "C" {
 #include <gsl/gsl_sf_gamma.h>
   // For spline interpolation
 #include <gsl/gsl_spline.h>
+  // For hypergeometric functions
+#include <gsl/gsl_sf_hyperg.h>
 }
 
 double doublefact(int n) {
@@ -108,6 +110,15 @@ std::vector<double> boysF_arr(int mmax, double x) {
     F[m]=(2*x*F[m+1]+emx)/(2*m+1);
 
   return F;
+}
+
+double hyperg_1F1(double a, double b, double x) {
+  // Handle possible underflows with a Kummer transformation
+  if(x>=-500.0) {
+    return gsl_sf_hyperg_1F1(a,b,x);
+  } else {
+    return exp(x)*gsl_sf_hyperg_1F1(b-a,b,-x);
+  }
 }
 
 double choose(int m, int n) {
@@ -205,8 +216,9 @@ std::vector<double> spline_interpolation(const std::vector<double> & xt, const s
   gsl_interp_init(interp,&(xt[0]),&(yt[0]),xt.size());
   
   // Perform interpolation.
-  for(size_t i=0;i<x.size();i++)
+  for(size_t i=0;i<x.size();i++) {
     y[i]=gsl_interp_eval(interp,&(xt[0]),&(yt[0]),x[i],acc);
+  }
 
   // Free memory
   gsl_interp_accel_free(acc);

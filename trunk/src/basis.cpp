@@ -1263,6 +1263,10 @@ std::vector<contr_t> BasisSet::get_contr(size_t ind) const {
   return shells[ind].get_contr();
 }
 
+std::vector<contr_t> BasisSet::get_contr_normalized(size_t ind) const {
+  return shells[ind].get_contr_normalized();
+}
+
 std::vector<shellf_t> BasisSet::get_cart(size_t ind) const {
   return shells[ind].get_cart();
 }
@@ -2905,3 +2909,68 @@ double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t
 
   return dens;
 }
+
+
+std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
+  // Returned list of identical basis functions
+  std::vector< std::vector<size_t> > ret;
+
+  // Loop over shells
+  for(size_t ish=0;ish<shells.size();ish++) {
+    // Get exponents, contractions and cartesian functions on shell
+    std::vector<contr_t> shell_contr=shells[ish].get_contr();
+    std::vector<shellf_t> shell_cart=shells[ish].get_cart();
+
+    // Try to find the shell on the current list of identicals
+    bool found=0;
+    for(size_t iident=0;iident<ret.size();iident++) {
+
+      // Check first cartesian part.
+      std::vector<shellf_t> cmp_cart=shells[ret[iident][0]].get_cart();
+
+      if(shell_cart.size()==cmp_cart.size()) {
+	// Default value
+	found=1;
+
+	for(size_t icart=0;icart<shell_cart.size();icart++)
+	  if(shell_cart[icart].l!=cmp_cart[icart].l || shell_cart[icart].m!=cmp_cart[icart].m || shell_cart[icart].n!=cmp_cart[icart].n)
+	    found=0;
+
+	// Check that usage of spherical harmonics matches, too
+	if(shells[ish].lm_in_use() != shells[ret[iident][0]].lm_in_use())
+	  found=0;
+
+	// If cartesian parts match, check also exponents and contraction coefficients
+	if(found) {
+	  // Get exponents
+	  std::vector<contr_t> cmp_contr=shells[ret[iident][0]].get_contr();
+
+	  // Check exponents
+	  if(shell_contr.size()==cmp_contr.size()) {
+	    for(size_t ic=0;ic<shell_contr.size();ic++)
+	      if(!(shell_contr[ic]==cmp_contr[ic]))
+		found=0;
+	  } else
+	    found=0;
+	}
+
+	// If everything matches, add the function to the current list.
+	if(found) {
+	  ret[iident].push_back(ish);
+	  // Stop iteration over list of identical functions
+	  break;
+	}
+      }
+    }
+
+    // If the shell was not found on the list of identicals, add it
+    if(!found) {
+      std::vector<size_t> hlp;
+      hlp.push_back(ish);
+      ret.push_back(hlp);
+    }
+  }
+
+  return ret;
+}
+

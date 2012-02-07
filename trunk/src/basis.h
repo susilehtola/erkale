@@ -134,7 +134,7 @@ typedef struct {
 } contr_t;
 /// Comparison for contractions
 bool operator<(const contr_t & lhs, const contr_t & rhs);
-/// Comparison for contractions
+/// Identity for contractions
 bool operator==(const contr_t & lhs, const contr_t & rhs);
 
 #include "basislibrary.h"
@@ -266,6 +266,8 @@ class BasisSet {
 
   /// Get exponential contraction of the ind:th shell
   std::vector<contr_t> get_contr(size_t ind) const;
+  /// Get normalized exponential contraction of the ind:th shell
+  std::vector<contr_t> get_contr_normalized(size_t ind) const;
   /// Get the cartesian functions on the ind:th shell
   std::vector<shellf_t> get_cart(size_t ind) const;
 
@@ -376,6 +378,9 @@ class BasisSet {
 
   /// Are the basis sets the same?
   bool operator==(const BasisSet & rhs) const;
+
+  /// Find "identical" shells in basis set.
+  std::vector< std::vector<size_t> > find_identical_shells() const;
 };
 
 /// Compute a shell of ERIs, transformed into spherical basis if necessary

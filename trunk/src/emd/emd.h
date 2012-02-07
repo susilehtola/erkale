@@ -1,12 +1,12 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Jussi Lehtola, 2010-2012
+ * Copyright (c) 2010-2012, Jussi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -14,125 +14,182 @@
  * of the License, or (at your option) any later version.
  */
 
-#ifndef ERKALE_EMD
-#define ERKALE_EMD
+#ifndef ERKALE_RADEMD
+#define ERKALE_RADEMD
 
-#include <cstdio>
+#include "basis.h"
+#include "global.h"
+#include "../emd/spherical_expansion.h"
+
+#include <complex>
 #include <vector>
-#include "../basis.h"
-#include "gto_fourier.h"
+#include <armadillo>
 
-/// One-center terms in spherical integral
-typedef struct {
-  /// Expansion coefficient
-  double c;
-  /// p^pm
-  int pm;
-  /// exp(-z*p^2)
-  double z;
-} onecenter_t;
-
-/// Sorting operator
-bool operator<(const onecenter_t & lhs, const onecenter_t & rhs);
-/// Addition operator
-bool operator==(const onecenter_t & lhs, const onecenter_t & rhs);
-
-/// Two-center contraction
-typedef struct {
-  /// Delta r_i
-  double dr;
-  /// Coefficient
-  double c;
-} twocenter_contr_t;
-
-/// Sorting operator
-bool operator<(const twocenter_contr_t & lhs, const twocenter_contr_t & rhs);
-/// Addition operator
-bool operator==(const twocenter_contr_t & lhs, const twocenter_contr_t & rhs);
-
-/// Two-center terms
-typedef struct {
-  /// List of contractions
-  std::vector<twocenter_contr_t> c;
-  /// j_l (p * dr_i)
+/// Class for (basis set independent) normalized radial wfs
+class RadialFourier {
+ protected:
+  /// l value
   int l;
-  /// p^pm
-  int pm;
-  /// exp(-z*p^2)
-  double z;
-} twocenter_t;
+
+ public:
+  /// Constructor
+  RadialFourier(int l);
+  /// Destructor
+  virtual ~RadialFourier();
+
+  /// Get l value
+  int getl() const;
+  // Print expansion
+  virtual void print() const = 0;
+
+  /**
+   * Calculate radial function at p. Must be overridden in the class
+   * that implements the function.
+   */
+  virtual std::complex<double> get(double p) const = 0;
+};
+
+/// Coupling coefficient
+typedef struct {
+  /// l
+  int l;
+  /// l'
+  int lp;
+
+  // couple to
+
+  /// L
+  int L;
+  /// M
+  int M;
+
+  /// The coupling coefficient
+  std::complex<double> c;
+} coupl_coeff_t;
 
 /// Sorting operator
-bool operator<(const twocenter_t & lhs, const twocenter_t & rhs);
+bool operator<(const coupl_coeff_t & lhs, const coupl_coeff_t & rhs);
 /// Addition operator
-bool operator==(const twocenter_t & lhs, const twocenter_t & rhs);
+bool operator==(const coupl_coeff_t & lhs, const coupl_coeff_t & rhs);
 
-/// Find out basis functions of the same type
-std::vector< std::vector<size_t> > find_identical_shells(const BasisSet & bas);
+/// Coupling list
+typedef struct {
+  /// L
+  int L;
+  /// M
+  int M;
+  /// Coefficient
+  std::complex<double> c;
+} total_coupl_t;
 
-/**
- * \class EMDEvaluator
- *
- * \brief Functions for evaluating the momentum density.
- *
- * This class evaluates the momentum density from the given density
- * matrix, using the procedure described in
- *
- * J. Lehtola, M. Hakala, J. Vaara and K. Hämäläinen, "Calculation of
- * isotropic Compton profiles with Gaussian basis sets",
- * Phys. Chem. Chem. Phys 13 (2011), pp. 5630 - 5641.
- *
- * \author Jussi Lehtola
- * \date 2011/03/08 17:13
- */
+/// Sorting operator
+bool operator<(const total_coupl_t & lhs, const total_coupl_t & rhs);
+/// Addition operator
+bool operator==(const total_coupl_t & lhs, const total_coupl_t & rhs);
 
+/// Add coupling to vector
+void add_coupling_term(std::vector<total_coupl_t> & v, total_coupl_t & t);
+
+/// Value of radial function
+typedef struct {
+  /// l
+  int l;
+  /// Value
+  std::complex<double> f;
+} radf_val_t;
+
+/// Radial EMD evaluator
 class EMDEvaluator {
-  /// List of two-center terms
-  std::vector<twocenter_t> twoc;
-  /// List of one-center terms
-  std::vector<onecenter_t> onec;
+  /**
+   * Lists of identical functions (same radial and angular parts),
+   * only difference comes from phase factor (different origins)
+   */
+  std::vector< std::vector<size_t> > idfuncs;
+  /// The coupling coefficients of the nonequivalent functions
+  std::vector< std::vector<coupl_coeff_t> > cc;
 
-  /// Add one-center term
-  void add_term(const onecenter_t & one);
-  /// Add two-center term
-  void add_term(const twocenter_t & two);
-  /// Add contraction in two-center term
-  void add_contr(size_t ind, const twocenter_contr_t & twoc);
+  /// The locations of the functions on the atoms (Nbas)
+  std::vector<size_t> loc;
 
-  /// Evaluate one-center terms at p
-  double eval_onec(double p) const;
-  /// Evaluate two-center terms at p
-  double eval_twoc(double p) const;
+  /// The number of centers
+  size_t Nat;
+  /// The distances between the functions' origins (Nat x Nat)
+  std::vector<double> dist;
+  /// Spherical harmonics values, complex conjugated [Nat x Nat] [(L,M)]
+  std::vector< std::vector< std::complex<double> > > YLM;
+
+  /// The density matrix
+  arma::mat P;
+
+  /// Maximum value of L
+  int Lmax;
+
+  /// Computes the distance table
+  void distance_table(const std::vector<coords_t> & coord);
+
+  /// Computes the coupling coefficients
+  void compute_coefficients(const std::vector< std::vector<ylmcoeff_t> > & clm);
+
+  /// Add coupling coefficient
+  void add_coupling(size_t ig, size_t jg, coupl_coeff_t c);
+
+  /// Get the coupling constants for L=|l-lp|, ..., l+lp.
+  std::vector<total_coupl_t> get_coupling(size_t ig, size_t jg, int l, int lp) const;
+
+  /// Computes the ig:th radial function
+  std::vector<radf_val_t> get_radial(size_t ig, double p) const;
+
+  /// Get the total coupling (incl. radial function)
+  std::vector<total_coupl_t> get_total_coupling(size_t ig, size_t jg, double p) const;
+
+ protected:
+  /**
+   * Radial parts for each non-equivalent function. Needs a pointer
+   * array, since otherwise the objects will be stripped to
+   * RadialFourier.
+   *
+   * This array needs to be constructed in a basis-set specific subclass.
+   */
+  std::vector< std::vector<RadialFourier *> > rad;
 
  public:
   /// Dummy constructor
   EMDEvaluator();
-  /// Constructor
-  EMDEvaluator(const BasisSet & bas, const arma::mat & P);
+
+  /**
+   * Construct evaluator.
+   *
+   * idfuncs is the list of equivalent functions, idfuncs[ieq][1..N] = ibf
+   * clm gives the lm expansion of the nonequivalent radial functions
+   *
+   * loc gives indices of centers of all of the basis functions
+   * coord are coordinates of the individual atoms (centers)
+   * P is the density matrix
+   *
+   * The radial functions need to be separately initialized.
+   */
+  EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv);
+
   /// Destructor
   ~EMDEvaluator();
 
-  /// Evaluate radial electron momentum density at p
-  double eval(double p) const;
-  
-  /// Get amount of one-center terms
-  size_t getN_onec() const;
-  /// Get amount of two-center terms
-  size_t getN_twoc() const;
-  /// Get total amount of two-center terms
-  size_t getN_twoc_total() const;
-
-  /// Print info
+  /// Print the evaluator
   void print() const;
-  
-  /// Clean terms with zero contribution
-  void clean();
+  /// Check norms of radial functions
+  void check_norm() const;
+
+  /// Evaluate radial EMD at p
+  double get(double p) const;
 };
+
+/// Evaluate Bessel functions j_l(pr_i), return j(pr_i,l)
+arma::mat bessel_array(const std::vector<double> & args, int lmax);
+
 
 /// Structure for holding radial EMD
 typedef struct {
   /// Radial momentum
-  double p; 
+  double p;
   /// Electron momentum density at p
   double d;
 } emd_t;
@@ -158,44 +215,49 @@ typedef struct {
 class EMD {
   /// List of radial densities
   std::vector<emd_t> dens;
-  /// Number of electrons
-  int Nel;
-  /// Norm of density matrix
-  double dmnorm;
-
-  /// Evaluator
-  EMDEvaluator eval;
-
   /// Add 4 points at ind
   void add4(size_t ind);
+
+ protected:
+  /// Number of electrons
+  int Nel;
+
+  /// Evaluator
+  const EMDEvaluator * eval;
+
  public:
   /// Constructor
-  EMD(const BasisSet & bas, const arma::mat & P, bool verbose=1);
+  EMD(const EMDEvaluator * eval, int Nel);
   /// Destructor
   ~EMD();
 
   /// Initial filling of grid
-  void initial_fill(bool verbose=1);
+  void initial_fill(bool verbose=true);
+  /// Fill regions where density changes by huge amounts
+  void complete_fill();
+
   /// Continue filling until number of electrons is reproduced within tolerance
-  void find_electrons(bool verbose=1, double tol=1e-4);
+  void find_electrons(bool verbose=true, double tol=1e-4);
   /// Optimize physical moments of EMD within tolerance
-  void optimize_moments(bool verbose=1, double tol=1e-10);
+  void optimize_moments(bool verbose=true, double tol=1e-10);
 
   /// Get EMD
   std::vector<emd_t> get() const;
 
   /// Save values of momentum density
   void save(const char * fname) const;
+
+  /// Calculate moments of momentum density
+  arma::mat moments() const;
   /// Save moments of momentum density
   void moments(const char * fname) const;
-  /// Calculate Compton profile in "raw" and interpolated form, input are filenames
-  void compton_profile(const char * raw, const char * interp) const;
+
+  /// Calculate Compton profile
+  arma::mat compton_profile() const;
+  /// Save Compton profile in "raw" form
+  void compton_profile(const char * raw) const;
+  /// Save Compton profile in interpolated form
+  void compton_profile_interp(const char * interp) const;
 };
-
-/**
- * Compute the EMD in a cube, save output to emdcube.dat
- */
-void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & px, const std::vector<double> & py, const std::vector<double> & pz);
-
 
 #endif

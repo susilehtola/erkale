@@ -123,9 +123,6 @@ SphericalExpansion operator*(std::complex<double> fac, const SphericalExpansion 
 /// Scale expansion by fac
 SphericalExpansion operator*(double fac, const SphericalExpansion & func);
 
-// Forward declaration
-class GTO_Fourier_Ylm;
-
 /**
  * \class SphericalExpansionMultiplicationTable
  *
@@ -145,7 +142,7 @@ class SphericalExpansionMultiplicationTable {
   int maxam;
  public:
   /// Construct multiplication table that supports spherical harmonics up to maxam
-  SphericalExpansionMultiplicationTable(int maxam=6);
+  SphericalExpansionMultiplicationTable(int maxam=max_am);
   /// Destructor
   ~SphericalExpansionMultiplicationTable();
 
@@ -154,93 +151,12 @@ class SphericalExpansionMultiplicationTable {
 
   /// Multiplication operator
   SphericalExpansion mult(const SphericalExpansion & lhs, const SphericalExpansion & rhs) const;
-  /// Multiplication operator
-  GTO_Fourier_Ylm mult(const GTO_Fourier_Ylm & lhs, const GTO_Fourier_Ylm & rhs) const;
 };
-
-/// Spherical harmonics expansion of Fourier transform of GTO
-typedef struct {
-  /// Angular part
-  SphericalExpansion ang;
-  /// p^pm
-  int pm;
-  /// exp(-z*p^2);
-  double z;
-} GTO_Fourier_Ylm_t;
-
-/// Comparison operator for sorting
-bool operator<(const GTO_Fourier_Ylm_t & lhs, const GTO_Fourier_Ylm_t & rhs);
-/// Comparison operator for addition
-bool operator==(const GTO_Fourier_Ylm_t & lhs, const GTO_Fourier_Ylm_t & rhs);
-
-
-/**
- * \class GTO_Fourier_Ylm
- *
- * \brief Routines for expanding the Fourier transforms of GTOs in
- * spherical harmonics
- *
- * The expansion in spherical harmonics is used to compute the angular
- * integral over products of Gaussian Type Orbital basis functions.
- *
- * For a reference, see
- *
- * J. Lehtola, M. Hakala, J. Vaara and K. Hämäläinen, "Calculation of
- * isotropic Compton profiles with Gaussian basis sets",
- * Phys. Chem. Chem. Phys. 13 (2011), pp. 5630 - 5641.
- *
- * \author Jussi Lehtola
- * \date 2011/03/07 15:31
- */
-
-class GTO_Fourier_Ylm {
-  /// Spherical harmonics expansion of Fourier transform of GTO
-  std::vector<GTO_Fourier_Ylm_t> sphexp;
-
- public:
-  /// Constructor
-  GTO_Fourier_Ylm();
-  /// Compute Fourier transform of \f$ x^l y^m z^n \exp(-\zeta*r^2) \f$ and expand it in spherical harmonics
-  GTO_Fourier_Ylm(int l, int m, int n, double zeta);
-  /// Destructor
-  ~GTO_Fourier_Ylm();
-
-  /// Add term to expansion
-  void addterm(const GTO_Fourier_Ylm_t & term);
-  /// Clean expansion by dropping terms with zero contribution
-  void clean();
-  /// Print out expansion
-  void print() const;
- 
-  /// Get complex conjugate of expansion
-  GTO_Fourier_Ylm conjugate() const;
-  /// Get expansion in spherical harmonics
-  std::vector<GTO_Fourier_Ylm_t> getexp() const;
-
-  /// Multiplication operator
-  GTO_Fourier_Ylm operator*(const GTO_Fourier_Ylm & rhs) const;
-  /// Addition operator
-  GTO_Fourier_Ylm operator+(const GTO_Fourier_Ylm & rhs) const;
-  /// Increment operator
-  GTO_Fourier_Ylm & operator+=(const GTO_Fourier_Ylm & rhs);
-
-  friend GTO_Fourier_Ylm operator*(std::complex<double> fac, const GTO_Fourier_Ylm & func);
-  friend GTO_Fourier_Ylm operator*(double fac, const GTO_Fourier_Ylm & func);
-  friend class SphericalExpansionMultiplicationTable;
-};
-
-/// Scale expansion by factor fac
-GTO_Fourier_Ylm operator*(std::complex<double> fac, const GTO_Fourier_Ylm & func);
-/// Scale expansion by factor fac
-GTO_Fourier_Ylm operator*(double fac, const GTO_Fourier_Ylm & func);
-
 
 /// Spherical expansion of px^l py^m pz^n
 class CartesianExpansion {
-  std::vector<SphericalExpansion> table;
-
-  /// Length of side (am+1)
-  int N;
+  // Expansions of shells, table[l+m+n][ind(l,m,n)]
+  std::vector< std::vector<SphericalExpansion> > table;
 
   /// Get index of element at (l,m,n)
   size_t ind(int l, int m, int n) const;

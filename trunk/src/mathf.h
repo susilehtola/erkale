@@ -42,6 +42,9 @@ double boysF(int m, double x);
 /// Computes an array of Boys function
 std::vector<double> boysF_arr(int mmax, double x);
 
+/// Computes the confluent hypergeometric function
+double hyperg_1F1(double a, double b, double x);
+
 /// Computes the binomial coefficient
 double choose(int m, int n);
 

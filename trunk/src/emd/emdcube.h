@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -14,18 +14,16 @@
  * of the License, or (at your option) any later version.
  */
 
+#ifndef ERKALE_EMDCUBE
+#define ERKALE_EMDCUBE
 
-
-#ifndef ERKALE_SPHHARM
-#define ERKALE_SPHHARM
-
-#include <complex>
 #include <vector>
+#include "../basis.h"
 
-/// Calculate value of \f$ Y_{l}^{m} (\cos \theta, \phi) = (-1)^m \sqrt{ \frac {2l +1} {4 \pi} \frac {(l-m)!} {(l+m)!} } P_l^m (\cos \theta) e^{i m \phi} \f$
-std::complex<double> spherical_harmonics(int l, int m, double cth, double phi);
+/**
+ * Compute the EMD in a cube, save output to emdcube.dat
+ */
+void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & px, const std::vector<double> & py, const std::vector<double> & pz);
 
-/// Calculate expansion coefficients for cartesian terms from solid harmonics expansion
-std::vector< std::complex<double> > cplx_Ylm_coeff(int l, int m);
 
 #endif
