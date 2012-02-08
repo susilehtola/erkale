@@ -57,6 +57,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   set.add_bool("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", true);
   set.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
+  set.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4-6","");
 
   if(argc==2)
     set.parse(argv[1]);
@@ -73,6 +74,78 @@ int main(int argc, char **argv) {
   // Load density matrix
   arma::mat P;
   chkpt.read("P",P);
+
+  // Compute orbital EMDs?
+  if(set.get_string("EMDOrbitals")!="") {
+    // Get orbitals
+    std::vector<std::string> orbs=splitline(set.get_string("EMDOrbitals"));
+
+    // Polarized calculation?
+    bool restr;
+    chkpt.read("Restricted",restr);
+    if(restr!= (orbs.size()==1))
+      throw std::runtime_error("Invalid occupancies for spin alpha and beta!\n");
+
+    for(size_t ispin=0;ispin<orbs.size();ispin++) {
+      // Indices of orbitals to include.
+      std::vector<size_t> idx=parse_range(orbs[ispin]);
+      // Change into C++ indexing
+      for(size_t i=0;i<idx.size();i++)
+	idx[i]--;
+
+      // Read orbitals
+      arma::mat C;
+      if(restr)
+	chkpt.read("C",C);
+      else {
+	if(ispin==0)
+	  chkpt.read("Ca",C);
+	else
+	  chkpt.read("Cb",C);
+      }
+	
+      for(size_t i=0;i<idx.size();i++) {
+	// Names of output files
+	char emdname[80];
+	char momname[80];
+	char Jname[80];
+	char Jintname[80];
+
+	if(restr) {
+	  sprintf(emdname,"emd-%i.txt",(int) idx[i]+1);
+	  sprintf(momname,"moments-%i.txt",(int) idx[i]+1);
+	  sprintf(Jname,"compton-%i.txt",(int) idx[i]+1);
+	  sprintf(Jintname,"compton-interp-%i.txt",(int) idx[i]+1);
+	} else {
+	  if(ispin==0) {
+	    sprintf(emdname,"emd-a-%i.txt",(int) idx[i]+1);
+	    sprintf(momname,"moments-a-%i.txt",(int) idx[i]+1);
+	    sprintf(Jname,"compton-a-%i.txt",(int) idx[i]+1);
+	    sprintf(Jintname,"compton-interp-a-%i.txt",(int) idx[i]+1);
+	  } else {
+	    sprintf(emdname,"emd-b-%i.txt",(int) idx[i]+1);
+	    sprintf(momname,"moments-b-%i.txt",(int) idx[i]+1);
+	    sprintf(Jname,"compton-b-%i.txt",(int) idx[i]+1);
+	    sprintf(Jintname,"compton-interp-b-%i.txt",(int) idx[i]+1);
+	  }
+	}
+
+	// Generate dummy density matrix
+	arma::mat Pdum=C.col(idx[i])*arma::trans(C.col(idx[i]));
+
+	Timer temd;
+	GaussianEMDEvaluator eval(basis,Pdum);
+	EMD emd(&eval, 1);
+	emd.initial_fill();
+	emd.find_electrons();
+	emd.optimize_moments();
+	emd.save(emdname);
+	emd.moments(momname);
+	emd.compton_profile(Jname);
+	emd.compton_profile_interp(Jintname);	  
+      }
+    }
+  }
   
   if(set.get_bool("DoEMD")) {
     t.print_time();
