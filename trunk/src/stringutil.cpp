@@ -387,6 +387,10 @@ std::vector<size_t> parse_range(const std::string & in) {
       throw std::runtime_error(oss.str());
     }
 
+    if(dash.size()==0) {
+      // No number given.
+      continue;
+    }
     if(dash.size()==1) {
       // Only a single number given.
       ret.push_back(readint(dash[0]));
