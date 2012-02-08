@@ -204,7 +204,7 @@ int main(int argc, char **argv) {
     // Solver
     SCF solver(basis,set,chkpt);
 
-    if(hf) {
+    if(hf || rohf) {
       // Solve restricted Hartree-Fock
       solver.RHF(sol,occs,conv);
     } else {
