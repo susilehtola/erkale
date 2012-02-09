@@ -101,17 +101,17 @@ std::string Timer::elapsed() const {
   time(&stop);
   gettimeofday(&tstop,NULL);
 
-  int isecs=tstop.tv_sec-tstart.tv_sec;
+  time_t isecs=tstop.tv_sec-tstart.tv_sec;
 
   // Minute is 60 sec
-  int min=60;
+  time_t min=60;
   // Hour is 60 minutes
-  int hour=60*min;
+  time_t hour=60*min;
   // Day is 24 hours
-  int day=24*hour;
+  time_t day=24*hour;
 
   // Compute number of days
-  int days=(int) trunc(isecs/day);
+  time_t days=(int) trunc(isecs/day);
   if(days) {
     isecs-=days*day;
 
@@ -119,7 +119,7 @@ std::string Timer::elapsed() const {
   }
   
   // Compute number of hours
-  int hours=(int) trunc(isecs/hour);
+  time_t hours=(int) trunc(isecs/hour);
   if(hours) {
     isecs-=hours*hour;
 
@@ -132,7 +132,7 @@ std::string Timer::elapsed() const {
   }
 
   // Compute number of minutes
-  int mins=(int) trunc(isecs/min);
+  time_t mins=(int) trunc(isecs/min);
   if(mins) {
     isecs-=mins*min;
 
