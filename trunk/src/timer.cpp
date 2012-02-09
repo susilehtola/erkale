@@ -111,7 +111,7 @@ std::string Timer::elapsed() const {
   time_t day=24*hour;
 
   // Compute number of days
-  time_t days=(int) trunc(isecs/day);
+  time_t days=(time_t) trunc(isecs/day);
   if(days) {
     isecs-=days*day;
 
@@ -119,7 +119,7 @@ std::string Timer::elapsed() const {
   }
   
   // Compute number of hours
-  time_t hours=(int) trunc(isecs/hour);
+  time_t hours=(time_t) trunc(isecs/hour);
   if(hours) {
     isecs-=hours*hour;
 
@@ -132,7 +132,7 @@ std::string Timer::elapsed() const {
   }
 
   // Compute number of minutes
-  time_t mins=(int) trunc(isecs/min);
+  time_t mins=(time_t) trunc(isecs/min);
   if(mins) {
     isecs-=mins*min;
 
