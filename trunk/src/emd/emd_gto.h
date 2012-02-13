@@ -61,6 +61,8 @@ class GaussianEMDEvaluator : public EMDEvaluator {
   /// Update the pointer lists
   void update_pointers();
  public:
+  /// Dummy constructor
+  GaussianEMDEvaluator();
   /// Constructor
   GaussianEMDEvaluator(const BasisSet & bas, const arma::mat & P);
   /// Copy constructor

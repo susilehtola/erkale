@@ -266,6 +266,9 @@ std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas) {
   return ret;
 }
 
+GaussianEMDEvaluator::GaussianEMDEvaluator() {
+}
+
 GaussianEMDEvaluator::GaussianEMDEvaluator(const GaussianEMDEvaluator & rhs) {
   *this=rhs;
 }
