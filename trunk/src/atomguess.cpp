@@ -42,6 +42,7 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
   set.add_scf_settings();
   set.set_bool("Verbose",false);
   set.set_bool("CoreGuess",true);
+  set.set_int("MaxIter",200);
 
   if(verbose) {
     printf("Performing atomic guess for atoms:\n");
@@ -65,26 +66,49 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
     nucleus_t nuc=basis.get_nucleus(idnuc[i][0]);
     // Set number
     nuc.ind=0;
+    nuc.r.x=0.0;
+    nuc.r.y=0.0;
+    nuc.r.z=0.0;
 
     // Construct the basis set
     BasisSet atbas(1,set);
     // Add the nucleus
     atbas.add_nucleus(nuc);
 
-    // Add the shells
+    // Add the shells relevant for a single atom.
+    int ammax;
+    if(nuc.Z<5)
+      // Only s electrons up to beryllium
+      ammax=0;
+    else if(nuc.Z<21)
+      // s and p electrons
+      ammax=1;
+    else
+      // s, p and d electrons
+      ammax=2;
+    
     std::vector<GaussianShell> shells=basis.get_funcs(idnuc[i][0]);
-    for(size_t ish=0;ish<shells.size();ish++)
+    // Indices of shells included
+    std::vector<size_t> shellidx;
+    for(size_t ish=0;ish<shells.size();ish++) {
       // Add shell on zeroth atom, don't sort
-      atbas.add_shell(0,shells[ish],false);
+      if(shells[ish].get_am()<=ammax) {
+	printf("Added shell with am = %i on nucleus %i.\n",shells[ish].get_am(),(int) idnuc[i][0]);
+	atbas.add_shell(0,shells[ish],false);
+	shellidx.push_back(ish);
+      }
+    }
 
     // Finalize basis set
     atbas.finalize();
+    atbas.print(true);
 
     // Determine ground state
     gs_conf_t gs=get_ground_state(nuc.Z);
 
     // Set multiplicity
     set.set_int("Multiplicity",gs.mult);
+    set.print();
 
     // Checkpoint
     Checkpoint chkpt(TEMPFILE,true);
@@ -92,10 +116,11 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
     // Solver
     SCF solver(atbas,set,chkpt);
 
+    // Use more relaxed convergence settings
     convergence_t conv;
-    conv.deltaEmax=set.get_double("DeltaEmax");
-    conv.deltaPmax=set.get_double("DeltaPmax");
-    conv.deltaPrms=set.get_double("DeltaPrms");
+    conv.deltaEmax=1e-6;
+    conv.deltaPmax=1e-5;
+    conv.deltaPrms=1e-6;
 
     // Count number of electrons
     int Nel_alpha;
@@ -119,13 +144,20 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
 	  std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
 
 	  // Store density
-	  P.submat(idsh[ish].get_first_ind(),idsh[jsh].get_first_ind(),idsh[ish].get_last_ind(),idsh[jsh].get_last_ind())=sol.P.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
+	  P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=sol.P.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
 	}
       }
 
     if(verbose)
       printf(" (%s)\n",tsol.elapsed().c_str());
   }
+
+  // Check that density matrix contains the right amount of electrons
+  arma::mat S=basis.overlap();
+  int Neltot=basis.Ztot()-set.get_int("Charge");
+  double Nel=arma::trace(P*S);
+  if(fabs(Nel-Neltot)/Neltot*100>1e-10)
+    fprintf(stderr,"Nel = %i, P contains %f electrons, difference %e.\n",Neltot,Nel,Nel-Neltot);
 
   if(verbose)
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
