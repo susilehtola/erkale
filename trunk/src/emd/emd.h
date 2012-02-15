@@ -98,6 +98,14 @@ typedef struct {
   std::complex<double> f;
 } radf_val_t;
 
+/// List of identical functions
+typedef struct {
+  /// first index
+  size_t i;
+  /// second index
+  size_t j;
+} noneqradf_t;
+
 /// Radial EMD evaluator
 class EMDEvaluator {
   /**

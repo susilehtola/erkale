@@ -58,11 +58,11 @@ std::complex<double> RadialGaussian::get(double p) const {
   if(lambda==l) {
     // Pure spherical harmonics.
     for(size_t i=0;i<c.size();i++)
-      ret+=c[i].c*pow(c[i].z,-l/2.0-3.0/4.0)*exp(-p*p/(4.0*c[i].z));
+      ret+=c[i].c*exp(-p*p/(4.0*c[i].z));
   } else {
     // Mixed set.
     for(size_t i=0;i<c.size();i++)
-      ret+=c[i].c*pow(c[i].z,-l/2.0-3.0/4.0)*hyperg_1F1((l+lambda)/2.0+1.5,l+1.5,-p*p/(4.0*c[i].z));
+      ret+=c[i].c*hyperg_1F1((l+lambda)/2.0+1.5,l+1.5,-p*p/(4.0*c[i].z));
 
     ret*=pow(sqrt(2.0),lambda-l)*doublefact(l+lambda+1)/doublefact(2*l+1);
   }
@@ -233,7 +233,10 @@ std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas) {
 
       // Add the contractions.
       for(size_t i=0;i<c.size();i++) {
-	help.add_term(c[i]);
+	contr_t term;
+	term.z=c[i].z;
+	term.c=c[i].c*pow(c[i].z,-am/2.0-3.0/4.0);
+	help.add_term(term);
       }
       rad.push_back(help);
 
@@ -251,7 +254,10 @@ std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas) {
 
 	// Add the contractions.
 	for(size_t i=0;i<c.size();i++) {
-	  help.add_term(c[i]);
+	  contr_t term;
+	  term.z=c[i].z;
+	  term.c=c[i].c*pow(c[i].z,-l/2.0-3.0/4.0);
+	  help.add_term(term);
 	}
 	// and add the term
 	rad.push_back(help);
