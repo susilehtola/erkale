@@ -688,7 +688,7 @@ int main(int argc, char **argv) {
   EMD emd(&eval, Nel);
   emd.initial_fill();
   emd.find_electrons();
-  emd.optimize_moments(true,1e-8);
+  emd.optimize_moments(true,1e-7);
   emd.save("emd.txt");
   emd.moments("moments.txt");
   emd.compton_profile("compton.txt");
