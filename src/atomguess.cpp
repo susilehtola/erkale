@@ -93,7 +93,6 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
     for(size_t ish=0;ish<shells.size();ish++) {
       // Add shell on zeroth atom, don't sort
       if(shells[ish].get_am()<=ammax) {
-	printf("Added shell with am = %i on nucleus %i.\n",shells[ish].get_am(),(int) idnuc[i][0]);
 	atbas.add_shell(0,shells[ish],false);
 	shellidx.push_back(ish);
       }
@@ -101,7 +100,6 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
 
     // Finalize basis set
     atbas.finalize();
-    atbas.print(true);
 
     // Determine ground state
     gs_conf_t gs=get_ground_state(nuc.Z);
