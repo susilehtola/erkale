@@ -108,7 +108,6 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
 
     // Set multiplicity
     set.set_int("Multiplicity",gs.mult);
-    set.print();
 
     // Checkpoint
     Checkpoint chkpt(TEMPFILE,true);
