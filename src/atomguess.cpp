@@ -57,10 +57,12 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
 
     Timer tsol;
 
-    printf("\t");
-    for(size_t iid=0;iid<idnuc[i].size();iid++)
-      printf("%i ",(int) idnuc[i][iid]+1);
-    fflush(stdout);
+    if(verbose) {
+      printf("\t");
+      for(size_t iid=0;iid<idnuc[i].size();iid++)
+	printf("%i ",(int) idnuc[i][iid]+1);
+      fflush(stdout);
+    }
 
     // Nucleus is
     nucleus_t nuc=basis.get_nucleus(idnuc[i][0]);
