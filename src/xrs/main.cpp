@@ -818,7 +818,7 @@ int main(int argc, char **argv) {
 
   set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false); 
   set.add_bool("XRSFullhole","Run full core-hole calculation",false);
-  set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3-5,10","");
+  set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3:5,10","");
   set.add_double("XRSGridTol","DFT grid tolerance in double basis set calculation",1e-4);
 
   set.add_string("XRSQval","List or range of Q values to compute","");
