@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   set.add_bool("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", true);
   set.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
-  set.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4-6","");
+  set.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4:6","");
 
   if(argc==2)
     set.parse(argv[1]);

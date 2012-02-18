@@ -377,8 +377,8 @@ std::vector<size_t> parse_range(const std::string & in) {
   // First break this wrt commas
   std::vector<std::string> comma=parse(in,",");
   for(size_t ic=0;ic<comma.size();ic++) {
-    // Now we can break wrt dashes.
-    std::vector<std::string> dash=parse(comma[ic],"-");
+    // Now we can break wrt semicolons
+    std::vector<std::string> dash=parse(comma[ic],":");
 
     if(dash.size()>2) {
       ERROR_INFO();
