@@ -418,7 +418,7 @@ void print_gradient(const gsl_vector *x, void * pars) {
   gsl_vector_free(gv);
 }
 
-std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n) {
+std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n, bool verbose, double *mog) {
   // Time minimization
   Timer tmin;
 
@@ -465,10 +465,12 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   Timer t;
 
   // Legend
-  printf("iter ");
-  for(int i=0;i<Nf;i++)
-    printf(" e%-3i ",i+1);
-  printf("mog\n");
+  if(verbose) {
+    printf("iter ");
+    for(int i=0;i<Nf;i++)
+      printf(" e%-3i ",i+1);
+    printf("mog\n");
+  }
   
   do
     {
@@ -481,32 +483,37 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
       size = gsl_multimin_fminimizer_size (s);
       status = gsl_multimin_test_size (size, 1e-2);
       
-      if (status == GSL_SUCCESS)
-	{
-	  printf ("converged to minimum at\n");
-	}
+      if (status == GSL_SUCCESS && verbose)
+	printf ("converged to minimum at\n");
 
-      if(iter==1 || status == GSL_SUCCESS || t.get()>=1.0) {
+      if(verbose && (iter==1 || status == GSL_SUCCESS || t.get()>=1.0)) {
 	t.set();
 	printf("%4u ",(unsigned int) iter);
 	for(int i=0;i<Nf;i++)
 	  // Convert to 10-base logarithm
 	  printf("% 2.2f ",log10(M_E)*gsl_vector_get(s->x,i));
 	printf("%e\n",pow(s->fval,1.0/n));
-
+	
 	// print_gradient(s->x,(void *) &pars);
       }
     }
   while (status == GSL_CONTINUE && iter < maxiter);
 
+  // Save mog
+  if(mog!=NULL)
+    *mog=pow(s->fval,1.0/n);
+
   // The returned exponents
   std::vector<double> ret=get_exponents(s->x);
+  // Sort into ascending order
+  std::sort(ret.begin(),ret.end());
   
   gsl_vector_free(x);
   gsl_vector_free(ss);
   gsl_multimin_fminimizer_free (s);
 
-  printf("\nMinimization completed in %s.\n",tmin.elapsed().c_str());
+  if(verbose)
+    printf("\nMinimization completed in %s.\n",tmin.elapsed().c_str());
 
   return ret;
 }

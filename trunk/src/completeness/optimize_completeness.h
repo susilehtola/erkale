@@ -72,7 +72,7 @@ void compl_mog_fdf(const gsl_vector * x, void * params, double *f, gsl_vector *g
  *
  * This routine uses the Nead-Miller algorithm.
  */
-std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n=2);
+std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL);
 
 /**
  * Optimize completeness profile for angular momentum am in exponent
