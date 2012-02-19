@@ -23,6 +23,9 @@
 #include <omp.h>
 #endif
 
+/// Maximum allowed number of functions
+#define NFMAX 40
+
 int main(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - Completeness optimization from Hel. OpenMP version, running on %i cores.\n",omp_get_max_threads());
@@ -34,13 +37,13 @@ int main(int argc, char **argv) {
   print_license();
 
   if(argc!=6) {
-    printf("Usage: %s am n min max Nf\n",argv[0]);
-    printf("am:  angular momentum of shell to optimize for\n");
-    printf("n:   moment to optimize for.\n");
-    printf("     1 for maximal area, 2 for minimal rms deviation from unity.\n");
-    printf("min: lower limit of exponent range to optimize, in log10\n");
-    printf("max: upper limit of exponent range to optimize, in log10\n");
-    printf("Nf:  number of functions to place on shell\n");
+    printf("Usage:  %s am n min max Nf/tol\n",argv[0]);
+    printf("am:     angular momentum of shell to optimize for\n");
+    printf("n:      moment to optimize for.\n");
+    printf("        1 for maximal area, 2 for minimal rms deviation from unity.\n");
+    printf("min:    lower limit of exponent range to optimize, in log10\n");
+    printf("max:    upper limit of exponent range to optimize, in log10\n");
+    printf("Nf/tol: number of functions to place on shell, or wanted tolerance.\n");
     return 1;
   }
 
@@ -49,15 +52,33 @@ int main(int argc, char **argv) {
   int n=atoi(argv[2]);
   double min=atof(argv[3]);
   double max=atof(argv[4]);
-  int Nf=atoi(argv[5]);
 
   // Form optimized set of primitives
   std::vector<double> exps;
-  // Nelder-Mead method
-  exps=optimize_completeness(am,min,max,Nf,n);
 
-  // Minimization with derivatives
-  //  exps=optimize_completeness_df(am,min,max,Nf,n);
+  // Did we get a tolerance, or a number of functions?
+  double tol=atof(argv[5]);
+  double tau;
+  if(tol<1) {
+    int Nf;
+    printf("\tNf tau\n");
+    for(Nf=1;Nf<=NFMAX;Nf++) {
+      // Nelder-Mead method
+      exps=optimize_completeness(am,min,max,Nf,n,false,&tau);
+
+      printf("\t%2i %e\n",Nf,tau);
+      if(tau<tol)
+	break;
+    }
+
+    if(Nf>NFMAX)
+      throw std::runtime_error("Unable to achieve wanted tolerance!\n");
+    else
+      printf("Wanted tolerance achieved.\n");
+  } else {
+    // Number of functions given.
+    exps=optimize_completeness(am,min,max,atoi(argv[5]),n,true,&tau);
+  }
 
   // Sort into ascending order
   std::sort(exps.begin(),exps.end());
