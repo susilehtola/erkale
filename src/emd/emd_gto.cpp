@@ -280,6 +280,16 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const GaussianEMDEvaluator & rhs) {
 }
 
 GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat & P) {
+  // Check size of P
+  if(P.n_cols!=P.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("P is not square matrix!\n");
+  }
+  if(P.n_cols!=bas.get_Nbf()) {
+    ERROR_INFO();
+    throw std::runtime_error("Density matrix does not correspond to basis!\n");
+  }
+
   // Form radial functions
   radf=form_radial(bas);
 
