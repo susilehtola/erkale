@@ -29,7 +29,7 @@
  * "Starting SCF Calculations by Superposition of Atomic Densities"
  * by J. H. Van Lenthe et al., J. Comp. Chem. 27 (2006), pp. 926-932.
  */
-arma::mat atomic_density(const BasisSet & basis, bool verbose);
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool verbose);
 
 /// Determine list of identical nuclei, determined by nucleus and basis set
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);
