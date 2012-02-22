@@ -129,8 +129,6 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   if(verbose)
     printf("\n ******* Initialization of run ********\n");
 
-  bool atomicguess=false;
-
 #ifdef RESTRICTED
   if(sol.C.n_rows!=Nbf)
 #else
@@ -165,9 +163,16 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 
 	  if(verbose)
 	    printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
-	} else
-	  atomicguess=true;
-	
+	} else {
+	  // Use atomic guess
+#ifdef RESTRICTED
+	  atomic_guess(*basisp,sol.C,sol.E,verbose);
+#else
+	  atomic_guess(*basisp,sol.Ca,sol.Ea,verbose);
+	  sol.Cb=sol.Ca;
+	  sol.Eb=sol.Ea;
+#endif
+	}	
       } else {
       // Got correctly sized input guess.
       
@@ -181,53 +186,42 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   size_t ixc_orb=0;
 #endif
     
-  if(!atomicguess) {
-      
 #ifdef RESTRICTED
-    form_density(sol.P,sol.C,occs);
+  form_density(sol.P,sol.C,occs);
 #else
-    
+  
 #if defined(FULLHOLE) || defined(HALFHOLE)
-    if(spin)
-      ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
-    else
-      ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
-    
-    if(spin) {
+  if(spin)
+    ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
+  else
+    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
+  
+  if(spin) {
 #if defined(FULLHOLE)
-      occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
+    occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
 #else
-      occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
+    occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
 #endif
-      occa=norm_occ(nocca); // Normal occupation in beta
-    } else {
-#if defined(FULLHOLE)
-      occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
-#else
-      occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
-#endif
-      occb=norm_occ(noccb); // Normal occupation in beta
-    }
-    
-    // End HALFHOLE || FULLHOLE
-#endif
-
-    form_density(sol.Pa,sol.Ca,occa);
-    form_density(sol.Pb,sol.Cb,occb);
-    sol.P=sol.Pa+sol.Pb;
-#endif
+    occa=norm_occ(nocca); // Normal occupation in beta
   } else {
-    // Do atomic guess.
-
-    sol.P=atomic_density(*basisp,verbose);
-#ifndef RESTRICTED
-    sol.Pa=sol.P/2.0;
-    sol.Pb=sol.P/2.0;
+#if defined(FULLHOLE)
+    occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
+#else
+    occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
 #endif
+    occb=norm_occ(noccb); // Normal occupation in beta
   }
   
+  // End HALFHOLE || FULLHOLE
+#endif
+  
+  form_density(sol.Pa,sol.Ca,occa);
+  form_density(sol.Pb,sol.Cb,occb);
+  sol.P=sol.Pa+sol.Pb;
+#endif
+  
   // Print orbital energies
-  if(verbose && !atomicguess) {
+  if(verbose) {
 #ifdef RESTRICTED
     print_E(sol.E,occs);
 #else
@@ -547,10 +541,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 
 #ifdef _ROHF
     // Constrain Fock operators to correspond to ROHF
-    if(!atomicguess)
-      ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose);
-    else if(verbose)
-      printf("Not doing ROHF update in first iteration since atomic guess was used.\n");
+    ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose);
 #endif
 
 #endif // end DFT clause
@@ -560,11 +551,6 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     
 #if defined(FULLHOLE) || defined(HALFHOLE)
     if(freeze.size()>0) {
-      if(atomicguess) {
-	ERROR_INFO();
-	throw std::runtime_error("Atomic guess not supported with orbital freezing!\n");
-      }
-      
       // Freeze orbitals.
       if(spin)
 	freeze_orbs(freeze,sol.Cb,S,sol.Hb);
@@ -601,8 +587,8 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
       throw std::runtime_error(oss.str());
     }
 
-    // Update ADIIS stacks. Don't update with first atomic density matrix.
-    if(useadiis && !atomicguess) {
+    // Update ADIIS stacks.
+    if(useadiis) {
 #ifdef RESTRICTED
       adiis.push(sol.en.E,sol.P,sol.H);
 #else
@@ -668,7 +654,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     }
 
     // Perform ADIIS interpolation
-    if(useadiis && !atomicguess && ((usediis && !diissucc) || !usediis)) {
+    if(useadiis && ((usediis && !diissucc) || !usediis)) {
 
       if(verbose) {
 	printf("Performing ADIIS interpolation of Fock operator ... ");
@@ -782,10 +768,6 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     form_density(Pbnew,sol.Cb,occb);
     Pnew=Panew+Pbnew;
 #endif
-
-    // Atomic guess is no longer used; now we have orbitals.
-    if(atomicguess)
-      atomicguess=false;
 
     // Compute change of (total) density
     deltaP=Pnew-sol.P;

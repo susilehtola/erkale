@@ -20,7 +20,7 @@
 #include "timer.h"
 #include <algorithm>
 
-arma::mat atomic_density(const BasisSet & basis, bool verbose) {
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool verbose) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -48,18 +48,19 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
   }
 
   Timer ttot;
+
+  // Approximate orbital energies
+  std::vector<double> orbE;
   
   // Loop over list of identical nuclei
   for(size_t i=0;i<idnuc.size();i++) {
 
     Timer tsol;
 
-    if(verbose) {
-      printf("\t");
-      for(size_t iid=0;iid<idnuc[i].size();iid++)
-	printf("%i ",(int) idnuc[i][iid]+1);
-      fflush(stdout);
-    }
+    printf("\t");
+    for(size_t iid=0;iid<idnuc[i].size();iid++)
+      printf("%i ",(int) idnuc[i][iid]+1);
+    fflush(stdout);
 
     // Nucleus is
     nucleus_t nuc=basis.get_nucleus(idnuc[i][0]);
@@ -76,8 +77,8 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
 
     // Add the shells relevant for a single atom.
     int ammax;
-    if(nuc.Z<5)
-      // Only s electrons up to beryllium
+    if(nuc.Z<3)
+      // Only s electrons up to lithium
       ammax=0;
     else if(nuc.Z<21)
       // s and p electrons
@@ -132,6 +133,11 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
     // Re-get shells, in new indexing.
     shells=atbas.get_funcs(0);
 
+    // Store approximate energies
+    for(size_t iid=0;iid<idnuc[i].size();iid++)
+      for(size_t i=0;i<sol.Ea.size();i++)
+	orbE.push_back(sol.Ea(i));
+
     // Loop over shells
     for(size_t ish=0;ish<shells.size();ish++)
       for(size_t jsh=0;jsh<shells.size();jsh++) {
@@ -162,10 +168,24 @@ arma::mat atomic_density(const BasisSet & basis, bool verbose) {
   if(fabs(Nel-Neltot)/Neltot*100>1e-10)
     fprintf(stderr,"Nel = %i, P contains %f electrons, difference %e.\n",Neltot,Nel,Nel-Neltot);
 
+  // Go to natural orbitals
+  arma::mat NO;
+  arma::mat tmp;
+  form_NOs(P,S,NO,tmp);
+
+  // Store orbitals, but in reverse order!
+  C.zeros(NO.n_rows,NO.n_cols);
+  for(size_t i=0;i<NO.n_cols;i++)
+    C.col(i)=NO.col(NO.n_cols-1-i);
+
+  // Store energies
+  E.zeros(C.n_cols);
+  std::sort(orbE.begin(),orbE.end());
+  for(size_t i=0;i<std::min(orbE.size(),(size_t) C.n_cols);i++)
+    E(i)=orbE[i];
+  
   if(verbose)
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
-
-  return P;
 }
 
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {
