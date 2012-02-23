@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
 	basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
       } else {
 	// Load old density matrix
-	arma::vec Pold;
+	arma::mat Pold;
 	load.read("P",Pold);
 	// Find out natural orbitals
 	arma::mat Cold;
