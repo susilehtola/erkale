@@ -65,6 +65,8 @@ void Settings::add_scf_settings() {
   bset.push_back(genb("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", true));
   // Use Broyden mixing?
   bset.push_back(genb("UseBroyden", "Use Broyden mixing of Fock matrices?", false));
+  // Use Trust-Region Roothaan-Hall?
+  bset.push_back(genb("UseTRRH", "Use Trust-Region Roothaan-Hall?", false));
   
   // Total charge of system
   iset.push_back(geni("Charge", "Total charge of system", 0));
