@@ -32,6 +32,8 @@ extern "C" {
 #include <gsl/gsl_spline.h>
   // For hypergeometric functions
 #include <gsl/gsl_sf_hyperg.h>
+  // For trigonometric functions
+#include <gsl/gsl_sf_trig.h>
 }
 
 double doublefact(int n) {
@@ -69,11 +71,7 @@ double gamma(double x) {
 }
 
 double sinc(double x) {
-  if(fabs(x)<100*DBL_EPSILON) {
-    double x2=x*x;
-    return 1.0 - x2/6.0 + x2*x2/140.0;
-  } else
-    return sin(x)/x;
+  return gsl_sf_sinc(x/M_PI);
 }
 
 double boysF(int m, double x) {
