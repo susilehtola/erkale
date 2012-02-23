@@ -32,6 +32,7 @@
 #include "scf.h"
 #include "stringutil.h"
 #include "timer.h"
+#include "trrh.h"
 
 #define ROUGHTOL 1e-8
 
@@ -56,6 +57,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   diisthr=set.get_double("DIISThr");
   useadiis=set.get_bool("UseADIIS");
   usebroyden=set.get_bool("UseBroyden");
+  usetrrh=set.get_bool("UseTRRH");
 
   maxiter=set.get_int("MaxIter");
   verbose=set.get_bool("Verbose");
@@ -68,7 +70,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   } 
 
-  if(!usediis && !useadiis && !usebroyden) {
+  if(!usediis && !useadiis && !usebroyden && !usetrrh) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to run calculation without an update scheme.\n");
   }

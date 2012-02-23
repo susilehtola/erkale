@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -160,6 +160,8 @@ class SCF {
   bool useadiis;
   /// Use Broyden accelerator?
   bool usebroyden;
+  /// Use Trust-Region Roothaan-Hall?
+  bool usetrrh;
 
   /// Maximum number of iterations
   int maxiter;

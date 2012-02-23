@@ -32,6 +32,34 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   std::vector<double> occb;
 #endif
 
+  // Determine number of occupied states
+#if !defined(HALFHOLE) && !defined(FULLHOLE)
+
+#ifdef _ROHF
+  size_t nocca=Nel_alpha;
+  size_t noccb=Nel_beta;
+#elif defined(RESTRICTED)
+  size_t nocc;
+  for(nocc=occs.size()-1;nocc<occs.size();nocc--)
+    if(occs[nocc]>0)
+      break;
+  nocc++;
+#else
+  size_t nocca;
+  for(nocca=occa.size()-1;nocca<occa.size();nocca--)
+    if(occa[nocca]>0)
+      break;
+  nocca++;
+
+  size_t noccb;
+  for(noccb=occb.size()-1;noccb<occb.size();noccb--)
+    if(occb[noccb]>0)
+      break;
+  noccb++;
+#endif
+#endif
+  
+
   Timer t;
   Timer ttot;
 
@@ -645,15 +673,16 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	diisb.solve(sol.Hb,diis_c1);
 #endif
 
-	diissucc=1;
+	diissucc=true;
       } else {
 	if(verbose)
 	  printf("\nDIIS error too large, not using DIIS extrapolation.\n");
-	diissucc=0;
+	diissucc=false;
       }
     }
 
     // Perform ADIIS interpolation
+    bool adiisdone=false;
     if(useadiis && ((usediis && !diissucc) || !usediis)) {
 
       if(verbose) {
@@ -662,7 +691,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	t.set();
       }
 
-      diissucc=1;
+      diissucc=true;
 #ifdef RESTRICTED
       sol.H=adiis.get_H();
 #else
@@ -672,6 +701,8 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
+
+      adiisdone=true;
     }
 
     // Perform Broyden interpolation
@@ -699,38 +730,76 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	printf("done (%s)\n",t.elapsed().c_str());
     }
 
-    // Solve FC=ESC
-    if(verbose) {
-      printf("\nSolving SCF equations ... ");
-      fflush(stdout);
-      t.set();
-    }
+    if(usetrrh) {
+      if(adiisdone)
+	;
 
 #ifdef RESTRICTED
-    // Transform Hamiltonian into orthogonal basis
-    Horth=arma::trans(Sinvh)*sol.H*Sinvh;
-    // Update orbitals and energies
-    eig_sym_ordered(sol.E,orbs,Horth);
-    // Transform back to non-orthogonal basis
-    sol.C=Sinvh*orbs;
+      arma::mat Cnew;
+      arma::vec Enew;
+      TRRH_update(sol.H,sol.C,S,Cnew,Enew,nocc,verbose);
 
-    // Check orthonormality
-    check_orth(sol.C,S,false);
+      // Update solution
+      sol.C=Cnew;
+      sol.E=Enew;
+
+      // Check orthonormality of orbitals
+      check_orth(sol.C,S,false);
 #else
-    Horth=trans(Sinvh)*sol.Ha*Sinvh;
-    eig_sym_ordered(sol.Ea,orbs,Horth);
-    sol.Ca=Sinvh*orbs;
-    check_orth(sol.Ca,S,false);
+      arma::mat Canew;
+      arma::vec Eanew;
+      TRRH_update(sol.Ha,sol.Ca,S,Canew,Eanew,nocca);
 
-    Horth=trans(Sinvh)*sol.Hb*Sinvh;
-    eig_sym_ordered(sol.Eb,orbs,Horth);
-    sol.Cb=Sinvh*orbs;
-    check_orth(sol.Cb,S,false);
+      arma::mat Cbnew;
+      arma::vec Ebnew;
+      TRRH_update(sol.Hb,sol.Cb,S,Cbnew,Ebnew,noccb);
+
+      // Update solutions
+      sol.Ca=Canew;
+      sol.Cb=Cbnew;
+
+      sol.Ea=Eanew;
+      sol.Eb=Ebnew;
+
+      // Check orthonormality of orbitals
+      check_orth(sol.Ca,S,false);
+      check_orth(sol.Cb,S,false);
 #endif
-
-    if(verbose)
-      printf("done (%s)\n",t.elapsed().c_str());
-
+    } else {
+      
+      // Solve FC=ESC
+      if(verbose) {
+	printf("\nSolving SCF equations ... ");
+	fflush(stdout);
+	t.set();
+      }
+      
+#ifdef RESTRICTED
+      // Transform Hamiltonian into orthogonal basis
+      Horth=arma::trans(Sinvh)*sol.H*Sinvh;
+      // Update orbitals and energies
+      eig_sym_ordered(sol.E,orbs,Horth);
+      // Transform back to non-orthogonal basis
+      sol.C=Sinvh*orbs;
+      
+      // Check orthonormality
+      check_orth(sol.C,S,false);
+#else
+      Horth=trans(Sinvh)*sol.Ha*Sinvh;
+      eig_sym_ordered(sol.Ea,orbs,Horth);
+      sol.Ca=Sinvh*orbs;
+      check_orth(sol.Ca,S,false);
+      
+      Horth=trans(Sinvh)*sol.Hb*Sinvh;
+      eig_sym_ordered(sol.Eb,orbs,Horth);
+      sol.Cb=Sinvh*orbs;
+      check_orth(sol.Cb,S,false);
+#endif
+      
+      if(verbose)
+	printf("done (%s)\n",t.elapsed().c_str());
+    }
+      
     // Form new density matrix
     arma::mat Pnew;
 #ifdef RESTRICTED
