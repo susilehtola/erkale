@@ -748,11 +748,11 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 #else
       arma::mat Canew;
       arma::vec Eanew;
-      TRRH_update(sol.Ha,sol.Ca,S,Canew,Eanew,nocca);
+      TRRH_update(sol.Ha,sol.Ca,S,Canew,Eanew,nocca,verbose);
 
       arma::mat Cbnew;
       arma::vec Ebnew;
-      TRRH_update(sol.Hb,sol.Cb,S,Cbnew,Ebnew,noccb);
+      TRRH_update(sol.Hb,sol.Cb,S,Cbnew,Ebnew,noccb,verbose);
 
       // Update solutions
       sol.Ca=Canew;
