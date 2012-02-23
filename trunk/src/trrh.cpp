@@ -17,6 +17,7 @@
 #include "trrh.h"
 #include "linalg.h"
 #include "mathf.h"
+#include "timer.h"
 
 #include <cfloat>
 
@@ -94,9 +95,15 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
       if(hess(a,i)<minhess)
 	minhess=hess(a,i);
 
+  // Print legend
+  if(verbose)
+    printf("\t%2s %12s %12s time\n","it","mu","Amin");
+
   // Get the rotated coefficients
   size_t iit;
   for(iit=0;iit<NMU;iit++) {
+    Timer t;
+
     // Value of mu is
     double mu=EPSMU-minhess+iit*DELTAMU;
 
@@ -126,7 +133,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
     }
     
     if(verbose)
-      printf("\t%2i %e %e\n",(int) iit,mu,amin);
+      printf("\t%2i %e %e %s\n",(int) iit+1,mu,amin,t.elapsed().c_str());
     
     if(amin>=MINA)
       break;
