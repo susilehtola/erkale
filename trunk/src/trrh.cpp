@@ -144,6 +144,14 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
     fprintf(stderr,"Warning - wanted level shift not found.\n");
   } else if(verbose)
     printf("mu loop converged in %i iterations\n",(int) iit+1);
+
+  // Make absolutely sure orbitals stay orthonormal.
+  for(size_t i=0;i<norbs;i++) {
+    for(size_t j=0;j<i;j++)
+      Cnew.col(i)-=arma::as_scalar(arma::trans(Cnew.col(i))*S*Cnew.col(j))*Cnew.col(j);
+    
+    Cnew.col(i)/=sqrt(arma::as_scalar(arma::trans(Cnew.col(i))*S*Cnew.col(i)));
+  }      
 }
 
 arma::mat TRRH::make_expK(const arma::mat & kappa) {
