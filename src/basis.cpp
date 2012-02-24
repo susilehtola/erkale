@@ -2328,31 +2328,50 @@ double BasisSet::Enuc() const {
 void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const {
   // Project MOs from old basis to new basis (this one)
 
+  // Get number of basis functions
+  const size_t Nbf=get_Nbf();
+  // Cutoff
+  const double cutoff=1e-5;
 
   // Get overlap matrix
   arma::mat S11=overlap();
 
   // and form orthogonalizing matrix
-  arma::mat Sinvh=CanonicalOrth(S11);
+  arma::mat Svec;
+  arma::vec Sval;
+  eig_sym_ordered(Sval,Svec,S11);
+
+  // Count number of eigenvalues that are above cutoff                          
+  size_t Nind=0;
+  for(size_t i=0;i<Nbf;i++)
+    if(Sval(i)>=cutoff)
+      Nind++;
+  // Number of linearly dependent basis functions                               
+  const size_t Ndep=Nbf-Nind;
+
+  // Form canonical orthonormalization matrix
+  arma::mat Sinvh(Nbf,Nind);
+  for(size_t i=0;i<Nind;i++)
+    Sinvh.col(i)=Svec.col(Ndep+i)/sqrt(Sval(Ndep+i));
+
   // and the real S^-1
   arma::mat Sinv=Sinvh*arma::trans(Sinvh);
 
   // Get overlap with old basis
   arma::mat S12=overlap(oldbas);
 
-  // Sizes of linearly independent basis sets
+  // Linearly independent size of old basis set
   const size_t Nbfo=oldMOs.n_cols;
-  const size_t Nbfn=Sinvh.n_cols;
 
   // How many MOs do we transform?
   size_t Nmo=Nbfo;
-  if(Nbfn<Nmo)
-    Nmo=Nbfn;
+  if(Nind<Nmo)
+    Nmo=Nind;
 
   // OK, now we are ready to calculate the projections.
 
   // Initialize MO matrix
-  MOs=arma::mat(Sinvh.n_rows,Nmo);
+  MOs=arma::mat(Sinvh.n_rows,Nind);
   MOs.zeros();
   // and energy
   E=arma::colvec(Nmo);
@@ -2389,6 +2408,60 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
     mo/=norm;
     // and store
     MOs.col(i)=mo;
+  }
+
+  // If the old basis had less functions than the new basis, then we
+  // need to form the rest of the orbitals. To do this we consider all
+  // of the linearly independent eigenvectors of the new basis, and
+  // remove the Nmo with the maximum absolute overlap with the
+  // MOs. The leftovers are then orthonormalized with respect to the
+  // MOs.
+
+  if(Nmo<Nind) {
+    // Index vector
+    std::vector<size_t> idx(Nind);
+    for(size_t i=0;i<Nind;i++)
+      idx[i]=Ndep+i;
+
+    for(size_t io=0;io<Nmo;io++) {
+      // Compute maximum overlap     
+      double ovlmax=-1.0;
+      size_t maxind=-1;
+
+      arma::vec hlp=S11*MOs.col(io);
+
+      for(size_t j=0;j<idx.size();j++) {
+	// Compute absolute overlap
+	double ovl=fabs(arma::dot(Svec.col(idx[j])/sqrt(Sval(idx[j])),hlp));
+	if(ovl>ovlmax) {
+	  ovlmax=ovl;
+	  maxind=j;
+	}
+      }
+
+      // Remove eigenvector with maximum overlap
+      idx.erase(idx.begin()+maxind);
+    }
+    
+    // Set the remaining orbitals
+    for(size_t io=0;io<idx.size();io++)
+      MOs.col(Nmo+io)=Svec.col(idx[io])/sqrt(Sval(idx[io]));
+    
+    // Orthonormalize rest of basis
+    for(size_t i=Nmo;i<Nind;i++) {
+      arma::vec mo=MOs.col(i);
+      
+      // Remove overlap with other orbitals
+      arma::vec hlp=S11*mo;
+      for(size_t j=0;j<i;j++)
+	mo-=arma::dot(MOs.col(j),hlp)*MOs.col(j);
+      // Calculate norm
+      double norm=sqrt(arma::as_scalar(arma::trans(mo)*S11*mo));
+      // Normalize
+      mo/=norm;
+      // and store
+      MOs.col(i)=mo;
+    }
   }
 }
 
