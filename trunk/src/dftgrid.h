@@ -73,6 +73,21 @@ typedef struct {
   size_t np;
 } radshell_t;
 
+/// Info for atomic grid
+typedef struct {
+  /// Atomic inedx
+  size_t atind;
+  /// Coordinates
+  coords_t cen;
+
+  /// Number of grid points
+  size_t ngrid;
+  /// Number of function values
+  size_t nfunc;
+  /// Radial shells
+  std::vector<radshell_t> sh;
+} atomgrid_t;
+
 /// Partitioning function
 double f_q(double mu, double a);
 /// Partitioning function
@@ -130,11 +145,6 @@ class AtomGrid {
  protected:
   /// Integration points
   std::vector<gridpoint_t> grid;
-  /// Structure of grid
-  std::vector<radshell_t> radgrid;
-
-  /// Number of grid points in total
-  size_t ngrid;
 
   /// Values of functions in grid points
   std::vector<bf_f_t> flist;
@@ -142,9 +152,6 @@ class AtomGrid {
   std::vector<double> glist;
   /// Laplacians, length flist
   std::vector<double> llist;
-
-  /// Number of function values in total
-  size_t nfunc;
 
   /// Is gradient needed?
   bool do_grad;
@@ -189,10 +196,6 @@ class AtomGrid {
   /// Functional derivative of energy wrt kinetic energy density
   std::vector<double> vtau;
 
-  /// Index of atom
-  size_t atind;
-  /// Coordinates of nucleus
-  coords_t cen;
   /// Grid tolerance (for pruning grid)
   double tol;
 
@@ -200,32 +203,39 @@ class AtomGrid {
   bool use_lobatto;
 
  public:
-  /// Dummy constructor
-  AtomGrid();
-  /// Construct adaptively a grid centered on the cenind:th center, restricted calculation
-  AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, double tol, int x_func, int c_func, bool lobatto, bool verbose);
-  /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
-  AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, double tol, int x_func, int c_func, bool lobatto, bool verbose);
+  /// Constructor. Need to set tolerance as well before using constructor!
+  AtomGrid(bool lobatto=false, double tol=1e-4);
   /// Destructor
   ~AtomGrid();
+  
+  /// Set tolerance
+  void set_tolerance(double toler);
+  /// Check necessity of computing gradient and laplacians, necessary for compute_bf!
+  void check_grad_lapl(int x_func, int c_func);
+
+  /// Construct adaptively a grid centered on the cenind:th center, restricted calculation
+  atomgrid_t construct(const BasisSet & bas, const arma::mat & P, size_t cenind, int x_func, int c_func, bool verbose);
+  /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
+  atomgrid_t construct(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, int x_func, int c_func, bool verbose);
 
   /// Form shells on an atom, as according to list of radial shells
-  void form_grid(const BasisSet & bas);
+  void form_grid(const BasisSet & bas, atomgrid_t & g);
   /// Compute values of basis functions in all grid points
-  void compute_bf(const BasisSet & bas);
+  void compute_bf(const BasisSet & bas, const atomgrid_t & g);
 
   /// Compute Becke weight for grid points on shell irad
-  void becke_weights(const BasisSet & bas, size_t irad);
+  void becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t ir);
   /// Prune points with small weight
-  void prune_points(double tol, size_t irad);
+  void prune_points(double tol, const radshell_t & rg);
 
   /// Add radial shell in Lobatto angular scheme, w/o Becke partitioning or pruning
-  void add_lobatto_shell(size_t ind);
+  void add_lobatto_shell(atomgrid_t & g, size_t ir);
   /// Add radial shell in Lebedev scheme, w/o Becke partitioning or pruning
-  void add_lebedev_shell(size_t ind);
+  void add_lebedev_shell(atomgrid_t & g, size_t ir);
 
   /// Compute basis functions on grid points on shell irad
-  void compute_bf(const BasisSet & bas, size_t irad);
+  void compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t irad);
+
   /// Free memory
   void free();
 
@@ -240,11 +250,6 @@ class AtomGrid {
   void eval_grad(const arma::mat & P, size_t ip, double *g) const;
   /// Evaluate laplacian of density and kinetic density at a point
   void eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl, double & kin) const;
-
-  /// Get amount of points
-  size_t get_Npoints() const;
-  /// Get amount of functions
-  size_t get_Nfuncs() const;
 
   /// Compute number of electrons
   double compute_Nel() const;
@@ -297,12 +302,13 @@ class AtomGrid {
  */
 
 class DFTGrid {
-  /// Atomic grids
-  std::vector<AtomGrid> atoms;
+  /// Work grids
+  std::vector<AtomGrid> wrk;
+  /// Atomic grid
+  std::vector<atomgrid_t> grids;
+
   /// Basis set
   const BasisSet * basp;
-  /// Direct calculation?
-  bool direct;
   /// Verbose operation?
   bool verbose;
   /// Use Lobatto quadrature?
@@ -310,7 +316,7 @@ class DFTGrid {
 
  public:
   /// Constructor
-  DFTGrid(const BasisSet * bas, bool direct, bool verbose, bool lobatto);
+  DFTGrid(const BasisSet * bas, bool verbose=true, bool lobatto=false);
   /// Destructor
   ~DFTGrid();
 

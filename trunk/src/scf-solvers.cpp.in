@@ -279,7 +279,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
       printf("\nA pure exchange functional used, no exact exchange.\n");
   }
 
-  DFTGrid grid(basisp,dft_direct,verbose,dft_lobatto);
+  DFTGrid grid(basisp,verbose,dft_lobatto);
 #endif
 
 

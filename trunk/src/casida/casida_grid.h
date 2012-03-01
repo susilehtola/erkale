@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -36,12 +36,8 @@ class CasidaAtom : public AtomGrid {
   std::vector<double> fc;
 
  public:
-  /// Dummy constructor
-  CasidaAtom();
-  /// Construct unpolarized atomic grid
-  CasidaAtom(const BasisSet & bas, const arma::mat & P, size_t cenind, double toler, int x_func, int c_func, bool lobatto, bool verbose);
-  /// Construct polarized atomic grid
-  CasidaAtom(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, double toler, int x_func, int c_func, bool lobatto, bool verbose);
+  /// Constructor. Need to set tolerance as well before using constructor!
+  CasidaAtom(bool lobatto=false, double tol=1e-4);
   /// Destructor
   ~CasidaAtom();
 
@@ -59,12 +55,13 @@ class CasidaAtom : public AtomGrid {
 
 /// Perform integral over molecular grid
 class CasidaGrid {
+  /// Work grids
+  std::vector<CasidaAtom> wrk;
   /// Atomic grids
-  std::vector<CasidaAtom> atoms;
+  std::vector<atomgrid_t> grids;
+
   /// Basis set
   const BasisSet * basp;
-  /// Direct calculation?
-  bool direct;
   /// Verbose operation?
   bool verbose;
   /// Use Lobatto quadrature?
@@ -74,7 +71,7 @@ class CasidaGrid {
   void construct(const std::vector<arma::mat> & P, double tol, int x_func, int c_func);
 
  public:
-  CasidaGrid(const BasisSet * bas, bool dir=0, bool ver=0, bool lobatto=0);
+  CasidaGrid(const BasisSet * bas, bool verbose=false, bool lobatto=false);
   ~CasidaGrid();
 
   /// Evaluate Kxc
