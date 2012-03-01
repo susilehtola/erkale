@@ -66,83 +66,15 @@ double f_s(double mu, double a) {
 }
 
 
-// Atomic radii in SG1 grid
-const double SG1_radii[]={0,
-			  1.0000, 0.5882, 3.0769, 2.0513, 1.5385, 1.2308,
-			  1.0256, 0.8791, 0.7692, 0.6838, 4.0909, 3.1579,
-			  2.5714, 2.1687, 1.8750, 1.6514, 1.4754, 1.3333};
-const int SG1_maxZ=18;
-
-
-void SG1_nodes(size_t N, std::vector<double> & r, std::vector<double> & w, int Z) {
-  // Compute nodes and weights in SG1 radial grid
-  r.resize(N);
-  w.resize(N);
-
-  if(Z<1 || Z>SG1_maxZ) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "SG1 grid has not been parametrized for element "<<Z<<"!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  // Atomic radius
-  double rad=SG1_radii[Z];
-  
-  for(size_t i=1;i<=N;i++) {
-    w[i-1]=2*rad*rad*rad*(N+1)*pow(i,5)*pow(N+1-i,-7.0);
-    r[i-1]=rad*i*i/(N+1.0-i)/(N+1.0-i);
-  }
-}
-
-int SG1_order(double r, int Z) {
-  // Get order of spherical integration at radius r for element Z in SG1 grid
-
-  if(Z<1 || Z>SG1_maxZ) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "SG1 grid has not been parametrized for element "<<Z<<"!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  // Partitioning parameters
-  double alpha[4];
-  if(Z<=2) {
-    alpha[0]=0.2500;
-    alpha[1]=0.5000;
-    alpha[2]=1.0000;
-    alpha[3]=4.5000;
-  } else if(Z<=10) {
-    alpha[0]=0.1667;
-    alpha[1]=0.5000;
-    alpha[2]=0.9000;
-    alpha[3]=3.5000;
-  } else {
-    alpha[0]=0.1000;
-    alpha[1]=0.4000;
-    alpha[2]=0.8000;
-    alpha[3]=2.5000;
-  }
-  // Order of integration
-  int order[]={3, 9, 15, 23, 15};
-  
-  // Determine order
-  int i;
-  for(i=0;i<4;i++)
-    if(r<alpha[i]*SG1_radii[Z])
-      break;
-  return order[i];  
-}
-		  
-void AtomGrid::add_lobatto_shell(size_t ind) {
+void AtomGrid::add_lobatto_shell(atomgrid_t & g, size_t ir) {
   // Add points on ind:th radial shell.
 
   // Radius
-  double rad=radgrid[ind].r;
+  double rad=g.sh[ir].r;
   // Order of quadrature rule
-  int l=radgrid[ind].l;
+  int l=g.sh[ir].l;
   // Radial weight
-  double wrad=radgrid[ind].w;
+  double wrad=g.sh[ir].w;
 
   // Number of points in theta
   int nth=(l+3)/2;
@@ -152,7 +84,7 @@ void AtomGrid::add_lobatto_shell(size_t ind) {
   lobatto_compute(nth,xl,wl);
 
   // Store index of first point
-  radgrid[ind].ind0=grid.size();
+  g.sh[ir].ind0=grid.size();
   // Number of points on this shell
   size_t np=0;
 
@@ -208,7 +140,7 @@ void AtomGrid::add_lobatto_shell(size_t ind) {
       point.r.z=rad*cth;
       
       // Displace to center
-      point.r=point.r+cen;
+      point.r=point.r+g.cen;
 
       // Add point
       grid.push_back(point);
@@ -218,24 +150,24 @@ void AtomGrid::add_lobatto_shell(size_t ind) {
   }
 
   // Store number of points on this shell
-  radgrid[ind].np=np;
+  g.sh[ir].np=np;
 }
 
-void AtomGrid::add_lebedev_shell(size_t ind) {
+void AtomGrid::add_lebedev_shell(atomgrid_t & g, size_t ir) {
   // Add points on ind:th radial shell.
 
   // Radius
-  double rad=radgrid[ind].r;
+  double rad=g.sh[ir].r;
   // Order of quadrature rule
-  int l=radgrid[ind].l;
+  int l=g.sh[ir].l;
   // Radial weight
-  double wrad=radgrid[ind].w;
+  double wrad=g.sh[ir].w;
 
   // Get quadrature rule
   std::vector<lebedev_point_t> points=lebedev_sphere(l);
 
   // Store index of first point
-  radgrid[ind].ind0=grid.size();
+  g.sh[ir].ind0=grid.size();
   // Number of points on this shell
   size_t np=points.size();
 
@@ -247,7 +179,7 @@ void AtomGrid::add_lebedev_shell(size_t ind) {
     point.r.y=rad*points[i].y;
     point.r.z=rad*points[i].z;
     // Displace to center
-    point.r=point.r+cen;
+    point.r=point.r+g.cen;
 
     // Compute quadrature weight
     // (Becke weight not included)
@@ -258,10 +190,10 @@ void AtomGrid::add_lebedev_shell(size_t ind) {
   }
   
   // Store number of points on this shell
-  radgrid[ind].np=np;
+  g.sh[ir].np=np;
 }
 
-void AtomGrid::becke_weights(const BasisSet & bas, size_t irad) {
+void AtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t ir) {
   // Compute weights of points.
 
   // Number of atoms in system
@@ -284,7 +216,7 @@ void AtomGrid::becke_weights(const BasisSet & bas, size_t irad) {
   }
 
   // Loop over points on wanted radial shell
-  for(size_t ip=radgrid[irad].ind0;ip<radgrid[irad].ind0+radgrid[irad].np;ip++) {
+  for(size_t ip=g.sh[ir].ind0;ip<g.sh[ir].ind0+g.sh[ir].np;ip++) {
     // Coordinates of the point are
     coords_t coord_p=grid[ip].r;
     
@@ -325,17 +257,17 @@ void AtomGrid::becke_weights(const BasisSet & bas, size_t irad) {
       awsum+=atom_weight[iat];
 
     // The Becke weight is
-    grid[ip].w*=atom_weight[atind]/awsum;
+    grid[ip].w*=atom_weight[g.atind]/awsum;
   }
 }
 
-void AtomGrid::prune_points(double tol, size_t irad) {
+void AtomGrid::prune_points(double tol, const radshell_t & rg) {
   // Prune points with small weight.
 
   // First point on radial shell
-  size_t ifirst=radgrid[irad].ind0;
+  size_t ifirst=rg.ind0;
   // Last point on radial shell
-  size_t ilast=ifirst+radgrid[irad].np;
+  size_t ilast=ifirst+rg.np;
 
   for(size_t i=ilast;(i>=ifirst && i<grid.size());i--)
     if(grid[i].w<tol)
@@ -587,44 +519,6 @@ double AtomGrid::compute_Nel() const {
 
   return nel;
 }
-
-size_t AtomGrid::memory_req_grid() const {
-  // Memory for grid (points, density, XC stuff)
-  size_t mem_grid=0;
-
-  // Memory taken by points themselves
-  mem_grid+=ngrid*sizeof(gridpoint_t)+radgrid.size()*sizeof(radshell_t);
-
-  // XC stuff
-  if(!polarized) {
-    // Closed shell, LDA: rho, exc and vxc
-    mem_grid+=3*ngrid*sizeof(double);
-    if(do_grad) // GGA: also grho (3), sigma, vsigma
-      mem_grid+=5*ngrid*sizeof(double);
-    if(do_lapl) // Meta-GGA: also lapl_rho, tau, vlapl_rho, vtau
-      mem_grid+=4*ngrid*sizeof(double);
-  } else {
-    // Open shell, LDA: rho(2), exc(2) and vxc(2)
-    mem_grid+=6*ngrid*sizeof(double);
-    if(do_grad) // GGA: also grho(3), sigma(3), vsigma(3)
-      mem_grid+=9*ngrid*sizeof(double);
-    if(do_lapl)
-      mem_grid+=8*ngrid*sizeof(double);
-  }
-
-  return mem_grid;
-}
-
-size_t AtomGrid::memory_req_bf() const {
-  size_t funcsize=sizeof(bf_f_t);
-  if(do_gga)
-    funcsize+=3*sizeof(double);
-  return nfunc*funcsize;
-}
-
-size_t AtomGrid::memory_req() const {
-  return memory_req_grid() + memory_req_bf();
-}    
 
 void AtomGrid::init_xc() {
   // Size of grid.
@@ -1167,52 +1061,61 @@ void AtomGrid::eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) cons
   }
 }
 
-
-AtomGrid::AtomGrid() {
-  // Dummy constructor
-}
-
-AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, double toler, int x_func, int c_func, bool lobatto, bool verbose) {
-  // Construct a grid centered on (x0,y0,z0)
-  // with nrad radial shells                         
-  // See Köster et al for specifics.
-
-  Timer t;
-
-  // Store index of center
-  atind=cenind;
-  // and its coordinates
-  cen=bas.get_coords(cenind);
-
-  // Use Lobatto quadrature?
+AtomGrid::AtomGrid(bool lobatto, double toler) {
   use_lobatto=lobatto;
 
-  // Grid tolerance
+  // These should really be set separately using the routines below.
   tol=toler;
+  do_grad=false;
+  do_lapl=false;
+}  
 
-  // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(atind)])));
+void AtomGrid::set_tolerance(double toler) {
+  tol=toler;
+}
 
-  // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
-
-  // Allocate memory
-  radgrid.resize(nrad);
-
+void AtomGrid::check_grad_lapl(int x_func, int c_func) {
   // Do we need gradients?
-  do_grad=0;
+  do_grad=false;
   if(x_func>0)
     do_grad=do_grad || gradient_needed(x_func);
   if(c_func>0)
     do_grad=do_grad || gradient_needed(c_func);
 
   // Do we need laplacians?
-  do_lapl=0;
+  do_lapl=false;
   if(x_func>0)
     do_lapl=do_lapl || laplacian_needed(x_func);
   if(c_func>0)
     do_lapl=do_lapl || laplacian_needed(c_func);
+}
+
+atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t cenind, int x_func, int c_func, bool verbose) {
+  // Construct a grid centered on (x0,y0,z0)
+  // with nrad radial shells                         
+  // See Köster et al for specifics.
+
+  // Returned info
+  atomgrid_t ret;
+  ret.ngrid=0;
+  ret.nfunc=0;
+
+  Timer t;
+
+  // Store index of center
+  ret.atind=cenind;
+  // and its coordinates
+  ret.cen=bas.get_coords(cenind);
+
+  // Compute necessary number of radial points
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
+
+  // Get Chebyshev nodes and weights for radial part
+  std::vector<double> xc, wc;
+  chebyshev(nrad,xc,wc);
+
+  // Allocate memory
+  ret.sh.resize(nrad);
 
   // Loop over radii
   double rad, jac;
@@ -1226,9 +1129,9 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
     double weight=wc[ir]*rad*rad*jac;
 
     // Store shell data
-    radgrid[ir].r=rad;
-    radgrid[ir].w=weight;
-    radgrid[ir].l=3;
+    ret.sh[ir].r=rad;
+    ret.sh[ir].w=weight;
+    ret.sh[ir].l=3;
   }
   
   // Number of basis functions
@@ -1244,13 +1147,8 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
 
-  // Initial size of grid is
-  ngrid=0;
-  // Initial number of function values is
-  nfunc=0;
-
   // Now, determine actual quadrature limits shell by shell
-  for(size_t ir=0;ir<radgrid.size();ir++) {
+  for(size_t ir=0;ir<ret.sh.size();ir++) {
 
     do {
       // Clear current grid points and function values
@@ -1258,16 +1156,16 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
 
       // Form radial shell
       if(use_lobatto)
-	add_lobatto_shell(ir);
+	add_lobatto_shell(ret,ir);
       else
-	add_lebedev_shell(ir);
+	add_lebedev_shell(ret,ir);
       // Compute Becke weights for radial shell
-      becke_weights(bas,ir);
+      becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(1e-8*tol,ir);
+      prune_points(1e-8*tol,ret.sh[ir]);
 
       // Compute values of basis functions
-      compute_bf(bas,ir);
+      compute_bf(bas,ret,ir);
 
       // Compute density
       update_density(P);
@@ -1298,70 +1196,57 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & P, size_t cenind, dou
       // Increment order if tolerance not achieved.
       if(maxdiff>tol/xc.size()) {
 	if(use_lobatto)
-	  radgrid[ir].l+=2;
+	  ret.sh[ir].l+=2;
 	else {
 	  // Need to determine what is next order of Lebedev
 	  // quadrature that is supported.
-	  radgrid[ir].l=next_lebedev(radgrid[ir].l);
+	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/xc.size() && radgrid[ir].l<=lmax);
+    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
-    ngrid+=grid.size();
-    nfunc+=flist.size();
+    ret.ngrid+=grid.size();
+    ret.nfunc+=flist.size();
   }
   
   // Free memory once more
   free();
   
   if(verbose) {
-    printf("\t%4u %7u %8u %s\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc,t.elapsed().c_str());
+    printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
+
+  return ret;
 }
 
-AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, double toler, int x_func, int c_func, bool lobatto, bool verbose) {
+atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, int x_func, int c_func, bool verbose) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells                         
   // See Köster et al for specifics.
 
   Timer t;
 
+  // Returned info
+  atomgrid_t ret;
+  ret.ngrid=0;
+  ret.nfunc=0;
+
   // Store index of center
-  atind=cenind;
+  ret.atind=cenind;
   // and its coordinates
-  cen=bas.get_coords(cenind);
-
-  // Use Lobatto quadrature?
-  use_lobatto=lobatto;
-
-  // Grid tolerance
-  tol=toler;
+  ret.cen=bas.get_coords(cenind);
 
   // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(atind)])));
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> xc, wc;
   chebyshev(nrad,xc,wc);
 
   // Allocate memory
-  radgrid.resize(nrad);
-
-  // Do we need gradients?
-  do_grad=0;
-  if(x_func>0)
-    do_grad=do_grad || gradient_needed(x_func);
-  if(c_func>0)
-    do_grad=do_grad || gradient_needed(c_func);
-
-  // Do we need laplacians?
-  do_lapl=0;
-  if(x_func>0)
-    do_lapl=do_lapl || laplacian_needed(x_func);
-  if(c_func>0)
-    do_lapl=do_lapl || laplacian_needed(c_func);
+  ret.sh.resize(nrad);
 
   // Loop over radii
   double rad, jac;
@@ -1375,9 +1260,9 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
     double weight=wc[ir]*rad*rad*jac;
 
     // Store shell data
-    radgrid[ir].r=rad;
-    radgrid[ir].w=weight;
-    radgrid[ir].l=3;
+    ret.sh[ir].r=rad;
+    ret.sh[ir].w=weight;
+    ret.sh[ir].l=3;
   }
   
   // Number of basis functions
@@ -1398,13 +1283,8 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
 
-  // Initial size of grid is
-  ngrid=0;
-  // Initial number of function values is
-  nfunc=0;
-
   // Now, determine actual quadrature limits shell by shell
-  for(size_t ir=0;ir<radgrid.size();ir++) {
+  for(size_t ir=0;ir<ret.sh.size();ir++) {
 
     do {
       // Clear current grid points and function values
@@ -1412,16 +1292,16 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
 
       // Form radial shell
       if(use_lobatto)
-	add_lobatto_shell(ir);
+	add_lobatto_shell(ret,ir);
       else
-	add_lebedev_shell(ir);
+	add_lebedev_shell(ret,ir);
       // Compute Becke weights for radial shell
-      becke_weights(bas,ir);
+      becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(1e-8*tol,ir);
+      prune_points(1e-8*tol,ret.sh[ir]);
 
       // Compute values of basis functions
-      compute_bf(bas,ir);
+      compute_bf(bas,ret,ir);
 
       // Compute density
       update_density(Pa,Pb);
@@ -1457,74 +1337,80 @@ AtomGrid::AtomGrid(const BasisSet & bas, const arma::mat & Pa, const arma::mat &
       // Increment order if tolerance not achieved.
       if(maxdiff>tol/xc.size()) {
 	if(use_lobatto)
-	  radgrid[ir].l+=2;
+	  ret.sh[ir].l+=2;
 	else {
 	  // Need to determine what is next order of Lebedev
 	  // quadrature that is supported.
-	  radgrid[ir].l=next_lebedev(radgrid[ir].l);
+	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/xc.size() && radgrid[ir].l<=lmax);
+    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
-    ngrid+=grid.size();
-    nfunc+=flist.size();
+    ret.ngrid+=grid.size();
+    ret.nfunc+=flist.size();
   }
 
   // Free memory once more
   free();
   
   if(verbose) {
-    printf("\t%4u %7u %8u %s\n",(unsigned int) atind+1,(unsigned int) ngrid,(unsigned int) nfunc,t.elapsed().c_str());
+    printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
-}
 
+  return ret;
+}
 
 AtomGrid::~AtomGrid() {
 }
 
-void AtomGrid::form_grid(const BasisSet & bas) {
+void AtomGrid::form_grid(const BasisSet & bas, atomgrid_t & g) {
+  // Clear anything that already exists
+  free();
+
   // Check allocation
-  grid.reserve(ngrid);
+  grid.reserve(g.ngrid);
 
   // Loop over radial shells
-  for(size_t ir=0;ir<radgrid.size();ir++) {
+  for(size_t ir=0;ir<g.sh.size();ir++) {
     // Add grid points
     if(use_lobatto)
-      add_lobatto_shell(ir);
+      add_lobatto_shell(g,ir);			
     else
-      add_lebedev_shell(ir);
+      add_lebedev_shell(g,ir);
     // Do Becke weights
-    becke_weights(bas,ir);
+    becke_weights(bas,g,ir);
     // Prune points with small weight
-    prune_points(1e-8*tol,ir);
+    prune_points(1e-8*tol,g.sh[ir]);
   }
 }
 
-void AtomGrid::compute_bf(const BasisSet & bas) {
+void AtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g) {
   // Check allocation
-  flist.reserve(get_Nfuncs());
+  flist.reserve(g.nfunc);
   if(do_grad)
-    glist.reserve(3*get_Nfuncs());
+    glist.reserve(3*g.nfunc);
   if(do_lapl)
-    llist.reserve(get_Nfuncs());
+    llist.reserve(g.nfunc);
 
   // Loop over radial shells
-  for(size_t ir=0;ir<radgrid.size();ir++) {
-    compute_bf(bas,ir);
+  for(size_t ir=0;ir<g.sh.size();ir++) {
+    compute_bf(bas,g,ir);
   }
 }
   
 
-void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
+void AtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t irad) {
   // Compute values of relevant basis functions on irad:th shell
 
+  //  fprintf(stderr,"Computing bf of rad shell %i of atom %i\n",(int) g.atind,(int) irad);
+
   // Get distances of other nuclei
-  std::vector<double> nucdist=bas.get_nuclear_distances(atind);
+  std::vector<double> nucdist=bas.get_nuclear_distances(g.atind);
 
   // Current radius
-  double rad=radgrid[irad].r;
+  double rad=g.sh[irad].r;
 
   // Get ranges of shells
   std::vector<double> shran=bas.get_shell_ranges();
@@ -1552,7 +1438,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
 
   if(do_lapl) {
     // Loop over points
-    for(size_t ip=radgrid[irad].ind0;ip<radgrid[irad].ind0+radgrid[irad].np;ip++) {
+    for(size_t ip=g.sh[irad].ind0;ip<g.sh[irad].ind0+g.sh[irad].np;ip++) {
       // Store index of first function on grid point
       grid[ip].f0=flist.size();
       // Number of functions on point
@@ -1599,7 +1485,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
     }
   } else if(do_grad) {
     // Loop over points
-    for(size_t ip=radgrid[irad].ind0;ip<radgrid[irad].ind0+radgrid[irad].np;ip++) {
+    for(size_t ip=g.sh[irad].ind0;ip<g.sh[irad].ind0+g.sh[irad].np;ip++) {
       // Store index of first function on grid point
       grid[ip].f0=flist.size();
       // Number of functions on point
@@ -1642,7 +1528,7 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
     }
   } else {
     // Loop over points
-    for(size_t ip=radgrid[irad].ind0;ip<radgrid[irad].ind0+radgrid[irad].np;ip++) {
+    for(size_t ip=g.sh[irad].ind0;ip<g.sh[irad].ind0+g.sh[irad].np;ip++) {
       // Store index of first function on grid point
       grid[ip].f0=flist.size();
       // Number of functions on point
@@ -1681,21 +1567,22 @@ void AtomGrid::compute_bf(const BasisSet & bas, size_t irad) {
   }
 }
 
-size_t AtomGrid::get_Npoints() const {
-  return ngrid;
-}
-
-size_t AtomGrid::get_Nfuncs() const {
-  return nfunc;
-}
-
-DFTGrid::DFTGrid(const BasisSet * bas, bool dir, bool ver, bool lobatto) {
+DFTGrid::DFTGrid(const BasisSet * bas, bool ver, bool lobatto) {
   basp=bas;
-  direct=dir;
   verbose=ver;
   use_lobatto=lobatto;
 
-  atoms.resize(basp->get_Nnuc());
+  // Allocate atomic grids
+  grids.resize(bas->get_Nnuc());
+
+  // Allocate work grids
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+  for(int i=0;i<nth;i++)
+    wrk.push_back(AtomGrid(lobatto));
+#else
+  wrk.push_back(AtomGrid(lobatto));
+#endif
 }
 
 DFTGrid::~DFTGrid() {
@@ -1709,33 +1596,33 @@ void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func)
     printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
   }
 
+  // Set tolerances
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].set_tolerance(tol);
+  // Check necessity of gradients and laplacians
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].check_grad_lapl(x_func,c_func);
+
   Timer t;
 
   size_t Nat=basp->get_Nnuc();
 
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
-#endif  
+#pragma omp parallel
+  {
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+    for(size_t i=0;i<Nat;i++) {
+      grids[i]=wrk[ith].construct(*basp,P,i,x_func,c_func,verbose);
+    }
+  }
+#else
   for(size_t i=0;i<Nat;i++)
-    atoms[i]=AtomGrid(*basp,P,i,tol,x_func,c_func,use_lobatto,verbose);
+    grids[i]=wrk[0].construct(*basp,P,i,x_func,c_func,verbose);
+#endif
+  
   if(verbose)
     printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
-
-  // If we are not running a direct calculation, compute grids and basis functions.
-  if(!direct) {
-    t.set();
-
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
-#endif
-    for(size_t i=0;i<Nat;i++) {
-      atoms[i].form_grid(*basp);
-      atoms[i].compute_bf(*basp);
-    }
-    
-    if(verbose)
-      printf("Basis functions computed on grid in %s.\n",t.elapsed().c_str());
-  }
 }
 
 void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, int x_func, int c_func) {
@@ -1744,75 +1631,46 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
     printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
   }
 
+  // Set tolerances
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].set_tolerance(tol);
+  // Check necessity of gradients and laplacians
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].check_grad_lapl(x_func,c_func);
+
   Timer t;
 
   size_t Nat=basp->get_Nnuc();
 
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
-#endif  
+#pragma omp parallel
+  {
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+    for(size_t i=0;i<Nat;i++)
+      grids[i]=wrk[ith].construct(*basp,Pa,Pb,i,x_func,c_func,verbose);
+  }
+#else
   for(size_t i=0;i<Nat;i++)
-    atoms[i]=AtomGrid(*basp,Pa,Pb,i,tol,x_func,c_func,use_lobatto,verbose);
+    grids[i]=wrk[0].construct(*basp,Pa,Pb,i,x_func,c_func,verbose);
+#endif  
+
   if(verbose)
     printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
-
-  // If we are not running a direct calculation, compute grids and basis functions.
-  if(!direct) {
-    t.set();
-
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
-#endif
-    for(size_t i=0;i<Nat;i++) {
-      atoms[i].form_grid(*basp);
-      atoms[i].compute_bf(*basp);
-    }
-
-    if(verbose)
-      printf("Basis functions computed on grid in %s.\n",t.elapsed().c_str());
-  }
 }
 
 size_t DFTGrid::get_Npoints() const {
   size_t np=0;
-  for(size_t i=0;i<atoms.size();i++)
-    np+=atoms[i].get_Npoints();
+  for(size_t i=0;i<grids.size();i++)
+    np+=grids[i].ngrid;
   return np;
 }
 
 size_t DFTGrid::get_Nfuncs() const {
   size_t nf=0;
-  for(size_t i=0;i<atoms.size();i++)
-    nf+=atoms[i].get_Nfuncs();
+  for(size_t i=0;i<grids.size();i++)
+    nf+=grids[i].nfunc;
   return nf;
-}
-
-size_t DFTGrid::memory_req_grid() const {
-  size_t n=0;
-  for(size_t i=0;i<atoms.size();i++)
-    n+=atoms[i].memory_req_grid();
-  return n;
-}
-
-size_t DFTGrid::memory_req_bf() const {
-  size_t n=0;
-  for(size_t i=0;i<atoms.size();i++)
-    n+=atoms[i].memory_req_bf();
-  return n;
-}
-
-size_t DFTGrid::memory_req() const {
-  return memory_req_grid()+memory_req_bf();
-}
-
-void DFTGrid::print_memory_req() const {
-  size_t grid=memory_req_grid();
-  size_t bf=memory_req_bf();
-
-  printf("Grid points take %s of memory.\n",memory_size(grid).c_str());
-  printf("Basis functions take %s of memory.\n",memory_size(bf).c_str());
-  printf("All in all DFT grid memory consumption is %s.\n",memory_size(grid+bf).c_str());
-  fflush(stdout);
 }
 
 #ifdef CONSISTENCYCHECK
@@ -1861,36 +1719,31 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 
 #pragma omp for schedule(dynamic,1)
     // Loop over atoms
-    for(size_t i=0;i<atoms.size();i++) {
-      if(direct) {
-	// Form grid
-	atoms[i].form_grid(*basp);
-	// Compute values of basis functions
-	atoms[i].compute_bf(*basp);
-      }
+    for(size_t i=0;i<grids.size();i++) {
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[i]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[i]);
       
       // Update density
-      atoms[i].update_density(P);
+      wrk[ith].update_density(P);
       // Update number of electrons
-      Nelwrk[ith]+=atoms[i].compute_Nel();
+      Nelwrk[ith]+=wrk[ith].compute_Nel();
       
       // Initialize the arrays
-      atoms[i].init_xc();
+      wrk[ith].init_xc();
       // Compute the functionals
       if(x_func>0)
-	atoms[i].compute_xc(x_func);
+	wrk[ith].compute_xc(x_func);
       if(c_func>0)
-	atoms[i].compute_xc(c_func);
+	wrk[ith].compute_xc(c_func);
 
       // Evaluate the energy
-      Excwrk[ith]+=atoms[i].eval_Exc();
+      Excwrk[ith]+=wrk[ith].eval_Exc();
       // and construct the Fock matrices
-      atoms[i].eval_Fxc(Hwrk[ith]);
-      
-      if(direct) {
-	// Free memory
-	atoms[i].free();
-      }
+      wrk[ith].eval_Fxc(Hwrk[ith]);
+      // Free memory
+      wrk[ith].free();
     }
   } // End parallel region
 
@@ -1901,36 +1754,31 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
     Exc+=Excwrk[i];
   }
 #else
-  for(size_t i=0;i<atoms.size();i++) {
-    if(direct) {
-      // Form grid
-      atoms[i].form_grid(*basp);
-      // Compute values of basis functions
-      atoms[i].compute_bf(*basp);
-    }
+  for(size_t i=0;i<grids.size();i++) {
+    // Change atom and create grid
+    wrk[0].form_grid(*basp,grids[i]);
+    // Compute basis functions
+    wrk[0].compute_bf(*basp,grids[i]);
 
     // Update density
-    atoms[i].update_density(P);
+    wrk[0].update_density(P);
     // Update number of electrons
-    Nel+=atoms[i].compute_Nel();
+    Nel+=wrk[0].compute_Nel();
     
     // Initialize the arrays
-    atoms[i].init_xc();
+    wrk[0].init_xc();
     // Compute the functionals
     if(x_func>0)
-      atoms[i].compute_xc(x_func);
+      wrk[0].compute_xc(x_func);
     if(c_func>0)
-      atoms[i].compute_xc(c_func);
+      wrk[0].compute_xc(c_func);
 
     // Evaluate the energy
-    Exc+=atoms[i].eval_Exc();
+    Exc+=wrk[0].eval_Exc();
     // and construct the Fock matrices
-    atoms[i].eval_Fxc(H);
-
-    if(direct) {
-      // Free memory
-      atoms[i].free();
-    }
+    wrk[0].eval_Fxc(H);
+    // Free memory
+    wrk[0].free();
   }
 #endif
 }
@@ -1964,7 +1812,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
     Nelwrk.push_back(0.0);
     Excwrk.push_back(0.0);
   }
-  
+
 #pragma omp parallel shared(Hawrk,Hbwrk,Nelwrk,Excwrk)
   { // Begin parallel region
     
@@ -1973,36 +1821,33 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
     
 #pragma omp for schedule(dynamic,1)
     // Loop over atoms
-    for(size_t i=0;i<atoms.size();i++) {
-      if(direct) {
-	// Form grid
-	atoms[i].form_grid(*basp);
-	// Compute values of basis functions
-	atoms[i].compute_bf(*basp);
-      }
+    for(size_t i=0;i<grids.size();i++) {
+
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[i]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[i]);
       
       // Update density
-      atoms[i].update_density(Pa,Pb);
+      wrk[ith].update_density(Pa,Pb);
       // Update number of electrons
-      Nel+=atoms[i].compute_Nel();
+      Nel+=wrk[ith].compute_Nel();
 
       // Initialize the arrays
-      atoms[i].init_xc();
+      wrk[ith].init_xc();
       // Compute the functionals
       if(x_func>0)
-        atoms[i].compute_xc(x_func);
+        wrk[ith].compute_xc(x_func);
       if(c_func>0)
-        atoms[i].compute_xc(c_func);
+        wrk[ith].compute_xc(c_func);
 
       // Evaluate the energy
-      Exc+=atoms[i].eval_Exc();
+      Exc+=wrk[ith].eval_Exc();
       // and construct the Fock matrices
-      atoms[i].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
+      wrk[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
            
-      if(direct) {
-	// Free memory
-	atoms[i].free();
-      }
+      // Free memory
+      wrk[ith].free();
     }
   } // End parallel region
   
@@ -2015,37 +1860,32 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
   }
 #else
   // Loop over atoms
-  for(size_t i=0;i<atoms.size();i++) {
-    if(direct) {
-      // Form grid
-      atoms[i].form_grid(*basp);
-      // Compute values of basis functions
-      atoms[i].compute_bf(*basp);
-    }
-
+  for(size_t i=0;i<grids.size();i++) {
+    // Change atom and create grid
+    wrk[0].form_grid(*basp,grids[i]);
+    // Compute basis functions
+    wrk[0].compute_bf(*basp,grids[i]);
+    
     // Update density
-    atoms[i].update_density(Pa,Pb);
+    wrk[0].update_density(Pa,Pb);
     // Update number of electrons
-    Nel+=atoms[i].compute_Nel();
+    Nel+=wrk[0].compute_Nel();
 
     // Initialize the arrays
-    atoms[i].init_xc();
+    wrk[0].init_xc();
     // Compute the functionals
     if(x_func>0)
-      atoms[i].compute_xc(x_func);
+      wrk[0].compute_xc(x_func);
     if(c_func>0)
-      atoms[i].compute_xc(c_func);
+      wrk[0].compute_xc(c_func);
 
     // Evaluate the energy
-    Exc+=atoms[i].eval_Exc();
+    Exc+=wrk[0].eval_Exc();
     // and construct the Fock matrices
-    atoms[i].eval_Fxc(Ha,Hb);
+    wrk[0].eval_Fxc(Ha,Hb);
  
-
-    if(direct) {
-      // Free memory
-      atoms[i].free();
-    }
+    // Free memory
+    wrk[0].free();
   }
 #endif
 }

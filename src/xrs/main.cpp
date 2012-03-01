@@ -312,7 +312,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   arma::mat XCa, XCb;
   {
     double Exc, Nelnum;
-    DFTGrid grid(&augbas,true,true,false);
+    DFTGrid grid(&augbas);
     grid.construct(Paaug,Pbaug,dft.gridtol,dft.x_func,dft.c_func);
     taug.set();
     grid.eval_Fxc(dft.x_func,dft.c_func,Paaug,Pbaug,XCa,XCb,Exc,Nelnum);
