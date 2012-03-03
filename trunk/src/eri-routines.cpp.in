@@ -163,9 +163,36 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 #endif
 
   // Get list of unique shell pairs
-  std::vector<shellpair_t> pairs=basp->get_unique_shellpairs();
+  std::vector<shellpair_t> shpairs=basp->get_unique_shellpairs();
   // Get number of shell pairs
-  const size_t Npairs=pairs.size();
+  const size_t Npairs=shpairs.size();
+
+  // Maximum density matrix
+#ifndef ERITABLE
+  const size_t Nsh=basp->get_Nshells();
+  arma::mat Psh(Nsh,Nsh);
+  Psh.zeros();
+
+  // Collect maximum density
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t ip=0;ip<Npairs;ip++) {
+    // Shells are
+    size_t is=shpairs[ip].is;
+    size_t js=shpairs[ip].js;
+    // First functions on shells are
+    size_t i0=basp->get_first_ind(is);
+    size_t j0=basp->get_first_ind(js);
+    // Indices of last functions on shells
+    size_t ilast=basp->get_last_ind(is);
+    size_t jlast=basp->get_last_ind(js);
+    
+    // Maximum value of density is
+    Psh(is,js)=max_abs(R.submat(i0,j0,ilast,jlast));
+    Psh(js,is)=Psh(is,js);
+  }
+#endif
 
 
   // Loop over first pairs
@@ -199,8 +226,8 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
       for(size_t jp=0;jp<=ip;jp++) {
 
 	// Shells on first pair are
-	size_t ks=pairs[ip].is;
-	size_t ls=pairs[ip].js;
+	size_t ks=shpairs[ip].is;
+	size_t ls=shpairs[ip].js;
 	// First functions on shells are
 	size_t k0=basp->get_first_ind(ks);
 	size_t l0=basp->get_first_ind(ls);
@@ -208,27 +235,15 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	size_t Nk=basp->get_Nbf(ks);
 	size_t Nl=basp->get_Nbf(ls);
 	
-#ifndef ERITABLE
-	// Indices of last functions on shells
-	size_t klast=basp->get_last_ind(ks);
-	size_t llast=basp->get_last_ind(ls);
-#endif
-      
 	// Shells on second pair are
-	size_t is=pairs[jp].is;
-	size_t js=pairs[jp].js;
+	size_t is=shpairs[jp].is;
+	size_t js=shpairs[jp].js;
 	// First functions on shells are
 	size_t i0=basp->get_first_ind(is);
 	size_t j0=basp->get_first_ind(js);
 	// and amounts of functions on shells are
 	size_t Ni=basp->get_Nbf(is);
 	size_t Nj=basp->get_Nbf(js);
-	
-#ifndef ERITABLE
-	// Indices of last functions on shells
-	size_t ilast=basp->get_last_ind(is);
-	size_t jlast=basp->get_last_ind(js);
-#endif
 	
 	/* Perform screening of integrals */
 #ifndef ERITABLE
@@ -242,19 +257,15 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	  
 	} else {
 	  // Compute maximum density
-	  
-	  // Maximum value of density
-	  double maxR, maxR_arr[6], maxR_red[2];
-	  maxR_arr[0]=max_abs(R.submat(i0,j0,ilast,jlast));
-	  maxR_arr[1]=max_abs(R.submat(i0,k0,ilast,klast));
-	  maxR_arr[2]=max_abs(R.submat(i0,l0,ilast,llast));
-	  maxR_arr[3]=max_abs(R.submat(j0,k0,jlast,klast));
-	  maxR_arr[4]=max_abs(R.submat(j0,l0,jlast,llast));
-	  maxR_arr[5]=max_abs(R.submat(k0,l0,klast,llast));
-	  
-	  maxR_red[0]=max4(maxR_arr[0],maxR_arr[1],maxR_arr[2],maxR_arr[3]);
-	  maxR_red[1]=std::max(maxR_arr[4],maxR_arr[5]);
-	  maxR=std::max(maxR_red[0],maxR_red[1]);
+	  arma::vec Rv(6);
+	  Rv.zeros();
+	  Rv(0)=Psh(is,js);
+	  Rv(1)=Psh(is,ks);
+	  Rv(2)=Psh(is,ls);
+	  Rv(3)=Psh(js,ks);
+	  Rv(4)=Psh(js,ls);
+	  Rv(5)=Psh(ks,ls);
+	  double maxR=max(Rv);
 	  
 	  if(maxR*intmax<tol) {
 	    // Skip integral due to small product of density and integral
