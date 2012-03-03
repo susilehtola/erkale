@@ -32,7 +32,7 @@
 #endif
 
 // To check that every nonequivalent integral is computed exactly once
-#define CHECKFILL
+//#define CHECKFILL
 
 
 ERItable::ERItable() {
