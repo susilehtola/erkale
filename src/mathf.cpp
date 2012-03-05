@@ -86,6 +86,9 @@ double boysF(int m, double x) {
     // instead, which is accurate enough
 
     return 1.0/(2*m+1.0) - x2/(2*m+3.0) + 0.5*x2*x2/(2*m+5.0);
+  } else if(x>=40.0) {
+    // Use asymptotic expansion, which is precise to <1e-16 for F_n(x), n = 0 .. 60
+    return doublefact(2*m-1)/pow(2,m+1)*sqrt(M_PI/pow(x,2*m+1));
   } else
     return 0.5*gsl_sf_gamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
 }
