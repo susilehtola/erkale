@@ -49,9 +49,9 @@ printf("\n");
 #ifndef CALCK
 		    // Increment Coulomb
 #ifdef _OPENMP
-		    Jwrk[thid](iarr[inid],jarr[inid])+=R(karr[inid],larr[inid])*res;
+		    Jwrk(iarr[inid],jarr[inid])+=Pwrk(karr[inid],larr[inid])*res;
 #else
-		    J(iarr[inid],jarr[inid])+=R(karr[inid],larr[inid])*res;
+		    J(iarr[inid],jarr[inid])+=P(karr[inid],larr[inid])*res;
 #endif
 #endif // ifndef CALCK
 
@@ -59,9 +59,9 @@ printf("\n");
 #if defined(CALCK) || defined(CALCJK)
 		    // Increment exchange
 #ifdef _OPENMP
-		    Kwrk[thid](iarr[inid],larr[inid])+=R(jarr[inid],karr[inid])*res;
+		    Kwrk(iarr[inid],larr[inid])+=Pwrk(jarr[inid],karr[inid])*res;
 #else
-		    K(iarr[inid],larr[inid])+=R(jarr[inid],karr[inid])*res;
+		    K(iarr[inid],larr[inid])+=P(jarr[inid],karr[inid])*res;
 #endif
 #endif // if defined(CALCK) || defined(CALCJK)
 
@@ -69,11 +69,11 @@ printf("\n");
 #ifdef CALCJKab
 		    // Increment exchange
 #ifdef _OPENMP
-		    Kawrk[thid](iarr[inid],larr[inid])+=Ra(jarr[inid],karr[inid])*res;
-		    Kbwrk[thid](iarr[inid],larr[inid])+=Rb(jarr[inid],karr[inid])*res;
+		    Kawrk(iarr[inid],larr[inid])+=Pawrk(jarr[inid],karr[inid])*res;
+		    Kbwrk(iarr[inid],larr[inid])+=Pbwrk(jarr[inid],karr[inid])*res;
 #else
-		    Ka(iarr[inid],larr[inid])+=Ra(jarr[inid],karr[inid])*res;
-		    Kb(iarr[inid],larr[inid])+=Rb(jarr[inid],karr[inid])*res;
+		    Ka(iarr[inid],larr[inid])+=Pa(jarr[inid],karr[inid])*res;
+		    Kb(iarr[inid],larr[inid])+=Pb(jarr[inid],karr[inid])*res;
 #endif
 #endif // ifdef CALCJKab
 		  }
