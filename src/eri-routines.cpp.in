@@ -13,16 +13,16 @@ void ERItable::fill(const BasisSet * basp) {
 #else
 
 #if defined(CALCJKab)
-void ERIscreen::calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
+void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
 // Compute total density for Coulomb matrix
-  arma::mat R=Ra+Rb;
+  arma::mat P=Pa+Pb;
 #elif defined(CALCJK)
-void ERIscreen::calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff) const {
+void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol, double *eff) const {
 #elif defined(CALCK)
-arma::mat ERIscreen::calcK(const arma::mat & R, double tol, double *eff) const {
+arma::mat ERIscreen::calcK(const arma::mat & P, double tol, double *eff) const {
   arma::mat K;
 #else
-arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
+arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
   arma::mat J;
 #endif // if defined(CALCJKab)
 
@@ -34,12 +34,12 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
   /* Check sizes of input */
 
 #if defined(CALCK) || defined(CALCJK)
-  MAT_SIZE_CHECK(R,Nbf,Nbf,"R is not square!\n");
+  MAT_SIZE_CHECK(P,Nbf,Nbf,"P is not square!\n");
 #endif
 
 #if defined(CALCJKab)
-  MAT_SIZE_CHECK(Ra,Nbf,Nbf,"Ra is not square!\n");
-  MAT_SIZE_CHECK(Rb,Nbf,Nbf,"Rb is not square!\n");
+  MAT_SIZE_CHECK(Pa,Nbf,Nbf,"Pa is not square!\n");
+  MAT_SIZE_CHECK(Pb,Nbf,Nbf,"Pb is not square!\n");
 #endif
 
   /* Check size of output */
@@ -61,41 +61,6 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
   Ka.zeros();
   Kb.zeros(); 
 #endif
-
-  /* Allocate worker memory */
-#ifdef _OPENMP
-  // Get (maximum) number of threads
-  int nth=omp_get_max_threads();
-
-#ifndef CALCK
-  std::vector<arma::mat> Jwrk;
-  for(int i=0;i<nth;i++) {
-    arma::mat zeros(Nbf,Nbf);
-    zeros.zeros();
-    Jwrk.push_back(zeros);
-  }
-#endif
-
-#if defined(CALCK) || defined(CALCJK)
-  std::vector<arma::mat> Kwrk;
-  for(int i=0;i<nth;i++) {
-    arma::mat zeros(Nbf,Nbf);
-    zeros.zeros();
-    Kwrk.push_back(zeros);
-  }
-#endif
-
-#ifdef CALCJKab
-  std::vector<arma::mat> Kawrk, Kbwrk;
-  for(int i=0;i<nth;i++) {
-    arma::mat zeros(Nbf,Nbf);
-    zeros.zeros();
-    Kawrk.push_back(zeros);
-    Kbwrk.push_back(zeros);
-  }
-#endif
-
-#endif // ifdef _OPENMP
 
 #endif // ifndef ERITABLE
 
@@ -189,7 +154,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
     size_t jlast=basp->get_last_ind(js);
     
     // Maximum value of density is
-    Psh(is,js)=max_abs(R.submat(i0,j0,ilast,jlast));
+    Psh(is,js)=max_abs(P.submat(i0,j0,ilast,jlast));
     Psh(js,is)=Psh(is,js);
   }
 #endif
@@ -211,19 +176,46 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
     // Arrays of identical integrals
     size_t iarr[8], jarr[8], karr[8], larr[8];
     size_t nid; // Number of identical integrals in this batch
-#endif
 
 #ifdef _OPENMP
-
-#ifndef ERITABLE
-    int thid=omp_get_thread_num();
+    const arma::mat Pwrk=P;
+    const arma::mat Pshwrk=Psh;
+#ifdef CALCJKab
+    const arma::mat Pawrk=Pa;
+    const arma::mat Pbwrk=Pb;
+#endif
 #endif
 
+#ifdef _OPENMP    
+#ifndef CALCK
+    arma::mat Jwrk(Nbf,Nbf);
+    Jwrk.zeros();
+#endif
+
+#if defined(CALCK) || defined(CALCJK)
+    arma::mat Kwrk(Nbf,Nbf);
+    Kwrk.zeros();
+#endif
+
+#ifdef CALCJKab
+    arma::mat Kawrk(Nbf,Nbf);
+    Kawrk.zeros();
+
+    arma::mat Kbwrk(Nbf,Nbf);
+    Kbwrk.zeros();
+#endif
+#endif
+
+#endif // ifndef ERITABLE
+
+
+#ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif // ifdef _OPENMP
     for(size_t ip=0;ip<Npairs;ip++) {
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++) {
+
 
 	// Shells on first pair are
 	size_t ks=shpairs[ip].is;
@@ -257,17 +249,26 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	  
 	} else {
 	  // Compute maximum density
-	  arma::vec Rv(6);
-	  Rv.zeros();
-	  Rv(0)=Psh(is,js);
-	  Rv(1)=Psh(is,ks);
-	  Rv(2)=Psh(is,ls);
-	  Rv(3)=Psh(js,ks);
-	  Rv(4)=Psh(js,ls);
-	  Rv(5)=Psh(ks,ls);
-	  double maxR=max(Rv);
+	  arma::vec Pv(6);
+	  Pv.zeros();
+#ifdef _OPENMP
+	  Pv(0)=Pshwrk(is,js);
+	  Pv(1)=Pshwrk(is,ks);
+	  Pv(2)=Pshwrk(is,ls);
+	  Pv(3)=Pshwrk(js,ks);
+	  Pv(4)=Pshwrk(js,ls);
+	  Pv(5)=Pshwrk(ks,ls);
+#else
+	  Pv(0)=Psh(is,js);
+	  Pv(1)=Psh(is,ks);
+	  Pv(2)=Psh(is,ls);
+	  Pv(3)=Psh(js,ks);
+	  Pv(4)=Psh(js,ls);
+	  Pv(5)=Psh(ks,ls);
+#endif
+	  double maxP=max(Pv);
 	  
-	  if(maxR*intmax<tol) {
+	  if(maxP*intmax<tol) {
 	    // Skip integral due to small product of density and integral
 	    denskip++;
 	    continue;
@@ -381,32 +382,29 @@ arma::mat ERIscreen::calcJ(const arma::mat & R, double tol, double *eff) const {
 	} // end critical region
       }
     }
-  } // end parallel region
-
-  /* Sum results together */
-#if defined(_OPENMP) && !defined(ERITABLE)
+    
+    // Collect results
+#if !defined(ERITABLE) && defined(_OPENMP)
 
 #ifndef CALCK
-  for(int i=0;i<nth;i++) {
-    J+=Jwrk[i];
-  }
+#pragma omp critical
+    J+=Jwrk;
 #endif
 
 #if defined(CALCK) || defined(CALCJK)
-  for(int i=0;i<nth;i++) {
-    K+=Kwrk[i];
-  }
+#pragma omp critical
+    K+=Kwrk;
 #endif
 
 #ifdef CALCJKab
-  for(int i=0;i<nth;i++) {
-    Ka+=Kawrk[i];
-    Kb+=Kbwrk[i];
-  }
+#pragma omp critical
+    Ka+=Kawrk;
+    Kb+=Kbwrk;
 #endif
 
 #endif
 
+  } // end parallel region
   
 #ifdef CHECKFILL  
   size_t ndupl=0, nmiss=0;
