@@ -35,101 +35,128 @@ Settings::~Settings() {
 
 void Settings::add_scf_settings() {
   // Dummy functional: this will be set to HF or a X-C combination
-  sset.push_back(gens("Method", "Method used in calculation (HF or a DFT functional)", "Dummy"));
+  add_string("Method", "Method used in calculation (HF or a DFT functional)", "Dummy");
 
   // Default basis set
-  sset.push_back(gens("Basis", "Basis set used in calculation", "aug-cc-pVTZ"));
+  add_string("Basis", "Basis set used in calculation", "aug-cc-pVTZ");
 
   // Input system
-  sset.push_back(gens("System", "System as an xyz file", "atoms.xyz"));
-
+  add_string("System", "System as an xyz file", "atoms.xyz");
+  
   // Log file
-  sset.push_back(gens("Logfile", "File to print out full information, stdout for screen", "erkale.log"));
-
+  add_string("Logfile", "File to print out full information, stdout for screen", "erkale.log");
+  
   // Use spherical harmonics.
-  bset.push_back(genb("UseLM", "Use a spherical harmonics basis set by default?", true));
+  add_bool("UseLM", "Use a spherical harmonics basis set by default?", true);
   
   // Decontract basis set?
-  sset.push_back(gens("Decontract","Indices of atoms to decontract basis set for",""));
-
+  add_string("Decontract","Indices of atoms to decontract basis set for","");
+  
   // Use DIIS.
-  bset.push_back(genb("UseDIIS", "Use Pulay's Direct Inversion in the Iterative Subspace?", true));
+  add_bool("UseDIIS", "Use Pulay's Direct Inversion in the Iterative Subspace?", true);
   // Use old version of DIIS?
-  bset.push_back(genb("C1-DIIS", "Use older version of DIIS (C1-DIIS instead of C2-DIIS)?", false));
+  add_bool("C1-DIIS", "Use older version of DIIS (C1-DIIS instead of C2-DIIS)?", false);
   // Number of DIIS matrices to use?
-  iset.push_back(geni("DIISOrder", "How many DIIS iterations to keep in memory?", 20));
+  add_int("DIISOrder", "How many DIIS iterations to keep in memory?", 20);
   // DIIS threshold
-  dset.push_back(gend("DIISThr", "DIIS error threshold for DIIS updates", 0.05));
+  add_double("DIISThr", "DIIS error threshold for DIIS updates", 0.05);
 
   // Use ADIIS?
-  bset.push_back(genb("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", true));
+  add_bool("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", true);
   // Use Broyden mixing?
-  bset.push_back(genb("UseBroyden", "Use Broyden mixing of Fock matrices?", false));
+  add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);
   // Use Trust-Region Roothaan-Hall?
-  bset.push_back(genb("UseTRRH", "Use Trust-Region Roothaan-Hall?", false));
+  add_bool("UseTRRH", "Use Trust-Region Roothaan-Hall?", false);
   
   // Total charge of system
-  iset.push_back(geni("Charge", "Total charge of system", 0));
+  add_int("Charge", "Total charge of system", 0);
   // Multiplicity
-  iset.push_back(geni("Multiplicity", "Spin multiplicity", 1));
+  add_int("Multiplicity", "Spin multiplicity", 1);
   // Occupancies
-  sset.push_back(gens("Occupancies", "Orbital occupancies", ""));
-
+  add_string("Occupancies", "Orbital occupancies", "");
+  
   // Use core guess? Default is atomic.
-  bset.push_back(genb("CoreGuess","Use core guess instead of atomic guess",false));
+  add_bool("CoreGuess","Use core guess instead of atomic guess",false);
 
   // Verbose run?
-  bset.push_back(genb("Verbose", "Verbose calculation?", true));
+  add_bool("Verbose", "Verbose calculation?", true);
 
   // Direct calculation?
-  bset.push_back(genb("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false));
+  add_bool("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false);
 
   // Default orthogonalization method
-  sset.push_back(gens("BasisOrth", "Method of orthonormalization of basis set", "Can"));
+  add_string("BasisOrth", "Method of orthonormalization of basis set", "Can");
 
   // Default cutoff for orthogonalization
-  dset.push_back(gend("BasisLinTol", "Cutoff for linearly dependent basis functions", 1e-5));
+  add_double("BasisLinTol", "Cutoff for linearly dependent basis functions", 1e-5);
 
   // Convergence criteria
-  dset.push_back(gend("DeltaPrms", "Maximum allowed RMS difference of density matrix", 1e-8));
-  dset.push_back(gend("DeltaPmax", "Maximum allowed maximum difference of density matrix", 1e-6));
-  dset.push_back(gend("DeltaEmax", "Maximum allowed change of energy", 1e-6));
+  add_double("DeltaPrms", "Maximum allowed RMS difference of density matrix", 1e-8);
+  add_double("DeltaPmax", "Maximum allowed maximum difference of density matrix", 1e-6);
+  add_double("DeltaEmax", "Maximum allowed change of energy", 1e-6);
 
   // Maximum iterations
-  iset.push_back(geni("MaxIter", "Maximum number of iterations in SCF cycle", 100));
+  add_int("MaxIter", "Maximum number of iterations in SCF cycle", 100);
 }
 
 void Settings::add_dft_settings() {
   // Store full DFT grid in memory?
-  bset.push_back(genb("DFTDirect", "Save memory by not storing values of basis functions in memory", false));
+  add_bool("DFTDirect", "Save memory by not storing values of basis functions in memory", false);
   // Store full DFT grid in memory?
-  bset.push_back(genb("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false));
+  add_bool("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false);
   
   // Initial and final tolerances of DFT grid
-  dset.push_back(gend("DFTInitialTol", "Tolerance of initial DFT grid", 1e-4));
-  dset.push_back(gend("DFTFinalTol", "Tolerance of final DFT grid", 1e-5));
+  add_double("DFTInitialTol", "Tolerance of initial DFT grid", 1e-4);
+  add_double("DFTFinalTol", "Tolerance of final DFT grid", 1e-5);
   // Relative factor for initialization
-  dset.push_back(gend("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0));
+  add_double("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0);
   
   // Use density fitting if possible?
-  bset.push_back(genb("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", true));
+  add_bool("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", true);
   // Which basis to use as density fitting basis
-  sset.push_back(gens("DFTFittingBasis", "Basis to use for density fitting (Auto for automatic)","Auto"));
+  add_string("DFTFittingBasis", "Basis to use for density fitting (Auto for automatic)","Auto");
 }
-  
+
 void Settings::add_double(std::string name, std::string comment, double val) {
+  // Check that setting does not exist
+  if(is_double(name)) {
+    std::ostringstream oss;
+    oss << "Error in add_double: setting " << name << " already exists!";
+    throw std::runtime_error(oss.str());
+  }
+
   dset.push_back(gend(name,comment,val));
 }
 
 void Settings::add_bool(std::string name, std::string comment, bool val) {
+  // Check that setting does not exist
+  if(is_bool(name)) {
+    std::ostringstream oss;
+    oss << "Error in add_bool: setting " << name << " already exists!";
+    throw std::runtime_error(oss.str());
+  }
+
   bset.push_back(genb(name,comment,val));
 }
 
 void Settings::add_int(std::string name, std::string comment, int val) {
+  // Check that setting does not exist
+  if(is_int(name)) {
+    std::ostringstream oss;
+    oss << "Error in add_int: setting " << name << " already exists!";
+    throw std::runtime_error(oss.str());
+  }
+
   iset.push_back(geni(name,comment,val));
 }
 
 void Settings::add_string(std::string name, std::string comment, std::string val) {
+  // Check that setting does not exist
+  if(is_string(name)) {
+    std::ostringstream oss;
+    oss << "Error in add_string: setting " << name << " already exists!";
+    throw std::runtime_error(oss.str());
+  }
   sset.push_back(gens(name,comment,val));
 }
 
@@ -321,7 +348,11 @@ void Settings::parse(std::string filename) {
 	    set_string("Method","ROHF");
 	  else {
 	    // Add dft related settings
-	    add_dft_settings();
+	    try {
+	      add_dft_settings();
+	    } catch(std::runtime_error) {
+	      // Settings already added, as e.g. in xrs executable.
+	    }	    
 	    set_string("Method",words[1]);
 	  }
 
