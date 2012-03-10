@@ -794,6 +794,7 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_scf_settings();
+  // Need to add DFT settings so that DFTDelta setting is available
   set.add_dft_settings();
 
   // Change defaults
