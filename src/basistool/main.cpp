@@ -75,39 +75,47 @@ int main(int argc, char **argv) {
   } else if(stricmp(cmd,"composition")==0) {
     // Determine composition of basis set.
 
-    if(argc!=4) {
-      printf("\nUsage: %s input.gbs composition El\n",argv[0]);
+    if(argc!=3 && argc!=4) {
+      printf("\nUsage: %s input.gbs composition (El)\n",argv[0]);
       return 1;
     }
 
-    // Get element
-    std::string el(argv[3]);
-    // Get the basis set
-    ElementBasisSet elbas=bas.get_element(el);
+    // Elemental basis sets
+    std::vector<ElementBasisSet> elbases;
 
-    // Decontracted basis
-    ElementBasisSet eldec(elbas);
-    eldec.decontract();
+    if(argc==4)
+      elbases.push_back(bas.get_element(argv[3]));
+    else
+      elbases=bas.get_elements();
 
-    // Get the shells
-    std::vector<FunctionShell> sh=elbas.get_shells();
-    std::vector<FunctionShell> decsh=eldec.get_shells();
-
-    // Count the shells
-    arma::imat Nsh(max_am,2);
-    Nsh.zeros();
-    for(size_t ish=0;ish<decsh.size();ish++)
-      Nsh(decsh[ish].get_am(),0)++;
-    for(size_t ish=0;ish<sh.size();ish++)
-      Nsh(sh[ish].get_am(),1)++;
-
-    // Print the composition
-    printf("\nComposition of basis set is:\n");
-    printf("\tam Nprim Ncontr\n");
-    for(int am=0;am<max_am;am++)
-      if(Nsh(am,0)>0)
-	printf("\t%2c %5i %6i\n",shell_types[am],Nsh(am,0),Nsh(am,1));
-
+    // Loop over elements
+    for(size_t iel=0;iel<elbases.size();iel++) {
+      // Get the basis set
+      ElementBasisSet elbas=elbases[iel];
+      
+      // Decontracted basis
+      ElementBasisSet eldec(elbas);
+      eldec.decontract();
+      
+      // Get the shells
+      std::vector<FunctionShell> sh=elbas.get_shells();
+      std::vector<FunctionShell> decsh=eldec.get_shells();
+      
+      // Count the shells
+      arma::imat Nsh(max_am,2);
+      Nsh.zeros();
+      for(size_t ish=0;ish<decsh.size();ish++)
+	Nsh(decsh[ish].get_am(),0)++;
+      for(size_t ish=0;ish<sh.size();ish++)
+	Nsh(sh[ish].get_am(),1)++;
+      
+      // Print the composition
+      printf("%-2s %3i am Np Nc\n",elbas.get_symbol().c_str(),(int) elbas.get_number());
+      for(int am=0;am<max_am;am++)
+	if(Nsh(am,0)>0)
+	  printf("%6s %2c %2i %2i\n","",shell_types[am],Nsh(am,0),Nsh(am,1));
+      printf("\n");
+    }
   } else if(stricmp(cmd,"decontract")==0) {
     // Decontract basis set.
 
