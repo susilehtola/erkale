@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -166,7 +166,7 @@ class BasisSet {
   arma::mat nucleardist;
   /// List of unique shell pairs
   std::vector<shellpair_t> shellpairs;
-  
+
   /// Ranges of shells
   std::vector<double> shell_ranges;
 
@@ -198,7 +198,7 @@ class BasisSet {
    * for LCAO-SCF calculations", Chem. Phys. Lett. 213, p. 514 - 518 (1993).
    */
   BasisSet exchange_fitting() const;
-  
+
   /// Add nucleus
   void add_nucleus(const nucleus_t & nuc);
   /// Add a shell to a nucleus and sort functions if wanted
@@ -218,7 +218,7 @@ class BasisSet {
   /* Finalization routines */
 
   /// Compute nuclear distance table
-  void compute_nuclear_distances();   
+  void compute_nuclear_distances();
 
   /// Form list of unique shell pairs
   void form_unique_shellpairs();
@@ -242,7 +242,7 @@ class BasisSet {
   double nuclear_distance(size_t i, size_t j) const;
 
   /// Get angular momentum of shell
-  int get_am(size_t shind) const;  
+  int get_am(size_t shind) const;
   /// Get maximum angular momentum in basis set
   int get_max_am() const;
   /// Get maximum number of contractions
@@ -277,7 +277,7 @@ class BasisSet {
   bool lm_in_use(size_t ind) const;
   /// Toggle the use of spherical harmonics on shell ind
   void set_lm(size_t ind, bool lm);
-  
+
   /// Get transformation matrix
   arma::mat get_trans(size_t ind) const;
 
@@ -369,7 +369,7 @@ class BasisSet {
 
   /// Calculate nuclear charge
   int Ztot() const;
-  
+
   /// Calculate nuclear repulsion energy
   double Enuc() const;
 
@@ -424,7 +424,7 @@ class GaussianShell {
   arma::mat transmat;
 
   /**
-   * Contraction of unnormalized primitives. 
+   * Contraction of unnormalized primitives.
    * N.B. Normalization is wrt first function of shell.
    */
   std::vector<contr_t> c;
@@ -436,7 +436,7 @@ class GaussianShell {
    * Table of cartesians, containing am indices
    * and relative normalization factors.
    */
-  std::vector<shellf_t> cart; 
+  std::vector<shellf_t> cart;
 
  public:
   /// Dummy constructor
@@ -568,5 +568,8 @@ BasisSet construct_basis(const std::vector<nucleus_t> & nuclei, const BasisSetLi
 std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r);
 /// Compute density at given point
 double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t & r);
+
+/// Check orthonormality of molecular orbitals
+double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
 
 #endif

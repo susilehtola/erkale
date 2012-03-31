@@ -244,9 +244,6 @@ double electron_spread(const arma::mat & P, const BasisSet & basis);
 /// Determine amount of alpha and beta electrons based on multiplicity
 void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta);
 
-/// Check orthonormality of molecular orbitals
-double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
-
 #include "checkpoint.h"
 
 
