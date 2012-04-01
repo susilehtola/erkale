@@ -184,7 +184,7 @@ arma::mat TRRH::make_expK(const arma::mat & kappa) {
     if(kktval(i)>=MAXNEGEIG) {
       ERROR_INFO();
       std::ostringstream oss;
-      oss << "kkt part of K^2 has eivenvalue " << kktval(i) << "!\n";
+      oss << "kkt part of K^2 has eigenvalue " << kktval(i) << "!\n";
       throw std::runtime_error(oss.str());
     }
 
