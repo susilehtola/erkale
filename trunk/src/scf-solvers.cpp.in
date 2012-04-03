@@ -317,7 +317,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
       fprintf(stderr," with ");
 #ifdef FULLHOLE
     fprintf(stderr,"full core hole");
-#else HALFHOLE
+#else // half hole
     fprintf(stderr,"half core hole");
 #endif
 #endif
