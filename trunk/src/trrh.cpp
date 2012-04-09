@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -18,6 +18,7 @@
 #include "linalg.h"
 #include "mathf.h"
 #include "timer.h"
+#include "basis.h"
 
 #include <cfloat>
 
@@ -33,7 +34,7 @@
 #define EPSMU 0.01
 
 /// Throw error if eigenvalues of K^2 are bigger than (should be negative!)
-#define MAXNEGEIG 1e-8
+#define MAXNEGEIG 1e-6
 
 void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, bool verbose) {
   // Transform Fock matrix into MO basis
@@ -65,7 +66,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
 
   // Compute Fock matrix in new basis
   arma::mat F_ov=arma::trans(C_ov)*F_AO*C_ov;
-  // Force symmetrization of F_ov
+  // Force symmetricity of F_ov
   F_ov=(F_ov + arma::trans(F_ov))/2.0;
 
   // Save (pseudo-)orbital energies
@@ -84,8 +85,8 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
   // Fill the matrices, remembering the ordering of the full Fock matrix
   for(size_t a=0;a<nvirt;a++)
     for(size_t i=0;i<nocc;i++) {
-      grad(a,i)=-4.0*F_ov(nocc+a,i);
-      hess(a,i)=4.0*(F_ov(nocc+a,nocc+a)-F_ov(i,i));
+      grad(a,i)=-4.0*F_ov(nocc+a,i); // eq (27b)
+      hess(a,i)=4.0*(F_ov(nocc+a,nocc+a)-F_ov(i,i)); // eq (29b)
     }
 
   // Get (approximation to) smallest negative eigenvalue
@@ -118,8 +119,8 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
 
     // New orbital coefficients are given by exp(-K)
     Cnew=C_ov*arma::trans(expK);
-    
-    // Calculate minimal projection
+
+    // Calculate minimal projection.
     double amin=DBL_MAX;
     arma::mat proj=arma::trans(C.submat(0,0,nbf-1,nocc-1))*S*Cnew.submat(0,0,nbf-1,nocc-1);
     for(size_t i=0;i<nocc;i++) {
@@ -131,14 +132,14 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
       if(a<amin)
 	amin=a;
     }
-    
+
     if(verbose)
       printf("\t%2i %e %e %s\n",(int) iit+1,mu,amin,t.elapsed().c_str());
-    
+
     if(amin>=MINA)
       break;
   }
-  
+
   if(iit==NMU) {
     printf("Warning - wanted level shift not found.\n");
     fprintf(stderr,"Warning - wanted level shift not found.\n");
@@ -149,9 +150,17 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
   for(size_t i=0;i<norbs;i++) {
     for(size_t j=0;j<i;j++)
       Cnew.col(i)-=arma::as_scalar(arma::trans(Cnew.col(i))*S*Cnew.col(j))*Cnew.col(j);
-    
+
     Cnew.col(i)/=sqrt(arma::as_scalar(arma::trans(Cnew.col(i))*S*Cnew.col(i)));
-  }      
+  }
+
+  // Debug
+  try {
+    check_orth(Cnew,S,false);
+  } catch(std::runtime_error err) {
+    ERROR_INFO();
+    throw std::runtime_error("Orbitals updated by TRRH are not orthonormal!\n");
+  }
 }
 
 arma::mat TRRH::make_expK(const arma::mat & kappa) {
@@ -164,7 +173,7 @@ arma::mat TRRH::make_expK(const arma::mat & kappa) {
 
   // K^2 is block diagonal, so we can do the diagonalization in
   // subblocks.
-  
+
   // Compute kkt and ktk
   arma::mat kkt=-kappa*arma::trans(kappa);
   arma::mat ktk=-arma::trans(kappa)*kappa;
@@ -218,9 +227,9 @@ arma::mat TRRH::make_expK(const arma::mat & kappa) {
   sinckkt.zeros();
   for(size_t i=0;i<kktval.n_elem;i++) {
     coskkt +=kktvec.col(i)*cos (kktval(i))*arma::trans(kktvec.col(i));
-    sinckkt+=kktvec.col(i)*sinc(kktval(i))*arma::trans(kktvec.col(i));    
+    sinckkt+=kktvec.col(i)*sinc(kktval(i))*arma::trans(kktvec.col(i));
   }
-  
+
   arma::mat cosktk(ktk);
   cosktk.zeros();
   arma::mat sincktk(ktk);
