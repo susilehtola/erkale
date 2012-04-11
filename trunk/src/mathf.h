@@ -37,6 +37,9 @@ double gamma(double x);
 /// Compute sinc = sin(x)/x
 double sinc(double x);
 
+/// Compute the spherical Bessel function
+double bessel_jl(int l, double x);
+
 /// Computes the Boys function
 double boysF(int m, double x);
 /// Computes an array of Boys function

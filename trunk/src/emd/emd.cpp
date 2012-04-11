@@ -22,10 +22,6 @@
 #include "../timer.h"
 #include "spherical_harmonics.h"
 
-extern "C" {
-#include <gsl/gsl_sf_bessel.h>
-}
-
 #include <cfloat>
 
 // Value of moment of electron density in Fourier space
@@ -609,21 +605,12 @@ arma::mat bessel_array(const std::vector<double> & args, int lmax) {
 #pragma omp parallel
 #endif
   {
-    // Work space for functions
-    double wrk[lmax+1];
-
 #ifdef _OPENMP
 #pragma omp for
 #endif
     for(size_t i=0;i<args.size();i++) {
-      // Evaluate Bessel functions
-      gsl_sf_bessel_jl_array(lmax,args[i],wrk);
-      // or with more stable Steed recursion
-      //      gsl_sf_bessel_jl_steed_array(lmax,args[i],wrk);
-
-      // Copy the values
       for(int l=0;l<=lmax;l++)
-	j(i,l)=wrk[l];
+	j(i,l)=bessel_jl(l,args[i]);
     }
   }
 

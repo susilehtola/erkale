@@ -30,6 +30,8 @@ extern "C" {
 #include <gsl/gsl_sf_gamma.h>
   // For spline interpolation
 #include <gsl/gsl_spline.h>
+  // For Bessel functions
+#include <gsl/gsl_sf_bessel.h>
   // For hypergeometric functions
 #include <gsl/gsl_sf_hyperg.h>
   // For trigonometric functions
@@ -72,6 +74,21 @@ double gamma(double x) {
 
 double sinc(double x) {
   return gsl_sf_sinc(x/M_PI);
+}
+
+double bessel_jl(int l, double x) {
+  // Small x: use series expansion
+  double series=pow(x,l)/doublefact(2*l+1);
+  if(fabs(series)<sqrt(DBL_EPSILON))
+    return series;
+
+  // Large x: truncate due to incorrect GSL asymptotics
+  // (GSL bug https://savannah.gnu.org/bugs/index.php?36152)
+  if(x>1.0/DBL_EPSILON)
+    return 0.0;
+
+  // Default case: use GSL
+  return gsl_sf_bessel_jl(l,x);
 }
 
 double boysF(int m, double x) {
