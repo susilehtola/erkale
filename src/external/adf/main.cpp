@@ -681,7 +681,7 @@ int main(int argc, char **argv) {
   arma::mat P=form_density(tape);
 
   SlaterEMDEvaluator eval=get_eval(tape,P);
-  //eval.print();
+  eval.print();
 
   // Get number of electrons
   int Nel=tape.get_double_vec("General - electrons")[0];

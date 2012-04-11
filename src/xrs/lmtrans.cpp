@@ -21,11 +21,6 @@
 #include "timer.h"
 #include "spherical_harmonics.h"
 
-// Bessel functions
-extern "C" {
-#include <gsl/gsl_sf_bessel.h>
-}
-
 // Tolerance for differing value of Q in Bessel table
 #define QTOL (1.01*q*DBL_EPSILON)
 
@@ -103,8 +98,6 @@ bessel_t lmtrans::compute_bessel(double q) const {
     fflush(stdout);
   */
 
-  size_t nser=0, ncomp=0;
-
   // Returned array
   bessel_t bes;
 
@@ -115,39 +108,10 @@ bessel_t lmtrans::compute_bessel(double q) const {
   for(int l=0;l<=2*lmax;l++)
     bes.jl[l].resize(exp.grid.size());
 
-  // Result of Bessel function
-  double res=0.0;
-  // Argument of Bessel function
-  double arg;
-  // Do series?
-  bool do_series;
-
   // Compute values of Bessel function
   for(int l=0;l<=2*lmax;l++)
-    for(size_t ip=0;ip<exp.grid.size();ip++) {
-      // Default - don't use series expansion
-      do_series=0;
-      // Compute argument
-      arg=q*exp.grid[ip].r;
-
-      // Check whether to use series expansion
-      if(arg<100.0*l) {
-	// for x<<l,  j_l(x) ~ x^l / (2l+1)!!
-	res=pow(arg,l)/doublefact(2*l+1);
-
-	// If this is small, stop here.
-	if(fabs(res)<10*DBL_EPSILON)
-	  do_series=1;
-      }
-
-      if(!do_series) {
-	ncomp++;
-	bes.jl[l][ip]=gsl_sf_bessel_jl(l,arg);
-      } else {
-	nser++;
-	bes.jl[l][ip]=res;
-      }
-    }
+    for(size_t ip=0;ip<exp.grid.size();ip++)
+      bes.jl[l][ip]=bessel_jl(l,q*exp.grid[ip].r);
 
   /*
   printf("done (%s)\n",t.elapsed().c_str());
