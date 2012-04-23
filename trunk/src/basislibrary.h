@@ -30,7 +30,7 @@
 int find_am(char am);
 
 /// Find basis set file
-std::string find_basis(const std::string & filename);
+std::string find_basis(const std::string & filename, bool verbose=true);
 
 /// System default location for basis sets
 #ifndef ERKALE_SYSTEM_LIBRARY
@@ -169,9 +169,9 @@ class BasisSetLibrary {
   ~BasisSetLibrary();
 
   /// Load basis set from file
-  void load_gaussian94(const char * filename);
+  void load_gaussian94(const char * filename, bool verbose=true);
   /// Load basis set from file
-  void load_gaussian94(const std::string & filename);
+  void load_gaussian94(const std::string & filename, bool verbose=true);
 
   /// Save basis set to file
   void save_gaussian94(const char * filename) const;
