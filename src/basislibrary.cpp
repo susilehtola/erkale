@@ -42,7 +42,7 @@ int find_am(char am) {
   return -1;
 }
 
-std::string find_basis(const std::string & basisname) {
+std::string find_basis(const std::string & basisname, bool verbose) {
   // Directories where the basis set file might be found
   std::vector<std::string> dirs;
 
@@ -77,7 +77,8 @@ std::string find_basis(const std::string & basisname) {
       std::ifstream in(fname.c_str());
       if(in.is_open()) {
 	// Found basis set!
-	printf("Basis set ""%s"" found in file %s in %s.\n",basisname.c_str(),trialnames[it].c_str(),dirs[id].c_str());
+	if(verbose)
+	  printf("Basis set ""%s"" found in file %s in %s.\n",basisname.c_str(),trialnames[it].c_str(),dirs[id].c_str());
 	return fname;
       }
     }
@@ -316,13 +317,13 @@ BasisSetLibrary::BasisSetLibrary() {
 BasisSetLibrary::~BasisSetLibrary() {
 }
 
-void BasisSetLibrary::load_gaussian94(const char * filename) {
-  load_gaussian94(std::string(filename));
+void BasisSetLibrary::load_gaussian94(const char * filename, bool verbose) {
+  load_gaussian94(std::string(filename),verbose);
 }
 
-void BasisSetLibrary::load_gaussian94(const std::string & basis) {
+void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
   // First, find out file where basis set is
-  std::string filename=find_basis(basis);
+  std::string filename=find_basis(basis,verbose);
 
   // Input file
   std::ifstream in(filename.c_str());
