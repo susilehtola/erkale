@@ -120,6 +120,8 @@ class ElementBasisSet {
   std::string get_symbol() const;
   /// Get the number 
   size_t get_number() const;
+  /// Set the number
+  void set_number(size_t num);  
 
   /// Comparison operator for sorting
   bool operator<(const ElementBasisSet &rhs) const;
