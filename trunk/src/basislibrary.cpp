@@ -159,7 +159,7 @@ void ElementBasisSet::sort() {
 }
 
 void ElementBasisSet::print() const {
-  printf("%s:\n",symbol.c_str());
+  printf("%s %i:\n",symbol.c_str(),(int) number);
   for(size_t i=0;i<bf.size();i++) {
     bf[i].print();
   }
@@ -172,6 +172,10 @@ std::string ElementBasisSet::get_symbol() const {
 
 size_t ElementBasisSet::get_number() const {
   return number;
+}
+
+void ElementBasisSet::set_number(size_t num) {
+  number=num;
 }
 
 bool ElementBasisSet::operator<(const ElementBasisSet &rhs) const {
