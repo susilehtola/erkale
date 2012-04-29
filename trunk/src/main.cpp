@@ -273,10 +273,6 @@ int main(int argc, char **argv) {
     } else if(rohf) {
       // Solve restricted open-shell Hartree-Fock
 
-      // Amount of occupied states
-      int Nel_alpha;
-      int Nel_beta;
-      get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
       // Solve ROHF
       solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
 

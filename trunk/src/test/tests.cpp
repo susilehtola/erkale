@@ -209,18 +209,18 @@ void check_sph_orthonorm(int lmax) {
 	  
 	  // Form the list of cartesian functions
 	  std::vector<shellf_t> cartr(((lr+1)*(lr+2))/2);
-	  size_t n=0;
+	  size_t N=0;
 	  for(int i=0; i<=lr; i++) {
 	    int nx = lr - i;
 	    for(int j=0; j<=i; j++) {
 	      int ny = i-j;
 	      int nz = j;
 	      
-	      cartr[n].l=nx;
-	      cartr[n].m=ny;
-	      cartr[n].n=nz;
-	      cartr[n].relnorm=cr[n];
-	      n++;
+	      cartr[N].l=nx;
+	      cartr[N].m=ny;
+	      cartr[N].n=nz;
+	      cartr[N].relnorm=cr[N];
+	      N++;
 	    }
 	  }
 	  

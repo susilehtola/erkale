@@ -35,10 +35,8 @@ Timer::~Timer() {
 }
 
 void Timer::stop() {
-  time_t stop;
   struct timeval tstop;
 
-  time(&stop);
   gettimeofday(&tstop,NULL);
 
   elapsd+=(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_usec-tstart.tv_usec)/1000000.0;
@@ -83,22 +81,16 @@ void Timer::print_time() const {
 }
 
 double Timer::get() const {
-  time_t stop;
   struct timeval tstop;
 
-  time(&stop);
-  gettimeofday(&tstop,NULL);
-  //  return difftime(stop,start);
   return elapsd+(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_usec-tstart.tv_usec)/1000000.0;
 }
 
 std::string Timer::elapsed() const {
   std::ostringstream ret;
 
-  time_t stop;
   struct timeval tstop;
 
-  time(&stop);
   gettimeofday(&tstop,NULL);
 
   time_t isecs=tstop.tv_sec-tstart.tv_sec;

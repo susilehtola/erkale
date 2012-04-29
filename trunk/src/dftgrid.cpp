@@ -261,7 +261,7 @@ void AtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t 
   }
 }
 
-void AtomGrid::prune_points(double tol, const radshell_t & rg) {
+void AtomGrid::prune_points(double tolv, const radshell_t & rg) {
   // Prune points with small weight.
 
   // First point on radial shell
@@ -270,7 +270,7 @@ void AtomGrid::prune_points(double tol, const radshell_t & rg) {
   size_t ilast=ifirst+rg.np;
 
   for(size_t i=ilast;(i>=ifirst && i<grid.size());i--)
-    if(grid[i].w<tol)
+    if(grid[i].w<tolv)
       grid.erase(grid.begin()+i);
 }
 

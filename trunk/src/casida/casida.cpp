@@ -389,11 +389,11 @@ arma::mat Casida::dipole_transition(const BasisSet & bas) const {
   std::vector<arma::mat> dm=bas.moment(1);
 
   // and convert it to the MO basis
-  std::vector< std::vector<arma::mat> > dipmat(3);
+  std::vector< std::vector<arma::mat> > dip(3);
   for(int ic=0;ic<3;ic++)
     for(size_t ispin=0;ispin<C.size();ispin++) {
-      dipmat[ic].resize(C.size());
-      dipmat[ic][ispin]=matrix_transform(ispin,dm[ic]);
+      dip[ic].resize(C.size());
+      dip[ic][ispin]=matrix_transform(ispin,dm[ic]);
     }
   
   // Compute the oscillator strengths.
@@ -401,7 +401,7 @@ arma::mat Casida::dipole_transition(const BasisSet & bas) const {
   osc.zeros();
   for(int ic=0;ic<3;ic++) {
     // Compute the transitions in the current direction
-    arma::mat hlp=transition(dipmat[ic]);
+    arma::mat hlp=transition(dip[ic]);
 
     // Store the energies
     osc.col(0)=hlp.col(0);
@@ -714,11 +714,6 @@ void Casida::Kcoul(const BasisSet & basis, const Settings & set) {
 #endif
 	for(size_t ip=0;ip<pairs[ispin].size();ip++)
 	  for(size_t jp=0;jp<pairs[jspin].size();jp++) {
-	    // Offset in i
-	    const size_t ioff=ispin*pairs[0].size();
-	    // Offset in j
-	    const size_t joff=jspin*pairs[0].size();
-
 	    K(ioff+ip,joff+jp)=arma::as_scalar(munu_I[ispin].row(pairs[ispin][ip].i*Norbi+pairs[ispin][ip].f)*ab_inv*arma::trans(munu_I[jspin].row(pairs[jspin][jp].i*Norbj+pairs[jspin][jp].f)));
 	  }
       }

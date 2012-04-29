@@ -18,7 +18,7 @@
 #include "mathf.h"
 #include <algorithm>
 
-RadialSlater::RadialSlater(int nv, int l, double zetav) : RadialFourier(l) {
+RadialSlater::RadialSlater(int nv, int lv, double zetav) : RadialFourier(lv) {
   n=nv;
   zeta=zetav;
 }

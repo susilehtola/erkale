@@ -162,7 +162,7 @@ size_t DensityFit::idx(size_t ia, size_t imu, size_t inu) const {
   return Naux*(iidx[imu]+inu)+ia;
 }
 
-size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, bool direct) const {
+size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, bool dir) const {
 
   // Amount of orbital basis functions
   size_t No=orbbas.get_Nbf();
@@ -174,7 +174,7 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
   // Memory taken up by index helper
   Nmem+=No*sizeof(size_t);
   // Memory taken up by  ( \alpha | \mu \nu)
-  if(!direct)
+  if(!dir)
     Nmem+=(Na*No*(No+1)/2)*sizeof(double);
 #ifdef SCREENING
   else {

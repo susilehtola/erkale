@@ -417,14 +417,14 @@ CartesianExpansion::CartesianExpansion(int maxam) {
   for(int am=0;am<=maxam;am++) {
 
     // Loop over functions
-    size_t ind=0;
+    size_t idx=0;
     for(int ii=0; ii<=am; ii++) {
       int l = am - ii;
       for(int jj=0; jj<=ii; jj++) {
 	int m = ii-jj;
 	int n = jj;
 
-	table[am][ind++]=px[l]*py[m]*pz[n];
+	table[am][idx++]=px[l]*py[m]*pz[n];
       }
     }
   }
