@@ -198,9 +198,9 @@ void lmtrans::print_info() const {
   }
 }
 
-std::vector<double> lmtrans::transition_velocity(size_t i, size_t f, const bessel_t & bes) const {
+std::vector<double> lmtrans::transition_velocity(size_t is, size_t fs, const bessel_t & bes) const {
   // Compute radial integrals
-  rad_int_t rad=compute_radial_integrals(i,f,bes);
+  rad_int_t rad=compute_radial_integrals(is,fs,bes);
 
   // Get angular mesh for directional average. Even though in
   // principle this should be 2*lmax to be exact, we probably don't
@@ -210,9 +210,9 @@ std::vector<double> lmtrans::transition_velocity(size_t i, size_t f, const besse
 
   // We normalize the weights so that for purely dipolar transitions we
   // get the same output as with using the dipole matrix.
-  for(size_t i=0;i<mesh.size();i++) {
+  for(size_t ig=0;ig<mesh.size();ig++) {
     // Dipole integral is only wrt theta - divide off phi part.
-    mesh[i].w/=2.0*M_PI;
+    mesh[ig].w/=2.0*M_PI;
   }
 
   // Transition velocities.
@@ -235,9 +235,9 @@ std::vector<double> lmtrans::transition_velocity(size_t i, size_t f, const besse
     t[0]+=mesh[iq].w*norm(Atot);
 
     // Compute final state stuff:
-    arma::cx_mat fs=A*conj(A);
+    arma::cx_mat fsm=A*conj(A);
     for(int l=0;l<=lmax;l++)
-      t[1+l]+=mesh[iq].w*fs(l,l).real();
+      t[1+l]+=mesh[iq].w*fsm(l,l).real();
   }
 
   return t;

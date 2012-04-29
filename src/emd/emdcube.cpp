@@ -127,7 +127,7 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
     fvals[ith].resize(Nbf);
 
   // Loop over batches.
-  for(size_t i=0;i<Nbatch;i++) {
+  for(size_t ib=0;ib<Nbatch;ib++) {
     // Zero amount of points in current batch.
     np=0;
     

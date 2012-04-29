@@ -20,7 +20,7 @@
 #include <omp.h>
 #endif
 
-CasidaAtom::CasidaAtom(bool lobatto, double tol) : AtomGrid(lobatto,tol) {
+CasidaAtom::CasidaAtom(bool lobatto, double tolv) : AtomGrid(lobatto,tolv) {
 }
 
 CasidaAtom::~CasidaAtom() {

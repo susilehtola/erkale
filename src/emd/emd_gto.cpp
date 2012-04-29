@@ -18,7 +18,7 @@
 #include "../mathf.h"
 #include <algorithm>
 
-RadialGaussian::RadialGaussian(int lambdav, int l) : RadialFourier(l) {
+RadialGaussian::RadialGaussian(int lambdav, int lv) : RadialFourier(lv) {
   lambda=lambdav;
 }
 
@@ -279,13 +279,13 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const GaussianEMDEvaluator & rhs) {
   *this=rhs;
 }
 
-GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat & P) {
+GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat & Pv) {
   // Check size of P
-  if(P.n_cols!=P.n_rows) {
+  if(Pv.n_cols!=Pv.n_rows) {
     ERROR_INFO();
     throw std::runtime_error("P is not square matrix!\n");
   }
-  if(P.n_cols!=bas.get_Nbf()) {
+  if(Pv.n_cols!=bas.get_Nbf()) {
     ERROR_INFO();
     throw std::runtime_error("Density matrix does not correspond to basis!\n");
   }
@@ -300,10 +300,10 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat
   std::vector< std::vector<ylmcoeff_t> > clm=form_clm(bas);
 
   // Form the index list of the centers of the functions
-  std::vector<size_t> loc;
+  std::vector<size_t> locv;
   for(size_t ish=0;ish<bas.get_Nshells();ish++)
     for(size_t ifunc=0;ifunc<bas.get_Nbf(ish);ifunc++)
-      loc.push_back(bas.get_center_ind(ish));
+      locv.push_back(bas.get_center_ind(ish));
 
   /*
   printf("Functions centered on atoms:\n");
@@ -322,7 +322,7 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat
     printf("%3i % f % f % f\n",(int) i+1, coord[i].x, coord[i].y, coord[i].z);
   */
 
-  *this=GaussianEMDEvaluator(radf,idf,clm,loc,coord,P);
+  *this=GaussianEMDEvaluator(radf,idf,clm,locv,coord,Pv);
 
   // Check norm of radial functions
   //  check_norm();

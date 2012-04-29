@@ -871,17 +871,17 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   return Vnuc;
 }
 
-std::vector<arma::mat> GaussianShell::moment(int am, double x, double y, double z, const GaussianShell & rhs) const {
+std::vector<arma::mat> GaussianShell::moment(int momam, double x, double y, double z, const GaussianShell & rhs) const {
   // Calculate moment integrals around (x,y,z) between shells
 
   // Amount of moments is
-  size_t Nmom=(am+1)*(am+2)/2;
+  size_t Nmom=(momam+1)*(momam+2)/2;
 
   // Moments to compute:
   std::vector<shellf_t> mom;
   mom.reserve(Nmom);
-  for(int ii=0; ii<=am; ii++) {
-    int lc=am - ii;
+  for(int ii=0; ii<=momam; ii++) {
+    int lc=momam - ii;
     for(int jj=0; jj<=ii; jj++) {
       int mc=ii - jj;
       int nc=jj;
@@ -1430,16 +1430,16 @@ arma::mat BasisSet::cart_to_sph_trans() const {
     int am=shells[i].get_am();
 
     // Number of cartesians and harmonics on shell
-    int Ncart=(am+1)*(am+2)/2;
-    int Nlm=2*am+1;
+    int Nc=(am+1)*(am+2)/2;
+    int Nl=2*am+1;
 
     // Get transformation matrix
     tmp=Ylm_transmat(am);
 
     // Store transformation matrix
-    trans.submat(l,n,l+Nlm-1,n+Ncart-1)=tmp;
-    n+=Ncart;
-    l+=Nlm;
+    trans.submat(l,n,l+Nl-1,n+Nc-1)=tmp;
+    n+=Nc;
+    l+=Nl;
   }
 
   return trans;
@@ -1755,7 +1755,7 @@ std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *
   const GaussianShell *ls=ls_orig;
 
   // Figure out maximum angular momentum
-  int max_am=max4(is->get_am(),js->get_am(),ks->get_am(),ls->get_am());
+  int ammax=max4(is->get_am(),js->get_am(),ks->get_am(),ls->get_am());
   // and the sum of angular momenta
   int mmax=is->get_am()+js->get_am()+ks->get_am()+ls->get_am();
 
@@ -1763,7 +1763,7 @@ std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *
   size_t Ncomb=is->get_Ncontr()*js->get_Ncontr()*ks->get_Ncontr()*ls->get_Ncontr();
 
   // Check angular momentum
-  if(max_am>=LIBINT_MAX_AM) {
+  if(ammax>=LIBINT_MAX_AM) {
     ERROR_INFO();
     throw std::domain_error("You need a version of LIBINT that supports larger angular momentum.\n");
   }
@@ -1771,7 +1771,7 @@ std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *
   // Evaluator object
   Libint_t libint;
   // Initialize evaluator object
-  init_libint(&libint,max_am,Ncomb);
+  init_libint(&libint,ammax,Ncomb);
 
   // Did we need to swap the indices?
   bool swap_ij=0;
@@ -2295,17 +2295,17 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
 }
 
 int BasisSet::Ztot() const {
-  int Ztot=0;
+  int Zt=0;
   for(size_t i=0;i<nuclei.size();i++) {
     if(nuclei[i].bsse)
       continue;
-    Ztot+=nuclei[i].Z;
+    Zt+=nuclei[i].Z;
   }
-  return Ztot;
+  return Zt;
 }
 
 double BasisSet::Enuc() const {
-  double Enuc=0.0;
+  double En=0.0;
 
   for(size_t i=0;i<nuclei.size();i++) {
     if(nuclei[i].bsse)
@@ -2318,11 +2318,11 @@ double BasisSet::Enuc() const {
 	continue;
       int Zj=nuclei[j].Z;
       
-      Enuc+=Zi*Zj/nucleardist(i,j);
+      En+=Zi*Zj/nucleardist(i,j);
     }
   }
   
-  return Enuc;
+  return En;
 }
 
 void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const {
@@ -2511,15 +2511,15 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
       lval=3;
 
     // Get shells corresponding to this nucleus
-    std::vector<GaussianShell> shells=get_funcs(in);
+    std::vector<GaussianShell> shs=get_funcs(in);
 
     // Form candidate set - (2), (3) and (6) in YRF
     std::vector<GaussianShell> cand;
-    for(size_t i=0;i<shells.size();i++) {
+    for(size_t i=0;i<shs.size();i++) {
       // Get angular momentum
-      int am=2*shells[i].get_am();
+      int am=2*shs[i].get_am();
       // Get exponents
-      std::vector<contr_t> contr=shells[i].get_contr();
+      std::vector<contr_t> contr=shs[i].get_contr();
 
       // Dummy contraction
       std::vector<contr_t> C(1);
@@ -2552,9 +2552,9 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
     // Define maximum angular momentum for candidate functions and for
     // density fitting - (5) in YRF
     int lmax_obs=0;
-    for(size_t i=0;i<shells.size();i++)
-      if(shells[i].get_am()>lmax_obs)
-	lmax_obs=shells[i].get_am();
+    for(size_t i=0;i<shs.size();i++)
+      if(shs[i].get_am()>lmax_obs)
+	lmax_obs=shs[i].get_am();
     int lmax_abs=std::max(lmax_obs+lmaxinc,2*lval);
     
     // (6) was already above.
@@ -2652,10 +2652,10 @@ BasisSet BasisSet::exchange_fitting() const {
   // Loop over nuclei
   for(size_t in=0;in<nuclei.size();in++) {
     // Get shells corresponding to this nucleus
-    std::vector<GaussianShell> shells=get_funcs(in);
+    std::vector<GaussianShell> shs=get_funcs(in);
 
     // Sort shells in increasing angular momentum
-    std::sort(shells.begin(),shells.end());
+    std::sort(shs.begin(),shs.end());
 
     // Determine amount of functions on current atom and minimum and maximum exponents
     std::vector<int> nfunc(2*maxam+1);
@@ -2671,12 +2671,12 @@ BasisSet BasisSet::exchange_fitting() const {
     }
 
     // Loop over shells of current nucleus
-    for(size_t ish=0;ish<shells.size();ish++)
+    for(size_t ish=0;ish<shs.size();ish++)
       // Second loop over shells of current nucleus
-      for(size_t jsh=0;jsh<shells.size();jsh++) {
+      for(size_t jsh=0;jsh<shs.size();jsh++) {
 	
 	// Current angular momentum
-	int l=shells[ish].get_am()+shells[jsh].get_am();
+	int l=shs[ish].get_am()+shs[jsh].get_am();
 	
 	// Update maximum value
 	if(l>lmax)
@@ -2686,8 +2686,8 @@ BasisSet BasisSet::exchange_fitting() const {
 	nfunc[l]++;
 	
 	// Get exponential contractions
-	std::vector<contr_t> icontr=shells[ish].get_contr();
-	std::vector<contr_t> jcontr=shells[jsh].get_contr();
+	std::vector<contr_t> icontr=shs[ish].get_contr();
+	std::vector<contr_t> jcontr=shs[jsh].get_contr();
 
 	// Minimum exponent
 	double mi=icontr[icontr.size()-1].z+jcontr[jcontr.size()-1].z;

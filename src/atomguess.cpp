@@ -137,8 +137,8 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
 
     // Store approximate energies
     for(size_t iid=0;iid<idnuc[i].size();iid++)
-      for(size_t i=0;i<sol.Ea.size();i++)
-	orbE.push_back(sol.Ea(i));
+      for(size_t io=0;io<sol.Ea.size();io++)
+	orbE.push_back(sol.Ea(io));
 
     // Loop over shells
     for(size_t ish=0;ish<shells.size();ish++)
@@ -234,8 +234,8 @@ std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {
 	    same=false;
 	    break;
 	  }
-	  for(size_t i=0;i<lhc.size();i++) {
-	    if(!(lhc[i]==rhc[i])) {
+	  for(size_t ic=0;ic<lhc.size();ic++) {
+	    if(!(lhc[ic]==rhc[ic])) {
 	      same=false;
 	      break;
 	    }

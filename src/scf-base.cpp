@@ -359,9 +359,9 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
       double Smax=0.0;
 
       for(size_t j=0;j<C.n_cols;j++) {
-	double S=arma::dot(C.col(j),hlp);
-	if(fabs(S)>Smax) {
-	  Smax=fabs(S);
+	double ovl=arma::dot(C.col(j),hlp);
+	if(fabs(ovl)>Smax) {
+	  Smax=fabs(ovl);
 	  loc=j;
 	}
       }

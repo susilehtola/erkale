@@ -162,16 +162,16 @@ Storage parse_tape(const std::string & name) {
       line=readline(in);
       iline++;
 
-      std::vector<std::string> words=splitline(line);
-      if(words.size()!=3) {
+      std::vector<std::string> nwords=splitline(line);
+      if(nwords.size()!=3) {
 	std::ostringstream oss;
 	oss << "Unexpected line: " << line <<"!\n";
 	throw std::runtime_error(oss.str());
       }
 
       //      int nres=readint(words[0]);
-      int ndat=readint(words[1]);
-      int type=readint(words[2]);
+      int ndat=readint(nwords[1]);
+      int type=readint(nwords[2]);
 
       if(type==3) {
 	// Read in string.
@@ -681,7 +681,7 @@ int main(int argc, char **argv) {
   arma::mat P=form_density(tape);
 
   SlaterEMDEvaluator eval=get_eval(tape,P);
-  eval.print();
+  //  eval.print();
 
   // Get number of electrons
   int Nel=tape.get_double_vec("General - electrons")[0];
