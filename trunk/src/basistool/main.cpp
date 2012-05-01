@@ -109,11 +109,15 @@ int main(int argc, char **argv) {
       for(size_t ish=0;ish<sh.size();ish++)
 	Nsh(sh[ish].get_am(),1)++;
       
-      // Print the composition
+      // Print the composition and count the number of basis functions
+      size_t nbf=0;
       printf("%-2s %3i am Np Nc\n",elbas.get_symbol().c_str(),(int) elbas.get_number());
       for(int am=0;am<max_am;am++)
-	if(Nsh(am,0)>0)
+	if(Nsh(am,0)>0) {
+	  nbf+=Nsh(am,1)*(2*am+1);
 	  printf("%6s %2c %2i %2i\n","",shell_types[am],Nsh(am,0),Nsh(am,1));
+	}
+      printf("%-3i functions\n",(int) nbf);
       printf("\n");
     }
   } else if(stricmp(cmd,"decontract")==0) {
