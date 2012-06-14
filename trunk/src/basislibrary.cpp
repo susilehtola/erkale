@@ -458,9 +458,12 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
   }
 }
 
-void BasisSetLibrary::save_gaussian94(const char * filename) const {
+void BasisSetLibrary::save_gaussian94(const char * filename, bool append) const {
   FILE *out;
-  out=fopen(filename,"w");
+  if(append)
+    out=fopen(filename,"a");
+  else
+    out=fopen(filename,"w");
 
   // Loop over elements
   for(size_t iel=0;iel<elements.size();iel++) {
@@ -481,8 +484,8 @@ void BasisSetLibrary::save_gaussian94(const char * filename) const {
   fclose(out);
 }
 
-void BasisSetLibrary::save_gaussian94(const std::string & filename) const {
-  save_gaussian94(filename.c_str());
+void BasisSetLibrary::save_gaussian94(const std::string & filename, bool append) const {
+  save_gaussian94(filename.c_str(),append);
 }
 
 void BasisSetLibrary::add_element(const ElementBasisSet & el) {
