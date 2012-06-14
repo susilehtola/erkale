@@ -83,6 +83,8 @@ void Timer::print_time() const {
 double Timer::get() const {
   struct timeval tstop;
 
+  tstop.tv_sec=0;
+  tstop.tv_usec=0;
   gettimeofday(&tstop,NULL);
 
   return elapsd+(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_usec-tstart.tv_usec)/1000000.0;
