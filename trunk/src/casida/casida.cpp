@@ -181,7 +181,7 @@ void Casida::form_pairs(const Settings & set, const std::vector< std::vector<dou
 
   // What orbitals are included in the calculation?
   std::vector<std::string> states=splitline(set.get_string("CasidaStates"));
-  if(states.size()!=nocc.size()) {
+  if(states.size()==0) {
     // Include all pairs in the calculation.
     for(size_t ispin=0;ispin<nocc.size();ispin++) {
       for(size_t iocc=0;iocc<nocc[ispin];iocc++)
@@ -200,6 +200,8 @@ void Casida::form_pairs(const Settings & set, const std::vector< std::vector<dou
       for(size_t iocc=0;iocc<nocc[ispin];iocc++)
 	f[ispin](iocc)=pol ? 1.0 : 2.0;
     }
+  } else if(states.size()!=nocc.size()) {
+    throw std::runtime_error("Specified orbitals not consistent with type of calculation.\n");
   } else {
     // Loop over spins
     for(size_t ispin=0;ispin<nocc.size();ispin++) {
