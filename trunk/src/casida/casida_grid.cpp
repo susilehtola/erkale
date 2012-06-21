@@ -297,9 +297,6 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
       // Compute basis functions
       wrk[ith].compute_bf(*basp,grids[i]);
       
-      // Compute the values of the orbitals
-      wrk[ith].compute_orbs(C);
-      
       // Update the density
       if(P.size()==1)
 	wrk[ith].update_density(P[0]);
@@ -307,7 +304,10 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
 	wrk[ith].update_density(P[0],P[1]);
       // and compute fxc
       wrk[ith].eval_fxc(x_func,c_func);
-      
+
+      // Compute the values of the orbitals
+      wrk[ith].compute_orbs(C);
+
       // Compute Kxc's
 #pragma omp critical
       wrk[ith].Kxc(pairs, Kx);
@@ -323,9 +323,6 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
     // Compute basis functions
     wrk[0].compute_bf(*basp,grids[i]);
       
-    // Compute the values of the orbitals
-    wrk[0].compute_orbs(C);
-      
     // Update the density
     if(P.size()==1)
       wrk[0].update_density(P[0]);
@@ -333,7 +330,10 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
       wrk[0].update_density(P[0],P[1]);
     // and compute fxc
     wrk[0].eval_fxc(x_func,c_func);
-      
+
+    // Compute the values of the orbitals
+    wrk[0].compute_orbs(C);
+            
     // Compute Kxc's
     wrk[0].Kxc(pairs, Kx);
       
