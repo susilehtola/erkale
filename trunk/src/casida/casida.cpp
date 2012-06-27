@@ -201,7 +201,7 @@ void Casida::form_pairs(const Settings & set, const std::vector< std::vector<dou
 	f[ispin](iocc)=pol ? 1.0 : 2.0;
     }
   } else if(states.size()!=nocc.size()) {
-    throw std::runtime_error("Specified orbitals not consistent with type of calculation.\n");
+    throw std::runtime_error("CasidaStates input not consistent with type of wavefunction!\n");
   } else {
     // Loop over spins
     for(size_t ispin=0;ispin<nocc.size();ispin++) {
