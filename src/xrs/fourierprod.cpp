@@ -96,7 +96,7 @@ prod_fourier::prod_fourier(const prod_gaussian_3d & prod) {
     GTO_Fourier ft;
     for(size_t j=0;j<expn[i].c.size();j++) {
       GTO_Fourier term=GTO_Fourier(expn[i].c[j].l,expn[i].c[j].m,expn[i].c[j].n,expn[i].zeta);
-      // GTO_Fourier places the normalization factor \lf$ 1/(2 \pi)^{3/2} \lf$, but it isn't needed here.
+      // GTO_Fourier places the normalization factor \f$ 1/(2 \pi)^{3/2} \f$, but it isn't needed here.
       ft+=(pow(2.0*M_PI,3.0/2.0)*expn[i].c[j].c)*term;
     }
     // Clean transform
@@ -121,7 +121,7 @@ prod_fourier::prod_fourier(const prod_gaussian_3d & prod) {
   }
 
   // We want to evaluate
-  // \lf$ \langle \mu | \exp i {\bf q} \cdot {\bf r} | \nu \rangle \lf$,
+  // \f$ \langle \mu | \exp i {\bf q} \cdot {\bf r} | \nu \rangle \f$,
   // but transform is wrt -q => do complex conjugate
   *this=conjugate();
 }

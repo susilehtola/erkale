@@ -94,7 +94,7 @@ class prod_fourier {
 /// Fourier transform products
 std::vector<prod_fourier> fourier_transform(const std::vector<prod_gaussian_3d> & prod);
 
-/// Get momentum transfer matrix \lf$ \langle \mu|\exp i {\bf q} \cdot {\bf r} |\nu \rangle \lf$ using Fourier method
+/// Get momentum transfer matrix \f$ \langle \mu|\exp i {\bf q} \cdot {\bf r} |\nu \rangle \f$ using Fourier method
 arma::cx_mat momentum_transfer(const std::vector<prod_fourier> & fprod, size_t Nbf, const arma::vec & q);
 
 #endif

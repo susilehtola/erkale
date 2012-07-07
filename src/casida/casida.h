@@ -110,7 +110,7 @@ class Casida {
 
   /**
    * This routine constructs the Coulomb coupling matrix
-   * \lf$ K_{\rm Coul}(ij\sigma, kl\tau) = \int d^3r d^3r' \psi_{i\sigma}({\bf r}) \psi_{j\sigma}({\bf r}) \frac 1 {\left| {\bf r} - {\bf r}' \right|} \psi_{k\tau}(r') \psi_{l\tau}(r') \lf$
+   * \f$ K_{\rm Coul}(ij\sigma, kl\tau) = \int d^3r d^3r' \psi_{i\sigma}({\bf r}) \psi_{j\sigma}({\bf r}) \frac 1 {\left| {\bf r} - {\bf r}' \right|} \psi_{k\tau}(r') \psi_{l\tau}(r') \f$
    * (Eq. 2.6 in Jamorski et al [1996]).
    *
    * Only the same-spin couplings are computed, since spin up - spin
@@ -122,7 +122,7 @@ class Casida {
 
   /**
    * This routine constructs the exchange-correlation coupling matrix
-   * \lf$ K_{\rm XC}(ij\sigma, kl\tau) = \int d^3r d^3r' \psi_{i\sigma}({\bf r}) \psi_{j\sigma}({\bf r}) \frac {\delta^2 E_{xc} [\rho_\uparrow,\rho_\downarrow]} {\delta \rho_\sigma ({\bf r}) \delta \rho_\tau ({\bf r})} \psi_{k\tau}(r') \psi_{l\tau}(r') \lf$
+   * \f$ K_{\rm XC}(ij\sigma, kl\tau) = \int d^3r d^3r' \psi_{i\sigma}({\bf r}) \psi_{j\sigma}({\bf r}) \frac {\delta^2 E_{xc} [\rho_\uparrow,\rho_\downarrow]} {\delta \rho_\sigma ({\bf r}) \delta \rho_\tau ({\bf r})} \psi_{k\tau}(r') \psi_{l\tau}(r') \f$
    *
    * Only the same-spin couplings are computed, since spin up - spin
    * down couplings are not necessary even for TDLDA.  
@@ -133,10 +133,10 @@ class Casida {
 
   /* Helper routines */
 
-  /// Calculate \lf$ (\epsilon_{l\tau} - \epsilon_{k\tau})^2 \lf$
+  /// Calculate \f$ (\epsilon_{l\tau} - \epsilon_{k\tau})^2 \f$
   double esq(states_pair_t ip, bool ispin) const;
 
-  /// Calculate \lf$ \sqrt{ (f_{i\sigma} - f_{j\sigma}) (\epsilon_{j\sigma}-\epsilon_{i\sigma}) } \lf$
+  /// Calculate \f$ \sqrt{ (f_{i\sigma} - f_{j\sigma}) (\epsilon_{j\sigma}-\epsilon_{i\sigma}) } \f$
   double fe(states_pair_t ip, bool ispin) const;
 
   /// Form pairs and occupations
@@ -154,7 +154,7 @@ class Casida {
   /// Construct the K matrices
   void calc_K(const Settings & set, const BasisSet & bas);
 
-  /// Compute the Coulomb fitting integrals \lf$ (\mu \nu | a) \lf$ and the matrix \lf$ (a|b)^{-1} \lf$
+  /// Compute the Coulomb fitting integrals \f$ (\mu \nu | a) \f$ and the matrix \f$ (a|b)^{-1} \f$
   void coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv, const Settings & set) const;
 
   /// Solve the Casida equation
