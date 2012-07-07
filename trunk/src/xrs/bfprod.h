@@ -130,7 +130,7 @@ class prod_gaussian_3d {
   /// Clean out terms with zero contribution
   void clean();
 
-  /// Compute the integral over \lf$ d^3r \lf$. When \lf$ \chi_\mu \chi_\nu \lf$ has been computed, one can check this against \lf$ \langle \mu | \nu \rangle \lf$
+  /// Compute the integral over \f$ d^3r \f$. When \f$ \chi_\mu \chi_\nu \f$ has been computed, one can check this against \f$ \langle \mu | \nu \rangle \f$
   double integral() const;
 
   /// Get expansion

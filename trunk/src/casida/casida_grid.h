@@ -30,7 +30,7 @@ class CasidaAtom : public AtomGrid {
   /// Stack of values of orbitals at grid points: orbs[nspin][ngrid][norb]
   std::vector< std::vector< std::vector<double> > > orbs;
 
-  /// Values of the exchange part of \lf$ \frac {\delta^2 E_{xc} [\rho_\uparrow,\rho_\downarrow]} {\delta \rho_\sigma ({\bf r}) \delta \rho_\tau ({\bf r})} \lf$
+  /// Values of the exchange part of \f$ \frac {\delta^2 E_{xc} [\rho_\uparrow,\rho_\downarrow]} {\delta \rho_\sigma ({\bf r}) \delta \rho_\tau ({\bf r})} \f$
   std::vector<double> fx;
   /// Values of the correlation part
   std::vector<double> fc;

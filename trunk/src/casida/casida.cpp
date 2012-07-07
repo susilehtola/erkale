@@ -336,8 +336,8 @@ arma::mat Casida::transition(const std::vector<arma::mat> & m) const {
       }
     }
     
-    // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
-    // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
+    // Normalize to get \f$ \left\langle \Psi_0 \left| \hat{x}
+    // \right| \right\rangle \f$ , see Eq. 4.40 of Casida (1994),
     // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
     tr(it)/=sqrt(w_i(it));
   }
@@ -370,8 +370,8 @@ arma::mat Casida::transition(const std::vector<arma::cx_mat> & m) const {
       }
     }
     
-    // Normalize to get \lf$ \left\langle \Psi_0 \left| \hat{x}
-    // \right| \right\rangle \lf$ , see Eq. 4.40 of Casida (1994),
+    // Normalize to get \f$ \left\langle \Psi_0 \left| \hat{x}
+    // \right| \right\rangle \f$ , see Eq. 4.40 of Casida (1994),
     // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
     tr(it)/=sqrt(w_i(it));
   }

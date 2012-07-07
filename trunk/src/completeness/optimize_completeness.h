@@ -39,15 +39,15 @@ typedef struct {
 /// Get exponents. x contains the natural logarithms
 std::vector<double> get_exponents(const gsl_vector *x);
 
-/// Compute self-overlap \lf$ S_{ij} \lf$
+/// Compute self-overlap \f$ S_{ij} \f$
 arma::mat self_overlap(const std::vector<double> & z, int am);
 
 /// Compute derivative of inverse overlap
 std::vector<arma::mat> self_inv_overlap_logder(const arma::mat & Sinv, const arma::mat & D);
 
 /**
- * Compute overlap derivative matrix \lf$ D_{\mu \nu} =
- * \partial_{\log \zeta_\mu} S_{\mu \nu } = \partial_{\log \zeta_\mu} S_{\nu \mu} \lf$
+ * Compute overlap derivative matrix \f$ D_{\mu \nu} =
+ * \partial_{\log \zeta_\mu} S_{\mu \nu } = \partial_{\log \zeta_\mu} S_{\nu \mu} \f$
  * (this also works for M)
  */
 arma::mat overlap_logder(const std::vector<double> & z, const std::vector<double> & zp, const arma::mat & S, int am);
