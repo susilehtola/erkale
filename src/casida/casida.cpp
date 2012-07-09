@@ -50,6 +50,9 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   std::vector< std::vector<double> > occ;
   occ.push_back(occs);
   form_pairs(set,occ);
+  // Sanity check
+  if(pairs[0].size()==0)
+    throw std::runtime_error("No pairs for Casida calculation! Please check your input.\n");
   printf("Casida calculation has %u pairs.\n",(unsigned int) pairs[0].size());
 
   // Parse coupling mode
@@ -75,6 +78,9 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   occ.push_back(occa);
   occ.push_back(occb);
   form_pairs(set,occ);
+  // Sanity check
+  if(pairs[0].size()==0 && pairs[1].size()==0)
+    throw std::runtime_error("No pairs for Casida calculation! Please check your input.\n");
   printf("Casida calculation has %u spin up and %u spin down pairs.\n",(unsigned int) pairs[0].size(),(unsigned int) pairs[1].size());
 
   // Parse coupling mode
