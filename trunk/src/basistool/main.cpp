@@ -88,6 +88,10 @@ int main(int argc, char **argv) {
     else
       elbases=bas.get_elements();
 
+    printf("\n");
+    printf("el at# nbf [primitive|contracted(?)]\n");
+    printf("------------------------------------\n");
+
     // Loop over elements
     for(size_t iel=0;iel<elbases.size();iel++) {
       // Get the basis set
@@ -109,16 +113,40 @@ int main(int argc, char **argv) {
       for(size_t ish=0;ish<sh.size();ish++)
 	Nsh(sh[ish].get_am(),1)++;
       
-      // Print the composition and count the number of basis functions
+      // Determine if basis set is contracted and the amount of
+      // functions
+      bool contr=false;
       size_t nbf=0;
-      printf("%-2s %3i am Np Nc\n",elbas.get_symbol().c_str(),(int) elbas.get_number());
-      for(int am=0;am<max_am;am++)
+      for(int am=0;am<max_am;am++) {
+	// Number of contracted functions
 	if(Nsh(am,0)>0) {
 	  nbf+=Nsh(am,1)*(2*am+1);
-	  printf("%6s %2c %2i %2i\n","",shell_types[am],Nsh(am,0),Nsh(am,1));
 	}
-      printf("%-3i functions\n",(int) nbf);
-      printf("\n");
+	if(Nsh(am,0)!=Nsh(am,1))
+	  contr=true;
+      }
+
+      // Print composition
+      printf("%-2s %3i %3i ",elbas.get_symbol().c_str(),(int) elbas.get_number(),(int) nbf);
+      if(contr) {
+	// Print amount of primitives
+	printf("[");
+	for(int am=0;am<max_am;am++)
+	  if(Nsh(am,1)>0)
+	    printf("%i%c",Nsh(am,1),tolower(shell_types[am]));
+	// Print contractions
+	printf("|");
+	for(int am=0;am<max_am;am++)
+	  if(Nsh(am,0)!=Nsh(am,1))
+	    printf("%i%c",Nsh(am,0),tolower(shell_types[am]));
+	printf("]\n");	
+      } else {
+	printf("[");
+	for(int am=0;am<max_am;am++)
+	  if(Nsh(am,0)>0)
+	    printf("%i%c",Nsh(am,0),tolower(shell_types[am]));
+	printf("]\n");
+      }
     }
   } else if(stricmp(cmd,"decontract")==0) {
     // Decontract basis set.
