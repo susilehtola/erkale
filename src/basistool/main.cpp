@@ -89,8 +89,8 @@ int main(int argc, char **argv) {
       elbases=bas.get_elements();
 
     printf("\n");
-    printf("el at# nbf [primitive|contracted(?)]\n");
-    printf("------------------------------------\n");
+    printf("el at# nbf npr [primitive|contracted(?)]\n");
+    printf("------------------------------------------\n");
 
     // Loop over elements
     for(size_t iel=0;iel<elbases.size();iel++) {
@@ -117,17 +117,18 @@ int main(int argc, char **argv) {
       // functions
       bool contr=false;
       size_t nbf=0;
+      size_t nprim=0;
       for(int am=0;am<max_am;am++) {
+	// Number of primitives
+	nprim+=Nsh(am,0)*(2*am+1);
 	// Number of contracted functions
-	if(Nsh(am,0)>0) {
-	  nbf+=Nsh(am,1)*(2*am+1);
-	}
-	if(Nsh(am,0)!=Nsh(am,1))
-	  contr=true;
+	nbf+=Nsh(am,1)*(2*am+1);
       }
+      if(nbf!=nprim)
+	contr=true;
 
       // Print composition
-      printf("%-2s %3i %3i ",elbas.get_symbol().c_str(),(int) elbas.get_number(),(int) nbf);
+      printf("%-2s %3i %3i %3i ",elbas.get_symbol().c_str(),(int) elbas.get_number(),(int) nbf,(int) nprim);
       if(contr) {
 	// Print amount of primitives
 	printf("[");
