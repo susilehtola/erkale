@@ -89,8 +89,8 @@ int main(int argc, char **argv) {
       elbases=bas.get_elements();
 
     printf("\n");
-    printf("el at# nbf npr [primitive|contracted(?)]\n");
-    printf("------------------------------------------\n");
+    printf("el at#  [npr|nbf] [primitive|contracted(?)]\n");
+    printf("-------------------------------------------\n");
 
     // Loop over elements
     for(size_t iel=0;iel<elbases.size();iel++) {
@@ -128,10 +128,14 @@ int main(int argc, char **argv) {
 	contr=true;
 
       // Print composition
-      printf("%-2s %3i %3i %3i ",elbas.get_symbol().c_str(),(int) elbas.get_number(),(int) nbf,(int) nprim);
+      printf("%-2s %3i ",elbas.get_symbol().c_str(),(int) elbas.get_number());
       if(contr) {
-	// Print amount of primitives
-	printf("[");
+	// Print amount of functions
+	char cmp[20];
+	sprintf(cmp,"[%i|%i]",(int) nprim,(int) nbf);
+	printf("%10s [",cmp);
+
+	// Print primitives
 	for(int am=0;am<max_am;am++)
 	  if(Nsh(am,0)>0)
 	    printf("%i%c",Nsh(am,0),tolower(shell_types[am]));
@@ -142,11 +146,11 @@ int main(int argc, char **argv) {
 	    printf("%i%c",Nsh(am,1),tolower(shell_types[am]));
 	printf("]\n");	
       } else {
-	printf("[");
+	printf("%10i  ",(int) nbf);
 	for(int am=0;am<max_am;am++)
 	  if(Nsh(am,0)>0)
 	    printf("%i%c",Nsh(am,0),tolower(shell_types[am]));
-	printf("]\n");
+	printf("\n");
       }
     }
   } else if(stricmp(cmd,"decontract")==0) {
