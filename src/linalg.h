@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -44,6 +44,11 @@ arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval, bool ver
 arma::mat CanonicalOrth(const arma::mat & S, double cutoff=1e-4, bool verbose=true);
 /// Same, but use computed decomposition
 arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff, bool verbose=true);
+
+/// Automatic orthonormalization.
+arma::mat BasOrth(const arma::mat & S, bool verbose);
+/// Orthogonalize basis
+arma::mat BasOrth(const arma::mat & S, const Settings & set);
 
 /// Form symmetric matrices S^1/2 and S^-1/2
 void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvhalf, double cutoff);
