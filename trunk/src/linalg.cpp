@@ -142,6 +142,54 @@ arma::mat CanonicalOrth(const arma::mat & S, double cutoff, bool verbose) {
   return CanonicalOrth(Svec,Sval,cutoff);
 }
 
+arma::mat BasOrth(const arma::mat & S, bool verbose) {
+  // Symmetric if possible, otherwise canonical. Default cutoff
+  const double tol=1e-5;
+  
+  // Eigendecomposition of S: eigenvalues and eigenvectors
+  arma::vec Sval;
+  arma::mat Svec;
+  // Compute the decomposition
+  eig_sym_ordered(Sval,Svec,S);
+  
+  // Check smallest eigenvalue.
+  if(Sval(0)>=tol) {
+    // OK to use symmetric
+    return SymmetricOrth(Svec,Sval,verbose);
+  } else {
+    // Have to drop eigenvectors. Use canonical.
+    return CanonicalOrth(Svec,Sval,tol,verbose);
+  }
+}
+
+arma::mat BasOrth(const arma::mat & S, const Settings & set) {
+  // Orthogonalize basis
+
+  // Get wanted method
+  std::string met=set.get_string("BasisOrth");
+  // Verbose operation?
+  bool verbose=set.get_bool("Verbose");
+
+  if(stricmp(met,"auto")==0) {
+    return BasOrth(S,verbose);
+  } else if(stricmp(met,"Can")==0) {
+    // Canonical orthogonalization
+    double tol=set.get_double("BasisLinTol");
+    return CanonicalOrth(S,tol,verbose);
+  } else if(stricmp(met,"Sym")==0) {
+    // Symmetric orthogonalization
+    return SymmetricOrth(S,verbose);
+  } else if(stricmp(met,"Chol")==0) {
+    return CholeskyOrth(S,verbose);
+  } else {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << met << " is not a valid orthogonalization keyword.\n";
+    throw std::domain_error(oss.str());
+    return arma::mat();
+  }
+}
+
 void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, double cutoff) {
   if(S.n_cols != S.n_rows) {
     ERROR_INFO();
@@ -336,4 +384,3 @@ arma::mat sqrt(const arma::mat & M) {
 
   return sqrtM;
 }
-  

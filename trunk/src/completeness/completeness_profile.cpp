@@ -88,7 +88,7 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
       if(chol)
 	J=arma::trans(scanov)*contr*arma::inv(arma::trimatu(arma::chol(S)));
       else
-	J=arma::trans(scanov)*contr*CanonicalOrth(S);
+	J=arma::trans(scanov)*contr*BasOrth(S,false);
       
       // Compute completeness profile
       compprof_am_t profile;
