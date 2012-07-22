@@ -34,15 +34,16 @@ void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec);
 
 /* Orthogonalization routines */
 
-/// Orthogonalize basis
-arma::mat BasOrth(const arma::mat & S, const Settings & set, double & smallest);
-
 /// Cholesky orthogonalization of basis set
-arma::mat CholeskyOrth(const arma::mat & S, double *smallest=NULL);
+arma::mat CholeskyOrth(const arma::mat & S, bool verbose=true);
 /// Symmetric orthogonalization of basis set
-arma::mat SymmetricOrth(const arma::mat & S, double *smallest=NULL);
+arma::mat SymmetricOrth(const arma::mat & S, bool verbose=true);
+/// Same, but use computed decomoposition
+arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval, bool verbose=true);
 /// Canonical orthogonalization of basis set
-arma::mat CanonicalOrth(const arma::mat & S, double cutoff=1e-4, double *smallest=NULL);
+arma::mat CanonicalOrth(const arma::mat & S, double cutoff=1e-4, bool verbose=true);
+/// Same, but use computed decomposition
+arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff, bool verbose=true);
 
 /// Form symmetric matrices S^1/2 and S^-1/2
 void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvhalf, double cutoff);

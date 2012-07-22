@@ -85,7 +85,7 @@ void Settings::add_scf_settings() {
   add_bool("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false);
 
   // Default orthogonalization method
-  add_string("BasisOrth", "Method of orthonormalization of basis set", "Can");
+  add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");
 
   // Default cutoff for orthogonalization
   add_double("BasisLinTol", "Cutoff for linearly dependent basis functions", 1e-5);

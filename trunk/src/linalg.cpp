@@ -19,6 +19,7 @@
 #include <cfloat>
 #include "linalg.h"
 #include "mathf.h"
+#include "stringutil.h"
 
 void eig_sym_ordered(arma::colvec & eigval, arma::mat & eigvec, const arma::mat & X) {
   /* Solve eigenvalues of symmetric matrix with guarantee
@@ -61,55 +62,68 @@ void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec) {
   }
 }
 
-arma::mat CholeskyOrth(const arma::mat & S, double *ratio) {
+arma::mat CholeskyOrth(const arma::mat & S, bool verbose) {
   // Cholesky orthogonalization
-
-  // Dummy value.
-  if(ratio!=NULL)
-    *ratio=-1.0;
-
-  //  printf("Using Cholesky orthogonalization.\n");
+  if(verbose)
+    printf("Using Cholesky orthogonalization.\n");
 
   return inv(chol(S));
 }
 
-arma::mat SymmetricOrth(const arma::mat & S, double *ratio) {
-  // Symmetric orthogonalization
-
-  if(S.n_cols != S.n_rows) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Cannot orthogonalize non-square matrix!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  //  printf("Using symmetric orthogonalization.\n");
-
-  // Size of basis
-  const size_t Nbf=S.n_cols;
-
-  // Eigendecomposition of S: eigenvalues and eigenvectors
-  arma::vec Sval;
-  arma::mat Svec;
-
-  // Compute the decomposition
-  eig_sym_ordered(Sval,Svec,S);
-
-  if(ratio!=NULL)
-    *ratio=Sval(0)/Sval(Nbf-1);
-
+arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval, bool verbose) {
   // Compute matrix filled with inverse eigenvalues
+  const size_t Nbf=Svec.n_rows;
   arma::mat invval(Nbf,Nbf);
   invval.zeros();
   for(size_t i=0;i<Nbf;i++)
     invval(i,i)=1.0/sqrt(Sval(i));
 
+  if(verbose) {
+    printf("Using symmetric orthogonalization.\n");	     
+    printf("Smallest eigenvalue of overlap matrix is %e, ratio to largest is %e.\n",Sval(0),Sval(0)/Sval(Sval.n_elem-1));
+  }
+
   // Returned matrix is
   return Svec*invval*trans(Svec);
 }
-  
 
-arma::mat CanonicalOrth(const arma::mat & S, double cutoff, double *ratio) {
+arma::mat SymmetricOrth(const arma::mat & S, bool verbose) {
+  // Symmetric orthogonalization
+
+  // Eigendecomposition of S: eigenvalues and eigenvectors
+  arma::vec Sval;
+  arma::mat Svec;
+  eig_sym_ordered(Sval,Svec,S);
+
+  // Compute the decomposition
+  return SymmetricOrth(Svec,Sval,verbose);
+}
+  
+arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff, bool verbose) {
+  // Count number of eigenvalues that are above cutoff
+  const size_t Nbf=Svec.n_rows;
+
+  size_t Nlin=0;
+  for(size_t i=0;i<Nbf;i++)
+    if(Sval(i)>=cutoff)
+      Nlin++;
+  // Number of linearly dependent basis functions
+  size_t Ndep=Nbf-Nlin;
+
+  // Form returned matrix
+  arma::mat Sinvh(Nbf,Nlin);
+  for(size_t i=0;i<Nlin;i++)
+    Sinvh.col(i)=Svec.col(Ndep+i)/sqrt(Sval(Ndep+i));
+
+  if(verbose) {
+    printf("Using canonical orthogonalization.\n");
+    printf("Smallest eigenvalue of overlap matrix is %e, ratio to largest is %e.\n",Sval(0),Sval(0)/Sval(Sval.n_elem-1));
+  }
+
+  return Sinvh;
+}
+
+arma::mat CanonicalOrth(const arma::mat & S, double cutoff, bool verbose) {
   // Canonical orthogonalization
 
   if(S.n_cols != S.n_rows) {
@@ -119,35 +133,13 @@ arma::mat CanonicalOrth(const arma::mat & S, double cutoff, double *ratio) {
     throw std::runtime_error(oss.str());
   }
 
-  //  printf("Using canonical orthogonalization with cutoff=%.2e.\n",cutoff);
-
-  // Size of basis
-  const size_t Nbf=S.n_cols;
-
   // Eigendecomposition of S: eigenvalues and eigenvectors
   arma::vec Sval;
   arma::mat Svec;
 
   // Compute the decomposition
   eig_sym_ordered(Sval,Svec,S);
-
-  // Count number of eigenvalues that are above cutoff
-  size_t Nlin=0;
-  for(size_t i=0;i<Nbf;i++)
-    if(Sval(i)>=cutoff)
-      Nlin++;
-  // Number of linearly dependent basis functions
-  size_t Ndep=Nbf-Nlin;
-
-  if(ratio!=NULL)
-    *ratio=Sval(0)/Sval(Nbf-1);
-
-  // Form returned matrix
-  arma::mat Sinvh(Nbf,Nlin);
-  for(size_t i=0;i<Nlin;i++)
-    Sinvh.col(i)=Svec.col(Ndep+i)/sqrt(Sval(Ndep+i));
-
-  return Sinvh;
+  return CanonicalOrth(Svec,Sval,cutoff);
 }
 
 void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, double cutoff) {
@@ -188,29 +180,6 @@ void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, d
   }
 }
 
-arma::mat BasOrth(const arma::mat & S, const Settings & set, double & ratio) {
-  // Orthogonalize basis
-
-  // Get wanted method
-  std::string met=set.get_string("BasisOrth");
-
-  if(met=="Can") {
-    // Canonical orthogonalization
-    double tol=set.get_double("BasisLinTol");
-    return CanonicalOrth(S,tol,&ratio);
-  } else if(met=="Sym") {
-    // Symmetric orthogonalization
-    return SymmetricOrth(S,&ratio);
-  } else if(met=="Chol") {
-    return CholeskyOrth(S,&ratio);
-  } else {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << met << " is not a valid orthogonalization keyword.\n";
-    throw std::domain_error(oss.str());
-    return arma::mat();
-  }
-}
 
 arma::vec MatToVec(const arma::mat & m) {
   // Size of vector to return
