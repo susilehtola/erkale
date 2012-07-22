@@ -34,7 +34,7 @@
 #include "timer.h"
 #include "trrh.h"
 
-#define ROUGHTOL 1e-8
+#define ROUGHTOL 1e-16
 
 SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Amount of basis functions
@@ -131,22 +131,17 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   Hcore=T+Vnuc;
 
   if(verbose) {
-    printf("\nDiagonalizing basis set ... ");
-    fflush(stdout);
+    printf("\n");
     t.set();
   }
 
-  double Sratio;
-  Sinvh=BasOrth(S,set,Sratio);
-    
+  Sinvh=BasOrth(S,set);
+  
   if(verbose) {
-    printf("done (%s)\n",t.elapsed().c_str());
+    printf("Basis set diagonalized in %s.\n",t.elapsed().c_str());
     
     if(Sinvh.n_cols!=Sinvh.n_rows) {
-      printf("Basis set is near-degenerate, ratio of smallest eigenvalue to largest\neigenvalue of overlap matrix is %.2e.\n",Sratio);
       printf("%i linear combinations of basis functions have been removed.\n",Sinvh.n_rows-Sinvh.n_cols);
-    } else {
-      printf("Ratio of smallest to largest eigenvalue of overlap matrix is %.2e.\n",Sratio);
     }
     printf("\n");
   }
@@ -566,3 +561,46 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
   Nel_beta=Nel-Nel_alpha;
 }
 
+arma::mat BasOrth(const arma::mat & S, const Settings & set) {
+  // Orthogonalize basis
+
+  // Get wanted method
+  std::string met=set.get_string("BasisOrth");
+  // Verbose operation?
+  bool verbose=set.get_bool("Verbose");
+
+  if(stricmp(met,"auto")==0) {
+    // Symmetric if possible, otherwise canonical.
+    double tol=set.get_double("BasisLinTol");    
+
+    // Eigendecomposition of S: eigenvalues and eigenvectors
+    arma::vec Sval;
+    arma::mat Svec;
+    // Compute the decomposition
+    eig_sym_ordered(Sval,Svec,S);
+
+    // Check smallest eigenvalue.
+    if(Sval(0)>=tol) {
+      // OK to use symmetric
+      return SymmetricOrth(Svec,Sval,verbose);
+    } else {
+      // Have to drop eigenvectors. Use canonical.
+      return CanonicalOrth(Svec,Sval,tol,verbose);
+    }
+  } else if(stricmp(met,"Can")==0) {
+    // Canonical orthogonalization
+    double tol=set.get_double("BasisLinTol");
+    return CanonicalOrth(S,tol,verbose);
+  } else if(stricmp(met,"Sym")==0) {
+    // Symmetric orthogonalization
+    return SymmetricOrth(S,verbose);
+  } else if(stricmp(met,"Chol")==0) {
+    return CholeskyOrth(S,verbose);
+  } else {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << met << " is not a valid orthogonalization keyword.\n";
+    throw std::domain_error(oss.str());
+    return arma::mat();
+  }
+}
