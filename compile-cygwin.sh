@@ -25,7 +25,7 @@ export CPP="${CC} -E"
 export FCCPP="${FC} -E"
 
 # C flags to use. 
-export CFLAGS="-Wall -O2 -funroll-loops -fPIC -mtune=generic"
+export CFLAGS="-Wall -O2 -funroll-loops -mtune=generic"
 
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
