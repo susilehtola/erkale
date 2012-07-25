@@ -35,7 +35,6 @@ Checkpoint::Checkpoint(const std::string & fname, bool writem) {
     // Save checkpoint version
     int ver=ERKALE_CHKVER;
     write("chkver",ver);
-
     // Close the file
     close();
   } else {
@@ -84,6 +83,11 @@ void Checkpoint::close() {
     opend=false;
   } else
     throw std::runtime_error("Trying to close file that has already been closed!\n");
+}
+
+void Checkpoint::flush() {
+  if(opend && writemode)
+      H5Fflush(file,H5F_SCOPE_GLOBAL);
 }
 
 bool Checkpoint::is_open() const {

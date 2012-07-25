@@ -94,6 +94,8 @@ class Checkpoint {
   void open();
   /// Close the file
   void close();
+  /// Flush the data
+  void flush();
 
   /// Is the file open?
   bool is_open() const;
