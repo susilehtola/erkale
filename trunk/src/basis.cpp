@@ -2021,8 +2021,9 @@ void reorder_ERIs(std::vector<double> & ret, const GaussianShell *is, const Gaus
   const size_t Nk=ks->get_Ncart();
   const size_t Nl=ls->get_Ncart();
 
-  // Collect integrals in correct order
-  std::vector<double> tmp(ret.size());
+  // Integrals in old order
+  double tmp[ret.size()];
+  memcpy(tmp,&ret[0],ret.size()*sizeof(double));
 
   for(size_t ii=0;ii<Ni;ii++) {
     ind_i=ii*Nj;
@@ -2033,14 +2034,11 @@ void reorder_ERIs(std::vector<double> & ret, const GaussianShell *is, const Gaus
         for(size_t li=0;li<Nl;li++) {
 	  ind=ind_ijk+li;
 	  indout=get_swapped_ind(ii,Ni,ji,Nj,ki,Nk,li,Nl,swap_ij,swap_kl,swap_ijkl);
-	  tmp[indout]=ret[ind];
+	  ret[indout]=tmp[ind];
 	}
       }
     }
   }
-
-  // Swap integrals
-  ret=tmp;
 }
 
 void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
@@ -2115,7 +2113,7 @@ std::vector<double> BasisSet::ERI(const size_t is_orig, const size_t js_orig, co
   // get them in the original order
   reorder_ERIs(eris,&shells[is],&shells[js],&shells[ks],&shells[ls],swap_ij,swap_kl,swap_ijkl);
   // and transform them into the spherical basis
-  eris=spherical_ERI_transform(eris,&shells[is_orig],&shells[js_orig],&shells[ks_orig],&shells[ls_orig]);
+  spherical_ERI_transform(eris,&shells[is_orig],&shells[js_orig],&shells[ks_orig],&shells[ls_orig]);
 
   return eris;
 }
@@ -2163,20 +2161,20 @@ std::vector<double> compute_ERI_cart(const GaussianShell * const is_orig, const 
 std::vector<double> compute_ERI(const GaussianShell * const is_orig, const GaussianShell * const js_orig, const GaussianShell * const ks_orig, const GaussianShell * const ls_orig) {
   // Compute ERIs and transform them to spherical harmonics basis, if necessary.
   std::vector<double> eris=compute_ERI_cart(is_orig,js_orig,ks_orig,ls_orig);
-  eris=spherical_ERI_transform(eris,is_orig,js_orig,ks_orig,ls_orig);
+  spherical_ERI_transform(eris,is_orig,js_orig,ks_orig,ls_orig);
   return eris;
 }
 
-std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
+void spherical_ERI_transform(std::vector<double> & eris, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
   // Are the shells in question using spherical harmonics?
   const bool is_lm=is->lm_in_use();
   const bool js_lm=js->lm_in_use();
   const bool ks_lm=ks->lm_in_use();
   const bool ls_lm=ls->lm_in_use();
 
-  // If not, return the cartesian ERIs.
+  // If not, do nothing
   if(!is_lm && !js_lm && !ks_lm && !ls_lm)
-    return eris;
+    return;
 
   // Otherwise we need to compute the transformation of the ERIs into the
   // spherical basis. The transformation is made one shell at a time;
@@ -2212,20 +2210,29 @@ std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const Ga
   const size_t Nk_tgt=ks->get_Nbf();
   const size_t Nl_tgt=ls->get_Nbf();
 
-  // Sizes after transformations
-  const size_t N_l  =Ni_cart*Nj_cart*Nk_cart*Nl_tgt;
-  const size_t N_kl =Ni_cart*Nj_cart*Nk_tgt *Nl_tgt;
-  const size_t N_jkl=Ni_cart*Nj_tgt *Nk_tgt *Nl_tgt;
   // The number of target integrals is
   const size_t N_tgt=Ni_tgt*Nj_tgt*Nk_tgt*Nl_tgt;
+
+  // Helper arrays
+  double first[Ni_cart*Nj_cart*Nk_cart*Nl_cart];
+  double second[Ni_cart*Nj_cart*Nk_cart*Nl_cart];
+
+  // Pointer to array which contains current data
+  double *oldarr;
+  // Pointer to array where to store new data
+  double *newarr;
 
   // Helpers for computing indices
   size_t indout_i, indout_j, indout_k, indout;
   size_t indin_i, indin_j, indin_k, indin;
   size_t indinout_i, indinout_j;
 
-  // Helper array
-  std::vector<double> tmp(N_l);
+  // Initialize array pointers
+  oldarr=first;
+  newarr=second;
+
+  // Copy integrals
+  memcpy(oldarr,&eris[0],eris.size()*sizeof(double));
 
   // Transform over l
   if(ls_lm) {
@@ -2241,23 +2248,24 @@ std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const Ga
 	    //	  indout=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_sph+ll;
 	    indout=indout_k+ll;
 
-	    tmp[indout]=0.0;
+	    newarr[indout]=0.0;
 
 	    for(size_t llc=0;llc<Nl_cart;llc++) {
 	      //	    indin=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_cart+llc;
 	      indin=indin_k+llc;
-	      tmp[indout]+=trans_l(ll,llc)*eris[indin];
+	      newarr[indout]+=trans_l(ll,llc)*oldarr[indin];
 	    }
 	  }
 	}
       }
     }
-  } else
-    tmp=eris;
+
+    // Switch array pointers
+    std::swap(oldarr,newarr);
+  }
 
   // Next, transform over k
   if(ks_lm) {
-    eris.resize(N_kl);
     for(size_t iic=0;iic<Ni_cart;iic++) {
       indinout_i=iic*Nj_cart;
 
@@ -2272,22 +2280,23 @@ std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const Ga
 	    //	    indout=((iic*Nj_cart+jjc)*Nk_tgt+kk)*Nl_tgt+ll;
 	    indout=indout_k+ll;
 
-	    eris[indout]=0.0;
+	    newarr[indout]=0.0;
 	    for(size_t kkc=0;kkc<Nk_cart;kkc++) {
 	      //indin=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_tgt+ll;
 	      indin=(indin_j+kkc)*Nl_tgt+ll;
-	      eris[indout]+=trans_k(kk,kkc)*tmp[indin];
+	      newarr[indout]+=trans_k(kk,kkc)*oldarr[indin];
 	    }
 	  }
 	}
       }
     }
-  } else
-    eris=tmp;
+
+    // Switch array pointers
+    std::swap(oldarr,newarr);
+  }
 
   // And over j
   if(js_lm) {
-    tmp.resize(N_jkl);
     for(size_t iic=0;iic<Ni_cart;iic++) {
       indout_i=iic*Nj_tgt;
       indin_i=iic*Nj_cart;
@@ -2302,22 +2311,23 @@ std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const Ga
 	    //	  indout=((iic*Nj_tgt+jj)*Nk_tgt+kk)*Nl_tgt+ll;
 	    indout=indout_k+ll;
 
-	    tmp[indout]=0.0;
+	    newarr[indout]=0.0;
 	    for(size_t jjc=0;jjc<Nj_cart;jjc++) {
 	      //	    indin=((iic*Nj_cart+jjc)*Nk_tgt+kk)*Nl_tgt+ll;
 	      indin=((indin_i+jjc)*Nk_tgt+kk)*Nl_tgt+ll;
-	      tmp[indout]+=trans_j(jj,jjc)*eris[indin];
+	      newarr[indout]+=trans_j(jj,jjc)*oldarr[indin];
 	    }
 	  }
 	}
       }
     }
-  } else
-    tmp=eris;
+
+    // Switch array pointers
+    std::swap(oldarr,newarr);
+  }
 
   // Finally, transform over i
   if(is_lm) {
-    eris.resize(N_tgt);
     for(size_t ii=0;ii<Ni_tgt;ii++) {
       indout_i=ii*Nj_tgt;
 
@@ -2331,20 +2341,23 @@ std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const Ga
 	    //	  indout=((ii*Nj_sph+jj)*Nk_sph+kk)*Nl_sph+ll;
 	    indout=indout_k+ll;
 
-	    eris[indout]=0.0;
+	    newarr[indout]=0.0;
 	    for(size_t iic=0;iic<Ni_cart;iic++) {
 	      indin=((iic*Nj_tgt+jj)*Nk_tgt+kk)*Nl_tgt+ll;
-	      eris[indout]+=trans_i(ii,iic)*tmp[indin];
+	      newarr[indout]+=trans_i(ii,iic)*oldarr[indin];
 	    }
 	  }
 	}
       }
     }
 
-    return eris;
-  } else
-    // No need for i transform
-    return tmp;
+    // Switch pointers
+    std::swap(oldarr,newarr);
+  }
+
+  // Copy results back
+  eris.resize(N_tgt);
+  memcpy(&eris[0],oldarr,N_tgt*sizeof(double));
 }
 
 int BasisSet::Ztot() const {
