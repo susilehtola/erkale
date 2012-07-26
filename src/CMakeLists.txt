@@ -15,17 +15,19 @@ INCLUDE_DIRECTORIES(${LIBINT_INCLUDE_DIRS})
 # Add HDF5 include directory
 INCLUDE_DIRECTORIES(${HDF5_INCLUDE_DIRS})
 
-# Create the ERKALE base library "erkale" which includes the following sources
-add_library (liberkale 
-basis.cpp basislibrary.cpp stringutil.cpp mathf.cpp integrals.cpp
-eritable.cpp eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp
-solidharmonics.cpp diis.cpp scf.cpp elements.cpp xyzutils.cpp
-settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
-properties.cpp checkpoint.cpp atomguess.cpp external/storage.cpp
-gaunt.cpp lmgrid.cpp spherical_harmonics.cpp trrh.cpp
+# Create the ERKALE base library "erkale" which includes the following
+#sources
+
+add_library (liberkale basis.cpp basislibrary.cpp stringutil.cpp
+mathf.cpp integrals.cpp eritable.cpp eriscreen.cpp timer.cpp
+linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf.cpp
+elements.cpp xyzutils.cpp settings.cpp broyden.cpp adiis.cpp
+tempered.cpp find_molecules.cpp properties.cpp checkpoint.cpp
+atomguess.cpp external/storage.cpp external/fchkpt_tools.cpp gaunt.cpp
+lmgrid.cpp spherical_harmonics.cpp trrh.cpp
 # DFT stuff
-lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
-density_fitting.cpp lebedev.cpp)
+lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp density_fitting.cpp
+lebedev.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
