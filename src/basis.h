@@ -137,6 +137,26 @@ bool operator<(const contr_t & lhs, const contr_t & rhs);
 /// Identity for contractions
 bool operator==(const contr_t & lhs, const contr_t & rhs);
 
+/// Precursor data for ERIs
+typedef struct {
+  /// Distance between centers A and B
+  arma::vec AB;
+  /// Sum of exponents (Na,Nb)
+  arma::mat zeta;
+  /// Coordinates of center of product gaussian P, dimension (Na,Nb,3)
+  arma::cube P;
+  /// Distance between P and shell i center (Na,Nb,3)
+  arma::cube PA;
+  /// Distance between P and shell j center (Na,Nb,3)
+  arma::cube PB;
+  /// Contraction for first center (Na)
+  std::vector<contr_t> ic;
+  /// Array of exponents for second center (Nb)
+  std::vector<contr_t> jc;
+  /// Overlap of primitives on i and j (Na,Nb)
+  arma::mat S;
+} eri_precursor_t;
+
 #include "basislibrary.h"
 
 
@@ -169,6 +189,9 @@ class BasisSet {
 
   /// Ranges of shells
   std::vector<double> shell_ranges;
+
+  /// ERI precursors
+  eri_precursor_t **precursor;
 
  public:
   /// Dummy constructor
@@ -234,6 +257,9 @@ class BasisSet {
   void normalize();
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
+
+  /// Compute ERI precursors
+  void compute_precursors();
 
   /// Do all of the above
   void finalize(bool convert=false);
@@ -383,22 +409,30 @@ class BasisSet {
   std::vector< std::vector<size_t> > find_identical_shells() const;
 };
 
+/// Compute precursor
+eri_precursor_t compute_precursor(const GaussianShell *is, const GaussianShell *js);
+
+/// Compute cartesian ERIs
+std::vector<double> compute_ERI_cart(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 /// Compute a shell of ERIs, transformed into spherical basis if necessary
-std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+std::vector<double> compute_ERI(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 
 /// Compute data necessary for libint
 void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+/// Same thing using precursors
+void compute_libint_data(Libint_t & libint, const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax);
+/// Collect the integrals from ints and place them in ret, applying the necessary normalizations
+void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 
-/// Compute ERI over cartesian Gaussians
-std::vector<double> ERI_cart(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+/// Reorder ERIs
+void reorder_ERIs(std::vector<double> & ret, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
+/// Transform ERIs into the spherical basis
+std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 
-/// Collect the integrals from ints and place them in ret, undoing any swaps that may have taken place
-void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
-
-/// Compatibility function (G++ 4.5.1 refuses to use the above functions) "invalid conversion from ‘const GaussianShell*’ to ‘size_t’"
-std::vector<double> ERI_wrap(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-/// Compatibility function (G++ 4.5.1 refuses to use the above functions) "invalid conversion from ‘const GaussianShell*’ to ‘size_t’"
-std::vector<double> ERI_cart_wrap(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+/// Compute ERI over cartesian Gaussians. Assumes correct order of shells.
+std::vector<double> ERI_cart_libint(const GaussianShell * const is, const GaussianShell * const js, const GaussianShell * const ks, const GaussianShell * const ls);
+/// Same, but using precomputed precursors.
+std::vector<double> ERI_cart_libint(const GaussianShell * const is, const GaussianShell * const js, const eri_precursor_t & ip, const GaussianShell * const ks, const GaussianShell * const ls, const eri_precursor_t & jp);
 
 /**
  * \class GaussianShell
@@ -548,6 +582,8 @@ class GaussianShell {
   friend void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
   /// Compute data for LIBINT
   friend void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+  /// Compute data for LIBINT
+  friend void compute_libint_data_old(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 };
 
 /// Get dummy shell

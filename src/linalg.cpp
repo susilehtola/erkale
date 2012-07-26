@@ -262,6 +262,15 @@ arma::mat VecToMat(const arma::vec & v, size_t nrows, size_t ncols) {
   return m;
 }
 
+/// Get vector from cube: c(i,j,:)                                                                                                                                                                                                            
+arma::vec slicevec(const arma::cube & c, size_t i, size_t j) {
+  arma::vec v(c.n_slices);
+  for(size_t k=0;k<c.n_slices;k++)
+    v(k)=c(i,j,k);
+  return v;
+}
+
+
 arma::mat cos(const arma::mat & U) {
   // Compute eigendecomposition                                                                                                                                                                                                              
   arma::vec evals;

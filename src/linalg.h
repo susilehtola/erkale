@@ -58,6 +58,9 @@ arma::vec MatToVec(const arma::mat & v);
 /// Transform vector to matrix
 arma::mat VecToMat(const arma::vec & v, size_t nrows, size_t ncols);
 
+/// Get vector from cube: c(i,j,:)
+arma::vec slicevec(const arma::cube & c, size_t i, size_t j);
+
 /// Compute cosine of matrix
 arma::mat cos(const arma::mat & U);
 /// Compute sine of matrix

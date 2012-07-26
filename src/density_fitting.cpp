@@ -70,7 +70,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     size_t js=auxpairs[ip].js;
 
     // Compute (a|b)
-    std::vector<double> eris=ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
+    std::vector<double> eris=compute_ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
     
     // Store integrals
     for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
@@ -97,7 +97,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
       size_t js=orbpairs[ip].js;
       
       // Compute ERIs
-      std::vector<double> eris=ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
+      std::vector<double> eris=compute_ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
       
       // Find out maximum value
       double max=0.0;
@@ -133,7 +133,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 	size_t Nnu=orbshells[inu].get_Nbf();
 	
 	// Compute (a|mn)
-	std::vector<double> eris=ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
+	std::vector<double> eris=compute_ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
 	
 	// Store integrals
 	for(size_t af=0;af<Na;af++) {
@@ -245,7 +245,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 	  size_t Na=auxshells[ias].get_Nbf();
 	  
 	  // Compute (a|mn)
-	  std::vector<double> eris=ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	  std::vector<double> eris=compute_ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
 	  
 	  // Increment gamma
 	  for(size_t iia=0;iia<Na;iia++) {
@@ -334,7 +334,7 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 	size_t Nnu=orbshells[inus].get_Nbf();
 	
 	// Compute (a|mn)
-	std::vector<double> eris=ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	std::vector<double> eris=compute_ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
 	
 	// Increment J
 	for(size_t iia=0;iia<Na;iia++) {

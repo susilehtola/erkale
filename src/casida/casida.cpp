@@ -535,7 +535,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
     size_t js=auxpairs[ip].js;
 
     // Compute (a|b)
-    std::vector<double> eris=ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
+    std::vector<double> eris=compute_ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
     
     // Store integrals
     for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
@@ -566,7 +566,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
     size_t js=orbpairs[ip].js;
     
     // Compute ERIs
-    std::vector<double> eris=ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
+    std::vector<double> eris=compute_ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
     
     // Find out maximum value
     double max=0.0;
@@ -621,7 +621,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 	size_t a0=auxshells[ia].get_first_ind();
 	
 	// Compute the integral over the AOs
-	std::vector<double> eris=ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
+	std::vector<double> eris=compute_ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
 	
 	// Transform integrals to spin orbitals.
 	for(size_t ispin=0;ispin<C.size();ispin++) {
