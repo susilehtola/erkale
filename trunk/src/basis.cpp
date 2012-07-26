@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -100,7 +100,7 @@ bool operator==(const contr_t & lhs, const contr_t & rhs) {
   const double tol=50*DBL_EPSILON;
 
   bool same=(fabs(lhs.z-rhs.z)<tol) && (fabs(lhs.c-rhs.c)<tol);
-  
+
   /*
   if(!same) {
        fprintf(stderr,"Contractions differ: %e %e vs %e %e, diff %e %e!\n",lhs.c,lhs.z,rhs.c,rhs.z,rhs.c-lhs.c,rhs.z-lhs.z);
@@ -189,21 +189,21 @@ void GaussianShell::normalize() {
   // Normalize contraction of unnormalized primitives wrt first function on shell
 
   double fact=0.0;
-  
+
   // Calculate overlap of exponents
   for(size_t i=0;i<c.size();i++)
     for(size_t j=0;j<c.size();j++)
       fact+=c[i].c*c[j].c/pow(c[i].z+c[j].z,am+1.5);
-  
+
   // Add constant part
   fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
-  
+
   // The coefficients must be scaled by 1/sqrt(fact)
   fact=1.0/sqrt(fact);
   for(size_t i=0;i<c.size();i++)
     c[i].c*=fact;
 
-  // FIXME: Do something more clever here.    
+  // FIXME: Do something more clever here.
   if(!uselm) {
     // Compute relative normalization factors
     for(size_t i=0;i<cart.size();i++)
@@ -229,7 +229,7 @@ void GaussianShell::coulomb_normalize() {
   dummy=dummyshell();
 
   // Compute ERI
-  eris=ERI(this,&dummy,this,&dummy);
+  eris=compute_ERI(this,&dummy,this,&dummy);
 
   if(!uselm) {
     // Cartesian functions
@@ -277,7 +277,7 @@ std::vector<contr_t> GaussianShell::get_contr_normalized() const {
   std::vector<contr_t> cn=c;
 
   double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
-  
+
   // Convert coefficients to those of normalized primitives
   for(size_t i=0;i<cn.size();i++)
     cn[i].c/=fac*pow(cn[i].z,am/2.0+0.75);
@@ -313,7 +313,7 @@ double GaussianShell::range(double eps) const {
       val+=c[i].c*exp(-c[i].z*r*r);
     val*=pow(r,am);
   } while(fabs(val)>eps);
-  
+
   // OK, now the range lies in the range [oldr,r]. Use binary search to refine
   double left=oldr, right=r;
   double middle=(left+right)/2.0;
@@ -336,7 +336,7 @@ double GaussianShell::range(double eps) const {
       // Switch left value
       left=middle;
   }
-  
+
   return middle;
 }
 
@@ -403,7 +403,7 @@ bool GaussianShell::operator==(const GaussianShell & rhs) const {
     //    fprintf(stderr,"Center indices differ!\n");
     return false;
   }
-  
+
   // Then, angular momentum
   if(am!=rhs.am) {
     //    fprintf(stderr,"Angular momentum differs!\n");
@@ -493,7 +493,7 @@ arma::vec GaussianShell::eval_func(double x, double y, double z) const {
 
   // Power arrays, x^l, y^l, z^l
   double xr[am+1], yr[am+1], zr[am+1];
-  
+
   xr[0]=1.0;
   yr[0]=1.0;
   zr[0]=1.0;
@@ -538,7 +538,7 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
 
   // Power arrays, x^l, y^l, z^l
   double xr[am+2], yr[am+2], zr[am+2];
-  
+
   xr[0]=1.0;
   yr[0]=1.0;
   zr[0]=1.0;
@@ -546,7 +546,7 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
   xr[1]=xrel;
   yr[1]=yrel;
   zr[1]=zrel;
-  
+
   for(int i=2;i<=am+1;i++) {
     xr[i]=xr[i-1]*xrel;
     yr[i]=yr[i-1]*yrel;
@@ -583,7 +583,7 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
       if(m>0)
 	tmp+=m*yr[m-1];
       ret(icart,1)+=tmp*xr[l]*zr[n]*expf;
-      
+
       // z component
       tmp=-2.0*c[iexp].z*zr[n+1];
       if(n>0)
@@ -598,7 +598,7 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
   }
 
 
-  if(uselm) 
+  if(uselm)
     // Need to transform into spherical harmonics
     return transmat*ret;
   else
@@ -617,7 +617,7 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
 
   // Power arrays, x^l, y^l, z^l
   double xr[am+3], yr[am+3], zr[am+3];
-  
+
   xr[0]=1.0;
   yr[0]=1.0;
   zr[0]=1.0;
@@ -625,7 +625,7 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
   xr[1]=xrel;
   yr[1]=yrel;
   zr[1]=zrel;
-  
+
   for(int i=2;i<=am+2;i++) {
     xr[i]=xr[i-1]*xrel;
     yr[i]=yr[i-1]*yrel;
@@ -683,7 +683,7 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
 
 // Calculate overlaps between basis functions
 arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
-  
+
   // Overlap matrix
   arma::mat S(cart.size(),rhs.cart.size());
   S.zeros();
@@ -692,7 +692,7 @@ arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
   double xa=cen.x;
   double ya=cen.y;
   double za=cen.z;
-  
+
   double xb=rhs.cen.x;
   double yb=rhs.cen.y;
   double zb=rhs.cen.z;
@@ -741,7 +741,7 @@ arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
 
 // Calculate kinetic energy matrix element between basis functions
 arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
-  
+
   // Kinetic energy matrix
   arma::mat T(cart.size(),rhs.cart.size());
   T.zeros();
@@ -750,7 +750,7 @@ arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
   double xa=cen.x;
   double ya=cen.y;
   double za=cen.z;
-  
+
   double xb=rhs.cen.x;
   double yb=rhs.cen.y;
   double zb=rhs.cen.z;
@@ -781,7 +781,7 @@ arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
       for(size_t ixl=0;ixl<zeta.size();ixl++)
 	for(size_t ixr=0;ixr<rhs.zeta.size();ixr++)
 	  tmp+=c[ixl]*rhs.c[ixr]*kinetic_int(xa,ya,za,zeta[ixl],la,ma,na,xb,yb,zb,rhs.zeta[ixr],lb,mb,nb);
-	  
+
       // Set matrix element
       T(icl,icr)=tmp*cart[icl].relnorm*rhs.cart[icr].relnorm;
     }
@@ -802,7 +802,7 @@ arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
 
 // Calculate nuclear attraction matrix element between basis functions
 arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const {
-  
+
   // Matrix element of nuclear attraction operator
   arma::mat Vnuc(cart.size(),rhs.cart.size());
   Vnuc.zeros();
@@ -811,7 +811,7 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   double xa=cen.x;
   double ya=cen.y;
   double za=cen.z;
-  
+
   double xb=rhs.cen.x;
   double yb=rhs.cen.y;
   double zb=rhs.cen.z;
@@ -828,22 +828,22 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
     int la=cart[icl].l;
     int ma=cart[icl].m;
     int na=cart[icl].n;
-    
+
     for(size_t icr=0;icr<rhs.cart.size();icr++) {
-      
+
       // Angular momentum of shell
       int lb=rhs.cart[icr].l;
       int mb=rhs.cart[icr].m;
       int nb=rhs.cart[icr].n;
-      
+
       // Helper variable
       double tmp=0.0;
-      
+
       // Loop over exponents
       for(size_t ixl=0;ixl<zeta.size();ixl++) {
 	double ca=c[ixl];
 	double zetaa=zeta[ixl];
-	
+
 	for(size_t ixr=0;ixr<rhs.zeta.size();ixr++) {
 	  double cb=rhs.c[ixr];
 	  double zetab=rhs.zeta[ixr];
@@ -852,7 +852,7 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
 
 	}
       }
-	  
+
       // Set matrix element
       Vnuc(icl,icr)=tmp*cart[icl].relnorm*rhs.cart[icr].relnorm;
     }
@@ -866,7 +866,7 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   // Right side
   if(rhs.uselm) {
     Vnuc=Vnuc*arma::trans(rhs.transmat);
-  }  
+  }
 
   return Vnuc;
 }
@@ -898,7 +898,7 @@ std::vector<arma::mat> GaussianShell::moment(int momam, double x, double y, doub
   // Temporary array, place moment last so we can use slice()
   arma::cube wrk(cart.size(),rhs.cart.size(),Nmom);
   wrk.zeros();
-  
+
   // Coordinates
   double xa=cen.x;
   double ya=cen.y;
@@ -911,15 +911,15 @@ std::vector<arma::mat> GaussianShell::moment(int momam, double x, double y, doub
   for(size_t ixl=0;ixl<c.size();ixl++) {
     double ca=c[ixl].c;
     double zetaa=c[ixl].z;
-    
+
     for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
       double cb=rhs.c[ixr].c;
       double zetab=rhs.c[ixr].z;
-      
+
       wrk+=ca*cb*three_overlap_int_os(xa,ya,za,xb,yb,zb,x,y,z,zetaa,zetab,0.0,cart,rhs.cart,mom);
     }
   }
-  
+
   // Collect the results
   std::vector<arma::mat> ret;
   ret.reserve(Nmom);
@@ -940,7 +940,7 @@ std::vector<arma::mat> GaussianShell::moment(int momam, double x, double y, doub
     ret.push_back(momval);
   }
 
-  return ret;    
+  return ret;
 }
 
 
@@ -958,6 +958,11 @@ BasisSet::BasisSet(size_t Nat, const Settings & set) {
 }
 
 BasisSet::~BasisSet() {
+  if(precursor!=NULL) {
+    for(size_t ish=0;ish<shells.size();ish++)
+      delete [] precursor[ish];
+    delete [] precursor;
+  }
 }
 
 void BasisSet::add_nucleus(const nucleus_t & nuc) {
@@ -1097,7 +1102,7 @@ void BasisSet::form_unique_shellpairs() {
       // Check that libint's angular momentum rules are satisfied
       if(shells[j].get_am()>shells[i].get_am())
 	std::swap(tmp.is,tmp.js);
-      
+
       // Set angular momenta
       tmp.li=shells[tmp.is].get_am();
       tmp.lj=shells[tmp.js].get_am();
@@ -1115,7 +1120,7 @@ void BasisSet::form_unique_shellpairs() {
   for(size_t ind=0;ind<shellpairs.size();ind++) {
     size_t i=shellpairs[ind].is;
     size_t j=shellpairs[ind].js;
-    
+
     int li=shells[i].get_am();
     int lj=shells[j].get_am();
 
@@ -1130,6 +1135,18 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   }
 
   return shellpairs;
+}
+
+void BasisSet::compute_precursors() {
+  // Allocate memory for precursors
+  precursor=new eri_precursor_t*[shells.size()];
+  for(size_t i=0;i<shells.size();i++)
+    precursor[i]=new eri_precursor_t[shells.size()];
+
+  // Calculate precursors
+  for(size_t i=0;i<shells.size();i++)
+    for(size_t j=0;j<shells.size();j++)
+      precursor[i][j]=compute_precursor(&shells[i],&shells[j]);
 }
 
 void BasisSet::finalize(bool convert) {
@@ -1149,6 +1166,9 @@ void BasisSet::finalize(bool convert) {
 
   // Form list of unique shell pairs
   form_unique_shellpairs();
+
+  // Compute precursors
+  compute_precursors();
 }
 
 int BasisSet::get_am(size_t ind) const {
@@ -1208,7 +1228,7 @@ size_t BasisSet::get_Ncart() const {
   for(size_t i=0;i<shells.size();i++)
     n+=shells[i].get_Ncart();
   return n;
-} 
+}
 
 size_t BasisSet::get_Nlm() const {
   size_t n=0;
@@ -1393,8 +1413,8 @@ void BasisSet::print(bool verbose) const {
 	type="sph";
       else
 	type="cart";
-      
-      
+
+
       printf("Shell %4i",(int) i+1);
       printf("\t%c %4s shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) (shells[i].get_center_ind()+1),(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
     }
@@ -1497,7 +1517,7 @@ arma::mat BasisSet::overlap(const BasisSet & rhs) const {
   }
   return S12;
 }
-      
+
 
 arma::mat BasisSet::kinetic() const {
   // Form kinetic energy matrix
@@ -1543,10 +1563,10 @@ arma::mat BasisSet::nuclear() const {
       // If BSSE nucleus, do nothing
       if(nuclei[inuc].bsse)
 	continue;
-      
+
       // Nuclear charge
       int Z=nuclei[inuc].Z;
-      
+
       // Coordinates of nucleus
       double cx=nuclei[inuc].r.x;
       double cy=nuclei[inuc].r.y;
@@ -1555,10 +1575,10 @@ arma::mat BasisSet::nuclear() const {
       // Shells in pair
       size_t i=shellpairs[ip].is;
       size_t j=shellpairs[ip].js;
-      
+
       // Get subblock
       arma::mat tmp=Z*shells[i].nuclear(cx,cy,cz,shells[j]);
-      
+
       // On the off diagonal we fill out both sides of the matrix
       if(i!=j) {
 	Vnuc.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())+=tmp;
@@ -1567,7 +1587,7 @@ arma::mat BasisSet::nuclear() const {
 	// On the diagonal we just get it once
 	Vnuc.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())+=arma::trans(tmp);
     }
-  
+
   return Vnuc;
 }
 
@@ -1597,11 +1617,11 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
     // Shells in pair
     size_t i=shellpairs[ip].is;
     size_t j=shellpairs[ip].js;
-    
-    
+
+
     // Compute moment integral over shells
     std::vector<arma::mat> ints=shells[i].moment(mom,x,y,z,shells[j]);
-    
+
     // Store moments
     if(i!=j) {
       for(size_t m=0;m<Nmom;m++) {
@@ -1613,7 +1633,7 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
 	ret[m].submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=ints[m];
     }
   }
-  
+
   return ret;
 }
 
@@ -1668,7 +1688,7 @@ double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks,
 
 	  zd=shells[ls].c[lx].z;
 	  cd=shells[ls].c[lx].c;
-	  
+
 	  // ERI of these functions is
 	  eri+=ca*cb*cc*cd*ERI_int(la,ma,na,cena.x,cena.y,cena.z,za,
 				   lb,mb,nb,cenb.x,cenb.y,cenb.z,zb,
@@ -1685,24 +1705,26 @@ double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks,
   return eri;
 }
 
+
 std::vector<double> BasisSet::ERI_cart(size_t is, size_t js, size_t ks, size_t ls) const {
   // Compute shell of cartesian ERIs using libint
 
-  std::vector<double> ret=ERI_cart_wrap(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+  std::vector<double> ret=compute_ERI_cart(&shells[is],&shells[js],&shells[ks],&shells[ls]);
 
 #ifdef LIBINTDEBUG
-  // Check the integrals against Huzinaga
-  std::vector<double> huz;
-
-  // Allocate memory
-  huz.reserve(N);
-  huz.resize(N);
-
   // Numbers of functions on each shell
   const size_t Ni=shells[is].get_Ncart();
   const size_t Nj=shells[js].get_Ncart();
   const size_t Nk=shells[ks].get_Ncart();
   const size_t Nl=shells[ls].get_Ncart();
+
+  // Check the integrals against Huzinaga
+  std::vector<double> huz;
+
+  // Allocate memory
+  size_t N=Ni*Nj*Nk*Nl;
+  huz.reserve(N);
+  huz.resize(N);
 
   size_t ind;
   for(size_t ii=0;ii<Ni;ii++)
@@ -1727,7 +1749,7 @@ std::vector<double> BasisSet::ERI_cart(size_t is, size_t js, size_t ks, size_t l
 	    int indj=shells[js].get_first_ind()+ji;
 	    int indk=shells[ks].get_first_ind()+ki;
 	    int indl=shells[ls].get_first_ind()+li;
-	        
+
 	    printf("Integral %i %i %i %i gives %.16e with Huzinaga and %.16e with libint, relative difference is %e.\n",indi,indj,indk,indl,huz[ind],ret[ind],(huz[ind]-ret[ind])/std::max(huz[ind],ret[ind]));
 	  }
 
@@ -1740,19 +1762,23 @@ std::vector<double> BasisSet::ERI_cart(size_t is, size_t js, size_t ks, size_t l
 }
 
 
-std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *js_orig, const GaussianShell *ks_orig, const GaussianShell *ls_orig) {
+std::vector<double> ERI_cart_libint(const GaussianShell * const is, const GaussianShell * const js, const GaussianShell * const ks, const GaussianShell * const ls) {
   // Compute shell of cartesian ERIs using libint
 
-  // Libint computes (ab|cd) for 
-  // l(a)>=l(b), l(c)>=l(d) and l(a)+l(b)>=l(c)+l(d)
-  // where l(a) is the angular momentum type of the a shell,
-  // thus it is possible that the order of shells needs to be swapped.
+  eri_precursor_t ip=compute_precursor(is,js);
+  eri_precursor_t jp=compute_precursor(ks,ls);
 
-  // Helpers
-  const GaussianShell *is=is_orig;
-  const GaussianShell *js=js_orig;
-  const GaussianShell *ks=ks_orig;
-  const GaussianShell *ls=ls_orig;
+  // Return integrals
+  return ERI_cart_libint(is,js,ip,ks,ls,jp);
+}
+
+std::vector<double> ERI_cart_libint(const GaussianShell * const is, const GaussianShell * const js, const eri_precursor_t & ip, const GaussianShell * const ks, const GaussianShell * const ls, const eri_precursor_t & jp) {
+  // Compute shell of cartesian ERIs using libint
+
+  // Libint computes (ab|cd) for
+  // l(a)>=l(b), l(c)>=l(d) and l(a)+l(b)>=l(c)+l(d)
+  // where l(a) is the angular momentum type of the a shell.
+  // THIS ROUTINE ASSUMES THAT THE SHELLS ARE ALREADY IN CORRECT ORDER!
 
   // Figure out maximum angular momentum
   int ammax=max4(is->get_am(),js->get_am(),ks->get_am(),ls->get_am());
@@ -1768,35 +1794,29 @@ std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *
     throw std::domain_error("You need a version of LIBINT that supports larger angular momentum.\n");
   }
 
+  // Check that all is in order
+  if(is->get_am()<js->get_am()) {
+    ERROR_INFO();
+    throw std::runtime_error("lambda_i < lambda_j\n");
+  }
+
+  if(ks->get_am()<ls->get_am()) {
+    ERROR_INFO();
+    throw std::runtime_error("lambda_k < lambda_l\n");
+  }
+
+  if( (is->get_am()+js->get_am()) > (ks->get_am()+ls->get_am())) {
+    ERROR_INFO();
+    throw std::runtime_error("lambda_k + lambda_l < lambda_i + lambda_j\n");
+  }
+
   // Evaluator object
   Libint_t libint;
   // Initialize evaluator object
   init_libint(&libint,ammax,Ncomb);
 
-  // Did we need to swap the indices?
-  bool swap_ij=0;
-  bool swap_kl=0;
-  bool swap_ijkl=0;
-
-  // Check order and swap shells if necessary
-  if(is->get_am()<js->get_am()) {
-    swap_ij=1;
-    std::swap(is,js);
-  }
-  
-  if(ks->get_am()<ls->get_am()) {
-    swap_kl=1;
-    std::swap(ks,ls);
-  }
-  
-  if( (is->get_am()+js->get_am()) > (ks->get_am()+ls->get_am())) {
-    swap_ijkl=1;
-    std::swap(is,ks);
-    std::swap(js,ls);
-  }
-
   // Compute data for LIBINT
-  compute_libint_data(libint,is,js,ks,ls);
+  compute_libint_data(libint,ip,jp,mmax);
 
   // Numbers of functions on each shell
   const size_t Ni=is->get_Ncart();
@@ -1810,11 +1830,7 @@ std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *
   double *ints;
 
   // Allocate memory for return
-  std::vector<double> ret;
-
-  // Allocate memory
-  ret.reserve(N);
-  ret.resize(N);
+  std::vector<double> ret(N);
 
   // Special handling of (ss|ss) integrals:
   if(mmax==0) {
@@ -1829,15 +1845,14 @@ std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *
     tmp*=ls->get_cart()[0].relnorm;
 
     ret[0]=tmp;
-  } else {  
+  } else {
     //    printf("Computing shell %i %i %i %i",shells[is].get_am(),shells[js].get_am(),shells[ks].get_am(),shells[ls].get_am());
     //    printf("which consists of basis functions (%i-%i)x(%i-%i)x(%i-%i)x(%i-%i).\n",(int) shells[is].get_first_ind(),(int) shells[is].get_last_ind(),(int) shells[js].get_first_ind(),(int) shells[js].get_last_ind(),(int) shells[ks].get_first_ind(),(int) shells[ks].get_last_ind(),(int) shells[ls].get_first_ind(),(int) shells[ls].get_last_ind());
 
     // Now we can compute the integrals using libint:
     ints=build_eri[is->get_am()][js->get_am()][ks->get_am()][ls->get_am()](&libint,Ncomb);
-
-    // Normalize and collect the integrals
-    libint_collect(ret,ints,is,js,ks,ls,swap_ij,swap_kl,swap_ijkl);
+    // and collect the results
+    libint_collect(ret,ints,is,js,ks,ls);
   }
 
   // Free memory
@@ -1847,103 +1862,125 @@ std::vector<double> ERI_cart(const GaussianShell *is_orig, const GaussianShell *
   return ret;
 }
 
-void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {  
-  // Compute data necessary for libint.
+eri_precursor_t compute_precursor(const GaussianShell *is, const GaussianShell *js) {
+  // Returned precursor
+  eri_precursor_t r;
 
-  // Sum of angular momenta
+  // Initialize arrays
+  r.AB.zeros(3);
+
+  r.zeta.zeros(is->get_Ncontr(),js->get_Ncontr());
+  r.P.zeros(is->get_Ncontr(),js->get_Ncontr(),3);
+  r.PA.zeros(is->get_Ncontr(),js->get_Ncontr(),3);
+  r.PB.zeros(is->get_Ncontr(),js->get_Ncontr(),3);
+  r.S.zeros(is->get_Ncontr(),js->get_Ncontr());
+
+  // Get data
+  r.ic=is->get_contr();
+  r.jc=js->get_contr();
+
+  coords_t Ac=is->get_center();
+  arma::vec A(3);
+  A(0)=Ac.x;
+  A(1)=Ac.y;
+  A(2)=Ac.z;
+
+  coords_t Bc=js->get_center();
+  arma::vec B(3);
+  B(0)=Bc.x;
+  B(1)=Bc.y;
+  B(2)=Bc.z;
+
+  // Compute AB
+  r.AB=A-B;
+  double rabsq=arma::dot(r.AB,r.AB);
+
+  // Compute zeta
+  for(size_t i=0;i<r.ic.size();i++)
+    for(size_t j=0;j<r.jc.size();j++)
+      r.zeta(i,j)=r.ic[i].z+r.jc[j].z;
+
+  // Form P
+  for(size_t i=0;i<r.ic.size();i++)
+    for(size_t j=0;j<r.jc.size();j++)
+      for(int k=0;k<3;k++)
+	r.P(i,j,k)=(r.ic[i].z*A(k) + r.jc[j].z*B(k))/r.zeta(i,j);
+
+  // Compute PA
+  for(size_t i=0;i<r.ic.size();i++)
+    for(size_t j=0;j<r.jc.size();j++)
+      for(int k=0;k<3;k++)
+	r.PA(i,j,k)=r.P(i,j,k)-A(k);
+
+  // Compute PB
+  for(size_t i=0;i<r.ic.size();i++)
+    for(size_t j=0;j<r.jc.size();j++)
+      for(int k=0;k<3;k++)
+	r.PB(i,j,k)=r.P(i,j,k)-B(k);
+
+  // Compute S
+  for(size_t i=0;i<r.ic.size();i++)
+    for(size_t j=0;j<r.jc.size();j++)
+      r.S(i,j)=r.ic[i].c*r.jc[j].c*(M_PI/r.zeta(i,j))*sqrt(M_PI/r.zeta(i,j))*exp(-r.ic[i].z*r.jc[j].z/r.zeta(i,j)*rabsq);
+
+  return r;
+}
+
+void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
   int mmax=is->get_am()+js->get_am()+ks->get_am()+ls->get_am();
 
-  // Coordinates of centers
-  double A[3], B[3], C[3], D[3];
-  
-  A[0]=is->cen.x;
-  A[1]=is->cen.y;
-  A[2]=is->cen.z;
-  
-  B[0]=js->cen.x;
-  B[1]=js->cen.y;
-  B[2]=js->cen.z;
-  
-  C[0]=ks->cen.x;
-  C[1]=ks->cen.y;
-  C[2]=ks->cen.z;
-  
-  D[0]=ls->cen.x;
-  D[1]=ls->cen.y;
-  D[2]=ls->cen.z;
+  eri_precursor_t ip=compute_precursor(is,js);
+  eri_precursor_t jp=compute_precursor(ks,ls);
 
+  compute_libint_data(libint,ip,jp,mmax);
+}
+
+void compute_libint_data(Libint_t & libint, const eri_precursor_t & ip,const eri_precursor_t &jp, int mmax) {
   // Store AB and CD
   for(int i=0;i<3;i++) {
-    libint.AB[i]=A[i]-B[i];
-    libint.CD[i]=C[i]-D[i];
-  }
-
-  // Distances
-  double rabsq=0;
-  double rcdsq=0;
-  for(int i=0;i<3;i++) {
-    rabsq+=(A[i]-B[i])*(A[i]-B[i]);
-    rcdsq+=(C[i]-D[i])*(C[i]-D[i]);
+    libint.AB[i]=ip.AB(i);
+    libint.CD[i]=jp.AB(i);
   }
 
   size_t ind=0;
 
-  // Helper variable
-  prim_data data;
-
-  // Exponents
-  double zetaa, zetab, zetac, zetad;
-  // Contraction coefficients
-  double c_p, c_pr, c_prs, c;
-
   // Compute primitive data
-  for(size_t p=0;p<is->c.size();p++) {
-    zetaa=is->c[p].z;
-    c_p=is->c[p].c;
+  for(size_t p=0;p<ip.ic.size();p++)
+    for(size_t q=0;q<ip.jc.size();q++) {
+      double zeta=ip.zeta(p,q);
 
-    for(size_t r=0;r<js->c.size();r++) {
-      zetab=js->c[r].z;
-      c_pr=c_p*js->c[r].c;
+      // Compute overlaps for auxiliary integrals
+      double S12=ip.S(p,q);
 
-      // Reduced exponent
-      double zeta=zetaa+zetab;
+      for(size_t r=0;r<jp.ic.size();r++)
+	for(size_t s=0;s<jp.jc.size();s++) {
+	  double eta=jp.zeta(r,s);
 
-      for(size_t s=0;s<ks->c.size();s++) {
-	zetac=ks->c[s].z;
-	c_prs=c_pr*ks->c[s].c;
+	  // Overlap for auxiliary integral
+	  double S34=jp.S(r,s);
 
-	for(size_t t=0;t<ls->c.size();t++) {
-	  zetad=ls->c[t].z;
+	  // Reduced exponent
+          double rho=zeta*eta/(zeta+eta);
 
-	  // Product of contraction coefficients
-	  c=c_prs*ls->c[t].c;
+	  // Four-product center
+	  arma::vec W=(zeta*slicevec(ip.P,p,q)+eta*slicevec(jp.P,r,s))/(zeta+eta);
 
-	  // Reduced exponents
-	  double eta=zetac+zetad;
-	  double rho=zeta*eta/(zeta+eta);
+	  arma::vec PQ=slicevec(ip.P,p,q)-slicevec(jp.P,r,s);
+	  arma::vec WP=W-slicevec(ip.P,p,q);
+	  arma::vec WQ=W-slicevec(jp.P,r,s);
 
-	  // Geometrical quantities
-	  double P[3], Q[3], W[3];
-	  double rpqsq;
-	  
-	  for(int i=0;i<3;i++) {
-	    P[i]=(zetaa*A[i]+zetab*B[i])/zeta;
-	    Q[i]=(zetac*C[i]+zetad*D[i])/eta;
-	    W[i]=(P[i]*zeta+Q[i]*eta)/(zeta+eta);
-	  }
+	  double rpqsq=arma::dot(PQ,PQ);
 
-	  // Compute (PQ)^2
-	  rpqsq=0;
-	  for(int i=0;i<3;i++)
-	    rpqsq+=(P[i]-Q[i])*(P[i]-Q[i]);
+	  // Helper variable
+	  prim_data data;
 
-	  // Compute and store PA, QC, WP and WQ
-	  for(int i=0;i<3;i++) {
-	    data.U[0][i]=P[i]-A[i];
-	    data.U[2][i]=Q[i]-C[i];
-	    data.U[4][i]=W[i]-P[i];
-	    data.U[5][i]=W[i]-Q[i];
-	  }
+          // Compute and store PA, QC, WP and WQ
+          for(int i=0;i<3;i++) {
+            data.U[0][i]=ip.PA(p,q,i); // PA
+            data.U[2][i]=jp.PA(r,s,i); // QC
+            data.U[4][i]=WP(i); // WP
+            data.U[5][i]=WQ(i); // WQ
+          }
 
 	  // Store exponents
 	  data.oo2z=0.5/zeta;
@@ -1953,12 +1990,8 @@ void compute_libint_data(Libint_t & libint, const GaussianShell *is, const Gauss
 	  data.poz=rho/zeta;
 	  data.pon=rho/eta;
 
-	  // Compute overlaps for auxiliary integrals
-	  double S12=(M_PI/zeta)*sqrt(M_PI/zeta)*exp(-zetaa*zetab/zeta*rabsq);
-	  double S34=(M_PI/eta)*sqrt(M_PI/eta)*exp(-zetac*zetad/eta*rcdsq);
-
 	  // Prefactor of Boys' function is
-	  double prefac=2.0*sqrt(rho/M_PI)*S12*S34*c;
+	  double prefac=2.0*sqrt(rho/M_PI)*S12*S34;
 	  // and its argument is
 	  double boysarg=rho*rpqsq;
 	  // Evaluate Boys' function
@@ -1967,70 +2000,174 @@ void compute_libint_data(Libint_t & libint, const GaussianShell *is, const Gauss
 	  // Store auxiliary integrals
 	  for(int i=0;i<=mmax;i++)
 	    data.F[i]=prefac*bf[i];
-	  
+
 	  // We have all necessary data; store quartet.
 	  libint.PrimQuartet[ind++]=data;
 	}
-      }
     }
-  }
 }
 
-void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl) {
-  // Normalize and collect libint integrals
-  size_t ind_i, ind_ij, ind_ijk, ind;
-  size_t indout;
-  double norm_i, norm_ij, norm_ijk, norm;
-  
+void reorder_ERIs(std::vector<double> & ret, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl) {
+  // Do we need to do anything?
+  if(!swap_ij && !swap_kl && !swap_ijkl)
+    return;
+
+  // Indices
+  size_t ind_i, ind_ij, ind_ijk, ind, indout;
+
   // Numbers of functions on each shell
   const size_t Ni=is->get_Ncart();
   const size_t Nj=js->get_Ncart();
   const size_t Nk=ks->get_Ncart();
   const size_t Nl=ls->get_Ncart();
 
+  // Collect integrals in correct order
+  std::vector<double> tmp(ret.size());
+
   for(size_t ii=0;ii<Ni;ii++) {
     ind_i=ii*Nj;
-    norm_i=is->cart[ii].relnorm;
     for(size_t ji=0;ji<Nj;ji++) {
       ind_ij=(ind_i+ji)*Nk;
-      norm_ij=norm_i*js->cart[ji].relnorm;
       for(size_t ki=0;ki<Nk;ki++) {
-	ind_ijk=(ind_ij+ki)*Nl;
-	norm_ijk=norm_ij*ks->cart[ki].relnorm;
-	for(size_t li=0;li<Nl;li++) {
+        ind_ijk=(ind_ij+ki)*Nl;
+        for(size_t li=0;li<Nl;li++) {
+	  ind=ind_ijk+li;
+	  indout=get_swapped_ind(ii,Ni,ji,Nj,ki,Nk,li,Nl,swap_ij,swap_kl,swap_ijkl);
+	  tmp[indout]=ret[ind];
+	}
+      }
+    }
+  }
+
+  // Swap integrals
+  ret=tmp;
+}
+
+void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
+  // Normalize and collect libint integrals
+  size_t ind_i, ind_ij, ind_ijk, ind;
+  double norm_i, norm_ij, norm_ijk, norm;
+
+  // Numbers of functions on each shell
+  std::vector<shellf_t> ci=is->get_cart();
+  std::vector<shellf_t> cj=js->get_cart();
+  std::vector<shellf_t> ck=ks->get_cart();
+  std::vector<shellf_t> cl=ls->get_cart();
+
+  for(size_t ii=0;ii<ci.size();ii++) {
+    ind_i=ii*cj.size();
+    norm_i=ci[ii].relnorm;
+    for(size_t ji=0;ji<cj.size();ji++) {
+      ind_ij=(ind_i+ji)*ck.size();
+      norm_ij=cj[ji].relnorm*norm_i;
+      for(size_t ki=0;ki<ck.size();ki++) {
+	ind_ijk=(ind_ij+ki)*cl.size();
+	norm_ijk=ck[ki].relnorm*norm_ij;
+	for(size_t li=0;li<cl.size();li++) {
 	  // Index in computed integrals table
 	  ind=ind_ijk+li;
 	  // Total norm factor
-	  norm=norm_ijk*ls->cart[li].relnorm;
+	  norm=cl[li].relnorm*norm_ijk;
 	  // Compute output index
-	  indout=get_swapped_ind(ii,Ni,ji,Nj,ki,Nk,li,Nl,swap_ij,swap_kl,swap_ijkl);
-	  ret[indout]=norm*ints[ind];
+	  ret[ind]=norm*ints[ind];
 	}
       }
     }
   }
 }
 
-std::vector<double> ERI_cart_wrap(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
-  return ERI_cart(is,js,ks,ls);
-}
-
-std::vector<double> BasisSet::ERI(size_t is, size_t js, size_t ks, size_t ls) const {
+std::vector<double> BasisSet::ERI(const size_t is_orig, const size_t js_orig, const size_t ks_orig, const size_t ls_orig) const {
   // Calculate ERIs and transform them to spherical harmonics basis, if necessary.
 
-  return ERI_wrap(&(shells[is]),&(shells[js]),&(shells[ks]),&(shells[ls]));
-}
+  // Simple solution, slower than this one.
+  //  return compute_ERI(&(shells[is_orig]),&(shells[js_orig]),&(shells[ks_orig]),&(shells[ls_orig]));
 
-std::vector<double> ERI_wrap(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
-  return ERI(is,js,ks,ls);
-}
+  // Use precursors. Helpers
+  size_t is=is_orig;
+  size_t js=js_orig;
+  size_t ks=ks_orig;
+  size_t ls=ls_orig;
 
-std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
-  // Calculate ERIs and transform them to spherical harmonics basis, if necessary.
+  // Did we need to swap the indices?
+  bool swap_ij=0;
+  bool swap_kl=0;
+  bool swap_ijkl=0;
+
+  // Check order and swap shells if necessary
+  if(get_am(is)<get_am(js)) {
+    swap_ij=1;
+    std::swap(is,js);
+  }
+
+  if(get_am(ks)<get_am(ls)) {
+    swap_kl=1;
+    std::swap(ks,ls);
+  }
+
+  if(get_am(is)+get_am(js) > get_am(ks) + get_am(ls)) {
+    swap_ijkl=1;
+    std::swap(is,ks);
+    std::swap(js,ls);
+  }
 
   // Get the cartesian ERIs
-  std::vector<double> eris=ERI_cart(is,js,ks,ls);
+  std::vector<double> eris=ERI_cart_libint(&shells[is],&shells[js],precursor[is][js],&shells[ks],&shells[ls],precursor[ks][ls]);
+  // get them in the original order
+  reorder_ERIs(eris,&shells[is],&shells[js],&shells[ks],&shells[ls],swap_ij,swap_kl,swap_ijkl);
+  // and transform them into the spherical basis
+  eris=spherical_ERI_transform(eris,&shells[is_orig],&shells[js_orig],&shells[ks_orig],&shells[ls_orig]);
 
+  return eris;
+}
+
+
+std::vector<double> compute_ERI_cart(const GaussianShell * const is_orig, const GaussianShell * const js_orig, const GaussianShell * const ks_orig, const GaussianShell * const ls_orig) {
+  // Calculate cartesian ERIs
+
+  // Helpers
+  const GaussianShell *is=is_orig;
+  const GaussianShell *js=js_orig;
+  const GaussianShell *ks=ks_orig;
+  const GaussianShell *ls=ls_orig;
+
+  // Did we need to swap the indices?
+  bool swap_ij=0;
+  bool swap_kl=0;
+  bool swap_ijkl=0;
+
+  // Check order and swap shells if necessary
+  if(is->get_am()<js->get_am()) {
+    swap_ij=1;
+    std::swap(is,js);
+  }
+
+  if(ks->get_am()<ls->get_am()) {
+    swap_kl=1;
+    std::swap(ks,ls);
+  }
+
+  if( (is->get_am()+js->get_am()) > (ks->get_am()+ls->get_am())) {
+    swap_ijkl=1;
+    std::swap(is,ks);
+    std::swap(js,ls);
+  }
+
+  // Get the cartesian ERIs
+  std::vector<double> eris=ERI_cart_libint(is,js,ks,ls);
+  // and get them in the original order.
+  reorder_ERIs(eris,is,js,ks,ls,swap_ij,swap_kl,swap_ijkl);
+
+  return eris;
+}
+
+std::vector<double> compute_ERI(const GaussianShell * const is_orig, const GaussianShell * const js_orig, const GaussianShell * const ks_orig, const GaussianShell * const ls_orig) {
+  // Compute ERIs and transform them to spherical harmonics basis, if necessary.
+  std::vector<double> eris=compute_ERI_cart(is_orig,js_orig,ks_orig,ls_orig);
+  eris=spherical_ERI_transform(eris,is_orig,js_orig,ks_orig,ls_orig);
+  return eris;
+}
+
+std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
   // Are the shells in question using spherical harmonics?
   const bool is_lm=is->lm_in_use();
   const bool js_lm=js->lm_in_use();
@@ -2061,7 +2198,7 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
   arma::mat trans_l;
   if(ls_lm)
     trans_l=ls->get_trans();
-  
+
   // Amount of cartesians on shells (input)
   const size_t Ni_cart=is->get_Ncart();
   const size_t Nj_cart=js->get_Ncart();
@@ -2074,13 +2211,13 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
   const size_t Nj_tgt=js->get_Nbf();
   const size_t Nk_tgt=ks->get_Nbf();
   const size_t Nl_tgt=ls->get_Nbf();
-  
+
   // Sizes after transformations
   const size_t N_l  =Ni_cart*Nj_cart*Nk_cart*Nl_tgt;
   const size_t N_kl =Ni_cart*Nj_cart*Nk_tgt *Nl_tgt;
   const size_t N_jkl=Ni_cart*Nj_tgt *Nk_tgt *Nl_tgt;
   // The number of target integrals is
-  const size_t N_tgt=Ni_tgt*Nj_tgt*Nk_tgt*Nl_tgt;    
+  const size_t N_tgt=Ni_tgt*Nj_tgt*Nk_tgt*Nl_tgt;
 
   // Helpers for computing indices
   size_t indout_i, indout_j, indout_k, indout;
@@ -2089,90 +2226,6 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
 
   // Helper array
   std::vector<double> tmp(N_l);
-
-
-  /*
-  // First, transform over l.
-  if(ls_lm)
-    for(size_t iic=0;iic<Ni_cart;iic++)
-      for(size_t jjc=0;jjc<Nj_cart;jjc++)
-	for(size_t kkc=0;kkc<Nk_cart;kkc++)
-	  for(size_t lls=0;lls<Nl_tgt;lls++) {
-	    // Output index
-	    indout=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_tgt+lls;
-	    
-	    // Zero output
-	    tmp[indout]=0.0;
-	    
-	    // Compute transform
-	    for(size_t llc=0;llc<Nl_cart;llc++) {
-	      indin=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_cart+llc;
-	      tmp[indout]+=trans_l(lls,llc)*eris[indin];
-	    }
-	  }
-  else
-    tmp=eris;
-  
-  // Then, transform over k.
-  if(ks_lm) {
-    eris.resize(N_kl);
-
-    for(size_t iic=0;iic<Ni_cart;iic++)
-      for(size_t jjc=0;jjc<Nj_cart;jjc++)
-	for(size_t lls=0;lls<Nl_tgt;lls++)
-
-	  for(size_t kks=0;kks<Nk_tgt;kks++) {
-	    indout=((iic*Nj_cart+jjc)*Nk_tgt+kks)*Nl_tgt+lls;
-	    eris[indout]=0.0;
-
-	    for(size_t kkc=0;kkc<Nk_cart;kkc++) {
-	      indin=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_tgt+lls;
-	      eris[indout]+=trans_k(kks,kkc)*tmp[indin];
-	    }
-	  }
-  } else
-    eris=tmp;
-
-  // Then, over j
-  if(js_lm) {
-    eris.resize(N_jkl);
-
-    for(size_t iic=0;iic<Ni_cart;iic++)
-      for(size_t lls=0;lls<Nl_tgt;lls++)
-	for(size_t kks=0;kks<Nk_tgt;kks++) 
-	  for(size_t jjs=0;jjs<Nj_tgt;jjs++) {
-	    indout=((iic*Nj_tgt+jjs)*Nk_tgt+kks)*Nl_tgt+lls;
-
-	    tmp[indout]=0.0;
-	    for(size_t jjc=0;jjc<Nj_cart;jjc++) {
-	      indin=((iic*Nj_cart+jjc)*Nk_tgt+kks)*Nl_tgt+lls;
-	      tmp[indout]+=trans_j(jjs,jjc)*eris[indin];
-	    }
-	  }
-  } else
-    tmp=eris;
-
-  // Finally, over i
-  if(is_lm) {
-    eris.resize(N_tgt);
-
-    for(size_t lls=0;lls<Nl_tgt;lls++)
-      for(size_t kks=0;kks<Nk_tgt;kks++) 
-	for(size_t jjs=0;jjs<Nj_tgt;jjs++)
-	  for(size_t iis=0;iis<Ni_tgt;iis++) {
-	    indout=((iis*Nj_tgt+jjs)*Nk_tgt+kks)*Nl_tgt+lls;
-	    eris[indout]=0.0;
-	    for(size_t iic=0;iic<Ni_cart;iic++) {
-	      indin=((iic*Nj_tgt+jjs)*Nk_tgt+kks)*Nl_tgt+lls;
-	      eris[indout]+=trans_i(iis,iic)*tmp[indin];
-	    }
-	  }
-  } else
-    eris=tmp;
-
-  return eris;
-  */
-	    
 
   // Transform over l
   if(ls_lm) {
@@ -2183,13 +2236,13 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
 	for(size_t kkc=0;kkc<Nk_cart;kkc++) {
 	  indout_k=(indinout_j+kkc)*Nl_tgt;
 	  indin_k=(indinout_j+kkc)*Nl_cart;
-	  
+
 	  for(size_t ll=0;ll<Nl_tgt;ll++) {
 	    //	  indout=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_sph+ll;
 	    indout=indout_k+ll;
 
 	    tmp[indout]=0.0;
-	    
+
 	    for(size_t llc=0;llc<Nl_cart;llc++) {
 	      //	    indin=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_cart+llc;
 	      indin=indin_k+llc;
@@ -2207,18 +2260,18 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
     eris.resize(N_kl);
     for(size_t iic=0;iic<Ni_cart;iic++) {
       indinout_i=iic*Nj_cart;
-      
+
       for(size_t jjc=0;jjc<Nj_cart;jjc++) {
 	indout_j=(indinout_i+jjc)*Nk_tgt;
 	indin_j=(indinout_i+jjc)*Nk_cart;
-	
+
 	for(size_t kk=0;kk<Nk_tgt;kk++) {
 	  indout_k=(indout_j+kk)*Nl_tgt;
-	  
+
 	  for(size_t ll=0;ll<Nl_tgt;ll++) {
 	    //	    indout=((iic*Nj_cart+jjc)*Nk_tgt+kk)*Nl_tgt+ll;
 	    indout=indout_k+ll;
-	    
+
 	    eris[indout]=0.0;
 	    for(size_t kkc=0;kkc<Nk_cart;kkc++) {
 	      //indin=((iic*Nj_cart+jjc)*Nk_cart+kkc)*Nl_tgt+ll;
@@ -2238,13 +2291,13 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
     for(size_t iic=0;iic<Ni_cart;iic++) {
       indout_i=iic*Nj_tgt;
       indin_i=iic*Nj_cart;
-      
+
       for(size_t jj=0;jj<Nj_tgt;jj++) {
 	indout_j=(indout_i+jj)*Nk_tgt;
-	
+
 	for(size_t kk=0;kk<Nk_tgt;kk++) {
 	  indout_k=(indout_j+kk)*Nl_tgt;
-	  
+
 	  for(size_t ll=0;ll<Nl_tgt;ll++) {
 	    //	  indout=((iic*Nj_tgt+jj)*Nk_tgt+kk)*Nl_tgt+ll;
 	    indout=indout_k+ll;
@@ -2267,13 +2320,13 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
     eris.resize(N_tgt);
     for(size_t ii=0;ii<Ni_tgt;ii++) {
       indout_i=ii*Nj_tgt;
-      
+
       for(size_t jj=0;jj<Nj_tgt;jj++) {
 	indout_j=(indout_i+jj)*Nk_tgt;
-	
+
 	for(size_t kk=0;kk<Nk_tgt;kk++) {
 	  indout_k=(indout_j+kk)*Nl_tgt;
-	  
+
 	  for(size_t ll=0;ll<Nl_tgt;ll++) {
 	    //	  indout=((ii*Nj_sph+jj)*Nk_sph+kk)*Nl_sph+ll;
 	    indout=indout_k+ll;
@@ -2289,7 +2342,7 @@ std::vector<double> ERI(const GaussianShell *is, const GaussianShell *js, const 
     }
 
     return eris;
-  } else 
+  } else
     // No need for i transform
     return tmp;
 }
@@ -2312,16 +2365,16 @@ double BasisSet::Enuc() const {
       continue;
 
     int Zi=nuclei[i].Z;
-    
+
     for(size_t j=0;j<i;j++) {
       if(nuclei[j].bsse)
 	continue;
       int Zj=nuclei[j].Z;
-      
+
       En+=Zi*Zj/nucleardist(i,j);
     }
   }
-  
+
   return En;
 }
 
@@ -2341,12 +2394,12 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   arma::vec Sval;
   eig_sym_ordered(Sval,Svec,S11);
 
-  // Count number of eigenvalues that are above cutoff                          
+  // Count number of eigenvalues that are above cutoff
   size_t Nind=0;
   for(size_t i=0;i<Nbf;i++)
     if(Sval(i)>=cutoff)
       Nind++;
-  // Number of linearly dependent basis functions                               
+  // Number of linearly dependent basis functions
   const size_t Ndep=Nbf-Nind;
   // Get rid of linearly dependent eigenvalues and eigenvectors
   Sval=Sval.subvec(Ndep,Nbf-1);
@@ -2395,7 +2448,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
     MOs.col(i)=Sinv*S12*oldMOs.col(i);
     E(i)=oldE(i);
   }
-  
+
   // Assure that orbitals are orthonormal
   for(size_t i=0;i<Nmo;i++) {
     // Remove overlap with other orbitals
@@ -2444,13 +2497,13 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
       // Remove vector with maximum overlap
       idx.erase(idx.begin()+indmax);
     }
-    
+
     // Set the remaining orbitals
     for(size_t io=0;io<idx.size();io++) {
       MOs.col(Nmo+io)=Svec.col(idx[io]);
       E(Nmo+io)=E(Nmo-1);
     }
-    
+
     // Reorthogonalize the new functions against the projected
     // orbitals
     for(size_t i=Nmo;i<Nind;i++) {
@@ -2544,7 +2597,7 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 	}
       }
     }
-    
+
     // Sort trial set in order of decreasing exponents (don't care
     // about angular momentum) - (4) in YRF
     std::stable_sort(cand.begin(),cand.end(),exponent_compare);
@@ -2556,13 +2609,13 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
       if(shs[i].get_am()>lmax_obs)
 	lmax_obs=shs[i].get_am();
     int lmax_abs=std::max(lmax_obs+lmaxinc,2*lval);
-    
+
     // (6) was already above.
 
     while(cand.size()>0) {
       // Generate trial set
       std::vector<GaussianShell> trial;
-      
+
       // Function with largest exponent is moved to the trial set and
       // its exponent is set as the reference value - (7) in YRF
       double ref=(cand[0].get_contr())[0].z;
@@ -2674,17 +2727,17 @@ BasisSet BasisSet::exchange_fitting() const {
     for(size_t ish=0;ish<shs.size();ish++)
       // Second loop over shells of current nucleus
       for(size_t jsh=0;jsh<shs.size();jsh++) {
-	
+
 	// Current angular momentum
 	int l=shs[ish].get_am()+shs[jsh].get_am();
-	
+
 	// Update maximum value
 	if(l>lmax)
 	  lmax=l;
-	
+
 	// Increase amount of functions
 	nfunc[l]++;
-	
+
 	// Get exponential contractions
 	std::vector<contr_t> icontr=shs[ish].get_contr();
 	std::vector<contr_t> jcontr=shs[jsh].get_contr();
@@ -2693,14 +2746,14 @@ BasisSet BasisSet::exchange_fitting() const {
 	double mi=icontr[icontr.size()-1].z+jcontr[jcontr.size()-1].z;
 	// Maximum exponent
 	double ma=icontr[0].z+jcontr[0].z;
-	
+
 	// Check global minimum and maximum
 	if(mi<mine[l])
-	  mine[l]=mi;	
+	  mine[l]=mi;
 	if(ma>maxe[l])
 	  maxe[l]=ma;
       }
-    
+
     // Add functions to fitting basis set
     for(int l=0;l<=lmax;l++) {
       std::vector<contr_t> C(1);
@@ -2713,7 +2766,7 @@ BasisSet BasisSet::exchange_fitting() const {
 	beta=pow(maxe[l]/mine[l],1.0/(nfunc[l]-1));
       else
 	beta=1.0;
-      
+
       // Add even-tempered functions
       for(int n=0;n<nfunc[l];n++) {
 	// Compute exponent
@@ -2722,7 +2775,7 @@ BasisSet BasisSet::exchange_fitting() const {
       }
     }
   }
- 
+
   // Normalize basis set
   fit.coulomb_normalize();
   // Form list of unique shell pairs
@@ -2763,7 +2816,7 @@ GaussianShell dummyshell() {
   std::vector<contr_t> C(1);
   C[0].c=1.0;
   C[0].z=0.0;
-  
+
   GaussianShell sh(0,false,C);
   sh.set_center(r,0);
 
@@ -2780,7 +2833,7 @@ size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_
     std::swap(j,l);
     std::swap(Nj,Nl);
   }
-    
+
   // Then, swap k-l if necessary.
   if(swap_kl) {
     std::swap(k,l);
@@ -2903,7 +2956,7 @@ std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, 
     double dist=norm(r-bas.get_coords(inuc));
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=bas.get_shell_inds(inuc);
-    
+
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++) {
       // Shell is relevant if range is larger than minimal distance
@@ -2915,7 +2968,7 @@ std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, 
   }
 
   // Values of orbitals
-  std::vector<double> orbs(C.n_cols);  
+  std::vector<double> orbs(C.n_cols);
   for(size_t io=0;io<C.n_cols;io++)
     orbs[io]=0.0;
 
@@ -2949,7 +3002,7 @@ double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t
     double dist=norm(r-bas.get_coords(inuc));
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=bas.get_shell_inds(inuc);
-    
+
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++) {
       // Shell is relevant if range is larger than minimal distance
@@ -2970,7 +3023,7 @@ double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t
     arma::vec fval=bas.eval_func(compute_shells[ish],r.x,r.y,r.z);
     // Index of first function on shell is
     size_t i0=bas.get_first_ind(compute_shells[ish]);
-    
+
     // Store values and indices
     for(size_t ibf=0;ibf<fval.n_elem;ibf++) {
       f.push_back(fval(ibf));
