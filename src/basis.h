@@ -33,8 +33,8 @@
 
 /// Angular momentum notation for shells
 const char shell_types[]={'S','P','D','F','G','H','I','K','L','M'};
-/// Maximum angular momentum supported in current version of ERKALE
-const int max_am=9;
+/// Maximum angular momentum supported in current version of ERKALE 
+const int max_am=sizeof(shell_types)/sizeof(shell_types[0])-1;
 
 /// Structure for defining shells of functions
 typedef struct {
@@ -427,7 +427,7 @@ void libint_collect(std::vector<double> & ret, const double * ints, const Gaussi
 /// Reorder ERIs
 void reorder_ERIs(std::vector<double> & ret, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
 /// Transform ERIs into the spherical basis
-std::vector<double> spherical_ERI_transform(std::vector<double> & eris, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+void spherical_ERI_transform(std::vector<double> & eris, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 
 /// Compute ERI over cartesian Gaussians. Assumes correct order of shells.
 std::vector<double> ERI_cart_libint(const GaussianShell * const is, const GaussianShell * const js, const GaussianShell * const ks, const GaussianShell * const ls);
