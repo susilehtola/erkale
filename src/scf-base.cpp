@@ -194,7 +194,11 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	printf("Forming table of %lu ERIs, requiring %s of memory ... ",(long unsigned int) N,memory_size(N).c_str());
 	fflush(stdout);
       }
-      tab.fill(&basis);
+      if(strictint)
+	tab.fill(&basis);
+      else
+	// Don't compute small integrals
+	tab.fill(STRICTTOL,&basis);
     }
   }
   if(verbose)
