@@ -4,77 +4,77 @@
 */
 
 #if defined(CHECKFILL) || defined(ERITABLE)
-                  // Compute index in checking table
-		  size_t itab=idx(i,j,k,l);
+// Compute index in checking table
+size_t itab=idx(i,j,k,l);
 #endif
 
 #ifdef CHECKFILL
-		  if(nacc[itab])
-		    printf("Integral %i is %i %i %i %i, from shells %i %i %i %i, ams %i %i %i %i.\n",(int) itab,(int) i,(int) j,(int) k,(int) l,(int) is,(int) js,(int) ks,(int) ls,basp->get_am(is),basp->get_am(js),basp->get_am(ks),basp->get_am(ls));
-		  
-		  nacc[itab]++;
+if(nacc[itab])
+  printf("Integral %i is %i %i %i %i, from shells %i %i %i %i, ams %i %i %i %i.\n",(int) itab,(int) i,(int) j,(int) k,(int) l,(int) is,(int) js,(int) ks,(int) ls,basp->get_am(is),basp->get_am(js),basp->get_am(ks),basp->get_am(ls));
+
+nacc[itab]++;
 #endif
 
-                  // Compute index in shell table
-                  size_t ish=((ii*Nj+jj)*Nk+kk)*Nl+ll;
+// Compute index in shell table
+size_t ish=((ii*Nj+jj)*Nk+kk)*Nl+ll;
 
 
 #ifdef ERITABLE
-                  // Store integral in table
-		  ints[itab]=tmp[ish];
+// Store integral in table
+ints[itab]=tmp[ish];
 #else
-		  // Get symmetry equivalent integrals
-		  integral_symmetry(i,j,k,l,iarr,jarr,karr,larr,nid);
+// Get symmetry equivalent integrals
+integral_symmetry(i,j,k,l,iarr,jarr,karr,larr,nid);
 
 /*
-printf("ij = %i, kl = %i\n",ij,kl);
-printf("Symmetry equivalent integrals are:\n");
-for(int inid=0;inid<nid;inid++)
+  printf("ij = %i, kl = %i\n",ij,kl);
+  printf("Symmetry equivalent integrals are:\n");
+  for(int inid=0;inid<nid;inid++)
   printf(" (%i %i|%i %i)",iarr[inid],jarr[inid],karr[inid],larr[inid]);
-printf("\n");
+  printf("\n");
 */
 
 /*
-                  printf("The integral (%i %i | %i %i) = %e is identical to: ",tmp[ish],(int) i,(int) j,(int) k,(int) l);			 
-		  for(size_t inid=1;inid<nid;inid++)
-		    printf(" (%i %i | %i %i)",(int) iarr[inid],(int) jarr[inid],(int) karr[inid],(int) larr[inid]);
-		  printf("\n");
+  printf("The integral (%i %i | %i %i) = %e is identical to: ",tmp[ish],(int) i,(int) j,(int) k,(int) l);			 
+  for(size_t inid=1;inid<nid;inid++)
+  printf(" (%i %i | %i %i)",(int) iarr[inid],(int) jarr[inid],(int) karr[inid],(int) larr[inid]);
+  printf("\n");
 */
 
-		  // Get integral
-		  double res=tmp[ish];
-		  // Loop over symmetry equivalent integrals
-		  for(size_t inid=0;inid<nid;inid++) {
+// Get integral
+double res=tmp[ish];
+// Loop over symmetry equivalent integrals
+for(size_t inid=0;inid<nid;inid++) {
 
 #ifndef CALCK
-		    // Increment Coulomb
+  // Increment Coulomb
 #ifdef _OPENMP
-		    Jwrk(iarr[inid],jarr[inid])+=Pwrk(karr[inid],larr[inid])*res;
+  Jwrk(iarr[inid],jarr[inid])+=Pwrk(karr[inid],larr[inid])*res;
 #else
-		    J(iarr[inid],jarr[inid])+=P(karr[inid],larr[inid])*res;
+  J(iarr[inid],jarr[inid])+=P(karr[inid],larr[inid])*res;
 #endif
 #endif // ifndef CALCK
 
 
 #if defined(CALCK) || defined(CALCJK)
-		    // Increment exchange
+  // Increment exchange
 #ifdef _OPENMP
-		    Kwrk(iarr[inid],larr[inid])+=Pwrk(jarr[inid],karr[inid])*res;
+  Kwrk(iarr[inid],larr[inid])+=Pwrk(jarr[inid],karr[inid])*res;
 #else
-		    K(iarr[inid],larr[inid])+=P(jarr[inid],karr[inid])*res;
+  K(iarr[inid],larr[inid])+=P(jarr[inid],karr[inid])*res;
 #endif
 #endif // if defined(CALCK) || defined(CALCJK)
 
 
 #ifdef CALCJKab
-		    // Increment exchange
+  // Increment exchange
 #ifdef _OPENMP
-		    Kawrk(iarr[inid],larr[inid])+=Pawrk(jarr[inid],karr[inid])*res;
-		    Kbwrk(iarr[inid],larr[inid])+=Pbwrk(jarr[inid],karr[inid])*res;
+  Kawrk(iarr[inid],larr[inid])+=Pawrk(jarr[inid],karr[inid])*res;
+  Kbwrk(iarr[inid],larr[inid])+=Pbwrk(jarr[inid],karr[inid])*res;
 #else
-		    Ka(iarr[inid],larr[inid])+=Pa(jarr[inid],karr[inid])*res;
-		    Kb(iarr[inid],larr[inid])+=Pb(jarr[inid],karr[inid])*res;
+  Ka(iarr[inid],larr[inid])+=Pa(jarr[inid],karr[inid])*res;
+  Kb(iarr[inid],larr[inid])+=Pb(jarr[inid],karr[inid])*res;
 #endif
 #endif // ifdef CALCJKab
-		  }
+ }
 #endif

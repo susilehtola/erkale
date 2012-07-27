@@ -79,6 +79,12 @@
 // Fine structure constant
 #define FINESTRUCT 7.2973525540510957E-3
 
+// Initial tolerance, when density-based screening is used
+#define ROUGHTOL 1e-8
+// Tolerance when screening is only wrt absolute value of integrals
+#define STRICTTOL 1e-16
+
+
 
 
 // Error info

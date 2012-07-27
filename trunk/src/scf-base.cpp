@@ -27,14 +27,13 @@
 #include "dftfuncs.h"
 #include "dftgrid.h"
 #include "diis.h"
+#include "global.h"
 #include "linalg.h"
 #include "mathf.h"
 #include "scf.h"
 #include "stringutil.h"
 #include "timer.h"
 #include "trrh.h"
-
-#define ROUGHTOL 1e-16
 
 SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Amount of basis functions
@@ -63,6 +62,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   verbose=set.get_bool("Verbose");
 
   direct=set.get_bool("Direct");
+  strictint=set.get_bool("StrictIntegrals");
 
   // Check update scheme
   if(useadiis && usebroyden) {

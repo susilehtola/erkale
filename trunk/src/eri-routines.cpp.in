@@ -5,67 +5,94 @@
 
 /* Function definitions */
 
-#ifdef ERITABLE
+#if defined(ERITABLE) && defined(STRICT)
 void ERItable::fill(const BasisSet * basp) {
-// Don't do anything with a dummy argument.
-  if(basp==NULL)
-    return;
-#else
+#endif
+#if defined(ERITABLE) && !defined(STRICT)
+void ERItable::fill(double tol, const BasisSet * basp) {
+#endif
 
-#if defined(CALCJKab)
+#if defined(ERITABLE)
+    // Don't do anything with a dummy argument.
+    if(basp==NULL)
+      return;
+#endif
+
+#if defined(CALCJKab) && !defined(STRICT)
 void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
-// Compute total density for Coulomb matrix
+#endif
+#if defined(CALCJKab) && defined(STRICT)
+void ERIscreen::calcJK_strict(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
+#endif
+#if defined(CALCJKab)
+  // Compute total density for Coulomb matrix
   arma::mat P=Pa+Pb;
-#elif defined(CALCJK)
+#endif
+
+
+#if defined(CALCJK) && !defined(STRICT)
 void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol, double *eff) const {
-#elif defined(CALCK)
+#endif
+#if defined(CALCJK) && defined(STRICT)
+void ERIscreen::calcJK_strict(const arma::mat & P, arma::mat & J, arma::mat & K, double tol, double *eff) const {
+#endif
+
+
+#if defined(CALCK) && !defined(STRICT)
 arma::mat ERIscreen::calcK(const arma::mat & P, double tol, double *eff) const {
+#endif
+#if defined(CALCK) && defined(STRICT)
+arma::mat ERIscreen::calcK_strict(const arma::mat & P, double tol, double *eff) const {
+#endif
+#if defined(CALCK)
   arma::mat K;
-#else
+#endif
+
+#if defined(CALCJ) && !defined(STRICT)
 arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
+#endif
+#if defined(CALCJ) && defined(STRICT)
+arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) const {
+#endif
+#if defined(CALCJ)
   arma::mat J;
-#endif // if defined(CALCJKab)
+#endif
 
-#endif // ifdef ERITABLE
-
+  
   // Amount of basis functions
   size_t Nbf=basp->get_Nbf();
-
+  
   /* Check sizes of input */
-
+  
 #if defined(CALCK) || defined(CALCJK)
   MAT_SIZE_CHECK(P,Nbf,Nbf,"P is not square!\n");
 #endif
-
+  
 #if defined(CALCJKab)
   MAT_SIZE_CHECK(Pa,Nbf,Nbf,"Pa is not square!\n");
   MAT_SIZE_CHECK(Pb,Nbf,Nbf,"Pb is not square!\n");
 #endif
-
+  
   /* Check size of output */
-#ifndef ERITABLE
-
-#ifndef CALCK
+#if defined(CALCJ) || defined(CALCJK) || defined(CALCJKab)
   MAT_RESIZE(J,Nbf,Nbf);
   J.zeros();
 #endif
-
+  
 #if defined(CALCK) || defined(CALCJK)
   MAT_RESIZE(K,Nbf,Nbf);
   K.zeros();
 #endif
-
+  
 #if defined(CALCJKab)
   MAT_RESIZE(Ka,Nbf,Nbf);
   MAT_RESIZE(Kb,Nbf,Nbf);
   Ka.zeros();
   Kb.zeros(); 
 #endif
-
-#endif // ifndef ERITABLE
-
+  
   /* Allocate memory for table of integrals */
-
+  
 #ifdef ERITABLE
   // Make index helper
   iidx=i_idx(Nbf*(Nbf+1)/2);
@@ -81,20 +108,20 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
   // Compute memory requirements
   size_t N;
   N=N_ints(basp);
-
+  
   // Don't do DOS
   if(N*sizeof(double)>2*1e9) {
     ERROR_INFO();
     throw std::out_of_range("Cowardly refusing to allocate more than two gigs of memory.\n");
   }
-
+  
   try {
     ints.reserve(N);
     ints.resize(N);
   }
   catch(std::bad_alloc err) {
     std::ostringstream oss;
-
+    
     ERROR_INFO();
     oss << "Was unable to reserve " << memory_size(N*sizeof(double)) << " of memory.\n";
     throw std::runtime_error(oss.str());
@@ -103,20 +130,20 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
   // Number of calculated and skipped integrals
   size_t intskip=0, denskip=0, calcd=0;
 #endif
-
+  
   /* The filling algorithm may seem a bit complicated. This is because the ERIs
      are computed on a shell basis, and because the same algorithm is used here
      to form the ERIs as for direct calculations.
-
+     
      In order to determine if the filling algorithm works perfectly, there is
      the CHECKFILL option to count the number each integral has been
      calculated.
   */
-
+  
 #ifdef CHECKFILL
   // Debug number of accesses
   printf("Allocating memory for checking table.\n");
-
+  
 #ifndef ERITABLE
   // Number of integrals is 
   size_t N=Nbf*(Nbf+1)*(Nbf*Nbf+Nbf+2)/8;
@@ -124,20 +151,19 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
   std::vector<short int> nacc(N);
   for(size_t i=0;i<N;i++)
     nacc[i]=0;
-
 #endif
-
+  
+  
   // Get list of unique shell pairs
   std::vector<shellpair_t> shpairs=basp->get_unique_shellpairs();
   // Get number of shell pairs
   const size_t Npairs=shpairs.size();
-
-  // Maximum density matrix
-#ifndef ERITABLE
+  
+#if !defined(STRICT) && !defined(ERITABLE)
   const size_t Nsh=basp->get_Nshells();
   arma::mat Psh(Nsh,Nsh);
   Psh.zeros();
-
+  
   // Collect maximum density
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -158,96 +184,136 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
     Psh(js,is)=Psh(is,js);
   }
 #endif
-
-
+  
+  
+  
+#if defined(ERITABLE) && !defined(STRICT)
+  // Form screening matrix
+  const size_t Nsh=basp->get_Nshells();
+  arma::mat screen(Nsh,Nsh);
+  
+  // Loop over shell pairs
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic,1)
+#endif
+  for(size_t ip=0;ip<Npairs;ip++) {
+    size_t i=shpairs[ip].is;
+    size_t j=shpairs[ip].js;
+    
+    // Compute integrals
+    std::vector<double> tmp=basp->ERI(i,j,i,j);
+    // Get maximum value
+    double m=0.0;
+    for(size_t k=0;k<tmp.size();k++)
+      if(fabs(tmp[k])>m)
+	m=fabs(tmp[k]);
+    m=sqrt(m);
+    screen(i,j)=m;
+    screen(j,i)=m;
+  }
+#endif
+  
   // Loop over first pairs
 #ifdef _OPENMP
-
+  
 #ifdef ERITABLE
 #pragma omp parallel
 #else
 #pragma omp parallel reduction(+:calcd,intskip,denskip)
 #endif
-
+ 
 #endif // ifdef _OPENMP
   {
-
+    
 #ifndef ERITABLE
     // Arrays of identical integrals
     size_t iarr[8], jarr[8], karr[8], larr[8];
     size_t nid; // Number of identical integrals in this batch
-
-#ifdef _OPENMP
+#endif
+    
+#if !defined(ERITABLE) && defined(_OPENMP)
     const arma::mat Pwrk=P;
+#if !defined(STRICT)
     const arma::mat Pshwrk=Psh;
-#ifdef CALCJKab
+#endif
+#endif
+#if defined(CALCJKab) && defined(_OPENMP)
     const arma::mat Pawrk=Pa;
     const arma::mat Pbwrk=Pb;
 #endif
-#endif
-
-#ifdef _OPENMP    
-#ifndef CALCK
+    
+#if defined(_OPENMP) && !defined(ERITABLE) && !defined(CALCK)
     arma::mat Jwrk(Nbf,Nbf);
     Jwrk.zeros();
 #endif
-
-#if defined(CALCK) || defined(CALCJK)
+    
+#if defined(_OPENMP) && (defined(CALCK) || defined(CALCJK))
     arma::mat Kwrk(Nbf,Nbf);
     Kwrk.zeros();
 #endif
-
-#ifdef CALCJKab
+    
+#if defined(_OPENMP) && defined(CALCJKab)
     arma::mat Kawrk(Nbf,Nbf);
     Kawrk.zeros();
-
+    
     arma::mat Kbwrk(Nbf,Nbf);
     Kbwrk.zeros();
 #endif
-#endif
-
-#endif // ifndef ERITABLE
-
-
+    
+    
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
-#endif // ifdef _OPENMP
+#endif
     for(size_t ip=0;ip<Npairs;ip++) {
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++) {
-
-
-	// Shells on first pair are
+	
+	// Shells on second pair are
 	size_t ks=shpairs[ip].is;
 	size_t ls=shpairs[ip].js;
+	// and those on the first pair
+	size_t is=shpairs[jp].is;
+	size_t js=shpairs[jp].js;
+	
 	// First functions on shells are
 	size_t k0=basp->get_first_ind(ks);
 	size_t l0=basp->get_first_ind(ls);
-	// and amounts of functions on shells are
-	size_t Nk=basp->get_Nbf(ks);
-	size_t Nl=basp->get_Nbf(ls);
-	
-	// Shells on second pair are
-	size_t is=shpairs[jp].is;
-	size_t js=shpairs[jp].js;
-	// First functions on shells are
+	// and on the first pair
 	size_t i0=basp->get_first_ind(is);
 	size_t j0=basp->get_first_ind(js);
-	// and amounts of functions on shells are
+	
+	// Amount of functions on the second pair
+	size_t Nk=basp->get_Nbf(ks);
+	size_t Nl=basp->get_Nbf(ls);
+	// and on the first pair
 	size_t Ni=basp->get_Nbf(is);
 	size_t Nj=basp->get_Nbf(js);
 	
+	
 	/* Perform screening of integrals */
-#ifndef ERITABLE
+#if !(defined(ERITABLE) && defined(STRICT))
 	// Maximum value of the 2-electron integrals on this shell pair
 	double intmax=screen(is,js)*screen(ks,ls);
+#endif
 	
+#if defined(ERITABLE) && !defined(STRICT)
+	// Skip calculation of integrals, and just fill in zeros?
+	bool skip=false;
+	if(intmax<tol)
+	  skip=true;
+#endif
+	
+	
+#if !defined(ERITABLE)
 	if(intmax<tol) {
 	  // Skip integral due to small value of integral
 	  intskip++;
 	  continue;
-	  
-	} else {
+	}
+#if defined(STRICT)
+	else calcd++;
+#else
+	else {
 	  // Compute maximum density
 	  arma::vec Pv(6);
 	  Pv.zeros();
@@ -265,23 +331,35 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	  Pv(3)=Psh(js,ks);
 	  Pv(4)=Psh(js,ls);
 	  Pv(5)=Psh(ks,ls);
-#endif
+#endif // _OPENMP
 	  double maxP=max(Pv);
 	  
 	  if(maxP*intmax<tol) {
 	    // Skip integral due to small product of density and integral
 	    denskip++;
 	    continue;
-	  } else
+	  }
+	  else
+
 	    // Need to calculate integral.
 	    calcd++;
 	}
-#endif
+#endif // ifdef STRICT
+#endif // ifdef ERITABLE
+	  
 	
 	// Compute integrals
-	std::vector<double> tmp=basp->ERI(is,js,ks,ls);
-#ifdef _OPENMP
-	//	printf("Thread %i computed (%i %i %i %i)\n",omp_get_thread_num(),is,js,ks,ls);
+	std::vector<double> tmp;
+#if defined(ERITABLE) && !defined(STRICT)
+	// Screening for ERITABLE
+	if(!skip)
+	  tmp=basp->ERI(is,js,ks,ls);
+	else {
+	  tmp.reserve(Ni*Nj*Nk*Nl);
+	  tmp.insert(tmp.begin(),Ni*Nj*Nk*Nl,0.0);
+	}
+#else
+	tmp=basp->ERI(is,js,ks,ls);
 #endif
 	
 	
@@ -292,7 +370,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	  printf(" % e",tmp[in]);
 	  printf("\n");
 	*/
-
+	
 	/* Fill table, or increment matrices */
 	{
 	  // Helpers
@@ -379,31 +457,33 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	      }
 	    }
 	  }
-	} // end critical region
-      }
-    }
+	} // end table filling / matrix incrementation
+      } // End loop over jp pairs
+    } // End loop over ip pairs 
+  
+      // Collect results
+#if defined(_OPENMP)
     
-    // Collect results
-#if !defined(ERITABLE) && defined(_OPENMP)
-
-#ifndef CALCK
+#if !defined(CALCK) && !defined(ERITABLE)
 #pragma omp critical
     J+=Jwrk;
 #endif
-
+    
 #if defined(CALCK) || defined(CALCJK)
 #pragma omp critical
     K+=Kwrk;
 #endif
-
+    
 #ifdef CALCJKab
 #pragma omp critical
-    Ka+=Kawrk;
-    Kb+=Kbwrk;
+    {
+      Ka+=Kawrk;
+      Kb+=Kbwrk;
+    }
 #endif
-
-#endif
-
+    
+#endif // end collection
+    
   } // end parallel region
   
 #ifdef CHECKFILL  
@@ -450,19 +530,21 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
   
   printf("%lu are missing and %lu are duplicates.\n", nmiss, ndupl);
 #endif
-
+  
 #ifndef ERITABLE
   // Compute screening efficiency
   //  printf("Computed %lu shells, skipped %lu due to small absolute value and %lu due to small product.\n",calcd,intskip,denskip);
-
+  
   if(eff!=NULL) {
     *eff=calcd*100.0/(calcd+intskip+denskip);
   }
 #endif
-
+  
 #ifdef CALCJ
   return J;
 #elif defined(CALCK)
   return K;
 #endif
 }
+ 
+ 

@@ -139,8 +139,14 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   double olddip;
 
   // Tolerance for screening and screening efficiency
-  double tol=ROUGHTOL;
+  double tol;
   double screeneff;
+
+  // Determine tolerance to use
+  if(strictint)
+    tol=STRICTTOL;
+  else
+    tol=ROUGHTOL;
 
   // Change in energy from last iteration
   double deltaE=0;
@@ -382,14 +388,14 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	    t.set();
 	  }
 
-	  // Calculates everything
-	  //	    scr.calcJK(sol.P,J,K,tol,&screeneff);
-
-	  // Only calculate the changed part
-	  arma::mat dJ, dK;
-	  scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
-	  J+=dJ;
-	  K+=dK;
+	  if(strictint)
+	    scr.calcJK_strict(sol.P,J,K,tol,&screeneff);
+	  else {
+	    arma::mat dJ, dK;
+	    scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
+	    J+=dJ;
+	    K+=dK;
+	  }
 
 #ifdef DFT
 	} else {
@@ -400,8 +406,10 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	    t.set();
 	  }
 
-	  //	    J=scr.calcJ(sol.P,tol,&screeneff);
-	  J+=scr.calcJ(deltaP,tol,&screeneff);
+	  if(strictint)
+	    J=scr.calcJ_strict(sol.P,tol,&screeneff);
+	  else
+	    J+=scr.calcJ(deltaP,tol,&screeneff);
 	}
 #endif
 
@@ -417,14 +425,16 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	    t.set();
 	  }
 
-	  //	    scr.calcJK(sol.Pa,sol.Pb,J,Ka,Kb,tol,&screeneff);
-
-	  // Only calculate the changed part
-	  arma::mat dJ, dKa, dKb;
-	  scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
-	  J+=dJ;
-	  Ka+=dKa;
-	  Kb+=dKb;
+	  if(strictint)
+	    scr.calcJK_strict(sol.Pa,sol.Pb,J,Ka,Kb,tol,&screeneff);
+	  else {
+	    // Only calculate the changed part
+	    arma::mat dJ, dKa, dKb;
+	    scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
+	    J+=dJ;
+	    Ka+=dKa;
+	    Kb+=dKb;
+	  }
 
 #ifdef DFT
 	} else {
@@ -435,8 +445,10 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	    t.set();
 	  }
 
-	  //	    J=scr.calcJ(sol.P,tol,&screeneff);
-	  J+=scr.calcJ(deltaP,tol,&screeneff);
+	  if(strictint)
+	    J=scr.calcJ_strict(sol.P,tol,&screeneff);
+	  else
+	    J+=scr.calcJ(deltaP,tol,&screeneff);
 	}
 #endif
 
@@ -605,7 +617,8 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     deltaE=sol.en.E-Eold;
 
     // Update screening value
-    tol=std::min(std::min(fabs(deltaE)*1e-2,1e-9),tol);
+    if(!strictint)
+      tol=std::min(std::min(fabs(deltaE)*1e-2,1e-9),tol);
 
     // Sanity check
     if(!std::isfinite(sol.en.E)) {
