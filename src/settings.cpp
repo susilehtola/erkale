@@ -83,6 +83,8 @@ void Settings::add_scf_settings() {
 
   // Direct calculation?
   add_bool("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false);
+  // Strict integrals?
+  add_bool("StrictIntegrals", "Use strict integrals?", false);
 
   // Default orthogonalization method
   add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");

@@ -170,6 +170,8 @@ class SCF {
 
   /// Direct calculation?
   bool direct;
+  /// Strict integrals?
+  bool strictint;
   /// Density fitting calculation? (Pure DFT XC functionals)
   bool densityfit;
 
