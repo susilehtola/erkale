@@ -32,8 +32,8 @@
 #include <libint/libint.h>
 
 /// Angular momentum notation for shells
-const char shell_types[]={'S','P','D','F','G','H','I','K','L','M'};
-/// Maximum angular momentum supported in current version of ERKALE 
+const char shell_types[]={'S','P','D','F','G','H','I','K','L','M','N','O'};
+/// Maximum angular momentum supported in current version of ERKALE
 const int max_am=sizeof(shell_types)/sizeof(shell_types[0])-1;
 
 /// Structure for defining shells of functions
