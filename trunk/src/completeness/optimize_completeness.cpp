@@ -24,6 +24,13 @@ extern "C" {
 #include <gsl/gsl_multimin.h>
 }
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+// Maximum number of functions allowed in completeness optimization
+#define NFMAX 50
+
 std::vector<double> get_exponents(const gsl_vector *x) {
   // Get exponents
   size_t N=x->size;
@@ -116,11 +123,11 @@ std::vector<double> completeness_profile(const gsl_vector * x, void * params) {
     Y[i]=arma::dot(J.row(i),J.row(i));
 
   /*
-  FILE *out=fopen("Y.dat","w");
-  for(size_t ia=0;ia<par->scanexp.size();ia++) {
+    FILE *out=fopen("Y.dat","w");
+    for(size_t ia=0;ia<par->scanexp.size();ia++) {
     fprintf(out,"% e %e\n",log10(par->scanexp[ia]),Y[ia]);
-  }
-  fclose(out);
+    }
+    fclose(out);
   */
 
   return Y;
@@ -164,16 +171,16 @@ std::vector< std::vector<double> > completeness_profile_logder_num(const gsl_vec
   gsl_vector_free(right);
 
   /*
-  FILE *out=fopen("Ynumder.dat","w");
-  for(size_t ia=0;ia<par->scanexp.size();ia++) {
+    FILE *out=fopen("Ynumder.dat","w");
+    for(size_t ia=0;ia<par->scanexp.size();ia++) {
     fprintf(out,"% e ",log10(par->scanexp[ia]));
 
     // Print derivatives
     for(size_t fi=0;fi<Nf;fi++)
-      fprintf(out,"% e ",ret[ia][fi]);
+    fprintf(out,"% e ",ret[ia][fi]);
     fprintf(out,"\n");
-  }
-  fclose(out);
+    }
+    fclose(out);
   */
 
   return ret;
@@ -221,16 +228,16 @@ std::vector< std::vector<double> > completeness_profile_logder(const gsl_vector 
   }
 
   /*
-  FILE *out=fopen("Yder.dat","w");
-  for(size_t ia=0;ia<par->scanexp.size();ia++) {
+    FILE *out=fopen("Yder.dat","w");
+    for(size_t ia=0;ia<par->scanexp.size();ia++) {
     fprintf(out,"% e ",log10(par->scanexp[ia]));
 
     // Print derivatives
     for(size_t fi=0;fi<z.size();fi++)
-      fprintf(out,"% e ",ret[ia][fi]);
+    fprintf(out,"% e ",ret[ia][fi]);
     fprintf(out,"\n");
-  }
-  fclose(out);
+    }
+    fclose(out);
   */
 
   return ret;
@@ -380,10 +387,10 @@ void compl_mog_df(const gsl_vector * x, void * params, gsl_vector *gv) {
     gsl_vector_set(gv,fi,-g[fi]/(6.0*nint));
 
   /*
-  printf("Gradient vector is ");
-  for(size_t fi=0;fi<Nf;fi++)
+    printf("Gradient vector is ");
+    for(size_t fi=0;fi<Nf;fi++)
     printf("% e ",gsl_vector_get(gv,fi));
-  printf("\n");
+    printf("\n");
   */
 }
 
@@ -517,6 +524,149 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
 
   return ret;
 }
+
+double maxwidth(int am, double tol, int nexp, int nval) {
+  double width;
+  std::vector<double> exps=maxwidth_exps(am,tol,nexp,&width,nval);
+  return width;
+}
+
+std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, int nval) {
+  // Error check
+  if(nexp<=0) {
+    std::vector<double> exps;
+    return exps;
+  }
+
+  if(tol<MINTAU) {
+    //    printf("Renormalized CO tolerance to 1e-5.\n");
+    tol=MINTAU;
+  }
+
+  // Left value
+  double left=0.0;
+  std::vector<double> lexps;
+  // Right value
+  double right=nexp/2.0;
+  double rval;
+  std::vector<double> rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
+  while(rval<tol) {
+    right*=2.0;
+    rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
+  }
+
+  std::vector<double> mexps;
+
+  double middle;
+  do {
+    middle=(left+right)/2.0;
+
+    // Get exponents
+    double mval;
+    mexps=optimize_completeness(am,0.0,middle,nexp,nval,false,&mval);
+
+    // Figure out which end to move
+    if(mval>tol) {
+      right=middle;
+    }
+    else {
+      left=middle;
+    }
+  } while(right-left>1e-3);
+
+  // Set width
+  *width=middle;
+
+  return mexps;
+}
+
+
+/// Perform completeness-optimization of exponents
+std::vector<double> get_exponents(int am, double start, double end, double tol, int nval, bool verbose) {
+  // Exponents
+  std::vector<double> exps;
+  bool succ=false;
+
+  // Work array
+  std::vector< std::vector<double> > expwrk;
+  std::vector<double> mog;
+
+  // Sanity check
+  if(tol<MINTAU) {
+    printf("Renormalized CO tolerance to 1e-5.\n");
+    tol=MINTAU;
+  }
+
+  // Allocate work memory
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  expwrk.resize(nth);
+  mog.resize(nth);
+
+  // Do completeness optimization
+  int nf=1;
+  if(verbose)
+    printf("\tNf tau_%i\n",nval);
+
+  while(nf<=NFMAX) {
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+
+#ifdef _OPENMP
+      int ith=omp_get_thread_num();
+#else
+      int ith=0;
+#endif
+
+#ifdef _OPENMP
+#pragma omp for ordered
+#endif
+      for(int mf=nf;mf<nf+nth;mf++) {
+	// Get exponents.
+	mog[ith]=-1.0;
+	expwrk[ith]=optimize_completeness(am,start,end,mf,nval,false,&(mog[ith]));
+#ifdef _OPENMP
+#pragma omp ordered
+#endif
+	if(verbose)
+	  printf("\t%2i %e\n",mf,mog[ith]);
+      }
+    }
+
+    // Did we achieve the wanted mog?
+    for(int i=0;i<nth;i++) {
+      if(mog[i]<(1+sqrt(DBL_EPSILON))*tol) {
+	// Tolerance achieved. Save exponents.
+	exps=expwrk[i];
+	succ=true;
+	break;
+      }
+    }
+
+    // Need another break clause here.
+    if(succ)
+      break;
+
+    // Increase nf
+    nf+=nth;
+  }
+
+  if(!succ) {
+    fprintf(stderr,"Could not get exponents for %c shell with tol=%e.\n",shell_types[am],tol);
+    throw std::runtime_error("Unable to achieve wanted tolerance.\n");
+  } else if(verbose)
+    printf("Wanted tolerance achieved with %i exponents.\n",(int) exps.size());
+
+  return exps;
+}
+
 
 std::vector<double> optimize_completeness_df(int am, double min, double max, int Nf, int n) {
   // Time minimization
