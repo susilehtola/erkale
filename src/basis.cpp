@@ -2432,9 +2432,12 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   // Linearly independent size of old basis set
   const size_t Nbfo=oldMOs.n_cols;
 
+  if(Nbfo==0)
+    throw std::runtime_error("No orbitals to project!\n");
+
   // How many MOs do we transform?
   size_t Nmo=Nbfo;
-  if(Nind<Nmo)
+  if(Nind<Nmo) // New basis is smaller than old one
     Nmo=Nind;
 
   // OK, now we are ready to calculate the projections.
