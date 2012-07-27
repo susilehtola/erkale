@@ -60,21 +60,7 @@ int main(int argc, char **argv) {
   double tol=atof(argv[5]);
   double tau;
   if(tol<1) {
-    int Nf;
-    printf("\tNf tau\n");
-    for(Nf=1;Nf<=NFMAX;Nf++) {
-      // Nelder-Mead method
-      exps=optimize_completeness(am,min,max,Nf,n,false,&tau);
-
-      printf("\t%2i %e\n",Nf,tau);
-      if(tau<tol)
-	break;
-    }
-
-    if(Nf>NFMAX)
-      throw std::runtime_error("Unable to achieve wanted tolerance!\n");
-    else
-      printf("Wanted tolerance achieved.\n");
+    exps=get_exponents(am,min,max,tol,n,true);
   } else {
     // Number of functions given.
     exps=optimize_completeness(am,min,max,atoi(argv[5]),n,true,&tau);

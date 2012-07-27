@@ -17,6 +17,9 @@
 #ifndef ERKALE_OPTCOMP
 #define ERKALE_OPTCOMP
 
+/// Minimum allowed value of deviation from completeness (for numerical stability)
+#define MINTAU pow(10.0,-4.8)
+
 #include "../global.h"
 #include <armadillo>
 #include <vector>
@@ -73,6 +76,16 @@ void compl_mog_fdf(const gsl_vector * x, void * params, double *f, gsl_vector *g
  * This routine uses the Nead-Miller algorithm.
  */
 std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL);
+
+/// Calculate maximum width to obtain tolerance with given amount of exponents
+double maxwidth(int am, double tol, int nexp, int n=1);
+
+/// Calculate exponents corresponding to maximum width to obtain tolerance with given amount of exponents
+std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, int n=1);
+
+/// Perform completeness-optimization of exponents
+std::vector<double> get_exponents(int am, double start, double end, double tol, int n=1, bool verbose=false);
+
 
 /**
  * Optimize completeness profile for angular momentum am in exponent
