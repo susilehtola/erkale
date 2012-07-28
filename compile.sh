@@ -49,9 +49,9 @@ MAXAM="6"
 export GSLVER="1.15"
 export XCVER="1.2.0"
 export INTVER="1.1.4"
-export ARMAVER="3.2.2"
+export ARMAVER="3.2.4"
 export CMAKEVER="2.8.8"
-export HDF5VER="1.8.8"
+export HDF5VER="1.8.9"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
