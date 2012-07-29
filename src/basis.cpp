@@ -188,6 +188,13 @@ void GaussianShell::convert_contraction() {
 void GaussianShell::normalize() {
   // Normalize contraction of unnormalized primitives wrt first function on shell
 
+  // Check for dummy shell
+  if(c.size()==1 && c[0].z==0.0) {
+    // Yes, this is a dummy.
+    c[0].c=1.0;
+    return;
+  }
+
   double fact=0.0;
 
   // Calculate overlap of exponents
@@ -958,11 +965,6 @@ BasisSet::BasisSet(size_t Nat, const Settings & set) {
 }
 
 BasisSet::~BasisSet() {
-  if(precursor!=NULL) {
-    for(size_t ish=0;ish<shells.size();ish++)
-      delete [] precursor[ish];
-    delete [] precursor;
-  }
 }
 
 void BasisSet::add_nucleus(const nucleus_t & nuc) {
@@ -1139,9 +1141,9 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
 
 void BasisSet::compute_precursors() {
   // Allocate memory for precursors
-  precursor=new eri_precursor_t*[shells.size()];
+  precursor.resize(shells.size());
   for(size_t i=0;i<shells.size();i++)
-    precursor[i]=new eri_precursor_t[shells.size()];
+    precursor[i].resize(shells.size());
 
   // Calculate precursors
   for(size_t i=0;i<shells.size();i++)
