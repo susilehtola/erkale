@@ -136,6 +136,9 @@ std::vector<contr_t> FunctionShell::get_contr() const {
 }
 
 ElementBasisSet::ElementBasisSet() {
+  // Default values
+  sym="";
+  num=0;
 }
 
 ElementBasisSet::ElementBasisSet(std::string sym, size_t num) {
