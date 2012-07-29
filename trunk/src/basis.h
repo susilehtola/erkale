@@ -191,7 +191,7 @@ class BasisSet {
   std::vector<double> shell_ranges;
 
   /// ERI precursors
-  eri_precursor_t **precursor;
+  std::vector< std::vector<eri_precursor_t> > precursor;
 
  public:
   /// Dummy constructor
