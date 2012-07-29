@@ -46,13 +46,29 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   iidx=i_idx(Norb);
   // Fill list of shell pairs
   orbpairs=orbbas.get_unique_shellpairs();
-  
-  // Dummy shell, helper for computing ERIs
-  GaussianShell dummy=dummyshell();
 
-  // Store shell data
-  auxshells=auxbas.get_shells();
-  orbshells=orbbas.get_shells();
+  // Form total basis set
+  totbas=orbbas;
+  // Form indices of orbital shells
+  orbind.resize(orbbas.get_Nshells());
+  for(size_t i=0;i<orbbas.get_Nshells();i++)
+    orbind[i]=i;
+
+  // Add auxiliary functions to total basis set
+  auxind.resize(auxbas.get_Nshells());
+  std::vector<GaussianShell> auxsh=auxbas.get_shells();
+  for(size_t i=0;i<auxsh.size();i++) {
+    totbas.add_shell(auxsh[i].get_center_ind(),auxsh[i],false);
+    auxind[i]=i+orbbas.get_Nshells();
+  }
+
+  // Finally, add dummy shell to basis set
+  GaussianShell dummy=dummyshell();
+  totbas.add_shell(0,dummy,false);
+  dummyind=orbbas.get_Nshells()+auxbas.get_Nshells();
+
+  // Finalize total basis set
+  totbas.finalize();
 
   // First, compute the two-center integrals
   ab=arma::mat(Naux,Naux);
@@ -60,7 +76,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   
   // Get list of unique auxiliary shell pairs
   std::vector<shellpair_t> auxpairs=auxbas.get_unique_shellpairs();
-
+  
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
@@ -68,25 +84,33 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     // The shells in question are
     size_t is=auxpairs[ip].is;
     size_t js=auxpairs[ip].js;
-
+    
     // Compute (a|b)
-    std::vector<double> eris=compute_ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
+    std::vector<double> eris=totbas.ERI(auxind[is],dummyind,auxind[js],dummyind);
     
     // Store integrals
-    for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
-      for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
-	ab(auxshells[is].get_first_ind()+ii,auxshells[js].get_first_ind()+jj)=eris[ii*auxshells[js].get_Nbf()+jj];
-	ab(auxshells[js].get_first_ind()+jj,auxshells[is].get_first_ind()+ii)=eris[ii*auxshells[js].get_Nbf()+jj];
+    size_t Ni=totbas.get_Nbf(auxind[is]);
+    size_t Nj=totbas.get_Nbf(auxind[js]);
+    for(size_t ii=0;ii<Ni;ii++) {
+      // Account for orbital functions at the beginning of the basis set
+      size_t ai=totbas.get_first_ind(auxind[is])+ii-Norb;
+      for(size_t jj=0;jj<Nj;jj++) {
+	// Account for orbital functions at the beginning of the basis set
+	size_t aj=totbas.get_first_ind(auxind[js])+jj-Norb;
+
+	ab(ai,aj)=eris[ii*Nj+jj];
+	ab(aj,ai)=eris[ii*Nj+jj];
       }
+    }
   }
-  
+
   // Form ab_inv
   ab_inv=arma::inv(ab+DELTA);
 
 #ifdef SCREENING
   // Then, form the screening matrix
   if(direct) {
-    screen=arma::mat(orbshells.size(),orbshells.size());
+    screen=arma::mat(orbind.size(),orbind.size());
     screen.zeros();
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -97,7 +121,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
       size_t js=orbpairs[ip].js;
       
       // Compute ERIs
-      std::vector<double> eris=compute_ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
+      std::vector<double> eris=totbas.ERI(orbind[is],orbind[js],orbind[is],orbind[js]);
       
       // Find out maximum value
       double max=0.0;
@@ -120,7 +144,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for(size_t ia=0;ia<auxshells.size();ia++)
+    for(size_t ia=0;ia<auxind.size();ia++)
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	// Shells in question are
 	size_t imu=orbpairs[ip].is;
@@ -128,22 +152,23 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 	
 	// Amount of functions
 	
-	size_t Na=auxshells[ia].get_Nbf();
-	size_t Nmu=orbshells[imu].get_Nbf();
-	size_t Nnu=orbshells[inu].get_Nbf();
+	size_t Na=totbas.get_Nbf(auxind[ia]);
+	size_t Nmu=totbas.get_Nbf(orbind[imu]);
+	size_t Nnu=totbas.get_Nbf(orbind[inu]);
 	
 	// Compute (a|mn)
-	std::vector<double> eris=compute_ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
+	std::vector<double> eris=totbas.ERI(auxind[ia],dummyind,orbind[imu],orbind[inu]);
 	
 	// Store integrals
 	for(size_t af=0;af<Na;af++) {
-	  size_t inda=auxshells[ia].get_first_ind()+af;
+	  // Account for orbital functions at the beginning of the basis set
+	  size_t inda=totbas.get_first_ind(auxind[ia])+af-Norb;
 	  
 	  for(size_t muf=0;muf<Nmu;muf++) {
-	    size_t indmu=orbshells[imu].get_first_ind()+muf;
+	    size_t indmu=totbas.get_first_ind(orbind[imu])+muf;
 	    
 	    for(size_t nuf=0;nuf<Nnu;nuf++) {
-	      size_t indnu=orbshells[inu].get_first_ind()+nuf;
+	      size_t indnu=totbas.get_first_ind(orbind[inu])+nuf;
 	      
 	      a_munu[idx(inda,indmu,indnu)]=eris[(af*Nmu+muf)*Nnu+nuf];
 	    }
@@ -213,8 +238,6 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
       }
     }
   } else {
-    // Dummy shell, helper for computing ERIs
-    GaussianShell dummy=dummyshell();
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -237,25 +260,26 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 	  continue;
 #endif
 	
-	size_t Nmu=orbshells[imus].get_Nbf();
-	size_t Nnu=orbshells[inus].get_Nbf();
+	size_t Nmu=totbas.get_Nbf(orbind[imus]);
+	size_t Nnu=totbas.get_Nbf(orbind[inus]);
 	
-	for(size_t ias=0;ias<auxshells.size();ias++) {
+	for(size_t ias=0;ias<auxind.size();ias++) {
 	  
-	  size_t Na=auxshells[ias].get_Nbf();
+	  size_t Na=totbas.get_Nbf(auxind[ias]);
 	  
 	  // Compute (a|mn)
-	  std::vector<double> eris=compute_ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	  std::vector<double> eris=totbas.ERI(auxind[ias],dummyind,orbind[imus],orbind[inus]);
 	  
 	  // Increment gamma
 	  for(size_t iia=0;iia<Na;iia++) {
-	    size_t ia=auxshells[ias].get_first_ind()+iia;
+	  // Account for orbital functions at the beginning of the basis set
+	    size_t ia=totbas.get_first_ind(auxind[ias])+iia-Norb;
 	    
 	    for(size_t iimu=0;iimu<Nmu;iimu++) {
-	      size_t imu=orbshells[imus].get_first_ind()+iimu;
+	      size_t imu=totbas.get_first_ind(orbind[imus])+iimu;
 	      
 	      for(size_t iinu=0;iinu<Nnu;iinu++) {
-		size_t inu=orbshells[inus].get_first_ind()+iinu;
+		size_t inu=totbas.get_first_ind(orbind[inus])+iinu;
 
 		// The contracted integral
 		double res=eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
@@ -310,14 +334,12 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
       }
 
   } else {
-    // Dummy shell, helper for computing ERIs
-    GaussianShell dummy=dummyshell();
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<orbpairs.size();ip++)
-      for(size_t ias=0;ias<auxshells.size();ias++) {
+      for(size_t ias=0;ias<auxind.size();ias++) {
 	
 	size_t imus=orbpairs[ip].is;
 	size_t inus=orbpairs[ip].js;
@@ -329,22 +351,23 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 	  continue;
 #endif
 	
-	size_t Na=auxshells[ias].get_Nbf();
-	size_t Nmu=orbshells[imus].get_Nbf();
-	size_t Nnu=orbshells[inus].get_Nbf();
+	size_t Na=totbas.get_Nbf(auxind[ias]);
+	size_t Nmu=totbas.get_Nbf(orbind[imus]);
+	size_t Nnu=totbas.get_Nbf(orbind[inus]);
 	
 	// Compute (a|mn)
-	std::vector<double> eris=compute_ERI(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	std::vector<double> eris=totbas.ERI(auxind[ias],dummyind,orbind[imus],orbind[inus]);
 	
 	// Increment J
 	for(size_t iia=0;iia<Na;iia++) {
-	  size_t ia=auxshells[ias].get_first_ind()+iia;
+	  // Account for orbital functions at the beginning of the basis set
+	  size_t ia=totbas.get_first_ind(auxind[ias])+iia-Norb;
 	  
 	  for(size_t iimu=0;iimu<Nmu;iimu++) {
-	    size_t imu=orbshells[imus].get_first_ind()+iimu;
+	    size_t imu=totbas.get_first_ind(orbind[imus])+iimu;
 	    
 	    for(size_t iinu=0;iinu<Nnu;iinu++) {
-	      size_t inu=orbshells[inus].get_first_ind()+iinu;
+	      size_t inu=totbas.get_first_ind(orbind[inus])+iinu;
 
 	      // Contract result
 	      double tmp=eris[(iia*Nmu+iimu)*Nnu+iinu]*c(ia);
