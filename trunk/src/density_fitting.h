@@ -53,14 +53,18 @@ class DensityFit {
   /// Direct calculation? (Compute three-center integrals on-the-fly)
   bool direct;
 
-  /// Orbital shells
-  std::vector<GaussianShell> orbshells;
-  /// Density fitting shells
-  std::vector<GaussianShell> auxshells;
+  /// Basis set containing first orbital, then auxiliary and lastly dummy function
+  BasisSet totbas;
+  /// Indices of orbital shells
+  std::vector<size_t> orbind;
+  /// Indices of density fitting shells
+  std::vector<size_t> auxind;
+  /// Index of dummy function
+  size_t dummyind;
 
   /// List of unique orbital shell pairs
   std::vector<shellpair_t> orbpairs;
-  
+
   /// Index helper
   std::vector<size_t> iidx;
 
