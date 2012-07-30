@@ -610,7 +610,7 @@ std::vector<double> get_exponents(int am, double start, double end, double tol, 
   // Do completeness optimization
   int nf=1;
   if(verbose)
-    printf("\tNf tau_%i\n",nval);
+    printf("\tNf  tau_%i\n",nval);
 
   while(nf<=NFMAX) {
 
@@ -635,8 +635,12 @@ std::vector<double> get_exponents(int am, double start, double end, double tol, 
 #ifdef _OPENMP
 #pragma omp ordered
 #endif
-	if(verbose)
-	  printf("\t%2i %e\n",mf,mog[ith]);
+	if(verbose) {
+	  if(mog[ith]<(1+sqrt(DBL_EPSILON))*tol)
+	    printf("\t%2i *%e\n",mf,mog[ith]);
+	  else
+	    printf("\t%2i  %e\n",mf,mog[ith]);
+	}
       }
     }
 
