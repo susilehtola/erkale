@@ -520,7 +520,13 @@ arma::mat form_orbital(const Storage & stor, const std::string & name) {
   // Amount of basis functions
   size_t Nbf=stor.get_int("Number of basis functions");
   // Amount of orbitals
-  size_t Nmo=stor.get_int("Number of independent functions");
+  size_t Nmo;
+  try {
+    Nmo=stor.get_int("Number of independent functions");
+  } catch(std::runtime_error) {
+    // G03 has spelling error
+    Nmo=stor.get_int("Number of independant functions");
+  }
 
   // Get index converter
   std::vector<size_t> idx=ge_indarr(stor);
