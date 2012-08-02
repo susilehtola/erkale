@@ -50,7 +50,6 @@ set_target_properties(erkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
 target_link_libraries(erkale liberkale)
 target_link_libraries(erkale liberkale_emd)
 
-
 # Link libraries
 if(BUILD_SHARED_LIBS)
 else()
@@ -59,6 +58,22 @@ else()
  target_link_libraries(erkale ${LIBXC_LIBRARIES})
  target_link_libraries(erkale ${LIBINT_LIBRARIES})
  target_link_libraries(erkale ${HDF5_LIBRARIES})
+endif()
+
+# Density cube tool
+add_executable (erkale_cube cube.cpp)
+# The name of the executable is
+set_target_properties(erkale_cube PROPERTIES OUTPUT_NAME "erkale_cube${SUFFIX}")
+target_link_libraries(erkale_cube liberkale)
+
+# Link libraries
+if(BUILD_SHARED_LIBS)
+else()
+ target_link_libraries(erkale_cube ${GSL_LIBRARIES})
+ target_link_libraries(erkale_cube ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_cube ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_cube ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_cube ${HDF5_LIBRARIES})
 endif()
 
 # Install targets
