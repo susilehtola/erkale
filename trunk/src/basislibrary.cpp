@@ -478,7 +478,7 @@ void BasisSetLibrary::save_gaussian94(const char * filename, bool append) const 
       fprintf(out,"%c   %i   1.00\n",shell_types[elements[iel].bf[ish].am],(int) elements[iel].bf[ish].C.size());
       // Print out contraction
       for(size_t iexp=0;iexp<elements[iel].bf[ish].C.size();iexp++)
-	fprintf(out,"\t%.16e\t\t%.16e\n",elements[iel].bf[ish].C[iexp].z,elements[iel].bf[ish].C[iexp].c);
+	fprintf(out,"\t%.16e\t\t% .16e\n",elements[iel].bf[ish].C[iexp].z,elements[iel].bf[ish].C[iexp].c);
     }
     // Close entry
     fprintf(out,"****\n");
