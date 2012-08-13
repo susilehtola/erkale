@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cfloat>
+#include <string>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -37,6 +38,175 @@ void print_spectrum(const std::string & fname, const arma::mat & m) {
     fprintf(out,"%e %e\n",m(it,0)*HARTREEINEV, m(it,1));
   fclose(out);
 }
+
+void parse_states(const std::vector<double> & occs, std::string & input) {
+    // Get HOMO and LUMO
+    size_t homo;
+    for(homo=occs.size()-1;homo<occs.size();homo--)
+      if(occs[homo]>0)
+	break;
+
+    size_t lumo;
+    for(lumo=0;lumo<occs.size();lumo++)
+      if(occs[lumo]==0)
+	break;
+
+    // Convert to human indexing
+    homo++;
+    lumo++;
+
+    char homostr[80];
+    char lumostr[80];
+    sprintf(homostr,"%i",(int) homo);
+    sprintf(lumostr,"%i",(int) lumo);
+
+    // Check if input contains homo or lumo specifier. Replace all occurrences
+    while(true) {
+      std::string oldinput(input);
+
+      size_t ind=input.find("homo");
+      if(ind!=std::string::npos) {
+	// Found homo specifier.
+	if(ind>0)
+	  input=input.substr(0,ind)+std::string(homostr)+input.substr(ind+4,input.size());
+	else
+	  input=std::string(homostr)+input.substr(ind+4,input.size());
+      }
+      
+      ind=input.find("lumo");
+      if(ind!=std::string::npos) {
+	// Found lumo specifier.
+	if(ind>0)
+	  input=input.substr(0,ind)+std::string(lumostr)+input.substr(ind+4,input.size());
+	else
+	  input=std::string(lumostr)+input.substr(ind+4,input.size());
+      }
+
+      // String was unchanged, we are converged.
+      if(oldinput.compare(input)==0)
+	break;
+    }
+
+    // Perform addition or substraction
+    while(true) {
+      std::string oldinput(input);
+
+      std::vector<char> signs;
+      signs.push_back('+');
+      signs.push_back('-');
+      signs.push_back('*');
+
+      for(size_t is=0;is<signs.size();is++) {
+	size_t ind=input.find(signs[is]);
+	if(ind!=std::string::npos) {
+	  // Found specifier.
+	  if(ind==0 && signs[is]=='+')
+	    // Ignore
+	    input=input.substr(1,input.size());
+	  else {
+	    // Find start and end
+	    size_t start;
+	    std::string startsep;
+	    for(start=ind-1;start<input.size();start--)
+	      if(input[start]==':' || input[start] == ',') {	
+		// Found start
+		startsep=input[start];
+		break;
+	      }
+	    // Go back one step
+	    start++;
+	    if(start>input.size())
+	      // Overrun
+	      start=0;
+
+	    size_t end;
+	    std::string endsep;
+	    for(end=ind+1;end<input.size();end++)
+	      if(input[end]==':' || input[end] == ',') {
+		// Found end
+		endsep=input[end];
+		break;
+	      }
+	    // Go back one step
+	    end--;
+	    if(end>=input.size())
+	      end=input.size()-1;
+
+	    // Break string into four parts:
+	    std::string head="";
+	    if(start>0)
+	      head=input.substr(0,start-1);
+
+	    std::string val1str=input.substr(start,ind-start);
+	    std::string val2str=input.substr(ind+1,end-ind);
+
+	    std::string foot;
+	    if(end+2<input.size())
+	      foot=input.substr(end+2,input.size());
+
+	    // Perform addition
+	    int val1=readint(val1str);
+	    int val2=readint(val2str);
+	    
+	    int res=0;
+	    if(signs[is]=='+')
+	      res=val1+val2;
+	    else if(signs[is]=='-')
+	      res=val1-val2;
+	    else if(signs[is]=='*')
+	      res=val1*val2;
+
+	    char resstr[80];
+	    sprintf(resstr,"%i",res);
+	    
+	    // Replace string
+	    input=head+startsep+std::string(resstr)+endsep+foot;
+	  }
+	}
+      }
+      
+      // String was unchanged, we are converged.
+      if(oldinput.compare(input)==0)
+	break;
+    }
+}
+
+std::string parse_states(Checkpoint & chkpt, const std::string & stateset) {
+  // Get specification of states
+  std::vector<std::string> states=splitline(tolower(stateset));
+  
+  // No states specified
+  if(states.size()==0)
+    return stateset;
+
+  // Is the calculation restricted?
+  bool restr; 
+  chkpt.read("Restricted",restr);
+
+  // Sanity check
+  if((states.size()==1 && !restr) || (states.size()==2 && restr) || states.size()>2)
+    throw std::runtime_error("CasidaStates input not consistent with type of wavefunction!\n");
+
+  // Parse input
+  std::string state;
+  if(restr) {
+    std::vector<double> occs;
+    chkpt.read("occs",occs);
+
+    parse_states(occs,states[0]);
+    state=states[0];
+  } else {
+    std::vector<double> occa, occb;
+    chkpt.read("occa",occa);
+    chkpt.read("occb",occb);
+    parse_states(occa,states[0]);
+    parse_states(occb,states[1]);
+    state=states[0] + " " +states[1];
+  }
+
+  return state;
+}
+
 
 int main(int argc, char **argv) {
 
@@ -103,13 +273,20 @@ int main(int argc, char **argv) {
 
   // Load checkpoint
   std::string fchk=set.get_string("LoadChk");
-  Checkpoint chkpt(fchk,0);
+  Checkpoint chkpt(fchk,false);
 
   // Check that calculation was converged
   bool conv;
   chkpt.read("Converged",conv);
   if(!conv)
     throw std::runtime_error("Refusing to run Casida calculation based on a non-converged SCF density!\n");
+
+  // Parse input states
+  std::string states=set.get_string("CasidaStates");
+  std::string newstates=parse_states(chkpt,states);
+  set.set_string("CasidaStates",newstates);
+  if(states.compare(newstates)!=0) 
+    printf("CasidaStates has been parsed to \"%s\".\n",newstates.c_str());
 
   // Load basis set
   BasisSet basis;
