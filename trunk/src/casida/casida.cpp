@@ -129,6 +129,8 @@ void Casida::calc_K(const Settings & set, const BasisSet & basis) {
     // Unrestricted case
     K.zeros(pairs[0].size()+pairs[1].size(),pairs[0].size()+pairs[1].size());
 
+  printf("\n");
+
   // Do we need to form K?
   if(coupling!=IPA) {
     // Compute Coulomb coupling
@@ -206,8 +208,6 @@ void Casida::form_pairs(const Settings & set, const std::vector< std::vector<dou
       for(size_t iocc=0;iocc<nocc[ispin];iocc++)
 	f[ispin](iocc)=pol ? 1.0 : 2.0;
     }
-  } else if(states.size()!=nocc.size()) {
-    throw std::runtime_error("CasidaStates input not consistent with type of wavefunction!\n");
   } else {
     // Loop over spins
     for(size_t ispin=0;ispin<nocc.size();ispin++) {
