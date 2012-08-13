@@ -76,7 +76,7 @@ class DIIS {
   void update(const arma::mat & F, const arma::mat & D, double & error);
   
   /// Compute new Fock matrix, use C1-DIIS if wanted
-  void solve(arma::mat & F, bool c1_diis=0) const;
+  void solve(arma::mat & F, bool c1_diis=0);
 };
 
 #endif

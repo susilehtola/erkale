@@ -22,7 +22,7 @@
 #include "mathf.h"
 
 // Maximum allowed absolute weight for a Fockian.
-#define MAXWEIGHT 3.0
+#define MAXWEIGHT 10.0
 
 DIIS::DIIS(const arma::mat &Sv, size_t imaxv) {
   S=Sv;
@@ -60,7 +60,7 @@ void DIIS::update(const arma::mat & F, const arma::mat & D, double & error) {
   }
 }
 
-void DIIS::solve(arma::mat & F, bool c1) const {
+void DIIS::solve(arma::mat & F, bool c1) {
   // Size of LA problem
   int N;
   if((int) Fs.size()<imax)
@@ -104,8 +104,12 @@ void DIIS::solve(arma::mat & F, bool c1) const {
     if(succ) {
       // Check that weights are within tolerance
       for(int i=0;i<N;i++)
-	if(fabs(X(i))>=MAXWEIGHT)
-	  succ=0;
+	if(fabs(X(i))>=MAXWEIGHT) {
+	  printf("Large coefficient produced by DIIS. Reducing to %i matrices.\n",(int) Fs.size()-1);
+	  Fs.erase(Fs.begin());
+	  solve(F,c1);
+	  return;
+	}
       
       // Solution is (last element of X is DIIS error)
       sol.zeros();
