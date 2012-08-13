@@ -144,6 +144,35 @@ int main(int argc, char **argv) {
       set.set_bool("DFTFitting",false);
     }
 
+  // Load starting guess?
+  bool doload=(stricmp(loadname,"")!=0);
+  BasisSet oldbas;
+  bool oldrestr;
+  arma::vec Eold, Eaold, Ebold;
+  arma::mat Cold, Caold, Cbold;
+  arma::mat Pold;
+  
+  if(doload) {
+    Checkpoint load(loadname,false);
+    
+    // Basis set
+    load.read(oldbas);
+    
+    // Restricted calculation?
+    load.read("Restricted",oldrestr);
+
+    // Density matrix
+    load.read("P",Pold);
+    
+    if(oldrestr) {
+      // Load energies and orbitals
+      load.read("C",Cold);
+      load.read("E",Eold);
+    } else {
+      
+    }
+  }	
+
   // Write checkpoint.
   Checkpoint chkpt(savename,true);
   chkpt.write(basis);
@@ -160,43 +189,20 @@ int main(int argc, char **argv) {
     // Closed shell case
     rscf_t sol;
 
-    // Load starting guess?
-    if(stricmp(loadname,"")!=0) {
-      Checkpoint load(loadname,false);
-
-      // Basis set
-      BasisSet oldbas;
-      load.read(oldbas);
-      
-      // Restricted calculation?
-      bool restr;
-      load.read("Restricted",restr);
-
-      if(restr) {
-	// Load energies and orbitals
-	arma::vec Eold;
-	arma::mat Cold;
-	load.read("C",Cold);
-	load.read("E",Eold);
-
-	// Project to new basis.
-	basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
-      } else {
-	// Load old density matrix
-	arma::mat Pold;
-	load.read("P",Pold);
+    // Project old solution to new basis
+    if(doload) {
+      // Restricted calculation wanted but loaded spin-polarized one
+      if(!oldrestr) {
 	// Find out natural orbitals
-	arma::mat Cold;
 	arma::mat hlp;
 	form_NOs(Pold,oldbas.overlap(),Cold,hlp);
 
-	arma::vec Eold;
-	load.read("Ea",Eold);
-
-	// Project natural orbitals to new basis
-	basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
+	// Use alpha orbital energies
+	Eold=Eaold;
       }
-    }	
+      
+      basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
+    }      
 
     // Get orbital occupancies
     std::vector<double> occs=get_restricted_occupancy(set,basis);
@@ -222,38 +228,14 @@ int main(int argc, char **argv) {
   } else {
     uscf_t sol;
 
-    // Load starting guess?
-    if(stricmp(loadname,"")!=0) {
-      Checkpoint load(loadname,false);
-
-      // Basis set
-      BasisSet oldbas;
-      load.read(oldbas);
-      
-      // Restricted calculation?
-      bool restr;
-      load.read("Restricted",restr);
-
-      if(restr) {
-	// Load energies and orbitals
-	arma::vec Eold;
-	arma::mat Cold;
-	load.read("C",Cold);
-	load.read("E",Eold);
-
-	// Project to new basis.
+    if(doload) {
+      // Running polarized calculation but given restricted guess
+      if(oldrestr) {
+	// Project solution to new basis
 	basis.projectMOs(oldbas,Eold,Cold,sol.Ea,sol.Ca);
 	sol.Eb=sol.Ea;
 	sol.Cb=sol.Ca;
       } else {
-	// Load energies and orbitals
-	arma::vec Eaold, Ebold;
-	arma::mat Caold, Cbold;
-	load.read("Ca",Caold);
-	load.read("Ea",Eaold);
-	load.read("Cb",Cbold);
-	load.read("Eb",Ebold);
-
 	// Project to new basis.
 	basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca);
 	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
