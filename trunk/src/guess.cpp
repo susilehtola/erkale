@@ -14,7 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
-#include "atomguess.h"
+#include "guess.h"
 #include "checkpoint.h"
 #include "scf.h"
 #include "timer.h"
@@ -38,7 +38,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
   Settings set;
   set.add_scf_settings();
   set.set_bool("Verbose",false);
-  set.set_bool("CoreGuess",true);
+  set.set_string("Guess","Core");
   set.set_int("MaxIter",200);
 
   if(verbose) {
@@ -188,6 +188,157 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
   
   if(verbose)
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
+}
+
+int atom_am(int Z) {
+  int atomam;
+  if(Z<5)
+    atomam=0;
+  else if(Z<21)
+    atomam=1;
+  else if(Z<57)
+    atomam=2;
+  else
+    atomam=3;
+
+  return atomam;
+}
+
+void molecular_guess(const BasisSet & basis, const Settings & set, std::string & chkname) {
+  Timer t;
+  
+  // Get temporary file name
+  char *tmpn=tempnam("./",".chk");
+  std::string tempname=std::string(tmpn);
+  free(tmpn);
+
+  // New settings
+  Settings newset(set);
+  newset.set_string("LoadChk","");
+  newset.set_string("SaveChk",tempname);
+  newset.set_string("Guess","atomic");
+  newset.set_bool("Verbose",true);
+
+  // Use relaxed convergence settings
+  newset.set_double("DeltaEmax",std::max(set.get_double("DeltaEmax"),1e-6));
+  newset.set_double("DeltaPmax",std::max(set.get_double("DeltaPmax"),1e-5));
+  newset.set_double("DeltaPrms",std::max(set.get_double("DeltaPrms"),1e-6));
+
+  // Construct new basis
+  BasisSet newbas(basis.get_Nnuc(),newset);
+
+  // Add the nuclei
+  std::vector<nucleus_t> nuclei=basis.get_nuclei();
+  for(size_t i=0;i<nuclei.size();i++)
+    newbas.add_nucleus(nuclei[i]);
+
+  // Indices of added shells
+  std::vector<size_t> addedidx;
+  // Indices of missing shells
+  std::vector<size_t> missingidx;
+
+  // Add the shells
+  std::vector<GaussianShell> shells=basis.get_shells();
+  for(size_t i=0;i<shells.size();i++) {
+    // Add the shell to the minimal basis? Default is true
+    bool add=true;
+
+    // Check for polarization shells
+    if(shells[i].get_am() > atom_am(nuclei[shells[i].get_center_ind()].Z))
+      add=false;
+
+    if(add) {
+      // Add the shell to the basis set
+      newbas.add_shell(shells[i].get_center_ind(),shells[i],false);
+      // and to the list
+      addedidx.push_back(i);
+    } else
+      // Add the shell to the missing list
+      missingidx.push_back(i);
+  }
+  newbas.finalize();
+
+  // Now we have built the basis set and we can proceed with the solution.
+  printf("Calculating molecular guess.\nFull basis has %i functions, whereas reduced basis only has %i.\n",(int) basis.get_Nbf(),(int) newbas.get_Nbf());
+  fprintf(stderr,"Calculating molecular guess.\nFull basis has %i functions, whereas reduced basis only has %i.\n",(int) basis.get_Nbf(),(int) newbas.get_Nbf());
+
+
+  // Calculate the solution in the temporary file.
+  calculate(newbas,newset);
+  
+  // Get another temporary file name. This will contain the returned
+  // orbitals and energies.
+  tmpn=tempnam("./",".chk");
+  chkname=std::string(tmpn);
+  free(tmpn);  
+
+  // Open the return file
+  Checkpoint chkpt(chkname,true);
+
+  {
+    // Open the temp file
+    Checkpoint load(tempname,false);
+    
+    bool restr;
+    load.read("Restricted",restr);
+
+    if(restr) {
+      BasisSet oldbas;
+      arma::mat Cold;
+      arma::vec Eold;
+      load.read(oldbas);
+      load.read("E",Eold);
+      load.read("C",Cold);
+
+      // Project the orbitals
+      arma::mat C=project_orbitals(Cold,oldbas,basis);
+      chkpt.write("C",C);
+
+      // and generate dummy energies
+      arma::vec E(C.n_cols);
+      E.subvec(0,Eold.n_elem-1)=Eold;
+      for(size_t i=Eold.n_elem;i<E.n_elem;i++)
+	E(i)=Eold(Eold.n_elem-1);
+      chkpt.write("E",E);
+
+    } else {
+      BasisSet oldbas;
+      arma::mat Caold, Cbold;
+      arma::vec Eaold, Ebold;
+
+      load.read(oldbas);
+      load.read("Ca",Caold);
+      load.read("Cb",Cbold);
+      load.read("Ea",Eaold);
+      load.read("Eb",Ebold);
+
+      // Project the orbitals
+      arma::mat Ca=project_orbitals(Caold,oldbas,basis);
+      arma::mat Cb=project_orbitals(Cbold,oldbas,basis);
+      chkpt.write("Ca",Ca);
+      chkpt.write("Cb",Cb);
+
+      // and generate dummy energies
+      arma::vec Ea(Ca.n_cols);
+      arma::vec Eb(Cb.n_cols);
+      Ea.subvec(0,Eaold.n_elem-1)=Eaold;
+      Eb.subvec(0,Eaold.n_elem-1)=Ebold;
+      for(size_t i=Eaold.n_elem;i<Ea.n_elem;i++)
+	Ea(i)=Eaold(Eaold.n_elem-1);
+      for(size_t i=Ebold.n_elem;i<Eb.n_elem;i++)
+	Eb(i)=Ebold(Ebold.n_elem-1);
+
+      chkpt.write("Ea",Ea);
+      chkpt.write("Eb",Eb);
+    }
+  }
+
+  // Delete the temporary file
+  remove(tempname.c_str());
+
+  fprintf(stderr,"Molecular guess performed in %s.\n",t.elapsed().c_str());
+  printf("Molecular guess performed in %s.\n",t.elapsed().c_str());
+  fflush(stdout);
 }
 
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {

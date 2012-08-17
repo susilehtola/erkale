@@ -23,7 +23,6 @@
 
 #include <armadillo>
 #include <vector>
-#include "atomguess.h"
 #include "eritable.h"
 #include "eriscreen.h"
 #include "density_fitting.h"
@@ -115,6 +114,13 @@ typedef struct {
   energy_t en;
 } uscf_t;
 
+/// Possible guess types
+enum guess_t {
+  COREGUESS,
+  ATOMGUESS,
+  MOLGUESS
+};
+
 class SCF {
  protected:
   /// Overlap matrix
@@ -144,8 +150,8 @@ class SCF {
   /// Multiplicity
   int mult;
 
-  /// Use core guess?
-  bool coreguess;
+  /// Which guess to use
+  enum guess_t guess;
 
   /// Use DIIS?
   bool usediis;
@@ -245,6 +251,28 @@ double electron_spread(const arma::mat & P, const BasisSet & basis);
 
 /// Determine amount of alpha and beta electrons based on multiplicity
 void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta);
+
+/// Run the calculation
+void calculate(const BasisSet & basis, Settings & set);
+
+/// Helper for sorting orbitals into maximum overlap
+typedef struct {
+  /// Overlap
+  double S;
+  /// Index
+  size_t idx;
+} ovl_sort_t;
+
+/// Order into decreasing overlap
+bool operator<(const ovl_sort_t & lhs, const ovl_sort_t & rhs);
+
+/**
+ * Project orbitals from a minimal basis to an augmented
+ * basis. Existing functions stay the same (just padded with zeros),
+ * extra functions are determined from eigenvectors of the overlap
+ * matrix.
+ */
+arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, const BasisSet & augbas);
 
 #include "checkpoint.h"
 

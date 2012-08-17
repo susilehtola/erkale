@@ -28,12 +28,25 @@
 #include "dftgrid.h"
 #include "diis.h"
 #include "global.h"
+#include "guess.h"
 #include "linalg.h"
 #include "mathf.h"
+#include "properties.h"
 #include "scf.h"
 #include "stringutil.h"
 #include "timer.h"
 #include "trrh.h"
+
+enum guess_t parse_guess(const std::string & val) {
+  if(stricmp(val,"Core")==0)
+    return COREGUESS;
+  else if(stricmp(val,"Atomic")==0)
+    return ATOMGUESS;
+  else if(stricmp(val,"Molecular")==0)
+    return MOLGUESS;
+  else
+    throw std::runtime_error("Guess type not supported.\n");
+}
 
 SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Amount of basis functions
@@ -48,7 +61,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Amount of electrons
   Nel=basis.Ztot()-set.get_int("Charge");
 
-  coreguess=set.get_bool("CoreGuess");
+  // Parse guess
+  guess=parse_guess(set.get_string("Guess"));
 
   usediis=set.get_bool("UseDIIS");
   diis_c1=set.get_bool("C1-DIIS");
@@ -563,4 +577,398 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
 
   // The rest are spin down
   Nel_beta=Nel-Nel_alpha;
+}
+
+void calculate(const BasisSet & basis, Settings & set) {
+  // Checkpoint files to load and save
+  std::string loadname=set.get_string("LoadChk");
+  std::string savename=set.get_string("SaveChk");
+  
+  bool verbose=set.get_bool("Verbose");
+
+  // Print out settings
+  if(verbose)
+    set.print();
+
+  // Number of electrons is
+  int Nel=basis.Ztot()-set.get_int("Charge");
+
+  // Do a plain Hartree-Fock calculation?
+  bool hf= (stricmp(set.get_string("Method"),"HF")==0);
+  bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
+
+  // Final convergence settings
+  convergence_t conv;
+  conv.deltaEmax=set.get_double("DeltaEmax");
+  conv.deltaPmax=set.get_double("DeltaPmax");
+  conv.deltaPrms=set.get_double("DeltaPrms");
+
+  // Get exchange and correlation functionals
+  dft_t dft;
+  dft_t initdft;
+  // Initial convergence settings
+  convergence_t initconv(conv);
+
+  if(!hf && !rohf) {
+    parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
+    dft.gridtol=set.get_double("DFTFinalTol");
+
+    initdft=dft;
+    initdft.gridtol=set.get_double("DFTInitialTol");
+
+    initconv.deltaEmax*=set.get_double("DFTDelta");
+    initconv.deltaPmax*=set.get_double("DFTDelta");
+    initconv.deltaPrms*=set.get_double("DFTDelta");
+  }
+
+  // Check consistency of parameters
+  if(!hf && !rohf && exact_exchange(dft.x_func)!=0.0)
+    if(set.get_bool("DFTFitting")) {
+      printf("A hybrid functional is used, turning off density fitting.\n");
+      set.set_bool("DFTFitting",false);
+    }
+
+  // Load starting guess?
+  bool doload=(stricmp(loadname,"")!=0);
+  BasisSet oldbas;
+  bool oldrestr;
+  arma::vec Eold, Eaold, Ebold;
+  arma::mat Cold, Caold, Cbold;
+  arma::mat Pold;
+  
+  // Use core guess?
+  enum guess_t guess=parse_guess(set.get_string("Guess"));
+
+  if(doload) {
+    Checkpoint load(loadname,false);
+    
+    // Basis set
+    load.read(oldbas);
+    
+    // Restricted calculation?
+    load.read("Restricted",oldrestr);
+
+    // Density matrix
+    load.read("P",Pold);
+    
+    if(oldrestr) {
+      // Load energies and orbitals
+      load.read("C",Cold);
+      load.read("E",Eold);
+    } else {
+      // Load energies and orbitals
+      load.read("Ca",Caold);
+      load.read("Ea",Eaold);
+      load.read("Cb",Cbold);
+      load.read("Eb",Ebold);
+    }
+  }	
+
+  if(set.get_int("Multiplicity")==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
+    // Closed shell case
+    rscf_t sol;
+
+    // Project old solution to new basis
+    if(doload) {
+      // Restricted calculation wanted but loaded spin-polarized one
+      if(!oldrestr) {
+	// Find out natural orbitals
+	arma::mat hlp;
+	form_NOs(Pold,oldbas.overlap(),Cold,hlp);
+
+	// Use alpha orbital energies
+	Eold=Eaold;
+      }
+      
+      basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
+    } else if(guess == ATOMGUESS) {
+      atomic_guess(basis,sol.C,sol.E,verbose);
+    } else if(guess == MOLGUESS) {
+      // Need to generate the starting guess.
+      std::string name;
+      molecular_guess(basis,set,name);
+
+      // Load guess orbitals
+      {
+	Checkpoint guesschk(name,false);
+	guesschk.read("C",sol.C);
+	guesschk.read("E",sol.E);
+      }
+      // and remove the temporary file
+      remove(name.c_str());
+    }
+
+    // Get orbital occupancies
+    std::vector<double> occs=get_restricted_occupancy(set,basis);
+
+    // Write checkpoint.
+    Checkpoint chkpt(savename,true);
+    chkpt.write(basis);
+    
+    // Write number of electrons
+    int Nel_alpha;
+    int Nel_beta;
+    get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+    chkpt.write("Nel",Nel);
+    chkpt.write("Nel-a",Nel_alpha);
+    chkpt.write("Nel-b",Nel_beta);
+
+    
+    // Solver
+    SCF solver(basis,set,chkpt);
+
+    if(hf || rohf) {
+      // Solve restricted Hartree-Fock
+      solver.RHF(sol,occs,conv);
+    } else {
+      // Print information about used functionals
+      if(verbose)
+	print_info(dft.x_func,dft.c_func);
+      // Solve restricted DFT problem first on a rough grid
+      solver.RDFT(sol,occs,initconv,initdft);
+      // .. and then on the final grid
+      solver.RDFT(sol,occs,conv,dft);
+    }
+
+    // Do population analysis
+    if(verbose)
+      population_analysis(basis,sol.P);
+
+  } else {
+    uscf_t sol;
+
+    if(doload) {
+      // Running polarized calculation but given restricted guess
+      if(oldrestr) {
+	// Project solution to new basis
+	basis.projectMOs(oldbas,Eold,Cold,sol.Ea,sol.Ca);
+	sol.Eb=sol.Ea;
+	sol.Cb=sol.Ca;
+      } else {
+	// Project to new basis.
+	basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca);
+	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
+      }
+    } else if(guess == ATOMGUESS) {
+      atomic_guess(basis,sol.Ca,sol.Ea,verbose);
+      sol.Cb=sol.Ca;
+      sol.Eb=sol.Ea;
+    } else if(guess == MOLGUESS) {
+      // Need to generate the starting guess.
+      std::string name;
+      molecular_guess(basis,set,name);
+
+      // Load guess orbitals
+      {
+	Checkpoint guesschk(name,false);
+	guesschk.read("Ca",sol.Ca);
+	guesschk.read("Ea",sol.Ea);
+	guesschk.read("Cb",sol.Cb);
+	guesschk.read("Eb",sol.Eb);
+      }
+      // and remove the temporary file
+      remove(name.c_str());
+    }
+
+    // Get orbital occupancies
+    std::vector<double> occa, occb;
+    get_unrestricted_occupancy(set,basis,occa,occb);
+ 
+    // Write checkpoint.
+    Checkpoint chkpt(savename,true);
+    chkpt.write(basis);
+    
+    // Write number of electrons
+    int Nel_alpha;
+    int Nel_beta;
+    get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+    chkpt.write("Nel",Nel);
+    chkpt.write("Nel-a",Nel_alpha);
+    chkpt.write("Nel-b",Nel_beta);
+
+    // Solver
+    SCF solver(basis,set,chkpt);
+
+    if(hf) {
+      // Solve restricted Hartree-Fock
+      solver.UHF(sol,occa,occb,conv);
+    } else if(rohf) {
+      // Solve restricted open-shell Hartree-Fock
+
+      // Solve ROHF
+      solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
+
+      // Set occupancies right
+      get_unrestricted_occupancy(set,basis,occa,occb);
+    } else {
+      // Print information about used functionals
+      if(verbose)
+	print_info(dft.x_func,dft.c_func);
+      // Solve restricted DFT problem first on a rough grid
+      solver.UDFT(sol,occa,occb,initconv,initdft);
+      // ... and then on the more accurate grid
+      solver.UDFT(sol,occa,occb,conv,dft);
+    }
+
+    if(verbose)
+      population_analysis(basis,sol.Pa,sol.Pb);
+  }
+}
+
+bool operator<(const ovl_sort_t & lhs, const ovl_sort_t & rhs) {
+  // Sort into decreasing order
+  return lhs.S > rhs.S;
+}
+
+arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, const BasisSet & augbas) {
+  Timer ttot;
+  Timer t;
+  
+  // Total number of functions in augmented set is
+  const size_t Ntot=augbas.get_Nbf();
+  // Amount of old orbitals is
+  const size_t Nold=Cold.n_cols;
+
+  // Identify augmentation shells.
+  std::vector<size_t> augshellidx;
+  std::vector<size_t> origshellidx;
+
+  std::vector<GaussianShell> augshells=augbas.get_shells();
+  std::vector<GaussianShell> origshells=minbas.get_shells();
+
+  // Loop over shells in augmented set.
+  for(size_t i=0;i<augshells.size();i++) {
+    // Try to find the shell in the original set
+    bool found=false;
+    for(size_t j=0;j<origshells.size();j++)
+      if(augshells[i]==origshells[j]) {
+	found=true;
+	origshellidx.push_back(i);
+	break;
+      }
+
+    // If the shell was not found in the original set, it is an
+    // augmentation shell.
+    if(!found)
+      augshellidx.push_back(i);
+  }
+
+  // Overlap matrix in augmented basis
+  arma::mat S=augbas.overlap();
+  arma::vec Sval;
+  arma::mat Svec;
+  eig_sym_ordered(Sval,Svec,S);
+
+  printf("Condition number of overlap matrix is %e.\n",Sval(0)/Sval(Sval.n_elem-1));
+
+  printf("Diagonalization of basis took %s.\n",t.elapsed().c_str());
+  t.set();
+
+  // Count number of independent functions
+  size_t Nind=0;
+  for(size_t i=0;i<Ntot;i++)
+    if(Sval(i)>=1e-5)
+      Nind++;
+
+  printf("Augmented basis has %i linearly independent and %i dependent functions.\n",(int) Nind,(int) (Ntot-Nind));
+
+  // Drop linearly dependent ones.
+  Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
+  Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
+
+  // Form the new C matrix.
+  arma::mat C(Ntot,Nind);
+  C.zeros();
+
+  // The first vectors are simply the occupied states.
+  for(size_t i=0;i<Nold;i++)
+    for(size_t ish=0;ish<origshellidx.size();ish++)
+      C.submat(augshells[origshellidx[ish]].get_first_ind(),i,augshells[origshellidx[ish]].get_last_ind(),i)=Cold.submat(origshells[ish].get_first_ind(),i,origshells[ish].get_last_ind(),i);
+
+  // Do a Gram-Schmidt orthogonalization to find the rest of the
+  // orthonormal vectors. But first we need to drop the eigenvectors
+  // of S with the largest projection to the occupied orbitals, in
+  // order to avoid linear dependency problems with the Gram-Schmidt
+  // method.
+
+  // Indices to keep in the treatment
+  std::vector<size_t> keepidx;
+  for(size_t i=0;i<Svec.n_cols;i++)
+    keepidx.push_back(i);
+
+  // Deleted functions
+  std::vector<ovl_sort_t> delidx;
+  
+  // Drop the functions with the maximum overlap
+  for(size_t j=0;j<Nold;j++) {
+    // Find maximum overlap
+    double maxovl=0.0;
+    size_t maxind=-1;
+
+    // Helper vector
+    arma::vec hlp=S*C.col(j);
+    
+    for(size_t ii=0;ii<keepidx.size();ii++) {
+      // Index of eigenvector is
+      size_t i=keepidx[ii];
+      // Compute projection
+      double ovl=fabs(arma::dot(Svec.col(i),hlp))/sqrt(Sval(i));
+      // Check if it has the maximal value
+      if(fabs(ovl)>maxovl) {
+	maxovl=ovl;
+	maxind=ii;
+      }
+    }
+    
+    // Add the function to the deleted functions' list
+    ovl_sort_t tmp;
+    tmp.S=maxovl;
+    tmp.idx=keepidx[maxind];
+    delidx.push_back(tmp);
+
+    //    printf("%4i/%4i deleted function %i with overlap %e.\n",(int) j+1, (int) Nold, (int) keepidx[maxind],maxovl);
+
+    // Delete the index
+    fflush(stdout);
+    keepidx.erase(keepidx.begin()+maxind);
+  }
+  
+  // Print deleted functions
+  std::stable_sort(delidx.begin(),delidx.end());
+  for(size_t i=0;i<delidx.size();i++) {
+    printf("%4i/%4i deleted function %4i with overlap %e.\n",(int) i+1, (int) Nold, (int) delidx[i].idx,delidx[i].S);
+  }
+
+  // Fill in the rest of the vectors
+  for(size_t i=0;i<keepidx.size();i++) {
+    // The index of the vector to use is
+    size_t ind=keepidx[i];
+    // Normalize it, too
+    C.col(Nold+i)=Svec.col(ind)/sqrt(Sval(ind));
+  }
+
+  // Run the orthonormalization of the set
+  for(size_t i=0;i<Nind;i++) {
+    double norm=arma::as_scalar(arma::trans(C.col(i))*S*C.col(i));
+    // printf("Initial norm of vector %i is %e.\n",(int) i,norm);
+    
+    // Remove projections of already orthonormalized set
+    for(size_t j=0;j<i;j++) {
+      double proj=arma::as_scalar(arma::trans(C.col(j))*S*C.col(i));
+
+      //    printf("%i - %i was %e\n",(int) i, (int) j, proj);
+      C.col(i)-=proj*C.col(j);
+    }
+    
+    norm=arma::as_scalar(arma::trans(C.col(i))*S*C.col(i));
+    // printf("Norm of vector %i is %e.\n",(int) i,norm);
+    
+    // and normalize
+    C.col(i)/=sqrt(norm);
+  }
+
+  printf("Projected orbitals in %s.\n",ttot.elapsed().c_str());
+  fflush(stdout);
+  
+  return C;
 }
