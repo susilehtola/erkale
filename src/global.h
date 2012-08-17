@@ -68,7 +68,7 @@
 #include <cstdio>
 
 // Disable bounds checking in Armadillo.
-//#define ARMA_NO_DEBUG
+#define ARMA_NO_DEBUG
 
 // Ångström in atomic units
 #define ANGSTROMINBOHR 1.8897261
