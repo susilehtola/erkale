@@ -28,6 +28,7 @@
 #include "lmtrans.h"
 #include "mathf.h"
 #include "momentum_series.h"
+#include "scf.h"
 #include "settings.h"
 #include "stringutil.h"
 #include "tempered.h"
@@ -149,110 +150,11 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
   printf("\nAugmented original basis (%i functions) with %i diffuse functions.\n",(int) Nbf,(int) Naug);
 
-  Timer taug;
-  
-  // Overlap matrix in augmented basis
-  arma::mat S=augbas.overlap();
-  arma::vec Sval;
-  arma::mat Svec;
-  eig_sym_ordered(Sval,Svec,S);
-
-  printf("Condition number of overlap matrix is %e.\n",Sval(0)/Sval(Sval.n_elem-1));
-
-  printf("Diagonalization of basis took %s.\n",taug.elapsed().c_str());
-  taug.set();
-
-  // Count number of independent functions
-  size_t Nind=0;
-  for(size_t i=0;i<Ntot;i++)
-    if(Sval(i)>=1e-5)
-      Nind++;
-
-  printf("Augmented basis has %i linearly independent and %i dependent functions.\n",(int) Nind,(int) (Ntot-Nind));
-
-  // Drop linearly dependent ones.
-  Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
-  Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
-
-  // Form the matrix which takes from the AO basis to an orthonormal basis.
-  arma::mat AOtoO(Ntot,Nind);
-  AOtoO.zeros();
-
-  // The first nocc vectors are simply the occupied states.
-  size_t nocc;
-  if(!spin) {
-    nocc=nocca;
-    AOtoO.submat(0,0,Nbf-1,nocc-1)=sol.Ca.submat(0,0,Nbf-1,nocc-1);
-  } else {
-    nocc=noccb;
-    AOtoO.submat(0,0,Nbf-1,nocc-1)=sol.Cb.submat(0,0,Nbf-1,nocc-1);
-  }
-
-  // Do a Gram-Schmidt orthogonalization to find the rest of the
-  // orthonormal vectors. But first we need to drop the eigenvectors
-  // of S with the largest projection to the occupied orbitals, in
-  // order to avoid linear dependency problems with the Gram-Schmidt
-  // method.
-
-  // Indices to keep in the treatment
-  std::vector<size_t> keepidx;
-  for(size_t i=0;i<Nind;i++)
-    keepidx.push_back(i);
-  
-  // Drop the nocc largest eigenvalues
-  for(size_t j=0;j<nocc;j++) {
-    // Find maximum overlap
-    double maxovl=0.0;
-    size_t maxind=-1;
-
-    // Helper vector
-    arma::vec hlp=S*AOtoO.col(j);
-    
-    for(size_t ii=0;ii<keepidx.size();ii++) {
-      // Index of eigenvector is
-      size_t i=keepidx[ii];
-      // Compute projection
-      double ovl=fabs(arma::dot(Svec.col(i),hlp))/sqrt(Sval(i));
-      // Check if it has the maximal value
-      if(fabs(ovl>maxovl)) {
-	maxovl=ovl;
-	maxind=ii;
-      }
-    }
-    
-    // Delete the index
-    printf("Deleted function %i with overlap %e.\n",(int) keepidx[maxind],maxovl);
-    fflush(stdout);
-    keepidx.erase(keepidx.begin()+maxind);
-  }
-  
-  // Fill in the rest of the vectors
-  for(size_t i=0;i<keepidx.size();i++) {
-    // The index of the vector to use is
-    size_t ind=keepidx[i];
-    // Normalize it, too
-    AOtoO.col(nocc+i)=Svec.col(ind)/sqrt(Sval(ind));
-  }
-
-  // Run the orthonormalization of the set
-  for(size_t i=0;i<Nind;i++) {
-    double norm=arma::as_scalar(arma::trans(AOtoO.col(i))*S*AOtoO.col(i));
-    // printf("Initial norm of vector %i is %e.\n",(int) i,norm);
-    
-    // Remove projections of already orthonormalized set
-    for(size_t j=0;j<i;j++) {
-      double proj=arma::as_scalar(arma::trans(AOtoO.col(j))*S*AOtoO.col(i));
-
-      //    printf("%i - %i was %e\n",(int) i, (int) j, proj);
-      AOtoO.col(i)-=proj*AOtoO.col(j);
-    }
-    
-    norm=arma::as_scalar(arma::trans(AOtoO.col(i))*S*AOtoO.col(i));
-    // printf("Norm of vector %i is %e.\n",(int) i,norm);
-    
-    // and normalize
-    AOtoO.col(i)/=sqrt(norm);
-  }
+  arma::mat AOtoO;
+  if(!spin)
+    AOtoO=project_orbitals(sol.Ca,basis,augbas);
+  else
+    AOtoO=project_orbitals(sol.Cb,basis,augbas);
 
   /*
   arma::mat ovl=arma::trans(AOtoO)*S*AOtoO;
@@ -272,7 +174,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   Paug=Paaug+Pbaug;
 
   // Form Fock matrix.
-  taug.set();
+  Timer taug;
   arma::mat T=augbas.kinetic();
   arma::mat V=augbas.nuclear();
   printf("Hcore formed in %s.\n",taug.elapsed().c_str());
@@ -327,12 +229,16 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   else
     H=T+V+J+XCb;
 
-  // Amount of virtual orbitals
-  //size_t Nvirt=Nind-nocc;
+  // Amount of occupied orbitals
+  size_t nocc;
+  if(!spin)
+    nocc=nocca;
+  else
+    nocc=noccb;
 
   // Convert Fock operator to unoccupied MO basis.
   taug.set();
-  arma::mat H_MO=arma::trans(AOtoO.submat(0,nocc,Ntot-1,Nind-1))*H*AOtoO.submat(0,nocc,Ntot-1,Nind-1);
+  arma::mat H_MO=arma::trans(AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1))*H*AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1);
   printf("H_MO formed in %s.\n",taug.elapsed().c_str());
   fflush(stdout);
   
@@ -345,21 +251,21 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   fflush(stdout);  
 
   // Store energies
-  Eaug.zeros(Nind);
-  // Occupied orbitals
+  Eaug.zeros(AOtoO.n_cols);
+  // Occupied orbital energies
   if(!spin)
     Eaug.subvec(0,nocc-1)=sol.Ea.subvec(0,nocc-1);
   else
     Eaug.subvec(0,nocc-1)=sol.Eb.subvec(0,nocc-1);
   // Virtuals
-  Eaug.subvec(nocc,Nind-1)=Eval;
+  Eaug.subvec(nocc,AOtoO.n_cols-1)=Eval;
 
   // Back-transform orbitals to AO basis
-  Caug.zeros(Ntot,Nind);
+  Caug.zeros(Ntot,AOtoO.n_cols);
   // Occupied orbitals, padded with zeros
   Caug.submat(0,0,Nbf-1,nocc-1)=AOtoO.submat(0,0,Nbf-1,nocc-1);
   // Unoccupied orbitals
-  Caug.submat(0,nocc,Ntot-1,Nind-1)=AOtoO.submat(0,nocc,Ntot-1,Nind-1)*Evec;
+  Caug.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)=AOtoO.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)*Evec;
 
   fprintf(stderr,"Augmentation done in %s.\n",ttot.elapsed().c_str());
 }

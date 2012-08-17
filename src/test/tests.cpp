@@ -723,7 +723,7 @@ int main(void) {
   sph.add_scf_settings();
   sph.set_bool("Verbose",false);
   // Use core guess for tests.
-  sph.set_bool("CoreGuess",true);
+  sph.set_string("Guess","Core");
 
   // No spherical harmonics
   Settings cart=sph;

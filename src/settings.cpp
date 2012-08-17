@@ -76,7 +76,7 @@ void Settings::add_scf_settings() {
   add_string("Occupancies", "Orbital occupancies", "");
   
   // Use core guess? Default is atomic.
-  add_bool("CoreGuess","Use core guess instead of atomic guess",false);
+  add_string("Guess","Used guess: atomic (default), molecular, or core","Atomic");
 
   // Verbose run?
   add_bool("Verbose", "Verbose calculation?", true);

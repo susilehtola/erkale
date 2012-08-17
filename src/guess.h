@@ -34,6 +34,15 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
 /// Determine list of identical nuclei, determined by nucleus and basis set
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);
 
+/**
+ * Form starting guess density matrix from minimal basis calculation
+ *
+ * "A stepwise atomic, valence-molecular, and full-molecular
+ * optimisation of the Hartree–Fock/Kohn–Sham energy" by B. Jansík et
+ * al, PCCP 11, 5805 (2009).
+*/
+void molecular_guess(const BasisSet & basis, const Settings & set, std::string & name);
+
 /// Electronic configuration
 typedef struct {
   /// Primary quantum number

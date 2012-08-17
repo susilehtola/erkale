@@ -70,10 +70,6 @@ int main(int argc, char **argv) {
   set.add_bool("ForcePol","Force polarized calculation",false);
   set.parse(std::string(argv[1]));
 
-  // Checkpoint files to load and save
-  std::string loadname=set.get_string("LoadChk");
-  std::string savename=set.get_string("SaveChk");
-  
   // Redirect output?
   std::string logfile=set.get_string("Logfile");
   if(stricmp(logfile,"stdout")!=0) {
@@ -85,12 +81,6 @@ int main(int argc, char **argv) {
     } else
       fprintf(stderr,"\n");
   }
-
-  bool verbose=set.get_bool("Verbose");
-
-  // Print out settings
-  if(verbose)
-    set.print();
 
   // Read in atoms.
   std::vector<atom_t> atoms;
@@ -106,176 +96,14 @@ int main(int argc, char **argv) {
   // Construct basis set
   BasisSet basis=construct_basis(atoms,baslib,set);
 
-  // Number of electrons is
-  int Nel=basis.Ztot()-set.get_int("Charge");
+  // Do the calculation
+  calculate(basis,set);
 
-  // Do a plain Hartree-Fock calculation?
-  bool hf= (stricmp(set.get_string("Method"),"HF")==0);
-  bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
-
-  // Final convergence settings
-  convergence_t conv;
-  conv.deltaEmax=set.get_double("DeltaEmax");
-  conv.deltaPmax=set.get_double("DeltaPmax");
-  conv.deltaPrms=set.get_double("DeltaPrms");
-
-  // Get exchange and correlation functionals
-  dft_t dft;
-  dft_t initdft;
-  // Initial convergence settings
-  convergence_t initconv(conv);
-
-  if(!hf && !rohf) {
-    parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
-    dft.gridtol=set.get_double("DFTFinalTol");
-
-    initdft=dft;
-    initdft.gridtol=set.get_double("DFTInitialTol");
-
-    initconv.deltaEmax*=set.get_double("DFTDelta");
-    initconv.deltaPmax*=set.get_double("DFTDelta");
-    initconv.deltaPrms*=set.get_double("DFTDelta");
-  }
-
-  // Check consistency of parameters
-  if(!hf && !rohf && exact_exchange(dft.x_func)!=0.0)
-    if(set.get_bool("DFTFitting")) {
-      printf("A hybrid functional is used, turning off density fitting.\n");
-      set.set_bool("DFTFitting",false);
-    }
-
-  // Load starting guess?
-  bool doload=(stricmp(loadname,"")!=0);
-  BasisSet oldbas;
-  bool oldrestr;
-  arma::vec Eold, Eaold, Ebold;
-  arma::mat Cold, Caold, Cbold;
-  arma::mat Pold;
-  
-  if(doload) {
-    Checkpoint load(loadname,false);
-    
-    // Basis set
-    load.read(oldbas);
-    
-    // Restricted calculation?
-    load.read("Restricted",oldrestr);
-
-    // Density matrix
-    load.read("P",Pold);
-    
-    if(oldrestr) {
-      // Load energies and orbitals
-      load.read("C",Cold);
-      load.read("E",Eold);
-    } else {
-      
-    }
-  }	
-
-  // Write checkpoint.
-  Checkpoint chkpt(savename,true);
-  chkpt.write(basis);
-
-  // Write number of electrons
-  int Nel_alpha;
-  int Nel_beta;
-  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
-  chkpt.write("Nel",Nel);
-  chkpt.write("Nel-a",Nel_alpha);
-  chkpt.write("Nel-b",Nel_beta);
-
-  if(set.get_int("Multiplicity")==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
-    // Closed shell case
-    rscf_t sol;
-
-    // Project old solution to new basis
-    if(doload) {
-      // Restricted calculation wanted but loaded spin-polarized one
-      if(!oldrestr) {
-	// Find out natural orbitals
-	arma::mat hlp;
-	form_NOs(Pold,oldbas.overlap(),Cold,hlp);
-
-	// Use alpha orbital energies
-	Eold=Eaold;
-      }
-      
-      basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
-    }      
-
-    // Get orbital occupancies
-    std::vector<double> occs=get_restricted_occupancy(set,basis);
-
-    // Solver
-    SCF solver(basis,set,chkpt);
-
-    if(hf || rohf) {
-      // Solve restricted Hartree-Fock
-      solver.RHF(sol,occs,conv);
-    } else {
-      // Print information about used functionals
-      print_info(dft.x_func,dft.c_func);
-      // Solve restricted DFT problem first on a rough grid
-      solver.RDFT(sol,occs,initconv,initdft);
-      // .. and then on the final grid
-      solver.RDFT(sol,occs,conv,dft);
-    }
-
-    // Do population analysis
-    population_analysis(basis,sol.P);
-
-  } else {
-    uscf_t sol;
-
-    if(doload) {
-      // Running polarized calculation but given restricted guess
-      if(oldrestr) {
-	// Project solution to new basis
-	basis.projectMOs(oldbas,Eold,Cold,sol.Ea,sol.Ca);
-	sol.Eb=sol.Ea;
-	sol.Cb=sol.Ca;
-      } else {
-	// Project to new basis.
-	basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca);
-	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
-      }
-    }
-
-    // Get orbital occupancies
-    std::vector<double> occa, occb;
-    get_unrestricted_occupancy(set,basis,occa,occb);
-
-    // Solver
-    SCF solver(basis,set,chkpt);
-
-    if(hf) {
-      // Solve restricted Hartree-Fock
-      solver.UHF(sol,occa,occb,conv);
-    } else if(rohf) {
-      // Solve restricted open-shell Hartree-Fock
-
-      // Solve ROHF
-      solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
-
-      // Set occupancies right
-      get_unrestricted_occupancy(set,basis,occa,occb);
-    } else {
-      // Print information about used functionals
-      print_info(dft.x_func,dft.c_func);
-      // Solve restricted DFT problem first on a rough grid
-      solver.UDFT(sol,occa,occb,initconv,initdft);
-      // ... and then on the more accurate grid
-      solver.UDFT(sol,occa,occb,conv,dft);
-    }
-
-    population_analysis(basis,sol.Pa,sol.Pb);
-  }
-
-  if(verbose) {
+  if(set.get_bool("Verbose")) {
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
     t.print_time();
   }
+
 
   return 0;
 }

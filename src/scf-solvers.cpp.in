@@ -169,44 +169,32 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
     if(sol.Ca.n_rows!=Nbf || sol.Cb.n_rows!=Nbf)
 #endif
       {
-
-	if(coreguess) {
-	  if(verbose) {
-	    printf("\nNo input guess given, forming initial guess by diagonalizing core hamiltonian.\n");
-	    t.set();
-	  }
-	  
+	
+	if(guess!=COREGUESS)
+	  throw std::runtime_error("No starting guess, and use of core guess disallowed!\n");
+	
 #ifdef RESTRICTED
-	  Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-	  eig_sym_ordered(sol.E,orbs,Horth); // Solve in orthogonal basis
-	  
-	  // Transform back to non-orthogonal basis
-	  sol.C=Sinvh*orbs;
-	  check_orth(sol.C,S,false);
+	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
+	eig_sym_ordered(sol.E,orbs,Horth); // Solve in orthogonal basis
+	
+	// Transform back to non-orthogonal basis
+	sol.C=Sinvh*orbs;
+	check_orth(sol.C,S,false);
 #else
-	  Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-	  eig_sym_ordered(sol.Ea,orbs,Horth); // Solve in orthogonal basis
-	  // Transform back to non-orthogonal basis
-	  sol.Ca=Sinvh*orbs;
-	  check_orth(sol.Ca,S,false);
-	  
-	  // Copy orbitals
-	  sol.Eb=sol.Ea;
-	  sol.Cb=sol.Ca;
+	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
+	eig_sym_ordered(sol.Ea,orbs,Horth); // Solve in orthogonal basis
+	// Transform back to non-orthogonal basis
+	sol.Ca=Sinvh*orbs;
+	check_orth(sol.Ca,S,false);
+	
+	// Copy orbitals
+	sol.Eb=sol.Ea;
+	sol.Cb=sol.Ca;
 #endif
-
-	  if(verbose)
-	    printf("\nInitial guess formed in %s.\n",t.elapsed().c_str());
-	} else {
-	  // Use atomic guess
-#ifdef RESTRICTED
-	  atomic_guess(*basisp,sol.C,sol.E,verbose);
-#else
-	  atomic_guess(*basisp,sol.Ca,sol.Ea,verbose);
-	  sol.Cb=sol.Ca;
-	  sol.Eb=sol.Ea;
-#endif
-	}	
+	
+	if(verbose)
+	  printf("\nCore guess formed in %s.\n",t.elapsed().c_str());
+	
       } else {
       // Got correctly sized input guess.
       
@@ -214,7 +202,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
         printf("\nUsing input guess for orbitals.\n");
     }
   fflush(stdout);
-
+  
   
 #if defined(FULLHOLE) || defined(HALFHOLE)
   size_t ixc_orb=0;
