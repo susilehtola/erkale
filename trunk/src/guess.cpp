@@ -262,9 +262,14 @@ void molecular_guess(const BasisSet & basis, const Settings & set, std::string &
   printf("Calculating molecular guess.\nFull basis has %i functions, whereas reduced basis only has %i.\n",(int) basis.get_Nbf(),(int) newbas.get_Nbf());
   fprintf(stderr,"Calculating molecular guess.\nFull basis has %i functions, whereas reduced basis only has %i.\n",(int) basis.get_Nbf(),(int) newbas.get_Nbf());
 
-
   // Calculate the solution in the temporary file.
   calculate(newbas,newset);
+
+  printf("\nSolving the density in the reduced basis took %s.\n",t.elapsed().c_str());
+  fflush(stdout);
+  fprintf(stderr,"\nSolving the density in the reduced basis took %s.\n",t.elapsed().c_str());
+  fflush(stderr);
+  t.set();
   
   // Get another temporary file name. This will contain the returned
   // orbitals and energies.
@@ -336,8 +341,9 @@ void molecular_guess(const BasisSet & basis, const Settings & set, std::string &
   // Delete the temporary file
   remove(tempname.c_str());
 
-  fprintf(stderr,"Molecular guess performed in %s.\n",t.elapsed().c_str());
-  printf("Molecular guess performed in %s.\n",t.elapsed().c_str());
+  fprintf(stderr,"Projection of molecular guess took %s.\n",t.elapsed().c_str());
+  fflush(stderr);
+  printf("Projection of molecular guess took %s.\n",t.elapsed().c_str());
   fflush(stdout);
 }
 

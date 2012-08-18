@@ -938,6 +938,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   for(size_t i=0;i<delidx.size();i++) {
     printf("%4i/%4i deleted function %4i with overlap %e.\n",(int) i+1, (int) Nold, (int) delidx[i].idx,delidx[i].S);
   }
+  fflush(stdout);
 
   // Fill in the rest of the vectors
   for(size_t i=0;i<keepidx.size();i++) {
