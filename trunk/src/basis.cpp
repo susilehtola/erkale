@@ -2399,7 +2399,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   // Get number of basis functions
   const size_t Nbf=get_Nbf();
   // Cutoff
-  const double cutoff=1e-5;
+  const double cutoff=LINTHRES;
 
   // Get overlap matrix
   arma::mat S11=overlap();

@@ -144,7 +144,7 @@ arma::mat CanonicalOrth(const arma::mat & S, double cutoff, bool verbose) {
 
 arma::mat BasOrth(const arma::mat & S, bool verbose) {
   // Symmetric if possible, otherwise canonical. Default cutoff
-  const double tol=1e-5;
+  const double tol=LINTHRES;
   
   // Eigendecomposition of S: eigenvalues and eigenvectors
   arma::vec Sval;
@@ -174,7 +174,7 @@ arma::mat BasOrth(const arma::mat & S, const Settings & set) {
     return BasOrth(S,verbose);
   } else if(stricmp(met,"Can")==0) {
     // Canonical orthogonalization
-    double tol=set.get_double("BasisLinTol");
+    double tol=LINTHRES;
     return CanonicalOrth(S,tol,verbose);
   } else if(stricmp(met,"Sym")==0) {
     // Symmetric orthogonalization
