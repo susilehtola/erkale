@@ -89,9 +89,6 @@ void Settings::add_scf_settings() {
   // Default orthogonalization method
   add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");
 
-  // Default cutoff for orthogonalization
-  add_double("BasisLinTol", "Cutoff for linearly dependent basis functions", 1e-5);
-
   // Convergence criteria
   add_double("DeltaPrms", "Maximum allowed RMS difference of density matrix", 1e-8);
   add_double("DeltaPmax", "Maximum allowed maximum difference of density matrix", 1e-6);
