@@ -236,7 +236,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   // Count the number of linearly independent vectors
   size_t Nind=0;
   for(size_t i=0;i<Sval.n_elem;i++)
-    if(Sval[i]>1e-5)
+    if(Sval[i]>LINTHRES)
       Nind++;
   // ... and get rid of the linearly dependent ones. The eigenvalues
   // and vectors are in the order of increasing eigenvalue, so we want
@@ -867,7 +867,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   // Count number of independent functions
   size_t Nind=0;
   for(size_t i=0;i<Ntot;i++)
-    if(Sval(i)>=1e-5)
+    if(Sval(i)>=LINTHRES)
       Nind++;
 
   printf("Augmented basis has %i linearly independent and %i dependent functions.\n",(int) Nind,(int) (Ntot-Nind));

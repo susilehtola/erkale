@@ -84,6 +84,8 @@
 // Tolerance when screening is only wrt absolute value of integrals
 #define STRICTTOL 1e-16
 
+// Threshold for linear independence
+#define LINTHRES 1e-5
 
 
 
