@@ -17,6 +17,7 @@
 
 #include "basislibrary.h"
 #include "elements.h"
+#include "mathf.h"
 #include "stringutil.h"
 
 #include <algorithm>
@@ -112,6 +113,33 @@ void FunctionShell::sort() {
   std::stable_sort(C.begin(),C.end());
 }
 
+void FunctionShell::normalize() {
+  // Convert contraction from contraction of normalized gaussians to
+  // contraction of unnormalized gaussians.
+  double fact=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
+  for(size_t i=0;i<C.size();i++)
+    C[i].c*=fact*pow(C[i].z,am/2.0+0.75);
+  
+  // Calculate overlap of exponents
+  fact=0;
+  for(size_t i=0;i<C.size();i++)
+    for(size_t j=0;j<C.size();j++)
+      fact+=C[i].c*C[j].c/pow(C[i].z+C[j].z,am+1.5);
+
+  // Add constant part
+  fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
+
+  // The coefficients must be scaled by 1/sqrt(fact)
+  fact=1.0/sqrt(fact);
+  for(size_t i=0;i<C.size();i++)
+    C[i].c*=fact;
+
+  // Convert back to normalized gaussians
+  fact=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
+  for(size_t i=0;i<C.size();i++)
+    C[i].c/=fact*pow(C[i].z,am/2.0+0.75);
+}
+
 void FunctionShell::print() const {
   printf("\tam = %i, %i functions\n",am, (int) C.size());
   for(size_t i=0;i<C.size();i++)
@@ -159,6 +187,11 @@ void ElementBasisSet::sort() {
     bf[i].sort();
   // Then, sort the shells
   stable_sort(bf.begin(),bf.end());
+}
+
+void ElementBasisSet::normalize() {
+  for(size_t i=0;i<bf.size();i++)
+    bf[i].normalize();
 }
 
 void ElementBasisSet::print() const {
@@ -501,6 +534,12 @@ void BasisSetLibrary::sort() {
     elements[i].sort();
   // Sort order of elements
   stable_sort(elements.begin(),elements.end());
+}
+
+void BasisSetLibrary::normalize() {
+  // Normalize coefficients
+  for(size_t i=0;i<elements.size();i++)
+    elements[i].normalize();
 }
 
 size_t BasisSetLibrary::get_Nel() const {
