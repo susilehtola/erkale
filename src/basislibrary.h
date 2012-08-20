@@ -74,6 +74,8 @@ class FunctionShell {
 
   /// Sort exponents in decreasing order
   void sort();
+  /// Normalize coefficients
+  void normalize();  
   /// Print out info
   void print() const;
 
@@ -137,6 +139,9 @@ class ElementBasisSet {
   /// Get angular momentum of i:th shell
   int get_am(size_t ind) const;
 
+  /// Normalize coefficients
+  void normalize();  
+
   // Decontract set
   void decontract();
 
@@ -198,6 +203,9 @@ class BasisSetLibrary {
 
   /// Get basis set for wanted element
   ElementBasisSet get_element(std::string el, size_t number=0) const;
+
+  /// Normalize coefficients
+  void normalize();  
 
   /// Decontract basis set
   void decontract();
