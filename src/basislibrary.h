@@ -175,15 +175,20 @@ class BasisSetLibrary {
   /// Destructor
   ~BasisSetLibrary();
 
-  /// Load basis set from file
+  /// Load basis set from file in Gaussian'94 format
   void load_gaussian94(const char * filename, bool verbose=true);
-  /// Load basis set from file
+  /// Load basis set from file in Gaussian'94 format
   void load_gaussian94(const std::string & filename, bool verbose=true);
 
-  /// Save basis set to file
+  /// Save basis set to file in Gaussian'94 format
   void save_gaussian94(const char * filename, bool append=false) const;
-  /// Save basis set to file
+  /// Save basis set to file in Gaussian'94 format
   void save_gaussian94(const std::string & filename, bool append=false) const;
+
+  /// Save basis set to file in Dalton format
+  void save_dalton(const char * filename, bool verbose=true) const;
+  /// Save basis set to file in Dalton format
+  void save_dalton(const std::string & filename, bool verbose=true) const;
 
   /// Add element to basis set
   void add_element(const ElementBasisSet & el);
