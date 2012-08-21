@@ -18,7 +18,7 @@
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
 
-std::string cmds[]={"completeness", "composition", "decontract", "dump"};
+std::string cmds[]={"completeness", "composition", "decontract", "dump", "savedalton"};
 
 
 void help() {
@@ -179,6 +179,16 @@ int main(int argc, char **argv) {
     BasisSetLibrary elbas;
     elbas.add_element(bas.get_element(el));
     elbas.save_gaussian94(fileout);
+  } else if(stricmp(cmd,"savedalton")==0) {
+    // Save basis in Dalton format
+
+    if(argc!=4) {
+      printf("\nUsage: %s input.gbs savedalton output.dal\n",argv[0]);
+      return 1;
+    }
+
+    std::string fileout=argv[3];
+    bas.save_dalton(fileout);
   } else {
     printf("\nInvalid command.\n");
 

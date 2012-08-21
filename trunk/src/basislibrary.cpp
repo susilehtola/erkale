@@ -524,6 +524,47 @@ void BasisSetLibrary::save_gaussian94(const std::string & filename, bool append)
   save_gaussian94(filename.c_str(),append);
 }
 
+void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
+  FILE *out;
+  if(append)
+    out=fopen(filename,"a");
+  else
+    out=fopen(filename,"w");
+
+  // Loop over elements
+  for(size_t iel=0;iel<elements.size();iel++) {
+    // Get element
+    ElementBasisSet el=elements[iel];
+    // Loop over angular momentum
+    for(int l=0;l<=el.get_max_am();l++) {
+      // Get exponents and contraction coefficients
+      std::vector<double> exps;
+      arma::mat coeffs;
+      el.get_primitives(exps,coeffs,l);
+
+      // Print label
+      fprintf(out,"! %c functions\n",tolower(shell_types[l]));
+      // Print element, number of exponents and contracted functions
+      fprintf(out,"%2s %4i %4i\n",el.get_symbol().c_str(),(int) exps.size(),(int) coeffs.n_cols);
+      
+      // Loop over exponents
+      for(size_t iexp=0;iexp<exps.size();iexp++) {
+	// Print exponent
+	fprintf(out,"%e",exps[iexp]);
+	// and contraction scheme
+	for(size_t ic=0;ic<coeffs.n_cols;ic++)
+	  fprintf(out," % e",coeffs(iexp,ic));
+	fprintf(out,"\n");
+      }
+    }
+  }
+  fclose(out);
+}
+
+void BasisSetLibrary::save_dalton(const std::string & filename, bool append) const {
+  save_dalton(filename.c_str(),append);
+}
+
 void BasisSetLibrary::add_element(const ElementBasisSet & el) {
   elements.push_back(el);
 }
