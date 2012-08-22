@@ -40,6 +40,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
   set.set_bool("Verbose",false);
   set.set_string("Guess","Core");
   set.set_int("MaxIter",200);
+  set.set_bool("DensityFitting",false);
 
   if(verbose) {
     printf("Performing atomic guess for atoms:\n");
@@ -217,6 +218,7 @@ void molecular_guess(const BasisSet & basis, const Settings & set, std::string &
   newset.set_string("LoadChk","");
   newset.set_string("SaveChk",tempname);
   newset.set_string("Guess","atomic");
+  newset.set_bool("DensityFitting",false);
   newset.set_bool("Verbose",true);
 
   // Use relaxed convergence settings
