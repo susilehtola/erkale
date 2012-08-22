@@ -452,6 +452,12 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 	size_t imus=orbpairs[ip].is;
 	size_t inus=orbpairs[ip].js;
 
+#ifdef SCREENING
+	// Do we need to compute the integral?
+	if(screen(imus,inus)<SCRTHR)
+	  continue;
+#endif
+
 	// Parallellize auxiliary loop to avoid critical sections.
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -512,12 +518,12 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
     } else {
       // Loop over functions
       for(size_t mu=0;mu<Nbf;mu++)
-	for(size_t ia=0;ia<Naux;ia++)
 	  for(size_t io=0;io<Norb;io++)
 	    for(size_t nu=0;nu<Nbf;nu++)
-	      iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu[idx(ia,mu,nu)];
+	      for(size_t ia=0;ia<Naux;ia++)
+		iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu[idx(ia,mu,nu)];
     }
-      
+    
     // Plug in the half inverse, so iuP -> BiuQ
     iuP=iuP*ab_invh;
     
