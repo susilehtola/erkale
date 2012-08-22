@@ -178,8 +178,10 @@ class SCF {
   bool direct;
   /// Strict integrals?
   bool strictint;
-  /// Density fitting calculation? (Pure DFT XC functionals)
+  /// Density fitting calculation?
   bool densityfit;
+  /// Memory allocation for density fitting
+  size_t fitmem;
 
   /// Use Lobatto angular grid instead of Lebedev grid (DFT)
   bool dft_lobatto;

@@ -3,22 +3,22 @@
 void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const
 
 #elif defined(RESTRICTED) && defined(HF)
-  void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const
+void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-  void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
+void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
 
 #elif defined(UNRESTRICTED) && defined(HF)
-  void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
+void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-  void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
+void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-  size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
+size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
 
 #elif defined(DFT) && defined(HALFHOLE)
-  size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
+size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
 #endif
 {
 
@@ -300,10 +300,10 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 #endif
 
     fprintf(stderr,"calculation");
-#ifdef DFT
     if(densityfit)
       fprintf(stderr," with density fitting");
 
+#ifdef DFT
 #if (defined(FULLHOLE) || defined(HALFHOLE))
     if(densityfit)
       fprintf(stderr," and ");
@@ -348,12 +348,11 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
   // Loop:
   for(int iiter=1;iiter<=maxiter;iiter++) {
     Timer titer;
-
+    
     if(verbose)
       printf("\n ******* Iteration %4i ********\n",iiter);
-
+    
     // Form Coulomb and exchange matrices
-#ifdef DFT
     if(densityfit) {
       if(verbose) {
 	printf("Forming density fitted Coulomb matrix ... ");
@@ -361,12 +360,42 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	t.set();
       }
       J=dfit.calc_J(sol.P);
-
-    } else {
+      
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+      }
+      fflush(stdout);
+      
+#ifdef DFT
+      if(kfrac!=0.0) {
 #endif
+	if(verbose) {
+	  printf("Forming density fitted exchange matrix ... ");
+	  fflush(stdout);
+	  t.set();
+	}
+	
+#ifdef RESTRICTED
+	K=dfit.calc_K(sol.C,occs,fitmem);
+#else
+	Ka=dfit.calc_K(sol.Ca,occa,fitmem);
+	Kb=dfit.calc_K(sol.Cb,occb,fitmem);
+#endif
+	
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	}
+	fflush(stdout);
+	
+#ifdef DFT
+      }
+#endif
+      
+    } else { // No density fitting
+      
       if(direct) {
 #ifdef RESTRICTED
-
+	
 #ifdef DFT
 	if(kfrac!=0.0) {
 #endif
@@ -375,7 +404,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	    fflush(stdout);
 	    t.set();
 	  }
-
+	  
 	  if(strictint)
 	    scr.calcJK_strict(sol.P,J,K,tol,&screeneff);
 	  else {
@@ -384,24 +413,37 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	    J+=dJ;
 	    K+=dK;
 	  }
-
+	  
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  }
+	  fflush(stdout);
+	  
 #ifdef DFT
 	} else {
-
+	  
 	  if(verbose) {
 	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
 	    fflush(stdout);
 	    t.set();
 	  }
-
+	  
 	  if(strictint)
 	    J=scr.calcJ_strict(sol.P,tol,&screeneff);
 	  else
 	    J+=scr.calcJ(deltaP,tol,&screeneff);
+	  
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  }
+	  fflush(stdout);
+	  
 	}
 #endif
-
-
+	
+	
 #else
 	// Unrestricted case
 #ifdef DFT
@@ -412,7 +454,7 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	    fflush(stdout);
 	    t.set();
 	  }
-
+	  
 	  if(strictint)
 	    scr.calcJK_strict(sol.Pa,sol.Pb,J,Ka,Kb,tol,&screeneff);
 	  else {
@@ -424,29 +466,43 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	    Kb+=dKb;
 	  }
 
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  }
+	  fflush(stdout);
+	  
+	  
 #ifdef DFT
 	} else {
-
+	  
 	  if(verbose) {
 	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
 	    fflush(stdout);
 	    t.set();
 	  }
-
+	  
 	  if(strictint)
 	    J=scr.calcJ_strict(sol.P,tol,&screeneff);
 	  else
 	    J+=scr.calcJ(deltaP,tol,&screeneff);
+	  
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  }
+	  fflush(stdout);
+
 	}
 #endif
-
+	
 #endif
       } else {
-
+	
 	// Conventional mode - use tabled integrals
-
+	
 	if(verbose) {
-
+	  
 #ifdef DFT
 	  if(kfrac!=0.0)
 #endif
@@ -455,72 +511,63 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 	  else
 	    printf("Forming HF Coulomb matrix ... ");
 #endif
-
+	  
 	  fflush(stdout);
 	  t.set();
 	}
-
+	
 	J=tab.calcJ(sol.P);
-
+	
 #ifdef DFT
 	if(kfrac!=0.0) {
 #endif
-
+	  
 #ifdef RESTRICTED
 	  K=tab.calcK(sol.P);
 #else
 	  Ka=tab.calcK(sol.Pa);
 	  Kb=tab.calcK(sol.Pb);
 #endif
-
+	  
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	  }
+	  fflush(stdout);
+	  
+	  
 #ifdef DFT
 	} // End kfrac clause
 #endif
-
+	
       }
-
-#ifdef DFT
+      
     }
-#endif
-
-
-    if(verbose) {
-      printf("done (%s)\n",t.elapsed().c_str());
-#ifdef DFT
-      if(direct && !densityfit)
-#else
-	if(direct)
-#endif
-	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
-    }
-    fflush(stdout);
-
-
+    
 #ifdef DFT
     if(verbose) {
       printf("Computing DFT exchange and correlation ... ");
       fflush(stdout);
       t.set();
     }
-
+    
     double Nelnum; // Numerically integrated density
 #ifdef RESTRICTED
     grid.eval_Fxc(dft.x_func,dft.c_func,sol.P,XC,sol.en.Exc,Nelnum);
 #else
     grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,XCa,XCb,sol.en.Exc,Nelnum);
 #endif
-
+    
 #ifndef HALFHOLE
     double rel_diff=(Nelnum-Nel)*100.0/Nel;
 #else
     double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
 #endif
-
+    
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
       printf("Numerically integrated density is %.5f (%+.4f %%).\n",Nelnum,rel_diff);
     }
-
+    
     if(fabs(rel_diff)>1e-2) {
       std::ostringstream oss;
       //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
@@ -576,7 +623,6 @@ void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence
 
 #endif // End unrestricted case
 
-    
 #if defined(FULLHOLE) || defined(HALFHOLE)
     if(freeze.size()>0) {
       // Freeze orbitals.

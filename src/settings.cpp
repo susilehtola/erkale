@@ -96,6 +96,13 @@ void Settings::add_scf_settings() {
 
   // Maximum iterations
   add_int("MaxIter", "Maximum number of iterations in SCF cycle", 100);
+
+  // Use density fitting if possible?
+  add_bool("DensityFitting", "Use density fitting / RI if possible? (Pure DFT functionals)", true);
+  // Which basis to use as density fitting basis
+  add_string("FittingBasis", "Basis to use for density fitting / RI (Auto for automatic)","Auto");
+  // How much memory to allow for density fitting
+  add_int("FittingMemory", "Amount of memory in MB to use for exchange fitting",1000);
 }
 
 void Settings::add_dft_settings() {
@@ -109,11 +116,6 @@ void Settings::add_dft_settings() {
   add_double("DFTFinalTol", "Tolerance of final DFT grid", 1e-5);
   // Relative factor for initialization
   add_double("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0);
-  
-  // Use density fitting if possible?
-  add_bool("DFTFitting", "Use density fitting if possible? (Pure DFT functionals)", true);
-  // Which basis to use as density fitting basis
-  add_string("DFTFittingBasis", "Basis to use for density fitting (Auto for automatic)","Auto");
 }
 
 void Settings::add_double(std::string name, std::string comment, double val) {
@@ -341,11 +343,15 @@ void Settings::parse(std::string filename) {
 	
 	if(stricmp(words[0],"Method")==0) {
 	  // Hartree-Fock or DFT?
-	  if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0)
+	  if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0) {
 	    set_string("Method","HF");
-	  else if(stricmp(words[1],"ROHF")==0)
+	    // Turn off density fitting by default
+	    set_bool("DensityFitting",false);
+	  } else if(stricmp(words[1],"ROHF")==0) {
 	    set_string("Method","ROHF");
-	  else {
+	    // Turn off density fitting by default
+	    set_bool("DensityFitting",false);
+	  } else {
 	    // Add dft related settings
 	    try {
 	      add_dft_settings();

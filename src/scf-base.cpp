@@ -92,16 +92,18 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Nuclear repulsion
   Enuc=basis.Enuc();
 
+  // Use density fitting?
+  densityfit=set.get_bool("DensityFitting");
+  // How much memory to allow (convert to bytes)
+  fitmem=1000000*set.get_int("FittingMemory");
+
   try {
-    // Use density fitting?
-    densityfit=set.get_bool("DFTFitting");
     // Use Lobatto angular grid? (Lebedev is default)
     dft_lobatto=set.get_bool("DFTLobatto");
     // Direct DFT calculation?
     dft_direct=set.get_bool("DFTDirect");
   } catch(...) {
-    // Hartree-Fock
-    densityfit=0;
+    // Hartree-Fock doesn't have the settings
   }
 
   // Timer
@@ -166,13 +168,18 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     // Form density fitting basis
     BasisSet dfitbas;
 
-    if(stricmp(set.get_string("DFTFittingBasis"),"Auto")==0)
+    if(stricmp(set.get_string("FittingBasis"),"Auto")==0) {
+      // Check used method
+      if(stricmp(set.get_string("Method"),"HF")==0 || stricmp(set.get_string("Method"),"ROHF")==0)
+	throw std::runtime_error("Automatical fitting basis not implemented for Hartree-Fock.\n");
+
+      // DFT, OK.
       dfitbas=basisp->density_fitting();
-    else {
+    } else {
       // Load basis library
       BasisSetLibrary fitlib;
-      fitlib.load_gaussian94(set.get_string("DFTFittingBasis"));
-
+      fitlib.load_gaussian94(set.get_string("FittingBasis"));
+      
       // Construct fitting basis
       dfitbas=construct_basis(basisp->get_nuclei(),fitlib,set);
     }
@@ -925,7 +932,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
     tmp.S=maxovl;
     tmp.idx=keepidx[maxind];
     delidx.push_back(tmp);
-
+    
     //    printf("%4i/%4i deleted function %i with overlap %e.\n",(int) j+1, (int) Nold, (int) keepidx[maxind],maxovl);
 
     // Delete the index
