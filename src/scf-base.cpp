@@ -155,6 +155,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   
   if(verbose) {
     printf("Basis set diagonalized in %s.\n",t.elapsed().c_str());
+    t.set();
     
     if(Sinvh.n_cols!=Sinvh.n_rows) {
       printf("%i linear combinations of basis functions have been removed.\n",Sinvh.n_rows-Sinvh.n_cols);
@@ -171,9 +172,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     if(stricmp(set.get_string("FittingBasis"),"Auto")==0) {
       // Check used method
       if(stricmp(set.get_string("Method"),"HF")==0 || stricmp(set.get_string("Method"),"ROHF")==0)
-	throw std::runtime_error("Automatical fitting basis not implemented for Hartree-Fock.\n");
+	throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
 
-      // DFT, OK.
+      // DFT, OK for now (will be checked again later on)
       dfitbas=basisp->density_fitting();
     } else {
       // Load basis library
@@ -630,9 +631,8 @@ void calculate(const BasisSet & basis, Settings & set) {
 
   // Check consistency of parameters
   if(!hf && !rohf && exact_exchange(dft.x_func)!=0.0)
-    if(set.get_bool("DFTFitting")) {
-      printf("A hybrid functional is used, turning off density fitting.\n");
-      set.set_bool("DFTFitting",false);
+    if(set.get_bool("DensityFitting") && (stricmp(set.get_string("FittingBasis"),"Auto")==0)) {
+      throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
     }
 
   // Load starting guess?
