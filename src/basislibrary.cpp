@@ -496,7 +496,7 @@ void BasisSetLibrary::save_gaussian94(const char * filename, bool append) const 
   // Loop over elements
   for(size_t iel=0;iel<elements.size();iel++) {
     // Write out name of element
-    fprintf(out,"%-2s %i\n",elements[iel].symbol.c_str(),elements[iel].get_number());
+    fprintf(out,"%-2s %i\n",elements[iel].symbol.c_str(),(int) elements[iel].get_number());
     // Loop over shells
     for(size_t ish=0;ish<elements[iel].bf.size();ish++) {
       // Print out type and length of shell
