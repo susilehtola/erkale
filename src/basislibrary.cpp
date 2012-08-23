@@ -120,30 +120,16 @@ void FunctionShell::normalize() {
     return;
   }
 
-  // Convert contraction from contraction of normalized gaussians to
-  // contraction of unnormalized gaussians.
-  double fact=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
-  for(size_t i=0;i<C.size();i++)
-    C[i].c*=fact*pow(C[i].z,am/2.0+0.75);
-  
-  // Calculate overlap of exponents
-  fact=0;
+  // Calculate overlap of normalized functions
+  double S=0.0;
   for(size_t i=0;i<C.size();i++)
     for(size_t j=0;j<C.size();j++)
-      fact+=C[i].c*C[j].c/pow(C[i].z+C[j].z,am+1.5);
+      S+=C[i].c*C[j].c*std::pow(4*C[i].z*C[j].z/std::pow(C[i].z+C[j].z,2),am/2.0+3.0/4.0);
 
-  // Add constant part
-  fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
-
-  // The coefficients must be scaled by 1/sqrt(fact)
-  fact=1.0/sqrt(fact);
+  // The coefficients must be scaled by 1/sqrt(S)
+  S=sqrt(S);
   for(size_t i=0;i<C.size();i++)
-    C[i].c*=fact;
-
-  // Convert back to normalized gaussians
-  fact=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
-  for(size_t i=0;i<C.size();i++)
-    C[i].c/=fact*pow(C[i].z,am/2.0+0.75);
+    C[i].c/=S;
 }
 
 void FunctionShell::print() const {
