@@ -114,6 +114,12 @@ void FunctionShell::sort() {
 }
 
 void FunctionShell::normalize() {
+  // If there's a single function on the shell, its coefficient is unity.
+  if(C.size()==1) {
+    C[0].c=1.0;
+    return;
+  }
+
   // Convert contraction from contraction of normalized gaussians to
   // contraction of unnormalized gaussians.
   double fact=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
