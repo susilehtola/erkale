@@ -496,14 +496,14 @@ void BasisSetLibrary::save_gaussian94(const char * filename, bool append) const 
   // Loop over elements
   for(size_t iel=0;iel<elements.size();iel++) {
     // Write out name of element
-    fprintf(out,"%s\t0\n",elements[iel].symbol.c_str());
+    fprintf(out,"%-2s %i\n",elements[iel].symbol.c_str(),elements[iel].get_number());
     // Loop over shells
     for(size_t ish=0;ish<elements[iel].bf.size();ish++) {
       // Print out type and length of shell
       fprintf(out,"%c   %i   1.00\n",shell_types[elements[iel].bf[ish].am],(int) elements[iel].bf[ish].C.size());
       // Print out contraction
       for(size_t iexp=0;iexp<elements[iel].bf[ish].C.size();iexp++)
-	fprintf(out,"\t%.10e\t\t% .10e\n",elements[iel].bf[ish].C[iexp].z,elements[iel].bf[ish].C[iexp].c);
+	fprintf(out,"  %.10e  % .10e\n",elements[iel].bf[ish].C[iexp].z,elements[iel].bf[ish].C[iexp].c);
     }
     // Close entry
     fprintf(out,"****\n");
