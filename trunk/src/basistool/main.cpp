@@ -47,19 +47,22 @@ int main(int argc, char **argv) {
   if(stricmp(cmd,"completeness")==0) {
     // Print completeness profile.
 
-    if(argc!=5) {
-      printf("\nUsage: %s input.gbs completeness element output.dat\n",argv[0]);
+    if(argc!=5 && argc!=6) {
+      printf("\nUsage: %s input.gbs completeness element output.dat (coulomb)\n",argv[0]);
       return 1;
     }
 
     std::string el(argv[3]);
     std::string fileout(argv[4]);
+    bool coulomb=false;
+    if(argc==6)
+      coulomb=atoi(argv[5]);
 
     // Get wanted element from basis
     ElementBasisSet elbas=bas.get_element(el);
 
     // Compute completeness profile
-    compprof_t prof=compute_completeness(elbas);
+    compprof_t prof=compute_completeness(elbas,-10.0,10.0,2001,coulomb);
 
     // Print profile in output file
     FILE *out=fopen(fileout.c_str(),"w");
