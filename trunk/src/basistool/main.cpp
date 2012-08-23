@@ -39,6 +39,7 @@ int main(int argc, char **argv) {
   // Load input
   BasisSetLibrary bas;
   bas.load_gaussian94(filein);
+  bas.normalize();
 
   // Get command
   std::string cmd(argv[2]);
@@ -167,17 +168,21 @@ int main(int argc, char **argv) {
   } else if(stricmp(cmd,"dump")==0) {
     // Dump wanted element.
 
-    if(argc!=5) {
-      printf("\nUsage: %s input.gbs dump element output.gbs\n",argv[0]);
+    if(argc!=5 && argc!=6) {
+      printf("\nUsage: %s input.gbs dump element output.gbs (number)\n",argv[0]);
       return 1;
     }
 
     std::string el(argv[3]);
     std::string fileout(argv[4]);
 
+    int no=0;
+    if(argc==6)
+      no=atoi(argv[5]);
+
     // Save output
     BasisSetLibrary elbas;
-    elbas.add_element(bas.get_element(el));
+    elbas.add_element(bas.get_element(el,no));
     elbas.save_gaussian94(fileout);
   } else if(stricmp(cmd,"savedalton")==0) {
     // Save basis in Dalton format
