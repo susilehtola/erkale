@@ -36,14 +36,15 @@ int main(int argc, char **argv) {
 
   print_license();
 
-  if(argc!=6) {
-    printf("Usage:  %s am n min max Nf/tol\n",argv[0]);
-    printf("am:     angular momentum of shell to optimize for\n");
-    printf("n:      moment to optimize for.\n");
-    printf("        1 for maximal area, 2 for minimal rms deviation from unity.\n");
-    printf("min:    lower limit of exponent range to optimize, in log10\n");
-    printf("max:    upper limit of exponent range to optimize, in log10\n");
-    printf("Nf/tol: number of functions to place on shell, or wanted tolerance.\n");
+  if(argc!=6 && argc!=7) {
+    printf("Usage:   %s am n min max Nf/tol (coulomb)\n",argv[0]);
+    printf("am:      angular momentum of shell to optimize for\n");
+    printf("n:       moment to optimize for.\n");
+    printf("         1 for maximal area, 2 for minimal rms deviation from unity.\n");
+    printf("min:     lower limit of exponent range to optimize, in log10\n");
+    printf("max:     upper limit of exponent range to optimize, in log10\n");
+    printf("Nf/tol:  number of functions to place on shell, or wanted tolerance.\n");
+    printf("coulomb: use Coulomb metric?\n");
     return 1;
   }
 
@@ -58,6 +59,14 @@ int main(int argc, char **argv) {
 
   // Did we get a tolerance, or a number of functions?
   double tol=atof(argv[5]);
+  bool coulomb=false;
+  if(argc==7)
+    coulomb=atoi(argv[6]);
+
+  // The Coulomb metric is equivalent to the normal metric with am-1
+  if(coulomb)
+    am--;
+
   double tau;
   if(tol<1) {
     exps=get_exponents(am,min,max,tol,n,true);
@@ -69,6 +78,10 @@ int main(int argc, char **argv) {
   // Sort into ascending order
   std::sort(exps.begin(),exps.end());
   
+  // Return the original value if Coulomb metric was used
+  if(coulomb)
+    am++;
+
   // Create a basis set out of it. Print exponents in descending order
   ElementBasisSet el("El");
   for(size_t i=exps.size()-1;i<exps.size();i--) {

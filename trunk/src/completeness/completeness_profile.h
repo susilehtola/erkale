@@ -51,7 +51,7 @@ arma::mat overlap(const std::vector<double> & z, const std::vector<double> & zp,
  * D. P. Chong, "Completeness profiles of one-electron basis sets",
  * Can. J. Chem. 73 (1995), pp. 79 - 83.
  */
-compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scanexps, bool chol=false);
+compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scanexps, bool chol=false, bool coulomb=false);
 
 /**
  * Compute completeness profile for element from \f$ \alpha = 10^{min}
@@ -60,6 +60,6 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
  * D. P. Chong, "Completeness profiles of one-electron basis sets",
  * Can. J. Chem. 73 (1995), pp. 79 - 83.
  */
-compprof_t compute_completeness(const ElementBasisSet & bas, double min=-10.0, double max=10.0, size_t Np=2001);
+compprof_t compute_completeness(const ElementBasisSet & bas, double min=-10.0, double max=10.0, size_t Np=2001, bool coulomb=false);
 
 #endif

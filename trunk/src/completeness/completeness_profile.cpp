@@ -53,13 +53,13 @@ std::vector<double> get_scanning_exponents(double min, double max, size_t Np) {
 }
 
 /// Compute completeness profile for given element
-compprof_t compute_completeness(const ElementBasisSet & bas, double min, double max, size_t Np) {
-  return compute_completeness(bas,get_scanning_exponents(min,max,Np));
+compprof_t compute_completeness(const ElementBasisSet & bas, double min, double max, size_t Np, bool coulomb) {
+  return compute_completeness(bas,get_scanning_exponents(min,max,Np),false,coulomb);
 }
 
 
 /// Compute completeness profile for given element
-compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scan_exp, bool chol) {
+compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scan_exp, bool chol, bool coulomb) {
   // Returned completeness profile
   compprof_t ret;
 
@@ -76,12 +76,16 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
     // Do we need to calculate something?
     if(exps.size()) {
       
+      int amval=am;
+      if(coulomb)
+	amval--;
+
       // Compute overlaps of scanning functions and primitives
-      arma::mat scanov=overlap(exps,scan_exp,am);
+      arma::mat scanov=overlap(exps,scan_exp,amval);
       
       // Compute overlap matrix in used basis set
       arma::mat S;
-      S=arma::trans(contr)*overlap(exps,exps,am)*contr;
+      S=arma::trans(contr)*overlap(exps,exps,amval)*contr;
       
       // Compute completeness overlaps
       arma::mat J;
