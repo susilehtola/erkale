@@ -198,6 +198,11 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     }
 
     dfit.fill(*basisp,dfitbas,direct);
+
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+    }
   } else  {
     // Compute ERIs
     if(direct) {
@@ -222,9 +227,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	// Don't compute small integrals
 	tab.fill(STRICTTOL,&basis);
     }
+
+    if(verbose)
+      printf("done (%s)\n",t.elapsed().c_str());
   }
-  if(verbose)
-    printf("done (%s)\n",t.elapsed().c_str());
 
   if(verbose)
     printf("\nInitialization of computation done in %s.\n\n",tinit.elapsed().c_str());
