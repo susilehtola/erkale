@@ -746,6 +746,26 @@ arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
   return S;
 }
 
+// Calculate overlaps between basis functions
+arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
+
+  // Number of functions on shells
+  size_t Ni=get_Nbf();
+  size_t Nj=rhs.get_Nbf();
+
+  // Compute ERI
+  GaussianShell dummy=dummyshell();
+  std::vector<double> eris=compute_ERI(this,&dummy,&rhs,&dummy);
+    
+  // Fill overlap matrix
+  arma::mat S(Ni,Nj);
+  for(size_t i=0;i<Ni;i++)
+    for(size_t j=0;j<Nj;j++)
+      S(i,j)=eris[i*Nj+j];
+
+  return S;
+}
+
 // Calculate kinetic energy matrix element between basis functions
 arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
 
@@ -1485,16 +1505,51 @@ arma::mat BasisSet::overlap() const {
   S.zeros();
 
   // Loop over shells
-  for(size_t i=0;i<shells.size();i++)
-    for(size_t j=0;j<=i;j++) {
-      // Get overlap between shells
-      arma::mat tmp=shells[i].overlap(shells[j]);
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ip=0;ip<shellpairs.size();ip++) {
+    // Shells in pair
+    size_t i=shellpairs[ip].is;
+    size_t j=shellpairs[ip].js;
 
-      // Store overlap
-      S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-      S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
-    }
+    // Get overlap between shells
+    arma::mat tmp=shells[i].overlap(shells[j]);
+    
+    // Store overlap
+    S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+    S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+  }
 
+  return S;
+}
+
+arma::mat BasisSet::coulomb_overlap() const {
+  // Form overlap matrix
+
+  // Size of basis set
+  const size_t N=get_Nbf();
+
+  // Initialize matrix
+  arma::mat S(N,N);
+  S.zeros();
+
+  // Loop over shells
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ip=0;ip<shellpairs.size();ip++) {
+    // Shells in pair
+    size_t i=shellpairs[ip].is;
+    size_t j=shellpairs[ip].js;
+    
+    arma::mat tmp=shells[i].coulomb_overlap(shells[j]);
+    
+    // Store overlap
+    S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+    S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+  }
+  
   return S;
 }
 
@@ -1511,10 +1566,38 @@ arma::mat BasisSet::overlap(const BasisSet & rhs) const {
   S12.zeros();
 
   // Loop over shells
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
   for(size_t i=0;i<shells.size();i++) {
     for(size_t j=0;j<rhs.shells.size();j++) {
       S12.submat(shells[i].get_first_ind(),rhs.shells[j].get_first_ind(),
 		 shells[i].get_last_ind() ,rhs.shells[j].get_last_ind() )=shells[i].overlap(rhs.shells[j]);;
+    }
+  }
+  return S12;
+}
+
+arma::mat BasisSet::coulomb_overlap(const BasisSet & rhs) const {
+  // Form overlap wrt to other basis set
+
+  // Size of this basis set
+  const size_t Nl=get_Nbf();
+  // Size of rhs basis
+  const size_t Nr=rhs.get_Nbf();
+
+  // Initialize matrix
+  arma::mat S12(Nl,Nr);
+  S12.zeros();
+
+  // Loop over shells
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<shells.size();i++) {
+    for(size_t j=0;j<rhs.shells.size();j++) {
+      S12.submat(shells[i].get_first_ind(),rhs.shells[j].get_first_ind(),
+		 shells[i].get_last_ind() ,rhs.shells[j].get_last_ind() )=shells[i].coulomb_overlap(rhs.shells[j]);;
     }
   }
   return S12;
@@ -1532,17 +1615,22 @@ arma::mat BasisSet::kinetic() const {
   T.zeros();
 
   // Loop over shells
-  for(size_t i=0;i<shells.size();i++)
-    for(size_t j=0;j<=i;j++) {
-
-      // Get partial kinetic energy matrix
-      arma::mat tmp=shells[i].kinetic(shells[j]);
-
-      // Store result
-      T.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-      T.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
-    }
-
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ip=0;ip<shellpairs.size();ip++) {
+    // Shells in pair
+    size_t i=shellpairs[ip].is;
+    size_t j=shellpairs[ip].js;
+    
+    // Get partial kinetic energy matrix
+    arma::mat tmp=shells[i].kinetic(shells[j]);
+    
+    // Store result
+    T.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+    T.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+  }
+  
   return T;
 }
 

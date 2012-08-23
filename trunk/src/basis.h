@@ -374,8 +374,12 @@ class BasisSet {
 
   /// Calculate overlap matrix
   arma::mat overlap() const;
+  /// Calculate overlap matrix in Coulomb metric
+  arma::mat coulomb_overlap() const;
   /// Calculate overlap with another basis set
   arma::mat overlap(const BasisSet & rhs) const;
+  /// Calculate overlap in Coulomb metric with another basis set
+  arma::mat coulomb_overlap(const BasisSet & rhs) const;
   /// Calculate kinetic energy matrix
   arma::mat kinetic() const;
   /// Calculate nuclear repulsion matrix
@@ -563,6 +567,8 @@ class GaussianShell {
 
   /// Calculate block overlap matrix between shells
   arma::mat overlap(const GaussianShell & rhs) const;
+  /// Calculate block Coulomb overlap matrix between shells
+  arma::mat coulomb_overlap(const GaussianShell & rhs) const;
   /// Calculate kinetic energy matrix between shells
   arma::mat kinetic(const GaussianShell & rhs) const;
   /// Calculate nuclear repulsion matrix between shells
