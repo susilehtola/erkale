@@ -173,8 +173,9 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
 
   // Go to natural orbitals
   arma::mat NO;
+  arma::vec occs;
   arma::mat tmp;
-  form_NOs(P,S,NO,tmp);
+  form_NOs(P,S,NO,tmp,occs);
 
   // Store orbitals, but in reverse order!
   C.zeros(NO.n_rows,NO.n_cols);
