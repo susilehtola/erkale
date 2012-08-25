@@ -335,6 +335,7 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
     Nv=Nind-Na-Nc;
   }
 
+  /*
   double tot=0.0;
   printf("Core orbital occupations:");
   for(size_t c=Nind-1;c>=Nind-Nc && c<Nind;c--) {
@@ -350,7 +351,7 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   }
   printf("\n");
   printf("Total occupancy of core and active is %f.\n",tot);
-
+  */
 
   // Form lambda by flipping the signs of the cv and vc blocks and
   // zeroing out everything else.
