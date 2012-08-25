@@ -24,8 +24,17 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #if defined(UNRESTRICTED) && defined(_ROHF)
   // Occupations
-  std::vector<double> occa(Nel_alpha,1.0);
-  std::vector<double> occb(Nel_beta,1.0);
+  std::vector<double> occa;
+  std::vector<double> occb;
+
+  if(basisp->get_Nnuc()==1) {
+    occa=atomic_occupancy(Nel_alpha);
+    occb=atomic_occupancy(Nel_beta);
+  } else {
+    occa=std::vector<double>(Nel_alpha,1.0);
+    occb=std::vector<double>(Nel_beta,1.0);
+  }
+
 #elif ( defined(HALFHOLE) || defined(FULLHOLE) )
   // Occupation vector of spin up and spin down
   std::vector<double> occa;
@@ -595,6 +604,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     sol.en.Exc=-0.25*arma::trace(sol.P*K);
 #endif
 
+    // Atomic update
+    atomic_fock(*basisp,sol.H);
+
 #else // Unrestricted case
 
     // Store Hamiltonians of last iteration
@@ -616,8 +628,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef _ROHF
     // Constrain Fock operators to correspond to ROHF
-    ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose);
+    ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose,basisp->get_Nnuc()==1);
 #endif
+
+    // Atomic update
+    atomic_fock(*basisp,sol.Ha);
+    atomic_fock(*basisp,sol.Hb);
 
 #endif // end DFT clause
 

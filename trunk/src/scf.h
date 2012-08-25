@@ -219,7 +219,7 @@ class SCF {
 /**
  * Find natural orbitals from P.
  */
-void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO);
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs);
 
 /**
  * Make ROHF / CUHF update to (Hartree-)Fock operators Fa and Fb,
@@ -229,7 +229,10 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
  * unrestricted mean-field methods for controlling
  * spin-contamination", J. Chem. Phys. 134, 064101 (2011).
  */
-void ROHF_update(arma::mat & Fa, arma::mat & Fb, const arma::mat & P, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose=true);
+void ROHF_update(arma::mat & Fa, arma::mat & Fb, const arma::mat & P, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose=true, bool atomic=false);
+
+/// Make spherical average of Fock matrix (for single atoms)
+void atomic_fock(const BasisSet & basis, arma::mat & F);
 
 /// Update occupations by occupying states with maximum overlap
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S);
@@ -239,6 +242,8 @@ void form_density(arma::mat & R, const arma::mat & C, size_t nocc);
 /// Form density matrix with occupations nocc
 void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> & nocc);
 
+/// Get atomic occupancy (spherical average)
+std::vector<double> atomic_occupancy(int Nel);
 /// Generate orbital occupancies
 std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis);
 /// Generate orbital occupancies

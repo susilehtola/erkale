@@ -239,7 +239,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 SCF::~SCF() {
 }
 
-void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO) {
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {
 
   // First, get eigenvectors and eigenvalues of S so that we can go to
   // an orthonormal basis.
@@ -280,9 +280,8 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   arma::mat P_orth=arma::trans(Sm)*P*Sm;
 
   // Diagonalize P to get NOs in orthonormal basis.
-  arma::vec Pval;
   arma::mat Pvec;
-  eig_sym_ordered(Pval,Pvec,P_orth);
+  eig_sym_ordered(occs,Pvec,P_orth);
 
   /* Get NOs in AO basis. The natural orbital is written in the
      orthonormal basis as
@@ -297,7 +296,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   NO_to_AO=arma::trans(Sm*Pvec);
 }
 
-void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose) {
+void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose, bool atomic) {
   /*
    * T. Tsuchimochi and G. E. Scuseria, "Constrained active space
    * unrestricted mean-field methods for controlling
@@ -306,27 +305,10 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
 
   Timer t;
 
+  arma::vec occs;
   arma::mat AO_to_NO;
   arma::mat NO_to_AO;
-  form_NOs(P_AO,S,AO_to_NO,NO_to_AO);
-
-  /*
-  double tot=0.0;
-  printf("Core orbital occupations:");
-  for(size_t c=Nind-1;c>=Nind-Nc && c<Nind;c--) {
-    printf(" %f",Pval(c));
-    tot+=Pval(c);
-  }
-  printf("\n");
-
-  printf("Active orbital occupations:");
-  for(size_t a=Nind-Nc-1;a>=Nind-Nc-Na && a<Nind;a--) {
-    printf(" %f",Pval(a));
-    tot+=Pval(a);
-  }
-  printf("\n");
-  printf("Total occupancy of core and active is %f.\n",tot);
-  */
+  form_NOs(P_AO,S,AO_to_NO,NO_to_AO,occs);
 
   // Construct \Delta matrix in AO basis
   arma::mat Delta_AO=(Fa_AO-Fb_AO)/2.0;
@@ -335,13 +317,40 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   arma::mat Delta_NO=arma::trans(AO_to_NO)*Delta_AO*AO_to_NO;
 
   // Amount of independent orbitals is
-  const size_t Nind=AO_to_NO.n_cols;
+  size_t Nind=AO_to_NO.n_cols;
   // Amount of core orbitals is
-  const size_t Nc=std::min(Nel_alpha,Nel_beta);
+  size_t Nc=std::min(Nel_alpha,Nel_beta);
   // Amount of active space orbitals is
-  const size_t Na=std::max(Nel_alpha,Nel_beta)-Nc;
+  size_t Na=std::max(Nel_alpha,Nel_beta)-Nc;
   // Amount of virtual orbitals (in NO space) is
-  const size_t Nv=Nind-Na-Nc;
+  size_t Nv=Nind-Na-Nc;
+
+  if(atomic) {
+    // Get atomic occupations
+    std::vector<double> occa=atomic_occupancy(Nel_alpha);
+    std::vector<double> occb=atomic_occupancy(Nel_beta);
+    // and update the values
+    Nc=std::min(occa.size(),occb.size());
+    Na=std::max(occa.size(),occb.size())-Nc;
+    Nv=Nind-Na-Nc;
+  }
+
+  double tot=0.0;
+  printf("Core orbital occupations:");
+  for(size_t c=Nind-1;c>=Nind-Nc && c<Nind;c--) {
+    printf(" %f",occs(c));
+    tot+=occs(c);
+  }
+  printf("\n");
+
+  printf("Active orbital occupations:");
+  for(size_t a=Nind-Nc-1;a>=Nind-Nc-Na && a<Nind;a--) {
+    printf(" %f",occs(a));
+    tot+=occs(a);
+  }
+  printf("\n");
+  printf("Total occupancy of core and active is %f.\n",tot);
+
 
   // Form lambda by flipping the signs of the cv and vc blocks and
   // zeroing out everything else.
@@ -370,6 +379,52 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
 
   if(verbose)
     printf("Performed CUHF update of Fock operators in %s.\n",t.elapsed().c_str());
+}
+
+void atomic_fock(const BasisSet & basis, arma::mat & F) {
+  // Only do something if we have a single nucleus
+  if(basis.get_Nnuc()!=1)
+    return;
+
+  // Get shells in basis set
+  std::vector<GaussianShell> shells=basis.get_shells();
+
+  // Check that all are pure lm
+  bool ok=true;
+  for(size_t i=0;i<shells.size();i++)
+    if(shells[i].get_am()>=2) {
+      ok=false;
+      break;
+    }
+  if(!ok)
+    return;
+
+  // Loop over shells
+  for(size_t i=0;i<shells.size();i++) {
+    for(size_t j=0;j<=i;j++) {
+      // Zero out completely if symmetry is not the same
+      if(shells[i].get_am()!=shells[j].get_am()) {
+	F.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind()).zeros();
+	F.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind()).zeros();
+      } else {
+	// Otherwise do spherical average. Zero out off-diagonal
+	for(size_t fi=shells[i].get_first_ind();fi<=shells[i].get_last_ind();fi++)
+	  for(size_t fj=shells[j].get_first_ind();fj<=shells[j].get_last_ind();fj++)
+	    if(fi!=fj) {
+	      F(fi,fj)=0.0;
+	      F(fj,fi)=0.0;
+	    }
+
+	// and average diagonal
+	double dtot=0.0;
+	for(size_t fi=shells[i].get_first_ind();fi<=shells[i].get_last_ind();fi++)
+	  dtot+=F(fi,fi);
+	dtot/=shells[i].get_Nbf();
+	for(size_t fi=shells[i].get_first_ind();fi<=shells[i].get_last_ind();fi++)
+	  F(fi,fi)=dtot;
+      }
+    }
+  }
 }
 
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S) {
@@ -424,6 +479,100 @@ void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> 
       R+=nocc[n]*C.col(n)*arma::trans(C.col(n));
 }
 
+std::vector<double> atomic_occupancy(int Nel) {
+  std::vector<double> ret;
+
+  // Atomic case. Fill 1s
+  ret.push_back(1.0);
+  Nel--;
+  
+  // Fill 2s
+  if(Nel>0) {
+    ret.push_back(1.0);
+    Nel--;
+  }
+  
+  // Fill 2p
+  if(Nel>0) {
+    // Amount of electrons to put in shell
+    int n=std::min(3,Nel);
+    // Divide equally
+    for(int i=0;i<3;i++)
+      ret.push_back(n/3.0);
+    Nel-=n;
+  }
+  
+  // Fill 3s
+  if(Nel>0) {
+    ret.push_back(1.0);
+    Nel--;
+  }
+  
+  // Fill 3p
+  if(Nel>0) {
+    // Amount of electrons to put in shell
+    int n=std::min(3,Nel);
+    // Divide equally
+    for(int i=0;i<3;i++)
+      ret.push_back(n/3.0);
+    Nel-=n;
+  }
+
+  // Fill 4s
+  if(Nel>0) {
+    ret.push_back(1.0);
+    Nel--;
+  }
+
+  // Fill 3d
+  if(Nel>0) {
+    // Amount of electrons to put in shell
+    int n=std::min(5,Nel);
+    // Divide equally
+    for(int i=0;i<5;i++)
+      ret.push_back(n/5.0);
+    Nel-=n;
+  }
+
+  // Fill 4p
+  if(Nel>0) {
+    // Amount of electrons to put in shell
+    int n=std::min(3,Nel);
+    // Divide equally
+    for(int i=0;i<3;i++)
+      ret.push_back(n/3.0);
+    Nel-=n;
+  }
+
+  // Fill 5s
+  if(Nel>0) {
+    ret.push_back(1.0);
+    Nel--;
+  }
+
+  // Fill 4d
+  if(Nel>0) {
+    // Amount of electrons to put in shell
+    int n=std::min(5,Nel);
+    // Divide equally
+    for(int i=0;i<5;i++)
+      ret.push_back(n/5.0);
+    Nel-=n;
+  }
+
+  // Fill 5p
+  if(Nel>0) {
+    // Amount of electrons to put in shell
+    int n=std::min(3,Nel);
+    // Divide equally
+    for(int i=0;i<3;i++)
+      ret.push_back(n/3.0);
+    Nel-=n;
+  }
+
+  return ret;
+}
+
 std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis) {
   // Returned value
   std::vector<double> ret;
@@ -451,12 +600,21 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
     if(Nel%2!=0) {
       throw std::runtime_error("Refusing to run restricted calculation on unrestricted system!\n");
     }
-    // Resize output
-    ret.resize(Nel/2);
-    for(size_t i=0;i<ret.size();i++)
-      ret[i]=2.0; // All orbitals doubly occupied
+
+    if(basis.get_Nnuc()==1) {
+      // Atomic case. 
+      ret=atomic_occupancy(Nel/2);
+      // Orbitals are doubly occupied
+      for(size_t i=0;i<ret.size();i++)
+	ret[i]*=2.0;
+    } else {
+      // Resize output
+      ret.resize(Nel/2);
+      for(size_t i=0;i<ret.size();i++)
+	ret[i]=2.0; // All orbitals doubly occupied
+    }
   }
-    
+  
   return ret;
 }
 
@@ -495,14 +653,20 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     int Nel_alpha, Nel_beta;
     get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
 
-    // Resize output
-    occa.resize(Nel_alpha);
-    for(size_t i=0;i<occa.size();i++)
-      occa[i]=1.0;
-    
-    occb.resize(Nel_beta);
-    for(size_t i=0;i<occb.size();i++)
-      occb[i]=1.0;
+    if(basis.get_Nnuc()==1) {
+      // Atomic case
+      occa=atomic_occupancy(Nel_alpha);
+      occb=atomic_occupancy(Nel_beta);
+    } else {
+      // Resize output
+      occa.resize(Nel_alpha);
+      for(size_t i=0;i<occa.size();i++)
+	occa[i]=1.0;
+      
+      occb.resize(Nel_beta);
+      for(size_t i=0;i<occb.size();i++)
+	occb[i]=1.0;
+    }
   }
 }
 
@@ -687,7 +851,8 @@ void calculate(const BasisSet & basis, Settings & set) {
       if(!oldrestr) {
 	// Find out natural orbitals
 	arma::mat hlp;
-	form_NOs(Pold,oldbas.overlap(),Cold,hlp);
+	arma::vec occs;
+	form_NOs(Pold,oldbas.overlap(),Cold,hlp,occs);
 
 	// Use alpha orbital energies
 	Eold=Eaold;
