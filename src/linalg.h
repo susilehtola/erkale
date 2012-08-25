@@ -41,7 +41,7 @@ arma::mat SymmetricOrth(const arma::mat & S, bool verbose=true);
 /// Same, but use computed decomoposition
 arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval, bool verbose=true);
 /// Canonical orthogonalization of basis set
-arma::mat CanonicalOrth(const arma::mat & S, double cutoff=1e-4, bool verbose=true);
+arma::mat CanonicalOrth(const arma::mat & S, double cutoff=LINTHRES, bool verbose=true);
 /// Same, but use computed decomposition
 arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff, bool verbose=true);
 
