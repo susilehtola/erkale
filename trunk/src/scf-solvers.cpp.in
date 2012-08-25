@@ -604,8 +604,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     sol.en.Exc=-0.25*arma::trace(sol.P*K);
 #endif
 
-    // Atomic update
-    atomic_fock(*basisp,sol.H);
 
 #else // Unrestricted case
 
@@ -631,9 +629,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose,basisp->get_Nnuc()==1);
 #endif
 
-    // Atomic update
-    atomic_fock(*basisp,sol.Ha);
-    atomic_fock(*basisp,sol.Hb);
 
 #endif // end DFT clause
 

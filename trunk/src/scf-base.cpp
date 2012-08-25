@@ -382,52 +382,6 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
     printf("Performed CUHF update of Fock operators in %s.\n",t.elapsed().c_str());
 }
 
-void atomic_fock(const BasisSet & basis, arma::mat & F) {
-  // Only do something if we have a single nucleus
-  if(basis.get_Nnuc()!=1)
-    return;
-
-  // Get shells in basis set
-  std::vector<GaussianShell> shells=basis.get_shells();
-
-  // Check that all are pure lm
-  bool ok=true;
-  for(size_t i=0;i<shells.size();i++)
-    if(shells[i].get_am()>=2) {
-      ok=false;
-      break;
-    }
-  if(!ok)
-    return;
-
-  // Loop over shells
-  for(size_t i=0;i<shells.size();i++) {
-    for(size_t j=0;j<=i;j++) {
-      // Zero out completely if symmetry is not the same
-      if(shells[i].get_am()!=shells[j].get_am()) {
-	F.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind()).zeros();
-	F.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind()).zeros();
-      } else {
-	// Otherwise do spherical average. Zero out off-diagonal
-	for(size_t fi=shells[i].get_first_ind();fi<=shells[i].get_last_ind();fi++)
-	  for(size_t fj=shells[j].get_first_ind();fj<=shells[j].get_last_ind();fj++)
-	    if(fi!=fj) {
-	      F(fi,fj)=0.0;
-	      F(fj,fi)=0.0;
-	    }
-
-	// and average diagonal
-	double dtot=0.0;
-	for(size_t fi=shells[i].get_first_ind();fi<=shells[i].get_last_ind();fi++)
-	  dtot+=F(fi,fi);
-	dtot/=shells[i].get_Nbf();
-	for(size_t fi=shells[i].get_first_ind();fi<=shells[i].get_last_ind();fi++)
-	  F(fi,fi)=dtot;
-      }
-    }
-  }
-}
-
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S) {
   nocc.zeros();
 
@@ -484,8 +438,10 @@ std::vector<double> atomic_occupancy(int Nel) {
   std::vector<double> ret;
 
   // Atomic case. Fill 1s
-  ret.push_back(1.0);
-  Nel--;
+  if(Nel>0) {
+    ret.push_back(1.0);
+    Nel--;
+  }
   
   // Fill 2s
   if(Nel>0) {

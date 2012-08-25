@@ -231,9 +231,6 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
  */
 void ROHF_update(arma::mat & Fa, arma::mat & Fb, const arma::mat & P, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose=true, bool atomic=false);
 
-/// Make spherical average of Fock matrix (for single atoms)
-void atomic_fock(const BasisSet & basis, arma::mat & F);
-
 /// Update occupations by occupying states with maximum overlap
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S);
 
