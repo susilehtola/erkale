@@ -189,12 +189,12 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     // functions carry by definition no electron density)
     BasisSet dfitbas;
 
-    if(stricmp(set.get_string("DFTFittingBasis"),"Auto")==0)
+    if(stricmp(set.get_string("FittingBasis"),"Auto")==0)
       dfitbas=basis.density_fitting();
     else {
       // Load basis library
       BasisSetLibrary fitlib;
-      fitlib.load_gaussian94(set.get_string("DFTFittingBasis"));
+      fitlib.load_gaussian94(set.get_string("FittingBasis"));
 
       // Construct fitting basis
       dfitbas=construct_basis(basis.get_nuclei(),fitlib,set);
