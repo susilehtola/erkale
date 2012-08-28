@@ -282,6 +282,21 @@ void load_fchk(const Settings & set) {
   // Construct density matrix
   arma::mat P=form_density(stor);
 
+  // Special handling for ROHF
+  if(stor.get_int("IROHF")==1) {
+    P.zeros();
+    arma::mat Ca=form_orbital(stor,"Alpha MO coefficients");
+
+    int Nela=stor.get_int("Number of alpha electrons");
+    int Nelb=stor.get_int("Number of beta electrons");
+
+    P.zeros();
+    for(int i=0;i<Nela;i++)
+      P+=Ca.col(i)*arma::trans(Ca.col(i));
+    for(int i=0;i<Nelb;i++)
+      P+=Ca.col(i)*arma::trans(Ca.col(i));
+  }
+
   // Form orbitals
   arma::mat Ca, Cb;
   bool restr=false;
