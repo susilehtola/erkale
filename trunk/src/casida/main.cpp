@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
 
   // Parse settings
   Settings set;
-  set.add_string("DFTFittingBasis","Basis set to use for density fitting (Auto for automatic)","Auto");
+  set.add_string("FittingBasis","Basis set to use for density fitting (Auto for automatic)","Auto");
   set.add_string("CasidaX","Exchange functional for Casida","lda_x");
   set.add_string("CasidaC","Correlation functional for Casida","lda_c_vwn");
   set.add_bool("CasidaPol","Perform polarized Casida calculation (when using restricted wf)",false);
