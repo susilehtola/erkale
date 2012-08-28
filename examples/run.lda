@@ -10,4 +10,4 @@ Basis cc-pVDZ
 # Save the results in the checkpoint file
 SaveChk lda.chk
 # Use the core guess to initialize the calculation
-CoreGuess true
+Guess Core
