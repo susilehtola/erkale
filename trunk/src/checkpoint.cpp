@@ -172,7 +172,7 @@ void Checkpoint::read(const std::string & name, arma::mat & m) {
   // Get the class info
   hid_t hclass=H5Tget_class(datatype);
 
-  if(hclass!=H5T_INTEGER) {
+  if(hclass!=H5T_FLOAT) {
     std::ostringstream oss;
     oss << "Error - " << name << " is not a floating point value!\n";
     ERROR_INFO();
