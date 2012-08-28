@@ -172,7 +172,7 @@ void Checkpoint::read(const std::string & name, arma::mat & m) {
   // Get the class info
   hid_t hclass=H5Tget_class(datatype);
 
-  if(hclass!=H5T_FLOAT) {
+  if(hclass!=H5T_INTEGER) {
     std::ostringstream oss;
     oss << "Error - " << name << " is not a floating point value!\n";
     ERROR_INFO();
@@ -894,6 +894,95 @@ void Checkpoint::read(const std::string & name, hbool_t & v) {
   // Close dataset
   H5Dclose(dataset);
 
+  if(cl) close();
+}
+
+void Checkpoint::write(const std::string & name, const std::string & val) {
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
+  // Remove possibly existing entry
+  remove(name);
+
+  // Dimensions of the vector
+  hsize_t dims[1];
+  dims[0]=val.size()+1;
+
+  // Create a dataspace.
+  hid_t dataspace=H5Screate_simple(1,dims,NULL);
+
+  // Create a datatype.
+  hid_t datatype=H5Tcopy(H5T_NATIVE_CHAR);
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties.
+  hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Write the data to the file.
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, val.c_str());
+
+  // Close everything.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+  if(cl) close();
+}
+
+void Checkpoint::read(const std::string & name, std::string & val) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+  CHECK_EXIST();
+
+  // Open the dataset.
+  hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
+
+  // Get the data type
+  hid_t datatype  = H5Dget_type(dataset);
+
+  // Get the class info
+  hid_t hclass=H5Tget_class(datatype);
+
+  if(hclass!=H5T_INTEGER) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " does not consist of characters!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
+
+  // Get dataspace
+  hid_t dataspace = H5Dget_space(dataset);
+  // Get number of dimensions
+  int ndim = H5Sget_simple_extent_ndims(dataspace);
+  if(ndim!=1) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " should have dimension 1, instead dimension is " << ndim << "!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
+
+  // Get the size of the matrix
+  hsize_t dims[ndim];
+  H5Sget_simple_extent_dims(dataspace,dims,NULL);
+
+  // Allocate work memory
+  char *wrk=(char *)malloc(dims[0]*sizeof(char));
+  H5Dread(dataset, H5T_NATIVE_CHAR, H5S_ALL, H5S_ALL, H5P_DEFAULT, wrk);
+  val=std::string(wrk);
+  free(wrk);
+
+  // Close dataspace
+  H5Sclose(dataspace);
+  // Close datatype
+  H5Tclose(datatype);
+  // Close dataset
+  H5Dclose(dataset);
   if(cl) close();
 }
 
