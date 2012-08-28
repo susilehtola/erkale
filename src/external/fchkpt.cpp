@@ -306,6 +306,12 @@ void load_fchk(const Settings & set) {
   } catch(std::runtime_error) {
     // Restricted checkpoint
     restr=true;
+
+    // but check again if we have the ROHF bug
+    if(stor.get_int("IROHF")==1) {
+      restr=false;
+      Cb=Ca;
+    }
   }
 
   // Check that everything is OK
@@ -329,19 +335,30 @@ void load_fchk(const Settings & set) {
   chkpt.write(basis);
   chkpt.write("P",P);
 
+  int Nela=stor.get_int("Number of alpha electrons");
+  int Nelb=stor.get_int("Number of beta electrons");
+
   chkpt.write("Restricted",restr);
   if(restr) {
     chkpt.write("C",Ca);
+
+    // Occupations
+    std::vector<double> occs(Nel/2,2.0);
+    chkpt.write("occs",occs);
   } else {
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
+
+    // Occupations
+    std::vector<double> occa(Nela,1.0);
+    chkpt.write("occa",occa);
+    std::vector<double> occb(Nelb,1.0);
+    chkpt.write("occb",occb);
   }
 
   chkpt.write("Converged",1);
 
   // Write number of electrons
-  int Nela=stor.get_int("Number of alpha electrons");
-  int Nelb=stor.get_int("Number of beta electrons");
   chkpt.write("Nel",Nel);
   chkpt.write("Nel-a",Nela);
   chkpt.write("Nel-b",Nelb);
@@ -379,7 +396,7 @@ void save_fchk(const Settings & set) {
     arma::mat C;
     chkpt.read("C",C);
     write_mo("Alpha MO coefficients",basis,C,out);
-
+    
     arma::vec E;
     chkpt.read("E",E);
     std::vector<double> Ev(E.n_elem);
