@@ -514,6 +514,8 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   std::vector<double> ret=get_exponents(s->x);
   // Sort into ascending order
   std::sort(ret.begin(),ret.end());
+  // and reverse the order
+  std::reverse(ret.begin(),ret.end());
   
   gsl_vector_free(x);
   gsl_vector_free(ss);
