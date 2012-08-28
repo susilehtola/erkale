@@ -204,7 +204,7 @@ std::vector<double> norm_occ(size_t nocc) {
 }
 
 /// Set fractional occupation on excited orbital
-std::vector<double> frac_occ(size_t excited, size_t nocc) {
+std::vector<double> tp_occ(size_t excited, size_t nocc) {
   std::vector<double> ret(nocc);
   for(size_t i=0;i<nocc;i++) {
     ret[i]=1.0;
@@ -215,7 +215,7 @@ std::vector<double> frac_occ(size_t excited, size_t nocc) {
 }
 
 /// First excited state; core orbital is not occupied
-std::vector<double> exc_occ(size_t excited, size_t nocc) {
+std::vector<double> xch_occ(size_t excited, size_t nocc) {
   std::vector<double> ret(nocc+1);
   for(size_t i=0;i<nocc+1;i++) {
     ret[i]=1.0;
@@ -224,6 +224,18 @@ std::vector<double> exc_occ(size_t excited, size_t nocc) {
 
   return ret;
 }
+
+std::vector<double> fch_occ(size_t excited, size_t nocc) {
+  std::vector<double> ret(nocc);
+  for(size_t i=0;i<nocc;i++) {
+    ret[i]=1.0;
+  }
+  ret[excited]=0;
+
+  return ret;
+}
+
+
 
 bool operator<(const locdist_t & lhs, const locdist_t & rhs) {
   // Sort in increasing value

@@ -15,7 +15,7 @@ void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<
 void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
+  size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch) const
 
 #elif defined(DFT) && defined(HALFHOLE)
 size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
@@ -67,7 +67,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   noccb++;
 #endif
 #endif
-  
+
 
   Timer t;
   Timer ttot;
@@ -178,14 +178,14 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(sol.Ca.n_rows!=Nbf || sol.Cb.n_rows!=Nbf)
 #endif
       {
-	
+
 	if(guess!=COREGUESS)
 	  throw std::runtime_error("No starting guess, and use of core guess disallowed!\n");
-	
+
 #ifdef RESTRICTED
 	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
 	eig_sym_ordered(sol.E,orbs,Horth); // Solve in orthogonal basis
-	
+
 	// Transform back to non-orthogonal basis
 	sol.C=Sinvh*orbs;
 	check_orth(sol.C,S,false);
@@ -195,62 +195,68 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	// Transform back to non-orthogonal basis
 	sol.Ca=Sinvh*orbs;
 	check_orth(sol.Ca,S,false);
-	
+
 	// Copy orbitals
 	sol.Eb=sol.Ea;
 	sol.Cb=sol.Ca;
 #endif
-	
+
 	if(verbose)
 	  printf("\nCore guess formed in %s.\n",t.elapsed().c_str());
-	
+
       } else {
       // Got correctly sized input guess.
-      
+
       if(verbose)
         printf("\nUsing input guess for orbitals.\n");
     }
   fflush(stdout);
-  
-  
+
+
 #if defined(FULLHOLE) || defined(HALFHOLE)
   size_t ixc_orb=0;
 #endif
-    
+
 #ifdef RESTRICTED
   form_density(sol.P,sol.C,occs);
 #else
-  
+
 #if defined(FULLHOLE) || defined(HALFHOLE)
   if(spin)
     ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
   else
     ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
-  
+
   if(spin) {
 #if defined(FULLHOLE)
-    occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
+    if(!xch)
+      occb=fch_occ(ixc_orb,noccb); // Full hole in beta spin
+    else
+      occb=xch_occ(ixc_orb,noccb); // Full hole in beta spin, LUMO occupied
 #else
-    occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
+    occb=tp_occ(ixc_orb,noccb); // Transition potential occupation
 #endif
     occa=norm_occ(nocca); // Normal occupation in beta
   } else {
 #if defined(FULLHOLE)
-    occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
+    if(!xch)
+      occa=fch_occ(ixc_orb,nocca); // Full hole in alpha spin
+    else
+      occa=xch_occ(ixc_orb,nocca); // Full hole in alpha spin, LUMO occupied
 #else
-    occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
+    occa=tp_occ(ixc_orb,nocca); // Transition potential occupation
 #endif
     occb=norm_occ(noccb); // Normal occupation in beta
   }
-  
+
   // End HALFHOLE || FULLHOLE
 #endif
-  
+
   form_density(sol.Pa,sol.Ca,occa);
   form_density(sol.Pb,sol.Cb,occb);
   sol.P=sol.Pa+sol.Pb;
 #endif
-  
+
   // Print orbital energies
   if(verbose) {
 #ifdef RESTRICTED
@@ -320,6 +326,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       fprintf(stderr," with ");
 #ifdef FULLHOLE
     fprintf(stderr,"full core hole");
+    if(xch)
+      fprintf(stderr," (XCH)");
 #else // half hole
     fprintf(stderr,"half core hole");
 #endif
@@ -357,10 +365,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // Loop:
   for(int iiter=1;iiter<=maxiter;iiter++) {
     Timer titer;
-    
+
     if(verbose)
       printf("\n ******* Iteration %4i ********\n",iiter);
-    
+
     // Form Coulomb and exchange matrices
     if(densityfit) {
       if(verbose) {
@@ -369,12 +377,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	t.set();
       }
       J=dfit.calc_J(sol.P);
-      
+
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
       }
       fflush(stdout);
-      
+
 #ifdef DFT
       if(kfrac!=0.0) {
 #endif
@@ -383,28 +391,28 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  fflush(stdout);
 	  t.set();
 	}
-	
+
 #ifdef RESTRICTED
 	K=dfit.calc_K(sol.C,occs,fitmem);
 #else
 	Ka=dfit.calc_K(sol.Ca,occa,fitmem);
 	Kb=dfit.calc_K(sol.Cb,occb,fitmem);
 #endif
-	
+
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	}
 	fflush(stdout);
-	
+
 #ifdef DFT
       }
 #endif
-      
+
     } else { // No density fitting
-      
+
       if(direct) {
 #ifdef RESTRICTED
-	
+
 #ifdef DFT
 	if(kfrac!=0.0) {
 #endif
@@ -413,7 +421,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    fflush(stdout);
 	    t.set();
 	  }
-	  
+
 	  if(strictint)
 	    scr.calcJK_strict(sol.P,J,K,tol,&screeneff);
 	  else {
@@ -422,37 +430,37 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    J+=dJ;
 	    K+=dK;
 	  }
-	  
+
 	  if(verbose) {
 	    printf("done (%s)\n",t.elapsed().c_str());
 	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  }
 	  fflush(stdout);
-	  
+
 #ifdef DFT
 	} else {
-	  
+
 	  if(verbose) {
 	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
 	    fflush(stdout);
 	    t.set();
 	  }
-	  
+
 	  if(strictint)
 	    J=scr.calcJ_strict(sol.P,tol,&screeneff);
 	  else
 	    J+=scr.calcJ(deltaP,tol,&screeneff);
-	  
+
 	  if(verbose) {
 	    printf("done (%s)\n",t.elapsed().c_str());
 	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  }
 	  fflush(stdout);
-	  
+
 	}
 #endif
-	
-	
+
+
 #else
 	// Unrestricted case
 #ifdef DFT
@@ -463,7 +471,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    fflush(stdout);
 	    t.set();
 	  }
-	  
+
 	  if(strictint)
 	    scr.calcJK_strict(sol.Pa,sol.Pb,J,Ka,Kb,tol,&screeneff);
 	  else {
@@ -480,22 +488,22 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  }
 	  fflush(stdout);
-	  
-	  
+
+
 #ifdef DFT
 	} else {
-	  
+
 	  if(verbose) {
 	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
 	    fflush(stdout);
 	    t.set();
 	  }
-	  
+
 	  if(strictint)
 	    J=scr.calcJ_strict(sol.P,tol,&screeneff);
 	  else
 	    J+=scr.calcJ(deltaP,tol,&screeneff);
-	  
+
 	  if(verbose) {
 	    printf("done (%s)\n",t.elapsed().c_str());
 	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
@@ -504,14 +512,14 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 	}
 #endif
-	
+
 #endif
       } else {
-	
+
 	// Conventional mode - use tabled integrals
-	
+
 	if(verbose) {
-	  
+
 #ifdef DFT
 	  if(kfrac!=0.0)
 #endif
@@ -520,63 +528,63 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  else
 	    printf("Forming HF Coulomb matrix ... ");
 #endif
-	  
+
 	  fflush(stdout);
 	  t.set();
 	}
-	
+
 	J=tab.calcJ(sol.P);
-	
+
 #ifdef DFT
 	if(kfrac!=0.0) {
 #endif
-	  
+
 #ifdef RESTRICTED
 	  K=tab.calcK(sol.P);
 #else
 	  Ka=tab.calcK(sol.Pa);
 	  Kb=tab.calcK(sol.Pb);
 #endif
-	  
+
 	  if(verbose) {
 	    printf("done (%s)\n",t.elapsed().c_str());
 	  }
 	  fflush(stdout);
-	  
-	  
+
+
 #ifdef DFT
 	} // End kfrac clause
 #endif
-	
+
       }
-      
+
     }
-    
+
 #ifdef DFT
     if(verbose) {
       printf("Computing DFT exchange and correlation ... ");
       fflush(stdout);
       t.set();
     }
-    
+
     double Nelnum; // Numerically integrated density
 #ifdef RESTRICTED
     grid.eval_Fxc(dft.x_func,dft.c_func,sol.P,XC,sol.en.Exc,Nelnum);
 #else
     grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,XCa,XCb,sol.en.Exc,Nelnum);
 #endif
-    
+
 #ifndef HALFHOLE
     double rel_diff=(Nelnum-Nel)*100.0/Nel;
 #else
     double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
 #endif
-    
+
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
       printf("Numerically integrated density is %.5f (%+.4f %%).\n",Nelnum,rel_diff);
     }
-    
+
     if(fabs(rel_diff)>1e-2) {
       std::ostringstream oss;
       //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
@@ -598,7 +606,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       sol.H-=0.5*kfrac*K;
       sol.en.Exc-=0.25*kfrac*arma::trace(sol.P*K);
     }
-    
+
 #else
     sol.H=Hcore+J-0.5*K;
     sol.en.Exc=-0.25*arma::trace(sol.P*K);
@@ -641,7 +649,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	freeze_orbs(freeze,sol.Cb,S,sol.Hb);
       else
 	freeze_orbs(freeze,sol.Ca,S,sol.Ha);
-    } 
+    }
 #endif // end TP clause
 
     fflush(stdout);
@@ -824,14 +832,14 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       check_orth(sol.Cb,S,false);
 #endif
     } else {
-      
+
       // Solve FC=ESC
       if(verbose) {
 	printf("\nSolving SCF equations ... ");
 	fflush(stdout);
 	t.set();
       }
-      
+
 #ifdef RESTRICTED
       // Transform Hamiltonian into orthogonal basis
       Horth=arma::trans(Sinvh)*sol.H*Sinvh;
@@ -839,7 +847,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       eig_sym_ordered(sol.E,orbs,Horth);
       // Transform back to non-orthogonal basis
       sol.C=Sinvh*orbs;
-      
+
       // Check orthonormality
       check_orth(sol.C,S,false);
 #else
@@ -847,17 +855,17 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       eig_sym_ordered(sol.Ea,orbs,Horth);
       sol.Ca=Sinvh*orbs;
       check_orth(sol.Ca,S,false);
-      
+
       Horth=trans(Sinvh)*sol.Hb*Sinvh;
       eig_sym_ordered(sol.Eb,orbs,Horth);
       sol.Cb=Sinvh*orbs;
       check_orth(sol.Cb,S,false);
 #endif
-      
+
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
     }
-      
+
     // Form new density matrix
     arma::mat Pnew;
 #ifdef RESTRICTED
@@ -873,16 +881,22 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
     if(spin) {
 #if defined(FULLHOLE)
-      occb=exc_occ(ixc_orb,noccb); // Move alpha occupied states up by a notch
+      if(!xch)
+	occb=fch_occ(ixc_orb,noccb); // Full hole in beta spin
+      else
+	occb=xch_occ(ixc_orb,noccb); // Full hole in beta spin, LUMO occupied
 #else
-      occb=frac_occ(ixc_orb,noccb); // Fractional occupation in alpha orbitals
+      occb=tp_occ(ixc_orb,noccb); // Transition potential occupation
 #endif
       occa=norm_occ(nocca); // Normal occupation in beta
     } else {
 #if defined(FULLHOLE)
-      occa=exc_occ(ixc_orb,nocca); // Move alpha occupied states up by a notch
+      if(!xch)
+	occa=fch_occ(ixc_orb,nocca); // Full hole in alpha spin
+      else
+	occa=xch_occ(ixc_orb,nocca); // Full hole in alpha spin, LUMO occupied
 #else
-      occa=frac_occ(ixc_orb,nocca); // Fractional occupation in alpha orbitals
+      occa=tp_occ(ixc_orb,nocca); // Transition potential occupation
 #endif
       occb=norm_occ(noccb); // Normal occupation in beta
     }
@@ -890,7 +904,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // End HALFHOLE || FULLHOLE
 #endif
 
-    
+
     form_density(Panew,sol.Ca,occa);
     form_density(Pbnew,sol.Cb,occb);
     Pnew=Panew+Pbnew;
@@ -930,7 +944,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     sol.Pa=Panew;
     sol.Pb=Pbnew;
 #endif
-    
+
     // Print out status information
     if(verbose) {
 
@@ -1030,8 +1044,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     while(occr.size()<Sinvh.n_cols)
       occr.push_back(0.0);
 #endif
-    
-    // Write current matrices to checkpoint. 
+
+    // Write current matrices to checkpoint.
     // To use the file effectively, we keep it open for the whole shebang.
     chkptp->open();
     chkptp->write("P",sol.P);
@@ -1039,10 +1053,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #if !defined(RESTRICTED)
     chkptp->write("Ca",sol.Ca);
     chkptp->write("Cb",sol.Cb);
-    
+
     chkptp->write("Ea",sol.Ea);
     chkptp->write("Eb",sol.Eb);
-    
+
     chkptp->write("Pa",sol.Pa);
     chkptp->write("Pb",sol.Pb);
 
