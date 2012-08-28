@@ -151,6 +151,11 @@ class Checkpoint {
   void write(const std::string & name, bool val);
   /// Read value
   void read(const std::string & name, bool & val);
+
+  /// Save value
+  void write(const std::string & name, const std::string & val);
+  /// Read value
+  void read(const std::string & name, std::string & val);
 };
 
 /// Check for existence of file
