@@ -58,29 +58,17 @@ bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
   return lhs.E<rhs.E;
 }
 
-/// X-FIRST and X-SECOND by L. G. M. Pettersson, taken from StoBe basis
-ElementBasisSet stobe_augset(const std::string & el, bool second) {
-  // The even-tempered parameters
-  double alpha=0.0029;
-  double beta=1.4;
-  
-  // X-SECOND has 25 exponents, X-FIRST has 19
-  int nf=second ? 25 : 19;
-  
-  // Get exponents
-  std::vector<double> exps=eventempered_set(alpha,beta,nf);
+enum xrs_method parse_method(const std::string & method) {
+  enum xrs_method met;
+  if(stricmp(method,"TP")==0)
+    met=TP;
+  else if(stricmp(method,"FCH")==0)
+    met=FCH;
+  else if(stricmp(method,"XCH")==0)
+    met=XCH;
+  else throw std::runtime_error("Unrecognized method.\n");
 
-  // Returned basis
-  ElementBasisSet ret(el);
-  // Add functions
-  for(int am=0;am<=2;am++)
-    for(size_t iexp=0;iexp<exps.size();iexp++) {
-      FunctionShell sh(am);
-      sh.add_exponent(1.0,exps[iexp]);
-      ret.add_function(sh);
-    }
-  
-  return ret;
+  return met;
 }
 
 /**
@@ -632,13 +620,13 @@ bool load(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, uscf
       fprintf(stderr,"Dimensions do not match!\n");
   }
 
-  // Check consistency of spin and hole
+  // Check consistency of spin and method
   if(ok) {
-    bool hole;
-    chkpt.read("XRSFullhole",hole);
-    if(hole!=set.get_bool("XRSFullhole")) {
+    std::string method;
+    chkpt.read("XRSMethod",method);
+    if(stricmp(method,set.get_string("XRSMethod"))!=0) {
       ok=false;
-      fprintf(stderr,"Hole character does not match.\n");
+      fprintf(stderr,"Calculation methods do not match.\n");
     }
   }
 
@@ -724,7 +712,8 @@ int main(int argc, char **argv) {
   set.add_bool("XRSLocalize","Localize and freeze orbitals? (Needs ground-state calculation)",false);
 
   set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false); 
-  set.add_bool("XRSFullhole","Run full core-hole calculation",false);
+  set.add_string("XRSMethod", "Which kind of calculation to perform: TP, XCH or FCH","TP");
+
   set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3:5,10","");
   set.add_double("XRSGridTol","DFT grid tolerance in double basis set calculation",1e-4);
 
@@ -751,8 +740,10 @@ int main(int argc, char **argv) {
 
   // Get used settings
   const bool verbose=set.get_bool("Verbose");
-  const bool fullhole=set.get_bool("XRSFullhole");
   const bool spin=set.get_bool("XRSSpin");
+
+  // Parse method
+  enum xrs_method method=parse_method(set.get_string("XRSMethod"));
 
   // Print out settings
   if(verbose)
@@ -821,7 +812,7 @@ int main(int argc, char **argv) {
     Checkpoint chkpt(set.get_string("SaveChk"),true);
     chkpt.write(basis);
     chkpt.write("XRSSpin",set.get_bool("XRSSpin"));
-    chkpt.write("XRSFullhole",set.get_bool("XRSFullhole"));
+    chkpt.write("XRSMethod",set.get_string("XRSMethod"));
 
     // Amount of (orbital rotation) localized orbitals (nloc-1 are then frozen)
     size_t nloc=0;
@@ -841,7 +832,7 @@ int main(int argc, char **argv) {
       load.read("Restricted",restr);
 
       // Load ground-state energy
-      if(fullhole)
+      if(method==FCH || method==XCH)
 	load.read(gsen);
 
       // Load basis
@@ -910,16 +901,26 @@ int main(int argc, char **argv) {
     }
     
     // Do TP calculation.
-    if(fullhole) {
-      xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init);
-      xcorb=solver.full_hole(xcatom,sol,conv,dft);
+    if(method==FCH || method==XCH) {
+      if(method==FCH) {
+	xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init,false);
+	xcorb=solver.full_hole(xcatom,sol,conv,dft,false);
+      } else {
+	xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init,true);
+	xcorb=solver.full_hole(xcatom,sol,conv,dft,true);
+      }
 
       // Get excited state energy
       energy_t excen;
       chkpt.read(excen);
 
-      printf("\nAbsolute energy correction: first peak should be at %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
-      fprintf(stderr,"\nAbsolute energy correction: first peak should be at %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
+      if(method==XCH) {
+	printf("\nAbsolute energy correction: first peak should be at %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
+	fprintf(stderr,"\nAbsolute energy correction: first peak should be at %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
+      } else {
+	printf("Vertical photoionization energy is %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
+	fprintf(stderr,"Vertical photoionization energy is %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
+      }
     } else {      
       xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
       xcorb=solver.half_hole(xcatom,sol,conv,dft);

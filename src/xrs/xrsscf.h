@@ -22,6 +22,15 @@
 #include <armadillo>
 #include "scf.h"
 
+enum xrs_method {
+  // Transition potential: one half electron in excited initial state, system has net charge +0.5
+  TP,
+  // Full hole: no electron in excited initial state, system has net charge +1
+  FCH,
+  // XCH: Full hole, but excited electron placed on LUMO
+  XCH
+};
+
 class XRSSCF : public SCF {
   /// Excite beta spin?
   bool spin;
@@ -43,7 +52,7 @@ class XRSSCF : public SCF {
   void set_frozen(const arma::mat & C, size_t ind);
 
   /// Compute 1st core-excited state
-  size_t full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;
+  size_t full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch) const;
   /// Compute TP solution
   size_t half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;
 };
@@ -63,9 +72,11 @@ void print_info(const arma::mat & C, const arma::vec & E, const BasisSet & basis
 /// Aufbau occupation
 std::vector<double> norm_occ(size_t nocc);
 /// Set fractional occupation on excited orbital
-std::vector<double> frac_occ(size_t excited, size_t nocc);
+std::vector<double> tp_occ(size_t excited, size_t nocc);
 /// First excited state; core orbital is not occupied
-std::vector<double> exc_occ(size_t excited, size_t nocc);
+std::vector<double> xch_occ(size_t excited, size_t nocc);
+/// Full hole; core orbital is not occupied
+std::vector<double> fch_occ(size_t excited, size_t nocc);
 
 /// Helper structure for localization 
 typedef struct {
