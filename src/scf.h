@@ -198,6 +198,9 @@ class SCF {
   /// Density fitting table
   DensityFit dfit;
 
+  /// List of frozen orbitals by symmetry group. index+1 is symmetry group, group 0 contains all non-frozen orbitals
+  std::vector<arma::mat> freeze;
+
  public:
   /// Constructor
   SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt);
@@ -214,6 +217,9 @@ class SCF {
   void RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
   /// Calculate unrestricted density-functional theory solution
   void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
+
+  /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
+  void set_frozen(const arma::mat & C, size_t ind);
 };
 
 /**
@@ -277,6 +283,16 @@ bool operator<(const ovl_sort_t & lhs, const ovl_sort_t & rhs);
  * matrix.
  */
 arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, const BasisSet & augbas);
+
+/// Get symmetry groups of orbitals
+std::vector<int> symgroups(const arma::mat & C, const arma::mat & S, const std::vector<arma::mat> & freeze, bool verbose=false);
+
+/// Freeze orbitals
+void freeze_orbs(const std::vector<arma::mat> & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H, bool verbose=false);
+
+/// Localize core orbitals, returns number of localized orbitals.
+size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbose=false);
+
 
 #include "checkpoint.h"
 
