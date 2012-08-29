@@ -251,7 +251,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
   std::vector<locdist_t> locind;
   // Localize on all the atoms of the same type than the excited atom
   for(size_t i=0;i<basis.get_Nnuc();i++)
-    if(stricmp(basis.get_symbol(i),basis.get_symbol(xcatom))==0) {
+    if(!basis.get_nucleus(i).bsse && stricmp(basis.get_symbol(i),basis.get_symbol(xcatom))==0) {
       locdist_t tmp;
       tmp.ind=i;
       tmp.dist=norm(basis.get_coords(i)-basis.get_coords(xcatom));
