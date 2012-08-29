@@ -22,7 +22,7 @@
 #include <stdexcept>
 
 int get_Z(std::string el) {
-  for(int Z=1;Z<element_N;Z++)
+  for(int Z=1;Z<(int) (sizeof(element_symbols)/sizeof(element_symbols[0]));Z++)
     if(el==element_symbols[Z])
       return Z;
 
