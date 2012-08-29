@@ -239,6 +239,16 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 SCF::~SCF() {
 }
 
+void SCF::set_frozen(const arma::mat & C, size_t ind) {
+  // Check size of array
+  while(ind+1>freeze.size()) {
+    arma::mat tmp;
+    freeze.push_back(tmp);
+  }
+  // Store frozen core orbitals
+  freeze[ind]=C;
+}
+
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {
 
   // First, get eigenvectors and eigenvalues of S so that we can go to
@@ -770,8 +780,12 @@ void calculate(const BasisSet & basis, Settings & set) {
   arma::mat Cold, Caold, Cbold;
   arma::mat Pold;
   
-  // Use core guess?
+  // Which guess to use
   enum guess_t guess=parse_guess(set.get_string("Guess"));
+  // Freeze core orbitals?
+  bool freezecore=set.get_bool("FreezeCore");
+  if(freezecore && guess==COREGUESS)
+    throw std::runtime_error("Cannot freeze core orbitals with core guess!\n");
 
   if(doload) {
     Checkpoint load(loadname,false);
@@ -847,11 +861,18 @@ void calculate(const BasisSet & basis, Settings & set) {
     chkpt.write("Nel",Nel);
     chkpt.write("Nel-a",Nel_alpha);
     chkpt.write("Nel-b",Nel_beta);
-
     
     // Solver
     SCF solver(basis,set,chkpt);
 
+    // Freeze core orbitals?
+    if(freezecore) {
+      // Localize the core orbitals within the occupied space
+      size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),sol.C,verbose);
+      // and freeze them
+      solver.set_frozen(sol.C.submat(0,0,sol.C.n_rows-1,nloc-1),0);
+    }
+    
     if(hf || rohf) {
       // Solve restricted Hartree-Fock
       solver.RHF(sol,occs,conv);
@@ -923,6 +944,28 @@ void calculate(const BasisSet & basis, Settings & set) {
 
     // Solver
     SCF solver(basis,set,chkpt);
+
+    // Freeze core orbitals?
+    if(freezecore) {
+      // Form the density matrix
+      form_density(sol.Pa,sol.Ca,occa);
+      form_density(sol.Pb,sol.Cb,occb);
+      sol.P=sol.Pa+sol.Pb;
+
+      // Get the natural orbitals
+      arma::mat NO;
+      arma::mat tmp;
+      arma::vec occs;
+      form_NOs(sol.P,basis.overlap(),NO,tmp,occs);
+
+      // Then, localize the core orbitals within the occupied space
+      size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),NO);
+      // and freeze them
+      solver.set_frozen(NO.submat(0,0,NO.n_rows-1,nloc-1),0);
+      // Update the current orbitals as well
+      sol.Ca=NO;
+      sol.Cb=NO;
+    }
 
     if(hf) {
       // Solve restricted Hartree-Fock
@@ -1108,3 +1151,159 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   
   return C;
 }
+
+std::vector<int> symgroups(const arma::mat & C, const arma::mat & S, const std::vector<arma::mat> & freeze, bool verbose) {
+  // Initialize groups.
+  std::vector<int> gp(C.n_cols,0);
+
+  // Loop over frozen core groups
+  for(size_t igp=0;igp<freeze.size();igp++) {
+    
+    // Compute overlap of orbitals with frozen core orbitals
+    std::vector<ovl_sort_t> ovl(C.n_cols);
+    for(size_t i=0;i<C.n_cols;i++) {
+      
+      // Store index
+      ovl[i].idx=i;
+      // Initialize overlap
+      ovl[i].S=0.0;
+      
+      // Helper vector
+      arma::vec hlp=S*C.col(i);
+      
+      // Loop over frozen orbitals.
+      for(size_t ifz=0;ifz<freeze[igp].n_cols;ifz++) {
+	// Compute projection
+	double proj=arma::dot(hlp,freeze[igp].col(ifz));
+	// Increment overlap
+	ovl[i].S+=proj*proj;
+      }
+    }
+
+    // Sort the projections
+    std::sort(ovl.begin(),ovl.end());
+    
+    // Store the symmetries
+    for(size_t i=0;i<freeze[igp].n_cols;i++) {
+      // The orbital with the maximum overlap is
+      size_t maxind=ovl[i].idx;
+      // Change symmetry of orbital with maximum overlap
+      gp[maxind]=igp+1;
+
+      if(verbose)
+	printf("Set symmetry of orbital %i to %i (overlap %e).\n",(int) maxind+1,gp[maxind],ovl[i].S);
+    }
+    
+  }
+  
+  return gp;
+}
+
+void freeze_orbs(const std::vector<arma::mat> & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H, bool verbose) {
+  // Freezes the orbitals corresponding to different symmetry groups.
+
+  // Form H_MO
+  arma::mat H_MO=arma::trans(C)*H*C;
+
+  // Get symmetry groups
+  std::vector<int> sg=symgroups(C,S,freeze,verbose);
+  
+  // Loop over H_MO and zero out elements where symmetry groups differ
+  for(size_t i=0;i<H_MO.n_rows;i++)
+    for(size_t j=0;j<=i;j++)
+      if(sg[i]!=sg[j]) {
+	H_MO(i,j)=0;
+	H_MO(j,i)=0;
+      }
+  
+  // Back-transform to AO
+  arma::mat SC=S*C;
+
+  H=SC*H_MO*arma::trans(SC);
+}
+
+size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbose) {
+  // Check orthonormality
+  arma::mat S=basis.overlap();
+  check_orth(C,S,false);
+
+  // Magic numbers - noble gases
+  const int magicno[]={0, 2, 10, 18, 36, 54, 86, 118};
+  const int Nmagic=(int) (sizeof(magicno)/sizeof(magicno[0]));
+
+  // First, figure out how many orbitals to localize on each center
+  std::vector<size_t> locno(basis.get_Nnuc(),0);
+  // Localize on all the atoms of the same type than the excited atom
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    if(!basis.get_nucleus(i).bsse) {
+      // Charge of nucleus is
+      int Z=basis.get_nucleus(i).Z;
+
+      // Get the number of closed shells
+      int ncl=0;
+      for(int j=0;j<Nmagic-1;j++)
+	if(magicno[j] <= Z && Z <= magicno[j+1]) {
+	  ncl=magicno[j]/2;
+	  break;
+	}	  
+
+      // Store number of closed shells
+      locno[i]=ncl;
+    } else
+      locno[i]=0;
+
+  // Amount of orbitals already localized
+  size_t locd=0;
+  // Amount of basis functions
+  size_t Nbf=basis.get_Nbf();
+
+  // Perform the localization.
+  for(size_t inuc=0;inuc<locno.size();inuc++) {
+    if(locno[inuc]==0)
+      continue;
+
+    // The nucleus is located at
+    coords_t cen=basis.get_coords(inuc);
+    
+    // Compute moment integrals around the nucleus
+    std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
+    // Get matrix which transforms into occupied MO basis
+    arma::mat transmat=C.submat(0,locd,Nbf-1,nocc-1);
+    
+    // Sum together to get x^2 + y^2 + z^2
+    arma::mat rsqmat=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
+    // and transform into the occupied MO basis
+    rsqmat=arma::trans(transmat)*rsqmat*transmat;
+    
+    // Diagonalize rsq_mo
+    arma::vec reig;
+    arma::mat rvec;
+    eig_sym_ordered(reig,rvec,rsqmat);
+
+    /*    
+    printf("\nLocalization around center %i, eigenvalues (Å):",(int) locind[i].ind+1);
+    for(size_t ii=0;ii<reig.n_elem;ii++)
+      printf(" %e",sqrt(reig(ii))/ANGSTROMINBOHR);
+    printf("\n");
+    fflush(stdout);
+    */    
+
+    // Rotate yet unlocalized orbitals
+    C.submat(0,locd,Nbf-1,nocc-1)=transmat*rvec;
+
+    // Increase number of localized orbitals
+    locd+=locno[inuc];
+
+    if(verbose)
+      for(size_t k=0;k<locno[inuc];k++) {
+	printf("Localized orbital around nucleus %i with Rrms=%e Å.\n",(int) inuc+1,sqrt(reig(k))/ANGSTROMINBOHR);
+	fflush(stdout);
+      }
+  }
+  
+  // Check orthonormality
+  check_orth(C,S,false);
+  
+  return locd;
+}
+

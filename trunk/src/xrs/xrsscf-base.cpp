@@ -44,15 +44,6 @@ XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt,
 XRSSCF::~XRSSCF() {
 }
 
-void XRSSCF::set_frozen(const arma::mat & C, size_t ind) {
-  if(ind-1>=freeze.size())
-    freeze.resize(ind+1);
-
-  freeze[ind].resize(C.n_cols);
-  for(size_t i=0;i<C.n_cols;i++)
-    freeze[ind][i]=C.col(i);
-}
-
 /// Get excited atom from atomlist
 size_t get_excited_atom_idx(std::vector<atom_t> & at) {
   // Indices of atoms with frozen core
@@ -235,34 +226,32 @@ std::vector<double> fch_occ(size_t excited, size_t nocc) {
   return ret;
 }
 
-
-
-bool operator<(const locdist_t & lhs, const locdist_t & rhs) {
-  // Sort in increasing value
-  return lhs.dist < rhs.dist;
-}
-
 size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) {
   // Check orthonormality
   arma::mat S=basis.overlap();
   check_orth(C,S,false);
 
   // First, figure out which centers need to be localized upon.
-  std::vector<locdist_t> locind;
+  std::vector<ovl_sort_t> locind;
   // Localize on all the atoms of the same type than the excited atom
   for(size_t i=0;i<basis.get_Nnuc();i++)
     if(!basis.get_nucleus(i).bsse && stricmp(basis.get_symbol(i),basis.get_symbol(xcatom))==0) {
-      locdist_t tmp;
-      tmp.ind=i;
-      tmp.dist=norm(basis.get_coords(i)-basis.get_coords(xcatom));
-      locind.push_back(tmp);
-    }
+	ovl_sort_t tmp;
+	tmp.idx=i;
+	tmp.S=norm(basis.get_coords(i)-basis.get_coords(xcatom));
+	locind.push_back(tmp);
+      }
   // Sort in increasing distance
   std::stable_sort(locind.begin(),locind.end());
+  std::reverse(locind.begin(),locind.end());
+
+  printf("Localizing\n");
+  for(size_t i=0;i<locind.size();i++)
+    printf("%i\t%e\n",(int) locind[i].idx+1,locind[i].S);
 
   printf("Localizing on centers:");
   for(size_t i=0;i<locind.size();i++)
-    printf(" %i",(int) locind[i].ind+1);
+    printf(" %i",(int) locind[i].idx+1);
   printf("\n");
   printf("There are %i occupied states.\n",(int) nocc);
   fflush(stdout);
@@ -275,7 +264,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
   // Perform the localization.
   for(size_t i=0;i<locind.size();i++) {
     // The nucleus is
-    size_t inuc=locind[i].ind;
+    size_t inuc=locind[i].idx;
     // and it is located at
     coords_t cen=basis.get_coords(inuc);
 
@@ -318,71 +307,3 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
   return locd;
 }
 
-std::vector<int> symgroups(const arma::mat & C, const arma::mat& S, const std::vector< std::vector<arma::vec> > & freeze) {
-  // Initialize groups.
-  std::vector<int> gp(C.n_cols,0);
-
-  // Loop over frozen core groups
-  for(size_t igp=0;igp<freeze.size();igp++) {
-    
-    // Compute overlap of orbitals with frozen core orbitals
-    std::vector<locdist_t> ovl(C.n_cols);
-    for(size_t i=0;i<C.n_cols;i++) {
-      
-      // Store index
-      ovl[i].ind=i;
-      // Initialize overlap
-      ovl[i].dist=0.0;
-      
-      // Helper vector
-      arma::vec hlp=S*C.col(i);
-      
-      // Loop over frozen orbitals.
-      for(size_t ifz=0;ifz<freeze[igp].size();ifz++) {
-	// Compute projection
-	double proj=arma::dot(hlp,freeze[igp][ifz]);
-	// Increment overlap
-	ovl[i].dist+=proj*proj;
-      }
-    }
-
-    // Sort the projections
-    std::sort(ovl.begin(),ovl.end());
-    
-    // Store the symmetries
-    for(size_t i=0;i<freeze[igp].size();i++) {
-      // The orbital with the maximum overlap is (remember ovl is now in increasing order)
-      size_t maxind=ovl[C.n_cols-1-i].ind;
-      // Change symmetry of orbital with maximum overlap
-      gp[maxind]=igp+1;
-
-      printf("Set symmetry of orbital %i to %i.\n",(int) maxind+1,gp[maxind]);
-    }
-    
-  }
-  
-  return gp;
-}
-
-void freeze_orbs(const std::vector< std::vector<arma::vec> > & freeze, const arma::mat & C, const arma::mat & S, arma::mat & H) {
-  // Freezes the orbitals corresponding to different symmetry groups.
-
-  // Form H_MO
-  arma::mat H_MO=arma::trans(C)*H*C;
-
-  // Get symmetry groups
-  std::vector<int> sg=symgroups(C,S,freeze);
-  
-  // Loop over H_MO and zero out elements where symmetry groups differ
-  for(size_t i=0;i<H_MO.n_rows;i++)
-    for(size_t j=0;j<=i;j++)
-      if(sg[i]!=sg[j]) {
-	H_MO(i,j)=0;
-	H_MO(j,i)=0;
-      }
-  
-  // Back-transform to AO
-  arma::mat SC=S*C;
-
-  H=SC*H_MO*arma::trans(SC);
-}

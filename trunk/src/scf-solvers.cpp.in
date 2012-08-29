@@ -644,11 +644,21 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #if defined(FULLHOLE) || defined(HALFHOLE)
     if(freeze.size()>0) {
-      // Freeze orbitals.
+      // Freeze orbitals for TP/FCH/XCH calculation.
       if(spin)
-	freeze_orbs(freeze,sol.Cb,S,sol.Hb);
+	freeze_orbs(freeze,sol.Cb,S,sol.Hb,verbose);
       else
-	freeze_orbs(freeze,sol.Ca,S,sol.Ha);
+	freeze_orbs(freeze,sol.Ca,S,sol.Ha,verbose);
+    }
+#else
+    // Normal case - freeze both alpha and beta spins.
+    if(freeze.size()>0) {
+#ifdef RESTRICTED
+      freeze_orbs(freeze,sol.C,S,sol.H,verbose);
+#else
+      freeze_orbs(freeze,sol.Ca,S,sol.Ha,verbose);
+      freeze_orbs(freeze,sol.Cb,S,sol.Hb,verbose);
+#endif
     }
 #endif // end TP clause
 
