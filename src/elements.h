@@ -56,6 +56,9 @@ const int element_row[]={
   6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6
 };
 
+/// Ordering of shells: 1s, 2s, 2p, 3s, 3p, 4s, 3d, 4p, 5s, 4d, 5p, 6s, 4f, 5d, 6p, 7s, 5f, 6d, 7p
+const int lvals[]={0, 0, 1, 0, 1, 0, 2, 1, 0, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1};
+
 /// Atomic masses from http://www.chem.qmul.ac.uk/iupac/AtWt/index.html
 /// Technetium has no stable isotopes, set mass to -1e-10
 const double atomic_masses[]={
