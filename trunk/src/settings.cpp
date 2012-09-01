@@ -67,6 +67,8 @@ void Settings::add_scf_settings() {
   add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);
   // Use Trust-Region Roothaan-Hall?
   add_bool("UseTRRH", "Use Trust-Region Roothaan-Hall?", false);
+  // Use trust-region SCF?
+  add_bool("UseTRSCF", "Use Trust-Region SCF?", false);
   
   // Total charge of system
   add_int("Charge", "Total charge of system", 0);

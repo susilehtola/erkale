@@ -91,6 +91,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
   // ADIIS
   ADIIS adiis;
+  // TRSCF
+  TRSCF trscf(S);
   // Broyden
   Broyden broyd(Nbf*Nbf,verbose);
 
@@ -113,7 +115,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // ADIIS
   ADIIS adiisa;
   ADIIS adiisb;
-
+  
+  // TRSCF
+  TRSCF trscfa(S);
+  TRSCF trscfb(S);
+  
   // Broyden
   Broyden broyd_sum(Nbf*Nbf,verbose);
   Broyden broyd_diff(Nbf*Nbf,verbose);
@@ -701,6 +707,18 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
     }
 
+    // Update TRSCF stacks
+    if(usetrscf) {
+#ifdef RESTRICTED
+      // Need to divide density by two for purification to make sense
+      trscf.push(sol.en.E,sol.P/2.0,sol.H);
+#else
+      trscfa.push(sol.en.E,sol.Pa,sol.Ha);
+      trscfb.push(sol.en.E,sol.Pb,sol.Hb);
+#endif
+    }
+      
+
     if(iiter>1 && usebroyden) {
 #ifdef RESTRICTED
       // Update Broyden mixer
@@ -779,6 +797,24 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	printf("done (%s)\n",t.elapsed().c_str());
 
       adiisdone=true;
+    }
+
+    // Perform TRSCF update
+    if(usetrscf) {
+      if(verbose) {
+      printf("Performing trust-region SCF update of Fock operator ... ");
+      fflush(stdout);
+      t.set();
+    }
+#ifdef RESTRICTED
+      sol.H=trscf.solve();
+#else
+      sol.Ha=trscfa.solve();
+      sol.Hb=trscfb.solve();
+#endif
+
+      if(verbose)
+	printf("done (%s)\n",t.elapsed().c_str());
     }
 
     // Perform Broyden interpolation
