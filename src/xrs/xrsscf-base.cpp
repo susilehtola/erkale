@@ -27,6 +27,7 @@
 #include "stringutil.h"
 #include "timer.h"
 #include "trrh.h"
+#include "trscf.h"
 
  // Initial mixing factor
 #define INITMIX 0.25
