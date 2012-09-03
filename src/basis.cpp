@@ -443,7 +443,7 @@ size_t GaussianShell::get_last_ind() const {
 
 void GaussianShell::print() const {
 
-  printf("\t%c shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[am],(int) (get_center_ind()+1),(int) get_first_ind()+1,(int) get_last_ind()+1);
+  printf("\t%c shell at nucleus %3i with with basis functions %4i-%-4i\n",shell_types[am],(int) (get_center_ind()+1),(int) get_first_ind()+1,(int) get_last_ind()+1);
   printf("\t\tCenter of shell is at % 0.4f % 0.4f % 0.4f Å.\n",cen.x/ANGSTROMINBOHR,cen.y/ANGSTROMINBOHR,cen.z/ANGSTROMINBOHR);
 
   // Get contraction of normalized primitives
@@ -1438,7 +1438,7 @@ void BasisSet::print(bool verbose) const {
 
 
       printf("Shell %4i",(int) i+1);
-      printf("\t%c %4s shell at nucleus %i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) (shells[i].get_center_ind()+1),(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
+      printf("\t%c %4s shell at nucleus %3i with with basis functions %4i-%-4i\n",shell_types[shells[i].get_am()],type.c_str(),(int) (shells[i].get_center_ind()+1),(int) shells[i].get_first_ind()+1,(int) shells[i].get_last_ind()+1);
     }
   }
 
