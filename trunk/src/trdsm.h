@@ -14,8 +14,8 @@
  * of the License, or (at your option) any later version.
  */
 
-#ifndef ERKALE_TRSCF
-#define ERKALE_TRSCF
+#ifndef ERKALE_TRDSM
+#define ERKALE_TRDSM
 
 #include "global.h"
 
@@ -24,7 +24,7 @@
 #include <gsl/gsl_multimin.h>
 
 /**
- * \class TRSCF
+ * \class TRDSM
  *
  * \brief This class contains the trust-region SCF algorithm as described in
  *
@@ -41,7 +41,7 @@
  */
 
 
-class TRSCF {
+class TRDSM {
   /// Energy stack
   std::vector<double> Es;
   /// Density matrices
@@ -54,12 +54,6 @@ class TRSCF {
   /// Overlap matrix
   arma::mat S;
 
-  /// Predicted energies
-  std::vector<double> Epreds;
-
-  /// Trust radius
-  double h;
-  
   /// Index of entry with smallest energy
   size_t minind;
 
@@ -76,10 +70,13 @@ class TRSCF {
   /// Get the stack of difference matrices
   std::vector<arma::mat> get_Fn0() const;
 
-  /// Compute the gradient, JCP 121 eqn 49
-  arma::vec get_g(const arma::vec & c) const;
-  /// Compute the Hessian, JCP 121 eqn 49
-  arma::mat get_H(const arma::vec & c) const;
+  /// Compute the gradient
+  arma::vec get_gradient(const arma::vec & c) const;
+  /// Compute the gradient and hessian, JCP 121 eqn 49
+  void get_gradient_hessian(const arma::vec & c, arma::vec & g, arma::mat & H) const;
+
+  /// Solve for the coefficients using line search
+  arma::vec solve_c_ls() const;
 
   /// Solve for the coefficients
   arma::vec solve_c() const;
@@ -89,19 +86,22 @@ class TRSCF {
   /// Compute length of step
   double step_len(const arma::vec & c, const arma::mat & M) const;
 
+  /// Update the minimal index
+  void update_minind();
+  /// Clean bad density matrices
+  void clean_density();
+
  public:
   /// Constructor, keep max matrices in memory
-  TRSCF(const arma::mat & S, size_t max=6);
+  TRDSM(const arma::mat & S, size_t max=7);
   /// Destructor
-  ~TRSCF();
+  ~TRDSM();
 
   /// Add new matrices to stacks
   void push(double E, const arma::mat & D, const arma::mat & F);
+
   /// Drop everything in memory
   void clear();
-
-  /// Update the minimal index
-  void update_minind();
 
   /// Get the new Fock matrix
   arma::mat solve() const;
@@ -109,7 +109,7 @@ class TRSCF {
   /// Get the energy estimate
   double E_DSM(const arma::vec & c) const;
   /// Get the estimated change in energy
-  double dE(const arma::vec & g, const arma::mat & H, const arma::vec & c) const;
+  double dE_DSM(const arma::vec & g, const arma::mat & H, const arma::vec & c) const;
 };
 
 

@@ -24,7 +24,7 @@ linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf.cpp
 elements.cpp xyzutils.cpp settings.cpp broyden.cpp adiis.cpp
 tempered.cpp find_molecules.cpp properties.cpp checkpoint.cpp
 guess.cpp external/storage.cpp external/fchkpt_tools.cpp gaunt.cpp
-lmgrid.cpp spherical_harmonics.cpp trrh.cpp trscf.cpp
+lmgrid.cpp spherical_harmonics.cpp trrh.cpp trdsm.cpp
 # DFT stuff
 lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp density_fitting.cpp
 lebedev.cpp)

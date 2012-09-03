@@ -35,8 +35,8 @@
 #include "scf.h"
 #include "stringutil.h"
 #include "timer.h"
+#include "trdsm.h"
 #include "trrh.h"
-#include "trscf.h"
 
 enum guess_t parse_guess(const std::string & val) {
   if(stricmp(val,"Core")==0)
@@ -72,7 +72,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   useadiis=set.get_bool("UseADIIS");
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
-  usetrscf=set.get_bool("UseTRSCF");
+  usetrdsm=set.get_bool("UseTRDSM");
 
   maxiter=set.get_int("MaxIter");
   verbose=set.get_bool("Verbose");
@@ -86,14 +86,14 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   } 
 
-  if(!usediis && !useadiis && !usebroyden && !usetrrh && !usetrscf) {
+  if(!usediis && !useadiis && !usebroyden && !usetrrh && !usetrdsm) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to run calculation without an update scheme.\n");
   }
 
-  if(usetrscf && (useadiis || usediis || usebroyden || !usetrrh)) {
+  if(usetrdsm && (useadiis || usediis || usebroyden || !usetrrh)) {
     ERROR_INFO();
-    throw std::runtime_error("Use of TRSCF requires use of TRRH, and turning off (A)DIIS and Broyden.\n");
+    throw std::runtime_error("Use of TRDSM requires use of TRRH and turning off (A)DIIS and Broyden.\n");
   } 
 
   // Nuclear repulsion
@@ -209,6 +209,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
       printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+      fflush(stdout);
     }
   } else  {
     // Compute ERIs
@@ -239,8 +240,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       printf("done (%s)\n",t.elapsed().c_str());
   }
 
-  if(verbose)
+  if(verbose) {
     printf("\nInitialization of computation done in %s.\n\n",tinit.elapsed().c_str());
+    fflush(stdout);
+  }
 }
 
 SCF::~SCF() {

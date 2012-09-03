@@ -1594,6 +1594,7 @@ void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func)
   if(verbose) {
     printf("Constructing DFT grid.\n");
     printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
+    fflush(stdout);
   }
 
   // Set tolerances
@@ -1621,14 +1622,17 @@ void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func)
     grids[i]=wrk[0].construct(*basp,P,i,x_func,c_func,verbose);
 #endif
   
-  if(verbose)
+  if(verbose) {
     printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
 }
 
 void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, int x_func, int c_func) {
   // Add all atoms
   if(verbose) {
     printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
+    fflush(stdout);
   }
 
   // Set tolerances
@@ -1655,8 +1659,10 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
     grids[i]=wrk[0].construct(*basp,Pa,Pb,i,x_func,c_func,verbose);
 #endif  
 
-  if(verbose)
+  if(verbose) {
     printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
 }
 
 size_t DFTGrid::get_Npoints() const {
