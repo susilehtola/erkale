@@ -29,12 +29,12 @@
 #define NMU 50
 
 /// Mu increment
-#define DELTAMU 0.5
-/// Minimal allowed value of mu so that division by zero doesn't occur
-#define EPSMU 0.01
+#define DELTAMU 1.0
+/// Minimal allowed value of mu (Thøgersen JCP 123)
+#define EPSMU 0.1
 
 /// Throw error if eigenvalues of K^2 are bigger than (should be negative!)
-#define MAXNEGEIG 1e-6
+#define MAXNEGEIG 1e-4
 
 void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, bool verbose) {
   // Transform Fock matrix into MO basis
@@ -98,21 +98,35 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
 
   // Print legend
   if(verbose)
-    printf("\t%2s %12s %12s time\n","it","mu","Amin");
+    printf("\t%2s %12s %5s time\n","it","mu","Amin");
 
-  // Get the rotated coefficients
-  size_t iit;
-  for(iit=0;iit<NMU;iit++) {
+  // Increase mu until the change is small enough
+  const double fac=2.0;
+  double mu=EPSMU/fac;
+  size_t iit=0;
+  double amin;
+
+  bool refine=false;
+  double lmu;
+  double rmu;
+  
+
+  while(true) {
+    iit++;
     Timer t;
-
+    
     // Value of mu is
-    double mu=EPSMU-minhess+iit*DELTAMU;
-
+    if(!refine)
+      mu*=fac;
+    else {
+      mu=(lmu+rmu)/2.0;
+    }
+    
     // Get rotation parameters
     arma::mat kappa(nvirt,nocc);
     for(size_t a=0;a<nvirt;a++)
       for(size_t i=0;i<nocc;i++)
-	kappa(a,i)=-grad(a,i)/(hess(a,i)+mu);
+	kappa(a,i)=-grad(a,i)/(hess(a,i)-minhess+mu);
 
     // Get rotation matrix
     arma::mat expK=TRRH::make_expK(kappa);
@@ -121,7 +135,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
     Cnew=C_ov*arma::trans(expK);
 
     // Calculate minimal projection.
-    double amin=DBL_MAX;
+    amin=DBL_MAX;
     arma::mat proj=arma::trans(C.submat(0,0,nbf-1,nocc-1))*S*Cnew.submat(0,0,nbf-1,nocc-1);
     for(size_t i=0;i<nocc;i++) {
       // Compute projection
@@ -134,17 +148,34 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
     }
 
     if(verbose)
-      printf("\t%2i %e %e %s\n",(int) iit+1,mu,amin,t.elapsed().c_str());
+      printf("\t%2i %e %.3f %s\n",(int) iit,mu,amin,t.elapsed().c_str());
 
-    if(amin>=MINA)
-      break;
+    // Have we reached the refine stage?
+    if(amin>=MINA && !refine) {
+      // Did we converge straight away?
+      if(mu==EPSMU)
+	break;
+      
+      refine=true;
+      rmu=mu;
+      lmu=mu/fac;
+    } else if(refine) {
+      // Determine what to do.
+      if(amin<MINA)
+	lmu=mu;
+      else if(amin>MINA)
+	rmu=mu;
+      else
+	break;
+
+      // Have we determined the shift with the wanted accuracy?
+      if(fabs(amin-MINA) <= 1e-4)
+	break;
+    }
   }
-
-  if(iit==NMU) {
-    printf("Warning - wanted level shift not found.\n");
-    fprintf(stderr,"Warning - wanted level shift not found.\n");
-  } else if(verbose)
-    printf("mu loop converged in %i iterations\n",(int) iit+1);
+  
+  if(verbose)
+    printf("mu loop converged in %i iterations\n",(int) iit);
 
   // Make absolutely sure orbitals stay orthonormal.
   for(size_t i=0;i<norbs;i++) {
