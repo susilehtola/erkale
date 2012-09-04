@@ -22,7 +22,31 @@ void XRSSCF::Fock_half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 {
   Timer t;
-  
+
+  // Consistency check
+  if(sol.P.n_rows != Nbf || sol.P.n_cols != Nbf) {
+    fprintf(stderr,"Size of P is %i x %i while Nbf = %i.\n",(int) sol.P.n_rows,(int) sol.P.n_cols,(int) Nbf);
+    fflush(stderr);
+    ERROR_INFO();
+    throw std::runtime_error("P does not correspond to solver!\n");
+  }
+#ifndef RESTRICTED
+  if(sol.Pa.n_rows != Nbf || sol.Pa.n_cols != Nbf) {
+    fprintf(stderr,"Size of Pa is %i x %i while Nbf = %i.\n",(int) sol.Pa.n_rows,(int) sol.Pa.n_cols,(int) Nbf);
+    fflush(stderr);
+    ERROR_INFO();
+    throw std::runtime_error("Pa does not correspond to solver!\n");
+  }
+  if(sol.Pb.n_rows != Nbf || sol.Pb.n_cols != Nbf) {
+    fprintf(stderr,"Size of Pb is %i x %i while Nbf = %i.\n",(int) sol.Pb.n_rows,(int) sol.Pb.n_cols,(int) Nbf);
+    fflush(stderr);
+    ERROR_INFO();
+    throw std::runtime_error("Pb does not correspond to solver!\n");
+  }
+#endif
+
+
+
 #if defined(_ROHF)
   // Occupations
   std::vector<double> occa;
