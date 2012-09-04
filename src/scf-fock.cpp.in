@@ -1,0 +1,403 @@
+/* Resticted case */
+#if defined(RESTRICTED) && defined(DFT)
+void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, double tol) const
+
+#elif defined(RESTRICTED) && defined(HF)
+void SCF::Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const rscf_t & oldsol, double tol) const
+
+#elif defined(UNRESTRICTED) && defined(DFT)
+void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, double tol) const
+
+#elif defined(UNRESTRICTED) && defined(HF)
+void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const uscf_t & oldsol, double tol) const
+
+#elif defined(UNRESTRICTED) && defined(_ROHF)
+void SCF::Fock_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv, const uscf_t & oldsol, double tol) const
+
+#elif defined(DFT) && defined(FULLHOLE)
+void XRSSCF::Fock_full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, double tol, bool xch) const
+
+#elif defined(DFT) && defined(HALFHOLE)
+void XRSSCF::Fock_half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, double tol) const
+#endif
+{
+  Timer t;
+  
+#if defined(_ROHF)
+  // Occupations
+  std::vector<double> occa;
+  std::vector<double> occb;
+  
+  if(basisp->get_Nnuc()==1) {
+    occa=atomic_occupancy(Nel_alpha);
+    occb=atomic_occupancy(Nel_beta);
+  } else {
+    occa=std::vector<double>(Nel_alpha,1.0);
+    occb=std::vector<double>(Nel_beta,1.0);
+  }
+#endif
+  
+  // Coulomb and exchange matrices
+  sol.J.zeros(Nbf,Nbf);
+#ifdef RESTRICTED
+  sol.K.zeros(Nbf,Nbf);
+#else
+  sol.Ka.zeros(Nbf,Nbf);
+  sol.Kb.zeros(Nbf,Nbf);
+#endif
+  
+#if defined(DFT) && defined(RESTRICTED)
+  // Exchange-correlation functional
+  sol.XC.zeros(Nbf,Nbf);
+#endif
+#if defined(DFT) && !defined(RESTRICTED)
+  // Exchange-correlation functional
+  sol.XCa.zeros(Nbf,Nbf);
+  sol.XCb.zeros(Nbf,Nbf);
+#endif
+
+#ifdef DFT
+  // Fraction of exact exchange
+  double kfrac=exact_exchange(dft.x_func);
+#endif
+
+  // Form change-of-density matrices
+#ifdef RESTRICTED
+  arma::mat deltaP(Nbf,Nbf);
+  if(oldsol.P.n_rows == Nbf && oldsol.P.n_cols == Nbf && oldsol.J.n_rows==Nbf && oldsol.J.n_cols==Nbf && oldsol.K.n_rows == Nbf && oldsol.K.n_cols == Nbf) {
+    sol.J=oldsol.J;
+    sol.K=oldsol.K;
+    deltaP=sol.P-oldsol.P;
+  } else {
+    sol.J.zeros();
+    sol.K.zeros();
+    deltaP=sol.P;
+  }
+#else
+  arma::mat deltaPa(Nbf,Nbf), deltaPb(Nbf,Nbf);
+  if(oldsol.Pa.n_rows==Nbf && oldsol.Pa.n_cols==Nbf && oldsol.Pb.n_rows==Nbf && oldsol.Pb.n_cols==Nbf && oldsol.J.n_rows == Nbf && oldsol.J.n_cols == Nbf && oldsol.Ka.n_rows == Nbf && oldsol.Ka.n_cols == Nbf && oldsol.Kb.n_rows == Nbf && oldsol.Kb.n_cols == Nbf) {
+    sol.J=oldsol.J;
+    sol.Ka=oldsol.Ka;
+    sol.Kb=oldsol.Kb;
+    deltaPa=sol.Pa-oldsol.Pa;
+    deltaPb=sol.Pb-oldsol.Pb;
+  } else {
+    sol.Ka.zeros();
+    sol.Kb.zeros();
+    sol.J.zeros();
+    deltaPa=sol.Pa;
+    deltaPb=sol.Pb;
+  }
+  arma::mat deltaP=deltaPa+deltaPb;
+#endif
+
+  double screeneff;
+
+  // Form Coulomb and exchange matrices
+  if(densityfit) {
+    if(verbose) {
+      printf("Forming density fitted Coulomb matrix ... ");
+      fflush(stdout);
+      t.set();
+    }
+    sol.J=dfit.calc_J(sol.P);
+
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
+    }
+    fflush(stdout);
+
+#ifdef DFT
+    if(kfrac!=0.0) {
+#endif
+      if(verbose) {
+	printf("Forming density fitted exchange matrix ... ");
+	fflush(stdout);
+	t.set();
+      }
+
+#ifdef RESTRICTED
+      sol.K=dfit.calc_K(sol.C,occs,fitmem);
+#else
+      sol.Ka=dfit.calc_K(sol.Ca,occa,fitmem);
+      sol.Kb=dfit.calc_K(sol.Cb,occb,fitmem);
+#endif
+
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+      }
+      fflush(stdout);
+
+#ifdef DFT
+    }
+#endif
+
+  } else { // No density fitting
+
+    if(direct) {
+#ifdef RESTRICTED
+
+#ifdef DFT
+      if(kfrac!=0.0) {
+#endif
+	if(verbose) {
+	  printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
+	  fflush(stdout);
+	  t.set();
+	}
+
+	if(strictint)
+	  scr.calcJK_strict(sol.P,sol.J,sol.K,tol,&screeneff);
+	else {
+	  arma::mat dJ, dK;
+	  scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
+	  sol.J+=dJ;
+	  sol.K+=dK;
+	}
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	}
+	fflush(stdout);
+
+#ifdef DFT
+      } else {
+
+	if(verbose) {
+	  printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
+	  fflush(stdout);
+	  t.set();
+	}
+
+	if(strictint)
+	  sol.J=scr.calcJ_strict(sol.P,tol,&screeneff);
+	else
+	  sol.J+=scr.calcJ(deltaP,tol,&screeneff);
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	}
+	fflush(stdout);
+
+      }
+#endif
+
+
+#else
+      // Unrestricted case
+#ifdef DFT
+      if(kfrac!=0.0) {
+#endif
+	if(verbose) {
+	  printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
+	  fflush(stdout);
+	  t.set();
+	}
+
+	if(strictint)
+	  scr.calcJK_strict(sol.Pa,sol.Pb,sol.J,sol.Ka,sol.Kb,tol,&screeneff);
+	else {
+	  // Only calculate the changed part
+	  arma::mat dJ, dKa, dKb;
+	  scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
+	  sol.J+=dJ;
+	  sol.Ka+=dKa;
+	  sol.Kb+=dKb;
+	}
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	}
+	fflush(stdout);
+
+
+#ifdef DFT
+      } else {
+
+	if(verbose) {
+	  printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
+	  fflush(stdout);
+	  t.set();
+	}
+
+	if(strictint)
+	  sol.J=scr.calcJ_strict(sol.P,tol,&screeneff);
+	else
+	  sol.J+=scr.calcJ(deltaP,tol,&screeneff);
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	}
+	fflush(stdout);
+
+      }
+#endif
+
+#endif
+    } else {
+
+      // Conventional mode - use tabled integrals
+
+      if(verbose) {
+
+#ifdef DFT
+	if(kfrac==0.0)
+	  printf("Forming HF Coulomb matrix ... ");
+	else
+#endif
+	  printf("Forming HF Coulomb and exchange matrices ... ");
+
+	fflush(stdout);
+	t.set();
+      }
+      
+      sol.J=tab.calcJ(sol.P);
+      
+#ifdef DFT
+      if(kfrac!=0.0) {
+#endif
+
+#ifdef RESTRICTED
+	sol.K=tab.calcK(sol.P);
+#else
+	sol.Ka=tab.calcK(sol.Pa);
+	sol.Kb=tab.calcK(sol.Pb);
+#endif
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	}
+	fflush(stdout);
+
+
+#ifdef DFT
+      } // End kfrac clause
+#endif
+
+    }
+
+  }
+
+#ifdef DFT
+  if(verbose) {
+    printf("Computing DFT exchange and correlation ... ");
+    fflush(stdout);
+    t.set();
+  }
+
+  double Nelnum; // Numerically integrated density
+#ifdef RESTRICTED
+  grid.eval_Fxc(dft.x_func,dft.c_func,sol.P,sol.XC,sol.en.Exc,Nelnum);
+#else
+  grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,sol.XCa,sol.XCb,sol.en.Exc,Nelnum);
+#endif
+
+#if defined(FULLHOLE)
+  double rel_diff=(Nelnum+1.0-Nel)*100.0/Nel;
+#elif defined(HALFHOLE)
+  double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
+#else
+  double rel_diff=(Nelnum-Nel)*100.0/Nel;
+#endif
+
+  if(verbose) {
+    printf("done (%s)\n",t.elapsed().c_str());
+    printf("Numerically integrated density is %.5f (%+.4f %%).\n",Nelnum,rel_diff);
+  }
+
+  if(fabs(rel_diff)>1e-2) {
+    std::ostringstream oss;
+    //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
+    oss << "Warning - numerically integrated density seems inaccurate.\n";
+    if(verbose)
+      std::cout << oss.str();
+    //      throw std::runtime_error(oss.str());
+  }
+#endif
+
+  // Update Hamiltonian
+#ifdef RESTRICTED
+#ifdef DFT
+  sol.H=Hcore+sol.J+sol.XC;
+  // Add exact exchange if necessary
+  if(kfrac!=0.0) {
+    sol.H-=0.5*kfrac*sol.K;
+    sol.en.Exc-=0.25*kfrac*arma::trace(sol.P*sol.K);
+  }
+
+#else
+  sol.H=Hcore+sol.J-0.5*sol.K;
+  sol.en.Exc=-0.25*arma::trace(sol.P*sol.K);
+#endif
+
+
+#else // Unrestricted case
+
+#ifdef DFT
+  sol.Ha=Hcore+sol.J+sol.XCa;
+  sol.Hb=Hcore+sol.J+sol.XCb;
+  if(kfrac!=0) {
+    sol.Ha-=kfrac*sol.Ka;
+    sol.Hb-=kfrac*sol.Kb;
+    sol.en.Exc-=0.5*kfrac*(arma::trace(sol.Pa*sol.Ka)+arma::trace(sol.Pb*sol.Kb));
+  }
+#else
+  sol.Ha=Hcore+sol.J-sol.Ka;
+  sol.Hb=Hcore+sol.J-sol.Kb;
+  sol.en.Exc=-0.5*(arma::trace(sol.Pa*sol.Ka)+arma::trace(sol.Pb*sol.Kb));
+
+#ifdef _ROHF
+  // Constrain Fock operators to correspond to ROHF
+  ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose,basisp->get_Nnuc()==1);
+#endif
+
+
+#endif // end DFT clause
+#endif // End unrestricted case
+
+
+#if defined(FULLHOLE) || defined(HALFHOLE)
+  if(freeze.size()>0) {
+    // Freeze orbitals for TP/FCH/XCH calculation.
+    if(spin)
+      freeze_orbs(freeze,sol.Cb,S,sol.Hb,verbose);
+    else
+      freeze_orbs(freeze,sol.Ca,S,sol.Ha,verbose);
+  }
+#else
+  // Normal case - freeze both alpha and beta spins.
+  if(freeze.size()>0) {
+#ifdef RESTRICTED
+    freeze_orbs(freeze,sol.C,S,sol.H,verbose);
+#else
+    freeze_orbs(freeze,sol.Ca,S,sol.Ha,verbose);
+    freeze_orbs(freeze,sol.Cb,S,sol.Hb,verbose);
+#endif
+  }
+#endif // end TP clause
+
+  fflush(stdout);
+
+  // Energies
+  sol.en.Ekin=arma::trace(sol.P*T);
+  sol.en.Enuca=arma::trace(sol.P*Vnuc);
+  sol.en.Enucr=Enuc;
+  sol.en.Eone=arma::trace(sol.P*Hcore);
+  sol.en.Ecoul=0.5*arma::trace(sol.P*sol.J);
+
+  // Compute total energies
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone;
+  sol.en.E=sol.en.Eel+sol.en.Enucr;
+
+  // Sanity check
+  if(!std::isfinite(sol.en.E)) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "\nSomething wrong with total energy " << sol.en.E <<"?\nEnding program.\n";
+    throw std::runtime_error(oss.str());
+  }
+}
