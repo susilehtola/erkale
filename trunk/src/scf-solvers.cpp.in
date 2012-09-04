@@ -15,14 +15,14 @@ void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<
 void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-  size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch) const
+size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch) const
 
 #elif defined(DFT) && defined(HALFHOLE)
 size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
 #endif
 {
 
-#if defined(UNRESTRICTED) && defined(_ROHF)
+#if defined(_ROHF)
   // Occupations
   std::vector<double> occa;
   std::vector<double> occb;
@@ -100,13 +100,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   arma::mat J(Nbf,Nbf), K(Nbf,Nbf);
   J.zeros();
   K.zeros();
-
-  // Change of density matrix from last iteration
-  arma::mat deltaP(Nbf,Nbf);
-
-  // Hamiltonian of last iteration
-  arma::mat Hold(Nbf,Nbf);
-  Hold.zeros();
 #else
   // DIIS iterator
   DIIS diisa(S,diisorder);
@@ -124,29 +117,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   Broyden broyd_sum(Nbf*Nbf,verbose);
   Broyden broyd_diff(Nbf*Nbf,verbose);
 
-  // Coulomb and exchange matrices
-  arma::mat J(Nbf,Nbf);
-  J.zeros();
-
-  arma::mat Ka(Nbf,Nbf);
-  arma::mat Kb(Nbf,Nbf);
-  Ka.zeros();
-  Kb.zeros();
-
-  // Density matrix
-  arma::mat deltaP(Nbf,Nbf);
-  arma::mat deltaPa(Nbf,Nbf);
-  arma::mat deltaPb(Nbf,Nbf);
-  deltaPa.zeros();
-  deltaPb.zeros();
-
-  // Full Hamiltonian
-  arma::mat Ha, Hb;
-
-  // Hamiltonians of last iteration
-  arma::mat Haold(Nbf,Nbf), Hbold(Nbf,Nbf);
-  Haold.zeros();
-  Hbold.zeros();
 #endif
 
   // Dipole moment
@@ -155,7 +125,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
   // Tolerance for screening and screening efficiency
   double tol;
-  double screeneff;
 
   // Determine tolerance to use
   if(strictint)
@@ -165,8 +134,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
   // Change in energy from last iteration
   double deltaE=0;
-
-  double Eold=0;
 
   // Maximum and RMS differences of AO density matrix
   double rmsdiff=0.0, maxdiff=0.0;
@@ -261,7 +228,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   form_density(sol.Pa,sol.Ca,occa);
   form_density(sol.Pb,sol.Cb,occb);
   sol.P=sol.Pa+sol.Pb;
-#endif
+#endif // end ifdef RESTRICTED
 
   // Print orbital energies
   if(verbose) {
@@ -275,13 +242,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
     fflush(stdout);
   }
-
-  // Initialize change of density matrix
-  deltaP=sol.P;
-#ifndef RESTRICTED
-  deltaPa=sol.Pa;
-  deltaPb=sol.Pb;
-#endif
 
 #ifdef DFT
   // Fraction of exact exchange
@@ -346,13 +306,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef DFT
 #ifdef RESTRICTED
-  // Exchange-correlation functional
-  arma::mat XC(Nbf,Nbf);
   // Form DFT quadrature grid
   grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
 #else
-  // Exchange-correlation functional
-  arma::mat XCa(Nbf,Nbf), XCb(Nbf,Nbf);
   // Form DFT quadrature grid
   grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
@@ -368,335 +324,55 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // How many consecutive iterations have seemed converged
   int convd=0;
 
-  // Loop:
-  for(int iiter=1;iiter<=maxiter;iiter++) {
-    Timer titer;
+  // Solution of last iteration
+#ifdef RESTRICTED
+  rscf_t oldsol;
+#else
+  uscf_t oldsol;
+#endif
+  oldsol.en.E=0.0;
 
+  // Loop:
+  int iiter=1;
+  while(iiter<=maxiter) {
+    Timer titer;
+    
     if(verbose)
       printf("\n ******* Iteration %4i ********\n",iiter);
 
-    // Form Coulomb and exchange matrices
-    if(densityfit) {
-      if(verbose) {
-	printf("Forming density fitted Coulomb matrix ... ");
-	fflush(stdout);
-	t.set();
-      }
-      J=dfit.calc_J(sol.P);
-
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-      }
-      fflush(stdout);
-
-#ifdef DFT
-      if(kfrac!=0.0) {
-#endif
-	if(verbose) {
-	  printf("Forming density fitted exchange matrix ... ");
-	  fflush(stdout);
-	  t.set();
-	}
-
+    // Form the Fock operator.
 #ifdef RESTRICTED
-	K=dfit.calc_K(sol.C,occs,fitmem);
+    // Restricted case.
+#if defined(HF)
+    Fock_RHF(sol,occs,conv,oldsol,tol);
+#elif defined(DFT)
+    Fock_RDFT(sol,occs,conv,dft,oldsol,grid,tol);
+#endif
 #else
-	Ka=dfit.calc_K(sol.Ca,occa,fitmem);
-	Kb=dfit.calc_K(sol.Cb,occb,fitmem);
+#if defined(HALFHOLE)
+    // Transition potential
+    Fock_half_hole(xcatom,sol,conv,dft,occa,occb,oldsol,grid,tol);
+#elif defined(FULLHOLE)
+    // Full core hole
+    Fock_full_hole(xcatom,sol,conv,dft,occa,occb,oldsol,grid,tol,xch);
+
+    // Unrestricted case
+#elif defined(HF)
+    Fock_UHF(sol,occa,occb,conv,oldsol,tol);
+#elif defined(_ROHF)
+    Fock_ROHF(sol,Nel_alpha,Nel_beta,conv,oldsol,tol);
+#elif defined(DFT)
+    Fock_UDFT(sol,occa,occb,conv,dft,oldsol,grid,tol);
 #endif
 
-	if(verbose) {
-	  printf("done (%s)\n",t.elapsed().c_str());
-	}
-	fflush(stdout);
+#endif // End spin case
 
-#ifdef DFT
-      }
-#endif
-
-    } else { // No density fitting
-
-      if(direct) {
-#ifdef RESTRICTED
-
-#ifdef DFT
-	if(kfrac!=0.0) {
-#endif
-	  if(verbose) {
-	    printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(strictint)
-	    scr.calcJK_strict(sol.P,J,K,tol,&screeneff);
-	  else {
-	    arma::mat dJ, dK;
-	    scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
-	    J+=dJ;
-	    K+=dK;
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
-	  }
-	  fflush(stdout);
-
-#ifdef DFT
-	} else {
-
-	  if(verbose) {
-	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(strictint)
-	    J=scr.calcJ_strict(sol.P,tol,&screeneff);
-	  else
-	    J+=scr.calcJ(deltaP,tol,&screeneff);
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
-	  }
-	  fflush(stdout);
-
-	}
-#endif
-
-
-#else
-	// Unrestricted case
-#ifdef DFT
-	if(kfrac!=0.0) {
-#endif
-	  if(verbose) {
-	    printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(strictint)
-	    scr.calcJK_strict(sol.Pa,sol.Pb,J,Ka,Kb,tol,&screeneff);
-	  else {
-	    // Only calculate the changed part
-	    arma::mat dJ, dKa, dKb;
-	    scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
-	    J+=dJ;
-	    Ka+=dKa;
-	    Kb+=dKb;
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
-	  }
-	  fflush(stdout);
-
-
-#ifdef DFT
-	} else {
-
-	  if(verbose) {
-	    printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
-	    fflush(stdout);
-	    t.set();
-	  }
-
-	  if(strictint)
-	    J=scr.calcJ_strict(sol.P,tol,&screeneff);
-	  else
-	    J+=scr.calcJ(deltaP,tol,&screeneff);
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
-	  }
-	  fflush(stdout);
-
-	}
-#endif
-
-#endif
-      } else {
-
-	// Conventional mode - use tabled integrals
-
-	if(verbose) {
-
-#ifdef DFT
-	  if(kfrac!=0.0)
-#endif
-	    printf("Forming HF Coulomb and exchange matrices ... ");
-#ifdef DFT
-	  else
-	    printf("Forming HF Coulomb matrix ... ");
-#endif
-
-	  fflush(stdout);
-	  t.set();
-	}
-
-	J=tab.calcJ(sol.P);
-
-#ifdef DFT
-	if(kfrac!=0.0) {
-#endif
-
-#ifdef RESTRICTED
-	  K=tab.calcK(sol.P);
-#else
-	  Ka=tab.calcK(sol.Pa);
-	  Kb=tab.calcK(sol.Pb);
-#endif
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	  }
-	  fflush(stdout);
-
-
-#ifdef DFT
-	} // End kfrac clause
-#endif
-
-      }
-
-    }
-
-#ifdef DFT
-    if(verbose) {
-      printf("Computing DFT exchange and correlation ... ");
-      fflush(stdout);
-      t.set();
-    }
-
-    double Nelnum; // Numerically integrated density
-#ifdef RESTRICTED
-    grid.eval_Fxc(dft.x_func,dft.c_func,sol.P,XC,sol.en.Exc,Nelnum);
-#else
-    grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,XCa,XCb,sol.en.Exc,Nelnum);
-#endif
-
-#ifndef HALFHOLE
-    double rel_diff=(Nelnum-Nel)*100.0/Nel;
-#else
-    double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
-#endif
-
-    if(verbose) {
-      printf("done (%s)\n",t.elapsed().c_str());
-      printf("Numerically integrated density is %.5f (%+.4f %%).\n",Nelnum,rel_diff);
-    }
-
-    if(fabs(rel_diff)>1e-2) {
-      std::ostringstream oss;
-      //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
-      oss << "Warning - numerically integrated density seems inaccurate.\n";
-      if(verbose)
-	std::cout << oss.str();
-      //      throw std::runtime_error(oss.str());
-    }
-#endif
-
-    // Update Hamiltonian
-#ifdef RESTRICTED
-    Hold=sol.H;
-
-#ifdef DFT
-    sol.H=Hcore+J+XC;
-    // Add exact exchange if necessary
-    if(kfrac!=0.0) {
-      sol.H-=0.5*kfrac*K;
-      sol.en.Exc-=0.25*kfrac*arma::trace(sol.P*K);
-    }
-
-#else
-    sol.H=Hcore+J-0.5*K;
-    sol.en.Exc=-0.25*arma::trace(sol.P*K);
-#endif
-
-
-#else // Unrestricted case
-
-    // Store Hamiltonians of last iteration
-    Haold=sol.Ha;
-    Hbold=sol.Hb;
-
-#ifdef DFT
-    sol.Ha=Hcore+J+XCa;
-    sol.Hb=Hcore+J+XCb;
-    if(kfrac!=0) {
-      sol.Ha-=kfrac*Ka;
-      sol.Hb-=kfrac*Kb;
-      sol.en.Exc-=0.5*kfrac*(arma::trace(sol.Pa*Ka)+arma::trace(sol.Pb*Kb));
-    }
-#else
-    sol.Ha=Hcore+J-Ka;
-    sol.Hb=Hcore+J-Kb;
-    sol.en.Exc=-0.5*(arma::trace(sol.Pa*Ka)+arma::trace(sol.Pb*Kb));
-
-#ifdef _ROHF
-    // Constrain Fock operators to correspond to ROHF
-    ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose,basisp->get_Nnuc()==1);
-#endif
-
-
-#endif // end DFT clause
-
-#endif // End unrestricted case
-
-#if defined(FULLHOLE) || defined(HALFHOLE)
-    if(freeze.size()>0) {
-      // Freeze orbitals for TP/FCH/XCH calculation.
-      if(spin)
-	freeze_orbs(freeze,sol.Cb,S,sol.Hb,verbose);
-      else
-	freeze_orbs(freeze,sol.Ca,S,sol.Ha,verbose);
-    }
-#else
-    // Normal case - freeze both alpha and beta spins.
-    if(freeze.size()>0) {
-#ifdef RESTRICTED
-      freeze_orbs(freeze,sol.C,S,sol.H,verbose);
-#else
-      freeze_orbs(freeze,sol.Ca,S,sol.Ha,verbose);
-      freeze_orbs(freeze,sol.Cb,S,sol.Hb,verbose);
-#endif
-    }
-#endif // end TP clause
-
-    fflush(stdout);
-
-    // Energies
-    sol.en.Ekin=arma::trace(sol.P*T);
-    sol.en.Enuca=arma::trace(sol.P*Vnuc);
-    sol.en.Enucr=Enuc;
-    sol.en.Eone=arma::trace(sol.P*Hcore);
-    sol.en.Ecoul=0.5*arma::trace(sol.P*J);
-
-    // Compute total energies
-    Eold=sol.en.E;
-    sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone;
-    sol.en.E=sol.en.Eel+sol.en.Enucr;
-
-    // Compute change of energy since last iteration
-    deltaE=sol.en.E-Eold;
-
+    // Compute change of energy
+    deltaE=sol.en.E-oldsol.en.E;
     // Update screening value
     if(!strictint)
-      tol=std::min(std::min(fabs(deltaE)*1e-2,1e-9),tol);
-
-    // Sanity check
-    if(!std::isfinite(sol.en.E)) {
-      ERROR_INFO();
-      std::ostringstream oss;
-      oss << "\nSomething wrong with total energy " << sol.en.E <<"?\nEnding program.\n";
-      throw std::runtime_error(oss.str());
-    }
-
+      tol=std::min(std::min(fabs(deltaE)*1e-2,ROUGHTOL),tol);
+    
     // Update ADIIS stacks.
     if(useadiis) {
 #ifdef RESTRICTED
@@ -717,20 +393,19 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       trdsmb.push(sol.en.E,sol.Pb,sol.Hb);
 #endif
     }
-      
 
     if(iiter>1 && usebroyden) {
 #ifdef RESTRICTED
       // Update Broyden mixer
-      broyd.push_x(MatToVec(Hold));
-      broyd.push_f(MatToVec(Hold-sol.H));
+      broyd.push_x(MatToVec(oldsol.H));
+      broyd.push_f(MatToVec(oldsol.H-sol.H));
 #else
       // Compute sum and difference
       arma::mat Hs=sol.Ha+sol.Hb;
       arma::mat Hd=sol.Ha-sol.Hb;
 
-      arma::mat Hsold=Haold+Hbold;
-      arma::mat Hdold=Haold-Hbold;
+      arma::mat Hsold=oldsol.Ha+oldsol.Hb;
+      arma::mat Hdold=oldsol.Ha-oldsol.Hb;
 
       // Update Broyden mixers
       broyd_sum.push_x(MatToVec(Hsold));
@@ -844,6 +519,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	printf("done (%s)\n",t.elapsed().c_str());
     }
 
+    // Save old solution
+    oldsol=sol;
+
     if(usetrrh) {
       if(adiisdone)
 	;
@@ -915,11 +593,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     }
 
     // Form new density matrix
-    arma::mat Pnew;
 #ifdef RESTRICTED
-    form_density(Pnew,sol.C,occs);
+    form_density(sol.P,sol.C,occs);
 #else
-    arma::mat Panew, Pbnew;
 
 #if defined(FULLHOLE) || defined(HALFHOLE)
     if(spin)
@@ -952,23 +628,22 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // End HALFHOLE || FULLHOLE
 #endif
 
+    form_density(sol.Pa,sol.Ca,occa);
+    form_density(sol.Pb,sol.Cb,occb);
+    sol.P=sol.Pa+sol.Pb;
+#endif // end ifdef RESTRICTED
 
-    form_density(Panew,sol.Ca,occa);
-    form_density(Pbnew,sol.Cb,occb);
-    Pnew=Panew+Pbnew;
-#endif
-
-    // Compute change of (total) density
-    deltaP=Pnew-sol.P;
-#ifndef RESTRICTED
+#ifdef RESTRICTED
+    arma::mat deltaP=sol.P-oldsol.P;
+#else
     // Compute change of polarized densities
-    deltaPa=Panew-sol.Pa;
-    deltaPb=Pbnew-sol.Pb;
+    arma::mat deltaPa=sol.Pa-oldsol.Pa;
+    arma::mat deltaPb=sol.Pb-oldsol.Pb;
 #endif
 
     // Compute dipole moment
     olddip=norm(dipmom);
-    dipmom=dipole_moment(Pnew,*basisp);
+    dipmom=dipole_moment(sol.P,*basisp);
 
     // Compute convergence criteria
 #ifdef RESTRICTED
@@ -984,13 +659,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     maxdiff=std::max(maxdiffa,maxdiffb);
     rmsdiff=std::max(rmsdiffa,rmsdiffb);
     //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
-#endif
-
-    // Update density matrices
-    sol.P=Pnew;
-#ifndef RESTRICTED
-    sol.Pa=Panew;
-    sol.Pb=Pbnew;
 #endif
 
     // Print out status information
@@ -1125,6 +793,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
     if(converged)
       break;
+
+    iiter++;
   } // End SCF cycle
 
     // Compute dipole moment
