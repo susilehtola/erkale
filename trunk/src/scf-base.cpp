@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -52,7 +52,7 @@ enum guess_t parse_guess(const std::string & val) {
 SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Amount of basis functions
   Nbf=basis.get_Nbf();
-  
+
   basisp=&basis;
   chkptp=&chkpt;
 
@@ -84,7 +84,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   if(useadiis && usebroyden) {
     ERROR_INFO();
     throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
-  } 
+  }
 
   if(!usediis && !useadiis && !usebroyden && !usetrrh && !usetrdsm) {
     ERROR_INFO();
@@ -94,7 +94,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   if(usetrdsm && (useadiis || usediis || usebroyden || !usetrrh)) {
     ERROR_INFO();
     throw std::runtime_error("Use of TRDSM requires use of TRRH and turning off (A)DIIS and Broyden.\n");
-  } 
+  }
 
   // Nuclear repulsion
   Enuc=basis.Enuc();
@@ -121,7 +121,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     basis.print();
 
     printf("\nForming overlap matrix ... ");
-    fflush(stdout); 
+    fflush(stdout);
     t.set();
   }
 
@@ -129,24 +129,24 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
-    
+
     printf("Forming kinetic energy matrix ... ");
     fflush(stdout);
     t.set();
   }
 
   T=basis.kinetic();
-  
+
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
-    
+
     printf("Forming nuclear attraction matrix ... ");
     fflush(stdout);
     t.set();
   }
-  
+
   Vnuc=basis.nuclear();
-  
+
   if(verbose)
     printf("done (%s)\n",t.elapsed().c_str());
 
@@ -159,11 +159,11 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   }
 
   Sinvh=BasOrth(S,set);
-  
+
   if(verbose) {
     printf("Basis set diagonalized in %s.\n",t.elapsed().c_str());
     t.set();
-    
+
     if(Sinvh.n_cols!=Sinvh.n_rows) {
       printf("%i linear combinations of basis functions have been removed.\n",Sinvh.n_rows-Sinvh.n_cols);
     }
@@ -187,7 +187,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       // Load basis library
       BasisSetLibrary fitlib;
       fitlib.load_gaussian94(set.get_string("FittingBasis"));
-      
+
       // Construct fitting basis
       dfitbas=construct_basis(basisp->get_nuclei(),fitlib,set);
     }
@@ -223,7 +223,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     } else {
       // Compute memory requirement
       size_t N;
-      
+
       if(verbose) {
 	N=tab.memory_estimate(&basis);
 	printf("Forming table of %lu ERIs, requiring %s of memory ... ",(long unsigned int) N,memory_size(N).c_str());
@@ -259,6 +259,35 @@ void SCF::set_frozen(const arma::mat & C, size_t ind) {
   freeze[ind]=C;
 }
 
+void SCF::diagonalize(rscf_t & sol) const {
+  arma::mat Horth;
+  arma::mat orbs;
+  // Transform Hamiltonian into orthogonal basis
+  Horth=arma::trans(Sinvh)*sol.H*Sinvh;
+  // Update orbitals and energies
+  eig_sym_ordered(sol.E,orbs,Horth);
+  // Transform back to non-orthogonal basis
+  sol.C=Sinvh*orbs;
+
+  // Check orthonormality
+  check_orth(sol.C,S,false);
+}
+
+void SCF::diagonalize(uscf_t & sol) const {
+  arma::mat Horth;
+  arma::mat orbs;
+
+  Horth=trans(Sinvh)*sol.Ha*Sinvh;
+  eig_sym_ordered(sol.Ea,orbs,Horth);
+  sol.Ca=Sinvh*orbs;
+  check_orth(sol.Ca,S,false);
+
+  Horth=trans(Sinvh)*sol.Hb*Sinvh;
+  eig_sym_ordered(sol.Eb,orbs,Horth);
+  sol.Cb=Sinvh*orbs;
+  check_orth(sol.Cb,S,false);
+}
+
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {
 
   // First, get eigenvectors and eigenvalues of S so that we can go to
@@ -278,7 +307,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
   Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
 
-  /* Transformation to get matrix M in orthonormal basis is 
+  /* Transformation to get matrix M in orthonormal basis is
      M_ij = <i|M_AO|j> \sqrt{l_i l_j},
      where l_i and l_j are the corresponding eigenvalues of
      eigenvectors i and j.
@@ -307,7 +336,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
      orthonormal basis as
 
      |i> = x_ai |a> = x_ai s_ja |j>
-                    = s_ja x_ai |j>
+     = s_ja x_ai |j>
   */
 
   // The matrix that takes us from AO to NO is
@@ -356,21 +385,21 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   }
 
   /*
-  double tot=0.0;
-  printf("Core orbital occupations:");
-  for(size_t c=Nind-1;c>=Nind-Nc && c<Nind;c--) {
+    double tot=0.0;
+    printf("Core orbital occupations:");
+    for(size_t c=Nind-1;c>=Nind-Nc && c<Nind;c--) {
     printf(" %f",occs(c));
     tot+=occs(c);
-  }
-  printf("\n");
+    }
+    printf("\n");
 
-  printf("Active orbital occupations:");
-  for(size_t a=Nind-Nc-1;a>=Nind-Nc-Na && a<Nind;a--) {
+    printf("Active orbital occupations:");
+    for(size_t a=Nind-Nc-1;a>=Nind-Nc-Na && a<Nind;a--) {
     printf(" %f",occs(a));
     tot+=occs(a);
-  }
-  printf("\n");
-  printf("Total occupancy of core and active is %f.\n",tot);
+    }
+    printf("\n");
+    printf("Total occupancy of core and active is %f.\n",tot);
   */
 
   // Form lambda by flipping the signs of the cv and vc blocks and
@@ -429,29 +458,28 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
       nocc[loc]+=nocc_old[i];
     }
 }
-      
-void form_density(arma::mat & R, const arma::mat & C, size_t nocc) {
+
+arma::mat form_density(const arma::mat & C, size_t nocc) {
   std::vector<double> occs(nocc,1.0);
-  form_density(R,C,occs);
+  return form_density(C,occs);
 }
 
-void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> & nocc) {
-  // Check dimensions of R
-  if(R.n_rows!=C.n_rows || R.n_cols!=C.n_rows)
-    R.zeros(C.n_rows,C.n_rows);
-
+arma::mat form_density(const arma::mat & C, const std::vector<double> & nocc) {
   if(nocc.size()>C.n_cols) {
     std::ostringstream oss;
     oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): there should be " << nocc.size() << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
     throw std::runtime_error(oss.str());
   }
-  
+
   // Zero matrix
-  R.zeros();
+  arma::mat P(C.n_rows,C.n_rows);
+  P.zeros();
   // Formulate density
   for(size_t n=0;n<nocc.size();n++)
     if(nocc[n]>0.0)
-      R+=nocc[n]*C.col(n)*arma::trans(C.col(n));
+      P+=nocc[n]*C.col(n)*arma::trans(C.col(n));
+
+  return P;
 }
 
 std::vector<double> atomic_occupancy(int Nel) {
@@ -462,13 +490,13 @@ std::vector<double> atomic_occupancy(int Nel) {
     ret.push_back(1.0);
     Nel--;
   }
-  
+
   // Fill 2s
   if(Nel>0) {
     ret.push_back(1.0);
     Nel--;
   }
-  
+
   // Fill 2p
   if(Nel>0) {
     // Amount of electrons to put in shell
@@ -478,13 +506,13 @@ std::vector<double> atomic_occupancy(int Nel) {
       ret.push_back(n/3.0);
     Nel-=n;
   }
-  
+
   // Fill 3s
   if(Nel>0) {
     ret.push_back(1.0);
     Nel--;
   }
-  
+
   // Fill 3p
   if(Nel>0) {
     // Amount of electrons to put in shell
@@ -579,7 +607,7 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
     }
 
     if(basis.get_Nnuc()==1) {
-      // Atomic case. 
+      // Atomic case.
       ret=atomic_occupancy(Nel/2);
       // Orbitals are doubly occupied
       for(size_t i=0;i<ret.size();i++)
@@ -591,7 +619,7 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
 	ret[i]=2.0; // All orbitals doubly occupied
     }
   }
-  
+
   return ret;
 }
 
@@ -606,7 +634,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     if(occvals.size()%2!=0) {
       throw std::runtime_error("Error - specify both alpha and beta occupancies for all states!\n");
     }
-    
+
     // Resize output vectors
     occa.resize(occvals.size()/2);
     occb.resize(occvals.size()/2);
@@ -639,7 +667,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
       occa.resize(Nel_alpha);
       for(size_t i=0;i<occa.size();i++)
 	occa[i]=1.0;
-      
+
       occb.resize(Nel_beta);
       for(size_t i=0;i<occb.size();i++)
 	occb[i]=1.0;
@@ -649,7 +677,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
 
 double dip_mom(const arma::mat & P, const BasisSet & basis) {
   // Compute magnitude of dipole moment
-  
+
   arma::vec dp=dipole_moment(P,basis);
   return norm(dp);
 }
@@ -708,10 +736,10 @@ double electron_spread(const arma::mat & P, const BasisSet & basis) {
   // Then, get <r^2> around r
   std::vector<arma::mat> mom2=basis.moment(2,r(0),r(1),r(2));
   double r2=arma::trace(Pnorm*(mom2[getind(2,0,0)]+mom2[getind(0,2,0)]+mom2[getind(0,0,2)]));
-  
+
   double dr=sqrt(r2);
 
-  return dr;  
+  return dr;
 }
 
 void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
@@ -724,7 +752,7 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
     throw std::runtime_error("Incorrect multiplicity for odd number of electrons.\n");
 
   if(Nel%2==0)
-    // Even number of electrons, the amount of spin up is 
+    // Even number of electrons, the amount of spin up is
     Nel_alpha=Nel/2+(mult-1)/2;
   else
     // Odd number of electrons, the amount of spin up is
@@ -738,7 +766,7 @@ void calculate(const BasisSet & basis, Settings & set) {
   // Checkpoint files to load and save
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
-  
+
   bool verbose=set.get_bool("Verbose");
 
   // Print out settings
@@ -751,6 +779,9 @@ void calculate(const BasisSet & basis, Settings & set) {
   // Do a plain Hartree-Fock calculation?
   bool hf= (stricmp(set.get_string("Method"),"HF")==0);
   bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
+
+  // Do a line search?
+  bool linesearch=set.get_bool("LineSearch");
 
   // Final convergence settings
   convergence_t conv;
@@ -789,7 +820,7 @@ void calculate(const BasisSet & basis, Settings & set) {
   arma::vec Eold, Eaold, Ebold;
   arma::mat Cold, Caold, Cbold;
   arma::mat Pold;
-  
+
   // Which guess to use
   enum guess_t guess=parse_guess(set.get_string("Guess"));
   // Freeze core orbitals?
@@ -799,16 +830,16 @@ void calculate(const BasisSet & basis, Settings & set) {
 
   if(doload) {
     Checkpoint load(loadname,false);
-    
+
     // Basis set
     load.read(oldbas);
-    
+
     // Restricted calculation?
     load.read("Restricted",oldrestr);
 
     // Density matrix
     load.read("P",Pold);
-    
+
     if(oldrestr) {
       // Load energies and orbitals
       load.read("C",Cold);
@@ -820,7 +851,7 @@ void calculate(const BasisSet & basis, Settings & set) {
       load.read("Cb",Cbold);
       load.read("Eb",Ebold);
     }
-  }	
+  }
 
   if(set.get_int("Multiplicity")==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
     // Closed shell case
@@ -838,7 +869,7 @@ void calculate(const BasisSet & basis, Settings & set) {
 	// Use alpha orbital energies
 	Eold=Eaold;
       }
-      
+
       basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
     } else if(guess == ATOMGUESS) {
       atomic_guess(basis,sol.C,sol.E,verbose);
@@ -863,7 +894,7 @@ void calculate(const BasisSet & basis, Settings & set) {
     // Write checkpoint.
     Checkpoint chkpt(savename,true);
     chkpt.write(basis);
-    
+
     // Write number of electrons
     int Nel_alpha;
     int Nel_beta;
@@ -871,7 +902,7 @@ void calculate(const BasisSet & basis, Settings & set) {
     chkpt.write("Nel",Nel);
     chkpt.write("Nel-a",Nel_alpha);
     chkpt.write("Nel-b",Nel_beta);
-    
+
     // Solver
     SCF solver(basis,set,chkpt);
 
@@ -882,18 +913,25 @@ void calculate(const BasisSet & basis, Settings & set) {
       // and freeze them
       solver.set_frozen(sol.C.submat(0,0,sol.C.n_rows-1,nloc-1),0);
     }
-    
+
     if(hf || rohf) {
       // Solve restricted Hartree-Fock
-      solver.RHF(sol,occs,conv);
+      if(linesearch)
+	solver.RHF_ls(sol,occs,conv);
+      else
+	solver.RHF(sol,occs,conv);
     } else {
       // Print information about used functionals
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
-      // Solve restricted DFT problem first on a rough grid
-      solver.RDFT(sol,occs,initconv,initdft);
-      // .. and then on the final grid
-      solver.RDFT(sol,occs,conv,dft);
+      if(linesearch)
+	solver.RDFT_ls(sol,occs,conv,dft);
+      else {
+	// Solve restricted DFT problem first on a rough grid
+	solver.RDFT(sol,occs,initconv,initdft);
+	// .. and then on the final grid
+	solver.RDFT(sol,occs,conv,dft);
+      }
     }
 
     // Do population analysis
@@ -939,11 +977,11 @@ void calculate(const BasisSet & basis, Settings & set) {
     // Get orbital occupancies
     std::vector<double> occa, occb;
     get_unrestricted_occupancy(set,basis,occa,occb);
- 
+
     // Write checkpoint.
     Checkpoint chkpt(savename,true);
     chkpt.write(basis);
-    
+
     // Write number of electrons
     int Nel_alpha;
     int Nel_beta;
@@ -958,8 +996,8 @@ void calculate(const BasisSet & basis, Settings & set) {
     // Freeze core orbitals?
     if(freezecore) {
       // Form the density matrix
-      form_density(sol.Pa,sol.Ca,occa);
-      form_density(sol.Pb,sol.Cb,occb);
+      sol.Pa=form_density(sol.Ca,occa);
+      sol.Pb=form_density(sol.Cb,occb);
       sol.P=sol.Pa+sol.Pb;
 
       // Get the natural orbitals
@@ -979,12 +1017,18 @@ void calculate(const BasisSet & basis, Settings & set) {
 
     if(hf) {
       // Solve restricted Hartree-Fock
-      solver.UHF(sol,occa,occb,conv);
+      if(linesearch)
+	solver.UHF_ls(sol,occa,occb,conv);
+      else
+	solver.UHF(sol,occa,occb,conv);
     } else if(rohf) {
       // Solve restricted open-shell Hartree-Fock
 
       // Solve ROHF
-      solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
+      if(linesearch)
+	solver.ROHF_ls(sol,Nel_alpha,Nel_beta,conv);
+      else
+	solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
 
       // Set occupancies right
       get_unrestricted_occupancy(set,basis,occa,occb);
@@ -992,10 +1036,14 @@ void calculate(const BasisSet & basis, Settings & set) {
       // Print information about used functionals
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
-      // Solve restricted DFT problem first on a rough grid
-      solver.UDFT(sol,occa,occb,initconv,initdft);
-      // ... and then on the more accurate grid
-      solver.UDFT(sol,occa,occb,conv,dft);
+      if(linesearch)
+	solver.UDFT_ls(sol,occa,occb,conv,dft);
+      else {
+	// Solve restricted DFT problem first on a rough grid
+	solver.UDFT(sol,occa,occb,initconv,initdft);
+	// ... and then on the more accurate grid
+	solver.UDFT(sol,occa,occb,conv,dft);
+      }
     }
 
     if(verbose)
@@ -1011,7 +1059,7 @@ bool operator<(const ovl_sort_t & lhs, const ovl_sort_t & rhs) {
 arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, const BasisSet & augbas) {
   Timer ttot;
   Timer t;
-  
+
   // Total number of functions in augmented set is
   const size_t Ntot=augbas.get_Nbf();
   // Amount of old orbitals is
@@ -1086,7 +1134,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
 
   // Deleted functions
   std::vector<ovl_sort_t> delidx;
-  
+
   // Drop the functions with the maximum overlap
   for(size_t j=0;j<Nold;j++) {
     // Find maximum overlap
@@ -1095,7 +1143,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
 
     // Helper vector
     arma::vec hlp=S*C.col(j);
-    
+
     for(size_t ii=0;ii<keepidx.size();ii++) {
       // Index of eigenvector is
       size_t i=keepidx[ii];
@@ -1107,20 +1155,20 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
 	maxind=ii;
       }
     }
-    
+
     // Add the function to the deleted functions' list
     ovl_sort_t tmp;
     tmp.S=maxovl;
     tmp.idx=keepidx[maxind];
     delidx.push_back(tmp);
-    
+
     //    printf("%4i/%4i deleted function %i with overlap %e.\n",(int) j+1, (int) Nold, (int) keepidx[maxind],maxovl);
 
     // Delete the index
     fflush(stdout);
     keepidx.erase(keepidx.begin()+maxind);
   }
-  
+
   // Print deleted functions
   std::stable_sort(delidx.begin(),delidx.end());
   for(size_t i=0;i<delidx.size();i++) {
@@ -1140,7 +1188,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   for(size_t i=0;i<Nind;i++) {
     double norm=arma::as_scalar(arma::trans(C.col(i))*S*C.col(i));
     // printf("Initial norm of vector %i is %e.\n",(int) i,norm);
-    
+
     // Remove projections of already orthonormalized set
     for(size_t j=0;j<i;j++) {
       double proj=arma::as_scalar(arma::trans(C.col(j))*S*C.col(i));
@@ -1148,17 +1196,17 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
       //    printf("%i - %i was %e\n",(int) i, (int) j, proj);
       C.col(i)-=proj*C.col(j);
     }
-    
+
     norm=arma::as_scalar(arma::trans(C.col(i))*S*C.col(i));
     // printf("Norm of vector %i is %e.\n",(int) i,norm);
-    
+
     // and normalize
     C.col(i)/=sqrt(norm);
   }
 
   printf("Projected orbitals in %s.\n",ttot.elapsed().c_str());
   fflush(stdout);
-  
+
   return C;
 }
 
@@ -1168,19 +1216,19 @@ std::vector<int> symgroups(const arma::mat & C, const arma::mat & S, const std::
 
   // Loop over frozen core groups
   for(size_t igp=0;igp<freeze.size();igp++) {
-    
+
     // Compute overlap of orbitals with frozen core orbitals
     std::vector<ovl_sort_t> ovl(C.n_cols);
     for(size_t i=0;i<C.n_cols;i++) {
-      
+
       // Store index
       ovl[i].idx=i;
       // Initialize overlap
       ovl[i].S=0.0;
-      
+
       // Helper vector
       arma::vec hlp=S*C.col(i);
-      
+
       // Loop over frozen orbitals.
       for(size_t ifz=0;ifz<freeze[igp].n_cols;ifz++) {
 	// Compute projection
@@ -1192,7 +1240,7 @@ std::vector<int> symgroups(const arma::mat & C, const arma::mat & S, const std::
 
     // Sort the projections
     std::sort(ovl.begin(),ovl.end());
-    
+
     // Store the symmetries
     for(size_t i=0;i<freeze[igp].n_cols;i++) {
       // The orbital with the maximum overlap is
@@ -1203,9 +1251,9 @@ std::vector<int> symgroups(const arma::mat & C, const arma::mat & S, const std::
       if(verbose)
 	printf("Set symmetry of orbital %i to %i (overlap %e).\n",(int) maxind+1,gp[maxind],ovl[i].S);
     }
-    
+
   }
-  
+
   return gp;
 }
 
@@ -1217,7 +1265,7 @@ void freeze_orbs(const std::vector<arma::mat> & freeze, const arma::mat & C, con
 
   // Get symmetry groups
   std::vector<int> sg=symgroups(C,S,freeze,verbose);
-  
+
   // Loop over H_MO and zero out elements where symmetry groups differ
   for(size_t i=0;i<H_MO.n_rows;i++)
     for(size_t j=0;j<=i;j++)
@@ -1225,7 +1273,7 @@ void freeze_orbs(const std::vector<arma::mat> & freeze, const arma::mat & C, con
 	H_MO(i,j)=0;
 	H_MO(j,i)=0;
       }
-  
+
   // Back-transform to AO
   arma::mat SC=S*C;
 
@@ -1255,7 +1303,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 	if(magicno[j] <= Z && Z <= magicno[j+1]) {
 	  ncl=magicno[j]/2;
 	  break;
-	}	  
+	}
 
       // Store number of closed shells
       locno[i]=ncl;
@@ -1274,29 +1322,29 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 
     // The nucleus is located at
     coords_t cen=basis.get_coords(inuc);
-    
+
     // Compute moment integrals around the nucleus
     std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
     // Get matrix which transforms into occupied MO basis
     arma::mat transmat=C.submat(0,locd,Nbf-1,nocc-1);
-    
+
     // Sum together to get x^2 + y^2 + z^2
     arma::mat rsqmat=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
     // and transform into the occupied MO basis
     rsqmat=arma::trans(transmat)*rsqmat*transmat;
-    
+
     // Diagonalize rsq_mo
     arma::vec reig;
     arma::mat rvec;
     eig_sym_ordered(reig,rvec,rsqmat);
 
-    /*    
-    printf("\nLocalization around center %i, eigenvalues (Å):",(int) locind[i].ind+1);
-    for(size_t ii=0;ii<reig.n_elem;ii++)
+    /*
+      printf("\nLocalization around center %i, eigenvalues (Å):",(int) locind[i].ind+1);
+      for(size_t ii=0;ii<reig.n_elem;ii++)
       printf(" %e",sqrt(reig(ii))/ANGSTROMINBOHR);
-    printf("\n");
-    fflush(stdout);
-    */    
+      printf("\n");
+      fflush(stdout);
+    */
 
     // Rotate yet unlocalized orbitals
     C.submat(0,locd,Nbf-1,nocc-1)=transmat*rvec;
@@ -1310,10 +1358,9 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 	fflush(stdout);
       }
   }
-  
+
   // Check orthonormality
   check_orth(C,S,false);
-  
+
   return locd;
 }
-

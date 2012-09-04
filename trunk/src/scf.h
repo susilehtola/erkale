@@ -228,19 +228,31 @@ class SCF {
   /// Calculate restricted open-shell Hartree-Fock solution
   void ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const;
   /// Calculate unrestricted Hartree-Fock solution
-  void UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occ, const convergence_t conv) const;
+  void UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const;
 
   /// Calculate restricted density-functional theory solution
   void RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
   /// Calculate unrestricted density-functional theory solution
   void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
 
+  /// Calculate restricted Hartree-Fock solution using line search (slow!)
+  void RHF_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const;
+  /// Calculate restricted open-shell Hartree-Fock solution using line search (slow!)
+  void ROHF_ls(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const;
+  /// Calculate unrestricted Hartree-Fock solution using line search (slow!)
+  void UHF_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const;
+
+  /// Calculate restricted density-functional theory solution using line search (slow!)
+  void RDFT_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
+  /// Calculate unrestricted density-functional theory solution using line search (slow!)
+  void UDFT_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
+
   /// Calculate restricted Hartree-Fock operator
   void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const rscf_t & oldsol, double tol) const;
   /// Calculate restricted open-shell Hartree-Fock operator
   void Fock_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv, const uscf_t & oldsol, double tol) const;
   /// Calculate unrestricted Hartree-Fock operator
-  void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occ, const convergence_t conv, const uscf_t & oldsol, double tol) const;
+  void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const uscf_t & oldsol, double tol) const;
 
   /// Calculate restricted density-functional theory KS-Fock operator
   void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, double tol) const;
@@ -249,6 +261,11 @@ class SCF {
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
+
+  /// Diagonalize Fock matrix
+  void diagonalize(rscf_t & sol) const;
+  /// Diagonalize Fock matrix
+  void diagonalize(uscf_t & sol) const;
 };
 
 /**
@@ -266,13 +283,14 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
  */
 void ROHF_update(arma::mat & Fa, arma::mat & Fb, const arma::mat & P, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose=true, bool atomic=false);
 
+
 /// Update occupations by occupying states with maximum overlap
 void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc_old, const arma::mat & C_old, const arma::mat & S);
 
 /// Form density matrix by occupying nocc lowest lying states
-void form_density(arma::mat & R, const arma::mat & C, size_t nocc);
+arma::mat form_density(const arma::mat & C, size_t nocc);
 /// Form density matrix with occupations nocc
-void form_density(arma::mat & R, const arma::mat & C, const std::vector<double> & nocc);
+arma::mat form_density(const arma::mat & C, const std::vector<double> & nocc);
 
 /// Get atomic occupancy (spherical average)
 std::vector<double> atomic_occupancy(int Nel);

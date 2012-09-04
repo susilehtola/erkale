@@ -96,6 +96,9 @@ void Settings::add_scf_settings() {
   add_double("DeltaPmax", "Maximum allowed maximum difference of density matrix", 1e-6);
   add_double("DeltaEmax", "Maximum allowed change of energy", 1e-6);
 
+  // Line search?
+  add_bool("LineSearch", "Perform a full line search (slow!!!)", false);
+
   // Maximum iterations
   add_int("MaxIter", "Maximum number of iterations in SCF cycle", 100);
 
