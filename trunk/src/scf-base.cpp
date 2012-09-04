@@ -1317,8 +1317,6 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   arma::mat S=basis.overlap();
   check_orth(C,S,false);
 
-  // Magic numbers - noble gases
-  const int magicno[]={0, 2, 10, 18, 36, 54, 86, 118};
   const int Nmagic=(int) (sizeof(magicno)/sizeof(magicno[0]));
 
   // First, figure out how many orbitals to localize on each center
