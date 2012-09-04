@@ -384,13 +384,12 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       
       // Sort the energies in increasing order
       std::vector<double> en;
-      std::vector<int> enidx;
+      std::vector< std::vector<int> > enidx;
       bool added;
       do {
 	added=false;
 	// Find the next minimal energy in the array
 	double Emin=DBL_MAX;
-	int minind=-1;
 	
 	for(int idx=0;idx<4;idx++) {
 	  if(msol[idx].en.E<Emin) {
@@ -402,29 +401,48 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 		ok=false;
 	    
 	    if(ok) {
-	      // OK, update indices.
-	      minind=idx;
+	      // OK, update energy
 	      Emin=msol[idx].en.E;
 	    }
 	  }
 	}
 
-	// Add the energy
-	if(minind!=-1) {
+	// Add the energy and the indices
+	if(Emin!=DBL_MAX) {
 	  added=true;
-	  en.push_back(msol[minind].en.E);
-	  enidx.push_back(minind);
+	  std::vector<int> hlp;
+	  for(int idx=0;idx<4;idx++)
+	    if(msol[idx].en.E==Emin)
+	      hlp.push_back(idx);
+	  enidx.push_back(hlp);
+	  en.push_back(Emin);
 	}
       } while(added);
 
+      // All energies are the same! Reduce bracket
+      if(en.size()<2) {
+	bracket[0]=bracket[1];
+	bracket[3]=bracket[2];
+	continue;
+      }
+
       // Determine which indices to use
-      int minind=enidx[0];
-      int lowind=enidx[1];
-
-      // Check if the interval changed or not.
-      if( (minind==0 && lowind==3) || (minind==3 && lowind==0) )
-	lowind=enidx[2];
-
+      int minind=enidx[0][0];
+      int lowind=enidx[1][0];
+     
+      // Check if the interval is going to change or not
+      if( (minind==0 && lowind==3) || (minind==3 && lowind==0) ) 
+	if(en.size()<3) {
+	  // Use another value for the bracket. Minimal energy
+	  for(size_t i=0;i<enidx[0].size();i++)
+	    if(enidx[0][i]!=0 && enidx[0][i]!=3)
+	      minind=enidx[0][i];
+	  // and second-minimal one
+	  for(size_t i=0;i<enidx[1].size();i++)
+	    if(enidx[1][i]!=0 && enidx[1][i]!=3)
+	      minind=enidx[1][i];
+	}
+      
       // Update the best solution?
       if(msol[minind].en.E!=sol.en.E) {
 	isol=sol;
