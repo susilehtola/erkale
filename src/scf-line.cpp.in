@@ -240,21 +240,24 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 
 #ifdef DFT
+    {
+      Timer tgrid;
 #ifdef RESTRICTED
-    // Form DFT quadrature grid
-    grid.construct(lhsol.P,dft.gridtol,dft.x_func,dft.c_func);
+      // Form DFT quadrature grid
+      grid.construct(lhsol.P,dft.gridtol,dft.x_func,dft.c_func);
 #else
-    // Form DFT quadrature grid
-    grid.construct(lhsol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+      // Form DFT quadrature grid
+      grid.construct(lhsol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
-    fflush(stdout);
-
-    if(verbose) {
-      fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",t.get());
-      fflush(stderr);
-      t.set();
+      fflush(stdout);
+      
+      if(verbose) {
+	fprintf(stderr,"%-66s %10.3f\n","    DFT grid formation",tgrid.get());
+	fflush(stderr);
+	t.set();
+      }
     }
-#endif
+#endif // ifdef DFT
 
     // Form the LHS Fock operator.
 #ifdef RESTRICTED
@@ -352,6 +355,7 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 
     // Fock operator will be F=a*F0+b*F1
     for(int is=1;is<=maxiter;is++) {
+      Timer tstep;
 
       // The current best solution is
 #ifdef RESTRICTED
@@ -534,7 +538,7 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 	else
 	  fprintf(stderr," %9.3e ",maxdiff);
 
-	fprintf(stderr," %8.3f %10.3f\n",norm(dipmom),titer.get());
+	fprintf(stderr," %8.3f %10.3f\n",norm(dipmom),tstep.get());
 	fflush(stderr);
       }
 
