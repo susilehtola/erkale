@@ -32,7 +32,7 @@
  // Initial mixing factor
 #define INITMIX 0.25
 
-#define ROUGHTOL 1e-8
+#define ROUGHTOL 1e-9
 
 
 XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool sp) : SCF(basis,set,chkpt) {
