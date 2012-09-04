@@ -131,7 +131,8 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
 
     // Solve ROHF
     uscf_t sol;
-    solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
+    // We should always afford to do a line search in an sp basis for a single atom
+    solver.ROHF_ls(sol,Nel_alpha,Nel_beta,conv);
     
     // Re-get shells, in new indexing.
     shells=atbas.get_funcs(0);
