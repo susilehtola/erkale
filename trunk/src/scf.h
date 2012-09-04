@@ -291,6 +291,12 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
 arma::mat form_density(const arma::mat & C, size_t nocc);
 /// Form density matrix with occupations nocc
 arma::mat form_density(const arma::mat & C, const std::vector<double> & nocc);
+/// Purify the density matrix (N.B. requires occupations to be 0<=n<=1 !)
+arma::mat purify_density(const arma::mat & P, const arma::mat & S);
+/// Purify the density matrix with natural orbitals
+arma::mat purify_density_NO(const arma::mat & P, const arma::mat & S);
+/// Purify the density matrix with natural orbitals (stored in C)
+arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat & S);
 
 /// Get atomic occupancy (spherical average)
 std::vector<double> atomic_occupancy(int Nel);

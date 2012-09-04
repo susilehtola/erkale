@@ -3,13 +3,13 @@
 void SCF::RDFT_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const
 
 #elif defined(RESTRICTED) && defined(HF)
-void SCF::RHF_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const
+  void SCF::RHF_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::UDFT_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
+  void SCF::UDFT_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
 
 #elif defined(UNRESTRICTED) && defined(HF)
-void SCF::UHF_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
+  void SCF::UHF_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
 #elif defined(UNRESTRICTED) && defined(_ROHF)
 void SCF::ROHF_ls(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
 
@@ -17,9 +17,56 @@ void SCF::ROHF_ls(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t
 size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch) const
 
 #elif defined(DFT) && defined(HALFHOLE)
-size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
+  size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
 #endif
 {
+
+  /// Mix densities instead of Fock matrices?
+  //#define MIXDENSITY
+
+  /// Formation of Fock matrix
+#ifdef RESTRICTED
+#if defined(HF)
+#define form_fock(sol,ref) Fock_RHF(sol,occs,conv,ref,tol); nfock++;
+#elif defined(DFT)
+#define form_fock(sol,ref) Fock_RDFT(sol,occs,conv,dft,ref,grid,tol); nfock++;
+#endif
+
+#else
+  // Unrestricted case: first core excited states
+
+#if defined(HALFHOLE)
+#define form_fock(sol,ref) Fock_half_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,tol); nfock++;
+#elif defined(FULLHOLE)
+#define form_fock(sol,ref) Fock_full_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,tol,xch); nfock++;
+
+  // Conventional HF and DFT
+#elif defined(HF)
+#define form_fock(sol,ref) Fock_UHF(sol,occa,occb,conv,ref,tol); nfock++;
+#elif defined(_ROHF)
+#define form_fock(sol,ref) Fock_ROHF(sol,Nel_alpha,Nel_beta,conv,ref,tol); nfock++;
+#elif defined(DFT)
+#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,conv,dft,ref,grid,tol); nfock++;
+#endif
+#endif
+
+  /// Diagonalization
+#if defined(HALFHOLE)
+#define diag(sol) diagonalize_hch(sol);
+#elif defined(FULLHOLE)
+#define diag(sol) diagonalize_fch(sol);
+#else
+#define diag(sol) diagonalize(sol);
+#endif
+
+  /// Density formation
+#ifdef RESTRICTED
+#define form_dens(sol) sol.P=form_density(sol.C,occs);
+#else
+#define form_dens(sol) sol.Pa=form_density(sol.Ca,occa); sol.Pb=form_density(sol.Cb,occb); sol.P=sol.Pa+sol.Pb;
+#endif
+
+
 
 #if defined(_ROHF)
   // Occupations
@@ -110,36 +157,23 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 	sol.Hb=Hcore;
 #endif
 
-#if defined(HALFHOLE)
-    diagonalize_hch(sol);
-#elif defined(FULLHOLE)
-    diagonalize_fch(sol);
-#elif defined(RESTRICTED)
-    diagonalize(sol);
-#else
-    diagonalize(sol);
-#endif
+	// Diagonalize
+	diag(sol);
 
 	if(verbose)
 	  printf("\nCore guess formed in %s.\n",t.elapsed().c_str());
 	
       } else {
       // Got correctly sized input guess.
-
+      
       if(verbose)
         printf("\nUsing input guess for orbitals.\n");
     }
   fflush(stdout);
 
-#if defined(RESTRICTED)
-  sol.P=form_density(sol.C,occs);
-#else
-  sol.Pa=form_density(sol.Ca,occa);
-  sol.Pb=form_density(sol.Cb,occb);
-  sol.P=sol.Pa+sol.Pb;
-#endif
-  
-  
+  // Form the density matrix
+  form_dens(sol);
+
 #if defined(FULLHOLE) || defined(HALFHOLE)
   size_t ixc_orb=0;
 #endif
@@ -200,7 +234,13 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 
 #endif // end DFT clause
-    fprintf(stderr," using line search.\n");
+    fprintf(stderr," using line search of ");
+#ifdef MIXDENSITY
+    fprintf(stderr,"density");
+#else
+    fprintf(stderr,"Fock");
+#endif
+    fprintf(stderr," matrix.\n");
     fprintf(stderr,"%6s %16s %10s  %9s  %9s  %8s %10s\n","","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
   }
   fflush(stdout);
@@ -214,7 +254,31 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 
   bool converged=false;
-  size_t nfock=0;
+  int nfock=0;
+
+#ifdef DFT
+  // Use the same grid in all iterations, otherwise convergence cannot be achieved
+  {
+    Timer tgrid;
+#ifdef RESTRICTED
+    // Form DFT quadrature grid
+    grid.construct(sol.P,conv.deltaEmax,dft.x_func,dft.c_func);
+#else
+    // Form DFT quadrature grid
+    grid.construct(sol.Pa,sol.Pb,conv.deltaEmax,dft.x_func,dft.c_func);
+#endif
+    fflush(stdout);
+    
+    if(verbose) {
+      fprintf(stderr,"%-66s %10.3f\n","    DFT grid formation",tgrid.get());
+      fflush(stderr);
+      t.set();
+    }
+  }
+#endif // ifdef DFT
+
+  // The old bracket
+  std::vector<double> oldbracket;
 
   // Loop:
   for(int iiter=1;iiter<=maxiter;iiter++) {
@@ -230,131 +294,35 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     // Save solution
     oldsol=sol;
 
-    // LH and RH solutions.
+    // Solution matrix
 #ifdef RESTRICTED
-    rscf_t lhsol(sol);
-    rscf_t rhsol(sol);
+    std::vector<rscf_t> msol(4,sol); 
 #else
-    uscf_t lhsol(sol);
-    uscf_t rhsol(sol);
+    std::vector<uscf_t> msol(4,sol);
 #endif
 
-#ifdef DFT
-    {
-      Timer tgrid;
-#ifdef RESTRICTED
-      // Form DFT quadrature grid
-      grid.construct(lhsol.P,dft.gridtol,dft.x_func,dft.c_func);
-#else
-      // Form DFT quadrature grid
-      grid.construct(lhsol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
-#endif
-      fflush(stdout);
-      
-      if(verbose) {
-	fprintf(stderr,"%-66s %10.3f\n","    DFT grid formation",tgrid.get());
-	fflush(stderr);
-	t.set();
-      }
-    }
-#endif // ifdef DFT
-
-    // Form the LHS Fock operator.
-#ifdef RESTRICTED
-    // Restricted case.
-#if defined(HF)
-    Fock_RHF(lhsol,occs,conv,oldsol,tol);
-#elif defined(DFT)
-    Fock_RDFT(lhsol,occs,conv,dft,oldsol,grid,tol);
-#endif
-#else
-#if defined(HALFHOLE)
-    // Transition potential
-    Fock_half_hole(xcatom,lhsol,conv,dft,occa,occb,oldsol,grid,tol);
-#elif defined(FULLHOLE)
-    // Full core hole
-    Fock_full_hole(xcatom,lhsol,conv,dft,occa,occb,oldsol,grid,tol,xch);
-
-    // Unrestricted case
-#elif defined(HF)
-    Fock_UHF(lhsol,occa,occb,conv,oldsol,tol);
-#elif defined(_ROHF)
-    Fock_ROHF(lhsol,Nel_alpha,Nel_beta,conv,oldsol,tol);
-#elif defined(DFT)
-    Fock_UDFT(lhsol,occa,occb,conv,dft,oldsol,grid,tol);
-#endif
-
-#endif // End spin case
-    nfock++;
+    // We have the LHS density, form the LHS Fock operator.
+    form_fock(msol[0],sol);
 
     // Copy LHS Fock matrix to RHS
-    rhsol=lhsol;
-
+    msol[3]=msol[0];
     // and diagonalize it to get the RHS density
-#if defined(HALFHOLE)
-    diagonalize_hch(rhsol);
-#elif defined(FULLHOLE)
-    diagonalize_fch(rhsol);
-#elif defined(RESTRICTED)
-    diagonalize(rhsol);
-#else
-    diagonalize(rhsol);
-#endif
+    diag(msol[3]);
+    form_dens(msol[3]);
+    // and then form the RHS Fock operator
+    form_fock(msol[3],msol[0]);
 
-#ifdef RESTRICTED
-    rhsol.P=form_density(rhsol.C,occs);
-#else
-    rhsol.Pa=form_density(rhsol.Ca,occa);
-    rhsol.Pb=form_density(rhsol.Cb,occb);
-#endif
-    
-    // Form the rhs fock operator
-#ifdef RESTRICTED
-    // Restricted case.
-#if defined(HF)
-    Fock_RHF(rhsol,occs,conv,sol,tol);
-#elif defined(DFT)
-    Fock_RDFT(rhsol,occs,conv,dft,sol,grid,tol);
-#endif
-#else
-#if defined(HALFHOLE)
-    // Transition potential
-    Fock_half_hole(xcatom,rhsol,conv,dft,occa,occb,sol,grid,tol);
-#elif defined(FULLHOLE)
-    // Full core hole
-    Fock_full_hole(xcatom,rhsol,conv,dft,occa,occb,sol,grid,tol,xch);
-
-    // Unrestricted case
-#elif defined(HF)
-    Fock_UHF(rhsol,occa,occb,conv,sol,tol);
-#elif defined(_ROHF)
-    Fock_ROHF(rhsol,Nel_alpha,Nel_beta,conv,sol,tol);
-#elif defined(DFT)
-    Fock_UDFT(rhsol,occa,occb,conv,dft,sol,grid,tol);
-#endif
-
-#endif // End spin case
-    nfock++;
-    
-
-
-    // Now determine optimal mixing factor. Golden ratio is
+    // Now determine optimal mixing factor. Golden ratio is ~ 0.618
     const double tau=2.0/(1.0+sqrt(5.0));
 
     // Bracket is
-    double a=0.0;
-    double b=1.0;
+    std::vector<double> bracket(4);
+    bracket[0]=0.0;
+    bracket[3]=1.0;
 
-#ifdef RESTRICTED
-    rscf_t s1, s2;
-    rscf_t s1ref, s2ref; 
-#else
-    uscf_t s1, s2;
-    uscf_t s1ref, s2ref;
-#endif
-
-    // Fock operator will be F=a*F0+b*F1
-    for(int is=1;is<=maxiter;is++) {
+    // Average Fock or density operator will be M=a*M_LHS+b*M_RHS.
+    // 10 iterations refines the mixing factor to a precision of ~10^-6
+    for(int is=1;is<=10;is++) {
       Timer tstep;
 
       // The current best solution is
@@ -365,130 +333,115 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 
       // Compute trials 1 and 2
-      double l1=a+(1-tau)*(b-a);
-      double l2=a+tau*(b-a);
-
-      // Do the Fock matrix averaging
-#ifdef RESTRICTED
-      s1.H=l1*rhsol.H+(1-l1)*lhsol.H;
-      s2.H=l2*rhsol.H+(1-l2)*lhsol.H;
-#else
-      s1.Ha=l1*rhsol.Ha+(1-l1)*lhsol.Ha;
-      s1.Hb=l1*rhsol.Hb+(1-l1)*lhsol.Hb;
-      s2.Ha=l2*rhsol.Ha+(1-l2)*lhsol.Ha;
-      s2.Hb=l2*rhsol.Hb+(1-l2)*lhsol.Hb;
-#endif
-
-      // Diagonalize the matrices
-#if defined(HALFHOLE)
-      diagonalize_hch(s1);
-      diagonalize_hch(s2);
-#elif defined(FULLHOLE)
-      diagonalize_fch(s1);
-      diagonalize_fch(s2);
-#elif defined(RESTRICTED)
-      diagonalize(s1);
-      diagonalize(s2);
-#else
-      diagonalize(s1);
-      diagonalize(s2);
-#endif
-
-      // And generate density matrices (for checking convergence)
-#ifdef RESTRICTED
-      s1.P=form_density(s1.C,occs);
-      s2.P=form_density(s2.C,occs);
-#else
-      s1.Pa=form_density(s1.Ca,occa);
-      s1.Pb=form_density(s1.Cb,occb);
-      s1.P=s1.Pa+s1.Pb;
-
-      s2.Pa=form_density(s2.Ca,occa);
-      s2.Pb=form_density(s2.Cb,occb);
-      s2.P=s2.Pa+s2.Pb;
-#endif
+      bracket[1]=bracket[0]+(1-tau)*(bracket[3]-bracket[0]);
+      bracket[2]=bracket[0]+tau*(bracket[3]-bracket[0]);
       
-      // Initialize references
-      if(l1<0.5)
-	s1ref=lhsol;
-      else
-	s1ref=rhsol;
-      if(l2<0.5)
-	s2ref=lhsol;
-      else
-	s2ref=rhsol;
+      // Do the averaging
+      for(int idx=1;idx<3;idx++) {
 
-      // and form the Fock matrices
+#ifdef MIXDENSITY
 #ifdef RESTRICTED
-      // Restricted case.
-#if defined(HF)
-      Fock_RHF(s1,occs,conv,s1ref,tol);
-      Fock_RHF(s2,occs,conv,s2ref,tol);
-#elif defined(DFT)
-      Fock_RDFT(s1,occs,conv,dft,s1ref,grid,tol);
-      Fock_RDFT(s2,occs,conv,dft,s2ref,grid,tol);
-#endif
+	msol[idx].P=bracket[idx]*msol[3].P+(1-bracket[idx])*msol[0].P;
+	// Purify, account for double occupancy
+	msol[idx].P=2.0*purify_density_NO(msol[idx].P/2.0,msol[idx].C,S);
 #else
-#if defined(HALFHOLE)
-      // Transition potential
-      Fock_half_hole(xcatom,s1,conv,dft,occa,occb,s1ref,grid,tol);
-      Fock_half_hole(xcatom,s2,conv,dft,occa,occb,s2ref,grid,tol);
-#elif defined(FULLHOLE)
-      // Full core hole
-      Fock_full_hole(xcatom,s1,conv,dft,occa,occb,s1ref,grid,tol,xch);
-      Fock_full_hole(xcatom,s2,conv,dft,occa,occb,s2ref,grid,tol,xch);
-
-      // Unrestricted case
-#elif defined(HF)
-      Fock_UHF(s1,occa,occb,conv,s1ref,tol);
-      Fock_UHF(s2,occa,occb,conv,s2ref,tol);
-#elif defined(_ROHF)
-      Fock_ROHF(s1,Nel_alpha,Nel_beta,conv,s1ref,tol);
-      Fock_ROHF(s2,Nel_alpha,Nel_beta,conv,s2ref,tol);
-#elif defined(DFT)
-      Fock_UDFT(s1,occa,occb,conv,dft,s1ref,grid,tol);
-      Fock_UDFT(s2,occa,occb,conv,dft,s2ref,grid,tol);
+	msol[idx].Pa=bracket[idx]*msol[3].Pa+(1-bracket[idx])*msol[0].Pa;
+	msol[idx].Pb=bracket[idx]*msol[3].Pb+(1-bracket[idx])*msol[0].Pb;
+	msol[idx].Pa=purify_density_NO(msol[idx].Pa,msol[idx].Ca,S);
+	msol[idx].Pb=purify_density_NO(msol[idx].Pb,msol[idx].Cb,S);
 #endif
 
-#endif // End spin case
-      nfock+=2;
+#else // ifdef MIXDENSITY
 
-      // Update best solution
-      double Emin=std::min(std::min(lhsol.en.E,s1.en.E),std::min(s2.en.E,rhsol.en.E));
-      if(lhsol.en.E==Emin)
-	sol=lhsol;
-      else if(s1.en.E==Emin)
-	sol=s1;
-      else if(s2.en.E==Emin)
-	sol=s2;
-      else
-	sol=rhsol;
+#ifdef RESTRICTED
+	msol[idx].H=bracket[idx]*msol[3].H+(1-bracket[idx])*msol[0].H;
+#else
+	msol[idx].Ha=bracket[idx]*msol[3].Ha+(1-bracket[idx])*msol[0].Ha;
+	msol[idx].Hb=bracket[idx]*msol[3].Hb+(1-bracket[idx])*msol[0].Hb;
+#endif
+	// Form the density generated by the average Fock matrix
+	diag(msol[idx]);
+	// And generate density matrix (for checking convergence)
+	form_dens(msol[idx]);
 
-      // Check that we aren't sitting on the minimum
-      double Ei=std::min(s1.en.E,s2.en.E);
-      if(rhsol.en.E<Ei) {
-	// Move left limit to right value
-	a=l2;
-	lhsol=s2;
-      } else if(lhsol.en.E<Ei) {
-        // Move right limit to left value.
-        b=l1;
-	rhsol=s1;
-      } else if(s1.en.E<s2.en.E) {
-        // Move right limit
-        b=l2;
-	rhsol=s2;
-      } else if(s1.en.E>s2.en.E) {
-        // Move left limit
-        a=l1;
-	lhsol=s1;
-      } else { // E1==E2        // Move both limits
-        a=l1;
-	lhsol=s1;
-        b=l2;
-	rhsol=s2;
+#endif // ifdef MIXDENSITY
+
+	// Initialize reference
+#ifdef RESTRICTED
+	rscf_t ref;
+#else
+	uscf_t ref;
+#endif
+
+	if(fabs(bracket[idx]-bracket[0])<fabs(bracket[idx]-bracket[3]))
+	  ref=msol[0];
+	else
+	  ref=msol[3];
+	
+	// and form the Fock matrix
+	form_fock(msol[idx],ref);
       }
       
+      // Sort the energies in increasing order
+      std::vector<double> en;
+      std::vector<int> enidx;
+      bool added;
+      do {
+	added=false;
+	// Find the next minimal energy in the array
+	double Emin=DBL_MAX;
+	int minind=-1;
+	
+	for(int idx=0;idx<4;idx++) {
+	  if(msol[idx].en.E<Emin) {
+	    // Check that the energy isn't already in the table
+	    bool ok=true;
+	    for(size_t j=0;j<en.size();j++)
+	      if(en[j]==msol[idx].en.E)
+		// Found the energy.
+		ok=false;
+	    
+	    if(ok) {
+	      // OK, update indices.
+	      minind=idx;
+	      Emin=msol[idx].en.E;
+	    }
+	  }
+	}
+
+	// Add the energy
+	if(minind!=-1) {
+	  added=true;
+	  en.push_back(msol[minind].en.E);
+	  enidx.push_back(minind);
+	}
+      } while(added);
+
+      // Determine which indices to use
+      int minind=enidx[0];
+      int lowind=enidx[1];
+
+      // Check if the interval changed or not.
+      if( (minind==0 && lowind==3) || (minind==3 && lowind==0) )
+	lowind=enidx[2];
+
+      // Update the best solution?
+      if(msol[minind].en.E!=sol.en.E) {
+	isol=sol;
+	sol=msol[minind];
+      }
+      
+      // Form the new bracket
+      std::vector<double> newbracket(4);
+      newbracket[0]=bracket[lowind];
+      newbracket[3]=bracket[minind];
+      if(newbracket[3]<newbracket[0])
+	std::swap(newbracket[3],newbracket[0]);
+
+      // and update it
+      oldbracket=bracket;
+      bracket=newbracket;
+
       // Evaluate termination criteria
 #ifdef RESTRICTED
       arma::mat deltaP=sol.P-isol.P;
@@ -543,19 +496,16 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       }
 
       if(verbose) {
-	printf("Energies in current bracket\n\t% .10e\t% .10e\t% .10e\t% .10e\n",lhsol.en.E,s1.en.E,s2.en.E,rhsol.en.E);
+	printf("Current bracket for mixing factor is\n\t% .10e\t% .10e\t% .10e\t% .10e\n",oldbracket[0],oldbracket[1],oldbracket[2],oldbracket[3]);
+	printf("Energies in current bracket\n\t% .10e\t% .10e\t% .10e\t% .10e\n",msol[0].en.E,msol[1].en.E,msol[2].en.E,msol[3].en.E);
 	printf("Minimum energy change from last bracket %e.\n",deltaE);
 	printf("Density change: %e RMS, %e max.\n\n",rmsdiff,maxdiff);
       }
 
 
-      // Terminate iteration? Energy converged?
-      //      if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)
-      if(fabs(deltaE)<conv.deltaEmax)
-	break;
-      
-      // Too small a section?
-      if(fabs(b-a)<sqrt(DBL_EPSILON)*(fabs(l1)+fabs(l2)))
+      // Terminate iteration?
+      if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)
+	//      if(fabs(deltaE)<conv.deltaEmax)
 	break;
     }
     
@@ -729,8 +679,8 @@ size_t XRSSCF::half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 	;
 
-      printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
-      fprintf(stderr,"%s converged in %s.\n\n",method.c_str(),ttot.elapsed().c_str());
+      printf("Solution of %s took %i Fock matrix rebuilds (%s).\n",method.c_str(),nfock,ttot.elapsed().c_str());
+      fprintf(stderr,"Solution of %s required %i Fock matrix builds and took %s.\n\n",method.c_str(),nfock,ttot.elapsed().c_str());
     }
   } else {
     std::ostringstream oss;
