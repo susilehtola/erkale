@@ -20,14 +20,13 @@ INCLUDE_DIRECTORIES(${HDF5_INCLUDE_DIRS})
 
 add_library (liberkale basis.cpp basislibrary.cpp stringutil.cpp
 mathf.cpp integrals.cpp eritable.cpp eriscreen.cpp timer.cpp
-linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf.cpp
-elements.cpp xyzutils.cpp settings.cpp broyden.cpp adiis.cpp
-tempered.cpp find_molecules.cpp properties.cpp checkpoint.cpp
-guess.cpp external/storage.cpp external/fchkpt_tools.cpp gaunt.cpp
-lmgrid.cpp spherical_harmonics.cpp trrh.cpp trdsm.cpp
-# DFT stuff
-lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp density_fitting.cpp
-lebedev.cpp)
+linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf-base.cpp
+scf-solvers.cpp scf-fock.cpp scf-line.cpp elements.cpp xyzutils.cpp
+settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
+properties.cpp checkpoint.cpp guess.cpp external/storage.cpp
+external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
+trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
+density_fitting.cpp lebedev.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
@@ -135,21 +134,40 @@ add_custom_command(
 
 # Recipe for building SCF
 add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in
- 
-  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
 
-  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf.cpp
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
+  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
+  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-solvers.cpp
+)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in
+
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
+  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
+  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
+)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in
+
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
+  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
+  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
 )

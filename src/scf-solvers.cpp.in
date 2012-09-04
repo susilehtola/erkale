@@ -191,7 +191,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
 
 #ifdef RESTRICTED
-  form_density(sol.P,sol.C,occs);
+  sol.P=form_density(sol.C,occs);
 #else
 
 #if defined(FULLHOLE) || defined(HALFHOLE)
@@ -225,8 +225,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // End HALFHOLE || FULLHOLE
 #endif
 
-  form_density(sol.Pa,sol.Ca,occa);
-  form_density(sol.Pb,sol.Cb,occb);
+  sol.Pa=form_density(sol.Ca,occa);
+  sol.Pb=form_density(sol.Cb,occb);
   sol.P=sol.Pa+sol.Pb;
 #endif // end ifdef RESTRICTED
 
@@ -594,7 +594,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
     // Form new density matrix
 #ifdef RESTRICTED
-    form_density(sol.P,sol.C,occs);
+    sol.P=form_density(sol.C,occs);
 #else
 
 #if defined(FULLHOLE) || defined(HALFHOLE)
@@ -628,8 +628,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // End HALFHOLE || FULLHOLE
 #endif
 
-    form_density(sol.Pa,sol.Ca,occa);
-    form_density(sol.Pb,sol.Cb,occb);
+    sol.Pa=form_density(sol.Ca,occa);
+    sol.Pb=form_density(sol.Cb,occb);
     sol.P=sol.Pa+sol.Pb;
 #endif // end ifdef RESTRICTED
 
