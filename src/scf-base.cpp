@@ -482,6 +482,36 @@ arma::mat form_density(const arma::mat & C, const std::vector<double> & nocc) {
   return P;
 }
 
+arma::mat purify_density(const arma::mat & P, const arma::mat & S) {
+  // McWeeny purification
+  arma::mat PS=P*S;
+  return 3.0*PS*P - 2.0*PS*PS*P;
+}
+
+arma::mat purify_density_NO(const arma::mat & P, const arma::mat & S) {
+  arma::mat C;
+  return purify_density_NO(P,C,S);
+}
+
+arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat & S) {
+  // Number of electrons
+  int Nel=(int) round(arma::trace(P*S));
+
+  // Get the natural orbitals                                                                                                                                                                                                             
+  arma::mat NO;
+  arma::mat tmp;
+  arma::vec occs;
+  form_NOs(P,S,NO,tmp,occs);
+
+  // Store the NOs in inverted order (highest occupation first)
+  C.zeros(NO.n_rows,NO.n_cols);
+  for(size_t icol=0;icol<NO.n_cols;icol++)
+    C.col(icol)=NO.col(NO.n_cols-1-icol);
+
+  // and form the density
+  return form_density(C,Nel);
+}
+
 std::vector<double> atomic_occupancy(int Nel) {
   std::vector<double> ret;
 
@@ -924,9 +954,10 @@ void calculate(const BasisSet & basis, Settings & set) {
       // Print information about used functionals
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
-      if(linesearch)
+      if(linesearch) {
 	solver.RDFT_ls(sol,occs,conv,dft);
-      else {
+	solver.RDFT_ls(sol,occs,conv,dft);
+      } else {
 	// Solve restricted DFT problem first on a rough grid
 	solver.RDFT(sol,occs,initconv,initdft);
 	// .. and then on the final grid
@@ -1036,9 +1067,10 @@ void calculate(const BasisSet & basis, Settings & set) {
       // Print information about used functionals
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
-      if(linesearch)
+      if(linesearch) {
 	solver.UDFT_ls(sol,occa,occb,conv,dft);
-      else {
+	solver.UDFT_ls(sol,occa,occb,conv,dft);
+      } else {
 	// Solve restricted DFT problem first on a rough grid
 	solver.UDFT(sol,occa,occb,initconv,initdft);
 	// ... and then on the more accurate grid
