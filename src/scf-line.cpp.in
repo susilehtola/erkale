@@ -254,7 +254,10 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 
   bool converged=false;
+  // Times Fock matrix has been built
   int nfock=0;
+  // Amount of successive energy converged iterations
+  int nconv=0;
 
 #ifdef DFT
   // Use the same grid in all iterations, otherwise convergence cannot be achieved
@@ -420,28 +423,31 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       } while(added);
 
       // All energies are the same! Reduce bracket
+      int minind; 
+      int lowind;
       if(en.size()<2) {
-	bracket[0]=bracket[1];
-	bracket[3]=bracket[2];
+	minind=1;
+	lowind=2;
 	continue;
+      } else {
+	
+	// Determine which indices to use
+	minind=enidx[0][0];
+	lowind=enidx[1][0];
+	
+	// Check if the interval is going to change or not
+	if( (minind==0 && lowind==3) || (minind==3 && lowind==0) ) 
+	  if(en.size()<3) {
+	    // Use another value for the bracket. Minimal energy
+	    for(size_t i=0;i<enidx[0].size();i++)
+	      if(enidx[0][i]!=0 && enidx[0][i]!=3)
+		minind=enidx[0][i];
+	    // and second-minimal one
+	    for(size_t i=0;i<enidx[1].size();i++)
+	      if(enidx[1][i]!=0 && enidx[1][i]!=3)
+		minind=enidx[1][i];
+	  }
       }
-
-      // Determine which indices to use
-      int minind=enidx[0][0];
-      int lowind=enidx[1][0];
-     
-      // Check if the interval is going to change or not
-      if( (minind==0 && lowind==3) || (minind==3 && lowind==0) ) 
-	if(en.size()<3) {
-	  // Use another value for the bracket. Minimal energy
-	  for(size_t i=0;i<enidx[0].size();i++)
-	    if(enidx[0][i]!=0 && enidx[0][i]!=3)
-	      minind=enidx[0][i];
-	  // and second-minimal one
-	  for(size_t i=0;i<enidx[1].size();i++)
-	    if(enidx[1][i]!=0 && enidx[1][i]!=3)
-	      minind=enidx[1][i];
-	}
       
       // Update the best solution?
       if(msol[minind].en.E!=sol.en.E) {
@@ -451,14 +457,24 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       
       // Form the new bracket
       std::vector<double> newbracket(4);
+      if(bracket[minind]<bracket[lowind])
+	std::swap(minind,lowind);
+
       newbracket[0]=bracket[lowind];
       newbracket[3]=bracket[minind];
-      if(newbracket[3]<newbracket[0])
-	std::swap(newbracket[3],newbracket[0]);
-
       // and update it
       oldbracket=bracket;
       bracket=newbracket;
+
+      // and the solutions as well
+#ifdef RESTRICTED
+      std::vector<rscf_t> msolnew(4);
+#else
+      std::vector<uscf_t> msolnew(4);
+#endif
+      msolnew[0]=msol[lowind];
+      msolnew[3]=msol[minind];
+      msol=msolnew;
 
       // Evaluate termination criteria
 #ifdef RESTRICTED
@@ -520,10 +536,8 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 	printf("Density change: %e RMS, %e max.\n\n",rmsdiff,maxdiff);
       }
 
-
       // Terminate iteration?
       if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)
-	//      if(fabs(deltaE)<conv.deltaEmax)
 	break;
     }
     
@@ -621,7 +635,13 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
     }
 
-    if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
+    // Check successive iterations
+    if(fabs(deltaE)<conv.deltaEmax)
+      nconv++;
+    else
+      nconv=0;
+
+    if(nconv==10 || (fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)) {
       printf("\n ******* Convergence achieved ********\n");
       converged=true;
       break;
