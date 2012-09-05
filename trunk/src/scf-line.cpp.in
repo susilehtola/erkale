@@ -256,8 +256,6 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
   bool converged=false;
   // Times Fock matrix has been built
   int nfock=0;
-  // Amount of successive energy converged iterations
-  int nconv=0;
 
 #ifdef DFT
   // Use the same grid in all iterations, otherwise convergence cannot be achieved
@@ -635,13 +633,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
     }
 
-    // Check successive iterations
-    if(fabs(deltaE)<conv.deltaEmax)
-      nconv++;
-    else
-      nconv=0;
-
-    if(nconv==10 || (fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)) {
+    if((fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)) {
       printf("\n ******* Convergence achieved ********\n");
       converged=true;
       break;
