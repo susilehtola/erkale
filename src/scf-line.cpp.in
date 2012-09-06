@@ -266,10 +266,6 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
   bool converged=false;
   // Times Fock matrix has been built
   int nfock=0;
-  // Macroiterations with converged energy
-  int convd=0;
-  // Maximum allowed iterations until normal DIIS procedure is turned on
-  const int maxconv=3;
 
 #ifdef DFT
   // Use the same grid in all iterations, otherwise convergence cannot be achieved
@@ -292,7 +288,18 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
   }
 #endif // ifdef DFT
 
-  // Loop:
+  // Energy, rms and max density change of last microiteration
+  double macdE=0.0;
+  double macdPmax=0.0, macdPrms=0.0;
+  // Refine microiterations till x times macroiteration precision
+  const double micfac=0.01;
+
+  // Trigger normal SCF after nconv energy converged macroiterations
+  const int maxconv=7;
+  // Amount of converged macroiterations
+  int convd=0;
+
+  // Loop over macroiterations
   for(int iiter=1;iiter<=maxiter;iiter++) {
     Timer titer;
     
@@ -303,16 +310,14 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       fflush(stdout);
     }
 
-    // Save solution
-    oldsol=sol;
-
-    // Solution matrix and LH and RH solutions
+    // LH and RH solutions
 #ifdef RESTRICTED
-    std::vector<rscf_t> msol(4); 
     rscf_t lhsol, rhsol;
+    // Initial bracket solutions
+    rscf_t lbsol, rbsol;
 #else
-    std::vector<uscf_t> msol(4);
     uscf_t lhsol, rhsol;
+    uscf_t lbsol, rbsol;
 #endif
 
     // We have the LHS density, form the LHS Fock operator.
@@ -320,6 +325,12 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     form_fock(lhsol,sol);
     sol=lhsol;
 
+    // Save old solution
+    if(iiter==1)
+      oldsol=lhsol;
+    else
+      oldsol=sol;
+    
     // Copy LHS Fock matrix to RHS
     rhsol=lhsol;
     // and diagonalize it to get the RHS density
@@ -331,15 +342,22 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     // Now determine optimal mixing factor. Golden ratio is ~ 0.618
     const double tau=2.0/(1.0+sqrt(5.0));
 
-    // Bracket is
+    // The bracket to use is bracket[0] .. bracket[3]
     std::vector<double> bracket(4);
     bracket[0]=0.0;
     bracket[3]=1.0;
+
+#ifdef RESTRICTED
+    std::vector<rscf_t> msol(4);
+#else
+    std::vector<uscf_t> msol(4);
+#endif
 
     // and initial solutions are
     msol[0]=lhsol;
     msol[3]=rhsol;
 
+    // Loop over microiterations.
     // Average Fock or density operator will be M=a*M_LHS+b*M_RHS.
     // 10 iterations refines the mixing factor to a precision of ~10^-6
     for(int is=1;is<=10;is++) {
@@ -439,45 +457,31 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 	}
       } while(added);
 
-      // All energies are the same! Reduce bracket
-      int minind; 
-      int lowind;
-      if(en.size()<2) {
-	minind=1;
-	lowind=2;
-	continue;
-      } else {
-	
-	// Determine which indices to use
-	minind=enidx[0][0];
-	lowind=enidx[1][0];
-	
-	// Check if the interval is going to change or not
-	if( (minind==0 && lowind==3) || (minind==3 && lowind==0) ) 
-	  if(en.size()<3) {
-	    // Use another value for the bracket. Minimal energy
-	    for(size_t i=0;i<enidx[0].size();i++)
-	      if(enidx[0][i]!=0 && enidx[0][i]!=3)
-		minind=enidx[0][i];
-	    // and second-minimal one
-	    for(size_t i=0;i<enidx[1].size();i++)
-	      if(enidx[1][i]!=0 && enidx[1][i]!=3)
-		minind=enidx[1][i];
-	  }
-      }
+      // Index of minimal solution
+      int minind=enidx[0][0];
       
       // Update the best solution?
       if(msol[minind].en.E!=sol.en.E) {
 	isol=sol;
 	sol=msol[minind];
       }
-      
+
       // Form the new bracket
+      int lind, rind;
+      if(minind==0) {
+	lind=0;
+	rind=1;
+      } else if(minind==3) {
+	lind=2;
+	rind=3;
+      } else {
+	lind=minind-1;
+	rind=minind+1;
+      }
+
       const std::vector<double> oldbracket(bracket);
-      if(bracket[minind]<bracket[lowind])
-	std::swap(minind,lowind);
-      bracket[0]=oldbracket[lowind];
-      bracket[3]=oldbracket[minind];
+      bracket[0]=oldbracket[lind];
+      bracket[3]=oldbracket[rind];
 
       // and the solutions as well
 #ifdef RESTRICTED
@@ -485,8 +489,8 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #else
       const std::vector<uscf_t> msolold(msol);
 #endif
-      msol[0]=msolold[lowind];
-      msol[3]=msolold[minind];
+      msol[0]=msolold[lind];
+      msol[3]=msolold[rind];
 
       // Evaluate termination criteria
 #ifdef RESTRICTED
@@ -502,7 +506,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       olddip=norm(dipmom);
       dipmom=dipole_moment(sol.P,*basisp);
       
-      // Compute convergence criteria
+      // Compute convergence criteria for microiteration
 #ifdef RESTRICTED
       maxdiff=max_abs(deltaP);
       rmsdiff=rms_norm(deltaP);
@@ -518,22 +522,38 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
 #endif
 
+      // Initialize macroiteration convergence criteria?
+      if(iiter==1 && is==1) {
+	macdE=deltaE;
+	macdPrms=rmsdiff;
+	macdPmax=maxdiff;
+      }
+
+      // Microiteration convergence criteria
+      const double micdE=std::max(macdE*micfac,conv.deltaEmax);
+      const double micdPmax=std::max(macdPmax*micfac,conv.deltaPmax);
+      const double micdPrms=std::max(macdPrms*micfac,conv.deltaPrms);
+      
+      // Print out microiteration convergence criteria?
+      if(is==1) 
+	printf("Converging microiterations till |dE|<%e, |dP|max < %e and |dP|rms < %e.\n",micdE,micdPmax,micdPrms);
+
       // Sparse output
       if(verbose) {
 	fprintf(stderr,"%6i % 16.8f",is,sol.en.E);
 
-	if(fabs(deltaE)<conv.deltaEmax)
-	  fprintf(stderr," % 10.3e*",deltaE);
+	if(fabs(deltaE)<micdE)
+	  fprintf(stderr," % 10.3e+",deltaE);
 	else
 	  fprintf(stderr," % 10.3e ",deltaE);
 
-	if(rmsdiff<conv.deltaPrms)
-	  fprintf(stderr," %9.3e*",rmsdiff);
+	if(rmsdiff<micdPrms)
+	  fprintf(stderr," %9.3e+",rmsdiff);
 	else
 	  fprintf(stderr," %9.3e ",rmsdiff);
 
-	if(maxdiff<conv.deltaPmax)
-	  fprintf(stderr," %9.3e*",maxdiff);
+	if(maxdiff<micdPmax)
+	  fprintf(stderr," %9.3e+",maxdiff);
 	else
 	  fprintf(stderr," %9.3e ",maxdiff);
 
@@ -544,12 +564,12 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       if(verbose) {
 	printf("Current bracket for mixing factor is\n\t% .10e\t% .10e\t% .10e\t% .10e\n",oldbracket[0],oldbracket[1],oldbracket[2],oldbracket[3]);
 	printf("Energies in current bracket\n\t% .10e\t% .10e\t% .10e\t% .10e\n",msolold[0].en.E,msolold[1].en.E,msolold[2].en.E,msolold[3].en.E);
-	printf("Minimum energy change from last bracket %e.\n",deltaE);
+	printf("Minimum energy change from last bracket %e.\n",sol.en.E-isol.en.E);
 	printf("Density change: %e RMS, %e max.\n\n",rmsdiff,maxdiff);
       }
 
-      // Terminate iteration?
-      if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)
+      // Terminate microiteration?
+      if(fabs(deltaE)<micdE && maxdiff<micdPmax && rmsdiff<micdPrms)
 	break;
     }
     
@@ -588,6 +608,11 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     rmsdiff=std::max(rmsdiffa,rmsdiffb);
     //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
 #endif
+
+    // Store macroiteration convergence criteria
+    macdE=fabs(deltaE);
+    macdPrms=rmsdiff;
+    macdPmax=maxdiff;
 
     // Sparse output
     if(verbose) {
@@ -646,7 +671,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
 #endif
     }
-
+    
     if(fabs(deltaE)<conv.deltaEmax)
       convd++;
     else
@@ -657,7 +682,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       converged=true;
       break;
     }
-    
+
     // Pad occupancies with zeros (needed e.g. in Casida routines)
 #if !defined(RESTRICTED)
     std::vector<double> occar(occa), occbr(occb);
@@ -703,16 +728,15 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 
     if(converged)
       break;
-    /*
     if(convd==maxconv)
       break;
-    */
   } // End SCF cycle
   
-  /*
-  if(convd==maxconv) {
-    printf("Density is not converging using line search, %i Fock matrices built.\nFalling back to normal SCF procedure.\n\n",nfock);
-    fprintf(stderr,"Density is not converging using line search, %i Fock matrices built.\nFalling back to normal SCF procedure.\n\n",nfock);
+  if(convd==maxconv && !converged) {
+    if(verbose) {
+      printf("\nLine search did not converge. Fock matrix has been built %i times.\nSwitching to conventional SCF.\n\n",nfock);
+      fprintf(stderr,"\nLine search did not converge. Fock matrix has been built %i times.\nSwitching to conventional SCF.\n\n",nfock);
+    }
 
 #if defined(RESTRICTED) && defined(DFT)
     RDFT(sol,occs,conv,dft);
@@ -736,8 +760,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     return;
 #endif
   }    
-  */
-  
+
   // Compute dipole moment
   if(verbose) {
     arma::vec dp=dipole_moment(sol.P,*basisp);
