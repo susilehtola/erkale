@@ -279,10 +279,10 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     Timer tgrid;
 #ifdef RESTRICTED
     // Form DFT quadrature grid
-    grid.construct(sol.P,conv.deltaEmax,dft.x_func,dft.c_func);
+    grid.construct(sol.P,conv.deltaEmax/10.0,dft.x_func,dft.c_func);
 #else
     // Form DFT quadrature grid
-    grid.construct(sol.Pa,sol.Pb,conv.deltaEmax,dft.x_func,dft.c_func);
+    grid.construct(sol.Pa,sol.Pb,conv.deltaEmax/10.0,dft.x_func,dft.c_func);
 #endif
     fflush(stdout);
     
