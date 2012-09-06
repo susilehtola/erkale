@@ -37,7 +37,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
   // SCF settings to use
   Settings set;
   set.add_scf_settings();
-  //  set.set_bool("Verbose",false);
+  set.set_bool("Verbose",false);
   set.set_string("Guess","Core");
   set.set_int("MaxIter",200);
   set.set_bool("DensityFitting",false);
