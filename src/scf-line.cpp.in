@@ -256,6 +256,10 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
   bool converged=false;
   // Times Fock matrix has been built
   int nfock=0;
+  // Macroiterations with converged energy
+  int convd=0;
+  // Maximum allowed iterations until normal DIIS procedure is turned on
+  const int maxconv=3;
 
 #ifdef DFT
   // Use the same grid in all iterations, otherwise convergence cannot be achieved
@@ -633,6 +637,11 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
     }
 
+    if(fabs(deltaE)<conv.deltaEmax)
+      convd++;
+    else
+      convd=0;
+
     if((fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)) {
       printf("\n ******* Convergence achieved ********\n");
       converged=true;
@@ -684,8 +693,37 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 
     if(converged)
       break;
+    if(convd==maxconv)
+      break;
   } // End SCF cycle
   
+  if(convd==maxconv) {
+    printf("Density is not converging using line search, %i Fock matrices built.\nFalling back to normal SCF procedure.\n",nfock);
+    fprintf(stderr,"Density is not converging using line search, %i Fock matrices built.\nFalling back to normal SCF procedure.\n",nfock);
+
+#if defined(RESTRICTED) && defined(DFT)
+    RDFT(sol,occs,conv,dft);
+#elif defined(RESTRICTED) && defined(HF)
+    RHF(sol,occs,conv);
+#elif defined(UNRESTRICTED) && defined(DFT)
+    UDFT(sol,occa,occb,conv,dft);
+#elif defined(UNRESTRICTED) && defined(HF)
+    UHF(sol,occa,occb,conv);
+#elif defined(UNRESTRICTED) && defined(_ROHF)
+    ROHF(sol,Nel_alpha,Nel_beta,conv);
+#elif defined(DFT) && defined(FULLHOLE)
+    ixc_orb=full_hole(xcatom,sol,conv,dft,xch);
+#elif defined(DFT) && defined(HALFHOLE)
+    ixc_orb=half_hole(xcatom,sol,conv,dft);
+#endif
+
+#if defined(FULLHOLE) || defined(HALFHOLE)
+    return ixc_orb;
+#else
+    return;
+#endif
+  }    
+
     // Compute dipole moment
   if(verbose) {
     arma::vec dp=dipole_moment(sol.P,*basisp);
