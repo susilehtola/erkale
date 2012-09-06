@@ -2,8 +2,10 @@
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 
-add_library (liberkale_xrs
-bfprod.cpp fourierprod.cpp lmtrans.cpp momentum_series.cpp xrsscf.cpp )
+add_library (liberkale_xrs bfprod.cpp fourierprod.cpp lmtrans.cpp
+momentum_series.cpp xrsscf-base.cpp xrsscf-fock.cpp xrsscf-line.cpp
+xrsscf-solvers.cpp)
+
 # The name of the library is
 set_target_properties(liberkale_xrs PROPERTIES OUTPUT_NAME "erkale_xrs${SUFFIX}")
 
@@ -39,14 +41,37 @@ install(FILES ${headers} DESTINATION include/erkale/xrs)
 
 
 add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xrsscf.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/xrsscf-base.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../scf-solvers.cpp.in
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xrsscf-fock.cpp
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../scf-fock.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../scf-includes.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/xrsscf-includes.cpp.in
 
-  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/xrsscf-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/xrsscf.cpp
-  COMMAND ${PPROC} -DDFT -DHALFHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf.cpp
-  COMMAND ${PPROC} -DDFT -DFULLHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf.cpp
-  COMMAND ${PPROC} -DDFT -DHALFHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf.cpp
-  COMMAND ${PPROC} -DDFT -DFULLHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf.cpp
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/../scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/xrsscf-fock.cpp
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/xrsscf-includes.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-fock.cpp
+  COMMAND ${PPROC} -DDFT -DHALFHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-fock.cpp
+  COMMAND ${PPROC} -DDFT -DFULLHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-fock.cpp
+)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xrsscf-line.cpp
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../scf-line.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../scf-includes.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/xrsscf-includes.cpp.in
+
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/../scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/xrsscf-line.cpp
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/xrsscf-includes.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-line.cpp
+  COMMAND ${PPROC} -DDFT -DHALFHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-line.cpp
+  COMMAND ${PPROC} -DDFT -DFULLHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-line.cpp
+)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xrsscf-solvers.cpp
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../scf-solvers.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../scf-includes.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/xrsscf-includes.cpp.in
+
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/../scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/xrsscf-solvers.cpp
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/xrsscf-includes.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-solvers.cpp
+  COMMAND ${PPROC} -DDFT -DHALFHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-solvers.cpp
+  COMMAND ${PPROC} -DDFT -DFULLHOLE ${CMAKE_CURRENT_SOURCE_DIR}/../scf-solvers.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/xrsscf-solvers.cpp
 )

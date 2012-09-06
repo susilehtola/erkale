@@ -744,6 +744,7 @@ int main(int argc, char **argv) {
 
   // Parse method
   enum xrs_method method=parse_method(set.get_string("XRSMethod"));
+  const bool linesearch=set.get_bool("LineSearch");
 
   // Print out settings
   if(verbose)
@@ -891,7 +892,7 @@ int main(int argc, char **argv) {
     chkpt.write("Nel",nocca+noccb);
     chkpt.write("Nel-a",nocca);
     chkpt.write("Nel-b",noccb);
-
+    
     // Set frozen orbitals
     if(nloc>0) {
       if(spin)
@@ -900,20 +901,20 @@ int main(int argc, char **argv) {
 	solver.set_frozen(sol.Ca.submat(0,1,sol.Ca.n_rows-1,nloc-1),0);
     }
     
-    // Do TP calculation.
+    // Do calculation
     if(method==FCH || method==XCH) {
-      if(method==FCH) {
-	xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init,false);
-	xcorb=solver.full_hole(xcatom,sol,conv,dft,false);
+      if(linesearch) {
+	xcorb=solver.full_hole_ls(xcatom,sol,init_conv,dft_init,method==XCH);
+	xcorb=solver.full_hole_ls(xcatom,sol,conv,dft,method==XCH);
       } else {
-	xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init,true);
-	xcorb=solver.full_hole(xcatom,sol,conv,dft,true);
+	  xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init,method==XCH);
+	  xcorb=solver.full_hole(xcatom,sol,conv,dft,method==XCH);
       }
-
+      
       // Get excited state energy
       energy_t excen;
       chkpt.read(excen);
-
+      
       if(method==XCH) {
 	printf("\nAbsolute energy correction: first peak should be at %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
 	fprintf(stderr,"\nAbsolute energy correction: first peak should be at %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
@@ -921,11 +922,16 @@ int main(int argc, char **argv) {
 	printf("Vertical photoionization energy is %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
 	fprintf(stderr,"Vertical photoionization energy is %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
       }
-    } else {      
-      xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
-      xcorb=solver.half_hole(xcatom,sol,conv,dft);
+    } else {
+      if(linesearch) {
+	xcorb=solver.half_hole_ls(xcatom,sol,init_conv,dft_init);
+	xcorb=solver.half_hole_ls(xcatom,sol,conv,dft);
+      } else {
+	xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
+	xcorb=solver.half_hole(xcatom,sol,conv,dft);
+      }
     }
-
+    
     printf("\n\n");
   } else {
     if(spin)
@@ -933,7 +939,7 @@ int main(int argc, char **argv) {
     else
       xcorb=find_excited_orb(sol.Ca,basis,xcatom,nocca);
   }
-
+  
   // Augment the solutions if necessary
   BasisSet augbas;
   arma::mat C_aug;

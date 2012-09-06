@@ -955,7 +955,7 @@ void calculate(const BasisSet & basis, Settings & set) {
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
       if(linesearch) {
-	solver.RDFT_ls(sol,occs,conv,dft);
+	solver.RDFT_ls(sol,occs,initconv,initdft);
 	solver.RDFT_ls(sol,occs,conv,dft);
       } else {
 	// Solve restricted DFT problem first on a rough grid
@@ -1068,7 +1068,7 @@ void calculate(const BasisSet & basis, Settings & set) {
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
       if(linesearch) {
-	solver.UDFT_ls(sol,occa,occb,conv,dft);
+	solver.UDFT_ls(sol,occa,occb,initconv,initdft);
 	solver.UDFT_ls(sol,occa,occb,conv,dft);
       } else {
 	// Solve restricted DFT problem first on a rough grid

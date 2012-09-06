@@ -50,6 +50,11 @@ class XRSSCF : public SCF {
   /// Compute TP solution
   size_t half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;
 
+  /// Compute 1st core-excited state using line search (slow!)
+  size_t full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch) const;
+  /// Compute TP solution using line search (slow!)
+  size_t half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const;
+
   /// Get Fock operator for 1st core-excited state
   void Fock_full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, double tol, bool xch) const;
   /// Get Fock operator for TP state
