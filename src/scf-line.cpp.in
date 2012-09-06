@@ -50,23 +50,33 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 #endif
 
-  /// Diagonalization
-#if defined(HALFHOLE)
-#define diag(sol) diagonalize_hch(sol);
-#elif defined(FULLHOLE)
-#define diag(sol) diagonalize_fch(sol);
-#else
-#define diag(sol) diagonalize(sol);
+  /// Find excited orbital
+#if defined(FULLHOLE) || defined(HALFHOLE)
+#define find_exc(sol) if(spin) {ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);} else {ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);}
+#endif
+
+  /// Occupancy update
+#if defined(FULLHOLE)
+#define upd_occa() if(spin) {occa=norm_occ(nocca);} else { if(xch) {occa=xch_occ(ixc_orb,nocca);} else {occa=fch_occ(ixc_orb,nocca);} }
+#define upd_occb() if(!spin) {occb=norm_occ(noccb);} else { if(xch) {occb=xch_occ(ixc_orb,noccb);} else {occb=fch_occ(ixc_orb,noccb);} }
+#elif defined(HALFHOLE)
+#define upd_occa() if(spin) {occa=norm_occ(nocca);} else { occa=tp_occ(ixc_orb,nocca);}
+#define upd_occb() if(!spin) {occb=norm_occ(noccb);} else { occb=tp_occ(ixc_orb,noccb);}
 #endif
 
   /// Density formation
 #ifdef RESTRICTED
 #define form_dens(sol) sol.P=form_density(sol.C,occs);
 #else
-#define form_dens(sol) sol.Pa=form_density(sol.Ca,occa); sol.Pb=form_density(sol.Cb,occb); sol.P=sol.Pa+sol.Pb;
+#define form_dens_ur(sol) sol.Pa=form_density(sol.Ca,occa); sol.Pb=form_density(sol.Cb,occb); sol.P=sol.Pa+sol.Pb;
+
+#if defined(HALFHOLE) || defined(FULLHOLE)
+#define form_dens(sol) find_exc(sol); upd_occa(); upd_occb(); form_dens_ur(sol);
+#else
+#define form_dens(sol) form_dens_ur(sol)
 #endif
 
-
+#endif // ifdef RESTRICTED
 
 #if defined(_ROHF)
   // Occupations
@@ -158,7 +168,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 
 	// Diagonalize
-	diag(sol);
+	diagonalize(sol);
 
 	if(verbose)
 	  printf("\nCore guess formed in %s.\n",t.elapsed().c_str());
@@ -171,13 +181,13 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     }
   fflush(stdout);
 
-  // Form the density matrix
-  form_dens(sol);
-
 #if defined(FULLHOLE) || defined(HALFHOLE)
   size_t ixc_orb=0;
 #endif
-  
+    
+  // Form the density matrix
+  form_dens(sol);
+
 #ifdef DFT
   // Fraction of exact exchange
   double kfrac=exact_exchange(dft.x_func);
@@ -282,9 +292,6 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
   }
 #endif // ifdef DFT
 
-  // The old bracket
-  std::vector<double> oldbracket;
-
   // Loop:
   for(int iiter=1;iiter<=maxiter;iiter++) {
     Timer titer;
@@ -299,23 +306,27 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     // Save solution
     oldsol=sol;
 
-    // Solution matrix
+    // Solution matrix and LH and RH solutions
 #ifdef RESTRICTED
-    std::vector<rscf_t> msol(4,sol); 
+    std::vector<rscf_t> msol(4); 
+    rscf_t lhsol, rhsol;
 #else
-    std::vector<uscf_t> msol(4,sol);
+    std::vector<uscf_t> msol(4);
+    uscf_t lhsol, rhsol;
 #endif
 
     // We have the LHS density, form the LHS Fock operator.
-    form_fock(msol[0],sol);
+    lhsol=sol;
+    form_fock(lhsol,sol);
+    sol=lhsol;
 
     // Copy LHS Fock matrix to RHS
-    msol[3]=msol[0];
+    rhsol=lhsol;
     // and diagonalize it to get the RHS density
-    diag(msol[3]);
-    form_dens(msol[3]);
+    diagonalize(rhsol);
+    form_dens(rhsol);
     // and then form the RHS Fock operator
-    form_fock(msol[3],msol[0]);
+    form_fock(rhsol,lhsol);
 
     // Now determine optimal mixing factor. Golden ratio is ~ 0.618
     const double tau=2.0/(1.0+sqrt(5.0));
@@ -324,6 +335,10 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     std::vector<double> bracket(4);
     bracket[0]=0.0;
     bracket[3]=1.0;
+
+    // and initial solutions are
+    msol[0]=lhsol;
+    msol[3]=rhsol;
 
     // Average Fock or density operator will be M=a*M_LHS+b*M_RHS.
     // 10 iterations refines the mixing factor to a precision of ~10^-6
@@ -346,12 +361,12 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 
 #ifdef MIXDENSITY
 #ifdef RESTRICTED
-	msol[idx].P=bracket[idx]*msol[3].P+(1-bracket[idx])*msol[0].P;
+	msol[idx].P=bracket[idx]*rhsol.P+(1-bracket[idx])*lhsol.P;
 	// Purify, account for double occupancy
 	msol[idx].P=2.0*purify_density_NO(msol[idx].P/2.0,msol[idx].C,S);
 #else
-	msol[idx].Pa=bracket[idx]*msol[3].Pa+(1-bracket[idx])*msol[0].Pa;
-	msol[idx].Pb=bracket[idx]*msol[3].Pb+(1-bracket[idx])*msol[0].Pb;
+	msol[idx].Pa=bracket[idx]*rhsol.Pa+(1-bracket[idx])*lhsol.Pa;
+	msol[idx].Pb=bracket[idx]*rhsol.Pb+(1-bracket[idx])*lhsol.Pb;
 	msol[idx].Pa=purify_density_NO(msol[idx].Pa,msol[idx].Ca,S);
 	msol[idx].Pb=purify_density_NO(msol[idx].Pb,msol[idx].Cb,S);
 #endif
@@ -359,13 +374,13 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #else // ifdef MIXDENSITY
 
 #ifdef RESTRICTED
-	msol[idx].H=bracket[idx]*msol[3].H+(1-bracket[idx])*msol[0].H;
+	msol[idx].H=bracket[idx]*rhsol.H+(1-bracket[idx])*lhsol.H;
 #else
-	msol[idx].Ha=bracket[idx]*msol[3].Ha+(1-bracket[idx])*msol[0].Ha;
-	msol[idx].Hb=bracket[idx]*msol[3].Hb+(1-bracket[idx])*msol[0].Hb;
+	msol[idx].Ha=bracket[idx]*rhsol.Ha+(1-bracket[idx])*lhsol.Ha;
+	msol[idx].Hb=bracket[idx]*rhsol.Hb+(1-bracket[idx])*lhsol.Hb;
 #endif
 	// Form the density generated by the average Fock matrix
-	diag(msol[idx]);
+	diagonalize(msol[idx]);
 	// And generate density matrix (for checking convergence)
 	form_dens(msol[idx]);
 
@@ -458,25 +473,20 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       }
       
       // Form the new bracket
-      std::vector<double> newbracket(4);
+      const std::vector<double> oldbracket(bracket);
       if(bracket[minind]<bracket[lowind])
 	std::swap(minind,lowind);
-
-      newbracket[0]=bracket[lowind];
-      newbracket[3]=bracket[minind];
-      // and update it
-      oldbracket=bracket;
-      bracket=newbracket;
+      bracket[0]=oldbracket[lowind];
+      bracket[3]=oldbracket[minind];
 
       // and the solutions as well
 #ifdef RESTRICTED
-      std::vector<rscf_t> msolnew(4);
+      const std::vector<rscf_t> msolold(msol);
 #else
-      std::vector<uscf_t> msolnew(4);
+      const std::vector<uscf_t> msolold(msol);
 #endif
-      msolnew[0]=msol[lowind];
-      msolnew[3]=msol[minind];
-      msol=msolnew;
+      msol[0]=msolold[lowind];
+      msol[3]=msolold[minind];
 
       // Evaluate termination criteria
 #ifdef RESTRICTED
@@ -533,7 +543,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 
       if(verbose) {
 	printf("Current bracket for mixing factor is\n\t% .10e\t% .10e\t% .10e\t% .10e\n",oldbracket[0],oldbracket[1],oldbracket[2],oldbracket[3]);
-	printf("Energies in current bracket\n\t% .10e\t% .10e\t% .10e\t% .10e\n",msol[0].en.E,msol[1].en.E,msol[2].en.E,msol[3].en.E);
+	printf("Energies in current bracket\n\t% .10e\t% .10e\t% .10e\t% .10e\n",msolold[0].en.E,msolold[1].en.E,msolold[2].en.E,msolold[3].en.E);
 	printf("Minimum energy change from last bracket %e.\n",deltaE);
 	printf("Density change: %e RMS, %e max.\n\n",rmsdiff,maxdiff);
       }
@@ -693,13 +703,16 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 
     if(converged)
       break;
+    /*
     if(convd==maxconv)
       break;
+    */
   } // End SCF cycle
   
+  /*
   if(convd==maxconv) {
-    printf("Density is not converging using line search, %i Fock matrices built.\nFalling back to normal SCF procedure.\n",nfock);
-    fprintf(stderr,"Density is not converging using line search, %i Fock matrices built.\nFalling back to normal SCF procedure.\n",nfock);
+    printf("Density is not converging using line search, %i Fock matrices built.\nFalling back to normal SCF procedure.\n\n",nfock);
+    fprintf(stderr,"Density is not converging using line search, %i Fock matrices built.\nFalling back to normal SCF procedure.\n\n",nfock);
 
 #if defined(RESTRICTED) && defined(DFT)
     RDFT(sol,occs,conv,dft);
@@ -723,8 +736,9 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     return;
 #endif
   }    
-
-    // Compute dipole moment
+  */
+  
+  // Compute dipole moment
   if(verbose) {
     arma::vec dp=dipole_moment(sol.P,*basisp);
     printf("Dipole moment is (%f,%f,%f) D, |mu|=%f D.\n",dp[0]/AUINDEBYE,dp[1]/AUINDEBYE,dp[2]/AUINDEBYE,norm(dp)/AUINDEBYE);
@@ -752,7 +766,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     }
   } else {
     std::ostringstream oss;
-    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): SCF did not converge in "<<maxiter<<" iterations!\n";
+    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): SCF line search did not converge in "<<maxiter<<" iterations!\n";
     throw std::runtime_error(oss.str());
   }
 
