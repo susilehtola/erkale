@@ -680,7 +680,7 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     if((fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)) {
       printf("\n ******* Convergence achieved ********\n");
       converged=true;
-      break;
+      // Need to write checkpoint below
     }
 
     // Pad occupancies with zeros (needed e.g. in Casida routines)
