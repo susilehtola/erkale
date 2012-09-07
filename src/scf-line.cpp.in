@@ -120,11 +120,15 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 #endif
 #endif
 
-  // Broyden accelerator
+  // Accelerators
 #ifdef RESTRICTED
   Broyden broyd(Nbf*Nbf);
+  DIIS diis(S);
+  double diiserr;
 #else
   Broyden broyda(Nbf*Nbf), broydb(Nbf*Nbf);
+  DIIS diisa(S), diisb(S);
+  double diiserra, diiserrb;
 #endif
 
   Timer t;
@@ -300,11 +304,6 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
   // Refine microiterations till x times macroiteration precision
   const double micfac=0.01;
 
-  // Trigger Broyden after nconv energy converged macroiterations
-  const int maxconv=3;
-  // Amount of converged macroiterations
-  int convd=0;
-
   // Initial Fock matrix construction
   form_fock(sol,sol);
 
@@ -333,35 +332,60 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
     lhsol=sol;
 
     // Try acceleration
-    if(iiter>1) {
+    {
 #ifdef RESTRICTED
       rscf_t bsol(lhsol);
+      rscf_t dsol(lhsol);
 #else
       uscf_t bsol(lhsol);
+      uscf_t dsol(lhsol);
 #endif
-
+      
+      // Try DIIS acceleration
 #ifdef RESTRICTED
-      bsol.H=VecToMat(broyd.update_x(),Nbf,Nbf);
+      diis.update(dsol.H,dsol.P,diiserr);
 #else
-      bsol.Ha=VecToMat(broyda.update_x(),Nbf,Nbf);
-      bsol.Hb=VecToMat(broydb.update_x(),Nbf,Nbf);
+      diisa.update(dsol.Ha,dsol.Pa,diiserra);
+      diisb.update(dsol.Hb,dsol.Pb,diiserrb);
 #endif
       // Diagonalize interpolated matrix
-      diagonalize(bsol);
+      diagonalize(dsol);
       // Form the density
-      form_dens(bsol);
+      form_dens(dsol);
       // and form the Fock matrix corresponding to the density
-      form_fock(bsol,lhsol);
-
+      form_fock(dsol,lhsol);
+      
+      // Try Broyden acceleration
+      if(iiter>1) {
+#ifdef RESTRICTED
+	bsol.H=VecToMat(broyd.update_x(),Nbf,Nbf);
+#else
+	bsol.Ha=VecToMat(broyda.update_x(),Nbf,Nbf);
+	bsol.Hb=VecToMat(broydb.update_x(),Nbf,Nbf);
+#endif
+	// Diagonalize interpolated matrix
+	diagonalize(bsol);
+	// Form the density
+	form_dens(bsol);
+	// and form the Fock matrix corresponding to the density
+	form_fock(bsol,lhsol);
+      }
+      
+      double minE=std::min(std::min(bsol.en.E,dsol.en.E),lhsol.en.E);
+      
       // Did the energy decrease?
-      if(bsol.en.E<lhsol.en.E) {
+      if(minE==dsol.en.E && minE<lhsol.en.E) {
+	printf("DIIS update decreased energy by %e.\n",dsol.en.E-lhsol.en.E);
+	fprintf(stderr,"DIIS update decreased energy by %e.\n",dsol.en.E-lhsol.en.E);
+	lhsol=dsol;
+      }	else if(minE==bsol.en.E && bsol.en.E<lhsol.en.E) {
 	// Yes - use the interpolated value
 	printf("Broyden update decreased energy by %e.\n",bsol.en.E-lhsol.en.E);
 	fprintf(stderr,"Broyden update decreased energy by %e.\n",bsol.en.E-lhsol.en.E);
 	lhsol=bsol;
       }
     }
-
+  
     // Save old solution
     if(iiter==1)
       oldsol=lhsol;
@@ -719,11 +743,6 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
 #endif
     }
-    
-    if(fabs(deltaE)<conv.deltaEmax)
-      convd++;
-    else
-      convd=0;
 
     if((fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms)) {
       printf("\n ******* Convergence achieved ********\n");
@@ -776,40 +795,8 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 
     if(converged)
       break;
-    if(convd==maxconv) {
-      break;
-    }
   } // End SCF cycle
   
-  if(convd==maxconv && !converged) {
-    if(verbose) {
-      printf("\nLine search did not converge. Fock matrix has been built %i times.\nSwitching to conventional SCF.\n\n",nfock);
-      fprintf(stderr,"\nLine search did not converge. Fock matrix has been built %i times.\nSwitching to conventional SCF.\n\n",nfock);
-    }
-
-#if defined(RESTRICTED) && defined(DFT)
-    RDFT(sol,occs,conv,dft);
-#elif defined(RESTRICTED) && defined(HF)
-    RHF(sol,occs,conv);
-#elif defined(UNRESTRICTED) && defined(DFT)
-    UDFT(sol,occa,occb,conv,dft);
-#elif defined(UNRESTRICTED) && defined(HF)
-    UHF(sol,occa,occb,conv);
-#elif defined(UNRESTRICTED) && defined(_ROHF)
-    ROHF(sol,Nel_alpha,Nel_beta,conv);
-#elif defined(DFT) && defined(FULLHOLE)
-    ixc_orb=full_hole(xcatom,sol,conv,dft,xch);
-#elif defined(DFT) && defined(HALFHOLE)
-    ixc_orb=half_hole(xcatom,sol,conv,dft);
-#endif
-
-#if defined(FULLHOLE) || defined(HALFHOLE)
-    return ixc_orb;
-#else
-    return;
-#endif
-  }    
-
   // Compute dipole moment
   if(verbose) {
     arma::vec dp=dipole_moment(sol.P,*basisp);
