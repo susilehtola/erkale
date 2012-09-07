@@ -375,13 +375,17 @@ size_t XRSSCF::full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft
       
       // Did the energy decrease?
       if(minE==dsol.en.E && minE<lhsol.en.E) {
-	printf("DIIS update decreased energy by %e.\n",dsol.en.E-lhsol.en.E);
-	fprintf(stderr,"DIIS update decreased energy by %e.\n",dsol.en.E-lhsol.en.E);
+	if(verbose) {
+	  printf("DIIS update decreased energy by %e.\n",dsol.en.E-lhsol.en.E);
+	  fprintf(stderr,"DIIS update decreased energy by %e.\n",dsol.en.E-lhsol.en.E);
+	}
 	lhsol=dsol;
       }	else if(minE==bsol.en.E && bsol.en.E<lhsol.en.E) {
 	// Yes - use the interpolated value
-	printf("Broyden update decreased energy by %e.\n",bsol.en.E-lhsol.en.E);
-	fprintf(stderr,"Broyden update decreased energy by %e.\n",bsol.en.E-lhsol.en.E);
+	if(verbose) {
+	  printf("Broyden update decreased energy by %e.\n",bsol.en.E-lhsol.en.E);
+	  fprintf(stderr,"Broyden update decreased energy by %e.\n",bsol.en.E-lhsol.en.E);
+	}
 	lhsol=bsol;
       }
     }
