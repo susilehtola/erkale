@@ -130,6 +130,15 @@ void FunctionShell::normalize() {
   S=sqrt(S);
   for(size_t i=0;i<C.size();i++)
     C[i].c/=S;
+
+  // Check sign of coefficient with maximum absolute value
+  double maxfabs=0.0;
+  for(size_t i=0;i<C.size();i++)
+    if(fabs(C[i].c)>fabs(maxfabs))
+      maxfabs=C[i].c;
+  if(maxfabs<0.0)
+    for(size_t i=0;i<C.size();i++)
+      C[i].c*=-1.0;
 }
 
 void FunctionShell::print() const {
