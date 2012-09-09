@@ -32,3 +32,33 @@ int get_Z(std::string el) {
   // Not found, return dummy charge.
   return 0;
 }
+
+std::vector<int> shell_count(int Z) {
+  // Determine how many shells we have.
+  std::vector <int> ret;
+  
+  // Electrons in closed shells
+  int n=0;
+  for(size_t i=0;i<sizeof(shell_order)/sizeof(shell_order[0]);i++) {
+    if(Z>n) {
+      // Still electrons left.
+      int l=shell_order[i];
+      n+=2*(2*l+1); // Amount of electrons on this shell
+
+      // Resize output
+      while(l+1>(int) ret.size())
+        ret.push_back(0);
+      ret[l]++;
+    } else
+      break;
+  }
+
+  // Overflow?
+  if(Z>n) {
+    std::ostringstream oss;
+    oss << "Only implemented up to Z=" << n <<".\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  return ret;
+}
