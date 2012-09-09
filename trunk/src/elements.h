@@ -19,6 +19,7 @@
 #define ERKALE_ELEMENTS
 
 #include <string>
+#include <vector>
 
 /// Names of elements
 const std::string element_names[]={
@@ -57,6 +58,9 @@ const int element_row[]={
 
 /// Ordering of shells: 1s, 2s, 2p, 3s, 3p, 4s, 3d, 4p, 5s, 4d, 5p, 6s, 4f, 5d, 6p, 7s, 5f, 6d, 7p
 const int shell_order[]={0, 0, 1, 0, 1, 0, 2, 1, 0, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1};
+
+/// Get number of shells with am l
+std::vector<int> shell_count(int Z);
 
 /// Atomic masses from http://www.chem.qmul.ac.uk/iupac/AtWt/index.html
 /// Technetium has no stable isotopes, set mass to -1e-10
