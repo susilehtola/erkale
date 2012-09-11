@@ -87,7 +87,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   }
 
-  if(!usediis && !useadiis && !usebroyden && !usetrrh && !usetrdsm) {
+  if(!usediis && !useadiis && !usebroyden && !usetrrh && !usetrdsm && !linesearch) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to run calculation without an update scheme.\n");
   }
