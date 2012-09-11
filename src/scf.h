@@ -185,6 +185,8 @@ class SCF {
   bool usetrrh;
   /// Use trust-region DSM?
   bool usetrdsm;
+  /// Do line search in level shift?
+  bool linesearch;
 
   /// Maximum number of iterations
   int maxiter;

@@ -73,6 +73,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
   usetrdsm=set.get_bool("UseTRDSM");
+  linesearch=set.get_bool("LineSearch");
 
   maxiter=set.get_int("MaxIter");
   verbose=set.get_bool("Verbose");
@@ -810,9 +811,6 @@ void calculate(const BasisSet & basis, Settings & set) {
   bool hf= (stricmp(set.get_string("Method"),"HF")==0);
   bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
 
-  // Do a line search?
-  bool linesearch=set.get_bool("LineSearch");
-
   // Final convergence settings
   convergence_t conv;
   conv.deltaEmax=set.get_double("DeltaEmax");
@@ -946,23 +944,15 @@ void calculate(const BasisSet & basis, Settings & set) {
 
     if(hf || rohf) {
       // Solve restricted Hartree-Fock
-      if(linesearch)
-	solver.RHF_ls(sol,occs,conv);
-      else
-	solver.RHF(sol,occs,conv);
+      solver.RHF(sol,occs,conv);
     } else {
       // Print information about used functionals
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
-      if(linesearch) {
-	solver.RDFT_ls(sol,occs,initconv,initdft);
-	solver.RDFT_ls(sol,occs,conv,dft);
-      } else {
-	// Solve restricted DFT problem first on a rough grid
-	solver.RDFT(sol,occs,initconv,initdft);
-	// .. and then on the final grid
-	solver.RDFT(sol,occs,conv,dft);
-      }
+      // Solve restricted DFT problem first on a rough grid
+      solver.RDFT(sol,occs,initconv,initdft);
+      // .. and then on the final grid
+      solver.RDFT(sol,occs,conv,dft);
     }
 
     // Do population analysis
@@ -1048,18 +1038,12 @@ void calculate(const BasisSet & basis, Settings & set) {
 
     if(hf) {
       // Solve restricted Hartree-Fock
-      if(linesearch)
-	solver.UHF_ls(sol,occa,occb,conv);
-      else
-	solver.UHF(sol,occa,occb,conv);
+      solver.UHF(sol,occa,occb,conv);
     } else if(rohf) {
       // Solve restricted open-shell Hartree-Fock
 
       // Solve ROHF
-      if(linesearch)
-	solver.ROHF_ls(sol,Nel_alpha,Nel_beta,conv);
-      else
-	solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
+      solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
 
       // Set occupancies right
       get_unrestricted_occupancy(set,basis,occa,occb);
@@ -1067,15 +1051,10 @@ void calculate(const BasisSet & basis, Settings & set) {
       // Print information about used functionals
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
-      if(linesearch) {
-	solver.UDFT_ls(sol,occa,occb,initconv,initdft);
-	solver.UDFT_ls(sol,occa,occb,conv,dft);
-      } else {
-	// Solve restricted DFT problem first on a rough grid
-	solver.UDFT(sol,occa,occb,initconv,initdft);
-	// ... and then on the more accurate grid
-	solver.UDFT(sol,occa,occb,conv,dft);
-      }
+      // Solve restricted DFT problem first on a rough grid
+      solver.UDFT(sol,occa,occb,initconv,initdft);
+      // ... and then on the more accurate grid
+      solver.UDFT(sol,occa,occb,conv,dft);
     }
 
     if(verbose)

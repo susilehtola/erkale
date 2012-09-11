@@ -903,14 +903,9 @@ int main(int argc, char **argv) {
     
     // Do calculation
     if(method==FCH || method==XCH) {
-      if(linesearch) {
-	xcorb=solver.full_hole_ls(xcatom,sol,init_conv,dft_init,method==XCH);
-	xcorb=solver.full_hole_ls(xcatom,sol,conv,dft,method==XCH);
-      } else {
-	  xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init,method==XCH);
-	  xcorb=solver.full_hole(xcatom,sol,conv,dft,method==XCH);
-      }
-      
+      xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init,method==XCH);
+      xcorb=solver.full_hole(xcatom,sol,conv,dft,method==XCH);
+          
       // Get excited state energy
       energy_t excen;
       chkpt.read(excen);
@@ -923,13 +918,8 @@ int main(int argc, char **argv) {
 	fprintf(stderr,"Vertical photoionization energy is %.2f eV.\n",(excen.E-gsen.E)*HARTREEINEV);
       }
     } else {
-      if(linesearch) {
-	xcorb=solver.half_hole_ls(xcatom,sol,init_conv,dft_init);
-	xcorb=solver.half_hole_ls(xcatom,sol,conv,dft);
-      } else {
-	xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
-	xcorb=solver.half_hole(xcatom,sol,conv,dft);
-      }
+      xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
+      xcorb=solver.half_hole(xcatom,sol,conv,dft);
     }
     
     printf("\n\n");

@@ -69,7 +69,9 @@ void Settings::add_scf_settings() {
   add_bool("UseTRRH", "Use Trust-Region Roothaan-Hall?", false);
   // Use trust-region DSM?
   add_bool("UseTRDSM", "Use Trust-Region DSM?", false);
-  
+  // Do line search?
+  add_bool("LineSearch", "Do line search in level shift (EXPENSIVE!)", false);
+
   // Total charge of system
   add_int("Charge", "Total charge of system", 0);
   // Multiplicity
@@ -95,9 +97,6 @@ void Settings::add_scf_settings() {
   add_double("DeltaPrms", "Maximum allowed RMS difference of density matrix", 1e-8);
   add_double("DeltaPmax", "Maximum allowed maximum difference of density matrix", 1e-6);
   add_double("DeltaEmax", "Maximum allowed change of energy", 1e-6);
-
-  // Line search?
-  add_bool("LineSearch", "Perform a full line search (slow!!!)", false);
 
   // Maximum iterations
   add_int("MaxIter", "Maximum number of iterations in SCF cycle", 100);

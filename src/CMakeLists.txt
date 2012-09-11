@@ -21,7 +21,7 @@ INCLUDE_DIRECTORIES(${HDF5_INCLUDE_DIRS})
 add_library (liberkale basis.cpp basislibrary.cpp stringutil.cpp
 mathf.cpp integrals.cpp eritable.cpp eriscreen.cpp timer.cpp
 linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf-base.cpp
-scf-solvers.cpp scf-fock.cpp scf-line.cpp elements.cpp xyzutils.cpp
+scf-solvers.cpp scf-fock.cpp elements.cpp xyzutils.cpp
 settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
 properties.cpp checkpoint.cpp guess.cpp external/storage.cpp
 external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
@@ -157,17 +157,4 @@ add_custom_command(
   COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
   COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
   COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
-)
-
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in
-
-  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
-  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
-  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-line.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-line.cpp
 )
