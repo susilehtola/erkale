@@ -283,6 +283,8 @@ class BasisSet {
 
   /// Get shells in basis set
   std::vector<GaussianShell> get_shells() const;
+  /// Get shells of inucth nucleus in basis set
+  std::vector<GaussianShell> get_shells(size_t inuc) const;
   /// Get ind:th shell
   GaussianShell get_shell(size_t shind) const;
   /// Get index of the center of the ind'th shell
