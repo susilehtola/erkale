@@ -41,6 +41,8 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
   set.set_string("Guess","Core");
   set.set_int("MaxIter",200);
   set.set_bool("DensityFitting",false);
+  // We should always afford to do a line search in an sp basis for a single atom
+  set.set_bool("LineSearch",true);
 
   if(verbose) {
     printf("Performing atomic guess for atoms:\n");
@@ -131,8 +133,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
 
     // Solve ROHF
     uscf_t sol;
-    // We should always afford to do a line search in an sp basis for a single atom
-    solver.ROHF_ls(sol,Nel_alpha,Nel_beta,conv);
+    solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
     
     // Re-get shells, in new indexing.
     shells=atbas.get_funcs(0);

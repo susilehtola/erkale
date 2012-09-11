@@ -1,4 +1,3 @@
-/* Resticted case */
 #if defined(RESTRICTED) && defined(DFT)
 void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const
 
@@ -21,6 +20,61 @@ size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
 #endif
 {
+
+  /// Formation of Fock matrix
+#ifdef RESTRICTED
+#if defined(HF)
+#define form_fock(sol,ref) Fock_RHF(sol,occs,conv,ref,tol); nfock++;
+#elif defined(DFT)
+#define form_fock(sol,ref) Fock_RDFT(sol,occs,conv,dft,ref,grid,tol); nfock++;
+#endif
+
+#else
+  // Unrestricted case: first core excited states
+
+#if defined(HALFHOLE)
+#define form_fock(sol,ref) Fock_half_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,tol); nfock++;
+#elif defined(FULLHOLE)
+#define form_fock(sol,ref) Fock_full_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,tol,xch); nfock++;
+
+  // Conventional HF and DFT
+#elif defined(HF)
+#define form_fock(sol,ref) Fock_UHF(sol,occa,occb,conv,ref,tol); nfock++;
+#elif defined(_ROHF)
+#define form_fock(sol,ref) Fock_ROHF(sol,Nel_alpha,Nel_beta,conv,ref,tol); nfock++;
+#elif defined(DFT)
+#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,conv,dft,ref,grid,tol); nfock++;
+#endif
+#endif
+
+  /// Find excited orbital
+#if defined(FULLHOLE) || defined(HALFHOLE)
+#define find_exc(sol) if(spin) {ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);} else {ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);}
+#endif
+
+  /// Occupancy update
+#if defined(FULLHOLE)
+#define upd_occa() if(spin) {occa=norm_occ(nocca);} else { if(xch) {occa=xch_occ(ixc_orb,nocca);} else {occa=fch_occ(ixc_orb,nocca);} }
+#define upd_occb() if(!spin) {occb=norm_occ(noccb);} else { if(xch) {occb=xch_occ(ixc_orb,noccb);} else {occb=fch_occ(ixc_orb,noccb);} }
+#elif defined(HALFHOLE)
+#define upd_occa() if(spin) {occa=norm_occ(nocca);} else { occa=tp_occ(ixc_orb,nocca);}
+#define upd_occb() if(!spin) {occb=norm_occ(noccb);} else { occb=tp_occ(ixc_orb,noccb);}
+#endif
+
+  /// Density formation
+#ifdef RESTRICTED
+#define form_dens(sol) sol.P=form_density(sol.C,occs);
+#else
+#define form_dens_ur(sol) sol.Pa=form_density(sol.Ca,occa); sol.Pb=form_density(sol.Cb,occb); sol.P=sol.Pa+sol.Pb;
+
+#if defined(HALFHOLE) || defined(FULLHOLE)
+#define form_dens(sol) find_exc(sol); upd_occa(); upd_occb(); form_dens_ur(sol);
+#else
+#define form_dens(sol) form_dens_ur(sol)
+#endif
+
+#endif // ifdef RESTRICTED
+
 
 #if defined(_ROHF)
   // Occupations
@@ -68,6 +122,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
 #endif
 
+  int nfock=0;
 
   Timer t;
   Timer ttot;
@@ -108,11 +163,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // ADIIS
   ADIIS adiisa;
   ADIIS adiisb;
-  
+
   // TRDSM
   TRDSM trdsma(S);
   TRDSM trdsmb(S);
-  
+
   // Broyden
   Broyden broyd_sum(Nbf*Nbf,verbose);
   Broyden broyd_diff(Nbf*Nbf,verbose);
@@ -156,23 +211,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  throw std::runtime_error("No starting guess, and use of core guess disallowed!\n");
 
 #ifdef RESTRICTED
-	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-	eig_sym_ordered(sol.E,orbs,Horth); // Solve in orthogonal basis
-
-	// Transform back to non-orthogonal basis
-	sol.C=Sinvh*orbs;
-	check_orth(sol.C,S,false);
+	sol.H=Hcore;
 #else
-	Horth=trans(Sinvh)*Hcore*Sinvh; // Transform to orthogonal basis
-	eig_sym_ordered(sol.Ea,orbs,Horth); // Solve in orthogonal basis
-	// Transform back to non-orthogonal basis
-	sol.Ca=Sinvh*orbs;
-	check_orth(sol.Ca,S,false);
-
-	// Copy orbitals
-	sol.Eb=sol.Ea;
-	sol.Cb=sol.Ca;
+	sol.Ha=Hcore;
+	sol.Hb=Hcore;
 #endif
+
+	diagonalize(sol);
 
 	if(verbose)
 	  printf("\nCore guess formed in %s.\n",t.elapsed().c_str());
@@ -190,45 +235,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   size_t ixc_orb=0;
 #endif
 
-#ifdef RESTRICTED
-  sol.P=form_density(sol.C,occs);
-#else
-
-#if defined(FULLHOLE) || defined(HALFHOLE)
-  if(spin)
-    ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
-  else
-    ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
-
-  if(spin) {
-#if defined(FULLHOLE)
-    if(!xch)
-      occb=fch_occ(ixc_orb,noccb); // Full hole in beta spin
-    else
-      occb=xch_occ(ixc_orb,noccb); // Full hole in beta spin, LUMO occupied
-#else
-    occb=tp_occ(ixc_orb,noccb); // Transition potential occupation
-#endif
-    occa=norm_occ(nocca); // Normal occupation in beta
-  } else {
-#if defined(FULLHOLE)
-    if(!xch)
-      occa=fch_occ(ixc_orb,nocca); // Full hole in alpha spin
-    else
-      occa=xch_occ(ixc_orb,nocca); // Full hole in alpha spin, LUMO occupied
-#else
-    occa=tp_occ(ixc_orb,nocca); // Transition potential occupation
-#endif
-    occb=norm_occ(noccb); // Normal occupation in beta
-  }
-
-  // End HALFHOLE || FULLHOLE
-#endif
-
-  sol.Pa=form_density(sol.Ca,occa);
-  sol.Pb=form_density(sol.Cb,occb);
-  sol.P=sol.Pa+sol.Pb;
-#endif // end ifdef RESTRICTED
+  // Form the density matrix
+  form_dens(sol);
 
   // Print orbital energies
   if(verbose) {
@@ -336,43 +344,19 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   int iiter=1;
   while(iiter<=maxiter) {
     Timer titer;
-    
+
     if(verbose)
       printf("\n ******* Iteration %4i ********\n",iiter);
 
     // Form the Fock operator.
-#ifdef RESTRICTED
-    // Restricted case.
-#if defined(HF)
-    Fock_RHF(sol,occs,conv,oldsol,tol);
-#elif defined(DFT)
-    Fock_RDFT(sol,occs,conv,dft,oldsol,grid,tol);
-#endif
-#else
-#if defined(HALFHOLE)
-    // Transition potential
-    Fock_half_hole(xcatom,sol,conv,dft,occa,occb,oldsol,grid,tol);
-#elif defined(FULLHOLE)
-    // Full core hole
-    Fock_full_hole(xcatom,sol,conv,dft,occa,occb,oldsol,grid,tol,xch);
-
-    // Unrestricted case
-#elif defined(HF)
-    Fock_UHF(sol,occa,occb,conv,oldsol,tol);
-#elif defined(_ROHF)
-    Fock_ROHF(sol,Nel_alpha,Nel_beta,conv,oldsol,tol);
-#elif defined(DFT)
-    Fock_UDFT(sol,occa,occb,conv,dft,oldsol,grid,tol);
-#endif
-
-#endif // End spin case
+    form_fock(sol,sol);
 
     // Compute change of energy
     deltaE=sol.en.E-oldsol.en.E;
     // Update screening value
     if(!strictint)
       tol=std::min(std::min(fabs(deltaE)*1e-2,ROUGHTOL),tol);
-    
+
     // Update ADIIS stacks.
     if(useadiis) {
 #ifdef RESTRICTED
@@ -522,7 +506,188 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // Save old solution
     oldsol=sol;
 
-    if(usetrrh) {
+    if(linesearch) {
+      // Do line search in the level shift to find the update
+
+      // LH level shift
+      double lmu=0.0;
+      // RH level shift;
+      const double rmuin=0.5;
+      double rmu=rmuin;
+      
+      bool mufound=false;
+
+      // Solutions
+#ifdef RESTRICTED
+      rscf_t lhsol(sol), oldrhsol, rhsol(sol);
+      const rscf_t refsol(sol);
+#else
+      uscf_t lhsol(sol), oldrhsol, rhsol(sol);
+      const uscf_t refsol(sol);
+#endif
+      // Form LH solution - no level shift
+      diagonalize(lhsol);
+      form_dens(lhsol);
+      form_fock(lhsol,sol);
+      diagonalize(lhsol);
+
+      printf("\nLine search for level shift\n");
+      printf("\t%e\t%e\n",lmu,lhsol.en.E);
+
+      double minE=lhsol.en.E;
+
+      // Find RH level shift
+      while(true) {
+	// Store old RH solution
+	oldrhsol=rhsol;
+
+#ifdef RESTRICTED
+	rhsol.H=sol.H-rmu*S*sol.P*S;
+#else
+	rhsol.Ha=sol.Ha-rmu*S*sol.Pa*S;
+	rhsol.Hb=sol.Hb-rmu*S*sol.Pb*S;
+#endif
+	diagonalize(rhsol);
+	form_dens(rhsol);
+	form_fock(rhsol,sol);
+	diagonalize(rhsol);
+
+	printf("\t%e\t%e\t%e\n",rmu,rhsol.en.E,rhsol.en.E-lhsol.en.E);
+	fflush(stdout);
+
+	if(fabs(rhsol.en.E-lhsol.en.E)<conv.deltaEmax) {
+	  sol=lhsol;
+	  mufound=true;
+	  break;
+	}
+	 
+
+	if(rhsol.en.E<minE) {
+	  minE=rhsol.en.E;
+	  // Update LH shift and solution
+	  if(rmu!=rmuin) {
+	    lhsol=oldrhsol;
+	    lmu=rmu/2.0;
+	  }
+	  // and increase RH shift
+	  rmu*=2.0;
+	} else
+	  break;
+      }
+
+      double Emin0=std::min(lhsol.en.E,rhsol.en.E);
+
+      double oldE=0.0;
+      
+      // Use golden section search to find minimum
+      const double tau=(sqrt(5.0)-1.0)/2.0;
+
+      // Compute trials 1 and 2?
+      bool comp1=true;
+      bool comp2=true;
+
+#ifdef RESTRICTED
+      rscf_t sol1(sol), sol2(sol);
+#else
+      uscf_t sol1(sol), sol2(sol);
+#endif
+      
+      if(!mufound)
+	for(int imu=0;imu<10;imu++) {
+	  // Compute new trials
+	  double mu1=lmu+(1-tau)*(rmu-lmu);
+	  double mu2=lmu+tau*(rmu-lmu);
+	  
+	  // Do level shifts
+#ifdef RESTRICTED
+	  if(comp1)
+	    sol1.H=refsol.H-mu1*S*refsol.P*S;
+	  if(comp2)
+	    sol2.H=refsol.H-mu2*S*refsol.P*S;
+#else
+	  if(comp1) {
+	    sol1.Ha=refsol.Ha-mu1*S*refsol.Pa*S;
+	    sol1.Hb=refsol.Hb-mu1*S*refsol.Pb*S;
+	  }
+	  if(comp2) {
+	    sol2.Ha=refsol.Ha-mu2*S*refsol.Pa*S;
+	    sol2.Hb=refsol.Hb-mu2*S*refsol.Pb*S;
+	  }
+#endif
+	  
+	  // Compute energies
+	  if(comp1) {
+	    diagonalize(sol1);
+	    form_dens(sol1);
+	    form_fock(sol1,sol);
+	    diagonalize(sol1);
+	    printf("\t%e\t%e\t%e\n",mu1,sol1.en.E,sol1.en.E-Emin0);
+	    fflush(stdout);
+	  }
+	  
+	  if(comp2) {
+	    diagonalize(sol2);
+	    form_dens(sol2);
+	    form_fock(sol2,sol);
+	    diagonalize(sol2);
+	    printf("\t%e\t%e\t%e\n",mu2,sol2.en.E,sol2.en.E-Emin0);
+	    fflush(stdout);
+	  }
+	  
+	  /*
+	  fprintf(stderr,"mu: %e %e %e %e\n",lmu,mu1,mu2,rmu);
+	  fprintf(stderr,"E: %e %e %e %e\n",lhsol.en.E,sol1.en.E,sol2.en.E,rhsol.en.E);
+	  */
+	  
+	  // Choose what to do
+	  minE=std::min(std::min(lhsol.en.E,rhsol.en.E),std::min(sol1.en.E,sol2.en.E));
+	  
+	  double mu;
+	  
+	  if(minE==lhsol.en.E) {
+	    // probably converged
+	    mu=lmu;
+	    sol=lhsol;
+	    break;
+	  } else if(minE==rhsol.en.E) {
+	    // probably converged
+	    mu=rmu;
+	    sol=rhsol;
+	    break;
+	  } else if(minE==sol1.en.E) {
+	    // Move right limit closer
+	    rmu=mu2;
+	    rhsol=sol2;
+	    
+	    // New solution 2 is old solution 1
+	    sol2=sol1;
+	    comp2=false;
+	    comp1=true;
+	    
+	    oldE=sol.en.E;
+	    mu=mu1;
+	    sol=sol1;
+	  } else { // minE==sol2.en.E
+	    // Move left limit closer
+	    lmu=mu1;
+	    lhsol=sol1;
+	    
+	    // New solution 1 is old solution 2
+	    sol1=sol2;
+	    comp1=false;
+	    comp2=true;
+	    
+	    oldE=sol.en.E;
+	    mu=mu2;
+	    sol=sol2;
+	  }
+	  
+	  // Check convergence
+	  if(oldE-sol.en.E<conv.deltaEmax)
+	    break;
+	  
+	}
+    } else if(usetrrh) {
       if(adiisdone)
 	;
 
@@ -566,72 +731,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	t.set();
       }
 
-#ifdef RESTRICTED
-      // Transform Hamiltonian into orthogonal basis
-      Horth=arma::trans(Sinvh)*sol.H*Sinvh;
-      // Update orbitals and energies
-      eig_sym_ordered(sol.E,orbs,Horth);
-      // Transform back to non-orthogonal basis
-      sol.C=Sinvh*orbs;
-
-      // Check orthonormality
-      check_orth(sol.C,S,false);
-#else
-      Horth=trans(Sinvh)*sol.Ha*Sinvh;
-      eig_sym_ordered(sol.Ea,orbs,Horth);
-      sol.Ca=Sinvh*orbs;
-      check_orth(sol.Ca,S,false);
-
-      Horth=trans(Sinvh)*sol.Hb*Sinvh;
-      eig_sym_ordered(sol.Eb,orbs,Horth);
-      sol.Cb=Sinvh*orbs;
-      check_orth(sol.Cb,S,false);
-#endif
+      // Do the diagonalization
+      diagonalize(sol);
 
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
     }
 
     // Form new density matrix
-#ifdef RESTRICTED
-    sol.P=form_density(sol.C,occs);
-#else
-
-#if defined(FULLHOLE) || defined(HALFHOLE)
-    if(spin)
-      ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);
-    else
-      ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);
-
-    if(spin) {
-#if defined(FULLHOLE)
-      if(!xch)
-	occb=fch_occ(ixc_orb,noccb); // Full hole in beta spin
-      else
-	occb=xch_occ(ixc_orb,noccb); // Full hole in beta spin, LUMO occupied
-#else
-      occb=tp_occ(ixc_orb,noccb); // Transition potential occupation
-#endif
-      occa=norm_occ(nocca); // Normal occupation in beta
-    } else {
-#if defined(FULLHOLE)
-      if(!xch)
-	occa=fch_occ(ixc_orb,nocca); // Full hole in alpha spin
-      else
-	occa=xch_occ(ixc_orb,nocca); // Full hole in alpha spin, LUMO occupied
-#else
-      occa=tp_occ(ixc_orb,nocca); // Transition potential occupation
-#endif
-      occb=norm_occ(noccb); // Normal occupation in beta
-    }
-
-    // End HALFHOLE || FULLHOLE
-#endif
-
-    sol.Pa=form_density(sol.Ca,occa);
-    sol.Pb=form_density(sol.Cb,occb);
-    sol.P=sol.Pa+sol.Pb;
-#endif // end ifdef RESTRICTED
+    form_dens(sol);
 
 #ifdef RESTRICTED
     arma::mat deltaP=sol.P-oldsol.P;
@@ -822,6 +930,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
       printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
       fprintf(stderr,"%s converged in %s.\n\n",method.c_str(),ttot.elapsed().c_str());
+
+      if(linesearch) {
+	printf("Fock matrix was built %i times.\n",nfock);
+	fprintf(stderr,"Fock matrix was built %i times.\n",nfock);
+      }
+	
     }
   } else {
     std::ostringstream oss;
