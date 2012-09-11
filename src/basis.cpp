@@ -1293,6 +1293,14 @@ std::vector<GaussianShell> BasisSet::get_shells() const {
   return shells;
 }
 
+std::vector<GaussianShell> BasisSet::get_shells(size_t inuc) const {
+  std::vector<GaussianShell> ret;
+  for(size_t ish=0;ish<shells.size();ish++)
+    if(shells[ish].get_center_ind()==inuc)
+      ret.push_back(shells[ish]);
+  return ret;
+}
+
 GaussianShell BasisSet::get_shell(size_t ind) const {
   return shells[ind];
 }
