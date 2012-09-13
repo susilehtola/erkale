@@ -186,9 +186,9 @@ class BasisSetLibrary {
   void save_gaussian94(const std::string & filename, bool append=false) const;
 
   /// Save basis set to file in Dalton format
-  void save_dalton(const char * filename, bool verbose=true) const;
+  void save_dalton(const char * filename, bool append=false) const;
   /// Save basis set to file in Dalton format
-  void save_dalton(const std::string & filename, bool verbose=true) const;
+  void save_dalton(const std::string & filename, bool append=false) const;
 
   /// Add element to basis set
   void add_element(const ElementBasisSet & el);

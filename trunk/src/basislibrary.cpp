@@ -529,13 +529,22 @@ void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
   FILE *out;
   if(append)
     out=fopen(filename,"a");
-  else
+  else {
     out=fopen(filename,"w");
+    fprintf(out,"$ Supported elements\n$");
+    for(size_t i=0;i<elements.size();i++)
+      fprintf(out," %s",elements[i].get_symbol().c_str());
+    fprintf(out,"\n");
+
+    fprintf(out,"************************************************************************\n");
+  }
 
   // Loop over elements
   for(size_t iel=0;iel<elements.size();iel++) {
     // Get element
     ElementBasisSet el=elements[iel];
+    // Print element
+    fprintf(out,"a %i\n",get_Z(el.get_symbol()));
     // Loop over angular momentum
     for(int l=0;l<=el.get_max_am();l++) {
       // Get exponents and contraction coefficients
@@ -544,18 +553,30 @@ void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
       el.get_primitives(exps,coeffs,l);
 
       // Print label
-      fprintf(out,"! %c functions\n",tolower(shell_types[l]));
+      fprintf(out,"$ %s\n",toupper(element_names[get_Z(el.get_symbol())]).c_str());
+      fprintf(out,"$ %c-TYPE FUNCTIONS\n",toupper(shell_types[l]));
       // Print element, number of exponents and contracted functions
-      fprintf(out,"%2s %4i %4i\n",el.get_symbol().c_str(),(int) exps.size(),(int) coeffs.n_cols);
+      fprintf(out,"%4i %4i %4i\n",(int) exps.size(),(int) coeffs.n_cols,0);
       
       // Loop over exponents
       for(size_t iexp=0;iexp<exps.size();iexp++) {
 	// Print exponent
-	fprintf(out,"%e",exps[iexp]);
+	fprintf(out,"% 14.8f",exps[iexp]);
 	// and contraction scheme
-	for(size_t ic=0;ic<coeffs.n_cols;ic++)
-	  fprintf(out," % e",coeffs(iexp,ic));
-	fprintf(out,"\n");
+	int np=1; // amount of printed entries
+	for(size_t ic=0;ic<coeffs.n_cols;ic++) {
+	  if(np==0)
+	    fprintf(out,"% 14.8f",coeffs(iexp,ic));
+	  else
+	    fprintf(out," % .8f",coeffs(iexp,ic));
+	  np++;
+	  if(np==7) {
+	    fprintf(out,"\n");
+	    np=0;
+	  }
+	}
+	if(np!=0)
+	  fprintf(out,"\n");
       }
     }
   }
