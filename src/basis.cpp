@@ -1189,8 +1189,8 @@ void BasisSet::finalize(bool convert) {
   // Form list of unique shell pairs
   form_unique_shellpairs();
 
-  // Compute precursors
-  compute_precursors();
+  // Compute precursors - not done since they often take a huge bunch of memory!
+  //  compute_precursors();
 }
 
 int BasisSet::get_am(size_t ind) const {
@@ -2206,8 +2206,12 @@ std::vector<double> BasisSet::ERI(const size_t is_orig, const size_t js_orig, co
     std::swap(js,ls);
   }
 
-  // Get the cartesian ERIs
-  std::vector<double> eris=ERI_cart_libint(&shells[is],&shells[js],precursor[is][js],&shells[ks],&shells[ls],precursor[ks][ls]);
+  //// Get the cartesian ERIs:
+  // using precomputed precursors - not done
+  //  std::vector<double> eris=ERI_cart_libint(&shells[is],&shells[js],precursor[is][js],&shells[ks],&shells[ls],precursor[ks][ls]);
+  // computing precursor on-the-fly
+  std::vector<double> eris=ERI_cart_libint(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+
   // get them in the original order
   reorder_ERIs(eris,&shells[is],&shells[js],&shells[ks],&shells[ls],swap_ij,swap_kl,swap_ijkl);
   // and transform them into the spherical basis
