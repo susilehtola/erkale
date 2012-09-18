@@ -47,6 +47,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
   if(verbose) {
     printf("Performing atomic guess for atoms:\n");
     fprintf(stderr,"Calculating initial atomic guess ... ");
+    fflush(stdout);
     fflush(stderr);
   }
 
@@ -157,8 +158,10 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
 	}
       }
 
-    if(verbose)
+    if(verbose) {
       printf(" (%s)\n",tsol.elapsed().c_str());
+      fflush(stdout);
+    }
 
     // Remove temporary file
     remove(tmpname);
@@ -190,8 +193,10 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
   for(size_t i=0;i<std::min(orbE.size(),(size_t) C.n_cols);i++)
     E(i)=orbE[i];
   
-  if(verbose)
+  if(verbose) {
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
+    fflush(stderr);
+  }
 }
 
 int atom_am(int Z) {
