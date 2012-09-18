@@ -531,8 +531,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       form_fock(lhsol,sol);
       diagonalize(lhsol);
 
-      printf("\nLine search for level shift\n");
-      printf("\t%e\t%e\n",lmu,lhsol.en.E);
+      if(verbose) {
+	printf("\nLine search for level shift\n");
+	printf("\t%e\t%e\n",lmu,lhsol.en.E);
+      }
 
       double minE=lhsol.en.E;
 
@@ -552,8 +554,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	form_fock(rhsol,sol);
 	diagonalize(rhsol);
 
-	printf("\t%e\t%e\t%e\n",rmu,rhsol.en.E,rhsol.en.E-lhsol.en.E);
-	fflush(stdout);
+	if(verbose) {
+	  printf("\t%e\t%e\t%e\n",rmu,rhsol.en.E,rhsol.en.E-lhsol.en.E);
+	  fflush(stdout);
+	}
 
 	if(fabs(rhsol.en.E-lhsol.en.E)<conv.deltaEmax) {
 	  sol=lhsol;
@@ -621,8 +625,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_dens(sol1);
 	    form_fock(sol1,sol);
 	    diagonalize(sol1);
-	    printf("\t%e\t%e\t%e\n",mu1,sol1.en.E,sol1.en.E-Emin0);
-	    fflush(stdout);
+	    if(verbose) {
+	      printf("\t%e\t%e\t%e\n",mu1,sol1.en.E,sol1.en.E-Emin0);
+	      fflush(stdout);
+	    }
 	  }
 	  
 	  if(comp2) {
@@ -630,8 +636,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_dens(sol2);
 	    form_fock(sol2,sol);
 	    diagonalize(sol2);
-	    printf("\t%e\t%e\t%e\n",mu2,sol2.en.E,sol2.en.E-Emin0);
-	    fflush(stdout);
+	    if(verbose) {
+	      printf("\t%e\t%e\t%e\n",mu2,sol2.en.E,sol2.en.E-Emin0);
+	      fflush(stdout);
+	    }
 	  }
 	  
 	  /*
