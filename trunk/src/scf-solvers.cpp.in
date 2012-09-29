@@ -650,8 +650,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  // Choose what to do
 	  minE=std::min(std::min(lhsol.en.E,rhsol.en.E),std::min(sol1.en.E,sol2.en.E));
 	  
-	  double mu;
-	  
 	  if(minE==lhsol.en.E) {
 	    // probably converged
 	    mu=lmu;
