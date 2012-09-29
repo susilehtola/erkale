@@ -652,12 +652,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  
 	  if(minE==lhsol.en.E) {
 	    // probably converged
-	    mu=lmu;
 	    sol=lhsol;
 	    break;
 	  } else if(minE==rhsol.en.E) {
 	    // probably converged
-	    mu=rmu;
 	    sol=rhsol;
 	    break;
 	  } else if(minE==sol1.en.E) {
@@ -671,7 +669,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    comp1=true;
 	    
 	    oldE=sol.en.E;
-	    mu=mu1;
 	    sol=sol1;
 	  } else { // minE==sol2.en.E
 	    // Move left limit closer
@@ -684,7 +681,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    comp2=true;
 	    
 	    oldE=sol.en.E;
-	    mu=mu2;
 	    sol=sol2;
 	  }
 	  
