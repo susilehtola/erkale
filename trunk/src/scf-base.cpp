@@ -215,12 +215,16 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   } else  {
     // Compute ERIs
     if(direct) {
+
+      // Form decontracted basis set and get the screening matrix
+      decbas=basis.decontract(decconv);
+
       if(verbose) {
 	t.set();
 	printf("Forming ERI screening matrix ... ");
 	fflush(stdout);
       }
-      scr.fill(&basis);
+      scr.fill(&decbas);
     } else {
       // Compute memory requirement
       size_t N;

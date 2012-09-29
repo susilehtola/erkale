@@ -217,6 +217,11 @@ class SCF {
   /// Density fitting table
   DensityFit dfit;
 
+  /// Decontracted basis set
+  BasisSet decbas;
+  /// Conversion matrix
+  arma::mat decconv;
+
   /// List of frozen orbitals by symmetry group. index+1 is symmetry group, group 0 contains all non-frozen orbitals
   std::vector<arma::mat> freeze;
 

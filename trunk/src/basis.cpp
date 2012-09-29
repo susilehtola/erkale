@@ -2924,6 +2924,138 @@ bool BasisSet::operator==(const BasisSet & rhs) const {
   return true;
 }
 
+BasisSet BasisSet::decontract(arma::mat & m) const {
+  // Decontract basis set. m maps old basis functions to new ones
+  
+  // Contraction schemes for the nuclei
+  std::vector< std::vector<arma::mat> > coeffs(nuclei.size());
+  std::vector< std::vector< std::vector<double> > > exps(nuclei.size());
+  // Is puream used on the shell?
+  std::vector< std::vector<bool> > puream(nuclei.size());
+
+  // Amount of new basis functions
+  size_t Nbfnew=0;
+
+  // Collect the schemes. Loop over the nuclei.
+  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+    // Construct an elemental basis set for the nucleus
+    ElementBasisSet elbas(get_symbol(inuc));
+
+    // Get the shells belonging to this nucleus
+    std::vector<GaussianShell> shs=get_shells(inuc);
+
+    // and add the contractions to the elemental basis set
+    for(size_t ish=0;ish<shs.size();ish++) {
+      // Angular momentum is
+      int am=shs[ish].get_am();
+      // Normalized contraction coefficients
+      std::vector<contr_t> c=shs[ish].get_contr_normalized();
+      FunctionShell fsh(am,c);
+      elbas.add_function(fsh);
+    }
+
+    // Sanity check - puream must be the same for all shells of the current nucleus with the same am
+    if(shs.size()>0) {
+      std::vector<int> pam;
+      for(int am=0;am<=elbas.get_max_am();am++) {
+	// Initialization value
+	pam.push_back(-1);
+	
+	for(size_t ish=0;ish<shs.size();ish++) {
+	  // Skip if am is not the same
+	  if(shs[ish].get_am()!=am)
+	    continue;
+	  
+	  // Is this the first shell of the type?
+	  if(pam[am]==-1)
+	    pam[am]=shs[ish].lm_in_use();
+	  else if(shs[ish].lm_in_use()!=pam[am]) {
+	    ERROR_INFO();
+	    throw std::runtime_error("BasisSet::decontract not implemented for mixed pure am on the same center.\n");
+	  }
+	}
+
+	// Store the value
+	puream[inuc].push_back(pam[am]==1);
+      }
+    }
+
+    // Exponents and contraction schemes
+    for(int am=0;am<=elbas.get_max_am();am++) {
+      std::vector<double> z;
+      arma::mat c;
+      elbas.get_primitives(z,c,am);
+      coeffs[inuc].push_back(c);
+      exps[inuc].push_back(z);
+
+      if(puream[inuc][am])
+	Nbfnew+=(2*am+1)*z.size();
+      else
+	Nbfnew+=(am+1)*(am+2)/2*z.size();
+    }
+  }
+
+  // Now form the new, decontracted basis set.
+  BasisSet dec;
+  // Initialize transformation matrix
+  m.zeros(Nbfnew,get_Nbf());
+
+  // Add the nuclei
+  for(size_t i=0;i<nuclei.size();i++)
+    dec.add_nucleus(nuclei[i]);
+
+  // and the shells.
+  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+    // Get the shells belonging to this nucleus
+    std::vector<GaussianShell> shs=get_shells(inuc);
+
+    // Generate the new basis functions. Loop over am
+    for(size_t am=0;am<coeffs[inuc].size();am++) {
+      // First functions with the exponents are
+      std::vector<size_t> ind0;
+
+      // Add the new shells
+      for(size_t iz=0;iz<exps[inuc][am].size();iz++) {
+	// Index of first function is
+	ind0.push_back(dec.get_Nbf());
+	// Add the shell
+	std::vector<contr_t> hlp(1);
+	hlp[0].c=1.0;
+	hlp[0].z=exps[inuc][am][iz];
+	dec.add_shell(inuc,am,puream[inuc][am],hlp,false);
+      }
+
+      // and store the coefficients
+      for(size_t ish=0;ish<shs.size();ish++)
+	if(shs[ish].get_am()==am) {
+	  // Get the normalized contraction on the shell
+	  std::vector<contr_t> ct=shs[ish].get_contr_normalized();
+	  // and loop over the exponents
+	  for(size_t ic=0;ic<ct.size();ic++) {
+
+	    // Find out where the exponent is in the new basis set
+	    size_t ix;
+	    for(ix=0;ix<exps[inuc][am].size();ix++)
+	      if(exps[inuc][am][ix]==ct[ic].z)
+		// Found exponent
+		break;
+
+	    // Now that we know where the exponent is in the new basis
+	    // set, we can just store the coefficients. So, loop over
+	    // the functions on the shell
+	    for(size_t ibf=0;ibf<shs[ish].get_Nbf();ibf++)
+	      m(ind0[ix]+ibf,shs[ish].get_first_ind()+ibf)=ct[ic].c;
+	  }
+	}
+    }
+  }
+
+  // Finalize the basis
+  dec.finalize();
+
+  return dec;
+}
+
 GaussianShell dummyshell() {
   // Set center
   coords_t r;
