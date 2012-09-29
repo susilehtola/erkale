@@ -58,6 +58,8 @@ class FunctionShell {
  public:
   /// Construct a shell with angular momentum am
   FunctionShell(int am=-1);
+  /// Construct a shell with angular momentum am and given contraction
+  FunctionShell(int am, const std::vector<contr_t> & c);
   /// Destructor
   ~FunctionShell();
 

@@ -96,6 +96,11 @@ FunctionShell::FunctionShell(int amval) {
   am=amval;
 }
 
+FunctionShell::FunctionShell(int amval, const std::vector<contr_t> & c) {
+  am=amval;
+  C=c;
+}
+
 FunctionShell::~FunctionShell() {
 }
 
