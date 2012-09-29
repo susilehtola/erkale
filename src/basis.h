@@ -222,6 +222,9 @@ class BasisSet {
    */
   BasisSet exchange_fitting() const;
 
+  /// Decontract basis set, m gives mapping from old functions to new ones
+  BasisSet decontract(arma::mat & m) const;
+
   /// Add nucleus
   void add_nucleus(const nucleus_t & nuc);
   /// Add a shell to a nucleus and sort functions if wanted
