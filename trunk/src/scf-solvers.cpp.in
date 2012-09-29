@@ -349,7 +349,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       printf("\n ******* Iteration %4i ********\n",iiter);
 
     // Form the Fock operator.
-    form_fock(sol,sol);
+    form_fock(sol,oldsol);
 
     // Compute change of energy
     deltaE=sol.en.E-oldsol.en.E;
