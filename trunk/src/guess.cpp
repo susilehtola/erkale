@@ -169,6 +169,12 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
     free(tmpname);
   }
 
+  Timer trest;
+  if(verbose) {
+    printf("Diagonalizing density matrix ... ");
+    fflush(stdout);
+  }
+
   // Check that density matrix contains the right amount of electrons
   arma::mat S=basis.overlap();
   int Neltot=basis.Ztot()-set.get_int("Charge");
@@ -194,6 +200,8 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
     E(i)=orbE[i];
   
   if(verbose) {
+    printf("done (%s)\n",trest.elapsed().c_str());
+    printf("Atomic guess formed in %s.\n\n",ttot.elapsed().c_str());
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
     fflush(stderr);
   }
