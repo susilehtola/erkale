@@ -37,8 +37,8 @@ export FFLAGS="${CFLAGS}"
 export FCFLAGS="${CFLAGS}"
 
 # LAPACK and BLAS library to use
-LAPACK="-L/usr/lib64/atlas -llapack -latlas"
-BLAS="-L/usr/lib64/atlas -latlas"
+LAPACK="-L/usr/lib64/atlas -llapack -lcblas -latlas"
+BLAS="-L/usr/lib64/atlas -lcblas -latlas"
 
 # Maximum supported angular momentum (affects libint)
 # If this is very high, libint compilation will take ages and the
