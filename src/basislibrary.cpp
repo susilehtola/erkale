@@ -1,6 +1,6 @@
 /**
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -233,7 +233,7 @@ void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coe
   int nsh=0;
   // Clear current exponents
   exps.clear();
-  
+
   for(size_t ish=0;ish<bf.size();ish++)
     if(bf[ish].get_am()==am) {
       // Increment number of shells
@@ -251,7 +251,7 @@ void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coe
 	    found=1;
 	    break;
 	  }
-	
+
 	// If exponent was not found, add it to the list.
 	if(!found)
 	  exps.push_back(shc[iexp].z);
@@ -326,10 +326,10 @@ void ElementBasisSet::decontract() {
 	// Get upper bound
 	std::vector<double>::iterator high;
 	high=std::upper_bound(zeta[am].begin(),zeta[am].end(),c[iexp].z);
-	
+
 	// Corresponding index is
 	size_t ind=high-zeta[am].begin();
-	
+
 	if(ind>0 && zeta[am][ind-1]==c[iexp].z)
 	  // Already on list. Don't do anything.
 	  ;
@@ -413,13 +413,13 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	  if(elements[i].get_number()==num) {
 	    // Already an element with this index!
 	    numfound=1;
-	    
+
 	    if(elements[i].get_symbol()==sym)
 	      // And the entry is even duplicate!
 	      dupl++;
 	  }
 	}
-	
+
 	if(dupl) {
 	  std::ostringstream oss;
 	  ERROR_INFO();
@@ -431,10 +431,10 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	  oss << "Error: a special basis set given multiple times for center " << num;
 	  throw std::runtime_error(oss.str());
 	}
-	  
+
 	// Create basis set structure for the element
 	el=ElementBasisSet(sym,num);
-	
+
 	// Now, proceed by reading in the basis functions
 	while(1) {
 	  // Get next line
@@ -453,16 +453,16 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	  } else {
 	    // Nope, there is a shell.
 	    std::vector<std::string> words=splitline(line);
-	    
+
 	    // The shell type is
 	    std::string shelltype=words[0];
 	    // The amount of exponents is
 	    int nc=readint(words[1]);
 
-	    if(shelltype.size()==2) {
-	      // This is an SP shell!
+	    if(strcmp(shelltype.c_str(),"SP")==0) {
+	      // SP shell
 	      FunctionShell S(0), P(1);
-	      
+
 	      // Read the exponents
 	      for(int i=0;i<nc;i++) {
 		line=readline(in);
@@ -474,7 +474,7 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	      }
 	      el.add_function(S);
 	      el.add_function(P);
-	    } else {
+	    } else if(shelltype.size()==1) {
 	      // This is a normal shell
 	      int am=find_am(shelltype[0]);
 	      FunctionShell sh(am);
@@ -487,6 +487,28 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 		sh.add_exponent(readdouble(nums[1]),readdouble(nums[0]));
 	      }
 	      el.add_function(sh);
+	    } else {
+	      // AM given with L=%i
+
+	      if(shelltype.size()<3)
+		throw std::runtime_error("Unrecognized shell type!\n");
+
+	      // Check beginning
+	      if(stricmp(shelltype.substr(0,2),"L=")!=0)
+		throw std::runtime_error("Could not parse shell type.\n");
+
+	      // Now get the shell type
+	      int am=readint(shelltype.substr(2));
+
+	      // and add the exponents
+              FunctionShell sh(am);
+              for(int i=0;i<nc;i++) {
+                line=readline(in);
+		std::vector<std::string> nums=splitline(line);
+                sh.add_exponent(readdouble(nums[1]),readdouble(nums[0]));
+              }
+              el.add_function(sh);
+	      
 	    }
 	  }
 	}
@@ -514,7 +536,10 @@ void BasisSetLibrary::save_gaussian94(const char * filename, bool append) const 
     // Loop over shells
     for(size_t ish=0;ish<elements[iel].bf.size();ish++) {
       // Print out type and length of shell
-      fprintf(out,"%c   %i   1.00\n",shell_types[elements[iel].bf[ish].am],(int) elements[iel].bf[ish].C.size());
+      if(elements[iel].bf[ish].am<7)
+	fprintf(out,"%c   %i   1.00\n",shell_types[elements[iel].bf[ish].am],(int) elements[iel].bf[ish].C.size());
+      else
+	fprintf(out,"L=%i %i   1.00\n",elements[iel].bf[ish].am,(int) elements[iel].bf[ish].C.size());
       // Print out contraction
       for(size_t iexp=0;iexp<elements[iel].bf[ish].C.size();iexp++)
 	fprintf(out,"  %.10e  % .10e\n",elements[iel].bf[ish].C[iexp].z,elements[iel].bf[ish].C[iexp].c);
@@ -522,7 +547,7 @@ void BasisSetLibrary::save_gaussian94(const char * filename, bool append) const 
     // Close entry
     fprintf(out,"****\n");
   }
-  
+
   fclose(out);
 }
 
@@ -562,7 +587,7 @@ void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
       fprintf(out,"$ %c-TYPE FUNCTIONS\n",toupper(shell_types[l]));
       // Print element, number of exponents and contracted functions
       fprintf(out,"%4i %4i %4i\n",(int) exps.size(),(int) coeffs.n_cols,0);
-      
+
       // Loop over exponents
       for(size_t iexp=0;iexp<exps.size();iexp++) {
 	// Print exponent
@@ -665,7 +690,7 @@ ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) cons
   std::ostringstream oss;
   oss << "Could not find basis for element " << el << " with atom number " << number << " in library!\n";
   throw std::runtime_error(oss.str());
-  
+
   // Dummy return clause
   return ElementBasisSet();
 }
