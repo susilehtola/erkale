@@ -3010,7 +3010,7 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
     std::vector<GaussianShell> shs=get_shells(inuc);
 
     // Generate the new basis functions. Loop over am
-    for(size_t am=0;am<coeffs[inuc].size();am++) {
+    for(int am=0;am<(int) coeffs[inuc].size();am++) {
       // First functions with the exponents are
       std::vector<size_t> ind0;
 
