@@ -744,7 +744,6 @@ int main(int argc, char **argv) {
 
   // Parse method
   enum xrs_method method=parse_method(set.get_string("XRSMethod"));
-  const bool linesearch=set.get_bool("LineSearch");
 
   // Print out settings
   if(verbose)
