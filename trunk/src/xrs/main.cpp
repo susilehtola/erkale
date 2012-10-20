@@ -190,7 +190,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
     DensityFit dfit;
     // We do the formation directly.
-    dfit.fill(augbas,dfitbas,true);
+    dfit.fill(augbas,dfitbas,true,set.get_double("FittingThreshold"));
     J=dfit.calc_J(Paug);
   }
   printf("J formed in %s.\n",taug.elapsed().c_str());
