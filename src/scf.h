@@ -201,6 +201,8 @@ class SCF {
   bool densityfit;
   /// Memory allocation for density fitting
   size_t fitmem;
+  /// Threshold for density fitting
+  double fitthr;
 
   /// Use Lobatto angular grid instead of Lebedev grid (DFT)
   bool dft_lobatto;

@@ -104,6 +104,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   densityfit=set.get_bool("DensityFitting");
   // How much memory to allow (convert to bytes)
   fitmem=1000000*set.get_int("FittingMemory");
+  // Linear dependence threshold
+  fitthr=set.get_double("FittingThreshold");
 
   try {
     // Use Lobatto angular grid? (Lebedev is default)
@@ -176,11 +178,25 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
     // Form density fitting basis
     BasisSet dfitbas;
+    
+    // Do we need RI-K, or is RI-J sufficient?
+    bool rik=false;
+    if(stricmp(set.get_string("Method"),"HF")==0)
+      rik=true;
+    else if(stricmp(set.get_string("Method"),"ROHF")==0)
+      rik=true;
+    else {
+      // No hartree-fock; check if functional has exact exchange part
+      int xfunc, cfunc;
+      parse_xc_func(xfunc,cfunc,set.get_string("Method"));
+      if(exact_exchange(xfunc)!=0.0)
+	rik=true;
+    }
 
     if(stricmp(set.get_string("FittingBasis"),"Auto")==0) {
       // Check used method
-      if(stricmp(set.get_string("Method"),"HF")==0 || stricmp(set.get_string("Method"),"ROHF")==0)
-	throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
+      if(rik)
+	throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nSet the FittingBasis.\n");
 
       // DFT, OK for now (will be checked again later on)
       dfitbas=basisp->density_fitting();
@@ -205,7 +221,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       t.set();
     }
 
-    dfit.fill(*basisp,dfitbas,direct);
+    // Fill the basis
+    dfit.fill(*basisp,dfitbas,direct,fitthr,rik);
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());

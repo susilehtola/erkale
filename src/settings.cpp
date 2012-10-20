@@ -107,6 +107,8 @@ void Settings::add_scf_settings() {
   add_string("FittingBasis", "Basis to use for density fitting / RI (Auto for automatic)","Auto");
   // How much memory to allow for density fitting
   add_int("FittingMemory", "Amount of memory in MB to use for exchange fitting",1000);
+  // Threshold for screening eigenvectors
+  add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-8);
 }
 
 void Settings::add_dft_settings() {

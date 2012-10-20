@@ -20,8 +20,11 @@
 // Screen integrals? (Direct calculations)
 #define SCREENING
 
-// Screening threshold
-#define SCRTHR 1e-10
+// Integral screening cutoff
+#define SCRTHR 1e-12
+
+// \delta parameter in Eichkorn et al
+#define DELTA 1e-9
 
 DensityFit::DensityFit() {
 }
@@ -30,13 +33,14 @@ DensityFit::~DensityFit() {
 }
 
 
-void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir) {
+void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double threshold, bool hartreefock) {
   // Construct density fitting basis
 
   // Store amount of functions
   Nbf=orbbas.get_Nbf();
   Naux=auxbas.get_Nbf();
   direct=dir;
+  hf=hartreefock;
 
   // Fill index helper
   iidx=i_idx(Nbf);
@@ -67,8 +71,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   totbas.finalize();
 
   // First, compute the two-center integrals
-  arma::mat ab(Naux,Naux);
-  ab.zeros();
+  ab.zeros(Naux,Naux);
 
   // Get list of unique auxiliary shell pairs
   std::vector<shellpair_t> auxpairs=auxbas.get_unique_shellpairs();
@@ -100,27 +103,33 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     }
   }
 
-  // Form ab^-1 and ab^-1/2
-  arma::mat abvec;
-  arma::vec abval;
-  eig_sym_ordered(abval,abvec,ab);
 
-  // Count linearly independent vectors
-  size_t Nind=0;
-  for(size_t i=0;i<abval.n_elem;i++)
-    if(abval(i)>=LINTHRES)
-      Nind++;
-
-  // and drop the linearly dependent ones
-  abval=abval.subvec(abval.n_elem-Nind,abval.n_elem-1);
-  abvec=abvec.submat(0,abvec.n_cols-Nind,abvec.n_rows-1,abvec.n_cols-1);
-
-  // Form matrices
-  ab_inv.zeros(abvec.n_rows,abvec.n_rows);
-  ab_invh.zeros(abvec.n_rows,abvec.n_rows);
-  for(size_t i=0;i<abval.n_elem;i++) {
-    ab_inv+=abvec.col(i)*arma::trans(abvec.col(i))/abval(i);
-    ab_invh+=abvec.col(i)*arma::trans(abvec.col(i))/sqrt(abval(i));
+  if(hf) {
+    // Form ab^-1 and ab^-1/2
+    arma::mat abvec;
+    arma::vec abval;
+    eig_sym_ordered(abval,abvec,ab);
+    
+    // Count linearly independent vectors
+    size_t Nind=0;
+    for(size_t i=0;i<abval.n_elem;i++)
+      if(abval(i)>=threshold)
+	Nind++;
+    
+    // and drop the linearly dependent ones
+    abval=abval.subvec(abval.n_elem-Nind,abval.n_elem-1);
+    abvec=abvec.submat(0,abvec.n_cols-Nind,abvec.n_rows-1,abvec.n_cols-1);
+    
+    // Form matrices
+    ab_inv.zeros(abvec.n_rows,abvec.n_rows);
+    ab_invh.zeros(abvec.n_rows,abvec.n_rows);
+    for(size_t i=0;i<abval.n_elem;i++) {
+      ab_inv+=abvec.col(i)*arma::trans(abvec.col(i))/abval(i);
+      ab_invh+=abvec.col(i)*arma::trans(abvec.col(i))/sqrt(abval(i));
+    }
+  } else {
+    // Just RI-J, use faster method from Eichkorn et al to form ab_inv only
+    ab_inv=arma::inv(ab+DELTA);
   }
 
 #ifdef SCREENING
@@ -278,6 +287,13 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 
 	size_t Nmu=totbas.get_Nbf(orbind[imus]);
 	size_t Nnu=totbas.get_Nbf(orbind[inus]);
+	
+	// If imus==inus, we need to take care that we count
+	// every term only once; on the off-diagonal we get
+	// every term twice.
+	double fac=1.0;
+	if(imus==inus)
+	  fac=2.0;
 
 	for(size_t ias=0;ias<auxind.size();ias++) {
 
@@ -300,13 +316,10 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 		// The contracted integral
 		double res=eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
 
-		// If imus==inus, we need to take care that we count
-		// every term only once; on the off-diagonal we get
-		// every term twice.
 #ifdef _OPENMP
-		gammawrk(ia)+= (imus==inus) ? res : 2.0*res;
+		gammawrk(ia)+= fac*res;
 #else
-		gamma(ia)+= (imus==inus) ? res : 2.0*res;
+		gamma(ia)+= fac*res;
 #endif
 	      }
 	    }
@@ -323,7 +336,14 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
   }
 
   // Compute and return c
-  return ab_inv*gamma;
+  if(hf) {
+    return ab_inv*gamma;
+  } else {
+    // Compute x0
+    arma::vec x0=ab_inv*gamma;
+    // Compute and return c
+    return x0+ab_inv*(gamma-ab*x0);
+  }
 }
 
 arma::mat DensityFit::calc_J(const arma::mat & P) const {
@@ -369,6 +389,11 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 	size_t Nmu=totbas.get_Nbf(orbind[imus]);
 	size_t Nnu=totbas.get_Nbf(orbind[inus]);
 
+
+	double symfac=0.0;
+	if(imus==inus)
+	  symfac=1.0;
+
 	// Compute (a|mn)
 	std::vector<double> eris=totbas.ERI(auxind[ias],dummyind,orbind[imus],orbind[inus]);
 
@@ -388,7 +413,7 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 
 	      J(imu,inu)+=tmp;
 	      // Need to symmetrize?
-	      J(inu,imu)+= (imus==inus) ? 0.0 : tmp;
+	      J(inu,imu)+=symfac*tmp;
 	    }
 	  }
 	}

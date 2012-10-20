@@ -24,12 +24,21 @@
  * routines used for the approximate calculation of the Coulomb and
  * exchange operators J and K. 
  *
- * The implementation is based on the procedure described in
+ * The RI-JK implementation is based on the procedure described in
  *
  * F. Weigend, "A fully direct RI-HF algorithm: Implementation,
  * optimised auxiliary basis sets, demonstration of accuracy and
  * efficiency", Phys. Chem. Chem. Phys. 4, 4285 (2002).
  * 
+ * 
+ * If only RI-J is necessary, then the procedure described in 
+ *
+ * K. Eichkorn, O. Treutler, H. Öhm, M. Häser and R. Ahlrichs,
+ * "Auxiliary basis sets to approximate Coulomb potentials",
+ * Chem. Phys. Lett. 240 (1995), 283-290.
+ *
+ * is used.
+ *
  * \author Jussi Lehtola
  * \date 2012/08/22 23:53
  */
@@ -51,6 +60,8 @@ class DensityFit {
   size_t Naux;
   /// Direct calculation? (Compute three-center integrals on-the-fly)
   bool direct;
+  /// Hartree-Fock calculation?
+  bool hf;
 
   /// Basis set containing first orbital, then auxiliary and lastly dummy function
   BasisSet totbas;
@@ -72,6 +83,9 @@ class DensityFit {
 
   /// Integrals \f$ ( \alpha | \mu \nu) \f$
   std::vector<double> a_munu;
+
+  /// \f$ ( \alpha | \beta) \f$
+  arma::mat ab;
   /// \f$ ( \alpha | \beta)^-1 \f$
   arma::mat ab_inv;
   /// \f$ ( \alpha | \beta)^-1/2 \f$
@@ -83,8 +97,8 @@ class DensityFit {
   /// Destructor
   ~DensityFit();
 
-  /// Compute integrals
-  void fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct);
+  /// Compute integrals, use given linear dependency treshhold
+  void fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double threshold, bool hf=false);
   /// Compute index in integral table
   size_t idx(size_t ia, size_t imu, size_t inu) const;
 
