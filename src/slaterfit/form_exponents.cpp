@@ -195,31 +195,22 @@ int main(int argc, char **argv) {
   for(size_t i=0;i<optexp.size();i++)
     printf("%e\t%e\n",optc(i),optexp[i]);
 
-  FILE *out;
-  out=fopen("slater-contr.gbs","w");
-  // Write out name of element
-  fprintf(out,"H\t0\n");
-  // Print out type and length of shell
-  fprintf(out,"%c   %i   1.00\n",shell_types[par.l],(int) optexp.size());
-  // Print out contraction
-  for(size_t iexp=0;iexp<optexp.size();iexp++)
-    fprintf(out,"\t%.16e\t\t%.16e\n",optexp[iexp],optc(iexp));
-  // Close entry
-  fprintf(out,"****\n");
-  fclose(out);
-
-  out=fopen("slater-uncontr.gbs","w");
-  // Write out name of element
-  fprintf(out,"H\t0\n");
-  for(size_t iexp=0;iexp<optexp.size();iexp++) {
-    // Print out type and length of shell
-    fprintf(out,"%c   %i   1.00\n",shell_types[par.l],1);
-    // Print out exponent
-    fprintf(out,"\t%.16e\t\t%.16e\n",optexp[iexp],1.0);
+  // Form basis set
+  ElementBasisSet elbas("El");
+  FunctionShell sh(par.l);
+  for(size_t i=0;i<optexp.size();i++) {
+    sh.add_exponent(optc[i],optexp[i]);
   }
-  // Close entry
-  fprintf(out,"****\n");
-  fclose(out);
+  elbas.add_function(sh);
+
+  // Save the basis set
+  BasisSetLibrary baslib;
+  baslib.add_element(elbas);
+  baslib.save_gaussian94("slater-contr.gbs");
+
+  // also in decontracted form
+  baslib.decontract();
+  baslib.save_gaussian94("slater-uncontr.gbs");
 
   return 0;
 }
