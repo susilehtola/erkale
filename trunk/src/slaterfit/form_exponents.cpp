@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
   for(int i=0;i<dof;i++)
     gsl_vector_set(x,i,i);
   // Set initial step sizes
-  gsl_vector_set_all(ss,1.0);
+  gsl_vector_set_all(ss,0.1);
 
   // Set minimizer
   gsl_multimin_fminimizer_set(min, &minfunc, x, ss);
