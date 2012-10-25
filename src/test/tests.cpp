@@ -448,7 +448,7 @@ void rohf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
 #else
 #define rdft_test(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc) rdft_test_run(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc);
 #endif
-void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom, int xfunc, int cfunc) {
+void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, Settings set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom, int xfunc, int cfunc) {
   Timer t;
 
 #ifndef COMPUTE_REFERENCE
@@ -458,6 +458,10 @@ void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
 
   arma::vec E;
   arma::mat C;
+
+  char method[80];
+  sprintf(method,"%i-%i",xfunc,cfunc);
+  set.set_string("Method",method);
 
   // Construct basis set
   BasisSet bas=construct_basis(at,baslib,set);
@@ -521,13 +525,18 @@ void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basli
 #else
 #define udft_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc) udft_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc);
 #endif
-void udft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom, int xfunc, int cfunc) {
+void udft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, Settings set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom, int xfunc, int cfunc) {
   Timer t;
 
 #ifndef COMPUTE_REFERENCE
   printf("%s, ",label.c_str());
   fflush(stdout);
 #endif
+
+  char method[80];
+  sprintf(method,"%i-%i",xfunc,cfunc);
+  set.set_string("Method",method);
+
 
   arma::vec Ea, Eb;
   arma::mat Ca, Cb;
