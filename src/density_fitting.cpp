@@ -291,9 +291,9 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 	// If imus==inus, we need to take care that we count
 	// every term only once; on the off-diagonal we get
 	// every term twice.
-	double fac=1.0;
+	double fac=2.0;
 	if(imus==inus)
-	  fac=2.0;
+	  fac=1.0;
 
 	for(size_t ias=0;ias<auxind.size();ias++) {
 
@@ -390,9 +390,9 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 	size_t Nnu=totbas.get_Nbf(orbind[inus]);
 
 
-	double symfac=0.0;
+	double symfac=1.0;
 	if(imus==inus)
-	  symfac=1.0;
+	  symfac=0.0;
 
 	// Compute (a|mn)
 	std::vector<double> eris=totbas.ERI(auxind[ias],dummyind,orbind[imus],orbind[inus]);
