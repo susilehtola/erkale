@@ -102,7 +102,7 @@ void Settings::add_scf_settings() {
   add_int("MaxIter", "Maximum number of iterations in SCF cycle", 100);
 
   // Use density fitting if possible?
-  add_bool("DensityFitting", "Use density fitting / RI if possible? (Pure DFT functionals)", true);
+  add_bool("DensityFitting", "Use density fitting / RI?", true);
   // Which basis to use as density fitting basis
   add_string("FittingBasis", "Basis to use for density fitting / RI (Auto for automatic)","Auto");
   // How much memory to allow for density fitting
