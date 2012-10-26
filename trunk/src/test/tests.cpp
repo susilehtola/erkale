@@ -148,7 +148,7 @@ const char * stat[]={"fail","ok"};
 void check_norm(const BasisSet & bas) {
   size_t Nbf=bas.get_Nbf();
   arma::mat S=bas.overlap();
-  
+
   for(size_t i=0;i<Nbf;i++)
     if(fabs(S(i,i)-1.0)>=normtol) {
       std::ostringstream oss;
@@ -175,7 +175,7 @@ double cartint(int l, int m, int n) {
 
 // Check norm of Y_{l,m}.
 void check_sph_orthonorm(int lmax) {
-  
+
   // Left hand value of l
   for(int ll=0;ll<=lmax;ll++)
     // Right hand value of l
@@ -185,7 +185,7 @@ void check_sph_orthonorm(int lmax) {
       for(int ml=-ll;ml<=ll;ml++) {
 	// Get the coefficients
 	std::vector<double> cl=calcYlm_coeff(ll,ml);
-	
+
 	// Form the list of cartesian functions
 	std::vector<shellf_t> cartl(((ll+1)*(ll+2))/2);
 	size_t n=0;
@@ -194,7 +194,7 @@ void check_sph_orthonorm(int lmax) {
 	  for(int j=0; j<=i; j++) {
 	    int ny = i-j;
 	    int nz = j;
-	    
+
 	    cartl[n].l=nx;
 	    cartl[n].m=ny;
 	    cartl[n].n=nz;
@@ -202,11 +202,11 @@ void check_sph_orthonorm(int lmax) {
 	    n++;
 	  }
 	}
-	
+
 	for(int mr=-lr;mr<=lr;mr++) {
 	  // Get the coefficients
 	  std::vector<double> cr=calcYlm_coeff(lr,mr);
-	  
+
 	  // Form the list of cartesian functions
 	  std::vector<shellf_t> cartr(((lr+1)*(lr+2))/2);
 	  size_t N=0;
@@ -215,7 +215,7 @@ void check_sph_orthonorm(int lmax) {
 	    for(int j=0; j<=i; j++) {
 	      int ny = i-j;
 	      int nz = j;
-	      
+
 	      cartr[N].l=nx;
 	      cartr[N].m=ny;
 	      cartr[N].n=nz;
@@ -223,7 +223,7 @@ void check_sph_orthonorm(int lmax) {
 	      N++;
 	    }
 	  }
-	  
+
 	  // Compute dot product
 	  double norm=0.0;
 	  for(size_t i=0;i<cartl.size();i++)
@@ -247,13 +247,13 @@ void check_sph_orthonorm(int lmax) {
 }
 
 
-/// Test RHF solution
+/// Test restricted solution
 #ifdef COMPUTE_REFERENCE
-#define rhf_test(at,baslib,set,Etot,Eorb,label,dipmom) rhf_test_run(at,baslib,set,Etot,Eorb,label,dipmom); printf("rhf_test(" #at "," #baslib "," #set "," #Etot "," #Eorb "," #label "," #dipmom ");\n\n");
+#define restr_test(at,baslib,set,Etot,Eorb,label,dipmom) restr_test_run(at,baslib,set,Etot,Eorb,label,dipmom); printf(#set ".set_string(\"Method\",\"%s\");\n",set.get_string("Method").c_str()); printf("restr_test(" #at "," #baslib "," #set "," #Etot "," #Eorb "," #label "," #dipmom ");\n\n");
 #else
-#define rhf_test(at,baslib,set,Etot,Eorb,label,dipmom) rhf_test_run(at,baslib,set,Etot,Eorb,label,dipmom);
+#define restr_test(at,baslib,set,Etot,Eorb,label,dipmom) restr_test_run(at,baslib,set,Etot,Eorb,label,dipmom);
 #endif
-void rhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom) {
+void restr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, Settings set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom) {
   Timer t;
 
 #ifndef COMPUTE_REFERENCE
@@ -261,41 +261,59 @@ void rhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
   fflush(stdout);
 #endif
 
-  arma::vec E;
-  arma::mat C;
-
-  // Construct basis set
+  // Construct the basis set
   BasisSet bas=construct_basis(at,baslib,set);
-  // Get orbital occupancies
-  std::vector<double> occs=get_restricted_occupancy(set,bas);
-  // Solve SCF equations
-  rscf_t sol;
-  Checkpoint chkpt("test.chk",1);
-  SCF solver=SCF(bas,set,chkpt);
-  solver.RHF(sol,occs,final_conv);
+
+  // Temporary file name
+  char *tmpfile=tempnam("./",".chk");
+  set.set_string("SaveChk",tmpfile);
+
+  // Run the calculation
+  calculate(bas,set);
+
+  // Density matrix
+  arma::mat P;
+  // The orbital energies
+  arma::vec Eo;
+  // and the total energy
+  energy_t en;
+  {
+    // Open the checkpoint
+    Checkpoint chkpt(tmpfile,false);
+
+    // Load everything necessary
+    chkpt.read("P",P);
+    chkpt.read("E",Eo);
+    chkpt.read(en);
+  }
+
+  // Get rid of the temporary file
+  remove(tmpfile);
+  free(tmpfile);
+
   // Compute dipole moment
-  double dip=dip_mom(sol.P,bas);
+  double dip=dip_mom(P,bas);
 
   // Check normalization of basis
   check_norm(bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",sol.en.E);
+  printf("Etot=%.16e;\n",en.E);
   printf("dip=%.16e;\n",dip);
   printf("Eorb=\"");
-  for(size_t i=0;i<sol.E.n_elem;i++)
-    printf("%.16e ",sol.E(i));
+  for(size_t i=0;i<Eo.n_elem;i++)
+    printf("%.16e ",Eo(i));
   printf("\";\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
   size_t nsucc=0, nfail=0;
-  compare(sol.E,Eorb,otol,nsucc,nfail); // Compare orbital energies
-  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
+  compare(Eo,Eorb,otol,nsucc,nfail); // Compare orbital energies
+  Eok=rel_compare(en.E,Etot,tol); // Compare total energies
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
-  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.E,Eorb));
+  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",en.E,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(en.E,Etot),dip-dipmom,max_diff(Eo,Eorb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -307,13 +325,13 @@ void rhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
 #endif
 }
 
-/// Test UHF solution
+/// Test unrestricted solution
 #ifdef COMPUTE_REFERENCE
-#define uhf_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) uhf_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom); printf("uhf_test(" #at "," #baslib "," #set "," #Etot "," #Eorba "," #Eorbb "," #label "," #dipmom ");\n\n");
+#define unrestr_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) unrestr_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom);  printf(#set ".set_string(\"Method\",\"%s\");\n",set.get_string("Method").c_str()); printf("unrestr_test(" #at "," #baslib "," #set "," #Etot "," #Eorba "," #Eorbb "," #label "," #dipmom ");\n\n");
 #else
-#define uhf_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) uhf_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom);
+#define unrestr_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) unrestr_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom);
 #endif
-void uhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom) {
+void unrestr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, Settings set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom) {
   Timer t;
 
 #ifndef COMPUTE_REFERENCE
@@ -321,48 +339,66 @@ void uhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
   fflush(stdout);
 #endif
 
-  arma::vec Ea, Eb;
-  arma::mat Ca, Cb;
-
   // Construct basis set
   BasisSet bas=construct_basis(at,baslib,set);
-  // Get orbital occupancies
-  std::vector<double> occa, occb;
-  get_unrestricted_occupancy(set,bas,occa,occb);
-  // Solve SCF equations
-  uscf_t sol;
-  Checkpoint chkpt("test.chk",1);
-  SCF solver=SCF(bas,set,chkpt);
-  solver.UHF(sol,occa,occb,final_conv);
+
+  // Temporary file name
+  char *tmpfile=tempnam("./",".chk");
+  set.set_string("SaveChk",tmpfile);
+
+  // Run the calculation
+  calculate(bas,set);
+
+  // Density matrix
+  arma::mat P;
+  // The orbital energies
+  arma::vec Eao, Ebo;
+  // and the total energy
+  energy_t en;
+  {
+    // Open the checkpoint
+    Checkpoint chkpt(tmpfile,false);
+
+    // Load everything necessary
+    chkpt.read("P",P);
+    chkpt.read("Ea",Eao);
+    chkpt.read("Eb",Ebo);
+    chkpt.read(en);
+  }
+
+  // Get rid of the temporary file
+  remove(tmpfile);
+  free(tmpfile);
+
   // Compute dipole moment
-  double dip=dip_mom(sol.P,bas);
+  double dip=dip_mom(P,bas);
 
 #ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",sol.en.E);
+  printf("Etot=%.16e;\n",en.E);
   printf("dip=%.16e;\n",dip);
   printf("Eorba=\"");
-  for(size_t i=0;i<sol.Ea.n_elem;i++)
-    printf("%.16e ",sol.Ea(i));
+  for(size_t i=0;i<Eao.n_elem;i++)
+    printf("%.16e ",Eao(i));
   printf("\";\n");
   printf("Eorbb=\"");
-  for(size_t i=0;i<sol.Eb.n_elem;i++)
-    printf("%.16e ",sol.Eb(i));
+  for(size_t i=0;i<Ebo.n_elem;i++)
+    printf("%.16e ",Ebo(i));
   printf("\";\n");
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
   size_t nsucca=0, nfaila=0;
   size_t nsuccb=0, nfailb=0;
-  compare(sol.Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
-  compare(sol.Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
+  compare(Eao,Eorba,otol,nsucca,nfaila); // Compare orbital energies
+  compare(Ebo,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
   size_t nsucc=nsucca+nsuccb;
   size_t nfail=nfaila+nfailb;
 
-  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
+  Eok=rel_compare(en.E,Etot,tol); // Compare total energies
   Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
   ok=(Eok && Dok);
-  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",sol.en.E,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.Ea,Eorba),max_diff(sol.Eb,Eorbb));
+  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",en.E,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
+  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(en.E,Etot),dip-dipmom,max_diff(Eao,Eorba),max_diff(Ebo,Eorbb));
 
   if(!ok) {
     std::ostringstream oss;
@@ -374,233 +410,6 @@ void uhf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib
 #endif
 }
 
-/// Test ROHF solution
-#ifdef COMPUTE_REFERENCE
-#define rohf_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) rohf_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom); printf("rohf_test(" #at "," #baslib "," #set "," #Etot "," #Eorba "," #Eorbb "," #label "," #dipmom ");\n\n");
-#else
-#define rohf_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom) rohf_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom);
-#endif
-void rohf_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, const Settings & set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom) {
-  Timer t;
-
-#ifndef COMPUTE_REFERENCE
-  printf("%s, ",label.c_str());
-  fflush(stdout);
-#endif
-
-  arma::vec Ea, Eb;
-  arma::mat Ca, Cb;
-
-  // Construct basis set
-  BasisSet bas=construct_basis(at,baslib,set);
-  int Nel_alpha;
-  int Nel_beta;
-  get_Nel_alpha_beta(bas.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
-  // Solve SCF equations
-  uscf_t sol;
-  Checkpoint chkpt("test.chk",1);
-  SCF solver=SCF(bas,set,chkpt);
-  solver.ROHF(sol,Nel_alpha,Nel_beta,final_conv);
-  // Compute dipole moment
-  double dip=dip_mom(sol.P,bas);
-
-#ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",sol.en.E);
-  printf("dip=%.16e;\n",dip);
-  printf("Eorba=\"");
-  for(size_t i=0;i<sol.Ea.n_elem;i++)
-    printf("%.16e ",sol.Ea(i));
-  printf("\";\n");
-  printf("Eorbb=\"");
-  for(size_t i=0;i<sol.Eb.n_elem;i++)
-    printf("%.16e ",sol.Eb(i));
-  printf("\";\n");
-#else
-  // Compare results
-  bool Eok=1, Dok=1, ok=1;
-  size_t nsucca=0, nfaila=0;
-  size_t nsuccb=0, nfailb=0;
-  compare(sol.Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
-  compare(sol.Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
-  size_t nsucc=nsucca+nsuccb;
-  size_t nfail=nfaila+nfailb;
-
-  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
-  Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
-  ok=(Eok && Dok);
-  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",sol.en.E,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.Ea,Eorba),max_diff(sol.Eb,Eorbb));
-
-  if(!ok) {
-    std::ostringstream oss;
-    ERROR_INFO();
-    fflush(stdout);
-    oss << "Test " << label << " failed.\n";
-    throw std::runtime_error(oss.str());
-  }
-
-#endif
-}
-
-/// Test RDFT solution
-#ifdef COMPUTE_REFERENCE
-#define rdft_test(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc) rdft_test_run(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc); printf("rdft_test(" #at "," #baslib "," #set "," #Etot "," #Eorb "," #label "," #dipmom "," #xfunc "," #cfunc ");\n\n");
-#else
-#define rdft_test(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc) rdft_test_run(at,baslib,set,Etot,Eorb,label,dipmom,xfunc,cfunc);
-#endif
-void rdft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, Settings set, double Etot, const arma::vec & Eorb, const std::string & label, double dipmom, int xfunc, int cfunc) {
-  Timer t;
-
-#ifndef COMPUTE_REFERENCE
-  printf("%s, ",label.c_str());
-  fflush(stdout);
-#endif
-
-  arma::vec E;
-  arma::mat C;
-
-  char method[80];
-  sprintf(method,"%i-%i",xfunc,cfunc);
-  set.set_string("Method",method);
-
-  // Construct basis set
-  BasisSet bas=construct_basis(at,baslib,set);
-  // Get orbital occupancies
-  std::vector<double> occs=get_restricted_occupancy(set,bas);
-  // Solve SCF equations
-  rscf_t sol;
-  Checkpoint chkpt("test.chk",1);
-  SCF solver=SCF(bas,set,chkpt);
-
-  // Check normalization of basis
-  check_norm(bas);
-
-  // Final dft settings
-  dft_t dft_f;
-  dft_f.x_func=xfunc;
-  dft_f.c_func=cfunc;
-  dft_f.gridtol=dft_finaltol;
-
-  // Initial dft settings
-  dft_t dft_i(dft_f);
-  dft_i.gridtol=dft_initialtol;
-
-  solver.RDFT(sol,occs,init_conv,dft_i);
-  solver.RDFT(sol,occs,final_conv,dft_f);
-  // Compute dipole moment
-  double dip=dip_mom(sol.P,bas);
-
-#ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",sol.en.E);
-  printf("dip=%.16e;\n",dip);
-  printf("Eorb=\"");
-  for(size_t i=0;i<sol.E.n_elem;i++)
-    printf("%.16e ",sol.E(i));
-  printf("\";\n");
-#else
-  // Compare results
-  bool Eok=1, Dok=1, ok=1;
-  size_t nsucc=0, nfail=0;
-  compare(sol.E,Eorb,otol,nsucc,nfail); // Compare orbital energies
-
-  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
-  Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
-  ok=(Eok && Dok);
-  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",Etot,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum difference of orbital energy is %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.E,Eorb));
-
-  if(!ok) {
-    std::ostringstream oss;
-    ERROR_INFO();
-    fflush(stdout);
-    oss << "Test " << label << " failed.\n";
-    throw std::runtime_error(oss.str());
-  }
-#endif
-}
-
-/// Test UDFT solution
-#ifdef COMPUTE_REFERENCE
-#define udft_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc) udft_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc); printf("udft_test(" #at "," #baslib "," #set "," #Etot "," #Eorba "," #Eorbb "," #label "," #dipmom "," #xfunc "," #cfunc ");\n\n");
-#else
-#define udft_test(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc) udft_test_run(at,baslib,set,Etot,Eorba,Eorbb,label,dipmom,xfunc,cfunc);
-#endif
-void udft_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & baslib, Settings set, double Etot, const arma::vec & Eorba, const arma::vec & Eorbb, const std::string & label, double dipmom, int xfunc, int cfunc) {
-  Timer t;
-
-#ifndef COMPUTE_REFERENCE
-  printf("%s, ",label.c_str());
-  fflush(stdout);
-#endif
-
-  char method[80];
-  sprintf(method,"%i-%i",xfunc,cfunc);
-  set.set_string("Method",method);
-
-
-  arma::vec Ea, Eb;
-  arma::mat Ca, Cb;
-
-  // Final dft settings
-  dft_t dft_f;
-  dft_f.x_func=xfunc;
-  dft_f.c_func=cfunc;
-  dft_f.gridtol=dft_finaltol;
-
-  // Initial dft settings
-  dft_t dft_i(dft_f);
-  dft_i.gridtol=dft_initialtol;
-
-  // Construct basis set
-  BasisSet bas=construct_basis(at,baslib,set);
-  // Get orbital occupancies
-  std::vector<double> occa, occb;
-  get_unrestricted_occupancy(set,bas,occa,occb);
-  // Solve SCF equations
-  uscf_t sol;
-  Checkpoint chkpt("test.chk",1);
-  SCF solver=SCF(bas,set,chkpt);
-  solver.UDFT(sol,occa,occb,init_conv,dft_i);
-  solver.UDFT(sol,occa,occb,final_conv,dft_f);
-  // Compute dipole moment
-  double dip=dip_mom(sol.P,bas);
-
-#ifdef COMPUTE_REFERENCE
-  printf("Etot=%.16e;\n",sol.en.E);
-  printf("dip=%.16e;\n",dip);
-  printf("Eorba=\"");
-  for(size_t i=0;i<sol.Ea.n_elem;i++)
-    printf("%.16e ",sol.Ea(i));
-  printf("\";\n");
-  printf("Eorbb=\"");
-  for(size_t i=0;i<sol.Eb.n_elem;i++)
-    printf("%.16e ",sol.Eb(i));
-  printf("\";\n");
-#else
-  // Compare results
-  bool Eok=1, Dok=1, ok=1;
-  size_t nsucca=0, nfaila=0;
-  size_t nsuccb=0, nfailb=0;
-  compare(sol.Ea,Eorba,otol,nsucca,nfaila); // Compare orbital energies
-  compare(sol.Eb,Eorbb,otol,nsuccb,nfailb); // Compare orbital energies
-  size_t nsucc=nsucca+nsuccb;
-  size_t nfail=nfaila+nfailb;
-
-  Eok=rel_compare(sol.en.E,Etot,tol); // Compare total energies
-  Dok=abs_compare(dip,dipmom,dtol); // Compare dipole moments
-  ok=(Eok && Dok);
-  printf("E=%f %s, dp=%f %s, orbital energies %i ok, %i failed (%s)\n",sol.en.E,stat[Eok],dip,stat[Dok],(int) nsucc, (int) nfail,t.elapsed().c_str());
-  printf("Relative difference of total energy is %e, difference in dipole moment is %e.\nMaximum differences of orbital energies are %e and %e.\n",rel_diff(sol.en.E,Etot),dip-dipmom,max_diff(sol.Ea,Eorba),max_diff(sol.Eb,Eorbb));
-
-  if(!ok) {
-    std::ostringstream oss;
-    ERROR_INFO();
-    fflush(stdout);
-    oss << "Test " << label << " failed.\n";
-    throw std::runtime_error(oss.str());
-  }
-#endif
-}
 
 /// Run unit tests by comparing calculations to ones that should be OK
 int main(void) {
@@ -730,49 +539,52 @@ int main(void) {
   // Construct settings
   Settings sph;
   sph.add_scf_settings();
+  sph.add_string("SaveChk","Save checkpoint to","erkale.chk");
+  sph.add_string("LoadChk","Load checkpoint","");
+  sph.add_bool("FreezeCore","Freeze the cores of the atoms",false);
+  sph.add_bool("ForcePol","Force polarized calculation?",false);
   sph.set_bool("Verbose",false);
   // Use core guess and no density fitting for tests.
   sph.set_string("Guess","Core");
   sph.set_bool("DensityFitting",false);
 
   // No spherical harmonics
-  Settings cart=sph;
+  Settings cart(sph);
   cart.set_bool("UseLM",false);
 
   // Direct calculation
-  Settings direct=sph;
+  Settings direct(sph);
   direct.set_bool("Direct",true);
 
   // Polarized calculation
-  Settings pol=sph;
+  Settings pol(sph);
   pol.set_int("Multiplicity",2);
 
   // DFT tests
 
   // Settings for DFT
-  Settings dftsph=sph; // Normal settings
+  Settings dftsph(sph); // Normal settings
   dftsph.add_dft_settings();
   dftsph.set_bool("DensityFitting",true);
 
-  Settings dftcart=cart; // Cartesian basis
+  Settings dftcart(cart); // Cartesian basis
   dftcart.add_dft_settings();
   dftcart.set_bool("DensityFitting",true);
 
-  Settings dftnofit=dftsph; // No density fitting
+  Settings dftnofit(dftsph); // No density fitting
   dftnofit.set_bool("DensityFitting",false);
 
-  Settings dftcart_nofit=dftcart;
+  Settings dftcart_nofit(dftcart);
   dftcart_nofit.set_bool("DensityFitting",false);
 
-  Settings dftdirect=dftsph; // Direct calculation
+  Settings dftdirect(dftsph); // Direct calculation
   dftdirect.set_bool("Direct",true);
-  dftdirect.set_bool("DFTDirect",true);
 
-  Settings dftpol=pol; // Polarized calculation
+  Settings dftpol(pol); // Polarized calculation
   dftpol.add_dft_settings();
   dftpol.set_double("DFTInitialTol",1e-4);
 
-  Settings dftpol_nofit=dftpol; // Polarized calculation, no density fitting
+  Settings dftpol_nofit(dftpol); // Polarized calculation, no density fitting
   dftpol_nofit.set_bool("DensityFitting",false);
 
   printf("****** Running calculations *******\n");
@@ -788,122 +600,133 @@ int main(void) {
   arma::vec Eorbb;
 
   Etot=-1.2848877555174082e+02;
-  dip=4.3460353067759622e-16;
-  Eorb="-3.2765635418561338e+01 -1.9187982340179033e+00 -8.3209725199350892e-01 -8.3209725199350559e-01 -8.3209725199349815e-01 1.6945577282675361e+00 1.6945577282675413e+00 1.6945577282675452e+00 2.1594249508218963e+00 5.1967114014294067e+00 5.1967114014294076e+00 5.1967114014294085e+00 5.1967114014294129e+00 5.1967114014294173e+00 ";
-  rhf_test(Ne,cc_pVDZ,sph,Etot,Eorb,"Neon, HF/cc-pVDZ",dip);
+  dip=5.7206424166128525e-16;
+  Eorb="-3.2765635418578533e+01 -1.9187982340008261e+00 -8.3209725200484452e-01 -8.3209725200484153e-01 -8.3209725200484086e-01 1.6945577282762601e+00 1.6945577282762661e+00 1.6945577282762763e+00 2.1594249508065495e+00 5.1967114014289297e+00 5.1967114014289351e+00 5.1967114014289448e+00 5.1967114014289502e+00 5.1967114014289617e+00 ";
+  sph.set_string("Method","HF");
+  restr_test(Ne,cc_pVDZ,sph,Etot,Eorb,"Neon, HF/cc-pVDZ",dip);
 
-  Etot=-1.2848886617203755e+02;
-  dip=3.6746372416365226e-16;
-  Eorb="-3.2765400811469348e+01 -1.9190111585186405e+00 -8.3228220464890301e-01 -8.3228220464890135e-01 -8.3228220464890001e-01 1.6944246989475953e+00 1.6944246989475973e+00 1.6944246989476028e+00 1.9905987652939690e+00 5.1964245950191925e+00 5.1964245950192005e+00 5.1964245950192023e+00 5.1964245950192058e+00 5.1964245950192129e+00 1.0383358428328878e+01 ";
-  rhf_test(Ne,cc_pVDZ,cart,Etot,Eorb,"Neon, HF/cc-pVDZ cart",dip);
+  Etot=-1.2848886617203752e+02;
+  dip=4.4557482940797417e-16;
+  Eorb="-3.2765400792453278e+01 -1.9190111534959520e+00 -8.3228219724415120e-01 -8.3228219724414843e-01 -8.3228219724414521e-01 1.6944246993916028e+00 1.6944246993916092e+00 1.6944246993916154e+00 1.9905987683859308e+00 5.1964245996467664e+00 5.1964245996467779e+00 5.1964245996467842e+00 5.1964245996467886e+00 5.1964245996467975e+00 1.0383358435419975e+01 ";
+  cart.set_string("Method","HF");
+  restr_test(Ne,cc_pVDZ,cart,Etot,Eorb,"Neon, HF/cc-pVDZ cart",dip);
 
-  Etot=-1.2853186163632139e+02;
-  dip=8.3502519156009142e-16;
-  Eorb="-3.2769110713076643e+01 -1.9270833030665337e+00 -8.4541550982383029e-01 -8.4541550982382441e-01 -8.4541550982382108e-01 1.0988680373861486e+00 1.0988680373861495e+00 1.0988680373861568e+00 1.4176388084675071e+00 2.8142175665198019e+00 2.8142175665198086e+00 2.8142175665198099e+00 2.8142175665198144e+00 2.8142175665198192e+00 6.1558667275843053e+00 6.1558667275843169e+00 6.1558667275843231e+00 9.6473695834491160e+00 9.6473695834491249e+00 9.6473695834491284e+00 9.6473695834491373e+00 9.6473695834491462e+00 9.6473695834491497e+00 9.6473695834491746e+00 1.1227312686815079e+01 1.1227312686815083e+01 1.1227312686815091e+01 1.1227312686815099e+01 1.1227312686815116e+01 1.1744558071686216e+01 ";
-  rhf_test(Ne,cc_pVTZ,sph,Etot,Eorb,"Neon, HF/cc-pVTZ",dip);
+  Etot=-1.2853186163632137e+02;
+  dip=1.4214203598379343e-15;
+  Eorb="-3.2769110714528658e+01 -1.9270833039703708e+00 -8.4541551017319616e-01 -8.4541551017319438e-01 -8.4541551017318473e-01 1.0988680366807098e+00 1.0988680366807102e+00 1.0988680366807186e+00 1.4176388079436251e+00 2.8142175659355386e+00 2.8142175659355466e+00 2.8142175659355471e+00 2.8142175659355488e+00 2.8142175659355524e+00 6.1558667265949829e+00 6.1558667265949838e+00 6.1558667265950016e+00 9.6473695825273680e+00 9.6473695825273733e+00 9.6473695825273804e+00 9.6473695825273822e+00 9.6473695825273875e+00 9.6473695825274035e+00 9.6473695825274071e+00 1.1227312685696281e+01 1.1227312685696283e+01 1.1227312685696287e+01 1.1227312685696305e+01 1.1227312685696312e+01 1.1744558070628615e+01 ";
+  sph.set_string("Method","HF");
+  restr_test(Ne,cc_pVTZ,sph,Etot,Eorb,"Neon, HF/cc-pVTZ",dip);
 
   Etot=-1.2853200998517838e+02;
-  dip=6.6380079248466308e-16;
-  Eorb="-3.2769827645370881e+01 -1.9274545165098154e+00 -8.4572301714341613e-01 -8.4572301714341047e-01 -8.4572301714340359e-01 8.8038911834282818e-01 1.0282198401387626e+00 1.0282198401387714e+00 1.0282198401387843e+00 2.8138968464505494e+00 2.8138968464505556e+00 2.8138968464505623e+00 2.8138968464505649e+00 2.8138968464505756e+00 4.1362240323294408e+00 4.6398467065847120e+00 4.6398467065847404e+00 4.6398467065848195e+00 9.6470056629945820e+00 9.6470056629946264e+00 9.6470056629946406e+00 9.6470056629946441e+00 9.6470056629946583e+00 9.6470056629946850e+00 9.6470056629946921e+00 1.1226914497219928e+01 1.1226914497219932e+01 1.1226914497219971e+01 1.1226914497219974e+01 1.1226914497219980e+01 1.1317534800892307e+01 1.1317534800892322e+01 1.1317534800892561e+01 1.6394442678210712e+01 2.8816114658169489e+01 ";
-  rhf_test(Ne,cc_pVTZ,cart,Etot,Eorb,"Neon, HF/cc-pVTZ cart",dip);
+  dip=1.1051055106472576e-15;
+  Eorb="-3.2769827645786037e+01 -1.9274545167728918e+00 -8.4572301732492183e-01 -8.4572301732491673e-01 -8.4572301732490052e-01 8.8038911821659349e-01 1.0282198400142224e+00 1.0282198400142359e+00 1.0282198400142488e+00 2.8138968462395724e+00 2.8138968462395728e+00 2.8138968462396035e+00 2.8138968462396123e+00 2.8138968462396292e+00 4.1362240320956083e+00 4.6398467063294477e+00 4.6398467063295730e+00 4.6398467063296058e+00 9.6470056626706793e+00 9.6470056626706864e+00 9.6470056626706899e+00 9.6470056626707041e+00 9.6470056626707361e+00 9.6470056626707557e+00 9.6470056626707823e+00 1.1226914496837626e+01 1.1226914496837649e+01 1.1226914496837665e+01 1.1226914496837681e+01 1.1226914496837709e+01 1.1317534800567527e+01 1.1317534800567607e+01 1.1317534800567788e+01 1.6394442677951606e+01 2.8816114657744336e+01 ";
+  cart.set_string("Method","HF");
+  restr_test(Ne,cc_pVTZ,cart,Etot,Eorb,"Neon, HF/cc-pVTZ cart",dip);
 
-  Etot=-1.2854346965912143e+02;
-  dip=3.2095576000267208e-15;
-  Eorb="-3.2771496233517290e+01 -1.9293376374525115e+00 -8.4895896099165180e-01 -8.4895896099161694e-01 -8.4895896099160384e-01 8.0890413889981250e-01 8.0890413889981760e-01 8.0890413889983614e-01 9.3559988915417558e-01 1.9978112798088274e+00 1.9978112798088357e+00 1.9978112798088368e+00 1.9978112798088374e+00 1.9978112798088499e+00 3.9328189059163301e+00 3.9328189059163385e+00 3.9328189059163883e+00 5.8106845428882137e+00 5.9042211384000538e+00 5.9042211384000645e+00 5.9042211384000653e+00 5.9042211384000725e+00 5.9042211384000760e+00 5.9042211384000778e+00 5.9042211384000902e+00 6.7616951546319441e+00 6.7616951546319601e+00 6.7616951546319699e+00 6.7616951546319752e+00 6.7616951546319877e+00 1.4903626162246129e+01 1.4903626162246139e+01 1.4903626162246150e+01 1.4903626162246159e+01 1.4903626162246189e+01 1.4903626162246193e+01 1.4903626162246201e+01 1.4903626162246209e+01 1.4903626162246239e+01 1.5804420585275807e+01 1.5804420585275855e+01 1.5804420585276043e+01 1.9794585643251352e+01 1.9794585643251366e+01 1.9794585643251420e+01 1.9794585643251434e+01 1.9794585643251434e+01 1.9794585643251452e+01 1.9794585643251470e+01 2.0954549905858485e+01 2.0954549905858521e+01 2.0954549905858595e+01 2.0954549905858624e+01 2.0954549905858777e+01 6.6550956475278127e+01 ";
-  rhf_test(Ne,cc_pVQZ,sph,Etot,Eorb,"Neon, HF/cc-pVQZ",dip);
+  Etot=-1.2854346965912185e+02;
+  dip=3.2021748118834346e-15;
+  Eorb="-3.2771496235374315e+01 -1.9293376383772340e+00 -8.4895896153025774e-01 -8.4895896153025752e-01 -8.4895896153024974e-01 8.0890413831431107e-01 8.0890413831431496e-01 8.0890413831433072e-01 9.3559988865755328e-01 1.9978112793680989e+00 1.9978112793681106e+00 1.9978112793681158e+00 1.9978112793681326e+00 1.9978112793681404e+00 3.9328189051347304e+00 3.9328189051347402e+00 3.9328189051347495e+00 5.8106845419074720e+00 5.9042211377158509e+00 5.9042211377158651e+00 5.9042211377158731e+00 5.9042211377158758e+00 5.9042211377158837e+00 5.9042211377158873e+00 5.9042211377158909e+00 6.7616951536519663e+00 6.7616951536519707e+00 6.7616951536519734e+00 6.7616951536519858e+00 6.7616951536519903e+00 1.4903626161293799e+01 1.4903626161293806e+01 1.4903626161293818e+01 1.4903626161293834e+01 1.4903626161293856e+01 1.4903626161293863e+01 1.4903626161293888e+01 1.4903626161293904e+01 1.4903626161293904e+01 1.5804420583863358e+01 1.5804420583863383e+01 1.5804420583863422e+01 1.9794585642017378e+01 1.9794585642017385e+01 1.9794585642017399e+01 1.9794585642017413e+01 1.9794585642017434e+01 1.9794585642017466e+01 1.9794585642017505e+01 2.0954549904477808e+01 2.0954549904477833e+01 2.0954549904477854e+01 2.0954549904477872e+01 2.0954549904477894e+01 6.6550956473550229e+01 ";
+  sph.set_string("Method","HF");
+  restr_test(Ne,cc_pVQZ,sph,Etot,Eorb,"Neon, HF/cc-pVQZ",dip);
 
-  Etot=-1.2854353449722535e+02;
-  dip=4.9111891471703474e-15;
-  Eorb="-3.2771625129442207e+01 -1.9294942841597944e+00 -8.4906688462322333e-01 -8.4906688462317337e-01 -8.4906688462316682e-01 5.8690441469416910e-01 7.1271797748979482e-01 7.1271797748989851e-01 7.1271797748994248e-01 1.9879845921823593e+00 1.9879845921823780e+00 1.9879845921823940e+00 1.9879845921823951e+00 1.9879845921824026e+00 2.5105148502433825e+00 2.7214792301496118e+00 2.7214792301497104e+00 2.7214792301504458e+00 5.9040962888723980e+00 5.9040962888724051e+00 5.9040962888724069e+00 5.9040962888724140e+00 5.9040962888724264e+00 5.9040962888724309e+00 5.9040962888724549e+00 6.4115733390523166e+00 6.5684069303044801e+00 6.5684069303046506e+00 6.5684069303046630e+00 6.5684069303047075e+00 6.5684069303047696e+00 6.7659166001584987e+00 6.7659166001586906e+00 6.7659166001598354e+00 1.4004805313565495e+01 1.4903514354744658e+01 1.4903514354744772e+01 1.4903514354744789e+01 1.4903514354744805e+01 1.4903514354744823e+01 1.4903514354744855e+01 1.4903514354744882e+01 1.4903514354744903e+01 1.4903514354744928e+01 1.8145155385275633e+01 1.8145155385276635e+01 1.8145155385279438e+01 1.8145155385279814e+01 1.8145155385280798e+01 1.8540067452508058e+01 1.8540067452508215e+01 1.8540067452508730e+01 1.9794449045302592e+01 1.9794449045302603e+01 1.9794449045302631e+01 1.9794449045302674e+01 1.9794449045302706e+01 1.9794449045302727e+01 1.9794449045302855e+01 2.9727979556957887e+01 3.9089870736201604e+01 3.9089870736219702e+01 3.9089870736252436e+01 3.9089870736264608e+01 3.9089870736270100e+01 3.9551871550109936e+01 3.9551871550112317e+01 3.9551871550113653e+01 5.8376821811945391e+01 2.0568373998233861e+02 ";
-  rhf_test(Ne,cc_pVQZ,cart,Etot,Eorb,"Neon, HF/cc-pVQZ cart",dip);
+  Etot=-1.2854353449722555e+02;
+  dip=9.5502946808503636e-16;
+  Eorb="-3.2771625129304006e+01 -1.9294942840840930e+00 -8.4906688457015289e-01 -8.4906688457013879e-01 -8.4906688457011326e-01 5.8690441472046939e-01 7.1271797752943955e-01 7.1271797752952104e-01 7.1271797752966903e-01 1.9879845922197152e+00 1.9879845922197266e+00 1.9879845922197301e+00 1.9879845922197374e+00 1.9879845922197594e+00 2.5105148502691832e+00 2.7214792301836028e+00 2.7214792301844364e+00 2.7214792301849156e+00 5.9040962889273514e+00 5.9040962889273638e+00 5.9040962889273887e+00 5.9040962889274056e+00 5.9040962889274082e+00 5.9040962889274189e+00 5.9040962889274340e+00 6.4115733390970142e+00 6.5684069303762236e+00 6.5684069303762520e+00 6.5684069303762831e+00 6.5684069303762946e+00 6.5684069303763151e+00 6.7659166002162312e+00 6.7659166002172855e+00 6.7659166002178068e+00 1.4004805313638407e+01 1.4903514354815833e+01 1.4903514354815854e+01 1.4903514354815885e+01 1.4903514354815902e+01 1.4903514354815918e+01 1.4903514354815931e+01 1.4903514354815984e+01 1.4903514354816046e+01 1.4903514354816060e+01 1.8145155385363683e+01 1.8145155385363875e+01 1.8145155385364870e+01 1.8145155385367524e+01 1.8145155385370863e+01 1.8540067452605978e+01 1.8540067452606280e+01 1.8540067452606625e+01 1.9794449045390628e+01 1.9794449045390706e+01 1.9794449045390767e+01 1.9794449045390770e+01 1.9794449045390810e+01 1.9794449045390834e+01 1.9794449045390873e+01 2.9727979557050126e+01 3.9089870736327491e+01 3.9089870736330781e+01 3.9089870736339627e+01 3.9089870736357135e+01 3.9089870736407022e+01 3.9551871550183897e+01 3.9551871550189333e+01 3.9551871550197419e+01 5.8376821811951636e+01 2.0568373997926801e+02 ";
+  cart.set_string("Method","HF");
+  restr_test(Ne,cc_pVQZ,cart,Etot,Eorb,"Neon, HF/cc-pVQZ cart",dip);
 
-  Etot=-4.5929863365640989e+02;
-  dip=1.2244011504065293e-14;
-  Eorba="-1.0490206724478891e+02 -1.0633455727500298e+01 -8.1040440220502550e+00 -8.1040440220502514e+00 -8.1040440220502425e+00 -1.1496923108323660e+00 -5.4051812023291523e-01 -5.4051812023290502e-01 -5.4051812023290224e-01 4.9527159118920455e-01 5.8723233571039113e-01 5.8723233571040545e-01 5.8723233571041689e-01 1.0645439012887277e+00 1.0645439012887321e+00 1.0645439012887401e+00 1.0645439012887412e+00 1.0645439012887694e+00 ";
-  Eorbb="-1.0488804088980702e+02 -1.0619379134957526e+01 -8.0797501762810668e+00 -8.0797501762810651e+00 -8.0797501762810544e+00 -1.0135907512454072e+00 -3.2998928467463101e-01 -3.2998928467462951e-01 -3.2998928467462812e-01 5.1691166703002978e-01 6.2702739937235863e-01 6.2702739937235941e-01 6.2702739937236307e-01 1.1416804426056471e+00 1.1416804426056508e+00 1.1416804426056530e+00 1.1416804426056557e+00 1.1416804426056602e+00 ";
-  uhf_test(Cl,b6_31Gpp,pol,Etot,Eorba,Eorbb,"Chlorine, HF/6-31G** polarized",dip);
+  Etot=-4.5929863365655353e+02;
+  dip=7.0056679727986178e-15;
+  Eorba="-1.0490206922615540e+02 -1.0633457343120563e+01 -8.1040456970866757e+00 -8.1040456970866721e+00 -8.1040456970866472e+00 -1.1496933695315230e+00 -5.4051895138115480e-01 -5.4051895138115258e-01 -5.4051895138114769e-01 4.9527126688407580e-01 5.8723188307406682e-01 5.8723188307406982e-01 5.8723188307407737e-01 1.0645429475081860e+00 1.0645429475082009e+00 1.0645429475082102e+00 1.0645429475082151e+00 1.0645429475082309e+00 ";
+  Eorbb="-1.0488803471646810e+02 -1.0619374104092802e+01 -8.0797449831608752e+00 -8.0797449831608592e+00 -8.0797449831608485e+00 -1.0135876578143137e+00 -3.2998710690358241e-01 -3.2998710690356170e-01 -3.2998710690354610e-01 5.1691272642155983e-01 6.2702896022137533e-01 6.2702896022138654e-01 6.2702896022138777e-01 1.1416832737677816e+00 1.1416832737677824e+00 1.1416832737677851e+00 1.1416832737677969e+00 1.1416832737678109e+00 ";
+  pol.set_string("Method","HF");
+  unrestr_test(Cl,b6_31Gpp,pol,Etot,Eorba,Eorbb,"Chlorine, HF/6-31G** polarized",dip);
 
-  Etot=-4.5929468403476301e+02;
-  dip=5.1034125596712059e-16;
-  Eorba="-1.0490985539356139e+02 -1.0639223023705611e+01 -8.1086672205943149e+00 -8.1086672205943149e+00 -8.1086672205942900e+00 -1.1427051922058722e+00 -5.3421034965985981e-01 -5.3421034965985792e-01 -5.3421034965985670e-01 4.9202839886734012e-01 5.8916626654184756e-01 5.8916626654185067e-01 5.8916626654185478e-01 1.0673063872335229e+00 1.0673063872335360e+00 1.0673063872335369e+00 1.0673063872335384e+00 1.0673063872335387e+00 ";
-  Eorbb="-1.0490015299355959e+02 -1.0629710473260911e+01 -8.0913085795158217e+00 -8.0913085795158128e+00 -8.0913085795158057e+00 -1.0275446617675257e+00 -3.3913561848669821e-01 -3.3913561848669760e-01 -3.3913561848669638e-01 5.1611864609989144e-01 6.1978236033055112e-01 6.1978236033055256e-01 6.1978236033055489e-01 1.1316262091582592e+00 1.1316262091582701e+00 1.1316262091582729e+00 1.1316262091582754e+00 1.1316262091582880e+00 ";
-  rohf_test(Cl,b6_31Gpp,pol,Etot,Eorba,Eorbb,"Chlorine, ROHF/6-31G**",dip);
+  Etot=-4.5929468403432463e+02;
+  dip=4.3533650946783002e-16;
+  Eorba="-1.0490985520662321e+02 -1.0639222875879000e+01 -8.1086670674509218e+00 -8.1086670674509094e+00 -8.1086670674509058e+00 -1.1427051245339961e+00 -5.3421029373398843e-01 -5.3421029373398787e-01 -5.3421029373398676e-01 4.9202842554983406e-01 5.8916630212254073e-01 5.8916630212254428e-01 5.8916630212255061e-01 1.0673064590407824e+00 1.0673064590407901e+00 1.0673064590407919e+00 1.0673064590407964e+00 1.0673064590407966e+00 ";
+  Eorbb="-1.0490015301985268e+02 -1.0629710492175453e+01 -8.0913085983052326e+00 -8.0913085983052238e+00 -8.0913085983052184e+00 -1.0275446925912901e+00 -3.3913564185933154e-01 -3.3913564185933087e-01 -3.3913564185933026e-01 5.1611862854758883e-01 6.1978235357213896e-01 6.1978235357214184e-01 6.1978235357214606e-01 1.1316261852044098e+00 1.1316261852044363e+00 1.1316261852044429e+00 1.1316261852044434e+00 1.1316261852044465e+00 ";
+  pol.set_string("Method","ROHF");
+  unrestr_test(Cl,b6_31Gpp,pol,Etot,Eorba,Eorbb,"Chlorine, ROHF/6-31G**",dip);
 
-  Etot=-4.6010297760915580e+02;
-  dip=8.9928885936030105e-15;
-  Eorba="-1.0158419200170279e+02 -9.5119813449869532e+00 -7.2706311059273210e+00 -7.2706311059273165e+00 -7.2706311059273103e+00 -8.4711265424867288e-01 -3.7353924722515414e-01 -3.7353924722515330e-01 -3.7353924722515236e-01 3.2665107498161333e-01 4.1369807671988751e-01 4.1369807671989112e-01 4.1369807671989234e-01 8.0595462145567209e-01 8.0595462145567476e-01 8.0595462145567720e-01 8.0595462145567864e-01 8.0595462145568908e-01 ";
-  Eorbb="-1.0157705223195735e+02 -9.5053419675798896e+00 -7.2605067044516813e+00 -7.2605067044516733e+00 -7.2605067044516698e+00 -7.9606595272714353e-01 -3.0983181416419081e-01 -3.0983181416418981e-01 -3.0983181416418687e-01 3.4216414980023580e-01 4.3147951937548029e-01 4.3147951937548762e-01 4.3147951937549045e-01 8.4918624484331440e-01 8.4918624484331673e-01 8.4918624484332250e-01 8.4918624484333338e-01 8.4918624484333505e-01 ";
-  udft_test(Cl,b6_31Gpp,dftpol_nofit,Etot,Eorba,Eorbb,"Chlorine, B3LYP/6-31G** polarized",dip,402,0);
+  Etot=-4.6010297757405141e+02;
+  dip=1.2022435269365581e-14;
+  Eorba="-1.0158417621491525e+02 -9.5119736881692951e+00 -7.2706233268179323e+00 -7.2706233268179297e+00 -7.2706233268179199e+00 -8.4710663930193486e-01 -3.7353479972172710e-01 -3.7353479972172604e-01 -3.7353479972172493e-01 3.2665389851463505e-01 4.1370113075889564e-01 4.1370113075890524e-01 4.1370113075891690e-01 8.0595993079137007e-01 8.0595993079137507e-01 8.0595993079137707e-01 8.0595993079138251e-01 8.0595993079138306e-01 ";
+  Eorbb="-1.0157708646536911e+02 -9.5053733435112431e+00 -7.2605395772294559e+00 -7.2605395772294496e+00 -7.2605395772294479e+00 -7.9608357397051188e-01 -3.0984544157977617e-01 -3.0984544157976435e-01 -3.0984544157974092e-01 3.4215684959920273e-01 4.3147074805148838e-01 4.3147074805148866e-01 4.3147074805149388e-01 8.4916878410204688e-01 8.4916878410206209e-01 8.4916878410206209e-01 8.4916878410206476e-01 8.4916878410209151e-01 ";
+  dftpol_nofit.set_string("Method","hyb_gga_xc_b3lyp");
+  unrestr_test(Cl,b6_31Gpp,dftpol_nofit,Etot,Eorba,Eorbb,"Chlorine, B3LYP/6-31G** polarized",dip);
 
-  Etot=-1.1287000934441980e+00;
-  dip=2.1343411060601321e-15;
-  Eorb="-5.9241098911311940e-01 1.9744005746521254e-01 4.7932104724330460e-01 9.3732369227359724e-01 1.2929037097066669e+00 1.2929037097066682e+00 1.9570226089315619e+00 2.0435200542705290e+00 2.0435200542705307e+00 3.6104742345380396e+00 ";
-  rhf_test(H2,cc_pVDZ,sph,Etot,Eorb,"Hydrogen molecule, HF/cc-pVDZ",dip);
+  Etot=-1.1287000934442020e+00;
+  dip=4.9196533417830540e-15;
+  Eorb="-5.9241098912717105e-01 1.9744005746927679e-01 4.7932104726976116e-01 9.3732369228506429e-01 1.2929037097182370e+00 1.2929037097182376e+00 1.9570226089437432e+00 2.0435200542832326e+00 2.0435200542832348e+00 3.6104742345529406e+00 ";
+  sph.set_string("Method","HF");
+  restr_test(H2,cc_pVDZ,sph,Etot,Eorb,"Hydrogen molecule, HF/cc-pVDZ",dip);
 
-  Etot=-1.1676141182306354e+00;
-  dip=1.1656887264340757e-11;
-  Eorb="-3.9201515929287012e-01 3.6518736507866585e-02 2.9071356474513632e-01 6.5832910704230607e-01 9.7502281430276683e-01 9.7502281430276727e-01 1.6066119799166587e+00 1.7001805817762130e+00 1.7001805817762154e+00 3.1926513611865524e+00 ";
-  rdft_test(H2,cc_pVDZ,dftsph,Etot,Eorb,"Hydrogen molecule, SVWN(RPA)/cc-pVDZ",dip,1,8);
+  Etot=-1.1676141294603308e+00;
+  dip=1.2920120371587861e-14;
+  Eorb="-3.9201515131303832e-01 3.6521080362697057e-02 2.9071322496894020e-01 6.5833098538632140e-01 9.7502316975335390e-01 9.7502316975335457e-01 1.6066122928284690e+00 1.7001809420472254e+00 1.7001809420472280e+00 3.1926496355618328e+00 ";
+  dftsph.set_string("Method","lda_x-lda_c_vwn_rpa");
+  restr_test(H2,cc_pVDZ,dftsph,Etot,Eorb,"Hydrogen molecule, SVWN(RPA)/cc-pVDZ",dip);
 
-  Etot=-1.1603962551524631e+00;
-  dip=1.3500735269314753e-11;
-  Eorb="-3.7849160709600571e-01 5.3520939144858150e-02 3.0277187275095591e-01 6.6374649499006155e-01 9.9246457875921301e-01 9.9246457875921390e-01 1.6235425150397582e+00 1.7198878039951977e+00 1.7198878039952001e+00 3.2019324159988081e+00 ";
-  rdft_test(H2,cc_pVDZ,dftsph,Etot,Eorb,"Hydrogen molecule, PBEPBE/cc-pVDZ",dip,101,130);
+  Etot=-1.1603962667280063e+00;
+  dip=1.7633027220705997e-15;
+  Eorb="-3.7849167468778783e-01 5.3523492272485353e-02 3.0277089209824404e-01 6.6374851097954213e-01 9.9246487779866777e-01 9.9246487779866832e-01 1.6235426412156961e+00 1.7198880924572890e+00 1.7198880924572910e+00 3.2019311002043445e+00 ";
+  dftsph.set_string("Method","gga_x_pbe-gga_c_pbe");
+  restr_test(H2,cc_pVDZ,dftsph,Etot,Eorb,"Hydrogen molecule, PBEPBE/cc-pVDZ",dip);
 
-  Etot=-7.6056825377225564e+01;
-  dip=7.9472744343929869e-01;
-  Eorb="-2.0555281278776970e+01 -1.3428635537281559e+00 -7.0828436772836423e-01 -5.7575384365951965e-01 -5.0391497913463179e-01 1.4187951599425103e-01 2.0351537963994643e-01 5.4324870449138551e-01 5.9753586796449110e-01 6.6949546818534122e-01 7.8747678943406219e-01 8.0274150242571207e-01 8.0481260841383739e-01 8.5898803403194812e-01 9.5702121794526473e-01 1.1344778956407338e+00 1.1928203504066246e+00 1.5241753072412736e+00 1.5579529876615632e+00 2.0324408702192183e+00 2.0594682931278281e+00 2.0654407666615451e+00 2.1686553969423561e+00 2.2363161872847197e+00 2.5909431281582012e+00 2.9581971198961607e+00 3.3610002630919418e+00 3.4914002753883344e+00 3.5741938470236509e+00 3.6463660407477341e+00 3.7977214227148788e+00 3.8739670203702525e+00 3.8824466778069948e+00 3.9569498248557631e+00 4.0199059055182360e+00 4.0760332616599868e+00 4.1862021921761468e+00 4.3092789383370826e+00 4.3875716395997424e+00 4.5640073761554314e+00 4.6817931187719548e+00 4.8550947813824870e+00 5.1380848619208335e+00 5.2500191192691386e+00 5.5275547774048421e+00 6.0402478806294075e+00 6.5453259404069435e+00 6.9113516638993611e+00 6.9366142677525842e+00 7.0003720404165710e+00 7.0078239262479061e+00 7.0609382582980622e+00 7.1598075638127874e+00 7.2256524677488203e+00 7.4561719771478145e+00 7.7799625502786478e+00 8.2653639985152694e+00 1.2804358858241361e+01 ";
-  rhf_test(h2o,cc_pVTZ,sph,Etot,Eorb,"Water, HF/cc-pVTZ",dip);
+  Etot=-7.6056825377225422e+01;
+  dip=7.9472745072200657e-01;
+  Eorb="-2.0555281285934726e+01 -1.3428635537909901e+00 -7.0828436625348579e-01 -5.7575384380924743e-01 -5.0391497984008182e-01 1.4187951589759165e-01 2.0351537962038532e-01 5.4324870468950459e-01 5.9753586791489099e-01 6.6949546783762515e-01 7.8747678855204362e-01 8.0274150280423950e-01 8.0481260840460700e-01 8.5898803455371819e-01 9.5702121842132137e-01 1.1344778955823469e+00 1.1928203508899533e+00 1.5241753072179296e+00 1.5579529874909843e+00 2.0324408704982821e+00 2.0594682937122948e+00 2.0654407668810433e+00 2.1686553973436147e+00 2.2363161875432400e+00 2.5909431287455948e+00 2.9581971204027107e+00 3.3610002638181835e+00 3.4914002761854577e+00 3.5741938478471766e+00 3.6463660415151087e+00 3.7977214224126157e+00 3.8739670211315360e+00 3.8824466785427605e+00 3.9569498256901841e+00 4.0199059058121316e+00 4.0760332618203368e+00 4.1862021920006081e+00 4.3092789389183386e+00 4.3875716398195577e+00 4.5640073766296867e+00 4.6817931186516955e+00 4.8550947816336150e+00 5.1380848619670463e+00 5.2500191191868639e+00 5.5275547773335951e+00 6.0402478809183231e+00 6.5453259405837096e+00 6.9113516634168608e+00 6.9366142668500848e+00 7.0003720398995481e+00 7.0078239258509960e+00 7.0609382581883109e+00 7.1598075631432812e+00 7.2256524677377953e+00 7.4561719765011816e+00 7.7799625501198211e+00 8.2653639981405256e+00 1.2804358856428037e+01 ";
+  sph.set_string("Method","HF");
+  restr_test(h2o,cc_pVTZ,sph,Etot,Eorb,"Water, HF/cc-pVTZ",dip);
+  direct.set_string("Method","HF");
+  restr_test(h2o,cc_pVTZ,direct,Etot,Eorb,"Water, HF/cc-pVTZ direct",dip);
 
-  Etot=-7.6056825376389511e+01;
-  dip=7.9472744046754185e-01;
-  Eorb="-2.0555281275360336e+01 -1.3428635535334648e+00 -7.0828436837923359e-01 -5.7575384375947969e-01 -5.0391497891294001e-01 1.4187951603664034e-01 2.0351537963632929e-01 5.4324870442454332e-01 5.9753586766334532e-01 6.6949546836456608e-01 7.8747678978968727e-01 8.0274150230500829e-01 8.0481260791849729e-01 8.5898803375094956e-01 9.5702121773383775e-01 1.1344778988379318e+00 1.1928203502522781e+00 1.5241753065163055e+00 1.5579529881509557e+00 2.0324408701864676e+00 2.0594682903994426e+00 2.0654407665446972e+00 2.1686553958713022e+00 2.2363161892813523e+00 2.5909431311271849e+00 2.9581971167697469e+00 3.3610002633540312e+00 3.4914002773054067e+00 3.5741938461112692e+00 3.6463660362999084e+00 3.7977214224559028e+00 3.8739670174671939e+00 3.8824466830528692e+00 3.9569498215092440e+00 4.0199059080863551e+00 4.0760332577487652e+00 4.1862022002507100e+00 4.3092789348970291e+00 4.3875716467711392e+00 4.5640073622167296e+00 4.6817931187886703e+00 4.8550947747008646e+00 5.1380848515215884e+00 5.2500191201087727e+00 5.5275547728274663e+00 6.0402478812502682e+00 6.5453259388178946e+00 6.9113516651018045e+00 6.9366142682447771e+00 7.0003720409657948e+00 7.0078239278055570e+00 7.0609382550465707e+00 7.1598075638151570e+00 7.2256524659473742e+00 7.4561719785674576e+00 7.7799625531987076e+00 8.2653640047782950e+00 1.2804358803848945e+01 ";
-  rhf_test(h2o,cc_pVTZ,direct,Etot,Eorb,"Water, HF/cc-pVTZ direct",dip);
+  Etot=-7.6064480528901996e+01;
+  dip=7.8765852091213884e-01;
+  Eorb="-2.0560341503070870e+01 -1.3467109753317892e+00 -7.1286865704812985e-01 -5.7999183696220857e-01 -5.0759009739011363e-01 1.1677961589096358e-01 1.7061237229712237e-01 4.4878630960720378e-01 4.6240973978032041e-01 4.9860081780452231e-01 5.8389461441260848e-01 6.0602248903580302e-01 6.1386901025638518e-01 6.5509670197439718e-01 7.1940581338715970e-01 8.5193265637445159e-01 9.1760642713404861e-01 1.1091391703789830e+00 1.1559117513387467e+00 1.3479064828239411e+00 1.4144381942402131e+00 1.4776186086096790e+00 1.4856774065797351e+00 1.5814608129854377e+00 1.6854835697724755e+00 1.9096187714790473e+00 2.0727777009518751e+00 2.1976502952743173e+00 2.2888869956948557e+00 2.3588905628937868e+00 2.4246094515834740e+00 2.4837778781609683e+00 2.5224544336426380e+00 2.5800657941447209e+00 2.5803867643471823e+00 2.6507304488272769e+00 2.6683130229705831e+00 2.8407379933648804e+00 2.8643130298355373e+00 3.0412098274030632e+00 3.1190680413397298e+00 3.2889763501206364e+00 3.3518967285195242e+00 3.4467312435745998e+00 3.6214003254381333e+00 3.8285931940886737e+00 3.9968185293596479e+00 4.1278766575022532e+00 4.1879462994524301e+00 4.2176486551288326e+00 4.4343620853999530e+00 4.4925098765109226e+00 4.6832772386553669e+00 4.7403725769474701e+00 4.8079058187004913e+00 4.9140701187379188e+00 5.3503959730578057e+00 5.4039303348339010e+00 5.9860940816386616e+00 6.1030498779280915e+00 6.2449376391805291e+00 6.3029981795203440e+00 6.7000543778133013e+00 6.7926548536651277e+00 7.0589633218031382e+00 7.2683601224501091e+00 7.3171930242900993e+00 7.3671378803166627e+00 7.4371264985030203e+00 7.5184752946049738e+00 7.5458434074120815e+00 7.5694204735356037e+00 8.0046360187860319e+00 8.0708295731913307e+00 8.0987711863948846e+00 8.1338237893781606e+00 8.1523664183036892e+00 8.2695443407258793e+00 8.3150962692646164e+00 8.3485048844392153e+00 8.4164827900428314e+00 8.6181288282799464e+00 8.8336406071438933e+00 8.9048326503928354e+00 8.9437734419928479e+00 9.2166366996281148e+00 9.3761387895206560e+00 9.3791690844601199e+00 9.9423093830121729e+00 1.0035594101020509e+01 1.0257561208226431e+01 1.0425629819423381e+01 1.0646599814788384e+01 1.0757780264898562e+01 1.0806846315825933e+01 1.1272406006487746e+01 1.1390414016451706e+01 1.1595907189072937e+01 1.1644666354945205e+01 1.1693629515526762e+01 1.1844883870853446e+01 1.2158546419172534e+01 1.2320144570863606e+01 1.2398213786649526e+01 1.2413264229519632e+01 1.2465013633068635e+01 1.3602019533761757e+01 1.3763660836516737e+01 1.4247885728479471e+01 1.4614348058859646e+01 1.4639079459321810e+01 1.4826337833045631e+01 1.6435472092033965e+01 1.6799107180542922e+01 4.4322817445320311e+01 ";
+  sph.set_string("Method","HF");
+  restr_test(h2o,cc_pVQZ,sph,Etot,Eorb,"Water, HF/cc-pVQZ",dip);
+  direct.set_string("Method","HF");
+  restr_test(h2o,cc_pVQZ,direct,Etot,Eorb,"Water, HF/cc-pVQZ direct",dip);
 
-  Etot=-7.6064480528902479e+01;
-  dip=7.8765851962769917e-01;
-  Eorb="-2.0560341499270589e+01 -1.3467109720217496e+00 -7.1286865313183456e-01 -5.7999183516266961e-01 -5.0759009626244245e-01 1.1677961767350450e-01 1.7061237380347088e-01 4.4878631182631712e-01 4.6240974154111197e-01 4.9860081971591441e-01 5.8389461634349749e-01 6.0602249093736016e-01 6.1386901266918004e-01 6.5509670363871331e-01 7.1940581530280601e-01 8.5193265933746987e-01 9.1760642858290364e-01 1.1091391723647659e+00 1.1559117535700829e+00 1.3479064851673335e+00 1.4144381966570361e+00 1.4776186118957291e+00 1.4856774098325205e+00 1.5814608164171593e+00 1.6854835728292772e+00 1.9096187748790210e+00 2.0727777036945647e+00 2.1976502980203221e+00 2.2888869981559608e+00 2.3588905651392751e+00 2.4246094542541567e+00 2.4837778803533217e+00 2.5224544363405776e+00 2.5800657965810885e+00 2.5803867670953373e+00 2.6507304510360146e+00 2.6683130249784979e+00 2.8407379961544641e+00 2.8643130332654625e+00 3.0412098309390854e+00 3.1190680440555587e+00 3.2889763530299758e+00 3.3518967322469329e+00 3.4467312467144260e+00 3.6214003290947696e+00 3.8285931976970762e+00 3.9968185332513020e+00 4.1278766618243612e+00 4.1879463040549041e+00 4.2176486594224594e+00 4.4343620890827413e+00 4.4925098804020385e+00 4.6832772420633066e+00 4.7403725807774757e+00 4.8079058229063900e+00 4.9140701224929595e+00 5.3503959766022877e+00 5.4039303384743329e+00 5.9860940849439928e+00 6.1030498812572054e+00 6.2449376423994831e+00 6.3029981826679533e+00 6.7000543811473969e+00 6.7926548570324394e+00 7.0589633252358643e+00 7.2683601257540333e+00 7.3171930276894628e+00 7.3671378836459960e+00 7.4371265018414272e+00 7.5184752974575586e+00 7.5458434106222390e+00 7.5694204766462425e+00 8.0046360222396746e+00 8.0708295767684763e+00 8.0987711899968140e+00 8.1338237929497641e+00 8.1523664217240253e+00 8.2695443442848600e+00 8.3150962727273559e+00 8.3485048879745349e+00 8.4164827935449011e+00 8.6181288316032774e+00 8.8336406109731485e+00 8.9048326538891960e+00 8.9437734458433162e+00 9.2166367032190610e+00 9.3761387936289697e+00 9.3791690880304639e+00 9.9423093869840340e+00 1.0035594104802046e+01 1.0257561212651373e+01 1.0425629823483774e+01 1.0646599818841560e+01 1.0757780268942588e+01 1.0806846320036330e+01 1.1272406010921758e+01 1.1390414020786878e+01 1.1595907193510442e+01 1.1644666359296814e+01 1.1693629519324093e+01 1.1844883875029035e+01 1.2158546422725857e+01 1.2320144574477068e+01 1.2398213790657289e+01 1.2413264233065656e+01 1.2465013637020194e+01 1.3602019537401793e+01 1.3763660839734902e+01 1.4247885732248553e+01 1.4614348062391949e+01 1.4639079462510823e+01 1.4826337836293808e+01 1.6435472095510654e+01 1.6799107184001958e+01 4.4322817449503709e+01 ";
-  rhf_test(h2o,cc_pVQZ,sph,Etot,Eorb,"Water, HF/cc-pVQZ",dip);
+  Etot=-7.6372961222395176e+01;
+  dip=7.3249328281426695e-01;
+  Eorb="-1.8738953501512668e+01 -9.1586785162758488e-01 -4.7160106589892448e-01 -3.2507287613067931e-01 -2.4816655857437953e-01 8.4534036387175372e-03 8.1125737524763347e-02 3.3806729297976212e-01 3.7949122776263966e-01 4.6548871040459011e-01 5.4539135465825450e-01 5.9072372577610277e-01 5.9687803067281364e-01 6.4398044404233656e-01 7.4418029766585625e-01 8.8306547475122232e-01 9.7381887521623300e-01 1.2412763516779126e+00 1.2611338609439329e+00 1.6999121835648665e+00 1.7261707906470463e+00 1.7619584545398468e+00 1.8256258288425098e+00 1.9002743849740662e+00 2.1846823312343671e+00 2.5326906159406088e+00 2.9875043516088651e+00 3.1260225297411024e+00 3.1892007455508291e+00 3.2799583723193648e+00 3.2859664655622591e+00 3.4399388077633155e+00 3.5114854019505550e+00 3.5697880009196892e+00 3.6175833251931109e+00 3.6363368817608812e+00 3.6947695819172353e+00 3.9240129133177546e+00 3.9512251176804907e+00 4.1557724959072777e+00 4.1932317708017095e+00 4.4292385921948565e+00 4.6459620146423370e+00 4.7303864407719258e+00 4.9898268736842226e+00 5.4868943652627520e+00 5.9838983452499930e+00 6.2843629405007277e+00 6.2901656603461262e+00 6.3781111568916353e+00 6.4202760176874385e+00 6.4811650993453380e+00 6.5329728518002055e+00 6.6594412404200245e+00 6.8404602024857608e+00 7.1724946503567466e+00 7.6259352319106544e+00 1.1962240167932499e+01 ";
+  dftnofit.set_string("Method","gga_x_pbe-gga_c_pbe");
+  restr_test(h2o,cc_pVTZ,dftnofit,Etot,Eorb,"Water, PBEPBE/cc-pVTZ no fitting",dip);
 
-  Etot=-7.6064480532894763e+01;
-  dip=7.8765852675648074e-01;
-  Eorb="-2.0560341504671111e+01 -1.3467109757507181e+00 -7.1286865563075530e-01 -5.7999183589483350e-01 -5.0759009668720623e-01 1.1677962171577008e-01 1.7061237603481758e-01 4.4878630925126956e-01 4.6240974591688105e-01 4.9860082036279973e-01 5.8389461476515081e-01 6.0602248987570051e-01 6.1386901174331088e-01 6.5509670163548817e-01 7.1940581433417861e-01 8.5193266391892086e-01 9.1760642581506369e-01 1.1091391809183024e+00 1.1559117484781947e+00 1.3479064722576932e+00 1.4144382156042175e+00 1.4776186083046539e+00 1.4856774023796986e+00 1.5814608129744541e+00 1.6854835723337092e+00 1.9096187679633918e+00 2.0727777003752732e+00 2.1976503026051137e+00 2.2888869950421835e+00 2.3588905523108017e+00 2.4246094541612417e+00 2.4837778810534403e+00 2.5224544209261999e+00 2.5800657875536688e+00 2.5803867662859652e+00 2.6507304364669344e+00 2.6683130297587465e+00 2.8407379668963406e+00 2.8643130428121371e+00 3.0412098372698391e+00 3.1190680039924290e+00 3.2889763027922752e+00 3.3518967746208896e+00 3.4467312988143552e+00 3.6214003077281300e+00 3.8285932272098062e+00 3.9968185307232784e+00 4.1278766223170456e+00 4.1879462855107743e+00 4.2176486431199365e+00 4.4343620556219392e+00 4.4925098612802161e+00 4.6832772450729827e+00 4.7403725625255992e+00 4.8079057041372835e+00 4.9140700687681171e+00 5.3503959099367000e+00 5.4039304323793917e+00 5.9860940870058110e+00 6.1030499069182031e+00 6.2449376323384298e+00 6.3029981728563911e+00 6.7000543614402650e+00 6.7926548347071840e+00 7.0589632915692739e+00 7.2683600652839777e+00 7.3171930266086651e+00 7.3671378848872831e+00 7.4371264613003074e+00 7.5184751967190806e+00 7.5458434381210004e+00 7.5694205382422943e+00 8.0046360309735203e+00 8.0708295818380762e+00 8.0987711934928779e+00 8.1338237877456869e+00 8.1523664040661359e+00 8.2695443532763910e+00 8.3150962653283802e+00 8.3485048803820785e+00 8.4164827142540890e+00 8.6181287900931896e+00 8.8336405773768938e+00 8.9048326988154933e+00 8.9437733343310697e+00 9.2166365377317092e+00 9.3761387754285384e+00 9.3791690967303225e+00 9.9423092280896004e+00 1.0035594174979247e+01 1.0257561179108400e+01 1.0425629799440141e+01 1.0646599821700168e+01 1.0757780239406292e+01 1.0806846285326071e+01 1.1272406086883407e+01 1.1390413921053730e+01 1.1595907184841902e+01 1.1644666304884353e+01 1.1693629564129328e+01 1.1844883849843320e+01 1.2158546312309563e+01 1.2320144541632427e+01 1.2398213734145687e+01 1.2413264189578783e+01 1.2465013572156144e+01 1.3602019453238052e+01 1.3763660417689284e+01 1.4247885691243058e+01 1.4614347842100035e+01 1.4639079538703688e+01 1.4826337735735549e+01 1.6435472085349989e+01 1.6799106948715078e+01 4.4322817045905964e+01 ";
-  rhf_test(h2o,cc_pVQZ,direct,Etot,Eorb,"Water, HF/cc-pVQZ direct",dip);
+  Etot=-7.6373025076488673e+01;
+  dip=7.3223619689403330e-01;
+  Eorb="-1.8739067712785722e+01 -9.1594855273587239e-01 -4.7168658517960171e-01 -3.2515022233953389e-01 -2.4824134771110840e-01 7.6868694473288309e-03 8.0201485087255525e-02 3.3767224652239702e-01 3.7911611254247746e-01 4.6520448054549846e-01 5.4523065610039867e-01 5.9029285519597252e-01 5.9663403526027015e-01 6.4384844712900602e-01 7.4405492511090687e-01 8.8293500311302198e-01 9.7364987322544572e-01 1.2410683077869380e+00 1.2610076706322275e+00 1.6997990579831839e+00 1.7260539463664721e+00 1.7615703419251318e+00 1.8254642144178257e+00 1.8999177919380381e+00 2.1845241425571515e+00 2.5325349915420712e+00 2.9874617550488836e+00 3.1259288098732232e+00 3.1891620087522048e+00 3.2797685659270934e+00 3.2858678167539623e+00 3.4399087715591086e+00 3.5114590806631694e+00 3.5697300791389694e+00 3.6174584672067120e+00 3.6361205767158391e+00 3.6945923089450781e+00 3.9240163487242503e+00 3.9511494091589037e+00 4.1557167093092815e+00 4.1932269766328245e+00 4.4291609287371365e+00 4.6459391796805267e+00 4.7302938427415056e+00 4.9896645806173474e+00 5.4868660751967662e+00 5.9839044167317903e+00 6.2842935455017033e+00 6.2900613307459370e+00 6.3780017572026706e+00 6.4202853530426838e+00 6.4811643201762257e+00 6.5328557623554646e+00 6.6594818284426678e+00 6.8404421490490348e+00 7.1725297508540526e+00 7.6257028377016018e+00 1.1962121373941059e+01 ";
+  dftsph.set_string("Method","gga_x_pbe-gga_c_pbe");
+  restr_test(h2o,cc_pVTZ,dftsph,Etot,Eorb,"Water, PBEPBE/cc-pVTZ",dip);
+  dftdirect.set_string("Method","gga_x_pbe-gga_c_pbe");
+  restr_test(h2o,cc_pVTZ,dftdirect,Etot,Eorb,"Water, PBEPBE/cc-pVTZ direct",dip);
 
-  Etot=-7.6372960091487556e+01;
-  dip=7.3249263898782657e-01;
-  Eorb="-1.8738948429978532e+01 -9.1586662298410071e-01 -4.7160098682673152e-01 -3.2507312110059816e-01 -2.4816681489651393e-01 8.4539946277438389e-03 8.1125782160355098e-02 3.3806739529329138e-01 3.7949173608938658e-01 4.6548883661112594e-01 5.4539141643148170e-01 5.9072343390210746e-01 5.9687830460036961e-01 6.4398060383516931e-01 7.4418118818247858e-01 8.8306708991538774e-01 9.7381877470435652e-01 1.2412765965980648e+00 1.2611347124682801e+00 1.6999126761271168e+00 1.7261712004009595e+00 1.7619586778167080e+00 1.8256262936927541e+00 1.9002764144047402e+00 2.1846825266685794e+00 2.5326905668905142e+00 2.9875044051036106e+00 3.1260227084714272e+00 3.1892009386445483e+00 3.2799585244377845e+00 3.2859636719728709e+00 3.4399389490815730e+00 3.5114854920858143e+00 3.5697881509618243e+00 3.6175830606363348e+00 3.6363350934114207e+00 3.6947672374317717e+00 3.9240131299608207e+00 3.9512247156884928e+00 4.1557716012586656e+00 4.1932310311822105e+00 4.4292389574081064e+00 4.6459624866239952e+00 4.7303852627990999e+00 4.9898261806822495e+00 5.4868949994525735e+00 5.9838981563620957e+00 6.2843645529589951e+00 6.2901683610854455e+00 6.3781139884101314e+00 6.4202764891352935e+00 6.4811645041167862e+00 6.5329743115822172e+00 6.6594420275154587e+00 6.8404619006548373e+00 7.1724953354064915e+00 7.6259348749423985e+00 1.1962233213355514e+01 ";
-  rdft_test(h2o,cc_pVTZ,dftnofit,Etot,Eorb,"Water, PBEPBE/cc-pVTZ no fitting",dip,101,130);
+  Etot=-7.6374645230136579e+01;
+  dip=7.3272055001056791e-01;
+  Eorb="-1.8741546114801132e+01 -9.1788065208209446e-01 -4.7348527540133711e-01 -3.2745824709260957e-01 -2.5054888296114508e-01 2.7901830605709353e-03 7.8041748636364830e-02 3.2383381111154008e-01 3.5924016484003485e-01 4.5242229923291338e-01 5.1413396046066395e-01 5.7767374228604651e-01 5.8423722555860824e-01 6.4253357514563425e-01 6.5976489675954308e-01 7.4241931809380313e-01 9.7186975918768803e-01 1.1822077426651889e+00 1.2023227295161933e+00 1.5759172313869179e+00 1.6360776272990976e+00 1.6982201437031095e+00 1.7245167623654827e+00 1.8628724330066746e+00 1.9081332377655202e+00 2.1641869722699374e+00 2.3473125251804889e+00 2.7892764468587328e+00 3.0049313704665610e+00 3.0831686635910702e+00 3.1876656925771618e+00 3.2328093756756040e+00 3.4168951292175458e+00 3.4579185918048125e+00 3.5049998737852537e+00 3.5282503323274854e+00 3.5683149815126400e+00 3.5772258007783102e+00 3.8379020258070216e+00 3.9226525885208940e+00 4.0867013276915669e+00 4.0926885575202059e+00 4.3310827329021171e+00 4.4154604410275207e+00 4.4322656550567450e+00 4.6027454835204953e+00 5.1266097225215299e+00 5.2200923676093147e+00 5.4840610597680879e+00 6.1494592260597187e+00 6.2799826595305293e+00 6.2885803768662605e+00 6.3502580499100194e+00 6.4059374497217982e+00 6.4358015216736266e+00 6.6570174354996077e+00 6.7153040590271038e+00 6.7372414808564365e+00 6.9398791763075751e+00 7.3406783795788462e+00 8.2789338893516629e+00 8.3551996988201971e+00 9.3390714650755893e+00 1.4480083318411110e+01 1.5822331894566005e+01 ";
+  dftcart.set_string("Method","gga_x_pbe-gga_c_pbe");
+  restr_test(h2o,cc_pVTZ,dftcart,Etot,Eorb,"Water, PBEPBE/cc-pVTZ cart",dip);
 
-  Etot=-7.6373023947425040e+01;
-  dip=7.3223555302009014e-01;
-  Eorb="-1.8739062641973323e+01 -9.1594732399710610e-01 -4.7168650625328040e-01 -3.2515046754205257e-01 -2.4824160427950492e-01 7.6874633463247495e-03 8.0201529568266511e-02 3.3767234820596947e-01 3.7911662387975020e-01 4.6520460763114130e-01 5.4523071812090040e-01 5.9029256228709415e-01 5.9663430911121229e-01 6.4384860676791689e-01 7.4405581502588214e-01 8.8293661865882422e-01 9.7364977239492123e-01 1.2410685524610152e+00 1.2610085226334991e+00 1.6997995507077175e+00 1.7260543563063422e+00 1.7615705657444682e+00 1.8254646795208649e+00 1.8999198212203057e+00 2.1845243382626780e+00 2.5325349423053249e+00 2.9874618084840625e+00 3.1259289886697132e+00 3.1891622018426791e+00 3.2797687179831438e+00 3.2858650222306589e+00 3.4399089128186455e+00 3.5114591703872060e+00 3.5697302290254358e+00 3.6174582021917470e+00 3.6361187876760708e+00 3.6945899647270330e+00 3.9240165653554344e+00 3.9511490061627290e+00 4.1557158145447257e+00 4.1932262373379645e+00 4.4291612940744534e+00 4.6459396523080150e+00 4.7302926640597143e+00 4.9896638865593923e+00 5.4868667090939711e+00 5.9839042272429515e+00 6.2842951592350520e+00 6.2900640320565300e+00 6.3780045898347613e+00 6.4202858230534527e+00 6.4811637242196500e+00 6.5328572219835088e+00 6.6594826148814796e+00 6.8404438467596167e+00 7.1725304358357498e+00 7.6257024807295721e+00 1.1962114417445628e+01 ";
-  rdft_test(h2o,cc_pVTZ,dftsph,Etot,Eorb,"Water, PBEPBE/cc-pVTZ",dip,101,130);
+  Etot=-5.6637319431552451e+03;
+  dip=4.1660088834246976e+00;
+  Eorb="-9.4985623401084922e+02 -1.4146635096151900e+02 -1.3119294652385088e+02 -1.3119287267577752e+02 -1.3119259493746125e+02 -2.7676547691792301e+01 -2.3232980792733077e+01 -2.3232722807094294e+01 -2.3231117092468306e+01 -1.6049049285751671e+01 -1.6049045527048754e+01 -1.6047827628809060e+01 -1.6047723998141574e+01 -1.6047713429571882e+01 -1.5604531114638549e+01 -1.5532249508743689e+01 -1.1296661981993843e+01 -1.1249243905448862e+01 -1.1232665100177721e+01 -4.3970789345813728e+00 -2.8992752064223999e+00 -2.8986598198201792e+00 -2.8951186726513405e+00 -1.4177741000934041e+00 -1.2312596845201322e+00 -1.0610694333369168e+00 -8.7645299904748530e-01 -8.5303383590368376e-01 -8.1305176899424181e-01 -7.2468343875797003e-01 -7.1752258214429510e-01 -7.1751284685512984e-01 -7.1453924533189261e-01 -7.1369021199259119e-01 -6.5649508637232634e-01 -6.5484509295061721e-01 -6.4819562287760424e-01 -6.1951447150925953e-01 -5.1149277324130693e-01 -4.5694083043993949e-01 -3.6925756806739601e-01 -1.8059222432334721e-01 6.9314381254108728e-02 7.4011365129729501e-02 1.1409015162784526e-01 1.4993230420133646e-01 1.8266978920779786e-01 1.9355783709120195e-01 2.1197840197699441e-01 2.5237135912475550e-01 2.7656210436371020e-01 2.8532362813164641e-01 3.0336607729429366e-01 3.3343210573533683e-01 3.3688909108465009e-01 3.9652955932324596e-01 4.2174259761515015e-01 5.4893795286654889e-01 5.6113635599052614e-01 6.8232568727284570e-01 8.8548529678096843e-01 9.2615820257226422e-01 9.2670939968291288e-01 9.6328468236703935e-01 9.8346701432100769e-01 9.9887403607853043e-01 1.0364505418087133e+00 1.0834412255935677e+00 1.0936564370961901e+00 1.1989337393459161e+00 1.2617670006488484e+00 1.2818433261317506e+00 1.3193949689649473e+00 1.3895935277553249e+00 1.4308893047157156e+00 1.4702798396743568e+00 1.4945329094972504e+00 1.5683750147507491e+00 1.5822512400322790e+00 1.6271531996210089e+00 1.6323133139909889e+00 1.6700777111800558e+00 1.7294530519032278e+00 1.8374560579013428e+00 1.9460156012210297e+00 1.9779608167721001e+00 2.0568938304150897e+00 2.2440133879579096e+00 2.9829355522082452e+00 3.0788481916082322e+00 5.2757403673940324e+00 2.1121787321920766e+02 ";
+  cart.set_string("Method","HF");
+  restr_test(cdcplx,b3_21G,cart,Etot,Eorb,"Cadmium complex, HF/3-21G",dip);
 
-  Etot=-7.6373023947237542e+01;
-  dip=7.3223555296985721e-01;
-  Eorb="-1.8739062641940894e+01 -9.1594732398961454e-01 -4.7168650624657926e-01 -3.2515046753241883e-01 -2.4824160427050576e-01 7.6874633489942652e-03 8.0201529571312768e-02 3.3767234820880399e-01 3.7911662388173839e-01 4.6520460763705918e-01 5.4523071812767065e-01 5.9029256229324611e-01 5.9663430911408344e-01 6.4384860676950928e-01 7.4405581502858975e-01 8.8293661866590967e-01 9.7364977239646056e-01 1.2410685524638019e+00 1.2610085226364030e+00 1.6997995507127623e+00 1.7260543563118627e+00 1.7615705657489422e+00 1.8254646795254164e+00 1.8999198212265578e+00 2.1845243382648856e+00 2.5325349423093897e+00 2.9874618084859690e+00 3.1259289886709323e+00 3.1891622018428305e+00 3.2797687179835120e+00 3.2858650222397285e+00 3.4399089128204303e+00 3.5114591703870066e+00 3.5697302290266140e+00 3.6174582021935353e+00 3.6361187876810703e+00 3.6945899647352292e+00 3.9240165653569758e+00 3.9511490061664887e+00 4.1557158145471824e+00 4.1932262373430058e+00 4.4291612940772254e+00 4.6459396523129906e+00 4.7302926640664307e+00 4.9896638865661203e+00 5.4868667091002266e+00 5.9839042272485790e+00 6.2842951592458034e+00 6.2900640320682610e+00 6.3780045898455189e+00 6.4202858230609348e+00 6.4811637242273736e+00 6.5328572219941261e+00 6.6594826148881872e+00 6.8404438467693396e+00 7.1725304358442248e+00 7.6257024807381519e+00 1.1962114417458340e+01 ";
-  rdft_test(h2o,cc_pVTZ,dftdirect,Etot,Eorb,"Water, PBEPBE/cc-pVTZ direct",dip,101,130);
+  Etot=-5.6676815794766926e+03;
+  dip=3.7002300085044890e+00;
+  Eorb="-9.3984197878952841e+02 -1.3753207522046588e+02 -1.2775494107405805e+02 -1.2775484171225446e+02 -1.2775461960887357e+02 -2.5877644442456802e+01 -2.1698212815028793e+01 -2.1697968271882321e+01 -2.1696704158457113e+01 -1.4963813791270914e+01 -1.4963803365167337e+01 -1.4963010152088080e+01 -1.4962863939859645e+01 -1.4962827551311833e+01 -1.4360306731961844e+01 -1.4284297995016706e+01 -1.0222101845542946e+01 -1.0189092847713537e+01 -1.0172543507985537e+01 -3.7205486431198804e+00 -2.3708088892569479e+00 -2.3701439379079918e+00 -2.3667607303053226e+00 -1.0858782839065826e+00 -9.3089329287251510e-01 -7.9260853132579101e-01 -6.6325335530145113e-01 -6.4256578413793441e-01 -6.0923656535837034e-01 -4.9709259456890159e-01 -4.8503224686270330e-01 -4.8171575509472009e-01 -4.7251855258258801e-01 -4.6879509568055117e-01 -4.6872800449357094e-01 -4.6436499517171681e-01 -4.6398093869607449e-01 -4.5266952061687249e-01 -3.3969175959210790e-01 -3.2987594726594271e-01 -2.7191017553038022e-01 -1.3325525837862687e-01 -4.5383611666855311e-03 -2.5448034298397684e-03 7.9044987764334759e-03 3.3666775538252508e-02 3.7585799687484309e-02 6.3639044594268168e-02 9.5522170012342783e-02 1.3206159995685737e-01 1.3440150146033925e-01 1.5776398038903308e-01 1.6224244042871572e-01 1.8802877366446027e-01 2.0172854854460281e-01 2.1971847445246126e-01 2.4645550608891145e-01 3.6713699341960859e-01 3.7513123097133150e-01 4.5357894584789393e-01 6.5944642835063838e-01 6.7596336913781108e-01 6.7892117829366350e-01 7.2415269434745366e-01 7.3375296998000461e-01 7.3583957280832468e-01 7.7451977483344381e-01 8.4047815074913601e-01 8.5273298305566703e-01 9.2809648988551208e-01 9.7420657391615106e-01 1.0043092051244433e+00 1.0256246087480674e+00 1.0797443971853455e+00 1.1228254103218724e+00 1.1979813921467568e+00 1.2156262812631009e+00 1.2858830965429917e+00 1.3032976683000577e+00 1.3297849878102790e+00 1.3368291650747819e+00 1.3822188324525937e+00 1.4204706180888911e+00 1.5533759863601031e+00 1.6676753248022878e+00 1.6794892260077781e+00 1.7665908000423525e+00 1.9160562755412367e+00 2.6597651277331500e+00 2.7556240575712274e+00 4.7845674022918327e+00 2.0810560203555852e+02 ";
+  dftcart_nofit.set_string("Method","hyb_gga_xc_b3lyp");
+  restr_test(cdcplx,b3_21G,dftcart_nofit,Etot,Eorb,"Cadmium complex, B3LYP/3-21G",dip);
 
-  Etot=-7.6374644167572512e+01;
-  dip=7.3271974251554295e-01;
-  Eorb="-1.8741541731759810e+01 -9.1787950636738691e-01 -4.7348522116670827e-01 -3.2745849791223164e-01 -2.5054915145591655e-01 2.7898124205604407e-03 7.8041232374228900e-02 3.2383354376787288e-01 3.5923989385176153e-01 4.5242208383861915e-01 5.1413429025246249e-01 5.7767382354498076e-01 5.8423669317291782e-01 6.4253371029187423e-01 6.5976615322687293e-01 7.4242015765422575e-01 9.7186961456465293e-01 1.1822083570359594e+00 1.2023229166544720e+00 1.5759178758447987e+00 1.6360778896597516e+00 1.6982205899567406e+00 1.7245171020954757e+00 1.8628731621330781e+00 1.9081341118202926e+00 2.1641868811391021e+00 2.3473130498617900e+00 2.7892740579566060e+00 3.0049314683630102e+00 3.0831688108093949e+00 3.1876658550395254e+00 3.2328093871926491e+00 3.4168944845610532e+00 3.4579171565755153e+00 3.5049981823137650e+00 3.5282496943570854e+00 3.5683151012784271e+00 3.5772260315055342e+00 3.8379019141525523e+00 3.9226527662625346e+00 4.0867005425148371e+00 4.0926886256468027e+00 4.3310831878584350e+00 4.4154607873264089e+00 4.4322654831829471e+00 4.6027456854642175e+00 5.1266099094690158e+00 5.2200925451478959e+00 5.4840615662050087e+00 6.1494589937174000e+00 6.2799837231732276e+00 6.2885829261169617e+00 6.3502583089139018e+00 6.4059400739329408e+00 6.4358010457409289e+00 6.6570181281617504e+00 6.7153054057773502e+00 6.7372430419576466e+00 6.9398799604533767e+00 7.3406795354123613e+00 8.2789340425838596e+00 8.3551997731992582e+00 9.3390722337102439e+00 1.4480083705886720e+01 1.5822312179923705e+01 ";
-  rdft_test(h2o,cc_pVTZ,dftcart,Etot,Eorb,"Water, PBEPBE/cc-pVTZ cart",dip,101,130);
-
-  Etot=-5.6637319431552269e+03;
-  dip=4.1660088061504972e+00;
-  Eorb="-9.4985623400254997e+02 -1.4146635095337089e+02 -1.3119294651562322e+02 -1.3119287266756504e+02 -1.3119259492920537e+02 -2.7676547683110730e+01 -2.3232980783872318e+01 -2.3232722798290002e+01 -2.3231117083556573e+01 -1.6049049276775264e+01 -1.6049045518071299e+01 -1.6047827619839651e+01 -1.6047723989166524e+01 -1.6047713420772880e+01 -1.5604531119814240e+01 -1.5532249519996229e+01 -1.1296661984748688e+01 -1.1249243907588900e+01 -1.1232665096274223e+01 -4.3970789262363299e+00 -2.8992751970566046e+00 -2.8986598103930916e+00 -2.8951186636211221e+00 -1.4177741029625148e+00 -1.2312596877270838e+00 -1.0610694350762055e+00 -8.7645300192619890e-01 -8.5303383785325215e-01 -8.1305177132523232e-01 -7.2468343175269601e-01 -7.1752257242798956e-01 -7.1751283714677005e-01 -7.1453923616897674e-01 -7.1369020299665686e-01 -6.5649508814902890e-01 -6.5484509382498435e-01 -6.4819562624000604e-01 -6.1951447194970333e-01 -5.1149277317008124e-01 -4.5694083009866726e-01 -3.6925757013033722e-01 -1.8059222293960120e-01 6.9314384834826825e-02 7.4011367977397380e-02 1.1409015231636327e-01 1.4993230658575632e-01 1.8266979086609392e-01 1.9355783963427042e-01 2.1197839865704907e-01 2.5237136262091242e-01 2.7656210807034870e-01 2.8532362563875135e-01 3.0336607555728407e-01 3.3343210664029688e-01 3.3688909262207323e-01 3.9652955682820679e-01 4.2174259742956793e-01 5.4893795120060540e-01 5.6113635473889356e-01 6.8232568571181806e-01 8.8548530011995874e-01 9.2615820162378037e-01 9.2670939793457818e-01 9.6328468187080274e-01 9.8346701281301152e-01 9.9887403513510875e-01 1.0364505421301553e+00 1.0834412260808501e+00 1.0936564357019709e+00 1.1989337382265584e+00 1.2617669988538658e+00 1.2818433266079519e+00 1.3193949660362958e+00 1.3895935254617837e+00 1.4308893060532106e+00 1.4702798388478833e+00 1.4945329082993719e+00 1.5683750176059559e+00 1.5822512425610162e+00 1.6271532085814402e+00 1.6323133226289412e+00 1.6700777107312283e+00 1.7294530576881546e+00 1.8374560586959574e+00 1.9460155992022372e+00 1.9779608147927583e+00 2.0568938289856304e+00 2.2440133897945587e+00 2.9829355493840426e+00 3.0788481878696974e+00 5.2757403757962811e+00 2.1121787322744808e+02 ";
-  rhf_test(cdcplx,b3_21G,cart,Etot,Eorb,"Cadmium complex, HF/3-21G",dip);
-
-  Etot=-5.6676815335032607e+03;
-  dip=3.7002317036606138e+00;
-  Eorb="-9.3984200681110383e+02 -1.3753207293563835e+02 -1.2775492453787326e+02 -1.2775482517535237e+02 -1.2775460308684549e+02 -2.5877636330403867e+01 -2.1698213476069157e+01 -2.1697968938458910e+01 -2.1696704899798089e+01 -1.4963823118300505e+01 -1.4963812691959960e+01 -1.4963019524679636e+01 -1.4962873318553701e+01 -1.4962836925079902e+01 -1.4360307511109218e+01 -1.4284298056059704e+01 -1.0222099616264661e+01 -1.0189091421505740e+01 -1.0172541512781828e+01 -3.7205449766201131e+00 -2.3708080819084811e+00 -2.3701431324751594e+00 -2.3667600322783473e+00 -1.0858774692634061e+00 -9.3089363740127318e-01 -7.9260907485469556e-01 -6.6325307733299343e-01 -6.4256580137649910e-01 -6.0923607777315714e-01 -4.9709272067536603e-01 -4.8503230449713164e-01 -4.8171579230720679e-01 -4.7251894025038121e-01 -4.6879535217913376e-01 -4.6872828013403978e-01 -4.6436539131386556e-01 -4.6398131112891083e-01 -4.5266960416614471e-01 -3.3969102485982305e-01 -3.2987575018863585e-01 -2.7190968854195924e-01 -1.3325502825837374e-01 -4.5377277860056877e-03 -2.5452570196682722e-03 7.9053281087351629e-03 3.3668099680141332e-02 3.7586253534334563e-02 6.3640326215540569e-02 9.5522623346438865e-02 1.3206140374708533e-01 1.3440146861026245e-01 1.5776397320745142e-01 1.6224463455020047e-01 1.8802863453441063e-01 2.0173060797921427e-01 2.1971894218827176e-01 2.4645592541853792e-01 3.6713719728969840e-01 3.7513181221055220e-01 4.5357912845512000e-01 6.5944751684980774e-01 6.7596288788574099e-01 6.7892129221674324e-01 7.2415347958123577e-01 7.3375434123718342e-01 7.3584026308764583e-01 7.7452085726585829e-01 8.4047864874115386e-01 8.5273435876673531e-01 9.2809759824914695e-01 9.7420818823252608e-01 1.0043108029773538e+00 1.0256257211834729e+00 1.0797444957816169e+00 1.1228262131272593e+00 1.1979813647609487e+00 1.2156268320382597e+00 1.2858833671162966e+00 1.3032976137586048e+00 1.3297849523380059e+00 1.3368291430037851e+00 1.3822192363817614e+00 1.4204708968483097e+00 1.5533763536484373e+00 1.6676765552942929e+00 1.6794890664289810e+00 1.7665915290741188e+00 1.9160564376107643e+00 2.6597655363661397e+00 2.7556227138007365e+00 4.7845696038276699e+00 2.0810566662890562e+02 ";
-  rdft_test(cdcplx,b3_21G,dftcart_nofit,Etot,Eorb,"Cadmium complex, B3LYP/3-21G",dip,402,0);
-
-  Etot=-4.6701321137062700e+02;
-  dip=5.6558460353209283e-01;
-  Eorb="-1.8627155391457261e+01 -9.8468883956112965e+00 -9.8000403160528027e+00 -9.7985030192799236e+00 -9.7964382098128002e+00 -9.7961807271748640e+00 -9.7961550277323042e+00 -9.7957612753748933e+00 -9.7955844233619533e+00 -9.7955253329214909e+00 -9.7902010909561508e+00 -9.4290462267276642e-01 -7.5219755377223751e-01 -7.3523264270799571e-01 -7.0339379628197807e-01 -6.7054043702887633e-01 -6.3196338350669290e-01 -5.8307141502875803e-01 -5.5339064212592681e-01 -5.4222274090365918e-01 -5.1586083053230347e-01 -5.0988718092502650e-01 -4.8254315754359156e-01 -4.3597789502935247e-01 -4.3184704285525777e-01 -4.1614324000167124e-01 -4.0900731415217656e-01 -4.0310300960657697e-01 -3.8729721846206161e-01 -3.7610092536615514e-01 -3.7081200669031733e-01 -3.4983203938405183e-01 -3.4595252981279484e-01 -3.3597079142586528e-01 -3.2455694687846559e-01 -3.2107059196600329e-01 -3.1361176718987510e-01 -2.9876327694288268e-01 -2.9369154471655551e-01 -2.9084626582970297e-01 -2.8883510414644881e-01 -2.8097010147869828e-01 -2.7633843713493111e-01 -2.6485318849747869e-01 -2.2609495855006834e-01 2.9806192290392833e-02 4.3502577780544914e-02 4.7425901926521130e-02 5.3710247716224804e-02 6.2798357087970699e-02 6.8714799751040279e-02 7.6075437604299065e-02 8.0543340638187397e-02 9.0741951398397497e-02 1.0571675341097821e-01 1.1202229719361251e-01 1.1622893576896096e-01 1.2071515524393225e-01 1.3140988288967598e-01 1.3642600353429132e-01 1.3882306098981226e-01 1.4089032619225283e-01 1.4347204313778514e-01 1.4890078770125176e-01 1.5392861551102316e-01 1.6458475911018383e-01 1.6999258000171452e-01 1.7439288072758835e-01 1.8134945654707318e-01 1.9191609914768332e-01 1.9907634033921279e-01 2.0636216880861247e-01 2.1896327684407113e-01 2.2823888375286169e-01 2.4034506371558256e-01 2.4854950671650858e-01 2.5464806654737326e-01 4.2493271094059948e-01 4.2850886099440066e-01 4.4064410594136144e-01 4.5736194587928819e-01 4.6331708670399840e-01 4.6892492669186708e-01 4.7902752167095475e-01 4.8942009419242338e-01 5.0243422108922409e-01 5.1194298161808560e-01 5.1904520746964766e-01 5.3632788859734704e-01 5.4651472618126795e-01 5.7350453440593574e-01 5.9413007609607349e-01 6.0273922361404864e-01 6.0614929508181969e-01 6.1191796712487623e-01 6.1545221879901502e-01 6.3140381129038481e-01 6.4954779318123312e-01 6.7503495422841886e-01 6.8567421319586230e-01 6.9676129735933068e-01 7.1482468370743091e-01 7.2341293384041783e-01 7.4573470780706397e-01 7.5077683309306320e-01 7.6086260402574901e-01 7.7072141477946510e-01 7.7609700261734316e-01 7.8186561550178701e-01 7.9605246671624019e-01 8.0732894774107800e-01 8.1699563598529312e-01 8.2988574556376626e-01 8.3747020149497586e-01 8.3872073228803778e-01 8.4332465984670413e-01 8.4899137153227822e-01 8.5771909574060401e-01 8.6351982184206333e-01 8.6889346749276086e-01 8.7768101589643166e-01 8.8613576101322833e-01 8.9531622471268535e-01 9.0580268361310012e-01 9.1529394562154442e-01 9.2211729533358244e-01 9.4122869085435856e-01 9.6566335852449037e-01 9.7153227992218738e-01 9.8203184774613683e-01 1.0177357276275714e+00 1.0490679048734122e+00 1.0974974184064521e+00 1.1473859294693729e+00 1.1642856510399122e+00 1.2116505175370667e+00 1.2321588904611254e+00 1.2665602310176585e+00 1.2725658261601944e+00 1.3173851683637137e+00 1.3344567208730451e+00 1.3696815752456353e+00 1.4032274262112134e+00 1.4066934560309814e+00 1.4522678810954939e+00 1.4859434689889990e+00 1.4994164804759276e+00 1.5182768893462120e+00 1.5407584246424093e+00 1.5551907016617632e+00 1.5718427978962703e+00 1.5854147636285247e+00 1.6035526836999050e+00 1.6248642993513742e+00 1.6295953902867923e+00 1.6386264160230943e+00 1.6518537213958844e+00 1.6708603664138071e+00 1.7082441386483631e+00 1.7240858691623080e+00 1.7309955647299635e+00 1.7768180308453236e+00 1.7799398232295720e+00 1.7966929376543859e+00 1.7986813205279357e+00 1.8208975445205899e+00 1.8371991726444703e+00 1.8486132039339520e+00 1.8627496354288031e+00 1.8684090738511838e+00 1.8910556476881752e+00 1.9068268283867666e+00 1.9273963897389339e+00 1.9366440447967901e+00 1.9517986870735198e+00 1.9711843610472877e+00 1.9748131899605390e+00 1.9784538518373438e+00 2.0029272578917205e+00 2.0163942525243508e+00 2.0242113320427984e+00 2.0282111342993994e+00 2.0446483729968845e+00 2.0506332749704606e+00 2.0622352424720773e+00 2.0764523142715570e+00 2.0982714696496236e+00 2.1124504076196486e+00 2.1473840442978203e+00 2.1546265286447737e+00 2.1669072492661070e+00 2.1723423244757405e+00 2.1811756006923217e+00 2.1987631391869709e+00 2.2110770700414504e+00 2.2189960020656758e+00 2.2523875264355104e+00 2.2601866815199085e+00 2.2680782162603097e+00 2.2959486227306249e+00 2.3105472764824362e+00 2.3159943418256055e+00 2.3268618442761357e+00 2.3486729953518770e+00 2.3828964186611823e+00 2.3876850296449788e+00 2.4069231529996555e+00 2.4220203031663976e+00 2.4322426933442869e+00 2.4627677968116677e+00 2.4929212136477763e+00 2.5133876327032851e+00 2.5312878454967578e+00 2.5380551594235872e+00 2.5674710849937470e+00 2.5816439124311494e+00 2.5894765248548350e+00 2.6092017888053913e+00 2.6302178349441636e+00 2.6355319067044722e+00 2.6434882763824556e+00 2.6604218992813014e+00 2.6727747139288258e+00 2.6917618215642252e+00 2.6952996954797985e+00 2.7073942131418396e+00 2.7113426273160157e+00 2.7285878283272287e+00 2.7487932280257419e+00 2.7749378211934173e+00 2.7823800344883702e+00 2.7848198282276502e+00 2.7958607811597824e+00 2.8014816856811935e+00 2.8080213294383789e+00 2.8118708849500358e+00 2.8150036084560806e+00 2.8202128434503928e+00 2.8419229221037101e+00 2.8601398015936041e+00 2.8723562375220726e+00 2.9059069938909214e+00 3.0865699410575247e+00 3.1217730414893872e+00 3.1464491109780144e+00 3.1676576393550682e+00 3.1811710464410945e+00 3.1906302978570693e+00 3.1946229015124032e+00 3.2130861550093734e+00 3.2280261748428960e+00 3.2455312692546228e+00 3.2648008255959167e+00 3.2857850472807395e+00 3.3101638864144691e+00 3.3528868367836555e+00 3.3823782119507948e+00 3.3896321409392702e+00 3.3912089335559443e+00 3.4239218196540513e+00 3.4639873569895583e+00 3.4735422040319475e+00 3.4830952411426064e+00 3.4844489535811141e+00 3.8198817193801875e+00 4.1566323101697904e+00 4.2134192360005800e+00 4.2755955533574852e+00 4.3733051136501313e+00 4.4240197375597763e+00 4.4487034811745669e+00 4.5000880340018314e+00 4.5662886434854633e+00 4.6275751512384815e+00 4.7059770514396533e+00 ";
-  rdft_test(decanol,b6_31Gpp,dftcart,Etot,Eorb,"1-decanol, SVWN(RPA)/6-31G**",dip,1,8);
+  Etot=-4.6701319106466121e+02;
+  dip=5.6560553480429165e-01;
+  Eorb="-1.8627156137414740e+01 -9.8468881482340400e+00 -9.8000391517469598e+00 -9.7985011419330252e+00 -9.7964364575688929e+00 -9.7961796182329461e+00 -9.7961538181902839e+00 -9.7957599877667558e+00 -9.7955835271397795e+00 -9.7955232617832486e+00 -9.7902003723404949e+00 -9.4290504921817542e-01 -7.5219613177441991e-01 -7.3523070964674742e-01 -7.0339284896349685e-01 -6.7053970652227235e-01 -6.3196272182918134e-01 -5.8307096954512283e-01 -5.5339028077466890e-01 -5.4222232573820928e-01 -5.1586037469875401e-01 -5.0988656850143577e-01 -4.8254334761967033e-01 -4.3597690315016052e-01 -4.3184612755778290e-01 -4.1614320411869582e-01 -4.0900622003916576e-01 -4.0310188710970768e-01 -3.8729582524320422e-01 -3.7610044214693328e-01 -3.7081071379694314e-01 -3.4983175697788466e-01 -3.4595200749954713e-01 -3.3597040211245149e-01 -3.2455675534227874e-01 -3.2107022335441965e-01 -3.1361134265387458e-01 -2.9876292893223810e-01 -2.9369136716103117e-01 -2.9084571652371832e-01 -2.8883498872629759e-01 -2.8096971437661467e-01 -2.7633805939563316e-01 -2.6485285973129780e-01 -2.2609541072740300e-01 2.9805855894624440e-02 4.3502677346194965e-02 4.7426725365729533e-02 5.3710757378925465e-02 6.2797617369385411e-02 6.8714814059148324e-02 7.6075981759246930e-02 8.0543504060975143e-02 9.0742583177356201e-02 1.0571678684068528e-01 1.1202417780225085e-01 1.1622977423060403e-01 1.2071505888504254e-01 1.3141047001852843e-01 1.3642706211485034e-01 1.3882287416996306e-01 1.4089055727029007e-01 1.4347231788511447e-01 1.4890062748763838e-01 1.5392887232504460e-01 1.6458457312368394e-01 1.6999277437489285e-01 1.7439450528282893e-01 1.8135077373572689e-01 1.9191613434721402e-01 1.9907690618972165e-01 2.0636287815046414e-01 2.1896427853694983e-01 2.2823888475458817e-01 2.4034566912244662e-01 2.4854964939856927e-01 2.5464927714167190e-01 4.2493471205429295e-01 4.2851185152694626e-01 4.4064832814845228e-01 4.5736258205995822e-01 4.6331892590647267e-01 4.6892714839174315e-01 4.7902895761514092e-01 4.8942038635596535e-01 5.0243462398944239e-01 5.1194661341493730e-01 5.1904667789537817e-01 5.3632921696527924e-01 5.4651593944248456e-01 5.7350572278483780e-01 5.9413190620158196e-01 6.0274011685043871e-01 6.0615107217002095e-01 6.1192054489011105e-01 6.1545345280523878e-01 6.3140456749582996e-01 6.4954861771530648e-01 6.7503539963164005e-01 6.8567621358330944e-01 6.9676237746694314e-01 7.1482451925833412e-01 7.2341450054639544e-01 7.4573454757777824e-01 7.5077764004667824e-01 7.6086360295405930e-01 7.7072201661701478e-01 7.7609737861476846e-01 7.8186598771562921e-01 7.9605299507983973e-01 8.0733034510044455e-01 8.1699593686656935e-01 8.2988605370214474e-01 8.3747034317472602e-01 8.3872144621050893e-01 8.4332432024613835e-01 8.4899282518215702e-01 8.5771956081874789e-01 8.6352094748052399e-01 8.6889377491992381e-01 8.7768136666514496e-01 8.8613716944752563e-01 8.9531601913513925e-01 9.0580566192370371e-01 9.1529333167764970e-01 9.2211841553416385e-01 9.4122939281480900e-01 9.6566486778488980e-01 9.7153246956680528e-01 9.8203219683326715e-01 1.0177360042264518e+00 1.0490684286457130e+00 1.0974976528007792e+00 1.1473874617809137e+00 1.1642859026502761e+00 1.2116509187269016e+00 1.2321590391999906e+00 1.2665604261674661e+00 1.2725684625970817e+00 1.3173850202476802e+00 1.3344566273077512e+00 1.3696820715100828e+00 1.4032275848680187e+00 1.4066934922770138e+00 1.4522683232239595e+00 1.4859434634868329e+00 1.4994160378384340e+00 1.5182767451716950e+00 1.5407584835347834e+00 1.5551904002181023e+00 1.5718411887172332e+00 1.5854149676169729e+00 1.6035523896312616e+00 1.6248643113187842e+00 1.6295959660185155e+00 1.6386262242244998e+00 1.6518538728083023e+00 1.6708612449382079e+00 1.7082446818989399e+00 1.7240850952393305e+00 1.7309952793447123e+00 1.7768187846207442e+00 1.7799403646935756e+00 1.7966946016904104e+00 1.7986817518766915e+00 1.8208995571027895e+00 1.8372013232145044e+00 1.8486146070636016e+00 1.8627514421049500e+00 1.8684098765938302e+00 1.8910561096108354e+00 1.9068270583406370e+00 1.9273968288188883e+00 1.9366445871516782e+00 1.9517986017352753e+00 1.9711844780304517e+00 1.9748133079906700e+00 1.9784543231955742e+00 2.0029278940081015e+00 2.0163943715198167e+00 2.0242114756656524e+00 2.0282110266384845e+00 2.0446485567204040e+00 2.0506337590043184e+00 2.0622360718407018e+00 2.0764528328463112e+00 2.0982719010479896e+00 2.1124509195415229e+00 2.1473844095863899e+00 2.1546267202019820e+00 2.1669075167091925e+00 2.1723427463382512e+00 2.1811757011113042e+00 2.1987630017831785e+00 2.2110769871906704e+00 2.2189959413675835e+00 2.2523882270946554e+00 2.2601867182536926e+00 2.2680781760112536e+00 2.2959489188668827e+00 2.3105475471568120e+00 2.3159945969413989e+00 2.3268620433861074e+00 2.3486729796987103e+00 2.3828969309073971e+00 2.3876853759860190e+00 2.4069231194231686e+00 2.4220207900350226e+00 2.4322427568743290e+00 2.4627682578986847e+00 2.4929223015120900e+00 2.5133883875349854e+00 2.5312880356365914e+00 2.5380554046631825e+00 2.5674716654780778e+00 2.5816435389163557e+00 2.5894762032807774e+00 2.6092020143611041e+00 2.6302177174833363e+00 2.6355319705984823e+00 2.6434882100204957e+00 2.6604218865324785e+00 2.6727749979186739e+00 2.6917620788808696e+00 2.6952997280663236e+00 2.7073943192439862e+00 2.7113430298838037e+00 2.7285879153821773e+00 2.7487932106016753e+00 2.7749377073323349e+00 2.7823799816919839e+00 2.7848199307417638e+00 2.7958608220036849e+00 2.8014818217484256e+00 2.8080216831783305e+00 2.8118711270951047e+00 2.8150035616433464e+00 2.8202130279837041e+00 2.8419227985166580e+00 2.8601401507184305e+00 2.8723563155111278e+00 2.9059065752014646e+00 3.0865702800717769e+00 3.1217735371578956e+00 3.1464493193581116e+00 3.1676580405212769e+00 3.1811714301819114e+00 3.1906306283765531e+00 3.1946230916664633e+00 3.2130867125886793e+00 3.2280265646609783e+00 3.2455319088108858e+00 3.2648013869433909e+00 3.2857855810527092e+00 3.3101643538895371e+00 3.3528874734145844e+00 3.3823787880194054e+00 3.3896325761751194e+00 3.3912089879022735e+00 3.4239218421938657e+00 3.4639876952600530e+00 3.4735427201728499e+00 3.4830955915546586e+00 3.4844494961986330e+00 3.8198802524409041e+00 4.1566349269402991e+00 4.2134221438014716e+00 4.2755969057884062e+00 4.3733062554011015e+00 4.4240204790734863e+00 4.4487042219417159e+00 4.5000884822941307e+00 4.5662887855876724e+00 4.6275754522083838e+00 4.7059780253464272e+00 ";
+  dftcart.set_string("Method","lda_x-lda_c_vwn_rpa");
+  restr_test(decanol,b6_31Gpp,dftcart,Etot,Eorb,"1-decanol, SVWN(RPA)/6-31G**",dip);
 
 
 #ifndef COMPUTE_REFERENCE
