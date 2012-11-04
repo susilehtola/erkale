@@ -24,32 +24,26 @@
 #include "timer.h"
 
 Timer::Timer() {
-  // Get time.
-  time(&start);
-  gettimeofday(&tstart,NULL);
-
-  elapsd=0.0;
+  set();
 }
 
 Timer::~Timer() {
 }
 
 void Timer::stop() {
-  struct timeval tstop;
+  struct timespec tstop;
+  clock_gettime(CLOCK_REALTIME,&tstop);
 
-  gettimeofday(&tstop,NULL);
-
-  elapsd+=(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_usec-tstart.tv_usec)/1000000.0;
+  elapsd+=(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_nsec-tstart.tv_nsec)*1.0e-9;
 }
 
 void Timer::cont() {
-  time(&start);
-  gettimeofday(&tstart,NULL);
+  clock_gettime(CLOCK_REALTIME,&tstart);
 }
 
 void Timer::set() {
-  time(&start);
-  gettimeofday(&tstart,NULL);
+  // Get time.
+  clock_gettime(CLOCK_REALTIME,&tstart);
   elapsd=0.0;
 }
 
@@ -81,43 +75,37 @@ void Timer::print_time() const {
 }
 
 double Timer::get() const {
-  struct timeval tstop;
+  struct timespec tstop;
+  clock_gettime(CLOCK_REALTIME,&tstop);
 
-  tstop.tv_sec=0;
-  tstop.tv_usec=0;
-  gettimeofday(&tstop,NULL);
-
-  return elapsd+(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_usec-tstart.tv_usec)/1000000.0;
+  return elapsd+(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_nsec-tstart.tv_nsec)*1.0e-9;
 }
 
 std::string Timer::elapsed() const {
   std::ostringstream ret;
 
-  struct timeval tstop;
-
-  gettimeofday(&tstop,NULL);
-
-  time_t isecs=tstop.tv_sec-tstart.tv_sec;
+  // Get elapsed time
+  double telapsed=get();
 
   // Minute is 60 sec
-  time_t min=60;
+  size_t min=60;
   // Hour is 60 minutes
-  time_t hour=60*min;
+  size_t hour=60*min;
   // Day is 24 hours
-  time_t day=24*hour;
+  size_t day=24*hour;
 
   // Compute number of days
-  time_t days=(time_t) trunc(isecs/day);
+  size_t days=(size_t) trunc(telapsed/day);
   if(days) {
-    isecs-=days*day;
+    telapsed-=days*day;
 
     ret << days << " d";
   }
   
   // Compute number of hours
-  time_t hours=(time_t) trunc(isecs/hour);
+  size_t hours=(size_t) trunc(telapsed/hour);
   if(hours) {
-    isecs-=hours*hour;
+    telapsed-=hours*hour;
 
     // Check that there is a space at the end
     std::string tmp=ret.str();
@@ -128,9 +116,9 @@ std::string Timer::elapsed() const {
   }
 
   // Compute number of minutes
-  time_t mins=(time_t) trunc(isecs/min);
+  size_t mins=(size_t) trunc(telapsed/min);
   if(mins) {
-    isecs-=mins*min;
+    telapsed-=mins*min;
 
     // Check that there is a space at the end
     std::string tmp=ret.str();
@@ -140,16 +128,13 @@ std::string Timer::elapsed() const {
     ret << mins << " min";
   }
 
-  // Compute number of seconds
-  double secs=isecs+(tstop.tv_usec-tstart.tv_usec)/1000000.0;
-  
   // Check that there is a space at the end
   std::string tmp=ret.str();
   if(tmp.size() && tmp[tmp.size()-1]!=' ')
     ret << " ";
 
   char hlp[80];
-  sprintf(hlp,"%.2f s",secs);
+  sprintf(hlp,"%.2f s",telapsed);
   ret << hlp;
   
   return ret.str();

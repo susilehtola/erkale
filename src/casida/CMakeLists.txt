@@ -7,6 +7,7 @@ target_link_libraries(erkale_casida liberkale_emd)
 # Link libraries
 if(BUILD_SHARED_LIBS)
 else()
+ target_link_libraries(erkale_casida -lrt)
  target_link_libraries(erkale_casida ${GSL_LIBRARIES})
  target_link_libraries(erkale_casida ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_casida ${LIBXC_LIBRARIES})
