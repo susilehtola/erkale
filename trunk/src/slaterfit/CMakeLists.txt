@@ -5,6 +5,7 @@ set_target_properties(erkale_slaterfit PROPERTIES OUTPUT_NAME "erkale_slaterfit$
 target_link_libraries(erkale_slaterfit liberkale)
 if(BUILD_SHARED_LIBS)
 else()
+ target_link_libraries(erkale_slaterfit -lrt)
  target_link_libraries(erkale_slaterfit ${GSL_LIBRARIES})
  target_link_libraries(erkale_slaterfit ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_slaterfit ${LIBINT_LIBRARIES})

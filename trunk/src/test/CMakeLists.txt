@@ -7,6 +7,7 @@ target_link_libraries(erkale_tests liberkale)
 # Link libraries
 if(BUILD_SHARED_LIBS)
 else()
+ target_link_libraries(erkale_tests -lrt)
  target_link_libraries(erkale_tests ${GSL_LIBRARIES})
  target_link_libraries(erkale_tests ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_tests ${LIBXC_LIBRARIES})

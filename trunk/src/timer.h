@@ -42,9 +42,7 @@ extern "C" {
 
 class Timer {
   /// Time when timer was started
-  time_t start;
-  /// Time when timer was started
-  struct timeval tstart;
+  struct timespec tstart;
 
   /// Elapsed time
   double elapsd;

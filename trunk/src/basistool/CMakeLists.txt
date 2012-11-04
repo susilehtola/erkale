@@ -5,6 +5,7 @@ target_link_libraries(erkale_bastool liberkale_cmp)
 # Link other libraries if necessary
 if(BUILD_SHARED_LIBS)
 else()
+ target_link_libraries(erkale_bastool -lrt)
  target_link_libraries(erkale_bastool ${GSL_LIBRARIES})
  target_link_libraries(erkale_bastool ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_bastool ${LIBINT_LIBRARIES})

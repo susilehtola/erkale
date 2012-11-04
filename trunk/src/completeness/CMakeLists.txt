@@ -15,6 +15,7 @@ target_link_libraries(erkale_copt liberkale)
 # Link other libraries if necessary
 if(BUILD_SHARED_LIBS)
 else()
+ target_link_libraries(erkale_copt -lrt)
  target_link_libraries(erkale_copt ${GSL_LIBRARIES})
  target_link_libraries(erkale_copt ${LAPACK_LIBRARIES})
  if(LIBINT_FOUND)
