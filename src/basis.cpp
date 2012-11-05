@@ -179,7 +179,8 @@ void GaussianShell::convert_contraction() {
   // Convert contraction from contraction of normalized gaussians to
   // contraction of unnormalized gaussians.
 
-  double fac=pow(M_2_PI,0.25)*pow(2,am+1.5)/sqrt(doublefact(2*am+1));
+  // Note - these refer to cartesian functions!
+  double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
 
   for(size_t i=0;i<c.size();i++)
     c[i].c*=fac*pow(c[i].z,am/2.0+0.75);
@@ -283,7 +284,8 @@ std::vector<contr_t> GaussianShell::get_contr_normalized() const {
   // Returned array
   std::vector<contr_t> cn=c;
 
-  double fac=pow(M_2_PI,0.25)*pow(2,am+1.5)/sqrt(doublefact(2*am+1));
+  // Note - these refer to cartesian functions!
+  double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
 
   // Convert coefficients to those of normalized primitives
   for(size_t i=0;i<cn.size();i++)
