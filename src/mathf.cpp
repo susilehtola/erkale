@@ -94,19 +94,37 @@ double bessel_jl(int l, double x) {
 double boysF(int m, double x) {
   // Compute Boys' function
 
-  double x2=x*x;
+  // Check whether we are operating in the range where the Taylor series is OK
+  if( x<=5.5 ) {
 
-  // Check whether we are operating in the range where x is small
-  if( x2/(2*m+3) < 100*DBL_EPSILON/(2*m+1)  ) {
-    // For small values of x the numeric evaluation leads to trouble
-    // due to x^(-m-0.5). Use the first few terms of the Taylor series
-    // instead, which is accurate enough
+    // Taylor series uses -x
+    x=-x;
 
-    return 1.0/(2*m+1.0) - x2/(2*m+3.0) + 0.5*x2*x2/(2*m+5.0);
+    // (-x)^k
+    double xk=1.0;
+    // k!
+    double kf=1.0;
+    // Value of Boys' function
+    double fm=0.0;
+    // index k
+    int k=0;
+
+    while(k<=38) {
+      // \f$ F_m(x) = \sum_{k=0}^\infty \frac {(-x)^k} { k! (2m+2k+1)} \f$
+      fm+=xk/(kf*(2*(m+k)+1));
+
+      k++;
+      xk*=x;
+      kf*=k;
+    }
+
+    return fm;
+
   } else if(x>=40.0) {
     // Use asymptotic expansion, which is precise to <1e-16 for F_n(x), n = 0 .. 60
     return doublefact(2*m-1)/pow(2,m+1)*sqrt(M_PI/pow(x,2*m+1));
   } else
+    // Need to use the exact formula
     return 0.5*gsl_sf_gamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
 }
 
