@@ -102,9 +102,11 @@ add_subdirectory(slaterfit)
 add_subdirectory(test)
 # Create basis set tool
 add_subdirectory(basistool)
-
 # Compile support programs for external programs
 add_subdirectory(external)
+
+# Compile the contributed programs
+#add_subdirectory(contrib)
 
 # Recipe for building ERITable
 add_custom_command(
