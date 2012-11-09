@@ -36,7 +36,7 @@ export CXXFLAGS="${CFLAGS}"
 export FFLAGS="${CFLAGS}"
 export FCFLAGS="${CFLAGS}"
 
-# LAPACK and BLAS library to use
+# LAPACK and BLAS library to use. On Debian and Ubuntu you need to add -lblas to the end
 LAPACK="-L/usr/lib64/atlas -llapack -lcblas -latlas"
 BLAS="-L/usr/lib64/atlas -lcblas -latlas"
 
@@ -237,6 +237,12 @@ echo "set(GSL_FOUND 1)" > erkale/cmake/FindGSL.cmake
 echo "set(GSL_INCLUDE_DIRS \"${topdir}/gsl/include\")" >> erkale/cmake/FindGSL.cmake
 echo "set(GSL_LIBRARY_DIRS \"${topdir}/gsl/lib\")" >> erkale/cmake/FindGSL.cmake
 echo "set(GSL_LIBRARIES ${topdir}/gsl/lib/libgsl.a)" >> erkale/cmake/FindGSL.cmake
+
+# libxc
+echo "set(LIBXC_FOUND 1)" > erkale/cmake/Findlibxc.cmake
+echo "set(LIBXC_INCLUDE_DIRS \"${topdir}/libxc/include\")" >> erkale/cmake/Findlibxc.cmake
+echo "set(LIBXC_LIBRARY_DIRS \"${topdir}/libxc/lib\")" >> erkale/cmake/Findlibxc.cmake
+echo "set(LIBXC_LIBRARIES ${topdir}/libxc/lib/libgsl.a)" >> erkale/cmake/Findlibxc.cmake
 
 # HDF5
 echo "set(HDF5_FOUND 1)" > erkale/cmake/FindHDF5.cmake
