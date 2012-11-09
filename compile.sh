@@ -232,6 +232,12 @@ echo "Done"
 echo "set(ARMADILLO_FOUND 1)" > erkale/cmake/FindArmadillo.cmake
 echo "set(ARMADILLO_INCLUDE_DIRS \"${topdir}/armadillo/include\")" >> erkale/cmake/FindArmadillo.cmake
 
+# GSL
+echo "set(GSL_FOUND 1)" > erkale/cmake/FindGSL.cmake
+echo "set(GSL_INCLUDE_DIRS \"${topdir}/gsl/include\")" >> erkale/cmake/FindGSL.cmake
+echo "set(GSL_LIBRARY_DIRS \"${topdir}/gsl/lib\")" >> erkale/cmake/FindGSL.cmake
+echo "set(GSL_LIBRARIES ${topdir}/gsl/lib/libgsl.a)" >> erkale/cmake/FindGSL.cmake
+
 # HDF5
 echo "set(HDF5_FOUND 1)" > erkale/cmake/FindHDF5.cmake
 echo "set(HDF5_INCLUDE_DIRS \"${topdir}/hdf5/include\")" >> erkale/cmake/FindHDF5.cmake
