@@ -5,6 +5,7 @@ set_target_properties(erkale_fchkpt PROPERTIES OUTPUT_NAME "erkale_fchkpt${SUFFI
 target_link_libraries(erkale_fchkpt liberkale)
 if(BUILD_SHARED_LIBS)
 else()
+ target_link_libraries(erkale_fchkpt -lrt)
  target_link_libraries(erkale_fchkpt ${GSL_LIBRARIES})
  target_link_libraries(erkale_fchkpt ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_fchkpt ${HDF5_LIBRARIES})
