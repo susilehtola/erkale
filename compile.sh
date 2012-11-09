@@ -242,7 +242,7 @@ echo "set(GSL_LIBRARIES ${topdir}/gsl/lib/libgsl.a)" >> erkale/cmake/FindGSL.cma
 echo "set(LIBXC_FOUND 1)" > erkale/cmake/Findlibxc.cmake
 echo "set(LIBXC_INCLUDE_DIRS \"${topdir}/libxc/include\")" >> erkale/cmake/Findlibxc.cmake
 echo "set(LIBXC_LIBRARY_DIRS \"${topdir}/libxc/lib\")" >> erkale/cmake/Findlibxc.cmake
-echo "set(LIBXC_LIBRARIES ${topdir}/libxc/lib/libgsl.a)" >> erkale/cmake/Findlibxc.cmake
+echo "set(LIBXC_LIBRARIES ${topdir}/libxc/lib/libxc.a)" >> erkale/cmake/Findlibxc.cmake
 
 # HDF5
 echo "set(HDF5_FOUND 1)" > erkale/cmake/FindHDF5.cmake
