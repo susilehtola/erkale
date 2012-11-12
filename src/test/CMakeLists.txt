@@ -1,7 +1,7 @@
 add_executable(erkale_tests tests.cpp)
 # The name of the executable is
 set_target_properties(erkale_tests PROPERTIES OUTPUT_NAME "erkale_tests${SUFFIX}")
-
+target_link_libraries(erkale_tests liberkale_emd)
 target_link_libraries(erkale_tests liberkale)
 
 # Link libraries
