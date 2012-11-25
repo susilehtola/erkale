@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2011
- * Copyright (c) 2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2011
+ * Copyright (c) 2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -137,7 +137,7 @@ int SG1_order(double r, int Z);
  * O. Treutler and R. Ahlrichs, "Efficient molecular integration
  * schemes", J. Chem. Phys. 102, pp. 346 - 354 (1994).
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/11 22:35
  */
 
@@ -297,7 +297,7 @@ class AtomGrid {
  *
  * The actual work is done in the AtomGrid class.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/11 22:35
  */
 

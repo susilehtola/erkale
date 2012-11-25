@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -168,7 +168,7 @@ typedef struct {
  * This class contains the data structures necessary for Gaussian
  * basis sets, and functions for evaluating integrals over them.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/05 20:17
  */
 
@@ -449,7 +449,7 @@ std::vector<double> ERI_cart_libint(const GaussianShell * const is, const Gaussi
  * \brief A shell of Gaussian basis functions of a given angular
  * momentum, sharing the same exponential contraction.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/05 20:17
  */
 class GaussianShell {

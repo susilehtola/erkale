@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -36,7 +36,7 @@ extern "C" {
  * This class implements a timer that can be used to measure runtimes
  * of routines. 
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/01/26 21:54
 */
 

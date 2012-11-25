@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,7 +29,7 @@
  * The dimension of the problem is Nbas^2. The jacobian would thus be
  * Nbas^4, so we need to work with a memory limited algorithm.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/10 15:39
  *
  */

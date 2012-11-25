@@ -5,8 +5,8 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -670,7 +670,7 @@ int main(int argc, char **argv) {
 #else
   printf("ERKALE - XRS from Hel, serial version.\n");
 #endif
-  printf("(c) Jussi Lehtola, 2010-2011.\n");
+  printf("(c) Susi Lehtola, 2010-2011.\n");
 
   print_license();
 

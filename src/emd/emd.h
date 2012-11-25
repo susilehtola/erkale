@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2012
- * Copyright (c) 2010-2012, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2012
+ * Copyright (c) 2010-2012, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -216,7 +216,7 @@ typedef struct {
  * isotropic Compton profiles with Gaussian basis sets",
  * Phys. Chem. Chem. Phys 13 (2011), pp. 5630 - 5641.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/03/08 17:13
  */
 

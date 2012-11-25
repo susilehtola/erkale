@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -62,7 +62,7 @@ bool operator==(const poly1d_t & lhs, const poly1d_t & rhs);
  * basis set", J. Chem. Phys. 63 (1975), pp. 113 - 114.
  *
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/10 15:32
  */
 
@@ -138,7 +138,7 @@ bool operator==(const trans3d_t & lhs, const trans3d_t& rhs);
  * This class contains routines for computing the Fourier transform of
  * Gaussian Type Orbitals using recursion relations.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/10 15:32
  */
 

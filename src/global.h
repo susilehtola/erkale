@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -56,7 +56,7 @@
  * I have chosen the GNU General public license, which is commonly
  * used in other scientific software as well.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/11/25 13:16
  */
 

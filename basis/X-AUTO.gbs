@@ -1,9 +1,10 @@
-# 2011-12-01 Jussi Lehtola
+# 2011-12-01 Susi Lehtola
 
 # "Automatic" augmentation basis for use with ERKALE in the dual basis method.
 # This basis is NOT intended for SCF calculations as such.
 
 # Uses X-FIRST for first row and X-SECOND for second row elements.
+# X-FIRST and X-SECOND are L. G. M. Pettersson's basis sets, copied from StoBe.
 
 Li 0
 S 1

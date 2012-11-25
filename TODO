@@ -11,7 +11,3 @@
 * Write geometry optimization routines.
 
 * Implement computation of two-electron completeness profiles.
-
-? Rewrite the SCF solver in a clearer, more object-oriented form.
-
-? Speed up ERI computation by precomputing shell pair data.
