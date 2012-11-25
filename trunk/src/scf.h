@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -40,7 +40,7 @@ class Checkpoint;
  * and unrestricted Hartree-Fock and density-functional theory
  * calculations.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/12 00:54
  */
 

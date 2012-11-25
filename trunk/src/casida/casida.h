@@ -1,6 +1,6 @@
 /*
- * This file is written by Arto Sakko and Jussi Lehtola, 2011
- * Copyright (c) 2011, Arto Sakko and Jussi Lehtola
+ * This file is written by Arto Sakko and Susi Lehtola, 2011
+ * Copyright (c) 2011, Arto Sakko and Susi Lehtola
  *
  */
 
@@ -13,8 +13,8 @@
  *                            -
  *                       DFT from Hel
  *
- * ERKALE is written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * ERKALE is written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  *
  * This program is free software; you can redistribute it and/or

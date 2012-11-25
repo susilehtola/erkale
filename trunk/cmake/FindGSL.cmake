@@ -1,4 +1,4 @@
-# Copyright 2011-06-05 Jussi Lehtola.
+# Copyright 2011-06-05 Susi Lehtola.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without

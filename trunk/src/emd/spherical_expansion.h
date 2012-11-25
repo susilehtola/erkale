@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -50,7 +50,7 @@ class SphericalExpansionMultiplicationTable;
  * spherical harmonics. It can do, e.g., multiplication of spherical
  * harmonics using the closure relations.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/03/07 15:31
  */
 
@@ -131,7 +131,7 @@ SphericalExpansion operator*(double fac, const SphericalExpansion & func);
  * This class is used to speed up multiplication, since they only need
  * be computed once.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/03/07 15:31
  */
 

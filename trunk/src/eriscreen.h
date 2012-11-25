@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,7 +25,7 @@
  * integrals are screened adaptively by the use of the Schwarz
  * inequality.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/12 19:44
 */
 

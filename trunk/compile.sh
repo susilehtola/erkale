@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and 
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2011-11-12 Jussi Lehtola
+# 2011-11-12 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -49,9 +49,9 @@ MAXAM="6"
 export GSLVER="1.15"
 export XCVER="1.2.0"
 export INTVER="1.1.4"
-export ARMAVER="3.2.4"
-export CMAKEVER="2.8.8"
-export HDF5VER="1.8.9"
+export ARMAVER="3.4.4"
+export CMAKEVER="2.8.10"
+export HDF5VER="1.8.10"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 

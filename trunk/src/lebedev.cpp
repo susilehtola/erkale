@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Jussi Lehtola
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -74,7 +74,7 @@
 
 /*
   The original MATLAB routine, obtained via email directly from Rob
-  Parrish, was translated into C++ by Jussi Lehtola.
+  Parrish, was translated into C++ by Susi Lehtola.
   The original version was under the BSD license, but the C++ version
   has been relicensed to the General Public License version 2 (or
   later).

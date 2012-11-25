@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Jussi Lehtola, 2010
- * Copyright (c) 2010, Jussi Lehtola
+ * Written by Susi Lehtola, 2010
+ * Copyright (c) 2010, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -45,7 +45,7 @@ std::string find_basis(const std::string & filename, bool verbose=true);
  * This class defines a shell of functions of the same angular
  * momentum, used in the ElementBasisSet class.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/08 17:10
  */
 
@@ -92,7 +92,7 @@ class FunctionShell {
  * This class defines a basis set for an element, used by the
  * BasisSetLibrary class.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/08 17:10
  */
 
@@ -160,7 +160,7 @@ class ElementBasisSet {
  * e.g. to read in basis sets from files, or to save basis sets to
  * files.
  *
- * \author Jussi Lehtola
+ * \author Susi Lehtola
  * \date 2011/05/08 17:10
  */
 

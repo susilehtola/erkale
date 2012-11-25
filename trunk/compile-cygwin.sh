@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and 
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2011-11-12 Jussi Lehtola
+# 2012-11-25 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=5
@@ -45,7 +45,7 @@ MAXAM="6"
 # Current versions of libraries
 export XCVER="1.2.0"
 export INTVER="1.1.4"
-export ARMAVER="3.2.4"
+export ARMAVER="3.4.4"
 
 # Silence cmake warnings about changed behavior
 export CMAKE_LEGACY_CYGWIN_WIN32=0 
