@@ -382,6 +382,10 @@ void Settings::parse(std::string filename) {
 		value=true;
 	      else if(stricmp(words[1],"false")==0)
 		value=false;
+	      else if(stricmp(words[1],"on")==0)
+		value=true;
+	      else if(stricmp(words[1],"off")==0)
+		value=false;
 	      else {
 		value=false;
 
