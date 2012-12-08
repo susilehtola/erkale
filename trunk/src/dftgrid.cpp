@@ -502,7 +502,11 @@ void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl,
       
       // Increment output
       lapl+=P(i,j)*(bf_lapl + 2.0*bf_gdot);
-      kin+=P(i,j)*bf_gdot; // Used in libxc without factor 0.5
+
+      // libxc prior to version 2.0.0: without factor 0.5
+      //kin+=P(i,j)*bf_gdot;
+      // Since version 2.0.0:
+      kin+=0.5*P(i,j)*bf_gdot;
     }
   }
 }

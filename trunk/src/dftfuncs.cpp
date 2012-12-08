@@ -309,9 +309,10 @@ double exact_exchange(int func_id) {
     switch(func.info->family)
       {
       case XC_FAMILY_HYB_GGA:
-	// TODO - FIXME
-	//	f=xc_hyb_gga_exx_coef(&func);
-	f=xc_hyb_gga_exx_coef(func.gga);
+	// libxc prior to 2.0.0
+	// f=xc_hyb_gga_exx_coef(func.gga);
+	// libxc 2.0.0
+	f=xc_hyb_exx_coef(&func);
 	break;
       }
     
