@@ -47,9 +47,9 @@ MAXAM="6"
 
 # Current versions of libraries
 export GSLVER="1.15"
-export XCVER="1.2.0"
+export XCVER="2.0.0"
 export INTVER="1.1.4"
-export ARMAVER="3.4.4"
+export ARMAVER="3.6.0"
 export CMAKEVER="2.8.10"
 export HDF5VER="1.8.10"
 
