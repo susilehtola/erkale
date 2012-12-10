@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 #else
   printf("ERKALE - HF/DFT from Hel, serial version.\n");
 #endif
-  printf("(c) Susi Lehtola, 2010-2011.\n");
+  printf("(c) Susi Lehtola, 2010-2012.\n");
 
   print_license();
 
