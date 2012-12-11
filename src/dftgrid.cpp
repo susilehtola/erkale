@@ -483,8 +483,8 @@ void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl,
 
   size_t i, j;
 
-  double bf_lapl;
   double bf_gdot;
+  double bf_lapl;
 
   // Initialize output
   lapl=0.0;
@@ -496,12 +496,13 @@ void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl,
     for(size_t jj=first;jj<last;jj++) {
       j=flist[jj].ind;
       
-      // Laplacian and kinetic energy density
-      bf_lapl=flist[ii].f*llist[jj] + llist[ii]*flist[jj].f;
+      // Dot product of gradients of basis functions
       bf_gdot=glist[3*ii]*glist[3*jj] + glist[3*ii+1]*glist[3*jj+1] + glist[3*ii+2]*glist[3*jj+2];
+      // Pure laplacian part (laplacian also has two times the gradient factor)
+      bf_lapl=flist[ii].f*llist[jj]  + llist[ii]*flist[jj].f;
       
-      // Increment output
-      lapl+=P(i,j)*(bf_lapl + 2.0*bf_gdot);
+      // Increment output. 
+      lapl+=P(i,j)*(bf_lapl+2.0*bf_gdot);
 
       // libxc prior to version 2.0.0: without factor 0.5
       //kin+=P(i,j)*bf_gdot;
@@ -789,7 +790,7 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
 	  bf_lapl=flist[ii].f*llist[jj] + llist[ii]*flist[jj].f;
 	  bf_gdot=glist[3*ii]*glist[3*jj] + glist[3*ii+1]*glist[3*jj+1] + glist[3*ii+2]*glist[3*jj+2];
 	  
-	  // TODO - check factor
+	  // Contribution is
 	  H(i,j)+=0.5*kfac*bf_gdot + lfac*(bf_lapl + 2.0*bf_gdot);
 	}
       }
@@ -871,7 +872,6 @@ void AtomGrid::eval_Fxc(std::vector<double> & H) const {
 	bf_lapl=2.0*flist[ii].f*llist[ii];
 	bf_gdot=glist[3*ii]*glist[3*ii] + glist[3*ii+1]*glist[3*ii+1] + glist[3*ii+2]*glist[3*ii+2];
 	
-	// TODO - check factor
 	H[i]+=0.5*kfac*bf_gdot + lfac*(bf_lapl + 2.0*bf_gdot);
       }
     }
@@ -951,8 +951,8 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
       lfaca=grid[ip].w*vlapl_rho[2*ip];
       lfacb=grid[ip].w*vlapl_rho[2*ip+1];
 
-      kfaca=grid[ip].w*vtau[ip];
-      kfacb=grid[ip].w*vtau[ip+1];
+      kfaca=grid[ip].w*vtau[2*ip];
+      kfacb=grid[ip].w*vtau[2*ip+1];
    
       // Loop over functions on grid point
       size_t first=grid[ip].f0;
@@ -1043,8 +1043,8 @@ void AtomGrid::eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) cons
       lfaca=grid[ip].w*vlapl_rho[2*ip];
       lfacb=grid[ip].w*vlapl_rho[2*ip+1];
 
-      kfaca=grid[ip].w*vtau[ip];
-      kfacb=grid[ip].w*vtau[ip+1];
+      kfaca=grid[ip].w*vtau[2*ip];
+      kfacb=grid[ip].w*vtau[2*ip+1];
    
       // Loop over functions on grid point
       size_t first=grid[ip].f0;
