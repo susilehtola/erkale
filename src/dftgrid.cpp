@@ -15,7 +15,7 @@
  */
 
 
-
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 // LibXC
@@ -486,7 +486,7 @@ void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl,
   double bf_gdot;
   double bf_lapl;
 
-  // Initialize output
+   // Initialize output
   lapl=0.0;
   kin=0.0;
 
@@ -498,11 +498,11 @@ void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl,
       
       // Dot product of gradients of basis functions
       bf_gdot=glist[3*ii]*glist[3*jj] + glist[3*ii+1]*glist[3*jj+1] + glist[3*ii+2]*glist[3*jj+2];
-      // Pure laplacian part (laplacian also has two times the gradient factor)
-      bf_lapl=flist[ii].f*llist[jj]  + llist[ii]*flist[jj].f;
+      // Laplacian
+      bf_lapl=flist[ii].f*llist[jj]  + llist[ii]*flist[jj].f + 2.0*bf_gdot;
       
       // Increment output. 
-      lapl+=P(i,j)*(bf_lapl+2.0*bf_gdot);
+      lapl+=P(i,j)*bf_lapl;
 
       // libxc prior to version 2.0.0: without factor 0.5
       //kin+=P(i,j)*bf_gdot;
@@ -568,10 +568,11 @@ void AtomGrid::init_xc() {
     }
   }
 
-  // Fill arrays with zeros.
+  // Initial values
   do_gga=false;
   do_mgga=false;
 
+  // Fill arrays with zeros.
   for(size_t i=0;i<exc.size();i++)
     exc[i]=0.0;
   for(size_t i=0;i<vxc.size();i++)
@@ -633,7 +634,8 @@ void AtomGrid::compute_xc(int func_id) {
       }
     }
   
-  // Update controlling flags for eval_Fxc.
+  // Update controlling flags for eval_Fxc (exchange and correlation
+  // parts might be of different type)
   do_gga=do_gga || gga || mgga;
   do_mgga=do_mgga || mgga;
 
@@ -655,7 +657,7 @@ void AtomGrid::compute_xc(int func_id) {
   else // LDA
     xc_lda_exc_vxc(&func, N, &rho[0], &exc_wrk[0], &vxc_wrk[0]);
 
-  // Sum to total arrays
+  // Sum to total arrays containing both exchange and correlation
   for(size_t i=0;i<exc.size();i++)
     exc[i]+=exc_wrk[i];
   for(size_t i=0;i<vxc.size();i++)
@@ -666,6 +668,41 @@ void AtomGrid::compute_xc(int func_id) {
     vlapl[i]+=vlapl_wrk[i];
   for(size_t i=0;i<vtau.size();i++)
     vtau[i]+=vtau_wrk[i];
+
+  /*
+  // Sanity check
+  size_t nerr=0;
+  for(size_t i=0;i<exc.size();i++)
+    if(std::isnan(exc_wrk[i])) {
+      nerr++;
+      fprintf(stderr,"exc[%i]=%e\n",(int) i, exc_wrk[i]);
+    }
+  for(size_t i=0;i<vxc.size();i++)
+    if(std::isnan(vxc_wrk[i])) {
+      nerr++;
+      fprintf(stderr,"rho[%i]=%e, vxc[%i]=%e\n",(int) i, rho[i],(int) i, vxc_wrk[i]);
+    }
+  for(size_t i=0;i<vsigma.size();i++)
+    if(std::isnan(vsigma_wrk[i])) {
+      nerr++;
+      fprintf(stderr,"sigma[%i]=%e, vsigma[%i]=%e\n",(int) i, sigma[i],(int) i, vsigma_wrk[i]);
+    }
+  for(size_t i=0;i<vtau.size();i++)
+    if(std::isnan(vtau_wrk[i])) {
+      nerr++;
+      fprintf(stderr,"tau[%i]=%e, vtau[%i]=%e\n",(int) i, tau[i],(int) i, vtau_wrk[i]);
+    }
+  for(size_t i=0;i<vlapl.size();i++)
+    if(std::isnan(vlapl_wrk[i])) {
+      nerr++;
+      fprintf(stderr,"lapl[%i]=%e, vlapl[%i]=%e\n",(int) i, lapl_rho[i],(int) i, vlapl_wrk[i]);
+    }
+
+  if(nerr!=0) {
+    fprintf(stderr,"%u errors with funcid=%i.\n",(unsigned int) nerr, func_id);
+    throw std::runtime_error("NaN error\n");
+  }
+  */    
 
   // Free functional
   xc_func_end(&func);
@@ -748,8 +785,8 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
-      lfac=grid[ip].w*vlapl[ip];
       kfac=grid[ip].w*vtau[ip];
+      lfac=grid[ip].w*vlapl[ip];
    
       // Loop over functions on grid point
       size_t first=grid[ip].f0;
@@ -762,11 +799,11 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
 	  size_t j=flist[jj].ind;
 
 	  // Laplacian and kinetic energy density
-	  bf_lapl=flist[ii].f*llist[jj] + llist[ii]*flist[jj].f;
 	  bf_gdot=glist[3*ii]*glist[3*jj] + glist[3*ii+1]*glist[3*jj+1] + glist[3*ii+2]*glist[3*jj+2];
+	  bf_lapl=flist[ii].f*llist[jj] + llist[ii]*flist[jj].f + 2.0*bf_gdot;
 	  
 	  // Contribution is
-	  H(i,j)+=0.5*kfac*bf_gdot + lfac*(bf_lapl + 2.0*bf_gdot);
+	  H(i,j)+=0.5*kfac*bf_gdot + lfac*bf_lapl;
 	}
       }
     }
@@ -824,8 +861,8 @@ void AtomGrid::eval_Fxc(std::vector<double> & H) const {
 
   // Meta-GGA
   if(do_mgga) {
-    double bf_lapl;
     double bf_gdot;
+    double bf_lapl;
 
     double kfac;
     double lfac;
@@ -844,10 +881,10 @@ void AtomGrid::eval_Fxc(std::vector<double> & H) const {
 	size_t i=flist[ii].ind;
 	
 	// Laplacian and kinetic energy density
-	bf_lapl=2.0*flist[ii].f*llist[ii];
 	bf_gdot=glist[3*ii]*glist[3*ii] + glist[3*ii+1]*glist[3*ii+1] + glist[3*ii+2]*glist[3*ii+2];
+	bf_lapl=2.0*flist[ii].f*llist[ii] + 2.0*bf_gdot;
 	
-	H[i]+=0.5*kfac*bf_gdot + lfac*(bf_lapl + 2.0*bf_gdot);
+	H[i]+=0.5*kfac*bf_gdot + lfac*bf_lapl;
       }
     }
   }
@@ -915,8 +952,8 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
 
   // Meta-GGA
   if(do_mgga) {
-    double bf_lapl;
     double bf_gdot;
+    double bf_lapl;
 
     double kfaca, kfacb;
     double lfaca, lfacb;
@@ -940,11 +977,11 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
 	  size_t j=flist[jj].ind;
 
 	  // Laplacian and kinetic energy density
-	  bf_lapl=flist[ii].f*llist[jj] + llist[ii]*flist[jj].f;
 	  bf_gdot=glist[3*ii]*glist[3*jj] + glist[3*ii+1]*glist[3*jj+1] + glist[3*ii+2]*glist[3*jj+2];
+	  bf_lapl=flist[ii].f*llist[jj] + llist[ii]*flist[jj].f + 2.0*bf_gdot;
 	  
-	  Ha(i,j)+=0.5*kfaca*bf_gdot + lfaca*(bf_lapl + 2.0*bf_gdot);
-	  Hb(i,j)+=0.5*kfacb*bf_gdot + lfacb*(bf_lapl + 2.0*bf_gdot);
+	  Ha(i,j)+=0.5*kfaca*bf_gdot + lfaca*bf_lapl;
+	  Hb(i,j)+=0.5*kfacb*bf_gdot + lfacb*bf_lapl;
 	}
       }
     }
@@ -1030,11 +1067,11 @@ void AtomGrid::eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) cons
 	size_t i=flist[ii].ind;
 
 	// Laplacian and kinetic energy density
-	bf_lapl=2.0*flist[ii].f*llist[ii];
 	bf_gdot=glist[3*ii]*glist[3*ii] + glist[3*ii+1]*glist[3*ii+1] + glist[3*ii+2]*glist[3*ii+2];
-	
-	Ha[i]+=0.5*kfaca*bf_gdot + lfaca*(bf_lapl + 2.0*bf_gdot);
-	Hb[i]+=0.5*kfacb*bf_gdot + lfacb*(bf_lapl + 2.0*bf_gdot);
+	bf_lapl=2.0*flist[ii].f*llist[ii] + 2.0*bf_gdot;
+
+	Ha[i]+=0.5*kfaca*bf_gdot + lfaca*bf_lapl;
+	Hb[i]+=0.5*kfacb*bf_gdot + lfacb*bf_lapl;
       }
     }
   }
