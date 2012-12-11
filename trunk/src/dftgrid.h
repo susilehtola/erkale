@@ -192,7 +192,7 @@ class AtomGrid {
   std::vector<double> tau; 
 
   /// Functional derivative of energy wrt laplacian of electron density
-  std::vector<double> vlapl_rho;
+  std::vector<double> vlapl;
   /// Functional derivative of energy wrt kinetic energy density
   std::vector<double> vtau;
 
