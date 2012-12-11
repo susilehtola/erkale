@@ -294,7 +294,7 @@ void AtomGrid::free() {
 
   // Free mGGA stuff
   lapl_rho.clear();
-  vlapl_rho.clear();
+  vlapl.clear();
   tau.clear();
   vtau.clear();
 }
@@ -308,7 +308,7 @@ void AtomGrid::update_density(const arma::mat & P) {
   }
 
   // Non-polarized calculation.
-  polarized=0;
+  polarized=false;
 
   // Check consistency of allocation
   if(rho.size()!=grid.size())
@@ -368,7 +368,7 @@ void AtomGrid::update_density(const arma::mat & Pa, const arma::mat & Pb) {
   }
 
   // Polarized calculation.
-  polarized=1;
+  polarized=true;
 
   // Check consistency of allocation
   if(rho.size()!=2*grid.size())
@@ -547,8 +547,8 @@ void AtomGrid::init_xc() {
     if(do_lapl) {
       if(vtau.size()!=N)
 	vtau.resize(N);
-      if(vlapl_rho.size()!=N)
-	vlapl_rho.resize(N);
+      if(vlapl.size()!=N)
+	vlapl.resize(N);
     }
   } else {
     // Unrestricted case - arrays of length 2N or 3N
@@ -561,16 +561,16 @@ void AtomGrid::init_xc() {
     }
 
     if(do_lapl) {
-      if(vlapl_rho.size()!=2*N)
-	vlapl_rho.resize(2*N);
+      if(vlapl.size()!=2*N)
+	vlapl.resize(2*N);
       if(vtau.size()!=2*N)
 	vtau.resize(2*N);
     }
   }
 
   // Fill arrays with zeros.
-  do_gga=0;
-  do_mgga=0;
+  do_gga=false;
+  do_mgga=false;
 
   for(size_t i=0;i<exc.size();i++)
     exc[i]=0.0;
@@ -578,8 +578,8 @@ void AtomGrid::init_xc() {
     vxc[i]=0.0;
   for(size_t i=0;i<vsigma.size();i++)
     vsigma[i]=0.0;
-  for(size_t i=0;i<vlapl_rho.size();i++)
-    vlapl_rho[i]=0.0;
+  for(size_t i=0;i<vlapl.size();i++)
+    vlapl[i]=0.0;
   for(size_t i=0;i<vtau.size();i++)
     vtau[i]=0.0;  
 }
@@ -603,25 +603,25 @@ void AtomGrid::compute_xc(int func_id) {
   }
 
   // Which functional is in question?
-  bool gga=0, mgga=0;
+  bool gga=false, mgga=false;
   
   // Determine the family
   switch(func.info->family)
     {
     case XC_FAMILY_LDA:
-      gga=0;
-      mgga=0;
+      gga=false;
+      mgga=false;
       break;
       
     case XC_FAMILY_GGA:
     case XC_FAMILY_HYB_GGA:
-      gga=1;
-      mgga=0;
+      gga=true;
+      mgga=false;
       break;
       
     case XC_FAMILY_MGGA:
-      gga=0;
-      mgga=1;
+      gga=false;
+      mgga=true;
       break;
 
     default:
@@ -637,61 +637,36 @@ void AtomGrid::compute_xc(int func_id) {
   do_gga=do_gga || gga || mgga;
   do_mgga=do_mgga || mgga;
 
-  /* Work arrays. */
+  // Amount of grid points
   const size_t N=grid.size();
 
-  // Energy density
-  std::vector<double> excwrk(N);
-
-  // LDA term
-  std::vector<double> vxcwrk;
-  // GGA term
-  std::vector<double> vsigmawrk;
-  // mGGA terms
-  std::vector<double> vlapl_rhowrk;
-  std::vector<double> vtauwrk;
-
-  // Allocate memory
-  if(!polarized) {
-    vxcwrk.resize(N);
-    if(gga||mgga)
-      vsigmawrk.resize(N);
-    if(mgga) {
-      vlapl_rhowrk.resize(N);
-      vtauwrk.resize(N);
-    }
-  } else {
-    vxcwrk.resize(2*N);
-    if(gga||mgga)
-      vsigmawrk.resize(3*N);
-    if(mgga) {
-      vlapl_rhowrk.resize(2*N);
-      vtauwrk.resize(2*N);
-    }
-  }
+  // Work arrays - exchange and correlation are computed separately
+  std::vector<double> exc_wrk(exc);
+  std::vector<double> vxc_wrk(vxc);
+  std::vector<double> vsigma_wrk(vsigma);
+  std::vector<double> vlapl_wrk(vlapl);
+  std::vector<double> vtau_wrk(vtau);
 
   // Evaluate functionals.
   if(mgga) // meta-GGA
-    xc_mgga_exc_vxc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &excwrk[0], &vxcwrk[0], &vsigmawrk[0], &vlapl_rhowrk[0], &vtauwrk[0]);
+    xc_mgga_exc_vxc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0], &vlapl_wrk[0], &vtau_wrk[0]);
   else if(gga) // GGA
-    xc_gga_exc_vxc(&func, N, &rho[0], &sigma[0], &excwrk[0], &vxcwrk[0], &vsigmawrk[0]);
+    xc_gga_exc_vxc(&func, N, &rho[0], &sigma[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0]);
   else // LDA
-    xc_lda_exc_vxc(&func, N, &rho[0], &excwrk[0], &vxcwrk[0]);
+    xc_lda_exc_vxc(&func, N, &rho[0], &exc_wrk[0], &vxc_wrk[0]);
 
-  // Sum results
-  for(size_t i=0;i<excwrk.size();i++)
-    exc[i]+=excwrk[i];
-  for(size_t i=0;i<vxcwrk.size();i++)
-    vxc[i]+=vxcwrk[i];
-  if(gga || mgga)
-    for(size_t i=0;i<vsigmawrk.size();i++)
-      vsigma[i]+=vsigmawrk[i];
-  if(mgga)
-    for(size_t i=0;i<vtau.size();i++) {
-      vtau[i]+=vtauwrk[i];
-      vlapl_rho[i]+=vlapl_rho[i];
-    }
-  
+  // Sum to total arrays
+  for(size_t i=0;i<exc.size();i++)
+    exc[i]+=exc_wrk[i];
+  for(size_t i=0;i<vxc.size();i++)
+    vxc[i]+=vxc_wrk[i];
+  for(size_t i=0;i<vsigma.size();i++)
+    vsigma[i]+=vsigma_wrk[i];
+  for(size_t i=0;i<vlapl.size();i++)
+    vlapl[i]+=vlapl_wrk[i];
+  for(size_t i=0;i<vtau.size();i++)
+    vtau[i]+=vtau_wrk[i];
+
   // Free functional
   xc_func_end(&func);
 }
@@ -773,7 +748,7 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
-      lfac=grid[ip].w*vlapl_rho[ip];
+      lfac=grid[ip].w*vlapl[ip];
       kfac=grid[ip].w*vtau[ip];
    
       // Loop over functions on grid point
@@ -857,7 +832,7 @@ void AtomGrid::eval_Fxc(std::vector<double> & H) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
-      lfac=grid[ip].w*vlapl_rho[ip];
+      lfac=grid[ip].w*vlapl[ip];
       kfac=grid[ip].w*vtau[ip];
    
       // Loop over functions on grid point
@@ -948,8 +923,8 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
-      lfaca=grid[ip].w*vlapl_rho[2*ip];
-      lfacb=grid[ip].w*vlapl_rho[2*ip+1];
+      lfaca=grid[ip].w*vlapl[2*ip];
+      lfacb=grid[ip].w*vlapl[2*ip+1];
 
       kfaca=grid[ip].w*vtau[2*ip];
       kfacb=grid[ip].w*vtau[2*ip+1];
@@ -1040,8 +1015,8 @@ void AtomGrid::eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) cons
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
-      lfaca=grid[ip].w*vlapl_rho[2*ip];
-      lfacb=grid[ip].w*vlapl_rho[2*ip+1];
+      lfaca=grid[ip].w*vlapl[2*ip];
+      lfacb=grid[ip].w*vlapl[2*ip+1];
 
       kfaca=grid[ip].w*vtau[2*ip];
       kfacb=grid[ip].w*vtau[2*ip+1];
