@@ -670,8 +670,7 @@ int main(int argc, char **argv) {
 #else
   printf("ERKALE - XRS from Hel, serial version.\n");
 #endif
-  printf("(c) Susi Lehtola, 2010-2011.\n");
-
+  print_copyright();
   print_license();
 
   if(argc!=2) {

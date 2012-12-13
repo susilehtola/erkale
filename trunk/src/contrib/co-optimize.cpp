@@ -2563,11 +2563,8 @@ int main(int argc, char **argv) {
 #else
   printf("ERKALE - Completeness optimization from Hel. Serial version.\n");
 #endif
-  printf("(c) Susi Lehtola, 2010-2012.\n");
-
+  print_header();
   print_license();
-
-  init_libint_base();
 
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);
