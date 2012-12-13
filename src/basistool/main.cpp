@@ -28,6 +28,10 @@ void help() {
 }
 
 int main(int argc, char **argv) {
+  printf("ERKALE - Basis set tools from Hel.\n");
+  print_copyright();
+  print_license();
+
   if(argc<3) {
     printf("Usage: %s input.gbs command\n\n",argv[0]);
     help();

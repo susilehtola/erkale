@@ -658,11 +658,11 @@ arma::mat form_density(const Storage & stor) {
 
 int main(int argc, char **argv) {
 #ifdef _OPENMP
-  printf("ERKALE - ADF EMD from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
+  printf("ERKALE - ADF interface from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
-  printf("ERKALE - ADF EMD from Hel, serial version.\n");
+  printf("ERKALE - ADF interface from Hel, serial version.\n");
 #endif
-  printf("(c) Susi Lehtola, 2010-2012.\n");
+  print_copyright();
   print_license();
 
   if(argc!=2) {

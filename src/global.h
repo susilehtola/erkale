@@ -98,6 +98,9 @@
 // Resize matrix if necessary
 #define MAT_RESIZE(M,NR,NC) if(M.n_rows != NR || M.n_cols != NC) { M=arma::mat(NR,NC);}
 
+#define print_copyright() \
+  printf("(c) Susi Lehtola, 2010-2012.\n");
+
 #define print_license() \
   printf("\n%s%s%s%s\n",							\
 	 "This program is free software; you can redistribute it and/or modify\n", \

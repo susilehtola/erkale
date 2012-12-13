@@ -96,7 +96,9 @@ double eval_difference(const gsl_vector *v, void *params) {
 
 
 int main(int argc, char **argv) {
-  
+  print_copyright();
+  print_license();
+
   if(argc!=5) {
     printf("Usage: %s zeta l Nf method\n",argv[0]);
     printf("zeta is the STO exponent to fit\n");

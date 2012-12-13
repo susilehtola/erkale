@@ -23,6 +23,7 @@
  * other program suites.
  */
 
+#include "global.h"
 #include "basis.h"
 #include "checkpoint.h"
 #include "mathf.h"
@@ -462,12 +463,11 @@ void save_fchk(const Settings & set) {
 
 int main(int argc, char **argv) {
 #ifdef _OPENMP
-  printf("ERKALE - HF/DFT from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
+  printf("ERKALE - Gaussian(TM) interface from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
-  printf("ERKALE - HF/DFT from Hel, serial version.\n");
+  printf("ERKALE - Gaussian(TM) interface from Hel, serial version.\n");
 #endif
-  printf("(c) Susi Lehtola, 2010-2011.\n");
-
+  print_copyright();
   print_license();
 
   if(argc>2) {

@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "global.h"
 #include "basis.h"
 #include "checkpoint.h"
 #include "stringutil.h"
@@ -116,6 +117,14 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
 }
 
 int main(int argc, char **argv) {
+#ifdef _OPENMP
+  printf("ERKALE - Cubes from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
+#else
+  printf("ERKALE - Cubes from Hel, serial version.\n");
+#endif
+  print_copyright();
+  print_license();
+
   // Parse settings
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
