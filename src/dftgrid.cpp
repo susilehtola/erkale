@@ -621,6 +621,7 @@ void AtomGrid::compute_xc(int func_id) {
       break;
       
     case XC_FAMILY_MGGA:
+    case XC_FAMILY_HYB_MGGA:
       gga=false;
       mgga=true;
       break;
