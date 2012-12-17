@@ -309,6 +309,7 @@ double exact_exchange(int func_id) {
     switch(func.info->family)
       {
       case XC_FAMILY_HYB_GGA:
+      case XC_FAMILY_HYB_MGGA:
 	// libxc prior to 2.0.0
 	// f=xc_hyb_gga_exx_coef(func.gga);
 	// libxc 2.0.0
@@ -344,6 +345,7 @@ bool gradient_needed(int func_id) {
       case XC_FAMILY_GGA:
       case XC_FAMILY_HYB_GGA:
       case XC_FAMILY_MGGA:
+      case XC_FAMILY_HYB_MGGA:
 	grad=1;
 	break;
       }
@@ -371,6 +373,7 @@ bool laplacian_needed(int func_id) {
     switch(func.info->family)
       {
       case XC_FAMILY_MGGA:
+      case XC_FAMILY_HYB_MGGA:
 	lapl=1;
 	break;
       }
