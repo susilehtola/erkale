@@ -356,6 +356,34 @@ void ElementBasisSet::decontract() {
   *this=decontr;
 }
 
+void ElementBasisSet::augment(int naug) {
+  // Loop over am
+  for(int am=0;am<=get_max_am();am++) {
+    // Get the current contraction pattern
+    std::vector<double> exps;
+    arma::mat coeffs;
+    get_primitives(exps,coeffs,am);
+
+    // If only one exponent, no augmentation
+    if(exps.size()<2)
+      continue;
+
+    // Compute the new exponents
+    double ed=exps[exps.size()-1];
+    double el=exps[exps.size()-2];
+    for(int i=0;i<naug;i++) {
+      double aug=el/pow(el/ed,i+2);
+    
+      // Add the exponent
+      FunctionShell sh(am);
+      sh.add_exponent(1.0,aug);
+      add_function(sh);
+    }
+  } 
+
+  sort();
+}
+
 
 BasisSetLibrary::BasisSetLibrary() {
 }
@@ -699,4 +727,12 @@ void BasisSetLibrary::decontract(){
   name="Decontracted "+name;
   for(size_t iel=0;iel<elements.size();iel++)
     elements[iel].decontract();
+}
+
+void BasisSetLibrary::augment(int naug){
+  char tmp[80];
+  sprintf(tmp," with %i augmentation functions",naug);
+  name=name+tmp;
+  for(size_t iel=0;iel<elements.size();iel++)
+    elements[iel].augment(naug);
 }

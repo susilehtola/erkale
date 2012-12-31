@@ -18,7 +18,7 @@
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
 
-std::string cmds[]={"completeness", "composition", "decontract", "dump", "savedalton"};
+std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "savedalton", "taug"};
 
 
 void help() {
@@ -161,8 +161,25 @@ int main(int argc, char **argv) {
 	printf("\n");
       }
     }
+  } else if(stricmp(cmd,"daug")==0 || stricmp(cmd,"taug")==0) {
+    // Augment basis set
+    
+    if(argc!=4) {
+      printf("\nUsage: %s input.gbs %s output.gbs\n",tolower(cmd).c_str(),argv[0]);
+      return 1;
+    }
+
+    int naug;
+    if(stricmp(cmd,"daug")==0)
+      naug=1;
+    else
+      naug=2;
+
+    std::string fileout(argv[3]);
+    bas.augment(naug);
+    bas.save_gaussian94(fileout);
   } else if(stricmp(cmd,"decontract")==0) {
-    // Decontract basis set.
+  // Decontract basis set.
 
     if(argc!=4) {
       printf("\nUsage: %s input.gbs decontract output.gbs\n",argv[0]);
