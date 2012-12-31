@@ -144,8 +144,11 @@ class ElementBasisSet {
   /// Normalize coefficients
   void normalize();  
 
-  // Decontract set
+  /// Decontract set
   void decontract();
+
+  /// Augment the basis
+  void augment(int naug);
 
   friend class BasisSetLibrary;
 };
@@ -216,6 +219,9 @@ class BasisSetLibrary {
 
   /// Decontract basis set
   void decontract();
+
+  /// Augment the basis
+  void augment(int naug);
 
   /// Print out library
   void print() const;
