@@ -210,13 +210,12 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
 	break;
       
       size = gsl_multimin_fminimizer_size (s);
-      status = gsl_multimin_test_size (size, 1e-2);
+      status = gsl_multimin_test_size (size, 1e-3);
       
       if (status == GSL_SUCCESS && verbose)
 	printf ("converged to minimum at\n");
 
-      //      if(verbose && (iter==1 || status == GSL_SUCCESS)) {
-      {
+      if(verbose) {
 	t.set();
 	printf("%4u ",(unsigned int) iter);
 	for(int i=0;i<Nf;i++)
