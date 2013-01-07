@@ -2225,6 +2225,79 @@ void libint_collect(std::vector<double> & ret, const double * ints, const Gaussi
   }
 }
 
+arma::cube three_overlap(const GaussianShell *is, const GaussianShell *js, const GaussianShell*ks) {
+  // First, compute the cartesian integrals. Centers of shells
+  coords_t icen=is->get_center();
+  coords_t jcen=js->get_center();
+  coords_t kcen=ks->get_center();
+
+  // Cartesian functions
+  std::vector<shellf_t> icart=is->get_cart();
+  std::vector<shellf_t> jcart=js->get_cart();
+  std::vector<shellf_t> kcart=ks->get_cart();
+
+  // Exponential contractions
+  std::vector<contr_t> icontr=is->get_contr();
+  std::vector<contr_t> jcontr=js->get_contr();
+  std::vector<contr_t> kcontr=ks->get_contr();
+
+  // Cartesian integrals
+  arma::cube cartint(icart.size(),jcart.size(),kcart.size());
+  cartint.zeros();
+  for(size_t ix=0;ix<icontr.size();ix++) {
+    double iz=icontr[ix].z;
+    double ic=icontr[ix].c;
+
+    for(size_t jx=0;jx<jcontr.size();jx++) {
+      double jz=jcontr[jx].z;
+      double jc=jcontr[jx].c;
+
+      for(size_t kx=0;kx<kcontr.size();kx++) {
+	double kz=kcontr[kx].z;
+	double kc=kcontr[kx].c;
+	
+	cartint+=ic*jc*kc*three_overlap_int_os(icen.x,icen.y,icen.z,jcen.x,jcen.y,jcen.z,kcen.x,kcen.y,kcen.z,iz,jz,kz,icart,jcart,kcart);
+      }
+    }
+  }
+
+  // Convert first two indices to spherical basis
+  arma::cube twints(is->get_Nbf(),js->get_Nbf(),kcart.size());
+  twints.zeros();
+  for(int ik=0;ik<kcart.size();ik++) {
+    // ({i}|{j}|ks) is
+    arma::mat momval=cartint.slice(ik);
+    
+    // Do conversion
+    if(is->lm_in_use())
+      momval=is->get_trans()*momval;
+    if(js->lm_in_use())
+      momval=momval*arma::trans(js->get_trans());
+
+    twints.slice(ik)=momval;
+  }
+
+  // Convert last index to spherical basis
+  if(! ks->lm_in_use())
+    return twints;
+
+  // Transformation matrix
+  arma::mat ktrans=ks->get_trans();
+
+  // Final integrals
+  arma::cube ints(is->get_Nbf(),js->get_Nbf(),ks->get_Nbf());
+  ints.zeros();
+
+  // Loop over spherical basis functions
+  for(int ik=0;ik<ks->get_Nbf();ik++)
+    // Loop over cartesians
+    for(int ick=0;ick<kcart.size();ick++)
+      ints.slice(ik)+=ktrans(ik,ick)*twints.slice(ick);
+  
+  return ints;
+}
+
+
 std::vector<double> BasisSet::ERI(const size_t is_orig, const size_t js_orig, const size_t ks_orig, const size_t ls_orig) const {
   // Calculate ERIs and transform them to spherical harmonics basis, if necessary.
 

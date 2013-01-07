@@ -446,6 +446,9 @@ std::vector<double> ERI_cart_libint(const GaussianShell * const is, const Gaussi
 /// Same, but using precomputed precursors.
 std::vector<double> ERI_cart_libint(const GaussianShell * const is, const GaussianShell * const js, const eri_precursor_t & ip, const GaussianShell * const ks, const GaussianShell * const ls, const eri_precursor_t & jp);
 
+/// Compute three-center overlap integral
+arma::cube three_overlap(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks);
+
 /**
  * \class GaussianShell
  *
