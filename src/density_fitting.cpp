@@ -346,6 +346,141 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
   }
 }
 
+arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
+  arma::mat H(Nbf,Nbf);
+  H.zeros();
+
+  // Compute middle result
+  arma::vec xcg=arma::trans(xcgamma)*ab_inv;
+
+  // Compute Fock matrix elements
+  if(!direct) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(size_t ia=0;ia<Naux;ia++) {
+      for(size_t imu=0;imu<Nbf;imu++) {
+	// Off-diagonal
+	for(size_t inu=0;inu<imu;inu++) {
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+	  H(imu,inu)+=xcg(ia)*a_munu[idx(ia,imu,inu)];
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+	  H(inu,imu)+=xcg(ia)*a_munu[idx(ia,imu,inu)];
+	}
+	// Diagonal
+	H(imu,imu)+=xcg(ia)*a_munu[idx(ia,imu,imu)];
+      }
+    }
+  } else {
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<orbpairs.size();ip++)
+      for(size_t ias=0;ias<auxind.size();ias++) {
+
+	size_t imus=orbpairs[ip].is;
+	size_t inus=orbpairs[ip].js;
+
+
+#ifdef SCREENING
+	// Do we need to compute the integral?
+	if(screen(imus,inus)<SCRTHR)
+	  continue;
+#endif
+
+	size_t Na=totbas.get_Nbf(auxind[ias]);
+	size_t Nmu=totbas.get_Nbf(orbind[imus]);
+	size_t Nnu=totbas.get_Nbf(orbind[inus]);
+
+	double symfac=1.0;
+	if(imus==inus)
+	  symfac=0.0;
+
+	// Compute (a|mn)
+	std::vector<double> eris=totbas.ERI(auxind[ias],dummyind,orbind[imus],orbind[inus]);
+
+	// Increment H
+	for(size_t iia=0;iia<Na;iia++) {
+	  // Account for orbital functions at the beginning of the basis set
+	  size_t ia=totbas.get_first_ind(auxind[ias])+iia-Nbf;
+
+	  for(size_t iimu=0;iimu<Nmu;iimu++) {
+	    size_t imu=totbas.get_first_ind(orbind[imus])+iimu;
+
+	    for(size_t iinu=0;iinu<Nnu;iinu++) {
+	      size_t inu=totbas.get_first_ind(orbind[inus])+iinu;
+
+	      // Contract result
+	      double tmp=eris[(iia*Nmu+iimu)*Nnu+iinu]*xcg(ia);
+
+	      H(imu,inu)+=tmp;
+	      // Need to symmetrize?
+	      H(inu,imu)+=symfac*tmp;
+	    }
+	  }
+	}
+      }
+  }
+
+  return H;
+}
+
+arma::vec DensityFit::invert_expansion_diag(const arma::vec & xcgamma) const {
+  arma::vec H(Nbf,Nbf);
+  H.zeros();
+
+  // Compute middle result
+  arma::vec xcg=arma::trans(xcgamma)*ab_inv;
+
+  // Compute Fock matrix elements
+  if(!direct) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(size_t ia=0;ia<Naux;ia++) {
+      for(size_t imu=0;imu<Nbf;imu++) {
+	// Diagonal
+	H(imu,imu)+=xcg(ia)*a_munu[idx(ia,imu,imu)];
+      }
+    }
+  } else {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+    for(size_t imus=0;imus<orbind.size();imus++)
+      for(size_t ias=0;ias<auxind.size();ias++) {
+
+	size_t Na=totbas.get_Nbf(auxind[ias]);
+	size_t Nmu=totbas.get_Nbf(orbind[imus]);
+	
+	// Compute (a|mn)
+	std::vector<double> eris=totbas.ERI(auxind[ias],dummyind,orbind[imus],orbind[imus]);
+
+	// Increment H
+	for(size_t iia=0;iia<Na;iia++) {
+	  // Account for orbital functions at the beginning of the basis set
+	  size_t ia=totbas.get_first_ind(auxind[ias])+iia-Nbf;
+
+	  for(size_t iimu=0;iimu<Nmu;iimu++) {
+	    size_t imu=totbas.get_first_ind(orbind[imus])+iimu;
+
+	    // Contract result
+	    double tmp=eris[(iia*Nmu+iimu)*Nmu+iimu]*xcg(ia);
+	    
+	    H(imu)+=tmp;
+	  }
+	}
+      }
+  }
+
+  return H;
+}
+
 arma::mat DensityFit::calc_J(const arma::mat & P) const {
   // Get the expansion coefficients
   arma::vec c=compute_expansion(P);

@@ -107,6 +107,10 @@ class DensityFit {
 
   /// Compute expansion coefficients c
   arma::vec compute_expansion(const arma::mat & P) const;
+  /// Invert expansion (needed for XC fitting)
+  arma::mat invert_expansion(const arma::vec & gamma) const;
+  /// Invert only the diagonal of the expansion
+  arma::vec invert_expansion_diag(const arma::vec & gamma) const;
 
   /// Get Coulomb matrix from P
   arma::mat calc_J(const arma::mat & P) const;

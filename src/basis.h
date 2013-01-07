@@ -393,6 +393,9 @@ class BasisSet {
   /// Compute moment integral around (x,y,z)
   std::vector<arma::mat> moment(int mom, double x=0.0, double y=0.0, double z=0.0) const;
 
+  /// Compute integrals of basis functions (used in xc-fitting)
+  arma::vec integral() const;
+
   /// Compute a shell of ERIs, transformed into spherical basis if necessary
   std::vector<double> ERI(size_t is, size_t js, size_t ks, size_t ls) const;
 
@@ -578,6 +581,9 @@ class GaussianShell {
   arma::mat kinetic(const GaussianShell & rhs) const;
   /// Calculate nuclear repulsion matrix between shells
   arma::mat nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const;
+
+  /// Calculate integral over function (used in xc-fitting)
+  arma::vec integral() const;
 
   /// Calculate moment integrals around (x,y,z) between shells
   std::vector<arma::mat> moment(int mom, double x, double y, double z, const GaussianShell & rhs) const;

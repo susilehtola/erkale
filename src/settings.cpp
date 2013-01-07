@@ -122,6 +122,9 @@ void Settings::add_dft_settings() {
   add_double("DFTFinalTol", "Tolerance of final DFT grid", 1e-5);
   // Relative factor for initialization
   add_double("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0);
+
+  // XC fitting?
+  add_bool("DFTXCFitting", "Use XC fitting to compute Fock matrix", false);
 }
 
 void Settings::add_double(std::string name, std::string comment, double val) {
