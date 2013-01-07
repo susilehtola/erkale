@@ -107,8 +107,8 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
   double amin;
 
   bool refine=false;
-  double lmu;
-  double rmu;
+  double lmu=0.0;
+  double rmu=0.0;
   
 
   while(true) {
