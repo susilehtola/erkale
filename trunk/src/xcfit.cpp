@@ -691,7 +691,7 @@ void XCAtomGrid::check_grad(int x_func, int c_func) {
     do_grad=do_grad || gradient_needed(c_func);
 }
 
-atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, size_t cenind, int x_func, int c_func, bool verbose) {
+atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells                         
   // See Köster et al for specifics.
@@ -736,13 +736,14 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, 
   }
   
   // Number of basis functions
-  size_t Nbf=bas.get_Nbf();
+  size_t Naux=dfit.get_Naux();
+  size_t Norb=dfit.get_Norb();
 
   // Determine limit for angular quadrature
   int lmax=(int) ceil(5.0-6.0*log10(tol));
 
   // Old and new diagonal elements of Hamiltonian
-  arma::vec Hold(Nbf), Hnew(Nbf);
+  arma::vec Hold(Norb), Hnew(Norb);
   Hold.zeros();
 
   // Maximum difference of diagonal elements of Hamiltonian
@@ -783,17 +784,19 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, 
 	compute_xc(c_func);
 
       // Construct the Fock matrix
-      eval_Fxc(Hnew);
+      arma::vec Fvec(Naux);
+      Fvec.zeros();
+      eval_Fxc(Fvec);
+      Hnew=dfit.invert_expansion_diag(Fvec);
       
       // Compute maximum difference of diagonal elements of Fock matrix
       maxdiff=0.0;
-      for(size_t i=0;i<Nbf;i++)
+      for(size_t i=0;i<Norb;i++)
 	if(fabs(Hold[i]-Hnew[i])>maxdiff)
 	  maxdiff=fabs(Hold[i]-Hnew[i]);
 
       // Copy contents
-      for(size_t i=0;i<Nbf;i++)
-	Hold[i]=Hnew[i];
+      Hold=Hnew;
 
       // Increment order if tolerance not achieved.
       if(maxdiff>tol/xc.size()) {
@@ -823,7 +826,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, 
   return ret;
 }
 
-atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa, const arma::vec & gammab, size_t cenind, int x_func, int c_func, bool verbose) {
+atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa, const arma::vec & gammab, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells                         
   // See Köster et al for specifics.
@@ -868,14 +871,15 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
   }
   
   // Number of basis functions
-  size_t Nbf=bas.get_Nbf();
+  size_t Naux=dfit.get_Naux();
+  size_t Norb=dfit.get_Norb();
 
   // Determine limit for angular quadrature
   int lmax=(int) ceil(5.0-6.0*log10(tol));
 
   // Old and new diagonal elements of Hamiltonian
-  arma::vec Haold(Nbf), Hanew(Nbf);
-  arma::vec Hbold(Nbf), Hbnew(Nbf);
+  arma::vec Haold(Norb), Hanew(Norb);
+  arma::vec Hbold(Norb), Hbnew(Norb);
 
   Haold.zeros();
   Hanew.zeros();
@@ -908,10 +912,6 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
       // Compute density
       update_density(gammaa,gammab);
 
-      // Clean out Hamiltonian
-      Hanew.zeros();
-      Hbnew.zeros();
-
       // Compute exchange and correlation.
       init_xc();
       // Compute the functionals
@@ -920,21 +920,25 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
       if(c_func>0)
 	compute_xc(c_func);
       // and construct the Fock matrices
-      eval_Fxc(Hanew,Hbnew);
+      arma::vec Favec(Naux);
+      arma::vec Fbvec(Naux);
+      Favec.zeros();
+      Fbvec.zeros();
+      eval_Fxc(Favec,Fbvec);
+      Hanew=dfit.invert_expansion_diag(Favec);
+      Hbnew=dfit.invert_expansion_diag(Fbvec);
       
       // Compute maximum difference of diagonal elements of Fock matrix
       maxdiff=0.0;
-      for(size_t i=0;i<Nbf;i++) {
+      for(size_t i=0;i<Norb;i++) {
 	double tmp=std::max(fabs(Hanew[i]-Haold[i]),fabs(Hbnew[i]-Hbold[i]));
 	if(tmp>maxdiff)
 	  maxdiff=tmp;
       }
-
-      // Copy contents
-      for(size_t i=0;i<Nbf;i++) {
-	Haold[i]=Hanew[i];
-	Hbold[i]=Hbnew[i];
-      }
+      
+      // Copy values
+      Haold=Hanew;
+      Hbold=Hbnew;
 
       // Increment order if tolerance not achieved.
       if(maxdiff>tol/xc.size()) {
@@ -1192,12 +1196,12 @@ void XCGrid::construct(const arma::mat & P, double tol, int x_func, int c_func) 
     int ith=omp_get_thread_num();
 #pragma omp for schedule(dynamic,1)
     for(size_t i=0;i<Nat;i++) {
-      grids[i]=wrk[ith].construct(*fitbasp,gamma,i,x_func,c_func,verbose);
+      grids[i]=wrk[ith].construct(*fitbasp,gamma,i,x_func,c_func,verbose,*dfitp);
     }
   }
 #else
   for(size_t i=0;i<Nat;i++)
-    grids[i]=wrk[0].construct(*fitbasp,gamma,i,x_func,c_func,verbose);
+    grids[i]=wrk[0].construct(*fitbasp,gamma,i,x_func,c_func,verbose,*dfitp);
 #endif
   
   if(verbose) {
@@ -1234,11 +1238,11 @@ void XCGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, i
     int ith=omp_get_thread_num();
 #pragma omp for schedule(dynamic,1)
     for(size_t i=0;i<Nat;i++)
-      grids[i]=wrk[ith].construct(*fitbasp,gammaa,gammab,i,x_func,c_func,verbose);
+      grids[i]=wrk[ith].construct(*fitbasp,gammaa,gammab,i,x_func,c_func,verbose,*dfitp);
   }
 #else
   for(size_t i=0;i<Nat;i++)
-    grids[i]=wrk[0].construct(*fitbasp,gammaa,gammab,i,x_func,c_func,verbose);
+    grids[i]=wrk[0].construct(*fitbasp,gammaa,gammab,i,x_func,c_func,verbose,*dfitp);
 #endif  
 
   if(verbose) {

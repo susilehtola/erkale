@@ -162,6 +162,34 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   }
 #endif
 
+  // Then, compute the diagonal integrals
+  a_mu.resize(Naux*Nbf);
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ia=0;ia<auxind.size();ia++)
+    for(size_t imu=0;imu<orbind.size();imu++) {
+      // Amount of functions
+      size_t Na=totbas.get_Nbf(auxind[ia]);
+      size_t Nmu=totbas.get_Nbf(orbind[imu]);
+
+      // Compute (a|uu)
+      std::vector<double> eris=totbas.ERI(auxind[ia],dummyind,orbind[imu],orbind[imu]);
+      
+      // Store integrals
+      for(size_t af=0;af<Na;af++) {
+	// Account for orbital functions at the beginning of the basis set
+	size_t inda=totbas.get_first_ind(auxind[ia])+af-Nbf;
+	
+	for(size_t muf=0;muf<Nmu;muf++) {
+	  size_t indmu=totbas.get_first_ind(orbind[imu])+muf;
+	  
+	  a_mu[inda*Nbf+indmu]=eris[(af*Nmu+muf)*Nmu+muf];
+	}
+      }
+    }
+
+
   // Then, compute the three-center integrals
   if(!direct) {
     a_munu.resize(Naux*Nbf*(Nbf+1)/2);
@@ -438,44 +466,14 @@ arma::vec DensityFit::invert_expansion_diag(const arma::vec & xcgamma) const {
   arma::vec xcg=arma::trans(xcgamma)*ab_inv;
 
   // Compute Fock matrix elements
-  if(!direct) {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    for(size_t ia=0;ia<Naux;ia++) {
-      for(size_t imu=0;imu<Nbf;imu++) {
-	// Diagonal
-	H(imu,imu)+=xcg(ia)*a_munu[idx(ia,imu,imu)];
-      }
+  for(size_t ia=0;ia<Naux;ia++) {
+    for(size_t imu=0;imu<Nbf;imu++) {
+      // Diagonal
+      H(imu)+=xcg(ia)*a_mu[ia*Nbf+imu];
     }
-  } else {
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-    for(size_t imus=0;imus<orbind.size();imus++)
-      for(size_t ias=0;ias<auxind.size();ias++) {
-
-	size_t Na=totbas.get_Nbf(auxind[ias]);
-	size_t Nmu=totbas.get_Nbf(orbind[imus]);
-	
-	// Compute (a|mn)
-	std::vector<double> eris=totbas.ERI(auxind[ias],dummyind,orbind[imus],orbind[imus]);
-
-	// Increment H
-	for(size_t iia=0;iia<Na;iia++) {
-	  // Account for orbital functions at the beginning of the basis set
-	  size_t ia=totbas.get_first_ind(auxind[ias])+iia-Nbf;
-
-	  for(size_t iimu=0;iimu<Nmu;iimu++) {
-	    size_t imu=totbas.get_first_ind(orbind[imus])+iimu;
-
-	    // Contract result
-	    double tmp=eris[(iia*Nmu+iimu)*Nmu+iimu]*xcg(ia);
-	    
-	    H(imu)+=tmp;
-	  }
-	}
-      }
   }
 
   return H;
@@ -643,7 +641,7 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 	    for(size_t imu=0;imu<Nmu;imu++) {
 	      size_t mu=totbas.get_first_ind(orbind[imus])+imu;
 	      
-		// Loop over orbitals
+	      // Loop over orbitals
 	      for(size_t io=0;io<Norb;io++)
 		
 		// Loop over functions on the nu shell
@@ -661,15 +659,15 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 	      size_t ia=totbas.get_first_ind(auxind[ias])+iia-Nbf;
 
 	      for(size_t imu=0;imu<Nmu;imu++) {
-	      size_t mu=totbas.get_first_ind(orbind[imus])+imu;
+		size_t mu=totbas.get_first_ind(orbind[imus])+imu;
 	      
-	      for(size_t io=0;io<Norb;io++)
+		for(size_t io=0;io<Norb;io++)
 		
-		for(size_t inu=0;inu<Nnu;inu++) {
-		  size_t nu=totbas.get_first_ind(orbind[inus])+inu;
+		  for(size_t inu=0;inu<Nnu;inu++) {
+		    size_t nu=totbas.get_first_ind(orbind[inus])+inu;
 		  
-		  iuP(io*Nbf+nu,ia)+=C(mu,orbstart+io)*eris[(iia*Nmu+imu)*Nnu+inu];
-		}
+		    iuP(io*Nbf+nu,ia)+=C(mu,orbstart+io)*eris[(iia*Nmu+imu)*Nnu+inu];
+		  }
 	      }
 	    }
 	  }
@@ -678,10 +676,10 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
     } else {
       // Loop over functions
       for(size_t mu=0;mu<Nbf;mu++)
-	  for(size_t io=0;io<Norb;io++)
-	    for(size_t nu=0;nu<Nbf;nu++)
-	      for(size_t ia=0;ia<Naux;ia++)
-		iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu[idx(ia,mu,nu)];
+	for(size_t io=0;io<Norb;io++)
+	  for(size_t nu=0;nu<Nbf;nu++)
+	    for(size_t ia=0;ia<Naux;ia++)
+	      iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu[idx(ia,mu,nu)];
     }
     
     // Plug in the half inverse, so iuP -> BiuQ
@@ -695,7 +693,7 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 	for(size_t io=0;io<Norb;io++) {
 	  // Kuv -> BiuQ*BivQ
 	  //  	  for(size_t ia=0;ia<Naux;ia++)
-	    //	    K(mu,nu)+=occs[orbstart+io]*iuP(io*Nbf+mu,ia)*iuP(io*Nbf+nu,ia);
+	  //	    K(mu,nu)+=occs[orbstart+io]*iuP(io*Nbf+mu,ia)*iuP(io*Nbf+nu,ia);
 
 	  K(mu,nu)+=occs[orbstart+io]*arma::dot(iuP.row(io*Nbf+mu),iuP.row(io*Nbf+nu));
 	}
@@ -707,6 +705,10 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
   } // End loop over orbital blocks
   
   return K;
+}
+
+size_t DensityFit::get_Norb() const {
+  return Nbf;
 }
 
 size_t DensityFit::get_Naux() const {

@@ -83,6 +83,8 @@ class DensityFit {
 
   /// Integrals \f$ ( \alpha | \mu \nu) \f$
   std::vector<double> a_munu;
+  /// Integrals \f$ ( \alpha | \mu \mu) \f$ (needed for xc fitting)
+  std::vector<double> a_mu;
 
   /// \f$ ( \alpha | \beta) \f$
   arma::mat ab;
@@ -118,6 +120,8 @@ class DensityFit {
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::mat calc_K(const arma::mat & C, const std::vector<double> & occs, size_t memlimit) const;
   
+  /// Get the number of orbital functions
+  size_t get_Norb() const;
   /// Get the number of auxiliary functions
   size_t get_Naux() const;
   /// Get the three-electron integral
