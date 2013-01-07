@@ -972,6 +972,47 @@ std::vector<arma::mat> GaussianShell::moment(int momam, double x, double y, doub
   return ret;
 }
 
+arma::vec GaussianShell::integral() const {
+  // Compute integrals over the cartesian functions
+  arma::vec ints(cart.size());
+  ints.zeros();
+
+  // Loop over cartesians
+  for(size_t ic=0;ic<cart.size();ic++) {
+    int l=cart[ic].l;
+    int m=cart[ic].m;
+    int n=cart[ic].n;
+
+    if(l%2 || m%2 || n%2)
+      // Odd function - zero integral
+      continue;
+
+    // Loop over exponents
+    for(size_t ix=0;ix<c.size();ix++) {
+      double zeta=c[ix].z;
+      
+      // Integral over x gives
+      double intx=2.0*pow(0.5/sqrt(zeta),l+1)*sqrt(M_PI);
+      // Integral over y
+      double inty=2.0*pow(0.5/sqrt(zeta),m+1)*sqrt(M_PI);
+      // Integral over z
+      double intz=2.0*pow(0.5/sqrt(zeta),n+1)*sqrt(M_PI);
+
+      // Increment total integral
+      ints(ic)+=c[ix].c*intx*inty*intz;
+    }
+
+    // Plug in relative norm
+    ints(ic)*=cart[ic].relnorm;
+  }
+
+  // Do conversion to spherical basis
+  if(uselm)
+    ints=transmat*ints;
+
+  return ints;
+}
+
 
 BasisSet::BasisSet() {
   // Use spherical harmonics by default.
@@ -1737,6 +1778,16 @@ std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) c
   return ret;
 }
 
+arma::vec BasisSet::integral() const {
+  arma::vec ints(get_Nbf());
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t is=0;is<shells.size();is++)
+    ints.subvec(shells[is].get_first_ind(),shells[is].get_last_ind())=shells[is].integral();
+
+  return ints;
+}
 
 double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks, size_t kk, size_t ls, size_t ll) const {
   // Calculate cartesian ERI from functions ii, jj, kk, and ll on shells is, js, ks and ls.

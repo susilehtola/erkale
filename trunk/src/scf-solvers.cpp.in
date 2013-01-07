@@ -26,16 +26,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #if defined(HF)
 #define form_fock(sol,ref) Fock_RHF(sol,occs,conv,ref,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_RDFT(sol,occs,conv,dft,ref,grid,tol); nfock++;
+#define form_fock(sol,ref) Fock_RDFT(sol,occs,conv,dft,ref,grid,fitgrid,tol); nfock++;
 #endif
 
 #else
   // Unrestricted case: first core excited states
 
 #if defined(HALFHOLE)
-#define form_fock(sol,ref) Fock_half_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,tol); nfock++;
+#define form_fock(sol,ref) Fock_half_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,fitgrid,tol); nfock++;
 #elif defined(FULLHOLE)
-#define form_fock(sol,ref) Fock_full_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,tol,xch); nfock++;
+#define form_fock(sol,ref) Fock_full_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,fitgrid,tol,xch); nfock++;
 
   // Conventional HF and DFT
 #elif defined(HF)
@@ -43,7 +43,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #elif defined(_ROHF)
 #define form_fock(sol,ref) Fock_ROHF(sol,Nel_alpha,Nel_beta,conv,ref,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,conv,dft,ref,grid,tol); nfock++;
+#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,conv,dft,ref,grid,fitgrid,tol); nfock++;
 #endif
 #endif
 
@@ -263,6 +263,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   }
 
   DFTGrid grid(basisp,verbose,dft_lobatto);
+  XCGrid fitgrid(&xcfitbas,&dfit,verbose,dft_lobatto);
 #endif
 
 
@@ -289,8 +290,14 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
 
     fprintf(stderr,"calculation");
-    if(densityfit)
-      fprintf(stderr," with density fitting");
+    if(densityfit) {
+      fprintf(stderr," with density");
+#ifdef DFT
+      if(dft_xcfit)
+	fprintf(stderr," and exchange-correlation");
+#endif
+      fprintf(stderr," fitting");
+    }
 
 #ifdef DFT
 #if (defined(FULLHOLE) || defined(HALFHOLE))
@@ -315,10 +322,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #ifdef DFT
 #ifdef RESTRICTED
   // Form DFT quadrature grid
-  grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+  if(dft_xcfit)
+    fitgrid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+  else
+    grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
 #else
   // Form DFT quadrature grid
-  grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+  if(dft_xcfit)
+    fitgrid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+  else
+    grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
   fflush(stdout);
 

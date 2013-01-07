@@ -110,8 +110,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   try {
     // Use Lobatto angular grid? (Lebedev is default)
     dft_lobatto=set.get_bool("DFTLobatto");
-    // Direct DFT calculation?
-    dft_direct=set.get_bool("DFTDirect");
+    // Use XC fitting?
+    dft_xcfit=set.get_bool("DFTXCFitting");
   } catch(...) {
     // Hartree-Fock doesn't have the settings
   }
@@ -174,11 +174,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   }
 
   if(densityfit) {
-    // Density fitting.
-
     // Form density fitting basis
-    BasisSet dfitbas;
-    
+
     // Do we need RI-K, or is RI-J sufficient?
     bool rik=false;
     if(stricmp(set.get_string("Method"),"HF")==0)
@@ -208,6 +205,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       // Construct fitting basis
       dfitbas=construct_basis(basisp->get_nuclei(),fitlib,set);
     }
+    // Store XC fitting basis
+    xcfitbas=dfitbas;
+    // Finalize basis, including normalization wrt overlap metric!
+    xcfitbas.finalize();
 
     // Compute memory estimate
     std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,direct));
@@ -862,6 +863,9 @@ void calculate(const BasisSet & basis, Settings & set) {
     if(set.get_bool("DensityFitting") && (stricmp(set.get_string("FittingBasis"),"Auto")==0)) {
       throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
     }
+
+  if(!hf && !rohf && set.get_bool("DFTXCFitting") && !set.get_bool("DensityFitting"))
+    throw std::runtime_error("XC fitting is enabled but RI-J is disabled!\n");
 
   // Load starting guess?
   bool doload=(stricmp(loadname,"")!=0);

@@ -24,6 +24,7 @@
 #include <armadillo>
 #include <vector>
 #include "dftgrid.h"
+#include "xcfit.h"
 #include "eritable.h"
 #include "eriscreen.h"
 #include "density_fitting.h"
@@ -150,6 +151,9 @@ class SCF {
 
   /// Basis set to use (needed for DFT grid operation)
   const BasisSet * basisp;
+  /// Density fitting basis
+  BasisSet dfitbas;
+  BasisSet xcfitbas;
   /// Checkpoint file
   Checkpoint * chkptp;
 
@@ -206,8 +210,8 @@ class SCF {
 
   /// Use Lobatto angular grid instead of Lebedev grid (DFT)
   bool dft_lobatto;
-  /// Save memory by reforming DFT grid on every iteration?
-  bool dft_direct;
+  /// Use XC fitting?
+  bool dft_xcfit;
 
   /// Nuclear repulsion energy
   double Enuc;
@@ -264,9 +268,9 @@ class SCF {
   void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const uscf_t & oldsol, double tol) const;
 
   /// Calculate restricted density-functional theory KS-Fock operator
-  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, double tol) const;
+  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const;
   /// Calculate unrestricted density-functional theory KS-Fock operator
-  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, double tol) const;
+  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const;
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
