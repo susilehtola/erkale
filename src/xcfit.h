@@ -92,9 +92,9 @@ class XCAtomGrid {
 
   /// Construct adaptively a grid centered on the cenind:th center,
   /// restricted calculation
-  atomgrid_t construct(const BasisSet & bas, const arma::vec & gamma, size_t cenind, int x_func, int c_func, bool verbose);
+  atomgrid_t construct(const BasisSet & bas, const arma::vec & gamma, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit);
   /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
-  atomgrid_t construct(const BasisSet & bas, const arma::vec & gammaa, const arma::vec & gammab, size_t cenind, int x_func, int c_func, bool verbose);
+  atomgrid_t construct(const BasisSet & bas, const arma::vec & gammaa, const arma::vec & gammab, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit);
 
   /// Form shells on an atom, as according to list of radial shells
   void form_grid(const BasisSet & bas, atomgrid_t & g);
