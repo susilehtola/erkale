@@ -71,6 +71,12 @@ std::vector<atom_t> load_xyz(std::string filename) {
 	oss << "File \""<<filename<<"\" ended unexpectedly!\n";
 	throw std::runtime_error(oss.str());
       }
+      if(words.size()<4) {
+	ERROR_INFO();
+	std::ostringstream oss;
+	oss << "Malformed xyz file \"" << filename << "\"!\n";
+	throw std::runtime_error(oss.str());
+      }    
       
       // and extract the information
       tmp.el=words[0]; // Element type
