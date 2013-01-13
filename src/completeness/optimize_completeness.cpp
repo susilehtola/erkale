@@ -275,6 +275,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
   double rval;
   std::vector<double> rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
   while(rval<tol) {
+    left=right;
     right*=2.0;
     rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
   }
