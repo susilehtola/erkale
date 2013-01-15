@@ -70,12 +70,8 @@ target_link_libraries(erkale_cube liberkale)
 
 # Spherical transform generator
 add_executable (eriworker_gentransform eriworker_gentransform.cpp solidharmonics.cpp mathf.cpp)
-if(BUILD_SHARED_LIBS)
-else()
- target_link_libraries(eriworker_gentransform ${GSL_LIBRARIES})
- target_link_libraries(eriworker_gentransform ${LAPACK_LIBRARIES})
-endif()
-
+target_link_libraries(eriworker_gentransform ${GSL_LIBRARIES})
+target_link_libraries(eriworker_gentransform ${LAPACK_LIBRARIES})
 
 # Link libraries
 if(BUILD_SHARED_LIBS)
