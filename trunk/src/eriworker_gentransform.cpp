@@ -75,7 +75,7 @@ int main(void) {
 	for(size_t iin=0;iin<Ncart;iin++)
 	  for(size_t iout=0;iout<Nsph;iout++)
 	    if(transmat(iout,iin)!=0.0)
-	      printf("        output[((%i*Nj+jj)*Nk+kk)*Nl+ll]+=%.16e*input[((%i*Nj+jj)*Nk+kk)*Nl+ll];\n",(int) iout,transmat(iout,iin),(int) iin);
+	      printf("        output[((%2i*Nj+jj)*Nk+kk)*Nl+ll] += % .16e * input[((%2i*Nj+jj)*Nk+kk)*Nl+ll];\n",(int) iout,transmat(iout,iin),(int) iin);
 	break;
 
       case(j):
@@ -85,7 +85,7 @@ int main(void) {
 	for(size_t jin=0;jin<Ncart;jin++)
 	  for(size_t jout=0;jout<Nsph;jout++)
 	    if(transmat(jout,jin)!=0.0)
-	      printf("        output[((ii*%i+%i)*Nk+kk)*Nl+ll]+=%.16e*input[((ii*%i+%i)*Nk+kk)*Nl+ll];\n",(int) Nsph,(int) jout,transmat(jout,jin),(int) Ncart,(int) jin);
+	      printf("        output[((ii*%2i+%2i)*Nk+kk)*Nl+ll] += % .16e * input[((ii*%2i+%2i)*Nk+kk)*Nl+ll];\n",(int) Nsph,(int) jout,transmat(jout,jin),(int) Ncart,(int) jin);
 	break;
 
       case(k):
@@ -95,7 +95,7 @@ int main(void) {
 	for(size_t kin=0;kin<Ncart;kin++)
 	  for(size_t kout=0;kout<Nsph;kout++)
 	    if(transmat(kout,kin)!=0.0)
-	      printf("        output[((ii*Nj+jj)*%i+%i)*Nl+ll]+=%.16e*input[((ii*Nj+jj)*%i+%i)*Nl+ll];\n",(int) Nsph,(int) kout,transmat(kout,kin),(int) Ncart,(int) kin);
+	      printf("        output[((ii*Nj+jj)*%2i+%2i)*Nl+ll] += % .16e * input[((ii*Nj+jj)*%2i+%2i)*Nl+ll];\n",(int) Nsph,(int) kout,transmat(kout,kin),(int) Ncart,(int) kin);
 	break;
 
       case(l):
@@ -105,7 +105,7 @@ int main(void) {
 	for(size_t lin=0;lin<Ncart;lin++)
 	  for(size_t lout=0;lout<Nsph;lout++)
 	    if(transmat(lout,lin)!=0.0)
-	      printf("    output[((ii*Nj+jj)*Nk+kk)*%i+%i]+=%.16e*input[((ii*Nj+jj)*Nk+kk)*%i+%i];\n",(int) Nsph,(int) lout,transmat(lout,lin),(int) Ncart,(int) lin);
+	      printf("        output[((ii*Nj+jj)*Nk+kk)*%2i+%2i] += % .16e * input[((ii*Nj+jj)*Nk+kk)*%2i+%2i];\n",(int) Nsph,(int) lout,transmat(lout,lin),(int) Ncart,(int) lin);
 	break;
       }
 
@@ -123,15 +123,6 @@ int main(void) {
     printf("  if(am<%i) {\n",MAXAM+1);
     printf("    f[am](%s,%s,%s,input,output);\n",arg1.c_str(),arg2.c_str(),arg3.c_str());
     printf("  } else {\n");
-
-    /*
-    for(int am=0;am<=MAXAM;am++) {
-      printf("  if(am==%i) {\n",am);
-      printf("    transform_%c%i(%s,%s,%s);\n",ijkl[it],am,arg1.c_str(),arg2.c_str(),arg3.c_str());
-      printf("    return;\n");
-      printf("  }\n");
-    }
-    */
 
     // Nope, do general transform.
     printf("    zero(output);\n");
