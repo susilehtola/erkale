@@ -29,8 +29,6 @@
 #include "settings.h"
 #include "xyzutils.h"
 
-#include <libint/libint.h>
-
 /// Angular momentum notation for shells
 const char shell_types[]={'S','P','D','F','G','H','I','J','K','L','M','N','O','Q','R'};
 /// Maximum angular momentum supported in current version of ERKALE
@@ -137,26 +135,6 @@ bool operator<(const contr_t & lhs, const contr_t & rhs);
 /// Identity for contractions
 bool operator==(const contr_t & lhs, const contr_t & rhs);
 
-/// Precursor data for ERIs
-typedef struct {
-  /// Distance between centers A and B
-  arma::vec AB;
-  /// Sum of exponents (Na,Nb)
-  arma::mat zeta;
-  /// Coordinates of center of product gaussian P, dimension (Na,Nb,3)
-  arma::cube P;
-  /// Distance between P and shell i center (Na,Nb,3)
-  arma::cube PA;
-  /// Distance between P and shell j center (Na,Nb,3)
-  arma::cube PB;
-  /// Contraction for first center (Na)
-  std::vector<contr_t> ic;
-  /// Array of exponents for second center (Nb)
-  std::vector<contr_t> jc;
-  /// Overlap of primitives on i and j (Na,Nb)
-  arma::mat S;
-} eri_precursor_t;
-
 #include "basislibrary.h"
 
 
@@ -189,9 +167,6 @@ class BasisSet {
 
   /// Ranges of shells
   std::vector<double> shell_ranges;
-
-  /// ERI precursors
-  std::vector< std::vector<eri_precursor_t> > precursor;
 
  public:
   /// Dummy constructor
@@ -260,9 +235,6 @@ class BasisSet {
   void normalize();
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
-
-  /// Compute ERI precursors
-  void compute_precursors();
 
   /// Do all of the above
   void finalize(bool convert=false);
@@ -396,15 +368,6 @@ class BasisSet {
   /// Compute integrals of basis functions (used in xc-fitting)
   arma::vec integral() const;
 
-  /// Compute a shell of ERIs, transformed into spherical basis if necessary
-  std::vector<double> ERI(size_t is, size_t js, size_t ks, size_t ls) const;
-
-  /// Helper for ERI: compute a shell of cartesian ERIs
-  std::vector<double> ERI_cart(size_t is, size_t js, size_t ks, size_t ls) const;
-
-  /// Helper for ERI: calculate cartesian ERI using Huzinaga (mostly for debugging)
-  double ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks, size_t kk, size_t ls, size_t ll) const;
-
   /// Calculate nuclear charge
   int Ztot() const;
 
@@ -420,31 +383,6 @@ class BasisSet {
   /// Find "identical" shells in basis set.
   std::vector< std::vector<size_t> > find_identical_shells() const;
 };
-
-/// Compute precursor
-eri_precursor_t compute_precursor(const GaussianShell *is, const GaussianShell *js);
-
-/// Compute cartesian ERIs
-std::vector<double> compute_ERI_cart(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-/// Compute a shell of ERIs, transformed into spherical basis if necessary
-std::vector<double> compute_ERI(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-
-/// Compute data necessary for libint
-void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-/// Same thing using precursors
-void compute_libint_data(Libint_t & libint, const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax);
-/// Collect the integrals from ints and place them in ret, applying the necessary normalizations
-void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-
-/// Reorder ERIs
-void reorder_ERIs(std::vector<double> & ret, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
-/// Transform ERIs into the spherical basis
-void spherical_ERI_transform(std::vector<double> & eris, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-
-/// Compute ERI over cartesian Gaussians. Assumes correct order of shells.
-std::vector<double> ERI_cart_libint(const GaussianShell * const is, const GaussianShell * const js, const GaussianShell * const ks, const GaussianShell * const ls);
-/// Same, but using precomputed precursors.
-std::vector<double> ERI_cart_libint(const GaussianShell * const is, const GaussianShell * const js, const eri_precursor_t & ip, const GaussianShell * const ks, const GaussianShell * const ls, const eri_precursor_t & jp);
 
 /// Compute three-center overlap integral
 arma::cube three_overlap(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks);
@@ -590,27 +528,10 @@ class GaussianShell {
 
   /// Calculate moment integrals around (x,y,z) between shells
   std::vector<arma::mat> moment(int mom, double x, double y, double z, const GaussianShell & rhs) const;
-
-  /// Compute ERI over cartesian functions
-  friend std::vector<double> ERI_cart(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Compute ERI over cartesian functions using the Huzinaga algorithm (mostly for debugging)
-  friend double BasisSet::ERI_cart(size_t is, size_t ii, size_t js, size_t jj, size_t ks, size_t kk, size_t ls, size_t ll) const;
-  /// Compute ERI over cartesian functions
-  friend std::vector<double> BasisSet::ERI_cart(size_t is, size_t js, size_t ks, size_t ls) const;
-
-  /// Normalize libint integrals
-  friend void libint_collect(std::vector<double> & ret, const double * ints, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
-  /// Compute data for LIBINT
-  friend void compute_libint_data(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Compute data for LIBINT
-  friend void compute_libint_data_old(Libint_t & libint, const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
 };
 
 /// Get dummy shell
 GaussianShell dummyshell();
-
-/// Compute index of swapped integral
-size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl);
 
 /// Form index helper table: i*(i+1)/2
 std::vector<size_t> i_idx(size_t N);
@@ -627,5 +548,7 @@ double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t
 
 /// Check orthonormality of molecular orbitals
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
+
+#include "eriworker.h"
 
 #endif
