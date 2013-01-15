@@ -527,24 +527,32 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   ab.zeros();
 
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<auxpairs.size();ip++) {
-    // Shells in question are
-    size_t is=auxpairs[ip].is;
-    size_t js=auxpairs[ip].js;
+  {
+    ERIWorker eri(dfitbas.get_max_am(),dfitbas.get_max_Ncontr());
+    std::vector<double> eris;
 
-    // Compute (a|b)
-    std::vector<double> eris=compute_ERI(&auxshells[is],&dummy,&auxshells[js],&dummy);
-    
-    // Store integrals
-    for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
-      for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
-	ab(auxshells[is].get_first_ind()+ii,auxshells[js].get_first_ind()+jj)=eris[ii*auxshells[js].get_Nbf()+jj];
-	ab(auxshells[js].get_first_ind()+jj,auxshells[is].get_first_ind()+ii)=eris[ii*auxshells[js].get_Nbf()+jj];
-      }
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<auxpairs.size();ip++) {
+      // Shells in question are
+      size_t is=auxpairs[ip].is;
+      size_t js=auxpairs[ip].js;
+      
+      // Compute (a|b)
+      eri.compute(&auxshells[is],&dummy,&auxshells[js],&dummy,eris);
+      
+      // Store integrals
+      for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
+	for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
+	  ab(auxshells[is].get_first_ind()+ii,auxshells[js].get_first_ind()+jj)=eris[ii*auxshells[js].get_Nbf()+jj];
+	  ab(auxshells[js].get_first_ind()+jj,auxshells[is].get_first_ind()+ii)=eris[ii*auxshells[js].get_Nbf()+jj];
+	}
+    }
   }
-
+  
   // Form ab_inv
   ab_inv=arma::inv(ab+DELTA);
   
@@ -558,26 +566,34 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   // Screen the integrals.
   arma::mat screen(orbshells.size(),orbshells.size());
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<orbpairs.size();ip++) {
-    // The shells in question are
-    size_t is=orbpairs[ip].is;
-    size_t js=orbpairs[ip].js;
-    
-    // Compute ERIs
-    std::vector<double> eris=compute_ERI(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
-    
-    // Find out maximum value
-    double max=0.0;
-    for(size_t i=0;i<eris.size();i++)
-      if(fabs(eris[i])>max)
-	max=eris[i];
-    max=sqrt(max);
-    
-    // Store value
-    screen(is,js)=max;
-    screen(js,is)=max;
+  {
+    ERIWorker eri(basis.get_max_am(),basis.get_max_Ncontr());
+    std::vector<double> eris;
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<orbpairs.size();ip++) {
+      // The shells in question are
+      size_t is=orbpairs[ip].is;
+      size_t js=orbpairs[ip].js;
+      
+      // Compute ERIs
+      eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js],eris);
+      
+      // Find out maximum value
+      double max=0.0;
+      for(size_t i=0;i<eris.size();i++)
+	if(fabs(eris[i])>max)
+	  max=eris[i];
+      max=sqrt(max);
+      
+      // Store value
+      screen(is,js)=max;
+      screen(js,is)=max;
+    }
   }
 #endif
   
@@ -586,6 +602,9 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 #pragma omp parallel
 #endif
   {
+    ERIWorker eri(std::max(basis.get_max_am(),dfitbas.get_max_am()),std::max(basis.get_max_Ncontr(),dfitbas.get_max_Ncontr()));
+    std::vector<double> eris;
+    
     
 #ifdef _OPENMP
     // Worker stack for each thread
@@ -621,7 +640,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 	size_t a0=auxshells[ia].get_first_ind();
 	
 	// Compute the integral over the AOs
-	std::vector<double> eris=compute_ERI(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
+	eri.compute(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu],eris);
 	
 	// Transform integrals to spin orbitals.
 	for(size_t ispin=0;ispin<C.size();ispin++) {

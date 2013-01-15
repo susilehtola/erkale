@@ -61,6 +61,8 @@ arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) 
   
   // Amount of basis functions
   size_t Nbf=basp->get_Nbf();
+  // Shells
+  std::vector<GaussianShell> shells=basp->get_shells();
   
   /* Check sizes of input */
   
@@ -192,24 +194,31 @@ arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) 
   const size_t Nsh=basp->get_Nshells();
   arma::mat screen(Nsh,Nsh);
   
-  // Loop over shell pairs
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<Npairs;ip++) {
-    size_t i=shpairs[ip].is;
-    size_t j=shpairs[ip].js;
+  {
+    ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
+    std::vector<double> tmp;
     
-    // Compute integrals
-    std::vector<double> tmp=basp->ERI(i,j,i,j);
-    // Get maximum value
-    double m=0.0;
-    for(size_t k=0;k<tmp.size();k++)
-      if(fabs(tmp[k])>m)
-	m=fabs(tmp[k]);
-    m=sqrt(m);
-    screen(i,j)=m;
-    screen(j,i)=m;
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<Npairs;ip++) {
+      size_t i=shpairs[ip].is;
+      size_t j=shpairs[ip].js;
+      
+      // Compute integrals
+      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j],tmp);
+      // Get maximum value
+      double m=0.0;
+      for(size_t k=0;k<tmp.size();k++)
+	if(fabs(tmp[k])>m)
+	  m=fabs(tmp[k]);
+      m=sqrt(m);
+      screen(i,j)=m;
+      screen(j,i)=m;
+    }
   }
 #endif
   
@@ -224,6 +233,12 @@ arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) 
  
 #endif // ifdef _OPENMP
   {
+
+    /// ERI worker
+    ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
+
+    /// Integral array
+    std::vector<double> tmp;
     
 #ifndef ERITABLE
     // Arrays of identical integrals
@@ -349,17 +364,16 @@ arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) 
 	  
 	
 	// Compute integrals
-	std::vector<double> tmp;
 #if defined(ERITABLE) && !defined(STRICT)
 	// Screening for ERITABLE
 	if(!skip)
-	  tmp=basp->ERI(is,js,ks,ls);
+	  eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls],tmp);
 	else {
 	  tmp.reserve(Ni*Nj*Nk*Nl);
 	  tmp.insert(tmp.begin(),Ni*Nj*Nk*Nl,0.0);
 	}
 #else
-	tmp=basp->ERI(is,js,ks,ls);
+	eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls],tmp);
 #endif
 	
 	

@@ -26,7 +26,8 @@ broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp properties.cpp
 checkpoint.cpp guess.cpp external/storage.cpp
 external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfit.cpp
-chebyshev.cpp density_fitting.cpp lebedev.cpp)
+chebyshev.cpp density_fitting.cpp lebedev.cpp eriworker.cpp
+eriworker_transforms.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
@@ -66,6 +67,15 @@ add_executable (erkale_cube cube.cpp)
 # The name of the executable is
 set_target_properties(erkale_cube PROPERTIES OUTPUT_NAME "erkale_cube${SUFFIX}")
 target_link_libraries(erkale_cube liberkale)
+
+# Spherical transform generator
+add_executable (eriworker_gentransform eriworker_gentransform.cpp solidharmonics.cpp mathf.cpp)
+if(BUILD_SHARED_LIBS)
+else()
+ target_link_libraries(eriworker_gentransform ${GSL_LIBRARIES})
+ target_link_libraries(eriworker_gentransform ${LAPACK_LIBRARIES})
+endif()
+
 
 # Link libraries
 if(BUILD_SHARED_LIBS)
@@ -107,6 +117,13 @@ add_subdirectory(external)
 
 # Compile the contributed programs
 #add_subdirectory(contrib)
+
+# Recipe for building ERIWorker transforms
+add_custom_command(
+ OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eriworker_transforms.cpp
+ DEPENDS eriworker_gentransform
+ COMMAND eriworker_gentransform > ${CMAKE_CURRENT_BINARY_DIR}/eriworker_transforms.cpp
+)
 
 # Recipe for building ERITable
 add_custom_command(

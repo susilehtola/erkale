@@ -79,24 +79,34 @@ void ERIscreen::fill(const BasisSet * basisv) {
   // Get number of shell pairs
   const size_t Npairs=pairs.size();
 
+  std::vector<GaussianShell> shells=basp->get_shells();
+
   // Loop over shell pairs
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic,1)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<Npairs;ip++) {
-    size_t i=pairs[ip].is;
-    size_t j=pairs[ip].js;
+  {
+    ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
+    std::vector<double> tmp;
     
-    // Compute integrals
-    std::vector<double> ints=basp->ERI(i,j,i,j);
-    // Get maximum value
-    double m=0.0;
-    for(size_t k=0;k<ints.size();k++)
-      if(fabs(ints[k])>m)
-	m=fabs(ints[k]);
-    m=sqrt(m);
-    screen(i,j)=m;
-    screen(j,i)=m;
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<Npairs;ip++) {
+      size_t i=pairs[ip].is;
+      size_t j=pairs[ip].js;
+      
+      // Compute integrals
+      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j],tmp);
+      // Get maximum value
+      double m=0.0;
+      for(size_t k=0;k<tmp.size();k++)
+        if(fabs(tmp[k])>m)
+          m=fabs(tmp[k]);
+      m=sqrt(m);
+      screen(i,j)=m;
+      screen(j,i)=m;
+    }
   }
 
   // Get minimum of screening matrix

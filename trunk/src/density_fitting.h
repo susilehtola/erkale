@@ -63,12 +63,17 @@ class DensityFit {
   /// Hartree-Fock calculation?
   bool hf;
 
-  /// Basis set containing first orbital, then auxiliary and lastly dummy function
-  BasisSet totbas;
-  /// Indices of orbital shells
-  std::vector<size_t> orbind;
-  /// Indices of density fitting shells
-  std::vector<size_t> auxind;
+  /// Orbital shells
+  std::vector<GaussianShell> orbshells;
+  int maxorbam;
+  size_t maxorbcontr;
+  /// Density fitting shells
+  std::vector<GaussianShell> auxshells;
+  int maxauxam;
+  size_t maxauxcontr;
+  /// Dummy shell
+  GaussianShell dummy;
+
   /// Index of dummy function
   size_t dummyind;
 
