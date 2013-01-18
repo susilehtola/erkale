@@ -295,7 +295,7 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const Storage & stor) {
   std::vector< std::vector<ylmcoeff_t> > ret;
 
   // Expansions of cartesian functions. ADF is currently limited to
-  // d-type, so this is enough.
+  // f-type, so this is enough.
   CartesianExpansion cart(3);
 
   // Loop over functions
