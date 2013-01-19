@@ -132,6 +132,7 @@ size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom
   // Amount of orbitals localized on atom.
   std::vector<size_t> loc_idx;
 
+  printf("\nOrbital analysis:\n");
   // Loop over orbitals.
   for(size_t io=0;io<nocc;io++) {
     // Index of localization.
@@ -164,6 +165,8 @@ size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom
       printf("Orbital %i is unlocalized.\n",(int) io+1);
     }
   }
+
+  printf("\n");
 
   if(loc_idx.size()==0) {
     throw std::runtime_error("Error - could not localize core orbital!\n");
@@ -246,15 +249,15 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
   std::stable_sort(locind.begin(),locind.end());
   std::reverse(locind.begin(),locind.end());
 
-  printf("Localizing\n");
+  printf("\nDistances of atoms from the center\n");
   for(size_t i=0;i<locind.size();i++)
     printf("%i\t%e\n",(int) locind[i].idx+1,locind[i].S);
 
-  printf("Localizing on centers:");
+  printf("\nLocalizing on centers:");
   for(size_t i=0;i<locind.size();i++)
     printf(" %i",(int) locind[i].idx+1);
-  printf("\n");
-  printf("There are %i occupied states.\n",(int) nocc);
+  printf("\n\n");
+  printf("There are %i occupied states, from which the %i frozen orbitals are determined.\n",(int) nocc, (int) locind.size()-1);
   fflush(stdout);
 
   // Amount of orbitals already localized
@@ -301,6 +304,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
     printf("Localized orbital around nucleus %i with Rrms=%e Å.\n",(int) inuc+1,sqrt(reig(0))/ANGSTROMINBOHR);
     fflush(stdout);
   }
+  printf("\n");
 
   // Check orthonormality
   check_orth(C,S,false);
