@@ -231,7 +231,7 @@ int getHostByteOrder();
 
 /* Primary methods for accessing KF file data */
 
-int   openKFFile(KFFile *kf, char *name); /* Return file descriptor or -1 if there was an error opening file */
+int   openKFFile(KFFile *kf, const char *name); /* Return file descriptor or -1 if there was an error opening file */
 void  closeKFFile (KFFile *kf);           /* Free memory taken by the file structures and close the file */
 
 int   getKFVariableLength(KFFile *kf, const char *name); /* returns variable length in units 
