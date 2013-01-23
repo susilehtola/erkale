@@ -38,9 +38,9 @@
 
 /* (de-)initializers */
 
-static KFVariable *createKFVariable (KFSection *sec, char* name, int lbl, int dex, int len, int fln, int usd, int typ);
+static KFVariable *createKFVariable (KFSection *sec, const char* name, int lbl, int dex, int len, int fln, int usd, int typ);
 static void deleteKFVariable(KFVariable *var);
-static KFSection *createKFSection (KFFile *kf, char *name, int phBlk, int logBlk, int numBlks);
+static KFSection *createKFSection (KFFile *kf, const char *name, int phBlk, int logBlk, int numBlks);
 static void deleteKFSection(KFSection *sec);
 static KFBlockRun *createKFBlockRun(int phBlk, int logBlk, int numBlks);
 static void deleteKFBlockRun(KFBlockRun *br);
@@ -85,7 +85,7 @@ char *KFTypeNames[5] = {"Unknown","Integer","Real","String","Logical"};
  * Function definitions follow *
  * --------------------------- */
 
-int openKFFile(KFFile *kf, char *name){
+int openKFFile(KFFile *kf, const char *name){
    char   buf[KF_BLOCKLENGTH];
    KFSuperIndexBlock32 *buf32 = (KFSuperIndexBlock32 *)buf;
    KFSuperIndexBlock64 *buf64 = (KFSuperIndexBlock64 *)buf;
@@ -96,7 +96,8 @@ int openKFFile(KFFile *kf, char *name){
    int recordNum = 1;
 
    memset(kf, 0, sizeof(KFFile));
-   kf->name = name;
+   kf->name=malloc(KF_SECTION_NAME_LENGTH+1);
+   strncpy(kf->name, name, KF_SECTION_NAME_LENGTH);
 #ifdef _MSC_VER
    kf->fd = open(kf->name, O_BINARY|O_RDONLY);
 #else
@@ -325,7 +326,7 @@ int getHostByteOrder(){
 }
 
 /* Return 1 if the file has a valid superblock. */
-int isValidKFFile(char* fname) {
+int isValidKFFile(const char* fname) {
 
    int n;
    char blk[KF_BLOCKLENGTH];
@@ -514,7 +515,7 @@ static void swapBytesIndexBlock(KFFile *kf, char *buf){
 
 
 /*************** Functions for KFVariable **************/
-static KFVariable *createKFVariable (KFSection *sec, char *name, int lbl, int dex, int len, int fln, int usd, int typ){
+static KFVariable *createKFVariable (KFSection *sec, const char *name, int lbl, int dex, int len, int fln, int usd, int typ){
    KFVariable *var = malloc (sizeof(KFVariable));
    if (var != NULL) {
       var->section = sec;
@@ -564,7 +565,7 @@ static int getPhysicalBlockNumberForLogical(KFVariable *var, int logBlock){
 
 /* Functions for KFSection */
 
-static KFSection *createKFSection (KFFile *kf, char *name, int phBlk, int logBlk, int numBlks){
+static KFSection *createKFSection (KFFile *kf, const char *name, int phBlk, int logBlk, int numBlks){
    KFSection *sec = malloc (sizeof(KFSection));
    memset(sec, 0, sizeof(KFSection));
    if (sec != NULL) {
@@ -772,7 +773,6 @@ static void getSectionFromSuperEntry(KFFile *kf, void *buf){
 static void getDataBlockFromSuperEntry(KFFile *kf, void *buf){
    char name[KF_SECTION_NAME_LENGTH+1];
    int phBlk, logBlk, numBlks, type;
-   int iblk;
    KFSuperIndexBlockEntry32 *ent32 = buf;
    KFSuperIndexBlockEntry64 *ent64 = buf;
    KFSection *section;
