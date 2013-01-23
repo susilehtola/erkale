@@ -13,7 +13,7 @@ else()
 endif()
 
 # ADF EMD executable
-add_executable (erkale_adf_emd adf/main.cpp adf/emd_sto.cpp)
+add_executable (erkale_adf_emd adf/main.cpp adf/emd_sto.cpp adf/ArrayList.c adf/KFReader.c)
 set_target_properties(erkale_adf_emd PROPERTIES OUTPUT_NAME "erkale_adf_emd${SUFFIX}")
 target_link_libraries(erkale_adf_emd liberkale_emd)
 target_link_libraries(erkale_adf_emd liberkale)

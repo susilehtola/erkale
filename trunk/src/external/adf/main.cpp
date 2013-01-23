@@ -31,225 +31,76 @@
 #include <omp.h>
 #endif
 
-#define MAXLEN 1024
+extern "C" {
+  /* ADF's keyed-file routines */
+#include "KFc.h"
+}
 
-/// Parse the TAPE21 file, converted into ASCII
-Storage parse_tape(const std::string & name) {
-  // Returned storage
-  Storage ret;
+// The kf file
+KFFile kf;
 
-  // Input file
-  FILE *in;
+void open_kf() {
+  if (openKFFile(&kf, "TAPE21") < 0)
+    throw std::runtime_error("Error opening TAPE21.\n");
+}
 
-  // Handle also compressed files
-  const char gzcmd[]="zcat ";
-  bool usegz=false;
-  if(strstr(name.c_str(),".gz")!=NULL)
-    usegz=true;
-  const char xzcmd[]="xzcat ";
-  bool usexz=false;
-  if(strstr(name.c_str(),".xz")!=NULL)
-    usexz=true;
+void close_kf() {
+  closeKFFile (&kf);
+}
 
-  const char bz2cmd[]="bzcat ";
-  bool usebz2=false;
-  if(strstr(name.c_str(),".bz2")!=NULL)
-    usebz2=true;
-
-  const char lzmacmd[]="lzcat ";
-  bool uselzma=false;
-  if(strstr(name.c_str(),".lzma")!=NULL)
-    uselzma=true;
-
-  /* Open the file */
-  if(usegz) {
-    char cmd[strlen(gzcmd)+name.size()+1];
-    sprintf(cmd,"%s%s",gzcmd,name.c_str());
-    in=popen(cmd,"r");
-  } else if(usexz) {
-    char cmd[strlen(xzcmd)+name.size()+1];
-    sprintf(cmd,"%s%s",xzcmd,name.c_str());
-    in=popen(cmd,"r");
-  } else if(usebz2) {
-    char cmd[strlen(bz2cmd)+name.size()+1];
-    sprintf(cmd,"%s%s",bz2cmd,name.c_str());
-    in=popen(cmd,"r");
-  } else if(uselzma) {
-    char cmd[strlen(lzmacmd)+name.size()+1];
-    sprintf(cmd,"%s%s",lzmacmd,name.c_str());
-    in=popen(cmd,"r");
-  } else
-    in=fopen(name.c_str(),"r");
-
-  if(in==NULL) {
-    throw std::runtime_error("Unable to open input file.\n");
-  }
-
-  // Line number
-  size_t iline=0;
-
-  // The name of the entry
-  std::string entryname;
-  // Number of entries to read in
-  size_t N=0;
-
-  // Are in the middle of reading an integer vector
-  bool intvec=false;
-  std::vector<int> intv;
-
-  // Are we in the middle of reading a double vector?
-  bool doublevec=false;
-  std::vector<double> dblv;
-
-  while(true) {
-
-    // Line from input file.
-    std::string line;
-    
-    try {
-      line=readline(in);
-      iline++;
-    } catch(std::runtime_error) {
-      break;
-    }
-
-    // and split it into fields
-    std::vector<std::string> words=splitline(line);
-
-    // Read in numbers?
-    if(intvec) {
-      for(size_t i=0;i<words.size();i++)
-	intv.push_back(readint(words[i]));
-
-      N-=words.size();
-      if(N==0) {
-	intvec=false;
-	// Add to stack
-	int_vec_st_t help;
-	help.name=entryname;
-	help.val=intv;
-	ret.add(help);
-	// Clear vector
-	intv.clear();
-      }
-    } else if(doublevec) {
-      for(size_t i=0;i<words.size();i++)
-	dblv.push_back(readdouble(words[i]));
-      N-=words.size();
-      if(N==0) {
-	doublevec=false;
-	// Add to stack
-	double_vec_st_t help;
-	help.name=entryname;
-	help.val=dblv;
-	ret.add(help);
-	// Clear vector
-	dblv.clear();
-      }
-    } else {
-      // New entry. Get its name.
-
-      // Get next line as well, which is part of the name.
-      std::string line2=readline(in);
-      iline++;
-	
-      // The name is thus
-      entryname=trim(line)+" - "+trim(line2);
-
-      //      printf("\nline %i\n%s\n%s\n",(int) iline,line.c_str(),line2.c_str());
-
-      // Move on. Next line contains nres, ndat and data type.
-      line=readline(in);
-      iline++;
-
-      std::vector<std::string> nwords=splitline(line);
-      if(nwords.size()!=3) {
-	std::ostringstream oss;
-	oss << "Unexpected line: " << line <<"!\n";
-	throw std::runtime_error(oss.str());
-      }
-
-      //      int nres=readint(words[0]);
-      int ndat=readint(nwords[1]);
-      int type=readint(nwords[2]);
-
-      if(type==3) {
-	// Read in string.
-
-	// Empty the line variable.
-	line="";
-	// Read in the characters.
-	do {
-	  line2=readline(in);
-	  iline++;
-	  ndat-=line2.size();
-	  line+=line2;
-	} while(ndat>0);
-
-	// Store the string.
-	string_st_t help;
-	help.name=entryname;
-	help.val=line;
-	ret.add(help);
-      } else if(type==2) {
-	// Read in floating point values.
-
-	doublevec=true;
-	N=ndat;
-      } else if(type==1) {
-	// Read in integers
-
-	intvec=true;
-	N=ndat;
-      } else if(type==4) {
-	// Read in logical values. 
-	N=ndat;
-
-	do {
-	  line=readline(in);
-	  for(size_t l=0;l<line.size();l++)
-	    if(isalpha(line[l])) {
-	      if(line[l]=='T') {
-		intv.push_back(1);
-		N--;
-	      } else if(line[l]=='F') {
-		intv.push_back(0);
-		N--;
-	      } else {
-		ERROR_INFO();
-		throw std::runtime_error("Truth value was not recognized!\n");
-	      }
-	    }
-	  
-	  int_vec_st_t help;
-	  help.name=entryname;
-	  help.val=intv;
-	  ret.add(help);
-	  // Clear vector
-	  intv.clear();
-	} while(N>0);
-      } else {
-	throw std::runtime_error("Unknown data type.\n");
-      }
-    }
+std::vector<int> get_int_vec_kf(const std::string & name) {
+  // Figure out the number of entries
+  int N=getKFVariableLength(&kf,name.c_str());
+  if(N<=0) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Entry "<< name <<" in KF file has " << N << " elements!\n";; 
+    throw std::runtime_error(oss.str());
   }
   
-  // Close input
-  if(usegz || usexz || usebz2 || uselzma)
-    pclose(in);
-  else
-    fclose(in);
-
-  //  printf("Read in %u lines from input file.\n",(unsigned int) iline);
+  // Allocate memory
+  std::vector<int> ret(N);
   
+  // Read the data
+  if(getKFData(&kf, name.c_str(), (void *) &ret[0]) < 0) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Error reading "<< name <<" entry from KF file!"; 
+    throw std::runtime_error(oss.str());
+  }
+
   return ret;
 }
 
-std::vector< std::vector<size_t> > find_identical_functions(const Storage & stor) {
+std::vector<double> get_double_vec_kf(const std::string & name) {
+  // Figure out the number of entries
+  int N=getKFVariableLength(&kf,name.c_str());
+  if(N<=0) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Entry "<< name <<" in KF file has " << N << " elements!\n";; 
+    throw std::runtime_error(oss.str());
+  }
+
+  // Allocate memory
+  std::vector<double> ret(N);
+  
+  // Read the data
+  if(getKFData(&kf, name.c_str(), (void *) &ret[0]) < 0) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Error reading "<< name <<" entry from KF file!"; 
+    throw std::runtime_error(oss.str());
+  }
+
+  return ret;
+}
+
+std::vector< std::vector<size_t> > find_identical_functions() {
   // Get atom type list
-  std::vector<int> nbptr=stor.get_int_vec("Basis - nbptr");
+  std::vector<int> nbptr=get_int_vec_kf("Basis%nbptr");
   // Get number of atoms of each type
-  std::vector<int> nqptr=stor.get_int_vec("Geometry - nqptr");
+  std::vector<int> nqptr=get_int_vec_kf("Geometry%nqptr");
 
   // The returned list is
   std::vector< std::vector<size_t> > ret;
@@ -285,11 +136,11 @@ std::vector< std::vector<size_t> > find_identical_functions(const Storage & stor
   return ret;
 }
 
-std::vector< std::vector<ylmcoeff_t> > form_clm(const Storage & stor) {
+std::vector< std::vector<ylmcoeff_t> > form_clm() {
   // Get the exponents
-  std::vector<int> kx=stor.get_int_vec("Basis - kx");
-  std::vector<int> ky=stor.get_int_vec("Basis - ky");
-  std::vector<int> kz=stor.get_int_vec("Basis - kz");
+  std::vector<int> kx=get_int_vec_kf("Basis%kx");
+  std::vector<int> ky=get_int_vec_kf("Basis%ky");
+  std::vector<int> kz=get_int_vec_kf("Basis%kz");
 
   // The returned expansion
   std::vector< std::vector<ylmcoeff_t> > ret;
@@ -328,13 +179,13 @@ std::vector< std::vector<ylmcoeff_t> > form_clm(const Storage & stor) {
   return ret;
 }
 
-std::vector< std::vector<RadialSlater> > form_radial(const Storage & stor) {
+std::vector< std::vector<RadialSlater> > form_radial() {
   // Get the exponents
-  std::vector<int> kx=stor.get_int_vec("Basis - kx");
-  std::vector<int> ky=stor.get_int_vec("Basis - ky");
-  std::vector<int> kz=stor.get_int_vec("Basis - kz");
-  std::vector<int> kr=stor.get_int_vec("Basis - kr");
-  std::vector<double> z=stor.get_double_vec("Basis - alf");
+  std::vector<int> kx=get_int_vec_kf("Basis%kx");
+  std::vector<int> ky=get_int_vec_kf("Basis%ky");
+  std::vector<int> kz=get_int_vec_kf("Basis%kz");
+  std::vector<int> kr=get_int_vec_kf("Basis%kr");
+  std::vector<double> z=get_double_vec_kf("Basis%alf");
 
   // Returned functions
   std::vector< std::vector<RadialSlater> > ret(kx.size());
@@ -355,17 +206,17 @@ std::vector< std::vector<RadialSlater> > form_radial(const Storage & stor) {
   return ret;
 }
 
-std::vector<size_t> get_centers(const Storage & stor) {
+std::vector<size_t> get_centers() {
   // Index of center
   size_t ind=0;
 
   // Get atom type list
-  std::vector<int> nbptr=stor.get_int_vec("Basis - nbptr");
+  std::vector<int> nbptr=get_int_vec_kf("Basis%nbptr");
   // Get number of atoms of each type
-  std::vector<int> nqptr=stor.get_int_vec("Geometry - nqptr");
+  std::vector<int> nqptr=get_int_vec_kf("Geometry%nqptr");
 
   // Get number of functions
-  int nbf=stor.get_int_vec("Symmetry - nfcn")[0];
+  int nbf=get_int_vec_kf("Symmetry%nfcn")[0];
 
   // Allocate memory
   std::vector<size_t> ret(nbf);
@@ -383,18 +234,18 @@ std::vector<size_t> get_centers(const Storage & stor) {
   return ret;
 }
 
-SlaterEMDEvaluator get_eval(const Storage & stor, const arma::mat & P) {
+SlaterEMDEvaluator get_eval(arma::mat & P) {
   // Form radial functions
-  std::vector< std::vector<RadialSlater > > radf=form_radial(stor);
+  std::vector< std::vector<RadialSlater > > radf=form_radial();
 
   // Form identical functions
-  std::vector< std::vector<size_t> > idf=find_identical_functions(stor);
+  std::vector< std::vector<size_t> > idf=find_identical_functions();
 
   // Form Ylm expansion of functions
-  std::vector< std::vector<ylmcoeff_t> > clm=form_clm(stor);
+  std::vector< std::vector<ylmcoeff_t> > clm=form_clm();
 
   // Form list of centers of functions
-  std::vector<size_t> loc=get_centers(stor);
+  std::vector<size_t> loc=get_centers();
 
   /*
     printf("Functions centered on atoms:\n");
@@ -404,7 +255,7 @@ SlaterEMDEvaluator get_eval(const Storage & stor, const arma::mat & P) {
 
   // Form the list of atomic coordinates
   std::vector<coords_t> coord;
-  std::vector<double> clist=stor.get_double_vec("Geometry - xyz");
+  std::vector<double> clist=get_double_vec_kf("Geometry%xyz");
   for(size_t i=0;i<clist.size();i+=3) {
     coords_t tmp;
     tmp.x=clist[i];
@@ -422,193 +273,17 @@ SlaterEMDEvaluator get_eval(const Storage & stor, const arma::mat & P) {
   return SlaterEMDEvaluator(radf,idf,clm,loc,coord,P);
 }
 
-/// Read overlap matrix (needs TAPE15)
-arma::mat read_overlap(const Storage & stor) {
-  // Read number of basis functions
-  int nbf=stor.get_int_vec("Basis - naos")[0];
-  arma::mat S(nbf,nbf);
-
-  try {
-    std::vector<double> sv=stor.get_double_vec("Matrices - Smat");
-    for(int i=0;i<nbf;i++)
-      for(int j=0;j<=i;j++) {
-	S(i,j)=sv[i*(i+1)/2 + j];
-	S(j,i)=S(i,j);
-      }
-    
-    S.print("Read in overlap matrix");
-  } catch(std::runtime_error) {
-    S=arma::mat(0,0);
-  }
-
-  return S;
-}
-
-/// Read density matrix (needs TAPE15)
-arma::mat read_density(const Storage & stor) {
-  // Read number of basis functions                                                                                                                                                           
-  int nbf=stor.get_int_vec("Basis - naos")[0];
-
-  arma::mat P(nbf,nbf);
-
-  try {
-    std::vector<double> pv=stor.get_double_vec("Pmat - Pmat_A");
-    for(int i=0;i<nbf;i++)
-      for(int j=0;j<=i;j++) {
-	P(i,j)=pv[i*(i+1)/2 + j];
-	P(j,i)=P(i,j);
-      }
-    
-    P.print("Read in density matrix");
-  } catch(std::runtime_error) {
-    P=arma::mat(0,0);
-  }
-
-  return P;
-}
-
-
-arma::mat calc_overlap(const Storage & stor) {
-  // Get number of basis functions.
-  int nbf=stor.get_int_vec("Symmetry - nfcn")[0];
-
-  // Returned matrix.
-  arma::mat S(nbf,nbf);
-  S.zeros();
-
-  arma::mat dS(nbf,nbf);
-  dS.zeros();
-
-  // Get radial grid
-  std::vector<radial_grid_t> grid=form_radial_grid(500);
-  
-  // Integrand
-  for(int i=0;i<nbf;i++)
-    for(int j=0;j<=i;j++) {
-      // Dummy density matrix
-      arma::mat P(nbf,nbf);
-      P.zeros();
-      P(i,j)+=0.5;
-      P(j,i)+=0.5;
-
-      // Construct EMD evaluator
-      SlaterEMDEvaluator eval=get_eval(stor,P);
-
-      char fname[80];
-      sprintf(fname,"ovl-%i-%i.dat",i,j);
-      FILE *out=fopen(fname,"w");
-
-      double integ=0.0;
-      for(size_t ip=0;ip<grid.size();ip++) {
-	double d=eval.get(grid[ip].r);
-	integ+=grid[ip].w*d;
-	fprintf(out,"%e %e\n",grid[ip].r,d);
-      }
-      fclose(out);
-
-      printf("%i %i %e\n",i,j,integ);
-      S(i,j)=integ;
-      S(j,i)=integ;
-    }
-
-  return S;  
-}
-
-/// Calculate analytic overlaps. Only works with single center.
-arma::mat anal_overlap(const Storage & stor) {
-  // Get number of functions
-  int nbf=stor.get_int_vec("Symmetry - nfcn")[0];
-  arma::mat S(nbf,nbf);
-  S.zeros();
-  
-  // Get lm exansion
-  std::vector< std::vector<ylmcoeff_t> > clm=form_clm(stor);
-  // Get radial functions
-  std::vector< std::vector<RadialSlater> > radf=form_radial(stor);
-
-  // Get the centers of the functions
-  std::vector<size_t> cen=get_centers(stor);
-
-  // Find identical functions
-  std::vector< std::vector<size_t> > idfunc=find_identical_functions(stor);
-
-  // Loop over equivalent functions
-  for(size_t iid=0;iid<idfunc.size();iid++)
-    for(size_t jid=0;jid<=iid;jid++) {
-
-      // Compute overlap
-      std::complex<double> ovl=0.0;
-      for(size_t ilm=0;ilm<clm[iid].size();ilm++)
-	for(size_t jlm=0;jlm<clm[jid].size();jlm++) {
-	  int l=clm[iid][ilm].l;
-	  int m=clm[iid][ilm].m;
-	  std::complex<double> c=clm[iid][ilm].c;
-
-	  int lp=clm[jid][jlm].l;
-	  int mp=clm[jid][jlm].m;
-	  std::complex<double> cp=clm[jid][jlm].c;
-
-	  // Get zeta and n
-	  int n=-1;
-	  double z=-1.0;
-	  for(size_t ir=0;ir<radf[iid].size();ir++)
-	    if(radf[iid][ir].getl()==l) {
-	      n=radf[iid][ir].getn();
-	      z=radf[iid][ir].getzeta();
-	    }
-	  if(n==-1)
-	    throw std::runtime_error("Did not find n and z!\n");
-
-	  int np=-1;
-	  double zp=-1;
-          for(size_t ir=0;ir<radf[jid].size();ir++)
-            if(radf[jid][ir].getl()==lp) {
-              np=radf[jid][ir].getn();
-              zp=radf[jid][ir].getzeta();
-            }
-	  if(np==-1)
-	    throw std::runtime_error("Did not find np and zp!\n");
-
-	  if((l==lp) && (m==mp))
-	    ovl+=std::conj(c)*cp*pow(2,n+np+1)*pow(z,n+0.5)*pow(zp,np+0.5)/pow(z+zp,n+np+1)*fact(n+np)/sqrt(fact(2*n)*fact(2*np));	      
-	}
-
-      if(fabs(ovl.imag())>DBL_EPSILON)
-	printf("Imaginary part %e.\n",ovl.imag());
-
-      // Set overlaps
-      for(size_t iif=0;iif<idfunc[iid].size();iif++)
-	for(size_t jjf=0;jjf<idfunc[jid].size();jjf++) {
-	  
-	  // The function indices are
-	  size_t mu=idfunc[iid][iif];
-	  size_t nu=idfunc[jid][jjf];
-	  
-	  // Check that functions are on same center
-	  if(cen[mu]!=cen[nu]) {
-	    S(mu,nu)=1.0/0.0;
-	    S(nu,mu)=1.0/0.0;
-	  } else {
-	    S(mu,nu)=ovl.real();
-	    S(nu,mu)=ovl.real();
-	  }
-	}
-    }
-  return S;
-}
-
-
-arma::mat form_density(const Storage & stor) {
+arma::mat form_density() {
   // Get number of orbitals
-  int nmo=stor.get_int_vec("Symmetry - norb")[0];
+  int nmo=get_int_vec_kf("Symmetry%norb")[0];
 
   // Get number of basis functions
-  int nbf=stor.get_int_vec("Symmetry - nfcn")[0];
+  int nbf=get_int_vec_kf("Symmetry%nfcn")[0];
 
   //  printf("%i functions and %i orbitals.\n",nbf,nmo);
 
   // Get basis function vector
-  std::vector<int> npart=stor.get_int_vec("A - npart");
+  std::vector<int> npart=get_int_vec_kf("A%npart");
   // Convert to c++ indexing
   for(size_t i=0;i<npart.size();i++)
     npart[i]--;
@@ -621,9 +296,9 @@ arma::mat form_density(const Storage & stor) {
 
   // Alpha orbital part.
   // Get MO coefficients
-  std::vector<double> cca=stor.get_double_vec("A - Eigen-Bas_A");
+  std::vector<double> cca=get_double_vec_kf("A%Eigen-Bas_A");
   // and occupation numbers
-  std::vector<double> occa=stor.get_double_vec("A - froc_A");
+  std::vector<double> occa=get_double_vec_kf("A%froc_A");
   if((int) cca.size() != nbf*nmo)
     throw std::runtime_error("Size of cc is incorrect!\n");
 
@@ -640,9 +315,9 @@ arma::mat form_density(const Storage & stor) {
     P+=occa[i]*C.col(i)*arma::trans(C.col(i));
 
   // Beta orbital part.
-  if(stor.get_int_vec("General - nspin")[0]==2) {
-    std::vector<double> ccb=stor.get_double_vec("A - Eigen-Bas_B");
-    std::vector<double> occb=stor.get_double_vec("A - froc_B");
+  if(get_int_vec_kf("General%nspin")[0]==2) {
+    std::vector<double> ccb=get_double_vec_kf("A%Eigen-Bas_B");
+    std::vector<double> occb=get_double_vec_kf("A%froc_B");
 
     C.zeros();
     for(int fi=0;fi<nbf;fi++)
@@ -673,18 +348,21 @@ int main(int argc, char **argv) {
   Timer t;
   t.print_time();
 
-  // Read in the checkpoint file.
-  Storage tape=parse_tape(argv[1]);
-  //  tape.print(false);
+  // Open the KF file
+  open_kf();
 
   // Construct EMD evaluator
-  arma::mat P=form_density(tape);
+  arma::mat P=form_density();
 
-  SlaterEMDEvaluator eval=get_eval(tape,P);
+  SlaterEMDEvaluator eval=get_eval(P);
   //  eval.print();
 
   // Get number of electrons
-  int Nel=tape.get_double_vec("General - electrons")[0];
+  int Nel=get_double_vec_kf("General%electrons")[0];
+
+  // Close the KF file
+  close_kf();
+
   EMD emd(&eval, Nel);
   emd.initial_fill();
   emd.find_electrons();
