@@ -5,96 +5,65 @@
 
 /* Function definitions */
 
-#if defined(ERITABLE) && defined(STRICT)
-void ERItable::fill(const BasisSet * basp) {
-#endif
-#if defined(ERITABLE) && !defined(STRICT)
-void ERItable::fill(double tol, const BasisSet * basp) {
-#endif
-
 #if defined(ERITABLE)
-    // Don't do anything with a dummy argument.
-    if(basp==NULL)
-      return;
+void ERItable::fill(const BasisSet * basp, double tol) {
 #endif
 
-#if defined(CALCJKab) && !defined(STRICT)
-void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
-#endif
-#if defined(CALCJKab) && defined(STRICT)
-void ERIscreen::calcJK_strict(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
-#endif
 #if defined(CALCJKab)
+void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
   // Compute total density for Coulomb matrix
   arma::mat P=Pa+Pb;
 #endif
 
 
-#if defined(CALCJK) && !defined(STRICT)
+#if defined(CALCJK)
 void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol, double *eff) const {
 #endif
-#if defined(CALCJK) && defined(STRICT)
-void ERIscreen::calcJK_strict(const arma::mat & P, arma::mat & J, arma::mat & K, double tol, double *eff) const {
-#endif
 
-
-#if defined(CALCK) && !defined(STRICT)
-arma::mat ERIscreen::calcK(const arma::mat & P, double tol, double *eff) const {
-#endif
-#if defined(CALCK) && defined(STRICT)
-arma::mat ERIscreen::calcK_strict(const arma::mat & P, double tol, double *eff) const {
-#endif
 #if defined(CALCK)
+arma::mat ERIscreen::calcK(const arma::mat & P, double tol, double *eff) const {
   arma::mat K;
 #endif
 
-#if defined(CALCJ) && !defined(STRICT)
-arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
-#endif
-#if defined(CALCJ) && defined(STRICT)
-arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) const {
-#endif
 #if defined(CALCJ)
+arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
   arma::mat J;
 #endif
 
-  
   // Amount of basis functions
   size_t Nbf=basp->get_Nbf();
   // Shells
   std::vector<GaussianShell> shells=basp->get_shells();
-  
+
   /* Check sizes of input */
-  
+
+#if defined(CALCJ) || defined(CALCJK) || defined(CALCJKab)
+#define DO_J
+  J.zeros(Nbf,Nbf);
+#endif
+
 #if defined(CALCK) || defined(CALCJK)
+#define DO_K
+  K.zeros(Nbf,Nbf);
+#endif
+
+#if defined(CALCJKab)
+#define DO_Kab
+#endif
+
+#if defined(DO_J) || defined(DO_K)
   MAT_SIZE_CHECK(P,Nbf,Nbf,"P is not square!\n");
 #endif
-  
-#if defined(CALCJKab)
+
+#if defined(DO_Kab)
   MAT_SIZE_CHECK(Pa,Nbf,Nbf,"Pa is not square!\n");
   MAT_SIZE_CHECK(Pb,Nbf,Nbf,"Pb is not square!\n");
+
+  Ka.zeros(Nbf,Nbf);
+  Kb.zeros(Nbf,Nbf);
 #endif
-  
-  /* Check size of output */
-#if defined(CALCJ) || defined(CALCJK) || defined(CALCJKab)
-  MAT_RESIZE(J,Nbf,Nbf);
-  J.zeros();
-#endif
-  
-#if defined(CALCK) || defined(CALCJK)
-  MAT_RESIZE(K,Nbf,Nbf);
-  K.zeros();
-#endif
-  
-#if defined(CALCJKab)
-  MAT_RESIZE(Ka,Nbf,Nbf);
-  MAT_RESIZE(Kb,Nbf,Nbf);
-  Ka.zeros();
-  Kb.zeros(); 
-#endif
-  
+
   /* Allocate memory for table of integrals */
-  
 #ifdef ERITABLE
   // Make index helper
   iidx=i_idx(Nbf*(Nbf+1)/2);
@@ -106,66 +75,54 @@ arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) 
       tmp.j=j;
       pairs.push_back(tmp);
     }
-  
+
   // Compute memory requirements
   size_t N;
   N=N_ints(basp);
-  
+
   // Don't do DOS
-  if(N*sizeof(double)>2*1e9) {
+  if(N*sizeof(double)>14*1e9) {
     ERROR_INFO();
-    throw std::out_of_range("Cowardly refusing to allocate more than two gigs of memory.\n");
+    throw std::out_of_range("Cowardly refusing to allocate more than 14 gigs of memory.\n");
   }
-  
+
   try {
     ints.reserve(N);
     ints.resize(N);
-  }
-  catch(std::bad_alloc err) {
+  } catch(std::bad_alloc err) {
     std::ostringstream oss;
-    
+
     ERROR_INFO();
     oss << "Was unable to reserve " << memory_size(N*sizeof(double)) << " of memory.\n";
     throw std::runtime_error(oss.str());
   }
-#else
-  // Number of calculated and skipped integrals
-  size_t intskip=0, denskip=0, calcd=0;
+
+  // Initialize with zeros
+  for(size_t i=0;i<N;i++)
+    ints[i]=0.0;
 #endif
-  
+
+  // Number of calculated and skipped integrals
+  size_t intskip=0, calcd=0;
+#ifndef ERITABLE
+  size_t denskip=0;
+#endif
+
   /* The filling algorithm may seem a bit complicated. This is because the ERIs
      are computed on a shell basis, and because the same algorithm is used here
      to form the ERIs as for direct calculations.
-     
-     In order to determine if the filling algorithm works perfectly, there is
-     the CHECKFILL option to count the number each integral has been
-     calculated.
   */
-  
-#ifdef CHECKFILL
-  // Debug number of accesses
-  printf("Allocating memory for checking table.\n");
-  
-#ifndef ERITABLE
-  // Number of integrals is 
-  size_t N=Nbf*(Nbf+1)*(Nbf*Nbf+Nbf+2)/8;
-#endif
-  std::vector<short int> nacc(N);
-  for(size_t i=0;i<N;i++)
-    nacc[i]=0;
-#endif
-  
-  
+
   // Get list of unique shell pairs
   std::vector<shellpair_t> shpairs=basp->get_unique_shellpairs();
   // Get number of shell pairs
   const size_t Npairs=shpairs.size();
-  
-#if !defined(STRICT) && !defined(ERITABLE)
+
+#if !defined(ERITABLE)
   const size_t Nsh=basp->get_Nshells();
   arma::mat Psh(Nsh,Nsh);
   Psh.zeros();
-  
+
   // Collect maximum density
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -180,34 +137,33 @@ arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) 
     // Indices of last functions on shells
     size_t ilast=basp->get_last_ind(is);
     size_t jlast=basp->get_last_ind(js);
-    
+
     // Maximum value of density is
     Psh(is,js)=max_abs(P.submat(i0,j0,ilast,jlast));
     Psh(js,is)=Psh(is,js);
   }
 #endif
-  
-  
-  
-#if defined(ERITABLE) && !defined(STRICT)
+
+
+#if defined(ERITABLE)
   // Form screening matrix
   const size_t Nsh=basp->get_Nshells();
   arma::mat screen(Nsh,Nsh);
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
     ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
     std::vector<double> tmp;
-    
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<Npairs;ip++) {
       size_t i=shpairs[ip].is;
       size_t j=shpairs[ip].js;
-      
+
       // Compute integrals
       eri.compute(&shells[i],&shells[j],&shells[i],&shells[j],tmp);
       // Get maximum value
@@ -221,344 +177,497 @@ arma::mat ERIscreen::calcJ_strict(const arma::mat & P, double tol, double *eff) 
     }
   }
 #endif
-  
+
   // Loop over first pairs
 #ifdef _OPENMP
-  
+
 #ifdef ERITABLE
 #pragma omp parallel
 #else
 #pragma omp parallel reduction(+:calcd,intskip,denskip)
 #endif
- 
 #endif // ifdef _OPENMP
-  {
+  { // Open parallel region
 
     /// ERI worker
     ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
 
     /// Integral array
-    std::vector<double> tmp;
-    
-#ifndef ERITABLE
-    // Arrays of identical integrals
-    size_t iarr[8], jarr[8], karr[8], larr[8];
-    size_t nid; // Number of identical integrals in this batch
+    std::vector<double> eris;
+
+#ifdef DO_J
+    arma::mat Jwrk(J);
 #endif
-    
-#if !defined(ERITABLE) && defined(_OPENMP)
-    const arma::mat Pwrk=P;
-#if !defined(STRICT)
-    const arma::mat Pshwrk=Psh;
+
+#ifdef DO_K
+    arma::mat Kwrk(K);
 #endif
+
+#ifdef DO_Kab
+    arma::mat Kawrk(Ka);
+    arma::mat Kbwrk(Kb);
 #endif
-#if defined(CALCJKab) && defined(_OPENMP)
-    const arma::mat Pawrk=Pa;
-    const arma::mat Pbwrk=Pb;
-#endif
-    
-#if defined(_OPENMP) && !defined(ERITABLE) && !defined(CALCK)
-    arma::mat Jwrk(Nbf,Nbf);
-    Jwrk.zeros();
-#endif
-    
-#if defined(_OPENMP) && (defined(CALCK) || defined(CALCJK))
-    arma::mat Kwrk(Nbf,Nbf);
-    Kwrk.zeros();
-#endif
-    
-#if defined(_OPENMP) && defined(CALCJKab)
-    arma::mat Kawrk(Nbf,Nbf);
-    Kawrk.zeros();
-    
-    arma::mat Kbwrk(Nbf,Nbf);
-    Kbwrk.zeros();
-#endif
-    
-    
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<Npairs;ip++) {
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++) {
-	
+
 	// Shells on second pair are
 	size_t ks=shpairs[ip].is;
 	size_t ls=shpairs[ip].js;
 	// and those on the first pair
 	size_t is=shpairs[jp].is;
 	size_t js=shpairs[jp].js;
-	
+
 	// First functions on shells are
 	size_t k0=basp->get_first_ind(ks);
 	size_t l0=basp->get_first_ind(ls);
 	// and on the first pair
 	size_t i0=basp->get_first_ind(is);
 	size_t j0=basp->get_first_ind(js);
-	
+
 	// Amount of functions on the second pair
 	size_t Nk=basp->get_Nbf(ks);
 	size_t Nl=basp->get_Nbf(ls);
 	// and on the first pair
 	size_t Ni=basp->get_Nbf(is);
 	size_t Nj=basp->get_Nbf(js);
-	
-	
-	/* Perform screening of integrals */
-#if !(defined(ERITABLE) && defined(STRICT))
+
 	// Maximum value of the 2-electron integrals on this shell pair
 	double intmax=screen(is,js)*screen(ks,ls);
-#endif
-	
-#if defined(ERITABLE) && !defined(STRICT)
-	// Skip calculation of integrals, and just fill in zeros?
-	bool skip=false;
-	if(intmax<tol)
-	  skip=true;
-#endif
-	
-	
-#if !defined(ERITABLE)
 	if(intmax<tol) {
 	  // Skip integral due to small value of integral
 	  intskip++;
 	  continue;
 	}
-#if defined(STRICT)
-	else calcd++;
-#else
-	else {
-	  // Compute maximum density
-	  arma::vec Pv(6);
-	  Pv.zeros();
-#ifdef _OPENMP
-	  Pv(0)=Pshwrk(is,js);
-	  Pv(1)=Pshwrk(is,ks);
-	  Pv(2)=Pshwrk(is,ls);
-	  Pv(3)=Pshwrk(js,ks);
-	  Pv(4)=Pshwrk(js,ls);
-	  Pv(5)=Pshwrk(ks,ls);
-#else
-	  Pv(0)=Psh(is,js);
-	  Pv(1)=Psh(is,ks);
-	  Pv(2)=Psh(is,ls);
-	  Pv(3)=Psh(js,ks);
-	  Pv(4)=Psh(js,ls);
-	  Pv(5)=Psh(ks,ls);
-#endif // _OPENMP
-	  double maxP=max(Pv);
-	  
-	  if(maxP*intmax<tol) {
-	    // Skip integral due to small product of density and integral
-	    denskip++;
-	    continue;
-	  }
-	  else
 
-	    // Need to calculate integral.
-	    calcd++;
-	}
-#endif // ifdef STRICT
-#endif // ifdef ERITABLE
-	  
-	
-	// Compute integrals
-#if defined(ERITABLE) && !defined(STRICT)
-	// Screening for ERITABLE
-	if(!skip)
-	  eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls],tmp);
-	else {
-	  tmp.reserve(Ni*Nj*Nk*Nl);
-	  tmp.insert(tmp.begin(),Ni*Nj*Nk*Nl,0.0);
-	}
-#else
-	eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls],tmp);
+#if !defined(ERITABLE)
+	// Do density screening?
+
+	// Coulomb
+	bool coulskip=true;
+#ifdef DO_J
+	if(intmax*std::max(Psh(is,js),Psh(ks,ls))>=tol)
+	  coulskip=false;
 #endif
-	
-	
-	/*
-	  printf("\nShells (%i %i | %i %i)\n",is,js,ks,ls);
-	  printf("Integrals are:");
-	  for(size_t in=0;in<tmp.size();in++)
-	  printf(" % e",tmp[in]);
-	  printf("\n");
-	*/
-	
-	/* Fill table, or increment matrices */
+
+	// Exchange
+	bool exchskip=true;
+#if defined(DO_K) || defined(DO_Kab)
+	double denmax=std::max(std::max(Psh(ks,ls),Psh(is,ls)),std::max(Psh(ks,js),Psh(is,js)));
+	if(intmax*denmax>=tol)
+	  exchskip=false;
+#endif
+
+	if(coulskip && exchskip) {
+	  denskip++;
+	  continue;
+	}
+#endif // if !defined(ERITABLE)
+
+	// Increment amount of calculated integrals
+	calcd++;
+
+	// Compute integrals
+	eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls],eris);
+
+#ifdef ERITABLE
+	// Store integrals
+	for(size_t ii=0;ii<Ni;ii++)
+	  for(size_t jj=0;jj<Nj;jj++)
+	    for(size_t kk=0;kk<Nk;kk++)
+	      for(size_t ll=0;ll<Nl;ll++)
+		ints[idx(i0+ii,j0+jj,k0+kk,l0+ll)]=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+#endif
+
+	// Increment matrices.
+#ifdef DO_J
+
+	// J_ij = (ij|kl) P_kl
 	{
-	  // Helpers
-	  size_t i, j, k, l;
-	  size_t iimax, jjmax, kkmax, llmax;
-	  
-	  if(is==js && ks==ls && is==ks) {
-	    // All shells are the same: (is is | is is)
-	    
-	    iimax=Ni-1;
-	    for(size_t ii=0;ii<=iimax;ii++) {
-	      i=i0+ii;
-	      
-	      jjmax=ii;
-	      for(size_t jj=0;jj<=jjmax;jj++) {
-		j=j0+jj;
-		
-		kkmax=ii;
-		for(size_t kk=0;kk<=kkmax;kk++) {
-		  k=k0+kk;
-		  
-		  // jj if kk and ii are same, otherwise kk
-		  llmax = (kk==ii) ? jj : kk ; 
-		  for(size_t ll=0;ll<=llmax;ll++) {
-		    l=l0+ll;
-		    
-		    // Store integral or increment matrices
-#include "eri-routines-increment.cpp.in"
-		    
-		  }
-		}
-	      }
+	  // Work matrix
+	  arma::mat Jij(Ni,Nj);
+	  Jij.zeros();
+	  arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
+
+	  // Degeneracy factor
+	  double fac=1.0;
+	  if(ks!=ls)
+	    fac=2.0;
+
+	  /* Increment matrix */
+	  for(size_t ii=0;ii<Ni;ii++) 
+	    for(size_t jj=0;jj<Nj;jj++) {
+
+	      // Matrix element
+	      double el=0.0;
+	      for(size_t kk=0;kk<Nk;kk++)
+		for(size_t ll=0;ll<Nl;ll++)
+		  el+=Pkl(kk,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+
+	      // Set the element
+	      Jij(ii,jj)+=fac*el;
 	    }
-	  } else if(is==ks && js==ls) {
-	    // Two shells are the same: (is js | is js)
-	    
-	    iimax=Ni-1;
-	    jjmax=Nj-1;
-	    
-	    for(size_t ii=0;ii<=iimax;ii++) {
-	      i=i0+ii;
-	      for(size_t jj=0;jj<=jjmax;jj++) {
-		j=j0+jj;
-		
-		kkmax=ii;
-		for(size_t kk=0;kk<=kkmax;kk++) {
-		  k=k0+kk;
-		  
-		  llmax = (kk==ii) ? jj : Nl-1 ;
-		  for(size_t ll=0;ll<=llmax;ll++) {
-		    l=l0+ll;
-		    
-		    // Store integral or increment matrices
-#include "eri-routines-increment.cpp.in"
-		    
-		  }
+
+	  // Store the matrix element
+	  Jwrk.submat(i0,j0,i0+Ni-1,j0+Nj-1)+=Jij;
+	  if(is!=js)
+	    Jwrk.submat(j0,i0,j0+Nj-1,i0+Ni-1)+=arma::trans(Jij);
+	}
+
+	// Permutation:
+	// J_kl = (ij|kl) P_ij
+	if(ip!=jp) {
+	  // Work matrix
+	  arma::mat Jkl(Nk,Nl);
+	  Jkl.zeros();
+	  arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
+
+	  // Degeneracy factor
+	  double fac=1.0;
+	  if(is!=js)
+	    fac=2.0;
+
+	  /* Increment matrix */
+	  for(size_t kk=0;kk<Nk;kk++)
+	    for(size_t ll=0;ll<Nl;ll++) {
+
+	      // Matrix element
+	      double el=0.0;
+	      for(size_t ii=0;ii<Ni;ii++) {
+		for(size_t jj=0;jj<Nj;jj++) {
+		  el+=Pij(ii,jj)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 		}
 	      }
-	    }
-	  } else {
-	    // (is js | ks ls) case
-	    
-	    iimax=Ni-1;
-	    kkmax=Nk-1;
-	    for(size_t ii=0;ii<=iimax;ii++) {
-	      i=i0+ii;
 	      
-	      jjmax= (is==js) ? ii : Nj-1;
-	      for(size_t jj=0;jj<=jjmax;jj++) {
-		j=j0+jj;
-		
-		for(size_t kk=0;kk<=kkmax;kk++) {
-		  k=k0+kk;
-		  
-		  llmax = (ks==ls) ? kk : Nl-1 ;
-		  for(size_t ll=0;ll<=llmax;ll++) {
-		    l=l0+ll;
-		    
-		    // Store integral or increment matrices
-#include "eri-routines-increment.cpp.in"
-		    
-		  }
-		}
+	      // Set the element
+	      Jkl(kk,ll)+=fac*el;
+	    }
+
+	  // Store the matrix element
+	  Jwrk.submat(k0,l0,k0+Nk-1,l0+Nl-1)+=Jkl;
+	  if(ks!=ls)
+	    Jwrk.submat(l0,k0,l0+Nl-1,k0+Nk-1)+=arma::trans(Jkl);
+	}
+#endif
+
+#if defined(DO_K) || defined(DO_Kab)
+	{
+	  /* When all indices are different, the following integrals are
+	     equivalent:
+
+	     (ij|kl) (ij|lk) (ji|kl) (ji|lk)
+	     (kl|ij) (kl|ji) (lk|ij) (lk|ji)
+
+	     This translates to
+
+	     K(i,k) += (ij|kl) P(j,l) // always
+	     K(j,k) += (ij|kl) P(i,l) // if (is!=js)
+	     K(i,l) += (ij|kl) P(j,k) // if (ls!=ks)
+	     K(j,l) += (ij|kl) P(i,k) // if (is!=js) and (ls!=ks)
+
+	     and for ij != kl
+
+	     K(k,i) += (ij|kl) P(j,l) // always
+	     K(k,j) += (ij|kl) P(i,l) // if (is!=js)
+	     K(l,i) += (ij|kl) P(j,k) // if (ks!=ls)
+	     K(l,j) += (ij|kl) P(i,k) // if (is!=js) and (ks!=ls)
+
+	     However, the latter four permutations just make the
+	     exchange matrix symmetric. So the only thing we need to do
+	     is do the first four permutations, and at the end we sum up
+	     K_ij and K_ji for j>i and set K_ij and K_ji to this
+	     value. This makes things a *lot* easier. So:
+
+	     We just need to check if the shells are different, in which
+	     case K will get extra incremenets.
+	  */
+
+	  // First, do the ij part:  K(i,l) += (ij|kl) P(j,k)
+	  {
+#ifdef DO_K
+	    arma::mat Kik(Ni,Nk);
+	    Kik.zeros();
+	    arma::mat Pjl=P.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+#else
+	    arma::mat Kaik(Ni,Nk);
+	    Kaik.zeros();
+	    arma::mat Pajl=Pa.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+
+	    arma::mat Kbik(Ni,Nk);
+	    Kbik.zeros();
+	    arma::mat Pbjl=Pb.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+#endif
+
+	    // Increment Kik
+	    for(size_t ii=0;ii<Ni;ii++)
+	      for(size_t kk=0;kk<Nk;kk++)
+		for(size_t ll=0;ll<Nl;ll++)
+		  for(size_t jj=0;jj<Nj;jj++)
+		    {
+#ifdef DO_K
+		      Kik(ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjl(jj,ll);
+#else
+		      Kaik(ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pajl(jj,ll);
+		      Kbik(ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbjl(jj,ll);
+#endif
+		    }
+
+	    // Set elements
+	    for(size_t ii=0;ii<Ni;ii++)
+	      for(size_t kk=0;kk<Nk;kk++) {
+		size_t i=i0+ii;
+		size_t k=k0+kk;
+#ifdef DO_K
+		Kwrk(i,k)+=Kik(ii,kk);
+#else
+		Kawrk(i,k)+=Kaik(ii,kk);
+		Kbwrk(i,k)+=Kbik(ii,kk);
+#endif
 	      }
+
+	    // Symmetrize if necessary
+	    if(ip!=jp)
+	      for(size_t kk=0;kk<Nk;kk++)
+		for(size_t ii=0;ii<Ni;ii++) {
+		  size_t i=i0+ii;
+		  size_t k=k0+kk;
+#ifdef DO_K
+		  Kwrk(k,i)+=Kik(ii,kk);
+#else
+		  Kawrk(k,i)+=Kaik(ii,kk);
+		  Kbwrk(k,i)+=Kbik(ii,kk);
+#endif
+		}
+	  }
+
+
+	  // Then, the second part
+	  // K(j,k) += (ij|kl) P(i,l)
+	  if(is!=js) {
+#ifdef DO_K
+	    arma::mat Kjk(Nj,Nk);
+	    Kjk.zeros();
+	    arma::mat Pil=P.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+#else
+	    arma::mat Kajk(Nj,Nk);
+	    arma::mat Kbjk(Nj,Nk);
+	    Kajk.zeros();
+	    Kbjk.zeros();
+	    arma::mat Pail=Pa.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+	    arma::mat Pbil=Pb.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+#endif
+
+	    // Increment Kjk
+	    for(size_t jj=0;jj<Nj;jj++)
+	      for(size_t kk=0;kk<Nk;kk++)
+		for(size_t ll=0;ll<Nl;ll++)
+		  for(size_t ii=0;ii<Ni;ii++) {
+#ifdef DO_K
+		    Kjk(jj,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pil(ii,ll);
+#else
+		    Kajk(jj,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pail(ii,ll);
+		    Kbjk(jj,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbil(ii,ll);
+#endif
+		  }
+
+	    // Set elements
+	    for(size_t jj=0;jj<Nj;jj++)
+	      for(size_t kk=0;kk<Nk;kk++) {
+		size_t j=j0+jj;
+		size_t k=k0+kk;
+#ifdef DO_K
+		Kwrk(j,k)+=Kjk(jj,kk);
+#else
+		Kawrk(j,k)+=Kajk(jj,kk);
+		Kbwrk(j,k)+=Kbjk(jj,kk);
+#endif
+	      }
+
+	    // Symmetrize if necessary (take care about possible overlap with next routine)
+	    if((js!=ks || is!=ls) && ip!=jp) {
+	      for(size_t kk=0;kk<Nk;kk++)
+		for(size_t jj=0;jj<Nj;jj++) {
+		  size_t j=j0+jj;
+		  size_t k=k0+kk;
+#ifdef DO_K
+		  Kwrk(k,j)+=Kjk(jj,kk);
+#else
+		  Kawrk(k,j)+=Kajk(jj,kk);
+		  Kbwrk(k,j)+=Kbjk(jj,kk);
+#endif
+		}
 	    }
 	  }
-	} // end table filling / matrix incrementation
+
+
+	  // Third part
+	  //  K(i,l) += (ij|kl) P(j,k)
+	  if(ks!=ls) {
+#ifdef DO_K
+	    arma::mat Kil(Ni,Nl);
+	    Kil.zeros();
+	    arma::mat Pjk=P.submat(j0,k0,j0+Nj-1,k0+Nk-1);
+#else
+	    arma::mat Kail(Ni,Nl);
+	    arma::mat Kbil(Ni,Nl);
+	    Kail.zeros();
+	    Kbil.zeros();
+	    arma::mat Pajk=Pa.submat(j0,k0,j0+Nj-1,k0+Nk-1);
+	    arma::mat Pbjk=Pb.submat(j0,k0,j0+Nj-1,k0+Nk-1);
+#endif
+
+	    // Increment Kil
+	    for(size_t ii=0;ii<Ni;ii++)
+	      for(size_t ll=0;ll<Nl;ll++)
+		for(size_t jj=0;jj<Nj;jj++)
+		  for(size_t kk=0;kk<Nk;kk++) {
+#ifdef DO_K
+		    Kil(ii,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjk(jj,kk);
+#else
+		    Kail(ii,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pajk(jj,kk);
+		    Kbil(ii,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbjk(jj,kk);
+#endif
+		  }
+
+	    // Set elements
+	    for(size_t ii=0;ii<Ni;ii++)
+	      for(size_t ll=0;ll<Nl;ll++) {
+		size_t i=i0+ii;
+		size_t l=l0+ll;
+#ifdef DO_K
+		Kwrk(i,l)+=Kil(ii,ll);
+#else
+		Kawrk(i,l)+=Kail(ii,ll);
+		Kbwrk(i,l)+=Kbil(ii,ll);
+#endif
+	      }
+
+	    // Symmetrize if necessary
+	    if((js!=ks || is!=ls) && ip!=jp)
+	      for(size_t ll=0;ll<Nl;ll++)
+		for(size_t ii=0;ii<Ni;ii++) {
+		  size_t i=i0+ii;
+		  size_t l=l0+ll;
+#ifdef DO_K
+		  Kwrk(l,i)+=Kil(ii,ll);
+#else
+		  Kawrk(l,i)+=Kail(ii,ll);
+		  Kbwrk(l,i)+=Kbil(ii,ll);
+#endif
+		}
+	  }
+
+
+	  // Last permutation
+	  // K(j,l) += (ij|kl) P(i,k)
+	  if(is!=js && ks!=ls) {
+#ifdef DO_K
+	    arma::mat Kjl(Nj,Nl);
+	    Kjl.zeros();
+	    arma::mat Pik=P.submat(i0,k0,i0+Ni-1,k0+Nk-1);
+#else
+	    arma::mat Kajl(Nj,Nl);
+	    arma::mat Kbjl(Nj,Nl);
+	    Kajl.zeros();
+	    Kbjl.zeros();
+	    arma::mat Paik=Pa.submat(i0,k0,i0+Ni-1,k0+Nk-1);
+	    arma::mat Pbik=Pb.submat(i0,k0,i0+Ni-1,k0+Nk-1);
+#endif
+
+	    // Increment Kjl
+	    for(size_t jj=0;jj<Nj;jj++)
+	      for(size_t ll=0;ll<Nl;ll++)
+		for(size_t ii=0;ii<Ni;ii++)
+		  for(size_t kk=0;kk<Nk;kk++) {
+#ifdef DO_K
+		    Kjl(jj,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pik(ii,kk);
+#else
+		    Kajl(jj,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Paik(ii,kk);
+		    Kbjl(jj,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbik(ii,kk);
+#endif
+		  }
+
+	    // Set elements
+	    for(size_t jj=0;jj<Nj;jj++)
+	      for(size_t ll=0;ll<Nl;ll++) {
+		size_t j=j0+jj;
+		size_t l=l0+ll;
+#ifdef DO_K
+		Kwrk(j,l)+=Kjl(jj,ll);
+#else
+		Kawrk(j,l)+=Kajl(jj,ll);
+		Kbwrk(j,l)+=Kbjl(jj,ll);
+#endif
+	      }
+
+	    // Symmetrize if necessary
+	    if ((js!=ks || is!=ls) && ip!=jp)
+	      for(size_t ll=0;ll<Nl;ll++)
+		for(size_t jj=0;jj<Nj;jj++) {
+		  size_t j=j0+jj;
+		  size_t l=l0+ll;
+#ifdef DO_K
+		  Kwrk(l,j)+=Kjl(jj,ll);
+#else
+		  Kawrk(l,j)+=Kajl(jj,ll);
+		  Kbwrk(l,j)+=Kbjl(jj,ll);
+#endif
+		}
+	  }
+	}
+#endif // ifdef DO_K || DO_Kab
+
+
       } // End loop over jp pairs
-    } // End loop over ip pairs 
-  
-      // Collect results
-#if defined(_OPENMP)
-    
-#if !defined(CALCK) && !defined(ERITABLE)
+    } // End loop over ip pairs
+
+    // Collect results
+#ifdef DO_J
+#ifdef _OPENMP
 #pragma omp critical
-    J+=Jwrk;
 #endif
-    
-#if defined(CALCK) || defined(CALCJK)
-#pragma omp critical
-    K+=Kwrk;
+    {
+      J+=Jwrk;
+    }
 #endif
-    
-#ifdef CALCJKab
+
+#ifdef DO_K
+#ifdef _OPENMP
 #pragma omp critical
+#endif
+    {
+      K+=Kwrk;
+    }
+#endif
+
+#ifdef DO_Kab
+#ifdef _OPENMP
+#pragma omp critical
+#endif
     {
       Ka+=Kawrk;
       Kb+=Kbwrk;
     }
 #endif
-    
-#endif // end collection
-    
+
   } // end parallel region
-  
-#ifdef CHECKFILL  
-  size_t ndupl=0, nmiss=0;
-  bool print;
-  for(size_t i=0;i<N;i++) {
-    print=0;
-    if(nacc[i]==0) {
-      printf("Integral %i has not been calculated.\n",(int) i);
-      nmiss++;
-      print=1;
-    } else if(nacc[i]>1) {
-      printf("Integral %i has been calculated %i times.\n",(int) i,nacc[i]);
-      ndupl++;
-      print=1;
-    }
-    if(print) {
-      // Find out index
-      bool found=0;
-      for(size_t ii=0;ii<Nbf;ii++) {
-	for(size_t jj=0;jj<Nbf;jj++) {
-	  for(size_t kk=0;kk<Nbf;kk++) {
-	    for(size_t ll=0;ll<Nbf;ll++) {
-	      
-	      if(i==idx(ii,jj,kk,ll)) {
-		printf("It is %i %i %i %i.\n",ii,jj,kk,ll);
-		found=1;
-		break;
-	      }
-	    }
-	    
-	    if(found)
-	      break;
-	  }
-	  if(found)
-	    break;
-	}
-	if(found)
-	  break;
-      }
-      
-    }
-  }
-  
-  printf("%lu are missing and %lu are duplicates.\n", nmiss, ndupl);
-#endif
-  
+
 #ifndef ERITABLE
   // Compute screening efficiency
   //  printf("Computed %lu shells, skipped %lu due to small absolute value and %lu due to small product.\n",calcd,intskip,denskip);
-  
+
   if(eff!=NULL) {
     *eff=calcd*100.0/(calcd+intskip+denskip);
   }
 #endif
-  
+
 #ifdef CALCJ
   return J;
 #elif defined(CALCK)
   return K;
 #endif
 }
- 
- 

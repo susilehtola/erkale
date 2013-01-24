@@ -71,17 +71,6 @@ class ERIscreen {
   void calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff=NULL) const;
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
   void calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff=NULL) const;
-
-  /* Slower but more robust versions using plain integral value screening */
-
-  /// Calculate Coulomb matrix with tolerance tol for integrals, store efficiency of screening in *eff
-  arma::mat calcJ_strict(const arma::mat & R, double tol, double *eff=NULL) const;
-  /// Calculate exchange matrix with tolerance tol for integrals, store efficiency of screening in *eff
-  arma::mat calcK_strict(const arma::mat & R, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff
-  void calcJK_strict(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
-  void calcJK_strict(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff=NULL) const;
 };
 
 #include "basis.h"

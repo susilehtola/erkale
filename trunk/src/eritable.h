@@ -24,6 +24,7 @@
 //#define CHECKFILL
 
 #include <armadillo>
+#include <cfloat>
 #include <vector>
 // Forward declaration
 class BasisSet;
@@ -66,9 +67,7 @@ class ERItable {
   ~ERItable();
 
   /// Fill table
-  void fill(const BasisSet * basis=NULL);
-  /// Fill table, but compute explicitly only integrals that contribute above tol
-  void fill(double tol, const BasisSet * basis=NULL);
+  void fill(const BasisSet * basis, double tol=DBL_EPSILON);
 
   /// Compute number of integrals
   size_t N_ints(const BasisSet * basis) const;
