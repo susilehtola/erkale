@@ -43,9 +43,9 @@ BLAS="-lblas -lgfortran"
 MAXAM="6"
 
 # Current versions of libraries
-export XCVER="2.0.0"
+export XCVER="2.0.1"
 export INTVER="1.1.4"
-export ARMAVER="3.6.0"
+export ARMAVER="3.6.1"
 
 # Silence cmake warnings about changed behavior
 export CMAKE_LEGACY_CYGWIN_WIN32=0 
