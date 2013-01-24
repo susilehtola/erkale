@@ -171,7 +171,7 @@ void XRSSCF::Fock_half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 	}
 
 	if(strictint) {
-	  scr.calcJK_strict(sol.P,sol.J,sol.K,tol,&screeneff);
+	  scr.calcJK(sol.P,sol.J,sol.K,tol,&screeneff);
 
 	  /*
 	  // Helper matrices
@@ -214,7 +214,7 @@ void XRSSCF::Fock_half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 	}
 
 	if(strictint) {
-	  sol.J=scr.calcJ_strict(sol.P,tol,&screeneff);
+	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
 	  
 	  /*
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
@@ -253,7 +253,7 @@ void XRSSCF::Fock_half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 	}
 
 	if(strictint) {
-	  scr.calcJK_strict(sol.Pa,sol.Pb,sol.J,sol.Ka,sol.Kb,tol,&screeneff);
+	  scr.calcJK(sol.Pa,sol.Pb,sol.J,sol.Ka,sol.Kb,tol,&screeneff);
 
 	  /*
 	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
@@ -303,7 +303,7 @@ void XRSSCF::Fock_half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft
 	}
 
 	if(strictint) {
-	  sol.J=scr.calcJ_strict(sol.P,tol,&screeneff);
+	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
 
 	  /*
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
