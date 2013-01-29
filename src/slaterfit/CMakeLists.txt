@@ -1,4 +1,4 @@
-add_executable(erkale_slaterfit solve_coefficients.cpp form_exponents.cpp)
+add_executable(erkale_slaterfit main.cpp)
 # The name of the executable is
 set_target_properties(erkale_slaterfit PROPERTIES OUTPUT_NAME "erkale_slaterfit${SUFFIX}")
 

@@ -95,24 +95,12 @@ double eval_difference(const gsl_vector *v, void *params) {
 }
 
 
-int main(int argc, char **argv) {
-  print_copyright();
-  print_license();
-
-  if(argc!=5) {
-    printf("Usage: %s zeta l Nf method\n",argv[0]);
-    printf("zeta is the STO exponent to fit\n");
-    printf("l is angular momentum to use\n");
-    printf("Nf is number of exponents to use\n");
-    printf("method is 0 for even-tempered, 1 for well-tempered and 2 for full optimization.\n");
-    return 1;
-  }
-
+std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int method) {
   sto_params_t par;
-  par.zeta=atof(argv[1]);
-  par.l=atoi(argv[2]);
-  par.Nf=atoi(argv[3]);
-  par.method=atoi(argv[4]);
+  par.zeta=zeta;
+  par.l=am;
+  par.Nf=nf;
+  par.method=method;
 
   int maxiter=1000;
 
@@ -139,14 +127,33 @@ int main(int argc, char **argv) {
   ss=gsl_vector_alloc(dof);
   
   // Set starting point
-  for(int i=0;i<dof;i++)
-    gsl_vector_set(x,i,i);
+  switch(par.method) {
+
+  case(1):
+    // Well tempered - set gamma and delta to 0
+    gsl_vector_set_all(x,0.0);
+  case(0):
+    // Even tempered, set alpha=1.0 and beta=2.0
+    gsl_vector_set(x,0,1.0);
+    gsl_vector_set(x,0,2.0);
+    break;
+
+  case(2):
+    // Free minimization, set exponents to i
+    for(int i=0;i<nf;i++)
+      gsl_vector_set(x,i,i);
+    break;
+
+  default:
+    ERROR_INFO();
+    throw std::runtime_error("Unknown Slater fitting method.\n");
+  }
+
   // Set initial step sizes
   gsl_vector_set_all(ss,0.1);
 
   // Set minimizer
   gsl_multimin_fminimizer_set(min, &minfunc, x, ss);
-  printf("Minimizer set.\n\n");
 
   // Iterate
   int iter=0;
@@ -155,7 +162,7 @@ int main(int argc, char **argv) {
   double size;
   double cost=0;
 
-  printf("Iteration\tDelta\n");
+  if(verbose) printf("Iteration\tDelta\n");
   do {
     iter++;
     iterdelta++;
@@ -170,13 +177,13 @@ int main(int argc, char **argv) {
     
     // Are we converged?
     status = gsl_multimin_test_size (size, DBL_EPSILON);
-    if (status == GSL_SUCCESS)
+    if (verbose && status == GSL_SUCCESS)
       {
         printf ("converged to minimum at\n");
       }
 
     if(min->fval!=cost) {
-      printf("%i\t%e\t%e\n",iter,min->fval,min->fval-cost);
+      if(verbose) printf("%i\t%e\t%e\n",iter,min->fval,min->fval-cost);
       cost=min->fval;
       iterdelta=0;
     }
@@ -192,27 +199,12 @@ int main(int argc, char **argv) {
   gsl_vector_free(ss);  
   gsl_multimin_fminimizer_free(min);
 
-  // Print them out
-  printf("\nExponential contraction:\n");
-  for(size_t i=0;i<optexp.size();i++)
-    printf("%e\t%e\n",optc(i),optexp[i]);
-
-  // Form basis set
-  ElementBasisSet elbas("El");
-  FunctionShell sh(par.l);
-  for(size_t i=0;i<optexp.size();i++) {
-    sh.add_exponent(optc[i],optexp[i]);
+  // Return
+  std::vector<contr_t> ret(nf);
+  for(int i=0;i<nf;i++) {
+    ret[i].z=optexp[i];
+    ret[i].c=optc[i];
   }
-  elbas.add_function(sh);
 
-  // Save the basis set
-  BasisSetLibrary baslib;
-  baslib.add_element(elbas);
-  baslib.save_gaussian94("slater-contr.gbs");
-
-  // also in decontracted form
-  baslib.decontract();
-  baslib.save_gaussian94("slater-uncontr.gbs");
-
-  return 0;
+  return ret;
 }
