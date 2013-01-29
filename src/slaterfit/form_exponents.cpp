@@ -135,7 +135,7 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
   case(0):
     // Even tempered, set alpha=1.0 and beta=2.0
     gsl_vector_set(x,0,1.0);
-    gsl_vector_set(x,0,2.0);
+    gsl_vector_set(x,1,2.0);
     break;
 
   case(2):
