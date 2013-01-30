@@ -241,7 +241,7 @@ std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf) {
   // Convert to logarithm scale used in the integration
   min=log10(min);
   max=log10(max);
-  printf("lower=%e, max at %e, upper=%e\n",min,log10(maxz),max);
+  //  printf("lower=%e, max at %e, upper=%e\n",min,log10(maxz),max);
 
   // Quadrature points
   std::vector<double> lga(nf);
