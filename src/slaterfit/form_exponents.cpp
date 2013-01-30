@@ -222,7 +222,9 @@ std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf) {
   double maxz=zeta*zeta/(2*am+5);
   const double maxw=calc_slater_weight(zeta,maxz,am);
   // Weight must have decayed to
-  double decayfac=1e-6;
+  const double decayfac=1e-6;
+  // Refine up to
+  const double refineprec=sqrt(DBL_EPSILON);
 
   double min=maxz;
   double minval;
@@ -230,13 +232,43 @@ std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf) {
     min/=2.0;
     minval=calc_slater_weight(zeta,min,am);
   } while(minval>=decayfac*maxw);
+  // Refine value
+  double left=min, middle, right=min*2.0;
+  double midval;
+  do {
+    middle=(left+right)/2.0;
+    midval=calc_slater_weight(zeta,middle,am);
 
+    if(midval<decayfac*maxw)
+      left=middle;
+    else if(midval>decayfac*maxw)
+      right=middle;
+    else break;
+  } while(right-left>refineprec);
+  // Store value
+  min=middle;
+    
   double max=maxz;
   double maxval;
   do {
     max*=2.0;
     maxval=calc_slater_weight(zeta,max,am);
   } while(maxval>=decayfac*maxw);
+  // Refine
+  left=max/2.0;
+  right=max;
+  do {
+    middle=(left+right)/2.0;
+    midval=calc_slater_weight(zeta,middle,am);
+
+    if(midval>decayfac*maxw)
+      left=middle;
+    else if(midval<decayfac*maxw)
+      right=middle;
+    else break;
+  } while(right-left>refineprec);
+  // Store value
+  max=middle;
 
   // Convert to logarithm scale used in the integration
   min=log10(min);
