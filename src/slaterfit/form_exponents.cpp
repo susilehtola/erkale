@@ -19,6 +19,7 @@
 #include <algorithm>
 #include "solve_coefficients.h"
 #include "../basis.h"
+#include "../mathf.h"
 #include "../tempered.h"
 
 // Minimization routines
@@ -205,6 +206,65 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
     ret[i].z=optexp[i];
     ret[i].c=optc[i];
   }
+
+  return ret;
+}
+
+double calc_slater_weight(double zeta, double alpha, int am) {
+  return exp(-zeta*zeta*0.25/alpha)*pow(alpha,-0.5*am-5.0/4.0);
+}
+
+std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf) {
+  // Returned basis
+  std::vector<contr_t> ret(nf);
+
+  // Determine limits of integration interval
+  double maxz=zeta*zeta/(2*am+5);
+  const double maxw=calc_slater_weight(zeta,maxz,am);
+  // Weight must have decayed to
+  double decayfac=1e-6;
+
+  double min=maxz;
+  double minval;
+  do {
+    min/=2.0;
+    minval=calc_slater_weight(zeta,min,am);
+  } while(minval>=decayfac*maxw);
+
+  double max=maxz;
+  double maxval;
+  do {
+    max*=2.0;
+    maxval=calc_slater_weight(zeta,max,am);
+  } while(maxval>=decayfac*maxw);
+
+  // Convert to logarithm scale used in the integration
+  min=log10(min);
+  max=log10(max);
+  printf("lower=%e, max at %e, upper=%e\n",min,log10(maxz),max);
+
+  // Quadrature points
+  std::vector<double> lga(nf);
+  double dlga=(max-min)/nf;
+
+  // Form quadrature points
+  for(int i=0;i<nf;i++) {
+    lga[i]=min+(i+0.5)*dlga;
+    ret[i].z=pow(10.0,lga[i]);
+  }
+
+  // Initialize weights
+  for(int i=0;i<nf;i++) {
+    ret[i].c=0.0;
+  }
+
+  // Common factor is
+  double cfac=pow(zeta,am+5.0/2.0)/(pow(2.0,5.0/4.0)*pow(M_PI,1.0/4.0))*sqrt(doublefact(2*am+1)/fact(2*am+2))/log(10.0)*dlga;
+
+  // Calculate weights using midpoint method
+  for(int i=0;i<nf;i++)
+    ret[i].c=cfac*calc_slater_weight(zeta,ret[i].z,am);
+
 
   return ret;
 }
