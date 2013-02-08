@@ -583,8 +583,8 @@ void Checkpoint::read(BasisSet & basis) {
     basis.add_shell(shdata[i].cenind,shdata[i].am,shdata[i].uselm,contrs[i],false);
   }
 
-  // Finalize the basis
-  basis.finalize();
+  // Finalize the basis, no conversion of coefficients or normalization
+  basis.finalize(false,false);
 
   if(cl) close();
 }

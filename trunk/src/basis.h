@@ -237,7 +237,7 @@ class BasisSet {
   void coulomb_normalize();
 
   /// Do all of the above
-  void finalize(bool convert=false);
+  void finalize(bool convert=false, bool normalize=true);
 
   /// Get distance of nuclei
   double nuclear_distance(size_t i, size_t j) const;
