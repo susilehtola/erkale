@@ -143,7 +143,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
   arma::mat Hcore=T+V;
 
   // Inverse overlap
-  arma::mat Sinvh=BasOrth(S,true);
+  arma::mat Sinvh=BasOrth(S,verbose);
   if(Sinvh.n_cols!=Sinvh.n_rows && verbose)
     printf("%i nondegenerate basis functions.\n",Sinvh.n_cols);
 
@@ -269,7 +269,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
   arma::mat Hcore=T+V;
 
   // Inverse overlap
-  arma::mat Sinvh=BasOrth(S,true);
+  arma::mat Sinvh=BasOrth(S,verbose);
   if(Sinvh.n_cols!=Sinvh.n_rows && verbose)
     printf("%i nondegenerate basis functions.\n",Sinvh.n_cols);
 
