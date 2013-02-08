@@ -268,7 +268,7 @@ void write_basis(const BasisSet & basis, FILE *out) {
 }
 
 
-void load_fchk(const Settings & set) {
+void load_fchk(const Settings & set, double tol) {
   Timer t;
 
   // Read in checkpoint
@@ -321,14 +321,17 @@ void load_fchk(const Settings & set) {
   printf("\nComputed overlap matrix in %s.\n",t.elapsed().c_str());
 
   int Nel=stor.get_int("Number of electrons");
-  double neldiff=arma::trace(P*S);
-  neldiff-=Nel;
-  if(fabs(neldiff)/Nel>1e-8) {
+  double nelnum=arma::trace(P*S);
+  double neldiff=nelnum-Nel;
+  if(fabs(neldiff)/Nel>tol) {
     std::ostringstream oss;
     oss << "\nNumber of electrons and trace of density matrix differ by " << neldiff << "!\n";
     throw std::runtime_error(oss.str());
   }
   printf("tr PS - Nel = %.e\n",neldiff);
+
+  // Renormalize
+  P*=Nel/nelnum;
 
   // Save the result
   t.set();
@@ -478,6 +481,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadFchk","Gaussian formatted checkpoint file to load","");
   set.add_string("SaveFchk","Gaussian formatted checkpoint file to load","");
+  set.add_double("FchkTol","Tolerance for deviation in density matrix",1e-8);
   set.add_string("LoadChk","Save results to ERKALE checkpoint","");
   set.add_string("SaveChk","Save results to ERKALE checkpoint","");
 
@@ -489,9 +493,10 @@ int main(int argc, char **argv) {
   bool savefchk=(set.get_string("SaveFchk")!="");
   bool loadchk=(set.get_string("LoadChk")!="");
   bool savechk=(set.get_string("SaveChk")!="");
+  double tol=set.get_double("FchkTol");
 
   if(loadfchk && savechk && !loadchk && !savefchk)
-    load_fchk(set);
+    load_fchk(set,tol);
   else if(!loadfchk && !savechk && loadchk && savefchk)
     save_fchk(set);
   else
