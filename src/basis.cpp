@@ -1206,7 +1206,7 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   return shellpairs;
 }
 
-void BasisSet::finalize(bool convert) {
+void BasisSet::finalize(bool convert, bool donorm) {
   // Finalize basis set structure for use.
 
   // Compute nuclear distances.
@@ -1219,7 +1219,8 @@ void BasisSet::finalize(bool convert) {
   if(convert)
     convert_contractions();
   // Normalize contractions
-  normalize();
+  if(donorm)
+    normalize();
 
   // Form list of unique shell pairs
   form_unique_shellpairs();
