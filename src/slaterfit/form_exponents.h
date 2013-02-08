@@ -28,7 +28,7 @@
 std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose=true, int method=2);
 
 /**
- * Expand Slater function in Gaussians.
+ * Expand Slater function in Gaussians, do integral using midpoint rule
  */
 std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf);
 

@@ -214,19 +214,14 @@ double calc_slater_weight(double zeta, double alpha, int am) {
   return exp(-zeta*zeta*0.25/alpha)*pow(alpha,-0.5*am-5.0/4.0);
 }
 
-std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf) {
-  // Returned basis
-  std::vector<contr_t> ret(nf);
-
+void determine_slater_limits(double zeta, int am, double decayfac, double & min, double & max) {
   // Determine limits of integration interval
   double maxz=zeta*zeta/(2*am+5);
   const double maxw=calc_slater_weight(zeta,maxz,am);
-  // Weight must have decayed to
-  const double decayfac=1e-6;
   // Refine up to
   const double refineprec=sqrt(DBL_EPSILON);
 
-  double min=maxz;
+  min=maxz;
   double minval;
   do {
     min/=2.0;
@@ -247,8 +242,12 @@ std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf) {
   } while(right-left>refineprec);
   // Store value
   min=middle;
+
+  /// Normalize to Gaussian's limit
+  if(min<1e-6)
+    min=1e-6;
     
-  double max=maxz;
+  max=maxz;
   double maxval;
   do {
     max*=2.0;
@@ -269,6 +268,18 @@ std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf) {
   } while(right-left>refineprec);
   // Store value
   max=middle;
+}
+
+
+std::vector<contr_t> slater_fit_midpoint(double zeta, int am, int nf) {
+  // Returned basis
+  std::vector<contr_t> ret(nf);
+
+  // Weight must have decayed to
+  const double decayfac=1e-6;
+  // Determine the limits
+  double min, max;
+  determine_slater_limits(zeta,am,decayfac,min,max);
 
   // Convert to logarithm scale used in the integration
   min=log10(min);
