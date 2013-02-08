@@ -1,5 +1,5 @@
 add_library (liberkale_emd
-emd.cpp emd_gto.cpp emdcube.cpp gto_fourier.cpp spherical_expansion.cpp )
+emd.cpp emd_gto.cpp emd_sto.cpp emdcube.cpp gto_fourier.cpp spherical_expansion.cpp)
 # The name of the library is
 set_target_properties(liberkale_emd PROPERTIES OUTPUT_NAME "erkale_emd${SUFFIX}")
 

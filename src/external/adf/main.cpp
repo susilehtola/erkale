@@ -20,7 +20,7 @@
 #include "lmgrid.h"
 #include "timer.h"
 
-#include "emd_sto.h"
+#include "emd/emd_sto.h"
 
 #include <cfloat>
 #include <cstdlib>
