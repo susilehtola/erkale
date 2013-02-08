@@ -331,7 +331,8 @@ void load_fchk(const Settings & set, double tol) {
   printf("tr PS - Nel = %.e\n",neldiff);
 
   // Renormalize
-  P*=Nel/nelnum;
+  if(set.get_bool("Renormalize"))
+    P*=Nel/nelnum;
 
   // Save the result
   t.set();
@@ -358,6 +359,19 @@ void load_fchk(const Settings & set, double tol) {
     chkpt.write("occa",occa);
     std::vector<double> occb(Nelb,1.0);
     chkpt.write("occb",occb);
+
+    // Density matrices
+    arma::mat Pa(P), Pb(P);
+    Pa.zeros();
+    Pb.zeros();
+
+    for(size_t i=0;i<occa.size();i++)
+      Pa+=occa[i]*Ca.col(i)*arma::trans(Ca.col(i));
+    for(size_t i=0;i<occb.size();i++)
+      Pb+=occb[i]*Cb.col(i)*arma::trans(Cb.col(i));
+
+    chkpt.write("Pa",Pa);
+    chkpt.write("Pb",Pb);
   }
 
   chkpt.write("Converged",1);
@@ -482,6 +496,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadFchk","Gaussian formatted checkpoint file to load","");
   set.add_string("SaveFchk","Gaussian formatted checkpoint file to load","");
   set.add_double("FchkTol","Tolerance for deviation in density matrix",1e-8);
+  set.add_bool("Renormalize","Renormalize density matrix?",false);
   set.add_string("LoadChk","Save results to ERKALE checkpoint","");
   set.add_string("SaveChk","Save results to ERKALE checkpoint","");
 
