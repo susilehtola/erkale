@@ -1,0 +1,14 @@
+add_executable(erkale_atom main.cpp)
+# The name of the executable is
+set_target_properties(erkale_atom PROPERTIES OUTPUT_NAME "erkale_atom${SUFFIX}")
+
+target_link_libraries(erkale_atom liberkale)
+if(BUILD_SHARED_LIBS)
+else()
+ target_link_libraries(erkale_atom -lrt)
+ target_link_libraries(erkale_atom ${GSL_LIBRARIES})
+ target_link_libraries(erkale_atom ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_atom ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_atom ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_atom ${HDF5_LIBRARIES})
+endif()

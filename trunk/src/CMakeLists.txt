@@ -28,7 +28,7 @@ external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfit.cpp
 chebyshev.cpp density_fitting.cpp lebedev.cpp eriworker.cpp
 eriworker_transforms.cpp slaterfit/solve_coefficients.cpp
-slaterfit/form_exponents.cpp)
+slaterfit/form_exponents.cpp atom/integrals.cpp atom/solvers.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
@@ -105,6 +105,8 @@ add_subdirectory(xrs)
 
 # Create the Slater fit tool
 add_subdirectory(slaterfit)
+# Create the atom program
+add_subdirectory(atom)
 # Create test tool
 add_subdirectory(test)
 # Create basis set tool
