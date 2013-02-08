@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     printf("zeta is the STO exponent to fit\n");
     printf("l is angular momentum to use\n");
     printf("Nf is number of exponents to use\n");
-    printf("method is 0 for even-tempered, 1 for well-tempered and 2 for full optimization, or 3 for quadrature.\n");
+    printf("method is 0 for even-tempered, 1 for well-tempered and 2 for full optimization, or 3 for midpoint quadrature.\n");
     return 1;
   }
   
@@ -44,11 +44,12 @@ int main(int argc, char **argv) {
     contr=slater_fit(zeta,am,Nf,true,method);
   else if(method==3)
     contr=slater_fit_midpoint(zeta,am,Nf);
+  else throw std::runtime_error("Unknown method.\n");
 
   // Print them out
-  printf("\nExponential contraction\nc_i\t\tz_i\n");
+  printf("\nExponential contraction\nc_i\t\tz_i\t\tlg z_i\n");
   for(size_t i=0;i<contr.size();i++)
-    printf("%e\t%e\n",contr[i].c,contr[i].z);
+    printf("%e\t%e\t%e\n",contr[i].c,contr[i].z,log10(contr[i].z));
 
   // Form basis set
   ElementBasisSet elbas("El");
