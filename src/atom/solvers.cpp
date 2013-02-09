@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "atomtable.h"
 #include "solvers.h"
 #include "linalg.h"
 #include "timer.h"
@@ -107,6 +108,8 @@ void print_E(const arma::vec & Ea, const arma::vec & Eb, int Z) {
   for(size_t i=occb.size();i<Eb.size();i++)
     printf("% .6f  ",Eb[i]);
   printf("\n");
+
+  fflush(stdout);
 }
 
 void print_E(const arma::vec & E, int Z) {
@@ -132,10 +135,15 @@ void print_E(const arma::vec & E, int Z) {
   for(size_t i=occs.size();i<E.size();i++)
     printf("% .6f  ",E[i]);
   printf("\n");
+
+  fflush(stdout);
 }
 
 
-void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence_t conv, bool ROHF, bool verbose) {
+void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence_t conv, bool direct, bool ROHF, bool verbose) {
+  // Amount of basis function
+  size_t Nbf=basis.size();
+
   // Construct matrices
   arma::mat S=overlap(basis);
   arma::mat T=kinetic(basis);
@@ -144,15 +152,22 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
 
   // Inverse overlap
   arma::mat Sinvh=BasOrth(S,verbose);
-  if(Sinvh.n_cols!=Sinvh.n_rows && verbose)
+  if(Sinvh.n_cols!=Sinvh.n_rows && verbose) {
     printf("%i nondegenerate basis functions.\n",Sinvh.n_cols);
+    fflush(stdout);
+  }
+
+  // Integrals
+  AtomTable tab;
+  if(!direct) {
+    tab.fill(basis,verbose);
+  }
 
   // Get core guess
   diagonalize(Hcore,Sinvh,sol.Ca,sol.Ea);
   sol.Cb=sol.Ca;
   sol.Eb=sol.Ea;
 
-  size_t Nbf=basis.size();
   arma::mat Paold, Pbold, Pold;
   form_density(sol.Ca,sol.Cb,sol.Pa,sol.Pb,Z);
   sol.P=sol.Pa+sol.Pb;
@@ -162,7 +177,10 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
   double Prms;
   double oldE;
 
-  if(verbose) printf("Entering SCF loop, basis contains %i functions.\n",(int) Nbf);
+  if(verbose) {
+    printf("Entering SCF loop, basis contains %i functions.\n",(int) Nbf);
+    fflush(stdout);
+  }
 
   DIIS diisa(S), diisb(S);
   const double diisthr=0.05;
@@ -178,9 +196,15 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     iiter++;
 
     // Form Coulomb and exchange operators
-    sol.J=coulomb(basis,sol.P);
-    sol.Ka=exchange(basis,sol.Pa);
-    sol.Kb=exchange(basis,sol.Pb);
+    if(!direct) {
+      sol.J=tab.calcJ(sol.P);
+      sol.Ka=tab.calcK(sol.Pa);
+      sol.Kb=tab.calcK(sol.Pb);
+    } else {
+      sol.J=coulomb(basis,sol.P);
+      sol.Ka=exchange(basis,sol.Pa);
+      sol.Kb=exchange(basis,sol.Pb);
+    }
 
     oldHa=sol.Ha;
     oldHb=sol.Hb;
@@ -255,13 +279,19 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     if(Prms>conv.deltaPrms)
       prms=' ';
 
-    if(verbose) printf("%3i\t%.12f\t%e%c\t%e%c\t%e%c (%s)\n",(int) iiter,sol.en.E,sol.en.E-oldE,econv,Pmax,pmax,Prms,prms,t.elapsed().c_str());
+    if(verbose) {
+      printf("%3i\t%.12f\t%e%c\t%e%c\t%e%c (%s)\n",(int) iiter,sol.en.E,sol.en.E-oldE,econv,Pmax,pmax,Prms,prms,t.elapsed().c_str());
+      fflush(stdout);
+    }
   } while(fabs(sol.en.E-oldE)>conv.deltaEmax || Pmax>conv.deltaPmax || Prms>conv.deltaPrms);
 
   if(verbose) print_E(sol.Ea,sol.Eb,Z);
 }
 
-void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence_t conv, bool verbose) {
+void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence_t conv, bool direct, bool verbose) {
+  // Amount of basis functions
+  size_t Nbf=basis.size();
+
   // Construct matrices
   arma::mat S=overlap(basis);
   arma::mat T=kinetic(basis);
@@ -270,13 +300,20 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
 
   // Inverse overlap
   arma::mat Sinvh=BasOrth(S,verbose);
-  if(Sinvh.n_cols!=Sinvh.n_rows && verbose)
+  if(Sinvh.n_cols!=Sinvh.n_rows && verbose) {
     printf("%i nondegenerate basis functions.\n",Sinvh.n_cols);
+    fflush(stdout);
+  }
 
   // Get core guess
   diagonalize(Hcore,Sinvh,sol.C,sol.E);
 
-  size_t Nbf=basis.size();
+  // Integrals
+  AtomTable tab;
+  if(!direct) {
+    tab.fill(basis,verbose);
+  }
+
   arma::mat Pold;
   form_density(sol.C,sol.P,Z);
 
@@ -285,7 +322,10 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
   double Prms;
   double oldE;
 
-  if(verbose) printf("Entering SCF loop, basis contains %i functions.\n",(int) Nbf);
+  if(verbose) {
+    printf("Entering SCF loop, basis contains %i functions.\n",(int) Nbf);
+    fflush(stdout);
+  }
 
   ADIIS adiis;
   DIIS diis(S);
@@ -300,8 +340,20 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     iiter++;
 
     // Form Coulomb and exchange operators
-    sol.J=coulomb(basis,sol.P);
-    sol.K=exchange(basis,sol.P);
+    if(!direct) {
+      sol.J=tab.calcJ(sol.P);
+      sol.K=tab.calcK(sol.P);
+
+      /*
+      arma::mat Jr=coulomb(basis,sol.P);
+      arma::mat Kr=exchange(basis,sol.P);
+      (sol.J-Jr).print("J diff");
+      (sol.K-Kr).print("K diff");
+      */
+    } else {
+      sol.J=coulomb(basis,sol.P);
+      sol.K=exchange(basis,sol.P);
+    }
 
     oldH=sol.H;
     sol.H=Hcore+sol.J-0.5*sol.K;
@@ -354,7 +406,10 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     if(Prms>conv.deltaPrms)
       prms=' ';
 
-    if(verbose) printf("%3i\t%.12f\t%e%c\t%e%c\t%e%c (%s)\n",(int) iiter,sol.en.E,sol.en.E-oldE,econv,Pmax,pmax,Prms,prms,t.elapsed().c_str());
+    if(verbose) {
+      printf("%3i\t%.12f\t%e%c\t%e%c\t%e%c (%s)\n",(int) iiter,sol.en.E,sol.en.E-oldE,econv,Pmax,pmax,Prms,prms,t.elapsed().c_str());
+      fflush(stdout);
+    }
   } while(fabs(sol.en.E-oldE)>conv.deltaEmax || Pmax>conv.deltaPmax || Prms>conv.deltaPrms);
 
   if(verbose) print_E(sol.E,Z);
