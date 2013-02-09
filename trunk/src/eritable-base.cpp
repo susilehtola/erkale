@@ -144,31 +144,27 @@ arma::mat ERItable::calcK(const arma::mat & R) const {
   arma::mat K(N,N);
   K.zeros();
 
-  // Helpers
-  size_t i, l;
-  double tmp;
-
   // Loop over matrix elements
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic) private(i,l,tmp)
+#pragma omp parallel for schedule(dynamic)
 #endif
   for(size_t ip=0;ip<pairs.size();ip++) {
     // The relevant indices are
-    i=pairs[ip].i;
-    l=pairs[ip].j;
+    size_t i=pairs[ip].i;
+    size_t j=pairs[ip].j;
     
-    // The (il) element in the K array
-    tmp=0.0;
+    // The (ij) element in the K array
+    double el=0.0;
     
     // Loop over density matrix
-    for(size_t j=0;j<N;j++)
-      for(size_t k=0;k<N;k++) {
-	tmp+=R(j,k)*getERI(i,j,k,l);
+    for(size_t k=0;k<N;k++)
+      for(size_t l=0;l<N;l++) {
+	el+=R(k,l)*getERI(i,k,j,l);
       }
     
     // Store result
-    K(i,l)=tmp;
-    K(l,i)=tmp;
+    K(i,j)=el;
+    K(j,i)=el;
   }
   
   return K;

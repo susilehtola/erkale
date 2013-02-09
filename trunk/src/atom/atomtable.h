@@ -14,13 +14,26 @@
  * of the License, or (at your option) any later version.
  */
 
-#ifndef SOLVERS_H
-#define SOLVERS_H
+#ifndef ATOMTABLE_H
+#define ATOMTABLE_H
 
+#include "../eritable.h"
 #include "integrals.h"
-#include "scf.h"
 
-void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence_t conv, bool direct=false, bool verbose=true);
-void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence_t conv, bool direct=false, bool ROHF=false, bool verbose=true);
+class AtomTable : public ERItable {
+  /// Amount of functions
+  size_t Nbf;
+
+  /// Calculate index in integral table
+  size_t idx(size_t i, size_t j, size_t k, size_t l) const;
+ public:
+  /// Consructor
+  AtomTable();
+  /// Destructor
+  ~AtomTable();
+
+  /// Fill table
+  void fill(const std::vector<bf_t> & bas, bool verbose);
+};
 
 #endif

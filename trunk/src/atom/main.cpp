@@ -175,10 +175,10 @@ int main(int argc, char **argv) {
 
   if(get_ground_state(Z).mult==1) {
     rscf_t sol;
-    RHF(basis,Z,sol,conv);
+    RHF(basis,Z,sol,conv,false);
   } else {
     uscf_t sol;
-    UHF(basis,Z,sol,conv,true);
+    UHF(basis,Z,sol,conv,false,true);
   }
 
   return 0;

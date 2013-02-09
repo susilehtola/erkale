@@ -50,6 +50,7 @@ typedef struct {
  * \date 2011/05/12 18:35
  */
 class ERItable {
+ protected:
   /// Table of integrals
   std::vector<double> ints;
 
@@ -59,7 +60,7 @@ class ERItable {
   std::vector<bfpair_t> pairs;
 
   /// Calculate index in integral table
-  size_t idx(size_t i, size_t j, size_t k, size_t l) const;
+  virtual size_t idx(size_t i, size_t j, size_t k, size_t l) const;
  public:
   /// Constructor
   ERItable();
