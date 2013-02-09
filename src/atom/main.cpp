@@ -173,8 +173,7 @@ int main(int argc, char **argv) {
   conv.deltaPmax=1e-6;
   conv.deltaPrms=1e-8;
 
-  //  testexch(basis);
-  if(Z%2==0) {
+  if(get_ground_state(Z).mult==1) {
     rscf_t sol;
     RHF(basis,Z,sol,conv);
   } else {
