@@ -274,12 +274,13 @@ class SCF {
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
-
-  /// Diagonalize Fock matrix
-  void diagonalize(rscf_t & sol) const;
-  /// Diagonalize Fock matrix
-  void diagonalize(uscf_t & sol) const;
 };
+
+/// Diagonalize Fock matrix
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol);
+/// Diagonalize Fock matrix
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol);
+
 
 /**
  * Find natural orbitals from P.

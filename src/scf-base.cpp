@@ -280,7 +280,7 @@ void SCF::set_frozen(const arma::mat & C, size_t ind) {
   freeze[ind]=C;
 }
 
-void SCF::diagonalize(rscf_t & sol) const {
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol) {
   arma::mat Horth;
   arma::mat orbs;
   // Transform Hamiltonian into orthogonal basis
@@ -294,7 +294,7 @@ void SCF::diagonalize(rscf_t & sol) const {
   check_orth(sol.C,S,false);
 }
 
-void SCF::diagonalize(uscf_t & sol) const {
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol) {
   arma::mat Horth;
   arma::mat orbs;
 
