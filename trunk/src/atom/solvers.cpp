@@ -23,17 +23,6 @@
 #include "guess.h"
 #include "mathf.h"
 
-void diagonalize(const arma::mat & H, const arma::mat & Sinvh, arma::mat & C, arma::vec & E) {
-  arma::mat Horth;
-  arma::mat orbs;
-  // Transform Hamiltonian into orthogonal basis
-  Horth=arma::trans(Sinvh)*H*Sinvh;
-  // Update orbitals and energies
-  eig_sym_ordered(E,orbs,Horth);
-  // Transform back to non-orthogonal basis
-  C=Sinvh*orbs;
-}
-
 void form_density(const arma::mat & Ca, const arma::mat & Cb, arma::mat & Pa, arma::mat & Pb, int Z) {
   // Get ground state
   gs_conf_t gs=get_ground_state(Z);
@@ -164,9 +153,9 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
   }
 
   // Get core guess
-  diagonalize(Hcore,Sinvh,sol.Ca,sol.Ea);
-  sol.Cb=sol.Ca;
-  sol.Eb=sol.Ea;
+  sol.Ha=Hcore;
+  sol.Hb=Hcore;
+  diagonalize(S,Sinvh,sol);
 
   arma::mat Paold, Pbold, Pold;
   form_density(sol.Ca,sol.Cb,sol.Pa,sol.Pb,Z);
@@ -255,8 +244,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     }
 
     // Solve new orbitals
-    diagonalize(sol.Ha,Sinvh,sol.Ca,sol.Ea);
-    diagonalize(sol.Hb,Sinvh,sol.Cb,sol.Eb);
+    diagonalize(S,Sinvh,sol);
 
     // Form density matrix
     Paold=sol.Pa;
@@ -306,7 +294,8 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
   }
 
   // Get core guess
-  diagonalize(Hcore,Sinvh,sol.C,sol.E);
+  sol.H=Hcore;
+  diagonalize(S,Sinvh,sol);
 
   // Integrals
   AtomTable tab;
@@ -386,7 +375,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     }
 
     // Solve new orbitals
-    diagonalize(sol.H,Sinvh,sol.C,sol.E);
+    diagonalize(S,Sinvh,sol);
 
     // Form density matrix
     Pold=sol.P;

@@ -217,7 +217,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	sol.Hb=Hcore;
 #endif
 
-	diagonalize(sol);
+	diagonalize(S,Sinvh,sol);
 
 	if(verbose)
 	  printf("\nCore guess formed in %s.\n",t.elapsed().c_str());
@@ -539,10 +539,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       const uscf_t refsol(sol);
 #endif
       // Form LH solution - no level shift
-      diagonalize(lhsol);
+      diagonalize(S,Sinvh,lhsol);
       form_dens(lhsol);
       form_fock(lhsol,sol);
-      diagonalize(lhsol);
+      diagonalize(S,Sinvh,lhsol);
 
       if(verbose) {
 	printf("\nLine search for level shift\n");
@@ -562,10 +562,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	rhsol.Ha=sol.Ha-rmu*S*sol.Pa*S;
 	rhsol.Hb=sol.Hb-rmu*S*sol.Pb*S;
 #endif
-	diagonalize(rhsol);
+	diagonalize(S,Sinvh,rhsol);
 	form_dens(rhsol);
 	form_fock(rhsol,sol);
-	diagonalize(rhsol);
+	diagonalize(S,Sinvh,rhsol);
 
 	if(verbose) {
 	  printf("\t%e\t%e\t%e\n",rmu,rhsol.en.E,rhsol.en.E-lhsol.en.E);
@@ -634,10 +634,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  
 	  // Compute energies
 	  if(comp1) {
-	    diagonalize(sol1);
+	    diagonalize(S,Sinvh,sol1);
 	    form_dens(sol1);
 	    form_fock(sol1,sol);
-	    diagonalize(sol1);
+	    diagonalize(S,Sinvh,sol1);
 	    if(verbose) {
 	      printf("\t%e\t%e\t%e\n",mu1,sol1.en.E,sol1.en.E-Emin0);
 	      fflush(stdout);
@@ -645,10 +645,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  }
 	  
 	  if(comp2) {
-	    diagonalize(sol2);
+	    diagonalize(S,Sinvh,sol2);
 	    form_dens(sol2);
 	    form_fock(sol2,sol);
-	    diagonalize(sol2);
+	    diagonalize(S,Sinvh,sol2);
 	    if(verbose) {
 	      printf("\t%e\t%e\t%e\n",mu2,sol2.en.E,sol2.en.E-Emin0);
 	      fflush(stdout);
@@ -747,7 +747,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       }
 
       // Do the diagonalization
-      diagonalize(sol);
+      diagonalize(S,Sinvh,sol);
 
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
