@@ -1,3 +1,11 @@
+! Completeness-optimized basis sets for electron momentum density
+! calculations at the MP2 level of theory
+!
+! H-Ar: S. Lehtola, P. Manninen, M. Hakala and K. Hämäläinen,
+! Contraction of completeness-optimized basis sets. Application to
+! ground-state electron momentum densities, J. Chem. Phys. 138, 044109
+! (2013).
+
 He 0
 S   6   1.00
   1.8535735600e+03   3.2504184931e-03
