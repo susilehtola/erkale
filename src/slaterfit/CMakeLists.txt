@@ -9,6 +9,7 @@ else()
  target_link_libraries(erkale_slaterfit ${GSL_LIBRARIES})
  target_link_libraries(erkale_slaterfit ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_slaterfit ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_slaterfit ${LIBXC_LIBRARIES})
 endif()
 
 

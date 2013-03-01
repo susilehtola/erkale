@@ -10,6 +10,7 @@ else()
  target_link_libraries(erkale_fchkpt ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_fchkpt ${HDF5_LIBRARIES})
  target_link_libraries(erkale_fchkpt ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_fchkpt ${LIBXC_LIBRARIES})
 endif()
 
 # ADF EMD executable
@@ -24,6 +25,7 @@ else()
  target_link_libraries(erkale_adf_emd ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_adf_emd ${HDF5_LIBRARIES})
  target_link_libraries(erkale_adf_emd ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_adf_emd ${LIBXC_LIBRARIES})
 endif()
 
 install (TARGETS erkale_fchkpt erkale_adf_emd DESTINATION bin)

@@ -22,8 +22,8 @@ add_library (liberkale basis.cpp basislibrary.cpp stringutil.cpp
 mathf.cpp integrals.cpp eritable.cpp eriscreen.cpp timer.cpp
 linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf-base.cpp
 scf-solvers.cpp scf-fock.cpp elements.cpp xyzutils.cpp settings.cpp
-broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp properties.cpp
-checkpoint.cpp guess.cpp external/storage.cpp
+broyden.cpp adiis.cpp ediis.cpp tempered.cpp find_molecules.cpp
+properties.cpp checkpoint.cpp guess.cpp external/storage.cpp
 external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfit.cpp
 chebyshev.cpp density_fitting.cpp lebedev.cpp eriworker.cpp

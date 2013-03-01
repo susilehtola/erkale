@@ -15,7 +15,7 @@
  */
 
 
-
+#include "dftfuncs.h"
 #include "settings.h"
 #include "stringutil.h"
 
@@ -62,7 +62,9 @@ void Settings::add_scf_settings() {
   add_double("DIISThr", "DIIS error threshold for DIIS updates", 0.05);
 
   // Use ADIIS?
-  add_bool("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", true);
+  add_bool("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", false);
+  // Use EDIIS?
+  add_bool("UseEDIIS", "Use EDIIS for Fock matrix interpolation? (DIIS takes preference)", true);
   // Use Broyden mixing?
   add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);
   // Use Trust-Region Roothaan-Hall?
@@ -354,11 +356,10 @@ void Settings::parse(std::string filename) {
 	  // Hartree-Fock or DFT?
 	  if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0) {
 	    set_string("Method","HF");
-	    // Turn off density fitting by default
+	    // Turn of density fitting by default
 	    set_bool("DensityFitting",false);
 	  } else if(stricmp(words[1],"ROHF")==0) {
 	    set_string("Method","ROHF");
-	    // Turn off density fitting by default
 	    set_bool("DensityFitting",false);
 	  } else {
 	    // Add dft related settings
@@ -368,6 +369,12 @@ void Settings::parse(std::string filename) {
 	      // Settings already added, as e.g. in xrs executable.
 	    }	    
 	    set_string("Method",words[1]);
+
+	    // Hybrid functional? Do we turn off density fitting?
+	    int xfunc, cfunc;
+	    parse_xc_func(xfunc,cfunc,words[1]);
+	    if(exact_exchange(xfunc)!=0.0)
+	      set_bool("DensityFitting",false);
 	  }
 
 	} else {
