@@ -929,7 +929,7 @@ void calculate(const BasisSet & basis, Settings & set) {
 
       basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
     } else if(guess == ATOMGUESS) {
-      atomic_guess(basis,sol.C,sol.E,verbose);
+      atomic_guess(basis,sol.C,sol.E,set);
     } else if(guess == MOLGUESS) {
       // Need to generate the starting guess.
       std::string name;
@@ -1004,7 +1004,7 @@ void calculate(const BasisSet & basis, Settings & set) {
 	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
       }
     } else if(guess == ATOMGUESS) {
-      atomic_guess(basis,sol.Ca,sol.Ea,verbose);
+      atomic_guess(basis,sol.Ca,sol.Ea,set);
       sol.Cb=sol.Ca;
       sol.Eb=sol.Ea;
     } else if(guess == MOLGUESS) {

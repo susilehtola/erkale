@@ -20,7 +20,7 @@
 #include "timer.h"
 #include <algorithm>
 
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool verbose) {
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings set) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -33,16 +33,21 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
   // Density matrix
   arma::mat P(Nbf,Nbf);
   P.zeros();
+
+  // Print out info?
+  bool verbose=set.get_bool("Verbose");
   
-  // SCF settings to use
-  Settings set;
-  set.add_scf_settings();
-  set.set_bool("Verbose",false);
+  // Settings to use
   set.set_string("Guess","Core");
   set.set_int("MaxIter",200);
   set.set_bool("DensityFitting",false);
-  // We should always afford to do a line search in an sp basis for a single atom
-  set.set_bool("LineSearch",true);
+  set.set_bool("ForcePol",true);
+  set.set_bool("Verbose",false);
+
+  // Relax convergence requirements - open shell atoms may be hard to
+  // converge
+  set.set_double("DeltaPmax",1e-5);
+  set.set_double("DeltaPrms",1e-6);
 
   if(verbose) {
     printf("Performing atomic guess for atoms:\n");
@@ -89,9 +94,12 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
     else if(nuc.Z<21)
       // s and p electrons
       ammax=1;
-    else
+    else if(nuc.Z<57)
       // s, p and d electrons
       ammax=2;
+    else 
+      // s, p, d and f electrons
+      ammax=3;
     
     std::vector<GaussianShell> shells=basis.get_funcs(idnuc[i][0]);
     // Indices of shells included
@@ -115,34 +123,28 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
 
     // Temporary file name
     char *tmpname=tempnam("./",".chk");
+    set.set_string("SaveChk",tmpname);
+
+    // Run calculation
+    calculate(atbas,set);
+
     // Checkpoint
-    Checkpoint chkpt(tmpname,true);
+    Checkpoint chkpt(tmpname,false);
 
-    // Solver
-    SCF solver(atbas,set,chkpt);
-
-    // Use more relaxed convergence settings
-    convergence_t conv;
-    conv.deltaEmax=1e-6;
-    conv.deltaPmax=1e-5;
-    conv.deltaPrms=1e-6;
-
-    // Count number of electrons
-    int Nel_alpha;
-    int Nel_beta;
-    get_Nel_alpha_beta(atbas.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
-
-    // Solve ROHF
-    uscf_t sol;
-    solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
-    
     // Re-get shells, in new indexing.
     shells=atbas.get_funcs(0);
 
+    // Load energies and density matrix
+    arma::vec atEa;
+    arma::mat atP;
+
+    chkpt.read("Ea",atEa);
+    chkpt.read("P",atP);
+    
     // Store approximate energies
     for(size_t iid=0;iid<idnuc[i].size();iid++)
-      for(size_t io=0;io<sol.Ea.size();io++)
-	orbE.push_back(sol.Ea(io));
+      for(size_t io=0;io<atEa.size();io++)
+	orbE.push_back(atEa(io));
 
     // Loop over shells
     for(size_t ish=0;ish<shells.size();ish++)
@@ -152,9 +154,9 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool ver
 	for(size_t iid=0;iid<idnuc[i].size();iid++) {
 	  // Get shells on nucleus
 	  std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
-
+	  
 	  // Store density
-	  P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=sol.P.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
+	  P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=atP.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
 	}
       }
 
