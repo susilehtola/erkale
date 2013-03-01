@@ -24,12 +24,15 @@
 #include <armadillo>
 
 /**
- * Form starting guess density matrix from atomic ROHF densities
+ * Form starting guess density matrix from atomic densities
  *
  * "Starting SCF Calculations by Superposition of Atomic Densities"
  * by J. H. Van Lenthe et al., J. Comp. Chem. 27 (2006), pp. 926-932.
+ *
+ * However, contrary to the above paper, this version uses atomic
+ * densities of the method used in the main calculation instead of ROHF.
  */
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, bool verbose);
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings set);
 
 /// Determine list of identical nuclei, determined by nucleus and basis set
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);
