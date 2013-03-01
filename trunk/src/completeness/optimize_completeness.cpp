@@ -250,7 +250,8 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
 }
 
 double maxwidth(int am, double tol, int nexp, int nval) {
-  double width;
+  // Dummy value
+  double width=-1.0;
   std::vector<double> exps=maxwidth_exps(am,tol,nexp,&width,nval);
   return width;
 }
@@ -267,17 +268,29 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
     tol=MINTAU;
   }
 
-  // Left value
-  double left=0.0;
-  std::vector<double> lexps;
+  // Sanity check
+  if(*width<0.0)
+    *width=nexp/2.0;
+
   // Right value
-  double right=nexp/2.0;
+  double left=0.0;
+  double right=*width;
   double rval;
   std::vector<double> rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
   while(rval<tol) {
     left=right;
     right*=2.0;
     rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
+  }
+
+  // Left value
+  if(left==0.0) {
+    double lval=rval;
+    std::vector<double> lexps;
+    while(lval>=tol) {
+      left/=2.0;
+      lexps=optimize_completeness(am,0.0,left,nexp,nval,false,&lval);
+    }
   }
 
   std::vector<double> mexps;
