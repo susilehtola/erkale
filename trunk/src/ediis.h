@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Susi Lehtola
+ * Written by Susi Lehtola, 2010-2013
+ * Copyright (c) 2010-2013, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -14,8 +14,8 @@
  * of the License, or (at your option) any later version.
  */
 
-#ifndef ERKALE_ADIIS
-#define ERKALE_ADIIS
+#ifndef ERKALE_EDIIS
+#define ERKALE_EDIIS
 
 #include "global.h"
 
@@ -24,45 +24,55 @@
 #include <gsl/gsl_multimin.h>
 
 /**
- * \class ADIIS
+ * \class EDIIS
  *
- * \brief This class contains the ADIIS convergence accelerator.
+ * \brief This class contains the EDIIS convergence accelerator.
  *
- * The ADIIS algorithm is described in
- * X. Hu and W. Yang, "Accelerating self-consistent field convergence
- * with the augmented Roothaan–Hall energy function",
- * J. Chem. Phys. 132 (2010), 054109.
+ * The EDIIS algorithm is described in K. N. Kudin, G. E. Scuseria and
+ * E. Cancès, "A black-box self-consistent field convergence
+ * algorithm: One step closer", J. Chem. Phys. 116, 8255 (2002).
  *
  * \author Susi Lehtola
  * \date 2011/05/08 19:32
  *
  */
 
+/// Helper for sorts
+typedef struct {
+  /// Energy
+  double E;
+  /// Density matrix
+  arma::mat P;
+  /// Fock matrix
+  arma::mat F;
+} ediis_t;
 
-class ADIIS {
-  /// Energy stack
-  std::vector<double> E;
-  /// Density matrices
-  std::vector<arma::mat> D;
-  /// Fock matrices
-  std::vector<arma::mat> F;
+/// Helper for sorts
+bool operator<(const ediis_t & lhs, const ediis_t & rhs);
+
+class EDIIS {
+  /// Stack of entries
+  std::vector<ediis_t> stack;
+
+  /// Trace matrix
+  arma::mat FDtr;
 
   /// Maximum number of matrices to keep in memory
   size_t max;
 
  public:
   /// Constructor, keep max matrices in memory
-  ADIIS(size_t max=6);
+  EDIIS(size_t max=5);
   /// Destructor
-  ~ADIIS();
+  ~EDIIS();
 
-  /// Add new matrices to stacks
-  void push(double E, const arma::mat & D, const arma::mat & F);
+  /// Add new matrices to stack
+  void push(double E, const arma::mat & P, const arma::mat & F);
   /// Drop everything in memory
   void clear();
 
   /// Compute new estimate for density matrix
-  arma::mat get_D() const;
+  arma::mat get_P() const;
   /// Compute new estimate for Fock operator
   arma::mat get_H() const;
 
@@ -77,13 +87,12 @@ class ADIIS {
   void get_E_dEdx(const gsl_vector * x, double * E, gsl_vector * dEdx) const;
 };
 
-namespace adiis {
+namespace ediis {  
   /// Compute weights
   std::vector<double> compute_c(const gsl_vector * x);
   /// Compute jacobian
   arma::mat compute_jac(const gsl_vector * x);
   
-
   /// Compute energy
   double min_f(const gsl_vector * x, void * params);
   /// Compute derivative

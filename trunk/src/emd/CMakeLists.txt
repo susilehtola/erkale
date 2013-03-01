@@ -23,6 +23,7 @@ else()
  target_link_libraries(erkale_emd ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_emd ${HDF5_LIBRARIES})
  target_link_libraries(erkale_emd ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_emd ${LIBXC_LIBRARIES})
 endif()
 
 install (TARGETS erkale_emd DESTINATION bin)
