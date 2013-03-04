@@ -51,11 +51,6 @@ std::complex<double> RadialSlater::get(double p) const {
   return pow(2.0*M_PI,1.5)*pow(2.0,n-1)*fact(n-l)/(M_PI*M_PI)*pow(std::complex<double>(0.0,-p),l)*pow(zeta,n-l)*pow(2*zeta,n+0.5)/sqrt(fact(2*n))*sum;
 }
 
-
-SlaterEMDEvaluator::SlaterEMDEvaluator(const SlaterEMDEvaluator & rhs) {
-  *this=rhs;
-}
-
 SlaterEMDEvaluator::SlaterEMDEvaluator(const std::vector< std::vector<RadialSlater> > & radfv, const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv) : EMDEvaluator(idfuncsv,clm,locv,coord,Pv) {
   // Set the radial functions
   radf=radfv;

@@ -1,24 +1,24 @@
 /* Resticted case */
 #if defined(RESTRICTED) && defined(DFT)
-void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const
+void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const
 
 #elif defined(RESTRICTED) && defined(HF)
-void SCF::Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const rscf_t & oldsol, double tol) const
+void SCF::Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const rscf_t & oldsol, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const
+void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(HF)
-void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const uscf_t & oldsol, double tol) const
+void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-void SCF::Fock_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv, const uscf_t & oldsol, double tol) const
+void SCF::Fock_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const uscf_t & oldsol, double tol) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-void XRSSCF::Fock_full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol, bool xch) const
+void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const
 
 #elif defined(DFT) && defined(HALFHOLE)
-void XRSSCF::Fock_half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const
+void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const
 #endif
 {
   Timer t;

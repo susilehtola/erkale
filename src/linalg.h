@@ -35,15 +35,15 @@ void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec);
 /* Orthogonalization routines */
 
 /// Cholesky orthogonalization of basis set
-arma::mat CholeskyOrth(const arma::mat & S, bool verbose=true);
+arma::mat CholeskyOrth(const arma::mat & S);
 /// Symmetric orthogonalization of basis set
-arma::mat SymmetricOrth(const arma::mat & S, bool verbose=true);
+arma::mat SymmetricOrth(const arma::mat & S);
 /// Same, but use computed decomoposition
-arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval, bool verbose=true);
+arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval);
 /// Canonical orthogonalization of basis set
-arma::mat CanonicalOrth(const arma::mat & S, double cutoff=LINTHRES, bool verbose=true);
+arma::mat CanonicalOrth(const arma::mat & S, double cutoff=LINTHRES);
 /// Same, but use computed decomposition
-arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff, bool verbose=true);
+arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff);
 
 /// Automatic orthonormalization.
 arma::mat BasOrth(const arma::mat & S, bool verbose);

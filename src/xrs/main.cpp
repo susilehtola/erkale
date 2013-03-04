@@ -88,7 +88,7 @@ enum xrs_method parse_method(const std::string & method) {
  * matrix in the unoccupied space. The occupied orbitals and their
  * energies stay the same in the approximation.
  */
-void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t xcatom, size_t & ixc_orb, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin) {
+void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin) {
   // Get indices of atoms to augment
   std::vector<size_t> augind=parse_range(splitline(set.get_string("XRSAugment"))[0]);
   // Convert to C++ indexing
@@ -278,7 +278,7 @@ typedef struct {
 } spectrum_t;
 
 /// Compute transitions to unoccupied states.
-std::vector<spectrum_t> compute_transitions(const BasisSet & basis, const arma::mat & C, const arma::vec & E, size_t iat, size_t ixc, size_t nocc, bool abs=1) {
+std::vector<spectrum_t> compute_transitions(const BasisSet & basis, const arma::mat & C, const arma::vec & E, size_t iat, size_t ixc, size_t nocc) {
   // Returned array
   std::vector<spectrum_t> ret;
 
@@ -982,7 +982,7 @@ int main(int argc, char **argv) {
   arma::vec E_aug;
    
   if(stricmp(set.get_string("XRSAugment"),"")!=0)
-    augmented_solution(basis,set,sol,xcatom,xcorb,nocca,noccb,dft,augbas,C_aug,E_aug,spin);
+    augmented_solution(basis,set,sol,nocca,noccb,dft,augbas,C_aug,E_aug,spin);
   else {
     // No augmentation necessary, just copy the solutions
     augbas=basis;

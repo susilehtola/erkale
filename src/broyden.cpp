@@ -18,7 +18,7 @@
 
 #include "broyden.h"
 
-Broyden::Broyden(size_t N, bool verb, size_t max, double b, double s) {
+Broyden::Broyden(bool verb, size_t max, double b, double s) {
   m=max;
   beta=b;
   sigma=s;

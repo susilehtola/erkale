@@ -275,10 +275,6 @@ std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas) {
 GaussianEMDEvaluator::GaussianEMDEvaluator() {
 }
 
-GaussianEMDEvaluator::GaussianEMDEvaluator(const GaussianEMDEvaluator & rhs) {
-  *this=rhs;
-}
-
 GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat & Pv) {
   // Check size of P
   if(Pv.n_cols!=Pv.n_rows) {

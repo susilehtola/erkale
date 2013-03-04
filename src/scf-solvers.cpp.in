@@ -24,26 +24,26 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   /// Formation of Fock matrix
 #ifdef RESTRICTED
 #if defined(HF)
-#define form_fock(sol,ref) Fock_RHF(sol,occs,conv,ref,tol); nfock++;
+#define form_fock(sol,ref) Fock_RHF(sol,occs,ref,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_RDFT(sol,occs,conv,dft,ref,grid,fitgrid,tol); nfock++;
+#define form_fock(sol,ref) Fock_RDFT(sol,occs,dft,ref,grid,fitgrid,tol); nfock++;
 #endif
 
 #else
   // Unrestricted case: first core excited states
 
 #if defined(HALFHOLE)
-#define form_fock(sol,ref) Fock_half_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,fitgrid,tol); nfock++;
+#define form_fock(sol,ref) Fock_half_hole(sol,dft,occa,occb,ref,grid,fitgrid,tol); nfock++;
 #elif defined(FULLHOLE)
-#define form_fock(sol,ref) Fock_full_hole(xcatom,sol,conv,dft,occa,occb,ref,grid,fitgrid,tol,xch); nfock++;
+#define form_fock(sol,ref) Fock_full_hole(sol,dft,occa,occb,ref,grid,fitgrid,tol); nfock++;
 
   // Conventional HF and DFT
 #elif defined(HF)
-#define form_fock(sol,ref) Fock_UHF(sol,occa,occb,conv,ref,tol); nfock++;
+#define form_fock(sol,ref) Fock_UHF(sol,occa,occb,ref,tol); nfock++;
 #elif defined(_ROHF)
-#define form_fock(sol,ref) Fock_ROHF(sol,Nel_alpha,Nel_beta,conv,ref,tol); nfock++;
+#define form_fock(sol,ref) Fock_ROHF(sol,Nel_alpha,Nel_beta,ref,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,conv,dft,ref,grid,fitgrid,tol); nfock++;
+#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,dft,ref,grid,fitgrid,tol); nfock++;
 #endif
 #endif
 
@@ -151,7 +151,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // TRDSM
   TRDSM trdsm(S);
   // Broyden
-  Broyden broyd(Nbf*Nbf,verbose);
+  Broyden broyd(verbose);
 
   // Coulomb and exchange matrices
   arma::mat J(Nbf,Nbf), K(Nbf,Nbf);
@@ -174,8 +174,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   TRDSM trdsmb(S);
 
   // Broyden
-  Broyden broyd_sum(Nbf*Nbf,verbose);
-  Broyden broyd_diff(Nbf*Nbf,verbose);
+  Broyden broyd_sum(verbose);
+  Broyden broyd_diff(verbose);
 
 #endif
 
