@@ -36,7 +36,7 @@ arma::vec form_P(const std::vector<double> & expns, double zeta, int l) {
   return ret;
 }
 
-arma::mat form_S(const std::vector<double> & expns, double zeta, int l) {
+arma::mat form_S(const std::vector<double> & expns, int l) {
   // Amount of exponents
   const size_t N=expns.size();
   // Returned vector
@@ -61,14 +61,14 @@ arma::vec solve_coefficients(std::vector<double> expns, double zeta, int l) {
   // Solve coefficients of exponents.
 
   arma::vec P=form_P(expns,zeta,l);
-  arma::mat S=form_S(expns,zeta,l);
+  arma::mat S=form_S(expns,l);
 
   return inv(S)*P;
 }
 
 double compute_difference(std::vector<double> expns, double zeta, int l) {
   arma::vec P=form_P(expns,zeta,l);
-  arma::mat S=form_S(expns,zeta,l);
+  arma::mat S=form_S(expns,l);
   // Inverse overlap matrix
   arma::mat invS=arma::inv(S);
 

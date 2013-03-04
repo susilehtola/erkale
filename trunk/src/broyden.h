@@ -63,8 +63,8 @@ class Broyden {
   double sigma;
 
  public:
-  /// Construct accelerator of problem dimension N, storing m iterations and with mixing parameters beta and sigma.
-  Broyden(size_t N, bool verbose=1, size_t m=10, double beta=0.8, double sigma=0.25);
+  /// Construct accelerator storing m iterations and with mixing parameters beta and sigma.
+  Broyden(bool verbose=true, size_t m=10, double beta=0.8, double sigma=0.25);
   /// Destructor
   ~Broyden();
 

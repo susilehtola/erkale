@@ -62,15 +62,12 @@ void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec) {
   }
 }
 
-arma::mat CholeskyOrth(const arma::mat & S, bool verbose) {
+arma::mat CholeskyOrth(const arma::mat & S) {
   // Cholesky orthogonalization
-  if(verbose)
-    printf("Using Cholesky orthogonalization.\n");
-
   return inv(chol(S));
 }
 
-arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval, bool verbose) {
+arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval) {
   // Compute matrix filled with inverse eigenvalues
   const size_t Nbf=Svec.n_rows;
   arma::mat invval(Nbf,Nbf);
@@ -78,16 +75,11 @@ arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval, bool ver
   for(size_t i=0;i<Nbf;i++)
     invval(i,i)=1.0/sqrt(Sval(i));
 
-  if(verbose) {
-    printf("Using symmetric orthogonalization.\n");	     
-    printf("Smallest eigenvalue of overlap matrix is %e, ratio to largest is %e.\n",Sval(0),Sval(0)/Sval(Sval.n_elem-1));
-  }
-
   // Returned matrix is
   return Svec*invval*trans(Svec);
 }
 
-arma::mat SymmetricOrth(const arma::mat & S, bool verbose) {
+arma::mat SymmetricOrth(const arma::mat & S) {
   // Symmetric orthogonalization
 
   // Eigendecomposition of S: eigenvalues and eigenvectors
@@ -96,10 +88,10 @@ arma::mat SymmetricOrth(const arma::mat & S, bool verbose) {
   eig_sym_ordered(Sval,Svec,S);
 
   // Compute the decomposition
-  return SymmetricOrth(Svec,Sval,verbose);
+  return SymmetricOrth(Svec,Sval);
 }
   
-arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff, bool verbose) {
+arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff) {
   // Count number of eigenvalues that are above cutoff
   const size_t Nbf=Svec.n_rows;
 
@@ -115,15 +107,10 @@ arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double c
   for(size_t i=0;i<Nlin;i++)
     Sinvh.col(i)=Svec.col(Ndep+i)/sqrt(Sval(Ndep+i));
 
-  if(verbose) {
-    printf("Using canonical orthogonalization.\n");
-    printf("Smallest eigenvalue of overlap matrix is %e, ratio to largest is %e.\n",Sval(0),Sval(0)/Sval(Sval.n_elem-1));
-  }
-
   return Sinvh;
 }
 
-arma::mat CanonicalOrth(const arma::mat & S, double cutoff, bool verbose) {
+arma::mat CanonicalOrth(const arma::mat & S, double cutoff) {
   // Canonical orthogonalization
 
   if(S.n_cols != S.n_rows) {
@@ -151,14 +138,22 @@ arma::mat BasOrth(const arma::mat & S, bool verbose) {
   arma::mat Svec;
   // Compute the decomposition
   eig_sym_ordered(Sval,Svec,S);
-  
+
+  if(verbose) {
+    printf("Smallest eigenvalue of overlap matrix is %e, ratio to largest is %e.\n",Sval(0),Sval(0)/Sval(Sval.n_elem-1));
+  }
+
   // Check smallest eigenvalue.
   if(Sval(0)>=tol) {
     // OK to use symmetric
-    return SymmetricOrth(Svec,Sval,verbose);
+    if(verbose) printf("Using symmetric orthogonalization.\n");
+	
+    return SymmetricOrth(Svec,Sval);
   } else {
+    if(verbose) printf("Using canonical orthogonalization.\n");
+
     // Have to drop eigenvectors. Use canonical.
-    return CanonicalOrth(Svec,Sval,tol,verbose);
+    return CanonicalOrth(Svec,Sval,tol);
   }
 }
 
@@ -175,12 +170,12 @@ arma::mat BasOrth(const arma::mat & S, const Settings & set) {
   } else if(stricmp(met,"Can")==0) {
     // Canonical orthogonalization
     double tol=LINTHRES;
-    return CanonicalOrth(S,tol,verbose);
+    return CanonicalOrth(S,tol);
   } else if(stricmp(met,"Sym")==0) {
     // Symmetric orthogonalization
-    return SymmetricOrth(S,verbose);
+    return SymmetricOrth(S);
   } else if(stricmp(met,"Chol")==0) {
-    return CholeskyOrth(S,verbose);
+    return CholeskyOrth(S);
   } else {
     ERROR_INFO();
     std::ostringstream oss;

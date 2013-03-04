@@ -212,9 +212,3 @@ double darwin_1e(const BasisSet & basis, const arma::mat & P) {
 
   return E;
 }
-
-double mass_velocity(const BasisSet & basis, const arma::mat & P) {
-  throw std::runtime_error("mass-velocity not implemented yet.\n");
-
-  return 0.0;
-}

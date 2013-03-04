@@ -263,16 +263,16 @@ class SCF {
   void UDFT_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
 
   /// Calculate restricted Hartree-Fock operator
-  void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const rscf_t & oldsol, double tol) const;
+  void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const rscf_t & oldsol, double tol) const;
   /// Calculate restricted open-shell Hartree-Fock operator
-  void Fock_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv, const uscf_t & oldsol, double tol) const;
+  void Fock_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const uscf_t & oldsol, double tol) const;
   /// Calculate unrestricted Hartree-Fock operator
-  void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const uscf_t & oldsol, double tol) const;
+  void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const;
 
   /// Calculate restricted density-functional theory KS-Fock operator
-  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const;
+  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const;
   /// Calculate unrestricted density-functional theory KS-Fock operator
-  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const;
+  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const;
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
