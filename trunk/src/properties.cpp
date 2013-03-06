@@ -185,10 +185,14 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
   nucd.col(1)=nucd_b;
   nucd.col(2)=nucd_a+nucd_b;
 
-  mulov.print("Mulliken overlap");
   mulq.print("Mulliken charges");
-  bord.print("Bond order");
   nucd.print("Electron density at nuclei: alpha, beta, total");
+
+  // These generate a lot of output
+  /*
+  mulov.print("Mulliken overlap");
+  bord.print("Bond order");
+  */
 }
 
 
