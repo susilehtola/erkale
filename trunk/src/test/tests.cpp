@@ -55,7 +55,7 @@ const convergence_t init_conv={1e-4, 1e-4, 1e-6};
 const convergence_t final_conv={1e-6, 1e-6, 1e-8};
 
 /// To compute references instead of running tests
-#define COMPUTE_REFERENCE
+//#define COMPUTE_REFERENCE
 
 /// Compute relative difference \f$ (x-y)/y \f$
 double rel_diff(double x, double y) {
