@@ -257,6 +257,35 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     fflush(stdout);
   }
 
+  // Print occupancies
+  if(verbose) {
+#ifdef RESTRICTED
+    printf("\nOrbital occupancies:\n");
+    for(size_t i=0;i<occs.size();i++) {
+      printf("%.3f ",occs[i]);
+      if((i+1)%12==0 && i!=occs.size()-1)
+	printf("\n");
+    }
+    printf("\n");
+#else
+    printf("\nAlpha orbital occupancies:\n");
+    for(size_t i=0;i<occa.size();i++) {
+      printf("%.3f ",occa[i]);
+      if((i+1)%12==0 && i!=occa.size()-1)
+	printf("\n");
+    }
+    printf("\n");
+    printf("Beta orbital occupancies:\n");
+    for(size_t i=0;i<occb.size();i++) {
+      printf("%.3f ",occb[i]);
+      if((i+1)%12==0 && i!=occb.size()-1)
+	printf("\n");
+    }
+    printf("\n");
+#endif
+    fflush(stdout);
+  }
+
 #ifdef DFT
   // Fraction of exact exchange
   double kfrac=exact_exchange(dft.x_func);
