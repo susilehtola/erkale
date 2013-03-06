@@ -37,12 +37,9 @@ void EDIIS::push(double Es, const arma::mat & Ps, const arma::mat & Fs) {
   hlp.F=Fs;
   stack.push_back(hlp);
 
-  // Sort stack
-  std::stable_sort(stack.begin(),stack.end());
-
-  // Delete entry with highest energy
+  // Delete oldest entry
   if(stack.size()>max) {
-    stack.erase(stack.end());
+    stack.erase(stack.begin());
   }
 
   // Update trace matrix
