@@ -43,6 +43,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
   set.set_bool("DensityFitting",false);
   set.set_bool("ForcePol",true);
   set.set_bool("Verbose",false);
+  set.set_bool("Direct",false);
 
   // Relax convergence requirements - open shell atoms may be hard to
   // converge
