@@ -65,18 +65,15 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 
 #if defined(CALCJKab)
 #define DO_Kab
-#endif
-
-#if defined(DO_J) || defined(DO_K)
-  MAT_SIZE_CHECK(P,Nbf,Nbf,"P is not square!\n");
-#endif
-
-#if defined(DO_Kab)
   MAT_SIZE_CHECK(Pa,Nbf,Nbf,"Pa is not square!\n");
   MAT_SIZE_CHECK(Pb,Nbf,Nbf,"Pb is not square!\n");
 
   Ka.zeros(Nbf,Nbf);
   Kb.zeros(Nbf,Nbf);
+#endif
+
+#if defined(DO_J) || defined(DO_K)
+  MAT_SIZE_CHECK(P,Nbf,Nbf,"P is not square!\n");
 #endif
 
   /* Allocate memory for table of integrals */
@@ -264,7 +261,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	// Do density screening?
 
 	// Coulomb
-	bool coulskip=true;
+	bool coulskip=false;
 #ifdef DO_J
 	if(intmax*std::max(Psh(is,js),Psh(ks,ls))>=tol)
 	  coulskip=false;
@@ -402,12 +399,12 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	     case K will get extra incremenets.
 	  */
 
-	  // First, do the ij part:  K(i,l) += (ij|kl) P(j,k)
+	  // First, do the ik part:  K(i,k) += (ij|kl) P(j,l)
 	  {
 #ifdef DO_K
 	    arma::mat Kik(Ni,Nk);
 	    Kik.zeros();
-	    arma::mat Pjl=P.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+	    arma::mat Pjl =P.submat(j0,l0,j0+Nj-1,l0+Nl-1);
 #else
 	    arma::mat Kaik(Ni,Nk);
 	    Kaik.zeros();
@@ -425,7 +422,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 		  for(size_t jj=0;jj<Nj;jj++)
 		    {
 #ifdef DO_K
-		      Kik(ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjl(jj,ll);
+		      Kik (ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjl (jj,ll);
 #else
 		      Kaik(ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pajl(jj,ll);
 		      Kbik(ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbjl(jj,ll);
@@ -504,7 +501,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	      }
 
 	    // Symmetrize if necessary (take care about possible overlap with next routine)
-	    if((js!=ks || is!=ls) && ip!=jp) {
+	    if(ip!=jp) {
 	      for(size_t kk=0;kk<Nk;kk++)
 		for(size_t jj=0;jj<Nj;jj++) {
 		  size_t j=j0+jj;
@@ -563,7 +560,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	      }
 
 	    // Symmetrize if necessary
-	    if((js!=ks || is!=ls) && ip!=jp)
+	    if(ip!=jp)
 	      for(size_t ll=0;ll<Nl;ll++)
 		for(size_t ii=0;ii<Ni;ii++) {
 		  size_t i=i0+ii;
@@ -621,7 +618,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	      }
 
 	    // Symmetrize if necessary
-	    if ((js!=ks || is!=ls) && ip!=jp)
+	    if (ip!=jp)
 	      for(size_t ll=0;ll<Nl;ll++)
 		for(size_t jj=0;jj<Nj;jj++) {
 		  size_t j=j0+jj;
