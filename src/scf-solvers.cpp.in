@@ -191,6 +191,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     tol=STRICTTOL;
   else
     tol=ROUGHTOL;
+  bool strict(strictint);
 
   // Change in energy from last iteration
   double deltaE=0;
@@ -367,13 +368,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       printf("\n ******* Iteration %4i ********\n",iiter);
 
     // Form the Fock operator.
-    if(iiter%5==1 && !strictint) {
+    if((iiter%5==1 && !strict) || strict) {
 #ifdef RESTRICTED
       rscf_t refsol;
 #else
       uscf_t refsol;
 #endif
-      if(iiter!=1 && verbose)
+      if(iiter!=1 && !strict && verbose)
 	printf("Restarting Fock matrix formation from scratch.\n");
       
       form_fock(sol,refsol);
@@ -954,14 +955,14 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     chkptp->close();
     
     // Update screening value
-    if(direct && !strictint) {
+    if(direct && !strict) {
       // adapted from molpro
       double newtol=std::min(std::min(fabs(conv.deltaEmax)*1e-2,FINETOL),tol);
       
       // Clear out old accelerator stacks
-      if(tol!=newtol && rmsdiff<TOLCHANGE) {
+      if(tol!=newtol && rmsdiff<=TOLCHANGE) {
 	if(verbose) {
-	  printf("\nInitial convergence achieved.\n");
+	  printf("\nInitial convergence achieved. Turning off incremental formation.\n");
 	  fflush(stdout);
 	}
 #ifdef RESTRICTED
@@ -981,6 +982,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif	
 	// Set new tolerance
 	tol=newtol;
+	// and turn on strict integration - no incremental formation
+	strict=true;
       } else if(converged)
 	break;
     } else if(converged)
