@@ -80,7 +80,12 @@
 #define FINESTRUCT 7.2973525540510957E-3
 
 // Initial tolerance, when density-based screening is used
-#define ROUGHTOL 1e-9
+#define ROUGHTOL 1e-8
+// Fine tolance after initial convergence has been achieved (minimum)
+#define FINETOL  1e-9
+// When to switch to FINETOL (wrt. rms difference of density matrices)
+#define TOLCHANGE 1e-7
+
 // Tolerance when screening is only wrt absolute value of integrals
 #define STRICTTOL 1e-16
 
