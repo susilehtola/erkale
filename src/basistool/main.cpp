@@ -18,7 +18,7 @@
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
 
-std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "savedalton", "taug"};
+std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "savedalton", "sort", "taug"};
 
 
 void help() {
@@ -218,6 +218,17 @@ int main(int argc, char **argv) {
 
     std::string fileout=argv[3];
     bas.save_dalton(fileout);
+  } else if(stricmp(cmd,"sort")==0) {
+    // Sort basis set
+
+    if(argc!=4) {
+      printf("\nUsage: %s input.gbs sort output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    std::string fileout=argv[3];
+    bas.sort();
+    bas.save_gaussian94(fileout);
   } else {
     printf("\nInvalid command.\n");
 
