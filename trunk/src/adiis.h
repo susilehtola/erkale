@@ -38,17 +38,28 @@
  *
  */
 
+/// Stack entry
+typedef struct {
+  /// Energy
+  double E;
+  /// Density matrix
+  arma::mat P;
+  /// Fock matrix
+  arma::mat F;
+} adiis_t;
 
 class ADIIS {
-  /// Energy stack
-  std::vector<double> E;
-  /// Density matrices
-  std::vector<arma::mat> D;
-  /// Fock matrices
-  std::vector<arma::mat> F;
+  /// Stack of entries
+  std::vector<adiis_t> stack;
 
   /// Maximum number of matrices to keep in memory
   size_t max;
+
+  // Helpers for speeding up evaluation
+  /// < P_i - P_n | F(D_n) >
+  arma::vec PiF;
+  /// < P_i - P_n | F(D_j) - F(D_n) >
+  arma::mat PiFj;
 
  public:
   /// Constructor, keep max matrices in memory
@@ -57,17 +68,17 @@ class ADIIS {
   ~ADIIS();
 
   /// Add new matrices to stacks
-  void push(double E, const arma::mat & D, const arma::mat & F);
+  void push(double E, const arma::mat & P, const arma::mat & F);
   /// Drop everything in memory
   void clear();
 
   /// Compute new estimate for density matrix
-  arma::mat get_D() const;
+  arma::mat get_P() const;
   /// Compute new estimate for Fock operator
   arma::mat get_H() const;
 
   /// Solve coefficients
-  std::vector<double> get_c() const;
+  arma::vec get_c() const;
 
   /// Compute energy and its derivative with contraction coefficients \f$ c_i = x_i^2 / \left[ \sum_j x_j^2 \right] \f$
   double get_E(const gsl_vector * x) const;
@@ -79,7 +90,7 @@ class ADIIS {
 
 namespace adiis {
   /// Compute weights
-  std::vector<double> compute_c(const gsl_vector * x);
+  arma::vec compute_c(const gsl_vector * x);
   /// Compute jacobian
   arma::mat compute_jac(const gsl_vector * x);
   
