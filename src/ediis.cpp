@@ -45,7 +45,7 @@ void EDIIS::push(double Es, const arma::mat & Ps, const arma::mat & Fs) {
   // Update trace matrix
   FDtr.zeros(stack.size(),stack.size());
   for(size_t i=0;i<stack.size();i++)
-    for(size_t j=0;j<=i;j++) {
+    for(size_t j=0;j<i;j++) {
       FDtr(i,j)=arma::trace((stack[i].F-stack[j].F)*(stack[i].P-stack[j].P));
       FDtr(j,i)=FDtr(i,j);
     }     
@@ -183,7 +183,7 @@ double EDIIS::get_E(const gsl_vector * x) const {
     Eval+=c[i]*stack[i].E;
 
   for(size_t i=0;i<stack.size();i++)
-    for(size_t j=0;j<i;j++)
+    for(size_t j=0;j<stack.size();j++)
       Eval-=0.5*c[i]*c[j]*FDtr(i,j);
   
   return Eval;
@@ -212,7 +212,7 @@ void EDIIS::get_dEdx(const gsl_vector * x, gsl_vector * dEdx) const {
     
     // FD contribution
     for(size_t j=0;j<stack.size();j++)
-      el+=c[j]*FDtr(j,i);
+      el-=c[j]*FDtr(j,i);
 
     dEdc.push_back(el);
   }
