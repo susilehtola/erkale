@@ -26,27 +26,38 @@ ADIIS::ADIIS(size_t m) {
 ADIIS::~ADIIS() {
 }
 
-void ADIIS::push(double Es, const arma::mat & Ds, const arma::mat & Fs) {
-  E.push_back(Es);
-  D.push_back(Ds);
-  F.push_back(Fs);
+void ADIIS::push(double Es, const arma::mat & Ps, const arma::mat & Fs) {
+  adiis_t tmp;
+  tmp.E=Es;
+  tmp.P=Ps;
+  tmp.F=Fs;
+  stack.push_back(tmp);
 
-  if(D.size()>max) {
-    E.erase(E.begin());
-    D.erase(D.begin());
-    F.erase(F.begin());
+  if(stack.size()>max) {
+    stack.erase(stack.begin());
   }
+
+  arma::mat Pn=stack[stack.size()-1].P;
+  arma::mat Fn=stack[stack.size()-1].F;
+
+  // Update matrices
+  PiF.zeros(stack.size());
+  for(size_t i=0;i<stack.size();i++)
+    PiF(i)=arma::trace((stack[i].P-Pn)*Fn);
+
+  PiFj.zeros(stack.size(),stack.size());
+  for(size_t i=0;i<stack.size();i++)
+    for(size_t j=0;j<stack.size();j++)
+      PiFj(i,j)=arma::trace((stack[i].P-Pn)*(stack[j].F-Fn));
 }
 
 void ADIIS::clear() {
-  E.clear();
-  D.clear();
-  F.clear();
+  stack.clear();
 }  
 
-arma::mat ADIIS::get_D() const {
+arma::mat ADIIS::get_P() const {
   // Get coefficients
-  std::vector<double> c=get_c();
+  arma::vec c=get_c();
 
   /*
   printf("ADIIS weights are");
@@ -55,16 +66,16 @@ arma::mat ADIIS::get_D() const {
   printf("\n");
   */
 
-  arma::mat ret=c[0]*D[0];
-  for(size_t i=1;i<D.size();i++)
-    ret+=c[i]*D[i];
+  arma::mat ret=c[0]*stack[0].P;
+  for(size_t i=1;i<stack.size();i++)
+    ret+=c[i]*stack[i].P;
 
   return ret;
 }
 
 arma::mat ADIIS::get_H() const {
   // Get coefficients
-  std::vector<double> c=get_c();
+  arma::vec c=get_c();
 
   /*
   printf("ADIIS weights are");
@@ -73,16 +84,16 @@ arma::mat ADIIS::get_H() const {
   printf("\n");
   */
 
-  arma::mat H=c[0]*F[0];
-  for(size_t i=1;i<D.size();i++)
-    H+=c[i]*F[i];
+  arma::mat H=c[0]*stack[0].F;
+  for(size_t i=1;i<stack.size();i++)
+    H+=c[i]*stack[i].F;
 
   return H;
 }
 
-std::vector<double> ADIIS::get_c() const {
+arma::vec ADIIS::get_c() const {
   // Number of parameters
-  size_t N=D.size();
+  size_t N=stack.size();
 
   if(N==1) {
     // Trivial case.
@@ -147,7 +158,7 @@ std::vector<double> ADIIS::get_c() const {
   // double E_final=get_E(s->x);
 
   // Form minimum
-  std::vector<double> c=adiis::compute_c(s->x);
+  arma::vec c=adiis::compute_c(s->x);
      
   gsl_multimin_fdfminimizer_free (s);
   gsl_vector_free (x);
@@ -157,39 +168,27 @@ std::vector<double> ADIIS::get_c() const {
   return c;
 }
 
+
 double ADIIS::get_E(const gsl_vector * x) const {
   // Consistency check
-  if(x->size != D.size()) {
+  if(x->size != stack.size()) {
     ERROR_INFO();
     throw std::domain_error("Incorrect number of parameters.\n");
   }
 
-  std::vector<double> c=adiis::compute_c(x);
-
-  // Compute averaged D and F
-  arma::mat cF=c[0]*F[0]; // c_j F_j
-  for(size_t i=1;i<F.size();i++)
-    cF+=c[i]*F[i];
-
-  arma::mat cD=c[0]*D[0]; // c_j D_j
-  for(size_t i=1;i<D.size();i++)
-    cD+=c[i]*D[i];
-
-  arma::mat Dn=D[D.size()-1];
-  arma::mat Fn=F[F.size()-1];
+  arma::vec c=adiis::compute_c(x);
 
   // Compute energy
-  double Eval=E[E.size()-1];
-  Eval+=2.0*arma::trace(arma::trans(cD-Dn)*Fn);
-  Eval+=arma::trace(arma::trans(cD-Dn)*(cF-Fn));
+  double Eval=stack[stack.size()-1].E;
+  Eval+=2.0*arma::dot(c,PiF);
+  Eval+=arma::as_scalar(arma::trans(c)*PiFj*c);
   
   return Eval;
 }
     
-
 void ADIIS::get_dEdx(const gsl_vector * x, gsl_vector * dEdx) const {
   // Consistency check
-  if(x->size != D.size()) {
+  if(x->size != stack.size()) {
     ERROR_INFO();
     throw std::domain_error("Incorrect number of parameters.\n");
   }
@@ -199,43 +198,19 @@ void ADIIS::get_dEdx(const gsl_vector * x, gsl_vector * dEdx) const {
   }
 
   // Compute contraction coefficients
-  std::vector<double> c=adiis::compute_c(x);
+  arma::vec c=adiis::compute_c(x);
 
-  // Compute averaged D and F
-  arma::mat cF=c[0]*F[0]; // c_j F_j
-  for(size_t i=1;i<F.size();i++)
-    cF+=c[i]*F[i];
-
-  arma::mat cD=c[0]*D[0]; // c_j D_j
-  for(size_t i=1;i<D.size();i++)
-    cD+=c[i]*D[i];
-
-  arma::mat Dn=D[D.size()-1];
-  arma::mat Fn=F[F.size()-1];
- 
   // Compute derivative of energy
-  std::vector<double> dEdc;
-  for(size_t i=0;i<D.size();i++) {
-    // Constant term
-    double d=2.0*arma::trace(arma::trans(D[i]-Dn)*Fn);
-    d+=arma::trace(arma::trans(D[i]-Dn)*(cF-Fn))+arma::trace(arma::trans(cD-Dn)*(F[i]-Fn));
-
-    dEdc.push_back(d);
-  }
+  arma::vec dEdc=2.0*PiF + PiFj*c + arma::trans(PiFj)*c;
 
   // Compute jacobian of transformation: jac(i,j) = dc_i / dx_j
   arma::mat jac=adiis::compute_jac(x);
 
   // Finally, compute dEdx by plugging in Jacobian of transformation
   // dE/dx_i = dc_j/dx_i dE/dc_j
-  
-  for(size_t i=0;i<D.size();i++) {
-    double d=0.0;
-    for(size_t j=0;j<D.size();j++)
-      d+=jac(j,i)*dEdc[j];
-    
-    gsl_vector_set(dEdx,i,d);
-  }
+  arma::vec dEdxv=arma::trans(jac)*dEdc;
+  for(size_t i=0;i<stack.size();i++)
+    gsl_vector_set(dEdx,i,dEdxv(i));
 
   /*
   printf("get_dEdx finished\n");
@@ -250,11 +225,11 @@ void ADIIS::get_dEdx(const gsl_vector * x, gsl_vector * dEdx) const {
   printf(")\n");
   */
 }
-    
+
 
 void ADIIS::get_E_dEdx(const gsl_vector * x, double * Eval, gsl_vector * dEdx) const {
   // Consistency check
-  if(x->size != D.size()) {
+  if(x->size != stack.size()) {
     ERROR_INFO();
     throw std::domain_error("Incorrect number of parameters.\n");
   }
@@ -263,67 +238,12 @@ void ADIIS::get_E_dEdx(const gsl_vector * x, double * Eval, gsl_vector * dEdx) c
     throw std::domain_error("x and dEdx have different sizes!\n");
   }
 
-  // Compute contraction coefficients
-  std::vector<double> c=adiis::compute_c(x);
-
-  // Compute averaged D and F
-  arma::mat cF=c[0]*F[0]; // c_j F_j
-  for(size_t i=1;i<F.size();i++)
-    cF+=c[i]*F[i];
-
-  arma::mat cD=c[0]*D[0]; // c_j D_j
-  for(size_t i=1;i<D.size();i++)
-    cD+=c[i]*D[i];
-
-  arma::mat Dn=D[D.size()-1];
-  arma::mat Fn=F[F.size()-1];
-
   // Compute energy
-  *Eval=E[E.size()-1];
-  *Eval+=2.0*arma::trace(arma::trans(cD-Dn)*Fn);
-  *Eval+=arma::trace(arma::trans(cD-Dn)*(cF-Fn));
-
-  // Compute derivative of energy
-  std::vector<double> dEdc;
-  for(size_t i=0;i<D.size();i++) {
-    // Constant term
-    double d=2.0*arma::trace(arma::trans(D[i]-Dn)*Fn);
-    d+=arma::trace(arma::trans(D[i]-Dn)*(cF-Fn))+arma::trace(arma::trans(cD-Dn)*(F[i]-Fn));
-
-    dEdc.push_back(d);
-  }
-
-  // Compute jacobian of transformation: jac(i,j) = dc_i / dx_j
-  arma::mat jac=adiis::compute_jac(x);
-
-  //  printf("Jacobian is\n");
-  //  jac.print();
-
-  // Finally, compute dEdx by plugging in Jacobian of transformation
-  // dE/dx_i = dc_j/dx_i dE/dc_j
-  
-  for(size_t i=0;i<D.size();i++) {
-    double d=0.0;
-    for(size_t j=0;j<D.size();j++)
-      d+=jac(j,i)*dEdc[j];
-    gsl_vector_set(dEdx,i,d);
-  }
-
-  /*
-  printf("E=%e\n",*Eval);
-
-  printf("dEdc=(");
-  for(size_t i=0;i<D.size();i++)
-    printf(" %e,",dEdc[i]);
-  printf(")\n");
-
-  printf("dEdx=(");
-  for(size_t i=0;i<D.size();i++)
-    printf(" %e,",gsl_vector_get(dEdx,i));
-  printf(")\n");
-  */
+  *Eval=get_E(x);
+  // and its derivative
+  get_dEdx(x,dEdx);
 }
-    
+
 double adiis::min_f(const gsl_vector * x, void * params) {
   ADIIS * a=(ADIIS *) params;
   return a->get_E(x);
@@ -339,9 +259,9 @@ void adiis::min_fdf(const gsl_vector *x, void* params, double * f, gsl_vector * 
   a->get_E_dEdx(x,f,g);
 }
 
-std::vector<double> adiis::compute_c(const gsl_vector * x) {
+arma::vec adiis::compute_c(const gsl_vector * x) {
   // Compute contraction coefficients
-  std::vector<double> c(x->size);
+  arma::vec c(x->size);
 
   double xnorm=0.0;
   for(size_t i=0;i<x->size;i++) {
