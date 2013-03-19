@@ -153,8 +153,14 @@ void population_analysis(const BasisSet & basis, const arma::mat & P) {
   // Electron density at nuclei
   arma::vec nucd=nuclear_density(basis,P);
 
-  mulq.print("Mulliken charges");
-  nucd.print("Electron density at nuclei:");
+  printf("\nMulliken charges\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol(i).c_str(), mulq(i));
+
+  printf("\nElectron density at nuclei\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol(i).c_str(), nucd(i));
+  printf("\n");
 
   // These generate a lot of output
   /*
@@ -167,13 +173,18 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
   arma::mat P=Pa+Pb;
 
   // Mulliken overlap
-  arma::mat mulov=mulliken_overlap(basis,P);
+  arma::mat mulova=mulliken_overlap(basis,Pa);
+  arma::mat mulovb=mulliken_overlap(basis,Pb);
   // Mulliken charges
-  arma::vec mulq=-sum(mulov);
+  arma::mat mulq(Pa.n_rows,3);
+  mulq.col(0)=-sum(mulova);
+  mulq.col(1)=-sum(mulovb);
+  mulq.col(2)=mulq.col(0)+mulq.col(1);
   for(size_t i=0;i<basis.get_Nnuc();i++) {
     nucleus_t nuc=basis.get_nucleus(i);
-    if(!nuc.bsse)
-      mulq(i)+=nuc.Z;
+    if(!nuc.bsse) {
+      mulq(i,2)+=nuc.Z;
+    }
   }
 
   // Bond order
@@ -189,8 +200,14 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
   nucd.col(1)=nucd_b;
   nucd.col(2)=nucd_a+nucd_b;
 
-  mulq.print("Mulliken charges");
-  nucd.print("Electron density at nuclei: alpha, beta, total");
+  printf("\nMulliken charges: alpha, beta, total (incl. nucleus)\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol(i).c_str(), mulq(i,0), mulq(i,1), mulq(i,2));
+
+  printf("\nElectron density at nuclei: alpha, beta, total\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol(i).c_str(), nucd(i,0), nucd(i,1), nucd(i,2));
+  printf("\n");
 
   // These generate a lot of output
   /*
