@@ -775,7 +775,7 @@ void EMD::find_electrons(bool verbose, double tol) {
       }
     }
 
-    if(fabs(Nel-integral)>tol) {
+    if(fabs(Nel-integral)/Nel>tol) {
       // Check that the calculation will actually converge at some point..
       if(dens.size()>MAXPOINTS) {
 	ERROR_INFO();
