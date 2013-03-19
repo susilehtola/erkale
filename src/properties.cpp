@@ -154,7 +154,7 @@ void population_analysis(const BasisSet & basis, const arma::mat & P) {
   arma::vec nucd=nuclear_density(basis,P);
 
   mulq.print("Mulliken charges");
-  nucd.print("Electron density at nuclei: alpha, beta, total");
+  nucd.print("Electron density at nuclei:");
 
   // These generate a lot of output
   /*
