@@ -36,6 +36,7 @@ Settings::~Settings() {
 void Settings::add_scf_settings() {
   // Dummy functional: this will be set to HF or a X-C combination
   add_string("Method", "Method used in calculation (HF or a DFT functional)", "Dummy");
+  add_string("AtomGuess", "Method used for atomic guess (Auto for same as method)", "Auto");
 
   // Default basis set
   add_string("Basis", "Basis set used in calculation", "aug-cc-pVTZ");

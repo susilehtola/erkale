@@ -17,6 +17,7 @@
 #include "guess.h"
 #include "checkpoint.h"
 #include "scf.h"
+#include "stringutil.h"
 #include "timer.h"
 #include <algorithm>
 
@@ -45,6 +46,16 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
   set.set_bool("Verbose",false);
   set.set_bool("Direct",false);
   set.set_bool("DensityFitting",false);
+
+  // Use default convergence settings
+  set.set_bool("UseDIIS",true);
+  set.set_bool("UseADIIS",true);
+  set.set_bool("UseBroyden",false); 
+  set.set_bool("UseTRRH",false);
+
+  // Change guess method
+  if(stricmp(set.get_string("AtomGuess"),"Auto")!=0)
+    set.set_string("Method",set.get_string("AtomGuess"));
 
   // Relax convergence requirements - open shell atoms may be hard to
   // converge
