@@ -26,7 +26,13 @@ void eig_sym_ordered(arma::colvec & eigval, arma::mat & eigvec, const arma::mat 
      of ordering of eigenvalues from smallest to biggest */
 
   // Solve eigenvalues and eigenvectors
-  arma::eig_sym(eigval,eigvec,X);
+  bool ok=arma::eig_sym(eigval,eigvec,X);
+  if(!ok) {
+    ERROR_INFO();
+    printf("Unable to diagonalize matrix!\n");
+    X.print("X");
+    throw std::runtime_error("Error in eig_sym.\n");
+  }    
   
   // Sort vectors
   sort_eigvec(eigval,eigvec);
