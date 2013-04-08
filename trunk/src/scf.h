@@ -139,7 +139,7 @@ enum guess_t {
 
 class SCF {
  protected:
-  /// Overlap matrix
+ /// Overlap matrix
   arma::mat S;
 
   /// Kinetic energy matrix
@@ -215,6 +215,9 @@ class SCF {
   /// Use XC fitting?
   bool dft_xcfit;
 
+  /// Perdew-Zunger correction?
+  double pzcor;
+
   /// Nuclear repulsion energy
   double Enuc;
 
@@ -233,34 +236,45 @@ class SCF {
   /// List of frozen orbitals by symmetry group. index+1 is symmetry group, group 0 contains all non-frozen orbitals
   std::vector<arma::mat> freeze;
 
+  /// Perform Perdew-Zunger self-interaction correction
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, XCGrid & fitgrid, double tol);
+  /// Perform Perdew-Zunger self-interaction correction
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, XCGrid & fitgrid, double tol);
+
+  /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
+  void PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & ESIC, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid);
+  /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
+  void PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & ESIC, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid);
+
+
  public:
   /// Constructor
   SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt);
   ~SCF();
 
   /// Calculate restricted Hartree-Fock solution
-  void RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const;
+  void RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv);
   /// Calculate restricted open-shell Hartree-Fock solution
-  void ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const;
+  void ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv);
   /// Calculate unrestricted Hartree-Fock solution
-  void UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const;
+  void UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv);
 
   /// Calculate restricted density-functional theory solution
-  void RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
+  void RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft);
   /// Calculate unrestricted density-functional theory solution
-  void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
+  void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
 
   /// Calculate restricted Hartree-Fock solution using line search (slow!)
-  void RHF_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const;
+  void RHF_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv);
   /// Calculate restricted open-shell Hartree-Fock solution using line search (slow!)
-  void ROHF_ls(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const;
+  void ROHF_ls(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv);
   /// Calculate unrestricted Hartree-Fock solution using line search (slow!)
-  void UHF_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const;
+  void UHF_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv);
 
   /// Calculate restricted density-functional theory solution using line search (slow!)
-  void RDFT_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const;
+  void RDFT_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft);
   /// Calculate unrestricted density-functional theory solution using line search (slow!)
-  void UDFT_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const;
+  void UDFT_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
 
   /// Calculate restricted Hartree-Fock operator
   void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const rscf_t & oldsol, double tol) const;

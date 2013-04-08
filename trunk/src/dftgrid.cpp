@@ -1158,8 +1158,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   int lmax=(int) ceil(5.0-6.0*log10(tol));
 
   // Old and new diagonal elements of Hamiltonian
-  std::vector<double> Hold(Nbf), Hnew(Nbf);
-  zero(Hold);
+  std::vector<double> Hold(Nbf,0.0), Hnew(Nbf,0.0);
 
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
@@ -1188,7 +1187,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
       update_density(P);
 
       // Clean out Hamiltonian
-      zero(Hnew);
+      Hnew.assign(Hnew.size(),0.0);
 
       // Compute exchange and correlation.
       init_xc();
@@ -1292,10 +1291,10 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   std::vector<double> Haold(Nbf), Hanew(Nbf);
   std::vector<double> Hbold(Nbf), Hbnew(Nbf);
 
-  zero(Haold);
-  zero(Hanew);
-  zero(Hbold);
-  zero(Hbnew);
+  Haold.assign(Haold.size(),0.0);
+  Hanew.assign(Hanew.size(),0.0);
+  Hbold.assign(Hbold.size(),0.0);
+  Hbnew.assign(Hbnew.size(),0.0);
 
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
@@ -1324,8 +1323,8 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
       update_density(Pa,Pb);
 
       // Clean out Hamiltonian
-      zero(Hanew);
-      zero(Hbnew);
+      Hanew.assign(Hanew.size(),0.0);
+      Hbnew.assign(Hbnew.size(),0.0);
 
       // Compute exchange and correlation.
       init_xc();
@@ -1376,6 +1375,203 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
     fflush(stdout);
   }
 
+  return ret;
+}
+
+atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat> & Pa, size_t cenind, int x_func, int c_func, bool restr, bool verbose) {
+  // Construct a grid centered on (x0,y0,z0)
+  // with nrad radial shells                         
+  // See Köster et al for specifics.
+
+  // Dummy matrix
+  arma::mat Pdum(Pa[0]);
+  Pdum.zeros();
+
+  Timer t;
+
+  // Returned info
+  atomgrid_t ret;
+  ret.ngrid=0;
+  ret.nfunc=0;
+
+  // Store index of center
+  ret.atind=cenind;
+  // and its coordinates
+  ret.cen=bas.get_coords(cenind);
+
+  // Compute necessary number of radial points
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
+
+  // Get Chebyshev nodes and weights for radial part
+  std::vector<double> xc, wc;
+  chebyshev(nrad,xc,wc);
+
+  // Allocate memory
+  ret.sh.resize(nrad);
+
+  // Loop over radii
+  double rad, jac;
+  for(size_t ir=0;ir<xc.size();ir++) {
+    // Calculate value of radius
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+
+    // Jacobian of transformation is
+    jac=1.0/M_LN2/(1.0-xc[ir]);
+    // so total quadrature weight is
+    double weight=wc[ir]*rad*rad*jac;
+
+    // Store shell data
+    ret.sh[ir].r=rad;
+    ret.sh[ir].w=weight;
+    ret.sh[ir].l=3;
+  }
+  
+  // Number of basis functions
+  size_t Nbf=bas.get_Nbf();
+
+  // Determine limit for angular quadrature
+  int lmax=(int) ceil(5.0-6.0*log10(tol));
+
+  // Old and new diagonal elements of Hamiltonian
+  size_t nelem=Pa.size()-1;
+  if(restr)
+    nelem=Pa.size();
+  std::vector< std::vector<double> > Haold(nelem), Hanew(nelem);
+  std::vector< std::vector<double> > Hbold(nelem), Hbnew(nelem);
+
+  for(size_t i=0;i<nelem;i++) {
+    Haold[i].resize(Nbf,0.0);
+    Hanew[i].resize(Nbf,0.0);
+
+    Hbold[i].resize(Nbf,0.0);
+    Hbnew[i].resize(Nbf,0.0);
+  }
+
+
+  // Maximum difference of diagonal elements of Hamiltonian
+  double maxdiff;
+
+  // Now, determine actual quadrature limits shell by shell
+  for(size_t ir=0;ir<ret.sh.size();ir++) {
+
+    do {
+      // Clear current grid points and function values
+      free();
+
+      // Form radial shell
+      if(use_lobatto)
+	add_lobatto_shell(ret,ir);
+      else
+	add_lebedev_shell(ret,ir);
+      // Compute Becke weights for radial shell
+      becke_weights(bas,ret,ir);
+      // Prune points with small weight
+      prune_points(1e-8*tol,ret.sh[ir]);
+
+      // Compute values of basis functions
+      compute_bf(bas,ret,ir);
+
+      // Maximum difference of diagonal elements of Fock matrix
+      maxdiff=0.0;
+
+      // Loop over orbital densities
+      size_t ipmax=Pa.size()-2;
+      if(restr)
+	ipmax=Pa.size()-1;
+      for(size_t ip=0;ip<ipmax;ip++) {
+	// Compute density
+	update_density(Pa[ip],Pdum);
+	
+	// Clean out Hamiltonian
+	Hanew[ip].assign(Hanew[ip].size(),0.0);
+	Hbnew[ip].assign(Hbnew[ip].size(),0.0);
+
+	// Compute exchange and correlation.
+	init_xc();
+	// Compute the functionals
+	if(x_func>0)
+	  compute_xc(x_func);
+	if(c_func>0)
+	  compute_xc(c_func);
+	// and construct the Fock matrices
+	eval_Fxc(Hanew[ip],Hbnew[ip]);
+	
+	// Compute maximum difference of diagonal elements of Fock matrix
+	for(size_t i=0;i<Nbf;i++) {
+	  double tmp=std::max(fabs(Hanew[ip][i]-Haold[ip][i]),fabs(Hbnew[ip][i]-Hbold[ip][i]));
+	  if(tmp>maxdiff)
+	    maxdiff=tmp;
+	}
+      }
+
+      // Total density
+      {
+	size_t ip;
+
+	if(!restr) {
+	  ip=Pa.size()-2;
+	  // Compute density
+	  update_density(Pa[ip],Pa[ip+1]);
+	} else {
+	  ip=Pa.size()-1;
+	  update_density(Pa[ip]);
+	}
+	
+	// Clean out Hamiltonian
+	Hanew[ip].assign(Hanew[ip].size(),0.0);
+	Hbnew[ip].assign(Hbnew[ip].size(),0.0);
+
+	// Compute exchange and correlation.
+	init_xc();
+	// Compute the functionals
+	if(x_func>0)
+	  compute_xc(x_func);
+	if(c_func>0)
+	  compute_xc(c_func);
+	// and construct the Fock matrices
+	if(restr)
+	  eval_Fxc(Hanew[ip]);
+	else
+	  eval_Fxc(Hanew[ip],Hbnew[ip]);
+	
+	// Compute maximum difference of diagonal elements of Fock matrix
+	for(size_t i=0;i<Nbf;i++) {
+	  double tmp=std::max(fabs(Hanew[ip][i]-Haold[ip][i]),fabs(Hbnew[ip][i]-Hbold[ip][i]));
+	  if(tmp>maxdiff)
+	    maxdiff=tmp;
+	}
+      }
+
+      
+      // Increment order if tolerance not achieved.
+      if(maxdiff>tol/xc.size()) {
+	if(use_lobatto)
+	  ret.sh[ir].l+=2;
+	else {
+	  // Need to determine what is next order of Lebedev
+	  // quadrature that is supported.
+	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
+	}
+      }
+      
+      // Swap contents
+      std::swap(Haold,Hanew);
+      std::swap(Hbold,Hbnew);
+    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
+    
+    // Increase number of points and function values
+    ret.ngrid+=grid.size();
+    ret.nfunc+=flist.size();
+  }
+  
+  // Free memory once more
+  free();
+  
+  if(verbose) {
+    printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
+    fflush(stdout);
+  }
+  
   return ret;
 }
 
@@ -1682,6 +1878,43 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
   }
 }
 
+void DFTGrid::construct(const std::vector<arma::mat> & Pa, double tol, int x_func, int c_func, bool restr) {
+  // Add all atoms
+  if(verbose) {
+    printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
+    fflush(stdout);
+  }
+
+  // Set tolerances
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].set_tolerance(tol);
+  // Check necessity of gradients and laplacians
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].check_grad_lapl(x_func,c_func);
+
+  Timer t;
+
+  size_t Nat=basp->get_Nnuc();
+
+#ifdef _OPENMP
+#pragma omp parallel
+  {
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+    for(size_t i=0;i<Nat;i++)
+      grids[i]=wrk[ith].construct(*basp,Pa,i,x_func,c_func,restr,verbose);
+  }
+#else
+  for(size_t i=0;i<Nat;i++)
+    grids[i]=wrk[0].construct(*basp,Pa,i,x_func,c_func,restr,verbose);
+#endif  
+
+  if(verbose) {
+    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
+}
+
 size_t DFTGrid::get_Npoints() const {
   size_t np=0;
   for(size_t i=0;i<grids.size();i++)
@@ -1907,6 +2140,132 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
     // and construct the Fock matrices
     wrk[0].eval_Fxc(Ha,Hb);
  
+    // Free memory
+    wrk[0].free();
+  }
+#endif
+}
+
+
+void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa, std::vector<arma::mat> & Ha, std::vector<double> & Exc, std::vector<double> & Nel) {
+  // Clear Hamiltonian
+  Ha.resize(Pa.size());
+  for(size_t ip=0;ip<Pa.size();ip++)
+    Ha[ip].zeros(Pa[ip].n_rows,Pa[ip].n_cols);
+
+  // Clear exchange-correlation energy
+  Exc.assign(Pa.size(),0.0);
+  // Clear number of electrons
+  Nel.assign(Pa.size(),0.0);
+
+#ifdef _OPENMP
+  // Get (maximum) number of threads
+  int maxt=omp_get_max_threads();
+
+  // Stack of work arrays
+  std::vector<arma::mat> Hawrk, Hbwrk;
+  std::vector<double> Nelwrk;
+  std::vector<double> Excwrk;
+
+  for(int i=0;i<maxt;i++) {
+    Hawrk.push_back(arma::mat(Ha[0].n_rows,Ha[0].n_cols));
+    Hawrk[i].zeros();
+
+    Hbwrk.push_back(arma::mat(Ha[0].n_rows,Ha[0].n_cols));
+    Hbwrk[i].zeros();
+
+    Nelwrk.push_back(0.0);
+    Excwrk.push_back(0.0);
+  }
+
+#pragma omp parallel shared(Hawrk,Hbwrk,Nelwrk,Excwrk)
+  { // Begin parallel region
+
+    arma::mat Hdum(Pa[0]);
+    Hdum.zeros();
+    arma::mat Pdum(Pa[0]);
+    Pdum.zeros();
+    
+    // Current thread is
+    int ith=omp_get_thread_num();
+    
+#pragma omp for schedule(dynamic,1)
+    // Loop over atoms
+    for(size_t i=0;i<grids.size();i++) {
+      
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[i]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[i]);
+      
+      // Loop over densities
+      for(size_t ip=0;ip<Pa.size();ip++) {
+	// Update density
+	wrk[ith].update_density(Pa[ip],Pdum);
+	// Update number of electrons
+#pragma omp atomic
+	Nel[ip]+=wrk[ith].compute_Nel();
+	
+	// Initialize the arrays
+	wrk[ith].init_xc();
+	// Compute the functionals
+	if(x_func>0)
+	  wrk[ith].compute_xc(x_func);
+	if(c_func>0)
+	  wrk[ith].compute_xc(c_func);
+	
+	// Evaluate the energy
+#pragma omp atomic
+	Exc[ip]+=wrk[ith].eval_Exc();
+	// and construct the Fock matrices
+	Hawrk[ith].zeros(); // need to clear this here
+	wrk[ith].eval_Fxc(Hawrk[ith],Hdum);
+	
+	// Accumulate Fock matrix
+#pragma omp critical
+	Ha[ip]+=Hawrk[ith];
+      }
+    }
+
+    // Free memory
+    wrk[ith].free();
+
+  } // End parallel region
+#else
+
+  arma::mat Hdum(Pa[0]);
+  Hdum.zeros();
+  arma::mat Pdum(Pa[0]);
+  Pdum.zeros();
+
+  // Loop over atoms
+  for(size_t i=0;i<grids.size();i++) {
+    // Change atom and create grid
+    wrk[0].form_grid(*basp,grids[i]);
+    // Compute basis functions
+    wrk[0].compute_bf(*basp,grids[i]);
+
+    // Loop over densities
+    for(size_t ip=0;ip<Pa.size();ip++) {
+	// Update density
+	wrk[0].update_density(Pa[ip],Pdum);
+	// Update number of electrons
+	Nel[ip]+=wrk[0].compute_Nel();
+	
+	// Initialize the arrays
+	wrk[0].init_xc();
+	// Compute the functionals
+	if(x_func>0)
+	  wrk[0].compute_xc(x_func);
+	if(c_func>0)
+	  wrk[0].compute_xc(c_func);
+	
+	// Evaluate the energy
+	Exc[ip]+=wrk[0].eval_Exc();
+	// and construct the Fock matrices
+	wrk[0].eval_Fxc(Ha[ip],Hdum);
+    }
+    
     // Free memory
     wrk[0].free();
   }

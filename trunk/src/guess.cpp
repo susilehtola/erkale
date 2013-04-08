@@ -47,6 +47,9 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
   set.set_bool("Direct",false);
   set.set_bool("DensityFitting",false);
 
+  // Don't do PZ-SIC for the initial guess.
+  set.set_double("PZ-SIC",0.0);
+
   // Use default convergence settings
   set.set_bool("UseDIIS",true);
   set.set_bool("UseADIIS",true);

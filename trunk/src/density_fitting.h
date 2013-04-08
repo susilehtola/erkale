@@ -114,6 +114,9 @@ class DensityFit {
 
   /// Compute expansion coefficients c
   arma::vec compute_expansion(const arma::mat & P) const;
+  /// Compute expansion coefficients c
+  std::vector<arma::vec> compute_expansion(const std::vector<arma::mat> & P) const;
+
   /// Invert expansion (needed for XC fitting)
   arma::mat invert_expansion(const arma::vec & gamma) const;
   /// Invert only the diagonal of the expansion
@@ -121,6 +124,8 @@ class DensityFit {
 
   /// Get Coulomb matrix from P
   arma::mat calc_J(const arma::mat & P) const;
+  /// Get Coulomb matrix from P
+  std::vector<arma::mat> calc_J(const std::vector<arma::mat> & P) const;
 
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::mat calc_K(const arma::mat & C, const std::vector<double> & occs, size_t memlimit) const;

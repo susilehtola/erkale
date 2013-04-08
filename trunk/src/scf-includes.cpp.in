@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -14,8 +14,9 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "global.h"
 
-
+#include <algorithm>
 #include <armadillo>
 #include <cstdio>
 #include <cfloat>
@@ -28,7 +29,6 @@
 #include "dftfuncs.h"
 #include "dftgrid.h"
 #include "diis.h"
-#include "global.h"
 #include "guess.h"
 #include "linalg.h"
 #include "mathf.h"
@@ -38,3 +38,7 @@
 #include "timer.h"
 #include "trdsm.h"
 #include "trrh.h"
+
+extern "C" {
+#include <gsl/gsl_poly.h>
+}

@@ -69,7 +69,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   diis_c1=set.get_bool("C1-DIIS");
   diisorder=set.get_int("DIISOrder");
   diisthr=set.get_double("DIISThr");
-  useadiis=set.get_bool("UseADIIS");  
+  useadiis=set.get_bool("UseADIIS");
   useediis=set.get_bool("UseEDIIS");
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
@@ -81,6 +81,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
   direct=set.get_bool("Direct");
   strictint=set.get_bool("StrictIntegrals");
+  pzcor=set.get_double("PZ-SIC");
 
   // Check update scheme
   if(useadiis && useediis) {
@@ -524,7 +525,7 @@ arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat 
   // Number of electrons
   int Nel=(int) round(arma::trace(P*S));
 
-  // Get the natural orbitals                                                                                                                                                                                                             
+  // Get the natural orbitals
   arma::mat NO;
   arma::mat tmp;
   arma::vec occs;
@@ -736,7 +737,7 @@ double dip_mom(const arma::mat & P, const BasisSet & basis) {
   // Compute magnitude of dipole moment
 
   arma::vec dp=dipole_moment(P,basis);
-  return norm(dp);
+  return arma::norm(dp,2);
 }
 
 arma::vec dipole_moment(const arma::mat & P, const BasisSet & basis) {

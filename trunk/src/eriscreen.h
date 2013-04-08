@@ -61,8 +61,6 @@ class ERIscreen {
   /// Form screening matrix
   void fill(const BasisSet * basis=NULL);
 
-  /* Faster versions using density-based screening */
-
   /// Calculate Coulomb matrix with tolerance tol for integrals, store efficiency of screening in *eff
   arma::mat calcJ(const arma::mat & R, double tol, double *eff=NULL) const;
   /// Calculate exchange matrix with tolerance tol for integrals, store efficiency of screening in *eff
@@ -71,6 +69,15 @@ class ERIscreen {
   void calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff=NULL) const;
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
   void calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff=NULL) const;
+
+  /* Versions for SIC routines */
+
+  /// Calculate Coulomb matrix with tolerance tol for integrals, store efficiency of screening in *eff
+  std::vector<arma::mat> calcJ(const std::vector<arma::mat> & R, double tol, double *eff=NULL) const;
+  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff
+  void calcJK(const std::vector<arma::mat> & R, std::vector<arma::mat> & J, std::vector<arma::mat> & K, double tol, double *eff=NULL) const;
+  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
+  void calcJK(const std::vector<arma::mat> & Ra, const std::vector<arma::mat> & Rb, std::vector<arma::mat> & J, std::vector<arma::mat> & Ka, std::vector<arma::mat> & Kb, double tol, double *eff=NULL) const;
 };
 
 #include "basis.h"

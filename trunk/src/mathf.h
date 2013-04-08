@@ -78,14 +78,6 @@ double max_abs(const arma::mat & R);
 /// Compute rms norm of matrix
 double rms_norm(const arma::mat & R);
 
-/// Compute norm of vector
-double norm(const arma::vec & v);
-/// Compute squared norm of vector
-double normsq(const arma::vec & v);
-
-/// Zero array
-void zero(std::vector<double> & x);
-
 /// Reverse array
 template <class T> void reverse(std::vector<T> & a) {
   size_t i;
@@ -105,6 +97,11 @@ template <class T> T sum(const std::vector<T> & a) {
     sum+=a[i];
   }
   return sum;
+}
+
+/// Check magnitude
+template <class T> bool abscomp(const std::complex<T> & a, const std::complex<T> & b) {
+  return std::abs(a) < std::abs(b);
 }
 
 /// Spline interpolate data (xt,yt) to points in x.
