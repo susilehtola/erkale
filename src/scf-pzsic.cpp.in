@@ -1,0 +1,953 @@
+/*
+ *                This source code is part of
+ *
+ *                     E  R  K  A  L  E
+ *                             -
+ *                       DFT from Hel
+ *
+ * Written by Susi Lehtola, 2010-2013
+ * Copyright (c) 2010-2013, Susi Lehtola
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ */
+
+#ifdef RESTRICTED
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, XCGrid & fitgrid, double tol)
+#else
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, XCGrid & fitgrid, double tol)
+#endif
+{
+
+#define bracket(X,Y) (0.5*std::real(arma::trace(X*arma::trans(Y))))
+#define MAXITER 1000
+
+#define INITTRIAL 0.5
+  // Count amount of occupied orbitals
+  std::vector<size_t> nocc;
+
+#ifdef RESTRICTED
+  nocc.push_back(0);
+  for(size_t i=0;i<occs.size();i++)
+    if(occs[i]!=0.0)
+      nocc[0]++;
+#else
+  nocc.push_back(0);
+  for(size_t i=0;i<occa.size();i++)
+    if(occa[i]!=0.0)
+      nocc[0]++;
+  nocc.push_back(0);
+  for(size_t i=0;i<occb.size();i++)
+    if(occb[i]!=0.0)
+      nocc[1]++;
+#endif
+
+  // Orbital coefficients
+  std::vector<arma::mat> C;
+  std::vector<arma::vec> numocc;
+
+  // Collect orbitals and occupation numbers
+#ifdef RESTRICTED
+  C.resize(1);
+  numocc.resize(1);
+  C[0].zeros(sol.C.n_rows,nocc[0]);
+  numocc[0].zeros(nocc[0]);
+  {
+    size_t io=0;
+    for(size_t i=0;i<occs.size();i++)
+      if(occs[i]!=0.0) {
+	C[0].col(io)=sol.C.col(i);
+	numocc[0](io)=occs[i];
+	io++;
+      }
+  }
+#else
+  C.resize(2);
+  numocc.resize(2);
+
+  C[0].zeros(sol.Ca.n_rows,nocc[0]);
+  numocc[0].zeros(nocc[0]);
+  {
+    size_t io=0;
+    for(size_t i=0;i<occa.size();i++)
+      if(occa[i]!=0.0) {
+	C[0].col(io)=sol.Ca.col(i);
+	numocc[0](io)=occa[i];
+	io++;
+      }
+  }
+
+  C[1].zeros(sol.Cb.n_rows,nocc[1]);
+  numocc[1].zeros(nocc[1]);
+
+  {
+    size_t io=0;
+    for(size_t i=0;i<occb.size();i++)
+      if(occb[i]!=0.0) {
+	C[1].col(io)=sol.Cb.col(i);
+	numocc[1](io)=occb[i];
+	io++;
+      }
+  }
+#endif
+
+  // U matrices - remembered
+  static std::vector<arma::cx_mat> U(nocc.size());
+
+  // H matrices
+  std::vector<arma::cx_mat> H(nocc.size());
+  for(size_t ispin=0;ispin<nocc.size();ispin++) {
+    H[ispin].zeros(nocc[ispin],nocc[ispin]);
+  }
+
+  // Localized orbitals
+  std::vector<arma::cx_mat> Ctilde(C.size());
+
+  // Step size
+  std::vector<double> ltrial(C.size());
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    ltrial[ispin]=INITTRIAL;
+
+  // Orbital-dependent Fock matrices
+  std::vector< std::vector<arma::mat> > Forb;
+  // and the self-interaction energies
+  std::vector< std::vector<double> > Eorb;
+
+  // G matrices
+  std::vector< std::vector<arma::cx_mat> > G;
+
+  // The SIC contributions to the main Fock matrices
+  std::vector<arma::mat> HSIC(C.size());
+
+  // Convergence threshold
+  std::vector<double> diffR(C.size());
+  // Change in unitary optimization
+  std::vector<double> K(C.size());
+
+  // Self-interaction energy
+  double ESIC=0.0;
+  double ESICold;
+
+  // Iteration number
+  size_t k=0;
+
+  // Helpers
+  std::complex<double> imagI(0,1.0);
+  std::vector<arma::cx_mat> M(C.size());
+  std::vector<arma::vec> lambda(C.size());
+
+  /*
+  // Optimal U
+  std::vector<arma::cx_mat> Uopt(nocc.size());
+  // Optimal ESIC
+  double ESICopt=0.0;
+  */
+
+  if(verbose) {
+    printf("\nSIC iteration:\n");
+    fprintf(stderr,"\n\titer\tK/R\t\t ESIC\t\tdESIC\n");
+    fflush(stdout);
+    fflush(stderr);
+  }
+
+  // What U to start with?
+  bool dotrial=true;
+  for(size_t ispin=0;ispin<nocc.size();ispin++)
+    if(U[ispin].n_rows != nocc[ispin] || U[ispin].n_cols != nocc[ispin]) {
+      // Initialize with canonical orbitals
+      U[ispin].eye(nocc[ispin],nocc[ispin]);
+      dotrial=false;
+    }
+
+  if(dotrial) {
+    // Calculate SIC of current U
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      if(C[ispin].n_cols>1)
+	Ctilde[ispin]=C[ispin]*U[ispin];
+      else {
+	std::complex<double> dummy(1.0,0.0);
+	Ctilde[ispin]=C[ispin]*dummy;
+      }
+    // Compute the orbital-dependent Fock matrices
+#ifdef RESTRICTED
+    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#else
+    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#endif
+    (void) tol;
+
+    ESIC=0.0;
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      for(size_t io=0;io<nocc[ispin];io++)
+	ESIC+=Eorb[ispin][io];
+#ifdef RESTRICTED
+    ESIC*=2.0;
+#endif
+    
+    // and of a reset U
+    static std::vector<arma::cx_mat> Ueye(U);
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      Ueye[ispin].eye();
+
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      if(C[ispin].n_cols>1)
+	Ctilde[ispin]=C[ispin]*Ueye[ispin];
+      else {
+	std::complex<double> dummy(1.0,0.0);
+	Ctilde[ispin]=C[ispin]*dummy;
+      }
+
+#ifdef RESTRICTED
+    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#else
+    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#endif
+
+    double Eeye=0.0;
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      for(size_t io=0;io<nocc[ispin];io++)
+	Eeye+=Eorb[ispin][io];
+#ifdef RESTRICTED
+    Eeye*=2.0;
+#endif
+  
+    // Do swap?
+    if(Eeye>ESIC) {
+      if(verbose) {
+	printf("\nResetting transformation matrix: ESIC-old %e, ESIC-reset %e, difference %e.\n",ESIC,Eeye,Eeye-ESIC);
+	fflush(stdout);
+      }
+
+      U=Ueye;
+    } else {
+      if(verbose) {
+	printf("\nUsing old transformation matrix: ESIC-old %e, ESIC-reset %e, difference %e.\n",ESIC,Eeye,Eeye-ESIC);
+	fflush(stdout);
+      }
+    }
+  } else {
+    // Don't do trial - we start with the eye matrix anyway... which
+    // means that the integration grid probably isn't as good as it
+    // should. 
+
+    // Calculate Ctilde
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      if(C[ispin].n_cols>1)
+	Ctilde[ispin]=C[ispin]*U[ispin];
+      else {
+	std::complex<double> dummy(1.0,0.0);
+	Ctilde[ispin]=C[ispin]*dummy;
+      }
+
+    //Reform DFT grids. Stack of density matrices
+#ifdef RESTRICTED
+    std::vector<arma::mat> Pv(C[0].n_cols+1);
+#else
+    std::vector<arma::mat> Pv(C[0].n_cols+C[1].n_cols+2);
+#endif
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      size_t offset=0;
+      if(ispin!=0)
+	offset=C[0].n_cols;
+      
+      // First entries are orbital densities
+      for(size_t io=0;io<C[ispin].n_cols;io++)
+	Pv[offset+io]=numocc[ispin][io]*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+    }
+    
+    // Final element is total density
+#ifdef RESTRICTED
+    Pv[Pv.size()-1].zeros(Pv[0].n_rows,Pv[0].n_cols);
+    for(size_t io=0;io<Pv.size()-1;io++)
+      Pv[Pv.size()-1]+=Pv[io];
+#else
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      Pv[Pv.size()-2+ispin].zeros(Pv[0].n_rows,Pv[0].n_cols);
+      for(size_t io=0;io<C[ispin].n_cols;io++)
+	Pv[Pv.size()-2+ispin]+=numocc[ispin][io]*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+    }
+#endif
+    
+#ifdef RESTRICTED
+    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
+    (void) fitgrid;
+#else
+    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
+    (void) fitgrid;
+#endif
+  }
+
+  
+  while(true) {
+    // Increase iteration number
+    k++;
+    ESICold=ESIC;
+
+    // Update localized orbitals
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      if(C[ispin].n_cols>1)
+	Ctilde[ispin]=C[ispin]*U[ispin];
+      else {
+	// Bug in armadillo - can't do assignment
+	// Ctilde[ispin]=C[ispin];
+
+	std::complex<double> dummy(1.0,0.0);
+	Ctilde[ispin]=C[ispin]*dummy;
+      }
+
+    // Compute the orbital-dependent Fock matrices
+#ifdef RESTRICTED
+    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#else
+    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#endif
+
+    // and the total SIC contribution
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      HSIC[ispin].zeros(C[ispin].n_rows,C[ispin].n_rows);
+      for(size_t io=0;io<nocc[ispin];io++) {
+	arma::mat Pio=arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+
+	HSIC[ispin]+=Forb[ispin][io]*Pio*S;
+      }
+    }
+    ESIC=0.0;
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      for(size_t io=0;io<nocc[ispin];io++)
+	ESIC+=Eorb[ispin][io];
+#ifdef RESTRICTED
+    ESIC*=2.0;
+#endif
+
+    // Update the convergence threshold
+    {
+#ifdef RESTRICTED
+      rscf_t hlp(sol);
+      hlp.H-=pzcor*HSIC[0];
+#else
+      uscf_t hlp(sol);
+      hlp.Ha-=pzcor*HSIC[0];
+      hlp.Hb-=pzcor*HSIC[1];
+#endif
+      // Diagonalize to get new orbitals
+      diagonalize(S,Sinvh,hlp);
+
+      // and calculate new density
+#ifdef RESTRICTED
+      hlp.P=form_density(hlp.C,occs);
+      diffR[0]=rms_norm(hlp.P-sol.P);
+#else
+      hlp.Pa=form_density(hlp.Ca,occa);
+      diffR[0]=rms_norm(hlp.Pa-sol.Pa);
+      hlp.Pb=form_density(hlp.Cb,occb);
+      diffR[1]=rms_norm(hlp.Pb-sol.Pb);
+#endif
+    }
+
+    // Add new G matrices to stack
+    {
+      std::vector<arma::cx_mat> Ghlp(C.size());
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	Ghlp[ispin].zeros(nocc[ispin],nocc[ispin]);
+      G.push_back(Ghlp);
+    }
+    // Remove old matrices from memory?
+    if(G.size()>2)
+      G.erase(G.begin());
+
+    // Compute the euclidean derivative matrices, Abrudan 2009 table 3 step 2
+    std::vector<arma::cx_mat> Gammak(C.size());
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      Gammak[ispin].zeros(nocc[ispin],nocc[ispin]);
+      // Loop over elements
+      for(size_t io=0;io<nocc[ispin];io++)
+	for(size_t jo=0;jo<nocc[ispin];jo++) {
+	  //	  Gammak[ispin](io,jo)=arma::as_scalar(arma::trans(C[ispin].col(jo))*Forb[ispin][io]*Ctilde[ispin].col(io));
+	  Gammak[ispin](io,jo)=arma::as_scalar(arma::trans(C[ispin].col(io))*Forb[ispin][jo]*Ctilde[ispin].col(jo));
+	}
+    }
+
+    // Riemannian gradient, Abrudan 2009 table 3 step 2
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      G[G.size()-1][ispin]=Gammak[ispin]*arma::trans(U[ispin]) - U[ispin]*arma::trans(Gammak[ispin]);
+
+    // Kappa matrix
+    std::vector<arma::mat> kappa(C.size());
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      kappa[ispin].zeros(nocc[ispin],nocc[ispin]);
+      // Loop over elements
+      for(size_t io=0;io<nocc[ispin];io++)
+        for(size_t jo=0;jo<nocc[ispin];jo++) {
+          kappa[ispin](io,jo)=std::norm(arma::as_scalar(arma::trans(Ctilde[ispin].col(jo))*(Forb[ispin][jo]-Forb[ispin][io])*Ctilde[ispin].col(io)));
+        }
+    }
+
+    // H matrix
+    if(k==1) {
+      // First iteration; initialize with gradient
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	H[ispin]=G[G.size()-1][ispin];
+    } else {
+      for(size_t ispin=0;ispin<C.size();ispin++) {
+	// Compute Polak-Ribière coefficient
+	double gamma=bracket(G[G.size()-1][ispin] - G[G.size()-2][ispin], G[G.size()-1][ispin]) / bracket(G[G.size()-2][ispin],G[G.size()-2][ispin]);
+
+	// Update H
+	H[ispin]=G[G.size()-1][ispin]+gamma*H[ispin];
+
+	// Check that update is OK
+	double brack=bracket(H[ispin],G[G.size()-1][ispin]);
+	if(brack<=0.0)
+	  // Reset to gradient.
+	  H[ispin]=G[G.size()-1][ispin];
+	else if(ESIC>ESICold)
+	  // Reset to gradient.
+	  H[ispin]=G[G.size()-1][ispin];
+      }
+    }
+
+    // Check for convergence
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      K[ispin]=rms_norm(kappa[ispin]);
+      if(!kappa[ispin].n_elem)
+	K[ispin]=0.0;
+    }
+
+    if(verbose) {
+      printf("%4i",(int) k);
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	printf(" %e",K[ispin]);
+      printf(" /");
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	printf(" %e",diffR[ispin]);
+      printf(" /");
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	printf(" %e",K[ispin]/diffR[ispin]);
+      printf(", E-SIC=% e",ESIC);
+      
+      double dKmax=0.0;
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	if(K[ispin]/diffR[ispin]>dKmax)
+	  dKmax=K[ispin]/diffR[ispin];
+
+      fprintf(stderr,"\t%4i\t%e\t% e",(int) k,dKmax,ESIC);
+      if(k>1) {
+	fprintf(stderr,"\t%e", ESIC-ESICold);
+	printf(", dESIC=% e",ESIC-ESICold);
+      }
+
+      // Transformation matrix classification
+      for(size_t ispin=0;ispin<U.size();ispin++) {
+	double real=rms_norm(arma::real(U[ispin]));
+	double imag=rms_norm(arma::imag(U[ispin]));
+	
+	if(imag<sqrt(DBL_EPSILON)*real)
+	  printf(" real");
+	else if(real<sqrt(DBL_EPSILON)*imag)
+	  printf(" imaginary");
+	else
+	  printf(" complex");
+      }
+      printf("\n");
+      fprintf(stderr,"\n");
+      
+      fflush(stdout);
+      fflush(stderr);
+    }
+
+    {
+      bool convd=true;
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	if(K[ispin]>0.01*diffR[ispin])
+	  convd=false;
+
+      if(convd) {
+	if(verbose) {
+	  printf("Converged.\n");
+	  fflush(stdout);
+
+	  for(size_t ispin=0;ispin<U.size();ispin++) {
+	    double real=rms_norm(arma::real(U[ispin]));
+	    double imag=rms_norm(arma::imag(U[ispin]));
+	    
+	    printf("spin %i: transformation matrix is",(int) ispin);
+	    if(imag<sqrt(DBL_EPSILON)*real)
+	      printf(" real");
+	    else if(real<sqrt(DBL_EPSILON)*imag)
+	      printf(" imaginary");
+	    else
+	      printf(" complex");
+	    
+	    printf(", re norm %e, im norm %e\n",real,imag);
+	  }
+	}
+
+	break;
+      } else if(k==MAXITER) {
+	if(verbose) {
+	  printf("Not converged.\n");
+	  fflush(stdout);
+	}
+	break;
+      }
+    }
+
+    // Spin loop
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      if(C[ispin].n_cols<2)
+	// Less than two orbitals - unitary optimization not necessary, as cannot do rotations.
+	continue;
+
+      arma::vec Hval;
+      arma::cx_mat Hvec;
+      double wmax;
+      double Tmu;
+
+      // Diagonalize -iH to find eigenvalues purely imaginary
+      // eigenvalues iw_i of H; Abrudan 2009 table 3 step 1.
+      //      bool diagok=arma::eig_sym(Hval,imagI*H[ispin]);
+      bool diagok=arma::eig_sym(Hval,Hvec,-imagI*H[ispin]);
+      if(!diagok) {
+	ERROR_INFO();
+	throw std::runtime_error("PZ-SIC: error diagonalizing H.\n");
+      }
+
+      //      arma::trans(Hval).print("Eigenvalues");
+      
+      // Find maximal eigenvalue
+      wmax=0.0;
+      for(size_t n=0;n<Hval.n_elem;n++)
+	if(fabs(Hval(n))>wmax)
+	  wmax=fabs(Hval(n));
+      if(wmax==0.0) {
+	if(verbose) {
+	  printf("Zero eigenvalue! Spin channel %i converged.\n",(int) ispin);
+	  fflush(stdout);
+	}
+	continue;
+      }
+
+      // Compute maximal step size.
+      // Order of the cost function in the coefficients of W. This is
+      // for the Coulomb term, the XC term also has higher order
+      // terms, which however are of small importance
+      const int q=4;
+      Tmu=2.0*M_PI/(q*wmax);
+      //      printf("Maximal step size is %e.\n",Tmu);
+
+      // Amount of points to use. The polynomial fitting the
+      // derivative will be of order 2(n-1). Only n-1 new points need to
+      // be calculated. This choice corresponds to a 4th order fit.
+      const int n=3;
+
+      // Step size
+      const double deltaTmu=Tmu/(n-1);
+      std::vector<arma::cx_mat> R(n);
+
+      // Trial matrices
+      R[0].eye(nocc[ispin],nocc[ispin]);
+      R[1]=Hvec*arma::diagmat(arma::exp(deltaTmu*imagI*Hval))*arma::trans(Hvec);
+
+      for(int i=2;i<n;i++)
+	R[i]=R[i-1]*R[1];
+
+      // Evaluate the first-order derivative of the cost function at the expansion points
+      std::vector<double> Jprime(n);
+      std::vector<double> ESICtrial(n);
+      for(int i=0;i<n;i++) {
+	// Orbital-dependent Fock matrices
+	std::vector< std::vector<arma::mat> > Ftrial(Forb);
+	// and the self-interaction energies
+	std::vector< std::vector<double> > Etrial(Eorb);
+
+	// Initialize orbitals
+	std::vector<arma::cx_mat> Ctrial(Ctilde);
+	if(i==0) {
+	  // Current best guess - we already have the Fock matrices
+	  Ftrial=Forb;
+	  Etrial=Eorb;
+
+	} else {
+	  // Update current spin matrix
+	  Ctrial[ispin]=C[ispin]*R[i]*U[ispin];
+
+	  // Compute the orbital-dependent Fock matrices
+#ifdef RESTRICTED
+    PZSIC_Fock_RDFT(Ftrial,Etrial,Ctrial,nocc,numocc,dft,grid);
+#else
+    PZSIC_Fock_UDFT(Ftrial,Etrial,Ctrial,nocc,numocc,dft,grid);
+#endif
+	}
+
+	// Compute the derivative matrix
+	arma::cx_mat dJdW;
+	dJdW.zeros(nocc[ispin],nocc[ispin]);
+	// Loop over elements
+	for(size_t io=0;io<nocc[ispin];io++)
+	  for(size_t jo=0;jo<nocc[ispin];jo++) {
+	    dJdW(io,jo)=arma::as_scalar(arma::trans(C[ispin].col(io))*Ftrial[ispin][jo]*Ctrial[ispin].col(jo));
+	  }
+
+	ESICtrial[i]=0.0;
+	for(size_t io=0;io<nocc[ispin];io++)
+	  ESICtrial[i]+=Etrial[ispin][io];
+#ifdef RESTRICTED
+	ESICtrial[i]*=2.0;
+#endif
+
+	// Compute the derivative
+	Jprime[i]=2.0*std::real(arma::trace(dJdW*arma::trans(U[ispin])*arma::trans(R[i])*arma::trans(H[ispin])));
+      }
+ 
+      /*
+      printf("Values of cost function:");
+      for(int i=0;i<n;i++)
+	printf(" % e",ESICtrial[i]);
+      printf("\nDerivatives:          ");
+      for(int i=0;i<n;i++)
+	printf(" % e",Jprime[i]);
+      printf("\n");
+      */
+
+      // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
+      const int p=2*(n-1);
+
+      // Compute polynomial coefficients. We have 2*n values
+      arma::vec jvec(2*n);
+      for(int i=0;i<n;i++) {
+	jvec(2*i)=ESICtrial[i];
+	jvec(2*i+1)=Jprime[i];
+      }
+
+      // Form mu matrix
+      arma::mat mumat(2*n,p+2);
+      mumat.zeros();
+      for(int i=0;i<n;i++) {
+	// Value of mu in the point is
+	double mu=i*deltaTmu;
+
+	// First row: J(mu)
+	mumat(2*i,0)=1.0;
+	for(int j=1;j<=p+1;j++)
+	  mumat(2*i,j)=pow(mu,j)/(j);
+	// Second row: J'(mu)
+	mumat(2*i+1,1)=1.0;
+	for(int j=2;j<=p+1;j++)
+	  mumat(2*i+1,j)=pow(mu,j-1);
+      }
+
+      arma::vec aval;
+      bool solveok=true;
+
+      // Solve for coefficients - may not be stable numerically
+      //solveok=arma::solve(aval,mumat,jvec);
+
+      // Use inverse matrix
+      {
+	arma::mat invmu;
+	solveok=arma::inv(invmu,mumat);
+
+	if(solveok)
+	  aval=invmu*jvec;
+      }
+
+      if(!solveok) {
+	mumat.print("Mu");
+	arma::trans(jvec).print("Jvec");
+	throw std::runtime_error("Error solving for coefficients a.\n");
+      }
+      
+      // Find smallest positive root of a0 + a1*mu + ... + ap*mu^p = 0.
+      double xmin=DBL_MAX;
+      {
+	// Coefficient of highest order term must be nonzero.
+	int r=p;
+	while(aval(r+1)==0.0)
+	  r--;
+
+ 	// Coefficients
+	double a[r+1];
+	for(int i=0;i<r+1;i++)
+	  a[i]=aval(i+1);
+
+	/*
+	printf("Coefficients:");
+	for(int i=0;i<r+1;i++)
+	  printf(" % e",a[i]);
+	printf("\n");
+	*/
+	
+	// GSL routine workspace - r:th order polynomial has r+1 coefficients
+	gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r+1);
+
+	// Return values
+	double z[2*r];
+	int gslok=gsl_poly_complex_solve(a,r+1,w,z);
+
+	if(gslok!=GSL_SUCCESS) {
+	  ERROR_INFO();
+	  fprintf(stderr,"Solution of polynomial root failed, error: \"%s\"\n",gsl_strerror(solveok));
+	  throw std::runtime_error("Error solving polynomial.\n");
+	}
+
+	// Get roots
+	std::vector< std::complex<double> > roots(r);
+	for(int i=0;i<r;i++) {
+	  roots[i].real()=z[2*i];
+	  roots[i].imag()=z[2*i+1];
+	}
+	// and order them into increasing absolute value
+	std::stable_sort(roots.begin(),roots.end(),abscomp<double>);
+
+	/*
+	printf("Roots:");
+	for(size_t i=0;i<roots.size();i++)
+	  printf(" (% e, % e)",z[2*i],z[2*i+1]);
+	printf("\n");
+	*/
+
+	int nreal=0;
+	for(size_t i=0;i<roots.size();i++)
+	  if(fabs(roots[i].imag())<10*DBL_EPSILON)
+	    nreal++;
+
+	/*
+	printf("%i real roots:",nreal);
+	for(size_t i=0;i<roots.size();i++)
+	  if(fabs(roots[i].imag())<10*DBL_EPSILON)
+	    printf(" (% e,% e)",roots[i].real(),roots[i].imag());
+	printf("\n");
+	*/
+
+	for(size_t i=0;i<roots.size();i++)
+	  if(roots[i].real()>sqrt(DBL_EPSILON) && fabs(roots[i].imag())<10*DBL_EPSILON) {
+	    // Root is real and positive. Is it smaller than the current minimum?
+	    if(roots[i].real()<xmin)
+	      xmin=roots[i].real();
+	  }
+	
+	// Free workspace
+	gsl_poly_complex_workspace_free(w);
+      }
+
+      // Sanity check
+      if(xmin==DBL_MAX)
+	xmin=0.0;
+      if(xmin<0.0) throw std::runtime_error("Negative step size!\n");
+     
+      //      printf("Step size is %e, i.e. %e dTmu.\n",xmin,xmin/deltaTmu);
+      // Step size is xmin. Update U
+      if(xmin!=0.0) {
+	arma::cx_mat Ropt=Hvec*arma::diagmat(arma::exp(xmin*imagI*Hval))*arma::trans(Hvec);
+	U[ispin]=Ropt*U[ispin];
+      }
+    }
+  }
+
+#ifdef RESTRICTED
+  // Adjust Fock operator for SIC
+  sol.H     -=pzcor*HSIC[0];
+  sol.XC    -=pzcor*HSIC[0];
+#else
+  sol.Ha    -=pzcor*HSIC[0];
+  sol.XCa   -=pzcor*HSIC[0];
+  sol.Hb    -=pzcor*HSIC[1];
+  sol.XCb   -=pzcor*HSIC[1];
+#endif
+  // Need to adjust energy as well as this was calculated in the Fock routines
+  sol.en.Exc-=pzcor*ESIC;
+  sol.en.Eel-=pzcor*ESIC;
+  sol.en.E  -=pzcor*ESIC;
+
+  if(verbose) {
+    printf("Self-interaction energy is %e.\n",ESIC);
+    printf("Decomposition of self-interaction:\n");
+    for(size_t io=0;io<max(nocc);io++) {
+      printf("\t%4i",(int) io+1);
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	if(io<nocc[ispin])
+	  printf("\t%e",Eorb[ispin][io]);
+      printf("\n");
+    }
+    fflush(stdout);
+  }
+  
+  // Reform DFT grids. Stack of density matrices
+#ifdef RESTRICTED
+  std::vector<arma::mat> Pv(C[0].n_cols+1);
+#else
+  std::vector<arma::mat> Pv(C[0].n_cols+C[1].n_cols+2);
+#endif
+  for(size_t ispin=0;ispin<C.size();ispin++) {
+    size_t offset=0;
+    if(ispin!=0)
+      offset=C[0].n_cols;
+    
+    // First entries are orbital densities
+    for(size_t io=0;io<C[ispin].n_cols;io++)
+      Pv[offset+io]=numocc[ispin][io]*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+  }
+
+  // Final element is total density
+#ifdef RESTRICTED
+  Pv[Pv.size()-1].zeros(Pv[0].n_rows,Pv[0].n_cols);
+  for(size_t io=0;io<Pv.size()-1;io++)
+    Pv[Pv.size()-1]+=Pv[io];
+#else
+  for(size_t ispin=0;ispin<C.size();ispin++) {
+    Pv[Pv.size()-2+ispin].zeros(Pv[0].n_rows,Pv[0].n_cols);
+    for(size_t io=0;io<C[ispin].n_cols;io++)
+      Pv[Pv.size()-2+ispin]+=numocc[ispin][io]*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+  }
+#endif
+  
+#ifdef RESTRICTED
+  grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
+  (void) fitgrid;
+#else
+  grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
+  (void) fitgrid;
+#endif
+}
+
+
+#ifdef RESTRICTED
+void SCF::PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid)
+#else
+void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid)
+#endif
+{
+
+#ifdef RESTRICTED
+  if(Ctilde.size()!=1) {
+    ERROR_INFO();
+    throw std::runtime_error("PZSIC_Fock_RDFT called with restricted density!\n");
+  }
+#else
+  if(Ctilde.size()!=2) {
+    ERROR_INFO();
+    throw std::runtime_error("PZSIC_Fock_UDFT called with restricted density!\n");
+  }
+#endif
+
+  // Compute the orbital-dependent Fock matrices
+  Forb.resize(Ctilde.size());
+  Eorb.resize(Ctilde.size());
+  for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
+    Forb[ispin].resize(nocc[ispin]);
+    Eorb[ispin].resize(nocc[ispin]);
+  }
+  
+  // Fraction of exact exchange
+  double kfrac=exact_exchange(dft.x_func);
+  
+  // Orbital density matrices
+#ifdef RESTRICTED
+  std::vector<arma::mat> Porb(Ctilde[0].n_cols);
+#else
+  std::vector<arma::mat> Porb(Ctilde[0].n_cols+Ctilde[1].n_cols);
+#endif
+  for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
+    size_t offset=0;
+    if(ispin!=0)
+      offset=Ctilde[0].n_cols;
+    
+    for(size_t io=0;io<Ctilde[ispin].n_cols;io++)
+#ifdef RESTRICTED
+      Porb[io+offset]=occnum[ispin](io)/2.0*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+#else
+      Porb[io+offset]=occnum[ispin](io)*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+#endif
+  }  
+  
+  if(densityfit) {
+    // Coulomb matrices
+    std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
+    if(kfrac!=0.0)
+      throw std::runtime_error("Not implemented!\n");
+
+    for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
+      size_t offset=0;
+      if(ispin!=0)
+	offset=Ctilde[0].n_cols;
+
+      // Collect matrices
+      for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
+	Forb[ispin][io]=Jorb[io+offset];
+
+	Eorb[ispin][io]=0.5*arma::trace(Porb[io+offset]*Jorb[io+offset]);
+      }
+    }
+
+  } else {
+
+    if(!direct) {
+      // Tabled integrals
+      for(size_t ispin=0;ispin<Ctilde.size();ispin++)
+	for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
+	  
+	  // Where to find orbital density matrix
+	  size_t offset=0;
+	  if(ispin!=0)
+	    offset=Ctilde[0].n_cols;
+	  
+	  // Calculate Coulomb term
+	  Forb[ispin][io]=tab.calcJ(Porb[offset+io]);
+	  // and Coulomb energy
+	  Eorb[ispin][io]=0.5*arma::trace(Porb[offset+io]*Forb[ispin][io]);
+	}
+
+      // Exchange?
+      if(kfrac!=0.0) {
+	for(size_t ispin=0;ispin<Ctilde.size();ispin++)
+	  for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
+	    // Where to find orbital density matrix
+	    size_t offset=0;
+	    if(ispin!=0)
+	      offset=Ctilde[0].n_cols;
+	    
+	    // Calculate Coulomb term
+	    arma::mat Ko=tab.calcK(Porb[offset+io]);
+
+	    // Change to Fock matrix and energy
+	    Forb[ispin][io]-=0.5*kfrac*Ko;
+	    Eorb[ispin][io]-=0.25*kfrac*arma::trace(Porb[offset+io]*Ko);
+	  }
+      }
+    } else {
+      // HF coulomb/exchange not implemented
+      ERROR_INFO();
+      throw std::runtime_error("Analytical Coulomb/exchange matrix not implemented!\n");
+    }
+  }
+  
+  // Exchange-correlation
+  {
+    std::vector<double> Nelnum; // Numerically integrated density
+    std::vector<arma::mat> XC; // Exchange-correlation matrices
+    std::vector<double> Exc; // Exchange-correlation energy
+
+    grid.eval_Fxc(dft.x_func,dft.c_func,Porb,XC,Exc,Nelnum);
+      
+    if(kfrac!=0.0) {
+      ERROR_INFO();
+      throw std::runtime_error("HF energy correction not implemented.\n");
+    }
+    
+    // Add in the XC part to the Fock matrix and energy
+    for(size_t ispin=0;ispin<Ctilde.size();ispin++)
+      for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
+	// Where to find orbital density matrix
+	size_t offset=0;
+	if(ispin!=0)
+	  offset=Ctilde[0].n_cols;
+	
+	Forb[ispin][io]+=XC[offset+io];
+	Eorb[ispin][io]+=Exc[offset+io];
+      }
+  }
+}
+
+
