@@ -147,7 +147,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
   if(verbose) {
     printf("\nSIC iteration:\n");
-    fprintf(stderr,"\n\titer\tK/R\t\t ESIC\t\tdESIC\n");
+    fprintf(stderr,"\t%4s\t%12s\t%13s\t%13s\n","iter","K/R","ESIC","dESIC");
     fflush(stdout);
     fflush(stderr);
   }
@@ -157,7 +157,11 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   for(size_t ispin=0;ispin<nocc.size();ispin++)
     if(U[ispin].n_rows != nocc[ispin] || U[ispin].n_cols != nocc[ispin]) {
       // Initialize with canonical orbitals
-      U[ispin].eye(nocc[ispin],nocc[ispin]);
+      //      U[ispin].eye(nocc[ispin],nocc[ispin]);
+
+      // Initialize with localized orbitals
+      U[ispin]=localize(C[ispin]);
+
       dotrial=false;
     }
 
@@ -212,27 +216,66 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 #ifdef RESTRICTED
     Eeye*=2.0;
 #endif
+
+    // and of a localized U
+    static std::vector<arma::cx_mat> Uloc(U);
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      Uloc[ispin]=localize(C[ispin]);
+
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      if(C[ispin].n_cols>1)
+	Ctilde[ispin]=C[ispin]*Uloc[ispin];
+      else {
+	std::complex<double> dummy(1.0,0.0);
+	Ctilde[ispin]=C[ispin]*dummy;
+      }
+    
+#ifdef RESTRICTED
+    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#else
+    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#endif
+    
+    double Eloc=0.0;
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      for(size_t io=0;io<nocc[ispin];io++)
+	Eloc+=Eorb[ispin][io];
+#ifdef RESTRICTED
+    Eloc*=2.0;
+#endif
+
+    // What is maximum?
+    double Emax=std::max(std::max(Eeye,Eloc),ESIC);
   
+
     // Do swap?
-    if(Eeye>ESIC) {
+    if(ESIC==Emax) {
+      if(verbose) {
+	printf("\nUsing old transformation matrix, energies: old %e, reset %e, localized %e.\n",ESIC,Eeye,Eloc);
+	fflush(stdout);
+      }
+    } else if(Eloc==Emax) {
+      if(verbose) {
+	printf("\nUsing localized transformation matrix, energies: old %e, reset %e, localized %e.\n",ESIC,Eeye,Eloc);
+	fflush(stdout);
+      }
+      U=Uloc;
+    } else {
       if(verbose) {
 	printf("\nResetting transformation matrix: ESIC-old %e, ESIC-reset %e, difference %e.\n",ESIC,Eeye,Eeye-ESIC);
 	fflush(stdout);
       }
-
+      
       U=Ueye;
-    } else {
-      if(verbose) {
-	printf("\nUsing old transformation matrix: ESIC-old %e, ESIC-reset %e, difference %e.\n",ESIC,Eeye,Eeye-ESIC);
-	fflush(stdout);
-      }
     }
-  } else {
-    // Don't do trial - we start with the eye matrix anyway... which
-    // means that the integration grid probably isn't as good as it
-    // should. 
+  }
 
-    // Calculate Ctilde
+
+  {
+    // Before proceeding, reform DFT grids so that localized orbitals
+    // are properly integrated over.
+
+    // Update Ctilde
     for(size_t ispin=0;ispin<C.size();ispin++)
       if(C[ispin].n_cols>1)
 	Ctilde[ispin]=C[ispin]*U[ispin];
@@ -240,8 +283,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	std::complex<double> dummy(1.0,0.0);
 	Ctilde[ispin]=C[ispin]*dummy;
       }
-
-    //Reform DFT grids. Stack of density matrices
+    
+    // Stack of density matrices
 #ifdef RESTRICTED
     std::vector<arma::mat> Pv(C[0].n_cols+1);
 #else
@@ -278,9 +321,10 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     (void) fitgrid;
 #endif
   }
-
   
   while(true) {
+    Timer t;
+
     // Increase iteration number
     k++;
     ESICold=ESIC;
@@ -402,7 +446,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(brack<=0.0)
 	  // Reset to gradient.
 	  H[ispin]=G[G.size()-1][ispin];
-	else if(ESIC>ESICold)
+
+	//	else if(ESIC<ESICold)
 	  // Reset to gradient.
 	  H[ispin]=G[G.size()-1][ispin];
       }
@@ -434,8 +479,10 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
       fprintf(stderr,"\t%4i\t%e\t% e",(int) k,dKmax,ESIC);
       if(k>1) {
-	fprintf(stderr,"\t%e", ESIC-ESICold);
+	fprintf(stderr,"\t% e", ESIC-ESICold);
 	printf(", dESIC=% e",ESIC-ESICold);
+      } else {
+	fprintf(stderr,"\t%13s","");
       }
 
       // Transformation matrix classification
@@ -451,7 +498,6 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	  printf(" complex");
       }
       printf("\n");
-      fprintf(stderr,"\n");
       
       fflush(stdout);
       fflush(stderr);
@@ -465,6 +511,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
       if(convd) {
 	if(verbose) {
+	  fprintf(stderr,"\n");
+
 	  printf("Converged.\n");
 	  fflush(stdout);
 
@@ -487,6 +535,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	break;
       } else if(k==MAXITER) {
 	if(verbose) {
+	  fprintf(stderr,"\n");
 	  printf("Not converged.\n");
 	  fflush(stdout);
 	}
@@ -743,6 +792,10 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	arma::cx_mat Ropt=Hvec*arma::diagmat(arma::exp(xmin*imagI*Hval))*arma::trans(Hvec);
 	U[ispin]=Ropt*U[ispin];
       }
+
+      if(verbose) {
+	fprintf(stderr," %10.3f\n",t.get());
+      }
     }
   }
 
@@ -773,43 +826,6 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     }
     fflush(stdout);
   }
-  
-  // Reform DFT grids. Stack of density matrices
-#ifdef RESTRICTED
-  std::vector<arma::mat> Pv(C[0].n_cols+1);
-#else
-  std::vector<arma::mat> Pv(C[0].n_cols+C[1].n_cols+2);
-#endif
-  for(size_t ispin=0;ispin<C.size();ispin++) {
-    size_t offset=0;
-    if(ispin!=0)
-      offset=C[0].n_cols;
-    
-    // First entries are orbital densities
-    for(size_t io=0;io<C[ispin].n_cols;io++)
-      Pv[offset+io]=numocc[ispin][io]*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
-  }
-
-  // Final element is total density
-#ifdef RESTRICTED
-  Pv[Pv.size()-1].zeros(Pv[0].n_rows,Pv[0].n_cols);
-  for(size_t io=0;io<Pv.size()-1;io++)
-    Pv[Pv.size()-1]+=Pv[io];
-#else
-  for(size_t ispin=0;ispin<C.size();ispin++) {
-    Pv[Pv.size()-2+ispin].zeros(Pv[0].n_rows,Pv[0].n_cols);
-    for(size_t io=0;io<C[ispin].n_cols;io++)
-      Pv[Pv.size()-2+ispin]+=numocc[ispin][io]*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
-  }
-#endif
-  
-#ifdef RESTRICTED
-  grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
-  (void) fitgrid;
-#else
-  grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
-  (void) fitgrid;
-#endif
 }
 
 
