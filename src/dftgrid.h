@@ -218,6 +218,9 @@ class AtomGrid {
   /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
   atomgrid_t construct(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, int x_func, int c_func, bool verbose);
 
+  /// Construct adaptively a grid centered on the cenind:th center, SIC calculation
+  atomgrid_t construct(const BasisSet & bas, const std::vector<arma::mat> & Pa, size_t cenind, int x_func, int c_func, bool restr, bool verbose);
+
   /// Form shells on an atom, as according to list of radial shells
   void form_grid(const BasisSet & bas, atomgrid_t & g);
   /// Compute values of basis functions in all grid points
@@ -325,6 +328,9 @@ class DFTGrid {
   /// Create grid for unrestricted calculation
   void construct(const arma::mat & Pa, const arma::mat & Pb, double tol, int x_func, int c_func);
 
+  /// Create grid for SIC calculation
+  void construct(const std::vector<arma::mat> & Pa, double tol, int x_func, int c_func, bool restr);
+
   /// Get amount of points
   size_t get_Npoints() const;
   /// Get amount of functions
@@ -343,6 +349,9 @@ class DFTGrid {
   void eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel);
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, unrestricted case
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel);
+
+  /// Compute Fock matrix, exchange-correlation energy and integrated electron density, SIC calculation
+  void eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa, std::vector<arma::mat> & Ha, std::vector<double> & Exc, std::vector<double> & Nel);
 };
 
 #endif

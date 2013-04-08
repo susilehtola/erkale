@@ -968,6 +968,155 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
   return ret;
 }
 
+atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const std::vector<arma::vec> & gammaa, const std::vector<arma::vec> & gammab, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit) {
+  // Construct a grid centered on (x0,y0,z0)
+  // with nrad radial shells                         
+  // See Köster et al for specifics.
+
+  Timer t;
+
+  // Returned info
+  atomgrid_t ret;
+  ret.ngrid=0;
+  ret.nfunc=0;
+
+  // Store index of center
+  ret.atind=cenind;
+  // and its coordinates
+  ret.cen=bas.get_coords(cenind);
+
+  // Compute necessary number of radial points
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
+
+  // Get Chebyshev nodes and weights for radial part
+  std::vector<double> xc, wc;
+  chebyshev(nrad,xc,wc);
+
+  // Allocate memory
+  ret.sh.resize(nrad);
+
+  // Loop over radii
+  double rad, jac;
+  for(size_t ir=0;ir<xc.size();ir++) {
+    // Calculate value of radius
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+
+    // Jacobian of transformation is
+    jac=1.0/M_LN2/(1.0-xc[ir]);
+    // so total quadrature weight is
+    double weight=wc[ir]*rad*rad*jac;
+
+    // Store shell data
+    ret.sh[ir].r=rad;
+    ret.sh[ir].w=weight;
+    ret.sh[ir].l=3;
+  }
+  
+  // Number of basis functions
+  size_t Naux=dfit.get_Naux();
+  size_t Norb=dfit.get_Norb();
+
+  // Determine limit for angular quadrature
+  int lmax=(int) ceil(5.0-6.0*log10(tol));
+
+  // Old and new diagonal elements of Hamiltonian
+  std::vector<arma::vec> Haold(gammaa.size()), Hanew(gammaa.size());
+  std::vector<arma::vec> Hbold(gammab.size()), Hbnew(gammab.size());
+
+  for(size_t ig=0;ig<gammaa.size();ig++) {
+    Haold[ig].zeros(Norb);
+    Hanew[ig].zeros(Norb);
+  }
+  for(size_t ig=0;ig<gammab.size();ig++) {
+    Hbold[ig].zeros(Norb);
+    Hbnew[ig].zeros(Norb);
+  }
+
+  // Maximum difference of diagonal elements of Hamiltonian
+  double maxdiff;
+
+  // Now, determine actual quadrature limits shell by shell
+  for(size_t ir=0;ir<ret.sh.size();ir++) {
+
+    do {
+      // Clear current grid points and function values
+      free();
+
+      // Form radial shell
+      if(use_lobatto)
+	add_lobatto_shell(ret,ir);
+      else
+	add_lebedev_shell(ret,ir);
+      // Compute Becke weights for radial shell
+      becke_weights(bas,ret,ir);
+      // Prune points with small weight
+      prune_points(1e-8*tol,ret.sh[ir]);
+
+      // Compute values of basis functions
+      compute_bf(bas,ret,ir);
+
+      // Loop over densities
+      maxdiff=0.0;
+      for(size_t ig=0;ig<gammaa.size();ig++) {
+	// Compute density
+	update_density(gammaa[ig],gammab[ig]);
+	
+	// Compute exchange and correlation.
+	init_xc();
+	// Compute the functionals
+	if(x_func>0)
+	  compute_xc(x_func);
+	if(c_func>0)
+	  compute_xc(c_func);
+	// and construct the Fock matrices
+	arma::vec Favec(Naux);
+	arma::vec Fbvec(Naux);
+	Favec.zeros();
+	Fbvec.zeros();
+	eval_Fxc(Favec,Fbvec);
+	Hanew[ig]=dfit.invert_expansion_diag(Favec);
+	Hbnew[ig]=dfit.invert_expansion_diag(Fbvec);
+	
+	// Compute maximum difference of diagonal elements of Fock matrix
+	for(size_t i=0;i<Norb;i++) {
+	  double tmp=std::max(fabs(Hanew[ig][i]-Haold[ig][i]),fabs(Hbnew[ig][i]-Hbold[ig][i]));
+	  if(tmp>maxdiff)
+	    maxdiff=tmp;
+	}
+      }
+      
+      // Switch arrays
+      std::swap(Haold,Hanew);
+      std::swap(Hbold,Hbnew);
+      
+      // Increment order if tolerance not achieved.
+      if(maxdiff>tol/xc.size()) {
+	if(use_lobatto)
+	  ret.sh[ir].l+=2;
+	else {
+	  // Need to determine what is next order of Lebedev
+	  // quadrature that is supported.
+	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
+	}
+      }
+    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
+
+    // Increase number of points and function values
+    ret.ngrid+=grid.size();
+    ret.nfunc+=flist.size();
+  }
+  
+  // Free memory once more
+  free();
+  
+  if(verbose) {
+    printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
+    fflush(stdout);
+  }
+
+  return ret;
+}
+
 XCAtomGrid::~XCAtomGrid() {
 }
 
@@ -1161,6 +1310,14 @@ arma::vec XCGrid::expand(const arma::mat & P) const {
   return gamma;
 }
 
+std::vector<arma::vec> XCGrid::expand(const std::vector<arma::mat> & P) const {
+  // Do the fitting
+  std::vector<arma::vec> gamma=dfitp->compute_expansion(P);
+  
+  return gamma;
+}
+
+
 arma::mat XCGrid::invert(const arma::vec & gamma) const {
   arma::mat H=dfitp->invert_expansion(gamma);
 
@@ -1231,6 +1388,47 @@ void XCGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, i
   // Do fitting
   arma::vec gammaa=expand(Pa);
   arma::vec gammab=expand(Pb);
+
+#ifdef _OPENMP
+#pragma omp parallel
+  {
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+    for(size_t i=0;i<Nat;i++)
+      grids[i]=wrk[ith].construct(*fitbasp,gammaa,gammab,i,x_func,c_func,verbose,*dfitp);
+  }
+#else
+  for(size_t i=0;i<Nat;i++)
+    grids[i]=wrk[0].construct(*fitbasp,gammaa,gammab,i,x_func,c_func,verbose,*dfitp);
+#endif  
+
+  if(verbose) {
+    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
+}
+
+void XCGrid::construct(const std::vector<arma::mat> & Pa, const std::vector<arma::mat> & Pb, double tol, int x_func, int c_func) {
+  // Add all atoms
+  if(verbose) {
+    printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
+    fflush(stdout);
+  }
+
+  // Set tolerances
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].set_tolerance(tol);
+  // Check necessity of gradients
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].check_grad(x_func,c_func);
+
+  Timer t;
+
+  size_t Nat=fitbasp->get_Nnuc();
+
+  // Do fitting
+  std::vector<arma::vec> gammaa=expand(Pa);
+  std::vector<arma::vec> gammab=expand(Pb);
 
 #ifdef _OPENMP
 #pragma omp parallel

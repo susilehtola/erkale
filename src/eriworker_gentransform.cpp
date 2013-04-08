@@ -78,9 +78,8 @@ int main(void) {
       
       // Print function header
       printf("static void transform_%c%i(size_t %s, size_t %s, size_t %s, const std::vector<double> & input, std::vector<double> & output) {\n",ijkl[it],am,arg1.c_str(),arg2.c_str(),arg3.c_str());
-      printf("  output.resize(%i*%s*%s*%s);\n",(int) Nsph,arg1.c_str(),arg2.c_str(),arg3.c_str());
-      printf("  zero(output);\n");
-
+      printf("  output.clear();\n");
+      printf("  output.resize(%i*%s*%s*%s,0.0);\n",(int) Nsph,arg1.c_str(),arg2.c_str(),arg3.c_str());
 
       // Transform loops
       switch(trans) {
@@ -141,7 +140,7 @@ int main(void) {
     printf("  } else {\n");
 
     // Nope, do general transform.
-    printf("    zero(output);\n");
+    printf("    output.assign(output.size(),0.0);\n");
     // Transformation matrix is
     printf("    arma::mat transmat=Ylm_transmat(am);\n");
     printf("    size_t Ncart=transmat.n_cols;\n");

@@ -95,6 +95,8 @@ class XCAtomGrid {
   atomgrid_t construct(const BasisSet & bas, const arma::vec & gamma, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit);
   /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
   atomgrid_t construct(const BasisSet & bas, const arma::vec & gammaa, const arma::vec & gammab, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit);
+  /// Construct adaptively a grid centered on the cenind:th center, SIC calculation
+  atomgrid_t construct(const BasisSet & bas, const std::vector<arma::vec> & gammaa, const std::vector<arma::vec> & gammab, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit);
 
   /// Form shells on an atom, as according to list of radial shells
   void form_grid(const BasisSet & bas, atomgrid_t & g);
@@ -189,6 +191,8 @@ class XCGrid {
 
   /// Compute expansion of density
   arma::vec expand(const arma::mat & P) const;
+  /// Compute expansions of densities
+  std::vector<arma::vec> expand(const std::vector<arma::mat> & P) const;
   /// Compute inversion of expansion
   arma::mat invert(const arma::vec & gamma) const;
 
@@ -202,6 +206,8 @@ class XCGrid {
   void construct(const arma::mat & P, double tol, int x_func, int c_func);
   /// Create grid for unrestricted calculation
   void construct(const arma::mat & Pa, const arma::mat & Pb, double tol, int x_func, int c_func);
+  /// Create grid for SIC calculation
+  void construct(const std::vector<arma::mat> & Pa, const std::vector<arma::mat> & Pb, double tol, int x_func, int c_func);
 
   /// Get amount of points
   size_t get_Npoints() const;

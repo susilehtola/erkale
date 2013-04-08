@@ -383,6 +383,124 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
   }
 }
 
+std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat> & P) const {
+  std::vector<arma::vec> gamma(P.size());
+  for(size_t i=0;i<P.size();i++)
+    gamma[i].zeros(Naux);
+  
+  // Compute gamma
+  if(!direct) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(size_t ia=0;ia<Naux;ia++) {
+      for(size_t ip=0;ip<P.size();ip++)
+	gamma[ip](ia)=0.0;
+
+      for(size_t ip=0;ip<P.size();ip++)
+	for(size_t imu=0;imu<Nbf;imu++) {
+	  // Off-diagonal
+	  for(size_t inu=0;inu<imu;inu++)
+	    gamma[ip](ia)+=2.0*a_munu[idx(ia,imu,inu)]*P[ip](imu,inu);
+	  // Diagonal
+	  gamma[ip](ia)+=a_munu[idx(ia,imu,imu)]*P[ip](imu,imu);
+	}
+    }
+  } else {
+    
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+      
+      ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
+      std::vector<double> eris;
+
+#ifdef _OPENMP
+      // Worker stack for each matrix
+      std::vector<arma::vec> gammawrk(gamma);
+
+#pragma omp for schedule(dynamic)
+#endif
+      for(size_t ip=0;ip<orbpairs.size();ip++) {
+	size_t imus=orbpairs[ip].is;
+	size_t inus=orbpairs[ip].js;
+
+#ifdef SCREENING
+	// Do we need to compute the integral?
+	if(screen(imus,inus)<SCRTHR)
+	  continue;
+#endif
+
+	size_t Nmu=orbshells[imus].get_Nbf();
+	size_t Nnu=orbshells[inus].get_Nbf();
+	
+	// If imus==inus, we need to take care that we count
+	// every term only once; on the off-diagonal we get
+	// every term twice.
+	double fac=2.0;
+	if(imus==inus)
+	  fac=1.0;
+
+	for(size_t ias=0;ias<auxshells.size();ias++) {
+
+	  size_t Na=auxshells[ias].get_Nbf();	  
+
+	  // Compute (a|mn)
+	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus],eris);
+
+	  // Increment gamma
+	  for(size_t iia=0;iia<Na;iia++) {
+	    size_t ia=auxshells[ias].get_first_ind()+iia;
+
+	    for(size_t iimu=0;iimu<Nmu;iimu++) {
+	      size_t imu=orbshells[imus].get_first_ind()+iimu;
+
+	      for(size_t iinu=0;iinu<Nnu;iinu++) {
+		size_t inu=orbshells[inus].get_first_ind()+iinu;
+
+		for(size_t ig=0;ig<P.size();ig++) {
+		  // The contracted integral
+		  double res=eris[(iia*Nmu+iimu)*Nnu+iinu]*P[ig](imu,inu);
+		  
+#ifdef _OPENMP
+		  gammawrk[ig](ia)+= fac*res;
+#else
+		  gamma[ig](ia)+= fac*res;
+#endif
+		}
+	      }
+	    }
+	  }
+	}
+      }
+
+#ifdef _OPENMP
+#pragma omp critical
+      // Sum results together
+      for(size_t ig=0;ig<P.size();ig++)
+	gamma[ig]+=gammawrk[ig];
+#endif
+    } // end parallel section
+  }
+
+  // Compute and return c
+  if(hf) {
+    for(size_t ig=0;ig<P.size();ig++)
+      gamma[ig]=ab_inv*gamma[ig];
+
+  } else {
+    for(size_t ig=0;ig<P.size();ig++) {
+      // Compute x0
+      arma::vec x0=ab_inv*gamma[ig];
+      // Compute and return c
+      gamma[ig]=x0+ab_inv*(gamma[ig]-ab*x0);
+    }
+  }
+
+  return gamma;
+}
+
 arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
   arma::mat H(Nbf,Nbf);
   H.zeros();
@@ -572,6 +690,95 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 		J(imu,inu)+=tmp;
 		// Need to symmetrize?
 		J(inu,imu)+=symfac*tmp;
+	      }
+	    }
+	  }
+	}
+    }
+  }
+
+  return J;
+}
+
+std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) const {
+  // Get the expansion coefficients
+  std::vector<arma::vec> c=compute_expansion(P);
+
+  std::vector<arma::mat> J(P.size());
+  for(size_t ip=0;ip<P.size();ip++)
+    J[ip].zeros(Nbf,Nbf);
+
+  if(!direct) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+    for(size_t imu=0;imu<Nbf;imu++)
+      for(size_t ig=0;ig<P.size();ig++)
+	for(size_t inu=0;inu<=imu;inu++) {
+	  J[ig](imu,inu)=0.0;
+	  
+	  for(size_t ia=0;ia<Naux;ia++)
+	    J[ig](imu,inu)+=a_munu[idx(ia,imu,inu)]*c[ig](ia);
+	  
+	  J[ig](inu,imu)=J[ig](imu,inu);
+	}
+
+  } else {
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+      ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
+      std::vector<double> eris;
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+      for(size_t ip=0;ip<orbpairs.size();ip++)
+	for(size_t ias=0;ias<auxshells.size();ias++) {
+	  
+	  size_t imus=orbpairs[ip].is;
+	  size_t inus=orbpairs[ip].js;
+	  
+	  
+#ifdef SCREENING
+	// Do we need to compute the integral?
+	  if(screen(imus,inus)<SCRTHR)
+	    continue;
+#endif
+	  
+	  size_t Na=auxshells[ias].get_Nbf();
+	  size_t Nmu=orbshells[imus].get_Nbf();
+	  size_t Nnu=orbshells[inus].get_Nbf();
+	  
+	  
+	  double symfac=1.0;
+	  if(imus==inus)
+	    symfac=0.0;
+	  
+	  // Compute (a|mn)
+	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus],eris);
+	  
+	  // Increment J
+	  for(size_t iia=0;iia<Na;iia++) {
+	    // Account for orbital functions at the beginning of the basis set
+	    size_t ia=auxshells[ias].get_first_ind()+iia;
+
+	    for(size_t iimu=0;iimu<Nmu;iimu++) {
+	      size_t imu=orbshells[imus].get_first_ind()+iimu;
+	      
+	      for(size_t iinu=0;iinu<Nnu;iinu++) {
+		size_t inu=orbshells[inus].get_first_ind()+iinu;
+		
+		for(size_t ig=0;ig<P.size();ig++) {
+		  // Contract result
+		  double tmp=eris[(iia*Nmu+iimu)*Nnu+iinu]*c[ig](ia);
+		  
+		  J[ig](imu,inu)+=tmp;
+		  // Need to symmetrize?
+		  J[ig](inu,imu)+=symfac*tmp;
+		}
 	      }
 	    }
 	  }

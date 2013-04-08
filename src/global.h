@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Susi Lehtola
+ * Written by Susi Lehtola, 2010-2013
+ * Copyright (c) 2010-2013, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -104,7 +104,7 @@
 #define MAT_RESIZE(M,NR,NC) if(M.n_rows != NR || M.n_cols != NC) { M=arma::mat(NR,NC);}
 
 #define print_copyright() \
-  printf("(c) Susi Lehtola, 2010-2012.\n");
+  printf("(c) Susi Lehtola, 2010-2013.\n");
 
 #define print_license() \
   printf("\n%s%s%s%s\n",							\

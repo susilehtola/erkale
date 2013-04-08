@@ -1,23 +1,39 @@
+/*
+ *                This source code is part of
+ *
+ *                     E  R  K  A  L  E
+ *                             -
+ *                       DFT from Hel
+ *
+ * Written by Susi Lehtola, 2010-2013
+ * Copyright (c) 2010-2013, Susi Lehtola
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ */
+
 #if defined(RESTRICTED) && defined(DFT)
-void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft) const
+void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft)
 
 #elif defined(RESTRICTED) && defined(HF)
-void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv) const
+void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv)
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft) const
+void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft)
 
 #elif defined(UNRESTRICTED) && defined(HF)
-void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv) const
+void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv) const
+void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv)
 
 #elif defined(DFT) && defined(FULLHOLE)
-size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch) const
+size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch)
 
 #elif defined(DFT) && defined(HALFHOLE)
-size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft) const
+size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft)
 #endif
 {
 
@@ -322,6 +338,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       fprintf(stderr,"%s-%s ",get_keyword(dft.x_func).c_str(),get_keyword(dft.c_func).c_str());
     } else
       fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
+
+    if(pzcor!=0.0)
+      fprintf(stderr,"SIC ");
 #endif
 
     fprintf(stderr,"calculation");
@@ -410,6 +429,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     } else {
       form_fock(sol,oldsol);
     }
+
+#ifdef DFT
+    // Perdew-Zunger correction?
+    if(pzcor!=0.0)
+#ifdef RESTRICTED
+      PZSIC_RDFT(sol,occs,dft,grid,fitgrid,tol);
+#else
+      PZSIC_UDFT(sol,occa,occb,dft,grid,fitgrid,tol);
+#endif	
+#endif
 
     // Compute change of energy
     deltaE=sol.en.E-oldsol.en.E;
@@ -636,6 +665,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	diagonalize(S,Sinvh,rhsol);
 	form_dens(rhsol);
 	form_fock(rhsol,sol);
+#ifdef DFT
+    // Perdew-Zunger correction?
+    if(pzcor!=0.0)
+#ifdef RESTRICTED
+      PZSIC_RDFT(rhsol,occs,dft,grid,fitgrid,tol);
+#else
+      PZSIC_UDFT(rhsol,occa,occb,dft,grid,fitgrid,tol);
+#endif	
+#endif
 	diagonalize(S,Sinvh,rhsol);
 
 	if(verbose) {
@@ -708,6 +746,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    diagonalize(S,Sinvh,sol1);
 	    form_dens(sol1);
 	    form_fock(sol1,sol);
+#ifdef DFT
+    // Perdew-Zunger correction?
+    if(pzcor!=0.0)
+#ifdef RESTRICTED
+      PZSIC_RDFT(sol1,occs,dft,grid,fitgrid,tol);
+#else
+      PZSIC_UDFT(sol1,occa,occb,dft,grid,fitgrid,tol);
+#endif	
+#endif
 	    diagonalize(S,Sinvh,sol1);
 	    if(verbose) {
 	      printf("\t%e\t%e\t%e\n",mu1,sol1.en.E,sol1.en.E-Emin0);
@@ -719,6 +766,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    diagonalize(S,Sinvh,sol2);
 	    form_dens(sol2);
 	    form_fock(sol2,sol);
+#ifdef DFT
+    // Perdew-Zunger correction?
+    if(pzcor!=0.0)
+#ifdef RESTRICTED
+      PZSIC_RDFT(sol2,occs,dft,grid,fitgrid,tol);
+#else
+      PZSIC_UDFT(sol2,occa,occb,dft,grid,fitgrid,tol);
+#endif	
+#endif
 	    diagonalize(S,Sinvh,sol2);
 	    if(verbose) {
 	      printf("\t%e\t%e\t%e\n",mu2,sol2.en.E,sol2.en.E-Emin0);
@@ -834,7 +890,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
 
     // Compute dipole moment
-    olddip=norm(dipmom);
+    olddip=arma::norm(dipmom,2);
     dipmom=dipole_moment(sol.P,*basisp);
 
     // Compute convergence criteria
@@ -866,7 +922,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
 
       printf("\nDipole:\tx\t\ty\t\tz\t\tdipole change\n");
-      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% e\n",dipmom(0),dipmom(1),dipmom(2),norm(dipmom)-olddip);
+      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% e\n",dipmom(0),dipmom(1),dipmom(2),arma::norm(dipmom,2)-olddip);
 
       printf("Energy:\telectronic\ttotal\t\tvirial\t\tenergy change\n");
       printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",sol.en.Eel,sol.en.E,-sol.en.E/sol.en.Ekin,deltaE);
@@ -922,7 +978,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       else
 	fprintf(stderr," %9.3e ",maxdiff);
 
-      fprintf(stderr," %8.3f %10.3f\n",norm(dipmom),titer.get());
+      fprintf(stderr," %8.3f %10.3f\n",arma::norm(dipmom,2),titer.get());
     }
 
     if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
@@ -1025,7 +1081,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // Compute dipole moment
   if(verbose) {
     arma::vec dp=dipole_moment(sol.P,*basisp);
-    printf("Dipole moment is (%f,%f,%f) D, |mu|=%f D.\n",dp[0]/AUINDEBYE,dp[1]/AUINDEBYE,dp[2]/AUINDEBYE,norm(dp)/AUINDEBYE);
+    printf("Dipole moment is (%f,%f,%f) D, |mu|=%f D.\n",dp[0]/AUINDEBYE,dp[1]/AUINDEBYE,dp[2]/AUINDEBYE,arma::norm(dp,2)/AUINDEBYE);
   }
 
   if(converged) {

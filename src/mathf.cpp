@@ -210,28 +210,12 @@ double max_abs(const arma::mat & R) {
 }
 
 double rms_norm(const arma::mat & R) {
-  double rms=0.0;
-  for(size_t i=0;i<R.n_rows;i++)
-    for(size_t j=0;j<R.n_cols;j++) {
-      rms+=R(i,j)*R(i,j);
-    }
-  return sqrt(rms/(R.n_rows*R.n_cols));
-}
+  // Calculate \sum_ij R_ij^2
+  double rms=arma::trace(arma::trans(R)*R)/(R.n_rows*R.n_cols);
+  // and convert to rms
+  rms=sqrt(rms/(R.n_rows*R.n_cols));
 
-double normsq(const arma::vec & v) {
-  double n=0;
-  for(size_t i=0;i<v.n_elem;i++)
-    n+=v(i)*v(i);
-  return n;
-}
-
-double norm(const arma::vec & v) {
-  return sqrt(normsq(v));
-}
-
-void zero(std::vector<double> & x) {
-  for(size_t i=0;i<x.size();i++)
-    x[i]=0;
+  return rms;
 }
 
 std::vector<double> spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, const std::vector<double> & x) {
