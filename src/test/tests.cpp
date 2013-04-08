@@ -325,9 +325,13 @@ void restr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basl
     arma::mat mom=emd.moments();
 
     // Compare <p^2> with T and <p^0> with tr(P*S)
-    emdok=((fabs(mom(4,1)-2.0*en.Ekin)<=mom(4,2)) && (fabs(mom(2,1)-arma::trace(P*S))<=mom(2,2)));
-  }
+    emdok=((fabs(mom(4,1)-2.0*en.Ekin)<=10*mom(4,2)) && (fabs(mom(2,1)-arma::trace(P*S))<=10*mom(2,2)));
 
+    if(!emdok) {
+      printf("<p^2> = %e, 2Ekin=%e, diff %e vs %e\n",mom(4,1),2.0*en.Ekin,mom(4,1)-2.0*en.Ekin,mom(4,2));
+      printf("<p^0> = %e, Tr(PS)=%e, diff %e vs %e\n",mom(2,1),arma::trace(P*S),mom(2,1)-arma::trace(P*S),mom(2,2));
+    }
+  }
 
 #ifdef COMPUTE_REFERENCE
   if(!set.get_bool("Direct")) {
@@ -372,6 +376,8 @@ void restr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basl
     throw std::runtime_error(oss.str());
   }
 #endif
+
+  fflush(stdout);
 }
 
 /// Test unrestricted solution
@@ -399,7 +405,6 @@ void unrestr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & ba
 
   // Run the calculation
   calculate(bas,set);
-
   // Density matrix
   arma::mat P;
   // The orbital energies
@@ -440,10 +445,9 @@ void unrestr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & ba
     // Get moments
     arma::mat mom=emd.moments();
 
-    // Compare <p^2> with T
-    emdok=(fabs(mom(4,1)-2.0*en.Ekin)<mom(4,2));
+    // Compare <p^2> with T and <p^0> with tr(P*S)
+    emdok=((fabs(mom(4,1)-2.0*en.Ekin)<=10*mom(4,2)) && (fabs(mom(2,1)-arma::trace(P*S))<=10*mom(2,2)));
   }
-
 
 #ifdef COMPUTE_REFERENCE
   if(!set.get_bool("Direct")) {
@@ -498,6 +502,8 @@ void unrestr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & ba
     throw std::runtime_error(oss.str());
   }
 #endif
+
+  fflush(stdout);
 }
 
 
