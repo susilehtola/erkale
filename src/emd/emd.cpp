@@ -751,7 +751,7 @@ void EMD::find_electrons(bool verbose, double tol) {
   size_t iter=0;
 
   // Tighten grid adaptively
-  do {
+  while(true) {
     iter++;
     integral=0;
     error=0;
@@ -791,9 +791,10 @@ void EMD::find_electrons(bool verbose, double tol) {
       }
 
       add4(maxind);
-    }
-
-  } while(fabs(Nel-integral)>tol);
+    } else
+      // Converged
+      break;
+  }
 
   if(verbose)
     printf("done.\n");
