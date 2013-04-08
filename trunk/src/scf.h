@@ -245,7 +245,13 @@ class SCF {
   void PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & ESIC, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid);
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
   void PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & ESIC, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid);
+  /// Helper for PZ-SIC: localize occupied orbitals
+  arma::cx_mat localize(const arma::mat & C) const;
 
+  /// Helper for above - calculate B with given rotation matrix
+  double localize_B(const arma::mat & C, const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const;
+  /// Helper for above - calculate derivative of B with respect to rotation matrix
+  arma::cx_mat localize_Bder(const arma::mat & C, const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const;
 
  public:
   /// Constructor
