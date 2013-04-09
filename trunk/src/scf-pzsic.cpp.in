@@ -147,7 +147,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
   if(verbose) {
     printf("\nSIC iteration:\n");
-    fprintf(stderr,"\t%4s\t%12s\t%13s\t%13s\n","iter","K/R","ESIC","dESIC");
+    fprintf(stderr,"\n\t%4s\t%12s\t%13s\t%13s\n","iter","K/R","ESIC","dESIC");
     fflush(stdout);
     fflush(stderr);
   }

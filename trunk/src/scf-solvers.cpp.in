@@ -427,12 +427,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef DFT
     // Perdew-Zunger correction?
-    if(pzcor!=0.0)
+    if(pzcor!=0.0) {
+      titer.stop();
 #ifdef RESTRICTED
       PZSIC_RDFT(sol,occs,dft,grid,fitgrid,tol);
 #else
       PZSIC_UDFT(sol,occa,occb,dft,grid,fitgrid,tol);
 #endif	
+      titer.cont();
+    }
 #endif
 
     // Compute change of energy
@@ -539,10 +542,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // Perform TRDSM update
     if(usetrdsm) {
       if(verbose) {
-      printf("Performing trust-region DSM update of Fock operator ... ");
-      fflush(stdout);
-      t.set();
-    }
+	printf("Performing trust-region DSM update of Fock operator ... ");
+	fflush(stdout);
+	t.set();
+      }
 #ifdef RESTRICTED
       sol.H=trdsm.solve();
 #else
@@ -631,13 +634,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	form_dens(rhsol);
 	form_fock(rhsol,sol);
 #ifdef DFT
-    // Perdew-Zunger correction?
-    if(pzcor!=0.0)
+	// Perdew-Zunger correction?
+	if(pzcor!=0.0) {
+	  titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(rhsol,occs,dft,grid,fitgrid,tol);
+	  PZSIC_RDFT(rhsol,occs,dft,grid,fitgrid,tol);
 #else
-      PZSIC_UDFT(rhsol,occa,occb,dft,grid,fitgrid,tol);
+	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,fitgrid,tol);
 #endif	
+	  titer.cont();
+	}
 #endif
 	diagonalize(S,Sinvh,rhsol);
 
@@ -712,13 +718,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_dens(sol1);
 	    form_fock(sol1,sol);
 #ifdef DFT
-    // Perdew-Zunger correction?
-    if(pzcor!=0.0)
+	    // Perdew-Zunger correction?
+	    if(pzcor!=0.0) {
+	      titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol1,occs,dft,grid,fitgrid,tol);
+	      PZSIC_RDFT(sol1,occs,dft,grid,fitgrid,tol);
 #else
-      PZSIC_UDFT(sol1,occa,occb,dft,grid,fitgrid,tol);
+	      PZSIC_UDFT(sol1,occa,occb,dft,grid,fitgrid,tol);
 #endif	
+	      titer.cont();
+	    }
 #endif
 	    diagonalize(S,Sinvh,sol1);
 	    if(verbose) {
@@ -732,13 +741,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_dens(sol2);
 	    form_fock(sol2,sol);
 #ifdef DFT
-    // Perdew-Zunger correction?
-    if(pzcor!=0.0)
+	    // Perdew-Zunger correction?
+	    if(pzcor!=0.0) {
+	      titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol2,occs,dft,grid,fitgrid,tol);
+	      PZSIC_RDFT(sol2,occs,dft,grid,fitgrid,tol);
 #else
-      PZSIC_UDFT(sol2,occa,occb,dft,grid,fitgrid,tol);
+	      PZSIC_UDFT(sol2,occa,occb,dft,grid,fitgrid,tol);
 #endif	
+	      titer.cont();
+	    }
 #endif
 	    diagonalize(S,Sinvh,sol2);
 	    if(verbose) {
@@ -748,8 +760,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  }
 	  
 	  /*
-	  fprintf(stderr,"mu: %e %e %e %e\n",lmu,mu1,mu2,rmu);
-	  fprintf(stderr,"E: %e %e %e %e\n",lhsol.en.E,sol1.en.E,sol2.en.E,rhsol.en.E);
+	    fprintf(stderr,"mu: %e %e %e %e\n",lmu,mu1,mu2,rmu);
+	    fprintf(stderr,"E: %e %e %e %e\n",lhsol.en.E,sol1.en.E,sol2.en.E,rhsol.en.E);
 	  */
 	  
 	  // Choose what to do
