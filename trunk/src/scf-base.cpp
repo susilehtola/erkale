@@ -75,7 +75,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   diisorder=set.get_int("DIISOrder");
   diisthr=set.get_double("DIISThr");
   useadiis=set.get_bool("UseADIIS");
-  useediis=set.get_bool("UseEDIIS");
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
   usetrdsm=set.get_bool("UseTRDSM");
@@ -89,22 +88,17 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   pzcor=set.get_double("PZ-SIC");
 
   // Check update scheme
-  if(useadiis && useediis) {
+  if(useadiis && usebroyden) {
     ERROR_INFO();
-    throw std::runtime_error("ADIIS and EDIIS cannot be used at the same time.\n");
+    throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   }
 
-  if((useadiis || useediis) && usebroyden) {
-    ERROR_INFO();
-    throw std::runtime_error("ADIIS/EDIIS and Broyden mixing cannot be used at the same time.\n");
-  }
-
-  if(!usediis && !useadiis && !useediis && !usebroyden && !usetrrh && !usetrdsm && !linesearch) {
+  if(!usediis && !useadiis && !usebroyden && !usetrrh && !usetrdsm && !linesearch) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to run calculation without an update scheme.\n");
   }
 
-  if(usetrdsm && (useadiis || useediis || usediis || usebroyden || !usetrrh)) {
+  if(usetrdsm && (useadiis || usediis || usebroyden || !usetrrh)) {
     ERROR_INFO();
     throw std::runtime_error("Use of TRDSM requires use of TRRH and turning off (AE)DIIS and Broyden.\n");
   }

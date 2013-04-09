@@ -64,8 +64,6 @@ void Settings::add_scf_settings() {
 
   // Use ADIIS?
   add_bool("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", true);
-  // Use EDIIS?
-  add_bool("UseEDIIS", "Use EDIIS for Fock matrix interpolation? (DIIS takes preference)", false);
   // Use Broyden mixing?
   add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);
   // Use Trust-Region Roothaan-Hall?
