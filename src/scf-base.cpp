@@ -1439,7 +1439,6 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
   // Imaginary unit
   std::complex<double> imagI(0,1.0);
 
-
   while(true) {
     // Increase iteration number
     k++;
@@ -1457,7 +1456,7 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
     if(G.size()>2)
       G.erase(G.begin());
 
-    printf("\t%4i\t%e\t%e\n",(int) k,B,bracket(G[G.size()-1],G[G.size()-1])); 
+    printf("\t%4i\t%e\t%e\n",(int) k,B,bracket(G[G.size()-1],G[G.size()-1]));
     fflush(stdout);
 
     // H matrix
@@ -1467,10 +1466,10 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
     } else {
       // Compute Polak-Ribière coefficient
       double gamma=bracket(G[G.size()-1] - G[G.size()-2], G[G.size()-1]) / bracket(G[G.size()-2],G[G.size()-2]);
-      
+
       // Update H
-      H=G[G.size()-1]+gamma*H;
-	
+      H=G[G.size()-1]-gamma*H;
+
       // Check that update is OK
       double brack=bracket(H,G[G.size()-1]);
       if(brack<=0.0)
@@ -1479,28 +1478,21 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
 
       //      else if(B>Bold)
       (void) Bold;
-
-      // Reset to gradient.
+      
+      // Reset to gradient - SD performs better!!
       H=G[G.size()-1];
     }
-    
+
     // Check for convergence.
-    if(bracket(G[G.size()-1],G[G.size()-1])<1e-6)
+    if(bracket(G[G.size()-1],G[G.size()-1])<1e-5)
       break;
 
-    /*
-    // Alternatively, if we have gone on long enough that we've gotten
-    // out of the initial local minimum, and the derivative is
-    // relatively small, we are also probably converged enough.
-    if(k>=50 && bracket(G[G.size()-1],G[G.size()-1])<1e-3)
-      break;
-    */
-    
+
     arma::vec Hval;
     arma::cx_mat Hvec;
     double wmax;
     double Tmu;
-    
+
     // Diagonalize iH to find eigenvalues purely imaginary
     // eigenvalues iw_i of -H; Abrudan 2009 table 3 step 1.
     bool diagok=arma::eig_sym(Hval,Hvec,imagI*H);
@@ -1509,7 +1501,6 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
       throw std::runtime_error("PZ-SIC: error diagonalizing H.\n");
     }
 
-    /*    
     // Find maximal eigenvalue
     wmax=0.0;
     for(size_t n=0;n<Hval.n_elem;n++)
@@ -1518,128 +1509,104 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
     if(wmax==0.0) {
       continue;
     }
-    
+
     // Compute maximal step size.
-    // Order of the cost function in the coefficients of W. This is
-    // for the Coulomb term, the XC term also has higher order
-    // terms, which however are of small importance
+    // Order of the cost function in the coefficients of W.
     const int q=4;
     Tmu=2.0*M_PI/(q*wmax);
-    
-    // Amount of points to use. The polynomial fitting the
-    // derivative will be of order 2(n-1). Only n-1 new points need to
-    // be calculated. This choice corresponds to a 4th order fit.
+
+    // Amount of points to use for the fit.
     const int n=4;
-    
+
     // Step size
     const double deltaTmu=Tmu/(n-1);
     std::vector<arma::cx_mat> R(n);
-    
+
     // Trial matrices
     R[0].eye(C.n_cols,C.n_cols);
     R[1]=Hvec*arma::diagmat(arma::exp(deltaTmu*imagI*Hval))*arma::trans(Hvec);
-    
+
     for(int i=2;i<n;i++)
       R[i]=R[i-1]*R[1];
-    
+
     // Evaluate the first-order derivative of the cost function at the expansion points
     std::vector<double> Jprime(n);
-    std::vector<double> J(n);
     for(int i=0;i<n;i++) {
       // Trial matrix is
       arma::cx_mat Utr=R[i]*U;
 
-      // Evaluate B
-      J[i]=localize_B(C,Utr,rmat,rsq);
-      // and the derivative matrix
+      // Compute derivative matrix
       arma::cx_mat der=localize_Bder(C,Utr,rmat,rsq);
       // so the derivative wrt the step size is
       Jprime[i]=-2.0*std::real(arma::trace(der*arma::trans(U)*arma::trans(R[i])*arma::trans(H)));
     }
 
-    printf("Values of cost function:");
-    for(int i=0;i<n;i++)
-      printf(" % e",J[i]);
-    printf("\nDerivatives:          ");
+    /*
+    printf("Derivatives:");
     for(int i=0;i<n;i++)
       printf(" % e",Jprime[i]);
     printf("\n");
-    fflush(stdout);
+    */
 
     // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
-    const int p=2*(n-1);
-    
-    // Compute polynomial coefficients. We have 2*n values
-    arma::vec jvec(2*n);
-    for(int i=0;i<n;i++) {
-      jvec(2*i)=J[i];
-      jvec(2*i+1)=Jprime[i];
+    const int p=n-1;
+
+    // Compute polynomial coefficients.
+    arma::vec jvec(p);
+    for(int i=0;i<p;i++) {
+      jvec(i)=Jprime[i+1]-Jprime[0];
     }
-    
+
     // Form mu matrix
-    arma::mat mumat(2*n,p+2);
+    arma::mat mumat(p,p);
     mumat.zeros();
-    for(int i=0;i<n;i++) {
-      // Value of mu in the point is
-      double mu=i*deltaTmu;
-      
-      // First row: J(mu)
-      mumat(2*i,0)=1.0;
-      for(int j=1;j<=p+1;j++)
-	mumat(2*i,j)=pow(mu,j)/(j);
-      // Second row: J'(mu)
-      mumat(2*i+1,1)=1.0;
-      for(int j=2;j<=p+1;j++)
-	mumat(2*i+1,j)=pow(mu,j-1);
+    for(int i=0;i<p;i++) {
+      // Value of mu on the row is
+      double mu=(i+1)*deltaTmu;
+      // Fill entries
+      for(int j=0;j<p;j++)
+	mumat(i,j)=pow(mu,j+1);
     }
-    
+
     arma::vec aval;
     bool solveok=true;
-    
+
     // Solve for coefficients - may not be stable numerically
-    //solveok=arma::solve(aval,mumat,jvec);
-    
-    // Use inverse matrix
-    {
-      arma::mat invmu;
-      solveok=arma::inv(invmu,mumat);
-      
-      if(solveok)
-	aval=invmu*jvec;
-    }
-    
+    solveok=arma::solve(aval,mumat,jvec);
+
     if(!solveok) {
       mumat.print("Mu");
       arma::trans(jvec).print("Jvec");
       throw std::runtime_error("Error solving for coefficients a.\n");
     }
-    
+
     // Find smallest positive root of a0 + a1*mu + ... + ap*mu^p = 0.
     double xmin=DBL_MAX;
     {
       // Coefficient of highest order term must be nonzero.
       int r=p;
-      while(aval(r+1)==0.0)
+      while(aval(r-1)==0.0)
 	r--;
-      
+
       // Coefficients
-      double a[r+1];
-      for(int i=0;i<r+1;i++)
-	a[i]=aval(i+1);
-      
+      double a[r+2];
+      a[0]=Jprime[0];
+      for(int i=1;i<=r;i++)
+	a[i]=aval(i-1);
+
       // GSL routine workspace - r:th order polynomial has r+1 coefficients
       gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r+1);
-      
+
       // Return values
       double z[2*r];
       int gslok=gsl_poly_complex_solve(a,r+1,w,z);
-      
+
       if(gslok!=GSL_SUCCESS) {
 	ERROR_INFO();
 	fprintf(stderr,"Solution of polynomial root failed, error: \"%s\"\n",gsl_strerror(solveok));
 	throw std::runtime_error("Error solving polynomial.\n");
       }
-      
+
       // Get roots
       std::vector< std::complex<double> > roots(r);
       for(int i=0;i<r;i++) {
@@ -1648,42 +1615,36 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
       }
       // and order them into increasing absolute value
       std::stable_sort(roots.begin(),roots.end(),abscomp<double>);
-      
+
       int nreal=0;
       for(size_t i=0;i<roots.size();i++)
 	if(fabs(roots[i].imag())<10*DBL_EPSILON)
 	  nreal++;
-      
 
+      /*
 	printf("%i real roots:",nreal);
 	for(size_t i=0;i<roots.size();i++)
 	if(fabs(roots[i].imag())<10*DBL_EPSILON)
 	printf(" (% e,% e)",roots[i].real(),roots[i].imag());
 	printf("\n");
+      */
 
-      
       for(size_t i=0;i<roots.size();i++)
 	if(roots[i].real()>sqrt(DBL_EPSILON) && fabs(roots[i].imag())<10*DBL_EPSILON) {
 	  // Root is real and positive. Is it smaller than the current minimum?
 	  if(roots[i].real()<xmin)
 	    xmin=roots[i].real();
 	}
-      
+
       // Free workspace
       gsl_poly_complex_workspace_free(w);
     }
-    
+
     // Sanity check
     if(xmin==DBL_MAX)
       xmin=0.0;
     if(xmin<0.0) throw std::runtime_error("Negative step size!\n");
-    */
 
-    // Use fixed step size
-    double xmin=1.2e-2;
-    (void) wmax;
-    (void) Tmu;
-          
     //    printf("Step size is %e, i.e. %e dTmu.\n",xmin,xmin/deltaTmu);
     // Step size is xmin. Update U
     if(xmin!=0.0) {
