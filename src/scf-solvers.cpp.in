@@ -162,8 +162,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
   // ADIIS
   ADIIS adiis;
-  // EDIIS
-  EDIIS ediis;
   // TRDSM
   TRDSM trdsm(S);
   // Broyden
@@ -181,9 +179,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   // ADIIS
   ADIIS adiisa;
   ADIIS adiisb;
-  // EDIIS
-  EDIIS ediisa;
-  EDIIS ediisb;
 
   // TRDSM
   TRDSM trdsma(S);
@@ -452,15 +447,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       adiisb.push(sol.en.E,sol.Pb,sol.Hb);
 #endif
     }
-    // Update EDIIS stacks.
-    if(useediis) {
-#ifdef RESTRICTED
-      ediis.push(sol.en.E,sol.P,sol.H);
-#else
-      ediisa.push(sol.en.E,sol.Pa,sol.Ha);
-      ediisb.push(sol.en.E,sol.Pb,sol.Hb);
-#endif
-    }
 
     // Update TRDSM stacks
     if(usetrdsm) {
@@ -549,27 +535,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
     }
-    // Perform EDIIS interpolation
-    if(useediis && ((usediis && !diissucc) || !usediis)) {
-
-      if(verbose) {
-	printf("Performing EDIIS interpolation of Fock operator ... ");
-	fflush(stdout);
-	t.set();
-      }
-
-      diissucc=true;
-#ifdef RESTRICTED
-      sol.H=ediis.get_H();
-#else
-      sol.Ha=ediisa.get_H();
-      sol.Hb=ediisb.get_H();
-#endif
-
-      if(verbose)
-	printf("done (%s)\n",t.elapsed().c_str());
-    }
-
 
     // Perform TRDSM update
     if(usetrdsm) {
@@ -1053,15 +1018,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #ifdef RESTRICTED
 	diis.clear();
 	adiis.clear();
-	ediis.clear();
 	broyd.clear();
 #else
 	diisa.clear();
 	diisb.clear();
 	adiisa.clear();
 	adiisb.clear();
-	ediisa.clear();
-	ediisb.clear();
 	broyd_sum.clear();
 	broyd_diff.clear();
 #endif	

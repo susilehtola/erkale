@@ -22,7 +22,6 @@
 #include <cfloat>
 
 #include "adiis.h"
-#include "ediis.h"
 #include "basis.h"
 #include "broyden.h"
 #include "elements.h"
