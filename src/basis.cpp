@@ -2491,8 +2491,15 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
 
   // Indices of atoms to decontract basis set for
   std::vector<size_t> dec;
-  if(stricmp(set.get_string("Decontract"),"")!=0)
-    dec=parse_range(set.get_string("Decontract"));
+  bool decall=false;
+  if(stricmp(set.get_string("Decontract"),"")!=0) {
+    // Check for '*'
+    std::string str=set.get_string("Decontract");
+    if(str.size()==1 && str[0]=='*')
+      decall=true;
+    else
+      dec=parse_range(set.get_string("Decontract"));
+  }
   // Convert to C++ indexing
   for(size_t i=0;i<dec.size();i++)
     dec[i]--;
@@ -2539,9 +2546,14 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
 
     // Decontract set?
     bool decon=false;
-    for(size_t j=0;j<dec.size();j++)
-      if(i==dec[j])
-	decon=true;
+    if(decall)
+      // All functions decontracted
+      decon=true;
+    else
+      // Check if this center is decontracted
+      for(size_t j=0;j<dec.size();j++)
+	if(i==dec[j])
+	  decon=true;
     if(decon)
       elbas.decontract();
 
