@@ -22,26 +22,24 @@
 #define CHECK_WRITE() {if(!writemode) {throw std::runtime_error("Cannot write to checkpoint file that was opened for reading only!\n");}}
 #define CHECK_EXIST() {if(!exist(name)) { std::ostringstream oss; oss << "The entry " << name << " does not exist in the checkpoint file!\n"; throw std::runtime_error(oss.str()); } }
 
-Checkpoint::Checkpoint(const std::string & fname, bool writem) {
+Checkpoint::Checkpoint(const std::string & fname, bool writem, bool trunc) {
   writemode=writem;
   filename=fname;
   opend=false;
 
-  if(writemode) {
+  if(writemode && trunc) {
     // Truncate existing file, using default creation and access properties.
     file=H5Fcreate(fname.c_str(),H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
     opend=true;
-
+    
     // Save checkpoint version
     int ver=ERKALE_CHKVER;
     write("chkver",ver);
     // Close the file
     close();
   } else {
-    // Check existence of file
-    std::ifstream chkpt(fname.c_str());
-    if(!chkpt.good())
-      throw std::runtime_error("Trying to load a non-existent checkpoint file!\n");
+    // Open file
+    open();
 
     // Check version
     if(!exist("chkver"))
@@ -63,6 +61,11 @@ Checkpoint::~Checkpoint() {
 }
 
 void Checkpoint::open() {
+  // Check that file exists
+  if(!file_exists(filename)) {
+    throw std::runtime_error("Trying to open nonexistent checkpoint file!\n");
+  }
+
   if(!opend) {
     if(writemode)
       // Open in read-write mode

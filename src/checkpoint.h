@@ -86,7 +86,7 @@ class Checkpoint {
 
  public:
   /// Create checkpoint file
-  Checkpoint(const std::string & filename, bool write);
+  Checkpoint(const std::string & filename, bool write, bool trunc=true);
   /// Destructor
   ~Checkpoint();
 
