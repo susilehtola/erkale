@@ -294,6 +294,9 @@ class SCF {
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
+
+  /// Set the density-fitting basis set
+  void set_fitting(const BasisSet & fitbas);
 };
 
 /// Diagonalize Fock matrix

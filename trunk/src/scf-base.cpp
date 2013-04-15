@@ -286,6 +286,11 @@ void SCF::set_frozen(const arma::mat & C, size_t ind) {
   freeze[ind]=C;
 }
 
+void SCF::set_fitting(const BasisSet & fitbasv) {
+  dfitbas=fitbasv;
+  xcfitbas=fitbasv;
+}
+
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol) {
   arma::mat Horth;
   arma::mat orbs;
