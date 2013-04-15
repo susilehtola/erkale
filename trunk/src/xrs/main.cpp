@@ -81,14 +81,9 @@ enum xrs_method parse_method(const std::string & method) {
   return met;
 }
 
-/**
- * Double basis set method
- *
- * Augment the basis with diffuse functions and diagonalize the Fock
- * matrix in the unoccupied space. The occupied orbitals and their
- * energies stay the same in the approximation.
- */
-void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin) {
+
+/// Augment the basis set with diffuse functions
+BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
   // Get indices of atoms to augment
   std::vector<size_t> augind=parse_range(splitline(set.get_string("XRSAugment"))[0]);
   // Convert to C++ indexing
@@ -98,11 +93,14 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     augind[i]--;
   }
 
-  Timer ttot;
-  fprintf(stderr,"Augmenting basis set with diffuse functions.\n");
+  bool verbose=set.get_bool("Verbose");
+  if(verbose) {
+    printf("\nAugmenting basis set with diffuse functions.\n");
+    fflush(stdout);
+  }	   
 
   // Form augmented basis
-  augbas=basis;
+  BasisSet augbas(basis);
 
   // Basis set for augmentation functions
   BasisSetLibrary augbaslib;
@@ -139,6 +137,33 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   // Finalize augmentation basis
   augbas.finalize();
 
+  if(verbose) {
+    // Amount of functions in original basis set is
+    const size_t Nbf=basis.get_Nbf();
+    // Amount of augmentation functions is
+    const size_t Naug=augbas.get_Nbf()-Nbf;
+
+    printf("\nAugmented original basis (%i functions) with %i diffuse functions.\n",(int) Nbf,(int) Naug);
+    fflush(stdout);
+  }
+
+  return augbas;
+}
+
+/**
+ * Double basis set method
+ *
+ * Augment the basis with diffuse functions and diagonalize the Fock
+ * matrix in the unoccupied space. The occupied orbitals and their
+ * energies stay the same in the approximation.
+ */
+void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin, enum xrs_method method) {
+  Timer ttot;
+  
+  augbas=augment_basis(basis,set);
+  // Need to update pointers in augbas
+  augbas.update_nuclear_shell_list();
+
   // Amount of functions in original basis set is
   const size_t Nbf=basis.get_Nbf();
   // Total number of functions in augmented set is
@@ -146,126 +171,193 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   // Amount of augmentation functions is
   const size_t Naug=Ntot-Nbf;
 
-  printf("\nAugmented original basis (%i functions) with %i diffuse functions.\n",(int) Nbf,(int) Naug);
-
-  arma::mat AOtoO;
-  if(!spin)
-    AOtoO=project_orbitals(sol.Ca,basis,augbas);
-  else
-    AOtoO=project_orbitals(sol.Cb,basis,augbas);
-
-  /*
-    arma::mat ovl=arma::trans(AOtoO)*S*AOtoO;
-    printf("MO overlap\n");
-    ovl.print();
-  */
+  bool verbose=set.get_bool("Verbose");
+  if(verbose)
+    printf("\nAugmented original basis (%i functions) with %i diffuse functions.\n",(int) Nbf,(int) Naug);
+  
+  // Augmented solution
+  uscf_t augsol(sol);
 
   // Form density matrix.
   arma::mat Paaug(Ntot,Ntot), Pbaug(Ntot,Ntot), Paug(Ntot,Ntot);
 
-  Paaug.zeros();
-  Paaug.submat(0,0,Nbf-1,Nbf-1)=sol.Pa;
+  augsol.Pa.zeros(Ntot,Ntot);
+  augsol.Pa.submat(0,0,Nbf-1,Nbf-1)=sol.Pa;
 
-  Pbaug.zeros();
-  Pbaug.submat(0,0,Nbf-1,Nbf-1)=sol.Pb;
+  augsol.Pb.zeros(Ntot,Ntot);
+  augsol.Pb.submat(0,0,Nbf-1,Nbf-1)=sol.Pb;
 
-  Paug=Paaug+Pbaug;
+  augsol.P=augsol.Pa+augsol.Pb;
 
-  // Form Fock matrix.
-  Timer taug;
-  arma::mat T=augbas.kinetic();
-  arma::mat V=augbas.nuclear();
-  printf("Hcore formed in %s.\n",taug.elapsed().c_str());
-  fflush(stdout);
-
-  // Coulomb matrix
-  taug.set();
-  arma::mat J;
+  // Checkpoint
+  std::string augchk=set.get_string("AugChk");
+  bool delchk=false;
+  if(stricmp(augchk,"")==0) {
+    delchk=true;
+    // Get random file name
+    char *tmpname=tempnam("./",".chk");
+    augchk=std::string(tmpname);
+    free(tmpname);
+  }
+  
   {
-    // We naturally use the original basis' density fitting basis,
-    // since it's enough to represent the density (augmentation
-    // functions carry by definition no electron density)
-    BasisSet dfitbas;
+    // Copy base checkpoint to augmented checkpoint
+    std::string chk=set.get_string("SaveChk");
+    char cmd[chk.size()+augchk.size()+5];
+    sprintf(cmd,"cp %s %s",chk.c_str(),augchk.c_str());
+    int cperr=system(cmd);
+    if(cperr) {
+      ERROR_INFO();
+      throw std::runtime_error("Error copying checkpoint file.\n");
+    }
+  }
 
-    if(stricmp(set.get_string("FittingBasis"),"Auto")==0)
-      dfitbas=basis.density_fitting();
-    else {
-      // Load basis library
-      BasisSetLibrary fitlib;
-      fitlib.load_gaussian94(set.get_string("FittingBasis"));
+  Timer taug;
 
-      // Construct fitting basis
-      dfitbas=construct_basis(basis.get_nuclei(),fitlib,set);
+  // Open augmented checkpoint file in write mode, don't truncate it!
+  Checkpoint chkpt(augchk,true,false);
+  // Update the basis set
+  chkpt.write(augbas);
+
+  {
+    // Initialize solver
+    XRSSCF solver(augbas,set,chkpt,spin);
+    // The fitting basis set from the non-augmented basis is enough,
+    // since the density is restricted there.
+    BasisSet fitbas=basis.density_fitting();
+    solver.set_fitting(fitbas);
+
+    // Load occupation number vectors
+    std::vector<double> occa, occb;
+    chkpt.read("occa",occa);
+    chkpt.read("occb",occb);
+
+    // Construct Fock matrix
+    DFTGrid grid(&augbas,verbose,set.get_bool("DFTLobatto"));
+    grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+    // Dummy - not supported here
+    XCGrid fitgrid;
+    if(set.get_bool("DFTXCFitting")) {
+      ERROR_INFO();
+      throw std::runtime_error("DFT XC fitting not supported.\n");
+    }
+    
+    // No need for extreme accuracy
+    double tol=ROUGHTOL;
+    
+    switch(method) {
+    case(TP):
+      solver.Fock_half_hole(augsol,dft,occa,occb,augsol,grid,fitgrid,tol);
+      break;
+      
+    case(FCH):
+    case(XCH):
+      solver.Fock_full_hole(augsol,dft,occa,occb,augsol,grid,fitgrid,tol);
+    }
+  }
+
+  if(verbose) {
+    printf("Fock operator constructed in augmented space in %s.\n",taug.elapsed().c_str());
+    fprintf(stderr,"Constructed augmented Fock operator (%s).\n",taug.elapsed().c_str());
+  }
+  
+  // Diagonalize unoccupied space. Loop over spin
+  for(size_t ispin=0;ispin<2;ispin++) {
+    
+    // Form Fock operator  
+    arma::mat H;
+    if(!ispin)
+      H=augsol.Ha;
+    else
+      H=augsol.Hb;
+    
+    arma::mat AOtoO;
+    if(!ispin)
+      AOtoO=project_orbitals(sol.Ca,basis,augbas);
+    else
+      AOtoO=project_orbitals(sol.Cb,basis,augbas);
+    
+    // Amount of occupied orbitals
+    size_t nocc;
+    if(!ispin)
+      nocc=nocca;
+    else
+      nocc=noccb;
+    
+    // Convert Fock operator to unoccupied MO basis.
+    taug.set();
+    arma::mat H_MO=arma::trans(AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1))*H*AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1);
+    if(verbose) {
+      printf("H_MO formed in %s.\n",taug.elapsed().c_str());
+      fflush(stdout);
+    }
+    
+    // Diagonalize Fockian to find orbitals and energies
+    taug.set();
+    arma::vec Eval;
+    arma::mat Evec;
+    eig_sym_ordered(Eval,Evec,H_MO);
+
+    if(verbose) {
+      printf("H_MO diagonalized in unoccupied subspace in %s.\n",taug.elapsed().c_str());
+      fflush(stdout);  
+    }
+    
+    // Store energies
+    arma::vec Ea;
+    Ea.zeros(AOtoO.n_cols);
+    // Occupied orbital energies
+    if(!spin)
+      Ea.subvec(0,nocc-1)=sol.Ea.subvec(0,nocc-1);
+    else
+      Ea.subvec(0,nocc-1)=sol.Eb.subvec(0,nocc-1);
+    // Virtuals
+    Ea.subvec(nocc,AOtoO.n_cols-1)=Eval;
+    
+    // Back-transform orbitals to AO basis
+    arma::mat Ca;
+    Ca.zeros(Ntot,AOtoO.n_cols);
+    // Occupied orbitals, padded with zeros
+    Ca.submat(0,0,Nbf-1,nocc-1)=AOtoO.submat(0,0,Nbf-1,nocc-1);
+    // Unoccupied orbitals
+    Ca.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)=AOtoO.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)*Evec;
+    
+    // Save results
+    if(!ispin) {
+      augsol.Ca=Ca;
+      augsol.Ea=Ea;
+    } else {
+      augsol.Cb=Ca;
+      augsol.Eb=Ea;
     }
 
-    DensityFit dfit;
-    // We do the formation directly.
-    dfit.fill(augbas,dfitbas,true,set.get_double("FittingThreshold"));
-    J=dfit.calc_J(Paug);
+    // Return variables
+    if(ispin==spin) {
+      Eaug=Ea;
+      Caug=Ca;
+    }
   }
-  printf("J formed in %s.\n",taug.elapsed().c_str());
-  fflush(stdout);
+  
+  // Write out updated solution vectors
+  chkpt.write("Ca",augsol.Ca);
+  chkpt.write("Cb",augsol.Cb);
+  chkpt.write("Ea",augsol.Ea);
+  chkpt.write("Eb",augsol.Eb);
 
-  // DFT grid. Get used tolerance
-  dft.gridtol=set.get_double("XRSGridTol");
-  taug.set();
-  arma::mat XCa, XCb;
-  {
-    double Exc, Nelnum;
-    DFTGrid grid(&augbas);
-    grid.construct(Paaug,Pbaug,dft.gridtol,dft.x_func,dft.c_func);
-    taug.set();
-    grid.eval_Fxc(dft.x_func,dft.c_func,Paaug,Pbaug,XCa,XCb,Exc,Nelnum);
+  if(delchk) {
+    int err=remove(augchk.c_str());
+    if(err) {
+      ERROR_INFO();
+      throw std::runtime_error("Error removing temporary file.\n");
+    }
   }
-  printf("XC evaluated in %s.\n",taug.elapsed().c_str());
-  fflush(stdout);
 
-  // Form Fock operator  
-  arma::mat H;
-  if(!spin)
-    H=T+V+J+XCa;
-  else
-    H=T+V+J+XCb;
-
-  // Amount of occupied orbitals
-  size_t nocc;
-  if(!spin)
-    nocc=nocca;
-  else
-    nocc=noccb;
-
-  // Convert Fock operator to unoccupied MO basis.
-  taug.set();
-  arma::mat H_MO=arma::trans(AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1))*H*AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1);
-  printf("H_MO formed in %s.\n",taug.elapsed().c_str());
-  fflush(stdout);
-
-  // Diagonalize Fockian to find orbitals and energies
-  taug.set();
-  arma::vec Eval;
-  arma::mat Evec;
-  eig_sym_ordered(Eval,Evec,H_MO);
-  printf("H_MO diagonalized in unoccupied subspace in %s.\n",taug.elapsed().c_str());
-  fflush(stdout);  
-
-  // Store energies
-  Eaug.zeros(AOtoO.n_cols);
-  // Occupied orbital energies
-  if(!spin)
-    Eaug.subvec(0,nocc-1)=sol.Ea.subvec(0,nocc-1);
-  else
-    Eaug.subvec(0,nocc-1)=sol.Eb.subvec(0,nocc-1);
-  // Virtuals
-  Eaug.subvec(nocc,AOtoO.n_cols-1)=Eval;
-
-  // Back-transform orbitals to AO basis
-  Caug.zeros(Ntot,AOtoO.n_cols);
-  // Occupied orbitals, padded with zeros
-  Caug.submat(0,0,Nbf-1,nocc-1)=AOtoO.submat(0,0,Nbf-1,nocc-1);
-  // Unoccupied orbitals
-  Caug.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)=AOtoO.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)*Evec;
-
-  fprintf(stderr,"Augmentation done in %s.\n",ttot.elapsed().c_str());
+  if(verbose) {
+    printf("Augmentation took %s.\n",ttot.elapsed().c_str());
+    fprintf(stderr,"Augmentation done (%s).\n",taug.elapsed().c_str());
+    fflush(stdout);
+    fflush(stderr);
+  }
 }
 
 typedef struct {
@@ -721,6 +813,7 @@ int main(int argc, char **argv) {
   // Add xrs specific settings
   set.add_string("LoadChk","Initialize with ground state calculation from file","");
   set.add_string("SaveChk","Try initializing with and save results to file","erkale_xrs.chk");
+  set.add_string("AugChk","Save augmented calculation to file (if applicable)","erkale_xrs_aug.chk");
 
   set.add_string("XRSDoubleBasis","The augmentation basis to use for double-basis set calculations","X-AUTO");
   set.add_bool("XRSLocalize","Localize and freeze orbitals? (Needs ground-state calculation)",false);
@@ -982,7 +1075,7 @@ int main(int argc, char **argv) {
   arma::vec E_aug;
    
   if(stricmp(set.get_string("XRSAugment"),"")!=0)
-    augmented_solution(basis,set,sol,nocca,noccb,dft,augbas,C_aug,E_aug,spin);
+    augmented_solution(basis,set,sol,nocca,noccb,dft,augbas,C_aug,E_aug,spin,method);
   else {
     // No augmentation necessary, just copy the solutions
     augbas=basis;
