@@ -197,6 +197,8 @@ class XCGrid {
   arma::mat invert(const arma::vec & gamma) const;
 
  public:
+  /// Dummy constructor
+  XCGrid();
   /// Constructor
   XCGrid(const BasisSet * fitbas, const DensityFit * dfit, bool verbose=true, bool lobatto=false);
   /// Destructor

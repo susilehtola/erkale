@@ -1273,6 +1273,9 @@ void XCAtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t i
   }
 }
 
+XCGrid::XCGrid() {
+}
+
 XCGrid::XCGrid(const BasisSet * fitbas, const DensityFit * dfit, bool ver, bool lobatto) {
   fitbasp=fitbas;
   dfitp=dfit;
