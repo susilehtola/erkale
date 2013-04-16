@@ -137,16 +137,6 @@ BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
   // Finalize augmentation basis
   augbas.finalize();
 
-  if(verbose) {
-    // Amount of functions in original basis set is
-    const size_t Nbf=basis.get_Nbf();
-    // Amount of augmentation functions is
-    const size_t Naug=augbas.get_Nbf()-Nbf;
-
-    printf("\nAugmented original basis (%i functions) with %i diffuse functions.\n",(int) Nbf,(int) Naug);
-    fflush(stdout);
-  }
-
   return augbas;
 }
 
@@ -164,6 +154,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   // Need to update pointers in augbas
   augbas.update_nuclear_shell_list();
 
+
   // Amount of functions in original basis set is
   const size_t Nbf=basis.get_Nbf();
   // Total number of functions in augmented set is
@@ -172,8 +163,16 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   const size_t Naug=Ntot-Nbf;
 
   bool verbose=set.get_bool("Verbose");
-  if(verbose)
+
+  if(verbose) {
     printf("\nAugmented original basis (%i functions) with %i diffuse functions.\n",(int) Nbf,(int) Naug);
+    printf("Computing unoccupied orbitals.\n");
+    fflush(stdout);
+
+    fprintf(stderr,"Calculating unoccupied orbitals in augmented basis.\n");
+    fflush(stderr);
+  }
+
   
   // Augmented solution
   uscf_t augsol(sol);
@@ -244,15 +243,17 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     
     // No need for extreme accuracy
     double tol=ROUGHTOL;
-    
+
+    uscf_t dummy;
+
     switch(method) {
     case(TP):
-      solver.Fock_half_hole(augsol,dft,occa,occb,augsol,grid,fitgrid,tol);
+      solver.Fock_half_hole(augsol,dft,occa,occb,dummy,grid,fitgrid,tol);
       break;
       
     case(FCH):
     case(XCH):
-      solver.Fock_full_hole(augsol,dft,occa,occb,augsol,grid,fitgrid,tol);
+      solver.Fock_full_hole(augsol,dft,occa,occb,dummy,grid,fitgrid,tol);
     }
   }
 
@@ -343,6 +344,12 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   chkpt.write("Cb",augsol.Cb);
   chkpt.write("Ea",augsol.Ea);
   chkpt.write("Eb",augsol.Eb);
+  // and the density matrix
+  chkpt.write("Pa",augsol.Pa);
+  chkpt.write("Pb",augsol.Pb);
+  chkpt.write("P",augsol.P);
+  // and the energy
+  chkpt.write(augsol.en);
 
   if(delchk) {
     int err=remove(augchk.c_str());
