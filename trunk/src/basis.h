@@ -19,9 +19,6 @@
 
 #include "global.h"
 
-/// Use Obara-Saika for computing 1-electron integrals?
-#define OBARASAIKA
-
 #include <armadillo>
 #include <vector>
 #include <string>
@@ -362,6 +359,17 @@ class BasisSet {
   /// Calculate nuclear repulsion matrix
   arma::mat nuclear() const;
 
+  /// Calculate nuclear Pulay forces
+  arma::vec nuclear_pulay(const arma::mat & P) const;
+  /// Calculate nuclear Hellman-Feynman force
+  arma::vec nuclear_der(const arma::mat & P) const;
+  /// Calculate kinetic Pulay forces
+  arma::vec kinetic_pulay(const arma::mat & P) const;
+  /// Calculate overlap derivative
+  arma::vec overlap_der(const arma::mat & W) const;
+  /// Calculate nuclear repulsion force
+  arma::vec nuclear_force() const;  
+
   /// Compute moment integral around (x,y,z)
   std::vector<arma::mat> moment(int mom, double x=0.0, double y=0.0, double z=0.0) const;
 
@@ -522,6 +530,15 @@ class GaussianShell {
   arma::mat kinetic(const GaussianShell & rhs) const;
   /// Calculate nuclear repulsion matrix between shells
   arma::mat nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const;
+
+  /// Calculate nuclear Pulay forces
+  arma::vec nuclear_pulay(double cx, double cy, double cz, const arma::mat & P, const GaussianShell & rhs) const;
+  /// Calculate nuclear Hellman-Feynman force
+  arma::vec nuclear_der(double cx, double cy, double cz, const arma::mat & P, const GaussianShell & rhs) const;
+  /// Calculate kinetic Pulay forces
+  arma::vec kinetic_pulay(const arma::mat & P, const GaussianShell & rhs) const;
+  /// Calculate overlap derivative
+  arma::vec overlap_der(const arma::mat & W, const GaussianShell & rhs) const;
 
   /// Calculate integral over function (used in xc-fitting)
   arma::vec integral() const;

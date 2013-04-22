@@ -514,6 +514,30 @@ arma::mat form_density(const arma::mat & C, const std::vector<double> & nocc) {
   return P;
 }
 
+arma::mat form_density(const arma::vec & E, const arma::mat & C, const std::vector<double> & nocc) {
+  if(nocc.size()>C.n_cols) {
+    std::ostringstream oss;
+    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): there should be " << nocc.size() << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  if(E.n_elem != C.n_cols) {
+    std::ostringstream oss;
+    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): " << E.size() << " energies but " << C.n_cols << " orbitals!\n";
+    throw std::runtime_error(oss.str());
+  }
+  
+  // Zero matrix
+  arma::mat W(C.n_rows,C.n_rows);
+  W.zeros();
+  // Formulate density
+  for(size_t n=0;n<nocc.size();n++)
+    if(nocc[n]>0.0)
+      W+=nocc[n]*E(n)*C.col(n)*arma::trans(C.col(n));
+
+  return W;
+}
+
 arma::mat purify_density(const arma::mat & P, const arma::mat & S) {
   // McWeeny purification
   arma::mat PS=P*S;

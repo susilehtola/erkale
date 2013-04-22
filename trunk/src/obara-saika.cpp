@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -87,15 +87,15 @@ arma::mat overlap_int_os(double xa, double ya, double za, double zetaa, const st
 
   int diff=0;
   for(size_t i=0;i<carta.size();i++)
-    for(size_t j=0;j<cartb.size();j++) 
+    for(size_t j=0;j<cartb.size();j++)
       if(fabs(S(i,j)-huz(i,j))>10*DBL_EPSILON*fabs(huz(i,j)))
 	diff++;
 
-  if(diff==0) 
+  if(diff==0)
     printf("Computed shell of overlaps (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,zetaa,zetab,am_a,am_b);
   else
       for(size_t i=0;i<carta.size();i++)
-	for(size_t j=0;j<cartb.size();j++) 
+	for(size_t j=0;j<cartb.size();j++)
 	  if(fabs(S(i,j)-huz(i,j))>10*DBL_EPSILON*fabs(huz(i,j))) {
 	    printf("Computed overlap (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i,%i)-(%i,%i,%i)\n",xa,ya,za,xb,yb,zb,zetaa,zetab,la,ma,na,lb,mb,nb);
 	    printf("Huzinaga gives %e, OS gives %e.\n",huz(i,j),S(i,j));
@@ -105,7 +105,77 @@ arma::mat overlap_int_os(double xa, double ya, double za, double zetaa, const st
 
   return S;
 }
-	
+
+std::vector<arma::mat> overlap_int_pulay_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb) {
+  // Compute shell of overlap integrals
+
+  // Angular momenta of shells
+  int am_a=carta[0].l+carta[0].m+carta[0].n;
+  int am_b=cartb[0].l+cartb[0].m+cartb[0].n;
+
+  // Returned matrix
+  std::vector<arma::mat> S(6);
+  for(int ic=0;ic<6;ic++)
+    S[ic].zeros(carta.size(),cartb.size());
+
+  // Get 1d overlaps
+  arma::mat ox=overlap_ints_1d(xa,xb,zetaa,zetab,am_a+1,am_b+1);
+  arma::mat oy=overlap_ints_1d(ya,yb,zetaa,zetab,am_a+1,am_b+1);
+  arma::mat oz=overlap_ints_1d(za,zb,zetaa,zetab,am_a+1,am_b+1);
+
+  int la, ma, na;
+  int lb, mb, nb;
+  double norma, normb;
+
+  for(size_t i=0;i<carta.size();i++) {
+      la=carta[i].l;
+      ma=carta[i].m;
+      na=carta[i].n;
+      norma=carta[i].relnorm;
+
+    for(size_t j=0;j<cartb.size();j++) {
+      lb=cartb[j].l;
+      mb=cartb[j].m;
+      nb=cartb[j].n;
+      normb=cartb[j].relnorm;
+
+      // LHS derivatives
+      S[0](i,j)=-2.0*zetaa*ox(la+1,lb)*oy(ma,mb)*oz(na,nb);
+      if(la>0)
+	S[0](i,j)+=     la*ox(la-1,lb)*oy(ma,mb)*oz(na,nb);
+      S[0](i,j)*=norma*normb;
+
+      S[1](i,j)=-2.0*zetaa*ox(la,lb)*oy(ma+1,mb)*oz(na,nb);
+      if(ma>0)
+	S[1](i,j)+=     ma*ox(la,lb)*oy(ma-1,mb)*oz(na,nb);
+      S[1](i,j)*=norma*normb;
+
+      S[2](i,j)=-2.0*zetaa*ox(la,lb)*oy(ma,mb)*oz(na+1,nb);
+      if(na>0)
+	S[2](i,j)+=     na*ox(la,lb)*oy(ma,mb)*oz(na-1,nb);
+      S[2](i,j)*=norma*normb;
+
+      // RHS derivatives
+      S[3](i,j)=-2.0*zetab*ox(la,lb+1)*oy(ma,mb)*oz(na,nb);
+      if(lb>0)
+	S[3](i,j)+=     lb*ox(la,lb-1)*oy(ma,mb)*oz(na,nb);
+      S[3](i,j)*=norma*normb;
+
+      S[4](i,j)=-2.0*zetab*ox(la,lb)*oy(ma,mb+1)*oz(na,nb);
+      if(mb>0)
+	S[4](i,j)+=     mb*ox(la,lb)*oy(ma,mb-1)*oz(na,nb);
+      S[4](i,j)*=norma*normb;
+
+      S[5](i,j)=-2.0*zetab*ox(la,lb)*oy(ma,mb)*oz(na,nb+1);
+      if(nb>0)
+	S[5](i,j)+=     nb*ox(la,lb)*oy(ma,mb)*oz(na,nb-1);
+      S[5](i,j)*=norma*normb;
+    }
+  }
+
+  return S;
+}
+
 double overlap_int_os(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xb, double yb, double zb, double zetab, int lb, int mb, int nb) {
   return overlap_int_1d(xa,xb,zetaa,zetab,la,lb)*overlap_int_1d(ya,yb,zetaa,zetab,ma,mb)*overlap_int_1d(za,zb,zetaa,zetab,na,nb);
 }
@@ -144,7 +214,7 @@ arma::mat overlap_ints_1d(double xa, double xb, double zetaa, double zetab, int 
   S(0,0)=sqrt(M_PI/p)*exp(-mu*xab*xab);
 
   if(la>0 || lb>0) {
-    
+
     // Generate integrals S_{0,j}
     S(0,1)=xpb*S(0,0);
     for(int j=1;j<lbwrk-1;j++) {
@@ -160,7 +230,7 @@ arma::mat overlap_ints_1d(double xa, double xb, double zetaa, double zetab, int 
     }
   }
 
-  // Return result, dropping the temporary 
+  // Return result, dropping the temporary
   return S.submat(0,0,la,lb);
 }
 
@@ -218,7 +288,7 @@ arma::mat kinetic_int_os(double xa, double ya, double za, double zetaa, const st
     }
   }
 
-#ifdef DEBUG      
+#ifdef DEBUG
 
   arma::mat huz(carta.size(),cartb.size());
   for(size_t i=0;i<carta.size();i++) {
@@ -239,24 +309,196 @@ arma::mat kinetic_int_os(double xa, double ya, double za, double zetaa, const st
 
   int diff=0;
   for(size_t i=0;i<carta.size();i++)
-    for(size_t j=0;j<cartb.size();j++) 
+    for(size_t j=0;j<cartb.size();j++)
       if(fabs(T(i,j)-huz(i,j))>10*DBL_EPSILON*fabs(huz(i,j)))
 	diff++;
 
-  if(diff==0) 
+  if(diff==0)
     printf("Computed shell of KE (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,zetaa,zetab,am_a,am_b);
   else
       for(size_t i=0;i<carta.size();i++)
-	for(size_t j=0;j<cartb.size();j++) 
+	for(size_t j=0;j<cartb.size();j++)
 	  if(fabs(T(i,j)-huz(i,j))>1000*DBL_EPSILON*fabs(huz(i,j))) {
 	    printf("Computed KE (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i,%i)-(%i,%i,%i)\n",xa,ya,za,xb,yb,zb,zetaa,zetab,la,ma,na,lb,mb,nb);
 	    printf("Huzinaga gives %e, OS gives %e.\n",huz(i,j),T(i,j));
 	  }
- 
+
 #endif
-      
+
   return T;
 }
+
+std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb) {
+  // Compute shell of kinetic energy integrals
+
+  // Angular momenta of shells
+  int am_a=carta[0].l+carta[0].m+carta[0].n;
+  int am_b=cartb[0].l+cartb[0].m+cartb[0].n;
+
+  // Returned matrix
+  std::vector<arma::mat> T(6);
+  for(int ic=0;ic<6;ic++)
+    T[ic].zeros(carta.size(),cartb.size());
+
+  // Get 1d overlap integrals
+  arma::mat ox_arr=overlap_ints_1d(xa,xb,zetaa,zetab,am_a+1,am_b+1);
+  arma::mat oy_arr=overlap_ints_1d(ya,yb,zetaa,zetab,am_a+1,am_b+1);
+  arma::mat oz_arr=overlap_ints_1d(za,zb,zetaa,zetab,am_a+1,am_b+1);
+
+  // Get kinetic energy integrals
+  arma::mat kx_arr=derivative_ints_1d(xa,xb,zetaa,zetab,am_a+1,am_b+1,2);
+  arma::mat ky_arr=derivative_ints_1d(ya,yb,zetaa,zetab,am_a+1,am_b+1,2);
+  arma::mat kz_arr=derivative_ints_1d(za,zb,zetaa,zetab,am_a+1,am_b+1,2);
+
+  int la, ma, na;
+  int lb, mb, nb;
+
+  double ox, oy, oz;
+  double oxp, oyp, ozp;
+  double oxm, oym, ozm;
+  double kx, ky, kz;
+  double kxp, kyp, kzp;
+  double kxm, kym, kzm;
+
+  double anorm, bnorm;
+
+  for(size_t i=0;i<carta.size();i++) {
+    anorm=carta[i].relnorm;
+
+    la=carta[i].l;
+    ma=carta[i].m;
+    na=carta[i].n;
+
+    for(size_t j=0;j<cartb.size();j++) {
+      lb=cartb[j].l;
+      mb=cartb[j].m;
+      nb=cartb[j].n;
+
+      bnorm=cartb[j].relnorm;
+
+      // LHS, derivative acting on x component. The lhs function with
+      // cartesian angular momentum (la,ma,na) becomes two functions:
+      // -2*zetaa*(la+1,ma,na) + la*(la-1,ma,na)
+      {
+	oxp=ox_arr(la+1,lb);
+	oy=oy_arr(ma,mb);
+	oz=oz_arr(na,nb);
+
+	kxp=kx_arr(la+1,lb);
+	ky=ky_arr(ma,mb);
+	kz=kz_arr(na,nb);
+
+	T[0](i,j)= -2.0*zetaa*(kxp*oy*oz + oxp*ky*oz + oxp*oy*kz);
+	if(la>0) {
+	  oxm=ox_arr(la-1,lb);
+	  kxm=kx_arr(la-1,lb);
+	  T[0](i,j)+=      la*(kxm*oy*oz + oxm*ky*oz + oxm*oy*kz);
+	}
+	T[0](i,j)*=-0.5*anorm*bnorm;
+      }
+
+      // LHS, derivative acting on y component
+      {
+	ox=ox_arr(la,lb);
+	oyp=oy_arr(ma+1,mb);
+	oz=oz_arr(na,nb);
+
+	kx=kx_arr(la,lb);
+	kyp=ky_arr(ma+1,mb);
+	kz=kz_arr(na,nb);
+
+	T[1](i,j)= -2.0*zetaa*(kx*oyp*oz + ox*kyp*oz + ox*oyp*kz);
+	if(ma>0) {
+	  oym=oy_arr(ma-1,mb);
+	  kym=ky_arr(ma-1,mb);
+	  T[1](i,j)+=      ma*(kx*oym*oz + ox*kym*oz + ox*oym*kz);
+	}
+	T[1](i,j)*=-0.5*anorm*bnorm;
+      }
+
+      // LHS, derivative acting on z component
+      {
+	ox=ox_arr(la,lb);
+	oy=oy_arr(ma,mb);
+	ozp=oz_arr(na+1,nb);
+
+	kx=kx_arr(la,lb);
+	ky=ky_arr(ma,mb);
+	kzp=kz_arr(na+1,nb);
+
+	T[2](i,j)= -2.0*zetaa*(kx*oy*ozp + ox*ky*ozp + ox*oy*kzp);
+	if(na>0) {
+	  ozm=oz_arr(na-1,nb);
+	  kzm=kz_arr(na-1,nb);
+	  T[2](i,j)+=      na*(kx*oy*ozm + ox*ky*ozm + ox*oy*kzm);
+	}
+	T[2](i,j)*=-0.5*anorm*bnorm;
+      }
+
+
+      // RHS, derivative acting on x component
+      {
+	oxp=ox_arr(la,lb+1);
+	oy=oy_arr(ma,mb);
+	oz=oz_arr(na,nb);
+	
+	kxp=kx_arr(la,lb+1);
+	ky=ky_arr(ma,mb);
+	kz=kz_arr(na,nb);
+
+	T[3](i,j)= -2.0*zetab*(kxp*oy*oz + oxp*ky*oz + oxp*oy*kz);
+	if(lb>0) {
+	  oxm=ox_arr(la,lb-1);
+	  kxm=kx_arr(la,lb-1);
+	  T[3](i,j)+=      lb*(kxm*oy*oz + oxm*ky*oz + oxm*oy*kz);
+	}
+	T[3](i,j)*=-0.5*anorm*bnorm;
+      }
+
+      // RHS, derivative acting on y component
+      {
+	ox=ox_arr(la,lb);
+	oyp=oy_arr(ma,mb+1);
+	oz=oz_arr(na,nb);
+
+	kx=kx_arr(la,lb);
+	kyp=ky_arr(ma,mb+1);
+	kz=kz_arr(na,nb);
+
+	T[4](i,j)= -2.0*zetab*(kx*oyp*oz + ox*kyp*oz + ox*oyp*kz);
+	if(mb>0) {
+	  oym=oy_arr(ma,mb-1);
+	  kym=ky_arr(ma,mb-1);
+	  T[4](i,j)+=      mb*(kx*oym*oz + ox*kym*oz + ox*oym*kz);
+	}
+	T[4](i,j)*=-0.5*anorm*bnorm;
+      }
+
+      // RHS, derivative acting on z component
+      {
+	ox=ox_arr(la,lb);
+	oy=oy_arr(ma,mb);
+	ozp=oz_arr(na,nb+1);
+
+	kx=kx_arr(la,lb);
+	ky=ky_arr(ma,mb);
+	kzp=kz_arr(na,nb+1);
+
+	T[5](i,j)= -2.0*zetab*(kx*oy*ozp + ox*ky*ozp + ox*oy*kzp);
+	if(nb>0) {
+	  ozm=oz_arr(na,nb-1);
+	  kzm=kz_arr(na,nb-1);
+	  T[5](i,j)+=      nb*(kx*oy*ozm + ox*ky*ozm + ox*oy*kzm);
+	}
+	T[5](i,j)*=-0.5*anorm*bnorm;
+      }
+      
+    }
+  }
+
+  return T;
+}
+
 
 // Compute kinetic energy integral of unnormalized primitives at r_A and r_B
 double kinetic_int_os(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xb, double yb, double zb, double zetab, int lb, int mb, int nb) {
@@ -374,7 +616,7 @@ arma::mat derivative_ints_1d(double xa, double xb, double zetaa, double zetab, i
   // The lowest order matrix is simply the ovelap matrix,
   // which we need to get in a big enough form
   D.push_back(overlap_ints_1d(xa,xb,zetaa,zetab,la+eval,lb));
-  
+
   // Now, perform the recursion.
   for(int e=1;e<=eval;e++) {
     // Number of rows in the matrix of the current iteration
@@ -485,7 +727,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
   const int Nan = 1;
   const int Nam = am_a+1;
   const int Nal = Nam*Nam;
-	
+
   const int Nbn = 1;
   const int Nbm = am_b+1;
   const int Nbl = Nbm*Nbm;
@@ -506,21 +748,21 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 
   // Loop over total angular momentum
   for(int lambdab=1;lambdab<=am_b;lambdab++)
-    
+
     // Loop over angular momentum functions belonging to this shell
     for(int ii=0; ii<=lambdab; ii++) {
       int lb=lambdab - ii;
       for(int jj=0; jj<=ii; jj++) {
 	int mb=ii - jj;
 	int nb=jj;
-	
+
 	// Index in integrals table
 	int bind = lb*Nbl+mb*Nbm+nb*Nbn;
-	
+
 	if (nb > 0) {
 	  for(int m=0;m<=mmax-lambdab;m++)
 	    ints(0,bind,m) = PBz*ints(0,bind-Nbn,m)-PCz*ints(0,bind-Nbn,m+1);
-	  
+
 	  if (nb > 1) {
 	    for(int m=0;m<=mmax-lambdab;m++)
 	      ints(0,bind,m) += o2g*(nb-1)*(ints(0,bind-2*Nbn,m)-ints(0,bind-2*Nbn,m+1));
@@ -533,11 +775,11 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 	    ints(0,bind,m) = PBy*ints(0,bind-Nbm,m)-PCy*ints(0,bind-Nbm,m+1);
 
 	  if (mb > 1) {
-	      for(int m=0;m<=mmax-lambdab;m++)  
+	      for(int m=0;m<=mmax-lambdab;m++)
 		ints(0,bind,m) += o2g*(mb-1)*(ints(0,bind-2*Nbm,m)-ints(0,bind-2*Nbm,m+1));
 	  }
 	}
-	
+
 	else if (lb > 0) {
 
 	  for(int m=0;m<=mmax-lambdab;m++)
@@ -555,9 +797,9 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 	}
       }
   }
-  
+
   // Now, increase the angular momentum of the left-hand side, too.
-  
+
   // Loop over total angular momentum of RHS
   for(int lambdab=0;lambdab<=am_b;lambdab++)
 
@@ -567,17 +809,17 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
       for(int jj=0; jj<=ii; jj++) {
 	int mb=ii - jj;
 	int nb=jj;
-	
+
 	// RHS index is
 	int bind = lb*Nbl + mb*Nbm + nb*Nbn;
-	
+
 	// Loop over total angular momentum of LHS
 	for(int lambdaa=1;lambdaa<=am_a;lambdaa++)
-	  
+
 	  // Loop over angular momentum of second shell
 	  for(int kk=0; kk<=lambdaa; kk++) {
 	    int la=lambdaa-kk;
-	    
+
 	    for(int ll=0; ll<=kk; ll++) {
 	      int ma=kk-ll;
 	      int na=ll;
@@ -590,19 +832,19 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 		for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
 		  ints(aind,bind,m) = PAz*ints(aind-Nan,bind,m)-PCz*ints(aind-Nan,bind,m+1);
 		}
-		
+
 		if (na > 1) {
 		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
 		    ints(aind,bind,m) += o2g*(na-1)*(ints(aind-2*Nan,bind,m)-ints(aind-2*Nan,bind,m+1));
 		}
-		
+
 		if (nb > 0) {
 		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
 		    ints(aind,bind,m) += o2g*nb*(ints(aind-Nan,bind-Nbn,m)-ints(aind-Nan,bind-Nbn,m+1));
 		}
 
 	      } else if (ma > 0) {
-		
+
 		for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
 		  ints(aind,bind,m) = PAy*ints(aind-Nam,bind,m)-PCy*ints(aind-Nam,bind,m+1);
 		}
@@ -611,7 +853,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
 		    ints(aind,bind,m) += o2g*(ma-1)*(ints(aind-2*Nam,bind,m) - ints(aind-2*Nam,bind,m+1));
 		}
-		
+
 		if (mb > 0) {
 		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
 		    ints(aind,bind,m) += o2g*mb*(ints(aind-Nam,bind-Nbm,m) - ints(aind-Nam,bind-Nbm,m+1));
@@ -630,7 +872,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 
 		if (lb > 0) {
 		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
-		    ints(aind,bind,m) += o2g*lb*(ints(aind-Nal,bind-Nbl,m) - ints(aind-Nal,bind-Nbl,m+1));  
+		    ints(aind,bind,m) += o2g*lb*(ints(aind-Nal,bind-Nbl,m) - ints(aind-Nal,bind-Nbl,m+1));
 		}
 	      }
 	      else {
@@ -656,51 +898,49 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
   // Index of left basis function
   ia=0;
 
-  
+
   // Loop over basis functions on this shell
   for(int ii=0; ii<=am_a; ii++) {
     int la=am_a - ii;
     for(int jj=0; jj<=ii; jj++) {
       int ma=ii - jj;
       int na=jj;
-      
+
       // Index in worker array
       int aind=la*Nal+ma*Nam+na;
-      
+
       // Index of right basis function
       ib=0;
-      
+
       // Loop over angular momentum of second shell
       for(int kk=0; kk<=am_b; kk++) {
 	int lb=am_b - kk;
-	
+
 	for(int ll=0; ll<=kk; ll++) {
 	  int mb=kk-ll;
 	  int nb=ll;
-	  
+
 	  // Other index is
 	  int bind=lb*Nbl+mb*Nbm+nb;
-	  
+
 	  // Store result
 	  V(ia,ib)=-ints(aind,bind,0);
-	  
+
 	  // Increment index of basis function
 	  ib++;
 	}
       }
-      
+
       // Increment index of basis function
       ia++;
     }
   }
 
 #ifdef DEBUG
-
-
   // Compute Huzinaga integrals
   arma::mat huzint=V;
   huzint.zeros();
-  
+
   int diff=0;
 
   ia=0;
@@ -710,7 +950,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
     for(int jj=0; jj<=ii; jj++) {
       int ima=ii - jj;
       int ina=jj;
-      
+
       ib=0;
       // Loop over basis functions on this shell
       for(int kk=0; kk<=am_b; kk++) {
@@ -718,7 +958,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 	for(int ll=0; ll<=kk; ll++) {
 	  int imb=kk - ll;
 	  int inb=ll;
-	  
+
 	  huzint(ia,ib)=nuclear_int(xa,ya,za,zetaa,ila,ima,ina,xnuc,ynuc,znuc,xb,yb,zb,zetab,ilb,imb,inb);
 
 	  if(fabs(huzint(ia,ib)-V(ia,ib))>100*DBL_EPSILON*fabs(huzint(ia,ib)))
@@ -727,7 +967,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 	  ib++;
 	}
       }
-      
+
       ia++;
     }
   }
@@ -736,7 +976,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
     printf("Computed NAI shell (%e,%e,%e) - (%e,%e,%e) with nucleus at (%e,%e,%e) and exponents %e and %e with am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,xnuc,ynuc,znuc,zetaa,zetab,am_a,am_b);
   else {
     ia=0;
-    // Loop over basis functions on this shell                                                                                                                                     
+    // Loop over basis functions on this shell
     for(int ii=0; ii<=am_a; ii++) {
       int ila=am_a - ii;
       for(int jj=0; jj<=ii; jj++) {
@@ -744,7 +984,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 	int ina=jj;
 
 	ib=0;
-	// Loop over basis functions on this shell                                                                                                                                 
+	// Loop over basis functions on this shell
 	for(int kk=0; kk<=am_b; kk++) {
 	  int ilb=am_b - kk;
 	  for(int ll=0; ll<=kk; ll++) {
@@ -762,17 +1002,685 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
       }
     }
   }
-  
+
   /*    printf("Obara-Saika shell of integrals:\n");
 	V.print();
 	printf("Huzinaga shell of integrals:\n");
 	huzint.print();
 	printf("\n");*/
 #endif
-  
+
   return V;
 }
 
+
+std::vector<arma::mat> nuclear_int_pulay_os(double xa, double ya, double za, double zetaa, int amorig_a, double xnuc, double ynuc, double znuc, double xb, double yb, double zb, double zetab, int amorig_b) {
+
+  // Compute coordinates of center
+  const double zeta=zetaa+zetab;
+  const double o2g=1/(2.0*zeta);
+
+  const double xp=(zetaa*xa+zetab*xb)/zeta;
+  const double yp=(zetaa*ya+zetab*yb)/zeta;
+  const double zp=(zetaa*za+zetab*zb)/zeta;
+
+  const double PAx=xp-xa;
+  const double PAy=yp-ya;
+  const double PAz=zp-za;
+
+  const double PBx=xp-xb;
+  const double PBy=yp-yb;
+  const double PBz=zp-zb;
+
+  const double PCx=xp-xnuc;
+  const double PCy=yp-ynuc;
+  const double PCz=zp-znuc;
+
+  const double ABsq=(xa-xb)*(xa-xb) + (ya-yb)*(ya-yb) + (za-zb)*(za-zb);
+
+  // Recursion formulas need am_a and am_b increased by one.
+  int am_a=amorig_a+1;
+  int am_b=amorig_b+1;
+
+  // Sum of angular momenta
+  const int mmax=am_a+am_b;
+
+  const int size_a=(am_a+1)*(am_a+1)*am_a+1;
+  const int size_b=(am_b+1)*(am_b+1)*am_b+1;
+
+  // Work array for recursion formulas
+  arma::cube ints(size_a,size_b,mmax+1);
+  ints.zeros();
+
+  // Helpers for computing indices on work array
+  const int Nan = 1;
+  const int Nam = am_a+1;
+  const int Nal = Nam*Nam;
+
+  const int Nbn = 1;
+  const int Nbm = am_b+1;
+  const int Nbl = Nbm*Nbm;
+
+  // Argument of Boys' function
+  const double boysarg=zeta*(PCx*PCx + PCy*PCy + PCz*PCz);
+  // Evaluate Boys' function
+  std::vector<double> bf=boysF_arr(mmax,boysarg);
+
+  // Constant prefactor for auxiliary integrals
+  const double prefac=2.0*M_PI/zeta*exp(-zetaa*zetab*ABsq/zeta);
+
+  // Initialize integral array (0_A | A(0) | 0_B)^(m)
+  for(size_t m=0;m<bf.size();m++)
+    ints(0,0,m)=prefac*bf[m];
+
+  // Increase angular momentum on right hand side.
+
+  // Loop over total angular momentum
+  for(int lambdab=1;lambdab<=am_b;lambdab++)
+
+    // Loop over angular momentum functions belonging to this shell
+    for(int ii=0; ii<=lambdab; ii++) {
+      int lb=lambdab - ii;
+      for(int jj=0; jj<=ii; jj++) {
+	int mb=ii - jj;
+	int nb=jj;
+
+	// Index in integrals table
+	int bind = lb*Nbl+mb*Nbm+nb*Nbn;
+
+	if (nb > 0) {
+	  for(int m=0;m<=mmax-lambdab;m++)
+	    ints(0,bind,m) = PBz*ints(0,bind-Nbn,m)-PCz*ints(0,bind-Nbn,m+1);
+
+	  if (nb > 1) {
+	    for(int m=0;m<=mmax-lambdab;m++)
+	      ints(0,bind,m) += o2g*(nb-1)*(ints(0,bind-2*Nbn,m)-ints(0,bind-2*Nbn,m+1));
+	  }
+	}
+
+	else if (mb > 0) {
+
+	  for(int m=0;m<=mmax-lambdab;m++)
+	    ints(0,bind,m) = PBy*ints(0,bind-Nbm,m)-PCy*ints(0,bind-Nbm,m+1);
+
+	  if (mb > 1) {
+	      for(int m=0;m<=mmax-lambdab;m++)
+		ints(0,bind,m) += o2g*(mb-1)*(ints(0,bind-2*Nbm,m)-ints(0,bind-2*Nbm,m+1));
+	  }
+	}
+
+	else if (lb > 0) {
+
+	  for(int m=0;m<=mmax-lambdab;m++)
+	    ints(0,bind,m) = PBx*ints(0,bind-Nbl,m)-PCx*ints(0,bind-Nbl,m+1);
+
+	  if (lb > 1) {
+	    for(int m=0;m<=mmax-lambdab;m++)
+	      ints(0,bind,m) += o2g*(lb-1)*(ints(0,bind-2*Nbl,m)-ints(0,bind-2*Nbl,m+1));
+	  }
+
+	}
+	else {
+	  ERROR_INFO();
+	  throw std::runtime_error("Something went haywire in the Obara-Saika nuclear attraction integral algorithm.\n");
+	}
+      }
+  }
+
+  // Now, increase the angular momentum of the left-hand side, too.
+
+  // Loop over total angular momentum of RHS
+  for(int lambdab=0;lambdab<=am_b;lambdab++)
+
+    // Loop over the functions belonging to the shell
+    for(int ii=0; ii<=lambdab; ii++) {
+      int lb=lambdab - ii;
+      for(int jj=0; jj<=ii; jj++) {
+	int mb=ii - jj;
+	int nb=jj;
+
+	// RHS index is
+	int bind = lb*Nbl + mb*Nbm + nb*Nbn;
+
+	// Loop over total angular momentum of LHS
+	for(int lambdaa=1;lambdaa<=am_a;lambdaa++)
+
+	  // Loop over angular momentum of second shell
+	  for(int kk=0; kk<=lambdaa; kk++) {
+	    int la=lambdaa-kk;
+
+	    for(int ll=0; ll<=kk; ll++) {
+	      int ma=kk-ll;
+	      int na=ll;
+
+	      // LHS index is
+	      int aind = la*Nal + ma*Nam + na*Nan;
+
+	      if (na > 0) {
+
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		  ints(aind,bind,m) = PAz*ints(aind-Nan,bind,m)-PCz*ints(aind-Nan,bind,m+1);
+		}
+
+		if (na > 1) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*(na-1)*(ints(aind-2*Nan,bind,m)-ints(aind-2*Nan,bind,m+1));
+		}
+
+		if (nb > 0) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*nb*(ints(aind-Nan,bind-Nbn,m)-ints(aind-Nan,bind-Nbn,m+1));
+		}
+
+	      } else if (ma > 0) {
+
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		  ints(aind,bind,m) = PAy*ints(aind-Nam,bind,m)-PCy*ints(aind-Nam,bind,m+1);
+		}
+
+		if (ma > 1) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*(ma-1)*(ints(aind-2*Nam,bind,m) - ints(aind-2*Nam,bind,m+1));
+		}
+
+		if (mb > 0) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*mb*(ints(aind-Nam,bind-Nbm,m) - ints(aind-Nam,bind-Nbm,m+1));
+		}
+
+	      }	else if (la > 0) {
+
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		  ints(aind,bind,m) = PAx*ints(aind-Nal,bind,m)-PCx*ints(aind-Nal,bind,m+1);
+		}
+
+		if (la > 1) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*(la-1)*(ints(aind-2*Nal,bind,m) - ints(aind-2*Nal,bind,m+1));
+		}
+
+		if (lb > 0) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*lb*(ints(aind-Nal,bind-Nbl,m) - ints(aind-Nal,bind-Nbl,m+1));
+		}
+	      }
+	      else {
+		ERROR_INFO();
+		throw std::runtime_error("Something went haywire in the Obara-Saika nuclear attraction integral algorithm.\n");
+	      }
+	    }
+	  }
+    }
+  }
+
+  // Size of returned array
+  int Na=(amorig_a+1)*(amorig_a+2)/2;
+  int Nb=(amorig_b+1)*(amorig_b+2)/2;
+
+  // Returned array
+  std::vector<arma::mat> V(6);
+  for(int ic=0;ic<6;ic++)
+    V[ic].zeros(Na,Nb);
+
+  // Fill in array
+  int ia, ib;
+
+  // Index of left basis function
+  ia=0;
+
+  // Loop over basis functions on this shell
+  for(int ii=0; ii<=amorig_a; ii++) {
+    int la=amorig_a - ii;
+    for(int jj=0; jj<=ii; jj++) {
+      int ma=ii - jj;
+      int na=jj;
+
+      // Index of right basis function
+      ib=0;
+
+      // Loop over angular momentum of second shell
+      for(int kk=0; kk<=amorig_b; kk++) {
+	int lb=amorig_b - kk;
+
+	for(int ll=0; ll<=kk; ll++) {
+	  int mb=kk-ll;
+	  int nb=ll;
+
+	  int aind=la*Nal+ma*Nam+na;
+	  // x
+	  int alpind=(la+1)*Nal+ma*Nam+na;
+	  int almind=(la-1)*Nal+ma*Nam+na;
+	  // y
+	  int ampind=la*Nal+(ma+1)*Nam+na;
+	  int ammind=la*Nal+(ma-1)*Nam+na;
+	  // z
+	  int anpind=la*Nal+ma*Nam+na+1;
+	  int anmind=la*Nal+ma*Nam+na-1;
+
+	  int bind=lb*Nbl+mb*Nbm+nb;
+	  // x
+	  int blpind=(lb+1)*Nbl+mb*Nbm+nb;
+	  int blmind=(lb-1)*Nbl+mb*Nbm+nb;
+	  // y
+	  int bmpind=lb*Nbl+(mb+1)*Nbm+nb;
+	  int bmmind=lb*Nbl+(mb-1)*Nbm+nb;
+	  // z
+	  int bnpind=lb*Nbl+mb*Nbm+nb+1;
+	  int bnmind=lb*Nbl+mb*Nbm+nb-1;
+
+	  // LHS, x
+	  V[0](ia,ib)=2.0*zetaa*ints(alpind,bind,0);
+	  if(la>0)
+	    V[0](ia,ib)-=    la*ints(almind,bind,0);
+	  // LHS, y
+	  V[1](ia,ib)=2.0*zetaa*ints(ampind,bind,0);
+	  if(ma>0)
+	    V[1](ia,ib)-=    ma*ints(ammind,bind,0);
+	  // LHS, z
+	  V[2](ia,ib)=2.0*zetaa*ints(anpind,bind,0);
+	  if(na>0)
+	    V[2](ia,ib)-=    na*ints(anmind,bind,0);
+
+	  // RHS, x
+	  V[3](ia,ib)=2.0*zetab*ints(aind,blpind,0);
+	  if(lb>0)
+	    V[3](ia,ib)-=    lb*ints(aind,blmind,0);
+	  // RHS, y
+	  V[4](ia,ib)=2.0*zetab*ints(aind,bmpind,0);
+	  if(mb>0)
+	    V[4](ia,ib)-=    mb*ints(aind,bmmind,0);
+	  // RHS, z
+	  V[5](ia,ib)=2.0*zetab*ints(aind,bnpind,0);
+	  if(nb>0)
+	    V[5](ia,ib)-=    nb*ints(aind,bnmind,0);
+
+	  // Increment index of basis function
+	  ib++;
+	}
+      }
+
+      // Increment index of basis function
+      ia++;
+    }
+  }
+
+  return V;
+}
+
+
+std::vector<arma::mat> nuclear_int_pulay_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xnuc, double ynuc, double znuc, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb) {
+  // Compute shell of overlap integrals
+
+  // Angular momenta of shells
+  int am_a=carta[0].l+carta[0].m+carta[0].n;
+  int am_b=cartb[0].l+cartb[0].m+cartb[0].n;
+
+  // Compute the matrix
+  std::vector<arma::mat> V=nuclear_int_pulay_os(xa,ya,za,zetaa,am_a,xnuc,ynuc,znuc,xb,yb,zb,zetab,am_b);
+
+  // Plug in the relative normalization factors
+  for(size_t i=0;i<carta.size();i++)
+    for(size_t j=0;j<cartb.size();j++)
+      for(size_t ic=0;ic<V.size();ic++)
+	V[ic](i,j)*=carta[i].relnorm*cartb[j].relnorm;
+
+  return V;
+}
+
+std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, double zetaa, int am_a, double xnuc, double ynuc, double znuc, double xb, double yb, double zb, double zetab, int am_b) {
+
+  // Compute coordinates of center
+  const double zeta=zetaa+zetab;
+  const double o2g=1/(2.0*zeta);
+
+  const double xp=(zetaa*xa+zetab*xb)/zeta;
+  const double yp=(zetaa*ya+zetab*yb)/zeta;
+  const double zp=(zetaa*za+zetab*zb)/zeta;
+
+  const double PAx=xp-xa;
+  const double PAy=yp-ya;
+  const double PAz=zp-za;
+
+  const double PBx=xp-xb;
+  const double PBy=yp-yb;
+  const double PBz=zp-zb;
+
+  const double PCx=xp-xnuc;
+  const double PCy=yp-ynuc;
+  const double PCz=zp-znuc;
+
+  const double ABsq=(xa-xb)*(xa-xb) + (ya-yb)*(ya-yb) + (za-zb)*(za-zb);
+
+  // Sum of angular momenta
+  const int mmax=am_a+am_b;
+
+  const int size_a=(am_a+1)*(am_a+1)*am_a+1;
+  const int size_b=(am_b+1)*(am_b+1)*am_b+1;
+
+  // Work array for recursion formulas
+  arma::cube ints(size_a,size_b,mmax+1);
+  ints.zeros();
+
+  arma::cube xint(size_a,size_b,mmax+1);
+  xint.zeros();
+  arma::cube yint(size_a,size_b,mmax+1);
+  yint.zeros();
+  arma::cube zint(size_a,size_b,mmax+1);
+  zint.zeros();
+
+  // Helpers for computing indices on work array
+  const int Nan = 1;
+  const int Nam = am_a+1;
+  const int Nal = Nam*Nam;
+
+  const int Nbn = 1;
+  const int Nbm = am_b+1;
+  const int Nbl = Nbm*Nbm;
+
+  // Argument of Boys' function
+  const double boysarg=zeta*(PCx*PCx + PCy*PCy + PCz*PCz);
+  // Evaluate Boys' function
+  std::vector<double> bf=boysF_arr(mmax+1,boysarg);
+
+  // Constant prefactor for auxiliary integrals
+  const double prefac=2.0*M_PI/zeta*exp(-zetaa*zetab*ABsq/zeta);
+
+  // Initialize integral array (0_A | A(0) | 0_B)^(m)
+  for(int m=0;m<=mmax;m++)
+    ints(0,0,m)=prefac*bf[m];
+  // and (0_A | A(1) | 0_B)^(m)
+  for(int m=0;m<=mmax;m++) {
+    xint(0,0,m)=2.0*zeta*PCx*prefac*bf[m+1];
+    yint(0,0,m)=2.0*zeta*PCy*prefac*bf[m+1];
+    zint(0,0,m)=2.0*zeta*PCz*prefac*bf[m+1];
+  }
+
+  // Increase angular momentum on right hand side.
+
+  // Loop over total angular momentum
+  for(int lambdab=1;lambdab<=am_b;lambdab++)
+
+    // Loop over angular momentum functions belonging to this shell
+    for(int ii=0; ii<=lambdab; ii++) {
+      int lb=lambdab - ii;
+      for(int jj=0; jj<=ii; jj++) {
+	int mb=ii - jj;
+	int nb=jj;
+
+	// Index in integrals table
+	int bind = lb*Nbl+mb*Nbm+nb*Nbn;
+
+	if (nb > 0) {
+	  for(int m=0;m<=mmax-lambdab;m++)
+	    ints(0,bind,m) = PBz*ints(0,bind-Nbn,m)-PCz*ints(0,bind-Nbn,m+1);
+	  for(int m=0;m<=mmax-lambdab;m++) {
+	    xint(0,bind,m) = PBz*xint(0,bind-Nbn,m)-PCz*xint(0,bind-Nbn,m+1);
+	    yint(0,bind,m) = PBz*yint(0,bind-Nbn,m)-PCz*yint(0,bind-Nbn,m+1);
+	    zint(0,bind,m) = PBz*zint(0,bind-Nbn,m)-PCz*zint(0,bind-Nbn,m+1) + ints(0,bind-Nbn,m+1);
+	  }
+
+	  if (nb > 1) {
+	    for(int m=0;m<=mmax-lambdab;m++)
+	      ints(0,bind,m) += o2g*(nb-1)*(ints(0,bind-2*Nbn,m)-ints(0,bind-2*Nbn,m+1));
+	    for(int m=0;m<=mmax-lambdab;m++) {
+	      xint(0,bind,m) += o2g*(nb-1)*(xint(0,bind-2*Nbn,m)-xint(0,bind-2*Nbn,m+1));
+	      yint(0,bind,m) += o2g*(nb-1)*(yint(0,bind-2*Nbn,m)-yint(0,bind-2*Nbn,m+1));
+	      zint(0,bind,m) += o2g*(nb-1)*(zint(0,bind-2*Nbn,m)-zint(0,bind-2*Nbn,m+1));
+	    }
+	  }
+	}
+	
+	else if (mb > 0) {
+
+	  for(int m=0;m<=mmax-lambdab;m++)
+	    ints(0,bind,m) = PBy*ints(0,bind-Nbm,m)-PCy*ints(0,bind-Nbm,m+1);
+	  for(int m=0;m<=mmax-lambdab;m++) {
+	    xint(0,bind,m) = PBy*xint(0,bind-Nbm,m)-PCy*xint(0,bind-Nbm,m+1);
+	    yint(0,bind,m) = PBy*yint(0,bind-Nbm,m)-PCy*yint(0,bind-Nbm,m+1) + ints(0,bind-Nbm,m+1);
+	    zint(0,bind,m) = PBy*zint(0,bind-Nbm,m)-PCy*zint(0,bind-Nbm,m+1);
+	  }
+
+	  if (mb > 1) {
+	      for(int m=0;m<=mmax-lambdab;m++)
+		ints(0,bind,m) += o2g*(mb-1)*(ints(0,bind-2*Nbm,m)-ints(0,bind-2*Nbm,m+1));
+	      for(int m=0;m<=mmax-lambdab;m++) {
+		xint(0,bind,m) += o2g*(mb-1)*(xint(0,bind-2*Nbm,m)-xint(0,bind-2*Nbm,m+1));
+		yint(0,bind,m) += o2g*(mb-1)*(yint(0,bind-2*Nbm,m)-yint(0,bind-2*Nbm,m+1));
+		zint(0,bind,m) += o2g*(mb-1)*(zint(0,bind-2*Nbm,m)-zint(0,bind-2*Nbm,m+1));
+	      }
+	  }
+	}
+	
+	else if (lb > 0) {
+
+	  for(int m=0;m<=mmax-lambdab;m++)
+	    ints(0,bind,m) = PBx*ints(0,bind-Nbl,m)-PCx*ints(0,bind-Nbl,m+1);
+	  for(int m=0;m<=mmax-lambdab;m++) {
+	    xint(0,bind,m) = PBx*xint(0,bind-Nbl,m)-PCx*xint(0,bind-Nbl,m+1) + ints(0,bind-Nbl,m+1);
+	    yint(0,bind,m) = PBx*yint(0,bind-Nbl,m)-PCx*yint(0,bind-Nbl,m+1);
+	    zint(0,bind,m) = PBx*zint(0,bind-Nbl,m)-PCx*zint(0,bind-Nbl,m+1);
+	  }
+
+	  if (lb > 1) {
+	    for(int m=0;m<=mmax-lambdab;m++)
+	      ints(0,bind,m) += o2g*(lb-1)*(ints(0,bind-2*Nbl,m)-ints(0,bind-2*Nbl,m+1));
+	    for(int m=0;m<=mmax-lambdab;m++) {
+	      xint(0,bind,m) += o2g*(lb-1)*(xint(0,bind-2*Nbl,m)-xint(0,bind-2*Nbl,m+1));
+	      yint(0,bind,m) += o2g*(lb-1)*(yint(0,bind-2*Nbl,m)-yint(0,bind-2*Nbl,m+1));
+	      zint(0,bind,m) += o2g*(lb-1)*(zint(0,bind-2*Nbl,m)-zint(0,bind-2*Nbl,m+1));
+	    }
+	  }
+	  
+	}
+	else {
+	  ERROR_INFO();
+	  throw std::runtime_error("Something went haywire in the Obara-Saika nuclear attraction integral algorithm.\n");
+	}
+      }
+  }
+
+  // Now, increase the angular momentum of the left-hand side, too.
+
+  // Loop over total angular momentum of RHS
+  for(int lambdab=0;lambdab<=am_b;lambdab++)
+
+    // Loop over the functions belonging to the shell
+    for(int ii=0; ii<=lambdab; ii++) {
+      int lb=lambdab - ii;
+      for(int jj=0; jj<=ii; jj++) {
+	int mb=ii - jj;
+	int nb=jj;
+
+	// RHS index is
+	int bind = lb*Nbl + mb*Nbm + nb*Nbn;
+
+	// Loop over total angular momentum of LHS
+	for(int lambdaa=1;lambdaa<=am_a;lambdaa++)
+
+	  // Loop over angular momentum of second shell
+	  for(int kk=0; kk<=lambdaa; kk++) {
+	    int la=lambdaa-kk;
+
+	    for(int ll=0; ll<=kk; ll++) {
+	      int ma=kk-ll;
+	      int na=ll;
+
+	      // LHS index is
+	      int aind = la*Nal + ma*Nam + na*Nan;
+
+	      if (na > 0) {
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		  ints(aind,bind,m) = PAz*ints(aind-Nan,bind,m)-PCz*ints(aind-Nan,bind,m+1);
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		  xint(aind,bind,m) = PAz*xint(aind-Nan,bind,m)-PCz*xint(aind-Nan,bind,m+1);
+		  yint(aind,bind,m) = PAz*yint(aind-Nan,bind,m)-PCz*yint(aind-Nan,bind,m+1);
+		  zint(aind,bind,m) = PAz*zint(aind-Nan,bind,m)-PCz*zint(aind-Nan,bind,m+1) + ints(aind-Nan,bind,m+1);
+		}
+
+		if (na > 1) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*(na-1)*(ints(aind-2*Nan,bind,m)-ints(aind-2*Nan,bind,m+1));
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		    xint(aind,bind,m) += o2g*(na-1)*(xint(aind-2*Nan,bind,m)-xint(aind-2*Nan,bind,m+1));
+		    yint(aind,bind,m) += o2g*(na-1)*(yint(aind-2*Nan,bind,m)-yint(aind-2*Nan,bind,m+1));
+		    zint(aind,bind,m) += o2g*(na-1)*(zint(aind-2*Nan,bind,m)-zint(aind-2*Nan,bind,m+1));
+		  }
+		}
+
+		if (nb > 0) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*nb*(ints(aind-Nan,bind-Nbn,m)-ints(aind-Nan,bind-Nbn,m+1));
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		    xint(aind,bind,m) += o2g*nb*(xint(aind-Nan,bind-Nbn,m)-xint(aind-Nan,bind-Nbn,m+1));
+		    yint(aind,bind,m) += o2g*nb*(yint(aind-Nan,bind-Nbn,m)-yint(aind-Nan,bind-Nbn,m+1));
+		    zint(aind,bind,m) += o2g*nb*(zint(aind-Nan,bind-Nbn,m)-zint(aind-Nan,bind-Nbn,m+1));
+		  }
+		}
+
+	      } else if (ma > 0) {
+
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		  ints(aind,bind,m) = PAy*ints(aind-Nam,bind,m)-PCy*ints(aind-Nam,bind,m+1);
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		  xint(aind,bind,m) = PAy*xint(aind-Nam,bind,m)-PCy*xint(aind-Nam,bind,m+1);
+		  yint(aind,bind,m) = PAy*yint(aind-Nam,bind,m)-PCy*yint(aind-Nam,bind,m+1) + ints(aind-Nam,bind,m+1);
+		  zint(aind,bind,m) = PAy*zint(aind-Nam,bind,m)-PCy*zint(aind-Nam,bind,m+1);
+		}
+
+		if (ma > 1) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*(ma-1)*(ints(aind-2*Nam,bind,m) - ints(aind-2*Nam,bind,m+1));
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		    xint(aind,bind,m) += o2g*(ma-1)*(xint(aind-2*Nam,bind,m) - xint(aind-2*Nam,bind,m+1));
+		    yint(aind,bind,m) += o2g*(ma-1)*(yint(aind-2*Nam,bind,m) - yint(aind-2*Nam,bind,m+1));
+		    zint(aind,bind,m) += o2g*(ma-1)*(zint(aind-2*Nam,bind,m) - zint(aind-2*Nam,bind,m+1));
+		  }
+		}
+
+		if (mb > 0) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*mb*(ints(aind-Nam,bind-Nbm,m) - ints(aind-Nam,bind-Nbm,m+1));
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		    xint(aind,bind,m) += o2g*mb*(xint(aind-Nam,bind-Nbm,m) - xint(aind-Nam,bind-Nbm,m+1));
+		    yint(aind,bind,m) += o2g*mb*(yint(aind-Nam,bind-Nbm,m) - yint(aind-Nam,bind-Nbm,m+1));
+		    zint(aind,bind,m) += o2g*mb*(zint(aind-Nam,bind-Nbm,m) - zint(aind-Nam,bind-Nbm,m+1));
+		  }
+		}
+
+	      }	else if (la > 0) {
+
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		  ints(aind,bind,m) = PAx*ints(aind-Nal,bind,m)-PCx*ints(aind-Nal,bind,m+1);
+		for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		  xint(aind,bind,m) = PAx*xint(aind-Nal,bind,m)-PCx*xint(aind-Nal,bind,m+1) + ints(aind-Nal,bind,m+1);
+		  yint(aind,bind,m) = PAx*yint(aind-Nal,bind,m)-PCx*yint(aind-Nal,bind,m+1);
+		  zint(aind,bind,m) = PAx*zint(aind-Nal,bind,m)-PCx*zint(aind-Nal,bind,m+1);
+		}
+
+		if (la > 1) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*(la-1)*(ints(aind-2*Nal,bind,m) - ints(aind-2*Nal,bind,m+1));
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		    xint(aind,bind,m) += o2g*(la-1)*(xint(aind-2*Nal,bind,m) - xint(aind-2*Nal,bind,m+1));
+		    yint(aind,bind,m) += o2g*(la-1)*(yint(aind-2*Nal,bind,m) - yint(aind-2*Nal,bind,m+1));
+		    zint(aind,bind,m) += o2g*(la-1)*(zint(aind-2*Nal,bind,m) - zint(aind-2*Nal,bind,m+1));
+		  }
+		}
+
+		if (lb > 0) {
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++)
+		    ints(aind,bind,m) += o2g*lb*(ints(aind-Nal,bind-Nbl,m) - ints(aind-Nal,bind-Nbl,m+1));
+		  for(int m=0;m<=mmax-lambdaa-lambdab;m++) {
+		    xint(aind,bind,m) += o2g*lb*(xint(aind-Nal,bind-Nbl,m) - xint(aind-Nal,bind-Nbl,m+1));
+		    yint(aind,bind,m) += o2g*lb*(yint(aind-Nal,bind-Nbl,m) - yint(aind-Nal,bind-Nbl,m+1));
+		    zint(aind,bind,m) += o2g*lb*(zint(aind-Nal,bind-Nbl,m) - zint(aind-Nal,bind-Nbl,m+1));
+		  }
+		}
+	      }
+	      else {
+		ERROR_INFO();
+		throw std::runtime_error("Something went haywire in the Obara-Saika nuclear attraction integral algorithm.\n");
+	      }
+	    }
+	  }
+      }
+    }
+  
+  // Size of returned array
+  int Na=(am_a+1)*(am_a+2)/2;
+  int Nb=(am_b+1)*(am_b+2)/2;
+
+  // Returned array
+  std::vector<arma::mat> V(3);
+  for(int ic=0;ic<3;ic++)
+    V[ic].zeros(Na,Nb);
+
+  // Fill in array
+  int ia, ib;
+
+  // Index of left basis function
+  ia=0;
+
+  // Loop over basis functions on this shell
+  for(int ii=0; ii<=am_a; ii++) {
+    int la=am_a - ii;
+    for(int jj=0; jj<=ii; jj++) {
+      int ma=ii - jj;
+      int na=jj;
+
+      // Index in worker array
+      int aind=la*Nal+ma*Nam+na;
+
+      // Index of right basis function
+      ib=0;
+
+      // Loop over angular momentum of second shell
+      for(int kk=0; kk<=am_b; kk++) {
+	int lb=am_b - kk;
+
+	for(int ll=0; ll<=kk; ll++) {
+	  int mb=kk-ll;
+	  int nb=ll;
+
+	  // Other index is
+	  int bind=lb*Nbl+mb*Nbm+nb;
+
+	  // Store result
+	  V[0](ia,ib)=-xint(aind,bind,0);
+	  V[1](ia,ib)=-yint(aind,bind,0);
+	  V[2](ia,ib)=-zint(aind,bind,0);
+	  
+	  // Increment index of basis function
+	  ib++;
+	}
+      }
+      
+      // Increment index of basis function
+      ia++;
+    }
+  }
+
+  return V;
+}
+
+std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xnuc, double ynuc, double znuc, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb) {
+  // Compute shell of overlap integrals
+
+  // Angular momenta of shells
+  int am_a=carta[0].l+carta[0].m+carta[0].n;
+  int am_b=cartb[0].l+cartb[0].m+cartb[0].n;
+
+  // Compute the matrices
+  std::vector<arma::mat> V=nuclear_int_ders_os(xa,ya,za,zetaa,am_a,xnuc,ynuc,znuc,xb,yb,zb,zetab,am_b);
+
+  // Plug in the relative normalization factors
+  for(size_t i=0;i<carta.size();i++)
+    for(size_t j=0;j<cartb.size();j++)
+      for(size_t ic=0;ic<V.size();ic++)
+	V[ic](i,j)*=carta[i].relnorm*cartb[j].relnorm;
+
+  return V;
+}
 
 arma::cube three_overlap_int_os(double xa, double ya, double za, double xc, double yc, double zc, double xb, double yb, double zb, double zetaa, double zetac, double zetab, const std::vector<shellf_t> & carta, const std::vector<shellf_t> & cartc, const std::vector<shellf_t> & cartb) {
 
@@ -796,7 +1704,7 @@ arma::cube three_overlap_int_os(double xa, double ya, double za, double xc, doub
   const int Nan = 1;
   const int Nam = am_a+1;
   const int Nal = Nam*Nam;
-  
+
   const int Nbn = 1;
   const int Nbm = am_b+1;
   const int Nbl = Nbm*Nbm;
@@ -850,10 +1758,10 @@ arma::cube three_overlap_int_os(double xa, double ya, double za, double xc, doub
       for(int jj=0; jj<=ii; jj++) {
 	int ma=ii - jj;
 	int na=jj;
-	
+
 	// Index in integrals table
 	int aind = la*Nal+ma*Nam+na*Nan;
-	
+
 	// Compute integral
 	if(la>0) {
 
@@ -880,31 +1788,31 @@ arma::cube three_overlap_int_os(double xa, double ya, double za, double xc, doub
   // Increase total angular momentum on right-hand side
   // Loop over total angular momentum of LHS
   for(int lambdaa=0;lambdaa<=am_a;lambdaa++)
-    
+
     // Loop over angular momentum of second shell
     for(int kk=0; kk<=lambdaa; kk++) {
       int la=lambdaa-kk;
-      
+
       for(int ll=0; ll<=kk; ll++) {
 	int ma=kk-ll;
 	int na=ll;
-	
+
 	// LHS index is
 	int aind = la*Nal + ma*Nam + na*Nan;
-	
+
 	// Loop over total angular momentum of RHS
 	for(int lambdab=1;lambdab<=am_b;lambdab++)
-	  
+
 	  // Loop over the functions belonging to the shell
 	  for(int ii=0; ii<=lambdab; ii++) {
 	    int lb=lambdab - ii;
 	    for(int jj=0; jj<=ii; jj++) {
 	      int mb=ii - jj;
 	      int nb=jj;
-	      
+
 	      // RHS index is
 	      int bind = lb*Nbl + mb*Nbm + nb*Nbn;
-	
+
 	      // Compute integral
 	      if(lb>0) {
 
@@ -942,43 +1850,43 @@ arma::cube three_overlap_int_os(double xa, double ya, double za, double xc, doub
   // Finally, increase angular momentum in the middle
   // Loop over total angular momentum of LHS
   for(int lambdaa=0;lambdaa<=am_a;lambdaa++)
-    
+
     // Loop over angular momentum of second shell
     for(int kk=0; kk<=lambdaa; kk++) {
       int la=lambdaa-kk;
-      
+
       for(int ll=0; ll<=kk; ll++) {
 	int ma=kk-ll;
 	int na=ll;
-	
+
 	// LHS index is
 	int aind = la*Nal + ma*Nam + na*Nan;
-	
+
 	// Loop over total angular momentum of RHS
 	for(int lambdab=0;lambdab<=am_b;lambdab++)
-	  
+
 	  // Loop over the functions belonging to the shell
 	  for(int ii=0; ii<=lambdab; ii++) {
 	    int lb=lambdab - ii;
 	    for(int jj=0; jj<=ii; jj++) {
 	      int mb=ii - jj;
 	      int nb=jj;
-	      
+
 	      // RHS index is
-	      int bind = lb*Nbl + mb*Nbm + nb*Nbn;  
-	      
+	      int bind = lb*Nbl + mb*Nbm + nb*Nbn;
+
 	      // Loop over total angular momentum of middle
-	      for(int lambdac=1;lambdac<=am_c;lambdac++)    
+	      for(int lambdac=1;lambdac<=am_c;lambdac++)
 		// Loop over the functions belonging to the shell
 		for(int mm=0; mm<=lambdac; mm++) {
 		  int lc=lambdac - mm;
 		  for(int nn=0; nn<=mm; nn++) {
 		    int mc=mm - nn;
 		    int nc=nn;
-		    
+
 		    // RHS index is
-		    int cind = lc*Ncl + mc*Ncm + nc*Ncn;  
-		    
+		    int cind = lc*Ncl + mc*Ncm + nc*Ncn;
+
 		    // Calculate integral
 		    if(lc>0) {
 
@@ -1056,7 +1964,7 @@ arma::cube three_overlap_int_os(double xa, double ya, double za, double xc, doub
 	int nc=cartc[k].n;
 
 	double cc=cartc[k].relnorm;
-	
+
 	// Middle index in worker array
 	int cind = lc*Ncl + mc*Ncm + nc*Ncn;
 
@@ -1071,6 +1979,6 @@ arma::cube three_overlap_int_os(double xa, double ya, double za, double xc, doub
       }
     }
   }
-  
+
   return S;
 }
