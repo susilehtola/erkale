@@ -706,35 +706,9 @@ arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
   double yb=rhs.cen.y;
   double zb=rhs.cen.z;
 
-#ifdef OBARASAIKA
   for(size_t ixl=0;ixl<c.size();ixl++)
     for(size_t ixr=0;ixr<rhs.c.size();ixr++)
       S+=c[ixl].c*rhs.c[ixr].c*overlap_int_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
-#else
-  // Loop over shells
-  for(size_t icl=0;icl<cart.size();icl++)
-    for(size_t icr=0;icr<rhs.cart.size();icr++) {
-      // Angular momenta of shells
-      int la=cart[icl].l;
-      int ma=cart[icl].m;
-      int na=cart[icl].n;
-
-      int lb=rhs.cart[icr].l;
-      int mb=rhs.cart[icr].m;
-      int nb=rhs.cart[icr].n;
-
-      // Helper variable
-      double tmp=0.0;
-
-      // Loop over exponents
-      for(size_t ixl=0;ixl<zeta.size();ixl++)
-	for(size_t ixr=0;ixr<rhs.zeta.size();ixr++)
-	  tmp+=c[ixl]*rhs.c[ixr]*overlap_int(xa,ya,za,zeta[ixl],la,ma,na,xb,yb,zb,rhs.zeta[ixr],lb,mb,nb);
-
-      // Set overlap
-      S(icl,icr)=tmp*cart[icl].relnorm*rhs.cart[icr].relnorm;
-    }
-#endif
 
   // Transformation to spherical harmonics. Left side:
   if(uselm) {
@@ -788,37 +762,9 @@ arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
   double yb=rhs.cen.y;
   double zb=rhs.cen.z;
 
-
-#ifdef OBARASAIKA
   for(size_t ixl=0;ixl<c.size();ixl++)
     for(size_t ixr=0;ixr<rhs.c.size();ixr++)
       T+=c[ixl].c*rhs.c[ixr].c*kinetic_int_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
-
-#else
-  // Loop over shells
-  for(size_t icl=0;icl<cart.size();icl++)
-    for(size_t icr=0;icr<rhs.cart.size();icr++) {
-      // Angular momenta of shells
-      int la=cart[icl].l;
-      int ma=cart[icl].m;
-      int na=cart[icl].n;
-
-      int lb=rhs.cart[icr].l;
-      int mb=rhs.cart[icr].m;
-      int nb=rhs.cart[icr].n;
-
-      // Helper variable
-      double tmp=0.0;
-
-      // Loop over exponents
-      for(size_t ixl=0;ixl<zeta.size();ixl++)
-	for(size_t ixr=0;ixr<rhs.zeta.size();ixr++)
-	  tmp+=c[ixl]*rhs.c[ixr]*kinetic_int(xa,ya,za,zeta[ixl],la,ma,na,xb,yb,zb,rhs.zeta[ixr],lb,mb,nb);
-
-      // Set matrix element
-      T(icl,icr)=tmp*cart[icl].relnorm*rhs.cart[icr].relnorm;
-    }
-#endif
 
   // Transformation to spherical harmonics. Left side:
   if(uselm) {
@@ -849,48 +795,9 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   double yb=rhs.cen.y;
   double zb=rhs.cen.z;
 
-#ifdef OBARASAIKA
   for(size_t ixl=0;ixl<c.size();ixl++)
     for(size_t ixr=0;ixr<rhs.c.size();ixr++)
       Vnuc+=c[ixl].c*rhs.c[ixr].c*nuclear_int_os(xa,ya,za,c[ixl].z,cart,cx,cy,cz,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
-#else
-
-  // Loop over shells
-  for(size_t icl=0;icl<cart.size();icl++) {
-    // Angular momentum of shell
-    int la=cart[icl].l;
-    int ma=cart[icl].m;
-    int na=cart[icl].n;
-
-    for(size_t icr=0;icr<rhs.cart.size();icr++) {
-
-      // Angular momentum of shell
-      int lb=rhs.cart[icr].l;
-      int mb=rhs.cart[icr].m;
-      int nb=rhs.cart[icr].n;
-
-      // Helper variable
-      double tmp=0.0;
-
-      // Loop over exponents
-      for(size_t ixl=0;ixl<zeta.size();ixl++) {
-	double ca=c[ixl];
-	double zetaa=zeta[ixl];
-
-	for(size_t ixr=0;ixr<rhs.zeta.size();ixr++) {
-	  double cb=rhs.c[ixr];
-	  double zetab=rhs.zeta[ixr];
-
-	  tmp+=ca*cb*nuclear_int(xa,ya,za,zetaa,la,ma,na,cx,cy,cz,xb,yb,zb,zetab,lb,mb,nb);
-
-	}
-      }
-
-      // Set matrix element
-      Vnuc(icl,icr)=tmp*cart[icl].relnorm*rhs.cart[icr].relnorm;
-    }
-  }
-#endif
 
   // Transformation to spherical harmonics. Left side:
   if(uselm) {
@@ -902,6 +809,172 @@ arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const Gaussian
   }
 
   return Vnuc;
+}
+
+arma::vec GaussianShell::nuclear_pulay(double cx, double cy, double cz, const arma::mat & P, const GaussianShell & rhs) const {
+  // Coordinates
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
+
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
+
+  // Derivative matrices
+  std::vector<arma::mat> dermat(6);
+  for(size_t i=0;i<dermat.size();i++)
+    dermat[i].zeros(get_Ncart(),rhs.get_Ncart());
+
+  // Increment derivative matrices
+  for(size_t ixl=0;ixl<c.size();ixl++)
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
+      std::vector<arma::mat> hlp=nuclear_int_pulay_os(xa,ya,za,c[ixl].z,cart,cx,cy,cz,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
+      for(size_t i=0;i<dermat.size();i++)
+	dermat[i]+=c[ixl].c*rhs.c[ixr].c*hlp[i];
+    }
+  
+  // Transformation to spherical harmonics. Left side:
+  if(uselm)
+    for(size_t i=0;i<dermat.size();i++)
+      dermat[i]=transmat*dermat[i];
+  // Right side
+  if(rhs.uselm)
+    for(size_t i=0;i<dermat.size();i++)
+      dermat[i]=dermat[i]*arma::trans(rhs.transmat);
+
+  // Compute the force
+  arma::vec ret(dermat.size());
+  ret.zeros();
+  for(size_t i=0;i<dermat.size();i++) {
+    ret(i)=arma::trace(arma::trans(P)*dermat[i]);
+  }
+ 
+  return ret;
+}
+
+arma::vec GaussianShell::nuclear_der(double cx, double cy, double cz, const arma::mat & P, const GaussianShell & rhs) const {
+  // Coordinates
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
+
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
+
+  // Derivative matrices
+  std::vector<arma::mat> dermat(3);
+  for(size_t i=0;i<dermat.size();i++)
+    dermat[i].zeros(get_Ncart(),rhs.get_Ncart());
+
+  // Increment derivative matrices
+  for(size_t ixl=0;ixl<c.size();ixl++)
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
+      std::vector<arma::mat> hlp=nuclear_int_ders_os(xa,ya,za,c[ixl].z,cart,cx,cy,cz,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
+      for(size_t i=0;i<dermat.size();i++) {
+	dermat[i]+=c[ixl].c*rhs.c[ixr].c*hlp[i];
+      }
+    }
+  
+  // Transformation to spherical harmonics. Left side:
+  if(uselm)
+    for(size_t i=0;i<dermat.size();i++)
+      dermat[i]=transmat*dermat[i];
+
+  // Right side
+  if(rhs.uselm)
+    for(size_t i=0;i<dermat.size();i++)
+      dermat[i]=dermat[i]*arma::trans(rhs.transmat);
+
+  // Compute the force
+  arma::vec ret(dermat.size());
+  ret.zeros();
+  for(size_t i=0;i<dermat.size();i++) {
+    ret(i)=arma::trace(arma::trans(P)*dermat[i]);
+  }
+ 
+  return ret;
+}
+
+arma::vec GaussianShell::kinetic_pulay(const arma::mat & P, const GaussianShell & rhs) const {
+  // Coordinates
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
+
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
+
+  std::vector<arma::mat> dermat(6);
+  for(size_t i=0;i<dermat.size();i++)
+    dermat[i].zeros(get_Ncart(),rhs.get_Ncart());
+  
+  for(size_t ixl=0;ixl<c.size();ixl++)
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
+      std::vector<arma::mat> hlp=kinetic_int_pulay_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
+      for(size_t i=0;i<dermat.size();i++)
+	dermat[i]+=c[ixl].c*rhs.c[ixr].c*hlp[i];
+    }
+  
+  // Transformation to spherical harmonics. Left side:
+  if(uselm)
+    for(size_t i=0;i<dermat.size();i++)
+      dermat[i]=transmat*dermat[i];
+  // Right side
+  if(rhs.uselm)
+    for(size_t i=0;i<dermat.size();i++)
+      dermat[i]=dermat[i]*arma::trans(rhs.transmat);
+
+  // Compute the force
+  arma::vec ret(dermat.size());
+  ret.zeros();
+  for(size_t i=0;i<dermat.size();i++) {
+    ret(i)=arma::trace(arma::trans(P)*dermat[i]);
+  }
+ 
+  return ret;
+}
+
+arma::vec GaussianShell::overlap_der(const arma::mat & W, const GaussianShell & rhs) const {
+  // Coordinates
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
+
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
+
+  std::vector<arma::mat> dermat(6);
+  for(size_t i=0;i<dermat.size();i++)
+    dermat[i].zeros(get_Ncart(),rhs.get_Ncart());
+  
+  for(size_t ixl=0;ixl<c.size();ixl++)
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
+      std::vector<arma::mat> hlp=overlap_int_pulay_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
+      for(size_t i=0;i<dermat.size();i++)
+	dermat[i]+=c[ixl].c*rhs.c[ixr].c*hlp[i];
+    }
+  
+  // Transformation to spherical harmonics. Left side:
+  if(uselm)
+    for(size_t i=0;i<dermat.size();i++)
+      dermat[i]=transmat*dermat[i];
+  // Right side
+  if(rhs.uselm)
+    for(size_t i=0;i<dermat.size();i++)
+      dermat[i]=dermat[i]*arma::trans(rhs.transmat);
+
+  // Compute the force
+  arma::vec ret(dermat.size());
+  ret.zeros();
+  for(size_t i=0;i<dermat.size();i++) {
+    ret(i)=-arma::trace(arma::trans(W)*dermat[i]);
+  }
+ 
+  return ret;
 }
 
 std::vector<arma::mat> GaussianShell::moment(int momam, double x, double y, double z, const GaussianShell & rhs) const {
@@ -1720,6 +1793,258 @@ arma::mat BasisSet::nuclear() const {
     }
 
   return Vnuc;
+}
+
+arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
+  arma::vec f(3*nuclei.size());
+  f.zeros();
+  
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    // Loop over shells
+#ifdef _OPENMP
+    arma::vec fwrk(3*nuclei.size());
+    fwrk.zeros();
+    
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<shellpairs.size();ip++)
+      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+	// If BSSE nucleus, do nothing
+	if(nuclei[inuc].bsse)
+	  continue;
+
+	// Shells in pair
+	size_t i=shellpairs[ip].is;
+	size_t j=shellpairs[ip].js;
+	
+	// Nuclear charge
+	int Z=nuclei[inuc].Z;
+	
+	// Coordinates of nucleus
+	double cx=nuclei[inuc].r.x;
+	double cy=nuclei[inuc].r.y;
+	double cz=nuclei[inuc].r.z;
+	
+	// Density matrix for the pair
+	arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
+	
+	// Get the forces
+	arma::vec tmp=Z*shells[i].nuclear_pulay(cx,cy,cz,Pmat,shells[j]);
+
+	// Off-diagonal?
+	if(i!=j)
+	  tmp*=2.0;
+	
+	// and increment the nuclear force.
+#ifdef _OPENMP
+	fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
+	fwrk.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+#else
+	f.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
+	f.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+#endif
+      }
+
+#ifdef _OPENMP
+#pragma omp critical
+    f+=fwrk;
+#endif
+  }
+
+  return f;
+}
+
+arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
+  arma::vec f(3*nuclei.size());
+  f.zeros();
+  
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    // Loop over shells
+#ifdef _OPENMP
+    arma::vec fwrk(3*nuclei.size());
+    fwrk.zeros();
+    
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<shellpairs.size();ip++)
+      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+	// If BSSE nucleus, do nothing
+	if(nuclei[inuc].bsse)
+	  continue;
+	
+	// Shells in pair
+	size_t i=shellpairs[ip].is;
+	size_t j=shellpairs[ip].js;
+	
+	// Nuclear charge
+	int Z=nuclei[inuc].Z;
+	
+	// Coordinates of nucleus
+	double cx=nuclei[inuc].r.x;
+	double cy=nuclei[inuc].r.y;
+	double cz=nuclei[inuc].r.z;
+	
+	// Density matrix for the pair
+	arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
+	
+	// Get the forces
+	arma::vec tmp=Z*shells[i].nuclear_der(cx,cy,cz,Pmat,shells[j]);
+
+	// Off-diagonal?
+	if(i!=j)
+	  tmp*=2.0;
+
+	// and increment the nuclear force.
+#ifdef _OPENMP
+	fwrk.subvec(3*i,3*i+2)+=tmp;
+#else
+	f.subvec(3*i,3*i+2)+=tmp;
+#endif
+      }
+
+#ifdef _OPENMP
+#pragma omp critical
+    f+=fwrk;
+#endif
+  }
+  
+  return f;
+}
+
+arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
+  arma::vec f(3*nuclei.size());
+  f.zeros();
+  
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    // Loop over shells
+#ifdef _OPENMP
+    arma::vec fwrk(3*nuclei.size());
+    fwrk.zeros();
+    
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<shellpairs.size();ip++) {
+      // Shells in pair
+      size_t i=shellpairs[ip].is;
+      size_t j=shellpairs[ip].js;
+      
+      // Density matrix for the pair
+      arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
+      
+      // Get the forces
+      arma::vec tmp=shells[i].kinetic_pulay(Pmat,shells[j]);
+
+      // Off-diagonal?
+      if(i!=j)
+	tmp*=2.0;
+      
+      // and increment the nuclear force.
+#ifdef _OPENMP
+      fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
+      fwrk.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+#else
+      f.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
+      f.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+#endif
+    }
+    
+#ifdef _OPENMP
+#pragma omp critical
+    f+=fwrk;
+#endif
+  }
+  
+  return f;
+}
+
+arma::vec BasisSet::overlap_der(const arma::mat & P) const {
+  arma::vec f(3*nuclei.size());
+  f.zeros();
+  
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    // Loop over shells
+#ifdef _OPENMP
+    arma::vec fwrk(3*nuclei.size());
+    fwrk.zeros();
+    
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<shellpairs.size();ip++) {
+
+      // Shells in pair
+      size_t i=shellpairs[ip].is;
+      size_t j=shellpairs[ip].js;
+      
+      // Density matrix for the pair
+      arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
+      
+      // Get the forces
+      arma::vec tmp=shells[i].overlap_der(Pmat,shells[j]);
+
+      // Off-diagonal?
+      if(i!=j)
+	tmp*=2.0;
+      
+      // and increment the nuclear force.
+#ifdef _OPENMP
+      fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
+      fwrk.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+#else
+      f.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
+      f.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
+#endif
+    }
+    
+#ifdef _OPENMP
+#pragma omp critical
+    f+=fwrk;
+#endif
+  }
+  
+  return f;
+}
+
+arma::vec BasisSet::nuclear_force() const {
+  arma::vec f(3*nuclei.size());
+  f.zeros();
+
+  for(size_t i=0;i<nuclei.size();i++) {
+    if(nuclei[i].bsse)
+      continue;
+
+    for(size_t j=0;j<i;j++) {
+      if(nuclei[j].bsse)
+	continue;
+
+      // Calculate distance
+      coords_t rij=nuclei[i].r-nuclei[j].r;
+      // and its third power
+      double rcb=pow(norm(rij),3);
+
+      // Force is
+      arma::vec F(3);
+      F(0)=nuclei[i].Z*nuclei[j].Z/rcb*rij.x;
+      F(1)=nuclei[i].Z*nuclei[j].Z/rcb*rij.y;
+      F(2)=nuclei[i].Z*nuclei[j].Z/rcb*rij.z;
+
+      f.subvec(3*i,3*i+2)+=F;
+      f.subvec(3*j,3*j+2)-=F;
+    }
+  }
+
+  return f;
 }
 
 std::vector<arma::mat> BasisSet::moment(int mom, double x, double y, double z) const {

@@ -328,6 +328,8 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
 arma::mat form_density(const arma::mat & C, size_t nocc);
 /// Form density matrix with occupations nocc
 arma::mat form_density(const arma::mat & C, const std::vector<double> & nocc);
+/// Form energy weighted density matrix
+arma::mat form_density(const arma::vec & E, const arma::mat & C, const std::vector<double> & nocc);
 /// Purify the density matrix (N.B. requires occupations to be 0<=n<=1 !)
 arma::mat purify_density(const arma::mat & P, const arma::mat & S);
 /// Purify the density matrix with natural orbitals

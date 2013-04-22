@@ -204,9 +204,42 @@ std::vector<double> A_array(int la, int lb, double PAx, double PBx, double PCx, 
 	// Current index in array is
 	indx=i-2*r-u;
 	// Increment element
-	incr=pow(-1.0,i+u)*fj(i,la,lb,PAx,PBx)*fact(i)*
-	  pow(PCx,i-2*r-2*u)*pow(4.0*zeta,-r-u)
-	  /(fact(r)*fact(u)*fact(i-2*r-2*u));
+	incr=pow(-1.0,i+u)*fj(i,la,lb,PAx,PBx)*fact(i)*pow(PCx,i-2*r-2*u)*pow(4.0*zeta,-r-u)/(fact(r)*fact(u)*fact(i-2*r-2*u));
+
+	ret[indx]+=incr;
+      }
+  return ret;
+}
+
+// Compute derivative of A array for nucler attraction integral (THO 2.18)
+std::vector<double> derA_array(int la, int lb, double PAx, double PBx, double PCx, double zeta) {
+  // The idea behind the array is that although in principle it has three
+  // indices (i, r and u), only the combination i-2r-u is used in THO 2.17.
+
+  // Size of array
+  int N=la+lb+1;
+
+  std::vector<double> ret;
+  // Make sure of sufficient memory allocation
+  ret.reserve(N);
+  // Resize array
+  ret.resize(N);
+ 
+  // Zero out array
+  for(int i=0;i<N;i++)
+    ret[i]=0.0;
+
+  // Loop over indices i, r, and u
+  int indx;
+  double incr;
+
+  for(int i=0;i<=la+lb;i++)
+    for(int r=0;r<=i/2;r++)
+      for(int u=0;u<=(i-2*r)/2;u++) {
+	// Current index in array is
+	indx=i-2*r-u;
+	// Increment element
+	incr=(i-2.0*r+1.0)/(i-2.0*r-2.0*u+1.0)*PCx*pow(-1.0,i+u)*fj(i,la,lb,PAx,PBx)*fact(i)*pow(PCx,i-2*r-2*u)*pow(4.0*zeta,-r-u)/(fact(r)*fact(u)*fact(i-2*r-2*u));
 
 	ret[indx]+=incr;
       }
@@ -297,6 +330,95 @@ double nuclear_int(double xa, double ya, double za, double zetaa, int la, int ma
   //  printf("Nuclear attraction from (%e,%e,%e), wrt to l=%i,m=%i,n=%i,zeta=%e at (%e,%e,%e) and l=%i,m=%i,n=%i,zeta=%e at (%e,%e,%e) is %e.\n",xnuc,ynuc,znuc,la,ma,na,zetaa,xa,ya,za,lb,mb,nb,zetab,xb,yb,zb,nai);
 
   return nai;
+}
+
+void nuclear_int_der(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xnuc, double ynuc, double znuc, double xb, double yb, double zb, double zetab, int lb, int mb, int nb, double & dx, double & dy, double & dz) {
+  // Compute nuclear attraction integral <r_A|r_nuc|r_B>
+
+  // Distance between centers
+  double ABsq=distsq(xa,ya,za,xb,yb,zb);
+  
+  // Compute center of product
+  double xp=center_1d(zetaa,xa,zetab,xb);
+  double yp=center_1d(zetaa,ya,zetab,yb);
+  double zp=center_1d(zetaa,za,zetab,zb);
+
+  // Sum of the exponentials
+  double zeta=zetaa+zetab;
+
+  // Distances to center
+  double PAx=xp-xa;
+  double PAy=yp-ya;
+  double PAz=zp-za;
+
+  double PBx=xp-xb;
+  double PBy=yp-yb;
+  double PBz=zp-zb;
+
+  /* There seems to be some confusion in THO, where after 2.15 {\bf p} is
+     defined as {\bf P} - {\bf C} and p_x^(i-2r-2u) appears in the intermediate
+     formulas, but CPx is in 2.18 instead of PCx. However, only the
+     latter version works.
+
+     "Handbook of Computational Chemistry" by David B. Cook also
+     users PCx, not CPx.
+ */
+
+  double PCx=xp-xnuc;
+  double PCy=yp-ynuc;
+  double PCz=zp-znuc;
+
+  double PCsq=PCx*PCx+PCy*PCy+PCz*PCz;
+
+  // The argument of the Boys function is
+  double boysarg=zeta*PCsq;
+
+  // Get arrays in x, y and z
+  std::vector<double> Ax=A_array(la,lb,PAx,PBx,PCx,zeta);
+  std::vector<double> Ay=A_array(ma,mb,PAy,PBy,PCy,zeta);
+  std::vector<double> Az=A_array(na,nb,PAz,PBz,PCz,zeta);
+  // Get derivatives too
+  std::vector<double> dAx=A_array(la,lb,PAx,PBx,PCx,zeta);
+  std::vector<double> dAy=A_array(ma,mb,PAy,PBy,PCy,zeta);
+  std::vector<double> dAz=A_array(na,nb,PAz,PBz,PCz,zeta);
+
+  /*  for(size_t i=0;i<Ax.size();i++)
+    printf("Ax[%i]=%e\n",(int) i,Ax[i]);
+  for(size_t i=0;i<Ay.size();i++)
+    printf("Ay[%i]=%e\n",(int) i,Ay[i]);
+  for(size_t i=0;i<Az.size();i++)
+  printf("Az[%i]=%e\n",(int) i,Az[i]);*/
+
+  // Total product array
+  std::vector<double> A_x, A_y, A_z;
+  // Size of product array
+  size_type N=Ax.size()+Ay.size()+Az.size();
+  A_x.resize(N,0.0);
+  A_y.resize(N,0.0);
+  A_z.resize(N,0.0);
+  
+  // Compute products
+  for(size_type ix=0;ix<Ax.size();ix++)
+    for(size_type iy=0;iy<Ay.size();iy++)
+      for(size_type iz=0;iz<Az.size();iz++) {
+	A_x[ix+iy+iz]+=dAx[ix]*Ay[iy]*Az[iz];
+	A_y[ix+iy+iz]+=Ax[ix]*dAy[iy]*Az[iz];
+	A_z[ix+iy+iz]+=Ax[ix]*Ay[iy]*dAz[iz];
+      }
+  
+  // Compute derivatives
+  dx = dy = dz = 0.0;
+  double bf;
+  for(size_type i=0;i<N;i++) {
+    bf=boysF(i,boysarg);
+    dx+=A_x[i]*bf;
+    dy+=A_y[i]*bf;
+    dz+=A_z[i]*bf;
+  }
+  // and we plug in the constant factor to get
+  dx*=-4.0*M_PI*exp(-zetaa*zetab*ABsq/zeta);
+  dy*=-4.0*M_PI*exp(-zetaa*zetab*ABsq/zeta);
+  dz*=-4.0*M_PI*exp(-zetaa*zetab*ABsq/zeta);
 }
 
 // The factor that appears in the B array
