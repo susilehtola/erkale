@@ -21,6 +21,7 @@
 #include "basis.h"
 
 #include <libint/libint.h>
+#include <libderiv/libderiv.h>
 
 /// Precursor data for ERIs
 typedef struct {
@@ -42,27 +43,48 @@ typedef struct {
   arma::mat S;
 } eri_precursor_t;
 
-/// Worker for computing electron repulsion integrals
-class ERIWorker {
+/// Worker for dealing with electron repulsion integrals and their derivatives
+class IntegralWorker {
+ protected:
   /// Input array
   std::vector<double> input;
   /// Output array
   std::vector<double> output;
+  
+  /// Reorder integrals
+  void reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
+  
+  /// Do spherical transforms if necessary
+  void spherical_transform(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+  /// Do spherical transform with respect to first index
+  void transform_i(int am, size_t Nj, size_t Nk, size_t Nl);
+  /// Do spherical transform with respect to second index
+  void transform_j(int am, size_t Ni, size_t Nk, size_t Nl);
+  /// Do spherical transform with respect to third index
+  void transform_k(int am, size_t Ni, size_t Nj, size_t Nl);
+  /// Do spherical transform with respect to fourth index
+  void transform_l(int am, size_t Ni, size_t Nj, size_t Nk);
 
+  /// Compute index of swapped integral
+  size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl);
+
+  /// Compute precursor
+  eri_precursor_t compute_precursor(const GaussianShell *is, const GaussianShell *js);
+
+ public:
+  IntegralWorker();
+  ~IntegralWorker();
+};
+
+/// Worker for computing electron repulsion integrals
+class ERIWorker: public IntegralWorker {
   /// Libint worker
   Libint_t libint;
 
   /// Compute the cartesian ERIs
   void compute_cartesian(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  /// Reorder integrals
-  void reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-
-  /// Do spherical transform
-  void spherical_transform(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
-  void transform_i(int am, size_t Nj, size_t Nk, size_t Nl);
-  void transform_j(int am, size_t Ni, size_t Nk, size_t Nl);
-  void transform_k(int am, size_t Ni, size_t Nj, size_t Nl);
-  void transform_l(int am, size_t Ni, size_t Nj, size_t Nk);
+  /// Compute data for libint
+  void compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t &jp, int mmax);
 
  public:
   ERIWorker(int maxam, int maxcontr);
@@ -72,11 +94,36 @@ class ERIWorker {
   void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, std::vector<double> & ints);
 };
 
-/// Compute precursor
-eri_precursor_t compute_precursor(const GaussianShell *is, const GaussianShell *js);
-/// Compute data for libint
-void compute_libint_data(Libint_t & libint, const eri_precursor_t & ip, const eri_precursor_t &jp, int mmax);
-/// Compute index of swapped integral
-size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl);
+/// Worker for computing electron repulsion integrals
+class dERIWorker: public IntegralWorker {
+  /// Libint worker
+  Libderiv_t libderiv;
+
+  /// Compute the cartesian ERI derivatives
+  void compute_cartesian();
+  /// Compute data for libderiv
+  void compute_libderiv_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax);
+
+  // Pointers to the current shells
+  /// 1st shell
+  const GaussianShell *is, *is_orig;
+  /// 2nd shell
+  const GaussianShell *js, *js_orig;
+  /// 3rd shell
+  const GaussianShell *ks, *ks_orig;
+  /// 4th shell
+  const GaussianShell *ls, *ls_orig;
+  /// Swap?
+  bool swap_ij, swap_kl, swap_ijkl;
+  
+ public:
+  dERIWorker(int maxam, int maxcontr);
+  ~dERIWorker();
+
+  /// Compute derivatives
+  void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+  /// Get the derivatives wrt index idx
+  void get(int idx, std::vector<double> & ints);
+};
 
 #endif
