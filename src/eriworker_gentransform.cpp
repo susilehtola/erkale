@@ -129,7 +129,7 @@ int main(void) {
     }
 
     /// Main driver
-    printf("void ERIWorker::transform_%c(int am, size_t %s, size_t %s, size_t %s) {\n",ijkl[it],arg1.c_str(),arg2.c_str(),arg3.c_str());
+    printf("void IntegralWorker::transform_%c(int am, size_t %s, size_t %s, size_t %s) {\n",ijkl[it],arg1.c_str(),arg2.c_str(),arg3.c_str());
 
     // Check if more efficient transform exists
     printf("  void (*f[%i])(size_t, size_t, size_t, const std::vector<double> &, std::vector<double> &);\n",MAXAM+1);
