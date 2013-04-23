@@ -1902,9 +1902,9 @@ arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
 
 	// and increment the nuclear force.
 #ifdef _OPENMP
-	fwrk.subvec(3*i,3*i+2)+=tmp;
+	fwrk.subvec(3*inuc,3*inuc+2)+=tmp;
 #else
-	f.subvec(3*i,3*i+2)+=tmp;
+	f.subvec(3*inuc,3*inuc+2)+=tmp;
 #endif
       }
 
