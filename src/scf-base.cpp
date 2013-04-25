@@ -832,10 +832,15 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
   // Check sanity of arguments
   if(mult<1)
     throw std::runtime_error("Invalid value for multiplicity, which must be >=1.\n");
-  else if(Nel%2==0 && mult%2!=1)
-    throw std::runtime_error("Incorrect multiplicity for even number of electrons.\n");
-  else if(Nel%2==1 && mult%2!=0)
-    throw std::runtime_error("Incorrect multiplicity for odd number of electrons.\n");
+  else if(Nel%2==0 && mult%2!=1) {
+    std::ostringstream oss;
+    oss << "Requested multiplicity " << mult << " with " << Nel << " electrons.\n";
+    throw std::runtime_error(oss.str());
+  } else if(Nel%2==1 && mult%2!=0) {
+    std::ostringstream oss;
+    oss << "Requested multiplicity " << mult << " with " << Nel << " electrons.\n";
+    throw std::runtime_error(oss.str());
+  }
 
   if(Nel%2==0)
     // Even number of electrons, the amount of spin up is
