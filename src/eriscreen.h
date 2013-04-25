@@ -50,8 +50,6 @@ class ERIscreen {
   /// Index helper
   std::vector<size_t> iidx;
 
-  /// Form list of identical integrals
-  void integral_symmetry(size_t i, size_t j, size_t k, size_t l, size_t iarr[], size_t jarr[], size_t karr[], size_t larr[], size_t & nid) const;
  public:
   /// Constructor
   ERIscreen();
@@ -69,6 +67,17 @@ class ERIscreen {
   void calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff=NULL) const;
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
   void calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff=NULL) const;
+
+  /* Force calculation */
+
+  /// Calculate Coulomb force with tolerance tol for integrals, store efficiency of screening in *eff
+  arma::vec forceJ(const arma::mat & R, double tol, double *eff=NULL) const;
+  /// Calculate exchange force with tolerance tol for integrals, store efficiency of screening in *eff
+  arma::vec forceK(const arma::mat & R, double tol, double *eff=NULL) const;
+  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, store efficiency of screening in *eff
+  void forceJK(const arma::mat & R, arma::vec & fJ, arma::vec & fK, double tol, double *eff=NULL) const;
+  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
+  void forceJK(const arma::mat & Ra, const arma::mat & Rb, arma::vec & fJ, arma::vec & fKa, arma::vec & fKb, double tol, double *eff=NULL) const;
 
   /* Versions for SIC routines */
 
