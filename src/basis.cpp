@@ -2039,8 +2039,8 @@ arma::vec BasisSet::nuclear_force() const {
       F(1)=nuclei[i].Z*nuclei[j].Z/rcb*rij.y;
       F(2)=nuclei[i].Z*nuclei[j].Z/rcb*rij.z;
 
-      f.subvec(3*i,3*i+2)+=F;
-      f.subvec(3*j,3*j+2)-=F;
+      f.subvec(3*i,3*i+2)-=F;
+      f.subvec(3*j,3*j+2)+=F;
     }
   }
 
