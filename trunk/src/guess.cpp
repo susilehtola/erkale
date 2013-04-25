@@ -55,6 +55,8 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
   set.set_bool("UseADIIS",true);
   set.set_bool("UseBroyden",false); 
   set.set_bool("UseTRRH",false);
+  // and default charge
+  set.set_int("Charge", 0);
 
   // Change guess method
   if(stricmp(set.get_string("AtomGuess"),"Auto")!=0)
