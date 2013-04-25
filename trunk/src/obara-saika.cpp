@@ -29,7 +29,6 @@
 // For comparison against Huzinaga integrals
 //#define DEBUG
 
-
 arma::mat overlap_int_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb) {
   // Compute shell of overlap integrals
 
@@ -92,7 +91,8 @@ arma::mat overlap_int_os(double xa, double ya, double za, double zetaa, const st
 	diff++;
 
   if(diff==0)
-    printf("Computed shell of overlaps (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,zetaa,zetab,am_a,am_b);
+    //    printf("Computed shell of overlaps (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,zetaa,zetab,am_a,am_b);
+    ;
   else
       for(size_t i=0;i<carta.size();i++)
 	for(size_t j=0;j<cartb.size();j++)
@@ -140,35 +140,35 @@ std::vector<arma::mat> overlap_int_pulay_os(double xa, double ya, double za, dou
       normb=cartb[j].relnorm;
 
       // LHS derivatives
-      S[0](i,j)=-2.0*zetaa*ox(la+1,lb)*oy(ma,mb)*oz(na,nb);
+      S[0](i,j)=sqrt((2*la+1)*zetaa)*ox(la+1,lb)*oy(ma,mb)*oz(na,nb);
       if(la>0)
-	S[0](i,j)+=     la*ox(la-1,lb)*oy(ma,mb)*oz(na,nb);
+	S[0](i,j)-=     2*la*sqrt(zetaa/(2*la-1))*ox(la-1,lb)*oy(ma,mb)*oz(na,nb);
       S[0](i,j)*=norma*normb;
 
-      S[1](i,j)=-2.0*zetaa*ox(la,lb)*oy(ma+1,mb)*oz(na,nb);
+      S[1](i,j)=sqrt((2*ma+1)*zetaa)*ox(la,lb)*oy(ma+1,mb)*oz(na,nb);
       if(ma>0)
-	S[1](i,j)+=     ma*ox(la,lb)*oy(ma-1,mb)*oz(na,nb);
+	S[1](i,j)-=     2*ma*sqrt(zetaa/(2*ma-1))*ox(la,lb)*oy(ma-1,mb)*oz(na,nb);
       S[1](i,j)*=norma*normb;
 
-      S[2](i,j)=-2.0*zetaa*ox(la,lb)*oy(ma,mb)*oz(na+1,nb);
+      S[2](i,j)=sqrt((2*na+1)*zetaa)*ox(la,lb)*oy(ma,mb)*oz(na+1,nb);
       if(na>0)
-	S[2](i,j)+=     na*ox(la,lb)*oy(ma,mb)*oz(na-1,nb);
+	S[2](i,j)-=     2*na*sqrt(zetaa/(2*na-1))*ox(la,lb)*oy(ma,mb)*oz(na-1,nb);
       S[2](i,j)*=norma*normb;
 
       // RHS derivatives
-      S[3](i,j)=-2.0*zetab*ox(la,lb+1)*oy(ma,mb)*oz(na,nb);
+      S[3](i,j)=sqrt((2*lb+1)*zetab)*ox(la,lb+1)*oy(ma,mb)*oz(na,nb);
       if(lb>0)
-	S[3](i,j)+=     lb*ox(la,lb-1)*oy(ma,mb)*oz(na,nb);
+	S[3](i,j)-=     2*lb*sqrt(zetab/(2*lb-1))*ox(la,lb-1)*oy(ma,mb)*oz(na,nb);
       S[3](i,j)*=norma*normb;
 
-      S[4](i,j)=-2.0*zetab*ox(la,lb)*oy(ma,mb+1)*oz(na,nb);
+      S[4](i,j)=sqrt((2*mb+1)*zetab)*ox(la,lb)*oy(ma,mb+1)*oz(na,nb);
       if(mb>0)
-	S[4](i,j)+=     mb*ox(la,lb)*oy(ma,mb-1)*oz(na,nb);
+	S[4](i,j)-=     2*mb*sqrt(zetab/(2*mb-1))*ox(la,lb)*oy(ma,mb-1)*oz(na,nb);
       S[4](i,j)*=norma*normb;
 
-      S[5](i,j)=-2.0*zetab*ox(la,lb)*oy(ma,mb)*oz(na,nb+1);
+      S[5](i,j)=sqrt((2*nb+1)*zetab)*ox(la,lb)*oy(ma,mb)*oz(na,nb+1);
       if(nb>0)
-	S[5](i,j)+=     nb*ox(la,lb)*oy(ma,mb)*oz(na,nb-1);
+	S[5](i,j)-=     2*nb*sqrt(zetab/(2*nb-1))*ox(la,lb)*oy(ma,mb)*oz(na,nb-1);
       S[5](i,j)*=norma*normb;
     }
   }
@@ -314,7 +314,8 @@ arma::mat kinetic_int_os(double xa, double ya, double za, double zetaa, const st
 	diff++;
 
   if(diff==0)
-    printf("Computed shell of KE (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,zetaa,zetab,am_a,am_b);
+    //    printf("Computed shell of KE (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,zetaa,zetab,am_a,am_b);
+    ;
   else
       for(size_t i=0;i<carta.size();i++)
 	for(size_t j=0;j<cartb.size();j++)
@@ -378,7 +379,9 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 
       // LHS, derivative acting on x component. The lhs function with
       // cartesian angular momentum (la,ma,na) becomes two functions:
-      // -2*zetaa*(la+1,ma,na) + la*(la-1,ma,na)
+      // sqrt[(2 la+1) zetaa] (la+1,ma,na) - 2 la sqrt[zetaa / (2 la -1)] (la-1,ma,na)
+      // note that derivatives are with respect to normalized functions!
+
       {
 	oxp=ox_arr(la+1,lb);
 	oy=oy_arr(ma,mb);
@@ -388,11 +391,11 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	ky=ky_arr(ma,mb);
 	kz=kz_arr(na,nb);
 
-	T[0](i,j)= -2.0*zetaa*(kxp*oy*oz + oxp*ky*oz + oxp*oy*kz);
+	T[0](i,j)= sqrt((2*la+1)*zetaa)*(kxp*oy*oz + oxp*ky*oz + oxp*oy*kz);
 	if(la>0) {
 	  oxm=ox_arr(la-1,lb);
 	  kxm=kx_arr(la-1,lb);
-	  T[0](i,j)+=      la*(kxm*oy*oz + oxm*ky*oz + oxm*oy*kz);
+	  T[0](i,j)-=      2*la*sqrt(zetaa/(2*la-1))*(kxm*oy*oz + oxm*ky*oz + oxm*oy*kz);
 	}
 	T[0](i,j)*=-0.5*anorm*bnorm;
       }
@@ -407,11 +410,11 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	kyp=ky_arr(ma+1,mb);
 	kz=kz_arr(na,nb);
 
-	T[1](i,j)= -2.0*zetaa*(kx*oyp*oz + ox*kyp*oz + ox*oyp*kz);
+	T[1](i,j)= sqrt((2*ma+1)*zetaa)*(kx*oyp*oz + ox*kyp*oz + ox*oyp*kz);
 	if(ma>0) {
 	  oym=oy_arr(ma-1,mb);
 	  kym=ky_arr(ma-1,mb);
-	  T[1](i,j)+=      ma*(kx*oym*oz + ox*kym*oz + ox*oym*kz);
+	  T[1](i,j)-=      2*ma*sqrt(zetaa/(2*ma-1))*(kx*oym*oz + ox*kym*oz + ox*oym*kz);
 	}
 	T[1](i,j)*=-0.5*anorm*bnorm;
       }
@@ -426,11 +429,11 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	ky=ky_arr(ma,mb);
 	kzp=kz_arr(na+1,nb);
 
-	T[2](i,j)= -2.0*zetaa*(kx*oy*ozp + ox*ky*ozp + ox*oy*kzp);
+	T[2](i,j)= sqrt((2*na+1)*zetaa)*(kx*oy*ozp + ox*ky*ozp + ox*oy*kzp);
 	if(na>0) {
 	  ozm=oz_arr(na-1,nb);
 	  kzm=kz_arr(na-1,nb);
-	  T[2](i,j)+=      na*(kx*oy*ozm + ox*ky*ozm + ox*oy*kzm);
+	  T[2](i,j)-=      2*na*sqrt(zetaa/(2*na-1))*(kx*oy*ozm + ox*ky*ozm + ox*oy*kzm);
 	}
 	T[2](i,j)*=-0.5*anorm*bnorm;
       }
@@ -445,12 +448,12 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	kxp=kx_arr(la,lb+1);
 	ky=ky_arr(ma,mb);
 	kz=kz_arr(na,nb);
-
-	T[3](i,j)= -2.0*zetab*(kxp*oy*oz + oxp*ky*oz + oxp*oy*kz);
+	
+	T[3](i,j)= sqrt((2*lb+1)*zetab)*(kxp*oy*oz + oxp*ky*oz + oxp*oy*kz);
 	if(lb>0) {
 	  oxm=ox_arr(la,lb-1);
 	  kxm=kx_arr(la,lb-1);
-	  T[3](i,j)+=      lb*(kxm*oy*oz + oxm*ky*oz + oxm*oy*kz);
+	  T[3](i,j)-=      2*lb*sqrt(zetab/(2*lb-1))*(kxm*oy*oz + oxm*ky*oz + oxm*oy*kz);
 	}
 	T[3](i,j)*=-0.5*anorm*bnorm;
       }
@@ -465,11 +468,11 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	kyp=ky_arr(ma,mb+1);
 	kz=kz_arr(na,nb);
 
-	T[4](i,j)= -2.0*zetab*(kx*oyp*oz + ox*kyp*oz + ox*oyp*kz);
+	T[4](i,j)= sqrt((2*mb+1)*zetab)*(kx*oyp*oz + ox*kyp*oz + ox*oyp*kz);
 	if(mb>0) {
 	  oym=oy_arr(ma,mb-1);
 	  kym=ky_arr(ma,mb-1);
-	  T[4](i,j)+=      mb*(kx*oym*oz + ox*kym*oz + ox*oym*kz);
+	  T[4](i,j)-=      2*mb*sqrt(zetab/(2*mb-1))*(kx*oym*oz + ox*kym*oz + ox*oym*kz);
 	}
 	T[4](i,j)*=-0.5*anorm*bnorm;
       }
@@ -484,11 +487,11 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	ky=ky_arr(ma,mb);
 	kzp=kz_arr(na,nb+1);
 
-	T[5](i,j)= -2.0*zetab*(kx*oy*ozp + ox*ky*ozp + ox*oy*kzp);
+	T[5](i,j)= sqrt((2*nb+1)*zetab)*(kx*oy*ozp + ox*ky*ozp + ox*oy*kzp);
 	if(nb>0) {
 	  ozm=oz_arr(na,nb-1);
 	  kzm=kz_arr(na,nb-1);
-	  T[5](i,j)+=      nb*(kx*oy*ozm + ox*ky*ozm + ox*oy*kzm);
+	  T[5](i,j)-=      2*nb*sqrt(zetab/(2*nb-1))*(kx*oy*ozm + ox*ky*ozm + ox*oy*kzm);
 	}
 	T[5](i,j)*=-0.5*anorm*bnorm;
       }
@@ -973,7 +976,8 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
   }
 
   if(diff==0)
-    printf("Computed NAI shell (%e,%e,%e) - (%e,%e,%e) with nucleus at (%e,%e,%e) and exponents %e and %e with am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,xnuc,ynuc,znuc,zetaa,zetab,am_a,am_b);
+    //    printf("Computed NAI shell (%e,%e,%e) - (%e,%e,%e) with nucleus at (%e,%e,%e) and exponents %e and %e with am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,xnuc,ynuc,znuc,zetaa,zetab,am_a,am_b);
+    ;
   else {
     ia=0;
     // Loop over basis functions on this shell
@@ -993,7 +997,7 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
 
 	    if(fabs(huzint(ia,ib)-V(ia,ib))>100*DBL_EPSILON*fabs(huzint(ia,ib))) {
 	      printf("Computed NAI shell (%e,%e,%e) - (%e,%e,%e) with nucleus at (%e,%e,%e) and exponents %e and %e.\n",xa,ya,za,xb,yb,zb,xnuc,ynuc,znuc,zetaa,zetab);
-	      printf("The result for the integral (%i,%i,%i)-(%i,%i,%i) is %e with Huzinaga, whereas %e with Obara-Saika.\n\n",ila,ima,ina,ilb,imb,inb,huzint(ia,ib),V(ia,ib));
+	      printf("The result for the integral (%i,%i,%i)-(%i,%i,%i) is %e with Huzinaga, whereas %e with Obara-Saika; difference is %e.\n\n",ila,ima,ina,ilb,imb,inb,huzint(ia,ib),V(ia,ib),huzint(ia,ib)-V(ia,ib));
 	    }
 	    ib++;
 	  }
@@ -1269,30 +1273,30 @@ std::vector<arma::mat> nuclear_int_pulay_os(double xa, double ya, double za, dou
 	  int bnmind=lb*Nbl+mb*Nbm+nb-1;
 
 	  // LHS, x
-	  V[0](ia,ib)=2.0*zetaa*ints(alpind,bind,0);
+	  V[0](ia,ib)=sqrt((2*la+1)*zetaa)*ints(alpind,bind,0);
 	  if(la>0)
-	    V[0](ia,ib)-=    la*ints(almind,bind,0);
+	    V[0](ia,ib)-=    2*la*sqrt(zetaa/(2*la-1))*ints(almind,bind,0);
 	  // LHS, y
-	  V[1](ia,ib)=2.0*zetaa*ints(ampind,bind,0);
+	  V[1](ia,ib)=sqrt((2*ma+1)*zetaa)*ints(ampind,bind,0);
 	  if(ma>0)
-	    V[1](ia,ib)-=    ma*ints(ammind,bind,0);
+	    V[1](ia,ib)-=    2*ma*sqrt(zetaa/(2*ma-1))*ints(ammind,bind,0);
 	  // LHS, z
-	  V[2](ia,ib)=2.0*zetaa*ints(anpind,bind,0);
+	  V[2](ia,ib)=sqrt((2*na+1)*zetaa)*ints(anpind,bind,0);
 	  if(na>0)
-	    V[2](ia,ib)-=    na*ints(anmind,bind,0);
+	    V[2](ia,ib)-=    2*na*sqrt(zetaa/(2*na-1))*ints(anmind,bind,0);
 
 	  // RHS, x
-	  V[3](ia,ib)=2.0*zetab*ints(aind,blpind,0);
+	  V[3](ia,ib)=sqrt((2*lb+1)*zetab)*ints(aind,blpind,0);
 	  if(lb>0)
-	    V[3](ia,ib)-=    lb*ints(aind,blmind,0);
+	    V[3](ia,ib)-=    2*lb*sqrt(zetab/(2*lb-1))*ints(aind,blmind,0);
 	  // RHS, y
-	  V[4](ia,ib)=2.0*zetab*ints(aind,bmpind,0);
+	  V[4](ia,ib)=sqrt((2*mb+1)*zetab)*ints(aind,bmpind,0);
 	  if(mb>0)
-	    V[4](ia,ib)-=    mb*ints(aind,bmmind,0);
+	    V[4](ia,ib)-=    2*mb*sqrt(zetab/(2*mb-1))*ints(aind,bmmind,0);
 	  // RHS, z
-	  V[5](ia,ib)=2.0*zetab*ints(aind,bnpind,0);
+	  V[5](ia,ib)=sqrt((2*nb+1)*zetab)*ints(aind,bnpind,0);
 	  if(nb>0)
-	    V[5](ia,ib)-=    nb*ints(aind,bnmind,0);
+	    V[5](ia,ib)-=    2*nb*sqrt(zetab/(2*nb-1))*ints(aind,bnmind,0);
 
 	  // Increment index of basis function
 	  ib++;
@@ -1474,7 +1478,7 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	}
 	else {
 	  ERROR_INFO();
-	  throw std::runtime_error("Something went haywire in the Obara-Saika nuclear attraction integral algorithm.\n");
+	  throw std::runtime_error("Something went haywire in the Obara-Saika nuclear attraction integral derivative algorithm.\n");
 	}
       }
   }
@@ -1599,7 +1603,7 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	      }
 	      else {
 		ERROR_INFO();
-		throw std::runtime_error("Something went haywire in the Obara-Saika nuclear attraction integral algorithm.\n");
+		throw std::runtime_error("Something went haywire in the Obara-Saika nuclear attraction integral derivative algorithm.\n");
 	      }
 	    }
 	  }
@@ -1659,6 +1663,79 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
       ia++;
     }
   }
+
+#ifdef DEBUG
+  // Compute Huzinaga integrals
+  std::vector<arma::mat> huzint(V);
+  for(size_t ic=0;ic<V.size();ic++)
+    huzint[ic].zeros();
+  
+  int diff=0;
+  
+  ia=0;
+  // Loop over basis functions on this shell
+  for(int ii=0; ii<=am_a; ii++) {
+    int ila=am_a - ii;
+    for(int jj=0; jj<=ii; jj++) {
+      int ima=ii - jj;
+      int ina=jj;
+
+      ib=0;
+      // Loop over basis functions on this shell
+      for(int kk=0; kk<=am_b; kk++) {
+	int ilb=am_b - kk;
+	for(int ll=0; ll<=kk; ll++) {
+	  int imb=kk - ll;
+	  int inb=ll;
+
+	  nuclear_int_der(xa,ya,za,zetaa,ila,ima,ina,xnuc,ynuc,znuc,xb,yb,zb,zetab,ilb,imb,inb,huzint[0](ia,ib),huzint[1](ia,ib),huzint[2](ia,ib));
+	  
+	  for(int ic=0;ic<3;ic++)
+	    if(fabs(huzint[ic](ia,ib)-V[ic](ia,ib))>100*DBL_EPSILON*std::max(fabs(huzint[ic](ia,ib)),fabs(V[ic](ia,ib))))
+	      diff++;
+	  
+	  ib++;
+	}
+      }
+
+      ia++;
+    }
+  }
+
+  if(diff==0)
+    //    printf("Computed NAI shell (%e,%e,%e) - (%e,%e,%e) with nucleus at (%e,%e,%e) and exponents %e and %e with am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,xnuc,ynuc,znuc,zetaa,zetab,am_a,am_b);
+    ;
+  else {
+    ia=0;
+    // Loop over basis functions on this shell
+    for(int ii=0; ii<=am_a; ii++) {
+      int ila=am_a - ii;
+      for(int jj=0; jj<=ii; jj++) {
+	int ima=ii - jj;
+	int ina=jj;
+
+	ib=0;
+	// Loop over basis functions on this shell
+	for(int kk=0; kk<=am_b; kk++) {
+	  int ilb=am_b - kk;
+	  for(int ll=0; ll<=kk; ll++) {
+	    int imb=kk - ll;
+	    int inb=ll;
+
+	    for(int ic=0;ic<3;ic++)
+	      if(fabs(huzint[ic](ia,ib)-V[ic](ia,ib))>100*DBL_EPSILON*std::max(fabs(huzint[ic](ia,ib)),fabs(V[ic](ia,ib)))) {
+		printf("Computed NAI shell (%e,%e,%e) - (%e,%e,%e) with nucleus at (%e,%e,%e) and exponents %e and %e.\n",xa,ya,za,xb,yb,zb,xnuc,ynuc,znuc,zetaa,zetab);
+		printf("The result for the %i derivative (%i,%i,%i)-(%i,%i,%i) is %e with Huzinaga, whereas %e with Obara-Saika; difference is %e.\n\n",(int) ic, ila,ima,ina,ilb,imb,inb,huzint[ic](ia,ib),V[ic](ia,ib),huzint[ic](ia,ib)-V[ic](ia,ib));
+	      }
+	    ib++;
+	  }
+	}
+	ia++;
+      }
+    }
+  }
+#endif
+
 
   return V;
 }
