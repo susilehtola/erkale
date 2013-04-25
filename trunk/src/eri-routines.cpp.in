@@ -26,50 +26,91 @@ void ERItable::fill(const BasisSet * basp, double tol) {
 #endif
 
 #if defined(CALCJKab)
-void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const {
+#ifndef FORCE
+void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const
+#else
+void ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fJ, arma::vec & fKa, arma::vec & fKb, double tol, double *eff) const
+#endif
+{
   // Compute total density for Coulomb matrix
   arma::mat P=Pa+Pb;
 #endif
 
 
 #if defined(CALCJK)
+#ifndef FORCE
 void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol, double *eff) const {
+#else
+void ERIscreen::forceJK(const arma::mat & P, arma::vec & fJ, arma::vec & fK, double tol, double *eff) const {
+#endif
 #endif
 
 #if defined(CALCK)
+#ifndef FORCE
 arma::mat ERIscreen::calcK(const arma::mat & P, double tol, double *eff) const {
   arma::mat K;
+#else
+arma::vec ERIscreen::forceK(const arma::mat & P, double tol, double *eff) const {
+  arma::vec fK;
+#endif
 #endif
 
 #if defined(CALCJ)
+#ifndef FORCE
 arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
   arma::mat J;
+#else
+arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const {
+  arma::vec fJ;
 #endif
-
+#endif
+  
   // Amount of basis functions
   size_t Nbf=basp->get_Nbf();
   // Shells
   std::vector<GaussianShell> shells=basp->get_shells();
 
   /* Check sizes of input */
-
+#ifndef FORCE
 #if defined(CALCJ) || defined(CALCJK) || defined(CALCJKab)
 #define DO_J
   J.zeros(Nbf,Nbf);
 #endif
-
+  
 #if defined(CALCK) || defined(CALCJK)
 #define DO_K
   K.zeros(Nbf,Nbf);
 #endif
 
 #if defined(CALCJKab)
+  Ka.zeros(Nbf,Nbf);
+  Kb.zeros(Nbf,Nbf);
+#endif
+
+#else // FORCE
+
+#if defined(CALCJ) || defined(CALCJK) || defined(CALCJKab)
+#define DO_J
+  fJ.zeros(3*basp->get_Nnuc());
+#endif
+
+#if defined(CALCK) || defined(CALCJK)
+#define DO_K
+  fK.zeros(3*basp->get_Nnuc());
+#endif
+
+#if defined(CALCJKab)
+  fKa.zeros(3*basp->get_Nnuc());
+  fKb.zeros(3*basp->get_Nnuc());
+#endif
+
+#endif // FORCE
+
+
+#if defined(CALCJKab)
 #define DO_Kab
   MAT_SIZE_CHECK(Pa,Nbf,Nbf,"Pa is not square!\n");
   MAT_SIZE_CHECK(Pb,Nbf,Nbf,"Pb is not square!\n");
-
-  Ka.zeros(Nbf,Nbf);
-  Kb.zeros(Nbf,Nbf);
 #endif
 
 #if defined(DO_J) || defined(DO_K)
@@ -202,12 +243,18 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 #endif // ifdef _OPENMP
   { // Open parallel region
 
+#ifndef FORCE
     /// ERI worker
     ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
+#else
+    /// ERI worker
+    dERIWorker deri(basp->get_max_am(),basp->get_max_Ncontr());
+#endif
 
     /// Integral array
     std::vector<double> eris;
 
+#ifndef FORCE
 #ifdef DO_J
     arma::mat Jwrk(J);
 #endif
@@ -220,6 +267,23 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
     arma::mat Kawrk(Ka);
     arma::mat Kbwrk(Kb);
 #endif
+
+#else // FORCE
+
+#ifdef DO_J
+    arma::vec fJwrk(fJ);
+#endif
+
+#ifdef DO_K
+    arma::vec fKwrk(fK);
+#endif
+
+#ifdef DO_Kab
+    arma::vec fKawrk(fKa);
+    arma::vec fKbwrk(fKb);
+#endif
+
+#endif // FORCE
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -284,6 +348,7 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	// Increment amount of calculated integrals
 	calcd++;
 
+#ifndef FORCE
 	// Compute integrals
 	eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls],eris);
 
@@ -634,40 +699,281 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 	}
 #endif // ifdef DO_K || DO_Kab
 
+#else // FORCE
 
-      } // End loop over jp pairs
-    } // End loop over ip pairs
+	// Compute the derivatives.
+	deri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
 
-    // Collect results
+	// Loop over shell centers
+	size_t inuc=shells[is].get_center_ind();
+	size_t jnuc=shells[js].get_center_ind();
+	size_t knuc=shells[ks].get_center_ind();
+	size_t lnuc=shells[ls].get_center_ind();
+
+#ifdef DO_J
+	  arma::vec Jforce(12);
+	  Jforce.zeros();
+
+	  // E_J = P_ij (ij|kl) P_kl. Work matrices
+	  arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
+	  arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
+	  
+	  // Degeneracy factor
+	  double Jfac=0.5;
+	  if(is!=js)
+	    Jfac*=2.0;
+	  if(ks!=ls)
+	    Jfac*=2.0;
+#endif
+
+#ifdef DO_K
+	  arma::vec Kforce(12);
+	  Kforce.zeros();
+
+	  // E_K = P_ik (ij|kl) P_jl
+	  arma::mat Pik=P.submat(i0,k0,i0+Ni-1,k0+Nk-1);
+	  arma::mat Pjl=P.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+	  //     + P_jk (ij|kl) P_il
+	  arma::mat Pjk=P.submat(j0,k0,j0+Nj-1,k0+Nk-1);
+	  arma::mat Pil=P.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+#endif
+
+#ifdef DO_Kab
+	  arma::vec Kaforce(12);
+	  Kaforce.zeros();
+	  arma::vec Kbforce(12);
+	  Kbforce.zeros();
+
+	  // E_K = P_ik (ij|kl) P_jl
+	  arma::mat Paik=Pa.submat(i0,k0,i0+Ni-1,k0+Nk-1);
+	  arma::mat Pbik=Pb.submat(i0,k0,i0+Ni-1,k0+Nk-1);
+	  arma::mat Pajl=Pa.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+	  arma::mat Pbjl=Pb.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+	  //     + P_jk (ij|kl) P_il
+	  arma::mat Pajk=Pa.submat(j0,k0,j0+Nj-1,k0+Nk-1);
+	  arma::mat Pbjk=Pb.submat(j0,k0,j0+Nj-1,k0+Nk-1);
+	  arma::mat Pail=Pa.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+	  arma::mat Pbil=Pb.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+#endif
+
+#if defined(DO_K) || defined(DO_Kab)
+	  double K1fac, K2fac;
+	  if(is!=js && ks!=ls) {
+	    // Get both twice.
+	    K1fac=-1.0;
+	    K2fac=-1.0;
+	  } else if((is==js && ks!=ls) || (is!=js && ks==ls)) {
+	    // Get both once.
+	    K1fac=-0.5;
+	    K2fac=-0.5;
+	  } else {
+	    // Only get the first once.
+	    K1fac=-0.5;
+	    K2fac=0.0;
+	  }
+#endif
+
+
+	  // Increment the forces.
+	  for(int idx=0;idx<12;idx++) {
+	    // Get the integral derivatives
+	    deri.get(idx,eris);
+	    
+#ifdef DO_J
+	    {
+	      // E_J = P_ij (ij|kl) P_kl
+	      double el=0.0;
+	      /* Increment matrix */
+	      for(size_t ii=0;ii<Ni;ii++) 
+		for(size_t jj=0;jj<Nj;jj++)
+		  for(size_t kk=0;kk<Nk;kk++)
+		    for(size_t ll=0;ll<Nl;ll++)
+		      el+=Pij(ii,jj)*Pkl(kk,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	      
+	      // Set the element
+	      Jforce(idx)=Jfac*el;
+	    }
+#endif // DO_J
+	    
+	    
+#ifdef DO_K
+	    // E_K = P_ik (ij|kl) P_jl
+	    {
+	      double el=0.0;
+	      /* Increment matrix */
+	      for(size_t ii=0;ii<Ni;ii++) 
+		for(size_t jj=0;jj<Nj;jj++)
+		  for(size_t kk=0;kk<Nk;kk++)
+		    for(size_t ll=0;ll<Nl;ll++)
+		      el+=Pik(ii,kk)*Pjl(jj,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	      
+	      // Set the element
+	      Kforce(idx)=K1fac*el;
+	      
+
+	      if(K2fac!=0.0) {
+		el=0.0;
+		/* Increment matrix */
+		for(size_t ii=0;ii<Ni;ii++) 
+		  for(size_t jj=0;jj<Nj;jj++)
+		    for(size_t kk=0;kk<Nk;kk++)
+		      for(size_t ll=0;ll<Nl;ll++)
+			el+=Pjk(jj,kk)*Pil(ii,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		
+		// Increment the element
+		Kforce(idx)+=K2fac*el;
+	      }
+	    }
+#endif
+
+#ifdef DO_Kab
+	    // E_K = P_ik (ij|kl) P_jl
+	    {
+	      double ael=0.0, bel=0.0;
+	      /* Increment matrix */
+	      for(size_t ii=0;ii<Ni;ii++) 
+		for(size_t jj=0;jj<Nj;jj++)
+		  for(size_t kk=0;kk<Nk;kk++)
+		    for(size_t ll=0;ll<Nl;ll++)
+		      ael+=Paik(ii,kk)*Pajl(jj,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	      for(size_t ii=0;ii<Ni;ii++) 
+		for(size_t jj=0;jj<Nj;jj++)
+		  for(size_t kk=0;kk<Nk;kk++)
+		    for(size_t ll=0;ll<Nl;ll++)
+		      bel+=Pbik(ii,kk)*Pbjl(jj,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	      
+	      // Set the element
+	      Kaforce(idx)=K1fac*ael;
+	      Kbforce(idx)=K1fac*bel;
+	      
+	      if(K2fac!=0.0) {
+		ael=0.0;
+		for(size_t ii=0;ii<Ni;ii++) 
+		  for(size_t jj=0;jj<Nj;jj++)
+		    for(size_t kk=0;kk<Nk;kk++)
+		      for(size_t ll=0;ll<Nl;ll++)
+			ael+=Pajk(jj,kk)*Pail(ii,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+
+		bel=0.0;
+		for(size_t ii=0;ii<Ni;ii++) 
+		  for(size_t jj=0;jj<Nj;jj++)
+		    for(size_t kk=0;kk<Nk;kk++)
+		      for(size_t ll=0;ll<Nl;ll++)
+			bel+=Pbjk(jj,kk)*Pbil(ii,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		
+		// Increment the element
+		Kaforce(idx)+=K2fac*ael;
+		Kbforce(idx)+=K2fac*bel;
+	      }
+	    }
+#endif
+	  } // End loop over idx
+  
+	  
+	  // Increment forces on atoms
+#ifdef DO_J
+#ifdef _OPENMP
+	  fJwrk.subvec(3*inuc,3*inuc+2)+=Jforce.subvec(0,2);
+	  fJwrk.subvec(3*jnuc,3*jnuc+2)+=Jforce.subvec(3,5);
+	  fJwrk.subvec(3*knuc,3*knuc+2)+=Jforce.subvec(6,8);
+	  fJwrk.subvec(3*lnuc,3*lnuc+2)+=Jforce.subvec(9,11);
+#else
+	  fJ.subvec(3*inuc,3*inuc+2)+=Jforce.subvec(0,2);
+	  fJ.subvec(3*jnuc,3*jnuc+2)+=Jforce.subvec(3,5);
+	  fJ.subvec(3*knuc,3*knuc+2)+=Jforce.subvec(6,8);
+	  fJ.subvec(3*lnuc,3*lnuc+2)+=Jforce.subvec(9,11);
+#endif
+#endif
+
+
+#ifdef DO_K
+#ifdef _OPENMP
+	  fKwrk.subvec(3*inuc,3*inuc+2)+=Kforce.subvec(0,2);
+	  fKwrk.subvec(3*jnuc,3*jnuc+2)+=Kforce.subvec(3,5);
+	  fKwrk.subvec(3*knuc,3*knuc+2)+=Kforce.subvec(6,8);
+	  fKwrk.subvec(3*lnuc,3*lnuc+2)+=Kforce.subvec(9,11);
+#else
+	  fK.subvec(3*inuc,3*inuc+2)+=Kforce.subvec(0,2);
+	  fK.subvec(3*jnuc,3*jnuc+2)+=Kforce.subvec(3,5);
+	  fK.subvec(3*knuc,3*knuc+2)+=Kforce.subvec(6,8);
+	  fK.subvec(3*lnuc,3*lnuc+2)+=Kforce.subvec(9,11);
+#endif
+#endif
+
+#ifdef DO_Kab
+#ifdef _OPENMP
+	  fKawrk.subvec(3*inuc,3*inuc+2)+=Kaforce.subvec(0,2);
+	  fKawrk.subvec(3*jnuc,3*jnuc+2)+=Kaforce.subvec(3,5);
+	  fKawrk.subvec(3*knuc,3*knuc+2)+=Kaforce.subvec(6,8);
+	  fKawrk.subvec(3*lnuc,3*lnuc+2)+=Kaforce.subvec(9,11);
+
+	  fKbwrk.subvec(3*inuc,3*inuc+2)+=Kbforce.subvec(0,2);
+	  fKbwrk.subvec(3*jnuc,3*jnuc+2)+=Kbforce.subvec(3,5);
+	  fKbwrk.subvec(3*knuc,3*knuc+2)+=Kbforce.subvec(6,8);
+	  fKbwrk.subvec(3*lnuc,3*lnuc+2)+=Kbforce.subvec(9,11);
+#else
+	  fKa.subvec(3*inuc,3*inuc+2)+=Kaforce.subvec(0,2);
+	  fKa.subvec(3*jnuc,3*jnuc+2)+=Kaforce.subvec(3,5);
+	  fKa.subvec(3*knuc,3*knuc+2)+=Kaforce.subvec(6,8);
+	  fKa.subvec(3*lnuc,3*lnuc+2)+=Kaforce.subvec(9,11);
+
+	  fKb.subvec(3*inuc,3*inuc+2)+=Kbforce.subvec(0,2);
+	  fKb.subvec(3*jnuc,3*jnuc+2)+=Kbforce.subvec(3,5);
+	  fKb.subvec(3*knuc,3*knuc+2)+=Kbforce.subvec(6,8);
+	  fKb.subvec(3*lnuc,3*lnuc+2)+=Kbforce.subvec(9,11);
+#endif
+#endif
+
+
+#endif // FORCE
+	
+	
+	} // End loop over jp pairs
+      } // End loop over ip pairs
+
+      // Collect results
 #ifdef DO_J
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    {
-      J+=Jwrk;
-    }
+      {
+#ifndef FORCE
+	J+=Jwrk;
+#else
+	fJ+=fJwrk;
+#endif
+      }
 #endif
 
 #ifdef DO_K
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    {
-      K+=Kwrk;
-    }
+      {
+#ifndef FORCE
+	K+=Kwrk;
+#else
+	fK+=fKwrk;
+#endif
+      }
 #endif
 
 #ifdef DO_Kab
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    {
-      Ka+=Kawrk;
-      Kb+=Kbwrk;
-    }
+      {
+#ifndef FORCE
+	Ka+=Kawrk;
+	Kb+=Kbwrk;
+#else
+	fKa+=fKawrk;
+	fKb+=fKbwrk;
+#endif
+      }
 #endif
 
-  } // end parallel region
+    } // end parallel region
 
 #ifndef ERITABLE
   // Compute screening efficiency
@@ -679,8 +985,16 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
 #endif
 
 #ifdef CALCJ
+#ifndef FORCE
   return J;
+#else
+  return fJ;
+#endif
 #elif defined(CALCK)
+#ifndef FORCE
   return K;
+#else
+  return fK;
+#endif
 #endif
 }
