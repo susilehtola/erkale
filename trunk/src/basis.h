@@ -337,6 +337,8 @@ class BasisSet {
   arma::mat eval_grad(size_t ish, double x, double y, double z) const;
   /// Evaluate laplacian at (x,y,z)
   arma::vec eval_lapl(size_t ish, double x, double y, double z) const;
+  /// Evaluate Hessian at (x,y,z)
+  arma::cube eval_hess(size_t ish, double x, double y, double z) const;
 
   /// Print out basis set
   void print(bool verbose=false) const;
@@ -521,6 +523,8 @@ class GaussianShell {
   arma::mat eval_grad(double x, double y, double z) const;
   /// Evaluate laplacian at (x,y,z)
   arma::vec eval_lapl(double x, double y, double z) const;
+  /// Evaluate Hessian at (x,y,z)
+  arma::cube eval_hess(double x, double y, double z) const;
 
   /// Calculate block overlap matrix between shells
   arma::mat overlap(const GaussianShell & rhs) const;
