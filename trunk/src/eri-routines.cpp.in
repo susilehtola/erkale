@@ -719,7 +719,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
 	  
 	  // Degeneracy factor
-	  double Jfac=0.5;
+	  double Jfac=-0.5;
 	  if(is!=js)
 	    Jfac*=2.0;
 	  if(ks!=ls)
@@ -760,17 +760,22 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  double K1fac, K2fac;
 	  if(is!=js && ks!=ls) {
 	    // Get both twice.
-	    K1fac=-1.0;
-	    K2fac=-1.0;
+	    K1fac=1.0;
+	    K2fac=1.0;
 	  } else if((is==js && ks!=ls) || (is!=js && ks==ls)) {
 	    // Get both once.
-	    K1fac=-0.5;
-	    K2fac=-0.5;
+	    K1fac=0.5;
+	    K2fac=0.5;
 	  } else {
 	    // Only get the first once.
-	    K1fac=-0.5;
+	    K1fac=0.5;
 	    K2fac=0.0;
 	  }
+#ifdef DO_K
+	  // Restricted case - only get half
+	  K1fac/=2;
+	  K2fac/=2;
+#endif
 #endif
 
 
