@@ -143,33 +143,33 @@ std::vector<arma::mat> overlap_int_pulay_os(double xa, double ya, double za, dou
       S[0](i,j)=sqrt((2*la+1)*zetaa)*ox(la+1,lb)*oy(ma,mb)*oz(na,nb);
       if(la>0)
 	S[0](i,j)-=     2*la*sqrt(zetaa/(2*la-1))*ox(la-1,lb)*oy(ma,mb)*oz(na,nb);
-      S[0](i,j)*=norma*normb;
+      S[0](i,j)*=-norma*normb;
 
       S[1](i,j)=sqrt((2*ma+1)*zetaa)*ox(la,lb)*oy(ma+1,mb)*oz(na,nb);
       if(ma>0)
 	S[1](i,j)-=     2*ma*sqrt(zetaa/(2*ma-1))*ox(la,lb)*oy(ma-1,mb)*oz(na,nb);
-      S[1](i,j)*=norma*normb;
+      S[1](i,j)*=-norma*normb;
 
       S[2](i,j)=sqrt((2*na+1)*zetaa)*ox(la,lb)*oy(ma,mb)*oz(na+1,nb);
       if(na>0)
 	S[2](i,j)-=     2*na*sqrt(zetaa/(2*na-1))*ox(la,lb)*oy(ma,mb)*oz(na-1,nb);
-      S[2](i,j)*=norma*normb;
+      S[2](i,j)*=-norma*normb;
 
       // RHS derivatives
       S[3](i,j)=sqrt((2*lb+1)*zetab)*ox(la,lb+1)*oy(ma,mb)*oz(na,nb);
       if(lb>0)
 	S[3](i,j)-=     2*lb*sqrt(zetab/(2*lb-1))*ox(la,lb-1)*oy(ma,mb)*oz(na,nb);
-      S[3](i,j)*=norma*normb;
+      S[3](i,j)*=-norma*normb;
 
       S[4](i,j)=sqrt((2*mb+1)*zetab)*ox(la,lb)*oy(ma,mb+1)*oz(na,nb);
       if(mb>0)
 	S[4](i,j)-=     2*mb*sqrt(zetab/(2*mb-1))*ox(la,lb)*oy(ma,mb-1)*oz(na,nb);
-      S[4](i,j)*=norma*normb;
+      S[4](i,j)*=-norma*normb;
 
       S[5](i,j)=sqrt((2*nb+1)*zetab)*ox(la,lb)*oy(ma,mb)*oz(na,nb+1);
       if(nb>0)
 	S[5](i,j)-=     2*nb*sqrt(zetab/(2*nb-1))*ox(la,lb)*oy(ma,mb)*oz(na,nb-1);
-      S[5](i,j)*=norma*normb;
+      S[5](i,j)*=-norma*normb;
     }
   }
 
@@ -397,7 +397,7 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	  kxm=kx_arr(la-1,lb);
 	  T[0](i,j)-=      2*la*sqrt(zetaa/(2*la-1))*(kxm*oy*oz + oxm*ky*oz + oxm*oy*kz);
 	}
-	T[0](i,j)*=-0.5*anorm*bnorm;
+	T[0](i,j)*=0.5*anorm*bnorm;
       }
 
       // LHS, derivative acting on y component
@@ -416,7 +416,7 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	  kym=ky_arr(ma-1,mb);
 	  T[1](i,j)-=      2*ma*sqrt(zetaa/(2*ma-1))*(kx*oym*oz + ox*kym*oz + ox*oym*kz);
 	}
-	T[1](i,j)*=-0.5*anorm*bnorm;
+	T[1](i,j)*=0.5*anorm*bnorm;
       }
 
       // LHS, derivative acting on z component
@@ -435,7 +435,7 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	  kzm=kz_arr(na-1,nb);
 	  T[2](i,j)-=      2*na*sqrt(zetaa/(2*na-1))*(kx*oy*ozm + ox*ky*ozm + ox*oy*kzm);
 	}
-	T[2](i,j)*=-0.5*anorm*bnorm;
+	T[2](i,j)*=0.5*anorm*bnorm;
       }
 
 
@@ -455,7 +455,7 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	  kxm=kx_arr(la,lb-1);
 	  T[3](i,j)-=      2*lb*sqrt(zetab/(2*lb-1))*(kxm*oy*oz + oxm*ky*oz + oxm*oy*kz);
 	}
-	T[3](i,j)*=-0.5*anorm*bnorm;
+	T[3](i,j)*=0.5*anorm*bnorm;
       }
 
       // RHS, derivative acting on y component
@@ -474,7 +474,7 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	  kym=ky_arr(ma,mb-1);
 	  T[4](i,j)-=      2*mb*sqrt(zetab/(2*mb-1))*(kx*oym*oz + ox*kym*oz + ox*oym*kz);
 	}
-	T[4](i,j)*=-0.5*anorm*bnorm;
+	T[4](i,j)*=0.5*anorm*bnorm;
       }
 
       // RHS, derivative acting on z component
@@ -493,7 +493,7 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	  kzm=kz_arr(na,nb-1);
 	  T[5](i,j)-=      2*nb*sqrt(zetab/(2*nb-1))*(kx*oy*ozm + ox*ky*ozm + ox*oy*kzm);
 	}
-	T[5](i,j)*=-0.5*anorm*bnorm;
+	T[5](i,j)*=0.5*anorm*bnorm;
       }
       
     }
@@ -1650,9 +1650,9 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	  int bind=lb*Nbl+mb*Nbm+nb;
 
 	  // Store result
-	  V[0](ia,ib)=-xint(aind,bind,0);
-	  V[1](ia,ib)=-yint(aind,bind,0);
-	  V[2](ia,ib)=-zint(aind,bind,0);
+	  V[0](ia,ib)=xint(aind,bind,0);
+	  V[1](ia,ib)=yint(aind,bind,0);
+	  V[2](ia,ib)=zint(aind,bind,0);
 	  
 	  // Increment index of basis function
 	  ib++;
@@ -1690,8 +1690,9 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 
 	  nuclear_int_der(xa,ya,za,zetaa,ila,ima,ina,xnuc,ynuc,znuc,xb,yb,zb,zetab,ilb,imb,inb,huzint[0](ia,ib),huzint[1](ia,ib),huzint[2](ia,ib));
 	  
-	  for(int ic=0;ic<3;ic++)
-	    if(fabs(huzint[ic](ia,ib)-V[ic](ia,ib))>100*DBL_EPSILON*std::max(fabs(huzint[ic](ia,ib)),fabs(V[ic](ia,ib))))
+	  for(int ic=0;ic<3;ic++) 
+	    // Differring sign convention - we actually do the force, not the derivative
+	    if(fabs(huzint[ic](ia,ib)+V[ic](ia,ib))>100*DBL_EPSILON*std::max(fabs(huzint[ic](ia,ib)),fabs(V[ic](ia,ib))))
 	      diff++;
 	  
 	  ib++;
