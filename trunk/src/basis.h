@@ -359,15 +359,15 @@ class BasisSet {
   /// Calculate nuclear repulsion matrix
   arma::mat nuclear() const;
 
-  /// Calculate (negative of) nuclear Pulay forces
+  /// Calculate nuclear Pulay forces
   arma::vec nuclear_pulay(const arma::mat & P) const;
-  /// Calculate (negative of) nuclear Hellman-Feynman force
+  /// Calculate nuclear Hellman-Feynman force
   arma::vec nuclear_der(const arma::mat & P) const;
-  /// Calculate (negative of) kinetic Pulay forces
+  /// Calculate kinetic Pulay forces
   arma::vec kinetic_pulay(const arma::mat & P) const;
-  /// Calculate (negative of) overlap derivative
+  /// Calculate overlap derivative force
   arma::vec overlap_der(const arma::mat & W) const;
-  /// Calculate (negative of) nuclear repulsion force
+  /// Calculate nuclear repulsion force
   arma::vec nuclear_force() const;  
 
   /// Compute moment integral around (x,y,z)

@@ -2032,15 +2032,15 @@ arma::vec BasisSet::nuclear_force() const {
       coords_t rij=nuclei[i].r-nuclei[j].r;
       // and its third power
       double rcb=pow(norm(rij),3);
-
+      
       // Force is
       arma::vec F(3);
       F(0)=nuclei[i].Z*nuclei[j].Z/rcb*rij.x;
       F(1)=nuclei[i].Z*nuclei[j].Z/rcb*rij.y;
       F(2)=nuclei[i].Z*nuclei[j].Z/rcb*rij.z;
 
-      f.subvec(3*i,3*i+2)-=F;
-      f.subvec(3*j,3*j+2)+=F;
+      f.subvec(3*i,3*i+2)+=F;
+      f.subvec(3*j,3*j+2)-=F;
     }
   }
 
