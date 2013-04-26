@@ -690,6 +690,125 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
     return ret;
 }
 
+arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
+  // Evaluate gradients of functions at (x,y,z)
+
+  // Compute coordinates relative to center
+  double xrel=x-cen.x;
+  double yrel=y-cen.y;
+  double zrel=z-cen.z;
+
+  double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
+
+  // Power arrays, x^l, y^l, z^l
+  double xr[am+3], yr[am+3], zr[am+3];
+
+  xr[0]=1.0;
+  yr[0]=1.0;
+  zr[0]=1.0;
+
+  xr[1]=xrel;
+  yr[1]=yrel;
+  zr[1]=zrel;
+
+  for(int i=2;i<=am+2;i++) {
+    xr[i]=xr[i-1]*xrel;
+    yr[i]=yr[i-1]*yrel;
+    zr[i]=zr[i-1]*zrel;
+  }
+
+  // Gradient array, N_cart x 3 x 3
+  arma::cube ret(3,3,cart.size());
+  ret.zeros();
+
+  // Helper variables
+  double tmp, expf;
+
+  // Loop over functions
+  for(size_t icart=0;icart<cart.size();icart++) {
+    // Get types
+    int l=cart[icart].l;
+    int m=cart[icart].m;
+    int n=cart[icart].n;
+
+    // Loop over exponential contraction
+    for(size_t iexp=0;iexp<c.size();iexp++) {
+      // Contracted exponent
+      expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
+
+      // d/dx^2
+      tmp=4.0*pow(c[iexp].z,2)*xr[l+2] - 2.0*c[iexp].z*(2*l+1)*xr[l];
+      if(l>1)
+	tmp+=l*(l-1)*xr[l-2];
+      ret(0,0,icart)=tmp*yr[m]*zr[n]*expf;
+
+      // d/dy^2
+      tmp=4.0*pow(c[iexp].z,2)*yr[m+2] - 2.0*c[iexp].z*(2*m+1)*yr[m];
+      if(m>1)
+	tmp+=m*(m-1)*yr[m-2];
+      ret(1,1,icart)=tmp*xr[l]*zr[n]*expf;
+
+      // d/dz^2
+      tmp=4.0*pow(c[iexp].z,2)*zr[n+2] - 2.0*c[iexp].z*(2*n+1)*zr[n];
+      if(n>1)
+	tmp+=n*(n-1)*zr[n-2];
+      ret(2,2,icart)=tmp*xr[l]*yr[m]*expf;
+
+      // dxdy = dydx
+      tmp=4.0*pow(c[iexp].z,2)*xr[l+1]*yr[m+1];
+      if(l>0)
+	tmp-=2.0*c[iexp].z*l*xr[l-1]*yr[m+1];
+      if(m>0)
+	tmp-=2.0*c[iexp].z*m*xr[l+1]*yr[m-1];
+      if(l>0 && m>0)
+	tmp+=l*m*xr[l-1]*yr[m-1];
+      ret(0,1,icart)=tmp*zr[n]*expf;
+      ret(1,0,icart)=ret(0,1,icart);
+
+      // dxdz = dzdx
+      tmp=4.0*pow(c[iexp].z,2)*xr[l+1]*zr[n+1];
+      if(l>0)
+	tmp-=2.0*c[iexp].z*l*xr[l-1]*zr[n+1];
+      if(n>0)
+	tmp-=2.0*c[iexp].z*n*xr[l+1]*zr[n-1];
+      if(l>0 && n>0)
+	tmp+=l*n*xr[l-1]*zr[n-1];
+      ret(0,2,icart)=tmp*yr[m]*expf;
+      ret(2,0,icart)=ret(0,2,icart);
+
+      // dydz = dzdy
+      tmp=4.0*pow(c[iexp].z,2)*yr[m+1]*zr[n+1];
+      if(m>0)
+	tmp-=2.0*c[iexp].z*m*yr[m-1]*zr[n+1];
+      if(n>0)
+	tmp-=2.0*c[iexp].z*n*yr[m+1]*zr[n-1];
+      if(m>0 && n>0)
+	tmp+=m*n*yr[m-1]*zr[n-1];
+      ret(0,3,icart)=tmp*xr[l]*expf;
+      ret(3,0,icart)=ret(0,3,icart);
+    }
+    
+    // Plug in normalization constant
+    for(int ic=0;ic<3;ic++)
+      for(int jc=0;jc<3;jc++)
+	ret(ic,jc,icart)*=cart[icart].relnorm;
+  }
+  
+
+  if(uselm) {
+    // Need to transform into spherical harmonics
+    arma::cube transform(3,3,get_Nbf());
+    transform.zeros();
+    for(size_t i=0;i<get_Nbf();i++)
+      for(size_t j=0;j<get_Ncart();j++)
+	transform.slice(i)+=transmat(i,j)*ret.slice(j);
+
+    return transform;
+  } else
+    return ret;
+}
+
+
 // Calculate overlaps between basis functions
 arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
 
