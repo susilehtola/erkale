@@ -808,6 +808,128 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
     return ret;
 }
 
+arma::mat GaussianShell::eval_laplgrad(double x, double y, double z) const {
+  // Evaluate laplacian of gradients of functions at (x,y,z)
+
+  // Compute coordinates relative to center
+  double xrel=x-cen.x;
+  double yrel=y-cen.y;
+  double zrel=z-cen.z;
+
+  double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
+
+  // Power arrays, x^l, y^l, z^l
+  double xr[am+4], yr[am+4], zr[am+4];
+
+  xr[0]=1.0;
+  yr[0]=1.0;
+  zr[0]=1.0;
+
+  xr[1]=xrel;
+  yr[1]=yrel;
+  zr[1]=zrel;
+
+  for(int i=2;i<=am+3;i++) {
+    xr[i]=xr[i-1]*xrel;
+    yr[i]=yr[i-1]*yrel;
+    zr[i]=zr[i-1]*zrel;
+  }
+
+  // Helper array, N_cart x 3 x 3
+  arma::cube hlp(cart.size(),3,3);
+  hlp.zeros();
+
+  // Helper variables
+  double expf;
+
+  // Loop over functions
+  for(size_t icart=0;icart<cart.size();icart++) {
+    // Get types
+    int l=cart[icart].l;
+    int m=cart[icart].m;
+    int n=cart[icart].n;
+
+    // Indices
+    int idx[3]={l,m,n};
+    arma::mat rr(am+4,3);
+    for(int ia=0;ia<am+4;ia++) {
+      rr(ia,0)=xr[ia];
+      rr(ia,1)=yr[ia];
+      rr(ia,2)=zr[ia];
+    }
+
+    // Loop over exponential contraction
+    for(size_t iexp=0;iexp<c.size();iexp++) {
+      // Contracted exponent
+      expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
+
+      // Loop over components
+      for(int i=0;i<3;i++)
+	for(int j=0;j<3;j++) {
+
+	  if(i==j) {
+	    int oi1, oi2;
+	    if(i==0) {
+	      oi1=1;
+	      oi2=2;
+	    } else if(i==1) {
+	      oi1=0;
+	      oi2=2;
+	    } else if(i==2) {
+	      oi1=0;
+	      oi2=1;
+	    }
+
+	    // Third derivative	    
+	    hlp(icart,i,j)=12.0*pow(c[iexp].z,2)*(idx[i]+1)*rr(idx[i]+1,i) - 8.0*pow(c[iexp].z,3)*rr(idx[i]+3);
+	    if(idx[i]>0)
+	      hlp(icart,i,j)-=6.0*c[iexp].z*pow(idx[i],2)*rr(idx[i]-1,i);
+	    if(idx[i]>1)
+	      hlp(icart,i,j)+=idx[i]*(idx[i]-1)*(idx[i]-2)*rr(idx[i]-3,i);
+	    hlp(icart,i,j)*=rr(idx[oi1],oi1)*rr(idx[oi2],oi2)*expf;
+
+	  } else {
+	    // Second derivate wrt i, first derivate wrt j
+	    
+	    int oi=0;
+	    while(oi==i || oi==j) {
+	      oi=(oi+1)%3;
+	    }
+
+	    double icomp=-2.0*c[iexp].z*(2*idx[i]+1)*rr(idx[i],i) + 4.0*pow(c[iexp].z,2)*rr(idx[i]+2,i);
+	    if(idx[i]>1)
+	      icomp+=idx[i]*(idx[i]-1)*rr(idx[i]-2,i);
+
+	    double jcomp=-2.0*c[iexp].z*rr(idx[j]+1,j);
+	    if(idx[j]>0)
+	      jcomp+=idx[j]*rr(idx[j]-1,j);
+	    
+	    hlp(icart,i,j)=icomp*jcomp*rr(idx[oi],oi)*expf;
+	  }
+	}
+    }
+  }
+
+  // Returned array, N_cart x 3
+  arma::mat ret(cart.size(),3);
+  ret.zeros();
+
+  for(size_t icart=0;icart<cart.size();icart++)
+    for(int j=0;j<3;j++) {
+      // Sum up laplacian
+      for(int i=0;i<3;i++)
+	ret(icart,j)+=hlp(icart,i,j);
+      
+      // Plug in normalization constant
+      ret(icart,j)*=cart[icart].relnorm;
+    }
+  
+  if(uselm)
+    // Need to transform into spherical harmonics
+    return transmat*ret;
+  else
+    return ret;
+}
 
 // Calculate overlaps between basis functions
 arma::mat GaussianShell::overlap(const GaussianShell & rhs) const {
@@ -1620,6 +1742,10 @@ arma::mat BasisSet::eval_grad(size_t ish, double x, double y, double z) const {
 
 arma::vec BasisSet::eval_lapl(size_t ish, double x, double y, double z) const {
   return shells[ish].eval_lapl(x,y,z);
+}
+
+arma::mat BasisSet::eval_laplgrad(size_t ish, double x, double y, double z) const {
+  return shells[ish].eval_laplgrad(x,y,z);
 }
 
 void BasisSet::convert_contractions() {
