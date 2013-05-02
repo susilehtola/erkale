@@ -868,17 +868,7 @@ arma::mat GaussianShell::eval_laplgrad(double x, double y, double z) const {
 	for(int j=0;j<3;j++) {
 
 	  if(i==j) {
-	    int oi1, oi2;
-	    if(i==0) {
-	      oi1=1;
-	      oi2=2;
-	    } else if(i==1) {
-	      oi1=0;
-	      oi2=2;
-	    } else if(i==2) {
-	      oi1=0;
-	      oi2=1;
-	    }
+	    int oi1=(i+1)%3, oi2=(i+2)%3;
 
 	    // Third derivative	    
 	    hlp(icart,i,j)=12.0*pow(c[iexp].z,2)*(idx[i]+1)*rr(idx[i]+1,i) - 8.0*pow(c[iexp].z,3)*rr(idx[i]+3);
