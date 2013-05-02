@@ -37,6 +37,32 @@
 // Debug LIBINT routines against Huzinaga integrals?
 //#define LIBINTDEBUG
 
+// Derivative operator
+inline double _der1(const double x[], int l, double zeta) {
+  double d=-2.0*zeta*x[l+1];
+  if(l>0)
+    d+=l*x[l-1];
+  return d;
+}
+
+// Second derivative operator
+inline double _der2(const double x[], int l, double zeta) {
+  double d=4.0*zeta*zeta*x[l+2] - 2.0*zeta*(l+1)*x[l];
+  if(l>1)
+    d+=l*(l-1)*x[l-2];
+  return d;
+}
+
+// Third derivative operator
+inline double _der3(const double x[], int l, double zeta) {
+  double d=-8.0*zeta*zeta*zeta*x[l+3] + 12.0*zeta*zeta*(l+1)*x[l+1];
+  if(l>0)
+    d-=6.0*zeta*l*l*x[l-1];
+  if(l>2)
+    d+=l*(l-1)*(l-2)*x[l-3];
+  return d;
+}
+
 bool operator==(const nucleus_t & lhs, const nucleus_t & rhs) {
   return (lhs.ind == rhs.ind) && (lhs.r == rhs.r) && (lhs.Z == rhs.Z) && \
     (lhs.bsse == rhs.bsse) && (stricmp(lhs.symbol,rhs.symbol)==0);
@@ -567,7 +593,7 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
   ret.zeros();
 
   // Helper variables
-  double tmp, expf;
+  double expf;
 
   // Loop over functions
   for(size_t icart=0;icart<cart.size();icart++) {
@@ -582,22 +608,11 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
       expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
       // x component of gradient:
-      tmp=-2.0*c[iexp].z*xr[l+1];
-      if(l>0)
-	tmp+=l*xr[l-1];
-      ret(icart,0)+=tmp*yr[m]*zr[n]*expf;
-
+      ret(icart,0)+=_der1(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
       // y component
-      tmp=-2.0*c[iexp].z*yr[m+1];
-      if(m>0)
-	tmp+=m*yr[m-1];
-      ret(icart,1)+=tmp*xr[l]*zr[n]*expf;
-
+      ret(icart,1)+=xr[l]*_der1(yr,m,c[iexp].z)*zr[n]*expf;
       // z component
-      tmp=-2.0*c[iexp].z*zr[n+1];
-      if(n>0)
-	tmp+=n*zr[n-1];
-      ret(icart,2)+=tmp*xr[l]*yr[m]*expf;
+      ret(icart,2)+=xr[l]*yr[m]*_der1(zr,n,c[iexp].z)*expf;
     }
 
     // Plug in normalization constant
@@ -605,7 +620,6 @@ arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
     ret(icart,1)*=cart[icart].relnorm;
     ret(icart,2)*=cart[icart].relnorm;
   }
-
 
   if(uselm)
     // Need to transform into spherical harmonics
@@ -646,7 +660,7 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
   ret.zeros();
 
   // Helper variables
-  double tmp, expf;
+  double expf;
 
   // Loop over functions
   for(size_t icart=0;icart<cart.size();icart++) {
@@ -661,22 +675,11 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
       expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
       // Derivative wrt x
-      tmp=4.0*c[iexp].z*c[iexp].z*xr[l+2]-2.0*(2*l+1)*c[iexp].z*xr[l];
-      if(l>1)
-	tmp+=l*(l-1)*xr[l-2];
-      ret(icart)+=tmp*yr[m]*zr[n]*expf;
-
+      ret(icart)+=_der2(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
       // Derivative wrt y
-      tmp=4.0*c[iexp].z*c[iexp].z*yr[m+2]-2.0*(2*m+1)*c[iexp].z*yr[m];
-      if(m>1)
-	tmp+=m*(m-1)*yr[m-2];
-      ret(icart)+=tmp*xr[l]*zr[n]*expf;
-
+      ret(icart)+=xr[l]*_der2(yr,m,c[iexp].z)*zr[n]*expf;
       // Derivative wrt z
-      tmp=4.0*c[iexp].z*c[iexp].z*zr[n+2]-2.0*(2*n+1)*c[iexp].z*zr[n];
-      if(n>1)
-	tmp+=n*(n-1)*zr[n-2];
-      ret(icart)+=tmp*xr[l]*yr[m]*expf;
+      ret(icart)+=xr[l]*yr[m]*_der2(zr,n,c[iexp].z)*expf;
     }
 
     // Plug in normalization constant
@@ -722,7 +725,7 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
   ret.zeros();
 
   // Helper variables
-  double tmp, expf;
+  double expf;
 
   // Loop over functions
   for(size_t icart=0;icart<cart.size();icart++) {
@@ -737,55 +740,23 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
       expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
       // d/dx^2
-      tmp=4.0*pow(c[iexp].z,2)*xr[l+2] - 2.0*c[iexp].z*(2*l+1)*xr[l];
-      if(l>1)
-	tmp+=l*(l-1)*xr[l-2];
-      ret(0,0,icart)=tmp*yr[m]*zr[n]*expf;
-
+      ret(0,0,icart)=_der2(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
       // d/dy^2
-      tmp=4.0*pow(c[iexp].z,2)*yr[m+2] - 2.0*c[iexp].z*(2*m+1)*yr[m];
-      if(m>1)
-	tmp+=m*(m-1)*yr[m-2];
-      ret(1,1,icart)=tmp*xr[l]*zr[n]*expf;
-
+      ret(1,1,icart)=xr[l]*_der2(yr,m,c[iexp].z)*zr[n]*expf;
       // d/dz^2
-      tmp=4.0*pow(c[iexp].z,2)*zr[n+2] - 2.0*c[iexp].z*(2*n+1)*zr[n];
-      if(n>1)
-	tmp+=n*(n-1)*zr[n-2];
-      ret(2,2,icart)=tmp*xr[l]*yr[m]*expf;
+      ret(2,2,icart)=xr[l]*yr[m]*_der2(zr,n,c[iexp].z)*expf;
 
       // dxdy = dydx
-      tmp=4.0*pow(c[iexp].z,2)*xr[l+1]*yr[m+1];
-      if(l>0)
-	tmp-=2.0*c[iexp].z*l*xr[l-1]*yr[m+1];
-      if(m>0)
-	tmp-=2.0*c[iexp].z*m*xr[l+1]*yr[m-1];
-      if(l>0 && m>0)
-	tmp+=l*m*xr[l-1]*yr[m-1];
-      ret(0,1,icart)=tmp*zr[n]*expf;
+      ret(0,1,icart)=_der1(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
       ret(1,0,icart)=ret(0,1,icart);
 
       // dxdz = dzdx
-      tmp=4.0*pow(c[iexp].z,2)*xr[l+1]*zr[n+1];
-      if(l>0)
-	tmp-=2.0*c[iexp].z*l*xr[l-1]*zr[n+1];
-      if(n>0)
-	tmp-=2.0*c[iexp].z*n*xr[l+1]*zr[n-1];
-      if(l>0 && n>0)
-	tmp+=l*n*xr[l-1]*zr[n-1];
-      ret(0,2,icart)=tmp*yr[m]*expf;
+      ret(0,2,icart)=_der1(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
       ret(2,0,icart)=ret(0,2,icart);
 
       // dydz = dzdy
-      tmp=4.0*pow(c[iexp].z,2)*yr[m+1]*zr[n+1];
-      if(m>0)
-	tmp-=2.0*c[iexp].z*m*yr[m-1]*zr[n+1];
-      if(n>0)
-	tmp-=2.0*c[iexp].z*n*yr[m+1]*zr[n-1];
-      if(m>0 && n>0)
-	tmp+=m*n*yr[m-1]*zr[n-1];
-      ret(0,3,icart)=tmp*xr[l]*expf;
-      ret(3,0,icart)=ret(0,3,icart);
+      ret(1,2,icart)=xr[l]*_der1(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*expf;
+      ret(2,1,icart)=ret(1,2,icart);
     }
     
     // Plug in normalization constant
@@ -835,9 +806,9 @@ arma::mat GaussianShell::eval_laplgrad(double x, double y, double z) const {
     zr[i]=zr[i-1]*zrel;
   }
 
-  // Helper array, N_cart x 3 x 3
-  arma::cube hlp(cart.size(),3,3);
-  hlp.zeros();
+  // Returned array, N_cart x 3
+  arma::mat ret(cart.size(),3);
+  ret.zeros();
 
   // Helper variables
   double expf;
@@ -849,70 +820,38 @@ arma::mat GaussianShell::eval_laplgrad(double x, double y, double z) const {
     int m=cart[icart].m;
     int n=cart[icart].n;
 
-    // Indices
-    int idx[3]={l,m,n};
-    arma::mat rr(am+4,3);
-    for(int ia=0;ia<am+4;ia++) {
-      rr(ia,0)=xr[ia];
-      rr(ia,1)=yr[ia];
-      rr(ia,2)=zr[ia];
-    }
-
     // Loop over exponential contraction
     for(size_t iexp=0;iexp<c.size();iexp++) {
       // Contracted exponent
       expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
-      // Loop over components
-      for(int i=0;i<3;i++)
-	for(int j=0;j<3;j++) {
+      // dx^3
+      ret(icart,0) =_der3(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
+      // dy^2 dx
+      ret(icart,0)+=_der1(xr,l,c[iexp].z)*_der2(yr,m,c[iexp].z)*zr[n]*expf;
+      // dz^2 dx
+      ret(icart,0)+=_der1(xr,l,c[iexp].z)*yr[m]*_der2(zr,n,c[iexp].z)*expf;
 
-	  if(i==j) {
-	    int oi1=(i+1)%3, oi2=(i+2)%3;
+      // dx^2 dy
+      ret(icart,1) =_der2(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
+      // dy^3
+      ret(icart,1)+=xr[l]*_der3(yr,m,c[iexp].z)*zr[n]*expf;
+      // dz^2 dy
+      ret(icart,1)+=xr[l]*_der1(yr,m,c[iexp].z)*_der2(zr,n,c[iexp].z)*expf;
 
-	    // Third derivative	    
-	    hlp(icart,i,j)=12.0*pow(c[iexp].z,2)*(idx[i]+1)*rr(idx[i]+1,i) - 8.0*pow(c[iexp].z,3)*rr(idx[i]+3);
-	    if(idx[i]>0)
-	      hlp(icart,i,j)-=6.0*c[iexp].z*pow(idx[i],2)*rr(idx[i]-1,i);
-	    if(idx[i]>1)
-	      hlp(icart,i,j)+=idx[i]*(idx[i]-1)*(idx[i]-2)*rr(idx[i]-3,i);
-	    hlp(icart,i,j)*=rr(idx[oi1],oi1)*rr(idx[oi2],oi2)*expf;
-
-	  } else {
-	    // Second derivate wrt i, first derivate wrt j
-	    
-	    int oi=0;
-	    while(oi==i || oi==j) {
-	      oi=(oi+1)%3;
-	    }
-
-	    double icomp=-2.0*c[iexp].z*(2*idx[i]+1)*rr(idx[i],i) + 4.0*pow(c[iexp].z,2)*rr(idx[i]+2,i);
-	    if(idx[i]>1)
-	      icomp+=idx[i]*(idx[i]-1)*rr(idx[i]-2,i);
-
-	    double jcomp=-2.0*c[iexp].z*rr(idx[j]+1,j);
-	    if(idx[j]>0)
-	      jcomp+=idx[j]*rr(idx[j]-1,j);
-	    
-	    hlp(icart,i,j)=icomp*jcomp*rr(idx[oi],oi)*expf;
-	  }
-	}
+      // dx^2 dz
+      ret(icart,2) =_der2(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
+      // dy^2 dz
+      ret(icart,2)+=xr[l]*_der2(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*expf;
+      // dz^3
+      ret(icart,2)+=xr[l]*yr[m]*_der3(zr,n,c[iexp].z)*expf;
     }
+
+    // Plug in normalization constant
+    ret(icart,0)*=cart[icart].relnorm;
+    ret(icart,1)*=cart[icart].relnorm;
+    ret(icart,2)*=cart[icart].relnorm;
   }
-
-  // Returned array, N_cart x 3
-  arma::mat ret(cart.size(),3);
-  ret.zeros();
-
-  for(size_t icart=0;icart<cart.size();icart++)
-    for(int j=0;j<3;j++) {
-      // Sum up laplacian
-      for(int i=0;i<3;i++)
-	ret(icart,j)+=hlp(icart,i,j);
-      
-      // Plug in normalization constant
-      ret(icart,j)*=cart[icart].relnorm;
-    }
   
   if(uselm)
     // Need to transform into spherical harmonics
