@@ -43,8 +43,6 @@ double kinetic_int(double xa, double ya, double za, double zetaa, int la, int ma
 
 /// Calculate nuclear attraction integral
 double nuclear_int(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xnuc, double ynuc, double znuc, double xb, double yb, double zb, double zetab, int lb, int mb, int nb);
-/// Calculate nuclear attraction integral derivative
-void nuclear_int_der(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xnuc, double ynuc, double znuc, double xb, double yb, double zb, double zetab, int lb, int mb, int nb, double & dx, double & dy, double & dz);
 
 /// Calculate electron repulsion integral
 double ERI_int(int la, int ma, int na, double Ax, double Ay, double Az, double zetaa, int lb, int mb, int nb, double Bx, double By, double Bz, double zetab, int lc, int mc, int nc, double Cx, double Cy, double Cz, double zetac, int ld, int md, int nd, double Dx, double Dy, double Dz, double zetad);
