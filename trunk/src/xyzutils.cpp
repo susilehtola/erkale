@@ -104,11 +104,14 @@ std::vector<atom_t> load_xyz(std::string filename) {
   return atoms;
 }
 
-void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const std::string & fname) {
+void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const std::string & fname, bool append) {
   // Output file
   FILE *out;
   
-  out=fopen(fname.c_str(),"w");
+  if(append)
+    out=fopen(fname.c_str(),"a");
+  else
+    out=fopen(fname.c_str(),"w");
 
   // Print out number of atoms
   fprintf(out,"%u\n",(unsigned int) at.size());
@@ -116,6 +119,6 @@ void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const
   fprintf(out,"%s\n",comment.c_str());
   // Print atoms
   for(size_t i=0;i<at.size();i++)
-    fprintf(out,"%s\t%g\t%g\t%g\n",at[i].el.c_str(),at[i].x,at[i].y,at[i].z);
+    fprintf(out,"%-4s  % 10.5f  % 10.5f  % 10.5f\n",at[i].el.c_str(),at[i].x/ANGSTROMINBOHR,at[i].y/ANGSTROMINBOHR,at[i].z/ANGSTROMINBOHR);
   fclose(out);
 }
