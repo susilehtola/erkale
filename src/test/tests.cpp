@@ -57,6 +57,30 @@ const convergence_t final_conv={1e-6, 1e-6, 1e-8};
 /// To compute references instead of running tests
 //#define COMPUTE_REFERENCE
 
+/// Test indices
+void testind() {
+  for(int am=0;am<max_am;am++) {
+    int idx=0;
+    for(int ii=0;ii<=am;ii++)
+      for(int jj=0;jj<=ii;jj++) {
+	int l=am-ii;
+	int m=ii-jj;
+	int n=jj;
+
+	int ind=getind(l,m,n);
+	if(ind!=idx) {
+	  ERROR_INFO();
+	  printf("l=%i, m=%i, n=%i, ind=%i, idx=%i.\n",l,m,n,ind,idx);
+	  throw std::runtime_error("Indexing error.\n");
+	}
+
+	idx++;
+      }
+  }
+
+  printf("Indices OK.\n");
+}
+
 /// Compute relative difference \f$ (x-y)/y \f$
 double rel_diff(double x, double y) {
   return (x-y)/y;
@@ -509,6 +533,8 @@ void unrestr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & ba
 
 /// Run unit tests by comparing calculations to ones that should be OK
 int main(void) {
+  testind();
+  
   // Initialize libint
   init_libint_base();
 
