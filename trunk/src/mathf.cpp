@@ -167,33 +167,13 @@ double choose(int m, int n) {
 }
 
 int getind(int l, int m, int n) {
-  int am=l+m+n;
-
-  int l1, m1, n1;
-  int ii, jj;
-
-  int ind=0;
-
-  for(ii = 0; ii <= am; ii++) {
-    l1 = am - ii;
-
-    for(jj = 0; jj <= ii; jj++) {
-      m1 = ii - jj;
-      n1 = jj;
-
-      if((l==l1) && (m==m1) && (n==n1))
-	return ind;
-
-      ind++;
-    }
-  }
-
-  ERROR_INFO();
-  std::ostringstream oss;
-  oss << "Could not find index of basis function!\n";
-  throw std::runtime_error(oss.str());
-  
-  return 0;
+  // Silence compiler warning
+  (void) l;
+  // In the loop the indices will be
+  int ii=m+n;
+  int jj=n;
+  // so the corresponding index is
+  return ii*(ii+1)/2 + jj;
 }
 
 double max_abs(const arma::mat & R) {
