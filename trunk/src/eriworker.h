@@ -14,8 +14,12 @@
  * of the License, or (at your option) any later version.
  */
 
+
 #ifndef ERIWORKER_H
 #define ERIWORKER_H
+
+// To debug derivatives
+//#define DEBUGDERIV
 
 #include <vector>
 #include "basis.h"
@@ -87,7 +91,9 @@ class ERIWorker: public IntegralWorker {
   void compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t &jp, int mmax);
 
  public:
+  /// Constructor
   ERIWorker(int maxam, int maxcontr);
+  /// Destructor
   ~ERIWorker();
 
   /// Compute eris
@@ -115,7 +121,7 @@ class dERIWorker: public IntegralWorker {
   const GaussianShell *ls, *ls_orig;
   /// Swap?
   bool swap_ij, swap_kl, swap_ijkl;
-  
+
  public:
   dERIWorker(int maxam, int maxcontr);
   ~dERIWorker();
