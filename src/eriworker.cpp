@@ -17,6 +17,7 @@
 #include "eriworker.h"
 #include "linalg.h"
 #include "mathf.h"
+#include <cfloat>
 
 IntegralWorker::IntegralWorker() {
 }
@@ -264,18 +265,525 @@ void dERIWorker::get(int idx, std::vector<double> & ints) {
     // Integrals have been computed explicitely.
     for(size_t i=0;i<N;i++)
       input[i]=libderiv.ABCD[idx][i];
-  } else {
+  } else if(idx>=3 && idx<=5) {
     // Derivate wrt B_i: d/dB_i = - d/dA_i - d/dC_i - d/dD_i
     for(size_t i=0;i<N;i++)
-      input[i]= -libderiv.ABCD[idx-3][i] - libderiv.ABCD[idx+3][i] - libderiv.ABCD[idx+6][i];
+      input[i]= - libderiv.ABCD[idx-3][i] - libderiv.ABCD[idx+3][i] - libderiv.ABCD[idx+6][i];
+  } else {
+    ERROR_INFO();
+    throw std::runtime_error("Invalid derivative index requested!\n");
   }
-  
+
   // Reorder integrals
   reorder(is,js,ks,ls,swap_ij,swap_kl,swap_ijkl);
   // and transform them into the spherical basis
   spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
   // and return them
   ints=input;
+
+#ifdef DEBUGDERIV
+  // Form cartesian shells
+  GaussianShell isc(is_orig->get_am(),false,is_orig->get_contr());
+  isc.set_center(is_orig->get_center(),is_orig->get_center_ind());
+  isc.set_first_ind(is_orig->get_first_ind());
+
+  GaussianShell jsc(js_orig->get_am(),false,js_orig->get_contr());
+  jsc.set_center(js_orig->get_center(),js_orig->get_center_ind());
+  jsc.set_first_ind(js_orig->get_first_ind());  
+
+  GaussianShell ksc(ks_orig->get_am(),false,ks_orig->get_contr());
+  ksc.set_center(ks_orig->get_center(),ks_orig->get_center_ind());
+  ksc.set_first_ind(ks_orig->get_first_ind());  
+
+  GaussianShell lsc(ls_orig->get_am(),false,ls_orig->get_contr());
+  lsc.set_center(ls_orig->get_center(),ls_orig->get_center_ind());
+  lsc.set_first_ind(ls_orig->get_first_ind());  
+
+  // Sizes
+  size_t Ni=isc.get_Ncart();
+  size_t Nj=jsc.get_Ncart();
+  size_t Nk=ksc.get_Ncart();
+  size_t Nl=lsc.get_Ncart();
+
+  // ERI evaluator
+  ERIWorker eri(std::max(std::max(isc.get_am(),jsc.get_am()),std::max(ksc.get_am(),lsc.get_am()))+1,std::max(std::max(isc.get_Ncontr(),jsc.get_Ncontr()),std::max(ksc.get_Ncontr(),lsc.get_Ncontr())));
+
+  // Zero out input array
+  input.assign(N,0.0);
+  
+  // Which derivative are we taking?
+  if(idx>=0 && idx<3) {
+    // Get normalized contraction.
+    std::vector<contr_t> ic=isc.get_contr_normalized();
+
+    // Get cartesians
+    std::vector<shellf_t> icart=isc.get_cart();
+
+    // Loop over contraction
+    for(size_t iic=0;iic<ic.size();iic++) {
+      // Dummy contraction
+      std::vector<contr_t> dumcontr(1);
+      dumcontr[0].c=1.0;
+      dumcontr[0].z=ic[iic].z;
+
+      // Form helpers
+      GaussianShell icp(is_orig->get_am()+1,false,dumcontr);
+      icp.set_center(is_orig->get_center(),is_orig->get_center_ind());
+      icp.set_first_ind(is_orig->get_first_ind());
+      icp.normalize();
+
+      // Evaluate ERI
+      std::vector<double> eris;
+      eri.compute(&icp,&jsc,&ksc,&lsc,eris);
+
+      // Collect terms
+      for(size_t ica=0;ica<icart.size();ica++) {
+	int l=icart[ica].l;
+	int m=icart[ica].m;
+	int n=icart[ica].n;
+
+	int il=l;
+	int im=m;
+	int in=n;
+
+	double fac=ic[iic].c*sqrt(ic[iic].z);
+	if(idx==0) {
+	  fac*=sqrt(2*l+1);
+	  il++;
+	} else if(idx==1) {
+	  fac*=sqrt(2*m+1);
+	  im++;
+	} else if(idx==2) {
+	  fac*=sqrt(2*n+1);
+	  in++;
+	}
+
+	// i index of target integral is
+	size_t idt=getind(l,m,n);
+	// i index of source integral is
+	size_t idp=getind(il,im,in);
+
+	// Loop over target integrals
+	for(size_t jj=0;jj<Nj;jj++)
+	  for(size_t kk=0;kk<Nk;kk++)
+	    for(size_t ll=0;ll<Nl;ll++)
+	      input[((idt*Nj+jj)*Nk+kk)*Nl+ll]+=fac*eris[((idp*Nj+jj)*Nk+kk)*Nl+ll];
+      }
+
+      if(is_orig->get_am()>0) {	
+	GaussianShell icm=GaussianShell(is_orig->get_am()-1,false,dumcontr);
+	icm.set_center(is_orig->get_center(),is_orig->get_center_ind());
+	icm.set_first_ind(is_orig->get_first_ind());
+	icm.normalize();
+	
+	// Evaluate ERI
+	eri.compute(&icm,&jsc,&ksc,&lsc,eris);
+	
+	// Collect terms
+	for(size_t ica=0;ica<icart.size();ica++) {
+	  int l=icart[ica].l;
+	  int m=icart[ica].m;
+	  int n=icart[ica].n;
+
+	  // Skip nonexistent integrals
+	  if(idx==0 && l==0)
+	    continue;
+	  if(idx==1 && m==0)
+	    continue;
+	  if(idx==2 && n==0)
+	    continue;
+	  
+	  int il=l;
+	  int im=m;
+	  int in=n;
+	  
+	  double fac=-ic[iic].c*sqrt(ic[iic].z);
+	  if(idx==0) {
+	    fac*=2*l/sqrt(2*l-1);
+	    il--;
+	  } else if(idx==1) {
+	    fac*=2*m/sqrt(2*m-1);
+	    im--;
+	  } else if(idx==2) {
+	    fac*=2*n/sqrt(2*n-1);
+	    in--;
+	  }
+	  
+	  // i index of target integral is
+	  size_t idt=getind(l,m,n);
+	  // i index of source integral is
+	  size_t idm=getind(il,im,in);
+	  
+	  // Loop over target integrals
+	  for(size_t jj=0;jj<Nj;jj++)
+	    for(size_t kk=0;kk<Nk;kk++)
+	      for(size_t ll=0;ll<Nl;ll++)
+		input[((idt*Nj+jj)*Nk+kk)*Nl+ll]+=fac*eris[((idm*Nj+jj)*Nk+kk)*Nl+ll];
+	}
+      }
+    }
+
+  } else if(idx>=3 && idx<6) {
+    // Get normalized contraction.
+    std::vector<contr_t> jc=jsc.get_contr_normalized();
+
+    // Get cartesians
+    std::vector<shellf_t> jcart=jsc.get_cart();
+
+    // Loop over contraction
+    for(size_t jic=0;jic<jc.size();jic++) {
+      // Dummy contraction
+      std::vector<contr_t> dumcontr(1);
+      dumcontr[0].c=1.0;
+      dumcontr[0].z=jc[jic].z;
+
+      // Form helpers
+      GaussianShell jcp(js_orig->get_am()+1,false,dumcontr);
+      jcp.set_center(js_orig->get_center(),js_orig->get_center_ind());
+      jcp.set_first_ind(js_orig->get_first_ind());
+      jcp.normalize();
+      size_t Njp=jcp.get_Ncart();
+
+      // Evaluate ERI
+      std::vector<double> eris;
+      eri.compute(&isc,&jcp,&ksc,&lsc,eris);
+
+      // Collect terms
+      for(size_t jca=0;jca<jcart.size();jca++) {
+	int l=jcart[jca].l;
+	int m=jcart[jca].m;
+	int n=jcart[jca].n;
+
+	int il=l;
+	int im=m;
+	int in=n;
+
+	double fac=jc[jic].c*sqrt(jc[jic].z);
+	if(idx==3) {
+	  fac*=sqrt(2*l+1);
+	  il++;
+	} else if(idx==4) {
+	  fac*=sqrt(2*m+1);
+	  im++;
+	} else if(idx==5) {
+	  fac*=sqrt(2*n+1);
+	  in++;
+	}
+
+	// j index of target integral is
+	size_t jdt=getind(l,m,n);
+	// j index of source integral is
+	size_t jdp=getind(il,im,in);
+
+	// Loop over target integrals
+	for(size_t ii=0;ii<Ni;ii++)
+	  for(size_t kk=0;kk<Nk;kk++)
+	    for(size_t ll=0;ll<Nl;ll++)
+	      input[((ii*Nj+jdt)*Nk+kk)*Nl+ll]+=fac*eris[((ii*Njp+jdp)*Nk+kk)*Nl+ll];
+      }
+
+      if(js_orig->get_am()>0) {	
+	GaussianShell jcm=GaussianShell(js_orig->get_am()-1,false,dumcontr);
+	jcm.set_center(js_orig->get_center(),js_orig->get_center_ind());
+	jcm.set_first_ind(js_orig->get_first_ind());
+	jcm.normalize();
+	size_t Njm=jcm.get_Ncart();
+	
+	// Evaluate ERI
+	eri.compute(&isc,&jcm,&ksc,&lsc,eris);
+	
+	// Collect terms
+	for(size_t jca=0;jca<jcart.size();jca++) {
+	  int l=jcart[jca].l;
+	  int m=jcart[jca].m;
+	  int n=jcart[jca].n;
+
+	  // Skip nonexistent integrals
+	  if(idx==3 && l==0)
+	    continue;
+	  if(idx==4 && m==0)
+	    continue;
+	  if(idx==5 && n==0)
+	    continue;
+	  
+	  int il=l;
+	  int im=m;
+	  int in=n;
+	  
+	  double fac=-jc[jic].c*sqrt(jc[jic].z);
+	  if(idx==3) {
+	    fac*=2*l/sqrt(2*l-1);
+	    il--;
+	  } else if(idx==4) {
+	    fac*=2*m/sqrt(2*m-1);
+	    im--;
+	  } else if(idx==5) {
+	    fac*=2*n/sqrt(2*n-1);
+	    in--;
+	  }
+	  
+	  // j index of target integral is
+	  size_t jdt=getind(l,m,n);
+	  // j index of source integral is
+	  size_t jdm=getind(il,im,in);
+	  
+	  // Loop over target integrals
+	  for(size_t ii=0;ii<Ni;ii++)
+	    for(size_t kk=0;kk<Nk;kk++)
+	      for(size_t ll=0;ll<Nl;ll++)
+		input[((ii*Nj+jdt)*Nk+kk)*Nl+ll]+=fac*eris[((ii*Njm+jdm)*Nk+kk)*Nl+ll];
+	}
+      }
+    }
+
+  } else if(idx>=6 && idx<9) {
+    // Get normalized contraction.
+    std::vector<contr_t> kc=ksc.get_contr_normalized();
+
+    // Get cartesians
+    std::vector<shellf_t> kcart=ksc.get_cart();
+
+    // Loop over contraction
+    for(size_t kic=0;kic<kc.size();kic++) {
+      // Dummy contraction
+      std::vector<contr_t> dumcontr(1);
+      dumcontr[0].c=1.0;
+      dumcontr[0].z=kc[kic].z;
+
+      // Form helpers
+      GaussianShell kcp(ks_orig->get_am()+1,false,dumcontr);
+      kcp.set_center(ks_orig->get_center(),ks_orig->get_center_ind());
+      kcp.set_first_ind(ks_orig->get_first_ind());
+      kcp.normalize();
+      size_t Nkp=kcp.get_Ncart();
+
+      // Evaluate ERI
+      std::vector<double> eris;
+      eri.compute(&isc,&jsc,&kcp,&lsc,eris);
+
+      // Collect terms
+      for(size_t kca=0;kca<kcart.size();kca++) {
+	int l=kcart[kca].l;
+	int m=kcart[kca].m;
+	int n=kcart[kca].n;
+
+	int il=l;
+	int im=m;
+	int in=n;
+
+	double fac=kc[kic].c*sqrt(kc[kic].z);
+	if(idx==6) {
+	  fac*=sqrt(2*l+1);
+	  il++;
+	} else if(idx==7) {
+	  fac*=sqrt(2*m+1);
+	  im++;
+	} else if(idx==8) {
+	  fac*=sqrt(2*n+1);
+	  in++;
+	}
+
+	// k index of target integral is
+	size_t kdt=getind(l,m,n);
+	// k index of source integral is
+	size_t kdp=getind(il,im,in);
+
+	// Loop over target integrals
+	for(size_t ii=0;ii<Ni;ii++)
+	  for(size_t jj=0;jj<Nj;jj++)
+	    for(size_t ll=0;ll<Nl;ll++)
+	      input[((ii*Nj+jj)*Nk+kdt)*Nl+ll]+=fac*eris[((ii*Nj+jj)*Nkp+kdp)*Nl+ll];
+      }
+
+      if(ks_orig->get_am()>0) {	
+	GaussianShell kcm=GaussianShell(ks_orig->get_am()-1,false,dumcontr);
+	kcm.set_center(ks_orig->get_center(),ks_orig->get_center_ind());
+	kcm.set_first_ind(ks_orig->get_first_ind());
+	kcm.normalize();
+	size_t Nkm=kcm.get_Ncart();
+	
+	// Evaluate ERI
+	eri.compute(&isc,&jsc,&kcm,&lsc,eris);
+	
+	// Collect terms
+	for(size_t kca=0;kca<kcart.size();kca++) {
+	  int l=kcart[kca].l;
+	  int m=kcart[kca].m;
+	  int n=kcart[kca].n;
+
+	  // Skip nonexistent integrals
+	  if(idx==6 && l==0)
+	    continue;
+	  if(idx==7 && m==0)
+	    continue;
+	  if(idx==8 && n==0)
+	    continue;
+	  
+	  int il=l;
+	  int im=m;
+	  int in=n;
+	  
+	  double fac=-kc[kic].c*sqrt(kc[kic].z);
+	  if(idx==6) {
+	    fac*=2*l/sqrt(2*l-1);
+	    il--;
+	  } else if(idx==7) {
+	    fac*=2*m/sqrt(2*m-1);
+	    im--;
+	  } else if(idx==8) {
+	    fac*=2*n/sqrt(2*n-1);
+	    in--;
+	  }
+	  
+	  // k index of target integral is
+	  size_t kdt=getind(l,m,n);
+	  // k index of source integral is
+	  size_t kdm=getind(il,im,in);
+	  
+	  // Loop over target integrals
+	  for(size_t ii=0;ii<Ni;ii++)
+	    for(size_t jj=0;jj<Nj;jj++)
+	      for(size_t ll=0;ll<Nl;ll++)
+		input[((ii*Nj+jj)*Nk+kdt)*Nl+ll]+=fac*eris[((ii*Nj+jj)*Nkm+kdm)*Nl+ll];
+	}
+      }
+    }
+  } else if(idx>=9 && idx<12) {
+    // Get normalized contraction.
+    std::vector<contr_t> lc=lsc.get_contr_normalized();
+
+    // Get cartesians
+    std::vector<shellf_t> lcart=lsc.get_cart();
+
+    // Loop over contraction
+    for(size_t lic=0;lic<lc.size();lic++) {
+      // Dummy contraction
+      std::vector<contr_t> dumcontr(1);
+      dumcontr[0].c=1.0;
+      dumcontr[0].z=lc[lic].z;
+
+      // Form helpers
+      GaussianShell lcp(ls_orig->get_am()+1,false,dumcontr);
+      lcp.set_center(ls_orig->get_center(),ls_orig->get_center_ind());
+      lcp.set_first_ind(ls_orig->get_first_ind());
+      lcp.normalize();
+      size_t Nlp=lcp.get_Ncart();
+
+      // Evaluate ERI
+      std::vector<double> eris;
+      eri.compute(&isc,&jsc,&ksc,&lcp,eris);
+
+      // Collect terms
+      for(size_t lca=0;lca<lcart.size();lca++) {
+	int l=lcart[lca].l;
+	int m=lcart[lca].m;
+	int n=lcart[lca].n;
+
+	int il=l;
+	int im=m;
+	int in=n;
+
+	double fac=lc[lic].c*sqrt(lc[lic].z);
+	if(idx==9) {
+	  fac*=sqrt(2*l+1);
+	  il++;
+	} else if(idx==10) {
+	  fac*=sqrt(2*m+1);
+	  im++;
+	} else if(idx==11) {
+	  fac*=sqrt(2*n+1);
+	  in++;
+	}
+
+	// l index of target integral is
+	size_t ldt=getind(l,m,n);
+	// l index of source integral is
+	size_t ldp=getind(il,im,in);
+
+	// Loop over target integrals
+	for(size_t ii=0;ii<Ni;ii++)
+	  for(size_t jj=0;jj<Nj;jj++)
+	    for(size_t kk=0;kk<Nk;kk++)
+	      input[((ii*Nj+jj)*Nk+kk)*Nl+ldt]+=fac*eris[((ii*Nj+jj)*Nk+kk)*Nlp+ldp];
+      }
+
+      if(ls_orig->get_am()>0) {	
+	GaussianShell lcm=GaussianShell(ls_orig->get_am()-1,false,dumcontr);
+	lcm.set_center(ls_orig->get_center(),ls_orig->get_center_ind());
+	lcm.set_first_ind(ls_orig->get_first_ind());
+	lcm.normalize();
+	size_t Nlm=lcm.get_Ncart();
+	
+	// Evaluate ERI
+	eri.compute(&isc,&jsc,&ksc,&lcm,eris);
+	
+	// Collect terms
+	for(size_t lca=0;lca<lcart.size();lca++) {
+	  int l=lcart[lca].l;
+	  int m=lcart[lca].m;
+	  int n=lcart[lca].n;
+
+	  // Skip nonexistent integrals
+	  if(idx==9 && l==0)
+	    continue;
+	  if(idx==10 && m==0)
+	    continue;
+	  if(idx==11 && n==0)
+	    continue;
+	  
+	  int il=l;
+	  int im=m;
+	  int in=n;
+	  
+	  double fac=-lc[lic].c*sqrt(lc[lic].z);
+	  if(idx==9) {
+	    fac*=2*l/sqrt(2*l-1);
+	    il--;
+	  } else if(idx==10) {
+	    fac*=2*m/sqrt(2*m-1);
+	    im--;
+	  } else if(idx==11) {
+	    fac*=2*n/sqrt(2*n-1);
+	    in--;
+	  }
+	  
+	  // l index of target integral is
+	  size_t ldt=getind(l,m,n);
+	  // l index of source integral is
+	  size_t ldm=getind(il,im,in);
+	  
+	  // Loop over target integrals
+	  for(size_t ii=0;ii<Ni;ii++)
+	    for(size_t jj=0;jj<Nj;jj++)
+	      for(size_t kk=0;kk<Nk;kk++)
+		input[((ii*Nj+jj)*Nk+kk)*Nl+ldt]+=fac*eris[((ii*Nj+jj)*Nk+kk)*Nlm+ldm];
+	}
+      }
+    }
+  }
+
+  // Convert the integrals to the shperical harmonics basis
+  spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
+
+  // Check the integrals
+  size_t Nfail=0;
+  for(size_t i=0;i<N;i++)
+    if(fabs(input[i]-ints[i])>100*DBL_EPSILON)
+      Nfail++;
+  if(Nfail) {
+    is_orig->print();
+    js_orig->print();
+    ks_orig->print();
+    ls_orig->print();
+    printf("idx = %i\n",idx);
+    for(size_t i=0;i<N;i++)
+      printf("%i % e % e % e\n",(int) i,input[i],ints[i],input[i]-ints[i]);
+    printf("%i integrals failed\n",(int) Nfail);
+  }
+
+  // Use the new integrals
+  ints=input;
+#endif
 }
 
 eri_precursor_t IntegralWorker::compute_precursor(const GaussianShell *is, const GaussianShell *js) {
@@ -322,17 +830,13 @@ eri_precursor_t IntegralWorker::compute_precursor(const GaussianShell *is, const
       for(int k=0;k<3;k++)
 	r.P(i,j,k)=(r.ic[i].z*A(k) + r.jc[j].z*B(k))/r.zeta(i,j);
 
-  // Compute PA
+  // Compute PA and PB
   for(size_t i=0;i<r.ic.size();i++)
     for(size_t j=0;j<r.jc.size();j++)
-      for(int k=0;k<3;k++)
+      for(int k=0;k<3;k++) {
 	r.PA(i,j,k)=r.P(i,j,k)-A(k);
-
-  // Compute PB
-  for(size_t i=0;i<r.ic.size();i++)
-    for(size_t j=0;j<r.jc.size();j++)
-      for(int k=0;k<3;k++)
 	r.PB(i,j,k)=r.P(i,j,k)-B(k);
+      }
 
   // Compute S
   for(size_t i=0;i<r.ic.size();i++)
@@ -342,7 +846,7 @@ eri_precursor_t IntegralWorker::compute_precursor(const GaussianShell *is, const
   return r;
 }
 
-void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t &jp, int mmax) {
+void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax) {
   // Store AB and CD
   for(int i=0;i<3;i++) {
     libint.AB[i]=ip.AB(i);
@@ -381,7 +885,7 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 	  // Helper variable
 	  prim_data data;
 
-          // Compute and store PA, QC, WP and WQ
+          // Store PA, QC, WP and WQ
           for(int i=0;i<3;i++) {
             data.U[0][i]=ip.PA(p,q,i); // PA
             data.U[2][i]=jp.PA(r,s,i); // QC
@@ -453,7 +957,7 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 	  // Helper variable
 	  prim_data data;
 
-          // Compute and store PA, QC, WP and WQ
+          // Store PA, PB, QC, QD, WP and WQ
           for(int i=0;i<3;i++) {
             data.U[0][i]=ip.PA(p,q,i); // PA
 	    data.U[1][i]=ip.PB(p,q,i); // PB
