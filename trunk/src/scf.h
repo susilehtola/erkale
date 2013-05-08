@@ -153,7 +153,6 @@ class SCF {
   const BasisSet * basisp;
   /// Density fitting basis
   BasisSet dfitbas;
-  BasisSet xcfitbas;
   /// Checkpoint file
   Checkpoint * chkptp;
 
@@ -210,8 +209,6 @@ class SCF {
 
   /// Use Lobatto angular grid instead of Lebedev grid (DFT)
   bool dft_lobatto;
-  /// Use XC fitting?
-  bool dft_xcfit;
 
   /// Perdew-Zunger correction?
   double pzcor;
@@ -235,9 +232,9 @@ class SCF {
   std::vector<arma::mat> freeze;
 
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, XCGrid & fitgrid, double tol);
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol);
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, XCGrid & fitgrid, double tol);
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol);
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
   void PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & ESIC, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid);
@@ -288,9 +285,20 @@ class SCF {
   void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const;
 
   /// Calculate restricted density-functional theory KS-Fock operator
-  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const;
+  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, double tol) const;
   /// Calculate unrestricted density-functional theory KS-Fock operator
-  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, XCGrid & fitgrid, double tol) const;
+  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, double tol) const;
+
+  /// Calculate force in restricted Hartree-Fock
+  arma::vec force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol);
+  /// Calculate force in restricted open-shell Hartree-Fock
+  arma::vec force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol);
+  /// Calculate force in unrestricted Hartree-Fock
+  arma::vec force_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol);
+  /// Calculate force in restricted density-functional theory
+  arma::vec force_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol);
+  /// Calculate force in unrestricted density-functional theory
+  arma::vec force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol);
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
@@ -385,6 +393,8 @@ void freeze_orbs(const std::vector<arma::mat> & freeze, const arma::mat & C, con
 /// Localize core orbitals, returns number of localized orbitals.
 size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbose=false);
 
+/// Convert force vector to matrix
+arma::mat interpret_force(const arma::vec & f);
 
 #include "checkpoint.h"
 

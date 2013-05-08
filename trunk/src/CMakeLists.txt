@@ -21,15 +21,15 @@ INCLUDE_DIRECTORIES(${HDF5_INCLUDE_DIRS})
 add_library (liberkale basis.cpp basislibrary.cpp stringutil.cpp
 mathf.cpp integrals.cpp eritable.cpp eriscreen.cpp timer.cpp
 linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf-base.cpp
-scf-solvers.cpp scf-fock.cpp scf-pzsic.cpp elements.cpp xyzutils.cpp settings.cpp
-broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
-properties.cpp checkpoint.cpp guess.cpp external/storage.cpp
-external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
-trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfit.cpp
-chebyshev.cpp density_fitting.cpp lebedev.cpp eriworker.cpp
-eriworker_transforms.cpp slaterfit/solve_coefficients.cpp
-slaterfit/form_exponents.cpp atom/integrals.cpp atom/solvers.cpp
-atom/atomtable.cpp)
+scf-solvers.cpp scf-fock.cpp scf-force.cpp scf-pzsic.cpp elements.cpp
+xyzutils.cpp settings.cpp broyden.cpp adiis.cpp tempered.cpp
+find_molecules.cpp properties.cpp checkpoint.cpp guess.cpp
+external/storage.cpp external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp
+spherical_harmonics.cpp trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp
+dftfuncs.cpp xcfit.cpp chebyshev.cpp density_fitting.cpp lebedev.cpp
+eriworker.cpp eriworker_transforms.cpp
+slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
+atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
@@ -62,6 +62,24 @@ else()
  target_link_libraries(erkale ${LIBXC_LIBRARIES})
  target_link_libraries(erkale ${LIBINT_LIBRARIES})
  target_link_libraries(erkale ${HDF5_LIBRARIES})
+endif()
+
+# Create the ERKALE main executable
+add_executable (erkale_geom geometry.cpp)
+# The name of the executable is
+set_target_properties(erkale_geom PROPERTIES OUTPUT_NAME "erkale_geom${SUFFIX}")
+target_link_libraries(erkale_geom liberkale)
+target_link_libraries(erkale_geom liberkale_emd)
+
+# Link libraries
+if(BUILD_SHARED_LIBS)
+else()
+ target_link_libraries(erkale_geom -lrt)
+ target_link_libraries(erkale_geom ${GSL_LIBRARIES})
+ target_link_libraries(erkale_geom ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_geom ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_geom ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_geom ${HDF5_LIBRARIES})
 endif()
 
 # Density cube tool
@@ -178,6 +196,19 @@ add_custom_command(
   COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
   COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
   COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-fock.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-fock.cpp
+)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in
+
+  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
+  COMMAND ${PPROC} -DRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -DHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
+#  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
+  COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
+  COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
 )
 
 add_custom_command(
