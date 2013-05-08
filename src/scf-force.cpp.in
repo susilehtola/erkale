@@ -1,0 +1,78 @@
+/* Restricted case */
+#if defined(RESTRICTED) && defined(DFT)
+arma::vec SCF::force_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol)
+
+#elif defined(RESTRICTED) && defined(HF)
+arma::vec SCF::force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol)
+
+#elif defined(UNRESTRICTED) && defined(DFT)
+arma::vec SCF::force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol)
+
+#elif defined(UNRESTRICTED) && defined(HF)
+arma::vec SCF::force_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol)
+
+#elif defined(UNRESTRICTED) && defined(_ROHF)
+arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
+#endif
+{
+
+    arma::mat W;
+#ifdef RESTRICTED
+    W=form_density(sol.E,sol.C,occs);
+#else
+    W=form_density(sol.Ea,sol.Ca,occa)+form_density(sol.Eb,sol.Cb,occb);
+#endif
+    
+    printf("Doing forces:\n");
+    fflush(stdout);
+
+    if(!direct)
+      scr.fill(basisp);
+
+    // Compute force
+    arma::vec fpul_kin=basisp->kinetic_pulay(sol.P);
+    interpret_force(fpul_kin).print("Kinetic Pulay");
+    
+    arma::vec fpul_nuc=basisp->nuclear_pulay(sol.P);
+    interpret_force(fpul_nuc).print("Nuclear Pulay");
+    
+    arma::vec fnuc=basisp->nuclear_der(sol.P);
+    interpret_force(fnuc).print("Hellman-Feynman");
+    
+    arma::vec forth=basisp->overlap_der(W);
+    interpret_force(forth).print("Orthonormality");
+    
+    arma::vec frep=basisp->nuclear_force();
+    interpret_force(frep).print("Nuclear repulsion");
+    
+    arma::vec fcoul;
+    arma::vec fxch;
+    if(direct) {
+#ifdef RESTRICTED
+      scr.forceJK(sol.P,fcoul,fxch,tol,NULL);
+#else
+      arma::vec faxch, fbxch;
+      scr.forceJK(sol.Pa,sol.Pb,fcoul,faxch,fbxch,tol,NULL);
+      fxch=faxch+fbxch;
+
+      interpret_force(faxch).print("alpha exchange");
+      interpret_force(fbxch).print("beta exchange");
+#endif
+    }
+    interpret_force(fcoul).print("Coulomb");
+    interpret_force(fxch).print("Exchange");
+    interpret_force(fcoul+fxch).print("2-electron contribution");
+
+#ifdef DFT
+    (void) dft;
+    (void) grid;
+#endif
+
+    arma::vec ftot=fpul_kin+fpul_nuc+fnuc+forth+frep;
+    interpret_force(ftot).print("Total (w.o. 2-electron)");
+
+    arma::vec ffull=ftot+fcoul+fxch;
+    interpret_force(ffull).print("Total");
+
+    return ffull;
+}

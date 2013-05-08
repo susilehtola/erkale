@@ -104,6 +104,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
   fKb.zeros(3*basp->get_Nnuc());
 #endif
 
+  P.print("P");
 #endif // FORCE
 
 
@@ -701,28 +702,34 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 
 #else // FORCE
 
-	// Compute the derivatives.
-	deri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
-
-	// Loop over shell centers
+	// Shell centers
 	size_t inuc=shells[is].get_center_ind();
 	size_t jnuc=shells[js].get_center_ind();
 	size_t knuc=shells[ks].get_center_ind();
 	size_t lnuc=shells[ls].get_center_ind();
+
+	// Skip when all functions are on the same nucleus
+	if(inuc==jnuc && jnuc==knuc && knuc==lnuc)
+	  continue;
+
+	// Compute the derivatives.
+	deri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
 
 #ifdef DO_J
 	  arma::vec Jforce(12);
 	  Jforce.zeros();
 
 	  // E_J = P_ij (ij|kl) P_kl. Work matrices
-	  arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
 	  arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
+	  arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
 	  
 	  // Degeneracy factor
 	  double Jfac=-0.5;
 	  if(is!=js)
 	    Jfac*=2.0;
 	  if(ks!=ls)
+	    Jfac*=2.0;
+	  if(ip!=jp)
 	    Jfac*=2.0;
 #endif
 
@@ -762,15 +769,22 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	    // Get both twice.
 	    K1fac=1.0;
 	    K2fac=1.0;
-	  } else if((is==js && ks!=ls) || (is!=js && ks==ls)) {
+	  } else if(is==js && ks==ls) {
+	    // Only get the first one, once.
+	    K1fac=0.5;
+	    K2fac=0.0;
+	  } else {
 	    // Get both once.
 	    K1fac=0.5;
 	    K2fac=0.5;
-	  } else {
-	    // Only get the first once.
-	    K1fac=0.5;
-	    K2fac=0.0;
 	  }
+
+	  // Switch symmetry
+	  if(ip!=jp) {
+	    K1fac*=2.0;
+	    K2fac*=2.0;
+	  }
+	  
 #ifdef DO_K
 	  // Restricted case - only get half
 	  K1fac/=2;
@@ -783,7 +797,11 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  for(int idx=0;idx<12;idx++) {
 	    // Get the integral derivatives
 	    deri.get(idx,eris);
-	    
+
+	    printf("(%i %i %i %i) derivatives, idx=%i:\n",(int) is, (int) js, (int) ks, (int) ls,idx);
+	    for(size_t i=0;i<eris.size();i++)
+	      printf("% e\n",eris[i]);
+
 #ifdef DO_J
 	    {
 	      // E_J = P_ij (ij|kl) P_kl

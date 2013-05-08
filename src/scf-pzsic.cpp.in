@@ -15,9 +15,9 @@
  */
 
 #ifdef RESTRICTED
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, XCGrid & fitgrid, double tol)
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol)
 #else
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, XCGrid & fitgrid, double tol)
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol)
 #endif
 {
 
@@ -315,10 +315,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     
 #ifdef RESTRICTED
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
-    (void) fitgrid;
 #else
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
-    (void) fitgrid;
 #endif
   }
   

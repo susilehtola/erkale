@@ -130,6 +130,9 @@ class dERIWorker: public IntegralWorker {
   void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Get the derivatives wrt index idx
   void get(int idx, std::vector<double> & ints);
+
+  /// Compute the derivatives, debug version
+  void get_debug(int idx, std::vector<double> & ints);
 };
 
 #endif

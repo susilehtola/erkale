@@ -234,12 +234,6 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     // Construct Fock matrix
     DFTGrid grid(&augbas,verbose,set.get_bool("DFTLobatto"));
     grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
-    // Dummy - not supported here
-    XCGrid fitgrid;
-    if(set.get_bool("DFTXCFitting")) {
-      ERROR_INFO();
-      throw std::runtime_error("DFT XC fitting not supported.\n");
-    }
     
     // No need for extreme accuracy
     double tol=ROUGHTOL;
@@ -248,12 +242,12 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
     switch(method) {
     case(TP):
-      solver.Fock_half_hole(augsol,dft,occa,occb,dummy,grid,fitgrid,tol);
+      solver.Fock_half_hole(augsol,dft,occa,occb,dummy,grid,tol);
       break;
       
     case(FCH):
     case(XCH):
-      solver.Fock_full_hole(augsol,dft,occa,occb,dummy,grid,fitgrid,tol);
+      solver.Fock_full_hole(augsol,dft,occa,occb,dummy,grid,tol);
     }
   }
 

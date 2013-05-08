@@ -42,16 +42,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #if defined(HF)
 #define form_fock(sol,ref) Fock_RHF(sol,occs,ref,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_RDFT(sol,occs,dft,ref,grid,fitgrid,tol); nfock++;
+#define form_fock(sol,ref) Fock_RDFT(sol,occs,dft,ref,grid,tol); nfock++;
 #endif
 
 #else
   // Unrestricted case: first core excited states
 
 #if defined(HALFHOLE)
-#define form_fock(sol,ref) Fock_half_hole(sol,dft,occa,occb,ref,grid,fitgrid,tol); nfock++;
+#define form_fock(sol,ref) Fock_half_hole(sol,dft,occa,occb,ref,grid,tol); nfock++;
 #elif defined(FULLHOLE)
-#define form_fock(sol,ref) Fock_full_hole(sol,dft,occa,occb,ref,grid,fitgrid,tol); nfock++;
+#define form_fock(sol,ref) Fock_full_hole(sol,dft,occa,occb,ref,grid,tol); nfock++;
 
   // Conventional HF and DFT
 #elif defined(HF)
@@ -59,7 +59,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #elif defined(_ROHF)
 #define form_fock(sol,ref) Fock_ROHF(sol,Nel_alpha,Nel_beta,ref,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,dft,ref,grid,fitgrid,tol); nfock++;
+#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,dft,ref,grid,tol); nfock++;
 #endif
 #endif
 
@@ -309,7 +309,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   }
 
   DFTGrid grid(basisp,verbose,dft_lobatto);
-  XCGrid fitgrid(&xcfitbas,&dfit,verbose,dft_lobatto);
 #endif
 
 
@@ -340,12 +339,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
     fprintf(stderr,"calculation");
     if(densityfit) {
-      fprintf(stderr," with density");
-#ifdef DFT
-      if(dft_xcfit)
-	fprintf(stderr," and exchange-correlation");
-#endif
-      fprintf(stderr," fitting");
+      fprintf(stderr," with density fitting");
     }
 
 #ifdef DFT
@@ -371,16 +365,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #ifdef DFT
 #ifdef RESTRICTED
   // Form DFT quadrature grid
-  if(dft_xcfit)
-    fitgrid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
-  else
-    grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+  grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
 #else
   // Form DFT quadrature grid
-  if(dft_xcfit)
-    fitgrid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
-  else
-    grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+  grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
   fflush(stdout);
 
@@ -430,9 +418,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(pzcor!=0.0) {
       titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,fitgrid,tol);
+      PZSIC_RDFT(sol,occs,dft,grid,tol);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,fitgrid,tol);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,tol);
 #endif	
       titer.cont();
     }
@@ -638,9 +626,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	if(pzcor!=0.0) {
 	  titer.stop();
 #ifdef RESTRICTED
-	  PZSIC_RDFT(rhsol,occs,dft,grid,fitgrid,tol);
+	  PZSIC_RDFT(rhsol,occs,dft,grid,tol);
 #else
-	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,fitgrid,tol);
+	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,tol);
 #endif	
 	  titer.cont();
 	}
@@ -722,9 +710,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    if(pzcor!=0.0) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol1,occs,dft,grid,fitgrid,tol);
+	      PZSIC_RDFT(sol1,occs,dft,grid,tol);
 #else
-	      PZSIC_UDFT(sol1,occa,occb,dft,grid,fitgrid,tol);
+	      PZSIC_UDFT(sol1,occa,occb,dft,grid,tol);
 #endif	
 	      titer.cont();
 	    }
@@ -745,9 +733,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    if(pzcor!=0.0) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol2,occs,dft,grid,fitgrid,tol);
+	      PZSIC_RDFT(sol2,occs,dft,grid,tol);
 #else
-	      PZSIC_UDFT(sol2,occa,occb,dft,grid,fitgrid,tol);
+	      PZSIC_UDFT(sol2,occa,occb,dft,grid,tol);
 #endif	
 	      titer.cont();
 	    }
@@ -998,6 +986,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     chkptp->write("Ea",sol.Ea);
     chkptp->write("Eb",sol.Eb);
 
+    chkptp->write("Ha",sol.Ha);
+    chkptp->write("Hb",sol.Hb);
+
     chkptp->write("Pa",sol.Pa);
     chkptp->write("Pb",sol.Pb);
 
@@ -1009,6 +1000,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #else
     chkptp->write("C",sol.C);
     chkptp->write("E",sol.E);
+    chkptp->write("H",sol.H);
     chkptp->write("occs",occr);
     // Unrestricted
     chkptp->write("Restricted",1);

@@ -116,8 +116,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   try {
     // Use Lobatto angular grid? (Lebedev is default)
     dft_lobatto=set.get_bool("DFTLobatto");
-    // Use XC fitting?
-    dft_xcfit=set.get_bool("DFTXCFitting");
   } catch(...) {
     // Hartree-Fock doesn't have the settings
   }
@@ -211,10 +209,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       // Construct fitting basis
       dfitbas=construct_basis(basisp->get_nuclei(),fitlib,set);
     }
-    // Store XC fitting basis
-    xcfitbas=dfitbas;
-    // Finalize basis, including normalization wrt overlap metric!
-    xcfitbas.finalize();
 
     // Compute memory estimate
     std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,direct));
@@ -288,7 +282,6 @@ void SCF::set_frozen(const arma::mat & C, size_t ind) {
 
 void SCF::set_fitting(const BasisSet & fitbasv) {
   dfitbas=fitbasv;
-  xcfitbas=fitbasv;
 }
 
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol) {
@@ -901,9 +894,6 @@ void calculate(const BasisSet & basis, Settings & set) {
       throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
     }
 
-  if(!hf && !rohf && set.get_bool("DFTXCFitting") && !set.get_bool("DensityFitting"))
-    throw std::runtime_error("XC fitting is enabled but RI-J is disabled!\n");
-
   // Load starting guess?
   bool doload=(stricmp(loadname,"")!=0);
   BasisSet oldbas;
@@ -993,6 +983,9 @@ void calculate(const BasisSet & basis, Settings & set) {
     chkpt.write("Nel",Nel);
     chkpt.write("Nel-a",Nel_alpha);
     chkpt.write("Nel-b",Nel_beta);
+
+    // Write method
+    chkpt.write("Method",set.get_string("Method"));
 
     // Solver
     SCF solver(basis,set,chkpt);
@@ -1762,4 +1755,15 @@ arma::cx_mat SCF::localize_Bder(const arma::mat & C, const arma::cx_mat & M, con
     }
 
   return Bder;
+}
+
+arma::mat interpret_force(const arma::vec & f) {
+  if(f.n_elem%3!=0) {
+    ERROR_INFO();
+    throw std::runtime_error("Invalid argument for interpret_force.\n");
+  }
+
+  arma::mat force(f);
+  force.reshape(3,f.n_elem/3);
+  return arma::trans(force); 
 }

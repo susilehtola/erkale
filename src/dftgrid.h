@@ -280,6 +280,11 @@ class AtomGrid {
   void eval_Fxc(std::vector<double> & H) const;
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
   void eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) const;
+
+  /// Evaluate force
+  arma::vec eval_force(const BasisSet & bas, size_t inuc, const arma::mat & P) const;
+  /// Evaluate force
+  arma::vec eval_force(const BasisSet & bas, size_t inuc, const arma::mat & Pa, const arma::mat & Pb) const;
 };
 
 
@@ -352,6 +357,11 @@ class DFTGrid {
 
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, SIC calculation
   void eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa, std::vector<arma::mat> & Ha, std::vector<double> & Exc, std::vector<double> & Nel);
+
+  /// Evaluate force
+  arma::vec eval_force(int x_func, int c_func, const arma::mat & P);
+  /// Evaluate force
+  arma::vec eval_force(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb);
 };
 
 #endif
