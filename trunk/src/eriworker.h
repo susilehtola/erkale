@@ -19,7 +19,7 @@
 #define ERIWORKER_H
 
 // To debug derivatives
-//#define DEBUGDERIV
+#define DEBUGDERIV
 
 #include <vector>
 #include "basis.h"
