@@ -289,8 +289,12 @@ void dERIWorker::get(int idx, std::vector<double> & ints) {
   // Check the integrals
   size_t Nfail=0;
   for(size_t i=0;i<N;i++)
-    if(fabs(ints[i]-eris[i])>1e-6)
+    if(fabs(ints[i]-eris[i])>1e-6) {
       Nfail++;
+      printf("(%c %c %c %c) integral, idx = %i, first functions (%i %i %i %i)\n",shell_types[is_orig->get_am()],shell_types[js_orig->get_am()],shell_types[ks_orig->get_am()],shell_types[ls_orig->get_am()],idx,(int) is_orig->get_first_ind(),(int) js_orig->get_first_ind(),(int) ks_orig->get_first_ind(),(int) ls_orig->get_first_ind());
+      printf("%i % e % e % e\n",(int) i,ints[i],eris[i],ints[i]-eris[i]);
+    }
+
   if(Nfail) {
     /*
       is_orig->print();
@@ -298,9 +302,11 @@ void dERIWorker::get(int idx, std::vector<double> & ints) {
     ks_orig->print();
     ls_orig->print();
     */
-    printf("(%c %c %c %c) integral, idx = %i, first functions (%i %i %i %i)\n",shell_types[is_orig->get_am()],shell_types[js_orig->get_am()],shell_types[ks_orig->get_am()],shell_types[ls_orig->get_am()],idx,(int) is_orig->get_first_ind(),(int) js_orig->get_first_ind(),(int) ks_orig->get_first_ind(),(int) ls_orig->get_first_ind());
+
+    /*
     for(size_t i=0;i<N;i++)
       printf("%i % e % e % e\n",(int) i,ints[i],eris[i],ints[i]-eris[i]);
+    */
     printf("%i integrals failed\n",(int) Nfail);
   }
 

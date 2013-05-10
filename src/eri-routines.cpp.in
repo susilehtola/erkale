@@ -103,8 +103,6 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
   fKa.zeros(3*basp->get_Nnuc());
   fKb.zeros(3*basp->get_Nnuc());
 #endif
-
-  P.print("P");
 #endif // FORCE
 
 
@@ -797,10 +795,6 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  for(int idx=0;idx<12;idx++) {
 	    // Get the integral derivatives
 	    deri.get(idx,eris);
-
-	    printf("(%i %i %i %i) derivatives, idx=%i:\n",(int) is, (int) js, (int) ks, (int) ls,idx);
-	    for(size_t i=0;i<eris.size();i++)
-	      printf("% e\n",eris[i]);
 
 #ifdef DO_J
 	    {
