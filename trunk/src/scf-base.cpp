@@ -86,6 +86,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   direct=set.get_bool("Direct");
   strictint=set.get_bool("StrictIntegrals");
   pzcor=set.get_double("PZ-SIC");
+  doforce=false;
 
   // Check update scheme
   if(useadiis && usebroyden) {
@@ -846,7 +847,7 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
   Nel_beta=Nel-Nel_alpha;
 }
 
-void calculate(const BasisSet & basis, Settings & set) {
+void calculate(const BasisSet & basis, Settings & set, bool force) {
   // Checkpoint files to load and save
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
@@ -1000,6 +1001,7 @@ void calculate(const BasisSet & basis, Settings & set) {
 
     if(hf || rohf) {
       // Solve restricted Hartree-Fock
+      solver.do_force(force);
       solver.RHF(sol,occs,conv);
     } else {
       // Print information about used functionals
@@ -1008,6 +1010,7 @@ void calculate(const BasisSet & basis, Settings & set) {
       // Solve restricted DFT problem first on a rough grid
       solver.RDFT(sol,occs,initconv,initdft);
       // .. and then on the final grid
+      solver.do_force(force);
       solver.RDFT(sol,occs,conv,dft);
     }
 
@@ -1094,6 +1097,7 @@ void calculate(const BasisSet & basis, Settings & set) {
 
     if(hf) {
       // Solve restricted Hartree-Fock
+      solver.do_force(force);
       solver.UHF(sol,occa,occb,conv);
     } else if(rohf) {
       // Solve restricted open-shell Hartree-Fock
@@ -1110,6 +1114,7 @@ void calculate(const BasisSet & basis, Settings & set) {
       // Solve restricted DFT problem first on a rough grid
       solver.UDFT(sol,occa,occb,initconv,initdft);
       // ... and then on the more accurate grid
+      solver.do_force(force);
       solver.UDFT(sol,occa,occb,conv,dft);
     }
 
@@ -1755,6 +1760,10 @@ arma::cx_mat SCF::localize_Bder(const arma::mat & C, const arma::cx_mat & M, con
     }
 
   return Bder;
+}
+
+void SCF::do_force(bool val) {
+  doforce=val;
 }
 
 arma::mat interpret_force(const arma::vec & f) {

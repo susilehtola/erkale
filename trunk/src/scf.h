@@ -213,6 +213,9 @@ class SCF {
   /// Perdew-Zunger correction?
   double pzcor;
 
+  /// Calculate forces?
+  bool doforce;
+
   /// Nuclear repulsion energy
   double Enuc;
 
@@ -305,6 +308,9 @@ class SCF {
 
   /// Set the density-fitting basis set
   void set_fitting(const BasisSet & fitbas);
+
+  /// Toggle calculation of forces
+  void do_force(bool val);
 };
 
 /// Diagonalize Fock matrix
@@ -363,7 +369,7 @@ double electron_spread(const arma::mat & P, const BasisSet & basis);
 void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta);
 
 /// Run the calculation
-void calculate(const BasisSet & basis, Settings & set);
+void calculate(const BasisSet & basis, Settings & set, bool doforce=false);
 
 /// Helper for sorting orbitals into maximum overlap
 typedef struct {

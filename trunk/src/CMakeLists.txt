@@ -108,6 +108,7 @@ endif()
 install (TARGETS liberkale DESTINATION lib${LIB_SUFFIX})
 install (TARGETS erkale DESTINATION bin)
 install (TARGETS erkale_cube DESTINATION bin)
+install (TARGETS erkale_geom DESTINATION bin)
 
 # Install headers
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
