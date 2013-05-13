@@ -31,19 +31,19 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 
     // Compute force
     arma::vec fpul_kin=basisp->kinetic_pulay(sol.P);
-    interpret_force(fpul_kin).print("Kinetic Pulay");
+    //    interpret_force(fpul_kin).print("Kinetic Pulay");
     
     arma::vec fpul_nuc=basisp->nuclear_pulay(sol.P);
-    interpret_force(fpul_nuc).print("Nuclear Pulay");
+    //    interpret_force(fpul_nuc).print("Nuclear Pulay");
     
     arma::vec fnuc=basisp->nuclear_der(sol.P);
-    interpret_force(fnuc).print("Hellman-Feynman");
+    //    interpret_force(fnuc).print("Hellman-Feynman");
     
     arma::vec forth=basisp->overlap_der(W);
-    interpret_force(forth).print("Orthonormality");
+    //    interpret_force(forth).print("Orthonormality");
     
     arma::vec frep=basisp->nuclear_force();
-    interpret_force(frep).print("Nuclear repulsion");
+    //    interpret_force(frep).print("Nuclear repulsion");
     
     arma::vec fcoul;
     arma::vec fxch;
@@ -55,13 +55,13 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       scr.forceJK(sol.Pa,sol.Pb,fcoul,faxch,fbxch,tol,NULL);
       fxch=faxch+fbxch;
 
-      interpret_force(faxch).print("alpha exchange");
-      interpret_force(fbxch).print("beta exchange");
+      //      interpret_force(faxch).print("alpha exchange");
+      //      interpret_force(fbxch).print("beta exchange");
 #endif
     }
-    interpret_force(fcoul).print("Coulomb");
-    interpret_force(fxch).print("Exchange");
-    interpret_force(fcoul+fxch).print("2-electron contribution");
+    //    interpret_force(fcoul).print("Coulomb");
+    //    interpret_force(fxch).print("Exchange");
+    //    interpret_force(fcoul+fxch).print("2-electron contribution");
 
 #ifdef DFT
     (void) dft;

@@ -1076,12 +1076,35 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       }
 	
     }
+
+    if(doforce) {
+      arma::vec f;
+#if defined(RESTRICTED) && defined(HF)
+      f=force_RHF(sol,occs,tol);
+#endif
+#if defined(UNRESTRICTED) && defined(HF)
+      f=force_UHF(sol,occa,occb,tol);
+#endif
+#if defined(RESTRICTED) && defined(DFT)
+      f=force_RDFT(sol,occs,dft,grid,tol);
+#endif
+#if defined(UNRESTRICTED) && defined(DFT)
+      f=force_UDFT(sol,occa,occb,dft,grid,tol);
+#endif
+#if defined(_ROHF) || defined(FULLHOLE) || defined(HALFHOLE)
+      ERROR_INFO();
+      throw std::runtime_error("Forces not supported for this method.\n");
+#endif
+
+      chkptp->write("Force",f);      
+    }
+    
   } else {
     std::ostringstream oss;
     oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): SCF did not converge in "<<maxiter<<" iterations!\n";
     throw std::runtime_error(oss.str());
   }
-
+  
 #if defined(HALFHOLE) || defined(FULLHOLE)
   return ixc_orb;
 #endif
