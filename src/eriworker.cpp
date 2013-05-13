@@ -324,18 +324,22 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
   GaussianShell isc(is_orig->get_am(),false,is_orig->get_contr());
   isc.set_center(is_orig->get_center(),is_orig->get_center_ind());
   isc.set_first_ind(is_orig->get_first_ind());
+  isc.normalize(); // Need to normalize, otherwise cartesian relative factors aren't initalized
 
   GaussianShell jsc(js_orig->get_am(),false,js_orig->get_contr());
   jsc.set_center(js_orig->get_center(),js_orig->get_center_ind());
   jsc.set_first_ind(js_orig->get_first_ind());
+  jsc.normalize(); // Need to normalize, otherwise cartesian relative factors aren't initalized
 
   GaussianShell ksc(ks_orig->get_am(),false,ks_orig->get_contr());
   ksc.set_center(ks_orig->get_center(),ks_orig->get_center_ind());
   ksc.set_first_ind(ks_orig->get_first_ind());
+  ksc.normalize(); // Need to normalize, otherwise cartesian relative factors aren't initalized
 
   GaussianShell lsc(ls_orig->get_am(),false,ls_orig->get_contr());
   lsc.set_center(ls_orig->get_center(),ls_orig->get_center_ind());
   lsc.set_first_ind(ls_orig->get_first_ind());
+  lsc.normalize(); // Need to normalize, otherwise cartesian relative factors aren't initalized
 
   // Sizes
   size_t Ni=isc.get_Ncart();
