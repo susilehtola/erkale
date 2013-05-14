@@ -69,10 +69,10 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 #endif
 
     arma::vec ftot=fpul_kin+fpul_nuc+fnuc+forth+frep;
-    interpret_force(ftot).print("Total (w.o. 2-electron)");
+    //    interpret_force(ftot).print("Total (w.o. 2-electron)");
 
     arma::vec ffull=ftot+fcoul+fxch;
-    interpret_force(ffull).print("Total");
+    //   interpret_force(ffull).print("Total");
 
     return ffull;
 }
