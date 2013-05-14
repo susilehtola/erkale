@@ -66,52 +66,42 @@ enum minimizer {
   SD
 };
 
+// Convergence criteria
+enum convergence {
+  LOOSE,
+  NORMAL,
+  TIGHT,
+  VERYTIGHT
+};
+
 std::vector<atom_t> get_atoms(const gsl_vector * x, const std::vector<atom_t> orig) {
   // Update atomic positions
   std::vector<atom_t> atoms(orig);
-  double dx=0, dy=0, dz=0;
   for(size_t i=0;i<x->size/3;i++) {
     atoms[i].x=gsl_vector_get(x,3*i);
     atoms[i].y=gsl_vector_get(x,3*i+1);
     atoms[i].z=gsl_vector_get(x,3*i+2);
-
-    dx+=atoms[i].x;
-    dy+=atoms[i].y;
-    dz+=atoms[i].z;
   }
-
-  // Compute center of old geometry
-  double cenx=0, ceny=0, cenz=0;
-  for(size_t i=0;i<orig.size();i++) {
-    cenx+=orig[i].x;
-    ceny+=orig[i].y;
-    cenz+=orig[i].z;
-  }
-
-  // Last atom will be at
-  atoms[atoms.size()-1].x=cenx-dx;
-  atoms[atoms.size()-1].y=ceny-dy;
-  atoms[atoms.size()-1].z=cenz-dz;
 
   return atoms;
-}  
+}
 
 double calc_E(const gsl_vector *x, void *par) {
   // Get the helpers
   opthelper_t *p=(opthelper_t *) par;
-  
+
   // Get the atomic positions
   std::vector<atom_t> atoms=get_atoms(x,p->atoms);
 
   // Construct basis set
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
-  
+
   // Perform the electronic structure calculation
   calculate(basis,p->set,false);
-  
+
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
-  
+
   // Current energy is
   energy_t en;
   solchk.read(en);
@@ -122,19 +112,19 @@ double calc_E(const gsl_vector *x, void *par) {
 void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   // Get the helpers
   opthelper_t *p=(opthelper_t *) par;
-  
+
   // Get the atomic positions
   std::vector<atom_t> atoms=get_atoms(x,p->atoms);
 
   // Construct basis set
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
-  
+
   // Perform the electronic structure calculation
   calculate(basis,p->set,true);
-  
+
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
-  
+
   // Energy
   energy_t en;
   solchk.read(en);
@@ -143,13 +133,13 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   // Force
   arma::vec f;
   solchk.read("Force",f);
-  
+
   // Set components
-  size_t N=atoms.size()-1;
-  for(size_t i=0;i<N-1;i++) {
-    gsl_vector_set(g,3*i,-f(3*i)+f(3*N));
-    gsl_vector_set(g,3*i+1,-f(3*i+1)+f(3*N+1));
-    gsl_vector_set(g,3*i+2,-f(3*i+2)+f(3*N+2));
+  size_t N=atoms.size();
+  for(size_t i=0;i<N;i++) {
+    gsl_vector_set(g,3*i  ,-f(3*i));
+    gsl_vector_set(g,3*i+1,-f(3*i+1));
+    gsl_vector_set(g,3*i+2,-f(3*i+2));
   }
 }
 
@@ -233,12 +223,14 @@ int main(int argc, char **argv) {
   set.add_bool("ForcePol","Force polarized calculation",false);
   set.add_bool("FreezeCore","Freeze the atomic cores?",false);
   set.add_string("Optimizer","Optimizer to use: CGFR, CGPR, BFGS, BFGS2 (default), SD","BFGS2");
-  set.add_int("MaxSteps","Maximum amount of geometry steps",128);
+  set.add_int("MaxSteps","Maximum amount of geometry steps",256);
+  set.add_string("Criterion","Convergence criterion to use: LOOSE, NORMAL, TIGHT, VERYTIGHT","NORMAL");
   set.parse(std::string(argv[1]));
 
   bool verbose=set.get_bool("Verbose");
   int maxiter=set.get_int("MaxSteps");
 
+  // Interpret optimizer
   enum minimizer alg;
   std::string method=set.get_string("Optimizer");
   if(stricmp(method,"CGFR")==0)
@@ -254,7 +246,23 @@ int main(int argc, char **argv) {
   else {
     ERROR_INFO();
     throw std::runtime_error("Unknown optimization method.\n");
-  }  
+  }
+
+  // Interpret optimizer
+  enum convergence crit;
+  method=set.get_string("Criterion");
+  if(stricmp(method,"LOOSE")==0)
+    crit=LOOSE;
+  else if(stricmp(method,"NORMAL")==0)
+    crit=NORMAL;
+  else if(stricmp(method,"TIGHT")==0)
+    crit=TIGHT;
+  else if(stricmp(method,"VERYTIGHT")==0)
+    crit=VERYTIGHT;
+  else {
+    ERROR_INFO();
+    throw std::runtime_error("Unknown optimization method.\n");
+  }
 
   // Redirect output?
   std::string logfile=set.get_string("Logfile");
@@ -290,22 +298,22 @@ int main(int argc, char **argv) {
 
   // GSL stuff
   int status;
-     
+
   const gsl_multimin_fdfminimizer_type *T;
   gsl_multimin_fdfminimizer *s;
-  
+
   gsl_vector *x;
   gsl_multimin_function_fdf minimizer;
-  
-  minimizer.n = 3*(atoms.size()-1);
+
+  minimizer.n = 3*atoms.size();
   minimizer.f = calc_E;
   minimizer.df = calc_f;
   minimizer.fdf = calc_Ef;
   minimizer.params = (void *) &pars;
-     
+
   /* Starting point */
-  x = gsl_vector_alloc (minimizer.n);		       
-  for(size_t i=0;i<atoms.size()-1;i++) {
+  x = gsl_vector_alloc (minimizer.n);
+  for(size_t i=0;i<atoms.size();i++) {
     gsl_vector_set(x,3*i,atoms[i].x);
     gsl_vector_set(x,3*i+1,atoms[i].y);
     gsl_vector_set(x,3*i+2,atoms[i].z);
@@ -347,9 +355,9 @@ int main(int argc, char **argv) {
   pars.set.set_string("LoadChk",pars.set.get_string("SaveChk"));
 
   s = gsl_multimin_fdfminimizer_alloc (T, minimizer.n);
-     
+
   gsl_multimin_fdfminimizer_set (s, &minimizer, x, 0.01, 1e-4);
-     
+
   fprintf(stderr,"Geometry optimizer initialized in %s.\n",t.elapsed().c_str());
   fprintf(stderr,"Entering minimization loop with %s optimizer.\n",set.get_string("Optimizer").c_str());
 
@@ -360,11 +368,11 @@ int main(int argc, char **argv) {
   for(int iter=1;iter<=maxiter;iter++) {
     Timer titer;
     t.set();
-   
+
     status = gsl_multimin_fdfminimizer_iterate (s);
-    
+
     if (status) {
-      fprintf(stderr,"Error \"%s\" encountered.\n",gsl_strerror(status));
+      fprintf(stderr,"GSL encountered error: \"%s\".\n",gsl_strerror(status));
       break;
     }
 
@@ -377,7 +385,7 @@ int main(int argc, char **argv) {
 
     // Switch geometries
     oldgeom=geom;
-    
+
     // Get forces
     double fmax, frms;
     get_forces(s->gradient, fmax, frms);
@@ -385,23 +393,46 @@ int main(int argc, char **argv) {
     // Save geometry step
     char comment[80];
     sprintf(comment,"Step %i",(int) iter);
-    save_xyz(get_atoms(s->x,pars.atoms),comment,"optimize.xyz",true);    
+    save_xyz(get_atoms(s->x,pars.atoms),comment,"optimize.xyz",true);
 
     fprintf (stderr,"%5d % 08.8f % .3e %.3e %.3e %.3e %.3e %s\n", (int) iter, s->f, s->f - oldE, dmax, drms, fmax, frms, titer.elapsed().c_str());
     fflush(stderr);
-    
+
     // Check convergence
-    if((frms < 1e-5) && (fmax < 1.5e-5) && (dmax < 6e-5) && (drms < 4e-5))
+    bool convd=false;
+
+    switch(crit) {
+
+    case(LOOSE):
+      if((fmax < 2.5e-3) && (frms < 1.7e-3) && (dmax < 1.0e-2) && (drms < 6.7e-3))
+	convd=true;
+
+    case(NORMAL):
+      if((fmax < 4.5e-4) && (frms < 3.0e-4) && (dmax < 1.8e-3) && (drms < 1.2e-3))
+	convd=true;
+
+    case(TIGHT):
+      if((fmax < 1.5e-5) && (frms < 1.0e-5) && (dmax < 6.0e-5) && (drms < 4.0e-5))
+	convd=true;
+
+    case(VERYTIGHT):
+      if((fmax < 2.0e-6) && (frms < 1.0e-6) && (dmax < 6.0e-6) && (drms < 4.0e-6))
+	convd=true;
+    }
+
+    if(convd) {
+      fprintf(stderr,"Converged.\n");
       break;
+    }
 
     // Store old energy
-    oldE=s->f;    
+    oldE=s->f;
   }
-  
+
   gsl_multimin_fdfminimizer_free (s);
   gsl_vector_free (x);
-  
+
   printf("Running program took %s.\n",t.elapsed().c_str());
-  
+
   return 0;
 }
