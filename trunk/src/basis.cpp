@@ -725,7 +725,7 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
   ret.zeros();
 
   // Helper variables
-  double expf;
+  double expf, tmp;
 
   // Loop over functions
   for(size_t icart=0;icart<cart.size();icart++) {
@@ -740,23 +740,26 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
       expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
       // d/dx^2
-      ret(0,0,icart)=_der2(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
+      ret(0,0,icart)+=_der2(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
       // d/dy^2
-      ret(1,1,icart)=xr[l]*_der2(yr,m,c[iexp].z)*zr[n]*expf;
+      ret(1,1,icart)+=xr[l]*_der2(yr,m,c[iexp].z)*zr[n]*expf;
       // d/dz^2
-      ret(2,2,icart)=xr[l]*yr[m]*_der2(zr,n,c[iexp].z)*expf;
+      ret(2,2,icart)+=xr[l]*yr[m]*_der2(zr,n,c[iexp].z)*expf;
 
       // dxdy = dydx
-      ret(0,1,icart)=_der1(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
-      ret(1,0,icart)=ret(0,1,icart);
+      tmp=_der1(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
+      ret(0,1,icart)+=tmp;
+      ret(1,0,icart)+=tmp;
 
       // dxdz = dzdx
-      ret(0,2,icart)=_der1(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
-      ret(2,0,icart)=ret(0,2,icart);
+      tmp=_der1(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
+      ret(0,2,icart)+=tmp;
+      ret(2,0,icart)+=tmp;
 
       // dydz = dzdy
-      ret(1,2,icart)=xr[l]*_der1(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*expf;
-      ret(2,1,icart)=ret(1,2,icart);
+      tmp=xr[l]*_der1(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*exp;
+      ret(1,2,icart)+=tmp;
+      ret(2,1,icart)+=tmp;
     }
     
     // Plug in normalization constant
@@ -826,21 +829,21 @@ arma::mat GaussianShell::eval_laplgrad(double x, double y, double z) const {
       expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
       // dx^3
-      ret(icart,0) =_der3(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
+      ret(icart,0)+=_der3(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
       // dy^2 dx
       ret(icart,0)+=_der1(xr,l,c[iexp].z)*_der2(yr,m,c[iexp].z)*zr[n]*expf;
       // dz^2 dx
       ret(icart,0)+=_der1(xr,l,c[iexp].z)*yr[m]*_der2(zr,n,c[iexp].z)*expf;
 
       // dx^2 dy
-      ret(icart,1) =_der2(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
+      ret(icart,1)+=_der2(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
       // dy^3
       ret(icart,1)+=xr[l]*_der3(yr,m,c[iexp].z)*zr[n]*expf;
       // dz^2 dy
       ret(icart,1)+=xr[l]*_der1(yr,m,c[iexp].z)*_der2(zr,n,c[iexp].z)*expf;
 
       // dx^2 dz
-      ret(icart,2) =_der2(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
+      ret(icart,2)+=_der2(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
       // dy^2 dz
       ret(icart,2)+=xr[l]*_der2(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*expf;
       // dz^3
