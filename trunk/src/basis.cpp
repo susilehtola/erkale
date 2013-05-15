@@ -757,7 +757,7 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
       ret(2,0,icart)+=tmp;
 
       // dydz = dzdy
-      tmp=xr[l]*_der1(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*exp;
+      tmp=xr[l]*_der1(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*expf;
       ret(1,2,icart)+=tmp;
       ret(2,1,icart)+=tmp;
     }
