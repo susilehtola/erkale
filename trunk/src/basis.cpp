@@ -47,7 +47,7 @@ inline double _der1(const double x[], int l, double zeta) {
 
 // Second derivative operator
 inline double _der2(const double x[], int l, double zeta) {
-  double d=4.0*zeta*zeta*x[l+2] - 2.0*zeta*(l+1)*x[l];
+  double d=4.0*zeta*zeta*x[l+2] - 2.0*zeta*(2*l+1)*x[l];
   if(l>1)
     d+=l*(l-1)*x[l-2];
   return d;
