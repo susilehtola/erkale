@@ -74,80 +74,6 @@ enum convergence {
   VERYTIGHT
 };
 
-std::vector<atom_t> get_atoms(const gsl_vector * x, const std::vector<atom_t> orig) {
-  // Update atomic positions
-  std::vector<atom_t> atoms(orig);
-  for(size_t i=0;i<x->size/3;i++) {
-    atoms[i].x=gsl_vector_get(x,3*i);
-    atoms[i].y=gsl_vector_get(x,3*i+1);
-    atoms[i].z=gsl_vector_get(x,3*i+2);
-  }
-
-  return atoms;
-}
-
-double calc_E(const gsl_vector *x, void *par) {
-  // Get the helpers
-  opthelper_t *p=(opthelper_t *) par;
-
-  // Get the atomic positions
-  std::vector<atom_t> atoms=get_atoms(x,p->atoms);
-
-  // Construct basis set
-  BasisSet basis=construct_basis(atoms,p->baslib,p->set);
-
-  // Perform the electronic structure calculation
-  calculate(basis,p->set,false);
-
-  // Solution checkpoint
-  Checkpoint solchk(p->set.get_string("SaveChk"),false);
-
-  // Current energy is
-  energy_t en;
-  solchk.read(en);
-
-  return en.E;
-}
-
-void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
-  // Get the helpers
-  opthelper_t *p=(opthelper_t *) par;
-
-  // Get the atomic positions
-  std::vector<atom_t> atoms=get_atoms(x,p->atoms);
-
-  // Construct basis set
-  BasisSet basis=construct_basis(atoms,p->baslib,p->set);
-
-  // Perform the electronic structure calculation
-  calculate(basis,p->set,true);
-
-  // Solution checkpoint
-  Checkpoint solchk(p->set.get_string("SaveChk"),false);
-
-  // Energy
-  energy_t en;
-  solchk.read(en);
-  *E=en.E;
-
-  // Force
-  arma::vec f;
-  solchk.read("Force",f);
-
-  // Set components
-  size_t N=atoms.size();
-  for(size_t i=0;i<N;i++) {
-    gsl_vector_set(g,3*i  ,-f(3*i));
-    gsl_vector_set(g,3*i+1,-f(3*i+1));
-    gsl_vector_set(g,3*i+2,-f(3*i+2));
-  }
-}
-
-void calc_f(const gsl_vector *x, void *par, gsl_vector *g) {
-  double E;
-  calc_Ef(x,par,&E,g);
-}
-
 void get_displacement(const std::vector<atom_t> & g, const std::vector<atom_t> & o, double & dmax, double & drms) {
   if(g.size()!=o.size()) {
     ERROR_INFO();
@@ -191,6 +117,92 @@ void get_forces(const gsl_vector *g, double & fmax, double & frms) {
   fmax=sqrt(fmax);
 }
 
+std::vector<atom_t> get_atoms(const gsl_vector * x, const std::vector<atom_t> orig) {
+  // Update atomic positions
+  std::vector<atom_t> atoms(orig);
+  for(size_t i=0;i<x->size/3;i++) {
+    atoms[i].x=gsl_vector_get(x,3*i);
+    atoms[i].y=gsl_vector_get(x,3*i+1);
+    atoms[i].z=gsl_vector_get(x,3*i+2);
+  }
+
+  return atoms;
+}
+
+double calc_E(const gsl_vector *x, void *par) {
+  Timer t;
+
+  // Get the helpers
+  opthelper_t *p=(opthelper_t *) par;
+
+  // Get the atomic positions
+  std::vector<atom_t> atoms=get_atoms(x,p->atoms);
+
+  // Construct basis set
+  BasisSet basis=construct_basis(atoms,p->baslib,p->set);
+
+  // Perform the electronic structure calculation
+  calculate(basis,p->set,false);
+
+  // Solution checkpoint
+  Checkpoint solchk(p->set.get_string("SaveChk"),false);
+
+  // Current energy is
+  energy_t en;
+  solchk.read(en);
+
+  printf("Computed energy % 08.8f in %s.\n",en.E,t.elapsed().c_str());
+  fflush(stdout);
+
+  return en.E;
+}
+
+void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
+  Timer t;
+
+  // Get the helpers
+  opthelper_t *p=(opthelper_t *) par;
+
+  // Get the atomic positions
+  std::vector<atom_t> atoms=get_atoms(x,p->atoms);
+
+  // Construct basis set
+  BasisSet basis=construct_basis(atoms,p->baslib,p->set);
+
+  // Perform the electronic structure calculation
+  calculate(basis,p->set,true);
+
+  // Solution checkpoint
+  Checkpoint solchk(p->set.get_string("SaveChk"),false);
+
+  // Energy
+  energy_t en;
+  solchk.read(en);
+  *E=en.E;
+
+  // Force
+  arma::vec f;
+  solchk.read("Force",f);
+
+  // Set components
+  size_t N=atoms.size();
+  for(size_t i=0;i<N;i++) {
+    gsl_vector_set(g,3*i  ,-f(3*i));
+    gsl_vector_set(g,3*i+1,-f(3*i+1));
+    gsl_vector_set(g,3*i+2,-f(3*i+2));
+  }
+
+  double frms, fmax;
+  get_forces(g,fmax,frms);
+  printf("Computed energy % 08.8f and forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
+  fflush(stdout);
+}
+
+void calc_f(const gsl_vector *x, void *par, gsl_vector *g) {
+  double E;
+  calc_Ef(x,par,&E,g);
+}
+
 
 int main(int argc, char **argv) {
 
@@ -212,8 +224,8 @@ int main(int argc, char **argv) {
   // Initialize libderiv
   init_libderiv_base();
 
-  Timer t;
-  t.print_time();
+  Timer tprog;
+  tprog.print_time();
 
   // Parse settings
   Settings set;
@@ -358,7 +370,7 @@ int main(int argc, char **argv) {
 
   gsl_multimin_fdfminimizer_set (s, &minimizer, x, 0.01, 1e-4);
 
-  fprintf(stderr,"Geometry optimizer initialized in %s.\n",t.elapsed().c_str());
+  fprintf(stderr,"Geometry optimizer initialized in %s.\n",tprog.elapsed().c_str());
   fprintf(stderr,"Entering minimization loop with %s optimizer.\n",set.get_string("Optimizer").c_str());
 
   fprintf(stderr,"%5s %13s %10s %9s %9s %9s %9s %s\n","iter","E","deltaE","disp max","disp rms","f max","f rms", "titer");
@@ -366,8 +378,10 @@ int main(int argc, char **argv) {
   std::vector<atom_t> oldgeom(atoms);
 
   for(int iter=1;iter<=maxiter;iter++) {
+    printf("Iteration %i\n",(int) iter);
+    fflush(stdout);
+
     Timer titer;
-    t.set();
 
     status = gsl_multimin_fdfminimizer_iterate (s);
 
@@ -394,8 +408,8 @@ int main(int argc, char **argv) {
     char comment[80];
     sprintf(comment,"Step %i",(int) iter);
     save_xyz(get_atoms(s->x,pars.atoms),comment,"optimize.xyz",true);
-
-    fprintf (stderr,"%5d % 08.8f % .3e %.3e %.3e %.3e %.3e %s\n", (int) iter, s->f, s->f - oldE, dmax, drms, fmax, frms, titer.elapsed().c_str());
+    
+    fprintf(stderr,"%5d % 08.8f % .3e %.3e %.3e %.3e %.3e %s\n", (int) iter, s->f, s->f - oldE, dmax, drms, fmax, frms, titer.elapsed().c_str());
     fflush(stderr);
 
     // Check convergence
@@ -432,7 +446,7 @@ int main(int argc, char **argv) {
   gsl_multimin_fdfminimizer_free (s);
   gsl_vector_free (x);
 
-  printf("Running program took %s.\n",t.elapsed().c_str());
+  printf("Running program took %s.\n",tprog.elapsed().c_str());
 
   return 0;
 }
