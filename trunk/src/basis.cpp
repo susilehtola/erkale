@@ -1668,6 +1668,10 @@ arma::vec BasisSet::eval_lapl(size_t ish, double x, double y, double z) const {
   return shells[ish].eval_lapl(x,y,z);
 }
 
+arma::cube BasisSet::eval_hess(size_t ish, double x, double y, double z) const {
+  return shells[ish].eval_hess(x,y,z);
+}
+
 arma::mat BasisSet::eval_laplgrad(size_t ish, double x, double y, double z) const {
   return shells[ish].eval_laplgrad(x,y,z);
 }
