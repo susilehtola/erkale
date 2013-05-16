@@ -42,4 +42,7 @@ std::vector<atom_t> load_xyz(std::string filename);
 /// Save atoms to xyz file
 void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const std::string & fname, bool append=false);
 
+/// Print xyz
+void print_xyz(const std::vector<atom_t> & at);
+
 #endif

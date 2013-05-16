@@ -122,3 +122,8 @@ void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const
     fprintf(out,"%-4s  % 10.5f  % 10.5f  % 10.5f\n",at[i].el.c_str(),at[i].x/ANGSTROMINBOHR,at[i].y/ANGSTROMINBOHR,at[i].z/ANGSTROMINBOHR);
   fclose(out);
 }
+
+void print_xyz(const std::vector<atom_t> & at) {
+  for(size_t i=0;i<at.size();i++)
+    printf("%4i %-4s  % 10.5f  % 10.5f  % 10.5f\n",(int) i, at[i].el.c_str(),at[i].x/ANGSTROMINBOHR,at[i].y/ANGSTROMINBOHR,at[i].z/ANGSTROMINBOHR);
+}
