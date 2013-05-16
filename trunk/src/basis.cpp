@@ -1572,14 +1572,6 @@ std::vector<GaussianShell> BasisSet::get_shells() const {
   return shells;
 }
 
-std::vector<GaussianShell> BasisSet::get_shells(size_t inuc) const {
-  std::vector<GaussianShell> ret;
-  for(size_t ish=0;ish<shells.size();ish++)
-    if(shells[ish].get_center_ind()==inuc)
-      ret.push_back(shells[ish]);
-  return ret;
-}
-
 GaussianShell BasisSet::get_shell(size_t ind) const {
   return shells[ind];
 }
@@ -2834,7 +2826,7 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
     ElementBasisSet elbas(get_symbol(inuc));
 
     // Get the shells belonging to this nucleus
-    std::vector<GaussianShell> shs=get_shells(inuc);
+    std::vector<GaussianShell> shs=get_funcs(inuc);
 
     // and add the contractions to the elemental basis set
     for(size_t ish=0;ish<shs.size();ish++) {
@@ -2899,7 +2891,7 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
   // and the shells.
   for(size_t inuc=0;inuc<nuclei.size();inuc++) {
     // Get the shells belonging to this nucleus
-    std::vector<GaussianShell> shs=get_shells(inuc);
+    std::vector<GaussianShell> shs=get_funcs(inuc);
 
     // Generate the new basis functions. Loop over am
     for(int am=0;am<(int) coeffs[inuc].size();am++) {
