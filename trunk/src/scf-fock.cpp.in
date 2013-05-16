@@ -375,17 +375,16 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	sol.Ka=tab.calcK(sol.Pa);
 	sol.Kb=tab.calcK(sol.Pb);
 #endif
-
-	if(verbose) {
-	  printf("done (%s)\n",t.elapsed().c_str());
-	}
-	fflush(stdout);
-
-
+	
 #ifdef DFT
-      } // End kfrac clause
+      }
 #endif
-
+      
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	}
+      fflush(stdout);
+      
     }
 
   }
