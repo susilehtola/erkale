@@ -176,9 +176,9 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
   arma::mat mulova=mulliken_overlap(basis,Pa);
   arma::mat mulovb=mulliken_overlap(basis,Pb);
   // Mulliken charges
-  arma::mat mulq(Pa.n_rows,3);
-  mulq.col(0)=-sum(mulova);
-  mulq.col(1)=-sum(mulovb);
+  arma::mat mulq(basis.get_Nnuc(),3);
+  mulq.col(0)=-arma::trans(sum(mulova));
+  mulq.col(1)=-arma::trans(sum(mulovb));
   mulq.col(2)=mulq.col(0)+mulq.col(1);
   for(size_t i=0;i<basis.get_Nnuc();i++) {
     nucleus_t nuc=basis.get_nucleus(i);
