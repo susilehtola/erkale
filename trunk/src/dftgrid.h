@@ -282,9 +282,9 @@ class AtomGrid {
   void eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) const;
 
   /// Evaluate force
-  arma::vec eval_force(const BasisSet & bas, size_t inuc, const arma::mat & P) const;
+  arma::vec eval_force(const BasisSet & bas, const arma::mat & P) const;
   /// Evaluate force
-  arma::vec eval_force(const BasisSet & bas, size_t inuc, const arma::mat & Pa, const arma::mat & Pb) const;
+  arma::vec eval_force(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb) const;
 };
 
 
