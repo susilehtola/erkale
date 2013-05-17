@@ -1083,118 +1083,125 @@ void AtomGrid::eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) cons
   }
 }
 
-arma::vec AtomGrid::eval_force(const BasisSet & bas, size_t inuc, const arma::mat & Pa, const arma::mat & Pb) const {
+arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb) const {
   if(!polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute unrestricted force with restricted density.\n");
   }
 
-  arma::rowvec f(3);
+  arma::rowvec f(3*bas.get_Nnuc());
   f.zeros();
 
-  // Get functions centered on the atom
-  std::vector<GaussianShell> shells=bas.get_funcs(inuc);
-  
-  // LDA part. Loop over grid
-  for(size_t ip=0;ip<grid.size();ip++) {
-
-    // Grad rho in current point
-    arma::rowvec gradrhoa(3);
-    gradrhoa.zeros();
-    arma::rowvec gradrhob(3);
-    gradrhob.zeros();
-
-    // Loop over shells on the nucleus
-    for(size_t ish=0;ish<shells.size();ish++) {
-
-      // First function on shell is
-      size_t mu0=shells[ish].get_first_ind();
-
-      // Evaluate the gradient in the current grid point
-      arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-      // Increment sum. Loop over mu
-      for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
-	// Function index is
-	size_t mu=mu0+imu;
-
-	// Loop over the functions on the grid point
-	size_t first=grid[ip].f0;
-	size_t last=first+grid[ip].nf;
+  // Loop over nuclei
+  for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
+    
+    // Get functions centered on the atom
+    std::vector<GaussianShell> shells=bas.get_funcs(inuc);
+    
+    // LDA part. Loop over grid
+    for(size_t ip=0;ip<grid.size();ip++) {
+      
+      // Grad rho in current point
+      arma::rowvec gradrhoa(3);
+      gradrhoa.zeros();
+      arma::rowvec gradrhob(3);
+      gradrhob.zeros();
+      
+      // Loop over shells on the nucleus
+      for(size_t ish=0;ish<shells.size();ish++) {
 	
-	for(size_t inu=first;inu<last;inu++) {
-	  // Get index of function
-	  size_t nu=flist[inu].ind;
+	// First function on shell is
+	size_t mu0=shells[ish].get_first_ind();
+	
+	// Evaluate the gradient in the current grid point
+	arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	
+	// Increment sum. Loop over mu
+	for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
+	  // Function index is
+	  size_t mu=mu0+imu;
 	  
-	  gradrhoa+=Pa(mu,nu)*grad.row(imu)*flist[inu].f;
-	  gradrhob+=Pb(mu,nu)*grad.row(imu)*flist[inu].f;
- 	}
+	  // Loop over the functions on the grid point
+	  size_t first=grid[ip].f0;
+	  size_t last=first+grid[ip].nf;
+	  
+	  for(size_t inu=first;inu<last;inu++) {
+	    // Get index of function
+	    size_t nu=flist[inu].ind;
+	    
+	    gradrhoa+=Pa(mu,nu)*grad.row(imu)*flist[inu].f;
+	    gradrhob+=Pb(mu,nu)*grad.row(imu)*flist[inu].f;
+	  }
+	}
       }
+      // Plug in the factor 2 to get the total gradient
+      gradrhoa*=2.0;
+      gradrhob*=2.0;
+      
+      // Increment total force
+      f.subvec(3*inuc,3*inuc+2)+=grid[ip].w*(vxc[2*ip]*gradrhoa + vxc[2*ip+1]*gradrhob);
     }
-    // Plug in the factor 2 to get the total gradient
-    gradrhoa*=2.0;
-    gradrhob*=2.0;
-
-    // Increment total force
-    f+=grid[ip].w*(vxc[2*ip]*gradrhoa + vxc[2*ip+1]*gradrhob);
   }
 
-
+  
   return arma::trans(f);
 }
 
 
-arma::vec AtomGrid::eval_force(const BasisSet & bas, size_t inuc, const arma::mat & P) const {
+arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & P) const {
   if(polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute restricted force with unrestricted density.\n");
   }
 
   // Initialize force
-  arma::rowvec f(3);
+  arma::rowvec f(3*bas.get_Nnuc());
   f.zeros();
 
-  // Get functions centered on the atom
-  std::vector<GaussianShell> shells=bas.get_funcs(inuc);
-  
-  // LDA part. Loop over grid
-  for(size_t ip=0;ip<grid.size();ip++) {
-
-    // Grad rho in current point
-    arma::rowvec gradrho(3);
-    gradrho.zeros();
-
-    // Loop over shells on the nucleus
-    for(size_t ish=0;ish<shells.size();ish++) {
-
-      // First function on shell is
-      size_t mu0=shells[ish].get_first_ind();
-
-      // Evaluate the gradient in the current grid point
-      arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-      // Increment sum. Loop over mu
-      for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
-	// Function index is
-	size_t mu=mu0+imu;
-
-	// Loop over the functions on the grid point
-	size_t first=grid[ip].f0;
-	size_t last=first+grid[ip].nf;
+  // Loop over nuclei
+  for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
+    // Get functions centered on the atom
+    std::vector<GaussianShell> shells=bas.get_funcs(inuc);
+    
+    // LDA part. Loop over grid
+    for(size_t ip=0;ip<grid.size();ip++) {
+      
+      // Grad rho in current point
+      arma::rowvec gradrho(3);
+      gradrho.zeros();
+      
+      // Loop over shells on the nucleus
+      for(size_t ish=0;ish<shells.size();ish++) {
 	
-	for(size_t inu=first;inu<last;inu++) {
-	  // Get index of function
-	  size_t nu=flist[inu].ind;
+	// First function on shell is
+	size_t mu0=shells[ish].get_first_ind();
+	
+	// Evaluate the gradient in the current grid point
+	arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	
+	// Increment sum. Loop over mu
+	for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
+	  // Function index is
+	  size_t mu=mu0+imu;
 	  
-	  gradrho+=P(mu,nu)*grad.row(imu)*flist[inu].f;
- 	}
+	  // Loop over the functions on the grid point
+	  size_t first=grid[ip].f0;
+	  size_t last=first+grid[ip].nf;
+	  
+	  for(size_t inu=first;inu<last;inu++) {
+	    // Get index of function
+	    size_t nu=flist[inu].ind;
+	    
+	    gradrho+=P(mu,nu)*grad.row(imu)*flist[inu].f;
+	  }
+	}
       }
+      // Plug in the factor 2 to get the total gradient
+      gradrho*=2.0;
+      
+      // Increment total force
+      f.subvec(3*inuc,3*inuc+2)+=grid[ip].w*vxc[ip]*gradrho;
     }
-    // Plug in the factor 2 to get the total gradient
-    gradrho*=2.0;
-
-    // Increment total force
-    f+=grid[ip].w*vxc[ip]*gradrho;
   }
   
   return arma::trans(f);
@@ -2359,6 +2366,10 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 #else
     // Current thread is
     int ith=omp_get_thread_num();
+
+    // Helper
+    arma::vec fwrk(f);
+
 #pragma omp for schedule(dynamic,1)
 #endif
     // Loop over atoms
@@ -2380,14 +2391,20 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 	wrk[ith].compute_xc(c_func);
       
       // Calculate the force on the atom
-      arma::vec fat=wrk[ith].eval_force(*basp,iat,P);
-
-      // Save to total force
-      f.subvec(3*iat,3*iat+2)=fat;
+#ifdef _OPENMP
+      fwrk+=wrk[ith].eval_force(*basp,P);
+#else
+      f+=wrk[ith].eval_force(*basp,P);
+#endif
       
       // Free memory
       wrk[ith].free();
     }
+
+#ifdef _OPENMP
+#pragma omp critical
+    f+=fwrk;
+#endif
   } // End parallel region
 
   return f;
@@ -2407,6 +2424,10 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
 #else
     // Current thread is
     int ith=omp_get_thread_num();
+    
+    // Helper
+    arma::vec fwrk(f);
+
 #pragma omp for schedule(dynamic,1)
 #endif
     // Loop over atoms
@@ -2428,14 +2449,20 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
 	wrk[ith].compute_xc(c_func);
       
       // Calculate the force on the atom
-      arma::vec fat=wrk[ith].eval_force(*basp,iat,Pa,Pb);
-
-      // Save to total force
-      f.subvec(3*iat,3*iat+2)=fat;
+#ifdef _OPENMP
+      fwrk+=wrk[ith].eval_force(*basp,Pa,Pb);
+#else
+      f+=wrk[ith].eval_force(*basp,Pa,Pb);
+#endif
       
       // Free memory
       wrk[ith].free();
     }
+
+#ifdef _OPENMP
+#pragma omp critical
+    f+=fwrk;
+#endif
   } // End parallel region
   
   return f;
