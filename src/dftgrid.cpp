@@ -464,6 +464,8 @@ void AtomGrid::eval_grad(const arma::mat & P, size_t ip, double *g) const {
 
   size_t i, j;
 
+  // grad rho = P(i,j) [ (grad i) j + i (grad j) ]
+  //          = 2 P(i,j) i (grad j)
   for(size_t ii=first;ii<last;ii++) {
     // Index of function is
     i=flist[ii].ind;
@@ -471,9 +473,12 @@ void AtomGrid::eval_grad(const arma::mat & P, size_t ip, double *g) const {
       j=flist[jj].ind;
 
       for(int ic=0;ic<3;ic++)
-	g[ic]+=P(i,j)*(flist[ii].f*glist[3*jj+ic] + glist[3*ii+ic]*flist[jj].f);
+	g[ic]+=P(i,j)*flist[ii].f*glist[3*jj+ic];
     }
   }
+
+  for(int ic=0;ic<3;ic++)
+    g[ic]*=2.0;
 }
 
 void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl, double & kin) const {
@@ -811,111 +816,6 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
   }
 }
 
-arma::vec AtomGrid::eval_force(const BasisSet & bas, size_t inuc, const arma::mat & Pa, const arma::mat & Pb) const {
-  if(!polarized) {
-    ERROR_INFO();
-    throw std::runtime_error("Refusing to compute unrestricted force with restricted density.\n");
-  }
-
-  // Get functions centered on atom
-  std::vector<GaussianShell> shells=bas.get_shells(inuc);
-
-  // Initialize force
-  arma::vec f(3);
-  f.zeros();
-
-  // LDA part. Loop over grid
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Sum in current point
-    arma::vec asum(3), bsum(3);
-    asum.zeros();
-    bsum.zeros();
-
-    // Loop over functions on the atom
-    for(size_t ish=0;ish<shells.size();ish++) {
-      // FIrst index on shell
-      size_t mu0=shells[ish].get_first_ind();
-      // Evaluate gradient
-      arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-      
-      // Loop over functions
-      for(size_t jj=0;jj<shells[ish].get_Nbf();jj++) {
-	// Index is
-	size_t mu=mu0+jj;
-	
-	// Loop over functions on grid point
-	size_t first=grid[ip].f0;
-	size_t last=first+grid[ip].nf;
-	for(size_t ii=first;ii<last;ii++) {
-	  // Get index of function
-	  size_t nu=flist[ii].ind;
-	  
-	  asum+=Pa(mu,nu)*flist[ii].f*grad.row(jj);
-	  bsum+=Pb(mu,nu)*flist[ii].f*grad.row(jj);
-	}
-      }
-    }
-    
-    // Increment force
-    f+=2.0*asum*grid[ip].w*vxc[2*ip];
-    f+=2.0*bsum*grid[ip].w*vxc[2*ip+1];
-  }
-
-  return f;
-}
-
-
-arma::vec AtomGrid::eval_force(const BasisSet & bas, size_t inuc, const arma::mat & P) const {
-  if(polarized) {
-    ERROR_INFO();
-    throw std::runtime_error("Refusing to compute restricted force with unrestricted density.\n");
-  }
-
-  // Get functions centered on atom
-  std::vector<GaussianShell> shells=bas.get_shells(inuc);
-
-  // Initialize force
-  arma::vec f(3);
-  f.zeros();
-
-  // LDA part. Loop over grid
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Sum in current point
-    arma::vec sum(3);
-    sum.zeros();
-
-    // Loop over functions on the atom
-    for(size_t ish=0;ish<shells.size();ish++) {
-      // FIrst index on shell
-      size_t mu0=shells[ish].get_first_ind();
-      // Evaluate gradient
-      arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-      
-      // Loop over functions
-      for(size_t jj=0;jj<shells[ish].get_Nbf();jj++) {
-	// Index is
-	size_t mu=mu0+jj;
-	
-	// Loop over functions on grid point
-	size_t first=grid[ip].f0;
-	size_t last=first+grid[ip].nf;
-	for(size_t ii=first;ii<last;ii++) {
-	  // Get index of function
-	  size_t nu=flist[ii].ind;
-	  
-	  sum+=P(mu,nu)*flist[ii].f*grad.row(jj);
-	}
-      }
-    }
-    
-    // Increment force
-    f+=2.0*sum*grid[ip].w*vxc[ip];
-  }
-
-  return f;
-}
-
-
 void AtomGrid::eval_Fxc(std::vector<double> & H) const {
   double xcfac;
 
@@ -1181,6 +1081,123 @@ void AtomGrid::eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) cons
       }
     }
   }
+}
+
+arma::vec AtomGrid::eval_force(const BasisSet & bas, size_t inuc, const arma::mat & Pa, const arma::mat & Pb) const {
+  if(!polarized) {
+    ERROR_INFO();
+    throw std::runtime_error("Refusing to compute unrestricted force with restricted density.\n");
+  }
+
+  arma::rowvec f(3);
+  f.zeros();
+
+  // Get functions centered on the atom
+  std::vector<GaussianShell> shells=bas.get_funcs(inuc);
+  
+  // LDA part. Loop over grid
+  for(size_t ip=0;ip<grid.size();ip++) {
+
+    // Grad rho in current point
+    arma::rowvec gradrhoa(3);
+    gradrhoa.zeros();
+    arma::rowvec gradrhob(3);
+    gradrhob.zeros();
+
+    // Loop over shells on the nucleus
+    for(size_t ish=0;ish<shells.size();ish++) {
+
+      // First function on shell is
+      size_t mu0=shells[ish].get_first_ind();
+
+      // Evaluate the gradient in the current grid point
+      arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+
+      // Increment sum. Loop over mu
+      for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
+	// Function index is
+	size_t mu=mu0+imu;
+
+	// Loop over the functions on the grid point
+	size_t first=grid[ip].f0;
+	size_t last=first+grid[ip].nf;
+	
+	for(size_t inu=first;inu<last;inu++) {
+	  // Get index of function
+	  size_t nu=flist[inu].ind;
+	  
+	  gradrhoa+=Pa(mu,nu)*grad.row(imu)*flist[inu].f;
+	  gradrhob+=Pb(mu,nu)*grad.row(imu)*flist[inu].f;
+ 	}
+      }
+    }
+    // Plug in the factor 2 to get the total gradient
+    gradrhoa*=2.0;
+    gradrhob*=2.0;
+
+    // Increment total force
+    f+=grid[ip].w*(vxc[2*ip]*gradrhoa + vxc[2*ip+1]*gradrhob);
+  }
+
+
+  return arma::trans(f);
+}
+
+
+arma::vec AtomGrid::eval_force(const BasisSet & bas, size_t inuc, const arma::mat & P) const {
+  if(polarized) {
+    ERROR_INFO();
+    throw std::runtime_error("Refusing to compute restricted force with unrestricted density.\n");
+  }
+
+  // Initialize force
+  arma::rowvec f(3);
+  f.zeros();
+
+  // Get functions centered on the atom
+  std::vector<GaussianShell> shells=bas.get_funcs(inuc);
+  
+  // LDA part. Loop over grid
+  for(size_t ip=0;ip<grid.size();ip++) {
+
+    // Grad rho in current point
+    arma::rowvec gradrho(3);
+    gradrho.zeros();
+
+    // Loop over shells on the nucleus
+    for(size_t ish=0;ish<shells.size();ish++) {
+
+      // First function on shell is
+      size_t mu0=shells[ish].get_first_ind();
+
+      // Evaluate the gradient in the current grid point
+      arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+
+      // Increment sum. Loop over mu
+      for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
+	// Function index is
+	size_t mu=mu0+imu;
+
+	// Loop over the functions on the grid point
+	size_t first=grid[ip].f0;
+	size_t last=first+grid[ip].nf;
+	
+	for(size_t inu=first;inu<last;inu++) {
+	  // Get index of function
+	  size_t nu=flist[inu].ind;
+	  
+	  gradrho+=P(mu,nu)*grad.row(imu)*flist[inu].f;
+ 	}
+      }
+    }
+    // Plug in the factor 2 to get the total gradient
+    gradrho*=2.0;
+
+    // Increment total force
+    f+=grid[ip].w*vxc[ip]*gradrho;
+  }
+  
+  return arma::trans(f);
 }
 
 AtomGrid::AtomGrid(bool lobatto, double toler) {
@@ -2048,13 +2065,13 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
   H=(Ha+Hb)/2.0;
 }
 #else
-void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel) {
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Excv, double & Nelv) {
   // Clear Hamiltonian
   H.zeros(P.n_rows,P.n_cols);
   // Clear exchange-correlation energy
-  Exc=0.0;
+  double Exc=0.0;
   // Clear number of electrons
-  Nel=0.0;
+  double Nel=0.0;
 
 #ifdef _OPENMP
   // Get (maximum) number of threads
@@ -2062,23 +2079,24 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 
   // Stack of work arrays
   std::vector<arma::mat> Hwrk;
-  std::vector<double> Nelwrk;
-  std::vector<double> Excwrk;
 
   for(int i=0;i<maxt;i++) {
     Hwrk.push_back(arma::mat(H.n_rows,H.n_cols));
     Hwrk[i].zeros();
-    Nelwrk.push_back(0.0);
-    Excwrk.push_back(0.0);
   }
 
-#pragma omp parallel shared(Hwrk,Nelwrk,Excwrk)
+#pragma omp parallel shared(Hwrk) reduction(+:Nel,Exc)
+#endif
   { // Begin parallel region
     
+#ifdef _OPENMP
     // Current thread is
     int ith=omp_get_thread_num();
 
 #pragma omp for schedule(dynamic,1)
+#else
+    int ith=0;
+#endif
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
@@ -2089,7 +2107,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       // Update density
       wrk[ith].update_density(P);
       // Update number of electrons
-      Nelwrk[ith]+=wrk[ith].compute_Nel();
+      Nel+=wrk[ith].compute_Nel();
       
       // Initialize the arrays
       wrk[ith].init_xc();
@@ -2100,59 +2118,37 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
 	wrk[ith].compute_xc(c_func);
 
       // Evaluate the energy
-      Excwrk[ith]+=wrk[ith].eval_Exc();
+      Exc+=wrk[ith].eval_Exc();
       // and construct the Fock matrices
+#ifdef _OPENMP
       wrk[ith].eval_Fxc(Hwrk[ith]);
+#else
+      wrk[ith].eval_Fxc(H);
+#endif
       // Free memory
       wrk[ith].free();
     }
   } // End parallel region
 
+#ifdef _OPENMP
   // Sum results
-  for(int i=0;i<maxt;i++) {
+  for(int i=0;i<maxt;i++)
     H+=Hwrk[i];
-    Nel+=Nelwrk[i];
-    Exc+=Excwrk[i];
-  }
-#else
-  for(size_t i=0;i<grids.size();i++) {
-    // Change atom and create grid
-    wrk[0].form_grid(*basp,grids[i]);
-    // Compute basis functions
-    wrk[0].compute_bf(*basp,grids[i]);
-
-    // Update density
-    wrk[0].update_density(P);
-    // Update number of electrons
-    Nel+=wrk[0].compute_Nel();
-    
-    // Initialize the arrays
-    wrk[0].init_xc();
-    // Compute the functionals
-    if(x_func>0)
-      wrk[0].compute_xc(x_func);
-    if(c_func>0)
-      wrk[0].compute_xc(c_func);
-
-    // Evaluate the energy
-    Exc+=wrk[0].eval_Exc();
-    // and construct the Fock matrices
-    wrk[0].eval_Fxc(H);
-    // Free memory
-    wrk[0].free();
-  }
 #endif
+
+  Excv=Exc;
+  Nelv=Nel;
 }
-#endif
+#endif // CONSISTENCYCHECK
 
-void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel) {
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Excv, double & Nelv) {
   // Clear Hamiltonian
   Ha.zeros(Pa.n_rows,Pa.n_cols);
   Hb.zeros(Pb.n_rows,Pb.n_cols);
   // Clear exchange-correlation energy
-  Exc=0.0;
+  double Exc=0.0;
   // Clear number of electrons
-  Nel=0.0;
+  double Nel=0.0;
 
 #ifdef _OPENMP
   // Get (maximum) number of threads
@@ -2160,8 +2156,6 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 
   // Stack of work arrays
   std::vector<arma::mat> Hawrk, Hbwrk;
-  std::vector<double> Nelwrk;
-  std::vector<double> Excwrk;
 
   for(int i=0;i<maxt;i++) {
     Hawrk.push_back(arma::mat(Ha.n_rows,Ha.n_cols));
@@ -2169,18 +2163,20 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 
     Hbwrk.push_back(arma::mat(Hb.n_rows,Hb.n_cols));
     Hbwrk[i].zeros();
-
-    Nelwrk.push_back(0.0);
-    Excwrk.push_back(0.0);
   }
 
-#pragma omp parallel shared(Hawrk,Hbwrk,Nelwrk,Excwrk)
+#pragma omp parallel shared(Hawrk,Hbwrk) reduction(+:Nel,Exc)
+#endif
   { // Begin parallel region
     
+#ifdef _OPENMP
     // Current thread is
     int ith=omp_get_thread_num();
     
 #pragma omp for schedule(dynamic,1)
+#else
+    int ith=0;
+#endif
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
 
@@ -2201,54 +2197,31 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
         wrk[ith].compute_xc(x_func);
       if(c_func>0)
         wrk[ith].compute_xc(c_func);
-
+      
       // Evaluate the energy
       Exc+=wrk[ith].eval_Exc();
       // and construct the Fock matrices
+#ifdef _OPENMP
       wrk[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
+#else
+      wrk[ith].eval_Fxc(Ha,Hb);
+#endif
            
       // Free memory
       wrk[ith].free();
     }
   } // End parallel region
-  
+
+#ifdef _OPENMP  
   // Sum results
   for(int i=0;i<maxt;i++) {
     Ha+=Hawrk[i];
     Hb+=Hbwrk[i];
-    Nel+=Nelwrk[i];
-    Exc+=Excwrk[i];
-  }
-#else
-  // Loop over atoms
-  for(size_t i=0;i<grids.size();i++) {
-    // Change atom and create grid
-    wrk[0].form_grid(*basp,grids[i]);
-    // Compute basis functions
-    wrk[0].compute_bf(*basp,grids[i]);
-    
-    // Update density
-    wrk[0].update_density(Pa,Pb);
-    // Update number of electrons
-    Nel+=wrk[0].compute_Nel();
-
-    // Initialize the arrays
-    wrk[0].init_xc();
-    // Compute the functionals
-    if(x_func>0)
-      wrk[0].compute_xc(x_func);
-    if(c_func>0)
-      wrk[0].compute_xc(c_func);
-
-    // Evaluate the energy
-    Exc+=wrk[0].eval_Exc();
-    // and construct the Fock matrices
-    wrk[0].eval_Fxc(Ha,Hb);
- 
-    // Free memory
-    wrk[0].free();
   }
 #endif
+
+  Excv=Exc;
+  Nelv=Nel;
 }
 
 
@@ -2269,8 +2242,6 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
 
   // Stack of work arrays
   std::vector<arma::mat> Hawrk, Hbwrk;
-  std::vector<double> Nelwrk;
-  std::vector<double> Excwrk;
 
   for(int i=0;i<maxt;i++) {
     Hawrk.push_back(arma::mat(Ha[0].n_rows,Ha[0].n_cols));
@@ -2278,12 +2249,9 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
 
     Hbwrk.push_back(arma::mat(Ha[0].n_rows,Ha[0].n_cols));
     Hbwrk[i].zeros();
-
-    Nelwrk.push_back(0.0);
-    Excwrk.push_back(0.0);
   }
 
-#pragma omp parallel shared(Hawrk,Hbwrk,Nelwrk,Excwrk)
+#pragma omp parallel shared(Hawrk,Hbwrk)
   { // Begin parallel region
 
     arma::mat Hdum(Pa[0]);
@@ -2375,4 +2343,100 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
     wrk[0].free();
   }
 #endif
+}
+
+arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
+  arma::vec f(3*basp->get_Nnuc());
+  f.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  { // Begin parallel region
+
+#ifndef _OPENMP
+    int ith=0;
+#else
+    // Current thread is
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#endif
+    // Loop over atoms
+    for(size_t iat=0;iat<grids.size();iat++) {
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[iat]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[iat]);
+      
+      // Update density
+      wrk[ith].update_density(P);
+
+      // Initialize the arrays
+      wrk[ith].init_xc();
+      // Compute the functionals
+      if(x_func>0)
+	wrk[ith].compute_xc(x_func);
+      if(c_func>0)
+	wrk[ith].compute_xc(c_func);
+      
+      // Calculate the force on the atom
+      arma::vec fat=wrk[ith].eval_force(*basp,iat,P);
+
+      // Save to total force
+      f.subvec(3*iat,3*iat+2)=fat;
+      
+      // Free memory
+      wrk[ith].free();
+    }
+  } // End parallel region
+
+  return f;
+}
+
+arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb) {
+  arma::vec f(3*basp->get_Nnuc());
+  f.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  { // Begin parallel region
+
+#ifndef _OPENMP
+    int ith=0;
+#else
+    // Current thread is
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#endif
+    // Loop over atoms
+    for(size_t iat=0;iat<grids.size();iat++) {
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[iat]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[iat]);
+      
+      // Update density
+      wrk[ith].update_density(Pa,Pb);
+
+      // Initialize the arrays
+      wrk[ith].init_xc();
+      // Compute the functionals
+      if(x_func>0)
+	wrk[ith].compute_xc(x_func);
+      if(c_func>0)
+	wrk[ith].compute_xc(c_func);
+      
+      // Calculate the force on the atom
+      arma::vec fat=wrk[ith].eval_force(*basp,iat,Pa,Pb);
+
+      // Save to total force
+      f.subvec(3*iat,3*iat+2)=fat;
+      
+      // Free memory
+      wrk[ith].free();
+    }
+  } // End parallel region
+  
+  return f;
 }
