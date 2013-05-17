@@ -22,12 +22,6 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 #else
     W=form_density(sol.Ea,sol.Ca,occa)+form_density(sol.Eb,sol.Cb,occb);
 #endif
-    
-    printf("Doing forces:\n");
-    fflush(stdout);
-
-    if(!direct)
-      scr.fill(basisp);
 
     // Compute force
     arma::vec fpul_kin=basisp->kinetic_pulay(sol.P);
@@ -35,7 +29,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
     
     arma::vec fpul_nuc=basisp->nuclear_pulay(sol.P);
     //    interpret_force(fpul_nuc).print("Nuclear Pulay");
-    
+ 
     arma::vec fnuc=basisp->nuclear_der(sol.P);
     //    interpret_force(fnuc).print("Hellman-Feynman");
     
@@ -44,35 +38,66 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
     
     arma::vec frep=basisp->nuclear_force();
     //    interpret_force(frep).print("Nuclear repulsion");
+
+#ifdef DFT
+    // Get fraction of exact exchange
+    double kfrac=exact_exchange(dft.x_func);
+#endif
+
+    if(!direct || densityfit)
+      scr.fill(basisp);
     
     arma::vec fcoul;
-    arma::vec fxch;
-    if(direct) {
-#ifdef RESTRICTED
-      scr.forceJK(sol.P,fcoul,fxch,tol,NULL);
-#else
-      arma::vec faxch, fbxch;
-      scr.forceJK(sol.Pa,sol.Pb,fcoul,faxch,fbxch,tol,NULL);
-      fxch=faxch+fbxch;
+    arma::vec fxchf;
 
+#ifdef DFT
+    if(kfrac>0) {
+#endif
+
+#ifdef RESTRICTED
+      scr.forceJK(sol.P,fcoul,fxchf,tol,NULL);
+#else
+      arma::vec faxchf, fbxchf;
+      scr.forceJK(sol.Pa,sol.Pb,fcoul,faxchf,fbxchf,tol,NULL);
+      fxchf=faxchf+fbxchf;
+      
       //      interpret_force(faxch).print("alpha exchange");
       //      interpret_force(fbxch).print("beta exchange");
 #endif
-    }
-    //    interpret_force(fcoul).print("Coulomb");
-    //    interpret_force(fxch).print("Exchange");
-    //    interpret_force(fcoul+fxch).print("2-electron contribution");
+      //    interpret_force(fxchf).print("Exchange");
+      //    interpret_force(fcoul+fxchf).print("2-electron contribution");
 
 #ifdef DFT
-    (void) dft;
-    (void) grid;
+    } else {
+      
+      fcoul=scr.forceJ(sol.P,tol,NULL);
+    }
+    
+    // Get the DFT contribution
+    arma::vec fxc;
+#ifdef RESTRICTED
+    fxc=grid.eval_force(dft.x_func,dft.c_func,sol.P);
+#else
+    fxc=grid.eval_force(dft.x_func,dft.c_func,sol.Pa,sol.Pb);
 #endif
 
+    //    interpret_force(fxc).print("XC force");
+
+#endif // DFT
+    
+    //    interpret_force(fcoul).print("Coulomb");
+    
     arma::vec ftot=fpul_kin+fpul_nuc+fnuc+forth+frep;
     //    interpret_force(ftot).print("Total (w.o. 2-electron)");
 
-    arma::vec ffull=ftot+fcoul+fxch;
-    //   interpret_force(ffull).print("Total");
-
+#ifndef DFT    
+    arma::vec ffull=ftot+fcoul+fxchf;
+#else
+    arma::vec ffull=ftot+fcoul+fxc;
+    if(kfrac!=0.0)
+      ffull+=kfrac*fxchf;
+#endif
+    //    interpret_force(ffull).print("Total");
+    
     return ffull;
 }
