@@ -51,6 +51,8 @@ typedef struct {
   BasisSetLibrary baslib;
   // Settings used
   Settings set;
+  // Indices of dofs
+  std::vector<size_t> dofidx;
 } opthelper_t;
 
 enum minimizer {
@@ -97,10 +99,12 @@ void get_displacement(const std::vector<atom_t> & g, const std::vector<atom_t> &
   dmax=sqrt(dmax);
 }
 
-double calculate_projection(const std::vector<atom_t> & g, const std::vector<atom_t> & o, const arma::mat & f) {
+double calculate_projection(const std::vector<atom_t> & g, const std::vector<atom_t> & o, const arma::mat & f, const std::vector<size_t> & dofidx) {
   double dE=0.0;
-  for(size_t i=0;i<g.size();i++)
-    dE+=f(i,0)*(g[i].x-o[i].x) + f(i,1)*(g[i].y-o[i].y) + f(i,2)*(g[i].z-o[i].z);
+  for(size_t i=0;i<g.size();i++) {
+    size_t j=dofidx[i];
+    dE+=f(i,0)*(g[j].x-o[j].x) + f(i,1)*(g[j].y-o[j].y) + f(i,2)*(g[j].z-o[j].z);
+  }
   return dE;
 }
 
@@ -124,13 +128,15 @@ void get_forces(const gsl_vector *g, double & fmax, double & frms) {
   fmax=sqrt(fmax);
 }
 
-std::vector<atom_t> get_atoms(const gsl_vector * x, const std::vector<atom_t> orig) {
+std::vector<atom_t> get_atoms(const gsl_vector * x, const opthelper_t & opts) {
   // Update atomic positions
-  std::vector<atom_t> atoms(orig);
-  for(size_t i=0;i<x->size/3;i++) {
-    atoms[i].x=gsl_vector_get(x,3*i);
-    atoms[i].y=gsl_vector_get(x,3*i+1);
-    atoms[i].z=gsl_vector_get(x,3*i+2);
+  std::vector<atom_t> atoms(opts.atoms);
+
+  for(size_t i=0;i<opts.dofidx.size();i++) {
+    size_t j=opts.dofidx[i];
+    atoms[j].x=gsl_vector_get(x,3*i);
+    atoms[j].y=gsl_vector_get(x,3*i+1);
+    atoms[j].z=gsl_vector_get(x,3*i+2);
   }
 
   return atoms;
@@ -143,7 +149,7 @@ double calc_E(const gsl_vector *x, void *par) {
   opthelper_t *p=(opthelper_t *) par;
 
   // Get the atomic positions
-  std::vector<atom_t> atoms=get_atoms(x,p->atoms);
+  std::vector<atom_t> atoms=get_atoms(x,*p);
 
   // Construct basis set
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
@@ -172,7 +178,7 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   opthelper_t *p=(opthelper_t *) par;
 
   // Get the atomic positions
-  std::vector<atom_t> atoms=get_atoms(x,p->atoms);
+  std::vector<atom_t> atoms=get_atoms(x,*p);
 
   // Construct basis set
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
@@ -193,11 +199,11 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   solchk.read("Force",f);
 
   // Set components
-  size_t N=atoms.size();
-  for(size_t i=0;i<N;i++) {
-    gsl_vector_set(g,3*i  ,-f(3*i));
-    gsl_vector_set(g,3*i+1,-f(3*i+1));
-    gsl_vector_set(g,3*i+2,-f(3*i+2));
+  for(size_t i=0;i<p->dofidx.size();i++) {
+    size_t j=p->dofidx[i];
+    gsl_vector_set(g,3*i  ,-f(3*j));
+    gsl_vector_set(g,3*i+1,-f(3*j+1));
+    gsl_vector_set(g,3*i+2,-f(3*j+2));
   }
 
   double frms, fmax;
@@ -312,6 +318,22 @@ int main(int argc, char **argv) {
   const std::vector<atom_t> origgeom=load_xyz(atomfile);
   std::vector<atom_t> atoms(origgeom);
 
+  // Are any atoms fixed?
+  std::vector<size_t> dofidx;
+  for(size_t i=0;i<atoms.size();i++) {
+    bool fixed=false;
+
+    if(atoms[i].el.size()>3)
+      if(stricmp(atoms[i].el.substr(atoms[i].el.size()-3),"-Fx")==0) {
+	fixed=true;
+	atoms[i].el=atoms[i].el.substr(0,atoms[i].el.size()-3);
+      }
+
+    // Add to degrees of freedom
+    if(!fixed)
+      dofidx.push_back(i);
+  }
+
   // Read in basis set
   BasisSetLibrary baslib;
   std::string basfile=set.get_string("Basis");
@@ -326,13 +348,14 @@ int main(int argc, char **argv) {
   pars.atoms=atoms;
   pars.baslib=baslib;
   pars.set=set;
+  pars.dofidx=dofidx;
 
   /* Starting point */
-  gsl_vector *x = gsl_vector_alloc (3*atoms.size());
-  for(size_t i=0;i<atoms.size();i++) {
-    gsl_vector_set(x,3*i,atoms[i].x);
-    gsl_vector_set(x,3*i+1,atoms[i].y);
-    gsl_vector_set(x,3*i+2,atoms[i].z);
+  gsl_vector *x = gsl_vector_alloc (3*dofidx.size());
+  for(size_t i=0;i<dofidx.size();i++) {
+    gsl_vector_set(x,3*i,atoms[dofidx[i]].x);
+    gsl_vector_set(x,3*i+1,atoms[dofidx[i]].y);
+    gsl_vector_set(x,3*i+2,atoms[dofidx[i]].z);
   }
 
   // GSL status
@@ -343,7 +366,7 @@ int main(int argc, char **argv) {
     
   gsl_multimin_function_fdf minimizer;
     
-  minimizer.n = 3*atoms.size();
+  minimizer.n = x->size;
   minimizer.f = calc_E;
   minimizer.df = calc_f;
   minimizer.fdf = calc_Ef;
@@ -373,7 +396,7 @@ int main(int argc, char **argv) {
   double oldE;
   arma::mat oldf;
   {
-    gsl_vector *g=gsl_vector_alloc(3*atoms.size());
+    gsl_vector *g=gsl_vector_alloc(x->size);
     calc_Ef(x,minimizer.params,&oldE,g);
     oldf=interpret_force(g);
     gsl_vector_free(g);
@@ -396,7 +419,7 @@ int main(int argc, char **argv) {
   std::vector<atom_t> oldgeom(atoms);
     
   for(int iter=1;iter<=maxiter;iter++) {
-    printf("Iteration %i\n",(int) iter);
+    printf("\nGeometry iteration %i\n",(int) iter);
     fflush(stdout);
       
     Timer titer;
@@ -409,14 +432,14 @@ int main(int argc, char **argv) {
     }
       
     // New geometry is
-    std::vector<atom_t> geom=get_atoms(s->x,pars.atoms);
+    std::vector<atom_t> geom=get_atoms(s->x,pars);
       
     // Calculate displacements
     double dmax, drms;
     get_displacement(geom, oldgeom, dmax, drms);
       
     // Calculate projected change of energy
-    double dEproj=calculate_projection(geom,oldgeom,oldf);
+    double dEproj=calculate_projection(geom,oldgeom,oldf,pars.dofidx);
     // Actual change of energy is
     double dE=s->f - oldE;
       
@@ -431,7 +454,7 @@ int main(int argc, char **argv) {
     // Save geometry step
     char comment[80];
     sprintf(comment,"Step %i",(int) iter);
-    save_xyz(get_atoms(s->x,pars.atoms),comment,"optimize.xyz",true);
+    save_xyz(get_atoms(s->x,pars),comment,"optimize.xyz",true);
       
     fprintf(stderr,"%4d % 16.8f % .3e % .3e %.3e %.3e %.3e %.3e %s\n", (int) iter, s->f, dE, dE/dEproj, dmax, drms, fmax, frms, titer.elapsed().c_str());
     fflush(stderr);
