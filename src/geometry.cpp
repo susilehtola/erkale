@@ -160,7 +160,7 @@ double calc_E(const gsl_vector *x, void *par) {
 
   printf("Computed energy % 08.8f in %s.\n",en.E,t.elapsed().c_str());
   fflush(stdout);
-  print_xyz(atoms);
+  //  print_xyz(atoms);
 
   return en.E;
 }
@@ -204,7 +204,7 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   get_forces(g,fmax,frms);
   printf("Computed energy % 08.8f and forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
   fflush(stdout);
-  print_xyz(atoms);
+  //  print_xyz(atoms);
 }
 
 void calc_f(const gsl_vector *x, void *par, gsl_vector *g) {
