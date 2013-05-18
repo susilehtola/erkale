@@ -262,10 +262,12 @@ int main(int argc, char **argv) {
   set.add_string("Optimizer","Optimizer to use: CGFR, CGPR, BFGS, BFGS2 (default), SD","BFGS2");
   set.add_int("MaxSteps","Maximum amount of geometry steps",256);
   set.add_string("Criterion","Convergence criterion to use: LOOSE, NORMAL, TIGHT, VERYTIGHT","NORMAL");
+  set.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
   set.parse(std::string(argv[1]));
 
   bool verbose=set.get_bool("Verbose");
   int maxiter=set.get_int("MaxSteps");
+  std::string optmovie=set.get_string("OptMovie");
 
   // Interpret optimizer
   enum minimizer alg;
@@ -341,7 +343,7 @@ int main(int argc, char **argv) {
   printf("\n");
 
   // Save to output
-  save_xyz(atoms,"Initial configuration","optimize.xyz",false);
+  save_xyz(atoms,"Initial configuration",optmovie,false);
 
   // Minimizer options
   opthelper_t pars;
@@ -454,7 +456,7 @@ int main(int argc, char **argv) {
     // Save geometry step
     char comment[80];
     sprintf(comment,"Step %i",(int) iter);
-    save_xyz(get_atoms(s->x,pars),comment,"optimize.xyz",true);
+    save_xyz(get_atoms(s->x,pars),comment,optmovie,true);
       
     fprintf(stderr,"%4d % 16.8f % .3e % .3e %.3e %.3e %.3e %.3e %s\n", (int) iter, s->f, dE, dE/dEproj, dmax, drms, fmax, frms, titer.elapsed().c_str());
     fflush(stderr);
