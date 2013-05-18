@@ -720,7 +720,7 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
     zr[i]=zr[i-1]*zrel;
   }
 
-  // Gradient array, N_cart x 3 x 3
+  // Gradient array, 3 x 3 x Ncart
   arma::cube ret(3,3,cart.size());
   ret.zeros();
 
