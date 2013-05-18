@@ -1143,6 +1143,72 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & Pa, const
     }
   }
 
+  // GGA part
+  if(do_gga) {
+
+    // Loop over nuclei
+    for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
+      // Get functions centered on the atom
+      std::vector<GaussianShell> shells=bas.get_funcs(inuc);
+
+      // Loop over the grid
+      for(size_t ip=0;ip<grid.size();ip++) {
+
+	// PX in the current grid point
+	arma::mat PXa(3,3);
+	PXa.zeros();
+
+	arma::mat PXb(3,3);
+	PXb.zeros();
+	
+	// Loop over shells on the nucleus
+	for(size_t ish=0;ish<shells.size();ish++) {
+	  
+	  // First function on shell is
+	  size_t mu0=shells[ish].get_first_ind();
+	  
+	  // Evaluate the gradient in the current grid point
+	  arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	  // Evaluate the Hessian in the current grid point
+	  arma::cube hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+
+	  // Increment sum. Loop over mu
+	  for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
+	    // Function index is
+	    size_t mu=mu0+imu;
+	    
+	    // Loop over the functions on the grid point
+	    size_t first=grid[ip].f0;
+	    size_t last=first+grid[ip].nf;
+	    
+	    for(size_t inu=first;inu<last;inu++) {
+	      // Get index of function
+	      size_t nu=flist[inu].ind;
+
+	      for(int ic=0;ic<3;ic++)
+		for(int jc=0;jc<3;jc++)
+		  PXa(ic,jc)+=Pa(mu,nu)*(flist[inu].f*hess(ic,jc,imu) + glist[3*inu+jc]*grad(imu,ic));
+	      for(int ic=0;ic<3;ic++)
+		for(int jc=0;jc<3;jc++)
+		  PXb(ic,jc)+=Pb(mu,nu)*(flist[inu].f*hess(ic,jc,imu) + glist[3*inu+jc]*grad(imu,ic));
+	    }
+	  }
+	}
+	
+	// The xc "vector" is
+	arma::vec xca(3);
+	for(int ic=0;ic<3;ic++)
+	  xca(ic)=2.0*vsigma[3*ip  ]*grho[6*ip  +ic] + vsigma[3*ip+1]*grho[6*ip+3+ic];
+	arma::vec xcb(3);
+	for(int ic=0;ic<3;ic++)
+	  xcb(ic)=2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip  +ic];
+	
+	// Increment total force
+	f.subvec(3*inuc,3*inuc+2)+=2.0*grid[ip].w*arma::trans(PXa*xca+PXb*xcb);
+      }
+    }
+  }
+
   
   return arma::trans(f);
 }
@@ -1201,6 +1267,63 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & P) const 
       
       // Increment total force
       f.subvec(3*inuc,3*inuc+2)+=grid[ip].w*vxc[ip]*gradrho;
+    }
+  }
+
+  // GGA part
+  if(do_gga) {
+
+    // Loop over nuclei
+    for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
+      // Get functions centered on the atom
+      std::vector<GaussianShell> shells=bas.get_funcs(inuc);
+
+      // Loop over the grid
+      for(size_t ip=0;ip<grid.size();ip++) {
+
+	// PX in the current grid point
+	arma::mat PX(3,3);
+	PX.zeros();
+	
+	// Loop over shells on the nucleus
+	for(size_t ish=0;ish<shells.size();ish++) {
+	  
+	  // First function on shell is
+	  size_t mu0=shells[ish].get_first_ind();
+	  
+	  // Evaluate the gradient in the current grid point
+	  arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	  // Evaluate the Hessian in the current grid point
+	  arma::cube hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+
+	  // Increment sum. Loop over mu
+	  for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
+	    // Function index is
+	    size_t mu=mu0+imu;
+	    
+	    // Loop over the functions on the grid point
+	    size_t first=grid[ip].f0;
+	    size_t last=first+grid[ip].nf;
+	    
+	    for(size_t inu=first;inu<last;inu++) {
+	      // Get index of function
+	      size_t nu=flist[inu].ind;
+
+	      for(int ic=0;ic<3;ic++)
+		for(int jc=0;jc<3;jc++)
+		  PX(ic,jc)+=P(mu,nu)*(flist[inu].f*hess(ic,jc,imu) + glist[3*inu+jc]*grad(imu,ic));
+	    }
+	  }
+	}
+	
+	// The xc "vector" is
+	arma::vec xc(3);
+	for(int ic=0;ic<3;ic++)
+	  xc(ic)=2.0*vsigma[ip]*grho[3*ip+ic];
+	
+	// Increment total force
+	f.subvec(3*inuc,3*inuc+2)+=2.0*grid[ip].w*arma::trans(PX*xc);
+      }
     }
   }
   
