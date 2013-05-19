@@ -261,6 +261,53 @@ void dERIWorker::get(int idx, std::vector<double> & ints) {
   size_t N=(is->get_Ncart())*(js->get_Ncart())*(ks->get_Ncart())*(ls->get_Ncart());
   input.resize(N);
 
+  // Determine what is the real center requested (juggling of integrals)
+  if(idx>=0 && idx<3) {
+    if(swap_ij && swap_ijkl)
+      // i-> j -> l
+      idx+=9;
+    else if(swap_ij)
+      // i -> j
+      idx+=3;
+    else if(swap_ijkl)
+      // i -> k
+      idx+=6;
+
+  } else if(idx>=3 && idx<6) {
+    if(swap_ij && swap_ijkl)
+      // j -> i -> k
+      idx+=3;
+    else if(swap_ij)
+      // j -> i
+      idx-=3;
+    else if(swap_ijkl)
+      // j -> l
+      idx+=6;
+
+  } else if(idx>=6 && idx<9) {
+    if(swap_kl && swap_ijkl)
+      // k -> l -> j
+      idx-=3;
+    else if(swap_kl)
+      // k -> l
+      idx+=3;
+    else if(swap_ijkl)
+      // k -> i
+      idx-=6;
+
+  } else if(idx>=9 && idx<12) {
+
+    if(swap_kl && swap_ijkl)
+      // l -> k -> i
+      idx-=9;
+    else if(swap_kl)
+      // l -> k
+      idx-=3;
+    else if(swap_ijkl)
+      // l -> j
+      idx-=6;
+  }
+
   if((idx>=0 && idx<3) || (idx>5 && idx<12)) {
     // Integrals have been computed explicitely.
     for(size_t i=0;i<N;i++)
