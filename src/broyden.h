@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -19,7 +19,7 @@
  * \class Broyden
  *
  * \brief Broyden accelerator.
- * 
+ *
  * This class contains a Broyden convergence accelerator, as described in
  *
  * K. Baarman, T. Eirola and V. Havu, "Robust acceleration of self
@@ -83,4 +83,4 @@ class Broyden {
 };
 
 #endif
-  
+

@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -15,13 +15,13 @@
  */
 
 /*! \mainpage ERKALE - DFT from Hel
- * 
+ *
  * \section intro_sec Introduction
- * 
+ *
  * ERKALE is a code for Hartree-Fock and density-functional theory
  * calculations for atoms and molecules. It uses a Gaussian basis set
  * for representing the molecular orbitals and the electron density.
- * 
+ *
  * ERKALE is written in C++ and uses the Armadillo template library
  * for linear algebra operations.
  *

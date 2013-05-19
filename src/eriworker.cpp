@@ -280,7 +280,7 @@ void dERIWorker::get(int idx, std::vector<double> & ints) {
   spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
   // and return them
   ints=input;
-  
+
 #ifdef DEBUGDERIV
   // Evaluate other integrals
   std::vector<double> eris;

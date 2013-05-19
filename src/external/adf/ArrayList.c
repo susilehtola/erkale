@@ -1,6 +1,6 @@
  /***************************************************************************
  ArrayList.c - Implementation of a simple searchable and extendable list type
- 
+
  Copyright (C) 2006-2008 by Scientific Computing and Modelling NV.
  For support, contact Alexei Yakovlev (yakovlev at scm . com)
 

@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -117,16 +117,16 @@ int SG1_order(double r, int Z);
  * Chem. Phys. Lett. 199 (1992), pp. 557 - 560.
  *
  * For speed and to guarantee the accuracy of the results, the
- * integration grid is formed adaptively as described in 
+ * integration grid is formed adaptively as described in
  * A. M. Köster, R. Flores-Morano and J. U. Reveles, "Efficient and
  * reliable numerical integration of exchange-correlation energies and
  * potentials", J. Chem. Phys. 121, pp. 681 - 690 (2004).
  *
  * The radial integral is done with Gauss-Chebyshev quadrature, with
- * the change of variables used being the parameter free version 
+ * the change of variables used being the parameter free version
  * \f$ \displaystyle{ r_A = \frac 1 {\ln 2} \ln \left( \frac 2 {1-x_A} \right) } \f$
  * as used in the aforementioned article.
- * 
+ *
  * The angular integrals are performed either by Lebedev quadrature
  * or by Lobatto quadrature, as described in
  *
@@ -189,7 +189,7 @@ class AtomGrid {
   /// Laplacian of electron density
   std::vector<double> lapl_rho;
   /// Kinetic energy density
-  std::vector<double> tau; 
+  std::vector<double> tau;
 
   /// Functional derivative of energy wrt laplacian of electron density
   std::vector<double> vlapl;
@@ -207,7 +207,7 @@ class AtomGrid {
   AtomGrid(bool lobatto=false, double tol=1e-4);
   /// Destructor
   ~AtomGrid();
-  
+
   /// Set tolerance
   void set_tolerance(double toler);
   /// Check necessity of computing gradient and laplacians, necessary for compute_bf!

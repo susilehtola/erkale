@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -41,7 +41,7 @@ int main(void) {
       trans=l;
       break;
     }
-   
+
     std::string arg1, arg2, arg3;
 
     switch(trans) {
@@ -68,14 +68,14 @@ int main(void) {
     }
 
     const char ijkl[]="ijkl";
-    
+
     // Individual transforms
     for(int am=0;am<=MAXAM;am++) {
       // Get transformation matrix
       arma::mat transmat=Ylm_transmat(am);
       size_t Nsph=transmat.n_rows;
       size_t Ncart=transmat.n_cols;
-      
+
       // Print function header
       printf("static void transform_%c%i(size_t %s, size_t %s, size_t %s, const std::vector<double> & input, std::vector<double> & output) {\n",ijkl[it],am,arg1.c_str(),arg2.c_str(),arg3.c_str());
       printf("  output.clear();\n");
@@ -146,7 +146,7 @@ int main(void) {
     printf("    size_t Ncart=transmat.n_cols;\n");
     printf("    size_t Nsph=transmat.n_rows;\n");
 
-    // Transform loops                                                                                                                                                                      
+    // Transform loops
     switch(trans) {
     case(i):
       printf("    for(size_t jj=0;jj<Nj;jj++)\n");
@@ -191,6 +191,6 @@ int main(void) {
     printf("}\n");
 
 
-  }  
+  }
   return 0;
 }

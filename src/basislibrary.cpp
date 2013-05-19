@@ -373,13 +373,13 @@ void ElementBasisSet::augment(int naug) {
     double el=exps[exps.size()-2];
     for(int i=0;i<naug;i++) {
       double aug=el/pow(el/ed,i+2);
-    
+
       // Add the exponent
       FunctionShell sh(am);
       sh.add_exponent(1.0,aug);
       add_function(sh);
     }
-  } 
+  }
 
   sort();
 }
@@ -536,7 +536,7 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
                 sh.add_exponent(readdouble(nums[1]),readdouble(nums[0]));
               }
               el.add_function(sh);
-	      
+
 	    }
 	  }
 	}

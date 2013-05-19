@@ -166,7 +166,7 @@ size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom
     throw std::runtime_error("Error - could not localize core orbital!\n");
   } else if(loc_idx.size()>1)
     printf("Warning - there is more than one orbital localized on wanted atom.\n");
-  
+
   // Return index of orbital localized on atom
   return minind;
 }
@@ -281,13 +281,13 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
     arma::mat rvec;
     eig_sym_ordered(reig,rvec,rsqmat);
 
-    /*    
+    /*
     printf("\nLocalization around center %i, eigenvalues (Å):",(int) locind[i].ind+1);
     for(size_t ii=0;ii<reig.n_elem;ii++)
       printf(" %e",sqrt(reig(ii))/ANGSTROMINBOHR);
     printf("\n");
     fflush(stdout);
-    */    
+    */
 
     // Rotate occupied orbitals
     C.submat(0,locd,Nbf-1,nocc-1)=transmat*rvec;

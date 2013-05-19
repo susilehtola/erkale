@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -83,7 +83,7 @@ class XCAtomGrid {
   XCAtomGrid(bool lobatto=false, double tol=1e-4);
   /// Destructor
   ~XCAtomGrid();
-  
+
   /// Set tolerance
   void set_tolerance(double toler);
   /// Check necessity of computing gradient and laplacians, necessary

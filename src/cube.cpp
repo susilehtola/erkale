@@ -29,7 +29,7 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
 
   // Compute the norm (assumes evenly spaced grid!)
   double norm=0.0;
-  
+
   // Compute the momentum densities in batches, allowing
   // parallellization.
 #ifdef _OPENMP
@@ -62,22 +62,22 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
   for(size_t ib=0;ib<Nbatch;ib++) {
     // Zero amount of points in current batch.
     np=0;
-    
+
     // Form list of points to compute.
     while(np<Nbatch_p && ntot+np<N) {
       r[np].x=x_arr[xind];
       r[np].y=y_arr[yind];
       r[np].z=z_arr[zind];
-      
+
       // Increment number of points
       np++;
-      
+
       // Determine next point.
       if(zind+1<z_arr.size())
 	zind++;
       else {
 	zind=0;
-	
+
 	if(yind+1<y_arr.size())
 	  yind++;
 	else {
@@ -93,7 +93,7 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
     // Loop over the points in the batch
     for(size_t ip=0;ip<np;ip++)
       rho[ip]=compute_density(P,bas,r[ip]);
-    
+
     // Save computed value of density and increment norm
     for(size_t ip=0;ip<np;ip++) {
       fprintf(out,"%e\t%e\t%e\t%e\n",r[ip].x,r[ip].y,r[ip].z,rho[ip]);
@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   set.add_string("DensCube", "Calculate electron density on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
-  
+
   if(argc==2)
     set.parse(argv[1]);
   else
@@ -137,21 +137,21 @@ int main(int argc, char **argv) {
 
   // Load checkpoint
   Checkpoint chkpt(set.get_string("LoadChk"),false);
-  
+
   // Load basis set
   BasisSet basis;
   chkpt.read(basis);
-  
+
   // Load density matrix
   arma::mat P;
   chkpt.read("P",P);
-  
+
   // Form grid in p space.
   std::vector<double> x, y, z;
   parse_cube(set.get_string("DensCube"),x,y,z);
-    
+
   // Calculate density on cube
   density_cube(basis,P,x,y,z);
-    
+
   return 0;
 }

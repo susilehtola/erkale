@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -45,7 +45,7 @@ void Broyden::push_f(const arma::vec & fv) {
     if( newnorm > oldnorm) {
       if(verbose)
 	printf("Broyden: bad update detected - norm increased by %e from %e to %e.\n",newnorm-oldnorm,oldnorm,newnorm);
-      
+
       //      x.erase(x.begin()+x.size()-1);
       //      f.erase(f.begin()+f.size()-1);
       difficult=1;

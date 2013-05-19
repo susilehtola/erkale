@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -101,7 +101,7 @@ std::string Timer::elapsed() const {
 
     ret << days << " d";
   }
-  
+
   // Compute number of hours
   size_t hours=(size_t) trunc(telapsed/hour);
   if(hours) {
@@ -111,7 +111,7 @@ std::string Timer::elapsed() const {
     std::string tmp=ret.str();
     if(tmp.size() && tmp[tmp.size()-1]!=' ')
       ret << " ";
-    
+
     ret << hours << " h";
   }
 
@@ -124,7 +124,7 @@ std::string Timer::elapsed() const {
     std::string tmp=ret.str();
     if(tmp.size() && tmp[tmp.size()-1]!=' ')
       ret << " ";
-    
+
     ret << mins << " min";
   }
 
@@ -136,6 +136,6 @@ std::string Timer::elapsed() const {
   char hlp[80];
   sprintf(hlp,"%.2f s",telapsed);
   ret << hlp;
-  
+
   return ret.str();
 }

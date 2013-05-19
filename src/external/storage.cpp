@@ -51,7 +51,7 @@ int Storage::get_int(const std::string & name) const {
       return ints[i].val;
 
   std::ostringstream oss;
-  oss << "\nThe entry "<<name<<" was not found!\n"; 
+  oss << "\nThe entry "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return 0;
@@ -63,7 +63,7 @@ double Storage::get_double(const std::string & name) const {
       return doubles[i].val;
 
   std::ostringstream oss;
-  oss << "\nThe entry "<<name<<" was not found!\n"; 
+  oss << "\nThe entry "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return 0.0;
@@ -75,7 +75,7 @@ std::vector<int> Storage::get_int_vec(const std::string & name) const {
       return intvec[i].val;
 
   std::ostringstream oss;
-  oss << "\nThe entry "<<name<<" was not found!\n"; 
+  oss << "\nThe entry "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   std::vector<int> ret;
@@ -88,7 +88,7 @@ std::vector<double> Storage::get_double_vec(const std::string & name) const {
       return doublevec[i].val;
 
   std::ostringstream oss;
-  oss << "\nThe entry "<<name<<" was not found!\n"; 
+  oss << "\nThe entry "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   std::vector<double> ret;

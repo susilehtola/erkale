@@ -1,27 +1,27 @@
  /***************************************************************************
  KFReader.h - Implementation of KFReader library for handling ADF binary file
-              format, the so-called KF-files. The current version supports only 
-              reading KF files. 
-              Even though the binary files are system-dependent, they are 
+              format, the so-called KF-files. The current version supports only
+              reading KF files.
+              Even though the binary files are system-dependent, they are
               converted on the fly and the caller routine gets the data in the
               native format.
 
  Copyright (C) 2006-2008 by Scientific Computing and Modelling NV.
  For support, contact Alexei Yakovlev (yakovlev at scm . com)
-   
+
  This file is part of the ADF software
  For more information, see <http://www.scm.com>
-   
+
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU Lesser General Public License as published by
  the Free Software Foundation version 3 of the License.
-   
+
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
 
- SCM owns the intellectual property right for this file and reserves the 
+ SCM owns the intellectual property right for this file and reserves the
  right to distrbute it under a license other than LGPL
  ****************************************************************************/
 #include "KFc.h"
@@ -112,8 +112,8 @@ int openKFFile(KFFile *kf, const char *name){
    /* First pass to collect and parse only section header blocks */
    do {
 
-      if (readBlock(kf->fd,(void *)buf,recordNum) != KF_BLOCKLENGTH) return -1; 
-   
+      if (readBlock(kf->fd,(void *)buf,recordNum) != KF_BLOCKLENGTH) return -1;
+
       if (firstSBlock) {
          if (verifySuperIndex(buf)) {
             /* Figure out basic file characteristics - byte order and int size. */
@@ -138,18 +138,18 @@ int openKFFile(KFFile *kf, const char *name){
                      off += kf->superIndexEntryLength) {
          getSectionFromSuperEntry(kf, (char*)buf+off);
       }
-      
+
    } while (! lastSBlock);
 
-   /* Second pass to collect data blocks for all sections */ 
+   /* Second pass to collect data blocks for all sections */
    lastSBlock = 0;
    firstSBlock = 1;
    recordNum = 1;
 
    do {
 
-      if (readBlock(kf->fd,(void *)buf,recordNum) != KF_BLOCKLENGTH) return -1; 
-   
+      if (readBlock(kf->fd,(void *)buf,recordNum) != KF_BLOCKLENGTH) return -1;
+
       if (kf->byteOrder != getHostByteOrder())
          swapBytesSuperIndexBlock(kf, buf);
       if (kf->integerSize == 4)
@@ -163,7 +163,7 @@ int openKFFile(KFFile *kf, const char *name){
                      off += kf->superIndexEntryLength) {
          getDataBlockFromSuperEntry(kf, (char*)buf+off);
       }
-      
+
    } while (! lastSBlock);
 
    return kf->fd;
@@ -182,7 +182,7 @@ void closeKFFile (KFFile *kf){
 
 /*
 
-   returns variable length in units of the corresponding type 
+   returns variable length in units of the corresponding type
 
 */
 
@@ -196,7 +196,7 @@ int getKFVariableLength(KFFile *kf, const char *name){
 
 /*
 
-   returns the number of used elements in the variable 
+   returns the number of used elements in the variable
 
 */
 
@@ -224,9 +224,9 @@ int getKFData(KFFile *kf, const char *name, void *buf){
       return -1;
 }
 
-/* 
+/*
 
-   returns variable type (one of the T_* macros) or 0 (zero) 
+   returns variable type (one of the T_* macros) or 0 (zero)
 
 */
 
@@ -238,7 +238,7 @@ int getKFVariableType(KFFile *kf, const char *name){
       return 0;
 }
 
-/* 
+/*
    the memory space pointed to by buf must be
    large enough to hold all data.
    IMPORTANT: the data is converted to native for this platform types
@@ -252,7 +252,7 @@ int getKFVariableData(KFVariable *var, void *buf){
    int retValue = 0;
    KFFile *kf = var->section->file;
    int needInversion = (getHostByteOrder() != kf->byteOrder);
-   int off, size, i, 
+   int off, size, i,
       logicalBlk = var->firstLogBlk,
       firstBlk = 1,
       done = 0,
@@ -264,12 +264,12 @@ int getKFVariableData(KFVariable *var, void *buf){
          if (needInversion)
             swapNBytes(blk, kf->integerSize, KF_N_DATATYPES);
            /* where in the data block the data for this variable starts*/
-           off = calculateDataOffset(var, blk, firstBlk); 
-           size = calculateDataSize(var, blk, firstBlk);  
+           off = calculateDataOffset(var, blk, firstBlk);
+           size = calculateDataSize(var, blk, firstBlk);
            if (size > var->usedLen - targetIndex)
                size = var->usedLen - targetIndex;
            /* size = number of elements of this variable in this block*/
-         if (needInversion && var->type != KF_T_STRING) 
+         if (needInversion && var->type != KF_T_STRING)
             swapNBytes(blk+off, kf->typeSize[var->type], size);
          switch (var->type){
             case KF_T_INTEGER:
@@ -337,16 +337,16 @@ int isValidKFFile(const char* fname) {
    int fd = open(fname, O_RDONLY);
 #endif
 
-    
+
    if (fd < 0) return 0;
 
    n = readBlock(fd, blk, 1);
 
    if (n != KF_BLOCKLENGTH) return 0;
-   
+
    n = verifySuperIndex(blk);
    close(fd);
-   
+
    return n;
 }
 
@@ -451,14 +451,14 @@ static int guessByteOrder(void *buf, int size){
    KFSuperIndexBlock32 *bl32 = (KFSuperIndexBlock32 *)buf;
    KFSuperIndexBlock64 *bl64 = (KFSuperIndexBlock64 *)buf;
    char *c;
-   if (size == 4) 
+   if (size == 4)
       c = (char *)&(bl32->entries[0].physBlk);
    else if (size == 8)
       c = (char *)&(bl64->entries[0].physBlk);
 
-   if (*c == '\0') 
+   if (*c == '\0')
       return KF_BIG_ENDIAN;
-   else if (*c == '\001') 
+   else if (*c == '\001')
       return KF_LITTLE_ENDIAN;
    else {
       fprintf (stderr, "Corrupted file header\n");
@@ -653,7 +653,7 @@ static void parseIndexEntry(KFSection *sec, KFFile *kf, void *buf){
    KFIndexBlockEntry64 *ent64 = buf;
    int firstLogBlk, firstBlkIndex, length, firstBlkLen, usedLen, type;
    /* Check that the variable does not already exist */
-   KFVariable *var = findVariableInSection(sec, buf); 
+   KFVariable *var = findVariableInSection(sec, buf);
 
    if (kf->integerSize == 4) {
       firstLogBlk = (int)ent32->firstLBlk;
@@ -831,7 +831,7 @@ static void getVariableFromName(const char *complexName, char *varName){
       strncpy(varName, percent+1, KF_SECTION_NAME_LENGTH);
    else
       strncpy(varName, complexName, KF_SECTION_NAME_LENGTH);
-   
+
 }
 
 static KFVariable *findVariable(KFFile *kf, const char *name){

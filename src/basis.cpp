@@ -761,13 +761,13 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
       ret(1,2,icart)+=tmp;
       ret(2,1,icart)+=tmp;
     }
-    
+
     // Plug in normalization constant
     for(int ic=0;ic<3;ic++)
       for(int jc=0;jc<3;jc++)
 	ret(ic,jc,icart)*=cart[icart].relnorm;
   }
-  
+
 
   if(uselm) {
     // Need to transform into spherical harmonics
@@ -855,7 +855,7 @@ arma::mat GaussianShell::eval_laplgrad(double x, double y, double z) const {
     ret(icart,1)*=cart[icart].relnorm;
     ret(icart,2)*=cart[icart].relnorm;
   }
-  
+
   if(uselm)
     // Need to transform into spherical harmonics
     return transmat*ret;
@@ -909,7 +909,7 @@ arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
   int maxcontr=std::max(get_Ncontr(),rhs.get_Ncontr());
   ERIWorker eri(maxam,maxcontr);
   eri.compute(this,&dummy,&rhs,&dummy,eris);
-    
+
   // Fill overlap matrix
   arma::mat S(Ni,Nj);
   for(size_t i=0;i<Ni;i++)
@@ -1006,7 +1006,7 @@ arma::vec GaussianShell::nuclear_pulay(double cx, double cy, double cz, const ar
       for(size_t i=0;i<dermat.size();i++)
 	dermat[i]+=c[ixl].c*rhs.c[ixr].c*hlp[i];
     }
-  
+
   // Transformation to spherical harmonics. Left side:
   if(uselm)
     for(size_t i=0;i<dermat.size();i++)
@@ -1022,7 +1022,7 @@ arma::vec GaussianShell::nuclear_pulay(double cx, double cy, double cz, const ar
   for(size_t i=0;i<dermat.size();i++) {
     ret(i)=arma::trace(arma::trans(P)*dermat[i]);
   }
- 
+
   return ret;
 }
 
@@ -1049,7 +1049,7 @@ arma::vec GaussianShell::nuclear_der(double cx, double cy, double cz, const arma
 	dermat[i]+=c[ixl].c*rhs.c[ixr].c*hlp[i];
       }
     }
-  
+
   // Transformation to spherical harmonics. Left side:
   if(uselm)
     for(size_t i=0;i<dermat.size();i++)
@@ -1066,7 +1066,7 @@ arma::vec GaussianShell::nuclear_der(double cx, double cy, double cz, const arma
   for(size_t i=0;i<dermat.size();i++) {
     ret(i)=arma::trace(arma::trans(P)*dermat[i]);
   }
- 
+
   return ret;
 }
 
@@ -1083,14 +1083,14 @@ arma::vec GaussianShell::kinetic_pulay(const arma::mat & P, const GaussianShell 
   std::vector<arma::mat> dermat(6);
   for(size_t i=0;i<dermat.size();i++)
     dermat[i].zeros(get_Ncart(),rhs.get_Ncart());
-  
+
   for(size_t ixl=0;ixl<c.size();ixl++)
     for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
       std::vector<arma::mat> hlp=kinetic_int_pulay_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
       for(size_t i=0;i<dermat.size();i++)
 	dermat[i]+=c[ixl].c*rhs.c[ixr].c*hlp[i];
     }
-  
+
   // Transformation to spherical harmonics. Left side:
   if(uselm)
     for(size_t i=0;i<dermat.size();i++)
@@ -1106,7 +1106,7 @@ arma::vec GaussianShell::kinetic_pulay(const arma::mat & P, const GaussianShell 
   for(size_t i=0;i<dermat.size();i++) {
     ret(i)=arma::trace(arma::trans(P)*dermat[i]);
   }
- 
+
   return ret;
 }
 
@@ -1123,14 +1123,14 @@ arma::vec GaussianShell::overlap_der(const arma::mat & W, const GaussianShell & 
   std::vector<arma::mat> dermat(6);
   for(size_t i=0;i<dermat.size();i++)
     dermat[i].zeros(get_Ncart(),rhs.get_Ncart());
-  
+
   for(size_t ixl=0;ixl<c.size();ixl++)
     for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
       std::vector<arma::mat> hlp=overlap_int_pulay_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
       for(size_t i=0;i<dermat.size();i++)
 	dermat[i]+=c[ixl].c*rhs.c[ixr].c*hlp[i];
     }
-  
+
   // Transformation to spherical harmonics. Left side:
   if(uselm)
     for(size_t i=0;i<dermat.size();i++)
@@ -1146,7 +1146,7 @@ arma::vec GaussianShell::overlap_der(const arma::mat & W, const GaussianShell & 
   for(size_t i=0;i<dermat.size();i++) {
     ret(i)=-arma::trace(arma::trans(W)*dermat[i]);
   }
- 
+
   return ret;
 }
 
@@ -1240,7 +1240,7 @@ arma::vec GaussianShell::integral() const {
     // Loop over exponents
     for(size_t ix=0;ix<c.size();ix++) {
       double zeta=c[ix].z;
-      
+
       // Integral over x gives
       double intx=2.0*pow(0.5/sqrt(zeta),l+1)*sqrt(M_PI);
       // Integral over y
@@ -1802,7 +1802,7 @@ arma::mat BasisSet::overlap() const {
 
     // Get overlap between shells
     arma::mat tmp=shells[i].overlap(shells[j]);
-    
+
     // Store overlap
     S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
     S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
@@ -1829,14 +1829,14 @@ arma::mat BasisSet::coulomb_overlap() const {
     // Shells in pair
     size_t i=shellpairs[ip].is;
     size_t j=shellpairs[ip].js;
-    
+
     arma::mat tmp=shells[i].coulomb_overlap(shells[j]);
-    
+
     // Store overlap
     S.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
     S.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
   }
-  
+
   return S;
 }
 
@@ -1909,15 +1909,15 @@ arma::mat BasisSet::kinetic() const {
     // Shells in pair
     size_t i=shellpairs[ip].is;
     size_t j=shellpairs[ip].js;
-    
+
     // Get partial kinetic energy matrix
     arma::mat tmp=shells[i].kinetic(shells[j]);
-    
+
     // Store result
     T.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
     T.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
   }
-  
+
   return T;
 }
 
@@ -1971,7 +1971,7 @@ arma::mat BasisSet::nuclear() const {
 arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
   arma::vec f(3*nuclei.size());
   f.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -1980,7 +1980,7 @@ arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
 #ifdef _OPENMP
     arma::vec fwrk(3*nuclei.size());
     fwrk.zeros();
-    
+
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shellpairs.size();ip++)
@@ -1992,25 +1992,25 @@ arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
 	// Shells in pair
 	size_t i=shellpairs[ip].is;
 	size_t j=shellpairs[ip].js;
-	
+
 	// Nuclear charge
 	int Z=nuclei[inuc].Z;
-	
+
 	// Coordinates of nucleus
 	double cx=nuclei[inuc].r.x;
 	double cy=nuclei[inuc].r.y;
 	double cz=nuclei[inuc].r.z;
-	
+
 	// Density matrix for the pair
 	arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
-	
+
 	// Get the forces
 	arma::vec tmp=Z*shells[i].nuclear_pulay(cx,cy,cz,Pmat,shells[j]);
 
 	// Off-diagonal?
 	if(i!=j)
 	  tmp*=2.0;
-	
+
 	// and increment the nuclear force.
 #ifdef _OPENMP
 	fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
@@ -2033,7 +2033,7 @@ arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
 arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
   arma::vec f(3*nuclei.size());
   f.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -2042,7 +2042,7 @@ arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
 #ifdef _OPENMP
     arma::vec fwrk(3*nuclei.size());
     fwrk.zeros();
-    
+
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shellpairs.size();ip++)
@@ -2050,22 +2050,22 @@ arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
 	// If BSSE nucleus, do nothing
 	if(nuclei[inuc].bsse)
 	  continue;
-	
+
 	// Shells in pair
 	size_t i=shellpairs[ip].is;
 	size_t j=shellpairs[ip].js;
-	
+
 	// Nuclear charge
 	int Z=nuclei[inuc].Z;
-	
+
 	// Coordinates of nucleus
 	double cx=nuclei[inuc].r.x;
 	double cy=nuclei[inuc].r.y;
 	double cz=nuclei[inuc].r.z;
-	
+
 	// Density matrix for the pair
 	arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
-	
+
 	// Get the forces
 	arma::vec tmp=Z*shells[i].nuclear_der(cx,cy,cz,Pmat,shells[j]);
 
@@ -2086,14 +2086,14 @@ arma::vec BasisSet::nuclear_der(const arma::mat & P) const {
     f+=fwrk;
 #endif
   }
-  
+
   return f;
 }
 
 arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
   arma::vec f(3*nuclei.size());
   f.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -2102,24 +2102,24 @@ arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
 #ifdef _OPENMP
     arma::vec fwrk(3*nuclei.size());
     fwrk.zeros();
-    
+
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shellpairs.size();ip++) {
       // Shells in pair
       size_t i=shellpairs[ip].is;
       size_t j=shellpairs[ip].js;
-      
+
       // Density matrix for the pair
       arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
-      
+
       // Get the forces
       arma::vec tmp=shells[i].kinetic_pulay(Pmat,shells[j]);
 
       // Off-diagonal?
       if(i!=j)
 	tmp*=2.0;
-      
+
       // and increment the nuclear force.
 #ifdef _OPENMP
       fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
@@ -2129,20 +2129,20 @@ arma::vec BasisSet::kinetic_pulay(const arma::mat & P) const {
       f.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
 #endif
     }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     f+=fwrk;
 #endif
   }
-  
+
   return f;
 }
 
 arma::vec BasisSet::overlap_der(const arma::mat & P) const {
   arma::vec f(3*nuclei.size());
   f.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -2151,7 +2151,7 @@ arma::vec BasisSet::overlap_der(const arma::mat & P) const {
 #ifdef _OPENMP
     arma::vec fwrk(3*nuclei.size());
     fwrk.zeros();
-    
+
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shellpairs.size();ip++) {
@@ -2159,17 +2159,17 @@ arma::vec BasisSet::overlap_der(const arma::mat & P) const {
       // Shells in pair
       size_t i=shellpairs[ip].is;
       size_t j=shellpairs[ip].js;
-      
+
       // Density matrix for the pair
       arma::mat Pmat=P.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind());
-      
+
       // Get the forces
       arma::vec tmp=shells[i].overlap_der(Pmat,shells[j]);
 
       // Off-diagonal?
       if(i!=j)
 	tmp*=2.0;
-      
+
       // and increment the nuclear force.
 #ifdef _OPENMP
       fwrk.subvec(3*shells[i].get_center_ind(),3*shells[i].get_center_ind()+2)+=tmp.subvec(0,2);
@@ -2179,13 +2179,13 @@ arma::vec BasisSet::overlap_der(const arma::mat & P) const {
       f.subvec(3*shells[j].get_center_ind(),3*shells[j].get_center_ind()+2)+=tmp.subvec(3,5);
 #endif
     }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     f+=fwrk;
 #endif
   }
-  
+
   return f;
 }
 
@@ -2205,7 +2205,7 @@ arma::vec BasisSet::nuclear_force() const {
       coords_t rij=nuclei[i].r-nuclei[j].r;
       // and its third power
       double rcb=pow(norm(rij),3);
-      
+
       // Force is
       arma::vec F(3);
       F(0)=nuclei[i].Z*nuclei[j].Z/rcb*rij.x;
@@ -2307,7 +2307,7 @@ arma::cube three_overlap(const GaussianShell *is, const GaussianShell *js, const
       for(size_t kx=0;kx<kcontr.size();kx++) {
 	double kz=kcontr[kx].z;
 	double kc=kcontr[kx].c;
-	
+
 	cartint+=ic*jc*kc*three_overlap_int_os(icen.x,icen.y,icen.z,jcen.x,jcen.y,jcen.z,kcen.x,kcen.y,kcen.z,iz,jz,kz,icart,jcart,kcart);
       }
     }
@@ -2319,7 +2319,7 @@ arma::cube three_overlap(const GaussianShell *is, const GaussianShell *js, const
   for(size_t ik=0;ik<kcart.size();ik++) {
     // ({i}|{j}|ks) is
     arma::mat momval=cartint.slice(ik);
-    
+
     // Do conversion
     if(is->lm_in_use())
       momval=is->get_trans()*momval;
@@ -2345,7 +2345,7 @@ arma::cube three_overlap(const GaussianShell *is, const GaussianShell *js, const
     // Loop over cartesians
     for(size_t ick=0;ick<kcart.size();ick++)
       ints.slice(ik)+=ktrans(ik,ick)*twints.slice(ick);
-  
+
   return ints;
 }
 
@@ -2814,7 +2814,7 @@ bool BasisSet::operator==(const BasisSet & rhs) const {
 
 BasisSet BasisSet::decontract(arma::mat & m) const {
   // Decontract basis set. m maps old basis functions to new ones
-  
+
   // Contraction schemes for the nuclei
   std::vector< std::vector<arma::mat> > coeffs(nuclei.size());
   std::vector< std::vector< std::vector<double> > > exps(nuclei.size());
@@ -2848,12 +2848,12 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
       for(int am=0;am<=elbas.get_max_am();am++) {
 	// Initialization value
 	pam.push_back(-1);
-	
+
 	for(size_t ish=0;ish<shs.size();ish++) {
 	  // Skip if am is not the same
 	  if(shs[ish].get_am()!=am)
 	    continue;
-	  
+
 	  // Is this the first shell of the type?
 	  if(pam[am]==-1)
 	    pam[am]=shs[ish].lm_in_use();

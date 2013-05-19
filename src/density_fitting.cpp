@@ -56,7 +56,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   maxauxam=auxbas.get_max_am();
   maxorbcontr=orbbas.get_max_Ncontr();
   maxauxcontr=auxbas.get_max_Ncontr();
- 
+
   // First, compute the two-center integrals
   ab.zeros(Naux,Naux);
 
@@ -78,10 +78,10 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
       // The shells in question are
       size_t is=auxpairs[ip].is;
       size_t js=auxpairs[ip].js;
-      
+
       // Compute (a|b)
       eri.compute(&auxshells[is],&dummy,&auxshells[js],&dummy,eris);
-      
+
       // Store integrals
       size_t Ni=auxshells[is].get_Nbf();
       size_t Nj=auxshells[js].get_Nbf();
@@ -89,30 +89,30 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 	size_t ai=auxshells[is].get_first_ind()+ii;
 	for(size_t jj=0;jj<Nj;jj++) {
 	  size_t aj=auxshells[js].get_first_ind()+jj;
-	  
+
 	  ab(ai,aj)=eris[ii*Nj+jj];
 	  ab(aj,ai)=eris[ii*Nj+jj];
 	}
       }
     }
   }
-  
+
   if(hf) {
     // Form ab^-1 and ab^-1/2
     arma::mat abvec;
     arma::vec abval;
     eig_sym_ordered(abval,abvec,ab);
-    
+
     // Count linearly independent vectors
     size_t Nind=0;
     for(size_t i=0;i<abval.n_elem;i++)
       if(abval(i)>=threshold)
 	Nind++;
-    
+
     // and drop the linearly dependent ones
     abval=abval.subvec(abval.n_elem-Nind,abval.n_elem-1);
     abvec=abvec.submat(0,abvec.n_cols-Nind,abvec.n_rows-1,abvec.n_cols-1);
-    
+
     // Form matrices
     ab_inv.zeros(abvec.n_rows,abvec.n_rows);
     ab_invh.zeros(abvec.n_rows,abvec.n_rows);
@@ -136,22 +136,22 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     {
       ERIWorker eri(orbbas.get_max_am(),orbbas.get_max_Ncontr());
       std::vector<double> eris;
-      
+
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	// The shells in question are
 	size_t is=orbpairs[ip].is;
 	size_t js=orbpairs[ip].js;
-	
+
 	// Compute ERIs
 	eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js],eris);
-	
+
 	// Find out maximum value
 	double max=0.0;
 	for(size_t i=0;i<eris.size();i++)
 	  if(fabs(eris[i])>max)
 	    max=eris[i];
 	max=sqrt(max);
-	
+
 	// Store value
 	screen(is,js)=max;
 	screen(js,is)=max;
@@ -168,23 +168,23 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   {
     ERIWorker eri(std::max(orbbas.get_max_am(),auxbas.get_max_am()),std::max(orbbas.get_max_Ncontr(),auxbas.get_max_Ncontr()));
     std::vector<double> eris;
-    
+
     for(size_t ia=0;ia<auxshells.size();ia++)
       for(size_t imu=0;imu<orbshells.size();imu++) {
 	// Amount of functions
 	size_t Na=auxshells[ia].get_Nbf();
 	size_t Nmu=orbshells[imu].get_Nbf();
-	
+
 	// Compute (a|uu)
 	eri.compute(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[imu],eris);
-	
+
 	// Store integrals
 	for(size_t af=0;af<Na;af++) {
 	  size_t inda=auxshells[ia].get_first_ind()+af;
-	  
+
 	  for(size_t muf=0;muf<Nmu;muf++) {
 	    size_t indmu=orbshells[imu].get_first_ind()+muf;
-	    
+
 	    a_mu[inda*Nbf+indmu]=eris[(af*Nmu+muf)*Nmu+muf];
 	  }
 	}
@@ -203,32 +203,32 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 
       ERIWorker eri(std::max(orbbas.get_max_am(),auxbas.get_max_am()),std::max(orbbas.get_max_Ncontr(),auxbas.get_max_Ncontr()));
       std::vector<double> eris;
-      
+
       for(size_t ia=0;ia<auxshells.size();ia++)
 	for(size_t ip=0;ip<orbpairs.size();ip++) {
 	  // Shells in question are
 	  size_t imu=orbpairs[ip].is;
 	  size_t inu=orbpairs[ip].js;
-	  
+
 	  // Amount of functions
-	  
+
 	  size_t Na=auxshells[ia].get_Nbf();
 	  size_t Nmu=orbshells[imu].get_Nbf();
 	  size_t Nnu=orbshells[inu].get_Nbf();
-	  
+
 	  // Compute (a|mn)
 	  eri.compute(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu],eris);
-	  
+
 	  // Store integrals
 	  for(size_t af=0;af<Na;af++) {
 	    size_t inda=auxshells[ia].get_first_ind()+af;
-	    
+
 	    for(size_t muf=0;muf<Nmu;muf++) {
 	      size_t indmu=orbshells[imu].get_first_ind()+muf;
-	      
+
 	      for(size_t nuf=0;nuf<Nnu;nuf++) {
 		size_t indnu=orbshells[inu].get_first_ind()+nuf;
-		
+
 		a_munu[idx(inda,indmu,indnu)]=eris[(af*Nmu+muf)*Nnu+nuf];
 	      }
 	    }
@@ -325,7 +325,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 
 	size_t Nmu=orbshells[imus].get_Nbf();
 	size_t Nnu=orbshells[inus].get_Nbf();
-	
+
 	// If imus==inus, we need to take care that we count
 	// every term only once; on the off-diagonal we get
 	// every term twice.
@@ -335,7 +335,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 
 	for(size_t ias=0;ias<auxshells.size();ias++) {
 
-	  size_t Na=auxshells[ias].get_Nbf();	  
+	  size_t Na=auxshells[ias].get_Nbf();
 
 	  // Compute (a|mn)
 	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus],eris);
@@ -387,7 +387,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
   std::vector<arma::vec> gamma(P.size());
   for(size_t i=0;i<P.size();i++)
     gamma[i].zeros(Naux);
-  
+
   // Compute gamma
   if(!direct) {
 #ifdef _OPENMP
@@ -407,12 +407,12 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 	}
     }
   } else {
-    
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
     {
-      
+
       ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
       std::vector<double> eris;
 
@@ -434,7 +434,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 
 	size_t Nmu=orbshells[imus].get_Nbf();
 	size_t Nnu=orbshells[inus].get_Nbf();
-	
+
 	// If imus==inus, we need to take care that we count
 	// every term only once; on the off-diagonal we get
 	// every term twice.
@@ -444,7 +444,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 
 	for(size_t ias=0;ias<auxshells.size();ias++) {
 
-	  size_t Na=auxshells[ias].get_Nbf();	  
+	  size_t Na=auxshells[ias].get_Nbf();
 
 	  // Compute (a|mn)
 	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus],eris);
@@ -462,7 +462,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 		for(size_t ig=0;ig<P.size();ig++) {
 		  // The contracted integral
 		  double res=eris[(iia*Nmu+iimu)*Nnu+iinu]*P[ig](imu,inu);
-		  
+
 #ifdef _OPENMP
 		  gammawrk[ig](ia)+= fac*res;
 #else
@@ -545,42 +545,42 @@ arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
 #endif
       for(size_t ip=0;ip<orbpairs.size();ip++)
 	for(size_t ias=0;ias<auxshells.size();ias++) {
-	  
+
 	  size_t imus=orbpairs[ip].is;
 	  size_t inus=orbpairs[ip].js;
-	  
-	  
+
+
 #ifdef SCREENING
 	  // Do we need to compute the integral?
 	  if(screen(imus,inus)<SCRTHR)
 	    continue;
 #endif
-	  
+
 	  size_t Na=auxshells[ias].get_Nbf();
 	  size_t Nmu=orbshells[imus].get_Nbf();
 	  size_t Nnu=orbshells[inus].get_Nbf();
-	  
+
 	  double symfac=1.0;
 	  if(imus==inus)
 	    symfac=0.0;
-	  
+
 	  // Compute (a|mn)
 	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus],eris);
-	  
+
 	  // Increment H
 	  for(size_t iia=0;iia<Na;iia++) {
 	    // Account for orbital functions at the beginning of the basis set
 	    size_t ia=auxshells[ias].get_first_ind()+iia;
-	    
+
 	    for(size_t iimu=0;iimu<Nmu;iimu++) {
 	      size_t imu=orbshells[imus].get_first_ind()+iimu;
-			      
+
 	      for(size_t iinu=0;iinu<Nnu;iinu++) {
 		size_t inu=orbshells[inus].get_first_ind()+iinu;
-		
+
 		// Contract result
 		double tmp=eris[(iia*Nmu+iimu)*Nnu+iinu]*xcg(ia);
-		
+
 		H(imu,inu)+=tmp;
 		// Need to symmetrize?
 		H(inu,imu)+=symfac*tmp;
@@ -650,29 +650,29 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 #endif
       for(size_t ip=0;ip<orbpairs.size();ip++)
 	for(size_t ias=0;ias<auxshells.size();ias++) {
-	  
+
 	  size_t imus=orbpairs[ip].is;
 	  size_t inus=orbpairs[ip].js;
-	  
-	  
+
+
 #ifdef SCREENING
 	// Do we need to compute the integral?
 	  if(screen(imus,inus)<SCRTHR)
 	    continue;
 #endif
-	  
+
 	  size_t Na=auxshells[ias].get_Nbf();
 	  size_t Nmu=orbshells[imus].get_Nbf();
 	  size_t Nnu=orbshells[inus].get_Nbf();
-	  
-	  
+
+
 	  double symfac=1.0;
 	  if(imus==inus)
 	    symfac=0.0;
-	  
+
 	  // Compute (a|mn)
 	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus],eris);
-	  
+
 	  // Increment J
 	  for(size_t iia=0;iia<Na;iia++) {
 	    // Account for orbital functions at the beginning of the basis set
@@ -680,13 +680,13 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 
 	    for(size_t iimu=0;iimu<Nmu;iimu++) {
 	      size_t imu=orbshells[imus].get_first_ind()+iimu;
-	      
+
 	      for(size_t iinu=0;iinu<Nnu;iinu++) {
 		size_t inu=orbshells[inus].get_first_ind()+iinu;
-		
+
 		// Contract result
 		double tmp=eris[(iia*Nmu+iimu)*Nnu+iinu]*c(ia);
-		
+
 		J(imu,inu)+=tmp;
 		// Need to symmetrize?
 		J(inu,imu)+=symfac*tmp;
@@ -716,10 +716,10 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
       for(size_t ig=0;ig<P.size();ig++)
 	for(size_t inu=0;inu<=imu;inu++) {
 	  J[ig](imu,inu)=0.0;
-	  
+
 	  for(size_t ia=0;ia<Naux;ia++)
 	    J[ig](imu,inu)+=a_munu[idx(ia,imu,inu)]*c[ig](ia);
-	  
+
 	  J[ig](inu,imu)=J[ig](imu,inu);
 	}
 
@@ -737,29 +737,29 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
 #endif
       for(size_t ip=0;ip<orbpairs.size();ip++)
 	for(size_t ias=0;ias<auxshells.size();ias++) {
-	  
+
 	  size_t imus=orbpairs[ip].is;
 	  size_t inus=orbpairs[ip].js;
-	  
-	  
+
+
 #ifdef SCREENING
 	// Do we need to compute the integral?
 	  if(screen(imus,inus)<SCRTHR)
 	    continue;
 #endif
-	  
+
 	  size_t Na=auxshells[ias].get_Nbf();
 	  size_t Nmu=orbshells[imus].get_Nbf();
 	  size_t Nnu=orbshells[inus].get_Nbf();
-	  
-	  
+
+
 	  double symfac=1.0;
 	  if(imus==inus)
 	    symfac=0.0;
-	  
+
 	  // Compute (a|mn)
 	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus],eris);
-	  
+
 	  // Increment J
 	  for(size_t iia=0;iia<Na;iia++) {
 	    // Account for orbital functions at the beginning of the basis set
@@ -767,14 +767,14 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
 
 	    for(size_t iimu=0;iimu<Nmu;iimu++) {
 	      size_t imu=orbshells[imus].get_first_ind()+iimu;
-	      
+
 	      for(size_t iinu=0;iinu<Nnu;iinu++) {
 		size_t inu=orbshells[inus].get_first_ind()+iinu;
-		
+
 		for(size_t ig=0;ig<P.size();ig++) {
 		  // Contract result
 		  double tmp=eris[(iia*Nmu+iimu)*Nnu+iinu]*c[ig](ia);
-		  
+
 		  J[ig](imu,inu)+=tmp;
 		  // Need to symmetrize?
 		  J[ig](inu,imu)+=symfac*tmp;
@@ -862,48 +862,48 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 #pragma omp for schedule(dynamic)
 #endif
 	  for(size_t ias=0;ias<auxshells.size();ias++) {
-	    
+
 	    // Amount of functions on shells
-	    size_t Na=auxshells[ias].get_Nbf();	   
+	    size_t Na=auxshells[ias].get_Nbf();
 	    size_t Nmu=orbshells[imus].get_Nbf();
 	    size_t Nnu=orbshells[inus].get_Nbf();
-	    
+
 	    // Compute (a|mn)
 	    eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus],eris);
-	    
+
 	    // Increment iuP. Loop over auxiliary functions.
 	    for(size_t iia=0;iia<Na;iia++) {
 	      size_t ia=auxshells[ias].get_first_ind()+iia;
-	      
+
 	      // Loop over functions on the mu shell
 	      for(size_t imu=0;imu<Nmu;imu++) {
 		size_t mu=orbshells[imus].get_first_ind()+imu;
-		
+
 		// Loop over orbitals
 		for(size_t io=0;io<Norb;io++)
-		  
+
 		  // Loop over functions on the nu shell
 		  for(size_t inu=0;inu<Nnu;inu++) {
 		    size_t nu=orbshells[inus].get_first_ind()+inu;
-		    
+
 		    iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*eris[(iia*Nmu+imu)*Nnu+inu];
 		  }
 	      }
 	    }
-	    
+
 	    // Account for integral symmetry
 	    if(imus!=inus) {
 	      for(size_t iia=0;iia<Na;iia++) {
 		size_t ia=auxshells[ias].get_first_ind()+iia;
-		
+
 		for(size_t imu=0;imu<Nmu;imu++) {
 		  size_t mu=orbshells[imus].get_first_ind()+imu;
-		  
+
 		  for(size_t io=0;io<Norb;io++)
-		    
+
 		    for(size_t inu=0;inu<Nnu;inu++) {
 		      size_t nu=orbshells[inus].get_first_ind()+inu;
-		      
+
 		      iuP(io*Nbf+nu,ia)+=C(mu,orbstart+io)*eris[(iia*Nmu+imu)*Nnu+inu];
 		    }
 		}
@@ -920,14 +920,14 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 	    for(size_t ia=0;ia<Naux;ia++)
 	      iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu[idx(ia,mu,nu)];
     }
-    
+
     // Plug in the half inverse, so iuP -> BiuQ
     iuP=iuP*ab_invh;
-    
+
     // Increment the exchange matrix. Loop over functions
     for(size_t mu=0;mu<Nbf;mu++)
       for(size_t nu=0;nu<=mu;nu++) {
-	
+
 	// Compute the matrix element
 	for(size_t io=0;io<Norb;io++) {
 	  // Kuv -> BiuQ*BivQ
@@ -936,13 +936,13 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 
 	  K(mu,nu)+=occs[orbstart+io]*arma::dot(iuP.row(io*Nbf+mu),iuP.row(io*Nbf+nu));
 	}
-	
+
 	// and symmetrize
 	K(nu,mu)=K(mu,nu);
       }
-    
+
   } // End loop over orbital blocks
-  
+
   return K;
 }
 

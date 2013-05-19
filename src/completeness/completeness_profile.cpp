@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       HF/DFT from Hel
@@ -36,7 +36,7 @@ arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> &
 	}
     }
     break;
-  
+
   case(1):
     {
       for(size_t i=0;i<iexps.size();i++)
@@ -64,7 +64,7 @@ arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> &
 	}
     }
     break;
-    
+
   default:
     for(size_t i=0;i<iexps.size();i++)
       for(size_t j=0;j<jexps.size();j++) {
@@ -74,15 +74,15 @@ arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> &
 	double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
 	double s_eta=sqrt(eta);
 	double q_eta=sqrt(s_eta);
-	
+
 	// Compute overlap
 	// S(i,j)=pow(eta,am/2.0+0.75)
-	
+
 	// Calls pow(double,int) which should be pretty fast.
 	S(i,j)=pow(s_eta,am+1)*q_eta;
       }
   }
-  
+
   return S;
 }
 
@@ -93,7 +93,7 @@ std::vector<double> get_scanning_exponents(double min, double max, size_t Np) {
   for(size_t i=0;i<Np;i++) {
     scan_exp[i]=pow(10.0,min+i*da);
   }
-  
+
   return scan_exp;
 }
 
@@ -110,7 +110,7 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
 
   for(size_t i=0;i<scan_exp.size();i++)
     ret.lga.push_back(log10(scan_exp[i]));
-  
+
   // Loop over angular momenta
   for(int am=0;am<=bas.get_max_am();am++) {
     // Get primitives and contraction coefficients
@@ -120,37 +120,37 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
 
     // Do we need to calculate something?
     if(exps.size()) {
-      
+
       int amval=am;
       if(coulomb)
 	amval--;
 
       // Compute overlaps of scanning functions and primitives
       arma::mat scanov=overlap(exps,scan_exp,amval);
-      
+
       // Compute overlap matrix in used basis set
       arma::mat S;
       S=arma::trans(contr)*overlap(exps,exps,amval)*contr;
-      
+
       // Compute completeness overlaps
       arma::mat J;
       if(chol)
 	J=arma::trans(scanov)*contr*arma::inv(arma::trimatu(arma::chol(S)));
       else
 	J=arma::trans(scanov)*contr*BasOrth(S,false);
-      
+
       // Compute completeness profile
       compprof_am_t profile;
       profile.am=am;
       profile.Y.resize(J.n_rows);
-      
+
       // Loop over scanning exponents
       for(size_t ip=0;ip<J.n_rows;ip++) {
 	double Y=0.0;
 	// Loop over functions
 	for(size_t ifunc=0;ifunc<J.n_cols;ifunc++)
 	  Y+=J(ip,ifunc)*J(ip,ifunc);
-	
+
 	profile.Y[ip]=Y;
       }
 
@@ -162,7 +162,7 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
       profile.Y.resize(scan_exp.size());
       for(size_t i=0;i<scan_exp.size();i++)
 	profile.Y[i]=0.0;
-      ret.shells.push_back(profile);      
+      ret.shells.push_back(profile);
     }
   }
 

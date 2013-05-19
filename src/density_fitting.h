@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -22,16 +22,16 @@
  *
  * This class contains density fitting and resolution of the identity
  * routines used for the approximate calculation of the Coulomb and
- * exchange operators J and K. 
+ * exchange operators J and K.
  *
  * The RI-JK implementation is based on the procedure described in
  *
  * F. Weigend, "A fully direct RI-HF algorithm: Implementation,
  * optimised auxiliary basis sets, demonstration of accuracy and
  * efficiency", Phys. Chem. Chem. Phys. 4, 4285 (2002).
- * 
- * 
- * If only RI-J is necessary, then the procedure described in 
+ *
+ *
+ * If only RI-J is necessary, then the procedure described in
  *
  * K. Eichkorn, O. Treutler, H. Öhm, M. Häser and R. Ahlrichs,
  * "Auxiliary basis sets to approximate Coulomb potentials",
@@ -100,7 +100,7 @@ class DensityFit {
 
  public:
   /// Constructor
-  DensityFit();	 
+  DensityFit();
   /// Destructor
   ~DensityFit();
 
@@ -129,7 +129,7 @@ class DensityFit {
 
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::mat calc_K(const arma::mat & C, const std::vector<double> & occs, size_t memlimit) const;
-  
+
   /// Get the number of orbital functions
   size_t get_Norb() const;
   /// Get the number of auxiliary functions

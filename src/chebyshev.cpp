@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -38,7 +38,7 @@ void chebyshev(int n, std::vector<double> & x, std::vector<double> & w) {
 
   // Fill elements
   for(int i=1;i<=n;i++) {
-    
+
     // Compute value of sine and cosine
     sine=sin(i*M_PI*oonpp);
     sinesq=sine*sine;
@@ -50,4 +50,4 @@ void chebyshev(int n, std::vector<double> & x, std::vector<double> & w) {
     // Node is
     x[i-1]=1.0 - 2.0*i*oonpp + M_2_PI*(1.0 + 2.0/3.0*sinesq)*cosine*sine;
   }
-}    
+}

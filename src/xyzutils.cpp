@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -36,23 +36,23 @@ std::vector<atom_t> load_xyz(std::string filename) {
 
   if(in.good()) {
     // OK, file was succesfully opened.
-    
+
     // Read the first line to get the number of atoms
     std::string line=readline(in);
     std::vector<std::string> words=splitline(line);
     int Nat=readint(words[0]);
-    
+
     // Reserve enough memory.
     atoms.reserve(Nat);
-    
+
     // The next line contains the comment, skip it.
     line=readline(in);
-    
+
     // Now, proceed with reading in the atoms.
     for(int i=0;i<Nat;i++) {
       // Helper structure
       atom_t tmp;
-      
+
       if(!in.good()) {
 	ERROR_INFO();
 	std::ostringstream oss;
@@ -64,7 +64,7 @@ std::vector<atom_t> load_xyz(std::string filename) {
       line=readline(in);
       // and split it to words
       words=splitline(line);
-      
+
       if(!words.size()) {
 	ERROR_INFO();
 	std::ostringstream oss;
@@ -76,8 +76,8 @@ std::vector<atom_t> load_xyz(std::string filename) {
 	std::ostringstream oss;
 	oss << "Malformed xyz file \"" << filename << "\"!\n";
 	throw std::runtime_error(oss.str());
-      }    
-      
+      }
+
       // and extract the information
       tmp.el=words[0]; // Element type
       tmp.num=i; // Number of atom
@@ -107,7 +107,7 @@ std::vector<atom_t> load_xyz(std::string filename) {
 void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const std::string & fname, bool append) {
   // Output file
   FILE *out;
-  
+
   if(append)
     out=fopen(fname.c_str(),"a");
   else

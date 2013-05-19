@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -41,7 +41,7 @@ int main() {
     // Allocate memory for helper arrays
     x=new double[n];
     w=new double[n];
-    
+
     // Calculate sum of weights
     if(n%2==1) {
       // odd n

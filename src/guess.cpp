@@ -37,7 +37,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
 
   // Print out info?
   bool verbose=set.get_bool("Verbose");
-  
+
   // Settings to use
   set.set_string("Guess","Core");
   set.set_int("MaxIter",200);
@@ -53,7 +53,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
   // Use default convergence settings
   set.set_bool("UseDIIS",true);
   set.set_bool("UseADIIS",true);
-  set.set_bool("UseBroyden",false); 
+  set.set_bool("UseBroyden",false);
   set.set_bool("UseTRRH",false);
   // and default charge
   set.set_int("Charge", 0);
@@ -78,7 +78,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
 
   // Approximate orbital energies
   std::vector<double> orbE;
-  
+
   // Loop over list of identical nuclei
   for(size_t i=0;i<idnuc.size();i++) {
 
@@ -115,10 +115,10 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
     else if(nuc.Z<57)
       // s, p and d electrons
       ammax=2;
-    else 
+    else
       // s, p, d and f electrons
       ammax=3;
-    
+
     std::vector<GaussianShell> shells=basis.get_funcs(idnuc[i][0]);
     // Indices of shells included
     std::vector<size_t> shellidx;
@@ -158,7 +158,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
 
     chkpt.read("Ea",atEa);
     chkpt.read("P",atP);
-    
+
     // Store approximate energies
     for(size_t iid=0;iid<idnuc[i].size();iid++)
       for(size_t io=0;io<atEa.size();io++)
@@ -172,7 +172,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
 	for(size_t iid=0;iid<idnuc[i].size();iid++) {
 	  // Get shells on nucleus
 	  std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
-	  
+
 	  // Store density
 	  P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=atP.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
 	}
@@ -218,7 +218,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
   std::sort(orbE.begin(),orbE.end());
   for(size_t i=0;i<std::min(orbE.size(),(size_t) C.n_cols);i++)
     E(i)=orbE[i];
-  
+
   if(verbose) {
     printf("done (%s)\n",trest.elapsed().c_str());
     printf("Atomic guess formed in %s.\n\n",ttot.elapsed().c_str());
@@ -243,7 +243,7 @@ int atom_am(int Z) {
 
 void molecular_guess(const BasisSet & basis, const Settings & set, std::string & chkname) {
   Timer t;
-  
+
   // Get temporary file name
   char *tmpn=tempnam("./",".chk");
   std::string tempname=std::string(tmpn);
@@ -308,12 +308,12 @@ void molecular_guess(const BasisSet & basis, const Settings & set, std::string &
   fprintf(stderr,"\nSolving the density in the reduced basis took %s.\n",t.elapsed().c_str());
   fflush(stderr);
   t.set();
-  
+
   // Get another temporary file name. This will contain the returned
   // orbitals and energies.
   tmpn=tempnam("./",".chk");
   chkname=std::string(tmpn);
-  free(tmpn);  
+  free(tmpn);
 
   // Open the return file
   Checkpoint chkpt(chkname,true);
@@ -321,7 +321,7 @@ void molecular_guess(const BasisSet & basis, const Settings & set, std::string &
   {
     // Open the temp file
     Checkpoint load(tempname,false);
-    
+
     bool restr;
     load.read("Restricted",restr);
 
@@ -507,7 +507,7 @@ gs_conf_t get_ground_state(int Z) {
     ret.dJ=0;
   } else {
     // Determine how the states electrons are occupied.
-    
+
     arma::imat occs(2*confs[i].l+1,2);
     occs.zeros();
 
@@ -531,7 +531,7 @@ gs_conf_t get_ground_state(int Z) {
 	}
       }
     } while(Z>0);
-    
+
     // Compute S and L value
     int m=0, L=0, dJ=0;
     for(size_t j=0;j<occs.n_rows;j++) {

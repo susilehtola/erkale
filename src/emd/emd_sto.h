@@ -33,7 +33,7 @@ class RadialSlater: public RadialFourier {
 
   /// Exponent
   double zeta;
-  
+
  public:
   /// Constructor
   RadialSlater(int n, int l, double zeta);

@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -42,7 +42,7 @@ double doublefact(int n) {
   if(n<-1) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Trying to compute double factorial for n="<<n<<"!"; 
+    oss << "Trying to compute double factorial for n="<<n<<"!";
     throw std::runtime_error(oss.str());
   }
 
@@ -214,7 +214,7 @@ std::vector<double> spline_interpolation(const std::vector<double> & xt, const s
 
   // Initialize interpolant
   gsl_interp_init(interp,&(xt[0]),&(yt[0]),xt.size());
-  
+
   // Perform interpolation.
   for(size_t i=0;i<x.size();i++) {
     y[i]=gsl_interp_eval(interp,&(xt[0]),&(yt[0]),x[i],acc);

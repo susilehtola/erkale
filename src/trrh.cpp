@@ -109,19 +109,19 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
   bool refine=false;
   double lmu=0.0;
   double rmu=0.0;
-  
+
 
   while(true) {
     iit++;
     Timer t;
-    
+
     // Value of mu is
     if(!refine)
       mu*=fac;
     else {
       mu=(lmu+rmu)/2.0;
     }
-    
+
     // Get rotation parameters
     arma::mat kappa(nvirt,nocc);
     for(size_t a=0;a<nvirt;a++)
@@ -155,7 +155,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
       // Did we converge straight away?
       if(mu==EPSMU)
 	break;
-      
+
       refine=true;
       rmu=mu;
       lmu=mu/fac;
@@ -173,7 +173,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
 	break;
     }
   }
-  
+
   if(verbose)
     printf("mu loop converged in %i iterations\n",(int) iit);
 

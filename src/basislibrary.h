@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -77,7 +77,7 @@ class FunctionShell {
   /// Sort exponents in decreasing order
   void sort();
   /// Normalize coefficients
-  void normalize();  
+  void normalize();
   /// Print out info
   void print() const;
 
@@ -112,7 +112,7 @@ class ElementBasisSet {
   ElementBasisSet(std::string sym, size_t number=0);
   /// Destructor
   ~ElementBasisSet();
-  
+
   /// Add a shell of functions to the basis
   void add_function(FunctionShell f);
   /// Sort the shells in decreasing angular momentum
@@ -122,16 +122,16 @@ class ElementBasisSet {
 
   /// Get the symbol of the element
   std::string get_symbol() const;
-  /// Get the number 
+  /// Get the number
   size_t get_number() const;
   /// Set the number
-  void set_number(size_t num);  
+  void set_number(size_t num);
 
   /// Comparison operator for sorting
   bool operator<(const ElementBasisSet &rhs) const;
 
   /// Get the shells
-  std::vector<FunctionShell> get_shells() const;  
+  std::vector<FunctionShell> get_shells() const;
 
   /// Get exponents and contraction coefficients of angular momentum shell am
   void get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am) const;
@@ -142,7 +142,7 @@ class ElementBasisSet {
   int get_am(size_t ind) const;
 
   /// Normalize coefficients
-  void normalize();  
+  void normalize();
 
   /// Decontract set
   void decontract();
@@ -215,7 +215,7 @@ class BasisSetLibrary {
   ElementBasisSet get_element(std::string el, size_t number=0) const;
 
   /// Normalize coefficients
-  void normalize();  
+  void normalize();
 
   /// Decontract basis set
   void decontract();

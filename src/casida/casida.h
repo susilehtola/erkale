@@ -125,7 +125,7 @@ class Casida {
    * \f$ K_{\rm XC}(ij\sigma, kl\tau) = \int d^3r d^3r' \psi_{i\sigma}({\bf r}) \psi_{j\sigma}({\bf r}) \frac {\delta^2 E_{xc} [\rho_\uparrow,\rho_\downarrow]} {\delta \rho_\sigma ({\bf r}) \delta \rho_\tau ({\bf r})} \psi_{k\tau}(r') \psi_{l\tau}(r') \f$
    *
    * Only the same-spin couplings are computed, since spin up - spin
-   * down couplings are not necessary even for TDLDA.  
+   * down couplings are not necessary even for TDLDA.
    *
    * To save memory, the result is stored in the K matrix.
    */
@@ -146,7 +146,7 @@ class Casida {
   arma::mat matrix_transform(bool ispin, const arma::mat & m) const;
   /// Transform given AO matrix to MO
   arma::cx_mat matrix_transform(bool ispin, const arma::cx_mat & m) const;
-  
+
 
   /// Common routines for constructors
   void parse_coupling(const Settings & set);

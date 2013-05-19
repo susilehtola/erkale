@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -107,7 +107,7 @@ arma::mat ERItable::calcJ(const arma::mat & R) const {
   size_t i, j;
   // The (ij) element in the J array
   double tmp;
-  
+
   // Loop over matrix elements
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic) private(i,j,tmp)
@@ -124,13 +124,13 @@ arma::mat ERItable::calcJ(const arma::mat & R) const {
 	tmp+=R(k,l)*getERI(i,j,k,l);
 	//	  printf("J(%i,%i) += %e * %e\t(%i %i %i %i)\n",i,j,R(k,l),getERI(i,j,k,l),i,j,k,l);
       }
-    
-    // Store result 
+
+    // Store result
     J(i,j)=tmp;
     J(j,i)=tmp;
     //      J[i,j]=tmp;
   }
-  
+
   return J;
 }
 
@@ -152,20 +152,20 @@ arma::mat ERItable::calcK(const arma::mat & R) const {
     // The relevant indices are
     size_t i=pairs[ip].i;
     size_t j=pairs[ip].j;
-    
+
     // The (ij) element in the K array
     double el=0.0;
-    
+
     // Loop over density matrix
     for(size_t k=0;k<N;k++)
       for(size_t l=0;l<N;l++) {
 	el+=R(k,l)*getERI(i,k,j,l);
       }
-    
+
     // Store result
     K(i,j)=el;
     K(j,i)=el;
   }
-  
+
   return K;
 }

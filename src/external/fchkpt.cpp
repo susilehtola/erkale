@@ -188,7 +188,7 @@ void write_density(const std::string & entry, const BasisSet & basis, const arma
   }
   if(N!=0)
     fprintf(out,"\n");
-  
+
   if(ntot!=Nind)
     throw std::runtime_error("Wrong amount!\n");
 
@@ -414,7 +414,7 @@ void save_fchk(const Settings & set) {
     arma::mat C;
     chkpt.read("C",C);
     write_mo("Alpha MO coefficients",basis,C,out);
-    
+
     arma::vec E;
     chkpt.read("E",E);
     std::vector<double> Ev(E.n_elem);

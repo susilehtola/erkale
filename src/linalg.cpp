@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -32,8 +32,8 @@ void eig_sym_ordered(arma::colvec & eigval, arma::mat & eigvec, const arma::mat 
     printf("Unable to diagonalize matrix!\n");
     X.print("X");
     throw std::runtime_error("Error in eig_sym.\n");
-  }    
-  
+  }
+
   // Sort vectors
   sort_eigvec(eigval,eigvec);
 }
@@ -96,7 +96,7 @@ arma::mat SymmetricOrth(const arma::mat & S) {
   // Compute the decomposition
   return SymmetricOrth(Svec,Sval);
 }
-  
+
 arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff) {
   // Count number of eigenvalues that are above cutoff
   const size_t Nbf=Svec.n_rows;
@@ -138,7 +138,7 @@ arma::mat CanonicalOrth(const arma::mat & S, double cutoff) {
 arma::mat BasOrth(const arma::mat & S, bool verbose) {
   // Symmetric if possible, otherwise canonical. Default cutoff
   const double tol=LINTHRES;
-  
+
   // Eigendecomposition of S: eigenvalues and eigenvectors
   arma::vec Sval;
   arma::mat Svec;
@@ -153,7 +153,7 @@ arma::mat BasOrth(const arma::mat & S, bool verbose) {
   if(Sval(0)>=tol) {
     // OK to use symmetric
     if(verbose) printf("Using symmetric orthogonalization.\n");
-	
+
     return SymmetricOrth(Svec,Sval);
   } else {
     if(verbose) printf("Using canonical orthogonalization.\n");
@@ -263,7 +263,7 @@ arma::mat VecToMat(const arma::vec & v, size_t nrows, size_t ncols) {
   return m;
 }
 
-/// Get vector from cube: c(i,j,:)                                                                                                                                                                                                            
+/// Get vector from cube: c(i,j,:)
 arma::vec slicevec(const arma::cube & c, size_t i, size_t j) {
   arma::vec v(c.n_slices);
   for(size_t k=0;k<c.n_slices;k++)
@@ -273,13 +273,13 @@ arma::vec slicevec(const arma::cube & c, size_t i, size_t j) {
 
 
 arma::mat cos(const arma::mat & U) {
-  // Compute eigendecomposition                                                                                                                                                                                                              
+  // Compute eigendecomposition
   arma::vec evals;
   arma::mat evec;
   eig_sym_ordered(evals,evec,U);
 
   arma::mat cosU=U;
-  
+
   // Check eigenvalues
   bool ok=0;
   for(size_t i=0;i<evals.n_elem;i++)
@@ -300,7 +300,7 @@ arma::mat cos(const arma::mat & U) {
     cosU.eye();
     // U^2
     arma::mat Usq=U*U;
-    
+
     cosU+=0.5*Usq*(-1.0 + Usq*(1/12.0 - 1/360.0*Usq));
   }
 
@@ -308,7 +308,7 @@ arma::mat cos(const arma::mat & U) {
 }
 
 arma::mat sin(const arma::mat & U) {
-  // Compute eigendecomposition                                                                                                                                                                                                              
+  // Compute eigendecomposition
   arma::vec evals;
   arma::mat evec;
   eig_sym_ordered(evals,evec,U);
@@ -342,7 +342,7 @@ arma::mat sin(const arma::mat & U) {
 }
 
 arma::mat sinc(const arma::mat & U) {
-  // Compute eigendecomposition                                                                                                                                                                                                              
+  // Compute eigendecomposition
   arma::vec evals;
   arma::mat evec;
   eig_sym_ordered(evals,evec,U);
@@ -381,7 +381,7 @@ arma::mat sqrt(const arma::mat & M) {
   eig_sym_ordered(evals,evec,M);
 
   arma::mat sqrtM=M;
-  
+
   // Check eigenvalues
   if(evals(0)<0) {
     ERROR_INFO();

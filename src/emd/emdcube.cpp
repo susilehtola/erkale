@@ -79,7 +79,7 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
 
   // Compute the norm (assumes evenly spaced grid!)
   double norm=0.0;
-  
+
   // Compute the momentum densities in batches, allowing
   // parallellization.
 #ifdef _OPENMP
@@ -130,22 +130,22 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
   for(size_t ib=0;ib<Nbatch;ib++) {
     // Zero amount of points in current batch.
     np=0;
-    
+
     // Form list of points to compute.
     while(np<Nbatch_p && ntot+np<N) {
       p[np].x=px_arr[xind];
       p[np].y=py_arr[yind];
       p[np].z=pz_arr[zind];
-      
+
       // Increment number of points
       np++;
-      
+
       // Determine next point.
       if(zind+1<pz_arr.size())
 	zind++;
       else {
 	zind=0;
-	
+
 	if(yind+1<py_arr.size())
 	  yind++;
 	else {
@@ -167,7 +167,7 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
 #else
       int ith=0;
 #endif
-      
+
 #ifdef _OPENMP
 #pragma omp for
 #endif
@@ -177,13 +177,13 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
 	double px=p[ip].x;
 	double py=p[ip].y;
 	double pz=p[ip].z;
-	
+
 	// Compute values of Fourier polynomials at current value of p.
 	for(size_t iid=0;iid<idents.size();iid++)
 	  // Loop over the functions on the identical shells.
 	  for(size_t fi=0;fi<fourier[iid].size();fi++)
 	    fpoly[ith][iid][fi]=fourier[iid][fi].eval(px,py,pz);
-	
+
 	// Compute the values of the basis functions themselves.
 	// Loop over list of groups of identical shells
 	for(size_t ii=0;ii<idents.size();ii++)
@@ -195,7 +195,7 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
 	    coords_t cen=bas.get_center(is);
 	    // thus the phase factor we get is
 	    std::complex<double> phase=exp(std::complex<double>(0.0,-(px*cen.x+py*cen.y+pz*cen.z)));
-	    
+
 	    // Now we just store the individual function values.
 	    size_t i0=bas.get_first_ind(is);
 	    size_t Ni=bas.get_Nbf(is);
@@ -214,7 +214,7 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
 	}
       }
     } // end parallel region
-    
+
     // Save computed value of EMD and increment norm
     for(size_t ip=0;ip<np;ip++) {
       fprintf(out,"%e\t%e\t%e\t%e\n",p[ip].x,p[ip].y,p[ip].z,emd[ip]);

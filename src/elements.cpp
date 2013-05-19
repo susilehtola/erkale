@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -36,7 +36,7 @@ int get_Z(std::string el) {
 std::vector<int> shell_count(int Z) {
   // Determine how many shells we have.
   std::vector <int> ret;
-  
+
   // Electrons in closed shells
   int n=0;
   for(size_t i=0;i<sizeof(shell_order)/sizeof(shell_order[0]);i++) {

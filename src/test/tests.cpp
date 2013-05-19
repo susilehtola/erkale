@@ -373,7 +373,7 @@ void restr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basl
   (void) Eorb;
   (void) label;
   (void) dipmom;
-  
+
 #else
   // Compare results
   bool Eok=1, Dok=1, ok=1;
@@ -534,7 +534,7 @@ void unrestr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & ba
 /// Run unit tests by comparing calculations to ones that should be OK
 int main(void) {
   testind();
-  
+
   // Initialize libint
   init_libint_base();
 

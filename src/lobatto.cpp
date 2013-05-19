@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -12,7 +12,7 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This file contains the Lobatto quadrature routine ported from quadrule.
  * The original license was LGPL, this version is relicensed to GPLv2+.
  */
@@ -32,69 +32,69 @@ void lobatto_set(int order, std::vector<double> & xtab, std::vector<double> & we
 /******************************************************************************/
 /*
   Purpose:
-  
+
     LOBATTO_SET sets abscissas and weights for Lobatto quadrature.
-  
+
   Discussion:
-    
+
     The integral:
-  
+
       Integral ( -1 <= X <= 1 ) F(X) dX
-  
+
     The quadrature rule:
-  
+
       Sum ( 1 <= I <= ORDER ) WEIGHt[I) * F ( XTAb[I) )
-  
+
     The quadrature rule will integrate exactly all polynomials up to
     X**(2*ORDER-3).
-  
+
     The Lobatto rule is distinguished by the fact that both endpoints
     (-1 and 1) are always abscissas.
-  
+
   Licensing:
-  
+
     This code is distributed under the GNU LGPL license.
-  
+
   Modified:
-  
+
     30 April 2006
-  
+
   Author:
-  
+
     John Burkardt
-  
+
   Reference:
-  
+
     Milton Abramowitz, Irene Stegun,
     Handbook of Mathematical Functions,
     National Bureau of Standards, 1964,
     ISBN: 0-486-61272-4,
     LC: QA47.A34.
-  
+
     Arthur Stroud, Don Secrest,
     Gaussian Quadrature Formulas,
     Prentice Hall, 1966,
     LC: QA299.4G3S7.
-  
+
     Daniel Zwillinger, editor,
     CRC Standard Mathematical Tables and Formulae,
     30th Edition,
     CRC Press, 1996,
     ISBN: 0-8493-2479-3.
-  
+
   Parameters:
-  
+
     Input, int ORDER, the order.
     ORDER must be between 2 and 20.
-  
+
     Output, double XTAB[ORDER], the abscissas.
-  
+
     Output, double WEIGHT[ORDER], the weights.
 */
 {
   xtab.resize(order);
   weight.resize(order);
-  
+
   if ( order == 2 )
   {
     xtab[0] =  - 1.0E+00;
@@ -602,68 +602,68 @@ void lobatto_compute (int n, std::vector<double> & x, std::vector<double> & w)
 /******************************************************************************/
 /*
   Purpose:
-  
+
     LOBATTO_COMPUTE computes a Lobatto quadrature rule.
-  
+
   Discussion:
-    
+
     The integral:
-  
+
       Integral ( -1 <= X <= 1 ) F(X) dX
-  
+
     The quadrature rule:
-  
+
       Sum ( 1 <= I <= N ) WEIGHT(I) * F ( XTAB(I) )
-  
+
     The quadrature rule will integrate exactly all polynomials up to
     X**(2*N-3).
-  
+
     The Lobatto rule is distinguished by the fact that both endpoints
     (-1 and 1) are always abscissas.
-  
+
   Licensing:
-  
+
     This code is distributed under the GNU LGPL license.
-  
+
   Modified:
-  
+
     04 February 2007
-  
+
   Author:
-  
+
     Original MATLAB version by Greg von Winckel.
     C version by John Burkardt.
-  
+
   Reference:
-  
+
     Milton Abramowitz, Irene Stegun,
     Handbook of Mathematical Functions,
     National Bureau of Standards, 1964,
     ISBN: 0-486-61272-4,
     LC: QA47.A34.
-  
+
     Claudio Canuto, Yousuff Hussaini, Alfio Quarteroni, Thomas Zang,
     Spectral Methods in Fluid Dynamics,
     Springer, 1993,
     ISNB13: 978-3540522058,
     LC: QA377.S676.
-  
+
     Arthur Stroud, Don Secrest,
     Gaussian Quadrature Formulas,
     Prentice Hall, 1966,
     LC: QA299.4G3S7.
-  
+
     Daniel Zwillinger, editor,
     CRC Standard Mathematical Tables and Formulae,
     30th Edition,
     CRC Press, 1996,
     ISBN: 0-8493-2479-3.
-  
+
   Parameters:
-  
+
     Input, int N, the order.
     N must be at least 2.
-  
+
     Output, double X[N], the abscissas.
 
     Output, double W[N], the weights.

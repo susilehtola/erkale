@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -38,18 +38,18 @@ std::string get_keyword(int func_id) {
   if(keyword==NULL) {
     // Functional id not recognized.
     std::ostringstream oss;
-    oss << "\nError: libxc did not recognize functional id "<<func_id<<"!\n"; 
+    oss << "\nError: libxc did not recognize functional id "<<func_id<<"!\n";
     throw std::runtime_error(oss.str());
   }
-  
+
   // Get the keyword
   std::string key(keyword);
   // and free memory allocated by libxc
-  free(keyword);  
-  
+  free(keyword);
+
   return key;
 }
- 
+
 
 // Find out ID of functional
 int find_func(std::string name) {
@@ -69,7 +69,7 @@ int find_func(std::string name) {
   // If libxc returned -1, the functional was not found.
   if(funcid==-1) {
     std::ostringstream oss;
-    oss << "\nError: libxc did not recognize functional "<<name<<"!\n"; 
+    oss << "\nError: libxc did not recognize functional "<<name<<"!\n";
     throw std::runtime_error(oss.str());
   } else
     return funcid;
@@ -139,7 +139,7 @@ void print_info(int x_func, int c_func) {
       print_info(x_func);
     } else
       printf("No exchange functional.\n");
-    
+
     if(is_correlation(c_func)) {
       printf("\nUsed correlation functional is %s, ",get_keyword(c_func).c_str());
       print_info(c_func);
@@ -158,7 +158,7 @@ void print_info(int func_id) {
       oss << "\nFunctional "<<func_id<<" not found!\n";
       throw std::runtime_error(oss.str());
     }
-    
+
     printf("'%s', defined in the reference(s):\n%s\n", func.info->name, func.info->refs);
     xc_func_end(&func);
   }
@@ -166,7 +166,7 @@ void print_info(int func_id) {
 
 bool is_exchange(int func_id) {
   bool ans=0;
-  
+
   if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
@@ -175,7 +175,7 @@ bool is_exchange(int func_id) {
       oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
-    
+
     switch(func.info->kind)
       {
 	/* By default we assign exchange-correlation functionals as
@@ -199,7 +199,7 @@ bool is_exchange(int func_id) {
 
 bool is_exchange_correlation(int func_id) {
   bool ans=0;
-  
+
   if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
@@ -208,7 +208,7 @@ bool is_exchange_correlation(int func_id) {
       oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
-    
+
     switch(func.info->kind)
       {
 	/* By default we assign exchange-correlation functionals as
@@ -231,7 +231,7 @@ bool is_exchange_correlation(int func_id) {
 
 bool is_correlation(int func_id) {
   bool ans=0;
-  
+
   if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
@@ -240,7 +240,7 @@ bool is_correlation(int func_id) {
       oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
-    
+
     switch(func.info->kind)
       {
 	/* By default we assign exchange-correlation functionals as
@@ -263,7 +263,7 @@ bool is_correlation(int func_id) {
 
 bool is_kinetic(int func_id) {
   bool ans=0;
-  
+
   if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
@@ -272,7 +272,7 @@ bool is_kinetic(int func_id) {
       oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
-    
+
     switch(func.info->kind)
       {
 	/* By default we assign exchange-correlation functionals as
@@ -316,7 +316,7 @@ double exact_exchange(int func_id) {
 	f=xc_hyb_exx_coef(&func);
 	break;
       }
-    
+
     xc_func_end(&func);
   }
 
@@ -331,15 +331,15 @@ bool gradient_needed(int func_id) {
 
   bool grad=0;
 
-  if(func_id>0) {    
+  if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
       ERROR_INFO();
       std::ostringstream oss;
-      oss << "Functional "<<func_id<<" not found!"; 
+      oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
-    
+
     switch(func.info->family)
       {
       case XC_FAMILY_GGA:
@@ -361,15 +361,15 @@ bool laplacian_needed(int func_id) {
 
   bool lapl=0;
 
-  if(func_id>0) {    
+  if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
       ERROR_INFO();
       std::ostringstream oss;
-      oss << "Functional "<<func_id<<" not found!"; 
+      oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
-    
+
     switch(func.info->family)
       {
       case XC_FAMILY_MGGA:
