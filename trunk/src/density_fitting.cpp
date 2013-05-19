@@ -16,6 +16,8 @@
 
 #include "density_fitting.h"
 #include "linalg.h"
+#include "scf.h"
+#include <sstream>
 
 // Screen integrals? (Direct calculations)
 #define SCREENING
@@ -39,6 +41,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   // Store amount of functions
   Nbf=orbbas.get_Nbf();
   Naux=auxbas.get_Nbf();
+  Nnuc=orbbas.get_Nnuc();
   direct=dir;
   hf=hartreefock;
 
@@ -56,6 +59,8 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   maxauxam=auxbas.get_max_am();
   maxorbcontr=orbbas.get_max_Ncontr();
   maxauxcontr=auxbas.get_max_Ncontr();
+  maxam=std::max(orbbas.get_max_am(),auxbas.get_max_am());
+  maxcontr=std::max(orbbas.get_max_Ncontr(),auxbas.get_max_Ncontr());
 
   // First, compute the two-center integrals
   ab.zeros(Naux,Naux);
@@ -127,46 +132,14 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 
 #ifdef SCREENING
   // Then, form the screening matrix
-  if(direct) {
-    screen=arma::mat(orbshells.size(),orbshells.size());
-    screen.zeros();
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-      ERIWorker eri(orbbas.get_max_am(),orbbas.get_max_Ncontr());
-      std::vector<double> eris;
-
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
-	// The shells in question are
-	size_t is=orbpairs[ip].is;
-	size_t js=orbpairs[ip].js;
-
-	// Compute ERIs
-	eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js],eris);
-
-	// Find out maximum value
-	double max=0.0;
-	for(size_t i=0;i<eris.size();i++)
-	  if(fabs(eris[i])>max)
-	    max=eris[i];
-	max=sqrt(max);
-
-	// Store value
-	screen(is,js)=max;
-	screen(js,is)=max;
-      }
-    }
-  }
+  if(direct)
+    form_screening();
 #endif
 
   // Then, compute the diagonal integrals
   a_mu.resize(Naux*Nbf);
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
   {
-    ERIWorker eri(std::max(orbbas.get_max_am(),auxbas.get_max_am()),std::max(orbbas.get_max_Ncontr(),auxbas.get_max_Ncontr()));
+    ERIWorker eri(maxam,maxcontr);
     std::vector<double> eris;
 
     for(size_t ia=0;ia<auxshells.size();ia++)
@@ -191,7 +164,6 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
       }
   }
 
-
   // Then, compute the three-center integrals
   if(!direct) {
     a_munu.resize(Naux*Nbf*(Nbf+1)/2);
@@ -201,7 +173,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 #endif
     {
 
-      ERIWorker eri(std::max(orbbas.get_max_am(),auxbas.get_max_am()),std::max(orbbas.get_max_Ncontr(),auxbas.get_max_Ncontr()));
+      ERIWorker eri(maxam,maxcontr);
       std::vector<double> eris;
 
       for(size_t ia=0;ia<auxshells.size();ia++)
@@ -239,6 +211,36 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 
 }
 
+void DensityFit::form_screening() {
+  screen.zeros(orbshells.size(),orbshells.size());
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker eri(maxam,maxcontr);
+    std::vector<double> eris;
+
+    for(size_t ip=0;ip<orbpairs.size();ip++) {
+      // The shells in question are
+      size_t is=orbpairs[ip].is;
+      size_t js=orbpairs[ip].js;
+
+      // Compute ERIs
+      eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js],eris);
+
+	// Find out maximum value
+      double max=0.0;
+      for(size_t i=0;i<eris.size();i++)
+	if(fabs(eris[i])>max)
+	  max=eris[i];
+      max=sqrt(max);
+
+      // Store value
+      screen(is,js)=max;
+      screen(js,is)=max;
+    }
+  }
+}
 
 size_t DensityFit::idx(size_t ia, size_t imu, size_t inu) const {
   if(imu<inu)
@@ -304,7 +306,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 #endif
     {
 
-      ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
+      ERIWorker eri(maxam,maxcontr);
       std::vector<double> eris;
 
 #ifdef _OPENMP
@@ -412,8 +414,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 #pragma omp parallel
 #endif
     {
-
-      ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
+      ERIWorker eri(maxam,maxcontr);
       std::vector<double> eris;
 
 #ifdef _OPENMP
@@ -537,7 +538,7 @@ arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
 #endif
     {
 
-      ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
+      ERIWorker eri(maxam,maxcontr);
       std::vector<double> eris;
 
 #ifdef _OPENMP
@@ -642,7 +643,7 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 #pragma omp parallel
 #endif
     {
-      ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
+      ERIWorker eri(maxam,maxcontr);
       std::vector<double> eris;
 
 #ifdef _OPENMP
@@ -729,7 +730,7 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
 #pragma omp parallel
 #endif
     {
-      ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
+      ERIWorker eri(maxam,maxcontr);
       std::vector<double> eris;
 
 #ifdef _OPENMP
@@ -787,6 +788,212 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
   }
 
   return J;
+}
+
+arma::vec DensityFit::force_J(const arma::mat & P) {
+  // First, compute the expansion
+  arma::vec c=compute_expansion(P);
+
+  // The force
+  arma::vec f(3*Nnuc);
+  f.zeros();
+
+#ifdef SCREENING
+  // Form the screening matrix if not formed already
+  if(!direct)
+    form_screening();
+#endif
+
+  // First part: f = *#* 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a  
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    dERIWorker deri(maxauxam,maxauxcontr);
+    std::vector<double> eris;
+
+#ifdef _OPENMP
+    // Worker stack for each matrix
+    arma::vec fwrk(f);
+    fwrk.zeros();
+
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ias=0;ias<auxshells.size();ias++)
+      for(size_t jas=0;jas<=ias;jas++) {
+
+	// Symmetry factor
+	double fac=0.5;
+	if(ias!=jas)
+	  fac*=2.0;
+
+	size_t Na=auxshells[ias].get_Nbf();
+	size_t anuc=auxshells[ias].get_center_ind();
+	size_t Nb=auxshells[jas].get_Nbf();
+	size_t bnuc=auxshells[jas].get_center_ind();
+
+	if(anuc==bnuc)
+	  // Contributions vanish
+	  continue;
+
+	// Compute (a|b)
+	deri.compute(&auxshells[ias],&dummy,&auxshells[jas],&dummy);
+
+	// Compute forces
+	const static int index[]={0, 1, 2, 6, 7, 8};
+	const size_t Nidx=sizeof(index)/sizeof(index[0]);
+	arma::vec ders(Nidx);	
+	ders.zeros();
+
+	for(size_t iid=0;iid<Nidx;iid++) {
+	  // Index is
+	  int ic=index[iid];
+	  
+	  // Increment force, anuc
+	  deri.get(ic,eris);
+	  for(size_t iia=0;iia<Na;iia++) {
+	    size_t ia=auxshells[ias].get_first_ind()+iia;
+	    
+	    for(size_t iib=0;iib<Nb;iib++) {
+	      size_t ib=auxshells[jas].get_first_ind()+iib;
+	      
+	      // The integral is
+	      double res=eris[iia*Nb+iib];
+	      
+	      ders(iid)+= res*c(ia)*c(ib);
+	    }
+	  }
+	}
+	ders*=fac;
+
+	// Increment forces
+	for(int ic=0;ic<3;ic++) {
+#ifdef _OPENMP
+	  fwrk(3*anuc+ic)+=ders(ic);
+	  fwrk(3*bnuc+ic)+=ders(ic+3);
+#else
+	  f(3*anuc+ic)+=ders(ic);
+	  f(3*bnuc+ic)+=ders(ic+3);
+#endif
+	}
+      }
+    
+#ifdef _OPENMP
+#pragma omp critical
+    // Sum results together
+    f+=fwrk;
+#endif
+  } // end parallel section
+
+
+  // Second part: f = 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a *#*  
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    dERIWorker deri(maxam,maxcontr);
+    std::vector<double> eris;
+
+#ifdef _OPENMP
+    // Worker stack for each matrix
+    arma::vec fwrk(f);
+    fwrk.zeros();
+
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<orbpairs.size();ip++) {
+      size_t imus=orbpairs[ip].is;
+      size_t inus=orbpairs[ip].js;
+
+#ifdef SCREENING
+      // Do we need to compute the integral?
+      if(screen(imus,inus)<SCRTHR)
+	continue;
+#endif
+
+      size_t Nmu=orbshells[imus].get_Nbf();
+      size_t Nnu=orbshells[inus].get_Nbf();
+
+      size_t inuc=orbshells[imus].get_center_ind();
+      size_t jnuc=orbshells[inus].get_center_ind();
+
+      // If imus==inus, we need to take care that we count
+      // every term only once; on the off-diagonal we get
+      // every term twice.
+      double fac=2.0;
+      if(imus==inus)
+	fac=1.0;
+
+      for(size_t ias=0;ias<auxshells.size();ias++) {
+	size_t Na=auxshells[ias].get_Nbf();
+	size_t anuc=auxshells[ias].get_center_ind();
+
+	if(inuc==jnuc && jnuc==anuc)
+	  // Contributions vanish
+	  continue;
+
+	// Compute (a|mn)
+	deri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+
+	// Expansion coefficients
+	arma::vec ca=c.subvec(auxshells[ias].get_first_ind(),auxshells[ias].get_last_ind());
+
+	// Compute forces
+	const static int index[]={0, 1, 2, 6, 7, 8, 9, 10, 11};
+	const size_t Nidx=sizeof(index)/sizeof(index[0]);
+	arma::vec ders(Nidx);
+	ders.zeros();
+
+	for(size_t iid=0;iid<Nidx;iid++) {
+	  // Index is
+	  int ic=index[iid];
+	  arma::vec hlp(Na);
+	  
+	  deri.get(ic,eris);
+	  hlp.zeros();
+	  for(size_t iia=0;iia<Na;iia++)
+	    for(size_t iimu=0;iimu<Nmu;iimu++) {
+	      size_t imu=orbshells[imus].get_first_ind()+iimu;
+	      for(size_t iinu=0;iinu<Nnu;iinu++) {
+		size_t inu=orbshells[inus].get_first_ind()+iinu;
+		
+		// The contracted integral
+		hlp(iia)+=eris[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
+	      }
+	    }
+	  ders(iid)=fac*arma::dot(hlp,ca);
+	}
+	
+	// Increment forces
+	for(int ic=0;ic<3;ic++) {
+#ifdef _OPENMP
+	  fwrk(3*anuc+ic)-=ders(ic);
+	  fwrk(3*inuc+ic)-=ders(ic+3);
+	  fwrk(3*jnuc+ic)-=ders(ic+6);
+#else
+	  f(3*anuc+ic)-=ders(ic);
+	  f(3*inuc+ic)-=ders(ic+3);
+	  f(3*jnuc+ic)-=ders(ic+6);
+#endif
+	}
+
+	/*
+	std::ostringstream msg;
+	msg << "\nias = " << ias << ", imu = " << imus << ", inu = " << inus << ".\n";
+	msg << "am_a = " << auxshells[ias].get_am() << ", am_i = " << orbshells[imus].get_am() << ", am_j = " << orbshells[inus].get_am() << ".";
+	interpret_force(ders).print(msg.str());
+	*/
+      }
+    }
+    
+#ifdef _OPENMP
+#pragma omp critical
+    // Sum results together
+    f+=fwrk;
+#endif
+  } // end parallel section
+
+  return f;
 }
 
 arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> & occo, size_t memlimit) const {
@@ -854,7 +1061,7 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 #pragma omp parallel
 #endif
 	{
-	  ERIWorker eri(std::max(maxorbam,maxauxam),std::max(maxorbcontr,maxauxcontr));
+	  ERIWorker eri(maxam,maxcontr);
 	  std::vector<double> eris;
 
 
