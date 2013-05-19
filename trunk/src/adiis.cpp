@@ -125,8 +125,8 @@ arma::vec ADIIS::get_c() const {
   // double E_initial=get_E(x);
 
   // Initialize the optimizer. Use initial step size 0.02, and an
-  // orthogonality tolerance of 0.01 in the line searches.
-  gsl_multimin_fdfminimizer_set(s, &minfunc, x, 0.02, 0.01);
+  // orthogonality tolerance of 0.001 in the line searches.
+  gsl_multimin_fdfminimizer_set(s, &minfunc, x, 0.02, 0.001);
 
   size_t iter=0;
   int status;
