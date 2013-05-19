@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       HF/DFT from Hel
@@ -166,7 +166,7 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
   gsl_multimin_fminimizer *s = NULL;
   gsl_multimin_function minfunc;
-  
+
   size_t iter = 0;
   int status;
   double size;
@@ -176,17 +176,17 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   for(int i=0;i<Nf;i++)
     // Need to convert to natural logarithm
     gsl_vector_set(x,i,log(10.0)*(min + (i+0.5)*(max-min)/Nf));
-  
+
   /* Set initial step sizes to 0.45 times the spacing */
   gsl_vector *ss = gsl_vector_alloc (Nf);
   //  gsl_vector_set_all (ss, 0.45*log(10.0)*(max-min)/Nf);
   gsl_vector_set_all (ss, 1.0);
-  
+
   /* Initialize method and iterate */
   minfunc.n = Nf;
   minfunc.f = compl_mog;
   minfunc.params = (void *) &pars;
-  
+
   s = gsl_multimin_fminimizer_alloc (T, Nf);
   gsl_multimin_fminimizer_set (s, &minfunc, x, ss);
 
@@ -200,18 +200,18 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
       printf(" e%-3i ",i+1);
     printf("mog\n");
   }
-  
+
   do
     {
       iter++;
       status = gsl_multimin_fminimizer_iterate(s);
-      
+
       if (status)
 	break;
-      
+
       size = gsl_multimin_fminimizer_size (s);
       status = gsl_multimin_test_size (size, 1e-3);
-      
+
       if (status == GSL_SUCCESS && verbose)
 	printf ("converged to minimum at\n");
 
@@ -222,7 +222,7 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
 	  // Convert to 10-base logarithm
 	  printf("% 8.3e ",log10(M_E)*gsl_vector_get(s->x,i));
 	printf("%e %e\n",pow(s->fval,1.0/n),size);
-	
+
 	// print_gradient(s->x,(void *) &pars);
       }
     }
@@ -238,7 +238,7 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   std::sort(ret.begin(),ret.end());
   // and reverse the order
   std::reverse(ret.begin(),ret.end());
-  
+
   gsl_vector_free(x);
   gsl_vector_free(ss);
   gsl_multimin_fminimizer_free (s);

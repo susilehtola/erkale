@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -12,7 +12,7 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * The routines in this file are based on the classical paper
  *    "Gaussian-Expansion Methods for Molecular Integrals"
  * by H. Taketa, S. Huzinaga and K. O-Ohata, in the
@@ -61,7 +61,7 @@ double fj(int j, int l, int m, double a, double b) {
   if(j<0 || j>m+l) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Trying to compute fj for j="<<j<<", l="<<l<<", m="<<m<<"!"; 
+    oss << "Trying to compute fj for j="<<j<<", l="<<l<<", m="<<m<<"!";
     throw std::runtime_error(oss.str());
   }
 
@@ -91,7 +91,7 @@ double fj(int j, int l, int m, double a, double b) {
   else
     high=j;
 
-  double ret=0.0;  
+  double ret=0.0;
   for(int im=low;im<=high;im++) {
     // This would be
     // ret+=choose(m,im)*pow(b,m-im)*choose(l,il)*pow(a,l-il);
@@ -121,7 +121,7 @@ double overlap_int(double xa, double ya, double za, double zetaa, int la, int ma
 
   // Distance between centers
   double absq=distsq(xa,ya,za,xb,yb,zb);
-  
+
   // Compute center of product
   double xc=center_1d(zetaa,xa,zetab,xb);
   double yc=center_1d(zetaa,ya,zetab,yb);
@@ -154,7 +154,7 @@ double overlap_int(double xa, double ya, double za, double zetaa, int la, int ma
 double kinetic_int(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xb, double yb, double zb, double zetab, int lb, int mb, int nb) {
   // Kinetic energy integral
   // THO 2.14
-  
+
   // First term
   double ke1=zetab*(2*(lb+mb+nb)+3)*overlap_int(xa,ya,za,zetaa,la,ma,na,xb,yb,zb,zetab,lb,mb,nb);
   // Second term
@@ -189,7 +189,7 @@ std::vector<double> A_array(int la, int lb, double PAx, double PBx, double PCx, 
   ret.reserve(N);
   // Resize array
   ret.resize(N);
- 
+
   // Zero out array
   for(int i=0;i<N;i++)
     ret[i]=0.0;
@@ -216,7 +216,7 @@ double nuclear_int(double xa, double ya, double za, double zetaa, int la, int ma
 
   // Distance between centers
   double ABsq=distsq(xa,ya,za,xb,yb,zb);
-  
+
   // Compute center of product
   double xp=center_1d(zetaa,xa,zetab,xb);
   double yp=center_1d(zetaa,ya,zetab,yb);
@@ -270,7 +270,7 @@ double nuclear_int(double xa, double ya, double za, double zetaa, int la, int ma
   size_type N=Ax.size()+Ay.size()+Az.size();
   A.reserve(N);
   A.resize(N);
-  
+
   // Zero out array
   for(size_type i=0;i<N;i++)
     A[i]=0.0;
@@ -345,10 +345,10 @@ std::vector<double> B_array(int la, int lb, double Ax, double Bx, double Px, dou
 	      fact_ratio(i1+i2-2*(r1+r2),u)*pow(QPx,i1+i2-2*(r1+r2)-2*u)
 	      // THO actually reads
 	      *pow(delta,-i1-i2+u+r1+r2);
-	      // but only the following 
+	      // but only the following
 	      //	      	      *pow(delta,-i1-i2+2*(r1+r2)+u);
 	      */
-	    
+
 	    // Cook p. 249
 	    ret[indx]+=pow(-1.0,i2+u)
 	      *B_theta(i1,la,lb,PAx,PBx,r1,zetaab)
@@ -366,7 +366,7 @@ double ERI_int(int la, int ma, int na, double Ax, double Ay, double Az, double z
   double zetaab=zetaa+zetab;
   double zetacd=zetac+zetad;
   double fourdelta=1.0/zetaab+1.0/zetacd;
-  
+
   // Compute centers
   double Px=center_1d(zetaa,Ax,zetab,Bx);
   double Py=center_1d(zetaa,Ay,zetab,By);
@@ -392,7 +392,7 @@ double ERI_int(int la, int ma, int na, double Ax, double Ay, double Az, double z
     printf("By[%i]=%e\n",(int) i,Barry[i]);
   for(size_t i=0;i<Barrz.size();i++)
   printf("Bz[%i]=%e\n",(int) i,Barrz[i]);*/
-  
+
 
   // Form product array
   size_type N, Nx, Ny, Nz;

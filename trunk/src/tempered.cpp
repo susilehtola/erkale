@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -42,7 +42,7 @@ std::vector<double> welltempered_set(double alpha, double beta, double gamma, do
   // WT-F2
   if(Nf>=1)
     ret.push_back(alpha);
-  if(Nf>=2) 
+  if(Nf>=2)
     ret.push_back(alpha*beta);
   for(size_t i=2;i<Nf;i++)
     ret.push_back(ret[i-1]*beta*(1.0 + gamma*pow((i+1.0)/Nf,delta)));

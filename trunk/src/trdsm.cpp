@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -92,7 +92,7 @@ void TRDSM::clean_density() {
     // Compute purified density matrix
     arma::mat DSD=Dt*S*Dt;
     arma::mat DSDSD=DSD*S*Dt;
- 
+
     // Deviation from purity is
     arma::mat Dd=3.0*DSD-2*DSDSD-Dt;
 
@@ -156,7 +156,7 @@ arma::mat TRDSM::get_M() const {
 
   return M;
 }
-    
+
 arma::mat TRDSM::get_Dbar(const arma::vec & c) const {
   arma::mat Dbar=Ds[minind];
   size_t i=0;
@@ -198,7 +198,7 @@ std::vector<arma::mat> TRDSM::get_Fn0() const {
       ret[i]=Fs[ii]-Fs[minind];
       i++;
     }
-       
+
   return ret;
 }
 
@@ -218,7 +218,7 @@ double TRDSM::E_DSM(const arma::vec & c) const {
   double E=Es[minind];
   E+=arma::trace(Dbar*F0)-arma::trace(D0*F0)-arma::trace(DbarFbar)-arma::trace(D0*Fbar);
   E+=arma::trace(6.0*DbarS*DbarFbar)-arma::trace(4.0*DbarS*DbarS*DbarFbar);
-  
+
   return E;
 }
 
@@ -263,17 +263,17 @@ arma::vec TRDSM::get_gradient(const arma::vec & c) const {
     for(size_t n=0;n<N;n++) {
       // Step size
       double dx=STEPSIZE;
-      
+
       // Left and right values of c
       arma::vec lc(c), rc(c);
       lc(n)-=dx;
       rc(n)+=dx;
-      
+
       // Corresponding energies
       double lE=E_DSM(lc), rE=E_DSM(rc);
       // Gradient is
       ng(n)=(rE-lE)/(2.0*dx);
-      
+
       printf("g(%i)=%e vs. %e (l %e r %e), diff %e %%\n",(int) n+1,g(n),ng(n),lE,rE,(ng(n)-g(n))/g(n)*100.0);
     }
   }
@@ -318,17 +318,17 @@ void TRDSM::get_gradient_hessian(const arma::vec & c, arma::vec & g, arma::mat &
   for(size_t n=0;n<N;n++) {
     // Step size
     double dx=STEPSIZE;
-    
+
     // Left and right values of c
     arma::vec lc(c), rc(c);
     lc(n)-=dx;
     rc(n)+=dx;
-    
+
     // Corresponding energies
     double lE=E_DSM(lc), rE=E_DSM(rc);
     // Gradient is
     ng(n)=(rE-lE)/(2.0*dx);
-      
+
       printf("g(%i)=%e vs. %e (l %e r %e), diff %e %%\n",(int) n+1,g(n),ng(n),lE,rE,(ng(n)-g(n))/g(n)*100.0);
   }
 #endif
@@ -383,7 +383,7 @@ void TRDSM::get_gradient_hessian(const arma::vec & c, arma::vec & g, arma::mat &
     // Step size
     double dx=STEPSIZE;
 
-    for(size_t n=0;n<N;n++) {      
+    for(size_t n=0;n<N;n++) {
       // Left and right values of c
       arma::vec lc(c), rc(c);
       lc(m)-=dx;
@@ -395,7 +395,7 @@ void TRDSM::get_gradient_hessian(const arma::vec & c, arma::vec & g, arma::mat &
 
       // Hessian element is
       nH(m,n)=(rg(n)-lg(n))/(2.0*dx);
-      
+
       printf("H(%i,%i)=%e vs. %e, diff %e %%\n",(int) m+1, (int) n+1,H(m,n),nH(m,n),(nH(m,n)/H(m,n)-1.0)*100.0);
     }
   }
@@ -425,7 +425,7 @@ arma::vec TRDSM::solve_c_ls() const {
 
   // Old energy
   double Eold;
-  
+
   size_t ig=0;
 
   // Do gradient descent
@@ -434,7 +434,7 @@ arma::vec TRDSM::solve_c_ls() const {
     Eold=E;
     // and old c
     cold=c;
-    
+
     // Compute gradient at c
     ig++;
     arma::vec g=get_gradient(c);
@@ -455,7 +455,7 @@ arma::vec TRDSM::solve_c_ls() const {
     // Corresponding vectors
     arma::vec ca(c);
     arma::vec cb=c-b*g;
-    
+
     // Check step size
     double la=step_len(ca,M);
     double lb=step_len(cb,M);
@@ -526,7 +526,7 @@ arma::vec TRDSM::solve_c_ls() const {
       break;
     }
   }
-    
+
   return c;
 }
 
@@ -559,22 +559,22 @@ arma::vec TRDSM::solve_c() const {
 
     // Compute step length
     l=step_len(c,M);
-    
+
     // Increment mu if necessary
     if(l>h) {
       oldmu=mu;
       mu+=1.0;
     } else
       break;
-  } 
-  
+  }
+
   // Do we need to do a bisection to refine the step length?
   if(oldmu!=mu) {
     // Yes, we do. Left value is
     double lx=oldmu;
     // and right value is
     double rx=mu;
-    
+
     // Correct shift is somewhere in between.
     double mx;
     while(rx-lx>10*DBL_EPSILON) {
@@ -586,7 +586,7 @@ arma::vec TRDSM::solve_c() const {
 
       // and the length here is
       l=step_len(c,M);
-      
+
       // Determine which limit to move
       if(l>h) // Move left limit
 	lx=mx;
@@ -598,7 +598,7 @@ arma::vec TRDSM::solve_c() const {
   }
 
   //  printf("Final value of mu is %e.\n",mu);
-  
+
   return c;
 }
 
@@ -618,7 +618,7 @@ void TRDSM::solve_c(arma::vec & c, double mu, arma::vec & Hval, arma::mat & Hvec
   double d;
 
   //  double Estart=E_DSM(c);
-  
+
   // Trust radius
   double k=0.2;
 
@@ -634,7 +634,7 @@ void TRDSM::solve_c(arma::vec & c, double mu, arma::vec & Hval, arma::mat & Hvec
     // The level-shifted Hessian is
     arma::mat hess=H-mu*M;
     eig_sym_ordered(Hval,Hvec,hess);
-    
+
     // Solve (H - mu M) dc = -g.
     arma::vec dc(c);
     dc.zeros();
@@ -645,7 +645,7 @@ void TRDSM::solve_c(arma::vec & c, double mu, arma::vec & Hval, arma::mat & Hvec
     // Do step
     cold=c;
     c+=dc;
-    
+
     // Check that we are within the trust region
     l=step_len(c,M);
     if(l>k) {
@@ -687,7 +687,7 @@ void TRDSM::solve_c(arma::vec & c, double mu, arma::vec & Hval, arma::mat & Hvec
       ratio=dEact/dEpred;
     else
       ratio=-1.0;
-    
+
     // Do we accept the step?
     if(fabs(dEact)<ETOL || fabs(dEpred)<ETOL) {
       // Converged.
@@ -732,7 +732,7 @@ arma::mat TRDSM::solve() const {
   else
     //    c=solve_c_ls();
     c=solve_c();
-  
+
   // and perform the averaging
   return get_Fbar(c);
 }

@@ -72,7 +72,7 @@ void parse_states(const std::vector<double> & occs, std::string & input) {
 	else
 	  input=std::string(homostr)+input.substr(ind+4,input.size());
       }
-      
+
       ind=input.find("lumo");
       if(ind!=std::string::npos) {
 	// Found lumo specifier.
@@ -108,7 +108,7 @@ void parse_states(const std::vector<double> & occs, std::string & input) {
 	    size_t start;
 	    std::string startsep;
 	    for(start=ind-1;start<input.size();start--)
-	      if(input[start]==':' || input[start] == ',') {	
+	      if(input[start]==':' || input[start] == ',') {
 		// Found start
 		startsep=input[start];
 		break;
@@ -147,7 +147,7 @@ void parse_states(const std::vector<double> & occs, std::string & input) {
 	    // Perform addition
 	    int val1=readint(val1str);
 	    int val2=readint(val2str);
-	    
+
 	    int res=0;
 	    if(signs[is]=='+')
 	      res=val1+val2;
@@ -158,13 +158,13 @@ void parse_states(const std::vector<double> & occs, std::string & input) {
 
 	    char resstr[80];
 	    sprintf(resstr,"%i",res);
-	    
+
 	    // Replace string
 	    input=head+startsep+std::string(resstr)+endsep+foot;
 	  }
 	}
       }
-      
+
       // String was unchanged, we are converged.
       if(oldinput.compare(input)==0)
 	break;
@@ -174,13 +174,13 @@ void parse_states(const std::vector<double> & occs, std::string & input) {
 std::string parse_states(Checkpoint & chkpt, const std::string & stateset) {
   // Get specification of states
   std::vector<std::string> states=splitline(tolower(stateset));
-  
+
   // No states specified
   if(states.size()==0)
     return stateset;
 
   // Is the calculation restricted?
-  bool restr; 
+  bool restr;
   chkpt.read("Restricted",restr);
 
   // Sanity check
@@ -252,7 +252,7 @@ int main(int argc, char **argv) {
   // Get functional strings
   int xfunc=find_func(set.get_string("CasidaX"));
   int cfunc=find_func(set.get_string("CasidaC"));
-  
+
   if(is_correlation(xfunc))
     throw std::runtime_error("Refusing to use a correlation functional as exchange.\n");
   if(is_kinetic(xfunc))
@@ -284,7 +284,7 @@ int main(int argc, char **argv) {
   std::string states=set.get_string("CasidaStates");
   std::string newstates=parse_states(chkpt,states);
   set.set_string("CasidaStates",newstates);
-  if(states.compare(newstates)!=0) 
+  if(states.compare(newstates)!=0)
     printf("CasidaStates has been parsed to \"%s\".\n",newstates.c_str());
 
   // Load basis set
@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
     chkpt.read("C",C);
     chkpt.read("E",E);
     chkpt.read("occs",occs);
-    
+
     if(set.get_bool("CasidaPol")) {
       // Half occupancy (1.0 instead of 2.0)
       std::vector<double> hocc(occs);

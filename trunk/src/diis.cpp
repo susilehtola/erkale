@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -80,7 +80,7 @@ void DIIS::solve(arma::mat & F, bool c1) {
     // RHS vector
     arma::vec A(N+1);
     A.zeros();
-    
+
     // Compute errors
     for(int i=0;i<N;i++)
       for(int j=0;j<N;j++) {
@@ -91,16 +91,16 @@ void DIIS::solve(arma::mat & F, bool c1) {
       B(i,N)=-1.0;
       B(N,i)=-1.0;
     }
-    
+
     // Fill in A
     A(N)=-1.0;
-    
+
     // Solve B*X = A
     arma::vec X;
     bool succ;
 
     succ=arma::solve(X,B,A);
-    
+
     if(succ) {
       // Check that weights are within tolerance
       for(int i=0;i<N;i++)
@@ -110,13 +110,13 @@ void DIIS::solve(arma::mat & F, bool c1) {
 	  solve(F,c1);
 	  return;
 	}
-      
+
       // Solution is (last element of X is DIIS error)
       sol.zeros();
       for(int i=0;i<N;i++)
 	sol(i)=X(i);
     }
-    
+
     if(!succ) {
       // Failed to invert matrix. Use the two last iterations instead.
       printf("C1-DIIS was not succesful, mixing matrices instead.\n");
@@ -129,11 +129,11 @@ void DIIS::solve(arma::mat & F, bool c1) {
     }
   } else {
     // C2-DIIS
-    
+
     // Array holding the errors
     arma::mat B(N,N);
     B.zeros();
-    
+
     // Compute errors
     for(int i=0;i<N;i++)
       for(int j=0;j<N;j++) {
@@ -176,7 +176,7 @@ void DIIS::solve(arma::mat & F, bool c1) {
 	for(int j=0;j<N;j++)
 	  if(fabs(Q(j,i))>=MAXWEIGHT)
 	    ok=0;
-	
+
 	if(ok) {
 	  mine=errors[i];
 	  minloc=i;
@@ -189,22 +189,22 @@ void DIIS::solve(arma::mat & F, bool c1) {
       sol=Q.col(minloc);
     } else {
       printf("C2-DIIS did not find a suitable solution. Mixing matrices instead.\n");
-      
+
       int ilast=(icur+imax-1)%imax;
       sol.zeros();
       sol(icur)=0.5;
       sol(ilast)=0.5;
-    }      
+    }
   }
 
-  /*  
+  /*
   printf("DIIS weights are\n");
   for(int i=0;i<N;i++)
     printf(" % e",sol(i));
   printf("\n");
   */
 
-  // Form weighted Fockian  
+  // Form weighted Fockian
   F.zeros();
   for(int i=0;i<N;i++)
     F+=sol(i)*Fs[i];

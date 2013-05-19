@@ -203,7 +203,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     if(ROHF) {
       // Get ground state
       gs_conf_t gs=get_ground_state(Z);
-      
+
       // Calculate amount of alpha and beta electrons
       int Nel_alpha;
       int Nel_beta;

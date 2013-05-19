@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -29,7 +29,7 @@
  */
 arma::vec solve_coefficients(std::vector<double> expns, double zeta, int l);
 
-/// Compute self-overlap of difference 
+/// Compute self-overlap of difference
 double compute_difference(std::vector<double> expns, double zeta, int l);
 
 #endif

@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     printf("method is 0 for even-tempered, 1 for well-tempered and 2 for full optimization, or 3 for midpoint quadrature.\n");
     return 1;
   }
-  
+
   // Read parameteres
   double zeta=atof(argv[1]);
   double am=atoi(argv[2]);

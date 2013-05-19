@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       HF/DFT from Hel
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 
   // Sort into ascending order
   std::sort(exps.begin(),exps.end());
-  
+
   // Return the original value if Coulomb metric was used
   if(coulomb)
     am++;

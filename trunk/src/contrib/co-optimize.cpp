@@ -130,7 +130,7 @@ bool isscf(std::string method) {
       method=method.substr(1);
     else if(stricmp(method.substr(0,1),"U")==0)
       method=method.substr(1);
-    
+
     return ((stricmp(method,"hf")==0) || (stricmp(method,"rohf")==0));
   } else if(stricmp(prog,"psi4")==0)
     return (stricmp(method,"scf")==0);
@@ -504,7 +504,7 @@ void compute_density_gaussian(int Z, bool dimer, const BasisSetLibrary & baslib,
   if(stricmp(method.substr(0,3),"MP2")==0) {
     polmethod=UHF;
   }
-  
+
   // Write G09 input file.
   FILE *out;
 
@@ -513,7 +513,7 @@ void compute_density_gaussian(int Z, bool dimer, const BasisSetLibrary & baslib,
   // Write the headers
   fprintf(out,"%%RWF=temp\n%%Int=temp\n%%D2E=temp\n%%NoSave\n%%Chk=chkpt\n");
 
-  // Memory option. 
+  // Memory option.
   fprintf(out,"%%Mem=%s\n",memory.c_str());
   fprintf(out,"%%NProcShared=%i\n",nthreads);
   fprintf(out,"#P GFINPUT Density=Current SCF=(XQC,IntRep,NoIncFock,DSymm,NoVarAcc) Integral=(Acc2E=12,Grid=450974)\n");
@@ -760,10 +760,10 @@ void compute_density_erkale(int Z, bool dimer, const BasisSetLibrary & baslib, c
     fprintf(out,"Direct true\n");
     // fprintf(out,"StrictIntegrals true\n");
     fclose(out);
-    
+
     erkval=system(cmd);
   }
-  
+
   if(erkval) {
     fprintf(stderr,"Error running ERKALE. Trying again with DIIS.\n");
     out=fopen("input.erk","w");
@@ -782,10 +782,10 @@ void compute_density_erkale(int Z, bool dimer, const BasisSetLibrary & baslib, c
     //    fprintf(out,"StrictIntegrals true\n");
     fprintf(out,"Verbose true\n");
     fclose(out);
-    
+
     erkval=system(cmd);
   }
-  
+
   if(erkval) {
     fprintf(stderr,"Error running ERKALE. Trying again with DIIS and line search.\n");
     out=fopen("input.erk","w");
@@ -925,7 +925,7 @@ void get_contraction(int Z, const std::vector<coprof_t> & cpl, const std::string
     exps[l].zeros(lsh.size());
     for(size_t i=0;i<lsh.size();i++)
       exps[l](i)=lsh[i].get_contr()[0].z;
-    
+
     // Diagonalize density matrix in these subspaces
     std::vector<arma::mat> Pvec(nf);
     std::vector<arma::vec> Pval(nf);
@@ -966,7 +966,7 @@ void get_contraction(int Z, const std::vector<coprof_t> & cpl, const std::string
       // Normalize the coefficients
       c.col(io)/=sqrt(arma::as_scalar(arma::trans(c.col(io))*Ssub[0]*c.col(io)));
     }
-    
+
     // Store the contractions.
     contr[l]=c;
 
@@ -1287,7 +1287,7 @@ double get_pol_x(double x) {
   /*
     // Old version - use exponential scaling
     const double a=1.0/5.0;
-    
+
     // Convert to safe scale
     return minpol+exp(a*x);
   */
@@ -1353,7 +1353,7 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
     fflush(stdout);
     return 0.0;
   }
-  
+
   Timer tpol;
 
   // Width of completeness
@@ -1367,18 +1367,18 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
   printf("DEBUG: computing mogs for polarization shell.\n");
 
   static int iter=0;
-    
+
   for(size_t iel=0;iel<els.size();iel++) {
 
     // Just compile a list of mogs for the added angular momentum
-      
+
     char fname[80];
     sprintf(fname,"mog-%s-%c-%i.dat",element_symbols[els[iel]].c_str(),tolower(shell_types[addam]),iter);
     FILE *out=fopen(fname,"w");
     for(int id=-30;id<=20;id++) {
       // Do trial completeness profile
       double d=id*0.1;
-	
+
       std::vector<coprof_t> trcpl(cpl);
       trcpl[addam].start=d-pw/2.0;
       trcpl[addam].end=d+pw/2.0;
@@ -1396,7 +1396,7 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
 
   iter++;
   printf("END DEBUG SECTION\n");
-    
+
 #endif
 
   if(dimer && isscf(method))
@@ -1410,7 +1410,7 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
     //    return 0.0;
 
   fflush(stdout);
-    
+
   // Initial number of trials
   int ntrials=5;
   // Where the maximum should be
@@ -1420,21 +1420,21 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
   double offset=zero_pol_x();
   // Initial step size.
   double step=0.15;
-    
+
   // Maximum mog
   double maxmog=0.0;
   double oldmog=0.0;
   int maxel=-1;
-    
+
   // Trial profiles
   std::vector< std::vector<coprof_t> > ptrials(ntrials);
 
   // Values obtained with the trial profiles
   std::vector< std::vector<arma::vec> > trvals(ntrials);
-      
+
   for(int i=0;i<ntrials;i++)
-    trvals[i]=curval;	
-    
+    trvals[i]=curval;
+
   // Do we need to compute the value for trial i?
   std::vector<bool> compute(ntrials);
   for(int i=0;i<ntrials;i++)
@@ -1450,7 +1450,7 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
   do {
     // Save old mog
     oldmog=maxmog;
-    
+
     // Form the trials
     for(int i=0;i<ntrials;i++) {
       ptrials[i]=cpl;
@@ -1464,7 +1464,7 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
 	for(size_t iel=0;iel<els.size();iel++) {
 	  trvals[i][iel]=compute_value(els[iel],dimer,ptrials[i],method);
 	  double imog=compute_mog(trvals[i][iel],curval[iel]);
-	  
+
 	  if(imog>mogs[i]) {
 	    mogs[i]=imog;
 	    maxels[i]=els[iel];
@@ -1474,11 +1474,11 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
       }
       //	  printf("Trial %i: % .2e .. % .2e, mog %e\n",i+1,ptrials[i][addam].start,ptrials[i][addam].end,mogs[i]);
     }
-      
+
     // Reset computation flags
     for(int i=0;i<ntrials;i++)
       compute[i]=true;
-      
+
     maxel=els[0];
     maxmog=mogs[0];
     for(int i=1;i<ntrials;i++)
@@ -1486,28 +1486,28 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
 	maxmog=mogs[i];
 	maxel=maxels[i];
       }
-      
+
     if(maxmog<10*EMDTOL)
       // Mog is too small for shell to be important, don't try
       // to optimize the shell
       break;
-      
+
     if(maxmog<tol/100) {
       // Mog too small to be important, stop trying.
       break;
     }
-      
+
     // Check if maximum has been bracketed, account for
     // inaccuracy in the integral
     if(fabs(mogs[thmax]-maxmog)>10*EMDTOL) {
       bool moved=false;
-	
+
       // Maximum is to the right
       for(int i=thmax+1;i<ntrials;i++)
 	if(mogs[i]==maxmog) {
 	  // What is the displacement
 	  int d=i-thmax;
-	    
+
 	  // Move offset
 	  offset+=d*step;
 	  // and the solutions
@@ -1516,15 +1516,15 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
 	    mogs[isol]=mogs[isol+d];
 	    compute[isol]=false;
 	  }
-	    
+
 	  printf("%c % .2f % .2f %e %2i %e %e %-2s %s.\n",shell_types[addam],ptrials[i][addam].start,ptrials[i][addam].end,ptrials[i][addam].tol,(int) ptrials[i][addam].exps.size(),maxmog,maxmog-oldmog,element_symbols[maxel].c_str(),t.elapsed().c_str());
 	  fflush(stdout);
 	  t.set();
 	  moved=true;
-	    
+
 	  break;
 	}
-	
+
       if(!moved)
 	// Maximum is to the left.
 	for(int i=0;i<thmax;i++)
@@ -1540,36 +1540,36 @@ double check_polarization(double tol, const std::vector<int> & els, std::vector<
 	      mogs[isol]=mogs[isol-d];
 	      compute[isol]=false;
 	    }
-	      
+
 	    printf("%c % .2f % .2f %e %2i %e %e %-2s %s.\n",shell_types[addam],ptrials[i][addam].start,ptrials[i][addam].end,ptrials[i][addam].tol,(int) ptrials[i][addam].exps.size(),maxmog,maxmog-oldmog,element_symbols[maxel].c_str(),t.elapsed().c_str());
 	    fflush(stdout);
 	    t.set();
 	    break;
 	  }
     } else { // We have bracketed the maximum - change step size
-	
+
       if(maxmog<tol/10) {
 	// Mog too small to be important, stop trying.
 	break;
       }
-	
+
       // Find min mog
       double minmog=DBL_MAX;
       for(int i=0;i<ntrials;i++)
 	if(mogs[i]<minmog)
 	  minmog=mogs[i];
-	
+
       if(maxmog-minmog<tol/10)
 	// Refined to enough accuracy
 	break;
-	
-      step/=2.0;	    
+
+      step/=2.0;
       printf("Reducing step size to %e, pw is %e, mog uncertainty is %e (%s).\n",step,pw,maxmog-minmog,t.elapsed().c_str());
       fflush(stdout);
       t.set();
     }
   } while(step>pw/10.0);
-    
+
   // Do we need to add the shell?
   if(maxmog<tol) {
     printf("Not adding %c shell, mog = %e for %s. (%s)\n\n",shell_types[addam],maxmog,element_symbols[maxel].c_str(),tpol.elapsed().c_str());
@@ -1599,11 +1599,11 @@ double extend_profile(double tol, const std::vector<int> & els, std::vector<copr
   std::vector<int> converged(els.size());
   for(size_t i=0;i<converged.size();i++)
     converged[i]=INT_MAX;
-  
+
   // Check existing shells. Loop over elements
   while(true) {
     added=false;
-    
+
     // Reset extension mog
     extmog=0.0;
 
@@ -1619,15 +1619,15 @@ double extend_profile(double tol, const std::vector<int> & els, std::vector<copr
       // Trial values
       arma::vec lval(curval[iel]), mval(curval[iel]);
       arma::vec rval(curval[iel]), aval(curval[iel]);
-      
+
       if(dimer) {
 	if(maxam(cpl)>=ammin)
 	  printf("\n****** %-2s dim %s ********\n",element_symbols[els[iel]].c_str(),tolower(method).c_str());
       } else
 	printf("\n****** %-2s mono %s ********\n",element_symbols[els[iel]].c_str(),tolower(method).c_str());
-      
+
       for(int am=ammin;am<=std::min(maxam(cpl),ammax);am++) {
-	
+
 	// Check if am has been already converged
 	if(converged[iel]<=am)
 	  continue;
@@ -1639,28 +1639,28 @@ double extend_profile(double tol, const std::vector<int> & els, std::vector<copr
 	  std::vector<coprof_t> left(cpl);
 	  std::vector<coprof_t> middle(cpl);
 	  std::vector<coprof_t> right(cpl);
-	  
+
 	  // Get exponents
 	  printf("Determining exponents for %c shell ... ",shell_types[am]);
 	  fflush(stdout);
 	  double width;
 	  std::vector<double> exps=maxwidth_exps(am,cpl[am].tol,cpl[am].exps.size()+1,&width,OPTMOMIND);
-	  
+
 	  double step=width-(cpl[am].end-cpl[am].start);
-	  
+
 	  left[am].start=cpl[am].start-step;
 	  left[am].exps=move_exps(exps,left[am].start);
-	  
+
 	  if(domiddle) {
 	    middle[am].start=cpl[am].start-step/2.0;
 	    middle[am].end=cpl[am].end+step/2.0;
 	    middle[am].exps=move_exps(exps,middle[am].start);
 	  }
-	  
+
 	  right[am].end=cpl[am].end+step;
 	  right[am].exps=move_exps(exps,right[am].start);
-	  
-	  
+
+
 	  // .. or addition of an exponent
 	  bool expadd=false;
 	  std::vector<coprof_t> add(cpl);
@@ -1672,10 +1672,10 @@ double extend_profile(double tol, const std::vector<int> & els, std::vector<copr
 	  printf("(%s), step size is %e.\n",t.elapsed().c_str(),step);
 	  fflush(stdout);
 	  t.set();
-	  
+
 	  // Update current value
 	  curval[iel]=compute_value(els[iel],dimer,cpl,method);
-	  
+
 	  // and compute the trials
 	  lval=compute_value(els[iel],dimer,left, method);
 	  if(domiddle) mval=compute_value(els[iel],dimer,middle,method);
@@ -1684,55 +1684,55 @@ double extend_profile(double tol, const std::vector<int> & els, std::vector<copr
 	    aval=compute_value(els[iel],dimer,add,  method);
 	  else
 	    aval=curval[iel];
-	  
+
 	  // and mogs
 	  double lmog=compute_mog(lval,curval[iel]);
 	  double mmog=-10.0;
 	  if(domiddle) compute_mog(mval,curval[iel]);
 	  double rmog=compute_mog(rval,curval[iel]);
 	  double amog=compute_mog(aval,curval[iel]);
-	  
+
 	  // Interpolated value and mog
 	  std::vector<coprof_t> trcpl(cpl);
 	  arma::vec trval;
 	  double trmog;
-	  
+
 	  if(domiddle) {
 	    // Use inverse parabolic interpolation to find the maximum
 	    double xa=left[am].start;
 	    double xb=middle[am].start;
 	    double xc=right[am].start;
-	    
+
 	    double ya=lmog;
 	    double yb=mmog;
 	    double yc=rmog;
-	    
+
 	    // Numerical recipes 10.2.1
 	    double nom=(xb-xa)*(xb-xa)*(yb-yc) - (xb-xc)*(xb-xc)*(yb-ya);
 	    double den=(xb-xa)*(yb-yc) - (xb-xc)*(yb-ya);
-	    
+
 	    // Compute new point
 	    double x=DBL_MAX;
 	    if(fabs(den)>DBL_EPSILON) {
 	      x=xb-0.5*nom/den;
 	      //	      printf("Interpolation gives % .2f.\n",x);
 	    }
-	    
+
 	    // Check that x is in the trusted range
 	    if(fabs(x-xb)<step/2.0) {
 	      // and the value in the point
 	      trcpl[am].start=x;
 	      trcpl[am].end=x+width;
 	      trcpl[am].exps=move_exps(exps,trcpl[am].start);
-	      
+
 	      trval=compute_value(els[iel],dimer,trcpl,method);
 	      trmog=compute_mog(trval,curval[iel]);
-	      
+
 	      // Check that the trial mog isn't unbelievably large
 	      if(trmog>=10.0*std::max(std::max(lmog,mmog),rmog))
 		// Don't use the interpolated trial.
 		trmog=-10.0;
-	      
+
 	      //	      printf("Trial mog is %e.\n",trmog);
 	    } else {
 	      // Interpolation didn't work, use dummy value
@@ -1740,25 +1740,25 @@ double extend_profile(double tol, const std::vector<int> & els, std::vector<copr
 	      trmog=-10.0;
 	    }
 	  } else trmog=-10.0;
-	  
+
 	  double maxmog=std::max(std::max(std::max(lmog,rmog),std::max(mmog,amog)),trmog);
-	  
+
 	  if(fabs(maxmog)<tol) {
 	    // Existing shell is converged.
 
 	    // Set convergence flag
 	    if(am<convl)
 	      convl=am;
-	    
+
 	    if(fabs(maxmog)>extmog)
 	      extmog=fabs(maxmog);
-	    
+
 	    printf("%c % .2f % .2f %e %2i %e %s, converged.\n\n",shell_types[am],cpl[am].start,cpl[am].end,cpl[am].tol,(int) cpl[am].exps.size(),maxmog,t.elapsed().c_str());
 
 	    fflush(stdout);
 	    break;
 	  }
-	  
+
 	  added=true;
 	  int dir=INT_MAX;
 
@@ -1801,13 +1801,13 @@ double extend_profile(double tol, const std::vector<int> & els, std::vector<copr
       }
       converged[iel]=convl;
     }
-    
+
     // No functions added this iteration.
     if(!added) {
       break;
-    }	
+    }
   }
-  
+
   return extmog;
 }
 
@@ -1840,7 +1840,7 @@ std::vector<coprof_t> generate_limits(const std::vector<int> & els, double tol) 
 
       // Get the corresponding amount of electrons.
       std::vector<int> nel=shell_count(magicno[i]);
-      
+
       // Plug in the functions
       for(size_t l=0;l<nel.size();l++)
 	if(!cpl[l].exps.size())
@@ -1850,7 +1850,7 @@ std::vector<coprof_t> generate_limits(const std::vector<int> & els, double tol) 
       // Helper
       std::vector<int> hlp;
       hlp.push_back(magicno[i]);
-      
+
       // Do the expansion
       std::vector< std::vector<arma::vec> > trval;
       update_values(trval,cpl,hlp,scfmet(),false,false);
@@ -2013,7 +2013,7 @@ double reduce_profile(double tol, const std::vector<int> & els, std::vector<copr
 	    mvalfail=true;
 	    rvalfail=true;
 	  }
-	  
+
 	  try {
 	    dval[isys][iel]=compute_value(els[iel],(bool) isys,del,methods[isys]);
 	  } catch(std::runtime_error) {
@@ -2184,10 +2184,10 @@ void print_scheme(const BasisSetLibrary & baslib, const std::vector<int> & els, 
 
 double contraction_mog(int Z, const std::vector<int> & trial, const std::vector<coprof_t> & cpl, std::vector<arma::mat> Cmat, std::vector<arma::vec> exps, const std::string & method, const arma::vec & monoref, const arma::vec & dimref) {
   Timer t;
-  
+
   // Get the basis set
   BasisSetLibrary baslib=get_library(element_symbols[Z],cpl,Cmat,exps,trial);
-  
+
   // Compute new values
   double monomog, dimmog;
   try {
@@ -2213,7 +2213,7 @@ double contraction_mog(int Z, const std::vector<int> & trial, const std::vector<
   }
   printf(" %e %e (%s)\n",monomog,dimmog,t.elapsed().c_str());
   fflush(stdout);
-	  
+
   return std::max(monomog,dimmog);
 }
 
@@ -2260,7 +2260,7 @@ BasisSetLibrary contract_basis(double tol, const std::vector<int> & els, std::ve
       if((int) Cmat[iel][l].n_cols < contract[l])
         contract[l]=(int) Cmat[iel][l].n_cols;
     }
-  
+
   // Do the contraction.
   double minmog=0.0;
 
@@ -2270,7 +2270,7 @@ BasisSetLibrary contract_basis(double tol, const std::vector<int> & els, std::ve
     // Compute mogs of contracting one more function on each shell
     std::vector<double> mogs(cmaxam+1);
     for(int am=0;am<=cmaxam;am++) {
-      
+
       // We still have free functions left, calculate mog
       if(contract[am]<Nf[am]) {
 	mogs[am]=0.0;
@@ -2278,7 +2278,7 @@ BasisSetLibrary contract_basis(double tol, const std::vector<int> & els, std::ve
 	  // Trial contraction
 	  std::vector<int> trial(contract);
 	  trial[am]++;
-	  
+
 	  double mog=contraction_mog(els[iel],trial,cpl,Cmat[iel],exps[iel],method,refval[0][iel],refval[1][iel]);
 
 	  if(mog>mogs[am])
@@ -2291,12 +2291,12 @@ BasisSetLibrary contract_basis(double tol, const std::vector<int> & els, std::ve
 	// No free primitives left.
 	mogs[am]=DBL_MAX;
     }
-    
+
     // Determine minimal mog
     minmog=DBL_MAX;
     for(int l=0;l<=cmaxam;l++)
       minmog=std::min(minmog,mogs[l]);
-    
+
     // Accept move?
     if(minmog<=tol) {
       for(int l=cmaxam;l>=0;l--)
@@ -2315,14 +2315,14 @@ BasisSetLibrary contract_basis(double tol, const std::vector<int> & els, std::ve
       break;
     }
   }
-  
+
   // Compile library
   BasisSetLibrary ret;
   for(size_t iel=0;iel<els.size();iel++) {
     BasisSetLibrary baslib=get_library(element_symbols[els[iel]],cpl,Cmat[iel],exps[iel],contract);
     ret.add_element(baslib.get_element(element_symbols[els[iel]]));
   }
-  
+
   print_scheme(ret,els);
   printf(".\nContraction took %s.\n\n",ttot.elapsed().c_str());
   fflush(stdout);
@@ -2422,7 +2422,7 @@ int main(int argc, char **argv) {
 
   if(els.size()==0)
     throw std::runtime_error("Need element to optimize basis for!\n");
-  
+
   // Method to use for contraction
   std::string contrmet=method;
   if(set.get_bool("SCFContr"))
@@ -2488,7 +2488,7 @@ int main(int argc, char **argv) {
     tau/=10.0;
     if(tau<inittol)
       tau=inittol;
-         
+
     printf("\n\n\n***************************** tau = %e ********************************\n",tau);
 
     double polerr=0.0;
@@ -2498,7 +2498,7 @@ int main(int argc, char **argv) {
 	do {
 	  // Update values
 	  update_values(curval,cpl,els,method,true);
-	  
+
 	  // Check if polarization shells are necessary.
 	  if(calcdimer)
 	    polerr=check_polarization(tau,els,cpl,curval[1],true,method);
@@ -2506,19 +2506,19 @@ int main(int argc, char **argv) {
 	    polerr=check_polarization(tau,els,cpl,curval[0],false,method);
 	} while(polerr>=tau);
       }
-      
+
       // Update values once again (monomer value might have changed)
       update_values(curval,cpl,els,method,true);
-      
+
       // Then extend the monomer profile
       extend_profile(tau,els,cpl,curval[0],0,am_max,false,method);
       // Update once again (at least for contraction)
       update_values(curval,cpl,els,method,true);
-      
+
       // and then the dimer if wanted
       if(calcdimer) {
 
-	if(dimerpol) {	
+	if(dimerpol) {
 	  if(maxam(cpl)>=atom_am(els)+1) {
 	    // Extend only polarization shells
 	    extend_profile(tau,els,cpl,curval[1],atom_am(els)+1,am_max,true,method);
@@ -2532,7 +2532,7 @@ int main(int argc, char **argv) {
       // Check once again if polarization shells are
       // necessary. Include shells that would be relevant at the next
       // iteration.
-      double poltau=std::max(tau/10.0,inittol); 
+      double poltau=std::max(tau/10.0,inittol);
       if(calcdimer)
 	polerr=check_polarization(poltau,els,cpl,curval[1],true,method);
       else
@@ -2592,7 +2592,7 @@ int main(int argc, char **argv) {
   tau=1.0;
   while(tau>inittol)
     tau/=10.0;
-  
+
   while((1-sqrt(DBL_EPSILON))*tau<=1e-2) {
     printf("\n\n\n***************************** tau = %e ********************************\n",tau);
 

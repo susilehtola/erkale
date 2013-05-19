@@ -520,7 +520,7 @@ arma::mat form_density(const arma::vec & E, const arma::mat & C, const std::vect
     oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): " << E.size() << " energies but " << C.n_cols << " orbitals!\n";
     throw std::runtime_error(oss.str());
   }
-  
+
   // Zero matrix
   arma::mat W(C.n_rows,C.n_rows);
   W.zeros();
@@ -1510,7 +1510,7 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
 
       //      else if(B>Bold)
       (void) Bold;
-      
+
       // Reset to gradient - SD performs better!!
       H=G[G.size()-1];
     }
@@ -1603,13 +1603,13 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
     } else {
       // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
       const int p=n-1;
-      
+
       // Compute polynomial coefficients.
       arma::vec jvec(p);
       for(int i=0;i<p;i++) {
 	jvec(i)=Jprime[i+1]-Jprime[0];
       }
-      
+
       // Form mu matrix
       arma::mat mumat(p,p);
       mumat.zeros();
@@ -1620,10 +1620,10 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
 	for(int j=0;j<p;j++)
 	  mumat(i,j)=pow(mu,j+1);
       }
-      
+
       arma::vec aval;
       bool solveok=true;
-      
+
       // Solve for coefficients - may not be stable numerically
       solveok=arma::solve(aval,mumat,jvec);
 
@@ -1632,33 +1632,33 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
 	arma::trans(jvec).print("Jvec");
 	throw std::runtime_error("Error solving for coefficients a.\n");
       }
-      
+
       // Find smallest positive root of a0 + a1*mu + ... + ap*mu^p = 0.
       {
 	// Coefficient of highest order term must be nonzero.
 	int r=p;
 	while(aval(r-1)==0.0)
 	  r--;
-	
+
 	// Coefficients
 	double a[r+2];
 	a[0]=Jprime[0];
 	for(int i=1;i<=r;i++)
 	  a[i]=aval(i-1);
-	
+
 	// GSL routine workspace - r:th order polynomial has r+1 coefficients
 	gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r+1);
-	
+
 	// Return values
 	double z[2*r];
 	int gslok=gsl_poly_complex_solve(a,r+1,w,z);
-	
+
 	if(gslok!=GSL_SUCCESS) {
 	  ERROR_INFO();
 	  fprintf(stderr,"Solution of polynomial root failed, error: \"%s\"\n",gsl_strerror(solveok));
 	  throw std::runtime_error("Error solving polynomial.\n");
 	}
-	
+
 	// Get roots
 	std::vector< std::complex<double> > roots(r);
 	for(int i=0;i<r;i++) {
@@ -1667,12 +1667,12 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
 	}
 	// and order them into increasing absolute value
 	std::stable_sort(roots.begin(),roots.end(),abscomp<double>);
-	
+
 	int nreal=0;
 	for(size_t i=0;i<roots.size();i++)
 	  if(fabs(roots[i].imag())<10*DBL_EPSILON)
 	    nreal++;
-	
+
 	/*
 	  printf("%i real roots:",nreal);
 	  for(size_t i=0;i<roots.size();i++)
@@ -1680,18 +1680,18 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
 	  printf(" (% e,% e)",roots[i].real(),roots[i].imag());
 	  printf("\n");
 	*/
-	
+
 	for(size_t i=0;i<roots.size();i++)
 	  if(roots[i].real()>sqrt(DBL_EPSILON) && fabs(roots[i].imag())<10*DBL_EPSILON) {
 	    // Root is real and positive. Is it smaller than the current minimum?
 	    if(roots[i].real()<step)
 	      step=roots[i].real();
 	  }
-	
+
 	// Free workspace
 	gsl_poly_complex_workspace_free(w);
       }
-      
+
       // Sanity check
       if(step==DBL_MAX)
 	step=0.0;
@@ -1774,5 +1774,5 @@ arma::mat interpret_force(const arma::vec & f) {
 
   arma::mat force(f);
   force.reshape(3,f.n_elem/3);
-  return arma::trans(force); 
+  return arma::trans(force);
 }

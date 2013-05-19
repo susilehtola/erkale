@@ -370,7 +370,7 @@ class BasisSet {
   /// Calculate overlap derivative force
   arma::vec overlap_der(const arma::mat & W) const;
   /// Calculate nuclear repulsion force
-  arma::vec nuclear_force() const;  
+  arma::vec nuclear_force() const;
 
   /// Compute moment integral around (x,y,z)
   std::vector<arma::mat> moment(int mom, double x=0.0, double y=0.0, double z=0.0) const;

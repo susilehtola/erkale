@@ -96,7 +96,7 @@ bool operator<(const total_coupl_t & lhs, const total_coupl_t & rhs) {
     return true;
   else if(lhs.L==rhs.L)
     return lhs.M<rhs.M;
-  
+
   return false;
 }
 
@@ -129,7 +129,7 @@ EMDEvaluator::EMDEvaluator() {
 }
 
 EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv) {
-  
+
   idfuncs=idfuncsv;
   loc=locv;
   P=Pv;
@@ -169,9 +169,9 @@ void EMDEvaluator::distance_table(const std::vector<coords_t> & coord) {
 	// However, Y_0^0 is 1/sqrt(4*pi)
 	YLM[ind][lmind(0,0)]=1.0/sqrt(4.0*M_PI);
       } else {
-	// Displacement vector 
+	// Displacement vector
 	coords_t dr_vec=coord[i]-coord[j];
-	
+
 	// Compute distance
 	double dr=norm(dr_vec);
 	dist[ind]=dr;
@@ -185,7 +185,7 @@ void EMDEvaluator::distance_table(const std::vector<coords_t> & coord) {
 	  phi=-1;
 	  cth=-1;
 	}
-	
+
 	// Loop over L and M
 	for(int L=0;L<=Lmax;L++)
 	  for(int M=-L;M<=L;M++)
@@ -227,39 +227,39 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 
       if(!clm[jjg].size())
 	throw std::runtime_error("clm[jjg] is empty!\n");
-      
+
       // Loop over l, l' and m, m'
       for(size_t il=0;il<clm[iig].size();il++)
 	for(size_t ilp=0;ilp<clm[jjg].size();ilp++) {
 	  // l and l' are
 	  int l=clm[iig][il].l;
 	  int lp=clm[jjg][ilp].l;
-	  
+
 	  // m and m' are
 	  int m=clm[iig][il].m;
 	  int mp=clm[jjg][ilp].m;
-	  
+
 	  // and the expansion coefficients are
 	  std::complex<double> cmu=clm[iig][il].c;
 	  std::complex<double> cnu=clm[jjg][ilp].c;
-	  
+
 	  // Loop over L
 	  for(int L=std::max(abs(l-lp),abs(m-mp));L<=l+lp;L++) {
 	    // Coupling coefficient
 	    coupl_coeff_t tmp;
-	      
+
 	    // Set l indices
 	    tmp.l=l;
 	    tmp.lp=lp;
-	      
+
 	    // Coupled values
 	    tmp.L=L;
 	    tmp.M=m-mp;
-	    
+
 	    // Compute coefficient
 	    double g=gaunt.coeff(l,m,tmp.L,tmp.M,lp,mp);
 	    tmp.c=4.0*M_PI*pow(std::complex<double>(0.0,1.0),L)*std::conj(cmu)*cnu*g;
-	      
+
 	    // Store coefficient
 	    if(std::norm(tmp.c)>0.0) {
 	      add_coupling(iig,jjg,tmp);
@@ -268,7 +268,7 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 	}
     }
   }
-  
+
   // Clear coefficients with zero weight
   size_t nclean=0;
   for(size_t i=0;i<cc.size();i++) {
@@ -279,7 +279,7 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
       }
   }
   //  printf("%i terms cleaned.\n",(int) nclean);
-  
+
 }
 
 EMDEvaluator::~EMDEvaluator() {
@@ -303,7 +303,7 @@ void EMDEvaluator::add_coupling(size_t ig, size_t jg, coupl_coeff_t t) {
   // Index is
   size_t ijdx=ig*idfuncs.size()+jg;
 
-#ifdef DEBUG  
+#ifdef DEBUG
   if(ijdx>=cc.size()) {
     std::ostringstream oss;
     oss << "Error in add_coupling: requested element " << ijdx << " while size of cc is " << cc.size() <<"!\n";
@@ -349,7 +349,7 @@ std::vector<total_coupl_t> EMDEvaluator::get_coupling(size_t ig, size_t jg, int 
   hit.l=l;
   hit.lp=lp;
   hit.L=l+lp;
-  
+
   // Find upper limit
   std::vector<coupl_coeff_t>::iterator high;
   high=std::upper_bound(cc[ijidx].begin(),cc[ijidx].end(),hit);
@@ -366,7 +366,7 @@ std::vector<total_coupl_t> EMDEvaluator::get_coupling(size_t ig, size_t jg, int 
   std::vector<total_coupl_t> ret;
   for(size_t i=loind;i<=hiind;i++)
   if((cc[ijidx][i].l==l) && (cc[ijidx][i].lp==lp)) {
-      
+
   total_coupl_t hlp;
   hlp.L=cc[ijidx][i].L;
   hlp.c=cc[ijidx][i].c;
@@ -377,7 +377,7 @@ std::vector<total_coupl_t> EMDEvaluator::get_coupling(size_t ig, size_t jg, int 
   std::vector<total_coupl_t> ret;
   for(size_t i=0;i<cc[ijidx].size();i++)
     if((cc[ijidx][i].l==l) && (cc[ijidx][i].lp==lp)) {
-      
+
       total_coupl_t hlp;
       hlp.L=cc[ijidx][i].L;
       hlp.M=cc[ijidx][i].M;
@@ -395,7 +395,7 @@ std::vector<total_coupl_t> EMDEvaluator::get_total_coupling(size_t ig, size_t jg
 
   // Returned array
   std::vector<total_coupl_t> ret;
-  
+
   // Loop over factors
   for(size_t il=0;il<ri.size();il++) {
     // l is
@@ -451,7 +451,7 @@ void EMDEvaluator::print() const {
 void EMDEvaluator::check_norm() const {
   // Get radial grid
   std::vector<radial_grid_t> grid=form_radial_grid(NRAD);
-  
+
   for(size_t i=0;i<rad.size();i++) {
     for(size_t j=0;j<rad[i].size();j++) {
       // Calculate norm
@@ -459,7 +459,7 @@ void EMDEvaluator::check_norm() const {
       for(size_t ip=0;ip<grid.size();ip++)
 	norm+=grid[ip].w*std::norm(rad[i][j]->get(grid[ip].r));
       norm=sqrt(norm);
-      
+
 #ifdef DEBUG
       printf("Function %i %i has norm %e, difference by % e.\n",(int) i+1, (int) j, norm, norm-1.0);
 #else
@@ -500,28 +500,28 @@ double EMDEvaluator::get(double p) const {
   for(size_t iii=0;iii<offd.size();iii++) {
     size_t iig=offd[iii].i;
     size_t jjg=offd[iii].j;
-    
+
     // Get the total coupling coefficient
     std::vector<total_coupl_t> totc=get_total_coupling(iig,jjg,p);
     if(totc.size()==0)
       continue;
-    
+
     // Loop over the individual functions
     for(size_t ii=0;ii<idfuncs[iig].size();ii++)
       for(size_t jj=0;jj<idfuncs[jjg].size();jj++) {
 	// The indices are
 	size_t mu=idfuncs[iig][ii];
 	size_t nu=idfuncs[jjg][jj];
-	
+
 	// and the functions are centered on
 	size_t iat=loc[mu];
 	size_t jat=loc[nu];
-	
+
 	// so the corresponding index in the Bessel and spherical harmonics arrays is
 	size_t ibes;
 	// Sign of spherical harmonics
 	int ylmsign=1;
-	
+
 	//	  ibes=iat*Nat+jat;
 	if(iat>jat)
 	  ibes=iat*(iat+1)/2+jat;
@@ -530,20 +530,20 @@ double EMDEvaluator::get(double p) const {
 	  ibes=jat*(jat+1)/2+iat;
 	  ylmsign=-1;
 	}
-	
+
 	// Loop over coupling coefficient
 	for(size_t ic=0;ic<totc.size();ic++) {
 	  // L and M are
 	  int L=totc[ic].L;
 	  int M=totc[ic].M;
-	  
+
 	  // Increment EMD; we get the increment twice since we are off-diagonal.
 	  std::complex<double> incr=2.0*P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
 	  np+=incr.real();
-	}      
+	}
       }
   }
-  
+
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:np)
 #endif
@@ -552,24 +552,24 @@ double EMDEvaluator::get(double p) const {
     std::vector<total_coupl_t> totc=get_total_coupling(iig,iig,p);
     if(totc.size()==0)
       continue;
-    
+
     // Loop over the individual functions
     for(size_t ii=0;ii<idfuncs[iig].size();ii++)
       for(size_t jj=0;jj<idfuncs[iig].size();jj++) {
-	
+
 	// The indices are
 	size_t mu=idfuncs[iig][ii];
 	size_t nu=idfuncs[iig][jj];
-	
+
 	// and the functions are centered on
 	size_t iat=loc[mu];
 	size_t jat=loc[nu];
-	  
+
 	// so the corresponding index in the Bessel and spherical harmonics arrays is
 	size_t ibes;
 	// Sign of spherical harmonics
 	int ylmsign=1;
-	
+
 	//	  ibes=iat*Nat+jat;
 	if(iat>jat)
 	  ibes=iat*(iat+1)/2+jat;
@@ -578,20 +578,20 @@ double EMDEvaluator::get(double p) const {
 	  ibes=jat*(jat+1)/2+iat;
 	  ylmsign=-1;
 	}
-	
+
 	// Loop over coupling coefficient
 	for(size_t ic=0;ic<totc.size();ic++) {
 	  // L and M are
 	  int L=totc[ic].L;
 	  int M=totc[ic].M;
-	  
+
 	  // Increment EMD
 	  std::complex<double> incr=P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
 	  np+=incr.real();
-	}      
+	}
       }
   }
-  
+
   return np;
 }
 
@@ -880,7 +880,7 @@ void EMD::optimize_moments(bool verbose, double tol) {
   } while(errel>tol);
 
   // Try to work around pathological cases
-  //  complete_fill();  
+  //  complete_fill();
 }
 
 std::vector<emd_t> EMD::get() const {

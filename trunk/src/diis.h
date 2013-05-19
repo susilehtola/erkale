@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -44,7 +44,7 @@
  * default, instead, is C2-DIIS, which is documented in the article
  *
  * H. Sellers, "The C2-DIIS convergence acceleration algorithm",
- * Int. J. Quant. Chem. 45 (1993), pp. 31 - 41 
+ * Int. J. Quant. Chem. 45 (1993), pp. 31 - 41
  *
  * \author Susi Lehtola
  * \date 2011/04/20 15:37
@@ -74,7 +74,7 @@ class DIIS {
 
   /// Add matrix to stack
   void update(const arma::mat & F, const arma::mat & D, double & error);
-  
+
   /// Compute new Fock matrix, use C1-DIIS if wanted
   void solve(arma::mat & F, bool c1_diis=0);
 };

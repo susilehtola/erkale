@@ -74,7 +74,7 @@ class Storage {
   std::vector<double_vec_st_t> doublevec;
   /// String array
   std::vector<string_st_t> strings;
-  
+
  public:
   /// Constructor
   Storage();

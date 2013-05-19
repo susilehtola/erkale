@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -12,9 +12,9 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
- * The 
- * 
+ *
+ * The
+ *
  */
 
 #include <cmath>
@@ -66,7 +66,7 @@ std::vector<double> calcYlm_coeff(int l, int mval) {
   int m=abs(mval);
 
   // Compute prefactor
-  double prefac=sqrt((2*l+1)/(4.0*M_PI))*pow(2.0,-l); 
+  double prefac=sqrt((2*l+1)/(4.0*M_PI))*pow(2.0,-l);
   if(m!=0)
     prefac*=sqrt(fact(l-m)*2.0/fact(l+m));
 
@@ -187,7 +187,7 @@ std::vector<double> calcYlm_coeff(int l, int mval) {
 }
 
 #ifdef YLMDEBUG
- 
+
 void checkYlm() {
   for(int l=0;l<4;l++) {
     for(int m=-l;m<=l;m++) {

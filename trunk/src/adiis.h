@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -93,7 +93,7 @@ namespace adiis {
   arma::vec compute_c(const gsl_vector * x);
   /// Compute jacobian
   arma::mat compute_jac(const gsl_vector * x);
-  
+
 
   /// Compute energy
   double min_f(const gsl_vector * x, void * params);

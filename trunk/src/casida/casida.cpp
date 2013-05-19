@@ -247,7 +247,7 @@ void Casida::form_pairs(const Settings & set, const std::vector< std::vector<dou
 	  f[ispin](i)=pol ? 1.0 : 2.0;
 	else
 	  break;
-      
+
       // Loop over indices
       for(size_t iocc=0;iocc<idx.size();iocc++) {
 	// Check that it truly is occupied.
@@ -341,20 +341,20 @@ arma::mat Casida::transition(const std::vector<arma::mat> & m) const {
 	tr(it)+=m[jspin](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
       }
     }
-    
+
     // Normalize to get \f$ \left\langle \Psi_0 \left| \hat{x}
     // \right| \right\rangle \f$ , see Eq. 4.40 of Casida (1994),
     // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
     tr(it)/=sqrt(w_i(it));
   }
-  
+
   // Transition energies and oscillator strengths
   arma::mat osc(w_i.n_elem,2);
   for(size_t it=0; it<w_i.n_elem;it++) {
     osc(it,0) = w_i(it);
     osc(it,1) = tr(it)*tr(it);
   }
-  
+
   return osc;
 }
 
@@ -375,20 +375,20 @@ arma::mat Casida::transition(const std::vector<arma::cx_mat> & m) const {
 	tr(it)+=m[jspin](pairs[jspin][jp].i,pairs[jspin][jp].f)*F_i(joff+jp,it)*fe(pairs[jspin][jp],jspin);
       }
     }
-    
+
     // Normalize to get \f$ \left\langle \Psi_0 \left| \hat{x}
     // \right| \right\rangle \f$ , see Eq. 4.40 of Casida (1994),
     // or compare Eqs. 2.14 and 2.16 in Jamorski et al (1996).
     tr(it)/=sqrt(w_i(it));
   }
-  
+
   // Transition energies and oscillator strengths
   arma::mat osc(w_i.n_elem,2);
   for(size_t it=0; it<w_i.n_elem;it++) {
     osc(it,0) = w_i(it);
     osc(it,1) = std::norm(tr(it));
   }
-  
+
   return osc;
 }
 
@@ -403,7 +403,7 @@ arma::mat Casida::dipole_transition(const BasisSet & bas) const {
       dip[ic].resize(C.size());
       dip[ic][ispin]=matrix_transform(ispin,dm[ic]);
     }
-  
+
   // Compute the oscillator strengths.
   arma::mat osc(w_i.n_elem,2);
   osc.zeros();
@@ -416,7 +416,7 @@ arma::mat Casida::dipole_transition(const BasisSet & bas) const {
     // and increment the transition speeds
     osc.col(1)+=2.0/3.0*hlp.col(1);
   }
-  
+
   return osc;
 }
 
@@ -464,7 +464,7 @@ arma::mat Casida::transition(const BasisSet & basis, double qr) const {
   // Transition energies and oscillator strengths
   arma::mat osc(w_i.n_elem,2);
   osc.zeros();
-  
+
   // Loop over the angular mesh
   for(size_t ig=0;ig<grid.size();ig++) {
     // Current value of q is
@@ -540,10 +540,10 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       // Shells in question are
       size_t is=auxpairs[ip].is;
       size_t js=auxpairs[ip].js;
-      
+
       // Compute (a|b)
       eri.compute(&auxshells[is],&dummy,&auxshells[js],&dummy,eris);
-      
+
       // Store integrals
       for(size_t ii=0;ii<auxshells[is].get_Nbf();ii++)
 	for(size_t jj=0;jj<auxshells[js].get_Nbf();jj++) {
@@ -552,10 +552,10 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 	}
     }
   }
-  
+
   // Form ab_inv
   ab_inv=arma::inv(ab+DELTA);
-  
+
   // Allocate memory for the three-center integrals.
   munu.resize(C.size());
   for(size_t ispin=0;ispin<C.size();ispin++) {
@@ -579,24 +579,24 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       // The shells in question are
       size_t is=orbpairs[ip].is;
       size_t js=orbpairs[ip].js;
-      
+
       // Compute ERIs
       eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js],eris);
-      
+
       // Find out maximum value
       double max=0.0;
       for(size_t i=0;i<eris.size();i++)
 	if(fabs(eris[i])>max)
 	  max=eris[i];
       max=sqrt(max);
-      
+
       // Store value
       screen(is,js)=max;
       screen(js,is)=max;
     }
   }
 #endif
-  
+
   // Compute the three-center integrals.
 #ifdef _OPENMP
 #pragma omp parallel
@@ -604,12 +604,12 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   {
     ERIWorker eri(std::max(basis.get_max_am(),dfitbas.get_max_am()),std::max(basis.get_max_Ncontr(),dfitbas.get_max_Ncontr()));
     std::vector<double> eris;
-    
-    
+
+
 #ifdef _OPENMP
     // Worker stack for each thread
     std::vector<arma::mat> munu_wrk=munu;
-    
+
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<orbpairs.size();ip++) {
@@ -622,12 +622,12 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       if(screen(imu,inu)<SCREENTHR)
 	continue;
 #endif
-      
+
       // Amount of functions on shell
       size_t Nmu=orbshells[imu].get_Nbf();
       // Index of first function on shell
       size_t mu0=orbshells[imu].get_first_ind();
-      
+
       // Amount of functions on shell
       size_t Nnu=orbshells[inu].get_Nbf();
       // Index of first function on shell
@@ -638,15 +638,15 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 	size_t Na=auxshells[ia].get_Nbf();
 	// Index of first function on shell
 	size_t a0=auxshells[ia].get_first_ind();
-	
+
 	// Compute the integral over the AOs
 	eri.compute(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu],eris);
-	
+
 	// Transform integrals to spin orbitals.
 	for(size_t ispin=0;ispin<C.size();ispin++) {
 	  // Amount of active orbitals with current spin.
 	  size_t Norb=C[ispin].n_cols;
-	  
+
 	  size_t indmu, indnu, inda;
 	  // Loop over orbitals
 	  for(size_t mu=0;mu<Norb;mu++)
@@ -656,14 +656,14 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 		indmu=mu0+muf;
 		for(size_t nuf=0;nuf<Nnu;nuf++) {
 		  indnu=nu0+nuf;
-		  
+
 		  // Coefficient of integral is
 		  double c= (imu!=inu) ? C[ispin](indmu,mu)*C[ispin](indnu,nu) + C[ispin](indmu,nu)*C[ispin](indnu,mu) : C[ispin](indmu,mu)*C[ispin](indnu,nu);
-		  
+
 		  // Loop over auxiliary functions
 		  for(size_t af=0;af<Na;af++) {
 		    inda=a0+af;
-		    
+
 #ifdef _OPENMP
 		    munu_wrk[ispin](mu*Norb+nu,inda)+=c*eris[(af*Nmu+muf)*Nnu+nuf];
 #else
@@ -673,11 +673,11 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
 		}
 	      }
 	    }
-	  
+
 	} // end loop over spins
       }
     }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     // Sum the results together
@@ -685,7 +685,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       munu[ispin]+=munu_wrk[ispin];
 #endif
   } // end parallel region
-  
+
   // Symmetrize munu
   for(size_t ispin=0;ispin<C.size();ispin++) {
     size_t Norb=C[ispin].n_cols;

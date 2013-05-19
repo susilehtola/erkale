@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -104,7 +104,7 @@ void XCAtomGrid::add_lobatto_shell(atomgrid_t & g, size_t ir) {
     // Total weight of points on this ring is
     // (disregarding weight from Becke partitioning)
     point.w=2.0*M_PI*wl[ith]/nphi*wrad;
-    
+
     for(int iphi=0;iphi<nphi;iphi++) {
       // Value of phi is
       phi=iphi*dphi+phioff;
@@ -116,7 +116,7 @@ void XCAtomGrid::add_lobatto_shell(atomgrid_t & g, size_t ir) {
       point.r.x=rad*sth*cph;
       point.r.y=rad*sth*sph;
       point.r.z=rad*cth;
-      
+
       // Displace to center
       point.r=point.r+g.cen;
 
@@ -166,7 +166,7 @@ void XCAtomGrid::add_lebedev_shell(atomgrid_t & g, size_t ir) {
     // Add point
     grid.push_back(point);
   }
-  
+
   // Store number of points on this shell
   g.sh[ir].np=np;
 }
@@ -197,11 +197,11 @@ void XCAtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_
   for(size_t ip=g.sh[ir].ind0;ip<g.sh[ir].ind0+g.sh[ir].np;ip++) {
     // Coordinates of the point are
     coords_t coord_p=grid[ip].r;
-    
+
     // Compute distance of point to atoms
     for(size_t iat=0;iat<Nat;iat++)
       atom_dist[iat]=norm(bas.get_coords(iat)-coord_p);
-    
+
     // Compute mu_ab
     for(size_t iat=0;iat<Nat;iat++) {
       // Diagonal
@@ -217,7 +217,7 @@ void XCAtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_
     for(size_t iat=0;iat<Nat;iat++)
       for(size_t jat=0;jat<Nat;jat++) {
 	smu_ab[iat][jat]=f_s(mu_ab[iat][jat],0.7);
-      }    
+      }
 
     // Then, compute atomic weights
     for(size_t iat=0;iat<Nat;iat++) {
@@ -272,7 +272,7 @@ void XCAtomGrid::free() {
 }
 
 void XCAtomGrid::update_density(const arma::vec & gamma) {
-  // Update values of densitty 
+  // Update values of densitty
 
   if(!gamma.n_elem) {
     ERROR_INFO();
@@ -314,7 +314,7 @@ void XCAtomGrid::update_density(const arma::vec & gamma) {
 }
 
 void XCAtomGrid::update_density(const arma::vec & gammaa, const arma::vec & gammab) {
-  // Update values of densitty 
+  // Update values of densitty
 
   if(!gammaa.n_elem || !gammab.n_elem) {
     ERROR_INFO();
@@ -353,7 +353,7 @@ void XCAtomGrid::update_density(const arma::vec & gammaa, const arma::vec & gamm
 	grho[6*ip+ic]=grada[ic];
 	grho[6*ip+3+ic]=gradb[ic];
       }
-      
+
       // Compute values of sigma
       sigma[3*ip]  =grada[0]*grada[0] + grada[1]*grada[1] + grada[2]*grada[2];
       sigma[3*ip+1]=grada[0]*gradb[0] + grada[1]*gradb[1] + grada[2]*gradb[2];
@@ -365,7 +365,7 @@ void XCAtomGrid::update_density(const arma::vec & gammaa, const arma::vec & gamm
 double XCAtomGrid::eval_dens(const arma::vec & gamma, size_t ip) const {
   // Density
   double d=0.0;
-  
+
   // Loop over functions on point
   size_t first=grid[ip].f0;
   size_t last=first+grid[ip].nf;
@@ -381,7 +381,7 @@ double XCAtomGrid::eval_dens(const arma::vec & gamma, size_t ip) const {
   // Normalize negative densities (may cause problems in libxc)
   if(d<0.0)
     d=0.0;
-  
+
   return d;
 }
 
@@ -399,7 +399,7 @@ void XCAtomGrid::eval_grad(const arma::vec & gamma, size_t ip, double *g) const 
   for(size_t ii=first;ii<last;ii++) {
     // Index of function is
     i=flist[ii].ind;
-    
+
     for(int ic=0;ic<3;ic++)
       g[ic]+=gamma(i)*glist[3*ii+ic];
   }
@@ -467,31 +467,31 @@ void XCAtomGrid::compute_xc(int func_id) {
     nspin=XC_UNPOLARIZED;
   else
     nspin=XC_POLARIZED;
-  
+
   // Correlation and exchange functionals
   xc_func_type func;
   if(xc_func_init(&func, func_id, nspin) != 0) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Functional "<<func_id<<" not found!"; 
+    oss << "Functional "<<func_id<<" not found!";
     throw std::runtime_error(oss.str());
   }
 
   // Which functional is in question?
   bool gga=false;
-  
+
   // Determine the family
   switch(func.info->family)
     {
     case XC_FAMILY_LDA:
       gga=false;
       break;
-      
+
     case XC_FAMILY_GGA:
     case XC_FAMILY_HYB_GGA:
       gga=true;
       break;
-      
+
     default:
       {
 	ERROR_INFO();
@@ -500,7 +500,7 @@ void XCAtomGrid::compute_xc(int func_id) {
 	throw std::runtime_error(oss.str());
       }
     }
-  
+
   // Update controlling flags for eval_Fxc (exchange and correlation
   // parts might be of different type)
   do_gga=do_gga || gga;
@@ -550,7 +550,7 @@ void XCAtomGrid::compute_xc(int func_id) {
     fprintf(stderr,"%u errors with funcid=%i.\n",(unsigned int) nerr, func_id);
     throw std::runtime_error("NaN error\n");
   }
-  */    
+  */
 
   // Free functional
   xc_func_end(&func);
@@ -565,7 +565,7 @@ double XCAtomGrid::eval_Exc() const {
   else
     for(size_t i=0;i<grid.size();i++)
       Exc+=exc[i]*(rho[2*i]+rho[2*i+1])*grid[i].w;
-  
+
   return Exc;
 }
 
@@ -592,7 +592,7 @@ void XCAtomGrid::eval_Fxc(arma::vec & H) const {
       H(i)+=xcfac*flist[ii].f;
     }
   }
-  
+
   // GGA part
   if(do_gga) {
     double xcvec[3];
@@ -601,11 +601,11 @@ void XCAtomGrid::eval_Fxc(arma::vec & H) const {
       // Factor in common for basis functions
       for(int ic=0;ic<3;ic++)
 	xcvec[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
-      
+
       // Loop over functions on grid point
       size_t first=grid[ip].f0;
       size_t last=first+grid[ip].nf;
-      
+
       for(size_t ii=first;ii<last;ii++) {
 	// Get index of function
 	size_t i=flist[ii].ind;
@@ -645,7 +645,7 @@ void XCAtomGrid::eval_Fxc(arma::vec & Ha, arma::vec & Hb) const {
   // GGA part
   if(do_gga) {
     double xcveca[3], xcvecb[3];
-    
+
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factor in common for basis functions
       for(int ic=0;ic<3;ic++) {
@@ -656,12 +656,12 @@ void XCAtomGrid::eval_Fxc(arma::vec & Ha, arma::vec & Hb) const {
       // Loop over functions on grid point
       size_t first=grid[ip].f0;
       size_t last=first+grid[ip].nf;
-      
+
       for(size_t ii=first;ii<last;ii++) {
 	// Get index of function
 	size_t i=flist[ii].ind;
 
-	for(int ic=0;ic<3;ic++) {	  
+	for(int ic=0;ic<3;ic++) {
 	  Ha(i)+=xcveca[ic]*glist[3*ii+ic];
 	  Hb(i)+=xcvecb[ic]*glist[3*ii+ic];
 	}
@@ -676,7 +676,7 @@ XCAtomGrid::XCAtomGrid(bool lobatto, double toler) {
   // These should really be set separately using the routines below.
   tol=toler;
   do_grad=false;
-}  
+}
 
 void XCAtomGrid::set_tolerance(double toler) {
   tol=toler;
@@ -693,7 +693,7 @@ void XCAtomGrid::check_grad(int x_func, int c_func) {
 
 atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit) {
   // Construct a grid centered on (x0,y0,z0)
-  // with nrad radial shells                         
+  // with nrad radial shells
   // See Köster et al for specifics.
 
   // Returned info
@@ -734,7 +734,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, 
     ret.sh[ir].w=weight;
     ret.sh[ir].l=3;
   }
-  
+
   // Number of basis functions
   size_t Naux=dfit.get_Naux();
   size_t Norb=dfit.get_Norb();
@@ -788,7 +788,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, 
       Fvec.zeros();
       eval_Fxc(Fvec);
       Hnew=dfit.invert_expansion_diag(Fvec);
-      
+
       // Compute maximum difference of diagonal elements of Fock matrix
       maxdiff=0.0;
       for(size_t i=0;i<Norb;i++)
@@ -814,10 +814,10 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, 
     ret.ngrid+=grid.size();
     ret.nfunc+=flist.size();
   }
-  
+
   // Free memory once more
   free();
-  
+
   if(verbose) {
     printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
@@ -828,7 +828,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, 
 
 atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa, const arma::vec & gammab, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit) {
   // Construct a grid centered on (x0,y0,z0)
-  // with nrad radial shells                         
+  // with nrad radial shells
   // See Köster et al for specifics.
 
   Timer t;
@@ -869,7 +869,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
     ret.sh[ir].w=weight;
     ret.sh[ir].l=3;
   }
-  
+
   // Number of basis functions
   size_t Naux=dfit.get_Naux();
   size_t Norb=dfit.get_Norb();
@@ -927,7 +927,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
       eval_Fxc(Favec,Fbvec);
       Hanew=dfit.invert_expansion_diag(Favec);
       Hbnew=dfit.invert_expansion_diag(Fbvec);
-      
+
       // Compute maximum difference of diagonal elements of Fock matrix
       maxdiff=0.0;
       for(size_t i=0;i<Norb;i++) {
@@ -935,7 +935,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
 	if(tmp>maxdiff)
 	  maxdiff=tmp;
       }
-      
+
       // Copy values
       Haold=Hanew;
       Hbold=Hbnew;
@@ -959,7 +959,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
 
   // Free memory once more
   free();
-  
+
   if(verbose) {
     printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
@@ -970,7 +970,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
 
 atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const std::vector<arma::vec> & gammaa, const std::vector<arma::vec> & gammab, size_t cenind, int x_func, int c_func, bool verbose, const DensityFit & dfit) {
   // Construct a grid centered on (x0,y0,z0)
-  // with nrad radial shells                         
+  // with nrad radial shells
   // See Köster et al for specifics.
 
   Timer t;
@@ -1011,7 +1011,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const std::vector<arma::v
     ret.sh[ir].w=weight;
     ret.sh[ir].l=3;
   }
-  
+
   // Number of basis functions
   size_t Naux=dfit.get_Naux();
   size_t Norb=dfit.get_Norb();
@@ -1060,7 +1060,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const std::vector<arma::v
       for(size_t ig=0;ig<gammaa.size();ig++) {
 	// Compute density
 	update_density(gammaa[ig],gammab[ig]);
-	
+
 	// Compute exchange and correlation.
 	init_xc();
 	// Compute the functionals
@@ -1076,7 +1076,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const std::vector<arma::v
 	eval_Fxc(Favec,Fbvec);
 	Hanew[ig]=dfit.invert_expansion_diag(Favec);
 	Hbnew[ig]=dfit.invert_expansion_diag(Fbvec);
-	
+
 	// Compute maximum difference of diagonal elements of Fock matrix
 	for(size_t i=0;i<Norb;i++) {
 	  double tmp=std::max(fabs(Hanew[ig][i]-Haold[ig][i]),fabs(Hbnew[ig][i]-Hbold[ig][i]));
@@ -1084,11 +1084,11 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const std::vector<arma::v
 	    maxdiff=tmp;
 	}
       }
-      
+
       // Switch arrays
       std::swap(Haold,Hanew);
       std::swap(Hbold,Hbnew);
-      
+
       // Increment order if tolerance not achieved.
       if(maxdiff>tol/xc.size()) {
 	if(use_lobatto)
@@ -1105,10 +1105,10 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const std::vector<arma::v
     ret.ngrid+=grid.size();
     ret.nfunc+=flist.size();
   }
-  
+
   // Free memory once more
   free();
-  
+
   if(verbose) {
     printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
@@ -1131,7 +1131,7 @@ void XCAtomGrid::form_grid(const BasisSet & bas, atomgrid_t & g) {
   for(size_t ir=0;ir<g.sh.size();ir++) {
     // Add grid points
     if(use_lobatto)
-      add_lobatto_shell(g,ir);			
+      add_lobatto_shell(g,ir);
     else
       add_lebedev_shell(g,ir);
     // Do Becke weights
@@ -1152,7 +1152,7 @@ void XCAtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g) {
     compute_bf(bas,g,ir);
   }
 }
-  
+
 
 void XCAtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t irad) {
   // Compute values of relevant basis functions on irad:th shell
@@ -1180,7 +1180,7 @@ void XCAtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t i
 
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++) {
-      
+
       // Shell is relevant if range is larger than minimal distance
       if(dist<=shran[shellinds[ish]]) {
 	// Add shell to list of shells to compute
@@ -1196,50 +1196,7 @@ void XCAtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t i
       grid[ip].f0=flist.size();
       // Number of functions on point
       grid[ip].nf=0;
-      
-      // Loop over shells
-      for(size_t ish=0;ish<compute_shells.size();ish++) {
-	// Center of shell is
-	coords_t shell_center=bas.get_center(compute_shells[ish]);
-	// Compute distance of point to center of shell
-	double shell_dist=norm(shell_center-grid[ip].r);
-	// Add shell to point if it is within the range of the shell
-	if(shell_dist<shran[compute_shells[ish]]) {
-	  // Index of first function on shell is
-	  size_t ind0=bas.get_first_ind(compute_shells[ish]);
-	  
-	  // Compute values of basis functions
-	  arma::vec fval=bas.eval_func(compute_shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	  // and their gradients
-	  arma::mat gval=bas.eval_grad(compute_shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	  
-	  // and add them to the list
-	  bf_f_t hlp;
-	  for(size_t ifunc=0;ifunc<fval.n_elem;ifunc++) {
-	    // Index of function is
-	    hlp.ind=ind0+ifunc;
-	    // Value is
-	    hlp.f=fval(ifunc);
-	    // Add to stack
-	    flist.push_back(hlp);
-	    // and gradient, too
-	    for(int ic=0;ic<3;ic++)
-	      glist.push_back(gval(ifunc,ic));
-	    
-	    // Increment number of functions in point
-	    grid[ip].nf++;
-	  }
-	}
-      }
-    }
-  } else {
-    // Loop over points
-    for(size_t ip=g.sh[irad].ind0;ip<g.sh[irad].ind0+g.sh[irad].np;ip++) {
-      // Store index of first function on grid point
-      grid[ip].f0=flist.size();
-      // Number of functions on point
-      grid[ip].nf=0;
-      
+
       // Loop over shells
       for(size_t ish=0;ish<compute_shells.size();ish++) {
 	// Center of shell is
@@ -1253,7 +1210,50 @@ void XCAtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t i
 
 	  // Compute values of basis functions
 	  arma::vec fval=bas.eval_func(compute_shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	  
+	  // and their gradients
+	  arma::mat gval=bas.eval_grad(compute_shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+
+	  // and add them to the list
+	  bf_f_t hlp;
+	  for(size_t ifunc=0;ifunc<fval.n_elem;ifunc++) {
+	    // Index of function is
+	    hlp.ind=ind0+ifunc;
+	    // Value is
+	    hlp.f=fval(ifunc);
+	    // Add to stack
+	    flist.push_back(hlp);
+	    // and gradient, too
+	    for(int ic=0;ic<3;ic++)
+	      glist.push_back(gval(ifunc,ic));
+
+	    // Increment number of functions in point
+	    grid[ip].nf++;
+	  }
+	}
+      }
+    }
+  } else {
+    // Loop over points
+    for(size_t ip=g.sh[irad].ind0;ip<g.sh[irad].ind0+g.sh[irad].np;ip++) {
+      // Store index of first function on grid point
+      grid[ip].f0=flist.size();
+      // Number of functions on point
+      grid[ip].nf=0;
+
+      // Loop over shells
+      for(size_t ish=0;ish<compute_shells.size();ish++) {
+	// Center of shell is
+	coords_t shell_center=bas.get_center(compute_shells[ish]);
+	// Compute distance of point to center of shell
+	double shell_dist=norm(shell_center-grid[ip].r);
+	// Add shell to point if it is within the range of the shell
+	if(shell_dist<shran[compute_shells[ish]]) {
+	  // Index of first function on shell is
+	  size_t ind0=bas.get_first_ind(compute_shells[ish]);
+
+	  // Compute values of basis functions
+	  arma::vec fval=bas.eval_func(compute_shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+
 	  // and add them to the list
 	  bf_f_t hlp;
 	  for(size_t ifunc=0;ifunc<fval.n_elem;ifunc++) {
@@ -1305,7 +1305,7 @@ arma::vec XCGrid::expand(const arma::mat & P) const {
   /*
   // Compute norm
   arma::vec fitint=fitbasp->integral();
-  
+
   double fitnorm=arma::dot(gamma,fitint);
   fprintf(stderr,"Fitted norm is %e.\n",fitnorm);
   */
@@ -1316,7 +1316,7 @@ arma::vec XCGrid::expand(const arma::mat & P) const {
 std::vector<arma::vec> XCGrid::expand(const std::vector<arma::mat> & P) const {
   // Do the fitting
   std::vector<arma::vec> gamma=dfitp->compute_expansion(P);
-  
+
   return gamma;
 }
 
@@ -1363,7 +1363,7 @@ void XCGrid::construct(const arma::mat & P, double tol, int x_func, int c_func) 
   for(size_t i=0;i<Nat;i++)
     grids[i]=wrk[0].construct(*fitbasp,gamma,i,x_func,c_func,verbose,*dfitp);
 #endif
-  
+
   if(verbose) {
     printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
     fflush(stdout);
@@ -1403,7 +1403,7 @@ void XCGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, i
 #else
   for(size_t i=0;i<Nat;i++)
     grids[i]=wrk[0].construct(*fitbasp,gammaa,gammab,i,x_func,c_func,verbose,*dfitp);
-#endif  
+#endif
 
   if(verbose) {
     printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
@@ -1444,7 +1444,7 @@ void XCGrid::construct(const std::vector<arma::mat> & Pa, const std::vector<arma
 #else
   for(size_t i=0;i<Nat;i++)
     grids[i]=wrk[0].construct(*fitbasp,gammaa,gammab,i,x_func,c_func,verbose,*dfitp);
-#endif  
+#endif
 
   if(verbose) {
     printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
@@ -1514,7 +1514,7 @@ void XCGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H
 
 #pragma omp parallel shared(Hwrk,Nelwrk,Excwrk)
   { // Begin parallel region
-    
+
     // Current thread is
     int ith=omp_get_thread_num();
 
@@ -1525,12 +1525,12 @@ void XCGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H
       wrk[ith].form_grid(*fitbasp,grids[i]);
       // Compute basis functions
       wrk[ith].compute_bf(*fitbasp,grids[i]);
-      
+
       // Update density
       wrk[ith].update_density(gamma);
       // Update number of electrons
       Nelwrk[ith]+=wrk[ith].compute_Nel();
-      
+
       // Initialize the arrays
       wrk[ith].init_xc();
       // Compute the functionals
@@ -1565,7 +1565,7 @@ void XCGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H
     wrk[0].update_density(gamma);
     // Update number of electrons
     Nel+=wrk[0].compute_Nel();
-    
+
     // Initialize the arrays
     wrk[0].init_xc();
     // Compute the functionals
@@ -1626,10 +1626,10 @@ void XCGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::
 
 #pragma omp parallel shared(Hawrk,Hbwrk,Nelwrk,Excwrk)
   { // Begin parallel region
-    
+
     // Current thread is
     int ith=omp_get_thread_num();
-    
+
 #pragma omp for schedule(dynamic,1)
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
@@ -1638,7 +1638,7 @@ void XCGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::
       wrk[ith].form_grid(*fitbasp,grids[i]);
       // Compute basis functions
       wrk[ith].compute_bf(*fitbasp,grids[i]);
-      
+
       // Update density
       wrk[ith].update_density(gammaa,gammab);
       // Update number of electrons
@@ -1656,12 +1656,12 @@ void XCGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::
       Exc+=wrk[ith].eval_Exc();
       // and construct the Fock matrices
       wrk[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
-           
+
       // Free memory
       wrk[ith].free();
     }
   } // End parallel region
-  
+
   // Sum results
   for(int i=0;i<maxt;i++) {
     Hav+=Hawrk[i];
@@ -1676,7 +1676,7 @@ void XCGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::
     wrk[0].form_grid(*fitbasp,grids[i]);
     // Compute basis functions
     wrk[0].compute_bf(*fitbasp,grids[i]);
-    
+
     // Update density
     wrk[0].update_density(gammaa,gammab);
     // Update number of electrons
@@ -1694,7 +1694,7 @@ void XCGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::
     Exc+=wrk[0].eval_Exc();
     // and construct the Fock matrices
     wrk[0].eval_Fxc(Hav,Hbv);
- 
+
     // Free memory
     wrk[0].free();
   }

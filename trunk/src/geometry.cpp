@@ -365,19 +365,19 @@ int main(int argc, char **argv) {
 
   const gsl_multimin_fdfminimizer_type *T;
   gsl_multimin_fdfminimizer *s;
-    
+
   gsl_multimin_function_fdf minimizer;
-    
+
   minimizer.n = x->size;
   minimizer.f = calc_E;
   minimizer.df = calc_f;
   minimizer.fdf = calc_Ef;
   minimizer.params = (void *) &pars;
-    
+
   if(alg==CGFR) {
     T = gsl_multimin_fdfminimizer_conjugate_fr;
     if(verbose) printf("Using Fletcher-Reeves conjugate gradients.\n");
-  } else if(alg==CGPR) {      
+  } else if(alg==CGPR) {
     T = gsl_multimin_fdfminimizer_conjugate_pr;
     if(verbose) printf("Using Polak-Ribière conjugate gradients.\n");
   } else if(alg==BFGS) {
@@ -393,7 +393,7 @@ int main(int argc, char **argv) {
     ERROR_INFO();
     throw std::runtime_error("Unsupported minimizer\n");
   }
-    
+
   // Run an initial calculation
   double oldE;
   arma::mat oldf;
@@ -403,97 +403,97 @@ int main(int argc, char **argv) {
     oldf=interpret_force(g);
     gsl_vector_free(g);
   }
-    
+
   // Turn off verbose setting
   pars.set.set_bool("Verbose",false);
   // and load from old checkpoint
   pars.set.set_string("LoadChk",pars.set.get_string("SaveChk"));
-    
+
   s = gsl_multimin_fdfminimizer_alloc (T, minimizer.n);
-    
+
   gsl_multimin_fdfminimizer_set (s, &minimizer, x, 0.01, 1e-4);
-    
+
   fprintf(stderr,"Geometry optimizer initialized in %s.\n",tprog.elapsed().c_str());
   fprintf(stderr,"Entering minimization loop with %s optimizer.\n",set.get_string("Optimizer").c_str());
-    
+
   fprintf(stderr,"%4s %16s %10s %10s %9s %9s %9s %9s %s\n","iter","E","dE","dE/dEproj","disp max","disp rms","f max","f rms", "titer");
-    
+
   std::vector<atom_t> oldgeom(atoms);
-    
+
   for(int iter=1;iter<=maxiter;iter++) {
     printf("\nGeometry iteration %i\n",(int) iter);
     fflush(stdout);
-      
+
     Timer titer;
-      
+
     status = gsl_multimin_fdfminimizer_iterate (s);
-      
+
     if (status) {
       fprintf(stderr,"GSL encountered error: \"%s\".\n",gsl_strerror(status));
       break;
     }
-      
+
     // New geometry is
     std::vector<atom_t> geom=get_atoms(s->x,pars);
-      
+
     // Calculate displacements
     double dmax, drms;
     get_displacement(geom, oldgeom, dmax, drms);
-      
+
     // Calculate projected change of energy
     double dEproj=calculate_projection(geom,oldgeom,oldf,pars.dofidx);
     // Actual change of energy is
     double dE=s->f - oldE;
-      
+
     // Switch geometries
     oldgeom=geom;
     // Save old force
-      
+
     // Get forces
     double fmax, frms;
     get_forces(s->gradient, fmax, frms);
-      
+
     // Save geometry step
     char comment[80];
     sprintf(comment,"Step %i",(int) iter);
     save_xyz(get_atoms(s->x,pars),comment,optmovie,true);
-      
+
     fprintf(stderr,"%4d % 16.8f % .3e % .3e %.3e %.3e %.3e %.3e %s\n", (int) iter, s->f, dE, dE/dEproj, dmax, drms, fmax, frms, titer.elapsed().c_str());
     fflush(stderr);
-      
+
     // Check convergence
     bool convd=false;
-      
+
     switch(crit) {
-      
+
     case(LOOSE):
       if((fmax < 2.5e-3) && (frms < 1.7e-3) && (dmax < 1.0e-2) && (drms < 6.7e-3))
 	convd=true;
-	
+
     case(NORMAL):
       if((fmax < 4.5e-4) && (frms < 3.0e-4) && (dmax < 1.8e-3) && (drms < 1.2e-3))
 	convd=true;
-	
+
     case(TIGHT):
       if((fmax < 1.5e-5) && (frms < 1.0e-5) && (dmax < 6.0e-5) && (drms < 4.0e-5))
 	convd=true;
-	
+
     case(VERYTIGHT):
       if((fmax < 2.0e-6) && (frms < 1.0e-6) && (dmax < 6.0e-6) && (drms < 4.0e-6))
 	convd=true;
     }
-      
+
     if(convd) {
       fprintf(stderr,"Converged.\n");
       break;
     }
-      
+
     // Store old energy
     oldE=s->f;
     // Store old force
     oldf=interpret_force(s->gradient);
   }
-    
+
   gsl_multimin_fdfminimizer_free (s);
 
   gsl_vector_free (x);

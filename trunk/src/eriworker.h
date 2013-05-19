@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -54,10 +54,10 @@ class IntegralWorker {
   std::vector<double> input;
   /// Output array
   std::vector<double> output;
-  
+
   /// Reorder integrals
   void reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
-  
+
   /// Do spherical transforms if necessary
   void spherical_transform(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Do spherical transform with respect to first index

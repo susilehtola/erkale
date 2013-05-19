@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -43,16 +43,16 @@ void Settings::add_scf_settings() {
 
   // Input system
   add_string("System", "System as an xyz file", "atoms.xyz");
-  
+
   // Log file
   add_string("Logfile", "File to print out full information, stdout for screen", "erkale.log");
-  
+
   // Use spherical harmonics.
   add_bool("UseLM", "Use a spherical harmonics basis set by default?", true);
-  
+
   // Decontract basis set?
   add_string("Decontract","Indices of atoms to decontract basis set for","");
-  
+
   // Use DIIS.
   add_bool("UseDIIS", "Use Pulay's Direct Inversion in the Iterative Subspace?", true);
   // Use old version of DIIS?
@@ -79,7 +79,7 @@ void Settings::add_scf_settings() {
   add_int("Multiplicity", "Spin multiplicity", 1);
   // Occupancies
   add_string("Occupancies", "Orbital occupancies", "");
-  
+
   // Use core guess? Default is atomic.
   add_string("Guess","Used guess: atomic (default), molecular, or core","Atomic");
 
@@ -120,7 +120,7 @@ void Settings::add_dft_settings() {
   add_bool("DFTDirect", "Save memory by not storing values of basis functions in memory", false);
   // Store full DFT grid in memory?
   add_bool("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false);
-  
+
   // Initial and final tolerances of DFT grid
   add_double("DFTInitialTol", "Tolerance of initial DFT grid", 1e-4);
   add_double("DFTFinalTol", "Tolerance of final DFT grid", 1e-5);
@@ -187,7 +187,7 @@ void Settings::set_double(std::string name, double val) {
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n"; 
+  oss << "\nThe setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 }
 
@@ -201,7 +201,7 @@ void Settings::set_bool(std::string name, bool val) {
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n"; 
+  oss << "\nThe setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 }
 
@@ -215,7 +215,7 @@ void Settings::set_int(std::string name, int val) {
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n"; 
+  oss << "\nThe setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 }
 
@@ -230,7 +230,7 @@ void Settings::set_string(std::string name, std::string val) {
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n"; 
+  oss << "\nThe setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 }
 
@@ -245,7 +245,7 @@ double Settings::get_double(std::string name) const {
 
   //  ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n"; 
+  oss << "\nThe setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return 0.0;
@@ -260,7 +260,7 @@ bool Settings::get_bool(std::string name) const {
 
   //  ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n"; 
+  oss << "\nThe setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return 0;
@@ -275,7 +275,7 @@ int Settings::get_int(std::string name) const {
 
   //  ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n"; 
+  oss << "\nThe setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return 0;
@@ -290,7 +290,7 @@ std::string Settings::get_string(std::string name) const {
 
   //  ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n"; 
+  oss << "\nThe setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return "";
@@ -332,10 +332,10 @@ size_t Settings::is_string(std::string name) const {
 void Settings::parse(std::string filename) {
   // Input file
   std::ifstream in(filename.c_str());
-  
+
   if(in.good()) {
     // OK, file was succesfully opened.
-    
+
     while(in.good()) {
       // Read line and split it into words
       std::string line=readline(in);
@@ -347,10 +347,10 @@ void Settings::parse(std::string filename) {
 	if(words.size()==1) {
 	  ERROR_INFO();
 	  std::ostringstream oss;
-	  oss << "\nParse error: "<<words[0]<<" has no value!\n"; 
+	  oss << "\nParse error: "<<words[0]<<" has no value!\n";
 	  throw std::runtime_error(oss.str());
 	}
-	
+
 	if(stricmp(words[0],"Method")==0) {
 	  // Hartree-Fock or DFT?
 	  if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0) {
@@ -366,7 +366,7 @@ void Settings::parse(std::string filename) {
 	      add_dft_settings();
 	    } catch(std::runtime_error) {
 	      // Settings already added, as e.g. in xrs executable.
-	    }	    
+	    }
 	    set_string("Method",words[1]);
 
 	    // Hybrid functional? Do we turn off density fitting?
@@ -416,7 +416,7 @@ void Settings::parse(std::string filename) {
 	  } else {
 	    ERROR_INFO();
 	    std::ostringstream oss;
-	    oss << "\nCannot recognize keyword "<<words[0]<<"!\n"; 
+	    oss << "\nCannot recognize keyword "<<words[0]<<"!\n";
 	    throw std::runtime_error(oss.str());
 	  }
 	}
@@ -451,7 +451,7 @@ void Settings::print() const {
 
     if(is>0)
       // Is string!
-      printf("%5s%-15s\t%20s\t%s\n","",sset[is-1].name.c_str(),sset[is-1].val.c_str(),sset[is-1].comment.c_str());      
+      printf("%5s%-15s\t%20s\t%s\n","",sset[is-1].name.c_str(),sset[is-1].val.c_str(),sset[is-1].comment.c_str());
     if(id>0)
       // Is double!
       printf("%5s%-15s\t%20.3e\t%s\n","",dset[id-1].name.c_str(),dset[id-1].val,dset[id-1].comment.c_str());

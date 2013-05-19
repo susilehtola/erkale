@@ -1,8 +1,8 @@
  /***************************************************************************
  KFc.h - header file for KFReader: library for handling ADF binary file
-         format, the so-called KF-files. The current version supports only 
-         reading KF files. 
-         Even though the binary files are system-dependent, they are 
+         format, the so-called KF-files. The current version supports only
+         reading KF files.
+         Even though the binary files are system-dependent, they are
          converted on the fly and the caller routine gets the data in the
          native format.
 
@@ -76,8 +76,8 @@
 #endif
 
 /** --------------------------
- *  SuperIndex block header 
- *  -------------------------- */ 
+ *  SuperIndex block header
+ *  -------------------------- */
 typedef struct _KFSuperIndexBlockHeader32 {
    char name[KF_SIG_LENGTH];
    INT32 mxbl;     /* The total number of blocks in the file */
@@ -95,7 +95,7 @@ typedef struct _KFSuperIndexBlockHeader64 {
 
 /** --------------------------
  *  SuperIndex block entry
- *  -------------------------- */ 
+ *  -------------------------- */
 typedef struct _KFSuperIndexBlockEntry32 {
    char name[KF_SECTION_NAME_LENGTH];
    INT32 physBlk;  /* Physical block number */
@@ -112,8 +112,8 @@ typedef struct _KFSuperIndexBlockEntry64 {
 } KFSuperIndexBlockEntry64;
 
 /** --------------------------
- *  Index block header 
- *  -------------------------- */ 
+ *  Index block header
+ *  -------------------------- */
 typedef struct _KFIndexBlockHeader32 {
    char name[KF_SECTION_NAME_LENGTH];
    INT32 mxibl;    /* The number of index blocks in this section */
@@ -133,11 +133,11 @@ typedef struct _KFIndexBlockHeader64 {
 
 /** --------------------------
  *  Index block entry
- *  -------------------------- */ 
+ *  -------------------------- */
 typedef struct _KFIndexBlockEntry32 {
    char name[KF_SECTION_NAME_LENGTH];
    INT32 firstLBlk;     /* The logical block number of the data block where the varialbe starts */
-   INT32 firstBlkIndx;  /* The index into the data block where the variable starts. 
+   INT32 firstBlkIndx;  /* The index into the data block where the variable starts.
                             Each index refers to the part of the data block containing data of its own type. */
    INT32 length;        /* Length of the variable in elements (1 for scalars) */
    INT32 firstBlkLen;   /* The number of elements of the variable contained in its 1st data block */
@@ -147,7 +147,7 @@ typedef struct _KFIndexBlockEntry32 {
 typedef struct _KFIndexBlockEntry64 {
    char name[KF_SECTION_NAME_LENGTH];
    INT64 firstLBlk;     /* The logical block number of the data block where the varialbe starts */
-   INT64 firstBlkIndx;  /* The index into the data block where the variable starts. 
+   INT64 firstBlkIndx;  /* The index into the data block where the variable starts.
                             Each index refers to the part of the data block containing data of its own type. */
    INT64 length;        /* Length of the variable in elements (1 for scalars) */
    INT64 firstBlkLen;   /* The number of elements of the variable contained in its 1st data block */
@@ -156,8 +156,8 @@ typedef struct _KFIndexBlockEntry64 {
 } KFIndexBlockEntry64;
 
 /** --------------------------
- *  SuperIndex block 
- *  -------------------------- */ 
+ *  SuperIndex block
+ *  -------------------------- */
 typedef struct _KFSuperIndexBlock32 {
    KFSuperIndexBlockHeader32 header;
    KFSuperIndexBlockEntry32 entries[KF_NUM_SUPERINDEX_BLOCK_ENTRIES32];
@@ -168,8 +168,8 @@ typedef struct _KFSuperIndexBlock64 {
 } KFSuperIndexBlock64;
 
 /** --------------------------
- *  Data block header 
- *  -------------------------- */ 
+ *  Data block header
+ *  -------------------------- */
 typedef struct _KFDataBlockHeader32 {
    INT32 index[KF_N_DATATYPES]; /* Number of elements in this block, one per data type in the order: int, double, char, logical */
 } KFDataBlockHeader32;
@@ -210,7 +210,7 @@ typedef struct _KFSection {
 typedef struct _KFVariable {
    KFSection *section;
    int firstLogBlk;     /* The logical block number of the data block where the varialbe starts */
-   int firstBlkIndex;  /* The index into the data block where the variable starts. 
+   int firstBlkIndex;  /* The index into the data block where the variable starts.
                             Each index refers to the part of the data block containing data of its own type. */
    int length;        /* Length of the variable in elements (1 for scalars) */
    int firstBlkLen;   /* The number of elements of the variable contained in its 1st data block */
@@ -234,11 +234,11 @@ int getHostByteOrder();
 int   openKFFile(KFFile *kf, const char *name); /* Return file descriptor or -1 if there was an error opening file */
 void  closeKFFile (KFFile *kf);           /* Free memory taken by the file structures and close the file */
 
-int   getKFVariableLength(KFFile *kf, const char *name); /* returns variable length in units 
+int   getKFVariableLength(KFFile *kf, const char *name); /* returns variable length in units
                                                             of the corresponding type */
 int   getKFVariableUsedLength(KFFile *kf, const char *name); /* returns the number of used elements in the variable */
 
-int   getKFVariableType(KFFile *kf, const char *name); /* returns variable type (one of the 
+int   getKFVariableType(KFFile *kf, const char *name); /* returns variable type (one of the
                                                           T_* macros) or 0 (zero) */
 
 /* Fills in the memory pointed to by buf with data from the KF file.

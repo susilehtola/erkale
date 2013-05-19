@@ -97,7 +97,7 @@ BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
   if(verbose) {
     printf("\nAugmenting basis set with diffuse functions.\n");
     fflush(stdout);
-  }	   
+  }
 
   // Form augmented basis
   BasisSet augbas(basis);
@@ -149,7 +149,7 @@ BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
  */
 void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin, enum xrs_method method) {
   Timer ttot;
-  
+
   augbas=augment_basis(basis,set);
   // Need to update pointers in augbas
   augbas.update_nuclear_shell_list();
@@ -173,7 +173,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     fflush(stderr);
   }
 
-  
+
   // Augmented solution
   uscf_t augsol(sol);
 
@@ -198,7 +198,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     augchk=std::string(tmpname);
     free(tmpname);
   }
-  
+
   {
     // Copy base checkpoint to augmented checkpoint
     std::string chk=set.get_string("SaveChk");
@@ -234,7 +234,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     // Construct Fock matrix
     DFTGrid grid(&augbas,verbose,set.get_bool("DFTLobatto"));
     grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
-    
+
     // No need for extreme accuracy
     double tol=ROUGHTOL;
 
@@ -244,7 +244,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     case(TP):
       solver.Fock_half_hole(augsol,dft,occa,occb,dummy,grid,tol);
       break;
-      
+
     case(FCH):
     case(XCH):
       solver.Fock_full_hole(augsol,dft,occa,occb,dummy,grid,tol);
@@ -255,30 +255,30 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     printf("Fock operator constructed in augmented space in %s.\n",taug.elapsed().c_str());
     fprintf(stderr,"Constructed augmented Fock operator (%s).\n",taug.elapsed().c_str());
   }
-  
+
   // Diagonalize unoccupied space. Loop over spin
   for(size_t ispin=0;ispin<2;ispin++) {
-    
-    // Form Fock operator  
+
+    // Form Fock operator
     arma::mat H;
     if(!ispin)
       H=augsol.Ha;
     else
       H=augsol.Hb;
-    
+
     arma::mat AOtoO;
     if(!ispin)
       AOtoO=project_orbitals(sol.Ca,basis,augbas);
     else
       AOtoO=project_orbitals(sol.Cb,basis,augbas);
-    
+
     // Amount of occupied orbitals
     size_t nocc;
     if(!ispin)
       nocc=nocca;
     else
       nocc=noccb;
-    
+
     // Convert Fock operator to unoccupied MO basis.
     taug.set();
     arma::mat H_MO=arma::trans(AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1))*H*AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1);
@@ -286,7 +286,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
       printf("H_MO formed in %s.\n",taug.elapsed().c_str());
       fflush(stdout);
     }
-    
+
     // Diagonalize Fockian to find orbitals and energies
     taug.set();
     arma::vec Eval;
@@ -295,9 +295,9 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
     if(verbose) {
       printf("H_MO diagonalized in unoccupied subspace in %s.\n",taug.elapsed().c_str());
-      fflush(stdout);  
+      fflush(stdout);
     }
-    
+
     // Store energies
     arma::vec Ea;
     Ea.zeros(AOtoO.n_cols);
@@ -308,7 +308,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
       Ea.subvec(0,nocc-1)=sol.Eb.subvec(0,nocc-1);
     // Virtuals
     Ea.subvec(nocc,AOtoO.n_cols-1)=Eval;
-    
+
     // Back-transform orbitals to AO basis
     arma::mat Ca;
     Ca.zeros(Ntot,AOtoO.n_cols);
@@ -316,7 +316,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     Ca.submat(0,0,Nbf-1,nocc-1)=AOtoO.submat(0,0,Nbf-1,nocc-1);
     // Unoccupied orbitals
     Ca.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)=AOtoO.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)*Evec;
-    
+
     // Save results
     if(!ispin) {
       augsol.Ca=Ca;
@@ -332,7 +332,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
       Caug=Ca;
     }
   }
-  
+
   // Write out updated solution vectors
   chkpt.write("Ca",augsol.Ca);
   chkpt.write("Cb",augsol.Cb);
@@ -733,7 +733,7 @@ enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & 
   }
 
   // Check consistency of spin
-  if(ok) {    
+  if(ok) {
     bool spin;
     chkpt.read("XRSSpin",spin);
     if(spin!=set.get_bool("XRSSpin")) {
@@ -819,7 +819,7 @@ int main(int argc, char **argv) {
   set.add_string("XRSDoubleBasis","The augmentation basis to use for double-basis set calculations","X-AUTO");
   set.add_bool("XRSLocalize","Localize and freeze orbitals? (Needs ground-state calculation)",false);
 
-  set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false); 
+  set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false);
   set.add_string("XRSMethod", "Which kind of calculation to perform: TP, XCH or FCH","TP");
 
   set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3:5,10","");
@@ -990,7 +990,7 @@ int main(int argc, char **argv) {
 	  nloc=localize(basis,nocca,xcatom,sol.Ca);
       }
 
-      // Find excited orbital 
+      // Find excited orbital
       size_t ixc_orb;
       lmtrans lmground;
       if(spin) {
@@ -1069,12 +1069,12 @@ int main(int argc, char **argv) {
     else
       xcorb=find_excited_orb(sol.Ca,basis,xcatom,nocca);
   }
-   
+
   // Augment the solutions if necessary
   BasisSet augbas;
   arma::mat C_aug;
   arma::vec E_aug;
-   
+
   if(stricmp(set.get_string("XRSAugment"),"")!=0)
     augmented_solution(basis,set,sol,nocca,noccb,dft,augbas,C_aug,E_aug,spin,method);
   else {
@@ -1088,15 +1088,15 @@ int main(int argc, char **argv) {
       E_aug=sol.Ea;
     }
   }
-   
+
   // Number of occupied states
   size_t nocc;
   if(spin)
     nocc=noccb;
   else
     nocc=nocca;
-   
-   
+
+
   // Compute dipole transitions
   std::vector<spectrum_t> sp=compute_transitions(augbas,C_aug,E_aug,xcatom,xcorb,nocc);
   // Save spectrum
@@ -1116,19 +1116,19 @@ int main(int argc, char **argv) {
       qsp=compute_qdep_transitions_series(augbas,C_aug,E_aug,xcorb,nocc,qvals);
       spname="trans_ser";
     }
-    
+
     // Fourier method
     if(stricmp(set.get_string("XRSQMethod"),"Fourier")==0) {
       qsp=compute_qdep_transitions_fourier(augbas,C_aug,E_aug,xcorb,nocc,qvals);
       spname="trans_four";
     }
-    
+
     // Local method (Sakko et al)
     if(stricmp(set.get_string("XRSQMethod"),"Local")==0) {
       qsp=compute_qdep_transitions_local(augbas,set,C_aug,E_aug,xcatom,xcorb,nocc,qvals);
       spname="trans_loc";
     }
-    
+
     // Save transitions
     for(size_t i=0;i<qvals.size();i++) {
       char fname[80];

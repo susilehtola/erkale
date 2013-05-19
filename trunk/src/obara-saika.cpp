@@ -444,11 +444,11 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	oxp=ox_arr(la,lb+1);
 	oy=oy_arr(ma,mb);
 	oz=oz_arr(na,nb);
-	
+
 	kxp=kx_arr(la,lb+1);
 	ky=ky_arr(ma,mb);
 	kz=kz_arr(na,nb);
-	
+
 	T[3](i,j)=2*zetab*(kxp*oy*oz + oxp*ky*oz + oxp*oy*kz);
 	if(lb>0) {
 	  oxm=ox_arr(la,lb-1);
@@ -495,7 +495,7 @@ std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, dou
 	}
 	T[5](i,j)*=0.5*anorm*bnorm;
       }
-      
+
     }
   }
 
@@ -1433,7 +1433,7 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	    }
 	  }
 	}
-	
+
 	else if (mb > 0) {
 
 	  for(int m=0;m<=mmax-lambdab;m++)
@@ -1454,7 +1454,7 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	      }
 	  }
 	}
-	
+
 	else if (lb > 0) {
 
 	  for(int m=0;m<=mmax-lambdab;m++)
@@ -1474,7 +1474,7 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	      zint(0,bind,m) += o2g*(lb-1)*(zint(0,bind-2*Nbl,m)-zint(0,bind-2*Nbl,m+1));
 	    }
 	  }
-	  
+
 	}
 	else {
 	  ERROR_INFO();
@@ -1609,7 +1609,7 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	  }
       }
     }
-  
+
   // Size of returned array
   int Na=(am_a+1)*(am_a+2)/2;
   int Nb=(am_b+1)*(am_b+2)/2;
@@ -1653,12 +1653,12 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	  V[0](ia,ib)=xint(aind,bind,0);
 	  V[1](ia,ib)=yint(aind,bind,0);
 	  V[2](ia,ib)=zint(aind,bind,0);
-	  
+
 	  // Increment index of basis function
 	  ib++;
 	}
       }
-      
+
       // Increment index of basis function
       ia++;
     }
@@ -1669,9 +1669,9 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
   std::vector<arma::mat> huzint(V);
   for(size_t ic=0;ic<V.size();ic++)
     huzint[ic].zeros();
-  
+
   int diff=0;
-  
+
   ia=0;
   // Loop over basis functions on this shell
   for(int ii=0; ii<=am_a; ii++) {
@@ -1689,12 +1689,12 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
 	  int inb=ll;
 
 	  nuclear_int_der(xa,ya,za,zetaa,ila,ima,ina,xnuc,ynuc,znuc,xb,yb,zb,zetab,ilb,imb,inb,huzint[0](ia,ib),huzint[1](ia,ib),huzint[2](ia,ib));
-	  
-	  for(int ic=0;ic<3;ic++) 
+
+	  for(int ic=0;ic<3;ic++)
 	    // Differring sign convention - we actually do the force, not the derivative
 	    if(fabs(huzint[ic](ia,ib)+V[ic](ia,ib))>100*DBL_EPSILON*std::max(fabs(huzint[ic](ia,ib)),fabs(V[ic](ia,ib))))
 	      diff++;
-	  
+
 	  ib++;
 	}
       }

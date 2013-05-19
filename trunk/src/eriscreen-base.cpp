@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -29,7 +29,7 @@
 #include <omp.h>
 #endif
 
-// Print out screening table? 
+// Print out screening table?
 //#define PRINTOUT
 
 
@@ -62,12 +62,12 @@ void ERIscreen::fill(const BasisSet * basisv) {
 
   if(basisv==NULL)
     return;
-  
+
   basp=basisv;
 
   // Amount of shells in basis set is
   size_t Nsh=basp->get_Nshells();
-  
+
   // Form index helper
   iidx=i_idx(basp->get_Nbf());
 
@@ -88,14 +88,14 @@ void ERIscreen::fill(const BasisSet * basisv) {
   {
     ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
     std::vector<double> tmp;
-    
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<Npairs;ip++) {
       size_t i=pairs[ip].is;
       size_t j=pairs[ip].js;
-      
+
       // Compute integrals
       eri.compute(&shells[i],&shells[j],&shells[i],&shells[j],tmp);
       // Get maximum value

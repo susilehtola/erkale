@@ -150,32 +150,32 @@ double ERI(int na, int nb, int nc, int nd, double za, double zb, double zc, doub
 double gaussian_ERI(int la, int ma, int lb, int mb, int lc, int mc, int ld, int md, double za, double zb, double zc, double zd, int nfit) {
   ERIWorker eri(std::max(la,lb),nfit);
   std::vector<double> eris;
-  
+
   std::vector<contr_t> ca=slater_fit(za,la,nfit,false);
   std::vector<contr_t> cb=slater_fit(zb,lb,nfit,false);
   std::vector<contr_t> cc=slater_fit(zc,lc,nfit,false);
   std::vector<contr_t> cd=slater_fit(zd,ld,nfit,false);
-  
+
   GaussianShell ash(la,true,ca);
   GaussianShell bsh(lb,true,cb);
   GaussianShell csh(lc,true,cc);
   GaussianShell dsh(ld,true,cd);
-  
+
   coords_t cen={0.0, 0.0, 0.0};
-  
+
   ash.set_first_ind(0);
   ash.set_center(cen,0);
-  
+
   bsh.set_first_ind(ash.get_last_ind()+1);
   bsh.set_center(cen,0);
-  
+
   csh.set_first_ind(bsh.get_last_ind()+1);
   csh.set_center(cen,0);
-  
+
   dsh.set_first_ind(csh.get_last_ind()+1);
   dsh.set_center(cen,0);
-  
-  
+
+
   ash.convert_contraction();
   ash.normalize();
   bsh.convert_contraction();
@@ -184,20 +184,20 @@ double gaussian_ERI(int la, int ma, int lb, int mb, int lc, int mc, int ld, int 
   csh.normalize();
   dsh.convert_contraction();
   dsh.normalize();
-  
+
   eri.compute(&ash,&bsh,&csh,&dsh,eris);
-  
+
   // Lengths
   int bn=2*lb+1;
   int cn=2*lc+1;
   int dn=2*ld+1;
-  
+
   // Indices
   int ai=la+ma;
   int bi=lb+mb;
   int ci=lc+mc;
   int di=ld+md;
-  
+
   return eris[((ai*bn+bi)*cn+ci)*dn+di];
 }
 

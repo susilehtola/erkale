@@ -36,7 +36,7 @@ class XRSSCF : public SCF {
   bool spin;
   /// Number of alpha electrons
   int nocca;
-  /// Number of beta electrons 
+  /// Number of beta electrons
   int noccb;
 
  public:
@@ -83,6 +83,6 @@ std::vector<double> xch_occ(size_t excited, size_t nocc);
 std::vector<double> fch_occ(size_t excited, size_t nocc);
 
 /// Localize orbitals, returns number of localized orbitals.
-size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C); 
+size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C);
 
 #endif

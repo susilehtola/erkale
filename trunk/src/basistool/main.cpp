@@ -104,15 +104,15 @@ int main(int argc, char **argv) {
     for(size_t iel=0;iel<elbases.size();iel++) {
       // Get the basis set
       ElementBasisSet elbas=elbases[iel];
-      
+
       // Decontracted basis
       ElementBasisSet eldec(elbas);
       eldec.decontract();
-      
+
       // Get the shells
       std::vector<FunctionShell> sh=elbas.get_shells();
       std::vector<FunctionShell> decsh=eldec.get_shells();
-      
+
       // Count the shells
       arma::imat Nsh(max_am,2);
       Nsh.zeros();
@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
 	Nsh(decsh[ish].get_am(),0)++;
       for(size_t ish=0;ish<sh.size();ish++)
 	Nsh(sh[ish].get_am(),1)++;
-      
+
       // Determine if basis set is contracted and the amount of
       // functions
       bool contr=false;
@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
 	for(int am=0;am<max_am;am++)
 	  if(Nsh(am,0)!=Nsh(am,1))
 	    printf("%i%c",Nsh(am,1),tolower(shell_types[am]));
-	printf("]\n");	
+	printf("]\n");
       } else {
 	printf("%10i  ",(int) nbf);
 	for(int am=0;am<max_am;am++)
@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
     }
   } else if(stricmp(cmd,"daug")==0 || stricmp(cmd,"taug")==0) {
     // Augment basis set
-    
+
     if(argc!=4) {
       printf("\nUsage: %s input.gbs %s output.gbs\n",tolower(cmd).c_str(),argv[0]);
       return 1;

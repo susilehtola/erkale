@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -34,7 +34,7 @@ extern "C" {
  * \brief A timer routine
  *
  * This class implements a timer that can be used to measure runtimes
- * of routines. 
+ * of routines.
  *
  * \author Susi Lehtola
  * \date 2011/01/26 21:54
@@ -46,7 +46,7 @@ class Timer {
 
   /// Elapsed time
   double elapsd;
-  
+
  public:
   /// Constructor
   Timer();

@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -40,7 +40,7 @@ std::complex<double> spherical_harmonics(int l, int m, double cth, double phi) {
   // which already seems to take into account the Condon-Shortley
   // phase factor.
   ylm*=gsl_sf_legendre_sphPlm(l,m,cth);
- 
+
   return ylm;
 }
 
@@ -50,15 +50,15 @@ std::vector< std::complex<double> > cplx_Ylm_coeff(int l, int m) {
 
   // Get the expansion for absolute m
   std::vector<double> pm=calcYlm_coeff(l,absm);
-  
+
   // If necessary, get it for the negative value as well.
   std::vector<double> nm;
   if(absm>0)
     nm=calcYlm_coeff(l,-absm);
-  
+
   // Compute returned expansion.
   std::vector< std::complex<double> > ret(pm.size());
-  
+
   if(m==0) {
     for(size_t i=0;i<pm.size();i++)
       ret[i]=pm[i];

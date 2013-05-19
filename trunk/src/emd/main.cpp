@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
 	else
 	  chkpt.read("Cb",C);
       }
-	
+
       for(size_t i=0;i<idx.size();i++) {
 	// Names of output files
 	char emdname[80];
@@ -147,14 +147,14 @@ int main(int argc, char **argv) {
 	emd.save(emdname);
 	emd.moments(momname);
 	emd.compton_profile(Jname);
-	emd.compton_profile_interp(Jintname);	  
+	emd.compton_profile_interp(Jintname);
       }
     }
   }
-  
+
   if(set.get_bool("DoEMD")) {
     t.print_time();
-    
+
     printf("\nCalculating EMD properties.\n");
     printf("Please read and cite the reference:\n%s\n%s\n%s\n",	\
 	   "J. Lehtola, M. Hakala, J. Vaara and K. Hämäläinen",		\
@@ -179,7 +179,7 @@ int main(int argc, char **argv) {
     emd.moments("moments.txt");
     emd.compton_profile("compton.txt");
     emd.compton_profile_interp("compton-interp.txt");
-    
+
     printf("Calculating isotropic EMD properties took %s.\n",temd.elapsed().c_str());
   }
 
@@ -187,14 +187,14 @@ int main(int argc, char **argv) {
   if(stricmp(set.get_string("EMDCube"),"")!=0) {
     t.print_time();
     Timer temd;
-    
+
     // Form grid in p space.
     std::vector<double> px, py, pz;
     parse_cube(set.get_string("EMDCube"),px,py,pz);
-    
+
     // Calculate EMD on cube
     emd_cube(basis,P,px,py,pz);
-    
+
     printf("Calculating EMD on a cube took %s.\n",temd.elapsed().c_str());
   }
 

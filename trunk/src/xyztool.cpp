@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
 
   // Read atoms
   std::vector<atom_t> atoms=loadxyz(argv[1]);
-  
+
   // Parse commands
   int cur=3;
   while(cur<argc) {

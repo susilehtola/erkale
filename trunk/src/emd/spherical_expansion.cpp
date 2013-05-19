@@ -378,11 +378,11 @@ CartesianExpansion::CartesianExpansion(int maxam) {
 
   // Compute spherical harmonics expansions of px^l, py^m and pz^n
   std::vector<SphericalExpansion> px, py, pz;
-  
+
   px.resize(maxam+1);
   py.resize(maxam+1);
   pz.resize(maxam+1);
-  
+
   // p_i^0 = 1 = \sqrt{4 \pi} Y_0^0
   px[0].addylm(0,0,sqrt(4.0*M_PI));
   py[0].addylm(0,0,sqrt(4.0*M_PI));

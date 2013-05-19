@@ -154,7 +154,7 @@ std::string rem_dbl_whitespace(const std::string & line) {
 
   return ret;
 }
-      
+
 
 int readint(std::string num) {
   int no;

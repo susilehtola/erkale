@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -47,7 +47,7 @@ class TRDSM {
   /// Density matrices
   std::vector<arma::mat> Ds;
   /// Fock matrices
-  std::vector<arma::mat> Fs;  
+  std::vector<arma::mat> Fs;
   /// Maximum number of matrices to keep in memory
   size_t max;
 

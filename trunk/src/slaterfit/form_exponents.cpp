@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -126,7 +126,7 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
   gsl_vector *x, *ss;
   x=gsl_vector_alloc(dof);
   ss=gsl_vector_alloc(dof);
-  
+
   // Set starting point
   switch(par.method) {
 
@@ -167,15 +167,15 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
   do {
     iter++;
     iterdelta++;
-    
+
     // Simplex
     status = gsl_multimin_fminimizer_iterate(min);
-    if (status) 
+    if (status)
       break;
 
     // Get convergence estimate.
     size = gsl_multimin_fminimizer_size (min);
-    
+
     // Are we converged?
     status = gsl_multimin_test_size (size, DBL_EPSILON);
     if (verbose && status == GSL_SUCCESS)
@@ -190,14 +190,14 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
     }
 
   } while (status == GSL_CONTINUE && iterdelta < maxiter);
-  
+
   // Get best exponents and coefficients
   std::vector<double> optexp=get_exps(min->x,&par);
   arma::vec optc=solve_coefficients(optexp,par.zeta,par.l);
 
   // Free memory
   gsl_vector_free(x);
-  gsl_vector_free(ss);  
+  gsl_vector_free(ss);
   gsl_multimin_fminimizer_free(min);
 
   // Return
@@ -246,7 +246,7 @@ void determine_slater_limits(double zeta, int am, double decayfac, double & min,
   /// Normalize to Gaussian's limit
   if(min<1e-6)
     min=1e-6;
-    
+
   max=maxz;
   double maxval;
   do {

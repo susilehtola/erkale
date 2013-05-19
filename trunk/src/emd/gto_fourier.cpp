@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -79,7 +79,7 @@ FourierPoly_1D FourierPoly_1D::formpoly(int l, double zeta) {
       ret.addterm(term);
     }
   }
-  
+
   return ret;
 }
 
@@ -93,10 +93,10 @@ void FourierPoly_1D::addterm(const poly1d_t & t) {
     // Get upper bound
     std::vector<poly1d_t>::iterator high;
     high=std::upper_bound(poly.begin(),poly.end(),t);
-    
+
     // Corresponding index is
     size_t ind=high-poly.begin();
-    
+
     if(ind>0 && poly[ind-1]==t)
 	// Found it.
       poly[ind-1].c+=t.c;
@@ -140,10 +140,10 @@ void FourierPoly_1D::print() const {
 
 FourierPoly_1D operator*(std::complex<double> fac, const FourierPoly_1D & rhs) {
   FourierPoly_1D ret(rhs);
-  
+
   for(size_t i=0;i<ret.poly.size();i++)
     ret.poly[i].c*=fac;
-  
+
   return ret;
 }
 
@@ -229,10 +229,10 @@ void GTO_Fourier::addterm(const trans3d_t & t) {
     // Get upper bound
     std::vector<trans3d_t>::iterator high;
     high=std::upper_bound(trans.begin(),trans.end(),t);
-    
+
     // Corresponding index is
     size_t ind=high-trans.begin();
-    
+
     if(ind>0 && trans[ind-1]==t)
 	// Found it.
       trans[ind-1].c+=t.c;

@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       HF/DFT from Hel
@@ -40,7 +40,7 @@ std::vector< std::vector<size_t> > find_molecules(const std::vector<atom_t> & at
 	d+=(atoms[i].y-atoms[j].y)*(atoms[i].y-atoms[j].y);
 	d+=(atoms[i].z-atoms[j].z)*(atoms[i].z-atoms[j].z);
 	d=sqrt(d)/ANGSTROMINBOHR;
-	
+
 	// Check if bond exists
 	if(check_bonds(d,atoms[i].el,atoms[j].el)) {
 	  // Yes, add to molecule

@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -160,11 +160,11 @@ class CartesianExpansion {
 
   /// Get index of element at (l,m,n)
   size_t ind(int l, int m, int n) const;
-  
+
  public:
   CartesianExpansion(int max=2*max_am);
   ~CartesianExpansion();
-  
+
   /// Get expansion of px^l py^m pz^n
   SphericalExpansion get(int l, int m, int n) const;
 };

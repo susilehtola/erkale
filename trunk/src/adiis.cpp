@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -53,7 +53,7 @@ void ADIIS::push(double Es, const arma::mat & Ps, const arma::mat & Fs) {
 
 void ADIIS::clear() {
   stack.clear();
-}  
+}
 
 arma::mat ADIIS::get_P() const {
   // Get coefficients
@@ -100,7 +100,7 @@ arma::vec ADIIS::get_c() const {
     std::vector<double> ret;
     ret.push_back(1.0);
     return ret;
-  }    
+  }
 
   const gsl_multimin_fdfminimizer_type *T;
   gsl_multimin_fdfminimizer *s;
@@ -112,7 +112,7 @@ arma::vec ADIIS::get_c() const {
   minfunc.fdf = adiis::min_fdf;
   minfunc.n = N;
   minfunc.params = (void *) this;
-  
+
   T=gsl_multimin_fdfminimizer_vector_bfgs2;
   //  T=gsl_multimin_fdfminimizer_conjugate_fr;
   s=gsl_multimin_fdfminimizer_alloc(T,N);
@@ -134,18 +134,18 @@ arma::vec ADIIS::get_c() const {
     iter++;
     //    printf("iteration %lu\n",iter);
     status = gsl_multimin_fdfminimizer_iterate (s);
-     
+
     if (status) {
       //      printf("Error %i in minimization\n",status);
       break;
     }
-     
+
     status = gsl_multimin_test_gradient (s->gradient, 1e-7);
 
-    /*     
+    /*
     if (status == GSL_SUCCESS)
       printf ("Minimum found at:\n");
-    
+
     printf("%5lu ", iter);
     for(size_t i=0;i<N;i++)
       printf("%.5g ",gsl_vector_get(s->x,i));
@@ -159,7 +159,7 @@ arma::vec ADIIS::get_c() const {
 
   // Form minimum
   arma::vec c=adiis::compute_c(s->x);
-     
+
   gsl_multimin_fdfminimizer_free (s);
   gsl_vector_free (x);
 
@@ -182,10 +182,10 @@ double ADIIS::get_E(const gsl_vector * x) const {
   double Eval=stack[stack.size()-1].E;
   Eval+=2.0*arma::dot(c,PiF);
   Eval+=arma::as_scalar(arma::trans(c)*PiFj*c);
-  
+
   return Eval;
 }
-    
+
 void ADIIS::get_dEdx(const gsl_vector * x, gsl_vector * dEdx) const {
   // Consistency check
   if(x->size != stack.size()) {

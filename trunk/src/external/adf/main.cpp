@@ -54,18 +54,18 @@ std::vector<int> get_int_vec_kf(const std::string & name) {
   if(N<=0) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Entry "<< name <<" in KF file has " << N << " elements!\n";; 
+    oss << "Entry "<< name <<" in KF file has " << N << " elements!\n";;
     throw std::runtime_error(oss.str());
   }
-  
+
   // Allocate memory
   std::vector<int> ret(N);
-  
+
   // Read the data
   if(getKFData(&kf, name.c_str(), (void *) &ret[0]) < 0) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Error reading "<< name <<" entry from KF file!"; 
+    oss << "Error reading "<< name <<" entry from KF file!";
     throw std::runtime_error(oss.str());
   }
 
@@ -78,18 +78,18 @@ std::vector<double> get_double_vec_kf(const std::string & name) {
   if(N<=0) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Entry "<< name <<" in KF file has " << N << " elements!\n";; 
+    oss << "Entry "<< name <<" in KF file has " << N << " elements!\n";;
     throw std::runtime_error(oss.str());
   }
 
   // Allocate memory
   std::vector<double> ret(N);
-  
+
   // Read the data
   if(getKFData(&kf, name.c_str(), (void *) &ret[0]) < 0) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Error reading "<< name <<" entry from KF file!"; 
+    oss << "Error reading "<< name <<" entry from KF file!";
     throw std::runtime_error(oss.str());
   }
 
@@ -115,7 +115,7 @@ std::vector< std::vector<size_t> > find_identical_functions() {
 
     // Add space to list
     ret.resize(ret.size()+nbptr[i+1]-nbptr[i]);
-    
+
     // Loop over atoms of current type
     for(int iat=0;iat<nqptr[i+1]-nqptr[i];iat++)
       // Loop over functions on current atom
@@ -123,7 +123,7 @@ std::vector< std::vector<size_t> > find_identical_functions() {
 	ret[i0+ifunc].push_back(ind++);
   }
 
-  /*  
+  /*
       printf("Identical functions:\n");
       for(size_t ig=0;ig<ret.size();ig++) {
       printf("Group %i:",(int) ig);
@@ -373,6 +373,6 @@ int main(int argc, char **argv) {
   emd.compton_profile_interp("compton-interp.txt");
 
   printf("Computing EMD properties took %s.\n",t.elapsed().c_str());
-  
+
   return 0;
 }
