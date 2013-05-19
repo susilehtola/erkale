@@ -26,16 +26,16 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
     // Compute force
     arma::vec fpul_kin=basisp->kinetic_pulay(sol.P);
     //    interpret_force(fpul_kin).print("Kinetic Pulay");
-    
+
     arma::vec fpul_nuc=basisp->nuclear_pulay(sol.P);
     //    interpret_force(fpul_nuc).print("Nuclear Pulay");
- 
+
     arma::vec fnuc=basisp->nuclear_der(sol.P);
     //    interpret_force(fnuc).print("Hellman-Feynman");
-    
+
     arma::vec forth=basisp->overlap_der(W);
     //    interpret_force(forth).print("Orthonormality");
-    
+
     arma::vec frep=basisp->nuclear_force();
     //    interpret_force(frep).print("Nuclear repulsion");
 
@@ -44,14 +44,16 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
     double kfrac=exact_exchange(dft.x_func);
 #endif
 
-    if(!direct || densityfit)
-      scr.fill(basisp);
-    
     arma::vec fcoul;
     arma::vec fxchf;
 
 #ifdef DFT
-    if(kfrac>0) {
+    if(kfrac!=0) {
+      if(densityfit)
+	scr.fill(basisp);
+#else
+      if(!direct)
+	scr.fill(basisp);
 #endif
 
 #ifdef RESTRICTED
@@ -60,7 +62,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       arma::vec faxchf, fbxchf;
       scr.forceJK(sol.Pa,sol.Pb,fcoul,faxchf,fbxchf,tol,NULL);
       fxchf=faxchf+fbxchf;
-      
+
       //      interpret_force(faxch).print("alpha exchange");
       //      interpret_force(fbxch).print("beta exchange");
 #endif
@@ -69,10 +71,17 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 
 #ifdef DFT
     } else {
-      
-      fcoul=scr.forceJ(sol.P,tol,NULL);
+
+      if(densityfit)
+	fcoul=dfit.force_J(sol.P);
+      else {
+	if(!direct)
+	  scr.fill(basisp);
+
+	fcoul=scr.forceJ(sol.P,tol,NULL);
+      }
     }
-    
+
     // Get the DFT contribution
     arma::vec fxc;
 #ifdef RESTRICTED
@@ -84,13 +93,13 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
     //    interpret_force(fxc).print("XC force");
 
 #endif // DFT
-    
+
     //    interpret_force(fcoul).print("Coulomb");
-    
+
     arma::vec ftot=fpul_kin+fpul_nuc+fnuc+forth+frep;
     //    interpret_force(ftot).print("Total (w.o. 2-electron)");
 
-#ifndef DFT    
+#ifndef DFT
     arma::vec ffull=ftot+fcoul+fxchf;
 #else
     arma::vec ffull=ftot+fcoul+fxc;
@@ -98,6 +107,6 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       ffull+=kfrac*fxchf;
 #endif
     //    interpret_force(ffull).print("Total");
-    
+
     return ffull;
 }

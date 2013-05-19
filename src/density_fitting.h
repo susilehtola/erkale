@@ -63,6 +63,13 @@ class DensityFit {
   /// Hartree-Fock calculation?
   bool hf;
 
+  /// Amount of nuclei
+  size_t Nnuc;
+  /// Maximum angular momentum
+  int maxam;
+  /// Maximum contractions
+  int maxcontr;
+
   /// Orbital shells
   std::vector<GaussianShell> orbshells;
   int maxorbam;
@@ -98,6 +105,9 @@ class DensityFit {
   /// \f$ ( \alpha | \beta)^-1/2 \f$
   arma::mat ab_invh;
 
+  /// Form screening matrix
+  void form_screening();
+
  public:
   /// Constructor
   DensityFit();
@@ -126,6 +136,9 @@ class DensityFit {
   arma::mat calc_J(const arma::mat & P) const;
   /// Get Coulomb matrix from P
   std::vector<arma::mat> calc_J(const std::vector<arma::mat> & P) const;
+
+  /// Calculate force from P
+  arma::vec force_J(const arma::mat & P);
 
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::mat calc_K(const arma::mat & C, const std::vector<double> & occs, size_t memlimit) const;

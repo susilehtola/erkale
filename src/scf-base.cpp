@@ -1774,5 +1774,12 @@ arma::mat interpret_force(const arma::vec & f) {
 
   arma::mat force(f);
   force.reshape(3,f.n_elem/3);
-  return arma::trans(force);
+
+  // Calculate magnitude in fourth column
+  arma::mat retf(f.n_elem/3,4);
+  retf.submat(0,0,f.n_elem/3-1,2)=arma::trans(force);
+  for(size_t i=0;i<retf.n_rows;i++)
+    retf(i,3)=sqrt( pow(retf(i,0),2) + pow(retf(i,1),2) + pow(retf(i,2),2) );
+
+  return retf;
 }
