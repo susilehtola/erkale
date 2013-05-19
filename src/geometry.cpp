@@ -411,8 +411,8 @@ int main(int argc, char **argv) {
 
   s = gsl_multimin_fdfminimizer_alloc (T, minimizer.n);
 
-  // Use initial step length of 0.01 bohr, and a line search accuracy 1e-3
-  gsl_multimin_fdfminimizer_set (s, &minimizer, x, 0.01, 1e-3);
+  // Use initial step length of 0.01 bohr, and a line search accuracy 1e-2
+  gsl_multimin_fdfminimizer_set (s, &minimizer, x, 0.01, 1e-2);
 
   fprintf(stderr,"Geometry optimizer initialized in %s.\n",tprog.elapsed().c_str());
   fprintf(stderr,"Entering minimization loop with %s optimizer.\n",set.get_string("Optimizer").c_str());
