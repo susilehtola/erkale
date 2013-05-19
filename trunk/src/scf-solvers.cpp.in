@@ -1009,7 +1009,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     chkptp->close();
     
     // Update screening value
-    if(direct && !strict) {
+    if(direct && !strict && !densityfit) {
       // adapted from molpro
       double newtol=std::min(std::min(fabs(conv.deltaEmax)*1e-2,FINETOL),tol);
       
