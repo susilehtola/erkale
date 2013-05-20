@@ -142,6 +142,136 @@ std::vector<atom_t> get_atoms(const gsl_vector * x, const opthelper_t & opts) {
   return atoms;
 }
 
+void run_calc(const BasisSet & basis, Settings & set, bool force) {
+  // Checkpoint file to load
+  std::string loadname=set.get_string("LoadChk");
+
+  if(stricmp(loadname,"")==0) {
+    // Nothing to load - run full calculation.
+    calculate(basis,set,force);
+    return;
+  }
+
+  // Otherwise, check if the basis set is the same
+  BasisSet oldbas;
+  bool convd;
+  {
+    Checkpoint chkpt(loadname,false);
+    
+    chkpt.read("Converged",convd);
+    
+    chkpt.read(oldbas);
+  }
+
+  if(!(basis==oldbas) || !convd) {
+    // Basis set is different or calculation was not converged - need
+    // to run calculation
+    calculate(basis,set,force);
+    return;
+  }
+
+  // Basis set is the same, and the calculation has been converged -
+  // now we just have to calculate the force, if necessary
+  std::string savename=set.get_string("SaveChk");
+  if(stricmp(savename,loadname)!=0) {
+    // Copy the file
+    std::ostringstream oss;
+    oss << "cp " << loadname << " " << savename;
+    int cp=system(oss.str().c_str());
+    if(cp) {
+      ERROR_INFO();
+      throw std::runtime_error("Failed to copy checkpoint file.\n");
+    }
+  }
+
+  // Open the checkpoint in write mode, don't truncate it
+  Checkpoint chkpt(savename,true,false);
+
+  // SCF structure
+  SCF solver(basis,set,chkpt);
+
+  // Do a plain Hartree-Fock calculation?
+  bool hf= (stricmp(set.get_string("Method"),"HF")==0);
+  bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
+
+  // Get exchange and correlation functionals
+  dft_t dft;
+  if(!hf && !rohf) {
+    parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
+    dft.gridtol=set.get_double("DFTFinalTol");
+  }
+
+  // Force
+  arma::vec f;
+
+  double tol;
+  chkpt.read("tol",tol);
+
+  // Multiplicity
+  int mult=set.get_int("Multiplicity");
+  // Amount of electrons
+  int Nel=basis.Ztot()-set.get_int("Charge");
+
+  if(mult==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
+    rscf_t sol;
+    chkpt.read("C",sol.C);
+    chkpt.read("E",sol.E);
+    chkpt.read("H",sol.H);
+    chkpt.read("P",sol.P);
+
+    std::vector<double> occs;
+    chkpt.read("occs",occs);
+
+    // Restricted case
+    if(hf) {
+      f=solver.force_RHF(sol,occs,FINETOL);
+    } else {
+      DFTGrid grid(&basis,set.get_bool("Verbose"),set.get_bool("DFTLobatto"));
+      grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+      f=solver.force_RDFT(sol,occs,dft,grid,FINETOL);
+    }
+
+  } else {
+
+    uscf_t sol;
+    chkpt.read("Ca",sol.Ca);
+    chkpt.read("Ea",sol.Ea);
+    chkpt.read("Ha",sol.Ha);
+    chkpt.read("Pa",sol.Pa);
+
+    chkpt.read("Cb",sol.Cb);
+    chkpt.read("Eb",sol.Eb);
+    chkpt.read("Hb",sol.Hb);
+    chkpt.read("Pb",sol.Pb);
+    chkpt.read("P",sol.P);
+
+    std::vector<double> occa, occb;
+    chkpt.read("occa",occa);
+    chkpt.read("occb",occb);
+
+    if(hf) {
+      f=solver.force_UHF(sol,occa,occb,tol);
+    } else if(rohf) {
+      int Nela, Nelb;
+      chkpt.read("Nel-a",Nela);
+      chkpt.read("Nel-b",Nelb);
+      
+      throw std::runtime_error("Not implemented!\n");
+      //      f=solver.force_ROHF(sol,Nela,Nelb,tol);
+    } else {
+      DFTGrid grid(&basis,set.get_bool("Verbose"),set.get_bool("DFTLobatto"));
+      grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+      f=solver.force_UDFT(sol,occa,occb,dft,grid,tol);
+    }
+  }
+
+  chkpt.write("Force",f);
+  chkpt.close();
+
+  printf("Skipped electronic structure calculation.\n");
+}
+
+
 double calc_E(const gsl_vector *x, void *par) {
   Timer t;
 
@@ -155,7 +285,7 @@ double calc_E(const gsl_vector *x, void *par) {
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  calculate(basis,p->set,false);
+  run_calc(basis,p->set,false);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -184,7 +314,7 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  calculate(basis,p->set,true);
+  run_calc(basis,p->set,true);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -395,25 +525,22 @@ int main(int argc, char **argv) {
   }
 
   // Run an initial calculation
-  double oldE;
-  arma::mat oldf;
-  {
-    gsl_vector *g=gsl_vector_alloc(x->size);
-    calc_Ef(x,minimizer.params,&oldE,g);
-    oldf=interpret_force(g);
-    gsl_vector_free(g);
-  }
+  double oldE=calc_E(x,minimizer.params);
 
   // Turn off verbose setting
   pars.set.set_bool("Verbose",false);
   // and load from old checkpoint
   pars.set.set_string("LoadChk",pars.set.get_string("SaveChk"));
 
+  // Initialize minimizer
   s = gsl_multimin_fdfminimizer_alloc (T, minimizer.n);
 
   // Use initial step length of 0.02 bohr, and a line search accuracy
   // 1e-1 (recommended in the GSL manual for BFGS)
   gsl_multimin_fdfminimizer_set (s, &minimizer, x, 0.02, 1e-1);
+
+  // Store old force
+  arma::mat oldf=interpret_force(s->gradient);
 
   fprintf(stderr,"Geometry optimizer initialized in %s.\n",tprog.elapsed().c_str());
   fprintf(stderr,"Entering minimization loop with %s optimizer.\n",set.get_string("Optimizer").c_str());

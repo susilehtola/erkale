@@ -1006,6 +1006,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     chkptp->write("Restricted",1);
 #endif
     chkptp->write("Converged",converged);
+    chkptp->write("tol",tol);
     chkptp->close();
     
     // Update screening value
