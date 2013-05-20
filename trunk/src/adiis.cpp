@@ -114,7 +114,6 @@ arma::vec ADIIS::get_c() const {
   minfunc.params = (void *) this;
 
   T=gsl_multimin_fdfminimizer_vector_bfgs2;
-  //  T=gsl_multimin_fdfminimizer_conjugate_fr;
   s=gsl_multimin_fdfminimizer_alloc(T,N);
 
   // Starting point: equal weights on all matrices
@@ -125,8 +124,9 @@ arma::vec ADIIS::get_c() const {
   // double E_initial=get_E(x);
 
   // Initialize the optimizer. Use initial step size 0.02, and an
-  // orthogonality tolerance of 0.001 in the line searches.
-  gsl_multimin_fdfminimizer_set(s, &minfunc, x, 0.02, 0.001);
+  // orthogonality tolerance of 0.1 in the line searches (recommended
+  // by GSL manual for bfgs).
+  gsl_multimin_fdfminimizer_set(s, &minfunc, x, 0.02, 0.1);
 
   size_t iter=0;
   int status;
