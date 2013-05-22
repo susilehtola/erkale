@@ -469,11 +469,13 @@ void AtomGrid::eval_grad(const arma::mat & P, size_t ip, double *g) const {
   for(size_t ii=first;ii<last;ii++) {
     // Index of function is
     i=flist[ii].ind;
+    
     for(size_t jj=first;jj<last;jj++) {
       j=flist[jj].ind;
-
-      for(int ic=0;ic<3;ic++)
-	g[ic]+=P(i,j)*flist[ii].f*glist[3*jj+ic];
+      
+      g[0]+=P(i,j)*flist[ii].f*glist[3*jj  ];
+      g[1]+=P(i,j)*flist[ii].f*glist[3*jj+1];
+      g[2]+=P(i,j)*flist[ii].f*glist[3*jj+2];
     }
   }
 
@@ -771,17 +773,18 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
       for(size_t ii=first;ii<last;ii++) {
 	// Get index of function
 	size_t i=flist[ii].ind;
+
 	for(size_t jj=first;jj<last;jj++) {
 	  size_t j=flist[jj].ind;
 
-	  for(int ic=0;ic<3;ic++) {
-	    H(i,j)+=xcvec[ic]*(glist[3*ii+ic]*flist[jj].f + flist[ii].f*glist[3*jj+ic]);
-	  }
+	  H(i,j)+=xcvec[0]*(glist[3*ii]*flist[jj].f + flist[ii].f*glist[3*jj])
+	    +     xcvec[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
+	    +     xcvec[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2]);
 	}
       }
     }
   }
-
+  
   // Meta-GGA
   if(do_mgga) {
     double bf_lapl;
