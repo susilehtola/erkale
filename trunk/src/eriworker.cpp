@@ -1072,7 +1072,7 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 void ERIWorker::compute(const GaussianShell *is_orig, const GaussianShell *js_orig, const GaussianShell *ks_orig, const GaussianShell *ls_orig, std::vector<double> & ints) {
   // Calculate ERIs and transform them to spherical harmonics basis, if necessary.
 
-  // Use precursors. Helpers
+  // Helpers
   const GaussianShell *is=is_orig;
   const GaussianShell *js=js_orig;
   const GaussianShell *ks=ks_orig;
@@ -1152,63 +1152,92 @@ void dERIWorker::compute(const GaussianShell *is_origv, const GaussianShell *js_
 
 void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl) {
   // Integrals are now in the input array.
-  // Get them in the original order
-  if(swap_ij || swap_kl || swap_ijkl) {
-    // Check that we have enough memory
-    output.resize(input.size());
+  // Get them in the original order.
 
-    // Indices
-    size_t ind_i, ind_ij, ind_ijk, ind, indout;
+  if(!swap_ijkl && !swap_kl && !swap_ij) // 000
+    // Already in correct order.
+    return;
 
-    // Numbers of functions on each shell
-    const size_t Ni=is->get_Ncart();
-    const size_t Nj=js->get_Ncart();
-    const size_t Nk=ks->get_Ncart();
-    const size_t Nl=ls->get_Ncart();
+  // Numbers of functions on each shell
+  const size_t Ni=is->get_Ncart();
+  const size_t Nj=js->get_Ncart();
+  const size_t Nk=ks->get_Ncart();
+  const size_t Nl=ls->get_Ncart();
 
-    for(size_t ii=0;ii<Ni;ii++) {
-      ind_i=ii*Nj;
-      for(size_t ji=0;ji<Nj;ji++) {
-	ind_ij=(ind_i+ji)*Nk;
-	for(size_t ki=0;ki<Nk;ki++) {
-	  ind_ijk=(ind_ij+ki)*Nl;
-	  for(size_t li=0;li<Nl;li++) {
-	    ind=ind_ijk+li;
-	    indout=get_swapped_ind(ii,Ni,ji,Nj,ki,Nk,li,Nl,swap_ij,swap_kl,swap_ijkl);
-	    output[indout]=input[ind];
+  // Check that we have enough memory
+  output.resize(input.size());
+
+  if(!swap_ijkl && !swap_kl && swap_ij) { // 001
+    // Need two switch i and j.
+    for(size_t ii=0;ii<Ni;ii++)
+      for(size_t jj=0;jj<Nj;jj++)
+	for(size_t kk=0;kk<Nk;kk++)
+	  for(size_t ll=0;ll<Nl;ll++) {
+	    output[((jj*Ni+ii)*Nk+kk)*Nl+ll]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	  }
-	}
-      }
-    }
 
-    // Swap arrays
-    std::swap(input,output);
+  } else if(!swap_ijkl && swap_kl && !swap_ij) { // 010
+    // Need to switch k and l
+    
+    for(size_t ii=0;ii<Ni;ii++)
+      for(size_t jj=0;jj<Nj;jj++)
+	for(size_t kk=0;kk<Nk;kk++)
+	  for(size_t ll=0;ll<Nl;ll++) {
+	    output[((ii*Nj+jj)*Nl+ll)*Nk+kk]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	  }
+
+  } else if(!swap_ijkl && swap_kl && swap_ij) { // 011
+    // Switch i <-> j, and k <-> l
+
+    for(size_t ii=0;ii<Ni;ii++)
+      for(size_t jj=0;jj<Nj;jj++)
+	for(size_t kk=0;kk<Nk;kk++)
+	  for(size_t ll=0;ll<Nl;ll++) {
+	    output[((jj*Ni+ii)*Nl+ll)*Nk+kk]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	  }
+
+  } else if(swap_ijkl && !swap_ij && !swap_kl) { // 100
+    // Switch i <-> k, and j <-> l
+
+    for(size_t ii=0;ii<Ni;ii++)
+      for(size_t jj=0;jj<Nj;jj++)
+	for(size_t kk=0;kk<Nk;kk++)
+	  for(size_t ll=0;ll<Nl;ll++) {
+	    output[((kk*Nl+ll)*Ni+ii)*Nj+jj]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	  }
+
+  } else if(swap_ijkl && !swap_kl && swap_ij) { // 101
+    // i -> j -> l, j -> i -> k, so i <-> l and j <-> k 
+
+    for(size_t ii=0;ii<Ni;ii++)
+      for(size_t jj=0;jj<Nj;jj++)
+	for(size_t kk=0;kk<Nk;kk++)
+	  for(size_t ll=0;ll<Nl;ll++) {
+	    output[((ll*Nk+kk)*Nj+jj)*Ni+ii]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	  }
+    
+  } else if(swap_ijkl && swap_kl && !swap_ij) { // 110
+    // k -> l -> j, l -> k -> i, so i <-> l and j <-> k
+
+    for(size_t ii=0;ii<Ni;ii++)
+      for(size_t jj=0;jj<Nj;jj++)
+	for(size_t kk=0;kk<Nk;kk++)
+	  for(size_t ll=0;ll<Nl;ll++) {
+	    output[((ll*Nk+kk)*Nj+jj)*Ni+ii]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	  }
+
+  } else if(swap_ijkl && swap_kl && swap_ij) { // 111
+    // i -> j -> l -> k, j -> i -> k -> l, so i <-> k and j <-> l
+
+    for(size_t ii=0;ii<Ni;ii++)
+      for(size_t jj=0;jj<Nj;jj++)
+	for(size_t kk=0;kk<Nk;kk++)
+	  for(size_t ll=0;ll<Nl;ll++) {
+	    output[((kk*Nl+ll)*Ni+ii)*Nj+jj]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	  }
+
   }
-}
 
-size_t IntegralWorker::get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl) {
-  // Compute indices of swapped integrals.
-
-  // First, swap ij-kl if necessary.
-  if(swap_ijkl) {
-    std::swap(i,k);
-    std::swap(Ni,Nk);
-    std::swap(j,l);
-    std::swap(Nj,Nl);
-  }
-
-  // Then, swap k-l if necessary.
-  if(swap_kl) {
-    std::swap(k,l);
-    std::swap(Nk,Nl);
-  }
-
-  // Finally, swap i-j if necessary.
-  if(swap_ij) {
-    std::swap(i,j);
-    std::swap(Ni,Nj);
-  }
-
-  // Now, compute the index
-  return ((i * Nj + j) * Nk + k) * Nl + l;
+  // Swap arrays
+  std::swap(input,output);
 }
