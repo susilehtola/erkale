@@ -69,9 +69,6 @@ class IntegralWorker {
   /// Do spherical transform with respect to fourth index
   void transform_l(int am, size_t Ni, size_t Nj, size_t Nk);
 
-  /// Compute index of swapped integral
-  size_t get_swapped_ind(size_t i, size_t Ni, size_t j, size_t Nj, size_t k, size_t Nk, size_t l, size_t Nl, bool swap_ij, bool swap_kl, bool swap_ijkl);
-
   /// Compute precursor
   eri_precursor_t compute_precursor(const GaussianShell *is, const GaussianShell *js);
 
