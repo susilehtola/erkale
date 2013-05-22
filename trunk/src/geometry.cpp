@@ -142,14 +142,23 @@ std::vector<atom_t> get_atoms(const gsl_vector * x, const opthelper_t & opts) {
   return atoms;
 }
 
-void run_calc(const BasisSet & basis, Settings & set, bool force) {
+enum calcd {
+  // Full calculation
+  FULL,
+  // Just the forces
+  FORCE,
+  // Nothing
+  NONE
+};
+
+enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
 
   if(stricmp(loadname,"")==0) {
     // Nothing to load - run full calculation.
     calculate(basis,set,force);
-    return;
+    return FULL;
   }
 
   // Otherwise, check if the basis set is the same
@@ -167,11 +176,11 @@ void run_calc(const BasisSet & basis, Settings & set, bool force) {
     // Basis set is different or calculation was not converged - need
     // to run calculation
     calculate(basis,set,force);
-    return;
+    return FULL;
   }
 
   // Basis set is the same, and the calculation has been converged -
-  // now we just have to calculate the force, if necessary
+  // copy the checkpoint if necessary
   std::string savename=set.get_string("SaveChk");
   if(stricmp(savename,loadname)!=0) {
     // Copy the file
@@ -183,6 +192,10 @@ void run_calc(const BasisSet & basis, Settings & set, bool force) {
       throw std::runtime_error("Failed to copy checkpoint file.\n");
     }
   }
+
+  // Now we just have to calculate the force, if necessary
+  if(!force)
+    return NONE;
 
   // Open the checkpoint in write mode, don't truncate it
   Checkpoint chkpt(savename,true,false);
@@ -268,7 +281,7 @@ void run_calc(const BasisSet & basis, Settings & set, bool force) {
   chkpt.write("Force",f);
   chkpt.close();
 
-  printf("Skipped electronic structure calculation.\n");
+  return FORCE;
 }
 
 
@@ -285,7 +298,7 @@ double calc_E(const gsl_vector *x, void *par) {
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  run_calc(basis,p->set,false);
+  enum calcd mode=run_calc(basis,p->set,false);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -294,7 +307,10 @@ double calc_E(const gsl_vector *x, void *par) {
   energy_t en;
   solchk.read(en);
 
-  printf("Computed energy % 08.8f in %s.\n",en.E,t.elapsed().c_str());
+  if(mode==FULL)
+    printf("Computed energy % .8f in %s.\n",en.E,t.elapsed().c_str());
+  else
+    printf("Found    energy % .8f in checkpoint file.\n",en.E);
   fflush(stdout);
   //  print_xyz(atoms);
 
@@ -314,7 +330,7 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  run_calc(basis,p->set,true);
+  enum calcd mode=run_calc(basis,p->set,true);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -338,7 +354,15 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
 
   double frms, fmax;
   get_forces(g,fmax,frms);
-  printf("Computed energy % 08.8f and forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
+
+  if(mode==FULL)
+    printf("Computed energy % .8f and forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
+  else if(mode==FORCE)
+    printf("Found    energy % .8f in checkpoint file and calculated forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
+  else if(mode==NONE)
+    printf("Found energy and forces in checkpoint file.\n");
+  fflush(stdout);
+
   fflush(stdout);
   //  print_xyz(atoms);
 }
@@ -549,7 +573,10 @@ int main(int argc, char **argv) {
 
   std::vector<atom_t> oldgeom(atoms);
 
-  for(int iter=1;iter<=maxiter;iter++) {
+  bool convd=false;
+  int iter;
+
+  for(iter=1;iter<=maxiter;iter++) {
     printf("\nGeometry iteration %i\n",(int) iter);
     fflush(stdout);
 
@@ -587,30 +614,68 @@ int main(int argc, char **argv) {
     sprintf(comment,"Step %i",(int) iter);
     save_xyz(get_atoms(s->x,pars),comment,optmovie,true);
 
-    fprintf(stderr,"%4d % 16.8f % .3e % .3e %.3e %.3e %.3e %.3e %s\n", (int) iter, s->f, dE, dE/dEproj, dmax, drms, fmax, frms, titer.elapsed().c_str());
-    fflush(stderr);
-
     // Check convergence
-    bool convd=false;
+    bool fmaxconv=false, frmsconv=false;
+    bool dmaxconv=false, drmsconv=false;
 
     switch(crit) {
 
     case(LOOSE):
-      if((fmax < 2.5e-3) && (frms < 1.7e-3) && (dmax < 1.0e-2) && (drms < 6.7e-3))
-	convd=true;
+      if(fmax < 2.5e-3)
+	fmaxconv=true;
+      if(frms < 1.7e-3)
+	frmsconv=true;
+      if(dmax < 1.0e-2)
+	dmaxconv=true;
+      if(drms < 6.7e-3)
+	drmsconv=true;
+      break;
 
     case(NORMAL):
-      if((fmax < 4.5e-4) && (frms < 3.0e-4) && (dmax < 1.8e-3) && (drms < 1.2e-3))
-	convd=true;
+      if(fmax < 4.5e-4)
+	fmaxconv=true;
+      if(frms < 3.0e-4)
+	frmsconv=true;
+      if(dmax < 1.8e-3)
+	dmaxconv=true;
+      if(drms < 1.2e-3)
+	drmsconv=true;
+      break;
 
     case(TIGHT):
-      if((fmax < 1.5e-5) && (frms < 1.0e-5) && (dmax < 6.0e-5) && (drms < 4.0e-5))
-	convd=true;
+      if(fmax < 1.5e-5)
+	fmaxconv=true;
+      if(frms < 1.0e-5)
+	frmsconv=true;
+      if(dmax < 6.0e-5)
+	dmaxconv=true;
+      if(drms < 4.0e-5)
+	drmsconv=true;
+      break;
 
     case(VERYTIGHT):
-      if((fmax < 2.0e-6) && (frms < 1.0e-6) && (dmax < 6.0e-6) && (drms < 4.0e-6))
-	convd=true;
+      if(fmax < 2.0e-6)
+	fmaxconv=true;
+      if(frms < 1.0e-6)
+	frmsconv=true;
+      if(dmax < 6.0e-6)
+	dmaxconv=true;
+      if(drms < 4.0e-6)
+	drmsconv=true;
+      break;
+
+    default:
+      ERROR_INFO();
+      throw std::runtime_error("Not implemented!\n");
     }
+
+    // Converged?
+    const static char cconv[]=" *";
+
+    fprintf(stderr,"%4d % 16.8f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", (int) iter, s->f, dE, dE/dEproj, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
+    fflush(stderr);
+
+    convd=dmaxconv && drmsconv && fmaxconv && frmsconv;
 
     if(convd) {
       fprintf(stderr,"Converged.\n");
@@ -626,6 +691,11 @@ int main(int argc, char **argv) {
   gsl_multimin_fdfminimizer_free (s);
 
   gsl_vector_free (x);
+
+  if(iter==maxiter && !convd) {
+    printf("Geometry convergence was not achieved!\n");
+  }
+
 
   printf("Running program took %s.\n",tprog.elapsed().c_str());
 
