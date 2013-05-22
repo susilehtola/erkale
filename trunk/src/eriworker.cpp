@@ -927,6 +927,13 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 
   size_t ind=0;
 
+  // Two-product centers
+  double P[3], Q[3];
+  // Four-product center
+  double W[3];
+  // Distances
+  double PQ[3], WP[3], WQ[3];
+
   // Compute primitive data
   for(size_t p=0;p<ip.ic.size();p++)
     for(size_t q=0;q<ip.jc.size();q++) {
@@ -945,14 +952,31 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 	  // Reduced exponent
           double rho=zeta*eta/(zeta+eta);
 
-	  // Four-product center
-	  arma::vec W=(zeta*slicevec(ip.P,p,q)+eta*slicevec(jp.P,r,s))/(zeta+eta);
+	  P[0]=ip.P(p,q,0);
+	  P[1]=ip.P(p,q,1);
+	  P[2]=ip.P(p,q,2);
 
-	  arma::vec PQ=slicevec(ip.P,p,q)-slicevec(jp.P,r,s);
-	  arma::vec WP=W-slicevec(ip.P,p,q);
-	  arma::vec WQ=W-slicevec(jp.P,r,s);
+	  Q[0]=jp.P(r,s,0);
+	  Q[1]=jp.P(r,s,1);
+	  Q[2]=jp.P(r,s,2);
 
-	  double rpqsq=arma::dot(PQ,PQ);
+	  W[0]=(zeta*P[0]+eta*Q[0])/(zeta+eta);
+	  W[1]=(zeta*P[1]+eta*Q[1])/(zeta+eta);
+	  W[2]=(zeta*P[2]+eta*Q[2])/(zeta+eta);
+
+	  PQ[0]=P[0]-Q[0];
+	  PQ[1]=P[1]-Q[1];
+	  PQ[2]=P[2]-Q[2];
+
+	  WP[0]=W[0]-P[0];
+	  WP[1]=W[1]-P[1];
+	  WP[2]=W[2]-P[2];
+
+	  WQ[0]=W[0]-Q[0];
+	  WQ[1]=W[1]-Q[1];
+	  WQ[2]=W[2]-Q[2];
+
+	  double rpqsq=pow(PQ[0],2) + pow(PQ[1],2) + pow(PQ[2],2);
 
 	  // Helper variable
 	  prim_data data;
@@ -961,8 +985,8 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
           for(int i=0;i<3;i++) {
             data.U[0][i]=ip.PA(p,q,i); // PA
             data.U[2][i]=jp.PA(r,s,i); // QC
-            data.U[4][i]=WP(i); // WP
-            data.U[5][i]=WQ(i); // WQ
+            data.U[4][i]=WP[i]; // WP
+            data.U[5][i]=WQ[i]; // WQ
           }
 
 	  // Store exponents
@@ -999,6 +1023,14 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 
   size_t ind=0;
 
+  // Two-product centers
+  double P[3], Q[3];
+  // Four-product center
+  double W[3];
+  // Distances
+  double PQ[3], WP[3], WQ[3];
+
+
   // Compute primitive data
   for(size_t p=0;p<ip.ic.size();p++)
     for(size_t q=0;q<ip.jc.size();q++) {
@@ -1017,14 +1049,31 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 	  // Reduced exponent
           double rho=zeta*eta/(zeta+eta);
 
-	  // Four-product center
-	  arma::vec W=(zeta*slicevec(ip.P,p,q)+eta*slicevec(jp.P,r,s))/(zeta+eta);
+	  P[0]=ip.P(p,q,0);
+	  P[1]=ip.P(p,q,1);
+	  P[2]=ip.P(p,q,2);
 
-	  arma::vec PQ=slicevec(ip.P,p,q)-slicevec(jp.P,r,s);
-	  arma::vec WP=W-slicevec(ip.P,p,q);
-	  arma::vec WQ=W-slicevec(jp.P,r,s);
+	  Q[0]=jp.P(r,s,0);
+	  Q[1]=jp.P(r,s,1);
+	  Q[2]=jp.P(r,s,2);
 
-	  double rpqsq=arma::dot(PQ,PQ);
+	  W[0]=(zeta*P[0]+eta*Q[0])/(zeta+eta);
+	  W[1]=(zeta*P[1]+eta*Q[1])/(zeta+eta);
+	  W[2]=(zeta*P[2]+eta*Q[2])/(zeta+eta);
+
+	  PQ[0]=P[0]-Q[0];
+	  PQ[1]=P[1]-Q[1];
+	  PQ[2]=P[2]-Q[2];
+
+	  WP[0]=W[0]-P[0];
+	  WP[1]=W[1]-P[1];
+	  WP[2]=W[2]-P[2];
+
+	  WQ[0]=W[0]-Q[0];
+	  WQ[1]=W[1]-Q[1];
+	  WQ[2]=W[2]-Q[2];
+
+	  double rpqsq=pow(PQ[0],2) + pow(PQ[1],2) + pow(PQ[2],2);
 
 	  // Helper variable
 	  prim_data data;
@@ -1035,8 +1084,8 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 	    data.U[1][i]=ip.PB(p,q,i); // PB
             data.U[2][i]=jp.PA(r,s,i); // QC
 	    data.U[3][i]=jp.PB(r,s,i); // QD
-            data.U[4][i]=WP(i); // WP
-            data.U[5][i]=WQ(i); // WQ
+            data.U[4][i]=WP[i]; // WP
+            data.U[5][i]=WQ[i]; // WQ
           }
 
 	  // Store exponents
