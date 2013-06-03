@@ -1,13 +1,12 @@
 * Write pretty-printing routine for making bars such as *** text ***
   or --- text ---.
 
-* Implement writing of cube files, for visualization of e.g.
-  - electron density
-  - molecular orbitals.
-  - electrostatic potential
-
 * Implement GGA in Casida.
 
-* Write geometry optimization routines.
+* Implement molecular dynamics.
+
+* Implement propagation TDDFT.
 
 * Implement computation of two-electron completeness profiles.
+
+* Try to further speed up formation of Fock matrix.
