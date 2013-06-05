@@ -363,19 +363,24 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   fflush(stdout);
 
 #ifdef DFT
+  if(dft.adaptive) {
 #ifdef RESTRICTED
-  // Form DFT quadrature grid
-  grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+    // Form DFT quadrature grid
+    grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
 #else
-  // Form DFT quadrature grid
-  grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+    // Form DFT quadrature grid
+    grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
-  fflush(stdout);
+  } else {
+    // Fixed size grid
+    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+  }
 
   if(verbose) {
+    fflush(stdout);
     fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",t.get());
   }
-#endif
+#endif // DFT
 
   // Has calculation been converged?
   bool converged=0;

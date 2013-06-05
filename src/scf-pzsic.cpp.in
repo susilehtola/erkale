@@ -271,7 +271,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   }
 
 
-  {
+  if(dft.adaptive) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
 
@@ -312,13 +312,13 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	Pv[Pv.size()-2+ispin]+=numocc[ispin][io]*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
     }
 #endif
-    
+
 #ifdef RESTRICTED
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
 #else
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
 #endif
-  }
+  } // if(dft.adaptive)
   
   while(true) {
     Timer t;

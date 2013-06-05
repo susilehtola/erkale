@@ -1571,6 +1571,69 @@ void AtomGrid::check_grad_lapl(int x_func, int c_func) {
     do_lapl=do_lapl || laplacian_needed(c_func);
 }
 
+atomgrid_t AtomGrid::construct(const BasisSet & bas, size_t cenind, int nrad, int lmax, bool verbose) {
+  // Returned info
+  atomgrid_t ret;
+
+  // Store index of center
+  ret.atind=cenind;
+  // and its coordinates
+  ret.cen=bas.get_coords(cenind);
+  ret.ngrid=0;
+  ret.nfunc=0;
+
+  // Get Chebyshev nodes and weights for radial part
+  std::vector<double> xc, wc;
+  chebyshev(nrad,xc,wc);
+
+  // Allocate memory
+  ret.sh.resize(nrad);
+
+  // Loop over radii
+  double rad, jac;
+  for(size_t ir=0;ir<xc.size();ir++) {
+    // Calculate value of radius
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+
+    // Jacobian of transformation is
+    jac=1.0/M_LN2/(1.0-xc[ir]);
+    // so total quadrature weight is
+    double weight=wc[ir]*rad*rad*jac;
+
+    // Store shell data
+    ret.sh[ir].r=rad;
+    ret.sh[ir].w=weight;
+    ret.sh[ir].l=lmax;
+  }
+
+  // Add shells
+  for(size_t ir=0;ir<ret.sh.size();ir++)
+    // Form radial shell
+    if(use_lobatto)
+      add_lobatto_shell(ret,ir);
+    else
+      add_lebedev_shell(ret,ir);
+  
+  // Form grid
+  form_grid(bas,ret);
+  // Compute values of basis functions
+  compute_bf(bas,ret);
+  
+  // Store amount of grid and 
+  ret.ngrid=grid.size();
+  ret.nfunc=flist.size();
+
+  // Free memory
+  free();
+
+  if(verbose) {
+    printf("\t%4u %7u %8u\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc);
+    fflush(stdout);
+  }
+
+  return ret;
+}
+
 atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t cenind, int x_func, int c_func, bool verbose) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells
@@ -2263,6 +2326,36 @@ DFTGrid::DFTGrid(const BasisSet * bas, bool ver, bool lobatto) {
 }
 
 DFTGrid::~DFTGrid() {
+}
+
+void DFTGrid::construct(int nrad, int lmax, int x_func, int c_func) {
+  if(verbose) {
+    printf("Composition of static DFT grid:\n");
+    printf("\t%4s %7s %8s\n","atom","Npoints","Nfuncs");
+    fflush(stdout);
+  }
+
+  // Check necessity of gradients and laplacians
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].check_grad_lapl(x_func,c_func);
+
+  // Construct grids
+  size_t Nat=basp->get_Nnuc();
+#ifdef _OPENMP
+#pragma omp parallel
+  {
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+    for(size_t i=0;i<Nat;i++) {
+      grids[i]=wrk[ith].construct(*basp,i,nrad,lmax,verbose);
+    }
+  }
+#else
+  for(size_t i=0;i<Nat;i++)
+    grids[i]=wrk[0].construct(*basp,i,nrad,lmax,verbose);
+#endif
+
+  
 }
 
 void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func) {
