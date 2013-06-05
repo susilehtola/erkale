@@ -213,6 +213,9 @@ class AtomGrid {
   /// Check necessity of computing gradient and laplacians, necessary for compute_bf!
   void check_grad_lapl(int x_func, int c_func);
 
+  /// Construct a fixed size grid
+  atomgrid_t construct(const BasisSet & bas, size_t cenind, int nrad, int lmax, bool verbose);
+
   /// Construct adaptively a grid centered on the cenind:th center, restricted calculation
   atomgrid_t construct(const BasisSet & bas, const arma::mat & P, size_t cenind, int x_func, int c_func, bool verbose);
   /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
@@ -328,6 +331,8 @@ class DFTGrid {
   /// Destructor
   ~DFTGrid();
 
+  /// Create fixed size grid
+  void construct(int nrad, int lmax, int x_func, int c_func);
   /// Create grid for restricted calculation
   void construct(const arma::mat & P, double tol, int x_func, int c_func);
   /// Create grid for unrestricted calculation

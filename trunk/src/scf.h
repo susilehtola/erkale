@@ -61,8 +61,15 @@ typedef struct {
   int x_func;
   /// Used correlation functional
   int c_func;
+
+  /// Adaptive grid?
+  bool adaptive;
   /// Integration grid tolerance
   double gridtol;
+  /// Amount of radial shells (if not adaptive)
+  int nrad;
+  /// Maximum angular quantum number to integrate exactly (if not adaptive)
+  int lmax;
 } dft_t;
 
 /// Energy info

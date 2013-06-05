@@ -879,10 +879,30 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
-    dft.gridtol=set.get_double("DFTFinalTol");
+    dft.gridtol=0.0;
+    // Use static grid?
+    if(stricmp(set.get_string("DFTGrid"),"Auto")!=0) {
+      std::vector<std::string> opts=splitline(set.get_string("DFTGrid"));
+      if(opts.size()!=2) {
+	throw std::runtime_error("Invalid DFT grid specified.\n");
+      }
+
+      dft.adaptive=false;
+      dft.nrad=readint(opts[0]);
+      dft.lmax=readint(opts[1]);
+      if(dft.nrad<1 || dft.lmax<1) {
+	throw std::runtime_error("Invalid DFT grid specified.\n");
+      }
+      printf("dft.nrad = %i, dft.lmax = %i\n",dft.nrad,dft.lmax);
+
+    } else {
+      dft.adaptive=true;
+      dft.gridtol=set.get_double("DFTFinalTol");
+    }
 
     initdft=dft;
-    initdft.gridtol=set.get_double("DFTInitialTol");
+    if(dft.adaptive)
+      initdft.gridtol=set.get_double("DFTInitialTol");
 
     initconv.deltaEmax*=set.get_double("DFTDelta");
     initconv.deltaPmax*=set.get_double("DFTDelta");
@@ -1007,8 +1027,11 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Print information about used functionals
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
-      // Solve restricted DFT problem first on a rough grid
-      solver.RDFT(sol,occs,initconv,initdft);
+
+      if(stricmp(set.get_string("DFTGrid"),"Auto")==0) {
+	// Solve restricted DFT problem first on a rough grid
+	solver.RDFT(sol,occs,initconv,initdft);
+      }
       // .. and then on the final grid
       solver.do_force(force);
       solver.RDFT(sol,occs,conv,dft);
@@ -1111,8 +1134,11 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Print information about used functionals
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
-      // Solve restricted DFT problem first on a rough grid
-      solver.UDFT(sol,occa,occb,initconv,initdft);
+
+      if(stricmp(set.get_string("DFTGrid"),"Auto")==0) {
+	// Solve restricted DFT problem first on a rough grid
+	solver.UDFT(sol,occa,occb,initconv,initdft);
+      }
       // ... and then on the more accurate grid
       solver.do_force(force);
       solver.UDFT(sol,occa,occb,conv,dft);

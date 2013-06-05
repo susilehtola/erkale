@@ -211,7 +211,24 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
   dft_t dft;
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
-    dft.gridtol=set.get_double("DFTFinalTol");
+    dft.gridtol=0.0;
+    
+    if(stricmp(set.get_string("DFTGrid"),"Auto")!=0) {
+      std::vector<std::string> opts=splitline(set.get_string("DFTGrid"));
+      if(opts.size()!=2) {
+        throw std::runtime_error("Invalid DFT grid specified.\n");
+      }
+
+      dft.adaptive=false;
+      dft.nrad=readint(opts[0]);
+      dft.lmax=readint(opts[1]);
+      if(dft.nrad<1 || dft.lmax<1) {
+        throw std::runtime_error("Invalid DFT grid specified.\n");
+      }
+    } else {
+      dft.adaptive=true;
+      dft.gridtol=set.get_double("DFTFinalTol");
+    }
   }
 
   // Force
@@ -240,10 +257,15 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
       f=solver.force_RHF(sol,occs,FINETOL);
     } else {
       DFTGrid grid(&basis,set.get_bool("Verbose"),set.get_bool("DFTLobatto"));
-      grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+
+      // Fixed grid?
+      if(dft.adaptive)
+	grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+      else
+	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
       f=solver.force_RDFT(sol,occs,dft,grid,FINETOL);
     }
-
+    
   } else {
 
     uscf_t sol;
@@ -273,7 +295,12 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
       //      f=solver.force_ROHF(sol,Nela,Nelb,tol);
     } else {
       DFTGrid grid(&basis,set.get_bool("Verbose"),set.get_bool("DFTLobatto"));
-      grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+
+      // Fixed grid?
+      if(dft.adaptive)
+	grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+      else
+	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
       f=solver.force_UDFT(sol,occa,occb,dft,grid,tol);
     }
   }
