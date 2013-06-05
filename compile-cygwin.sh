@@ -25,7 +25,7 @@ export CPP="${CC} -E"
 export FCCPP="${FC} -E"
 
 # C flags to use. 
-export CFLAGS="-Wall -O2 -funroll-loops -mtune=generic"
+export CFLAGS="-Wall -O2 -funroll-loops -mtune=generic -msse2"
 
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
@@ -41,11 +41,13 @@ BLAS="-lblas -lgfortran"
 # If this is very high, libint compilation will take ages and the
 # resulting libraries will be HUGE.
 MAXAM="6"
+# Maximum angular momentum for first ERI derivatives
+MAXDERIV="5"
 
 # Current versions of libraries
 export XCVER="2.0.1"
 export INTVER="1.1.4"
-export ARMAVER="3.6.1"
+export ARMAVER="3.900.0"
 
 # Silence cmake warnings about changed behavior
 export CMAKE_LEGACY_CYGWIN_WIN32=0 
@@ -103,7 +105,7 @@ EOF
 fi
 
 # libint
-if [ ! -f ${topdir}/libint/lib/libint.a ]; then
+if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a ]]; then
  echo -n "Compiling libint ..."
 
  if [ ! -d ${builddir}/libint-${INTVER} ]; then
@@ -122,7 +124,7 @@ if [ ! -f ${topdir}/libint/lib/libint.a ]; then
  
   ./configure --enable-static --disable-shared \
   --prefix=${topdir}/libint --exec-prefix=${topdir}/libint \
-  --disable-deriv --disable-r12 --with-libint-max-am=${MAXAM} \
+  --disable-r12 --with-libint-max-am=${MAXAM} --with-libderiv-max-am1=${MAXDERIV} \
   --with-cc="${CC}" --with-cxx="${CXX}" --with-ar=${AR} \
   --with-cc-optflags="${ICFLAGS}" \
   --with-cxx-optflags="${ICXXFLAGS}" &>configure.log
