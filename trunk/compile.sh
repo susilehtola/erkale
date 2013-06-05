@@ -28,7 +28,7 @@ export FCCPP="${FC} -E"
 #For new versions of GCC on modern x86 hardware
 #export CFLAGS="-Wall -O2 -funroll-loops -fPIC -march=native -msse3"
 #For older versions
-export CFLAGS="-Wall -O2 -funroll-loops -fPIC"
+export CFLAGS="-Wall -O2 -funroll-loops -fPIC -msse2"
 
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
@@ -44,14 +44,16 @@ BLAS="-L/usr/lib64/atlas -lcblas -latlas"
 # If this is very high, libint compilation will take ages and the
 # resulting libraries will be HUGE.
 MAXAM="6"
+# Maximum angular momentum for first ERI derivatives
+MAXDERIV="5"
 
 # Current versions of libraries
 export GSLVER="1.15"
 export XCVER="2.0.1"
 export INTVER="1.1.4"
-export ARMAVER="3.6.1"
-export CMAKEVER="2.8.10"
-export HDF5VER="1.8.10"
+export ARMAVER="3.900.0"
+export CMAKEVER="2.8.11"
+export HDF5VER="1.8.11"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -148,7 +150,7 @@ EOF
 fi
 
 # libint
-if [ ! -f ${topdir}/libint/lib/libint.a ]; then
+if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a ]]; then
  echo -n "Compiling libint ..."
 
  if [ ! -d ${builddir}/libint-${INTVER} ]; then
@@ -167,7 +169,7 @@ if [ ! -f ${topdir}/libint/lib/libint.a ]; then
  
  ./configure --enable-static --disable-shared \
   --prefix=${topdir}/libint --exec-prefix=${topdir}/libint \
-  --disable-deriv --disable-r12 --with-libint-max-am=${MAXAM} \
+  --disable-r12 --with-libint-max-am=${MAXAM} --with-libderiv-max-am1=${MAXDERIV} \
   --with-cc="${CC}" --with-cxx="${CXX}" --with-ar=${AR} \
   --with-cc-optflags="${ICFLAGS}" \
   --with-cxx-optflags="${ICXXFLAGS}" &>configure.log
