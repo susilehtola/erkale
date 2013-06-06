@@ -1640,6 +1640,13 @@ std::string BasisSet::get_symbol(size_t inuc) const {
   return nuclei[inuc].symbol;
 }
 
+std::string BasisSet::get_symbol_hr(size_t inuc) const {
+  if(nuclei[inuc].bsse)
+    return nuclei[inuc].symbol+"-Bq";
+  else
+    return nuclei[inuc].symbol;
+}
+
 std::vector<GaussianShell> BasisSet::get_funcs(size_t inuc) const {
   std::vector<GaussianShell> ret;
   for(size_t i=0;i<nuclei[inuc].shells.size();i++)
