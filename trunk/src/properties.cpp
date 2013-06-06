@@ -155,11 +155,11 @@ void population_analysis(const BasisSet & basis, const arma::mat & P) {
 
   printf("\nMulliken charges\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol(i).c_str(), mulq(i));
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), mulq(i));
 
   printf("\nElectron density at nuclei\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol(i).c_str(), nucd(i));
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i));
   printf("\n");
 
   // These generate a lot of output
@@ -202,11 +202,11 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
 
   printf("\nMulliken charges: alpha, beta, total (incl. nucleus)\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol(i).c_str(), mulq(i,0), mulq(i,1), mulq(i,2));
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), mulq(i,0), mulq(i,1), mulq(i,2));
 
   printf("\nElectron density at nuclei: alpha, beta, total\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol(i).c_str(), nucd(i,0), nucd(i,1), nucd(i,2));
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i,0), nucd(i,1), nucd(i,2));
   printf("\n");
 
   // These generate a lot of output

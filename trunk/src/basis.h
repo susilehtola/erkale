@@ -324,6 +324,9 @@ class BasisSet {
   int get_Z(size_t inuc) const;
   /// Get symbol of nucleus
   std::string get_symbol(size_t inuc) const;
+  /// Get human readable symbol of nucleus (-Bq)
+  std::string get_symbol_hr(size_t inuc) const;
+
   /// Get basis functions centered on a given atom
   std::vector<GaussianShell> get_funcs(size_t inuc) const;
   /// Get indices of shells centered on a given atom
