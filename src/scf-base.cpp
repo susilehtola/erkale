@@ -85,7 +85,17 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
   direct=set.get_bool("Direct");
   strictint=set.get_bool("StrictIntegrals");
-  pzcor=set.get_double("PZ-SIC");
+
+  // Perdew-Zunger SIC?
+  pzcor=set.get_double("PZ-SICw");
+  std::string pzs=set.get_string("PZ-SIC");
+  if(stricmp(pzs,"Yes")==0)
+    pz=YES;
+  else if(stricmp(pzs,"Pert")==0)
+    pz=PERT;
+  else
+    pz=NO;  
+
   doforce=false;
 
   // Check update scheme
@@ -1030,7 +1040,10 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
       if(stricmp(set.get_string("DFTGrid"),"Auto")==0) {
 	// Solve restricted DFT problem first on a rough grid
+	enum pzsic pz=solver.do_sic();
+	if(pz==PERT) solver.do_sic(NO);
 	solver.RDFT(sol,occs,initconv,initdft);
+	if(pz==PERT) solver.do_sic(pz);
       }
       // .. and then on the final grid
       solver.do_force(force);
@@ -1137,7 +1150,10 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
       if(stricmp(set.get_string("DFTGrid"),"Auto")==0) {
 	// Solve restricted DFT problem first on a rough grid
+	enum pzsic pz=solver.do_sic();
+	if(pz==PERT) solver.do_sic(NO);
 	solver.UDFT(sol,occa,occb,initconv,initdft);
+	if(pz==PERT) solver.do_sic(pz);
       }
       // ... and then on the more accurate grid
       solver.do_force(force);
@@ -1790,6 +1806,14 @@ arma::cx_mat SCF::localize_Bder(const arma::mat & C, const arma::cx_mat & M, con
 
 void SCF::do_force(bool val) {
   doforce=val;
+}
+
+void SCF::do_sic(enum pzsic val) {
+  pz=val;
+}
+
+enum pzsic SCF::do_sic() const {
+  return pz;
 }
 
 arma::mat interpret_force(const arma::vec & f) {

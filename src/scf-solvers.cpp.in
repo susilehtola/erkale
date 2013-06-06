@@ -333,7 +333,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     } else
       fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
 
-    if(pzcor!=0.0)
+    if(pz==PERT)
+      fprintf(stderr,"perturbative SIC ");
+    else if(pz==YES)
       fprintf(stderr,"SIC ");
 #endif
 
@@ -412,7 +414,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
       if(iiter!=1 && !strict && verbose && !densityfit)
 	printf("Restarting Fock matrix formation from scratch.\n");
-      
+
       form_fock(sol,refsol);
     } else {
       form_fock(sol,oldsol);
@@ -420,13 +422,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef DFT
     // Perdew-Zunger correction?
-    if(pzcor!=0.0) {
+    if(pz==YES) {
       titer.stop();
 #ifdef RESTRICTED
       PZSIC_RDFT(sol,occs,dft,grid,tol);
 #else
       PZSIC_UDFT(sol,occa,occb,dft,grid,tol);
-#endif	
+#endif
       titer.cont();
     }
 #endif
@@ -588,7 +590,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       // RH level shift;
       const double rmuin=0.5;
       double rmu=rmuin;
-      
+
       bool mufound=false;
 
       // Solutions
@@ -628,13 +630,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	form_fock(rhsol,sol);
 #ifdef DFT
 	// Perdew-Zunger correction?
-	if(pzcor!=0.0) {
+	if(pz==YES) {
 	  titer.stop();
 #ifdef RESTRICTED
 	  PZSIC_RDFT(rhsol,occs,dft,grid,tol);
 #else
 	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,tol);
-#endif	
+#endif
 	  titer.cont();
 	}
 #endif
@@ -650,7 +652,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  mufound=true;
 	  break;
 	}
-	 
+
 
 	if(rhsol.en.E<minE) {
 	  minE=rhsol.en.E;
@@ -668,7 +670,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       double Emin0=std::min(lhsol.en.E,rhsol.en.E);
 
       double oldE=0.0;
-      
+
       // Use golden section search to find minimum
       const double tau=(sqrt(5.0)-1.0)/2.0;
 
@@ -681,13 +683,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #else
       uscf_t sol1(sol), sol2(sol);
 #endif
-      
+
       if(!mufound)
 	for(int imu=0;imu<10;imu++) {
 	  // Compute new trials
 	  double mu1=lmu+(1-tau)*(rmu-lmu);
 	  double mu2=lmu+tau*(rmu-lmu);
-	  
+
 	  // Do level shifts
 #ifdef RESTRICTED
 	  if(comp1)
@@ -704,7 +706,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    sol2.Hb=refsol.Hb-mu2*S*refsol.Pb*S;
 	  }
 #endif
-	  
+
 	  // Compute energies
 	  if(comp1) {
 	    diagonalize(S,Sinvh,sol1);
@@ -712,13 +714,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_fock(sol1,sol);
 #ifdef DFT
 	    // Perdew-Zunger correction?
-	    if(pzcor!=0.0) {
+	    if(pz==YES) {
 	      titer.stop();
 #ifdef RESTRICTED
 	      PZSIC_RDFT(sol1,occs,dft,grid,tol);
 #else
 	      PZSIC_UDFT(sol1,occa,occb,dft,grid,tol);
-#endif	
+#endif
 	      titer.cont();
 	    }
 #endif
@@ -728,20 +730,20 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	      fflush(stdout);
 	    }
 	  }
-	  
+
 	  if(comp2) {
 	    diagonalize(S,Sinvh,sol2);
 	    form_dens(sol2);
 	    form_fock(sol2,sol);
 #ifdef DFT
 	    // Perdew-Zunger correction?
-	    if(pzcor!=0.0) {
+	    if(pz==YES) {
 	      titer.stop();
 #ifdef RESTRICTED
 	      PZSIC_RDFT(sol2,occs,dft,grid,tol);
 #else
 	      PZSIC_UDFT(sol2,occa,occb,dft,grid,tol);
-#endif	
+#endif
 	      titer.cont();
 	    }
 #endif
@@ -751,15 +753,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	      fflush(stdout);
 	    }
 	  }
-	  
+
 	  /*
 	    fprintf(stderr,"mu: %e %e %e %e\n",lmu,mu1,mu2,rmu);
 	    fprintf(stderr,"E: %e %e %e %e\n",lhsol.en.E,sol1.en.E,sol2.en.E,rhsol.en.E);
 	  */
-	  
+
 	  // Choose what to do
 	  minE=std::min(std::min(lhsol.en.E,rhsol.en.E),std::min(sol1.en.E,sol2.en.E));
-	  
+
 	  if(minE==lhsol.en.E) {
 	    // probably converged
 	    sol=lhsol;
@@ -772,32 +774,32 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    // Move right limit closer
 	    rmu=mu2;
 	    rhsol=sol2;
-	    
+
 	    // New solution 2 is old solution 1
 	    sol2=sol1;
 	    comp2=false;
 	    comp1=true;
-	    
+
 	    oldE=sol.en.E;
 	    sol=sol1;
 	  } else { // minE==sol2.en.E
 	    // Move left limit closer
 	    lmu=mu1;
 	    lhsol=sol1;
-	    
+
 	    // New solution 1 is old solution 2
 	    sol1=sol2;
 	    comp1=false;
 	    comp2=true;
-	    
+
 	    oldE=sol.en.E;
 	    sol=sol2;
 	  }
-	  
+
 	  // Check convergence
 	  if(oldE-sol.en.E<conv.deltaEmax)
 	    break;
-	  
+
 	}
     } else if(usetrrh) {
 
@@ -1013,12 +1015,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     chkptp->write("Converged",converged);
     chkptp->write("tol",tol);
     chkptp->close();
-    
+
     // Update screening value
     if(direct && !strict && !densityfit) {
       // adapted from molpro
       double newtol=std::min(std::min(fabs(conv.deltaEmax)*1e-2,FINETOL),tol);
-      
+
       // Clear out old accelerator stacks
       if(tol!=newtol && rmsdiff<=TOLCHANGE) {
 	if(verbose) {
@@ -1036,16 +1038,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	adiisb.clear();
 	broyd_sum.clear();
 	broyd_diff.clear();
-#endif	
+#endif
 	// Set new tolerance
 	tol=newtol;
 	// and turn on strict integration - no incremental formation
 	strict=true;
       } else if(converged)
-	break;
+      	break;
     } else if(converged)
       break;
-
 
     iiter++;
   } // End SCF cycle
@@ -1080,8 +1081,18 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	printf("Fock matrix was built %i times.\n",nfock);
 	fprintf(stderr,"Fock matrix was built %i times.\n",nfock);
       }
-	
     }
+
+#ifdef DFT
+	if(pz==PERT) {
+#ifdef RESTRICTED
+	  PZSIC_RDFT(sol,occs,dft,grid,tol);
+#else
+	  PZSIC_UDFT(sol,occa,occb,dft,grid,tol);
+#endif
+	  diagonalize(S,Sinvh,sol);
+	}
+#endif
 
     if(doforce) {
       arma::vec f;
@@ -1102,15 +1113,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       throw std::runtime_error("Forces not supported for this method.\n");
 #endif
 
-      chkptp->write("Force",f);      
+      chkptp->write("Force",f);
     }
-    
+
   } else {
     std::ostringstream oss;
     oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): SCF did not converge in "<<maxiter<<" iterations!\n";
     throw std::runtime_error(oss.str());
   }
-  
+
 #if defined(HALFHOLE) || defined(FULLHOLE)
   return ixc_orb;
 #endif

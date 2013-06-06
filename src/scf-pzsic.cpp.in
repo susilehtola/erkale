@@ -509,7 +509,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
       if(convd) {
 	if(verbose) {
-	  fprintf(stderr,"\n");
+	  fprintf(stderr," %10.3f\n",t.get());
 
 	  printf("Converged.\n");
 	  fflush(stdout);
@@ -533,7 +533,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	break;
       } else if(k==MAXITER) {
 	if(verbose) {
-	  fprintf(stderr,"\n");
+	  fprintf(stderr," %10.3f\n",t.get());
 	  printf("Not converged.\n");
 	  fflush(stdout);
 	}

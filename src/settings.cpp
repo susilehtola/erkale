@@ -110,9 +110,6 @@ void Settings::add_scf_settings() {
   add_int("FittingMemory", "Amount of memory in MB to use for exchange fitting",1000);
   // Threshold for screening eigenvectors
   add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-8);
-
-  // Use Perdew-Zunger self-interaction correction?
-  add_double("PZ-SIC", "Perform Perdew-Zunger self-interaction correction? (Give weight)", 0.0);
 }
 
 void Settings::add_dft_settings() {
@@ -128,6 +125,11 @@ void Settings::add_dft_settings() {
   add_double("DFTFinalTol", "Tolerance of final DFT grid", 1e-5);
   // Relative factor for initialization
   add_double("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0);
+
+  // Use Perdew-Zunger self-interaction correction?
+  add_double("PZ-SICw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
+  // Perturbative SIC?
+  add_string("PZ-SIC", "Perform Perdew-Zunger self-interaction correction? Yes, No, Pert","No");
 }
 
 void Settings::add_double(std::string name, std::string comment, double val) {
@@ -189,7 +191,7 @@ void Settings::set_double(std::string name, double val) {
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n";
+  oss << "\nThe double type setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 }
 
@@ -203,7 +205,7 @@ void Settings::set_bool(std::string name, bool val) {
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n";
+  oss << "\nThe boolean setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 }
 
@@ -217,7 +219,7 @@ void Settings::set_int(std::string name, int val) {
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n";
+  oss << "\nThe integer setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 }
 
@@ -232,7 +234,7 @@ void Settings::set_string(std::string name, std::string val) {
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n";
+  oss << "\nThe string setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 }
 
@@ -247,7 +249,7 @@ double Settings::get_double(std::string name) const {
 
   //  ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n";
+  oss << "\nThe double type setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return 0.0;
@@ -262,7 +264,7 @@ bool Settings::get_bool(std::string name) const {
 
   //  ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n";
+  oss << "\nThe boolean setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return 0;
@@ -277,7 +279,7 @@ int Settings::get_int(std::string name) const {
 
   //  ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n";
+  oss << "\nThe integer setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return 0;
@@ -292,7 +294,7 @@ std::string Settings::get_string(std::string name) const {
 
   //  ERROR_INFO();
   std::ostringstream oss;
-  oss << "\nThe setting "<<name<<" was not found!\n";
+  oss << "\nThe string setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
 
   return "";
@@ -371,7 +373,7 @@ void Settings::parse(std::string filename) {
 	    }
 	    set_string("Method",words[1]);
 
-	    // Hybrid functional? Do we turn off density fitting?
+	    // Hybrid functional? Do we turn off density fitting by default?
 	    int xfunc, cfunc;
 	    parse_xc_func(xfunc,cfunc,words[1]);
 	    if(exact_exchange(xfunc)!=0.0)
