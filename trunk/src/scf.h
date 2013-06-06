@@ -144,6 +144,13 @@ enum guess_t {
   MOLGUESS
 };
 
+/// Perdew-Zunger SIC?
+enum pzsic {
+  NO,
+  YES,
+  PERT
+};
+
 class SCF {
  protected:
  /// Overlap matrix
@@ -218,6 +225,8 @@ class SCF {
   bool dft_lobatto;
 
   /// Perdew-Zunger correction?
+  enum pzsic pz;
+  /// Perdew-Zunger correction weight
   double pzcor;
 
   /// Calculate forces?
@@ -318,6 +327,10 @@ class SCF {
 
   /// Toggle calculation of forces
   void do_force(bool val);
+  /// Toggle calculation of SIC
+  void do_sic(enum pzsic val);
+  /// Get status of SIC
+  enum pzsic do_sic() const;
 };
 
 /// Diagonalize Fock matrix

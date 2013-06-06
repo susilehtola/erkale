@@ -69,6 +69,7 @@ int main(int argc, char **argv) {
   set.add_bool("ForcePol","Force polarized calculation",false);
   set.add_bool("FreezeCore","Freeze the atomic cores?",false);
   set.parse(std::string(argv[1]));
+  set.print();
 
   // Redirect output?
   std::string logfile=set.get_string("Logfile");
