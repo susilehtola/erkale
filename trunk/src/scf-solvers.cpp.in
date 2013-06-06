@@ -1044,7 +1044,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	// and turn on strict integration - no incremental formation
 	strict=true;
       } else if(converged)
-      	break;
+	break;
     } else if(converged)
       break;
 
@@ -1084,19 +1084,49 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     }
 
 #ifdef DFT
-	if(pz==PERT) {
+    if(pz==PERT) {
+      // Calculate SIC correction
 #ifdef RESTRICTED
-	  PZSIC_RDFT(sol,occs,dft,grid,tol);
+      PZSIC_RDFT(sol,occs,dft,grid,tol);
 #else
-	  PZSIC_UDFT(sol,occa,occb,dft,grid,tol);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,tol);
 #endif
-	  diagonalize(S,Sinvh,sol);
+      // Diagonalize to get new canonical orbitals and energies
+      diagonalize(S,Sinvh,sol);
 
-	  if(verbose) {
-	    fprintf(stderr,"ESIC % 16.8f\n",sol.en.E);
-	    printf("PZ-SIC corrected energy is % 16.8f\n",sol.en.E);
-	  }
-	}
+      chkptp->open();
+      chkptp->write(sol.en);
+      chkptp->write("P",sol.P);
+#if !defined(RESTRICTED)
+      chkptp->write("Ca",sol.Ca);
+      chkptp->write("Cb",sol.Cb);
+      chkptp->write("Ea",sol.Ea);
+      chkptp->write("Eb",sol.Eb);
+      chkptp->write("Ha",sol.Ha);
+      chkptp->write("Hb",sol.Hb);
+      chkptp->write("Pa",sol.Pa);
+      chkptp->write("Pb",sol.Pb);
+#else
+      chkptp->write("C",sol.C);
+      chkptp->write("E",sol.E);
+      chkptp->write("H",sol.H);
+#endif
+      chkptp->close();
+
+      if(verbose) {
+	fprintf(stderr,"ESIC % 16.8f\n",sol.en.E);
+	printf("PZ-SIC corrected energy is % 16.8f\n",sol.en.E);
+
+#ifdef RESTRICTED
+	print_E(sol.E,occs);
+#else
+	printf("alpha: ");
+	print_E(sol.Ea,occa);
+	printf("beta:  ");
+	print_E(sol.Eb,occb);
+#endif
+      }
+    }
 #endif
 
     if(doforce) {
