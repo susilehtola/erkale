@@ -226,3 +226,50 @@ std::vector<double> spline_interpolation(const std::vector<double> & xt, const s
 
   return y;
 }
+
+arma::cx_mat complex_unitary(size_t N) {
+  arma::cx_mat U(N,N);
+  U.zeros();
+
+  /*
+  // Spacing to use is                                                                                                                                                                      
+  std::complex<double> spacing(0.0,2.0*M_PI/(N+2));
+
+  // Fill matrix                                                                                                                                                                            
+  for(size_t i=0;i<N;i++) {
+    double iv=(double) i+1.0;
+    U(i,i)=exp(iv*spacing);
+  }
+
+  return U;
+  */
+
+  // Generate totally random matrix
+  arma::cx_mat A=arma::randn<arma::cx_mat>(N)+std::complex<double>(0.0,1.0)*arma::randn<arma::cx_mat>(N);
+  
+  // Perform QR decomposition on matrix
+  arma::cx_mat Q, R;
+  bool ok=arma::qr(Q,R,A);
+  if(!ok) {
+    ERROR_INFO();
+    throw std::runtime_error("QR decomposition failure in complex_unitary.\n");
+  }
+
+  // Perturb the phases randomly
+  //  Q*=arma::diagmat(exp(std::complex<double>(0.0,2.0*M_PI)*arma::randu<arma::cx_mat>(N,1)));
+
+
+  // Check that Q is unitary
+  arma::cx_mat test=Q*arma::trans(Q);
+  arma::cx_mat eye(test);
+  eye.eye();
+
+  test=test-eye;
+  double n=arma::norm(test,"fro")/(N*N); // Frobenius norm
+  if(n>10*DBL_EPSILON) {
+    ERROR_INFO();
+    throw std::runtime_error("Generated matrix is not unitary!\n");
+  }
+
+  return Q;
+}
