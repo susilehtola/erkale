@@ -107,4 +107,7 @@ template <class T> bool abscomp(const std::complex<T> & a, const std::complex<T>
 /// Spline interpolate data (xt,yt) to points in x.
 std::vector<double> spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, const std::vector<double> & x);
 
+/// Get complex unitary matrix of size N
+arma::cx_mat complex_unitary(size_t N);
+
 #endif

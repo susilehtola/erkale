@@ -1479,7 +1479,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 
 #define bracket(X,Y) (0.5*std::real(arma::trace(X*arma::trans(Y))))
 
-arma::cx_mat SCF::localize(const arma::mat & C) const {
+arma::cx_mat SCF::localize(const arma::mat & C, bool cplx) const {
   Timer t;
 
   if(verbose) {
@@ -1488,11 +1488,19 @@ arma::cx_mat SCF::localize(const arma::mat & C) const {
   }
 
   arma::cx_mat U(C.n_cols,C.n_cols);
-  U.eye();
+  if(cplx) {
+    // Initialize with a complex unitary matrix
+    U=complex_unitary(C.n_cols);
+  } else {
+    // Initialize with real unit matrix
+    U.eye();
+  }
 
-  if(C.n_cols<2)
+  if(C.n_cols<2) {
     // No optimization is necessary.
+    U.eye();
     return U;
+  }
 
   // Get R^2 matrix
   arma::mat rsq;

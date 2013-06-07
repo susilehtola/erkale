@@ -193,7 +193,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     // and of a reset U
     static std::vector<arma::cx_mat> Ueye(U);
     for(size_t ispin=0;ispin<C.size();ispin++)
-      Ueye[ispin].eye();
+      //      Ueye[ispin].eye();
+      Ueye[ispin]=complex_unitary(Ueye[ispin].n_cols);
 
     for(size_t ispin=0;ispin<C.size();ispin++)
       if(C[ispin].n_cols>1)
