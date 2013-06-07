@@ -24,7 +24,6 @@
 #include <sstream>
 #include <stdexcept>
 
-
 extern "C" {
   // For factorials and so on
 #include <gsl/gsl_sf_gamma.h>
@@ -36,6 +35,10 @@ extern "C" {
 #include <gsl/gsl_sf_hyperg.h>
   // For trigonometric functions
 #include <gsl/gsl_sf_trig.h>
+  // Random number generation
+#include <gsl/gsl_rng.h>
+  // Random number distributions
+#include <gsl/gsl_randist.h>
 }
 
 double doublefact(int n) {
@@ -227,26 +230,49 @@ std::vector<double> spline_interpolation(const std::vector<double> & xt, const s
   return y;
 }
 
-arma::cx_mat complex_unitary(size_t N) {
+arma::mat randu_mat(size_t M, size_t N, unsigned long int seed) {
+  // Use Mersenne Twister algorithm
+  gsl_rng *r = gsl_rng_alloc(gsl_rng_mt19937);
+  // Set seed
+  gsl_rng_set(r,seed);
+
+  // Matrix
+  arma::mat mat(M,N);
+  // Fill it
+  for(size_t i=0;i<M;i++)
+    for(size_t j=0;j<N;j++)
+      mat(i,j)=gsl_rng_uniform(r);
+
+  // Free rng
+  gsl_rng_free(r);
+  return mat;
+}
+
+arma::mat randn_mat(size_t M, size_t N, unsigned long int seed) {
+  // Use Mersenne Twister algorithm
+  gsl_rng *r = gsl_rng_alloc(gsl_rng_mt19937);
+  // Set seed
+  gsl_rng_set(r,seed);
+
+  // Matrix
+  arma::mat mat(M,N);
+  // Fill it
+  for(size_t i=0;i<M;i++)
+    for(size_t j=0;j<N;j++)
+      mat(i,j)=gsl_ran_gaussian(r,1.0);
+
+  // Free rng
+  gsl_rng_free(r);
+  return mat;
+}
+
+arma::cx_mat complex_unitary(size_t N, unsigned long int seed) {
   arma::cx_mat U(N,N);
   U.zeros();
 
-  /*
-  // Spacing to use is                                                                                                                                                                      
-  std::complex<double> spacing(0.0,2.0*M_PI/(N+2));
-
-  // Fill matrix                                                                                                                                                                            
-  for(size_t i=0;i<N;i++) {
-    double iv=(double) i+1.0;
-    U(i,i)=exp(iv*spacing);
-  }
-
-  return U;
-  */
-
   // Generate totally random matrix
-  arma::cx_mat A=arma::randn<arma::cx_mat>(N)+std::complex<double>(0.0,1.0)*arma::randn<arma::cx_mat>(N);
-  
+  arma::cx_mat A=std::complex<double>(1.0,0.0)*randn_mat(N,N,seed) + std::complex<double>(0.0,1.0)*randn_mat(N,N,seed+1);
+
   // Perform QR decomposition on matrix
   arma::cx_mat Q, R;
   bool ok=arma::qr(Q,R,A);
@@ -257,7 +283,6 @@ arma::cx_mat complex_unitary(size_t N) {
 
   // Perturb the phases randomly
   //  Q*=arma::diagmat(exp(std::complex<double>(0.0,2.0*M_PI)*arma::randu<arma::cx_mat>(N,1)));
-
 
   // Check that Q is unitary
   arma::cx_mat test=Q*arma::trans(Q);

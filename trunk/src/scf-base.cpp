@@ -1479,7 +1479,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 
 #define bracket(X,Y) (0.5*std::real(arma::trace(X*arma::trans(Y))))
 
-arma::cx_mat SCF::localize(const arma::mat & C, bool cplx) const {
+arma::cx_mat SCF::localize(const arma::mat & C, double & measure, bool cplx, long unsigned int seed) const {
   Timer t;
 
   if(verbose) {
@@ -1490,7 +1490,7 @@ arma::cx_mat SCF::localize(const arma::mat & C, bool cplx) const {
   arma::cx_mat U(C.n_cols,C.n_cols);
   if(cplx) {
     // Initialize with a complex unitary matrix
-    U=complex_unitary(C.n_cols);
+    U=complex_unitary(C.n_cols,seed);
   } else {
     // Initialize with real unit matrix
     U.eye();
@@ -1528,6 +1528,8 @@ arma::cx_mat SCF::localize(const arma::mat & C, bool cplx) const {
 
     // Compute B
     B=localize_B(C,U,rmat,rsq);
+    // Store B
+    measure=B;
 
     // Compute the euclidean derivative matrix, Abrudan 2009 table 3 step 2
     arma::cx_mat Gammak=localize_Bder(C,U,rmat,rsq);

@@ -152,123 +152,152 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     fflush(stderr);
   }
 
-  // What U to start with?
-  bool dotrial=true;
+  // Check that U is sane
   for(size_t ispin=0;ispin<nocc.size();ispin++)
     if(U[ispin].n_rows != nocc[ispin] || U[ispin].n_cols != nocc[ispin]) {
       // Initialize with canonical orbitals
-      //      U[ispin].eye(nocc[ispin],nocc[ispin]);
-
-      // Initialize with localized orbitals
-      U[ispin]=localize(C[ispin]);
-
-      dotrial=false;
+      U[ispin].eye(nocc[ispin],nocc[ispin]);
     }
 
-  if(dotrial) {
-    // Calculate SIC of current U
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      if(C[ispin].n_cols>1)
-	Ctilde[ispin]=C[ispin]*U[ispin];
-      else {
-	std::complex<double> dummy(1.0,0.0);
-	Ctilde[ispin]=C[ispin]*dummy;
-      }
-    // Compute the orbital-dependent Fock matrices
+  // Calculate SIC of current U
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    if(C[ispin].n_cols>1)
+      Ctilde[ispin]=C[ispin]*U[ispin];
+    else {
+      std::complex<double> dummy(1.0,0.0);
+      Ctilde[ispin]=C[ispin]*dummy;
+    }
+  // Compute the orbital-dependent Fock matrices
 #ifdef RESTRICTED
-    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+  PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
 #else
-    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+  PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
 #endif
-    (void) tol;
-
-    ESIC=0.0;
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      for(size_t io=0;io<nocc[ispin];io++)
-	ESIC+=Eorb[ispin][io];
-#ifdef RESTRICTED
-    ESIC*=2.0;
-#endif
-    
-    // and of a reset U
-    static std::vector<arma::cx_mat> Ueye(U);
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      //      Ueye[ispin].eye();
-      Ueye[ispin]=complex_unitary(Ueye[ispin].n_cols);
-
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      if(C[ispin].n_cols>1)
-	Ctilde[ispin]=C[ispin]*Ueye[ispin];
-      else {
-	std::complex<double> dummy(1.0,0.0);
-	Ctilde[ispin]=C[ispin]*dummy;
-      }
-
-#ifdef RESTRICTED
-    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-#else
-    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-#endif
-
-    double Eeye=0.0;
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      for(size_t io=0;io<nocc[ispin];io++)
-	Eeye+=Eorb[ispin][io];
-#ifdef RESTRICTED
-    Eeye*=2.0;
-#endif
-
-    // and of a localized U
-    static std::vector<arma::cx_mat> Uloc(U);
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      Uloc[ispin]=localize(C[ispin]);
-
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      if(C[ispin].n_cols>1)
-	Ctilde[ispin]=C[ispin]*Uloc[ispin];
-      else {
-	std::complex<double> dummy(1.0,0.0);
-	Ctilde[ispin]=C[ispin]*dummy;
-      }
-    
-#ifdef RESTRICTED
-    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-#else
-    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-#endif
-    
-    double Eloc=0.0;
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      for(size_t io=0;io<nocc[ispin];io++)
-	Eloc+=Eorb[ispin][io];
-#ifdef RESTRICTED
-    Eloc*=2.0;
-#endif
-
-    // What is maximum?
-    double Emax=std::max(std::max(Eeye,Eloc),ESIC);
+  (void) tol;
   
+  ESIC=0.0;
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    for(size_t io=0;io<nocc[ispin];io++)
+      ESIC+=Eorb[ispin][io];
+#ifdef RESTRICTED
+  ESIC*=2.0;
+#endif
+  
+  // and of a reset U
+  static std::vector<arma::cx_mat> Ueye(U);
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    Ueye[ispin].eye();
+  
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    if(C[ispin].n_cols>1)
+      Ctilde[ispin]=C[ispin]*Ueye[ispin];
+    else {
+      std::complex<double> dummy(1.0,0.0);
+      Ctilde[ispin]=C[ispin]*dummy;
+    }
+  
+#ifdef RESTRICTED
+  PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#else
+  PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#endif
+  
+  double Eeye=0.0;
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    for(size_t io=0;io<nocc[ispin];io++)
+      Eeye+=Eorb[ispin][io];
+#ifdef RESTRICTED
+  Eeye*=2.0;
+#endif
+  
+  // and of a localized U
+  static std::vector<arma::cx_mat> Uloc(U);
+  for(size_t ispin=0;ispin<C.size();ispin++) {
+    // Perform max amount of trials to get a good, localized starting guess.
+    size_t Ntrials=10;
+    std::vector<double> measures(Ntrials);
+    std::vector<arma::cx_mat> Utr(Ntrials);
 
-    // Do swap?
-    if(ESIC==Emax) {
-      if(verbose) {
-	printf("\nUsing old transformation matrix, energies: old %e, reset %e, localized %e.\n",ESIC,Eeye,Eloc);
-	fflush(stdout);
-      }
-    } else if(Eloc==Emax) {
-      if(verbose) {
-	printf("\nUsing localized transformation matrix, energies: old %e, reset %e, localized %e.\n",ESIC,Eeye,Eloc);
-	fflush(stdout);
-      }
-      U=Uloc;
-    } else {
-      if(verbose) {
-	printf("\nResetting transformation matrix: ESIC-old %e, ESIC-reset %e, difference %e.\n",ESIC,Eeye,Eeye-ESIC);
-	fflush(stdout);
+    // Value and location of minimal measure
+    double minmeasure=DBL_MAX;
+    size_t minidx=-1;
+
+    // Amount of similar measures
+    int similar=0;
+
+    // Loop over trials
+    for(size_t i=0;i<Ntrials;i++) {
+      // Localize
+      Utr[i]=localize(C[ispin],measures[i],true,(unsigned long int) i);
+
+      // Check the size of the change from the last trial
+      if(fabs(minmeasure-measures[i])<1e-4*minmeasure) {
+	// Not very large.
+	similar++;
+      } else if(measures[i]<minmeasure && minmeasure-measures[i]<1e-4*minmeasure) {
+	// Significant drop in measure, continue trials
+	similar=0;
       }
       
-      U=Ueye;
+      // Store minimal measure if necessary
+      if(measures[i]<minmeasure) {
+	minmeasure=measures[i];
+	minidx=i;
+      }
+
+      // Stop if three consequent give a similar estimate
+      if(similar==2)
+	break;
     }
+
+    // Use minimal guess
+    Uloc[ispin]=Utr[minidx];
+  }
+  
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    if(C[ispin].n_cols>1)
+      Ctilde[ispin]=C[ispin]*Uloc[ispin];
+    else {
+      std::complex<double> dummy(1.0,0.0);
+      Ctilde[ispin]=C[ispin]*dummy;
+    }
+  
+#ifdef RESTRICTED
+  PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#else
+  PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#endif
+  
+  double Eloc=0.0;
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    for(size_t io=0;io<nocc[ispin];io++)
+      Eloc+=Eorb[ispin][io];
+#ifdef RESTRICTED
+  Eloc*=2.0;
+#endif
+  
+  // What is maximum?
+  double Emax=std::max(std::max(Eeye,Eloc),ESIC);
+  
+  // Do swap?
+  if(ESIC==Emax) {
+    if(verbose) {
+      printf("\nUsing old transformation matrix, energies: old %e, reset %e, localized %e.\n",ESIC,Eeye,Eloc);
+      fflush(stdout);
+    }
+  } else if(Eloc==Emax) {
+    if(verbose) {
+      printf("\nUsing localized transformation matrix, energies: old %e, reset %e, localized %e.\n",ESIC,Eeye,Eloc);
+      fflush(stdout);
+    }
+    U=Uloc;
+  } else {
+    if(verbose) {
+      printf("\nResetting transformation matrix: ESIC-old %e, ESIC-reset %e, difference %e.\n",ESIC,Eeye,Eeye-ESIC);
+      fflush(stdout);
+    }
+    
+    U=Ueye;
   }
 
 
