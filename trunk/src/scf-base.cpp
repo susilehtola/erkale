@@ -86,16 +86,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   direct=set.get_bool("Direct");
   strictint=set.get_bool("StrictIntegrals");
 
-  // Perdew-Zunger SIC?
-  pzcor=set.get_double("PZ-SICw");
-  std::string pzs=set.get_string("PZ-SIC");
-  if(stricmp(pzs,"Yes")==0)
-    pz=YES;
-  else if(stricmp(pzs,"Pert")==0)
-    pz=PERT;
-  else
-    pz=NO;  
-
   doforce=false;
 
   // Check update scheme
@@ -127,6 +117,16 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   try {
     // Use Lobatto angular grid? (Lebedev is default)
     dft_lobatto=set.get_bool("DFTLobatto");
+    
+    // Perdew-Zunger SIC?
+    pzcor=set.get_double("PZ-SICw");
+    std::string pzs=set.get_string("PZ-SIC");
+    if(stricmp(pzs,"Yes")==0)
+      pz=YES;
+    else if(stricmp(pzs,"Pert")==0)
+      pz=PERT;
+    else
+      pz=NO;  
   } catch(...) {
     // Hartree-Fock doesn't have the settings
   }
