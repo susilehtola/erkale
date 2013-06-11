@@ -15,9 +15,9 @@
  */
 
 #ifdef RESTRICTED
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol)
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol, bool canonical, bool localization)
 #else
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol)
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol, bool canonical, bool localization)
 #endif
 {
 
@@ -96,12 +96,6 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   // U matrices - remembered
   static std::vector<arma::cx_mat> U(nocc.size());
 
-  // H matrices
-  std::vector<arma::cx_mat> H(nocc.size());
-  for(size_t ispin=0;ispin<nocc.size();ispin++) {
-    H[ispin].zeros(nocc[ispin],nocc[ispin]);
-  }
-
   // Localized orbitals
   std::vector<arma::cx_mat> Ctilde(C.size());
 
@@ -115,28 +109,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   // and the self-interaction energies
   std::vector< std::vector<double> > Eorb;
 
-  // G matrices
-  std::vector< std::vector<arma::cx_mat> > G;
-
   // The SIC contributions to the main Fock matrices
   std::vector<arma::mat> HSIC(C.size());
-
-  // Convergence threshold
-  std::vector<double> diffR(C.size());
-  // Change in unitary optimization
-  std::vector<double> K(C.size());
-
-  // Self-interaction energy
-  double ESIC=0.0;
-  double ESICold;
-
-  // Iteration number
-  size_t k=0;
-
-  // Helpers
-  std::complex<double> imagI(0,1.0);
-  std::vector<arma::cx_mat> M(C.size());
-  std::vector<arma::vec> lambda(C.size());
 
   /*
   // Optimal U
@@ -145,7 +119,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   double ESICopt=0.0;
   */
 
-  if(verbose) {
+  if(verbose && !canonical) {
     printf("\nSIC iteration:\n");
     fprintf(stderr,"\n\t%4s\t%12s\t%13s\t%13s\n","iter","K/R","ESIC","dESIC");
     fflush(stdout);
@@ -155,8 +129,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   // Check that U is sane
   for(size_t ispin=0;ispin<nocc.size();ispin++)
     if(U[ispin].n_rows != nocc[ispin] || U[ispin].n_cols != nocc[ispin]) {
-      // Initialize with canonical orbitals
-      U[ispin].eye(nocc[ispin],nocc[ispin]);
+      // Initialize with a random matrix
+      U[ispin]=complex_unitary(nocc[ispin]);
     }
 
   // Calculate SIC of current U
@@ -174,132 +148,125 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
 #endif
   (void) tol;
-  
-  ESIC=0.0;
+
+  double ESIC=0.0;
   for(size_t ispin=0;ispin<C.size();ispin++)
     for(size_t io=0;io<nocc[ispin];io++)
       ESIC+=Eorb[ispin][io];
 #ifdef RESTRICTED
   ESIC*=2.0;
 #endif
-  
-  // and of a reset U
-  static std::vector<arma::cx_mat> Ueye(U);
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    Ueye[ispin].eye();
-  
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    if(C[ispin].n_cols>1)
-      Ctilde[ispin]=C[ispin]*Ueye[ispin];
-    else {
-      std::complex<double> dummy(1.0,0.0);
-      Ctilde[ispin]=C[ispin]*dummy;
-    }
-  
-#ifdef RESTRICTED
-  PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-#else
-  PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-#endif
-  
-  double Eeye=0.0;
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    for(size_t io=0;io<nocc[ispin];io++)
-      Eeye+=Eorb[ispin][io];
-#ifdef RESTRICTED
-  Eeye*=2.0;
-#endif
-  
-  // and of a localized U
-  static std::vector<arma::cx_mat> Uloc(U);
-  for(size_t ispin=0;ispin<C.size();ispin++) {
-    // Perform max amount of trials to get a good, localized starting guess.
-    size_t Ntrials=10;
-    std::vector<double> measures(Ntrials);
-    std::vector<arma::cx_mat> Utr(Ntrials);
 
-    // Value and location of minimal measure
-    double minmeasure=DBL_MAX;
-    size_t minidx=-1;
+  if(!canonical && localization) {
+    // Calculate other possibilities of initializing U
 
-    // Amount of similar measures
-    int similar=0;
-
-    // Loop over trials
-    for(size_t i=0;i<Ntrials;i++) {
-      // Localize
-      Utr[i]=localize(C[ispin],measures[i],true,(unsigned long int) i);
-
-      // Check the size of the change from the last trial
-      if(fabs(minmeasure-measures[i])<1e-4*minmeasure) {
-	// Not very large.
-	similar++;
-      } else if(measures[i]<minmeasure && minmeasure-measures[i]<1e-4*minmeasure) {
-	// Significant drop in measure, continue trials
-	similar=0;
-      }
-      
-      // Store minimal measure if necessary
-      if(measures[i]<minmeasure) {
-	minmeasure=measures[i];
-	minidx=i;
+    /*
+      static std::vector<arma::cx_mat> Urnd(U);
+      for(size_t ispin=0;ispin<C.size();ispin++) {
+      // Initialize with random unit matrix
+      Urnd[ispin]=complex_unitary(C[ispin].n_cols);
+      // And localize it
+      double measure;
+      localize(C[ispin],measure,Urnd[ispin]);
       }
 
-      // Stop if three consequent give a similar estimate
-      if(similar==2)
-	break;
-    }
-
-    // Use minimal guess
-    Uloc[ispin]=Utr[minidx];
-  }
-  
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    if(C[ispin].n_cols>1)
-      Ctilde[ispin]=C[ispin]*Uloc[ispin];
-    else {
+      for(size_t ispin=0;ispin<C.size();ispin++)
+      if(C[ispin].n_cols>1)
+      Ctilde[ispin]=C[ispin]*Urnd[ispin];
+      else {
       std::complex<double> dummy(1.0,0.0);
       Ctilde[ispin]=C[ispin]*dummy;
-    }
-  
-#ifdef RESTRICTED
-  PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-#else
-  PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-#endif
-  
-  double Eloc=0.0;
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    for(size_t io=0;io<nocc[ispin];io++)
-      Eloc+=Eorb[ispin][io];
-#ifdef RESTRICTED
-  Eloc*=2.0;
-#endif
-  
-  // What is maximum?
-  double Emax=std::max(std::max(Eeye,Eloc),ESIC);
-  
-  // Do swap?
-  if(ESIC==Emax) {
-    if(verbose) {
-      printf("\nUsing old transformation matrix, energies: old %e, reset %e, localized %e.\n",ESIC,Eeye,Eloc);
-      fflush(stdout);
-    }
-  } else if(Eloc==Emax) {
-    if(verbose) {
-      printf("\nUsing localized transformation matrix, energies: old %e, reset %e, localized %e.\n",ESIC,Eeye,Eloc);
-      fflush(stdout);
-    }
-    U=Uloc;
-  } else {
-    if(verbose) {
-      printf("\nResetting transformation matrix: ESIC-old %e, ESIC-reset %e, difference %e.\n",ESIC,Eeye,Eeye-ESIC);
-      fflush(stdout);
-    }
-    
-    U=Ueye;
-  }
+      }
 
+      #ifdef RESTRICTED
+      PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+      #else
+      PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+      #endif
+
+      double Ernd=0.0;
+      for(size_t ispin=0;ispin<C.size();ispin++)
+      for(size_t io=0;io<nocc[ispin];io++)
+      Ernd+=Eorb[ispin][io];
+      #ifdef RESTRICTED
+      Ernd*=2.0;
+      #endif
+    */
+
+    // and of a localized U
+    static std::vector<arma::cx_mat> Uloc(U);
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      double measure;
+      localize(C[ispin],measure,Uloc[ispin]);
+    }
+
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      if(C[ispin].n_cols>1)
+	Ctilde[ispin]=C[ispin]*Uloc[ispin];
+      else {
+	std::complex<double> dummy(1.0,0.0);
+	Ctilde[ispin]=C[ispin]*dummy;
+      }
+
+#ifdef RESTRICTED
+    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#else
+    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#endif
+
+    double Eloc=0.0;
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      for(size_t io=0;io<nocc[ispin];io++)
+	Eloc+=Eorb[ispin][io];
+#ifdef RESTRICTED
+    Eloc*=2.0;
+#endif
+
+    // What is maximum?
+    //    double Emax=std::max(std::max(Ernd,Eloc),ESIC);
+    double Emax=std::max(Eloc,ESIC);
+
+    // Do swap?
+    if(ESIC==Emax) {
+      if(verbose) {
+	//	printf("\nUsing old transformation matrix, energies: old %e, randomized %e, localized %e.\n",ESIC,Ernd,Eloc);
+	printf("\nUsing old transformation matrix, energies: old %e, localized %e.\n",ESIC,Eloc);
+	fflush(stdout);
+      }
+    } else if(Eloc==Emax) {
+      if(verbose) {
+	//	printf("\nUsing localized transformation matrix, energies: old %e, randomized %e, localized %e.\n",ESIC,Ernd,Eloc);
+
+        // Transformation matrix classification
+	printf("\nUsing ");
+        for(size_t ispin=0;ispin<U.size();ispin++) {
+          double real=rms_norm(arma::real(Uloc[ispin]));
+          double imag=rms_norm(arma::imag(Uloc[ispin]));
+
+          if(imag<sqrt(DBL_EPSILON)*real)
+            printf("real");
+          else if(real<sqrt(DBL_EPSILON)*imag)
+            printf("imaginary");
+          else
+            printf("complex");
+        }
+	printf(" localized transformation matrix, energies: old %e, localized %e.\n",ESIC,Eloc);
+	fflush(stdout);
+
+      }
+
+      U=Uloc;
+    }
+    /* else {
+       if(verbose) {
+       printf("\nResetting transformation matrix: old %e, randomized %e, difference %e.\n",ESIC,Ernd,Ernd-ESIC);
+       fflush(stdout);
+       }
+
+       U=Urnd;
+       }
+    */
+  }
 
   if(dft.adaptive) {
     // Before proceeding, reform DFT grids so that localized orbitals
@@ -313,7 +280,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	std::complex<double> dummy(1.0,0.0);
 	Ctilde[ispin]=C[ispin]*dummy;
       }
-    
+
     // Stack of density matrices
 #ifdef RESTRICTED
     std::vector<arma::mat> Pv(C[0].n_cols+1);
@@ -324,12 +291,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       size_t offset=0;
       if(ispin!=0)
 	offset=C[0].n_cols;
-      
+
       // First entries are orbital densities
       for(size_t io=0;io<C[ispin].n_cols;io++)
 	Pv[offset+io]=numocc[ispin][io]*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
     }
-    
+
     // Final element is total density
 #ifdef RESTRICTED
     Pv[Pv.size()-1].zeros(Pv[0].n_rows,Pv[0].n_cols);
@@ -349,7 +316,262 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
 #endif
   } // if(dft.adaptive)
+
+
+  // Using canonical orbitals for SIC
+  if(canonical) {
+    // Update localized orbitals
+    for(size_t ispin=0;ispin<C.size();ispin++)
+      if(C[ispin].n_cols>1)
+	Ctilde[ispin]=C[ispin]*U[ispin];
+      else {
+	// Bug in armadillo - can't do assignment
+	// Ctilde[ispin]=C[ispin];
+
+	std::complex<double> dummy(1.0,0.0);
+	Ctilde[ispin]=C[ispin]*dummy;
+      }
+
+    // Compute the orbital-dependent Fock matrices
+#ifdef RESTRICTED
+    PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#else
+    PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+#endif
+
+    // and the total SIC contribution
+    for(size_t ispin=0;ispin<C.size();ispin++) {
+      HSIC[ispin].zeros(C[ispin].n_rows,C[ispin].n_rows);
+      for(size_t io=0;io<nocc[ispin];io++) {
+	arma::mat Pio=arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+
+	HSIC[ispin]+=Forb[ispin][io]*Pio*S;
+      }
+    }
+  } else {
+    //	Perform unitary optimization
+#ifdef RESTRICTED
+    unitary_REopt(C,U,Forb,Eorb,grid,nocc,numocc,dft,HSIC,occs,sol);
+#else
+    unitary_UEopt(C,U,Forb,Eorb,grid,nocc,numocc,dft,HSIC,occa,occb,sol);
+#endif
+  }
+
+  // Calculate SIC energy
+  ESIC=0.0;
+  for(size_t ispin=0;ispin<C.size();ispin++)
+    for(size_t io=0;io<nocc[ispin];io++)
+      ESIC+=Eorb[ispin][io];
+#ifdef RESTRICTED
+  ESIC*=2.0;
+#endif
   
+#ifdef RESTRICTED
+  // Adjust Fock operator for SIC
+  sol.H     -=pzcor*HSIC[0];
+  sol.XC    -=pzcor*HSIC[0];
+#else
+  sol.Ha    -=pzcor*HSIC[0];
+  sol.XCa   -=pzcor*HSIC[0];
+  sol.Hb    -=pzcor*HSIC[1];
+  sol.XCb   -=pzcor*HSIC[1];
+#endif
+  // Need to adjust energy as well as this was calculated in the Fock routines
+  sol.en.Exc-=pzcor*ESIC;
+  sol.en.Eel-=pzcor*ESIC;
+  sol.en.E  -=pzcor*ESIC;
+
+  if(verbose) {
+    printf("Self-interaction energy is %e.\n",ESIC);
+    printf("Decomposition of self-interaction:\n");
+    for(size_t io=0;io<max(nocc);io++) {
+      printf("\t%4i",(int) io+1);
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	if(io<nocc[ispin])
+	  printf("\t%e",Eorb[ispin][io]);
+      printf("\n");
+    }
+    fflush(stdout);
+  }
+}
+
+
+#ifdef RESTRICTED
+void SCF::PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid)
+#else
+void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid)
+#endif
+{
+
+#ifdef RESTRICTED
+  if(Ctilde.size()!=1) {
+    ERROR_INFO();
+    throw std::runtime_error("PZSIC_Fock_RDFT called with restricted density!\n");
+  }
+#else
+  if(Ctilde.size()!=2) {
+    ERROR_INFO();
+    throw std::runtime_error("PZSIC_Fock_UDFT called with restricted density!\n");
+  }
+#endif
+
+  // Compute the orbital-dependent Fock matrices
+  Forb.resize(Ctilde.size());
+  Eorb.resize(Ctilde.size());
+  for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
+    Forb[ispin].resize(nocc[ispin]);
+    Eorb[ispin].resize(nocc[ispin]);
+  }
+
+  // Fraction of exact exchange
+  double kfrac=exact_exchange(dft.x_func);
+
+  // Orbital density matrices
+#ifdef RESTRICTED
+  std::vector<arma::mat> Porb(Ctilde[0].n_cols);
+#else
+  std::vector<arma::mat> Porb(Ctilde[0].n_cols+Ctilde[1].n_cols);
+#endif
+  for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
+    size_t offset=0;
+    if(ispin!=0)
+      offset=Ctilde[0].n_cols;
+
+    for(size_t io=0;io<Ctilde[ispin].n_cols;io++)
+#ifdef RESTRICTED
+      Porb[io+offset]=occnum[ispin](io)/2.0*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+#else
+    Porb[io+offset]=occnum[ispin](io)*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+#endif
+  }
+
+  if(densityfit) {
+    // Coulomb matrices
+    std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
+    if(kfrac!=0.0)
+      throw std::runtime_error("Not implemented!\n");
+
+    for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
+      size_t offset=0;
+      if(ispin!=0)
+	offset=Ctilde[0].n_cols;
+
+      // Collect matrices
+      for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
+	Forb[ispin][io]=Jorb[io+offset];
+
+	Eorb[ispin][io]=0.5*arma::trace(Porb[io+offset]*Jorb[io+offset]);
+      }
+    }
+
+  } else {
+
+    if(!direct) {
+      // Tabled integrals
+      for(size_t ispin=0;ispin<Ctilde.size();ispin++)
+	for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
+
+	  // Where to find orbital density matrix
+	  size_t offset=0;
+	  if(ispin!=0)
+	    offset=Ctilde[0].n_cols;
+
+	  // Calculate Coulomb term
+	  Forb[ispin][io]=tab.calcJ(Porb[offset+io]);
+	  // and Coulomb energy
+	  Eorb[ispin][io]=0.5*arma::trace(Porb[offset+io]*Forb[ispin][io]);
+	}
+
+      // Exchange?
+      if(kfrac!=0.0) {
+	for(size_t ispin=0;ispin<Ctilde.size();ispin++)
+	  for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
+	    // Where to find orbital density matrix
+	    size_t offset=0;
+	    if(ispin!=0)
+	      offset=Ctilde[0].n_cols;
+
+	    // Calculate Coulomb term
+	    arma::mat Ko=tab.calcK(Porb[offset+io]);
+
+	    // Change to Fock matrix and energy
+	    Forb[ispin][io]-=0.5*kfrac*Ko;
+	    Eorb[ispin][io]-=0.25*kfrac*arma::trace(Porb[offset+io]*Ko);
+	  }
+      }
+    } else {
+      // HF coulomb/exchange not implemented
+      ERROR_INFO();
+      throw std::runtime_error("Analytical Coulomb/exchange matrix not implemented!\n");
+    }
+  }
+
+  // Exchange-correlation
+  {
+    std::vector<double> Nelnum; // Numerically integrated density
+    std::vector<arma::mat> XC; // Exchange-correlation matrices
+    std::vector<double> Exc; // Exchange-correlation energy
+
+    grid.eval_Fxc(dft.x_func,dft.c_func,Porb,XC,Exc,Nelnum);
+
+    if(kfrac!=0.0) {
+      ERROR_INFO();
+      throw std::runtime_error("HF energy correction not implemented.\n");
+    }
+
+    // Add in the XC part to the Fock matrix and energy
+    for(size_t ispin=0;ispin<Ctilde.size();ispin++)
+      for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
+	// Where to find orbital density matrix
+	size_t offset=0;
+	if(ispin!=0)
+	  offset=Ctilde[0].n_cols;
+
+	Forb[ispin][io]+=XC[offset+io];
+	Eorb[ispin][io]+=Exc[offset+io];
+      }
+  }
+}
+
+#ifdef RESTRICTED
+void SCF::unitary_REopt(const std::vector<arma::mat> & C, std::vector<arma::cx_mat> & U, std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, DFTGrid & grid, const std::vector<size_t> & nocc, const std::vector<arma::vec> & numocc, dft_t dft, std::vector<arma::mat> & HSIC, const std::vector<double> & occs, const rscf_t & sol)
+#else
+void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_mat> & U, std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, DFTGrid & grid, const std::vector<size_t> & nocc, const std::vector<arma::vec> & numocc, dft_t dft, std::vector<arma::mat> & HSIC, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & sol)
+#endif
+{
+
+  // Self-interaction energy
+  double ESIC=0.0;
+
+  // Helpers
+  std::complex<double> imagI(0,1.0);
+  std::vector<arma::cx_mat> M(C.size());
+  std::vector<arma::vec> lambda(C.size());
+
+  // Localized orbitals
+  std::vector<arma::cx_mat> Ctilde(C.size());
+
+  // Convergence threshold
+  std::vector<double> diffR(C.size());
+  // Change in unitary optimization
+  std::vector<double> K(C.size());
+
+  // Iteration number
+  size_t k=0;
+
+  // Old SIC energy
+  double ESICold;
+
+  // H matrices
+  std::vector<arma::cx_mat> H(nocc.size());
+  for(size_t ispin=0;ispin<nocc.size();ispin++) {
+    H[ispin].zeros(nocc[ispin],nocc[ispin]);
+  }
+
+  // G matrices
+  std::vector< std::vector<arma::cx_mat> > G;
+
+  // Use optimized orbitals for SIC.
   while(true) {
     Timer t;
 
@@ -451,9 +673,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       kappa[ispin].zeros(nocc[ispin],nocc[ispin]);
       // Loop over elements
       for(size_t io=0;io<nocc[ispin];io++)
-        for(size_t jo=0;jo<nocc[ispin];jo++) {
-          kappa[ispin](io,jo)=std::norm(arma::as_scalar(arma::trans(Ctilde[ispin].col(jo))*(Forb[ispin][jo]-Forb[ispin][io])*Ctilde[ispin].col(io)));
-        }
+	for(size_t jo=0;jo<nocc[ispin];jo++) {
+	  kappa[ispin](io,jo)=std::norm(arma::as_scalar(arma::trans(Ctilde[ispin].col(jo))*(Forb[ispin][jo]-Forb[ispin][io])*Ctilde[ispin].col(io)));
+	}
     }
 
     // H matrix
@@ -476,8 +698,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	  H[ispin]=G[G.size()-1][ispin];
 
 	//	else if(ESIC<ESICold)
-	  // Reset to gradient.
-	  H[ispin]=G[G.size()-1][ispin];
+	// Reset to gradient.
+	H[ispin]=G[G.size()-1][ispin];
       }
     }
 
@@ -499,7 +721,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       for(size_t ispin=0;ispin<C.size();ispin++)
 	printf(" %e",K[ispin]/diffR[ispin]);
       printf(", E-SIC=% e",ESIC);
-      
+
       double dKmax=0.0;
       for(size_t ispin=0;ispin<C.size();ispin++)
 	if(K[ispin]/diffR[ispin]>dKmax)
@@ -517,7 +739,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       for(size_t ispin=0;ispin<U.size();ispin++) {
 	double real=rms_norm(arma::real(U[ispin]));
 	double imag=rms_norm(arma::imag(U[ispin]));
-	
+
 	if(imag<sqrt(DBL_EPSILON)*real)
 	  printf(" real");
 	else if(real<sqrt(DBL_EPSILON)*imag)
@@ -526,7 +748,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	  printf(" complex");
       }
       printf("\n");
-      
+
       fflush(stdout);
       fflush(stderr);
     }
@@ -534,7 +756,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     {
       bool convd=true;
       for(size_t ispin=0;ispin<C.size();ispin++)
-	if(K[ispin]>0.01*diffR[ispin])
+	if(K[ispin]>0.1*diffR[ispin])
 	  convd=false;
 
       if(convd) {
@@ -547,7 +769,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	  for(size_t ispin=0;ispin<U.size();ispin++) {
 	    double real=rms_norm(arma::real(U[ispin]));
 	    double imag=rms_norm(arma::imag(U[ispin]));
-	    
+
 	    printf("spin %i: transformation matrix is",(int) ispin);
 	    if(imag<sqrt(DBL_EPSILON)*real)
 	      printf(" real");
@@ -555,7 +777,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	      printf(" imaginary");
 	    else
 	      printf(" complex");
-	    
+
 	    printf(", re norm %e, im norm %e\n",real,imag);
 	  }
 	}
@@ -592,7 +814,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       }
 
       //      arma::trans(Hval).print("Eigenvalues");
-      
+
       // Find maximal eigenvalue
       wmax=0.0;
       for(size_t n=0;n<Hval.n_elem;n++)
@@ -652,9 +874,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
 	  // Compute the orbital-dependent Fock matrices
 #ifdef RESTRICTED
-    PZSIC_Fock_RDFT(Ftrial,Etrial,Ctrial,nocc,numocc,dft,grid);
+	  PZSIC_Fock_RDFT(Ftrial,Etrial,Ctrial,nocc,numocc,dft,grid);
 #else
-    PZSIC_Fock_UDFT(Ftrial,Etrial,Ctrial,nocc,numocc,dft,grid);
+	  PZSIC_Fock_UDFT(Ftrial,Etrial,Ctrial,nocc,numocc,dft,grid);
 #endif
 	}
 
@@ -677,15 +899,15 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Compute the derivative
 	Jprime[i]=2.0*std::real(arma::trace(dJdW*arma::trans(U[ispin])*arma::trans(R[i])*arma::trans(H[ispin])));
       }
- 
+
       /*
-      printf("Values of cost function:");
-      for(int i=0;i<n;i++)
+	printf("Values of cost function:");
+	for(int i=0;i<n;i++)
 	printf(" % e",ESICtrial[i]);
-      printf("\nDerivatives:          ");
-      for(int i=0;i<n;i++)
+	printf("\nDerivatives:          ");
+	for(int i=0;i<n;i++)
 	printf(" % e",Jprime[i]);
-      printf("\n");
+	printf("\n");
       */
 
       // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
@@ -735,7 +957,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	arma::trans(jvec).print("Jvec");
 	throw std::runtime_error("Error solving for coefficients a.\n");
       }
-      
+
       // Find smallest positive root of a0 + a1*mu + ... + ap*mu^p = 0.
       double xmin=DBL_MAX;
       {
@@ -744,18 +966,18 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	while(aval(r+1)==0.0)
 	  r--;
 
- 	// Coefficients
+	// Coefficients
 	double a[r+1];
 	for(int i=0;i<r+1;i++)
 	  a[i]=aval(i+1);
 
 	/*
-	printf("Coefficients:");
-	for(int i=0;i<r+1;i++)
+	  printf("Coefficients:");
+	  for(int i=0;i<r+1;i++)
 	  printf(" % e",a[i]);
-	printf("\n");
+	  printf("\n");
 	*/
-	
+
 	// GSL routine workspace - r:th order polynomial has r+1 coefficients
 	gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r+1);
 
@@ -779,10 +1001,10 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	std::stable_sort(roots.begin(),roots.end(),abscomp<double>);
 
 	/*
-	printf("Roots:");
-	for(size_t i=0;i<roots.size();i++)
+	  printf("Roots:");
+	  for(size_t i=0;i<roots.size();i++)
 	  printf(" (% e, % e)",z[2*i],z[2*i+1]);
-	printf("\n");
+	  printf("\n");
 	*/
 
 	int nreal=0;
@@ -791,11 +1013,11 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	    nreal++;
 
 	/*
-	printf("%i real roots:",nreal);
-	for(size_t i=0;i<roots.size();i++)
+	  printf("%i real roots:",nreal);
+	  for(size_t i=0;i<roots.size();i++)
 	  if(fabs(roots[i].imag())<10*DBL_EPSILON)
-	    printf(" (% e,% e)",roots[i].real(),roots[i].imag());
-	printf("\n");
+	  printf(" (% e,% e)",roots[i].real(),roots[i].imag());
+	  printf("\n");
 	*/
 
 	for(size_t i=0;i<roots.size();i++)
@@ -804,7 +1026,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	    if(roots[i].real()<xmin)
 	      xmin=roots[i].real();
 	  }
-	
+
 	// Free workspace
 	gsl_poly_complex_workspace_free(w);
       }
@@ -813,7 +1035,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       if(xmin==DBL_MAX)
 	xmin=0.0;
       if(xmin<0.0) throw std::runtime_error("Negative step size!\n");
-     
+
       //      printf("Step size is %e, i.e. %e dTmu.\n",xmin,xmin/deltaTmu);
       // Step size is xmin. Update U
       if(xmin!=0.0) {
@@ -826,172 +1048,4 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       }
     }
   }
-
-#ifdef RESTRICTED
-  // Adjust Fock operator for SIC
-  sol.H     -=pzcor*HSIC[0];
-  sol.XC    -=pzcor*HSIC[0];
-#else
-  sol.Ha    -=pzcor*HSIC[0];
-  sol.XCa   -=pzcor*HSIC[0];
-  sol.Hb    -=pzcor*HSIC[1];
-  sol.XCb   -=pzcor*HSIC[1];
-#endif
-  // Need to adjust energy as well as this was calculated in the Fock routines
-  sol.en.Exc-=pzcor*ESIC;
-  sol.en.Eel-=pzcor*ESIC;
-  sol.en.E  -=pzcor*ESIC;
-
-  if(verbose) {
-    printf("Self-interaction energy is %e.\n",ESIC);
-    printf("Decomposition of self-interaction:\n");
-    for(size_t io=0;io<max(nocc);io++) {
-      printf("\t%4i",(int) io+1);
-      for(size_t ispin=0;ispin<C.size();ispin++)
-	if(io<nocc[ispin])
-	  printf("\t%e",Eorb[ispin][io]);
-      printf("\n");
-    }
-    fflush(stdout);
-  }
 }
-
-
-#ifdef RESTRICTED
-void SCF::PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid)
-#else
-void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid)
-#endif
-{
-
-#ifdef RESTRICTED
-  if(Ctilde.size()!=1) {
-    ERROR_INFO();
-    throw std::runtime_error("PZSIC_Fock_RDFT called with restricted density!\n");
-  }
-#else
-  if(Ctilde.size()!=2) {
-    ERROR_INFO();
-    throw std::runtime_error("PZSIC_Fock_UDFT called with restricted density!\n");
-  }
-#endif
-
-  // Compute the orbital-dependent Fock matrices
-  Forb.resize(Ctilde.size());
-  Eorb.resize(Ctilde.size());
-  for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
-    Forb[ispin].resize(nocc[ispin]);
-    Eorb[ispin].resize(nocc[ispin]);
-  }
-  
-  // Fraction of exact exchange
-  double kfrac=exact_exchange(dft.x_func);
-  
-  // Orbital density matrices
-#ifdef RESTRICTED
-  std::vector<arma::mat> Porb(Ctilde[0].n_cols);
-#else
-  std::vector<arma::mat> Porb(Ctilde[0].n_cols+Ctilde[1].n_cols);
-#endif
-  for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
-    size_t offset=0;
-    if(ispin!=0)
-      offset=Ctilde[0].n_cols;
-    
-    for(size_t io=0;io<Ctilde[ispin].n_cols;io++)
-#ifdef RESTRICTED
-      Porb[io+offset]=occnum[ispin](io)/2.0*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
-#else
-      Porb[io+offset]=occnum[ispin](io)*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
-#endif
-  }  
-  
-  if(densityfit) {
-    // Coulomb matrices
-    std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
-    if(kfrac!=0.0)
-      throw std::runtime_error("Not implemented!\n");
-
-    for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
-      size_t offset=0;
-      if(ispin!=0)
-	offset=Ctilde[0].n_cols;
-
-      // Collect matrices
-      for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
-	Forb[ispin][io]=Jorb[io+offset];
-
-	Eorb[ispin][io]=0.5*arma::trace(Porb[io+offset]*Jorb[io+offset]);
-      }
-    }
-
-  } else {
-
-    if(!direct) {
-      // Tabled integrals
-      for(size_t ispin=0;ispin<Ctilde.size();ispin++)
-	for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
-	  
-	  // Where to find orbital density matrix
-	  size_t offset=0;
-	  if(ispin!=0)
-	    offset=Ctilde[0].n_cols;
-	  
-	  // Calculate Coulomb term
-	  Forb[ispin][io]=tab.calcJ(Porb[offset+io]);
-	  // and Coulomb energy
-	  Eorb[ispin][io]=0.5*arma::trace(Porb[offset+io]*Forb[ispin][io]);
-	}
-
-      // Exchange?
-      if(kfrac!=0.0) {
-	for(size_t ispin=0;ispin<Ctilde.size();ispin++)
-	  for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
-	    // Where to find orbital density matrix
-	    size_t offset=0;
-	    if(ispin!=0)
-	      offset=Ctilde[0].n_cols;
-	    
-	    // Calculate Coulomb term
-	    arma::mat Ko=tab.calcK(Porb[offset+io]);
-
-	    // Change to Fock matrix and energy
-	    Forb[ispin][io]-=0.5*kfrac*Ko;
-	    Eorb[ispin][io]-=0.25*kfrac*arma::trace(Porb[offset+io]*Ko);
-	  }
-      }
-    } else {
-      // HF coulomb/exchange not implemented
-      ERROR_INFO();
-      throw std::runtime_error("Analytical Coulomb/exchange matrix not implemented!\n");
-    }
-  }
-  
-  // Exchange-correlation
-  {
-    std::vector<double> Nelnum; // Numerically integrated density
-    std::vector<arma::mat> XC; // Exchange-correlation matrices
-    std::vector<double> Exc; // Exchange-correlation energy
-
-    grid.eval_Fxc(dft.x_func,dft.c_func,Porb,XC,Exc,Nelnum);
-      
-    if(kfrac!=0.0) {
-      ERROR_INFO();
-      throw std::runtime_error("HF energy correction not implemented.\n");
-    }
-    
-    // Add in the XC part to the Fock matrix and energy
-    for(size_t ispin=0;ispin<Ctilde.size();ispin++)
-      for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
-	// Where to find orbital density matrix
-	size_t offset=0;
-	if(ispin!=0)
-	  offset=Ctilde[0].n_cols;
-	
-	Forb[ispin][io]+=XC[offset+io];
-	Eorb[ispin][io]+=Exc[offset+io];
-      }
-  }
-}
-
-
