@@ -129,7 +129,9 @@ void Settings::add_dft_settings() {
   // Use Perdew-Zunger self-interaction correction?
   add_double("PZ-SICw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
   // Perturbative SIC?
-  add_string("PZ-SIC", "Perform Perdew-Zunger self-interaction correction? Yes, No, Pert","No");
+  add_string("PZ-SIC", "Perform Perdew-Zunger self-interaction correction? No, Pert, Full, Can, CanPert","No");
+  // Initialize PZ-SIC with localized orbitals?
+  add_bool("PZ-SICloc", "Use Foster-Boys localized orbitals to initialize SIC?", true);
 }
 
 void Settings::add_double(std::string name, std::string comment, double val) {

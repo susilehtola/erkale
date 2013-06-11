@@ -333,10 +333,13 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     } else
       fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
 
-    if(pz==PERT)
-      fprintf(stderr,"perturbative SIC ");
-    else if(pz==YES)
+    if(pz!=NO) {
+      if(pz==PERT || pz==CANPERT)
+	fprintf(stderr,"perturbative ");
+      if(pz==CAN || pz==CANPERT)
+	fprintf(stderr,"canonical ");
       fprintf(stderr,"SIC ");
+    }
 #endif
 
     fprintf(stderr,"calculation");
@@ -422,12 +425,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef DFT
     // Perdew-Zunger correction?
-    if(pz==YES) {
+    if(pz==FULL || pz==CAN) {
       titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,tol);
+      PZSIC_RDFT(sol,occs,dft,grid,tol,pz==CAN,pzloc);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,tol);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,tol,pz==CAN,pzloc);
 #endif
       titer.cont();
     }
@@ -630,12 +633,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	form_fock(rhsol,sol);
 #ifdef DFT
 	// Perdew-Zunger correction?
-	if(pz==YES) {
+	if(pz==FULL || pz==CAN) {
 	  titer.stop();
 #ifdef RESTRICTED
-	  PZSIC_RDFT(rhsol,occs,dft,grid,tol);
+	  PZSIC_RDFT(rhsol,occs,dft,grid,tol,pz==CAN,pzloc);
 #else
-	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,tol);
+	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,tol,pz==CAN,pzloc);
 #endif
 	  titer.cont();
 	}
@@ -714,12 +717,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_fock(sol1,sol);
 #ifdef DFT
 	    // Perdew-Zunger correction?
-	    if(pz==YES) {
+	    if(pz==FULL || pz==CAN) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol1,occs,dft,grid,tol);
+	      PZSIC_RDFT(sol1,occs,dft,grid,tol,pz==CAN,pzloc);
 #else
-	      PZSIC_UDFT(sol1,occa,occb,dft,grid,tol);
+	      PZSIC_UDFT(sol1,occa,occb,dft,grid,tol,pz==CAN,pzloc);
 #endif
 	      titer.cont();
 	    }
@@ -737,12 +740,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_fock(sol2,sol);
 #ifdef DFT
 	    // Perdew-Zunger correction?
-	    if(pz==YES) {
+	    if(pz==FULL || pz==CAN) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol2,occs,dft,grid,tol);
+	      PZSIC_RDFT(sol2,occs,dft,grid,tol,pz==CAN,pzloc);
 #else
-	      PZSIC_UDFT(sol2,occa,occb,dft,grid,tol);
+	      PZSIC_UDFT(sol2,occa,occb,dft,grid,tol,pz==CAN,pzloc);
 #endif
 	      titer.cont();
 	    }
@@ -985,6 +988,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // To use the file effectively, we keep it open for the whole shebang.
     chkptp->open();
     chkptp->write("P",sol.P);
+    chkptp->write("S",S);
+    chkptp->write("Sinvh",Sinvh);
     chkptp->write(sol.en);
 #if !defined(RESTRICTED)
     chkptp->write("Ca",sol.Ca);
@@ -1075,7 +1080,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	;
 
       printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
-      fprintf(stderr,"%s converged in %s.\n\n",method.c_str(),ttot.elapsed().c_str());
+      fprintf(stderr,"%s converged in %s.\n",method.c_str(),ttot.elapsed().c_str());
 
       if(linesearch) {
 	printf("Fock matrix was built %i times.\n",nfock);
@@ -1084,12 +1089,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     }
 
 #ifdef DFT
-    if(pz==PERT) {
+    if(pz==PERT || pz==CANPERT) {
       // Calculate SIC correction
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,tol);
+      PZSIC_RDFT(sol,occs,dft,grid,tol,pz==CANPERT,pzloc);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,tol);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,tol,pz==CANPERT,pzloc);
 #endif
       // Diagonalize to get new canonical orbitals and energies
       diagonalize(S,Sinvh,sol);

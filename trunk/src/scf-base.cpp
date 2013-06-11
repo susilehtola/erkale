@@ -117,16 +117,21 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   try {
     // Use Lobatto angular grid? (Lebedev is default)
     dft_lobatto=set.get_bool("DFTLobatto");
-    
+
     // Perdew-Zunger SIC?
     pzcor=set.get_double("PZ-SICw");
+    pzloc=set.get_bool("PZ-SICloc");
     std::string pzs=set.get_string("PZ-SIC");
-    if(stricmp(pzs,"Yes")==0)
-      pz=YES;
+    if(stricmp(pzs,"Full")==0)
+      pz=FULL;
     else if(stricmp(pzs,"Pert")==0)
       pz=PERT;
+    else if(stricmp(pzs,"Can")==0)
+      pz=CAN;
+    else if(stricmp(pzs,"CanPert")==0)
+      pz=CANPERT;
     else
-      pz=NO;  
+      pz=NO;
   } catch(...) {
     // Hartree-Fock doesn't have the settings
   }
@@ -1044,6 +1049,11 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	if(pz==PERT) solver.do_sic(NO);
 	solver.RDFT(sol,occs,initconv,initdft);
 	if(pz==PERT) solver.do_sic(pz);
+
+	if(verbose) {
+	  fprintf(stderr,"\n");
+	  fflush(stderr);
+	}
       }
       // .. and then on the final grid
       solver.do_force(force);
@@ -1154,6 +1164,11 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	if(pz==PERT) solver.do_sic(NO);
 	solver.UDFT(sol,occa,occb,initconv,initdft);
 	if(pz==PERT) solver.do_sic(pz);
+
+	if(verbose) {
+	  fprintf(stderr,"\n");
+	  fflush(stderr);
+	}
       }
       // ... and then on the more accurate grid
       solver.do_force(force);
@@ -1482,11 +1497,6 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 arma::cx_mat SCF::localize(const arma::mat & C, double & measure, bool cplx, long unsigned int seed) const {
   Timer t;
 
-  if(verbose) {
-    printf("\nLocalizing orbitals.\n");
-    fflush(stdout);
-  }
-
   arma::cx_mat U(C.n_cols,C.n_cols);
   if(cplx) {
     // Initialize with a complex unitary matrix
@@ -1496,10 +1506,29 @@ arma::cx_mat SCF::localize(const arma::mat & C, double & measure, bool cplx, lon
     U.eye();
   }
 
+  // Run localization
+  localize(C,measure,U);
+
+  return U;
+}
+
+void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) const {
+  Timer t;
+
+  if(verbose) {
+    printf("\nLocalizing orbitals.\n");
+    fflush(stdout);
+  }
+
+  if(U.n_rows != U.n_cols || U.n_cols != C.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Wrong argument given.\n");
+  }
+
   if(C.n_cols<2) {
     // No optimization is necessary.
     U.eye();
-    return U;
+    return;
   }
 
   // Get R^2 matrix
@@ -1763,8 +1792,6 @@ arma::cx_mat SCF::localize(const arma::mat & C, double & measure, bool cplx, lon
     printf("Localization done in %s.\n\n",t.elapsed().c_str());
     fflush(stdout);
   }
-
-  return U;
 }
 
 
