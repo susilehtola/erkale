@@ -238,19 +238,19 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	//	printf("\nUsing localized transformation matrix, energies: old %e, randomized %e, localized %e.\n",ESIC,Ernd,Eloc);
 
         // Transformation matrix classification
-	printf("\nUsing ");
+	printf("\nUsing");
         for(size_t ispin=0;ispin<U.size();ispin++) {
           double real=rms_norm(arma::real(Uloc[ispin]));
           double imag=rms_norm(arma::imag(Uloc[ispin]));
 
           if(imag<sqrt(DBL_EPSILON)*real)
-            printf("real");
+            printf(" real ");
           else if(real<sqrt(DBL_EPSILON)*imag)
-            printf("imaginary");
+            printf(" imaginary ");
           else
-            printf("complex");
+            printf(" complex ");
         }
-	printf(" localized transformation matrix, energies: old %e, localized %e.\n",ESIC,Eloc);
+	printf("localized transformation matrix, energies: old %e, localized %e.\n",ESIC,Eloc);
 	fflush(stdout);
 
       }
