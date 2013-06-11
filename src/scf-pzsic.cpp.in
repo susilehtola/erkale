@@ -1042,10 +1042,10 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
 	arma::cx_mat Ropt=Hvec*arma::diagmat(arma::exp(xmin*imagI*Hval))*arma::trans(Hvec);
 	U[ispin]=Ropt*U[ispin];
       }
-
-      if(verbose) {
-	fprintf(stderr," %10.3f\n",t.get());
-      }
+    }
+    
+    if(verbose) {
+      fprintf(stderr," %10.3f\n",t.get());
     }
   }
 }
