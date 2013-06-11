@@ -1981,6 +1981,18 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   // Now, determine actual quadrature limits shell by shell
   for(size_t ir=0;ir<ret.sh.size();ir++) {
 
+    // Amount of orbitals
+    size_t ipmax=Pa.size()-2;
+    if(restr)
+      ipmax=Pa.size()-1;
+
+    // Orbitals to run over
+    std::vector<size_t> orbidx(ipmax);
+    for(size_t i=0;i<ipmax;i++)
+      orbidx[i]=i;
+
+    bool runtot=true;
+
     do {
       // Clear current grid points and function values
       free();
@@ -2002,10 +2014,8 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
       maxdiff=0.0;
 
       // Loop over orbital densities
-      size_t ipmax=Pa.size()-2;
-      if(restr)
-	ipmax=Pa.size()-1;
-      for(size_t ip=0;ip<ipmax;ip++) {
+      for(size_t iip=orbidx.size()-1;iip<orbidx.size();iip--) {
+	size_t ip=orbidx[iip];
 	// Compute density
 	update_density(Pa[ip],Pdum);
 
@@ -2024,15 +2034,26 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
 	eval_Fxc(Hanew[ip],Hbnew[ip]);
 
 	// Compute maximum difference of diagonal elements of Fock matrix
+	double maxd=0;
 	for(size_t i=0;i<Nbf;i++) {
 	  double tmp=std::max(fabs(Hanew[ip][i]-Haold[ip][i]),fabs(Hbnew[ip][i]-Hbold[ip][i]));
-	  if(tmp>maxdiff)
-	    maxdiff=tmp;
+	  if(tmp>maxd)
+	    maxd=tmp;
+	}
+
+	// Check if this orbital density has the most error
+	if(maxd>maxdiff)
+	  maxdiff=maxd;
+
+	// Is the orbital density converged?
+	if(maxd<tol/xc.size()) {
+	  //	  printf("Shell %i: orbital %i converged, l = %i\n",(int) ir, (int) ip, ret.sh[ir].l);
+	  orbidx.erase(orbidx.begin()+iip);
 	}
       }
 
       // Total density
-      {
+      if(runtot) {
 	size_t ip;
 
 	if(!restr) {
@@ -2062,13 +2083,24 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
 	  eval_Fxc(Hanew[ip],Hbnew[ip]);
 
 	// Compute maximum difference of diagonal elements of Fock matrix
+	double maxd=0;
 	for(size_t i=0;i<Nbf;i++) {
 	  double tmp=std::max(fabs(Hanew[ip][i]-Haold[ip][i]),fabs(Hbnew[ip][i]-Hbold[ip][i]));
-	  if(tmp>maxdiff)
-	    maxdiff=tmp;
+	  if(tmp>maxd)
+	    maxd=tmp;
 	}
-      }
 
+	// Is this the maximal error?
+	if(maxd>maxdiff)
+	  maxdiff=maxd;
+
+	// Is maximum density converged already?
+	if(maxd<tol/xc.size()) {
+	  runtot=false;
+	  //	  printf("Shell %i: total density converged, l = %i\n",(int) ir, ret.sh[ir].l);
+	}
+
+      }
 
       // Increment order if tolerance not achieved.
       if(maxdiff>tol/xc.size()) {
