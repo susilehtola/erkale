@@ -87,7 +87,7 @@ void ERIscreen::fill(const BasisSet * basisv) {
 #endif
   {
     ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
-    std::vector<double> tmp;
+    const std::vector<double> * erip;
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -97,12 +97,13 @@ void ERIscreen::fill(const BasisSet * basisv) {
       size_t j=pairs[ip].js;
 
       // Compute integrals
-      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j],tmp);
+      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j]);
+      erip=eri.getp();
       // Get maximum value
       double m=0.0;
-      for(size_t k=0;k<tmp.size();k++)
-        if(fabs(tmp[k])>m)
-          m=fabs(tmp[k]);
+      for(size_t k=0;k<(*erip).size();k++)
+        if(fabs((*erip)[k])>m)
+          m=fabs((*erip)[k]);
       m=sqrt(m);
       screen(i,j)=m;
       screen(j,i)=m;

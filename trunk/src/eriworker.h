@@ -50,10 +50,15 @@ typedef struct {
 /// Worker for dealing with electron repulsion integrals and their derivatives
 class IntegralWorker {
  protected:
+  /// Storage arrays (operated through pointer)
+  std::vector<double> arrone;
+  /// Storage arrays (operated through pointer)
+  std::vector<double> arrtwo;
+
   /// Input array
-  std::vector<double> input;
+  std::vector<double> * input;
   /// Output array
-  std::vector<double> output;
+  std::vector<double> * output;
 
   /// Reorder integrals
   void reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
@@ -94,7 +99,11 @@ class ERIWorker: public IntegralWorker {
   ~ERIWorker();
 
   /// Compute eris
-  void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, std::vector<double> & ints);
+  void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+  /// Get the eris
+  std::vector<double> get() const;
+  /// Get pointer to eris
+  const std::vector<double> * getp() const;
 };
 
 /// Worker for computing electron repulsion integrals
@@ -119,6 +128,9 @@ class dERIWorker: public IntegralWorker {
   /// Swap?
   bool swap_ij, swap_kl, swap_ijkl;
 
+  /// Get the idx'th derivative in the input array
+  void get_idx(int idx);
+
  public:
   dERIWorker(int maxam, int maxcontr);
   ~dERIWorker();
@@ -126,10 +138,12 @@ class dERIWorker: public IntegralWorker {
   /// Compute derivatives
   void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Get the derivatives wrt index idx
-  void get(int idx, std::vector<double> & ints);
+  std::vector<double> get(int idx);
+  /// Get the derivatives wrt index idx
+  const std::vector<double> * getp(int idx);
 
   /// Compute the derivatives, debug version
-  void get_debug(int idx, std::vector<double> & ints);
+  std::vector<double> get_debug(int idx);
 };
 
 #endif

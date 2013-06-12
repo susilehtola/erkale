@@ -208,7 +208,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 #endif
   {
     ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
-    std::vector<double> tmp;
+    const std::vector<double> * erip;
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -218,12 +218,13 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
       size_t j=shpairs[ip].js;
 
       // Compute integrals
-      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j],tmp);
+      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j]);
+      erip=eri.getp();
       // Get maximum value
       double m=0.0;
-      for(size_t k=0;k<tmp.size();k++)
-	if(fabs(tmp[k])>m)
-	  m=fabs(tmp[k]);
+      for(size_t k=0;k<(*erip).size();k++)
+	if(fabs((*erip)[k])>m)
+	  m=fabs((*erip)[k]);
       m=sqrt(m);
       screen(i,j)=m;
       screen(j,i)=m;
@@ -251,7 +252,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 #endif
 
     /// Integral array
-    std::vector<double> eris;
+    const std::vector<double> * erip;
 
 #ifndef FORCE
 #ifdef DO_J
@@ -349,7 +350,8 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 
 #ifndef FORCE
 	// Compute integrals
-	eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls],eris);
+	eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	erip=eri.getp();
 
 #ifdef ERITABLE
 	// Store integrals
@@ -357,7 +359,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  for(size_t jj=0;jj<Nj;jj++)
 	    for(size_t kk=0;kk<Nk;kk++)
 	      for(size_t ll=0;ll<Nl;ll++)
-		ints[idx(i0+ii,j0+jj,k0+kk,l0+ll)]=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		ints[idx(i0+ii,j0+jj,k0+kk,l0+ll)]=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 #endif
 
 	// Increment matrices.
@@ -383,7 +385,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	      double el=0.0;
 	      for(size_t kk=0;kk<Nk;kk++)
 		for(size_t ll=0;ll<Nl;ll++)
-		  el+=Pkl(kk,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		  el+=Pkl(kk,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 
 	      // Set the element
 	      Jij(ii,jj)+=fac*el;
@@ -416,7 +418,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	      double el=0.0;
 	      for(size_t ii=0;ii<Ni;ii++) {
 		for(size_t jj=0;jj<Nj;jj++) {
-		  el+=Pij(ii,jj)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		  el+=Pij(ii,jj)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 		}
 	      }
 	      
@@ -486,10 +488,10 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		  for(size_t jj=0;jj<Nj;jj++)
 		    {
 #ifdef DO_K
-		      Kik (ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjl (jj,ll);
+		      Kik (ii,kk)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjl (jj,ll);
 #else
-		      Kaik(ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pajl(jj,ll);
-		      Kbik(ii,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbjl(jj,ll);
+		      Kaik(ii,kk)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pajl(jj,ll);
+		      Kbik(ii,kk)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbjl(jj,ll);
 #endif
 		    }
 
@@ -544,10 +546,10 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		for(size_t ll=0;ll<Nl;ll++)
 		  for(size_t ii=0;ii<Ni;ii++) {
 #ifdef DO_K
-		    Kjk(jj,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pil(ii,ll);
+		    Kjk(jj,kk)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pil(ii,ll);
 #else
-		    Kajk(jj,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pail(ii,ll);
-		    Kbjk(jj,kk)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbil(ii,ll);
+		    Kajk(jj,kk)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pail(ii,ll);
+		    Kbjk(jj,kk)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbil(ii,ll);
 #endif
 		  }
 
@@ -603,10 +605,10 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		for(size_t jj=0;jj<Nj;jj++)
 		  for(size_t kk=0;kk<Nk;kk++) {
 #ifdef DO_K
-		    Kil(ii,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjk(jj,kk);
+		    Kil(ii,ll)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjk(jj,kk);
 #else
-		    Kail(ii,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pajk(jj,kk);
-		    Kbil(ii,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbjk(jj,kk);
+		    Kail(ii,ll)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pajk(jj,kk);
+		    Kbil(ii,ll)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbjk(jj,kk);
 #endif
 		  }
 
@@ -661,10 +663,10 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		for(size_t ii=0;ii<Ni;ii++)
 		  for(size_t kk=0;kk<Nk;kk++) {
 #ifdef DO_K
-		    Kjl(jj,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pik(ii,kk);
+		    Kjl(jj,ll)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pik(ii,kk);
 #else
-		    Kajl(jj,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Paik(ii,kk);
-		    Kbjl(jj,ll)+=eris[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbik(ii,kk);
+		    Kajl(jj,ll)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Paik(ii,kk);
+		    Kbjl(jj,ll)+=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pbik(ii,kk);
 #endif
 		  }
 
@@ -794,7 +796,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  // Increment the forces.
 	  for(int idx=0;idx<12;idx++) {
 	    // Get the integral derivatives
-	    deri.get(idx,eris);
+	    erip=deri.getp(idx);
 
 #ifdef DO_J
 	    {
@@ -805,7 +807,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		for(size_t jj=0;jj<Nj;jj++)
 		  for(size_t kk=0;kk<Nk;kk++)
 		    for(size_t ll=0;ll<Nl;ll++)
-		      el+=Pij(ii,jj)*Pkl(kk,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		      el+=Pij(ii,jj)*Pkl(kk,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	      
 	      // Set the element
 	      Jforce(idx)=Jfac*el;
@@ -822,7 +824,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		for(size_t jj=0;jj<Nj;jj++)
 		  for(size_t kk=0;kk<Nk;kk++)
 		    for(size_t ll=0;ll<Nl;ll++)
-		      el+=Pik(ii,kk)*Pjl(jj,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		      el+=Pik(ii,kk)*Pjl(jj,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	      
 	      // Set the element
 	      Kforce(idx)=K1fac*el;
@@ -835,7 +837,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		  for(size_t jj=0;jj<Nj;jj++)
 		    for(size_t kk=0;kk<Nk;kk++)
 		      for(size_t ll=0;ll<Nl;ll++)
-			el+=Pjk(jj,kk)*Pil(ii,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+			el+=Pjk(jj,kk)*Pil(ii,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 		
 		// Increment the element
 		Kforce(idx)+=K2fac*el;
@@ -852,12 +854,12 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		for(size_t jj=0;jj<Nj;jj++)
 		  for(size_t kk=0;kk<Nk;kk++)
 		    for(size_t ll=0;ll<Nl;ll++)
-		      ael+=Paik(ii,kk)*Pajl(jj,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		      ael+=Paik(ii,kk)*Pajl(jj,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	      for(size_t ii=0;ii<Ni;ii++) 
 		for(size_t jj=0;jj<Nj;jj++)
 		  for(size_t kk=0;kk<Nk;kk++)
 		    for(size_t ll=0;ll<Nl;ll++)
-		      bel+=Pbik(ii,kk)*Pbjl(jj,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+		      bel+=Pbik(ii,kk)*Pbjl(jj,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	      
 	      // Set the element
 	      Kaforce(idx)=K1fac*ael;
@@ -869,14 +871,14 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 		  for(size_t jj=0;jj<Nj;jj++)
 		    for(size_t kk=0;kk<Nk;kk++)
 		      for(size_t ll=0;ll<Nl;ll++)
-			ael+=Pajk(jj,kk)*Pail(ii,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+			ael+=Pajk(jj,kk)*Pail(ii,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 
 		bel=0.0;
 		for(size_t ii=0;ii<Ni;ii++) 
 		  for(size_t jj=0;jj<Nj;jj++)
 		    for(size_t kk=0;kk<Nk;kk++)
 		      for(size_t ll=0;ll<Nl;ll++)
-			bel+=Pbjk(jj,kk)*Pbil(ii,ll)*eris[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+			bel+=Pbjk(jj,kk)*Pbil(ii,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 		
 		// Increment the element
 		Kaforce(idx)+=K2fac*ael;

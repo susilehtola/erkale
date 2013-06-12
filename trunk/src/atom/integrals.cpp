@@ -185,7 +185,8 @@ double gaussian_ERI(int la, int ma, int lb, int mb, int lc, int mc, int ld, int 
   dsh.convert_contraction();
   dsh.normalize();
 
-  eri.compute(&ash,&bsh,&csh,&dsh,eris);
+  eri.compute(&ash,&bsh,&csh,&dsh);
+  eris=eri.get();
 
   // Lengths
   int bn=2*lb+1;
