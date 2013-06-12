@@ -77,9 +77,9 @@ int main(void) {
       size_t Ncart=transmat.n_cols;
 
       // Print function header
-      printf("static void transform_%c%i(size_t %s, size_t %s, size_t %s, const std::vector<double> & input, std::vector<double> & output) {\n",ijkl[it],am,arg1.c_str(),arg2.c_str(),arg3.c_str());
-      printf("  output.clear();\n");
-      printf("  output.resize(%i*%s*%s*%s,0.0);\n",(int) Nsph,arg1.c_str(),arg2.c_str(),arg3.c_str());
+      printf("static void transform_%c%i(size_t %s, size_t %s, size_t %s, const std::vector<double> *input, std::vector<double> *output) {\n",ijkl[it],am,arg1.c_str(),arg2.c_str(),arg3.c_str());
+      printf("  (*output).clear();\n");
+      printf("  (*output).resize(%i*%s*%s*%s,0.0);\n",(int) Nsph,arg1.c_str(),arg2.c_str(),arg3.c_str());
 
       // Transform loops
       switch(trans) {
@@ -90,7 +90,7 @@ int main(void) {
 	for(size_t iin=0;iin<Ncart;iin++)
 	  for(size_t iout=0;iout<Nsph;iout++)
 	    if(transmat(iout,iin)!=0.0)
-	      printf("        output[((%2i*Nj+jj)*Nk+kk)*Nl+ll] += % .16e * input[((%2i*Nj+jj)*Nk+kk)*Nl+ll];\n",(int) iout,transmat(iout,iin),(int) iin);
+	      printf("        (*output)[((%2i*Nj+jj)*Nk+kk)*Nl+ll] += % .16e * (*input)[((%2i*Nj+jj)*Nk+kk)*Nl+ll];\n",(int) iout,transmat(iout,iin),(int) iin);
 	break;
 
       case(j):
@@ -100,7 +100,7 @@ int main(void) {
 	for(size_t jin=0;jin<Ncart;jin++)
 	  for(size_t jout=0;jout<Nsph;jout++)
 	    if(transmat(jout,jin)!=0.0)
-	      printf("        output[((ii*%2i+%2i)*Nk+kk)*Nl+ll] += % .16e * input[((ii*%2i+%2i)*Nk+kk)*Nl+ll];\n",(int) Nsph,(int) jout,transmat(jout,jin),(int) Ncart,(int) jin);
+	      printf("        (*output)[((ii*%2i+%2i)*Nk+kk)*Nl+ll] += % .16e * (*input)[((ii*%2i+%2i)*Nk+kk)*Nl+ll];\n",(int) Nsph,(int) jout,transmat(jout,jin),(int) Ncart,(int) jin);
 	break;
 
       case(k):
@@ -110,7 +110,7 @@ int main(void) {
 	for(size_t kin=0;kin<Ncart;kin++)
 	  for(size_t kout=0;kout<Nsph;kout++)
 	    if(transmat(kout,kin)!=0.0)
-	      printf("        output[((ii*Nj+jj)*%2i+%2i)*Nl+ll] += % .16e * input[((ii*Nj+jj)*%2i+%2i)*Nl+ll];\n",(int) Nsph,(int) kout,transmat(kout,kin),(int) Ncart,(int) kin);
+	      printf("        (*output)[((ii*Nj+jj)*%2i+%2i)*Nl+ll] += % .16e * (*input)[((ii*Nj+jj)*%2i+%2i)*Nl+ll];\n",(int) Nsph,(int) kout,transmat(kout,kin),(int) Ncart,(int) kin);
 	break;
 
       case(l):
@@ -120,7 +120,7 @@ int main(void) {
 	for(size_t lin=0;lin<Ncart;lin++)
 	  for(size_t lout=0;lout<Nsph;lout++)
 	    if(transmat(lout,lin)!=0.0)
-	      printf("        output[((ii*Nj+jj)*Nk+kk)*%2i+%2i] += % .16e * input[((ii*Nj+jj)*Nk+kk)*%2i+%2i];\n",(int) Nsph,(int) lout,transmat(lout,lin),(int) Ncart,(int) lin);
+	      printf("        (*output)[((ii*Nj+jj)*Nk+kk)*%2i+%2i] += % .16e * (*input)[((ii*Nj+jj)*Nk+kk)*%2i+%2i];\n",(int) Nsph,(int) lout,transmat(lout,lin),(int) Ncart,(int) lin);
 	break;
       }
 
@@ -132,7 +132,7 @@ int main(void) {
     printf("void IntegralWorker::transform_%c(int am, size_t %s, size_t %s, size_t %s) {\n",ijkl[it],arg1.c_str(),arg2.c_str(),arg3.c_str());
 
     // Check if more efficient transform exists
-    printf("  void (*f[%i])(size_t, size_t, size_t, const std::vector<double> &, std::vector<double> &);\n",MAXAM+1);
+    printf("  void (*f[%i])(size_t, size_t, size_t, const std::vector<double> *, std::vector<double> *);\n",MAXAM+1);
     for(int am=0;am<=MAXAM;am++)
       printf("  f[%i]=transform_%c%i;\n",am,ijkl[it],am);
     printf("  if(am<%i) {\n",MAXAM+1);
@@ -140,7 +140,7 @@ int main(void) {
     printf("  } else {\n");
 
     // Nope, do general transform.
-    printf("    output.assign(output.size(),0.0);\n");
+    printf("    (*output).assign((*output).size(),0.0);\n");
     // Transformation matrix is
     printf("    arma::mat transmat=Ylm_transmat(am);\n");
     printf("    size_t Ncart=transmat.n_cols;\n");
@@ -154,7 +154,7 @@ int main(void) {
       printf("        for(size_t ll=0;ll<Nl;ll++)\n");
       printf("          for(size_t iin=0;iin<Ncart;iin++)\n");
       printf("            for(size_t iout=0;iout<Nsph;iout++)\n");
-      printf("              output[((iout*Nj+jj)*Nk+kk)*Nl+ll]+=transmat(iout,iin)*input[((iin*Nj+jj)*Nk+kk)*Nl+ll];\n");
+      printf("              (*output)[((iout*Nj+jj)*Nk+kk)*Nl+ll]+=transmat(iout,iin)*(*input)[((iin*Nj+jj)*Nk+kk)*Nl+ll];\n");
       break;
 
     case(j):
@@ -163,7 +163,7 @@ int main(void) {
       printf("        for(size_t ll=0;ll<Nl;ll++)\n");
       printf("          for(size_t jin=0;jin<Ncart;jin++)\n");
       printf("            for(size_t jout=0;jout<Nsph;jout++)\n");
-      printf("              output[((ii*Nsph+jout)*Nk+kk)*Nl+ll]+=transmat(jout,jin)*input[((ii*Ncart+jin)*Nk+kk)*Nl+ll];\n");
+      printf("              (*output)[((ii*Nsph+jout)*Nk+kk)*Nl+ll]+=transmat(jout,jin)*(*input)[((ii*Ncart+jin)*Nk+kk)*Nl+ll];\n");
       break;
 
     case(k):
@@ -172,7 +172,7 @@ int main(void) {
       printf("        for(size_t ll=0;ll<Nl;ll++)\n");
       printf("          for(size_t kin=0;kin<Ncart;kin++)\n");
       printf("            for(size_t kout=0;kout<Nsph;kout++)\n");
-      printf("              output[((ii*Nj+jj)*Nsph+kout)*Nl+ll]+=transmat(kout,kin)*input[((ii*Nj+jj)*Ncart+kin)*Nl+ll];\n");
+      printf("              (*output)[((ii*Nj+jj)*Nsph+kout)*Nl+ll]+=transmat(kout,kin)*(*input)[((ii*Nj+jj)*Ncart+kin)*Nl+ll];\n");
       break;
 
     case(l):
@@ -181,7 +181,7 @@ int main(void) {
       printf("        for(size_t kk=0;kk<Nk;kk++)\n");
       printf("          for(size_t lin=0;lin<Ncart;lin++)\n");
       printf("            for(size_t lout=0;lout<Nsph;lout++)\n");
-      printf("              output[((ii*Nj+jj)*Nk+kk)*Nsph+lout]+=transmat(lout,lin)*input[((ii*Nj+jj)*Nk+kk)*Ncart+lin];\n");
+      printf("              (*output)[((ii*Nj+jj)*Nk+kk)*Nsph+lout]+=transmat(lout,lin)*(*input)[((ii*Nj+jj)*Nk+kk)*Ncart+lin];\n");
       break;
     }
 

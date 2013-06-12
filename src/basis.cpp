@@ -262,13 +262,14 @@ void GaussianShell::coulomb_normalize() {
 
   // Compute ERI
   ERIWorker eri(get_am(),get_Ncontr());
-  std::vector<double> eris(get_Nbf()*get_Nbf());
-  eri.compute(this,&dummy,this,&dummy,eris);
+  eri.compute(this,&dummy,this,&dummy);
+  const std::vector<double> * erip=eri.getp();
+
 
   if(!uselm) {
     // Cartesian functions
     for(size_t i=0;i<Ncart;i++)
-      cart[i].relnorm*=1.0/sqrt(eris[i*Nbf+i]);
+      cart[i].relnorm*=1.0/sqrt((*erip)[i*Nbf+i]);
   } else {
     // Spherical normalization, need to distribute
     // normalization coefficient among cartesians
@@ -280,8 +281,8 @@ void GaussianShell::coulomb_normalize() {
     // Check that all factors are the same
     int diff=0;
     for(size_t i=1;i<Nbf;i++)
-      if(fabs(eris[i*Nbf+i]-eris[0])>1000*DBL_EPSILON*eris[0]) {
-	printf("%e != %e, diff %e\n",eris[i*Nbf+i],eris[0],eris[i*Nbf+i]-eris[0]);
+      if(fabs((*erip)[i*Nbf+i]-(*erip)[0])>1000*DBL_EPSILON*(*erip)[0]) {
+	printf("%e != %e, diff %e\n",(*erip)[i*Nbf+i],(*erip)[0],(*erip)[i*Nbf+i]-(*erip)[0]);
 	diff++;
       }
 
@@ -294,7 +295,7 @@ void GaussianShell::coulomb_normalize() {
 
     // Scale coefficients
     for(size_t i=0;i<Ncart;i++)
-      cart[i].relnorm*=1.0/sqrt(eris[0]);
+      cart[i].relnorm*=1.0/sqrt((*erip)[0]);
   }
 }
 
@@ -904,17 +905,18 @@ arma::mat GaussianShell::coulomb_overlap(const GaussianShell & rhs) const {
 
   // Compute ERI
   GaussianShell dummy=dummyshell();
-  std::vector<double> eris(get_Nbf()*rhs.get_Nbf());
   int maxam=std::max(get_am(),rhs.get_am());
   int maxcontr=std::max(get_Ncontr(),rhs.get_Ncontr());
   ERIWorker eri(maxam,maxcontr);
-  eri.compute(this,&dummy,&rhs,&dummy,eris);
+  const std::vector<double> * erip;
+  eri.compute(this,&dummy,&rhs,&dummy);
+  erip=eri.getp();
 
   // Fill overlap matrix
   arma::mat S(Ni,Nj);
   for(size_t i=0;i<Ni;i++)
     for(size_t j=0;j<Nj;j++)
-      S(i,j)=eris[i*Nj+j];
+      S(i,j)=(*erip)[i*Nj+j];
 
   return S;
 }

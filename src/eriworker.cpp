@@ -20,6 +20,8 @@
 #include <cfloat>
 
 IntegralWorker::IntegralWorker() {
+  input=&arrone;
+  output=&arrtwo;
 }
 
 IntegralWorker::~IntegralWorker() {
@@ -137,8 +139,8 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
     tmp*=ks->get_cart()[0].relnorm;
     tmp*=ls->get_cart()[0].relnorm;
 
-    input.resize(1);
-    input[0]=tmp;
+    (*input).resize(1);
+    (*input)[0]=tmp;
   } else {
     //    printf("Computing shell %i %i %i %i",shells[is].get_am(),shells[js].get_am(),shells[ks].get_am(),shells[ls].get_am());
     //    printf("which consists of basis functions (%i-%i)x(%i-%i)x(%i-%i)x(%i-%i).\n",(int) shells[is].get_first_ind(),(int) shells[is].get_last_ind(),(int) shells[js].get_first_ind(),(int) shells[js].get_last_ind(),(int) shells[ks].get_first_ind(),(int) shells[ks].get_last_ind(),(int) shells[ls].get_first_ind(),(int) shells[ls].get_last_ind());
@@ -155,7 +157,7 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
     std::vector<shellf_t> cj=js->get_cart();
     std::vector<shellf_t> ck=ks->get_cart();
     std::vector<shellf_t> cl=ls->get_cart();
-    input.resize(ci.size()*cj.size()*ck.size()*cl.size());
+    (*input).resize(ci.size()*cj.size()*ck.size()*cl.size());
 
     for(size_t ii=0;ii<ci.size();ii++) {
       ind_i=ii*cj.size();
@@ -171,8 +173,8 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
 	    ind=ind_ijk+li;
 	    // Total norm factor
 	    norm=cl[li].relnorm*norm_ijk;
-	    // Compute output index
-	    input[ind]=norm*ints[ind];
+	    // Compute (*output) index
+	    (*input)[ind]=norm*ints[ind];
 	  }
 	}
       }
@@ -255,11 +257,10 @@ void dERIWorker::compute_cartesian() {
   }
 }
 
-
-void dERIWorker::get(int idx, std::vector<double> & ints) {
+void dERIWorker::get_idx(int idx) {
   // Amount of integrals is
   size_t N=(is->get_Ncart())*(js->get_Ncart())*(ks->get_Ncart())*(ls->get_Ncart());
-  input.resize(N);
+  (*input).resize(N);
 
   // Determine what is the real center requested (juggling of integrals)
   if(idx>=0 && idx<3) {
@@ -311,11 +312,11 @@ void dERIWorker::get(int idx, std::vector<double> & ints) {
   if((idx>=0 && idx<3) || (idx>5 && idx<12)) {
     // Integrals have been computed explicitely.
     for(size_t i=0;i<N;i++)
-      input[i]=libderiv.ABCD[idx][i];
+      (*input)[i]=libderiv.ABCD[idx][i];
   } else if(idx>=3 && idx<=5) {
     // Derivate wrt B_i: d/dB_i = - d/dA_i - d/dC_i - d/dD_i
     for(size_t i=0;i<N;i++)
-      input[i]= - libderiv.ABCD[idx-3][i] - libderiv.ABCD[idx+3][i] - libderiv.ABCD[idx+6][i];
+      (*input)[i]= - libderiv.ABCD[idx-3][i] - libderiv.ABCD[idx+3][i] - libderiv.ABCD[idx+6][i];
   } else {
     ERROR_INFO();
     throw std::runtime_error("Invalid derivative index requested!\n");
@@ -325,13 +326,15 @@ void dERIWorker::get(int idx, std::vector<double> & ints) {
   reorder(is,js,ks,ls,swap_ij,swap_kl,swap_ijkl);
   // and transform them into the spherical basis
   spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
-  // and return them
-  ints=input;
+}
+
+std::vector<double> dERIWorker::get(int idx) {
+  // Get the integrals
+  get_idx(idx);
 
 #ifdef DEBUGDERIV
   // Evaluate other integrals
-  std::vector<double> eris;
-  get_debug(idx,eris);
+  std::vector<double> eris=get_debug(idx);
 
   // Check the integrals
   size_t Nfail=0;
@@ -357,15 +360,21 @@ void dERIWorker::get(int idx, std::vector<double> & ints) {
     printf("%i integrals failed\n",(int) Nfail);
   }
 
-  ints=eris;
 #endif
+
+  return *input;
+}
+
+const std::vector<double> * dERIWorker::getp(int idx) {
+  get_idx(idx);
+  return input;
 }
 
 
-void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
+std::vector<double> dERIWorker::get_debug(int idx) {
   // Amount of integrals
   size_t N=(is->get_Ncart())*(js->get_Ncart())*(ks->get_Ncart())*(ls->get_Ncart());
-  input.resize(N);
+  (*input).resize(N);
 
   // Form cartesian shells
   GaussianShell isc(is_orig->get_am(),false,is_orig->get_contr());
@@ -397,8 +406,8 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
   // ERI evaluator
   ERIWorker eri(std::max(std::max(isc.get_am(),jsc.get_am()),std::max(ksc.get_am(),lsc.get_am()))+1,std::max(std::max(isc.get_Ncontr(),jsc.get_Ncontr()),std::max(ksc.get_Ncontr(),lsc.get_Ncontr())));
 
-  // Zero out input array
-  input.assign(N,0.0);
+  // Zero out (*input) array
+  (*input).assign(N,0.0);
 
   // Which derivative are we taking?
   if(idx>=0 && idx<3) {
@@ -422,8 +431,9 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
       icp.normalize();
 
       // Evaluate ERI
-      std::vector<double> eris;
-      eri.compute(&icp,&jsc,&ksc,&lsc,eris);
+      const std::vector<double> * erip;
+      eri.compute(&icp,&jsc,&ksc,&lsc);
+      erip=eri.getp();
 
       // Collect terms
       for(size_t ica=0;ica<icart.size();ica++) {
@@ -456,7 +466,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	for(size_t jj=0;jj<Nj;jj++)
 	  for(size_t kk=0;kk<Nk;kk++)
 	    for(size_t ll=0;ll<Nl;ll++)
-	      input[((idt*Nj+jj)*Nk+kk)*Nl+ll]+=fac*eris[((idp*Nj+jj)*Nk+kk)*Nl+ll];
+	      (*input)[((idt*Nj+jj)*Nk+kk)*Nl+ll]+=fac*(*erip)[((idp*Nj+jj)*Nk+kk)*Nl+ll];
       }
 
       if(is_orig->get_am()>0) {
@@ -466,7 +476,8 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	icm.normalize();
 
 	// Evaluate ERI
-	eri.compute(&icm,&jsc,&ksc,&lsc,eris);
+	eri.compute(&icm,&jsc,&ksc,&lsc);
+	erip=eri.getp();
 
 	// Collect terms
 	for(size_t ica=0;ica<icart.size();ica++) {
@@ -507,7 +518,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	  for(size_t jj=0;jj<Nj;jj++)
 	    for(size_t kk=0;kk<Nk;kk++)
 	      for(size_t ll=0;ll<Nl;ll++)
-		input[((idt*Nj+jj)*Nk+kk)*Nl+ll]+=fac*eris[((idm*Nj+jj)*Nk+kk)*Nl+ll];
+		(*input)[((idt*Nj+jj)*Nk+kk)*Nl+ll]+=fac*(*erip)[((idm*Nj+jj)*Nk+kk)*Nl+ll];
 	}
       }
     }
@@ -534,8 +545,9 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
       size_t Njp=jcp.get_Ncart();
 
       // Evaluate ERI
-      std::vector<double> eris;
-      eri.compute(&isc,&jcp,&ksc,&lsc,eris);
+      const std::vector<double> * erip;
+      eri.compute(&isc,&jcp,&ksc,&lsc);
+      erip=eri.getp();
 
       // Collect terms
       for(size_t jca=0;jca<jcart.size();jca++) {
@@ -568,7 +580,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	for(size_t ii=0;ii<Ni;ii++)
 	  for(size_t kk=0;kk<Nk;kk++)
 	    for(size_t ll=0;ll<Nl;ll++)
-	      input[((ii*Nj+jdt)*Nk+kk)*Nl+ll]+=fac*eris[((ii*Njp+jdp)*Nk+kk)*Nl+ll];
+	      (*input)[((ii*Nj+jdt)*Nk+kk)*Nl+ll]+=fac*(*erip)[((ii*Njp+jdp)*Nk+kk)*Nl+ll];
       }
 
       if(js_orig->get_am()>0) {
@@ -579,7 +591,8 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	size_t Njm=jcm.get_Ncart();
 
 	// Evaluate ERI
-	eri.compute(&isc,&jcm,&ksc,&lsc,eris);
+	eri.compute(&isc,&jcm,&ksc,&lsc);
+	erip=eri.getp();
 
 	// Collect terms
 	for(size_t jca=0;jca<jcart.size();jca++) {
@@ -620,7 +633,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	  for(size_t ii=0;ii<Ni;ii++)
 	    for(size_t kk=0;kk<Nk;kk++)
 	      for(size_t ll=0;ll<Nl;ll++)
-		input[((ii*Nj+jdt)*Nk+kk)*Nl+ll]+=fac*eris[((ii*Njm+jdm)*Nk+kk)*Nl+ll];
+		(*input)[((ii*Nj+jdt)*Nk+kk)*Nl+ll]+=fac*(*erip)[((ii*Njm+jdm)*Nk+kk)*Nl+ll];
 	}
       }
     }
@@ -647,8 +660,9 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
       size_t Nkp=kcp.get_Ncart();
 
       // Evaluate ERI
-      std::vector<double> eris;
-      eri.compute(&isc,&jsc,&kcp,&lsc,eris);
+      const std::vector<double> * erip;
+      eri.compute(&isc,&jsc,&kcp,&lsc);
+      erip=eri.getp();
 
       // Collect terms
       for(size_t kca=0;kca<kcart.size();kca++) {
@@ -681,7 +695,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	for(size_t ii=0;ii<Ni;ii++)
 	  for(size_t jj=0;jj<Nj;jj++)
 	    for(size_t ll=0;ll<Nl;ll++)
-	      input[((ii*Nj+jj)*Nk+kdt)*Nl+ll]+=fac*eris[((ii*Nj+jj)*Nkp+kdp)*Nl+ll];
+	      (*input)[((ii*Nj+jj)*Nk+kdt)*Nl+ll]+=fac*(*erip)[((ii*Nj+jj)*Nkp+kdp)*Nl+ll];
       }
 
       if(ks_orig->get_am()>0) {
@@ -692,7 +706,8 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	size_t Nkm=kcm.get_Ncart();
 
 	// Evaluate ERI
-	eri.compute(&isc,&jsc,&kcm,&lsc,eris);
+	eri.compute(&isc,&jsc,&kcm,&lsc);
+	erip=eri.getp();
 
 	// Collect terms
 	for(size_t kca=0;kca<kcart.size();kca++) {
@@ -733,7 +748,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	  for(size_t ii=0;ii<Ni;ii++)
 	    for(size_t jj=0;jj<Nj;jj++)
 	      for(size_t ll=0;ll<Nl;ll++)
-		input[((ii*Nj+jj)*Nk+kdt)*Nl+ll]+=fac*eris[((ii*Nj+jj)*Nkm+kdm)*Nl+ll];
+		(*input)[((ii*Nj+jj)*Nk+kdt)*Nl+ll]+=fac*(*erip)[((ii*Nj+jj)*Nkm+kdm)*Nl+ll];
 	}
       }
     }
@@ -759,8 +774,9 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
       size_t Nlp=lcp.get_Ncart();
 
       // Evaluate ERI
-      std::vector<double> eris;
-      eri.compute(&isc,&jsc,&ksc,&lcp,eris);
+      const std::vector<double> * erip;
+      eri.compute(&isc,&jsc,&ksc,&lcp);
+      erip=eri.getp();
 
       // Collect terms
       for(size_t lca=0;lca<lcart.size();lca++) {
@@ -793,7 +809,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	for(size_t ii=0;ii<Ni;ii++)
 	  for(size_t jj=0;jj<Nj;jj++)
 	    for(size_t kk=0;kk<Nk;kk++)
-	      input[((ii*Nj+jj)*Nk+kk)*Nl+ldt]+=fac*eris[((ii*Nj+jj)*Nk+kk)*Nlp+ldp];
+	      (*input)[((ii*Nj+jj)*Nk+kk)*Nl+ldt]+=fac*(*erip)[((ii*Nj+jj)*Nk+kk)*Nlp+ldp];
       }
 
       if(ls_orig->get_am()>0) {
@@ -804,7 +820,8 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	size_t Nlm=lcm.get_Ncart();
 
 	// Evaluate ERI
-	eri.compute(&isc,&jsc,&ksc,&lcm,eris);
+	eri.compute(&isc,&jsc,&ksc,&lcm);
+	erip=eri.getp();
 
 	// Collect terms
 	for(size_t lca=0;lca<lcart.size();lca++) {
@@ -845,7 +862,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
 	  for(size_t ii=0;ii<Ni;ii++)
 	    for(size_t jj=0;jj<Nj;jj++)
 	      for(size_t kk=0;kk<Nk;kk++)
-		input[((ii*Nj+jj)*Nk+kk)*Nl+ldt]+=fac*eris[((ii*Nj+jj)*Nk+kk)*Nlm+ldm];
+		(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ldt]+=fac*(*erip)[((ii*Nj+jj)*Nk+kk)*Nlm+ldm];
 	}
       }
     }
@@ -855,7 +872,7 @@ void dERIWorker::get_debug(int idx, std::vector<double> & ints) {
   spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
 
   // Return the integrals
-  ints=input;
+  return *input;
 }
 
 eri_precursor_t IntegralWorker::compute_precursor(const GaussianShell *is, const GaussianShell *js) {
@@ -1118,7 +1135,7 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
     }
 }
 
-void ERIWorker::compute(const GaussianShell *is_orig, const GaussianShell *js_orig, const GaussianShell *ks_orig, const GaussianShell *ls_orig, std::vector<double> & ints) {
+void ERIWorker::compute(const GaussianShell *is_orig, const GaussianShell *js_orig, const GaussianShell *ks_orig, const GaussianShell *ls_orig) {
   // Calculate ERIs and transform them to spherical harmonics basis, if necessary.
 
   // Helpers
@@ -1155,9 +1172,14 @@ void ERIWorker::compute(const GaussianShell *is_orig, const GaussianShell *js_or
   reorder(is,js,ks,ls,swap_ij,swap_kl,swap_ijkl);
   // and transform them into the spherical basis
   spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
+}
 
-  // Finally, return the integrals
-  ints=input;
+std::vector<double> ERIWorker::get() const {
+  return *input;
+}
+
+const std::vector<double> * ERIWorker::getp() const {
+  return input;
 }
 
 void dERIWorker::compute(const GaussianShell *is_origv, const GaussianShell *js_origv, const GaussianShell *ks_origv, const GaussianShell *ls_origv) {
@@ -1200,7 +1222,7 @@ void dERIWorker::compute(const GaussianShell *is_origv, const GaussianShell *js_
 }
 
 void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl) {
-  // Integrals are now in the input array.
+  // Integrals are now in the (*input) array.
   // Get them in the original order.
 
   if(!swap_ijkl && !swap_kl && !swap_ij) // 000
@@ -1214,7 +1236,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
   const size_t Nl=ls->get_Ncart();
 
   // Check that we have enough memory
-  output.resize(input.size());
+  (*output).resize((*input).size());
 
   if(!swap_ijkl && !swap_kl && swap_ij) { // 001
     // Need two switch i and j.
@@ -1222,7 +1244,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    output[((jj*Ni+ii)*Nk+kk)*Nl+ll]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    (*output)[((jj*Ni+ii)*Nk+kk)*Nl+ll]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	  }
 
   } else if(!swap_ijkl && swap_kl && !swap_ij) { // 010
@@ -1232,7 +1254,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    output[((ii*Nj+jj)*Nl+ll)*Nk+kk]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    (*output)[((ii*Nj+jj)*Nl+ll)*Nk+kk]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	  }
 
   } else if(!swap_ijkl && swap_kl && swap_ij) { // 011
@@ -1242,7 +1264,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    output[((jj*Ni+ii)*Nl+ll)*Nk+kk]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    (*output)[((jj*Ni+ii)*Nl+ll)*Nk+kk]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	  }
 
   } else if(swap_ijkl && !swap_ij && !swap_kl) { // 100
@@ -1252,7 +1274,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    output[((kk*Nl+ll)*Ni+ii)*Nj+jj]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    (*output)[((kk*Nl+ll)*Ni+ii)*Nj+jj]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	  }
 
   } else if(swap_ijkl && !swap_kl && swap_ij) { // 101
@@ -1262,7 +1284,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    output[((ll*Nk+kk)*Nj+jj)*Ni+ii]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    (*output)[((ll*Nk+kk)*Nj+jj)*Ni+ii]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	  }
     
   } else if(swap_ijkl && swap_kl && !swap_ij) { // 110
@@ -1272,7 +1294,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    output[((ll*Nk+kk)*Nj+jj)*Ni+ii]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    (*output)[((ll*Nk+kk)*Nj+jj)*Ni+ii]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	  }
 
   } else if(swap_ijkl && swap_kl && swap_ij) { // 111
@@ -1282,7 +1304,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    output[((kk*Nl+ll)*Ni+ii)*Nj+jj]=input[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    (*output)[((kk*Nl+ll)*Ni+ii)*Nj+jj]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 	  }
 
   }
