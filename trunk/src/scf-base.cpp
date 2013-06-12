@@ -1538,6 +1538,11 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
     rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
   }
 
+  // Convergence threshold
+  double eps=1e-6;
+  if(measure>0.0)
+    eps=measure;
+
   // Get r matrix
   std::vector<arma::mat> rmat=basisp->moment(1);
   int k=0;
@@ -1597,7 +1602,7 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
     }
 
     // Check for convergence.
-    if(bracket(G[G.size()-1],G[G.size()-1])<1e-6)
+    if(bracket(G[G.size()-1],G[G.size()-1])<eps)
       break;
 
 

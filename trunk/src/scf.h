@@ -274,9 +274,9 @@ class SCF {
   /// Helper for PZ-SIC - perform unitary optimization of energy
   void unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_mat> & U, std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, DFTGrid & grid, const std::vector<size_t> & nocc, const std::vector<arma::vec> & numocc, dft_t dft, std::vector<arma::mat> & HSIC, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & sol);
 
-  /// Helper for PZ-SIC: localize occupied orbitals
+  /// Helper for PZ-SIC: localize occupied orbitals. Initial value of measure is taken as the convergence threshold
   arma::cx_mat localize(const arma::mat & C, double & measure, bool complex=true, long unsigned int seed=0) const;
-  /// Helper for PZ-SIC: optimize U
+  /// Helper for PZ-SIC: optimize U. Initial value of measure is taken as the convergence threshold
   void localize(const arma::mat & C, double & measure, arma::cx_mat & U) const;
 
   /// Helper for above - calculate B with given rotation matrix
