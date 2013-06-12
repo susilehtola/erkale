@@ -146,7 +146,7 @@ arma::mat BasOrth(const arma::mat & S, bool verbose) {
   eig_sym_ordered(Sval,Svec,S);
 
   if(verbose) {
-    printf("Smallest eigenvalue of overlap matrix is %e, ratio to largest is %e.\n",Sval(0),Sval(0)/Sval(Sval.n_elem-1));
+    printf("Smallest eigenvalue of overlap matrix is %.2e, ratio to largest is %.2e.\n",Sval(0),Sval(0)/Sval(Sval.n_elem-1));
   }
 
   // Check smallest eigenvalue.
