@@ -119,153 +119,120 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   double ESICopt=0.0;
   */
 
-  if(verbose && !canonical) {
-    printf("\nSIC iteration:\n");
-    fprintf(stderr,"\n\t%4s\t%12s\t%13s\t%13s\n","iter","K/R","ESIC","dESIC");
-    fflush(stdout);
-    fflush(stderr);
-  }
-
   // Check that U is sane
+  bool sane=true;
   for(size_t ispin=0;ispin<nocc.size();ispin++)
-    if(U[ispin].n_rows != nocc[ispin] || U[ispin].n_cols != nocc[ispin]) {
+    if(U[ispin].n_rows != nocc[ispin] || U[ispin].n_cols != nocc[ispin])
+      sane=false;
+
+  double ESIC; 
+  // Amount of trials
+  if(!sane) {
+    // Initialize with a random unitary matrix.
+    int Ntr=1;
+    std::vector< std::vector<arma::cx_mat> > Ctr(Ntr);
+    std::vector< std::vector<arma::cx_mat> > Utr(Ntr);
+    std::vector<double> Etr(Ntr);
+
+    // Orbital Fock matrices and self-interaction energies
+    std::vector< std::vector< std::vector<arma::mat> > > Forbtr(Ntr);
+    std::vector< std::vector< std::vector<double> > > Eorbtr(Ntr);
+    
+    if(verbose)
+      printf("Forming random SIC localization matrix starting points.\n");
+
+    for(int itr=0;itr<Ntr;itr++) {
       // Initialize with a random matrix
-      U[ispin]=complex_unitary(nocc[ispin]);
-    }
+      Utr[itr].resize(nocc.size());
+      Ctr[itr].resize(nocc.size());
+      for(size_t ispin=0;ispin<nocc.size();ispin++)
+	Utr[itr][ispin]=complex_unitary(nocc[ispin],itr);
 
-  // Calculate SIC of current U
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    if(C[ispin].n_cols>1)
-      Ctilde[ispin]=C[ispin]*U[ispin];
-    else {
-      std::complex<double> dummy(1.0,0.0);
-      Ctilde[ispin]=C[ispin]*dummy;
-    }
-  // Compute the orbital-dependent Fock matrices
+      if(localization) {
+	// Localize starting guess with threshold 0.1
+	double measure=0.1;
+	for(size_t ispin=0;ispin<nocc.size();ispin++)
+	  localize(C[ispin],measure,Utr[itr][ispin]);
+      }	
+
+      Forbtr[itr]=Forb;
+      Eorbtr[itr]=Eorb;
+      
+      // Calculate SIC of current U
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	if(C[ispin].n_cols>1)
+	  Ctr[itr][ispin]=C[ispin]*Utr[itr][ispin];
+	else {
+	  std::complex<double> dummy(1.0,0.0);
+	  Ctr[itr][ispin]=C[ispin]*dummy;
+	}
+      // Compute the orbital-dependent Fock matrices
 #ifdef RESTRICTED
-  PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+      PZSIC_Fock_RDFT(Forb,Eorb,Ctr[itr],nocc,numocc,dft,grid);
 #else
-  PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
+      PZSIC_Fock_UDFT(Forb,Eorb,Ctr[itr],nocc,numocc,dft,grid);
 #endif
-  (void) tol;
-
-  double ESIC=0.0;
-  for(size_t ispin=0;ispin<C.size();ispin++)
-    for(size_t io=0;io<nocc[ispin];io++)
-      ESIC+=Eorb[ispin][io];
+      (void) tol;
+      
+      Etr[itr]=0.0;
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	for(size_t io=0;io<nocc[ispin];io++)
+	  Etr[itr]+=Eorb[ispin][io];
 #ifdef RESTRICTED
-  ESIC*=2.0;
+      Etr[itr]*=2.0;
 #endif
-
-  if(!canonical && localization) {
-    // Calculate other possibilities of initializing U
-
-    /*
-      static std::vector<arma::cx_mat> Urnd(U);
-      for(size_t ispin=0;ispin<C.size();ispin++) {
-      // Initialize with random unit matrix
-      Urnd[ispin]=complex_unitary(C[ispin].n_cols);
-      // And localize it
-      double measure;
-      localize(C[ispin],measure,Urnd[ispin]);
+      
+      if(verbose) {
+	printf("%3i % .16f\n",(int) itr+1,Etr[itr]);
+	fflush(stdout);
       }
-
-      for(size_t ispin=0;ispin<C.size();ispin++)
-      if(C[ispin].n_cols>1)
-      Ctilde[ispin]=C[ispin]*Urnd[ispin];
-      else {
-      std::complex<double> dummy(1.0,0.0);
-      Ctilde[ispin]=C[ispin]*dummy;
-      }
-
-      #ifdef RESTRICTED
-      PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-      #else
-      PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
-      #endif
-
-      double Ernd=0.0;
-      for(size_t ispin=0;ispin<C.size();ispin++)
-      for(size_t io=0;io<nocc[ispin];io++)
-      Ernd+=Eorb[ispin][io];
-      #ifdef RESTRICTED
-      Ernd*=2.0;
-      #endif
-    */
-
-    // and of a localized U
-    static std::vector<arma::cx_mat> Uloc(U);
-    for(size_t ispin=0;ispin<C.size();ispin++) {
-      double measure;
-      localize(C[ispin],measure,Uloc[ispin]);
     }
 
+    // Find maximum SIC energy
+    double Emax=Etr[0];
+    int maxidx=0;
+    for(int itr=1;itr<Ntr;itr++)
+      if(Etr[itr]>Emax) {
+	Emax=Etr[itr];
+	maxidx=itr;
+      }
+
+    // Store ESIC and other stuff
+    ESIC=Etr[maxidx];
+    Ctilde=Ctr[maxidx];
+    Forb=Forbtr[maxidx];
+    Eorb=Eorbtr[maxidx];
+    U=Utr[maxidx];
+
+    if(verbose) {
+      printf("Maximal SIC energy % .16f with trial %i.\n",ESIC,maxidx+1);
+      fflush(stdout);
+    }
+
+  } else {
+    // Calculate SIC of current U
     for(size_t ispin=0;ispin<C.size();ispin++)
       if(C[ispin].n_cols>1)
-	Ctilde[ispin]=C[ispin]*Uloc[ispin];
+	Ctilde[ispin]=C[ispin]*U[ispin];
       else {
 	std::complex<double> dummy(1.0,0.0);
 	Ctilde[ispin]=C[ispin]*dummy;
       }
-
+    // Compute the orbital-dependent Fock matrices
 #ifdef RESTRICTED
     PZSIC_Fock_RDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
 #else
     PZSIC_Fock_UDFT(Forb,Eorb,Ctilde,nocc,numocc,dft,grid);
 #endif
-
-    double Eloc=0.0;
+    (void) tol;
+    
+    ESIC=0.0;
     for(size_t ispin=0;ispin<C.size();ispin++)
       for(size_t io=0;io<nocc[ispin];io++)
-	Eloc+=Eorb[ispin][io];
+	ESIC+=Eorb[ispin][io];
 #ifdef RESTRICTED
-    Eloc*=2.0;
+    ESIC*=2.0;
 #endif
-
-    // What is maximum?
-    //    double Emax=std::max(std::max(Ernd,Eloc),ESIC);
-    double Emax=std::max(Eloc,ESIC);
-
-    // Do swap?
-    if(ESIC==Emax) {
-      if(verbose) {
-	//	printf("\nUsing old transformation matrix, energies: old %e, randomized %e, localized %e.\n",ESIC,Ernd,Eloc);
-	printf("\nUsing old transformation matrix, energies: old %e, localized %e.\n",ESIC,Eloc);
-	fflush(stdout);
-      }
-    } else if(Eloc==Emax) {
-      if(verbose) {
-	//	printf("\nUsing localized transformation matrix, energies: old %e, randomized %e, localized %e.\n",ESIC,Ernd,Eloc);
-
-        // Transformation matrix classification
-	printf("\nUsing");
-        for(size_t ispin=0;ispin<U.size();ispin++) {
-          double real=rms_norm(arma::real(Uloc[ispin]));
-          double imag=rms_norm(arma::imag(Uloc[ispin]));
-
-          if(imag<sqrt(DBL_EPSILON)*real)
-            printf(" real ");
-          else if(real<sqrt(DBL_EPSILON)*imag)
-            printf(" imaginary ");
-          else
-            printf(" complex ");
-        }
-	printf("localized transformation matrix, energies: old %e, localized %e.\n",ESIC,Eloc);
-	fflush(stdout);
-
-      }
-
-      U=Uloc;
-    }
-    /* else {
-       if(verbose) {
-       printf("\nResetting transformation matrix: old %e, randomized %e, difference %e.\n",ESIC,Ernd,Ernd-ESIC);
-       fflush(stdout);
-       }
-
-       U=Urnd;
-       }
-    */
   }
 
   if(dft.adaptive) {
@@ -540,6 +507,9 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
 #endif
 {
 
+  // Tolerance of unitary optimization wrt R
+  double kappatol=1e-3;
+
   // Self-interaction energy
   double ESIC=0.0;
 
@@ -570,6 +540,13 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
 
   // G matrices
   std::vector< std::vector<arma::cx_mat> > G;
+
+  if(verbose) {
+    printf("\nSIC iteration:\n");
+    fprintf(stderr,"\n\t%4s\t%12s\t%13s\t%13s\n","iter","K/R","ESIC","dESIC");
+    fflush(stdout);
+    fflush(stderr);
+  }
 
   // Use optimized orbitals for SIC.
   while(true) {
@@ -756,9 +733,9 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
     {
       bool convd=true;
       for(size_t ispin=0;ispin<C.size();ispin++)
-	if(K[ispin]>0.1*diffR[ispin])
+	if(K[ispin]>kappatol*diffR[ispin])
 	  convd=false;
-
+      
       if(convd) {
 	if(verbose) {
 	  fprintf(stderr," %10.3f\n",t.get());
@@ -1046,6 +1023,7 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
     
     if(verbose) {
       fprintf(stderr," %10.3f\n",t.get());
+      fflush(stdout);
     }
   }
 }
