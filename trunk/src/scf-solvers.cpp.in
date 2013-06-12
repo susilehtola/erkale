@@ -388,7 +388,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif // DFT
 
   // Has calculation been converged?
-  bool converged=0;
+  bool converged=false;
   // How many consecutive iterations have seemed converged
   int convd=0;
 
@@ -399,6 +399,52 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   uscf_t oldsol;
 #endif
   oldsol.en.E=0.0;
+
+  // Pad occupancies with zeros (needed e.g. in Casida routines)
+#if !defined(RESTRICTED)
+  std::vector<double> occar(occa), occbr(occb);
+  while(occar.size()<Sinvh.n_cols)
+    occar.push_back(0.0);
+  while(occbr.size()<Sinvh.n_cols)
+    occbr.push_back(0.0);
+#else
+  std::vector<double> occr(occs);
+  while(occr.size()<Sinvh.n_cols)
+    occr.push_back(0.0);
+#endif
+
+  // Write current matrices to checkpoint.
+  // To use the file effectively, we keep it open for the whole shebang.
+  chkptp->open();
+  chkptp->write("P",sol.P);
+  chkptp->write("S",S);
+  chkptp->write("Sinvh",Sinvh);
+  chkptp->write(sol.en);
+#if !defined(RESTRICTED)
+  chkptp->write("Ca",sol.Ca);
+  chkptp->write("Cb",sol.Cb);
+
+  chkptp->write("Ea",sol.Ea);
+  chkptp->write("Eb",sol.Eb);
+
+  chkptp->write("Pa",sol.Pa);
+  chkptp->write("Pb",sol.Pb);
+
+  chkptp->write("occa",occar);
+  chkptp->write("occb",occbr);
+
+  // Restricted
+  chkptp->write("Restricted",0);
+#else
+  chkptp->write("C",sol.C);
+  chkptp->write("E",sol.E);
+  chkptp->write("occs",occr);
+  // Unrestricted
+  chkptp->write("Restricted",1);
+#endif
+  chkptp->write("Converged",converged);
+  chkptp->write("tol",tol);
+  chkptp->close();
 
   // Loop:
   int iiter=1;
@@ -970,19 +1016,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       // Reset number of consecutive converged iterations
       convd=0;
     }
-
-    // Pad occupancies with zeros (needed e.g. in Casida routines)
-#if !defined(RESTRICTED)
-    std::vector<double> occar(occa), occbr(occb);
-    while(occar.size()<Sinvh.n_cols)
-      occar.push_back(0.0);
-    while(occbr.size()<Sinvh.n_cols)
-      occbr.push_back(0.0);
-#else
-    std::vector<double> occr(occs);
-    while(occr.size()<Sinvh.n_cols)
-      occr.push_back(0.0);
-#endif
 
     // Write current matrices to checkpoint.
     // To use the file effectively, we keep it open for the whole shebang.
