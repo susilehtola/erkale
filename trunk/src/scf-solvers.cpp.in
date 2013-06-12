@@ -409,7 +409,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       printf("\n ******* Iteration %4i ********\n",iiter);
 
     // Form the Fock operator.
-    if((iiter%5==1 && !strict) || strict) {
+    if(strict || (!strict && iiter%5==1)) {
 #ifdef RESTRICTED
       rscf_t refsol;
 #else
@@ -417,7 +417,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
       if(iiter!=1 && !strict && verbose && !densityfit)
 	printf("Restarting Fock matrix formation from scratch.\n");
-
+      
       form_fock(sol,refsol);
     } else {
       form_fock(sol,oldsol);
