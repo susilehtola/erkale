@@ -75,8 +75,12 @@ template <class T> T max4(const T & a, const T & b, const T & c, const T & d) {
 
 /// Get element with maximum absolute value
 double max_abs(const arma::mat & R);
+/// Get element with maximum absolute value
+double max_cabs(const arma::cx_mat & R);
 /// Compute rms norm of matrix
 double rms_norm(const arma::mat & R);
+/// Compute rms norm of matrix
+double rms_cnorm(const arma::cx_mat & R);
 
 /// Reverse array
 template <class T> void reverse(std::vector<T> & a) {

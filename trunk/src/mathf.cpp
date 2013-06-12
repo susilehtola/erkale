@@ -192,9 +192,31 @@ double max_abs(const arma::mat & R) {
   return m;
 }
 
+double max_cabs(const arma::cx_mat & R) {
+  // Find maximum absolute value of matrix
+  double m=0;
+  double tmp;
+  for(size_t i=0;i<R.n_rows;i++)
+    for(size_t j=0;j<R.n_cols;j++) {
+      tmp=std::abs(R(i,j));
+      if(tmp>m)
+	m=tmp;
+    }
+  return m;
+}
+
 double rms_norm(const arma::mat & R) {
   // Calculate \sum_ij R_ij^2
-  double rms=arma::trace(arma::trans(R)*R)/(R.n_rows*R.n_cols);
+  double rms=arma::trace(arma::trans(R)*R);
+  // and convert to rms
+  rms=sqrt(rms/(R.n_rows*R.n_cols));
+
+  return rms;
+}
+
+double rms_cnorm(const arma::cx_mat & R) {
+  // Calculate \sum_ij R_ij^2
+  double rms=std::abs(arma::trace(arma::trans(R)*R));
   // and convert to rms
   rms=sqrt(rms/(R.n_rows*R.n_cols));
 
