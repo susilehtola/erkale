@@ -1046,9 +1046,9 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       if(stricmp(set.get_string("DFTGrid"),"Auto")==0) {
 	// Solve restricted DFT problem first on a rough grid
 	enum pzsic pz=solver.do_sic();
-	if(pz==PERT) solver.do_sic(NO);
+	if(pz==PERT || pz==CANPERT) solver.do_sic(NO);
 	solver.RDFT(sol,occs,initconv,initdft);
-	if(pz==PERT) solver.do_sic(pz);
+	if(pz==PERT || pz==CANPERT) solver.do_sic(pz);
 
 	if(verbose) {
 	  fprintf(stderr,"\n");
@@ -1161,9 +1161,9 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       if(stricmp(set.get_string("DFTGrid"),"Auto")==0) {
 	// Solve restricted DFT problem first on a rough grid
 	enum pzsic pz=solver.do_sic();
-	if(pz==PERT) solver.do_sic(NO);
+	if(pz==PERT || pz==CANPERT) solver.do_sic(NO);
 	solver.UDFT(sol,occa,occb,initconv,initdft);
-	if(pz==PERT) solver.do_sic(pz);
+	if(pz==PERT || pz==CANPERT) solver.do_sic(pz);
 
 	if(verbose) {
 	  fprintf(stderr,"\n");
