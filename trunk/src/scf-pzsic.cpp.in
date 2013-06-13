@@ -149,8 +149,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	Utr[itr][ispin]=complex_unitary(nocc[ispin],itr);
 
       if(localization) {
-	// Localize starting guess with threshold 0.1
-	double measure=0.1;
+	// Localize starting guess with threshold 1.0
+	double measure=1.0;
 	for(size_t ispin=0;ispin<nocc.size();ispin++)
 	  localize(C[ispin],measure,Utr[itr][ispin]);
       }	
@@ -233,6 +233,60 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 #ifdef RESTRICTED
     ESIC*=2.0;
 #endif
+    
+    // Calculate SIC of localized U
+    if(localization) {
+      // Initialize with a random unitary matrix.
+      std::vector<arma::cx_mat> Cloc(Ctilde);
+      std::vector<arma::cx_mat> Uloc(U);
+      double Eloc;
+      
+      // Orbital Fock matrices and self-interaction energies
+      std::vector< std::vector<arma::mat> > Forbloc(Forb);
+      std::vector< std::vector<double> > Eorbloc(Eorb);
+      
+      // Localize orbitals with threshold 1.0
+      double measure=1.0;
+      for(size_t ispin=0;ispin<nocc.size();ispin++)
+	localize(C[ispin],measure,Uloc[ispin]);
+
+      // Calculate SIC of localized U
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	if(C[ispin].n_cols>1)
+	  Cloc[ispin]=C[ispin]*Uloc[ispin];
+	else {
+	  std::complex<double> dummy(1.0,0.0);
+	  Cloc[ispin]=C[ispin]*dummy;
+	}
+      // Compute the orbital-dependent Fock matrices
+#ifdef RESTRICTED
+      PZSIC_Fock_RDFT(Forbloc,Eorbloc,Cloc,nocc,numocc,dft,grid);
+#else
+      PZSIC_Fock_UDFT(Forbloc,Eorbloc,Cloc,nocc,numocc,dft,grid);
+#endif
+      (void) tol;
+      
+      Eloc=0.0;
+      for(size_t ispin=0;ispin<C.size();ispin++)
+	for(size_t io=0;io<nocc[ispin];io++)
+	  Eloc+=Eorbloc[ispin][io];
+#ifdef RESTRICTED
+      Eloc*=2.0;
+#endif
+      
+      if(Eloc>ESIC) {
+	if(verbose)
+	  printf("Using localized matrix with SIC energy %e vs %e.\n",Eloc,ESIC);
+	ESIC=Eloc;
+	U=Uloc;
+	Ctilde=Cloc;
+	Forb=Forbloc;
+	Eorb=Eorbloc;
+      } else {
+	if(verbose)
+	  printf("Not using localized matrix, SIC energy %e vs %e.\n",Eloc,ESIC);
+      }
+    }
   }
 
   if(dft.adaptive) {
