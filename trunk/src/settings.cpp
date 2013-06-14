@@ -191,7 +191,6 @@ void Settings::set_double(std::string name, double val) {
       return;
     }
 
-  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe double type setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
@@ -205,7 +204,6 @@ void Settings::set_bool(std::string name, bool val) {
       return;
     }
 
-  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe boolean setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
@@ -219,7 +217,6 @@ void Settings::set_int(std::string name, int val) {
       return;
     }
 
-  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe integer setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
@@ -234,7 +231,6 @@ void Settings::set_string(std::string name, std::string val) {
       return;
     }
 
-  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe string setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
@@ -249,7 +245,6 @@ double Settings::get_double(std::string name) const {
       return dset[i].val;
     }
 
-  //  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe double type setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
@@ -264,7 +259,6 @@ bool Settings::get_bool(std::string name) const {
       return bset[i].val;
     }
 
-  //  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe boolean setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
@@ -279,7 +273,6 @@ int Settings::get_int(std::string name) const {
       return iset[i].val;
     }
 
-  //  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe integer setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
@@ -294,7 +287,6 @@ std::string Settings::get_string(std::string name) const {
       return sset[i].val;
     }
 
-  //  ERROR_INFO();
   std::ostringstream oss;
   oss << "\nThe string setting "<<name<<" was not found!\n";
   throw std::runtime_error(oss.str());
