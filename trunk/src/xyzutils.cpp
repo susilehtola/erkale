@@ -15,7 +15,7 @@
  */
 
 
-
+#include "elements.h"
 #include "global.h"
 #include "xyzutils.h"
 #include "stringutil.h"
@@ -78,8 +78,23 @@ std::vector<atom_t> load_xyz(std::string filename) {
 	throw std::runtime_error(oss.str());
       }
 
-      // and extract the information
-      tmp.el=words[0]; // Element type
+      // and extract the information.
+
+      // Was element given as number or symbol?
+      if(isdigit(words[0][0])) {
+	int Z=readint(words[0]);
+	if(Z> (int) (sizeof(element_symbols)/sizeof(element_symbols[0]))) {
+	  ERROR_INFO();
+	  throw std::runtime_error("Too heavy atom requested in xyz file.\n");
+	} else if(Z<0) {
+	  throw std::runtime_error("Can't have nucleus with negative charge.\n");
+	}
+
+	tmp.el=element_symbols[Z];
+      } else
+	// Given as symbol
+	tmp.el=words[0];
+      
       tmp.num=i; // Number of atom
       tmp.x=readdouble(words[1])*ANGSTROMINBOHR;
       tmp.y=readdouble(words[2])*ANGSTROMINBOHR;
