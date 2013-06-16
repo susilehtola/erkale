@@ -149,8 +149,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	Utr[itr][ispin]=complex_unitary(nocc[ispin],itr);
 
       if(localization) {
-	// Localize starting guess with threshold 1.0
-	double measure=1.0;
+	// Localize starting guess with threshold 10.0
+	double measure=10.0;
 	for(size_t ispin=0;ispin<nocc.size();ispin++)
 	  localize(C[ispin],measure,Utr[itr][ispin]);
       }	
@@ -245,8 +245,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       std::vector< std::vector<arma::mat> > Forbloc(Forb);
       std::vector< std::vector<double> > Eorbloc(Eorb);
       
-      // Localize orbitals with threshold 1.0
-      double measure=1.0;
+      // Localize orbitals with threshold 10.0
+      double measure=10.0;
       for(size_t ispin=0;ispin<nocc.size();ispin++)
 	localize(C[ispin],measure,Uloc[ispin]);
 
@@ -699,13 +699,13 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
       G[G.size()-1][ispin]=Gammak[ispin]*arma::trans(U[ispin]) - U[ispin]*arma::trans(Gammak[ispin]);
 
     // Kappa matrix
-    std::vector<arma::mat> kappa(C.size());
+    std::vector<arma::cx_mat> kappa(C.size());
     for(size_t ispin=0;ispin<C.size();ispin++) {
       kappa[ispin].zeros(nocc[ispin],nocc[ispin]);
       // Loop over elements
       for(size_t io=0;io<nocc[ispin];io++)
 	for(size_t jo=0;jo<nocc[ispin];jo++) {
-	  kappa[ispin](io,jo)=std::norm(arma::as_scalar(arma::trans(Ctilde[ispin].col(jo))*(Forb[ispin][jo]-Forb[ispin][io])*Ctilde[ispin].col(io)));
+	  kappa[ispin](io,jo)=arma::as_scalar(arma::trans(Ctilde[ispin].col(jo))*(Forb[ispin][jo]-Forb[ispin][io])*Ctilde[ispin].col(io));
 	}
     }
 
@@ -736,7 +736,7 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
 
     // Check for convergence
     for(size_t ispin=0;ispin<C.size();ispin++) {
-      K[ispin]=rms_norm(kappa[ispin]);
+      K[ispin]=rms_cnorm(kappa[ispin]);
       if(!kappa[ispin].n_elem)
 	K[ispin]=0.0;
     }
