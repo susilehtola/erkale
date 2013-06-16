@@ -703,23 +703,19 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
       // First iteration; initialize with gradient
       for(size_t ispin=0;ispin<C.size();ispin++)
 	H[ispin]=G[G.size()-1][ispin];
+
     } else {
       for(size_t ispin=0;ispin<C.size();ispin++) {
 	// Compute Polak-Ribière coefficient
 	double gamma=bracket(G[G.size()-1][ispin] - G[G.size()-2][ispin], G[G.size()-1][ispin]) / bracket(G[G.size()-2][ispin],G[G.size()-2][ispin]);
+	// Fletcher-Reeves coefficient
+	// double gamma=bracket(G[G.size()-1][ispin] - G[G.size()-2][ispin], G[G.size()-1][ispin]) / bracket(G[G.size()-2][ispin],G[G.size()-2][ispin]);
+
+	// Check update
+	gamma=std::max(gamma,0.0);
 
 	// Update H
 	H[ispin]=G[G.size()-1][ispin]+gamma*H[ispin];
-
-	// Check that update is OK
-	double brack=bracket(H[ispin],G[G.size()-1][ispin]);
-	if(brack<=0.0)
-	  // Reset to gradient.
-	  H[ispin]=G[G.size()-1][ispin];
-
-	//	else if(ESIC<ESICold)
-	// Reset to gradient.
-	H[ispin]=G[G.size()-1][ispin];
       }
     }
 
