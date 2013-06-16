@@ -1584,21 +1584,15 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
     } else {
       // Compute Polak-Ribière coefficient
       double gamma=bracket(G[G.size()-1] - G[G.size()-2], G[G.size()-1]) / bracket(G[G.size()-2],G[G.size()-2]);
+      // Fletcher-Reeves
+      //double gamma=bracket(G[G.size()-1], G[G.size()-1]) / bracket(G[G.size()-2],G[G.size()-2]);
+
+      gamma=std::max(gamma,0.0);
 
       // Update H
-      H=G[G.size()-1]-gamma*H;
+      H=G[G.size()-1]+gamma*H;
 
-      // Check that update is OK
-      double brack=bracket(H,G[G.size()-1]);
-      if(brack<=0.0)
-	// Reset to gradient.
-	H=G[G.size()-1];
-
-      //      else if(B>Bold)
       (void) Bold;
-
-      // Reset to gradient - SD performs better!!
-      H=G[G.size()-1];
     }
 
     // Check for convergence.
