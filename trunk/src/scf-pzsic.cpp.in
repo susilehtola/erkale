@@ -727,28 +727,19 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
     }
 
     if(verbose) {
-      printf("%4i",(int) k);
-      for(size_t ispin=0;ispin<C.size();ispin++)
-	printf(" %e",K[ispin]);
-      printf(" /");
-      for(size_t ispin=0;ispin<C.size();ispin++)
-	printf(" %e",diffR[ispin]);
-      printf(" /");
-      for(size_t ispin=0;ispin<C.size();ispin++)
-	printf(" %e",K[ispin]/diffR[ispin]);
-      printf(", E-SIC=% e",ESIC);
-
       double dKmax=0.0;
       for(size_t ispin=0;ispin<C.size();ispin++)
 	if(K[ispin]/diffR[ispin]>dKmax)
 	  dKmax=K[ispin]/diffR[ispin];
 
       fprintf(stderr,"\t%4i\t%e\t% e",(int) k,dKmax,ESIC);
+      printf("\t%4i\t%e\t% e",(int) k,dKmax,ESIC);
       if(k>1) {
 	fprintf(stderr,"\t% e", ESIC-ESICold);
-	printf(", dESIC=% e",ESIC-ESICold);
+	printf("\t% e", ESIC-ESICold);
       } else {
 	fprintf(stderr,"\t%13s","");
+	printf("\t%13s","");
       }
 
       // Transformation matrix classification
@@ -759,11 +750,10 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
 	if(imag<sqrt(DBL_EPSILON)*real)
 	  printf(" real");
 	else if(real<sqrt(DBL_EPSILON)*imag)
-	  printf(" imaginary");
+	  printf(" imag");
 	else
-	  printf(" complex");
+	  printf(" cplx");
       }
-      printf("\n");
 
       fflush(stdout);
       fflush(stderr);
@@ -778,8 +768,9 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
       if(convd) {
 	if(verbose) {
 	  fprintf(stderr," %10.3f\n",t.get());
+	  fflush(stderr);
 
-	  printf("Converged.\n");
+	  printf(" %s\nConverged.\n",t.elapsed().c_str());
 	  fflush(stdout);
 
 	  for(size_t ispin=0;ispin<U.size();ispin++) {
@@ -802,7 +793,9 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
       } else if(k==MAXITER) {
 	if(verbose) {
 	  fprintf(stderr," %10.3f\n",t.get());
-	  printf("Not converged.\n");
+	  fflush(stderr);
+
+	  printf(" %s\nNot converged.\n",t.elapsed().c_str());
 	  fflush(stdout);
 	}
 	break;
@@ -1063,6 +1056,9 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
     
     if(verbose) {
       fprintf(stderr," %10.3f\n",t.get());
+      fflush(stderr);
+
+      printf(" %s\n",t.elapsed().c_str());
       fflush(stdout);
     }
   }
