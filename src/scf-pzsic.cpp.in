@@ -178,9 +178,6 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       for(size_t ispin=0;ispin<C.size();ispin++)
 	for(size_t io=0;io<nocc[ispin];io++)
 	  Etr[itr]+=Eorb[ispin][io];
-#ifdef RESTRICTED
-      Etr[itr]*=2.0;
-#endif
       
       if(verbose) {
 	printf("%3i % .16f\n",(int) itr+1,Etr[itr]);
@@ -230,9 +227,6 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     for(size_t ispin=0;ispin<C.size();ispin++)
       for(size_t io=0;io<nocc[ispin];io++)
 	ESIC+=Eorb[ispin][io];
-#ifdef RESTRICTED
-    ESIC*=2.0;
-#endif
     
     // Calculate SIC of localized U
     if(localization) {
@@ -270,9 +264,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       for(size_t ispin=0;ispin<C.size();ispin++)
 	for(size_t io=0;io<nocc[ispin];io++)
 	  Eloc+=Eorbloc[ispin][io];
-#ifdef RESTRICTED
-      Eloc*=2.0;
-#endif
+
       
       if(Eloc>ESIC) {
 	if(verbose)
@@ -383,9 +375,6 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   for(size_t ispin=0;ispin<C.size();ispin++)
     for(size_t io=0;io<nocc[ispin];io++)
       ESIC+=Eorb[ispin][io];
-#ifdef RESTRICTED
-  ESIC*=2.0;
-#endif
   
 #ifdef RESTRICTED
   // Adjust Fock operator for SIC
@@ -418,21 +407,16 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
 
 #ifdef RESTRICTED
-void SCF::PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid)
+void SCF::PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & numocc, const dft_t dft, DFTGrid & grid)
 #else
-void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid)
+void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & numocc, const dft_t dft, DFTGrid & grid)
 #endif
 {
 
 #ifdef RESTRICTED
   if(Ctilde.size()!=1) {
     ERROR_INFO();
-    throw std::runtime_error("PZSIC_Fock_RDFT called with restricted density!\n");
-  }
-#else
-  if(Ctilde.size()!=2) {
-    ERROR_INFO();
-    throw std::runtime_error("PZSIC_Fock_UDFT called with restricted density!\n");
+    throw std::runtime_error("PZSIC_Fock_RDFT called with unrestricted density!\n");
   }
 #endif
 
@@ -448,22 +432,24 @@ void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vec
   double kfrac=exact_exchange(dft.x_func);
 
   // Orbital density matrices
-#ifdef RESTRICTED
-  std::vector<arma::mat> Porb(Ctilde[0].n_cols);
-#else
-  std::vector<arma::mat> Porb(Ctilde[0].n_cols+Ctilde[1].n_cols);
-#endif
+  std::vector<arma::mat> Porb;
+  if(Ctilde.size()==1)
+    Porb.resize(Ctilde[0].n_cols);
+  else
+    Porb.resize(Ctilde[0].n_cols+Ctilde[1].n_cols);
+
   for(size_t ispin=0;ispin<Ctilde.size();ispin++) {
     size_t offset=0;
     if(ispin!=0)
       offset=Ctilde[0].n_cols;
 
-    for(size_t io=0;io<Ctilde[ispin].n_cols;io++)
+    for(size_t io=0;io<Ctilde[ispin].n_cols;io++) {
 #ifdef RESTRICTED
-      Porb[io+offset]=occnum[ispin](io)/2.0*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+      Porb[io+offset]=numocc[ispin](io)/2.0*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
 #else
-    Porb[io+offset]=occnum[ispin](io)*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
+      Porb[io+offset]=numocc[ispin](io)*arma::real(Ctilde[ispin].col(io)*arma::trans(Ctilde[ispin].col(io)));
 #endif
+    }
   }
 
   if(densityfit) {
@@ -552,6 +538,12 @@ void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vec
 	Eorb[ispin][io]+=Exc[offset+io];
       }
   }
+
+#ifdef RESTRICTED
+  for(size_t ispin=0;ispin<Ctilde.size();ispin++)
+    for(size_t io=0;io<Ctilde[ispin].n_cols;io++)
+      Eorb[ispin][io]*=2.0;
+#endif
 }
 
 #ifdef RESTRICTED
@@ -642,9 +634,6 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
     for(size_t ispin=0;ispin<C.size();ispin++)
       for(size_t io=0;io<nocc[ispin];io++)
 	ESIC+=Eorb[ispin][io];
-#ifdef RESTRICTED
-    ESIC*=2.0;
-#endif
 
     // Update the convergence threshold
     {
@@ -888,26 +877,30 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
       std::vector<double> ESICtrial(n);
       for(int i=0;i<n;i++) {
 	// Orbital-dependent Fock matrices
-	std::vector< std::vector<arma::mat> > Ftrial(Forb);
+	std::vector< std::vector<arma::mat> > Ftrial;
+	Ftrial.push_back(Forb[ispin]);
+
 	// and the self-interaction energies
-	std::vector< std::vector<double> > Etrial(Eorb);
+	std::vector< std::vector<double> > Etrial;
+	Etrial.push_back(Eorb[ispin]);
 
-	// Initialize orbitals
-	std::vector<arma::cx_mat> Ctrial(Ctilde);
-	if(i==0) {
-	  // Current best guess - we already have the Fock matrices
-	  Ftrial=Forb;
-	  Etrial=Eorb;
+	// Orbitals
+	std::vector<arma::cx_mat> Ctrial;
+	Ctrial.push_back(C[ispin]*R[i]*U[ispin]);
 
-	} else {
-	  // Update current spin matrix
-	  Ctrial[ispin]=C[ispin]*R[i]*U[ispin];
+	std::vector<size_t> nocctr;
+	nocctr.push_back(nocc[ispin]);
 
-	  // Compute the orbital-dependent Fock matrices
+	std::vector<arma::vec> numocctr;
+	numocctr.push_back(numocc[ispin]);
+	
+	if(i!=0) {
+	  // When i==0 we already have everything. Otherwise we need
+	  // to calculate the orbital-dependent Fock matrices
 #ifdef RESTRICTED
-	  PZSIC_Fock_RDFT(Ftrial,Etrial,Ctrial,nocc,numocc,dft,grid);
+	  PZSIC_Fock_RDFT(Ftrial,Etrial,Ctrial,nocctr,numocctr,dft,grid);
 #else
-	  PZSIC_Fock_UDFT(Ftrial,Etrial,Ctrial,nocc,numocc,dft,grid);
+	  PZSIC_Fock_UDFT(Ftrial,Etrial,Ctrial,nocctr,numocctr,dft,grid);
 #endif
 	}
 
@@ -917,15 +910,12 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
 	// Loop over elements
 	for(size_t io=0;io<nocc[ispin];io++)
 	  for(size_t jo=0;jo<nocc[ispin];jo++) {
-	    dJdW(io,jo)=arma::as_scalar(arma::trans(C[ispin].col(io))*Ftrial[ispin][jo]*Ctrial[ispin].col(jo));
+	    dJdW(io,jo)=arma::as_scalar(arma::trans(C[ispin].col(io))*Ftrial[0][jo]*Ctrial[0].col(jo));
 	  }
 
 	ESICtrial[i]=0.0;
 	for(size_t io=0;io<nocc[ispin];io++)
-	  ESICtrial[i]+=Etrial[ispin][io];
-#ifdef RESTRICTED
-	ESICtrial[i]*=2.0;
-#endif
+	  ESICtrial[i]+=Etrial[0][io];
 
 	// Compute the derivative
 	Jprime[i]=2.0*std::real(arma::trace(dJdW*arma::trans(U[ispin])*arma::trans(R[i])*arma::trans(H[ispin])));
