@@ -132,6 +132,8 @@ void Settings::add_dft_settings() {
   add_string("PZ-SIC", "Perform Perdew-Zunger self-interaction correction? No, Pert, Full, Can, CanPert","No");
   // Initialize PZ-SIC with localized orbitals?
   add_bool("PZ-SICloc", "Use Foster-Boys localized orbitals to initialize SIC?", true);
+  // Mode to use PZ-SIC
+  add_string("PZ-SICmode", "Mode to use PZ-SIC in. Coul, CoulX, CoulC, CoulXC", "CoulXC");
 }
 
 void Settings::add_double(std::string name, std::string comment, double val) {
