@@ -281,7 +281,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     }
   }
 
-  if(dft.adaptive) {
+  if(dft.adaptive && pzmode!=COUL) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
 
@@ -407,9 +407,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
 
 #ifdef RESTRICTED
-void SCF::PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & numocc, const dft_t dft, DFTGrid & grid)
+void SCF::PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & numocc, dft_t dft, DFTGrid & grid)
 #else
-void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & numocc, const dft_t dft, DFTGrid & grid)
+void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & numocc, dft_t dft, DFTGrid & grid)
 #endif
 {
 
@@ -419,6 +419,16 @@ void SCF::PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vec
     throw std::runtime_error("PZSIC_Fock_RDFT called with unrestricted density!\n");
   }
 #endif
+
+  // Set xc functionals
+  if(pzmode==COUL) {
+    dft.x_func=0;
+    dft.c_func=0;
+  } else if(pzmode==COULX) {
+    dft.c_func=0;
+  } else if(pzmode==COULC) {
+    dft.x_func=0;
+  }
 
   // Compute the orbital-dependent Fock matrices
   Forb.resize(Ctilde.size());
@@ -554,7 +564,7 @@ void SCF::unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_m
 {
 
   // Tolerance of unitary optimization wrt R
-  double kappatol=1e-2;
+  double kappatol=1e-1;
 
   // Self-interaction energy
   double ESIC=0.0;

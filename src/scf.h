@@ -158,6 +158,18 @@ enum pzsic {
   CANPERT
 };
 
+/// Perdew-Zunger SIC mode
+enum pzmet {
+  /// Coulomb
+  COUL,
+  /// Coulomb + exchange
+  COULX,
+  /// Coulomb + correlation
+  COULC,
+  /// Coulomb + exchange + correlation
+  COULXC
+};
+
 class SCF {
  protected:
  /// Overlap matrix
@@ -233,6 +245,8 @@ class SCF {
 
   /// Perdew-Zunger correction?
   enum pzsic pz;
+  /// Perdew-Zunger mode
+  enum pzmet pzmode;
   /// Perdew-Zunger correction weight
   double pzcor;
   /// Localize orbitals before Perdew-Zunger?
@@ -260,9 +274,9 @@ class SCF {
   std::vector<arma::mat> freeze;
 
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol, bool canonical=false, bool localize=true);
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, DFTGrid & grid, double tol, bool canonical=false, bool localize=true);
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol, bool canonical=false, bool localize=true);
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, DFTGrid & grid, double tol, bool canonical=false, bool localize=true);
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
   void PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & ESIC, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid);

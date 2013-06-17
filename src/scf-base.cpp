@@ -132,6 +132,21 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       pz=CANPERT;
     else
       pz=NO;
+
+    std::string pzmod=set.get_string("PZ-SICmode");
+    if(stricmp(pzmod,"Coul")==0)
+      pzmode=COUL;
+    else if(stricmp(pzmod,"CoulX")==0)
+      pzmode=COULX;
+    else if(stricmp(pzmod,"CoulC")==0)
+      pzmode=COULC;
+    else if(stricmp(pzmod,"CoulXC")==0)
+      pzmode=COULXC;
+    else {
+      ERROR_INFO();
+      throw std::runtime_error("Invalid PZ-SICmode.\n");
+    }
+    
   } catch(...) {
     // Hartree-Fock doesn't have the settings
   }
