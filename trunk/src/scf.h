@@ -288,16 +288,6 @@ class SCF {
   /// Helper for PZ-SIC - perform unitary optimization of energy
   void unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_mat> & U, std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, DFTGrid & grid, const std::vector<size_t> & nocc, const std::vector<arma::vec> & numocc, dft_t dft, std::vector<arma::mat> & HSIC, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & sol);
 
-  /// Helper for PZ-SIC: localize occupied orbitals. Initial value of measure is taken as the convergence threshold
-  arma::cx_mat localize(const arma::mat & C, double & measure, bool complex=true, long unsigned int seed=0) const;
-  /// Helper for PZ-SIC: optimize U. Initial value of measure is taken as the convergence threshold
-  void localize(const arma::mat & C, double & measure, arma::cx_mat & U) const;
-
-  /// Helper for above - calculate B with given rotation matrix
-  double localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const;
-  /// Helper for above - calculate derivative of B with respect to rotation matrix
-  arma::cx_mat localize_Bder(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const;
-
  public:
   /// Constructor
   SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt);
@@ -452,6 +442,18 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 
 /// Convert force vector to matrix
 arma::mat interpret_force(const arma::vec & f);
+
+/// Helper for PZ-SIC: localize occupied orbitals. Initial value of measure is taken as the convergence threshold
+arma::cx_mat localize(const BasisSet & basis, const arma::mat & C, double & measure, bool complex=true, long unsigned int seed=0, bool verbose=true);
+/// Helper for PZ-SIC: optimize U. Initial value of measure is taken as the convergence threshold
+void localize(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose);
+
+/// Helper for above - calculate B with given rotation matrix
+double localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq);
+/// Helper for above - calculate derivative of B with respect to rotation matrix
+arma::cx_mat localize_Bder(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq);
+
+
 
 #include "checkpoint.h"
 
