@@ -147,7 +147,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       ERROR_INFO();
       throw std::runtime_error("Invalid PZ-SICmode.\n");
     }
-    
+
   } catch(...) {
     // Hartree-Fock doesn't have the settings
   }
@@ -1530,16 +1530,21 @@ void localize(const BasisSet & basis, const arma::mat & C, double & measure, arm
   if(verbose)
     printf("Localizing orbitals.\n");
 
-  // Worker
-  Boys worker(basis,C,verbose);
-
   // Threshold
   double thr=1e-6;
   if(measure>0.0)
     thr=measure;
 
-  // Run optimization, using 4 points.
-  measure=worker.optimize_poly(U,4,thr,false);
+  // Worker
+  Boys worker(basis,C,thr,verbose);
+
+  // Set polynomial settings: use 4 points and fit only derivative
+  worker.set_poly(4,false);
+
+  // Use Armijo method
+  //  measure=worker.optimize(U,ARMIJO);
+  // Use polynomial method
+  measure=worker.optimize(U,POLYNOMIAL);
 
   if(verbose) {
     printf("Localization done in %s.\n",t.elapsed().c_str());
