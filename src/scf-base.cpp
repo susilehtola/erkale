@@ -1560,6 +1560,12 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
 
   // Get r matrix
   std::vector<arma::mat> rmat=basisp->moment(1);
+
+  // Convert matrices to MO basis
+  rsq=arma::trans(C)*rsq*C;
+  for(int ic=0;ic<3;ic++)
+    rmat[ic]=arma::trans(C)*rmat[ic]*C;
+
   int k=0;
   double B=0, Bold;
 
@@ -1576,12 +1582,12 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
     Bold=B;
 
     // Compute B
-    B=localize_B(C,U,rmat,rsq);
+    B=localize_B(U,rmat,rsq);
     // Store B
     measure=B;
 
     // Compute the euclidean derivative matrix, Abrudan 2009 table 3 step 2
-    arma::cx_mat Gammak=localize_Bder(C,U,rmat,rsq);
+    arma::cx_mat Gammak=localize_Bder(U,rmat,rsq);
 
     // Riemannian gradient, Abrudan 2009 table 3 step 2
     G.push_back(Gammak*arma::trans(U) - U*arma::trans(Gammak));
@@ -1663,7 +1669,7 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
       arma::cx_mat Utr=R[i]*U;
 
       // Compute derivative matrix
-      arma::cx_mat der=localize_Bder(C,Utr,rmat,rsq);
+      arma::cx_mat der=localize_Bder(Utr,rmat,rsq);
       // so the derivative wrt the step size is
       Jprime[i]=-2.0*std::real(arma::trace(der*arma::trans(U)*arma::trans(R[i])*arma::trans(H)));
     }
@@ -1687,7 +1693,7 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
       // Check for any point lower than the current one
       for(int i=n-1;i>=0;i--) {
 	arma::cx_mat Utr=R[i]*U;
-	double Btr=localize_B(C,Utr,rmat,rsq);
+	double Btr=localize_B(Utr,rmat,rsq);
 	if(Btr<B) {
 	  // Use current value of i
 	  step=i*deltaTmu;
@@ -1809,49 +1815,43 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
 }
 
 
-double SCF::localize_B(const arma::mat & C, const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const {
-  // Calculate rotated orbitals
-  arma::cx_mat Ctilde=C*M;
-
+double SCF::localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const {
   double B=0;
 
   // <i|r^2|i> terms
-  for(size_t io=0;io<Ctilde.n_cols;io++)
-    B+=std::real(arma::as_scalar(arma::trans(Ctilde.col(io))*rsq*Ctilde.col(io)));
+  for(size_t io=0;io<M.n_cols;io++)
+    B+=std::real(arma::as_scalar(arma::trans(M.col(io))*rsq*M.col(io)));
 
   // <i|r|i>^2 terms
-  for(size_t io=0;io<Ctilde.n_cols;io++)
+  for(size_t io=0;io<M.n_cols;io++)
     for(int ic=0;ic<3;ic++) {
-      std::complex<double> t=arma::as_scalar(arma::trans(Ctilde.col(io))*r[ic]*Ctilde.col(io));
+      std::complex<double> t=arma::as_scalar(arma::trans(M.col(io))*r[ic]*M.col(io));
       B-=std::norm(t);
     }
 
   return B;
 }
 
-arma::cx_mat SCF::localize_Bder(const arma::mat & C, const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const {
+arma::cx_mat SCF::localize_Bder(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const {
   // Returned matrix
-  arma::cx_mat Bder(C.n_cols,C.n_cols);
-
-  // Rotated orbitals
-  arma::cx_mat Ctilde=C*M;
+  arma::cx_mat Bder(M.n_cols,M.n_cols);
 
   // Loop over orbitals
-  for(size_t a=0;a<C.n_cols;a++)
-    for(size_t b=0;b<C.n_cols;b++) {
+  for(size_t a=0;a<M.n_cols;a++)
+    for(size_t b=0;b<M.n_cols;b++) {
 
       // r^2 term
-      Bder(a,b)=arma::as_scalar(arma::trans(C.col(a))*rsq*Ctilde.col(b));
+      Bder(a,b)=arma::as_scalar(rsq.row(a)*M.col(b));
 
       // r terms
       for(int ic=0;ic<3;ic++) {
-	std::complex<double> tl=arma::as_scalar(arma::trans(C.col(a))*r[ic]*Ctilde.col(b));
-	std::complex<double> tr=arma::as_scalar(arma::trans(Ctilde.col(b))*r[ic]*Ctilde.col(b));
-
+	std::complex<double> tl=arma::as_scalar(r[ic].row(a)*M.col(b));
+	std::complex<double> tr=arma::as_scalar(arma::trans(M.col(b))*r[ic]*M.col(b));
+	
 	Bder(a,b)-=2.0*tl*tr;
       }
     }
-
+  
   return Bder;
 }
 

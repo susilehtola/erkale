@@ -294,9 +294,9 @@ class SCF {
   void localize(const arma::mat & C, double & measure, arma::cx_mat & U) const;
 
   /// Helper for above - calculate B with given rotation matrix
-  double localize_B(const arma::mat & C, const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const;
+  double localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const;
   /// Helper for above - calculate derivative of B with respect to rotation matrix
-  arma::cx_mat localize_Bder(const arma::mat & C, const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const;
+  arma::cx_mat localize_Bder(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const;
 
  public:
   /// Constructor
