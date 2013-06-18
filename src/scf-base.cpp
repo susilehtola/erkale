@@ -1836,17 +1836,18 @@ arma::cx_mat SCF::localize_Bder(const arma::cx_mat & M, const std::vector<arma::
   // Returned matrix
   arma::cx_mat Bder(M.n_cols,M.n_cols);
 
-  // Loop over orbitals
-  for(size_t a=0;a<M.n_cols;a++)
-    for(size_t b=0;b<M.n_cols;b++) {
-
-      // r^2 term
+  // r^2 terms
+  for(size_t b=0;b<M.n_cols;b++)
+    for(size_t a=0;a<M.n_cols;a++)
       Bder(a,b)=arma::as_scalar(rsq.row(a)*M.col(b));
-
-      // r terms
-      for(int ic=0;ic<3;ic++) {
+    
+  // r terms
+  for(size_t b=0;b<M.n_cols;b++)
+    for(int ic=0;ic<3;ic++) { 
+      std::complex<double> tr=arma::as_scalar(arma::trans(M.col(b))*r[ic]*M.col(b));
+      
+      for(size_t a=0;a<M.n_cols;a++) {
 	std::complex<double> tl=arma::as_scalar(r[ic].row(a)*M.col(b));
-	std::complex<double> tr=arma::as_scalar(arma::trans(M.col(b))*r[ic]*M.col(b));
 	
 	Bder(a,b)-=2.0*tl*tr;
       }
