@@ -1819,15 +1819,19 @@ double SCF::localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r,
   double B=0;
 
   // <i|r^2|i> terms
+  arma::cx_mat rsm=rsq*M;
   for(size_t io=0;io<M.n_cols;io++)
-    B+=std::real(arma::as_scalar(arma::trans(M.col(io))*rsq*M.col(io)));
+    B+=std::real(arma::as_scalar(arma::trans(M.col(io))*rsm.col(io)));
 
   // <i|r|i>^2 terms
-  for(size_t io=0;io<M.n_cols;io++)
-    for(int ic=0;ic<3;ic++) {
-      std::complex<double> t=arma::as_scalar(arma::trans(M.col(io))*r[ic]*M.col(io));
+  for(int ic=0;ic<3;ic++) {
+    arma::cx_mat RM=r[ic]*M;
+    
+    for(size_t io=0;io<M.n_cols;io++) {
+      std::complex<double> t=arma::as_scalar(arma::trans(M.col(io))*RM.col(io));
       B-=std::norm(t);
     }
+  }
 
   return B;
 }
@@ -1841,17 +1845,20 @@ arma::cx_mat SCF::localize_Bder(const arma::cx_mat & M, const std::vector<arma::
     for(size_t a=0;a<M.n_cols;a++)
       Bder(a,b)=arma::as_scalar(rsq.row(a)*M.col(b));
     
-  // r terms
-  for(size_t b=0;b<M.n_cols;b++)
-    for(int ic=0;ic<3;ic++) { 
-      std::complex<double> tr=arma::as_scalar(arma::trans(M.col(b))*r[ic]*M.col(b));
+  // r terms 
+  for(int ic=0;ic<3;ic++) {
+    arma::cx_mat RM=r[ic]*M;
+    
+    for(size_t b=0;b<M.n_cols;b++) {
+      std::complex<double> tr=arma::as_scalar(arma::trans(M.col(b))*RM.col(b));
       
       for(size_t a=0;a<M.n_cols;a++) {
-	std::complex<double> tl=arma::as_scalar(r[ic].row(a)*M.col(b));
+	std::complex<double> tl=RM(a,b);
 	
 	Bder(a,b)-=2.0*tl*tr;
       }
     }
+  }
   
   return Bder;
 }
