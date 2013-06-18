@@ -1509,7 +1509,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 
 #define bracket(X,Y) (0.5*std::real(arma::trace(X*arma::trans(Y))))
 
-arma::cx_mat SCF::localize(const arma::mat & C, double & measure, bool cplx, long unsigned int seed) const {
+arma::cx_mat localize(const BasisSet & basis, const arma::mat & C, double & measure, bool cplx, long unsigned int seed, bool verbose) {
   Timer t;
 
   arma::cx_mat U(C.n_cols,C.n_cols);
@@ -1522,12 +1522,12 @@ arma::cx_mat SCF::localize(const arma::mat & C, double & measure, bool cplx, lon
   }
 
   // Run localization
-  localize(C,measure,U);
+  localize(basis,C,measure,U,verbose);
 
   return U;
 }
 
-void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) const {
+void localize(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose) {
   Timer t;
 
   if(verbose) {
@@ -1549,7 +1549,7 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
   // Get R^2 matrix
   arma::mat rsq;
   {
-    std::vector<arma::mat> momstack=basisp->moment(2);
+    std::vector<arma::mat> momstack=basis.moment(2);
     rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
   }
 
@@ -1559,7 +1559,7 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
     eps=measure;
 
   // Get r matrix
-  std::vector<arma::mat> rmat=basisp->moment(1);
+  std::vector<arma::mat> rmat=basis.moment(1);
 
   // Convert matrices to MO basis
   rsq=arma::trans(C)*rsq*C;
@@ -1815,7 +1815,7 @@ void SCF::localize(const arma::mat & C, double & measure, arma::cx_mat & U) cons
 }
 
 
-double SCF::localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const {
+double localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) {
   double B=0;
 
   // <i|r^2|i> terms
@@ -1836,7 +1836,7 @@ double SCF::localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r,
   return B;
 }
 
-arma::cx_mat SCF::localize_Bder(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) const {
+arma::cx_mat localize_Bder(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) {
   // Returned matrix
   arma::cx_mat Bder(M.n_cols,M.n_cols);
 

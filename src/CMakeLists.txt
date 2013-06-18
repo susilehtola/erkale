@@ -64,7 +64,7 @@ else()
  target_link_libraries(erkale ${HDF5_LIBRARIES})
 endif()
 
-# Create the ERKALE main executable
+# Create the ERKALE geometry optimization executable
 add_executable (erkale_geom geometry.cpp)
 # The name of the executable is
 set_target_properties(erkale_geom PROPERTIES OUTPUT_NAME "erkale_geom${SUFFIX}")
@@ -81,6 +81,26 @@ else()
  target_link_libraries(erkale_geom ${LIBINT_LIBRARIES})
  target_link_libraries(erkale_geom ${HDF5_LIBRARIES})
 endif()
+
+
+# Create the ERKALE localization executable
+add_executable (erkale_loc localize.cpp)
+# The name of the executable is
+set_target_properties(erkale_loc PROPERTIES OUTPUT_NAME "erkale_loc${SUFFIX}")
+target_link_libraries(erkale_loc liberkale)
+target_link_libraries(erkale_loc liberkale_emd)
+
+# Link libraries
+if(BUILD_SHARED_LIBS)
+else()
+ target_link_libraries(erkale_loc -lrt)
+ target_link_libraries(erkale_loc ${GSL_LIBRARIES})
+ target_link_libraries(erkale_loc ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_loc ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_loc ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_loc ${HDF5_LIBRARIES})
+endif()
+
 
 # Density cube tool
 add_executable (erkale_cube cube.cpp)
@@ -103,6 +123,8 @@ else()
  target_link_libraries(erkale_cube ${LIBINT_LIBRARIES})
  target_link_libraries(erkale_cube ${HDF5_LIBRARIES})
 endif()
+
+
 
 # Install targets
 install (TARGETS liberkale DESTINATION lib${LIB_SUFFIX})
