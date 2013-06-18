@@ -37,6 +37,7 @@
 #include "timer.h"
 #include "trdsm.h"
 #include "trrh.h"
+#include "unitary.h"
 
 extern "C" {
 #include <gsl/gsl_poly.h>
@@ -1507,11 +1508,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-#define bracket(X,Y) (0.5*std::real(arma::trace(X*arma::trans(Y))))
-
 arma::cx_mat localize(const BasisSet & basis, const arma::mat & C, double & measure, bool cplx, long unsigned int seed, bool verbose) {
-  Timer t;
-
   arma::cx_mat U(C.n_cols,C.n_cols);
   if(cplx) {
     // Initialize with a complex unitary matrix
@@ -1530,337 +1527,24 @@ arma::cx_mat localize(const BasisSet & basis, const arma::mat & C, double & meas
 void localize(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose) {
   Timer t;
 
-  if(verbose) {
-    printf("\nLocalizing orbitals.\n");
-    fflush(stdout);
-  }
+  if(verbose)
+    printf("Localizing orbitals.\n");
 
-  if(U.n_rows != U.n_cols || U.n_cols != C.n_cols) {
-    ERROR_INFO();
-    throw std::runtime_error("Wrong argument given.\n");
-  }
+  // Worker
+  Boys worker(basis,C,verbose);
 
-  if(C.n_cols<2) {
-    // No optimization is necessary.
-    U.eye();
-    return;
-  }
-
-  // Get R^2 matrix
-  arma::mat rsq;
-  {
-    std::vector<arma::mat> momstack=basis.moment(2);
-    rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
-  }
-
-  // Convergence threshold
-  double eps=1e-6;
+  // Threshold
+  double thr=1e-6;
   if(measure>0.0)
-    eps=measure;
+    thr=measure;
 
-  // Get r matrix
-  std::vector<arma::mat> rmat=basis.moment(1);
-
-  // Convert matrices to MO basis
-  rsq=arma::trans(C)*rsq*C;
-  for(int ic=0;ic<3;ic++)
-    rmat[ic]=arma::trans(C)*rmat[ic]*C;
-
-  int k=0;
-  double B=0, Bold;
-
-  // G matrices
-  std::vector<arma::cx_mat> G;
-  // H matrix
-  arma::cx_mat H;
-  // Imaginary unit
-  std::complex<double> imagI(0,1.0);
-
-  while(true) {
-    // Increase iteration number
-    k++;
-    Bold=B;
-
-    // Compute B
-    B=localize_B(U,rmat,rsq);
-    // Store B
-    measure=B;
-
-    // Compute the euclidean derivative matrix, Abrudan 2009 table 3 step 2
-    arma::cx_mat Gammak=localize_Bder(U,rmat,rsq);
-
-    // Riemannian gradient, Abrudan 2009 table 3 step 2
-    G.push_back(Gammak*arma::trans(U) - U*arma::trans(Gammak));
-    // Remove old matrices from memory?
-    if(G.size()>2)
-      G.erase(G.begin());
-
-    printf("\t%4i\t%e\t%e\n",(int) k,B,bracket(G[G.size()-1],G[G.size()-1]));
-    fflush(stdout);
-
-    // H matrix
-    if(k==1) {
-      // First iteration; initialize with gradient
-      H=G[G.size()-1];
-    } else {
-      // Compute Polak-Ribière coefficient
-      double gamma=bracket(G[G.size()-1] - G[G.size()-2], G[G.size()-1]) / bracket(G[G.size()-2],G[G.size()-2]);
-      // Fletcher-Reeves
-      //double gamma=bracket(G[G.size()-1], G[G.size()-1]) / bracket(G[G.size()-2],G[G.size()-2]);
-
-      gamma=std::max(gamma,0.0);
-
-      // Update H
-      H=G[G.size()-1]+gamma*H;
-
-      (void) Bold;
-    }
-
-    // Check for convergence.
-    if(bracket(G[G.size()-1],G[G.size()-1])<eps)
-      break;
-
-
-    arma::vec Hval;
-    arma::cx_mat Hvec;
-    double wmax;
-    double Tmu;
-
-    // Diagonalize iH to find eigenvalues purely imaginary
-    // eigenvalues iw_i of -H; Abrudan 2009 table 3 step 1.
-    bool diagok=arma::eig_sym(Hval,Hvec,imagI*H);
-    if(!diagok) {
-      ERROR_INFO();
-      throw std::runtime_error("PZ-SIC: error diagonalizing H.\n");
-    }
-
-    // Find maximal eigenvalue
-    wmax=0.0;
-    for(size_t n=0;n<Hval.n_elem;n++)
-      if(fabs(Hval(n))>wmax)
-	wmax=fabs(Hval(n));
-    if(wmax==0.0) {
-      continue;
-    }
-
-    // Compute maximal step size.
-    // Order of the cost function in the coefficients of W.
-    const int q=4;
-    Tmu=2.0*M_PI/(q*wmax);
-
-    // Amount of points to use for the fit.
-    const int n=4;
-
-    // Step size
-    const double deltaTmu=Tmu/(n-1);
-    std::vector<arma::cx_mat> R(n);
-
-    // Trial matrices
-    R[0].eye(C.n_cols,C.n_cols);
-    R[1]=Hvec*arma::diagmat(arma::exp(deltaTmu*imagI*Hval))*arma::trans(Hvec);
-
-    for(int i=2;i<n;i++)
-      R[i]=R[i-1]*R[1];
-
-    // Evaluate the first-order derivative of the cost function at the expansion points
-    std::vector<double> Jprime(n);
-    for(int i=0;i<n;i++) {
-      // Trial matrix is
-      arma::cx_mat Utr=R[i]*U;
-
-      // Compute derivative matrix
-      arma::cx_mat der=localize_Bder(Utr,rmat,rsq);
-      // so the derivative wrt the step size is
-      Jprime[i]=-2.0*std::real(arma::trace(der*arma::trans(U)*arma::trans(R[i])*arma::trans(H)));
-    }
-
-    /*
-      printf("Derivatives:");
-      for(int i=0;i<n;i++)
-      printf(" % e",Jprime[i]);
-      printf("\n");
-    */
-
-    // Step size to use
-    double step=DBL_MAX;
-
-    // Sanity check - are all derivatives negative?
-    bool allneg=true;
-    for(int i=0;i<n;i++)
-      if(Jprime[i]>0.0)
-	allneg=false;
-    if(allneg) {
-      // Check for any point lower than the current one
-      for(int i=n-1;i>=0;i--) {
-	arma::cx_mat Utr=R[i]*U;
-	double Btr=localize_B(Utr,rmat,rsq);
-	if(Btr<B) {
-	  // Use current value of i
-	  step=i*deltaTmu;
-	  // and proceed with the update
-	  break;
-	}
-      }
-    } else {
-      // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
-      const int p=n-1;
-
-      // Compute polynomial coefficients.
-      arma::vec jvec(p);
-      for(int i=0;i<p;i++) {
-	jvec(i)=Jprime[i+1]-Jprime[0];
-      }
-
-      // Form mu matrix
-      arma::mat mumat(p,p);
-      mumat.zeros();
-      for(int i=0;i<p;i++) {
-	// Value of mu on the row is
-	double mu=(i+1)*deltaTmu;
-	// Fill entries
-	for(int j=0;j<p;j++)
-	  mumat(i,j)=pow(mu,j+1);
-      }
-
-      arma::vec aval;
-      bool solveok=true;
-
-      // Solve for coefficients - may not be stable numerically
-      solveok=arma::solve(aval,mumat,jvec);
-
-      if(!solveok) {
-	mumat.print("Mu");
-	arma::trans(jvec).print("Jvec");
-	throw std::runtime_error("Error solving for coefficients a.\n");
-      }
-
-      // Find smallest positive root of a0 + a1*mu + ... + ap*mu^p = 0.
-      {
-	// Coefficient of highest order term must be nonzero.
-	int r=p;
-	while(aval(r-1)==0.0)
-	  r--;
-
-	// Coefficients
-	double a[r+2];
-	a[0]=Jprime[0];
-	for(int i=1;i<=r;i++)
-	  a[i]=aval(i-1);
-
-	// GSL routine workspace - r:th order polynomial has r+1 coefficients
-	gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r+1);
-
-	// Return values
-	double z[2*r];
-	int gslok=gsl_poly_complex_solve(a,r+1,w,z);
-
-	if(gslok!=GSL_SUCCESS) {
-	  ERROR_INFO();
-	  fprintf(stderr,"Solution of polynomial root failed, error: \"%s\"\n",gsl_strerror(solveok));
-	  throw std::runtime_error("Error solving polynomial.\n");
-	}
-
-	// Get roots
-	std::vector< std::complex<double> > roots(r);
-	for(int i=0;i<r;i++) {
-	  roots[i].real()=z[2*i];
-	  roots[i].imag()=z[2*i+1];
-	}
-	// and order them into increasing absolute value
-	std::stable_sort(roots.begin(),roots.end(),abscomp<double>);
-
-	int nreal=0;
-	for(size_t i=0;i<roots.size();i++)
-	  if(fabs(roots[i].imag())<10*DBL_EPSILON)
-	    nreal++;
-
-	/*
-	  printf("%i real roots:",nreal);
-	  for(size_t i=0;i<roots.size();i++)
-	  if(fabs(roots[i].imag())<10*DBL_EPSILON)
-	  printf(" (% e,% e)",roots[i].real(),roots[i].imag());
-	  printf("\n");
-	*/
-
-	for(size_t i=0;i<roots.size();i++)
-	  if(roots[i].real()>sqrt(DBL_EPSILON) && fabs(roots[i].imag())<10*DBL_EPSILON) {
-	    // Root is real and positive. Is it smaller than the current minimum?
-	    if(roots[i].real()<step)
-	      step=roots[i].real();
-	  }
-
-	// Free workspace
-	gsl_poly_complex_workspace_free(w);
-      }
-
-      // Sanity check
-      if(step==DBL_MAX)
-	step=0.0;
-    }
-
-    //    printf("Step size is %e, i.e. %e dTmu.\n",step,step/deltaTmu);
-
-    // Step size is xmin. Update U
-    if(step<0.0) throw std::runtime_error("Negative step size!\n");
-    if(step!=0.0) {
-      arma::cx_mat Ropt=Hvec*arma::diagmat(arma::exp(step*imagI*Hval))*arma::trans(Hvec);
-      U=Ropt*U;
-    }
-  }
+  // Run optimization, using 4 points.
+  measure=worker.optimize_poly(U,4,thr,false);
 
   if(verbose) {
-    printf("Localization done in %s.\n\n",t.elapsed().c_str());
+    printf("Localization done in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }
-}
-
-
-double localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) {
-  double B=0;
-
-  // <i|r^2|i> terms
-  arma::cx_mat rsm=rsq*M;
-  for(size_t io=0;io<M.n_cols;io++)
-    B+=std::real(arma::as_scalar(arma::trans(M.col(io))*rsm.col(io)));
-
-  // <i|r|i>^2 terms
-  for(int ic=0;ic<3;ic++) {
-    arma::cx_mat RM=r[ic]*M;
-    
-    for(size_t io=0;io<M.n_cols;io++) {
-      std::complex<double> t=arma::as_scalar(arma::trans(M.col(io))*RM.col(io));
-      B-=std::norm(t);
-    }
-  }
-
-  return B;
-}
-
-arma::cx_mat localize_Bder(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq) {
-  // Returned matrix
-  arma::cx_mat Bder(M.n_cols,M.n_cols);
-
-  // r^2 terms
-  for(size_t b=0;b<M.n_cols;b++)
-    for(size_t a=0;a<M.n_cols;a++)
-      Bder(a,b)=arma::as_scalar(rsq.row(a)*M.col(b));
-    
-  // r terms 
-  for(int ic=0;ic<3;ic++) {
-    arma::cx_mat RM=r[ic]*M;
-    
-    for(size_t b=0;b<M.n_cols;b++) {
-      std::complex<double> tr=arma::as_scalar(arma::trans(M.col(b))*RM.col(b));
-      
-      for(size_t a=0;a<M.n_cols;a++) {
-	std::complex<double> tl=RM(a,b);
-	
-	Bder(a,b)-=2.0*tl*tr;
-      }
-    }
-  }
-  
-  return Bder;
 }
 
 void SCF::do_force(bool val) {
