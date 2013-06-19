@@ -316,6 +316,26 @@ void SCF::set_fitting(const BasisSet & fitbasv) {
   dfitbas=fitbasv;
 }
 
+void SCF::do_force(bool val) {
+  doforce=val;
+}
+
+void SCF::do_sic(enum pzsic val) {
+  pz=val;
+}
+
+enum pzsic SCF::do_sic() const {
+  return pz;
+}
+
+arma::mat SCF::get_S() const {
+  return S;
+}
+
+arma::mat SCF::get_Sinvh() const {
+  return Sinvh;
+}
+
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol) {
   arma::mat Horth;
   arma::mat orbs;
@@ -1538,30 +1558,15 @@ void localize(const BasisSet & basis, const arma::mat & C, double & measure, arm
   // Worker
   Boys worker(basis,C,thr,verbose);
 
-  // Set polynomial settings: use 4 points and fit only derivative
-  worker.set_poly(4,false);
-
   // Use Armijo method
   //  measure=worker.optimize(U,ARMIJO);
   // Use polynomial method
-  measure=worker.optimize(U,POLYNOMIAL);
+  measure=worker.optimize(U,POLY_DF);
 
   if(verbose) {
     printf("Localization done in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }
-}
-
-void SCF::do_force(bool val) {
-  doforce=val;
-}
-
-void SCF::do_sic(enum pzsic val) {
-  pz=val;
-}
-
-enum pzsic SCF::do_sic() const {
-  return pz;
 }
 
 arma::mat interpret_force(const arma::vec & f) {

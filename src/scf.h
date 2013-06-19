@@ -352,6 +352,11 @@ class SCF {
   void do_sic(enum pzsic val);
   /// Get status of SIC
   enum pzsic do_sic() const;
+
+  /// Get overlap matrix
+  arma::mat get_S() const;
+  /// Get half-inverse overlap matrix
+  arma::mat get_Sinvh() const;
 };
 
 /// Diagonalize Fock matrix
