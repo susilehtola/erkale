@@ -64,7 +64,7 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met) {
   if(W.n_cols<2) {
     // No optimization is necessary.
     W.eye();
-    cost_func(W,J);
+    J=cost_func(W);
     return 0.0;
   }
 
@@ -708,7 +708,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   arma::cx_mat Ctilde=sol.C*W;
 
   // Compute orbital-dependent Fock matrices
-  solver->PZSIC_Fock(Forb,Eorb,Ctilde,occnum,dft,*grid);
+  //  solver->PZSIC_Fock(Forb,Eorb,Ctilde,occnum,dft,*grid);
 
   // and the total SIC contribution
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
