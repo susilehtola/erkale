@@ -19,8 +19,10 @@ Unitary::Unitary(int qv, double thr, bool max, bool ver) {
   else
     sign=-1;
 
-  // Default options
-  npoly=4; // 4 points for polynomial
+  // Defaults - use 4 points for fit of just derivative
+  npoly_df=4; 
+  // and 3 points for fit of both function and derivative
+  npoly_fdf=3;
 }
 
 Unitary::~Unitary() {
@@ -35,7 +37,7 @@ void Unitary::check_unitary(const arma::cx_mat & W) const {
   for(size_t i=0;i<prod.n_cols;i++)
     prod(i,i)-=1.0;
   double norm=rms_cnorm(prod);
-  if(norm>=1e-10)
+  if(norm>=sqrt(DBL_EPSILON))
     throw std::runtime_error("Matrix is not unitary!\n");
 }
 
@@ -46,8 +48,9 @@ arma::cx_mat Unitary::get_rotation(double step) const {
   return Hvec*arma::diagmat(arma::exp(sign*step*imagI*Hval))*arma::trans(Hvec);
 }
 
-void Unitary::set_poly(int n) {
-  npoly=n;
+void Unitary::set_poly(int ndf, int nfdf) {
+  npoly_df=ndf;
+  npoly_fdf=nfdf;
 }
 
 bool Unitary::converged(const arma::cx_mat & W) {
@@ -176,14 +179,14 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     // Find optimal step size
     double step;
     if(met==POLY_DF) {
-      //      printf("Polynomial df step\n");
       step=polynomial_step_df(W);
+      fprintf(stderr,"Polynomial_df  step %e\n",step);
     } else if(met==POLY_FDF) {
-      //      printf("Polynomial fdf step\n");
       step=polynomial_step_fdf(W);
+      fprintf(stderr,"Polynomial_fdf step %e\n",step);
     } else if(met==ARMIJO) {
-      //      printf("Armijo step\n");
       step=armijo_step(W);
+      fprintf(stderr,"Armijo         step %e\n",step);
     } else throw std::runtime_error("Method not implemented.\n");
 
     // Check step size
@@ -231,23 +234,99 @@ void Unitary::classify(const arma::cx_mat & W) const {
   printf(", re norm %e, im norm %e\n",real,imag);
 }
 
+arma::cx_vec Unitary::solve_roots_cplx(const arma::vec & a) const {
+  // Find roots of a_0 + a_1*mu + ... + a_(p-1)*mu^(p-1) = 0.
+  // Coefficient of highest order term must be nonzero.
+  size_t r=a.size();
+  while(a(r-1)==0.0)
+    r--;
+  
+  // GSL routine workspace
+  gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r);
+  
+  // Collect coefficients
+  double ad[r];
+  for(size_t i=0;i<r;i++)
+    ad[i]=a(i);
+  
+  // Return values
+  double z[2*(r-1)];
+  int gslok=gsl_poly_complex_solve(ad,r,w,z);
+  
+  if(gslok!=GSL_SUCCESS) {
+    ERROR_INFO();
+    fprintf(stderr,"Solution of polynomial root failed, error: \"%s\"\n",gsl_strerror(gslok));
+    throw std::runtime_error("Error solving polynomial.\n");
+  }
+  
+  // Get roots
+  arma::cx_vec roots(r-1);
+  for(size_t i=0;i<r-1;i++) {
+    roots(i).real()=z[2*i];
+    roots(i).imag()=z[2*i+1];
+  }
+
+  // Sort the roots (Armadillo's sort is broken at least in 3.900)
+  roots=arma::sort(roots);
+
+  printf("\n");
+  a.print("Coefficients");
+  roots.print("Roots");
+
+  return roots;
+}
+
+arma::vec Unitary::solve_roots(const arma::vec & a) const {
+  // Solve the roots
+  arma::cx_vec croots=solve_roots_cplx(a);
+
+  // Collect real roots
+  size_t nreal=0;
+  for(size_t i=0;i<croots.n_elem;i++)
+    if(fabs(std::imag(croots[i]))<10*DBL_EPSILON)
+      nreal++;
+
+  // Real roots
+  arma::vec roots(nreal);
+  size_t ir=0;
+  for(size_t i=0;i<croots.n_elem;i++)
+    if(fabs(std::imag(croots(i)))<10*DBL_EPSILON)
+      roots(ir++)=std::real(croots(i));
+
+  // Sort roots
+  roots=arma::sort(roots);
+  
+  roots.print("Real roots");
+
+  return roots;
+}
+
+double Unitary::smallest_positive(const arma::vec & a) const {
+  double step=0.0;
+  for(size_t i=0;i<a.size();i++) {
+    step=a(i);
+
+    // Omit extremely small steps because they might get you stuck.
+    if(step>sqrt(DBL_EPSILON))
+      break;
+  }
+  return step;
+}
+
 double Unitary::polynomial_step_df(const arma::cx_mat & W) {
   // Step size
-  const double deltaTmu=Tmu/(npoly-1);
-  std::vector<arma::cx_mat> R(npoly);
+  const double deltaTmu=Tmu/(npoly_df-1);
+  std::vector<arma::cx_mat> R(npoly_df);
 
   // Trial matrices
   R[0].eye(W.n_cols,W.n_cols);
   R[1]=get_rotation(deltaTmu);
-  for(int i=2;i<npoly;i++)
+  for(int i=2;i<npoly_df;i++)
     R[i]=R[i-1]*R[1];
   
-  // Step size to use
-  double step=DBL_MAX;
-
   // Evaluate the first-order derivative of the cost function at the expansion points
-  std::vector<double> Jprime(npoly);
-  for(int i=0;i<npoly;i++) {
+  std::vector<double> Jprime(npoly_df);
+  for(int i=0;i<npoly_df;i++) {
     // Trial matrix is
     arma::cx_mat Wtr=R[i]*W;
 
@@ -257,6 +336,15 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
     Jprime[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
   }
 
+  // Print derivatives
+  printf("\nMu         : ");
+  for(int i=0;i<npoly_df;i++)
+    printf(" % e",i*deltaTmu);
+  printf("\nDerivatives: ");
+  for(size_t i=0;i<Jprime.size();i++)
+    printf(" % e",Jprime[i]);
+  printf("\n");
+
   // Sanity check - is derivative of the right sign?
   if(sign*Jprime[0]<0.0) {
     ERROR_INFO();
@@ -264,7 +352,7 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
   }
 
   // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
-  const int p=npoly-1;
+  const int p=npoly_df-1;
 
   // Compute polynomial coefficients.
   arma::vec jvec(p);
@@ -283,95 +371,45 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
       mumat(i,j)=pow(mu,j+1);
   }
 
-  arma::vec aval;
-  bool solveok=true;
-
-  // Solve for coefficients - may not be stable numerically
-  solveok=arma::solve(aval,mumat,jvec);
-
-  if(!solveok) {
+  // Solve for coefficients. Use inverse matrix, as mumat might be ill
+  // conditioned.
+  arma::mat invmu;
+  bool solveok=arma::inv(invmu,mumat);
+  arma::vec a;
+  if(solveok)
+    a=invmu*jvec;
+  else {
     mumat.print("Mu");
     arma::trans(jvec).print("Jvec");
     throw std::runtime_error("Error solving for coefficients a.\n");
   }
 
-  // Find smallest positive root of a0 + a1*mu + ... + ap*mu^p = 0.
-  {
-    // Coefficient of highest order term must be nonzero.
-    int r=p;
-    while(aval(r-1)==0.0)
-      r--;
+  // Coefficients are then
+  arma::vec coeff(a.n_elem+1);
+  coeff(0)=Jprime[0];
+  coeff.subvec(1,a.n_elem)=a;
 
-    // Coefficients
-    double a[r+2];
-    a[0]=Jprime[0];
-    for(int i=1;i<=r;i++)
-      a[i]=aval(i-1);
-
-    // GSL routine workspace - r:th order polynomial has r+1 coefficients
-    gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r+1);
-
-    // Return values
-    double z[2*r];
-    int gslok=gsl_poly_complex_solve(a,r+1,w,z);
-
-    if(gslok!=GSL_SUCCESS) {
-      ERROR_INFO();
-      fprintf(stderr,"Solution of polynomial root failed, error: \"%s\"\n",gsl_strerror(solveok));
-      throw std::runtime_error("Error solving polynomial.\n");
-    }
-
-    // Get roots
-    std::vector< std::complex<double> > roots(r);
-    for(int i=0;i<r;i++) {
-      roots[i].real()=z[2*i];
-      roots[i].imag()=z[2*i+1];
-    }
-    // and order them into increasing absolute value
-    std::stable_sort(roots.begin(),roots.end(),abscomp<double>);
-
-    int nreal=0;
-    for(size_t i=0;i<roots.size();i++)
-      if(fabs(roots[i].imag())<10*DBL_EPSILON)
-	nreal++;
-
-    /*
-      printf("%i real roots:",nreal);
-      for(size_t i=0;i<roots.size();i++)
-      if(fabs(roots[i].imag())<10*DBL_EPSILON)
-      printf(" (% e,% e)",roots[i].real(),roots[i].imag());
-      printf("\n");
-    */
-
-    for(size_t i=0;i<roots.size();i++)
-      if(roots[i].real()>sqrt(DBL_EPSILON) && fabs(roots[i].imag())<10*DBL_EPSILON) {
-	// Root is real and positive. Is it smaller than the current minimum?
-	if(roots[i].real()<step)
-	  step=roots[i].real();
-      }
-
-    // Free workspace
-    gsl_poly_complex_workspace_free(w);
-  }
-    
-  return step;
+  // Find out zeros of the polynomial
+  arma::vec roots=solve_roots(coeff);
+  // and return the smallest positive one
+  return smallest_positive(roots);
 }
 
 double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
   // Step size
-  const double deltaTmu=Tmu/(npoly-1);
-  std::vector<arma::cx_mat> R(npoly);
+  const double deltaTmu=Tmu/(npoly_fdf-1);
+  std::vector<arma::cx_mat> R(npoly_fdf);
   
   // Trial matrices
   R[0].eye(W.n_cols,W.n_cols);
   R[1]=get_rotation(deltaTmu);
-  for(int i=2;i<npoly;i++)
+  for(int i=2;i<npoly_fdf;i++)
     R[i]=R[i-1]*R[1];
 
   // Evaluate the first-order derivative of the cost function at the expansion points
-  std::vector<double> f(npoly);
-  std::vector<double> fp(npoly);
-  for(int i=0;i<npoly;i++) {
+  std::vector<double> f(npoly_fdf);
+  std::vector<double> fp(npoly_fdf);
+  for(int i=0;i<npoly_fdf;i++) {
     // Trial matrix is
     arma::cx_mat Wtr=R[i]*W;
     arma::cx_mat der;
@@ -386,132 +424,58 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
     fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
   }
 
-  // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
-  const int p=2*(npoly-1);
+  // Fit function to polynomial of order p
+  //  J(mu)  = a_0 + a_1*mu + ... + a_(p-1)*mu^(p-1)
+  // and its derivative to the function
+  //  J'(mu) = a_1 + 2*a_2*mu + ... + (p-1)*a_(p-1)*mu^(p-2).
 
-  // Compute polynomial coefficients. We have 2*n values
-  arma::vec jvec(2*npoly);
-  for(int i=0;i<npoly;i++) {
+  // We thus have p unknowns, with 2*npoly_fdf knowns.
+  const int p=2*npoly_fdf;
+
+  // Fill knowns
+  arma::vec jvec(p);
+  for(int i=0;i<npoly_fdf;i++) {
     jvec(2*i)=f[i];
     jvec(2*i+1)=fp[i];
   }
 
-  // Form mu matrix
-  arma::mat mumat(2*npoly,p+2);
+  // Form mu matrix.
+  arma::mat mumat(p,p);
   mumat.zeros();
-  for(int i=0;i<npoly;i++) {
+  for(int i=0;i<npoly_fdf;i++) {
     // Value of mu in the point is
     double mu=i*deltaTmu;
 
     // First row: J(mu)
-    mumat(2*i,0)=1.0;
-    for(int j=1;j<=p+1;j++)
-      mumat(2*i,j)=pow(mu,j)/(j);
+    for(int j=0;j<p;j++)
+      mumat(2*i,j)=pow(mu,j);
     // Second row: J'(mu)
-    mumat(2*i+1,1)=1.0;
-    for(int j=2;j<=p+1;j++)
-      mumat(2*i+1,j)=pow(mu,j-1);
+    for(int j=1;j<p;j++)
+      mumat(2*i+1,j)=j*pow(mu,j-1);
   }
 
-  arma::vec aval;
-  bool solveok=true;
-
-  // Solve for coefficients - may not be stable numerically
-  //solveok=arma::solve(aval,mumat,jvec);
-
-  // Use inverse matrix
-  {
-    arma::mat invmu;
-    solveok=arma::inv(invmu,mumat);
-
-    if(solveok)
-      aval=invmu*jvec;
-  }
-
-  if(!solveok) {
+  // Solve for coefficients. Use inverse matrix, as mumat might be ill
+  // conditioned.
+  arma::mat invmu;
+  bool solveok=arma::inv(invmu,mumat);
+  arma::vec a;
+  if(solveok)
+    a=invmu*jvec;
+  else {
     mumat.print("Mu");
     arma::trans(jvec).print("Jvec");
     throw std::runtime_error("Error solving for coefficients a.\n");
   }
 
-  // Find smallest positive root of a0 + a1*mu + ... + ap*mu^p = 0.
-  double step=DBL_MAX;
-  {
-    // Coefficient of highest order term must be nonzero.
-    int r=p;
-    while(aval(r+1)==0.0)
-      r--;
+  // Get coefficients for the derivative
+  arma::vec ader(a.n_elem-1);
+  for(size_t i=1;i<a.n_elem;i++)
+    ader(i-1)=i*a(i);
 
-    // Coefficients
-    double a[r+1];
-    for(int i=0;i<r+1;i++)
-      a[i]=aval(i+1);
-
-    /*
-      printf("Coefficients:");
-      for(int i=0;i<r+1;i++)
-      printf(" % e",a[i]);
-      printf("\n");
-    */
-
-    // GSL routine workspace - r:th order polynomial has r+1 coefficients
-    gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r+1);
-
-    // Return values
-    double z[2*r];
-    int gslok=gsl_poly_complex_solve(a,r+1,w,z);
-
-    if(gslok!=GSL_SUCCESS) {
-      ERROR_INFO();
-      fprintf(stderr,"Solution of polynomial root failed, error: \"%s\"\n",gsl_strerror(solveok));
-      throw std::runtime_error("Error solving polynomial.\n");
-    }
-
-    // Get roots
-    std::vector< std::complex<double> > roots(r);
-    for(int i=0;i<r;i++) {
-      roots[i].real()=z[2*i];
-      roots[i].imag()=z[2*i+1];
-    }
-    // and order them into increasing absolute value
-    std::stable_sort(roots.begin(),roots.end(),abscomp<double>);
-
-    /*
-      printf("Roots:");
-      for(size_t i=0;i<roots.size();i++)
-      printf(" (% e, % e)",z[2*i],z[2*i+1]);
-      printf("\n");
-    */
-
-    int nreal=0;
-    for(size_t i=0;i<roots.size();i++)
-      if(fabs(roots[i].imag())<10*DBL_EPSILON)
-	nreal++;
-
-    /*
-      printf("%i real roots:",nreal);
-      for(size_t i=0;i<roots.size();i++)
-      if(fabs(roots[i].imag())<10*DBL_EPSILON)
-      printf(" (% e,% e)",roots[i].real(),roots[i].imag());
-      printf("\n");
-    */
-
-    for(size_t i=0;i<roots.size();i++)
-      if(roots[i].real()>sqrt(DBL_EPSILON) && fabs(roots[i].imag())<10*DBL_EPSILON) {
-	// Root is real and positive. Is it smaller than the current minimum?
-	if(roots[i].real()<step)
-	  step=roots[i].real();
-      }
-
-    // Free workspace
-    gsl_poly_complex_workspace_free(w);
-  }
-
-  // Sanity check
-  if(step==DBL_MAX)
-    step=0.0;
-  
-  return step;
+  // Find out zeros of the polynomial
+  arma::vec roots=solve_roots(ader);
+  // and return the smallest positive one
+  return smallest_positive(roots);
 }
 
 double Unitary::armijo_step(const arma::cx_mat & W) {
@@ -581,7 +545,7 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
   return step;
 }
 
-Brockett::Brockett(size_t N, unsigned long int seed) : Unitary(2, 1e-10, true, true) {
+Brockett::Brockett(size_t N, unsigned long int seed) : Unitary(2, sqrt(DBL_EPSILON), true, true) {
   // Get random complex matrix
   sigma=randn_mat(N,N,seed)+std::complex<double>(0.0,1.0)*randn_mat(N,N,seed+1);
   // Hermitize it
@@ -620,9 +584,9 @@ void Brockett::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
 }
 
 void Brockett::print_progress(size_t k) const {
-  printf("%4i % e % e % e % e\n",(int) k, J, bracket(G,G), diag, unit);
+  printf("%4i % e % e % e % e",(int) k, J, bracket(G,G), diag, unit);
 
-  fprintf(log,"%4i % e % e % e % e\n",(int) k, J, bracket(G,G), diag, unit);
+  fprintf(log,"%4i % e % e % e % e\n",(int) k, J, 10*log10(bracket(G,G)), diag, unit);
   fflush(log);
 }
 
