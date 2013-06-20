@@ -451,6 +451,9 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   for(size_t i=0;i<nocc;i++)
     sicsol.C.col(i)=sol.C.col(i);
 
+  // Grid to use in integration
+  DFTGrid grid(ogrid);
+
   // The localizing matrix
   arma::cx_mat W;
   if(chkptp->exist("W.re"))
@@ -475,15 +478,27 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   } else {
     if(localization) {
       // Localize starting guess with threshold 10.0
+      arma::cx_mat Wloc(W);
       if(verbose) printf("\nInitial localization.\n");
       double measure=10.0;
-      boys_localization(*basisp,sicsol.C,measure,W,verbose);
+      boys_localization(*basisp,sicsol.C,measure,Wloc,verbose);
       if(verbose) printf("\n");
+
+      // Compare SIC energies
+      PZSIC worker(this,dft,&grid,verbose);
+      worker.set(sicsol,pzcor);
+      double E=2*worker.cost_func(W);
+      double Eloc=2*worker.cost_func(Wloc);
+
+      if(Eloc>E) {
+	W=Wloc;
+	if(verbose) printf("Using localized transformation matrix, SIC energy %e vs %e.\n",Eloc,E);
+      } else {
+	if(verbose) printf("Using old transformation matrix, SIC energy %e vs %e.\n",E,Eloc);
+      }
     }
   }
 
-  // Grid to use in integration
-  DFTGrid grid(ogrid);
   if(dft.adaptive && pzmode!=COUL) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
@@ -508,6 +523,9 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   } // if(dft.adaptive)
 
   // Do the calculation
+  if(verbose && !canonical) {
+    fprintf(stderr,"\nSIC unitary optimization\n");
+  }
   PZSIC_calculate(sicsol,W,dft,grid,canonical);
   // Save matrix
   chkptp->cwrite("W",W);
@@ -579,6 +597,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   for(size_t i=0;i<noccb;i++)
     sicsolb.C.col(i)=sol.Cb.col(i);
 
+  // Grid to use in integration
+  DFTGrid grid(ogrid);
+
   // The localizing matrix
   arma::cx_mat Wa, Wb;
   if(chkptp->exist("Wa.re"))
@@ -606,10 +627,24 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   } else {
     if(localization) {
       // Localize starting guess with threshold 10.0
+      arma::cx_mat Wloca(Wa);
       if(verbose) printf("\nInitial localization.\n");
       double measure=10.0;
-      boys_localization(*basisp,sicsola.C,measure,Wa,verbose);
+      boys_localization(*basisp,sicsola.C,measure,Wloca,verbose);
       if(verbose) printf("\n");
+
+      // Compare SIC energies
+      PZSIC worker(this,dft,&grid,verbose);
+      worker.set(sicsola,pzcor);
+      double E=worker.cost_func(Wa);
+      double Eloc=worker.cost_func(Wloca);
+
+      if(Eloc>E) {
+	Wa=Wloca;
+	if(verbose) printf("Using localized transformation matrix, SIC energy %e vs %e.\n",Eloc,E);
+      } else {
+	if(verbose) printf("Using old transformation matrix, SIC energy %e vs %e.\n",E,Eloc);
+      }
     }
   }
 
@@ -632,15 +667,27 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   } else {
     if(localization) {
       // Localize starting guess with threshold 10.0
+      arma::cx_mat Wlocb(Wb);
       if(verbose) printf("\nInitial localization.\n");
       double measure=10.0;
-      boys_localization(*basisp,sicsolb.C,measure,Wb,verbose);
+      boys_localization(*basisp,sicsolb.C,measure,Wlocb,verbose);
       if(verbose) printf("\n");
+
+      // Compare SIC energies
+      PZSIC worker(this,dft,&grid,verbose);
+      worker.set(sicsolb,pzcor);
+      double E=worker.cost_func(Wb);
+      double Eloc=worker.cost_func(Wlocb);
+
+      if(Eloc>E) {
+	Wb=Wlocb;
+	if(verbose) printf("Using localized transformation matrix, SIC energy %e vs %e.\n",Eloc,E);
+      } else {
+	if(verbose) printf("Using old transformation matrix, SIC energy %e vs %e.\n",E,Eloc);
+      }
     }
   }
 
-  // Grid to use in integration
-  DFTGrid grid(ogrid);
   if(dft.adaptive && pzmode!=COUL) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
@@ -673,8 +720,14 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   } // if(dft.adaptive)
 
   // Do the calculation
+  if(verbose && !canonical) {
+      fprintf(stderr,"\nSIC unitary optimization, alpha spin\n");
+  }
   PZSIC_calculate(sicsola,Wa,dft,grid,canonical);
   chkptp->cwrite("Wa",Wa);
+  if(verbose && !canonical) {
+      fprintf(stderr,"\nSIC unitary optimization, beta spin\n");
+  }
   PZSIC_calculate(sicsolb,Wb,dft,grid,canonical);
   chkptp->cwrite("Wb",Wb);
 
@@ -2278,13 +2331,6 @@ void PZSIC::get_rk(double & R, double & K) const {
   sic.H-=pzcor*HSIC;
   diagonalize(S,Sinvh,sic);
   sic.P=form_density(sic.C,sol.C.n_cols);
-
-  printf("\n");
-  sic.P.print("SIC density");
-  sol.P.print("sol density");
-
-  printf("Norm of SIC density is %f, while that of sol density is %f.\n",arma::trace(sic.P*S),arma::trace(sol.P*S));
-  (arma::trans(sic.C)*S*sic.C).print("C^T S C");
 
   // Difference from self-consistency is
   R=rms_norm(sic.P-sol.P);

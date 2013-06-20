@@ -35,10 +35,8 @@ class Unitary {
   /// Convergence threshold
   double eps;
 
-  /// Amount of points to use in df polynomial search
-  int npoly_df;
-  /// Amount of points to use in fdf polynomial search
-  int npoly_fdf;
+  /// Degree of polynomial used for fit: a_0 + a_1*mu + ... + a_(d-1)*mu^(d-1)
+  int dpoly;
 
   /// Value of cost function
   double J;
@@ -91,7 +89,7 @@ class Unitary {
   virtual void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)=0;
 
   /// Set polynomial search options
-  void set_poly(int n_df, int n_fdf);
+  void set_poly(int deg);
 
   /// Unitary optimization
   double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
@@ -101,10 +99,10 @@ class Unitary {
 /// Compute the bracket product
 double bracket(const arma::cx_mat & X, const arma::cx_mat & Y);
 
-/// Fit polynomial to derivative
-arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & dy);
-/// Fit polynomial to function and derivative
-arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arma::vec & dy);
+/// Fit polynomial of wanted degree to derivative
+arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & dy, int deg=-1);
+/// Fit polynomial of wanted degree to function and derivative
+arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arma::vec & dy, int deg=-1);
 
 /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
 arma::vec solve_roots(const arma::vec & v);
