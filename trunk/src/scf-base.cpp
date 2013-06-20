@@ -336,6 +336,396 @@ arma::mat SCF::get_Sinvh() const {
   return Sinvh;
 }
 
+void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid) {
+  // Compute the orbital-dependent Fock matrices
+  Forb.resize(Ctilde.n_cols);
+  Eorb.resize(Ctilde.n_cols);
+
+  // Fraction of exact exchange
+  double kfrac=exact_exchange(dft.x_func);
+
+  // Orbital density matrices
+  std::vector<arma::mat> Porb(Ctilde.n_cols);
+  for(size_t io=0;io<Ctilde.n_cols;io++)
+    Porb[io]=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+
+  if(densityfit) {
+    // Coulomb matrices
+    std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
+    if(kfrac!=0.0)
+      throw std::runtime_error("Not implemented!\n");
+    
+    // Collect matrices
+    for(size_t io=0;io<Ctilde.n_cols;io++) {
+      Forb[io]=Jorb[io];
+      Eorb[io]=0.5*arma::trace(Porb[io]*Jorb[io]);
+    }
+    
+  } else {
+
+    if(!direct) {
+      // Tabled integrals
+	for(size_t io=0;io<Ctilde.n_cols;io++) {
+	  // Calculate Coulomb term
+	  Forb[io]=tab.calcJ(Porb[io]);
+	  // and Coulomb energy
+	  Eorb[io]=0.5*arma::trace(Porb[io]*Forb[io]);
+	}
+
+      // Exchange?
+      if(kfrac!=0.0) {
+	  for(size_t io=0;io<Ctilde.n_cols;io++) {
+	    // Calculate Coulomb term
+	    arma::mat Ko=tab.calcK(Porb[io]);
+
+	    // Change to Fock matrix and energy
+	    Forb[io]-=0.5*kfrac*Ko;
+	    Eorb[io]-=0.25*kfrac*arma::trace(Porb[io]*Ko);
+	  }
+      }
+    } else {
+      // HF coulomb/exchange not implemented
+      ERROR_INFO();
+      throw std::runtime_error("Analytical Coulomb/exchange matrix not implemented!\n");
+    }
+  }
+
+  // Exchange-correlation
+  {
+    std::vector<double> Nelnum; // Numerically integrated density
+    std::vector<arma::mat> XC; // Exchange-correlation matrices
+    std::vector<double> Exc; // Exchange-correlation energy
+
+    grid.eval_Fxc(dft.x_func,dft.c_func,Porb,XC,Exc,Nelnum);
+
+    if(kfrac!=0.0) {
+      ERROR_INFO();
+      throw std::runtime_error("HF energy correction not implemented.\n");
+    }
+
+    // Add in the XC part to the Fock matrix and energy
+    for(size_t io=0;io<Ctilde.n_cols;io++) {
+	Forb[io]+=XC[io];
+	Eorb[io]+=Exc[io];
+      }
+  }
+}
+
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, bool canonical, bool localization) {
+  // Set xc functionals
+  if(pzmode==COUL) {
+    dft.x_func=0;
+    dft.c_func=0;
+  } else if(pzmode==COULX) {
+    dft.c_func=0;
+  } else if(pzmode==COULC) {
+    dft.x_func=0;
+  }
+
+  // Count amount of occupied orbitals
+  size_t nocc=0;
+  while(occs[nocc]!=0.0 && nocc<occs.size())
+    nocc++;
+
+  // Check occupations
+  {
+    bool ok=true;
+    for(size_t i=1;i<nocc;i++)
+      if(fabs(occs[i]-occs[0])>1e-6)
+	ok=false;
+    if(!ok)  {
+      fprintf(stderr,"Occupations:");
+      for(size_t i=0;i<nocc;i++)
+	fprintf(stderr," %e",occs[i]);
+      fprintf(stderr,"\n");
+
+      throw std::runtime_error("SIC not supported for orbitals with varying occupations.\n");
+    }
+  }
+
+  // Collect the orbitals
+  rscf_t sicsol;
+  sicsol.H=sol.H;
+  sicsol.P=sol.P/2.0;
+  sicsol.C.zeros(sol.C.n_rows,nocc);
+  for(size_t i=0;i<nocc;i++)
+    sicsol.C.col(i)=sol.C.col(i);
+
+  // The localizing matrix
+  arma::cx_mat W;
+  if(chkptp->exist("W.re"))
+    chkptp->cread("W",W);
+  // Check that it is sane
+  if(W.n_rows != nocc || W.n_cols != nocc) {
+    if(canonical)
+      // Use canonical orbitals
+      W.eye(nocc,nocc);
+    else {
+      // Initialize with a random unitary matrix.
+      W=complex_unitary(nocc);
+
+      if(localization) {
+	// Localize starting guess with threshold 10.0
+	if(verbose) printf("\nInitial localization.\n");
+	double measure=10.0;
+	boys_localization(*basisp,sicsol.C,measure,W,verbose);
+	if(verbose) printf("\n");
+      }
+    }
+  } else {
+    if(localization) {
+      // Localize starting guess with threshold 10.0
+      if(verbose) printf("\nInitial localization.\n");
+      double measure=10.0;
+      boys_localization(*basisp,sicsol.C,measure,W,verbose);
+      if(verbose) printf("\n");
+    }
+  }
+
+  // Grid to use in integration
+  DFTGrid grid(ogrid);
+  if(dft.adaptive && pzmode!=COUL) {
+    // Before proceeding, reform DFT grids so that localized orbitals
+    // are properly integrated over.
+
+    // Update Ctilde
+    arma::cx_mat Ctilde=sicsol.C*W;
+    
+    // Stack of density matrices
+    std::vector<arma::mat> Pv(nocc+1);
+    // First entries are orbital densities
+    for(size_t io=0;io<nocc;io++)
+      Pv[io]=occs[0]*arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+    // Final element is total density
+    Pv[Pv.size()-1].zeros(Pv[0].n_rows,Pv[0].n_cols);
+    for(size_t io=0;io<Pv.size()-1;io++)
+      Pv[Pv.size()-1]+=Pv[io];
+
+    // Update DFT grid
+    if(verbose) printf("\nReconstructing DFT grid.\n");
+    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
+    if(verbose) printf("\n");
+  } // if(dft.adaptive)
+
+  // Do the calculation
+  PZSIC_calculate(sicsol,W,dft,grid,canonical);
+  // Save matrix
+  chkptp->cwrite("W",W);
+
+  // Update current solution
+  sol.H +=sicsol.H;
+  sol.XC+=sicsol.XC;
+  // Remember there are two electrons in each orbital
+  sol.en.Exc+=2*sicsol.en.Exc;
+  sol.en.Eel+=2*sicsol.en.Eel;
+  sol.en.E  +=2*sicsol.en.E;
+}
+
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, bool canonical, bool localization) {
+  // Set xc functionals
+  if(pzmode==COUL) {
+    dft.x_func=0;
+    dft.c_func=0;
+  } else if(pzmode==COULX) {
+    dft.c_func=0;
+  } else if(pzmode==COULC) {
+    dft.x_func=0;
+  }
+
+  // Count amount of occupied orbitals
+  size_t nocca=0;
+  while(occa[nocca]!=0.0 && nocca<occa.size())
+    nocca++;
+  size_t noccb=0;
+  while(occa[noccb]!=0.0 && noccb<occb.size())
+    noccb++;
+
+  // Check occupations
+  {
+    bool ok=true;
+    for(size_t i=1;i<nocca;i++)
+      if(fabs(occa[i]-occa[0])>1e-6)
+	ok=false;
+    for(size_t i=1;i<noccb;i++)
+      if(fabs(occb[i]-occb[0])>1e-6)
+	ok=false;
+    if(!ok) {
+      fprintf(stderr,"Alpha occupations:");
+      for(size_t i=0;i<nocca;i++)
+	fprintf(stderr," %e",occa[i]);
+      fprintf(stderr,"\n");
+
+      fprintf(stderr,"Beta occupations:");
+      for(size_t i=0;i<noccb;i++)
+	fprintf(stderr," %e",occb[i]);
+      fprintf(stderr,"\n");
+      
+      throw std::runtime_error("SIC not supported for orbitals with varying occupations.\n");
+    }
+  }
+
+  // Collect the orbitals
+  rscf_t sicsola;
+  sicsola.H=sol.Ha;
+  sicsola.P=sol.Pa;
+  sicsola.C.zeros(sol.Ca.n_rows,nocca);
+  for(size_t i=0;i<nocca;i++)
+    sicsola.C.col(i)=sol.Ca.col(i);
+
+  rscf_t sicsolb;
+  sicsolb.H=sol.Hb;
+  sicsolb.P=sol.Pb;
+  sicsolb.C.zeros(sol.Cb.n_rows,noccb);
+  for(size_t i=0;i<noccb;i++)
+    sicsolb.C.col(i)=sol.Cb.col(i);
+
+  // The localizing matrix
+  arma::cx_mat Wa, Wb;
+  if(chkptp->exist("Wa.re"))
+    chkptp->cread("Wa",Wa);
+  if(chkptp->exist("Wb.re"))
+    chkptp->cread("Wb",Wb);
+
+  // Check that they are sane
+  if(Wa.n_rows != nocca || Wa.n_cols != nocca) {
+    if(canonical)
+      // Use canonical orbitals
+      Wa.eye(nocca,nocca);
+    else {
+      // Initialize with a random unitary matrix.
+      Wa=complex_unitary(nocca);
+
+      if(localization) {
+	// Localize starting guess with threshold 10.0
+	if(verbose) printf("\nInitial localization.\n");
+	double measure=10.0;
+	boys_localization(*basisp,sicsola.C,measure,Wa,verbose);
+	if(verbose) printf("\n");
+      }
+    }
+  } else {
+    if(localization) {
+      // Localize starting guess with threshold 10.0
+      if(verbose) printf("\nInitial localization.\n");
+      double measure=10.0;
+      boys_localization(*basisp,sicsola.C,measure,Wa,verbose);
+      if(verbose) printf("\n");
+    }
+  }
+
+  if(Wb.n_rows != noccb || Wb.n_cols != noccb) {
+    if(canonical)
+      // Use canonical orbitals
+      Wb.eye(noccb,noccb);
+    else {
+      // Initialize with a random unitary matrix.
+      Wb=complex_unitary(noccb);
+
+      if(localization) {
+	// Localize starting guess with threshold 10.0
+	if(verbose) printf("\nInitial localization.\n");
+	double measure=10.0;
+	boys_localization(*basisp,sicsolb.C,measure,Wb,verbose);
+	if(verbose) printf("\n");
+      }
+    }
+  } else {
+    if(localization) {
+      // Localize starting guess with threshold 10.0
+      if(verbose) printf("\nInitial localization.\n");
+      double measure=10.0;
+      boys_localization(*basisp,sicsolb.C,measure,Wb,verbose);
+      if(verbose) printf("\n");
+    }
+  }
+
+  // Grid to use in integration
+  DFTGrid grid(ogrid);
+  if(dft.adaptive && pzmode!=COUL) {
+    // Before proceeding, reform DFT grids so that localized orbitals
+    // are properly integrated over.
+
+    // Update Ctilde
+    arma::cx_mat Catilde=sicsola.C*Wa;
+    arma::cx_mat Cbtilde=sicsolb.C*Wb;
+    
+    // Stack of density matrices
+    std::vector<arma::mat> Pv(nocca+noccb+2);
+    // First entries are orbital densities
+    for(size_t io=0;io<nocca;io++)
+      Pv[io]=arma::real(Catilde.col(io)*arma::trans(Catilde.col(io)));
+    for(size_t io=0;io<noccb;io++)
+      Pv[io+nocca]=arma::real(Cbtilde.col(io)*arma::trans(Cbtilde.col(io)));
+
+    // Final element is total density
+    Pv[Pv.size()-2].zeros(Pv[0].n_rows,Pv[0].n_cols);
+    for(size_t io=0;io<nocca;io++)
+      Pv[Pv.size()-2]+=Pv[io];
+
+    Pv[Pv.size()-1].zeros(Pv[0].n_rows,Pv[0].n_cols);
+    for(size_t io=0;io<noccb;io++)
+      Pv[Pv.size()-1]+=Pv[io+nocca];
+
+    // Update DFT grid
+    if(verbose) printf("\nReconstructing DFT grid.\n");
+    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
+    if(verbose) printf("\n");
+  } // if(dft.adaptive)
+
+  // Do the calculation
+  PZSIC_calculate(sicsola,Wa,dft,grid,canonical);
+  chkptp->cwrite("Wa",Wa);
+  PZSIC_calculate(sicsolb,Wb,dft,grid,canonical);
+  chkptp->cwrite("Wb",Wb);
+
+  // Update current solution
+  sol.Ha +=sicsola.H;
+  sol.Hb +=sicsolb.H;
+  sol.XCa+=sicsola.XC;
+  sol.XCb+=sicsolb.XC;
+
+  sol.en.Exc+=sicsola.en.Exc+sicsolb.en.Exc;
+  sol.en.Eel+=sicsola.en.Eel+sicsolb.en.Eel;
+  sol.en.E  +=sicsola.en.E+sicsolb.en.E;
+}
+
+void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool canonical) {
+  // Initialize the worker
+  PZSIC worker(this,dft,&grid,verbose);
+  worker.set(sol,pzcor);
+  
+  // Use canonical orbitals for SIC
+  if(canonical) {
+    worker.cost_func(W);
+  } else {
+    //	Perform unitary optimization
+    worker.optimize(W);
+  }
+
+  // Get SIC energy and hamiltonian
+  double ESIC=worker.get_ESIC();
+  arma::mat HSIC=worker.get_HSIC();
+  
+  // Adjust Fock operator for SIC
+  sol.H     =-pzcor*HSIC;
+  sol.XC    =-pzcor*HSIC;
+  // Need to adjust energy as well as this was calculated in the Fock routines
+  sol.en.Exc=-pzcor*ESIC;
+  sol.en.Eel=-pzcor*ESIC;
+  sol.en.E  =-pzcor*ESIC;
+
+  // Get orbital self-interaction energies
+  if(verbose) {
+    printf("Self-interaction energy is %e.\n",ESIC);
+
+    arma::vec Eorb=worker.get_Eorb();
+    printf("Decomposition of self-interaction:\n");
+    for(size_t io=0;io<Eorb.n_elem;io++)
+      printf("\t%4i\t%e\n",(int) io+1,Eorb(io));
+    fflush(stdout);
+  }
+}
+
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol) {
   arma::mat Horth;
   arma::mat orbs;
@@ -1798,9 +2188,8 @@ PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0
 PZSIC::~PZSIC() {
 }
 
-void PZSIC::set(const rscf_t & solp, double occ, double pz) {
+void PZSIC::set(const rscf_t & solp, double pz) {
   sol=solp;
-  occnum=occ;
   pzcor=pz;
 }
 
@@ -1836,7 +2225,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   arma::cx_mat Ctilde=sol.C*W;
 
   // Compute orbital-dependent Fock matrices
-  //  solver->PZSIC_Fock(Forb,Eorb,Ctilde,occnum,dft,*grid);
+  solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid);
 
   // and the total SIC contribution
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
@@ -1881,14 +2270,21 @@ void PZSIC::print_progress(size_t k) const {
 }
 
 void PZSIC::get_rk(double & R, double & K) const {
-  // Occupation numbers
-  std::vector<double> occs;
-  occs.assign(sol.C.n_cols,occnum);
+  arma::mat S=solver->get_S();
+  arma::mat Sinvh=solver->get_Sinvh();
 
   // Compute SIC density
   rscf_t sic(sol);
   sic.H-=pzcor*HSIC;
-  diagonalize(solver->get_S(),solver->get_Sinvh(),sic);
+  diagonalize(S,Sinvh,sic);
+  sic.P=form_density(sic.C,sol.C.n_cols);
+
+  printf("\n");
+  sic.P.print("SIC density");
+  sol.P.print("sol density");
+
+  printf("Norm of SIC density is %f, while that of sol density is %f.\n",arma::trace(sic.P*S),arma::trace(sol.P*S));
+  (arma::trans(sic.C)*S*sic.C).print("C^T S C");
 
   // Difference from self-consistency is
   R=rms_norm(sic.P-sol.P);
@@ -1900,6 +2296,9 @@ bool PZSIC::converged(const arma::cx_mat & W) {
   double R, K;
   get_rk(R,K);
   (void) W;
+
+  printf("\nR = %e, K = %e\n",R,K);
+  kappa.print("Kappa");
   
   if(K<0.1*R)
     // Converged
@@ -1907,4 +2306,16 @@ bool PZSIC::converged(const arma::cx_mat & W) {
   else
     // Not converged
     return false;
+}
+
+double PZSIC::get_ESIC() const {
+  return J;
+}
+
+arma::vec PZSIC::get_Eorb() const {
+  return Eorb;
+}
+
+arma::mat PZSIC::get_HSIC() const {
+  return HSIC;
 }

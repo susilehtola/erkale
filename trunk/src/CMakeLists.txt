@@ -21,7 +21,7 @@ INCLUDE_DIRECTORIES(${HDF5_INCLUDE_DIRS})
 add_library (liberkale basis.cpp basislibrary.cpp stringutil.cpp
 mathf.cpp integrals.cpp eritable.cpp eriscreen.cpp timer.cpp
 linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf-base.cpp
-scf-solvers.cpp scf-fock.cpp scf-force.cpp scf-pzsic.cpp elements.cpp
+scf-solvers.cpp scf-fock.cpp scf-force.cpp elements.cpp
 xyzutils.cpp settings.cpp broyden.cpp adiis.cpp tempered.cpp
 find_molecules.cpp properties.cpp checkpoint.cpp guess.cpp
 external/storage.cpp external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp
@@ -232,14 +232,4 @@ add_custom_command(
 #  COMMAND ${PPROC} -DUNRESTRICTED -D_ROHF ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
   COMMAND ${PPROC} -DRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
   COMMAND ${PPROC} -DUNRESTRICTED -DDFT ${CMAKE_CURRENT_SOURCE_DIR}/scf-force.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-force.cpp
-)
-
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/scf-pzsic.cpp
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scf-pzsic.cpp.in
-
-  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/scf-includes.cpp.in >${CMAKE_CURRENT_BINARY_DIR}/scf-pzsic.cpp
-  COMMAND ${PPROC} ${CMAKE_CURRENT_SOURCE_DIR}/scf-pzsic.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-pzsic.cpp
-  COMMAND ${PPROC} -DRESTRICTED ${CMAKE_CURRENT_SOURCE_DIR}/scf-pzsic.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/scf-pzsic.cpp
 )
