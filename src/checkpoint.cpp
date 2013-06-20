@@ -211,6 +211,22 @@ void Checkpoint::read(const std::string & name, arma::mat & m) {
   if(cl) close();
 }
 
+
+void Checkpoint::cwrite(const std::string & name, const arma::cx_mat & m) {
+  arma::mat mreal=arma::real(m);
+  arma::mat mim=arma::imag(m);
+
+  write(name+".re",mreal);
+  write(name+".im",mim);
+}
+
+void Checkpoint::cread(const std::string & name, arma::cx_mat & m) {
+  arma::mat mreal, mim;
+  read(name+".re",mreal);
+  read(name+".im",mim);
+  m=mreal+std::complex<double>(0.0,1.0)*mim;
+}
+
 void Checkpoint::write(const std::string & name, const std::vector<double> & v) {
   CHECK_WRITE();
   bool cl=false;

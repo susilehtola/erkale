@@ -76,15 +76,6 @@ class Unitary {
   /// Polynomial step (fit function and derivative), return step length
   double polynomial_step_fdf(const arma::cx_mat & W);
 
-  /// Compute the bracket product
-  double bracket(const arma::cx_mat & X, const arma::cx_mat & Y) const;
-  /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
-  arma::vec solve_roots(const arma::vec & v) const;
-  /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
-  arma::cx_vec solve_roots_cplx(const arma::vec & v) const;
-  /// Get smallest positive root
-  double smallest_positive(const arma::vec & v) const;
-
  public:
   /// Constructor
   Unitary(int q, double thr, bool maximize, bool verbose=true);
@@ -105,6 +96,23 @@ class Unitary {
   /// Unitary optimization
   double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
 };
+
+
+/// Compute the bracket product
+double bracket(const arma::cx_mat & X, const arma::cx_mat & Y);
+
+/// Fit polynomial to derivative
+arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & dy);
+/// Fit polynomial to function and derivative
+arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arma::vec & dy);
+
+/// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
+arma::vec solve_roots(const arma::vec & v);
+/// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
+arma::cx_vec solve_roots_cplx(const arma::vec & v);
+/// Get smallest positive root
+double smallest_positive(const arma::vec & v);
+
 
 /// Brockett
 class Brockett : public Unitary {

@@ -276,19 +276,12 @@ class SCF {
   std::vector<arma::mat> freeze;
 
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, DFTGrid & grid, double tol, bool canonical=false, bool localize=true);
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & grid, bool canonical=false, bool localize=true);
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, DFTGrid & grid, double tol, bool canonical=false, bool localize=true);
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & grid, bool canonical=false, bool localize=true);
+  /// Helper routine for the above
+  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool canonical);
 
-  /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
-  void PZSIC_Fock_UDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & ESIC, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid);
-  /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
-  void PZSIC_Fock_RDFT(std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & ESIC, const std::vector<arma::cx_mat> & Ctilde, const std::vector<size_t> nocc, const std::vector<arma::vec> & occnum, const dft_t dft, DFTGrid & grid);
-
-  /// Helper for PZ-SIC - perform unitary optimization of energy
-  void unitary_REopt(const std::vector<arma::mat> & C, std::vector<arma::cx_mat> & U, std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, DFTGrid & grid, const std::vector<size_t> & nocc, const std::vector<arma::vec> & numocc, dft_t dft, std::vector<arma::mat> & HSIC, const std::vector<double> & occs, const rscf_t & sol);
-  /// Helper for PZ-SIC - perform unitary optimization of energy
-  void unitary_UEopt(const std::vector<arma::mat> & C, std::vector<arma::cx_mat> & U, std::vector< std::vector<arma::mat> > & Forb, std::vector< std::vector<double> > & Eorb, DFTGrid & grid, const std::vector<size_t> & nocc, const std::vector<arma::vec> & numocc, dft_t dft, std::vector<arma::mat> & HSIC, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & sol);
 
  public:
   /// Constructor
@@ -331,6 +324,9 @@ class SCF {
   /// Calculate unrestricted density-functional theory KS-Fock operator
   void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, double tol) const;
 
+  /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
+  void PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid);
+  
   /// Calculate force in restricted Hartree-Fock
   arma::vec force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol);
   /// Calculate force in restricted open-shell Hartree-Fock
@@ -535,7 +531,7 @@ class PZSIC : public Unitary {
   ~PZSIC();
 
   /// Set orbitals
-  void set(const rscf_t & ref, double occ, double pzcor);
+  void set(const rscf_t & ref, double pzcor);
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
@@ -543,6 +539,13 @@ class PZSIC : public Unitary {
   arma::cx_mat cost_der(const arma::cx_mat & W);
   /// Evaluate cost function and its derivative
   void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
+
+  /// Get SIC energy
+  double get_ESIC() const;
+  /// Get orbital-by-orbital SIC
+  arma::vec get_Eorb() const;
+  /// Get SIC Hamiltonian
+  arma::mat get_HSIC() const;
 };
 
 

@@ -122,6 +122,11 @@ class Checkpoint {
   /// Read matrix
   void read(const std::string & name, arma::mat & mat);
 
+  /// Save complex matrix
+  void cwrite(const std::string & name, const arma::cx_mat & mat);
+  /// Read complex matrix
+  void cread(const std::string & name, arma::cx_mat & mat);
+
   /// Save array
   void write(const std::string & name, const std::vector<double> & v);
   /// Load array

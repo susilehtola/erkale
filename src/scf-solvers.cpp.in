@@ -474,9 +474,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(pz==FULL || pz==CAN) {
       titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,tol,pz==CAN,pzloc);
+      PZSIC_RDFT(sol,occs,dft,grid,pz==CAN,pzloc);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,tol,pz==CAN,pzloc);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,pz==CAN,pzloc);
 #endif
       titer.cont();
     }
@@ -682,9 +682,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	if(pz==FULL || pz==CAN) {
 	  titer.stop();
 #ifdef RESTRICTED
-	  PZSIC_RDFT(rhsol,occs,dft,grid,tol,pz==CAN,pzloc);
+	  PZSIC_RDFT(rhsol,occs,dft,grid,pz==CAN,pzloc);
 #else
-	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,tol,pz==CAN,pzloc);
+	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,pz==CAN,pzloc);
 #endif
 	  titer.cont();
 	}
@@ -766,9 +766,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    if(pz==FULL || pz==CAN) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol1,occs,dft,grid,tol,pz==CAN,pzloc);
+	      PZSIC_RDFT(sol1,occs,dft,grid,pz==CAN,pzloc);
 #else
-	      PZSIC_UDFT(sol1,occa,occb,dft,grid,tol,pz==CAN,pzloc);
+	      PZSIC_UDFT(sol1,occa,occb,dft,grid,pz==CAN,pzloc);
 #endif
 	      titer.cont();
 	    }
@@ -789,9 +789,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    if(pz==FULL || pz==CAN) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol2,occs,dft,grid,tol,pz==CAN,pzloc);
+	      PZSIC_RDFT(sol2,occs,dft,grid,pz==CAN,pzloc);
 #else
-	      PZSIC_UDFT(sol2,occa,occb,dft,grid,tol,pz==CAN,pzloc);
+	      PZSIC_UDFT(sol2,occa,occb,dft,grid,pz==CAN,pzloc);
 #endif
 	      titer.cont();
 	    }
@@ -1125,9 +1125,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(pz==PERT || pz==CANPERT) {
       // Calculate SIC correction
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,tol,pz==CANPERT,pzloc);
+      PZSIC_RDFT(sol,occs,dft,grid,pz==CANPERT,pzloc);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,tol,pz==CANPERT,pzloc);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,pz==CANPERT,pzloc);
 #endif
       // Diagonalize to get new canonical orbitals and energies
       diagonalize(S,Sinvh,sol);
