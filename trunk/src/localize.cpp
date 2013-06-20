@@ -30,7 +30,14 @@
 #include <omp.h>
 #endif
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, const std::vector<double> & occs) {
+enum locmet {
+  // Boys
+  BOYS,
+  // Pipek-Mezey
+  PIPEK
+};
+
+void localize_wrk(const BasisSet & basis, arma::mat & C, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
@@ -71,7 +78,10 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, const std::vector<doubl
       printf(" %i",(int) orbidx[io]+1);
     printf("\n");
     
-    localize(basis,Cwrk,measure,U,true);
+    if(method==BOYS)
+      boys_localization(basis,Cwrk,measure,U,true,umet,acc);
+    else if(method==PIPEK)
+      pipek_localization(basis,Cwrk,measure,U,true,umet,acc);
     
     // Transform orbitals
     arma::mat Cloc=arma::real(Cwrk*U);
@@ -83,9 +93,9 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, const std::vector<doubl
 }
 
 
-void localize(const BasisSet & basis, arma::mat & C, std::vector<double> occs, bool virt) {
+void localize(const BasisSet & basis, arma::mat & C, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc) {
   // Run localization, occupied space
-  localize_wrk(basis,C,occs);
+  localize_wrk(basis,C,occs,method,umet,acc);
 
   // Run localization, virtual space
   if(virt) {
@@ -94,10 +104,9 @@ void localize(const BasisSet & basis, arma::mat & C, std::vector<double> occs, b
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,occs);
+    localize_wrk(basis,C,occs,method,umet,acc);
   }
 }
-
 
 int main(int argc, char **argv) {
 #ifdef _OPENMP
@@ -108,17 +117,83 @@ int main(int argc, char **argv) {
   print_copyright();
   print_license();
 
-  if(argc!=2 && argc!=3) {
-    printf("Usage: %s checkpoint (dovirtual)\n",argv[0]);
+  if(argc!=2) {
+    printf("Usage: %s runfile\n",argv[0]);
     return 1;
   }
 
-  int virt=0;
-  if(argc==3)
-    virt=atoi(argv[2]);
+  Settings set;
+  set.add_string("LoadChk","Checkpoint to load","erkale.chk");
+  set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
+  set.add_string("Localization","Localization method: BF, PM, ER","BF");
+  set.add_bool("Virtual","Localize virtual orbitals as well?",false);
+  set.add_string("Logfile","File to store standard output in","erkale_loc.log");
+  set.add_string("Accelerator","Accelerator to use: SD, CGPR, CGFR","CGPR");
+  set.add_string("LineSearch","Line search to use: poly_df, poly_fdf, armijo","poly_df");
+  set.parse(argv[1]);
+  set.print();
+
+  // Redirect output?
+  std::string logfile=set.get_string("Logfile");
+  if(stricmp(logfile,"stdout")!=0) {
+    // Redirect stdout to file
+    FILE *outstream=freopen(logfile.c_str(),"w",stdout);
+    if(outstream==NULL) {
+      ERROR_INFO();
+      throw std::runtime_error("Unable to redirect output!\n");
+    } else
+      fprintf(stderr,"\n");
+  }
+
+  bool virt=set.get_bool("Virtual");
+
+  std::string loadname(set.get_string("LoadChk"));
+  std::string savename(set.get_string("SaveChk"));
+
+  // Determine method
+  enum locmet method;
+  std::string mets=set.get_string("Localization");
+  if(stricmp(mets,"BF")==0)
+    method=BOYS;
+  else if(stricmp(mets,"PM")==0)
+    method=PIPEK;
+  else throw std::runtime_error("Localization method not implemented.\n");
+
+  // Determine accelerator
+  enum unitacc acc;
+  std::string accs=set.get_string("Accelerator");
+  if(stricmp(accs,"SD")==0)
+    acc=SD;
+  else if(stricmp(accs,"CGPR")==0)
+    acc=CGPR;
+  else if(stricmp(accs,"CGFR")==0)
+    acc=CGFR;
+  else throw std::runtime_error("Accelerator not implemented.\n");
+
+  // Determine line search
+  enum unitmethod umet;
+  std::string umets=set.get_string("LineSearch");
+  if(stricmp(umets,"poly_df")==0)
+    umet=POLY_DF;
+  else if(stricmp(umets,"poly_fdf")==0)
+    umet=POLY_FDF;
+  else if(stricmp(umets,"armijo")==0)
+    umet=ARMIJO;
+  else throw std::runtime_error("Accelerator not implemented.\n");
+  
+  if(stricmp(loadname,savename)!=0) {
+    // Copy checkpoint
+    std::ostringstream oss;
+    oss << "cp " << loadname << " " << savename;
+    int cp=system(oss.str().c_str());
+    if(cp) {
+      ERROR_INFO();
+      throw std::runtime_error("Failed to copy checkpoint file.\n");
+    }
+  }
 
   // Open checkpoint in read-write mode, don't truncate
-  Checkpoint chkpt(argv[1],true,false);
+  Checkpoint chkpt(savename,true,false);
     
   // Basis set
   BasisSet basis;
@@ -138,7 +213,7 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,occs,virt);
+    localize(basis,C,occs,virt,method,umet,acc);
 
     chkpt.write("C",C);
 
@@ -154,8 +229,8 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,occa,virt);
-    localize(basis,Cb,occb,virt);
+    localize(basis,Ca,occa,virt,method,umet,acc);
+    localize(basis,Cb,occb,virt,method,umet,acc);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);

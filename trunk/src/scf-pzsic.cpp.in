@@ -152,7 +152,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	double measure=10.0;
 	for(size_t ispin=0;ispin<nocc.size();ispin++)
-	  localize(*basisp,C[ispin],measure,Utr[itr][ispin],verbose);
+	  boys_localization(*basisp,C[ispin],measure,Utr[itr][ispin],verbose);
       }
 
       Forbtr[itr]=Forb;
@@ -242,7 +242,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       // Localize orbitals with threshold 10.0
       double measure=10.0;
       for(size_t ispin=0;ispin<nocc.size();ispin++)
-	localize(*basisp,C[ispin],measure,Uloc[ispin],verbose);
+	boys_localization(*basisp,C[ispin],measure,Uloc[ispin],verbose);
 
       // Calculate SIC of localized U
       for(size_t ispin=0;ispin<C.size();ispin++)

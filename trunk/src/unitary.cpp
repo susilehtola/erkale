@@ -8,10 +8,6 @@ extern "C" {
 #include <gsl/gsl_errno.h>
 }
 
-#define bracket(X,Y) (0.5*std::real(arma::trace(X*arma::trans(Y))))
-
-#define MAXITER 1000
-
 Unitary::Unitary(int qv, double thr, bool max, bool ver) {
   q=qv;
   eps=thr;
@@ -28,6 +24,10 @@ Unitary::Unitary(int qv, double thr, bool max, bool ver) {
 }
 
 Unitary::~Unitary() {
+}
+
+double Unitary::bracket(const arma::cx_mat & X, const arma::cx_mat & Y) const {
+  return 0.5*std::real(arma::trace(arma::trans(X)*Y));
 }
 
 void Unitary::check_unitary(const arma::cx_mat & W) const {
@@ -50,16 +50,16 @@ void Unitary::set_poly(int n) {
   npoly=n;
 }
 
-bool Unitary::converged() const {
+bool Unitary::converged(const arma::cx_mat & W) {
   /// Dummy default function, just check norm of gradient
+  (void) W;
   return false;
 }
 
-double Unitary::optimize(arma::cx_mat & W, enum unitmethod met) {
-  Timer t;
-
-  // Clear derivative stack
-  G.clear();
+double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter) {
+  // Old gradient
+  arma::cx_mat oldG;
+  G.zeros(W.n_cols,W.n_cols);
 
   if(W.n_cols<2) {
     // No optimization is necessary.
@@ -72,14 +72,15 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met) {
   check_unitary(W);
 
   // Iteration number
-  int k=0;
-
+  size_t k=0;
   J=0;
 
   while(true) {
     // Increase iteration number
     k++;
-
+    
+    Timer t;
+  
     // Store old value
     oldJ=J;
 
@@ -88,11 +89,9 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met) {
     cost_func_der(W,J,Gammak);
 
     // Riemannian gradient, Abrudan 2009 table 3 step 2
-    G.push_back(Gammak*arma::trans(W) - W*arma::trans(Gammak));
-    // Remove old matrices from memory?
-    if(G.size()>2)
-      G.erase(G.begin());
-
+    oldG=G;
+    G=Gammak*arma::trans(W) - W*arma::trans(Gammak);
+    
     // Print progress
     if(verbose)
       print_progress(k);
@@ -100,21 +99,34 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met) {
     // H matrix
     if(k==1) {
       // First iteration; initialize with gradient
-      H=G[G.size()-1];
+      H=G;
+
     } else {
-      // Compute Polak-Ribière coefficient
-      double gamma=bracket(G[G.size()-1] - G[G.size()-2], G[G.size()-1]) / bracket(G[G.size()-2],G[G.size()-2]);
-      // Fletcher-Reeves
-      //double gamma=bracket(G[G.size()-1], G[G.size()-1]) / bracket(G[G.size()-2],G[G.size()-2]);
 
-      gamma=std::max(gamma,0.0);
-
-      // Update H
-      H=G[G.size()-1]+gamma*H;
+      double gamma=0.0;
+      if(acc==SD) {
+	// Steepest descent
+	gamma=0.0;
+      } else if(acc==CGPR) {
+	// Compute Polak-Ribière coefficient
+	gamma=bracket(G - oldG, G) / bracket(oldG, oldG);
+      } else if(acc==CGFR) {
+	// Fletcher-Reeves
+	gamma=bracket(G, G) / bracket(oldG, oldG);
+      } else
+	throw std::runtime_error("Unsupported update.\n");
+      
+      H=G+gamma*H;
+      
+      // Check that update is OK
+      if(bracket(G,H)<0.0) {
+	H=G;
+	printf("CG search direction reset.\n");
+      }
     }
-
+    
     // Check for convergence.
-    if(bracket(G[G.size()-1],G[G.size()-1])<eps || converged()) {
+    if(bracket(G,G)<eps || converged(W)) {
       
       if(verbose) {
 	fprintf(stderr," %10.3f\n",t.get());
@@ -122,13 +134,13 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met) {
 	
 	printf(" %s\nConverged.\n",t.elapsed().c_str());
 	fflush(stdout);
-
+	
 	// Print classification
 	classify(W);
       }
-
+      
       break;
-    } else if(k==MAXITER) {
+    } else if(k==maxiter) {
       if(verbose) {
 	fprintf(stderr," %10.3f\n",t.get());
 	fflush(stderr);
@@ -163,13 +175,16 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met) {
 
     // Find optimal step size
     double step;
-    if(met==POLY_DF)
+    if(met==POLY_DF) {
+      //      printf("Polynomial df step\n");
       step=polynomial_step_df(W);
-    else if(met==POLY_FDF)
+    } else if(met==POLY_FDF) {
+      //      printf("Polynomial fdf step\n");
       step=polynomial_step_fdf(W);
-    else if(met==ARMIJO)
+    } else if(met==ARMIJO) {
+      //      printf("Armijo step\n");
       step=armijo_step(W);
-    else throw std::runtime_error("Method not implemented.\n");
+    } else throw std::runtime_error("Method not implemented.\n");
 
     // Check step size
     if(step<0.0) throw std::runtime_error("Negative step size!\n");
@@ -193,8 +208,11 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met) {
 }
 
 void Unitary::print_progress(size_t k) const {
-  printf("\t%4i\t% e\t% e\t%e ",(int) k,J,J-oldJ,bracket(G[G.size()-1],G[G.size()-1]));
+  printf("\t%4i\t% e\t% e\t%e ",(int) k,J,J-oldJ,bracket(G,G));
   fflush(stdout);
+  
+  fprintf(stderr,"\t%4i\t% e\t% e\t%e ",(int) k,J,J-oldJ,bracket(G,G));
+  fflush(stderr);
 }
 
 void Unitary::classify(const arma::cx_mat & W) const {
@@ -510,7 +528,7 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
     // Minimization.
 
     // First condition: f(W) - f(R^2 W) >= mu*<G,H>
-    while(J-J2 >= step*bracket(G[G.size()-1],H)) {
+    while(J-J2 >= step*bracket(G,H)) {
       // Increase step size.
       step*=2.0;
       R=get_rotation(step);
@@ -523,7 +541,7 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
     double J1=cost_func(R*W);
 
     // Second condition: f(W) - f(R W) <= mu/2*<G,H>
-    while(J-J1 < step/2.0*bracket(G[G.size()-1],H)) {
+    while(J-J1 < step/2.0*bracket(G,H)) {
       // Decrease step size.
       step/=2.0;
       R=get_rotation(step);
@@ -536,7 +554,7 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
     // Maximization
 
     // First condition: f(W) - f(R^2 W) >= mu*<G,H>
-    while(J-J2 <= -step*bracket(G[G.size()-1],H)) {
+    while(J-J2 <= -step*bracket(G,H)) {
       // Increase step size.
       step*=2.0;
       R=get_rotation(step);
@@ -549,7 +567,7 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
     double J1=cost_func(R*W);
 
     // Second condition: f(W) - f(R W) <= mu/2*<G,H>
-    while(J-J1 > -step/2.0*bracket(G[G.size()-1],H)) {
+    while(J-J1 > -step/2.0*bracket(G,H)) {
       // Decrease step size.
       step/=2.0;
       R=get_rotation(step);
@@ -563,219 +581,76 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
   return step;
 }
 
-Boys::Boys(const BasisSet & basis, const arma::mat & C, double thr, bool ver) : Unitary(4,thr,false,ver) {
-  // Get R^2 matrix
-  std::vector<arma::mat> momstack=basis.moment(2);
-  rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
+Brockett::Brockett(size_t N, unsigned long int seed) : Unitary(2, 1e-10, true, true) {
+  // Get random complex matrix
+  sigma=randn_mat(N,N,seed)+std::complex<double>(0.0,1.0)*randn_mat(N,N,seed+1);
+  // Hermitize it
+  sigma=sigma+arma::trans(sigma);
+  // Get N matrix
+  Nmat.zeros(N,N);
+  for(size_t i=1;i<=N;i++)
+    Nmat(i,i)=i;
 
-  // Get r matrices
-  std::vector<arma::mat> rmat=basis.moment(1);
-
-  // Convert matrices to MO basis
-  rsq=arma::trans(C)*rsq*C;
-  rx=arma::trans(C)*rmat[0]*C;
-  ry=arma::trans(C)*rmat[1]*C;
-  rz=arma::trans(C)*rmat[2]*C;
+  log=fopen("brockett.dat","w");
 }
 
-Boys::~Boys() {
+Brockett::~Brockett() {
+  fclose(log);
 }
 
-double Boys::cost_func(const arma::cx_mat & W) {
-  if(W.n_rows != W.n_cols) {
-    ERROR_INFO();
-    throw std::runtime_error("Matrix is not square!\n");
-  }
-
-  if(W.n_rows != rsq.n_rows) {
-    ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
-  }
-
-  double B=0;
-
-  // <i|r^2|i> terms
-  arma::cx_mat rsm=rsq*W;
-  for(size_t io=0;io<W.n_cols;io++)
-    B+=std::real(arma::as_scalar(arma::trans(W.col(io))*rsm.col(io)));
-
-  // <i|r|i>^2 terms
-  arma::cx_mat rxw=rx*W;
-  arma::cx_mat ryw=ry*W;
-  arma::cx_mat rzw=rz*W;
-
-  for(size_t io=0;io<W.n_cols;io++) {
-    double xp=std::real(arma::as_scalar(arma::trans(W.col(io))*rxw.col(io)));
-    double yp=std::real(arma::as_scalar(arma::trans(W.col(io))*ryw.col(io)));
-    double zp=std::real(arma::as_scalar(arma::trans(W.col(io))*rzw.col(io)));
-    B-=xp*xp + yp*yp + zp*zp;
-  }
-
-  return B;
+bool Brockett::converged(const arma::cx_mat & W) {
+  // Update diagonality and unitarity criteria
+  unit=unitarity(W);
+  diag=diagonality(W);
+  // Dummy return
+  return false;
 }
 
-arma::cx_mat Boys::cost_der(const arma::cx_mat & W) {
-  if(W.n_rows != W.n_cols) {
-    ERROR_INFO();
-    throw std::runtime_error("Matrix is not square!\n");
-  }
-
-  if(W.n_rows != rsq.n_rows) {
-    ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
-  }
-
-  // Returned matrix
-  arma::cx_mat Bder(W.n_cols,W.n_cols);
-
-  // r^2 terms
-  for(size_t b=0;b<W.n_cols;b++)
-    for(size_t a=0;a<W.n_cols;a++)
-      Bder(a,b)=arma::as_scalar(rsq.row(a)*W.col(b));
-
-  // r terms
-  arma::cx_mat rxw=rx*W;
-  arma::cx_mat ryw=ry*W;
-  arma::cx_mat rzw=rz*W;
-
-
-  for(size_t b=0;b<W.n_cols;b++) {
-    std::complex<double> xp=arma::as_scalar(arma::trans(W.col(b))*rxw.col(b));
-    std::complex<double> yp=arma::as_scalar(arma::trans(W.col(b))*ryw.col(b));
-    std::complex<double> zp=arma::as_scalar(arma::trans(W.col(b))*rzw.col(b));
-
-    for(size_t a=0;a<W.n_cols;a++) {
-      std::complex<double> dx=rxw(a,b);
-      std::complex<double> dy=ryw(a,b);
-      std::complex<double> dz=rzw(a,b);
-
-      Bder(a,b)-=2.0*(xp*dx + yp*dy + zp*dz);
-    }
-  }
-
-  return Bder;
+double Brockett::cost_func(const arma::cx_mat & W) {
+  return std::real(arma::trace(arma::trans(W)*sigma*W*Nmat));
 }
 
-void Boys::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
+arma::cx_mat Brockett::cost_der(const arma::cx_mat & W) {
+  return sigma*W*Nmat;
+}
+
+void Brockett::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
   f=cost_func(W);
   der=cost_der(W);
 }
 
-PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0.0,true,verb) {
-  solver=solverp;
-  dft=dftp;
-  grid=gridp;
+void Brockett::print_progress(size_t k) const {
+  printf("%4i % e % e % e % e\n",(int) k, J, bracket(G,G), diag, unit);
+
+  fprintf(log,"%4i % e % e % e % e\n",(int) k, J, bracket(G,G), diag, unit);
+  fflush(log);
 }
 
-PZSIC::~PZSIC() {
-}
+double Brockett::diagonality(const arma::cx_mat & W) const {
+  arma::cx_mat WSW=arma::trans(W)*sigma*W;
 
-void PZSIC::set(const rscf_t & solp, double occ, double pz) {
-  sol=solp;
-  occnum=occ;
-  pzcor=pz;
-}
+  double off=0.0;
+  double dg=0.0;
 
-double PZSIC::cost_func(const arma::cx_mat & W) {
-  // Evaluate SIC energy.
+  for(size_t i=0;i<WSW.n_cols;i++)
+    dg+=std::norm(WSW(i,i));
 
-  arma::cx_mat der;
-  double ESIC;
-  cost_func_der(W,ESIC,der);
-  return ESIC;
-}
-
-arma::cx_mat PZSIC::cost_der(const arma::cx_mat & W) {
-
-  arma::cx_mat der;
-  double ESIC;
-  cost_func_der(W,ESIC,der);
-  return der;
-}
-
-void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
-  if(W.n_rows != W.n_cols) {
-    ERROR_INFO();
-    throw std::runtime_error("Matrix is not square!\n");
+  for(size_t i=0;i<WSW.n_cols;i++) {
+    for(size_t j=0;j<i;j++)
+      off+=std::norm(WSW(i,j));
+    for(size_t j=i+1;j<WSW.n_cols;j++)
+      off+=std::norm(WSW(i,j));
   }
 
-  if(W.n_rows != sol.C.n_cols) {
-    ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
-  }
-
-  // Get transformed orbitals
-  arma::cx_mat Ctilde=sol.C*W;
-
-  // Compute orbital-dependent Fock matrices
-  //  solver->PZSIC_Fock(Forb,Eorb,Ctilde,occnum,dft,*grid);
-
-  // and the total SIC contribution
-  HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
-  for(size_t io=0;io<Ctilde.n_cols;io++) {
-    arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
-    
-    HSIC+=Forb[io]*Pio*(solver->get_S());
-  }
-  
-  // SI energy is
-  f=arma::sum(Eorb);
-
-  // Derivative is
-  der.zeros(Ctilde.n_cols,Ctilde.n_cols);
-  for(size_t io=0;io<Ctilde.n_cols;io++)
-    for(size_t jo=0;jo<Ctilde.n_cols;jo++)
-      der(io,jo)=arma::as_scalar(arma::trans(sol.C.col(io))*Forb[jo]*Ctilde.col(jo));
-
-  // Kappa is
-  kappa.zeros(Ctilde.n_cols,Ctilde.n_cols);
-  for(size_t io=0;io<Ctilde.n_cols;io++)
-    for(size_t jo=0;jo<Ctilde.n_cols;jo++)
-      kappa(io,jo)=arma::as_scalar(arma::trans(Ctilde.col(io))*(Forb[jo]-Forb[io])*Ctilde.col(jo));
+  return 10*log10(off/dg);
 }
 
-void PZSIC::print_progress(size_t k) const {
-  double R, K;
-  get_rk(R,K);
+double Brockett::unitarity(const arma::cx_mat & W) const {
+  arma::cx_mat U=W*arma::trans(W);
+  arma::cx_mat eye(W);
+  eye.eye();
   
-  fprintf(stderr,"\t%4i\t%e\t% e",(int) k,K/R,J);
-  printf("\t%4i\t%e\t% e",(int) k,K/R,J);
-  if(k>1) {
-    fprintf(stderr,"\t% e", J-oldJ);
-    printf("\t% e", J-oldJ);
-  } else {
-    fprintf(stderr,"\t%13s","");
-    printf("\t%13s","");
-  }
-  
-  fflush(stdout);
-  fflush(stderr);
+  double norm=arma::norm(U-eye,"fro");
+  return 10*log10(norm);
 }
 
-void PZSIC::get_rk(double & R, double & K) const {
-  // Occupation numbers
-  std::vector<double> occs;
-  occs.assign(sol.C.n_cols,occnum);
-
-  // Compute SIC density
-  rscf_t sic(sol);
-  sic.H-=pzcor*HSIC;
-  diagonalize(solver->get_S(),solver->get_Sinvh(),sic);
-
-  // Difference from self-consistency is
-  R=rms_norm(sic.P-sol.P);
-  // Difference from Pedersen condition is
-  K=rms_cnorm(kappa);
-}
-
-bool PZSIC::converged() const {
-  double R, K;
-  get_rk(R,K);
-  
-  if(K<0.1*R)
-    // Converged
-    return true;
-  else
-    // Not converged
-    return false;
-}

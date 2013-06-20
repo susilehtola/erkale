@@ -112,9 +112,9 @@ template <class T> bool abscomp(const std::complex<T> & a, const std::complex<T>
 std::vector<double> spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, const std::vector<double> & x);
 
 /// Get random matrix
-arma::mat randu_mat(size_t N, unsigned long int seed=0);
+arma::mat randu_mat(size_t M, size_t N, unsigned long int seed=0);
 /// Get random matrix
-arma::mat randn_mat(size_t N, unsigned long int seed=0);
+arma::mat randn_mat(size_t M, size_t N, unsigned long int seed=0);
 
 /// Get complex unitary matrix of size N
 arma::cx_mat complex_unitary(size_t N, unsigned long int seed=0);

@@ -2,8 +2,6 @@
 #define ERKALE_UNITARY
 
 #include "global.h"
-#include "basis.h"
-#include "scf.h"
 #include <armadillo>
 
 enum unitmethod {
@@ -13,6 +11,15 @@ enum unitmethod {
   POLY_FDF,
   /// Armijo method
   ARMIJO
+};
+
+enum unitacc {
+  /// Steepest descent
+  SD,
+  /// Polak-Ribière conjugate gradients
+  CGPR,
+  /// Fletcher-Reeves conjugate gradients
+  CGFR
 };
 
 /// Unitary optimization worker
@@ -35,8 +42,8 @@ class Unitary {
   double J;
   /// Old value
   double oldJ;
-  /// G matrices
-  std::vector<arma::cx_mat> G;
+  /// G matrix
+  arma::cx_mat G;
   /// H matrix
   arma::cx_mat H;
 
@@ -48,7 +55,7 @@ class Unitary {
   double Tmu;
 
   /// Check convergence
-  virtual bool converged() const;
+  virtual bool converged(const arma::cx_mat & W);
   /// Print progress
   virtual void print_progress(size_t k) const;
 
@@ -66,6 +73,9 @@ class Unitary {
   double polynomial_step_df(const arma::cx_mat & W);
   /// Polynomial step (fit function and derivative), return step length
   double polynomial_step_fdf(const arma::cx_mat & W);
+
+  /// Compute the bracket product
+  double bracket(const arma::cx_mat & X, const arma::cx_mat & Y) const;
 
  public:
   /// Constructor
@@ -85,80 +95,34 @@ class Unitary {
   void set_poly(int n);
 
   /// Unitary optimization
-  double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF);
+  double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
 };
 
+/// Brockett
+class Brockett : public Unitary {
+  /// Sigma matrix
+  arma::cx_mat sigma;
+  /// N matrix
+  arma::mat Nmat;
 
-/// Boys localization
-class Boys : public Unitary {
-  /// R^2 matrix
-  arma::mat rsq;
-  /// r_x matrix
-  arma::mat rx;
-  /// r_y matrix
-  arma::mat ry;
-  /// r_z matrix
-  arma::mat rz;
+  /// Unitarity and diagonality criteria
+  double unit, diag;
 
-
- public:
-  Boys(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
-  ~Boys();
-
-  /// Evaluate cost function
-  double cost_func(const arma::cx_mat & W);
-  /// Evaluate derivative of cost function
-  arma::cx_mat cost_der(const arma::cx_mat & W);
-  /// Evaluate cost function and its derivative
-  void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
-};
-
-
-/// Perdew-Zunger self-interaction correction
-class PZSIC : public Unitary {
-  /// SCF object for constructing Fock matrix
-  SCF * solver;
-  /// Settings for DFT calculation
-  dft_t dft;
-  /// XC grid
-  DFTGrid * grid;
-
-  /// Solution
-  rscf_t sol;
-  /// Occupation number
-  double occnum;
-  /// Coefficient for PZ-SIC
-  double pzcor;
-
-  /// Orbital Fock matrices
-  std::vector<arma::mat> Forb;
-  /// Orbital SIC energies
-  arma::vec Eorb;
-  /// Kappa matrix
-  arma::cx_mat kappa;
-
-  /// SIC Fock operator
-  arma::mat HSIC;
-
-  /// Check convergence
-  bool converged();
-
-  /// Calculate R and K
-  void get_rk(double & R, double & K) const;
-
+  /// Log file
+  FILE *log;
   /// Print progress
   void print_progress(size_t k) const;
+
   /// Check convergence
-  bool converged() const;
+  bool converged(const arma::cx_mat & W);
+  /// Compute diagonality criterion
+  double diagonality(const arma::cx_mat & W) const;
+  /// Compute unitarity criterion
+  double unitarity(const arma::cx_mat & W) const;
 
  public:
-  /// Constructor
-  PZSIC(SCF *solver, dft_t dft, DFTGrid * grid, bool verbose);
-  /// Destructor
-  ~PZSIC();
-
-  /// Set orbitals
-  void set(const rscf_t & ref, double occ, double pzcor);
+  Brockett(size_t N, unsigned long int seed=0);
+  ~Brockett();
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
@@ -167,7 +131,6 @@ class PZSIC : public Unitary {
   /// Evaluate cost function and its derivative
   void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
 };
-
 
 
 #endif

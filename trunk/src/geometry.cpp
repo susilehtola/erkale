@@ -57,15 +57,15 @@ typedef struct {
 
 enum minimizer {
   // Fletcher-Reeves conjugate gradients
-  CGFR,
+  gCGFR,
   // Polak-Ribiere conjugate gradient
-  CGPR,
+  gCGPR,
   // Broyden-Fletcher-Goldfarb-Shanno
-  BFGS,
+  gBFGS,
   // Broyden-Fletcher-Goldfarb-Shanno, second version
-  BFGS2,
+  gBFGS2,
   // Steepest descent
-  SD
+  gSD
 };
 
 // Convergence criteria
@@ -523,15 +523,15 @@ int main(int argc, char **argv) {
   enum minimizer alg;
   std::string method=set.get_string("Optimizer");
   if(stricmp(method,"CGFR")==0)
-    alg=CGFR;
+    alg=gCGFR;
   else if(stricmp(method,"CGPR")==0)
-    alg=CGPR;
+    alg=gCGPR;
   else if(stricmp(method,"BFGS")==0)
-    alg=BFGS;
+    alg=gBFGS;
   else if(stricmp(method,"BFGS2")==0)
-    alg=BFGS2;
+    alg=gBFGS2;
   else if(stricmp(method,"SD")==0)
-    alg=SD;
+    alg=gSD;
   else {
     ERROR_INFO();
     throw std::runtime_error("Unknown optimization method.\n");
@@ -624,19 +624,19 @@ int main(int argc, char **argv) {
   minimizer.fdf = calc_Ef;
   minimizer.params = (void *) &pars;
 
-  if(alg==CGFR) {
+  if(alg==gCGFR) {
     T = gsl_multimin_fdfminimizer_conjugate_fr;
     if(verbose) printf("Using Fletcher-Reeves conjugate gradients.\n");
-  } else if(alg==CGPR) {
+  } else if(alg==gCGPR) {
     T = gsl_multimin_fdfminimizer_conjugate_pr;
     if(verbose) printf("Using Polak-Ribière conjugate gradients.\n");
-  } else if(alg==BFGS) {
+  } else if(alg==gBFGS) {
     T = gsl_multimin_fdfminimizer_vector_bfgs;
     if(verbose) printf("Using the BFGS minimizer.\n");
-  } else if(alg==BFGS2) {
+  } else if(alg==gBFGS2) {
     T = gsl_multimin_fdfminimizer_vector_bfgs2;
     if(verbose) printf("Using the BFGS2 minimizer.\n");
-  } else if(alg==SD) {
+  } else if(alg==gSD) {
     T = gsl_multimin_fdfminimizer_steepest_descent;
     if(verbose) printf("Using the steepest descent minimizer.\n");
   } else {

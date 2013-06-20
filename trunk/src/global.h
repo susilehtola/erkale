@@ -69,6 +69,7 @@
 
 // Disable bounds checking in Armadillo.
 #define ARMA_NO_DEBUG
+#include <armadillo>
 
 // Ångström in atomic units
 #define ANGSTROMINBOHR 1.8897261
@@ -112,5 +113,6 @@
 	 "it under the terms of the GNU General Public License as published by\n", \
 	 "the Free Software Foundation; either version 2 of the License, or\n", \
 	 "(at your option) any later version.\n")
+
 
 #endif
