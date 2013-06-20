@@ -104,8 +104,8 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     } else {
 
       double gamma=0.0;
-      if(acc==SD) {
-	// Steepest descent
+      if(acc==SDSA) {
+	// Steepest descent / steepest ascent
 	gamma=0.0;
       } else if(acc==CGPR) {
 	// Compute Polak-Ribière coefficient

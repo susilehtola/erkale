@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
   set.add_string("Localization","Localization method: BF, PM, ER","BF");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
   set.add_string("Logfile","File to store standard output in","erkale_loc.log");
-  set.add_string("Accelerator","Accelerator to use: SD, CGPR, CGFR","CGPR");
+  set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR","CGPR");
   set.add_string("LineSearch","Line search to use: poly_df, poly_fdf, armijo","poly_df");
   set.parse(argv[1]);
   set.print();
@@ -162,8 +162,8 @@ int main(int argc, char **argv) {
   // Determine accelerator
   enum unitacc acc;
   std::string accs=set.get_string("Accelerator");
-  if(stricmp(accs,"SD")==0)
-    acc=SD;
+  if(stricmp(accs,"SDSA")==0)
+    acc=SDSA;
   else if(stricmp(accs,"CGPR")==0)
     acc=CGPR;
   else if(stricmp(accs,"CGFR")==0)

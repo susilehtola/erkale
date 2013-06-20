@@ -14,8 +14,8 @@ enum unitmethod {
 };
 
 enum unitacc {
-  /// Steepest descent
-  SD,
+  /// Steepest descent / steepest ascent
+  SDSA,
   /// Polak-Ribière conjugate gradients
   CGPR,
   /// Fletcher-Reeves conjugate gradients
