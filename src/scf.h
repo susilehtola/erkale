@@ -16,10 +16,10 @@
 
 
 
-#include "global.h"
-
 #ifndef ERKALE_SCF
 #define ERKALE_SCF
+
+#include "global.h"
 
 #include <armadillo>
 #include <vector>
@@ -93,6 +93,7 @@ typedef struct {
   double E;
 } energy_t;
 
+
 /// Restricted solver info
 typedef struct {
   /// Orbitals
@@ -136,6 +137,7 @@ typedef struct {
   /// Energy information
   energy_t en;
 } uscf_t;
+
 
 /// Possible guess types
 enum guess_t {
@@ -448,16 +450,106 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 /// Convert force vector to matrix
 arma::mat interpret_force(const arma::vec & f);
 
-/// Helper for PZ-SIC: localize occupied orbitals. Initial value of measure is taken as the convergence threshold
-arma::cx_mat localize(const BasisSet & basis, const arma::mat & C, double & measure, bool complex=true, long unsigned int seed=0, bool verbose=true);
-/// Helper for PZ-SIC: optimize U. Initial value of measure is taken as the convergence threshold
-void localize(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose);
+#include "unitary.h"
 
-/// Helper for above - calculate B with given rotation matrix
-double localize_B(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq);
-/// Helper for above - calculate derivative of B with respect to rotation matrix
-arma::cx_mat localize_Bder(const arma::cx_mat & M, const std::vector<arma::mat> & r, const arma::mat & rsq);
+/// Boys localization
+class Boys : public Unitary {
+  /// R^2 matrix
+  arma::mat rsq;
+  /// r_x matrix
+  arma::mat rx;
+  /// r_y matrix
+  arma::mat ry;
+  /// r_z matrix
+  arma::mat rz;
 
+
+ public:
+  Boys(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
+  ~Boys();
+
+  /// Evaluate cost function
+  double cost_func(const arma::cx_mat & W);
+  /// Evaluate derivative of cost function
+  arma::cx_mat cost_der(const arma::cx_mat & W);
+  /// Evaluate cost function and its derivative
+  void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
+};
+
+/// Pipek-Mezey localization
+class Pipek : public Unitary {
+  /// Charge matrix in MO basis
+  arma::cube Q;
+
+ public:
+  Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
+  ~Pipek();
+
+  /// Evaluate cost function
+  double cost_func(const arma::cx_mat & W);
+  /// Evaluate derivative of cost function
+  arma::cx_mat cost_der(const arma::cx_mat & W);
+  /// Evaluate cost function and its derivative
+  void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
+};
+
+
+/// Perdew-Zunger self-interaction correction
+class PZSIC : public Unitary {
+  /// SCF object for constructing Fock matrix
+  SCF * solver;
+  /// Settings for DFT calculation
+  dft_t dft;
+  /// XC grid
+  DFTGrid * grid;
+
+  /// Solution
+  rscf_t sol;
+  /// Occupation number
+  double occnum;
+  /// Coefficient for PZ-SIC
+  double pzcor;
+
+  /// Orbital Fock matrices
+  std::vector<arma::mat> Forb;
+  /// Orbital SIC energies
+  arma::vec Eorb;
+  /// Kappa matrix
+  arma::cx_mat kappa;
+
+  /// SIC Fock operator
+  arma::mat HSIC;
+
+  /// Calculate R and K
+  void get_rk(double & R, double & K) const;
+
+  /// Print progress
+  void print_progress(size_t k) const;
+  /// Check convergence
+  bool converged(const arma::cx_mat & W);
+
+ public:
+  /// Constructor
+  PZSIC(SCF *solver, dft_t dft, DFTGrid * grid, bool verbose);
+  /// Destructor
+  ~PZSIC();
+
+  /// Set orbitals
+  void set(const rscf_t & ref, double occ, double pzcor);
+
+  /// Evaluate cost function
+  double cost_func(const arma::cx_mat & W);
+  /// Evaluate derivative of cost function
+  arma::cx_mat cost_der(const arma::cx_mat & W);
+  /// Evaluate cost function and its derivative
+  void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
+};
+
+
+/// Boys localization. Initial value of measure is taken as the convergence threshold
+void boys_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR);
+/// Pipek-Mezey localization. Initial value of measure is taken as the convergence threshold
+void pipek_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR);
 
 
 #include "checkpoint.h"

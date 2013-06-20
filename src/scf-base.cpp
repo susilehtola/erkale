@@ -1528,23 +1528,25 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-arma::cx_mat localize(const BasisSet & basis, const arma::mat & C, double & measure, bool cplx, long unsigned int seed, bool verbose) {
-  arma::cx_mat U(C.n_cols,C.n_cols);
-  if(cplx) {
-    // Initialize with a complex unitary matrix
-    U=complex_unitary(C.n_cols,seed);
-  } else {
-    // Initialize with real unit matrix
-    U.eye();
+void boys_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod met, enum unitacc acc) {
+  Timer t;
+
+  // Threshold
+  double thr=1e-6;
+  if(measure>0.0)
+    thr=measure;
+
+  // Worker
+  Boys worker(basis,C,thr,verbose);
+  measure=worker.optimize(U,met,acc);
+
+  if(verbose) {
+    printf("Localization done in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
   }
-
-  // Run localization
-  localize(basis,C,measure,U,verbose);
-
-  return U;
 }
 
-void localize(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose) {
+void pipek_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod met, enum unitacc acc) {
   Timer t;
 
   if(verbose)
@@ -1556,12 +1558,8 @@ void localize(const BasisSet & basis, const arma::mat & C, double & measure, arm
     thr=measure;
 
   // Worker
-  Boys worker(basis,C,thr,verbose);
-
-  // Use Armijo method
-  //  measure=worker.optimize(U,ARMIJO);
-  // Use polynomial method
-  measure=worker.optimize(U,POLY_DF);
+  Pipek worker(basis,C,thr,verbose);
+  measure=worker.optimize(U,met,acc);
 
   if(verbose) {
     printf("Localization done in %s.\n",t.elapsed().c_str());
@@ -1585,4 +1583,328 @@ arma::mat interpret_force(const arma::vec & f) {
     retf(i,3)=sqrt( pow(retf(i,0),2) + pow(retf(i,1),2) + pow(retf(i,2),2) );
 
   return retf;
+}
+
+Boys::Boys(const BasisSet & basis, const arma::mat & C, double thr, bool ver) : Unitary(4,thr,false,ver) {
+  // Get R^2 matrix
+  std::vector<arma::mat> momstack=basis.moment(2);
+  rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
+
+  // Get r matrices
+  std::vector<arma::mat> rmat=basis.moment(1);
+
+  // Convert matrices to MO basis
+  rsq=arma::trans(C)*rsq*C;
+  rx=arma::trans(C)*rmat[0]*C;
+  ry=arma::trans(C)*rmat[1]*C;
+  rz=arma::trans(C)*rmat[2]*C;
+
+  rsq.save("rsq.dat",arma::raw_ascii);
+  rx.save("rx.dat",arma::raw_ascii);
+  ry.save("ry.dat",arma::raw_ascii);
+  rz.save("rz.dat",arma::raw_ascii);
+}
+
+Boys::~Boys() {
+}
+
+double Boys::cost_func(const arma::cx_mat & W) {
+  if(W.n_rows != W.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+
+  if(W.n_rows != rsq.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix does not match size of problem!\n");
+  }
+
+  double B=0;
+
+  // <i|r^2|i> terms
+  arma::cx_mat rsm=rsq*W;
+  for(size_t io=0;io<W.n_cols;io++)
+    B+=std::real(arma::as_scalar(arma::trans(W.col(io))*rsm.col(io)));
+
+  // <i|r|i>^2 terms
+  arma::cx_mat rxw=rx*W;
+  arma::cx_mat ryw=ry*W;
+  arma::cx_mat rzw=rz*W;
+
+  for(size_t io=0;io<W.n_cols;io++) {
+    double xp=std::real(arma::as_scalar(arma::trans(W.col(io))*rxw.col(io)));
+    double yp=std::real(arma::as_scalar(arma::trans(W.col(io))*ryw.col(io)));
+    double zp=std::real(arma::as_scalar(arma::trans(W.col(io))*rzw.col(io)));
+    B-=xp*xp + yp*yp + zp*zp;
+  }
+
+  return B;
+}
+
+arma::cx_mat Boys::cost_der(const arma::cx_mat & W) {
+  if(W.n_rows != W.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+
+  if(W.n_rows != rsq.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix does not match size of problem!\n");
+  }
+
+  // Returned matrix
+  arma::cx_mat Bder(W.n_cols,W.n_cols);
+
+  // r^2 terms
+  for(size_t b=0;b<W.n_cols;b++)
+    for(size_t a=0;a<W.n_cols;a++)
+      Bder(a,b)=arma::as_scalar(rsq.row(a)*W.col(b));
+
+  // r terms
+  arma::cx_mat rxw=rx*W;
+  arma::cx_mat ryw=ry*W;
+  arma::cx_mat rzw=rz*W;
+
+
+  for(size_t b=0;b<W.n_cols;b++) {
+    std::complex<double> xp=arma::as_scalar(arma::trans(W.col(b))*rxw.col(b));
+    std::complex<double> yp=arma::as_scalar(arma::trans(W.col(b))*ryw.col(b));
+    std::complex<double> zp=arma::as_scalar(arma::trans(W.col(b))*rzw.col(b));
+
+    for(size_t a=0;a<W.n_cols;a++) {
+      std::complex<double> dx=rxw(a,b);
+      std::complex<double> dy=ryw(a,b);
+      std::complex<double> dz=rzw(a,b);
+
+      Bder(a,b)-=2.0*(xp*dx + yp*dy + zp*dz);
+    }
+  }
+
+  return Bder;
+}
+
+void Boys::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
+  f=cost_func(W);
+  der=cost_der(W);
+}
+
+Pipek::Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool ver) : Unitary(4,thr,true,ver) {
+  // Get overlap matrix
+  arma::mat S=basis.overlap();
+  // Helper matrix
+  arma::mat SC=S*C;
+
+  // Initialize charge matrix
+  Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
+
+  // Loop over atoms
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Get shells on nucleus
+    std::vector<GaussianShell> shells=basis.get_funcs(inuc);
+
+    // Increment charge
+    for(size_t io=0;io<C.n_cols;io++)
+      for(size_t jo=0;jo<C.n_cols;jo++)
+	for(size_t is=0;is<shells.size();is++)
+	  for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
+	    Q(io,jo,inuc)+=C(fi,io)*SC(fi,jo);
+  }
+
+  // Compute Mulliken charges
+  arma::vec qmul(Q.n_slices);
+  qmul.zeros();
+  for(size_t i=0;i<Q.n_slices;i++)
+    qmul(i)=-2*arma::trace(Q.slice(i));
+  for(size_t i=0;i<Q.n_slices;i++) {
+    nucleus_t nuc=basis.get_nucleus(i);
+    if(!nuc.bsse)
+      qmul(i)+=nuc.Z;
+  }
+
+  printf("\nMulliken charges\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), qmul(i));
+  printf("Sum of charges is %f.\n",sum(qmul));
+}
+
+Pipek::~Pipek() {
+}
+
+double Pipek::cost_func(const arma::cx_mat & W) {
+  if(W.n_rows != W.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+
+  if(W.n_rows != Q.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix does not match size of problem!\n");
+  }
+
+  double Dinv=0;
+
+  // Compute sum
+  for(size_t iat=0;iat<Q.n_slices;iat++) {
+    // Helper matrix
+    arma::cx_mat qw=Q.slice(iat)*W;
+    for(size_t io=0;io<W.n_cols;io++)
+      Dinv+=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
+  }
+
+  return Dinv;
+}
+
+arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
+  if(W.n_rows != W.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+
+  if(W.n_rows != Q.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix does not match size of problem!\n");
+  }
+  
+  // Returned matrix
+  arma::cx_mat Dder(W.n_cols,W.n_cols);
+  
+  // Compute sum
+  for(size_t iat=0;iat<Q.n_slices;iat++) {
+    // Helper matrix
+    arma::cx_mat qw=Q.slice(iat)*W;
+    
+    for(size_t b=0;b<W.n_cols;b++) {
+      std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+      
+      for(size_t a=0;a<W.n_cols;a++)
+	Dder(a,b)=2.0*qwp*qw(a,b);
+    }
+  }
+    
+  return Dder;
+}
+
+void Pipek::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
+  f=cost_func(W);
+  der=cost_der(W);
+}
+
+PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0.0,true,verb) {
+  solver=solverp;
+  dft=dftp;
+  grid=gridp;
+}
+
+PZSIC::~PZSIC() {
+}
+
+void PZSIC::set(const rscf_t & solp, double occ, double pz) {
+  sol=solp;
+  occnum=occ;
+  pzcor=pz;
+}
+
+double PZSIC::cost_func(const arma::cx_mat & W) {
+  // Evaluate SIC energy.
+
+  arma::cx_mat der;
+  double ESIC;
+  cost_func_der(W,ESIC,der);
+  return ESIC;
+}
+
+arma::cx_mat PZSIC::cost_der(const arma::cx_mat & W) {
+
+  arma::cx_mat der;
+  double ESIC;
+  cost_func_der(W,ESIC,der);
+  return der;
+}
+
+void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
+  if(W.n_rows != W.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+
+  if(W.n_rows != sol.C.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix does not match size of problem!\n");
+  }
+
+  // Get transformed orbitals
+  arma::cx_mat Ctilde=sol.C*W;
+
+  // Compute orbital-dependent Fock matrices
+  //  solver->PZSIC_Fock(Forb,Eorb,Ctilde,occnum,dft,*grid);
+
+  // and the total SIC contribution
+  HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
+  for(size_t io=0;io<Ctilde.n_cols;io++) {
+    arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+    
+    HSIC+=Forb[io]*Pio*(solver->get_S());
+  }
+  
+  // SI energy is
+  f=arma::sum(Eorb);
+
+  // Derivative is
+  der.zeros(Ctilde.n_cols,Ctilde.n_cols);
+  for(size_t io=0;io<Ctilde.n_cols;io++)
+    for(size_t jo=0;jo<Ctilde.n_cols;jo++)
+      der(io,jo)=arma::as_scalar(arma::trans(sol.C.col(io))*Forb[jo]*Ctilde.col(jo));
+
+  // Kappa is
+  kappa.zeros(Ctilde.n_cols,Ctilde.n_cols);
+  for(size_t io=0;io<Ctilde.n_cols;io++)
+    for(size_t jo=0;jo<Ctilde.n_cols;jo++)
+      kappa(io,jo)=arma::as_scalar(arma::trans(Ctilde.col(io))*(Forb[jo]-Forb[io])*Ctilde.col(jo));
+}
+
+void PZSIC::print_progress(size_t k) const {
+  double R, K;
+  get_rk(R,K);
+  
+  fprintf(stderr,"\t%4i\t%e\t% e",(int) k,K/R,J);
+  printf("\t%4i\t%e\t% e",(int) k,K/R,J);
+  if(k>1) {
+    fprintf(stderr,"\t% e", J-oldJ);
+    printf("\t% e", J-oldJ);
+  } else {
+    fprintf(stderr,"\t%13s","");
+    printf("\t%13s","");
+  }
+  
+  fflush(stdout);
+  fflush(stderr);
+}
+
+void PZSIC::get_rk(double & R, double & K) const {
+  // Occupation numbers
+  std::vector<double> occs;
+  occs.assign(sol.C.n_cols,occnum);
+
+  // Compute SIC density
+  rscf_t sic(sol);
+  sic.H-=pzcor*HSIC;
+  diagonalize(solver->get_S(),solver->get_Sinvh(),sic);
+
+  // Difference from self-consistency is
+  R=rms_norm(sic.P-sol.P);
+  // Difference from Pedersen condition is
+  K=rms_cnorm(kappa);
+}
+
+bool PZSIC::converged(const arma::cx_mat & W) {
+  double R, K;
+  get_rk(R,K);
+  (void) W;
+  
+  if(K<0.1*R)
+    // Converged
+    return true;
+  else
+    // Not converged
+    return false;
 }
