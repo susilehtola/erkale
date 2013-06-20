@@ -35,8 +35,10 @@ class Unitary {
   /// Convergence threshold
   double eps;
 
-  /// Amount of points to use in polynomial search
-  int npoly;
+  /// Amount of points to use in df polynomial search
+  int npoly_df;
+  /// Amount of points to use in fdf polynomial search
+  int npoly_fdf;
 
   /// Value of cost function
   double J;
@@ -76,6 +78,12 @@ class Unitary {
 
   /// Compute the bracket product
   double bracket(const arma::cx_mat & X, const arma::cx_mat & Y) const;
+  /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
+  arma::vec solve_roots(const arma::vec & v) const;
+  /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
+  arma::cx_vec solve_roots_cplx(const arma::vec & v) const;
+  /// Get smallest positive root
+  double smallest_positive(const arma::vec & v) const;
 
  public:
   /// Constructor
@@ -92,7 +100,7 @@ class Unitary {
   virtual void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)=0;
 
   /// Set polynomial search options
-  void set_poly(int n);
+  void set_poly(int n_df, int n_fdf);
 
   /// Unitary optimization
   double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
