@@ -68,8 +68,6 @@ class Unitary {
   virtual void print_progress(size_t k) const;
   /// Print time
   virtual void print_time(const Timer & t) const;
-  /// Print chosen step length
-  virtual void print_step(enum unitmethod & met, double step) const;
 
   /// Check that the matrix is unitary
   void check_unitary(const arma::cx_mat & W) const;

@@ -148,52 +148,50 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
 
     // Run calculation
     calculate(atbas,set);
-    
+
+    // Checkpoint
+    Checkpoint chkpt(tmpname,false);
+
     // Re-get shells, in new indexing.
     shells=atbas.get_funcs(0);
-    
+
     // Load energies and density matrix
     arma::vec atEa;
     arma::mat atP;
 
-    {
-      // Checkpoint
-      Checkpoint chkpt(tmpname,false);
-      
-      chkpt.read("Ea",atEa);
-      chkpt.read("P",atP);
+    chkpt.read("Ea",atEa);
+    chkpt.read("P",atP);
+
+    // Store approximate energies
+    for(size_t iid=0;iid<idnuc[i].size();iid++)
+      for(size_t io=0;io<atEa.size();io++)
+	orbE.push_back(atEa(io));
+
+    // Loop over shells
+    for(size_t ish=0;ish<shells.size();ish++)
+      for(size_t jsh=0;jsh<shells.size();jsh++) {
+
+	// Loop over identical nuclei
+	for(size_t iid=0;iid<idnuc[i].size();iid++) {
+	  // Get shells on nucleus
+	  std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
+
+	  // Store density
+	  P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=atP.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
+	}
+      }
+
+    if(verbose) {
+      printf(" (%s)\n",tsol.elapsed().c_str());
+      fflush(stdout);
     }
 
     // Remove temporary file
     remove(tmpname);
     // Free memory
     free(tmpname);
-    
-    // Store approximate energies
-    for(size_t iid=0;iid<idnuc[i].size();iid++)
-      for(size_t io=0;io<atEa.size();io++)
-	orbE.push_back(atEa(io));
-    
-    // Loop over shells
-    for(size_t ish=0;ish<shells.size();ish++)
-      for(size_t jsh=0;jsh<shells.size();jsh++) {
-	
-	// Loop over identical nuclei
-	for(size_t iid=0;iid<idnuc[i].size();iid++) {
-	  // Get shells on nucleus
-	  std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
-	  
-	  // Store density
-	  P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=atP.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
-	}
-      }
-    
-    if(verbose) {
-      printf(" (%s)\n",tsol.elapsed().c_str());
-      fflush(stdout);
-    }
   }
-  
+
   Timer trest;
   if(verbose) {
     printf("Diagonalizing density matrix ... ");
