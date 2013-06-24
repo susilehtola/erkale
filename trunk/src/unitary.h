@@ -2,6 +2,7 @@
 #define ERKALE_UNITARY
 
 #include "global.h"
+#include "timer.h"
 #include <armadillo>
 
 enum unitmethod {
@@ -65,6 +66,8 @@ class Unitary {
   virtual bool converged(const arma::cx_mat & W);
   /// Print progress
   virtual void print_progress(size_t k) const;
+  /// Print time
+  virtual void print_time(const Timer & t) const;
 
   /// Check that the matrix is unitary
   void check_unitary(const arma::cx_mat & W) const;
@@ -109,6 +112,9 @@ class Unitary {
 
 /// Compute the bracket product
 double bracket(const arma::cx_mat & X, const arma::cx_mat & Y);
+
+/// Shift Fourier coefficients
+arma::cx_vec fourier_shift(const arma::cx_vec & v);
 
 /// Fit polynomial of wanted degree to derivative
 arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & dy, int deg=-1);

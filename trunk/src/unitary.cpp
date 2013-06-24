@@ -129,10 +129,8 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     if(bracket(G,G)<eps || converged(W)) {
       
       if(verbose) {
-	fprintf(stderr," %10.3f\n",t.get());
-	fflush(stderr);
-	
-	printf(" %s\nConverged.\n",t.elapsed().c_str());
+	print_time(t);
+	printf("Converged.\n");
 	fflush(stdout);
 	
 	// Print classification
@@ -142,8 +140,7 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
       break;
     } else if(k==maxiter) {
       if(verbose) {
-	fprintf(stderr," %10.3f\n",t.get());
-	fflush(stderr);
+	print_time(t);
 
 	printf(" %s\nNot converged.\n",t.elapsed().c_str());
 	fflush(stdout);
@@ -177,16 +174,16 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     double step;
     if(met==POLY_DF) {
       step=polynomial_step_df(W);
-      fprintf(stderr,"Polynomial_df  step %e (%e of Tmu)\n",step,step/Tmu);
+      //      fprintf(stderr,"Polynomial_df  step %e (%e of Tmu)\n",step,step/Tmu);
     } else if(met==POLY_FDF) {
       step=polynomial_step_fdf(W);
-      fprintf(stderr,"Polynomial_fdf step %e (%e of Tmu)\n",step,step/Tmu);
+      //      fprintf(stderr,"Polynomial_fdf step %e (%e of Tmu)\n",step,step/Tmu);
     } else if(met==FOURIER_DF) {
       step=fourier_step_df(W);
-      fprintf(stderr,"Fourier_df step %e (%e of Tmu)\n",step,step/Tmu);
+      //      fprintf(stderr,"Fourier_df step %e (%e of Tmu)\n",step,step/Tmu);
     } else if(met==ARMIJO) {
       step=armijo_step(W);
-      fprintf(stderr,"Armijo         step %e (%e of Tmu)\n",step,step/Tmu);
+      //      fprintf(stderr,"Armijo         step %e (%e of Tmu)\n",step,step/Tmu);
     } else throw std::runtime_error("Method not implemented.\n");
 
     // Check step size
@@ -199,11 +196,7 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     }
 
     if(verbose) {
-      fprintf(stderr," %10.3f\n",t.get());
-      fflush(stderr);
-
-      printf(" %s\n",t.elapsed().c_str());
-      fflush(stdout);
+      print_time(t);
     }
   }
 
@@ -212,6 +205,14 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
 
 void Unitary::print_progress(size_t k) const {
   printf("\t%4i\t% e\t% e\t%e ",(int) k,J,J-oldJ,bracket(G,G));
+  fflush(stdout);
+}
+
+void Unitary::print_time(const Timer & t) const {
+  fprintf(stderr," %10.3f\n",t.get());
+  fflush(stderr);
+  
+  printf(" %s\n",t.elapsed().c_str());
   fflush(stdout);
 }
 
@@ -381,13 +382,32 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
   return step;
 }
 
+arma::cx_vec fourier_shift(const arma::cx_vec & c) {
+  // Amount of elements
+  size_t N=c.n_elem;
+
+  // Midpoint is at at
+  size_t m=N/2;
+  if(N%2==1)
+    m++;
+
+  // Returned vector
+  arma::cx_vec ret(N);
+  ret.zeros();
+
+  // Low frequencies
+  ret.subvec(0,N-1-m)=c.subvec(m,N-1);
+  // High frequencies
+  ret.subvec(N-m,N-1)=c.subvec(0,m-1);
+
+  return ret;
+}
+
 double Unitary::fourier_step_df(const arma::cx_mat & W) {
   // Length of DFT interval
   double fourier_interval=fourier_periods*Tmu;
   // and of the transform. We want integer division here!
   int fourier_length=2*((fourier_samples*fourier_periods)/2)+1;
-
-  printf("\nFourier length is %i.\n",fourier_length);
 
   // Step length is
   double deltaTmu=fourier_interval/fourier_length;
@@ -424,15 +444,14 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
   for(int i=0;i<fourier_length;i++)
     windowed(i)=fp(i)*hannw(i);
 
-  arma::strans(windowed).print("Windowed derivative");
-
   // Fourier coefficients
   arma::cx_vec coeffs=arma::fft(windowed)/fourier_length;
-  arma::strans(coeffs).print("Fourier coefficients");
+
+  // Reorder coefficients
+  arma::cx_vec shiftc=fourier_shift(coeffs);
 
   // Find roots of polynomial
-  arma::cx_vec croots=solve_roots_cplx(coeffs);
-  arma::strans(croots).print("Roots of polynomial");
+  arma::cx_vec croots=solve_roots_cplx(shiftc);
 
   // Figure out roots on the unit circle
   double circletol=1e-2;
@@ -442,20 +461,14 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
       // Root is on the unit circle. Angle is
       double phi=std::imag(log(croots(i)));
 
-      printf("Root on unit circle: (% e,% e), corresponding to e^(% ei)\n",croots(i).real(),croots(i).imag(),phi);
-
       // Convert to the real length scale
       phi*=fourier_interval/(2*M_PI);
 
-      printf("angle in real length scale %e\n",phi);
-
       // Avoid aliases
       phi=fmod(phi,fourier_interval);
-      // and check for negative values
+      // and check for negative values (fmod can return negative values)
       if(phi<0.0)
 	phi+=fourier_interval;
-
-      printf("angle in real interval %e\n",phi);
 
       // Add to roots
       muval.push_back(phi);
@@ -508,7 +521,6 @@ arma::cx_mat companion_matrix(const arma::cx_vec & c) {
     ERROR_INFO();
     throw std::runtime_error("Coefficient of highest term vanishes!\n");
   }
-  arma::strans(c).print("Coefficients");
 
   arma::cx_mat companion(N,N);
   companion.zeros();
@@ -573,8 +585,6 @@ arma::vec solve_roots(const arma::vec & a) {
   // Sort roots
   roots=arma::sort(roots);
   
-  //  roots.print("Real roots");
-
   return roots;
 }
 
