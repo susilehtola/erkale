@@ -157,7 +157,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   Timer tinit;
 
   if(verbose) {
-    basis.print(true);
+    basis.print();
 
     printf("\nForming overlap matrix ... ");
     fflush(stdout);
@@ -465,10 +465,9 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       W.eye(nocc,nocc);
     else {
       // Initialize with a random unitary matrix.
-      //      W=complex_unitary(nocc);
-      W.eye(nocc,nocc);
+      W=complex_unitary(nocc);
 
-      if(localization && false) {
+      if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
 	double measure=10.0;
@@ -753,7 +752,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
     worker.cost_func(W);
   } else {
     //	Perform unitary optimization
-    worker.optimize(W,POLY_DF,CGPR);
+    worker.optimize(W);
   }
 
   // Get SIC energy and hamiltonian
@@ -1540,9 +1539,6 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       solver.RDFT(sol,occs,conv,dft);
     }
 
-    sol.C.save("C.dat",arma::raw_ascii);
-    (basis.overlap()).save("S.dat",arma::raw_ascii);
-
     // Do population analysis
     if(verbose)
       population_analysis(basis,sol.P);
@@ -2055,11 +2051,6 @@ Boys::Boys(const BasisSet & basis, const arma::mat & C, double thr, bool ver) : 
 Boys::~Boys() {
 }
 
-void Boys::print_step(enum unitmethod & met, double step) const {
-  (void) met;
-  (void) step;
-}
-
 double Boys::cost_func(const arma::cx_mat & W) {
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
@@ -2161,6 +2152,22 @@ Pipek::Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool ver) 
 	  for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
 	    Q(io,jo,inuc)+=C(fi,io)*SC(fi,jo);
   }
+
+  // Compute Mulliken charges
+  arma::vec qmul(Q.n_slices);
+  qmul.zeros();
+  for(size_t i=0;i<Q.n_slices;i++)
+    qmul(i)=-2*arma::trace(Q.slice(i));
+  for(size_t i=0;i<Q.n_slices;i++) {
+    nucleus_t nuc=basis.get_nucleus(i);
+    if(!nuc.bsse)
+      qmul(i)+=nuc.Z;
+  }
+
+  printf("\nMulliken charges\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), qmul(i));
+  printf("Sum of charges is %f.\n",sum(qmul));
 }
 
 Pipek::~Pipek() {
@@ -2289,14 +2296,12 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   for(size_t io=0;io<Ctilde.n_cols;io++)
     for(size_t jo=0;jo<Ctilde.n_cols;jo++)
       der(io,jo)=arma::as_scalar(arma::trans(sol.C.col(io))*Forb[jo]*Ctilde.col(jo));
-  der.print("der");
-  
+
   // Kappa is
   kappa.zeros(Ctilde.n_cols,Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
     for(size_t jo=0;jo<Ctilde.n_cols;jo++)
       kappa(io,jo)=arma::as_scalar(arma::trans(Ctilde.col(io))*(Forb[jo]-Forb[io])*Ctilde.col(jo));
-  kappa.print("kappa");
 }
 
 void PZSIC::print_progress(size_t k) const {
@@ -2304,22 +2309,16 @@ void PZSIC::print_progress(size_t k) const {
   get_rk(R,K);
   
   fprintf(stderr,"\t%4i\t%e\t% e",(int) k,K/R,J);
-  if(k>1)
+  printf("\t%4i\t%e\t% e",(int) k,K/R,J);
+  if(k>1) {
     fprintf(stderr,"\t% e", J-oldJ);
-  else
+    printf("\t% e", J-oldJ);
+  } else {
     fprintf(stderr,"\t%13s","");
-  fflush(stderr);
-
-  printf("\nSIC iteration %i\n",(int) k);
-  printf("E-SIC = % 16.8f, dE = % e, K/R = %e\n",J,J-oldJ,K/R);
+    printf("\t%13s","");
+  }
+  
   fflush(stdout);
-}
-
-void PZSIC::print_time(const Timer & t) const {
-  printf("Iteration done in %s.\n",t.elapsed().c_str());
-  fflush(stdout);
-
-  fprintf(stderr," %10.3f\n",t.get());
   fflush(stderr);
 }
 
@@ -2344,6 +2343,9 @@ bool PZSIC::converged(const arma::cx_mat & W) {
   get_rk(R,K);
   (void) W;
 
+  printf("\nR = %e, K = %e\n",R,K);
+  kappa.print("Kappa");
+  
   if(K<0.1*R)
     // Converged
     return true;
