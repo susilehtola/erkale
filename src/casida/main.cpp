@@ -306,6 +306,9 @@ int main(int argc, char **argv) {
     chkpt.read("E",E);
     chkpt.read("occs",occs);
 
+    // Check orthonormality
+    check_orth(C,basis.overlap(),false);
+
     if(set.get_bool("CasidaPol")) {
       // Half occupancy (1.0 instead of 2.0)
       std::vector<double> hocc(occs);
@@ -330,6 +333,10 @@ int main(int argc, char **argv) {
     chkpt.read("Eb",Eb);
     chkpt.read("occa",occa);
     chkpt.read("occb",occb);
+
+    // Check orthonormality
+    check_orth(Ca,basis.overlap(),false);
+    check_orth(Cb,basis.overlap(),false);
 
     cas=Casida(set,basis,Ea,Eb,Ca,Cb,Pa,Pb,occa,occb);
   }
