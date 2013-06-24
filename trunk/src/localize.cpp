@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
   set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
   set.add_string("Localization","Localization method: BF, PM, ER","BF");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
-  set.add_string("Logfile","File to store standard output in","erkale_loc.log");
+  set.add_string("Logfile","File to store standard output in","stdout");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR","CGPR");
   set.add_string("LineSearch","Line search to use: poly_df, poly_fdf, armijo","poly_df");
   set.parse(argv[1]);
@@ -208,6 +208,9 @@ int main(int argc, char **argv) {
     arma::mat C;
     chkpt.read("C",C);
 
+    // Check orthogonality
+    check_orth(C,basis.overlap(),false);
+
     // Occupation numbers
     std::vector<double> occs;
     chkpt.read("occs",occs);
@@ -222,6 +225,10 @@ int main(int argc, char **argv) {
     arma::mat Ca, Cb;
     chkpt.read("Ca",Ca);
     chkpt.read("Cb",Cb);
+
+    // Check orthogonality
+    check_orth(Ca,basis.overlap(),false);
+    check_orth(Cb,basis.overlap(),false);
 
     // Occupation numbers
     std::vector<double> occa, occb;
