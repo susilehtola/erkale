@@ -272,6 +272,99 @@ void check_sph_orthonorm(int lmax) {
     }
 }
 
+/// Test checkpoints
+void test_checkpoint() {
+  // Temporary file name
+  char *tmpfile=tempnam("./",".chk");
+
+  {
+    // Dummy checkpoint
+    Checkpoint chkpt(tmpfile,true);
+    
+    // Size of vectors and matrices
+    size_t N=5000, M=300;
+    
+    /* Vectors */
+    
+    // Random vector
+    arma::vec randvec=randu_mat(N,1);
+    chkpt.write("randvec",randvec);
+    
+    arma::vec randvec_load;
+    chkpt.read("randvec",randvec_load);
+    
+    double vecnorm=arma::norm(randvec-randvec_load,"fro")/N;
+    if(vecnorm>DBL_EPSILON) {
+      printf("Vector read/write norm %e.\n",vecnorm);
+      ERROR_INFO();
+      throw std::runtime_error("Error in vector read/write.\n");
+    }
+    
+    // Complex vector
+    arma::cx_vec crandvec=randu_mat(N,1)+std::complex<double>(0.0,1.0)*randu_mat(N,1);
+    chkpt.cwrite("crandvec",crandvec);
+    arma::cx_vec crandvec_load;
+    chkpt.cread("crandvec",crandvec_load);
+    
+    double cvecnorm=arma::norm(crandvec-crandvec_load,"fro")/N;
+    if(cvecnorm>DBL_EPSILON) {
+      printf("Complex vector read/write norm %e.\n",cvecnorm);
+      ERROR_INFO();
+      throw std::runtime_error("Error in complex vector read/write.\n");
+    }
+    
+    /* Matrices */
+    arma::mat randmat=randn_mat(N,M);
+    chkpt.write("randmat",randmat);
+    arma::mat randmat_load;
+    chkpt.read("randmat",randmat_load);
+
+    double matnorm=arma::norm(randmat-randmat_load,"fro")/(M*N);
+    if(matnorm>DBL_EPSILON) {
+      printf("Matrix read/write norm %e.\n",matnorm);
+      ERROR_INFO();
+      throw std::runtime_error("Error in matrix read/write.\n");
+    }
+
+  }
+
+  remove(tmpfile);
+  free(tmpfile);
+}
+
+
+/// Test checkpoints
+void test_checkpoint_basis(const BasisSet & bas) {
+  // Temporary file name
+  char *tmpfile=tempnam("./",".chk");
+
+  {
+    // Dummy checkpoint
+    Checkpoint chkpt(tmpfile,true);
+    
+    // Write basis
+    chkpt.write(bas);
+
+    // Read basis
+    BasisSet loadbas;
+    chkpt.read(loadbas);
+
+    // Get overlap matrices
+    arma::mat S=bas.overlap();
+    arma::mat Sload=loadbas.overlap();
+
+    double matnorm=rms_norm(S-Sload);
+    if(matnorm>DBL_EPSILON) {
+      printf("Basis set read-write error %e.\n",matnorm);
+      ERROR_INFO();
+      throw std::runtime_error("Error in basis set read/write.\n");
+    }
+  }
+
+  remove(tmpfile);
+  free(tmpfile);
+}
+
 
 /// Test restricted solution
 #ifdef COMPUTE_REFERENCE
@@ -291,6 +384,8 @@ void restr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basl
   BasisSet bas=construct_basis(at,baslib,set);
   // Check normalization of basis
   check_norm(bas);
+  // and checkpoints
+  test_checkpoint_basis(bas);
 
   // Temporary file name
   char *tmpfile=tempnam("./",".chk");
@@ -541,6 +636,10 @@ int main(void) {
   // First, check norms of spherical harmonics.
   check_sph_orthonorm(Lmax);
   printf("Solid harmonics OK.\n");
+
+  // Then, check checkpoint utilities
+  test_checkpoint();
+  printf("Checkpointing OK.\n");
 
   // Load basis sets
 
