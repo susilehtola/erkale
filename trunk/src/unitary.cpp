@@ -3,11 +3,6 @@
 #include "mathf.h"
 #include <cfloat>
 
-extern "C" {
-#include <gsl/gsl_poly.h>
-#include <gsl/gsl_errno.h>
-}
-
 Unitary::Unitary(int qv, double thr, bool max, bool ver) {
   q=qv;
   eps=thr;
@@ -44,6 +39,11 @@ arma::cx_mat Unitary::get_rotation(double step) const {
 
 void Unitary::set_poly(int deg) {
   dpoly=deg;
+}
+
+void Unitary::set_fourier(int samples, int pers) {
+  fourperiods=pers;
+  foursamples=samples;
 }
 
 bool Unitary::converged(const arma::cx_mat & W) {
@@ -177,6 +177,9 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     } else if(met==POLY_FDF) {
       step=polynomial_step_fdf(W);
       fprintf(stderr,"Polynomial_fdf step %e (%e of Tmu)\n",step,step/Tmu);
+    } else if(met==FOURIER_DF) {
+      step=fourier_step_df(W);
+      fprintf(stderr,"Fourier_df step %e (%e of Tmu)\n",step,step/Tmu);
     } else if(met==ARMIJO) {
       step=armijo_step(W);
       fprintf(stderr,"Armijo         step %e (%e of Tmu)\n",step,step/Tmu);
@@ -241,7 +244,11 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
     // Trial matrix is
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     // Compute derivative matrix
-    arma::cx_mat der=cost_der(Wtr);
+    arma::cx_mat der;
+    if(i==0)
+      der=G;
+    else
+      der=cost_der(Wtr);
     // so the derivative wrt the step is
     Jprime(i)=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
   }
@@ -282,7 +289,7 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
     
     if(i==0) {
       f[i]=J;
-      der=G[G.size()-1];
+      der=G;
     } else
       cost_func_der(Wtr*W,f[i],der);
     
@@ -370,52 +377,159 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
   return step;
 }
 
+double Unitary::fourier_step_df(const arma::cx_mat & W) {
+  // Length of DFT interval
+  double fourier_interval=fourperiods*Tmu;
+  // and of the transform. We want integer division here!
+  int fourier_length=2*((foursamples*fourperiods)/2)+1;
+
+  // Step length is
+  double deltaTmu=fourier_interval/fourier_length;
+
+  // Values of mu, J(mu) and J'(mu)
+  arma::vec mu(fourier_length);
+  arma::vec f(fourier_length);
+  arma::vec fp(fourier_length);
+  for(int i=0;i<fourier_length;i++) {
+    // Value of mu is
+    mu(i)=i*deltaTmu;
+
+    // Trial matrix is
+    arma::cx_mat Wtr=get_rotation(mu(i))*W;
+    arma::cx_mat der;
+    
+    if(i==0) {
+      f(i)=J;
+      der=G;
+    } else
+      cost_func_der(Wtr*W,f(i),der);
+    
+    // Compute the derivative
+    fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
+  }
+  
+  // Compute Hann window
+  arma::vec hannw(fourier_length);
+  for(int i=0;i<fourier_length;i++)
+    hannw(i)=0.5*(1-cos((i+1)*2.0*M_PI/(fourier_length+1.0)));
+
+  // Windowed derivative is
+  arma::vec windowed=fp%hannw;
+
+  // Fourier coefficients
+  arma::cx_vec coeffs=arma::fft(windowed)/fourier_length;
+
+  // Find roots of polynomial
+  arma::cx_vec croots=solve_roots_cplx(coeffs);
+
+  // Figure out roots on the unit circle
+  double circletol=1e-2;
+  std::vector<double> muval;
+  for(size_t i=0;i<croots.n_elem;i++)
+    if(fabs(std::abs(croots(i))-1)<circletol) {
+      // Root is on the unit circle. Angle is
+      double phi=std::imag(log(croots(i)));
+
+      // Convert to the real length scale
+      phi*=fourier_interval/(2*M_PI);
+
+      // Avoid aliases
+      phi=fmod(phi,fourier_interval);
+
+      // Add to roots
+      muval.push_back(phi);
+    }
+
+  // Sort the roots
+  std::sort(muval.begin(),muval.end());
+
+  // Sanity check
+  if(!muval.size() || fabs(windowed(0))<sqrt(DBL_EPSILON))
+    return 0.0;
+
+  // Figure out where the function goes to the wanted direction
+  double findJ;
+  if(sign==1)
+    findJ=arma::max(f);
+  else
+    findJ=arma::min(f);
+
+  // and the corresponding value of mu is
+  double findmu=mu(0);
+  for(int i=1;i<fourier_length;i++)
+    if(f(i)==findJ) {
+      findmu=mu(i);
+      // Stop at closest extremum
+      break;
+    }
+  
+  // Find closest value of mu
+  size_t rootind=0;
+  double diffmu=fabs(muval[0]-findmu);
+  for(size_t i=1;i<muval.size();i++)
+    if(fabs(muval[i]-findmu)<diffmu) {
+      rootind=i;
+      diffmu=fabs(muval[i]-findmu);
+    }
+
+  // Optimized step size is
+  return muval[rootind];
+}
+
 double bracket(const arma::cx_mat & X, const arma::cx_mat & Y) {
   return 0.5*std::real(arma::trace(arma::trans(X)*Y));
 }
 
+arma::cx_mat companion_matrix(const arma::cx_vec & c) {
+  // Form companion matrix
+  size_t N=c.size()-1;
+  if(c(N)==0.0) {
+    ERROR_INFO();
+    throw std::runtime_error("Coefficient of highest term vanishes!\n");
+  }
+  arma::strans(c).print("Coefficients");
+
+  arma::cx_mat companion(N,N);
+  companion.zeros();
+
+  // First row - coefficients normalized to that of highest term.
+  for(size_t j=0;j<N;j++)
+    companion(0,j)=-c(N-(j+1))/c(N);
+  // Fill out the unit matrix part
+  companion.submat(1,0,N-1,N-2).eye();
+
+  return companion;
+}
+
 arma::cx_vec solve_roots_cplx(const arma::vec & a) {
+  return solve_roots_cplx(std::complex<double>(1.0,0.0)*a);
+}
+
+arma::cx_vec solve_roots_cplx(const arma::cx_vec & a) {
   // Find roots of a_0 + a_1*mu + ... + a_(p-1)*mu^(p-1) = 0.
+
   // Coefficient of highest order term must be nonzero.
   size_t r=a.size();
-  while(a(r-1)==0.0)
+  while(a(r-1)==0.0 && r>=1)
     r--;
-  
-  // GSL routine workspace
-  gsl_poly_complex_workspace *w=gsl_poly_complex_workspace_alloc(r);
-  
-  // Collect coefficients
-  double ad[r];
-  for(size_t i=0;i<r;i++)
-    ad[i]=a(i);
-  
-  // Return values
-  double z[2*(r-1)];
-  int gslok=gsl_poly_complex_solve(ad,r,w,z);
-  
-  if(gslok!=GSL_SUCCESS) {
-    ERROR_INFO();
-    fprintf(stderr,"Solution of polynomial root failed, error: \"%s\"\n",gsl_strerror(gslok));
-    throw std::runtime_error("Error solving polynomial.\n");
-  }
-  
-  // Get roots
-  arma::cx_vec roots(r-1);
-  for(size_t i=0;i<r-1;i++) {
-    roots(i).real()=z[2*i];
-    roots(i).imag()=z[2*i+1];
+
+  if(r==1) {
+    // Zeroth degree - no zeros!
+    arma::cx_vec dummy;
+    dummy.zeros(0);
+    return dummy;
   }
 
-  // Sort the roots (Armadillo's sort is broken at least in 3.900)
-  roots=arma::sort(roots);
+  // Form companion matrix
+  arma::cx_mat comp=companion_matrix(a.subvec(0,r-1));
 
-  /*
-  printf("\n");
-  a.print("Coefficients");
-  roots.print("Roots");
-  */
-
-  return roots;
+  // and diagonalize it
+  arma::cx_vec eigval;
+  arma::cx_mat eigvec;
+  arma::eig_gen(eigval, eigvec, comp);
+  
+  // Return the sorted roots
+  return arma::sort(eigval);
 }
 
 arma::vec solve_roots(const arma::vec & a) {
@@ -567,8 +681,8 @@ Brockett::Brockett(size_t N, unsigned long int seed) : Unitary(2, sqrt(DBL_EPSIL
   sigma=sigma+arma::trans(sigma);
   // Get N matrix
   Nmat.zeros(N,N);
-  for(size_t i=1;i<=N;i++)
-    Nmat(i,i)=i;
+  for(size_t i=0;i<N;i++)
+    Nmat(i,i)=i+1;
 
   log=fopen("brockett.dat","w");
 }

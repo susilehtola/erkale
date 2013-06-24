@@ -9,6 +9,8 @@ enum unitmethod {
   POLY_DF,
   /// Polynomial search, fit function and derivative
   POLY_FDF,
+  /// Fourier transform
+  FOURIER_DF,
   /// Armijo method
   ARMIJO
 };
@@ -37,6 +39,11 @@ class Unitary {
 
   /// Degree of polynomial used for fit: a_0 + a_1*mu + ... + a_(d-1)*mu^(d-1)
   int dpoly;
+
+  /// Amount of quasi-periods for Fourier method (N_T = 1, 2, ...)
+  int fourperiods;
+  /// Amount of samples per one period (K = 3, 4, or 5)
+  int foursamples;
 
   /// Value of cost function
   double J;
@@ -73,6 +80,8 @@ class Unitary {
   double polynomial_step_df(const arma::cx_mat & W);
   /// Polynomial step (fit function and derivative), return step length
   double polynomial_step_fdf(const arma::cx_mat & W);
+  /// Fourier step
+  double fourier_step_df(const arma::cx_mat & W);
 
  public:
   /// Constructor
@@ -90,6 +99,8 @@ class Unitary {
 
   /// Set polynomial search options
   void set_poly(int deg);
+  /// Set Fourier search options
+  void set_fourier(int Nsamples, int Nperiods);
 
   /// Unitary optimization
   double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
@@ -105,9 +116,11 @@ arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & dy, int deg=-
 arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arma::vec & dy, int deg=-1);
 
 /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
-arma::vec solve_roots(const arma::vec & v);
+arma::cx_vec solve_roots_cplx(const arma::cx_vec & v);
 /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
 arma::cx_vec solve_roots_cplx(const arma::vec & v);
+/// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
+arma::vec solve_roots(const arma::vec & v);
 /// Get smallest positive root
 double smallest_positive(const arma::vec & v);
 
