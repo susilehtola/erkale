@@ -38,12 +38,12 @@ class Unitary {
   double eps;
 
   /// Degree of polynomial used for fit: a_0 + a_1*mu + ... + a_(d-1)*mu^(d-1)
-  int dpoly;
+  int polynomial_degree;
 
   /// Amount of quasi-periods for Fourier method (N_T = 1, 2, ...)
-  int fourperiods;
+  int fourier_periods;
   /// Amount of samples per one period (K = 3, 4, or 5)
-  int foursamples;
+  int fourier_samples;
 
   /// Value of cost function
   double J;
@@ -112,8 +112,11 @@ double bracket(const arma::cx_mat & X, const arma::cx_mat & Y);
 
 /// Fit polynomial of wanted degree to derivative
 arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & dy, int deg=-1);
-/// Fit polynomial of wanted degree to function and derivative
+/// Fit polynomial of wanted degree to function and derivative, return coefficients of function
 arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arma::vec & dy, int deg=-1);
+
+/// Convert coefficients of y(x) = c0 + c1*x + ... + c^N x^N to those of y'(x)
+arma::vec derivative_coefficients(const arma::vec & c);
 
 /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
 arma::cx_vec solve_roots_cplx(const arma::cx_vec & v);

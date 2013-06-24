@@ -14,8 +14,12 @@ Unitary::Unitary(int qv, double thr, bool max, bool ver) {
   else
     sign=-1;
 
-  // Default - use 3rd degree polynomial to fit derivative
-  dpoly=4; 
+  // Defaults
+  // use 3rd degree polynomial to fit derivative
+  polynomial_degree=4;
+  // and in the fourier transform use
+  fourier_samples=3; // three points per period
+  fourier_periods=5; // five quasio-periods  
 }
 
 Unitary::~Unitary() {
@@ -38,12 +42,12 @@ arma::cx_mat Unitary::get_rotation(double step) const {
 }
 
 void Unitary::set_poly(int deg) {
-  dpoly=deg;
+  polynomial_degree=deg;
 }
 
 void Unitary::set_fourier(int samples, int pers) {
-  fourperiods=pers;
-  foursamples=samples;
+  fourier_periods=pers;
+  fourier_samples=samples;
 }
 
 bool Unitary::converged(const arma::cx_mat & W) {
@@ -229,7 +233,7 @@ void Unitary::classify(const arma::cx_mat & W) const {
 
 double Unitary::polynomial_step_df(const arma::cx_mat & W) {
   // Amount of points to use is
-  int npoints=dpoly;
+  int npoints=polynomial_degree;
 
   // Step size
   const double deltaTmu=Tmu/(npoints-1);
@@ -270,7 +274,7 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
 
 double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
   // Amount of points to use is
-  int npoints=(int) ceil((dpoly+1)/2.0);
+  int npoints=(int) ceil((polynomial_degree+1)/2.0);
 
   // Step size
   const double deltaTmu=Tmu/(npoints-1);
@@ -301,11 +305,11 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
   //  J(mu)  = a_0 + a_1*mu + ... + a_(p-1)*mu^(p-1)
   // and its derivative to the function
   //  J'(mu) = a_1 + 2*a_2*mu + ... + (p-1)*a_(p-1)*mu^(p-2).
-  arma::vec ader=fit_polynomial_fdf(mu,f,fp,dpoly);
+  // Pull out coefficients of derivative
+  arma::vec ader=derivative_coefficients(fit_polynomial_fdf(mu,f,fp,polynomial_degree));
 
   // Find out zeros of the polynomial
   arma::vec roots=solve_roots(ader);
-  roots.print("Roots");
   // and return the smallest positive one
   return smallest_positive(roots);
 }
@@ -379,9 +383,11 @@ double Unitary::armijo_step(const arma::cx_mat & W) {
 
 double Unitary::fourier_step_df(const arma::cx_mat & W) {
   // Length of DFT interval
-  double fourier_interval=fourperiods*Tmu;
+  double fourier_interval=fourier_periods*Tmu;
   // and of the transform. We want integer division here!
-  int fourier_length=2*((foursamples*fourperiods)/2)+1;
+  int fourier_length=2*((fourier_samples*fourier_periods)/2)+1;
+
+  printf("\nFourier length is %i.\n",fourier_length);
 
   // Step length is
   double deltaTmu=fourier_interval/fourier_length;
@@ -414,13 +420,19 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
     hannw(i)=0.5*(1-cos((i+1)*2.0*M_PI/(fourier_length+1.0)));
 
   // Windowed derivative is
-  arma::vec windowed=fp%hannw;
+  arma::vec windowed(fourier_length);
+  for(int i=0;i<fourier_length;i++)
+    windowed(i)=fp(i)*hannw(i);
+
+  arma::strans(windowed).print("Windowed derivative");
 
   // Fourier coefficients
   arma::cx_vec coeffs=arma::fft(windowed)/fourier_length;
+  arma::strans(coeffs).print("Fourier coefficients");
 
   // Find roots of polynomial
   arma::cx_vec croots=solve_roots_cplx(coeffs);
+  arma::strans(croots).print("Roots of polynomial");
 
   // Figure out roots on the unit circle
   double circletol=1e-2;
@@ -430,11 +442,20 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
       // Root is on the unit circle. Angle is
       double phi=std::imag(log(croots(i)));
 
+      printf("Root on unit circle: (% e,% e), corresponding to e^(% ei)\n",croots(i).real(),croots(i).imag(),phi);
+
       // Convert to the real length scale
       phi*=fourier_interval/(2*M_PI);
 
+      printf("angle in real length scale %e\n",phi);
+
       // Avoid aliases
       phi=fmod(phi,fourier_interval);
+      // and check for negative values
+      if(phi<0.0)
+	phi+=fourier_interval;
+
+      printf("angle in real interval %e\n",phi);
 
       // Add to roots
       muval.push_back(phi);
@@ -570,6 +591,15 @@ double smallest_positive(const arma::vec & a) {
   return step;
 }
 
+arma::vec derivative_coefficients(const arma::vec & c) {
+  // Coefficients for polynomial expansion of y'
+  arma::vec cder(c.n_elem-1);
+  for(size_t i=1;i<c.n_elem;i++)
+    cder(i-1)=i*c(i);
+
+  return cder;
+}
+
 arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & y, int deg) {
   // Fit derivative to polynomial of order p: y(x) = a_0 + a_1*x + ... + a_(p-1)*x^(p-1)
 
@@ -664,13 +694,8 @@ arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arm
     mumat.print("Mu");
     throw std::runtime_error("Error solving for coefficients a.\n");
   }
-
-  // Coefficients for polynomial expansion of y'
-  arma::vec cder(c.n_elem-1);
-  for(size_t i=1;i<c.n_elem;i++)
-    cder(i-1)=i*c(i);
   
-  return cder;
+  return c;
 }
 
 
