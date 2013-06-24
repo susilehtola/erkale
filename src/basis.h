@@ -228,8 +228,8 @@ class BasisSet {
   /// Convert contraction on given shell
   void convert_contraction(size_t ish);
 
-  /// Normalize contractions
-  void normalize();
+  /// Normalize contractions. If !coeffs, only cartesian factors are calculated.
+  void normalize(bool coeffs=true);
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
 
@@ -461,7 +461,7 @@ class GaussianShell {
   void convert_contraction();
 
   /// Normalize contractions
-  void normalize();
+  void normalize(bool coeffs=true);
   /// Normalize contractions in Coulomb norm (for density fitting)
   void coulomb_normalize();
 

@@ -212,7 +212,7 @@ void GaussianShell::convert_contraction() {
     c[i].c*=fac*pow(c[i].z,am/2.0+0.75);
 }
 
-void GaussianShell::normalize() {
+void GaussianShell::normalize(bool coeffs) {
   // Normalize contraction of unnormalized primitives wrt first function on shell
 
   // Check for dummy shell
@@ -222,21 +222,23 @@ void GaussianShell::normalize() {
     return;
   }
 
-  double fact=0.0;
-
-  // Calculate overlap of exponents
-  for(size_t i=0;i<c.size();i++)
-    for(size_t j=0;j<c.size();j++)
-      fact+=c[i].c*c[j].c/pow(c[i].z+c[j].z,am+1.5);
-
-  // Add constant part
-  fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
-
-  // The coefficients must be scaled by 1/sqrt(fact)
-  fact=1.0/sqrt(fact);
-  for(size_t i=0;i<c.size();i++)
-    c[i].c*=fact;
-
+  if(coeffs) {
+    double fact=0.0;
+    
+    // Calculate overlap of exponents
+    for(size_t i=0;i<c.size();i++)
+      for(size_t j=0;j<c.size();j++)
+	fact+=c[i].c*c[j].c/pow(c[i].z+c[j].z,am+1.5);
+    
+    // Add constant part
+    fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
+    
+    // The coefficients must be scaled by 1/sqrt(fact)
+    fact=1.0/sqrt(fact);
+    for(size_t i=0;i<c.size();i++)
+      c[i].c*=fact;
+  }
+  
   // FIXME: Do something more clever here.
   if(!uselm) {
     // Compute relative normalization factors
@@ -1466,12 +1468,14 @@ void BasisSet::finalize(bool convert, bool donorm) {
   // Convert contractions
   if(convert)
     convert_contractions();
-  // Normalize contractions
-  if(donorm)
-    normalize();
+  // Normalize contractions if requested, and compute cartesian norms
+  normalize(donorm);
 
   // Form list of unique shell pairs
   form_unique_shellpairs();
+  // and update the nuclear shell list (in case the basis set was
+  // loaded from checkpoint)
+  update_nuclear_shell_list();
 }
 
 int BasisSet::get_am(size_t ind) const {
@@ -1694,9 +1698,9 @@ void BasisSet::convert_contraction(size_t ind) {
   shells[ind].convert_contraction();
 }
 
-void BasisSet::normalize() {
+void BasisSet::normalize(bool coeffs) {
   for(size_t i=0;i<shells.size();i++)
-    shells[i].normalize();
+    shells[i].normalize(coeffs);
 }
 
 void BasisSet::coulomb_normalize() {
@@ -3243,30 +3247,31 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
 }
 
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose) {
-  double maxerr=0.0;
-  size_t maxi=0, maxj=0;
+  // Compute overlap matrix
   arma::mat MOovl=arma::trans(C)*S*C;
-  for(size_t i=0;i<MOovl.n_cols;i++) {
-    for(size_t j=0;j<i;j++)
-      if(fabs(MOovl(i,j))>maxerr) {
-        maxerr=fabs(MOovl(i,j));
-        maxi=i;
-        maxj=j;
-      }
-    if(fabs(MOovl(i,i)-1)>maxerr) {
-      maxerr=fabs(MOovl(i,i)-1);
-      maxi=i;
-      maxj=i;
-    }
-  }
+  // and remove the unit from the diagonal
+  for(size_t i=0;i<MOovl.n_cols;i++)
+    MOovl(i,i)-=1.0;
+
+  // Get maximum error
+  double maxerr=max(max(abs(MOovl)));
+
   if(verbose) {
-    printf("Maximum deviation from orthogonality is %e, occurring at %i %i.\n",maxerr,(int) maxi, (int) maxj);
+    printf("Maximum deviation from orthogonality is %e.\n",maxerr);
     fflush(stdout);
   }
 
-  if(maxerr>=1e-8) {
+  if(maxerr>=sqrt(DBL_EPSILON)) {
+    // Clean up
+    for(size_t i=0;i<MOovl.n_cols;i++)
+      for(size_t j=0;j<MOovl.n_cols;j++)
+	if(fabs(MOovl(i,j))<10*DBL_EPSILON)
+	  MOovl(i,j)=0.0;
+
+    MOovl.print("Deviation from unit matrix");
+
     std::ostringstream oss;
-    oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality at " << maxi+1 << "," << maxj+1 <<": " << maxerr <<".\nCheck the used LAPACK implementation.\n";
+    oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality is " << maxerr <<".\nCheck the used LAPACK implementation.\n";
     throw std::runtime_error(oss.str());
   }
 
