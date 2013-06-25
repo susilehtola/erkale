@@ -70,4 +70,9 @@ arma::mat sinc(const arma::mat & U);
 /// Compute square root of matrix
 arma::mat sqrt(const arma::mat & M);
 
+/// Orthogonalize
+arma::mat orthogonalize(const arma::mat & M);
+/// Unitarize
+arma::cx_mat unitarize(const arma::cx_mat & M);
+
 #endif
