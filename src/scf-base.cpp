@@ -2041,11 +2041,6 @@ Boys::Boys(const BasisSet & basis, const arma::mat & C, double thr, bool ver) : 
   rx=arma::trans(C)*rmat[0]*C;
   ry=arma::trans(C)*rmat[1]*C;
   rz=arma::trans(C)*rmat[2]*C;
-
-  rsq.save("rsq.dat",arma::raw_ascii);
-  rx.save("rx.dat",arma::raw_ascii);
-  ry.save("ry.dat",arma::raw_ascii);
-  rz.save("rz.dat",arma::raw_ascii);
 }
 
 Boys::~Boys() {
