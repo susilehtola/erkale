@@ -394,3 +394,35 @@ arma::mat sqrt(const arma::mat & M) {
 
   return sqrtM;
 }
+
+arma::mat orthogonalize(const arma::mat & M) {
+  // Decomposition: M = U s V'
+  arma::mat U;
+  arma::vec s;
+  arma::mat V;
+  bool svdok=arma::svd(U,s,V,M);
+  if(!svdok) {
+    ERROR_INFO();
+    M.print("M");
+    throw std::runtime_error("SVD failed.\n");
+  }
+
+  // Return matrix with singular values set to unity
+  return U*arma::trans(V);
+}
+
+arma::cx_mat unitarize(const arma::cx_mat & M) {
+  // Decomposition: M = U s V'
+  arma::cx_mat U;
+  arma::vec s;
+  arma::cx_mat V;
+  bool svdok=arma::svd(U,s,V,M);
+  if(!svdok) {
+    ERROR_INFO();
+    M.print("M");
+    throw std::runtime_error("SVD failed.\n");
+  }
+
+  // Return matrix with singular values set to unity
+  return U*arma::trans(V);
+}
