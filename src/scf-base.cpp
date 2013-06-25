@@ -456,8 +456,15 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 
   // The localizing matrix
   arma::cx_mat W;
-  if(chkptp->exist("W.re"))
-    chkptp->cread("W",W);
+  if(chkptp->exist("CW.re")) {
+    printf("Read localization matrix from checkpoint.\n");
+
+    // Get old localized orbitals
+    arma::cx_mat CW;
+    chkptp->cread("CW",CW);
+    // The starting guess is the unitarized version of the overlap
+    W=unitarize(arma::trans(sicsol.C)*S*CW);
+  }
   // Check that it is sane
   if(W.n_rows != nocc || W.n_cols != nocc) {
     if(canonical)
@@ -466,7 +473,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     else {
       // Initialize with a random unitary matrix.
       W=complex_unitary(nocc);
-
+      
       if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
@@ -479,7 +486,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     if(localization) {
       // Localize starting guess with threshold 10.0
       arma::cx_mat Wloc(W);
-      if(verbose) printf("\nInitial localization.\n");
+      if(verbose) printf("\nRefining localization.\n");
       double measure=10.0;
       boys_localization(*basisp,sicsol.C,measure,Wloc,verbose);
       if(verbose) printf("\n");
@@ -528,7 +535,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   }
   PZSIC_calculate(sicsol,W,dft,grid,canonical);
   // Save matrix
-  chkptp->cwrite("W",W);
+  chkptp->cwrite("CW",sicsol.C*W);
 
   // Update current solution
   sol.H +=sicsol.H;
@@ -602,10 +609,24 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
   // The localizing matrix
   arma::cx_mat Wa, Wb;
-  if(chkptp->exist("Wa.re"))
-    chkptp->cread("Wa",Wa);
-  if(chkptp->exist("Wb.re"))
-    chkptp->cread("Wb",Wb);
+  if(chkptp->exist("CWa.re")) {
+    if(verbose) printf("Read alpha localization matrix from checkpoint.\n");
+
+    // Get old localized orbitals
+    arma::cx_mat CWa;
+    chkptp->cread("CWa",CWa);
+    // The starting guess is the unitarized version of the overlap
+    Wa=unitarize(arma::trans(sicsola.C)*S*CWa);
+  }
+  if(chkptp->exist("CWb.re")) {
+    if(verbose) printf("Read beta localization matrix from checkpoint.\n");
+
+    // Get old localized orbitals
+    arma::cx_mat CWb;
+    chkptp->cread("CWb",CWb);
+    // The starting guess is the unitarized version of the overlap
+    Wb=unitarize(arma::trans(sicsolb.C)*S*CWb);
+  }
 
   // Check that they are sane
   if(Wa.n_rows != nocca || Wa.n_cols != nocca) {
@@ -618,7 +639,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
       if(localization) {
 	// Localize starting guess with threshold 10.0
-	if(verbose) printf("\nInitial localization.\n");
+	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure=10.0;
 	boys_localization(*basisp,sicsola.C,measure,Wa,verbose);
 	if(verbose) printf("\n");
@@ -628,7 +649,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     if(localization) {
       // Localize starting guess with threshold 10.0
       arma::cx_mat Wloca(Wa);
-      if(verbose) printf("\nInitial localization.\n");
+      if(verbose) printf("\nRefining alpha localization.\n");
       double measure=10.0;
       boys_localization(*basisp,sicsola.C,measure,Wloca,verbose);
       if(verbose) printf("\n");
@@ -658,7 +679,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
       if(localization) {
 	// Localize starting guess with threshold 10.0
-	if(verbose) printf("\nInitial localization.\n");
+	if(verbose) printf("\nInitial beta localization.\n");
 	double measure=10.0;
 	boys_localization(*basisp,sicsolb.C,measure,Wb,verbose);
 	if(verbose) printf("\n");
@@ -668,7 +689,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     if(localization) {
       // Localize starting guess with threshold 10.0
       arma::cx_mat Wlocb(Wb);
-      if(verbose) printf("\nInitial localization.\n");
+      if(verbose) printf("\nRefining beta localization.\n");
       double measure=10.0;
       boys_localization(*basisp,sicsolb.C,measure,Wlocb,verbose);
       if(verbose) printf("\n");
@@ -724,12 +745,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       fprintf(stderr,"\nSIC unitary optimization, alpha spin\n");
   }
   PZSIC_calculate(sicsola,Wa,dft,grid,canonical);
-  chkptp->cwrite("Wa",Wa);
+  chkptp->cwrite("CWa",sicsola.C*Wa);
   if(verbose && !canonical) {
       fprintf(stderr,"\nSIC unitary optimization, beta spin\n");
   }
   PZSIC_calculate(sicsolb,Wb,dft,grid,canonical);
-  chkptp->cwrite("Wb",Wb);
+  chkptp->cwrite("CWb",sicsolb.C*Wb);
 
   // Update current solution
   sol.Ha +=sicsola.H;
@@ -752,7 +773,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
     worker.cost_func(W);
   } else {
     //	Perform unitary optimization
-    worker.optimize(W);
+    worker.optimize(W,POLY_DF,CGPR);
   }
 
   // Get SIC energy and hamiltonian
@@ -2046,6 +2067,11 @@ Boys::Boys(const BasisSet & basis, const arma::mat & C, double thr, bool ver) : 
 Boys::~Boys() {
 }
 
+void Boys::print_step(enum unitmethod & met, double step) const {
+  (void) met;
+  (void) step;
+}
+
 double Boys::cost_func(const arma::cx_mat & W) {
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
@@ -2147,22 +2173,6 @@ Pipek::Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool ver) 
 	  for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
 	    Q(io,jo,inuc)+=C(fi,io)*SC(fi,jo);
   }
-
-  // Compute Mulliken charges
-  arma::vec qmul(Q.n_slices);
-  qmul.zeros();
-  for(size_t i=0;i<Q.n_slices;i++)
-    qmul(i)=-2*arma::trace(Q.slice(i));
-  for(size_t i=0;i<Q.n_slices;i++) {
-    nucleus_t nuc=basis.get_nucleus(i);
-    if(!nuc.bsse)
-      qmul(i)+=nuc.Z;
-  }
-
-  printf("\nMulliken charges\n");
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), qmul(i));
-  printf("Sum of charges is %f.\n",sum(qmul));
 }
 
 Pipek::~Pipek() {
@@ -2231,6 +2241,9 @@ PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0
   solver=solverp;
   dft=dftp;
   grid=gridp;
+
+  // Default value
+  kappatol=0.1;
 }
 
 PZSIC::~PZSIC() {
@@ -2291,7 +2304,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   for(size_t io=0;io<Ctilde.n_cols;io++)
     for(size_t jo=0;jo<Ctilde.n_cols;jo++)
       der(io,jo)=arma::as_scalar(arma::trans(sol.C.col(io))*Forb[jo]*Ctilde.col(jo));
-
+  
   // Kappa is
   kappa.zeros(Ctilde.n_cols,Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
@@ -2304,16 +2317,22 @@ void PZSIC::print_progress(size_t k) const {
   get_rk(R,K);
   
   fprintf(stderr,"\t%4i\t%e\t% e",(int) k,K/R,J);
-  printf("\t%4i\t%e\t% e",(int) k,K/R,J);
-  if(k>1) {
+  if(k>1)
     fprintf(stderr,"\t% e", J-oldJ);
-    printf("\t% e", J-oldJ);
-  } else {
+  else
     fprintf(stderr,"\t%13s","");
-    printf("\t%13s","");
-  }
-  
+  fflush(stderr);
+
+  printf("\nSIC iteration %i\n",(int) k);
+  printf("E-SIC = % 16.8f, dE = % e, K/R = %e\n",J,J-oldJ,K/R);
   fflush(stdout);
+}
+
+void PZSIC::print_time(const Timer & t) const {
+  printf("Iteration done in %s.\n",t.elapsed().c_str());
+  fflush(stdout);
+
+  fprintf(stderr," %10.3f\n",t.get());
   fflush(stderr);
 }
 
@@ -2333,15 +2352,25 @@ void PZSIC::get_rk(double & R, double & K) const {
   K=rms_cnorm(kappa);
 }
 
+void PZSIC::initialize(const arma::cx_mat & W0) {
+  // Form matrices
+  arma::cx_mat der;
+  double f;
+  cost_func_der(W0,f,der);
+
+  // Compute K/R
+  double R, K;
+  get_rk(R,K);
+  // Set tolerance on kappa
+  kappatol=std::max( K/R*5e-1, 5e-1 );
+}
+
 bool PZSIC::converged(const arma::cx_mat & W) {
   double R, K;
   get_rk(R,K);
   (void) W;
 
-  printf("\nR = %e, K = %e\n",R,K);
-  kappa.print("Kappa");
-  
-  if(K<0.1*R)
+  if(K<kappatol*R)
     // Converged
     return true;
   else

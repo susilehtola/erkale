@@ -50,6 +50,10 @@ void Unitary::set_fourier(int samples, int pers) {
   fourier_samples=samples;
 }
 
+void Unitary::initialize(const arma::cx_mat & W0) {
+  (void) W0;
+}
+
 bool Unitary::converged(const arma::cx_mat & W) {
   /// Dummy default function, just check norm of gradient
   (void) W;
@@ -71,6 +75,9 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
   // Check matrix
   check_unitary(W);
 
+  // Perform any necessary initialization
+  initialize(W);
+  
   // Iteration number
   size_t k=0;
   J=0;
@@ -103,6 +110,7 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
 
     } else {
 
+      // Compute update coefficient
       double gamma=0.0;
       if(acc==SDSA) {
 	// Steepest descent / steepest ascent
@@ -115,8 +123,11 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
 	gamma=bracket(G, G) / bracket(oldG, oldG);
       } else
 	throw std::runtime_error("Unsupported update.\n");
-      
+
+      // Perform update
       H=G+gamma*H;
+      // Make sure H stays skew symmetric
+      H=0.5*(H-arma::trans(H));
       
       // Check that update is OK
       if(bracket(G,H)<0.0) {
@@ -174,21 +185,23 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     double step;
     if(met==POLY_DF) {
       step=polynomial_step_df(W);
-      //      fprintf(stderr,"Polynomial_df  step %e (%e of Tmu)\n",step,step/Tmu);
     } else if(met==POLY_FDF) {
       step=polynomial_step_fdf(W);
-      //      fprintf(stderr,"Polynomial_fdf step %e (%e of Tmu)\n",step,step/Tmu);
     } else if(met==FOURIER_DF) {
       step=fourier_step_df(W);
-      //      fprintf(stderr,"Fourier_df step %e (%e of Tmu)\n",step,step/Tmu);
     } else if(met==ARMIJO) {
       step=armijo_step(W);
-      //      fprintf(stderr,"Armijo         step %e (%e of Tmu)\n",step,step/Tmu);
-    } else throw std::runtime_error("Method not implemented.\n");
+    } else {
+      ERROR_INFO();
+      throw std::runtime_error("Method not implemented.\n");
+    }
 
     // Check step size
     if(step<0.0) throw std::runtime_error("Negative step size!\n");
     if(step==DBL_MAX) throw std::runtime_error("Could not find step size!\n");
+
+    if(verbose)
+      print_step(met,step);
 
     // Take step
     if(step!=0.0) {
@@ -209,11 +222,23 @@ void Unitary::print_progress(size_t k) const {
 }
 
 void Unitary::print_time(const Timer & t) const {
-  fprintf(stderr," %10.3f\n",t.get());
-  fflush(stderr);
-  
   printf(" %s\n",t.elapsed().c_str());
   fflush(stdout);
+}
+
+void Unitary::print_step(enum unitmethod & met, double step) const {
+  if(met==POLY_DF)
+    printf("Polynomial_df  step %e (%e of Tmu)\n",step,step/Tmu);
+  else if(met==POLY_FDF)
+    printf("Polynomial_fdf step %e (%e of Tmu)\n",step,step/Tmu);
+  else if(met==FOURIER_DF)
+    printf("Fourier_df     step %e (%e of Tmu)\n",step,step/Tmu);
+  else if(met==ARMIJO)
+    printf("Armijo         step %e (%e of Tmu)\n",step,step/Tmu);
+  else {
+    ERROR_INFO();
+    throw std::runtime_error("Method not implemented.\n");
+  }
 }
 
 void Unitary::classify(const arma::cx_mat & W) const {
@@ -241,7 +266,7 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
   
   // Evaluate the first-order derivative of the cost function at the expansion points
   arma::vec mu(npoints);
-  arma::vec Jprime(npoints);
+  arma::vec fp(npoints);
   for(int i=0;i<npoints;i++) {
     // Mu in the point is
     mu(i)=i*deltaTmu;
@@ -249,23 +274,21 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
     // Trial matrix is
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     // Compute derivative matrix
-    arma::cx_mat der;
-    if(i==0)
-      der=G;
-    else
-      der=cost_der(Wtr);
+    arma::cx_mat der=cost_der(Wtr);
     // so the derivative wrt the step is
-    Jprime(i)=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
+    fp(i)=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
   }
 
   // Sanity check - is derivative of the right sign?
-  if(sign*Jprime[0]<0.0) {
-    ERROR_INFO();
-    throw std::runtime_error("Derivative is of the wrong sign!\n");
+  if(sign*fp[0]<0.0) {
+    printf("Derivative is of the wrong sign!\n");
+    arma::trans(mu).print("mu");
+    arma::trans(fp).print("J'(mu)");
+    throw std::runtime_error("Derivative consistency error.\n");
   }
 
   // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
-  arma::vec coeff=fit_polynomial_df(mu,Jprime);
+  arma::vec coeff=fit_polynomial_df(mu,fp);
 
   // Find out zeros of the polynomial
   arma::vec roots=solve_roots(coeff);
@@ -291,15 +314,18 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
     // Trial matrix is
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     arma::cx_mat der;
-    
-    if(i==0) {
-      f[i]=J;
-      der=G;
-    } else
-      cost_func_der(Wtr*W,f[i],der);
+    cost_func_der(Wtr*W,f[i],der);
     
     // Compute the derivative
     fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
+  }
+
+  // Sanity check - is derivative of the right sign?
+  if(sign*fp[0]<0.0) {
+    printf("Derivative is of the wrong sign!\n");
+    arma::trans(mu).print("mu");
+    arma::trans(fp).print("J'(mu)");
+    throw std::runtime_error("Derivative consistency error.\n");
   }
 
   // Fit function to polynomial of order p
@@ -423,12 +449,7 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
     // Trial matrix is
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     arma::cx_mat der;
-    
-    if(i==0) {
-      f(i)=J;
-      der=G;
-    } else
-      cost_func_der(Wtr*W,f(i),der);
+    cost_func_der(Wtr*W,f(i),der);
     
     // Compute the derivative
     fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));

@@ -459,6 +459,7 @@ class Boys : public Unitary {
   /// r_z matrix
   arma::mat rz;
 
+  void print_step(enum unitmethod & met, double step) const;
 
  public:
   Boys(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
@@ -506,6 +507,9 @@ class PZSIC : public Unitary {
   /// Coefficient for PZ-SIC
   double pzcor;
 
+  /// Convergence criterion
+  double kappatol;
+
   /// Orbital Fock matrices
   std::vector<arma::mat> Forb;
   /// Orbital SIC energies
@@ -521,6 +525,11 @@ class PZSIC : public Unitary {
 
   /// Print progress
   void print_progress(size_t k) const;
+  /// Print progress
+  void print_time(const Timer & t) const;
+
+  /// Initialize convergence criterion
+  void initialize(const arma::cx_mat & W0);
   /// Check convergence
   bool converged(const arma::cx_mat & W);
 
