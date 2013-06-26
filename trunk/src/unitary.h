@@ -152,8 +152,13 @@ class Brockett : public Unitary {
 
   /// Log file
   FILE *log;
+
+  /// Print legend
+  void print_legend() const;
   /// Print progress
   void print_progress(size_t k) const;
+  /// Don't print step length
+  void print_step(enum unitmethod & met, double step) const;
 
   /// Check convergence
   bool converged(const arma::cx_mat & W);
