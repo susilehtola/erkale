@@ -459,6 +459,7 @@ class Boys : public Unitary {
   /// r_z matrix
   arma::mat rz;
 
+  /// (Don't) print out step size during optimization
   void print_step(enum unitmethod & met, double step) const;
 
  public:
@@ -477,6 +478,9 @@ class Boys : public Unitary {
 class Pipek : public Unitary {
   /// Charge matrix in MO basis
   arma::cube Q;
+
+  /// (Don't) print out step size during optimization
+  void print_step(enum unitmethod & met, double step) const;
 
  public:
   Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
@@ -523,6 +527,8 @@ class PZSIC : public Unitary {
   /// Calculate R and K
   void get_rk(double & R, double & K) const;
 
+  /// Print legend
+  void print_legend() const;
   /// Print progress
   void print_progress(size_t k) const;
   /// Print progress
