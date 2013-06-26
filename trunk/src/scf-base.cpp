@@ -2031,6 +2031,27 @@ void pipek_localization(const BasisSet & basis, const arma::mat & C, double & me
   }
 }
 
+void edminston_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod met, enum unitacc acc) {
+  Timer t;
+
+  if(verbose)
+    printf("Localizing orbitals.\n");
+
+  // Threshold
+  double thr=1e-6;
+  if(measure>0.0)
+    thr=measure;
+
+  // Worker
+  Edminston worker(basis,C,thr,verbose);
+  measure=worker.optimize(U,met,acc);
+
+  if(verbose) {
+    printf("Localization done in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
+}
+
 arma::mat interpret_force(const arma::vec & f) {
   if(f.n_elem%3!=0) {
     ERROR_INFO();
@@ -2240,6 +2261,64 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
 void Pipek::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
   f=cost_func(W);
   der=cost_der(W);
+}
+
+Edminston::Edminston(const BasisSet & basis, const arma::mat & Cv, double thr, bool ver) : Unitary(4,thr,true,ver) {
+  // Store orbitals
+  C=Cv;
+  // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, no Hartree-Fock
+  dfit.fill(basis,basis.density_fitting(),true,1e-8,false);
+}
+
+Edminston::~Edminston() {
+}
+
+void Edminston::print_step(enum unitmethod & met, double step) const {
+  (void) met;
+  (void) step;
+}
+
+double Edminston::cost_func(const arma::cx_mat & W) {
+  double f;
+  arma::cx_mat der;
+  cost_func_der(W,f,der);
+  return f;
+}
+
+arma::cx_mat Edminston::cost_der(const arma::cx_mat & W) {
+  double f;
+  arma::cx_mat der;
+  cost_func_der(W,f,der);
+  return der;
+}
+
+void Edminston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
+  if(W.n_cols != C.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Invalid matrix size.\n");
+  }
+
+  // Transformed orbitals
+  arma::cx_mat Ctilde=C*W;
+
+  // Orbital density matrices
+  std::vector<arma::mat> Porb(W.n_cols);
+  for(size_t io=0;io<W.n_cols;io++)
+    Porb[io]=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+  
+  // Orbital Coulomb matrices
+  std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
+  
+  // Compute self-repulsion
+  f=0.0;
+  for(size_t io=0;io<W.n_cols;io++)
+    f+=arma::trace(Porb[io]*Jorb[io]);
+
+  // Compute derivative
+  der.zeros(W.n_cols,W.n_cols);
+  for(size_t a=0;a<W.n_cols;a++)
+    for(size_t b=0;b<W.n_cols;b++)
+      der(a,b)=2.0*arma::as_scalar(arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b));
 }
 
 PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0.0,true,verb) {
