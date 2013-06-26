@@ -34,10 +34,12 @@ enum locmet {
   // Boys
   BOYS,
   // Pipek-Mezey
-  PIPEK
+  PIPEK,
+  // Edminston-Ruedenberg
+  EDMINSTON
 };
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc) {
+void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
@@ -82,20 +84,26 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, const std::vector<doubl
       boys_localization(basis,Cwrk,measure,U,true,umet,acc);
     else if(method==PIPEK)
       pipek_localization(basis,Cwrk,measure,U,true,umet,acc);
+    else if(method==EDMINSTON)
+      edminston_localization(basis,Cwrk,measure,U,true,umet,acc);
     
     // Transform orbitals
     arma::mat Cloc=arma::real(Cwrk*U);
+    // and energies
+    arma::vec Eloc=arma::real(E*U);
     
-    // Update orbitals
+    // Update orbitals and energies
     for(size_t io=0;io<orbidx.size();io++)
       C.col(orbidx[io])=Cloc.col(io);
+    for(size_t io=0;io<orbidx.size();io++)
+      E(orbidx[io])=Eloc(io);
   }
 }
 
 
-void localize(const BasisSet & basis, arma::mat & C, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc) {
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc) {
   // Run localization, occupied space
-  localize_wrk(basis,C,occs,method,umet,acc);
+  localize_wrk(basis,C,E,occs,method,umet,acc);
 
   // Run localization, virtual space
   if(virt) {
@@ -104,7 +112,7 @@ void localize(const BasisSet & basis, arma::mat & C, std::vector<double> occs, b
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,occs,method,umet,acc);
+    localize_wrk(basis,C,E,occs,method,umet,acc);
   }
 }
 
@@ -121,6 +129,9 @@ int main(int argc, char **argv) {
     printf("Usage: %s runfile\n",argv[0]);
     return 1;
   }
+
+  // Initialize libint
+  init_libint_base();
 
   Settings set;
   set.add_string("LoadChk","Checkpoint to load","erkale.chk");
@@ -157,6 +168,8 @@ int main(int argc, char **argv) {
     method=BOYS;
   else if(stricmp(mets,"PM")==0)
     method=PIPEK;
+  else if(stricmp(mets,"ER")==0)
+    method=EDMINSTON;
   else throw std::runtime_error("Localization method not implemented.\n");
 
   // Determine accelerator
@@ -207,6 +220,9 @@ int main(int argc, char **argv) {
     // Orbitals
     arma::mat C;
     chkpt.read("C",C);
+    // and energies
+    arma::vec E;
+    chkpt.read("E",E);
 
     // Check orthogonality
     check_orth(C,basis.overlap(),false);
@@ -216,15 +232,20 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,occs,virt,method,umet,acc);
+    localize(basis,C,E,occs,virt,method,umet,acc);
 
     chkpt.write("C",C);
+    chkpt.write("E",E);
 
   } else {
     // Orbitals
     arma::mat Ca, Cb;
     chkpt.read("Ca",Ca);
     chkpt.read("Cb",Cb);
+    // and energies
+    arma::vec Ea, Eb;
+    chkpt.read("Ea",Ea);
+    chkpt.read("Eb",Eb);
 
     // Check orthogonality
     check_orth(Ca,basis.overlap(),false);
@@ -236,11 +257,13 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,occa,virt,method,umet,acc);
-    localize(basis,Cb,occb,virt,method,umet,acc);
+    localize(basis,Ca,Ea,occa,virt,method,umet,acc);
+    localize(basis,Cb,Eb,occb,virt,method,umet,acc);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
+    chkpt.write("Ea",Ea);
+    chkpt.write("Eb",Eb);
   }
 
   return 0;

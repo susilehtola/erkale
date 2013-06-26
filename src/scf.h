@@ -495,6 +495,29 @@ class Pipek : public Unitary {
 };
 
 
+/// Edminston-Ruedenberg localization
+class Edminston : public Unitary {
+  /// Density fitting object
+  DensityFit dfit;
+  /// Orbitals
+  arma::mat C;
+
+  /// (Don't) print out step size during optimization
+  void print_step(enum unitmethod & met, double step) const;
+
+ public:
+  Edminston(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
+  ~Edminston();
+
+  /// Evaluate cost function
+  double cost_func(const arma::cx_mat & W);
+  /// Evaluate derivative of cost function
+  arma::cx_mat cost_der(const arma::cx_mat & W);
+  /// Evaluate cost function and its derivative
+  void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
+};
+
+
 /// Perdew-Zunger self-interaction correction
 class PZSIC : public Unitary {
   /// SCF object for constructing Fock matrix
@@ -568,6 +591,8 @@ class PZSIC : public Unitary {
 void boys_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR);
 /// Pipek-Mezey localization. Initial value of measure is taken as the convergence threshold
 void pipek_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR);
+/// Edminston-Ruedenberg localization. Initial value of measure is taken as the convergence threshold
+void edminston_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR);
 
 
 #include "checkpoint.h"
