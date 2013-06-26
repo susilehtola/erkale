@@ -82,6 +82,10 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
   size_t k=0;
   J=0;
 
+  // Print out the legend
+  if(verbose)
+    print_legend();
+
   while(true) {
     // Increase iteration number
     k++;
@@ -216,8 +220,16 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
   return J;
 }
 
+void Unitary::print_legend() const {
+  printf("\t%4s\t%13s\t%13s\t%12s\n","iter","J","delta J","<G,G>");
+}
+
 void Unitary::print_progress(size_t k) const {
-  printf("\t%4i\t% e\t% e\t%e ",(int) k,J,J-oldJ,bracket(G,G));
+  if(k==1)
+    // No info on delta J
+    printf("\t%4i\t% e\t%13s\t%e ",(int) k,J,"",bracket(G,G));
+  else
+    printf("\t%4i\t% e\t% e\t%e ",(int) k,J,J-oldJ,bracket(G,G));
   fflush(stdout);
 }
 

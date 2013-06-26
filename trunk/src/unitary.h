@@ -67,6 +67,8 @@ class Unitary {
   /// Check convergence
   virtual bool converged(const arma::cx_mat & W);
 
+  /// Print legend
+  virtual void print_legend() const;
   /// Print progress
   virtual void print_progress(size_t k) const;
   /// Print time

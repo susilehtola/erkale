@@ -2178,6 +2178,11 @@ Pipek::Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool ver) 
 Pipek::~Pipek() {
 }
 
+void Pipek::print_step(enum unitmethod & met, double step) const {
+  (void) met;
+  (void) step;
+}
+
 double Pipek::cost_func(const arma::cx_mat & W) {
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
@@ -2195,8 +2200,10 @@ double Pipek::cost_func(const arma::cx_mat & W) {
   for(size_t iat=0;iat<Q.n_slices;iat++) {
     // Helper matrix
     arma::cx_mat qw=Q.slice(iat)*W;
-    for(size_t io=0;io<W.n_cols;io++)
-      Dinv+=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
+    for(size_t io=0;io<W.n_cols;io++) {
+      double Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
+      Dinv+=Qa*Qa;
+    }
   }
 
   return Dinv;
@@ -2312,15 +2319,20 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
       kappa(io,jo)=arma::as_scalar(arma::trans(Ctilde.col(io))*(Forb[jo]-Forb[io])*Ctilde.col(jo));
 }
 
+
+void PZSIC::print_legend() const {
+  fprintf(stderr,"\t%4s\t%12s\t%13s\t%13s\t%10s\n","iter","K/R","E-SIC","change","time (s)");
+  fflush(stderr);
+}
+
 void PZSIC::print_progress(size_t k) const {
   double R, K;
   get_rk(R,K);
   
-  fprintf(stderr,"\t%4i\t%e\t% e",(int) k,K/R,J);
-  if(k>1)
-    fprintf(stderr,"\t% e", J-oldJ);
-  else
-    fprintf(stderr,"\t%13s","");
+   if(k>1)
+     fprintf(stderr,"\t%4i\t%e\t% e\t% e",(int) k,K/R,J,J-oldJ);
+   else
+     fprintf(stderr,"\t%4i\t%e\t% e\t%13s",(int) k,K/R,J,"");
   fflush(stderr);
 
   printf("\nSIC iteration %i\n",(int) k);
@@ -2332,7 +2344,7 @@ void PZSIC::print_time(const Timer & t) const {
   printf("Iteration done in %s.\n",t.elapsed().c_str());
   fflush(stdout);
 
-  fprintf(stderr," %10.3f\n",t.get());
+  fprintf(stderr,"\t%10.3f\n",t.get());
   fflush(stderr);
 }
 
