@@ -2094,7 +2094,6 @@ double Boys::cost_func(const arma::cx_mat & W) {
   arma::cx_mat rxw=rx*W;
   arma::cx_mat ryw=ry*W;
   arma::cx_mat rzw=rz*W;
-
   for(size_t io=0;io<W.n_cols;io++) {
     double xp=std::real(arma::as_scalar(arma::trans(W.col(io))*rxw.col(io)));
     double yp=std::real(arma::as_scalar(arma::trans(W.col(io))*ryw.col(io)));
@@ -2128,8 +2127,6 @@ arma::cx_mat Boys::cost_der(const arma::cx_mat & W) {
   arma::cx_mat rxw=rx*W;
   arma::cx_mat ryw=ry*W;
   arma::cx_mat rzw=rz*W;
-
-
   for(size_t b=0;b<W.n_cols;b++) {
     std::complex<double> xp=arma::as_scalar(arma::trans(W.col(b))*rxw.col(b));
     std::complex<double> yp=arma::as_scalar(arma::trans(W.col(b))*ryw.col(b));
@@ -2222,6 +2219,7 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
   
   // Returned matrix
   arma::cx_mat Dder(W.n_cols,W.n_cols);
+  Dder.zeros();
   
   // Compute sum
   for(size_t iat=0;iat<Q.n_slices;iat++) {
@@ -2232,7 +2230,7 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
       std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
       
       for(size_t a=0;a<W.n_cols;a++)
-	Dder(a,b)=2.0*qwp*qw(a,b);
+	Dder(a,b)+=2.0*qwp*qw(a,b);
     }
   }
     
