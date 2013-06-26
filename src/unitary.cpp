@@ -326,7 +326,7 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
     // Trial matrix is
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     arma::cx_mat der;
-    cost_func_der(Wtr*W,f[i],der);
+    cost_func_der(Wtr,f[i],der);
     
     // Compute the derivative
     fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
@@ -461,7 +461,7 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
     // Trial matrix is
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     arma::cx_mat der;
-    cost_func_der(Wtr*W,f(i),der);
+    cost_func_der(Wtr,f(i),der);
     
     // Compute the derivative
     fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
@@ -780,11 +780,20 @@ void Brockett::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
   der=cost_der(W);
 }
 
+void Brockett::print_legend() const {
+  printf("%4s %13s %13s %13s %13s\n","iter","J","<G,G>","diag","unit");
+}
+
 void Brockett::print_progress(size_t k) const {
   printf("%4i % e % e % e % e",(int) k, J, bracket(G,G), diag, unit);
 
   fprintf(log,"%4i % e % e % e % e\n",(int) k, J, 10*log10(bracket(G,G)), diag, unit);
   fflush(log);
+}
+
+void Brockett::print_step(enum unitmethod & met, double step) const {
+  (void) met;
+  (void) step;
 }
 
 double Brockett::diagonality(const arma::cx_mat & W) const {
@@ -811,7 +820,7 @@ double Brockett::unitarity(const arma::cx_mat & W) const {
   arma::cx_mat eye(W);
   eye.eye();
   
-  double norm=arma::norm(U-eye,"fro");
+  double norm=pow(arma::norm(U-eye,"fro"),2);
   return 10*log10(norm);
 }
 
