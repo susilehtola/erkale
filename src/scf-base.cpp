@@ -2190,6 +2190,9 @@ Pipek::Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool ver) 
 	for(size_t is=0;is<shells.size();is++)
 	  for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
 	    Q(io,jo,inuc)+=C(fi,io)*SC(fi,jo);
+    
+    // Symmetrize
+    Q.slice(inuc)=(Q.slice(inuc)+arma::trans(Q.slice(inuc)))/2.0;
   }
 }
 
