@@ -124,8 +124,8 @@ class Settings {
   /// Is "name" a setting of string type? Returns index + 1 if found, else 0.
   size_t is_string(std::string name) const;
 
-  /// Parse file containing settings to use
-  void parse(std::string filename);
+  /// Parse file containing settings to use. SCF indicates special handling for the method keyword
+  void parse(std::string filename, bool scf=false);
 
   /// Print current settings
   void print() const;
