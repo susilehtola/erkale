@@ -595,52 +595,9 @@ void AtomGrid::init_xc() {
 void AtomGrid::compute_xc(int func_id) {
   // Compute exchange-correlation functional
 
-  int nspin;
-  if(!polarized)
-    nspin=XC_UNPOLARIZED;
-  else
-    nspin=XC_POLARIZED;
-
-  // Correlation and exchange functionals
-  xc_func_type func;
-  if(xc_func_init(&func, func_id, nspin) != 0) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Functional "<<func_id<<" not found!";
-    throw std::runtime_error(oss.str());
-  }
-
   // Which functional is in question?
-  bool gga=false, mgga=false;
-
-  // Determine the family
-  switch(func.info->family)
-    {
-    case XC_FAMILY_LDA:
-      gga=false;
-      mgga=false;
-      break;
-
-    case XC_FAMILY_GGA:
-    case XC_FAMILY_HYB_GGA:
-      gga=true;
-      mgga=false;
-      break;
-
-    case XC_FAMILY_MGGA:
-    case XC_FAMILY_HYB_MGGA:
-      gga=false;
-      mgga=true;
-      break;
-
-    default:
-      {
-	ERROR_INFO();
-	std::ostringstream oss;
-	oss << "Functional family " << func.info->family << " not currently supported in ERKALE!\n";
-	throw std::runtime_error(oss.str());
-      }
-    }
+  bool gga, mgga;
+  is_gga_mgga(func_id,gga,mgga);
 
   // Update controlling flags for eval_Fxc (exchange and correlation
   // parts might be of different type)
@@ -656,6 +613,22 @@ void AtomGrid::compute_xc(int func_id) {
   std::vector<double> vsigma_wrk(vsigma);
   std::vector<double> vlapl_wrk(vlapl);
   std::vector<double> vtau_wrk(vtau);
+
+  // Spin variable for libxc
+  int nspin;
+  if(!polarized)
+    nspin=XC_UNPOLARIZED;
+  else
+    nspin=XC_POLARIZED;
+
+  // Initialize libxc worker
+  xc_func_type func;
+  if(xc_func_init(&func, func_id, nspin) != 0) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Functional "<<func_id<<" not found!";
+    throw std::runtime_error(oss.str());
+  }
 
   // Evaluate functionals.
   if(mgga) // meta-GGA

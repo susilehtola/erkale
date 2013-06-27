@@ -50,6 +50,8 @@ bool is_exchange_correlation(int func_id);
 /// Is the functional for kinetic energy? (Not used in ERKALE)
 bool is_kinetic(int func_id);
 
+/// Is functional a gga / mgga functional?
+void is_gga_mgga(int func_id, bool & gga, bool & mgga);
 
 /// Get fraction of exact exchange
 double exact_exchange(int func_id);
