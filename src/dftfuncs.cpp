@@ -293,6 +293,52 @@ bool is_kinetic(int func_id) {
   return ans;
 }
 
+void is_gga_mgga(int func_id, bool & gga, bool & mgga) {
+  // Initialize
+  gga=false;
+  mgga=false;
+
+  // Correlation and exchange functionals
+  xc_func_type func;
+  if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Functional "<<func_id<<" not found!";
+    throw std::runtime_error(oss.str());
+  }  
+
+  switch(func.info->family)
+    {
+    case XC_FAMILY_LDA:
+      gga=false;
+      mgga=false;
+      break;
+
+    case XC_FAMILY_GGA:
+    case XC_FAMILY_HYB_GGA:
+      gga=true;
+      mgga=false;
+      break;
+
+    case XC_FAMILY_MGGA:
+    case XC_FAMILY_HYB_MGGA:
+      gga=false;
+      mgga=true;
+      break;
+
+    default:
+      {
+        ERROR_INFO();
+	std::ostringstream oss;
+        oss << "Functional family " << func.info->family << " not currently supported in ERKALE!\n";
+        throw std::runtime_error(oss.str());
+      }
+    }
+
+  // Free functional
+  xc_func_end(&func);
+}
+
 double exact_exchange(int func_id) {
   // Default - no exact exchange.
   double f=0.0;
