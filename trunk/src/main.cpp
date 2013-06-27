@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","File to load old results from","");
   set.add_bool("ForcePol","Force polarized calculation",false);
   set.add_bool("FreezeCore","Freeze the atomic cores?",false);
-  set.parse(std::string(argv[1]));
+  set.parse(std::string(argv[1]),true);
   set.print();
 
   // Redirect output?

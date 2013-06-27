@@ -329,96 +329,99 @@ size_t Settings::is_string(std::string name) const {
 }
 
 
-void Settings::parse(std::string filename) {
+void Settings::parse(std::string filename, bool scf) {
   // Input file
   std::ifstream in(filename.c_str());
 
-  if(in.good()) {
-    // OK, file was succesfully opened.
+  if(!in.good()) {
+    std::ostringstream oss;
+    oss << "Input file "<<filename<<" not found!";
+    throw std::runtime_error(oss.str());
+  }
 
-    while(in.good()) {
-      // Read line and split it into words
-      std::string line=readline(in);
-      std::vector<std::string> words=splitline(line);
-
-      if(words.size()) {
-	// Parse keywords
-
-	if(words.size()==1) {
+  // OK, file was succesfully opened.
+  while(in.good()) {
+    // Read line and split it into words
+    std::string line=readline(in);
+    std::vector<std::string> words=splitline(line);
+    
+    if(words.size()) {
+      // Parse keywords
+      
+      if(words.size()==1) {
+	ERROR_INFO();
+	std::ostringstream oss;
+	oss << "\nParse error: "<<words[0]<<" has no value!\n";
+	throw std::runtime_error(oss.str());
+      }
+      
+      if(scf && stricmp(words[0],"Method")==0) {
+	// Hartree-Fock or DFT?
+	if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0) {
+	  set_string("Method","HF");
+	  // Turn of density fitting by default
+	  set_bool("DensityFitting",false);
+	} else if(stricmp(words[1],"ROHF")==0) {
+	  set_string("Method","ROHF");
+	  set_bool("DensityFitting",false);
+	} else {
+	  // Add dft related settings
+	  try {
+	    add_dft_settings();
+	  } catch(std::runtime_error) {
+	    // Settings already added, as e.g. in xrs executable.
+	  }
+	  set_string("Method",words[1]);
+	  
+	  // Hybrid functional? Do we turn off density fitting by default?
+	  int xfunc, cfunc;
+	  parse_xc_func(xfunc,cfunc,words[1]);
+	  if(exact_exchange(xfunc)!=0.0)
+	    set_bool("DensityFitting",false);
+	}
+	
+      } else {
+	if(is_double(words[0])) {
+	  set_double(words[0],readdouble(words[1]));
+	} else if(is_int(words[0])) {
+	  set_int(words[0],readint(words[1]));
+	} else if(is_bool(words[0])) {
+	  // Was the value given as a number or as a string?
+	  if(isalpha(words[1][0])) {
+	    
+	    // As a string - parse it
+	    bool value;
+	    if(stricmp(words[1],"true")==0)
+	      value=true;
+	    else if(stricmp(words[1],"false")==0)
+	      value=false;
+	    else if(stricmp(words[1],"on")==0)
+	      value=true;
+	    else if(stricmp(words[1],"off")==0)
+	      value=false;
+	    else {
+	      value=false;
+	      
+	      std::ostringstream oss;
+	      oss << "Could not parse the truth value " << words[1] << " for setting "<<words[0]<<"!\n";
+	      throw std::runtime_error(oss.str());
+	    }
+	    
+	    set_bool(words[0],value);
+	  } else
+	    set_bool(words[0],readint(words[1]));
+	} else if(is_string(words[0])) {
+	  // Concatenate value
+	  std::string val=words[1];
+	  for(size_t i=2;i<words.size();i++)
+	    val+=" "+words[i];
+	  // Store value
+	  set_string(words[0],val);
+	} else {
 	  ERROR_INFO();
 	  std::ostringstream oss;
-	  oss << "\nParse error: "<<words[0]<<" has no value!\n";
+	  oss << "\nCannot recognize keyword "<<words[0]<<"!\n";
 	  throw std::runtime_error(oss.str());
-	}
-
-	if(stricmp(words[0],"Method")==0) {
-	  // Hartree-Fock or DFT?
-	  if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0) {
-	    set_string("Method","HF");
-	    // Turn of density fitting by default
-	    set_bool("DensityFitting",false);
-	  } else if(stricmp(words[1],"ROHF")==0) {
-	    set_string("Method","ROHF");
-	    set_bool("DensityFitting",false);
-	  } else {
-	    // Add dft related settings
-	    try {
-	      add_dft_settings();
-	    } catch(std::runtime_error) {
-	      // Settings already added, as e.g. in xrs executable.
-	    }
-	    set_string("Method",words[1]);
-
-	    // Hybrid functional? Do we turn off density fitting by default?
-	    int xfunc, cfunc;
-	    parse_xc_func(xfunc,cfunc,words[1]);
-	    if(exact_exchange(xfunc)!=0.0)
-	      set_bool("DensityFitting",false);
-	  }
-
-	} else {
-	  if(is_double(words[0])) {
-	    set_double(words[0],readdouble(words[1]));
-	  } else if(is_int(words[0])) {
-	    set_int(words[0],readint(words[1]));
-	  } else if(is_bool(words[0])) {
-	    // Was the value given as a number or as a string?
-	    if(isalpha(words[1][0])) {
-
-	      // As a string - parse it
-	      bool value;
-	      if(stricmp(words[1],"true")==0)
-		value=true;
-	      else if(stricmp(words[1],"false")==0)
-		value=false;
-	      else if(stricmp(words[1],"on")==0)
-		value=true;
-	      else if(stricmp(words[1],"off")==0)
-		value=false;
-	      else {
-		value=false;
-
-		std::ostringstream oss;
-		oss << "Could not parse the truth value " << words[1] << " for setting "<<words[0]<<"!\n";
-		throw std::runtime_error(oss.str());
-	      }
-
-	      set_bool(words[0],value);
-	    } else
-	      set_bool(words[0],readint(words[1]));
-	  } else if(is_string(words[0])) {
-	    // Concatenate value
-	    std::string val=words[1];
-	    for(size_t i=2;i<words.size();i++)
-	      val+=" "+words[i];
-	    // Store value
-	    set_string(words[0],val);
-	  } else {
-	    ERROR_INFO();
-	    std::ostringstream oss;
-	    oss << "\nCannot recognize keyword "<<words[0]<<"!\n";
-	    throw std::runtime_error(oss.str());
-	  }
 	}
       }
     }
