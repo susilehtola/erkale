@@ -503,6 +503,15 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   // Sanity check
   if(!std::isfinite(sol.en.E)) {
     ERROR_INFO();
+
+    // Print out hamiltonians
+#ifdef RESTRICTED
+    sol.H.print("H");
+#else
+    sol.Ha.print("Ha");
+    sol.Hb.print("Hb");
+#endif   
+
     std::ostringstream oss;
     oss << "\nSomething wrong with total energy " << sol.en.E <<"?\nEnding program.\n";
     throw std::runtime_error(oss.str());
