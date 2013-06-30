@@ -349,6 +349,13 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   for(size_t io=0;io<Ctilde.n_cols;io++)
     Porb[io]=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
 
+  Timer t;
+
+  if(verbose) {
+    printf("Constructing orbital Coulomb matrices ...");
+    fflush(stdout);
+  }
+
   if(densityfit) {
     // Coulomb matrices
     std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
@@ -389,9 +396,20 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       throw std::runtime_error("Analytical Coulomb/exchange matrix not implemented!\n");
     }
   }
+  
+  if(verbose) {
+    printf(" done (%s)\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
 
   // Exchange-correlation
   {
+    if(verbose) {
+      printf("Constructing orbital XC matrices ...");
+      fflush(stdout);
+    }
+    t.set();
+
     std::vector<double> Nelnum; // Numerically integrated density
     std::vector<arma::mat> XC; // Exchange-correlation matrices
     std::vector<double> Exc; // Exchange-correlation energy
@@ -408,6 +426,11 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	Forb[io]+=XC[io];
 	Eorb[io]+=Exc[io];
       }
+
+    if(verbose) {
+      printf(" done (%s)",t.elapsed().c_str());
+      fflush(stdout);
+    }
   }
 }
 
@@ -477,31 +500,9 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
-	double measure=10.0;
-	boys_localization(*basisp,sicsol.C,measure,W,verbose);
+	double measure=1e-3;
+	orbital_localization(PIPEK,*basisp,sicsol.C,measure,W,verbose);
 	if(verbose) printf("\n");
-      }
-    }
-  } else {
-    if(localization) {
-      // Localize starting guess with threshold 10.0
-      arma::cx_mat Wloc(W);
-      if(verbose) printf("\nRefining localization.\n");
-      double measure=10.0;
-      boys_localization(*basisp,sicsol.C,measure,Wloc,verbose);
-      if(verbose) printf("\n");
-
-      // Compare SIC energies
-      PZSIC worker(this,dft,&grid,verbose);
-      worker.set(sicsol,pzcor);
-      double E=2*worker.cost_func(W);
-      double Eloc=2*worker.cost_func(Wloc);
-
-      if(Eloc>E) {
-	W=Wloc;
-	if(verbose) printf("Using localized transformation matrix, SIC energy %e vs %e.\n",Eloc,E);
-      } else {
-	if(verbose) printf("Using old transformation matrix, SIC energy %e vs %e.\n",E,Eloc);
       }
     }
   }
@@ -640,31 +641,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial alpha localization.\n");
-	double measure=10.0;
-	boys_localization(*basisp,sicsola.C,measure,Wa,verbose);
+	double measure=1e-3;
+	orbital_localization(PIPEK,*basisp,sicsola.C,measure,Wa,verbose);
 	if(verbose) printf("\n");
-      }
-    }
-  } else {
-    if(localization) {
-      // Localize starting guess with threshold 10.0
-      arma::cx_mat Wloca(Wa);
-      if(verbose) printf("\nRefining alpha localization.\n");
-      double measure=10.0;
-      boys_localization(*basisp,sicsola.C,measure,Wloca,verbose);
-      if(verbose) printf("\n");
-
-      // Compare SIC energies
-      PZSIC worker(this,dft,&grid,verbose);
-      worker.set(sicsola,pzcor);
-      double E=worker.cost_func(Wa);
-      double Eloc=worker.cost_func(Wloca);
-
-      if(Eloc>E) {
-	Wa=Wloca;
-	if(verbose) printf("Using localized transformation matrix, SIC energy %e vs %e.\n",Eloc,E);
-      } else {
-	if(verbose) printf("Using old transformation matrix, SIC energy %e vs %e.\n",E,Eloc);
       }
     }
   }
@@ -680,31 +659,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial beta localization.\n");
-	double measure=10.0;
-	boys_localization(*basisp,sicsolb.C,measure,Wb,verbose);
+	double measure=1e-3;
+	orbital_localization(PIPEK,*basisp,sicsolb.C,measure,Wb,verbose);
 	if(verbose) printf("\n");
-      }
-    }
-  } else {
-    if(localization) {
-      // Localize starting guess with threshold 10.0
-      arma::cx_mat Wlocb(Wb);
-      if(verbose) printf("\nRefining beta localization.\n");
-      double measure=10.0;
-      boys_localization(*basisp,sicsolb.C,measure,Wlocb,verbose);
-      if(verbose) printf("\n");
-
-      // Compare SIC energies
-      PZSIC worker(this,dft,&grid,verbose);
-      worker.set(sicsolb,pzcor);
-      double E=worker.cost_func(Wb);
-      double Eloc=worker.cost_func(Wlocb);
-
-      if(Eloc>E) {
-	Wb=Wlocb;
-	if(verbose) printf("Using localized transformation matrix, SIC energy %e vs %e.\n",Eloc,E);
-      } else {
-	if(verbose) printf("Using old transformation matrix, SIC energy %e vs %e.\n",E,Eloc);
       }
     }
   }
@@ -1992,7 +1949,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-void boys_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod met, enum unitacc acc) {
+void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize) {
   Timer t;
 
   // Threshold
@@ -2001,50 +1958,19 @@ void boys_localization(const BasisSet & basis, const arma::mat & C, double & mea
     thr=measure;
 
   // Worker
-  Boys worker(basis,C,thr,verbose);
-  measure=worker.optimize(U,met,acc);
-
-  if(verbose) {
-    printf("Localization done in %s.\n",t.elapsed().c_str());
-    fflush(stdout);
+  if(met==BOYS) {
+    Boys worker(basis,C,thr,verbose,delocalize);
+    measure=worker.optimize(U,umet,uacc);
+  } else if(met==PIPEK) {
+    Pipek worker(basis,C,thr,verbose);
+    measure=worker.optimize(U,umet,uacc);
+  } else if(met==EDMINSTON) {
+    Edminston worker(basis,C,thr,verbose);
+    measure=worker.optimize(U,umet,uacc);
+  } else {
+    ERROR_INFO();
+    throw std::runtime_error("Method not implemented.\n");
   }
-}
-
-void pipek_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod met, enum unitacc acc) {
-  Timer t;
-
-  if(verbose)
-    printf("Localizing orbitals.\n");
-
-  // Threshold
-  double thr=1e-6;
-  if(measure>0.0)
-    thr=measure;
-
-  // Worker
-  Pipek worker(basis,C,thr,verbose);
-  measure=worker.optimize(U,met,acc);
-
-  if(verbose) {
-    printf("Localization done in %s.\n",t.elapsed().c_str());
-    fflush(stdout);
-  }
-}
-
-void edminston_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod met, enum unitacc acc) {
-  Timer t;
-
-  if(verbose)
-    printf("Localizing orbitals.\n");
-
-  // Threshold
-  double thr=1e-6;
-  if(measure>0.0)
-    thr=measure;
-
-  // Worker
-  Edminston worker(basis,C,thr,verbose);
-  measure=worker.optimize(U,met,acc);
 
   if(verbose) {
     printf("Localization done in %s.\n",t.elapsed().c_str());
@@ -2070,7 +1996,7 @@ arma::mat interpret_force(const arma::vec & f) {
   return retf;
 }
 
-Boys::Boys(const BasisSet & basis, const arma::mat & C, double thr, bool ver) : Unitary(4,thr,false,ver) {
+Boys::Boys(const BasisSet & basis, const arma::mat & C, double thr, bool ver, bool delocalize) : Unitary(4,thr,delocalize,ver) {
   // Get R^2 matrix
   std::vector<arma::mat> momstack=basis.moment(2);
   rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
@@ -2170,7 +2096,7 @@ void Boys::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)
   der=cost_der(W);
 }
 
-Pipek::Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool ver) : Unitary(4,thr,true,ver) {
+Pipek::Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool ver, bool delocalize) : Unitary(4,thr,!delocalize,ver) {
   // Get overlap matrix
   arma::mat S=basis.overlap();
   // Helper matrix
@@ -2266,7 +2192,7 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   der=cost_der(W);
 }
 
-Edminston::Edminston(const BasisSet & basis, const arma::mat & Cv, double thr, bool ver) : Unitary(4,thr,true,ver) {
+Edminston::Edminston(const BasisSet & basis, const arma::mat & Cv, double thr, bool ver, bool delocalize) : Unitary(4,thr,!delocalize,ver) {
   // Store orbitals
   C=Cv;
   // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, no Hartree-Fock
@@ -2454,7 +2380,7 @@ void PZSIC::initialize(const arma::cx_mat & W0) {
   double R, K;
   get_rk(R,K);
   // Set tolerance on kappa
-  kappatol=std::max( K/R*5e-1, 5e-1 );
+  kappatol=std::max( 0.5*K/R, 0.25 );
 }
 
 bool PZSIC::converged(const arma::cx_mat & W) {

@@ -326,7 +326,7 @@ class SCF {
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
   void PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid);
-  
+
   /// Calculate force in restricted Hartree-Fock
   arma::vec force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol);
   /// Calculate force in restricted open-shell Hartree-Fock
@@ -463,7 +463,7 @@ class Boys : public Unitary {
   void print_step(enum unitmethod & met, double step) const;
 
  public:
-  Boys(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
+  Boys(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
   ~Boys();
 
   /// Evaluate cost function
@@ -483,7 +483,7 @@ class Pipek : public Unitary {
   void print_step(enum unitmethod & met, double step) const;
 
  public:
-  Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
+  Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
   ~Pipek();
 
   /// Evaluate cost function
@@ -506,7 +506,7 @@ class Edminston : public Unitary {
   void print_step(enum unitmethod & met, double step) const;
 
  public:
-  Edminston(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true);
+  Edminston(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
   ~Edminston();
 
   /// Evaluate cost function
@@ -586,14 +586,18 @@ class PZSIC : public Unitary {
   arma::mat get_HSIC() const;
 };
 
+/// Localization methods
+enum locmet {
+  /// Boys
+  BOYS,
+  /// Pipek-Mezey
+  PIPEK,
+  /// Edminston-Ruedenberg
+  EDMINSTON
+};
 
-/// Boys localization. Initial value of measure is taken as the convergence threshold
-void boys_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR);
-/// Pipek-Mezey localization. Initial value of measure is taken as the convergence threshold
-void pipek_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR);
-/// Edminston-Ruedenberg localization. Initial value of measure is taken as the convergence threshold
-void edminston_localization(const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR);
-
+/// Orbital localization. Initial value of measure is taken as the convergence threshold
+void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false);
 
 #include "checkpoint.h"
 
