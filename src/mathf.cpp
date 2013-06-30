@@ -288,6 +288,36 @@ arma::mat randn_mat(size_t M, size_t N, unsigned long int seed) {
   return mat;
 }
 
+arma::mat real_orthogonal(size_t N, unsigned long int seed) {
+  arma::mat U(N,N);
+  U.zeros();
+
+  // Generate totally random matrix
+  arma::mat A=randn_mat(N,N,seed);
+
+  // Perform QR decomposition on matrix
+  arma::mat Q, R;
+  bool ok=arma::qr(Q,R,A);
+  if(!ok) {
+    ERROR_INFO();
+    throw std::runtime_error("QR decomposition failure in complex_unitary.\n");
+  }
+
+  // Check that Q is orthogonal
+  arma::mat test=Q*arma::trans(Q);
+  arma::mat eye(test);
+  eye.eye();
+
+  test=test-eye;
+  double n=rms_norm(test);
+  if(n>10*DBL_EPSILON) {
+    ERROR_INFO();
+    throw std::runtime_error("Generated matrix is not unitary!\n");
+  }
+
+  return Q;
+}
+
 arma::cx_mat complex_unitary(size_t N, unsigned long int seed) {
   arma::cx_mat U(N,N);
   U.zeros();
@@ -303,16 +333,13 @@ arma::cx_mat complex_unitary(size_t N, unsigned long int seed) {
     throw std::runtime_error("QR decomposition failure in complex_unitary.\n");
   }
 
-  // Perturb the phases randomly
-  //  Q*=arma::diagmat(exp(std::complex<double>(0.0,2.0*M_PI)*arma::randu<arma::cx_mat>(N,1)));
-
   // Check that Q is unitary
   arma::cx_mat test=Q*arma::trans(Q);
   arma::cx_mat eye(test);
   eye.eye();
 
   test=test-eye;
-  double n=arma::norm(test,"fro")/(N*N); // Frobenius norm
+  double n=rms_cnorm(test);
   if(n>10*DBL_EPSILON) {
     ERROR_INFO();
     throw std::runtime_error("Generated matrix is not unitary!\n");

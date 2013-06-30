@@ -116,7 +116,9 @@ arma::mat randu_mat(size_t M, size_t N, unsigned long int seed=0);
 /// Get random matrix
 arma::mat randn_mat(size_t M, size_t N, unsigned long int seed=0);
 
-/// Get complex unitary matrix of size N
+/// Get random real orthogonal matrix of size N
+arma::mat real_orthogonal(size_t N, unsigned long int seed=0);
+/// Get random complex unitary matrix of size N
 arma::cx_mat complex_unitary(size_t N, unsigned long int seed=0);
 
 #endif
