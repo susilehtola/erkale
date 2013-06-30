@@ -20,6 +20,7 @@
 #include "mathf.h"
 #include "stringutil.h"
 #include "timer.h"
+#include "linalg.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -30,16 +31,7 @@
 #include <omp.h>
 #endif
 
-enum locmet {
-  // Boys
-  BOYS,
-  // Pipek-Mezey
-  PIPEK,
-  // Edminston-Ruedenberg
-  EDMINSTON
-};
-
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc) {
+void localize_wrk(const BasisSet & basis, arma::mat & C, const arma::mat & H, arma::vec & E, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
@@ -70,27 +62,32 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const st
       Cwrk.col(io)=C.col(orbidx[io]);
     
     // Localizing matrix
-    arma::cx_mat U(orbidx.size(),orbidx.size());
-    U.eye();
+    arma::cx_mat U;
+    if(randomize)
+      U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),orbidx.size());
+    else
+      U.eye(orbidx.size(),orbidx.size());
     double measure=1e-7;
     
     // Run localization
-    printf("Localizing orbitals:");
+    if(delocalize)
+      printf("Delocalizing orbitals:");
+    else
+      printf("Localizing   orbitals:");
     for(size_t io=0;io<orbidx.size();io++)
       printf(" %i",(int) orbidx[io]+1);
     printf("\n");
-    
-    if(method==BOYS)
-      boys_localization(basis,Cwrk,measure,U,true,umet,acc);
-    else if(method==PIPEK)
-      pipek_localization(basis,Cwrk,measure,U,true,umet,acc);
-    else if(method==EDMINSTON)
-      edminston_localization(basis,Cwrk,measure,U,true,umet,acc);
+
+    orbital_localization(method,basis,Cwrk,measure,U,true,umet,acc,delocalize);
     
     // Transform orbitals
     arma::mat Cloc=arma::real(Cwrk*U);
     // and energies
-    arma::vec Eloc=arma::real(E*U);
+    arma::vec Eloc(orbidx.size());
+    for(size_t io=0;io<orbidx.size();io++)
+      Eloc(io)=arma::as_scalar(arma::trans(Cloc.col(io))*H*Cloc.col(io));
+    // and sort them in the new energy order
+    sort_eigvec(Eloc,Cloc);
     
     // Update orbitals and energies
     for(size_t io=0;io<orbidx.size();io++)
@@ -101,9 +98,9 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const st
 }
 
 
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc) {
+void localize(const BasisSet & basis, arma::mat & C, const arma::mat & H, arma::vec & E, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize) {
   // Run localization, occupied space
-  localize_wrk(basis,C,E,occs,method,umet,acc);
+  localize_wrk(basis,C,H,E,occs,method,umet,acc,randomize,delocalize);
 
   // Run localization, virtual space
   if(virt) {
@@ -112,7 +109,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, std::vector<
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,E,occs,method,umet,acc);
+    localize_wrk(basis,C,H,E,occs,method,umet,acc,randomize,delocalize);
   }
 }
 
@@ -136,11 +133,13 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadChk","Checkpoint to load","erkale.chk");
   set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
-  set.add_string("Localization","Localization method: BF, PM, ER","BF");
+  set.add_string("Method","Localization method: BF, PM, ER","BF");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
   set.add_string("Logfile","File to store standard output in","stdout");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR","CGPR");
   set.add_string("LineSearch","Line search to use: poly_df, poly_fdf, armijo","poly_df");
+  set.add_bool("Randomize","Use random starting point instead of canonical orbitals?",true);
+  set.add_bool("Delocalize","Run delocalization instead of localization",false);
   set.parse(argv[1]);
   set.print();
 
@@ -163,7 +162,7 @@ int main(int argc, char **argv) {
 
   // Determine method
   enum locmet method;
-  std::string mets=set.get_string("Localization");
+  std::string mets=set.get_string("Method");
   if(stricmp(mets,"BF")==0)
     method=BOYS;
   else if(stricmp(mets,"PM")==0)
@@ -205,6 +204,10 @@ int main(int argc, char **argv) {
     }
   }
 
+  // Use randomized starting point?
+  bool randomize=set.get_bool("Randomize");
+  bool delocalize=set.get_bool("Delocalize");
+
   // Open checkpoint in read-write mode, don't truncate
   Checkpoint chkpt(savename,true,false);
     
@@ -220,6 +223,9 @@ int main(int argc, char **argv) {
     // Orbitals
     arma::mat C;
     chkpt.read("C",C);
+    // potentials
+    arma::mat H;
+    chkpt.read("H",H);
     // and energies
     arma::vec E;
     chkpt.read("E",E);
@@ -232,7 +238,7 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,E,occs,virt,method,umet,acc);
+    localize(basis,C,H,E,occs,virt,method,umet,acc,randomize,delocalize);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -242,6 +248,10 @@ int main(int argc, char **argv) {
     arma::mat Ca, Cb;
     chkpt.read("Ca",Ca);
     chkpt.read("Cb",Cb);
+    // potentials
+    arma::mat Ha, Hb;
+    chkpt.read("Ha",Ha);
+    chkpt.read("Hb",Hb);
     // and energies
     arma::vec Ea, Eb;
     chkpt.read("Ea",Ea);
@@ -257,8 +267,8 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,Ea,occa,virt,method,umet,acc);
-    localize(basis,Cb,Eb,occb,virt,method,umet,acc);
+    localize(basis,Ca,Ha,Ea,occa,virt,method,umet,acc,randomize,delocalize);
+    localize(basis,Cb,Hb,Eb,occb,virt,method,umet,acc,randomize,delocalize);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
