@@ -16,6 +16,7 @@
 
 #include "properties.h"
 #include "stringutil.h"
+#include "dftgrid.h"
 
 arma::mat mulliken_overlap(const BasisSet & basis, const arma::mat & P) {
   // Amount of nuclei in basis set
@@ -135,6 +136,100 @@ arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
   return ret;
 }
 
+void becke_analysis(const BasisSet & basis, const arma::mat & P) {
+  // Get charges
+  arma::mat q=becke_charges(basis,P);
+
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    nucleus_t nuc=basis.get_nucleus(inuc);
+    if(!nuc.bsse)
+      q(inuc,0)+=nuc.Z;
+  }
+
+  printf("\nBecke charges\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i));
+}  
+
+void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
+  // Get charges
+  arma::mat q=becke_charges(basis,Pa,Pb);
+
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    nucleus_t nuc=basis.get_nucleus(inuc);
+    if(!nuc.bsse)
+      q(inuc,2)+=nuc.Z;
+  }
+
+  printf("\nBecke charges: alpha, beta, total (incl. nucleus)\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i,0), q(i,1), q(i,2));
+}  
+
+arma::mat becke_charges(const BasisSet & basis, const arma::mat & P) {
+  arma::mat q(basis.get_Nnuc(),1);
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    
+    // Helper. Non-verbose operation
+    DFTGrid intgrid(&basis,false);
+    // Use 200 radial shells and 230 angular points (l=25). Dummy
+    // exchange and correlation - only need function values, no
+    // gradients or laplacians.
+    intgrid.construct(200,25,0,0);
+
+    // Loop over atoms
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+      // Get atomic overlap matrix
+      arma::mat Sat=intgrid.eval_overlap(inuc);
+      
+      // Compute charges
+      q(inuc)=-arma::trace(P*Sat);
+    }
+  }
+
+  return q;
+}
+
+arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
+  arma::mat q(basis.get_Nnuc(),3);
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    
+    // Helper. Non-verbose operation
+    DFTGrid intgrid(&basis,false);
+    // Use 200 radial shells and 230 angular points (l=25). Dummy
+    // exchange and correlation - only need function values, no
+    // gradients or laplacians.
+    intgrid.construct(200,25,0,0);
+
+    // Loop over atoms
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+      // Get atomic overlap matrix
+      arma::mat Sat=intgrid.eval_overlap(inuc);
+      
+      // Compute charges
+      q(inuc,0)=-arma::trace(Pa*Sat);
+      q(inuc,1)=-arma::trace(Pb*Sat);
+      q(inuc,2)=q(inuc,0)+q(inuc,1);
+    }
+  }
+  
+  return q;
+}
+
 void population_analysis(const BasisSet & basis, const arma::mat & P) {
 
   // Mulliken overlap
@@ -160,7 +255,8 @@ void population_analysis(const BasisSet & basis, const arma::mat & P) {
   printf("\nElectron density at nuclei\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i));
-  printf("\n");
+
+  //  becke_analysis(basis,P);
 
   // These generate a lot of output
   /*
@@ -207,7 +303,8 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
   printf("\nElectron density at nuclei: alpha, beta, total\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i,0), nucd(i,1), nucd(i,2));
-  printf("\n");
+
+  //  becke_analysis(basis,Pa,Pb);
 
   // These generate a lot of output
   /*
