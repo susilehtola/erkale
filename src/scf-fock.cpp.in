@@ -506,8 +506,14 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
     // Print out hamiltonians
 #ifdef RESTRICTED
+    sol.C.print("C");
+    sol.P.print("P");
     sol.H.print("H");
 #else
+    sol.Ca.print("Ca");
+    sol.Cb.print("Cb");
+    sol.Pa.print("Pa");
+    sol.Pb.print("Pb");
     sol.Ha.print("Ha");
     sol.Hb.print("Hb");
 #endif   
