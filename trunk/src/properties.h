@@ -25,7 +25,15 @@
  * Mayer (IM), Kluwer Academic 2003.
  */
 
+/// Compute Becke charges
+arma::mat becke_charges(const BasisSet & basis, const arma::mat & P);
+/// Compute Becke charges
+arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
+/// Compute Becke analysis
+void becke_analysis(const BasisSet & basis, const arma::mat & P);
+/// Compute Becke analysis
+void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
 /**
  * Computes Mulliken's overlap population
