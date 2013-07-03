@@ -21,7 +21,126 @@
 #include "timer.h"
 #include <algorithm>
 
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings set) {
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<GaussianShell> & shells, std::vector<size_t> & shellidx, arma::vec & atE, arma::mat & atP, bool dropshells) {
+  // Nucleus is
+  nucleus_t nuc=basis.get_nucleus(inuc);
+
+  // Set number
+  nuc.ind=0;
+  nuc.r.x=0.0;
+  nuc.r.y=0.0;
+  nuc.r.z=0.0;
+
+  // Settings to use
+  Settings set;
+  set.add_scf_settings();
+  set.add_dft_settings();
+  set.add_bool("ForcePol","Force polarized calculation",true);
+  set.add_string("SaveChk","Save calculation to","");
+  set.add_string("LoadChk","Load calculation from","");
+  set.add_bool("FreezeCore","Freeze atomic cores",false);
+
+  set.set_string("Guess","Core");
+  set.set_int("MaxIter",200);
+  set.set_bool("DensityFitting",false);
+  set.set_bool("Verbose",false);
+  set.set_bool("Direct",false);
+  set.set_bool("DensityFitting",false);
+  
+  // Don't do PZ-SIC for the initial guess.
+  try {
+    set.set_string("PZ-SIC","No");
+  } catch(...) {
+  }
+  
+  // Use default convergence settings
+  set.set_bool("UseDIIS",true);
+  set.set_bool("UseADIIS",true);
+  set.set_bool("UseBroyden",false);
+  set.set_bool("UseTRRH",false);
+  // and default charge
+  set.set_int("Charge", 0);
+
+  // Method
+  set.set_string("Method",method);
+
+  // Relax convergence requirements - open shell atoms may be hard to
+  // converge
+  set.set_double("DeltaPmax",1e-5);
+  set.set_double("DeltaPrms",1e-6);
+
+
+
+  // Construct the basis set
+  BasisSet atbas(1,set);
+  // Add the nucleus
+  atbas.add_nucleus(nuc);
+  
+  // Add the shells relevant for a single atom.
+  int ammax;
+  if(dropshells) {
+    if(nuc.Z<3)
+      // Only s electrons up to lithium
+      ammax=0;
+    else if(nuc.Z<21)
+      // s and p electrons
+      ammax=1;
+    else if(nuc.Z<57)
+      // s, p and d electrons
+      ammax=2;
+    else
+      // s, p, d and f electrons
+      ammax=3;
+  } else {
+    ammax=basis.get_max_am();
+  }
+  
+  shells=basis.get_funcs(inuc);
+  // Indices of shells included
+  shellidx.clear();
+  for(size_t ish=0;ish<shells.size();ish++) {
+    if(shells[ish].get_am()<=ammax) {
+      // Add shell on zeroth atom, don't sort
+      atbas.add_shell(0,shells[ish],false);
+      shellidx.push_back(ish);
+    }
+  }
+  
+  // Finalize basis set
+  atbas.finalize();
+  
+  // Determine ground state
+  gs_conf_t gs=get_ground_state(nuc.Z);
+  
+  // Set multiplicity
+  set.set_int("Multiplicity",gs.mult);
+  
+  // Temporary file name
+  char *tmpname=tempnam("./",".chk");
+  set.set_string("SaveChk",tmpname);
+  
+  // Run calculation
+  calculate(atbas,set);
+  
+  // Re-get shells in the new indexing.
+  shells=atbas.get_funcs(0);
+  
+  // Load energies and density matrix
+  {
+    // Checkpoint
+    Checkpoint chkpt(tmpname,false);
+    
+    chkpt.read("Ea",atE);
+    chkpt.read("P",atP);
+  }
+  
+  // Remove temporary file
+  remove(tmpname);
+  // Free memory
+  free(tmpname);
+}
+
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -38,38 +157,10 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
   // Print out info?
   bool verbose=set.get_bool("Verbose");
 
-  // Settings to use
-  set.set_string("Guess","Core");
-  set.set_int("MaxIter",200);
-  set.set_bool("DensityFitting",false);
-  set.set_bool("ForcePol",true);
-  set.set_bool("Verbose",false);
-  set.set_bool("Direct",false);
-  set.set_bool("DensityFitting",false);
-
-  // Don't do PZ-SIC for the initial guess.
-  try {
-    set.set_string("PZ-SIC","No");
-  } catch(...) {
-  }
-
-  // Use default convergence settings
-  set.set_bool("UseDIIS",true);
-  set.set_bool("UseADIIS",true);
-  set.set_bool("UseBroyden",false);
-  set.set_bool("UseTRRH",false);
-  // and default charge
-  set.set_int("Charge", 0);
-
-  // Change guess method
+  std::string method=set.get_string("Method");
   if(stricmp(set.get_string("AtomGuess"),"Auto")!=0)
-    set.set_string("Method",set.get_string("AtomGuess"));
-
-  // Relax convergence requirements - open shell atoms may be hard to
-  // converge
-  set.set_double("DeltaPmax",1e-5);
-  set.set_double("DeltaPrms",1e-6);
-
+    method=set.get_string("AtomGuess");
+  
   if(verbose) {
     printf("Performing atomic guess for atoms:\n");
     fprintf(stderr,"Calculating initial atomic guess ... ");
@@ -94,85 +185,18 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings
       fflush(stdout);
     }
 
-    // Nucleus is
-    nucleus_t nuc=basis.get_nucleus(idnuc[i][0]);
-    // Set number
-    nuc.ind=0;
-    nuc.r.x=0.0;
-    nuc.r.y=0.0;
-    nuc.r.z=0.0;
-
-    // Construct the basis set
-    BasisSet atbas(1,set);
-    // Add the nucleus
-    atbas.add_nucleus(nuc);
-
-    // Add the shells relevant for a single atom.
-    int ammax;
-    if(nuc.Z<3)
-      // Only s electrons up to lithium
-      ammax=0;
-    else if(nuc.Z<21)
-      // s and p electrons
-      ammax=1;
-    else if(nuc.Z<57)
-      // s, p and d electrons
-      ammax=2;
-    else
-      // s, p, d and f electrons
-      ammax=3;
-
-    std::vector<GaussianShell> shells=basis.get_funcs(idnuc[i][0]);
-    // Indices of shells included
-    std::vector<size_t> shellidx;
-    for(size_t ish=0;ish<shells.size();ish++) {
-      // Add shell on zeroth atom, don't sort
-      if(shells[ish].get_am()<=ammax) {
-	atbas.add_shell(0,shells[ish],false);
-	shellidx.push_back(ish);
-      }
-    }
-
-    // Finalize basis set
-    atbas.finalize();
-
-    // Determine ground state
-    gs_conf_t gs=get_ground_state(nuc.Z);
-
-    // Set multiplicity
-    set.set_int("Multiplicity",gs.mult);
-
-    // Temporary file name
-    char *tmpname=tempnam("./",".chk");
-    set.set_string("SaveChk",tmpname);
-
-    // Run calculation
-    calculate(atbas,set);
-    
-    // Re-get shells, in new indexing.
-    shells=atbas.get_funcs(0);
-    
-    // Load energies and density matrix
-    arma::vec atEa;
+    arma::vec atE;
     arma::mat atP;
+    std::vector<GaussianShell> shells;
+    std::vector<size_t> shellidx;
 
-    {
-      // Checkpoint
-      Checkpoint chkpt(tmpname,false);
-      
-      chkpt.read("Ea",atEa);
-      chkpt.read("P",atP);
-    }
-
-    // Remove temporary file
-    remove(tmpname);
-    // Free memory
-    free(tmpname);
+    // Perform the guess
+    atomic_guess(basis,idnuc[i][0],method,shells,shellidx,atE,atP,true);
     
     // Store approximate energies
     for(size_t iid=0;iid<idnuc[i].size();iid++)
-      for(size_t io=0;io<atEa.size();io++)
-	orbE.push_back(atEa(io));
+      for(size_t io=0;io<atE.size();io++)
+	orbE.push_back(atE(io));
     
     // Loop over shells
     for(size_t ish=0;ish<shells.size();ish++)
