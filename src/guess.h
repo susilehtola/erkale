@@ -32,7 +32,16 @@
  * However, contrary to the above paper, this version uses atomic
  * densities of the method used in the main calculation instead of ROHF.
  */
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::mat & E, Settings set);
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set);
+
+/**
+ * Worker routine - perform guess for inuc:th atom in basis, using given method.
+ *
+ * Returns the shells on the atom, with shellidx containing the original indices of the shells on the list obtained with get_funcs.
+ *
+ * If dropshells is true, shells with large angular momentum are not included in the calcuation, e.g. the P shell for H and He.
+ */
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<GaussianShell> & shells, std::vector<size_t> & shellidx, arma::vec & atE, arma::mat & atP, bool dropshells);
 
 /// Determine list of identical nuclei, determined by nucleus and basis set
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);
