@@ -299,7 +299,7 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat
   std::vector<size_t> locv;
   for(size_t ish=0;ish<bas.get_Nshells();ish++)
     for(size_t ifunc=0;ifunc<bas.get_Nbf(ish);ifunc++)
-      locv.push_back(bas.get_center_ind(ish));
+      locv.push_back(bas.get_shell_center_ind(ish));
 
   /*
   printf("Functions centered on atoms:\n");

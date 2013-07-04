@@ -404,8 +404,8 @@ std::vector<prod_gaussian_3d> compute_product(const BasisSet & bas, size_t is, s
   std::vector<shellf_t> jcart=bas.get_cart(js);
 
   // Centers of shells
-  coords_t icen=bas.get_center(is);
-  coords_t jcen=bas.get_center(js);
+  coords_t icen=bas.get_shell_center(is);
+  coords_t jcen=bas.get_shell_center(js);
 
   // Returned array
   std::vector<prod_gaussian_3d> ret;

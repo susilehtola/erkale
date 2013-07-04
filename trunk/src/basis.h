@@ -258,9 +258,9 @@ class BasisSet {
   /// Get ind:th shell
   GaussianShell get_shell(size_t shind) const;
   /// Get index of the center of the ind'th shell
-  size_t get_center_ind(size_t shind) const;
+  size_t get_shell_center_ind(size_t shind) const;
   /// Get coordinates of center of ind'th shell
-  coords_t get_center(size_t shind) const;
+  coords_t get_shell_center(size_t shind) const;
 
   /// Get exponential contraction of the ind:th shell
   std::vector<contr_t> get_contr(size_t ind) const;
