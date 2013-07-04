@@ -123,39 +123,37 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     if(verbose)
       print_progress(k);
 
-    // H matrix
-    if(k==1) {
-      // First iteration; initialize with gradient
+    // Compute update coefficient
+    double gamma=0.0;
+    if(acc==SDSA || k==1) {
+      // First step in CG, or steepest descent / steepest ascent
+      gamma=0.0;
+    } else if(acc==CGPR) {
+      // Compute Polak-Ribière coefficient
+      gamma=bracket(G - oldG, G) / bracket(oldG, oldG);
+    } else if(acc==CGFR) {
+      // Fletcher-Reeves
+      gamma=bracket(G, G) / bracket(oldG, oldG);
+    } else
+      throw std::runtime_error("Unsupported update.\n");
+    
+    // Perform update
+    if(gamma==0.0) {
+      // Use gradient direction
       H=G;
-
     } else {
-
-      // Compute update coefficient
-      double gamma=0.0;
-      if(acc==SDSA) {
-	// Steepest descent / steepest ascent
-	gamma=0.0;
-      } else if(acc==CGPR) {
-	// Compute Polak-Ribière coefficient
-	gamma=bracket(G - oldG, G) / bracket(oldG, oldG);
-      } else if(acc==CGFR) {
-	// Fletcher-Reeves
-	gamma=bracket(G, G) / bracket(oldG, oldG);
-      } else
-	throw std::runtime_error("Unsupported update.\n");
-
-      // Perform update
+      // Compute update
       H=G+gamma*H;
       // Make sure H stays skew symmetric
       H=0.5*(H-arma::trans(H));
-
+      
       // Check that update is OK
       if(bracket(G,H)<0.0) {
 	H=G;
 	printf("CG search direction reset.\n");
       }
     }
-
+    
     // Check for convergence.
     if(bracket(G,G)<eps || converged(W)) {
 
