@@ -27,7 +27,7 @@ find_molecules.cpp properties.cpp checkpoint.cpp guess.cpp
 external/storage.cpp external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp
 spherical_harmonics.cpp trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp
 dftfuncs.cpp xcfit.cpp chebyshev.cpp density_fitting.cpp lebedev.cpp
-eriworker.cpp eriworker_transforms.cpp unitary.cpp
+eriworker.cpp eriworker_transforms.cpp unitary.cpp hirshfeld.cpp
 slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
 atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp)
 

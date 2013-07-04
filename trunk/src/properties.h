@@ -35,6 +35,16 @@ void becke_analysis(const BasisSet & basis, const arma::mat & P);
 /// Compute Becke analysis
 void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
+/// Compute Hirshfeld charges
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum, double & Nelhirsh);
+/// Compute Hirshfeld charges
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double & Nelnum, double & Nelhirsh);
+
+/// Compute Hirshfeld analysis
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method);
+/// Compute Hirshfeld analysis
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method);
+
 /**
  * Computes Mulliken's overlap population
  * \f$ d_{AB} = \sum_{\mu \in A} \sum_{\nu in B} P_{\mu \nu} S_{\mu \nu} \f$

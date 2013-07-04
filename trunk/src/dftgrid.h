@@ -32,6 +32,7 @@
 
 #include "global.h"
 #include "basis.h"
+#include "hirshfeld.h"
 
 /**
  * Structure for value of basis function in a point (LDA). The
@@ -215,11 +216,13 @@ class AtomGrid {
 
   /// Construct a fixed size grid
   atomgrid_t construct(const BasisSet & bas, size_t cenind, int nrad, int lmax, bool verbose);
-
   /// Construct adaptively a grid centered on the cenind:th center, restricted calculation
   atomgrid_t construct(const BasisSet & bas, const arma::mat & P, size_t cenind, int x_func, int c_func, bool verbose);
   /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
   atomgrid_t construct(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, int x_func, int c_func, bool verbose);
+
+  /// Construct a dummy grid that is only meant for the overlap matrix (Becke charges)
+  atomgrid_t construct_dummy(const BasisSet & bas, size_t cenind, bool verbose);
 
   /// Construct adaptively a grid centered on the cenind:th center, SIC calculation
   atomgrid_t construct(const BasisSet & bas, const std::vector<arma::mat> & Pa, size_t cenind, int x_func, int c_func, bool restr, bool verbose);
@@ -259,6 +262,8 @@ class AtomGrid {
 
   /// Compute number of electrons
   double compute_Nel() const;
+  /// Compute number of Hirshfeld electrons
+  double compute_Nel(const Hirshfeld & hirsh, size_t inuc) const;
 
   /// Compute memory requirements for grid points
   size_t memory_req_grid() const;
@@ -274,15 +279,22 @@ class AtomGrid {
   /// Evaluate exchange/correlation energy
   double eval_Exc() const;
 
+  /// Evaluate atomic contribution to overlap matrix
+  void eval_overlap(arma::mat & S) const;
+  /// Evaluate diagonal elements of overlap matrix
+  void eval_diag_overlap(arma::vec & S) const;
+  /// Evaluate atomic contribution to Hirshfeld overlap matrix
+  void eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc, arma::mat & S) const;
+
   /// Evaluate Fock matrix, restricted calculation
   void eval_Fxc(arma::mat & H) const;
   /// Evaluate Fock matrix, unrestricted calculation
   void eval_Fxc(arma::mat & Ha, arma::mat & Hb) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
-  void eval_Fxc(std::vector<double> & H) const;
+  void eval_diag_Fxc(arma::vec & H) const;
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
-  void eval_Fxc(std::vector<double> & Ha, std::vector<double> & Hb) const;
+  void eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const;
 
   /// Evaluate force
   arma::vec eval_force(const BasisSet & bas, const arma::mat & P) const;
@@ -338,6 +350,9 @@ class DFTGrid {
   /// Create grid for unrestricted calculation
   void construct(const arma::mat & Pa, const arma::mat & Pb, double tol, int x_func, int c_func);
 
+  /// Create dummy grid for Becke charges (only overlap matrix)
+  void construct_dummy(double tol);
+
   /// Create grid for SIC calculation
   void construct(const std::vector<arma::mat> & Pa, double tol, int x_func, int c_func, bool restr);
 
@@ -355,6 +370,13 @@ class DFTGrid {
   /// Print memory requirements
   void print_memory_req() const;
 
+  /// Evaluate amount of electrons
+  double compute_Nel(const arma::mat & P);
+  /// Evaluate amount of electrons
+  double compute_Nel(const arma::mat & Pa, const arma::mat & Pb);
+  /// Evaluate amount of electrons
+  double compute_Nel(const Hirshfeld & hirsh);
+
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, restricted case
   void eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel);
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, unrestricted case
@@ -362,6 +384,16 @@ class DFTGrid {
 
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, SIC calculation
   void eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa, std::vector<arma::mat> & Ha, std::vector<double> & Exc, std::vector<double> & Nel);
+
+  /// Evaluate overlap matrix numerically
+  arma::mat eval_overlap();
+  /// Evaluate atomic contribution to overlap matrix
+  arma::mat eval_overlap(size_t iat);
+  /// Evaluate overlap matrices numerically
+  std::vector<arma::mat> eval_overlaps();
+
+  /// Evaluate Hirshfeld overlap matrices
+  std::vector<arma::mat> eval_hirshfeld_overlaps(const Hirshfeld & hirsh);
 
   /// Evaluate force
   arma::vec eval_force(int x_func, int c_func, const arma::mat & P);
