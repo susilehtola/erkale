@@ -1,3 +1,19 @@
+/*
+ *                This source code is part of
+ *
+ *                     E  R  K  A  L  E
+ *                             -
+ *                       HF/DFT from Hel
+ *
+ * Written by Susi Lehtola, 2010-2013
+ * Copyright (c) 2010-2013, Susi Lehtola
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ */
+
 #include "unitary.h"
 #include "timer.h"
 #include "mathf.h"
@@ -19,7 +35,7 @@ Unitary::Unitary(int qv, double thr, bool max, bool ver) {
   polynomial_degree=4;
   // and in the fourier transform use
   fourier_samples=3; // three points per period
-  fourier_periods=5; // five quasio-periods  
+  fourier_periods=5; // five quasio-periods
 }
 
 Unitary::~Unitary() {
@@ -77,7 +93,7 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
 
   // Perform any necessary initialization
   initialize(W);
-  
+
   // Iteration number
   size_t k=0;
   J=0;
@@ -89,9 +105,9 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
   while(true) {
     // Increase iteration number
     k++;
-    
+
     Timer t;
-  
+
     // Store old value
     oldJ=J;
 
@@ -102,7 +118,7 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
     // Riemannian gradient, Abrudan 2009 table 3 step 2
     oldG=G;
     G=Gammak*arma::trans(W) - W*arma::trans(Gammak);
-    
+
     // Print progress
     if(verbose)
       print_progress(k);
@@ -132,26 +148,26 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
       H=G+gamma*H;
       // Make sure H stays skew symmetric
       H=0.5*(H-arma::trans(H));
-      
+
       // Check that update is OK
       if(bracket(G,H)<0.0) {
 	H=G;
 	printf("CG search direction reset.\n");
       }
     }
-    
+
     // Check for convergence.
     if(bracket(G,G)<eps || converged(W)) {
-      
+
       if(verbose) {
 	print_time(t);
 	printf("Converged.\n");
 	fflush(stdout);
-	
+
 	// Print classification
 	classify(W);
       }
-      
+
       break;
     } else if(k==maxiter) {
       if(verbose) {
@@ -257,7 +273,7 @@ void Unitary::classify(const arma::cx_mat & W) const {
   // Classify matrix
   double real=rms_norm(arma::real(W));
   double imag=rms_norm(arma::imag(W));
-  
+
   printf("Transformation matrix is");
   if(imag<sqrt(DBL_EPSILON)*real)
     printf(" real");
@@ -265,7 +281,7 @@ void Unitary::classify(const arma::cx_mat & W) const {
     printf(" imaginary");
   else
     printf(" complex");
-  
+
   printf(", re norm %e, im norm %e\n",real,imag);
 }
 
@@ -275,7 +291,7 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
 
   // Step size
   const double deltaTmu=Tmu/(npoints-1);
-  
+
   // Evaluate the first-order derivative of the cost function at the expansion points
   arma::vec mu(npoints);
   arma::vec fp(npoints);
@@ -314,7 +330,7 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
 
   // Step size
   const double deltaTmu=Tmu/(npoints-1);
-  
+
   // Evaluate the first-order derivative of the cost function at the expansion points
   arma::vec mu(npoints);
   arma::vec f(npoints);
@@ -327,7 +343,7 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     arma::cx_mat der;
     cost_func_der(Wtr,f[i],der);
-    
+
     // Compute the derivative
     fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
   }
@@ -462,11 +478,11 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     arma::cx_mat der;
     cost_func_der(Wtr,f(i),der);
-    
+
     // Compute the derivative
     fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
   }
-  
+
   // Compute Hann window
   arma::vec hannw(fourier_length);
   for(int i=0;i<fourier_length;i++)
@@ -529,7 +545,7 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
       // Stop at closest extremum
       break;
     }
-  
+
   // Find closest value of mu
   size_t rootind=0;
   double diffmu=fabs(muval[0]-findmu);
@@ -593,7 +609,7 @@ arma::cx_vec solve_roots_cplx(const arma::cx_vec & a) {
   arma::cx_vec eigval;
   arma::cx_mat eigvec;
   arma::eig_gen(eigval, eigvec, comp);
-  
+
   // Return the sorted roots
   return arma::sort(eigval);
 }
@@ -617,7 +633,7 @@ arma::vec solve_roots(const arma::vec & a) {
 
   // Sort roots
   roots=arma::sort(roots);
-  
+
   return roots;
 }
 
@@ -666,7 +682,7 @@ arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & y, int deg) {
   for(size_t i=0;i<N;i++)
     for(int j=0;j<deg;j++)
       mumat(i,j)=pow(x(i),j);
-  
+
   // Solve for coefficients: mumat * c = y
   arma::vec c;
   bool solveok=arma::solve(c,mumat,y);
@@ -676,7 +692,7 @@ arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & y, int deg) {
     mumat.print("Mu");
     throw std::runtime_error("Error solving for coefficients a.\n");
   }
-  
+
   return c;
 }
 
@@ -709,7 +725,7 @@ arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arm
     ERROR_INFO();
     throw std::runtime_error("Underdetermined polynomial!\n");
   }
-  
+
   // Form mu matrix.
   arma::mat mumat(2*N,deg);
   mumat.zeros();
@@ -721,7 +737,7 @@ arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arm
   for(size_t i=0;i<N;i++)
     for(int j=1;j<deg;j++)
       mumat(i+N,j)=j*pow(x(i),j-1);
-  
+
   // Form rhs vector
   arma::vec data(2*N);
   data.subvec(0,N-1)=y;
@@ -737,7 +753,7 @@ arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arm
     mumat.print("Mu");
     throw std::runtime_error("Error solving for coefficients a.\n");
   }
-  
+
   return c;
 }
 
@@ -819,8 +835,7 @@ double Brockett::unitarity(const arma::cx_mat & W) const {
   arma::cx_mat U=W*arma::trans(W);
   arma::cx_mat eye(W);
   eye.eye();
-  
+
   double norm=pow(arma::norm(U-eye,"fro"),2);
   return 10*log10(norm);
 }
-
