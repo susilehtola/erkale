@@ -21,7 +21,7 @@
 #include "timer.h"
 #include <algorithm>
 
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<GaussianShell> & shells, std::vector<size_t> & shellidx, arma::vec & atE, arma::mat & atP, bool dropshells) {
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells) {
   // Nucleus is
   nucleus_t nuc=basis.get_nucleus(inuc);
 
@@ -69,10 +69,8 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   set.set_double("DeltaPmax",1e-5);
   set.set_double("DeltaPrms",1e-6);
 
-
-
   // Construct the basis set
-  BasisSet atbas(1,set);
+  atbas=BasisSet(1,set);
   // Add the nucleus
   atbas.add_nucleus(nuc);
   
@@ -95,7 +93,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
     ammax=basis.get_max_am();
   }
   
-  shells=basis.get_funcs(inuc);
+  std::vector<GaussianShell> shells=basis.get_funcs(inuc);
   // Indices of shells included
   shellidx.clear();
   for(size_t ish=0;ish<shells.size();ish++) {
@@ -121,9 +119,6 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   
   // Run calculation
   calculate(atbas,set);
-  
-  // Re-get shells in the new indexing.
-  shells=atbas.get_funcs(0);
   
   // Load energies and density matrix
   {
@@ -185,13 +180,15 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
       fflush(stdout);
     }
 
+    BasisSet atbas;
     arma::vec atE;
     arma::mat atP;
-    std::vector<GaussianShell> shells;
     std::vector<size_t> shellidx;
 
     // Perform the guess
-    atomic_guess(basis,idnuc[i][0],method,shells,shellidx,atE,atP,true);
+    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,true);
+    // Get the atomic shells
+    std::vector<GaussianShell> shells=atbas.get_funcs(0);
     
     // Store approximate energies
     for(size_t iid=0;iid<idnuc[i].size();iid++)

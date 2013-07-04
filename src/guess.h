@@ -41,7 +41,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
  *
  * If dropshells is true, shells with large angular momentum are not included in the calcuation, e.g. the P shell for H and He.
  */
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<GaussianShell> & shells, std::vector<size_t> & shellidx, arma::vec & atE, arma::mat & atP, bool dropshells);
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells);
 
 /// Determine list of identical nuclei, determined by nucleus and basis set
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);
