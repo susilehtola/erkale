@@ -110,6 +110,8 @@ template <class T> bool abscomp(const std::complex<T> & a, const std::complex<T>
 
 /// Spline interpolate data (xt,yt) to points in x.
 std::vector<double> spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, const std::vector<double> & x);
+/// Spline interpolate data (xt,yt) to x.
+double spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, double x);
 
 /// Get random matrix
 arma::mat randu_mat(size_t M, size_t N, unsigned long int seed=0);

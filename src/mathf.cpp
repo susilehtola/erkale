@@ -226,7 +226,9 @@ double rms_cnorm(const arma::cx_mat & R) {
 std::vector<double> spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, const std::vector<double> & x) {
   if(xt.size()!=yt.size()) {
     ERROR_INFO();
-    throw std::runtime_error("xt and yt are of different lengths!\n");
+    std::ostringstream oss;
+    oss << "xt and yt are of different lengths - " << xt.size() << " vs " << yt.size() << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
   // Returned data
@@ -244,6 +246,32 @@ std::vector<double> spline_interpolation(const std::vector<double> & xt, const s
   for(size_t i=0;i<x.size();i++) {
     y[i]=gsl_interp_eval(interp,&(xt[0]),&(yt[0]),x[i],acc);
   }
+
+  // Free memory
+  gsl_interp_accel_free(acc);
+  gsl_interp_free(interp);
+
+  return y;
+}
+
+double spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, double x) {
+  if(xt.size()!=yt.size()) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "xt and yt are of different lengths - " << xt.size() << " vs " << yt.size() << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Index accelerator
+  gsl_interp_accel *acc=gsl_interp_accel_alloc();
+  // Interpolant
+  gsl_interp *interp=gsl_interp_alloc(gsl_interp_cspline,xt.size());
+
+  // Initialize interpolant
+  gsl_interp_init(interp,&(xt[0]),&(yt[0]),xt.size());
+
+  // Perform interpolation.
+  double y=gsl_interp_eval(interp,&(xt[0]),&(yt[0]),x,acc);
 
   // Free memory
   gsl_interp_accel_free(acc);
