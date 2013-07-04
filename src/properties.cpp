@@ -169,73 +169,143 @@ void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::ma
 arma::mat becke_charges(const BasisSet & basis, const arma::mat & P) {
   arma::mat q(basis.get_Nnuc(),1);
 
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-    
-    // Helper. Non-verbose operation
-    DFTGrid intgrid(&basis,false);
-    // Use 200 radial shells and 230 angular points (l=25). Dummy
-    // exchange and correlation - only need function values, no
-    // gradients or laplacians.
-    intgrid.construct(200,25,0,0);
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,false);
+  // Construct grid
+  intgrid.construct_dummy(1e-5);
+  // Evaluate overlaps
+  std::vector<arma::mat> Sat=intgrid.eval_overlaps();
 
-    // Loop over atoms
-#ifdef _OPENMP
-#pragma omp for
-#endif
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-      // Get atomic overlap matrix
-      arma::mat Sat=intgrid.eval_overlap(inuc);
-      
-      // Compute charges
-      q(inuc)=-arma::trace(P*Sat);
-    }
+  // Loop over atoms
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Compute charges
+    q(inuc,0)=-arma::trace(P*Sat[inuc]);
   }
-
+  
   return q;
 }
 
 arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
   arma::mat q(basis.get_Nnuc(),3);
 
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-    
-    // Helper. Non-verbose operation
-    DFTGrid intgrid(&basis,false);
-    // Use 200 radial shells and 230 angular points (l=25). Dummy
-    // exchange and correlation - only need function values, no
-    // gradients or laplacians.
-    intgrid.construct(200,25,0,0);
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,false);
+  // Construct grid
+  intgrid.construct_dummy(1e-5);
+  // Evaluate overlaps
+  std::vector<arma::mat> Sat=intgrid.eval_overlaps();
 
-    // Loop over atoms
-#ifdef _OPENMP
-#pragma omp for
-#endif
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-      // Get atomic overlap matrix
-      arma::mat Sat=intgrid.eval_overlap(inuc);
-      
-      // Compute charges
-      q(inuc,0)=-arma::trace(Pa*Sat);
-      q(inuc,1)=-arma::trace(Pb*Sat);
-      q(inuc,2)=q(inuc,0)+q(inuc,1);
-    }
+  // Loop over atoms
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Compute charges
+    q(inuc,0)=-arma::trace(Pa*Sat[inuc]);
+    q(inuc,1)=-arma::trace(Pb*Sat[inuc]);
+    q(inuc,2)=q(inuc,0)+q(inuc,1);
   }
   
   return q;
 }
+
+
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method) {
+  // Get charges
+  double Nelnum, Nelhirsh;
+  arma::mat q=hirshfeld_charges(basis,P,method,Nelnum,Nelhirsh);
+
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    nucleus_t nuc=basis.get_nucleus(inuc);
+    if(!nuc.bsse)
+      q(inuc,0)+=nuc.Z;
+  }
+
+  printf("\nHirshfeld charges\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i));
+  printf("Sum of Hirshfeld charges %e\n",arma::sum(q.col(0)));
+  printf("Integral over    SCF    density %.8f\n",Nelnum);
+  printf("Integral over Hirshfeld density %.8f\n",Nelhirsh);
+}  
+
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method) {
+  // Get charges
+  double Nelnum, Nelhirsh;
+  arma::mat q=hirshfeld_charges(basis,Pa,Pb,method,Nelnum,Nelhirsh);
+
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    nucleus_t nuc=basis.get_nucleus(inuc);
+    if(!nuc.bsse)
+      q(inuc,2)+=nuc.Z;
+  }
+
+  printf("\nHirshfeld charges: alpha, beta, total (incl. nucleus)\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i,0), q(i,1), q(i,2));
+  printf("Sum of Hirshfeld charges %e\n",arma::sum(q.col(2)));
+  printf("Integral over     SCF    density %.8f\n",Nelnum);
+  printf("Integral over Hirshfield density %.8f\n",Nelhirsh);
+}  
+
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum, double & Nelhirsh) {
+  arma::mat q(basis.get_Nnuc(),1);
+
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,false);
+  // Construct grid
+  intgrid.construct_dummy(1e-5);
+
+  // Hirshfeld atomic charges
+  Hirshfeld hirsh;
+  hirsh.compute(basis,method);
+  // Evaluate overlaps
+  std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
+  // Evaluate densities
+  Nelnum=intgrid.compute_Nel(P);
+  Nelhirsh=intgrid.compute_Nel(hirsh);
+    
+  // Loop over atoms
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Compute charges
+    q(inuc,0)=-arma::trace(P*Sat[inuc]);
+  }
+  
+  return q;
+}
+
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double & Nelnum, double & Nelhirsh) {
+  arma::mat q(basis.get_Nnuc(),3);
+
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,false);
+  // Construct grid
+  intgrid.construct_dummy(1e-5);
+
+  // Hirshfeld atomic charges
+  Hirshfeld hirsh;
+  hirsh.compute(basis,method);
+  // Evaluate overlaps
+  std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
+  // Evaluate densities
+  Nelnum=intgrid.compute_Nel(Pa,Pb);
+  Nelhirsh=intgrid.compute_Nel(hirsh);
+  
+  // Loop over atoms
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Compute charges
+    q(inuc,0)=-arma::trace(Pa*Sat[inuc]);
+    q(inuc,1)=-arma::trace(Pb*Sat[inuc]);
+    q(inuc,2)=q(inuc,0)+q(inuc,1);
+  }
+  
+  return q;
+}
+
 
 void population_analysis(const BasisSet & basis, const arma::mat & P) {
 
   // Mulliken overlap
   arma::mat mulov=mulliken_overlap(basis,P);
   // Mulliken charges
-  arma::mat mulq=-sum(mulov);
+  arma::vec mulq=-sum(mulov);
   for(size_t i=0;i<basis.get_Nnuc();i++) {
     nucleus_t nuc=basis.get_nucleus(i);
     if(!nuc.bsse)
@@ -248,13 +318,14 @@ void population_analysis(const BasisSet & basis, const arma::mat & P) {
   // Electron density at nuclei
   arma::vec nucd=nuclear_density(basis,P);
 
-  printf("\nMulliken charges\n");
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), mulq(i));
-
   printf("\nElectron density at nuclei\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i));
+
+  printf("\nMulliken charges\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), mulq(i));
+  printf("Sum of Mulliken charges %e\n",arma::sum(mulq));
 
   //  becke_analysis(basis,P);
 
@@ -296,13 +367,14 @@ void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arm
   nucd.col(1)=nucd_b;
   nucd.col(2)=nucd_a+nucd_b;
 
-  printf("\nMulliken charges: alpha, beta, total (incl. nucleus)\n");
-  for(size_t i=0;i<basis.get_Nnuc();i++)
-    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), mulq(i,0), mulq(i,1), mulq(i,2));
-
   printf("\nElectron density at nuclei: alpha, beta, total\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i,0), nucd(i,1), nucd(i,2));
+
+  printf("\nMulliken charges: alpha, beta, total (incl. nucleus)\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), mulq(i,0), mulq(i,1), mulq(i,2));
+  printf("Sum of Mulliken charges %e\n",arma::sum(mulq.col(2)));
 
   //  becke_analysis(basis,Pa,Pb);
 
