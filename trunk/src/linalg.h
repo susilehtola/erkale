@@ -51,7 +51,7 @@ arma::mat BasOrth(const arma::mat & S, bool verbose);
 arma::mat BasOrth(const arma::mat & S, const Settings & set);
 
 /// Form symmetric matrices S^1/2 and S^-1/2
-void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvhalf, double cutoff);
+void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvhalf, double cutoff=LINTHRES);
 
 /// Transform matrix to vector
 arma::vec MatToVec(const arma::mat & v);
