@@ -434,7 +434,7 @@ void Checkpoint::write(const BasisSet & basis) {
     shdata[i].indstart=basis.get_first_ind(i);
     shdata[i].am=basis.get_am(i);
     shdata[i].uselm=basis.lm_in_use(i);
-    shdata[i].cenind=basis.get_center_ind(i);
+    shdata[i].cenind=basis.get_shell_center_ind(i);
   }
 
   // Create dataset for shared data

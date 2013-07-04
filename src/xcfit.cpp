@@ -1200,7 +1200,7 @@ void XCAtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t i
       // Loop over shells
       for(size_t ish=0;ish<compute_shells.size();ish++) {
 	// Center of shell is
-	coords_t shell_center=bas.get_center(compute_shells[ish]);
+	coords_t shell_center=bas.get_shell_center(compute_shells[ish]);
 	// Compute distance of point to center of shell
 	double shell_dist=norm(shell_center-grid[ip].r);
 	// Add shell to point if it is within the range of the shell
@@ -1243,7 +1243,7 @@ void XCAtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t i
       // Loop over shells
       for(size_t ish=0;ish<compute_shells.size();ish++) {
 	// Center of shell is
-	coords_t shell_center=bas.get_center(compute_shells[ish]);
+	coords_t shell_center=bas.get_shell_center(compute_shells[ish]);
 	// Compute distance of point to center of shell
 	double shell_dist=norm(shell_center-grid[ip].r);
 	// Add shell to point if it is within the range of the shell

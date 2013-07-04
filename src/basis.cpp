@@ -1570,7 +1570,7 @@ size_t BasisSet::get_last_ind(size_t num) const {
   return shells[num].get_last_ind();
 }
 
-size_t BasisSet::get_center_ind(size_t num) const {
+size_t BasisSet::get_shell_center_ind(size_t num) const {
   return shells[num].get_center_ind();
 }
 
@@ -1582,7 +1582,7 @@ GaussianShell BasisSet::get_shell(size_t ind) const {
   return shells[ind];
 }
 
-coords_t BasisSet::get_center(size_t num) const {
+coords_t BasisSet::get_shell_center(size_t num) const {
   return shells[num].get_center();
 }
 

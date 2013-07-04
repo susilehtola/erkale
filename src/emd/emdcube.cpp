@@ -192,7 +192,7 @@ void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
 	    // The current shell is
 	    size_t is=idents[ii][jj];
 	    // and it is centered at
-	    coords_t cen=bas.get_center(is);
+	    coords_t cen=bas.get_shell_center(is);
 	    // thus the phase factor we get is
 	    std::complex<double> phase=exp(std::complex<double>(0.0,-(px*cen.x+py*cen.y+pz*cen.z)));
 
