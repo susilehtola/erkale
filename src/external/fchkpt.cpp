@@ -286,7 +286,7 @@ void load_fchk(const Settings & set, double tol) {
   // Special handling for ROHF
   if(stor.get_int("IROHF")==1) {
     P.zeros();
-    arma::mat Ca=form_orbital(stor,"Alpha MO coefficients");
+    arma::mat Ca=form_orbital_C(stor,"Alpha MO coefficients");
 
     int Nela=stor.get_int("Number of alpha electrons");
     int Nelb=stor.get_int("Number of beta electrons");
@@ -301,9 +301,9 @@ void load_fchk(const Settings & set, double tol) {
   // Form orbitals
   arma::mat Ca, Cb;
   bool restr=false;
-  Ca=form_orbital(stor,"Alpha MO coefficients");
+  Ca=form_orbital_C(stor,"Alpha MO coefficients");
   try {
-    Cb=form_orbital(stor,"Beta MO coefficients");
+    Cb=form_orbital_C(stor,"Beta MO coefficients");
   } catch(std::runtime_error) {
     // Restricted checkpoint
     restr=true;
@@ -314,6 +314,12 @@ void load_fchk(const Settings & set, double tol) {
       Cb=Ca;
     }
   }
+
+  // Energies
+  arma::vec Ea, Eb;
+  Ea=form_orbital_E(stor,"Alpha Orbital Energies");
+  if(!restr)
+    Eb=form_orbital_E(stor,"Beta Orbital Energies");
 
   // Check that everything is OK
   t.set();
@@ -346,6 +352,7 @@ void load_fchk(const Settings & set, double tol) {
   chkpt.write("Restricted",restr);
   if(restr) {
     chkpt.write("C",Ca);
+    chkpt.write("E",Ea);
 
     // Occupations
     std::vector<double> occs(Nel/2,2.0);
@@ -353,6 +360,8 @@ void load_fchk(const Settings & set, double tol) {
   } else {
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
+    chkpt.write("Ea",Ea);
+    chkpt.write("Eb",Eb);
 
     // Occupations
     std::vector<double> occa(Nela,1.0);

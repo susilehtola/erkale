@@ -38,8 +38,11 @@ BasisSet form_basis(const Storage & stor);
 /// Form the density matrix
 arma::mat form_density(const Storage & stor);
 
-/// Get the orbital matrix
-arma::mat form_orbital(const Storage & stor, const std::string & name);
+/// Get the orbital coefficient matrix
+arma::mat form_orbital_C(const Storage & stor, const std::string & name);
+
+/// Get the orbital energies
+arma::vec form_orbital_E(const Storage & stor, const std::string & name);
 
 /*
  * The below are routines needed by the ones above.
