@@ -516,7 +516,7 @@ arma::mat form_density(const Storage & stor) {
 }
 
 /// Get orbital matrix
-arma::mat form_orbital(const Storage & stor, const std::string & name) {
+arma::mat form_orbital_C(const Storage & stor, const std::string & name) {
   // Amount of basis functions
   size_t Nbf=stor.get_int("Number of basis functions");
   // Amount of orbitals
@@ -554,6 +554,31 @@ arma::mat form_orbital(const Storage & stor, const std::string & name) {
   return C;
 }
 
+/// Get orbital energies
+arma::vec form_orbital_E(const Storage & stor, const std::string & name) {
+  // Amount of orbitals
+  size_t Nmo;
+  try {
+    Nmo=stor.get_int("Number of independent functions");
+  } catch(std::runtime_error) {
+    // G03 has spelling error
+    Nmo=stor.get_int("Number of independant functions");
+  }
+
+  // Get the energies
+  std::vector<double> e=stor.get_double_vec(name);
+
+  if(e.size()!=Nmo) {
+    ERROR_INFO();
+    throw std::runtime_error("Not the right amount of orbital energies!\n");
+  }
+
+  arma::vec E(Nmo);
+  for(size_t imo=0;imo<Nmo;imo++)
+    E(imo)=e[imo];
+
+  return E;
+}
 
 /// Form the basis set from the checkpoint file
 BasisSet form_basis(const Storage & stor) {
