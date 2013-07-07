@@ -222,18 +222,26 @@ class AtomGrid {
   atomgrid_t construct(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, int x_func, int c_func, bool verbose);
 
   /// Construct a dummy grid that is only meant for the overlap matrix (Becke charges)
-  atomgrid_t construct_dummy(const BasisSet & bas, size_t cenind, bool verbose);
+  atomgrid_t construct_becke(const BasisSet & bas, size_t cenind, bool verbose);
+  /// Construct a dummy grid that is only meant for the overlap matrix (Hirshfeld charges)
+  atomgrid_t construct_hirshfeld(const BasisSet & bas, size_t cenind, const Hirshfeld & hirsh, bool verbose);
 
   /// Construct adaptively a grid centered on the cenind:th center, SIC calculation
   atomgrid_t construct(const BasisSet & bas, const std::vector<arma::mat> & Pa, size_t cenind, int x_func, int c_func, bool restr, bool verbose);
 
   /// Form shells on an atom, as according to list of radial shells
   void form_grid(const BasisSet & bas, atomgrid_t & g);
+  /// Form shells on an atom, but using Hirshfeld weight instead of Becke weight
+  void form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g);
+
   /// Compute values of basis functions in all grid points
   void compute_bf(const BasisSet & bas, const atomgrid_t & g);
 
   /// Compute Becke weight for grid points on shell irad
   void becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t ir);
+  /// Compute Hirshfeld weight for grid points on shell irad
+  void hirshfeld_weights(const Hirshfeld & hirsh, const atomgrid_t & g, size_t ir);
+
   /// Prune points with small weight
   void prune_points(double tol, const radshell_t & rg);
 
@@ -262,8 +270,6 @@ class AtomGrid {
 
   /// Compute number of electrons
   double compute_Nel() const;
-  /// Compute number of Hirshfeld electrons
-  double compute_Nel(const Hirshfeld & hirsh, size_t inuc) const;
 
   /// Compute memory requirements for grid points
   size_t memory_req_grid() const;
@@ -283,8 +289,6 @@ class AtomGrid {
   void eval_overlap(arma::mat & S) const;
   /// Evaluate diagonal elements of overlap matrix
   void eval_diag_overlap(arma::vec & S) const;
-  /// Evaluate atomic contribution to Hirshfeld overlap matrix
-  void eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc, arma::mat & S) const;
 
   /// Evaluate Fock matrix, restricted calculation
   void eval_Fxc(arma::mat & H) const;
@@ -351,7 +355,9 @@ class DFTGrid {
   void construct(const arma::mat & Pa, const arma::mat & Pb, double tol, int x_func, int c_func);
 
   /// Create dummy grid for Becke charges (only overlap matrix)
-  void construct_dummy(double tol);
+  void construct_becke(double tol);
+  /// Create dummy grid for Hirshfeld charges (only overlap matrix)
+  void construct_hirshfeld(const Hirshfeld & hirsh, double tol);
 
   /// Create grid for SIC calculation
   void construct(const std::vector<arma::mat> & Pa, double tol, int x_func, int c_func, bool restr);
@@ -374,8 +380,6 @@ class DFTGrid {
   double compute_Nel(const arma::mat & P);
   /// Evaluate amount of electrons
   double compute_Nel(const arma::mat & Pa, const arma::mat & Pb);
-  /// Evaluate amount of electrons
-  double compute_Nel(const Hirshfeld & hirsh);
 
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, restricted case
   void eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel);
@@ -387,12 +391,9 @@ class DFTGrid {
 
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();
-  /// Evaluate atomic contribution to overlap matrix
-  arma::mat eval_overlap(size_t iat);
   /// Evaluate overlap matrices numerically
   std::vector<arma::mat> eval_overlaps();
-
-  /// Evaluate Hirshfeld overlap matrices
+  /// Evaluate overlap matrices numerically
   std::vector<arma::mat> eval_hirshfeld_overlaps(const Hirshfeld & hirsh);
 
   /// Evaluate force

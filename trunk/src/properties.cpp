@@ -172,7 +172,7 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & P) {
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,false);
   // Construct grid
-  intgrid.construct_dummy(1e-5);
+  intgrid.construct_becke(1e-5);
   // Evaluate overlaps
   std::vector<arma::mat> Sat=intgrid.eval_overlaps();
 
@@ -191,7 +191,7 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,false);
   // Construct grid
-  intgrid.construct_dummy(1e-5);
+  intgrid.construct_becke(1e-5);
   // Evaluate overlaps
   std::vector<arma::mat> Sat=intgrid.eval_overlaps();
 
@@ -209,8 +209,8 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma
 
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method) {
   // Get charges
-  double Nelnum, Nelhirsh;
-  arma::mat q=hirshfeld_charges(basis,P,method,Nelnum,Nelhirsh);
+  double Nelnum;
+  arma::mat q=hirshfeld_charges(basis,P,method,Nelnum);
 
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     nucleus_t nuc=basis.get_nucleus(inuc);
@@ -222,14 +222,13 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i));
   printf("Sum of Hirshfeld charges %e\n",arma::sum(q.col(0)));
-  printf("Integral over    SCF    density %.8f\n",Nelnum);
-  printf("Integral over Hirshfeld density %.8f\n",Nelhirsh);
+  printf("Integral over density %.8f\n",Nelnum);
 }  
 
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method) {
   // Get charges
-  double Nelnum, Nelhirsh;
-  arma::mat q=hirshfeld_charges(basis,Pa,Pb,method,Nelnum,Nelhirsh);
+  double Nelnum;
+  arma::mat q=hirshfeld_charges(basis,Pa,Pb,method,Nelnum);
 
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     nucleus_t nuc=basis.get_nucleus(inuc);
@@ -241,26 +240,25 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i,0), q(i,1), q(i,2));
   printf("Sum of Hirshfeld charges %e\n",arma::sum(q.col(2)));
-  printf("Integral over     SCF    density %.8f\n",Nelnum);
-  printf("Integral over Hirshfield density %.8f\n",Nelhirsh);
+  printf("Integral over density %.8f\n",Nelnum);
 }  
 
-arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum, double & Nelhirsh) {
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum) {
   arma::mat q(basis.get_Nnuc(),1);
-
-  // Helper. Non-verbose operation
-  DFTGrid intgrid(&basis,false);
-  // Construct grid
-  intgrid.construct_dummy(1e-5);
 
   // Hirshfeld atomic charges
   Hirshfeld hirsh;
   hirsh.compute(basis,method);
+
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,false);
+  // Construct grid
+  intgrid.construct_hirshfeld(hirsh,1e-5);
+
   // Evaluate overlaps
   std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
   // Evaluate densities
   Nelnum=intgrid.compute_Nel(P);
-  Nelhirsh=intgrid.compute_Nel(hirsh);
     
   // Loop over atoms
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
@@ -271,22 +269,22 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::st
   return q;
 }
 
-arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double & Nelnum, double & Nelhirsh) {
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double & Nelnum) {
   arma::mat q(basis.get_Nnuc(),3);
-
-  // Helper. Non-verbose operation
-  DFTGrid intgrid(&basis,false);
-  // Construct grid
-  intgrid.construct_dummy(1e-5);
 
   // Hirshfeld atomic charges
   Hirshfeld hirsh;
   hirsh.compute(basis,method);
+
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,false);
+  // Construct grid
+  intgrid.construct_hirshfeld(hirsh,1e-5);
+
   // Evaluate overlaps
   std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
   // Evaluate densities
   Nelnum=intgrid.compute_Nel(Pa,Pb);
-  Nelhirsh=intgrid.compute_Nel(hirsh);
   
   // Loop over atoms
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {

@@ -261,6 +261,16 @@ void AtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t 
   }
 }
 
+void AtomGrid::hirshfeld_weights(const Hirshfeld & hirsh, const atomgrid_t & g, size_t ir) {
+  // Compute weights of points.
+
+  // Loop over points on wanted radial shell
+  for(size_t ip=g.sh[ir].ind0;ip<g.sh[ir].ind0+g.sh[ir].np;ip++) {
+    // The Hirshfeld weight is
+    grid[ip].w*=hirsh.get_weight(g.atind,grid[ip].r);
+  }
+}
+
 void AtomGrid::prune_points(double tolv, const radshell_t & rg) {
   // Prune points with small weight.
 
@@ -532,14 +542,6 @@ double AtomGrid::compute_Nel() const {
   return nel;
 }
 
-double AtomGrid::compute_Nel(const Hirshfeld & hirsh, size_t inuc) const {
-  double nel=0.0;
-  for(size_t ip=0;ip<grid.size();ip++)
-    nel+=grid[ip].w*hirsh.get_density(inuc,grid[ip].r);
-
-  return nel;
-}
-
 void AtomGrid::init_xc() {
   // Size of grid.
   const size_t N=grid.size();
@@ -740,31 +742,6 @@ void AtomGrid::eval_diag_overlap(arma::vec & S) const {
       size_t i=flist[ii].ind;
 
       S(i)+=grid[ip].w*flist[ii].f*flist[ii].f;
-    }
-  }
-}
-
-void AtomGrid::eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc, arma::mat & S) const {
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Hirshfeld weight in the grid point, including normal grid weight
-    double hw=hirsh.get_weight(inuc,grid[ip].r)*grid[ip].w;
-
-    // Avoid counting zeros
-    if(hw==0.0)
-      continue;
-    
-    // Loop over functions on grid point
-    size_t first=grid[ip].f0;
-    size_t last=first+grid[ip].nf;
-
-    for(size_t ii=first;ii<last;ii++) {
-      // Get index of function
-      size_t i=flist[ii].ind;
-      for(size_t jj=first;jj<last;jj++) {
-	size_t j=flist[jj].ind;
-
-	S(i,j)+=hw*flist[ii].f*flist[jj].f;
-      }
     }
   }
 }
@@ -2139,7 +2116,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   return ret;
 }
 
-atomgrid_t AtomGrid::construct_dummy(const BasisSet & bas, size_t cenind, bool verbose) {
+atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool verbose) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells
   // See Krack 1998 for details
@@ -2254,6 +2231,121 @@ atomgrid_t AtomGrid::construct_dummy(const BasisSet & bas, size_t cenind, bool v
   return ret;
 }
 
+atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, const Hirshfeld & hirsh, bool verbose) {
+  // Construct a grid centered on (x0,y0,z0)
+  // with nrad radial shells
+  // See Krack 1998 for details
+
+  // Returned info
+  atomgrid_t ret;
+  ret.ngrid=0;
+  ret.nfunc=0;
+
+  Timer t;
+
+  // Store index of center
+  ret.atind=cenind;
+  // and its coordinates
+  ret.cen=bas.get_coords(cenind);
+
+  // Compute necessary number of radial points
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+8-element_row[bas.get_Z(ret.atind)])));
+
+  // Get Chebyshev nodes and weights for radial part
+  std::vector<double> xc, wc;
+  chebyshev(nrad,xc,wc);
+
+  // Allocate memory
+  ret.sh.resize(nrad);
+
+  // Loop over radii
+  double rad, jac;
+  for(size_t ir=0;ir<xc.size();ir++) {
+    // Calculate value of radius
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+
+    // Jacobian of transformation is
+    jac=1.0/M_LN2/(1.0-xc[ir]);
+    // so total quadrature weight is
+    double weight=wc[ir]*rad*rad*jac;
+
+    // Store shell data
+    ret.sh[ir].r=rad;
+    ret.sh[ir].w=weight;
+    ret.sh[ir].l=3;
+  }
+
+  // Number of basis functions
+  size_t Nbf=bas.get_Nbf();
+
+  // Determine limit for angular quadrature
+  int lmax=(int) ceil(5.0-6.0*log10(tol));
+
+  // Old and new diagonal elements of overlap
+  arma::vec Sold(Nbf), Snew(Nbf);
+  Sold.zeros();
+
+  // Maximum difference of diagonal elements of Hamiltonian
+  double maxdiff;
+
+  // Now, determine actual quadrature limits shell by shell
+  for(size_t ir=0;ir<ret.sh.size();ir++) {
+
+    do {
+      // Clear current grid points and function values
+      free();
+
+      // Form radial shell
+      if(use_lobatto)
+	add_lobatto_shell(ret,ir);
+      else
+	add_lebedev_shell(ret,ir);
+      // Compute Hirshfeld weights for radial shell
+      hirshfeld_weights(hirsh,ret,ir);
+      // Prune points with small weight
+      prune_points(1e-8*tol,ret.sh[ir]);
+
+      // Compute values of basis functions
+      compute_bf(bas,ret,ir);
+
+      // Compute new overlap
+      Snew.zeros();
+      eval_diag_overlap(Snew);
+
+      // Compute maximum difference of diagonal elements
+      maxdiff=arma::max(arma::abs(Snew-Sold));
+
+      // Copy contents
+      std::swap(Snew,Sold);
+
+      // Increment order if tolerance not achieved.
+      if(maxdiff>tol/xc.size()) {
+	if(use_lobatto)
+	  ret.sh[ir].l+=2;
+	else {
+	  // Need to determine what is next order of Lebedev
+	  // quadrature that is supported.
+	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
+	}
+      }
+    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
+
+    // Increase number of points and function values
+    ret.ngrid+=grid.size();
+    ret.nfunc+=flist.size();
+  }
+
+  // Free memory once more
+  free();
+
+  if(verbose) {
+    printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
+    fflush(stdout);
+  }
+
+  return ret;
+}
+
 AtomGrid::~AtomGrid() {
 }
 
@@ -2273,6 +2365,27 @@ void AtomGrid::form_grid(const BasisSet & bas, atomgrid_t & g) {
       add_lebedev_shell(g,ir);
     // Do Becke weights
     becke_weights(bas,g,ir);
+    // Prune points with small weight
+    prune_points(1e-8*tol,g.sh[ir]);
+  }
+}
+
+void AtomGrid::form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g) {
+  // Clear anything that already exists
+  free();
+
+  // Check allocation
+  grid.reserve(g.ngrid);
+
+  // Loop over radial shells
+  for(size_t ir=0;ir<g.sh.size();ir++) {
+    // Add grid points
+    if(use_lobatto)
+      add_lobatto_shell(g,ir);
+    else
+      add_lebedev_shell(g,ir);
+    // Do Becke weights
+    hirshfeld_weights(hirsh,g,ir);
     // Prune points with small weight
     prune_points(1e-8*tol,g.sh[ir]);
   }
@@ -2624,7 +2737,7 @@ void DFTGrid::construct(const std::vector<arma::mat> & Pa, double tol, int x_fun
   }
 }
 
-void DFTGrid::construct_dummy(double tol) {
+void DFTGrid::construct_becke(double tol) {
 
   // Add all atoms
   if(verbose) {
@@ -2652,7 +2765,46 @@ void DFTGrid::construct_dummy(double tol) {
 #pragma omp for schedule(dynamic,1)
 #endif
     for(size_t i=0;i<Nat;i++) {
-      grids[i]=wrk[ith].construct_dummy(*basp,i,verbose);
+      grids[i]=wrk[ith].construct_becke(*basp,i,verbose);
+    }
+
+  }   // End parallel section
+
+  if(verbose) {
+    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
+}
+
+void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double tol) {
+
+  // Add all atoms
+  if(verbose) {
+    printf("Constructing DFT grid.\n");
+    printf("\t%4s %7s %8s %s\n","atom","Npoints","Nfuncs","t");
+    fflush(stdout);
+  }
+
+  // Set tolerances
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].set_tolerance(tol);
+
+  Timer t;
+  size_t Nat=basp->get_Nnuc();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  { // Begin parallel section
+
+#ifndef _OPENMP
+    int ith=0;
+#else
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<Nat;i++) {
+      grids[i]=wrk[ith].construct_hirshfeld(*basp,i,hirsh,verbose);
     }
 
   }   // End parallel section
@@ -2745,49 +2897,24 @@ std::vector<arma::mat> DFTGrid::eval_hirshfeld_overlaps(const Hirshfeld & hirsh)
     int ith=0;
 #endif
 
+  // Add atomic contributions
 #ifdef _OPENMP
 #pragma omp for
 #endif
-    // Loop over Hirshfeld atoms, so that we parallellize properly
-    for(size_t iat=0;iat<grids.size();iat++) {
-      
-      // Loop over integral grid
-      for(size_t inuc=0;inuc<grids.size();inuc++) {
-	// Change atom and create grid
-	wrk[ith].form_grid(*basp,grids[inuc]);
-	// Compute basis functions
-	wrk[ith].compute_bf(*basp,grids[inuc]);
-	// Evaluate overlap
-	wrk[ith].eval_hirshfeld_overlap(hirsh,iat,Sat[iat]);
-	// Free memory
-	wrk[ith].free();
-      }
+    for(size_t inuc=0;inuc<grids.size();inuc++) {
+      // Change atom and create grid
+      wrk[ith].form_hirshfeld_grid(hirsh,grids[inuc]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[inuc]);
+      // Evaluate overlap
+      wrk[ith].eval_overlap(Sat[inuc]);
+      // Free memory
+      wrk[ith].free();
     }
   }
   
   return Sat;
 }
-
-arma::mat DFTGrid::eval_overlap(size_t inuc) {
-  // Amount of basis functions
-  size_t N=basp->get_Nbf();
-
-  // Returned matrix
-  arma::mat S(N,N);
-  S.zeros();
-
-  // Add atomic contribution. Create grid
-  wrk[0].form_grid(*basp,grids[inuc]);
-  // Compute basis functions
-  wrk[0].compute_bf(*basp,grids[inuc]);
-  // Evaluate overlap
-  wrk[0].eval_overlap(S);
-  // Free memory
-  wrk[0].free();
-
-  return S;
-}
-
 
 double DFTGrid::compute_Nel(const arma::mat & P) {
   double Nel=0.0;
@@ -2858,41 +2985,6 @@ double DFTGrid::compute_Nel(const arma::mat & Pa, const arma::mat & Pb) {
   
   return Nel;
 }
-
-double DFTGrid::compute_Nel(const Hirshfeld & hirsh) {
-  double Nel=0.0;
-
-#ifdef _OPENMP
-#pragma omp parallel reduction(+:Nel)
-#endif
-  {
-    
-#ifdef _OPENMP
-    int ith=omp_get_thread_num();
-#else
-    int ith=0;
-#endif
-    
-#ifdef _OPENMP
-#pragma omp for
-#endif
-    // Loop over integral grid
-    for(size_t inuc=0;inuc<grids.size();inuc++) {
-      // Change atom and create grid
-      wrk[ith].form_grid(*basp,grids[inuc]);
-      // Compute basis functions
-      wrk[ith].compute_bf(*basp,grids[inuc]);
-      // Integrate electrons over all Hirshfeld nuclei
-      for(size_t ih=0;ih<grids.size();ih++)
-	Nel+=wrk[ith].compute_Nel(hirsh,ih);
-      // Free memory
-      wrk[ith].free();
-    }
-  }
-  
-  return Nel;
-}
-
 
 #ifdef CONSISTENCYCHECK
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel) {
