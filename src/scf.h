@@ -448,8 +448,31 @@ arma::mat interpret_force(const arma::vec & f);
 
 #include "unitary.h"
 
+/// Localization methods
+enum locmet {
+  /// Boys
+  BOYS,
+  /// Second central moment
+  BOYS_2,
+  /// Fourth central moment
+  BOYS_4,
+  /// Pipek-Mezey, Mulliken charge
+  PIPEK_MULLIKEN,
+  /// Pipek-Mezey, Löwdin charge
+  PIPEK_LOWDIN,
+  /// Pipek-Mezey, Becke charge
+  PIPEK_BECKE,
+  /// Pipek-Mezey, Hirshfeld charge
+  PIPEK_HIRSHFELD,
+  /// Edminston-Ruedenberg
+  EDMINSTON
+};
+
 /// Boys localization
 class Boys : public Unitary {
+  /// Penalty
+  int n;
+
   /// R^2 matrix
   arma::mat rsq;
   /// r_x matrix
@@ -463,7 +486,9 @@ class Boys : public Unitary {
   void print_step(enum unitmethod & met, double step) const;
 
  public:
-  Boys(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
+  /// Constructor. n gives the penalty power to use
+  Boys(const BasisSet & basis, const arma::mat & C, int n, double thr, bool verbose=true, bool delocalize=false);
+  /// Destructor
   ~Boys();
 
   /// Evaluate cost function
@@ -474,6 +499,7 @@ class Boys : public Unitary {
   void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
 };
 
+
 /// Pipek-Mezey localization
 class Pipek : public Unitary {
   /// Charge matrix in MO basis
@@ -483,7 +509,7 @@ class Pipek : public Unitary {
   void print_step(enum unitmethod & met, double step) const;
 
  public:
-  Pipek(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
+  Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
   ~Pipek();
 
   /// Evaluate cost function
@@ -493,7 +519,6 @@ class Pipek : public Unitary {
   /// Evaluate cost function and its derivative
   void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
 };
-
 
 /// Edminston-Ruedenberg localization
 class Edminston : public Unitary {
@@ -584,16 +609,6 @@ class PZSIC : public Unitary {
   arma::vec get_Eorb() const;
   /// Get SIC Hamiltonian
   arma::mat get_HSIC() const;
-};
-
-/// Localization methods
-enum locmet {
-  /// Boys
-  BOYS,
-  /// Pipek-Mezey
-  PIPEK,
-  /// Edminston-Ruedenberg
-  EDMINSTON
 };
 
 /// Orbital localization. Initial value of measure is taken as the convergence threshold
