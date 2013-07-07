@@ -25,7 +25,7 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P) {
   /// Fill out grid
   while(true) {
     // Compute radius
-    double r=rad.size()*dr;
+    double r=rho.size()*dr;
 
     // Helper
     coords_t hlp;
@@ -34,13 +34,10 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P) {
 
     // Compute density
     d=compute_density(P,basis,hlp);
-
     // Add to stack
-    if(d>0.0) {
-      rad.push_back(r);
-      logrho.push_back(log(d));
-    } else {
-      //      printf("%i points used, max radius %e.\n",(int) rad.size(),rad[rad.size()-1]);
+    rho.push_back(d);
+    // Stop iteration?
+    if(d==0.0) {
       break;
     }
   }
@@ -50,22 +47,24 @@ HirshfeldAtom::~HirshfeldAtom() {
 }
 
 double HirshfeldAtom::get(double r) const {
-  /// Limiting case
-  if(r>rad[rad.size()-1])
+  // Linear interpolation.
+  double rdr=r/dr;
+  // Index of entry is
+  size_t i=(size_t) floor(rdr);
+  
+  // Check limit
+  if(i>=rho.size()-1)
     return 0.0;
-
-  // Otherwise, perform spline interpolation
-  return exp(spline_interpolation(rad,logrho,r));
+  
+  // Perform interpolation
+  return rho[i] + (rho[i+1]-rho[i])*(rdr-i);
 }
 
-std::vector<double> HirshfeldAtom::get_rad() const {
-  return rad;
+double HirshfeldAtom::get_spacing() const {
+  return dr;
 }
 
 std::vector<double> HirshfeldAtom::get_rho() const {
-  std::vector<double> rho(logrho);
-  for(size_t i=0;i<rho.size();i++)
-    rho[i]=exp(rho[i]);
   return rho;
 }
 

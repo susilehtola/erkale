@@ -27,12 +27,9 @@ extern "C" {
 /// Hirshfeld atomic density
 class HirshfeldAtom {
   /// Grid spacing
-  static const double dr=0.01;
-
-  /// Radii
-  std::vector<double> rad;
-  /// Logarithm of density
-  std::vector<double> logrho;
+  static const double dr=0.001;
+  /// Densities
+  std::vector<double> rho;
 
  public:
   /// Dummy constructor
@@ -45,8 +42,8 @@ class HirshfeldAtom {
   /// Evaluate density at r
   double get(double r) const;
 
-  /// Get radii
-  std::vector<double> get_rad() const;
+  /// Get grid spacing
+  double get_spacing() const;
   /// Get densities
   std::vector<double> get_rho() const;
 };
