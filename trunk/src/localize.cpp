@@ -31,6 +31,92 @@
 #include <omp.h>
 #endif
 
+void size_distribution(const BasisSet & basis, arma::mat & C, std::string filename, const std::vector<size_t> & printidx) {
+  // Get the r_i^2 r_j^2 matrices
+  std::vector<arma::mat> momstack=basis.moment(4);
+  // Diagonal: x^4 + y^4 + z^4
+  arma::mat rfour=momstack[getind(4,0,0)] + momstack[getind(0,4,0)] + momstack[getind(0,0,4)] \
+    // Off-diagonal: 2 x^2 y^2 + 2 x^2 z^2 + 2 y^2 z^2
+    +2.0*(momstack[getind(2,2,0)]+momstack[getind(2,0,2)]+momstack[getind(0,2,2)]);
+
+  // Get R^3 matrices
+  momstack=basis.moment(3);
+  std::vector<arma::mat> rrsq(3);
+  // x^3 + xy^2 + xz^2
+  rrsq[0]=momstack[getind(3,0,0)]+momstack[getind(1,2,0)]+momstack[getind(1,0,2)];
+  // x^2y + y^3 + yz^2
+  rrsq[1]=momstack[getind(2,1,0)]+momstack[getind(0,3,0)]+momstack[getind(0,1,2)];
+  // x^2z + y^2z + z^3
+  rrsq[2]=momstack[getind(2,0,1)]+momstack[getind(0,2,1)]+momstack[getind(0,0,3)];
+
+  // Get R^2 matrix
+  momstack=basis.moment(2);
+  std::vector< std::vector<arma::mat> > rr(3);
+  for(int ic=0;ic<3;ic++)
+    rr[ic].resize(3);
+
+  // Diagonal
+  rr[0][0]=momstack[getind(2,0,0)];
+  rr[1][1]=momstack[getind(0,2,0)];
+  rr[2][2]=momstack[getind(0,0,2)];
+
+  // Off-diagonal
+  rr[0][1]=momstack[getind(1,1,0)];
+  rr[1][0]=rr[0][1];
+
+  rr[0][2]=momstack[getind(1,0,1)];
+  rr[2][0]=rr[0][2];
+
+  rr[1][2]=momstack[getind(0,1,1)];
+  rr[2][1]=rr[1][2];
+
+  // and the rsq matrix
+  arma::mat rsq=rr[0][0]+rr[1][1]+rr[2][2];
+
+  // Get r matrices
+  std::vector<arma::mat> rmat=basis.moment(1);
+
+  // Output file
+  FILE *out=fopen(filename.c_str(),"w");
+  for(size_t i=0;i<printidx.size();i++) {
+    // Orbital index is
+    size_t iorb=printidx[i];
+   
+    // r^4 term
+    double rfour_t=arma::as_scalar(arma::trans(C.col(iorb))*rfour*C.col(iorb));
+
+    // rr^2 term
+    arma::vec rrsq_t(3);
+    for(int ic=0;ic<3;ic++)
+      rrsq_t(ic)=arma::as_scalar(arma::trans(C.col(iorb))*rrsq[ic]*C.col(iorb));
+
+    // rr terms
+    arma::mat rr_t(3,3);
+    for(int ic=0;ic<3;ic++)
+      for(int jc=0;jc<=ic;jc++) {
+	rr_t(ic,jc)=arma::as_scalar(arma::trans(C.col(iorb))*rr[ic][jc]*C.col(iorb));
+	rr_t(jc,ic)=rr_t(ic,jc);
+      }
+
+    // <r^2> term
+    double rsq_t=arma::as_scalar(arma::trans(C.col(iorb))*rsq*C.col(iorb));
+
+    // <r> terms
+    arma::vec r_t(3);
+    for(int ic=0;ic<3;ic++)
+      r_t(ic)=arma::as_scalar(arma::trans(C.col(iorb))*rmat[ic]*C.col(iorb));
+
+    // Second moment is
+    double SM=sqrt(rsq_t - arma::dot(r_t,r_t));
+    // Fourth moment is
+    double FM=sqrt(sqrt(rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2)));
+
+    // Print
+    fprintf(out,"%i %e %e\n",(int) iorb+1,SM,FM);
+  }
+  fclose(out);
+}
+
 void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size) {
   // Orbitals to localize
   std::vector<size_t> locorb;
@@ -102,42 +188,8 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const st
   }
 
   // Compute size distribution
-  if(size) {
-    // Get R^2 matrix
-    std::vector<arma::mat> momstack=basis.moment(2);
-    // Get r matrices
-    std::vector<arma::mat> rmat=basis.moment(1);
-
-    arma::mat rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
-    arma::mat rx(rmat[0]), ry(rmat[1]), rz(rmat[2]);
-
-    // Transform to MO basis
-    rsq=arma::trans(C)*rsq*C;
-    rx=arma::trans(C)*rx*C;
-    ry=arma::trans(C)*ry*C;
-    rz=arma::trans(C)*rz*C;
-
-    // Output file
-    FILE *out=fopen(sizedist.c_str(),"w");
-    for(size_t i=0;i<printidx.size();i++) {
-      // Orbital index is
-      size_t iorb=printidx[i];
-      
-      // <r^2> term
-      double w=arma::as_scalar(arma::trans(C.col(iorb))*rsq*C.col(iorb));
-      // <r>^2 terms
-      double xp=arma::as_scalar(arma::trans(C.col(iorb))*rx*C.col(iorb));
-      double yp=arma::as_scalar(arma::trans(C.col(iorb))*ry*C.col(iorb));
-      double zp=arma::as_scalar(arma::trans(C.col(iorb))*rz*C.col(iorb));
-
-      // so orbital spread is
-      double spread=sqrt(w - xp*xp - yp*yp - zp*zp);
-
-      // Print
-      fprintf(out,"%i %e\n",(int) iorb+1,spread);
-    }
-    fclose(out);
-  }
+  if(size)
+    size_distribution(basis,C,sizedist,printidx);
 }
 
 
@@ -176,7 +228,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadChk","Checkpoint to load","erkale.chk");
   set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
-  set.add_string("Method","Localization method: FB, SM, FM, MU, LO, BE, HI, ER","FB");
+  set.add_string("Method","Localization method: FB, FB2, FB3, FB4, FM, FM2, FM3, FM4, MU, LO, BE, HI, ER","FB");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
   set.add_string("Logfile","File to store standard output in","stdout");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR","CGPR");
@@ -211,10 +263,20 @@ int main(int argc, char **argv) {
   std::string mets=set.get_string("Method");
   if(stricmp(mets,"FB")==0)
     method=BOYS;
-  else if(stricmp(mets,"SM")==0)
+  else if(stricmp(mets,"FB2")==0)
     method=BOYS_2;
-  else if(stricmp(mets,"FM")==0)
+  else if(stricmp(mets,"FB3")==0)
+    method=BOYS_3;
+  else if(stricmp(mets,"FB4")==0)
     method=BOYS_4;
+  else if(stricmp(mets,"FM")==0)
+    method=FM_1;
+  else if(stricmp(mets,"FM2")==0)
+    method=FM_2;
+  else if(stricmp(mets,"FM3")==0)
+    method=FM_3;
+  else if(stricmp(mets,"FM4")==0)
+    method=FM_4;
   else if(stricmp(mets,"MU")==0)
     method=PIPEK_MULLIKEN;
   else if(stricmp(mets,"LO")==0)

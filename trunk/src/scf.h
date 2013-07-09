@@ -452,10 +452,20 @@ arma::mat interpret_force(const arma::vec & f);
 enum locmet {
   /// Boys
   BOYS,
-  /// Second central moment
+  /// Boys, penalty 2
   BOYS_2,
-  /// Fourth central moment
+  /// Boys, penalty 3
+  BOYS_3,
+  /// Boys, penalty 4
   BOYS_4,
+  /// Fourth moment
+  FM_1,
+  /// Fourth moment, penalty 2
+  FM_2,
+  /// Fourth moment, penalty 3
+  FM_3,
+  /// Fourth moment, penalty 4
+  FM_4,
   /// Pipek-Mezey, Mulliken charge
   PIPEK_MULLIKEN,
   /// Pipek-Mezey, Löwdin charge
@@ -490,6 +500,39 @@ class Boys : public Unitary {
   Boys(const BasisSet & basis, const arma::mat & C, int n, double thr, bool verbose=true, bool delocalize=false);
   /// Destructor
   ~Boys();
+
+  /// Evaluate cost function
+  double cost_func(const arma::cx_mat & W);
+  /// Evaluate derivative of cost function
+  arma::cx_mat cost_der(const arma::cx_mat & W);
+  /// Evaluate cost function and its derivative
+  void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
+};
+
+/// Fourth moment localization
+class FMLoc : public Unitary {
+  /// Penalty
+  int n;
+
+  /// r^4 contributions
+  arma::mat rfour;
+  /// rr^2 matrices
+  std::vector<arma::mat> rrsq;
+  /// rr matrices
+  std::vector< std::vector<arma::mat> > rr;
+  /// and the r^2 matrix
+  arma::mat rsq;
+  /// r matrices
+  std::vector<arma::mat> rmat;
+
+  /// (Don't) print out step size during optimization
+  void print_step(enum unitmethod & met, double step) const;
+
+ public:
+  /// Constructor. n gives the penalty power to use
+  FMLoc(const BasisSet & basis, const arma::mat & C, int n, double thr, bool verbose=true, bool delocalize=false);
+  /// Destructor
+  ~FMLoc();
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);

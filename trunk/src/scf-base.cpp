@@ -1960,16 +1960,31 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     thr=measure;
 
   // Worker
-  if(met==BOYS || met==BOYS_2 || met==BOYS_4) {
-    int n;
+  if(met==BOYS || met==BOYS_2 || met==BOYS_3 || met==BOYS_4) {
+    int n=0;
     if(met==BOYS)
       n=1;
     else if(met==BOYS_2)
       n=2;
+    else if(met==BOYS_3)
+      n=3;
     else if(met==BOYS_4)
       n=4;
     
     Boys worker(basis,C,n,thr,verbose,delocalize);
+    measure=worker.optimize(U,umet,uacc);
+  } else if(met==FM_1 || met==FM_2 || met==FM_3 || met==FM_4) {
+    int n=0;
+    if(met==FM_1)
+      n=1;
+    else if(met==FM_2)
+      n=2;
+    else if(met==FM_3)
+      n=3;
+    else if(met==FM_4)
+      n=4;
+
+    FMLoc worker(basis,C,n,thr,verbose,delocalize);
     measure=worker.optimize(U,umet,uacc);
   } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
     Pipek worker(met,basis,C,thr,verbose);
@@ -2118,8 +2133,7 @@ arma::cx_mat Boys::cost_der(const arma::cx_mat & W) {
     // r^2 terms
     for(size_t a=0;a<W.n_cols;a++) {
       // Compute derivative
-      std::complex<double> dert=arma::as_scalar(rsq.row(a)*W.col(b));
-      dert-=2.0*(xp*rxw(a,b) + yp*ryw(a,b) + zp*rzw(a,b));
+      std::complex<double> dert=rsw(a,b) - 2.0*(xp*rxw(a,b) + yp*ryw(a,b) + zp*rzw(a,b));
       
       // Set derivative
       Bder(a,b)=n*pow(w,n-1)*dert;
@@ -2133,6 +2147,267 @@ void Boys::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)
   f=cost_func(W);
   der=cost_der(W);
 }
+
+
+FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(8*nv,thr,delocalize,ver) {
+  // Save n
+  n=nv;
+
+  Timer t;
+  if(ver) {
+    printf("Computing r^4, r^3, r^2 and r matrices ...");
+    fflush(stdout);
+  }
+  
+  // Get the r_i^2 r_j^2 matrices
+  std::vector<arma::mat> momstack=basis.moment(4);
+  // Diagonal: x^4 + y^4 + z^4
+  rfour=momstack[getind(4,0,0)] + momstack[getind(0,4,0)] + momstack[getind(0,0,4)] \
+    // Off-diagonal: 2 x^2 y^2 + 2 x^2 z^2 + 2 y^2 z^2
+    +2.0*(momstack[getind(2,2,0)]+momstack[getind(2,0,2)]+momstack[getind(0,2,2)]);
+  // Convert to MO basis
+  rfour=arma::trans(C)*rfour*C;
+
+  // Get R^3 matrices
+  momstack=basis.moment(3);
+  rrsq.resize(3);
+  // x^3 + xy^2 + xz^2
+  rrsq[0]=momstack[getind(3,0,0)]+momstack[getind(1,2,0)]+momstack[getind(1,0,2)];
+  // x^2y + y^3 + yz^2
+  rrsq[1]=momstack[getind(2,1,0)]+momstack[getind(0,3,0)]+momstack[getind(0,1,2)];
+  // x^2z + y^2z + z^3
+  rrsq[2]=momstack[getind(2,0,1)]+momstack[getind(0,2,1)]+momstack[getind(0,0,3)];
+  // and convert to the MO basis
+  for(int ic=0;ic<3;ic++)
+    rrsq[ic]=arma::trans(C)*rrsq[ic]*C;
+
+  // Get R^2 matrix
+  momstack=basis.moment(2);
+  // and convert to the MO basis
+  for(size_t i=0;i<momstack.size();i++) {
+    momstack[i]=arma::trans(C)*momstack[i]*C;
+  }
+  rr.resize(3);
+  for(int ic=0;ic<3;ic++)
+    rr[ic].resize(3);
+
+  // Diagonal
+  rr[0][0]=momstack[getind(2,0,0)];
+  rr[1][1]=momstack[getind(0,2,0)];
+  rr[2][2]=momstack[getind(0,0,2)];
+
+  // Off-diagonal
+  rr[0][1]=momstack[getind(1,1,0)];
+  rr[1][0]=rr[0][1];
+
+  rr[0][2]=momstack[getind(1,0,1)];
+  rr[2][0]=rr[0][2];
+
+  rr[1][2]=momstack[getind(0,1,1)];
+  rr[2][1]=rr[1][2];
+
+  // and the rsq matrix
+  rsq=rr[0][0]+rr[1][1]+rr[2][2];
+
+  // Get r matrices
+  rmat=basis.moment(1);
+  // and convert to the MO basis
+  for(size_t i=0;i<rmat.size();i++) {
+    rmat[i]=arma::trans(C)*rmat[i]*C;
+  }
+
+  if(ver) {
+    printf(" done (%s)\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
+}
+
+FMLoc::~FMLoc() {
+}
+
+void FMLoc::print_step(enum unitmethod & met, double step) const {
+  (void) met;
+  (void) step;
+}
+
+double FMLoc::cost_func(const arma::cx_mat & W) {
+  if(W.n_rows != W.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+
+  if(W.n_rows != rsq.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix does not match size of problem!\n");
+  }
+
+  double B=0;
+
+  // For <i|r^4|i> terms
+  arma::cx_mat rfw=rfour*W;
+  // For <i|r^3|i> terms
+  std::vector<arma::cx_mat> rrsqw(3);
+  for(int ic=0;ic<3;ic++)
+    rrsqw[ic]=rrsq[ic]*W;
+  // For <i|r^2|i> terms
+  std::vector< std::vector<arma::cx_mat> > rrw(3);
+  for(int ic=0;ic<3;ic++) {
+    rrw[ic].resize(3);
+    for(int jc=0;jc<3;jc++)
+      rrw[ic][jc]=rr[ic][jc]*W;
+  }
+  arma::cx_mat rsqw=rsq*W;
+  // For <i|r|i> terms
+  std::vector<arma::cx_mat> rw(3);
+  for(int ic=0;ic<3;ic++)
+    rw[ic]=rmat[ic]*W;
+
+  // Loop over orbitals
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:B)
+#endif
+  for(size_t io=0;io<W.n_cols;io++) {
+    // <r^4> term
+    double rfour_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rfw.col(io)));
+    
+    // rrsq
+    arma::vec rrsq_t(3);
+    for(int ic=0;ic<3;ic++)
+      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(W.col(io))*rrsqw[ic].col(io)));
+
+    // rr
+    arma::mat rr_t(3,3);
+    for(int ic=0;ic<3;ic++)
+      for(int jc=0;jc<=ic;jc++) {
+	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(W.col(io))*rrw[ic][jc].col(io)));
+	rr_t(jc,ic)=rr_t(ic,jc);
+      }
+
+    // rsq
+    double rsq_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rsqw.col(io)));
+
+    // r
+    arma::vec r_t(3);
+    for(int ic=0;ic<3;ic++)
+      r_t(ic)=std::real(arma::as_scalar(arma::trans(W.col(io))*rw[ic].col(io)));
+
+    // Collect terms
+    double w= rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2);
+    
+    // Add to total
+    B+=pow(w,n);
+  }
+
+  return B;
+}
+
+arma::cx_mat FMLoc::cost_der(const arma::cx_mat & W) {
+  if(W.n_rows != W.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+
+  if(W.n_rows != rsq.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix does not match size of problem!\n");
+  }
+
+  // Returned matrix
+  arma::cx_mat Bder(W.n_cols,W.n_cols);
+
+  // For <i|r^4|i> terms
+  arma::cx_mat rfw=rfour*W;
+  // For <i|r^3|i> terms
+  std::vector<arma::cx_mat> rrsqw(3);
+  for(int ic=0;ic<3;ic++)
+    rrsqw[ic]=rrsq[ic]*W;
+  // For <i|r^2|i> terms
+  std::vector< std::vector<arma::cx_mat> > rrw(3);
+  for(int ic=0;ic<3;ic++) {
+    rrw[ic].resize(3);
+    for(int jc=0;jc<3;jc++)
+      rrw[ic][jc]=rr[ic][jc]*W;
+  }
+  arma::cx_mat rsqw=rsq*W;
+  // For <i|r|i> terms
+  std::vector<arma::cx_mat> rw(3);
+  for(int ic=0;ic<3;ic++)
+    rw[ic]=rmat[ic]*W;
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif  
+  for(size_t io=0;io<W.n_cols;io++) {
+    // <r^4> term
+    double rfour_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rfw.col(io)));
+    
+    // rrsq
+    arma::vec rrsq_t(3);
+    for(int ic=0;ic<3;ic++)
+      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(W.col(io))*rrsqw[ic].col(io)));
+
+    // rr
+    arma::mat rr_t(3,3);
+    for(int ic=0;ic<3;ic++)
+      for(int jc=0;jc<=ic;jc++) {
+	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(W.col(io))*rrw[ic][jc].col(io)));
+	rr_t(jc,ic)=rr_t(ic,jc);
+      }
+
+    // rsq
+    double rsq_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rsqw.col(io)));
+
+    // r
+    arma::vec r_t(3);
+    for(int ic=0;ic<3;ic++)
+      r_t(ic)=std::real(arma::as_scalar(arma::trans(W.col(io))*rw[ic].col(io)));
+
+    // Collect terms
+    double w= rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2);
+
+    // Compute derivative
+    for(size_t a=0;a<W.n_cols;a++) {
+
+      // <r^4> term
+      std::complex<double> rfour_d=rfw(a,io);
+      
+      // rrsq
+      arma::cx_vec rrsq_d(3);
+      for(int ic=0;ic<3;ic++)
+	rrsq_d(ic)=rrsqw[ic](a,io);
+      
+      // rr
+      arma::cx_mat rr_d(3,3);
+      for(int ic=0;ic<3;ic++)
+	for(int jc=0;jc<3;jc++) {
+	  rr_d(ic,jc)=rrw[ic][jc](a,io);
+      }
+      
+      // rsq
+      std::complex<double> rsq_d=rsqw(a,io);
+      
+      // r
+      arma::cx_vec r_d(3);
+      for(int ic=0;ic<3;ic++)
+	r_d(ic)=rw[ic](a,io);
+
+      // Derivative is
+      std::complex<double> one(1.0,0.0);
+      std::complex<double> dert=rfour_d - 4.0*(arma::dot(one*rrsq_t,r_d)+arma::dot(rrsq_d,one*r_t)) + 2.0*rsq_d*arma::dot(r_t,r_t) + 4.0*rsq_t*arma::dot(one*r_t,r_d) + 8.0*arma::as_scalar((one*(arma::trans(r_t)*rr_t))*r_d) + 4.0*arma::as_scalar(arma::trans(one*r_t)*rr_d*(one*r_t)) - 12.0*arma::dot(r_t,r_t)*arma::dot(one*r_t,r_d);
+      
+      // Set derivative
+      Bder(a,io)=n*pow(w,n-1)*dert;
+    }
+  }
+
+  return Bder;
+}
+
+void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
+  f=cost_func(W);
+  der=cost_der(W);
+}
+
 
 Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double thr, bool ver, bool delocalize) : Unitary(4,thr,!delocalize,ver) {
   // Initialize charge matrix
