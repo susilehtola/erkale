@@ -76,6 +76,28 @@ bool Unitary::converged(const arma::cx_mat & W) {
   return false;
 }
 
+void Unitary::update_gradient(const arma::cx_mat & W) {
+  // Euclidean gradient
+  arma::cx_mat Gammak;
+  cost_func_der(W,J,Gammak);
+
+  // Riemannian gradient, Abrudan 2009 table 3 step 2
+  G=Gammak*arma::trans(W) - W*arma::trans(Gammak);
+}
+
+void Unitary::update_search_direction() {
+  // Imaginary unit
+  std::complex<double> imagI(0,1.0);
+  
+  // Diagonalize -iH to find eigenvalues purely imaginary
+  // eigenvalues iw_i of H; Abrudan 2009 table 3 step 1.
+  bool diagok=arma::eig_sym(Hval,Hvec,-imagI*H);
+  if(!diagok) {
+    ERROR_INFO();
+    throw std::runtime_error("Unitary optimization: error diagonalizing H.\n");
+  }
+}
+
 double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter) {
   // Old gradient
   arma::cx_mat oldG;
@@ -90,6 +112,8 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
 
   // Check matrix
   check_unitary(W);
+  // Check derivative
+  check_derivative(W);
 
   // Perform any necessary initialization
   initialize(W);
@@ -108,16 +132,12 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
 
     Timer t;
 
-    // Store old value
+    // Store old values
     oldJ=J;
+    oldG=G;
 
     // Compute the cost function and the euclidean derivative, Abrudan 2009 table 3 step 2
-    arma::cx_mat Gammak;
-    cost_func_der(W,J,Gammak);
-
-    // Riemannian gradient, Abrudan 2009 table 3 step 2
-    oldG=G;
-    G=Gammak*arma::trans(W) - W*arma::trans(Gammak);
+    update_gradient(W);
 
     // Print progress
     if(verbose)
@@ -178,19 +198,11 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
       break;
     }
 
-    // Imaginary unit
-    std::complex<double> imagI(0,1.0);
-
-    // Diagonalize -iH to find eigenvalues purely imaginary
-    // eigenvalues iw_i of H; Abrudan 2009 table 3 step 1.
-    bool diagok=arma::eig_sym(Hval,Hvec,-imagI*H);
-    if(!diagok) {
-      ERROR_INFO();
-      throw std::runtime_error("Unitary optimization: error diagonalizing H.\n");
-    }
+    // Compute new search direction
+    update_search_direction();
 
     // Find maximal eigenvalue
-    double wmax=max(abs(Hval));
+    double wmax=arma::max(arma::abs(Hval));
     if(wmax==0.0) {
       continue;
     }
@@ -281,6 +293,51 @@ void Unitary::classify(const arma::cx_mat & W) const {
     printf(" complex");
 
   printf(", re norm %e, im norm %e\n",real,imag);
+}
+
+void Unitary::check_derivative(const arma::cx_mat & W0) {
+  // Compute gradient
+  update_gradient(W0);
+  // and the search direction
+  H=G;
+  update_search_direction();
+
+  // Determine step size
+  double wmax=arma::max(arma::abs(Hval));
+  if(wmax==0.0) {
+    // Derivative vanishes - don't do anything
+    return;
+  }
+  
+  // Compute maximal step size.
+  // Order of the cost function in the coefficients of W.
+  Tmu=2.0*M_PI/(q*wmax);
+
+  // Get derivative matrix
+  arma::cx_mat der=cost_der(W0);
+  // The derivative is
+  double dfdmu=sign*2.0*std::real(arma::trace(der*arma::trans(W0)*arma::trans(H)));
+
+  // Compute trial value.
+  double trstep=Tmu*sqrt(DBL_EPSILON);
+  arma::cx_mat Wtr=get_rotation(trstep)*W0;
+  double Jtr=cost_func(Wtr);
+  
+  // Estimated change in function is
+  double dfest=trstep*dfdmu;
+  // Real change in function is
+  double dfreal=Jtr-J;
+
+  // Is the difference ok? Check absolute or relative magnitude
+  if(fabs(dfest-dfreal)>sqrt(DBL_EPSILON)*std::max(1.0,dfest)) {
+    fprintf(stderr,"\nDerivative mismatch error!\n");
+    fprintf(stderr,"Used step size %e.\n",trstep);
+    fprintf(stderr,"Estimated change of function % e\n",dfest);
+    fprintf(stderr,"Realized  change of function % e\n",dfreal);
+    fprintf(stderr,"Difference in changes        % e\n",dfest-dfreal);
+    fprintf(stderr,"Relative error in changes    % e\n",(dfest-dfreal)/dfest);
+    throw std::runtime_error("Derivative mismatch! Check your cost function and its derivative.\n");
+  }
 }
 
 double Unitary::polynomial_step_df(const arma::cx_mat & W) {

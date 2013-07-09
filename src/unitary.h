@@ -21,6 +21,20 @@
 #include "timer.h"
 #include <armadillo>
 
+
+/**
+ * This file contains algorithms for unitary optimization of matrices.
+ * The algorithms are based on the following references
+ *
+ * T. E. Abrudan, J. Eriksson, and V. Koivunen, "Steepest Descent
+ * Algorithms for Optimization Under Unitary Matrix Constraint",
+ * IEEE Transactions on Signal Processing 56 (2008), 1134.
+ *
+ * T. Abrudan, J. Eriksson, and V. Koivunen, "Conjugate gradient
+ * algorithm for optimization under unitary matrix constraint",
+ * Signal Processing 89 (2009), 1704.
+ */
+
 enum unitmethod {
   /// Polynomial search, fit derivative
   POLY_DF,
@@ -94,8 +108,15 @@ class Unitary {
 
   /// Check that the matrix is unitary
   void check_unitary(const arma::cx_mat & W) const;
+  /// Check that the programmed cost function and its derivative are OK
+  void check_derivative(const arma::cx_mat & W0);
   /// Classify matrix
   void classify(const arma::cx_mat & W) const;
+
+  /// Update cost function value and spherical gradient vector
+  void update_gradient(const arma::cx_mat & W);
+  /// Compute new search direction (diagonalize H)
+  void update_search_direction();
 
   /// Get rotation matrix with wanted step size
   arma::cx_mat get_rotation(double step) const;
