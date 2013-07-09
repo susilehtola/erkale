@@ -2658,7 +2658,7 @@ void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func)
 #endif
 
   if(verbose) {
-    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    printf("DFT XC grid constructed in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -2695,7 +2695,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
 #endif
 
   if(verbose) {
-    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    printf("DFT XC grid constructed in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -2732,7 +2732,7 @@ void DFTGrid::construct(const std::vector<arma::mat> & Pa, double tol, int x_fun
 #endif
 
   if(verbose) {
-    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    printf("SIC-DFT XC grid constructed in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -2771,7 +2771,7 @@ void DFTGrid::construct_becke(double tol) {
   }   // End parallel section
 
   if(verbose) {
-    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    printf("Becke grid constructed in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -2810,7 +2810,7 @@ void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double tol) {
   }   // End parallel section
 
   if(verbose) {
-    printf("DFT grid constructed in %s.\n",t.elapsed().c_str());
+    printf("Hirshfeld grid constructed in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }
 }
