@@ -117,7 +117,7 @@ void size_distribution(const BasisSet & basis, arma::mat & C, std::string filena
   fclose(out);
 }
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size) {
+void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
@@ -176,7 +176,16 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const st
     // Transform orbitals
     arma::mat Cloc=arma::real(Cwrk*U);
     // and energies
-    arma::vec Eloc=arma::real(arma::diagvec(arma::trans(U)*arma::diagmat(Ewrk)*U));
+    arma::vec Eloc(Cloc.n_cols);
+    if(H.n_rows == Cwrk.n_rows) {
+      // We have Fock operator; use it to calculate energies (in case
+      // we don't have canonical orbitals here)
+      for(size_t io=0;io<Cloc.n_cols;io++)
+	Eloc(io)=arma::as_scalar(arma::trans(Cloc.col(io))*H*Cloc.col(io));
+    } else
+      // No Fock operator given
+      Eloc=arma::real(arma::diagvec(arma::trans(U)*arma::diagmat(Ewrk)*U));
+
     // and sort them in the new energy order
     sort_eigvec(Eloc,Cloc);
     
@@ -193,9 +202,9 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const st
 }
 
 
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size) {
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size) {
   // Run localization, occupied space
-  localize_wrk(basis,C,E,occs,method,umet,acc,randomize,delocalize,sizedist+".o",size);
+  localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".o",size);
 
   // Run localization, virtual space
   if(virt) {
@@ -204,7 +213,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, std::vector<
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,E,occs,method,umet,acc,randomize,delocalize,sizedist+".v",size);
+    localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".v",size);
   }
 }
 
@@ -347,6 +356,11 @@ int main(int argc, char **argv) {
     arma::vec E;
     chkpt.read("E",E);
 
+    // Fock matrix?
+    arma::mat H;
+    if(chkpt.exist("H"))
+      chkpt.read("H",H);
+
     // Check orthogonality
     check_orth(C,basis.overlap(),false);
 
@@ -355,7 +369,7 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,E,occs,virt,method,umet,acc,randomize,delocalize,sizedist,size);
+    localize(basis,C,E,H,occs,virt,method,umet,acc,randomize,delocalize,sizedist,size);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -370,6 +384,13 @@ int main(int argc, char **argv) {
     chkpt.read("Ea",Ea);
     chkpt.read("Eb",Eb);
 
+    // Fock matrices?
+    arma::mat Ha, Hb;
+    if(chkpt.exist("Ha") && chkpt.exist("Hb")) {
+      chkpt.read("Ha",Ha);
+      chkpt.read("Hb",Hb);
+    }
+
     // Check orthogonality
     check_orth(Ca,basis.overlap(),false);
     check_orth(Cb,basis.overlap(),false);
@@ -380,8 +401,8 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,Ea,occa,virt,method,umet,acc,randomize,delocalize,sizedist+".a",size);
-    localize(basis,Cb,Eb,occb,virt,method,umet,acc,randomize,delocalize,sizedist+".b",size);
+    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,randomize,delocalize,sizedist+".a",size);
+    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,randomize,delocalize,sizedist+".b",size);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
