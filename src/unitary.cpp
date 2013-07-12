@@ -46,6 +46,10 @@ Unitary::~Unitary() {
     fclose(log);
 }
 
+void Unitary::set_q(int qv) {
+  q=qv;
+}
+
 void Unitary::open_log(const std::string & fname) {
   if(log!=NULL)
     fclose(log);

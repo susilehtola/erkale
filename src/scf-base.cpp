@@ -1972,8 +1972,16 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       n=4;
     
     Boys worker(basis,C,n,thr,verbose,delocalize);
+    // Perform initial localization
+    if(n>1) {
+      worker.set_n(1);
+      measure=worker.optimize(U,umet,uacc);
+      worker.set_n(n);
+    }
+    // Final optimization
     if(fname.length()) worker.open_log(fname);
     measure=worker.optimize(U,umet,uacc);
+
   } else if(met==FM_1 || met==FM_2 || met==FM_3 || met==FM_4) {
     int n=0;
     if(met==FM_1)
@@ -1986,6 +1994,13 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       n=4;
 
     FMLoc worker(basis,C,n,thr,verbose,delocalize);
+    // Perform initial localization
+    if(n>1) {
+      worker.set_n(1);
+      measure=worker.optimize(U,umet,uacc);
+      worker.set_n(n);
+    }
+    // Final optimization
     if(fname.length()) worker.open_log(fname);
     measure=worker.optimize(U,umet,uacc);
   } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
@@ -2025,7 +2040,9 @@ arma::mat interpret_force(const arma::vec & f) {
   return retf;
 }
 
-Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(4*nv,thr,delocalize,ver) {
+Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(4*(nv+1),thr,delocalize,ver) { 
+  // The order is really 4*n, but in some cases with n>1 the line optimization doesn't work.
+
   // Save n
   n=nv;
 
@@ -2055,6 +2072,13 @@ Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool
 }
 
 Boys::~Boys() {
+}
+
+void Boys::set_n(int nv) {
+  n=nv;
+
+  // Set q accordingly
+  set_q(4*(n+1));
 }
 
 void Boys::print_step(enum unitmethod & met, double step) const {
@@ -2153,7 +2177,9 @@ void Boys::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)
 }
 
 
-FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(8*nv,thr,delocalize,ver) {
+FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(8*(nv+1),thr,delocalize,ver) {
+  // The order is really 8*n, but in some cases with n>1 the line optimization doesn't work.
+
   // Save n
   n=nv;
 
@@ -2232,6 +2258,13 @@ FMLoc::~FMLoc() {
 void FMLoc::print_step(enum unitmethod & met, double step) const {
   (void) met;
   (void) step;
+}
+
+void FMLoc::set_n(int nv) {
+  n=nv;
+
+  // Set q accordingly
+  set_q(8*(nv+1));
 }
 
 double FMLoc::cost_func(const arma::cx_mat & W) {
