@@ -474,8 +474,8 @@ enum locmet {
   PIPEK_BECKE,
   /// Pipek-Mezey, Hirshfeld charge
   PIPEK_HIRSHFELD,
-  /// Edminston-Ruedenberg
-  EDMINSTON
+  /// Edmiston-Ruedenberg
+  EDMISTON
 };
 
 /// Boys localization
@@ -563,8 +563,8 @@ class Pipek : public Unitary {
   void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
 };
 
-/// Edminston-Ruedenberg localization
-class Edminston : public Unitary {
+/// Edmiston-Ruedenberg localization
+class Edmiston : public Unitary {
   /// Density fitting object
   DensityFit dfit;
   /// Orbitals
@@ -574,8 +574,8 @@ class Edminston : public Unitary {
   void print_step(enum unitmethod & met, double step) const;
 
  public:
-  Edminston(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
-  ~Edminston();
+  Edmiston(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
+  ~Edmiston();
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
@@ -655,7 +655,7 @@ class PZSIC : public Unitary {
 };
 
 /// Orbital localization. Initial value of measure is taken as the convergence threshold
-void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false);
+void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="");
 
 #include "checkpoint.h"
 

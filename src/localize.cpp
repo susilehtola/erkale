@@ -117,12 +117,21 @@ void size_distribution(const BasisSet & basis, arma::mat & C, std::string filena
   fclose(out);
 }
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size) {
+void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size, std::string fname) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
     if(occs[io]!=0.0)
       locorb.push_back(io);
+
+  // Check that fname is ok
+  if(fname.length()==2) // No, it's equal to .o or .v
+    fname="";
+  if(fname.length()==4) { // May be ok, or
+    std::string sub=fname.substr(0,2);
+    if(stricmp(sub,".a")==0 || stricmp(sub,".b")==0)
+      fname="";
+  }
 
   // Save indices
   std::vector<size_t> printidx(locorb);
@@ -171,7 +180,7 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       printf(" %i",(int) orbidx[io]+1);
     printf("\n");
 
-    orbital_localization(method,basis,Cwrk,measure,U,true,umet,acc,delocalize);
+    orbital_localization(method,basis,Cwrk,measure,U,true,umet,acc,delocalize,fname);
     
     // Transform orbitals
     arma::mat Cloc=arma::real(Cwrk*U);
@@ -202,9 +211,9 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
 }
 
 
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size) {
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size, std::string fname) {
   // Run localization, occupied space
-  localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".o",size);
+  localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".o",size,fname+".o");
 
   // Run localization, virtual space
   if(virt) {
@@ -213,7 +222,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".v",size);
+    localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".v",size,fname+".v");
   }
 }
 
@@ -239,7 +248,7 @@ int main(int argc, char **argv) {
   set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
   set.add_string("Method","Localization method: FB, FB2, FB3, FB4, FM, FM2, FM3, FM4, MU, LO, BE, HI, ER","FB");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
-  set.add_string("Logfile","File to store standard output in","stdout");
+  set.add_string("Logfile","File to store output in","");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR","CGPR");
   set.add_string("LineSearch","Line search to use: poly_df, poly_fdf, armijo, fourier_df","poly_df");
   set.add_bool("Randomize","Use random starting point instead of canonical orbitals?",true);
@@ -248,18 +257,7 @@ int main(int argc, char **argv) {
   set.parse(argv[1]);
   set.print();
 
-  // Redirect output?
   std::string logfile=set.get_string("Logfile");
-  if(stricmp(logfile,"stdout")!=0) {
-    // Redirect stdout to file
-    FILE *outstream=freopen(logfile.c_str(),"w",stdout);
-    if(outstream==NULL) {
-      ERROR_INFO();
-      throw std::runtime_error("Unable to redirect output!\n");
-    } else
-      fprintf(stderr,"\n");
-  }
-
   bool virt=set.get_bool("Virtual");
 
   std::string loadname(set.get_string("LoadChk"));
@@ -295,7 +293,7 @@ int main(int argc, char **argv) {
   else if(stricmp(mets,"HI")==0)
     method=PIPEK_HIRSHFELD;
   else if(stricmp(mets,"ER")==0)
-    method=EDMINSTON;
+    method=EDMISTON;
   else throw std::runtime_error("Localization method not implemented.\n");
 
   // Determine accelerator
@@ -369,7 +367,7 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,E,H,occs,virt,method,umet,acc,randomize,delocalize,sizedist,size);
+    localize(basis,C,E,H,occs,virt,method,umet,acc,randomize,delocalize,sizedist,size,logfile);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -401,8 +399,8 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,randomize,delocalize,sizedist+".a",size);
-    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,randomize,delocalize,sizedist+".b",size);
+    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,randomize,delocalize,sizedist+".a",size,logfile+".a");
+    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,randomize,delocalize,sizedist+".b",size,logfile+".b");
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
