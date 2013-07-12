@@ -125,6 +125,8 @@ class Unitary {
 
   /// Get rotation matrix with wanted step size
   arma::cx_mat get_rotation(double step) const;
+  /// Get derivative wrt step length
+  double step_der(const arma::cx_mat & W, const arma::cx_mat & der) const;
 
   /// Armijo step, return step length
   double armijo_step(const arma::cx_mat & W);
