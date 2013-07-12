@@ -36,7 +36,9 @@
  */
 
 enum unitmethod {
-  /// Polynomial search, fit derivative
+  /// Polynomial search, fit function
+  POLY_F,
+  /// Polynomial search, fit derivative <--- the default
   POLY_DF,
   /// Polynomial search, fit function and derivative
   POLY_FDF,
@@ -126,6 +128,8 @@ class Unitary {
 
   /// Armijo step, return step length
   double armijo_step(const arma::cx_mat & W);
+  /// Polynomial step (fit function), return step length
+  double polynomial_step_f(const arma::cx_mat & W);
   /// Polynomial step (fit only derivative), return step length
   double polynomial_step_df(const arma::cx_mat & W);
   /// Polynomial step (fit function and derivative), return step length
@@ -165,8 +169,8 @@ double bracket(const arma::cx_mat & X, const arma::cx_mat & Y);
 /// Shift Fourier coefficients
 arma::cx_vec fourier_shift(const arma::cx_vec & v);
 
-/// Fit polynomial of wanted degree to derivative
-arma::vec fit_polynomial_df(const arma::vec & x, const arma::vec & dy, int deg=-1);
+/// Fit polynomial of wanted degree to function
+arma::vec fit_polynomial(const arma::vec & x, const arma::vec & y, int deg=-1);
 /// Fit polynomial of wanted degree to function and derivative, return coefficients of function
 arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arma::vec & dy, int deg=-1);
 
