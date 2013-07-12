@@ -2683,18 +2683,35 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
   
   // Compute sum
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel
 #endif
-  for(size_t iat=0;iat<Q.n_slices;iat++) {
-    // Helper matrix
-    arma::cx_mat qw=Q.slice(iat)*W;
-    
-    for(size_t b=0;b<W.n_cols;b++) {
-      std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+  {
+#ifdef _OPENMP
+    arma::cx_mat Dwrk(Dder);
+#pragma omp for
+#endif
+    for(size_t iat=0;iat<Q.n_slices;iat++) {
+      // Helper matrix
+      arma::cx_mat qw=Q.slice(iat)*W;
       
-      for(size_t a=0;a<W.n_cols;a++)
-	Dder(a,b)+=2.0*qwp*qw(a,b);
+      for(size_t b=0;b<W.n_cols;b++) {
+	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+	
+	for(size_t a=0;a<W.n_cols;a++) {
+#ifdef _OPENMP
+	  Dwrk(a,b)+=2.0*qwp*qw(a,b);
+#else
+	  Dder(a,b)+=2.0*qwp*qw(a,b);
+#endif
+	}
+      }
     }
+
+#ifdef _OPENMP
+#pragma omp critical
+    // Collect output
+    Dder+=Dwrk;
+#endif
   }
     
   return Dder;
