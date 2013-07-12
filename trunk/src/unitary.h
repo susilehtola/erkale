@@ -153,6 +153,8 @@ class Unitary {
   /// Open log file
   void open_log(const std::string & fname);
 
+  /// Set degree
+  void set_q(int q);
   /// Set polynomial search options
   void set_poly(int deg);
   /// Set Fourier search options

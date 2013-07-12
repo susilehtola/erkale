@@ -501,6 +501,9 @@ class Boys : public Unitary {
   /// Destructor
   ~Boys();
 
+  /// Reset penalty
+  void set_n(int n);
+
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
   /// Evaluate derivative of cost function
@@ -533,6 +536,9 @@ class FMLoc : public Unitary {
   FMLoc(const BasisSet & basis, const arma::mat & C, int n, double thr, bool verbose=true, bool delocalize=false);
   /// Destructor
   ~FMLoc();
+
+  /// Reset penalty
+  void set_n(int n);
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
