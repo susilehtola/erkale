@@ -250,7 +250,7 @@ int main(int argc, char **argv) {
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
   set.add_string("Logfile","File to store output in","");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR","CGPR");
-  set.add_string("LineSearch","Line search to use: poly_df, poly_fdf, armijo, fourier_df","poly_df");
+  set.add_string("LineSearch","Line search to use: poly_df, poly_f, poly_fdf, armijo, fourier_df","poly_df");
   set.add_bool("Randomize","Use random starting point instead of canonical orbitals?",true);
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
   set.add_string("SizeDistribution","File to save orbital size distribution in","");
@@ -312,6 +312,8 @@ int main(int argc, char **argv) {
   std::string umets=set.get_string("LineSearch");
   if(stricmp(umets,"poly_df")==0)
     umet=POLY_DF;
+  else if(stricmp(umets,"poly_f")==0)
+    umet=POLY_F;
   else if(stricmp(umets,"poly_fdf")==0)
     umet=POLY_FDF;
   else if(stricmp(umets,"armijo")==0)
