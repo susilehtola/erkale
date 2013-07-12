@@ -218,14 +218,15 @@ void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, d
   size_t Ndep=Nbf-Nlin;
 
   // Form Shalf and Sinvhalf
-  Shalf=arma::mat(Nbf,Nlin);
-  Sinvh=arma::mat(Nbf,Nlin);
+  Shalf=arma::mat(Nbf,Nbf);
+  Sinvh=arma::mat(Nbf,Nbf);
 
   Shalf.zeros();
   Sinvh.zeros();
   for(size_t i=0;i<Nlin;i++) {
-    Sinvh.col(i)=Svec.col(Ndep+i)/sqrt(Sval(Ndep+i));
-    Shalf.col(i)=Svec.col(Ndep+i)*sqrt(Sval(Ndep+i));
+    size_t icol=Ndep+i;
+    Sinvh+=Svec.col(icol)*arma::trans(Svec.col(icol))/sqrt(Sval(icol));
+    Shalf+=Svec.col(icol)*arma::trans(Svec.col(icol))*sqrt(Sval(icol));
   }
 }
 
