@@ -92,6 +92,9 @@ class Unitary {
   /// Maximum step size
   double Tmu;
 
+  /// Log file
+  FILE *log;
+
   /// Initialize possible convergence criteria
   virtual void initialize(const arma::cx_mat & W0);
   /// Check convergence
@@ -142,6 +145,9 @@ class Unitary {
   virtual arma::cx_mat cost_der(const arma::cx_mat & W)=0;
   /// Evaluate cost function and its derivative
   virtual void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)=0;
+
+  /// Open log file
+  void open_log(const std::string & fname);
 
   /// Set polynomial search options
   void set_poly(int deg);
