@@ -36,9 +36,22 @@ Unitary::Unitary(int qv, double thr, bool max, bool ver) {
   // and in the fourier transform use
   fourier_samples=3; // three points per period
   fourier_periods=5; // five quasio-periods
+
+  // Logfile is closed
+  log=NULL;
 }
 
 Unitary::~Unitary() {
+  if(log!=NULL)
+    fclose(log);
+}
+
+void Unitary::open_log(const std::string & fname) {
+  if(log!=NULL)
+    fclose(log);
+  
+  if(fname.length())
+    log=fopen(fname.c_str(),"w");
 }
 
 void Unitary::check_unitary(const arma::cx_mat & W) const {
@@ -257,6 +270,11 @@ void Unitary::print_progress(size_t k) const {
   else
     printf("\t%4i\t% e\t% e\t%e ",(int) k,J,J-oldJ,bracket(G,G));
   fflush(stdout);
+
+  if(log!=NULL) {
+    fprintf(log,"%4i % e %e\n",(int) k,J,bracket(G,G));
+    fflush(log);
+  }
 }
 
 void Unitary::print_time(const Timer & t) const {
@@ -329,9 +347,9 @@ void Unitary::check_derivative(const arma::cx_mat & W0) {
   double dfreal=Jtr-J;
 
   // Is the difference ok? Check absolute or relative magnitude
-  if(fabs(dfest-dfreal)>sqrt(DBL_EPSILON)*std::max(1.0,dfest)) {
+  if(fabs(dfest-dfreal)>sqrt(DBL_EPSILON)*std::max(1.0,dfest) && fabs(dfest)>1e-6) {
     fprintf(stderr,"\nDerivative mismatch error!\n");
-    fprintf(stderr,"Used step size %e.\n",trstep);
+    fprintf(stderr,"Used step size %e, value of function % e.\n",trstep,J);
     fprintf(stderr,"Estimated change of function % e\n",dfest);
     fprintf(stderr,"Realized  change of function % e\n",dfreal);
     fprintf(stderr,"Difference in changes        % e\n",dfest-dfreal);
@@ -563,7 +581,7 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
   for(size_t i=0;i<croots.n_elem;i++)
     if(fabs(std::abs(croots(i))-1)<circletol) {
       // Root is on the unit circle. Angle is
-      double phi=std::imag(log(croots(i)));
+      double phi=std::imag(std::log(croots(i)));
 
       // Convert to the real length scale
       phi*=fourier_interval/(2*M_PI);
