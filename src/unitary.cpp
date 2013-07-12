@@ -340,7 +340,7 @@ void Unitary::check_derivative(const arma::cx_mat & W0) {
   // Get derivative matrix
   arma::cx_mat der=cost_der(W0);
   // The derivative is
-  double dfdmu=sign*2.0*std::real(arma::trace(der*arma::trans(W0)*arma::trans(H)));
+  double dfdmu=step_der(W0,der);
 
   // Compute trial value.
   double trstep=Tmu*sqrt(DBL_EPSILON);
@@ -405,6 +405,10 @@ double Unitary::polynomial_step_f(const arma::cx_mat & W) {
   return step;
 }
 
+double Unitary::step_der(const arma::cx_mat & W, const arma::cx_mat & der) const {
+  return sign*2.0*std::real(arma::trace(der*arma::trans(W)*arma::trans(H)));
+}
+
 double Unitary::polynomial_step_df(const arma::cx_mat & W) {
   // Amount of points to use is
   int npoints=polynomial_degree;
@@ -424,7 +428,7 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
     // Compute derivative matrix
     arma::cx_mat der=cost_der(Wtr);
     // so the derivative wrt the step is
-    fp(i)=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
+    fp(i)=step_der(Wtr,der);
   }
 
   // Sanity check - is derivative of the right sign?
@@ -465,7 +469,7 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
     cost_func_der(Wtr,f(i),der);
 
     // Compute the derivative
-    fp(i)=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
+    fp(i)=step_der(Wtr,der);
   }
 
   // Sanity check - is derivative of the right sign?
@@ -612,7 +616,7 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
     cost_func_der(Wtr,f(i),der);
 
     // Compute the derivative
-    fp[i]=sign*2.0*std::real(arma::trace(der*arma::trans(Wtr)*arma::trans(H)));
+    fp[i]=step_der(Wtr,der);
   }
 
   // Compute Hann window
