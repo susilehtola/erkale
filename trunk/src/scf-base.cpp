@@ -1951,7 +1951,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize) {
+void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname) {
   Timer t;
 
   // Threshold
@@ -1972,6 +1972,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       n=4;
     
     Boys worker(basis,C,n,thr,verbose,delocalize);
+    if(fname.length()) worker.open_log(fname);
     measure=worker.optimize(U,umet,uacc);
   } else if(met==FM_1 || met==FM_2 || met==FM_3 || met==FM_4) {
     int n=0;
@@ -1985,12 +1986,15 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       n=4;
 
     FMLoc worker(basis,C,n,thr,verbose,delocalize);
+    if(fname.length()) worker.open_log(fname);
     measure=worker.optimize(U,umet,uacc);
   } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
     Pipek worker(met,basis,C,thr,verbose);
+    if(fname.length()) worker.open_log(fname);
     measure=worker.optimize(U,umet,uacc);
-  } else if(met==EDMINSTON) {
-    Edminston worker(basis,C,thr,verbose);
+  } else if(met==EDMISTON) {
+    Edmiston worker(basis,C,thr,verbose);
+    if(fname.length()) worker.open_log(fname);
     measure=worker.optimize(U,umet,uacc);
   } else {
     ERROR_INFO();
@@ -2681,36 +2685,36 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   der=cost_der(W);
 }
 
-Edminston::Edminston(const BasisSet & basis, const arma::mat & Cv, double thr, bool ver, bool delocalize) : Unitary(4,thr,!delocalize,ver) {
+Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double thr, bool ver, bool delocalize) : Unitary(4,thr,!delocalize,ver) {
   // Store orbitals
   C=Cv;
   // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, no Hartree-Fock
   dfit.fill(basis,basis.density_fitting(),true,1e-8,false);
 }
 
-Edminston::~Edminston() {
+Edmiston::~Edmiston() {
 }
 
-void Edminston::print_step(enum unitmethod & met, double step) const {
+void Edmiston::print_step(enum unitmethod & met, double step) const {
   (void) met;
   (void) step;
 }
 
-double Edminston::cost_func(const arma::cx_mat & W) {
+double Edmiston::cost_func(const arma::cx_mat & W) {
   double f;
   arma::cx_mat der;
   cost_func_der(W,f,der);
   return f;
 }
 
-arma::cx_mat Edminston::cost_der(const arma::cx_mat & W) {
+arma::cx_mat Edmiston::cost_der(const arma::cx_mat & W) {
   double f;
   arma::cx_mat der;
   cost_func_der(W,f,der);
   return der;
 }
 
-void Edminston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
+void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
   if(W.n_cols != C.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Invalid matrix size.\n");
