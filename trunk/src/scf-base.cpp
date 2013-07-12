@@ -2451,113 +2451,100 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
   Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
   
   if(chg==PIPEK_BECKE) {
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-      
-      // Helper. Non-verbose operation
-      //      DFTGrid intgrid(&basis,false);
-      DFTGrid intgrid(&basis,ver);
-      // Construct integration grid
-      intgrid.construct_becke(1e-5);
-
-      // Get overlap matrices
-      Timer t;
-      if(ver) {
-	printf("Computing atomic overlap matrices ...");
-	fflush(stdout);
-      }
-
-      std::vector<arma::mat> Sat=intgrid.eval_overlaps();
-
-      if(ver) {
-	printf(" done (%s)\n",t.elapsed().c_str());
-	t.set();
-
-	printf("Computing Becke charges ...");
-	fflush(stdout);
-      }
-
-      // Loop over atoms
-#ifdef _OPENMP
-#pragma omp for
-#endif
-      for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-	// Compute charges
-	Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
-      }
-
-      if(ver) {
-	printf(" done (%s)\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
-
-    }
-
-  } else if(chg==PIPEK_HIRSHFELD) {
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-
-      Timer t;
-      if(ver) {
-	printf("Computing Hirshfeld densities ...");
-	fflush(stdout);
-      }
-
-      // Hirshfeld densities
-      Hirshfeld hirsh;
-      // We don't know method here so just use HF.
-      hirsh.compute(basis,"HF");
-      
-      if(ver) {
-	printf(" done (%s)\n",t.elapsed().c_str());
-	fflush(stdout);
-      }	
-
-      // Helper. Non-verbose operation
-      //      DFTGrid intgrid(&basis,false);
-      DFTGrid intgrid(&basis,ver);
-      // Construct integration grid
-      intgrid.construct_hirshfeld(hirsh,1e-5);
-
-      if(ver) {
-	t.set();
-
-	printf("Computing Hirshfeld overlap matrices ...");
-	fflush(stdout);
-      }
-
-      // Get overlap matrices
-      std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
-
-      if(ver) {
-	printf(" done (%s)\n",t.elapsed().c_str());
-	t.set();
-
-	printf("Computing Hirshfeld charges ...");
-	fflush(stdout);
-      }
-      
-      // Loop over atoms
-#ifdef _OPENMP
-#pragma omp for
-#endif
-      for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-	// Compute charges
-	Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
-      }
-
-      if(ver) {
-	printf(" done (%s)\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
+    
+    // Helper. Non-verbose operation
+    //      DFTGrid intgrid(&basis,false);
+    DFTGrid intgrid(&basis,ver);
+    // Construct integration grid
+    intgrid.construct_becke(1e-5);
+    
+    // Get overlap matrices
+    Timer t;
+    if(ver) {
+      printf("Computing atomic overlap matrices ...");
+      fflush(stdout);
     }
     
+    std::vector<arma::mat> Sat=intgrid.eval_overlaps();
+    
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      t.set();
+      
+      printf("Computing Becke charges ...");
+      fflush(stdout);
+    }
+    
+    // Loop over atoms
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+      // Compute charges
+      Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
+    }
+    
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
+    
+  } else if(chg==PIPEK_HIRSHFELD) {
+
+    Timer t;
+    if(ver) {
+      printf("Computing Hirshfeld densities ...");
+      fflush(stdout);
+    }
+    
+    // Hirshfeld densities
+    Hirshfeld hirsh;
+    // We don't know method here so just use HF.
+    hirsh.compute(basis,"HF");
+    
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }	
+    
+    // Helper. Non-verbose operation
+    //      DFTGrid intgrid(&basis,false);
+    DFTGrid intgrid(&basis,ver);
+    // Construct integration grid
+    intgrid.construct_hirshfeld(hirsh,1e-5);
+    
+    if(ver) {
+      t.set();
+      
+      printf("Computing Hirshfeld overlap matrices ...");
+      fflush(stdout);
+    }
+    
+    // Get overlap matrices
+    std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
+    
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      t.set();
+      
+      printf("Computing Hirshfeld charges ...");
+      fflush(stdout);
+    }
+    
+    // Loop over atoms
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+      // Compute charges
+      Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
+    }
+    
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
+  
   } else if(chg==PIPEK_MULLIKEN) {
 
     Timer t;
