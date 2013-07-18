@@ -34,10 +34,9 @@
  *
  * and it was generalized to contracted basis sets in
  *
- * J. Lehtola, P. Manninen, M. Hakala, and K. Hämäläinen, "Contraction
+ * S. Lehtola, P. Manninen, M. Hakala, and K. Hämäläinen, "Contraction
  * of completeness-optimized basis sets: Application to ground-state
- * electron momentum densities", to be submitted.
- *
+ * electron momentum densities", J. Chem. Phys. 138, 044109 (2013).
  */
 
 #include <cstdio>
