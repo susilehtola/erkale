@@ -50,6 +50,10 @@ void Unitary::set_q(int qv) {
   q=qv;
 }
 
+void Unitary::set_thr(double epsv) {
+  eps=epsv;
+}
+
 void Unitary::open_log(const std::string & fname) {
   if(log!=NULL)
     fclose(log);
@@ -191,8 +195,10 @@ double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc
       }
     }
     
-    // Check for convergence.
-    if(bracket(G,G)<eps || converged(W)) {
+    // Check for convergence. Don't do the check in the first
+    // iteration, because for canonical orbitals it can be a really
+    // bad saddle point
+    if(k>1 && (bracket(G,G)<eps || converged(W))) {
 
       if(verbose) {
 	print_time(t);
@@ -353,7 +359,7 @@ void Unitary::check_derivative(const arma::cx_mat & W0) {
   double dfreal=Jtr-J;
 
   // Is the difference ok? Check absolute or relative magnitude
-  if(fabs(dfest-dfreal)>sqrt(DBL_EPSILON)*std::max(1.0,dfest) && fabs(dfest)>1e-6) {
+  if(fabs(dfest)>sqrt(DBL_EPSILON)*fabs(J) && fabs(dfest-dfreal)>1e-2*fabs(dfest)) {
     fprintf(stderr,"\nDerivative mismatch error!\n");
     fprintf(stderr,"Used step size %e, value of function % e.\n",trstep,J);
     fprintf(stderr,"Estimated change of function % e\n",dfest);
@@ -368,38 +374,47 @@ double Unitary::polynomial_step_f(const arma::cx_mat & W) {
   // Amount of points to use is
   int npoints=polynomial_degree;
 
+  // Spacing
+  double deltaTmu=Tmu/(npoints-1);
   // Step size
-  const double deltaTmu=Tmu/(npoints-1);
+  double step=0.0;
+  
+  while(step==0.0) {
+    // Evaluate the cost function at the expansion points
+    arma::vec mu(npoints);
+    arma::vec f(npoints);
+    for(int i=0;i<npoints;i++) {
+      // Mu in the point is
+      mu(i)=i*deltaTmu;
+      
+      // Trial matrix is
+      arma::cx_mat Wtr=get_rotation(mu(i))*W;
+      // and the function is
+      f(i)=cost_func(Wtr);
+    }
+    
+    // Fit to polynomial of order p
+    arma::vec coeff=fit_polynomial(mu,f);
+    
+    // Find out zeros of the derivative polynomial
+    arma::vec roots=solve_roots(derivative_coefficients(coeff));
+    // and return the smallest positive one
+    step=smallest_positive(roots);
+    
+    // If root vanishes, go to minimum value
+    if(step==0.0 || step > Tmu) {
+      double minval=arma::min(f);
+      for(size_t i=0;i<mu.n_elem;i++)
+	if(minval==f(i)) {
+	  step=mu(i);
+	  break;
+	}
+    }
 
-  // Evaluate the cost function at the expansion points
-  arma::vec mu(npoints);
-  arma::vec f(npoints);
-  for(int i=0;i<npoints;i++) {
-    // Mu in the point is
-    mu(i)=i*deltaTmu;
-
-    // Trial matrix is
-    arma::cx_mat Wtr=get_rotation(mu(i))*W;
-    // and the function is
-    f(i)=cost_func(Wtr);
-  }
-
-  // Fit to polynomial of order p
-  arma::vec coeff=fit_polynomial(mu,f);
-
-  // Find out zeros of the derivative polynomial
-  arma::vec roots=solve_roots(derivative_coefficients(coeff));
-  // and return the smallest positive one
-  double step=smallest_positive(roots);
-
-  // If root vanishes, go to minimum value
-  if(step==0.0 || step > Tmu) {
-    double minval=arma::min(f);
-    for(size_t i=0;i<mu.n_elem;i++)
-      if(minval==f(i)) {
-	step=mu(i);
-	break;
-      }
+    if(step==0.0) {
+      deltaTmu/=2.0;
+      printf("No root found, halving step size to %e.\n",deltaTmu);
+    }
   }
 
   return step;
@@ -414,38 +429,49 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
   int npoints=polynomial_degree;
 
   // Step size
-  const double deltaTmu=Tmu/(npoints-1);
+  double step=0.0;
+  // Spacing
+  double deltaTmu=Tmu/(npoints-1);
 
-  // Evaluate the first-order derivative of the cost function at the expansion points
-  arma::vec mu(npoints);
-  arma::vec fp(npoints);
-  for(int i=0;i<npoints;i++) {
-    // Mu in the point is
-    mu(i)=i*deltaTmu;
+  while(step==0.0) {
+    // Evaluate the first-order derivative of the cost function at the expansion points
+    arma::vec mu(npoints);
+    arma::vec fp(npoints);
+    for(int i=0;i<npoints;i++) {
+      // Mu in the point is
+      mu(i)=i*deltaTmu;
+      
+      // Trial matrix is
+      arma::cx_mat Wtr=get_rotation(mu(i))*W;
+      // Compute derivative matrix
+      arma::cx_mat der=cost_der(Wtr);
+      // so the derivative wrt the step is
+      fp(i)=step_der(Wtr,der);
+    }
+    
+    // Sanity check - is derivative of the right sign?
+    if(sign*fp[0]<0.0) {
+      printf("Derivative is of the wrong sign!\n");
+      arma::trans(mu).print("mu");
+      arma::trans(fp).print("J'(mu)");
+      throw std::runtime_error("Derivative consistency error.\n");
+    }
+    
+    // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
+    arma::vec coeff=fit_polynomial(mu,fp);
+    
+    // Find out zeros of the polynomial
+    arma::vec roots=solve_roots(coeff);
+    // and return the smallest positive one
+    step=smallest_positive(roots);
 
-    // Trial matrix is
-    arma::cx_mat Wtr=get_rotation(mu(i))*W;
-    // Compute derivative matrix
-    arma::cx_mat der=cost_der(Wtr);
-    // so the derivative wrt the step is
-    fp(i)=step_der(Wtr,der);
+    if(step==0.0) {
+      deltaTmu/=2.0;
+      printf("No root found, halving step size to %e.\n",deltaTmu);
+    }
   }
 
-  // Sanity check - is derivative of the right sign?
-  if(sign*fp[0]<0.0) {
-    printf("Derivative is of the wrong sign!\n");
-    arma::trans(mu).print("mu");
-    arma::trans(fp).print("J'(mu)");
-    throw std::runtime_error("Derivative consistency error.\n");
-  }
-
-  // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
-  arma::vec coeff=fit_polynomial(mu,fp);
-
-  // Find out zeros of the polynomial
-  arma::vec roots=solve_roots(coeff);
-  // and return the smallest positive one
-  return smallest_positive(roots);
+  return step;
 }
 
 double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
@@ -453,53 +479,63 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
   int npoints=(int) ceil((polynomial_degree+1)/2.0);
 
   // Step size
-  const double deltaTmu=Tmu/(npoints-1);
+  double step=0.0;
+  // Spacing
+  double deltaTmu=Tmu/(npoints-1);
 
-  // Evaluate the first-order derivative of the cost function at the expansion points
-  arma::vec mu(npoints);
-  arma::vec f(npoints);
-  arma::vec fp(npoints);
-  for(int i=0;i<npoints;i++) {
-    // Value of mu is
-    mu(i)=i*deltaTmu;
+  while(true) {
+    // Evaluate the first-order derivative of the cost function at the expansion points
+    arma::vec mu(npoints);
+    arma::vec f(npoints);
+    arma::vec fp(npoints);
+    for(int i=0;i<npoints;i++) {
+      // Value of mu is
+      mu(i)=i*deltaTmu;
+      
+      // Trial matrix is
+      arma::cx_mat Wtr=get_rotation(mu(i))*W;
+      arma::cx_mat der;
+      cost_func_der(Wtr,f(i),der);
+      
+      // Compute the derivative
+      fp(i)=step_der(Wtr,der);
+    }
+    
+    // Sanity check - is derivative of the right sign?
+    if(sign*fp[0]<0.0) {
+      printf("Derivative is of the wrong sign!\n");
+      arma::trans(mu).print("mu");
+      arma::trans(fp).print("J'(mu)");
+      throw std::runtime_error("Derivative consistency error.\n");
+    }
+    
+    // Fit function to polynomial of order p
+    //  J(mu)  = a_0 + a_1*mu + ... + a_(p-1)*mu^(p-1)
+    // and its derivative to the function
+    //  J'(mu) = a_1 + 2*a_2*mu + ... + (p-1)*a_(p-1)*mu^(p-2).
+    // Pull out coefficients of derivative
+    arma::vec ader=derivative_coefficients(fit_polynomial_fdf(mu,f,fp,polynomial_degree));
+    
+    // Find out zeros of the polynomial
+    arma::vec roots=solve_roots(ader);
+    // and get the smallest positive one
+    step=smallest_positive(roots);
+    
+    // If root vanishes, go to minimum value
+    if(step==0.0 || step > Tmu) {
+      double minval=arma::min(f);
+      for(size_t i=0;i<mu.n_elem;i++)
+	if(minval==f(i)) {
+	  step=mu(i);
+	  break;
+	}
+    }
 
-    // Trial matrix is
-    arma::cx_mat Wtr=get_rotation(mu(i))*W;
-    arma::cx_mat der;
-    cost_func_der(Wtr,f(i),der);
-
-    // Compute the derivative
-    fp(i)=step_der(Wtr,der);
-  }
-
-  // Sanity check - is derivative of the right sign?
-  if(sign*fp[0]<0.0) {
-    printf("Derivative is of the wrong sign!\n");
-    arma::trans(mu).print("mu");
-    arma::trans(fp).print("J'(mu)");
-    throw std::runtime_error("Derivative consistency error.\n");
-  }
-
-  // Fit function to polynomial of order p
-  //  J(mu)  = a_0 + a_1*mu + ... + a_(p-1)*mu^(p-1)
-  // and its derivative to the function
-  //  J'(mu) = a_1 + 2*a_2*mu + ... + (p-1)*a_(p-1)*mu^(p-2).
-  // Pull out coefficients of derivative
-  arma::vec ader=derivative_coefficients(fit_polynomial_fdf(mu,f,fp,polynomial_degree));
-
-  // Find out zeros of the polynomial
-  arma::vec roots=solve_roots(ader);
-  // and get the smallest positive one
-  double step=smallest_positive(roots);
-  
-  // If root vanishes, go to minimum value
-  if(step==0.0 || step > Tmu) {
-    double minval=arma::min(f);
-    for(size_t i=0;i<mu.n_elem;i++)
-      if(minval==f(i)) {
-	step=mu(i);
-	break;
-      }
+    // Check step
+    if(step==0.0) {
+      deltaTmu/=2.0;
+      printf("No root found, halving step size to %e.\n",deltaTmu);
+    }
   }
 
   return step;

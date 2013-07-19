@@ -128,6 +128,9 @@ class Unitary {
   /// Get derivative wrt step length
   double step_der(const arma::cx_mat & W, const arma::cx_mat & der) const;
 
+  /// Set degree
+  void set_q(int q);
+
   /// Armijo step, return step length
   double armijo_step(const arma::cx_mat & W);
   /// Polynomial step (fit function), return step length
@@ -155,12 +158,12 @@ class Unitary {
   /// Open log file
   void open_log(const std::string & fname);
 
-  /// Set degree
-  void set_q(int q);
   /// Set polynomial search options
   void set_poly(int deg);
   /// Set Fourier search options
   void set_fourier(int Nsamples, int Nperiods);
+  /// Set convergence threshold
+  void set_thr(double eps);
 
   /// Unitary optimization
   double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
