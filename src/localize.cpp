@@ -31,50 +31,56 @@
 #include <omp.h>
 #endif
 
-void size_distribution(const BasisSet & basis, arma::mat & C, std::string filename, const std::vector<size_t> & printidx) {
+void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string filename, const std::vector<size_t> & printidx) {
   // Get the r_i^2 r_j^2 matrices
   std::vector<arma::mat> momstack=basis.moment(4);
+  // Helper
+  std::complex<double> one(1.0,0.0);
+
   // Diagonal: x^4 + y^4 + z^4
-  arma::mat rfour=momstack[getind(4,0,0)] + momstack[getind(0,4,0)] + momstack[getind(0,0,4)] \
-    // Off-diagonal: 2 x^2 y^2 + 2 x^2 z^2 + 2 y^2 z^2
-    +2.0*(momstack[getind(2,2,0)]+momstack[getind(2,0,2)]+momstack[getind(0,2,2)]);
+  arma::cx_mat rfour=(momstack[getind(4,0,0)] + momstack[getind(0,4,0)] + momstack[getind(0,0,4)] \
+		      // Off-diagonal: 2 x^2 y^2 + 2 x^2 z^2 + 2 y^2 z^2
+		      +2.0*(momstack[getind(2,2,0)]+momstack[getind(2,0,2)]+momstack[getind(0,2,2)]))*one;
 
   // Get R^3 matrices
   momstack=basis.moment(3);
-  std::vector<arma::mat> rrsq(3);
+  std::vector<arma::cx_mat> rrsq(3);
   // x^3 + xy^2 + xz^2
-  rrsq[0]=momstack[getind(3,0,0)]+momstack[getind(1,2,0)]+momstack[getind(1,0,2)];
+  rrsq[0]=(momstack[getind(3,0,0)]+momstack[getind(1,2,0)]+momstack[getind(1,0,2)])*one;
   // x^2y + y^3 + yz^2
-  rrsq[1]=momstack[getind(2,1,0)]+momstack[getind(0,3,0)]+momstack[getind(0,1,2)];
+  rrsq[1]=(momstack[getind(2,1,0)]+momstack[getind(0,3,0)]+momstack[getind(0,1,2)])*one;
   // x^2z + y^2z + z^3
-  rrsq[2]=momstack[getind(2,0,1)]+momstack[getind(0,2,1)]+momstack[getind(0,0,3)];
+  rrsq[2]=(momstack[getind(2,0,1)]+momstack[getind(0,2,1)]+momstack[getind(0,0,3)])*one;
 
   // Get R^2 matrix
   momstack=basis.moment(2);
-  std::vector< std::vector<arma::mat> > rr(3);
+  std::vector< std::vector<arma::cx_mat> > rr(3);
   for(int ic=0;ic<3;ic++)
     rr[ic].resize(3);
 
   // Diagonal
-  rr[0][0]=momstack[getind(2,0,0)];
-  rr[1][1]=momstack[getind(0,2,0)];
-  rr[2][2]=momstack[getind(0,0,2)];
+  rr[0][0]=momstack[getind(2,0,0)]*one;
+  rr[1][1]=momstack[getind(0,2,0)]*one;
+  rr[2][2]=momstack[getind(0,0,2)]*one;
 
   // Off-diagonal
-  rr[0][1]=momstack[getind(1,1,0)];
+  rr[0][1]=momstack[getind(1,1,0)]*one;
   rr[1][0]=rr[0][1];
 
-  rr[0][2]=momstack[getind(1,0,1)];
+  rr[0][2]=momstack[getind(1,0,1)]*one;
   rr[2][0]=rr[0][2];
 
-  rr[1][2]=momstack[getind(0,1,1)];
+  rr[1][2]=momstack[getind(0,1,1)]*one;
   rr[2][1]=rr[1][2];
 
   // and the rsq matrix
-  arma::mat rsq=rr[0][0]+rr[1][1]+rr[2][2];
+  arma::cx_mat rsq=(rr[0][0]+rr[1][1]+rr[2][2]);
 
   // Get r matrices
-  std::vector<arma::mat> rmat=basis.moment(1);
+  std::vector<arma::cx_mat> rmat(3);
+  momstack=basis.moment(1);
+  for(int ic=0;ic<3;ic++)
+    rmat[ic]=momstack[ic]*one;
 
   // Output file
   FILE *out=fopen(filename.c_str(),"w");
@@ -83,28 +89,28 @@ void size_distribution(const BasisSet & basis, arma::mat & C, std::string filena
     size_t iorb=printidx[i];
    
     // r^4 term
-    double rfour_t=arma::as_scalar(arma::trans(C.col(iorb))*rfour*C.col(iorb));
+    double rfour_t=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rfour*C.col(iorb)));
 
     // rr^2 term
     arma::vec rrsq_t(3);
     for(int ic=0;ic<3;ic++)
-      rrsq_t(ic)=arma::as_scalar(arma::trans(C.col(iorb))*rrsq[ic]*C.col(iorb));
+      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rrsq[ic]*C.col(iorb)));
 
     // rr terms
     arma::mat rr_t(3,3);
     for(int ic=0;ic<3;ic++)
       for(int jc=0;jc<=ic;jc++) {
-	rr_t(ic,jc)=arma::as_scalar(arma::trans(C.col(iorb))*rr[ic][jc]*C.col(iorb));
+	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rr[ic][jc]*C.col(iorb)));
 	rr_t(jc,ic)=rr_t(ic,jc);
       }
 
     // <r^2> term
-    double rsq_t=arma::as_scalar(arma::trans(C.col(iorb))*rsq*C.col(iorb));
+    double rsq_t=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rsq*C.col(iorb)));
 
     // <r> terms
     arma::vec r_t(3);
     for(int ic=0;ic<3;ic++)
-      r_t(ic)=arma::as_scalar(arma::trans(C.col(iorb))*rmat[ic]*C.col(iorb));
+      r_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rmat[ic]*C.col(iorb)));
 
     // Second moment is
     double SM=sqrt(rsq_t - arma::dot(r_t,r_t));
@@ -117,7 +123,7 @@ void size_distribution(const BasisSet & basis, arma::mat & C, std::string filena
   fclose(out);
 }
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size, std::string fname) {
+void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size, std::string fname, bool complex) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
@@ -132,6 +138,8 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
     if(stricmp(sub,".a")==0 || stricmp(sub,".b")==0)
       fname="";
   }
+
+  arma::cx_mat Cplx(C*std::complex<double>(1.0,0.0));
 
   // Save indices
   std::vector<size_t> printidx(locorb);
@@ -148,8 +156,8 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       // Degeneracy in occupation?
       if(fabs(occs[locorb[io]]-occno)<1e-6) {
 	// Orbitals are degenerate; add to current batch
-	  orbidx.push_back(locorb[io]);
-	  locorb.erase(locorb.begin()+io);
+	orbidx.push_back(locorb[io]);
+	locorb.erase(locorb.begin()+io);
       }
     
     std::sort(orbidx.begin(),orbidx.end());
@@ -165,10 +173,14 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
 
     // Localizing matrix
     arma::cx_mat U;
-    if(randomize)
-      U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),orbidx.size());
-    else
-      U.eye(orbidx.size(),orbidx.size());
+    if(complex)
+      U=complex_unitary(orbidx.size(),orbidx.size());
+    else {
+      if(randomize)
+	U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),orbidx.size());
+      else
+	U.eye(orbidx.size(),orbidx.size());
+    }
     double measure=1e-7;
     
     // Run localization
@@ -181,39 +193,54 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
     printf("\n");
 
     orbital_localization(method,basis,Cwrk,measure,U,true,umet,acc,delocalize,fname);
-    
-    // Transform orbitals
-    arma::mat Cloc=arma::real(Cwrk*U);
-    // and energies
-    arma::vec Eloc(Cloc.n_cols);
-    if(H.n_rows == Cwrk.n_rows) {
-      // We have Fock operator; use it to calculate energies (in case
-      // we don't have canonical orbitals here)
-      for(size_t io=0;io<Cloc.n_cols;io++)
-	Eloc(io)=arma::as_scalar(arma::trans(Cloc.col(io))*H*Cloc.col(io));
-    } else
-      // No Fock operator given
-      Eloc=arma::real(arma::diagvec(arma::trans(U)*arma::diagmat(Ewrk)*U));
 
-    // and sort them in the new energy order
-    sort_eigvec(Eloc,Cloc);
-    
-    // Update orbitals and energies
-    for(size_t io=0;io<orbidx.size();io++)
-      C.col(orbidx[io])=Cloc.col(io);
-    for(size_t io=0;io<orbidx.size();io++)
-      E(orbidx[io])=Eloc(io);
+    if(complex) {
+      // Update orbitals
+      arma::cx_mat Cloc=Cwrk*U;
+      for(size_t io=0;io<orbidx.size();io++)
+	Cplx.col(orbidx[io])=Cloc.col(io);
+
+    } else {
+      // Convert U to real form
+      arma::mat Ur=orthogonalize(arma::real(U));    
+      // Transform orbitals
+      arma::mat Cloc=Cwrk*Ur;
+      // and energies
+      arma::vec Eloc(Cloc.n_cols);
+      if(H.n_rows == Cwrk.n_rows) {
+	// We have Fock operator; use it to calculate energies (in case
+	// we don't have canonical orbitals here)
+	for(size_t io=0;io<Cloc.n_cols;io++)
+	  Eloc(io)=arma::as_scalar(arma::trans(Cloc.col(io))*H*Cloc.col(io));
+      } else
+	// No Fock operator given
+	Eloc=arma::diagvec(arma::trans(Ur)*arma::diagmat(Ewrk)*Ur);
+      
+      // and sort them in the new energy order
+      sort_eigvec(Eloc,Cloc);
+      
+      // Update orbitals and energies
+      for(size_t io=0;io<orbidx.size();io++)
+	C.col(orbidx[io])=Cloc.col(io);
+      for(size_t io=0;io<orbidx.size();io++)
+	E(orbidx[io])=Eloc(io);
+    }
   }
-
+  
   // Compute size distribution
-  if(size)
-    size_distribution(basis,C,sizedist,printidx);
+  if(size) {
+    if(complex)
+      size_distribution(basis,Cplx,sizedist,printidx);
+    else {
+      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+      size_distribution(basis,Chlp,sizedist,printidx);
+    }
+  }
 }
 
-
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size, std::string fname) {
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size, std::string fname, bool complex) {
   // Run localization, occupied space
-  localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".o",size,fname+".o");
+  localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".o",size,fname+".o",complex);
 
   // Run localization, virtual space
   if(virt) {
@@ -222,7 +249,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".v",size,fname+".v");
+    localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".v",size,fname+".v",complex);
   }
 }
 
@@ -253,6 +280,7 @@ int main(int argc, char **argv) {
   set.add_string("LineSearch","Line search to use: poly_df, poly_f, poly_fdf, armijo, fourier_df","poly_df");
   set.add_bool("Randomize","Use random starting point instead of canonical orbitals?",true);
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
+  set.add_bool("Complex","Use complex orbitals? (Updated orbitals and energies are not saved)",false);
   set.add_string("SizeDistribution","File to save orbital size distribution in","");
   set.parse(argv[1]);
   set.print();
@@ -335,7 +363,10 @@ int main(int argc, char **argv) {
 
   // Use randomized starting point?
   bool randomize=set.get_bool("Randomize");
+  // Delocalize orbitals?
   bool delocalize=set.get_bool("Delocalize");
+  // Use complex orbitals?
+  bool cplx=set.get_bool("Complex");
 
   // Open checkpoint in read-write mode, don't truncate
   Checkpoint chkpt(savename,true,false);
@@ -369,7 +400,7 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,E,H,occs,virt,method,umet,acc,randomize,delocalize,sizedist,size,logfile);
+    localize(basis,C,E,H,occs,virt,method,umet,acc,randomize,delocalize,sizedist,size,logfile,cplx);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -401,8 +432,8 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,randomize,delocalize,sizedist+".a",size,logfile+".a");
-    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,randomize,delocalize,sizedist+".b",size,logfile+".b");
+    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,randomize,delocalize,sizedist+".a",size,logfile+".a",cplx);
+    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,randomize,delocalize,sizedist+".b",size,logfile+".b",cplx);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
