@@ -14,6 +14,18 @@
  * of the License, or (at your option) any later version.
  */
 
+
+/**
+ * The routines in this file provide basis set agnostic tools for
+ * evaluating the radial electron momentum density and its
+ * moments. For the formalism see chapter 3.8 in Susi Lehtola's PhD
+ * thesis "Computational Modeling of the Electron Momentum Density",
+ * University of Helsinki 2013. 
+ *
+ * A full electronic version is available at
+ * http://urn.fi/URN:ISBN:978-952-10-8091-3
+ */
+
 #ifndef ERKALE_RADEMD
 #define ERKALE_RADEMD
 
@@ -209,8 +221,8 @@ typedef struct {
  * \brief Functions for evaluating properties of the electron momentum density
  *
  * This class contains functions for computing moments of the electron
- * momentum density and Compton profiles. The algorithm has been
- * described in
+ * momentum density and Compton profiles. The adaptive grid algorithm
+ * has been described in
  *
  * J. Lehtola, M. Hakala, J. Vaara and K. Hämäläinen, "Calculation of
  * isotropic Compton profiles with Gaussian basis sets",
