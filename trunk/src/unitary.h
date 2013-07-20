@@ -66,6 +66,8 @@ class Unitary {
   bool verbose;
   /// Maximization or minimization?
   int sign;
+  /// Operate with real or complex matrices?
+  bool real;
 
   /// Convergence threshold
   double eps;
@@ -142,9 +144,12 @@ class Unitary {
   /// Fourier step
   double fourier_step_df(const arma::cx_mat & W);
 
+  /// Optimizer routine
+  double optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter);
+
  public:
   /// Constructor
-  Unitary(int q, double thr, bool maximize, bool verbose=true);
+  Unitary(int q, double thr, bool maximize, bool verbose=true, bool real=false);
   /// Destructor
   ~Unitary();
 
@@ -167,6 +172,8 @@ class Unitary {
 
   /// Unitary optimization
   double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
+  /// Orthogonal optimization
+  double optimize(arma::mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
 };
 
 
