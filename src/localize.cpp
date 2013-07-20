@@ -123,7 +123,17 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
   fclose(out);
 }
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size, std::string fname, bool complex) {
+enum startingpoint {
+  // Canonical orbitals - stay real
+  CANORB,
+  // Orthogonal matrix - stay real
+  ORTHMAT,
+  // Unitary matrix - go complex
+  UNITMAT
+};
+
+
+void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
@@ -173,13 +183,18 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
 
     // Localizing matrix
     arma::cx_mat U;
-    if(complex)
+    if(start==CANORB)
+      // Start with canonical orbitals
+      U.eye(orbidx.size(),orbidx.size());
+    else if(start==ORTHMAT)
+      // Start with orthogonal matrix
+      U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),orbidx.size());
+    else if(start==UNITMAT)
+      // Start with unitary matrix
       U=complex_unitary(orbidx.size(),orbidx.size());
     else {
-      if(randomize)
-	U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),orbidx.size());
-      else
-	U.eye(orbidx.size(),orbidx.size());
+      ERROR_INFO();
+      throw std::runtime_error("Starting point not implemented!\n");
     }
     double measure=1e-7;
     
@@ -192,15 +207,17 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       printf(" %i",(int) orbidx[io]+1);
     printf("\n");
 
-    orbital_localization(method,basis,Cwrk,measure,U,true,umet,acc,delocalize,fname);
+    orbital_localization(method,basis,Cwrk,measure,U,!(start==UNITMAT),true,umet,acc,delocalize,fname);
 
-    if(complex) {
-      // Update orbitals
+    if(start==UNITMAT) {
+      // Update orbitals, complex case
       arma::cx_mat Cloc=Cwrk*U;
       for(size_t io=0;io<orbidx.size();io++)
 	Cplx.col(orbidx[io])=Cloc.col(io);
-
+      
     } else {
+      // Update orbitals and energies, real case
+
       // Convert U to real form
       arma::mat Ur=orthogonalize(arma::real(U));    
       // Transform orbitals
@@ -229,7 +246,7 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
   
   // Compute size distribution
   if(size) {
-    if(complex)
+    if(start==UNITMAT)
       size_distribution(basis,Cplx,sizedist,printidx);
     else {
       arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
@@ -238,9 +255,9 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
   }
 }
 
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, bool randomize, bool delocalize, std::string sizedist, bool size, std::string fname, bool complex) {
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname) {
   // Run localization, occupied space
-  localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".o",size,fname+".o",complex);
+  localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o");
 
   // Run localization, virtual space
   if(virt) {
@@ -249,7 +266,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,E,H,occs,method,umet,acc,randomize,delocalize,sizedist+".v",size,fname+".v",complex);
+    localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v");
   }
 }
 
@@ -278,9 +295,8 @@ int main(int argc, char **argv) {
   set.add_string("Logfile","File to store output in","");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR","CGPR");
   set.add_string("LineSearch","Line search to use: poly_df, poly_f, poly_fdf, armijo, fourier_df","poly_df");
-  set.add_bool("Randomize","Use random starting point instead of canonical orbitals?",true);
+  set.add_string("StartingPoint","Starting point to use: CAN, ORTH, UNIT?","ORTH");
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
-  set.add_bool("Complex","Use complex orbitals? (Updated orbitals and energies are not saved)",false);
   set.add_string("SizeDistribution","File to save orbital size distribution in","");
   set.parse(argv[1]);
   set.print();
@@ -361,12 +377,22 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Use randomized starting point?
-  bool randomize=set.get_bool("Randomize");
   // Delocalize orbitals?
   bool delocalize=set.get_bool("Delocalize");
-  // Use complex orbitals?
-  bool cplx=set.get_bool("Complex");
+
+  // Starting point
+  std::string startp=set.get_string("StartingPoint");
+  enum startingpoint start;
+  if(stricmp(startp,"CAN")==0)
+    start=CANORB;
+  else if(stricmp(startp,"ORTH")==0)
+    start=ORTHMAT;
+  else if(stricmp(startp,"UNIT")==0)
+    start=UNITMAT;
+  else {
+    ERROR_INFO();
+    throw std::runtime_error("Starting point not implemented!\n");
+  }
 
   // Open checkpoint in read-write mode, don't truncate
   Checkpoint chkpt(savename,true,false);
@@ -400,7 +426,7 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,E,H,occs,virt,method,umet,acc,randomize,delocalize,sizedist,size,logfile,cplx);
+    localize(basis,C,E,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -432,8 +458,8 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,randomize,delocalize,sizedist+".a",size,logfile+".a",cplx);
-    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,randomize,delocalize,sizedist+".b",size,logfile+".b",cplx);
+    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a");
+    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b");
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);

@@ -1951,13 +1951,18 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname) {
+void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool real, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname) {
   Timer t;
 
   // Threshold
   double thr=1e-6;
   if(measure>0.0)
     thr=measure;
+
+  // Real part of U
+  arma::mat Ureal;
+  if(real)
+    Ureal=arma::real(U);
 
   // Worker
   if(met==BOYS || met==BOYS_2 || met==BOYS_3 || met==BOYS_4) {
@@ -1978,7 +1983,10 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
 	if(verbose) printf("\nInitial localization with p=%i\n",nv);
 	worker.set_n(nv);
 	worker.set_thr(1e-3);
-	measure=worker.optimize(U,umet,uacc);
+	if(real)
+	  measure=worker.optimize(Ureal,umet,uacc);
+	else
+	  measure=worker.optimize(U,umet,uacc);
       }
       worker.set_thr(thr);
       worker.set_n(n);
@@ -1986,7 +1994,11 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     }
     // Final optimization
     if(fname.length()) worker.open_log(fname);
-    measure=worker.optimize(U,umet,uacc);
+
+    if(real)
+      measure=worker.optimize(Ureal,umet,uacc);
+    else
+      measure=worker.optimize(U,umet,uacc);
 
   } else if(met==FM_1 || met==FM_2 || met==FM_3 || met==FM_4) {
     int n=0;
@@ -2006,7 +2018,11 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
 	if(verbose) printf("\nInitial localization with p=%i\n",nv);
 	worker.set_n(nv);
 	worker.set_thr(1e-3);
-	measure=worker.optimize(U,umet,uacc);
+
+	if(real)
+	  measure=worker.optimize(Ureal,umet,uacc);
+	else
+	  measure=worker.optimize(U,umet,uacc);
       }
 
       if(verbose) printf("\n");
@@ -2014,15 +2030,29 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       worker.set_thr(thr);
     }
     if(fname.length()) worker.open_log(fname);
-    measure=worker.optimize(U,umet,uacc);
+
+    if(real)
+      measure=worker.optimize(Ureal,umet,uacc);
+    else
+      measure=worker.optimize(U,umet,uacc);
+
   } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
     Pipek worker(met,basis,C,thr,verbose);
     if(fname.length()) worker.open_log(fname);
-    measure=worker.optimize(U,umet,uacc);
+
+    if(real)
+      measure=worker.optimize(Ureal,umet,uacc);
+    else
+      measure=worker.optimize(U,umet,uacc);
+
   } else if(met==EDMISTON) {
     Edmiston worker(basis,C,thr,verbose);
     if(fname.length()) worker.open_log(fname);
-    measure=worker.optimize(U,umet,uacc);
+
+    if(real)
+      measure=worker.optimize(Ureal,umet,uacc);
+    else
+      measure=worker.optimize(U,umet,uacc);
   } else {
     ERROR_INFO();
     throw std::runtime_error("Method not implemented.\n");
@@ -2031,6 +2061,11 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
   if(verbose) {
     printf("Localization done in %s.\n",t.elapsed().c_str());
     fflush(stdout);
+  }
+
+  if(real) {
+    // Save U
+    U=Ureal*std::complex<double>(1.0,0.0);
   }
 }
 

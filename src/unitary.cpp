@@ -19,10 +19,11 @@
 #include "mathf.h"
 #include <cfloat>
 
-Unitary::Unitary(int qv, double thr, bool max, bool ver) {
+Unitary::Unitary(int qv, double thr, bool max, bool ver, bool realv) {
   q=qv;
   eps=thr;
   verbose=ver;
+  real=realv;
 
   /// Maximize or minimize?
   if(max)
@@ -75,7 +76,13 @@ arma::cx_mat Unitary::get_rotation(double step) const {
   // Imaginary unit
   std::complex<double> imagI(0,1.0);
 
-  return Hvec*arma::diagmat(arma::exp(sign*step*imagI*Hval))*arma::trans(Hvec);
+  // Rotation matrix is
+  arma::cx_mat rot=Hvec*arma::diagmat(arma::exp(sign*step*imagI*Hval))*arma::trans(Hvec);
+  if(real)
+    // Zero out possible imaginary part
+    rot=arma::real(rot)*std::complex<double>(1.0,0.0);
+  
+  return rot;
 }
 
 void Unitary::set_poly(int deg) {
@@ -120,6 +127,23 @@ void Unitary::update_search_direction() {
 }
 
 double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter) {
+  // Operating on complex matrix.
+  real=false;
+  return optimizer(W,met,acc,maxiter);
+}
+
+double Unitary::optimize(arma::mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter) {
+  // Operating on real matrix.
+  real=true;
+
+  arma::cx_mat Whlp=W*std::complex<double>(1.0,0.0);
+  double o=optimizer(Whlp,met,acc,maxiter);
+  W=arma::real(Whlp);
+
+  return o;
+}
+
+double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter) {
   // Old gradient
   arma::cx_mat oldG;
   G.zeros(W.n_cols,W.n_cols);
@@ -310,19 +334,22 @@ void Unitary::print_step(enum unitmethod & met, double step) const {
 }
 
 void Unitary::classify(const arma::cx_mat & W) const {
+  if(real)
+    return;
+  
   // Classify matrix
-  double real=rms_norm(arma::real(W));
-  double imag=rms_norm(arma::imag(W));
+  double realpart=rms_norm(arma::real(W));
+  double imagpart=rms_norm(arma::imag(W));
 
   printf("Transformation matrix is");
-  if(imag<sqrt(DBL_EPSILON)*real)
+  if(imagpart<sqrt(DBL_EPSILON)*realpart)
     printf(" real");
-  else if(real<sqrt(DBL_EPSILON)*imag)
+  else if(realpart<sqrt(DBL_EPSILON)*imagpart)
     printf(" imaginary");
   else
     printf(" complex");
 
-  printf(", re norm %e, im norm %e\n",real,imag);
+  printf(", re norm %e, im norm %e\n",realpart,imagpart);
 }
 
 void Unitary::check_derivative(const arma::cx_mat & W0) {
