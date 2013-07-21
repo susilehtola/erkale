@@ -3268,7 +3268,7 @@ double check_orth(const arma::mat & C, const arma::mat & S, bool verbose) {
 	if(fabs(MOovl(i,j))<10*DBL_EPSILON)
 	  MOovl(i,j)=0.0;
 
-    MOovl.print("Deviation from unit matrix");
+    MOovl.save("MOovl.dat",arma::raw_ascii);
 
     std::ostringstream oss;
     oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality is " << maxerr <<".\nCheck the used LAPACK implementation.\n";
