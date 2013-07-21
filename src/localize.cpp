@@ -133,7 +133,7 @@ enum startingpoint {
 };
 
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname) {
+void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double thr) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
@@ -196,7 +196,7 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       ERROR_INFO();
       throw std::runtime_error("Starting point not implemented!\n");
     }
-    double measure=1e-7;
+    double measure=thr;
     
     // Run localization
     if(delocalize)
@@ -255,9 +255,9 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
   }
 }
 
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname) {
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double thr) {
   // Run localization, occupied space
-  localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o");
+  localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o",thr);
 
   // Run localization, virtual space
   if(virt) {
@@ -266,7 +266,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v");
+    localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v",thr);
   }
 }
 
@@ -298,6 +298,7 @@ int main(int argc, char **argv) {
   set.add_string("StartingPoint","Starting point to use: CAN, ORTH, UNIT?","ORTH");
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
   set.add_string("SizeDistribution","File to save orbital size distribution in","");
+  set.add_double("Threshold","Threshold for localization",1e-7);
   set.parse(argv[1]);
   set.print();
 
@@ -394,6 +395,9 @@ int main(int argc, char **argv) {
     throw std::runtime_error("Starting point not implemented!\n");
   }
 
+  // Convergence threshold
+  double thr=set.get_double("Threshold");
+
   // Open checkpoint in read-write mode, don't truncate
   Checkpoint chkpt(savename,true,false);
     
@@ -426,7 +430,7 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,E,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile);
+    localize(basis,C,E,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile,thr);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -458,8 +462,8 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a");
-    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b");
+    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a",thr);
+    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b",thr);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
