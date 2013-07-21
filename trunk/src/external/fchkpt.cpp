@@ -26,6 +26,7 @@
 #include "global.h"
 #include "basis.h"
 #include "checkpoint.h"
+#include "linalg.h"
 #include "mathf.h"
 #include "storage.h"
 #include "stringutil.h"
@@ -272,9 +273,11 @@ void load_fchk(const Settings & set, double tol) {
   Timer t;
 
   // Read in checkpoint
+  printf("Read in formatted checkpoint ... ");
+  fflush(stdout);
   Storage stor=parse_fchk(set.get_string("LoadFchk"));
+  printf("done (%s)\n",t.elapsed().c_str());
   //  stor.print(false);
-  printf("Read in formatted checkpoint in %s.\n",t.elapsed().c_str());
 
   // Construct basis set
   BasisSet basis=form_basis(stor);
@@ -323,8 +326,10 @@ void load_fchk(const Settings & set, double tol) {
 
   // Check that everything is OK
   t.set();
+  printf("\nComputing overlap matrix ... ");
+  fflush(stdout);
   arma::mat S=basis.overlap();
-  printf("\nComputed overlap matrix in %s.\n",t.elapsed().c_str());
+  printf("done (%s)\n",t.elapsed().c_str());
 
   int Nel=stor.get_int("Number of electrons");
   double nelnum=arma::trace(P*S);
@@ -339,6 +344,41 @@ void load_fchk(const Settings & set, double tol) {
   // Renormalize
   if(set.get_bool("Renormalize"))
     P*=Nel/nelnum;
+  if(set.get_bool("Reorthonormalize")) {
+    // Compute Ca overlap
+    arma::mat CSC=arma::trans(Ca)*S*Ca;
+    // Find eigenvectors
+    arma::vec eval;
+    arma::mat evec;
+    eig_sym_ordered(eval,evec,CSC);
+    // Rotate Ca by eigenvectors
+    arma::mat Cnew(Ca);
+    for(size_t io=0;io<Ca.n_cols;io++)
+      Cnew.col(io)=Ca*evec.col(io)/eval(io);
+    Ca=Cnew;
+    // Renormalize orbitals
+    for(size_t io=0;io<Ca.n_cols;io++)
+      Ca.col(io)/=sqrt(arma::as_scalar(arma::trans(Ca.col(io))*S*Ca.col(io)));
+
+    double Camax=arma::max(arma::abs(diagvec(CSC)-1.0));
+
+    if(restr)
+      printf("Reorthonormalized orbitals, maximum non-ortogonality was %e.\n",Camax);
+    else {
+      CSC=arma::trans(Cb)*S*Cb;
+      eig_sym_ordered(eval,evec,CSC);
+      for(size_t io=0;io<Ca.n_cols;io++)
+	Cnew.col(io)=Cb*evec.col(io)/eval(io);
+      Cb=Cnew;
+      // Renormalize orbitals
+      for(size_t io=0;io<Cb.n_cols;io++)
+	Cb.col(io)/=sqrt(arma::as_scalar(arma::trans(Cb.col(io))*S*Cb.col(io)));
+
+      double Cbmax=arma::max(arma::abs(diagvec(CSC)-1.0));
+
+      printf("Reorthonormalized orbitals, maximum non-ortogonality was %e %e.\n",Camax,Cbmax);
+    }
+  }
 
   // Save the result
   t.set();
@@ -383,7 +423,7 @@ void load_fchk(const Settings & set, double tol) {
     chkpt.write("Pb",Pb);
   }
 
-  chkpt.write("Converged",1);
+  chkpt.write("Converged",true);
 
   // Write number of electrons
   chkpt.write("Nel",Nel);
@@ -506,6 +546,7 @@ int main(int argc, char **argv) {
   set.add_string("SaveFchk","Gaussian formatted checkpoint file to load","");
   set.add_double("FchkTol","Tolerance for deviation in density matrix",1e-8);
   set.add_bool("Renormalize","Renormalize density matrix?",false);
+  set.add_bool("Reorthonormalize","Reorthonormalize orbitals?",false);
   set.add_string("LoadChk","Save results to ERKALE checkpoint","");
   set.add_string("SaveChk","Save results to ERKALE checkpoint","");
 
