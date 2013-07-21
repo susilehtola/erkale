@@ -361,13 +361,13 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
     std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
     if(kfrac!=0.0)
       throw std::runtime_error("Not implemented!\n");
-    
+
     // Collect matrices
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       Forb[io]=Jorb[io];
       Eorb[io]=0.5*arma::trace(Porb[io]*Jorb[io]);
     }
-    
+
   } else {
 
     if(!direct) {
@@ -396,7 +396,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       throw std::runtime_error("Analytical Coulomb/exchange matrix not implemented!\n");
     }
   }
-  
+
   if(verbose) {
     printf(" done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
@@ -496,7 +496,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     else {
       // Initialize with a random unitary matrix.
       W=complex_unitary(nocc);
-      
+
       if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
@@ -513,7 +513,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 
     // Update Ctilde
     arma::cx_mat Ctilde=sicsol.C*W;
-    
+
     // Stack of density matrices
     std::vector<arma::mat> Pv(nocc+1);
     // First entries are orbital densities
@@ -585,7 +585,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       for(size_t i=0;i<noccb;i++)
 	fprintf(stderr," %e",occb[i]);
       fprintf(stderr,"\n");
-      
+
       throw std::runtime_error("SIC not supported for orbitals with varying occupations.\n");
     }
   }
@@ -673,7 +673,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     // Update Ctilde
     arma::cx_mat Catilde=sicsola.C*Wa;
     arma::cx_mat Cbtilde=sicsolb.C*Wb;
-    
+
     // Stack of density matrices
     std::vector<arma::mat> Pv(nocca+noccb+2);
     // First entries are orbital densities
@@ -724,7 +724,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   // Initialize the worker
   PZSIC worker(this,dft,&grid,verbose);
   worker.set(sol,pzcor);
-  
+
   // Use canonical orbitals for SIC
   if(canonical) {
     worker.cost_func(W);
@@ -736,7 +736,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   // Get SIC energy and hamiltonian
   double ESIC=worker.get_ESIC();
   arma::mat HSIC=worker.get_HSIC();
-  
+
   // Adjust Fock operator for SIC
   sol.H     =-pzcor*HSIC;
   sol.XC    =-pzcor*HSIC;
@@ -1975,7 +1975,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       n=3;
     else if(met==BOYS_4)
       n=4;
-    
+
     Boys worker(basis,C,n,thr,verbose,delocalize);
     // Perform initial localization
     if(n>1) {
@@ -2010,6 +2010,18 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       n=3;
     else if(met==FM_4)
       n=4;
+
+    {
+      // Initial localization with Boys
+      Boys worker(basis,C,n,thr,verbose,delocalize);
+      if(verbose) printf("\nInitial localization with Foster-Boys\n");
+      if(real)
+	measure=worker.optimize(Ureal,umet,uacc);
+      else
+	measure=worker.optimize(U,umet,uacc);
+      if(verbose) printf("\n");
+    }
+
 
     FMLoc worker(basis,C,n,thr,verbose,delocalize);
     // Perform initial localization
@@ -2087,7 +2099,7 @@ arma::mat interpret_force(const arma::vec & f) {
   return retf;
 }
 
-Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(4*nv,thr,delocalize,ver) { 
+Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(4*nv,thr,delocalize,ver) {
   // Save n
   n=nv;
 
@@ -2096,7 +2108,7 @@ Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool
     printf("Computing r^2 and dipole matrices ...");
     fflush(stdout);
   }
-  
+
   // Get R^2 matrix
   std::vector<arma::mat> momstack=basis.moment(2);
   rsq=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
@@ -2192,7 +2204,7 @@ arma::cx_mat Boys::cost_der(const arma::cx_mat & W) {
 
 #ifdef _OPENMP
 #pragma omp parallel for
-#endif  
+#endif
   for(size_t b=0;b<W.n_cols;b++) {
     // Helpers for r terms
     double xp=std::real(arma::as_scalar(arma::trans(W.col(b))*rxw.col(b)));
@@ -2202,12 +2214,12 @@ arma::cx_mat Boys::cost_der(const arma::cx_mat & W) {
     // Normal Boys contribution
     double w=std::real(arma::as_scalar(arma::trans(W.col(b))*rsw.col(b)));
     w-=xp*xp + yp*yp + zp*zp;
-    
+
     // r^2 terms
     for(size_t a=0;a<W.n_cols;a++) {
       // Compute derivative
       std::complex<double> dert=rsw(a,b) - 2.0*(xp*rxw(a,b) + yp*ryw(a,b) + zp*rzw(a,b));
-      
+
       // Set derivative
       Bder(a,b)=n*pow(w,n-1)*dert;
     }
@@ -2231,7 +2243,7 @@ FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double thr, bo
     printf("Computing r^4, r^3, r^2 and r matrices ...");
     fflush(stdout);
   }
-  
+
   // Get the r_i^2 r_j^2 matrices
   std::vector<arma::mat> momstack=basis.moment(4);
   // Diagonal: x^4 + y^4 + z^4
@@ -2349,7 +2361,7 @@ double FMLoc::cost_func(const arma::cx_mat & W) {
   for(size_t io=0;io<W.n_cols;io++) {
     // <r^4> term
     double rfour_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rfw.col(io)));
-    
+
     // rrsq
     arma::vec rrsq_t(3);
     for(int ic=0;ic<3;ic++)
@@ -2373,7 +2385,7 @@ double FMLoc::cost_func(const arma::cx_mat & W) {
 
     // Collect terms
     double w= rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2);
-    
+
     // Add to total
     B+=pow(w,n);
   }
@@ -2416,11 +2428,11 @@ arma::cx_mat FMLoc::cost_der(const arma::cx_mat & W) {
 
 #ifdef _OPENMP
 #pragma omp parallel for
-#endif  
+#endif
   for(size_t io=0;io<W.n_cols;io++) {
     // <r^4> term
     double rfour_t=std::real(arma::as_scalar(arma::trans(W.col(io))*rfw.col(io)));
-    
+
     // rrsq
     arma::vec rrsq_t(3);
     for(int ic=0;ic<3;ic++)
@@ -2450,22 +2462,22 @@ arma::cx_mat FMLoc::cost_der(const arma::cx_mat & W) {
 
       // <r^4> term
       std::complex<double> rfour_d=rfw(a,io);
-      
+
       // rrsq
       arma::cx_vec rrsq_d(3);
       for(int ic=0;ic<3;ic++)
 	rrsq_d(ic)=rrsqw[ic](a,io);
-      
+
       // rr
       arma::cx_mat rr_d(3,3);
       for(int ic=0;ic<3;ic++)
 	for(int jc=0;jc<3;jc++) {
 	  rr_d(ic,jc)=rrw[ic][jc](a,io);
       }
-      
+
       // rsq
       std::complex<double> rsq_d=rsqw(a,io);
-      
+
       // r
       arma::cx_vec r_d(3);
       for(int ic=0;ic<3;ic++)
@@ -2474,7 +2486,7 @@ arma::cx_mat FMLoc::cost_der(const arma::cx_mat & W) {
       // Derivative is
       std::complex<double> one(1.0,0.0);
       std::complex<double> dert=rfour_d - 4.0*(arma::dot(one*rrsq_t,r_d)+arma::dot(rrsq_d,one*r_t)) + 2.0*rsq_d*arma::dot(r_t,r_t) + 4.0*rsq_t*arma::dot(one*r_t,r_d) + 8.0*arma::as_scalar((one*(arma::trans(r_t)*rr_t))*r_d) + 4.0*arma::as_scalar(arma::trans(one*r_t)*rr_d*(one*r_t)) - 12.0*arma::dot(r_t,r_t)*arma::dot(one*r_t,r_d);
-      
+
       // Set derivative
       Bder(a,io)=n*pow(w,n-1)*dert;
     }
@@ -2492,32 +2504,32 @@ void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double thr, bool ver, bool delocalize) : Unitary(4,thr,!delocalize,ver) {
   // Initialize charge matrix
   Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
-  
+
   if(chg==PIPEK_BECKE) {
-    
+
     // Helper. Non-verbose operation
     //      DFTGrid intgrid(&basis,false);
     DFTGrid intgrid(&basis,ver);
     // Construct integration grid
     intgrid.construct_becke(1e-5);
-    
+
     // Get overlap matrices
     Timer t;
     if(ver) {
       printf("Computing atomic overlap matrices ...");
       fflush(stdout);
     }
-    
+
     std::vector<arma::mat> Sat=intgrid.eval_overlaps();
-    
+
     if(ver) {
       printf(" done (%s)\n",t.elapsed().c_str());
       t.set();
-      
+
       printf("Computing Becke charges ...");
       fflush(stdout);
     }
-    
+
     // Loop over atoms
 #ifdef _OPENMP
 #pragma omp for
@@ -2526,12 +2538,12 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
       // Compute charges
       Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
     }
-    
+
     if(ver) {
       printf(" done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
     }
-    
+
   } else if(chg==PIPEK_HIRSHFELD) {
 
     Timer t;
@@ -2539,41 +2551,41 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
       printf("Computing Hirshfeld densities ...");
       fflush(stdout);
     }
-    
+
     // Hirshfeld densities
     Hirshfeld hirsh;
     // We don't know method here so just use HF.
     hirsh.compute(basis,"HF");
-    
+
     if(ver) {
       printf(" done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
-    }	
-    
+    }
+
     // Helper. Non-verbose operation
     //      DFTGrid intgrid(&basis,false);
     DFTGrid intgrid(&basis,ver);
     // Construct integration grid
     intgrid.construct_hirshfeld(hirsh,1e-5);
-    
+
     if(ver) {
       t.set();
-      
+
       printf("Computing Hirshfeld overlap matrices ...");
       fflush(stdout);
     }
-    
+
     // Get overlap matrices
     std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
-    
+
     if(ver) {
       printf(" done (%s)\n",t.elapsed().c_str());
       t.set();
-      
+
       printf("Computing Hirshfeld charges ...");
       fflush(stdout);
     }
-    
+
     // Loop over atoms
 #ifdef _OPENMP
 #pragma omp for
@@ -2582,12 +2594,12 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
       // Compute charges
       Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
     }
-    
+
     if(ver) {
       printf(" done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
     }
-  
+
   } else if(chg==PIPEK_MULLIKEN) {
 
     Timer t;
@@ -2600,7 +2612,7 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
     arma::mat S=basis.overlap();
     // Helper matrix
     arma::mat SC=S*C;
-    
+
     // Loop over atoms
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -2608,14 +2620,14 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
     for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
       // Get shells on nucleus
       std::vector<GaussianShell> shells=basis.get_funcs(inuc);
-      
+
       // Increment charge
       for(size_t io=0;io<C.n_cols;io++)
 	for(size_t jo=0;jo<C.n_cols;jo++)
 	  for(size_t is=0;is<shells.size();is++)
 	    for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
 	      Q(io,jo,inuc)+=C(fi,io)*SC(fi,jo);
-      
+
       // Symmetrize
       Q.slice(inuc)=(Q.slice(inuc)+arma::trans(Q.slice(inuc)))/2.0;
     }
@@ -2650,7 +2662,7 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
     for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
       // Get shells on nucleus
       std::vector<GaussianShell> shells=basis.get_funcs(inuc);
-      
+
       // Increment charge
       for(size_t io=0;io<C.n_cols;io++)
 	for(size_t jo=0;jo<C.n_cols;jo++)
@@ -2664,7 +2676,7 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
       fflush(stdout);
     }
 
-    
+
   } else {
     ERROR_INFO();
     throw std::runtime_error("Charge method not implemented.\n");
@@ -2719,11 +2731,11 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
     ERROR_INFO();
     throw std::runtime_error("Matrix does not match size of problem!\n");
   }
-  
+
   // Returned matrix
   arma::cx_mat Dder(W.n_cols,W.n_cols);
   Dder.zeros();
-  
+
   // Compute sum
 #ifdef _OPENMP
 #pragma omp parallel
@@ -2736,10 +2748,10 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
     for(size_t iat=0;iat<Q.n_slices;iat++) {
       // Helper matrix
       arma::cx_mat qw=Q.slice(iat)*W;
-      
+
       for(size_t b=0;b<W.n_cols;b++) {
 	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-	
+
 	for(size_t a=0;a<W.n_cols;a++) {
 #ifdef _OPENMP
 	  Dwrk(a,b)+=2.0*qwp*qw(a,b);
@@ -2756,7 +2768,7 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
     Dder+=Dwrk;
 #endif
   }
-    
+
   return Dder;
 }
 
@@ -2807,10 +2819,10 @@ void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
   std::vector<arma::mat> Porb(W.n_cols);
   for(size_t io=0;io<W.n_cols;io++)
     Porb[io]=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
-  
+
   // Orbital Coulomb matrices
   std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
-  
+
   // Compute self-repulsion
   f=0.0;
   for(size_t io=0;io<W.n_cols;io++)
@@ -2878,10 +2890,10 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
   for(size_t io=0;io<Ctilde.n_cols;io++) {
     arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
-    
+
     HSIC+=Forb[io]*Pio*(solver->get_S());
   }
-  
+
   // SI energy is
   f=arma::sum(Eorb);
 
@@ -2890,7 +2902,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   for(size_t io=0;io<Ctilde.n_cols;io++)
     for(size_t jo=0;jo<Ctilde.n_cols;jo++)
       der(io,jo)=arma::as_scalar(arma::trans(sol.C.col(io))*Forb[jo]*Ctilde.col(jo));
-  
+
   // Kappa is
   kappa.zeros(Ctilde.n_cols,Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
@@ -2907,7 +2919,7 @@ void PZSIC::print_legend() const {
 void PZSIC::print_progress(size_t k) const {
   double R, K;
   get_rk(R,K);
-  
+
    if(k>1)
      fprintf(stderr,"\t%4i\t%e\t% e\t% e",(int) k,K/R,J,J-oldJ);
    else
