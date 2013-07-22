@@ -345,6 +345,10 @@ void load_fchk(const Settings & set, double tol) {
   if(set.get_bool("Renormalize"))
     P*=Nel/nelnum;
   if(set.get_bool("Reorthonormalize")) {
+    printf("\nReorthonormalizing orbitals ... ");
+    fflush(stdout);
+    t.set();
+
     // Compute Ca overlap
     arma::mat CSC=arma::trans(Ca)*S*Ca;
     // Find eigenvectors
@@ -363,7 +367,7 @@ void load_fchk(const Settings & set, double tol) {
     double Camax=arma::max(arma::abs(diagvec(CSC)-1.0));
 
     if(restr)
-      printf("Reorthonormalized orbitals, maximum non-ortogonality was %e.\n",Camax);
+      printf("done (%s).\nMaximum deviation from orthonormality was %e.\n",t.elapsed().c_str(),Camax);
     else {
       CSC=arma::trans(Cb)*S*Cb;
       eig_sym_ordered(eval,evec,CSC);
@@ -376,7 +380,7 @@ void load_fchk(const Settings & set, double tol) {
 
       double Cbmax=arma::max(arma::abs(diagvec(CSC)-1.0));
 
-      printf("Reorthonormalized orbitals, maximum non-ortogonality was %e %e.\n",Camax,Cbmax);
+      printf("done (%s).\nMaximum deviation from orthonormality was %e %e.\n",t.elapsed().c_str(),Camax,Cbmax);
     }
   }
 
