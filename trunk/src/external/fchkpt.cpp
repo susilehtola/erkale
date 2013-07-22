@@ -399,7 +399,9 @@ void load_fchk(const Settings & set, double tol) {
     chkpt.write("E",Ea);
 
     // Occupations
-    std::vector<double> occs(Nel/2,2.0);
+    std::vector<double> occs(Ca.n_cols,0.0);
+    for(int io=0;io<Nel/2;io++)
+      occs[io]=2.0;
     chkpt.write("occs",occs);
   } else {
     chkpt.write("Ca",Ca);
@@ -408,9 +410,13 @@ void load_fchk(const Settings & set, double tol) {
     chkpt.write("Eb",Eb);
 
     // Occupations
-    std::vector<double> occa(Nela,1.0);
+    std::vector<double> occa(Ca.n_cols,0.0);
+    for(int io=0;io<Nela;io++)
+      occa[io]=1.0;
     chkpt.write("occa",occa);
-    std::vector<double> occb(Nelb,1.0);
+    std::vector<double> occb(Ca.n_cols,0.0);
+    for(int io=0;io<Nelb;io++)
+      occb[io]=1.0;
     chkpt.write("occb",occb);
 
     // Density matrices
