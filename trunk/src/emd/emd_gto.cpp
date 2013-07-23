@@ -310,7 +310,7 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat
   // Form the list of atomic coordinates
   std::vector<coords_t> coord;
   for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++)
-    coord.push_back(bas.get_coords(inuc));
+    coord.push_back(bas.get_nuclear_coords(inuc));
 
   /*
   printf("Coordinates of atoms:\n");

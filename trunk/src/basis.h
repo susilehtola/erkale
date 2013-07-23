@@ -319,7 +319,7 @@ class BasisSet {
   std::vector<nucleus_t> get_nuclei() const;
 
   /// Get coordinates of nucleus
-  coords_t get_coords(size_t inuc) const;
+  coords_t get_nuclear_coords(size_t inuc) const;
   /// Get charge of nucleus
   int get_Z(size_t inuc) const;
   /// Get symbol of nucleus

@@ -200,7 +200,7 @@ void XCAtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_
 
     // Compute distance of point to atoms
     for(size_t iat=0;iat<Nat;iat++)
-      atom_dist[iat]=norm(bas.get_coords(iat)-coord_p);
+      atom_dist[iat]=norm(bas.get_nuclear_coords(iat)-coord_p);
 
     // Compute mu_ab
     for(size_t iat=0;iat<Nat;iat++) {
@@ -706,7 +706,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gamma, 
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
@@ -841,7 +841,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const arma::vec & gammaa,
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
@@ -983,7 +983,7 @@ atomgrid_t XCAtomGrid::construct(const BasisSet & bas, const std::vector<arma::v
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));

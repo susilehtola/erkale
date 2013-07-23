@@ -376,7 +376,7 @@ std::vector<spectrum_t> compute_transitions(const BasisSet & basis, const arma::
   std::vector<spectrum_t> ret;
 
   // Coordinates of excited atom
-  coords_t xccen=basis.get_coords(iat);
+  coords_t xccen=basis.get_nuclear_coords(iat);
   // Dipole moment matrix
   std::vector<arma::mat> mom1=basis.moment(1,xccen.x,xccen.y,xccen.z);
   // Compute RHS of transition
@@ -594,7 +594,7 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_local(const Basi
   }
 
   // Do lm expansion of orbitals
-  lmtrans lm(C,basis,basis.get_coords(iat),Nrad,Lmax,Lquad);
+  lmtrans lm(C,basis,basis.get_nuclear_coords(iat),Nrad,Lmax,Lquad);
 
   printf("\n");
   lm.print_info();
@@ -996,12 +996,12 @@ int main(int argc, char **argv) {
       if(spin) {
 	ixc_orb=find_excited_orb(sol.Cb,basis,xcatom,noccb);
 	// Do local expansion
-	lmground=lmtrans(sol.Cb.submat(0,ixc_orb,sol.Cb.n_rows,ixc_orb),basis,basis.get_coords(xcatom));
+	lmground=lmtrans(sol.Cb.submat(0,ixc_orb,sol.Cb.n_rows,ixc_orb),basis,basis.get_nuclear_coords(xcatom));
       }
       else {
 	ixc_orb=find_excited_orb(sol.Ca,basis,xcatom,nocca);
 	// Do local expansion
-	lmground=lmtrans(sol.Ca.submat(0,ixc_orb,sol.Ca.n_rows,ixc_orb),basis,basis.get_coords(xcatom));
+	lmground=lmtrans(sol.Ca.submat(0,ixc_orb,sol.Ca.n_rows,ixc_orb),basis,basis.get_nuclear_coords(xcatom));
       }
       // Save localized orbital
       lmground.write_prob(0,"ground_orb.dat");
