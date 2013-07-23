@@ -104,15 +104,17 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
       // Increment number of points
       np++;
 
-      // Determine next point.
+      // Determine next point. Inner loop wrt z
       if(zind+1<z_arr.size())
 	zind++;
       else {
+	// y loop
 	zind=0;
-
+	
 	if(yind+1<y_arr.size())
 	  yind++;
 	else {
+	  // Outermost loop wrt x
 	  yind=0;
 	  xind++;
 	}
@@ -151,7 +153,16 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
   norm*=dx*dy*dz;
 }
 
+typedef struct {
+  coords_t r;
+  bool newline;
+} orbcoord_t;
+
 void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, const std::vector<size_t> & orbidx, std::string fname, bool split) {
+  // Check that C is orthonormal
+  arma::mat S=bas.overlap();
+  check_orth(C,S,false);
+
   // Output file(s)
   std::vector<FILE *> out;
   if(split) {
@@ -216,34 +227,18 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
     }
   }
 
-  // Print out orbital indices
-  if(split)
-    for(size_t io=0;io<orbidx.size();io++)
-      fprintf(out[io],"%5i",1);
-  else
-    fprintf(out[0],"%5i",(int) orbidx.size());
-
   size_t idx=1;
 
+  // Print out orbital indices
   if(split) {
-    idx++;
-    for(size_t io=0;io<orbidx.size();io++) {
-      fprintf(out[io],"%5i",(int) orbidx[io]);
-      if(idx==10) {
-	fprintf(out[io],"\n");
-      } else if(io+1 != orbidx.size())
-	fprintf(out[io]," ");
-    }
+    // Only one orbital, since we're splitting
+    for(size_t io=0;io<orbidx.size();io++)
+      fprintf(out[io],"%5i %5i\n",1,(int) orbidx[io]);
     // Reset idx
-    if(idx==10)
-      idx=0;
-    // Do we need a new line?
-    if(idx!=0) {
-      for(size_t io=0;io<orbidx.size();io++)
-	fprintf(out[io],"\n");
-      idx=0;
-    }
+    idx=0;
+
   } else {
+    fprintf(out[0],"%5i",(int) orbidx.size());
     for(size_t io=0;io<orbidx.size();io++) {
       fprintf(out[0],"%5i",(int) orbidx[io]);
       idx++;
@@ -260,7 +255,7 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
   }
 
   // The points in the batch
-  coords_t r[Nbatch_p];
+  orbcoord_t r[Nbatch_p];
   // The values of the orbitals in the batch
   arma::mat orbs(Nbatch_p,orbidx.size());
 
@@ -283,9 +278,10 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
 
     // Form list of points to compute.
     while(np<Nbatch_p && ntot+np<N) {
-      r[np].x=x_arr[xind];
-      r[np].y=y_arr[yind];
-      r[np].z=z_arr[zind];
+      r[np].r.x=x_arr[xind];
+      r[np].r.y=y_arr[yind];
+      r[np].r.z=z_arr[zind];
+      r[np].newline=false;
 
       // Increment number of points
       np++;
@@ -294,7 +290,9 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
       if(zind+1<z_arr.size())
 	zind++;
       else {
+	// z coordinate changes, break line here
 	zind=0;
+	r[np-1].newline=true;
 
 	if(yind+1<y_arr.size())
 	  yind++;
@@ -310,28 +308,34 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
 #endif
     // Loop over the points in the batch
     for(size_t ip=0;ip<np;ip++)
-      orbs.row(ip)=arma::trans(compute_orbitals(Cwrk,bas,r[ip]));
+      orbs.row(ip)=arma::trans(compute_orbitals(Cwrk,bas,r[ip].r));
 
     // Save computed values
     if(split) {
+
       for(size_t ip=0;ip<np;ip++) {
+	// Increment point index
 	idx++;
+
+	// Print out orbital values
 	for(size_t io=0;io<Cwrk.n_cols;io++) {
 	  fprintf(out[io]," % .5e",orbs(ip,io));
 	}
 
-	if(idx==6) {
+	// Do we need a newline?
+	if(idx==6 || r[ip].newline) {
 	  idx=0;
 	  for(size_t io=0;io<Cwrk.n_cols;io++)
 	    fprintf(out[io],"\n");
 	}
       }
+
     } else {
       for(size_t ip=0;ip<np;ip++)
 	for(size_t io=0;io<Cwrk.n_cols;io++) {
 	  fprintf(out[0]," % .5e",orbs(ip,io));
 	  idx++;
-	  if(idx==6) {
+	  if(idx==6 || r[ip].newline) {
 	    idx=0;
 	    fprintf(out[0],"\n");
 	  }
