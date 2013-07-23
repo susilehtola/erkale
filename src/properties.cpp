@@ -132,7 +132,7 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & Pa, const arma::m
 arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
   arma::vec ret(basis.get_Nnuc());
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++)
-    ret(inuc)=compute_density(P,basis,basis.get_coords(inuc));
+    ret(inuc)=compute_density(P,basis,basis.get_nuclear_coords(inuc));
   return ret;
 }
 

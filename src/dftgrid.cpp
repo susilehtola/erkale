@@ -222,7 +222,7 @@ void AtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t 
 
     // Compute distance of point to atoms
     for(size_t iat=0;iat<Nat;iat++)
-      atom_dist[iat]=norm(bas.get_coords(iat)-coord_p);
+      atom_dist[iat]=norm(bas.get_nuclear_coords(iat)-coord_p);
 
     // Compute mu_ab
     for(size_t iat=0;iat<Nat;iat++) {
@@ -1595,7 +1595,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, size_t cenind, int nrad, in
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
   ret.ngrid=0;
   ret.nfunc=0;
 
@@ -1666,7 +1666,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
@@ -1792,7 +1792,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
@@ -1926,7 +1926,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
@@ -2131,7 +2131,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+8-element_row[bas.get_Z(ret.atind)])));
@@ -2246,7 +2246,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
   // Store index of center
   ret.atind=cenind;
   // and its coordinates
-  ret.cen=bas.get_coords(cenind);
+  ret.cen=bas.get_nuclear_coords(cenind);
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+8-element_row[bas.get_Z(ret.atind)])));

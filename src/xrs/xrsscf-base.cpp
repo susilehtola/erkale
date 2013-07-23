@@ -97,7 +97,7 @@ arma::mat compute_center_width(const arma::mat & C, const BasisSet & basis, size
 /// Find excited core orbital, located on atom idx
 size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom_idx, size_t nocc) {
   // Coordinates of the excited atom
-  coords_t xccoord=basis.get_coords(atom_idx);
+  coords_t xccoord=basis.get_nuclear_coords(atom_idx);
 
   // Measures of goodness for orbitals.
   arma::vec mog(nocc);
@@ -136,7 +136,7 @@ size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom
     // Determine localization of orbital. Loop over nuclei
     for(size_t iat=0;iat<basis.get_Nnuc();iat++) {
       // Coordinates of nucleus
-      coords_t atcoord=basis.get_coords(iat);
+      coords_t atcoord=basis.get_nuclear_coords(iat);
 
       double dx=atcoord.x-cenwidth(io,0);
       double dy=atcoord.y-cenwidth(io,1);
@@ -236,7 +236,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
     if(!basis.get_nucleus(i).bsse && stricmp(basis.get_symbol(i),basis.get_symbol(xcatom))==0) {
 	ovl_sort_t tmp;
 	tmp.idx=i;
-	tmp.S=norm(basis.get_coords(i)-basis.get_coords(xcatom));
+	tmp.S=norm(basis.get_nuclear_coords(i)-basis.get_nuclear_coords(xcatom));
 	locind.push_back(tmp);
       }
   // Sort in increasing distance
@@ -264,7 +264,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) 
     // The nucleus is
     size_t inuc=locind[i].idx;
     // and it is located at
-    coords_t cen=basis.get_coords(inuc);
+    coords_t cen=basis.get_nuclear_coords(inuc);
 
     // Compute moment integrals around the nucleus
     std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);

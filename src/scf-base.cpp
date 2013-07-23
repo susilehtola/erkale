@@ -1907,7 +1907,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
       continue;
 
     // The nucleus is located at
-    coords_t cen=basis.get_coords(inuc);
+    coords_t cen=basis.get_nuclear_coords(inuc);
 
     // Compute moment integrals around the nucleus
     std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);

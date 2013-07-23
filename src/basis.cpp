@@ -1634,7 +1634,7 @@ std::vector<nucleus_t> BasisSet::get_nuclei() const {
   return nuclei;
 }
 
-coords_t BasisSet::get_coords(size_t inuc) const {
+coords_t BasisSet::get_nuclear_coords(size_t inuc) const {
   return nuclei[inuc].r;
 }
 
@@ -3087,7 +3087,7 @@ arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coor
   // Determine which shells might contribute
   for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
     // Determine distance of nucleus
-    double dist=norm(r-bas.get_coords(inuc));
+    double dist=norm(r-bas.get_nuclear_coords(inuc));
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=bas.get_shell_inds(inuc);
 
@@ -3132,7 +3132,7 @@ double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t
   // Determine which shells might contribute
   for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
     // Determine distance of nucleus
-    double dist=norm(r-bas.get_coords(inuc));
+    double dist=norm(r-bas.get_nuclear_coords(inuc));
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=bas.get_shell_inds(inuc);
 
