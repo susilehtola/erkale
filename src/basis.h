@@ -333,14 +333,17 @@ class BasisSet {
   std::vector<size_t> get_shell_inds(size_t inuc) const;
 
   /// Evaluate functions at (x,y,z)
+  arma::vec eval_func(double x, double y, double z) const;
+
+  /// Evaluate functions of shell ish at (x,y,z)
   arma::vec eval_func(size_t ish, double x, double y, double z) const;
-  /// Evaluate gradients at (x,y,z)
+  /// Evaluate gradients of shell ish at (x,y,z)
   arma::mat eval_grad(size_t ish, double x, double y, double z) const;
-  /// Evaluate laplacian at (x,y,z)
+  /// Evaluate laplacian of shell ish at (x,y,z)
   arma::vec eval_lapl(size_t ish, double x, double y, double z) const;
-  /// Evaluate Hessian at (x,y,z)
+  /// Evaluate Hessian of shell ish at (x,y,z)
   arma::cube eval_hess(size_t ish, double x, double y, double z) const;
-  /// Evaluate gradient of laplacian at (x,y,z)
+  /// Evaluate gradient of laplacian of shell ish at (x,y,z)
   arma::mat eval_laplgrad(size_t ish, double x, double y, double z) const;
 
   /// Print out basis set
