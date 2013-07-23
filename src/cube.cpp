@@ -23,12 +23,13 @@
 #include <omp.h>
 #endif
 
-void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, std::string fname) {
+void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, std::string fname, double & norm) {
   // Open output file.
+  fname=fname+".cube";
   FILE *out=fopen(fname.c_str(),"w");
 
   // Compute the norm (assumes evenly spaced grid!)
-  double norm=0.0;
+  norm=0.0;
 
   // Compute the momentum densities in batches, allowing
   // parallellization.
@@ -148,14 +149,24 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
 
   // Plug in the spacing in the integral
   norm*=dx*dy*dz;
-
-  // Print norm
-  printf("The norm of the density on the cube is %e.\n",norm);
 }
 
-void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, const std::vector<size_t> & orbidx, std::string fname) {
-  // Open output file.
-  FILE *out=fopen(fname.c_str(),"w");
+void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, const std::vector<size_t> & orbidx, std::string fname, bool split) {
+  // Output file(s)
+  std::vector<FILE *> out;
+  if(split) {
+    out.resize(orbidx.size());
+    for(size_t io=0;io<orbidx.size();io++) {
+      // File name will be
+      char orbname[80];
+      sprintf(orbname,"%s.%i.cube",fname.c_str(),(int) orbidx[io]);
+      out[io]=fopen(orbname,"w");
+    }
+  } else {
+    out.resize(1);
+    std::string orbname=fname+".cube";
+    out[0]=fopen(orbname.c_str(),"w");
+  }
 
   // Compute the momentum densities in batches, allowing
   // parallellization.
@@ -175,8 +186,10 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
 
   // Write out comment fields
   Timer t;
-  fprintf(out,"ERKALE molecular orbital output\n");
-  fprintf(out,"Generated on %s.\n",t.current_time().c_str());
+  for(size_t io=0;io<out.size();io++) {
+    fprintf(out[io],"ERKALE molecular orbital output\n");
+    fprintf(out[io],"Generated on %s.\n",t.current_time().c_str());
+  }
 
   // Spacing
   double dx=0.0;
@@ -189,32 +202,61 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
   if(z_arr.size()>1)
     dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
 
-  // Write out starting point. Because orbitals, amount of atoms is printed out negatively
-  fprintf(out,"%5i % 11.6f % 11.6f % 11.6f\n",-((int) bas.get_Nnuc()),x_arr[0],y_arr[0],z_arr[0]);
-  // Print amount of points and step sizes in the directions
-  fprintf(out,"%5i % 11.6f % 11.6f % 11.6f\n",(int) x_arr.size(),dx,0.0,0.0);
-  fprintf(out,"%5i % 11.6f % 11.6f % 11.6f\n",(int) y_arr.size(),0.0,dy,0.0);
-  fprintf(out,"%5i % 11.6f % 11.6f % 11.6f\n",(int) z_arr.size(),0.0,0.0,dz);
-  // Print out atoms
-  for(size_t i=0;i<bas.get_Nnuc();i++) {
-    nucleus_t nuc=bas.get_nucleus(i);
-    fprintf(out,"%5i % 11.6f % 11.6f % 11.6f % 11.6f\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+  for(size_t io=0;io<out.size();io++) {
+    // Write out starting point. Because orbitals, amount of atoms is printed out negatively
+    fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",-((int) bas.get_Nnuc()),x_arr[0],y_arr[0],z_arr[0]);
+    // Print amount of points and step sizes in the directions
+    fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",(int) x_arr.size(),dx,0.0,0.0);
+    fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",(int) y_arr.size(),0.0,dy,0.0);
+    fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f\n",(int) z_arr.size(),0.0,0.0,dz);
+    // Print out atoms
+    for(size_t inuc=0;inuc<bas.get_Nnuc();inuc++) {
+      nucleus_t nuc=bas.get_nucleus(inuc);
+      fprintf(out[io],"%5i % 11.6f % 11.6f % 11.6f % 11.6f\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+    }
   }
+
   // Print out orbital indices
-  fprintf(out,"%5i",(int) orbidx.size());
+  if(split)
+    for(size_t io=0;io<orbidx.size();io++)
+      fprintf(out[io],"%5i",1);
+  else
+    fprintf(out[0],"%5i",(int) orbidx.size());
+
   size_t idx=1;
-  for(size_t io=0;io<orbidx.size();io++) {
-    fprintf(out,"%5i",(int) orbidx[io]);
+
+  if(split) {
     idx++;
-    if(idx==10) {
+    for(size_t io=0;io<orbidx.size();io++) {
+      fprintf(out[io],"%5i",(int) orbidx[io]);
+      if(idx==10) {
+	fprintf(out[io],"\n");
+      } else if(io+1 != orbidx.size())
+	fprintf(out[io]," ");
+    }
+    // Reset idx
+    if(idx==10)
       idx=0;
-      fprintf(out,"\n");
-    } else if(io+1 != orbidx.size())
-      fprintf(out," ");
-  }
-  if(idx!=0) {
-    fprintf(out,"\n");
-    idx=0;
+    // Do we need a new line?
+    if(idx!=0) {
+      for(size_t io=0;io<orbidx.size();io++)
+	fprintf(out[io],"\n");
+      idx=0;
+    }
+  } else {
+    for(size_t io=0;io<orbidx.size();io++) {
+      fprintf(out[0],"%5i",(int) orbidx[io]);
+      idx++;
+      if(idx==10) {
+	idx=0;
+	fprintf(out[0],"\n");
+      } else if(io+1 != orbidx.size())
+	fprintf(out[0]," ");
+    }
+    if(idx!=0) {
+      fprintf(out[0],"\n");
+      idx=0;
+    }
   }
 
   // The points in the batch
@@ -275,21 +317,37 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
 
 
     // Save computed values
-    for(size_t ip=0;ip<np;ip++)
-      for(size_t io=0;io<Cwrk.n_cols;io++) {
-	fprintf(out," % .5e",orbs(ip,io));
+    if(split) {
+      for(size_t ip=0;ip<np;ip++) {
 	idx++;
+	for(size_t io=0;io<Cwrk.n_cols;io++) {
+	  fprintf(out[io]," % .5e",orbs(ip,io));
+	}
+
 	if(idx==6) {
 	  idx=0;
-	  fprintf(out,"\n");
+	  for(size_t io=0;io<Cwrk.n_cols;io++)
+	    fprintf(out[io],"\n");
 	}
       }
+    } else {
+      for(size_t ip=0;ip<np;ip++)
+	for(size_t io=0;io<Cwrk.n_cols;io++) {
+	  fprintf(out[0]," % .5e",orbs(ip,io));
+	  idx++;
+	  if(idx==6) {
+	    idx=0;
+	    fprintf(out[0],"\n");
+	  }
+	}
+    }
     
     // Increment number of computed points
     ntot+=np;
   }
   // Close output file.
-  fclose(out);
+  for(size_t io=0;io<out.size();io++)
+    fclose(out[io]);
 }
 
 
@@ -308,11 +366,15 @@ int main(int argc, char **argv) {
   set.add_string("Cube", "Cube to use, e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
   set.add_bool("Density", "Compute density on the cube?", false);
   set.add_string("OrbIdx", "Indices of orbitals to compute, e.g. 1-10 1-2", "");
+  set.add_bool("SplitOrbs", "Split orbital plots into different files?", false);
 
   if(argc==2)
     set.parse(argv[1]);
   else
     printf("Using default settings.\n");
+
+  // Print settings
+  set.print();
 
   // Load checkpoint
   Checkpoint chkpt(set.get_string("LoadChk"),false);
@@ -349,7 +411,10 @@ int main(int argc, char **argv) {
   if(set.get_string("OrbIdx").length()) {
     // Get ranges
     std::vector<std::string> ranges=splitline(set.get_string("OrbIdx"));
-    
+
+    // Split orbitals into many files?
+    bool split=set.get_bool("SplitOrbs");
+
     if((ranges.size()==2 && restr) || (ranges.size()==1 && !restr))
       throw std::runtime_error("Invalid orbital range specified.\n");
     
@@ -359,7 +424,7 @@ int main(int argc, char **argv) {
 
       printf("Calculating orbitals ... ");
       fflush(stdout); t.set();
-      orbital_cube(basis,Ca,x,y,z,orbidx,"orbitals.cube");
+      orbital_cube(basis,Ca,x,y,z,orbidx,"orbital",split);
       printf("done (%s)\n",t.elapsed().c_str());
 
     } else {
@@ -369,12 +434,12 @@ int main(int argc, char **argv) {
 
       printf("Calculating alpha orbitals ... ");
       fflush(stdout); t.set();
-      orbital_cube(basis,Ca,x,y,z,orbidxa,"orbitals-a.cube");
+      orbital_cube(basis,Ca,x,y,z,orbidxa,"orbital-a",split);
       printf("done (%s)\n",t.elapsed().c_str());
 
       printf("Calculating beta orbitals ... ");
       fflush(stdout); t.set();
-      orbital_cube(basis,Cb,x,y,z,orbidxb,"orbitals-b.cube");
+      orbital_cube(basis,Cb,x,y,z,orbidxb,"orbital-b",split);
       printf("done (%s)\n",t.elapsed().c_str());
     }
   }
@@ -382,21 +447,22 @@ int main(int argc, char **argv) {
   // Calculate density on cube
   if(set.get_bool("Density")) {
 
+    double norm;
     printf("Calculating total electron density ... ");
     fflush(stdout); t.set();
-    density_cube(basis,P,x,y,z,"density.cube");
-    printf("done (%s)\n",t.elapsed().c_str());
+    density_cube(basis,P,x,y,z,"density",norm);
+    printf("done (%s).\nNorm of total density is %e.\n",t.elapsed().c_str(),norm);
 
     if(!restr) {
       printf("Calculating alpha electron density ... ");
       fflush(stdout); t.set();
-      density_cube(basis,Pa,x,y,z,"density-a.cube");
-      printf("done (%s)\n",t.elapsed().c_str());
+      density_cube(basis,Pa,x,y,z,"density-a",norm);
+      printf("done (%s).\nNorm of alpha density is %e.\n",t.elapsed().c_str(),norm);
 
       printf("Calculating beta  electron density ... ");
       fflush(stdout); t.set();
-      density_cube(basis,Pb,x,y,z,"density-b.cube");
-      printf("done (%s)\n",t.elapsed().c_str());
+      density_cube(basis,Pb,x,y,z,"density-b",norm);
+      printf("done (%s).\nNorm of beta  density is %e.\n",t.elapsed().c_str(),norm);
     }
   }
 
