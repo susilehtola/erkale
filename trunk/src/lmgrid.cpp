@@ -240,12 +240,12 @@ expansion_t expand_orbitals(const arma::mat & C, const BasisSet & bas, const coo
       // Compute coordinates of grid point
       coords_t gp=grid[iang].r*ret.grid[irad].r+cen;
       // Evaluate values of orbitals at grid point
-      std::vector<double> orbs=compute_orbitals(C,bas,gp);
+      arma::vec orbs=compute_orbitals(C,bas,gp);
 
       // Do quadrature step
       for(size_t lm=0;lm<Ylm_conj[iang].size();lm++)
-	for(size_t iorb=0;iorb<orbs.size();iorb++)
-	  ret.clm[iorb][lm][irad]+=orbs[iorb]*grid[iang].w*Ylm_conj[iang][lm];
+	for(size_t iorb=0;iorb<orbs.n_elem;iorb++)
+	  ret.clm[iorb][lm][irad]+=orbs(iorb)*grid[iang].w*Ylm_conj[iang][lm];
     }
   }
 

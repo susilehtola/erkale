@@ -568,7 +568,7 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
 BasisSet construct_basis(const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib, const Settings & set);
 
 /// Compute values of orbitals at given point
-std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r);
+arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r);
 /// Compute density at given point
 double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t & r);
 

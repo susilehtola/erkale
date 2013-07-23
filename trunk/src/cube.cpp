@@ -309,12 +309,8 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
 #pragma omp parallel for
 #endif
     // Loop over the points in the batch
-    for(size_t ip=0;ip<np;ip++) {
-      std::vector<double> orb=compute_orbitals(Cwrk,bas,r[ip]);
-      for(size_t io=0;io<Cwrk.n_cols;io++)
-	orbs(ip,io)=orb[io];
-    }
-
+    for(size_t ip=0;ip<np;ip++)
+      orbs.row(ip)=arma::trans(compute_orbitals(Cwrk,bas,r[ip]));
 
     // Save computed values
     if(split) {
@@ -382,7 +378,7 @@ int main(int argc, char **argv) {
   // Load basis set
   BasisSet basis;
   chkpt.read(basis);
-
+  
   // Restricted calculation?
   bool restr;
   chkpt.read("Restricted",restr);

@@ -3077,9 +3077,7 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
   return basis;
 }
 
-
-
-std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r) {
+arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r) {
   // Get ranges of shells
   std::vector<double> shran=bas.get_shell_ranges();
 
@@ -3095,7 +3093,7 @@ std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, 
 
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++) {
-      // Shell is relevant if range is larger than minimal distance
+      // Shell is relevant if range is larger than distance
       if(dist<shran[shellinds[ish]]) {
         // Add shell to list of shells to compute
         compute_shells.push_back(shellinds[ish]);
@@ -3104,9 +3102,8 @@ std::vector<double> compute_orbitals(const arma::mat & C, const BasisSet & bas, 
   }
 
   // Values of orbitals
-  std::vector<double> orbs(C.n_cols);
-  for(size_t io=0;io<C.n_cols;io++)
-    orbs[io]=0.0;
+  arma::vec orbs(C.n_cols);
+  orbs.zeros();
 
   // Loop over shells
   for(size_t ish=0;ish<compute_shells.size();ish++) {
