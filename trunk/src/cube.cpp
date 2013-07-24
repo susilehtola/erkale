@@ -376,7 +376,7 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
-  set.add_string("Cube", "Cube to use, e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
+  set.add_string("Cube", "Cube to use, e.g. -10:.3:10 -5:.2:4 -2:.1:3", "Auto");
   set.add_bool("Density", "Compute density on the cube?", false);
   set.add_string("OrbIdx", "Indices of orbitals to compute, e.g. 1-10 1-2", "");
   set.add_bool("SplitOrbs", "Split orbital plots into different files?", false);
@@ -416,6 +416,36 @@ int main(int argc, char **argv) {
 
   // Form grid in p space.
   std::vector<double> x, y, z;
+  if(stricmp(set.get_string("Cube"),"Auto")==0) {
+    // Automatical formation. Spacing to use
+    double spacing=0.2;
+
+    // Get coordinate matrix
+    arma::mat coords=basis.get_nuclear_coords();
+
+    // Put in 2.5 Å extra space on each side
+    double extra=2.5*ANGSTROMINBOHR;
+
+    // Minimum and maximum
+    arma::vec minc=arma::min(coords)-extra;
+    arma::vec maxc=arma::max(coords)+extra;
+
+    // Round to spacing
+    for(int ic=0;ic<3;ic++) {
+      minc(ic)=floor(minc(ic)/spacing)*spacing;
+      maxc(ic)=ceil(maxc(ic)/spacing)*spacing;
+    }
+
+    // Dimensions to use
+    std::ostringstream dims;
+    dims << " " << minc(0) << ":" << spacing << ":" << maxc(0); // x
+    dims << " " << minc(1) << ":" << spacing << ":" << maxc(1); // y
+    dims << " " << minc(2) << ":" << spacing << ":" << maxc(2); // z
+    set.set_string("Cube",dims.str());
+
+    printf("Grid is %s.\n",dims.str().c_str());
+  }
+  // Parse cube
   parse_cube(set.get_string("Cube"),x,y,z);
 
   Timer t;
