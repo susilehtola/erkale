@@ -362,12 +362,8 @@ void load_fchk(const Settings & set, double tol) {
     U.zeros();
     for(size_t io=0;io<eval.n_elem;io++)
       U+=evec.col(io)*arma::trans(evec.col(io))/sqrt(eval(io));
-
     // Rotate Ca by eigenvectors
     Ca=Ca*U;
-    // Renormalize orbitals
-    for(size_t io=0;io<Ca.n_cols;io++)
-      Ca.col(io)/=sqrt(arma::as_scalar(arma::trans(Ca.col(io))*S*Ca.col(io)));
 
     double Camax=arma::max(arma::abs(diagvec(CSC)-1.0));
 
@@ -380,9 +376,6 @@ void load_fchk(const Settings & set, double tol) {
       for(size_t io=0;io<eval.n_elem;io++)
 	U+=evec.col(io)*arma::trans(evec.col(io))/sqrt(eval(io));
       Cb=Cb*U;
-      // Renormalize orbitals
-      for(size_t io=0;io<Cb.n_cols;io++)
-	Cb.col(io)/=sqrt(arma::as_scalar(arma::trans(Cb.col(io))*S*Cb.col(io)));
 
       double Cbmax=arma::max(arma::abs(diagvec(CSC)-1.0));
 
