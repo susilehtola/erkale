@@ -377,6 +377,8 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   set.add_string("Cube", "Cube to use, e.g. -10:.3:10 -5:.2:4 -2:.1:3", "Auto");
+  set.add_double("AutoBuffer","Buffer zone in Å to add on each side of the cube",2.5);
+  set.add_double("AutoSpacing","Spacing in Å to use",0.1);
   set.add_bool("Density", "Compute density on the cube?", false);
   set.add_string("OrbIdx", "Indices of orbitals to compute, e.g. 1-10 1-2", "");
   set.add_bool("SplitOrbs", "Split orbital plots into different files?", false);
@@ -418,13 +420,13 @@ int main(int argc, char **argv) {
   std::vector<double> x, y, z;
   if(stricmp(set.get_string("Cube"),"Auto")==0) {
     // Automatical formation. Spacing to use
-    double spacing=0.2;
+    double spacing=set.get_double("AutoSpacing")/ANGSTROMINBOHR;
 
     // Get coordinate matrix
     arma::mat coords=basis.get_nuclear_coords();
 
-    // Put in 2.5 Å extra space on each side
-    double extra=2.5*ANGSTROMINBOHR;
+    // Buffer to put in each side
+    double extra=set.get_double("AutoBuffer")*ANGSTROMINBOHR;
 
     // Minimum and maximum
     arma::vec minc=arma::min(coords)-extra;
