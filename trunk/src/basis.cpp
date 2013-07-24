@@ -1707,7 +1707,6 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
     
     // and store the functions
     for(size_t fi=0;fi<shells[ish].get_Nbf();fi++) {
-      printf("%e %e %e %4i %e\n",x,y,z,(int) (f0+fi),shf(fi));
       ret(f0+fi)=shf(fi);
     }
   }
