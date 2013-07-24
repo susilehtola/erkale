@@ -1690,7 +1690,7 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++) {
       // Shell is relevant if range is larger than distance
-      if(dist<shell_ranges[shellinds[ish]]) {
+      if(dist < shell_ranges[shellinds[ish]]) {
 	// Evalute shell. Function values
 	arma::vec shf=shells[ish].eval_func(x,y,z);
 	// First function on shell
@@ -3115,7 +3115,13 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
 }
 
 arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r) {
-  return bas.eval_func(r.x,r.y,r.z)*C;
+  // Evaluate basis functions
+  arma::vec bf=bas.eval_func(r.x,r.y,r.z);
+
+  // Orbitals are
+  arma::rowvec orbs=arma::trans(bf)*C;
+
+  return arma::trans(orbs);
 }
 
 double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t & r) {
