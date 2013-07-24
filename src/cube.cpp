@@ -158,7 +158,8 @@ typedef struct {
   bool newline;
 } orbcoord_t;
 
-void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, const std::vector<size_t> & orbidx, std::string fname, bool split) {
+
+void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, const std::vector<size_t> & orbidx, std::string fname, bool split, arma::vec & norms) {
   // Check that C is orthonormal
   arma::mat S=bas.overlap();
   check_orth(C,S,false);
@@ -263,6 +264,8 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
   arma::mat Cwrk(C.n_rows,orbidx.size());
   for(size_t io=0;io<orbidx.size();io++)
     Cwrk.col(io)=C.col(orbidx[io]-1); // Convert to C++ indexing
+  // Orbital norms
+  norms.zeros(orbidx.size());
 
   // Number of points to compute in the batch
   size_t np;
@@ -307,8 +310,14 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
 #pragma omp parallel for
 #endif
     // Loop over the points in the batch
-    for(size_t ip=0;ip<np;ip++)
+    for(size_t ip=0;ip<np;ip++) {
       orbs.row(ip)=arma::trans(compute_orbitals(Cwrk,bas,r[ip].r));
+    }
+
+    // Increment norms
+    for(size_t ip=0;ip<np;ip++)
+      for(size_t io=0;io<norms.n_elem;io++)
+	norms(io)+=orbs(ip,io)*orbs(ip,io);
 
     // Save computed values
     if(split) {
@@ -348,6 +357,10 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
   // Close output file.
   for(size_t io=0;io<out.size();io++)
     fclose(out[io]);
+
+  // Norms
+  for(size_t io=0;io<norms.size();io++)
+    norms(io)*=dx*dy*dz;
 }
 
 
@@ -414,6 +427,8 @@ int main(int argc, char **argv) {
 
     // Split orbitals into many files?
     bool split=set.get_bool("SplitOrbs");
+    // Orbital norms
+    arma::vec orbnorm;
 
     if((ranges.size()==2 && restr) || (ranges.size()==1 && !restr))
       throw std::runtime_error("Invalid orbital range specified.\n");
@@ -424,8 +439,12 @@ int main(int argc, char **argv) {
 
       printf("Calculating orbitals ... ");
       fflush(stdout); t.set();
-      orbital_cube(basis,Ca,x,y,z,orbidx,"orbital",split);
+      orbital_cube(basis,Ca,x,y,z,orbidx,"orbital",split,orbnorm);
       printf("done (%s)\n",t.elapsed().c_str());
+
+      printf("Orbital norms on grid\n");
+      for(size_t io=0;io<orbidx.size();io++)
+	printf("%4i %e\n",(int) orbidx[io],orbnorm(io));
 
     } else {
       // Orbital indices, NOT IN C++ INDEXING!
@@ -434,13 +453,19 @@ int main(int argc, char **argv) {
 
       printf("Calculating alpha orbitals ... ");
       fflush(stdout); t.set();
-      orbital_cube(basis,Ca,x,y,z,orbidxa,"orbital-a",split);
+      orbital_cube(basis,Ca,x,y,z,orbidxa,"orbital-a",split,orbnorm);
       printf("done (%s)\n",t.elapsed().c_str());
+      printf("Orbital norms on grid\n");
+      for(size_t io=0;io<orbidxa.size();io++)
+	printf("%4i %e\n",(int) orbidxa[io],orbnorm(io));
 
       printf("Calculating beta orbitals ... ");
       fflush(stdout); t.set();
-      orbital_cube(basis,Cb,x,y,z,orbidxb,"orbital-b",split);
+      orbital_cube(basis,Cb,x,y,z,orbidxb,"orbital-b",split,orbnorm);
       printf("done (%s)\n",t.elapsed().c_str());
+      printf("Orbital norms on grid\n");
+      for(size_t io=0;io<orbidxb.size();io++)
+	printf("%4i %e\n",(int) orbidxb[io],orbnorm(io));
     }
   }
 
