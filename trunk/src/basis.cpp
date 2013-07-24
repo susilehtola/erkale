@@ -1634,6 +1634,17 @@ std::vector<nucleus_t> BasisSet::get_nuclei() const {
   return nuclei;
 }
 
+arma::mat BasisSet::get_nuclear_coords() const {
+  arma::mat coords(nuclei.size(),3);
+  for(size_t i=0;i<nuclei.size();i++) {
+    coords(i,0)=nuclei[i].r.x;
+    coords(i,1)=nuclei[i].r.y;
+    coords(i,2)=nuclei[i].r.z;
+  }
+
+  return coords;
+}
+
 coords_t BasisSet::get_nuclear_coords(size_t inuc) const {
   return nuclei[inuc].r;
 }
