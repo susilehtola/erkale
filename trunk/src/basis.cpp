@@ -1670,10 +1670,6 @@ std::vector<size_t> BasisSet::get_shell_inds(size_t inuc) const {
 }
 
 arma::vec BasisSet::eval_func(double x, double y, double z) const {
-  // Returned values
-  arma::vec ret(get_Nbf());
-  ret.zeros();
-
   // Helper
   coords_t r;
   r.x=x;
@@ -1681,25 +1677,38 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
   r.z=z;
   
   // Determine which shells might contribute
+  std::vector<size_t> compute_shells;
   for(size_t inuc=0;inuc<nuclei.size();inuc++) {
-    // Determine distance of nucleus
+    // Determine distance to nucleus
     double dist=norm(r-nuclei[inuc].r);
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=get_shell_inds(inuc);
     
     // Loop over shells on nucleus
-    for(size_t ish=0;ish<shellinds.size();ish++) {
+    for(size_t ish=0;ish<shellinds.size();ish++)
       // Shell is relevant if range is larger than distance
-      if(dist < shell_ranges[shellinds[ish]]) {
-	// Evalute shell. Function values
-	arma::vec shf=shells[ish].eval_func(x,y,z);
-	// First function on shell
-	size_t f0=shells[ish].get_first_ind();
+      if(dist < shell_ranges[shellinds[ish]])
+	compute_shells.push_back(shellinds[ish]);
+  }
 
-	// and store the functions
-	for(size_t fi=0;fi<shells[ish].get_Nbf();fi++)
-	  ret(f0+fi)=shf(fi);
-      }
+  // Returned values
+  arma::vec ret(get_Nbf());
+  ret.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<compute_shells.size();i++) {
+    size_t ish=compute_shells[i];
+    
+    // Evalute shell. Function values
+    arma::vec shf=shells[ish].eval_func(x,y,z);
+    // First function on shell
+    size_t f0=shells[ish].get_first_ind();
+    
+    // and store the functions
+    for(size_t fi=0;fi<shells[ish].get_Nbf();fi++) {
+      printf("%e %e %e %4i %e\n",x,y,z,(int) (f0+fi),shf(fi));
+      ret(f0+fi)=shf(fi);
     }
   }
 
