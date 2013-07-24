@@ -351,15 +351,20 @@ void load_fchk(const Settings & set, double tol) {
 
     // Compute Ca overlap
     arma::mat CSC=arma::trans(Ca)*S*Ca;
+
     // Find eigenvectors
     arma::vec eval;
     arma::mat evec;
     eig_sym_ordered(eval,evec,CSC);
+
+    // Construct transformation matrix
+    arma::mat U(CSC);
+    U.zeros();
+    for(size_t io=0;io<eval.n_elem;io++)
+      U+=evec.col(io)*arma::trans(evec.col(io))/sqrt(eval(io));
+
     // Rotate Ca by eigenvectors
-    arma::mat Cnew(Ca);
-    for(size_t io=0;io<Ca.n_cols;io++)
-      Cnew.col(io)=Ca*evec.col(io)/eval(io);
-    Ca=Cnew;
+    Ca=Ca*U;
     // Renormalize orbitals
     for(size_t io=0;io<Ca.n_cols;io++)
       Ca.col(io)/=sqrt(arma::as_scalar(arma::trans(Ca.col(io))*S*Ca.col(io)));
@@ -371,9 +376,10 @@ void load_fchk(const Settings & set, double tol) {
     else {
       CSC=arma::trans(Cb)*S*Cb;
       eig_sym_ordered(eval,evec,CSC);
-      for(size_t io=0;io<Ca.n_cols;io++)
-	Cnew.col(io)=Cb*evec.col(io)/eval(io);
-      Cb=Cnew;
+      U.zeros();
+      for(size_t io=0;io<eval.n_elem;io++)
+	U+=evec.col(io)*arma::trans(evec.col(io))/sqrt(eval(io));
+      Cb=Cb*U;
       // Renormalize orbitals
       for(size_t io=0;io<Cb.n_cols;io++)
 	Cb.col(io)/=sqrt(arma::as_scalar(arma::trans(Cb.col(io))*S*Cb.col(io)));
