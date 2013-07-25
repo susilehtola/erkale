@@ -453,6 +453,30 @@ void save_fchk(const Settings & set) {
   chkpt.read(basis);
   //  basis.print(true);
 
+  // File to save
+  std::string savename=set.get_string("SaveFchk");
+
+  // Handle also compressed files
+  std::string gzcmd="gzip ";
+  bool usegz=false;
+  if(strstr(savename.c_str(),".gz")!=NULL)
+    usegz=true;
+
+  std::string xzcmd="xz ";
+  bool usexz=false;
+  if(strstr(savename.c_str(),".xz")!=NULL)
+    usexz=true;
+  
+  std::string bz2cmd="bzip2 ";
+  bool usebz2=false;
+  if(strstr(savename.c_str(),".bz2")!=NULL)
+    usebz2=true;
+
+  std::string lzmacmd="lzma ";
+  bool uselzma=false;
+  if(strstr(savename.c_str(),".lzma")!=NULL)
+    uselzma=true;
+
   // Open output file.
   FILE *out=fopen(set.get_string("SaveFchk").c_str(),"w");
 
@@ -534,6 +558,57 @@ void save_fchk(const Settings & set) {
   fclose(out);
 
   printf("Formatted checkpoint file created in %s.\n",t.elapsed().c_str());
+
+  if(usegz || usexz || usebz2 || uselzma) {
+    t.set();
+
+    if(usegz) {
+      std::string name=savename.substr(0,savename.size()-3);
+      std::ostringstream cmd;
+      cmd << "mv " << savename << " " << name;
+      int error=system(cmd.str().c_str());
+      if(error) throw std::runtime_error("Unable to rename file.\n");
+      gzcmd+=name;
+      error=system(gzcmd.c_str());
+      if(error) throw std::runtime_error("Unable to compress file.\n");
+    }
+
+    if(usexz) {
+      std::string name=savename.substr(0,savename.size()-3);
+      std::ostringstream cmd;
+      cmd << "mv " << savename << " " << name;
+      int error=system(cmd.str().c_str());
+      if(error) throw std::runtime_error("Unable to rename file.\n");
+      xzcmd+=name;
+      error=system(xzcmd.c_str());
+      if(error) throw std::runtime_error("Unable to compress file.\n");
+    }
+
+    if(usebz2) {
+      std::string name=savename.substr(0,savename.size()-4);
+      std::ostringstream cmd;
+      cmd << "mv " << savename << " " << name;
+      int error=system(cmd.str().c_str());
+      if(error) throw std::runtime_error("Unable to rename file.\n");
+      bz2cmd+=name;
+      error=system(bz2cmd.c_str());
+      if(error) throw std::runtime_error("Unable to compress file.\n");
+    }
+
+    if(uselzma) {
+      std::string name=savename.substr(0,savename.size()-5);
+      std::ostringstream cmd;
+      cmd << "mv " << savename << " " << name;
+      int error=system(cmd.str().c_str());
+      if(error) throw std::runtime_error("Unable to rename file.\n");
+      lzmacmd+=name;
+      error=system(lzmacmd.c_str());
+      if(error) throw std::runtime_error("Unable to compress file.\n");
+    }
+
+    printf("File compressed in %s.\n",t.elapsed().c_str());
+  }
+    
 }
 
 int main(int argc, char **argv) {
