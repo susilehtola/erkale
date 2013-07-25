@@ -420,7 +420,7 @@ int main(int argc, char **argv) {
   std::vector<double> x, y, z;
   if(stricmp(set.get_string("Cube"),"Auto")==0) {
     // Automatical formation. Spacing to use
-    double spacing=set.get_double("AutoSpacing")/ANGSTROMINBOHR;
+    double spacing=set.get_double("AutoSpacing")*ANGSTROMINBOHR;
 
     // Get coordinate matrix
     arma::mat coords=basis.get_nuclear_coords();
