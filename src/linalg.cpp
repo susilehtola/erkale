@@ -38,33 +38,26 @@ void eig_sym_ordered(arma::colvec & eigval, arma::mat & eigvec, const arma::mat 
   sort_eigvec(eigval,eigvec);
 }
 
+bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
+  return lhs.E < rhs.E;
+}
+
 void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec) {
+  if(eigval.n_elem != eigvec.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Eigenvalue vector does not correspond to eigenvector matrix!\n");
+  }
 
-  // Get number of elements
-  const size_t N=eigval.n_elem;
-
-  size_t incr=N/2;
-  arma::colvec tmpvec;
-  double tmpval;
-
-  while(incr>0) {
-    // Loop over eigenvalues
-    for(size_t i=incr;i<N;i++) {
-      tmpval=eigval(i);
-      tmpvec=eigvec.col(i);
-
-      size_t j=i;
-      while((j>=incr) && (eigval[j-incr]>tmpval)) {
-	eigval(j)=eigval(j-incr);
-	eigvec.col(j)=eigvec.col(j-incr);
-	j=j-incr;
-      }
-
-      eigval(j)=tmpval;
-      eigvec.col(j)=tmpvec;
-    }
-
-    incr=(int) (incr/2.2);
+  // Helper
+  std::vector<orbital_t> orbs(eigval.n_elem);
+  for(size_t io=0;io<eigval.n_elem;io++) {
+    orbs[io].E=eigval(io);
+    orbs[io].c=eigvec.col(io);
+  }
+  std::stable_sort(orbs.begin(),orbs.end());
+  for(size_t io=0;io<eigval.n_elem;io++) {
+    eigval(io)=orbs[io].E;
+    eigvec.col(io)=orbs[io].c;
   }
 }
 

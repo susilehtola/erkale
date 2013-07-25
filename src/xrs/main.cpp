@@ -47,17 +47,6 @@
 #include <omp.h>
 #endif
 
-/// Struct for orbitals.
-typedef struct {
-  arma::vec C;
-  double E;
-} orbital_t;
-
-/// Tool for sorting orbitals in order of increasing energy
-bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
-  return lhs.E<rhs.E;
-}
-
 /**
  * Was loading a success?
  *
