@@ -1459,17 +1459,14 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
 std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen) const {
   // Get the screening matrix
   screen=eri_screening();
-  
+
   // Fill out list
-  std::vector<struct eripair_t> list;
-  for(size_t is=0;is<screen.n_rows;is++)
-    for(size_t js=0;js<=is;js++) {
-      struct eripair_t hlp;
-      hlp.is=is;
-      hlp.js=js;
-      hlp.eri=screen(is,js);
-      list.push_back(hlp);
-    }
+  std::vector<struct eripair_t> list(shellpairs.size());
+  for(size_t i=0;i<shellpairs.size();i++) {
+    list[i].is=shellpairs[i].is;
+    list[i].js=shellpairs[i].js;
+    list[i].eri=screen(list[i].is,list[i].js);
+  }
   // and sort it
   std::stable_sort(list.begin(),list.end());
 

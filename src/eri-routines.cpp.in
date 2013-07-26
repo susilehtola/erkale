@@ -166,8 +166,11 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
      to form the ERIs as for direct calculations.
   */
 
-  // Get list of unique shell pairs
-  std::vector<shellpair_t> shpairs=basp->get_unique_shellpairs();
+#ifdef ERITABLE
+  // Get ERI screening matrix and list of unique shell pairs
+  arma::mat screen;
+  std::vector<eripair_t> shpairs=basp->get_eripairs(screen);
+#endif
   // Get number of shell pairs
   const size_t Npairs=shpairs.size();
 
@@ -194,41 +197,6 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
     // Maximum value of density is
     Psh(is,js)=max_abs(P.submat(i0,j0,ilast,jlast));
     Psh(js,is)=Psh(is,js);
-  }
-#endif
-
-
-#if defined(ERITABLE)
-  // Form screening matrix
-  const size_t Nsh=basp->get_Nshells();
-  arma::mat screen(Nsh,Nsh);
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-    ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
-    const std::vector<double> * erip;
-
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic)
-#endif
-    for(size_t ip=0;ip<Npairs;ip++) {
-      size_t i=shpairs[ip].is;
-      size_t j=shpairs[ip].js;
-
-      // Compute integrals
-      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j]);
-      erip=eri.getp();
-      // Get maximum value
-      double m=0.0;
-      for(size_t k=0;k<(*erip).size();k++)
-	if(fabs((*erip)[k])>m)
-	  m=fabs((*erip)[k]);
-      m=sqrt(m);
-      screen(i,j)=m;
-      screen(j,i)=m;
-    }
   }
 #endif
 
@@ -316,7 +284,14 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	// Maximum value of the 2-electron integrals on this shell pair
 	double intmax=screen(is,js)*screen(ks,ls);
 	if(intmax<tol) {
-	  // Skip integral due to small value of integral
+	  /*
+	  // Skip due to small value of integral. Because
+	  // integrals have been ordered, all the next ones will be
+	  // small as well!
+	  intskip+=is-js+1;
+	  break;
+	  */
+
 	  intskip++;
 	  continue;
 	}
