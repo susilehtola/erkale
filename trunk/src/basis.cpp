@@ -1456,6 +1456,37 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   return shellpairs;
 }
 
+std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen) const {
+  // Get the screening matrix
+  screen=eri_screening();
+  
+  // Fill out list
+  std::vector<struct eripair_t> list;
+  for(size_t is=0;is<screen.n_rows;is++)
+    for(size_t js=0;js<=is;js++) {
+      struct eripair_t hlp;
+      hlp.is=is;
+      hlp.js=js;
+      hlp.eri=screen(is,js);
+      list.push_back(hlp);
+    }
+  // and sort it
+  std::stable_sort(list.begin(),list.end());
+
+  FILE *out=fopen("screen.dat","w");
+  for(size_t i=0;i<list.size();i++)
+    fprintf(out,"%4i %4i %e\n",(int) list[i].is, (int) list[i].js, list[i].eri);
+  fclose(out);
+
+  return list;
+} 
+
+bool operator<(const struct eripair_t & lhs, const struct eripair_t & rhs) {
+  // Sort in decreasing order!
+  return lhs.eri > rhs.eri;
+}
+
+
 void BasisSet::finalize(bool convert, bool donorm) {
   // Finalize basis set structure for use.
 
@@ -2035,6 +2066,43 @@ arma::mat BasisSet::nuclear() const {
     }
 
   return Vnuc;
+}
+
+arma::mat BasisSet::eri_screening() const {
+ // Get unique pairs
+ std::vector<shellpair_t> pairs=get_unique_shellpairs();
+
+ arma::mat screen(shells.size(),shells.size());
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker eri(get_max_am(),get_max_Ncontr());
+    const std::vector<double> * erip;
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<pairs.size();ip++) {
+      size_t i=pairs[ip].is;
+      size_t j=pairs[ip].js;
+
+      // Compute integrals
+      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j]);
+      erip=eri.getp();
+      // Get maximum value
+      double m=0.0;
+      for(size_t k=0;k<(*erip).size();k++)
+        if(fabs((*erip)[k])>m)
+          m=fabs((*erip)[k]);
+      m=sqrt(m);
+      screen(i,j)=m;
+      screen(j,i)=m;
+    }
+  }
+
+  return screen;
 }
 
 arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {
