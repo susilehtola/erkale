@@ -65,50 +65,11 @@ void ERIscreen::fill(const BasisSet * basisv) {
 
   basp=basisv;
 
-  // Amount of shells in basis set is
-  size_t Nsh=basp->get_Nshells();
-
   // Form index helper
   iidx=i_idx(basp->get_Nbf());
 
-  // Allocate storage
-  screen=arma::mat(Nsh,Nsh);
-
-  // Get list of unique shell pairs
-  std::vector<shellpair_t> pairs=basp->get_unique_shellpairs();
-  // Get number of shell pairs
-  const size_t Npairs=pairs.size();
-
-  std::vector<GaussianShell> shells=basp->get_shells();
-
-  // Loop over shell pairs
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-    ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
-    const std::vector<double> * erip;
-
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic)
-#endif
-    for(size_t ip=0;ip<Npairs;ip++) {
-      size_t i=pairs[ip].is;
-      size_t j=pairs[ip].js;
-
-      // Compute integrals
-      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j]);
-      erip=eri.getp();
-      // Get maximum value
-      double m=0.0;
-      for(size_t k=0;k<(*erip).size();k++)
-        if(fabs((*erip)[k])>m)
-          m=fabs((*erip)[k]);
-      m=sqrt(m);
-      screen(i,j)=m;
-      screen(j,i)=m;
-    }
-  }
+  // Screening matrix and pairs
+  shpairs=basp->get_eripairs(screen);
 
   // Get minimum of screening matrix
   //  double minval=min(min(screen));

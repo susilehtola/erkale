@@ -39,11 +39,14 @@
 #include <vector>
 // Forward declaration
 class BasisSet;
+struct eripair_t;
 
 /// Screening of electron repulsion integrals
 class ERIscreen {
   /// Prescreening table of shell integrals
   arma::mat screen;
+  /// Integral pairs sorted by value
+  std::vector<eripair_t> shpairs;
 
   /// Pointer to the used basis set
   const BasisSet * basp;
