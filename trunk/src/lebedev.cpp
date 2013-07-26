@@ -87,6 +87,7 @@
 #include "lebedev.h"
 
 #include <cmath>
+#include <cstdio>
 #include <sstream>
 #include <stdexcept>
 

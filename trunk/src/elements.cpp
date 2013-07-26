@@ -18,6 +18,7 @@
 
 #include "elements.h"
 #include "global.h"
+#include <cstdio>
 #include <sstream>
 #include <stdexcept>
 

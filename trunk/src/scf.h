@@ -233,6 +233,8 @@ class SCF {
 
   /// Direct calculation?
   bool direct;
+  /// Use decontracted basis to construct Fock matrix? (Direct formation)
+  bool decfock;
   /// Strict integrals?
   bool strictint;
   /// Density fitting calculation?

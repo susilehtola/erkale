@@ -88,6 +88,8 @@ void Settings::add_scf_settings() {
 
   // Direct calculation?
   add_bool("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false);
+  // Compute Fock matrix in decontracted basis
+  add_bool("DecFock", "Use decontracted basis to calculate Fock matrix (direct HF)", false);
   // Strict integrals?
   add_bool("StrictIntegrals", "Use strict integrals?", false);
 

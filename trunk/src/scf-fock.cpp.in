@@ -14,6 +14,8 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "global.h"
+
 /* Restricted case */
 #if defined(RESTRICTED) && defined(DFT)
 void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, double tol) const
@@ -40,27 +42,11 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   Timer t;
 
   // Consistency check
-  if(sol.P.n_rows != Nbf || sol.P.n_cols != Nbf) {
-    fprintf(stderr,"Size of P is %i x %i while Nbf = %i.\n",(int) sol.P.n_rows,(int) sol.P.n_cols,(int) Nbf);
-    fflush(stderr);
-    ERROR_INFO();
-    throw std::runtime_error("P does not correspond to solver!\n");
-  }
+  MAT_SIZE_CHECK(sol.P,Nbf,Nbf);
 #ifndef RESTRICTED
-  if(sol.Pa.n_rows != Nbf || sol.Pa.n_cols != Nbf) {
-    fprintf(stderr,"Size of Pa is %i x %i while Nbf = %i.\n",(int) sol.Pa.n_rows,(int) sol.Pa.n_cols,(int) Nbf);
-    fflush(stderr);
-    ERROR_INFO();
-    throw std::runtime_error("Pa does not correspond to solver!\n");
-  }
-  if(sol.Pb.n_rows != Nbf || sol.Pb.n_cols != Nbf) {
-    fprintf(stderr,"Size of Pb is %i x %i while Nbf = %i.\n",(int) sol.Pb.n_rows,(int) sol.Pb.n_cols,(int) Nbf);
-    fflush(stderr);
-    ERROR_INFO();
-    throw std::runtime_error("Pb does not correspond to solver!\n");
-  }
+  MAT_SIZE_CHECK(sol.Pa,Nbf,Nbf);
+  MAT_SIZE_CHECK(sol.Pb,Nbf,Nbf);
 #endif
-
 
 
 #if defined(_ROHF)
@@ -187,32 +173,32 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(strictint) {
-#ifndef DECFOCK
-	  scr.calcJK(sol.P,sol.J,sol.K,tol,&screeneff);
-#else
-	  // Helper matrices
-	  arma::mat Jhlp, Khlp;
-	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  
-	  scr.calcJK(Phlp,Jhlp,Khlp,tol,&screeneff);
-	  sol.J=arma::trans(decconv)*Jhlp*decconv;
-	  sol.K=arma::trans(decconv)*Khlp*decconv;
-#endif
+	  if(!decfock)
+	    scr.calcJK(sol.P,sol.J,sol.K,tol,&screeneff);
+	  else {
+	    // Helper matrices
+	    arma::mat Jhlp, Khlp;
+	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	    
+	    scr.calcJK(Phlp,Jhlp,Khlp,tol,&screeneff);
+	    sol.J=arma::trans(decconv)*Jhlp*decconv;
+	    sol.K=arma::trans(decconv)*Khlp*decconv;
+	  }
 
 	} else {
 	  arma::mat dJ, dK;
 
-#ifndef DECFOCK
-	  scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
-	  sol.J+=dJ;
-	  sol.K+=dK;
-#else
-	  arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-	  
-	  scr.calcJK(Phlp,dJ,dK,tol,&screeneff);
-	  sol.J+=arma::trans(decconv)*dJ*decconv;
-	  sol.K+=arma::trans(decconv)*dK*decconv;
-#endif
+	  if(!decfock) {
+	    scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
+	    sol.J+=dJ;
+	    sol.K+=dK;
+	  } else {
+	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
+	    
+	    scr.calcJK(Phlp,dJ,dK,tol,&screeneff);
+	    sol.J+=arma::trans(decconv)*dJ*decconv;
+	    sol.K+=arma::trans(decconv)*dK*decconv;
+	  }
 	}
 
 	if(verbose) {
@@ -231,22 +217,22 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(strictint) {
-#ifndef DECFOCK
-	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
-#else
-	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
-	  sol.J=arma::trans(decconv)*Jhlp*decconv;
-#endif
+	  if(!decfock)
+	    sol.J=scr.calcJ(sol.P,tol,&screeneff);
+	  else {
+	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
+	    sol.J=arma::trans(decconv)*Jhlp*decconv;
+	  }
 
 	} else {
-#ifndef DECFOCK
+	  if(!decfock)
 	    sol.J+=scr.calcJ(deltaP,tol,&screeneff);
-#else
+	  else {
 	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
 	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
 	    sol.J+arma::trans(decconv)*Jhlp*decconv;
-#endif
+	  }
 	}
 
 	if(verbose) {
@@ -271,37 +257,37 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(strictint) {
-#ifndef DECFOCK
-	  scr.calcJK(sol.Pa,sol.Pb,sol.J,sol.Ka,sol.Kb,tol,&screeneff);
-#else
-	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
-	  arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
-
-	  arma::mat Jhlp, Kahlp, Kbhlp;
-	  scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol,&screeneff);
-	  sol.J=arma::trans(decconv)*Jhlp*decconv;
-	  sol.Ka=arma::trans(decconv)*Kahlp*decconv;
-	  sol.Kb=arma::trans(decconv)*Kbhlp*decconv;
-#endif
+	  if(!decfock)
+	    scr.calcJK(sol.Pa,sol.Pb,sol.J,sol.Ka,sol.Kb,tol,&screeneff);
+	  else {
+	    arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
+	    arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
+	    
+	    arma::mat Jhlp, Kahlp, Kbhlp;
+	    scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol,&screeneff);
+	    sol.J=arma::trans(decconv)*Jhlp*decconv;
+	    sol.Ka=arma::trans(decconv)*Kahlp*decconv;
+	    sol.Kb=arma::trans(decconv)*Kbhlp*decconv;
+	  }
 
 	} else {
 	  // Only calculate the changed part
 	  arma::mat dJ, dKa, dKb;
 
-#ifndef DECFOCK
-	  scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
-	  sol.J+=dJ;
-	  sol.Ka+=dKa;
-	  sol.Kb+=dKb;
-#else	  
-	  arma::mat Pahlp=decconv*deltaPa*arma::trans(decconv);
-	  arma::mat Pbhlp=decconv*deltaPb*arma::trans(decconv);
-	  scr.calcJK(Pahlp,Pbhlp,dJ,dKa,dKb,tol,&screeneff);
-	  
-	  sol.J+=arma::trans(decconv)*dJ*decconv;
-	  sol.Ka+=arma::trans(decconv)*dKa*decconv;
-	  sol.Kb+=arma::trans(decconv)*dKb*decconv;
-#endif
+	  if(!decfock) {
+	    scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
+	    sol.J+=dJ;
+	    sol.Ka+=dKa;
+	    sol.Kb+=dKb;
+	  } else {
+	    arma::mat Pahlp=decconv*deltaPa*arma::trans(decconv);
+	    arma::mat Pbhlp=decconv*deltaPb*arma::trans(decconv);
+	    scr.calcJK(Pahlp,Pbhlp,dJ,dKa,dKb,tol,&screeneff);
+	    
+	    sol.J+=arma::trans(decconv)*dJ*decconv;
+	    sol.Ka+=arma::trans(decconv)*dKa*decconv;
+	    sol.Kb+=arma::trans(decconv)*dKb*decconv;
+	  }
 	}
 
 	if(verbose) {
@@ -321,22 +307,22 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(strictint) {
-#ifndef DECFOCK
-	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
-#else
-	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
-	  sol.J=arma::trans(decconv)*Jhlp*decconv;
-#endif
+	  if(!decfock)
+	    sol.J=scr.calcJ(sol.P,tol,&screeneff);
+	  else {
+	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
+	    sol.J=arma::trans(decconv)*Jhlp*decconv;
+	  }
 
 	} else {
-#ifndef DECFOCK
-	  sol.J+=scr.calcJ(deltaP,tol,&screeneff);
-#else
-	  arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
-	  sol.J+=arma::trans(decconv)*Jhlp*decconv;
-#endif
+	  if(!decfock)
+	    sol.J+=scr.calcJ(deltaP,tol,&screeneff);
+	  else {
+	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
+	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
+	    sol.J+=arma::trans(decconv)*Jhlp*decconv;
+	  }
 	}
 
 	if(verbose) {
