@@ -97,6 +97,19 @@ typedef struct {
 /// Comparison operator for shellpairs for ordering into libint order
 bool operator<(const shellpair_t & lhs, const shellpair_t & rhs);
 
+/// Helper for integral sorts
+struct eripair_t {
+  /// First shell
+  size_t is;
+  /// Second shell
+  size_t js;
+  /// Integral
+  double eri;
+};
+
+/// Comparison operator
+bool operator<(const struct eripair_t & lhs, const struct eripair_t & rhs);
+
 // Forward declarations
 class ElementBasisSet;
 class BasisSetLibrary;
@@ -222,6 +235,9 @@ class BasisSet {
   void form_unique_shellpairs();
   /// Get list of unique shell pairs
   std::vector<shellpair_t> get_unique_shellpairs() const;
+
+  /// Get list of ERI pairs. Screening matrix will also be calculated
+  std::vector<eripair_t> get_eripairs(arma::mat & screen) const;
 
   /// Convert contractions from normalized primitives to unnormalized primitives
   void convert_contractions();
@@ -369,6 +385,9 @@ class BasisSet {
   arma::mat kinetic() const;
   /// Calculate nuclear repulsion matrix
   arma::mat nuclear() const;
+
+  /// Calculate ERI screening matrix
+  arma::mat eri_screening() const;
 
   /// Calculate nuclear Pulay forces
   arma::vec nuclear_pulay(const arma::mat & P) const;
