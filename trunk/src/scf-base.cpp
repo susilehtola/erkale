@@ -274,8 +274,13 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	printf("Forming ERI screening matrix ... ");
 	fflush(stdout);
       }
-      //      scr.fill(&decbas);
+
+#ifdef DECFOCK
+      scr.fill(&decbas);
+#else
       scr.fill(&basis);
+#endif
+
     } else {
       // Compute memory requirement
       size_t N;

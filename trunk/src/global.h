@@ -86,6 +86,8 @@
 #define FINETOL  1e-10
 // When to switch to FINETOL (wrt. rms difference of density matrices)
 #define TOLCHANGE 1e-5
+// When using direct formation, evaluate Fock matrix always in the decontracted basis?
+//#define DECFOCK
 
 // Tolerance when screening is only wrt absolute value of integrals
 #define STRICTTOL 1e-16
