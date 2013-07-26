@@ -187,31 +187,32 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(strictint) {
+#ifndef DECFOCK
 	  scr.calcJK(sol.P,sol.J,sol.K,tol,&screeneff);
-
-	  /*
+#else
 	  // Helper matrices
 	  arma::mat Jhlp, Khlp;
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-
-	  scr.calcJK_strict(Phlp,Jhlp,Khlp,tol,&screeneff);
+	  
+	  scr.calcJK(Phlp,Jhlp,Khlp,tol,&screeneff);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	  sol.K=arma::trans(decconv)*Khlp*decconv;
-	  */
+#endif
+
 	} else {
 	  arma::mat dJ, dK;
 
+#ifndef DECFOCK
 	  scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
 	  sol.J+=dJ;
 	  sol.K+=dK;
-
-	  /*
+#else
 	  arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
 	  
 	  scr.calcJK(Phlp,dJ,dK,tol,&screeneff);
 	  sol.J+=arma::trans(decconv)*dJ*decconv;
 	  sol.K+=arma::trans(decconv)*dK*decconv;
-	  */
+#endif
 	}
 
 	if(verbose) {
@@ -230,21 +231,22 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(strictint) {
+#ifndef DECFOCK
 	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
-	  
-	  /*
+#else
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ_strict(Phlp,tol,&screeneff);
+	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
-	  */
-	} else {
-	  sol.J+=scr.calcJ(deltaP,tol,&screeneff);
+#endif
 
-	  /*
-	  arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ_strict(Phlp,tol,&screeneff);
-          sol.J+arma::trans(decconv)*Jhlp*decconv;
-	  */
+	} else {
+#ifndef DECFOCK
+	    sol.J+=scr.calcJ(deltaP,tol,&screeneff);
+#else
+	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
+	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
+	    sol.J+arma::trans(decconv)*Jhlp*decconv;
+#endif
 	}
 
 	if(verbose) {
@@ -269,29 +271,29 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(strictint) {
+#ifndef DECFOCK
 	  scr.calcJK(sol.Pa,sol.Pb,sol.J,sol.Ka,sol.Kb,tol,&screeneff);
-
-	  /*
+#else
 	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
 	  arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
 
 	  arma::mat Jhlp, Kahlp, Kbhlp;
-	  scr.calcJK_strict(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol,&screeneff);
+	  scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol,&screeneff);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	  sol.Ka=arma::trans(decconv)*Kahlp*decconv;
 	  sol.Kb=arma::trans(decconv)*Kbhlp*decconv;
-	  */
+#endif
+
 	} else {
 	  // Only calculate the changed part
 	  arma::mat dJ, dKa, dKb;
 
+#ifndef DECFOCK
 	  scr.calcJK(deltaPa,deltaPb,dJ,dKa,dKb,tol,&screeneff);
 	  sol.J+=dJ;
 	  sol.Ka+=dKa;
 	  sol.Kb+=dKb;
-
-
-	  /*
+#else	  
 	  arma::mat Pahlp=decconv*deltaPa*arma::trans(decconv);
 	  arma::mat Pbhlp=decconv*deltaPb*arma::trans(decconv);
 	  scr.calcJK(Pahlp,Pbhlp,dJ,dKa,dKb,tol,&screeneff);
@@ -299,7 +301,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  sol.J+=arma::trans(decconv)*dJ*decconv;
 	  sol.Ka+=arma::trans(decconv)*dKa*decconv;
 	  sol.Kb+=arma::trans(decconv)*dKb*decconv;
-	  */
+#endif
 	}
 
 	if(verbose) {
@@ -319,21 +321,22 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(strictint) {
+#ifndef DECFOCK
 	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
-
-	  /*
+#else
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ_strict(Phlp,tol,&screeneff);
+	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
-	  */
-	} else {
-	  sol.J+=scr.calcJ(deltaP,tol,&screeneff);
+#endif
 
-	  /*
+	} else {
+#ifndef DECFOCK
+	  sol.J+=scr.calcJ(deltaP,tol,&screeneff);
+#else
 	  arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ_strict(Phlp,tol,&screeneff);
+	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
 	  sol.J+=arma::trans(decconv)*Jhlp*decconv;
-	  */
+#endif
 	}
 
 	if(verbose) {
@@ -382,7 +385,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
-	}
+      }
       fflush(stdout);
       
     }
