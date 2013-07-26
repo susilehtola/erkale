@@ -85,6 +85,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   verbose=set.get_bool("Verbose");
 
   direct=set.get_bool("Direct");
+  decfock=set.get_bool("DecFock");
   strictint=set.get_bool("StrictIntegrals");
 
   doforce=false;
@@ -275,11 +276,12 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	fflush(stdout);
       }
 
-#ifdef DECFOCK
-      scr.fill(&decbas);
-#else
-      scr.fill(&basis);
-#endif
+      if(decfock)
+	// Use decontracted basis
+	scr.fill(&decbas);
+      else
+	// Use contracted basis
+	scr.fill(&basis);
 
     } else {
       // Compute memory requirement

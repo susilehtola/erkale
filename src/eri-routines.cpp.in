@@ -108,12 +108,12 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 
 #if defined(CALCJKab)
 #define DO_Kab
-  MAT_SIZE_CHECK(Pa,Nbf,Nbf,"Pa is not square!\n");
-  MAT_SIZE_CHECK(Pb,Nbf,Nbf,"Pb is not square!\n");
+  MAT_SIZE_CHECK(Pa,Nbf,Nbf);
+  MAT_SIZE_CHECK(Pb,Nbf,Nbf);
 #endif
 
 #if defined(DO_J) || defined(DO_K)
-  MAT_SIZE_CHECK(P,Nbf,Nbf,"P is not square!\n");
+  MAT_SIZE_CHECK(P,Nbf,Nbf);
 #endif
 
   /* Allocate memory for table of integrals */
@@ -284,16 +284,11 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	// Maximum value of the 2-electron integrals on this shell pair
 	double intmax=screen(is,js)*screen(ks,ls);
 	if(intmax<tol) {
-	  /*
-	  // Skip due to small value of integral. Because
+	  // Skip due to small value of integral. Because the
 	  // integrals have been ordered, all the next ones will be
 	  // small as well!
 	  intskip+=is-js+1;
 	  break;
-	  */
-
-	  intskip++;
-	  continue;
 	}
 
 #if !defined(ERITABLE)

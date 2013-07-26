@@ -65,11 +65,8 @@
 #ifndef ERKALE_GLOBAL
 #define ERKALE_GLOBAL
 
-#include <cstdio>
-
 // Disable bounds checking in Armadillo.
 #define ARMA_NO_DEBUG
-#include <armadillo>
 
 // Ångström in atomic units
 #define ANGSTROMINBOHR 1.8897261
@@ -86,8 +83,6 @@
 #define FINETOL  1e-10
 // When to switch to FINETOL (wrt. rms difference of density matrices)
 #define TOLCHANGE 1e-5
-// When using direct formation, evaluate Fock matrix always in the decontracted basis?
-//#define DECFOCK
 
 // Tolerance when screening is only wrt absolute value of integrals
 #define STRICTTOL 1e-16
@@ -101,10 +96,12 @@
 #define ERROR_INFO() printf("\nError in function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__)
 
 // Check that matrix is of wanted size
-#define MAT_SIZE_CHECK(M,NR,NC,MSG) if(M.n_rows != NR || M.n_cols != NC) { \
-    ERROR_INFO(); throw std::runtime_error(MSG);}
+#define MAT_SIZE_CHECK(M,NR,NC) if(M.n_rows != NR || M.n_cols != NC) { \
+    std::ostringstream oss;						\
+    oss << #M << " should be " << NR << " x " << NC << " but is " << M.n_rows << " x " << M.n_cols << "!\n"; \
+      throw std::runtime_error(oss.str());}
 // Resize matrix if necessary
-#define MAT_RESIZE(M,NR,NC) if(M.n_rows != NR || M.n_cols != NC) { M=arma::mat(NR,NC);}
+#define MAT_RESIZE(M,NR,NC) if(M.n_rows != NR || M.n_cols != NC) { M.zeros(NR,NC);}
 
 #define print_copyright() \
   printf("(c) Susi Lehtola, 2010-2013.\n");

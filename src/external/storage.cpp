@@ -15,6 +15,7 @@
  */
 
 #include "storage.h"
+#include <cstdio>
 #include <sstream>
 #include <stdexcept>
 
