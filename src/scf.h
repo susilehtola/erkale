@@ -494,9 +494,6 @@ class Boys : public Unitary {
   /// r_z matrix
   arma::mat rz;
 
-  /// (Don't) print out step size during optimization
-  void print_step(enum unitmethod & met, double step) const;
-
  public:
   /// Constructor. n gives the penalty power to use
   Boys(const BasisSet & basis, const arma::mat & C, int n, double thr, bool verbose=true, bool delocalize=false);
@@ -530,9 +527,6 @@ class FMLoc : public Unitary {
   /// r matrices
   std::vector<arma::mat> rmat;
 
-  /// (Don't) print out step size during optimization
-  void print_step(enum unitmethod & met, double step) const;
-
  public:
   /// Constructor. n gives the penalty power to use
   FMLoc(const BasisSet & basis, const arma::mat & C, int n, double thr, bool verbose=true, bool delocalize=false);
@@ -556,9 +550,6 @@ class Pipek : public Unitary {
   /// Charge matrix in MO basis
   arma::cube Q;
 
-  /// (Don't) print out step size during optimization
-  void print_step(enum unitmethod & met, double step) const;
-
  public:
   Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
   ~Pipek();
@@ -577,9 +568,6 @@ class Edmiston : public Unitary {
   DensityFit dfit;
   /// Orbitals
   arma::mat C;
-
-  /// (Don't) print out step size during optimization
-  void print_step(enum unitmethod & met, double step) const;
 
  public:
   Edmiston(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);

@@ -2145,10 +2145,6 @@ void Boys::set_n(int nv) {
   set_q(4*(n+1));
 }
 
-void Boys::print_step(enum unitmethod & met, double step) const {
-  (void) met;
-  (void) step;
-}
 
 double Boys::cost_func(const arma::cx_mat & W) {
   if(W.n_rows != W.n_cols) {
@@ -2315,11 +2311,6 @@ FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double thr, bo
 }
 
 FMLoc::~FMLoc() {
-}
-
-void FMLoc::print_step(enum unitmethod & met, double step) const {
-  (void) met;
-  (void) step;
 }
 
 void FMLoc::set_n(int nv) {
@@ -2694,11 +2685,6 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
 Pipek::~Pipek() {
 }
 
-void Pipek::print_step(enum unitmethod & met, double step) const {
-  (void) met;
-  (void) step;
-}
-
 double Pipek::cost_func(const arma::cx_mat & W) {
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
@@ -2792,11 +2778,6 @@ Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double thr, boo
 }
 
 Edmiston::~Edmiston() {
-}
-
-void Edmiston::print_step(enum unitmethod & met, double step) const {
-  (void) met;
-  (void) step;
 }
 
 double Edmiston::cost_func(const arma::cx_mat & W) {
