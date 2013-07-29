@@ -54,7 +54,9 @@ enum unitacc {
   /// Polak-Ribière conjugate gradients
   CGPR,
   /// Fletcher-Reeves conjugate gradients
-  CGFR
+  CGFR,
+  /// Hestenes-Stiefel conjugate gradients
+  CGHS
 };
 
 /// Unitary optimization worker
@@ -171,9 +173,9 @@ class Unitary {
   void set_thr(double eps);
 
   /// Unitary optimization
-  double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
+  double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=50000);
   /// Orthogonal optimization
-  double optimize(arma::mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=10000);
+  double optimize(arma::mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=50000);
 };
 
 
