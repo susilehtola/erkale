@@ -663,7 +663,7 @@ class PZSIC : public Unitary {
 };
 
 /// Orbital localization. Initial value of measure is taken as the convergence threshold
-void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, bool real=true, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="");
+void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter=50000, bool real=true, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="");
 
 #include "checkpoint.h"
 
