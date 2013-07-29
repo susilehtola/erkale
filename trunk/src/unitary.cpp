@@ -331,6 +331,7 @@ void Unitary::print_time(const Timer & t) const {
 }
 
 void Unitary::print_step(enum unitmethod & met, double step) const {
+  /*
   if(met==POLY_DF)
     printf("Polynomial_df  step %e (%e of Tmu)\n",step,step/Tmu);
   else if(met==POLY_FDF)
@@ -342,6 +343,13 @@ void Unitary::print_step(enum unitmethod & met, double step) const {
   else {
     ERROR_INFO();
     throw std::runtime_error("Method not implemented.\n");
+  }
+  */
+
+  (void) met;
+  if(log!=NULL) {
+    fprintf(log,"%e %e ",step,Tmu);
+    fflush(log);
   }
 }
 
