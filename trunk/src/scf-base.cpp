@@ -1958,13 +1958,8 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter, bool real, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname) {
+void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter, double Gthr, double Fthr, bool real, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname) {
   Timer t;
-
-  // Threshold
-  double thr=1e-6;
-  if(measure>0.0)
-    thr=measure;
 
   // Real part of U
   arma::mat Ureal;
@@ -1983,19 +1978,17 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     else if(met==BOYS_4)
       n=4;
 
-    Boys worker(basis,C,n,thr,verbose,delocalize);
+    Boys worker(basis,C,n,Gthr,Fthr,verbose,delocalize);
     // Perform initial localization
     if(n>1) {
       for(int nv=1;nv<n;nv++) {
 	if(verbose) printf("\nInitial localization with p=%i\n",nv);
 	worker.set_n(nv);
-	worker.set_thr(1e-3);
 	if(real)
 	  measure=worker.optimize(Ureal,umet,uacc,maxiter);
 	else
 	  measure=worker.optimize(U,umet,uacc,maxiter);
       }
-      worker.set_thr(thr);
       worker.set_n(n);
       if(verbose) printf("\n");
     }
@@ -2020,7 +2013,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
 
     {
       // Initial localization with Boys
-      Boys worker(basis,C,n,thr,verbose,delocalize);
+      Boys worker(basis,C,n,Gthr,Fthr,verbose,delocalize);
       if(verbose) printf("\nInitial localization with Foster-Boys\n");
       if(real)
 	measure=worker.optimize(Ureal,umet,uacc,maxiter);
@@ -2030,13 +2023,12 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     }
 
 
-    FMLoc worker(basis,C,n,thr,verbose,delocalize);
+    FMLoc worker(basis,C,n,Gthr,Fthr,verbose,delocalize);
     // Perform initial localization
     if(n>1) {
       for(int nv=1;nv<n;nv++) {
 	if(verbose) printf("\nInitial localization with p=%i\n",nv);
 	worker.set_n(nv);
-	worker.set_thr(1e-3);
 
 	if(real)
 	  measure=worker.optimize(Ureal,umet,uacc,maxiter);
@@ -2046,7 +2038,6 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
 
       if(verbose) printf("\n");
       worker.set_n(n);
-      worker.set_thr(thr);
     }
     if(fname.length()) worker.open_log(fname);
 
@@ -2056,7 +2047,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       measure=worker.optimize(U,umet,uacc,maxiter);
 
   } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
-    Pipek worker(met,basis,C,thr,verbose);
+    Pipek worker(met,basis,C,Gthr,Fthr,verbose);
     if(fname.length()) worker.open_log(fname);
 
     if(real)
@@ -2065,7 +2056,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       measure=worker.optimize(U,umet,uacc,maxiter);
 
   } else if(met==EDMISTON) {
-    Edmiston worker(basis,C,thr,verbose);
+    Edmiston worker(basis,C,Gthr,Fthr,verbose);
     if(fname.length()) worker.open_log(fname);
 
     if(real)
@@ -2106,7 +2097,7 @@ arma::mat interpret_force(const arma::vec & f) {
   return retf;
 }
 
-Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(4*nv,thr,delocalize,ver) {
+Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4*nv,Gth,Fth,delocalize,ver) {
   // Save n
   n=nv;
 
@@ -2237,7 +2228,7 @@ void Boys::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)
 }
 
 
-FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double thr, bool ver, bool delocalize) : Unitary(8*nv,thr,delocalize,ver) {
+FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(8*nv,Gth,Fth,delocalize,ver) {
   // Save n
   n=nv;
 
@@ -2499,7 +2490,7 @@ void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 }
 
 
-Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double thr, bool ver, bool delocalize) : Unitary(4,thr,!delocalize,ver) {
+Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
   // Initialize charge matrix
   Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
 
@@ -2770,7 +2761,7 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   der=cost_der(W);
 }
 
-Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double thr, bool ver, bool delocalize) : Unitary(4,thr,!delocalize,ver) {
+Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
   // Store orbitals
   C=Cv;
   // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, no Hartree-Fock
@@ -2823,7 +2814,7 @@ void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
       der(a,b)=2.0*arma::as_scalar(arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b));
 }
 
-PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0.0,true,verb) {
+PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0.0,0.0,true,verb) {
   solver=solverp;
   dft=dftp;
   grid=gridp;

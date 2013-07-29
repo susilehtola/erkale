@@ -71,8 +71,10 @@ class Unitary {
   /// Operate with real or complex matrices?
   bool real;
 
-  /// Convergence threshold
-  double eps;
+  /// Convergence threshold wrt norm of Riemannian derivative
+  double Gthr;
+  /// Convergence threshold wrt relative change in function
+  double Fthr;
 
   /// Degree of polynomial used for fit: a_0 + a_1*mu + ... + a_(d-1)*mu^(d-1)
   int polynomial_degree;
@@ -151,7 +153,7 @@ class Unitary {
 
  public:
   /// Constructor
-  Unitary(int q, double thr, bool maximize, bool verbose=true, bool real=false);
+  Unitary(int q, double Gthr, double Fthr, bool maximize, bool verbose=true, bool real=false);
   /// Destructor
   ~Unitary();
 
@@ -170,7 +172,7 @@ class Unitary {
   /// Set Fourier search options
   void set_fourier(int Nsamples, int Nperiods);
   /// Set convergence threshold
-  void set_thr(double eps);
+  void set_thr(double Gtol, double Ftol);
 
   /// Unitary optimization
   double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=50000);
