@@ -147,6 +147,9 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
   // Old gradient
   arma::cx_mat oldG;
   G.zeros(W.n_cols,W.n_cols);
+  // Old search direction
+  arma::cx_mat oldH;
+  H.zeros(W.n_cols,W.n_cols);
 
   if(W.n_cols<2) {
     // No optimization is necessary.
@@ -180,6 +183,7 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
     // Store old values
     oldJ=J;
     oldG=G;
+    oldH=H;
 
     // Compute the cost function and the euclidean derivative, Abrudan 2009 table 3 step 2
     update_gradient(W);
@@ -199,6 +203,9 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
     } else if(acc==CGFR) {
       // Fletcher-Reeves
       gamma=bracket(G, G) / bracket(oldG, oldG);
+    } else if(acc==CGHS) {
+      // Hestenes-Stiefel
+      gamma=bracket(G - oldG, G) / bracket(G - oldG, oldH);
     } else
       throw std::runtime_error("Unsupported update.\n");
     
@@ -308,7 +315,7 @@ void Unitary::print_progress(size_t k) const {
   fflush(stdout);
 
   if(log!=NULL) {
-    fprintf(log,"%4i % e %e\n",(int) k,J,bracket(G,G));
+    fprintf(log,"%4i % .16e %.16e ",(int) k,J,bracket(G,G));
     fflush(log);
   }
 }
@@ -316,6 +323,11 @@ void Unitary::print_progress(size_t k) const {
 void Unitary::print_time(const Timer & t) const {
   printf(" %s\n",t.elapsed().c_str());
   fflush(stdout);
+
+  if(log!=NULL) {
+    fprintf(log,"%e\n",t.get());
+    fflush(log);
+  }
 }
 
 void Unitary::print_step(enum unitmethod & met, double step) const {
@@ -661,10 +673,10 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
   double fourier_interval=fourier_periods*Tmu;
   // and of the transform. We want integer division here!
   int fourier_length=2*((fourier_samples*fourier_periods)/2)+1;
-
+    
   // Step length is
   double deltaTmu=fourier_interval/fourier_length;
-
+  
   // Values of mu, J(mu) and J'(mu)
   arma::vec mu(fourier_length);
   arma::vec f(fourier_length);
@@ -672,70 +684,73 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
   for(int i=0;i<fourier_length;i++) {
     // Value of mu is
     mu(i)=i*deltaTmu;
-
+    
     // Trial matrix is
     arma::cx_mat Wtr=get_rotation(mu(i))*W;
     arma::cx_mat der;
     cost_func_der(Wtr,f(i),der);
-
+    
     // Compute the derivative
     fp[i]=step_der(Wtr,der);
   }
-
+  
   // Compute Hann window
   arma::vec hannw(fourier_length);
   for(int i=0;i<fourier_length;i++)
     hannw(i)=0.5*(1-cos((i+1)*2.0*M_PI/(fourier_length+1.0)));
-
+  
   // Windowed derivative is
   arma::vec windowed(fourier_length);
   for(int i=0;i<fourier_length;i++)
     windowed(i)=fp(i)*hannw(i);
-
+    
   // Fourier coefficients
   arma::cx_vec coeffs=arma::fft(windowed)/fourier_length;
-
+  
   // Reorder coefficients
   arma::cx_vec shiftc=fourier_shift(coeffs);
-
+  
   // Find roots of polynomial
   arma::cx_vec croots=solve_roots_cplx(shiftc);
-
-  // Figure out roots on the unit circle
+  
+    // Figure out roots on the unit circle
   double circletol=1e-2;
   std::vector<double> muval;
   for(size_t i=0;i<croots.n_elem;i++)
     if(fabs(std::abs(croots(i))-1)<circletol) {
       // Root is on the unit circle. Angle is
       double phi=std::imag(std::log(croots(i)));
-
+      
       // Convert to the real length scale
       phi*=fourier_interval/(2*M_PI);
-
+      
       // Avoid aliases
       phi=fmod(phi,fourier_interval);
       // and check for negative values (fmod can return negative values)
       if(phi<0.0)
 	phi+=fourier_interval;
-
+      
       // Add to roots
       muval.push_back(phi);
     }
-
+  
   // Sort the roots
   std::sort(muval.begin(),muval.end());
-
+  
   // Sanity check
-  if(!muval.size() || fabs(windowed(0))<sqrt(DBL_EPSILON))
-    return 0.0;
-
+  if(!muval.size() || fabs(windowed(0))<sqrt(DBL_EPSILON)) {
+    // Failed. Reduce Tmu and try again
+    printf("No root found, falling back to polynomial step.\n");
+    return polynomial_step_df(W);
+  }
+  
   // Figure out where the function goes to the wanted direction
   double findJ;
   if(sign==1)
     findJ=arma::max(f);
   else
     findJ=arma::min(f);
-
+  
   // and the corresponding value of mu is
   double findmu=mu(0);
   for(int i=1;i<fourier_length;i++)
@@ -744,7 +759,7 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
       // Stop at closest extremum
       break;
     }
-
+  
   // Find closest value of mu
   size_t rootind=0;
   double diffmu=fabs(muval[0]-findmu);
@@ -753,7 +768,7 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
       rootind=i;
       diffmu=fabs(muval[i]-findmu);
     }
-
+  
   // Optimized step size is
   return muval[rootind];
 }

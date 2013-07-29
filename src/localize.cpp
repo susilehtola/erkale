@@ -293,7 +293,7 @@ int main(int argc, char **argv) {
   set.add_string("Method","Localization method: FB, FB2, FB3, FB4, FM, FM2, FM3, FM4, MU, LO, BE, HI, ER","FB");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
   set.add_string("Logfile","File to store output in","");
-  set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR","CGPR");
+  set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR, CGHS","CGPR");
   set.add_string("LineSearch","Line search to use: poly_df, poly_f, poly_fdf, armijo, fourier_df","poly_df");
   set.add_string("StartingPoint","Starting point to use: CAN, ORTH, UNIT?","ORTH");
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
@@ -350,6 +350,8 @@ int main(int argc, char **argv) {
     acc=CGPR;
   else if(stricmp(accs,"CGFR")==0)
     acc=CGFR;
+  else if(stricmp(accs,"CGHS")==0)
+    acc=CGHS;
   else throw std::runtime_error("Accelerator not implemented.\n");
 
   // Determine line search
