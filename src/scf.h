@@ -496,7 +496,7 @@ class Boys : public Unitary {
 
  public:
   /// Constructor. n gives the penalty power to use
-  Boys(const BasisSet & basis, const arma::mat & C, int n, double thr, bool verbose=true, bool delocalize=false);
+  Boys(const BasisSet & basis, const arma::mat & C, int n, double Gthr=1e-5, double Fthr=1e-6,  bool verbose=true, bool delocalize=false);
   /// Destructor
   ~Boys();
 
@@ -529,7 +529,7 @@ class FMLoc : public Unitary {
 
  public:
   /// Constructor. n gives the penalty power to use
-  FMLoc(const BasisSet & basis, const arma::mat & C, int n, double thr, bool verbose=true, bool delocalize=false);
+  FMLoc(const BasisSet & basis, const arma::mat & C, int n, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
   /// Destructor
   ~FMLoc();
 
@@ -551,7 +551,7 @@ class Pipek : public Unitary {
   arma::cube Q;
 
  public:
-  Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
+  Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
   ~Pipek();
 
   /// Evaluate cost function
@@ -570,7 +570,7 @@ class Edmiston : public Unitary {
   arma::mat C;
 
  public:
-  Edmiston(const BasisSet & basis, const arma::mat & C, double thr, bool verbose=true, bool delocalize=false);
+  Edmiston(const BasisSet & basis, const arma::mat & C, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
   ~Edmiston();
 
   /// Evaluate cost function
@@ -650,8 +650,8 @@ class PZSIC : public Unitary {
   arma::mat get_HSIC() const;
 };
 
-/// Orbital localization. Initial value of measure is taken as the convergence threshold
-void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter=50000, bool real=true, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="");
+/// Orbital localization
+void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter=50000, double Gthr=1e-6, double Fthr=1e-7, bool real=true, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="");
 
 #include "checkpoint.h"
 

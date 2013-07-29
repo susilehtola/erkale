@@ -19,9 +19,10 @@
 #include "mathf.h"
 #include <cfloat>
 
-Unitary::Unitary(int qv, double thr, bool max, bool ver, bool realv) {
+Unitary::Unitary(int qv, double Gthrv, double Fthrv, bool max, bool ver, bool realv) {
   q=qv;
-  eps=thr;
+  Gthr=Gthrv;
+  Fthr=Fthrv;
   verbose=ver;
   real=realv;
 
@@ -51,8 +52,9 @@ void Unitary::set_q(int qv) {
   q=qv;
 }
 
-void Unitary::set_thr(double epsv) {
-  eps=epsv;
+void Unitary::set_thr(double Geps, double Feps) {
+  Gthr=Geps;
+  Fthr=Feps;
 }
 
 void Unitary::open_log(const std::string & fname) {
@@ -229,9 +231,10 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
     // Check for convergence. Don't do the check in the first
     // iteration, because for canonical orbitals it can be a really
     // bad saddle point
-    if(k>1 && (bracket(G,G)<eps || converged(W))) {
+    if(k>1 && ( (bracket(G,G)<Gthr) || (fabs(J-oldJ)<Fthr*std::max(fabs(oldJ),fabs(J))) || converged(W) ) ) {
 
       if(verbose) {
+	print_step(met,0.0);
 	print_time(t);
 	printf("Converged.\n");
 	fflush(stdout);
@@ -243,6 +246,7 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
       break;
     } else if(k==maxiter) {
       if(verbose) {
+	print_step(met,0.0);
 	print_time(t);
 
 	printf(" %s\nNot converged.\n",t.elapsed().c_str());
