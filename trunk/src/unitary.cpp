@@ -25,6 +25,7 @@ Unitary::Unitary(int qv, double Gthrv, double Fthrv, bool max, bool ver, bool re
   Fthr=Fthrv;
   verbose=ver;
   real=realv;
+  debug=false;
 
   /// Maximize or minimize?
   if(max)
