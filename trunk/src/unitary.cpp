@@ -52,6 +52,10 @@ void Unitary::set_q(int qv) {
   q=qv;
 }
 
+void Unitary::set_debug(bool d) {
+  debug=d;
+}
+
 void Unitary::set_thr(double Geps, double Feps) {
   Gthr=Geps;
   Fthr=Feps;
@@ -268,6 +272,20 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
     // Compute maximal step size.
     // Order of the cost function in the coefficients of W.
     Tmu=2.0*M_PI/(q*wmax);
+
+    if(debug) {
+      char fname[80];
+      sprintf(fname,"unitary_%04i.dat",(int) k);
+      FILE *p=fopen(fname,"w");
+      
+      for(int i=-80;i<=80;i++) {
+	double x=i*0.05;
+	double xT=x*Tmu;
+	double y=cost_func(get_rotation(xT)*W);
+	fprintf(p,"%e %e % e\n",x,xT,y);
+      }
+      fclose(p);
+    }
 
     // Find optimal step size
     double step;

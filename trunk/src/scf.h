@@ -651,7 +651,7 @@ class PZSIC : public Unitary {
 };
 
 /// Orbital localization
-void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter=50000, double Gthr=1e-6, double Fthr=1e-7, bool real=true, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="");
+void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter=50000, double Gthr=1e-6, double Fthr=1e-7, bool real=true, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="", bool debug=false);
 
 #include "checkpoint.h"
 

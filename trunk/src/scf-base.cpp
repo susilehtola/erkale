@@ -1958,7 +1958,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter, double Gthr, double Fthr, bool real, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname) {
+void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter, double Gthr, double Fthr, bool real, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
   Timer t;
 
   // Real part of U
@@ -1994,7 +1994,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     }
     // Final optimization
     if(fname.length()) worker.open_log(fname);
-
+    worker.set_debug(debug);
     if(real)
       measure=worker.optimize(Ureal,umet,uacc,maxiter);
     else
@@ -2040,7 +2040,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       worker.set_n(n);
     }
     if(fname.length()) worker.open_log(fname);
-
+    worker.set_debug(debug);
     if(real)
       measure=worker.optimize(Ureal,umet,uacc,maxiter);
     else
@@ -2049,7 +2049,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
   } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
     Pipek worker(met,basis,C,Gthr,Fthr,verbose);
     if(fname.length()) worker.open_log(fname);
-
+    worker.set_debug(debug);
     if(real)
       measure=worker.optimize(Ureal,umet,uacc,maxiter);
     else
@@ -2058,7 +2058,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
   } else if(met==EDMISTON) {
     Edmiston worker(basis,C,Gthr,Fthr,verbose);
     if(fname.length()) worker.open_log(fname);
-
+    worker.set_debug(debug);
     if(real)
       measure=worker.optimize(Ureal,umet,uacc,maxiter);
     else

@@ -133,7 +133,7 @@ enum startingpoint {
 };
 
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter) {
+void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, bool debug) {
   // Orbitals to localize
   std::vector<size_t> locorb;
   for(size_t io=0;io<occs.size();io++)
@@ -209,7 +209,7 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       printf(" %i",(int) orbidx[io]+1);
     printf("\n");
 
-    orbital_localization(method,basis,Cwrk,measure,U,maxiter,Gthr,Fthr,!(start==UNITMAT),true,umet,acc,delocalize,fname);
+    orbital_localization(method,basis,Cwrk,measure,U,maxiter,Gthr,Fthr,!(start==UNITMAT),true,umet,acc,delocalize,fname,debug);
 
     if(start==UNITMAT) {
       // Update orbitals, complex case
@@ -257,9 +257,9 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
   }
 }
 
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter) {
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, bool debug) {
   // Run localization, occupied space
-  localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o",Gthr,Fthr,maxiter);
+  localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o",Gthr,Fthr,maxiter,debug);
 
   // Run localization, virtual space
   if(virt) {
@@ -268,7 +268,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v",Gthr,Fthr,maxiter);
+    localize_wrk(basis,C,E,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v",Gthr,Fthr,maxiter,debug);
   }
 }
 
@@ -303,6 +303,7 @@ int main(int argc, char **argv) {
   set.add_double("GThreshold","Threshold for convergence: norm of Riemannian gradient",1e-7);
   set.add_double("FThreshold","Threshold for convergence: relative change in function",1e-7);
   set.add_int("Maxiter","Maximum number of iterations",50000);
+  set.add_bool("Debug","Print out line search every iteration",false);
   set.parse(argv[1]);
   set.print();
 
@@ -313,6 +314,7 @@ int main(int argc, char **argv) {
   std::string savename(set.get_string("SaveChk"));
   std::string sizedist(set.get_string("SizeDistribution"));
   bool size=stricmp(sizedist,"");
+  bool debug=set.get_bool("Debug");
 
   // Determine method
   enum locmet method;
@@ -439,7 +441,7 @@ int main(int argc, char **argv) {
     chkpt.read("occs",occs);
 
     // Run localization
-    localize(basis,C,E,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile,Gthr,Fthr,maxiter);
+    localize(basis,C,E,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile,Gthr,Fthr,maxiter,debug);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -471,8 +473,8 @@ int main(int argc, char **argv) {
     chkpt.read("occb",occb);
 
     // Run localization
-    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a",Gthr,Fthr,maxiter);
-    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b",Gthr,Fthr,maxiter);
+    localize(basis,Ca,Ea,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a",Gthr,Fthr,maxiter,debug);
+    localize(basis,Cb,Eb,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b",Gthr,Fthr,maxiter,debug);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
