@@ -84,6 +84,9 @@ class Unitary {
   /// Amount of samples per one period (K = 3, 4, or 5)
   int fourier_samples;
 
+  /// Debugging mode - print out line search every iteration
+  bool debug;
+
   /// Value of cost function
   double J;
   /// Old value
@@ -166,6 +169,8 @@ class Unitary {
 
   /// Open log file
   void open_log(const std::string & fname);
+  /// Set debug mode
+  void set_debug(bool dbg);
 
   /// Set polynomial search options
   void set_poly(int deg);
