@@ -1470,10 +1470,12 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen) const {
   // and sort it
   std::stable_sort(list.begin(),list.end());
 
+  /*
   FILE *out=fopen("screen.dat","w");
   for(size_t i=0;i<list.size();i++)
     fprintf(out,"%4i %4i %e\n",(int) list[i].is, (int) list[i].js, list[i].eri);
   fclose(out);
+  */
 
   return list;
 } 
