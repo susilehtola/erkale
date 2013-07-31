@@ -201,8 +201,8 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
 
     // Compute update coefficient
     double gamma=0.0;
-    if(acc==SDSA || k==1) {
-      // First step in CG, or steepest descent / steepest ascent
+    if(acc==SDSA || (k-1)%W.n_cols==0) {
+      // Reset step in CG, or steepest descent / steepest ascent
       gamma=0.0;
     } else if(acc==CGPR) {
       // Compute Polak-Ribière coefficient
