@@ -23,6 +23,12 @@
 #include <omp.h>
 #endif
 
+typedef struct {
+  coords_t r;
+  bool newline;
+} cubecoord_t;
+
+
 void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, std::string fname, double & norm) {
   // Open output file.
   fname=fname+".cube";
@@ -31,7 +37,7 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
   // Compute the norm (assumes evenly spaced grid!)
   norm=0.0;
 
-  // Compute the momentum densities in batches, allowing
+  // Compute the density in batches, allowing
   // parallellization.
 #ifdef _OPENMP
   // The number of points per batch
@@ -76,7 +82,7 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
   }
 
   // The points in the batch
-  coords_t r[Nbatch_p];
+  cubecoord_t r[Nbatch_p];
   // The values of the density in the batch
   double rho[Nbatch_p];
 
@@ -97,24 +103,25 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
 
     // Form list of points to compute.
     while(np<Nbatch_p && ntot+np<N) {
-      r[np].x=x_arr[xind];
-      r[np].y=y_arr[yind];
-      r[np].z=z_arr[zind];
+      r[np].r.x=x_arr[xind];
+      r[np].r.y=y_arr[yind];
+      r[np].r.z=z_arr[zind];
+      r[np].newline=false;
 
       // Increment number of points
       np++;
 
-      // Determine next point. Inner loop wrt z
+      // Determine next point.
       if(zind+1<z_arr.size())
 	zind++;
       else {
-	// y loop
+	// z coordinate changes, break line here
 	zind=0;
-	
+	r[np-1].newline=true;
+
 	if(yind+1<y_arr.size())
 	  yind++;
 	else {
-	  // Outermost loop wrt x
 	  yind=0;
 	  xind++;
 	}
@@ -126,7 +133,7 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
 #endif
     // Loop over the points in the batch
     for(size_t ip=0;ip<np;ip++)
-      rho[ip]=compute_density(P,bas,r[ip]);
+      rho[ip]=compute_density(P,bas,r[ip].r);
 
     // Save density values
     for(size_t ip=0;ip<np;ip++) {
@@ -134,7 +141,7 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
       
       fprintf(out," % .5e",rho[ip]);
       idx++;
-      if(idx==6) {
+      if(idx==6 || r[ip].newline) {
 	idx=0;
 	fprintf(out,"\n");
       }
@@ -152,12 +159,6 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
   // Plug in the spacing in the integral
   norm*=dx*dy*dz;
 }
-
-typedef struct {
-  coords_t r;
-  bool newline;
-} orbcoord_t;
-
 
 void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, const std::vector<size_t> & orbidx, std::string fname, bool split, arma::vec & norms) {
   // Check that C is orthonormal
@@ -180,7 +181,7 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
     out[0]=fopen(orbname.c_str(),"w");
   }
 
-  // Compute the momentum densities in batches, allowing
+  // Compute the molecular orbital values in batches, allowing
   // parallellization.
 #ifdef _OPENMP
   // The number of points per batch
@@ -256,7 +257,7 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
   }
 
   // The points in the batch
-  orbcoord_t r[Nbatch_p];
+  cubecoord_t r[Nbatch_p];
   // The values of the orbitals in the batch
   arma::mat orbs(Nbatch_p,orbidx.size());
 
