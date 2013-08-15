@@ -145,7 +145,7 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
   }
 
   // Close output file.
-  if(idx!=0.0)
+  if(idx!=0)
     fprintf(out,"\n");
   fclose(out);
 
