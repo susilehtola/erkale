@@ -17,7 +17,11 @@
 #include "bader.h"
 #include "timer.h"
 
-Bader::Bader() {
+// Debug printout?
+//#define BADERDEBUG
+
+Bader::Bader(bool ver) {
+  verbose=ver;
 }
 
 Bader::~Bader() {
@@ -25,16 +29,19 @@ Bader::~Bader() {
 
 void Bader::fill(const BasisSet & basis, const arma::mat & P, double space, double padding) {
   Timer t;
-  printf("Filling Bader grid ... ");
-  fflush(stdout);
+  if(verbose) {
+    printf("Filling Bader grid ... ");
+    fflush(stdout);
+  }
 
-  // Get coordinate matrix
-  nuclei=basis.get_nuclear_coords();
-  
+  // Get nuclei and nuclear coordinate matrix
+  nuclei=basis.get_nuclei();
+  nucc=basis.get_nuclear_coords();
+
   // Minimum and maximum coordinates
-  start=arma::min(nuclei)-padding;
-  arma::vec maxc=arma::max(nuclei)+padding;
-  
+  start=arma::trans(arma::min(nucc)-padding);
+  arma::vec maxc=arma::max(nucc)+padding;
+
   // Round to spacing
   for(int ic=0;ic<3;ic++) {
     start(ic)=floor(start(ic)/space)*space;
@@ -45,26 +52,53 @@ void Bader::fill(const BasisSet & basis, const arma::mat & P, double space, doub
   spacing=space*arma::ones(3);
 
   // Compute size of array
-  size_t Nx=(maxc(0)-start(0))/space;
-  size_t Ny=(maxc(1)-start(1))/space;
-  size_t Nz=(maxc(2)-start(2))/space;
+  array_size.zeros(3);
+  array_size(0)=(maxc(0)-start(0))/space;
+  array_size(1)=(maxc(1)-start(1))/space;
+  array_size(2)=(maxc(2)-start(2))/space;
+
+  // Integrated charge
+  double Q=0.0;
 
   // Density array
-  dens.zeros(Nx,Ny,Nz);
+  dens.zeros(array_size(0),array_size(1),array_size(2));
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for reduction(+:Q)
 #endif
-  for(size_t iz=0;iz<Nz;iz++) // Loop over slices first, since they're stored continguously in memory
-    for(size_t ix=0;ix<Nx;ix++)
-      for(size_t iy=0;iy<Ny;iy++) {
+  for(size_t iz=0;iz<dens.n_slices;iz++) // Loop over slices first, since they're stored continguously in memory
+    for(size_t ix=0;ix<dens.n_rows;ix++)
+      for(size_t iy=0;iy<dens.n_cols;iy++) {
 	coords_t tmp;
 	tmp.x=start(0)+ix*spacing(0);
 	tmp.y=start(1)+iy*spacing(1);
 	tmp.z=start(2)+iz*spacing(2);
 	dens(ix,iy,iz)=compute_density(P,basis,tmp);
+	Q+=dens(ix,iy,iz);
       }
+  Q*=spacing(0)*spacing(1)*spacing(2);
 
-  printf("done (%s). Grid has %u points.\n",t.elapsed().c_str(),dens.n_elem);
+  if(verbose) {
+    printf("done (%s).\nGrid is %u x %u x %u, totalling %u points.\n",t.elapsed().c_str(),dens.n_rows,dens.n_cols,dens.n_slices,dens.n_elem);
+
+#ifdef BADERDEBUG
+    arma::trans(start).print("Grid start");
+    arma::vec end=start+(array_size-1)%spacing;
+    arma::trans(end).print("Grid end");
+#endif
+  }
+
+  double PS=arma::trace(P*basis.overlap());
+#ifdef BADERDEBUG
+  if(verbose)
+    printf("Integral of charge over grid is %e, trace of density matrix is %e, difference %e.\n",Q,PS,Q-PS);
+#endif
+
+  // Renormalize density to account for inaccurate quadrature
+  dens*=PS/Q;
+#ifdef BADERDEBUG
+  if(verbose)
+    printf("Renormalized density on grid to correct norm.\n");
+#endif
 }
 
 bool Bader::in_cube(const arma::ivec & p) const {
@@ -74,137 +108,271 @@ bool Bader::in_cube(const arma::ivec & p) const {
     return false;
   if( p(2) < 0 || p(2) >= (arma::sword) dens.n_slices )
     return false;
-  
+
   return true;
 }
 
+bool Bader::on_edge(const arma::ivec & p) const {
+  if(p(0) == 0 || p(0) == (arma::sword) dens.n_rows-1 )
+    return true;
+  if( p(1) == 0 || p(1) == (arma::sword) dens.n_cols-1 )
+    return true;
+  if( p(2) == 0 || p(2) == (arma::sword) dens.n_slices-1 )
+    return true;
+
+  return false;
+}
+
+void Bader::check_regions(std::string msg) const {
+  size_t nfail=0;
+  for(size_t iz=0;iz<dens.n_slices;iz++) // Loop over slices first, since they're stored continguously in memory
+    for(size_t ix=0;ix<dens.n_rows;ix++)
+      for(size_t iy=0;iy<dens.n_cols;iy++)
+	if(region(ix,iy,iz)<0) {
+	  nfail++;
+	  fprintf(stderr,"Point %u %u %u is in region %i.\n",(unsigned) ix, (unsigned) iy, (unsigned) iz, region(ix,iy,iz));
+	}
+
+  if(nfail) {
+    std::ostringstream oss;
+    oss << "Some points were not classified";
+    if(msg.size()) {
+      oss << " in " << msg;
+    }
+    oss << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+}
+
 bool Bader::neighbors_assigned(const arma::ivec & p) const {
-  // Do its neighbors have the same assignment? 2.3(v)
+  // Do its neighbors have the same assignment as p? 2.3(v)
+
+  // If p doesn't have an assignment, this is automatically false.
+  if(region(p(0),p(1),p(2))==-1)
+    return false;
+
   bool assigned=true;
-  for(int dx=-1;dx<=1;dx++)
-    for(int dy=-1;dy<=1;dy++)
-      for(int dz=-1;dz<=1;dz++) {
-	// Skip current point
-	if(dx==0 && dy==0 && dz==0)
-	  continue;
 
-	arma::ivec dp(3);
-	dp(0)=dx;
-	dp(1)=dy;
-	dp(2)=dz;
+#ifdef BADERDEBUG
+  if(!in_cube(p)) {
+    arma::trans(p).print("Point");
+    throw std::runtime_error("The point is not in the cube!\n");
+  }
+#endif
 
-	// Check that we don't run over
-	arma::ivec np=p+dp;
-	if(!in_cube(np))
-	  continue;
-	// Check assignment
-	if(region(np(0),np(1),np(2))==region(p(0),p(1),p(2)))
-	  assigned=false;
-      }
-  
+  // On an edge
+  if(on_edge(p)) {
+    for(int dx=-1;dx<=1;dx++)
+      for(int dy=-1;dy<=1;dy++)
+	for(int dz=-1;dz<=1;dz++) {
+	  arma::ivec dp(3);
+	  dp(0)=dx;
+	  dp(1)=dy;
+	  dp(2)=dz;
+
+	  // Is the point still in the cube?
+	  arma::ivec np=p+dp;
+	  if(!in_cube(np))
+	    continue;
+
+	  // Check if assignment is same
+	  if(region(np(0),np(1),np(2))!=region(p(0),p(1),p(2)))
+	    assigned=false;
+	}
+
+    // Inside of cube
+  } else {
+    for(int dx=-1;dx<=1;dx++)
+      for(int dy=-1;dy<=1;dy++)
+	for(int dz=-1;dz<=1;dz++) {
+	  arma::ivec dp(3);
+	  dp(0)=dx;
+	  dp(1)=dy;
+	  dp(2)=dz;
+
+	  // Check if assignment is same
+	  arma::ivec np=p+dp;
+	  if(region(np(0),np(1),np(2))!=region(p(0),p(1),p(2)))
+	    assigned=false;
+	}
+  }
+
   return assigned;
 }
 
 bool Bader::local_maximum(const arma::ivec & p) const {
   double maxd=0.0;
-  for(int dx=-1;dx<=1;dx++)
-    for(int dy=-1;dy<=1;dy++)
-      for(int dz=-1;dz<=1;dz++) {
-	// Skip current point
-	if(dx==0 && dy==0 && dz==0)
-	  continue;
 
-	arma::ivec dp(3);
-	dp(0)=dx;
-	dp(1)=dy;
-	dp(2)=dz;
+#ifdef BADERDEBUG
+  if(!in_cube(p)) {
+    arma::trans(p).print("Point");
+    throw std::runtime_error("The point is not in the cube!\n");
+  }
+#endif
 
-	// Check that we don't run over
-	arma::ivec np=p+dp;
-	if(!in_cube(np))
-	  continue;
+  if(on_edge(p)) {
+    for(int dx=-1;dx<=1;dx++)
+      for(int dy=-1;dy<=1;dy++)
+	for(int dz=-1;dz<=1;dz++) {
+	  // Skip current point
+	  if(dx==0 && dy==0 && dz==0)
+	    continue;
 
-	// Check for largest density value
-	if(dens(p(0)+dx,p(1)+dy,p(2)+dz)>maxd)
-	  maxd=dens(p(0)+dx,p(1)+dy,p(2)+dz);
-      }
-  
+	  arma::ivec dp(3);
+	  dp(0)=dx;
+	  dp(1)=dy;
+	  dp(2)=dz;
+
+	  // Check maximum value making sure that we don't run over
+	  arma::ivec np=p+dp;
+	  if(in_cube(np) && dens(p(0)+dx,p(1)+dy,p(2)+dz)>maxd)
+	    maxd=dens(p(0)+dx,p(1)+dy,p(2)+dz);
+	}
+
+  } else {
+    for(int dx=-1;dx<=1;dx++)
+      for(int dy=-1;dy<=1;dy++)
+	for(int dz=-1;dz<=1;dz++) {
+	  // Skip current point
+	  if(dx==0 && dy==0 && dz==0)
+	    continue;
+
+	  arma::ivec dp(3);
+	  dp(0)=dx;
+	  dp(1)=dy;
+	  dp(2)=dz;
+
+	  // Check for largest density value
+	  arma::ivec np=p+dp;
+	  if(dens(p(0)+dx,p(1)+dy,p(2)+dz)>maxd)
+	    maxd=dens(p(0)+dx,p(1)+dy,p(2)+dz);
+	}
+  }
+
   // Are we at a local maximum?
   return maxd<=dens(p(0),p(1),p(2));
 }
 
 bool Bader::on_boundary(const arma::ivec & p) const {
+  // We are on a boundary, if one or more of the neighboring points
+  // doesn't share the same classification
+
   return !neighbors_assigned(p);
 }
 
-std::vector<arma::ivec> Bader::classify(arma::ivec p) {
+arma::vec Bader::gradient(const arma::ivec & p) const {
+
+#ifdef BADERDEBUG
+  if(!in_cube(p)) {
+    arma::trans(p).print("Point");
+    throw std::runtime_error("The point is not in the cube!\n");
+  }
+#endif
+
+  arma::vec g(3);
+
+  if(on_edge(p)) {
+    // Need to account for edges
+    if(p(0)==0)
+      g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)  ,p(1),p(2)))/spacing(0);
+    else if(p(0)==(arma::sword) (dens.n_rows-1))
+      g(0)=(dens(p(0)  ,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/spacing(0);
+    else
+      g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/(2*spacing(0));
+
+    if(p(1)==0)
+      g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)  ,p(2)))/spacing(1);
+    else if(p(1)==(arma::sword) (dens.n_cols-1))
+      g(1)=(dens(p(0),p(1)  ,p(2))-dens(p(0),p(1)-1,p(2)))/spacing(1);
+    else
+      g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)-1,p(2)))/(2*spacing(1));
+
+    if(p(2)==0)
+      g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)  ))/spacing(2);
+    else if(p(2)==(arma::sword) (dens.n_slices-1))
+      g(2)=(dens(p(0),p(1),p(2)  )-dens(p(0),p(1),p(2)-1))/spacing(2);
+    else
+      g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)-1))/(2*spacing(2));
+
+  } else {
+
+    // Safely inside of cube
+    g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/(2*spacing(0));
+    g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)-1,p(2)))/(2*spacing(1));
+    g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)-1))/(2*spacing(2));
+  }
+
+  return g;
+}
+
+std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
   // Original point
   const arma::ivec p0(p);
 
   // List of points treated in current path.
   std::vector<arma::ivec> points;
+  points.push_back(p);
   // Correction step
   arma::vec dr;
   dr.zeros(3);
 
-  arma::trans(p).print("Start");
-  
+  size_t iiter=0;
+
   // Loop over trajectory
   while(true) {
-    // First, check if the current point has already a region assignment
-    if(region(p(0),p(1),p(2))!=-1 && neighbors_assigned(p)) {
-      // Yes. Assign the original point to this point
-      region(p0(0),p0(1),p0(2))=region(p(0),p(1),p(2));
-      // Stop processing here.
-      break;
-    }
-    
-    // Next, check if the current point is a local maximum. 2.3(v)
+
+    // Check if the current point is a local maximum. 2.3(v)
     if(local_maximum(p)) {
-      // Yes, do assignment for the original point
-      region(p0(0),p0(1),p0(2))=index;
-      // Increment index
-      index++;
       break;
     }
 
-    arma::trans(p).print("Next p");
-    
+    // Next, check if the current point and its neighbors are already assigned
+    if(region(p(0),p(1),p(2))!=-1 && neighbors_assigned(p)) {
+      // Stop processing here.
+      break;
+    }
+
     // If we're here, we need to move on the grid.
     // Compute the gradient in the current point
-    arma::vec rgrad(3);
-    rgrad(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/(2*spacing(0));
-    rgrad(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)-1,p(2)))/(2*spacing(1));
-    rgrad(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)-1))/(2*spacing(2));
-    
+    arma::vec rgrad=gradient(p);
+
     // Determine step length by allowing at maximum displacement by one grid point in any direction.
-    rgrad*=arma::min(spacing/rgrad);
-    
+    rgrad*=arma::min(spacing/arma::abs(rgrad));
+
     // Determine what is the closest point on the grid to the displacement by rgrad
     arma::ivec dgrid(3);
     for(int ic=0;ic<3;ic++) {
-      dgrid(ic)=(int) round(start(ic)/spacing(ic));
+      dgrid(ic)=(arma::sword) round(rgrad(ic)/spacing(ic));
     }
-    
+
     // Perform the move on the grid
-    p(0)+=dgrid(0);
-    p(1)+=dgrid(1);
-    p(2)+=dgrid(2);
-    
+    for(int ic=0;ic<3;ic++)
+      if(p(ic)+dgrid(ic)>=0 && p(ic)+dgrid(ic)<array_size(ic))
+	// Move is OK.
+	p(ic)+=dgrid(ic);
+      else
+	// We would move outside the grid - don't perform the move
+	dgrid(ic)=0;
+
     // Update the correction vector
     dr+=rgrad - dgrid%spacing;
-    
+
     // Check that the correction is smaller than the grid spacing
     for(int ic=0;ic<3;ic++) {
-      while(dr(ic) < -0.5*spacing(ic)) {
+      while(dr(ic) < -0.5*spacing(ic) && p(ic)<array_size(ic)-1) {
 	p(ic)++;
 	dr(ic)+=spacing(ic);
       }
-      while(dr(ic) > 0.5*spacing(ic)) {
+      while(dr(ic) > 0.5*spacing(ic) && p(ic)>0) {
 	p(ic)--;
 	dr(ic)-=spacing(ic);
       }
     }
+
+    // Add to points list
+    points.push_back(p);
+    iiter++;
+
   } // End loop over trajectory
 
   return points;
@@ -212,155 +380,275 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) {
 
 void Bader::analysis() {
   Timer t;
-  printf("Performing Bader analysis ... ");
-  fflush(stdout);
+  if(verbose) {
+    printf("Performing Bader analysis ... ");
+    fflush(stdout);
+  }
 
-  // Index for next region
-  index=0;
-  
+  // Reset amount of regions
+  Nregions=0;
+
   // Initialize assignment array
-  region.ones(dens.n_rows,dens.n_cols,dens.n_slices);
+  region.ones(array_size(0),array_size(1),array_size(2));
   region*=-1;
-  
+
   // Loop over inside of grid
-  for(size_t iiz=1;iiz<dens.n_slices-1;iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(size_t iix=1;iix<dens.n_rows-1;iix++)
-      for(size_t iiy=1;iiy<dens.n_cols-1;iiy++) {
-	
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(size_t iix=0;iix<dens.n_rows;iix++)
+      for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+
 	// Check if point has already been classified
 	if(region(iix,iiy,iiz)!=-1)
 	  continue;
-	
+
 	// Otherwise, continue with the trajectory analysis.
 	// Current point is
 	arma::ivec p(3);
 	p(0)=iix;
 	p(1)=iiy;
 	p(2)=iiz;
-	
+
 	// Get the trajectory
 	std::vector<arma::ivec> points=classify(p);
-	// and assign the points in the trajectory to the current point
-	for(size_t ip=0;ip<points.size();ip++)
-	  region(points[ip](0),points[ip](1),points[ip](2))=region(p(0),p(1),p(2));
-	
-      } // End loop over grid
-  printf("done (%s)\n",t.elapsed().c_str());
-  
-  // Loop over edge points. This can be done in a rough fashion.
-  for(size_t iiz=0;iiz<dens.n_slices;iiz+=dens.n_slices-1) // Loop over slices first, since they're stored continguously in memory
-    for(size_t iix=0;iix<dens.n_rows;iix+=dens.n_rows-1)
-      for(size_t iiy=0;iiy<dens.n_cols;iiy+=dens.n_cols-1) {
-	
-	// Region has already been assigned?!
-	if(region(iix,iiy,iiz)!=-1) {
-	  printf("Grid point (%e, %e, %e) already has an assignment?!\n",start(0)+iix*spacing(0),start(1)+iiy*spacing(1),start(2)+iiz*spacing(2));
-	  continue;
-	}
-	
-	// Current point
-	arma::ivec p(3);
-	p(0)=iix;
-	p(1)=iiy;
-	p(2)=iiz;
-	
-	// Find maximum density of neighbors.
-	double maxd=0.0; // Max density
-	arma::sword reg=-1; // Assignment
-	for(int dx=-1;dx<=1;dx++)
-	  for(int dy=-1;dy<=1;dy++)
-	    for(int dz=-1;dz<=1;dz++) {
-	      // Skip current point
-	      if(dx==0 && dy==0 && dz==0)
-		continue;
-	      
-	      arma::ivec dp(3);
-	      dp(0)=dx;
-	      dp(1)=dy;
-	      dp(2)=dz;
-	      
-	      // Check that we don't run over
-	      arma::ivec np=p+dp;
-	      if(!in_cube(np))
-		continue;
-	      // Check density
-	      if(dens(np(0),np(1),np(2))>maxd) {
-		maxd=dens(np(0),np(1),np(2));
-		reg=region(np(0),np(1),np(2));
-	      }
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+	{
+	  // Assign classification to the points. Ending point of trajectory is
+	  arma::ivec pend=points[points.size()-1];
+
+	  // Ended up at a local maximum?
+	  if(local_maximum(pend)) {
+
+	    arma::vec maxloc=start+pend%spacing;
+
+	    // Maximum already classified?
+	    if(region(pend(0),pend(1),pend(2))!=-1) {
+#ifdef BADERDEBUG
+	      //	      printf("Ended up at maximum %i at %4i %4i %4i, i.e. at % e % e %e.\n",region(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+#endif
+	      for(size_t ip=0;ip<points.size()-1;ip++)
+		region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
+
+	      // New region
+	    } else {
+#ifdef BADERDEBUG
+	      printf("Maximum %i = %e found at %4i %4i %4i, i.e. at % e % e %e.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+#endif
+
+	      for(size_t ip=0;ip<points.size();ip++)
+		region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
+	      Nregions++;
 	    }
-	
-	// Store the region
-	region(p(0),p(1),p(2))=reg;
-      }	
 
 
-  printf("Refining analysis ... ");
-  fflush(stdout);
-  t.set();
+	    // Ended up in a point surrounded by points with the same classification
+	  } else if(region(pend(0),pend(1),pend(2))!=-1 && neighbors_assigned(pend)) {
+
+	    for(size_t ip=0;ip<points.size()-1;ip++)
+	      region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
+
+	  } else {
+	    ERROR_INFO();
+	    throw std::runtime_error("Should not end here!\n");
+	  }
+	} // End critical region
+
+      } // End loop over grid
+
+  if(verbose)
+    printf("done (%s)\n",t.elapsed().c_str());
+
+#ifdef BADERDEBUG
+  check_regions("the initial analysis");
+#endif
+
+  if(verbose) {
+    printf("Refining analysis ... ");
+    fflush(stdout);
+    t.set();
+  }
 
   // Finally, analyze which points are on the boundary.
   std::vector<arma::ivec> points;
-  for(size_t iiz=0;iiz<dens.n_slices;iiz+=dens.n_slices-1) // Loop over slices first, since they're stored continguously in memory
-    for(size_t iix=0;iix<dens.n_rows;iix+=dens.n_rows-1)
-      for(size_t iiy=0;iiy<dens.n_cols;iiy+=dens.n_cols-1) {
-	
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(size_t iix=0;iix<dens.n_rows;iix++)
+      for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+
 	// Current point
 	arma::ivec p(3);
 	p(0)=iix;
 	p(1)=iiy;
 	p(2)=iiz;
-	
-	// Is the point on a boundary?
-	if(on_boundary(p)) {
+
+	// Is the point on a boundary? Also, it can't be a local maximum, otherwise it forms an own region by itself.
+	if(on_boundary(p) && !local_maximum(p)) {
 	  // Add it to the list
+#ifdef _OPENMP
+#pragma omp critical
+#endif
 	  points.push_back(p);
-	  // and clear its assignment
-	  region(p(0),p(1),p(2))=-1;
 	}
       }
-  
-  // ... and rerun the analysis for the boundary points
-  for(size_t ip=0;ip<points.size();ip++)
-    classify(points[ip]);
 
-  printf("done (%s).%i regions found.\n",t.elapsed().c_str(),index);
+  // ... reset their classification
+  for(size_t ip=0;ip<points.size();ip++)
+    region(points[ip](0),points[ip](1),points[ip](2))=-1;
+
+  // ... and rerun the analysis
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t ip=0;ip<points.size();ip++) {
+
+    // Get the trajectory from the point
+    std::vector<arma::ivec> traj=classify(points[ip]);
+
+    // ... and assign only the initial point.
+    arma::ivec p0=traj[0];
+    arma::ivec pend=traj[traj.size()-1];
+    region(p0(0),p0(1),p0(2))=region(pend(0),pend(1),pend(2));
+
+#ifdef BADERDEBUG
+    if(region(pend(0),pend(1),pend(2))==-1) {
+      std::ostringstream oss;
+      oss << "Reclassification trajectory ends at non-classified point " << pend;
+      throw std::runtime_error(oss.str());
+    }
+#endif
+  }
+
+  if(verbose)
+    printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
+
+#ifdef BADERDEBUG
+  check_regions("the refinement analysis");
+#endif
+
+  // Reorder regions
+  reorder();
 
   // Save regions to file
-  region.save("region.dat",arma::raw_ascii);
+#ifdef BADERDEBUG
+  print_regions();
+  print_individual_regions();
+#endif
 }
 
 arma::ivec Bader::nuclear_regions() const {
-  // Regions of the nuclei
-  arma::ivec nucreg(nuclei.n_rows);
-  for(size_t inuc=0;inuc<nuclei.n_rows;inuc++) {
-    // Determine the grid point in which the nucleus resides
-    arma::vec pv=(arma::trans(nuclei.row(inuc))-start)/spacing;
+#ifdef BADERDEBUG
+  check_regions("before nuclear regions");
+#endif
+
+  // Regions of the nucc
+  arma::ivec nucreg(nucc.n_rows);
+  for(size_t inuc=0;inuc<nucc.n_rows;inuc++) {
+    // Determine the grid point in which the nucleus resides.
+    arma::vec gpf=(arma::trans(nucc.row(inuc))-start)/spacing;
+    // Round up to the closest grid point
+    arma::ivec gp(3);
+    for(int ic=0;ic<3;ic++) {
+      gp(ic)=(arma::sword) round(gpf(ic));
+
+      // Check that we don't go outside the array
+      if(gp(ic)<0)
+	gp(ic)=0;
+      else if(gp(ic)>=array_size(ic))
+	gp(ic)=array_size(ic)-1;
+    }
 
     // The region is
-    nucreg(inuc) = region((arma::uword) round(pv(0)),(arma::uword) round(pv(1)), (arma::uword) round(pv(2)));
+    nucreg(inuc) = region(gp(0),gp(1),gp(2));
+
+    // Coordinates of the grid point
+    arma::vec gpc=start+gp%spacing;
+    // Distance from nucleus
+    arma::vec gp_dist=gpc-arma::trans(nucc.row(inuc));
+    //    printf("Nucleus %i is in region %i, distance to grid point is %e.\n",(int) inuc+1,nucreg(inuc)+1,arma::norm(gp_dist,2));
   }
 
   return nucreg;
 }
 
-arma::vec Bader::charges() const {
+void Bader::reorder() {
+  // Translation map
+  arma::uvec map(Nregions);
+  for(arma::uword i=0;i<map.n_elem;i++)
+    map(i)=i;
+
+  // Get the nuclear regions
+  arma::ivec nucreg=nuclear_regions();
+
+  // Loop over nuclei
+  for(arma::uword inuc=0;inuc<nucreg.n_elem;inuc++)
+    // The mapping should take the region of the nucleus to inuc.
+    if(map(nucreg(inuc))!=inuc) {
+
+      // Find out what entry of map is inuc
+      arma::uword imap;
+      for(imap=0;imap<map.n_elem;imap++)
+	if(map(imap)==inuc)
+	  break;
+
+      // Swap the entries
+      std::swap(map(nucreg(inuc)),map(imap));
+    }
+
+  // Perform remapping
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(size_t iix=0;iix<dens.n_rows;iix++)
+      for(size_t iiy=0;iiy<dens.n_cols;iiy++)
+	region(iix,iiy,iiz)=map(region(iix,iiy,iiz));
+}
+
+
+arma::vec Bader::regional_charges() const {
   // Charges in the Bader regions
-  arma::vec q(index);
+  arma::vec q(Nregions);
   q.zeros();
 
   // Perform integration
-  for(size_t iiz=0;iiz<dens.n_slices;iiz+=dens.n_slices-1) // Loop over slices first, since they're stored continguously in memory
-    for(size_t iix=0;iix<dens.n_rows;iix+=dens.n_rows-1)
-      for(size_t iiy=0;iiy<dens.n_cols;iiy+=dens.n_cols-1)
-	q(region(iix,iiy,iiz))+=dens(iix,iiy,iiz);
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    arma::vec qwrk(q);
+#pragma omp for
+#endif
+    for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(size_t iix=0;iix<dens.n_rows;iix++)
+	for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+#ifdef _OPENMP
+	  qwrk(region(iix,iiy,iiz))+=dens(iix,iiy,iiz);
+#else
+	  q(region(iix,iiy,iiz))+=dens(iix,iiy,iiz);
+#endif
+	}
 
-  arma::trans(q).print("Raw charges");
+#ifdef _OPENMP
+#pragma omp critical
+    q+=qwrk;
+#endif
+  }
 
   // Plug in the spacing
   q*=spacing(0)*spacing(1)*spacing(2);
+  return q;
+}
 
-  arma::trans(q).print("Normalized charges");
+arma::vec Bader::nuclear_charges() const {
+  arma::vec q=regional_charges();
 
   // Get the nuclear regions
   arma::ivec nucreg=nuclear_regions();
@@ -369,4 +657,129 @@ arma::vec Bader::charges() const {
     qnuc(i)=q(nucreg(i));
 
   return qnuc;
+}
+
+void Bader::print_regions() const {
+  // Open output file.
+  FILE *out=fopen("bader_regions.cube","w");
+
+  // Write out comment fields
+  Timer t;
+  fprintf(out,"ERKALE Bader regions\n");
+  fprintf(out,"Generated on %s.\n",t.current_time().c_str());
+
+  // Write out starting point
+  fprintf(out,"%7i % g % g % g\n",(int) nuclei.size(),start(0),start(1),start(2));
+  // Print amount of points and step sizes in the directions
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_rows,spacing(0),0.0,0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_cols,0.0,spacing(1),0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_slices,0.0,0.0,spacing(2));
+  // Print out atoms
+  for(size_t i=0;i<nuclei.size();i++) {
+    nucleus_t nuc=nuclei[i];
+    fprintf(out,"%7i %g % g % g % g\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+  }
+
+  // Index of points written
+  size_t idx=0;
+
+  // Cube ordering - innermost loop wrt z, inner wrt y and outer wrt x
+  for(size_t iix=0;iix<dens.n_rows;iix++)
+    for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+      for(size_t iiz=0;iiz<dens.n_slices;iiz++) {
+	// Point
+	arma::ivec p(3);
+	p(0)=iix;
+	p(1)=iiy;
+	p(2)=iiz;
+
+	// Is the point on a boundary?
+	if(on_boundary(p))
+	  fprintf(out," % .5e",1.0);
+	else
+	  fprintf(out," % .5e",0.0);
+	idx++;
+	if(idx==6) {
+	  idx=0;
+	  fprintf(out,"\n");
+	}
+      }
+      // y value changes
+      if(idx!=0)
+	fprintf(out,"\n");
+    }
+  // Close file
+  fclose(out);
+}
+
+void Bader::print_individual_regions() const {
+  // Open output file.
+  FILE *out=fopen("individual_bader_regions.cube","w");
+
+  // Write out comment fields
+  Timer t;
+  fprintf(out,"ERKALE individual Bader regions\n");
+  fprintf(out,"Generated on %s.\n",t.current_time().c_str());
+
+  // Write out starting point. Amount of nuclei as negative, because we use MO format
+  fprintf(out,"%7i % g % g % g\n",-(int) nuclei.size(),start(0),start(1),start(2));
+  // Print amount of points and step sizes in the directions
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_rows,spacing(0),0.0,0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_cols,0.0,spacing(1),0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_slices,0.0,0.0,spacing(2));
+  // Print out atoms
+  for(size_t i=0;i<nuclei.size();i++) {
+    nucleus_t nuc=nuclei[i];
+    fprintf(out,"%7i %g % g % g % g\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+  }
+
+  // Index of points written
+  size_t idx=1;
+
+  // Print out region indices
+  fprintf(out,"%5i", Nregions);
+  for(arma::sword ireg=0;ireg<Nregions;ireg++) {
+    fprintf(out,"%5i", ireg+1);
+    idx++;
+    if(idx==10) {
+      idx=0;
+      fprintf(out,"\n");
+    } else if(ireg+1 != Nregions)
+      fprintf(out," ");
+  }
+  if(idx!=0) {
+    fprintf(out,"\n");
+    idx=0;
+  }
+
+
+  // Cube ordering - innermost loop wrt z, inner wrt y and outer wrt x
+  for(size_t iix=0;iix<dens.n_rows;iix++)
+    for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+      for(size_t iiz=0;iiz<dens.n_slices;iiz++) {
+	// Point
+	arma::ivec p(3);
+	p(0)=iix;
+	p(1)=iiy;
+	p(2)=iiz;
+
+	// Is the point in the region?
+	for(arma::sword ireg=0;ireg<Nregions;ireg++) {
+	  if(region(p(0),p(1),p(2))==ireg)
+	    fprintf(out," % .5e",1.0);
+	  else
+	    fprintf(out," % .5e",0.0);
+	  idx++;
+	  if(idx==6) {
+	    idx=0;
+	    fprintf(out,"\n");
+	  }
+	}
+      }
+      // y value changes
+      if(idx!=0)
+	fprintf(out,"\n");
+    }
+  // Close file
+  fclose(out);
 }

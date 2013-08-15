@@ -40,23 +40,36 @@ typedef struct {
  * (2009) 084204.
  */
 class Bader {
+  /// List of nuclei
+  std::vector<nucleus_t> nuclei;
   /// List of nuclear coordinates
-  arma::mat nuclei;
+  arma::mat nucc;
 
   /// Density array
   arma::cube dens;
   /// Which Bader region the points belong to
   arma::icube region;
-  /// Index for next Bader region
-  arma::sword index;
+  /// Amount of Bader regions
+  arma::sword Nregions;
+  /// Array size
+  arma::ivec array_size;
 
   /// Starting point of grid
   arma::vec start;
   /// Grid spacing
   arma::vec spacing;
 
+  /// Verbose operation?
+  bool verbose;
+
+  /// Check that all points have been classified
+  void check_regions(std::string msg="") const;
+
   /// Check that point is in the cube
   bool in_cube(const arma::ivec & p) const;
+  /// Is the point on an edge of the cube?
+  bool on_edge(const arma::ivec & p) const;
+
   /// Are the neighbors of the point assigned?
   bool neighbors_assigned(const arma::ivec & p) const;
   /// Is the point a local maximum
@@ -64,16 +77,19 @@ class Bader {
   /// Is the point on a Bader region boundary?
   bool on_boundary(const arma::ivec & p) const;
 
-  /// Determine nuclear regions
-  arma::ivec nuclear_regions() const;
+  /// Compute gradient
+  arma::vec gradient(const arma::ivec & p) const;
 
   /// Run classification on the grid point p. Returns a list of points
   /// on the trajectory.
-  std::vector<arma::ivec> classify(arma::ivec p);
+  std::vector<arma::ivec> classify(arma::ivec p) const;
+
+  /// Reorder regions to nuclear order
+  void reorder();
   
  public:
   /// Constructor
-  Bader();
+  Bader(bool verbose=true);
   /// Destructor
   ~Bader();
 
@@ -83,8 +99,18 @@ class Bader {
   /// Perform Bader analysis
   void analysis();
 
-  /// Get Bader charges
-  arma::vec charges() const;
+  /// Determine nuclear regions
+  arma::ivec nuclear_regions() const;
+
+  /// Get charges in the Bader regions
+  arma::vec regional_charges() const;
+  /// Get nuclear charges
+  arma::vec nuclear_charges() const;
+
+  /// Write out Bader regions
+  void print_regions() const;
+  /// Write out individual Bader regions
+  void print_individual_regions() const;
 };
 
 #endif
