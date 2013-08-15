@@ -17,6 +17,8 @@
 #include "properties.h"
 #include "stringutil.h"
 #include "dftgrid.h"
+#include "bader.h"
+#include "linalg.h"
 
 arma::mat mulliken_overlap(const BasisSet & basis, const arma::mat & P) {
   // Amount of nuclei in basis set
@@ -128,6 +130,110 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & Pa, const arma::m
   return bond_order(basis,Pa+Pb)+bond_order(basis,Pa-Pb);
 }
 
+arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P) {
+  // Get overlap matrix
+  arma::mat S=basis.overlap();
+
+  // Get half overlap
+  arma::mat Sh, Sinvh;
+  S_half_invhalf(S,Sh,Sinvh);
+
+  // Compute ShPSh
+  arma::mat SPS=Sh*P*Sh;
+
+  arma::vec q(basis.get_Nnuc());
+  q.zeros();
+
+  // Loop over nuclei
+  for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
+    // Get shells on nucleus
+    std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
+    
+    // Loop over shells
+    for(size_t fi=0;fi<ifuncs.size();fi++) {
+      size_t ifirst=ifuncs[fi].get_first_ind();
+      size_t ilast=ifuncs[fi].get_last_ind();
+      
+      // Loop over functions
+      for(size_t i=ifirst;i<=ilast;i++)
+	q(ii)+=SPS(i,i);
+    }
+  }
+
+  return q;
+}
+
+arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
+  // Get overlap matrix
+  arma::mat S=basis.overlap();
+
+  // Get half overlap
+  arma::mat Sh, Sinvh;
+  S_half_invhalf(S,Sh,Sinvh);
+
+  // Compute ShPSh
+  arma::mat SPaS=Sh*Pa*Sh;
+  arma::mat SPbS=Sh*Pb*Sh;
+
+  arma::mat q(basis.get_Nnuc(),3);
+  q.zeros();
+
+  // Loop over nuclei
+  for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
+    // Get shells on nucleus
+    std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
+    
+    // Loop over shells
+    for(size_t fi=0;fi<ifuncs.size();fi++) {
+      size_t ifirst=ifuncs[fi].get_first_ind();
+      size_t ilast=ifuncs[fi].get_last_ind();
+      
+      // Loop over functions
+      for(size_t i=ifirst;i<=ilast;i++) {
+	q(ii,0)+=SPaS(i,i);
+	q(ii,1)+=SPbS(i,i);
+      }
+    }
+
+    // Total charge
+    q(ii,2)=q(ii,0)+q(ii,1);
+    
+  }
+
+  return q;
+}
+
+void lowdin_analysis(const BasisSet & basis, const arma::mat & P) {
+  // Get charges
+  arma::vec q=lowdin_charges(basis,P);
+
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    nucleus_t nuc=basis.get_nucleus(inuc);
+    if(!nuc.bsse)
+      q(inuc)+=nuc.Z;
+  }
+
+  printf("\nLöwdin charges\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i));
+  printf("Sum of Löwdin charges %e\n",arma::sum(q));
+}
+
+void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
+  // Get charges
+  arma::mat q=lowdin_charges(basis,Pa,Pb);
+
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    nucleus_t nuc=basis.get_nucleus(inuc);
+    if(!nuc.bsse)
+      q(inuc,2)+=nuc.Z;
+  }
+
+  printf("\nLöwdin charges: alpha, beta, total (incl. nucleus)\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i,0), q(i,1), q(i,2));
+  printf("Sum of Löwdin charges %e\n",arma::sum(q.col(2)));
+}
 
 arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
   arma::vec ret(basis.get_Nnuc());
@@ -138,18 +244,19 @@ arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
 
 void becke_analysis(const BasisSet & basis, const arma::mat & P) {
   // Get charges
-  arma::mat q=becke_charges(basis,P);
+  arma::vec q=becke_charges(basis,P);
 
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     nucleus_t nuc=basis.get_nucleus(inuc);
     if(!nuc.bsse)
-      q(inuc,0)+=nuc.Z;
+      q(inuc)+=nuc.Z;
   }
 
   printf("\nBecke charges\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i));
-}  
+  printf("Sum of Becke charges %e\n",arma::sum(q));
+}
 
 void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
   // Get charges
@@ -164,10 +271,11 @@ void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::ma
   printf("\nBecke charges: alpha, beta, total (incl. nucleus)\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i,0), q(i,1), q(i,2));
-}  
+  printf("Sum of Becke charges %e\n",arma::sum(q.col(2)));
+}
 
-arma::mat becke_charges(const BasisSet & basis, const arma::mat & P) {
-  arma::mat q(basis.get_Nnuc(),1);
+arma::vec becke_charges(const BasisSet & basis, const arma::mat & P) {
+  arma::vec q(basis.get_Nnuc());
 
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,false);
@@ -179,9 +287,9 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & P) {
   // Loop over atoms
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     // Compute charges
-    q(inuc,0)=-arma::trace(P*Sat[inuc]);
+    q(inuc)=-arma::trace(P*Sat[inuc]);
   }
-  
+
   return q;
 }
 
@@ -202,7 +310,7 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma
     q(inuc,1)=-arma::trace(Pb*Sat[inuc]);
     q(inuc,2)=q(inuc,0)+q(inuc,1);
   }
-  
+
   return q;
 }
 
@@ -210,20 +318,20 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method) {
   // Get charges
   double Nelnum;
-  arma::mat q=hirshfeld_charges(basis,P,method,Nelnum);
+  arma::vec q=hirshfeld_charges(basis,P,method,Nelnum);
 
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     nucleus_t nuc=basis.get_nucleus(inuc);
     if(!nuc.bsse)
-      q(inuc,0)+=nuc.Z;
+      q(inuc)+=nuc.Z;
   }
 
   printf("\nHirshfeld charges\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i));
-  printf("Sum of Hirshfeld charges %e\n",arma::sum(q.col(0)));
+  printf("Sum of Hirshfeld charges %e\n",arma::sum(q));
   printf("Integral over density %.8f\n",Nelnum);
-}  
+}
 
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method) {
   // Get charges
@@ -241,10 +349,10 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma
     printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i,0), q(i,1), q(i,2));
   printf("Sum of Hirshfeld charges %e\n",arma::sum(q.col(2)));
   printf("Integral over density %.8f\n",Nelnum);
-}  
+}
 
-arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum) {
-  arma::mat q(basis.get_Nnuc(),1);
+arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum) {
+  arma::vec q(basis.get_Nnuc(),1);
 
   // Hirshfeld atomic charges
   Hirshfeld hirsh;
@@ -259,13 +367,13 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::st
   std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
   // Evaluate densities
   Nelnum=intgrid.compute_Nel(P);
-    
+
   // Loop over atoms
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     // Compute charges
-    q(inuc,0)=-arma::trace(P*Sat[inuc]);
+    q(inuc)=-arma::trace(P*Sat[inuc]);
   }
-  
+
   return q;
 }
 
@@ -285,7 +393,7 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
   std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
   // Evaluate densities
   Nelnum=intgrid.compute_Nel(Pa,Pb);
-  
+
   // Loop over atoms
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     // Compute charges
@@ -293,10 +401,27 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
     q(inuc,1)=-arma::trace(Pb*Sat[inuc]);
     q(inuc,2)=q(inuc,0)+q(inuc,1);
   }
-  
+
   return q;
 }
 
+void bader_analysis(const BasisSet & basis, const arma::mat & P) {
+  Bader bader;
+  bader.fill(basis,P);
+  bader.analysis();
+
+  arma::vec q=-bader.nuclear_charges();
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    nucleus_t nuc=basis.get_nucleus(inuc);
+    if(!nuc.bsse)
+      q(inuc,0)+=nuc.Z;
+  }
+
+  printf("\nBader charges\n");
+  for(size_t i=0;i<basis.get_Nnuc();i++)
+    printf("%4i %-5s % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), q(i));
+  printf("Sum of Bader charges %e\n",arma::sum(q));
+}
 
 void population_analysis(const BasisSet & basis, const arma::mat & P) {
 
