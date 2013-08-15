@@ -26,7 +26,7 @@
  */
 
 /// Compute Becke charges
-arma::mat becke_charges(const BasisSet & basis, const arma::mat & P);
+arma::vec becke_charges(const BasisSet & basis, const arma::mat & P);
 /// Compute Becke charges
 arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
@@ -36,7 +36,7 @@ void becke_analysis(const BasisSet & basis, const arma::mat & P);
 void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
 /// Compute Hirshfeld charges
-arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum);
+arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum);
 /// Compute Hirshfeld charges
 arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double & Nelnum);
 
@@ -44,6 +44,10 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method);
 /// Compute Hirshfeld analysis
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method);
+
+/// Compute Bader analysis
+void bader_analysis(const BasisSet & basis, const arma::mat & P);
+
 
 /**
  * Computes Mulliken's overlap population
@@ -64,6 +68,16 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & P);
  * (IM) eqn 7.36
  */
 arma::mat bond_order(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+
+/// Compute Löwdin charges
+arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P);
+/// Compute Löwdin charges
+arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+
+/// Löwdin population analysis
+void lowdin_analysis(const BasisSet & basis, const arma::mat & P);
+/// Löwdin population analysis
+void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
 /**
  * Compute electron density at nuclei
