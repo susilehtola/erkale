@@ -472,6 +472,8 @@ enum locmet {
   PIPEK_MULLIKEN,
   /// Pipek-Mezey, Löwdin charge
   PIPEK_LOWDIN,
+  /// Pipek-Mezey, Bader charge
+  PIPEK_BADER,
   /// Pipek-Mezey, Becke charge
   PIPEK_BECKE,
   /// Pipek-Mezey, Hirshfeld charge
@@ -551,7 +553,7 @@ class Pipek : public Unitary {
   arma::cube Q;
 
  public:
-  Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
+  Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
   ~Pipek();
 
   /// Evaluate cost function
@@ -650,8 +652,8 @@ class PZSIC : public Unitary {
   arma::mat get_HSIC() const;
 };
 
-/// Orbital localization
-void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter=50000, double Gthr=1e-6, double Fthr=1e-7, bool real=true, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="", bool debug=false);
+/// Orbital localization. Density matrix is only used for construction of Bader grid (if applicable)
+void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & U, int maxiter=50000, double Gthr=1e-6, double Fthr=1e-7, bool real=true, bool verbose=true, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="", bool debug=false);
 
 #include "checkpoint.h"
 
