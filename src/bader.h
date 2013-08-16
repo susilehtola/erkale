@@ -70,12 +70,12 @@ class Bader {
   /// Is the point on an edge of the cube?
   bool on_edge(const arma::ivec & p) const;
 
-  /// Are the neighbors of the point assigned?
-  bool neighbors_assigned(const arma::ivec & p) const;
+  /// Are the neighbors of the point assigned? nnei gives the maximum displacement to look at
+  bool neighbors_assigned(const arma::ivec & p, int nnei=1) const;
   /// Is the point a local maximum
   bool local_maximum(const arma::ivec & p) const;
   /// Is the point on a Bader region boundary?
-  bool on_boundary(const arma::ivec & p) const;
+  bool on_boundary(const arma::ivec & p, int nnei=1) const;
 
   /// Compute gradient
   arma::vec gradient(const arma::ivec & p) const;

@@ -142,7 +142,7 @@ void Bader::check_regions(std::string msg) const {
   }
 }
 
-bool Bader::neighbors_assigned(const arma::ivec & p) const {
+bool Bader::neighbors_assigned(const arma::ivec & p, int nnei) const {
   // Do its neighbors have the same assignment as p? 2.3(v)
 
   // If p doesn't have an assignment, this is automatically false.
@@ -160,9 +160,9 @@ bool Bader::neighbors_assigned(const arma::ivec & p) const {
 
   // On an edge
   if(on_edge(p)) {
-    for(int dx=-1;dx<=1;dx++)
-      for(int dy=-1;dy<=1;dy++)
-	for(int dz=-1;dz<=1;dz++) {
+    for(int dx=-nnei;dx<=nnei;dx++)
+      for(int dy=-nnei;dy<=nnei;dy++)
+	for(int dz=-nnei;dz<=nnei;dz++) {
 	  arma::ivec dp(3);
 	  dp(0)=dx;
 	  dp(1)=dy;
@@ -251,11 +251,11 @@ bool Bader::local_maximum(const arma::ivec & p) const {
   return maxd<=dens(p(0),p(1),p(2));
 }
 
-bool Bader::on_boundary(const arma::ivec & p) const {
+bool Bader::on_boundary(const arma::ivec & p, int nnei) const {
   // We are on a boundary, if one or more of the neighboring points
-  // doesn't share the same classification
+  // doesn't share the same classification. 
 
-  return !neighbors_assigned(p);
+  return !neighbors_assigned(p,nnei);
 }
 
 arma::vec Bader::gradient(const arma::ivec & p) const {
@@ -467,7 +467,8 @@ void Bader::analysis() {
 	      // New region
 	    } else {
 #ifdef BADERDEBUG
-	      printf("Maximum %i = %e found at %4i %4i %4i, i.e. at % e % e %e.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+	      if(verbose)
+		printf("Maximum %i = %e found at %4i %4i %4i, i.e. at % e % e %e.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
 
 	      for(size_t ip=0;ip<points.size();ip++)
@@ -495,14 +496,14 @@ void Bader::analysis() {
       } // End loop over grid
 
   if(verbose)
-    printf("done (%s)\n",t.elapsed().c_str());
+    printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
 
 #ifdef BADERDEBUG
   check_regions("the initial analysis");
 #endif
 
   if(verbose) {
-    printf("Refining analysis ... ");
+    printf("Refining analysis on ");
     fflush(stdout);
     t.set();
   }
@@ -522,8 +523,14 @@ void Bader::analysis() {
 	p(1)=iiy;
 	p(2)=iiz;
 
-	// Is the point on a boundary? Also, it can't be a local maximum, otherwise it forms an own region by itself.
-	if(on_boundary(p) && !local_maximum(p)) {
+	// Is the point on a boundary? Since the initial
+	// classification is done by trajectories, the points nearby
+	// the exact boundaries can be misclassified; thus we look a
+	// couple of points beyond for additional safety.
+
+	// Also, the boundary point can't be a local maximum,
+	// otherwise it forms an own region by itself.
+	if(!local_maximum(p) && on_boundary(p,3)) {
 	  // Add it to the list
 #ifdef _OPENMP
 #pragma omp critical
@@ -535,6 +542,11 @@ void Bader::analysis() {
   // ... reset their classification
   for(size_t ip=0;ip<points.size();ip++)
     region(points[ip](0),points[ip](1),points[ip](2))=-1;
+
+  if(verbose) {
+    printf("%u boundary points ... ",(unsigned) points.size());
+    fflush(stdout);
+  }
 
   // ... and rerun the analysis
 #ifdef _OPENMP
@@ -560,7 +572,7 @@ void Bader::analysis() {
   }
 
   if(verbose)
-    printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
+    printf("done (%s)\n",t.elapsed().c_str());
 
 #ifdef BADERDEBUG
   check_regions("the refinement analysis");
