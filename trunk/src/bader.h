@@ -86,6 +86,9 @@ class Bader {
 
   /// Reorder regions to nuclear order
   void reorder();
+
+  /// Print neighbors of point
+  void print_neighbors(const arma::ivec & p) const;
   
  public:
   /// Constructor

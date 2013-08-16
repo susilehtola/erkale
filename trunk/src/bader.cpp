@@ -88,10 +88,8 @@ void Bader::fill(const BasisSet & basis, const arma::mat & P, double space, doub
   }
 
   double PS=arma::trace(P*basis.overlap());
-#ifdef BADERDEBUG
   if(verbose)
     printf("Integral of charge over grid is %e, trace of density matrix is %e, difference %e.\n",Q,PS,Q-PS);
-#endif
 
   // Renormalize density to account for inaccurate quadrature
   dens*=PS/Q;
@@ -305,6 +303,30 @@ arma::vec Bader::gradient(const arma::ivec & p) const {
   return g;
 }
 
+void Bader::print_neighbors(const arma::ivec & p) const {
+  printf("\nNeighbors of point %i %i %i in region %i\n",p(0),p(1),p(2),region(p(0),p(1),p(2)));
+  
+  for(int dx=-1;dx<=1;dx++)
+    for(int dy=-1;dy<=1;dy++)
+      for(int dz=-1;dz<=1;dz++) {
+	// Skip current point
+	if(dx==0 && dy==0 && dz==0)
+	  continue;
+	
+	arma::ivec dp(3);
+	dp(0)=dx;
+	dp(1)=dy;
+	dp(2)=dz;
+	
+	arma::ivec np=p+dp;
+	if(!in_cube(np))
+	  continue;
+	
+	// Check maximum value making sure that we don't run over
+	printf("\t%i %i %i region %i\n",np(0),np(1),np(2),region(np(0),np(1),np(2)));
+      }
+}
+
 std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
   // Original point
   const arma::ivec p0(p);
@@ -323,11 +345,13 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
 
     // Check if the current point is a local maximum. 2.3(v)
     if(local_maximum(p)) {
+      //      fprintf(stderr,"%i %i %i is local maximum.\n",p(0),p(1),p(2)); fflush(stderr);
       break;
     }
 
     // Next, check if the current point and its neighbors are already assigned
     if(region(p(0),p(1),p(2))!=-1 && neighbors_assigned(p)) {
+      //      fprintf(stderr,"%i %i %i is inside classified region.\n",p(0),p(1),p(2)); fflush(stderr);
       // Stop processing here.
       break;
     }
@@ -432,7 +456,13 @@ void Bader::analysis() {
 	      //	      printf("Ended up at maximum %i at %4i %4i %4i, i.e. at % e % e %e.\n",region(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
 	      for(size_t ip=0;ip<points.size()-1;ip++)
-		region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
+		// Only set classification on points that don't have a
+		// classification as of yet, since otherwise the
+		// classification of boundary points can fluctuate
+		// during the grid assignment.
+		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
+		  region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
+
 
 	      // New region
 	    } else {
@@ -441,18 +471,22 @@ void Bader::analysis() {
 #endif
 
 	      for(size_t ip=0;ip<points.size();ip++)
-		region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
+		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
+		  region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
 	      Nregions++;
 	    }
 
-
 	    // Ended up in a point surrounded by points with the same classification
 	  } else if(region(pend(0),pend(1),pend(2))!=-1 && neighbors_assigned(pend)) {
-
+	    
 	    for(size_t ip=0;ip<points.size()-1;ip++)
-	      region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
+	      if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
+		region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
 
 	  } else {
+	    fprintf(stderr,"%i %i %i is not classified!.\n",pend(0),pend(1),pend(2)); fflush(stderr);
+	    print_neighbors(pend);
+
 	    ERROR_INFO();
 	    throw std::runtime_error("Should not end here!\n");
 	  }
