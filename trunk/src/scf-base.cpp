@@ -22,6 +22,7 @@
 
 #include "adiis.h"
 #include "basis.h"
+#include "bader.h"
 #include "broyden.h"
 #include "elements.h"
 #include "dftfuncs.h"
@@ -508,7 +509,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
 	double measure=1e-3;
-	orbital_localization(PIPEK_LOWDIN,*basisp,sicsol.C,measure,W,verbose);
+	orbital_localization(PIPEK_LOWDIN,*basisp,sicsol.C,sol.P,measure,W,verbose);
 	if(verbose) printf("\n");
       }
     }
@@ -649,7 +650,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure=1e-3;
-	orbital_localization(PIPEK_LOWDIN,*basisp,sicsola.C,measure,Wa,verbose);
+	orbital_localization(PIPEK_LOWDIN,*basisp,sicsola.C,sol.P,measure,Wa,verbose);
 	if(verbose) printf("\n");
       }
     }
@@ -667,7 +668,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial beta localization.\n");
 	double measure=1e-3;
-	orbital_localization(PIPEK_LOWDIN,*basisp,sicsolb.C,measure,Wb,verbose);
+	orbital_localization(PIPEK_LOWDIN,*basisp,sicsolb.C,sol.P,measure,Wb,verbose);
 	if(verbose) printf("\n");
       }
     }
@@ -1527,6 +1528,11 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     // Do population analysis
     if(verbose) {
       population_analysis(basis,sol.P);
+      if(set.get_bool("FullPop")) {
+	lowdin_analysis(basis,sol.P);
+	becke_analysis(basis,sol.P);
+	bader_analysis(basis,sol.P);
+      }
     }
 
   } else {
@@ -1642,6 +1648,11 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
     if(verbose) {
       population_analysis(basis,sol.Pa,sol.Pb);
+      if(set.get_bool("FullPop")) {
+	lowdin_analysis(basis,sol.Pa,sol.Pb);
+	becke_analysis(basis,sol.Pa,sol.Pb);
+	bader_analysis(basis,sol.Pa,sol.Pb);
+      }
     }
   }
 }
@@ -1958,7 +1969,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, double & measure, arma::cx_mat & U, int maxiter, double Gthr, double Fthr, bool real, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
+void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & U, int maxiter, double Gthr, double Fthr, bool real, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
   Timer t;
 
   // Real part of U
@@ -2046,8 +2057,8 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     else
       measure=worker.optimize(U,umet,uacc,maxiter);
 
-  } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
-    Pipek worker(met,basis,C,Gthr,Fthr,verbose);
+  } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BADER || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
+    Pipek worker(met,basis,C,P,Gthr,Fthr,verbose);
     if(fname.length()) worker.open_log(fname);
     worker.set_debug(debug);
     if(real)
@@ -2490,11 +2501,50 @@ void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 }
 
 
-Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
-  // Initialize charge matrix
-  Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
+Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
+  if(chg==PIPEK_BADER) {
+    // Bader grid
+    Bader bader(ver);
+    bader.fill(basis,P);
+    bader.analysis();
 
-  if(chg==PIPEK_BECKE) {
+    // Get overlap matrices
+    Timer t;
+    if(ver) {
+      printf("Computing regional overlap matrices ...");
+      fflush(stdout);
+    }
+    
+    std::vector<arma::mat> Sat=bader.regional_overlap(basis);
+
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      t.set();
+
+      printf("Computing Bader charges ...");
+      fflush(stdout);
+    }
+
+    // Reserve memory for charge matrix
+    Q.zeros(C.n_cols,C.n_cols,Sat.size());
+
+    // Loop over atoms
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+      // Compute charges
+      Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
+    }
+
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
+
+  } else if(chg==PIPEK_BECKE) {
+    // Initialize charge matrix
+    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
 
     // Helper. Non-verbose operation
     //      DFTGrid intgrid(&basis,false);
@@ -2534,6 +2584,8 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
     }
 
   } else if(chg==PIPEK_HIRSHFELD) {
+    // Initialize charge matrix
+    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
 
     Timer t;
     if(ver) {
@@ -2590,6 +2642,8 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
     }
 
   } else if(chg==PIPEK_MULLIKEN) {
+    // Initialize charge matrix
+    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
 
     Timer t;
     if(ver) {
@@ -2627,6 +2681,8 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, doubl
     }
 
   } else if(chg==PIPEK_LOWDIN) {
+    // Initialize charge matrix
+    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
 
     Timer t;
     if(ver) {
