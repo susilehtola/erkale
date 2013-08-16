@@ -112,6 +112,9 @@ void Settings::add_scf_settings() {
   add_int("FittingMemory", "Amount of memory in MB to use for exchange fitting",1000);
   // Threshold for screening eigenvectors
   add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-8);
+
+  // Run full population analysis?
+  add_bool("FullPop", "Run full population analysis?", false);
 }
 
 void Settings::add_dft_settings() {
