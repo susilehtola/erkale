@@ -111,6 +111,14 @@ class Bader {
   void print_regions() const;
   /// Write out individual Bader regions
   void print_individual_regions() const;
+
+  /// Compute Bader charges using existing grid but input density
+  arma::vec regional_charges(const BasisSet & basis, const arma::mat & P) const;
+  /// Get nuclear charges
+  arma::vec nuclear_charges(const BasisSet & basis, const arma::mat & P) const;
+  
+  /// Compute Bader regional overlap matrices
+  std::vector<arma::mat> regional_overlap(const BasisSet & basis) const;
 };
 
 #endif

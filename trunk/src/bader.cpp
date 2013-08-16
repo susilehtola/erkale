@@ -30,7 +30,7 @@ Bader::~Bader() {
 void Bader::fill(const BasisSet & basis, const arma::mat & P, double space, double padding) {
   Timer t;
   if(verbose) {
-    printf("Filling Bader grid ... ");
+    printf("\nFilling Bader grid ... ");
     fflush(stdout);
   }
 
@@ -642,8 +642,8 @@ arma::vec Bader::regional_charges() const {
 #endif
   }
 
-  // Plug in the spacing
-  q*=spacing(0)*spacing(1)*spacing(2);
+  // Plug in the spacing, and convert sign
+  q*=-spacing(0)*spacing(1)*spacing(2);
   return q;
 }
 
@@ -782,4 +782,85 @@ void Bader::print_individual_regions() const {
     }
   // Close file
   fclose(out);
+}
+
+arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) const {
+  
+  // Charges in the Bader regions
+  arma::vec q(Nregions);
+  q.zeros();
+
+  // Perform integration
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    arma::vec qwrk(q);
+#pragma omp for
+#endif
+    for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(size_t iix=0;iix<dens.n_rows;iix++)
+	for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+	  
+	  coords_t tmp;
+	  tmp.x=start(0)+iix*spacing(0);
+	  tmp.y=start(1)+iiy*spacing(1);
+	  tmp.z=start(2)+iiz*spacing(2);
+	  double d=compute_density(P,basis,tmp);
+	  
+#ifdef _OPENMP
+	  qwrk(region(iix,iiy,iiz))+=d;
+#else
+	  q(region(iix,iiy,iiz))+=d;
+#endif
+	}
+    
+#ifdef _OPENMP
+#pragma omp critical
+    q+=qwrk;
+#endif
+  }
+  
+  // Plug in the spacing and convert sign
+  q*=-spacing(0)*spacing(1)*spacing(2);
+  return q;
+}
+
+arma::vec Bader::nuclear_charges(const BasisSet & basis, const arma::mat & P) const {
+  arma::vec q=regional_charges(basis,P);
+
+  // Get the nuclear regions
+  arma::ivec nucreg=nuclear_regions();
+  arma::vec qnuc(nucreg.n_elem);
+  for(size_t i=0;i<nucreg.n_elem;i++)
+    qnuc(i)=q(nucreg(i));
+  
+  return qnuc;
+}
+
+std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
+  std::vector<arma::mat> Sat(Nregions);
+
+  // Calculate matrices
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(arma::sword ireg=0;ireg<Nregions;ireg++) {
+    // Initialize
+    Sat[ireg].zeros(basis.get_Nbf(),basis.get_Nbf());
+    
+    // Loop over grid
+    for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(size_t iix=0;iix<dens.n_rows;iix++)
+	for(size_t iiy=0;iiy<dens.n_cols;iiy++)
+	  if(region(iix,iiy,iiz)==ireg) {
+	    // Evaluate basis function at the grid point
+	    arma::vec bf=basis.eval_func(start(0)+iix*spacing(0),start(1)+iiy*spacing(1),start(2)+iiz*spacing(2));
+	    // Add to overlap matrix
+	    Sat[ireg]+=bf*arma::trans(bf);
+	  }
+  }
+
+  return Sat;
 }
