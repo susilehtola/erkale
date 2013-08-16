@@ -26,9 +26,9 @@
  */
 
 /// Compute Becke charges
-arma::vec becke_charges(const BasisSet & basis, const arma::mat & P);
+arma::vec becke_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
 /// Compute Becke charges
-arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
 
 /// Compute Becke analysis
 void becke_analysis(const BasisSet & basis, const arma::mat & P);
@@ -36,17 +36,24 @@ void becke_analysis(const BasisSet & basis, const arma::mat & P);
 void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
 /// Compute Hirshfeld charges
-arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double & Nelnum);
+arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double tol=1e-5);
 /// Compute Hirshfeld charges
-arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double & Nelnum);
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double tol=1e-5);
 
 /// Compute Hirshfeld analysis
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method);
 /// Compute Hirshfeld analysis
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method);
 
+/// Compute Bader charges
+arma::vec bader_charges(const BasisSet & basis, const arma::mat & P);
+/// Compute Bader charges
+arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+
 /// Compute Bader analysis
 void bader_analysis(const BasisSet & basis, const arma::mat & P);
+/// Compute Bader analysis
+void bader_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
 
 /**
