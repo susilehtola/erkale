@@ -2505,8 +2505,7 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const
   if(chg==PIPEK_BADER) {
     // Bader grid
     Bader bader(ver);
-    bader.fill(basis,P);
-    bader.analysis();
+    bader.analyse(basis,P);
 
     // Get overlap matrices
     Timer t;

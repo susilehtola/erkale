@@ -400,8 +400,7 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
 arma::vec bader_charges(const BasisSet & basis, const arma::mat & P) {
   // Non-verbose operation
   Bader bader(false);
-  bader.fill(basis,P);
-  bader.analysis();
+  bader.analyse(basis,P);
 
   return bader.nuclear_charges();
 }
@@ -409,8 +408,7 @@ arma::vec bader_charges(const BasisSet & basis, const arma::mat & P) {
 arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
   // Non-verbose operation
   Bader bader;
-  bader.fill(basis,Pa+Pb);
-  bader.analysis();
+  bader.analyse(basis,Pa+Pb);
 
   arma::mat q(basis.get_Nnuc(),3);
   q.col(0)=bader.nuclear_charges(basis,Pa);
