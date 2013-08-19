@@ -99,8 +99,11 @@ class Bader {
   /// Destructor
   ~Bader();
 
-  /// Fill grid and analyse
-  void analyse(const BasisSet & basis, const arma::mat & P, double spacing=0.025*ANGSTROMINBOHR, double padding=5.0*ANGSTROMINBOHR);
+  /**
+   * Fill grid and analyse. Warning - a too large padding value will
+   * cause problems, if regions of zero density are created in the system.
+   */
+  void analyse(const BasisSet & basis, const arma::mat & P, double spacing=0.02*ANGSTROMINBOHR, double padding=3.0*ANGSTROMINBOHR);
 
   /// Determine nuclear regions
   arma::ivec nuclear_regions() const;
