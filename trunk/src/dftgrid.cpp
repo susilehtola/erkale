@@ -1644,7 +1644,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, size_t cenind, int nrad, in
   free();
 
   if(verbose) {
-    printf("\t%4u %7u %8u\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc);
+    printf("\t%4u %7s %8s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str());
     fflush(stdout);
   }
 
@@ -1770,7 +1770,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   free();
 
   if(verbose) {
-    printf("\t%4u %7u %8u %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
+    printf("\t%4u %7s %8s %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
     fflush(stdout);
   }
 
