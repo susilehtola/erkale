@@ -494,3 +494,35 @@ void parse_cube(const std::string & sizes, std::vector<double> & x, std::vector<
   y=parse_range_double(info[1]);
   z=parse_range_double(info[2]);
 }
+
+std::string space_number(int numb) {
+  // Convert number to string representation
+  std::ostringstream numo;
+  numo << numb;
+  std::string num=numo.str();
+
+  // Print out space after number?
+  bool space[num.size()];
+  for(size_t i=0;i<num.size();i++)
+    space[i]=false;
+
+  // Determine where to plug in spaces
+  size_t ip=0;
+  for(size_t i=num.size()-1;i<num.size();i--) {
+    ip++; // Printed numbers
+    if(ip%3==0 && i>0) {
+      space[i-1]=true;
+      ip=0;
+    }
+  }
+
+  // Collect number
+  std::ostringstream out;
+  for(size_t i=0;i<num.size();i++) {
+    out << num[i];
+    if(space[i])
+      out << " ";
+  }
+
+  return out.str();
+}

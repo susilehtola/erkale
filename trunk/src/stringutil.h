@@ -79,4 +79,7 @@ std::vector<double> parse_range_double(const std::string & in);
 /// Form wanted cube
 void parse_cube(const std::string & sizes, std::vector<double> & x, std::vector<double> & y, std::vector<double> & z);
 
+/// Add spaces in number
+std::string space_number(int num);
+
 #endif
