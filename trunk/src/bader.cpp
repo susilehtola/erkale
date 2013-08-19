@@ -486,9 +486,19 @@ void Bader::analysis() {
 		printf("Maximum %i = %e found at %4i %4i %4i, i.e. at % e % e %e.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
 
+	      // Check that the maximum doesn't vanish
+	      if(dens(pend(0),pend(1),pend(2))==0.0) {
+		std::ostringstream oss;
+		oss << "Zero-density maximum encountered at grid point (" << pend(0) << "," << pend(1) << "," << pend(2) << ").\n";
+		oss << "Check the padding, or use an augmented basis set.\n";
+		throw std::runtime_error(oss.str());
+	      }
+
+	      // Classify trajectory
 	      for(size_t ip=0;ip<points.size();ip++)
 		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
 		  region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
+	      // Increment running number of regions
 	      Nregions++;
 	    }
 
