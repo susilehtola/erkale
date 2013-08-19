@@ -2507,19 +2507,10 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const
     Bader bader(ver);
     bader.analyse(basis,P);
 
-    // Get overlap matrices
-    Timer t;
-    if(ver) {
-      printf("Computing regional overlap matrices ...");
-      fflush(stdout);
-    }
-    
     std::vector<arma::mat> Sat=bader.regional_overlap(basis);
 
+    Timer t;
     if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      t.set();
-
       printf("Computing Bader charges ...");
       fflush(stdout);
     }
