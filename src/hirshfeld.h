@@ -46,6 +46,9 @@ class HirshfeldAtom {
   double get_spacing() const;
   /// Get densities
   std::vector<double> get_rho() const;
+
+  /// Get the range of the atom
+  double get_range() const;
 };
 
 /// Hirshfeld atomic densities
@@ -75,6 +78,8 @@ class Hirshfeld {
   double get_density(size_t inuc, const coords_t & r) const;
   /// Evaluate weight at r
   double get_weight(size_t inuc, const coords_t & r) const;
+  /// Get range of atom
+  double get_range(size_t inuc) const;
 };
 
 #endif

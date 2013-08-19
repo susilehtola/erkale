@@ -68,6 +68,9 @@ std::vector<double> HirshfeldAtom::get_rho() const {
   return rho;
 }
 
+double HirshfeldAtom::get_range() const {
+  return (rho.size()-1)*dr;
+}
 
 Hirshfeld::Hirshfeld() {
 }
@@ -145,4 +148,8 @@ double Hirshfeld::get_weight(size_t inuc, const coords_t & r) const {
   else
     // Sum is nonzero.
     return atw(inuc)/arma::sum(atw);
+}
+
+double Hirshfeld::get_range(size_t inuc) const {
+  return atoms[inuc]->get_range();
 }
