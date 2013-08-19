@@ -27,7 +27,7 @@ Bader::Bader(bool ver) {
 Bader::~Bader() {
 }
 
-void Bader::fill(const BasisSet & basis, const arma::mat & P, double space, double padding) {
+void Bader::analyse(const BasisSet & basis, const arma::mat & P, double space, double padding) {
   Timer t;
   if(verbose) {
     printf("\nFilling Bader grid ... ");
@@ -97,6 +97,9 @@ void Bader::fill(const BasisSet & basis, const arma::mat & P, double space, doub
   if(verbose)
     printf("Renormalized density on grid to correct norm.\n");
 #endif
+
+  // Run analysis
+  analysis();
 }
 
 bool Bader::in_cube(const arma::ivec & p) const {

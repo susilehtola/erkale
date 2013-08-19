@@ -89,18 +89,18 @@ class Bader {
 
   /// Print neighbors of point
   void print_neighbors(const arma::ivec & p) const;
-  
+
+  /// Perform Bader analysis
+  void analysis();
+
  public:
   /// Constructor
   Bader(bool verbose=true);
   /// Destructor
   ~Bader();
 
-  /// Fill grid
-  void fill(const BasisSet & basis, const arma::mat & P, double spacing=0.1*ANGSTROMINBOHR, double padding=2.5*ANGSTROMINBOHR);
-
-  /// Perform Bader analysis
-  void analysis();
+  /// Fill grid and analyse
+  void analyse(const BasisSet & basis, const arma::mat & P, double spacing=0.025*ANGSTROMINBOHR, double padding=5.0*ANGSTROMINBOHR);
 
   /// Determine nuclear regions
   arma::ivec nuclear_regions() const;
