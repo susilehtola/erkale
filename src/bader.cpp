@@ -16,6 +16,7 @@
 
 #include "bader.h"
 #include "timer.h"
+#include "stringutil.h"
 
 // Debug printout?
 //#define BADERDEBUG
@@ -29,10 +30,6 @@ Bader::~Bader() {
 
 void Bader::analyse(const BasisSet & basis, const arma::mat & P, double space, double padding) {
   Timer t;
-  if(verbose) {
-    printf("\nFilling Bader grid ... ");
-    fflush(stdout);
-  }
 
   // Get nuclei and nuclear coordinate matrix
   nuclei=basis.get_nuclei();
@@ -57,11 +54,33 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, double space, d
   array_size(1)=(maxc(1)-start(1))/space;
   array_size(2)=(maxc(2)-start(2))/space;
 
+  // Size in memory is
+  size_t Nmem=array_size(0)*array_size(1)*array_size(2)*(sizeof(double)+sizeof(arma::sword));
+
+  if(verbose) {
+    printf("\nBader grid is %i x %i x %i, totalling %s points.\n",array_size(0),array_size(1),array_size(2),space_number(array_size(0)*array_size(1)*array_size(2)).c_str());
+    printf("Grid will require %s of memory.\n",memory_size(Nmem).c_str());
+
+#ifdef BADERDEBUG
+    arma::trans(start).print("Grid start");
+    arma::vec end=start+(array_size-1)%spacing;
+    arma::trans(end).print("Grid end");
+#endif
+
+    printf("Filling grid ... ");
+    fflush(stdout);
+  }
+
   // Integrated charge
   double Q=0.0;
-
-  // Density array
+  
+  // Allocate memory for density
   dens.zeros(array_size(0),array_size(1),array_size(2));
+  // Initialize assignment array
+  region.zeros(array_size(0),array_size(1),array_size(2));
+  region*=-1;
+  
+  // Fill array
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:Q)
 #endif
@@ -77,16 +96,9 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, double space, d
       }
   Q*=spacing(0)*spacing(1)*spacing(2);
 
-  if(verbose) {
-    printf("done (%s).\nGrid is %u x %u x %u, totalling %u points.\n",t.elapsed().c_str(),dens.n_rows,dens.n_cols,dens.n_slices,dens.n_elem);
-
-#ifdef BADERDEBUG
-    arma::trans(start).print("Grid start");
-    arma::vec end=start+(array_size-1)%spacing;
-    arma::trans(end).print("Grid end");
-#endif
-  }
-
+  if(verbose)
+    printf("done (%s).\n",t.elapsed().c_str());
+  
   double PS=arma::trace(P*basis.overlap());
   if(verbose)
     printf("Integral of charge over grid is %e, trace of density matrix is %e, difference %e.\n",Q,PS,Q-PS);
@@ -414,8 +426,8 @@ void Bader::analysis() {
 
   // Reset amount of regions
   Nregions=0;
-
-  // Initialize assignment array
+  
+  // Initialize region assignment
   region.ones(array_size(0),array_size(1),array_size(2));
   region*=-1;
 
@@ -498,8 +510,10 @@ void Bader::analysis() {
 
       } // End loop over grid
 
-  if(verbose)
+  if(verbose) {
     printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
+    fflush(stdout);
+  }
 
 #ifdef BADERDEBUG
   check_regions("the initial analysis");
@@ -547,7 +561,7 @@ void Bader::analysis() {
     region(points[ip](0),points[ip](1),points[ip](2))=-1;
 
   if(verbose) {
-    printf("%u boundary points ... ",(unsigned) points.size());
+    printf("%s boundary points ... ",space_number(points.size()).c_str());
     fflush(stdout);
   }
 
@@ -574,8 +588,10 @@ void Bader::analysis() {
 #endif
   }
 
-  if(verbose)
+  if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
 
 #ifdef BADERDEBUG
   check_regions("the refinement analysis");
@@ -891,6 +907,12 @@ arma::vec Bader::nuclear_charges(const BasisSet & basis, const arma::mat & P) co
 std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
   std::vector<arma::mat> Sat(Nregions);
 
+  Timer t;
+  if(verbose) {
+    printf("Computing regional overlap matrices ... ");
+    fflush(stdout);
+  }
+
   // Calculate matrices
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -909,6 +931,11 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
 	    // Add to overlap matrix
 	    Sat[ireg]+=bf*arma::trans(bf);
 	  }
+  }
+
+  if(verbose) {
+    printf("done (%s)\n",t.elapsed().c_str());
+    fflush(stdout);
   }
 
   return Sat;
