@@ -525,7 +525,7 @@ void Bader::analysis() {
     t.set();
   }
 
-  // Finally, analyze which points are on the boundary.
+  // Finally, analyze which points are on the boundary. 2.2(vii)
   std::vector<arma::ivec> points;
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -541,13 +541,12 @@ void Bader::analysis() {
 	p(2)=iiz;
 
 	// Is the point on a boundary? Since the initial
-	// classification is done by trajectories, the points nearby
-	// the exact boundaries can be misclassified; thus we look a
-	// couple of points beyond for additional safety.
-
-	// Also, the boundary point can't be a local maximum,
-	// otherwise it forms an own region by itself.
-	if(!local_maximum(p) && on_boundary(p,3)) {
+	// classification is done by trajectories, the points on the
+	// boundary may be misclassified.
+	// 
+	// However, if the point is a local maximum,
+	// there is no need for reclassification.
+	if(!local_maximum(p) && on_boundary(p)) {
 	  // Add it to the list
 #ifdef _OPENMP
 #pragma omp critical
