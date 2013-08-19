@@ -931,8 +931,11 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
 	    // Add to overlap matrix
 	    Sat[ireg]+=bf*arma::trans(bf);
 	  }
-  }
 
+    // Plug in normalization
+    Sat[ireg]*=spacing(0)*spacing(1)*spacing(2);
+  }
+  
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
