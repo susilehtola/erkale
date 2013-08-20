@@ -68,12 +68,14 @@ class Bader {
   /// Check that point is in the cube
   bool in_cube(const arma::ivec & p) const;
   /// Is the point on an edge of the cube?
-  bool on_edge(const arma::ivec & p) const;
+  bool on_edge(const arma::ivec & p, int nnei=1) const;
 
   /// Are the neighbors of the point assigned? nnei gives the maximum displacement to look at
   bool neighbors_assigned(const arma::ivec & p, int nnei=1) const;
   /// Is the point a local maximum
   bool local_maximum(const arma::ivec & p) const;
+  /// Check the strength of the maximum
+  double check_maximum(const arma::ivec & p) const;
   /// Is the point on a Bader region boundary?
   bool on_boundary(const arma::ivec & p, int nnei=1) const;
 
@@ -103,7 +105,7 @@ class Bader {
    * Fill grid and analyse. Warning - a too large padding value will
    * cause problems, if regions of zero density are created in the system.
    */
-  void analyse(const BasisSet & basis, const arma::mat & P, double spacing=0.02*ANGSTROMINBOHR, double padding=3.0*ANGSTROMINBOHR);
+  void analyse(const BasisSet & basis, const arma::mat & P, double spacing=0.035, double padding=6.0);
 
   /// Determine nuclear regions
   arma::ivec nuclear_regions() const;
@@ -113,6 +115,8 @@ class Bader {
   /// Get nuclear charges
   arma::vec nuclear_charges() const;
 
+  /// Write out electron density
+  void print_density() const;
   /// Write out Bader regions
   void print_regions() const;
   /// Write out individual Bader regions
