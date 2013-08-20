@@ -126,12 +126,12 @@ bool Bader::in_cube(const arma::ivec & p) const {
   return true;
 }
 
-bool Bader::on_edge(const arma::ivec & p) const {
-  if(p(0) == 0 || p(0) == (arma::sword) dens.n_rows-1 )
+bool Bader::on_edge(const arma::ivec & p, int nnei) const {
+  if( p(0) < nnei || p(0) + nnei >= (arma::sword) dens.n_rows )
     return true;
-  if( p(1) == 0 || p(1) == (arma::sword) dens.n_cols-1 )
+  if( p(1) < nnei || p(1) + nnei >= (arma::sword) dens.n_cols )
     return true;
-  if( p(2) == 0 || p(2) == (arma::sword) dens.n_slices-1 )
+  if( p(2) < nnei || p(2) + nnei >= (arma::sword) dens.n_slices )
     return true;
 
   return false;
@@ -214,7 +214,7 @@ bool Bader::neighbors_assigned(const arma::ivec & p, int nnei) const {
   return assigned;
 }
 
-bool Bader::local_maximum(const arma::ivec & p) const {
+double Bader::check_maximum(const arma::ivec & p) const {
   double maxd=0.0;
 
 #ifdef BADERDEBUG
@@ -239,8 +239,8 @@ bool Bader::local_maximum(const arma::ivec & p) const {
 
 	  // Check maximum value making sure that we don't run over
 	  arma::ivec np=p+dp;
-	  if(in_cube(np) && dens(p(0)+dx,p(1)+dy,p(2)+dz)>maxd)
-	    maxd=dens(p(0)+dx,p(1)+dy,p(2)+dz);
+	  if(in_cube(np) && dens(np(0),np(1),np(2))>maxd)
+	    maxd=dens(np(0),np(1),np(2));
 	}
 
   } else {
@@ -258,13 +258,17 @@ bool Bader::local_maximum(const arma::ivec & p) const {
 
 	  // Check for largest density value
 	  arma::ivec np=p+dp;
-	  if(dens(p(0)+dx,p(1)+dy,p(2)+dz)>maxd)
-	    maxd=dens(p(0)+dx,p(1)+dy,p(2)+dz);
+	  if(dens(np(0),np(1),np(2))>maxd)
+	    maxd=dens(np(0),np(1),np(2));
 	}
   }
 
-  // Are we at a local maximum?
-  return maxd<=dens(p(0),p(1),p(2));
+  // The strength of the local maximum is
+  return dens(p(0),p(1),p(2))-maxd;
+}
+
+bool Bader::local_maximum(const arma::ivec & p) const {
+  return check_maximum(p)>=0.0;
 }
 
 bool Bader::on_boundary(const arma::ivec & p, int nnei) const {
@@ -284,36 +288,35 @@ arma::vec Bader::gradient(const arma::ivec & p) const {
 #endif
 
   arma::vec g(3);
-
-  if(on_edge(p)) {
-    // Need to account for edges
+  
+  if(!on_edge(p)) {
+    // Use two-point stencil
+    g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/(2*spacing(0));
+    g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)-1,p(2)))/(2*spacing(1));
+    g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)-1))/(2*spacing(2));
+    
+  } else  {
+    // Need to account for edges.
     if(p(0)==0)
       g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)  ,p(1),p(2)))/spacing(0);
     else if(p(0)==(arma::sword) (dens.n_rows-1))
       g(0)=(dens(p(0)  ,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/spacing(0);
     else
       g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/(2*spacing(0));
-
+    
     if(p(1)==0)
       g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)  ,p(2)))/spacing(1);
     else if(p(1)==(arma::sword) (dens.n_cols-1))
       g(1)=(dens(p(0),p(1)  ,p(2))-dens(p(0),p(1)-1,p(2)))/spacing(1);
     else
       g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)-1,p(2)))/(2*spacing(1));
-
+    
     if(p(2)==0)
       g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)  ))/spacing(2);
     else if(p(2)==(arma::sword) (dens.n_slices-1))
       g(2)=(dens(p(0),p(1),p(2)  )-dens(p(0),p(1),p(2)-1))/spacing(2);
     else
       g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)-1))/(2*spacing(2));
-
-  } else {
-
-    // Safely inside of cube
-    g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/(2*spacing(0));
-    g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)-1,p(2)))/(2*spacing(1));
-    g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)-1))/(2*spacing(2));
   }
 
   return g;
@@ -358,14 +361,15 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
 
 #ifdef BADERDEBUG
   bool debug=false;
+  FILE *out;
 #endif
 
   // Loop over trajectory
   while(true) {
-
 #ifdef BADERDEBUG
     if(debug) {
       arma::trans(p).print("\nCurrent point");
+      printf("Density is %e.\n",dens(p(0),p(1),p(2)));
     }
 #endif
 
@@ -395,15 +399,21 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
     if(debug) arma::trans(rgrad).print("Raw gradient");
 #endif
 
+    // Check if gradient vanishes
+    if(arma::norm(rgrad,2)==0.0)
+      break;
+
     // Determine step length by allowing at maximum displacement by one grid point in any direction.
-    double c=DBL_MAX;
-    for(int ic=0;ic<3;ic++)
-      if(fabs(rgrad(ic))>0.0)
-	if(spacing(ic)/fabs(rgrad(ic))<c)
-	  c=spacing(ic)/fabs(rgrad(ic));
+    arma::vec stepv=arma::abs(rgrad)/spacing;
+    double c=1.0/arma::max(stepv);
     rgrad*=c;
 #ifdef BADERDEBUG
-    if(debug) arma::trans(rgrad).print("Normalized gradient");
+    if(debug) {
+      arma::trans(stepv).print("Step length vector");
+      printf("Step length is %e.\n",c);
+      arma::trans(rgrad).print("Normalized gradient");
+      arma::trans(spacing).print("Grid spacing");
+    }
 #endif
 
     // Determine what is the closest point on the grid to the displacement by rgrad
@@ -423,6 +433,10 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
 
 #ifdef BADERDEBUG
     if(debug) arma::trans(dgrid).print("Grid move");
+#endif
+
+#ifdef BADERDEBUG
+    if(debug) arma::trans(dr).print("Correction vector before update");
 #endif
 
     // Update the correction vector
@@ -456,6 +470,7 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
 #ifdef BADERDEBUG
     if(debug) arma::trans(corr).print("Correction move");
     if(debug) arma::trans(dr).print("Correction vector after correction");
+    if(debug) fprintf(out,"%6i %4i %4i %4i %e\n",(int) points.size(),p(0),p(1),p(2),dens(p(0),p(1),p(2)));
 #endif
 
     // Add to points list
@@ -463,7 +478,8 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
     iiter++;
     
 #ifdef BADERDEBUG
-    // Sanity-check path
+    // Sanity-check path. Actually closed trajectories may occur
+    // because of the correction vector scheme.
     for(size_t i=0;i<points.size();i++)
       for(size_t j=0;j<i;j++)
 	if(points[i](0)==points[j](0) && points[i](1)==points[j](1) && points[i](2)==points[j](2)) {
@@ -472,12 +488,17 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
 	    p=points[0];
 	    points.clear();
 	    points.push_back(p);
+	    dr.zeros();
 	    debug=true;
+
+	    out=fopen("badertraj.dat","w");
+	    fprintf(out,"%6i %4i %4i %4i %e\n",(int) points.size(),p(0),p(1),p(2),dens(p(0),p(1),p(2)));
+
 	  } else {
-	    throw std::runtime_error("Closed trajectory!\n");
+	    fclose(out);
+	    std::runtime_error("Closed trajectory!\n");
 	  }
 	}
-    
 #endif
     
   } // End loop over trajectory
@@ -500,7 +521,8 @@ void Bader::analysis() {
   region*=-1;
 
   // Loop over inside of grid
-#ifdef _OPENMP
+  //#ifdef _OPENMP
+#if defined(_OPENMP) && !defined(BADERDEBUG)
 #pragma omp parallel for
 #endif
   for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
@@ -533,10 +555,22 @@ void Bader::analysis() {
 
 	    arma::vec maxloc=start+pend%spacing;
 
+	    // Is this a zero maximum?
+	    if(dens(pend(0),pend(1),pend(2))==0.0) {
+	      // Classify points to region 0
+	      for(size_t ip=0;ip<points.size();ip++)
+		// Only set classification on points that don't have a
+		// classification as of yet, since otherwise the
+		// classification of boundary points can fluctuate
+		// during the grid assignment.
+		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
+		  region(points[ip](0),points[ip](1),points[ip](2))=0;
+	    }
+	    
 	    // Maximum already classified?
-	    if(region(pend(0),pend(1),pend(2))!=-1) {
+	    else if(region(pend(0),pend(1),pend(2))!=-1) {
 #ifdef BADERDEBUG
-	      // printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+	      printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
 	      for(size_t ip=0;ip<points.size()-1;ip++)
 		// Only set classification on points that don't have a
@@ -547,27 +581,25 @@ void Bader::analysis() {
 		  region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
 
 
-	      // New region
+	    // New region
 	    } else {
 #ifdef BADERDEBUG
 	      if(verbose)
 		printf("Maximum %i = %e found at %4i %4i %4i, i.e. at % e % e %e.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
 
-	      // Check that the maximum doesn't vanish
-	      if(dens(pend(0),pend(1),pend(2))==0.0) {
+	      // Check for ill defined maximum
+	      if(check_maximum(pend)==0.0) {
 		std::ostringstream oss;
-		oss << "Zero-density maximum encountered at grid point (" << pend(0) << "," << pend(1) << "," << pend(2) << ").\n";
-		oss << "Check the padding, or use an augmented basis set.\n";
+		oss << "Ending point (" << pend(0) << "," << pend(1) << "," << pend(2) << ") is an ill defined maximum!\n";
 		throw std::runtime_error(oss.str());
 	      }
-
-	      // Classify trajectory
+	      
+	      // Increment running number of regions and classify trajectory
+	      Nregions++;
 	      for(size_t ip=0;ip<points.size();ip++)
 		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
 		  region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
-	      // Increment running number of regions
-	      Nregions++;
 	    }
 
 	    // Ended up in a point surrounded by points with the same classification
@@ -577,6 +609,12 @@ void Bader::analysis() {
 	      if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
 		region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
 
+	    // Gradient vanishes?
+	  } else if(arma::norm(gradient(pend),2)==0.0) {
+	    for(size_t ip=0;ip<points.size();ip++)
+	      if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
+		region(points[ip](0),points[ip](1),points[ip](2))=0;
+	    
 	  } else {
 	    fprintf(stderr,"%i %i %i is not classified!.\n",pend(0),pend(1),pend(2)); fflush(stderr);
 	    print_neighbors(pend);
@@ -713,7 +751,7 @@ arma::ivec Bader::nuclear_regions() const {
     arma::vec gpc=start+gp%spacing;
     // Distance from nucleus
     arma::vec gp_dist=gpc-arma::trans(nucc.row(inuc));
-    //    printf("Nucleus %i is in region %i, distance to grid point is %e.\n",(int) inuc+1,nucreg(inuc)+1,arma::norm(gp_dist,2));
+    //    printf("Nucleus %i is in region %i, distance to grid point is %e.\n",(int) inuc+1,nucreg(inuc),arma::norm(gp_dist,2));
   }
 
   return nucreg;
@@ -723,7 +761,7 @@ void Bader::reorder() {
   // Translation map
   arma::uvec map(Nregions);
   for(arma::uword i=0;i<map.n_elem;i++)
-    map(i)=i;
+    map(i)=i+1;
 
   // Get the nuclear regions
   arma::ivec nucreg=nuclear_regions();
@@ -731,16 +769,16 @@ void Bader::reorder() {
   // Loop over nuclei
   for(arma::uword inuc=0;inuc<nucreg.n_elem;inuc++)
     // The mapping should take the region of the nucleus to inuc.
-    if(map(nucreg(inuc))!=inuc) {
+    if(map(nucreg(inuc)-1)!=inuc+1) {
 
       // Find out what entry of map is inuc
       arma::uword imap;
       for(imap=0;imap<map.n_elem;imap++)
-	if(map(imap)==inuc)
+	if(map(imap)==inuc+1)
 	  break;
 
       // Swap the entries
-      std::swap(map(nucreg(inuc)),map(imap));
+      std::swap(map(nucreg(inuc)-1),map(imap));
     }
 
   // Perform remapping
@@ -750,7 +788,7 @@ void Bader::reorder() {
   for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
     for(size_t iix=0;iix<dens.n_rows;iix++)
       for(size_t iiy=0;iiy<dens.n_cols;iiy++)
-	region(iix,iiy,iiz)=map(region(iix,iiy,iiz));
+	region(iix,iiy,iiz)=map(region(iix,iiy,iiz)-1);
 }
 
 
@@ -772,9 +810,9 @@ arma::vec Bader::regional_charges() const {
       for(size_t iix=0;iix<dens.n_rows;iix++)
 	for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
 #ifdef _OPENMP
-	  qwrk(region(iix,iiy,iiz))+=dens(iix,iiy,iiz);
+	  qwrk(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
 #else
-	  q(region(iix,iiy,iiz))+=dens(iix,iiy,iiz);
+	  q(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
 #endif
 	}
 
@@ -796,9 +834,58 @@ arma::vec Bader::nuclear_charges() const {
   arma::ivec nucreg=nuclear_regions();
   arma::vec qnuc(nucreg.n_elem);
   for(size_t i=0;i<nucreg.n_elem;i++)
-    qnuc(i)=q(nucreg(i));
+    qnuc(i)=q(nucreg(i)-1);
 
   return qnuc;
+}
+
+void Bader::print_density() const {
+  // Open output file.
+  FILE *out=fopen("bader_density.cube","w");
+
+  // Write out comment fields
+  Timer t;
+  fprintf(out,"ERKALE Bader electron density\n");
+  fprintf(out,"Generated on %s.\n",t.current_time().c_str());
+
+  // Write out starting point
+  fprintf(out,"%7i % g % g % g\n",(int) nuclei.size(),start(0),start(1),start(2));
+  // Print amount of points and step sizes in the directions
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_rows,spacing(0),0.0,0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_cols,0.0,spacing(1),0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) dens.n_slices,0.0,0.0,spacing(2));
+  // Print out atoms
+  for(size_t i=0;i<nuclei.size();i++) {
+    nucleus_t nuc=nuclei[i];
+    fprintf(out,"%7i %g % g % g % g\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+  }
+
+  // Index of points written
+  size_t idx=0;
+
+  // Cube ordering - innermost loop wrt z, inner wrt y and outer wrt x
+  for(size_t iix=0;iix<dens.n_rows;iix++)
+    for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+      for(size_t iiz=0;iiz<dens.n_slices;iiz++) {
+	// Point
+	arma::ivec p(3);
+	p(0)=iix;
+	p(1)=iiy;
+	p(2)=iiz;
+
+	fprintf(out," % .5e",dens(iix,iiy,iiz));
+	idx++;
+	if(idx==6) {
+	  idx=0;
+	  fprintf(out,"\n");
+	}
+      }
+      // y value changes
+      if(idx!=0)
+	fprintf(out,"\n");
+    }
+  // Close file
+  fclose(out);
 }
 
 void Bader::print_regions() const {
@@ -907,7 +994,7 @@ void Bader::print_individual_regions() const {
 
 	// Is the point in the region?
 	for(arma::sword ireg=0;ireg<Nregions;ireg++) {
-	  if(region(p(0),p(1),p(2))==ireg)
+	  if(region(p(0),p(1),p(2))-1==ireg)
 	    fprintf(out," % .5e",1.0);
 	  else
 	    fprintf(out," % .5e",0.0);
@@ -952,9 +1039,9 @@ arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) c
 	  double d=compute_density(P,basis,tmp);
 	  
 #ifdef _OPENMP
-	  qwrk(region(iix,iiy,iiz))+=d;
+	  qwrk(region(iix,iiy,iiz)-1)+=d;
 #else
-	  q(region(iix,iiy,iiz))+=d;
+	  q(region(iix,iiy,iiz)-1)+=d;
 #endif
 	}
     
@@ -1002,7 +1089,7 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
     for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
       for(size_t iix=0;iix<dens.n_rows;iix++)
 	for(size_t iiy=0;iiy<dens.n_cols;iiy++)
-	  if(region(iix,iiy,iiz)==ireg) {
+	  if(region(iix,iiy,iiz)-1==ireg) {
 	    // Evaluate basis function at the grid point
 	    arma::vec bf=basis.eval_func(start(0)+iix*spacing(0),start(1)+iiy*spacing(1),start(2)+iiz*spacing(2));
 	    // Add to overlap matrix
