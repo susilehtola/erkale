@@ -808,14 +808,15 @@ arma::vec Bader::regional_charges() const {
 #endif
     for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
       for(size_t iix=0;iix<dens.n_rows;iix++)
-	for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+	for(size_t iiy=0;iiy<dens.n_cols;iiy++)
+	  if(region(iix,iiy,iiz)>0) {
 #ifdef _OPENMP
-	  qwrk(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
+	    qwrk(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
 #else
-	  q(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
+	    q(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
 #endif
-	}
-
+	  }
+    
 #ifdef _OPENMP
 #pragma omp critical
     q+=qwrk;
@@ -1031,13 +1032,17 @@ arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) c
     for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
       for(size_t iix=0;iix<dens.n_rows;iix++)
 	for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+
+	  // Skip zero-density volume elements
+	  if(region(iix,iiy,iiz)==0)
+	    continue;
 	  
 	  coords_t tmp;
 	  tmp.x=start(0)+iix*spacing(0);
 	  tmp.y=start(1)+iiy*spacing(1);
 	  tmp.z=start(2)+iiz*spacing(2);
 	  double d=compute_density(P,basis,tmp);
-	  
+
 #ifdef _OPENMP
 	  qwrk(region(iix,iiy,iiz)-1)+=d;
 #else
@@ -1063,7 +1068,7 @@ arma::vec Bader::nuclear_charges(const BasisSet & basis, const arma::mat & P) co
   arma::ivec nucreg=nuclear_regions();
   arma::vec qnuc(nucreg.n_elem);
   for(size_t i=0;i<nucreg.n_elem;i++)
-    qnuc(i)=q(nucreg(i));
+    qnuc(i)=q(nucreg(i)-1);
   
   return qnuc;
 }
