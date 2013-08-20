@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
+#include <cfloat>
 #include "bader.h"
 #include "timer.h"
 #include "stringutil.h"
@@ -338,7 +339,7 @@ void Bader::print_neighbors(const arma::ivec & p) const {
 	  continue;
 	
 	// Check maximum value making sure that we don't run over
-	printf("\t%i %i %i region %i\n",np(0),np(1),np(2),region(np(0),np(1),np(2)));
+	printf("\t%i %i %i region %i density %e\n",np(0),np(1),np(2),region(np(0),np(1),np(2)),dens(np(0),np(1),np(2)));
       }
 }
 
@@ -355,18 +356,34 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
 
   size_t iiter=0;
 
+#ifdef BADERDEBUG
+  bool debug=false;
+#endif
+
   // Loop over trajectory
   while(true) {
 
+#ifdef BADERDEBUG
+    if(debug) {
+      arma::trans(p).print("\nCurrent point");
+    }
+#endif
+
     // Check if the current point is a local maximum. 2.3(v)
     if(local_maximum(p)) {
-      //      fprintf(stderr,"%i %i %i is local maximum.\n",p(0),p(1),p(2)); fflush(stderr);
+#ifdef BADERDEBUG
+      if(debug)
+	printf("%i %i %i is local maximum.\n",p(0),p(1),p(2)); fflush(stderr);
+#endif
       break;
     }
 
     // Next, check if the current point and its neighbors are already assigned
     if(region(p(0),p(1),p(2))!=-1 && neighbors_assigned(p)) {
-      //      fprintf(stderr,"%i %i %i is inside classified region.\n",p(0),p(1),p(2)); fflush(stderr);
+#ifdef BADERDEBUG
+      if(debug)
+	printf("%i %i %i is inside classified region.\n",p(0),p(1),p(2)); fflush(stderr);
+#endif
       // Stop processing here.
       break;
     }
@@ -374,9 +391,20 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
     // If we're here, we need to move on the grid.
     // Compute the gradient in the current point
     arma::vec rgrad=gradient(p);
+#ifdef BADERDEBUG
+    if(debug) arma::trans(rgrad).print("Raw gradient");
+#endif
 
     // Determine step length by allowing at maximum displacement by one grid point in any direction.
-    rgrad*=arma::min(spacing/arma::abs(rgrad));
+    double c=DBL_MAX;
+    for(int ic=0;ic<3;ic++)
+      if(fabs(rgrad(ic))>0.0)
+	if(spacing(ic)/fabs(rgrad(ic))<c)
+	  c=spacing(ic)/fabs(rgrad(ic));
+    rgrad*=c;
+#ifdef BADERDEBUG
+    if(debug) arma::trans(rgrad).print("Normalized gradient");
+#endif
 
     // Determine what is the closest point on the grid to the displacement by rgrad
     arma::ivec dgrid(3);
@@ -393,25 +421,65 @@ std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
 	// We would move outside the grid - don't perform the move
 	dgrid(ic)=0;
 
+#ifdef BADERDEBUG
+    if(debug) arma::trans(dgrid).print("Grid move");
+#endif
+
     // Update the correction vector
     dr+=rgrad - dgrid%spacing;
 
+#ifdef BADERDEBUG
+    if(debug) arma::trans(dr).print("Correction vector");
+#endif
+
     // Check that the correction is smaller than the grid spacing
+#ifdef BADERDEBUG
+    arma::ivec corr(3);
+    corr.zeros();
+#endif
     for(int ic=0;ic<3;ic++) {
-      while(dr(ic) < -0.5*spacing(ic) && p(ic)<array_size(ic)-1) {
-	p(ic)++;
-	dr(ic)+=spacing(ic);
-      }
-      while(dr(ic) > 0.5*spacing(ic) && p(ic)>0) {
+      while(dr(ic) < -0.5*spacing(ic) && p(ic)>0) {
 	p(ic)--;
+	dr(ic)+=spacing(ic);
+#ifdef BADERDEBUG
+	corr(ic)--;
+#endif
+      }
+      while(dr(ic) >= 0.5*spacing(ic) && p(ic)<array_size(ic)-1) {
+	p(ic)++;
 	dr(ic)-=spacing(ic);
+#ifdef BADERDEBUG
+	corr(ic)++;
+#endif
       }
     }
+#ifdef BADERDEBUG
+    if(debug) arma::trans(corr).print("Correction move");
+    if(debug) arma::trans(dr).print("Correction vector after correction");
+#endif
 
     // Add to points list
     points.push_back(p);
     iiter++;
-
+    
+#ifdef BADERDEBUG
+    // Sanity-check path
+    for(size_t i=0;i<points.size();i++)
+      for(size_t j=0;j<i;j++)
+	if(points[i](0)==points[j](0) && points[i](1)==points[j](1) && points[i](2)==points[j](2)) {
+	  if(!debug) {
+	    // Restart trajectory from start.
+	    p=points[0];
+	    points.clear();
+	    points.push_back(p);
+	    debug=true;
+	  } else {
+	    throw std::runtime_error("Closed trajectory!\n");
+	  }
+	}
+    
+#endif
+    
   } // End loop over trajectory
 
   return points;
@@ -468,7 +536,7 @@ void Bader::analysis() {
 	    // Maximum already classified?
 	    if(region(pend(0),pend(1),pend(2))!=-1) {
 #ifdef BADERDEBUG
-	      //	      printf("Ended up at maximum %i at %4i %4i %4i, i.e. at % e % e %e.\n",region(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+	      // printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
 	      for(size_t ip=0;ip<points.size()-1;ip++)
 		// Only set classification on points that don't have a
