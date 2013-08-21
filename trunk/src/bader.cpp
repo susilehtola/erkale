@@ -294,9 +294,10 @@ bool Bader::local_maximum(const arma::ivec & p) const {
 
 bool Bader::on_boundary(const arma::ivec & p) const {
   // We are on a boundary, if one or more of the neighboring points
-  // doesn't share the same classification.
-
-  return !neighbors_assigned(p);
+  // doesn't share the same classification. Also, the point must have
+  // some density assigned to it.
+  
+  return region(p(0),p(1),p(2))>0 && !neighbors_assigned(p);
 }
 
 arma::vec Bader::gradient(const arma::ivec & p) const {
@@ -648,9 +649,9 @@ void Bader::analysis_neargrid() {
 	// classification is done by trajectories, the points on the
 	// boundary may be misclassified.
 	//
-	// However, if the point is a local maximum or has small
-	// density, there is no need for reclassification.
-	if(!local_maximum(p) && region(p(0),p(1),p(2))!=0 && on_boundary(p)) {
+	// However, if the point is a local maximum, there is no need
+	// for reclassification.
+	if(!local_maximum(p) && on_boundary(p)) {
 	  // Add it to the list
 #ifdef _OPENMP
 #pragma omp critical
@@ -712,7 +713,7 @@ void Bader::analysis_neargrid() {
     std::vector<arma::ivec> reassigned;
     for(size_t ip=0;ip<points.size();ip++)
       if(region(points[ip](0),points[ip](1),points[ip](2))!=oldreg[ip]) {
-	printf("Point %4i %4i %4i reclassified %i -> %i\n",points[ip](0),points[ip](1),points[ip](2),oldreg[ip],region(points[ip](0),points[ip](1),points[ip](2)));
+	//	printf("Point %4i %4i %4i reclassified %i -> %i\n",points[ip](0),points[ip](1),points[ip](2),oldreg[ip],region(points[ip](0),points[ip](1),points[ip](2)));
 	reassigned.push_back(points[ip]);
       }
 
@@ -988,11 +989,16 @@ arma::vec Bader::nuclear_charges() const {
 }
 
 void Bader::print_density() const {
+  Timer t;
+  if(verbose) {
+    printf("Printing out density grid ... ");
+    fflush(stdout);
+  }
+
   // Open output file.
   FILE *out=fopen("bader_density.cube","w");
 
   // Write out comment fields
-  Timer t;
   fprintf(out,"ERKALE Bader electron density\n");
   fprintf(out,"Generated on %s.\n",t.current_time().c_str());
 
@@ -1034,14 +1040,24 @@ void Bader::print_density() const {
     }
   // Close file
   fclose(out);
+
+  if(verbose) {
+    printf("done (%s)\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
 }
 
 void Bader::print_regions() const {
+  Timer t;
+  if(verbose) {
+    printf("Printing out Bader region boundary grid ... ");
+    fflush(stdout);
+  }
+
   // Open output file.
   FILE *out=fopen("bader_regions.cube","w");
 
   // Write out comment fields
-  Timer t;
   fprintf(out,"ERKALE Bader regions\n");
   fprintf(out,"Generated on %s.\n",t.current_time().c_str());
 
@@ -1087,14 +1103,24 @@ void Bader::print_regions() const {
     }
   // Close file
   fclose(out);
+
+  if(verbose) {
+    printf("done (%s)\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
 }
 
 void Bader::print_individual_regions() const {
+  Timer t;
+  if(verbose) {
+    printf("Printing out individual Bader region grids ... ");
+    fflush(stdout);
+  }
+  
   // Open output file.
   FILE *out=fopen("individual_bader_regions.cube","w");
 
   // Write out comment fields
-  Timer t;
   fprintf(out,"ERKALE individual Bader regions\n");
   fprintf(out,"Generated on %s.\n",t.current_time().c_str());
 
@@ -1159,6 +1185,11 @@ void Bader::print_individual_regions() const {
     }
   // Close file
   fclose(out);
+
+  if(verbose) {
+    printf("done (%s)\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
 }
 
 arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) const {
