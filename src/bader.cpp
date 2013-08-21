@@ -31,6 +31,7 @@
 
 Bader::Bader(bool ver) {
   verbose=ver;
+  array_size.zeros(3);
 }
 
 Bader::~Bader() {
@@ -91,15 +92,17 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:Q)
 #endif
-  for(size_t iz=0;iz<dens.n_slices;iz++) // Loop over slices first, since they're stored continguously in memory
-    for(size_t ix=0;ix<dens.n_rows;ix++)
-      for(size_t iy=0;iy<dens.n_cols;iy++) {
+  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(arma::sword iix=0;iix<array_size(0);iix++)
+      for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
 	coords_t tmp;
-	tmp.x=start(0)+ix*spacing(0);
-	tmp.y=start(1)+iy*spacing(1);
-	tmp.z=start(2)+iz*spacing(2);
-	dens(ix,iy,iz)=compute_density(P,basis,tmp);
-	Q+=dens(ix,iy,iz);
+	tmp.x=start(0)+iix*spacing(0);
+	tmp.y=start(1)+iiy*spacing(1);
+	tmp.z=start(2)+iiz*spacing(2);
+	double d=compute_density(P,basis,tmp);
+
+	dens(iix,iiy,iiz)=d;
+	Q+=d;
       }
   Q*=spacing(0)*spacing(1)*spacing(2);
 
@@ -508,9 +511,9 @@ void Bader::analysis_neargrid() {
   //#if defined(_OPENMP) && !defined(BADERDEBUG)
 #pragma omp parallel for
 #endif
-  for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(size_t iix=0;iix<dens.n_rows;iix++)
-      for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(arma::sword iix=0;iix<array_size(0);iix++)
+      for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
 
 	// Check if point has already been classified
 	if(region(iix,iiy,iiz)!=-1)
@@ -635,9 +638,9 @@ void Bader::analysis_neargrid() {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(size_t iix=0;iix<dens.n_rows;iix++)
-      for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(arma::sword iix=0;iix<array_size(0);iix++)
+      for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
 
 	// Current point
 	arma::ivec p(3);
@@ -691,6 +694,10 @@ void Bader::analysis_neargrid() {
 #pragma omp parallel for
 #endif
     for(size_t ip=0;ip<points.size();ip++) {
+
+      // Check that the point is still unassigned.
+      if(region(points[ip](0),points[ip](1),points[ip](2))>0)
+	continue;
 
       // Get the near-grid trajectory from the point
       std::vector<arma::ivec> traj=classify_neargrid(points[ip]);
@@ -932,9 +939,9 @@ void Bader::reorder() {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(size_t iix=0;iix<dens.n_rows;iix++)
-      for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(arma::sword iix=0;iix<array_size(0);iix++)
+      for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
 	region(iix,iiy,iiz)=regmap(region(iix,iiy,iiz));
       }
 }
@@ -954,9 +961,9 @@ arma::vec Bader::regional_charges() const {
     arma::vec qwrk(q);
 #pragma omp for
 #endif
-    for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
-      for(size_t iix=0;iix<dens.n_rows;iix++)
-	for(size_t iiy=0;iiy<dens.n_cols;iiy++)
+  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(arma::sword iix=0;iix<array_size(0);iix++)
+      for(arma::sword iiy=0;iiy<array_size(1);iiy++)
 	  if(region(iix,iiy,iiz)>0) {
 #ifdef _OPENMP
 	    qwrk(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
@@ -964,7 +971,7 @@ arma::vec Bader::regional_charges() const {
 	    q(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
 #endif
 	  }
-
+  
 #ifdef _OPENMP
 #pragma omp critical
     q+=qwrk;
@@ -1207,10 +1214,10 @@ arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) c
     arma::vec qwrk(q);
 #pragma omp for
 #endif
-    for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
-      for(size_t iix=0;iix<dens.n_rows;iix++)
-	for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
-
+    for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(arma::sword iix=0;iix<array_size(0);iix++)
+	for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
+	  
 	  // Skip zero-density volume elements
 	  if(region(iix,iiy,iiz)==0)
 	    continue;
@@ -1260,22 +1267,19 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
     fflush(stdout);
   }
 
-  // Calculate matrices
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
   for(arma::sword ireg=0;ireg<Nregions;ireg++) {
-    // Initialize
     Sat[ireg].zeros(basis.get_Nbf(),basis.get_Nbf());
-
-    // Loop over grid
-    for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
-      for(size_t iix=0;iix<dens.n_rows;iix++)
-	for(size_t iiy=0;iiy<dens.n_cols;iiy++)
+  
+    for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(arma::sword iix=0;iix<array_size(0);iix++)
+	for(arma::sword iiy=0;iiy<array_size(1);iiy++)
 	  if(region(iix,iiy,iiz)-1==ireg) {
-	    // Evaluate basis function at the grid point
+	    // Evaluate basis functions at the grid point
 	    arma::vec bf=basis.eval_func(start(0)+iix*spacing(0),start(1)+iiy*spacing(1),start(2)+iiz*spacing(2));
-	    // Add to overlap matrix
+	    // and increment overlap
 	    Sat[ireg]+=bf*arma::trans(bf);
 	  }
 
@@ -1287,6 +1291,6 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
     printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
   }
-
+    
   return Sat;
 }
