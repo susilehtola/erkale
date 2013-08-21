@@ -677,7 +677,7 @@ void Bader::analysis_neargrid() {
       oldreg.push_back(region(points[ip](0),points[ip](1),points[ip](2)));
 
     if(verbose) {
-      printf("Iteration %2i: %s boundary points. ",iref,space_number(points.size()).c_str());
+      printf("Iteration %2i: %s points to check. ",iref,space_number(points.size()).c_str());
       fflush(stdout);
       t.set();
     }
