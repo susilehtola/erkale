@@ -68,23 +68,26 @@ class Bader {
   /// Check that point is in the cube
   bool in_cube(const arma::ivec & p) const;
   /// Is the point on an edge of the cube?
-  bool on_edge(const arma::ivec & p, int nnei=1) const;
+  bool on_edge(const arma::ivec & p) const;
 
   /// Are the neighbors of the point assigned? nnei gives the maximum displacement to look at
-  bool neighbors_assigned(const arma::ivec & p, int nnei=1) const;
+  bool neighbors_assigned(const arma::ivec & p) const;
   /// Is the point a local maximum
   bool local_maximum(const arma::ivec & p) const;
   /// Check the strength of the maximum
   double check_maximum(const arma::ivec & p) const;
   /// Is the point on a Bader region boundary?
-  bool on_boundary(const arma::ivec & p, int nnei=1) const;
+  bool on_boundary(const arma::ivec & p) const;
 
   /// Compute gradient
   arma::vec gradient(const arma::ivec & p) const;
 
-  /// Run classification on the grid point p. Returns a list of points
-  /// on the trajectory.
-  std::vector<arma::ivec> classify(arma::ivec p) const;
+  /// Run classification on the grid point p with the on-grid
+  /// method. Returns a list of points on the trajectory.
+  std::vector<arma::ivec> classify_ongrid(arma::ivec p) const;
+  /// Run classification on the grid point p with the near-grid
+  /// method. Returns a list of points on the trajectory.
+  std::vector<arma::ivec> classify_neargrid(arma::ivec p) const;
 
   /// Reorder regions to nuclear order
   void reorder();
@@ -92,8 +95,10 @@ class Bader {
   /// Print neighbors of point
   void print_neighbors(const arma::ivec & p) const;
 
-  /// Perform Bader analysis
-  void analysis();
+  /// Perform Bader analysis with the near-grid method
+  void analysis_neargrid();
+  /// Perform Bader analysis with the on-grid method
+  void analysis_ongrid();
 
  public:
   /// Constructor
@@ -105,7 +110,7 @@ class Bader {
    * Fill grid and analyse. Warning - a too large padding value will
    * cause problems, if regions of zero density are created in the system.
    */
-  void analyse(const BasisSet & basis, const arma::mat & P, double spacing=0.035, double padding=6.0);
+  void analyse(const BasisSet & basis, const arma::mat & P, bool neargrid=true, double spacing=0.035, double padding=6.0);
 
   /// Determine nuclear regions
   arma::ivec nuclear_regions() const;
