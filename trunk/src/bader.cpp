@@ -22,6 +22,13 @@
 // Debug printout?
 //#define BADERDEBUG
 
+// Threshold for vanishingly small density
+#define SMALLDENSITY 1e-8
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 Bader::Bader(bool ver) {
   verbose=ver;
 }
@@ -29,7 +36,7 @@ Bader::Bader(bool ver) {
 Bader::~Bader() {
 }
 
-void Bader::analyse(const BasisSet & basis, const arma::mat & P, double space, double padding) {
+void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, double space, double padding) {
   Timer t;
 
   // Get nuclei and nuclear coordinate matrix
@@ -74,13 +81,12 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, double space, d
 
   // Integrated charge
   double Q=0.0;
-  
+
   // Allocate memory for density
   dens.zeros(array_size(0),array_size(1),array_size(2));
-  // Initialize assignment array
+  // and for assignment array
   region.zeros(array_size(0),array_size(1),array_size(2));
-  region*=-1;
-  
+
   // Fill array
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:Q)
@@ -99,10 +105,14 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, double space, d
 
   if(verbose)
     printf("done (%s).\n",t.elapsed().c_str());
-  
+
   double PS=arma::trace(P*basis.overlap());
   if(verbose)
     printf("Integral of charge over grid is %e, trace of density matrix is %e, difference %e.\n",Q,PS,Q-PS);
+
+#ifdef BADERDEBUG
+  print_density();
+#endif
 
   // Renormalize density to account for inaccurate quadrature
   dens*=PS/Q;
@@ -112,7 +122,10 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, double space, d
 #endif
 
   // Run analysis
-  analysis();
+  if(neargrid)
+    analysis_neargrid();
+  else
+    analysis_ongrid();
 }
 
 bool Bader::in_cube(const arma::ivec & p) const {
@@ -126,12 +139,12 @@ bool Bader::in_cube(const arma::ivec & p) const {
   return true;
 }
 
-bool Bader::on_edge(const arma::ivec & p, int nnei) const {
-  if( p(0) < nnei || p(0) + nnei >= (arma::sword) dens.n_rows )
+bool Bader::on_edge(const arma::ivec & p) const {
+  if( p(0) == 0 || p(0) == (arma::sword) dens.n_rows - 1 )
     return true;
-  if( p(1) < nnei || p(1) + nnei >= (arma::sword) dens.n_cols )
+  if( p(1) == 0 || p(1) == (arma::sword) dens.n_cols - 1 )
     return true;
-  if( p(2) < nnei || p(2) + nnei >= (arma::sword) dens.n_slices )
+  if( p(2) == 0 || p(2) == (arma::sword) dens.n_slices - 1 )
     return true;
 
   return false;
@@ -158,7 +171,7 @@ void Bader::check_regions(std::string msg) const {
   }
 }
 
-bool Bader::neighbors_assigned(const arma::ivec & p, int nnei) const {
+bool Bader::neighbors_assigned(const arma::ivec & p) const {
   // Do its neighbors have the same assignment as p? 2.3(v)
 
   // If p doesn't have an assignment, this is automatically false.
@@ -176,9 +189,9 @@ bool Bader::neighbors_assigned(const arma::ivec & p, int nnei) const {
 
   // On an edge
   if(on_edge(p)) {
-    for(int dx=-nnei;dx<=nnei;dx++)
-      for(int dy=-nnei;dy<=nnei;dy++)
-	for(int dz=-nnei;dz<=nnei;dz++) {
+    for(int dx=-1;dx<=1;dx++)
+      for(int dy=-1;dy<=1;dy++)
+	for(int dz=-1;dz<=1;dz++) {
 	  arma::ivec dp(3);
 	  dp(0)=dx;
 	  dp(1)=dy;
@@ -189,7 +202,11 @@ bool Bader::neighbors_assigned(const arma::ivec & p, int nnei) const {
 	  if(!in_cube(np))
 	    continue;
 
-	  // Check if assignment is same
+	  // Skip zero-density volumes
+	  if(region(np(0),np(1),np(2))==0)
+	    continue;
+
+	  // Check if assignment is same.
 	  if(region(np(0),np(1),np(2))!=region(p(0),p(1),p(2)))
 	    assigned=false;
 	}
@@ -204,8 +221,12 @@ bool Bader::neighbors_assigned(const arma::ivec & p, int nnei) const {
 	  dp(1)=dy;
 	  dp(2)=dz;
 
-	  // Check if assignment is same
 	  arma::ivec np=p+dp;
+	  // Skip zero-density volumes
+	  if(region(np(0),np(1),np(2))==0)
+	    continue;
+
+	  // Check if assignment is same
 	  if(region(np(0),np(1),np(2))!=region(p(0),p(1),p(2)))
 	    assigned=false;
 	}
@@ -271,11 +292,11 @@ bool Bader::local_maximum(const arma::ivec & p) const {
   return check_maximum(p)>=0.0;
 }
 
-bool Bader::on_boundary(const arma::ivec & p, int nnei) const {
+bool Bader::on_boundary(const arma::ivec & p) const {
   // We are on a boundary, if one or more of the neighboring points
-  // doesn't share the same classification. 
+  // doesn't share the same classification.
 
-  return !neighbors_assigned(p,nnei);
+  return !neighbors_assigned(p);
 }
 
 arma::vec Bader::gradient(const arma::ivec & p) const {
@@ -288,35 +309,13 @@ arma::vec Bader::gradient(const arma::ivec & p) const {
 #endif
 
   arma::vec g(3);
-  
-  if(!on_edge(p)) {
-    // Use two-point stencil
-    g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/(2*spacing(0));
-    g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)-1,p(2)))/(2*spacing(1));
-    g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)-1))/(2*spacing(2));
-    
-  } else  {
-    // Need to account for edges.
-    if(p(0)==0)
-      g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)  ,p(1),p(2)))/spacing(0);
-    else if(p(0)==(arma::sword) (dens.n_rows-1))
-      g(0)=(dens(p(0)  ,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/spacing(0);
-    else
-      g(0)=(dens(p(0)+1,p(1),p(2))-dens(p(0)-1,p(1),p(2)))/(2*spacing(0));
-    
-    if(p(1)==0)
-      g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)  ,p(2)))/spacing(1);
-    else if(p(1)==(arma::sword) (dens.n_cols-1))
-      g(1)=(dens(p(0),p(1)  ,p(2))-dens(p(0),p(1)-1,p(2)))/spacing(1);
-    else
-      g(1)=(dens(p(0),p(1)+1,p(2))-dens(p(0),p(1)-1,p(2)))/(2*spacing(1));
-    
-    if(p(2)==0)
-      g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)  ))/spacing(2);
-    else if(p(2)==(arma::sword) (dens.n_slices-1))
-      g(2)=(dens(p(0),p(1),p(2)  )-dens(p(0),p(1),p(2)-1))/spacing(2);
-    else
-      g(2)=(dens(p(0),p(1),p(2)+1)-dens(p(0),p(1),p(2)-1))/(2*spacing(2));
+  for(int ic=0;ic<3;ic++) {
+    arma::ivec lh(p), rh(p);
+    if(p(ic)>0)
+      lh(ic)--;
+    if(p(ic)<array_size(ic)-1)
+      rh(ic)++;
+    g(ic)=(dens(rh(0),rh(1),rh(2))-dens(lh(0),lh(1),lh(2)))/arma::norm((rh-lh)%spacing,2);
   }
 
   return g;
@@ -324,205 +323,188 @@ arma::vec Bader::gradient(const arma::ivec & p) const {
 
 void Bader::print_neighbors(const arma::ivec & p) const {
   printf("\nNeighbors of point %i %i %i in region %i\n",p(0),p(1),p(2),region(p(0),p(1),p(2)));
-  
+
   for(int dx=-1;dx<=1;dx++)
     for(int dy=-1;dy<=1;dy++)
       for(int dz=-1;dz<=1;dz++) {
 	// Skip current point
 	if(dx==0 && dy==0 && dz==0)
 	  continue;
-	
+
 	arma::ivec dp(3);
 	dp(0)=dx;
 	dp(1)=dy;
 	dp(2)=dz;
-	
+
 	arma::ivec np=p+dp;
 	if(!in_cube(np))
 	  continue;
-	
+
 	// Check maximum value making sure that we don't run over
 	printf("\t%i %i %i region %i density %e\n",np(0),np(1),np(2),region(np(0),np(1),np(2)),dens(np(0),np(1),np(2)));
       }
 }
 
-std::vector<arma::ivec> Bader::classify(arma::ivec p) const {
+std::vector<arma::ivec> Bader::classify_neargrid(arma::ivec p) const {
   // Original point
   const arma::ivec p0(p);
 
   // List of points treated in current path.
   std::vector<arma::ivec> points;
   points.push_back(p);
+
   // Correction step
   arma::vec dr;
   dr.zeros(3);
 
   size_t iiter=0;
 
-#ifdef BADERDEBUG
-  bool debug=false;
-  FILE *out;
-#endif
-
   // Loop over trajectory
   while(true) {
-#ifdef BADERDEBUG
-    if(debug) {
-      arma::trans(p).print("\nCurrent point");
-      printf("Density is %e.\n",dens(p(0),p(1),p(2)));
-    }
-#endif
 
     // Check if the current point is a local maximum. 2.3(v)
     if(local_maximum(p)) {
-#ifdef BADERDEBUG
-      if(debug)
-	printf("%i %i %i is local maximum.\n",p(0),p(1),p(2)); fflush(stderr);
-#endif
       break;
     }
 
     // Next, check if the current point and its neighbors are already assigned
     if(region(p(0),p(1),p(2))!=-1 && neighbors_assigned(p)) {
-#ifdef BADERDEBUG
-      if(debug)
-	printf("%i %i %i is inside classified region.\n",p(0),p(1),p(2)); fflush(stderr);
-#endif
-      // Stop processing here.
       break;
     }
 
     // If we're here, we need to move on the grid.
     // Compute the gradient in the current point
     arma::vec rgrad=gradient(p);
-#ifdef BADERDEBUG
-    if(debug) arma::trans(rgrad).print("Raw gradient");
-#endif
 
     // Check if gradient vanishes
     if(arma::norm(rgrad,2)==0.0)
       break;
-
-    // Determine step length by allowing at maximum displacement by one grid point in any direction.
+    
+    // Determine step length by allowing at maximum displacement by
+    // one grid point in any direction. This is done inversely to
+    // Tang et al, because components of rgrad may vanish, but
+    // spacing is always finite in all dimensions.
     arma::vec stepv=arma::abs(rgrad)/spacing;
     double c=1.0/arma::max(stepv);
     rgrad*=c;
-#ifdef BADERDEBUG
-    if(debug) {
-      arma::trans(stepv).print("Step length vector");
-      printf("Step length is %e.\n",c);
-      arma::trans(rgrad).print("Normalized gradient");
-      arma::trans(spacing).print("Grid spacing");
-    }
-#endif
-
+    
     // Determine what is the closest point on the grid to the displacement by rgrad
     arma::ivec dgrid(3);
     for(int ic=0;ic<3;ic++) {
       dgrid(ic)=(arma::sword) round(rgrad(ic)/spacing(ic));
+      // Sanity check
+      if(p(ic)+dgrid(ic)<0 || p(ic)+dgrid(ic)>=array_size(ic))
+	dgrid(ic)=0;
     }
 
     // Perform the move on the grid
-    for(int ic=0;ic<3;ic++)
-      if(p(ic)+dgrid(ic)>=0 && p(ic)+dgrid(ic)<array_size(ic))
-	// Move is OK.
-	p(ic)+=dgrid(ic);
-      else
-	// We would move outside the grid - don't perform the move
-	dgrid(ic)=0;
-
-#ifdef BADERDEBUG
-    if(debug) arma::trans(dgrid).print("Grid move");
-#endif
-
-#ifdef BADERDEBUG
-    if(debug) arma::trans(dr).print("Correction vector before update");
-#endif
-
+    p+=dgrid;
     // Update the correction vector
     dr+=rgrad - dgrid%spacing;
 
-#ifdef BADERDEBUG
-    if(debug) arma::trans(dr).print("Correction vector");
-#endif
-
     // Check that the correction is smaller than the grid spacing
-#ifdef BADERDEBUG
-    arma::ivec corr(3);
-    corr.zeros();
-#endif
     for(int ic=0;ic<3;ic++) {
       while(dr(ic) < -0.5*spacing(ic) && p(ic)>0) {
 	p(ic)--;
 	dr(ic)+=spacing(ic);
-#ifdef BADERDEBUG
-	corr(ic)--;
-#endif
       }
       while(dr(ic) >= 0.5*spacing(ic) && p(ic)<array_size(ic)-1) {
 	p(ic)++;
 	dr(ic)-=spacing(ic);
-#ifdef BADERDEBUG
-	corr(ic)++;
-#endif
       }
     }
-#ifdef BADERDEBUG
-    if(debug) arma::trans(corr).print("Correction move");
-    if(debug) arma::trans(dr).print("Correction vector after correction");
-    if(debug) fprintf(out,"%6i %4i %4i %4i %e\n",(int) points.size(),p(0),p(1),p(2),dens(p(0),p(1),p(2)));
-#endif
 
-    // Add to points list
-    points.push_back(p);
-    iiter++;
-    
-#ifdef BADERDEBUG
-    // Sanity-check path. Actually closed trajectories may occur
-    // because of the correction vector scheme.
-    for(size_t i=0;i<points.size();i++)
-      for(size_t j=0;j<i;j++)
-	if(points[i](0)==points[j](0) && points[i](1)==points[j](1) && points[i](2)==points[j](2)) {
-	  if(!debug) {
-	    // Restart trajectory from start.
-	    p=points[0];
-	    points.clear();
-	    points.push_back(p);
-	    dr.zeros();
-	    debug=true;
+  // Add to points list
+  points.push_back(p);
+  iiter++;
 
-	    out=fopen("badertraj.dat","w");
-	    fprintf(out,"%6i %4i %4i %4i %e\n",(int) points.size(),p(0),p(1),p(2),dens(p(0),p(1),p(2)));
-
-	  } else {
-	    fclose(out);
-	    std::runtime_error("Closed trajectory!\n");
-	  }
-	}
-#endif
-    
   } // End loop over trajectory
 
   return points;
 }
 
-void Bader::analysis() {
+
+std::vector<arma::ivec> Bader::classify_ongrid(arma::ivec p) const {
+  // Original point
+  const arma::ivec p0(p);
+
+  // List of points treated in current path.
+  std::vector<arma::ivec> points;
+  points.push_back(p);
+
+  size_t iiter=0;
+
+  // Loop over trajectory
+  while(true) {
+    // Check if the current point and its neighbors are already assigned
+    if(region(p(0),p(1),p(2))!=-1 && neighbors_assigned(p)) {
+      break;
+    }
+    
+    // Calculate maximal projected gradient.
+    arma::ivec dir(3);
+    dir.zeros();
+    double maxgrad=0.0;
+
+    // Loop over neighboring cells
+    for(int dx=-1;dx<=1;dx++)
+      for(int dy=-1;dy<=1;dy++)
+	for(int dz=-1;dz<=1;dz++) {
+	  // Skip current point
+	  if(dx==0 && dy==0 && dz==0)
+	    continue;
+
+	  // New point
+	  arma::ivec dp(3);
+	  dp(0)=dx;
+	  dp(1)=dy;
+	  dp(2)=dz;
+	  arma::ivec np=p+dp;
+	  // Check that it is in the grid
+	  if(!in_cube(np))
+	    continue;
+
+	  // Compute gradient
+	  double drho=dens(np(0),np(1),np(2))-dens(p(0),p(1),p(2));
+	  double dr=arma::norm(dp%spacing,2);
+	  if(drho/dr>maxgrad) {
+	    // Maximal gradient found
+	    dir=dp;
+	    maxgrad=drho/dr;
+	  }
+	}
+    
+    // Converged?
+    if(maxgrad==0.0)
+      break;
+
+    // Perform move
+    p+=dir;
+    points.push_back(p);
+
+    iiter++;
+  }
+
+  return points;
+}
+
+void Bader::analysis_neargrid() {
   Timer t;
   if(verbose) {
-    printf("Performing Bader analysis ... ");
+    printf("Performing near-grid Bader analysis ... ");
     fflush(stdout);
   }
 
   // Reset amount of regions
   Nregions=0;
-  
+
   // Initialize region assignment
   region.ones(array_size(0),array_size(1),array_size(2));
   region*=-1;
 
   // Loop over inside of grid
-  //#ifdef _OPENMP
-#if defined(_OPENMP) && !defined(BADERDEBUG)
+#ifdef _OPENMP
+  //#if defined(_OPENMP) && !defined(BADERDEBUG)
 #pragma omp parallel for
 #endif
   for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
@@ -532,6 +514,11 @@ void Bader::analysis() {
 	// Check if point has already been classified
 	if(region(iix,iiy,iiz)!=-1)
 	  continue;
+	// or if it contains a vanishingly small density
+	else if(dens(iix,iiy,iiz)<=SMALLDENSITY) {
+	  region(iix,iiy,iiz)=0;
+	  continue;
+	}
 
 	// Otherwise, continue with the trajectory analysis.
 	// Current point is
@@ -541,7 +528,7 @@ void Bader::analysis() {
 	p(2)=iiz;
 
 	// Get the trajectory
-	std::vector<arma::ivec> points=classify(p);
+	std::vector<arma::ivec> points=classify_neargrid(p);
 
 #ifdef _OPENMP
 #pragma omp critical
@@ -556,7 +543,7 @@ void Bader::analysis() {
 	    arma::vec maxloc=start+pend%spacing;
 
 	    // Is this a zero maximum?
-	    if(dens(pend(0),pend(1),pend(2))==0.0) {
+	    if(dens(pend(0),pend(1),pend(2))<=SMALLDENSITY) {
 	      // Classify points to region 0
 	      for(size_t ip=0;ip<points.size();ip++)
 		// Only set classification on points that don't have a
@@ -566,11 +553,11 @@ void Bader::analysis() {
 		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
 		  region(points[ip](0),points[ip](1),points[ip](2))=0;
 	    }
-	    
+
 	    // Maximum already classified?
 	    else if(region(pend(0),pend(1),pend(2))!=-1) {
 #ifdef BADERDEBUG
-	      printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+	      // printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
 	      for(size_t ip=0;ip<points.size()-1;ip++)
 		// Only set classification on points that don't have a
@@ -581,7 +568,7 @@ void Bader::analysis() {
 		  region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
 
 
-	    // New region
+	      // New region
 	    } else {
 #ifdef BADERDEBUG
 	      if(verbose)
@@ -594,7 +581,7 @@ void Bader::analysis() {
 		oss << "Ending point (" << pend(0) << "," << pend(1) << "," << pend(2) << ") is an ill defined maximum!\n";
 		throw std::runtime_error(oss.str());
 	      }
-	      
+
 	      // Increment running number of regions and classify trajectory
 	      Nregions++;
 	      for(size_t ip=0;ip<points.size();ip++)
@@ -604,7 +591,7 @@ void Bader::analysis() {
 
 	    // Ended up in a point surrounded by points with the same classification
 	  } else if(region(pend(0),pend(1),pend(2))!=-1 && neighbors_assigned(pend)) {
-	    
+
 	    for(size_t ip=0;ip<points.size()-1;ip++)
 	      if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
 		region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
@@ -614,7 +601,7 @@ void Bader::analysis() {
 	    for(size_t ip=0;ip<points.size();ip++)
 	      if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
 		region(points[ip](0),points[ip](1),points[ip](2))=0;
-	    
+
 	  } else {
 	    fprintf(stderr,"%i %i %i is not classified!.\n",pend(0),pend(1),pend(2)); fflush(stderr);
 	    print_neighbors(pend);
@@ -636,13 +623,14 @@ void Bader::analysis() {
 #endif
 
   if(verbose) {
-    printf("Refining analysis on ");
+    printf("Refinement analysis initialization ... ");
     fflush(stdout);
     t.set();
   }
 
-  // Finally, analyze which points are on the boundary. 2.2(vii)
+  // Analyze which points are on the boundary. 2.2(vii)
   std::vector<arma::ivec> points;
+
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -659,58 +647,113 @@ void Bader::analysis() {
 	// Is the point on a boundary? Since the initial
 	// classification is done by trajectories, the points on the
 	// boundary may be misclassified.
-	// 
-	// However, if the point is a local maximum,
-	// there is no need for reclassification.
-	if(!local_maximum(p) && on_boundary(p)) {
+	//
+	// However, if the point is a local maximum or has small
+	// density, there is no need for reclassification.
+	if(!local_maximum(p) && region(p(0),p(1),p(2))!=0 && on_boundary(p)) {
 	  // Add it to the list
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-	  points.push_back(p);
+	  {
+	    points.push_back(p);
+	  }
 	}
       }
-
-  // ... reset their classification
-  for(size_t ip=0;ip<points.size();ip++)
-    region(points[ip](0),points[ip](1),points[ip](2))=-1;
-
-  if(verbose) {
-    printf("%s boundary points ... ",space_number(points.size()).c_str());
-    fflush(stdout);
-  }
-
-  // ... and rerun the analysis
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for(size_t ip=0;ip<points.size();ip++) {
-
-    // Get the trajectory from the point
-    std::vector<arma::ivec> traj=classify(points[ip]);
-
-    // ... and assign only the initial point.
-    arma::ivec p0=traj[0];
-    arma::ivec pend=traj[traj.size()-1];
-    region(p0(0),p0(1),p0(2))=region(pend(0),pend(1),pend(2));
-
-#ifdef BADERDEBUG
-    if(region(pend(0),pend(1),pend(2))==-1) {
-      std::ostringstream oss;
-      oss << "Reclassification trajectory ends at non-classified point " << pend;
-      throw std::runtime_error(oss.str());
-    }
-#endif
-  }
-
+  
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
   }
 
-#ifdef BADERDEBUG
-  check_regions("the refinement analysis");
+  int iref=0;
+  while(true) {
+    iref++;
+
+    // Collect old region assignments of boundary points
+    std::vector<arma::sword> oldreg;
+    for(size_t ip=0;ip<points.size();ip++)
+      oldreg.push_back(region(points[ip](0),points[ip](1),points[ip](2)));
+
+    if(verbose) {
+      printf("Iteration %2i: %s boundary points. ",iref,space_number(points.size()).c_str());
+      fflush(stdout);
+      t.set();
+    }
+
+    // Reset the classifications
+    for(size_t ip=0;ip<points.size();ip++)
+      region(points[ip](0),points[ip](1),points[ip](2))=-1;
+
+    // ... and rerun the analysis
+#ifdef _OPENMP
+#pragma omp parallel for
 #endif
+    for(size_t ip=0;ip<points.size();ip++) {
+
+      // Get the near-grid trajectory from the point
+      std::vector<arma::ivec> traj=classify_neargrid(points[ip]);
+
+      // ... and assign only the initial point.
+      arma::ivec p0=traj[0];
+      arma::ivec pend=traj[traj.size()-1];
+      region(p0(0),p0(1),p0(2))=region(pend(0),pend(1),pend(2));
+
+#ifdef BADERDEBUG
+      if(region(p0(0),p0(1),p0(2))<=0) {
+	std::ostringstream oss;
+	oss << "Reclassification trajectory ends at non-classified point " << pend;
+	throw std::runtime_error(oss.str());
+      }
+#endif
+    }
+
+    // Count how many have been reassigned
+    std::vector<arma::ivec> reassigned;
+    for(size_t ip=0;ip<points.size();ip++)
+      if(region(points[ip](0),points[ip](1),points[ip](2))!=oldreg[ip]) {
+	printf("Point %4i %4i %4i reclassified %i -> %i\n",points[ip](0),points[ip](1),points[ip](2),oldreg[ip],region(points[ip](0),points[ip](1),points[ip](2)));
+	reassigned.push_back(points[ip]);
+      }
+
+    if(verbose) {
+      printf("%s points reassigned. (%s)\n",space_number(reassigned.size()).c_str(),t.elapsed().c_str());
+      fflush(stdout);
+    }
+
+#ifdef BADERDEBUG
+    check_regions("the refinement analysis");
+#endif
+
+    if(reassigned.size()==0)
+      break;
+    else {
+      // Get neighboring points for reassigned points
+      points.clear();
+
+      for(size_t ip=0;ip<reassigned.size();ip++) {
+	// Loop over neighboring points
+	for(int xs=-1;xs<=1;xs++)
+	  for(int ys=-1;ys<=1;ys++)
+	    for(int zs=-1;zs<=1;zs++) {
+	      // We have already reclassified the central point.
+	      if(xs==0 && ys==0 && zs==0)
+		continue;
+	      
+	      arma::ivec dp(3);
+	      dp(0)=xs;
+	      dp(1)=ys;
+	      dp(2)=zs;
+	      
+	      arma::ivec np=reassigned[ip]+dp;
+	      // Once again, local maxima or vanishing densities
+	      // aren't allowed to be reclassified.
+	      if(in_cube(np) && region(np(0),np(1),np(2))!=0 && !local_maximum(np))
+		points.push_back(np);
+	    }
+      }
+    }
+  }
 
   // Reorder regions
   reorder();
@@ -721,6 +764,100 @@ void Bader::analysis() {
   print_individual_regions();
 #endif
 }
+
+
+void Bader::analysis_ongrid() {
+  Timer t;
+  if(verbose) {
+    printf("Performing on-grid Bader analysis ... ");
+    fflush(stdout);
+  }
+
+  // Reset amount of regions
+  Nregions=0;
+
+  // Initialize region assignment
+  region.ones(array_size(0),array_size(1),array_size(2));
+  region*=-1;
+
+  // Loop over inside of grid
+#ifdef _OPENMP
+  //#if defined(_OPENMP) && !defined(BADERDEBUG)
+#pragma omp parallel for
+#endif
+  for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
+    for(size_t iix=0;iix<dens.n_rows;iix++)
+      for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+
+	// Check if point has already been classified
+	if(region(iix,iiy,iiz)!=-1)
+	  continue;
+	// or if it contains a vanishingly small density
+	else if(dens(iix,iiy,iiz)<=SMALLDENSITY) {
+	  region(iix,iiy,iiz)=0;
+	  continue;
+	}
+
+	// Otherwise, continue with the trajectory analysis.
+	// Current point is
+	arma::ivec p(3);
+	p(0)=iix;
+	p(1)=iiy;
+	p(2)=iiz;
+
+	// Get the trajectory
+	std::vector<arma::ivec> points=classify_ongrid(p);
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+	{
+	  // Assign classification to the points. Ending point of trajectory is
+	  arma::ivec pend=points[points.size()-1];
+
+	  // Maximum already classified?
+	  if(region(pend(0),pend(1),pend(2))!=-1) {
+#ifdef BADERDEBUG
+	    // printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+#endif
+	    for(size_t ip=0;ip<points.size()-1;ip++)
+	      region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
+
+          // New region
+	  } else {
+#ifdef BADERDEBUG
+	    if(verbose)
+	      printf("Maximum %i = %e found at %4i %4i %4i.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2));
+#endif
+
+	    // Check for ill defined maximum
+	    if(check_maximum(pend)==0.0) {
+	      std::ostringstream oss;
+	      oss << "Ending point (" << pend(0) << "," << pend(1) << "," << pend(2) << ") is an ill defined maximum!\n";
+	      throw std::runtime_error(oss.str());
+	    }
+
+	    // Increment running number of regions and classify trajectory
+	    Nregions++;
+	    for(size_t ip=0;ip<points.size();ip++)
+	      region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
+	  }
+	} // End critical region
+
+      } // End loop over grid
+
+  if(verbose) {
+    printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
+    fflush(stdout);
+  }
+
+#ifdef BADERDEBUG
+  check_regions("on-grid analysis");
+#endif
+  // Reorder regions
+  reorder();
+}
+
 
 arma::ivec Bader::nuclear_regions() const {
 #ifdef BADERDEBUG
@@ -754,6 +891,10 @@ arma::ivec Bader::nuclear_regions() const {
     //    printf("Nucleus %i is in region %i, distance to grid point is %e.\n",(int) inuc+1,nucreg(inuc),arma::norm(gp_dist,2));
   }
 
+#ifdef BADERDEBUG
+  check_regions("after nuclear regions");
+#endif
+
   return nucreg;
 }
 
@@ -781,14 +922,20 @@ void Bader::reorder() {
       std::swap(map(nucreg(inuc)-1),map(imap));
     }
 
+  arma::uvec regmap(map.n_elem+1);
+  // Zero index does not chage
+  regmap(0)=0;
+  regmap.subvec(1,map.n_elem)=map;
+
   // Perform remapping
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
   for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
     for(size_t iix=0;iix<dens.n_rows;iix++)
-      for(size_t iiy=0;iiy<dens.n_cols;iiy++)
-	region(iix,iiy,iiz)=map(region(iix,iiy,iiz)-1);
+      for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+	region(iix,iiy,iiz)=regmap(region(iix,iiy,iiz));
+      }
 }
 
 
@@ -816,7 +963,7 @@ arma::vec Bader::regional_charges() const {
 	    q(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
 #endif
 	  }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     q+=qwrk;
@@ -1015,7 +1162,7 @@ void Bader::print_individual_regions() const {
 }
 
 arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) const {
-  
+
   // Charges in the Bader regions
   arma::vec q(Nregions);
   q.zeros();
@@ -1036,7 +1183,7 @@ arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) c
 	  // Skip zero-density volume elements
 	  if(region(iix,iiy,iiz)==0)
 	    continue;
-	  
+
 	  coords_t tmp;
 	  tmp.x=start(0)+iix*spacing(0);
 	  tmp.y=start(1)+iiy*spacing(1);
@@ -1049,13 +1196,13 @@ arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) c
 	  q(region(iix,iiy,iiz)-1)+=d;
 #endif
 	}
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     q+=qwrk;
 #endif
   }
-  
+
   // Plug in the spacing and convert sign
   q*=-spacing(0)*spacing(1)*spacing(2);
   return q;
@@ -1069,7 +1216,7 @@ arma::vec Bader::nuclear_charges(const BasisSet & basis, const arma::mat & P) co
   arma::vec qnuc(nucreg.n_elem);
   for(size_t i=0;i<nucreg.n_elem;i++)
     qnuc(i)=q(nucreg(i)-1);
-  
+
   return qnuc;
 }
 
@@ -1089,7 +1236,7 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
   for(arma::sword ireg=0;ireg<Nregions;ireg++) {
     // Initialize
     Sat[ireg].zeros(basis.get_Nbf(),basis.get_Nbf());
-    
+
     // Loop over grid
     for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
       for(size_t iix=0;iix<dens.n_rows;iix++)
@@ -1104,7 +1251,7 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
     // Plug in normalization
     Sat[ireg]*=spacing(0)*spacing(1)*spacing(2);
   }
-  
+
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
