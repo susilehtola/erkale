@@ -16,6 +16,7 @@
 
 #include <cfloat>
 #include "bader.h"
+#include "dftgrid.h"
 #include "timer.h"
 #include "stringutil.h"
 
@@ -80,30 +81,88 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
     fflush(stdout);
   }
 
-  // Integrated charge
-  double Q=0.0;
-
   // Allocate memory for density
   dens.zeros(array_size(0),array_size(1),array_size(2));
   // and for assignment array
   region.zeros(array_size(0),array_size(1),array_size(2));
 
-  // Fill array
+  // Divide the grid into boxes with edge length of
+  double L=1.0;
+  // Get the partitioning
+  std::vector<grid_partition_t> pt=partitioning(L);
+  // Inaccuracy in the distance is
+  double dL=sqrt(3.0/8.0)*L;
+
+  // Shell ranges
+  std::vector<double> shran=basis.get_shell_ranges(SMALLDENSITY);
+
+  // Fill array. Integrated charge
+  double Q=0.0;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:Q)
 #endif
-  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(arma::sword iix=0;iix<array_size(0);iix++)
-      for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
-	coords_t tmp;
-	tmp.x=start(0)+iix*spacing(0);
-	tmp.y=start(1)+iiy*spacing(1);
-	tmp.z=start(2)+iiz*spacing(2);
-	double d=compute_density(P,basis,tmp);
+  for(size_t ipt=0;ipt<pt.size();ipt++) {
+    // Compute center of grid box
+    arma::vec cen=start + (pt[ipt].start+pt[ipt].end)%spacing/2.0;
 
-	dens(iix,iiy,iiz)=d;
-	Q+=d;
-      }
+    // Form list of important shells in the partition region
+    std::vector<size_t> compute_shells;
+    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+      // Compute distance from grid element center to nucleus
+      coords_t gp;
+      gp.x=cen(0);
+      gp.y=cen(1);
+      gp.z=cen(2);
+      double dist=norm(basis.get_nuclear_coords(inuc)-gp);
+
+      // Get indices of shells centered on the nucleus
+      std::vector<size_t> shellinds=basis.get_shell_inds(inuc);
+      
+      // Do the shells contribute?
+      for(size_t is=0;is<shellinds.size();is++)
+	if(shran[shellinds[is]]>=dist-dL)
+	  compute_shells.push_back(shellinds[is]);
+    }
+
+    // Skip density computation altogether if nothing is there.
+    if(!compute_shells.size())
+      continue;
+    
+    // Function values
+    std::vector<bf_f_t> flist;
+    
+    // Loop over grid points
+    for(arma::sword iiz=pt[ipt].start(2);iiz<pt[ipt].end(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(arma::sword iix=pt[ipt].start(0);iix<pt[ipt].end(0);iix++)
+	for(arma::sword iiy=pt[ipt].start(1);iiy<pt[ipt].end(1);iiy++) {
+	  double x=start(0)+iix*spacing(0);
+	  double y=start(1)+iiy*spacing(1);
+	  double z=start(2)+iiz*spacing(2);
+
+	  // Compute functions in grid point
+	  flist.clear();
+	  for(size_t is=0;is<compute_shells.size();is++) {
+	    arma::vec bf=basis.eval_func(compute_shells[is],x,y,z);
+	    for(size_t fi=0;fi<bf.size();fi++) {
+	      bf_f_t f;
+	      f.ind=basis.get_first_ind(compute_shells[is])+fi;
+	      f.f=bf(fi);
+	      flist.push_back(f);
+	    }
+	  }
+	  
+	  // Compute the density
+	  double d=0.0;
+	  for(size_t ii=0;ii<flist.size();ii++) {
+	    // Off-diagonal first
+	    for(size_t jj=0;jj<ii;jj++)
+	      d+=2.0*P(flist[ii].ind,flist[jj].ind)*flist[ii].f*flist[jj].f;
+	    d+=P(flist[ii].ind,flist[ii].ind)*flist[ii].f*flist[ii].f;
+	  }
+	  dens(iix,iiy,iiz)=d;
+	  Q+=d;
+	}
+  }
   Q*=spacing(0)*spacing(1)*spacing(2);
 
   if(verbose)
@@ -172,6 +231,45 @@ void Bader::check_regions(std::string msg) const {
     oss << "!\n";
     throw std::runtime_error(oss.str());
   }
+}
+
+std::vector<grid_partition_t> Bader::partitioning(double l) const {
+  // Slice length in grid points
+  arma::ivec sl(3);
+  for(int ic=0;ic<3;ic++)
+    sl(ic)=(int) ceil(l/spacing(ic));
+  
+  // Amount of slices in each direction
+  arma::ivec Ns(3);
+  for(int ic=0;ic<3;ic++) {
+    Ns(ic)=array_size(ic)/sl(ic);
+    if(array_size(ic)%sl(ic)!=0)
+      Ns(ic)++;
+  }
+
+  // Create partitioning
+  std::vector<grid_partition_t> p;
+  for(arma::sword xs=0;xs<Ns(0);xs++)
+    for(arma::sword ys=0;ys<Ns(1);ys++)
+      for(arma::sword zs=0;zs<Ns(2);zs++) {
+	grid_partition_t slice;
+	
+	// Start indices
+	slice.start.zeros(3);
+	slice.start(0)=xs*sl(0);
+	slice.start(1)=ys*sl(1);
+	slice.start(2)=zs*sl(2);
+
+	// End indices
+	slice.end.zeros(3);
+	slice.end(0)=std::min((xs+1)*sl(0),array_size(0));
+	slice.end(1)=std::min((ys+1)*sl(1),array_size(1));
+	slice.end(2)=std::min((zs+1)*sl(2),array_size(2));
+
+	p.push_back(slice);
+      }
+
+  return p;
 }
 
 bool Bader::neighbors_assigned(const arma::ivec & p) const {
@@ -506,116 +604,120 @@ void Bader::analysis_neargrid() {
   region.ones(array_size(0),array_size(1),array_size(2));
   region*=-1;
 
-  // Loop over inside of grid
+  // Get partitioning
+  std::vector<grid_partition_t> pt=partitioning();
+  
+  // Loop over grid
 #ifdef _OPENMP
-  //#if defined(_OPENMP) && !defined(BADERDEBUG)
 #pragma omp parallel for
 #endif
-  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(arma::sword iix=0;iix<array_size(0);iix++)
-      for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
-
-	// Check if point has already been classified
-	if(region(iix,iiy,iiz)!=-1)
+  for(size_t ipt=0;ipt<pt.size();ipt++)
+    // Loop over grid points
+    for(arma::sword iiz=pt[ipt].start(2);iiz<pt[ipt].end(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(arma::sword iix=pt[ipt].start(0);iix<pt[ipt].end(0);iix++)
+	for(arma::sword iiy=pt[ipt].start(1);iiy<pt[ipt].end(1);iiy++) {
+	  
+	  // Check if point has already been classified
+	  if(region(iix,iiy,iiz)!=-1)
+	    continue;
+	  // or if it contains a vanishingly small density
+	  else if(dens(iix,iiy,iiz)<=SMALLDENSITY) {
+	    region(iix,iiy,iiz)=0;
 	  continue;
-	// or if it contains a vanishingly small density
-	else if(dens(iix,iiy,iiz)<=SMALLDENSITY) {
-	  region(iix,iiy,iiz)=0;
-	  continue;
-	}
-
-	// Otherwise, continue with the trajectory analysis.
-	// Current point is
-	arma::ivec p(3);
-	p(0)=iix;
-	p(1)=iiy;
-	p(2)=iiz;
-
-	// Get the trajectory
-	std::vector<arma::ivec> points=classify_neargrid(p);
-
+	  }
+	  
+	  // Otherwise, continue with the trajectory analysis.
+	  // Current point is
+	  arma::ivec p(3);
+	  p(0)=iix;
+	  p(1)=iiy;
+	  p(2)=iiz;
+	  
+	  // Get the trajectory
+	  std::vector<arma::ivec> points=classify_neargrid(p);
+	  
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-	{
-	  // Assign classification to the points. Ending point of trajectory is
-	  arma::ivec pend=points[points.size()-1];
+	  {
+	    // Assign classification to the points. Ending point of trajectory is
+	    arma::ivec pend=points[points.size()-1];
 
-	  // Ended up at a local maximum?
-	  if(local_maximum(pend)) {
+	    // Ended up at a local maximum?
+	    if(local_maximum(pend)) {
 
-	    arma::vec maxloc=start+pend%spacing;
+	      arma::vec maxloc=start+pend%spacing;
 
-	    // Is this a zero maximum?
-	    if(dens(pend(0),pend(1),pend(2))<=SMALLDENSITY) {
-	      // Classify points to region 0
-	      for(size_t ip=0;ip<points.size();ip++)
-		// Only set classification on points that don't have a
-		// classification as of yet, since otherwise the
-		// classification of boundary points can fluctuate
-		// during the grid assignment.
-		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
-		  region(points[ip](0),points[ip](1),points[ip](2))=0;
-	    }
+	      // Is this a zero maximum?
+	      if(dens(pend(0),pend(1),pend(2))<=SMALLDENSITY) {
+		// Classify points to region 0
+		for(size_t ip=0;ip<points.size();ip++)
+		  // Only set classification on points that don't have a
+		  // classification as of yet, since otherwise the
+		  // classification of boundary points can fluctuate
+		  // during the grid assignment.
+		  if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
+		    region(points[ip](0),points[ip](1),points[ip](2))=0;
+	      }
 
-	    // Maximum already classified?
-	    else if(region(pend(0),pend(1),pend(2))!=-1) {
+	      // Maximum already classified?
+	      else if(region(pend(0),pend(1),pend(2))!=-1) {
 #ifdef BADERDEBUG
-	      // printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+		// printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
+		for(size_t ip=0;ip<points.size()-1;ip++)
+		  // Only set classification on points that don't have a
+		  // classification as of yet, since otherwise the
+		  // classification of boundary points can fluctuate
+		  // during the grid assignment.
+		  if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
+		    region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
+
+
+		// New region
+	      } else {
+#ifdef BADERDEBUG
+		if(verbose)
+		  printf("Maximum %i = %e found at %4i %4i %4i, i.e. at % e % e %e.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+#endif
+
+		// Check for ill defined maximum
+		if(check_maximum(pend)==0.0) {
+		  std::ostringstream oss;
+		  oss << "Ending point (" << pend(0) << "," << pend(1) << "," << pend(2) << ") is an ill defined maximum!\n";
+		  throw std::runtime_error(oss.str());
+		}
+
+		// Increment running number of regions and classify trajectory
+		Nregions++;
+		for(size_t ip=0;ip<points.size();ip++)
+		  if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
+		    region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
+	      }
+
+	      // Ended up in a point surrounded by points with the same classification
+	    } else if(region(pend(0),pend(1),pend(2))!=-1 && neighbors_assigned(pend)) {
+
 	      for(size_t ip=0;ip<points.size()-1;ip++)
-		// Only set classification on points that don't have a
-		// classification as of yet, since otherwise the
-		// classification of boundary points can fluctuate
-		// during the grid assignment.
 		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
 		  region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
 
-
-	      // New region
-	    } else {
-#ifdef BADERDEBUG
-	      if(verbose)
-		printf("Maximum %i = %e found at %4i %4i %4i, i.e. at % e % e %e.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
-#endif
-
-	      // Check for ill defined maximum
-	      if(check_maximum(pend)==0.0) {
-		std::ostringstream oss;
-		oss << "Ending point (" << pend(0) << "," << pend(1) << "," << pend(2) << ") is an ill defined maximum!\n";
-		throw std::runtime_error(oss.str());
-	      }
-
-	      // Increment running number of regions and classify trajectory
-	      Nregions++;
+	      // Gradient vanishes?
+	    } else if(arma::norm(gradient(pend),2)==0.0) {
 	      for(size_t ip=0;ip<points.size();ip++)
 		if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
-		  region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
+		  region(points[ip](0),points[ip](1),points[ip](2))=0;
+
+	    } else {
+	      fprintf(stderr,"%i %i %i is not classified!.\n",pend(0),pend(1),pend(2)); fflush(stderr);
+	      print_neighbors(pend);
+
+	      ERROR_INFO();
+	      throw std::runtime_error("Should not end here!\n");
 	    }
+	  } // End critical region
 
-	    // Ended up in a point surrounded by points with the same classification
-	  } else if(region(pend(0),pend(1),pend(2))!=-1 && neighbors_assigned(pend)) {
-
-	    for(size_t ip=0;ip<points.size()-1;ip++)
-	      if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
-		region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
-
-	    // Gradient vanishes?
-	  } else if(arma::norm(gradient(pend),2)==0.0) {
-	    for(size_t ip=0;ip<points.size();ip++)
-	      if(region(points[ip](0),points[ip](1),points[ip](2))==-1)
-		region(points[ip](0),points[ip](1),points[ip](2))=0;
-
-	  } else {
-	    fprintf(stderr,"%i %i %i is not classified!.\n",pend(0),pend(1),pend(2)); fflush(stderr);
-	    print_neighbors(pend);
-
-	    ERROR_INFO();
-	    throw std::runtime_error("Should not end here!\n");
-	  }
-	} // End critical region
-
-      } // End loop over grid
+	} // End loop over grid
 
   if(verbose) {
     printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
@@ -635,35 +737,38 @@ void Bader::analysis_neargrid() {
   // Analyze which points are on the boundary. 2.2(vii)
   std::vector<arma::ivec> points;
 
+  // Loop over grid
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(arma::sword iix=0;iix<array_size(0);iix++)
-      for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
+  for(size_t ipt=0;ipt<pt.size();ipt++)
+    // Loop over grid points
+    for(arma::sword iiz=pt[ipt].start(2);iiz<pt[ipt].end(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(arma::sword iix=pt[ipt].start(0);iix<pt[ipt].end(0);iix++)
+	for(arma::sword iiy=pt[ipt].start(1);iiy<pt[ipt].end(1);iiy++) {
+	  
+	  // Current point
+	  arma::ivec p(3);
+	  p(0)=iix;
+	  p(1)=iiy;
+	  p(2)=iiz;
 
-	// Current point
-	arma::ivec p(3);
-	p(0)=iix;
-	p(1)=iiy;
-	p(2)=iiz;
-
-	// Is the point on a boundary? Since the initial
-	// classification is done by trajectories, the points on the
-	// boundary may be misclassified.
-	//
-	// However, if the point is a local maximum, there is no need
-	// for reclassification.
-	if(!local_maximum(p) && on_boundary(p)) {
-	  // Add it to the list
+	  // Is the point on a boundary? Since the initial
+	  // classification is done by trajectories, the points on the
+	  // boundary may be misclassified.
+	  //
+	  // However, if the point is a local maximum, there is no need
+	  // for reclassification.
+	  if(!local_maximum(p) && on_boundary(p)) {
+	    // Add it to the list
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-	  {
-	    points.push_back(p);
+	    {
+	      points.push_back(p);
+	    }
 	  }
 	}
-      }
   
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
@@ -788,71 +893,75 @@ void Bader::analysis_ongrid() {
   region.ones(array_size(0),array_size(1),array_size(2));
   region*=-1;
 
-  // Loop over inside of grid
+  // Get partitioning
+  std::vector<grid_partition_t> pt=partitioning();
+  
+  // Loop over grid
 #ifdef _OPENMP
-  //#if defined(_OPENMP) && !defined(BADERDEBUG)
 #pragma omp parallel for
 #endif
-  for(size_t iiz=0;iiz<dens.n_slices;iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(size_t iix=0;iix<dens.n_rows;iix++)
-      for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
+  for(size_t ipt=0;ipt<pt.size();ipt++)
+    // Loop over grid points
+    for(arma::sword iiz=pt[ipt].start(2);iiz<pt[ipt].end(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(arma::sword iix=pt[ipt].start(0);iix<pt[ipt].end(0);iix++)
+	for(arma::sword iiy=pt[ipt].start(1);iiy<pt[ipt].end(1);iiy++) {
 
-	// Check if point has already been classified
-	if(region(iix,iiy,iiz)!=-1)
-	  continue;
-	// or if it contains a vanishingly small density
-	else if(dens(iix,iiy,iiz)<=SMALLDENSITY) {
-	  region(iix,iiy,iiz)=0;
-	  continue;
-	}
+	  // Check if point has already been classified
+	  if(region(iix,iiy,iiz)!=-1)
+	    continue;
+	  // or if it contains a vanishingly small density
+	  else if(dens(iix,iiy,iiz)<=SMALLDENSITY) {
+	    region(iix,iiy,iiz)=0;
+	    continue;
+	  }
 
-	// Otherwise, continue with the trajectory analysis.
-	// Current point is
-	arma::ivec p(3);
-	p(0)=iix;
-	p(1)=iiy;
-	p(2)=iiz;
+	  // Otherwise, continue with the trajectory analysis.
+	  // Current point is
+	  arma::ivec p(3);
+	  p(0)=iix;
+	  p(1)=iiy;
+	  p(2)=iiz;
 
-	// Get the trajectory
-	std::vector<arma::ivec> points=classify_ongrid(p);
+	  // Get the trajectory
+	  std::vector<arma::ivec> points=classify_ongrid(p);
 
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-	{
-	  // Assign classification to the points. Ending point of trajectory is
-	  arma::ivec pend=points[points.size()-1];
+	  {
+	    // Assign classification to the points. Ending point of trajectory is
+	    arma::ivec pend=points[points.size()-1];
 
-	  // Maximum already classified?
-	  if(region(pend(0),pend(1),pend(2))!=-1) {
+	    // Maximum already classified?
+	    if(region(pend(0),pend(1),pend(2))!=-1) {
 #ifdef BADERDEBUG
-	    // printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
+	      // printf("%4i %4i %4i ended up at maximum %i = %e at %4i %4i %4i, i.e. at % e % e %e.\n",p(0),p(1),p(2),region(pend(0),pend(1),pend(2)),dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2),maxloc(0),maxloc(1),maxloc(2));
 #endif
-	    for(size_t ip=0;ip<points.size()-1;ip++)
-	      region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
+	      for(size_t ip=0;ip<points.size()-1;ip++)
+		region(points[ip](0),points[ip](1),points[ip](2))=region(pend(0),pend(1),pend(2));
 
-          // New region
-	  } else {
+	      // New region
+	    } else {
 #ifdef BADERDEBUG
-	    if(verbose)
-	      printf("Maximum %i = %e found at %4i %4i %4i.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2));
+	      if(verbose)
+		printf("Maximum %i = %e found at %4i %4i %4i.\n",Nregions,dens(pend(0),pend(1),pend(2)),pend(0),pend(1),pend(2));
 #endif
 
-	    // Check for ill defined maximum
-	    if(check_maximum(pend)==0.0) {
-	      std::ostringstream oss;
-	      oss << "Ending point (" << pend(0) << "," << pend(1) << "," << pend(2) << ") is an ill defined maximum!\n";
-	      throw std::runtime_error(oss.str());
+	      // Check for ill defined maximum
+	      if(check_maximum(pend)==0.0) {
+		std::ostringstream oss;
+		oss << "Ending point (" << pend(0) << "," << pend(1) << "," << pend(2) << ") is an ill defined maximum!\n";
+		throw std::runtime_error(oss.str());
+	      }
+
+	      // Increment running number of regions and classify trajectory
+	      Nregions++;
+	      for(size_t ip=0;ip<points.size();ip++)
+		region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
 	    }
+	  } // End critical region
 
-	    // Increment running number of regions and classify trajectory
-	    Nregions++;
-	    for(size_t ip=0;ip<points.size();ip++)
-	      region(points[ip](0),points[ip](1),points[ip](2))=Nregions;
-	  }
-	} // End critical region
-
-      } // End loop over grid
+	} // End loop over grid
 
   if(verbose) {
     printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
@@ -935,15 +1044,20 @@ void Bader::reorder() {
   regmap(0)=0;
   regmap.subvec(1,map.n_elem)=map;
 
-  // Perform remapping
+  // Get partitioning
+  std::vector<grid_partition_t> pt=partitioning();
+  
+  // Loop over grid
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
-    for(arma::sword iix=0;iix<array_size(0);iix++)
-      for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
-	region(iix,iiy,iiz)=regmap(region(iix,iiy,iiz));
-      }
+  for(size_t ipt=0;ipt<pt.size();ipt++)
+    // Loop over grid points
+    for(arma::sword iiz=pt[ipt].start(2);iiz<pt[ipt].end(2);iiz++) // Loop over slices first, since they're stored continguously in memory
+      for(arma::sword iix=pt[ipt].start(0);iix<pt[ipt].end(0);iix++)
+	for(arma::sword iiy=pt[ipt].start(1);iiy<pt[ipt].end(1);iiy++) {
+	  region(iix,iiy,iiz)=regmap(region(iix,iiy,iiz));
+	}
 }
 
 
