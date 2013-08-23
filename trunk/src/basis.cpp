@@ -1541,16 +1541,22 @@ size_t BasisSet::get_Nbf() const {
 }
 
 void BasisSet::compute_shell_ranges(double eps) {
-  shell_ranges.resize(shells.size());
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for(size_t i=0;i<shells.size();i++)
-    shell_ranges[i]=shells[i].range(eps);
+  shell_ranges=get_shell_ranges(eps);
 }
 
 std::vector<double> BasisSet::get_shell_ranges() const {
   return shell_ranges;
+}
+
+std::vector<double> BasisSet::get_shell_ranges(double eps) const {
+  std::vector<double> shran(shells.size());
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<shells.size();i++)
+    shran[i]=shells[i].range(eps);
+
+  return shran;
 }
 
 std::vector<double> BasisSet::get_nuclear_distances(size_t inuc) const {
