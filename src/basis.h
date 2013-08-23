@@ -321,8 +321,10 @@ class BasisSet {
    * Chem. Phys. Lett. 257 (1993), pp. 213-223.
    */
   void compute_shell_ranges(double eps=1e-10);
-  /// Get range of shells (distance at which functions have dropped below epsilon)
+  /// Get precomputed ranges of shells
   std::vector<double> get_shell_ranges() const;
+  /// Get range of shells with given value of epsilon
+  std::vector<double> get_shell_ranges(double eps) const;
 
   /// Get distances to other nuclei
   std::vector<double> get_nuclear_distances(size_t inuc) const;
