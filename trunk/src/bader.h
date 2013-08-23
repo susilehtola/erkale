@@ -30,6 +30,14 @@ typedef struct {
   size_t iz;
 } baderpoint_t;
 
+/// Helper for grid parallellization and basis function calculation
+typedef struct {
+  /// Minimum index values
+  arma::ivec start;
+  /// Maximum index values
+  arma::ivec end;
+} grid_partition_t;
+
 /**
  * Performs Bader analysis of the electron density.
  *
@@ -64,6 +72,9 @@ class Bader {
 
   /// Check that all points have been classified
   void check_regions(std::string msg="") const;
+
+  /// Partition grid into boxes with edge length l
+  std::vector<grid_partition_t> partitioning(double l=1.0) const;
 
   /// Check that point is in the cube
   bool in_cube(const arma::ivec & p) const;
