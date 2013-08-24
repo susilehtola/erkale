@@ -129,11 +129,11 @@ class Bader {
   arma::vec nuclear_charges() const;
 
   /// Write out electron density
-  void print_density() const;
+  void print_density(double spacing=0.1) const;
   /// Write out Bader regions
-  void print_regions() const;
+  void print_regions(double spacing=0.1) const;
   /// Write out individual Bader regions
-  void print_individual_regions() const;
+  void print_individual_regions(double spacing=0.1) const;
 
   /// Compute Bader charges using existing grid but input density
   arma::vec regional_charges(const BasisSet & basis, const arma::mat & P) const;
