@@ -1109,12 +1109,21 @@ arma::vec Bader::nuclear_charges() const {
   return qnuc;
 }
 
-void Bader::print_density() const {
+void Bader::print_density(double space) const {
   Timer t;
   if(verbose) {
     printf("Printing out density grid ... ");
     fflush(stdout);
   }
+
+  // Point increment will be
+  arma::ivec incr(3);
+  for(int ic=0;ic<3;ic++)
+    incr(ic)=(int) round(space/spacing(ic));
+  // and the spacing between points
+  arma::vec sp=incr%spacing;
+  // Output array size will be
+  arma::ivec size=1+(array_size-1)/incr;
 
   // Open output file.
   FILE *out=fopen("bader_density.cube","w");
@@ -1126,9 +1135,9 @@ void Bader::print_density() const {
   // Write out starting point
   fprintf(out,"%7i % g % g % g\n",(int) nuclei.size(),start(0),start(1),start(2));
   // Print amount of points and step sizes in the directions
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_rows,spacing(0),0.0,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_cols,0.0,spacing(1),0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_slices,0.0,0.0,spacing(2));
+  fprintf(out,"%7i % g % g % g\n",(int) size(0),sp(0),0.0,0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) size(1),0.0,sp(1),0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) size(2),0.0,0.0,sp(2));
   // Print out atoms
   for(size_t i=0;i<nuclei.size();i++) {
     nucleus_t nuc=nuclei[i];
@@ -1139,15 +1148,10 @@ void Bader::print_density() const {
   size_t idx=0;
 
   // Cube ordering - innermost loop wrt z, inner wrt y and outer wrt x
-  for(size_t iix=0;iix<dens.n_rows;iix++)
-    for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
-      for(size_t iiz=0;iiz<dens.n_slices;iiz++) {
-	// Point
-	arma::ivec p(3);
-	p(0)=iix;
-	p(1)=iiy;
-	p(2)=iiz;
-
+  for(arma::sword iix=0;iix<array_size(0);iix+=incr(0))
+    for(arma::sword iiy=0;iiy<array_size(1);iiy+=incr(1)) {
+      for(arma::sword iiz=0;iiz<array_size(2);iiz+=incr(2)) {
+	// Print density
 	fprintf(out," % .5e",dens(iix,iiy,iiz));
 	idx++;
 	if(idx==6) {
@@ -1161,19 +1165,28 @@ void Bader::print_density() const {
     }
   // Close file
   fclose(out);
-
+  
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
   }
 }
 
-void Bader::print_regions() const {
+void Bader::print_regions(double space) const {
   Timer t;
   if(verbose) {
     printf("Printing out Bader region boundary grid ... ");
     fflush(stdout);
   }
+
+  // Point increment will be
+  arma::ivec incr(3);
+  for(int ic=0;ic<3;ic++)
+    incr(ic)=(int) round(space/spacing(ic));
+  // and the spacing between points
+  arma::vec sp=incr%spacing;
+  // Array size will be
+  arma::ivec size=1+(array_size-1)/incr;
 
   // Open output file.
   FILE *out=fopen("bader_regions.cube","w");
@@ -1185,9 +1198,9 @@ void Bader::print_regions() const {
   // Write out starting point
   fprintf(out,"%7i % g % g % g\n",(int) nuclei.size(),start(0),start(1),start(2));
   // Print amount of points and step sizes in the directions
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_rows,spacing(0),0.0,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_cols,0.0,spacing(1),0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_slices,0.0,0.0,spacing(2));
+  fprintf(out,"%7i % g % g % g\n",(int) size(0),sp(0),0.0,0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) size(1),0.0,sp(1),0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) size(2),0.0,0.0,sp(2));
   // Print out atoms
   for(size_t i=0;i<nuclei.size();i++) {
     nucleus_t nuc=nuclei[i];
@@ -1198,9 +1211,9 @@ void Bader::print_regions() const {
   size_t idx=0;
 
   // Cube ordering - innermost loop wrt z, inner wrt y and outer wrt x
-  for(size_t iix=0;iix<dens.n_rows;iix++)
-    for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
-      for(size_t iiz=0;iiz<dens.n_slices;iiz++) {
+  for(arma::sword iix=0;iix<array_size(0);iix+=incr(0))
+    for(arma::sword iiy=0;iiy<array_size(1);iiy+=incr(1)) {
+      for(arma::sword iiz=0;iiz<array_size(2);iiz+=incr(2)) {
 	// Point
 	arma::ivec p(3);
 	p(0)=iix;
@@ -1231,15 +1244,25 @@ void Bader::print_regions() const {
   }
 }
 
-void Bader::print_individual_regions() const {
+void Bader::print_individual_regions(double space) const {
   Timer t;
   if(verbose) {
     printf("Printing out individual Bader region grids ... ");
     fflush(stdout);
   }
   
+  // Point increment will be
+  arma::ivec incr(3);
+  for(int ic=0;ic<3;ic++)
+    incr(ic)=(int) round(space/spacing(ic));
+  // and the spacing between points
+  arma::vec sp=incr%spacing;
+  // Array size will be
+  arma::ivec size=1+(array_size-1)/incr;
+
   // Open output file.
   FILE *out=fopen("individual_bader_regions.cube","w");
+
 
   // Write out comment fields
   fprintf(out,"ERKALE individual Bader regions\n");
@@ -1248,9 +1271,9 @@ void Bader::print_individual_regions() const {
   // Write out starting point. Amount of nuclei as negative, because we use MO format
   fprintf(out,"%7i % g % g % g\n",-(int) nuclei.size(),start(0),start(1),start(2));
   // Print amount of points and step sizes in the directions
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_rows,spacing(0),0.0,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_cols,0.0,spacing(1),0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) dens.n_slices,0.0,0.0,spacing(2));
+  fprintf(out,"%7i % g % g % g\n",(int) size(0),sp(0),0.0,0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) size(1),0.0,sp(1),0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) size(2),0.0,0.0,sp(2));
   // Print out atoms
   for(size_t i=0;i<nuclei.size();i++) {
     nucleus_t nuc=nuclei[i];
@@ -1259,7 +1282,7 @@ void Bader::print_individual_regions() const {
 
   // Index of points written
   size_t idx=1;
-
+  
   // Print out region indices
   fprintf(out,"%5i", Nregions);
   for(arma::sword ireg=0;ireg<Nregions;ireg++) {
@@ -1278,9 +1301,9 @@ void Bader::print_individual_regions() const {
 
 
   // Cube ordering - innermost loop wrt z, inner wrt y and outer wrt x
-  for(size_t iix=0;iix<dens.n_rows;iix++)
-    for(size_t iiy=0;iiy<dens.n_cols;iiy++) {
-      for(size_t iiz=0;iiz<dens.n_slices;iiz++) {
+  for(arma::sword iix=0;iix<array_size(0);iix+=incr(0))
+    for(arma::sword iiy=0;iiy<array_size(1);iiy+=incr(1)) {
+      for(arma::sword iiz=0;iiz<array_size(2);iiz+=incr(2)) {
 	// Point
 	arma::ivec p(3);
 	p(0)=iix;
