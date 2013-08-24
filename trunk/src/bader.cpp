@@ -24,7 +24,7 @@
 //#define BADERDEBUG
 
 // Threshold for vanishingly small density
-#define SMALLDENSITY 1e-8
+#define SMALLDENSITY 1e-6
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -93,13 +93,15 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
   // Inaccuracy in the distance is
   double dL=sqrt(3.0/8.0)*L;
 
-  // Shell ranges
+  // Shell ranges. Basically this could be more agressive, i.e.
+  //  std::vector<double> shran=basis.get_shell_ranges(sqrt(SMALLDENSITY));
+  // but for the moment this causes problems in the near-grid algorithm...
   std::vector<double> shran=basis.get_shell_ranges(SMALLDENSITY);
-
+  
   // Fill array. Integrated charge
   double Q=0.0;
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+:Q)
+#pragma omp parallel for schedule(dynamic,1) reduction(+:Q)
 #endif
   for(size_t ipt=0;ipt<pt.size();ipt++) {
     // Compute center of grid box
@@ -516,6 +518,7 @@ std::vector<arma::ivec> Bader::classify_neargrid(arma::ivec p) const {
       }
     }
 
+
   // Add to points list
   points.push_back(p);
   iiter++;
@@ -609,7 +612,7 @@ void Bader::analysis_neargrid() {
   
   // Loop over grid
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
 #endif
   for(size_t ipt=0;ipt<pt.size();ipt++)
     // Loop over grid points
@@ -739,7 +742,7 @@ void Bader::analysis_neargrid() {
 
   // Loop over grid
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
 #endif
   for(size_t ipt=0;ipt<pt.size();ipt++)
     // Loop over grid points
@@ -796,7 +799,7 @@ void Bader::analysis_neargrid() {
 
     // ... and rerun the analysis
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
 #endif
     for(size_t ip=0;ip<points.size();ip++) {
 
@@ -898,7 +901,7 @@ void Bader::analysis_ongrid() {
   
   // Loop over grid
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
 #endif
   for(size_t ipt=0;ipt<pt.size();ipt++)
     // Loop over grid points
@@ -1049,7 +1052,7 @@ void Bader::reorder() {
   
   // Loop over grid
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
 #endif
   for(size_t ipt=0;ipt<pt.size();ipt++)
     // Loop over grid points
@@ -1405,7 +1408,7 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
   }
 
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic,1)
 #endif
   for(arma::sword ireg=0;ireg<Nregions;ireg++) {
     Sat[ireg].zeros(basis.get_Nbf(),basis.get_Nbf());
