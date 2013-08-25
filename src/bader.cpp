@@ -16,15 +16,15 @@
 
 #include <cfloat>
 #include "bader.h"
-#include "dftgrid.h"
 #include "timer.h"
 #include "stringutil.h"
+#include "dftgrid.h"
 
 // Debug printout?
 //#define BADERDEBUG
 
 // Threshold for vanishingly small density
-#define SMALLDENSITY 1e-6
+#define SMALLDENSITY 1e-8
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -1434,3 +1434,5 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
     
   return Sat;
 }
+
+
