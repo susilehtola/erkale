@@ -18,6 +18,7 @@
 #include "stringutil.h"
 #include "dftgrid.h"
 #include "bader.h"
+#include "badergrid.h"
 #include "linalg.h"
 
 arma::mat mulliken_overlap(const BasisSet & basis, const arma::mat & P) {
@@ -397,22 +398,29 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
   return q;
 }
 
-arma::vec bader_charges(const BasisSet & basis, const arma::mat & P) {
-  // Non-verbose operation
-  Bader bader(false);
-  bader.analyse(basis,P);
+arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol) {
+  // Helper. Non-verbose operation
+  BaderGrid intgrid(&basis,false);
+  // Construct grid
+  intgrid.construct(tol);
+  // and run analysis
+  intgrid.classify(P);
 
-  return bader.nuclear_charges();
+  // Get nuclear charges
+  return intgrid.nuclear_charges(P);
 }
 
-arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
-  // Non-verbose operation
-  Bader bader;
-  bader.analyse(basis,Pa+Pb);
+arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
+  // Helper. Non-verbose operation
+  BaderGrid intgrid(&basis,false);
+  // Construct grid
+  intgrid.construct(tol);
+  // and run analysis
+  intgrid.classify(Pa+Pb);
 
   arma::mat q(basis.get_Nnuc(),3);
-  q.col(0)=bader.nuclear_charges(basis,Pa);
-  q.col(1)=bader.nuclear_charges(basis,Pb);
+  q.col(0)=intgrid.nuclear_charges(Pa);
+  q.col(1)=intgrid.nuclear_charges(Pb);
   q.col(2)=q.col(0)+q.col(1);
 
   return q;
