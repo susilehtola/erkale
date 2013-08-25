@@ -22,7 +22,7 @@
 
 #include "adiis.h"
 #include "basis.h"
-#include "bader.h"
+#include "badergrid.h"
 #include "broyden.h"
 #include "elements.h"
 #include "dftfuncs.h"
@@ -2503,11 +2503,14 @@ void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 
 Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
   if(chg==PIPEK_BADER) {
-    // Bader grid
-    Bader bader(ver);
-    bader.analyse(basis,P);
+    // Helper. Non-verbose operation
+    BaderGrid intgrid(&basis,ver);
+    // Construct integration grid
+    intgrid.construct(1e-5);
+    // Run classification
+    intgrid.classify(P);
 
-    std::vector<arma::mat> Sat=bader.regional_overlap(basis);
+    std::vector<arma::mat> Sat=intgrid.regional_overlap();
 
     Timer t;
     if(ver) {

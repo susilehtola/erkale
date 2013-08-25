@@ -46,9 +46,9 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method);
 
 /// Compute Bader charges
-arma::vec bader_charges(const BasisSet & basis, const arma::mat & P);
+arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
 /// Compute Bader charges
-arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
 
 /// Compute Bader analysis
 void bader_analysis(const BasisSet & basis, const arma::mat & P);
