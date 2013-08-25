@@ -602,6 +602,8 @@ arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coor
 double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t & r);
 /// Compute gradient at given point
 arma::vec compute_gradient(const arma::mat & P, const BasisSet & bas, const coords_t & r);
+/// Compute density and gradient at a given point
+void compute_density_gradient(const arma::mat & P, const BasisSet & bas, const coords_t & r, double & d, arma::vec & g);
 
 /// Check orthonormality of molecular orbitals
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
