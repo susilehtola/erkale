@@ -271,12 +271,8 @@ class AtomGrid {
   /// Compute number of electrons
   double compute_Nel() const;
 
-  /// Compute memory requirements for grid points
-  size_t memory_req_grid() const;
-  /// Compute memory requirements for storing values of basis functions at grid points
-  size_t memory_req_bf() const;
-  /// Compute total memory requirements
-  size_t memory_req() const;
+  /// Print atomic grid
+  void print_grid() const;
 
   /// Initialize XC arrays
   void init_xc();
@@ -366,15 +362,6 @@ class DFTGrid {
   size_t get_Npoints() const;
   /// Get amount of functions
   size_t get_Nfuncs() const;
-
-  /// Get memory requirement for grid points
-  size_t memory_req_grid() const;
-  /// Get memory requirement for storing values of basis functions
-  size_t memory_req_bf() const;
-  /// Get total memory requirements
-  size_t memory_req() const;
-  /// Print memory requirements
-  void print_memory_req() const;
 
   /// Evaluate amount of electrons
   double compute_Nel(const arma::mat & P);

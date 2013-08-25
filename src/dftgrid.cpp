@@ -542,6 +542,11 @@ double AtomGrid::compute_Nel() const {
   return nel;
 }
 
+void AtomGrid::print_grid() const {
+  for(size_t ip=0;ip<grid.size();ip++)
+    printf("%5i % f % f % f %e\n",(int) ip+1,grid[ip].r.x,grid[ip].r.y,grid[ip].r.z,grid[ip].w);
+}
+
 void AtomGrid::init_xc() {
   // Size of grid.
   const size_t N=grid.size();
@@ -1610,12 +1615,13 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, size_t cenind, int nrad, in
   double rad, jac;
   for(size_t ir=0;ir<xc.size();ir++) {
     // Calculate value of radius
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+    double ixc=xc.size()-1-ir;
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
 
     // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ir]);
+    jac=1.0/M_LN2/(1.0-xc[ixc]);
     // so total quadrature weight is
-    double weight=wc[ir]*rad*rad*jac;
+    double weight=wc[ixc]*rad*rad*jac;
 
     // Store shell data
     ret.sh[ir].r=rad;
@@ -1682,12 +1688,13 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   double rad, jac;
   for(size_t ir=0;ir<xc.size();ir++) {
     // Calculate value of radius
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+    double ixc=xc.size()-1-ir;
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
 
     // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ir]);
+    jac=1.0/M_LN2/(1.0-xc[ixc]);
     // so total quadrature weight is
-    double weight=wc[ir]*rad*rad*jac;
+    double weight=wc[ixc]*rad*rad*jac;
 
     // Store shell data
     ret.sh[ir].r=rad;
@@ -1808,12 +1815,13 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   double rad, jac;
   for(size_t ir=0;ir<xc.size();ir++) {
     // Calculate value of radius
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+    double ixc=xc.size()-1-ir;
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
 
     // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ir]);
+    jac=1.0/M_LN2/(1.0-xc[ixc]);
     // so total quadrature weight is
-    double weight=wc[ir]*rad*rad*jac;
+    double weight=wc[ixc]*rad*rad*jac;
 
     // Store shell data
     ret.sh[ir].r=rad;
@@ -1942,12 +1950,13 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   double rad, jac;
   for(size_t ir=0;ir<xc.size();ir++) {
     // Calculate value of radius
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+    double ixc=xc.size()-1-ir;
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
 
     // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ir]);
+    jac=1.0/M_LN2/(1.0-xc[ixc]);
     // so total quadrature weight is
-    double weight=wc[ir]*rad*rad*jac;
+    double weight=wc[ixc]*rad*rad*jac;
 
     // Store shell data
     ret.sh[ir].r=rad;
@@ -2147,12 +2156,13 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
   double rad, jac;
   for(size_t ir=0;ir<xc.size();ir++) {
     // Calculate value of radius
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+    double ixc=xc.size()-1-ir;
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
 
     // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ir]);
+    jac=1.0/M_LN2/(1.0-xc[ixc]);
     // so total quadrature weight is
-    double weight=wc[ir]*rad*rad*jac;
+    double weight=wc[ixc]*rad*rad*jac;
 
     // Store shell data
     ret.sh[ir].r=rad;
@@ -2262,12 +2272,13 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
   double rad, jac;
   for(size_t ir=0;ir<xc.size();ir++) {
     // Calculate value of radius
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
+    double ixc=xc.size()-1-ir;
+    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
 
     // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ir]);
+    jac=1.0/M_LN2/(1.0-xc[ixc]);
     // so total quadrature weight is
-    double weight=wc[ir]*rad*rad*jac;
+    double weight=wc[ixc]*rad*rad*jac;
 
     // Store shell data
     ret.sh[ir].r=rad;
@@ -2873,7 +2884,7 @@ std::vector<arma::mat> DFTGrid::eval_overlaps() {
       wrk[ith].free();
     }
   }
-  
+
   return Sat;
 }
 
@@ -2912,7 +2923,7 @@ std::vector<arma::mat> DFTGrid::eval_hirshfeld_overlaps(const Hirshfeld & hirsh)
       wrk[ith].free();
     }
   }
-  
+
   return Sat;
 }
 
@@ -2923,13 +2934,13 @@ double DFTGrid::compute_Nel(const arma::mat & P) {
 #pragma omp parallel reduction(+:Nel)
 #endif
   {
-    
+
 #ifdef _OPENMP
     int ith=omp_get_thread_num();
 #else
     int ith=0;
 #endif
-    
+
 #ifdef _OPENMP
 #pragma omp for
 #endif
@@ -2947,7 +2958,7 @@ double DFTGrid::compute_Nel(const arma::mat & P) {
       wrk[ith].free();
     }
   }
-  
+
   return Nel;
 }
 
@@ -2958,13 +2969,13 @@ double DFTGrid::compute_Nel(const arma::mat & Pa, const arma::mat & Pb) {
 #pragma omp parallel reduction(+:Nel)
 #endif
   {
-    
+
 #ifdef _OPENMP
     int ith=omp_get_thread_num();
 #else
     int ith=0;
 #endif
-    
+
 #ifdef _OPENMP
 #pragma omp for
 #endif
@@ -2982,7 +2993,7 @@ double DFTGrid::compute_Nel(const arma::mat & Pa, const arma::mat & Pb) {
       wrk[ith].free();
     }
   }
-  
+
   return Nel;
 }
 
