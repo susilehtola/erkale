@@ -3273,12 +3273,23 @@ arma::vec compute_gradient(const arma::mat & P, const BasisSet & bas, const coor
   // Evaluate basis functions
   arma::vec bf=bas.eval_func(r.x,r.y,r.z);
   // and gradients
-  arma::vec grad=bas.eval_grad(r.x,r.y,r.z);
+  arma::mat grad=bas.eval_grad(r.x,r.y,r.z);
   
   // Density gradient is
   return arma::trans(bf)*P*grad;
 }
 
+void compute_density_gradient(const arma::mat & P, const BasisSet & bas, const coords_t & r, double & d, arma::vec & g) {
+  // Evaluate basis functions
+  arma::vec bf=bas.eval_func(r.x,r.y,r.z);
+  // and gradients
+  arma::mat grad=bas.eval_grad(r.x,r.y,r.z);
+
+  // Density is
+  d=arma::as_scalar(arma::trans(bf)*P*bf);
+  // and the gradient
+  g=arma::trans(bf)*P*grad;
+}
 
 std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
   // Returned list of identical basis functions
