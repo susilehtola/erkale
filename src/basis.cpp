@@ -1761,6 +1761,51 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
   return ret;
 }
 
+arma::mat BasisSet::eval_grad(double x, double y, double z) const {
+  // Helper
+  coords_t r;
+  r.x=x;
+  r.y=y;
+  r.z=z;
+  
+  // Determine which shells might contribute
+  std::vector<size_t> compute_shells;
+  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+    // Determine distance to nucleus
+    double dist=norm(r-nuclei[inuc].r);
+    // Get indices of shells centered on nucleus
+    std::vector<size_t> shellinds=get_shell_inds(inuc);
+    
+    // Loop over shells on nucleus
+    for(size_t ish=0;ish<shellinds.size();ish++)
+      // Shell is relevant if range is larger than distance
+      if(dist < shell_ranges[shellinds[ish]])
+	compute_shells.push_back(shellinds[ish]);
+  }
+
+  // Returned values
+  arma::mat ret(get_Nbf(),3);
+  ret.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<compute_shells.size();i++) {
+    size_t ish=compute_shells[i];
+    
+    // Evalute shell. Gradient values
+    arma::mat gf=shells[ish].eval_grad(x,y,z);
+    // First function on shell
+    size_t f0=shells[ish].get_first_ind();
+    
+    // and store the functions
+    for(size_t fi=0;fi<shells[ish].get_Nbf();fi++) {
+      ret.row(f0+fi)=gf.row(fi);
+    }
+  }
+
+  return ret;
+}
+
 arma::vec BasisSet::eval_func(size_t ish, double x, double y, double z) const {
   return shells[ish].eval_func(x,y,z);
 }
@@ -3222,6 +3267,16 @@ double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t
 
   // Density is
   return arma::as_scalar(arma::trans(bf)*P*bf);
+}
+
+arma::vec compute_gradient(const arma::mat & P, const BasisSet & bas, const coords_t & r) {
+  // Evaluate basis functions
+  arma::vec bf=bas.eval_func(r.x,r.y,r.z);
+  // and gradients
+  arma::vec grad=bas.eval_grad(r.x,r.y,r.z);
+  
+  // Density gradient is
+  return arma::trans(bf)*P*grad;
 }
 
 
