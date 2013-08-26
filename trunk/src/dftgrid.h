@@ -245,7 +245,8 @@ class AtomGrid {
    * exchange-correlation density functional quadratures",
    * Chem. Phys. Lett. 257, 213 (1996).
    *
-   * The value for the constant a is 0.7.
+   * The value for the constant a is 0.7, as in the Köster et al.
+   * (2004) paper.
    */
   void becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t ir);
   /// Compute Hirshfeld weight for grid points on shell irad
