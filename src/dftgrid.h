@@ -237,7 +237,16 @@ class AtomGrid {
   /// Compute values of basis functions in all grid points
   void compute_bf(const BasisSet & bas, const atomgrid_t & g);
 
-  /// Compute Becke weight for grid points on shell irad
+  /**
+   * Compute Becke weight for grid points on shell irad.
+   *
+   * The weighting scheme is from the article R. E. Stratmann,
+   * G. E. Scuseria, M. J. Frisch, "Achieving linear scaling in
+   * exchange-correlation density functional quadratures",
+   * Chem. Phys. Lett. 257, 213 (1996).
+   *
+   * The value for the constant a is 0.7.
+   */
   void becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t ir);
   /// Compute Hirshfeld weight for grid points on shell irad
   void hirshfeld_weights(const Hirshfeld & hirsh, const atomgrid_t & g, size_t ir);
