@@ -29,16 +29,10 @@
 // Threshold for vanishingly small density
 #define SMALLDENSITY 1e-8
 
-// Threshold for converged density gradient
-#define SMALLGRADIENT 1e-30
-// Threshold for separation of maxima
-#define SAMEMAXIMUM 0.1
-
-// Minimum step size
-#define MINSTEPSIZE 1e-6
-
-// Threshold for convergence at nucleus
-#define NUCLEARTHRESHOLD 1e-4
+// Convergence threshold of update
+#define CONVTHR 1e-3
+// Threshold distance for separation of maxima
+#define SAMEMAXIMUM (10*CONVTHR)
 
 BaderAtom::BaderAtom(bool lobatto, double tolv) : AtomGrid(lobatto,tolv) {
 }
@@ -94,8 +88,7 @@ std::vector<arma::sword> BaderAtom::classify(const BasisSet & basis, const arma:
 	region[ip]=0;
 	break;
 	
-      } else if(gnorm<=SMALLGRADIENT)
-	break;
+      }
 
       // Normalize gradient and preform line search
       coords_t gn;
@@ -193,7 +186,7 @@ std::vector<arma::sword> BaderAtom::classify(const BasisSet & basis, const arma:
       printf("Optimal step length is %e.\n",optlen);
 #endif
       if(optlen==0.0) {
-	if(dr>=MINSTEPSIZE) {
+	if(dr>=CONVTHR) {
 	  // Reduce step length.
 	  dr/=10.0;
 	  continue;
@@ -211,7 +204,7 @@ std::vector<arma::sword> BaderAtom::classify(const BasisSet & basis, const arma:
       } else {
 
 	// Check for convergence
-	if(std::min(optlen,mindist)<=NUCLEARTHRESHOLD) {
+	if(std::min(optlen,mindist)<=CONVTHR) {
 	  // Converged at nucleus.
 	  r.x=closenuc(0);
 	  r.y=closenuc(1);
@@ -221,6 +214,12 @@ std::vector<arma::sword> BaderAtom::classify(const BasisSet & basis, const arma:
 	  printf("Point %4i converged to nucleus.\n",(int) ip+1);
 #endif
 	  break;
+	} else if(optlen<=CONVTHR) {
+	  // Converged elsewhere.
+
+#ifdef BADERDEBUG
+	  printf("Point %4i converged to a non-nuclear maximum.\n",(int) ip+1);
+#endif
 	}
       }
 
@@ -402,7 +401,7 @@ void BaderGrid::classify(const arma::mat & P) {
 
   if(verbose) {
     printf("Running Bader classification.\n");
-    printf("\t%4s  %7s  %7s\n","atom","Ndens","Ngrad");
+    printf("\t%4s  %7s  %7s  %5s\n","atom","Ngrad","Ndens","Avg");
     fflush(stdout);
   }
 
@@ -412,8 +411,9 @@ void BaderGrid::classify(const arma::mat & P) {
     // and run the classification
     size_t ndens=0, ngrad=0;
     regions[i]=wrk[0].classify(*basp,P,maxima,ndens,ngrad);
+    double densave=ndens*1.0/grids[i].ngrid;
     if(verbose) {
-      printf("\t%4i  %7s  %7s\n",(int) i+1,space_number(ndens).c_str(),space_number(ngrad).c_str());
+      printf("\t%4i  %7s  %7s  %4.2f\n",(int) i+1,space_number(ngrad).c_str(),space_number(ndens).c_str(),densave);
       fflush(stdout);
     }
     denstot+=ndens;
