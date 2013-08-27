@@ -19,11 +19,36 @@
 
 #include "basis.h"
 
-/**
- * The population analysis stuff is based on the book "Simple
- * theorems, proofs, and derivations in Quantum Chemistry" by István
- * Mayer (IM), Kluwer Academic 2003.
- */
+/// Add in the nuclear charges to q
+arma::vec add_nuclear_charges(const BasisSet & basis, const arma::vec & q);
+
+/// Compute Mulliken charges
+arma::vec mulliken_charges(const BasisSet & basis, const arma::mat & P);
+/// Compute Mulliken charges
+arma::mat mulliken_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+
+/// Mulliken population analysis
+void mulliken_analysis(const BasisSet & basis, const arma::mat & P);
+/// Mulliken population analysis
+void mulliken_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+
+/// Compute Löwdin charges
+arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P);
+/// Compute Löwdin charges
+arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+
+/// Löwdin population analysis
+void lowdin_analysis(const BasisSet & basis, const arma::mat & P);
+/// Löwdin population analysis
+void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+
+/// Compute electron density at nuclei
+arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P);
+
+/// Compute nuclear density analysis
+void nuclear_analysis(const BasisSet & basis, const arma::mat & P);
+/// Compute nuclear density analysis
+void nuclear_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
 /// Compute Becke charges
 arma::vec becke_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
@@ -31,19 +56,19 @@ arma::vec becke_charges(const BasisSet & basis, const arma::mat & P, double tol=
 arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
 
 /// Compute Becke analysis
-void becke_analysis(const BasisSet & basis, const arma::mat & P);
+void becke_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
 /// Compute Becke analysis
-void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
 
 /// Compute Hirshfeld charges
-arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double tol=1e-5);
+arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5, std::string method="HF");
 /// Compute Hirshfeld charges
-arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double tol=1e-5);
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
 
 /// Compute Hirshfeld analysis
-void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method);
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5, std::string method="HF");
 /// Compute Hirshfeld analysis
-void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method);
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
 
 /// Compute Bader charges
 arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
@@ -51,10 +76,15 @@ arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol=
 arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
 
 /// Compute Bader analysis
-void bader_analysis(const BasisSet & basis, const arma::mat & P);
+void bader_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
 /// Compute Bader analysis
-void bader_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
+void bader_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
 
+/**
+ * The Mulliken population analysis stuff is based on the book "Simple
+ * theorems, proofs, and derivations in Quantum Chemistry" by István
+ * Mayer (IM), Kluwer Academic 2003.
+ */
 
 /**
  * Computes Mulliken's overlap population
@@ -76,24 +106,8 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & P);
  */
 arma::mat bond_order(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
-/// Compute Löwdin charges
-arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P);
-/// Compute Löwdin charges
-arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
-
-/// Löwdin population analysis
-void lowdin_analysis(const BasisSet & basis, const arma::mat & P);
-/// Löwdin population analysis
-void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
-
 /**
- * Compute electron density at nuclei
- */
-arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P);
-
-
-/**
- * Do all of the above.
+ * Default set of population analysis
  */
 void population_analysis(const BasisSet & basis, const arma::mat & P);
 void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
