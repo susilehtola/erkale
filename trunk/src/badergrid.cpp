@@ -49,151 +49,6 @@ BaderAtom::BaderAtom(bool lobatto, double tolv) : AtomGrid(lobatto,tolv) {
 BaderAtom::~BaderAtom() {
 }
 
-atomgrid_t BaderAtom::construct(const BasisSet & basis, const arma::mat & P, size_t cenind, bool verbose) {
-  // Construct a grid centered on (x0,y0,z0)
-  // with nrad radial shells
-  // See Krack 1998 for details
-
-  // Returned info
-  atomgrid_t ret;
-  ret.ngrid=0;
-  ret.nfunc=0;
-
-  Timer t;
-
-  // Store index of center
-  ret.atind=cenind;
-  // and its coordinates
-  ret.cen=basis.get_nuclear_coords(cenind);
-
-  // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+8-element_row[basis.get_Z(ret.atind)])));
-
-  // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
-
-  // Allocate memory
-  ret.sh.resize(nrad);
-
-  // Loop over radii
-  double rad, jac;
-  for(size_t ir=0;ir<xc.size();ir++) {
-    // Calculate value of radius
-    double ixc=xc.size()-1-ir;
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-
-    // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ixc]);
-    // so total quadrature weight is
-    double weight=wc[ixc]*rad*rad*jac;
-
-    // Store shell data
-    ret.sh[ir].r=rad;
-    ret.sh[ir].w=weight;
-    ret.sh[ir].l=3;
-  }
-
-  // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(tol));
-
-  // List of maxima
-  std::vector<coords_t> maxima;
-  // Amount of density and gradient evaluations
-  size_t ngrad=0, ndens=0;
-
-  // Old and new diagonal elements of regional overlap
-  arma::mat Sold, Snew;
-
-  // Maximum difference of diagonal elements of Hamiltonian
-  double maxdiff;
-
-  // Now, determine actual quadrature limits shell by shell
-  for(size_t ir=0;ir<ret.sh.size();ir++) {
-
-    // Radial shell converged?
-    bool convd;
-
-    do {
-      // Clear current grid points and function values
-      free();
-
-      // Form radial shell
-      if(use_lobatto)
-	add_lobatto_shell(ret,ir);
-      else
-	add_lebedev_shell(ret,ir);
-      // Compute Becke weights for radial shell
-      becke_weights(basis,ret,ir);
-      // Prune points with small weight
-      prune_points(1e-8*tol,ret.sh[ir]);
-
-      // Compute values of basis functions
-      compute_bf(basis,ret,ir);
-
-      // Run classification
-      std::vector<arma::sword> regions=classify(basis,P,maxima,ndens,ngrad);
-
-      // Compute new diagonal overlap
-      Snew.zeros(basis.get_Nbf(),maxima.size());
-      for(size_t ip=0;ip<grid.size();ip++)
-	if(regions[ip]>0) {
-	  // Loop over functions on grid point
-	  size_t first=grid[ip].f0;
-	  size_t last=first+grid[ip].nf;
-	  
-	  for(size_t ii=first;ii<last;ii++) {
-	    // Get index of function
-	    size_t i=flist[ii].ind;
-	    
-	    Snew(i,regions[ip]-1)+=grid[ip].w*flist[ii].f*flist[ii].f;
-	  }
-	}
-
-      // Check if amount of regions has changed / convergence has been achieved
-      convd=true;
-      if(Snew.n_cols!=Sold.n_cols)
-	convd=false;
-      else {
-	// Compute maximum difference of diagonal elements,
-	// normalizing to the amount of maxima
-	maxdiff=arma::max(arma::max(arma::abs(Snew-Sold)));
-	convd=(maxdiff<tol/xc.size());
-      }
-      
-      // Swap matrices
-      std::swap(Snew,Sold);
-
-      // Increment order if tolerance not achieved.
-      if(!convd) {
-	if(use_lobatto)
-	  ret.sh[ir].l+=2;
-	else {
-	  // Need to determine what is next order of Lebedev
-	  // quadrature that is supported.
-	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
-	}
-      }
-    } while(!convd && ret.sh[ir].l<=lmax);
-    
-    // Increase number of points and function values
-    ret.ngrid+=grid.size();
-    ret.nfunc+=flist.size();
-  }
-
-  // Free memory once more
-  free();
-
-  if(verbose) {
-    //    printf("\t%4u  %7s  %10s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),space_number(ndens).c_str(),t.elapsed().c_str());
-    printf("\t%4u  %7u  %10u  %10u  %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,(unsigned int) ndens,t.elapsed().c_str());
-    fflush(stdout);
-  }
-
-  return ret;
-}
-
-
 std::vector<arma::sword> BaderAtom::classify(const BasisSet & basis, const arma::mat & P, std::vector<coords_t> & maxima, size_t & ndens, size_t & ngrad) {
   // Returned classifications
   std::vector<arma::sword> region;
@@ -332,15 +187,12 @@ BaderGrid::BaderGrid(const BasisSet * bas, bool ver, bool lobatto) {
 BaderGrid::~BaderGrid() {
 }
 
-void BaderGrid::construct(const arma::mat & P, double tol, bool regional) {
+void BaderGrid::construct(double tol) {
   
   // Add all atoms
   if(verbose) {
     printf("Constructing Bader grid.\n");
-    if(regional)
-      printf("\t%4s  %7s  %10s  %10s  %s\n","atom","Npoints","Nfuncs","Ndens","t");
-    else
-      printf("\t%4s  %7s  %10s  %s\n","atom","Npoints","Nfuncs","t");
+    printf("\t%4s  %7s  %10s  %s\n","atom","Npoints","Nfuncs","t");
     fflush(stdout);
   }
   
@@ -363,14 +215,11 @@ void BaderGrid::construct(const arma::mat & P, double tol, bool regional) {
 #pragma omp for schedule(dynamic,1)
 #endif
     for(size_t i=0;i<Nat;i++) {
-      if(regional)
-	grids[i]=wrk[ith].construct(*basp,P,i,verbose);
-      else
-	grids[i]=wrk[ith].construct_becke(*basp,i,verbose);
+      grids[i]=wrk[ith].construct_becke(*basp,i,verbose);
     }
-
+    
   }   // End parallel section
-
+  
   if(verbose) {
     printf("Bader grid constructed in %s.\n",t.elapsed().c_str());
     fflush(stdout);

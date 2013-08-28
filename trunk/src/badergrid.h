@@ -40,9 +40,6 @@ class BaderAtom: public AtomGrid {
   BaderAtom(bool lobatto, double tol=1e-4);
   /// Destructor
   ~BaderAtom();
-
-  /// Adaptive construction of grid for overlap matrix
-  atomgrid_t construct(const BasisSet & bas, const arma::mat & P, size_t cenind, bool verbose);
   
   /// Classify points into regions. Returns region list
   std::vector<arma::sword> classify(const BasisSet & basis, const arma::mat & P, std::vector<coords_t> & maxima, size_t & ndens, size_t & ngrad);
@@ -85,7 +82,7 @@ class BaderGrid {
   ~BaderGrid();
 
   /// Create grid for Bader charges (optimize overlap matrix)
-  void construct(const arma::mat & P, double tol, bool regional=true);
+  void construct(double tol);
 
   /// Run classification
   void classify(const arma::mat & P);
