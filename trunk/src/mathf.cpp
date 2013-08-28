@@ -375,3 +375,8 @@ arma::cx_mat complex_unitary(size_t N, unsigned long int seed) {
 
   return Q;
 }
+
+double round(double x, unsigned n) {
+  double fac=pow(10.0,n);
+  return round(fac*x)/fac;
+}
