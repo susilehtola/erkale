@@ -103,16 +103,17 @@ else()
 endif()
 
 
+# Spherical transform generator
+add_executable (eriworker_gentransform eriworker_gentransform.cpp solidharmonics.cpp mathf.cpp)
+target_link_libraries(eriworker_gentransform ${GSL_LIBRARIES})
+target_link_libraries(eriworker_gentransform ${LAPACK_LIBRARIES})
+
+
 # Density cube tool
 add_executable (erkale_cube cube.cpp)
 # The name of the executable is
 set_target_properties(erkale_cube PROPERTIES OUTPUT_NAME "erkale_cube${SUFFIX}")
 target_link_libraries(erkale_cube liberkale)
-
-# Spherical transform generator
-add_executable (eriworker_gentransform eriworker_gentransform.cpp solidharmonics.cpp mathf.cpp)
-target_link_libraries(eriworker_gentransform ${GSL_LIBRARIES})
-target_link_libraries(eriworker_gentransform ${LAPACK_LIBRARIES})
 
 # Link libraries
 if(BUILD_SHARED_LIBS)
@@ -126,6 +127,24 @@ else()
 endif()
 
 
+# Population analysis tool
+add_executable (erkale_pop population.cpp)
+# The name of the executable is
+set_target_properties(erkale_pop PROPERTIES OUTPUT_NAME "erkale_pop${SUFFIX}")
+target_link_libraries(erkale_pop liberkale)
+
+# Link libraries
+if(BUILD_SHARED_LIBS)
+else()
+ target_link_libraries(erkale_pop -lrt)
+ target_link_libraries(erkale_pop ${GSL_LIBRARIES})
+ target_link_libraries(erkale_pop ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_pop ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_pop ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_pop ${HDF5_LIBRARIES})
+endif()
+
+
 
 # Install targets
 install (TARGETS liberkale DESTINATION lib${LIB_SUFFIX})
@@ -133,6 +152,7 @@ install (TARGETS erkale DESTINATION bin)
 install (TARGETS erkale_cube DESTINATION bin)
 install (TARGETS erkale_geom DESTINATION bin)
 install (TARGETS erkale_loc DESTINATION bin)
+install (TARGETS erkale_pop DESTINATION bin)
 
 # Install headers
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
