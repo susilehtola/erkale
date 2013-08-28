@@ -52,6 +52,9 @@ int main(int argc, char **argv) {
   // Print settings
   set.print();
 
+  // Initialize libint
+  init_libint_base();
+
   // Load checkpoint
   Checkpoint chkpt(set.get_string("LoadChk"),false);
 
