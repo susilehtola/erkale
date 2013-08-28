@@ -21,14 +21,28 @@
 #include "basis.h"
 #include "dftgrid.h"
 
+/**
+ * The algorithms here are original work, but actually are very much
+ * similar to the work in
+ *
+ * J. I. Rodríguez, A. M. Köster, P. W. Ayers, A. Santos-Valle,
+ * A. Vela, and G. Merino, "An efficient grid-based scheme to compute
+ * QTAIM atomic properties without explicit calculation of zero-flux
+ * surfaces", J. Comp. Chem. 30, 1082 (2009).
+ */
 
-
+/**
+ * Integration over Bader regions
+ */
 class BaderAtom: public AtomGrid {
  public:
   /// Constructor
   BaderAtom(bool lobatto, double tol=1e-4);
   /// Destructor
   ~BaderAtom();
+
+  /// Adaptive construction of grid for overlap matrix
+  atomgrid_t construct(const BasisSet & bas, const arma::mat & P, size_t cenind, bool verbose);
   
   /// Classify points into regions. Returns region list
   std::vector<arma::sword> classify(const BasisSet & basis, const arma::mat & P, std::vector<coords_t> & maxima, size_t & ndens, size_t & ngrad);
@@ -40,7 +54,9 @@ class BaderAtom: public AtomGrid {
   void regional_overlap(const std::vector<arma::sword> & regions, std::vector<arma::mat> & stack) const;
 };
 
-
+/**
+ * Integration over Bader regions
+ */
 class BaderGrid {
   /// Work grid
   std::vector<BaderAtom> wrk;
@@ -59,6 +75,9 @@ class BaderGrid {
   /// Use Lobatto quadrature?
   bool use_lobatto;
 
+  /// Print maxima
+  void print_maxima() const;
+  
  public:
   /// Constructor
   BaderGrid(const BasisSet * bas, bool verbose=true, bool lobatto=false);
@@ -66,7 +85,7 @@ class BaderGrid {
   ~BaderGrid();
 
   /// Create grid for Bader charges (optimize overlap matrix)
-  void construct(double tol);
+  void construct(const arma::mat & P, double tol, bool regional=true);
 
   /// Run classification
   void classify(const arma::mat & P);
@@ -79,6 +98,9 @@ class BaderGrid {
   /// Compute regional overlap matrices
   std::vector<arma::mat> regional_overlap();
 };
+
+/// Track point to maximum
+coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coords_t r0, size_t & nd, size_t & ng);
 
 
 #endif
