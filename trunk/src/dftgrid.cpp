@@ -1650,7 +1650,8 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, size_t cenind, int nrad, in
   free();
 
   if(verbose) {
-    printf("\t%4u  %7s  %10s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str());
+    //    printf("\t%4u  %7s  %10s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str());
+    printf("\t%4u  %7u  %10u\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc);
     fflush(stdout);
   }
 
@@ -1777,7 +1778,8 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   free();
 
   if(verbose) {
-    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    //    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    printf("\t%4u  %7u  %10u  %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
 
@@ -1908,7 +1910,8 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   free();
 
   if(verbose) {
-    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    //    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    printf("\t%4u  %7u  %10u  %s\n",(unsigned int) ret.atind+1,(unsigned int)ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
 
@@ -2118,7 +2121,8 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   free();
 
   if(verbose) {
-    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    //printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    printf("\t%4u  %7u  %10u  %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
 
@@ -2234,7 +2238,8 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
   free();
 
   if(verbose) {
-    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    //    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    printf("\t%4u  %7u  %10u  %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
 
@@ -2350,7 +2355,8 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
   free();
 
   if(verbose) {
-    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    //    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    printf("\t%4u  %7u  %10u  %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
     fflush(stdout);
   }
 
