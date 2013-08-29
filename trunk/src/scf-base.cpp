@@ -1528,11 +1528,6 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     // Do population analysis
     if(verbose) {
       population_analysis(basis,sol.P);
-      if(set.get_bool("FullPop")) {
-	lowdin_analysis(basis,sol.P);
-	becke_analysis(basis,sol.P);
-	bader_analysis(basis,sol.P);
-      }
     }
 
   } else {
@@ -1648,11 +1643,6 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
     if(verbose) {
       population_analysis(basis,sol.Pa,sol.Pb);
-      if(set.get_bool("FullPop")) {
-	lowdin_analysis(basis,sol.Pa,sol.Pb);
-	becke_analysis(basis,sol.Pa,sol.Pb);
-	bader_analysis(basis,sol.Pa,sol.Pb);
-      }
     }
   }
 }
