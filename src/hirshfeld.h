@@ -27,7 +27,7 @@ extern "C" {
 /// Hirshfeld atomic density
 class HirshfeldAtom {
   /// Grid spacing
-  static const double dr=0.001;
+  double dr;
   /// Densities
   std::vector<double> rho;
 
@@ -35,7 +35,9 @@ class HirshfeldAtom {
   /// Dummy constructor
   HirshfeldAtom();
   /// Constructor
-  HirshfeldAtom(const BasisSet & basis, const arma::mat & P);
+  HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double dr=0.05);
+  /// Constructor, given input density
+  HirshfeldAtom(double dr, const std::vector<double> & rho);
   /// Destructor
   ~HirshfeldAtom();
 
@@ -53,13 +55,9 @@ class HirshfeldAtom {
 
 /// Hirshfeld atomic densities
 class Hirshfeld {
-  /// The actual atoms
-  std::vector<HirshfeldAtom> atomstorage;
-  /// List of identical nuclei
-  std::vector< std::vector<size_t> > idnuc;
-
-  /// List of atom pointers
-  std::vector<HirshfeldAtom *> atoms;
+ protected:
+  /// List of atoms
+  std::vector<HirshfeldAtom> atoms;
   /// Centers
   std::vector<coords_t> cen;
 
@@ -69,10 +67,13 @@ class Hirshfeld {
   /// Destructor
   ~Hirshfeld();
 
+  /// Set atoms
+  void set(const std::vector<coords_t> & cen, double dr, const std::vector< std::vector<double> > & rho);
+  /// Get atomic densities
+  std::vector< std::vector<double> > get_rho() const;
+
   /// Compute
   void compute(const BasisSet & basis, std::string method);
-  /// Update pointers
-  void update_pointers();
 
   /// Evaluate density at r
   double get_density(size_t inuc, const coords_t & r) const;
@@ -80,6 +81,9 @@ class Hirshfeld {
   double get_weight(size_t inuc, const coords_t & r) const;
   /// Get range of atom
   double get_range(size_t inuc) const;
+
+  /// Print densities
+  void print_densities() const;
 };
 
 #endif
