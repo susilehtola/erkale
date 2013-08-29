@@ -19,6 +19,7 @@
 #include "dftgrid.h"
 #include "bader.h"
 #include "badergrid.h"
+#include "stockholder.h"
 #include "linalg.h"
 
 void print_analysis(const BasisSet & basis, const std::string & msg, const arma::vec & q) {
@@ -401,7 +402,6 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma
   return q;
 }
 
-
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol, std::string method) {
   // Get charges
   arma::vec q=hirshfeld_charges(basis,P,tol,method);
@@ -452,6 +452,78 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
   // Hirshfeld atomic charges
   Hirshfeld hirsh;
   hirsh.compute(basis,method);
+
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,true);
+  // Construct grid
+  intgrid.construct_hirshfeld(hirsh,tol);
+
+  // Evaluate overlaps
+  std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
+
+  // Loop over atoms
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Compute charges
+    q(inuc,0)=-arma::trace(Pa*Sat[inuc]);
+    q(inuc,1)=-arma::trace(Pb*Sat[inuc]);
+    q(inuc,2)=q(inuc,0)+q(inuc,1);
+  }
+
+  return q;
+}
+
+void stockholder_analysis(const BasisSet & basis, const arma::mat & P, double tol) {
+  // Get charges
+  arma::vec q=stockholder_charges(basis,P,tol);
+
+  // Add contribution from nuclei
+  q=add_nuclear_charges(basis,q);
+
+  print_analysis(basis,"Stockholder",q);
+}
+
+void stockholder_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
+  // Get charges
+  arma::mat q=stockholder_charges(basis,Pa,Pb,tol);
+
+  // Add contribution from nuclei
+  q.col(2)=add_nuclear_charges(basis,q.col(2));
+
+  print_analysis(basis,"Stockholder",q);
+}
+
+arma::vec stockholder_charges(const BasisSet & basis, const arma::mat & P, double tol) {
+  arma::vec q(basis.get_Nnuc(),1);
+
+  // Stockholder atomic charges
+  Stockholder stock(basis,P);
+  // Helper
+  Hirshfeld hirsh=stock.get();
+
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,true);
+  // Construct grid
+  intgrid.construct_hirshfeld(hirsh,tol);
+
+  // Evaluate overlaps
+  std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
+
+  // Loop over atoms
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Compute charges
+    q(inuc)=-arma::trace(P*Sat[inuc]);
+  }
+
+  return q;
+}
+
+arma::mat stockholder_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
+  arma::mat q(basis.get_Nnuc(),3);
+
+  // Stockholder atomic charges
+  Stockholder stock(basis,Pa+Pb);
+  // Helper
+  Hirshfeld hirsh=stock.get();
 
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,true);
