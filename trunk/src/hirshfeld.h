@@ -35,7 +35,7 @@ class HirshfeldAtom {
   /// Dummy constructor
   HirshfeldAtom();
   /// Constructor
-  HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double dr=0.05);
+  HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double dr=0.01);
   /// Constructor, given input density
   HirshfeldAtom(double dr, const std::vector<double> & rho);
   /// Destructor

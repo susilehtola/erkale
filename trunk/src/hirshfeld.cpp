@@ -66,9 +66,16 @@ double HirshfeldAtom::get(double r) const {
   // Check limit
   if(i>=rho.size()-1)
     return 0.0;
-  
-  // Perform logarithmic interpolation
-  return rho[i]*pow(rho[i+1]/rho[i],rdr-i);
+
+  /*  
+  if(rho[i+1]>0.0 && rho[i]>0.0)
+    // Perform logarithmic interpolation
+    return rho[i]*pow(rho[i+1]/rho[i],rdr-i);
+  else
+  */
+
+  // Perform linear intepolation
+  return rho[i] + (rho[i+1]-rho[i])*(rdr-i);
 }
 
 double HirshfeldAtom::get_spacing() const {
@@ -160,7 +167,7 @@ void Hirshfeld::print_densities() const {
   // Print out atom densities
   for(size_t i=0;i<atoms.size();i++) {
     std::ostringstream fname;
-    fname << "atom_" << i << ".dat";
+    fname << "hirshfeld_" << i << ".dat";
     FILE *out=fopen(fname.str().c_str(),"w");
 
     // Spacing to use
