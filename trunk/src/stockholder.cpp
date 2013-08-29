@@ -201,7 +201,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double tol
   // Loop
   if(verbose) {
     printf("\nStockholder iteration\n");
-    printf("%5s %12s\n","iter","delta");
+    printf("%5s  %12s  %12s\n","iter","max","mean");
     fflush(stdout);
   }
 
@@ -212,22 +212,22 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double tol
     // Evaluate new spherically averaged densities
     for(size_t i=0;i<atoms.size();i++)
       atoms[i].update(ISA,newrho[i]);
-
+    
     // Check for convergence
-    double delta=0.0;
+    arma::vec diff(atoms.size());
+    diff.zeros();
+    
     for(size_t irad=0;irad<newrho[0].size();irad++) {
       // Radius
       double r=irad*dr;
-
+      
       // Compute density difference
-      double d=0.0;
-      for(size_t iat=0;iat<atoms.size();iat++)
-	d+=fabs(newrho[iat][irad]-oldrho[iat][irad]);
-
-      // Increment delta
-      delta+=r*r*d*dr;
+      for(size_t iat=0;iat<atoms.size();iat++) {
+	double d=fabs(newrho[iat][irad]-oldrho[iat][irad]);
+	diff(iat)+=r*r*d*dr;
+      }
     }
-
+    
     /*
     // Print out densities
     std::ostringstream fname;
@@ -245,12 +245,15 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double tol
     // Swap densities
     std::swap(newrho,oldrho);
 
+    double maxdiff=arma::max(diff);
+    double meandiff=arma::mean(diff);
+
     if(verbose) {
-      printf("%5i %e\n",(int) iiter+1,delta);
+      printf("%5i  %e  %e\n",(int) iiter+1,maxdiff,meandiff);	     
       fflush(stdout);
     }
 
-    if(delta<tol)
+    if(maxdiff<tol)
       break;
   }
 

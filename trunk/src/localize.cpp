@@ -345,6 +345,8 @@ int main(int argc, char **argv) {
     method=PIPEK_BECKE;
   else if(stricmp(mets,"HI")==0)
     method=PIPEK_HIRSHFELD;
+  else if(stricmp(mets,"ST")==0)
+    method=PIPEK_STOCKHOLDER;
   else if(stricmp(mets,"ER")==0)
     method=EDMISTON;
   else throw std::runtime_error("Localization method not implemented.\n");
