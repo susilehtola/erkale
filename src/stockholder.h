@@ -38,14 +38,22 @@ class StockholderAtom {
   /// and grid points
   std::vector< std::vector<coords_t> > grid;
 
+  /// Compute molecular density on radial shell
+  void compute(const BasisSet & basis, const arma::mat & P, const std::vector<double> & shran, const std::vector<size_t> & compute_shells, double dr, size_t irad, int lmax);
+
+  /// Compute average
+  double average(const Hirshfeld & hirsh, size_t irad) const;
+
  public:
   /// Constructor
   StockholderAtom();
   /// Destructor
   ~StockholderAtom();
 
-  /// Compute the density
-  void fill(const BasisSet & basis, const arma::mat & P, size_t atind, double dr, int nrad, int lmax);
+  /// Adaptively fill the grid
+  void fill_adaptive(const BasisSet & basis, const arma::mat & P, const Hirshfeld & hirsh, size_t atind, double dr, int nrad, int lmax, double tol, bool verbose);
+  /// Static fill of the grid
+  void fill_static(const BasisSet & basis, const arma::mat & P, size_t atind, double dr, int nrad, int l, bool verbose);
 
   /// Compute a new radial density
   void update(const Hirshfeld & hirsh, std::vector<double> & rho);
@@ -63,7 +71,7 @@ class Stockholder {
 
  public:
   /// Constructor. Tolerance for change in the integral \f$ \int_0^\infty r^2 | \rho_n(r) - \rho_o(r) | dr \f$
-  Stockholder(const BasisSet & basis, const arma::mat & P, double tol=1e-6, double dr=0.01, int nrad=1001, int lmax=35, bool verbose=true);
+  Stockholder(const BasisSet & basis, const arma::mat & P, double tol=1e-6, double dr=0.01, int nrad=1001, int l0=3, int lmax=35, bool verbose=true);
   /// Destructor
   ~Stockholder();
 
