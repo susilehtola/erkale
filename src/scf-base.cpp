@@ -35,6 +35,7 @@
 #include "properties.h"
 #include "scf.h"
 #include "stringutil.h"
+#include "stockholder.h"
 #include "timer.h"
 #include "trdsm.h"
 #include "trrh.h"
@@ -2047,7 +2048,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     else
       measure=worker.optimize(U,umet,uacc,maxiter);
 
-  } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BADER || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD) {
+  } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BADER || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD || met==PIPEK_STOCKHOLDER) {
     Pipek worker(met,basis,C,P,Gthr,Fthr,verbose);
     if(fname.length()) worker.open_log(fname);
     worker.set_debug(debug);
@@ -2585,6 +2586,55 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const
       printf(" done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
     }
+
+    // Helper. Non-verbose operation
+    //      DFTGrid intgrid(&basis,false);
+    DFTGrid intgrid(&basis,ver);
+    // Construct integration grid
+    intgrid.construct_hirshfeld(hirsh,1e-5);
+
+    if(ver) {
+      t.set();
+
+      printf("Computing Hirshfeld overlap matrices ...");
+      fflush(stdout);
+    }
+
+    // Get overlap matrices
+    std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
+
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      t.set();
+
+      printf("Computing Hirshfeld charges ...");
+      fflush(stdout);
+    }
+
+    // Loop over atoms
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+      // Compute charges
+      Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
+    }
+
+    if(ver) {
+      printf(" done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
+
+  } else if(chg==PIPEK_STOCKHOLDER) {
+    // Initialize charge matrix
+    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
+
+    Timer t;
+
+    // Stockholder atomic charges
+    Stockholder stock(basis,P);
+    // Helper
+    Hirshfeld hirsh=stock.get();
 
     // Helper. Non-verbose operation
     //      DFTGrid intgrid(&basis,false);

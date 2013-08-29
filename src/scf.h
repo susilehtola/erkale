@@ -478,6 +478,8 @@ enum locmet {
   PIPEK_BECKE,
   /// Pipek-Mezey, Hirshfeld charge
   PIPEK_HIRSHFELD,
+  /// Pipek-Mezey, Stockholder charge
+  PIPEK_STOCKHOLDER,
   /// Edmiston-Ruedenberg
   EDMISTON
 };
