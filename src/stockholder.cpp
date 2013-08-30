@@ -18,6 +18,7 @@
 #include "stockholder.h"
 #include "timer.h"
 #include "dftgrid.h"
+#include <cfloat>
 
 StockholderAtom::StockholderAtom() {
 }
@@ -329,14 +330,27 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
     t.set();
   }
 
+
+  /*
+  {
+    // Print out densities
+    std::ostringstream fname;
+    fname << "atoms_start.dat";
+    FILE *out=fopen(fname.str().c_str(),"w");
+    for(size_t irad=0;irad<oldrho[0].size();irad++) {
+      fprintf(out,"%e",irad*dr);
+      for(size_t iat=0;iat<oldrho.size();iat++)
+	fprintf(out," %e",oldrho[iat][irad]);
+      fprintf(out,"\n");
+    }
+    fclose(out);
+  }
+  */
+
   // and use these as starting weights for the self-consistent iteration
   ISA.set(cen,dr,oldrho);
   
   while(true) {
-    tol/=10.0;
-    if(tol<finaltol)
-      break;
-
     // Compute molecular density
     if(verbose) {
       printf("\nFilling Stockholder molecular density grid.\n");
@@ -375,20 +389,6 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
 	}
       }
       
-      /*
-      // Print out densities
-      std::ostringstream fname;
-      fname << "atoms_" << iiter << ".dat";
-      FILE *out=fopen(fname.str().c_str(),"w");
-      for(size_t irad=0;irad<newrho[0].size();irad++) {
-      fprintf(out,"%e",irad*dr);
-      for(size_t iat=0;iat<newrho.size();iat++)
-      fprintf(out," %e",newrho[iat][irad]);
-      fprintf(out,"\n");
-      }
-      fclose(out);
-      */
-      
       // Swap densities
       std::swap(newrho,oldrho);
       
@@ -406,10 +406,38 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
       // Update weights
       ISA.set(cen,dr,oldrho);
     }
-    printf("Iteration converged within %e in %s.\n",tol,t.elapsed().c_str());
+
+    if(verbose) {
+      printf("Iteration converged within %e in %s.\n",tol,t.elapsed().c_str());
+      fflush(stdout);
+
+      /*
+      // Print out densities
+      char fname[80];
+      sprintf(fname,"atoms_%.3e.dat",tol);
+      FILE *out=fopen(fname,"w");
+      for(size_t irad=0;irad<newrho[0].size();irad++) {
+	fprintf(out,"%e",irad*dr);
+	for(size_t iat=0;iat<oldrho.size();iat++)
+	  fprintf(out," %e",oldrho[iat][irad]);
+	fprintf(out,"\n");
+      }
+      fclose(out);
+      */
+    }	
+
+    // Reduce tolerance and check convergence
+    tol/=sqrt(10.0);
+    if(tol < (1-sqrt(DBL_EPSILON))*finaltol)
+      break;
+
+    printf("tol = %e, finaltol = %e, diff %e\n",tol,finaltol,tol-finaltol);
   }
   
-  printf("Stockholder atoms solved in %s.\n",ttot.elapsed().c_str());
+  if(verbose) {
+    printf("Stockholder atoms solved in %s.\n",ttot.elapsed().c_str());
+    fflush(stdout);
+  }
 }
 
 Stockholder::~Stockholder() {
