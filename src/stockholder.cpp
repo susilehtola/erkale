@@ -430,8 +430,6 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
     tol/=sqrt(10.0);
     if(tol < (1-sqrt(DBL_EPSILON))*finaltol)
       break;
-
-    printf("tol = %e, finaltol = %e, diff %e\n",tol,finaltol,tol-finaltol);
   }
   
   if(verbose) {
