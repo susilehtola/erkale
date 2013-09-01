@@ -1195,7 +1195,7 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & Pa, const
 	  // Evaluate the gradient in the current grid point
 	  arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
 	  // Evaluate the Hessian in the current grid point
-	  arma::cube hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	  arma::mat hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
 
 	  // Increment sum. Loop over mu
 	  for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
@@ -1212,10 +1212,10 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & Pa, const
 
 	      for(int ic=0;ic<3;ic++)
 		for(int jc=0;jc<3;jc++)
-		  Xa(ic,jc)+=Pa(mu,nu)*(flist[inu].f*hess(ic,jc,imu) + glist[3*inu+jc]*grad(imu,ic));
+		  Xa(ic,jc)+=Pa(mu,nu)*(flist[inu].f*hess(imu,3*ic+jc) + glist[3*inu+jc]*grad(imu,ic));
 	      for(int ic=0;ic<3;ic++)
 		for(int jc=0;jc<3;jc++)
-		  Xb(ic,jc)+=Pb(mu,nu)*(flist[inu].f*hess(ic,jc,imu) + glist[3*inu+jc]*grad(imu,ic));
+		  Xb(ic,jc)+=Pb(mu,nu)*(flist[inu].f*hess(imu,3*ic+jc) + glist[3*inu+jc]*grad(imu,ic));
 	    }
 	  }
 	}
@@ -1260,7 +1260,7 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & Pa, const
 	  size_t mu0=shells[ish].get_first_ind();
 
 	  // Evaluate the Hessian in the current grid point
-	  arma::cube hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	  arma::mat hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
 
 	  // Increment sum. Loop over mu
 	  for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
@@ -1280,8 +1280,11 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & Pa, const
 	      for(int ic=0;ic<3;ic++)
 		gnu(ic)=glist[3*inu+ic];
 
-	      ya+=Pa(mu,nu)*hess.slice(imu)*gnu;
-	      yb+=Pb(mu,nu)*hess.slice(imu)*gnu;
+	      for(int ic=0;ic<3;ic++)
+		for(int jc=0;jc<3;jc++) {
+		  ya(ic)+=Pa(mu,nu)*hess(imu,3*ic+jc)*gnu(jc);
+		  yb(ic)+=Pb(mu,nu)*hess(imu,3*ic+jc)*gnu(jc);
+		}
 	    }
 	  }
 	}
@@ -1427,7 +1430,7 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & P) const 
 	  // Evaluate the gradient in the current grid point
 	  arma::mat grad=shells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
 	  // Evaluate the Hessian in the current grid point
-	  arma::cube hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	  arma::mat hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
 
 	  // Increment sum. Loop over mu
 	  for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
@@ -1444,7 +1447,7 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & P) const 
 
 	      for(int ic=0;ic<3;ic++)
 		for(int jc=0;jc<3;jc++)
-		  X(ic,jc)+=P(mu,nu)*(flist[inu].f*hess(ic,jc,imu) + glist[3*inu+jc]*grad(imu,ic));
+		  X(ic,jc)+=P(mu,nu)*(flist[inu].f*hess(imu,3*ic+jc) + glist[3*inu+jc]*grad(imu,ic));
 	    }
 	  }
 	}
@@ -1483,7 +1486,7 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & P) const 
 	  size_t mu0=shells[ish].get_first_ind();
 
 	  // Evaluate the Hessian in the current grid point
-	  arma::cube hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	  arma::mat hess=shells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
 
 	  // Increment sum. Loop over mu
 	  for(size_t imu=0;imu<shells[ish].get_Nbf();imu++) {
@@ -1503,7 +1506,9 @@ arma::vec AtomGrid::eval_force(const BasisSet & bas, const arma::mat & P) const 
 	      for(int ic=0;ic<3;ic++)
 		gnu(ic)=glist[3*inu+ic];
 
-	      y+=P(mu,nu)*hess.slice(imu)*gnu;
+	      for(int ic=0;ic<3;ic++)
+		for(int jc=0;jc<3;jc++)
+		  y(ic)+=P(mu,nu)*hess(imu,3*ic+jc)*gnu(jc);
 	    }
 	  }
 	}
