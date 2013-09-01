@@ -501,7 +501,7 @@ int main(int argc, char **argv) {
 
   Timer tprog;
   tprog.print_time();
-
+  
   // Parse settings
   Settings set;
   set.add_scf_settings();
@@ -513,7 +513,8 @@ int main(int argc, char **argv) {
   set.add_int("MaxSteps","Maximum amount of geometry steps",256);
   set.add_string("Criterion","Convergence criterion to use: LOOSE, NORMAL, TIGHT, VERYTIGHT","NORMAL");
   set.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
-  set.parse(std::string(argv[1]));
+  set.parse(std::string(argv[1]),true);
+  set.print();
 
   bool verbose=set.get_bool("Verbose");
   int maxiter=set.get_int("MaxSteps");
