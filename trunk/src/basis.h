@@ -365,7 +365,7 @@ class BasisSet {
   /// Evaluate laplacian of shell ish at (x,y,z)
   arma::vec eval_lapl(size_t ish, double x, double y, double z) const;
   /// Evaluate Hessian of shell ish at (x,y,z)
-  arma::cube eval_hess(size_t ish, double x, double y, double z) const;
+  arma::mat eval_hess(size_t ish, double x, double y, double z) const;
   /// Evaluate gradient of laplacian of shell ish at (x,y,z)
   arma::mat eval_laplgrad(size_t ish, double x, double y, double z) const;
 
@@ -556,7 +556,7 @@ class GaussianShell {
   /// Evaluate laplacian at (x,y,z)
   arma::vec eval_lapl(double x, double y, double z) const;
   /// Evaluate Hessian at (x,y,z)
-  arma::cube eval_hess(double x, double y, double z) const;
+  arma::mat eval_hess(double x, double y, double z) const;
   /// Evaluate gradient of laplacian at (x,y,z)
   arma::mat eval_laplgrad(double x, double y, double z) const;
 

@@ -5,8 +5,8 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Susi Lehtola
+ * Written by Susi Lehtola, 2010-2013
+ * Copyright (c) 2010-2013, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -224,21 +224,21 @@ void GaussianShell::normalize(bool coeffs) {
 
   if(coeffs) {
     double fact=0.0;
-    
+
     // Calculate overlap of exponents
     for(size_t i=0;i<c.size();i++)
       for(size_t j=0;j<c.size();j++)
 	fact+=c[i].c*c[j].c/pow(c[i].z+c[j].z,am+1.5);
-    
+
     // Add constant part
     fact*=pow(M_PI,1.5)*doublefact(2*am-1)/pow(2.0,am);
-    
+
     // The coefficients must be scaled by 1/sqrt(fact)
     fact=1.0/sqrt(fact);
     for(size_t i=0;i<c.size();i++)
       c[i].c*=fact;
   }
-  
+
   // FIXME: Do something more clever here.
   if(!uselm) {
     // Compute relative normalization factors
@@ -696,7 +696,7 @@ arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
     return ret;
 }
 
-arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
+arma::mat GaussianShell::eval_hess(double x, double y, double z) const {
   // Evaluate gradients of functions at (x,y,z)
 
   // Compute coordinates relative to center
@@ -723,8 +723,8 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
     zr[i]=zr[i-1]*zrel;
   }
 
-  // Gradient array, 3 x 3 x Ncart
-  arma::cube ret(3,3,cart.size());
+  // Gradient array, Ncart x 9
+  arma::mat ret(cart.size(),9);
   ret.zeros();
 
   // Helper variables
@@ -743,45 +743,36 @@ arma::cube GaussianShell::eval_hess(double x, double y, double z) const {
       expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
 
       // d/dx^2
-      ret(0,0,icart)+=_der2(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
+      ret(icart,0)+=_der2(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
       // d/dy^2
-      ret(1,1,icart)+=xr[l]*_der2(yr,m,c[iexp].z)*zr[n]*expf;
+      ret(icart,4)+=xr[l]*_der2(yr,m,c[iexp].z)*zr[n]*expf;
       // d/dz^2
-      ret(2,2,icart)+=xr[l]*yr[m]*_der2(zr,n,c[iexp].z)*expf;
+      ret(icart,8)+=xr[l]*yr[m]*_der2(zr,n,c[iexp].z)*expf;
 
       // dxdy = dydx
       tmp=_der1(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
-      ret(0,1,icart)+=tmp;
-      ret(1,0,icart)+=tmp;
+      ret(icart,1)+=tmp;
+      ret(icart,3)+=tmp;
 
       // dxdz = dzdx
       tmp=_der1(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
-      ret(0,2,icart)+=tmp;
-      ret(2,0,icart)+=tmp;
+      ret(icart,2)+=tmp;
+      ret(icart,6)+=tmp;
 
       // dydz = dzdy
       tmp=xr[l]*_der1(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*expf;
-      ret(1,2,icart)+=tmp;
-      ret(2,1,icart)+=tmp;
+      ret(icart,5)+=tmp;
+      ret(icart,7)+=tmp;
     }
 
     // Plug in normalization constant
-    for(int ic=0;ic<3;ic++)
-      for(int jc=0;jc<3;jc++)
-	ret(ic,jc,icart)*=cart[icart].relnorm;
+    for(int ii=0;ii<9;ii++)
+      ret(icart,ii)*=cart[icart].relnorm;
   }
 
-
-  if(uselm) {
-    // Need to transform into spherical harmonics
-    arma::cube transform(3,3,get_Nbf());
-    transform.zeros();
-    for(size_t i=0;i<get_Nbf();i++)
-      for(size_t j=0;j<get_Ncart();j++)
-	transform.slice(i)+=transmat(i,j)*ret.slice(j);
-
-    return transform;
-  } else
+  if(uselm)
+    return transmat*ret;
+  else
     return ret;
 }
 
@@ -1478,7 +1469,7 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen) const {
   */
 
   return list;
-} 
+}
 
 bool operator<(const struct eripair_t & lhs, const struct eripair_t & rhs) {
   // Sort in decreasing order!
@@ -1722,7 +1713,7 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
   r.x=x;
   r.y=y;
   r.z=z;
-  
+
   // Determine which shells might contribute
   std::vector<size_t> compute_shells;
   for(size_t inuc=0;inuc<nuclei.size();inuc++) {
@@ -1730,7 +1721,7 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
     double dist=norm(r-nuclei[inuc].r);
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=get_shell_inds(inuc);
-    
+
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++)
       // Shell is relevant if range is larger than distance
@@ -1746,12 +1737,12 @@ arma::vec BasisSet::eval_func(double x, double y, double z) const {
 #endif
   for(size_t i=0;i<compute_shells.size();i++) {
     size_t ish=compute_shells[i];
-    
+
     // Evalute shell. Function values
     arma::vec shf=shells[ish].eval_func(x,y,z);
     // First function on shell
     size_t f0=shells[ish].get_first_ind();
-    
+
     // and store the functions
     for(size_t fi=0;fi<shells[ish].get_Nbf();fi++) {
       ret(f0+fi)=shf(fi);
@@ -1767,7 +1758,7 @@ arma::mat BasisSet::eval_grad(double x, double y, double z) const {
   r.x=x;
   r.y=y;
   r.z=z;
-  
+
   // Determine which shells might contribute
   std::vector<size_t> compute_shells;
   for(size_t inuc=0;inuc<nuclei.size();inuc++) {
@@ -1775,7 +1766,7 @@ arma::mat BasisSet::eval_grad(double x, double y, double z) const {
     double dist=norm(r-nuclei[inuc].r);
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=get_shell_inds(inuc);
-    
+
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++)
       // Shell is relevant if range is larger than distance
@@ -1791,12 +1782,12 @@ arma::mat BasisSet::eval_grad(double x, double y, double z) const {
 #endif
   for(size_t i=0;i<compute_shells.size();i++) {
     size_t ish=compute_shells[i];
-    
+
     // Evalute shell. Gradient values
     arma::mat gf=shells[ish].eval_grad(x,y,z);
     // First function on shell
     size_t f0=shells[ish].get_first_ind();
-    
+
     // and store the functions
     for(size_t fi=0;fi<shells[ish].get_Nbf();fi++) {
       ret.row(f0+fi)=gf.row(fi);
@@ -1818,7 +1809,7 @@ arma::vec BasisSet::eval_lapl(size_t ish, double x, double y, double z) const {
   return shells[ish].eval_lapl(x,y,z);
 }
 
-arma::cube BasisSet::eval_hess(size_t ish, double x, double y, double z) const {
+arma::mat BasisSet::eval_hess(size_t ish, double x, double y, double z) const {
   return shells[ish].eval_hess(x,y,z);
 }
 
@@ -3274,7 +3265,7 @@ arma::vec compute_gradient(const arma::mat & P, const BasisSet & bas, const coor
   arma::vec bf=bas.eval_func(r.x,r.y,r.z);
   // and gradients
   arma::mat grad=bas.eval_grad(r.x,r.y,r.z);
-  
+
   // Density gradient is
   return arma::trans(bf)*P*grad;
 }
