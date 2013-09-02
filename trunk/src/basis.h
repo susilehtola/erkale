@@ -357,6 +357,8 @@ class BasisSet {
   arma::vec eval_func(double x, double y, double z) const;
   /// Evaluate gradient at (x,y,z)
   arma::mat eval_grad(double x, double y, double z) const;
+  /// Evaluate Hessian at (x,y,z)
+  arma::mat eval_hess(double x, double y, double z) const;
 
   /// Evaluate functions of shell ish at (x,y,z)
   arma::vec eval_func(size_t ish, double x, double y, double z) const;
@@ -598,12 +600,13 @@ BasisSet construct_basis(const std::vector<nucleus_t> & nuclei, const BasisSetLi
 
 /// Compute values of orbitals at given point
 arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r);
+
 /// Compute density at given point
 double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t & r);
-/// Compute gradient at given point
-arma::vec compute_gradient(const arma::mat & P, const BasisSet & bas, const coords_t & r);
 /// Compute density and gradient at a given point
 void compute_density_gradient(const arma::mat & P, const BasisSet & bas, const coords_t & r, double & d, arma::vec & g);
+/// Compute density, gradient and hessian at a given point
+void compute_density_gradient_hessian(const arma::mat & P, const BasisSet & bas, const coords_t & r, double & d, arma::vec & g, arma::mat & h);
 
 /// Check orthonormality of molecular orbitals
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
