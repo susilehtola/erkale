@@ -192,8 +192,10 @@ void StockholderAtom::fill_adaptive(const BasisSet & basis, const arma::mat & P,
   for(size_t ir=0;ir<grid.size();ir++)
     N+=grid[ir].size();
 
-  if(verbose)
+  if(verbose) {
     printf("%4i %7i\n",(int) atind+1,(int) N);
+    fflush(stdout);
+  }
 }
 
 void StockholderAtom::fill_static(const BasisSet & basis, const arma::mat & P, size_t atindv, double dr, int nrad, int l, bool verbose) {
@@ -245,8 +247,10 @@ void StockholderAtom::fill_static(const BasisSet & basis, const arma::mat & P, s
   for(size_t ir=0;ir<grid.size();ir++)
     N+=grid[ir].size();
   
-  if(verbose)
+  if(verbose) {
     printf("%4i %7i\n",(int) atind+1,(int) N);
+    fflush(stdout);
+  }
 }
 
 double StockholderAtom::average(const Hirshfeld & hirsh, size_t irad) const {
