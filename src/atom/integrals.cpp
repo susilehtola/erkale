@@ -14,36 +14,31 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "gaunt.h"
+#include "linalg.h"
 #include "mathf.h"
 #include "integrals.h"
 #include "basis.h"
 #include "slaterfit/form_exponents.h"
 
 /// A. Kumar and P. C. Mishra, Pramana 29 (1987), pp. 385-390.
-double Ul(int l, int na, int nb, int nc, int nd, double za, double zb, double zc, double zd) {
-  const double x=pow(2*za,na+0.5)*pow(2*zb,nb+0.5)/sqrt(fact(2*na)*fact(2*nb));
-  const double y=pow(2*zc,nc+0.5)*pow(2*zd,nd+0.5)/sqrt(fact(2*nc)*fact(2*nd));
-  const int dn1=(na+nb); // 2n1 in Kumar's notation
-  const int dn2=(nc+nd); // 2n2 in Kumar's notation
-  const double dz1=za+zb; // 2zeta1 in Kumar's notation
-  const double dz2=zc+zd; // 2zeta2 in Kumar's notation
-
+double Ul(int l, int n12, int n34, double z12, double z34) {
   // Prefactor
-  double prefac=x*y*fact(dn2+l)/pow(dz2,dn2+l+1);
+  double prefac=fact(n34+l)/pow(z34,n34+l+1);
 
   // First term
-  double term1=fact(dn1-l-1)/pow(dz1,dn1-l);
+  double term1=fact(n12-l-1)/pow(z12,n12-l);
 
   // Second term
   double term2=0.0;
-  for(int lp=1;lp<=dn2+l+1;lp++)
-    term2-=pow(dz2,dn2+l-lp+1)/fact(dn2+l-lp+1) * fact(dn1+dn2-lp)/pow(dz1+dz2,dn1+dn2-lp+1);
+  for(int lp=1;lp<=n34+l+1;lp++)
+    term2-=pow(z34,n34+l-lp+1)/fact(n34+l-lp+1) * fact(n12+n34-lp)/pow(z12+z34,n12+n34-lp+1);
 
   // Third term
   double term3=0.0;
-  for(int lp=1;lp<=dn2-l;lp++)
-    term3+=pow(dz2,dn2+l-lp+1)*fact(dn1+dn2-lp) / (fact(dn2-l-lp)*pow(dz1+dz2,dn1+dn2-lp+1));
-  term3*=fact(dn2-l-1)/fact(dn2+l);
+  for(int lp=1;lp<=n34-l;lp++)
+    term3+=pow(z34,n34+l-lp+1)*fact(n12+n34-lp) / (fact(n34-l-lp)*pow(z12+z34,n12+n34-lp+1));
+  term3*=fact(n34-l-1)/fact(n34+l);
 
   return prefac*(term1+term2+term3);
 }
@@ -104,17 +99,16 @@ double ck(int k, int l, int m, int lp, int mp) {
 
 // Normalization coefficient
 double normalization(int n, double z) {
-  return pow(2.0*z,n+0.5)/sqrt(fact(2*n));
+  return sqrt(pow(2.0*z,2*n+1)/fact(2*n));
 }
 
 // Primitive overlap integral
-double overlap_primitive(int nab, double za, double zb) {
-  return fact(nab)/pow(za+zb,nab+1);
+double overlap_primitive(int nab, double zab) {
+  return fact(nab)/pow(zab,nab+1);
 }
 
-
 // Repulsion integral (ab|cd) = \int \phi_a(r_1) \phi_b(r_1) r^{-1}_{12} \phi_c(r_2) \phi_d(r_2) d^3 r_1 d^3 r_2
-double ERI(int na, int nb, int nc, int nd, double za, double zb, double zc, double zd, int la, int ma, int lb, int mb, int lc, int mc, int ld, int md) {
+double ERI_unnormalized(int na, int nb, int nc, int nd, double za, double zb, double zc, double zd, int la, int ma, int lb, int mb, int lc, int mc, int ld, int md) {
   // Remember complex conjugation in ERI
   if(mb-ma!=md-mc) {
     //    printf("m different - ma=%i, mb=%i => %i, mc=%i, md=%i => %i\n",ma,mb,mb-ma,mc,md,md-mc);
@@ -141,10 +135,45 @@ double ERI(int na, int nb, int nc, int nd, double za, double zb, double zc, doub
   double eri=0.0;
 
   for(int l=lmin;l<=lmax;l++)
-    eri+=Ul(l,na,nb,nc,nd,za,zb,zc,zd)*ck(l,la,ma,lb,mb)*ck(l,lc,mc,ld,md);
+    eri+=Ul(l,na+nb,nc+nd,za+zb,zc+zd)*ck(l,la,ma,lb,mb)*ck(l,lc,mc,ld,md);
 
   return eri;
 }
+
+double ERI(int na, int nb, int nc, int nd, double za, double zb, double zc, double zd, int la, int ma, int lb, int mb, int lc, int mc, int ld, int md) {
+  double eri=ERI_unnormalized(na,nb,nc,nd,za,zb,zc,zd,la,ma,lb,mb,lc,mc,ld,md);
+  // Plug in normalization
+  eri*=normalization(na,za)*normalization(nb,zb)*normalization(nc,zc)*normalization(nd,zd);
+  return eri;
+}
+
+double coulomb_overlap(const bf_t & a, const bf_t & b) {
+  bf_t dummy;
+  dummy.zeta=0.0;
+  dummy.n=1;
+  dummy.l=0;
+  dummy.m=0;
+
+  // Overlap wrt overlap-normalized functions
+  //  return ERI_unnormalized(a,dummy,b,dummy)*normalization(a.n,a.zeta)*normalization(b.n,b.zeta);
+
+  // Overlap wrt ERI-normalized functions
+  return ERI_unnormalized(a,dummy,b,dummy)/sqrt(ERI_unnormalized(a,dummy,a,dummy)*ERI_unnormalized(b,dummy,b,dummy));
+}
+
+double three_overlap(int na, int nc, int nd, int la, int ma, int lc, int mc, int ld, int md, double za, double zc, double zd) {
+  if(ma!=md-mc) {
+    return 0.0;
+  }
+  // The functions lc and ld can couple to |lc-ld| <= l <= lc+ld
+  // which must thus be the same as la
+  if(la<abs(lc-ld) || la>lc+ld)
+    return 0.0;
+
+  //return overlap_primitive(na+nc+nd,za+zc+zd)*gaunt_coefficient(la,ma,lc,mc,ld,md)*normalization(na,za)*normalization(nc,zc)*normalization(nd,zd);
+  return overlap_primitive(na+nc+nd,za+zc+zd)*ck(la,lc,mc,ld,md)*normalization(na,za)*normalization(nc,zc)*normalization(nd,zd);
+}
+
 
 // Do Gaussian expansion of ERI
 double gaussian_ERI(int la, int ma, int lb, int mb, int lc, int mc, int ld, int md, double za, double zb, double zc, double zd, int nfit) {
@@ -207,7 +236,7 @@ double overlap(int na, int nb, double za, double zb, int la, int ma, int lb, int
   if(la!=lb || ma!=mb)
     return 0.0;
 
-  return normalization(na,za)*normalization(nb,zb)*overlap_primitive(na+nb,za,zb);
+  return normalization(na,za)*normalization(nb,zb)*overlap_primitive(na+nb,za+zb);
 }
 
 // Nuclear attraction integral
@@ -215,7 +244,7 @@ double nuclear(int na, int nb, double za, double zb, int la, int ma, int lb, int
   if(la!=lb || ma!=mb)
     return 0.0;
 
-  return -normalization(na,za)*normalization(nb,zb)*overlap_primitive(na+nb-1,za,zb);
+  return -normalization(na,za)*normalization(nb,zb)*overlap_primitive(na+nb-1,za+zb);
 }
 
 // Kinetic energy integral
@@ -224,11 +253,11 @@ double kinetic(int na, int nb, double za, double zb, int la, int ma, int lb, int
     return 0.0;
 
   // First term is
-  double term1=(lb*(lb+1)-nb*(nb-1))*overlap_primitive(na+nb-2,za,zb);
+  double term1=(lb*(lb+1)-nb*(nb-1))*overlap_primitive(na+nb-2,za+zb);
   // Second term is
-  double term2=2*zb*nb*overlap_primitive(na+nb-1,za,zb);
+  double term2=2*zb*nb*overlap_primitive(na+nb-1,za+zb);
   // Third term is
-  double term3=-zb*zb*overlap_primitive(na+nb,za,zb);
+  double term3=-zb*zb*overlap_primitive(na+nb,za+zb);
 
   return 0.5*normalization(na,za)*normalization(nb,zb)*(term1+term2+term3);
 }
@@ -303,6 +332,193 @@ arma::mat coulomb(const std::vector<bf_t> & basis, const arma::mat & P) {
   return J;
 }
 
+arma::vec integral(const std::vector<bf_t> & fitbas, bool coulomb=false) {
+  arma::vec r(fitbas.size());
+  r.zeros();
+  for(size_t i=0;i<fitbas.size();i++)
+    if(fitbas[i].l==0) {
+      // Integral is
+      r(i)=sqrt(4.0*M_PI)*pow(fitbas[i].zeta,-fitbas[i].n-2)*fact(fitbas[i].n+1);
+
+      if(!coulomb) {
+	r(i)*=normalization(fitbas[i].n,fitbas[i].zeta);
+      } else {
+	bf_t dummy;
+	dummy.zeta=0.0;
+	dummy.n=1;
+	dummy.l=0;
+	dummy.m=0;
+
+	r(i)/=sqrt(ERI_unnormalized(fitbas[i],dummy,fitbas[i],dummy));
+      }
+    }
+
+  return r;
+}
+
+arma::mat coulomb_coul(const std::vector<bf_t> & basis, const std::vector<bf_t> & fitbas, const arma::mat & P) {
+  bf_t dummy;
+  dummy.zeta=0.0;
+  dummy.n=1;
+  dummy.l=0;
+  dummy.m=0;
+
+  // Coulomb overlap matrix
+  arma::mat V(fitbas.size(),fitbas.size());
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<fitbas.size();i++)
+    for(size_t j=0;j<=i;j++) {
+      double el=ERI_unnormalized(fitbas[i],dummy,fitbas[j],dummy)/sqrt(ERI_unnormalized(fitbas[i],dummy,fitbas[i],dummy)*ERI_unnormalized(fitbas[j],dummy,fitbas[j],dummy));
+      V(i,j)=el;
+      V(j,i)=el;
+    }  
+  arma::mat Vinvh=BasOrth(V,false);
+  arma::mat Vinv=Vinvh*Vinvh;
+
+  // Three-center integrals
+  arma::cube thr(fitbas.size(),basis.size(),basis.size());
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<fitbas.size();i++)
+    for(size_t k=0;k<basis.size();k++)
+      for(size_t l=0;l<basis.size();l++) {
+	thr(i,k,l)=ERI_unnormalized(fitbas[i],dummy,basis[k],basis[l])/sqrt(ERI_unnormalized(fitbas[i],dummy,fitbas[i],dummy))*normalization(basis[k].n,basis[k].zeta)*normalization(basis[l].n,basis[l].zeta);
+      }
+
+  // Compute fitting coefficients
+  arma::vec gamma(fitbas.size());
+  gamma.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<fitbas.size();i++)
+    for(size_t k=0;k<basis.size();k++)
+      for(size_t l=0;l<basis.size();l++) {
+	gamma(i)+=P(k,l)*thr(i,k,l);
+      }
+
+  //  printf("Norm of expanded density is %.12f (coul).\n",arma::dot(gamma,integral(fitbas,true)));
+  //printf("Norm of expanded density is %.12f (ovl).\n",arma::dot(gamma,integral(fitbas,false)));
+
+  // Translate coefficients
+  gamma=Vinv*gamma;
+  //  printf("Norm of expanded density is %.12f (coul).\n",arma::dot(gamma,integral(fitbas,true)));
+  //  printf("Norm of expanded density is %.12f (ovl).\n",arma::dot(gamma,integral(fitbas,false)));
+
+  // Collect Coulomb matrix
+  arma::mat J(basis.size(),basis.size());
+  J.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<basis.size();i++)
+    for(size_t j=0;j<=i;j++) {
+      double el=0.0;
+
+      for(size_t k=0;k<fitbas.size();k++)
+	el+=gamma(k)*thr(k,i,j);
+
+      J(i,j)=el;
+      J(j,i)=el;
+    }
+
+  return J;
+}
+
+arma::mat coulomb_ovl(const std::vector<bf_t> & basis, const std::vector<bf_t> & fitbas, const arma::mat & P) {
+  // Form overlap matrix
+  arma::mat S(fitbas.size(),fitbas.size());
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<fitbas.size();i++)
+    for(size_t j=0;j<=i;j++) {
+      double el=overlap(fitbas[i],fitbas[j]);
+      S(i,j)=el;
+      S(j,i)=el;
+    }
+
+  // Inverse overlap
+  arma::mat Sinvh=BasOrth(S,false);
+  arma::mat Sinv=Sinvh*Sinvh;
+
+  // Coulomb overlap matrix
+  arma::mat V(fitbas.size(),fitbas.size());
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<fitbas.size();i++)
+    for(size_t j=0;j<=i;j++) {
+      double el=coulomb_overlap(fitbas[i],fitbas[j]);
+      V(i,j)=el;
+      V(j,i)=el;
+    }  
+
+  // Three-center integrals
+  arma::cube thr(fitbas.size(),basis.size(),basis.size());
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<fitbas.size();i++)
+    for(size_t k=0;k<basis.size();k++)
+      for(size_t l=0;l<basis.size();l++) {
+	thr(i,k,l)=three_overlap(fitbas[i],basis[k],basis[l]);
+      }
+
+  // Compute fitting coefficients
+  arma::vec gamma(fitbas.size());
+  gamma.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<fitbas.size();i++)
+    for(size_t k=0;k<basis.size();k++)
+      for(size_t l=0;l<basis.size();l++) {
+	gamma(i)+=P(k,l)*thr(i,k,l);
+      }
+  //  printf("Norm of expanded density was %.12f.\n",arma::dot(gamma,integral(fitbas)));
+  gamma=Sinv*gamma;
+
+  //  printf("Norm of expanded density was %.12f.\n",arma::dot(gamma,integral(fitbas)));
+
+  /*
+    double Nelfit=arma::dot(gamma,integral(fitbas));
+    double Nel=arma::trace(P*overlap(basis));
+    // Renormalize
+    gamma*=Nel/Nelfit;
+  */
+
+  // Translate coefficients
+  gamma=Sinv*V*gamma;
+  
+  // Collect Coulomb matrix
+  arma::mat J(basis.size(),basis.size());
+  J.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t i=0;i<basis.size();i++)
+    for(size_t j=0;j<=i;j++) {
+      double el=0.0;
+
+      for(size_t k=0;k<fitbas.size();k++)
+	el+=gamma(k)*thr(k,i,j);
+
+      J(i,j)=el;
+      J(j,i)=el;
+    }
+
+  return J;
+}
+
+arma::mat coulomb(const std::vector<bf_t> & basis, const std::vector<bf_t> & fitbas, const arma::mat & P) {
+  return coulomb_coul(basis,fitbas,P);
+  //  return coulomb_ovl(basis,fitbas,P);
+}
+
 arma::mat exchange(const std::vector<bf_t> & basis, const arma::mat & P) {
   arma::mat K(basis.size(),basis.size());
   K.zeros();
@@ -324,4 +540,3 @@ arma::mat exchange(const std::vector<bf_t> & basis, const arma::mat & P) {
 
   return K;
 }
-
