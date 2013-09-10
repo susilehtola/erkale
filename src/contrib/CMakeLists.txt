@@ -6,6 +6,7 @@ target_link_libraries(erkale_co-optimize liberkale)
 # Link other libraries if necessary
 if(BUILD_SHARED_LIBS)
 else()
+ target_link_libraries(erkale_co-optimize -lrt)
  target_link_libraries(erkale_co-optimize ${GSL_LIBRARIES})
  target_link_libraries(erkale_co-optimize ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_co-optimize ${LIBINT_LIBRARIES})
