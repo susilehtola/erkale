@@ -42,15 +42,37 @@ arma::mat coulomb(const std::vector<bf_t> & basis, const arma::mat & P);
 /// Form exchange matrix
 arma::mat exchange(const std::vector<bf_t> & basis, const arma::mat & P);
 
+/// Form density-fitted Coulomb matrix
+arma::mat coulomb(const std::vector<bf_t> & basis, const std::vector<bf_t> & fitbas, const arma::mat & P);
+
 /// Calculate normalization factor
 double normalization(int n, double z);
 /// Calculate overlap integral
 double overlap(int na, int nb, double za, double zb, int la, int ma, int lb, int mb);
+/// Wrapper for the above
+inline double overlap(bf_t i, bf_t j) {
+  return overlap(i.n,j.n,i.zeta,j.zeta,i.l,i.m,j.l,j.m);
+}
+
+/// Three-function overlap
+double three_overlap(int na, int nc, int nd, int la, int ma, int lc, int mc, int ld, int md, double za, double zc, double zd);
+/// Wrapper for the above
+inline double three_overlap(bf_t i, bf_t k, bf_t l) {
+  return three_overlap(i.n,k.n,l.n,i.l,i.m,k.l,k.m,l.l,l.m,i.zeta,k.zeta,l.zeta);
+}
+
+
 /// Calculate kinetic energy integral
 double kinetic(int na, int nb, double za, double zb, int la, int ma, int lb, int mb);
 /// Calculate nuclear attraction integral
 double nuclear(int na, int nb, double za, double zb, int la, int ma, int lb, int mb);
 
+/// Calculate unnormalized repulsion integral
+double ERI_unnormalized(int na, int nb, int nc, int nd, double za, double zb, double zc, double zd, int la, int ma, int lb, int mb, int lc, int mc, int ld, int md);
+/// Wrapper for the above
+inline double ERI_unnormalized(bf_t i, bf_t j, bf_t k, bf_t l) {
+  return ERI_unnormalized(i.n,j.n,k.n,l.n,i.zeta,j.zeta,k.zeta,l.zeta,i.l,i.m,j.l,j.m,k.l,k.m,l.l,l.m);
+}
 /// Calculate electron repulsion integral
 double ERI(int na, int nb, int nc, int nd, double za, double zb, double zc, double zd, int la, int ma, int lb, int mb, int lc, int mc, int ld, int md);
 /// Wrapper for the above
