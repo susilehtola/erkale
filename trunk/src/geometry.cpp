@@ -514,6 +514,7 @@ int main(int argc, char **argv) {
   set.add_string("Criterion","Convergence criterion to use: LOOSE, NORMAL, TIGHT, VERYTIGHT","NORMAL");
   set.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
   set.add_string("Result","File to save optimized geometry in","optimized.xyz");
+  set.set_string("Logfile","erkale_geom.log");
   set.parse(std::string(argv[1]),true);
   set.print();
 
