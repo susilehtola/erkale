@@ -513,12 +513,14 @@ int main(int argc, char **argv) {
   set.add_int("MaxSteps","Maximum amount of geometry steps",256);
   set.add_string("Criterion","Convergence criterion to use: LOOSE, NORMAL, TIGHT, VERYTIGHT","NORMAL");
   set.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
+  set.add_string("Result","File to save optimized geometry in","optimized.xyz");
   set.parse(std::string(argv[1]),true);
   set.print();
 
   bool verbose=set.get_bool("Verbose");
   int maxiter=set.get_int("MaxSteps");
   std::string optmovie=set.get_string("OptMovie");
+  std::string result=set.get_string("Result");
 
   // Interpret optimizer
   enum minimizer alg;
@@ -784,7 +786,10 @@ int main(int argc, char **argv) {
     // Store old force
     oldf=interpret_force(s->gradient);
   }
-
+  
+  if(convd)
+    save_xyz(get_atoms(s->x,pars),"Optimized geometry",result);
+  
   gsl_multimin_fdfminimizer_free (s);
 
   gsl_vector_free (x);
