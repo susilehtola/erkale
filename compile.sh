@@ -48,10 +48,10 @@ MAXAM="6"
 MAXDERIV="5"
 
 # Current versions of libraries
-export GSLVER="1.15"
+export GSLVER="1.16"
 export XCVER="2.0.1"
 export INTVER="1.1.4"
-export ARMAVER="3.900.0"
+export ARMAVER="3.910.1"
 export CMAKEVER="2.8.11"
 export HDF5VER="1.8.11"
 
@@ -256,7 +256,7 @@ echo "set(HDF5_LIBRARIES ${topdir}/hdf5/lib/libhdf5.a -lz)" >> erkale/cmake/Find
 echo "set(LIBINT_FOUND 1)" > erkale/config/libintConfig.cmake
 echo "set(LIBINT_INCLUDE_DIRS \"${topdir}/libint/include\")" >> erkale/config/libintConfig.cmake
 #echo "set(LIBINT_LIBRARY_DIRS \"${topdir}/libint/lib\")"  >> erkale/config/libintConfig.cmake
-echo "set(LIBINT_LIBRARIES ${topdir}/libint/lib/libint.a)"  >> erkale/config/libintConfig.cmake
+echo "set(LIBINT_LIBRARIES ${topdir}/libint/lib/libderiv.a ${topdir}/libint/lib/libint.a)"  >> erkale/config/libintConfig.cmake
 
 ## Build erkale
 

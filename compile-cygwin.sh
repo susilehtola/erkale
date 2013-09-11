@@ -47,7 +47,7 @@ MAXDERIV="5"
 # Current versions of libraries
 export XCVER="2.0.1"
 export INTVER="1.1.4"
-export ARMAVER="3.900.0"
+export ARMAVER="3.910.1"
 
 # Silence cmake warnings about changed behavior
 export CMAKE_LEGACY_CYGWIN_WIN32=0 
@@ -186,7 +186,7 @@ echo "set(HDF5_LIBRARIES -lhdf5 -lz)" >> erkale/cmake/FindHDF5.cmake
 echo "set(LIBINT_FOUND 1)" > erkale/config/libintConfig.cmake
 echo "set(LIBINT_INCLUDE_DIRS \"${topdir}/libint/include\")" >> erkale/config/libintConfig.cmake
 #echo "set(LIBINT_LIBRARY_DIRS \"${topdir}/libint/lib\")"  >> erkale/config/libintConfig.cmake
-echo "set(LIBINT_LIBRARIES ${topdir}/libint/lib/libint.a)"  >> erkale/config/libintConfig.cmake
+echo "set(LIBINT_LIBRARIES ${topdir}/libint/lib/libderiv.a ${topdir}/libint/lib/libint.a)"  >> erkale/config/libintConfig.cmake
 
 ## Build erkale
 
