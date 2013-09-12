@@ -772,7 +772,13 @@ int main(int argc, char **argv) {
     // Converged?
     const static char cconv[]=" *";
 
-    fprintf(stderr,"%4d % 16.8f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", (int) iter, s->f, dE, dE/dEproj, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
+    double dEfrac;
+    if(dEproj!=0.0)
+      dEfrac=dE/dEproj;
+    else
+      dEfrac=0.0;
+
+    fprintf(stderr,"%4d % 16.8f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", (int) iter, s->f, dE, dEfrac, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
     fflush(stderr);
 
     convd=dmaxconv && drmsconv && fmaxconv && frmsconv;
