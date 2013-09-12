@@ -221,12 +221,16 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     fflush(stdout);
   }
 
-  // Check that density matrix contains the right amount of electrons
+  // Overlap matrix
   arma::mat S=basis.overlap();
+
+  /*
+  // Check that density matrix contains the right amount of electrons
   int Neltot=basis.Ztot()-set.get_int("Charge");
   double Nel=arma::trace(P*S);
   if(fabs(Nel-Neltot)/Neltot*100>1e-10)
     fprintf(stderr,"Nel = %i, P contains %f electrons, difference %e.\n",Neltot,Nel,Nel-Neltot);
+  */
 
   // Go to natural orbitals
   arma::mat NO;
