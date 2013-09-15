@@ -333,10 +333,8 @@ arma::mat real_orthogonal(size_t N, unsigned long int seed) {
 
   // Check that Q is orthogonal
   arma::mat test=Q*arma::trans(Q);
-  arma::mat eye(test);
-  eye.eye();
-
-  test=test-eye;
+  for(size_t i=0;i<test.n_cols;i++)
+    test(i,i)-=1.0;
   double n=rms_norm(test);
   if(n>10*DBL_EPSILON) {
     ERROR_INFO();
@@ -363,10 +361,8 @@ arma::cx_mat complex_unitary(size_t N, unsigned long int seed) {
 
   // Check that Q is unitary
   arma::cx_mat test=Q*arma::trans(Q);
-  arma::cx_mat eye(test);
-  eye.eye();
-
-  test=test-eye;
+  for(size_t i=0;i<test.n_cols;i++)
+    test(i,i)-=1.0;
   double n=rms_cnorm(test);
   if(n>10*DBL_EPSILON) {
     ERROR_INFO();
