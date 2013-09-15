@@ -509,8 +509,8 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
-	double measure=1e-3;
-	orbital_localization(PIPEK_LOWDIN,*basisp,sicsol.C,sol.P,measure,W,verbose);
+	double measure;
+	orbital_localization(PIPEK_BECKE,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
 	if(verbose) printf("\n");
       }
     }
@@ -650,8 +650,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial alpha localization.\n");
-	double measure=1e-3;
-	orbital_localization(PIPEK_LOWDIN,*basisp,sicsola.C,sol.P,measure,Wa,verbose);
+	double measure;
+	orbital_localization(PIPEK_BECKE,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
 	if(verbose) printf("\n");
       }
     }
@@ -668,8 +668,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       if(localization) {
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial beta localization.\n");
-	double measure=1e-3;
-	orbital_localization(PIPEK_LOWDIN,*basisp,sicsolb.C,sol.P,measure,Wb,verbose);
+	double measure;
+	orbital_localization(PIPEK_BECKE,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
 	if(verbose) printf("\n");
       }
     }
@@ -1960,7 +1960,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
   return locd;
 }
 
-void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & U, int maxiter, double Gthr, double Fthr, bool real, bool verbose, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
+void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & U, bool verbose, bool real, int maxiter, double Gthr, double Fthr, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
   Timer t;
 
   // Real part of U
