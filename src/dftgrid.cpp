@@ -1978,10 +1978,12 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   // Determine limit for angular quadrature
   int lmax=(int) ceil(5.0-6.0*log10(tol));
 
-  // Old and new diagonal elements of Hamiltonian
-  size_t nelem=Pa.size()-1;
-  if(restr)
-    nelem=Pa.size();
+  // Old and new diagonal elements of Hamiltonian. Amount of
+  // Hamiltonians is
+  size_t nelem=Pa.size();
+  if(!restr)
+    // Unrestricted density - two last elements make up total density
+    nelem=Pa.size()-1;
   std::vector<arma::vec> Haold(nelem), Hanew(nelem);
   std::vector<arma::vec> Hbold(nelem), Hbnew(nelem);
   for(size_t i=0;i<nelem;i++) {
@@ -1995,16 +1997,14 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   // Now, determine actual quadrature limits shell by shell
   for(size_t ir=0;ir<ret.sh.size();ir++) {
 
-    // Amount of orbitals
-    size_t ipmax=Pa.size()-2;
-    if(restr)
-      ipmax=Pa.size()-1;
-
-    // Orbitals to run over
+    // Amount of individual orbitals is
+    size_t ipmax=nelem-1;
+    // Orbitals to check
     std::vector<size_t> orbidx(ipmax);
     for(size_t i=0;i<ipmax;i++)
       orbidx[i]=i;
 
+    // Check total density as well?
     bool runtot=true;
 
     do {
@@ -2083,9 +2083,9 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
 	Hanew[ip].zeros(Nbf);
 	Hbnew[ip].zeros(Nbf);
 	if(restr)
-	  eval_Fxc(Hanew[ip]);
+	  eval_diag_Fxc(Hanew[ip]);
 	else
-	  eval_Fxc(Hanew[ip],Hbnew[ip]);
+	  eval_diag_Fxc(Hanew[ip],Hbnew[ip]);
 
 	// Compute maximum difference of diagonal elements of Fock matrix
 	double maxd=std::max(arma::max(arma::abs(Hanew[ip]-Haold[ip])),arma::max(arma::abs(Hbnew[ip]-Hbold[ip])));
@@ -3194,27 +3194,16 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
   Nel.assign(Pa.size(),0.0);
 
 #ifdef _OPENMP
-  // Get (maximum) number of threads
-  int maxt=omp_get_max_threads();
-
-  // Stack of work arrays
-  std::vector<arma::mat> Hawrk, Hbwrk;
-
-  for(int i=0;i<maxt;i++) {
-    Hawrk.push_back(arma::mat(Ha[0].n_rows,Ha[0].n_cols));
-    Hawrk[i].zeros();
-
-    Hbwrk.push_back(arma::mat(Ha[0].n_rows,Ha[0].n_cols));
-    Hbwrk[i].zeros();
-  }
-
-#pragma omp parallel shared(Hawrk,Hbwrk)
+#pragma omp parallel
   { // Begin parallel region
 
     arma::mat Hdum(Pa[0]);
     Hdum.zeros();
     arma::mat Pdum(Pa[0]);
     Pdum.zeros();
+
+    arma::mat Hwrk(Hdum);
+    Hwrk.zeros();
 
     // Current thread is
     int ith=omp_get_thread_num();
@@ -3248,18 +3237,18 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
 #pragma omp atomic
 	Exc[ip]+=wrk[ith].eval_Exc();
 	// and construct the Fock matrices
-	Hawrk[ith].zeros(); // need to clear this here
-	wrk[ith].eval_Fxc(Hawrk[ith],Hdum);
-
+	Hwrk.zeros(); // need to clear this here
+	wrk[ith].eval_Fxc(Hwrk,Hdum);
+	
 	// Accumulate Fock matrix
 #pragma omp critical
-	Ha[ip]+=Hawrk[ith];
+	Ha[ip]+=Hwrk;
       }
     }
-
+    
     // Free memory
     wrk[ith].free();
-
+    
   } // End parallel region
 #else
 
