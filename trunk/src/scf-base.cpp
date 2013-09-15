@@ -437,7 +437,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       }
 
     if(verbose) {
-      printf(" done (%s)",t.elapsed().c_str());
+      printf(" done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
     }
   }
@@ -511,6 +511,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	if(verbose) printf("\nInitial localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
+	orbital_localization(EDMISTON,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
 	if(verbose) printf("\n");
       }
     }
@@ -652,6 +653,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
+	orbital_localization(EDMISTON,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
 	if(verbose) printf("\n");
       }
     }
@@ -670,6 +672,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(verbose) printf("\nInitial beta localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
+	orbital_localization(EDMISTON,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
 	if(verbose) printf("\n");
       }
     }
