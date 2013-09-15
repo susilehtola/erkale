@@ -209,7 +209,7 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       printf(" %i",(int) orbidx[io]+1);
     printf("\n");
 
-    orbital_localization(method,basis,Cwrk,P,measure,U,maxiter,Gthr,Fthr,!(start==UNITMAT),true,umet,acc,delocalize,fname,debug);
+    orbital_localization(method,basis,Cwrk,P,measure,U,true,!(start==UNITMAT),maxiter,Gthr,Fthr,umet,acc,delocalize,fname,debug);
 
     if(start==UNITMAT) {
       // Update orbitals, complex case
