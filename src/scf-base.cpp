@@ -511,7 +511,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	if(verbose) printf("\nInitial localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
-	orbital_localization(EDMISTON,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
+	orbital_localization(EDMISTON,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-1);
 	if(verbose) printf("\n");
       }
     }
@@ -535,9 +535,19 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       Pv[Pv.size()-1]+=Pv[io];
 
     // Update DFT grid
-    if(verbose) printf("\nReconstructing DFT grid.\n");
+    Timer tgrid;
+    if(verbose) {
+      printf("\nReconstructing SIC DFT grid.\n");
+      fflush(stdout);
+    }
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
-    if(verbose) printf("\n");
+    if(verbose) {
+      printf("\n");
+      fflush(stdout);
+
+      fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",tgrid.get());
+      fflush(stderr);
+    }
   } // if(dft.adaptive)
 
   // Do the calculation
@@ -653,7 +663,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
-	orbital_localization(EDMISTON,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
+	orbital_localization(EDMISTON,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-1);
 	if(verbose) printf("\n");
       }
     }
@@ -672,7 +682,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(verbose) printf("\nInitial beta localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
-	orbital_localization(EDMISTON,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
+	orbital_localization(EDMISTON,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-1);
 	if(verbose) printf("\n");
       }
     }
@@ -704,9 +714,19 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       Pv[Pv.size()-1]+=Pv[io+nocca];
 
     // Update DFT grid
-    if(verbose) printf("\nReconstructing DFT grid.\n");
+    Timer tgrid;
+    if(verbose) {
+      printf("\nReconstructing SIC DFT grid.\n");
+      fflush(stdout);
+    }
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
-    if(verbose) printf("\n");
+    if(verbose) {
+      printf("\n");
+      fflush(stdout);
+      
+      fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",tgrid.get());
+      fflush(stderr);
+    }
   } // if(dft.adaptive)
 
   // Do the calculation
@@ -716,7 +736,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   PZSIC_calculate(sicsola,Wa,dft,grid,canonical);
   chkptp->cwrite("CWa",sicsola.C*Wa);
   if(verbose && !canonical) {
-      fprintf(stderr,"\nSIC unitary optimization, beta spin\n");
+      fprintf(stderr,"SIC unitary optimization, beta spin\n");
   }
   PZSIC_calculate(sicsolb,Wb,dft,grid,canonical);
   chkptp->cwrite("CWb",sicsolb.C*Wb);
@@ -764,7 +784,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
     arma::vec Eorb=worker.get_Eorb();
     printf("Decomposition of self-interaction:\n");
     for(size_t io=0;io<Eorb.n_elem;io++)
-      printf("\t%4i\t%e\n",(int) io+1,Eorb(io));
+      printf("\t%4i\t% f\n",(int) io+1,Eorb(io));
     fflush(stdout);
   }
 }
