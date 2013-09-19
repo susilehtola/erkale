@@ -89,7 +89,9 @@ Storage parse_fchk(const std::string & name) {
     in=fopen(name.c_str(),"r");
 
   if(in==NULL) {
-    throw std::runtime_error("Unable to open input file.\n");
+    std::ostringstream oss;
+    oss << "Unable to open input checkpoint file \"" << name << "\".\n";
+    throw std::runtime_error(oss.str());
   }
 
   // Line number
