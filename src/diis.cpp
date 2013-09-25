@@ -26,6 +26,10 @@
 
 DIIS::DIIS(const arma::mat &Sv, size_t imaxv) {
   S=Sv;
+  
+  // Get half-inverse
+  arma::mat Sh;
+  S_half_invhalf(S,Sh,Sinvh);
 
   imax=imaxv;
   icur=0;
@@ -44,6 +48,9 @@ void DIIS::clear() {
 void DIIS::update(const arma::mat & F, const arma::mat & D, double & error) {
   // Compute error matrix
   arma::mat err=F*D*S-S*D*F;
+  // and transform it to the orthonormal basis (1982 paper, page 557)
+  err=Sinvh*err*Sinvh;
+
   double maxerr=max_abs(err);
   error=maxerr;
 

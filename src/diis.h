@@ -57,6 +57,8 @@ class DIIS {
   std::vector<arma::vec> errs;
   /// Overlap matrix
   arma::mat S;
+  /// Half-inverse overlap matrix
+  arma::mat Sinvh;
 
   /// Index of current iteration
   int icur;
