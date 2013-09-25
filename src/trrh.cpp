@@ -30,13 +30,11 @@
 
 /// Mu increment
 #define DELTAMU 1.0
-/// Minimal allowed value of mu (Thøgersen JCP 123)
-#define EPSMU 0.1
 
 /// Throw error if eigenvalues of K^2 are bigger than (should be negative!)
 #define MAXNEGEIG 1e-4
 
-void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, bool verbose) {
+void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, double minshift, bool verbose) {
   // Transform Fock matrix into MO basis
   const arma::mat F_MO=arma::trans(C)*F_AO*C;
 
@@ -102,7 +100,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
 
   // Increase mu until the change is small enough
   const double fac=2.0;
-  double mu=EPSMU/fac;
+  double mu=minshift/fac;
   size_t iit=0;
   double amin;
 
@@ -153,7 +151,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
     // Have we reached the refine stage?
     if(amin>=MINA && !refine) {
       // Did we converge straight away?
-      if(mu==EPSMU)
+      if(mu==minshift)
 	break;
 
       refine=true;

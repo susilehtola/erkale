@@ -103,6 +103,8 @@ void Settings::add_scf_settings() {
 
   // Maximum iterations
   add_int("MaxIter", "Maximum number of iterations in SCF cycle", 100);
+  // Level shift
+  add_double("Shift", "Level shift to use in Hartree", 0.1);
 
   // Use density fitting if possible?
   add_bool("DensityFitting", "Use density fitting / RI?", true);

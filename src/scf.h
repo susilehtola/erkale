@@ -228,6 +228,8 @@ class SCF {
 
   /// Maximum number of iterations
   int maxiter;
+  /// Level shift
+  double shift;
   /// Verbose calculation?
   bool verbose;
 
@@ -360,9 +362,9 @@ class SCF {
 };
 
 /// Diagonalize Fock matrix
-void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol);
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift=0.0);
 /// Diagonalize Fock matrix
-void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol);
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol, double shift=0.0);
 
 
 /**

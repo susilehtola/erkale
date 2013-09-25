@@ -84,6 +84,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   linesearch=set.get_bool("LineSearch");
 
   maxiter=set.get_int("MaxIter");
+  shift=set.get_double("Shift");
   verbose=set.get_bool("Verbose");
 
   direct=set.get_bool("Direct");
@@ -789,33 +790,51 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   }
 }
 
-void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol) {
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift) {
   arma::mat Horth;
   arma::mat orbs;
   // Transform Hamiltonian into orthogonal basis
-  Horth=arma::trans(Sinvh)*sol.H*Sinvh;
+  if(shift==0.0)
+    Horth=arma::trans(Sinvh)*sol.H*Sinvh;
+  else
+    Horth=arma::trans(Sinvh)*(sol.H-shift*S*sol.P/2.0*S)*Sinvh;
   // Update orbitals and energies
   eig_sym_ordered(sol.E,orbs,Horth);
   // Transform back to non-orthogonal basis
   sol.C=Sinvh*orbs;
 
+  if(shift!=0.0) {
+    // Orbital energies occupied by shift, so recompute these
+    sol.E=arma::diagvec(arma::trans(sol.C)*sol.H*sol.C);
+  }
+
   // Check orthonormality
   check_orth(sol.C,S,false);
 }
 
-void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol) {
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol, double shift) {
   arma::mat Horth;
   arma::mat orbs;
 
-  Horth=trans(Sinvh)*sol.Ha*Sinvh;
+  if(shift==0.0)
+    Horth=trans(Sinvh)*sol.Ha*Sinvh;
+  else
+    Horth=trans(Sinvh)*(sol.Ha-shift*S*sol.Pa*S)*Sinvh;
   eig_sym_ordered(sol.Ea,orbs,Horth);
   sol.Ca=Sinvh*orbs;
   check_orth(sol.Ca,S,false);
+  if(shift!=0.0)
+    sol.Ea=arma::diagvec(arma::trans(sol.Ca)*sol.Ha*sol.Ca);
 
-  Horth=trans(Sinvh)*sol.Hb*Sinvh;
+  if(shift==0.0)
+    Horth=trans(Sinvh)*sol.Hb*Sinvh;
+  else
+    Horth=trans(Sinvh)*(sol.Hb-shift*S*sol.Pb*S)*Sinvh;
   eig_sym_ordered(sol.Eb,orbs,Horth);
   sol.Cb=Sinvh*orbs;
   check_orth(sol.Cb,S,false);
+  if(shift!=0.0)
+    sol.Eb=arma::diagvec(arma::trans(sol.Cb)*sol.Hb*sol.Cb);
 }
 
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {
