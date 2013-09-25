@@ -855,7 +855,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #ifdef RESTRICTED
       arma::mat Cnew;
       arma::vec Enew;
-      TRRH_update(sol.H,sol.C,S,Cnew,Enew,nocc,verbose);
+      TRRH_update(sol.H,sol.C,S,Cnew,Enew,nocc,shift,verbose);
 
       // Update solution
       sol.C=Cnew;
@@ -866,11 +866,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #else
       arma::mat Canew;
       arma::vec Eanew;
-      TRRH_update(sol.Ha,sol.Ca,S,Canew,Eanew,nocca,verbose);
+      TRRH_update(sol.Ha,sol.Ca,S,Canew,Eanew,nocca,shift,verbose);
 
       arma::mat Cbnew;
       arma::vec Ebnew;
-      TRRH_update(sol.Hb,sol.Cb,S,Cbnew,Ebnew,noccb,verbose);
+      TRRH_update(sol.Hb,sol.Cb,S,Cbnew,Ebnew,noccb,shift,verbose);
 
       // Update solutions
       sol.Ca=Canew;
@@ -887,13 +887,16 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
       // Solve FC=ESC
       if(verbose) {
-	printf("\nSolving SCF equations ... ");
+	if(shift==0.0)
+	  printf("\nSolving SCF equations ... ");
+	else
+	  printf("\nSolving SCF equations with level shift %.3f ... ",shift);
 	fflush(stdout);
 	t.set();
       }
 
       // Do the diagonalization
-      diagonalize(S,Sinvh,sol);
+      diagonalize(S,Sinvh,sol,shift);
 
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
@@ -1128,7 +1131,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       PZSIC_UDFT(sol,occa,occb,dft,grid,pz==CANPERT,pzloc);
 #endif
       // Diagonalize to get new canonical orbitals and energies
-      diagonalize(S,Sinvh,sol);
+      diagonalize(S,Sinvh,sol,shift);
 
       chkptp->open();
       chkptp->write(sol.en);
