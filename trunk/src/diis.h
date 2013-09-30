@@ -23,7 +23,24 @@
 #include <armadillo>
 #include <vector>
 
-/// Index entry
+/// Spin-polarized entry
+typedef struct {
+  /// Alpha density matrix
+  arma::mat Pa;
+  /// Alpha Fock matrix
+  arma::mat Fa;
+  /// Beta density matrix
+  arma::mat Pb;
+  /// Beta Fock matrix
+  arma::mat Fb;
+  /// Energy
+  double E;
+
+  /// DIIS error matrix
+  arma::vec err;
+} diis_pol_entry_t;
+
+/// Spin-unpolarized entry
 typedef struct {
   /// Density matrix
   arma::mat P;
@@ -34,10 +51,12 @@ typedef struct {
 
   /// DIIS error matrix
   arma::vec err;
-} diis_entry_t;
+} diis_unpol_entry_t;
 
 /// Helper for sort
-bool operator<(const diis_entry_t & lhs, const diis_entry_t & rhs);
+bool operator<(const diis_pol_entry_t & lhs, const diis_pol_entry_t & rhs);
+/// Helper for sort
+bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs);
 
 /**
  * \class DIIS
@@ -67,8 +86,11 @@ bool operator<(const diis_entry_t & lhs, const diis_entry_t & rhs);
  */
 
 class DIIS {
-  /// Fock matrices in AO basis
-  std::vector<diis_entry_t> stack;
+  /// Fock matrices in AO basis - spin polarized
+  std::vector<diis_pol_entry_t> pol;
+  /// Fock matrices in AO basis - spin unpolarized
+  std::vector<diis_unpol_entry_t> unpol;
+
   /// Overlap matrix
   arma::mat S;
   /// Half-inverse overlap matrix
@@ -89,14 +111,20 @@ class DIIS {
   /// Clear Fock matrices and errors
   void clear();
 
-  /// Add matrix to stack
-  void update(const arma::mat & F, const arma::mat & D, double E, double & error);
+  /// Add matrices to stack
+  void update(const arma::mat & F, const arma::mat & P, double E, double & error);
+  /// Add matrices to stack
+  void update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & Pa, const arma::mat & Pb, double E, double & error);
 
   /// Compute new Fock matrix, use C1-DIIS if wanted
   void solve_F(arma::mat & F, bool c1_diis=false);
+  /// Compute new Fock matrix, use C1-DIIS if wanted
+  void solve_F(arma::mat & Fa, arma::mat & Fb, bool c1_diis=false);
 
   /// Compute new density matrix, use C1-DIIS if wanted
-  void solve_P(arma::mat & F, bool c1_diis=false);
+  void solve_P(arma::mat & P, bool c1_diis=false);
+  /// Compute new density matrix, use C1-DIIS if wanted
+  void solve_P(arma::mat & Pa, arma::mat & Pb, bool c1_diis=false);
 };
 
 #endif

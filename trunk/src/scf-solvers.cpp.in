@@ -155,11 +155,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   arma::mat orbs;
   arma::mat Horth;
 
-
-#ifdef RESTRICTED
   // DIIS iterator
   DIIS diis(S,diisorder);
 
+#ifdef RESTRICTED
   // ADIIS
   ADIIS adiis;
   // TRDSM
@@ -172,10 +171,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   J.zeros();
   K.zeros();
 #else
-  // DIIS iterator
-  DIIS diisa(S,diisorder);
-  DIIS diisb(S,diisorder);
-
   // ADIIS
   ADIIS adiisa;
   ADIIS adiisb;
@@ -536,9 +531,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       diis.update(sol.H,sol.P,sol.en.E,diiserr);
 #else
       // Update DIIS stacks of matrices
-      diisa.update(sol.Ha,sol.Pa,sol.en.E,diiserra);
-      diisb.update(sol.Hb,sol.Pb,sol.en.E,diiserrb);
-      diiserr=std::max(diiserra,diiserrb);
+      diis.update(sol.Ha,sol.Hb,sol.Pa,sol.Pb,sol.en.E,diiserr);
 #endif
 
       if(diiserr<diisthr) {
@@ -550,8 +543,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	diis.solve_F(sol.H,diis_c1);
 #else
 	// Solve new matrices
-	diisa.solve_F(sol.Ha,diis_c1);
-	diisb.solve_F(sol.Hb,diis_c1);
+	diis.solve_F(sol.Ha,sol.Hb,diis_c1);
 #endif
 
 	diissucc=true;
@@ -1068,13 +1060,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  printf("\nInitial convergence achieved. Turning off incremental formation.\n");
 	  fflush(stdout);
 	}
-#ifdef RESTRICTED
 	diis.clear();
+#ifdef RESTRICTED
 	adiis.clear();
 	broyd.clear();
 #else
-	diisa.clear();
-	diisb.clear();
 	adiisa.clear();
 	adiisb.clear();
 	broyd_sum.clear();
