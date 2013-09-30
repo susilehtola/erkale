@@ -15,18 +15,6 @@
  */
 
 
- /*
- * P. M. W. Gill, B. G. Johnson and J. A. Pople, "A standard grid for
- * density functional calculations", Chem. Phys. Lett. 209, pp. 506 -
- * 512 (1993).
-
- * J. M. Pérez-Jorda, A. Becke and E. San-Fabián, "Automatic numerical
- * integration techniques for polyatomic molecules",
- * J. Chem. Phys. 100, pp. 6520 - 6534 (1994).
-
- */
-
-
 #ifndef ERKALE_DFTGRID
 #define ERKALE_DFTGRID
 
@@ -118,10 +106,17 @@ int SG1_order(double r, int Z);
  * Chem. Phys. Lett. 199 (1992), pp. 557 - 560.
  *
  * For speed and to guarantee the accuracy of the results, the
- * integration grid is formed adaptively as described in
+ * integration grid is formed adaptively by default, as described in
  * A. M. Köster, R. Flores-Morano and J. U. Reveles, "Efficient and
  * reliable numerical integration of exchange-correlation energies and
- * potentials", J. Chem. Phys. 121, pp. 681 - 690 (2004).
+ * potentials", J. Chem. Phys. 121, pp. 681 - 690 (2004). Fixed grids
+ * can also be used.
+ *
+ * In addition to the above adaptive procedure, there is also an older
+ * variant for adaptive grid generation that is mostly useful for
+ * computing partial charges, i.e. M. Krack and A. M. Köster, "An
+ * adaptive numerical integrator for molecular integrals",
+ * J. Chem. Phys. 108, 3226 (2008).
  *
  * The radial integral is done with Gauss-Chebyshev quadrature, with
  * the change of variables used being the parameter free version
