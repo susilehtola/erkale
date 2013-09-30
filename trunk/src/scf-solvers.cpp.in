@@ -152,12 +152,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   arma::mat orbs;
   arma::mat Horth;
 
-  // DIIS iterator
-  DIIS diis(S,Sinvh,diisorder);
-
 #ifdef RESTRICTED
+  // DIIS iterator
+  rDIIS diis(S,Sinvh,diisorder);
   // ADIIS
-  ADIIS adiis;
+  rADIIS adiis;
   // TRDSM
   TRDSM trdsm(S);
   // Broyden
@@ -168,9 +167,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   J.zeros();
   K.zeros();
 #else
+  // DIIS iterator
+  uDIIS diis(S,Sinvh,diisorder);
   // ADIIS
-  ADIIS adiisa;
-  ADIIS adiisb;
+  uADIIS adiis;
 
   // TRDSM
   TRDSM trdsma(S);
@@ -480,10 +480,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // Update ADIIS stacks.
     if(useadiis) {
 #ifdef RESTRICTED
-      adiis.push(sol.en.E,sol.P,sol.H);
+      adiis.update(sol.P,sol.H,sol.en.E);
 #else
-      adiisa.push(sol.en.E,sol.Pa,sol.Ha);
-      adiisb.push(sol.en.E,sol.Pb,sol.Hb);
+      adiis.update(sol.Pa,sol.Pb,sol.Ha,sol.Hb,sol.en.E);
 #endif
     }
 
@@ -562,10 +561,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
       diissucc=true;
 #ifdef RESTRICTED
-      sol.H=adiis.get_H();
+      adiis.get_F(sol.H);
 #else
-      sol.Ha=adiisa.get_H();
-      sol.Hb=adiisb.get_H();
+      adiis.get_F(sol.Ha,sol.Hb);
 #endif
 
       if(verbose)
@@ -1058,12 +1056,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  fflush(stdout);
 	}
 	diis.clear();
-#ifdef RESTRICTED
 	adiis.clear();
+#ifdef RESTRICTED
 	broyd.clear();
 #else
-	adiisa.clear();
-	adiisb.clear();
 	broyd_sum.clear();
 	broyd_diff.clear();
 #endif

@@ -39,19 +39,38 @@ DIIS::DIIS(const arma::mat & Sv, const arma::mat & Sinvhv, size_t imaxv) {
   imax=imaxv;
 }
 
+rDIIS::rDIIS(const arma::mat & Sv, const arma::mat & Sinvhv, size_t imaxv) : DIIS(Sv,Sinvhv,imaxv) {
+}
+
+uDIIS::uDIIS(const arma::mat & Sv, const arma::mat & Sinvhv, size_t imaxv) : DIIS(Sv,Sinvhv,imaxv) {
+}
+
 DIIS::~DIIS() {
 }
 
-void DIIS::clear() {
-  pol.clear();
-  unpol.clear();
+rDIIS::~rDIIS() {
 }
 
-void DIIS::update(const arma::mat & F, const arma::mat & P, double E, double & error) {
-  if(pol.size()) {
-    throw std::runtime_error("Trying to add spin-unpolarized entry to spin-polarized DIIS stack!\n");
-  }
+uDIIS::~uDIIS() {
+}
 
+void rDIIS::clear() {
+  stack.clear();
+}
+
+void uDIIS::clear() {
+  stack.clear();
+}
+
+void rDIIS::erase_last() {
+  stack.erase(stack.begin()+stack.size()-1);
+}
+
+void uDIIS::erase_last() {
+  stack.erase(stack.begin()+stack.size()-1);
+}
+
+void rDIIS::update(const arma::mat & F, const arma::mat & P, double E, double & error) {
   // New entry
   diis_unpol_entry_t hlp;
   hlp.F=F;
@@ -69,19 +88,15 @@ void DIIS::update(const arma::mat & F, const arma::mat & P, double E, double & e
   error=max_abs(errmat);
 
   // Is stack full?
-  if(unpol.size()==imax) {
-    unpol.erase(unpol.begin()+unpol.size()-1);
+  if(stack.size()==imax) {
+    erase_last();
   }
   // Add to stack and resort
-  unpol.push_back(hlp);
-  std::stable_sort(unpol.begin(),unpol.end());
+  stack.push_back(hlp);
+  std::stable_sort(stack.begin(),stack.end());
 }
 
-void DIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & Pa, const arma::mat & Pb, double E, double & error) {
-  if(unpol.size()) {
-    throw std::runtime_error("Trying to add spin-polarized entry to spin-unpolarized DIIS stack!\n");
-  }
-
+void uDIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & Pa, const arma::mat & Pb, double E, double & error) {
   // New entry
   diis_pol_entry_t hlp;
   hlp.Fa=Fa;
@@ -102,28 +117,31 @@ void DIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & 
   error=max_abs(errmat);
 
   // Is stack full?
-  if(pol.size()==imax) {
-    pol.erase(pol.begin()+pol.size()-1);
+  if(stack.size()==imax) {
+    erase_last();
   }
   // Add to stack and resort
-  pol.push_back(hlp);
-  std::stable_sort(pol.begin(),pol.end());
+  stack.push_back(hlp);
+  std::stable_sort(stack.begin(),stack.end());
+}
+
+std::vector<arma::vec> rDIIS::get_error() const {
+  std::vector<arma::vec> err(stack.size());
+  for(size_t i=0;i<stack.size();i++)
+    err[i]=stack[i].err;
+  return err;
+}
+
+std::vector<arma::vec> uDIIS::get_error() const {
+  std::vector<arma::vec> err(stack.size());
+  for(size_t i=0;i<stack.size();i++)
+    err[i]=stack[i].err;
+  return err;
 }
 
 arma::vec DIIS::get_weights(bool c1) {
   // Collect error vectors
-  std::vector<arma::vec> errs;
-  if(unpol.size() && pol.size())
-    throw std::runtime_error("Error - DIIS has both spin-polarized and spin-unpolarized error stacks!\n");
-  if(unpol.size()) {
-    errs.resize(unpol.size());
-    for(size_t i=0;i<unpol.size();i++)
-      errs[i]=unpol[i].err;
-  } else if(pol.size()) {
-    errs.resize(pol.size());
-    for(size_t i=0;i<pol.size();i++)
-      errs[i]=pol[i].err;
-  }
+  std::vector<arma::vec> errs=get_error();
 
   // Size of LA problem
   int N=(int) errs.size();
@@ -167,10 +185,7 @@ arma::vec DIIS::get_weights(bool c1) {
       for(int i=0;i<N;i++)
 	if(fabs(X(i))>=MAXWEIGHT) {
 	  printf("Large coefficient produced by DIIS. Reducing to %i matrices.\n",N-1);
-	  if(pol.size())
-	    pol.erase(pol.begin()+pol.size()-1);
-	  if(unpol.size())
-	    unpol.erase(unpol.begin()+unpol.size()-1);
+	  erase_last();
 	  return get_weights(c1);
 	}
 
@@ -261,57 +276,45 @@ arma::vec DIIS::get_weights(bool c1) {
   return sol;
 }
 
-void DIIS::solve_F(arma::mat & F, bool c1) {
-  if(!unpol.size())
-    throw std::runtime_error("Trying to get DIIS-averaged spin-unpolarized Fock matrix while no entries exist!\n");
-  
+void rDIIS::solve_F(arma::mat & F, bool c1) {
   arma::vec sol=get_weights(c1);
  
   // Form weighted Fock matrix
   F.zeros();
-  for(size_t i=0;i<unpol.size();i++)
-    F+=sol(i)*unpol[i].F;
+  for(size_t i=0;i<stack.size();i++)
+    F+=sol(i)*stack[i].F;
 }
 
-void DIIS::solve_F(arma::mat & Fa, arma::mat & Fb, bool c1) {
-  if(!pol.size())
-    throw std::runtime_error("Trying to get DIIS-averaged spin-polarized Fock matrix while no entries exist!\n");
-  
+void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb, bool c1) {
   arma::vec sol=get_weights(c1);
  
   // Form weighted Fock matrix
   Fa.zeros();
   Fb.zeros();
-  for(size_t i=0;i<pol.size();i++) {
-    Fa+=sol(i)*pol[i].Fa;
-    Fb+=sol(i)*pol[i].Fb;
+  for(size_t i=0;i<stack.size();i++) {
+    Fa+=sol(i)*stack[i].Fa;
+    Fb+=sol(i)*stack[i].Fb;
   }
 }
 
-void DIIS::solve_P(arma::mat & P, bool c1) {
-  if(!unpol.size())
-    throw std::runtime_error("Trying to get DIIS-averaged spin-unpolarized density matrix while no entries exist!\n");
-  
+void rDIIS::solve_P(arma::mat & P, bool c1) {
   arma::vec sol=get_weights(c1);
  
   // Form weighted density matrix
   P.zeros();
-  for(size_t i=0;i<unpol.size();i++)
-    P+=sol(i)*unpol[i].P;
+  for(size_t i=0;i<stack.size();i++)
+    P+=sol(i)*stack[i].P;
 }
 
-void DIIS::solve_P(arma::mat & Pa, arma::mat & Pb, bool c1) {
-  if(!pol.size())
-    throw std::runtime_error("Trying to get DIIS-averaged spin-polarized density matrix while no entries exist!\n");
-  
+void uDIIS::solve_P(arma::mat & Pa, arma::mat & Pb, bool c1) {
   arma::vec sol=get_weights(c1);
  
   // Form weighted density matrix
   Pa.zeros();
   Pb.zeros();
-  for(size_t i=0;i<pol.size();i++) {
-    Pa+=sol(i)*pol[i].Pa;
-    Pb+=sol(i)*pol[i].Pb;
+  for(size_t i=0;i<stack.size();i++) {
+    Pa+=sol(i)*stack[i].Pa;
+    Pb+=sol(i)*stack[i].Pb;
   }
 }
 

@@ -40,25 +40,39 @@
 
 /// Stack entry
 typedef struct {
-  /// Energy
-  double E;
   /// Density matrix
   arma::mat P;
   /// Fock matrix
   arma::mat F;
-} adiis_t;
+  /// Energy
+  double E;
+} radiis_entry_t;
 
+/// Stack entry
+typedef struct {
+  /// Density matrix
+  arma::mat Pa;
+  /// Density matrix
+  arma::mat Pb;
+  /// Fock matrix
+  arma::mat Fa;
+  /// Fock matrix
+  arma::mat Fb;
+  /// Energy
+  double E;
+} uadiis_entry_t;
+
+
+/// ADIIS minimizer
 class ADIIS {
-  /// Stack of entries
-  std::vector<adiis_t> stack;
-
+ protected:
   /// Maximum number of matrices to keep in memory
   size_t max;
 
   // Helpers for speeding up evaluation
-  /// < P_i - P_n | F(D_n) >
+  /// < P_i - P_n | F(D_n) >   or   < Pa_i - Pa_n | Fa(P_n) > + < Pb_i - Pb_n | Fb(P_n) >
   arma::vec PiF;
-  /// < P_i - P_n | F(D_j) - F(D_n) >
+  /// < P_i - P_n | F(D_j) - F(D_n) >   or    < Pa_i - Pa_n | Fa(P_j) - Fa(P_n) > + < Pb_i - Pb_n | Fb(P_j) - Fb(P_n) >
   arma::mat PiFj;
 
  public:
@@ -67,18 +81,8 @@ class ADIIS {
   /// Destructor
   ~ADIIS();
 
-  /// Add new matrices to stacks
-  void push(double E, const arma::mat & P, const arma::mat & F);
   /// Drop everything in memory
-  void clear();
-
-  /// Compute new estimate for density matrix
-  arma::mat get_P() const;
-  /// Compute new estimate for Fock operator
-  arma::mat get_H() const;
-
-  /// Solve coefficients
-  arma::vec get_c() const;
+  virtual void clear()=0;
 
   /// Compute energy and its derivative with contraction coefficients \f$ c_i = x_i^2 / \left[ \sum_j x_j^2 \right] \f$
   double get_E(const gsl_vector * x) const;
@@ -86,7 +90,57 @@ class ADIIS {
   void get_dEdx(const gsl_vector * x, gsl_vector * dEdx) const;
   /// Compute energy and derivative wrt contraction coefficients
   void get_E_dEdx(const gsl_vector * x, double * E, gsl_vector * dEdx) const;
+
+  /// Solve coefficients
+  arma::vec get_c() const;
 };
+
+/// Spin-restricted ADIIS
+class rADIIS: public ADIIS {
+  /// Stack of entries
+  std::vector<radiis_entry_t> stack;
+
+ public:
+  /// Constructor, keep max matrices in memory
+  rADIIS(size_t max=6);
+  /// Destructor
+  ~rADIIS();
+
+  /// Add new matrices to stacks
+  void update(const arma::mat & P, const arma::mat & F, double E);
+
+  /// Get new Fock matrix
+  void get_F(arma::mat & F) const;
+  /// or density matrix
+  void get_P(arma::mat & P) const;
+
+  /// Drop everything in memory
+  void clear();
+};
+
+/// Spin-unrestricted ADIIS
+class uADIIS: public ADIIS {
+  /// Stack of entries
+  std::vector<uadiis_entry_t> stack;
+
+ public:
+  /// Constructor, keep max matrices in memory
+  uADIIS(size_t max=6);
+  /// Destructor
+  ~uADIIS();
+
+  /// Add new matrices to stacks
+  void update(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Fa, const arma::mat & Fb, double E);
+
+  /// Get new Fock matrix
+  void get_F(arma::mat & Fa, arma::mat & Fb) const;
+  /// or density matrix
+  void get_P(arma::mat & Pa, arma::mat & Pb) const;
+
+  /// Drop everything in memory
+  void clear();
+};
+
 
 namespace adiis {
   /// Compute weights

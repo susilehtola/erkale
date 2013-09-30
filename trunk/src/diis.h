@@ -86,11 +86,7 @@ bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs);
  */
 
 class DIIS {
-  /// Fock matrices in AO basis - spin polarized
-  std::vector<diis_pol_entry_t> pol;
-  /// Fock matrices in AO basis - spin unpolarized
-  std::vector<diis_unpol_entry_t> unpol;
-
+ protected:
   /// Overlap matrix
   arma::mat S;
   /// Half-inverse overlap matrix
@@ -99,32 +95,81 @@ class DIIS {
   /// Maximum amount of matrices to store
   size_t imax;
 
+  /// Get errors
+  virtual std::vector<arma::vec> get_error() const=0;
+  /// Reduce size of stack by one
+  virtual void erase_last()=0;
+
   /// Compute weights, use C1-DIIS if wanted
   arma::vec get_weights(bool c1_diis);
 
  public:
   /// Constructor
-  DIIS(const arma::mat & S, const arma::mat & Sinvh, size_t imax=5);
+  DIIS(const arma::mat & S, const arma::mat & Sinvh, size_t imax=20);
   /// Destructor
   ~DIIS();
 
   /// Clear Fock matrices and errors
-  void clear();
+  virtual void clear()=0;
+};
+
+/// Spin-restricted DIIS
+class rDIIS: protected DIIS {
+  /// Fock matrices in AO basis
+  std::vector<diis_unpol_entry_t> stack;
+
+  /// Get errors
+  std::vector<arma::vec> get_error() const;
+  /// Reduce size of stack by one
+  void erase_last();
+
+ public:
+  /// Constructor
+  rDIIS(const arma::mat & S, const arma::mat & Sinvh, size_t imax=20);
+  /// Destructor
+  ~rDIIS();
 
   /// Add matrices to stack
   void update(const arma::mat & F, const arma::mat & P, double E, double & error);
+
+  /// Compute new Fock matrix, use C1-DIIS if wanted
+  void solve_F(arma::mat & F, bool c1_diis=false);
+
+  /// Compute new density matrix, use C1-DIIS if wanted
+  void solve_P(arma::mat & P, bool c1_diis=false);
+
+  /// Clear Fock matrices and errors
+  void clear();
+};
+
+/// Spin-unrestricted DIIS
+class uDIIS: protected DIIS {
+  /// Fock matrices in AO basis - spin polarized
+  std::vector<diis_pol_entry_t> stack;
+
+  /// Get errors
+  std::vector<arma::vec> get_error() const;
+  /// Reduce size of stack by one
+  void erase_last();
+
+ public:
+  /// Constructor
+  uDIIS(const arma::mat & S, const arma::mat & Sinvh, size_t imax=20);
+  /// Destructor
+  ~uDIIS();
+
   /// Add matrices to stack
   void update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & Pa, const arma::mat & Pb, double E, double & error);
 
   /// Compute new Fock matrix, use C1-DIIS if wanted
-  void solve_F(arma::mat & F, bool c1_diis=false);
-  /// Compute new Fock matrix, use C1-DIIS if wanted
   void solve_F(arma::mat & Fa, arma::mat & Fb, bool c1_diis=false);
 
   /// Compute new density matrix, use C1-DIIS if wanted
-  void solve_P(arma::mat & P, bool c1_diis=false);
-  /// Compute new density matrix, use C1-DIIS if wanted
   void solve_P(arma::mat & Pa, arma::mat & Pb, bool c1_diis=false);
+
+  /// Clear Fock matrices and errors
+  void clear();
 };
+
 
 #endif
