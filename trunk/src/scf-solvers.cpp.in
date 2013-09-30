@@ -145,11 +145,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
   // DIIS error
   double diiserr;
-#ifndef RESTRICTED
-  double diiserra, diiserrb;
-#endif
   // Was DIIS succesful?
-  bool diissucc=0;
+  bool diissucc=false;
 
   // Helper arrays
   arma::mat orbs;
@@ -962,8 +959,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #else
       if(usediis) {
 	printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
-	printf("alpha\t%e\t%e\t%e\n",maxdiffa,rmsdiffa,diiserra);
-	printf("beta\t%e\t%e\t%e\n",maxdiffb,rmsdiffb,diiserrb);
+	printf("alpha\t%e\t%e\t%e\n",maxdiffa,rmsdiffa,diiserr);
+	printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
       } else {
 	printf("Errors:\tMax dens\tRMS dens\n");
 	printf("alpha\t%e\t%e\n",maxdiffa,rmsdiffa);
