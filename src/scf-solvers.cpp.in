@@ -533,11 +533,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef RESTRICTED
       // Update DIIS stack of matrices
-      diis.update(sol.H,sol.P,diiserr);
+      diis.update(sol.H,sol.P,sol.en.E,diiserr);
 #else
       // Update DIIS stacks of matrices
-      diisa.update(sol.Ha,sol.Pa,diiserra);
-      diisb.update(sol.Hb,sol.Pb,diiserrb);
+      diisa.update(sol.Ha,sol.Pa,sol.en.E,diiserra);
+      diisb.update(sol.Hb,sol.Pb,sol.en.E,diiserrb);
       diiserr=std::max(diiserra,diiserrb);
 #endif
 
@@ -547,11 +547,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef RESTRICTED
 	// Solve new matrix
-	diis.solve(sol.H,diis_c1);
+	diis.solve_F(sol.H,diis_c1);
 #else
 	// Solve new matrices
-	diisa.solve(sol.Ha,diis_c1);
-	diisb.solve(sol.Hb,diis_c1);
+	diisa.solve_F(sol.Ha,diis_c1);
+	diisb.solve_F(sol.Hb,diis_c1);
 #endif
 
 	diissucc=true;

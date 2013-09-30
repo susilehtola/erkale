@@ -23,6 +23,22 @@
 #include <armadillo>
 #include <vector>
 
+/// Index entry
+typedef struct {
+  /// Density matrix
+  arma::mat P;
+  /// Fock matrix
+  arma::mat F;
+  /// Energy
+  double E;
+
+  /// DIIS error matrix
+  arma::vec err;
+} diis_entry_t;
+
+/// Helper for sort
+bool operator<(const diis_entry_t & lhs, const diis_entry_t & rhs);
+
 /**
  * \class DIIS
  *
@@ -52,18 +68,17 @@
 
 class DIIS {
   /// Fock matrices in AO basis
-  std::vector<arma::mat> Fs;
-  /// Errors
-  std::vector<arma::vec> errs;
+  std::vector<diis_entry_t> stack;
   /// Overlap matrix
   arma::mat S;
   /// Half-inverse overlap matrix
   arma::mat Sinvh;
 
-  /// Index of current iteration
-  int icur;
   /// Maximum amount of matrices to store
-  int imax;
+  size_t imax;
+
+  /// Compute weights, use C1-DIIS if wanted
+  arma::vec get_weights(bool c1_diis);
 
  public:
   /// Constructor
@@ -75,10 +90,13 @@ class DIIS {
   void clear();
 
   /// Add matrix to stack
-  void update(const arma::mat & F, const arma::mat & D, double & error);
+  void update(const arma::mat & F, const arma::mat & D, double E, double & error);
 
   /// Compute new Fock matrix, use C1-DIIS if wanted
-  void solve(arma::mat & F, bool c1_diis=0);
+  void solve_F(arma::mat & F, bool c1_diis=false);
+
+  /// Compute new density matrix, use C1-DIIS if wanted
+  void solve_P(arma::mat & F, bool c1_diis=false);
 };
 
 #endif
