@@ -231,13 +231,13 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
 
     // Update DIIS stacks
     double diiserra, diiserrb, diiserr;
-    diisa.update(sol.Ha,sol.Pa,diiserra);
-    diisb.update(sol.Hb,sol.Pb,diiserrb);
+    diisa.update(sol.Ha,sol.Pa,sol.en.E,diiserra);
+    diisb.update(sol.Hb,sol.Pb,sol.en.E,diiserrb);
     diiserr=std::max(diiserra,diiserrb);
 
     if(diiserr<diisthr) {
-      diisa.solve(sol.Ha);
-      diisb.solve(sol.Hb);
+      diisa.solve_F(sol.Ha);
+      diisb.solve_F(sol.Hb);
     } else {
       sol.Ha=adiisa.get_H();
       sol.Hb=adiisb.get_H();
@@ -366,10 +366,10 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
 
     // Update DIIS stacks
     double diiserr;
-    diis.update(sol.H,sol.P,diiserr);
+    diis.update(sol.H,sol.P,sol.en.E,diiserr);
 
     if(diiserr<diisthr) {
-      diis.solve(sol.H);
+      diis.solve_F(sol.H);
     } else {
       sol.H=adiis.get_H();
     }

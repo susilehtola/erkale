@@ -24,7 +24,11 @@
 // Maximum allowed absolute weight for a Fockian.
 #define MAXWEIGHT 10.0
 
-DIIS::DIIS(const arma::mat &Sv, size_t imaxv) {
+bool operator<(const diis_entry_t & lhs, const diis_entry_t & rhs) {
+  return lhs.E < rhs.E;
+}
+
+DIIS::DIIS(const arma::mat & Sv, size_t imaxv) {
   S=Sv;
   
   // Get half-inverse
@@ -32,49 +36,47 @@ DIIS::DIIS(const arma::mat &Sv, size_t imaxv) {
   S_half_invhalf(S,Sh,Sinvh);
 
   imax=imaxv;
-  icur=0;
 }
 
 DIIS::~DIIS() {
 }
 
 void DIIS::clear() {
-  Fs.clear();
-  errs.clear();
-  icur=0;
+  stack.clear();
 }
 
 
-void DIIS::update(const arma::mat & F, const arma::mat & D, double & error) {
+void DIIS::update(const arma::mat & F, const arma::mat & P, double E, double & error) {
+  // New entry
+  diis_entry_t hlp;
+  hlp.F=F;
+  hlp.P=P;
+  hlp.E=E;
+
   // Compute error matrix
-  arma::mat err=F*D*S-S*D*F;
+  arma::mat errmat=F*P*S-S*P*F;
   // and transform it to the orthonormal basis (1982 paper, page 557)
-  err=Sinvh*err*Sinvh;
+  errmat=Sinvh*errmat*Sinvh;
+  // and store it
+  hlp.err=MatToVec(errmat);
 
-  double maxerr=max_abs(err);
-  error=maxerr;
+  // DIIS error is
+  error=max_abs(errmat);
 
-  // Do we have accumulated enough matrices?
-  if((int) Fs.size()<imax) { // No, add to stack
-    icur=(int) Fs.size();
-    Fs.push_back(F);
-    errs.push_back(MatToVec(err));
-  } else { // Yes, replace oldest
-    // Index is
-    icur=(icur+1)%imax;
-    Fs[icur]=F;
-    errs[icur]=MatToVec(err);
+  // Is stack full?
+  if(stack.size()==imax) {
+    stack.erase(stack.begin()+stack.size()-1);
   }
+  // Add to stack and resort
+  stack.push_back(hlp);
+  std::stable_sort(stack.begin(),stack.end());
 }
 
-void DIIS::solve(arma::mat & F, bool c1) {
+arma::vec DIIS::get_weights(bool c1) {
   // Size of LA problem
-  int N;
-  if((int) Fs.size()<imax)
-    N=Fs.size();
-  else
-    N=imax;
+  int N=(int) stack.size();
 
+  // DIIS weights
   arma::vec sol(N);
   sol.zeros();
 
@@ -91,7 +93,7 @@ void DIIS::solve(arma::mat & F, bool c1) {
     // Compute errors
     for(int i=0;i<N;i++)
       for(int j=0;j<N;j++) {
-	B(i,j)=arma::dot(errs[i],errs[j]);
+	B(i,j)=arma::dot(stack[i].err,stack[j].err);
       }
     // Fill in the rest of B
     for(int i=0;i<N;i++) {
@@ -112,10 +114,9 @@ void DIIS::solve(arma::mat & F, bool c1) {
       // Check that weights are within tolerance
       for(int i=0;i<N;i++)
 	if(fabs(X(i))>=MAXWEIGHT) {
-	  printf("Large coefficient produced by DIIS. Reducing to %i matrices.\n",(int) Fs.size()-1);
-	  Fs.erase(Fs.begin());
-	  solve(F,c1);
-	  return;
+	  printf("Large coefficient produced by DIIS. Reducing to %i matrices.\n",(int) stack.size()-1);
+	  stack.erase(stack.begin()+stack.size()-1);
+	  return get_weights(c1);
 	}
 
       // Solution is (last element of X is DIIS error)
@@ -127,12 +128,9 @@ void DIIS::solve(arma::mat & F, bool c1) {
     if(!succ) {
       // Failed to invert matrix. Use the two last iterations instead.
       printf("C1-DIIS was not succesful, mixing matrices instead.\n");
-      // Index of last iteration
-      int ilast=(icur+imax-1)%imax;
-
       sol.zeros();
-      sol(icur)=0.5;
-      sol(ilast)=0.5;
+      sol(0)=0.5;
+      sol(1)=0.5;
     }
   } else {
     // C2-DIIS
@@ -144,7 +142,7 @@ void DIIS::solve(arma::mat & F, bool c1) {
     // Compute errors
     for(int i=0;i<N;i++)
       for(int j=0;j<N;j++) {
-	B(i,j)=arma::dot(errs[i],errs[j]);
+	B(i,j)=arma::dot(stack[i].err,stack[j].err);
       }
 
     // Solve eigenvectors of B
@@ -162,13 +160,13 @@ void DIIS::solve(arma::mat & F, bool c1) {
     // Choose solution by picking out solution with smallest error
     std::vector<double> errors(N);
     // Helper array
-    arma::vec werr(errs[0].n_elem);
+    arma::vec werr(stack[0].err.n_elem);
     for(int i=0;i<N;i++) {
       // Zero out helper
       werr.zeros();
       // Compute weighed error
       for(int j=0;j<N;j++)
-	werr+=Q(j,i)*errs[j];
+	werr+=Q(j,i)*stack[j].err;
       // The error is
       errors[i]=arma::dot(werr,werr);
     }
@@ -197,22 +195,31 @@ void DIIS::solve(arma::mat & F, bool c1) {
     } else {
       printf("C2-DIIS did not find a suitable solution. Mixing matrices instead.\n");
 
-      int ilast=(icur+imax-1)%imax;
       sol.zeros();
-      sol(icur)=0.5;
-      sol(ilast)=0.5;
+      sol(0)=0.5;
+      sol(1)=0.5;
     }
   }
 
-  /*
-  printf("DIIS weights are\n");
-  for(int i=0;i<N;i++)
-    printf(" % e",sol(i));
-  printf("\n");
-  */
+  // arma::trans(sol).print("DIIS weights");
 
-  // Form weighted Fockian
+  return sol;
+}
+
+void DIIS::solve_F(arma::mat & F, bool c1) {
+  arma::vec sol=get_weights(c1);
+ 
+  // Form weighted Fock matrix
   F.zeros();
-  for(int i=0;i<N;i++)
-    F+=sol(i)*Fs[i];
+  for(size_t i=0;i<stack.size();i++)
+    F+=sol(i)*stack[i].F;
+}
+
+void DIIS::solve_P(arma::mat & P, bool c1) {
+  arma::vec sol=get_weights(c1);
+
+  // Form weighted density matrix
+  P.zeros();
+  for(size_t i=0;i<stack.size();i++)
+    P+=sol(i)*stack[i].P;
 }
