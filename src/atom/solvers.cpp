@@ -171,9 +171,9 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     fflush(stdout);
   }
 
-  DIIS diis(S,Sinvh);
+  uDIIS diis(S,Sinvh);
   const double diisthr=0.05;
-  ADIIS adiisa, adiisb;
+  uADIIS adiis;
 
   arma::mat oldHa, oldHb;
   sol.Ha.zeros();
@@ -226,8 +226,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     //    printf("Exc=%e, Ekin=%e, Enuc=%e, Ecoul=%e\n",Exc,Ekin,Enuc,Ecoul);
 
     // Update ADIIS stacks
-    adiisa.push(sol.en.E,sol.Pa,sol.Ha);
-    adiisb.push(sol.en.E,sol.Pb,sol.Hb);
+    adiis.update(sol.Pa,sol.Pb,sol.Ha,sol.Hb,sol.en.E);
 
     // Update DIIS stacks
     double diiserr;
@@ -236,8 +235,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     if(diiserr<diisthr) {
       diis.solve_F(sol.Ha,sol.Hb);
     } else {
-      sol.Ha=adiisa.get_H();
-      sol.Hb=adiisb.get_H();
+      adiis.get_F(sol.Ha,sol.Hb);
     }
 
     // Solve new orbitals
@@ -313,8 +311,8 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     fflush(stdout);
   }
 
-  ADIIS adiis;
-  DIIS diis(S,Sinvh);
+  rADIIS adiis;
+  rDIIS diis(S,Sinvh);
   const double diisthr=0.05;
 
   arma::mat oldH;
@@ -359,7 +357,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     //    printf("Exc=%e, Ekin=%e, Enuc=%e, Ecoul=%e\n",Exc,Ekin,Enuc,Ecoul);
 
     // Update ADIIS stacks
-    adiis.push(sol.en.E,sol.P,sol.H);
+    adiis.update(sol.P,sol.H,sol.en.E);
 
     // Update DIIS stacks
     double diiserr;
@@ -368,7 +366,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     if(diiserr<diisthr) {
       diis.solve_F(sol.H);
     } else {
-      sol.H=adiis.get_H();
+      adiis.get_F(sol.H);
     }
 
     // Solve new orbitals
