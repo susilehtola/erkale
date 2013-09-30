@@ -222,8 +222,14 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
     // Construct Fock matrix
     DFTGrid grid(&augbas,verbose,set.get_bool("DFTLobatto"));
-    grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
-
+    if(dft.adaptive) {
+      // Form DFT quadrature grid
+      grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+    } else {
+      // Fixed size grid
+      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+    }
+    
     // No need for extreme accuracy
     double tol=ROUGHTOL;
 
