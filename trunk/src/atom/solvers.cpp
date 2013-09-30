@@ -171,7 +171,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     fflush(stdout);
   }
 
-  DIIS diisa(S), diisb(S);
+  DIIS diis(S,Sinvh);
   const double diisthr=0.05;
   ADIIS adiisa, adiisb;
 
@@ -230,14 +230,11 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     adiisb.push(sol.en.E,sol.Pb,sol.Hb);
 
     // Update DIIS stacks
-    double diiserra, diiserrb, diiserr;
-    diisa.update(sol.Ha,sol.Pa,sol.en.E,diiserra);
-    diisb.update(sol.Hb,sol.Pb,sol.en.E,diiserrb);
-    diiserr=std::max(diiserra,diiserrb);
+    double diiserr;
+    diis.update(sol.Ha,sol.Hb,sol.Pa,sol.Pb,sol.en.E,diiserr);
 
     if(diiserr<diisthr) {
-      diisa.solve_F(sol.Ha);
-      diisb.solve_F(sol.Hb);
+      diis.solve_F(sol.Ha,sol.Hb);
     } else {
       sol.Ha=adiisa.get_H();
       sol.Hb=adiisb.get_H();
@@ -317,7 +314,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
   }
 
   ADIIS adiis;
-  DIIS diis(S);
+  DIIS diis(S,Sinvh);
   const double diisthr=0.05;
 
   arma::mat oldH;

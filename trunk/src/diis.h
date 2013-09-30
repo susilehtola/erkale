@@ -104,7 +104,7 @@ class DIIS {
 
  public:
   /// Constructor
-  DIIS(const arma::mat & S, size_t imax=5);
+  DIIS(const arma::mat & S, const arma::mat & Sinvh, size_t imax=5);
   /// Destructor
   ~DIIS();
 

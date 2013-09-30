@@ -153,7 +153,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   arma::mat Horth;
 
   // DIIS iterator
-  DIIS diis(S,diisorder);
+  DIIS diis(S,Sinvh,diisorder);
 
 #ifdef RESTRICTED
   // ADIIS

@@ -32,12 +32,9 @@ bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs) {
   return lhs.E < rhs.E;
 }
 
-DIIS::DIIS(const arma::mat & Sv, size_t imaxv) {
+DIIS::DIIS(const arma::mat & Sv, const arma::mat & Sinvhv, size_t imaxv) {
   S=Sv;
-  
-  // Get half-inverse
-  arma::mat Sh;
-  S_half_invhalf(S,Sh,Sinvh);
+  Sinvh=Sinvhv;
 
   imax=imaxv;
 }
