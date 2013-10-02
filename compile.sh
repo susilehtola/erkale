@@ -250,7 +250,7 @@ echo "set(LIBXC_LIBRARIES ${topdir}/libxc/lib/libxc.a)" >> erkale/cmake/Findlibx
 echo "set(HDF5_FOUND 1)" > erkale/cmake/FindHDF5.cmake
 echo "set(HDF5_INCLUDE_DIRS \"${topdir}/hdf5/include\")" >> erkale/cmake/FindHDF5.cmake
 echo "set(HDF5_LIBRARY_DIRS \"${topdir}/hdf5/lib\")" >> erkale/cmake/FindHDF5.cmake
-echo "set(HDF5_LIBRARIES ${topdir}/hdf5/lib/libhdf5.a -lz)" >> erkale/cmake/FindHDF5.cmake
+echo "set(HDF5_LIBRARIES ${topdir}/hdf5/lib/libhdf5.a -ldl -lz)" >> erkale/cmake/FindHDF5.cmake
 
 # Libint
 echo "set(LIBINT_FOUND 1)" > erkale/config/libintConfig.cmake
