@@ -167,6 +167,29 @@ void BaderAtom::regional_overlap(const std::vector<arma::sword> & region, std::v
 #endif
 }
 
+void BaderAtom::regional_overlap(const std::vector<arma::sword> & region, size_t ireg, arma::mat & Sat) const {
+  for(size_t ip=0;ip<grid.size();ip++)
+    if(region[ip]-1==(arma::sword) ireg) {
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+      
+      size_t i, j;
+      for(size_t ii=first;ii<last;ii++) {
+	// Index of function is
+	i=flist[ii].ind;
+	for(size_t jj=first;jj<last;jj++) {
+	  j=flist[jj].ind;
+	  
+	  Sat(i,j)+=grid[ip].w*flist[ii].f*flist[jj].f;
+	}
+      }
+    }
+}
+
+BaderGrid::BaderGrid() {
+}
+
 BaderGrid::BaderGrid(const BasisSet * bas, bool ver, bool lobatto) {
   basp=bas;
   verbose=ver;
@@ -265,6 +288,10 @@ void BaderGrid::classify(const arma::mat & P) {
   print_maxima();
 }
 
+size_t BaderGrid::get_Nmax() const {
+  return maxima.size();
+}
+
 void BaderGrid::print_maxima() const {
   // Classify into nuclear and nonnuclear maxima
   std::vector<coords_t> nuclear, nonnuc;
@@ -335,6 +362,7 @@ std::vector<arma::mat> BaderGrid::regional_overlap() {
     wrk[0].form_grid(*basp,grids[i]);
     wrk[0].compute_bf(*basp,grids[i]);
     wrk[0].regional_overlap(regions[i],stack);
+    wrk[0].free();
   }
 
   if(verbose) {
@@ -343,6 +371,26 @@ std::vector<arma::mat> BaderGrid::regional_overlap() {
   }
 
   return stack;
+}
+
+arma::mat BaderGrid::regional_overlap(size_t ireg) {
+  arma::mat Sreg(basp->get_Nbf(),basp->get_Nbf());
+  Sreg.zeros();
+
+#ifdef _OPENMP
+  int ith=omp_get_thread_num();
+#else
+  int ith=0;
+#endif
+
+  for(size_t i=0;i<grids.size();i++) {
+    wrk[ith].form_grid(*basp,grids[i]);
+    wrk[ith].compute_bf(*basp,grids[i]);
+    wrk[ith].regional_overlap(regions[i],ireg,Sreg);
+    wrk[ith].free();
+  }
+
+  return Sreg;
 }
 
 coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coords_t r0, size_t & nd, size_t & ng) {

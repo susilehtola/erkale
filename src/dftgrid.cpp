@@ -2594,6 +2594,9 @@ void AtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t ira
   }
 }
 
+DFTGrid::DFTGrid() {
+}
+
 DFTGrid::DFTGrid(const BasisSet * bas, bool ver, bool lobatto) {
   basp=bas;
   verbose=ver;
@@ -2860,6 +2863,32 @@ arma::mat DFTGrid::eval_overlap() {
   return S;
 }
 
+arma::mat DFTGrid::eval_overlap(size_t inuc) {
+  // Amount of basis functions
+  size_t N=basp->get_Nbf();
+
+  // Returned matrix
+  arma::mat Sat(N,N);
+  Sat.zeros();
+  
+#ifdef _OPENMP
+  int ith=omp_get_thread_num();
+#else
+  int ith=0;
+#endif
+  
+  // Change atom and create grid
+  wrk[ith].form_grid(*basp,grids[inuc]);
+  // Compute basis functions
+  wrk[ith].compute_bf(*basp,grids[inuc]);
+  // Evaluate overlap
+  wrk[ith].eval_overlap(Sat);
+  // Free memory
+  wrk[ith].free();
+
+  return Sat;
+}
+
 std::vector<arma::mat> DFTGrid::eval_overlaps() {
   // Amount of basis functions
   size_t N=basp->get_Nbf();
@@ -2896,6 +2925,32 @@ std::vector<arma::mat> DFTGrid::eval_overlaps() {
     }
   }
 
+  return Sat;
+}
+
+arma::mat DFTGrid::eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc) {
+  // Amount of basis functions
+  size_t N=basp->get_Nbf();
+
+  // Returned matrices
+  arma::mat Sat(N,N);
+  Sat.zeros();
+
+#ifdef _OPENMP
+  int ith=omp_get_thread_num();
+#else
+  int ith=0;
+#endif
+
+  // Change atom and create grid
+  wrk[ith].form_hirshfeld_grid(hirsh,grids[inuc]);
+  // Compute basis functions
+  wrk[ith].compute_bf(*basp,grids[inuc]);
+  // Evaluate overlap
+  wrk[ith].eval_overlap(Sat);
+  // Free memory
+  wrk[ith].free();
+  
   return Sat;
 }
 

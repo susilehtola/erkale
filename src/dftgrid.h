@@ -343,6 +343,8 @@ class DFTGrid {
   bool use_lobatto;
 
  public:
+  /// Dummy constructor
+  DFTGrid();
   /// Constructor
   DFTGrid(const BasisSet * bas, bool verbose=true, bool lobatto=false);
   /// Destructor
@@ -383,8 +385,12 @@ class DFTGrid {
 
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();
+  /// Evaluate overlap matrix numerically in the inuc:th region
+  arma::mat eval_overlap(size_t inuc);
   /// Evaluate overlap matrices numerically
   std::vector<arma::mat> eval_overlaps();
+  /// Evaluate overlap matrices numerically
+  arma::mat eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc);
   /// Evaluate overlap matrices numerically
   std::vector<arma::mat> eval_hirshfeld_overlaps(const Hirshfeld & hirsh);
 
