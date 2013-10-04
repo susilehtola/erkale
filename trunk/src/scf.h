@@ -24,6 +24,7 @@
 #include <armadillo>
 #include <vector>
 #include "dftgrid.h"
+#include "badergrid.h"
 #include "xcfit.h"
 #include "eritable.h"
 #include "eriscreen.h"
@@ -553,8 +554,34 @@ class FMLoc : public Unitary {
 
 /// Pipek-Mezey localization
 class Pipek : public Unitary {
-  /// Charge matrix in MO basis
-  arma::cube Q;
+  // The localization is based on partial charches on atoms, so the
+  // memory requirement would be Nat * Nocc^2, limiting the routine to
+  // small systems. Instead, we calculate everything on-the-fly, so
+  // the memory requirement is only Nocc^2
+
+  /// Method
+  enum locmet chg;
+  /// Amount of charges
+  size_t N;
+
+  /// Orbitals
+  arma::mat C;
+  /// Overlap matrix for Mulliken
+  arma::mat S;
+  /// Half-overlap matrix for Löwdin
+  arma::mat Sh;
+  /// Shell list for Löwdin and Mulliken
+  std::vector< std::vector<GaussianShell> > shells;
+
+  /// Integration grid for Becke, Hirshfeld or Stockholder localization
+  DFTGrid grid;
+  /// Hirshfeld / Stockholder density
+  Hirshfeld hirsh;
+  /// Bader localization grid
+  BaderGrid bader;
+
+  /// Get the charge matrix for the i:th region
+  arma::mat get_charge(size_t i);
 
  public:
   Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);

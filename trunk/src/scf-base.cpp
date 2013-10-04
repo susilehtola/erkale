@@ -22,7 +22,6 @@
 
 #include "adiis.h"
 #include "basis.h"
-#include "badergrid.h"
 #include "broyden.h"
 #include "elements.h"
 #include "dftfuncs.h"
@@ -382,23 +381,23 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
     if(!direct) {
       // Tabled integrals
-	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Calculate Coulomb term
-	  Forb[io]=tab.calcJ(Porb[io]);
-	  // and Coulomb energy
-	  Eorb[io]=0.5*arma::trace(Porb[io]*Forb[io]);
-	}
+      for(size_t io=0;io<Ctilde.n_cols;io++) {
+	// Calculate Coulomb term
+	Forb[io]=tab.calcJ(Porb[io]);
+	// and Coulomb energy
+	Eorb[io]=0.5*arma::trace(Porb[io]*Forb[io]);
+      }
 
       // Exchange?
       if(kfrac!=0.0) {
-	  for(size_t io=0;io<Ctilde.n_cols;io++) {
-	    // Calculate Coulomb term
-	    arma::mat Ko=tab.calcK(Porb[io]);
+	for(size_t io=0;io<Ctilde.n_cols;io++) {
+	  // Calculate exchange term
+	  arma::mat Ko=tab.calcK(Porb[io]);
 
-	    // Change to Fock matrix and energy
-	    Forb[io]-=0.5*kfrac*Ko;
-	    Eorb[io]-=0.25*kfrac*arma::trace(Porb[io]*Ko);
-	  }
+	  // Change to Fock matrix and energy
+	  Forb[io]-=0.5*kfrac*Ko;
+	  Eorb[io]-=0.25*kfrac*arma::trace(Porb[io]*Ko);
+	}
       }
     } else {
       // HF coulomb/exchange not implemented
@@ -433,9 +432,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
     // Add in the XC part to the Fock matrix and energy
     for(size_t io=0;io<Ctilde.n_cols;io++) {
-	Forb[io]+=XC[io];
-	Eorb[io]+=Exc[io];
-      }
+      Forb[io]+=XC[io];
+      Eorb[io]+=Exc[io];
+    }
 
     if(verbose) {
       printf(" done (%s)\n",t.elapsed().c_str());
@@ -724,7 +723,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     if(verbose) {
       printf("\n");
       fflush(stdout);
-      
+
       fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",tgrid.get());
       fflush(stderr);
     }
@@ -732,12 +731,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
   // Do the calculation
   if(verbose && !canonical) {
-      fprintf(stderr,"\nSIC unitary optimization, alpha spin\n");
+    fprintf(stderr,"\nSIC unitary optimization, alpha spin\n");
   }
   PZSIC_calculate(sicsola,Wa,dft,grid,canonical);
   chkptp->cwrite("CWa",sicsola.C*Wa);
   if(verbose && !canonical) {
-      fprintf(stderr,"SIC unitary optimization, beta spin\n");
+    fprintf(stderr,"SIC unitary optimization, beta spin\n");
   }
   PZSIC_calculate(sicsolb,Wb,dft,grid,canonical);
   chkptp->cwrite("CWb",sicsolb.C*Wb);
@@ -2506,7 +2505,7 @@ arma::cx_mat FMLoc::cost_der(const arma::cx_mat & W) {
       for(int ic=0;ic<3;ic++)
 	for(int jc=0;jc<3;jc++) {
 	  rr_d(ic,jc)=rrw[ic][jc](a,io);
-      }
+	}
 
       // rsq
       std::complex<double> rsq_d=rsqw(a,io);
@@ -2534,268 +2533,79 @@ void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 }
 
 
-Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
+Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
+  // Store used method
+  chg=chgv;
+  C=Cv;
+
   if(chg==PIPEK_BADER) {
     // Helper. Non-verbose operation
-    BaderGrid intgrid(&basis,ver);
+    bader=BaderGrid(&basis,ver);
     // Construct integration grid
-    intgrid.construct(1e-5);
+    bader.construct(1e-5);
     // Run classification
-    intgrid.classify(P);
-
-    std::vector<arma::mat> Sat=intgrid.regional_overlap();
-
-    Timer t;
-    if(ver) {
-      printf("Computing Bader charges ...");
-      fflush(stdout);
-    }
-
-    // Reserve memory for charge matrix
-    Q.zeros(C.n_cols,C.n_cols,Sat.size());
-
-    // Loop over atoms
-#ifdef _OPENMP
-#pragma omp for
-#endif
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-      // Compute charges
-      Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
-    }
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
-    }
+    bader.classify(P);
+    // Amount of regions
+    N=bader.get_Nmax();
 
   } else if(chg==PIPEK_BECKE) {
-    // Initialize charge matrix
-    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
-
-    // Helper. Non-verbose operation
-    //      DFTGrid intgrid(&basis,false);
-    DFTGrid intgrid(&basis,ver);
+    // Amount of regions
+    N=basis.get_Nnuc();
+    // Grid
+    grid=DFTGrid(&basis,ver);
     // Construct integration grid
-    intgrid.construct_becke(1e-5);
-
-    // Get overlap matrices
-    Timer t;
-    if(ver) {
-      printf("Computing atomic overlap matrices ...");
-      fflush(stdout);
-    }
-
-    std::vector<arma::mat> Sat=intgrid.eval_overlaps();
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      t.set();
-
-      printf("Computing Becke charges ...");
-      fflush(stdout);
-    }
-
-    // Loop over atoms
-#ifdef _OPENMP
-#pragma omp for
-#endif
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-      // Compute charges
-      Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
-    }
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
-    }
+    grid.construct_becke(1e-5);
 
   } else if(chg==PIPEK_HIRSHFELD) {
-    // Initialize charge matrix
-    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
-
-    Timer t;
-    if(ver) {
-      printf("Computing Hirshfeld densities ...");
-      fflush(stdout);
-    }
-
-    // Hirshfeld densities
-    Hirshfeld hirsh;
+    // Amount of regions
+    N=basis.get_Nnuc();
     // We don't know method here so just use HF.
     hirsh.compute(basis,"HF");
 
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
-    }
-
     // Helper. Non-verbose operation
     //      DFTGrid intgrid(&basis,false);
-    DFTGrid intgrid(&basis,ver);
+    grid=DFTGrid(&basis,ver);
     // Construct integration grid
-    intgrid.construct_hirshfeld(hirsh,1e-5);
-
-    if(ver) {
-      t.set();
-
-      printf("Computing Hirshfeld overlap matrices ...");
-      fflush(stdout);
-    }
-
-    // Get overlap matrices
-    std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      t.set();
-
-      printf("Computing Hirshfeld charges ...");
-      fflush(stdout);
-    }
-
-    // Loop over atoms
-#ifdef _OPENMP
-#pragma omp for
-#endif
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-      // Compute charges
-      Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
-    }
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
-    }
+    grid.construct_hirshfeld(hirsh,1e-5);
 
   } else if(chg==PIPEK_STOCKHOLDER) {
-    // Initialize charge matrix
-    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
-
-    Timer t;
-
+    // Amount of regions
+    N=basis.get_Nnuc();
     // Stockholder atomic charges
     Stockholder stock(basis,P);
     // Helper
-    Hirshfeld hirsh=stock.get();
+    hirsh=stock.get();
 
     // Helper. Non-verbose operation
     //      DFTGrid intgrid(&basis,false);
-    DFTGrid intgrid(&basis,ver);
+    grid=DFTGrid(&basis,ver);
     // Construct integration grid
-    intgrid.construct_hirshfeld(hirsh,1e-5);
-
-    if(ver) {
-      t.set();
-
-      printf("Computing Hirshfeld overlap matrices ...");
-      fflush(stdout);
-    }
-
-    // Get overlap matrices
-    std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      t.set();
-
-      printf("Computing Hirshfeld charges ...");
-      fflush(stdout);
-    }
-
-    // Loop over atoms
-#ifdef _OPENMP
-#pragma omp for
-#endif
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-      // Compute charges
-      Q.slice(inuc)=arma::trans(C)*Sat[inuc]*C;
-    }
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
-    }
+    grid.construct_hirshfeld(hirsh,1e-5);
 
   } else if(chg==PIPEK_MULLIKEN) {
-    // Initialize charge matrix
-    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
-
-    Timer t;
-    if(ver) {
-      printf("Computing Mulliken charges ...");
-      fflush(stdout);
-    }
-
+    // Amount of regions
+    N=basis.get_Nnuc();
     // Get overlap matrix
-    arma::mat S=basis.overlap();
-    // Helper matrix
-    arma::mat SC=S*C;
-
-    // Loop over atoms
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-      // Get shells on nucleus
-      std::vector<GaussianShell> shells=basis.get_funcs(inuc);
-
-      // Increment charge
-      for(size_t io=0;io<C.n_cols;io++)
-	for(size_t jo=0;jo<C.n_cols;jo++)
-	  for(size_t is=0;is<shells.size();is++)
-	    for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
-	      Q(io,jo,inuc)+=C(fi,io)*SC(fi,jo);
-
-      // Symmetrize
-      Q.slice(inuc)=(Q.slice(inuc)+arma::trans(Q.slice(inuc)))/2.0;
-    }
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
-    }
+    S=basis.overlap();
+    // Get shells
+    shells.resize(N);
+    for(size_t i=0;i<N;i++)
+      shells[i]=basis.get_funcs(i);
 
   } else if(chg==PIPEK_LOWDIN) {
-    // Initialize charge matrix
-    Q.zeros(C.n_cols,C.n_cols,basis.get_Nnuc());
-
-    Timer t;
-    if(ver) {
-      printf("Computing Löwdin charges ...");
-      fflush(stdout);
-    }
-
+    // Amount of regions
+    N=basis.get_Nnuc();
     // Get overlap matrix
-    arma::mat S=basis.overlap();
+    S=basis.overlap();
 
     // Get S^1/2 (and S^-1/2)
-    arma::mat Sh, Sinvh;
+    arma::mat Sinvh;
     S_half_invhalf(S,Sh,Sinvh);
 
-    // Helper matrix
-    arma::mat ShC=Sh*C;
-
-    // Loop over atoms
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-      // Get shells on nucleus
-      std::vector<GaussianShell> shells=basis.get_funcs(inuc);
-
-      // Increment charge
-      for(size_t io=0;io<C.n_cols;io++)
-	for(size_t jo=0;jo<C.n_cols;jo++)
-	  for(size_t is=0;is<shells.size();is++)
-	    for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
-	      Q(io,jo,inuc)+=ShC(fi,io)*ShC(fi,jo);
-    }
-
-    if(ver) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
-    }
-
+    // Get shells
+    shells.resize(N);
+    for(size_t i=0;i<N;i++)
+      shells[i]=basis.get_funcs(i);
 
   } else {
     ERROR_INFO();
@@ -2807,26 +2617,79 @@ Pipek::Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const
 Pipek::~Pipek() {
 }
 
+arma::mat Pipek::get_charge(size_t iat) {
+  arma::mat Q;
+
+  if(chg==PIPEK_BADER) {
+    arma::mat Sat=bader.regional_overlap(iat);
+    Q=arma::trans(C)*Sat*C;
+
+  } else if(chg==PIPEK_BECKE) {
+    arma::mat Sat=grid.eval_overlap(iat);
+    Q=arma::trans(C)*Sat*C;
+
+  } else if(chg==PIPEK_HIRSHFELD || chg==PIPEK_STOCKHOLDER) {
+    arma::mat Sat=grid.eval_hirshfeld_overlap(hirsh,iat);
+    Q=arma::trans(C)*Sat*C;
+
+  } else if(chg==PIPEK_LOWDIN) {
+    Q.zeros(C.n_cols,C.n_cols);
+
+    // Helper matrix
+    arma::mat ShC=Sh*C;
+
+    for(size_t io=0;io<C.n_cols;io++)
+      for(size_t jo=0;jo<C.n_cols;jo++)
+	for(size_t is=0;is<shells[iat].size();is++)
+	  for(size_t fi=shells[iat][is].get_first_ind();fi<=shells[iat][is].get_last_ind();fi++)
+	    Q(io,jo)+=ShC(fi,io)*ShC(fi,jo);
+
+  } else if(chg==PIPEK_MULLIKEN) {
+    Q.zeros(C.n_cols,C.n_cols);
+
+    // Helper matrix
+    arma::mat SC=S*C;
+
+    // Increment charge
+    for(size_t io=0;io<C.n_cols;io++)
+      for(size_t jo=0;jo<C.n_cols;jo++)
+	for(size_t is=0;is<shells[iat].size();is++)
+	  for(size_t fi=shells[iat][is].get_first_ind();fi<=shells[iat][is].get_last_ind();fi++)
+	    Q(io,jo)+=C(fi,io)*SC(fi,jo);
+
+    // Symmetrize
+    Q=(Q+arma::trans(Q))/2.0;
+
+  } else {
+    ERROR_INFO();
+    throw std::runtime_error("Charge method not implemented.\n");
+  }
+
+  return Q;
+}
+
 double Pipek::cost_func(const arma::cx_mat & W) {
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(W.n_rows != Q.n_cols) {
+  if(W.n_rows != C.n_cols) {
     ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << C.n_cols << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
   double Dinv=0;
 
   // Compute sum
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+:Dinv)
+#pragma omp parallel for reduction(+:Dinv) schedule(dynamic,1)
 #endif
-  for(size_t iat=0;iat<Q.n_slices;iat++) {
+  for(size_t iat=0;iat<N;iat++) {
     // Helper matrix
-    arma::cx_mat qw=Q.slice(iat)*W;
+    arma::cx_mat qw=get_charge(iat)*W;
     for(size_t io=0;io<W.n_cols;io++) {
       double Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
       Dinv+=Qa*Qa;
@@ -2842,9 +2705,11 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(W.n_rows != Q.n_rows) {
+  if(W.n_rows != C.n_cols) {
     ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << C.n_cols << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
   // Returned matrix
@@ -2856,13 +2721,14 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
 #pragma omp parallel
 #endif
   {
+
 #ifdef _OPENMP
     arma::cx_mat Dwrk(Dder);
-#pragma omp for
+#pragma omp for schedule(dynamic,1)
 #endif
-    for(size_t iat=0;iat<Q.n_slices;iat++) {
+    for(size_t iat=0;iat<N;iat++) {
       // Helper matrix
-      arma::cx_mat qw=Q.slice(iat)*W;
+      arma::cx_mat qw=get_charge(iat)*W;
 
       for(size_t b=0;b<W.n_cols;b++) {
 	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
@@ -2879,7 +2745,6 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
 
 #ifdef _OPENMP
 #pragma omp critical
-    // Collect output
     Dder+=Dwrk;
 #endif
   }
@@ -2887,9 +2752,58 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
   return Dder;
 }
 
-void Pipek::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
-  f=cost_func(W);
-  der=cost_der(W);
+void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & Dder) {
+  if(W.n_rows != W.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+
+  if(W.n_rows != C.n_cols) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << C.n_cols << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Returned matrix
+  Dder.zeros(W.n_cols,W.n_cols);
+  double D=0;
+
+  // Compute sum
+#ifdef _OPENMP
+#pragma omp parallel reduction(+:D)
+#endif
+  {
+
+#ifdef _OPENMP
+    arma::cx_mat Dwrk(Dder);
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t iat=0;iat<N;iat++) {
+      // Helper matrix
+      arma::cx_mat qw=get_charge(iat)*W;
+
+      for(size_t b=0;b<W.n_cols;b++) {
+	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+	D+=std::real(qwp)*std::real(qwp);
+
+	for(size_t a=0;a<W.n_cols;a++) {
+#ifdef _OPENMP
+	  Dwrk(a,b)+=2.0*qwp*qw(a,b);
+#else
+	  Dder(a,b)+=2.0*qwp*qw(a,b);
+#endif
+	}
+      }
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+    Dder+=Dwrk;
+#endif
+  }
+
+  Dinv=D;
 }
 
 Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
@@ -3030,10 +2944,10 @@ void PZSIC::print_progress(size_t k) const {
   double R, K;
   get_rk(R,K);
 
-   if(k>1)
-     fprintf(stderr,"\t%4i\t%e\t% e\t% e",(int) k,K/R,J,J-oldJ);
-   else
-     fprintf(stderr,"\t%4i\t%e\t% e\t%13s",(int) k,K/R,J,"");
+  if(k>1)
+    fprintf(stderr,"\t%4i\t%e\t% e\t% e",(int) k,K/R,J,J-oldJ);
+  else
+    fprintf(stderr,"\t%4i\t%e\t% e\t%13s",(int) k,K/R,J,"");
   fflush(stderr);
 
   printf("\nSIC iteration %i\n",(int) k);

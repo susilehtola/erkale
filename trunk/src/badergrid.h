@@ -49,6 +49,8 @@ class BaderAtom: public AtomGrid {
 
   /// Calculate regional overlap matrices
   void regional_overlap(const std::vector<arma::sword> & regions, std::vector<arma::mat> & stack) const;
+  /// Calculate regional overlap matrix
+  void regional_overlap(const std::vector<arma::sword> & regions, size_t ireg, arma::mat & Sat) const;
 };
 
 /**
@@ -76,6 +78,8 @@ class BaderGrid {
   void print_maxima() const;
   
  public:
+  /// Dummy constructor
+  BaderGrid();
   /// Constructor
   BaderGrid(const BasisSet * bas, bool verbose=true, bool lobatto=false);
   /// Destructor
@@ -86,6 +90,8 @@ class BaderGrid {
 
   /// Run classification
   void classify(const arma::mat & P);
+  /// Get amount of regions
+  size_t get_Nmax() const;
 
   /// Compute regional charges
   arma::vec regional_charges(const arma::mat & P);
@@ -94,6 +100,8 @@ class BaderGrid {
 
   /// Compute regional overlap matrices
   std::vector<arma::mat> regional_overlap();
+  /// Compute regional overlap matrix
+  arma::mat regional_overlap(size_t ireg);
 };
 
 /// Track point to maximum
