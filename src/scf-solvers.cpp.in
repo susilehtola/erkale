@@ -466,9 +466,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(pz==FULL || pz==CAN) {
       titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,iiter,pz==CAN,pzloc);
+      PZSIC_RDFT(sol,occs,dft,grid,pz==CAN,pzloc);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,iiter,pz==CAN,pzloc);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,pz==CAN,pzloc);
 #endif
       titer.cont();
     }
