@@ -58,7 +58,7 @@ void Settings::add_scf_settings() {
   // Use old version of DIIS?
   add_bool("C1-DIIS", "Use older version of DIIS (C1-DIIS instead of C2-DIIS)?", false);
   // Number of DIIS matrices to use?
-  add_int("DIISOrder", "How many DIIS iterations to keep in memory?", 5);
+  add_int("DIISOrder", "How many DIIS iterations to keep in memory?", 10);
   // DIIS threshold
   add_double("DIISThr", "DIIS error threshold for DIIS updates", 0.05);
 
