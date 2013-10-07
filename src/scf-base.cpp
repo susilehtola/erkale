@@ -443,7 +443,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 }
 
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, bool canonical, bool localization) {
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, size_t iter, bool canonical, bool localization) {
   // Set xc functionals
   if(pzmode==COUL) {
     dft.x_func=0;
@@ -567,7 +567,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   sol.en.E  +=2*sicsol.en.E;
 }
 
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, bool canonical, bool localization) {
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, size_t iter, bool canonical, bool localization) {
   // Set xc functionals
   if(pzmode==COUL) {
     dft.x_func=0;
@@ -761,8 +761,8 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   if(canonical) {
     worker.cost_func(W);
   } else {
-    //	Perform unitary optimization
-    worker.optimize(W,POLY_DF,CGPR);
+    //	Perform unitary optimization, take at max 5 iterations
+    worker.optimize(W,POLY_DF,CGPR,5);
   }
 
   // Get SIC energy and hamiltonian
