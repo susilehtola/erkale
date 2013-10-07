@@ -2538,6 +2538,25 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
   chg=chgv;
   C=Cv;
 
+  Timer t;
+  if(ver) {
+    printf("Initializing Pipek-Mezey calculation with ");
+    if(chg==PIPEK_BADER)
+      printf("Bader");
+    else if(chg==PIPEK_BECKE)
+      printf("Becke");
+    else if(chg==PIPEK_HIRSHFELD)
+      printf("Hirshfeld");
+    else if(chg==PIPEK_LOWDIN)
+      printf("Löwdin");
+    else if(chg==PIPEK_MULLIKEN)
+      printf("Mulliken");
+    else if(chg==PIPEK_STOCKHOLDER)
+      printf("Stockholder");
+    printf(" charges ... ");
+    fflush(stdout);
+  }
+
   if(chg==PIPEK_BADER) {
     // Helper. Non-verbose operation
     bader=BaderGrid(&basis,ver);
@@ -2612,6 +2631,10 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     throw std::runtime_error("Charge method not implemented.\n");
   }
 
+  if(ver) {
+    printf("done (%s)\n",t.elapsed().c_str());
+    fflush(stdout);
+  }
 }
 
 Pipek::~Pipek() {
