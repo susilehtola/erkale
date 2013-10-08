@@ -196,9 +196,11 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
     // Orbitals in increasing order of occupation number
     orbs.erase(orbs.begin());
 
+  /*
   printf("Orbital occupations\n");
   for(size_t i=0;i<orbs.size();i++)
     printf("%4i %e\n",(int) i+1,orbs[i].E);
+  */
   
   // Collect the coefficients
   arma::mat Cat(basis.get_Nbf(),C.n_cols);
