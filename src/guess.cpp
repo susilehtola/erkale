@@ -112,7 +112,23 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   
   // Set multiplicity
   set.set_int("Multiplicity",gs.mult);
-  
+
+  // Force polarized calculation
+  set.set_bool("ForcePol",true);
+
+  // Get occupancies
+  std::vector<double> occa, occb;
+  get_unrestricted_occupancy(set,atbas,occa,occb,true);
+
+  // Pad to same length
+  while(occb.size()<occa.size())
+    occb.push_back(0.0);
+
+  std::ostringstream occs;
+  for(size_t i=0;i<occa.size();i++)
+    occs << occa[i] << " " << occb[i] << " ";
+  set.set_string("Occupancies",occs.str());
+
   // Temporary file name
   char *tmpname=tempnam("./",".chk");
   set.set_string("SaveChk",tmpname);
