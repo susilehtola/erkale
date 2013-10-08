@@ -2027,13 +2027,16 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       measure=worker.optimize(U,umet,uacc,maxiter);
 
   } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BADER || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD || met==PIPEK_STOCKHOLDER) {
-    Pipek worker(met,basis,C,P,Gthr,Fthr,verbose);
-    if(fname.length()) worker.open_log(fname);
-    worker.set_debug(debug);
-    if(real)
-      measure=worker.optimize(Ureal,umet,uacc,maxiter);
-    else
-      measure=worker.optimize(U,umet,uacc,maxiter);
+    // If only one nucleus - nothing to do
+    if(basis.get_Nnuc()>1) {
+      Pipek worker(met,basis,C,P,Gthr,Fthr,verbose);
+      if(fname.length()) worker.open_log(fname);
+      worker.set_debug(debug);
+      if(real)
+	measure=worker.optimize(Ureal,umet,uacc,maxiter);
+      else
+	measure=worker.optimize(U,umet,uacc,maxiter);
+    }
 
   } else if(met==EDMISTON) {
     Edmiston worker(basis,C,Gthr,Fthr,verbose);
