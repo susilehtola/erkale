@@ -123,15 +123,91 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
   fclose(out);
 }
 
+/// Starting points for localization
 enum startingpoint {
-  // Canonical orbitals - stay real
+  /// Canonical orbitals - stay real
   CANORB,
-  // Orthogonal matrix - stay real
+  /// Atomic natural orbitals (diagonalize atomic subblock of density matrix)
+  NATORB,
+  /// Orthogonal matrix - stay real
   ORTHMAT,
-  // Unitary matrix - go complex
+  /// Unitary matrix - go complex
   UNITMAT
 };
 
+/// Find atomic natural orbitals for starting guess
+arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, const arma::mat & C) {
+  // Returned matrix
+  arma::cx_mat W(C.n_cols,C.n_cols);
+  W.zeros();
+
+  // Compute overlap matrix
+  arma::mat S=basis.overlap();
+
+  // Atomic orbitals
+  std::vector<orbital_t> orbs;
+
+  // Loop over atoms
+  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+    // Get functions on center inuc
+    std::vector<GaussianShell> shells=basis.get_funcs(inuc);
+    
+    // and store their indices
+    std::vector<size_t> idx;
+    for(size_t is=0;is<shells.size();is++) {
+      size_t i0=shells[is].get_first_ind();
+      for(size_t fi=0;fi<shells[is].get_Nbf();fi++)
+	idx.push_back(i0+fi);
+    }
+
+    // Collect atomic density and overlap matrix
+    size_t N=idx.size();
+    arma::mat Pat(N,N), Sat(N,N);
+    for(size_t ii=0;ii<N;ii++)
+      for(size_t jj=0;jj<N;jj++) {
+	Pat(ii,jj)=P(idx[ii],idx[jj]);
+	Sat(ii,jj)=S(idx[ii],idx[jj]);
+      }
+    
+    // Get natural orbitals
+    arma::mat Cat, NOtoAO;
+    arma::vec occs;
+    form_NOs(Pat,Sat,Cat,NOtoAO,occs);
+    
+    // Store the orbitals
+    for(size_t iorb=0;iorb<Cat.n_cols;iorb++) {
+      orbital_t hlp;
+      // Occupation
+      hlp.E=occs(iorb);
+      // Orbital coefficients
+      hlp.c.zeros(basis.get_Nbf());
+      for(size_t ii=0;ii<idx.size();ii++)
+	hlp.c(idx[ii])=Cat(ii,iorb);
+      
+      orbs.push_back(hlp);
+    }
+  }
+
+  // Sort orbitals by occupation number
+  std::stable_sort(orbs.begin(),orbs.end());
+
+  // Delete extra orbitals (those with smallest occupation number)
+  while(orbs.size()>C.n_cols)
+    // Orbitals in increasing order of occupation number
+    orbs.erase(orbs.begin());
+
+  printf("Orbital occupations\n");
+  for(size_t i=0;i<orbs.size();i++)
+    printf("%4i %e\n",(int) i+1,orbs[i].E);
+  
+  // Collect the coefficients
+  arma::mat Cat(basis.get_Nbf(),C.n_cols);
+  for(size_t i=0;i<C.n_cols;i++)
+    Cat.col(i)=orbs[i].c;
+
+  // Compute orthogonalized transformation
+  return orthogonalize(arma::trans(Cat)*S*C)*std::complex<double>(1.0,0.0);
+}
 
 void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
   // Orbitals to localize
@@ -186,6 +262,8 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
     if(start==CANORB)
       // Start with canonical orbitals
       U.eye(orbidx.size(),orbidx.size());
+    else if(start==NATORB)
+      U=atomic_orbital_guess(basis,P,Cwrk);
     else if(start==ORTHMAT)
       // Start with orthogonal matrix
       U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),seed);
@@ -297,7 +375,7 @@ int main(int argc, char **argv) {
   set.add_string("Logfile","File to store output in","");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR, CGHS","CGPR");
   set.add_string("LineSearch","Line search to use: poly_df, poly_f, poly_fdf, armijo, fourier_df","poly_df");
-  set.add_string("StartingPoint","Starting point to use: CAN, ORTH, UNIT?","ORTH");
+  set.add_string("StartingPoint","Starting point to use: CAN, NAT, ORTH, UNIT?","ORTH");
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
   set.add_string("SizeDistribution","File to save orbital size distribution in","");
   set.add_double("GThreshold","Threshold for convergence: norm of Riemannian gradient",1e-7);
@@ -402,6 +480,8 @@ int main(int argc, char **argv) {
   enum startingpoint start;
   if(stricmp(startp,"CAN")==0)
     start=CANORB;
+  else if(stricmp(startp,"NAT")==0)
+    start=NATORB;
   else if(stricmp(startp,"ORTH")==0)
     start=ORTHMAT;
   else if(stricmp(startp,"UNIT")==0)
