@@ -507,12 +507,20 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       W=complex_unitary(nocc);
 
       if(localization) {
+	Timer tloc;
+
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
 	orbital_localization(EDMISTON,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-1);
-	if(verbose) printf("\n");
+
+	if(verbose) {
+	  printf("\n");
+
+	  fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+	  fflush(stderr);
+	}
       }
     }
   }
@@ -546,7 +554,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       printf("\n");
       fflush(stdout);
 
-      fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",tgrid.get());
+      fprintf(stderr,"%-64s %10.3f\n","    SIC-DFT grid formation",tgrid.get());
       fflush(stderr);
     }
   } else { // if(dft.adaptive)
@@ -663,12 +671,21 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       Wa=complex_unitary(nocca);
 
       if(localization) {
+	Timer tloc;
+
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
 	orbital_localization(EDMISTON,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-1);
-	if(verbose) printf("\n");
+
+	if(verbose) {
+	  printf("\n");
+
+	  fprintf(stderr,"%-64s %10.3f\n","    Initial alpha localization",tloc.get());
+	  fflush(stderr);
+	}
+	
       }
     }
   }
@@ -682,12 +699,21 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       Wb=complex_unitary(noccb);
 
       if(localization) {
+	Timer tloc;
+
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial beta localization.\n");
 	double measure;
 	orbital_localization(PIPEK_BECKE,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
 	orbital_localization(EDMISTON,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-1);
-	if(verbose) printf("\n");
+
+	if(verbose) {
+	  printf("\n");
+
+	  fprintf(stderr,"%-64s %10.3f\n","    Initial beta localization",tloc.get());
+	  fflush(stderr);
+	}
+
       }
     }
   }
@@ -729,7 +755,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       printf("\n");
       fflush(stdout);
 
-      fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",tgrid.get());
+      fprintf(stderr,"%-64s %10.3f\n","    SIC-DFT grid formation",tgrid.get());
       fflush(stderr);
     }
   } else { // if(dft.adaptive)
