@@ -403,9 +403,9 @@ arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat 
 /// Get atomic occupancy (spherical average)
 std::vector<double> atomic_occupancy(int Nel);
 /// Generate orbital occupancies
-std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis);
+std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis, bool atomic=false);
 /// Generate orbital occupancies
-void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb);
+void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb, bool atomic=false);
 
 /// Compute magnitude of dipole moment
 double dip_mom(const arma::mat & P, const BasisSet & basis);

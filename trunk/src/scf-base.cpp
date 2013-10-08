@@ -538,6 +538,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     Timer tgrid;
     if(verbose) {
       printf("\nReconstructing SIC DFT grid.\n");
+      fprintf(stderr,"\n");
       fflush(stdout);
     }
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
@@ -548,11 +549,14 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",tgrid.get());
       fflush(stderr);
     }
-  } // if(dft.adaptive)
+  } else { // if(dft.adaptive)
+    if(verbose)
+      fprintf(stderr,"\n");
+  }
 
   // Do the calculation
   if(verbose && !canonical) {
-    fprintf(stderr,"\nSIC unitary optimization\n");
+    fprintf(stderr,"SIC unitary optimization\n");
   }
   PZSIC_calculate(sicsol,W,dft,grid,canonical);
   // Save matrix
@@ -718,6 +722,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     if(verbose) {
       printf("\nReconstructing SIC DFT grid.\n");
       fflush(stdout);
+      fprintf(stderr,"\n");
     }
     grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
     if(verbose) {
@@ -727,11 +732,14 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",tgrid.get());
       fflush(stderr);
     }
-  } // if(dft.adaptive)
+  } else { // if(dft.adaptive)
+    if(verbose)
+      fprintf(stderr,"\n");
+  }
 
   // Do the calculation
   if(verbose && !canonical) {
-    fprintf(stderr,"\nSIC unitary optimization, alpha spin\n");
+    fprintf(stderr,"SIC unitary optimization, alpha spin\n");
   }
   PZSIC_calculate(sicsola,Wa,dft,grid,canonical);
   chkptp->cwrite("CWa",sicsola.C*Wa);
@@ -1087,100 +1095,29 @@ arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat 
 std::vector<double> atomic_occupancy(int Nel) {
   std::vector<double> ret;
 
-  // Atomic case. Fill 1s
-  if(Nel>0) {
-    ret.push_back(1.0);
-    Nel--;
-  }
+  // Fill shells. Shell index
+  for(size_t is=0;is<sizeof(shell_order)/sizeof(shell_order[0]);is++) {
+    // am of current shell is
+    int l=shell_order[is];
+    // and it has 2l+1 orbitals
+    int nsh=2*l+1;
+    // Amount of electrons to put is
+    int nput=std::min(nsh,Nel);
 
-  // Fill 2s
-  if(Nel>0) {
-    ret.push_back(1.0);
-    Nel--;
-  }
-
-  // Fill 2p
-  if(Nel>0) {
-    // Amount of electrons to put in shell
-    int n=std::min(3,Nel);
-    // Divide equally
-    for(int i=0;i<3;i++)
-      ret.push_back(n/3.0);
-    Nel-=n;
-  }
-
-  // Fill 3s
-  if(Nel>0) {
-    ret.push_back(1.0);
-    Nel--;
-  }
-
-  // Fill 3p
-  if(Nel>0) {
-    // Amount of electrons to put in shell
-    int n=std::min(3,Nel);
-    // Divide equally
-    for(int i=0;i<3;i++)
-      ret.push_back(n/3.0);
-    Nel-=n;
-  }
-
-  // Fill 4s
-  if(Nel>0) {
-    ret.push_back(1.0);
-    Nel--;
-  }
-
-  // Fill 3d
-  if(Nel>0) {
-    // Amount of electrons to put in shell
-    int n=std::min(5,Nel);
-    // Divide equally
-    for(int i=0;i<5;i++)
-      ret.push_back(n/5.0);
-    Nel-=n;
-  }
-
-  // Fill 4p
-  if(Nel>0) {
-    // Amount of electrons to put in shell
-    int n=std::min(3,Nel);
-    // Divide equally
-    for(int i=0;i<3;i++)
-      ret.push_back(n/3.0);
-    Nel-=n;
-  }
-
-  // Fill 5s
-  if(Nel>0) {
-    ret.push_back(1.0);
-    Nel--;
-  }
-
-  // Fill 4d
-  if(Nel>0) {
-    // Amount of electrons to put in shell
-    int n=std::min(5,Nel);
-    // Divide equally
-    for(int i=0;i<5;i++)
-      ret.push_back(n/5.0);
-    Nel-=n;
-  }
-
-  // Fill 5p
-  if(Nel>0) {
-    // Amount of electrons to put in shell
-    int n=std::min(3,Nel);
-    // Divide equally
-    for(int i=0;i<3;i++)
-      ret.push_back(n/3.0);
-    Nel-=n;
+    // and they are distributed equally
+    for(int i=0;i<nsh;i++)
+      ret.push_back(nput*1.0/nsh);
+    
+    // Reduce electron count
+    Nel-=nput;
+    if(Nel==0)
+      break;
   }
 
   return ret;
 }
 
-std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis) {
+std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis, bool atomic) {
   // Returned value
   std::vector<double> ret;
 
@@ -1208,7 +1145,7 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
       throw std::runtime_error("Refusing to run restricted calculation on unrestricted system!\n");
     }
 
-    if(basis.get_Nnuc()==1) {
+    if(atomic && basis.get_Nnuc()==1) {
       // Atomic case.
       ret=atomic_occupancy(Nel/2);
       // Orbitals are doubly occupied
@@ -1225,7 +1162,7 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
   return ret;
 }
 
-void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb) {
+void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb, bool atomic) {
   // Occupancies
   std::string occs=set.get_string("Occupancies");
 
@@ -1260,7 +1197,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     int Nel_alpha, Nel_beta;
     get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
 
-    if(basis.get_Nnuc()==1) {
+    if(atomic && basis.get_Nnuc()==1) {
       // Atomic case
       occa=atomic_occupancy(Nel_alpha);
       occb=atomic_occupancy(Nel_beta);

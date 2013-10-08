@@ -93,17 +93,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 
 #if defined(_ROHF)
-  // Occupations
+  // Occupations. TODO - this does not apply for fractional occupations..
   std::vector<double> occa;
   std::vector<double> occb;
-
-  if(basisp->get_Nnuc()==1) {
-    occa=atomic_occupancy(Nel_alpha);
-    occb=atomic_occupancy(Nel_beta);
-  } else {
-    occa=std::vector<double>(Nel_alpha,1.0);
-    occb=std::vector<double>(Nel_beta,1.0);
-  }
+  occa=std::vector<double>(Nel_alpha,1.0);
+  occb=std::vector<double>(Nel_beta,1.0);
 
 #elif ( defined(HALFHOLE) || defined(FULLHOLE) )
   // Occupation vector of spin up and spin down
