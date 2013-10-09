@@ -129,6 +129,8 @@ enum startingpoint {
   CANORB,
   /// Atomic natural orbitals (diagonalize atomic subblock of density matrix)
   NATORB,
+  /// Cholesky orbitals
+  CHOLORB,
   /// Orthogonal matrix - stay real
   ORTHMAT,
   /// Unitary matrix - go complex
@@ -211,6 +213,33 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
   return orthogonalize(arma::trans(Cat)*S*C)*std::complex<double>(1.0,0.0);
 }
 
+/// Find atomic natural orbitals for starting guess
+arma::cx_mat cholesky_guess(const BasisSet & basis, const arma::mat & C) {
+  Timer t;
+  printf("Performing Cholesky guess ... ");
+  fflush(stdout);
+
+  // Generate density matrix
+  arma::mat P(C.n_rows,C.n_rows);
+  P.zeros();
+  for(size_t i=0;i<C.n_cols;i++)
+    P+=C.col(i)*arma::trans(C.col(i));
+  
+  // Perform Cholesky factorization of density matrix
+  arma::mat Cchol=incomplete_cholesky(P,C.n_cols);
+
+  // Overlap matrix
+  arma::mat S=basis.overlap();
+  
+  // Compute transformation
+  arma::cx_mat ret=orthogonalize(arma::trans(Cchol)*S*C)*std::complex<double>(1.0,0.0);
+
+  printf("done (%s)\n",t.elapsed().c_str());
+
+  return ret;
+}
+
+
 void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
   // Orbitals to localize
   std::vector<size_t> locorb;
@@ -266,6 +295,8 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       U.eye(orbidx.size(),orbidx.size());
     else if(start==NATORB)
       U=atomic_orbital_guess(basis,P,Cwrk);
+    else if(start==CHOLORB)
+      U=cholesky_guess(basis,Cwrk);
     else if(start==ORTHMAT)
       // Start with orthogonal matrix
       U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),seed);
@@ -377,7 +408,7 @@ int main(int argc, char **argv) {
   set.add_string("Logfile","File to store output in","");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR, CGHS","CGPR");
   set.add_string("LineSearch","Line search to use: poly_df, poly_f, poly_fdf, armijo, fourier_df","poly_df");
-  set.add_string("StartingPoint","Starting point to use: CAN, NAT, ORTH, UNIT?","ORTH");
+  set.add_string("StartingPoint","Starting point to use: CAN, NAT, CHOL, ORTH, UNIT?","ORTH");
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
   set.add_string("SizeDistribution","File to save orbital size distribution in","");
   set.add_double("GThreshold","Threshold for convergence: norm of Riemannian gradient",1e-7);
@@ -484,6 +515,8 @@ int main(int argc, char **argv) {
     start=CANORB;
   else if(stricmp(startp,"NAT")==0)
     start=NATORB;
+  else if(stricmp(startp,"CHOL")==0)
+    start=CHOLORB;
   else if(stricmp(startp,"ORTH")==0)
     start=ORTHMAT;
   else if(stricmp(startp,"UNIT")==0)
