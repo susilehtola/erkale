@@ -795,8 +795,8 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   if(canonical) {
     worker.cost_func(W);
   } else {
-    //	Perform unitary optimization, take at max 5 iterations
-    worker.optimize(W,POLY_DF,CGPR,5);
+    //	Perform unitary optimization, take at max 10 iterations
+    worker.optimize(W,POLY_DF,CGPR,10);
   }
 
   // Get SIC energy and hamiltonian
@@ -2978,7 +2978,8 @@ void PZSIC::initialize(const arma::cx_mat & W0) {
   double R, K;
   get_rk(R,K);
   // Set tolerance on kappa
-  kappatol=std::max( 0.5*K/R, 0.25 );
+  //  kappatol=std::max( 0.5*K/R, 0.25 );
+  kappatol=0.25;
 }
 
 bool PZSIC::converged(const arma::cx_mat & W) {
