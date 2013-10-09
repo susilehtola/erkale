@@ -420,3 +420,42 @@ arma::cx_mat unitarize(const arma::cx_mat & M) {
   // Return matrix with singular values set to unity
   return U*arma::trans(V);
 }
+
+arma::mat incomplete_cholesky(const arma::mat & M, size_t n) {
+  if(M.n_rows != M.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Can't do Cholesky decomposition of non-square matrix!\n");
+  }
+  // Residual matrix
+  arma::mat R(M);
+
+  // Check sanity of argument
+  if(n>M.n_rows)
+    n=M.n_rows;
+
+  // Returned matrix
+  arma::mat C(R.n_rows,n);
+
+  // Perform factorization
+  size_t N=M.n_cols;
+  for(size_t ii=0;ii<n;ii++) {
+    // Find maximum diagonal element of residual
+    size_t maxind=-1;
+    double maxval=0.0;
+    for(size_t j=0;j<N;j++)
+      if(R(j,j)>maxval) {
+        maxval=R(j,j);
+        maxind=j;
+      }
+    // Take square root
+    maxval=sqrt(maxval);
+
+    // Added vector is
+    C.col(ii)=R.col(maxind)/maxval;
+
+    // Update remainder
+    R-=C.col(ii)*arma::trans(C.col(ii));
+  }
+
+  return C;
+}
