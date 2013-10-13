@@ -105,15 +105,6 @@ coords_t operator*(const coords_t & lhs, double fac) {
   return ret;
 }
 
-
-double normsq(const coords_t & r) {
-  return r.x*r.x + r.y*r.y + r.z*r.z;
-}
-
-double norm(const coords_t & r) {
-  return sqrt(normsq(r));
-}
-
 bool operator<(const contr_t & lhs, const contr_t & rhs) {
   // Decreasing order of exponents.
   return lhs.z>rhs.z;
@@ -1388,6 +1379,10 @@ void BasisSet::compute_nuclear_distances() {
 
 double BasisSet::nuclear_distance(size_t i, size_t j) const {
   return nucleardist(i,j);
+}
+
+arma::mat BasisSet::nuclear_distances() const {
+  return nucleardist;
 }
 
 bool operator<(const shellpair_t & lhs, const shellpair_t & rhs) {
