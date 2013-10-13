@@ -129,9 +129,14 @@ coords_t operator/(const coords_t & lhs, double fac);
 coords_t operator*(const coords_t & lhs, double fac);
 
 /// Compute squared norm
-double normsq(const coords_t & r);
+inline double normsq(const coords_t & r) {
+  return r.x*r.x + r.y*r.y + r.z*r.z;
+}
+
 /// Compute norm
-double norm(const coords_t & r);
+inline double norm(const coords_t & r) {
+  return sqrt(normsq(r));
+}
 
 /// Structure for contractions
 typedef struct {
@@ -254,6 +259,8 @@ class BasisSet {
 
   /// Get distance of nuclei
   double nuclear_distance(size_t i, size_t j) const;
+  /// Get nuclear distances
+  arma::mat nuclear_distances() const;
 
   /// Get angular momentum of shell
   int get_am(size_t shind) const;
