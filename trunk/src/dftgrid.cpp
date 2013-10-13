@@ -193,71 +193,85 @@ void AtomGrid::add_lebedev_shell(atomgrid_t & g, size_t ir) {
   g.sh[ir].np=np;
 }
 
-void AtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t ir) {
+void AtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t ir, double a) {
   // Compute weights of points.
 
   // Number of atoms in system
   const size_t Nat=bas.get_Nnuc();
 
   // Helper arrays
-  std::vector<double> atom_dist;
-  std::vector<double> atom_weight;
-  std::vector< std::vector<double> > mu_ab;
-  std::vector< std::vector<double> > smu_ab;
+  arma::vec atom_dist;
+  arma::vec atom_weight;
+  arma::mat mu_ab;
+  arma::mat smu_ab;
+  // Indices to consider
+  std::vector<size_t> cmpidx;
 
   // Initialize memory
-  atom_dist.resize(Nat);
-  atom_weight.resize(Nat);
-  mu_ab.resize(Nat);
-  smu_ab.resize(Nat);
-  for(size_t i=0;i<Nat;i++) {
-    mu_ab[i].resize(Nat);
-    smu_ab[i].resize(Nat);
-  }
+  atom_dist.zeros(Nat);
+  atom_weight.zeros(Nat);
+  mu_ab.zeros(Nat,Nat);
+  smu_ab.zeros(Nat,Nat);
+
+  // Get nuclei
+  std::vector<nucleus_t> nuccoords=bas.get_nuclei();
+
+  // Get nuclear distances
+  arma::mat nucdist=bas.nuclear_distances();
+  // Compute closest distance to other atoms
+  double Rin=DBL_MAX;
+  for(size_t i=0;i<g.atind;i++)
+    if(nucdist(g.atind,i)<Rin)
+      Rin=nucdist(g.atind,i);
+  for(size_t i=g.atind+1;i<Nat;i++)
+    if(nucdist(g.atind,i)<Rin)
+      Rin=nucdist(g.atind,i);
+
+  double scrthr=std::pow(0.5*(1-a)*Rin,2);
 
   // Loop over points on wanted radial shell
   for(size_t ip=g.sh[ir].ind0;ip<g.sh[ir].ind0+g.sh[ir].np;ip++) {
     // Coordinates of the point are
     coords_t coord_p=grid[ip].r;
+    
+    // Prescreen - is the weight unity?
+    if(normsq(nuccoords[g.atind].r-coord_p) < scrthr)
+      // Yes - nothing to do.
+      continue;
 
     // Compute distance of point to atoms
     for(size_t iat=0;iat<Nat;iat++)
-      atom_dist[iat]=norm(bas.get_nuclear_coords(iat)-coord_p);
+      atom_dist(iat)=norm(nuccoords[iat].r-coord_p);
 
     // Compute mu_ab
     for(size_t iat=0;iat<Nat;iat++) {
       // Diagonal
-      mu_ab[iat][iat]=0.0;
+      mu_ab(iat,iat)=0.0;
       // Off-diagonal
       for(size_t jat=0;jat<iat;jat++) {
-	mu_ab[iat][jat]=(atom_dist[iat]-atom_dist[jat])/bas.nuclear_distance(iat,jat);
-	mu_ab[jat][iat]=-mu_ab[iat][jat];
+	mu_ab(iat,jat)=(atom_dist(iat)-atom_dist(jat))/nucdist(iat,jat);
+	mu_ab(jat,iat)=-mu_ab(iat,jat);
       }
     }
 
     // Compute s(mu_ab)
     for(size_t iat=0;iat<Nat;iat++)
       for(size_t jat=0;jat<Nat;jat++) {
-	smu_ab[iat][jat]=f_s(mu_ab[iat][jat],0.7);
+	smu_ab(iat,jat)=f_s(mu_ab(iat,jat),a);
       }
 
     // Then, compute atomic weights
     for(size_t iat=0;iat<Nat;iat++) {
-      atom_weight[iat]=1.0;
+      atom_weight(iat)=1.0;
 
       for(size_t jat=0;jat<iat;jat++)
-	atom_weight[iat]*=smu_ab[iat][jat];
+	atom_weight(iat)*=smu_ab(iat,jat);
       for(size_t jat=iat+1;jat<Nat;jat++)
-	atom_weight[iat]*=smu_ab[iat][jat];
+	atom_weight(iat)*=smu_ab(iat,jat);
     }
 
-    // Compute sum of weights
-    double awsum=0.0;
-    for(size_t iat=0;iat<Nat;iat++)
-      awsum+=atom_weight[iat];
-
     // The Becke weight is
-    grid[ip].w*=atom_weight[g.atind]/awsum;
+    grid[ip].w*=atom_weight(g.atind)/arma::sum(atom_weight);
   }
 }
 
