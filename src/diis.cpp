@@ -139,7 +139,7 @@ std::vector<arma::vec> uDIIS::get_error() const {
   return err;
 }
 
-arma::vec DIIS::get_weights(bool c1) {
+arma::vec DIIS::get_weights(bool verbose, bool c1) {
   // Collect error vectors
   std::vector<arma::vec> errs=get_error();
 
@@ -186,7 +186,7 @@ arma::vec DIIS::get_weights(bool c1) {
 	if(fabs(X(i))>=MAXWEIGHT) {
 	  printf("Large coefficient produced by DIIS. Reducing to %i matrices.\n",N-1);
 	  erase_last();
-	  return get_weights(c1);
+	  return get_weights(verbose,c1);
 	}
 
       // Solution is (last element of X is DIIS error)
@@ -271,13 +271,14 @@ arma::vec DIIS::get_weights(bool c1) {
     }
   }
 
-  // arma::trans(sol).print("DIIS weights");
+  if(verbose)
+    arma::trans(sol).print("DIIS weights");
 
   return sol;
 }
 
-void rDIIS::solve_F(arma::mat & F, bool c1) {
-  arma::vec sol=get_weights(c1);
+void rDIIS::solve_F(arma::mat & F, bool verbose, bool c1) {
+  arma::vec sol=get_weights(verbose,c1);
  
   // Form weighted Fock matrix
   F.zeros();
@@ -285,8 +286,8 @@ void rDIIS::solve_F(arma::mat & F, bool c1) {
     F+=sol(i)*stack[i].F;
 }
 
-void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb, bool c1) {
-  arma::vec sol=get_weights(c1);
+void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb, bool verbose, bool c1) {
+  arma::vec sol=get_weights(verbose,c1);
  
   // Form weighted Fock matrix
   Fa.zeros();
@@ -297,8 +298,8 @@ void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb, bool c1) {
   }
 }
 
-void rDIIS::solve_P(arma::mat & P, bool c1) {
-  arma::vec sol=get_weights(c1);
+void rDIIS::solve_P(arma::mat & P, bool verbose, bool c1) {
+  arma::vec sol=get_weights(verbose,c1);
  
   // Form weighted density matrix
   P.zeros();
@@ -306,8 +307,8 @@ void rDIIS::solve_P(arma::mat & P, bool c1) {
     P+=sol(i)*stack[i].P;
 }
 
-void uDIIS::solve_P(arma::mat & Pa, arma::mat & Pb, bool c1) {
-  arma::vec sol=get_weights(c1);
+void uDIIS::solve_P(arma::mat & Pa, arma::mat & Pb, bool verbose, bool c1) {
+  arma::vec sol=get_weights(verbose,c1);
  
   // Form weighted density matrix
   Pa.zeros();

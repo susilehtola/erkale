@@ -530,10 +530,10 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef RESTRICTED
 	// Solve new matrix
-	diis.solve_F(sol.H,diis_c1);
+	diis.solve_F(sol.H,verbose,diis_c1);
 #else
 	// Solve new matrices
-	diis.solve_F(sol.Ha,sol.Hb,diis_c1);
+	diis.solve_F(sol.Ha,sol.Hb,verbose,diis_c1);
 #endif
 
 	diissucc=true;
