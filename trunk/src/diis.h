@@ -101,7 +101,7 @@ class DIIS {
   virtual void erase_last()=0;
 
   /// Compute weights, use C1-DIIS if wanted
-  arma::vec get_weights(bool c1_diis);
+  arma::vec get_weights(bool verbose, bool c1_diis);
 
  public:
   /// Constructor
@@ -133,10 +133,10 @@ class rDIIS: protected DIIS {
   void update(const arma::mat & F, const arma::mat & P, double E, double & error);
 
   /// Compute new Fock matrix, use C1-DIIS if wanted
-  void solve_F(arma::mat & F, bool c1_diis=false);
+  void solve_F(arma::mat & F, bool verbose=true, bool c1_diis=false);
 
   /// Compute new density matrix, use C1-DIIS if wanted
-  void solve_P(arma::mat & P, bool c1_diis=false);
+  void solve_P(arma::mat & P, bool verbose=true, bool c1_diis=false);
 
   /// Clear Fock matrices and errors
   void clear();
@@ -162,10 +162,10 @@ class uDIIS: protected DIIS {
   void update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & Pa, const arma::mat & Pb, double E, double & error);
 
   /// Compute new Fock matrix, use C1-DIIS if wanted
-  void solve_F(arma::mat & Fa, arma::mat & Fb, bool c1_diis=false);
+  void solve_F(arma::mat & Fa, arma::mat & Fb, bool verbose=true, bool c1_diis=false);
 
   /// Compute new density matrix, use C1-DIIS if wanted
-  void solve_P(arma::mat & Pa, arma::mat & Pb, bool c1_diis=false);
+  void solve_P(arma::mat & Pa, arma::mat & Pb, bool verbose=true, bool c1_diis=false);
 
   /// Clear Fock matrices and errors
   void clear();
