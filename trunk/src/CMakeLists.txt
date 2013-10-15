@@ -26,11 +26,10 @@ settings.cpp broyden.cpp adiis.cpp tempered.cpp find_molecules.cpp
 properties.cpp checkpoint.cpp guess.cpp external/storage.cpp
 external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfit.cpp
-chebyshev.cpp density_fitting.cpp lebedev.cpp eriworker.cpp
-eriworker_transforms.cpp unitary.cpp hirshfeld.cpp bader.cpp
-badergrid.cpp stockholder.cpp slaterfit/solve_coefficients.cpp
-slaterfit/form_exponents.cpp atom/integrals.cpp atom/solvers.cpp
-atom/atomtable.cpp)
+chebyshev.cpp density_fitting.cpp lebedev.cpp eriworker_routines.cpp
+unitary.cpp hirshfeld.cpp bader.cpp badergrid.cpp stockholder.cpp
+slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
+atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
@@ -181,11 +180,13 @@ add_subdirectory(external)
 # Compile the contributed programs
 #add_subdirectory(contrib)
 
-# Recipe for building ERIWorker transforms
+# Recipe for compiling full ERIWorker file
 add_custom_command(
- OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eriworker_transforms.cpp
+ OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eriworker_routines.cpp
  DEPENDS eriworker_gentransform
- COMMAND eriworker_gentransform > ${CMAKE_CURRENT_BINARY_DIR}/eriworker_transforms.cpp
+ DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eriworker.cpp
+ COMMAND eriworker_gentransform > ${CMAKE_CURRENT_BINARY_DIR}/eriworker_routines.cpp
+ COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eriworker.cpp >> ${CMAKE_CURRENT_BINARY_DIR}/eriworker_routines.cpp
 )
 
 # Recipe for building ERITable
