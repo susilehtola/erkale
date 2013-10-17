@@ -140,8 +140,8 @@ arma::vec ADIIS::get_c() const {
 
   if(N==1) {
     // Trivial case.
-    std::vector<double> ret;
-    ret.push_back(1.0);
+    arma::vec ret(1);
+    ret.ones();
     return ret;
   }
 
