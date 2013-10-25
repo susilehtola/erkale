@@ -32,7 +32,7 @@
 
 int find_am(char am) {
   for(int i=0;i<=max_am;i++)
-    if(shell_types[i]==am)
+    if(shell_types[i]==toupper(am))
       return i;
 
   ERROR_INFO();
@@ -694,14 +694,14 @@ ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) cons
   if(number==0) {
     // General basis requested
     for(size_t i=0;i<elements.size();i++)
-      if((elements[i].get_number()==number) && (elements[i].get_symbol()==el))
+      if((elements[i].get_number()==number) && (stricmp(elements[i].get_symbol(),el)==0) )
 	return elements[i];
   } else {
     // Special basis requested.
     for(size_t i=0;i<elements.size();i++)
       if(elements[i].get_number()==number) {
 	// Check that this is actually of the wanted type!
-	if(elements[i].get_symbol()==el)
+	if(stricmp(elements[i].get_symbol(),el)==0)
 	  return elements[i];
 	else {
 	  // The wanted index, but a nucleus of the wrong type!
