@@ -1,19 +1,19 @@
 #!/bin/bash
 # This is a script for downloading, compiling and 
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2012-11-25 Susi Lehtola
+# 2011-11-12 Susi Lehtola
 
 # Set this to the number of cores +1
-nprocs=5
+nprocs=9
 
 # Archiver
 export AR="ar"
 # C compiler
-export CC="gcc-4"
+export CC="gcc"
 # C++ compiler
-export CXX="g++-4"
+export CXX="g++"
 # Fortran compiler
-export F77="gfortran-4"
+export F77="gfortran"
 export FC="${F77}"
 
 # Patch libxc? Set to 1 if you use gfortran, otherwise 0.
@@ -25,7 +25,10 @@ export CPP="${CC} -E"
 export FCCPP="${FC} -E"
 
 # C flags to use. 
-export CFLAGS="-Wall -O2 -funroll-loops -mtune=generic -msse2"
+#For new versions of GCC on modern x86 hardware
+#export CFLAGS="-Wall -O2 -funroll-loops -fPIC -march=native -msse3"
+#For older versions
+export CFLAGS="-Wall -O2 -funroll-loops -fPIC -msse2"
 
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
@@ -33,7 +36,7 @@ export CXXFLAGS="${CFLAGS}"
 export FFLAGS="${CFLAGS}"
 export FCFLAGS="${CFLAGS}"
 
-# LAPACK and BLAS library to use
+# LAPACK and BLAS library to use. On Debian and Ubuntu you need to add -lblas to the end
 LAPACK="-llapack -lblas -lgfortran"
 BLAS="-lblas -lgfortran"
 
@@ -45,9 +48,11 @@ MAXAM="6"
 MAXDERIV="5"
 
 # Current versions of libraries
-export XCVER="2.0.1"
+export GSLVER="1.16"
+export XCVER="2.0.2"
 export INTVER="1.1.4"
-export ARMAVER="3.910.1"
+export ARMAVER="3.920.2"
+export HDF5VER="1.8.11"
 
 # Silence cmake warnings about changed behavior
 export CMAKE_LEGACY_CYGWIN_WIN32=0 
@@ -67,6 +72,48 @@ builddir=${topdir}/build
 if [ ! -d ${builddir} ]; then
  mkdir -p ${builddir}
 fi
+
+# GSL
+if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
+ echo -n "Compiling GSL ..."
+ 
+ if [ ! -d ${builddir}/gsl-${GSLVER} ]; then
+  if [ ! -f ${srcdir}/gsl-${GSLVER}.tar.gz ]; then
+   cd ${srcdir}
+   wget -O gsl-${GSLVER}.tar.gz ftp://ftp.gnu.org/gnu/gsl/gsl-${GSLVER}.tar.gz
+  fi
+  cd ${builddir}
+  tar zxf ${srcdir}/gsl-${GSLVER}.tar.gz
+ fi
+ 
+ cd ${builddir}/gsl-${GSLVER}/
+ ./configure --enable-static --disable-shared --prefix=${topdir}/gsl --exec-prefix=${topdir}/gsl &>configure.log
+ make -j ${nprocs} &> make.log
+ make install &> install.log
+ make clean &> clean.log
+ echo " done"
+fi 
+
+# HDF5
+if [ ! -f ${topdir}/hdf5/lib/libhdf5.a ]; then
+ echo -n "Compiling HDF5 ..."
+ 
+ if [ ! -d ${builddir}/hdf5-${HDF5VER} ]; then
+  if [ ! -f ${srcdir}/hdf5-${HDF5VER}.tar.gz ]; then
+   cd ${srcdir}
+   wget -O hdf5-${HDF5VER}.tar.gz http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-${HDF5VER}/src/hdf5-${HDF5VER}.tar.gz
+  fi
+  cd ${builddir}
+  tar zxf ${srcdir}/hdf5-${HDF5VER}.tar.gz
+ fi
+ 
+ cd ${builddir}/hdf5-${HDF5VER}/
+ ./configure --enable-static --disable-shared --prefix=${topdir}/hdf5 --exec-prefix=${topdir}/hdf5 &>configure.log
+ make -j ${nprocs} VERBOSE=1 &> make.log
+ make install &> install.log
+ make clean &> clean.log
+ echo " done"
+fi 
 
 # libXC
 if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
@@ -122,7 +169,7 @@ if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a
  export ICFLAGS=`echo ${CFLAGS} |sed 's|-O2|-O1|g'`
  export ICXXFLAGS=`echo ${CXXFLAGS} |sed 's|-O2|-O1|g'`
  
-  ./configure --enable-static --disable-shared \
+ ./configure --enable-static --disable-shared \
   --prefix=${topdir}/libint --exec-prefix=${topdir}/libint \
   --disable-r12 --with-libint-max-am=${MAXAM} --with-libderiv-max-am1=${MAXDERIV} \
   --with-cc="${CC}" --with-cxx="${CXX}" --with-ar=${AR} \
@@ -131,7 +178,6 @@ if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a
 
  # Grow stack size
  sed -i 's| -lm | -Wl,--stack,8388608 -lm|' src/bin/MakeVars
-
  # No SMP build
  make &> make.log
  make install &> install.log
@@ -163,7 +209,6 @@ fi
 
 echo "Done compiling libraries."
 
-
 # Check out ERKALE
 echo "Checking out source"
 cd ${builddir}
@@ -176,11 +221,23 @@ echo "Done"
 echo "set(ARMADILLO_FOUND 1)" > erkale/cmake/FindArmadillo.cmake
 echo "set(ARMADILLO_INCLUDE_DIRS \"${topdir}/armadillo/include\")" >> erkale/cmake/FindArmadillo.cmake
 
+# GSL
+echo "set(GSL_FOUND 1)" > erkale/cmake/FindGSL.cmake
+echo "set(GSL_INCLUDE_DIRS \"${topdir}/gsl/include\")" >> erkale/cmake/FindGSL.cmake
+echo "set(GSL_LIBRARY_DIRS \"${topdir}/gsl/lib\")" >> erkale/cmake/FindGSL.cmake
+echo "set(GSL_LIBRARIES ${topdir}/gsl/lib/libgsl.a)" >> erkale/cmake/FindGSL.cmake
+
+# libxc
+echo "set(LIBXC_FOUND 1)" > erkale/cmake/Findlibxc.cmake
+echo "set(LIBXC_INCLUDE_DIRS \"${topdir}/libxc/include\")" >> erkale/cmake/Findlibxc.cmake
+echo "set(LIBXC_LIBRARY_DIRS \"${topdir}/libxc/lib\")" >> erkale/cmake/Findlibxc.cmake
+echo "set(LIBXC_LIBRARIES ${topdir}/libxc/lib/libxc.a)" >> erkale/cmake/Findlibxc.cmake
+
 # HDF5
 echo "set(HDF5_FOUND 1)" > erkale/cmake/FindHDF5.cmake
-echo "set(HDF5_INCLUDE_DIRS \"/usr/include\")" >> erkale/cmake/FindHDF5.cmake
-echo "set(HDF5_LIBRARY_DIRS \"/usr/lib\")" >> erkale/cmake/FindHDF5.cmake
-echo "set(HDF5_LIBRARIES -lhdf5 -lz)" >> erkale/cmake/FindHDF5.cmake
+echo "set(HDF5_INCLUDE_DIRS \"${topdir}/hdf5/include\")" >> erkale/cmake/FindHDF5.cmake
+echo "set(HDF5_LIBRARY_DIRS \"${topdir}/hdf5/lib\")" >> erkale/cmake/FindHDF5.cmake
+echo "set(HDF5_LIBRARIES ${topdir}/hdf5/lib/libhdf5.a -ldl -lz)" >> erkale/cmake/FindHDF5.cmake
 
 # Libint
 echo "set(LIBINT_FOUND 1)" > erkale/config/libintConfig.cmake
@@ -200,7 +257,7 @@ if [ ! -d openmp ]; then
 fi
 cd openmp
 FC=${FC} CC=${CC} CXX=${CXX} \
- FCFLAGS="${FCFLAGS} -static" CFLAGS="${CFLAGS} -static" CXXFLAGS="${CXXFLAGS} -static" \
+ FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  cmake .. \
  -DLAPACK_LIBRARIES="${LAPACK}" \
  -DBLAS_LIBRARIES="${BLAS}" \
@@ -214,7 +271,7 @@ if [ ! -d serial ]; then
 fi
 cd serial
 FC=${FC} CC=${CC} CXX=${CXX} \
- FCFLAGS="${FCFLAGS} -static" CFLAGS="${CFLAGS} -static" CXXFLAGS="${CXXFLAGS} -static" \
+ FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  cmake .. \
  -DLAPACK_LIBRARIES="${LAPACK}" \
  -DBLAS_LIBRARIES="${BLAS}" \
