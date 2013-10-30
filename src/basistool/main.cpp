@@ -227,14 +227,43 @@ int main(int argc, char **argv) {
 
     // Collect elements
     std::vector<ElementBasisSet> els=bas.get_elements();
-    // Add the elements
-    for(size_t iel=0;iel<els.size();iel++) {
-      // Check if element found in system
-      for(size_t iat=0;iat<atoms.size();iat++)
-	if(stricmp(atoms[iat].el,els[iel].get_symbol())==0) {
+    // Loop over atoms in system
+    for(size_t iat=0;iat<atoms.size();iat++) {
+      bool found=false;
+      
+      // First, check if there is a special basis for the atom.
+      for(size_t iel=0;iel<els.size();iel++)
+	if(stricmp(atoms[iat].el,els[iel].get_symbol())==0 && atoms[iat].num == els[iel].get_number()) {
+	  // Yes, add it.
 	  elbas.add_element(els[iel]);
+	  found=true;
 	  break;
 	}
+      
+      // Otherwise, check if a general basis is already in the basis
+      if(!found) {
+	std::vector<ElementBasisSet> added=elbas.get_elements();
+	for(size_t j=0;j<added.size();j++)
+	  if(added[j].get_number()==0 && stricmp(atoms[iat].el,added[j].get_symbol())==0)
+	    found=true;
+      }
+
+      // If general basis not found, add it.
+      if(!found) {
+	for(size_t iel=0;iel<els.size();iel++)
+	  if(stricmp(atoms[iat].el,els[iel].get_symbol())==0 && els[iel].get_number()==0) {
+	    // Yes, add it.
+	    elbas.add_element(els[iel]);
+	    found=true;
+	    break;
+	  }
+      }
+
+      if(!found) {
+	std::ostringstream oss;
+	oss << "Basis set for element " << atoms[iat].el << " does not exist in " << filein << "!\n";
+	throw std::runtime_error(oss.str());
+      }
     }
     elbas.save_gaussian94(fileout);
     
