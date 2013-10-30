@@ -18,7 +18,7 @@
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
 
-std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "savedalton", "sort", "taug"};
+std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "genbas", "savedalton", "sort", "taug"};
 
 
 void help() {
@@ -189,6 +189,7 @@ int main(int argc, char **argv) {
     std::string fileout(argv[3]);
     bas.decontract();
     bas.save_gaussian94(fileout);
+
   } else if(stricmp(cmd,"dump")==0) {
     // Dump wanted element.
 
@@ -208,6 +209,35 @@ int main(int argc, char **argv) {
     BasisSetLibrary elbas;
     elbas.add_element(bas.get_element(el,no));
     elbas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"genbas")==0) {
+    // Generate basis set for xyz file
+
+    if(argc!=5) {
+      printf("\nUsage: %s input.gbs genbas system.xyz output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    // Load atoms from xyz file
+    std::vector<atom_t> atoms=load_xyz(argv[3]);
+    // Output file
+    std::string fileout(argv[4]);
+    // Save output
+    BasisSetLibrary elbas;
+
+    // Collect elements
+    std::vector<ElementBasisSet> els=bas.get_elements();
+    // Add the elements
+    for(size_t iel=0;iel<els.size();iel++) {
+      // Check if element found in system
+      for(size_t iat=0;iat<atoms.size();iat++)
+	if(stricmp(atoms[iat].el,els[iel].get_symbol())==0) {
+	  elbas.add_element(els[iel]);
+	  break;
+	}
+    }
+    elbas.save_gaussian94(fileout);
+    
   } else if(stricmp(cmd,"savedalton")==0) {
     // Save basis in Dalton format
 
