@@ -80,7 +80,6 @@ void stockholder_analysis(const BasisSet & basis, const arma::mat & P, double to
 /// Compute Stockholder analysis
 void stockholder_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
 
-
 /// Compute Bader charges
 arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
 /// Compute Bader charges
@@ -90,6 +89,17 @@ arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma
 void bader_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
 /// Compute Bader analysis
 void bader_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
+
+/// Compute Voronoi charges
+arma::vec voronoi_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
+/// Compute Voronoi charges
+arma::mat voronoi_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
+
+/// Compute Voronoi analysis
+void voronoi_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
+/// Compute Voronoi analysis
+void voronoi_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
+
 
 /**
  * The Mulliken population analysis stuff is based on the book "Simple

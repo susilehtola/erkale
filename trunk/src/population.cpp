@@ -43,6 +43,7 @@ int main(int argc, char **argv) {
   set.add_bool("Lowdin", "Run Löwdin analysis?", false);
   set.add_bool("Hirshfeld", "Run Hirshfeld analysis?", false);
   set.add_bool("Stockholder", "Run Stockholder analysis?", false);
+  set.add_bool("Voronoi", "Run Voronoi analysis?", false);
   set.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
 
   if(argc==2)
@@ -116,6 +117,13 @@ int main(int argc, char **argv) {
       stockholder_analysis(basis,P,tol);
     else
       stockholder_analysis(basis,Pa,Pb,tol);
+  }
+
+  if(set.get_bool("Voronoi")) {
+    if(restr)
+      voronoi_analysis(basis,P,tol);
+    else
+      voronoi_analysis(basis,Pa,Pb,tol);
   }
 
 

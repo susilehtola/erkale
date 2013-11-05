@@ -403,7 +403,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadChk","Checkpoint to load","erkale.chk");
   set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
-  set.add_string("Method","Localization method: FB, FB2, FM, FM2, MU, MU2, LO, LO2, BA, BA2, BE, BE2, HI, HI2, ST, ST2, ER","FB");
+  set.add_string("Method","Localization method: FB, FB2, FM, FM2, MU, MU2, LO, LO2, BA, BA2, BE, BE2, HI, HI2, ST, ST2, VO, VO2, ER","FB");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
   set.add_string("Logfile","File to store output in","");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR, CGHS","CGPR");
@@ -472,6 +472,10 @@ int main(int argc, char **argv) {
     method=PIPEK_STOCKHOLDER;
   else if(stricmp(mets,"ST2")==0)
     method=PIPEK_STOCKHOLDER2;
+  else if(stricmp(mets,"VO")==0)
+    method=PIPEK_VORONOI;
+  else if(stricmp(mets,"VO2")==0)
+    method=PIPEK_VORONOI2;
   else if(stricmp(mets,"ER")==0)
     method=EDMISTON;
   else throw std::runtime_error("Localization method not implemented.\n");
