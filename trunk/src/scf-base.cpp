@@ -2051,11 +2051,34 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       measure=worker.optimize(Ureal,umet,uacc,maxiter);
     else
       measure=worker.optimize(U,umet,uacc,maxiter);
+    
+  } else if(met==PIPEK_MULLIKEN || met==PIPEK_MULLIKEN2 || met==PIPEK_LOWDIN || met==PIPEK_LOWDIN2 ||  met==PIPEK_BADER || met==PIPEK_BADER2 || met==PIPEK_BECKE || met==PIPEK_BECKE2 || met==PIPEK_HIRSHFELD || met==PIPEK_HIRSHFELD2 || met==PIPEK_STOCKHOLDER || met==PIPEK_STOCKHOLDER2) {
 
-  } else if(met==PIPEK_MULLIKEN || met==PIPEK_LOWDIN || met==PIPEK_BADER || met==PIPEK_BECKE || met==PIPEK_HIRSHFELD || met==PIPEK_STOCKHOLDER) {
-    // If only one nucleus - nothing to do
+    // Penalty exponent
+    int p=1;
+    if(met==PIPEK_MULLIKEN2) {
+      met=PIPEK_MULLIKEN;
+      p=2;
+    } else if(met==PIPEK_LOWDIN2) {
+      met=PIPEK_LOWDIN;
+      p=2;
+    } else if(met==PIPEK_BADER2) {
+      met=PIPEK_BADER;
+      p=2;
+    } else if(met==PIPEK_BECKE2) {
+      met=PIPEK_BECKE;
+      p=2;
+    } else if(met==PIPEK_HIRSHFELD2) {
+      met=PIPEK_HIRSHFELD;
+      p=2;
+    } else if(met==PIPEK_STOCKHOLDER2) {
+      met=PIPEK_STOCKHOLDER;
+      p=2;
+    }
+
+    // If only one nucleus - nothing to do!
     if(basis.get_Nnuc()>1) {
-      Pipek worker(met,basis,C,P,Gthr,Fthr,verbose);
+      Pipek worker(met,basis,C,P,p,Gthr,Fthr,verbose);
       if(fname.length()) worker.open_log(fname);
       worker.set_debug(debug);
       if(real)
@@ -2499,10 +2522,19 @@ void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 }
 
 
-Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
+Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, int pv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4*pv,Gth,Fth,!delocalize,ver) {
   // Store used method
   chg=chgv;
   C=Cv;
+  // and penalty exponent
+  p=pv;
+
+  // Check validity of penalty
+  if(chg==PIPEK_BADER2 || chg==PIPEK_BECKE2 || chg==PIPEK_HIRSHFELD2 || chg==PIPEK_LOWDIN2 || chg==PIPEK_MULLIKEN2 || chg==PIPEK_STOCKHOLDER2) {
+    ERROR_INFO();
+    throw std::runtime_error("Penalty exponent must be handled outside Pipek.\n");
+  }
+																		   
 
   Timer t;
   if(ver) {
@@ -2672,18 +2704,37 @@ double Pipek::cost_func(const arma::cx_mat & W) {
 
   double Dinv=0;
 
-  // Compute sum
+  if(p==1) {
+    // Compute sum
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:Dinv) schedule(dynamic,1)
 #endif
-  for(size_t iat=0;iat<N;iat++) {
-    // Helper matrix
-    arma::cx_mat qw=get_charge(iat)*W;
-    for(size_t io=0;io<W.n_cols;io++) {
-      double Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
-      Dinv+=Qa*Qa;
+    for(size_t iat=0;iat<N;iat++) {
+      // Helper matrix
+      arma::cx_mat qw=get_charge(iat)*W;
+      for(size_t io=0;io<W.n_cols;io++) {
+	std::complex<double> Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
+	Dinv+=std::real(Qa*Qa);
+      }
     }
+  } else if(p==2) {
+    // Compute sum
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:Dinv) schedule(dynamic,1)
+#endif
+    for(size_t iat=0;iat<N;iat++) {
+      // Helper matrix
+      arma::cx_mat qw=get_charge(iat)*W;
+      for(size_t io=0;io<W.n_cols;io++) {
+	std::complex<double> Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
+	Dinv+=std::real(Qa*Qa*Qa*Qa);
+      }
+    }
+  } else {
+    ERROR_INFO();
+    throw std::runtime_error("Unimplemented PM penalty.\n");
   }
+
 
   return Dinv;
 }
@@ -2705,38 +2756,80 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
   arma::cx_mat Dder(W.n_cols,W.n_cols);
   Dder.zeros();
 
-  // Compute sum
+  if(p==1) {
+    // Compute sum
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-  {
-
+    {
+      
 #ifdef _OPENMP
-    arma::cx_mat Dwrk(Dder);
+      arma::cx_mat Dwrk(Dder);
 #pragma omp for schedule(dynamic,1)
 #endif
-    for(size_t iat=0;iat<N;iat++) {
-      // Helper matrix
-      arma::cx_mat qw=get_charge(iat)*W;
-
-      for(size_t b=0;b<W.n_cols;b++) {
-	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-
-	for(size_t a=0;a<W.n_cols;a++) {
+      for(size_t iat=0;iat<N;iat++) {
+	// Helper matrix
+	arma::cx_mat qw=get_charge(iat)*W;
+	
+	for(size_t b=0;b<W.n_cols;b++) {
+	  std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+	  
+	  for(size_t a=0;a<W.n_cols;a++) {
 #ifdef _OPENMP
-	  Dwrk(a,b)+=2.0*qwp*qw(a,b);
+	    Dwrk(a,b)+=2.0*qwp*qw(a,b);
 #else
-	  Dder(a,b)+=2.0*qwp*qw(a,b);
+	    Dder(a,b)+=2.0*qwp*qw(a,b);
 #endif
+	  }
 	}
       }
-    }
-
+      
 #ifdef _OPENMP
 #pragma omp critical
-    Dder+=Dwrk;
+      Dder+=Dwrk;
 #endif
+    }
+
+  } else if(p==2) {
+    // Compute sum
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+      
+#ifdef _OPENMP
+      arma::cx_mat Dwrk(Dder);
+#pragma omp for schedule(dynamic,1)
+#endif
+      for(size_t iat=0;iat<N;iat++) {
+	// Helper matrix
+	arma::cx_mat qw=get_charge(iat)*W;
+	
+	for(size_t b=0;b<W.n_cols;b++) {
+	  std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+	  std::complex<double> t=4.0*qwp*qwp*qwp;
+	  
+	  for(size_t a=0;a<W.n_cols;a++) {
+#ifdef _OPENMP
+	    Dwrk(a,b)+=t*qw(a,b);
+#else
+	    Dder(a,b)+=t*qw(a,b);
+#endif
+	  }
+	}
+      }
+      
+#ifdef _OPENMP
+#pragma omp critical
+      Dder+=Dwrk;
+#endif
+    }
+    
+  } else {
+    ERROR_INFO();
+    throw std::runtime_error("Unimplemented PM penalty.\n");
   }
+
 
   return Dder;
 }
@@ -2758,38 +2851,81 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & 
   Dder.zeros(W.n_cols,W.n_cols);
   double D=0;
 
-  // Compute sum
+  if(p==1) {
+    // Compute sum
 #ifdef _OPENMP
 #pragma omp parallel reduction(+:D)
 #endif
-  {
-
+    {
+      
 #ifdef _OPENMP
-    arma::cx_mat Dwrk(Dder);
+      arma::cx_mat Dwrk(Dder);
 #pragma omp for schedule(dynamic,1)
 #endif
-    for(size_t iat=0;iat<N;iat++) {
-      // Helper matrix
-      arma::cx_mat qw=get_charge(iat)*W;
-
-      for(size_t b=0;b<W.n_cols;b++) {
-	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-	D+=std::real(qwp)*std::real(qwp);
-
-	for(size_t a=0;a<W.n_cols;a++) {
+      for(size_t iat=0;iat<N;iat++) {
+	// Helper matrix
+	arma::cx_mat qw=get_charge(iat)*W;
+	
+	for(size_t b=0;b<W.n_cols;b++) {
+	  std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+	  D+=std::real(qwp*qwp);
+	  
+	  for(size_t a=0;a<W.n_cols;a++) {
 #ifdef _OPENMP
-	  Dwrk(a,b)+=2.0*qwp*qw(a,b);
+	    Dwrk(a,b)+=2.0*qwp*qw(a,b);
 #else
-	  Dder(a,b)+=2.0*qwp*qw(a,b);
+	    Dder(a,b)+=2.0*qwp*qw(a,b);
 #endif
+	  }
 	}
       }
-    }
-
+      
 #ifdef _OPENMP
 #pragma omp critical
-    Dder+=Dwrk;
+      Dder+=Dwrk;
 #endif
+    }
+
+  } else if(p==2) {
+
+    // Compute sum
+#ifdef _OPENMP
+#pragma omp parallel reduction(+:D)
+#endif
+    {
+      
+#ifdef _OPENMP
+      arma::cx_mat Dwrk(Dder);
+#pragma omp for schedule(dynamic,1)
+#endif
+      for(size_t iat=0;iat<N;iat++) {
+	// Helper matrix
+	arma::cx_mat qw=get_charge(iat)*W;
+	
+	for(size_t b=0;b<W.n_cols;b++) {
+	  std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+	  std::complex<double> t=4.0*qwp*qwp*qwp;
+	  D+=std::real(qwp*qwp*qwp*qwp);
+	  
+	  for(size_t a=0;a<W.n_cols;a++) {
+#ifdef _OPENMP
+	    Dwrk(a,b)+=t*qw(a,b);
+#else
+	    Dder(a,b)+=t*qw(a,b);
+#endif
+	  }
+	}
+      }
+      
+#ifdef _OPENMP
+#pragma omp critical
+      Dder+=Dwrk;
+#endif
+    }
+
+  } else {
+    ERROR_INFO();
+    throw std::runtime_error("Unimplemented PM penalty.\n");
   }
 
   Dinv=D;
