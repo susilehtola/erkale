@@ -43,6 +43,8 @@ class BaderAtom: public AtomGrid {
   
   /// Classify points into regions. Returns region list
   std::vector<arma::sword> classify(const BasisSet & basis, const arma::mat & P, std::vector<coords_t> & maxima, size_t & ndens, size_t & ngrad);
+  /// Classify points into Voronoi regions. Returns region list
+  std::vector<arma::sword> classify_voronoi(const BasisSet & basis);
 
   /// Integrate charge
   void charge(const BasisSet & basis, const arma::mat & P, const std::vector<arma::sword> & regions, arma::vec & q) const;
@@ -90,6 +92,8 @@ class BaderGrid {
 
   /// Run classification
   void classify(const arma::mat & P);
+  /// Run Voronoi classification
+  void classify_voronoi();
   /// Get amount of regions
   size_t get_Nmax() const;
 

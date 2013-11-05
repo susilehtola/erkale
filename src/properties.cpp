@@ -544,6 +544,23 @@ arma::mat stockholder_charges(const BasisSet & basis, const arma::mat & Pa, cons
   return q;
 }
 
+void bader_analysis(const BasisSet & basis, const arma::mat & P, double tol) {
+  arma::vec q=bader_charges(basis,P,tol);
+  // Add contribution from nuclei
+  q=add_nuclear_charges(basis,q);
+
+  print_analysis(basis,"Bader",q);
+}
+
+void bader_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
+  arma::mat q=bader_charges(basis,Pa,Pb,tol);
+
+  // Add contribution from nuclei
+  q.col(2)=add_nuclear_charges(basis,q.col(2));
+
+  print_analysis(basis,"Bader",q);
+}
+
 arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol) {
   // Helper. Non-verbose operation
   BaderGrid intgrid(&basis,true);
@@ -572,22 +589,51 @@ arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma
   return q;
 }
 
-void bader_analysis(const BasisSet & basis, const arma::mat & P, double tol) {
-  arma::vec q=bader_charges(basis,P,tol);
+void voronoi_analysis(const BasisSet & basis, const arma::mat & P, double tol) {
+  arma::vec q=voronoi_charges(basis,P,tol);
   // Add contribution from nuclei
   q=add_nuclear_charges(basis,q);
 
-  print_analysis(basis,"Bader",q);
+  print_analysis(basis,"Voronoi",q);
 }
 
-void bader_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
-  arma::mat q=bader_charges(basis,Pa,Pb,tol);
+void voronoi_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
+  arma::mat q=voronoi_charges(basis,Pa,Pb,tol);
 
   // Add contribution from nuclei
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
-  print_analysis(basis,"Bader",q);
+  print_analysis(basis,"Voronoi",q);
 }
+
+arma::vec voronoi_charges(const BasisSet & basis, const arma::mat & P, double tol) {
+  // Helper. Non-verbose operation
+  BaderGrid intgrid(&basis,true);
+  // Construct grid
+  intgrid.construct(tol);
+  // and run analysis
+  intgrid.classify_voronoi();
+
+  // Get nuclear charges
+  return intgrid.nuclear_charges(P);
+}
+
+arma::mat voronoi_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
+  // Helper. Non-verbose operation
+  BaderGrid intgrid(&basis,true);
+  // Construct grid
+  intgrid.construct(tol);
+  // and run analysis
+  intgrid.classify_voronoi();
+
+  arma::mat q(basis.get_Nnuc(),3);
+  q.col(0)=intgrid.nuclear_charges(Pa);
+  q.col(1)=intgrid.nuclear_charges(Pb);
+  q.col(2)=q.col(0)+q.col(1);
+
+  return q;
+}
+
 
 void nuclear_analysis(const BasisSet & basis, const arma::mat & P) {
   // Electron density at nuclei

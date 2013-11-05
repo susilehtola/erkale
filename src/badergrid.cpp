@@ -109,6 +109,40 @@ std::vector<arma::sword> BaderAtom::classify(const BasisSet & basis, const arma:
   return region;
 }
 
+std::vector<arma::sword> BaderAtom::classify_voronoi(const BasisSet & basis) {
+  // Returned classifications
+  std::vector<arma::sword> region;
+  region.assign(grid.size(),-1);
+  
+  // Nuclei
+  std::vector<nucleus_t> nuclei=basis.get_nuclei();
+
+  // Loop over points
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t ip=0;ip<grid.size();ip++) {
+    // Compute distance of point to nuclei
+    double mindist=DBL_MAX;
+    size_t minind=-1;
+
+    for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+      // Distance of point to nucleus
+      double dsq=normsq(grid[ip].r-nuclei[inuc].r);
+      // Check if minimal distance is here
+      if( dsq < mindist) {
+	mindist=dsq;
+	minind=inuc;
+      }
+    }
+
+    // Store the region - remember different indexing scheme used here!
+    region[ip]=minind+1;
+  }
+
+  return region;
+}
+
 void BaderAtom::charge(const BasisSet & basis, const arma::mat & P, const std::vector<arma::sword> & region, arma::vec & q) const {
   // Loop over points
 #ifndef _OPENMP
@@ -286,6 +320,34 @@ void BaderGrid::classify(const arma::mat & P) {
 
   printf("Bader analysis done in %s.\nUsed %i density and %i gradient evaluations.\n",t.elapsed().c_str(),(int) denstot, (int) gradtot);
   print_maxima();
+}
+
+void BaderGrid::classify_voronoi() {
+  Timer t;
+
+  // Destroy old classifications
+  regions.clear();
+  regions.resize(grids.size());
+  // and maxima
+  maxima.clear();
+
+  // The maxima are simply the nuclei.
+  for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++)
+    maxima.push_back(basp->get_nuclear_coords(inuc));
+
+  if(verbose) {
+    printf("Running Voronoi classification.\n");
+    fflush(stdout);
+  }
+
+  for(size_t i=0;i<grids.size();i++) {
+    // Form the grid
+    wrk[0].form_grid(*basp,grids[i]);
+    // and run the classification
+    regions[i]=wrk[0].classify_voronoi(*basp);
+  }
+
+  printf("Voronoi analysis done in %s.\n",t.elapsed().c_str());
 }
 
 size_t BaderGrid::get_Nmax() const {

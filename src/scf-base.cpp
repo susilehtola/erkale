@@ -1160,10 +1160,12 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
     for(size_t i=0;i<occvals.size();i++)
       ret[i]=readdouble(occvals[i]);
 
+    /*
     printf("Occupancies\n");
     for(size_t i=0;i<ret.size();i++)
       printf("%.2f ",ret[i]);
     printf("\n");
+    */
   } else {
     // Aufbau principle.
     int Nel=basis.Ztot()-set.get_int("Charge");
@@ -1209,6 +1211,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
       occb[i]=readdouble(occvals[2*i+1]);
     }
 
+    /*
     printf("Occupancies\n");
     printf("alpha\t");
     for(size_t i=0;i<occa.size();i++)
@@ -1217,6 +1220,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     for(size_t i=0;i<occb.size();i++)
       printf("%.2f ",occb[i]);
     printf("\n");
+    */
   } else {
     // Aufbau principle. Get amount of alpha and beta electrons.
 
@@ -2052,7 +2056,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     else
       measure=worker.optimize(U,umet,uacc,maxiter);
     
-  } else if(met==PIPEK_MULLIKEN || met==PIPEK_MULLIKEN2 || met==PIPEK_LOWDIN || met==PIPEK_LOWDIN2 ||  met==PIPEK_BADER || met==PIPEK_BADER2 || met==PIPEK_BECKE || met==PIPEK_BECKE2 || met==PIPEK_HIRSHFELD || met==PIPEK_HIRSHFELD2 || met==PIPEK_STOCKHOLDER || met==PIPEK_STOCKHOLDER2) {
+  } else if(met==PIPEK_MULLIKEN || met==PIPEK_MULLIKEN2 || met==PIPEK_LOWDIN || met==PIPEK_LOWDIN2 ||  met==PIPEK_BADER || met==PIPEK_BADER2 || met==PIPEK_BECKE || met==PIPEK_BECKE2 || met==PIPEK_HIRSHFELD || met==PIPEK_HIRSHFELD2 || met==PIPEK_STOCKHOLDER || met==PIPEK_STOCKHOLDER2 || met==PIPEK_VORONOI || met==PIPEK_VORONOI2) {
 
     // Penalty exponent
     int p=1;
@@ -2073,6 +2077,9 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       p=2;
     } else if(met==PIPEK_STOCKHOLDER2) {
       met=PIPEK_STOCKHOLDER;
+      p=2;
+    } else if(met==PIPEK_VORONOI2) {
+      met=PIPEK_VORONOI;
       p=2;
     }
 
@@ -2530,7 +2537,7 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
   p=pv;
 
   // Check validity of penalty
-  if(chg==PIPEK_BADER2 || chg==PIPEK_BECKE2 || chg==PIPEK_HIRSHFELD2 || chg==PIPEK_LOWDIN2 || chg==PIPEK_MULLIKEN2 || chg==PIPEK_STOCKHOLDER2) {
+  if(chg==PIPEK_BADER2 || chg==PIPEK_BECKE2 || chg==PIPEK_HIRSHFELD2 || chg==PIPEK_LOWDIN2 || chg==PIPEK_MULLIKEN2 || chg==PIPEK_STOCKHOLDER2 || chg==PIPEK_VORONOI2) {
     ERROR_INFO();
     throw std::runtime_error("Penalty exponent must be handled outside Pipek.\n");
   }
@@ -2551,17 +2558,22 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
       printf("Mulliken");
     else if(chg==PIPEK_STOCKHOLDER)
       printf("Stockholder");
+    else if(chg==PIPEK_VORONOI)
+      printf("Voronoi");
     printf(" charges ... ");
     fflush(stdout);
   }
 
-  if(chg==PIPEK_BADER) {
+  if(chg==PIPEK_BADER || chg==PIPEK_VORONOI) {
     // Helper. Non-verbose operation
     bader=BaderGrid(&basis,ver);
     // Construct integration grid
     bader.construct(1e-5);
     // Run classification
-    bader.classify(P);
+    if(chg==PIPEK_BADER)
+      bader.classify(P);
+    else
+      bader.classify_voronoi();
     // Amount of regions
     N=bader.get_Nmax();
 
@@ -2641,7 +2653,7 @@ Pipek::~Pipek() {
 arma::mat Pipek::get_charge(size_t iat) {
   arma::mat Q;
 
-  if(chg==PIPEK_BADER) {
+  if(chg==PIPEK_BADER || chg==PIPEK_VORONOI) {
     arma::mat Sat=bader.regional_overlap(iat);
     Q=arma::trans(C)*Sat*C;
 

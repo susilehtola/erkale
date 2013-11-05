@@ -495,6 +495,10 @@ enum locmet {
   PIPEK_STOCKHOLDER,
   /// Pipek-Mezey, Stockholder charge, penalty p=2
   PIPEK_STOCKHOLDER2,
+  /// Pipek-Mezey, Voronoi charge
+  PIPEK_VORONOI,
+  /// Pipek-Mezey, Voronoi charge, penalty p=2
+  PIPEK_VORONOI2,
   /// Edmiston-Ruedenberg
   EDMISTON
 };
