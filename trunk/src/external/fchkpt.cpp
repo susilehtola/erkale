@@ -620,7 +620,7 @@ int main(int argc, char **argv) {
   print_copyright();
   print_license();
 
-  if(argc>2) {
+  if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);
     return 1;
   }
@@ -635,8 +635,7 @@ int main(int argc, char **argv) {
   set.add_string("SaveChk","Save results to ERKALE checkpoint","");
 
   // Parse settings
-  if(argc==2)
-    set.parse(argv[1]);
+  set.parse(argv[1]);
 
   bool loadfchk=(set.get_string("LoadFchk")!="");
   bool savefchk=(set.get_string("SaveFchk")!="");
