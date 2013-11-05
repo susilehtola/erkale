@@ -42,30 +42,6 @@
 // Compute closed-shell result from open-shell result
 //#define CONSISTENCYCHECK
 
-/* Partitioning functions */
-
-double f_p(double mu) {
-  return 1.5*mu-0.5*mu*mu*mu;
-}
-
-double f_z(double mu, double a) {
-  return f_p(mu/a);
-}
-
-double f_q(double mu, double a) {
-  if(mu<-a)
-    return -1.0;
-  else if(mu<a)
-    return f_z(mu,a);
-  else
-    return 1.0;
-}
-
-double f_s(double mu, double a) {
-  return 0.5*(1.0-f_p(f_p(f_q(mu,a))));
-}
-
-
 void AtomGrid::add_lobatto_shell(atomgrid_t & g, size_t ir) {
   // Add points on ind:th radial shell.
 
