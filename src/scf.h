@@ -473,16 +473,28 @@ enum locmet {
   FM_4,
   /// Pipek-Mezey, Mulliken charge
   PIPEK_MULLIKEN,
+  /// Pipek-Mezey, Mulliken charge, penalty p=2
+  PIPEK_MULLIKEN2,
   /// Pipek-Mezey, Löwdin charge
   PIPEK_LOWDIN,
+  /// Pipek-Mezey, Löwdin charge, penalty p=2
+  PIPEK_LOWDIN2,
   /// Pipek-Mezey, Bader charge
   PIPEK_BADER,
+  /// Pipek-Mezey, Bader charge, penalty p=2
+  PIPEK_BADER2,
   /// Pipek-Mezey, Becke charge
   PIPEK_BECKE,
+  /// Pipek-Mezey, Becke charge, penalty p=2
+  PIPEK_BECKE2,
   /// Pipek-Mezey, Hirshfeld charge
   PIPEK_HIRSHFELD,
+  /// Pipek-Mezey, Hirshfeld charge, penalty p=2
+  PIPEK_HIRSHFELD2,
   /// Pipek-Mezey, Stockholder charge
   PIPEK_STOCKHOLDER,
+  /// Pipek-Mezey, Stockholder charge, penalty p=2
+  PIPEK_STOCKHOLDER2,
   /// Edmiston-Ruedenberg
   EDMISTON
 };
@@ -564,6 +576,9 @@ class Pipek : public Unitary {
   /// Amount of charges
   size_t N;
 
+  /// Penalty exponent
+  int p;
+
   /// Orbitals
   arma::mat C;
   /// Overlap matrix for Mulliken
@@ -584,7 +599,7 @@ class Pipek : public Unitary {
   arma::mat get_charge(size_t i);
 
  public:
-  Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
+  Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, int p=1, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
   ~Pipek();
 
   /// Evaluate cost function

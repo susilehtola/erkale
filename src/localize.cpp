@@ -403,7 +403,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadChk","Checkpoint to load","erkale.chk");
   set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
-  set.add_string("Method","Localization method: FB, FB2, FB3, FB4, FM, FM2, FM3, FM4, MU, LO, BE, HI, ER","FB");
+  set.add_string("Method","Localization method: FB, FB2, FM, FM2, MU, MU2, LO, LO2, BA, BA2, BE, BE2, HI, HI2, ST, ST2, ER","FB");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
   set.add_string("Logfile","File to store output in","");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR, CGHS","CGPR");
@@ -450,16 +450,28 @@ int main(int argc, char **argv) {
     method=FM_4;
   else if(stricmp(mets,"MU")==0)
     method=PIPEK_MULLIKEN;
+  else if(stricmp(mets,"MU2")==0)
+    method=PIPEK_MULLIKEN2;
   else if(stricmp(mets,"LO")==0)
     method=PIPEK_LOWDIN;
+  else if(stricmp(mets,"LO2")==0)
+    method=PIPEK_LOWDIN2;
   else if(stricmp(mets,"BA")==0)
     method=PIPEK_BADER;
+  else if(stricmp(mets,"BA2")==0)
+    method=PIPEK_BADER2;
   else if(stricmp(mets,"BE")==0)
     method=PIPEK_BECKE;
+  else if(stricmp(mets,"BE2")==0)
+    method=PIPEK_BECKE2;
   else if(stricmp(mets,"HI")==0)
     method=PIPEK_HIRSHFELD;
+  else if(stricmp(mets,"HI2")==0)
+    method=PIPEK_HIRSHFELD2;
   else if(stricmp(mets,"ST")==0)
     method=PIPEK_STOCKHOLDER;
+  else if(stricmp(mets,"ST2")==0)
+    method=PIPEK_STOCKHOLDER2;
   else if(stricmp(mets,"ER")==0)
     method=EDMISTON;
   else throw std::runtime_error("Localization method not implemented.\n");
