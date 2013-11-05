@@ -77,18 +77,6 @@ typedef struct {
   std::vector<radshell_t> sh;
 } atomgrid_t;
 
-/// Partitioning function
-double f_q(double mu, double a);
-/// Partitioning function
-double f_z(double mu, double a);
-/// Partitioning function
-double f_s(double mu, double a);
-
-/// Get radial nodes and weights for SG-1 grid
-void SG1_nodes(size_t N, std::vector<double> & r, std::vector<double> & w, int Z);
-/// Get order of spherical integration rule in SG-1 grid
-int SG1_order(double r, int Z);
-
 
 /**
  * \class AtomGrid
@@ -399,5 +387,24 @@ class DFTGrid {
   /// Evaluate force
   arma::vec eval_force(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb);
 };
+
+
+/* Partitioning functions */
+inline double f_p(double mu) {
+  return 1.5*mu-0.5*mu*mu*mu;
+}
+
+inline double f_q(double mu, double a) {
+  if(mu<-a)
+    return -1.0;
+  else if(mu<a)
+    return f_p(mu/a);
+  else
+    return 1.0;
+}
+
+inline double f_s(double mu, double a) {
+  return 0.5*(1.0-f_p(f_p(f_q(mu,a))));
+}
 
 #endif
