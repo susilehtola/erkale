@@ -620,4 +620,16 @@ double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
 
 #include "eriworker.h"
 
+/**
+ * Construct intrinsic atomic orbitals.
+ *
+ * G. Knizia, "Intrinsic Atomic Orbitals: An Unbiased Bridge between
+ * Quantum Theory and Chemical Concepts", J. Chem. Theory
+ * Comput. XXXX, XXX, XXX−XXX. doi: 10.1021/ct400687b.
+ *
+ * The algorithm returns the IAO matrix, and stores the atomic indices
+ * in idx.
+ */
+arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx);
+
 #endif

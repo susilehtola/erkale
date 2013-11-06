@@ -86,6 +86,9 @@ arma::mat orthogonalize(const arma::mat & M);
 /// Unitarize
 arma::cx_mat unitarize(const arma::cx_mat & M);
 
+/// Orthonormalize vectors
+arma::mat orthonormalize(const arma::mat & S, const arma::mat & C);
+
 /// Incomplete Cholesky factorization of matrix M, use n vectors
 arma::mat incomplete_cholesky(const arma::mat & M, size_t n);
 

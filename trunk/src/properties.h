@@ -42,6 +42,14 @@ void lowdin_analysis(const BasisSet & basis, const arma::mat & P);
 /// Löwdin population analysis
 void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
+/// Compute IAO charges
+arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, const arma::mat & P);
+
+/// IAO population analysis
+void IAO_analysis(const BasisSet & basis, const arma::mat & C, const arma::mat & P);
+/// IAO population analysis
+void IAO_analysis(const BasisSet & basis, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb);
+
 /// Compute electron density at nuclei
 arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P);
 

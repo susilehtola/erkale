@@ -162,6 +162,23 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & Pa, const arma::m
   return bond_order(basis,Pa+Pb)+bond_order(basis,Pa-Pb);
 }
 
+void mulliken_analysis(const BasisSet & basis, const arma::mat & P) {
+  // Get charges
+  arma::vec q=mulliken_charges(basis,P);
+  // Add contribution from nuclei
+  q=add_nuclear_charges(basis,q);
+
+  print_analysis(basis,"Mulliken",q);
+}
+
+void mulliken_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
+  // Get charges
+  arma::mat q=mulliken_charges(basis,Pa,Pb);
+  q.col(2)=add_nuclear_charges(basis,q.col(2));
+
+  print_analysis(basis,"Mulliken",q);
+}
+
 arma::vec mulliken_charges(const BasisSet & basis, const arma::mat & P) {
   // Get overlap matrix
   arma::mat S=basis.overlap();
@@ -227,21 +244,23 @@ arma::mat mulliken_charges(const BasisSet & basis, const arma::mat & Pa, const a
   return q;
 }
 
-void mulliken_analysis(const BasisSet & basis, const arma::mat & P) {
+void lowdin_analysis(const BasisSet & basis, const arma::mat & P) {
   // Get charges
-  arma::vec q=mulliken_charges(basis,P);
+  arma::vec q=lowdin_charges(basis,P);
   // Add contribution from nuclei
   q=add_nuclear_charges(basis,q);
 
-  print_analysis(basis,"Mulliken",q);
+  print_analysis(basis,"Löwdin",q);
 }
 
-void mulliken_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
+
+void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
   // Get charges
-  arma::mat q=mulliken_charges(basis,Pa,Pb);
+  arma::mat q=lowdin_charges(basis,Pa,Pb);
+  // Add contribution from nuclei
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
-  print_analysis(basis,"Mulliken",q);
+  print_analysis(basis,"Löwdin",q);
 }
 
 arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P) {
@@ -317,25 +336,53 @@ arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arm
   return q;
 }
 
-void lowdin_analysis(const BasisSet & basis, const arma::mat & P) {
+void IAO_analysis(const BasisSet & basis, const arma::mat & C, const arma::mat & P) {
   // Get charges
-  arma::vec q=lowdin_charges(basis,P);
+  arma::vec q=IAO_charges(basis,C,P);
   // Add contribution from nuclei
   q=add_nuclear_charges(basis,q);
 
-  print_analysis(basis,"Löwdin",q);
+  print_analysis(basis,"IAO",q);
 }
 
 
-void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb) {
+void IAO_analysis(const BasisSet & basis, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb) {
   // Get charges
-  arma::mat q=lowdin_charges(basis,Pa,Pb);
-  // Add contribution from nuclei
-  q.col(2)=add_nuclear_charges(basis,q.col(2));
+  arma::vec qa=IAO_charges(basis,Ca,Pa);
+  arma::vec qb=IAO_charges(basis,Cb,Pb);
 
-  print_analysis(basis,"Löwdin",q);
+  arma::mat q(qa.n_elem,3);
+  q.col(0)=qa;
+  q.col(1)=qb;
+  // Add contribution from nuclei
+  q.col(2)=add_nuclear_charges(basis,q.col(0)+q.col(1));
+
+  print_analysis(basis,"IAO",q);
 }
 
+arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, const arma::mat & P) {
+  // Get overlap matrix
+  arma::mat S=basis.overlap();
+
+  // Get IAO orbitals
+  std::vector< std::vector<size_t> > idx;
+  arma::mat iao=construct_IAO(basis,C,idx);
+
+  arma::vec q(basis.get_Nnuc());
+  q.zeros();
+
+  // Loop over nuclei
+  for(size_t ii=0;ii<basis.get_Nnuc();ii++)
+    // Loop over functions on nucleus
+    for(size_t fi=0;fi<idx[ii].size();fi++) {
+      // IAO orbital index is
+      size_t io=idx[ii][fi];
+
+      q(ii)-=arma::as_scalar(arma::trans(iao.col(io))*S*P*S*iao.col(io));
+    }
+  
+  return q;
+}
 
 arma::vec nuclear_density(const BasisSet & basis, const arma::mat & P) {
   arma::vec ret(basis.get_Nnuc());
