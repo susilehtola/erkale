@@ -67,15 +67,16 @@ arma::mat CholeskyOrth(const arma::mat & S) {
 }
 
 arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval) {
-  // Compute matrix filled with inverse eigenvalues
-  const size_t Nbf=Svec.n_rows;
-  arma::mat invval(Nbf,Nbf);
-  invval.zeros();
-  for(size_t i=0;i<Nbf;i++)
-    invval(i,i)=1.0/sqrt(Sval(i));
+  // Compute inverse roots of eigenvalues
+  arma::vec Sinvh(Sval);
+  for(size_t i=0;i<Sinvh.n_elem;i++)
+    if(Sinvh(i)>=LINTHRES)
+      Sinvh(i)=1/sqrt(Sinvh(i));
+    else
+      Sinvh(i)=0.0;
 
   // Returned matrix is
-  return Svec*invval*trans(Svec);
+  return Svec*arma::diagmat(Sinvh)*trans(Svec);
 }
 
 arma::mat SymmetricOrth(const arma::mat & S) {
@@ -419,6 +420,19 @@ arma::cx_mat unitarize(const arma::cx_mat & M) {
 
   // Return matrix with singular values set to unity
   return U*arma::trans(V);
+}
+
+arma::mat orthonormalize(const arma::mat & S, const arma::mat & C) {
+  // Compute MO overlap
+  arma::mat MOovl=arma::trans(C)*S*C;
+
+  // Perform eigendecomposition
+  arma::vec Cval;
+  arma::mat Cvec;
+  eig_sym_ordered(Cval,Cvec,MOovl);
+
+  // Return orthonormalized vectors
+  return C*SymmetricOrth(Cvec,Cval);
 }
 
 arma::mat incomplete_cholesky(const arma::mat & M, size_t n) {

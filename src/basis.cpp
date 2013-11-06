@@ -2674,16 +2674,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   }
 
   // Assure that orbitals are orthonormal
-  for(size_t i=0;i<Nmo;i++) {
-    // Remove overlap with other orbitals
-    for(size_t j=0;j<i;j++) {
-      MOs.col(i)-=arma::as_scalar(arma::trans(MOs.col(j))*S11*MOs.col(i))*MOs.col(j);
-    }
-    // Calculate norm
-    double norm=sqrt(arma::as_scalar(arma::trans(MOs.col(i))*S11*MOs.col(i)));
-    // Normalize
-    MOs.col(i)/=norm;
-  }
+  orthonormalize(S11,MOs);
 
   // If the old basis had less functions than the new basis, then we
   // need to form the rest of the orbitals. To do this we consider all
@@ -3426,4 +3417,62 @@ double check_orth(const arma::mat & C, const arma::mat & S, bool verbose) {
   }
 
   return maxerr;
+}
+
+arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx) {
+  // Get minao library
+  BasisSetLibrary minao;
+  minao.load_gaussian94("MINAO.gbs");
+  // Default settings
+  Settings set;
+  set.add_scf_settings();
+
+  // Construct minimal basis set
+  BasisSet minbas=construct_basis(basis.get_nuclei(),minao,set);
+
+  // Get indices
+  idx.clear();
+  idx.resize(minbas.get_Nnuc());
+  for(size_t inuc=0;inuc<minbas.get_Nnuc();inuc++) {
+    // Get shells on nucleus
+    std::vector<GaussianShell> sh=minbas.get_funcs(inuc);
+    // Store indices
+    for(size_t si=0;si<sh.size();si++)
+      for(size_t fi=0;fi<sh[si].get_Nbf();fi++)
+	idx[inuc].push_back(sh[si].get_first_ind()+fi);
+  }
+
+  // Calculate S1, S12, S2, and S21
+  arma::mat S1=basis.overlap();
+  arma::mat S2=minbas.overlap();
+
+  arma::mat S12=basis.overlap(minbas);
+  arma::mat S21=arma::trans(S12);
+
+  // and inverse matrices
+  arma::mat S1inv_h=BasOrth(S1,set);
+  arma::mat S2inv_h=BasOrth(S2,set);
+  // Need to be OK for canonical as well
+  arma::mat S1inv=S1inv_h*arma::trans(S1inv_h);
+  arma::mat S2inv=S2inv_h*arma::trans(S2inv_h);
+
+  // Compute Ctilde.
+  arma::mat Ctilde=S1inv*S12*S2inv*S21*C;
+
+  // and orthonormalize it
+  Ctilde=orthonormalize(S1,Ctilde);
+
+  // "Density matrices"
+  arma::mat P=C*arma::trans(C);
+  arma::mat Pt=Ctilde*arma::trans(Ctilde);
+
+  // Identity matrix
+  arma::mat unit(S1);
+  unit.eye();
+  
+  // Compute the non-orthonormal IAOs.
+  arma::mat A=P*S1*Pt*S12 + (unit-P*S1)*(unit-Pt*S1)*S1inv*S12;
+
+  // and orthonormalize them
+  return orthonormalize(S1,A);
 }
