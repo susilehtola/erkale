@@ -349,36 +349,20 @@ void load_fchk(const Settings & set, double tol) {
     fflush(stdout);
     t.set();
 
+    // Compute deviation from orthonormality
+    double Camax=arma::max(arma::abs(arma::diagvec(arma::trans(Ca)*S*Ca)-1.0));
+    
     // Compute Ca overlap
-    arma::mat CSC=arma::trans(Ca)*S*Ca;
-
-    // Find eigenvectors
-    arma::vec eval;
-    arma::mat evec;
-    eig_sym_ordered(eval,evec,CSC);
-
-    // Construct transformation matrix
-    arma::mat U(CSC);
-    U.zeros();
-    for(size_t io=0;io<eval.n_elem;io++)
-      U+=evec.col(io)*arma::trans(evec.col(io))/sqrt(eval(io));
-    // Rotate Ca by eigenvectors
-    Ca=Ca*U;
-
-    double Camax=arma::max(arma::abs(diagvec(CSC)-1.0));
+    Ca=orthonormalize(S,Ca);
 
     if(restr)
       printf("done (%s).\nMaximum deviation from orthonormality was %e.\n",t.elapsed().c_str(),Camax);
+
     else {
-      CSC=arma::trans(Cb)*S*Cb;
-      eig_sym_ordered(eval,evec,CSC);
-      U.zeros();
-      for(size_t io=0;io<eval.n_elem;io++)
-	U+=evec.col(io)*arma::trans(evec.col(io))/sqrt(eval(io));
-      Cb=Cb*U;
+      double Cbmax=arma::max(arma::abs(arma::diagvec(arma::trans(Cb)*S*Cb)-1.0));
 
-      double Cbmax=arma::max(arma::abs(diagvec(CSC)-1.0));
-
+      Cb=orthonormalize(S,Cb);
+      
       printf("done (%s).\nMaximum deviation from orthonormality was %e %e.\n",t.elapsed().c_str(),Camax,Cbmax);
     }
   }
