@@ -630,6 +630,6 @@ double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
  * The algorithm returns the IAO matrix, and stores the atomic indices
  * in idx.
  */
-arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx);
+arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, std::string minbas="MINAO.gbs");
 
 #endif
