@@ -28,7 +28,9 @@ int get_Z(std::string el) {
       return Z;
 
   ERROR_INFO();
-  throw std::runtime_error("Element not found in element library!\n");
+  std::ostringstream oss;
+  oss << "Element \"" << el << "\" not found in element library!\n";
+  throw std::runtime_error(oss.str());
 
   // Not found, return dummy charge.
   return 0;
