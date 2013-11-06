@@ -485,6 +485,7 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
     // Compute density and gradient
     compute_density_gradient(P,basis,r,d,g);
     double gnorm=arma::norm(g,2);
+    fflush(stdout);
     ndens++; ngrad++;
      
     // Normalize gradient and perform line search
@@ -502,7 +503,7 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
     rv(0)=r.x; rv(1)=r.y; rv(2)=r.z;
     // and the closest nucleus
     double mindist=arma::norm(rv-nuccoord.row(0),2);
-    arma::vec closenuc=nuccoord.row(0);
+    arma::rowvec closenuc=nuccoord.row(0);
     for(size_t i=1;i<nuccoord.n_rows;i++) {
       double t=arma::norm(rv-nuccoord.row(i),2);
       if(t<mindist) {
