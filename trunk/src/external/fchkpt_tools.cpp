@@ -25,6 +25,7 @@
 
 #include "basis.h"
 #include "checkpoint.h"
+#include "elements.h"
 #include "mathf.h"
 #include "storage.h"
 #include "stringutil.h"
@@ -625,6 +626,7 @@ BasisSet form_basis(const Storage & stor) {
     nuc.Z=nuctypes[i];
     nuc.ind=i;
     nuc.bsse=false;
+    nuc.symbol=element_symbols[nuc.Z];
 
     bas.add_nucleus(nuc);
   }
