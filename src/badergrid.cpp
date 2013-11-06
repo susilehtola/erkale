@@ -336,7 +336,7 @@ void BaderGrid::classify_voronoi() {
     maxima.push_back(basp->get_nuclear_coords(inuc));
 
   if(verbose) {
-    printf("Running Voronoi classification.\n");
+    printf("Running Voronoi classification ... ");
     fflush(stdout);
   }
 
@@ -347,7 +347,8 @@ void BaderGrid::classify_voronoi() {
     regions[i]=wrk[0].classify_voronoi(*basp);
   }
 
-  printf("Voronoi analysis done in %s.\n",t.elapsed().c_str());
+  printf("done (%s).\n",t.elapsed().c_str());
+  fflush(stdout);
 }
 
 size_t BaderGrid::get_Nmax() const {
