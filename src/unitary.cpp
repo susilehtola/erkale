@@ -809,6 +809,12 @@ double bracket(const arma::cx_mat & X, const arma::cx_mat & Y) {
 }
 
 arma::cx_mat companion_matrix(const arma::cx_vec & c) {
+  if(c.size()<=1) {
+    // Dummy return
+    arma::cx_mat dum;
+    return dum;
+  }
+
   // Form companion matrix
   size_t N=c.size()-1;
   if(c(N)==0.0) {
@@ -823,8 +829,9 @@ arma::cx_mat companion_matrix(const arma::cx_vec & c) {
   for(size_t j=0;j<N;j++)
     companion(0,j)=-c(N-(j+1))/c(N);
   // Fill out the unit matrix part
-  companion.submat(1,0,N-1,N-2).eye();
-
+  for(size_t j=1;j<N;j++)
+    companion(j,j-1)=1.0;
+  
   return companion;
 }
 
