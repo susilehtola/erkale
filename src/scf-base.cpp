@@ -2056,7 +2056,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     else
       measure=worker.optimize(U,umet,uacc,maxiter);
     
-  } else if(met==PIPEK_MULLIKEN || met==PIPEK_MULLIKEN2 || met==PIPEK_LOWDIN || met==PIPEK_LOWDIN2 ||  met==PIPEK_BADER || met==PIPEK_BADER2 || met==PIPEK_BECKE || met==PIPEK_BECKE2 || met==PIPEK_HIRSHFELD || met==PIPEK_HIRSHFELD2 || met==PIPEK_STOCKHOLDER || met==PIPEK_STOCKHOLDER2 || met==PIPEK_VORONOI || met==PIPEK_VORONOI2) {
+  } else if(met==PIPEK_MULLIKEN || met==PIPEK_MULLIKEN2 || met==PIPEK_LOWDIN || met==PIPEK_LOWDIN2 ||  met==PIPEK_BADER || met==PIPEK_BADER2 || met==PIPEK_BECKE || met==PIPEK_BECKE2 || met==PIPEK_HIRSHFELD || met==PIPEK_HIRSHFELD2 || met==PIPEK_IAO || met==PIPEK_IAO2 || met==PIPEK_STOCKHOLDER || met==PIPEK_STOCKHOLDER2 || met==PIPEK_VORONOI || met==PIPEK_VORONOI2) {
 
     // Penalty exponent
     int p=1;
@@ -2074,6 +2074,9 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       p=2;
     } else if(met==PIPEK_HIRSHFELD2) {
       met=PIPEK_HIRSHFELD;
+      p=2;
+    } else if(met==PIPEK_IAO2) {
+      met=PIPEK_IAO;
       p=2;
     } else if(met==PIPEK_STOCKHOLDER2) {
       met=PIPEK_STOCKHOLDER;
@@ -2537,7 +2540,7 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
   p=pv;
 
   // Check validity of penalty
-  if(chg==PIPEK_BADER2 || chg==PIPEK_BECKE2 || chg==PIPEK_HIRSHFELD2 || chg==PIPEK_LOWDIN2 || chg==PIPEK_MULLIKEN2 || chg==PIPEK_STOCKHOLDER2 || chg==PIPEK_VORONOI2) {
+  if(chg==PIPEK_BADER2 || chg==PIPEK_BECKE2 || chg==PIPEK_HIRSHFELD2 || chg==PIPEK_IAO2 || chg==PIPEK_LOWDIN2 || chg==PIPEK_MULLIKEN2 || chg==PIPEK_STOCKHOLDER2 || chg==PIPEK_VORONOI2) {
     ERROR_INFO();
     throw std::runtime_error("Penalty exponent must be handled outside Pipek.\n");
   }
@@ -2552,6 +2555,8 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
       printf("Becke");
     else if(chg==PIPEK_HIRSHFELD)
       printf("Hirshfeld");
+    else if(chg==PIPEK_IAO)
+      printf("IAO");
     else if(chg==PIPEK_LOWDIN)
       printf("Löwdin");
     else if(chg==PIPEK_MULLIKEN)
@@ -2596,6 +2601,18 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     grid=DFTGrid(&basis,ver);
     // Construct integration grid
     grid.construct_hirshfeld(hirsh,1e-5);
+
+  } else if(chg==PIPEK_IAO) {
+    // Amount of regions
+    N=basis.get_Nnuc();
+
+    basis.print();
+
+    // Construct IAO orbitals
+    C_iao=construct_IAO(basis,C,idx_iao);
+
+    // Also need overlap matrix
+    S=basis.overlap();
 
   } else if(chg==PIPEK_STOCKHOLDER) {
     // Amount of regions
@@ -2660,10 +2677,23 @@ arma::mat Pipek::get_charge(size_t iat) {
   } else if(chg==PIPEK_BECKE) {
     arma::mat Sat=grid.eval_overlap(iat);
     Q=arma::trans(C)*Sat*C;
-
+ 
   } else if(chg==PIPEK_HIRSHFELD || chg==PIPEK_STOCKHOLDER) {
     arma::mat Sat=grid.eval_hirshfeld_overlap(hirsh,iat);
     Q=arma::trans(C)*Sat*C;
+
+  } else if(chg==PIPEK_IAO) {
+
+    // Construct IAO density matrix
+    arma::mat Piao(C.n_rows, C.n_rows);
+    Piao.zeros();
+    for(size_t fi=0;fi<idx_iao[iat].size();fi++) {
+      // Index of IAO is
+      size_t io=idx_iao[iat][fi];
+      // Add to IAO density
+      Piao+=C_iao.col(io)*arma::trans(C_iao.col(io));
+    }
+    Q=arma::trans(C)*S*Piao*S*C;
 
   } else if(chg==PIPEK_LOWDIN) {
     Q.zeros(C.n_cols,C.n_cols);

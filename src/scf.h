@@ -491,6 +491,10 @@ enum locmet {
   PIPEK_HIRSHFELD,
   /// Pipek-Mezey, Hirshfeld charge, penalty p=2
   PIPEK_HIRSHFELD2,
+  /// Pipek-Mezey, intrinsic atomic orbital charge
+  PIPEK_IAO,
+  /// Pipek-Mezey, intrinsic atomic orbital charge, penalty p=2
+  PIPEK_IAO2,
   /// Pipek-Mezey, Stockholder charge
   PIPEK_STOCKHOLDER,
   /// Pipek-Mezey, Stockholder charge, penalty p=2
@@ -598,6 +602,11 @@ class Pipek : public Unitary {
   Hirshfeld hirsh;
   /// Bader localization grid
   BaderGrid bader;
+
+  /// Free-atom AOs for IAO localization
+  arma::mat C_iao;
+  /// Indices of centers for IAO localization
+  std::vector< std::vector<size_t> > idx_iao;
 
   /// Get the charge matrix for the i:th region
   arma::mat get_charge(size_t i);

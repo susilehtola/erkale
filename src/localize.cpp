@@ -403,7 +403,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadChk","Checkpoint to load","erkale.chk");
   set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
-  set.add_string("Method","Localization method: FB, FB2, FM, FM2, MU, MU2, LO, LO2, BA, BA2, BE, BE2, HI, HI2, ST, ST2, VO, VO2, ER","FB");
+  set.add_string("Method","Localization method: FB, FB2, FM, FM2, MU, MU2, LO, LO2, BA, BA2, BE, BE2, HI, HI2, IAO, IAO2, ST, ST2, VO, VO2, ER","FB");
   set.add_bool("Virtual","Localize virtual orbitals as well?",false);
   set.add_string("Logfile","File to store output in","");
   set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR, CGHS","CGPR");
@@ -468,6 +468,10 @@ int main(int argc, char **argv) {
     method=PIPEK_HIRSHFELD;
   else if(stricmp(mets,"HI2")==0)
     method=PIPEK_HIRSHFELD2;
+  else if(stricmp(mets,"IAO")==0)
+    method=PIPEK_IAO;
+  else if(stricmp(mets,"IAO2")==0)
+    method=PIPEK_IAO2;
   else if(stricmp(mets,"ST")==0)
     method=PIPEK_STOCKHOLDER;
   else if(stricmp(mets,"ST2")==0)
