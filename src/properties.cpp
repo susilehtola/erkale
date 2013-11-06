@@ -336,9 +336,9 @@ arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arm
   return q;
 }
 
-void IAO_analysis(const BasisSet & basis, const arma::mat & C, const arma::mat & P) {
+void IAO_analysis(const BasisSet & basis, const arma::mat & C, const arma::mat & P, std::string minbas) {
   // Get charges
-  arma::vec q=IAO_charges(basis,C,P);
+  arma::vec q=IAO_charges(basis,C,P,minbas);
   // Add contribution from nuclei
   q=add_nuclear_charges(basis,q);
 
@@ -346,10 +346,10 @@ void IAO_analysis(const BasisSet & basis, const arma::mat & C, const arma::mat &
 }
 
 
-void IAO_analysis(const BasisSet & basis, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb) {
+void IAO_analysis(const BasisSet & basis, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb, std::string minbas) {
   // Get charges
-  arma::vec qa=IAO_charges(basis,Ca,Pa);
-  arma::vec qb=IAO_charges(basis,Cb,Pb);
+  arma::vec qa=IAO_charges(basis,Ca,Pa,minbas);
+  arma::vec qb=IAO_charges(basis,Cb,Pb,minbas);
 
   arma::mat q(qa.n_elem,3);
   q.col(0)=qa;
@@ -360,13 +360,13 @@ void IAO_analysis(const BasisSet & basis, const arma::mat & Ca, const arma::mat 
   print_analysis(basis,"IAO",q);
 }
 
-arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, const arma::mat & P) {
+arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, const arma::mat & P, std::string minbas) {
   // Get overlap matrix
   arma::mat S=basis.overlap();
 
   // Get IAO orbitals
   std::vector< std::vector<size_t> > idx;
-  arma::mat iao=construct_IAO(basis,C,idx);
+  arma::mat iao=construct_IAO(basis,C,idx,minbas);
 
   arma::vec q(basis.get_Nnuc());
   q.zeros();

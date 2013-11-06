@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
   set.add_bool("Mulliken", "Run Mulliken analysis?", false);
   set.add_bool("Lowdin", "Run Löwdin analysis?", false);
   set.add_bool("IAO", "Run Intrinsic Atomic Orbital analysis?", false);
+  set.add_string("IAOBasis", "Minimal basis set for IAO analysis", "MINAO.gbs");
   set.add_bool("Hirshfeld", "Run Hirshfeld analysis?", false);
   set.add_bool("Stockholder", "Run Stockholder analysis?", false);
   set.add_bool("Voronoi", "Run Voronoi analysis?", false);
@@ -100,6 +101,8 @@ int main(int argc, char **argv) {
   }
 
   if(set.get_bool("IAO")) {
+    std::string minbas=set.get_string("IAOBasis");
+
     if(restr) {
       // Get amount of occupied orbitals
       int Nela;
@@ -110,7 +113,7 @@ int main(int argc, char **argv) {
       chkpt.read("C",C);
       
       // Do analysis
-      IAO_analysis(basis,C.submat(0,0,C.n_rows-1,Nela-1),P);
+      IAO_analysis(basis,C.submat(0,0,C.n_rows-1,Nela-1),P,minbas);
     } else {
       // Get amount of occupied orbitals
       int Nela, Nelb;
@@ -123,7 +126,7 @@ int main(int argc, char **argv) {
       chkpt.read("Cb",Cb);
       
       // Do analysis
-      IAO_analysis(basis,Ca.submat(0,0,Ca.n_rows-1,Nela-1),Cb.submat(0,0,Cb.n_rows-1,Nelb-1),Pa,Pb);
+      IAO_analysis(basis,Ca.submat(0,0,Ca.n_rows-1,Nela-1),Cb.submat(0,0,Cb.n_rows-1,Nelb-1),Pa,Pb,minbas);
     }
   }
 
