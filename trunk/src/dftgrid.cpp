@@ -42,6 +42,11 @@
 // Compute closed-shell result from open-shell result
 //#define CONSISTENCYCHECK
 
+bool operator<(const dens_list_t &lhs, const dens_list_t & rhs) {
+  // Sort in decreasing order
+  return lhs.d > rhs.d;
+}
+
 void AtomGrid::add_lobatto_shell(atomgrid_t & g, size_t ir) {
   // Add points on ind:th radial shell.
 
@@ -519,19 +524,14 @@ void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl,
   }
 }
 
-double AtomGrid::eval_dens_cutoff(const arma::mat & P, double cutoff) const {
-  // Total amount
-  double tot=0.0;
-
+void AtomGrid::eval_dens(const arma::mat & P, std::vector<dens_list_t> & list) const {
   for(size_t ip=0;ip<grid.size();ip++) {
     // Get density at grid point
-    double d=eval_dens(P,ip);
-    // Increment total
-    if(d>=cutoff)
-      tot+=grid[ip].w*d;
+    dens_list_t hlp;
+    hlp.d=eval_dens(P,ip);
+    hlp.w=grid[ip].w;
+    list.push_back(hlp);
   }
-
-  return tot;
 }
 
 double AtomGrid::compute_Nel() const {
@@ -2998,16 +2998,17 @@ std::vector<arma::mat> DFTGrid::eval_hirshfeld_overlaps(const Hirshfeld & hirsh)
   return Sat;
 }
 
-double DFTGrid::eval_dens_cutoff(const arma::mat & P, double cutoff) {
-  double Nel=0.0;
+std::vector<dens_list_t> DFTGrid::eval_dens_list(const arma::mat & P) {
+  std::vector<dens_list_t> list;
 
 #ifdef _OPENMP
-#pragma omp parallel reduction(+:Nel)
+#pragma omp parallel
 #endif
   {
 
 #ifdef _OPENMP
     int ith=omp_get_thread_num();
+    std::vector<dens_list_t> hlp;
 #else
     int ith=0;
 #endif
@@ -3021,14 +3022,27 @@ double DFTGrid::eval_dens_cutoff(const arma::mat & P, double cutoff) {
       wrk[ith].form_grid(*basp,grids[inuc]);
       // Compute basis functions
       wrk[ith].compute_bf(*basp,grids[inuc]);
-      // Integrate electrons
-      Nel+=wrk[ith].eval_dens_cutoff(P,cutoff);
+
+#ifndef _OPENMP
+      // Compute density
+      wrk[ith].eval_dens(P,list);
+#else
+      // Compute helper
+      hlp.clear();
+      wrk[ith].eval_dens(P,hlp);
+#pragma omp critical
+      // Add to full list
+      list.insert(list.end(),hlp.begin(),hlp.end());
+#endif
       // Free memory
       wrk[ith].free();
     }
   }
 
-  return Nel;
+  // Sort the list
+  std::sort(list.begin(),list.end());
+  
+  return list;
 }
 
 double DFTGrid::compute_Nel(const arma::mat & P) {

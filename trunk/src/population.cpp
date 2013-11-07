@@ -26,47 +26,21 @@
 #endif
 
 double compute_threshold(DFTGrid & intgrid, const arma::mat & Po, double thr) {
-  // Binary search
-  double lt=0.1;
-  double rt=0.4;
+  // Get the list of orbital density values
+  std::vector<dens_list_t> list=intgrid.eval_dens_list(Po);
 
-  // Check lt is ok
-  double lval;
-  while((lval=intgrid.eval_dens_cutoff(Po,lt)) < thr) {
-    rt=lt;
-    lt/=2.0;
-    //    printf("lt decreased, lval=%e\n",lval);
+  // Get cutoff
+  double itg=0.0;
+  size_t idx=0;
+  while(itg<thr && idx<list.size()) {
+    // Increment integral
+    itg+=list[idx].d*list[idx].w;
+    // Increment index
+    idx++;
   }
 
-  // Check rt is ok
-  double rval;
-  while((rval=intgrid.eval_dens_cutoff(Po,rt)) > thr) {
-    lt=rt;
-    rt*=2.0;
-    //    printf("rt increased, rval=%e\n",rval);
-  }
-
-  // Binary search algorithm. Relative accuracy of 1e-3
-  while(rt-lt > 1e-3*(rt+lt)) {
-    // Middle value
-    double mt=(rt+lt)/2.0;
-    double mval=intgrid.eval_dens_cutoff(Po,mt);
-
-    //    printf("mt = %e, mval = %e, acc = %e\n",mt,mval,(rt-lt)/(rt+mt));
-
-    if(mval>thr)
-      lt=mt;
-    else if(mval<thr)
-      rt=mt;
-    else {
-      rt=mt;
-      lt=mt;
-      break;
-    }
-  }
-
-  // Convert to orbital value
-  return sqrt((rt+lt)/2.0);
+  // Cutoff is thus between idx and idx-1. Convert to orbital value
+  return sqrt((list[idx].d+list[idx-1].d)/2.0);
 }
 
 
