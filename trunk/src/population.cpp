@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
       arma::mat C;
       chkpt.read("C",C);
 
-      printf("\n%4s %8s %8s\n","orb","thr","t (s)");
+      printf("\n%4s %9s %8s\n","orb","thr","t (s)");
       for(int io=0;io<Nela;io++) {
 	Timer t;
 	
@@ -234,7 +234,7 @@ int main(int argc, char **argv) {
 	double val=compute_threshold(intgrid,Po,thr);
 
 	// Print out orbital threshold
-	printf("%4i %8.3e %f\n", io+1, val, t.get());
+	printf("%4i %8.3e %8.3f\n", io+1, val, t.get());
       }
 
     } else {
@@ -248,7 +248,7 @@ int main(int argc, char **argv) {
       chkpt.read("Ca",Ca);
       chkpt.read("Cb",Cb);
 
-      printf("\n%4s %8s %8s %8s\n","orb","thr-a","thr-b","t (s)");
+      printf("\n%4s %9s %9s %8s\n","orb","thr-a","thr-b","t (s)");
       for(int io=0;io<Nela;io++) {
 	Timer t;
 
@@ -261,10 +261,10 @@ int main(int argc, char **argv) {
 	  double valb=compute_threshold(intgrid,Po,thr);
 	  
 	  // Print out orbital threshold
-	  printf("%4i %8.3e %8.3e %f\n", io+1, vala, valb, t.get());
+	  printf("%4i %8.3e %8.3e %8.3f\n", io+1, vala, valb, t.get());
 
 	} else 
-	  printf("%4i %8.3e %8s %f\n", io+1, vala, "****", t.get());
+	  printf("%4i %8.3e %9s %8.3f\n", io+1, vala, "****", t.get());
       }
       
     }
