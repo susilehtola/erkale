@@ -77,6 +77,17 @@ typedef struct {
   std::vector<radshell_t> sh;
 } atomgrid_t;
 
+/// Helper for determining density cutoffs for plots
+typedef struct {
+  /// Density at point
+  double d;
+  /// Integration weight
+  double w;
+} dens_list_t;
+
+/// Helper for sort
+bool operator<(const dens_list_t & lhs, const dens_list_t & rhs);
+
 
 /**
  * \class AtomGrid
@@ -261,8 +272,8 @@ class AtomGrid {
   /// Evaluate laplacian of density and kinetic density at a point
   void eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl, double & kin) const;
 
-  /// Evaluate integral of density with given cutoff
-  double eval_dens_cutoff(const arma::mat & P, double cutoff) const;
+  /// Evaluate density
+  void eval_dens(const arma::mat & P, std::vector<dens_list_t> & d) const;
 
   /// Compute number of electrons
   double compute_Nel() const;
@@ -385,8 +396,8 @@ class DFTGrid {
   /// Evaluate overlap matrices numerically
   std::vector<arma::mat> eval_hirshfeld_overlaps(const Hirshfeld & hirsh);
 
-  /// Evaluate density with given cutoff
-  double eval_dens_cutoff(const arma::mat & P, double cutoff);
+  /// Evaluate density
+  std::vector<dens_list_t> eval_dens_list(const arma::mat & P);
 
   /// Evaluate force
   arma::vec eval_force(int x_func, int c_func, const arma::mat & P);
