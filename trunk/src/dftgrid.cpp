@@ -519,6 +519,21 @@ void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl,
   }
 }
 
+double AtomGrid::eval_dens_cutoff(const arma::mat & P, double cutoff) const {
+  // Total amount
+  double tot=0.0;
+
+  for(size_t ip=0;ip<grid.size();ip++) {
+    // Get density at grid point
+    double d=eval_dens(P,ip);
+    // Increment total
+    if(d>=cutoff)
+      tot+=grid[ip].w*d;
+  }
+
+  return tot;
+}
+
 double AtomGrid::compute_Nel() const {
   double nel=0.0;
 
@@ -2981,6 +2996,39 @@ std::vector<arma::mat> DFTGrid::eval_hirshfeld_overlaps(const Hirshfeld & hirsh)
   }
 
   return Sat;
+}
+
+double DFTGrid::eval_dens_cutoff(const arma::mat & P, double cutoff) {
+  double Nel=0.0;
+
+#ifdef _OPENMP
+#pragma omp parallel reduction(+:Nel)
+#endif
+  {
+
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    // Loop over integral grid
+    for(size_t inuc=0;inuc<grids.size();inuc++) {
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[inuc]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[inuc]);
+      // Integrate electrons
+      Nel+=wrk[ith].eval_dens_cutoff(P,cutoff);
+      // Free memory
+      wrk[ith].free();
+    }
+  }
+
+  return Nel;
 }
 
 double DFTGrid::compute_Nel(const arma::mat & P) {

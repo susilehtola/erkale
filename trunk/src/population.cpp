@@ -25,6 +25,51 @@
 #include <omp.h>
 #endif
 
+double compute_threshold(DFTGrid & intgrid, const arma::mat & Po, double thr) {
+  // Binary search
+  double lt=0.1;
+  double rt=0.4;
+
+  // Check lt is ok
+  double lval;
+  while((lval=intgrid.eval_dens_cutoff(Po,lt)) < thr) {
+    rt=lt;
+    lt/=2.0;
+    //    printf("lt decreased, lval=%e\n",lval);
+  }
+
+  // Check rt is ok
+  double rval;
+  while((rval=intgrid.eval_dens_cutoff(Po,rt)) > thr) {
+    lt=rt;
+    rt*=2.0;
+    //    printf("rt increased, rval=%e\n",rval);
+  }
+
+  // Binary search algorithm. Relative accuracy of 1e-3
+  while(rt-lt > 1e-3*(rt+lt)) {
+    // Middle value
+    double mt=(rt+lt)/2.0;
+    double mval=intgrid.eval_dens_cutoff(Po,mt);
+
+    //    printf("mt = %e, mval = %e, acc = %e\n",mt,mval,(rt-lt)/(rt+mt));
+
+    if(mval>thr)
+      lt=mt;
+    else if(mval<thr)
+      rt=mt;
+    else {
+      rt=mt;
+      lt=mt;
+      break;
+    }
+  }
+
+  // Convert to orbital value
+  return sqrt((rt+lt)/2.0);
+}
+
+
 int main(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - population from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
@@ -47,6 +92,9 @@ int main(int argc, char **argv) {
   set.add_bool("Stockholder", "Run Stockholder analysis?", false);
   set.add_bool("Voronoi", "Run Voronoi analysis?", false);
   set.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
+  set.add_bool("OrbThr", "Compute orbital density thresholds", false);
+  set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
+  set.add_double("OrbThrAcc", "Accuracy of orbital density integration grid", 1e-5);
 
   if(argc==2)
     set.parse(argv[1]);
@@ -65,7 +113,7 @@ int main(int argc, char **argv) {
   // Load basis set
   BasisSet basis;
   chkpt.read(basis);
-  
+
   // Restricted calculation?
   bool restr;
   chkpt.read("Restricted",restr);
@@ -111,7 +159,7 @@ int main(int argc, char **argv) {
       // Get orbital coefficients
       arma::mat C;
       chkpt.read("C",C);
-      
+
       // Do analysis
       IAO_analysis(basis,C.submat(0,0,C.n_rows-1,Nela-1),P,minbas);
     } else {
@@ -124,7 +172,7 @@ int main(int argc, char **argv) {
       arma::mat Ca, Cb;
       chkpt.read("Ca",Ca);
       chkpt.read("Cb",Cb);
-      
+
       // Do analysis
       IAO_analysis(basis,Ca.submat(0,0,Ca.n_rows-1,Nela-1),Cb.submat(0,0,Cb.n_rows-1,Nelb-1),Pa,Pb,minbas);
     }
@@ -158,6 +206,69 @@ int main(int argc, char **argv) {
       voronoi_analysis(basis,Pa,Pb,tol);
   }
 
+  if(set.get_bool("OrbThr")) {
+    // Calculate orbital density thresholds
+
+    // Integration grid
+    DFTGrid intgrid(&basis,true);
+    intgrid.construct_becke(set.get_double("OrbThrAcc"));
+
+    // Threshold is
+    double thr=set.get_double("OrbThrVal");
+
+    if(restr) {
+      // Get amount of occupied orbitals
+      int Nela;
+      chkpt.read("Nel-a",Nela);
+
+      // Get orbital coefficients
+      arma::mat C;
+      chkpt.read("C",C);
+
+      printf("\n%4s %8s %8s\n","orb","thr","t (s)");
+      for(int io=0;io<Nela;io++) {
+	Timer t;
+	
+	// Orbital density matrix is
+	arma::mat Po=C.col(io)*arma::trans(C.col(io));
+	double val=compute_threshold(intgrid,Po,thr);
+
+	// Print out orbital threshold
+	printf("%4i %8.3e %f\n", io+1, val, t.get());
+      }
+
+    } else {
+      // Get amount of occupied orbitals
+      int Nela, Nelb;
+      chkpt.read("Nel-a",Nela);
+      chkpt.read("Nel-b",Nelb);
+
+      // Get orbital coefficients
+      arma::mat Ca, Cb;
+      chkpt.read("Ca",Ca);
+      chkpt.read("Cb",Cb);
+
+      printf("\n%4s %8s %8s %8s\n","orb","thr-a","thr-b","t (s)");
+      for(int io=0;io<Nela;io++) {
+	Timer t;
+
+	// Orbital density matrix is
+	arma::mat Po=Ca.col(io)*arma::trans(Ca.col(io));
+	double vala=compute_threshold(intgrid,Po,thr);
+
+	if(io<Nelb) {
+	  Po=Cb.col(io)*arma::trans(Cb.col(io));
+	  double valb=compute_threshold(intgrid,Po,thr);
+	  
+	  // Print out orbital threshold
+	  printf("%4i %8.3e %8.3e %f\n", io+1, vala, valb, t.get());
+
+	} else 
+	  printf("%4i %8.3e %8s %f\n", io+1, vala, "****", t.get());
+      }
+      
+    }
+  }
 
 
   return 0;
