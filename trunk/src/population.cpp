@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
   set.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
   set.add_bool("OrbThr", "Compute orbital density thresholds", false);
   set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
-  set.add_double("OrbThrAcc", "Accuracy of orbital density integration grid", 1e-5);
+  set.add_double("OrbThrGrid", "Accuracy of orbital density threshold integration grid", 1e-3);
 
   if(argc==2)
     set.parse(argv[1]);
@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
 
     // Integration grid
     DFTGrid intgrid(&basis,true);
-    intgrid.construct_becke(set.get_double("OrbThrAcc"));
+    intgrid.construct_becke(set.get_double("OrbThrGrid"));
 
     // Threshold is
     double thr=set.get_double("OrbThrVal");
