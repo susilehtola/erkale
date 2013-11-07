@@ -1,7 +1,13 @@
 ERKALE - HF/DFT from Hel
 
 Lead Developer
- * Susi Lehtola <susi.lehtola (at) gmail.com> (formerly Jussi)
+ * Susi Lehtola <susi.lehtola (at) gmail.com> (formerly Jussi Lehtola)
+
 
 Other contributions
- * Arto Sakko (parts of Casida code) <arto.sakko (at) helsinki.fi>
+ * Arto Sakko
+   - parts of the Casida code
+
+ * Christopher Ehlert
+   - patch for skipping basis set renormalization when reading from
+     checkpoint
