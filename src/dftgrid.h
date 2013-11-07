@@ -261,6 +261,9 @@ class AtomGrid {
   /// Evaluate laplacian of density and kinetic density at a point
   void eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl, double & kin) const;
 
+  /// Evaluate integral of density with given cutoff
+  double eval_dens_cutoff(const arma::mat & P, double cutoff) const;
+
   /// Compute number of electrons
   double compute_Nel() const;
 
@@ -381,6 +384,9 @@ class DFTGrid {
   arma::mat eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc);
   /// Evaluate overlap matrices numerically
   std::vector<arma::mat> eval_hirshfeld_overlaps(const Hirshfeld & hirsh);
+
+  /// Evaluate density with given cutoff
+  double eval_dens_cutoff(const arma::mat & P, double cutoff);
 
   /// Evaluate force
   arma::vec eval_force(int x_func, int c_func, const arma::mat & P);
