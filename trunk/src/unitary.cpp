@@ -524,7 +524,8 @@ double Unitary::polynomial_step_df(const arma::cx_mat & W) {
       printf("Derivative is of the wrong sign!\n");
       arma::trans(mu).print("mu");
       arma::trans(fp).print("J'(mu)");
-      throw std::runtime_error("Derivative consistency error.\n");
+      //      throw std::runtime_error("Derivative consistency error.\n");
+      fprintf(stderr,"Warning - inconsistent sign of derivative.\n");
     }
     
     // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
@@ -576,7 +577,8 @@ double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
       printf("Derivative is of the wrong sign!\n");
       arma::trans(mu).print("mu");
       arma::trans(fp).print("J'(mu)");
-      throw std::runtime_error("Derivative consistency error.\n");
+      //      throw std::runtime_error("Derivative consistency error.\n");
+      fprintf(stderr,"Warning - inconsistent sign of derivative.\n");
     }
     
     // Fit function to polynomial of order p
