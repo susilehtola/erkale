@@ -2976,8 +2976,8 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & 
 Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
   // Store orbitals
   C=Cv;
-  // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, no Hartree-Fock
-  dfit.fill(basis,basis.density_fitting(),true,1e-8,false);
+  // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, use Hartree-Fock routine since it has better tolerance for linear dependencies
+  dfit.fill(basis,basis.density_fitting(),true,1e-8,true);
 }
 
 Edmiston::~Edmiston() {
@@ -3009,7 +3009,7 @@ void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
   // Orbital density matrices
   std::vector<arma::mat> Porb(W.n_cols);
   for(size_t io=0;io<W.n_cols;io++)
-    Porb[io]=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+    Porb[io]=arma::real( Ctilde.col(io)*arma::trans(Ctilde.col(io)) );
 
   // Orbital Coulomb matrices
   std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
@@ -3023,7 +3023,7 @@ void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
   der.zeros(W.n_cols,W.n_cols);
   for(size_t a=0;a<W.n_cols;a++)
     for(size_t b=0;b<W.n_cols;b++)
-      der(a,b)=2.0*arma::as_scalar(arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b));
+      der(a,b) =2.0 * arma::as_scalar( arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b) );
 }
 
 PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0.0,0.0,true,verb) {
