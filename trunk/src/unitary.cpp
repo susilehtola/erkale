@@ -413,8 +413,10 @@ void Unitary::check_derivative(const arma::cx_mat & W0) {
   // Order of the cost function in the coefficients of W.
   Tmu=2.0*M_PI/(q*wmax);
 
-  // Get derivative matrix
-  arma::cx_mat der=cost_der(W0);
+  // Get cost function and derivative matrix
+  arma::cx_mat der;
+  double Jo;
+  cost_func_der(W0,Jo,der);
   // The derivative is
   double dfdmu=step_der(W0,der);
 
@@ -426,12 +428,12 @@ void Unitary::check_derivative(const arma::cx_mat & W0) {
   // Estimated change in function is
   double dfest=trstep*dfdmu;
   // Real change in function is
-  double dfreal=Jtr-J;
+  double dfreal=Jtr-Jo;
 
   // Is the difference ok? Check absolute or relative magnitude
   if(fabs(dfest)>sqrt(DBL_EPSILON)*fabs(J) && fabs(dfest-dfreal)>1e-2*fabs(dfest)) {
     fprintf(stderr,"\nDerivative mismatch error!\n");
-    fprintf(stderr,"Used step size %e, value of function % e.\n",trstep,J);
+    fprintf(stderr,"Used step size %e, value of function % e.\n",trstep,Jo);
     fprintf(stderr,"Estimated change of function % e\n",dfest);
     fprintf(stderr,"Realized  change of function % e\n",dfreal);
     fprintf(stderr,"Difference in changes        % e\n",dfest-dfreal);
