@@ -2977,7 +2977,7 @@ Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double Gth, dou
   // Store orbitals
   C=Cv;
   // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, use Hartree-Fock routine since it has better tolerance for linear dependencies
-  dfit.fill(basis,basis.density_fitting(),true,1e-8,true);
+  dfit.fill(basis,basis.density_fitting(),true,1e-8,false);
 }
 
 Edmiston::~Edmiston() {
