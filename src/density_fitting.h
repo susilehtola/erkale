@@ -114,8 +114,12 @@ class DensityFit {
   /// Destructor
   ~DensityFit();
 
-  /// Compute integrals, use given linear dependency treshhold
-  void fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double threshold, bool hf=false);
+  /**
+   *Compute integrals, use given linear dependency threshold. The HF
+   * flag here controls formation of (a|b)^{-1/2} and (a|b)^{-1}, the
+   * HF routine is more tolerant of linear dependencies in the basis.
+   */
+  void fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double threshold, bool hf=true);
   /// Compute index in integral table
   size_t idx(size_t ia, size_t imu, size_t inu) const;
 

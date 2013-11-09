@@ -127,8 +127,9 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
       ab_invh+=abvec.col(i)*arma::trans(abvec.col(i))/sqrt(abval(i));
     }
   } else {
-    // Just RI-J, use faster method from Eichkorn et al to form ab_inv only
-    ab_inv=arma::inv(ab+DELTA);
+    // Just RI-J, so use faster method from Eichkorn et al to form ab_inv only
+    bool invok;
+    invok=arma::inv(ab+DELTA,ab_inv);
   }
 
 #ifdef SCREENING
