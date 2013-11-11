@@ -209,6 +209,7 @@ int main(int argc, char **argv) {
 
 	// Print out orbital threshold
 	printf("%4i %8.3e %8.3f\n", io+1, val, t.get());
+	fflush(stdout);
       }
 
     } else {
@@ -236,14 +237,16 @@ int main(int argc, char **argv) {
 	  
 	  // Print out orbital threshold
 	  printf("%4i %8.3e %8.3e %8.3f\n", io+1, vala, valb, t.get());
-
-	} else 
+	  fflush(stdout);
+	} else {
 	  printf("%4i %8.3e %9s %8.3f\n", io+1, vala, "****", t.get());
-      }
+	  fflush(stdout);
+	}
+      }	
       
     }
   }
-
+  
 
   return 0;
 }
