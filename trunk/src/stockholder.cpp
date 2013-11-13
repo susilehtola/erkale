@@ -159,7 +159,7 @@ void StockholderAtom::fill_adaptive(const BasisSet & basis, const arma::mat & P,
     std::vector<double> oldrho, oldweights;
     std::vector<coords_t> oldgrid;
 
-    while(l<=lmax) {
+    while(l<lmax) {
       // Get old rho, weight and grid
       oldrho=rho[irad];
       oldweights=weights[irad];
