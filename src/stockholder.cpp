@@ -14,11 +14,13 @@
  * of the License, or (at your option) any later version.
  */
 
-
 #include "stockholder.h"
 #include "timer.h"
 #include "dftgrid.h"
 #include <cfloat>
+
+/// Maximum amount of iterations
+#define MAXITER 10000
 
 StockholderAtom::StockholderAtom() {
 }
@@ -372,8 +374,9 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
       fflush(stdout);
       t.set();
     }
-    
-    for(size_t iiter=0;iiter<10000;iiter++) {
+
+    size_t iiter;
+    for(iiter=0;iiter<MAXITER;iiter++) {
       // Evaluate new spherically averaged densities
       for(size_t i=0;i<atoms.size();i++)
 	atoms[i].update(ISA,newrho[i]);
@@ -406,30 +409,32 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
       
       if(maxdiff<tol)
 	break;
-
+      
       // Update weights
       ISA.set(cen,dr,oldrho);
     }
 
-    if(verbose) {
+    if(iiter==MAXITER)
+      throw std::runtime_error("Stockholder analysis did not converge!\n");
+    else if(verbose) {
       printf("Iteration converged within %e in %s.\n",tol,t.elapsed().c_str());
       fflush(stdout);
-
+      
       /*
       // Print out densities
       char fname[80];
       sprintf(fname,"atoms_%.3e.dat",tol);
       FILE *out=fopen(fname,"w");
       for(size_t irad=0;irad<newrho[0].size();irad++) {
-	fprintf(out,"%e",irad*dr);
-	for(size_t iat=0;iat<oldrho.size();iat++)
-	  fprintf(out," %e",oldrho[iat][irad]);
-	fprintf(out,"\n");
+      fprintf(out,"%e",irad*dr);
+      for(size_t iat=0;iat<oldrho.size();iat++)
+      fprintf(out," %e",oldrho[iat][irad]);
+      fprintf(out,"\n");
       }
       fclose(out);
       */
     }	
-
+    
     // Reduce tolerance and check convergence
     tol/=sqrt(10.0);
     if(tol < (1-sqrt(DBL_EPSILON))*finaltol)

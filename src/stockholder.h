@@ -71,7 +71,7 @@ class Stockholder {
 
  public:
   /// Constructor. Tolerance for change in the integral \f$ \int_0^\infty r^2 | \rho_n(r) - \rho_o(r) | dr \f$
-  Stockholder(const BasisSet & basis, const arma::mat & P, double tol=1e-6, double dr=0.01, int nrad=851, int l0=3, int lmax=53, bool verbose=true);
+  Stockholder(const BasisSet & basis, const arma::mat & P, double tol=1e-6, double dr=0.01, int nrad=851, int l0=3, int lmax=131, bool verbose=true);
   /// Destructor
   ~Stockholder();
 
