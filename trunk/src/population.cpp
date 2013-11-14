@@ -53,6 +53,11 @@ int main(int argc, char **argv) {
   print_copyright();
   print_license();
 
+  if(argc!=2) {
+    printf("Usage: %s runfile\n",argv[0]);
+    return 1;
+  }
+
   // Parse settings
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
@@ -69,12 +74,10 @@ int main(int argc, char **argv) {
   set.add_bool("OrbThr", "Compute orbital density thresholds", false);
   set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
   set.add_double("OrbThrGrid", "Accuracy of orbital density threshold integration grid", 1e-3);
-
-  if(argc==2)
-    set.parse(argv[1]);
-  else
-    printf("Using default settings.\n");
-
+  
+  // Parse settings
+  set.parse(argv[1]);
+    
   // Print settings
   set.print();
 
