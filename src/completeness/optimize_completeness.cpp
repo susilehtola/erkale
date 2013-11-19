@@ -268,14 +268,14 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
     tol=MINTAU;
   }
 
-  // Sanity check
-  if(*width<0.0)
-    *width=nexp/2.0;
-
-  // Right value
+  // Left value - vanishing plateau, i.e. too large completeness value
   double left=0.0;
-  double right=*width;
+
+  // Right value - pretty big plateau, i.e. too small completeness value
+  double right=0.5*nexp;
   double rval;
+
+  // Check that right value is OK
   std::vector<double> rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
   while(rval<tol) {
     left=right;
@@ -287,7 +287,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
   if(left==0.0) {
     double lval=rval;
     std::vector<double> lexps;
-    while(lval>=tol) {
+    while(lval>tol) {
       left/=2.0;
       lexps=optimize_completeness(am,0.0,left,nexp,nval,false,&lval);
     }
@@ -302,7 +302,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
     // Get exponents
     double mval;
     mexps=optimize_completeness(am,0.0,middle,nexp,nval,false,&mval);
-    
+
     // Figure out which end to move
     if(mval>tol) {
       right=middle;
@@ -314,7 +314,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
 
   // Set width
   *width=middle;
-
+  
   return mexps;
 }
 
