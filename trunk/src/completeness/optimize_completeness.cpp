@@ -302,7 +302,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
     // Get exponents
     double mval;
     mexps=optimize_completeness(am,0.0,middle,nexp,nval,false,&mval);
-
+    
     // Figure out which end to move
     if(mval>tol) {
       right=middle;
@@ -310,7 +310,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
     else {
       left=middle;
     }
-  } while(right-left>1e-3);
+  } while(right-left>1e-6);
 
   // Set width
   *width=middle;
