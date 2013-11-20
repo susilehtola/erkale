@@ -36,17 +36,17 @@ typedef struct {
   int n;
 
   /// Scanning exponents to optimize against
-  std::vector<double> scanexp;
+  arma::vec scanexp;
 } completeness_scan_t;
 
 /// Get exponents. x contains the natural logarithms
-std::vector<double> get_exponents(const gsl_vector *x);
+arma::vec get_exponents(const gsl_vector *x);
 
 /// Compute self-overlap \f$ S_{ij} \f$
-arma::mat self_overlap(const std::vector<double> & z, int am);
+arma::mat self_overlap(const arma::vec & z, int am);
 
 /// Compute completeness profile
-std::vector<double> completeness_profile(const gsl_vector * x, void * params);
+arma::vec completeness_profile(const gsl_vector * x, void * params);
 
 /// Evaluate measure of goodness
 double compl_mog(const gsl_vector * x, void * params);

@@ -28,22 +28,22 @@ typedef struct {
   /// Angular momentum
   int am;
   /// Values of completeness profile \f$ Y(\alpha) \f$
-  std::vector<double> Y;
+  arma::vec Y;
 } compprof_am_t;
 
 /// Completeness profiles for a given element
 typedef struct {
   /// Logarithms of scanning exponents \f$ \log_{10} \alpha \f$
-  std::vector<double> lga;
+  arma::vec lga;
   /// Completeness profiles for all angular momenta
   std::vector<compprof_am_t> shells;
 } compprof_t;
 
 /// Get scanning exponents
-std::vector<double> get_scanning_exponents(double min, double max, size_t Np);
+arma::vec get_scanning_exponents(double min, double max, size_t Np);
 
 /// Compute overlap of normalized Gaussian primitives
-arma::mat overlap(const std::vector<double> & z, const std::vector<double> & zp, int am);
+arma::mat overlap(const arma::vec & z, const arma::vec & zp, int am);
 
 /**
  * Compute completeness profile for element with given scanning exponents
@@ -51,7 +51,7 @@ arma::mat overlap(const std::vector<double> & z, const std::vector<double> & zp,
  * D. P. Chong, "Completeness profiles of one-electron basis sets",
  * Can. J. Chem. 73 (1995), pp. 79 - 83.
  */
-compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scanexps, bool chol=false, bool coulomb=false);
+compprof_t compute_completeness(const ElementBasisSet & bas, const arma::vec & scanexps, bool coulomb=false);
 
 /**
  * Compute completeness profile for element from \f$ \alpha = 10^{min}
