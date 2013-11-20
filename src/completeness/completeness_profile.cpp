@@ -19,18 +19,18 @@
 #include "../linalg.h"
 
 /// Compute overlap of normalized Gaussian primitives
-arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> & jexps, int am) {
+arma::mat overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
   arma::mat S(iexps.size(),jexps.size());
 
   switch(am) {
   case(0):
     {
-      for(size_t i=0;i<iexps.size();i++)
-	for(size_t j=0;j<jexps.size();j++) {
+      for(size_t i=0;i<iexps.n_elem;i++)
+	for(size_t j=0;j<jexps.n_elem;j++) {
 	  // Sum of exponents
-	  double zeta=iexps[i] + jexps[j];
+	  double zeta=iexps(i) + jexps(j);
 	  // Helpers
-	  double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
+	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
 	  double s_eta=sqrt(eta);
 	  S(i,j)=s_eta*sqrt(s_eta);
 	}
@@ -39,12 +39,12 @@ arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> &
 
   case(1):
     {
-      for(size_t i=0;i<iexps.size();i++)
-	for(size_t j=0;j<jexps.size();j++) {
+      for(size_t i=0;i<iexps.n_elem;i++)
+	for(size_t j=0;j<jexps.n_elem;j++) {
 	  // Sum of exponents
-	  double zeta=iexps[i] + jexps[j];
+	  double zeta=iexps(i) + jexps(j);
 	  // Helpers
-	  double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
+	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
 	  double s_eta=sqrt(eta);
 	  S(i,j)=s_eta*s_eta*sqrt(s_eta);
 	}
@@ -53,12 +53,12 @@ arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> &
 
   case(2):
     {
-      for(size_t i=0;i<iexps.size();i++)
-	for(size_t j=0;j<jexps.size();j++) {
+      for(size_t i=0;i<iexps.n_elem;i++)
+	for(size_t j=0;j<jexps.n_elem;j++) {
 	  // Sum of exponents
-	  double zeta=iexps[i] + jexps[j];
+	  double zeta=iexps(i) + jexps(j);
 	  // Helpers
-	  double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
+	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
 	  double s_eta=sqrt(eta);
 	  S(i,j)=s_eta*s_eta*s_eta*sqrt(s_eta);
 	}
@@ -66,12 +66,12 @@ arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> &
     break;
 
   default:
-    for(size_t i=0;i<iexps.size();i++)
-      for(size_t j=0;j<jexps.size();j++) {
+    for(size_t i=0;i<iexps.n_elem;i++)
+      for(size_t j=0;j<jexps.n_elem;j++) {
 	// Sum of exponents
-	double zeta=iexps[i] + jexps[j];
+	double zeta=iexps(i) + jexps(j);
 	// Helpers
-	double eta=4.0*iexps[i]*jexps[j]/(zeta*zeta);
+	double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
 	double s_eta=sqrt(eta);
 	double q_eta=sqrt(s_eta);
 
@@ -86,12 +86,12 @@ arma::mat overlap(const std::vector<double> & iexps, const std::vector<double> &
   return S;
 }
 
-std::vector<double> get_scanning_exponents(double min, double max, size_t Np) {
+arma::vec get_scanning_exponents(double min, double max, size_t Np) {
   // Form scanning exponents
-  std::vector<double> scan_exp(Np);
+  arma::vec scan_exp(Np);
   double da=(max-min)/(Np-1);
   for(size_t i=0;i<Np;i++) {
-    scan_exp[i]=pow(10.0,min+i*da);
+    scan_exp(i)=pow(10.0,min+i*da);
   }
 
   return scan_exp;
@@ -99,17 +99,15 @@ std::vector<double> get_scanning_exponents(double min, double max, size_t Np) {
 
 /// Compute completeness profile for given element
 compprof_t compute_completeness(const ElementBasisSet & bas, double min, double max, size_t Np, bool coulomb) {
-  return compute_completeness(bas,get_scanning_exponents(min,max,Np),false,coulomb);
+  return compute_completeness(bas,get_scanning_exponents(min,max,Np),coulomb);
 }
 
 
 /// Compute completeness profile for given element
-compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<double> & scan_exp, bool chol, bool coulomb) {
+compprof_t compute_completeness(const ElementBasisSet & bas, const arma::vec & scan_exp, bool coulomb) {
   // Returned completeness profile
   compprof_t ret;
-
-  for(size_t i=0;i<scan_exp.size();i++)
-    ret.lga.push_back(log10(scan_exp[i]));
+  ret.lga=arma::log10(scan_exp);
 
   // Loop over angular momenta
   for(int am=0;am<=bas.get_max_am();am++) {
@@ -132,36 +130,22 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const std::vector<d
       arma::mat S;
       S=arma::trans(contr)*overlap(exps,exps,amval)*contr;
 
-      // Compute completeness overlaps
-      arma::mat J;
-      if(chol)
-	J=arma::trans(scanov)*contr*arma::inv(arma::trimatu(arma::chol(S)));
-      else
-	J=arma::trans(scanov)*contr*BasOrth(S,false);
+      // Helper: scan overlaps of contracted basis functions
+      arma::mat hlp=arma::trans(scanov)*contr;
 
-      // Compute completeness profile
+      // Compute completeness profile. Only a single center is
+      // involved, so the basis set is always well behaved.
       compprof_am_t profile;
       profile.am=am;
-      profile.Y.resize(J.n_rows);
-
-      // Loop over scanning exponents
-      for(size_t ip=0;ip<J.n_rows;ip++) {
-	double Y=0.0;
-	// Loop over functions
-	for(size_t ifunc=0;ifunc<J.n_cols;ifunc++)
-	  Y+=J(ip,ifunc)*J(ip,ifunc);
-
-	profile.Y[ip]=Y;
-      }
-
+      profile.Y=arma::diagvec(hlp*arma::inv(S)*arma::trans(hlp));
+      
       ret.shells.push_back(profile);
+
     } else {
       // No exponents, create dummy profile.
       compprof_am_t profile;
       profile.am=am;
-      profile.Y.resize(scan_exp.size());
-      for(size_t i=0;i<scan_exp.size();i++)
-	profile.Y[i]=0.0;
+      profile.Y.zeros(scan_exp.n_elem);
       ret.shells.push_back(profile);
     }
   }

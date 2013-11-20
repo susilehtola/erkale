@@ -22,6 +22,7 @@
 extern "C" {
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multimin.h>
+#include <gsl/gsl_sf_legendre.h>
 }
 
 #ifdef _OPENMP
@@ -31,47 +32,44 @@ extern "C" {
 // Maximum number of functions allowed in completeness optimization
 #define NFMAX 50
 
-std::vector<double> get_exponents(const gsl_vector *x) {
-  // Get exponents
-  size_t N=x->size;
-  std::vector<double> z(N);
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for(size_t i=0;i<N;i++) {
-    z[i]=exp(gsl_vector_get(x,i));
-  }
-  return z;
+arma::vec get_exponents(const gsl_vector *x) {
+  // Get exponent values
+  arma::vec A(x->size);
+  for(size_t i=0;i<x->size;i++)
+    A(i)=exp(gsl_vector_get(x,i));
+
+  return A;
 }
 
-arma::mat self_overlap(const std::vector<double> & z, int am) {
+arma::mat self_overlap(const arma::vec & z, int am) {
   // Compute self-overlap
-  size_t N=z.size();
+  size_t N=z.n_elem;
   arma::mat Suv(N,N);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
   for(size_t i=0;i<N;i++)
     for(size_t j=0;j<=i;j++) {
-      Suv(i,j)=pow(4.0*z[i]*z[j]/pow(z[i]+z[j],2),am/2.0+0.75);
+      Suv(i,j)=pow(4.0*z(i)*z(j)/pow(z(i)+z(j),2),am/2.0+0.75);
       Suv(j,i)=Suv(i,j);
     }
 
   return Suv;
 }
 
-std::vector<double> completeness_profile(const gsl_vector * x, void * params) {
+arma::vec completeness_profile(const gsl_vector * x, void * params) {
   // Get parameters
   completeness_scan_t *par=(completeness_scan_t *) params;
 
   // Get exponents
-  std::vector<double> z=get_exponents(x);
+  arma::vec z=get_exponents(x);
 
   // Get self-overlap
   arma::mat Suv=self_overlap(z,par->am);
+
   // and its half inverse matrix
   arma::mat Sinvh=BasOrth(Suv,false);
-
+ 
   // Get overlap of primitives with scanning terms
   arma::mat amu=overlap(par->scanexp,z,par->am);
 
@@ -80,18 +78,9 @@ std::vector<double> completeness_profile(const gsl_vector * x, void * params) {
 
   // The completeness profile
   size_t N=par->scanexp.size();
-  std::vector<double> Y(N);
-
+  arma::vec Y(N);
   for(size_t i=0;i<N;i++)
     Y[i]=arma::dot(J.row(i),J.row(i));
-
-  /*
-    FILE *out=fopen("Y.dat","w");
-    for(size_t ia=0;ia<par->scanexp.size();ia++) {
-    fprintf(out,"% e %e\n",log10(par->scanexp[ia]),Y[ia]);
-    }
-    fclose(out);
-  */
 
   return Y;
 }
@@ -101,7 +90,7 @@ double compl_mog(const gsl_vector * x, void * params) {
   completeness_scan_t *p=(completeness_scan_t *) params;
 
   // Get completeness profile
-  std::vector<double> Y=completeness_profile(x,params);
+  arma::vec Y=completeness_profile(x,params);
 
   // Compute MOG.
   double phi=0.0;
@@ -111,7 +100,7 @@ double compl_mog(const gsl_vector * x, void * params) {
   switch(p->n) {
 
   case(1):
-    for(size_t i=1;i<Y.size()-1;i+=2) {
+    for(size_t i=1;i<Y.n_elem-1;i+=2) {
       // Compute differences from unity
       double ld=1.0-Y[i-1];
       double md=1.0-Y[i  ];
@@ -123,7 +112,7 @@ double compl_mog(const gsl_vector * x, void * params) {
     break;
 
   case(2):
-    for(size_t i=1;i<Y.size()-1;i+=2) {
+    for(size_t i=1;i<Y.n_elem-1;i+=2) {
       // Compute differences from unity
       double ld=1.0-Y[i-1];
       double md=1.0-Y[i  ];
@@ -171,15 +160,13 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   int status;
   double size;
 
-  /* Starting point: even tempered set */
+  /* Starting point */
   gsl_vector *x = gsl_vector_alloc (Nf);
   for(int i=0;i<Nf;i++)
-    // Need to convert to natural logarithm
     gsl_vector_set(x,i,log(10.0)*(min + (i+0.5)*(max-min)/Nf));
 
-  /* Set initial step sizes to 0.45 times the spacing */
+  /* Set initial step sizes to unity */
   gsl_vector *ss = gsl_vector_alloc (Nf);
-  //  gsl_vector_set_all (ss, 0.45*log(10.0)*(max-min)/Nf);
   gsl_vector_set_all (ss, 1.0);
 
   /* Initialize method and iterate */
@@ -232,12 +219,8 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   if(mog!=NULL)
     *mog=pow(s->fval,1.0/n);
 
-  // The returned exponents
-  std::vector<double> ret=get_exponents(s->x);
-  // Sort into ascending order
-  std::sort(ret.begin(),ret.end());
-  // and reverse the order
-  std::reverse(ret.begin(),ret.end());
+  // The optimized exponents in descending order
+  arma::vec exps=arma::sort(get_exponents(s->x),1);
 
   gsl_vector_free(x);
   gsl_vector_free(ss);
@@ -246,6 +229,10 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   if(verbose)
     printf("\nMinimization completed in %s.\n",tmin.elapsed().c_str());
 
+  // Retuned exponents
+  std::vector<double> ret(exps.n_elem);
+  for(size_t i=0;i<exps.n_elem;i++)
+    ret[i]=exps(i);
   return ret;
 }
 
