@@ -305,3 +305,115 @@ void GTO_Fourier::clean() {
     if(norm(trans[i].c) == 0.0)
       trans.erase(trans.begin()+i);
 }
+
+std::vector< std::vector<GTO_Fourier> > fourier_expand(const BasisSet & bas, std::vector< std::vector<size_t> > & idents) {
+  // Find out identical shells in basis set.
+  idents=bas.find_identical_shells();
+
+  // Compute the expansions of the non-identical shells
+  std::vector< std::vector<GTO_Fourier> > fourier;
+  for(size_t i=0;i<idents.size();i++) {
+    // Get exponents, contraction coefficients and cartesians
+    std::vector<contr_t> contr=bas.get_contr(idents[i][0]);
+    std::vector<shellf_t> cart=bas.get_cart(idents[i][0]);
+
+    // Compute expansion of basis functions on shell
+    // Form expansions of cartesian functions
+    std::vector<GTO_Fourier> cart_expansion;
+    for(size_t icart=0;icart<cart.size();icart++) {
+      // Expansion of current function
+      GTO_Fourier func;
+      for(size_t iexp=0;iexp<contr.size();iexp++)
+        func+=contr[iexp].c*GTO_Fourier(cart[icart].l,cart[icart].m,cart[icart].n,contr[iexp].z);
+      // Plug in the normalization factor
+      func=cart[icart].relnorm*func;
+      // Clean out terms with zero contribution
+      func.clean();
+      // Add to cartesian expansion
+      cart_expansion.push_back(func);
+    }
+
+    // If spherical harmonics are used, we need to transform the
+    // functions into the spherical harmonics basis.
+    if(bas.lm_in_use(idents[i][0])) {
+      std::vector<GTO_Fourier> sph_expansion;
+      // Get transformation matrix
+      arma::mat transmat=bas.get_trans(idents[i][0]);
+      // Form expansion
+      int l=bas.get_am(idents[i][0]);
+      for(int m=-l;m<=l;m++) {
+        // Expansion for current term
+        GTO_Fourier mcomp;
+        // Form expansion
+        for(size_t icart=0;icart<transmat.n_cols;icart++)
+          mcomp+=transmat(l+m,icart)*cart_expansion[icart];
+        // clean it
+        mcomp.clean();
+        // and add it to the stack
+        sph_expansion.push_back(mcomp);
+      }
+      // Now we have all components, add everything to the stack
+      fourier.push_back(sph_expansion);
+    } else
+      // No need to transform, cartesians are used.
+      fourier.push_back(cart_expansion);
+  }
+
+  return fourier;
+}
+
+double eval_emd(const BasisSet & bas, const arma::mat & P, const std::vector< std::vector<GTO_Fourier> > & fourier, const std::vector< std::vector<size_t> > & idents, double px, double py, double pz) {
+  if(fourier.size() != idents.size()) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Error - size of fourier array " << fourier.size() << " does not match that of idents " << idents.size() << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Values of the Fourier polynomial part of the basis functions: [nident][nfuncs]
+  std::vector< std::vector< std::complex<double> > > fpoly(fourier.size());
+  for(size_t i=0;i<fourier.size();i++)
+    fpoly[i].resize(fourier[i].size());
+  
+  // Amount of basis functions
+  const size_t Nbf=bas.get_Nbf();
+  // Values of the basis functions, i.e. the above with the additional phase factor
+  std::vector< std::complex<double> > fvals(Nbf);
+  
+  // Compute values of Fourier polynomials at current value of p.
+  for(size_t iid=0;iid<fourier.size();iid++)
+    // Loop over the functions on the identical shells.
+    for(size_t fi=0;fi<fourier[iid].size();fi++)
+      fpoly[iid][fi]=fourier[iid][fi].eval(px,py,pz);
+  
+  // Compute the values of the basis functions themselves.
+  // Loop over list of groups of identical shells
+  for(size_t ii=0;ii<idents.size();ii++)
+    // and over the shells of this type
+    for(size_t jj=0;jj<idents[ii].size();jj++) {
+      // The current shell is
+      size_t is=idents[ii][jj];
+      // and it is centered at
+      coords_t cen=bas.get_shell_center(is);
+      // thus the phase factor we get is
+      std::complex<double> phase=exp(std::complex<double>(0.0,-(px*cen.x+py*cen.y+pz*cen.z)));
+      
+      // Now we just store the individual function values.
+      size_t i0=bas.get_first_ind(is);
+      size_t Ni=bas.get_Nbf(is);
+      for(size_t fi=0;fi<Ni;fi++)
+	fvals[i0+fi]=phase*fpoly[ii][fi];
+    }
+  
+  // and now it's only a simple matter to compute the momentum density.
+  double emd=0.0;
+  for(size_t i=0;i<Nbf;i++) {
+    // Off-diagonal
+    for(size_t j=0;j<i;j++)
+      emd+=2.0*P(i,j)*std::real(std::conj(fvals[i])*fvals[j]);
+    // Diagonal
+    emd+=P(i,i)*std::norm(fvals[i]);
+  }
+  
+  return emd;
+}

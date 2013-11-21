@@ -16,6 +16,7 @@
 
 #include "emd.h"
 #include "emd_gto.h"
+#include "emd_similarity.h"
 #include "emdcube.h"
 //include "gto_fourier_ylm.h"
 #include "spherical_expansion.h"
@@ -60,6 +61,7 @@ int main(int argc, char **argv) {
 
   set.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
   set.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4:6","");
+  set.add_string("Similarity", "Compute similarity measure to checkpoint","");
 
   if(argc==2)
     set.parse(argv[1]);
@@ -196,6 +198,30 @@ int main(int argc, char **argv) {
     emd_cube(basis,P,px,py,pz);
 
     printf("Calculating EMD on a cube took %s.\n",temd.elapsed().c_str());
+  }
+
+  // Compute similarity?
+  if(stricmp(set.get_string("Similarity"),"")!=0) {
+
+    // Load checkpoint
+    Checkpoint simchk(set.get_string("Similarity"),false);
+
+    // Load basis set
+    BasisSet simbas;
+    simchk.read(simbas);
+
+    // Load density matrix
+    arma::mat simP;
+    simchk.read("P",simP);
+
+    // Compute similarity
+    arma::mat sim=emd_similarity(basis,P,simbas,simP);
+
+    printf("\nEMD similarity\n");
+
+    printf("%4s\t%9s\t%9s\n","idx","full","spherical");
+    for(int n=0;n<(int) sim.n_rows;n++)
+      printf("%4i\t%e\t%e\n",n-1,sim(n,0),sim(n,1));
   }
 
   return 0;

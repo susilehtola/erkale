@@ -182,4 +182,12 @@ GTO_Fourier operator*(std::complex<double> fac, const GTO_Fourier & rhs);
 /// Scale Fourier transform of GTO by factor fac
 GTO_Fourier operator*(double fac, const GTO_Fourier & rhs);
 
+#include "basis.h"
+
+/// Fourier transform basis set
+std::vector< std::vector<GTO_Fourier> > fourier_expand(const BasisSet & bas, std::vector< std::vector<size_t> > & idents);
+
+/// Evaluate EMD
+double eval_emd(const BasisSet & basis, const arma::mat & P, const std::vector< std::vector<GTO_Fourier> > & fourier, const std::vector< std::vector<size_t> > & idents, double px, double py, double pz);
+
 #endif
