@@ -214,14 +214,30 @@ int main(int argc, char **argv) {
     arma::mat simP;
     simchk.read("P",simP);
 
-    // Compute similarity
-    arma::mat sim=emd_similarity(basis,P,simbas,simP);
+    // Compute momentum density overlap
+    arma::cube ovl=emd_overlap(basis,P,simbas,simP);
 
-    printf("\nEMD similarity\n");
+    // Amount of electrons
+    int Nela, Nelb;
+    chkpt.read("Nel", Nela);
+    simchk.read("Nel", Nelb);
 
-    printf("%4s\t%9s\t%9s\n","idx","full","spherical");
-    for(int n=0;n<(int) sim.n_rows;n++)
-      printf("%4i\t%e\t%e\n",n-1,sim(n,0),sim(n,1));
+    // Shape function overlap
+    arma::cube sh=emd_similarity(ovl,Nela,Nelb);
+
+    for(int s=0;s<2;s++) {
+      if(s) {
+	printf("%2s\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s\n","k","S0(AA)","S0(BB)","S0(AB)","I0(AA)","I0(BB)","I0(AB)","D0(AB)");
+	for(int k=-1;k<3;k++)
+	  // Vandenbussche don't include p^2 in the spherical average
+	  printf("%2i\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", k+1, ovl(k+1,0,s), ovl(k+1,1,s), ovl(k+1,2,s), sh(k+1,0,s), sh(k+1,1,s), sh(k+1,2,s), sh(k+1,3,s));
+      } else {
+	printf("%2s\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s\n","k","S(AA)","S(BB)","S(AB)","I(AA)","I(BB)","I(AB)","D(AB)");
+	for(int k=-1;k<3;k++)
+	  printf("%2i\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", k, ovl(k+1,0,s), ovl(k+1,1,s), ovl(k+1,2,s), sh(k+1,0,s), sh(k+1,1,s), sh(k+1,2,s), sh(k+1,3,s));
+      }
+      printf("\n");
+    }
   }
 
   return 0;
