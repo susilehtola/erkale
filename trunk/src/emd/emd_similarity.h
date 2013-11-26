@@ -8,7 +8,7 @@
  * Compute EMD overlap integrals
  * Returns a cube [k][corr][iso] containing
  * k values in -1, 0, 1, 2
- * corr: I_{AA} I_{BB} I_{AB}
+ * corr: S_{AA} S_{BB} S_{AB}
  * iso: 0 for general 3D integral, 1 for spherical averaged
  *
  * For the used equations, see J. Vandenbussche, G. Acke, and Patrick
@@ -22,7 +22,7 @@ arma::cube emd_overlap(const BasisSet & bas_a, const arma::mat & P_a, const Basi
  * Compute shape function similarity from EMD overlap integrals
  * Returns a cube [k][corr][iso] containing
  * k values in -1, 0, 1, 2
- * corr: I_{AA} I_{BB} I_{AB} D_{AB}
+ * corr: S_{AA} S_{BB} S_{AB} I_{AA} I_{BB} I_{AB} D_{AB}
  * iso: 0 for general 3D integral, 1 for spherical averaged
  *
  * For the used equations, see J. Vandenbussche, G. Acke, and Patrick

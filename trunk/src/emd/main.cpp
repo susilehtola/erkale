@@ -224,17 +224,19 @@ int main(int argc, char **argv) {
 
     // Shape function overlap
     arma::cube sh=emd_similarity(ovl,Nela,Nelb);
+    sh.slice(0).save("similarity.dat",arma::raw_ascii);
+    sh.slice(1).save("similarity_avg.dat",arma::raw_ascii);
 
     for(int s=0;s<2;s++) {
       if(s) {
 	printf("%2s\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s\n","k","S0(AA)","S0(BB)","S0(AB)","I0(AA)","I0(BB)","I0(AB)","D0(AB)");
 	for(int k=-1;k<3;k++)
 	  // Vandenbussche don't include p^2 in the spherical average
-	  printf("%2i\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", k+1, ovl(k+1,0,s), ovl(k+1,1,s), ovl(k+1,2,s), sh(k+1,0,s), sh(k+1,1,s), sh(k+1,2,s), sh(k+1,3,s));
+	  printf("%2i\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", k+1, sh(k+1,0,s), sh(k+1,1,s), sh(k+1,2,s), sh(k+1,3,s), sh(k+1,4,s), sh(k+1,5,s), sh(k+1,6,s));
       } else {
 	printf("%2s\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s\n","k","S(AA)","S(BB)","S(AB)","I(AA)","I(BB)","I(AB)","D(AB)");
 	for(int k=-1;k<3;k++)
-	  printf("%2i\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", k, ovl(k+1,0,s), ovl(k+1,1,s), ovl(k+1,2,s), sh(k+1,0,s), sh(k+1,1,s), sh(k+1,2,s), sh(k+1,3,s));
+	  printf("%2i\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", k, sh(k+1,0,s), sh(k+1,1,s), sh(k+1,2,s), sh(k+1,3,s), sh(k+1,4,s), sh(k+1,5,s), sh(k+1,6,s));
       }
       printf("\n");
     }
