@@ -54,4 +54,7 @@ std::vector<double> welltempered_set(double alpha, double beta, double gamma, do
  */
 arma::vec legendre_set(const arma::vec & A, int Nf);
 
+/// Helper for the above
+arma::mat legendre_P_mat(int Nprim, int Npar);
+
 #endif
