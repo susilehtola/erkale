@@ -3157,7 +3157,7 @@ void PZSIC::initialize(const arma::cx_mat & W0) {
   get_rk(R,K);
   // Set tolerance on kappa
   //  kappatol=std::max( 0.5*K/R, 0.25 );
-  kappatol=0.25;
+  //  kappatol=0.25;
 }
 
 bool PZSIC::converged(const arma::cx_mat & W) {
