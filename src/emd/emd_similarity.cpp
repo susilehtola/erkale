@@ -4,6 +4,9 @@
 #include "gto_fourier.h"
 #include "timer.h"
 
+// Debug routines?
+//#define DEBUGSIM
+
 double similarity_quadrature(const std::vector<double> & rad, const std::vector<double> & wrad, const std::vector<lebedev_point_t> & angmesh, const std::vector< std::vector<double> > & emd_a, const std::vector< std::vector<double> > & emd_b, int k, bool sphave) {
 
   // Similarity
@@ -142,6 +145,7 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const Ba
     printf("done (%s).\n",t.elapsed().c_str());
     fflush(stdout);
 
+#ifdef DEBUGSIM
     // Compute moments
     arma::vec amom=emd_moments(rad,wrad,angmesh,emd_a);
     arma::vec bmom=emd_moments(rad,wrad,angmesh,emd_b);
@@ -152,6 +156,7 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const Ba
       printf("%4i\t%e\t%e\n",k,amom(k+2),bmom(k+2));
     printf("\n");
     fflush(stdout);
+#endif
     
     t.set();
   }
@@ -168,7 +173,7 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const Ba
     }
 
   if(verbose) {
-    printf("Similarity moments computed in %s.\n",t.elapsed().c_str());
+    printf("Similarity moments computed in %s.\n\n",t.elapsed().c_str());
     fflush(stdout);
     t.set();
   }
@@ -178,14 +183,17 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const Ba
 
 arma::cube emd_similarity(const arma::cube & emd, int Nela, int Nelb) {
   // Compute shape function overlap                                                                                                                                                                              
-  arma::cube sh(4,4,2);
+  arma::cube sh(4,7,2);
   sh.zeros();
   for(size_t s=0;s<sh.n_slices;s++)
     for(size_t k=0;k<sh.n_rows;k++) {
-      sh(k,0,s)=emd(k,0,s)/(Nela*Nela);
-      sh(k,1,s)=emd(k,1,s)/(Nelb*Nelb);
-      sh(k,2,s)=emd(k,2,s)/(Nela*Nelb);
-      sh(k,3,s)=sqrt(sh(k,0,s) + sh(k,1,s) - 2*sh(k,2,s));
+      sh(k,0,s)=emd(k,0,s);
+      sh(k,1,s)=emd(k,1,s);
+      sh(k,2,s)=emd(k,2,s);
+      sh(k,3,s)=emd(k,0,s)/(Nela*Nela);
+      sh(k,4,s)=emd(k,1,s)/(Nelb*Nelb);
+      sh(k,5,s)=emd(k,2,s)/(Nela*Nelb);
+      sh(k,6,s)=sqrt(sh(k,0,s) + sh(k,1,s) - 2*sh(k,2,s));
     }
 
   return sh;
