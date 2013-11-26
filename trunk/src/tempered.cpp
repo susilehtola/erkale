@@ -19,6 +19,10 @@
 #include "tempered.h"
 #include <cmath>
 
+extern "C" {
+#include <gsl/gsl_sf_legendre.h>
+}
+
 // Construct even-tempered set of exponents
 std::vector<double> eventempered_set(double alpha, double beta, int Nf) {
   std::vector<double> ret;
@@ -50,3 +54,30 @@ std::vector<double> welltempered_set(double alpha, double beta, double gamma, do
   return ret;
 }
 
+arma::mat legendre_P_mat(int Nprim, int kmax) {
+  // Compute the Legendre polynomials
+  arma::mat Pk(Nprim, kmax);
+  for(int j=1;j<=Nprim;j++) { // Loop over exponents
+    // Argument for Legendre polynomial is
+    double arg=(j-1)*2.0/(Nprim-1) - 1.0;
+
+    // Helper array
+    double Plarr[kmax];
+    gsl_sf_legendre_Pl_array(kmax-1, arg, Plarr);
+
+    // Store values
+    for(int k=0;k<kmax;k++)
+      Pk(j-1,k)=Plarr[k];
+  }
+
+  return Pk;
+}
+
+arma::vec legendre_set(const arma::vec & A, int Nf) {
+  // Get Pk matrix
+  arma::mat Pk=legendre_P_mat(Nf,A.n_elem);
+  // Exponents are
+  arma::vec exps=arma::exp(Pk*A);
+
+  return exps;
+}
