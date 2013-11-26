@@ -118,7 +118,7 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const Ba
   Timer t;
 
   if(verbose) {
-    printf("Using %lu points for the similarity integrals.\n",(long unsigned) (rad.size()*angmesh.size()));
+    printf("\n%lu point radial grid, %lu point angular grid, totalling %lu points for the similarity integrals.\n",(long unsigned) rad.size(), (long unsigned) angmesh.size(), (long unsigned) (rad.size()*angmesh.size()));
     printf("Computing reference  EMD ... ");
     fflush(stdout);
     t.set();
