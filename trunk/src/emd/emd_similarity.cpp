@@ -193,7 +193,7 @@ arma::cube emd_similarity(const arma::cube & emd, int Nela, int Nelb) {
       sh(k,3,s)=emd(k,0,s)/(Nela*Nela);
       sh(k,4,s)=emd(k,1,s)/(Nelb*Nelb);
       sh(k,5,s)=emd(k,2,s)/(Nela*Nelb);
-      sh(k,6,s)=sqrt(sh(k,0,s) + sh(k,1,s) - 2*sh(k,2,s));
+      sh(k,6,s)=sqrt(sh(k,3,s) + sh(k,4,s) - 2*sh(k,5,s));
     }
 
   return sh;
