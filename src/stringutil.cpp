@@ -526,3 +526,29 @@ std::string space_number(int numb) {
 
   return out.str();
 }
+
+std::string print_bar(std::string msg, char pad, int width, bool upper) {
+  // Trim message
+  msg=trim(msg);
+  
+  // Upper case?
+  if(upper)
+    msg=toupper(msg);
+
+  // Calculate padding
+  int lpad, rpad;
+  // Length of message (including white spaces)
+  int msglen=(int) msg.size() + 2;
+  
+  rpad = (width - msglen)/2;
+  lpad = width - msglen - rpad;
+
+  std::ostringstream oss;
+  for(int i=0;i<lpad;i++)
+    oss << pad;
+  oss << " " << msg << " ";
+  for(int i=0;i<rpad;i++)
+    oss << pad;
+
+  return oss.str();
+}
