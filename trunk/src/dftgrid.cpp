@@ -1617,6 +1617,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, size_t cenind, int nrad, in
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);
+  nrad=rad.size(); // Sanity check
 
   // Allocate memory
   ret.sh.resize(nrad);
@@ -1681,6 +1682,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);
+  nrad=rad.size(); // Sanity check
 
   // Allocate memory
   ret.sh.resize(nrad);
@@ -1798,6 +1800,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);
+  nrad=rad.size(); // Sanity check
 
   // Allocate memory
   ret.sh.resize(nrad);
@@ -1923,6 +1926,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);
+  nrad=rad.size(); // Sanity check
 
   // Allocate memory
   ret.sh.resize(nrad);
@@ -2120,6 +2124,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);
+  nrad=rad.size(); // Sanity check
 
   // Allocate memory
   ret.sh.resize(nrad);
@@ -2227,6 +2232,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);
+  nrad=rad.size(); // Sanity check
 
   // Allocate memory
   ret.sh.resize(nrad);

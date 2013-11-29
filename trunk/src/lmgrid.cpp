@@ -29,13 +29,13 @@
 #define ORTHTOL 50.0*DBL_EPSILON
 
 std::vector<radial_grid_t> form_radial_grid(int nrad) {
-  // Returned array
-  std::vector<radial_grid_t> ret(nrad);
-
   // Get Chebyshev nodes and weights
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);
+  nrad=rad.size(); // Sanity check
 
+  // Returned array
+  std::vector<radial_grid_t> ret(nrad);
   // Loop over radii
   for(size_t ir=0;ir<rad.size();ir++) {
     // Calculate value of radius
@@ -215,8 +215,8 @@ expansion_t expand_orbitals(const arma::mat & C, const BasisSet & bas, const coo
   for(size_t iorb=0;iorb<C.n_cols;iorb++) {
     ret.clm[iorb].resize(Ylm_conj[0].size());
     for(size_t lm=0;lm<Ylm_conj[0].size();lm++) {
-      ret.clm[iorb][lm].resize(Nrad);
-      for(size_t irad=0;irad<Nrad;irad++)
+      ret.clm[iorb][lm].resize(ret.grid.size());
+      for(size_t irad=0;irad<ret.grid.size();irad++)
 	ret.clm[iorb][lm][irad]=0.0;
     }
   }

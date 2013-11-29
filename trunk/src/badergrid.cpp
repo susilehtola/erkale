@@ -23,11 +23,6 @@
 
 #include "elements.h"
 #include "mathf.h"
-// Lobatto or Lebedev for angular
-#include "lobatto.h"
-#include "lebedev.h"
-// Gauss-Chebyshev for radial integral
-#include "chebyshev.h"
 
 #ifdef _OPENMP
 #include <omp.h>
