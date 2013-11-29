@@ -110,6 +110,8 @@ template <class T> bool abscomp(const std::complex<T> & a, const std::complex<T>
 
 /// Spline interpolate data (xt,yt) to points in x.
 std::vector<double> spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, const std::vector<double> & x);
+/// Spline interpolate data (xt,yt) to points in x.
+arma::vec spline_interpolation(const arma::vec & xt, const arma::vec & yt, const arma::vec & x);
 /// Spline interpolate data (xt,yt) to x.
 double spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, double x);
 

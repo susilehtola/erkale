@@ -254,6 +254,10 @@ std::vector<double> spline_interpolation(const std::vector<double> & xt, const s
   return y;
 }
 
+arma::vec spline_interpolation(const arma::vec & xtv, const arma::vec & ytv, const arma::vec & xv) {
+  return arma::conv_to<arma::colvec>::from(spline_interpolation(arma::conv_to< std::vector<double> >::from(xtv), arma::conv_to< std::vector<double> >::from(ytv), arma::conv_to< std::vector<double> >::from(xv)));
+}
+
 double spline_interpolation(const std::vector<double> & xt, const std::vector<double> & yt, double x) {
   if(xt.size()!=yt.size()) {
     ERROR_INFO();
