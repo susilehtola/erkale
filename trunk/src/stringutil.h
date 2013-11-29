@@ -82,4 +82,7 @@ void parse_cube(const std::string & sizes, std::vector<double> & x, std::vector<
 /// Add spaces in number
 std::string space_number(int num);
 
+/// Pretty-print bar
+std::string print_bar(std::string msg, char pad='*', int width=80, bool toupper=true);
+
 #endif
