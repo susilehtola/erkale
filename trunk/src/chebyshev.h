@@ -20,8 +20,12 @@
 #define ERKALE_CHEBYSHEV
 
 #include <vector>
+#include <cstdlib>
 
-// Modified Gauss-Chebyshev quadrature of the second kind for calculating \f$\int_{-1}^{1} f(x) dx\f$
+/// Modified Gauss-Chebyshev quadrature of the second kind for calculating \f$\int_{-1}^{1} f(x) dx\f$
 void chebyshev(int n, std::vector<double> & x, std::vector<double> & w);
+
+/// Modified Gauss-Chebyshev quadrature of the second kind for calculating \f$\int_{0}^{\infty} f(r) dr\f$. NB! For integration in spherical coordinates, you need to plug in the r^2 factor as well.
+void radial_chebyshev(int n, std::vector<double> & r, std::vector<double> & wr);
 
 #endif

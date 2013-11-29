@@ -33,23 +33,15 @@ std::vector<radial_grid_t> form_radial_grid(int nrad) {
   std::vector<radial_grid_t> ret(nrad);
 
   // Get Chebyshev nodes and weights
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
-
-  // Reverse xc and wc so radii are in increasing order.
-  std::reverse(xc.begin(),xc.end());
-  std::reverse(wc.begin(),wc.end());
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
 
   // Loop over radii
-  double jac;
-  for(size_t ir=0;ir<xc.size();ir++) {
+  for(size_t ir=0;ir<rad.size();ir++) {
     // Calculate value of radius
-    ret[ir].r=1.0/M_LN2*log(2.0/(1.0-xc[ir]));
-
-    // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ir]);
+    ret[ir].r=rad[ir];
     // so total quadrature weight is
-    ret[ir].w=wc[ir]*ret[ir].r*ret[ir].r*jac;
+    ret[ir].w=wrad[ir]*ret[ir].r*ret[ir].r;
   }
 
 

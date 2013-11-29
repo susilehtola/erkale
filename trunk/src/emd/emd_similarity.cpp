@@ -99,21 +99,8 @@ void fill_mesh(const BasisSet & basis, const arma::mat & P, const std::vector<do
 
 arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const BasisSet & basis_b, const arma::mat & P_b, int nrad, int lmax, bool verbose) {
   // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
-
-  // Compute radii
-  std::vector<double> rad(nrad), wrad(nrad);
-  for(size_t ir=0;ir<xc.size();ir++) {
-    // Calculate value of radius
-    double ixc=xc.size()-1-ir;
-    rad[ir]=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-    
-    // Jacobian of transformation is
-    double jac=1.0/M_LN2/(1.0-xc[ixc]);
-    // so total quadrature weight (excluding r^2!) is
-    wrad[ir]=wc[ixc]*jac;
-  }
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
 
   // Get angular quadrature rule
   std::vector<lebedev_point_t> angmesh=lebedev_sphere(lmax);
