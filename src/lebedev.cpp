@@ -97,8 +97,6 @@ std::vector<lebedev_point_t> lebedev_sphere(int order) {
       return getLebedevSphere(lebedev_degrees[i]);
 
   // We should not be here.
-
-  ERROR_INFO();
   std::ostringstream oss;
   oss << "Wanted order of Lebedev quadrature " << order << " not implemented.\\
 n";
@@ -116,6 +114,20 @@ int next_lebedev(int order) {
 
   // We should not be here.
   ERROR_INFO();
+  std::ostringstream oss;
+  oss << "Cannot find a higher order Lebedev rule than "<<order<<".";
+  throw std::runtime_error(oss.str());
+
+  return 0;
+}
+
+int closest_lebedev(int order) {
+
+  for(size_t i=0;i<sizeof(lebedev_orders)/sizeof(lebedev_orders[0]);i++)
+    if(lebedev_orders[i]>=order)
+      return lebedev_orders[i];
+
+  // We should not be here.
   std::ostringstream oss;
   oss << "Cannot find a higher order Lebedev rule than "<<order<<".";
   throw std::runtime_error(oss.str());
@@ -5424,4 +5436,3 @@ void getLebedevReccurencePoints(int type, int & start, double a, double b, doubl
     throw std::domain_error("Bad grid order.\n");
   }
 }
-
