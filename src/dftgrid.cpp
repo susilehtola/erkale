@@ -1615,27 +1615,17 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, size_t cenind, int nrad, in
   ret.nfunc=0;
 
   // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
 
   // Allocate memory
   ret.sh.resize(nrad);
 
   // Loop over radii
-  double rad, jac;
-  for(size_t ir=0;ir<xc.size();ir++) {
-    // Calculate value of radius
-    double ixc=xc.size()-1-ir;
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-
-    // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ixc]);
-    // so total quadrature weight is
-    double weight=wc[ixc]*rad*rad*jac;
-
+  for(size_t ir=0;ir<rad.size();ir++) {
     // Store shell data
-    ret.sh[ir].r=rad;
-    ret.sh[ir].w=weight;
+    ret.sh[ir].r=rad[ir];
+    ret.sh[ir].w=wrad[ir]*rad[ir]*rad[ir];
     ret.sh[ir].l=lmax;
   }
 
@@ -1689,27 +1679,16 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
 
   // Allocate memory
   ret.sh.resize(nrad);
-
   // Loop over radii
-  double rad, jac;
-  for(size_t ir=0;ir<xc.size();ir++) {
-    // Calculate value of radius
-    double ixc=xc.size()-1-ir;
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-
-    // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ixc]);
-    // so total quadrature weight is
-    double weight=wc[ixc]*rad*rad*jac;
-
+  for(size_t ir=0;ir<rad.size();ir++) {
     // Store shell data
-    ret.sh[ir].r=rad;
-    ret.sh[ir].w=weight;
+    ret.sh[ir].r=rad[ir];
+    ret.sh[ir].w=wrad[ir]*rad[ir]*rad[ir];
     ret.sh[ir].l=3;
   }
 
@@ -1768,7 +1747,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
       std::swap(Hold,Hnew);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/xc.size()) {
+      if(maxdiff>tol/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -1777,7 +1756,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -1817,27 +1796,16 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
 
   // Allocate memory
   ret.sh.resize(nrad);
-
   // Loop over radii
-  double rad, jac;
-  for(size_t ir=0;ir<xc.size();ir++) {
-    // Calculate value of radius
-    double ixc=xc.size()-1-ir;
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-
-    // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ixc]);
-    // so total quadrature weight is
-    double weight=wc[ixc]*rad*rad*jac;
-
+  for(size_t ir=0;ir<rad.size();ir++) {
     // Store shell data
-    ret.sh[ir].r=rad;
-    ret.sh[ir].w=weight;
+    ret.sh[ir].r=rad[ir];
+    ret.sh[ir].w=wrad[ir]*rad[ir]*rad[ir];
     ret.sh[ir].l=3;
   }
 
@@ -1900,7 +1868,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
       std::swap(Hbold,Hbnew);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/xc.size()) {
+      if(maxdiff>tol/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -1909,7 +1877,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -1953,27 +1921,17 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
 
   // Allocate memory
   ret.sh.resize(nrad);
 
   // Loop over radii
-  double rad, jac;
-  for(size_t ir=0;ir<xc.size();ir++) {
-    // Calculate value of radius
-    double ixc=xc.size()-1-ir;
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-
-    // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ixc]);
-    // so total quadrature weight is
-    double weight=wc[ixc]*rad*rad*jac;
-
+  for(size_t ir=0;ir<rad.size();ir++) {
     // Store shell data
-    ret.sh[ir].r=rad;
-    ret.sh[ir].w=weight;
+    ret.sh[ir].r=rad[ir];
+    ret.sh[ir].w=wrad[ir]*rad[ir]*rad[ir];
     ret.sh[ir].l=3;
   }
 
@@ -2058,7 +2016,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
 	  maxdiff=maxd;
 
 	// Is the orbital density converged?
-	if(maxd<tol/xc.size()) {
+	if(maxd<tol/rad.size()) {
 	  //	  printf("Shell %i: orbital %i converged, l = %i\n",(int) ir, (int) ip, ret.sh[ir].l);
 	  orbidx.erase(orbidx.begin()+iip);
 	}
@@ -2099,7 +2057,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
 	  maxdiff=maxd;
 
 	// Is maximum density converged already?
-	if(maxd<tol/xc.size()) {
+	if(maxd<tol/rad.size()) {
 	  runtot=false;
 	  //	  printf("Shell %i: total density converged, l = %i\n",(int) ir, ret.sh[ir].l);
 	}
@@ -2107,7 +2065,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
       }
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/xc.size()) {
+      if(maxdiff>tol/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -2120,7 +2078,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat
       // Swap contents
       std::swap(Haold,Hanew);
       std::swap(Hbold,Hbnew);
-    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -2160,27 +2118,17 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+8-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
 
   // Allocate memory
   ret.sh.resize(nrad);
 
   // Loop over radii
-  double rad, jac;
-  for(size_t ir=0;ir<xc.size();ir++) {
-    // Calculate value of radius
-    double ixc=xc.size()-1-ir;
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-
-    // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ixc]);
-    // so total quadrature weight is
-    double weight=wc[ixc]*rad*rad*jac;
-
+  for(size_t ir=0;ir<rad.size();ir++) {
     // Store shell data
-    ret.sh[ir].r=rad;
-    ret.sh[ir].w=weight;
+    ret.sh[ir].r=rad[ir];
+    ret.sh[ir].w=wrad[ir]*rad[ir]*rad[ir];
     ret.sh[ir].l=3;
   }
 
@@ -2228,7 +2176,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
       std::swap(Snew,Sold);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/xc.size()) {
+      if(maxdiff>tol/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -2237,7 +2185,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -2277,27 +2225,17 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+8-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
-  std::vector<double> xc, wc;
-  chebyshev(nrad,xc,wc);
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
 
   // Allocate memory
   ret.sh.resize(nrad);
 
   // Loop over radii
-  double rad, jac;
-  for(size_t ir=0;ir<xc.size();ir++) {
-    // Calculate value of radius
-    double ixc=xc.size()-1-ir;
-    rad=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-
-    // Jacobian of transformation is
-    jac=1.0/M_LN2/(1.0-xc[ixc]);
-    // so total quadrature weight is
-    double weight=wc[ixc]*rad*rad*jac;
-
+  for(size_t ir=0;ir<rad.size();ir++) {
     // Store shell data
-    ret.sh[ir].r=rad;
-    ret.sh[ir].w=weight;
+    ret.sh[ir].r=rad[ir];
+    ret.sh[ir].w=wrad[ir]*rad[ir]*rad[ir];
     ret.sh[ir].l=3;
   }
 
@@ -2345,7 +2283,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
       std::swap(Snew,Sold);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/xc.size()) {
+      if(maxdiff>tol/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -2354,7 +2292,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/xc.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();

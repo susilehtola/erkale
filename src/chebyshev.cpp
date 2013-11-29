@@ -51,3 +51,23 @@ void chebyshev(int n, std::vector<double> & x, std::vector<double> & w) {
     x[i-1]=1.0 - 2.0*i*oonpp + M_2_PI*(1.0 + 2.0/3.0*sinesq)*cosine*sine;
   }
 }
+
+void radial_chebyshev(int nrad, std::vector<double> & rad, std::vector<double> & wrad) {
+  // Get Chebyshev nodes and weights for radial part
+  std::vector<double> xc, wc;
+  chebyshev(nrad,xc,wc);
+
+  // Compute radii
+  rad.resize(nrad);
+  wrad.resize(nrad);
+  for(size_t ir=0;ir<xc.size();ir++) {
+    // Calculate value of radius
+    double ixc=xc.size()-1-ir;
+    rad[ir]=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
+    
+    // Jacobian of transformation is
+    double jac=1.0/M_LN2/(1.0-xc[ixc]);
+    // so total quadrature weight (excluding r^2!) is
+    wrad[ir]=wc[ixc]*jac;
+  }
+}
