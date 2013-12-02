@@ -412,7 +412,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 
   // Exchange-correlation
-  {
+  if(pzmode!=COUL) {
     if(verbose) {
       printf("Constructing orbital XC matrices ...");
       fflush(stdout);
