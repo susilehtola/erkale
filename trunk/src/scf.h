@@ -659,8 +659,10 @@ class PZSIC : public Unitary {
   /// Coefficient for PZ-SIC
   double pzcor;
 
-  /// Convergence criterion
-  double kappatol;
+  /// Convergence criterion: rms kappa
+  double rmstol;
+  /// Convergence criterion: max kappa
+  double maxtol;
 
   /// Orbital Fock matrices
   std::vector<arma::mat> Forb;
@@ -673,7 +675,7 @@ class PZSIC : public Unitary {
   arma::mat HSIC;
 
   /// Calculate R and K
-  void get_rk(double & R, double & K) const;
+  void get_rk(double & R, double & Krms, double & Kmax) const;
 
   /// Print legend
   void print_legend() const;
