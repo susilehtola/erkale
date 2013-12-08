@@ -92,18 +92,18 @@ void uADIIS::clear() {
   stack.clear();
 }
 
-void rADIIS::get_P(arma::mat & P) const {
+void rADIIS::get_P(arma::mat & P, bool verbose) const {
   // Get coefficients
-  arma::vec c=get_c();
+  arma::vec c=get_c(verbose);
 
   P.zeros(stack[0].P.n_rows,stack[0].P.n_cols);
   for(size_t i=0;i<stack.size();i++)
     P+=c[i]*stack[i].P;
 }
 
-void uADIIS::get_P(arma::mat & Pa, arma::mat & Pb) const {
+void uADIIS::get_P(arma::mat & Pa, arma::mat & Pb, bool verbose) const {
   // Get coefficients
-  arma::vec c=get_c();
+  arma::vec c=get_c(verbose);
   
   Pa.zeros(stack[0].Pa.n_rows,stack[0].Pa.n_cols);
   Pb.zeros(stack[0].Pb.n_rows,stack[0].Pb.n_cols);
@@ -113,18 +113,18 @@ void uADIIS::get_P(arma::mat & Pa, arma::mat & Pb) const {
   }
 }
 
-void rADIIS::get_F(arma::mat & F) const {
+void rADIIS::get_F(arma::mat & F, bool verbose) const {
   // Get coefficients
-  arma::vec c=get_c();
+  arma::vec c=get_c(verbose);
 
   F.zeros(stack[0].F.n_rows,stack[0].F.n_cols);
   for(size_t i=0;i<stack.size();i++)
     F+=c[i]*stack[i].F;
 }
 
-void uADIIS::get_F(arma::mat & Fa, arma::mat & Fb) const {
+void uADIIS::get_F(arma::mat & Fa, arma::mat & Fb, bool verbose) const {
   // Get coefficients
-  arma::vec c=get_c();
+  arma::vec c=get_c(verbose);
 
   Fa.zeros(stack[0].Fa.n_rows,stack[0].Fa.n_cols);
   Fb.zeros(stack[0].Fb.n_rows,stack[0].Fb.n_cols);
@@ -134,7 +134,7 @@ void uADIIS::get_F(arma::mat & Fa, arma::mat & Fb) const {
   }
 }
 
-arma::vec ADIIS::get_c() const {
+arma::vec ADIIS::get_c(bool verbose) const {
   // Number of parameters
   size_t N=PiF.n_elem;
 
@@ -207,6 +207,9 @@ arma::vec ADIIS::get_c() const {
   gsl_vector_free (x);
 
   //  printf("Minimized estimate of %lu matrices by %e from %e to %e in %lu iterations.\n",D.size(),E_final-E_initial,E_initial,E_final,iter);
+  if(verbose)
+    arma::trans(c).print("ADIIS weights");
+
 
   return c;
 }
