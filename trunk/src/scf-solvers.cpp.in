@@ -549,21 +549,15 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     // Perform ADIIS interpolation
     if(useadiis && ((usediis && !diissucc) || !usediis)) {
 
-      if(verbose) {
-	printf("Performing ADIIS interpolation of Fock operator ... ");
-	fflush(stdout);
-	t.set();
-      }
-
       diissucc=true;
 #ifdef RESTRICTED
-      adiis.get_F(sol.H);
+      adiis.get_F(sol.H,verbose);
 #else
-      adiis.get_F(sol.Ha,sol.Hb);
+      adiis.get_F(sol.Ha,sol.Hb,verbose);
 #endif
 
       if(verbose)
-	printf("done (%s)\n",t.elapsed().c_str());
+	printf("ADIIS interpolation done in %s.\n",t.elapsed().c_str());
     }
 
     // Perform TRDSM update

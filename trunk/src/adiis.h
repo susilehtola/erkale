@@ -92,7 +92,7 @@ class ADIIS {
   void get_E_dEdx(const gsl_vector * x, double * E, gsl_vector * dEdx) const;
 
   /// Solve coefficients
-  arma::vec get_c() const;
+  arma::vec get_c(bool verbose=false) const;
 };
 
 /// Spin-restricted ADIIS
@@ -110,9 +110,9 @@ class rADIIS: public ADIIS {
   void update(const arma::mat & P, const arma::mat & F, double E);
 
   /// Get new Fock matrix
-  void get_F(arma::mat & F) const;
+  void get_F(arma::mat & F, bool verbose=false) const;
   /// or density matrix
-  void get_P(arma::mat & P) const;
+  void get_P(arma::mat & P, bool verbose=false) const;
 
   /// Drop everything in memory
   void clear();
@@ -133,9 +133,9 @@ class uADIIS: public ADIIS {
   void update(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Fa, const arma::mat & Fb, double E);
 
   /// Get new Fock matrix
-  void get_F(arma::mat & Fa, arma::mat & Fb) const;
+  void get_F(arma::mat & Fa, arma::mat & Fb, bool verbose=false) const;
   /// or density matrix
-  void get_P(arma::mat & Pa, arma::mat & Pb) const;
+  void get_P(arma::mat & Pa, arma::mat & Pb, bool verbose=false) const;
 
   /// Drop everything in memory
   void clear();
