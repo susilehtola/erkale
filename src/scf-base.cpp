@@ -512,8 +512,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
 	double measure;
-	orbital_localization(PIPEK_BECKE,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
-	orbital_localization(EDMISTON,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-1);
+	orbital_localization(PIPEK_IAO,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -558,7 +557,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       fflush(stderr);
     }
   } else { // if(dft.adaptive)
-    if(verbose)
+    if(verbose && pzmode!=COUL)
       fprintf(stderr,"\n");
   }
 
@@ -676,8 +675,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure;
-	orbital_localization(PIPEK_BECKE,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
-	orbital_localization(EDMISTON,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-1);
+	orbital_localization(PIPEK_IAO,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -704,8 +702,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial beta localization.\n");
 	double measure;
-	orbital_localization(PIPEK_BECKE,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
-	orbital_localization(EDMISTON,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-1);
+	orbital_localization(PIPEK_IAO,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -759,7 +756,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       fflush(stderr);
     }
   } else { // if(dft.adaptive)
-    if(verbose)
+    if(verbose && pzmode!=COUL)
       fprintf(stderr,"\n");
   }
 
@@ -792,15 +789,16 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   worker.set(sol,pzcor);
 
   // Use canonical orbitals for SIC
+  double ESIC;
   if(canonical) {
-    worker.cost_func(W);
+    ESIC=worker.cost_func(W);
   } else {
-    //	Perform unitary optimization, take at max 10 iterations
-    worker.optimize(W,POLY_DF,CGPR,10);
+    //	Perform unitary optimization, take at max 20 iterations
+    worker.optimize(W,POLY_DF,CGPR,20);
+    ESIC=worker.get_ESIC();
   }
 
   // Get SIC energy and hamiltonian
-  double ESIC=worker.get_ESIC();
   arma::mat HSIC=worker.get_HSIC();
 
   // Adjust Fock operator for SIC
@@ -3032,7 +3030,8 @@ PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0
   grid=gridp;
 
   // Default value
-  kappatol=0.1;
+  rmstol=1e-3;
+  maxtol=1e-2;
 }
 
 PZSIC::~PZSIC() {
@@ -3079,11 +3078,26 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 
   // and the total SIC contribution
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
+  arma::mat S=solver->get_S();
   for(size_t io=0;io<Ctilde.n_cols;io++) {
     arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
-
-    HSIC+=Forb[io]*Pio*(solver->get_S());
+    arma::mat Fio=Forb[io];
+    HSIC+=Fio*Pio*S;
   }
+  // Symmetrize. HSIC in MO basis is
+  arma::mat Hmo=arma::trans(sol.C)*HSIC*sol.C;
+
+  /*
+  // Compute antisymmetric part
+  double an=rms_norm(0.5*(Hmo-arma::trans(Hmo)));
+  double sn=rms_norm(0.5*(Hmo+arma::trans(Hmo)));
+  printf("Norm of antisymmetric part is %e, and that of symmetric part is %e. Ratio is %e.\n",an,sn,an/sn);
+  */
+
+  // Symmetrize
+  Hmo=(arma::trans(Hmo)+Hmo)/2.0;
+  // and back-transfer to AO basis
+  HSIC=S*sol.C*Hmo*arma::trans(sol.C)*S;
 
   // SI energy is
   f=arma::sum(Eorb);
@@ -3103,22 +3117,34 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 
 
 void PZSIC::print_legend() const {
-  fprintf(stderr,"\t%4s\t%12s\t%13s\t%13s\t%10s\n","iter","K/R","E-SIC","change","time (s)");
+  fprintf(stderr,"\t%4s\t%13s\t%13s\t%13s\t%13s\t%10s\n","iter","kappa max","kappa rms","E-SIC","change","time (s)");
   fflush(stderr);
 }
 
 void PZSIC::print_progress(size_t k) const {
-  double R, K;
-  get_rk(R,K);
+  double R, Krms, Kmax;
+  get_rk(R,Krms,Kmax);
 
-  if(k>1)
-    fprintf(stderr,"\t%4i\t%e\t% e\t% e",(int) k,K/R,J,J-oldJ);
+  fprintf(stderr,"\t%4i",(int) k);
+  if(Kmax<maxtol)
+    fprintf(stderr,"\t%e*",Kmax);
   else
-    fprintf(stderr,"\t%4i\t%e\t% e\t%13s",(int) k,K/R,J,"");
+    fprintf(stderr,"\t%e ",Kmax);
+
+  if(Krms<rmstol)
+    fprintf(stderr,"\t%e*",Krms);
+  else
+    fprintf(stderr,"\t%e ",Krms);
+
+  fprintf(stderr,"\t% e",J);
+  if(k>1)
+    fprintf(stderr,"\t% e",J-oldJ);
+  else
+    fprintf(stderr,"\t%13s","");
   fflush(stderr);
 
   printf("\nSIC iteration %i\n",(int) k);
-  printf("E-SIC = % 16.8f, dE = % e, K/R = %e\n",J,J-oldJ,K/R);
+  printf("E-SIC = % 16.8f, dE = % e, Kmax = %e, Krms = %e, R = %e\n",J,J-oldJ,Kmax,Krms,R);
   fflush(stdout);
 }
 
@@ -3130,7 +3156,7 @@ void PZSIC::print_time(const Timer & t) const {
   fflush(stderr);
 }
 
-void PZSIC::get_rk(double & R, double & K) const {
+void PZSIC::get_rk(double & R, double & Krms, double & Kmax) const {
   arma::mat S=solver->get_S();
   arma::mat Sinvh=solver->get_Sinvh();
 
@@ -3143,7 +3169,8 @@ void PZSIC::get_rk(double & R, double & K) const {
   // Difference from self-consistency is
   R=rms_norm(sic.P-sol.P);
   // Difference from Pedersen condition is
-  K=rms_cnorm(kappa);
+  Krms=rms_cnorm(kappa);
+  Kmax=max_cabs(kappa);
 }
 
 void PZSIC::initialize(const arma::cx_mat & W0) {
@@ -3153,19 +3180,16 @@ void PZSIC::initialize(const arma::cx_mat & W0) {
   cost_func_der(W0,f,der);
 
   // Compute K/R
-  double R, K;
-  get_rk(R,K);
-  // Set tolerance on kappa
-  //  kappatol=std::max( 0.5*K/R, 0.25 );
-  //  kappatol=0.25;
+  double R, Krms, Kmax;
+  get_rk(R,Krms,Kmax);
 }
 
 bool PZSIC::converged(const arma::cx_mat & W) {
-  double R, K;
-  get_rk(R,K);
+  double R, Krms, Kmax;
+  get_rk(R,Krms,Kmax);
   (void) W;
 
-  if(K<kappatol*R)
+  if(Kmax<maxtol && Krms<rmstol)
     // Converged
     return true;
   else
