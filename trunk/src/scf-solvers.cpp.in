@@ -63,6 +63,11 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
 #endif
 
+  /// SIC energy tolerance
+#ifdef DFT
+#define SICETOL (conv.deltaEmax/10.0)
+#endif
+
   /// Find excited orbital
 #if defined(FULLHOLE) || defined(HALFHOLE)
 #define find_exc(sol) if(spin) {ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);} else {ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);}
@@ -462,9 +467,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(pz==FULL || pz==CAN) {
       titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,pz==CAN,pzloc);
+      PZSIC_RDFT(sol,occs,dft,grid,SICETOL,pz==CAN,pzloc);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,pz==CAN,pzloc);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,SICETOL,pz==CAN,pzloc);
 #endif
       titer.cont();
     }
@@ -659,9 +664,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	if(pz==FULL || pz==CAN) {
 	  titer.stop();
 #ifdef RESTRICTED
-	  PZSIC_RDFT(rhsol,occs,dft,grid,pz==CAN,pzloc);
+	  PZSIC_RDFT(rhsol,occs,dft,grid,SICETOL,pz==CAN,pzloc);
 #else
-	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,pz==CAN,pzloc);
+	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,SICETOL,pz==CAN,pzloc);
 #endif
 	  titer.cont();
 	}
@@ -743,9 +748,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    if(pz==FULL || pz==CAN) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol1,occs,dft,grid,pz==CAN,pzloc);
+	      PZSIC_RDFT(sol1,occs,dft,grid,SICETOL,pz==CAN,pzloc);
 #else
-	      PZSIC_UDFT(sol1,occa,occb,dft,grid,pz==CAN,pzloc);
+	      PZSIC_UDFT(sol1,occa,occb,dft,grid,SICETOL,pz==CAN,pzloc);
 #endif
 	      titer.cont();
 	    }
@@ -766,9 +771,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    if(pz==FULL || pz==CAN) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol2,occs,dft,grid,pz==CAN,pzloc);
+	      PZSIC_RDFT(sol2,occs,dft,grid,SICETOL,pz==CAN,pzloc);
 #else
-	      PZSIC_UDFT(sol2,occa,occb,dft,grid,pz==CAN,pzloc);
+	      PZSIC_UDFT(sol2,occa,occb,dft,grid,SICETOL,pz==CAN,pzloc);
 #endif
 	      titer.cont();
 	    }
@@ -1099,9 +1104,9 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     if(pz==PERT || pz==CANPERT) {
       // Calculate SIC correction
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,pz==CANPERT,pzloc);
+      PZSIC_RDFT(sol,occs,dft,grid,SICETOL,pz==CANPERT,pzloc);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,pz==CANPERT,pzloc);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,SICETOL,pz==CANPERT,pzloc);
 #endif
       // Diagonalize to get new canonical orbitals and energies
       diagonalize(S,Sinvh,sol,shift);
