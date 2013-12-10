@@ -443,7 +443,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 }
 
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, bool canonical, bool localization) {
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, double Etol, bool canonical, bool localization) {
   // Set xc functionals
   if(pzmode==COUL) {
     dft.x_func=0;
@@ -565,7 +565,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   if(verbose && !canonical) {
     fprintf(stderr,"SIC unitary optimization\n");
   }
-  PZSIC_calculate(sicsol,W,dft,grid,canonical);
+  PZSIC_calculate(sicsol,W,dft,grid,Etol,canonical);
   // Save matrix
   chkptp->cwrite("CW",sicsol.C*W);
 
@@ -578,7 +578,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   sol.en.E  +=2*sicsol.en.E;
 }
 
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, bool canonical, bool localization) {
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, double Etol, bool canonical, bool localization) {
   // Set xc functionals
   if(pzmode==COUL) {
     dft.x_func=0;
@@ -764,12 +764,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   if(verbose && !canonical) {
     fprintf(stderr,"SIC unitary optimization, alpha spin\n");
   }
-  PZSIC_calculate(sicsola,Wa,dft,grid,canonical);
+  PZSIC_calculate(sicsola,Wa,dft,grid,Etol,canonical);
   chkptp->cwrite("CWa",sicsola.C*Wa);
   if(verbose && !canonical) {
     fprintf(stderr,"SIC unitary optimization, beta spin\n");
   }
-  PZSIC_calculate(sicsolb,Wb,dft,grid,canonical);
+  PZSIC_calculate(sicsolb,Wb,dft,grid,Etol,canonical);
   chkptp->cwrite("CWb",sicsolb.C*Wb);
 
   // Update current solution
@@ -783,9 +783,11 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   sol.en.E  +=sicsola.en.E+sicsolb.en.E;
 }
 
-void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool canonical) {
+void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, double Etol, bool canonical) {
   // Initialize the worker
-  PZSIC worker(this,dft,&grid,verbose);
+  const double maxtol=1e-2;
+  const double rmstol=1e-3;
+  PZSIC worker(this,dft,&grid,Etol,maxtol,rmstol,verbose);
   worker.set(sol,pzcor);
 
   // Use canonical orbitals for SIC
@@ -813,8 +815,8 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   if(verbose) {
     printf("Self-interaction energy is %e.\n",ESIC);
 
-    arma::vec Eorb=worker.get_Eorb();
-    printf("Decomposition of self-interaction:\n");
+    arma::vec Eorb=arma::sort(worker.get_Eorb(),1);
+    printf("Decomposition of self-interaction (in decreasing order):\n");
     for(size_t io=0;io<Eorb.n_elem;io++)
       printf("\t%4i\t% f\n",(int) io+1,Eorb(io));
     fflush(stdout);
@@ -3024,14 +3026,15 @@ void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
       der(a,b) =2.0 * arma::as_scalar( arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b) );
 }
 
-PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, bool verb) : Unitary(4,0.0,0.0,true,verb) {
+PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, double Etolv, double maxtolv, double rmstolv, bool verb) : Unitary(4,0.0,0.0,true,verb) {
   solver=solverp;
   dft=dftp;
   grid=gridp;
 
-  // Default value
-  rmstol=1e-3;
-  maxtol=1e-2;
+  // Convergence criteria
+  Etol=Etolv;
+  rmstol=rmstolv;
+  maxtol=maxtolv;
 }
 
 PZSIC::~PZSIC() {
@@ -3084,20 +3087,8 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
     arma::mat Fio=Forb[io];
     HSIC+=Fio*Pio*S;
   }
-  // Symmetrize. HSIC in MO basis is
-  arma::mat Hmo=arma::trans(sol.C)*HSIC*sol.C;
-
-  /*
-  // Compute antisymmetric part
-  double an=rms_norm(0.5*(Hmo-arma::trans(Hmo)));
-  double sn=rms_norm(0.5*(Hmo+arma::trans(Hmo)));
-  printf("Norm of antisymmetric part is %e, and that of symmetric part is %e. Ratio is %e.\n",an,sn,an/sn);
-  */
-
-  // Symmetrize
-  Hmo=(arma::trans(Hmo)+Hmo)/2.0;
-  // and back-transfer to AO basis
-  HSIC=S*sol.C*Hmo*arma::trans(sol.C)*S;
+  // Symmetrize.
+  HSIC=0.5*(HSIC+arma::trans(HSIC));
 
   // SI energy is
   f=arma::sum(Eorb);
@@ -3117,7 +3108,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 
 
 void PZSIC::print_legend() const {
-  fprintf(stderr,"\t%4s\t%13s\t%13s\t%13s\t%13s\t%10s\n","iter","kappa max","kappa rms","E-SIC","change","time (s)");
+  fprintf(stderr,"\t%4s\t%13s\t%13s\t%13s\t%14s\t%10s\n","iter","kappa max","kappa rms","E-SIC","change","time (s)");
   fflush(stderr);
 }
 
@@ -3137,10 +3128,13 @@ void PZSIC::print_progress(size_t k) const {
     fprintf(stderr,"\t%e ",Krms);
 
   fprintf(stderr,"\t% e",J);
-  if(k>1)
-    fprintf(stderr,"\t% e",J-oldJ);
-  else
-    fprintf(stderr,"\t%13s","");
+  if(k>1) {
+    if(fabs(J-oldJ)<Etol)
+      fprintf(stderr,"\t% e*",J-oldJ);
+    else
+      fprintf(stderr,"\t% e",J-oldJ);
+  } else
+    fprintf(stderr,"\t%14s","");
   fflush(stderr);
 
   printf("\nSIC iteration %i\n",(int) k);
@@ -3189,7 +3183,7 @@ bool PZSIC::converged(const arma::cx_mat & W) {
   get_rk(R,Krms,Kmax);
   (void) W;
 
-  if(Kmax<maxtol && Krms<rmstol)
+  if(Kmax<maxtol && Krms<rmstol && fabs(J-oldJ)<Etol)
     // Converged
     return true;
   else
