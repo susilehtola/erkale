@@ -281,9 +281,9 @@ class SCF {
   std::vector<arma::mat> freeze;
 
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & grid, double Etol, bool canonical=false, bool localize=true);
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & grid, bool reconstruct, double Etol, bool canonical=false, bool localize=true);
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & grid, double Etol, bool canonical=false, bool localize=true);
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & grid, bool reconstruct, double Etol, bool canonical=false, bool localize=true);
   /// Helper routine for the above
   void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, double Etol, bool canonical);
 

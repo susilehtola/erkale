@@ -42,6 +42,10 @@ bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
   return lhs.E < rhs.E;
 }
 
+bool operator<(const corbital_t & lhs, const corbital_t & rhs) {
+  return lhs.E < rhs.E;
+}
+
 void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec) {
   if(eigval.n_elem != eigvec.n_cols) {
     ERROR_INFO();
@@ -50,6 +54,25 @@ void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec) {
 
   // Helper
   std::vector<orbital_t> orbs(eigval.n_elem);
+  for(size_t io=0;io<eigval.n_elem;io++) {
+    orbs[io].E=eigval(io);
+    orbs[io].c=eigvec.col(io);
+  }
+  std::stable_sort(orbs.begin(),orbs.end());
+  for(size_t io=0;io<eigval.n_elem;io++) {
+    eigval(io)=orbs[io].E;
+    eigvec.col(io)=orbs[io].c;
+  }
+}
+
+void sort_eigvec(arma::colvec & eigval, arma::cx_mat & eigvec) {
+  if(eigval.n_elem != eigvec.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Eigenvalue vector does not correspond to eigenvector matrix!\n");
+  }
+
+  // Helper
+  std::vector<corbital_t> orbs(eigval.n_elem);
   for(size_t io=0;io<eigval.n_elem;io++) {
     orbs[io].E=eigval(io);
     orbs[io].c=eigvec.col(io);
