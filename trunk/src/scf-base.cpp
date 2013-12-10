@@ -443,7 +443,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 }
 
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, double Etol, bool canonical, bool localization) {
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization) {
   // Set xc functionals
   if(pzmode==COUL) {
     dft.x_func=0;
@@ -524,7 +524,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     }
   }
 
-  if(dft.adaptive && pzmode!=COUL) {
+  if(dft.adaptive && reconstruct && pzmode!=COUL) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
 
@@ -578,7 +578,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   sol.en.E  +=2*sicsol.en.E;
 }
 
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, double Etol, bool canonical, bool localization) {
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization) {
   // Set xc functionals
   if(pzmode==COUL) {
     dft.x_func=0;
@@ -715,7 +715,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     }
   }
 
-  if(dft.adaptive && pzmode!=COUL) {
+  if(dft.adaptive && reconstruct && pzmode!=COUL) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
 
@@ -811,16 +811,21 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   sol.en.Eel=-pzcor*ESIC;
   sol.en.E  =-pzcor*ESIC;
 
+  // Get orbital energies
+  arma::vec Eorb=arma::sort(worker.get_Eorb(),1);
+
   // Get orbital self-interaction energies
   if(verbose) {
     printf("Self-interaction energy is %e.\n",ESIC);
 
-    arma::vec Eorb=arma::sort(worker.get_Eorb(),1);
     printf("Decomposition of self-interaction (in decreasing order):\n");
     for(size_t io=0;io<Eorb.n_elem;io++)
       printf("\t%4i\t% f\n",(int) io+1,Eorb(io));
     fflush(stdout);
   }
+
+  // Sort orbitals
+  sort_eigvec(Eorb,W);
 }
 
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift) {
@@ -3108,7 +3113,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 
 
 void PZSIC::print_legend() const {
-  fprintf(stderr,"\t%4s\t%13s\t%13s\t%13s\t%14s\t%10s\n","iter","kappa max","kappa rms","E-SIC","change","time (s)");
+  fprintf(stderr,"\t%4s\t%13s\t%13s\t%13s\t%14s\t%10s\n","iter","kappa max ","kappa rms ","E-SIC","change ","time (s)");
   fflush(stderr);
 }
 
@@ -3117,6 +3122,7 @@ void PZSIC::print_progress(size_t k) const {
   get_rk(R,Krms,Kmax);
 
   fprintf(stderr,"\t%4i",(int) k);
+
   if(Kmax<maxtol)
     fprintf(stderr,"\t%e*",Kmax);
   else
@@ -3128,6 +3134,7 @@ void PZSIC::print_progress(size_t k) const {
     fprintf(stderr,"\t%e ",Krms);
 
   fprintf(stderr,"\t% e",J);
+
   if(k>1) {
     if(fabs(J-oldJ)<Etol)
       fprintf(stderr,"\t% e*",J-oldJ);

@@ -40,8 +40,22 @@ typedef struct {
 /// Helper for sorts
 bool operator<(const orbital_t & lhs, const orbital_t & rhs);
 
+/// Helper for sorts
+typedef struct {
+  /// Energy
+  double E;
+  /// Eigenvector
+  arma::cx_vec c;
+} corbital_t;
+
+
+/// Helper for sorts
+bool operator<(const corbital_t & lhs, const corbital_t & rhs);
+
 /// Sort vectors in order of increasing eigenvalue
 void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec);
+/// Sort vectors in order of increasing eigenvalue
+void sort_eigvec(arma::colvec & eigval, arma::cx_mat & eigvec);
 
 /* Orthogonalization routines */
 
