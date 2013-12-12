@@ -333,11 +333,18 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
 
     if(pz!=NO) {
-      if(pz==PERT || pz==CANPERT)
+      if(pz==PERT || pz==CANPERT || pz==REALPERT)
 	fprintf(stderr,"perturbative ");
-      if(pz==CAN || pz==CANPERT)
+      fprintf(stderr,"SIC with ");
+
+      if(pz==REAL || pz==REALPERT)
+	fprintf(stderr,"real ");
+      else if(pz==FULL || pz==PERT)
+	fprintf(stderr,"complex ");
+      else if(pz==CAN || pz==CANPERT)
 	fprintf(stderr,"canonical ");
-      fprintf(stderr,"SIC ");
+
+      fprintf(stderr,"orbitals ");
     }
 #endif
 
@@ -470,12 +477,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
 #ifdef DFT
     // Perdew-Zunger correction?
-    if(pz==FULL || pz==CAN) {
+    if(pz==FULL || pz==REAL || pz==CAN) {
       titer.stop();
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,true,SICETOL,pz==CAN,pzloc);
+      PZSIC_RDFT(sol,occs,dft,grid,true,SICETOL,pz==CAN,pzloc,pz==REAL);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,true,SICETOL,pz==CAN,pzloc);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,true,SICETOL,pz==CAN,pzloc,pz==REAL);
 #endif
       titer.cont();
     }
@@ -667,12 +674,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	form_fock(rhsol,sol);
 #ifdef DFT
 	// Perdew-Zunger correction?
-	if(pz==FULL || pz==CAN) {
+	if(pz==FULL || pz==REAL || pz==CAN) {
 	  titer.stop();
 #ifdef RESTRICTED
-	  PZSIC_RDFT(rhsol,occs,dft,grid,false,SICETOL,pz==CAN,pzloc);
+	  PZSIC_RDFT(rhsol,occs,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
 #else
-	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc);
+	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
 #endif
 	  titer.cont();
 	}
@@ -751,12 +758,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_fock(sol1,sol);
 #ifdef DFT
 	    // Perdew-Zunger correction?
-	    if(pz==FULL || pz==CAN) {
+	    if(pz==FULL || pz==REAL || pz==CAN) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol1,occs,dft,grid,false,SICETOL,pz==CAN,pzloc);
+	      PZSIC_RDFT(sol1,occs,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
 #else
-	      PZSIC_UDFT(sol1,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc);
+	      PZSIC_UDFT(sol1,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
 #endif
 	      titer.cont();
 	    }
@@ -774,12 +781,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    form_fock(sol2,sol);
 #ifdef DFT
 	    // Perdew-Zunger correction?
-	    if(pz==FULL || pz==CAN) {
+	    if(pz==FULL || pz==REAL || pz==CAN) {
 	      titer.stop();
 #ifdef RESTRICTED
-	      PZSIC_RDFT(sol2,occs,dft,grid,false,SICETOL,pz==CAN,pzloc);
+	      PZSIC_RDFT(sol2,occs,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
 #else
-	      PZSIC_UDFT(sol2,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc);
+	      PZSIC_UDFT(sol2,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
 #endif
 	      titer.cont();
 	    }
@@ -1107,12 +1114,12 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     }
 
 #ifdef DFT
-    if(pz==PERT || pz==CANPERT) {
+    if(pz==PERT || pz==CANPERT || pz==REALPERT) {
       // Calculate SIC correction
 #ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,true,SICETOL,pz==CANPERT,pzloc);
+      PZSIC_RDFT(sol,occs,dft,grid,true,SICETOL,pz==CANPERT,pzloc,pz==REALPERT);
 #else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,true,SICETOL,pz==CANPERT,pzloc);
+      PZSIC_UDFT(sol,occa,occb,dft,grid,true,SICETOL,pz==CANPERT,pzloc,pz==REALPERT);
 #endif
       // Diagonalize to get new canonical orbitals and energies
       diagonalize(S,Sinvh,sol,shift);

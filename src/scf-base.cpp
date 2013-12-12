@@ -130,6 +130,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       pz=FULL;
     else if(stricmp(pzs,"Pert")==0)
       pz=PERT;
+    else if(stricmp(pzs,"Real")==0)
+      pz=REAL;
+    else if(stricmp(pzs,"RealPert")==0)
+      pz=REALPERT;
     else if(stricmp(pzs,"Can")==0)
       pz=CAN;
     else if(stricmp(pzs,"CanPert")==0)
@@ -443,7 +447,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 }
 
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization) {
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization, bool real) {
   // Set xc functionals
   if(pzmode==COUL) {
     dft.x_func=0;
@@ -504,7 +508,10 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       W.eye(nocc,nocc);
     else {
       // Initialize with a random unitary matrix.
-      W=complex_unitary(nocc);
+      if(real)
+	W=real_orthogonal(nocc)*std::complex<double>(1.0,0.0);
+      else
+	W=complex_unitary(nocc);
 
       if(localization && nocc>1) {
 	Timer tloc;
@@ -512,7 +519,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
 	double measure;
-	orbital_localization(PIPEK_IAO,*basisp,sicsol.C,sol.P,measure,W,verbose,canonical,1e5,1e-3);
+	orbital_localization(PIPEK_IAO,*basisp,sicsol.C,sol.P,measure,W,verbose,real,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -565,7 +572,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   if(verbose && !canonical) {
     fprintf(stderr,"SIC unitary optimization\n");
   }
-  PZSIC_calculate(sicsol,W,dft,grid,Etol,canonical);
+  PZSIC_calculate(sicsol,W,dft,grid,Etol,canonical,real);
   // Save matrix
   chkptp->cwrite("CW",sicsol.C*W);
 
@@ -578,7 +585,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   sol.en.E  +=2*sicsol.en.E;
 }
 
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization) {
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization, bool real) {
   // Set xc functionals
   if(pzmode==COUL) {
     dft.x_func=0;
@@ -667,7 +674,10 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       Wa.eye(nocca,nocca);
     else {
       // Initialize with a random unitary matrix.
-      Wa=complex_unitary(nocca);
+      if(real)
+	Wa=real_orthogonal(nocca)*std::complex<double>(1.0,0.0);
+      else
+	Wa=complex_unitary(nocca);
 
       if(localization && nocca>1) {
 	Timer tloc;
@@ -675,7 +685,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure;
-	orbital_localization(PIPEK_IAO,*basisp,sicsola.C,sol.P,measure,Wa,verbose,canonical,1e5,1e-3);
+	orbital_localization(PIPEK_IAO,*basisp,sicsola.C,sol.P,measure,Wa,verbose,real,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -694,7 +704,10 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       Wb.eye(noccb,noccb);
     else {
       // Initialize with a random unitary matrix.
-      Wb=complex_unitary(noccb);
+      if(real)
+	Wb=real_orthogonal(noccb)*std::complex<double>(1.0,0.0);
+      else
+	Wb=complex_unitary(noccb);
 
       if(localization && noccb>1) {
 	Timer tloc;
@@ -702,7 +715,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial beta localization.\n");
 	double measure;
-	orbital_localization(PIPEK_IAO,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,canonical,1e5,1e-3);
+	orbital_localization(PIPEK_IAO,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,real,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -767,7 +780,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     else
       fprintf(stderr,"SIC canonical calculation, alpha spin\n");
   }
-  PZSIC_calculate(sicsola,Wa,dft,grid,Etol,canonical);
+  PZSIC_calculate(sicsola,Wa,dft,grid,Etol,canonical,real);
   chkptp->cwrite("CWa",sicsola.C*Wa);
 
   if(Wb.n_cols) {
@@ -777,7 +790,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       else
 	fprintf(stderr,"SIC canonical calculation,  beta spin\n");
     }
-    PZSIC_calculate(sicsolb,Wb,dft,grid,Etol,canonical);
+    PZSIC_calculate(sicsolb,Wb,dft,grid,Etol,canonical,real);
     chkptp->cwrite("CWb",sicsolb.C*Wb);
   }
 
@@ -800,7 +813,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   }
 }
 
-void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, double Etol, bool canonical) {
+void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, double Etol, bool canonical, bool real) {
   // Initialize the worker
   const double maxtol=1e-2;
   const double rmstol=1e-3;
@@ -813,7 +826,17 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
     ESIC=worker.cost_func(W);
   } else {
     //	Perform unitary optimization, take at max 20 iterations
-    worker.optimize(W,POLY_DF,CGPR,20);
+    size_t nmax=20;
+
+    if(real) {
+      // Real optimization
+      arma::mat Wr=arma::real(W);
+      worker.optimize(Wr,POLY_DF,CGPR,nmax);
+      W=Wr*std::complex<double>(1.0,0.0);
+    } else
+      // Complex optimization
+      worker.optimize(W,POLY_DF,CGPR,nmax);
+
     ESIC=worker.get_ESIC();
   }
 
