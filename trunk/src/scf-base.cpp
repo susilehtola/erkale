@@ -506,7 +506,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       // Initialize with a random unitary matrix.
       W=complex_unitary(nocc);
 
-      if(localization) {
+      if(localization && nocc>1) {
 	Timer tloc;
 
 	// Localize starting guess with threshold 10.0
@@ -669,7 +669,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       // Initialize with a random unitary matrix.
       Wa=complex_unitary(nocca);
 
-      if(localization) {
+      if(localization && nocca>1) {
 	Timer tloc;
 
 	// Localize starting guess with threshold 10.0
@@ -696,7 +696,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       // Initialize with a random unitary matrix.
       Wb=complex_unitary(noccb);
 
-      if(localization) {
+      if(localization && noccb>1) {
 	Timer tloc;
 
 	// Localize starting guess with threshold 10.0
@@ -761,26 +761,43 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   }
 
   // Do the calculation
-  if(verbose && !canonical) {
-    fprintf(stderr,"SIC unitary optimization, alpha spin\n");
+  if(verbose) {
+    if(!canonical && Wa.n_cols>1)
+      fprintf(stderr,"SIC unitary optimization,  alpha spin\n");
+    else
+      fprintf(stderr,"SIC canonical calculation, alpha spin\n");
   }
   PZSIC_calculate(sicsola,Wa,dft,grid,Etol,canonical);
   chkptp->cwrite("CWa",sicsola.C*Wa);
-  if(verbose && !canonical) {
-    fprintf(stderr,"SIC unitary optimization, beta spin\n");
+
+  if(Wb.n_cols) {
+    if(verbose) {
+      if(!canonical && Wb.n_cols>1)
+	fprintf(stderr,"SIC unitary optimization,   beta spin\n");
+      else
+	fprintf(stderr,"SIC canonical calculation,  beta spin\n");
+    }
+    PZSIC_calculate(sicsolb,Wb,dft,grid,Etol,canonical);
+    chkptp->cwrite("CWb",sicsolb.C*Wb);
   }
-  PZSIC_calculate(sicsolb,Wb,dft,grid,Etol,canonical);
-  chkptp->cwrite("CWb",sicsolb.C*Wb);
 
   // Update current solution
   sol.Ha +=sicsola.H;
-  sol.Hb +=sicsolb.H;
   sol.XCa+=sicsola.XC;
-  sol.XCb+=sicsolb.XC;
 
-  sol.en.Exc+=sicsola.en.Exc+sicsolb.en.Exc;
-  sol.en.Eel+=sicsola.en.Eel+sicsolb.en.Eel;
-  sol.en.E  +=sicsola.en.E+sicsolb.en.E;
+  if(Wb.n_cols) {
+    sol.Hb +=sicsolb.H;
+    sol.XCb+=sicsolb.XC;
+    
+    sol.en.Exc+=sicsola.en.Exc+sicsolb.en.Exc;
+    sol.en.Eel+=sicsola.en.Eel+sicsolb.en.Eel;
+    sol.en.E  +=sicsola.en.E+sicsolb.en.E;
+  } else {
+
+    sol.en.Exc+=sicsola.en.Exc;
+    sol.en.Eel+=sicsola.en.Eel;
+    sol.en.E  +=sicsola.en.E;
+  }
 }
 
 void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, double Etol, bool canonical) {
@@ -790,9 +807,9 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   PZSIC worker(this,dft,&grid,Etol,maxtol,rmstol,verbose);
   worker.set(sol,pzcor);
 
-  // Use canonical orbitals for SIC
   double ESIC;
-  if(canonical) {
+  if(canonical || W.n_cols==1) {
+    // Use canonical orbitals for SIC
     ESIC=worker.cost_func(W);
   } else {
     //	Perform unitary optimization, take at max 20 iterations
