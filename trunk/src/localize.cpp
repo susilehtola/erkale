@@ -419,6 +419,11 @@ int main(int argc, char **argv) {
   set.parse(argv[1]);
   set.print();
 
+  printf("Please read and cite the reference:\n%s\n%s\n%s\n\n", \
+	 "S. Lehtola and H. Jónsson",         \
+	 "Unitary optimization of localized molecular orbitals", \
+	 "J. Chem. Theory Comput. 9 (2013), pp. 5365 - 5372.");
+
   std::string logfile=set.get_string("Logfile");
   bool virt=set.get_bool("Virtual");
   int seed=set.get_int("Seed");
