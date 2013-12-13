@@ -2149,6 +2149,40 @@ arma::mat BasisSet::nuclear() const {
   return Vnuc;
 }
 
+arma::mat BasisSet::potential(coords_t r) const {
+  // Form nuclear attraction matrix
+
+  // Size of basis set
+  size_t N=get_Nbf();
+
+  // Initialize matrix
+  arma::mat V(N,N);
+  V.zeros();
+
+  // Loop over shells
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ip=0;ip<shellpairs.size();ip++) {
+      // Shells in pair
+      size_t i=shellpairs[ip].is;
+      size_t j=shellpairs[ip].js;
+
+      // Get subblock
+      arma::mat tmp=shells[i].nuclear(r.x,r.y,r.z,shells[j]);
+      
+      // On the off diagonal we fill out both sides of the matrix
+      if(i!=j) {
+	V.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+	V.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+      } else
+	// On the diagonal we just get it once
+	V.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+  }
+  
+  return V;
+}
+
 arma::mat BasisSet::eri_screening() const {
  // Get unique pairs
  std::vector<shellpair_t> pairs=get_unique_shellpairs();
@@ -3322,6 +3356,22 @@ void compute_density_gradient_hessian(const arma::mat & P, const BasisSet & bas,
   arma::mat hs=arma::trans(grad)*P*grad;
   // Convert to matrix form
   h=arma::reshape(hf,3,3)+hs;
+}
+
+double compute_potential(const arma::mat & P, const BasisSet & bas, const coords_t & r) {
+  // Compute nuclear contribution
+  std::vector<nucleus_t> nucs=bas.get_nuclei();
+  double nucphi=0.0;
+  for(size_t i=0;i<nucs.size();i++)
+    if(!nucs[i].bsse)
+      nucphi+=nucs[i].Z/norm(r - nucs[i].r);
+ 
+  // Get potential energy matrix
+  arma::mat V=bas.potential(r);
+  // Electronic contribution is (minus sign is already in the definition of the potential matrix)
+  double elphi=arma::trace(P*V);
+
+  return nucphi+elphi;
 }
 
 std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {

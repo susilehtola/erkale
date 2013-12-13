@@ -398,6 +398,8 @@ class BasisSet {
   arma::mat kinetic() const;
   /// Calculate nuclear repulsion matrix
   arma::mat nuclear() const;
+  /// Calculate electric potential matrix
+  arma::mat potential(coords_t r) const;
 
   /// Calculate ERI screening matrix
   arma::mat eri_screening() const;
@@ -614,6 +616,9 @@ double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t
 void compute_density_gradient(const arma::mat & P, const BasisSet & bas, const coords_t & r, double & d, arma::vec & g);
 /// Compute density, gradient and hessian at a given point
 void compute_density_gradient_hessian(const arma::mat & P, const BasisSet & bas, const coords_t & r, double & d, arma::vec & g, arma::mat & h);
+
+/// Compute electrostatic potential at given point
+double compute_potential(const arma::mat & P, const BasisSet & bas, const coords_t & r);
 
 /// Check orthonormality of molecular orbitals
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
