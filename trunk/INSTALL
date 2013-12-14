@@ -41,7 +41,7 @@ will run a calculation with PBE exchange and PBE correlation, and
  Method hyb_gga_xc_b3lyp
 will run a B3LYP calculation.
 
-Please consult the libxc documentation for valid functional keywords.
+Please consult the list of supported functionals for more choices.
 
 Upon startup, ERKALE will print out the current settings, along with
 valid keywords.
@@ -106,9 +106,10 @@ The nineth line turns on Broyden acceleration.
 ** Contact information **
 
 Mr Susi Lehtola
-Department of Physics
-P. O. Box 64 (Gustaf Hällströmin katu 2) 
-FI-00014 University of Helsinki
+Department of Appied Physics
+Aalto University
+P. O. Box 11100
+FI-00076 AALTO
 FINLAND
 
 susi (dot) lehtola (at) alumni (dot) helsinki (dot) fi
