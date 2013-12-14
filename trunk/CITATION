@@ -1,10 +1,36 @@
 If you use ERKALE in a scientific publication, please cite the software as
 
-   S. Lehtola, ERKALE - HF/DFT from Hel (2012), http://erkale.googlecode.com.
+   S. Lehtola, ERKALE -- HF/DFT from Hel (2013), http://erkale.googlecode.com.
 
 Furthermore, there is an article detailing how ERKALE operates and
 what kinds of calculations it can be used for. Please cite this work
 as well.
 
-   J. Lehtola et al., "ERKALE - A Flexible Program Package for X-ray
-   Properties of Atoms and Molecules", J. Comp. Chem. 33, 1572 (2012).
+   J. Lehtola et al., "ERKALE -- A flexible program package for x-ray
+   properties of atoms and molecules", J. Comp. Chem. 33, 1572 (2012).
+
+
+Additionally:
+
+   * if you calculate electron momentum densities or Compton profiles
+     with ERKALE, please cite the used algorithms
+
+     J. Lehtola et al., "Calculation of isotropic Compton profiles with
+     Gaussian basis sets", Phys. Chem. Chem. Phys. 13, 5630 (2011).
+
+   * if you form localized orbitals with ERKALE, please cite
+
+     S. Lehtola and H. Jónsson, "Unitary optimization of localized
+     molecular orbitals", J. Chem. Theory Comput. 9, 5365 (2013).
+
+   * if you use the coemd basis sets, please cite
+
+     J. Lehtola et al., "Completeness-optimized basis sets:
+     Application to ground-state electron momentum densities",
+     J. Chem. Phys. 137, 104105 (2012).
+
+   * if you use the pcemd or the ccemd basis sets, please cite
+
+     S. Lehtola et al., "Contraction of completeness-optimized basis
+     sets: Application to ground-state electron momentum densities",
+     J. Chem. Phys. 138, 044109 (2013).
