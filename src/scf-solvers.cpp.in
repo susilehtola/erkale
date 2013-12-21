@@ -566,6 +566,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
     // Perform ADIIS interpolation
     if(useadiis && ((usediis && !diissucc) || !usediis)) {
+      if(verbose)
+	t.set();
 
       diissucc=true;
 #ifdef RESTRICTED
