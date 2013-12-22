@@ -41,19 +41,21 @@ LAPACK="-L/usr/lib64/atlas -llapack -lcblas -latlas"
 BLAS="-L/usr/lib64/atlas -lcblas -latlas"
 
 # Maximum supported angular momentum (affects libint)
-# If this is very high, libint compilation will take ages and the
-# resulting libraries will be HUGE.
-MAXAM="6"
+MAXAM="8"
+# Maximum optimized angular momentum (affects libint). If this is very
+# large, libint compilation will take ages and the resulting libraries
+# will be HUGE.
+OPTAM="6"
 # Maximum angular momentum for first ERI derivatives
 MAXDERIV="5"
 
 # Current versions of libraries
 export GSLVER="1.16"
 export XCVER="2.0.2"
-export INTVER="1.1.4"
-export ARMAVER="3.920.2"
+export INTVER="1.1.5"
+export ARMAVER="3.930"
 export CMAKEVER="2.8.12"
-export HDF5VER="1.8.11"
+export HDF5VER="1.8.12"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -169,7 +171,8 @@ if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a
  
  ./configure --enable-static --disable-shared \
   --prefix=${topdir}/libint --exec-prefix=${topdir}/libint \
-  --disable-r12 --with-libint-max-am=${MAXAM} --with-libderiv-max-am1=${MAXDERIV} \
+  --with-libint-max-am=${MAXAM} --with-libint-opt-am=${OPTAM} \
+  --with-libderiv-max-am1=${MAXDERIV}  --disable-r12 \
   --with-cc="${CC}" --with-cxx="${CXX}" --with-ar=${AR} \
   --with-cc-optflags="${ICFLAGS}" \
   --with-cxx-optflags="${ICXXFLAGS}" &>configure.log
