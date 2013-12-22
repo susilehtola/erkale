@@ -53,7 +53,7 @@ MAXDERIV="5"
 export GSLVER="1.16"
 export XCVER="2.0.2"
 export INTVER="1.1.5"
-export ARMAVER="3.930"
+export ARMAVER="3.930.2"
 export CMAKEVER="2.8.12"
 export HDF5VER="1.8.12"
 
