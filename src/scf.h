@@ -475,40 +475,76 @@ enum locmet {
   FM_3,
   /// Fourth moment, penalty 4
   FM_4,
-  /// Pipek-Mezey, Mulliken charge
-  PIPEK_MULLIKEN,
-  /// Pipek-Mezey, Mulliken charge, penalty p=2
+  /// Pipek-Mezey, Mulliken charge, p=1.5
+  PIPEK_MULLIKENH,
+  /// Pipek-Mezey, Mulliken charge, p=2
   PIPEK_MULLIKEN2,
-  /// Pipek-Mezey, Löwdin charge
-  PIPEK_LOWDIN,
-  /// Pipek-Mezey, Löwdin charge, penalty p=2
+  /// Pipek-Mezey, Mulliken charge, p=4
+  PIPEK_MULLIKEN4,
+  /// Pipek-Mezey, Löwdin charge, p=1.5
+  PIPEK_LOWDINH,
+  /// Pipek-Mezey, Löwdin charge, p=2
   PIPEK_LOWDIN2,
-  /// Pipek-Mezey, Bader charge
-  PIPEK_BADER,
-  /// Pipek-Mezey, Bader charge, penalty p=2
+  /// Pipek-Mezey, Löwdin charge, p=4
+  PIPEK_LOWDIN4,
+  /// Pipek-Mezey, Bader charge, p=1.5
+  PIPEK_BADERH,
+  /// Pipek-Mezey, Bader charge, p=2
   PIPEK_BADER2,
-  /// Pipek-Mezey, Becke charge
-  PIPEK_BECKE,
-  /// Pipek-Mezey, Becke charge, penalty p=2
+  /// Pipek-Mezey, Bader charge, p=4
+  PIPEK_BADER4,
+  /// Pipek-Mezey, Becke charge, p=1.5
+  PIPEK_BECKEH,
+  /// Pipek-Mezey, Becke charge, p=2
   PIPEK_BECKE2,
-  /// Pipek-Mezey, Hirshfeld charge
-  PIPEK_HIRSHFELD,
-  /// Pipek-Mezey, Hirshfeld charge, penalty p=2
+  /// Pipek-Mezey, Becke charge, p=4
+  PIPEK_BECKE4,
+  /// Pipek-Mezey, Hirshfeld charge, p=1.5
+  PIPEK_HIRSHFELDH,
+  /// Pipek-Mezey, Hirshfeld charge, p=2
   PIPEK_HIRSHFELD2,
-  /// Pipek-Mezey, intrinsic atomic orbital charge
-  PIPEK_IAO,
-  /// Pipek-Mezey, intrinsic atomic orbital charge, penalty p=2
+  /// Pipek-Mezey, Hirshfeld charge, p=4
+  PIPEK_HIRSHFELD4,
+  /// Pipek-Mezey, intrinsic atomic orbital charge, p=1.5
+  PIPEK_IAOH,
+  /// Pipek-Mezey, intrinsic atomic orbital charge, p=2
   PIPEK_IAO2,
-  /// Pipek-Mezey, Stockholder charge
-  PIPEK_STOCKHOLDER,
-  /// Pipek-Mezey, Stockholder charge, penalty p=2
+  /// Pipek-Mezey, intrinsic atomic orbital charge, p=4
+  PIPEK_IAO4,
+  /// Pipek-Mezey, Stockholder charge, p=1.5
+  PIPEK_STOCKHOLDERH,
+  /// Pipek-Mezey, Stockholder charge, p=2
   PIPEK_STOCKHOLDER2,
-  /// Pipek-Mezey, Voronoi charge
-  PIPEK_VORONOI,
-  /// Pipek-Mezey, Voronoi charge, penalty p=2
+  /// Pipek-Mezey, Stockholder charge, p=4
+  PIPEK_STOCKHOLDER4,
+  /// Pipek-Mezey, Voronoi charge, p=1.5
+  PIPEK_VORONOIH,
+  /// Pipek-Mezey, Voronoi charge, p=2
   PIPEK_VORONOI2,
+  /// Pipek-Mezey, Voronoi charge, p=4
+  PIPEK_VORONOI4,
   /// Edmiston-Ruedenberg
   EDMISTON
+};
+
+/// Charge method methods
+enum chgmet {
+  /// Mulliken charge
+  MULLIKEN,
+  /// Löwdin charge
+  LOWDIN,
+  /// Bader charge
+  BADER,
+  /// Becke charge
+  BECKE,
+  /// Hirshfeld charge
+  HIRSHFELD,
+  /// intrinsic atomic orbital charge
+  IAO,
+  /// Stockholder charge
+  STOCKHOLDER,
+  /// Voronoi charge
+  VORONOI
 };
 
 /// Boys localization
@@ -584,12 +620,12 @@ class Pipek : public Unitary {
   // the memory requirement is only Nocc^2
 
   /// Method
-  enum locmet chg;
+  enum chgmet chg;
   /// Amount of charges
   size_t N;
 
-  /// Penalty exponent
-  int p;
+  /// Penalty exponent, p=2 for conventional Pipek-Mezey
+  double p;
 
   /// Orbitals
   arma::mat C;
@@ -616,7 +652,7 @@ class Pipek : public Unitary {
   arma::mat get_charge(size_t i);
 
  public:
-  Pipek(enum locmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, int p=1, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
+  Pipek(enum chgmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double p=2.0, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
   ~Pipek();
 
   /// Evaluate cost function
