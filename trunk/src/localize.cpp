@@ -453,38 +453,54 @@ int main(int argc, char **argv) {
     method=FM_3;
   else if(stricmp(mets,"FM4")==0)
     method=FM_4;
+  else if(stricmp(mets,"MUH")==0)
+    method=PIPEK_MULLIKENH;
   else if(stricmp(mets,"MU")==0)
-    method=PIPEK_MULLIKEN;
-  else if(stricmp(mets,"MU2")==0)
     method=PIPEK_MULLIKEN2;
+  else if(stricmp(mets,"MU2")==0)
+    method=PIPEK_MULLIKEN4;
+  else if(stricmp(mets,"LOH")==0)
+    method=PIPEK_LOWDINH;
   else if(stricmp(mets,"LO")==0)
-    method=PIPEK_LOWDIN;
-  else if(stricmp(mets,"LO2")==0)
     method=PIPEK_LOWDIN2;
+  else if(stricmp(mets,"LO2")==0)
+    method=PIPEK_LOWDIN4;
+  else if(stricmp(mets,"BAH")==0)
+    method=PIPEK_BADERH;
   else if(stricmp(mets,"BA")==0)
-    method=PIPEK_BADER;
-  else if(stricmp(mets,"BA2")==0)
     method=PIPEK_BADER2;
+  else if(stricmp(mets,"BA2")==0)
+    method=PIPEK_BADER4;
+  else if(stricmp(mets,"BEH")==0)
+    method=PIPEK_BECKEH;
   else if(stricmp(mets,"BE")==0)
-    method=PIPEK_BECKE;
-  else if(stricmp(mets,"BE2")==0)
     method=PIPEK_BECKE2;
+  else if(stricmp(mets,"BE2")==0)
+    method=PIPEK_BECKE4;
+  else if(stricmp(mets,"HIH")==0)
+    method=PIPEK_HIRSHFELDH;
   else if(stricmp(mets,"HI")==0)
-    method=PIPEK_HIRSHFELD;
-  else if(stricmp(mets,"HI2")==0)
     method=PIPEK_HIRSHFELD2;
+  else if(stricmp(mets,"HI2")==0)
+    method=PIPEK_HIRSHFELD4;
+  else if(stricmp(mets,"IAOH")==0)
+    method=PIPEK_IAOH;
   else if(stricmp(mets,"IAO")==0)
-    method=PIPEK_IAO;
-  else if(stricmp(mets,"IAO2")==0)
     method=PIPEK_IAO2;
+  else if(stricmp(mets,"IAO2")==0)
+    method=PIPEK_IAO4;
+  else if(stricmp(mets,"STH")==0)
+    method=PIPEK_STOCKHOLDERH;
   else if(stricmp(mets,"ST")==0)
-    method=PIPEK_STOCKHOLDER;
-  else if(stricmp(mets,"ST2")==0)
     method=PIPEK_STOCKHOLDER2;
+  else if(stricmp(mets,"ST2")==0)
+    method=PIPEK_STOCKHOLDER4;
   else if(stricmp(mets,"VO")==0)
-    method=PIPEK_VORONOI;
-  else if(stricmp(mets,"VO2")==0)
     method=PIPEK_VORONOI2;
+  else if(stricmp(mets,"VOH")==0)
+    method=PIPEK_VORONOIH;
+  else if(stricmp(mets,"VO2")==0)
+    method=PIPEK_VORONOI4;
   else if(stricmp(mets,"ER")==0)
     method=EDMISTON;
   else throw std::runtime_error("Localization method not implemented.\n");

@@ -519,7 +519,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial localization.\n");
 	double measure;
-	orbital_localization(PIPEK_IAO,*basisp,sicsol.C,sol.P,measure,W,verbose,real,1e5,1e-3);
+	orbital_localization(PIPEK_IAO2,*basisp,sicsol.C,sol.P,measure,W,verbose,real,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -685,7 +685,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure;
-	orbital_localization(PIPEK_IAO,*basisp,sicsola.C,sol.P,measure,Wa,verbose,real,1e5,1e-3);
+	orbital_localization(PIPEK_IAO2,*basisp,sicsola.C,sol.P,measure,Wa,verbose,real,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -715,7 +715,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	// Localize starting guess with threshold 10.0
 	if(verbose) printf("\nInitial beta localization.\n");
 	double measure;
-	orbital_localization(PIPEK_IAO,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,real,1e5,1e-3);
+	orbital_localization(PIPEK_IAO2,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,real,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -2101,39 +2101,164 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     else
       measure=worker.optimize(U,umet,uacc,maxiter);
     
-  } else if(met==PIPEK_MULLIKEN || met==PIPEK_MULLIKEN2 || met==PIPEK_LOWDIN || met==PIPEK_LOWDIN2 ||  met==PIPEK_BADER || met==PIPEK_BADER2 || met==PIPEK_BECKE || met==PIPEK_BECKE2 || met==PIPEK_HIRSHFELD || met==PIPEK_HIRSHFELD2 || met==PIPEK_IAO || met==PIPEK_IAO2 || met==PIPEK_STOCKHOLDER || met==PIPEK_STOCKHOLDER2 || met==PIPEK_VORONOI || met==PIPEK_VORONOI2) {
+  } else if(met==PIPEK_MULLIKENH    ||		\
+	    met==PIPEK_MULLIKEN2    ||		\
+	    met==PIPEK_MULLIKEN4    ||		\
+	    met==PIPEK_LOWDINH      ||		\
+	    met==PIPEK_LOWDIN2      ||		\
+	    met==PIPEK_LOWDIN4      ||		\
+	    met==PIPEK_BADERH       ||		\
+	    met==PIPEK_BADER2       ||		\
+	    met==PIPEK_BADER4       ||		\
+	    met==PIPEK_BECKEH       ||		\
+	    met==PIPEK_BECKE2       ||		\
+	    met==PIPEK_BECKE4       ||		\
+	    met==PIPEK_HIRSHFELDH   ||		\
+	    met==PIPEK_HIRSHFELD2   ||		\
+	    met==PIPEK_HIRSHFELD4   ||		\
+	    met==PIPEK_IAOH         ||		\
+	    met==PIPEK_IAO2         ||		\
+	    met==PIPEK_IAO4         ||		\
+	    met==PIPEK_STOCKHOLDERH ||		\
+	    met==PIPEK_STOCKHOLDER2 ||		\
+	    met==PIPEK_STOCKHOLDER4 ||		\
+	    met==PIPEK_VORONOIH     ||		\
+	    met==PIPEK_VORONOI2     ||		\
+	    met==PIPEK_VORONOI4) {
 
     // Penalty exponent
-    int p=1;
-    if(met==PIPEK_MULLIKEN2) {
-      met=PIPEK_MULLIKEN;
-      p=2;
-    } else if(met==PIPEK_LOWDIN2) {
-      met=PIPEK_LOWDIN;
-      p=2;
-    } else if(met==PIPEK_BADER2) {
-      met=PIPEK_BADER;
-      p=2;
-    } else if(met==PIPEK_BECKE2) {
-      met=PIPEK_BECKE;
-      p=2;
-    } else if(met==PIPEK_HIRSHFELD2) {
-      met=PIPEK_HIRSHFELD;
-      p=2;
-    } else if(met==PIPEK_IAO2) {
-      met=PIPEK_IAO;
-      p=2;
-    } else if(met==PIPEK_STOCKHOLDER2) {
-      met=PIPEK_STOCKHOLDER;
-      p=2;
-    } else if(met==PIPEK_VORONOI2) {
-      met=PIPEK_VORONOI;
-      p=2;
+    double p;
+    enum chgmet chg;
+
+    switch(met) {
+    case(PIPEK_MULLIKENH):
+      p=1.5;
+      chg=MULLIKEN;
+      break;
+
+    case(PIPEK_MULLIKEN2):
+      p=2.0;
+      chg=MULLIKEN;
+      break;
+
+    case(PIPEK_MULLIKEN4):
+      p=4.0;
+      chg=MULLIKEN;
+      break;
+
+    case(PIPEK_LOWDINH):
+      p=1.5;
+      chg=LOWDIN;
+      break;
+
+    case(PIPEK_LOWDIN2):
+      p=2.0;
+      chg=LOWDIN;
+      break;
+
+    case(PIPEK_LOWDIN4):
+      p=4.0;
+      chg=LOWDIN;
+      break;
+
+    case(PIPEK_BADERH):
+      p=1.5;
+      chg=BADER;
+      break;
+
+    case(PIPEK_BADER2):
+      p=2.0;
+      chg=BADER;
+      break;
+
+    case(PIPEK_BADER4):
+      p=4.0;
+      chg=BADER;
+      break;
+
+    case(PIPEK_BECKEH):
+      p=1.5;
+      chg=BECKE;
+      break;
+
+    case(PIPEK_BECKE2):
+      p=2.0;
+      chg=BECKE;
+      break;
+
+    case(PIPEK_BECKE4):
+      p=4.0;
+      chg=BECKE;
+      break;
+
+    case(PIPEK_VORONOIH):
+      p=1.5;
+      chg=VORONOI;
+      break;
+
+    case(PIPEK_VORONOI2):
+      p=2.0;
+      chg=VORONOI;
+      break;
+
+    case(PIPEK_VORONOI4):
+      p=4.0;
+      chg=VORONOI;
+      break;
+
+    case(PIPEK_IAOH):
+      p=1.5;
+      chg=IAO;
+      break;
+
+    case(PIPEK_IAO2):
+      p=2.0;
+      chg=IAO;
+      break;
+
+    case(PIPEK_IAO4):
+      p=4.0;
+      chg=IAO;
+      break;
+
+    case(PIPEK_HIRSHFELDH):
+      p=1.5;
+      chg=HIRSHFELD;
+      break;
+
+    case(PIPEK_HIRSHFELD2):
+      p=2.0;
+      chg=HIRSHFELD;
+      break;
+
+    case(PIPEK_HIRSHFELD4):
+      p=4.0;
+      chg=HIRSHFELD;
+      break;
+
+    case(PIPEK_STOCKHOLDERH):
+      p=1.5;
+      chg=STOCKHOLDER;
+      break;
+
+    case(PIPEK_STOCKHOLDER2):
+      p=2.0;
+      chg=STOCKHOLDER;
+      break;
+
+    case(PIPEK_STOCKHOLDER4):
+      p=4.0;
+      chg=STOCKHOLDER;
+      break;
+      
+    default:
+      ERROR_INFO();
+      throw std::runtime_error("Not implemented.\n");
     }
 
     // If only one nucleus - nothing to do!
     if(basis.get_Nnuc()>1) {
-      Pipek worker(met,basis,C,P,p,Gthr,Fthr,verbose);
+      Pipek worker(chg,basis,C,P,p,Gthr,Fthr,verbose);
       if(fname.length()) worker.open_log(fname);
       worker.set_debug(debug);
       if(real)
@@ -2577,57 +2702,50 @@ void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
 }
 
 
-Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, int pv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4*pv,Gth,Fth,!delocalize,ver) {
+Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, double pv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(2*pv,Gth,Fth,!delocalize,ver) {
   // Store used method
   chg=chgv;
   C=Cv;
   // and penalty exponent
   p=pv;
 
-  // Check validity of penalty
-  if(chg==PIPEK_BADER2 || chg==PIPEK_BECKE2 || chg==PIPEK_HIRSHFELD2 || chg==PIPEK_IAO2 || chg==PIPEK_LOWDIN2 || chg==PIPEK_MULLIKEN2 || chg==PIPEK_STOCKHOLDER2 || chg==PIPEK_VORONOI2) {
-    ERROR_INFO();
-    throw std::runtime_error("Penalty exponent must be handled outside Pipek.\n");
-  }
-																		   
-
   Timer t;
   if(ver) {
     printf("Initializing Pipek-Mezey calculation with ");
-    if(chg==PIPEK_BADER)
+    if(chg==BADER)
       printf("Bader");
-    else if(chg==PIPEK_BECKE)
+    else if(chg==BECKE)
       printf("Becke");
-    else if(chg==PIPEK_HIRSHFELD)
+    else if(chg==HIRSHFELD)
       printf("Hirshfeld");
-    else if(chg==PIPEK_IAO)
+    else if(chg==IAO)
       printf("IAO");
-    else if(chg==PIPEK_LOWDIN)
+    else if(chg==LOWDIN)
       printf("Löwdin");
-    else if(chg==PIPEK_MULLIKEN)
+    else if(chg==MULLIKEN)
       printf("Mulliken");
-    else if(chg==PIPEK_STOCKHOLDER)
+    else if(chg==STOCKHOLDER)
       printf("Stockholder");
-    else if(chg==PIPEK_VORONOI)
+    else if(chg==VORONOI)
       printf("Voronoi");
-    printf(" charges ... ");
+    printf(" charges.\n");
     fflush(stdout);
   }
 
-  if(chg==PIPEK_BADER || chg==PIPEK_VORONOI) {
+  if(chg==BADER || chg==VORONOI) {
     // Helper. Non-verbose operation
     bader=BaderGrid(&basis,ver);
     // Construct integration grid
     bader.construct(1e-5);
     // Run classification
-    if(chg==PIPEK_BADER)
+    if(chg==BADER)
       bader.classify(P);
     else
       bader.classify_voronoi();
     // Amount of regions
     N=bader.get_Nmax();
 
-  } else if(chg==PIPEK_BECKE) {
+  } else if(chg==BECKE) {
     // Amount of regions
     N=basis.get_Nnuc();
     // Grid
@@ -2635,7 +2753,7 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Construct integration grid
     grid.construct_becke(1e-5);
 
-  } else if(chg==PIPEK_HIRSHFELD) {
+  } else if(chg==HIRSHFELD) {
     // Amount of regions
     N=basis.get_Nnuc();
     // We don't know method here so just use HF.
@@ -2647,7 +2765,7 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Construct integration grid
     grid.construct_hirshfeld(hirsh,1e-5);
 
-  } else if(chg==PIPEK_IAO) {
+  } else if(chg==IAO) {
     // Amount of regions
     N=basis.get_Nnuc();
 
@@ -2659,7 +2777,7 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Also need overlap matrix
     S=basis.overlap();
 
-  } else if(chg==PIPEK_STOCKHOLDER) {
+  } else if(chg==STOCKHOLDER) {
     // Amount of regions
     N=basis.get_Nnuc();
     // Stockholder atomic charges
@@ -2673,7 +2791,7 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Construct integration grid
     grid.construct_hirshfeld(hirsh,1e-5);
 
-  } else if(chg==PIPEK_MULLIKEN) {
+  } else if(chg==MULLIKEN) {
     // Amount of regions
     N=basis.get_Nnuc();
     // Get overlap matrix
@@ -2683,7 +2801,7 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     for(size_t i=0;i<N;i++)
       shells[i]=basis.get_funcs(i);
 
-  } else if(chg==PIPEK_LOWDIN) {
+  } else if(chg==LOWDIN) {
     // Amount of regions
     N=basis.get_Nnuc();
     // Get overlap matrix
@@ -2704,7 +2822,7 @@ Pipek::Pipek(enum locmet chgv, const BasisSet & basis, const arma::mat & Cv, con
   }
 
   if(ver) {
-    printf("done (%s)\n",t.elapsed().c_str());
+    printf("Initialization of Pipek-Mezey took %s\n",t.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -2715,19 +2833,19 @@ Pipek::~Pipek() {
 arma::mat Pipek::get_charge(size_t iat) {
   arma::mat Q;
 
-  if(chg==PIPEK_BADER || chg==PIPEK_VORONOI) {
+  if(chg==BADER || chg==VORONOI) {
     arma::mat Sat=bader.regional_overlap(iat);
     Q=arma::trans(C)*Sat*C;
 
-  } else if(chg==PIPEK_BECKE) {
+  } else if(chg==BECKE) {
     arma::mat Sat=grid.eval_overlap(iat);
     Q=arma::trans(C)*Sat*C;
  
-  } else if(chg==PIPEK_HIRSHFELD || chg==PIPEK_STOCKHOLDER) {
+  } else if(chg==HIRSHFELD || chg==STOCKHOLDER) {
     arma::mat Sat=grid.eval_hirshfeld_overlap(hirsh,iat);
     Q=arma::trans(C)*Sat*C;
 
-  } else if(chg==PIPEK_IAO) {
+  } else if(chg==IAO) {
 
     // Construct IAO density matrix
     arma::mat Piao(C.n_rows, C.n_rows);
@@ -2740,7 +2858,7 @@ arma::mat Pipek::get_charge(size_t iat) {
     }
     Q=arma::trans(C)*S*Piao*S*C;
 
-  } else if(chg==PIPEK_LOWDIN) {
+  } else if(chg==LOWDIN) {
     Q.zeros(C.n_cols,C.n_cols);
 
     // Helper matrix
@@ -2752,7 +2870,7 @@ arma::mat Pipek::get_charge(size_t iat) {
 	  for(size_t fi=shells[iat][is].get_first_ind();fi<=shells[iat][is].get_last_ind();fi++)
 	    Q(io,jo)+=ShC(fi,io)*ShC(fi,jo);
 
-  } else if(chg==PIPEK_MULLIKEN) {
+  } else if(chg==MULLIKEN) {
     Q.zeros(C.n_cols,C.n_cols);
 
     // Helper matrix
@@ -2791,37 +2909,18 @@ double Pipek::cost_func(const arma::cx_mat & W) {
 
   double Dinv=0;
 
-  if(p==1) {
-    // Compute sum
+  // Compute sum
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:Dinv) schedule(dynamic,1)
 #endif
-    for(size_t iat=0;iat<N;iat++) {
+  for(size_t iat=0;iat<N;iat++) {
       // Helper matrix
-      arma::cx_mat qw=get_charge(iat)*W;
-      for(size_t io=0;io<W.n_cols;io++) {
-	std::complex<double> Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
-	Dinv+=std::real(Qa*Qa);
-      }
+    arma::cx_mat qw=get_charge(iat)*W;
+    for(size_t io=0;io<W.n_cols;io++) {
+      std::complex<double> Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
+      Dinv+=std::real(std::pow(Qa,p));
     }
-  } else if(p==2) {
-    // Compute sum
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:Dinv) schedule(dynamic,1)
-#endif
-    for(size_t iat=0;iat<N;iat++) {
-      // Helper matrix
-      arma::cx_mat qw=get_charge(iat)*W;
-      for(size_t io=0;io<W.n_cols;io++) {
-	std::complex<double> Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
-	Dinv+=std::real(Qa*Qa*Qa*Qa);
-      }
-    }
-  } else {
-    ERROR_INFO();
-    throw std::runtime_error("Unimplemented PM penalty.\n");
   }
-
 
   return Dinv;
 }
@@ -2843,81 +2942,40 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
   arma::cx_mat Dder(W.n_cols,W.n_cols);
   Dder.zeros();
 
-  if(p==1) {
-    // Compute sum
+  // Compute sum
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-    {
+  {
       
 #ifdef _OPENMP
-      arma::cx_mat Dwrk(Dder);
+    arma::cx_mat Dwrk(Dder);
 #pragma omp for schedule(dynamic,1)
 #endif
-      for(size_t iat=0;iat<N;iat++) {
-	// Helper matrix
-	arma::cx_mat qw=get_charge(iat)*W;
+    for(size_t iat=0;iat<N;iat++) {
+      // Helper matrix
+      arma::cx_mat qw=get_charge(iat)*W;
+      
+      for(size_t b=0;b<W.n_cols;b++) {
+	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+	std::complex<double> t=p*std::pow(qwp,p-1);
 	
-	for(size_t b=0;b<W.n_cols;b++) {
-	  std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-	  
-	  for(size_t a=0;a<W.n_cols;a++) {
+	for(size_t a=0;a<W.n_cols;a++) {
 #ifdef _OPENMP
-	    Dwrk(a,b)+=2.0*qwp*qw(a,b);
+	  Dwrk(a,b)+=t*qw(a,b);
 #else
-	    Dder(a,b)+=2.0*qwp*qw(a,b);
+	  Dder(a,b)+=t*qw(a,b);
 #endif
-	  }
 	}
       }
-      
-#ifdef _OPENMP
-#pragma omp critical
-      Dder+=Dwrk;
-#endif
-    }
-
-  } else if(p==2) {
-    // Compute sum
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-      
-#ifdef _OPENMP
-      arma::cx_mat Dwrk(Dder);
-#pragma omp for schedule(dynamic,1)
-#endif
-      for(size_t iat=0;iat<N;iat++) {
-	// Helper matrix
-	arma::cx_mat qw=get_charge(iat)*W;
-	
-	for(size_t b=0;b<W.n_cols;b++) {
-	  std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-	  std::complex<double> t=4.0*qwp*qwp*qwp;
-	  
-	  for(size_t a=0;a<W.n_cols;a++) {
-#ifdef _OPENMP
-	    Dwrk(a,b)+=t*qw(a,b);
-#else
-	    Dder(a,b)+=t*qw(a,b);
-#endif
-	  }
-	}
-      }
-      
-#ifdef _OPENMP
-#pragma omp critical
-      Dder+=Dwrk;
-#endif
     }
     
-  } else {
-    ERROR_INFO();
-    throw std::runtime_error("Unimplemented PM penalty.\n");
+#ifdef _OPENMP
+#pragma omp critical
+    Dder+=Dwrk;
+#endif
   }
-
-
+  
   return Dder;
 }
 
@@ -2938,83 +2996,41 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & 
   Dder.zeros(W.n_cols,W.n_cols);
   double D=0;
 
-  if(p==1) {
-    // Compute sum
+  // Compute sum
 #ifdef _OPENMP
 #pragma omp parallel reduction(+:D)
 #endif
-    {
-      
+  {
+    
 #ifdef _OPENMP
-      arma::cx_mat Dwrk(Dder);
+    arma::cx_mat Dwrk(Dder);
 #pragma omp for schedule(dynamic,1)
 #endif
-      for(size_t iat=0;iat<N;iat++) {
-	// Helper matrix
-	arma::cx_mat qw=get_charge(iat)*W;
+    for(size_t iat=0;iat<N;iat++) {
+      // Helper matrix
+      arma::cx_mat qw=get_charge(iat)*W;
+      
+      for(size_t b=0;b<W.n_cols;b++) {
+	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
+	std::complex<double> t=p*std::pow(qwp,p-1);
+	D+=std::real(std::pow(qwp,p));
 	
-	for(size_t b=0;b<W.n_cols;b++) {
-	  std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-	  D+=std::real(qwp*qwp);
-	  
-	  for(size_t a=0;a<W.n_cols;a++) {
+	for(size_t a=0;a<W.n_cols;a++) {
 #ifdef _OPENMP
-	    Dwrk(a,b)+=2.0*qwp*qw(a,b);
+	  Dwrk(a,b)+=t*qw(a,b);
 #else
-	    Dder(a,b)+=2.0*qwp*qw(a,b);
+	  Dder(a,b)+=t*qw(a,b);
 #endif
-	  }
 	}
       }
-      
+    }
+    
 #ifdef _OPENMP
 #pragma omp critical
-      Dder+=Dwrk;
+    Dder+=Dwrk;
 #endif
-    }
-
-  } else if(p==2) {
-
-    // Compute sum
-#ifdef _OPENMP
-#pragma omp parallel reduction(+:D)
-#endif
-    {
-      
-#ifdef _OPENMP
-      arma::cx_mat Dwrk(Dder);
-#pragma omp for schedule(dynamic,1)
-#endif
-      for(size_t iat=0;iat<N;iat++) {
-	// Helper matrix
-	arma::cx_mat qw=get_charge(iat)*W;
-	
-	for(size_t b=0;b<W.n_cols;b++) {
-	  std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
-	  std::complex<double> t=4.0*qwp*qwp*qwp;
-	  D+=std::real(qwp*qwp*qwp*qwp);
-	  
-	  for(size_t a=0;a<W.n_cols;a++) {
-#ifdef _OPENMP
-	    Dwrk(a,b)+=t*qw(a,b);
-#else
-	    Dder(a,b)+=t*qw(a,b);
-#endif
-	  }
-	}
-      }
-      
-#ifdef _OPENMP
-#pragma omp critical
-      Dder+=Dwrk;
-#endif
-    }
-
-  } else {
-    ERROR_INFO();
-    throw std::runtime_error("Unimplemented PM penalty.\n");
   }
-
+  
   Dinv=D;
 }
 
