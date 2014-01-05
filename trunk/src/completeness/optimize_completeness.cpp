@@ -182,6 +182,8 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
 
   // Legend
   if(verbose) {
+    printf("Optimizing tau_%i for a=[%.3f ... %.3f] of %c shell with %i exponents.\n\n",n,min,max,shell_types[am],Nf);
+
     printf("iter ");
     char num[80];
     for(int i=0;i<Nf;i++) {

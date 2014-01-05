@@ -95,6 +95,7 @@ int main(int argc, char **argv) {
   baslib.add_element(el);
   baslib.save_gaussian94("optimized.gbs");
 
+  printf("\nCompleteness-optimized basis set saved to optimized.gbs.\n");
 
   return 0;
 }
