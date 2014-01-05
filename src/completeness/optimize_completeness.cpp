@@ -183,9 +183,12 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   // Legend
   if(verbose) {
     printf("iter ");
-    for(int i=0;i<Nf;i++)
-      printf(" e%-3i ",i+1);
-    printf("mog\n");
+    char num[80];
+    for(int i=0;i<Nf;i++) {
+      sprintf(num,"lg exp%i",i+1);
+      printf("%9s ",num);
+    }
+    printf(" %12s  %12s\n","tau","size");
   }
 
   do
@@ -207,8 +210,8 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
 	printf("%4u ",(unsigned int) iter);
 	for(int i=0;i<Nf;i++)
 	  // Convert to 10-base logarithm
-	  printf("% 8.3e ",log10(M_E)*gsl_vector_get(s->x,i));
-	printf("%e %e\n",pow(s->fval,1.0/n),size);
+	  printf("% 9.5f ",log10(M_E)*gsl_vector_get(s->x,i));
+	printf(" %e  %e\n",pow(s->fval,1.0/n),size);
 
 	// print_gradient(s->x,(void *) &pars);
       }
