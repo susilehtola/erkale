@@ -147,6 +147,8 @@ enum calcd {
   FULLCALC,
   // Just the forces
   FORCECALC,
+  // Just the energy
+  ECALC,
   // Nothing
   NOCALC
 };
@@ -158,18 +160,28 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
   if(stricmp(loadname,"")==0) {
     // Nothing to load - run full calculation.
     calculate(basis,set,force);
-    return FULLCALC;
+    if(force)
+      return FULLCALC;
+    else
+      return ECALC;
   }
-
-  // Otherwise, check if the basis set is the same
-  BasisSet oldbas;
+  
+  // Was the calculation converged?
   bool convd;
+  BasisSet oldbas;
   {
     Checkpoint chkpt(loadname,false);
-    
     chkpt.read("Converged",convd);
-    
     chkpt.read(oldbas);
+  }
+  if(!convd) {
+    // Old calculation was not converged - run full calculation
+    set.set_string("LoadName","");
+    calculate(basis,set,force);
+    if(force)
+      return FULLCALC;
+    else
+      return ECALC;
   }
 
   // Copy the checkpoint if necessary
@@ -185,13 +197,22 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
     }
   }
   
-  if(!(basis==oldbas) || !convd) {
+  // Check if the basis set is different
+  if(!(basis==oldbas)) {
     // Basis set is different or calculation was not converged - need
     // to run calculation. Project Fock matrix to new basis and
     // diagonalize to get new orbitals
     {
       // Open in write mode, don't truncate
       Checkpoint chkpt(savename,true,false);
+
+      // Save basis
+      chkpt.write(basis);
+      // Overlap matrix
+      arma::mat S=basis.overlap();
+      chkpt.write("S",S);
+      arma::mat Sinvh=BasOrth(S,set);
+      chkpt.write("Sinvh",Sinvh);
 
       // Restricted or unrestricted run?
       bool restr;
@@ -204,19 +225,13 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
 	chkpt.read("H",sol.H);
 	chkpt.read("occs",occs);
 
-	// Overlap matrix
-	arma::mat S, Sinvh;
-	chkpt.read("S",S);
-	chkpt.read("Sinvh",Sinvh);
-
-	// Form new orbitals
+	// Form new orbitals by diagonalizing H in new geometry
 	diagonalize(S,Sinvh,sol);
 
 	// Form new density
 	sol.P=form_density(sol.C,occs);
 
 	// Write basis set, orbitals and density
-	chkpt.write(basis);
 	chkpt.write("C",sol.C);
 	chkpt.write("E",sol.E);
 	chkpt.write("P",sol.P);
@@ -229,12 +244,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
 	chkpt.read("occa",occa);
 	chkpt.read("occb",occb);
 
-	// Overlap matrix
-	arma::mat S, Sinvh;
-	chkpt.read("S",S);
-	chkpt.read("Sinvh",Sinvh);
-
-	// Form new orbitals
+	// Form new orbitals by diagonalizing H in new geometry
 	diagonalize(S,Sinvh,sol);
 
 	// Form new density
@@ -243,7 +253,6 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
 	sol.P=sol.Pa+sol.Pb;
 
 	// Write basis set, orbitals and density
-	chkpt.write(basis);
 	chkpt.write("Ca",sol.Ca);
 	chkpt.write("Cb",sol.Cb);
 	chkpt.write("Ea",sol.Ea);
@@ -252,7 +261,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
 	chkpt.write("Pb",sol.Pb);
 	chkpt.write("P",sol.P);
       }
-
+      
       // Calculation is now not converged
       bool conv=false;
       chkpt.write("Converged",conv);
@@ -260,12 +269,18 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
     
     // Now we can do the SCF calculation
     calculate(basis,set,force);
-    return FULLCALC;
+    if(force)
+      return FULLCALC;
+    else
+      return ECALC;
   }
 
+  // Because we are here, the basis set is the same.
   if(!force)
+    // No force required, can just read energy from file.
     return NOCALC;
 
+  // Have converged energy, compute force.
   // Open the checkpoint in write mode, don't truncate it
   Checkpoint chkpt(savename,true,false);
 
@@ -389,6 +404,7 @@ double calc_E(const gsl_vector *x, void *par) {
 
   // Get the atomic positions
   std::vector<atom_t> atoms=get_atoms(x,*p);
+  //  print_xyz(atoms);
 
   // Construct basis set
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
@@ -403,12 +419,14 @@ double calc_E(const gsl_vector *x, void *par) {
   energy_t en;
   solchk.read(en);
 
-  if(mode==FULLCALC)
+  if(mode==FULLCALC) {
+    ERROR_INFO();
+    throw std::runtime_error("Should have not computed forces for energy.\n");
+  } else if(mode==ECALC)
     printf("Computed energy % .8f in %s.\n",en.E,t.elapsed().c_str());
   else
     printf("Found    energy % .8f in checkpoint file.\n",en.E);
   fflush(stdout);
-  //  print_xyz(atoms);
 
   return en.E;
 }
@@ -421,6 +439,7 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
 
   // Get the atomic positions
   std::vector<atom_t> atoms=get_atoms(x,*p);
+  //  print_xyz(atoms);
 
   // Construct basis set
   BasisSet basis=construct_basis(atoms,p->baslib,p->set);
@@ -451,16 +470,16 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   double frms, fmax;
   get_forces(g,fmax,frms);
 
-  if(mode==FULLCALC)
+  if(mode==ECALC) {
+    ERROR_INFO();
+    throw std::runtime_error("Should have not computed just the energy for forces.\n");
+  } else if(mode==FULLCALC)
     printf("Computed energy % .8f and forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
   else if(mode==FORCECALC)
     printf("Found    energy % .8f in checkpoint file and calculated forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
   else if(mode==NOCALC)
     printf("Found energy and forces in checkpoint file.\n");
   fflush(stdout);
-
-  fflush(stdout);
-  //  print_xyz(atoms);
 }
 
 void calc_f(const gsl_vector *x, void *par, gsl_vector *g) {
