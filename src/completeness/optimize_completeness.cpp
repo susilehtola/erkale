@@ -285,29 +285,61 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
     }
   }
 
-  std::vector<double> mexps;
-
-  double middle;
+#ifndef _OPENMP
+  int nth=1;
+#else
+  int nth=omp_get_max_threads();
+#endif
+  
+  // Worker stack  
+  std::vector< std::vector<double> > expstack(nth);
+  // Widths
+  std::vector<double> wstack(nth);
+  // Tolerances
+  std::vector<double> tstack(nth);
+  
   do {
-    middle=(left+right)/2.0;
+    // Set widths
+    for(int i=0;i<nth;i++)
+      wstack[i]=left + i*(right-left)/nth;
 
     // Get exponents
-    double mval;
-    mexps=optimize_completeness(am,0.0,middle,nexp,nval,false,&mval);
-
-    // Figure out which end to move
-    if(mval>tol) {
-      right=middle;
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+      // Get thread number
+#ifdef _OPENMP
+      int ith=omp_get_thread_num();
+#else
+      int ith=0;
+#endif
+      // Get exponents
+      expstack[ith]=optimize_completeness(am,0.0,wstack[ith],nexp,nval,false,&tstack[ith]);
     }
-    else {
-      left=middle;
+    
+    // Figure out how to move ends
+    for(int i=0;i<nth;i++) {
+      if(tstack[i]>tol && right>wstack[i])
+	right=wstack[i];
+      else if(tstack[i]<tol && left<wstack[i])
+	left=wstack[i];
     }
-  } while(right-left>1e-6);
+  } while(right-left>1e-7);
 
-  // Set width
-  *width=middle;
+  // Find value closest to tol
+  double min=DBL_MAX;
+  int mini=-1;
+  for(int i=0;i<nth;i++)
+    if(fabs(tstack[i]-tol)<min) {
+      min=fabs(tstack[i]-tol);
+      mini=i;
+    }
   
-  return mexps;
+  // Set width
+  *width=wstack[mini];
+  
+  return expstack[mini];
 }
 
 
