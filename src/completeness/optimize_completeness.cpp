@@ -301,7 +301,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
   do {
     // Set widths
     for(int i=0;i<nth;i++)
-      wstack[i]=left + i*(right-left)/nth;
+      wstack[i]=left + (i+1)*(right-left)/(nth+1);
 
     // Get exponents
 #ifdef _OPENMP
