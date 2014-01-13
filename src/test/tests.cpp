@@ -435,7 +435,7 @@ void restr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & basl
   bool emdok=true;
   if(doemd) {
     GaussianEMDEvaluator eval(bas,P);
-    EMD emd(&eval, Nel);
+    EMD emd(&eval, &eval, Nel);
     emd.initial_fill(false);
     emd.find_electrons(false);
     emd.optimize_moments(false);
@@ -556,7 +556,7 @@ void unrestr_test_run(const std::vector<atom_t> & at, const BasisSetLibrary & ba
   if(doemd) {
     arma::mat S=bas.overlap();
     GaussianEMDEvaluator eval(bas,P);
-    EMD emd(&eval, Nel);
+    EMD emd(&eval, &eval, Nel);
     emd.initial_fill(false);
     emd.find_electrons(false);
     emd.optimize_moments(false);

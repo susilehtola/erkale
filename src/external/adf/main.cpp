@@ -363,7 +363,7 @@ int main(int argc, char **argv) {
   // Close the KF file
   close_kf();
 
-  EMD emd(&eval, Nel);
+  EMD emd(&eval, &eval, Nel);
   emd.initial_fill();
   emd.find_electrons();
   emd.optimize_moments(true,1e-7);

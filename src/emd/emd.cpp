@@ -128,7 +128,7 @@ void add_coupling_term(std::vector<total_coupl_t> & v, total_coupl_t & t) {
 EMDEvaluator::EMDEvaluator() {
 }
 
-EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv) {
+EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv, int lp, int mp) {
 
   idfuncs=idfuncsv;
   loc=locv;
@@ -138,7 +138,7 @@ EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, 
     throw std::runtime_error("Density matrix not square!\n");
 
   // Compute the coupling coefficients.
-  compute_coefficients(clm);
+  compute_coefficients(clm,lp,mp);
 
   // Compute the distance table (must be done after Lmax has been set)
   distance_table(coord);
@@ -194,9 +194,22 @@ void EMDEvaluator::distance_table(const std::vector<coords_t> & coord) {
     }
 }
 
-void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_t> > & clm) {
+void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_t> > & clm, int lp, int mp) {
   if(clm.size()!=idfuncs.size())
     throw std::runtime_error("Sizes of clm and idfuncs do not match!\n");
+
+  // Sanity check
+  if(lp<0.0 || abs(mp)>lp) {
+    std::ostringstream oss;
+    oss << "Illegal values for spherical harmonics l = " << lp << ", m = " << mp << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  if(lp%2!=0) {
+    std::ostringstream oss;
+    oss << "Projection for l = " << lp << ", m = " << mp << ", but all projections for odd l vanish!\n";
+    throw std::runtime_error(oss.str());
+  }    
 
   // Number of nonequivalent functions
   size_t N=clm.size();
@@ -213,10 +226,10 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 	lmax=clm[i][j].l;
 
   // We can thus couple up to
-  Lmax=2*lmax;
+  Lmax=2*lmax+lp;
 
   // Compute Gaunt coefficient table.
-  Gaunt gaunt(lmax,Lmax,lmax);
+  Gaunt gaunt(lmax+lp,Lmax,lmax+lp);
 
   // Form the coefficients. Loop over groups of equivalent functions.
   for(size_t iig=0;iig<clm.size();iig++) {
@@ -229,40 +242,54 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 	throw std::runtime_error("clm[jjg] is empty!\n");
 
       // Loop over l, l' and m, m'
-      for(size_t il=0;il<clm[iig].size();il++)
-	for(size_t ilp=0;ilp<clm[jjg].size();ilp++) {
+      for(size_t iil=0;iil<clm[iig].size();iil++)
+	for(size_t jjl=0;jjl<clm[jjg].size();jjl++) {
 	  // l and l' are
-	  int l=clm[iig][il].l;
-	  int lp=clm[jjg][ilp].l;
+	  int il=clm[iig][iil].l;
+	  int jl=clm[jjg][jjl].l;
 
 	  // m and m' are
-	  int m=clm[iig][il].m;
-	  int mp=clm[jjg][ilp].m;
+	  int im=clm[iig][iil].m;
+	  int jm=clm[jjg][jjl].m;
 
 	  // and the expansion coefficients are
-	  std::complex<double> cmu=clm[iig][il].c;
-	  std::complex<double> cnu=clm[jjg][ilp].c;
+	  std::complex<double> cmu=clm[iig][iil].c;
+	  std::complex<double> cnu=clm[jjg][jjl].c;
 
-	  // Loop over L
-	  for(int L=std::max(abs(l-lp),abs(m-mp));L<=l+lp;L++) {
-	    // Coupling coefficient
-	    coupl_coeff_t tmp;
+	  // Loop over l1
+	  int m1=jm+mp;
+	  for(int l1=std::max(std::abs(jl-lp),std::abs(m1));l1<=jl+lp;l1++) {
+	    // Gaunt coefficient
+	    double g1=gaunt.coeff(l1,m1,jl,jm,lp,mp);
 
-	    // Set l indices
-	    tmp.l=l;
-	    tmp.lp=lp;
+	    //	    printf("(%i % i) + (%i % i) -> (%i % i) % e g1\n",jl,jm,lp,mp,l1,m1,g1);
+	    //	    fflush(stdout);
+	    if(g1==0.0)
+	      continue;
 
-	    // Coupled values
-	    tmp.L=L;
-	    tmp.M=m-mp;
+	    // Loop over L
+	    for(int L=std::max(abs(il-l1),abs(im-m1));L<=il+l1;L++) {
+	      // Coupling coefficient
+	      coupl_coeff_t tmp;
+	      
+	      // Set l indices
+	      tmp.l=il;
+	      tmp.lp=jl;
+	      
+	      // Coupled values
+	      tmp.L=L;
+	      tmp.M=im-m1;
+	      
+	      // Compute coefficient
+	      double g=gaunt.coeff(il,im,tmp.L,tmp.M,l1,m1);
+	      tmp.c=std::pow(4.0*M_PI,3.0/2.0)*std::conj(cmu)*cnu*g1*pow(std::complex<double>(0.0,1.0),L)*g;
+	      //	      printf("(%i % i) + (%i % i) -> (%i % i) % e g\n",tmp.L,tmp.M,l1,m1,il,im,g);
+	      //	      fflush(stdout);
 
-	    // Compute coefficient
-	    double g=gaunt.coeff(l,m,tmp.L,tmp.M,lp,mp);
-	    tmp.c=4.0*M_PI*pow(std::complex<double>(0.0,1.0),L)*std::conj(cmu)*cnu*g;
-
-	    // Store coefficient
-	    if(std::norm(tmp.c)>0.0) {
-	      add_coupling(iig,jjg,tmp);
+	      // Store coefficient
+	      if(std::norm(tmp.c)>0.0) {
+		add_coupling(iig,jjg,tmp);
+	      }
 	    }
 	  }
 	}
@@ -472,7 +499,7 @@ void EMDEvaluator::check_norm() const {
   printf("Norms of the functions checked.\n");
 }
 
-double EMDEvaluator::get(double p) const {
+std::complex<double> EMDEvaluator::get(double p) const {
   // Arguments of Bessel functions are
   std::vector<double> args(dist);
   for(size_t i=0;i<args.size();i++)
@@ -481,7 +508,7 @@ double EMDEvaluator::get(double p) const {
   arma::mat jl=bessel_array(args,Lmax);
 
   // Continue by computing the radial EMD
-  double np=0.0;
+  std::complex<double> np=0.0;
 
   // List of off-diagonal elements
   std::vector<noneqradf_t> offd;
@@ -493,8 +520,9 @@ double EMDEvaluator::get(double p) const {
       offd.push_back(hlp);
     }
 
+  double npre=0.0, npim=0.0;
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+:np)
+#pragma omp parallel for reduction(+:npre,npim)
 #endif
   // Loop over groups of equivalent functions
   for(size_t iii=0;iii<offd.size();iii++) {
@@ -539,13 +567,16 @@ double EMDEvaluator::get(double p) const {
 
 	  // Increment EMD; we get the increment twice since we are off-diagonal.
 	  std::complex<double> incr=2.0*P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
-	  np+=incr.real();
+	  npre+=incr.real();
+	  npim+=incr.imag();
 	}
       }
   }
+  np+=std::complex<double>(npre,npim);
 
+  npre=0.0; npim=0.0;
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+:np)
+#pragma omp parallel for reduction(+:npre,npim)
 #endif
   // Then, do diagonal. Get the total coupling coefficient
   for(size_t iig=0;iig<idfuncs.size();iig++) {
@@ -587,10 +618,12 @@ double EMDEvaluator::get(double p) const {
 
 	  // Increment EMD
 	  std::complex<double> incr=P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
-	  np+=incr.real();
+	  npre+=incr.real();
+	  npim+=incr.imag();
 	}
       }
   }
+  np+=std::complex<double>(npre,npim);
 
   return np;
 }
@@ -622,18 +655,46 @@ arma::mat bessel_array(const std::vector<double> & args, int lmax) {
 }
 
 
-EMD::EMD(const EMDEvaluator * evalp, int Nelv) {
+EMD::EMD(const EMDEvaluator * posevalp, const EMDEvaluator * negevalp, int Nelv, int m) {
   Nel=Nelv;
-  eval=evalp;
+  poseval=posevalp;
+
+  if(m>0) {
+    negeval=negevalp;
+    negcoef=M_SQRT1_2;
+    poscoef=std::pow(-1.0,m)*M_SQRT1_2;
+  } else if(m==0) {
+    negeval=NULL;
+    negcoef=0.0;
+    poscoef=1.0;
+  } else {
+    negeval=negevalp;
+    negcoef=std::complex<double>(0.0,M_SQRT1_2);
+    poscoef=-std::pow(-1.0,m)*std::complex<double>(0.0,M_SQRT1_2);
+  }
 }
 
 EMD::~EMD() {
 }
 
+double EMD::get(double p) const {
+  // Result
+  std::complex<double> r;
+
+  // Positive part
+  if(negcoef!=0.0)
+    r = poscoef*poseval->get(p) + negcoef*negeval->get(p);
+  else
+    r = poscoef*poseval->get(p);
+
+  // Return real part
+  return r.real();
+}
+
 void EMD::initial_fill(bool verbose) {
 
   // Initial dp
-  double idp=0.25;
+  double idp=0.01;
   // Helpers
   double p, dp;
 
@@ -647,10 +708,10 @@ void EMD::initial_fill(bool verbose) {
 
   // Add origin
   hlp.p=0.0;
-  hlp.d=eval->get(hlp.p);
+  hlp.d=get(hlp.p);
   dens.push_back(hlp);
 
-  do {
+  while(true) {
     // Calculate value of dp to use
     p=dens[dens.size()-1].p;
     dp=(1.0+2.0*p)*idp;
@@ -660,13 +721,16 @@ void EMD::initial_fill(bool verbose) {
 #endif
     for(int ipoint=0;ipoint<4;ipoint++) {
       hlparr[ipoint].p=p+(ipoint+1)*dp;
-      hlparr[ipoint].d=eval->get(hlparr[ipoint].p);
+      hlparr[ipoint].d=get(hlparr[ipoint].p);
 #ifdef _OPENMP
 #pragma omp ordered
 #endif
       dens.push_back(hlparr[ipoint]);
     }
-  } while(dens[dens.size()-1].d>0.0);
+    
+    if(dens[dens.size()-1].d==0.0)
+      break;
+  }
 
   if(verbose)
     printf("done.\n");
@@ -725,7 +789,7 @@ void EMD::add4(size_t loc) {
     // Value of p is
     integ[2-ipoint].p=0.5*(dens[loc+ipoint].p+dens[loc+ipoint-1].p);
     // Value of the density at this point is
-    integ[2-ipoint].d=eval->get(integ[2-ipoint].p);
+    integ[2-ipoint].d=get(integ[2-ipoint].p);
     // Add value to the list
 #ifdef _OPENMP
 #pragma omp ordered
@@ -787,6 +851,7 @@ void EMD::find_electrons(bool verbose, double tol) {
       // Add points to area of maximum error
       if(maxind==0) {
 	ERROR_INFO();
+	save("emddump.txt");
 	throw std::runtime_error("Unable to find location of maximum error!\n");
       }
 
@@ -868,9 +933,9 @@ void EMD::optimize_moments(bool verbose, double tol) {
       t.set();
       printf("\nUsing %u points, charge differs from Nel by %e.\n",(unsigned int) dens.size(),momval[2]-Nel);
       printf("Current values of moments are:\n");
-      printf("\tk\t<p^k>\t\t\\Delta <p^k>\t \\Delta <p^k> / <p^k>\n");
+      printf("\t%2s\t%13s\t%12s\t%13s\n","k","<p^k>","Abs error","Rel error");
       for(int imom=0;imom<Nmom;imom++)
-        printf("\t%i\t%e\t%e\t%e\n",moms[imom],momval[imom],momerr[imom],momerr[imom]/momval[imom]);
+        printf("\t%i\t% e\t%e\t% e\n",moms[imom],momval[imom],momerr[imom],momerr[imom]/momval[imom]);
     }
 
     // If tolerance has not been reached, add more points
