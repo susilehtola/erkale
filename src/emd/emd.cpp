@@ -948,6 +948,58 @@ void EMD::optimize_moments(bool verbose, double tol) {
   //  complete_fill();
 }
 
+void EMD::fixed_fill(bool verbose, double h0, double l0, double hfac, double lfac) {
+  Timer t;
+  if(verbose) {
+    printf("Filling the EMD grid ... ");
+    fflush(stdout);
+  }
+
+  // Add the origin
+  dens.resize(1);
+  dens[0].p=0.0;
+  dens[0].d=get(0.0);
+
+  // Loop over intervals
+  double pmin=0.0;
+
+  double l(l0);
+  double h(h0);
+
+  while(true) {
+    // Compute the length of the interval
+    size_t Nint=(size_t) round((l-pmin)/h);
+
+    // Allocate memory
+    size_t i0=dens.size();
+    dens.resize(dens.size()+4*Nint);
+
+    // Loop over intervals
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(size_t i=0;i<Nint;i++)
+      for(int j=0;j<4;j++) {
+	dens[i0+4*i+j].p = pmin + i*h + (j+1)*h/4.0;
+	dens[i0+4*i+j].d = get(dens[i0+4*i+j].p);
+      }
+
+    pmin+=Nint*h;
+    h*=hfac;
+    l*=lfac;
+
+    // Check if density has vanished
+    if(dens[dens.size()-1].d==0.0 && dens[dens.size()-2].d==0.0)
+      break;
+  }
+
+  if(verbose) {
+    printf("done (%s)\n",t.elapsed().c_str());
+    printf("Grid filled up to p = %e.\n",dens[dens.size()-1].p);
+    fflush(stdout);
+  }
+}
+
 std::vector<emd_t> EMD::get() const {
   return dens;
 }
