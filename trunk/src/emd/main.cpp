@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   set.add_bool("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", true);
   set.add_double("EMDTol", "Tolerance for the numerical integration of the radial EMD",1e-8);
+  set.add_string("EMDlm", "Which projection of the radial EMD to compute","");
 
   set.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
   set.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4:6","");
@@ -142,7 +143,7 @@ int main(int argc, char **argv) {
 
 	Timer temd;
 	GaussianEMDEvaluator eval(basis,Pdum);
-	EMD emd(&eval, 1);
+	EMD emd(&eval, &eval, 1, 0);
 	emd.initial_fill();
 	emd.find_electrons();
 	emd.optimize_moments(true,tol);
@@ -163,28 +164,56 @@ int main(int argc, char **argv) {
 	   "Calculation of isotropic Compton profiles with Gaussian basis sets", \
 	   "Phys. Chem. Chem. Phys 13 (2011), pp. 5630 - 5641.");
 
-    // Construct EMD evaluator
-    Timer temd;
-    GaussianEMDEvaluator eval(basis,P);
-    //    eval.print();
+    // The projection to calculate
+    int l=0, m=0;
+    std::string lmstr=set.get_string("EMDlm");
+    if(lmstr.size()) {
+      // Get l and m values
+      std::vector<std::string> lmval=splitline(lmstr);
+      if(lmval.size()!=2)
+	throw std::runtime_error("Invalid specification of l and m values.\n");
+      l=readint(lmval[0]);
+      m=readint(lmval[1]);
+    }
 
-    // and the EMD class
+    // Amount of electrons is
     int Nel;
     chkpt.read("Nel",Nel);
+    
+    // Construct EMD evaluators
+    Timer temd;
+    GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,P,l,std::abs(m));
+    GaussianEMDEvaluator *negeval;
+    if(m!=0) 
+      negeval=new GaussianEMDEvaluator(basis,P,l,-std::abs(m));
+    else
+      negeval=NULL;
 
     temd.set();
-    EMD emd(&eval, Nel);
+    EMD emd(poseval, negeval, Nel, m);
     emd.initial_fill();
-    emd.find_electrons();
+    if(l==0 && m==0) emd.find_electrons();
     emd.optimize_moments(true,tol);
-    emd.save("emd.txt");
-    emd.moments("moments.txt");
-    emd.compton_profile("compton.txt");
-    emd.compton_profile_interp("compton-interp.txt");
+    
+    if(l==0 && m==0) {
+      emd.save("emd.txt");
+      emd.moments("moments.txt");
+      emd.compton_profile("compton.txt");
+      emd.compton_profile_interp("compton-interp.txt");
+    } else {
+      char fname[80];
+      sprintf(fname,"emd_%i_%i.txt",l,m);
+      emd.save(fname);
 
+      sprintf(fname,"moments_%i_%i.txt",l,m);
+      emd.moments(fname);      
+    }
     printf("Calculating isotropic EMD properties took %s.\n",temd.elapsed().c_str());
-  }
 
+    delete poseval;
+    if(m!=0) delete negeval;
+  }
+    
   // Do EMD on a cube?
   if(stricmp(set.get_string("EMDCube"),"")!=0) {
     t.print_time();

@@ -148,7 +148,7 @@ class EMDEvaluator {
   void distance_table(const std::vector<coords_t> & coord);
 
   /// Computes the coupling coefficients
-  void compute_coefficients(const std::vector< std::vector<ylmcoeff_t> > & clm);
+  void compute_coefficients(const std::vector< std::vector<ylmcoeff_t> > & clm, int lp, int mp);
 
   /// Add coupling coefficient
   void add_coupling(size_t ig, size_t jg, coupl_coeff_t c);
@@ -180,15 +180,17 @@ class EMDEvaluator {
    * Construct evaluator.
    *
    * idfuncs is the list of equivalent functions, idfuncs[ieq][1..N] = ibf
-   * clm gives the lm expansion of the nonequivalent radial functions
+   * clm gives the lm expansion of the nonequivalent radial functions.
    *
    * loc gives indices of centers of all of the basis functions
    * coord are coordinates of the individual atoms (centers)
    * P is the density matrix
    *
    * The radial functions need to be separately initialized.
+   *
+   * (lp,mp) is the final spherical harmonic value.
    */
-  EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv);
+  EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv, int lp=0, int mp=0);
 
   /// Destructor
   ~EMDEvaluator();
@@ -199,7 +201,7 @@ class EMDEvaluator {
   void check_norm() const;
 
   /// Evaluate radial EMD at p
-  double get(double p) const;
+  std::complex<double> get(double p) const;
 };
 
 /// Evaluate Bessel functions j_l(pr_i), return j(pr_i,l)
@@ -237,17 +239,26 @@ class EMD {
   std::vector<emd_t> dens;
   /// Add 4 points at ind
   void add4(size_t ind);
+  /// Get density at p
+  double get(double p) const;
 
  protected:
   /// Number of electrons
   int Nel;
 
-  /// Evaluator
-  const EMDEvaluator * eval;
+  /// Positive evaluator
+  const EMDEvaluator * poseval;
+  /// Coefficient
+  std::complex<double> poscoef;
+
+  /// Negative evaluator
+  const EMDEvaluator * negeval;
+  /// Coefficient
+  std::complex<double> negcoef;
 
  public:
-  /// Constructor
-  EMD(const EMDEvaluator * eval, int Nel);
+  /// Constructor.
+  EMD(const EMDEvaluator * poseval, const EMDEvaluator * negeval, int Nel, int m=0);
   /// Destructor
   ~EMD();
 
