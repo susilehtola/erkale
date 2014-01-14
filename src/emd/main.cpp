@@ -82,7 +82,19 @@ int main(int argc, char **argv) {
   // Load density matrix
   arma::mat P;
   chkpt.read("P",P);
-
+  
+  // The projection to calculate
+  int l=0, m=0;
+  std::string lmstr=set.get_string("EMDlm");
+  if(lmstr.size()) {
+    // Get l and m values
+    std::vector<std::string> lmval=splitline(lmstr);
+    if(lmval.size()!=2)
+      throw std::runtime_error("Invalid specification of l and m values.\n");
+    l=readint(lmval[0]);
+    m=readint(lmval[1]);
+  }
+  
   // Compute orbital EMDs?
   if(set.get_string("EMDOrbitals")!="") {
     // Get orbitals
@@ -93,6 +105,9 @@ int main(int argc, char **argv) {
     chkpt.read("Restricted",restr);
     if(restr!= (orbs.size()==1))
       throw std::runtime_error("Invalid occupancies for spin alpha and beta!\n");
+
+    if(l!=0)
+      printf("\nComputing the (%i %+i) projection of the orbital EMD.\n",l,m);
 
     for(size_t ispin=0;ispin<orbs.size();ispin++) {
       // Indices of orbitals to include.
@@ -143,7 +158,7 @@ int main(int argc, char **argv) {
 
 	Timer temd;
 	GaussianEMDEvaluator eval(basis,Pdum);
-	EMD emd(&eval, &eval, 1, 0);
+	EMD emd(&eval, &eval, 1, l, m);
 	emd.initial_fill();
 	emd.find_electrons();
 	emd.optimize_moments(true,tol);
@@ -164,20 +179,8 @@ int main(int argc, char **argv) {
 	   "Calculation of isotropic Compton profiles with Gaussian basis sets", \
 	   "Phys. Chem. Chem. Phys 13 (2011), pp. 5630 - 5641.");
 
-    // The projection to calculate
-    int l=0, m=0;
-    std::string lmstr=set.get_string("EMDlm");
-    if(lmstr.size()) {
-      // Get l and m values
-      std::vector<std::string> lmval=splitline(lmstr);
-      if(lmval.size()!=2)
-	throw std::runtime_error("Invalid specification of l and m values.\n");
-      l=readint(lmval[0]);
-      m=readint(lmval[1]);
-    }
-
     if(l!=0)
-      printf("\nComputing the (%i %+i) projection of the EMD.\n",l,m);
+      printf("\nComputing the (%i %+i) projection of the orbital EMD.\n",l,m);
 
     // Amount of electrons is
     int Nel;
@@ -193,7 +196,7 @@ int main(int argc, char **argv) {
       negeval=NULL;
 
     temd.set();
-    EMD emd(poseval, negeval, Nel, m);
+    EMD emd(poseval, negeval, Nel, l, m);
     emd.initial_fill();
     if(l==0 && m==0) emd.find_electrons();
     emd.optimize_moments(true,tol);
