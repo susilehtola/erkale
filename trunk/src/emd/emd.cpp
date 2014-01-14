@@ -655,9 +655,11 @@ arma::mat bessel_array(const std::vector<double> & args, int lmax) {
 }
 
 
-EMD::EMD(const EMDEvaluator * posevalp, const EMDEvaluator * negevalp, int Nelv, int m) {
+EMD::EMD(const EMDEvaluator * posevalp, const EMDEvaluator * negevalp, int Nelv, int lv, int mv) {
   Nel=Nelv;
   poseval=posevalp;
+  l=lv;
+  m=mv;
 
   if(m>0) {
     negeval=negevalp;
@@ -931,11 +933,14 @@ void EMD::optimize_moments(bool verbose, double tol) {
     // Print out current values if necessary
     if(verbose && (iter==1 || t.get()>MAXPRINTFREQ || errel<=tol)) {
       t.set();
-      printf("\nUsing %u points, charge differs from Nel by %e.\n",(unsigned int) dens.size(),momval[2]-Nel);
+      if(l==0 && m==0)
+	printf("\nUsing %u points, charge differs from Nel by %e.\n",(unsigned int) dens.size(),momval[2]-Nel);
+      else
+	printf("\nUsing %u points.\n",(unsigned int) dens.size());
       printf("Current values of moments are:\n");
       printf("\t%2s\t%13s\t%12s\t%13s\n","k","<p^k>","Abs error","Rel error");
       for(int imom=0;imom<Nmom;imom++)
-        printf("\t%i\t% e\t%e\t% e\n",moms[imom],momval[imom],momerr[imom],momerr[imom]/momval[imom]);
+        printf("\t% i\t% e\t%e\t% e\n",moms[imom],momval[imom],momerr[imom],momerr[imom]/momval[imom]);
     }
 
     // If tolerance has not been reached, add more points
@@ -944,11 +949,23 @@ void EMD::optimize_moments(bool verbose, double tol) {
 
   } while(errel>tol);
 
+  if(verbose) {
+      t.set();
+      if(l==0 && m==0)
+	printf("\nUsed %u points, charge differs from Nel by %e.\n",(unsigned int) dens.size(),momval[2]-Nel);
+      else
+	printf("\nUsed %u points.\n",(unsigned int) dens.size());
+      printf("Final values of moments are:\n");
+      printf("\t%2s\t%13s\t%12s\t%13s\n","k","<p^k>","Abs error","Rel error");
+      for(int imom=0;imom<Nmom;imom++)
+        printf("\t% i\t% e\t%e\t% e\n",moms[imom],momval[imom],momerr[imom],momerr[imom]/momval[imom]);
+  }
+
   // Try to work around pathological cases
   //  complete_fill();
 }
 
-void EMD::fixed_fill(bool verbose, double h0, double l0, double hfac, double lfac) {
+void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double lfac) {
   Timer t;
   if(verbose) {
     printf("Filling the EMD grid ... ");
@@ -963,7 +980,7 @@ void EMD::fixed_fill(bool verbose, double h0, double l0, double hfac, double lfa
   // Loop over intervals
   double pmin=0.0;
 
-  double l(l0);
+  double len(len0);
   double h(h0);
 
   while(true) {
@@ -986,7 +1003,7 @@ void EMD::fixed_fill(bool verbose, double h0, double l0, double hfac, double lfa
 
     pmin+=Nint*h;
     h*=hfac;
-    l*=lfac;
+    len*=lfac;
 
     // Check if density has vanished
     if(dens[dens.size()-1].d==0.0 && dens[dens.size()-2].d==0.0)
@@ -1017,7 +1034,7 @@ arma::mat EMD::moments() const {
 
   // Moments calculated by Hart & Thakkar
   int Nm=7;
-  int m[]={-2, -1, 0, 1, 2, 3, 4};
+  int momarr[]={-2, -1, 0, 1, 2, 3, 4};
 
   // Moments and errors
   arma::mat moms(Nm,3);
@@ -1034,10 +1051,10 @@ arma::mat EMD::moments() const {
   for(int mi=0;mi<Nm;mi++) {
     // Fill in helper grid
     for(size_t i=0;i<N;i++)
-      integrand[i]=pow(p[i],2+m[mi])*dens[i].d;
+      integrand[i]=pow(p[i],2+momarr[mi])*dens[i].d;
 
     // Zero out old values
-    moms(mi,0)=m[mi];
+    moms(mi,0)=momarr[mi];
     moms(mi,1)=0;
     moms(mi,2)=0;
 
@@ -1062,7 +1079,7 @@ void EMD::moments(const char * fname) const {
   // Print out the moments
   FILE *out=fopen(fname,"w");
   for(size_t mi=0;mi<moms.n_rows;mi++)
-    fprintf(out,"\t%i\t%.12e\t%.12e\n",(int) moms(mi,0),moms(mi,1),moms(mi,2));
+    fprintf(out,"\t% i\t%.12e\t%.12e\n",(int) moms(mi,0),moms(mi,1),moms(mi,2));
   fclose(out);
 }
 

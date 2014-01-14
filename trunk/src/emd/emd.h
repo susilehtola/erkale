@@ -242,6 +242,11 @@ class EMD {
   /// Get density at p
   double get(double p) const;
 
+  /// l value
+  int l;
+  /// m value
+  int m;
+
  protected:
   /// Number of electrons
   int Nel;
@@ -258,7 +263,7 @@ class EMD {
 
  public:
   /// Constructor.
-  EMD(const EMDEvaluator * poseval, const EMDEvaluator * negeval, int Nel, int m=0);
+  EMD(const EMDEvaluator * poseval, const EMDEvaluator * negeval, int Nel, int l, int m);
   /// Destructor
   ~EMD();
 
