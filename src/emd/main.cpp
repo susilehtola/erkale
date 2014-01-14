@@ -134,38 +134,54 @@ int main(int argc, char **argv) {
 	char Jname[80];
 	char Jintname[80];
 
+	char suffix[80];
+	if(l==0)
+	  sprintf(suffix,".txt");
+	else
+	  sprintf(suffix,"_%i_%i.txt",l,m);
+
 	if(restr) {
-	  sprintf(emdname,"emd-%i.txt",(int) idx[i]+1);
-	  sprintf(momname,"moments-%i.txt",(int) idx[i]+1);
-	  sprintf(Jname,"compton-%i.txt",(int) idx[i]+1);
-	  sprintf(Jintname,"compton-interp-%i.txt",(int) idx[i]+1);
+	  sprintf(emdname,"emd-%i%s",(int) idx[i]+1,suffix);
+	  sprintf(momname,"moments-%i%s",(int) idx[i]+1,suffix);
+	  sprintf(Jname,"compton-%i%s",(int) idx[i]+1,suffix);
+	  sprintf(Jintname,"compton-interp-%i%s",(int) idx[i]+1,suffix);
 	} else {
 	  if(ispin==0) {
-	    sprintf(emdname,"emd-a-%i.txt",(int) idx[i]+1);
-	    sprintf(momname,"moments-a-%i.txt",(int) idx[i]+1);
-	    sprintf(Jname,"compton-a-%i.txt",(int) idx[i]+1);
-	    sprintf(Jintname,"compton-interp-a-%i.txt",(int) idx[i]+1);
+	    sprintf(emdname,"emd-a-%i%s",(int) idx[i]+1,suffix);
+	    sprintf(momname,"moments-a-%i%s",(int) idx[i]+1,suffix);
+	    sprintf(Jname,"compton-a-%i%s",(int) idx[i]+1,suffix);
+	    sprintf(Jintname,"compton-interp-a-%i%s",(int) idx[i]+1,suffix);
 	  } else {
-	    sprintf(emdname,"emd-b-%i.txt",(int) idx[i]+1);
-	    sprintf(momname,"moments-b-%i.txt",(int) idx[i]+1);
-	    sprintf(Jname,"compton-b-%i.txt",(int) idx[i]+1);
-	    sprintf(Jintname,"compton-interp-b-%i.txt",(int) idx[i]+1);
+	    sprintf(emdname,"emd-b-%i%s",(int) idx[i]+1,suffix);
+	    sprintf(momname,"moments-b-%i%s",(int) idx[i]+1,suffix);
+	    sprintf(Jname,"compton-b-%i%s",(int) idx[i]+1,suffix);
+	    sprintf(Jintname,"compton-interp-b-%i%s",(int) idx[i]+1,suffix);
 	  }
 	}
-
+	
 	// Generate dummy density matrix
 	arma::mat Pdum=C.col(idx[i])*arma::trans(C.col(idx[i]));
 
 	Timer temd;
-	GaussianEMDEvaluator eval(basis,Pdum);
-	EMD emd(&eval, &eval, 1, l, m);
+
+	GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,P,l,std::abs(m));
+	GaussianEMDEvaluator *negeval;
+	if(m!=0)
+	  negeval=new GaussianEMDEvaluator(basis,P,l,-std::abs(m));
+	else
+	  negeval=NULL;
+
+	EMD emd(poseval, negeval, 1, l, m);
 	emd.initial_fill();
-	emd.find_electrons();
+	if(l==0 && m==0) emd.find_electrons();
 	emd.optimize_moments(true,tol);
 	emd.save(emdname);
 	emd.moments(momname);
 	emd.compton_profile(Jname);
 	emd.compton_profile_interp(Jintname);
+
+	delete poseval;
+	if(m!=0) delete negeval;
       }
     }
   }
