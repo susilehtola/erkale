@@ -985,7 +985,7 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
 
   while(true) {
     // Compute the length of the interval
-    size_t Nint=(size_t) round((l-pmin)/h);
+    size_t Nint=(size_t) round((len-pmin)/h);
 
     // Allocate memory
     size_t i0=dens.size();
