@@ -176,6 +176,9 @@ int main(int argc, char **argv) {
       m=readint(lmval[1]);
     }
 
+    if(l!=0)
+      printf("\nComputing the (%i %+i) projection of the EMD.\n",l,m);
+
     // Amount of electrons is
     int Nel;
     chkpt.read("Nel",Nel);
