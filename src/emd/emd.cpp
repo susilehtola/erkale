@@ -694,88 +694,17 @@ double EMD::get(double p) const {
 }
 
 void EMD::initial_fill(bool verbose) {
-
-  // Initial dp
-  double idp=0.01;
-  // Helpers
-  double p, dp;
-
   if(verbose) {
     printf("\nFilling in initial grid ... ");
     fflush(stdout);
   }
 
-  emd_t hlp;
-  emd_t hlparr[4];
-
-  // Add origin
-  hlp.p=0.0;
-  hlp.d=get(hlp.p);
-  dens.push_back(hlp);
-
-  while(true) {
-    // Calculate value of dp to use
-    p=dens[dens.size()-1].p;
-    dp=(1.0+2.0*p)*idp;
-
-#ifdef _OPENMP
-#pragma omp parallel for ordered
-#endif
-    for(int ipoint=0;ipoint<4;ipoint++) {
-      hlparr[ipoint].p=p+(ipoint+1)*dp;
-      hlparr[ipoint].d=get(hlparr[ipoint].p);
-#ifdef _OPENMP
-#pragma omp ordered
-#endif
-      dens.push_back(hlparr[ipoint]);
-    }
-    
-    if(dens[dens.size()-1].d==0.0)
-      break;
-  }
-
+  // Fill a grid with initial spacing 0.1 for q = 0 .. 1.0.
+  // Multiply upper limit and spacing by factor 2 every interval.
+  fixed_fill(false,0.01,1.0,2.0,2.0);
+  
   if(verbose)
     printf("done.\n");
-}
-
-void EMD::complete_fill() {
-  // Work around pathological cases (very few exponents)
-
-  // Accept a decay by a factor up to
-  const double thr=20.0;
-
-  bool done;
-  do {
-    done=true;
-    for(size_t i=dens.size()-3;i<dens.size();i-=4) {
-      // Check that the density decreases at maximum by one order of
-      // magnitude per grid point.
-      if((dens[i-1].d>0.0) && (dens[i-2].d>0.0) && fabs(dens[i-1].d/dens[i-2].d)>=thr) {
-	add4(i);
-	done=false;
-	break;
-      }
-
-      if((dens[i].d>0.0) && (dens[i-1].d>0.0) && fabs(dens[i].d/dens[i-1].d)>=thr) {
-	add4(i);
-	done=false;
-	break;
-      }
-
-      if((dens[i+1].d>0.0) && (dens[i].d>0.0) && fabs(dens[i+1].d/dens[i].d)>=thr) {
-	add4(i);
-	done=false;
-	break;
-      }
-
-      if((dens[i+2].d>0.0) && (dens[i+1].d>0.0) && fabs(dens[i+2].d/dens[i+1].d)>=thr) {
-	add4(i);
-	done=false;
-	break;
-      }
-
-    }
-  } while(!done);
 }
 
 void EMD::add4(size_t loc) {
@@ -960,9 +889,6 @@ void EMD::optimize_moments(bool verbose, double tol) {
       for(int imom=0;imom<Nmom;imom++)
         printf("\t% i\t% e\t%e\t% e\n",moms[imom],momval[imom],momerr[imom],momerr[imom]/momval[imom]);
   }
-
-  // Try to work around pathological cases
-  //  complete_fill();
 }
 
 void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double lfac) {
@@ -985,7 +911,7 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
 
   while(true) {
     // Compute the length of the interval
-    size_t Nint=(size_t) round((len-pmin)/h);
+    size_t Nint=(size_t) round((len-pmin)/(4*h));
 
     // Allocate memory
     size_t i0=dens.size();
@@ -997,11 +923,11 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
 #endif
     for(size_t i=0;i<Nint;i++)
       for(int j=0;j<4;j++) {
-	dens[i0+4*i+j].p = pmin + i*h + (j+1)*h/4.0;
+	dens[i0+4*i+j].p = pmin + 4*i*h + (j+1)*h;
 	dens[i0+4*i+j].d = get(dens[i0+4*i+j].p);
       }
 
-    pmin+=Nint*h;
+    pmin+=Nint*4*h;
     h*=hfac;
     len*=lfac;
 
