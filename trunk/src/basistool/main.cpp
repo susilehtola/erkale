@@ -18,7 +18,7 @@
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
 
-std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "genbas", "savedalton", "sort", "taug"};
+std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "savedalton", "sort", "taug"};
 
 
 void help() {
@@ -207,6 +207,27 @@ int main(int argc, char **argv) {
 
     // Save output
     BasisSetLibrary elbas;
+    elbas.add_element(bas.get_element(el,no));
+    elbas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"dumpdec")==0) {
+    // Dump wanted element in decontracted form.
+
+    if(argc!=5 && argc!=6) {
+      printf("\nUsage: %s input.gbs dumpdec element output.gbs (number)\n",argv[0]);
+      return 1;
+    }
+
+    std::string el(argv[3]);
+    std::string fileout(argv[4]);
+
+    int no=0;
+    if(argc==6)
+      no=atoi(argv[5]);
+
+    // Save output
+    BasisSetLibrary elbas;
+    bas.decontract();
     elbas.add_element(bas.get_element(el,no));
     elbas.save_gaussian94(fileout);
 
