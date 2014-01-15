@@ -280,15 +280,13 @@ class EMD {
   /**
    * Alternative method of operation - fixed filling of the grid.
    *
-   * h0   - spacing for the grid in the first interval
+   * h0   - spacing for the points in the first interval
    * l0   - length of the first interval
    * 
    * hfac - factor to use in increasing the spacing
    * lfac - factor to use in increasing the interval length
-   *
-   * N.B. The actual spacing of the points is h/4.
    */
-  void fixed_fill(bool verbose=true, double h0=4e-3, double l0=3.0, double hfac=10.0, double lfac=10.0);
+  void fixed_fill(bool verbose=true, double h0=1e-3, double l0=3.0, double hfac=2.0, double lfac=2.0);
 
   /// Get EMD
   std::vector<emd_t> get() const;
