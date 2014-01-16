@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
 	   "Phys. Chem. Chem. Phys 13 (2011), pp. 5630 - 5641.");
 
     if(l!=0)
-      printf("\nComputing the (%i %+i) projection of the orbital EMD.\n",l,m);
+      printf("\nComputing the (%i %+i) projection of the EMD.\n",l,m);
 
     // Amount of electrons is
     int Nel;
