@@ -197,7 +197,9 @@ int main(int argc, char **argv) {
 
     if(l!=0)
       printf("\nComputing the (%i %+i) projection of the EMD.\n",l,m);
-
+    else
+      printf("\nComputing the isotropic projection of the EMD.\n",l,m);
+    
     // Amount of electrons is
     int Nel;
     chkpt.read("Nel",Nel);
@@ -230,7 +232,11 @@ int main(int argc, char **argv) {
       sprintf(fname,"moments_%i_%i.txt",l,m);
       emd.moments(fname);      
     }
-    printf("Calculating isotropic EMD properties took %s.\n",temd.elapsed().c_str());
+
+    if(l==0 && m==0)
+      printf("Calculating isotropic EMD properties took %s.\n",temd.elapsed().c_str());
+    else
+      printf("Calculating projected EMD properties took %s.\n",temd.elapsed().c_str());
 
     delete poseval;
     if(m!=0) delete negeval;
