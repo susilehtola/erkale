@@ -239,8 +239,6 @@ class EMD {
   std::vector<emd_t> dens;
   /// Add 4 points at ind
   void add4(size_t ind);
-  /// Get density at p
-  double get(double p) const;
 
   /// l value
   int l;
@@ -266,6 +264,9 @@ class EMD {
   EMD(const EMDEvaluator * poseval, const EMDEvaluator * negeval, int Nel, int l, int m);
   /// Destructor
   ~EMD();
+
+  /// Evaluate density at p
+  double eval(double p) const;
 
   /// Initial filling of grid
   void initial_fill(bool verbose=true);
