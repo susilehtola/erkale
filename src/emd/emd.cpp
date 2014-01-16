@@ -679,7 +679,7 @@ EMD::EMD(const EMDEvaluator * posevalp, const EMDEvaluator * negevalp, int Nelv,
 EMD::~EMD() {
 }
 
-double EMD::get(double p) const {
+double EMD::eval(double p) const {
   // Result
   std::complex<double> r;
 
@@ -720,7 +720,7 @@ void EMD::add4(size_t loc) {
     // Value of p is
     integ[2-ipoint].p=0.5*(dens[loc+ipoint].p+dens[loc+ipoint-1].p);
     // Value of the density at this point is
-    integ[2-ipoint].d=get(integ[2-ipoint].p);
+    integ[2-ipoint].d=eval(integ[2-ipoint].p);
     // Add value to the list
 #ifdef _OPENMP
 #pragma omp ordered
@@ -901,7 +901,7 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
   // Add the origin
   dens.resize(1);
   dens[0].p=0.0;
-  dens[0].d=get(0.0);
+  dens[0].d=eval(0.0);
 
   // Loop over intervals
   double pmin=0.0;
@@ -924,7 +924,7 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
     for(size_t i=0;i<Nint;i++)
       for(int j=0;j<4;j++) {
 	dens[i0+4*i+j].p = pmin + 4*i*h + (j+1)*h;
-	dens[i0+4*i+j].d = get(dens[i0+4*i+j].p);
+	dens[i0+4*i+j].d = eval(dens[i0+4*i+j].p);
       }
 
     pmin+=Nint*4*h;
