@@ -825,7 +825,7 @@ void EMD::optimize_moments(bool verbose, double tol) {
   do {
     iter++;
 
-    // Calculate momentums and error estimates
+    // Calculate moments and error estimates
     for(int imom=0;imom<Nmom;imom++) {
       mom=moms[imom];
       momval[imom]=0.0;
@@ -854,11 +854,12 @@ void EMD::optimize_moments(bool verbose, double tol) {
     errel=0;
     errelind=-1;
     for(int imom=0;imom<Nmom;imom++)
-      if(momerr[imom]/momval[imom]>errel) {
-        errel=momerr[imom]/momval[imom];
+      // Moments can be negative for l>0
+      if(fabs(momerr[imom]/momval[imom])>errel) {
+        errel=fabs(momerr[imom]/momval[imom]);
         errelind=imom;
       }
-
+    
     // Print out current values if necessary
     if(verbose && (iter==1 || t.get()>MAXPRINTFREQ || errel<=tol)) {
       t.set();
@@ -867,17 +868,17 @@ void EMD::optimize_moments(bool verbose, double tol) {
       else
 	printf("\nUsing %u points.\n",(unsigned int) dens.size());
       printf("Current values of moments are:\n");
-      printf("\t%2s\t%13s\t%12s\t%13s\n","k","<p^k>","Abs error","Rel error");
+      printf("\t%2s\t%13s\t%12s\t%12s\n","k","<p^k>","Abs error","Rel error");
       for(int imom=0;imom<Nmom;imom++)
-        printf("\t% i\t% e\t%e\t% e\n",moms[imom],momval[imom],momerr[imom],momerr[imom]/momval[imom]);
+        printf("\t% i\t% e\t%e\t%e\n",moms[imom],momval[imom],momerr[imom],fabs(momerr[imom]/momval[imom]));
     }
-
+    
     // If tolerance has not been reached, add more points
     if(errel>tol)
       add4(mommaxerrloc[errelind]);
-
+    
   } while(errel>tol);
-
+  
   if(verbose) {
       t.set();
       if(l==0 && m==0)
@@ -885,9 +886,9 @@ void EMD::optimize_moments(bool verbose, double tol) {
       else
 	printf("\nUsed %u points.\n",(unsigned int) dens.size());
       printf("Final values of moments are:\n");
-      printf("\t%2s\t%13s\t%12s\t%13s\n","k","<p^k>","Abs error","Rel error");
+      printf("\t%2s\t%13s\t%12s\t%12s\n","k","<p^k>","Abs error","Rel error");
       for(int imom=0;imom<Nmom;imom++)
-        printf("\t% i\t% e\t%e\t% e\n",moms[imom],momval[imom],momerr[imom],momerr[imom]/momval[imom]);
+        printf("\t% i\t% e\t%e\t%e\n",moms[imom],momval[imom],momerr[imom],fabs(momerr[imom]/momval[imom]));
   }
 }
 
