@@ -63,6 +63,9 @@ int main(int argc, char **argv) {
   set.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
   set.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4:6","");
   set.add_string("Similarity", "Compute similarity measure to checkpoint","");
+  set.add_string("SimilarityGrid", "Grid to use for computing similarity integrals","500 77");
+  set.add_bool("SimilarityLM", "Seminumerical computation of similarity integrals?", false);
+  set.add_int("SimilarityLmax", "Maximum angular momentum for seminumerical computation", 6);
 
   if(argc==2)
     set.parse(argv[1]);
@@ -198,7 +201,7 @@ int main(int argc, char **argv) {
     if(l!=0)
       printf("\nComputing the (%i %+i) projection of the EMD.\n",l,m);
     else
-      printf("\nComputing the isotropic projection of the EMD.\n",l,m);
+      printf("\nComputing the isotropic projection of the EMD.\n");
     
     // Amount of electrons is
     int Nel;
@@ -263,6 +266,15 @@ int main(int argc, char **argv) {
     // Load checkpoint
     Checkpoint simchk(set.get_string("Similarity"),false);
 
+    // Get grid size
+    std::vector<std::string> gridsize=splitline(set.get_string("SimilarityGrid"));
+    if(gridsize.size()!=2) {
+      throw std::runtime_error("Invalid grid size!\n");
+    }
+    int nrad=readint(gridsize[0]);
+    int lmax=readint(gridsize[1]);
+    int radlmax=set.get_int("SimilarityLmax");
+
     // Load basis set
     BasisSet simbas;
     simchk.read(simbas);
@@ -272,7 +284,11 @@ int main(int argc, char **argv) {
     simchk.read("P",simP);
 
     // Compute momentum density overlap
-    arma::cube ovl=emd_overlap(basis,P,simbas,simP);
+    arma::cube ovl;
+    if(set.get_bool("SimilarityLM"))
+      ovl=emd_overlap_semi(basis,P,simbas,simP,nrad,radlmax);
+    else
+      ovl=emd_overlap(basis,P,simbas,simP,nrad,lmax);
 
     // Amount of electrons
     int Nela, Nelb;
