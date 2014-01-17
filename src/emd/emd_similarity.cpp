@@ -2,6 +2,7 @@
 #include "lebedev.h"
 #include "chebyshev.h"
 #include "gto_fourier.h"
+#include "emd_gto.h"
 #include "timer.h"
 
 // Debug routines?
@@ -165,6 +166,122 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const Ba
     t.set();
   }
 
+  return ret;
+}
+
+std::vector<double> evaluate_projection(const BasisSet & basis, const arma::mat & P, const std::vector<double> rad, int l, int m) {
+  int Nel=round(arma::trace(P*basis.overlap()));
+
+  GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,P,l,std::abs(m));
+  GaussianEMDEvaluator *negeval=NULL;
+  if(m!=0)
+    negeval=new GaussianEMDEvaluator(basis,P,l,-std::abs(m));
+  EMD emd(poseval, negeval, Nel, l, m);
+
+  std::vector<double> ret(rad.size());
+  for(size_t i=0;i<rad.size();i++)
+    ret[i]=emd.eval(rad[i]);
+
+  delete poseval;
+  if(m!=0) delete negeval;
+
+  return ret;
+}
+
+// Offset in array
+int lm_offset(int l, int m) {
+  return l*(l-1)/2 + (l+m);
+}
+
+double similarity_quadrature_semi(const std::vector<double> & rad, const std::vector<double> & wrad, const std::vector< std::vector<double> > & emd_a, const std::vector< std::vector<double> > & emd_b, int k, int lmax) {
+  // Compute total product density
+  std::vector<double> proddens;
+  proddens.assign(rad.size(),0.0);
+  for(int l=0;l<=lmax;l+=2)
+    for(int m=-l;m<=l;m++)
+      for(size_t ir=0;ir<rad.size();ir++)
+	proddens[ir]+=emd_a[lm_offset(l,m)][ir]*emd_b[lm_offset(l,m)][ir];
+  
+  // Similarity
+  double sim=0.0;
+  for(size_t ir=0;ir<rad.size();ir++) {
+    // Increment measure
+    sim+=std::pow(rad[ir],2*k+2)*proddens[ir]*wrad[ir];
+  }
+  
+  // Remove extra 4pi factor
+  sim/=4.0*M_PI;
+
+  return sim;
+}
+
+arma::cube emd_overlap_semi(const BasisSet & basis_a, const arma::mat & P_a, const BasisSet & basis_b, const arma::mat & P_b, int nrad, int lmax, bool verbose) {
+  // Get Chebyshev nodes and weights for radial part
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
+
+  Timer t;
+
+  // Radial meshes of EMDs
+  std::vector< std::vector<double> > emd_a(lm_offset(lmax,lmax)+1);
+  std::vector< std::vector<double> > emd_b(lm_offset(lmax,lmax)+1);
+
+
+  if(verbose) {
+    printf("\n%lu point radial grid, coupling up to l=%i.\n",(long unsigned) rad.size(), lmax);
+    fflush(stdout);
+    t.set();
+  }
+
+  // Returned similarities
+  arma::cube ret(4,3,2);
+
+  // Loop over l
+  for(int l=0;l<=lmax;l+=2) {
+    // Compute reference
+    printf("Computing l = %-2i reference  EMD ... ",l);
+    fflush(stdout);
+    for(int m=-l;m<=l;m++)
+      emd_a[lm_offset(l,m)]=evaluate_projection(basis_a,P_a,rad,l,m);
+    
+    if(verbose) {
+      printf("done (%s).\n",t.elapsed().c_str());
+      printf("Computing l = %-2i comparison EMD ... ",l);
+      fflush(stdout);
+      t.set();
+    }
+    
+    for(int m=-l;m<=l;m++)
+      emd_b[lm_offset(l,m)]=evaluate_projection(basis_b,P_b,rad,l,m);
+    
+    if(verbose) {
+      printf("done (%s).\n",t.elapsed().c_str());
+      fflush(stdout);
+      t.set();
+    }
+  }
+    
+  // Get the similarity measures
+  for(int k=-1;k<=2;k++) {
+    // Full result
+    ret(1+k,0,0)=similarity_quadrature_semi(rad,wrad,emd_a,emd_a,k,lmax); // AA
+    ret(1+k,1,0)=similarity_quadrature_semi(rad,wrad,emd_b,emd_b,k,lmax); // BB
+    ret(1+k,2,0)=similarity_quadrature_semi(rad,wrad,emd_a,emd_b,k,lmax); // AB
+    
+    // Spherical average
+    ret(1+k,0,1)=similarity_quadrature_semi(rad,wrad,emd_a,emd_a,k,0); // AA
+    ret(1+k,1,1)=similarity_quadrature_semi(rad,wrad,emd_b,emd_b,k,0); // BB
+    ret(1+k,2,1)=similarity_quadrature_semi(rad,wrad,emd_a,emd_b,k,0); // AB
+    
+    //      printf("k = %i, ave = %i: AA = %e, BB = %e, AB = %e\n",k,ave,ret(1+k,0,ave),ret(1+k,1,ave),ret(1+k,2,ave));
+  }
+  
+  if(verbose) {
+    printf("Similarity moments computed in %s.\n\n",t.elapsed().c_str());
+    fflush(stdout);
+    t.set();
+  }
+  
   return ret;
 }
 
