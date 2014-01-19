@@ -413,15 +413,13 @@ void EMDEvaluator::get_coupling(size_t ig, size_t jg, int l, int lp, std::vector
     }
 }
 
-void EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & ret) const {
+void EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & ret, std::vector<total_coupl_t> & tmp) const {
   // Get the radial parts
   std::vector<radf_val_t> ri=get_radial(ig,p);
   std::vector<radf_val_t> rj=get_radial(jg,p);
 
   // Clear return array
   ret.clear();
-  // Helper array
-  std::vector<total_coupl_t> c;
 
   // Loop over factors
   for(size_t il=0;il<ri.size();il++) {
@@ -433,16 +431,16 @@ void EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p, std::vecto
       int lp=rj[ilp].l;
 
       // Get the coupling constants
-      get_coupling(ig,jg,l,lp,c);
+      get_coupling(ig,jg,l,lp,tmp);
 
       // Increment total value
-      for(size_t ic=0;ic<c.size();ic++) {
+      for(size_t ic=0;ic<tmp.size();ic++) {
 
 	// Term to add
 	total_coupl_t hlp;
-	hlp.L=c[ic].L;
-	hlp.M=c[ic].M;
-	hlp.c=std::conj(ri[il].f)*rj[ilp].f*c[ic].c;
+	hlp.L=tmp[ic].L;
+	hlp.M=tmp[ic].M;
+	hlp.c=std::conj(ri[il].f)*rj[ilp].f*tmp[ic].c;
 
 	// Add term
 	add_coupling_term(ret,hlp);
@@ -525,9 +523,11 @@ std::complex<double> EMDEvaluator::get(double p) const {
   {
     // Total coupling
     std::vector<total_coupl_t> totc;
+    // Helper array
+    std::vector<total_coupl_t> tmp;
     
 #ifdef _OPENMP
-#pragma omp for
+#pragma omp for schedule(dynamic)
 #endif
     // Loop over groups of equivalent functions
     for(size_t iii=0;iii<offd.size();iii++) {
@@ -535,7 +535,7 @@ std::complex<double> EMDEvaluator::get(double p) const {
       size_t jjg=offd[iii].j;
       
       // Get the total coupling coefficient
-      get_total_coupling(iig,jjg,p,totc);
+      get_total_coupling(iig,jjg,p,totc,tmp);
       if(totc.size()==0)
 	continue;
       
@@ -585,13 +585,13 @@ std::complex<double> EMDEvaluator::get(double p) const {
 #pragma omp parallel reduction(+:npre,npim)
 #endif
   {
-    std::vector<total_coupl_t> totc;
+    std::vector<total_coupl_t> totc, tmp;
 #ifdef _OPENMP
-#pragma omp for
+#pragma omp for schedule(dynamic)
 #endif
     // Then, do diagonal. Get the total coupling coefficient
     for(size_t iig=0;iig<idfuncs.size();iig++) {
-      get_total_coupling(iig,iig,p,totc);
+      get_total_coupling(iig,iig,p,totc,tmp);
       if(totc.size()==0)
 	continue;
       
@@ -907,7 +907,7 @@ void EMD::optimize_moments(bool verbose, double tol) {
 void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double lfac) {
   Timer t;
   if(verbose) {
-    printf("Filling the EMD grid ... ");
+    printf("\nFilling the EMD grid ... ");
     fflush(stdout);
   }
 

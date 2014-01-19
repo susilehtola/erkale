@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
     printf("Please read and cite the reference:\n%s\n%s\n%s\n",	\
 	   "J. Lehtola, M. Hakala, J. Vaara and K. Hämäläinen",		\
 	   "Calculation of isotropic Compton profiles with Gaussian basis sets", \
-	   "Phys. Chem. Chem. Phys 13 (2011), pp. 5630 - 5641.");
+	   "Phys. Chem. Chem. Phys. 13 (2011), pp. 5630 - 5641.");
 
     if(l!=0)
       printf("\nComputing the (%i %+i) projection of the EMD.\n",l,m);

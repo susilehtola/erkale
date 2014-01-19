@@ -160,7 +160,7 @@ class EMDEvaluator {
   std::vector<radf_val_t> get_radial(size_t ig, double p) const;
 
   /// Get the total coupling (incl. radial function)
-  void get_total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & c) const;
+  void get_total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & c, std::vector<total_coupl_t> & tmp) const;
 
  protected:
   /**
