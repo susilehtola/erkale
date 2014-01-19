@@ -185,8 +185,10 @@ int main(int argc, char **argv) {
 
 	emd.save(emdname);
 	emd.moments(momname);
-	emd.compton_profile(Jname);
-	emd.compton_profile_interp(Jintname);
+	if(l==0 && m==0) {
+	  emd.compton_profile(Jname);
+	  emd.compton_profile_interp(Jintname);
+	}
 
 	delete poseval;
 	if(m!=0) delete negeval;
