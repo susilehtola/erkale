@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
   set.add_bool("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", true);
   set.add_double("EMDTol", "Tolerance for the numerical integration of the radial EMD",1e-8);
   set.add_string("EMDlm", "Which projection of the radial EMD to compute","");
-
+  set.add_bool("EMDAdapt", "Use adaptive grid to compute EMD?", true);
   set.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
   set.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4:6","");
   set.add_string("Similarity", "Compute similarity measure to checkpoint","");
@@ -97,6 +97,7 @@ int main(int argc, char **argv) {
     l=readint(lmval[0]);
     m=readint(lmval[1]);
   }
+  bool adaptive=set.get_bool("EMDAdapt");
   
   // Compute orbital EMDs?
   if(set.get_string("EMDOrbitals")!="") {
@@ -175,9 +176,13 @@ int main(int argc, char **argv) {
 	  negeval=NULL;
 
 	EMD emd(poseval, negeval, 1, l, m);
-	emd.initial_fill();
-	if(l==0 && m==0) emd.find_electrons();
-	emd.optimize_moments(true,tol);
+	if(adaptive) {
+	  emd.initial_fill();
+	  if(l==0 && m==0) emd.find_electrons();
+	  emd.optimize_moments(true,tol);
+	} else
+	  emd.fixed_fill();
+
 	emd.save(emdname);
 	emd.moments(momname);
 	emd.compton_profile(Jname);
@@ -218,9 +223,12 @@ int main(int argc, char **argv) {
 
     temd.set();
     EMD emd(poseval, negeval, Nel, l, m);
-    emd.initial_fill();
-    if(l==0 && m==0) emd.find_electrons();
-    emd.optimize_moments(true,tol);
+    if(adaptive) {
+      emd.initial_fill();
+      if(l==0 && m==0) emd.find_electrons();
+      emd.optimize_moments(true,tol);
+    } else
+      emd.fixed_fill();
     
     if(l==0 && m==0) {
       emd.save("emd.txt");
