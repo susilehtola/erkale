@@ -358,7 +358,7 @@ void EMDEvaluator::add_coupling(size_t ig, size_t jg, coupl_coeff_t t) {
   }
 }
 
-std::vector<total_coupl_t> EMDEvaluator::get_coupling(size_t ig, size_t jg, int l, int lp) const {
+void EMDEvaluator::get_coupling(size_t ig, size_t jg, int l, int lp, std::vector<total_coupl_t> & c) const {
   // Find coupling coefficients with the wanted l and l'
 
   // The index in the cc list is
@@ -401,7 +401,7 @@ std::vector<total_coupl_t> EMDEvaluator::get_coupling(size_t ig, size_t jg, int 
   }
   */
 
-  std::vector<total_coupl_t> ret;
+  c.clear();
   for(size_t i=0;i<cc[ijidx].size();i++)
     if((cc[ijidx][i].l==l) && (cc[ijidx][i].lp==lp)) {
 
@@ -409,19 +409,19 @@ std::vector<total_coupl_t> EMDEvaluator::get_coupling(size_t ig, size_t jg, int 
       hlp.L=cc[ijidx][i].L;
       hlp.M=cc[ijidx][i].M;
       hlp.c=cc[ijidx][i].c;
-      ret.push_back(hlp);
+      c.push_back(hlp);
     }
-
-  return ret;
 }
 
-std::vector<total_coupl_t> EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p) const {
+void EMDEvaluator::get_total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & ret) const {
   // Get the radial parts
   std::vector<radf_val_t> ri=get_radial(ig,p);
   std::vector<radf_val_t> rj=get_radial(jg,p);
 
-  // Returned array
-  std::vector<total_coupl_t> ret;
+  // Clear return array
+  ret.clear();
+  // Helper array
+  std::vector<total_coupl_t> c;
 
   // Loop over factors
   for(size_t il=0;il<ri.size();il++) {
@@ -433,7 +433,7 @@ std::vector<total_coupl_t> EMDEvaluator::get_total_coupling(size_t ig, size_t jg
       int lp=rj[ilp].l;
 
       // Get the coupling constants
-      std::vector<total_coupl_t> c=get_coupling(ig,jg,l,lp);
+      get_coupling(ig,jg,l,lp,c);
 
       // Increment total value
       for(size_t ic=0;ic<c.size();ic++) {
@@ -460,8 +460,6 @@ std::vector<total_coupl_t> EMDEvaluator::get_total_coupling(size_t ig, size_t jg
   for(size_t i=0;i<ret.size();i++)
     printf("\t%i\t%i\t(% e,% e)\n",ret[i].L,ret[i].M,ret[i].c.real(),ret[i].c.imag());
 #endif
-
-  return ret;
 }
 
 void EMDEvaluator::print() const {
@@ -522,106 +520,120 @@ std::complex<double> EMDEvaluator::get(double p) const {
 
   double npre=0.0, npim=0.0;
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+:npre,npim)
+#pragma omp parallel reduction(+:npre,npim)
 #endif
-  // Loop over groups of equivalent functions
-  for(size_t iii=0;iii<offd.size();iii++) {
-    size_t iig=offd[iii].i;
-    size_t jjg=offd[iii].j;
-
-    // Get the total coupling coefficient
-    std::vector<total_coupl_t> totc=get_total_coupling(iig,jjg,p);
-    if(totc.size()==0)
-      continue;
-
-    // Loop over the individual functions
-    for(size_t ii=0;ii<idfuncs[iig].size();ii++)
-      for(size_t jj=0;jj<idfuncs[jjg].size();jj++) {
-	// The indices are
-	size_t mu=idfuncs[iig][ii];
-	size_t nu=idfuncs[jjg][jj];
-
-	// and the functions are centered on
-	size_t iat=loc[mu];
-	size_t jat=loc[nu];
-
-	// so the corresponding index in the Bessel and spherical harmonics arrays is
-	size_t ibes;
-	// Sign of spherical harmonics
-	int ylmsign=1;
-
-	//	  ibes=iat*Nat+jat;
-	if(iat>jat)
-	  ibes=iat*(iat+1)/2+jat;
-	else {
-	  // Reverse sign of Ylm
-	  ibes=jat*(jat+1)/2+iat;
-	  ylmsign=-1;
+  {
+    // Total coupling
+    std::vector<total_coupl_t> totc;
+    
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    // Loop over groups of equivalent functions
+    for(size_t iii=0;iii<offd.size();iii++) {
+      size_t iig=offd[iii].i;
+      size_t jjg=offd[iii].j;
+      
+      // Get the total coupling coefficient
+      get_total_coupling(iig,jjg,p,totc);
+      if(totc.size()==0)
+	continue;
+      
+      // Loop over the individual functions
+      for(size_t ii=0;ii<idfuncs[iig].size();ii++)
+	for(size_t jj=0;jj<idfuncs[jjg].size();jj++) {
+	  // The indices are
+	  size_t mu=idfuncs[iig][ii];
+	  size_t nu=idfuncs[jjg][jj];
+	  
+	  // and the functions are centered on
+	  size_t iat=loc[mu];
+	  size_t jat=loc[nu];
+	  
+	  // so the corresponding index in the Bessel and spherical harmonics arrays is
+	  size_t ibes;
+	  // Sign of spherical harmonics
+	  int ylmsign=1;
+	  
+	  //	  ibes=iat*Nat+jat;
+	  if(iat>jat)
+	    ibes=iat*(iat+1)/2+jat;
+	  else {
+	    // Reverse sign of Ylm
+	    ibes=jat*(jat+1)/2+iat;
+	    ylmsign=-1;
+	  }
+	  
+	  // Loop over coupling coefficient
+	  for(size_t ic=0;ic<totc.size();ic++) {
+	    // L and M are
+	    int L=totc[ic].L;
+	    int M=totc[ic].M;
+	    
+	    // Increment EMD; we get the increment twice since we are off-diagonal.
+	    std::complex<double> incr=2.0*P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
+	    npre+=incr.real();
+	    npim+=incr.imag();
+	  }
 	}
-
-	// Loop over coupling coefficient
-	for(size_t ic=0;ic<totc.size();ic++) {
-	  // L and M are
-	  int L=totc[ic].L;
-	  int M=totc[ic].M;
-
-	  // Increment EMD; we get the increment twice since we are off-diagonal.
-	  std::complex<double> incr=2.0*P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
-	  npre+=incr.real();
-	  npim+=incr.imag();
-	}
-      }
+    }
   }
   np+=std::complex<double>(npre,npim);
-
+  
   npre=0.0; npim=0.0;
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+:npre,npim)
+#pragma omp parallel reduction(+:npre,npim)
 #endif
-  // Then, do diagonal. Get the total coupling coefficient
-  for(size_t iig=0;iig<idfuncs.size();iig++) {
-    std::vector<total_coupl_t> totc=get_total_coupling(iig,iig,p);
-    if(totc.size()==0)
-      continue;
-
-    // Loop over the individual functions
-    for(size_t ii=0;ii<idfuncs[iig].size();ii++)
-      for(size_t jj=0;jj<idfuncs[iig].size();jj++) {
-
-	// The indices are
-	size_t mu=idfuncs[iig][ii];
-	size_t nu=idfuncs[iig][jj];
-
-	// and the functions are centered on
-	size_t iat=loc[mu];
-	size_t jat=loc[nu];
-
-	// so the corresponding index in the Bessel and spherical harmonics arrays is
-	size_t ibes;
-	// Sign of spherical harmonics
-	int ylmsign=1;
-
-	//	  ibes=iat*Nat+jat;
-	if(iat>jat)
-	  ibes=iat*(iat+1)/2+jat;
-	else {
-	  // Reverse sign of Ylm
-	  ibes=jat*(jat+1)/2+iat;
-	  ylmsign=-1;
+  {
+    std::vector<total_coupl_t> totc;
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    // Then, do diagonal. Get the total coupling coefficient
+    for(size_t iig=0;iig<idfuncs.size();iig++) {
+      get_total_coupling(iig,iig,p,totc);
+      if(totc.size()==0)
+	continue;
+      
+      // Loop over the individual functions
+      for(size_t ii=0;ii<idfuncs[iig].size();ii++)
+	for(size_t jj=0;jj<idfuncs[iig].size();jj++) {
+	  
+	  // The indices are
+	  size_t mu=idfuncs[iig][ii];
+	  size_t nu=idfuncs[iig][jj];
+	  
+	  // and the functions are centered on
+	  size_t iat=loc[mu];
+	  size_t jat=loc[nu];
+	  
+	  // so the corresponding index in the Bessel and spherical harmonics arrays is
+	  size_t ibes;
+	  // Sign of spherical harmonics
+	  int ylmsign=1;
+	  
+	  //	  ibes=iat*Nat+jat;
+	  if(iat>jat)
+	    ibes=iat*(iat+1)/2+jat;
+	  else {
+	    // Reverse sign of Ylm
+	    ibes=jat*(jat+1)/2+iat;
+	    ylmsign=-1;
+	  }
+	  
+	  // Loop over coupling coefficient
+	  for(size_t ic=0;ic<totc.size();ic++) {
+	    // L and M are
+	    int L=totc[ic].L;
+	    int M=totc[ic].M;
+	    
+	    // Increment EMD
+	    std::complex<double> incr=P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
+	    npre+=incr.real();
+	    npim+=incr.imag();
+	  }
 	}
-
-	// Loop over coupling coefficient
-	for(size_t ic=0;ic<totc.size();ic++) {
-	  // L and M are
-	  int L=totc[ic].L;
-	  int M=totc[ic].M;
-
-	  // Increment EMD
-	  std::complex<double> incr=P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
-	  npre+=incr.real();
-	  npim+=incr.imag();
-	}
-      }
+    }
   }
   np+=std::complex<double>(npre,npim);
 

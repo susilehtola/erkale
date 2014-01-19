@@ -154,13 +154,13 @@ class EMDEvaluator {
   void add_coupling(size_t ig, size_t jg, coupl_coeff_t c);
 
   /// Get the coupling constants for L=|l-lp|, ..., l+lp.
-  std::vector<total_coupl_t> get_coupling(size_t ig, size_t jg, int l, int lp) const;
+  void get_coupling(size_t ig, size_t jg, int l, int lp, std::vector<total_coupl_t> & c) const;
 
   /// Computes the ig:th radial function
   std::vector<radf_val_t> get_radial(size_t ig, double p) const;
 
   /// Get the total coupling (incl. radial function)
-  std::vector<total_coupl_t> get_total_coupling(size_t ig, size_t jg, double p) const;
+  void get_total_coupling(size_t ig, size_t jg, double p, std::vector<total_coupl_t> & c) const;
 
  protected:
   /**
