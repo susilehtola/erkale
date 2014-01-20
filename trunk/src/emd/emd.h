@@ -275,6 +275,8 @@ class EMD {
 
   /// Continue filling until number of electrons is reproduced within tolerance
   void find_electrons(bool verbose=true, double tol=1e-4);
+  /// Optimize given moments of EMD within tolerance
+  void optimize_moments(const std::vector<int> & moms, bool verbose=true, double tol=1e-8);
   /// Optimize physical moments of EMD within tolerance
   void optimize_moments(bool verbose=true, double tol=1e-8);
 

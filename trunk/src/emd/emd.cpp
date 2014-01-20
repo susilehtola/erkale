@@ -809,16 +809,25 @@ void EMD::find_electrons(bool verbose, double tol) {
 }
 
 void EMD::optimize_moments(bool verbose, double tol) {
+  std::vector<int> moms;
+  int kmin=-2;
+  int kmax=4;
+  if(l>0)
+    // Don't go up to p^4, it converges very badly for l>0.
+    kmax=3;
+
+  for(int k=kmin;k<=kmax;k++)
+    moms.push_back(k);
+  optimize_moments(moms,verbose,tol);
+}
+
+void EMD::optimize_moments(const std::vector<int> & moms, bool verbose, double tol) {
   // Integrals
   double rough, fine;
 
-  // Moments of density
-  int mom;
-  int Nmom=7;
-  int moms[]={-2, -1, 0, 1, 2, 3, 4};
-  double momval[Nmom];
-  double momerr[Nmom];
-  size_t mommaxerrloc[Nmom];
+  std::vector<double> momval(moms.size());
+  std::vector<double> momerr(moms.size());
+  std::vector<size_t> mommaxerrloc(moms.size());
 
   // Temporary helper
   double maxerr;
@@ -838,8 +847,8 @@ void EMD::optimize_moments(bool verbose, double tol) {
     iter++;
 
     // Calculate moments and error estimates
-    for(int imom=0;imom<Nmom;imom++) {
-      mom=moms[imom];
+    for(size_t imom=0;imom<moms.size();imom++) {
+      int mom=moms[imom];
       momval[imom]=0.0;
       momerr[imom]=0.0;
 
@@ -861,11 +870,11 @@ void EMD::optimize_moments(bool verbose, double tol) {
 	}
       }
     }
-
+    
     // Find out which moment has maximum error and where it is
     errel=0;
     errelind=-1;
-    for(int imom=0;imom<Nmom;imom++)
+    for(size_t imom=0;imom<moms.size();imom++)
       // Moments can be negative for l>0
       if(fabs(momerr[imom]/momval[imom])>errel) {
         errel=fabs(momerr[imom]/momval[imom]);
@@ -881,7 +890,7 @@ void EMD::optimize_moments(bool verbose, double tol) {
 	printf("\nUsing %u points.\n",(unsigned int) dens.size());
       printf("Current values of moments are:\n");
       printf("\t%2s\t%13s\t%12s\t%12s\n","k","<p^k>","Abs error","Rel error");
-      for(int imom=0;imom<Nmom;imom++)
+      for(size_t imom=0;imom<moms.size();imom++)
         printf("\t% i\t% e\t%e\t%e\n",moms[imom],momval[imom],momerr[imom],fabs(momerr[imom]/momval[imom]));
     }
     
@@ -892,14 +901,14 @@ void EMD::optimize_moments(bool verbose, double tol) {
   } while(errel>tol);
   
   if(verbose) {
-      t.set();
+    t.set();
       if(l==0 && m==0)
 	printf("\nUsed %u points, charge differs from Nel by %e.\n",(unsigned int) dens.size(),momval[2]-Nel);
       else
 	printf("\nUsed %u points.\n",(unsigned int) dens.size());
       printf("Final values of moments are:\n");
       printf("\t%2s\t%13s\t%12s\t%12s\n","k","<p^k>","Abs error","Rel error");
-      for(int imom=0;imom<Nmom;imom++)
+      for(size_t imom=0;imom<moms.size();imom++)
         printf("\t% i\t% e\t%e\t%e\n",moms[imom],momval[imom],momerr[imom],fabs(momerr[imom]/momval[imom]));
   }
 }
