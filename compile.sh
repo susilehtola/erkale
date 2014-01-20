@@ -36,16 +36,16 @@ export CXXFLAGS="${CFLAGS}"
 export FFLAGS="${CFLAGS}"
 export FCFLAGS="${CFLAGS}"
 
-# LAPACK and BLAS library to use. On Debian and Ubuntu you need to add -lblas to the end
-LAPACK="-L/usr/lib64/atlas -llapack -lcblas -latlas"
-BLAS="-L/usr/lib64/atlas -lcblas -latlas"
+# LAPACK and BLAS library to use.
+LAPACK="-L/usr/lib64/atlas -llapack -lf77blas -latlas"
+BLAS="-L/usr/lib64/atlas -lf77blas -latlas"
 
 # Maximum supported angular momentum (affects libint)
-MAXAM="8"
+MAXAM="6"
 # Maximum optimized angular momentum (affects libint). If this is very
 # large, libint compilation will take ages and the resulting libraries
 # will be HUGE.
-OPTAM="6"
+OPTAM="4"
 # Maximum angular momentum for first ERI derivatives
 MAXDERIV="5"
 
@@ -53,7 +53,7 @@ MAXDERIV="5"
 export GSLVER="1.16"
 export XCVER="2.0.2"
 export INTVER="1.1.5"
-export ARMAVER="3.930.2"
+export ARMAVER="4.000.1"
 export CMAKEVER="2.8.12"
 export HDF5VER="1.8.12"
 
