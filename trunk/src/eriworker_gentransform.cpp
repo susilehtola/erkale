@@ -132,7 +132,7 @@ int main(void) {
     printf("  static void (*f[%i])(size_t, size_t, size_t, const std::vector<double> *, std::vector<double> *)={\n",LIBINT_MAX_AM);
     for(int am=0;am<LIBINT_MAX_AM;am++) {
       printf("    transform_%c%i",ijkl[it],am);
-      if(am<LIBINT_MAX_AM)
+      if(am<LIBINT_MAX_AM-1)
 	printf(",");
       printf("\n");
     }
