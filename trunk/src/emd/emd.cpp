@@ -36,7 +36,7 @@
 #define finemom(i)   ((moment(i-2)+4.0*moment(i-1)+2.0*moment(i)+4.0*moment(i+1)+moment(i+2))*(dens[i+2].p-dens[i-2].p)/12.0)
 
 // Maximum number of points allowed for converging number of electrons
-#define MAXPOINTS 700
+#define MAXPOINTS 4000
 
 // Print out moments at maximum every N seconds
 #define MAXPRINTFREQ 5
