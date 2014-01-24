@@ -177,6 +177,10 @@ void mulliken_analysis(const BasisSet & basis, const arma::mat & Pa, const arma:
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Mulliken",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"Mulliken spin",qs);
 }
 
 arma::vec mulliken_charges(const BasisSet & basis, const arma::mat & P) {
@@ -261,6 +265,10 @@ void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::m
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Löwdin",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"Löwdin spin",qs);
 }
 
 arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P) {
