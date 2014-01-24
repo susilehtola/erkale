@@ -15,7 +15,7 @@
  */
 
 
-
+#include "global.h"
 #include "solve_coefficients.h"
 
 /* Hypergeometric functions */
@@ -57,29 +57,36 @@ arma::mat form_S(const std::vector<double> & expns, int l) {
   return ret;
 }
 
+arma::vec solve_coefficients(const arma::mat & S, const arma::vec & P) {
+  //  return inv(S)*P;
+  
+  arma::vec c;
+  bool ok=arma::solve(c,S,P);
+  if(!ok) {
+    ERROR_INFO();
+    throw std::runtime_error("Failed to solve coefficients - ill determined system?\n");
+  }
+
+  return c;
+}
+
 arma::vec solve_coefficients(std::vector<double> expns, double zeta, int l) {
   // Solve coefficients of exponents.
 
   arma::vec P=form_P(expns,zeta,l);
   arma::mat S=form_S(expns,l);
 
-  return inv(S)*P;
+  return solve_coefficients(S,P);
 }
 
 double compute_difference(std::vector<double> expns, double zeta, int l) {
   arma::vec P=form_P(expns,zeta,l);
   arma::mat S=form_S(expns,l);
-  // Inverse overlap matrix
-  arma::mat invS=arma::inv(S);
 
-  // If inversion was not succesful, invS is empty
-  if(invS.n_elem==0)
-    return 1.0;
-
-  arma::vec c=invS*P;
+  arma::vec c=solve_coefficients(S,P);
 
   // Compute difference from unity
-  double delta=1.0-2.0*arma::dot(c,P);
-  delta+=arma::as_scalar(arma::trans(c)*S*c);
+  double delta=1.0-arma::dot(c,P);
+
   return delta;
 }

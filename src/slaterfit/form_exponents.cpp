@@ -25,6 +25,7 @@
 // Minimization routines
 extern "C" {
 #include <gsl/gsl_multimin.h>
+#include <gsl/gsl_blas.h>
 }
 
 /// Parameters of Slater function to fit
@@ -71,14 +72,27 @@ std::vector<double> get_exps_eventempered(const gsl_vector *v, int Nf) {
   return exps;
 }
 
+std::vector<double> get_exps_legendre(const gsl_vector *v, int Nf) {
+  arma::vec A(v->size);
+  for(size_t i=0;i<v->size;i++)
+    A(i)=gsl_vector_get(v,i);
+
+  arma::vec z=legendre_set(A,Nf);
+  return arma::conv_to< std::vector<double> >::from(z);
+}
+
 std::vector<double> get_exps(const gsl_vector *v, const sto_params_t *p) {
   std::vector<double> exps;
   if(p->method==0)
     exps=get_exps_eventempered(v,p->Nf);
   else if(p->method==1)
     exps=get_exps_welltempered(v,p->Nf);
-  else
-    exps=get_exps_full(v,p->Nf);
+  else {
+    // Use legendre polynomials
+    exps=get_exps_legendre(v,p->Nf);
+
+    // exps=get_exps_full(v,p->Nf);
+  }
 
   return exps;
 }
@@ -92,11 +106,56 @@ double eval_difference(const gsl_vector *v, void *params) {
   std::vector<double> exps=get_exps(v,p);
 
   // Compute difference
-  return compute_difference(exps,p->zeta,p->l);
+  double d=compute_difference(exps,p->zeta,p->l);
+  //  printf("Computed difference %e.\n",d);
+
+  return d;
 }
 
+// Evaluate derivative
+void eval_difference_df(const gsl_vector *v, void *params, gsl_vector *g) {
+  // Parameters
+  sto_params_t *p=(sto_params_t *)params;
 
-std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int method) {
+  // Helper
+  gsl_vector *vt=gsl_vector_alloc(v->size);
+
+  // Step size
+  double step=1e-4;
+
+  // Loop over parameters
+  for(size_t i=0;i<v->size;i++) {
+    // Copy vector
+    gsl_vector_memcpy(vt,v);
+
+    // Current value
+    double x=gsl_vector_get(vt,i);
+
+    // Right trial
+    gsl_vector_set(vt,i,x+step);
+    double rval=compute_difference(get_exps(vt,p),p->zeta,p->l);
+
+    // Left trial
+    gsl_vector_set(vt,i,x-step);
+    double lval=compute_difference(get_exps(vt,p),p->zeta,p->l);
+
+    // Set gradient
+    gsl_vector_set(g,i,(rval-lval)/(2*step));
+  }
+
+  /*
+  printf("Gradient:\n");
+  for(size_t i=0;i<v->size;i++)
+    printf("g(%2i) = % e\n",(int) i, gsl_vector_get(g,i));
+  */
+}
+
+void eval_difference_fdf(const gsl_vector *v, void *params, double *f, gsl_vector *g) {
+  *f=eval_difference(v,params);
+  eval_difference_df(v,params,g);
+}
+
+std::vector<contr_t> slater_fit_f(double zeta, int am, int nf, bool verbose, int method) {
   sto_params_t par;
   par.zeta=zeta;
   par.l=am;
@@ -107,11 +166,20 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
 
   // Degrees of freedom
   int dof;
-  if(par.method==0)
+  if(par.method==0 && nf>=2)
     dof=2;
-  else if(par.method==1)
+  else
+    // Full optimization
+    par.method=2;
+
+  if(par.method==1 && nf>=4)
     dof=4;
   else
+    // Full optimization
+    par.method=2;
+
+  // Full optimization
+  if(par.method==2)
     dof=par.Nf;
 
   gsl_multimin_function minfunc;
@@ -127,23 +195,30 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
   x=gsl_vector_alloc(dof);
   ss=gsl_vector_alloc(dof);
 
+  // Initialize vector
+  gsl_vector_set_all(x,0.0);
+
   // Set starting point
   switch(par.method) {
 
+  case(2):
+    // Legendre - same as for even tempered
   case(1):
-    // Well tempered - set gamma and delta to 0
-    gsl_vector_set_all(x,0.0);
+    // Well tempered - same initialization as for even-tempered
   case(0):
     // Even tempered, set alpha=1.0 and beta=2.0
     gsl_vector_set(x,0,1.0);
-    gsl_vector_set(x,1,2.0);
+    if(dof>1)
+      gsl_vector_set(x,1,2.0);
     break;
 
+    /*
   case(2):
     // Free minimization, set exponents to i
     for(int i=0;i<nf;i++)
       gsl_vector_set(x,i,i);
     break;
+    */
 
   default:
     ERROR_INFO();
@@ -199,6 +274,132 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
   gsl_vector_free(x);
   gsl_vector_free(ss);
   gsl_multimin_fminimizer_free(min);
+
+  // Return
+  std::vector<contr_t> ret(nf);
+  for(int i=0;i<nf;i++) {
+    ret[i].z=optexp[i];
+    ret[i].c=optc[i];
+  }
+
+  return ret;
+}
+
+std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int method) {
+  sto_params_t par;
+  par.zeta=zeta;
+  par.l=am;
+  par.Nf=nf;
+  par.method=method;
+
+  int maxiter=1000;
+
+  // Degrees of freedom
+  int dof;
+  if(par.method==0 && nf>=2)
+    dof=2;
+  else
+    // Full optimization
+    par.method=2;
+
+  if(par.method==1 && nf>=4)
+    dof=4;
+  else
+    // Full optimization
+    par.method=2;
+
+  // Full optimization
+  if(par.method==2)
+    dof=par.Nf;
+
+  gsl_multimin_function_fdf minfunc;
+  minfunc.n=dof;
+  minfunc.f=eval_difference;
+  minfunc.df=eval_difference_df;
+  minfunc.fdf=eval_difference_fdf;
+  minfunc.params=(void *) &par;
+
+  gsl_multimin_fdfminimizer *min;
+  // Allocate minimizer
+  //  min=gsl_multimin_fdfminimizer_alloc(gsl_multimin_fdfminimizer_vector_bfgs2,dof);
+  min=gsl_multimin_fdfminimizer_alloc(gsl_multimin_fdfminimizer_conjugate_pr,dof);
+
+  gsl_vector *x;
+  x=gsl_vector_alloc(dof);
+
+  // Initialize vector
+  gsl_vector_set_all(x,0.0);
+
+  // Set starting point
+  switch(par.method) {
+    
+  case(2):
+    // Legendre - same as for even tempered
+  case(1):
+    // Well tempered - same initialization as for even-tempered
+  case(0):
+    // Even tempered, set alpha=1.0 and beta=2.0
+    gsl_vector_set(x,0,1.0);
+    if(dof>1)
+      gsl_vector_set(x,1,2.0);
+    break;
+  
+    /*
+  case(2):
+    // Free minimization, set exponents to i
+    for(int i=0;i<nf;i++)
+      gsl_vector_set(x,i,i);
+    break;
+    */
+
+  default:
+    ERROR_INFO();
+    throw std::runtime_error("Unknown Slater fitting method.\n");
+  }
+  
+  // Set minimizer
+  gsl_multimin_fdfminimizer_set(min, &minfunc, x, 0.01, 1e-4);
+
+  // Iterate
+  int iter=0;
+  int iterdelta=0;
+  int status;
+  double cost=0;
+
+  if(verbose) printf("Iteration\tDelta\n");
+  do {
+    iter++;
+    iterdelta++;
+
+    // Simplex
+    status = gsl_multimin_fdfminimizer_iterate(min);
+    if (status) {
+      //      printf("Encountered GSL error \"%s\"\n",gsl_strerror(status));
+      break;
+    }
+
+    // Are we converged?
+    status = gsl_multimin_test_gradient (min->gradient, 1e-12);
+    if (verbose && status == GSL_SUCCESS)
+      {
+        printf ("converged to minimum at\n");
+      }
+
+    if(min->f!=cost) {
+      if(verbose) printf("%i\t%e\t%e\t%e\n",iter,min->f,min->f-cost,gsl_blas_dnrm2(min->gradient));
+      cost=min->f;
+      iterdelta=0;
+    }
+
+  } while (status == GSL_CONTINUE && iterdelta < maxiter);
+
+  // Get best exponents and coefficients
+  std::vector<double> optexp=get_exps(min->x,&par);
+  arma::vec optc=solve_coefficients(optexp,par.zeta,par.l);
+
+  // Free memory
+  gsl_vector_free(x);
+  gsl_multimin_fdfminimizer_free(min);
 
   // Return
   std::vector<contr_t> ret(nf);

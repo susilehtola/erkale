@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
   // Print them out
   printf("\nExponential contraction\nc_i\t\tz_i\t\tlg z_i\n");
   for(size_t i=0;i<contr.size();i++)
-    printf("%e\t%e\t%e\n",contr[i].c,contr[i].z,log10(contr[i].z));
+    printf("% e\t%e\t% e\n",contr[i].c,contr[i].z,log10(contr[i].z));
 
   // Form basis set
   ElementBasisSet elbas("El");
