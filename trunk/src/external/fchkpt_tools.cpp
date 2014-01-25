@@ -25,6 +25,7 @@
 
 #include "basis.h"
 #include "checkpoint.h"
+#include "fchkpt_tools.h"
 #include "elements.h"
 #include "mathf.h"
 #include "storage.h"
@@ -458,12 +459,18 @@ std::vector<size_t> ge_indarr(const Storage & stor) {
 }
 
 
-arma::mat form_density(const Storage & stor) {
+arma::mat form_density(const Storage & stor, bool spin) {
   // Check what kind of densities are available
   std::vector<std::string> keys=stor.find_double_vec("Density");
-  for(size_t i=keys.size()-1;i<keys.size();i--)
-    if(splitline(keys[i])[0]!="Total")
-      keys.erase(keys.begin()+i);
+  if(!spin) {
+    for(size_t i=keys.size()-1;i<keys.size();i--)
+      if(splitline(keys[i])[0]!="Spin")
+	keys.erase(keys.begin()+i);
+  } else {
+    for(size_t i=keys.size()-1;i<keys.size();i--)
+      if(splitline(keys[i])[0]!="Total")
+	keys.erase(keys.begin()+i);
+  }
 
   /*
   printf("Available densities\n");
@@ -472,19 +479,27 @@ arma::mat form_density(const Storage & stor) {
   */
 
   // The density matrix
-  std::vector<double> dens;
+  std::string key;
   if(keys.size()==1)
-    dens=stor.get_double_vec(keys[0]);
+    key=keys[0];
   else {
     if(splitline(keys[0])[1]!="SCF")
-      dens=stor.get_double_vec(keys[0]);
+      key=keys[0];
     else if(splitline(keys[1])[1]!="SCF")
-      dens=stor.get_double_vec(keys[1]);
+      key=keys[1];
     else {
       ERROR_INFO();
       throw std::runtime_error("Could not find density matrix to use!\n");
     }
   }
+
+  return form_density(stor,key);
+}
+
+
+arma::mat form_density(const Storage & stor, const std::string & key) {
+  // Get density
+  std::vector<double> dens=stor.get_double_vec(key);
 
   // Amount of basis functions
   size_t Nbf=stor.get_int("Number of basis functions");

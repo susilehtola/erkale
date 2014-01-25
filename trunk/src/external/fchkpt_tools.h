@@ -36,7 +36,10 @@ Storage parse_fchk(const std::string & name);
 BasisSet form_basis(const Storage & stor);
 
 /// Form the density matrix
-arma::mat form_density(const Storage & stor);
+arma::mat form_density(const Storage & stor, const std::string & kw);
+
+/// Form the density matrix
+arma::mat form_density(const Storage & stor, bool spin=false);
 
 /// Get the orbital coefficient matrix
 arma::mat form_orbital_C(const Storage & stor, const std::string & name);
