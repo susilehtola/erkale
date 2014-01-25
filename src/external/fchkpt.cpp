@@ -286,13 +286,14 @@ void load_fchk(const Settings & set, double tol) {
   // Construct density matrix
   arma::mat P=form_density(stor);
 
+  int Nel=stor.get_int("Number of electrons");
+  int Nela=stor.get_int("Number of alpha electrons");
+  int Nelb=stor.get_int("Number of beta electrons");
+  
   // Special handling for ROHF
   if(stor.get_int("IROHF")==1) {
     P.zeros();
     arma::mat Ca=form_orbital_C(stor,"Alpha MO coefficients");
-
-    int Nela=stor.get_int("Number of alpha electrons");
-    int Nelb=stor.get_int("Number of beta electrons");
 
     P.zeros();
     for(int i=0;i<Nela;i++)
@@ -324,6 +325,15 @@ void load_fchk(const Settings & set, double tol) {
   if(!restr)
     Eb=form_orbital_E(stor,"Beta Orbital Energies");
 
+  // Densities?
+  arma::mat Pa, Pb;
+  if(!restr) {
+    arma::mat Pspin=form_density(stor,true);
+
+    Pa=(P+Pspin)/2.0;
+    Pb=(P-Pspin)/2.0;
+  }
+
   // Check that everything is OK
   t.set();
   printf("\nComputing overlap matrix ... ");
@@ -331,7 +341,6 @@ void load_fchk(const Settings & set, double tol) {
   arma::mat S=basis.overlap();
   printf("done (%s)\n",t.elapsed().c_str());
 
-  int Nel=stor.get_int("Number of electrons");
   double nelnum=arma::trace(P*S);
   double neldiff=nelnum-Nel;
   if(fabs(neldiff)/Nel>tol) {
@@ -341,9 +350,39 @@ void load_fchk(const Settings & set, double tol) {
   }
   printf("tr PS - Nel = %.e\n",neldiff);
 
+  if(!restr) {
+    double nelnuma=arma::trace(Pa*S);
+    double neldiffa=nelnuma-Nela;
+
+    double nelnumb=arma::trace(Pb*S);
+    double neldiffb=nelnumb-Nelb;
+
+    if(fabs(neldiffa)/Nela>tol) {
+      std::ostringstream oss;
+      oss << "\nNumber of alpha electrons and trace of alpha density matrix differ by " << neldiffa << "!\n";
+      throw std::runtime_error(oss.str());
+    }
+    printf("tr PaS - Nela = %.e\n",neldiffa);
+
+    if(fabs(neldiffb)/Nelb>tol) {
+      std::ostringstream oss;
+      oss << "\nNumber of beta electrons and trace of beta density matrix differ by " << neldiffb << "!\n";
+      throw std::runtime_error(oss.str());
+    }
+    printf("tr PbS - Nelb = %.e\n",neldiffb);
+  }
+
+
   // Renormalize
-  if(set.get_bool("Renormalize"))
+  if(set.get_bool("Renormalize")) {
     P*=Nel/nelnum;
+
+    if(!restr) {
+      Pa*=Nela/arma::trace(Pa*S);
+      Pb*=Nelb/arma::trace(Pb*S);
+    }
+  }
+
   if(set.get_bool("Reorthonormalize")) {
     printf("\nReorthonormalizing orbitals ... ");
     fflush(stdout);
@@ -373,9 +412,6 @@ void load_fchk(const Settings & set, double tol) {
   chkpt.write(basis);
   chkpt.write("P",P);
 
-  int Nela=stor.get_int("Number of alpha electrons");
-  int Nelb=stor.get_int("Number of beta electrons");
-
   chkpt.write("Restricted",restr);
   if(restr) {
     chkpt.write("C",Ca);
@@ -403,15 +439,6 @@ void load_fchk(const Settings & set, double tol) {
     chkpt.write("occb",occb);
 
     // Density matrices
-    arma::mat Pa(P), Pb(P);
-    Pa.zeros();
-    Pb.zeros();
-
-    for(size_t i=0;i<occa.size();i++)
-      Pa+=occa[i]*Ca.col(i)*arma::trans(Ca.col(i));
-    for(size_t i=0;i<occb.size();i++)
-      Pb+=occb[i]*Cb.col(i)*arma::trans(Cb.col(i));
-
     chkpt.write("Pa",Pa);
     chkpt.write("Pb",Pb);
   }
