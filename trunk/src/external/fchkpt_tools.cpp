@@ -462,7 +462,7 @@ std::vector<size_t> ge_indarr(const Storage & stor) {
 arma::mat form_density(const Storage & stor, bool spin) {
   // Check what kind of densities are available
   std::vector<std::string> keys=stor.find_double_vec("Density");
-  if(!spin) {
+  if(spin) {
     for(size_t i=keys.size()-1;i<keys.size();i--)
       if(splitline(keys[i])[0]!="Spin")
 	keys.erase(keys.begin()+i);
