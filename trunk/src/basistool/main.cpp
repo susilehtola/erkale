@@ -165,7 +165,7 @@ int main(int argc, char **argv) {
     // Augment basis set
 
     if(argc!=4) {
-      printf("\nUsage: %s input.gbs %s output.gbs\n",tolower(cmd).c_str(),argv[0]);
+      printf("\nUsage: %s input.gbs %s output.gbs\n",argv[0],tolower(cmd).c_str());
       return 1;
     }
 
