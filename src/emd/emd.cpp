@@ -667,7 +667,7 @@ arma::mat bessel_array(const std::vector<double> & args, int lmax) {
 }
 
 
-EMD::EMD(const EMDEvaluator * posevalp, const EMDEvaluator * negevalp, int Nelv, int lv, int mv) {
+EMD::EMD(const EMDEvaluator * posevalp, const EMDEvaluator * negevalp, double Nelv, int lv, int mv) {
   Nel=Nelv;
   poseval=posevalp;
   l=lv;
