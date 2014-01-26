@@ -371,11 +371,16 @@ void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, dou
 /// Diagonalize Fock matrix
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol, double shift=0.0);
 
-
 /**
- * Find natural orbitals from P.
+ * Find natural orbitals from P. Orbitals returned in decreasing occupation number.
  */
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs);
+
+/**
+ * Find natural orbitals from P. Orbitals returned in decreasing occupation number.
+ */
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::vec & occs);
+
 
 /**
  * Make ROHF / CUHF update to (Hartree-)Fock operators Fa and Fb,
