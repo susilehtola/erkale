@@ -248,16 +248,9 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     fprintf(stderr,"Nel = %i, P contains %f electrons, difference %e.\n",Neltot,Nel,Nel-Neltot);
   */
 
-  // Go to natural orbitals
-  arma::mat NO;
+  // Natural orbitals for orbital coefficients
   arma::vec occs;
-  arma::mat tmp;
-  form_NOs(P,S,NO,tmp,occs);
-
-  // Store orbitals, but in reverse order!
-  C.zeros(NO.n_rows,NO.n_cols);
-  for(size_t i=0;i<NO.n_cols;i++)
-    C.col(i)=NO.col(NO.n_cols-1-i);
+  form_NOs(P,S,C,occs);
 
   // Store energies
   E.zeros(C.n_cols);

@@ -172,9 +172,9 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
       }
     
     // Get natural orbitals
-    arma::mat Cat, NOtoAO;
+    arma::mat Cat;
     arma::vec occs;
-    form_NOs(Pat,Sat,Cat,NOtoAO,occs);
+    form_NOs(Pat,Sat,Cat,occs);
     
     // Store the orbitals
     for(size_t iorb=0;iorb<Cat.n_cols;iorb++) {

@@ -956,8 +956,18 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   arma::mat P_orth=arma::trans(Sm)*P*Sm;
 
   // Diagonalize P to get NOs in orthonormal basis.
+  arma::vec Pval;
   arma::mat Pvec;
-  eig_sym_ordered(occs,Pvec,P_orth);
+  eig_sym_ordered(Pval,Pvec,P_orth);
+
+  // Reverse ordering to get decreasing eigenvalues
+  occs.zeros(Pval.n_elem);
+  arma::mat Pv(Pvec.n_rows,Pvec.n_cols);
+  for(size_t i=0;i<Pval.n_elem;i++) {
+    size_t idx=Pval.n_elem-1-i;
+    occs(i)=Pval(idx);
+    Pv.col(i)=Pvec.col(idx);
+  }  
 
   /* Get NOs in AO basis. The natural orbital is written in the
      orthonormal basis as
@@ -967,9 +977,14 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   */
 
   // The matrix that takes us from AO to NO is
-  AO_to_NO=Sd*Pvec;
+  AO_to_NO=Sd*Pv;
   // and the one that takes us from NO to AO is
-  NO_to_AO=arma::trans(Sm*Pvec);
+  NO_to_AO=arma::trans(Sm*Pv);
+}
+
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::vec & occs) {
+  arma::mat tmp;
+  form_NOs(P,S,AO_to_NO,tmp,occs);
 }
 
 void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose, bool atomic) {
@@ -1041,15 +1056,15 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   // Zero everything
   lambda_NO.zeros();
   // and flip signs of cv and vc blocks from Delta
-  for(size_t v=0;v<Nv;v++) // Loop over virtuals
-    for(size_t c=Nind-Nc;c<Nind;c++) { // Loop over core orbitals
+  for(size_t c=0;c<Nc;c++) // Loop over core orbitals
+    for(size_t v=Nind-Nv;v<Nind;v++) { // Loop over virtuals
       lambda_NO(c,v)=-Delta_NO(c,v);
       lambda_NO(v,c)=-Delta_NO(v,c);
     }
-
+  
   // Lambda in AO is
   arma::mat lambda_AO=arma::trans(NO_to_AO)*lambda_NO*NO_to_AO;
-
+  
   // Update Fa and Fb
   Fa_AO+=lambda_AO;
   Fb_AO-=lambda_AO;
@@ -1149,15 +1164,8 @@ arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat 
   int Nel=(int) round(arma::trace(P*S));
 
   // Get the natural orbitals
-  arma::mat NO;
-  arma::mat tmp;
   arma::vec occs;
-  form_NOs(P,S,NO,tmp,occs);
-
-  // Store the NOs in inverted order (highest occupation first)
-  C.zeros(NO.n_rows,NO.n_cols);
-  for(size_t icol=0;icol<NO.n_cols;icol++)
-    C.col(icol)=NO.col(NO.n_cols-1-icol);
+  form_NOs(P,S,C,occs);
 
   // and form the density
   return form_density(C,Nel);
@@ -1498,9 +1506,8 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Restricted calculation wanted but loaded spin-polarized one
       if(!oldrestr) {
 	// Find out natural orbitals
-	arma::mat hlp;
 	arma::vec occs;
-	form_NOs(Pold,oldbas.overlap(),Cold,hlp,occs);
+	form_NOs(Pold,oldbas.overlap(),Cold,occs);
 
 	// Use alpha orbital energies
 	Eold=Eaold;
@@ -1648,9 +1655,8 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
       // Get the natural orbitals
       arma::mat NO;
-      arma::mat tmp;
       arma::vec occs;
-      form_NOs(sol.P,basis.overlap(),NO,tmp,occs);
+      form_NOs(sol.P,basis.overlap(),NO,occs);
 
       // Then, localize the core orbitals within the occupied space
       size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),NO);
