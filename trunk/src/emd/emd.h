@@ -247,7 +247,7 @@ class EMD {
 
  protected:
   /// Number of electrons
-  int Nel;
+  double Nel;
 
   /// Positive evaluator
   const EMDEvaluator * poseval;
@@ -261,7 +261,7 @@ class EMD {
 
  public:
   /// Constructor.
-  EMD(const EMDEvaluator * poseval, const EMDEvaluator * negeval, int Nel, int l, int m);
+  EMD(const EMDEvaluator * poseval, const EMDEvaluator * negeval, double Nel, int l, int m);
   /// Destructor
   ~EMD();
 
