@@ -2643,8 +2643,10 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
 
   // Get overlap matrix
   arma::mat S11=overlap();
+  // and overlap with old basis
+  arma::mat S12=overlap(oldbas);
 
-  // and form orthogonalizing matrix
+  // Form orthogonalizing matrix
   arma::mat Svec;
   arma::vec Sval;
   eig_sym_ordered(Sval,Svec,S11);
@@ -2668,47 +2670,25 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   // and the real S^-1
   arma::mat Sinv=Sinvh*arma::trans(Sinvh);
 
-  // Get overlap with old basis
-  arma::mat S12=overlap(oldbas);
-
   // Linearly independent size of old basis set
-  const size_t Nbfo=oldMOs.n_cols;
-
-  if(Nbfo==0)
+  const size_t Nmo_old=oldMOs.n_cols;
+  if(Nmo_old==0)
     throw std::runtime_error("No orbitals to project!\n");
 
   // How many MOs do we transform?
-  size_t Nmo=Nbfo;
-  if(Nind<Nmo) // New basis is smaller than old one
-    Nmo=Nind;
+  size_t Nmo=std::min(Nmo_old,Nind);
 
   // OK, now we are ready to calculate the projections.
-
   // Initialize MO matrix
   MOs=arma::mat(Sinvh.n_rows,Nind);
   MOs.zeros();
   // and energy
-  E=arma::colvec(Nind);
-  // and fill them
-  for(size_t i=0;i<Nmo;i++) {
+  E=arma::vec(Nind);
 
-    // We have the orbitals as |a> = \sum_n c_n |b_n>, where |b_n> are
-    // the basis functions of the old basis.
-
-    // We project the old orbitals with the (approximate identity)
-    // operator \sum_N |B_N> S^-1 <B_N|, where {B_N} are the basis
-    // functions of the new basis.
-
-    // This gives
-    // \sum_N |B_N> S^-1 <B_N| [\sum_n c_n |b_n>]
-    // = \sum_N |B_N> S^-1 \sum_n <B_N|b_n> c_n
-
-    MOs.col(i)=Sinv*S12*oldMOs.col(i);
-    E(i)=oldE(i);
-  }
-
-  // Assure that orbitals are orthonormal
-  orthonormalize(S11,MOs);
+  // Projected orbitals
+  MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1)=Sinv*S12*oldMOs.submat(0,0,oldMOs.n_rows-1,Nmo-1);
+  // and energies
+  E.subvec(0,Nmo-1)=oldE.subvec(0,Nmo-1);
 
   // If the old basis had less functions than the new basis, then we
   // need to form the rest of the orbitals. To do this we consider all
@@ -2716,56 +2696,41 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   // remove the Nmo with the maximum absolute overlap with the
   // MOs. The leftovers are then orthonormalized with respect to the
   // MOs.
-
   if(Nmo<Nind) {
-    // Normalize the eigenvectors
-    for(size_t i=0;i<Nind;i++)
-      Svec.col(i)/=sqrt(Sval(i));
-
     // Index vector
     std::vector<size_t> idx(Nind);
     for(size_t i=0;i<Nind;i++)
       idx[i]=i;
-
-    // Remove Nmo eigenvectors with largest overlap
-    for(size_t io=0;io<Nmo;io++) {
-      // Helper
-      arma::vec hlp=S11*MOs.col(io);
-
-      // Compute overlap
-      double maxovl=0.0;
-      size_t indmax=0;
-      for(size_t i=0;i<idx.size();i++) {
-	double ovl=fabs(arma::dot(Svec.col(idx[i]),hlp));
-	if(ovl>maxovl) {
-	  maxovl=ovl;
-	  indmax=i;
-	}
-      }
-
+    
+    // MO submatrix
+    arma::mat C=MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1);
+    
+    // Remove Nmo eigenvectors with largest overlap with occupied vectors
+    for(size_t ii=0;ii<Nmo;ii++) {
+      // Overlap between occupied orbitals and vectors
+      arma::mat ovl(idx.size(),Nmo);
+      for(size_t i=0;i<idx.size();i++)
+	ovl.row(i)=arma::abs(arma::trans(Sinvh.col(idx[i]))*S11*C);
+      
+      // Find out maximum value
+      arma::uword rowi, coli;
+      ovl.max(rowi,coli);
+      
       // Remove vector with maximum overlap
-      idx.erase(idx.begin()+indmax);
+      idx.erase(idx.begin()+rowi);
     }
-
+    
     // Set the remaining orbitals
     for(size_t io=0;io<idx.size();io++) {
-      MOs.col(Nmo+io)=Svec.col(idx[io]);
+      MOs.col(Nmo+io)=Sinvh.col(idx[io]);
+      // Dummy value for energy
       E(Nmo+io)=E(Nmo-1);
     }
-
-    // Reorthogonalize the new functions against the projected
-    // orbitals
-    for(size_t i=Nmo;i<Nind;i++) {
-      // Remove overlap with other orbitals
-      for(size_t j=0;j<i;j++)
-	MOs.col(i)-=arma::as_scalar(arma::trans(MOs.col(j))*S11*MOs.col(i))*MOs.col(j);
-      // Calculate norm
-      double norm=sqrt(arma::as_scalar(arma::trans(MOs.col(i))*S11*MOs.col(i)));
-      // Normalize
-      MOs.col(i)/=norm;
-    }
   }
-
+  
+  // Orthonormalize orbitals
+  MOs=orthonormalize(S11,MOs);
+  
   // Failsafe
   try {
     // Check orthogonality of orbitals
