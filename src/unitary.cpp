@@ -431,7 +431,7 @@ void Unitary::check_derivative(const arma::cx_mat & W0) {
   double dfreal=Jtr-Jo;
 
   // Is the difference ok? Check absolute or relative magnitude
-  if(fabs(dfest)>sqrt(DBL_EPSILON)*fabs(J) && fabs(dfest-dfreal)>1e-2*fabs(dfest)) {
+  if(fabs(dfest)>sqrt(DBL_EPSILON)*std::max(1.0,fabs(J)) && fabs(dfest-dfreal)>1e-2*fabs(dfest)) {
     fprintf(stderr,"\nDerivative mismatch error!\n");
     fprintf(stderr,"Used step size %e, value of function % e.\n",trstep,Jo);
     fprintf(stderr,"Estimated change of function % e\n",dfest);
