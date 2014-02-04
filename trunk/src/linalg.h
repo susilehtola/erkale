@@ -75,8 +75,8 @@ arma::mat BasOrth(const arma::mat & S, bool verbose);
 /// Orthogonalize basis
 arma::mat BasOrth(const arma::mat & S, const Settings & set);
 
-/// Form symmetric matrices S^1/2 and S^-1/2
-void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvhalf, double cutoff=LINTHRES);
+/// Form matrices S^1/2 and S^-1/2. By default matrices are computed in symmetric form, but canonical form is also available.
+void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvhalf, bool canonical=false, double cutoff=LINTHRES);
 
 /// Transform matrix to vector
 arma::vec MatToVec(const arma::mat & v);
