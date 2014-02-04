@@ -450,12 +450,17 @@ arma::mat orthonormalize(const arma::mat & S, const arma::mat & C) {
   arma::mat MOovl=arma::trans(C)*S*C;
 
   // Perform eigendecomposition
-  arma::vec Cval;
-  arma::mat Cvec;
-  eig_sym_ordered(Cval,Cvec,MOovl);
+  arma::vec oval;
+  arma::mat ovec;
+  eig_sym_ordered(oval,ovec,MOovl);
 
-  // Return orthonormalized vectors
-  return C*SymmetricOrth(Cvec,Cval);
+  // New orbitals
+  arma::mat Cnew(C*ovec);
+  for(size_t io=0;io<C.n_cols;io++) {
+    Cnew.col(io)/=sqrt(oval(io));
+  }
+
+  return Cnew;
 }
 
 arma::mat incomplete_cholesky(const arma::mat & M, size_t n) {
