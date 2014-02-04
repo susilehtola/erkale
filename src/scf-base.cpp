@@ -693,7 +693,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	  fprintf(stderr,"%-64s %10.3f\n","    Initial alpha localization",tloc.get());
 	  fflush(stderr);
 	}
-	
+
       }
     }
   }
@@ -801,7 +801,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   if(Wb.n_cols) {
     sol.Hb +=sicsolb.H;
     sol.XCb+=sicsolb.XC;
-    
+
     sol.en.Exc+=sicsola.en.Exc+sicsolb.en.Exc;
     sol.en.Eel+=sicsola.en.Eel+sicsolb.en.Eel;
     sol.en.E  +=sicsola.en.E+sicsolb.en.E;
@@ -916,44 +916,12 @@ void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol, dou
 }
 
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {
-
-  // First, get eigenvectors and eigenvalues of S so that we can go to
-  // an orthonormal basis.
-  arma::vec Sval;
-  arma::mat Svec;
-  eig_sym_ordered(Sval,Svec,S);
-
-  // Count the number of linearly independent vectors
-  size_t Nind=0;
-  for(size_t i=0;i<Sval.n_elem;i++)
-    if(Sval[i]>LINTHRES)
-      Nind++;
-  // ... and get rid of the linearly dependent ones. The eigenvalues
-  // and vectors are in the order of increasing eigenvalue, so we want
-  // the tail.
-  Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
-  Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
-
-  /* Transformation to get matrix M in orthonormal basis is
-     M_ij = <i|M_AO|j> \sqrt{l_i l_j},
-     where l_i and l_j are the corresponding eigenvalues of
-     eigenvectors i and j.
-
-     This can be written as
-     M_ij = Sm(i,k) M(k,l) Sm(j,l)
-  */
-
-  // Form scaled vectors
-  arma::mat Sm(Svec);
-  arma::mat Sd(Svec);
-  for(size_t i=0;i<Sval.n_elem;i++) {
-    double ss=sqrt(Sval(i));
-    Sm.col(i)*=ss;
-    Sd.col(i)/=ss;
-  }
+  // Get canonical half-overlap and half-inverse overlap matrices
+  arma::mat Sh, Sinvh;
+  S_half_invhalf(S,Sh,Sinvh,true);
 
   // P in orthonormal basis is
-  arma::mat P_orth=arma::trans(Sm)*P*Sm;
+  arma::mat P_orth=arma::trans(Sh)*P*Sh;
 
   // Diagonalize P to get NOs in orthonormal basis.
   arma::vec Pval;
@@ -967,7 +935,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
     size_t idx=Pval.n_elem-1-i;
     occs(i)=Pval(idx);
     Pv.col(i)=Pvec.col(idx);
-  }  
+  }
 
   /* Get NOs in AO basis. The natural orbital is written in the
      orthonormal basis as
@@ -977,10 +945,11 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   */
 
   // The matrix that takes us from AO to NO is
-  AO_to_NO=Sd*Pv;
+  AO_to_NO=Sinvh*Pv;
   // and the one that takes us from NO to AO is
-  NO_to_AO=arma::trans(Sm*Pv);
+  NO_to_AO=arma::trans(Sh*Pv);
 }
+
 
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::vec & occs) {
   arma::mat tmp;
@@ -1061,10 +1030,10 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
       lambda_NO(c,v)=-Delta_NO(c,v);
       lambda_NO(v,c)=-Delta_NO(v,c);
     }
-  
+
   // Lambda in AO is
   arma::mat lambda_AO=arma::trans(NO_to_AO)*lambda_NO*NO_to_AO;
-  
+
   // Update Fa and Fb
   Fa_AO+=lambda_AO;
   Fb_AO-=lambda_AO;
@@ -1186,7 +1155,7 @@ std::vector<double> atomic_occupancy(int Nel) {
     // and they are distributed equally
     for(int i=0;i<nsh;i++)
       ret.push_back(nput*1.0/nsh);
-    
+
     // Reduce electron count
     Nel-=nput;
     if(Nel==0)
@@ -2106,7 +2075,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       measure=worker.optimize(Ureal,umet,uacc,maxiter);
     else
       measure=worker.optimize(U,umet,uacc,maxiter);
-    
+
   } else if(met==PIPEK_MULLIKENH    ||		\
 	    met==PIPEK_MULLIKEN2    ||		\
 	    met==PIPEK_MULLIKEN4    ||		\
@@ -2256,7 +2225,7 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
       p=4.0;
       chg=STOCKHOLDER;
       break;
-      
+
     default:
       ERROR_INFO();
       throw std::runtime_error("Not implemented.\n");
@@ -2846,7 +2815,7 @@ arma::mat Pipek::get_charge(size_t iat) {
   } else if(chg==BECKE) {
     arma::mat Sat=grid.eval_overlap(iat);
     Q=arma::trans(C)*Sat*C;
- 
+
   } else if(chg==HIRSHFELD || chg==STOCKHOLDER) {
     arma::mat Sat=grid.eval_hirshfeld_overlap(hirsh,iat);
     Q=arma::trans(C)*Sat*C;
@@ -2953,7 +2922,7 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
 #pragma omp parallel
 #endif
   {
-      
+
 #ifdef _OPENMP
     arma::cx_mat Dwrk(Dder);
 #pragma omp for schedule(dynamic,1)
@@ -2961,11 +2930,11 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
     for(size_t iat=0;iat<N;iat++) {
       // Helper matrix
       arma::cx_mat qw=get_charge(iat)*W;
-      
+
       for(size_t b=0;b<W.n_cols;b++) {
 	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
 	std::complex<double> t=p*std::pow(qwp,p-1);
-	
+
 	for(size_t a=0;a<W.n_cols;a++) {
 #ifdef _OPENMP
 	  Dwrk(a,b)+=t*qw(a,b);
@@ -2975,13 +2944,13 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
 	}
       }
     }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     Dder+=Dwrk;
 #endif
   }
-  
+
   return Dder;
 }
 
@@ -3007,7 +2976,7 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & 
 #pragma omp parallel reduction(+:D)
 #endif
   {
-    
+
 #ifdef _OPENMP
     arma::cx_mat Dwrk(Dder);
 #pragma omp for schedule(dynamic,1)
@@ -3015,12 +2984,12 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & 
     for(size_t iat=0;iat<N;iat++) {
       // Helper matrix
       arma::cx_mat qw=get_charge(iat)*W;
-      
+
       for(size_t b=0;b<W.n_cols;b++) {
 	std::complex<double> qwp=arma::as_scalar(arma::trans(W.col(b))*qw.col(b));
 	std::complex<double> t=p*std::pow(qwp,p-1);
 	D+=std::real(std::pow(qwp,p));
-	
+
 	for(size_t a=0;a<W.n_cols;a++) {
 #ifdef _OPENMP
 	  Dwrk(a,b)+=t*qw(a,b);
@@ -3030,13 +2999,13 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & 
 	}
       }
     }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     Dder+=Dwrk;
 #endif
   }
-  
+
   Dinv=D;
 }
 
