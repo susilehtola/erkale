@@ -632,6 +632,7 @@ void Checkpoint::write(const energy_t & en) {
   H5Tinsert(datatype, "Eone" , HOFFSET(energy_t, Eone) , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Eel"  , HOFFSET(energy_t, Eel)  , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Enucr", HOFFSET(energy_t, Enucr), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Eeff",  HOFFSET(energy_t, Eeff),  H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "E"    , HOFFSET(energy_t, E)    , H5T_NATIVE_DOUBLE);
 
   // Create the dataset using the defined dataspace and datatype, and
@@ -670,6 +671,7 @@ void Checkpoint::read(energy_t & en) {
   H5Tinsert(datatype, "Eone" , HOFFSET(energy_t, Eone) , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Eel"  , HOFFSET(energy_t, Eel)  , H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "Enucr", HOFFSET(energy_t, Enucr), H5T_NATIVE_DOUBLE);
+  H5Tinsert(datatype, "Eeff",  HOFFSET(energy_t, Eeff),  H5T_NATIVE_DOUBLE);
   H5Tinsert(datatype, "E"    , HOFFSET(energy_t, E)    , H5T_NATIVE_DOUBLE);
 
   // Get dataspace

@@ -90,6 +90,9 @@ typedef struct {
   double Eel;
   /// Nuclear repulsion energy
   double Enucr;
+  /// Effective energy
+  double Eeff;
+
   /// Total energy
   double E;
 } energy_t;
@@ -113,6 +116,9 @@ typedef struct {
   // KS-XC matrix
   arma::mat XC;
 
+  // Effective potential
+  arma::mat Heff;
+
   /// Energy information
   energy_t en;
 } rscf_t;
@@ -135,6 +141,9 @@ typedef struct {
   // KS-XC matrix
   arma::mat XCa, XCb;
 
+  // Effective potentials
+  arma::mat Heffa, Heffb;
+  
   /// Energy information
   energy_t en;
 } uscf_t;
@@ -147,8 +156,8 @@ enum guess_t {
   MOLGUESS
 };
 
-/// Perdew-Zunger SIC?
-enum pzsic {
+/// Perdew-Zunger SIC run mode
+enum pzrun {
   /// No correction.
   NO,
   /// Full correction.
@@ -165,6 +174,9 @@ enum pzsic {
   CANPERT
 };
 
+// Parse run mode
+enum pzrun parse_pzrun(const std::string & str);
+
 /// Perdew-Zunger SIC mode
 enum pzmet {
   /// Coulomb
@@ -176,6 +188,9 @@ enum pzmet {
   /// Coulomb + exchange + correlation
   COULXC
 };
+
+// Parse PZ method
+enum pzmet parse_pzmet(const std::string & str);
 
 class SCF {
  protected:
@@ -254,15 +269,6 @@ class SCF {
   /// Use Lobatto angular grid instead of Lebedev grid (DFT)
   bool dft_lobatto;
 
-  /// Perdew-Zunger correction?
-  enum pzsic pz;
-  /// Perdew-Zunger mode
-  enum pzmet pzmode;
-  /// Perdew-Zunger correction weight
-  double pzcor;
-  /// Localize orbitals before Perdew-Zunger?
-  bool pzloc;
-
   /// Calculate forces?
   bool doforce;
 
@@ -284,13 +290,8 @@ class SCF {
   /// List of frozen orbitals by symmetry group. index+1 is symmetry group, group 0 contains all non-frozen orbitals
   std::vector<arma::mat> freeze;
 
-  /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & grid, bool reconstruct, double Etol, bool canonical=false, bool localize=true, bool real=false);
-  /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & grid, bool reconstruct, double Etol, bool canonical=false, bool localize=true, bool real=false);
-  /// Helper routine for the above
-  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, double Etol, bool canonical, bool real);
-
+  /// Helper routine for PZ-SIC
+  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, DFTGrid & grid, double Etol, bool canonical, bool real);
 
  public:
   /// Constructor
@@ -347,6 +348,11 @@ class SCF {
   /// Calculate force in unrestricted density-functional theory
   arma::vec force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol);
 
+  /// Perform Perdew-Zunger self-interaction correction
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, bool canonical=false, bool localize=true, bool real=false);
+  /// Perform Perdew-Zunger self-interaction correction
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, bool canonical=false, bool localize=true, bool real=false);
+
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
 
@@ -355,10 +361,6 @@ class SCF {
 
   /// Toggle calculation of forces
   void do_force(bool val);
-  /// Toggle calculation of SIC
-  void do_sic(enum pzsic val);
-  /// Get status of SIC
-  enum pzsic do_sic() const;
 
   /// Get overlap matrix
   arma::mat get_S() const;

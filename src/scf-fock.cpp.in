@@ -418,7 +418,10 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   // Update Hamiltonian
 #ifdef RESTRICTED
 #ifdef DFT
-  sol.H=Hcore+sol.J+sol.XC;
+  if(sol.Heff.n_elem == Hcore.n_elem)
+    sol.H=Hcore+sol.Heff+sol.J+sol.XC;
+  else
+    sol.H=Hcore+sol.J+sol.XC;
   // Add exact exchange if necessary
   if(kfrac!=0.0) {
     sol.H-=0.5*kfrac*sol.K;
@@ -426,7 +429,10 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   }
 
 #else
-  sol.H=Hcore+sol.J-0.5*sol.K;
+  if(sol.Heff.n_elem == Hcore.n_elem)
+    sol.H=Hcore+sol.Heff+sol.J-0.5*sol.K;
+  else
+    sol.H=Hcore+sol.J-0.5*sol.K;
   sol.en.Exc=-0.25*arma::trace(sol.P*sol.K);
 #endif
 
@@ -434,16 +440,26 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #else // Unrestricted case
 
 #ifdef DFT
-  sol.Ha=Hcore+sol.J+sol.XCa;
-  sol.Hb=Hcore+sol.J+sol.XCb;
+  if(sol.Heffa.n_elem == Hcore.n_elem && sol.Heffb.n_elem == Hcore.n_elem) {
+    sol.Ha=Hcore+sol.Heffa+sol.J+sol.XCa;
+    sol.Hb=Hcore+sol.Heffb+sol.J+sol.XCb;
+  } else {
+    sol.Ha=Hcore+sol.J+sol.XCa;
+    sol.Hb=Hcore+sol.J+sol.XCb;
+  }
   if(kfrac!=0) {
     sol.Ha-=kfrac*sol.Ka;
     sol.Hb-=kfrac*sol.Kb;
     sol.en.Exc-=0.5*kfrac*(arma::trace(sol.Pa*sol.Ka)+arma::trace(sol.Pb*sol.Kb));
   }
 #else
-  sol.Ha=Hcore+sol.J-sol.Ka;
-  sol.Hb=Hcore+sol.J-sol.Kb;
+  if(sol.Heffa.n_elem == Hcore.n_elem && sol.Heffb.n_elem == Hcore.n_elem) {
+    sol.Ha=Hcore+sol.J-sol.Ka;
+    sol.Hb=Hcore+sol.J-sol.Kb;
+  } else {
+    sol.Ha=Hcore+sol.J-sol.Ka;
+    sol.Hb=Hcore+sol.J-sol.Kb;
+  }
   sol.en.Exc=-0.5*(arma::trace(sol.Pa*sol.Ka)+arma::trace(sol.Pb*sol.Kb));
 
 #ifdef _ROHF
@@ -486,7 +502,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   sol.en.Ecoul=0.5*arma::trace(sol.P*sol.J);
 
   // Compute total energies
-  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone;
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Eeff;
   sol.en.E=sol.en.Eel+sol.en.Enucr;
 
   // Sanity check
