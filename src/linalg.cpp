@@ -208,7 +208,7 @@ arma::mat BasOrth(const arma::mat & S, const Settings & set) {
   }
 }
 
-void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, double cutoff) {
+void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, bool canonical, double cutoff) {
   if(S.n_cols != S.n_rows) {
     ERROR_INFO();
     std::ostringstream oss;
@@ -227,23 +227,33 @@ void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, d
   eig_sym_ordered(Sval,Svec,S);
 
   // Count number of eigenvalues that are above cutoff
-  size_t Nlin=0;
+  size_t Nind=0;
   for(size_t i=0;i<Nbf;i++)
     if(Sval(i)>=cutoff)
-      Nlin++;
+      Nind++;
   // Number of linearly dependent basis functions
-  size_t Ndep=Nbf-Nlin;
+  size_t Ndep=Nbf-Nind;
 
   // Form Shalf and Sinvhalf
-  Shalf=arma::mat(Nbf,Nbf);
-  Sinvh=arma::mat(Nbf,Nbf);
-
-  Shalf.zeros();
-  Sinvh.zeros();
-  for(size_t i=0;i<Nlin;i++) {
-    size_t icol=Ndep+i;
-    Sinvh+=Svec.col(icol)*arma::trans(Svec.col(icol))/sqrt(Sval(icol));
-    Shalf+=Svec.col(icol)*arma::trans(Svec.col(icol))*sqrt(Sval(icol));
+  if(canonical) {
+    // Canonical matrices - asymmetric
+    Shalf.zeros(Nbf,Nind);
+    Sinvh.zeros(Nbf,Nind);
+    for(size_t i=0;i<Nind;i++) {
+      size_t idx=Ndep+i;
+      double ss=sqrt(Sval(idx));
+      Shalf.col(i)=Svec.col(idx)*ss;
+      Sinvh.col(i)=Svec.col(idx)/ss;
+    }
+  } else {   
+    // Symmetric matrices
+    Shalf.zeros(Nbf,Nbf);
+    Sinvh.zeros(Nbf,Nbf);
+    for(size_t i=0;i<Nind;i++) {
+      size_t icol=Ndep+i;
+      Sinvh+=Svec.col(icol)*arma::trans(Svec.col(icol))/sqrt(Sval(icol));
+      Shalf+=Svec.col(icol)*arma::trans(Svec.col(icol))*sqrt(Sval(icol));
+    }
   }
 }
 
