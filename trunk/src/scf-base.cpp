@@ -121,40 +121,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   try {
     // Use Lobatto angular grid? (Lebedev is default)
     dft_lobatto=set.get_bool("DFTLobatto");
-
-    // Perdew-Zunger SIC?
-    pzcor=set.get_double("PZ-SICw");
-    pzloc=set.get_bool("PZ-SICloc");
-    std::string pzs=set.get_string("PZ-SIC");
-    if(stricmp(pzs,"Full")==0)
-      pz=FULL;
-    else if(stricmp(pzs,"Pert")==0)
-      pz=PERT;
-    else if(stricmp(pzs,"Real")==0)
-      pz=REAL;
-    else if(stricmp(pzs,"RealPert")==0)
-      pz=REALPERT;
-    else if(stricmp(pzs,"Can")==0)
-      pz=CAN;
-    else if(stricmp(pzs,"CanPert")==0)
-      pz=CANPERT;
-    else
-      pz=NO;
-
-    std::string pzmod=set.get_string("PZ-SICmode");
-    if(stricmp(pzmod,"Coul")==0)
-      pzmode=COUL;
-    else if(stricmp(pzmod,"CoulX")==0)
-      pzmode=COULX;
-    else if(stricmp(pzmod,"CoulC")==0)
-      pzmode=COULC;
-    else if(stricmp(pzmod,"CoulXC")==0)
-      pzmode=COULXC;
-    else {
-      ERROR_INFO();
-      throw std::runtime_error("Invalid PZ-SICmode.\n");
-    }
-
   } catch(...) {
     // Hartree-Fock doesn't have the settings
   }
@@ -333,14 +299,6 @@ void SCF::do_force(bool val) {
   doforce=val;
 }
 
-void SCF::do_sic(enum pzsic val) {
-  pz=val;
-}
-
-enum pzsic SCF::do_sic() const {
-  return pz;
-}
-
 arma::mat SCF::get_S() const {
   return S;
 }
@@ -416,7 +374,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 
   // Exchange-correlation
-  if(pzmode!=COUL) {
+  if(dft.x_func != 0 || dft.c_func != 0) {
     if(verbose) {
       printf("Constructing orbital XC matrices ...");
       fflush(stdout);
@@ -447,14 +405,14 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 }
 
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization, bool real) {
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization, bool real) {
   // Set xc functionals
-  if(pzmode==COUL) {
+  if(pzmet==COUL) {
     dft.x_func=0;
     dft.c_func=0;
-  } else if(pzmode==COULX) {
+  } else if(pzmet==COULX) {
     dft.c_func=0;
-  } else if(pzmode==COULC) {
+  } else if(pzmet==COULC) {
     dft.x_func=0;
   }
 
@@ -531,7 +489,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     }
   }
 
-  if(dft.adaptive && reconstruct && pzmode!=COUL) {
+  if(dft.adaptive && reconstruct && pzmet!=COUL) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
 
@@ -564,7 +522,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       fflush(stderr);
     }
   } else { // if(dft.adaptive)
-    if(verbose && pzmode!=COUL)
+    if(verbose && pzmet!=COUL)
       fprintf(stderr,"\n");
   }
 
@@ -572,27 +530,30 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   if(verbose && !canonical) {
     fprintf(stderr,"SIC unitary optimization\n");
   }
-  PZSIC_calculate(sicsol,W,dft,grid,Etol,canonical,real);
+  PZSIC_calculate(sicsol,W,dft,pzcor,grid,Etol,canonical,real);
+  if(verbose && !canonical) {
+    fprintf(stderr,"\n");
+  }
   // Save matrix
   chkptp->cwrite("CW",sicsol.C*W);
 
   // Update current solution
-  sol.H +=sicsol.H;
-  sol.XC+=sicsol.XC;
+  sol.Heff=sicsol.H;
+  sol.H  +=sicsol.H;
   // Remember there are two electrons in each orbital
-  sol.en.Exc+=2*sicsol.en.Exc;
-  sol.en.Eel+=2*sicsol.en.Eel;
+  sol.en.Eeff=2*sicsol.en.E;
+  sol.en.Eel+=2*sicsol.en.E;
   sol.en.E  +=2*sicsol.en.E;
 }
 
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization, bool real) {
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, bool canonical, bool localization, bool real) {
   // Set xc functionals
-  if(pzmode==COUL) {
+  if(pzmet==COUL) {
     dft.x_func=0;
     dft.c_func=0;
-  } else if(pzmode==COULX) {
+  } else if(pzmet==COULX) {
     dft.c_func=0;
-  } else if(pzmode==COULC) {
+  } else if(pzmet==COULC) {
     dft.x_func=0;
   }
 
@@ -728,7 +689,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     }
   }
 
-  if(dft.adaptive && reconstruct && pzmode!=COUL) {
+  if(dft.adaptive && reconstruct && pzmet!=COUL) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
 
@@ -769,7 +730,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       fflush(stderr);
     }
   } else { // if(dft.adaptive)
-    if(verbose && pzmode!=COUL)
+    if(verbose && pzmet!=COUL)
       fprintf(stderr,"\n");
   }
 
@@ -780,7 +741,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     else
       fprintf(stderr,"SIC canonical calculation, alpha spin\n");
   }
-  PZSIC_calculate(sicsola,Wa,dft,grid,Etol,canonical,real);
+  PZSIC_calculate(sicsola,Wa,dft,pzcor,grid,Etol,canonical,real);
   chkptp->cwrite("CWa",sicsola.C*Wa);
 
   if(Wb.n_cols) {
@@ -790,30 +751,31 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       else
 	fprintf(stderr,"SIC canonical calculation,  beta spin\n");
     }
-    PZSIC_calculate(sicsolb,Wb,dft,grid,Etol,canonical,real);
+    PZSIC_calculate(sicsolb,Wb,dft,pzcor,grid,Etol,canonical,real);
     chkptp->cwrite("CWb",sicsolb.C*Wb);
   }
 
+  if(verbose && !canonical) {
+    fprintf(stderr,"\n");
+  }
+
   // Update current solution
-  sol.Ha +=sicsola.H;
-  sol.XCa+=sicsola.XC;
-
+  sol.Heffa=sicsola.H;
+  sol.Ha  +=sicsola.H;
   if(Wb.n_cols) {
-    sol.Hb +=sicsolb.H;
-    sol.XCb+=sicsolb.XC;
-
-    sol.en.Exc+=sicsola.en.Exc+sicsolb.en.Exc;
-    sol.en.Eel+=sicsola.en.Eel+sicsolb.en.Eel;
+    sol.Heffb=sicsolb.H;
+    sol.Hb  +=sicsolb.H;
+    sol.en.Eeff=sicsola.en.E+sicsolb.en.E;
+    sol.en.Eel+=sicsola.en.E+sicsolb.en.E;
     sol.en.E  +=sicsola.en.E+sicsolb.en.E;
   } else {
-
-    sol.en.Exc+=sicsola.en.Exc;
-    sol.en.Eel+=sicsola.en.Eel;
+    sol.en.Eeff=sicsola.en.E;
+    sol.en.Eel+=sicsola.en.E;
     sol.en.E  +=sicsola.en.E;
   }
 }
 
-void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & grid, double Etol, bool canonical, bool real) {
+void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, DFTGrid & grid, double Etol, bool canonical, bool real) {
   // Initialize the worker
   const double maxtol=1e-2;
   const double rmstol=1e-3;
@@ -825,8 +787,8 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
     // Use canonical orbitals for SIC
     ESIC=worker.cost_func(W);
   } else {
-    //	Perform unitary optimization, take at max 20 iterations
-    size_t nmax=20;
+    //	Perform unitary optimization, take at max 10 iterations
+    size_t nmax=10;
 
     if(real) {
       // Real optimization
@@ -844,12 +806,9 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, DFTGrid & g
   arma::mat HSIC=worker.get_HSIC();
 
   // Adjust Fock operator for SIC
-  sol.H     =-pzcor*HSIC;
-  sol.XC    =-pzcor*HSIC;
+  sol.H=-pzcor*HSIC;
   // Need to adjust energy as well as this was calculated in the Fock routines
-  sol.en.Exc=-pzcor*ESIC;
-  sol.en.Eel=-pzcor*ESIC;
-  sol.en.E  =-pzcor*ESIC;
+  sol.en.E=-pzcor*ESIC;
 
   // Get orbital energies
   arma::vec Eorb=arma::sort(worker.get_Eorb(),1);
@@ -1358,6 +1317,47 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
   Nel_beta=Nel-Nel_alpha;
 }
 
+enum pzrun parse_pzsic(const std::string & pzs) {
+  enum pzrun pz;
+
+  // Perdew-Zunger SIC?
+  if(stricmp(pzs,"Full")==0)
+    pz=FULL;
+  else if(stricmp(pzs,"Pert")==0)
+    pz=PERT;
+  else if(stricmp(pzs,"Real")==0)
+    pz=REAL;
+  else if(stricmp(pzs,"RealPert")==0)
+    pz=REALPERT;
+  else if(stricmp(pzs,"Can")==0)
+    pz=CAN;
+  else if(stricmp(pzs,"CanPert")==0)
+    pz=CANPERT;
+  else
+    pz=NO;
+
+  return pz;
+}
+
+enum pzmet parse_pzmet(const std::string & pzmod) {
+  enum pzmet mode;
+
+  if(stricmp(pzmod,"Coul")==0)
+    mode=COUL;
+  else if(stricmp(pzmod,"CoulX")==0)
+    mode=COULX;
+  else if(stricmp(pzmod,"CoulC")==0)
+    mode=COULC;
+  else if(stricmp(pzmod,"CoulXC")==0)
+    mode=COULXC;
+  else {
+    ERROR_INFO();
+    throw std::runtime_error("Invalid PZ-SICmode.\n");
+  }
+
+  return mode;
+}
+
 void calculate(const BasisSet & basis, Settings & set, bool force) {
   // Checkpoint files to load and save
   std::string loadname=set.get_string("LoadChk");
@@ -1538,21 +1538,114 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
 
-      if(stricmp(set.get_string("DFTGrid"),"Auto")==0) {
+      bool adaptive=(stricmp(set.get_string("DFTGrid"),"Auto")==0);
+      if(adaptive) {
 	// Solve restricted DFT problem first on a rough grid
-	enum pzsic pz=solver.do_sic();
-	if(pz==PERT || pz==CANPERT) solver.do_sic(NO);
 	solver.RDFT(sol,occs,initconv,initdft);
-	if(pz==PERT || pz==CANPERT) solver.do_sic(pz);
 
 	if(verbose) {
 	  fprintf(stderr,"\n");
 	  fflush(stderr);
 	}
       }
-      // .. and then on the final grid
-      solver.do_force(force);
-      solver.RDFT(sol,occs,conv,dft);
+
+      // Perdew-Zunger?
+      enum pzrun pz=parse_pzsic(set.get_string("PZ-SIC"));
+      if(pz==NO) {
+	// ... and then on the more accurate grid
+	solver.do_force(force);
+	solver.RDFT(sol,occs,conv,dft);
+
+      } else {
+	// Run Perdew-Zunger calculation.
+	rscf_t oldsol;
+
+	// PZ weight
+	double pzcor=set.get_double("PZ-SICw");
+	// Run mode
+	enum pzmet pzmet=parse_pzmet(set.get_string("PZ-SICmode"));
+
+	// Convergence thresholds
+	double pzfac=set.get_double("PZ-SICfac");
+	double thr_dPmax=pzfac*conv.deltaPmax;
+	double thr_dPrms=pzfac*conv.deltaPrms;
+	double thr_dEmax=pzfac*conv.deltaEmax;
+
+	// Iteration number
+	int pziter=0;
+
+	while(true) {
+	  // Change reference values
+	  oldsol=sol;
+
+	  // DFT grid
+	  DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
+	  if(!adaptive)
+	    // Fixed size grid
+	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+
+	  // Get new SIC potential
+	  solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzcor,grid,adaptive,conv.deltaEmax,(pz==CAN || pz==CANPERT),true,(pz==REAL || pz==REALPERT));
+	  pziter++;
+
+	  if(pz==CANPERT || pz==REALPERT) {
+	    // Perturbative calculation - no need for self-consistency
+	    // Diagonalize to get new orbitals and energies
+	    diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
+	    // update density matrices
+	    sol.P=form_density(sol.C,occs);
+	    break;
+
+	  } else {
+	    // Solve self-consistent field equations in presence of new SIC potential
+	    solver.RDFT(sol,occs,conv,dft);
+	  }
+
+	  // Energy difference
+	  double dE=sol.en.E-oldsol.en.E;
+	  // Density differences
+	  double dP_rms=rms_norm((sol.P-oldsol.P)/2.0);
+	  double dP_max=max_abs((sol.P-oldsol.P)/2.0);
+
+	  // Print out changes
+	  if(verbose) {
+	    fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
+
+	    if(fabs(dE)<thr_dEmax)
+	      fprintf(stderr," % 10.3e*",dE);
+	    else
+	      fprintf(stderr," % 10.3e ",dE);
+
+	    if(dP_rms<thr_dPrms)
+	      fprintf(stderr," %9.3e*",dP_rms);
+	    else
+	      fprintf(stderr," %9.3e ",dP_rms);
+
+	    if(dP_max<thr_dPmax)
+	      fprintf(stderr," %9.3e*",dP_max);
+	    else
+	      fprintf(stderr," %9.3e ",dP_max);
+
+	    fprintf(stderr,"\n");
+
+	    printf("\nSIC terms: % e %e %e\n",dE,dP_max,dP_rms);
+	  }
+
+	  if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
+	    break;
+	}
+
+	// Do we need forces?
+	if(force) {
+	  solver.do_force(true);
+	  solver.RDFT(sol,occs,conv,dft);
+	}
+
+	// and update checkpoint file entries
+	chkpt.write("C",sol.C);
+	chkpt.write("E",sol.E);
+	chkpt.write("P",sol.P);
+      }
     }
 
     // Do population analysis
@@ -1653,21 +1746,125 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       if(verbose)
 	print_info(dft.x_func,dft.c_func);
 
-      if(stricmp(set.get_string("DFTGrid"),"Auto")==0) {
-	// Solve restricted DFT problem first on a rough grid
-	enum pzsic pz=solver.do_sic();
-	if(pz==PERT || pz==CANPERT) solver.do_sic(NO);
+      bool adaptive=(stricmp(set.get_string("DFTGrid"),"Auto")==0);
+      if(adaptive) {
+	// Solve unrestricted DFT problem first on a rough grid
 	solver.UDFT(sol,occa,occb,initconv,initdft);
-	if(pz==PERT || pz==CANPERT) solver.do_sic(pz);
 
 	if(verbose) {
 	  fprintf(stderr,"\n");
 	  fflush(stderr);
 	}
       }
-      // ... and then on the more accurate grid
-      solver.do_force(force);
-      solver.UDFT(sol,occa,occb,conv,dft);
+
+      // Perdew-Zunger?
+      enum pzrun pz=parse_pzsic(set.get_string("PZ-SIC"));
+      if(pz==NO) {
+	// ... and then on the more accurate grid
+	solver.do_force(force);
+	solver.UDFT(sol,occa,occb,conv,dft);
+
+      } else {
+	// Run Perdew-Zunger calculation.
+	uscf_t oldsol;
+
+	// PZ weight
+	double pzcor=set.get_double("PZ-SICw");
+	// Run mode
+	enum pzmet pzmet=parse_pzmet(set.get_string("PZ-SICmode"));
+
+
+	// Convergence thresholds
+	double pzfac=set.get_double("PZ-SICfac");
+	double thr_dPmax=pzfac*conv.deltaPmax;
+	double thr_dPrms=pzfac*conv.deltaPrms;
+	double thr_dEmax=pzfac*conv.deltaEmax;
+
+	// Iteration number
+	int pziter=0;
+
+	while(true) {
+	  // Change reference values
+	  oldsol=sol;
+
+	  // DFT grid
+	  DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
+	  if(!adaptive)
+	    // Fixed size grid
+	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+
+	  // Get new SIC potential
+	  solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzcor,grid,adaptive,conv.deltaEmax,(pz==CAN || pz==CANPERT),true,(pz==REAL || pz==REALPERT));
+	  pziter++;
+
+	  if(pz==CANPERT || pz==REALPERT) {
+	    // Perturbative calculation - no need for self-consistency
+	    // Diagonalize to get new orbitals and energies
+	    diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
+	    // update density matrices
+	    sol.Pa=form_density(sol.Ca,occa);
+	    sol.Pb=form_density(sol.Cb,occb);
+	    sol.P=sol.Pa+sol.Pb;
+	    break;
+
+	  } else {
+	    // Solve self-consistent field equations in presence of new SIC potential
+	    solver.UDFT(sol,occa,occb,conv,dft);
+	  }
+
+	  // Energy difference
+	  double dE=sol.en.E-oldsol.en.E;
+	  // Density differences
+	  double dPa_rms=rms_norm(sol.Pa-oldsol.Pa);
+	  double dPa_max=max_abs(sol.Pa-oldsol.Pa);
+	  double dPb_rms=rms_norm(sol.Pb-oldsol.Pb);
+	  double dPb_max=max_abs(sol.Pb-oldsol.Pb);
+	  double dP_rms=rms_norm(sol.P-oldsol.P);
+	  double dP_max=max_abs(sol.P-oldsol.P);
+
+	  // Print out changes
+	  if(verbose) {
+	    fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
+
+	    if(fabs(dE)<thr_dEmax)
+	      fprintf(stderr," % 10.3e*",dE);
+	    else
+	      fprintf(stderr," % 10.3e ",dE);
+
+	    if(dP_rms<thr_dPrms)
+	      fprintf(stderr," %9.3e*",dP_rms);
+	    else
+	      fprintf(stderr," %9.3e ",dP_rms);
+
+	    if(dP_max<thr_dPmax)
+	      fprintf(stderr," %9.3e*",dP_max);
+	    else
+	      fprintf(stderr," %9.3e ",dP_max);
+
+	    fprintf(stderr,"\n");
+
+	    printf("\nSIC terms: % e %e %e %e %e\n",dE,dPa_max,dPa_rms,dPb_max,dPb_rms);
+	  }
+
+	  if(fabs(dE)<thr_dEmax && std::max(dPa_rms,dPb_rms)<thr_dPrms && std::max(dPa_max,dPb_max)<thr_dPmax)
+	    break;
+	}
+
+	// Do we need forces?
+	if(force) {
+	  solver.do_force(true);
+	  solver.UDFT(sol,occa,occb,conv,dft);
+	}
+
+	// and update checkpoint file entries
+	chkpt.write("Ca",sol.Ca);
+	chkpt.write("Cb",sol.Cb);
+	chkpt.write("Ea",sol.Ea);
+	chkpt.write("Eb",sol.Eb);
+	chkpt.write("Pa",sol.Pa);
+	chkpt.write("Pb",sol.Pb);
+	chkpt.write("P",sol.P);
+      }
     }
 
     if(verbose) {

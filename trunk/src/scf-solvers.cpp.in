@@ -63,17 +63,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #endif
 #endif
 
-  /// SIC energy tolerance
-#ifdef DFT
-#ifdef RESTRICTED
-  // One channel, this should be OK
-#define SICETOL (conv.deltaEmax/2.0)
-#else
-  // Two channels, so must converge each a bit tighter
-#define SICETOL (conv.deltaEmax/4.0)
-#endif
-#endif
-
   /// Find excited orbital
 #if defined(FULLHOLE) || defined(HALFHOLE)
 #define find_exc(sol) if(spin) {ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);} else {ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);}
@@ -225,10 +214,18 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	  throw std::runtime_error("No starting guess, and use of core guess disallowed!\n");
 
 #ifdef RESTRICTED
-	sol.H=Hcore;
+	if(sol.Heff.n_elem == Hcore.n_elem)
+	  sol.H=Hcore+sol.Heff;
+	else
+	  sol.H=Hcore;
 #else
-	sol.Ha=Hcore;
-	sol.Hb=Hcore;
+	if(sol.Heffa.n_elem == Hcore.n_elem && sol.Heffb.n_elem == Hcore.n_elem) {
+	  sol.Ha=Hcore+sol.Heffa;
+	  sol.Hb=Hcore+sol.Heffb;
+	} else {
+	  sol.Ha=Hcore;
+	  sol.Hb=Hcore;
+	}
 #endif
 
 	diagonalize(S,Sinvh,sol);
@@ -331,21 +328,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
       fprintf(stderr,"%s-%s ",get_keyword(dft.x_func).c_str(),get_keyword(dft.c_func).c_str());
     } else
       fprintf(stderr,"%s ",get_keyword(dft.x_func).c_str());
-
-    if(pz!=NO) {
-      if(pz==PERT || pz==CANPERT || pz==REALPERT)
-	fprintf(stderr,"perturbative ");
-      fprintf(stderr,"SIC with ");
-
-      if(pz==REAL || pz==REALPERT)
-	fprintf(stderr,"real ");
-      else if(pz==FULL || pz==PERT)
-	fprintf(stderr,"complex ");
-      else if(pz==CAN || pz==CANPERT)
-	fprintf(stderr,"canonical ");
-
-      fprintf(stderr,"orbitals ");
-    }
 #endif
 
     fprintf(stderr,"calculation");
@@ -474,19 +456,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
     } else {
       form_fock(sol,oldsol);
     }
-
-#ifdef DFT
-    // Perdew-Zunger correction?
-    if(pz==FULL || pz==REAL || pz==CAN) {
-      titer.stop();
-#ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,true,SICETOL,pz==CAN,pzloc,pz==REAL);
-#else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,true,SICETOL,pz==CAN,pzloc,pz==REAL);
-#endif
-      titer.cont();
-    }
-#endif
 
     // Compute change of energy
     deltaE=sol.en.E-oldsol.en.E;
@@ -674,18 +643,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	diagonalize(S,Sinvh,rhsol);
 	form_dens(rhsol);
 	form_fock(rhsol,sol);
-#ifdef DFT
-	// Perdew-Zunger correction?
-	if(pz==FULL || pz==REAL || pz==CAN) {
-	  titer.stop();
-#ifdef RESTRICTED
-	  PZSIC_RDFT(rhsol,occs,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
-#else
-	  PZSIC_UDFT(rhsol,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
-#endif
-	  titer.cont();
-	}
-#endif
+
 	diagonalize(S,Sinvh,rhsol);
 
 	if(verbose) {
@@ -758,18 +716,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    diagonalize(S,Sinvh,sol1);
 	    form_dens(sol1);
 	    form_fock(sol1,sol);
-#ifdef DFT
-	    // Perdew-Zunger correction?
-	    if(pz==FULL || pz==REAL || pz==CAN) {
-	      titer.stop();
-#ifdef RESTRICTED
-	      PZSIC_RDFT(sol1,occs,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
-#else
-	      PZSIC_UDFT(sol1,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
-#endif
-	      titer.cont();
-	    }
-#endif
 	    diagonalize(S,Sinvh,sol1);
 	    if(verbose) {
 	      printf("\t%e\t%e\t%e\n",mu1,sol1.en.E,sol1.en.E-Emin0);
@@ -781,18 +727,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	    diagonalize(S,Sinvh,sol2);
 	    form_dens(sol2);
 	    form_fock(sol2,sol);
-#ifdef DFT
-	    // Perdew-Zunger correction?
-	    if(pz==FULL || pz==REAL || pz==CAN) {
-	      titer.stop();
-#ifdef RESTRICTED
-	      PZSIC_RDFT(sol2,occs,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
-#else
-	      PZSIC_UDFT(sol2,occa,occb,dft,grid,false,SICETOL,pz==CAN,pzloc,pz==REAL);
-#endif
-	      titer.cont();
-	    }
-#endif
 	    diagonalize(S,Sinvh,sol2);
 	    if(verbose) {
 	      printf("\t%e\t%e\t%e\n",mu2,sol2.en.E,sol2.en.E-Emin0);
@@ -916,8 +850,8 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
     // Compute convergence criteria
 #ifdef RESTRICTED
-    maxdiff=max_abs(deltaP);
-    rmsdiff=rms_norm(deltaP);
+    maxdiff=max_abs(deltaP/2.0);
+    rmsdiff=rms_norm(deltaP/2.0);
 #else
     maxdiffa=max_abs(deltaPa);
     maxdiffb=max_abs(deltaPb);
@@ -1114,52 +1048,6 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 	fprintf(stderr,"Fock matrix was built %i times.\n",nfock);
       }
     }
-
-#ifdef DFT
-    if(pz==PERT || pz==CANPERT || pz==REALPERT) {
-      // Calculate SIC correction
-#ifdef RESTRICTED
-      PZSIC_RDFT(sol,occs,dft,grid,true,SICETOL,pz==CANPERT,pzloc,pz==REALPERT);
-#else
-      PZSIC_UDFT(sol,occa,occb,dft,grid,true,SICETOL,pz==CANPERT,pzloc,pz==REALPERT);
-#endif
-      // Diagonalize to get new canonical orbitals and energies
-      diagonalize(S,Sinvh,sol,shift);
-
-      chkptp->open();
-      chkptp->write(sol.en);
-      chkptp->write("P",sol.P);
-#if !defined(RESTRICTED)
-      chkptp->write("Ca",sol.Ca);
-      chkptp->write("Cb",sol.Cb);
-      chkptp->write("Ea",sol.Ea);
-      chkptp->write("Eb",sol.Eb);
-      chkptp->write("Ha",sol.Ha);
-      chkptp->write("Hb",sol.Hb);
-      chkptp->write("Pa",sol.Pa);
-      chkptp->write("Pb",sol.Pb);
-#else
-      chkptp->write("C",sol.C);
-      chkptp->write("E",sol.E);
-      chkptp->write("H",sol.H);
-#endif
-      chkptp->close();
-
-      if(verbose) {
-	fprintf(stderr,"ESIC % 16.8f\n",sol.en.E);
-	printf("PZ-SIC corrected energy is % 16.8f\n",sol.en.E);
-
-#ifdef RESTRICTED
-	print_E(sol.E,occs);
-#else
-	printf("alpha: ");
-	print_E(sol.Ea,occa);
-	printf("beta:  ");
-	print_E(sol.Eb,occb);
-#endif
-      }
-    }
-#endif
 
     if(doforce) {
       arma::vec f;
