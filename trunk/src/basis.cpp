@@ -2690,6 +2690,23 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   // and energies
   E.subvec(0,Nmo-1)=oldE.subvec(0,Nmo-1);
 
+  // Schmidt orthonormalize projected orbitals. We don't want to screw
+  // up the occupied orbitals, since this will change the energy a lot.
+  for(size_t io=0;io<Nmo;io++) {
+    // Orbital coefficients
+    arma::vec mo=MOs.col(io);
+    
+    // Orthogonalize wrt occupied orbitals
+    for(size_t jo=0;jo<io;jo++)
+      // Remove overlaps
+      mo -= arma::as_scalar(arma::trans(MOs.col(jo))*S11*mo)*MOs.col(jo);
+    // and normalize
+    mo /= sqrt(arma::as_scalar(arma::trans(mo)*S11*mo));
+    
+    // Store orbital
+    MOs.col(io)=mo;
+  }
+
   // If the old basis had less functions than the new basis, then we
   // need to form the rest of the orbitals. To do this we consider all
   // of the linearly independent eigenvectors of the new basis, and
@@ -2722,14 +2739,22 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
     
     // Set the remaining orbitals
     for(size_t io=0;io<idx.size();io++) {
-      MOs.col(Nmo+io)=Sinvh.col(idx[io]);
-      // Dummy value for energy
+      // Orbital coefficients
+      arma::vec mo=Sinvh.col(idx[io]);
+
+      // Orthogonalize wrt occupied orbitals
+      for(size_t jo=0;jo<Nmo+io;jo++)
+	// Remove overlaps
+	mo -= arma::as_scalar(arma::trans(MOs.col(jo))*S11*mo)*MOs.col(jo);
+      // and normalize
+      mo /= sqrt(arma::as_scalar(arma::trans(mo)*S11*mo));
+      
+      // Store orbital
+      MOs.col(Nmo+io)=mo;
+      // and dummy value for energy
       E(Nmo+io)=E(Nmo-1);
     }
   }
-  
-  // Orthonormalize orbitals
-  MOs=orthonormalize(S11,MOs);
   
   // Failsafe
   try {
