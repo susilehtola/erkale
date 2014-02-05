@@ -2515,9 +2515,16 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
 #pragma omp parallel
   {
     int ith=omp_get_thread_num();
+    // Collapse statement introduced in OpenMP 3.0 in May 2008
+#if _OPENMP >= 200805
 #pragma omp for schedule(dynamic,1) collapse(2)
     for(size_t iat=0;iat<Nat;iat++) 
       for(size_t iorb=0;iorb<Norb;iorb++) {
+#else
+#pragma omp for schedule(dynamic,1)
+    for(size_t iorb=0;iorb<Norb;iorb++)
+      for(size_t iat=0;iat<Nat;iat++) {
+#endif
 	Timer toa;
 
 	// Construct the grid
