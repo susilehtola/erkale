@@ -1454,6 +1454,8 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
   if(set.get_int("Multiplicity")==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
     // Closed shell case
     rscf_t sol;
+    // Initialize energy
+    memset(&sol.en, 0, sizeof(energy_t));
 
     // Project old solution to new basis
     if(doload) {
@@ -1640,6 +1642,8 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
   } else {
     uscf_t sol;
+    // Initialize energy
+    memset(&sol.en, 0, sizeof(energy_t));
 
     if(doload) {
       // Running polarized calculation but given restricted guess
