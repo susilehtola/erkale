@@ -1899,208 +1899,6 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   return ret;
 }
 
-atomgrid_t AtomGrid::construct(const BasisSet & bas, const std::vector<arma::mat> & Pa, size_t cenind, int x_func, int c_func, bool restr, bool verbose) {
-  // Construct a grid centered on (x0,y0,z0)
-  // with nrad radial shells
-  // See Köster et al for specifics.
-
-  // Dummy matrix
-  arma::mat Pdum(Pa[0]);
-  Pdum.zeros();
-
-  Timer t;
-
-  // Returned info
-  atomgrid_t ret;
-  ret.ngrid=0;
-  ret.nfunc=0;
-
-  // Store index of center
-  ret.atind=cenind;
-  // and its coordinates
-  ret.cen=bas.get_nuclear_coords(cenind);
-
-  // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
-
-  // Get Chebyshev nodes and weights for radial part
-  std::vector<double> rad, wrad;
-  radial_chebyshev(nrad,rad,wrad);
-  nrad=rad.size(); // Sanity check
-
-  // Allocate memory
-  ret.sh.resize(nrad);
-
-  // Loop over radii
-  for(size_t ir=0;ir<rad.size();ir++) {
-    // Store shell data
-    ret.sh[ir].r=rad[ir];
-    ret.sh[ir].w=wrad[ir]*rad[ir]*rad[ir];
-    ret.sh[ir].l=3;
-  }
-
-  // Number of basis functions
-  size_t Nbf=bas.get_Nbf();
-
-  // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(tol));
-
-  // Old and new diagonal elements of Hamiltonian. Amount of
-  // Hamiltonians is
-  size_t nelem=Pa.size();
-  if(!restr)
-    // Unrestricted density - two last elements make up total density
-    nelem=Pa.size()-1;
-  std::vector<arma::vec> Haold(nelem), Hanew(nelem);
-  std::vector<arma::vec> Hbold(nelem), Hbnew(nelem);
-  for(size_t i=0;i<nelem;i++) {
-    Haold[i].zeros(Nbf);
-    Hbold[i].zeros(Nbf);
-  }
-
-  // Maximum difference of diagonal elements of Hamiltonian
-  double maxdiff;
-
-  // Now, determine actual quadrature limits shell by shell
-  for(size_t ir=0;ir<ret.sh.size();ir++) {
-
-    // Amount of individual orbitals is
-    size_t ipmax=nelem-1;
-    // Orbitals to check
-    std::vector<size_t> orbidx(ipmax);
-    for(size_t i=0;i<ipmax;i++)
-      orbidx[i]=i;
-
-    // Check total density as well?
-    bool runtot=true;
-
-    do {
-      // Clear current grid points and function values
-      free();
-
-      // Form radial shell
-      if(use_lobatto)
-	add_lobatto_shell(ret,ir);
-      else
-	add_lebedev_shell(ret,ir);
-      // Compute Becke weights for radial shell
-      becke_weights(bas,ret,ir);
-      // Prune points with small weight
-      prune_points(1e-8*tol,ret.sh[ir]);
-
-      // Compute values of basis functions
-      compute_bf(bas,ret,ir);
-
-      // Maximum difference of diagonal elements of Fock matrix
-      maxdiff=0.0;
-
-      // Loop over orbital densities
-      for(size_t iip=orbidx.size()-1;iip<orbidx.size();iip--) {
-	size_t ip=orbidx[iip];
-	// Compute density
-	update_density(Pa[ip],Pdum);
-
-	// Compute exchange and correlation.
-	init_xc();
-	// Compute the functionals
-	if(x_func>0)
-	  compute_xc(x_func);
-	if(c_func>0)
-	  compute_xc(c_func);
-	// and construct the Fock matrices
-	Hanew[ip].zeros(Nbf);
-	Hbnew[ip].zeros(Nbf);
-	eval_diag_Fxc(Hanew[ip],Hbnew[ip]);
-
-	// Compute maximum difference of diagonal elements of Fock matrix
-	double maxd=std::max(arma::max(arma::abs(Hanew[ip]-Haold[ip])),arma::max(arma::abs(Hbnew[ip]-Hbold[ip])));
-
-	// Check if this orbital density has the most error
-	if(maxd>maxdiff)
-	  maxdiff=maxd;
-
-	// Is the orbital density converged?
-	if(maxd<tol/rad.size()) {
-	  //	  printf("Shell %i: orbital %i converged, l = %i\n",(int) ir, (int) ip, ret.sh[ir].l);
-	  orbidx.erase(orbidx.begin()+iip);
-	}
-      }
-
-      // Total density
-      if(runtot) {
-	size_t ip;
-
-	if(!restr) {
-	  ip=Pa.size()-2;
-	  // Compute density
-	  update_density(Pa[ip],Pa[ip+1]);
-	} else {
-	  ip=Pa.size()-1;
-	  update_density(Pa[ip]);
-	}
-
-	// Compute exchange and correlation.
-	init_xc();
-	// Compute the functionals
-	if(x_func>0)
-	  compute_xc(x_func);
-	if(c_func>0)
-	  compute_xc(c_func);
-	// and construct the Fock matrices
-	Hanew[ip].zeros(Nbf);
-	Hbnew[ip].zeros(Nbf);
-	if(restr)
-	  eval_diag_Fxc(Hanew[ip]);
-	else
-	  eval_diag_Fxc(Hanew[ip],Hbnew[ip]);
-
-	// Compute maximum difference of diagonal elements of Fock matrix
-	double maxd=std::max(arma::max(arma::abs(Hanew[ip]-Haold[ip])),arma::max(arma::abs(Hbnew[ip]-Hbold[ip])));
-	// Is this the maximal error?
-	if(maxd>maxdiff)
-	  maxdiff=maxd;
-
-	// Is maximum density converged already?
-	if(maxd<tol/rad.size()) {
-	  runtot=false;
-	  //	  printf("Shell %i: total density converged, l = %i\n",(int) ir, ret.sh[ir].l);
-	}
-
-      }
-
-      // Increment order if tolerance not achieved.
-      if(maxdiff>tol/rad.size()) {
-	if(use_lobatto)
-	  ret.sh[ir].l+=2;
-	else {
-	  // Need to determine what is next order of Lebedev
-	  // quadrature that is supported.
-	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
-	}
-      }
-
-      // Swap contents
-      std::swap(Haold,Hanew);
-      std::swap(Hbold,Hbnew);
-    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
-
-    // Increase number of points and function values
-    ret.ngrid+=grid.size();
-    ret.nfunc+=flist.size();
-  }
-
-  // Free memory once more
-  free();
-
-  if(verbose) {
-    //printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
-    printf("\t%4u  %7u  %10u  %s\n",(unsigned int) ret.atind+1,(unsigned int) ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
-    fflush(stdout);
-  }
-
-  return ret;
-}
-
 atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool verbose) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells
@@ -2325,7 +2123,8 @@ void AtomGrid::form_grid(const BasisSet & bas, atomgrid_t & g) {
   free();
 
   // Check allocation
-  grid.reserve(g.ngrid);
+  if(g.ngrid>grid.capacity())
+    grid.reserve(g.ngrid);
 
   // Loop over radial shells
   for(size_t ir=0;ir<g.sh.size();ir++) {
@@ -2339,6 +2138,9 @@ void AtomGrid::form_grid(const BasisSet & bas, atomgrid_t & g) {
     // Prune points with small weight
     prune_points(1e-8*tol,g.sh[ir]);
   }
+
+  // Store number of points
+  g.ngrid=grid.size();
 }
 
 void AtomGrid::form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g) {
@@ -2346,7 +2148,8 @@ void AtomGrid::form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g) {
   free();
 
   // Check allocation
-  grid.reserve(g.ngrid);
+  if(g.ngrid>grid.capacity())
+    grid.reserve(g.ngrid);
 
   // Loop over radial shells
   for(size_t ir=0;ir<g.sh.size();ir++) {
@@ -2360,22 +2163,28 @@ void AtomGrid::form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g) {
     // Prune points with small weight
     prune_points(1e-8*tol,g.sh[ir]);
   }
+
+  // Store number of points
+  g.ngrid=grid.size();
 }
 
-void AtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g) {
+void AtomGrid::compute_bf(const BasisSet & bas, atomgrid_t & g) {
   // Check allocation
-  flist.reserve(g.nfunc);
-  if(do_grad)
+  if(g.nfunc>flist.capacity())
+    flist.reserve(g.nfunc);
+  if(do_grad && (3*g.nfunc>glist.capacity()))
     glist.reserve(3*g.nfunc);
-  if(do_lapl)
+  if(do_lapl && g.nfunc>llist.capacity())
     llist.reserve(g.nfunc);
 
   // Loop over radial shells
   for(size_t ir=0;ir<g.sh.size();ir++) {
     compute_bf(bas,g,ir);
   }
-}
 
+  // Store number of function values
+  g.nfunc=flist.size();
+}
 
 void AtomGrid::compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t irad) {
   // Compute values of relevant basis functions on irad:th shell
@@ -2674,38 +2483,119 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
   }
 }
 
-void DFTGrid::construct(const std::vector<arma::mat> & Pa, double tol, int x_func, int c_func, bool restr) {
+void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func, int c_func) {
   // Add all atoms
   if(verbose) {
-    printf("\t%4s  %7s  %10s  %s\n","atom","Npoints","Nfuncs","t");
+    printf("\t%4s  %4s  %7s  %10s  %s\n","atom","orb","Npoints","Nfuncs","t");
     fflush(stdout);
   }
-
+  
   // Set tolerances
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_tolerance(tol);
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
-
+  
   Timer t;
-
-  size_t Nat=basp->get_Nnuc();
-
+  
+  const size_t Nat=basp->get_Nnuc();
+  const size_t Norb=P.size();
+  
+  // Orbital grid lists
+  std::vector< std::vector<atomgrid_t> > orbgrid(Norb);
+  for(size_t iorb=0;iorb<Norb;iorb++)
+    orbgrid[iorb].resize(Nat);
+  
+  // Dummy density matrix
+  arma::mat Pdum(P[0]);
+  Pdum.zeros();
+  
 #ifdef _OPENMP
 #pragma omp parallel
   {
     int ith=omp_get_thread_num();
-#pragma omp for schedule(dynamic,1)
-    for(size_t i=0;i<Nat;i++)
-      grids[i]=wrk[ith].construct(*basp,Pa,i,x_func,c_func,restr,verbose);
+#pragma omp for schedule(dynamic,1) collapse(2)
+    for(size_t iat=0;iat<Nat;iat++) 
+      for(size_t iorb=0;iorb<Norb;iorb++) {
+	Timer toa;
+
+	// Construct the grid
+	orbgrid[iorb][iat]=wrk[ith].construct(*basp,P[iorb],Pdum,iat,x_func,c_func,false);
+	
+	// Print out info
+	if(verbose) {
+	  printf("\t%4u  %4u  %7u  %10u  %s\n",(unsigned int) iat+1,(unsigned int) iorb+1,(unsigned int) orbgrid[iorb][iat].ngrid,(unsigned int) orbgrid[iorb][iat].nfunc,toa.elapsed().c_str());
+	  fflush(stdout);
+	}
+      }
   }
 #else
-  for(size_t i=0;i<Nat;i++)
-    grids[i]=wrk[0].construct(*basp,Pa,i,x_func,c_func,restr,verbose);
+  for(size_t iorb=0;iorb<Norb;iorb++)
+    for(size_t iat=0;iat<Nat;iat++) {
+      Timer toa;
+      
+      orbgrid[iorb][iat]=wrk[0].construct(*basp,P[iorb],Pdum,iat,x_func,c_func,false);
+      
+      // Print out info
+      if(verbose) {
+	printf("\t%4u  %4u  %7u  %10u  %s\n",(unsigned int) iat+1,(unsigned int) iorb+1,(unsigned int) orbgrid[iorb][iat].ngrid,(unsigned int) orbgrid[iorb][iat].nfunc,toa.elapsed().c_str());
+	fflush(stdout);
+      }
+    }
 #endif
+  
+  // Collect orbital grids
+  grids.resize(orbgrid[0].size());
+  for(size_t iat=0;iat<orbgrid[0].size();iat++) {
+    // Initialize atomic grid
+    grids[iat]=orbgrid[0][iat];
+    
+    // Loop over radial shells
+    for(size_t irad=0;irad<grids[iat].sh.size();irad++) {
+      // Rule order
+      int l=orbgrid[0][iat].sh[irad].l;
+      
+      // Loop over orbitals
+      for(size_t iorb=1;iorb<orbgrid.size();iorb++)
+	l=std::max(l,orbgrid[iorb][iat].sh[irad].l);
+      
+      // Store l
+      grids[iat].sh[irad].l=l;
+    }
+  }
+  
+  // Update grid sizes
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+#else
+    int ith=0;
+#endif
+    
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t inuc=0;inuc<grids.size();inuc++) {
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[inuc]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[inuc]);
+      // Free memory
+      wrk[ith].free();
+    }
+  }
 
+  
+  // Print out info
   if(verbose) {
+    printf("Final grid size\n\t%4s  %7s  %10s\n","atom","Npoints","Nfuncs");
+    for(size_t iat=0;iat<grids.size();iat++)
+      printf("\t%4u  %7u  %10u\n",(unsigned int) iat+1,(unsigned int) grids[iat].ngrid,(unsigned int) grids[iat].nfunc);
     printf("SIC-DFT XC grid constructed in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }

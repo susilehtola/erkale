@@ -220,16 +220,13 @@ class AtomGrid {
   /// Construct a dummy grid that is only meant for the overlap matrix (Hirshfeld charges)
   atomgrid_t construct_hirshfeld(const BasisSet & bas, size_t cenind, const Hirshfeld & hirsh, bool verbose);
 
-  /// Construct adaptively a grid centered on the cenind:th center, SIC calculation
-  atomgrid_t construct(const BasisSet & bas, const std::vector<arma::mat> & Pa, size_t cenind, int x_func, int c_func, bool restr, bool verbose);
-
   /// Form shells on an atom, as according to list of radial shells
   void form_grid(const BasisSet & bas, atomgrid_t & g);
   /// Form shells on an atom, but using Hirshfeld weight instead of Becke weight
   void form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g);
 
   /// Compute values of basis functions in all grid points
-  void compute_bf(const BasisSet & bas, const atomgrid_t & g);
+  void compute_bf(const BasisSet & bas, atomgrid_t & g);
 
   /**
    * Compute Becke weight for grid points on shell irad.
@@ -365,7 +362,7 @@ class DFTGrid {
   void construct_hirshfeld(const Hirshfeld & hirsh, double tol);
 
   /// Create grid for SIC calculation
-  void construct(const std::vector<arma::mat> & Pa, double tol, int x_func, int c_func, bool restr);
+  void construct(const std::vector<arma::mat> & Porb, double tol, int x_func, int c_func);
 
   /// Get amount of points
   size_t get_Npoints() const;
@@ -383,7 +380,7 @@ class DFTGrid {
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel);
 
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, SIC calculation
-  void eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa, std::vector<arma::mat> & Ha, std::vector<double> & Exc, std::vector<double> & Nel);
+  void eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & P, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel);
 
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();

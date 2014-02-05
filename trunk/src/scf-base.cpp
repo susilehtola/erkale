@@ -497,14 +497,9 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     arma::cx_mat Ctilde=sicsol.C*W;
 
     // Stack of density matrices
-    std::vector<arma::mat> Pv(nocc+1);
-    // First entries are orbital densities
+    std::vector<arma::mat> Pv(nocc);
     for(size_t io=0;io<nocc;io++)
       Pv[io]=occs[0]*arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
-    // Final element is total density
-    Pv[Pv.size()-1].zeros(Pv[0].n_rows,Pv[0].n_cols);
-    for(size_t io=0;io<Pv.size()-1;io++)
-      Pv[Pv.size()-1]+=Pv[io];
 
     // Update DFT grid
     Timer tgrid;
@@ -513,7 +508,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       fprintf(stderr,"\n");
       fflush(stdout);
     }
-    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,true);
+    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func);
     if(verbose) {
       printf("\n");
       fflush(stdout);
@@ -698,21 +693,11 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     arma::cx_mat Cbtilde=sicsolb.C*Wb;
 
     // Stack of density matrices
-    std::vector<arma::mat> Pv(nocca+noccb+2);
-    // First entries are orbital densities
+    std::vector<arma::mat> Pv(nocca+noccb);
     for(size_t io=0;io<nocca;io++)
       Pv[io]=arma::real(Catilde.col(io)*arma::trans(Catilde.col(io)));
     for(size_t io=0;io<noccb;io++)
       Pv[io+nocca]=arma::real(Cbtilde.col(io)*arma::trans(Cbtilde.col(io)));
-
-    // Final element is total density
-    Pv[Pv.size()-2].zeros(Pv[0].n_rows,Pv[0].n_cols);
-    for(size_t io=0;io<nocca;io++)
-      Pv[Pv.size()-2]+=Pv[io];
-
-    Pv[Pv.size()-1].zeros(Pv[0].n_rows,Pv[0].n_cols);
-    for(size_t io=0;io<noccb;io++)
-      Pv[Pv.size()-1]+=Pv[io+nocca];
 
     // Update DFT grid
     Timer tgrid;
@@ -721,7 +706,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       fflush(stdout);
       fprintf(stderr,"\n");
     }
-    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func,false);
+    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func);
     if(verbose) {
       printf("\n");
       fflush(stdout);
