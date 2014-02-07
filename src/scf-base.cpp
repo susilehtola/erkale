@@ -307,6 +307,10 @@ arma::mat SCF::get_Sinvh() const {
   return Sinvh;
 }
 
+arma::mat SCF::get_Hcore() const {
+  return Hcore;
+}
+
 void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid) {
   // Compute the orbital-dependent Fock matrices
   Forb.resize(Ctilde.n_cols);
@@ -1508,6 +1512,16 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     // Solver
     SCF solver(basis,set,chkpt);
 
+    // Core guess?
+    if(guess==COREGUESS) {
+      // Get core Hamiltonian
+      sol.H=solver.get_Hcore();
+      // and diagonalize it to get the orbitals
+      diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
+    }
+    // Form density matrix
+    sol.P=form_density(sol.C,occs);
+
     // Freeze core orbitals?
     if(freezecore) {
       // Localize the core orbitals within the occupied space
@@ -1697,13 +1711,21 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     // Solver
     SCF solver(basis,set,chkpt);
 
+    // Core guess?
+    if(guess==COREGUESS) {
+      // Get core Hamiltonian
+      sol.Ha=solver.get_Hcore();
+      sol.Hb=sol.Ha;
+      // and diagonalize it to get the orbitals
+      diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
+    }
+    // Form density matrix
+    sol.Pa=form_density(sol.Ca,occa);
+    sol.Pb=form_density(sol.Cb,occb);
+    sol.P=sol.Pa+sol.Pb;
+    
     // Freeze core orbitals?
     if(freezecore) {
-      // Form the density matrix
-      sol.Pa=form_density(sol.Ca,occa);
-      sol.Pb=form_density(sol.Cb,occb);
-      sol.P=sol.Pa+sol.Pb;
-
       // Get the natural orbitals
       arma::mat NO;
       arma::vec occs;

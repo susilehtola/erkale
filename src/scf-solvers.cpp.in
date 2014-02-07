@@ -200,47 +200,14 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
   double rmsdiffb=0.0, maxdiffb=0.0;
 #endif
 
-  if(verbose)
-    printf("\n ******* Initialization of run ********\n");
-
 #ifdef RESTRICTED
   if(sol.C.n_rows!=Nbf)
 #else
     if(sol.Ca.n_rows!=Nbf || sol.Cb.n_rows!=Nbf)
 #endif
       {
-
-	if(guess!=COREGUESS)
-	  throw std::runtime_error("No starting guess, and use of core guess disallowed!\n");
-
-#ifdef RESTRICTED
-	if(sol.Heff.n_elem == Hcore.n_elem)
-	  sol.H=Hcore+sol.Heff;
-	else
-	  sol.H=Hcore;
-#else
-	if(sol.Heffa.n_elem == Hcore.n_elem && sol.Heffb.n_elem == Hcore.n_elem) {
-	  sol.Ha=Hcore+sol.Heffa;
-	  sol.Hb=Hcore+sol.Heffb;
-	} else {
-	  sol.Ha=Hcore;
-	  sol.Hb=Hcore;
-	}
-#endif
-
-	diagonalize(S,Sinvh,sol);
-
-	if(verbose)
-	  printf("\nCore guess formed in %s.\n",t.elapsed().c_str());
-
-      } else {
-      // Got correctly sized input guess.
-
-      if(verbose)
-        printf("\nUsing input guess for orbitals.\n");
-    }
-  fflush(stdout);
-
+	throw std::runtime_error("No starting guess provided for SCF solver!\n");
+      }
 
 #if defined(FULLHOLE) || defined(HALFHOLE)
   size_t ixc_orb=0;
