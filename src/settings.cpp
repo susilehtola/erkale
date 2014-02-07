@@ -139,7 +139,7 @@ void Settings::add_dft_settings() {
   // Mode to use PZ-SIC
   add_string("PZ-SICmode", "Mode to use PZ-SIC in. Coul, CoulX, CoulC, CoulXC", "CoulXC");
   // PZ-SIC convergence factor
-  add_double("PZ-SICfac", "Factor for convergence of PZ-SIC", 10.0);
+  add_double("PZ-SICfac", "Factor for convergence of PZ-SIC", 1000.0);
 }
 
 void Settings::add_double(std::string name, std::string comment, double val) {
