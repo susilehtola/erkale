@@ -49,7 +49,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   
   // Don't do PZ-SIC for the initial guess.
   try {
-    set.set_string("PZ-SIC","No");
+    set.set_string("PZ","No");
   } catch(...) {
   }
   
