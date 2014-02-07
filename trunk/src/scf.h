@@ -366,6 +366,8 @@ class SCF {
   arma::mat get_S() const;
   /// Get half-inverse overlap matrix
   arma::mat get_Sinvh() const;
+  /// Get core Hamiltonian matrix
+  arma::mat get_Hcore() const;
 };
 
 /// Diagonalize Fock matrix
