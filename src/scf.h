@@ -151,8 +151,11 @@ typedef struct {
 
 /// Possible guess types
 enum guess_t {
+  /// Core guess
   COREGUESS,
+  /// Atomic guess
   ATOMGUESS,
+  /// Molecular guess
   MOLGUESS
 };
 
@@ -291,7 +294,7 @@ class SCF {
   std::vector<arma::mat> freeze;
 
   /// Helper routine for PZ-SIC
-  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, DFTGrid & grid, double Etol, bool canonical, bool real);
+  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, DFTGrid & grid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool real);
 
  public:
   /// Constructor
@@ -349,9 +352,9 @@ class SCF {
   arma::vec force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol);
 
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, bool canonical=false, bool localize=true, bool real=false);
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false);
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, bool canonical=false, bool localize=true, bool real=false);
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false);
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
@@ -725,8 +728,8 @@ class PZSIC : public Unitary {
   /// SIC Fock operator
   arma::mat HSIC;
 
-  /// Calculate R and K
-  void get_rk(double & R, double & Krms, double & Kmax) const;
+  /// Calculate kappa rms and kappa max
+  void get_k_rms_max(double & Krms, double & Kmax) const;
 
   /// Print legend
   void print_legend() const;

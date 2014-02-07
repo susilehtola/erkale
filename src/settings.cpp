@@ -131,15 +131,28 @@ void Settings::add_dft_settings() {
   add_double("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0);
 
   // Use Perdew-Zunger self-interaction correction?
-  add_double("PZ-SICw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
+  add_double("PZw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
   // Perturbative SIC?
-  add_string("PZ-SIC", "Perform Perdew-Zunger self-interaction correction? No, Pert, Full, Can, CanPert","No");
+  add_string("PZ", "Perform Perdew-Zunger self-interaction correction? No, Pert, Full, Can, CanPert","No");
   // Initialize PZ-SIC with localized orbitals?
-  add_bool("PZ-SICloc", "Use Foster-Boys localized orbitals to initialize SIC?", true);
+  add_bool("PZloc", "Initial localization before SIC calculation?", true);
   // Mode to use PZ-SIC
-  add_string("PZ-SICmode", "Mode to use PZ-SIC in. Coul, CoulX, CoulC, CoulXC", "CoulXC");
-  // PZ-SIC convergence factor
-  add_double("PZ-SICfac", "Factor for convergence of PZ-SIC", 1000.0);
+  add_string("PZmode", "Mode to use PZ-SIC in. Coul, CoulX, CoulC, CoulXC", "CoulXC");
+  // PZ-SIC kappa max
+  add_double("PZKmax", "Threshold for kappa max in unitary optimization", 1e-3);
+  // PZ-SIC kappa rms
+  add_double("PZKrms", "Threshold for kappa rms in unitary optimization", 1e-3);
+  // PZ-SIC energy max
+  add_double("PZEmax", "Threshold for energy change in unitary optimization", 1e-3);
+  // PZ-SIC energy threshold
+  add_double("PZdEmax", "Tolerance threshold for energy convergence", 1e-3);
+  // PZ-SIC density threshold
+  add_double("PZdPmax", "Tolerance threshold for density convergence", 1e-4);
+  add_double("PZdPrms", "Tolerance threshold for density convergence", 1e-5);
+  // PZ-SIC maximum number of iterations in unitary optimization
+  add_int("PZunit", "Max number of iterations in unitary optimization", 10);
+  // PZ-SIC maximum number of iterations in self-consistency cycle
+  add_int("PZiter", "Max number of iterations in self-consistency iteration", 20);
 }
 
 void Settings::add_double(std::string name, std::string comment, double val) {
