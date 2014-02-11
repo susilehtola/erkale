@@ -19,6 +19,7 @@
 #include "mathf.h"
 
 HirshfeldAtom::HirshfeldAtom() {
+  dr=0.0;
 }
 
 HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double drv) {
@@ -58,6 +59,9 @@ HirshfeldAtom::~HirshfeldAtom() {
 }
 
 double HirshfeldAtom::get(double r) const {
+  if(dr==0.0)
+    return 0.0;
+
   // Linear interpolation.
   double rdr=r/dr;
   // Index of entry is
@@ -87,7 +91,10 @@ std::vector<double> HirshfeldAtom::get_rho() const {
 }
 
 double HirshfeldAtom::get_range() const {
-  return (rho.size()-1)*dr;
+  if(rho.size())
+    return (rho.size()-1)*dr;
+  else
+    return 0.0;
 }
 
 Hirshfeld::Hirshfeld() {
