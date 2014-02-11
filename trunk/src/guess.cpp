@@ -21,7 +21,7 @@
 #include "timer.h"
 #include <algorithm>
 
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells) {
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells, int Q) {
   // Nucleus is
   nucleus_t nuc=basis.get_nucleus(inuc);
 
@@ -59,7 +59,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   set.set_bool("UseBroyden",false);
   set.set_bool("UseTRRH",false);
   // and default charge
-  set.set_int("Charge", 0);
+  set.set_int("Charge", Q);
 
   // Method
   set.set_string("Method",method);
@@ -77,13 +77,13 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   // Add the shells relevant for a single atom.
   int ammax;
   if(dropshells) {
-    if(nuc.Z<3)
+    if(nuc.Z-Q<3)
       // Only s electrons up to lithium
       ammax=0;
-    else if(nuc.Z<21)
+    else if(nuc.Z-Q<21)
       // s and p electrons
       ammax=1;
-    else if(nuc.Z<57)
+    else if(nuc.Z-Q<57)
       // s, p and d electrons
       ammax=2;
     else
@@ -107,8 +107,8 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   // Finalize basis set
   atbas.finalize();
   
-  // Determine ground state
-  gs_conf_t gs=get_ground_state(nuc.Z);
+  // Determine ground state of charged species
+  gs_conf_t gs=get_ground_state(nuc.Z-Q);
   
   // Set multiplicity
   set.set_int("Multiplicity",gs.mult);
@@ -151,7 +151,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   free(tmpname);
 }
 
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set) {
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, int Q) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -202,7 +202,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     std::vector<size_t> shellidx;
 
     // Perform the guess
-    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,true);
+    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,true,Q);
     // Get the atomic shells
     std::vector<GaussianShell> shells=atbas.get_funcs(0);
     
