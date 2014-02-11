@@ -20,6 +20,7 @@
 #include "bader.h"
 #include "badergrid.h"
 #include "stockholder.h"
+#include "hirshfeldi.h"
 #include "linalg.h"
 
 void print_analysis(const BasisSet & basis, const std::string & msg, const arma::vec & q) {
@@ -492,6 +493,58 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
 
   q.col(0)=-intgrid.compute_atomic_Nel(hirsh,Pa);
   q.col(1)=-intgrid.compute_atomic_Nel(hirsh,Pb);
+  q.col(2)=q.col(0)+q.col(1);
+
+  return q;
+}
+
+void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol, std::string method) {
+  // Get charges
+  arma::vec q=iterative_hirshfeld_charges(basis,P,tol,method);
+
+  // Add contribution from nuclei
+  q=add_nuclear_charges(basis,q);
+
+  print_analysis(basis,"Iterative Hirshfeld",q);
+}
+
+void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol, std::string method) {
+  // Get charges
+  arma::mat q=iterative_hirshfeld_charges(basis,Pa,Pb,tol,method);
+
+  // Add contribution from nuclei
+  q.col(2)=add_nuclear_charges(basis,q.col(2));
+
+  print_analysis(basis,"Iterative Hirshfeld",q);
+}
+
+arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double tol, std::string method) {
+  arma::vec q(basis.get_Nnuc(),1);
+
+  // Iterative Hirshfeld atomic charges
+  HirshfeldI hirshi(basis,P,method,tol);
+
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,true);
+  // Construct grid
+  intgrid.construct_hirshfeld(hirshi.get(),tol);
+
+  return -intgrid.compute_atomic_Nel(hirshi.get(),P);
+}
+
+arma::mat iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol, std::string method) {
+  arma::mat q(basis.get_Nnuc(),3);
+
+  // Iterative Hirshfeld atomic charges
+  HirshfeldI hirshi(basis,Pa+Pb,method,tol);
+
+  // Helper. Non-verbose operation
+  DFTGrid intgrid(&basis,true);
+  // Construct grid
+  intgrid.construct_hirshfeld(hirshi.get(),tol);
+
+  q.col(0)=-intgrid.compute_atomic_Nel(hirshi.get(),Pa);
+  q.col(1)=-intgrid.compute_atomic_Nel(hirshi.get(),Pb);
   q.col(2)=q.col(0)+q.col(1);
 
   return q;

@@ -78,6 +78,16 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol=
 /// Compute Hirshfeld analysis
 void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
 
+/// Compute iterative Hirshfeld charges
+arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5, std::string method="HF");
+/// Compute iterative Hirshfeld charges
+arma::mat iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
+
+/// Compute iterative Hirshfeld analysis
+void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5, std::string method="HF");
+/// Compute iterative Hirshfeld analysis
+void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
+
 /// Compute Stockholder charges
 arma::vec stockholder_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5);
 /// Compute Stockholder charges
