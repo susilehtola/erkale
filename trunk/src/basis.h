@@ -630,7 +630,7 @@ double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
  *
  * G. Knizia, "Intrinsic Atomic Orbitals: An Unbiased Bridge between
  * Quantum Theory and Chemical Concepts", J. Chem. Theory
- * Comput. XXXX, XXX, XXX−XXX. doi: 10.1021/ct400687b.
+ * Comput. 9, 4834 (2013). doi: 10.1021/ct400687b.
  *
  * The algorithm returns the IAO matrix, and stores the atomic indices
  * in idx.
