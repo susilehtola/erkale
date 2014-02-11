@@ -374,6 +374,11 @@ class DFTGrid {
   /// Evaluate amount of electrons
   double compute_Nel(const arma::mat & Pa, const arma::mat & Pb);
 
+  /// Evaluate amount of electrons in each atomic region
+  arma::vec compute_atomic_Nel(const arma::mat & P);
+  /// Evaluate amount of electrons in each atomic region
+  arma::vec compute_atomic_Nel(const Hirshfeld & hirsh, const arma::mat & P);
+
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, restricted case
   void eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel);
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, unrestricted case

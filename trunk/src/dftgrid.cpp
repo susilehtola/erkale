@@ -214,7 +214,7 @@ void AtomGrid::becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t 
   for(size_t ip=g.sh[ir].ind0;ip<g.sh[ir].ind0+g.sh[ir].np;ip++) {
     // Coordinates of the point are
     coords_t coord_p=grid[ip].r;
-    
+
     // Prescreen - is the weight unity?
     if(normsq(nuccoords[g.atind].r-coord_p) < scrthr)
       // Yes - nothing to do.
@@ -2489,28 +2489,28 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
     printf("\t%4s  %4s  %7s  %10s  %s\n","atom","orb","Npoints","Nfuncs","t");
     fflush(stdout);
   }
-  
+
   // Set tolerances
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_tolerance(tol);
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
-  
+
   Timer t;
-  
+
   const size_t Nat=basp->get_Nnuc();
   const size_t Norb=P.size();
-  
+
   // Orbital grid lists
   std::vector< std::vector<atomgrid_t> > orbgrid(Norb);
   for(size_t iorb=0;iorb<Norb;iorb++)
     orbgrid[iorb].resize(Nat);
-  
+
   // Dummy density matrix
   arma::mat Pdum(P[0]);
   Pdum.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
   {
@@ -2518,7 +2518,7 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
     // Collapse statement introduced in OpenMP 3.0 in May 2008
 #if _OPENMP >= 200805
 #pragma omp for schedule(dynamic,1) collapse(2)
-    for(size_t iat=0;iat<Nat;iat++) 
+    for(size_t iat=0;iat<Nat;iat++)
       for(size_t iorb=0;iorb<Norb;iorb++) {
 #else
 #pragma omp for schedule(dynamic,1)
@@ -2529,7 +2529,7 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
 
 	// Construct the grid
 	orbgrid[iorb][iat]=wrk[ith].construct(*basp,P[iorb],Pdum,iat,x_func,c_func,false);
-	
+
 	// Print out info
 	if(verbose) {
 	  printf("\t%4u  %4u  %7u  %10u  %s\n",(unsigned int) iat+1,(unsigned int) iorb+1,(unsigned int) orbgrid[iorb][iat].ngrid,(unsigned int) orbgrid[iorb][iat].nfunc,toa.elapsed().c_str());
@@ -2541,9 +2541,9 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
   for(size_t iorb=0;iorb<Norb;iorb++)
     for(size_t iat=0;iat<Nat;iat++) {
       Timer toa;
-      
+
       orbgrid[iorb][iat]=wrk[0].construct(*basp,P[iorb],Pdum,iat,x_func,c_func,false);
-      
+
       // Print out info
       if(verbose) {
 	printf("\t%4u  %4u  %7u  %10u  %s\n",(unsigned int) iat+1,(unsigned int) iorb+1,(unsigned int) orbgrid[iorb][iat].ngrid,(unsigned int) orbgrid[iorb][iat].nfunc,toa.elapsed().c_str());
@@ -2551,39 +2551,39 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
       }
     }
 #endif
-  
+
   // Collect orbital grids
   grids.resize(orbgrid[0].size());
   for(size_t iat=0;iat<orbgrid[0].size();iat++) {
     // Initialize atomic grid
     grids[iat]=orbgrid[0][iat];
-    
+
     // Loop over radial shells
     for(size_t irad=0;irad<grids[iat].sh.size();irad++) {
       // Rule order
       int l=orbgrid[0][iat].sh[irad].l;
-      
+
       // Loop over orbitals
       for(size_t iorb=1;iorb<orbgrid.size();iorb++)
 	l=std::max(l,orbgrid[iorb][iat].sh[irad].l);
-      
+
       // Store l
       grids[iat].sh[irad].l=l;
     }
   }
-  
+
   // Update grid sizes
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-    
+
 #ifdef _OPENMP
     int ith=omp_get_thread_num();
 #else
     int ith=0;
 #endif
-    
+
 #ifdef _OPENMP
 #pragma omp for
 #endif
@@ -2597,7 +2597,7 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
     }
   }
 
-  
+
   // Print out info
   if(verbose) {
     printf("Final grid size\n\t%4s  %7s  %10s\n","atom","Npoints","Nfuncs");
@@ -2716,13 +2716,13 @@ arma::mat DFTGrid::eval_overlap(size_t inuc) {
   // Returned matrix
   arma::mat Sat(N,N);
   Sat.zeros();
-  
+
 #ifdef _OPENMP
   int ith=omp_get_thread_num();
 #else
   int ith=0;
 #endif
-  
+
   // Change atom and create grid
   wrk[ith].form_grid(*basp,grids[inuc]);
   // Compute basis functions
@@ -2796,7 +2796,7 @@ arma::mat DFTGrid::eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc) 
   wrk[ith].eval_overlap(Sat);
   // Free memory
   wrk[ith].free();
-  
+
   return Sat;
 }
 
@@ -2882,7 +2882,7 @@ std::vector<dens_list_t> DFTGrid::eval_dens_list(const arma::mat & P) {
 
   // Sort the list
   std::sort(list.begin(),list.end());
-  
+
   return list;
 }
 
@@ -2955,6 +2955,78 @@ double DFTGrid::compute_Nel(const arma::mat & Pa, const arma::mat & Pb) {
 
   return Nel;
 }
+
+arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
+   arma::vec Nel(grids.size());
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    // Loop over integral grid
+    for(size_t inuc=0;inuc<grids.size();inuc++) {
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[inuc]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[inuc]);
+      // Update density
+      wrk[ith].update_density(P);
+      // Integrate electrons
+      Nel[inuc]=wrk[ith].compute_Nel();
+      // Free memory
+      wrk[ith].free();
+    }
+  }
+  
+  return Nel;
+}
+
+
+arma::vec DFTGrid::compute_atomic_Nel(const Hirshfeld & hirsh, const arma::mat & P) {
+   arma::vec Nel(grids.size());
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    // Loop over integral grid
+    for(size_t inuc=0;inuc<grids.size();inuc++) {
+      // Change atom and create grid
+      wrk[ith].form_hirshfeld_grid(hirsh,grids[inuc]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[inuc]);
+      // Update density
+      wrk[ith].update_density(P);
+      // Integrate electrons
+      Nel[inuc]=wrk[ith].compute_Nel();
+      // Free memory
+      wrk[ith].free();
+    }
+  }
+  
+  return Nel;
+}
+
 
 #ifdef CONSISTENCYCHECK
 void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & H, double & Exc, double & Nel) {
@@ -3187,16 +3259,16 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
 	// and construct the Fock matrices
 	Hwrk.zeros(); // need to clear this here
 	wrk[ith].eval_Fxc(Hwrk,Hdum);
-	
+
 	// Accumulate Fock matrix
 #pragma omp critical
 	Ha[ip]+=Hwrk;
       }
     }
-    
+
     // Free memory
     wrk[ith].free();
-    
+
   } // End parallel region
 #else
 
