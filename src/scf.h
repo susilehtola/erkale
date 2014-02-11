@@ -517,6 +517,12 @@ enum locmet {
   PIPEK_HIRSHFELD2,
   /// Pipek-Mezey, Hirshfeld charge, p=4
   PIPEK_HIRSHFELD4,
+  /// Pipek-Mezey, iterative Hirshfeld charge, p=1.5
+  PIPEK_ITERHIRSHH,
+  /// Pipek-Mezey, iterative Hirshfeld charge, p=2
+  PIPEK_ITERHIRSH2,
+  /// Pipek-Mezey, iterative Hirshfeld charge, p=4
+  PIPEK_ITERHIRSH4,
   /// Pipek-Mezey, intrinsic atomic orbital charge, p=1.5
   PIPEK_IAOH,
   /// Pipek-Mezey, intrinsic atomic orbital charge, p=2
@@ -551,6 +557,8 @@ enum chgmet {
   BECKE,
   /// Hirshfeld charge
   HIRSHFELD,
+  /// iterative Hirshfeld charge
+  ITERHIRSH,
   /// intrinsic atomic orbital charge
   IAO,
   /// Stockholder charge

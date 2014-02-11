@@ -29,6 +29,7 @@
 #include "diis.h"
 #include "global.h"
 #include "guess.h"
+#include "hirshfeldi.h"
 #include "linalg.h"
 #include "mathf.h"
 #include "properties.h"
@@ -2365,6 +2366,9 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
 	    met==PIPEK_HIRSHFELDH   ||		\
 	    met==PIPEK_HIRSHFELD2   ||		\
 	    met==PIPEK_HIRSHFELD4   ||		\
+	    met==PIPEK_ITERHIRSHH   ||		\
+	    met==PIPEK_ITERHIRSH2   ||		\
+	    met==PIPEK_ITERHIRSH4   ||		\
 	    met==PIPEK_IAOH         ||		\
 	    met==PIPEK_IAO2         ||		\
 	    met==PIPEK_IAO4         ||		\
@@ -2483,6 +2487,21 @@ void orbital_localization(enum locmet met, const BasisSet & basis, const arma::m
     case(PIPEK_HIRSHFELD4):
       p=4.0;
       chg=HIRSHFELD;
+      break;
+
+    case(PIPEK_ITERHIRSHH):
+      p=1.5;
+      chg=ITERHIRSH;
+      break;
+
+    case(PIPEK_ITERHIRSH2):
+      p=2.0;
+      chg=ITERHIRSH;
+      break;
+
+    case(PIPEK_ITERHIRSH4):
+      p=4.0;
+      chg=ITERHIRSH;
       break;
 
     case(PIPEK_STOCKHOLDERH):
@@ -2967,6 +2986,8 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
       printf("Becke");
     else if(chg==HIRSHFELD)
       printf("Hirshfeld");
+    else if(chg==ITERHIRSH)
+      printf("iterative Hirshfeld");
     else if(chg==IAO)
       printf("IAO");
     else if(chg==LOWDIN)
@@ -3007,6 +3028,20 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     N=basis.get_Nnuc();
     // We don't know method here so just use HF.
     hirsh.compute(basis,"HF");
+
+    // Helper. Non-verbose operation
+    //      DFTGrid intgrid(&basis,false);
+    grid=DFTGrid(&basis,ver);
+    // Construct integration grid
+    grid.construct_hirshfeld(hirsh,1e-5);
+
+  } else if(chg==ITERHIRSH) {
+    // Amount of regions
+    N=basis.get_Nnuc();
+    // Iterative Hirshfeld atomic charges
+    HirshfeldI hirshi(basis,P);
+    // Helper
+    hirsh=hirshi.get();
 
     // Helper. Non-verbose operation
     //      DFTGrid intgrid(&basis,false);
@@ -3090,7 +3125,7 @@ arma::mat Pipek::get_charge(size_t iat) {
     arma::mat Sat=grid.eval_overlap(iat);
     Q=arma::trans(C)*Sat*C;
 
-  } else if(chg==HIRSHFELD || chg==STOCKHOLDER) {
+  } else if(chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER) {
     arma::mat Sat=grid.eval_hirshfeld_overlap(hirsh,iat);
     Q=arma::trans(C)*Sat*C;
 

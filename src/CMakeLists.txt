@@ -27,9 +27,10 @@ properties.cpp checkpoint.cpp guess.cpp external/storage.cpp
 external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp trdsm.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfit.cpp
 chebyshev.cpp density_fitting.cpp lebedev.cpp eriworker_routines.cpp
-unitary.cpp hirshfeld.cpp bader.cpp badergrid.cpp stockholder.cpp
-slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
-atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp)
+unitary.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
+stockholder.cpp slaterfit/solve_coefficients.cpp
+slaterfit/form_exponents.cpp atom/integrals.cpp atom/solvers.cpp
+atom/atomtable.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
