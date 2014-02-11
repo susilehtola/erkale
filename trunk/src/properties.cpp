@@ -424,16 +424,8 @@ arma::vec becke_charges(const BasisSet & basis, const arma::mat & P, double tol)
   DFTGrid intgrid(&basis,true);
   // Construct grid
   intgrid.construct_becke(tol);
-  // Evaluate overlaps
-  std::vector<arma::mat> Sat=intgrid.eval_overlaps();
 
-  // Loop over atoms
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-    // Compute charges
-    q(inuc)=-arma::trace(P*Sat[inuc]);
-  }
-
-  return q;
+  return -intgrid.compute_atomic_Nel(P);
 }
 
 arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
@@ -443,16 +435,10 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma
   DFTGrid intgrid(&basis,true);
   // Construct grid
   intgrid.construct_becke(tol);
-  // Evaluate overlaps
-  std::vector<arma::mat> Sat=intgrid.eval_overlaps();
 
-  // Loop over atoms
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-    // Compute charges
-    q(inuc,0)=-arma::trace(Pa*Sat[inuc]);
-    q(inuc,1)=-arma::trace(Pb*Sat[inuc]);
-    q(inuc,2)=q(inuc,0)+q(inuc,1);
-  }
+  q.col(0)=-intgrid.compute_atomic_Nel(Pa);
+  q.col(1)=-intgrid.compute_atomic_Nel(Pb);
+  q.col(2)=q.col(0)+q.col(1);
 
   return q;
 }
@@ -489,16 +475,7 @@ arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double 
   // Construct grid
   intgrid.construct_hirshfeld(hirsh,tol);
 
-  // Evaluate overlaps
-  std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
-
-  // Loop over atoms
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-    // Compute charges
-    q(inuc)=-arma::trace(P*Sat[inuc]);
-  }
-
-  return q;
+  return -intgrid.compute_atomic_Nel(hirsh,P);
 }
 
 arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol, std::string method) {
@@ -513,16 +490,9 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
   // Construct grid
   intgrid.construct_hirshfeld(hirsh,tol);
 
-  // Evaluate overlaps
-  std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
-
-  // Loop over atoms
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-    // Compute charges
-    q(inuc,0)=-arma::trace(Pa*Sat[inuc]);
-    q(inuc,1)=-arma::trace(Pb*Sat[inuc]);
-    q(inuc,2)=q(inuc,0)+q(inuc,1);
-  }
+  q.col(0)=-intgrid.compute_atomic_Nel(hirsh,Pa);
+  q.col(1)=-intgrid.compute_atomic_Nel(hirsh,Pb);
+  q.col(2)=q.col(0)+q.col(1);
 
   return q;
 }
@@ -560,16 +530,7 @@ arma::vec stockholder_charges(const BasisSet & basis, const arma::mat & P, doubl
   // Construct grid
   intgrid.construct_hirshfeld(hirsh,tol);
 
-  // Evaluate overlaps
-  std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
-
-  // Loop over atoms
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-    // Compute charges
-    q(inuc)=-arma::trace(P*Sat[inuc]);
-  }
-
-  return q;
+  return -intgrid.compute_atomic_Nel(hirsh,P);
 }
 
 arma::mat stockholder_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
@@ -585,16 +546,9 @@ arma::mat stockholder_charges(const BasisSet & basis, const arma::mat & Pa, cons
   // Construct grid
   intgrid.construct_hirshfeld(hirsh,tol);
 
-  // Evaluate overlaps
-  std::vector<arma::mat> Sat=intgrid.eval_hirshfeld_overlaps(hirsh);
-
-  // Loop over atoms
-  for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
-    // Compute charges
-    q(inuc,0)=-arma::trace(Pa*Sat[inuc]);
-    q(inuc,1)=-arma::trace(Pb*Sat[inuc]);
-    q(inuc,2)=q(inuc,0)+q(inuc,1);
-  }
+  q.col(0)=-intgrid.compute_atomic_Nel(hirsh,Pa);
+  q.col(1)=-intgrid.compute_atomic_Nel(hirsh,Pb);
+  q.col(2)=q.col(0)+q.col(1);
 
   return q;
 }
