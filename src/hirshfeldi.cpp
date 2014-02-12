@@ -44,8 +44,6 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
 
   // Loop over list of identical nuclei. (Can't parallellize here because of HDF)
   for(size_t i=0;i<idnuc.size();i++) {
-    Timer tat;
-    
     // Get the nucleus
     nucleus_t nuc=basis.get_nucleus(idnuc[i][0]);
 
@@ -57,6 +55,8 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
     
     // Loop over acceptable charge states
     for(int q=std::max(1,nuc.Z-dqmax);q<=nuc.Z+dqmax;q++) {
+      Timer tatq;
+
       // Charge difference to neutral species is
       int dq=q-nuc.Z;
 
@@ -76,8 +76,9 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
 	atQ[idnuc[i][j]][dq+dqmax]=q;
       }
 
-      if(verbose)
-	printf("\t%4i %-2s %6i %s\n",(int) idnuc[i][0]+1, element_symbols[nuc.Z].c_str(),dq,tat.elapsed().c_str());
+      if(verbose) {
+	printf("\t%4i %-2s %6i %s\n",(int) idnuc[i][0]+1, element_symbols[nuc.Z].c_str(),dq,tatq.elapsed().c_str());
+      }
     }
   }
 
