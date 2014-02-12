@@ -32,9 +32,12 @@
  * However, contrary to the above paper, this version uses atomic
  * densities of the method used in the main calculation instead of ROHF.
  *
+ * sphave toggles occupancy smearing over subshells, e.g. for boron
+ * alpha electrons, px, py and pz have 1/3 occupation.
+ *
  * Optional charge given as input.
  */
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, int Q=0);
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, bool dropshells=true, bool sphave=true, int Q=0);
 
 /**
  * Worker routine - perform guess for inuc:th atom in basis, using given method.
@@ -43,9 +46,12 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
  *
  * If dropshells is true, shells with large angular momentum are not included in the calcuation, e.g. the P shell for H and He.
  *
+ * sphave toggles occupancy smearing over subshells, e.g. for boron
+ * alpha electrons, px, py and pz have 1/3 occupation.
+ *
  * Optional charge given as input.
  */
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells, int Q=0);
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells, bool sphave, int Q);
 
 /// Determine list of identical nuclei, determined by nucleus and basis set
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);
