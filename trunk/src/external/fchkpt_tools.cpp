@@ -663,30 +663,34 @@ BasisSet form_basis(const Storage & stor) {
     }
 
     if(shtypes[ish]==-1) {
-      // SP shell. Add S shell first.
+      // SP shell.
 
-      std::vector<contr_t> Cs(C);
+      // p contraction coefficients are in P(S=P) block
+      std::vector<contr_t> Cp(C);
       for(int ip=0;ip<nprim[ish];ip++) {
-	Cs[ip].c=spcoeff[iprim+ip];
+	Cp[ip].c=spcoeff[iprim+ip];
       }
 
-      bas.add_shell(nucind,0,false,Cs,false);
+      // s comes first
+      bas.add_shell(nucind,0,false,C,false);
+      // and then p
+      bas.add_shell(nucind,1,false,Cp,false);
+    } else {
+      // Add shell. Angular momentum is
+      int am=abs(shtypes[ish]);
+      // Use spherical harmonics on shell?
+      bool lm=(shtypes[ish]<-1);
+      
+      // Add shell
+      bas.add_shell(nucind,am,lm,C,false);
+      
+      // Increment primitive index
+      iprim+=nprim[ish];
     }
-
-    // Add shell. Angular momentum is
-    int am=abs(shtypes[ish]);
-    // Use spherical harmonics on shell?
-    bool lm=(shtypes[ish]<-1);
-
-    GaussianShell sh(am,lm,C);
-    bas.add_shell(nucind,sh,false);
-
-    // Increment primitive index
-    iprim+=nprim[ish];
   }
 
-  // Finalize basis set, converting contraction coefficients.
-  bas.finalize(true);
+  // Finalize basis set, converting contraction coefficients and normalizing.
+  bas.finalize(true,true);
 
   // Check that we get the same amount of basis functions
   if((int) bas.get_Nbf() != stor.get_int("Number of basis functions")) {
