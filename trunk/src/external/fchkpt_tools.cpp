@@ -683,10 +683,10 @@ BasisSet form_basis(const Storage & stor) {
       
       // Add shell
       bas.add_shell(nucind,am,lm,C,false);
-      
-      // Increment primitive index
-      iprim+=nprim[ish];
     }
+      
+    // Increment primitive index
+    iprim+=nprim[ish];
   }
 
   // Finalize basis set, converting contraction coefficients and normalizing.
