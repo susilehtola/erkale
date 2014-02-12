@@ -17,17 +17,21 @@
 #include "hirshfeld.h"
 #include "guess.h"
 #include "mathf.h"
+#include "lebedev.h"
 
 HirshfeldAtom::HirshfeldAtom() {
   dr=0.0;
 }
 
-HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double drv) {
+HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double drv, int lmax) {
   // Set spacing
   dr=drv;
 
   // Value of density
   double d;
+
+  // Get Lebedev rule
+  std::vector<lebedev_point_t> ang=lebedev_sphere(lmax);
 
   /// Fill out grid
   while(true) {
@@ -36,11 +40,19 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
 
     // Helper
     coords_t hlp;
-    hlp.x=hlp.y=0.0;
-    hlp.z=r;
 
-    // Compute density
-    d=compute_density(P,basis,hlp);
+    // Compute spherical average
+    d=0.0;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(size_t iang=0;iang<ang.size();iang++) {
+      hlp.x=r*ang[iang].x;
+      hlp.y=r*ang[iang].y;
+      hlp.z=r*ang[iang].z;
+      // Compute density
+      d+=ang[iang].w*compute_density(P,basis,hlp);
+    }
     // Add to stack
     rho.push_back(d);
     // Stop iteration?
