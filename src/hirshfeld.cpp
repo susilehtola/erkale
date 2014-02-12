@@ -131,7 +131,8 @@ void Hirshfeld::compute(const BasisSet & basis, std::string method) {
     arma::mat atP;
     BasisSet atbas;
     std::vector<size_t> shellidx;
-    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,false);
+    // Don't drop polarization shells but do occupation smearing. Charge is 0
+    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,false,true,0);
 
     // Construct atom
     HirshfeldAtom at(atbas,atP);

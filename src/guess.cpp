@@ -21,7 +21,7 @@
 #include "timer.h"
 #include <algorithm>
 
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells, int Q) {
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells, bool sphave, int Q) {
   // Nucleus is
   nucleus_t nuc=basis.get_nucleus(inuc);
 
@@ -55,6 +55,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   
   // Use default convergence settings
   set.set_bool("UseDIIS",true);
+  set.set_int("DIISOrder",20);
   set.set_bool("UseADIIS",true);
   set.set_bool("UseBroyden",false);
   set.set_bool("UseTRRH",false);
@@ -118,7 +119,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
 
   // Get occupancies
   std::vector<double> occa, occb;
-  get_unrestricted_occupancy(set,atbas,occa,occb,true);
+  get_unrestricted_occupancy(set,atbas,occa,occb,sphave);
 
   // Pad to same length
   while(occb.size()<occa.size())
@@ -151,7 +152,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   free(tmpname);
 }
 
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, int Q) {
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, bool dropshells, bool sphave, int Q) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -202,7 +203,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     std::vector<size_t> shellidx;
 
     // Perform the guess
-    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,true,Q);
+    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,dropshells,sphave,Q);
     // Get the atomic shells
     std::vector<GaussianShell> shells=atbas.get_funcs(0);
     

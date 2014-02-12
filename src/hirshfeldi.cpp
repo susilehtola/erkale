@@ -26,14 +26,6 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
 
   Timer ttot;
   
-  // Use decontracted basis set, because charged species have different core functions
-  BasisSet decbas;
-  {
-    arma::mat dummy;
-    decbas=basis.decontract(dummy);
-    decbas.finalize();
-  }
-
   // Store atomic centers.
   cen.resize(basis.get_Nnuc());
   for(size_t i=0;i<cen.size();i++)
@@ -44,7 +36,7 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
   atQ.resize(basis.get_Nnuc());
 
   // Get list of identical nuclei
-  std::vector< std::vector<size_t> > idnuc=identical_nuclei(decbas);
+  std::vector< std::vector<size_t> > idnuc=identical_nuclei(basis);
 
   Timer t;
   if(verbose)
@@ -55,7 +47,7 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
     Timer tat;
     
     // Get the nucleus
-    nucleus_t nuc=decbas.get_nucleus(idnuc[i][0]);
+    nucleus_t nuc=basis.get_nucleus(idnuc[i][0]);
 
     // Resize storage
     for(size_t j=0;j<idnuc[i].size();j++) {
@@ -73,7 +65,8 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
       arma::mat atP;
       BasisSet atbas;
       std::vector<size_t> shellidx;
-      atomic_guess(decbas,idnuc[i][0],method,shellidx,atbas,atE,atP,false,dq);
+      // Don't drop polarization shells, but do occupation smearing
+      atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,false,true,dq);
       
       // Construct atom
       HirshfeldAtom at(atbas,atP,dr);
@@ -97,7 +90,7 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
   // Starting guess: neutral species
   arma::vec q(cen.size());
   for(size_t i=0;i<cen.size();i++) {
-    nucleus_t nuc=decbas.get_nucleus(i);
+    nucleus_t nuc=basis.get_nucleus(i);
     if(nuc.bsse)
       q[i]=0.0;
     else
