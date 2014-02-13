@@ -27,9 +27,6 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
   // Set spacing
   dr=drv;
 
-  // Value of density
-  double d;
-
   // Get Lebedev rule
   std::vector<lebedev_point_t> ang=lebedev_sphere(lmax);
 
@@ -38,15 +35,14 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
     // Compute radius
     double r=rho.size()*dr;
 
-    // Helper
-    coords_t hlp;
-
     // Compute spherical average
-    d=0.0;
+    double d=0.0;
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for reduction(+:d)
 #endif
     for(size_t iang=0;iang<ang.size();iang++) {
+      // Helper
+      coords_t hlp;
       hlp.x=r*ang[iang].x;
       hlp.y=r*ang[iang].y;
       hlp.z=r*ang[iang].z;
@@ -107,6 +103,14 @@ double HirshfeldAtom::get_range() const {
     return (rho.size()-1)*dr;
   else
     return 0.0;
+}
+
+double HirshfeldAtom::compute_moment(int k) const {
+  double m=0.0;
+  for(size_t i=0;i<rho.size();i++)
+    m+=std::pow(i*dr,k+2)*rho[i];
+  
+  return m*dr;
 }
 
 Hirshfeld::Hirshfeld() {
@@ -181,6 +185,10 @@ double Hirshfeld::get_weight(size_t inuc, const coords_t & r) const {
 
 double Hirshfeld::get_range(size_t inuc) const {
   return atoms[inuc].get_range();
+}
+
+double Hirshfeld::compute_moment(size_t inuc, int n) const {
+  return atoms[inuc].compute_moment(n);
 }
 
 void Hirshfeld::print_densities() const {

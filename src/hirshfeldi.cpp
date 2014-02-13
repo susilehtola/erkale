@@ -25,7 +25,7 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
   dr=drv;
 
   Timer ttot;
-  
+
   // Store atomic centers.
   cen.resize(basis.get_Nnuc());
   for(size_t i=0;i<cen.size();i++)
@@ -53,13 +53,13 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
       atQ[idnuc[i][j]].assign(2*dqmax+1,0.0);
     }
     
-    // Loop over acceptable charge states
-    for(int q=std::max(1,nuc.Z-dqmax);q<=nuc.Z+dqmax;q++) {
+    // Loop over electron count
+    for(int nel=std::max(1,nuc.Z-dqmax);nel<=nuc.Z+dqmax;nel++) {
       Timer tatq;
 
-      // Charge difference to neutral species is
-      int dq=q-nuc.Z;
-
+      // Charge difference of system is
+      int dq=nuc.Z-nel;
+      
       // Perform guess
       arma::vec atE;
       arma::mat atP;
@@ -70,10 +70,12 @@ HirshfeldI::HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string 
       
       // Construct atom
       HirshfeldAtom at(atbas,atP,dr);
+      // get the density
+      std::vector<double> d=at.get_rho();
       // and store it
       for(size_t j=0;j<idnuc[i].size();j++) {
-	atoms[idnuc[i][j]][dq+dqmax]=at.get_rho();
-	atQ[idnuc[i][j]][dq+dqmax]=q;
+	atoms[idnuc[i][j]][dqmax-dq]=d;
+	atQ[idnuc[i][j]][dqmax-dq]=nel;
       }
 
       if(verbose) {
@@ -178,7 +180,7 @@ Hirshfeld HirshfeldI::get(const arma::vec & Q) {
     for(upl=1;upl<atoms[i].size();upl++)
       if(atQ[i][upl] >= Q[i])
 	break;
-
+    
     if(Q[i]<atQ[i][0] || upl==atoms[i].size()) {
       printf("Charge on atom %i is %e.\n",(int) i+1, Q[i]);
       printf("Charge array:");
@@ -195,6 +197,7 @@ Hirshfeld HirshfeldI::get(const arma::vec & Q) {
     // Form linear combination
     double uc=Q[i]-atQ[i][upl-1];
     double lc=1.0-uc;
+    //    printf("Chosen combination is %e (%i) + %e (%i)\n",lc,atQ[i][upl-1],uc,atQ[i][upl]);
 
     // Initialize
     rho[i].resize(std::max(atoms[i][upl].size(),atoms[i][upl-1].size()));
@@ -217,6 +220,7 @@ Hirshfeld HirshfeldI::get(const arma::vec & Q) {
   // Returned object
   Hirshfeld hirsh;
   hirsh.set(cen,dr,rho);
+
   return hirsh;
 }
 

@@ -35,7 +35,7 @@ class HirshfeldAtom {
   /// Dummy constructor
   HirshfeldAtom();
   /// Constructor
-  HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double dr=0.01, int lmax=31);
+  HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double dr=0.001, int lmax=31);
   /// Constructor, given input density
   HirshfeldAtom(double dr, const std::vector<double> & rho);
   /// Destructor
@@ -51,6 +51,8 @@ class HirshfeldAtom {
 
   /// Get the range of the atom
   double get_range() const;
+  /// Calculate expectation values of radius (already includes r^2 factor)
+  double compute_moment(int n) const;
 };
 
 /// Hirshfeld atomic densities
@@ -81,6 +83,8 @@ class Hirshfeld {
   double get_weight(size_t inuc, const coords_t & r) const;
   /// Get range of atom
   double get_range(size_t inuc) const;
+  /// Calculate expectation values of radius (already includes r^2 factor)
+  double compute_moment(size_t inuc, int n) const;
 
   /// Print densities
   void print_densities() const;
