@@ -46,7 +46,7 @@ class HirshfeldI {
 
  public:
   /// Constructor. Tolerance for change in the integral \f$ \int_0^\infty r^2 | \rho_n(r) - \rho_o(r) | dr \f$, grid spacing, and change in charge species to compute
-  HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string method="HF", double tol=1e-5, double dr=0.01, int dq=2, bool verbose=true);
+  HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string method="HF", double tol=1e-5, double dr=0.001, int dq=2, bool verbose=true);
   /// Destructor
   ~HirshfeldI();
 
