@@ -14,7 +14,9 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "checkpoint.h"
 #include "hirshfeld.h"
+#include "elements.h"
 #include "guess.h"
 #include "mathf.h"
 #include "lebedev.h"
@@ -23,9 +25,22 @@ HirshfeldAtom::HirshfeldAtom() {
   dr=0.0;
 }
 
-HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double drv, int lmax) {
+HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double drv) {
   // Set spacing
   dr=drv;
+
+  if(basis.get_Nnuc()>1) {
+    ERROR_INFO();
+    fprintf(stderr,"Warning - more than one nucleus in system!\n");
+  }
+  if(basis.get_Nnuc()==0) {
+    throw std::runtime_error("No nucleus in system!\n");
+  }
+  // Get coordinates of nucleus
+  coords_t nuc=basis.get_nuclear_coords(0);
+
+  // Maximum component that can appear in density is 2L.
+  int lmax=next_lebedev(2*basis.get_max_am());
 
   // Get Lebedev rule
   std::vector<lebedev_point_t> ang=lebedev_sphere(lmax);
@@ -46,8 +61,8 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
       hlp.x=r*ang[iang].x;
       hlp.y=r*ang[iang].y;
       hlp.z=r*ang[iang].z;
-      // Compute density
-      d+=ang[iang].w*compute_density(P,basis,hlp);
+      // Compute density (relative to nucleus)
+      d+=ang[iang].w*compute_density(P,basis,hlp-nuc);
     }
     // Add to stack
     rho.push_back(d);
@@ -78,13 +93,6 @@ double HirshfeldAtom::get(double r) const {
   // Check limit
   if(i>=rho.size()-1)
     return 0.0;
-
-  /*  
-  if(rho[i+1]>0.0 && rho[i]>0.0)
-    // Perform logarithmic interpolation
-    return rho[i]*pow(rho[i+1]/rho[i],rdr-i);
-  else
-  */
 
   // Perform linear intepolation
   return rho[i] + (rho[i+1]-rho[i])*(rdr-i);
@@ -144,6 +152,56 @@ void Hirshfeld::compute(const BasisSet & basis, std::string method) {
     for(size_t j=0;j<idnuc[i].size();j++)
       atoms[idnuc[i][j]]=at;
   }
+}
+
+void Hirshfeld::load(const BasisSet & basis) {
+  // Store atomic centers.
+  cen.resize(basis.get_Nnuc());
+  for(size_t i=0;i<cen.size();i++)
+    cen[i]=basis.get_nucleus(i).r;
+
+  // Reserve memory for atomic densities
+  atoms.resize(basis.get_Nnuc());
+
+  // Get list of nuclei
+  std::vector<nucleus_t> nuc=basis.get_nuclei();
+  // Get list of elements in system
+  std::vector< std::vector<size_t> > Zv(maxZ+1);
+  for(size_t i=0;i<nuc.size();i++) {
+    if(nuc[i].bsse)
+      continue;
+    Zv[nuc[i].Z].push_back(i);
+  }
+
+  // Loop over elements
+  for(size_t Z=0;Z<Zv.size();Z++)
+    if(Zv[Z].size()) {
+      // Load checkpoint
+      std::string chkname=element_symbols[Z]+"_0.chk";
+      Checkpoint chkpt(chkname,false);
+      
+      // Load basis set and density matrix
+      BasisSet bas;
+      chkpt.read(bas);
+
+      arma::mat P;
+      chkpt.read("P",P);
+
+      // Check norm of density matrix
+      double Nel=arma::trace(P*bas.overlap());
+      if(fabs(Nel-Z)>1e-3) {
+	ERROR_INFO();
+	std::ostringstream oss;
+	oss << "Loaded density matrix for " << element_symbols[Z] << " contains " << Nel << " electrons!\n";
+	throw std::runtime_error(oss.str());
+      }
+
+      // Construct atom
+      HirshfeldAtom at(bas,P);
+      // and store it
+      for(size_t j=0;j<Zv[Z].size();j++)
+	atoms[Zv[Z][j]]=at;
+    }
 }
 
 Hirshfeld::~Hirshfeld() {

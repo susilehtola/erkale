@@ -3039,7 +3039,8 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Amount of regions
     N=basis.get_Nnuc();
     // Iterative Hirshfeld atomic charges
-    HirshfeldI hirshi(basis,P);
+    HirshfeldI hirshi;
+    hirshi.compute(basis,P);
     // Helper
     hirsh=hirshi.get();
 

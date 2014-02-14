@@ -69,24 +69,24 @@ void becke_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5
 void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5);
 
 /// Compute Hirshfeld charges
-arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5, std::string method="HF");
+arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method="HF", double tol=1e-5);
 /// Compute Hirshfeld charges
-arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method="HF", double tol=1e-5);
 
 /// Compute Hirshfeld analysis
-void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5, std::string method="HF");
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method="HF", double tol=1e-5);
 /// Compute Hirshfeld analysis
-void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method="HF", double tol=1e-5);
 
 /// Compute iterative Hirshfeld charges
-arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5, std::string method="HF");
+arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method="HF", double tol=1e-5);
 /// Compute iterative Hirshfeld charges
-arma::mat iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
+arma::mat iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method="HF", double tol=1e-5);
 
 /// Compute iterative Hirshfeld analysis
-void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol=1e-5, std::string method="HF");
+void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method="HF", double tol=1e-5);
 /// Compute iterative Hirshfeld analysis
-void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol=1e-5, std::string method="HF");
+void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method="HF", double tol=1e-5);
 
 /// Compute Stockholder charges
 arma::vec stockholder_charges(const BasisSet & basis, const arma::mat & P, double tol=1e-5);

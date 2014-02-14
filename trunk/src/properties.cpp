@@ -444,9 +444,9 @@ arma::mat becke_charges(const BasisSet & basis, const arma::mat & Pa, const arma
   return q;
 }
 
-void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol, std::string method) {
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method, double tol) {
   // Get charges
-  arma::vec q=hirshfeld_charges(basis,P,tol,method);
+  arma::vec q=hirshfeld_charges(basis,P,method,tol);
 
   // Add contribution from nuclei
   q=add_nuclear_charges(basis,q);
@@ -454,9 +454,9 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol,
   print_analysis(basis,"Hirshfeld",q);
 }
 
-void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol, std::string method) {
+void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double tol) {
   // Get charges
-  arma::mat q=hirshfeld_charges(basis,Pa,Pb,tol,method);
+  arma::mat q=hirshfeld_charges(basis,Pa,Pb,method,tol);
 
   // Add contribution from nuclei
   q.col(2)=add_nuclear_charges(basis,q.col(2));
@@ -464,12 +464,15 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma
   print_analysis(basis,"Hirshfeld",q);
 }
 
-arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double tol, std::string method) {
+arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double tol) {
   arma::vec q(basis.get_Nnuc(),1);
 
   // Hirshfeld atomic charges
   Hirshfeld hirsh;
-  hirsh.compute(basis,method);
+  if(stricmp(method,"Load")==0)
+    hirsh.load(basis);
+  else
+    hirsh.compute(basis,method);
 
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,true);
@@ -479,12 +482,15 @@ arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double 
   return -intgrid.compute_atomic_Nel(hirsh,P);
 }
 
-arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol, std::string method) {
+arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double tol) {
   arma::mat q(basis.get_Nnuc(),3);
 
   // Hirshfeld atomic charges
   Hirshfeld hirsh;
-  hirsh.compute(basis,method);
+  if(stricmp(method,"Load")==0)
+    hirsh.load(basis);
+  else
+    hirsh.compute(basis,method);
 
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,true);
@@ -498,9 +504,9 @@ arma::mat hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const 
   return q;
 }
 
-void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, double tol, std::string method) {
+void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, std::string method, double tol) {
   // Get charges
-  arma::vec q=iterative_hirshfeld_charges(basis,P,tol,method);
+  arma::vec q=iterative_hirshfeld_charges(basis,P,method,tol);
 
   // Add contribution from nuclei
   q=add_nuclear_charges(basis,q);
@@ -508,9 +514,9 @@ void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & P, d
   print_analysis(basis,"Iterative Hirshfeld",q);
 }
 
-void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol, std::string method) {
+void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double tol) {
   // Get charges
-  arma::mat q=iterative_hirshfeld_charges(basis,Pa,Pb,tol,method);
+  arma::mat q=iterative_hirshfeld_charges(basis,Pa,Pb,method,tol);
 
   // Add contribution from nuclei
   q.col(2)=add_nuclear_charges(basis,q.col(2));
@@ -518,11 +524,15 @@ void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, 
   print_analysis(basis,"Iterative Hirshfeld",q);
 }
 
-arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & P, double tol, std::string method) {
+arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double tol) {
   arma::vec q(basis.get_Nnuc(),1);
 
   // Iterative Hirshfeld atomic charges
-  HirshfeldI hirshi(basis,P,method,tol);
+  HirshfeldI hirshi;
+  if(stricmp(method,"Load")==0)
+    hirshi.compute_load(basis,P,tol);
+  else
+    hirshi.compute(basis,P,method,tol);
 
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,true);
@@ -532,11 +542,15 @@ arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & 
   return -intgrid.compute_atomic_Nel(hirshi.get(),P);
 }
 
-arma::mat iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol, std::string method) {
+arma::mat iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, std::string method, double tol) {
   arma::mat q(basis.get_Nnuc(),3);
 
   // Iterative Hirshfeld atomic charges
-  HirshfeldI hirshi(basis,Pa+Pb,method,tol);
+  HirshfeldI hirshi;
+  if(stricmp(method,"Load")==0)
+    hirshi.compute_load(basis,Pa+Pb,tol);
+  else
+    hirshi.compute(basis,Pa+Pb,method,tol);
 
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,true);

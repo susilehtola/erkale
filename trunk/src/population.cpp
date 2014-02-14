@@ -68,6 +68,7 @@ int main(int argc, char **argv) {
   set.add_bool("IAO", "Run Intrinsic Atomic Orbital analysis?", false);
   set.add_string("IAOBasis", "Minimal basis set for IAO analysis", "MINAO.gbs");
   set.add_bool("Hirshfeld", "Run Hirshfeld analysis?", false);
+  set.add_string("HirshfeldMethod", "Method to use for Hirshfeld(-I) analysis", "HF");
   set.add_bool("IterativeHirshfeld", "Run iterative Hirshfeld analysis?", false);
   set.add_bool("Stockholder", "Run Stockholder analysis?", false);
   set.add_bool("Voronoi", "Run Voronoi analysis?", false);
@@ -119,18 +120,20 @@ int main(int argc, char **argv) {
       becke_analysis(basis,Pa,Pb,tol);
   }
 
+  std::string hmet=set.get_string("HirshfeldMethod");
+
   if(set.get_bool("Hirshfeld")) {
     if(restr)
-      hirshfeld_analysis(basis,P,tol);
+      hirshfeld_analysis(basis,P,hmet,tol);
     else
-      hirshfeld_analysis(basis,Pa,Pb,tol);
+      hirshfeld_analysis(basis,Pa,Pb,hmet,tol);
   }
 
   if(set.get_bool("IterativeHirshfeld")) {
     if(restr)
-      iterative_hirshfeld_analysis(basis,P,tol);
+      iterative_hirshfeld_analysis(basis,P,hmet,tol);
     else
-      iterative_hirshfeld_analysis(basis,Pa,Pb,tol);
+      iterative_hirshfeld_analysis(basis,Pa,Pb,hmet,tol);
   }
 
   if(set.get_bool("IAO")) {

@@ -39,16 +39,23 @@ class HirshfeldI {
   /// Grid spacing
   double dr;
 
+  /// Solve the charges
+  void solve(const BasisSet & basis, const arma::mat & P, double tol, bool verbose);
   /// Iteratively refine charges
   void iterate(const BasisSet & basis, const arma::mat & P, arma::vec & q, double tol, bool verbose);
   /// Get new Hirshfeld composition
   Hirshfeld get(const arma::vec & Q);
 
  public:
-  /// Constructor. Tolerance for change in the integral \f$ \int_0^\infty r^2 | \rho_n(r) - \rho_o(r) | dr \f$, grid spacing, and change in charge species to compute
-  HirshfeldI(const BasisSet & basis, const arma::mat & P, std::string method="HF", double tol=1e-5, double dr=0.001, int dq=2, bool verbose=true);
+  /// Dummy constructor
+  HirshfeldI();
   /// Destructor
   ~HirshfeldI();
+
+  /// Compute decomposition. Tolerance for change in the integral \f$ \int_0^\infty r^2 | \rho_n(r) - \rho_o(r) | dr \f$, grid spacing, and change in charge species to compute.
+  void compute(const BasisSet & basis, const arma::mat & P, std::string method="HF", double tol=1e-5, double dr=0.001, int dq=2, bool verbose=true);
+  /// Compute decomposition, but load atomic densities from files.
+  void compute_load(const BasisSet & basis, const arma::mat & P, double tol=1e-5, double dr=0.001, int dq=2, bool verbose=true);
 
   /// Get the decomposition
   Hirshfeld get() const;
