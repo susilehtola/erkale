@@ -505,7 +505,38 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Eeff;
   sol.en.E=sol.en.Eel+sol.en.Enucr;
 
-  // Sanity check
+  // Sanity checks
+#ifdef RESTRICTED
+  if(!arma::is_finite(sol.H)) {
+    ERROR_INFO();
+    sol.C.print("C");
+    sol.P.print("P");
+    sol.H.print("H");
+    throw std::runtime_error("Fock operator is not finite.\n");
+  }
+#else
+  if(!arma::is_finite(sol.Ha)) {
+    ERROR_INFO();
+    sol.Ca.print("Ca");
+    sol.Cb.print("Cb");
+    sol.Pa.print("Pa");
+    sol.Pb.print("Pb");
+    sol.Ha.print("Ha");
+    sol.Hb.print("Hb");
+    throw std::runtime_error("Alpha Fock operator is not finite.\n");
+  }
+  if(!arma::is_finite(sol.Hb)) {
+    ERROR_INFO();
+    sol.Ca.print("Ca");
+    sol.Cb.print("Cb");
+    sol.Pa.print("Pa");
+    sol.Pb.print("Pb");
+    sol.Ha.print("Ha");
+    sol.Hb.print("Hb");
+    throw std::runtime_error("Beta Fock operator is not finite.\n");
+  }
+#endif
+
   if(!std::isfinite(sol.en.E)) {
     ERROR_INFO();
 
