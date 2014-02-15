@@ -30,6 +30,8 @@
 
 /// Mu increment
 #define DELTAMU 1.0
+/// Minimal allowed value for level shift
+#define EPSILONMU 1e-4
 
 /// Throw error if eigenvalues of K^2 are bigger than (should be negative!)
 #define MAXNEGEIG 1e-4
@@ -88,15 +90,17 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
     }
 
   // Get (approximation to) smallest negative eigenvalue
-  double minhess=0.0;
-  for(size_t a=0;a<nvirt;a++)
-    for(size_t i=0;i<nocc;i++)
-      if(hess(a,i)<minhess)
-	minhess=hess(a,i);
+  double minhess=hess.min();
 
   // Print legend
-  if(verbose)
+  if(verbose) {
     printf("\t%2s %12s %5s time\n","it","mu","Amin");
+    fflush(stdout);
+  }
+
+  // Check shift value is sane
+  if(minshift<EPSILONMU)
+    minshift=EPSILONMU;
 
   // Increase mu until the change is small enough
   const double fac=2.0;
@@ -107,12 +111,11 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
   bool refine=false;
   double lmu=0.0;
   double rmu=0.0;
-
-
+  
   while(true) {
     iit++;
     Timer t;
-
+    
     // Value of mu is
     if(!refine)
       mu*=fac;
@@ -137,16 +140,15 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
     arma::mat proj=arma::trans(C.submat(0,0,nbf-1,nocc-1))*S*Cnew.submat(0,0,nbf-1,nocc-1);
     for(size_t i=0;i<nocc;i++) {
       // Compute projection
-      double a=0.0;
-      for(size_t j=0;j<nocc;j++)
-	a+=proj(i,j)*proj(i,j);
-
+      double a=arma::dot(proj.row(i),proj.row(i));
       if(a<amin)
 	amin=a;
     }
 
-    if(verbose)
+    if(verbose) {
       printf("\t%2i %e %.3f %s\n",(int) iit,mu,amin,t.elapsed().c_str());
+      fflush(stdout);
+    }
 
     // Have we reached the refine stage?
     if(amin>=MINA && !refine) {
@@ -172,8 +174,10 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
     }
   }
 
-  if(verbose)
+  if(verbose) {
     printf("mu loop converged in %i iterations\n",(int) iit);
+    fflush(stdout);
+  }
 
   // Make absolutely sure orbitals stay orthonormal.
   for(size_t i=0;i<norbs;i++) {
