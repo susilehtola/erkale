@@ -266,7 +266,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
   if(verbose) {
     if(kfrac!=0.0)
-      printf("\nUsing hybrid exchange with % .3f of exact exchange.\n",kfrac*100);
+      printf("\nUsing hybrid exchange with % .3f %% of exact exchange.\n",kfrac*100);
     else
       printf("\nA pure exchange functional used, no exact exchange.\n");
   }
