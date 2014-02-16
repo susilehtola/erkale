@@ -339,12 +339,13 @@ void Checkpoint::write(const BasisSet & basis) {
   hid_t dataset;
 
   /* First, write out nuclei. */
-
   nuc_t nucs[Nnuc];
+  // Silence valgrind warning
+  memset(nucs,0,Nnuc*sizeof(nuc_t));
   for(size_t i=0;i<Nnuc;i++) {
     // Get nucleus
     nucleus_t n=basis.get_nucleus(i);
-
+    
     // Store data
     nucs[i].ind=n.ind;
     nucs[i].rx=n.r.x;
@@ -352,7 +353,7 @@ void Checkpoint::write(const BasisSet & basis) {
     nucs[i].rz=n.r.z;
     nucs[i].Z=n.Z;
     nucs[i].bsse=n.bsse;
-    strncpy(nucs[i].sym,n.symbol.c_str(),SYMLEN-1);
+    strncpy(nucs[i].sym,n.symbol.c_str(),SYMLEN);
   }
 
   datatype = H5Tcreate(H5T_COMPOUND, sizeof(nuc_t));
