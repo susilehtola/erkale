@@ -88,6 +88,26 @@ typedef struct {
 /// Helper for sort
 bool operator<(const dens_list_t & lhs, const dens_list_t & rhs);
 
+/// Helper for debugging output
+typedef struct {
+  /// Alpha and beta density
+  double rhoa, rhob;
+  /// Sigma variables
+  double sigmaaa, sigmaab, sigmabb;
+  /// Laplacians
+  double lapla, laplb;
+  /// Kinetic energy density
+  double taua, taub;
+
+  /// Alpha and beta potential
+  double vrhoa, vrhob;
+  /// Sigma potential
+  double vsigmaaa, vsigmaab, vsigmabb;
+  /// Laplacian potential
+  double vlapla, vlaplb;
+  /// Kinetic energy potential
+  double vtaua, vtaub;
+} libxc_debug_t;
 
 /**
  * \class AtomGrid
@@ -196,6 +216,10 @@ class AtomGrid {
 
   /// Use Lobatto quadrature? (Default is Lebedev)
   bool use_lobatto;
+
+  /// Get data for wanted point
+  libxc_debug_t get_data(size_t idx, bool mgga, bool gga, const std::vector<double> & vxc_wrk, const std::vector<double> & vsigma_wrk, const std::vector<double> & vlapl_wrk, const std::vector<double> & \
+vtau_wrk) const;
 
  public:
   /// Constructor. Need to set tolerance as well before using constructor!
