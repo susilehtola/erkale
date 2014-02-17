@@ -42,6 +42,9 @@
 // Compute closed-shell result from open-shell result
 //#define CONSISTENCYCHECK
 
+// Check libxc output for sanity
+//#define LIBXCCHECK
+
 bool operator<(const dens_list_t &lhs, const dens_list_t & rhs) {
   // Sort in decreasing order
   return lhs.d > rhs.d;
@@ -612,6 +615,31 @@ void AtomGrid::init_xc() {
     vtau[i]=0.0;
 }
 
+void check_array(const std::vector<double> & x, size_t n, std::vector<size_t> & idx) {
+  if(x.size()%n!=0) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Size of array " << x.size() << " is not divisible by " << n << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  for(size_t i=0;i<x.size()/n;i++) {
+    // Check for failed entry
+    bool fail=false;
+    for(size_t j=0;j<n;j++)
+      if(!std::isfinite(x[i*n+j]))
+	fail=true;
+
+    // If failed i is not in the list, add it
+    if(fail) {
+      if (!std::binary_search (idx.begin(), idx.end(), i)) {
+	idx.push_back(i);
+	std::sort(idx.begin(),idx.end());
+      }
+    }
+  }
+}
+
 void AtomGrid::compute_xc(int func_id) {
   // Compute exchange-correlation functional
 
@@ -658,6 +686,153 @@ void AtomGrid::compute_xc(int func_id) {
   else // LDA
     xc_lda_exc_vxc(&func, N, &rho[0], &exc_wrk[0], &vxc_wrk[0]);
 
+#ifdef LIBXCCHECK
+  {
+    // Length of entries
+    size_t Nlapl, Ntau, Nsigma, Nxc;
+    if(polarized) {
+      Nlapl=2;
+      Ntau=2;
+      Nsigma=3;
+      Nxc=2;
+    } else {
+      Nlapl=1;
+      Ntau=1;
+      Nsigma=1;
+      Nxc=1;
+    }
+    
+    // List of failed entries
+    std::vector<size_t> failed;
+    if(mgga) {
+      check_array(lapl_rho,Nlapl,failed);
+      check_array(tau,Ntau,failed);
+      check_array(sigma,Nsigma,failed);
+      check_array(rho,Nxc,failed);
+
+      check_array(vlapl_wrk,Nlapl,failed);
+      check_array(vtau_wrk,Ntau,failed);
+      check_array(vsigma_wrk,Nsigma,failed);
+      check_array(vxc_wrk,Nxc,failed);
+    } else if(gga) {
+      check_array(sigma,Nsigma,failed);
+      check_array(rho,Nxc,failed);
+
+      check_array(vsigma_wrk,Nsigma,failed);
+      check_array(vxc_wrk,Nxc,failed);
+    } else {
+      check_array(rho,Nxc,failed);
+      check_array(vxc_wrk,Nxc,failed);
+    }
+
+    // Print out failed entries
+    for(size_t i=0;i<failed.size();i++) {
+      // Index is
+      size_t idx=failed[i];
+
+      // Alpha and beta density
+      double rhoa=0.0, rhob=0.0;
+     
+      // Sigma variables
+      double sigmaaa=0.0, sigmaab=0.0, sigmabb=0.0;
+      
+      // Laplacians
+      double lapla=0.0, laplb=0.0;
+      
+      // Kinetic energy density
+      double taua=0.0, taub=0.0;
+
+      // Alpha and beta potential
+      double vrhoa=0.0, vrhob=0.0;
+     
+      // Sigma variables
+      double vsigmaaa=0.0, vsigmaab=0.0, vsigmabb=0.0;
+      
+      // Laplacians
+      double vlapla=0.0, vlaplb=0.0;
+      
+      // Kinetic energy density
+      double vtaua=0.0, vtaub=0.0;
+      
+      if(mgga) {
+	if(polarized) {
+	  lapla=lapl_rho[2*idx];
+	  laplb=lapl_rho[2*idx+1];
+	  taua=tau[2*idx];
+	  taub=tau[2*idx+1];
+
+	  sigmaaa=sigma[3*idx];
+	  sigmaab=sigma[3*idx+1];
+	  sigmabb=sigma[3*idx+2];
+	  
+	  rhoa=rho[2*idx];
+	  rhob=rho[2*idx+1];
+
+	  vlapla=vlapl_wrk[2*idx];
+	  vlaplb=vlapl_wrk[2*idx+1];
+	  vtaua=vtau_wrk[2*idx];
+	  vtaub=vtau_wrk[2*idx+1];
+
+	  vsigmaaa=vsigma_wrk[3*idx];
+	  vsigmaab=vsigma_wrk[3*idx+1];
+	  vsigmabb=vsigma_wrk[3*idx+2];
+	  
+	  vrhoa=vxc_wrk[2*idx];
+	  vrhob=vxc_wrk[2*idx+1];
+	} else {
+	  lapla=laplb=lapl_rho[idx]/2.0;
+	  taua=taub=tau[idx]/2.0;
+	  sigmaaa=sigmaab=sigmabb=sigma[idx]/4.0;
+	  rhoa=rhob=rho[idx]/2.0;
+
+	  vlapla=vlaplb=vlapl_wrk[idx];
+	  vtaua=vtaub=vtau_wrk[idx];
+	  vsigmaaa=vsigmaab=vsigmabb=vsigma_wrk[idx];
+	  vrhoa=vrhob=vxc_wrk[idx];
+	}
+      } else if(gga) {
+	if(polarized) {
+	  sigmaaa=sigma[3*idx];
+	  sigmaab=sigma[3*idx+1];
+	  sigmabb=sigma[3*idx+2];
+	  
+	  rhoa=rho[2*idx];
+	  rhob=rho[2*idx+1];
+
+	  vsigmaaa=vsigma_wrk[3*idx];
+	  vsigmaab=vsigma_wrk[3*idx+1];
+	  vsigmabb=vsigma_wrk[3*idx+2];
+	  
+	  vrhoa=vxc_wrk[2*idx];
+	  vrhob=vxc_wrk[2*idx+1];
+	} else {
+	  sigmaaa=sigmaab=sigmabb=sigma[idx]/4.0;
+	  rhoa=rhob=rho[idx]/2.0;
+
+	  vsigmaaa=vsigmaab=vsigmabb=vsigma_wrk[idx];
+	  vrhoa=vrhob=vxc_wrk[idx];
+	}
+      } else {
+	if(polarized) {
+	  rhoa=rho[2*idx];
+	  rhob=rho[2*idx+1];
+
+	  vrhoa=vxc_wrk[2*idx];
+	  vrhob=vxc_wrk[2*idx+1];
+	} else {
+	  rhoa=rhob=rho[idx]/2.0;
+
+	  vrhoa=vrhob=vxc_wrk[idx];
+	}
+      }
+      
+      // Spin
+      printf("%i %e %e %e %e %e %e %e %e %e\n",nspin,rhoa,rhob,sigmaaa,sigmaab,sigmabb,lapla,laplb,taua,taub);
+      printf("----> %e %e %e %e %e %e %e %e %e\n",vrhoa,vrhob,vsigmaaa,vsigmaab,vsigmabb,vlapla,vlaplb,vtaua,vtaub);
+    }
+  }
+#endif
+
   // Sum to total arrays containing both exchange and correlation
   for(size_t i=0;i<exc.size();i++)
     exc[i]+=exc_wrk[i];
@@ -669,41 +844,6 @@ void AtomGrid::compute_xc(int func_id) {
     vlapl[i]+=vlapl_wrk[i];
   for(size_t i=0;i<vtau.size();i++)
     vtau[i]+=vtau_wrk[i];
-
-  /*
-  // Sanity check
-  size_t nerr=0;
-  for(size_t i=0;i<exc.size();i++)
-    if(std::isnan(exc_wrk[i])) {
-      nerr++;
-      fprintf(stderr,"exc[%i]=%e\n",(int) i, exc_wrk[i]);
-    }
-  for(size_t i=0;i<vxc.size();i++)
-    if(std::isnan(vxc_wrk[i])) {
-      nerr++;
-      fprintf(stderr,"rho[%i]=%e, vxc[%i]=%e\n",(int) i, rho[i],(int) i, vxc_wrk[i]);
-    }
-  for(size_t i=0;i<vsigma.size();i++)
-    if(std::isnan(vsigma_wrk[i])) {
-      nerr++;
-      fprintf(stderr,"sigma[%i]=%e, vsigma[%i]=%e\n",(int) i, sigma[i],(int) i, vsigma_wrk[i]);
-    }
-  for(size_t i=0;i<vtau.size();i++)
-    if(std::isnan(vtau_wrk[i])) {
-      nerr++;
-      fprintf(stderr,"tau[%i]=%e, vtau[%i]=%e\n",(int) i, tau[i],(int) i, vtau_wrk[i]);
-    }
-  for(size_t i=0;i<vlapl.size();i++)
-    if(std::isnan(vlapl_wrk[i])) {
-      nerr++;
-      fprintf(stderr,"lapl[%i]=%e, vlapl[%i]=%e\n",(int) i, lapl_rho[i],(int) i, vlapl_wrk[i]);
-    }
-
-  if(nerr!=0) {
-    fprintf(stderr,"%u errors with funcid=%i.\n",(unsigned int) nerr, func_id);
-    throw std::runtime_error("NaN error\n");
-  }
-  */
 
   // Free functional
   xc_func_end(&func);
