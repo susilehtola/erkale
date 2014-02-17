@@ -729,107 +729,37 @@ void AtomGrid::compute_xc(int func_id) {
     for(size_t i=0;i<failed.size();i++) {
       // Index is
       size_t idx=failed[i];
-
-      // Alpha and beta density
-      double rhoa=0.0, rhob=0.0;
-     
-      // Sigma variables
-      double sigmaaa=0.0, sigmaab=0.0, sigmabb=0.0;
       
-      // Laplacians
-      double lapla=0.0, laplb=0.0;
-      
-      // Kinetic energy density
-      double taua=0.0, taub=0.0;
+      // Get data
+      libxc_debug_t d=get_data(idx,mgga,gga,vxc_wrk,vsigma_wrk,vlapl_wrk,vtau_wrk);
 
-      // Alpha and beta potential
-      double vrhoa=0.0, vrhob=0.0;
-     
-      // Sigma variables
-      double vsigmaaa=0.0, vsigmaab=0.0, vsigmabb=0.0;
-      
-      // Laplacians
-      double vlapla=0.0, vlaplb=0.0;
-      
-      // Kinetic energy density
-      double vtaua=0.0, vtaub=0.0;
-      
-      if(mgga) {
-	if(polarized) {
-	  lapla=lapl_rho[2*idx];
-	  laplb=lapl_rho[2*idx+1];
-	  taua=tau[2*idx];
-	  taub=tau[2*idx+1];
-
-	  sigmaaa=sigma[3*idx];
-	  sigmaab=sigma[3*idx+1];
-	  sigmabb=sigma[3*idx+2];
-	  
-	  rhoa=rho[2*idx];
-	  rhob=rho[2*idx+1];
-
-	  vlapla=vlapl_wrk[2*idx];
-	  vlaplb=vlapl_wrk[2*idx+1];
-	  vtaua=vtau_wrk[2*idx];
-	  vtaub=vtau_wrk[2*idx+1];
-
-	  vsigmaaa=vsigma_wrk[3*idx];
-	  vsigmaab=vsigma_wrk[3*idx+1];
-	  vsigmabb=vsigma_wrk[3*idx+2];
-	  
-	  vrhoa=vxc_wrk[2*idx];
-	  vrhob=vxc_wrk[2*idx+1];
-	} else {
-	  lapla=laplb=lapl_rho[idx]/2.0;
-	  taua=taub=tau[idx]/2.0;
-	  sigmaaa=sigmaab=sigmabb=sigma[idx]/4.0;
-	  rhoa=rhob=rho[idx]/2.0;
-
-	  vlapla=vlaplb=vlapl_wrk[idx];
-	  vtaua=vtaub=vtau_wrk[idx];
-	  vsigmaaa=vsigmaab=vsigmabb=vsigma_wrk[idx];
-	  vrhoa=vrhob=vxc_wrk[idx];
-	}
-      } else if(gga) {
-	if(polarized) {
-	  sigmaaa=sigma[3*idx];
-	  sigmaab=sigma[3*idx+1];
-	  sigmabb=sigma[3*idx+2];
-	  
-	  rhoa=rho[2*idx];
-	  rhob=rho[2*idx+1];
-
-	  vsigmaaa=vsigma_wrk[3*idx];
-	  vsigmaab=vsigma_wrk[3*idx+1];
-	  vsigmabb=vsigma_wrk[3*idx+2];
-	  
-	  vrhoa=vxc_wrk[2*idx];
-	  vrhob=vxc_wrk[2*idx+1];
-	} else {
-	  sigmaaa=sigmaab=sigmabb=sigma[idx]/4.0;
-	  rhoa=rhob=rho[idx]/2.0;
-
-	  vsigmaaa=vsigmaab=vsigmabb=vsigma_wrk[idx];
-	  vrhoa=vrhob=vxc_wrk[idx];
-	}
-      } else {
-	if(polarized) {
-	  rhoa=rho[2*idx];
-	  rhob=rho[2*idx+1];
-
-	  vrhoa=vxc_wrk[2*idx];
-	  vrhob=vxc_wrk[2*idx+1];
-	} else {
-	  rhoa=rhob=rho[idx]/2.0;
-
-	  vrhoa=vrhob=vxc_wrk[idx];
-	}
-      }
-      
-      // Spin
-      printf("%i %e %e %e %e %e %e %e %e %e\n",nspin,rhoa,rhob,sigmaaa,sigmaab,sigmabb,lapla,laplb,taua,taub);
-      printf("----> %e %e %e %e %e %e %e %e %e\n",vrhoa,vrhob,vsigmaaa,vsigmaab,vsigmabb,vlapla,vlaplb,vtaua,vtaub);
+      // Print out data
+      printf("%3i %2i % e % e % e % e % e % e % e % e % e\n",func_id,nspin,d.rhoa,d.rhob,d.sigmaaa,d.sigmaab,d.sigmabb,d.lapla,d.laplb,d.taua,d.taub);
+      printf("-----> % e % e % e % e % e % e % e % e % e\n",d.vrhoa,d.vrhob,d.vsigmaaa,d.vsigmaab,d.vsigmabb,d.vlapla,d.vlaplb,d.vtaua,d.vtaub);
     }
+  }
+
+  // Save out all data
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+  {
+    // Open in append mode
+    FILE *dens=fopen("densdata.dat","a");
+    FILE *pot=fopen("xcdata.dat","a");
+    
+    // Loop over grid points
+    for(size_t i=0;i<grid.size();i++) {
+      // Get data in point
+      libxc_debug_t data=get_data(i,mgga,gga,vxc_wrk,vsigma_wrk,vlapl_wrk,vtau_wrk);
+      
+      // Print out data
+      fprintf(dens,"%3i %2i % e % e % e % e % e % e % e % e % e\n",func_id,nspin,data.rhoa,data.rhob,data.sigmaaa,data.sigmaab,data.sigmabb,data.lapla,data.laplb,data.taua,data.taub);
+      fprintf(pot, "%3i %2i % e % e % e % e % e % e % e % e % e\n",func_id,nspin,data.vrhoa,data.vrhob,data.vsigmaaa,data.vsigmaab,data.vsigmabb,data.vlapla,data.vlaplb,data.vtaua,data.vtaub);
+    }
+    
+    fclose(dens);
+    fclose(pot);
   }
 #endif
 
@@ -847,6 +777,118 @@ void AtomGrid::compute_xc(int func_id) {
 
   // Free functional
   xc_func_end(&func);
+}
+
+libxc_debug_t AtomGrid::get_data(size_t idx, bool mgga, bool gga, const std::vector<double> & vxc_wrk, const std::vector<double> & vsigma_wrk, const std::vector<double> & vlapl_wrk, const std::vector<double> & vtau_wrk) const {
+  libxc_debug_t ret;
+
+  // Alpha and beta density
+  ret.rhoa=0.0;
+  ret.rhob=0.0;
+  
+  // Sigma variables
+  ret.sigmaaa=0.0;
+  ret.sigmaab=0.0;
+  ret.sigmabb=0.0;
+      
+  // Laplacians
+  ret.lapla=0.0;
+  ret.laplb=0.0;
+      
+  // Kinetic energy density
+  ret.taua=0.0;
+  ret.taub=0.0;
+
+  // Alpha and beta potential
+  ret.vrhoa=0.0;
+  ret.vrhob=0.0;
+  
+  // Sigma variables
+  ret.vsigmaaa=0.0;
+  ret.vsigmaab=0.0;
+  ret.vsigmabb=0.0;
+  
+  // Laplacians
+  ret.vlapla=0.0;
+  ret.vlaplb=0.0;
+      
+  // Kinetic energy density
+  ret.vtaua=0.0;
+  ret.vtaub=0.0;
+  
+  if(mgga) {
+    if(polarized) {
+      ret.lapla=lapl_rho[2*idx];
+      ret.laplb=lapl_rho[2*idx+1];
+      ret.taua=tau[2*idx];
+      ret.taub=tau[2*idx+1];
+      
+      ret.sigmaaa=sigma[3*idx];
+      ret.sigmaab=sigma[3*idx+1];
+      ret.sigmabb=sigma[3*idx+2];
+	  
+      ret.rhoa=rho[2*idx];
+      ret.rhob=rho[2*idx+1];
+
+      ret.vlapla=vlapl_wrk[2*idx];
+      ret.vlaplb=vlapl_wrk[2*idx+1];
+      ret.vtaua=vtau_wrk[2*idx];
+      ret.vtaub=vtau_wrk[2*idx+1];
+
+      ret.vsigmaaa=vsigma_wrk[3*idx];
+      ret.vsigmaab=vsigma_wrk[3*idx+1];
+      ret.vsigmabb=vsigma_wrk[3*idx+2];
+	  
+      ret.vrhoa=vxc_wrk[2*idx];
+      ret.vrhob=vxc_wrk[2*idx+1];
+    } else {
+      ret.lapla=ret.laplb=lapl_rho[idx]/2.0;
+      ret.taua=ret.taub=tau[idx]/2.0;
+      ret.sigmaaa=ret.sigmaab=ret.sigmabb=sigma[idx]/4.0;
+      ret.rhoa=ret.rhob=rho[idx]/2.0;
+
+      ret.vlapla=ret.vlaplb=vlapl_wrk[idx];
+      ret.vtaua=ret.vtaub=vtau_wrk[idx];
+      ret.vsigmaaa=ret.vsigmaab=ret.vsigmabb=vsigma_wrk[idx];
+      ret.vrhoa=ret.vrhob=vxc_wrk[idx];
+    }
+  } else if(gga) {
+    if(polarized) {
+      ret.sigmaaa=sigma[3*idx];
+      ret.sigmaab=sigma[3*idx+1];
+      ret.sigmabb=sigma[3*idx+2];
+      
+      ret.rhoa=rho[2*idx];
+      ret.rhob=rho[2*idx+1];
+      
+      ret.vsigmaaa=vsigma_wrk[3*idx];
+      ret.vsigmaab=vsigma_wrk[3*idx+1];
+      ret.vsigmabb=vsigma_wrk[3*idx+2];
+	  
+      ret.vrhoa=vxc_wrk[2*idx];
+      ret.vrhob=vxc_wrk[2*idx+1];
+    } else {
+      ret.sigmaaa=ret.sigmaab=ret.sigmabb=sigma[idx]/4.0;
+      ret.rhoa=ret.rhob=rho[idx]/2.0;
+      
+      ret.vsigmaaa=ret.vsigmaab=ret.vsigmabb=vsigma_wrk[idx];
+      ret.vrhoa=ret.vrhob=vxc_wrk[idx];
+    }
+  } else {
+    if(polarized) {
+      ret.rhoa=rho[2*idx];
+      ret.rhob=rho[2*idx+1];
+
+      ret.vrhoa=vxc_wrk[2*idx];
+      ret.vrhob=vxc_wrk[2*idx+1];
+    } else {
+      ret.rhoa=ret.rhob=rho[idx]/2.0;
+      
+      ret.vrhoa=ret.vrhob=vxc_wrk[idx];
+    }
+  }
+
+  return ret;
 }
 
 double AtomGrid::eval_Exc() const {
