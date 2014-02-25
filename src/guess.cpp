@@ -108,6 +108,18 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   // Finalize basis set
   atbas.finalize();
   
+  // Sanity check for "artificial" basis sets (e.g. only f functions)
+  if(ammax < basis.get_max_am() && (int) atbas.get_Nbf()<nuc.Z-Q) {
+    // Add the rest of the shells
+    for(size_t ish=0;ish<shells.size();ish++)
+      if(shells[ish].get_am()>ammax) {
+	atbas.add_shell(0,shells[ish],false);
+	shellidx.push_back(ish);
+      }
+    // Refinalize
+    atbas.finalize();
+  }
+  
   // Determine ground state of charged species
   gs_conf_t gs=get_ground_state(nuc.Z-Q);
   
