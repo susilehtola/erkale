@@ -686,83 +686,6 @@ void AtomGrid::compute_xc(int func_id) {
   else // LDA
     xc_lda_exc_vxc(&func, N, &rho[0], &exc_wrk[0], &vxc_wrk[0]);
 
-#ifdef LIBXCCHECK
-  {
-    // Length of entries
-    size_t Nlapl, Ntau, Nsigma, Nxc;
-    if(polarized) {
-      Nlapl=2;
-      Ntau=2;
-      Nsigma=3;
-      Nxc=2;
-    } else {
-      Nlapl=1;
-      Ntau=1;
-      Nsigma=1;
-      Nxc=1;
-    }
-    
-    // List of failed entries
-    std::vector<size_t> failed;
-    if(mgga) {
-      check_array(lapl_rho,Nlapl,failed);
-      check_array(tau,Ntau,failed);
-      check_array(sigma,Nsigma,failed);
-      check_array(rho,Nxc,failed);
-
-      check_array(vlapl_wrk,Nlapl,failed);
-      check_array(vtau_wrk,Ntau,failed);
-      check_array(vsigma_wrk,Nsigma,failed);
-      check_array(vxc_wrk,Nxc,failed);
-    } else if(gga) {
-      check_array(sigma,Nsigma,failed);
-      check_array(rho,Nxc,failed);
-
-      check_array(vsigma_wrk,Nsigma,failed);
-      check_array(vxc_wrk,Nxc,failed);
-    } else {
-      check_array(rho,Nxc,failed);
-      check_array(vxc_wrk,Nxc,failed);
-    }
-
-    // Print out failed entries
-    for(size_t i=0;i<failed.size();i++) {
-      // Index is
-      size_t idx=failed[i];
-      
-      // Get data
-      libxc_debug_t d=get_data(idx,mgga,gga,vxc_wrk,vsigma_wrk,vlapl_wrk,vtau_wrk);
-
-      // Print out data
-      printf("%3i %2i % e % e % e % e % e % e % e % e % e\n",func_id,nspin,d.rhoa,d.rhob,d.sigmaaa,d.sigmaab,d.sigmabb,d.lapla,d.laplb,d.taua,d.taub);
-      printf("-----> % e % e % e % e % e % e % e % e % e\n",d.vrhoa,d.vrhob,d.vsigmaaa,d.vsigmaab,d.vsigmabb,d.vlapla,d.vlaplb,d.vtaua,d.vtaub);
-    }
-  }
-
-  // Save out all data
-#ifdef _OPENMP
-#pragma omp critical
-#endif
-  {
-    // Open in append mode
-    FILE *dens=fopen("densdata.dat","a");
-    FILE *pot=fopen("xcdata.dat","a");
-    
-    // Loop over grid points
-    for(size_t i=0;i<grid.size();i++) {
-      // Get data in point
-      libxc_debug_t data=get_data(i,mgga,gga,vxc_wrk,vsigma_wrk,vlapl_wrk,vtau_wrk);
-      
-      // Print out data
-      fprintf(dens,"%3i %2i % e % e % e % e % e % e % e % e % e\n",func_id,nspin,data.rhoa,data.rhob,data.sigmaaa,data.sigmaab,data.sigmabb,data.lapla,data.laplb,data.taua,data.taub);
-      fprintf(pot, "%3i %2i % e % e % e % e % e % e % e % e % e\n",func_id,nspin,data.vrhoa,data.vrhob,data.vsigmaaa,data.vsigmaab,data.vsigmabb,data.vlapla,data.vlaplb,data.vtaua,data.vtaub);
-    }
-    
-    fclose(dens);
-    fclose(pot);
-  }
-#endif
-
   // Sum to total arrays containing both exchange and correlation
   for(size_t i=0;i<exc.size();i++)
     exc[i]+=exc_wrk[i];
@@ -779,8 +702,36 @@ void AtomGrid::compute_xc(int func_id) {
   xc_func_end(&func);
 }
 
-libxc_debug_t AtomGrid::get_data(size_t idx, bool mgga, bool gga, const std::vector<double> & vxc_wrk, const std::vector<double> & vsigma_wrk, const std::vector<double> & vlapl_wrk, const std::vector<double> & vtau_wrk) const {
-  libxc_debug_t ret;
+void AtomGrid::print_density(FILE *f) const {
+  // Loop over grid points
+  for(size_t i=0;i<grid.size();i++) {
+    // Get data in point
+    libxc_dens_t d=get_dens(i);
+    
+    // Print out data
+    fprintf(f,"% .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e\n",d.rhoa,d.rhob,d.sigmaaa,d.sigmaab,d.sigmabb,d.lapla,d.laplb,d.taua,d.taub);
+  }
+}
+
+void AtomGrid::print_potential(int func_id, FILE *f) const {
+  // Loop over grid points
+  for(size_t i=0;i<grid.size();i++) {
+    // Get data in point
+    libxc_pot_t d=get_pot(i);
+
+    int nspin;
+    if(polarized)
+      nspin=XC_POLARIZED;
+    else
+      nspin=XC_POLARIZED;
+    
+    // Print out data
+    fprintf(f, "%3i %2i % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e\n",func_id,nspin,d.vrhoa,d.vrhob,d.vsigmaaa,d.vsigmaab,d.vsigmabb,d.vlapla,d.vlaplb,d.vtaua,d.vtaub);
+  }
+}
+
+libxc_dens_t AtomGrid::get_dens(size_t idx) const {
+  libxc_dens_t ret;
 
   // Alpha and beta density
   ret.rhoa=0.0;
@@ -799,6 +750,59 @@ libxc_debug_t AtomGrid::get_data(size_t idx, bool mgga, bool gga, const std::vec
   ret.taua=0.0;
   ret.taub=0.0;
 
+  if(do_mgga) {
+    if(polarized) {
+      ret.lapla=lapl_rho[2*idx];
+      ret.laplb=lapl_rho[2*idx+1];
+      ret.taua=tau[2*idx];
+      ret.taub=tau[2*idx+1];
+      
+      ret.sigmaaa=sigma[3*idx];
+      ret.sigmaab=sigma[3*idx+1];
+      ret.sigmabb=sigma[3*idx+2];
+	  
+      ret.rhoa=rho[2*idx];
+      ret.rhob=rho[2*idx+1];
+    } else {
+      ret.lapla=ret.laplb=lapl_rho[idx]/2.0;
+      ret.taua=ret.taub=tau[idx]/2.0;
+      ret.sigmaaa=ret.sigmaab=ret.sigmabb=sigma[idx]/4.0;
+      ret.rhoa=ret.rhob=rho[idx]/2.0;
+    }
+  } else if(do_gga) {
+    if(polarized) {
+      ret.sigmaaa=sigma[3*idx];
+      ret.sigmaab=sigma[3*idx+1];
+      ret.sigmabb=sigma[3*idx+2];
+      
+      ret.rhoa=rho[2*idx];
+      ret.rhob=rho[2*idx+1];
+    } else {
+      ret.sigmaaa=ret.sigmaab=ret.sigmabb=sigma[idx]/4.0;
+      ret.rhoa=ret.rhob=rho[idx]/2.0;
+    }
+  } else {
+    if(polarized) {
+      ret.rhoa=rho[2*idx];
+      ret.rhob=rho[2*idx+1];
+    } else {
+      ret.rhoa=ret.rhob=rho[idx]/2.0;
+    }
+  }
+
+  return ret;
+}
+
+libxc_debug_t AtomGrid::get_data(size_t idx) const {
+  libxc_debug_t d;
+  d.dens=get_dens(idx);
+  d.pot=get_pot(idx);
+  return d;
+}
+
+libxc_pot_t AtomGrid::get_pot(size_t idx) const {
+  libxc_pot_t ret;
+
   // Alpha and beta potential
   ret.vrhoa=0.0;
   ret.vrhob=0.0;
@@ -816,75 +820,43 @@ libxc_debug_t AtomGrid::get_data(size_t idx, bool mgga, bool gga, const std::vec
   ret.vtaua=0.0;
   ret.vtaub=0.0;
   
-  if(mgga) {
+  if(do_mgga) {
     if(polarized) {
-      ret.lapla=lapl_rho[2*idx];
-      ret.laplb=lapl_rho[2*idx+1];
-      ret.taua=tau[2*idx];
-      ret.taub=tau[2*idx+1];
-      
-      ret.sigmaaa=sigma[3*idx];
-      ret.sigmaab=sigma[3*idx+1];
-      ret.sigmabb=sigma[3*idx+2];
-	  
-      ret.rhoa=rho[2*idx];
-      ret.rhob=rho[2*idx+1];
+      ret.vlapla=vlapl[2*idx];
+      ret.vlaplb=vlapl[2*idx+1];
+      ret.vtaua=vtau[2*idx];
+      ret.vtaub=vtau[2*idx+1];
 
-      ret.vlapla=vlapl_wrk[2*idx];
-      ret.vlaplb=vlapl_wrk[2*idx+1];
-      ret.vtaua=vtau_wrk[2*idx];
-      ret.vtaub=vtau_wrk[2*idx+1];
-
-      ret.vsigmaaa=vsigma_wrk[3*idx];
-      ret.vsigmaab=vsigma_wrk[3*idx+1];
-      ret.vsigmabb=vsigma_wrk[3*idx+2];
+      ret.vsigmaaa=vsigma[3*idx];
+      ret.vsigmaab=vsigma[3*idx+1];
+      ret.vsigmabb=vsigma[3*idx+2];
 	  
-      ret.vrhoa=vxc_wrk[2*idx];
-      ret.vrhob=vxc_wrk[2*idx+1];
+      ret.vrhoa=vxc[2*idx];
+      ret.vrhob=vxc[2*idx+1];
     } else {
-      ret.lapla=ret.laplb=lapl_rho[idx]/2.0;
-      ret.taua=ret.taub=tau[idx]/2.0;
-      ret.sigmaaa=ret.sigmaab=ret.sigmabb=sigma[idx]/4.0;
-      ret.rhoa=ret.rhob=rho[idx]/2.0;
-
-      ret.vlapla=ret.vlaplb=vlapl_wrk[idx];
-      ret.vtaua=ret.vtaub=vtau_wrk[idx];
-      ret.vsigmaaa=ret.vsigmaab=ret.vsigmabb=vsigma_wrk[idx];
-      ret.vrhoa=ret.vrhob=vxc_wrk[idx];
+      ret.vlapla=ret.vlaplb=vlapl[idx];
+      ret.vtaua=ret.vtaub=vtau[idx];
+      ret.vsigmaaa=ret.vsigmaab=ret.vsigmabb=vsigma[idx];
+      ret.vrhoa=ret.vrhob=vxc[idx];
     }
-  } else if(gga) {
+  } else if(do_gga) {
     if(polarized) {
-      ret.sigmaaa=sigma[3*idx];
-      ret.sigmaab=sigma[3*idx+1];
-      ret.sigmabb=sigma[3*idx+2];
-      
-      ret.rhoa=rho[2*idx];
-      ret.rhob=rho[2*idx+1];
-      
-      ret.vsigmaaa=vsigma_wrk[3*idx];
-      ret.vsigmaab=vsigma_wrk[3*idx+1];
-      ret.vsigmabb=vsigma_wrk[3*idx+2];
+      ret.vsigmaaa=vsigma[3*idx];
+      ret.vsigmaab=vsigma[3*idx+1];
+      ret.vsigmabb=vsigma[3*idx+2];
 	  
-      ret.vrhoa=vxc_wrk[2*idx];
-      ret.vrhob=vxc_wrk[2*idx+1];
+      ret.vrhoa=vxc[2*idx];
+      ret.vrhob=vxc[2*idx+1];
     } else {
-      ret.sigmaaa=ret.sigmaab=ret.sigmabb=sigma[idx]/4.0;
-      ret.rhoa=ret.rhob=rho[idx]/2.0;
-      
-      ret.vsigmaaa=ret.vsigmaab=ret.vsigmabb=vsigma_wrk[idx];
-      ret.vrhoa=ret.vrhob=vxc_wrk[idx];
+      ret.vsigmaaa=ret.vsigmaab=ret.vsigmabb=vsigma[idx];
+      ret.vrhoa=ret.vrhob=vxc[idx];
     }
   } else {
     if(polarized) {
-      ret.rhoa=rho[2*idx];
-      ret.rhob=rho[2*idx+1];
-
-      ret.vrhoa=vxc_wrk[2*idx];
-      ret.vrhob=vxc_wrk[2*idx+1];
+      ret.vrhoa=vxc[2*idx];
+      ret.vrhob=vxc[2*idx+1];
     } else {
-      ret.rhoa=ret.rhob=rho[idx]/2.0;
-      
-      ret.vrhoa=ret.vrhob=vxc_wrk[idx];
+      ret.vrhoa=ret.vrhob=vxc[idx];
     }
   }
 
@@ -3608,3 +3580,127 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
 
   return f;
 }
+
+void DFTGrid::print_density_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string densname, std::string potname) {
+
+  // Open output files
+  FILE *dens=fopen(densname.c_str(),"w");
+  FILE *pot=fopen(potname.c_str(),"w");
+
+  Timer t;
+  if(verbose) {
+    printf("\nSaving density and potential data in %s and %s ... ",densname.c_str(),potname.c_str());
+    fflush(stdout);
+  } 
+  
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  { // Begin parallel region
+    
+#ifdef _OPENMP
+    // Current thread is
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#else
+    int ith=0;
+#endif
+    // Loop over atoms
+    for(size_t i=0;i<grids.size();i++) {
+
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[i]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[i]);
+
+      // Update density
+      wrk[ith].update_density(Pa,Pb);
+
+      // Initialize the arrays
+      wrk[ith].init_xc();
+      // Compute the functionals
+      if(func_id>0)
+        wrk[ith].compute_xc(func_id);
+
+      // Write out density and potential data
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+      {
+	wrk[ith].print_density(dens);
+	wrk[ith].print_potential(func_id,pot);
+      }
+
+      // Free memory
+      wrk[ith].free();
+    }
+  } // End parallel region
+
+  // Close output files
+  fclose(dens);
+  fclose(pot);
+
+  printf("done (%s)\n",t.elapsed().c_str());
+}
+
+void DFTGrid::print_density_potential(int func_id, const arma::mat & P, std::string densname, std::string potname) {
+  // Open output files
+  FILE *dens=fopen(densname.c_str(),"w");
+  FILE *pot=fopen(potname.c_str(),"w");
+
+  Timer t;
+  if(verbose) {
+    printf("\nSaving density and potential data in %s and %s ... ",densname.c_str(),potname.c_str());
+    fflush(stdout);
+  } 
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  { // Begin parallel region
+
+#ifdef _OPENMP
+    // Current thread is
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#else
+    int ith=0;
+#endif
+    // Loop over atoms
+    for(size_t i=0;i<grids.size();i++) {
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,grids[i]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,grids[i]);
+
+      // Update density
+      wrk[ith].update_density(P);
+
+      // Initialize the arrays
+      wrk[ith].init_xc();
+      // Compute the functionals
+      if(func_id>0)
+	wrk[ith].compute_xc(func_id);
+
+      // Write out density and potential data
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+      {
+	wrk[ith].print_density(dens);
+	wrk[ith].print_potential(func_id,pot);
+      }
+      
+      // Free memory
+      wrk[ith].free();
+    }
+  } // End parallel region
+
+  // Close output files
+  fclose(dens);
+  fclose(pot);
+
+  printf("done (%s)\n",t.elapsed().c_str());
+}
+

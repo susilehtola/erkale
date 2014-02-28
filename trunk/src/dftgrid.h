@@ -88,7 +88,7 @@ typedef struct {
 /// Helper for sort
 bool operator<(const dens_list_t & lhs, const dens_list_t & rhs);
 
-/// Helper for debugging output
+/// Helper for debugging output: density input
 typedef struct {
   /// Alpha and beta density
   double rhoa, rhob;
@@ -98,7 +98,10 @@ typedef struct {
   double lapla, laplb;
   /// Kinetic energy density
   double taua, taub;
+} libxc_dens_t;
 
+/// Helper for debugging output: potential output
+typedef struct {
   /// Alpha and beta potential
   double vrhoa, vrhob;
   /// Sigma potential
@@ -107,6 +110,11 @@ typedef struct {
   double vlapla, vlaplb;
   /// Kinetic energy potential
   double vtaua, vtaub;
+} libxc_pot_t;
+
+typedef struct {
+  libxc_dens_t dens;
+  libxc_pot_t pot;
 } libxc_debug_t;
 
 /**
@@ -217,9 +225,12 @@ class AtomGrid {
   /// Use Lobatto quadrature? (Default is Lebedev)
   bool use_lobatto;
 
-  /// Get data for wanted point
-  libxc_debug_t get_data(size_t idx, bool mgga, bool gga, const std::vector<double> & vxc_wrk, const std::vector<double> & vsigma_wrk, const std::vector<double> & vlapl_wrk, const std::vector<double> & \
-vtau_wrk) const;
+  /// Get density data for wanted point
+  libxc_dens_t get_dens(size_t idx) const;
+  /// Get potential data for wanted point
+  libxc_pot_t get_pot(size_t idx) const;
+  /// Get density and potential data for wanted point
+  libxc_debug_t get_data(size_t idx) const;
 
  public:
   /// Constructor. Need to set tolerance as well before using constructor!
@@ -301,6 +312,11 @@ vtau_wrk) const;
 
   /// Print atomic grid
   void print_grid() const;
+
+  /// Print density information
+  void print_density(FILE *f) const;
+  /// Print potential information
+  void print_potential(int func_id, FILE *f) const;
 
   /// Initialize XC arrays
   void init_xc();
@@ -429,6 +445,11 @@ class DFTGrid {
   arma::vec eval_force(int x_func, int c_func, const arma::mat & P);
   /// Evaluate force
   arma::vec eval_force(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb);
+
+  /// Print out density data
+  void print_density_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string densname="density.dat", std::string potname="potential.dat");
+  /// Print out density data
+  void print_density_potential(int func_id, const arma::mat & P, std::string densname="density.dat", std::string potname="potential.dat");
 };
 
 
