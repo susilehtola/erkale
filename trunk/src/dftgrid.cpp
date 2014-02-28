@@ -3587,13 +3587,15 @@ void DFTGrid::print_density_potential(int func_id, const arma::mat & Pa, const a
   FILE *dens=fopen(densname.c_str(),"w");
   FILE *pot=fopen(potname.c_str(),"w");
 
+  fprintf(dens,"%i\n",(int) get_Npoints());
+  fprintf(pot,"%i\n",(int) get_Npoints());
+
   Timer t;
   if(verbose) {
     printf("\nSaving density and potential data in %s and %s ... ",densname.c_str(),potname.c_str());
     fflush(stdout);
   } 
   
-
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -3649,6 +3651,9 @@ void DFTGrid::print_density_potential(int func_id, const arma::mat & P, std::str
   FILE *dens=fopen(densname.c_str(),"w");
   FILE *pot=fopen(potname.c_str(),"w");
 
+  fprintf(dens,"%i\n",(int) get_Npoints());
+  fprintf(pot,"%i\n",(int) get_Npoints());
+  
   Timer t;
   if(verbose) {
     printf("\nSaving density and potential data in %s and %s ... ",densname.c_str(),potname.c_str());
