@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   set.add_string("Method","Functional to dump data for","mgga_x_tpss");
-  set.add_double("GridTol","DFT grid tolerance to use",1e-5);
+  set.add_double("GridTol","DFT grid tolerance to use",1e-3);
   if(argc==2)
     set.parse(argv[1]);
   else printf("Using default settings.\n\n");
