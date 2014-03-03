@@ -16,6 +16,7 @@
 
 #include "checkpoint.h"
 #include "dftgrid.h"
+#include "stringutil.h"
 #include "dftfuncs.h"
 
 #include <cstdio>
@@ -46,6 +47,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   set.add_string("Method","Functional to dump data for","mgga_x_tpss");
   set.add_double("GridTol","DFT grid tolerance to use",1e-3);
+  set.add_string("DFTGrid","DFT grid to use","Auto");
   if(argc==2)
     set.parse(argv[1]);
   else printf("Using default settings.\n\n");
@@ -70,19 +72,44 @@ int main(int argc, char **argv) {
 
   // DFT grid, verbose operation
   DFTGrid grid(&basis,true);
-  // Tolerance
-  double gridtol=set.get_double("GridTol");
+
+  // Adaptive grid?
+  bool adaptive;
+  int nrad, lmax;
+  double gridtol;
+
+  // Determine grid
+  std::string dftgrid=set.get_string("DFTGrid");
+  if(stricmp(dftgrid,"Auto")==0) {
+    adaptive=true;
+    gridtol=set.get_double("GridTol");
+  } else {
+    adaptive=false;
+    std::vector<std::string> gridsize=splitline(dftgrid);
+    if(gridsize.size()!=2)
+      throw std::runtime_error("Error determining grid size.\n");
+    nrad=readint(gridsize[0]);
+    lmax=readint(gridsize[1]);
+  }
 
   if(restr) {
-    grid.construct(P,gridtol,func_id,0);
+    if(adaptive)
+      grid.construct(P,gridtol,func_id,0);
+    else
+      grid.construct(nrad,lmax,func_id,0);
+    
     grid.print_density_potential(func_id,P);
-
+    
   } else {
     arma::mat Pa, Pb;
     chkpt.read("Pa",Pa);
     chkpt.read("Pb",Pb);
 
-    grid.construct(Pa,Pb,gridtol,func_id,0);
+    if(adaptive)
+      grid.construct(Pa,Pb,gridtol,func_id,0);
+    else
+      grid.construct(nrad,lmax,func_id,0);
+
     grid.print_density_potential(func_id,Pa,Pb);
   }
 
