@@ -507,6 +507,7 @@ int main(int argc, char **argv) {
   set.add_string("OrbIdx", "Indices of orbitals to compute, e.g. 1-10 1-2", "");
   set.add_bool("SplitOrbs", "Split orbital plots into different files?", false);
   set.add_bool("Potential", "Compute electrostatic potential on the cube?", false);
+  set.add_bool("SICOrbs", "Compute PZ-SIC orbitals on the cube?", false);
 
   if(argc==2)
     set.parse(argv[1]);
@@ -645,6 +646,78 @@ int main(int argc, char **argv) {
       fflush(stdout); t.set();
       density_cube(basis,Pb,x,y,z,"density-b",norm);
       printf("done (%s).\nNorm of beta  density is %e.\n",t.elapsed().c_str(),norm);
+    }
+  }
+
+  // Calculate density on cube
+  if(set.get_bool("SICOrbs")) {
+    if(restr) {
+      // Load orbitals
+      arma::cx_mat CW;
+      chkpt.cread("CW",CW);
+
+      // Loop over orbitals
+      for(size_t io=0;io<CW.n_cols;io++) {
+	std::ostringstream fname;
+	fname << "sicorb." << io+1;
+
+	printf("Orbital %i ... ",(int) io+1);
+	fflush(stdout);
+
+	Timer to;
+
+	// Density matrix
+	arma::mat Po=arma::real(CW.col(io)*arma::trans(CW.col(io)));
+
+	double norm;
+	density_cube(basis,Po,x,y,z,fname.str(),norm);
+
+	printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
+	fflush(stdout);
+      }
+    } else {
+      // Load orbitals
+      arma::cx_mat CWa, CWb;
+      chkpt.cread("CWa",CWa);
+      chkpt.cread("CWb",CWb);
+
+      // Loop over orbitals
+      for(size_t io=0;io<CWa.n_cols;io++) {
+	std::ostringstream fname;
+	fname << "sicorba." << io+1;
+
+	printf("Alpha orbital %i ... ",(int) io+1);
+	fflush(stdout);
+
+	Timer to;
+
+	// Density matrix
+	arma::mat Po=arma::real(CWa.col(io)*arma::trans(CWa.col(io)));
+
+	double norm;
+	density_cube(basis,Po,x,y,z,fname.str(),norm);
+
+	printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
+	fflush(stdout);
+      }
+      for(size_t io=0;io<CWb.n_cols;io++) {
+	std::ostringstream fname;
+	fname << "sicorbb." << io+1;
+
+	printf("Beta  orbital %i ... ",(int) io+1);
+	fflush(stdout);
+
+	Timer to;
+
+	// Density matrix
+	arma::mat Po=arma::real(CWb.col(io)*arma::trans(CWb.col(io)));
+	
+	double norm;
+	density_cube(basis,Po,x,y,z,fname.str(),norm);
+	
+	printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
+	fflush(stdout);
+      }
     }
   }
 
