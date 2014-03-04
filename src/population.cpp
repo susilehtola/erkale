@@ -74,6 +74,7 @@ int main(int argc, char **argv) {
   set.add_bool("Voronoi", "Run Voronoi analysis?", false);
   set.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
   set.add_bool("OrbThr", "Compute orbital density thresholds", false);
+  set.add_bool("SICThr", "Compute orbital density thresholds", false);
   set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
   set.add_double("OrbThrGrid", "Accuracy of orbital density threshold integration grid", 1e-3);
   
@@ -258,6 +259,63 @@ int main(int argc, char **argv) {
 	}
       }	
       
+    }
+  }
+
+  if(set.get_bool("SICThr")) {
+    // Calculate orbital density thresholds
+
+    // Integration grid
+    DFTGrid intgrid(&basis,true);
+    intgrid.construct_becke(set.get_double("OrbThrGrid"));
+
+    // Threshold is
+    double thr=set.get_double("OrbThrVal");
+
+    if(restr) {
+      // Get orbital coefficients
+      arma::cx_mat CW;
+      chkpt.cread("CW",CW);
+
+      printf("\n%4s %9s %8s\n","orb","thr","t (s)");
+      for(size_t io=0;io<CW.n_cols;io++) {
+	Timer t;
+	
+	// Orbital density matrix is
+	arma::mat Po=arma::real(CW.col(io)*arma::trans(CW.col(io)));
+	double val=compute_threshold(intgrid,Po,thr);
+
+	// Print out orbital threshold
+	printf("%4i %8.3e %8.3f\n", (int) io+1, val, t.get());
+	fflush(stdout);
+      }
+
+    } else {
+      // Get orbital coefficients
+      arma::cx_mat CWa, CWb;
+      chkpt.cread("CWa",CWa);
+      chkpt.cread("CWb",CWb);
+
+      printf("\n%4s %9s %9s %8s\n","orb","thr-a","thr-b","t (s)");
+      for(size_t io=0;io<CWa.n_cols;io++) {
+	Timer t;
+
+	// Orbital density matrix is
+	arma::mat Po=arma::real(CWa.col(io)*arma::trans(CWa.col(io)));
+	double vala=compute_threshold(intgrid,Po,thr);
+	
+	if(io<CWb.n_cols) {
+	  Po=arma::real(CWb.col(io)*arma::trans(CWb.col(io)));
+	  double valb=compute_threshold(intgrid,Po,thr);
+	  
+	  // Print out orbital threshold
+	  printf("%4i %8.3e %8.3e %8.3f\n", (int) io+1, vala, valb, t.get());
+	  fflush(stdout);
+	} else {
+	  printf("%4i %8.3e %9s %8.3f\n", (int) io+1, vala, "****", t.get());
+	  fflush(stdout);
+	}
+      }	
     }
   }
   
