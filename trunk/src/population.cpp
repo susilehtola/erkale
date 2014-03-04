@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   set.add_bool("Voronoi", "Run Voronoi analysis?", false);
   set.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
   set.add_bool("OrbThr", "Compute orbital density thresholds", false);
-  set.add_bool("SICThr", "Compute orbital density thresholds", false);
+  set.add_bool("SICThr", "Compute SIC orbital density thresholds", false);
   set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
   set.add_double("OrbThrGrid", "Accuracy of orbital density threshold integration grid", 1e-3);
   
