@@ -1650,6 +1650,60 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	  Timer tsic;
 	  
+	  if(adaptive) {
+	    while(true) {
+	      // Change reference values
+	      oldsol=sol;
+	      
+	      // DFT grid
+	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
+	      
+	      // Get new SIC potential
+	      solver.PZSIC_RDFT(sol,occs,initdft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT));
+	      pziter++;
+	      
+	      // Solve self-consistent field equations in presence of new SIC potential
+	      solver.RDFT(sol,occs,conv,initdft);
+	      
+	      // Energy difference
+	      double dE=sol.en.E-oldsol.en.E;
+	      // Density differences
+	      double dP_rms=rms_norm((sol.P-oldsol.P)/2.0);
+	      double dP_max=max_abs((sol.P-oldsol.P)/2.0);
+	      
+	      // Print out changes
+	      if(verbose) {
+		fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
+		
+		if(fabs(dE)<thr_dEmax)
+		  fprintf(stderr," % 10.3e*",dE);
+		else
+		  fprintf(stderr," % 10.3e ",dE);
+		
+		if(dP_rms<thr_dPrms)
+		  fprintf(stderr," %9.3e*",dP_rms);
+		else
+		  fprintf(stderr," %9.3e ",dP_rms);
+		
+		if(dP_max<thr_dPmax)
+		  fprintf(stderr," %9.3e*",dP_max);
+		else
+		  fprintf(stderr," %9.3e ",dP_max);
+		
+		fprintf(stderr,"\n");
+		
+		printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
+		printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
+	      }
+	      
+	      if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
+		break;
+	      if(pziter==pzniter)
+		break;
+	    }
+	    pziter=0;
+	  }
+	  
 	  while(true) {
 	    // Change reference values
 	    oldsol=sol;
@@ -1909,7 +1963,70 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	  // Iteration number
 	  int pziter=0;
-
+	  
+	  if(adaptive) {
+	    while(true) {
+	      // Change reference values
+	      oldsol=sol;
+	      
+	      // DFT grid
+	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
+	      if(!adaptive)
+		// Fixed size grid
+		grid.construct(initdft.nrad,initdft.lmax,initdft.x_func,initdft.c_func);
+	      
+	      // Get new SIC potential
+	      solver.PZSIC_UDFT(sol,occa,occb,initdft,pzmet,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT));
+	      pziter++;
+	      
+	      // Solve self-consistent field equations in presence of new SIC potential
+	      solver.UDFT(sol,occa,occb,conv,dft);
+	      
+	      // Energy difference
+	      double dE=sol.en.E-oldsol.en.E;
+	      // Density differences
+	      double dPa_rms=rms_norm(sol.Pa-oldsol.Pa);
+	      double dPa_max=max_abs(sol.Pa-oldsol.Pa);
+	      double dPb_rms=rms_norm(sol.Pb-oldsol.Pb);
+	      double dPb_max=max_abs(sol.Pb-oldsol.Pb);
+	      double dP_rms=std::max(dPa_rms,dPb_rms);
+	      double dP_max=std::max(dPa_max,dPb_max);
+	      
+	      // Print out changes
+	      if(verbose) {
+		fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
+		
+		if(fabs(dE)<thr_dEmax)
+		  fprintf(stderr," % 10.3e*",dE);
+		else
+		  fprintf(stderr," % 10.3e ",dE);
+		
+		if(dP_rms<thr_dPrms)
+		  fprintf(stderr," %9.3e*",dP_rms);
+		else
+		  fprintf(stderr," %9.3e ",dP_rms);
+		
+		if(dP_max<thr_dPmax)
+		  fprintf(stderr," %9.3e*",dP_max);
+		else
+		  fprintf(stderr," %9.3e ",dP_max);
+		
+		fprintf(stderr,"\n");
+		
+		printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
+		printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
+		printf("%7s %13s %e %e\n","alpha","",dPa_max,dPa_rms);
+		printf("%7s %13s %e %e\n","beta","",dPb_max,dPb_rms);
+	      }
+	      
+	      if(fabs(dE)<thr_dEmax && std::max(dPa_rms,dPb_rms)<thr_dPrms && std::max(dPa_max,dPb_max)<thr_dPmax)
+		break;
+	      if(pziter==pzniter)
+		break;
+	    }
+	    pziter=0;
+	  }
+	    
 	  while(true) {
 	    // Change reference values
 	    oldsol=sol;
