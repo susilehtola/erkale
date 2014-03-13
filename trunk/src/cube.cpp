@@ -30,7 +30,7 @@ typedef struct {
 } cubecoord_t;
 
 
-void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, std::string fname, double & norm) {
+void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, std::string fname, double & norm, bool sic) {
   // Open output file.
   fname=fname+".cube";
   FILE *out=fopen(fname.c_str(),"w");
@@ -139,8 +139,12 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
     // Save density values
     for(size_t ip=0;ip<np;ip++) {
       norm+=rho[ip];
-      
-      fprintf(out," % .5e",rho[ip]);
+
+      if(sic)
+	// For consistency with real case, take sqrt of complex orbitals
+	fprintf(out," % .5e",sqrt(rho[ip]));
+      else
+	fprintf(out," % .5e",rho[ip]);
       idx++;
       if(idx==6 || r[ip].newline) {
 	idx=0;
@@ -634,18 +638,18 @@ int main(int argc, char **argv) {
     double norm;
     printf("Calculating total electron density ... ");
     fflush(stdout); t.set();
-    density_cube(basis,P,x,y,z,"density",norm);
+    density_cube(basis,P,x,y,z,"density",norm,false);
     printf("done (%s).\nNorm of total density is %e.\n",t.elapsed().c_str(),norm);
 
     if(!restr) {
       printf("Calculating alpha electron density ... ");
       fflush(stdout); t.set();
-      density_cube(basis,Pa,x,y,z,"density-a",norm);
+      density_cube(basis,Pa,x,y,z,"density-a",norm,false);
       printf("done (%s).\nNorm of alpha density is %e.\n",t.elapsed().c_str(),norm);
 
       printf("Calculating beta  electron density ... ");
       fflush(stdout); t.set();
-      density_cube(basis,Pb,x,y,z,"density-b",norm);
+      density_cube(basis,Pb,x,y,z,"density-b",norm,false);
       printf("done (%s).\nNorm of beta  density is %e.\n",t.elapsed().c_str(),norm);
     }
   }
@@ -672,7 +676,7 @@ int main(int argc, char **argv) {
 	  arma::mat Po=arma::real(CW.col(io)*arma::trans(CW.col(io)));
 	  
 	  double norm;
-	  density_cube(basis,Po,x,y,z,fname.str(),norm);
+	  density_cube(basis,Po,x,y,z,fname.str(),norm,true);
 	  
 	  printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
 	  fflush(stdout);
@@ -717,7 +721,7 @@ int main(int argc, char **argv) {
 	  arma::mat Po=arma::real(CWa.col(io)*arma::trans(CWa.col(io)));
 	  
 	  double norm;
-	  density_cube(basis,Po,x,y,z,fname.str(),norm);
+	  density_cube(basis,Po,x,y,z,fname.str(),norm,true);
 	  
 	  printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
 	  fflush(stdout);
@@ -735,7 +739,7 @@ int main(int argc, char **argv) {
 	  arma::mat Po=arma::real(CWb.col(io)*arma::trans(CWb.col(io)));
 	  
 	  double norm;
-	  density_cube(basis,Po,x,y,z,fname.str(),norm);
+	  density_cube(basis,Po,x,y,z,fname.str(),norm,true);
 	  
 	  printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
 	  fflush(stdout);
