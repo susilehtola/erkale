@@ -545,6 +545,8 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   }
   // Save matrix
   chkptp->cwrite("CW",sicsol.C*W);
+  // Save SI energies
+  chkptp->write("ESIC",sicsol.E);
 
   // Update current solution
   sol.Heff=sicsol.H;
@@ -758,6 +760,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   }
   PZSIC_calculate(sicsola,Wa,dft,pzcor,grid,Etol,maxtol,rmstol,niter,canonical,real);
   chkptp->cwrite("CWa",sicsola.C*Wa);
+  chkptp->write("ESICa",sicsola.E);
 
   if(Wb.n_cols) {
     if(verbose) {
@@ -771,6 +774,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     }
     PZSIC_calculate(sicsolb,Wb,dft,pzcor,grid,Etol,maxtol,rmstol,niter,canonical,real);
     chkptp->cwrite("CWb",sicsolb.C*Wb);
+    chkptp->write("ESICb",sicsolb.E);
   }
 
   if(verbose && !canonical) {
@@ -819,7 +823,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
     ESIC=worker.get_ESIC();
   }
 
-  // Get SIC energy and hamiltonian
+  // Get SI energy and hamiltonian
   arma::mat HSIC=worker.get_HSIC();
 
   // Adjust Fock operator for SIC
@@ -828,20 +832,20 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   sol.en.E=-pzcor*ESIC;
 
   // Get orbital energies
-  arma::vec Eorb=arma::sort(worker.get_Eorb(),1);
+  sol.E=arma::sort(worker.get_Eorb(),1);
+
+  // Sort orbitals
+  sort_eigvec(sol.E,W);
 
   // Get orbital self-interaction energies
   if(verbose) {
     printf("Self-interaction energy is %e.\n",ESIC);
 
     printf("Decomposition of self-interaction (in decreasing order):\n");
-    for(size_t io=0;io<Eorb.n_elem;io++)
-      printf("\t%4i\t% f\n",(int) io+1,Eorb(io));
+    for(size_t io=0;io<sol.E.n_elem;io++)
+      printf("\t%4i\t% f\n",(int) io+1,sol.E(io));
     fflush(stdout);
   }
-
-  // Sort orbitals
-  sort_eigvec(Eorb,W);
 }
 
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift) {
@@ -3557,7 +3561,7 @@ void PZSIC::set(const rscf_t & solp, double pz) {
 }
 
 double PZSIC::cost_func(const arma::cx_mat & W) {
-  // Evaluate SIC energy.
+  // Evaluate SI energy.
 
   arma::cx_mat der;
   double ESIC;
