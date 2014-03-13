@@ -16,6 +16,7 @@
 
 #include "global.h"
 #include "basis.h"
+#include "mathf.h"
 #include "checkpoint.h"
 #include "stringutil.h"
 
@@ -616,7 +617,7 @@ int main(int argc, char **argv) {
       printf("Orbital norms on grid\n");
       for(size_t io=0;io<orbidxa.size();io++)
 	printf("%4i %e\n",(int) orbidxa[io],orbnorm(io));
-
+      
       printf("Calculating beta orbitals ... ");
       fflush(stdout); t.set();
       orbital_cube(basis,Cb,x,y,z,orbidxb,"orbital-b",split,orbnorm);
@@ -657,66 +658,117 @@ int main(int argc, char **argv) {
       chkpt.cread("CW",CW);
 
       // Loop over orbitals
-      for(size_t io=0;io<CW.n_cols;io++) {
-	std::ostringstream fname;
-	fname << "sicorb." << io+1;
-
-	printf("Orbital %i ... ",(int) io+1);
-	fflush(stdout);
-
-	Timer to;
-
-	// Density matrix
-	arma::mat Po=arma::real(CW.col(io)*arma::trans(CW.col(io)));
-
-	double norm;
-	density_cube(basis,Po,x,y,z,fname.str(),norm);
-
-	printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
-	fflush(stdout);
+      if(rms_norm(arma::imag(CW))>DBL_EPSILON) {
+	for(size_t io=0;io<CW.n_cols;io++) {
+	  std::ostringstream fname;
+	  fname << "sicorb." << io+1;
+	  
+	  printf("Orbital %i ... ",(int) io+1);
+	  fflush(stdout);
+	  
+	  Timer to;
+	  
+	  // Density matrix
+	  arma::mat Po=arma::real(CW.col(io)*arma::trans(CW.col(io)));
+	  
+	  double norm;
+	  density_cube(basis,Po,x,y,z,fname.str(),norm);
+	  
+	  printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
+	  fflush(stdout);
+	}
+      } else {
+	// Real orbitals
+	arma::mat CWr(arma::real(CW));
+	arma::vec orbnorm;
+	
+	// Orbital indices, NOT IN C++ INDEXING!
+	std::vector<size_t> orbidx(CW.n_cols);
+	for(size_t i=0;i<CW.n_cols;i++)
+	  orbidx[i]=i+1;
+	
+	printf("Calculating orbitals ... ");
+	fflush(stdout); t.set();
+	orbital_cube(basis,CWr,x,y,z,orbidx,"sicorb",true,orbnorm);
+	printf("done (%s)\n",t.elapsed().c_str());
+	printf("Orbital norms on grid\n");
+	for(size_t io=0;io<orbidx.size();io++)
+	  printf("%4i %e\n",(int) orbidx[io],orbnorm(io));
       }
-    } else {
+
+    } else { // Unrestricted calculation
       // Load orbitals
       arma::cx_mat CWa, CWb;
       chkpt.cread("CWa",CWa);
       chkpt.cread("CWb",CWb);
 
       // Loop over orbitals
-      for(size_t io=0;io<CWa.n_cols;io++) {
-	std::ostringstream fname;
-	fname << "sicorba." << io+1;
-
-	printf("Alpha orbital %i ... ",(int) io+1);
-	fflush(stdout);
-
-	Timer to;
-
-	// Density matrix
-	arma::mat Po=arma::real(CWa.col(io)*arma::trans(CWa.col(io)));
-
-	double norm;
-	density_cube(basis,Po,x,y,z,fname.str(),norm);
-
-	printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
-	fflush(stdout);
-      }
-      for(size_t io=0;io<CWb.n_cols;io++) {
-	std::ostringstream fname;
-	fname << "sicorbb." << io+1;
-
-	printf("Beta  orbital %i ... ",(int) io+1);
-	fflush(stdout);
-
-	Timer to;
-
-	// Density matrix
-	arma::mat Po=arma::real(CWb.col(io)*arma::trans(CWb.col(io)));
+      if(rms_norm(arma::imag(CWa))>DBL_EPSILON || rms_norm(arma::imag(CWb))>DBL_EPSILON ) {
+	for(size_t io=0;io<CWa.n_cols;io++) {
+	  std::ostringstream fname;
+	  fname << "sicorba." << io+1;
+	  
+	  printf("Alpha orbital %i ... ",(int) io+1);
+	  fflush(stdout);
+	  
+	  Timer to;
+	  
+	  // Density matrix
+	  arma::mat Po=arma::real(CWa.col(io)*arma::trans(CWa.col(io)));
+	  
+	  double norm;
+	  density_cube(basis,Po,x,y,z,fname.str(),norm);
+	  
+	  printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
+	  fflush(stdout);
+	}
+	for(size_t io=0;io<CWb.n_cols;io++) {
+	  std::ostringstream fname;
+	  fname << "sicorbb." << io+1;
+	  
+	  printf("Beta  orbital %i ... ",(int) io+1);
+	  fflush(stdout);
+	  
+	  Timer to;
+	  
+	  // Density matrix
+	  arma::mat Po=arma::real(CWb.col(io)*arma::trans(CWb.col(io)));
+	  
+	  double norm;
+	  density_cube(basis,Po,x,y,z,fname.str(),norm);
+	  
+	  printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
+	  fflush(stdout);
+	}
+      } else {
+	// Real orbitals
+	arma::mat CWra(arma::real(CWa));
+	arma::mat CWrb(arma::real(CWb));
+	arma::vec orbnorm;
 	
-	double norm;
-	density_cube(basis,Po,x,y,z,fname.str(),norm);
+	// Orbital indices, NOT IN C++ INDEXING!
+	std::vector<size_t> orbidxa(CWa.n_cols);
+	for(size_t i=0;i<CWa.n_cols;i++)
+	  orbidxa[i]=i+1;
+	std::vector<size_t> orbidxb(CWb.n_cols);
+	for(size_t i=0;i<CWb.n_cols;i++)
+	  orbidxb[i]=i+1;
 	
-	printf("norm is %e. (%s)\n",norm,to.elapsed().c_str());
-	fflush(stdout);
+	printf("Calculating alpha orbitals ... ");
+	fflush(stdout); t.set();
+	orbital_cube(basis,CWra,x,y,z,orbidxa,"sicorb-a",true,orbnorm);
+	printf("done (%s)\n",t.elapsed().c_str());
+	printf("Orbital norms on grid\n");
+	for(size_t io=0;io<orbidxa.size();io++)
+	  printf("%4i %e\n",(int) orbidxa[io],orbnorm(io));
+	
+	printf("Calculating beta orbitals ... ");
+	fflush(stdout); t.set();
+	orbital_cube(basis,CWrb,x,y,z,orbidxb,"sicorb-b",true,orbnorm);
+	printf("done (%s)\n",t.elapsed().c_str());
+	printf("Orbital norms on grid\n");
+	for(size_t io=0;io<orbidxb.size();io++)
+	  printf("%4i %e\n",(int) orbidxb[io],orbnorm(io));
       }
     }
   }
