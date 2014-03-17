@@ -547,6 +547,12 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   chkptp->cwrite("CW",sicsol.C*W);
   // Save SI energies
   chkptp->write("ESIC",sicsol.E);
+  // Compute projected energies
+  if(sol.H.n_elem == sicsol.H.n_elem) {
+    arma::cx_mat CW=sicsol.C*W;
+    arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sicsol.H)*CW));
+    chkptp->write("EpSIC",Ep);
+  }
 
   // Update current solution
   sol.Heff=sicsol.H;
@@ -761,6 +767,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   PZSIC_calculate(sicsola,Wa,dft,pzcor,grid,Etol,maxtol,rmstol,niter,canonical,real);
   chkptp->cwrite("CWa",sicsola.C*Wa);
   chkptp->write("ESICa",sicsola.E);
+  // Compute projected energies
+  if(sol.Ha.n_elem == sicsola.H.n_elem) {
+    arma::cx_mat CW=sicsola.C*Wa;
+    arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Ha+sicsola.H)*CW));
+    chkptp->write("EpSICa",Ep);
+  }
 
   if(Wb.n_cols) {
     if(verbose) {
@@ -775,6 +787,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     PZSIC_calculate(sicsolb,Wb,dft,pzcor,grid,Etol,maxtol,rmstol,niter,canonical,real);
     chkptp->cwrite("CWb",sicsolb.C*Wb);
     chkptp->write("ESICb",sicsolb.E);
+    // Compute projected energies
+    if(sol.Hb.n_elem == sicsolb.H.n_elem) {
+      arma::cx_mat CW=sicsolb.C*Wa;
+      arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Hb+sicsolb.H)*CW));
+      chkptp->write("EpSICb",Ep);
+    }
   }
 
   if(verbose && !canonical) {
@@ -841,7 +859,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   if(verbose) {
     printf("Self-interaction energy is %e.\n",ESIC);
 
-    printf("Decomposition of self-interaction (in decreasing order):\n");
+    printf("Decomposition of self-interaction (in increasing order):\n");
     for(size_t io=0;io<sol.E.n_elem;io++)
       printf("\t%4i\t% f\n",(int) io+1,sol.E(io));
     fflush(stdout);
