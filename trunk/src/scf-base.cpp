@@ -832,7 +832,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   sol.en.E=-pzcor*ESIC;
 
   // Get orbital energies
-  sol.E=arma::sort(worker.get_Eorb(),1);
+  sol.E=worker.get_Eorb();
 
   // Sort orbitals
   sort_eigvec(sol.E,W);
