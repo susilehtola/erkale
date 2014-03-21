@@ -410,7 +410,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 }
 
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real) {
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
   // Set xc functionals
   if(pzmet==COUL) {
     dft.x_func=0;
@@ -472,9 +472,9 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     else {
       // Initialize with a random unitary matrix.
       if(real)
-	W=real_orthogonal(nocc)*std::complex<double>(1.0,0.0);
+	W=real_orthogonal(nocc,seed)*std::complex<double>(1.0,0.0);
       else
-	W=complex_unitary(nocc);
+	W=complex_unitary(nocc,seed);
 
       if(localization && nocc>1) {
 	Timer tloc;
@@ -564,7 +564,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   sol.en.E  +=2*sicsol.en.E;
 }
 
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real) {
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
   // Set xc functionals
   if(pzmet==COUL) {
     dft.x_func=0;
@@ -654,9 +654,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     else {
       // Initialize with a random unitary matrix.
       if(real)
-	Wa=real_orthogonal(nocca)*std::complex<double>(1.0,0.0);
+	Wa=real_orthogonal(nocca,seed)*std::complex<double>(1.0,0.0);
       else
-	Wa=complex_unitary(nocca);
+	Wa=complex_unitary(nocca,seed);
 
       if(localization && nocca>1) {
 	Timer tloc;
@@ -691,9 +691,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     else {
       // Initialize with a random unitary matrix.
       if(real)
-	Wb=real_orthogonal(noccb)*std::complex<double>(1.0,0.0);
+	Wb=real_orthogonal(noccb,seed)*std::complex<double>(1.0,0.0);
       else
-	Wb=complex_unitary(noccb);
+	Wb=complex_unitary(noccb,seed);
 
       if(localization && noccb>1) {
 	Timer tloc;
@@ -1621,6 +1621,8 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	// Localization?
 	bool pzloc=set.get_bool("PZloc");
+	// Seed
+	int seed=set.get_int("PZseed");
 	// Convergence thresholds
 	double thr_Kmax=set.get_double("PZKmax");
 	double thr_Krms=set.get_double("PZKrms");
@@ -1654,7 +1656,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 	  
 	  // Get SIC potential
-	  solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT));
+	  solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	  
 	  // Perturbative calculation - no need for self-consistency
 	  // Diagonalize to get new orbitals and energies
@@ -1681,7 +1683,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
 	      
 	      // Get new SIC potential
-	      solver.PZSIC_RDFT(sol,occs,initdft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT));
+	      solver.PZSIC_RDFT(sol,occs,initdft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	      pziter++;
 	      
 	      // Solve self-consistent field equations in presence of new SIC potential
@@ -1737,7 +1739,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 	  
 	    // Get new SIC potential
-	    solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT));
+	    solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	    pziter++;
 
 	    // Solve self-consistent field equations in presence of new SIC potential
@@ -1931,6 +1933,8 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	enum pzmet pzmet=parse_pzmet(set.get_string("PZmode"));
 	// Localization?
 	bool pzloc=set.get_bool("PZloc");
+	// Seed
+	int seed=set.get_int("PZseed");
 
 	// Convergence thresholds
 	double thr_Kmax=set.get_double("PZKmax");
@@ -1966,7 +1970,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 
 	  // Get SIC potential
-	  solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT));
+	  solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 
           // Perturbative calculation - no need for self-consistency
     	  // Diagonalize to get new orbitals and energies
@@ -1998,7 +2002,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 		grid.construct(initdft.nrad,initdft.lmax,initdft.x_func,initdft.c_func);
 	      
 	      // Get new SIC potential
-	      solver.PZSIC_UDFT(sol,occa,occb,initdft,pzmet,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT));
+	      solver.PZSIC_UDFT(sol,occa,occb,initdft,pzmet,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	      pziter++;
 	      
 	      // Solve self-consistent field equations in presence of new SIC potential
@@ -2060,7 +2064,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 	    
 	    // Get new SIC potential
-	    solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT));
+	    solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	    pziter++;
 	    
 	    // Solve self-consistent field equations in presence of new SIC potential
