@@ -153,6 +153,8 @@ void Settings::add_dft_settings() {
   add_int("PZunit", "Max number of iterations in unitary optimization", 10);
   // PZ-SIC maximum number of iterations in self-consistency cycle
   add_int("PZiter", "Max number of iterations in self-consistency iteration", 20);
+  // PZ-SIC seed number
+  add_int("PZseed", "Seed number for randomized matrices?", 0);
 }
 
 void Settings::add_double(std::string name, std::string comment, double val) {

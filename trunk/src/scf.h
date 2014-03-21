@@ -352,9 +352,9 @@ class SCF {
   arma::vec force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol);
 
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false);
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false);
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
