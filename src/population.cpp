@@ -25,7 +25,7 @@
 #include <omp.h>
 #endif
 
-double compute_threshold(DFTGrid & intgrid, const arma::mat & Po, double thr) {
+double compute_threshold(DFTGrid & intgrid, const arma::mat & Po, double thr, bool dens) {
   // Get the list of orbital density values
   std::vector<dens_list_t> list=intgrid.eval_dens_list(Po);
 
@@ -39,8 +39,14 @@ double compute_threshold(DFTGrid & intgrid, const arma::mat & Po, double thr) {
     idx++;
   }
 
-  // Cutoff is thus between idx and idx-1. Convert to orbital value
-  return sqrt((list[idx].d+list[idx-1].d)/2.0);
+  // Cutoff is thus between idx and idx-1.
+  double cut=(list[idx].d + list[idx-1].d)/2.0;
+
+  if(dens)
+    return cut;
+  else
+    // Convert to orbital value
+    return sqrt(cut);
 }
 
 
@@ -75,6 +81,7 @@ int main(int argc, char **argv) {
   set.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
   set.add_bool("OrbThr", "Compute orbital density thresholds", false);
   set.add_bool("SICThr", "Compute SIC orbital density thresholds", false);
+  set.add_bool("DensThr", "Compute total density thresholds", false);
   set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
   set.add_double("OrbThrGrid", "Accuracy of orbital density threshold integration grid", 1e-3);
   
@@ -220,7 +227,7 @@ int main(int argc, char **argv) {
 	
 	// Orbital density matrix is
 	arma::mat Po=C.col(io)*arma::trans(C.col(io));
-	double val=compute_threshold(intgrid,Po,thr);
+	double val=compute_threshold(intgrid,Po,thr,false);
 
 	// Print out orbital threshold
 	printf("%4i %8.3e %8.3f\n", io+1, val, t.get());
@@ -244,11 +251,11 @@ int main(int argc, char **argv) {
 
 	// Orbital density matrix is
 	arma::mat Po=Ca.col(io)*arma::trans(Ca.col(io));
-	double vala=compute_threshold(intgrid,Po,thr);
+	double vala=compute_threshold(intgrid,Po,thr,false);
 
 	if(io<Nelb) {
 	  Po=Cb.col(io)*arma::trans(Cb.col(io));
-	  double valb=compute_threshold(intgrid,Po,thr);
+	  double valb=compute_threshold(intgrid,Po,thr,false);
 	  
 	  // Print out orbital threshold
 	  printf("%4i %8.3e %8.3e %8.3f\n", io+1, vala, valb, t.get());
@@ -263,7 +270,7 @@ int main(int argc, char **argv) {
   }
 
   if(set.get_bool("SICThr")) {
-    // Calculate orbital density thresholds
+    // Calculate SIC orbital density thresholds
 
     // Integration grid
     DFTGrid intgrid(&basis,true);
@@ -283,7 +290,7 @@ int main(int argc, char **argv) {
 	
 	// Orbital density matrix is
 	arma::mat Po=arma::real(CW.col(io)*arma::trans(CW.col(io)));
-	double val=compute_threshold(intgrid,Po,thr);
+	double val=compute_threshold(intgrid,Po,thr,false);
 
 	// Print out orbital threshold
 	printf("%4i %8.3e %8.3f\n", (int) io+1, val, t.get());
@@ -302,11 +309,11 @@ int main(int argc, char **argv) {
 
 	// Orbital density matrix is
 	arma::mat Po=arma::real(CWa.col(io)*arma::trans(CWa.col(io)));
-	double vala=compute_threshold(intgrid,Po,thr);
+	double vala=compute_threshold(intgrid,Po,thr,false);
 	
 	if(io<CWb.n_cols) {
 	  Po=arma::real(CWb.col(io)*arma::trans(CWb.col(io)));
-	  double valb=compute_threshold(intgrid,Po,thr);
+	  double valb=compute_threshold(intgrid,Po,thr,false);
 	  
 	  // Print out orbital threshold
 	  printf("%4i %8.3e %8.3e %8.3f\n", (int) io+1, vala, valb, t.get());
@@ -317,6 +324,36 @@ int main(int argc, char **argv) {
 	}
       }	
     }
+  }
+
+  if(set.get_bool("DensThr")) {
+    // Calculate SIC orbital density thresholds
+
+    // Integration grid
+    DFTGrid intgrid(&basis,true);
+    intgrid.construct_becke(set.get_double("OrbThrGrid"));
+
+    // Threshold is
+    double thr=set.get_double("OrbThrVal");
+
+    Timer t;
+
+    printf("\n%10s %9s %8s\n","density","thr","t (s)");
+    if(!restr) {
+      double aval=compute_threshold(intgrid,Pa,thr*arma::trace(P*basis.overlap()),true);
+      printf("%10s %8.3e %8.3f\n", "alpha", aval, t.get());
+      fflush(stdout);
+      t.set();
+      
+      double bval=compute_threshold(intgrid,Pb,thr*arma::trace(P*basis.overlap()),true);
+      printf("%10s %8.3e %8.3f\n", "beta", bval, t.get());
+      fflush(stdout);
+      t.set();
+    }
+
+    double val=compute_threshold(intgrid,P,thr*arma::trace(P*basis.overlap()),true);
+    printf("%10s %8.3e %8.3f\n", "total", val, t.get());
+    fflush(stdout);
   }
   
 
