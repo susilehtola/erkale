@@ -132,6 +132,8 @@ class ElementBasisSet {
 
   /// Get the shells
   std::vector<FunctionShell> get_shells() const;
+  /// Get the shells for am value
+  std::vector<FunctionShell> get_shells(int am) const;
 
   /// Get exponents and contraction coefficients of angular momentum shell am
   void get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am) const;
