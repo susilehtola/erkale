@@ -228,6 +228,15 @@ std::vector<FunctionShell> ElementBasisSet::get_shells() const {
   return bf;
 }
 
+std::vector<FunctionShell> ElementBasisSet::get_shells(int am) const {
+  std::vector<FunctionShell> ret;
+  for(size_t i=0;i<bf.size();i++)
+    if(bf[i].get_am() == am)
+      ret.push_back(bf[i]);
+
+  return ret;
+}
+
 void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am) const {
   // Count number of exponents and shells that have angular momentum am
   int nsh=0;
