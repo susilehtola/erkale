@@ -112,12 +112,12 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const arma::vec & s
   // Loop over angular momenta
   for(int am=0;am<=bas.get_max_am();am++) {
     // Get primitives and contraction coefficients
-    std::vector<double> exps;
+    arma::vec exps;
     arma::mat contr;
     bas.get_primitives(exps,contr,am);
 
     // Do we need to calculate something?
-    if(exps.size()) {
+    if(exps.n_elem) {
 
       int amval=am;
       if(coulomb)

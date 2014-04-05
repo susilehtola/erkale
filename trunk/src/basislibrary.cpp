@@ -237,11 +237,11 @@ std::vector<FunctionShell> ElementBasisSet::get_shells(int am) const {
   return ret;
 }
 
-void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coeffs, int am) const {
+void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int am) const {
   // Count number of exponents and shells that have angular momentum am
   int nsh=0;
-  // Clear current exponents
-  exps.clear();
+  // Helper
+  std::vector<double> exps;
 
   for(size_t ish=0;ish<bf.size();ish++)
     if(bf[ish].get_am()==am) {
@@ -268,10 +268,14 @@ void ElementBasisSet::get_primitives(std::vector<double> & exps, arma::mat & coe
     }
 
   // Allocate returned contractions
-  coeffs=arma::mat(exps.size(),nsh);
-
+  coeffs.zeros(exps.size(),nsh);
+  expsv.zeros(exps.size());
+  
   // Collect contraction coefficients. Loop over exponents
   for(size_t iexp=0;iexp<exps.size();iexp++) {
+    // Store exponent
+    expsv[iexp]=exps[iexp];
+
     int iish=0;
     // Loop over shells
     for(size_t ish=0;ish<bf.size();ish++)
@@ -369,7 +373,7 @@ void ElementBasisSet::augment(int naug) {
   // Loop over am
   for(int am=0;am<=get_max_am();am++) {
     // Get the current contraction pattern
-    std::vector<double> exps;
+    arma::vec exps;
     arma::mat coeffs;
     get_primitives(exps,coeffs,am);
 
@@ -378,8 +382,8 @@ void ElementBasisSet::augment(int naug) {
       continue;
 
     // Compute the new exponents
-    double ed=exps[exps.size()-1];
-    double el=exps[exps.size()-2];
+    double ed=exps(exps.n_elem-1);
+    double el=exps(exps.n_elem-2);
     for(int i=0;i<naug;i++) {
       double aug=el/pow(el/ed,i+2);
 
@@ -615,7 +619,7 @@ void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
     // Loop over angular momentum
     for(int l=0;l<=el.get_max_am();l++) {
       // Get exponents and contraction coefficients
-      std::vector<double> exps;
+      arma::vec exps;
       arma::mat coeffs;
       el.get_primitives(exps,coeffs,l);
 
@@ -626,9 +630,9 @@ void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
       fprintf(out,"%4i %4i %4i\n",(int) exps.size(),(int) coeffs.n_cols,0);
 
       // Loop over exponents
-      for(size_t iexp=0;iexp<exps.size();iexp++) {
+      for(size_t iexp=0;iexp<exps.n_elem;iexp++) {
 	// Print exponent
-	fprintf(out,"% 14.8f",exps[iexp]);
+	fprintf(out,"% 14.8f",exps(iexp));
 	// and contraction scheme
 	int np=1; // amount of printed entries
 	for(size_t ic=0;ic<coeffs.n_cols;ic++) {

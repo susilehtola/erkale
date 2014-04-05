@@ -3050,7 +3050,7 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
 
   // Contraction schemes for the nuclei
   std::vector< std::vector<arma::mat> > coeffs(nuclei.size());
-  std::vector< std::vector< std::vector<double> > > exps(nuclei.size());
+  std::vector< std::vector<arma::vec> > exps(nuclei.size());
   // Is puream used on the shell?
   std::vector< std::vector<bool> > puream(nuclei.size());
 
@@ -3103,7 +3103,7 @@ BasisSet BasisSet::decontract(arma::mat & m) const {
 
     // Exponents and contraction schemes
     for(int am=0;am<=elbas.get_max_am();am++) {
-      std::vector<double> z;
+      arma::vec z;
       arma::mat c;
       elbas.get_primitives(z,c,am);
       coeffs[inuc].push_back(c);
