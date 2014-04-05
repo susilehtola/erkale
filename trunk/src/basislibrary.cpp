@@ -632,12 +632,13 @@ void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
       // Loop over exponents
       for(size_t iexp=0;iexp<exps.n_elem;iexp++) {
 	// Print exponent
-	fprintf(out,"% 14.8f",exps(iexp));
+	fprintf(out,"% 18.8f",exps(iexp));
 	// and contraction scheme
 	int np=1; // amount of printed entries
 	for(size_t ic=0;ic<coeffs.n_cols;ic++) {
 	  if(np==0)
-	    fprintf(out,"% 14.8f",coeffs(iexp,ic));
+	    // Sync with exponent style
+	    fprintf(out,"% 18.8f",coeffs(iexp,ic));
 	  else
 	    fprintf(out," % .8f",coeffs(iexp,ic));
 	  np++;
