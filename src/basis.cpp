@@ -3235,6 +3235,10 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
   for(size_t i=0;i<dec.size();i++)
     dec[i]--;
 
+  // Rotation?
+  bool rotate=set.get_bool("BasisRotate");
+  double cutoff=set.get_double("BasisCutoff");
+
   // Create basis set
   BasisSet basis(Nat,set);
   // and add atoms to basis set
@@ -3285,9 +3289,12 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
       for(size_t j=0;j<dec.size();j++)
 	if(i==dec[j])
 	  decon=true;
+
     if(decon)
       elbas.decontract();
-
+    else if(rotate)
+      elbas.P_orthogonalize(cutoff);
+    
     basis.add_shells(i,elbas);
   }
 
