@@ -42,9 +42,6 @@ typedef struct {
 /// Get scanning exponents
 arma::vec get_scanning_exponents(double min, double max, size_t Np);
 
-/// Compute overlap of normalized Gaussian primitives
-arma::mat overlap(const arma::vec & z, const arma::vec & zp, int am);
-
 /**
  * Compute completeness profile for element with given scanning exponents
  *
