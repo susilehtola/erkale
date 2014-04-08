@@ -3251,10 +3251,10 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
     std::string el=atoms[i].el;
 
     // Determine if nucleus is BSSE or not
-    nuc.bsse=0;
+    nuc.bsse=false;
     if(el.size()>3 && el.substr(el.size()-3,3)=="-Bq") {
       // Yes, this is a BSSE nucleus
-      nuc.bsse=1;
+      nuc.bsse=true;
       el=el.substr(0,el.size()-3);
     }
 
