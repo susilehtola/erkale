@@ -156,7 +156,7 @@ class ElementBasisSet {
    * Sets. Segmented Polarization Consistent Basis Sets",
    * J. Chem. Theory Comput. 10, 1074 (2014).
    */
-  void P_orthogonalize(double cutoff=1e-4, double Cortho=1e-4);
+  void P_orthogonalize(double cutoff=1e-8, double Cortho=1e-4);
 
   /// Get maximum angular momentum used in the shells
   int get_max_am() const;
@@ -263,7 +263,7 @@ class BasisSetLibrary {
    * the threshold in the intermediate normalization (largest
    * coefficient is set to unity).
    */
-  void P_orthogonalize(double cutoff=1e-4, double Cortho=1e-4);
+  void P_orthogonalize(double cutoff=1e-8, double Cortho=1e-4);
 
   /// Augment the basis
   void augment(int naug);

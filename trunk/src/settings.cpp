@@ -40,6 +40,10 @@ void Settings::add_scf_settings() {
 
   // Default basis set
   add_string("Basis", "Basis set used in calculation", "aug-cc-pVTZ");
+  // Rotate basis set to drop out redundant functions?
+  add_bool("BasisRotate", "Rotate basis set to remove redundant functions?", true);
+  // Cutoff for redundant functions
+  add_double("BasisCutoff", "Cutoff for dropping out small primitives from contraction", 1e-8);
 
   // Input system
   add_string("System", "System as an xyz file", "atoms.xyz");
