@@ -25,15 +25,15 @@
 #include <cfloat>
 
 // Value of moment of electron density in Fourier space
-#define moment(i) (pow(dens[i].p,2+mom)*dens[i].d)
-#define density(i) (pow(dens[i].p,2)*dens[i].d)
+#define moment(i,k) (pow(dens[i].p,k+2) * dens[i].d)
+// Value of momentum density
+#define density(i)  (pow(dens[i].p,2)   * dens[i].d)
 
 // Integration rules
-#define roughdens(i) ((density(i-2)+4.0*density(i)+density(i+2))*(dens[i+2].p-dens[i-2].p)/6.0)
-#define finedens(i)  ((density(i-2)+4.0*density(i-1)+2.0*density(i)+4.0*density(i+1)+density(i+2))*(dens[i+2].p-dens[i-2].p)/12.0)
-
-#define roughmom(i)  ((moment(i-2)+4.0*moment(i)+moment(i+2))*(dens[i+2].p-dens[i-2].p)/6.0)
-#define finemom(i)   ((moment(i-2)+4.0*moment(i-1)+2.0*moment(i)+4.0*moment(i+1)+moment(i+2))*(dens[i+2].p-dens[i-2].p)/12.0)
+#define finedens(i)   ( (density(i-2)  + 4.0*density(i-1)  + 2.0*density(i)  + 4.0*density(i+1)  + density(i+2)  ) * (dens[i+2].p-dens[i-2].p)/12.0)
+#define roughdens(i)  ( (density(i-2)                      + 4.0*density(i)                      + density(i+2)  ) * (dens[i+2].p-dens[i-2].p)/6.0)
+#define finemom(i,k)  ( (moment(i-2,k) + 4.0*moment(i-1,k) + 2.0*moment(i,k) + 4.0*moment(i+1,k) + moment(i+2,k) ) * (dens[i+2].p-dens[i-2].p)/12.0)
+#define roughmom(i,k) ( (moment(i-2,k)                     + 4.0*moment(i,k)                     + moment(i+2,k) ) * (dens[i+2].p-dens[i-2].p)/6.0)
 
 // Maximum number of points allowed for converging number of electrons
 #define MAXPOINTS 4000
@@ -857,8 +857,8 @@ void EMD::optimize_moments(const std::vector<int> & moms, bool verbose, double t
 
       // Calculate <p^k>
       for(size_t i=dens.size()-3;i<dens.size();i-=4) {
-	rough=roughmom(i);
-	fine=finemom(i);
+	rough=roughmom(i,mom);
+	fine=finemom(i,mom);
 
 	momval[imom]+=fine;
 	momerr[imom]+=fabs(fine-rough)/15.0;
