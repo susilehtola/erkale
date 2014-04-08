@@ -19,9 +19,11 @@
 #include "elements.h"
 #include "mathf.h"
 #include "stringutil.h"
+#include "linalg.h"
 
 #include <algorithm>
 #include <fstream>
+#include <cfloat>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -335,16 +337,19 @@ void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int 
 	  exps.push_back(shc[iexp].z);
       }
     }
+  
+  // Allocate room for exponents
+  expsv.zeros(exps.size());
+  for(size_t iexp=0;iexp<exps.size();iexp++)
+    expsv(iexp)=exps[iexp];
+  // Sort in descending order
+  expsv=arma::sort(expsv,"descend");
 
   // Allocate returned contractions
   coeffs.zeros(exps.size(),nsh);
-  expsv.zeros(exps.size());
   
   // Collect contraction coefficients. Loop over exponents
-  for(size_t iexp=0;iexp<exps.size();iexp++) {
-    // Store exponent
-    expsv[iexp]=exps[iexp];
-
+  for(size_t iexp=0;iexp<expsv.n_elem;iexp++) {
     int iish=0;
     // Loop over shells
     for(size_t ish=0;ish<bf.size();ish++)
@@ -356,7 +361,7 @@ void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int 
 	// Find current exponent
 	bool found=0;
 	for(size_t i=0;i<shc.size();i++)
-	  if(shc[i].z==exps[iexp]) {
+	  if(shc[i].z==expsv(iexp)) {
 	    // Found exponent!
 	    found=1;
 	    // Store contraction coefficient.
@@ -373,6 +378,18 @@ void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int 
 	iish++;
       }
   }
+
+  /*
+  // Get overlap of primitives
+  arma::mat S=overlap(expsv,expsv,am);
+  
+  // Compute overlap of functions. First normalize
+  arma::mat genc(coeffs);
+  for(size_t i=0;i<genc.n_cols;i++)
+    genc.col(i)/=sqrt(arma::as_scalar(arma::trans(genc.col(i))*S*genc.col(i)));
+  arma::mat covl=arma::trans(genc)*S*genc;
+  covl.print("Contraction overlap");
+  */
 }
 
 int ElementBasisSet::get_max_am() const {
@@ -388,54 +405,416 @@ int ElementBasisSet::get_am(size_t ind) const {
 }
 
 void ElementBasisSet::decontract() {
-  // Create list of exponents: zeta[l][1,..,nx]
-  std::vector< std::vector<double> > zeta;
-  zeta.resize(get_max_am()+1);
+  // Create new basis set
+  ElementBasisSet decontr(symbol);
+  for(int am=0;am<=get_max_am();am++) {
+    // Get contraction style
+    arma::vec exps;
+    arma::mat coeffs;
+    get_primitives(exps,coeffs,am);
 
-  // Loop over shells
-  for(size_t ish=0;ish<bf.size();ish++) {
-    // Angular momentum of the shell is
-    int am=bf[ish].get_am();
-
-    // Get exponents
-    std::vector<contr_t> c=bf[ish].get_contr();
-
-    // See if these need to be added to the list.
-    for(size_t iexp=0;iexp<c.size();iexp++) {
-      if(zeta[am].size()==0)
-	zeta[am].push_back(c[iexp].z);
-      else {
-	// Get upper bound
-	std::vector<double>::iterator high;
-	high=std::upper_bound(zeta[am].begin(),zeta[am].end(),c[iexp].z);
-
-	// Corresponding index is
-	size_t ind=high-zeta[am].begin();
-
-	if(ind>0 && zeta[am][ind-1]==c[iexp].z)
-	  // Already on list. Don't do anything.
-	  ;
-	else {
-	  // Term does not exist, add it
-	  zeta[am].insert(high,c[iexp].z);
-	}
-      }
+    for(size_t iexp=0;iexp<exps.n_elem;iexp++) {
+      // Create new shell
+      FunctionShell tmp(am);
+      tmp.add_exponent(1.0,exps(iexp));
+      decontr.add_function(tmp);
     }
   }
 
-  // Create new basis set
-  ElementBasisSet decontr(symbol);
-  for(int am=0;am<=get_max_am();am++)
-    for(size_t iexp=0;iexp<zeta[am].size();iexp++) {
-      // Create new shell
-      FunctionShell tmp(am);
-      tmp.add_exponent(1.0,zeta[am][iexp]);
-      decontr.add_function(tmp);
-    }
+  // Sort basis
   decontr.sort();
 
   // Change to decontracted set
   *this=decontr;
+}
+
+void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::mat & cgen, int am) const {
+  // Get current contraction style
+  arma::vec exps;
+  arma::mat coeffs;
+  get_primitives(exps,coeffs,am);
+  
+  // Find indices of free functions
+  std::vector<size_t> freex, freec;
+  for(size_t iexp=0;iexp<exps.n_elem;iexp++) {
+    // List contractions exponents is in
+    std::vector<size_t> icontr;
+    for(size_t ic=0;ic<coeffs.n_cols;ic++)
+      if(coeffs(iexp,ic)!=0.0)
+	icontr.push_back(ic);
+    
+    // Loop over contractions to check for free functions
+    for(size_t ic=0;ic<icontr.size();ic++) {
+      // Check if any other exponents appear in the contraction
+      arma::vec ch=coeffs.col(icontr[ic]);
+      // Set to zero and check norm
+      ch(iexp)=0.0;
+      if(arma::dot(ch,ch) == 0.0) {
+	// Exponent is free.
+	freex.push_back(iexp);
+	freec.push_back(icontr[ic]);
+	continue;
+      }
+    }
+  }
+
+  // Collect free functions
+  zfree.zeros(freex.size());
+  for(size_t i=0;i<freex.size();i++)
+    zfree(i)=exps(freex[i]);
+  
+  // Collect generally contracted exponents and their coefficients
+  zgen.zeros(exps.n_elem-freex.size());
+  cgen.zeros(zgen.n_elem,coeffs.n_cols-freec.size());
+  
+  size_t ix=0;
+  for(size_t iexp=0;iexp<exps.n_elem;iexp++) {
+    // Check if exponent is free
+    bool free=false;
+    for(size_t i=0;i<freex.size();i++)
+      if(iexp == freex[i])
+	free=true;
+    if(free) continue;
+    
+    // Store exponent
+    zgen(ix)=exps(iexp);
+    
+    // Find coefficients for exponent
+    size_t ic=0;
+    for(size_t icontr=0;icontr<coeffs.n_cols;icontr++) {
+      // If contraction free?
+      free=false;
+      for(size_t i=0;i<freec.size();i++)
+	if(icontr == freec[i])
+	  free=true;
+      if(free) continue;
+      
+      cgen(ix,ic++)=coeffs(iexp,icontr);
+    }
+    
+    // Increment exponent
+    ix++;
+  }
+
+  /*
+  arma::trans(exps).print("All exponents");
+  coeffs.print("Contraction scheme");
+  
+  arma::trans(zfree).print("Free exponents: ");
+  arma::trans(zgen).print("General exponents");
+  cgen.print("General contractions");
+  */
+}
+
+void ElementBasisSet::orthonormalize() {
+  // Helper: orthonormalized basis
+  ElementBasisSet orthbas(symbol);
+
+  // Loop over am
+  for(int am=0;am<=get_max_am();am++) {
+    // Get the current contraction pattern
+    arma::vec freex, genx;
+    arma::mat genc;
+    get_primitives(freex,genx,genc,am);
+    
+    // Get overlap of primitives
+    arma::mat S=overlap(genx,genx,am);
+    
+    // Normalize contractions
+    for(size_t i=0;i<genc.n_cols;i++)
+      genc.col(i)/=sqrt(arma::as_scalar(arma::trans(genc.col(i))*S*genc.col(i)));
+
+    // Compute overlap of contractions
+    arma::mat Sovl=arma::trans(genc)*S*genc;
+    // Do symmetric orthonormalization
+    arma::mat Sinvh=SymmetricOrth(Sovl);
+    // and adapt contraction coefficients
+    genc=genc*Sinvh;
+
+    // Store functions
+    for(size_t ic=0;ic<genc.n_cols;ic++) {
+      // Create new shell
+      FunctionShell tmp(am);
+      for(size_t iexp=0;iexp<genx.n_elem;iexp++) {
+	tmp.add_exponent(genc(iexp,ic),genx(iexp));
+      }
+      orthbas.add_function(tmp);
+    }
+    // and free primitives
+    for(size_t iexp=0;iexp<freex.n_elem;iexp++) {
+      FunctionShell tmp(am);
+      tmp.add_exponent(1.0,freex(iexp));
+      orthbas.add_function(tmp);
+    }
+  }
+
+  *this=orthbas;
+}
+
+double P_innerprod_inout(const arma::vec & ai, const arma::mat & S, const arma::vec & aj, size_t P) {
+  return arma::as_scalar( arma::trans(ai.subvec(0,P)) * S.submat(0,0,P,P) * aj.subvec(0,P) );
+}
+
+double P_innerprod_outin(const arma::vec & ai, const arma::mat & S, const arma::vec & aj, size_t P) {
+  size_t N=ai.n_elem-1;
+
+  return arma::as_scalar( arma::trans(ai.subvec(N-P,N)) * S.submat(N-P,N-P,N,N) * aj.subvec(N-P,N) );
+}
+
+size_t count_shared(const arma::vec & ai, const arma::vec & aj) {
+  size_t nshared=0;
+  for(size_t fi=0;fi<ai.n_elem;fi++)
+    if(ai(fi)!=0.0 && aj(fi)!=0.0)
+      nshared++;
+  return nshared;
+}
+
+bool treated_inout(const arma::mat & c, size_t i, size_t j) {
+  // Sanity check - is block of tight functions already empty?
+  bool empty=true;
+  for(size_t fi=0;fi<=i;fi++) {
+    if(c(fi,j)!=0.0)
+      empty=false;
+  }
+
+  return empty;
+}
+
+bool treated_outin(const arma::mat & c, size_t i, size_t j) {
+  // Sanity check - is block of diffuse functions already empty?
+  bool empty=true;
+  for(size_t fi=c.n_rows-c.n_cols+i;fi<c.n_rows;fi++) {
+    if(c(fi,j)!=0.0)
+      empty=false;
+  }
+
+  return empty;
+}	  
+
+void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
+  // Helper: orthogonalized basis
+  ElementBasisSet orthbas(symbol);
+
+  // Always use a nonzero cutoff because of truncation errors
+  cutoff=std::max(cutoff,100*DBL_EPSILON);
+
+  // Loop over am
+  for(int am=0;am<=get_max_am();am++) {
+    // Get the current contraction pattern
+    arma::vec freex, genx;
+    arma::mat genc;
+    get_primitives(freex,genx,genc,am);
+
+    if(genc.n_cols) {
+      // Get overlap of primitives
+      arma::mat S=overlap(genx,genx,am);
+      
+      // Compute overlap of functions. First normalize
+      for(size_t i=0;i<genc.n_cols;i++)
+	genc.col(i)/=sqrt(arma::as_scalar(arma::trans(genc.col(i))*S*genc.col(i)));
+
+      /*
+      arma::mat covl=arma::trans(genc)*S*genc;
+      covl.print("Contraction overlap");
+      */      
+
+      // Intermediate normalization
+      for(size_t i=0;i<genc.n_cols;i++) {
+	// Find maximum coefficient
+	arma::vec hlp=arma::abs(genc.col(i));
+	arma::uword ind;
+	hlp.max(ind);
+	// and normalize it to unity
+	genc.col(i)/=genc(ind,i);
+      }
+
+      // arma::trans(genx).print("Exponents");
+      // genc.print("Contraction scheme");
+      
+      // Inside-out purification
+      for(size_t i=0;i<genc.n_cols-1;i++) {
+	// P values
+	arma::uvec Pval(genc.n_cols-1-i);
+	size_t iP=0;
+
+	for(size_t j=i+1;j<genc.n_cols;j++) {
+	  // Initially set P = M
+	  size_t P=genx.n_rows-1;
+	  //	  printf("in-out P: i = %3i, j = %3i\n",(int) i, (int) j);
+	  
+	  // Sanity check - is block of tight functions already empty?
+	  if(treated_inout(genc,i,j)) {
+	    continue;
+	  }
+	  // Sanity check - do the functions even share any exponents?
+	  if(!count_shared(genc.col(i),genc.col(j))) {
+	    Pval(iP++)=P;
+	    continue;
+	  }
+	  
+	  while(true) {
+	    // eqn (7): inner products
+	    double aii=P_innerprod_inout(genc.col(i),S,genc.col(i),P);
+	    double aij=P_innerprod_inout(genc.col(i),S,genc.col(j),P);
+	    double ajj=P_innerprod_inout(genc.col(j),S,genc.col(j),P);
+	  
+	    // Compute linear dependency
+	    double Op=fabs(aij)/sqrt(aii*ajj);
+	    //	    printf("\tP = %3i, Op = %e\n",(int) P, Op);
+
+	    if(1-Op <= Cortho)
+	      // Reached sufficient value of P
+	      break;
+
+	    else if(P==0) {
+	      // arma::trans(genc.col(i)).print("ai");
+	      // arma::trans(genc.col(j)).print("aj");
+	      throw std::runtime_error("Error in P-orthogonalization in-out routine.\n");
+
+	    } else {
+	      // Decrement P
+	      P--;
+	    }
+	  }
+
+	  // Store P
+	  Pval(iP++)=P;
+	}
+
+	// Orthogonalize
+	size_t P=Pval.min();
+	for(size_t j=i+1;j<genc.n_cols;j++) {
+	  // Sanity check - do the functions even share any exponents?
+	  if(!count_shared(genc.col(i),genc.col(j))) {
+	    continue;
+	  }
+	  // Sanity check - is block of tight functions already empty?
+	  if(treated_inout(genc,i,j)) {
+	    continue;
+	  }
+
+	  // eqn (7): inner products
+	  double aii=P_innerprod_inout(genc.col(i),S,genc.col(i),P);
+	  double aij=P_innerprod_inout(genc.col(i),S,genc.col(j),P);
+	
+	  // Factor to use in elimination, eqn (8)
+	  double xP=aij/aii;
+	
+	  // Orthogonalize: eqn (4)
+	  genc.col(j) -= xP*genc.col(i);
+	}
+      }
+
+      // genc.print("Inside-out purified");
+      
+      // Outside-in purification
+      for(size_t i=genc.n_cols-1;i>0;i--) {
+
+	// P values
+	arma::uvec Pval(i);
+	size_t iP=0;
+
+	for(size_t j=i-1;j<genc.n_cols;j--) {
+	  // Initially set P = M
+	  size_t P=genx.n_rows-1;
+
+	  // Sanity check - do the functions even share any exponents?
+	  if(!count_shared(genc.col(i),genc.col(j))) {
+	    Pval(iP++)=P;
+	    continue;
+	  }
+	  // Sanity check - is block of diffuse functions already empty?
+	  if(treated_outin(genc,i,j)) {
+	    continue;
+	  }
+
+	  while(true) {
+	    // eqn (7): inner products
+	    double aii=P_innerprod_outin(genc.col(i),S,genc.col(i),P);
+	    double aij=P_innerprod_outin(genc.col(i),S,genc.col(j),P);
+	    double ajj=P_innerprod_outin(genc.col(j),S,genc.col(j),P);
+	  
+	    // Compute linear dependency
+	    double Op=fabs(aij)/sqrt(aii*ajj);
+	    //printf("\tP = %3i, Op = %e\n",(int) P, Op);
+
+	    if(1-Op <= Cortho) {
+	      // Reached sufficient value of P
+	      break;
+	      
+	    } else if(P==0) {
+	      // arma::trans(genc.col(i)).print("ai");
+	      // arma::trans(genc.col(j)).print("aj");
+	      throw std::runtime_error("Error in P-orthogonalization out-in routine.\n");
+
+	    } else {
+	      // Decrement P
+	      P--;
+	    }
+	  }
+
+	  // Store value
+	  Pval(iP++)=P;
+	}
+	
+	// Orthogonalize
+	size_t P=Pval.min();
+	for(size_t j=i-1;j<genc.n_cols;j--) {
+	  // Sanity check - do the functions even share any exponents?
+	  if(!count_shared(genc.col(i),genc.col(j))) {
+	    continue;
+	  }
+	  // Sanity check - is block of diffuse functions already empty?
+	  if(treated_outin(genc,i,j)) {
+	    continue;
+	  }
+
+	  // eqn (7): inner products
+	  double aii=P_innerprod_outin(genc.col(i),S,genc.col(i),P);
+	  double aij=P_innerprod_outin(genc.col(i),S,genc.col(j),P);
+	
+	  // Factor to use in elimination, eqn (8)
+	  double xP=aij/aii;
+	
+	  // Orthogonalize: eqn (4)
+	  genc.col(j) -= xP*genc.col(i);
+	}
+      }
+      
+      // Intermediate normalization
+      for(size_t i=0;i<genc.n_cols;i++) {
+	// Find maximum coefficient
+	arma::vec hlp=arma::abs(genc.col(i));
+	arma::uword ind;
+	hlp.max(ind);
+	// and normalize it to unity
+	genc.col(i)/=genc(ind,i);
+      }
+
+      //      genc.print("Refined scheme");
+    }
+    
+    // Add contracted functions
+    for(size_t ic=0;ic<genc.n_cols;ic++) {
+      // Create new shell
+      FunctionShell tmp(am);
+      for(size_t iexp=0;iexp<genx.n_elem;iexp++) {
+	if(fabs(genc(iexp,ic))>0.0 && fabs(genc(iexp,ic))>=cutoff)
+	  tmp.add_exponent(genc(iexp,ic),genx(iexp));
+      }
+      orthbas.add_function(tmp);
+    }
+
+    // and free primitives
+    for(size_t iexp=0;iexp<freex.n_elem;iexp++) {
+      FunctionShell tmp(am);
+      tmp.add_exponent(1.0,freex(iexp));
+      orthbas.add_function(tmp);
+    }
+  }
+
+  // Switch to orthogonalized basis
+  *this=orthbas;
 }
 
 void ElementBasisSet::augment(int naug) {
@@ -810,6 +1189,16 @@ void BasisSetLibrary::decontract(){
   name="Decontracted "+name;
   for(size_t iel=0;iel<elements.size();iel++)
     elements[iel].decontract();
+}
+
+void BasisSetLibrary::orthonormalize() {
+  for(size_t iel=0;iel<elements.size();iel++)
+    elements[iel].orthonormalize();
+}
+
+void BasisSetLibrary::P_orthogonalize(double Cortho, double cutoff) {
+  for(size_t iel=0;iel<elements.size();iel++)
+    elements[iel].P_orthogonalize(Cortho, cutoff);
 }
 
 void BasisSetLibrary::augment(int naug){
