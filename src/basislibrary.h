@@ -26,6 +26,9 @@
 
 #include "basis.h"
 
+/// Compute overlap of normalized Gaussian primitives
+arma::mat overlap(const arma::vec & z, const arma::vec & zp, int am);
+
 /// Find angular momentum
 int find_am(char am);
 

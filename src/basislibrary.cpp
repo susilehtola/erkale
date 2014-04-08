@@ -30,6 +30,75 @@
 #include <stdexcept>
 
 
+/// Compute overlap of normalized Gaussian primitives
+arma::mat overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
+  arma::mat S(iexps.size(),jexps.size());
+
+  switch(am) {
+  case(0):
+    {
+      for(size_t i=0;i<iexps.n_elem;i++)
+	for(size_t j=0;j<jexps.n_elem;j++) {
+	  // Sum of exponents
+	  double zeta=iexps(i) + jexps(j);
+	  // Helpers
+	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
+	  double s_eta=sqrt(eta);
+	  S(i,j)=s_eta*sqrt(s_eta);
+	}
+    }
+    break;
+
+  case(1):
+    {
+      for(size_t i=0;i<iexps.n_elem;i++)
+	for(size_t j=0;j<jexps.n_elem;j++) {
+	  // Sum of exponents
+	  double zeta=iexps(i) + jexps(j);
+	  // Helpers
+	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
+	  double s_eta=sqrt(eta);
+	  S(i,j)=s_eta*s_eta*sqrt(s_eta);
+	}
+    }
+    break;
+
+  case(2):
+    {
+      for(size_t i=0;i<iexps.n_elem;i++)
+	for(size_t j=0;j<jexps.n_elem;j++) {
+	  // Sum of exponents
+	  double zeta=iexps(i) + jexps(j);
+	  // Helpers
+	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
+	  double s_eta=sqrt(eta);
+	  S(i,j)=s_eta*s_eta*s_eta*sqrt(s_eta);
+	}
+    }
+    break;
+
+  default:
+    for(size_t i=0;i<iexps.n_elem;i++)
+      for(size_t j=0;j<jexps.n_elem;j++) {
+	// Sum of exponents
+	double zeta=iexps(i) + jexps(j);
+	// Helpers
+	double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
+	double s_eta=sqrt(eta);
+	double q_eta=sqrt(s_eta);
+
+	// Compute overlap
+	// S(i,j)=pow(eta,am/2.0+0.75)
+
+	// Calls pow(double,int) which should be pretty fast.
+	S(i,j)=pow(s_eta,am+1)*q_eta;
+      }
+  }
+
+  return S;
+}
+
+
 int find_am(char am) {
   for(int i=0;i<=max_am;i++)
     if(shell_types[i]==toupper(am))
