@@ -18,7 +18,7 @@
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
 
-std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "savedalton", "sort", "taug"};
+std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "orth", "Porth", "save", "savedalton", "sort", "taug"};
 
 
 void help() {
@@ -288,6 +288,43 @@ int main(int argc, char **argv) {
     }
     elbas.save_gaussian94(fileout);
     
+  } else if(stricmp(cmd,"orth")==0) {
+    // Sort basis set
+
+    if(argc!=4) {
+      printf("\nUsage: %s input.gbs orth output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    std::string fileout=argv[3];
+    bas.orthonormalize();
+    bas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"Porth")==0) {
+    // Sort basis set
+
+    if(argc!=6) {
+      printf("\nUsage: %s input.gbs Porth cutoff Cortho output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    double cutoff=atof(argv[3]);
+    double Cortho=atof(argv[4]);
+    std::string fileout=argv[5];
+    bas.P_orthogonalize(cutoff,Cortho);
+    bas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"save")==0) {
+    // Save basis 
+
+    if(argc!=4) {
+      printf("\nUsage: %s input.gbs save output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    std::string fileout=argv[3];
+    bas.save_gaussian94(fileout);
+
   } else if(stricmp(cmd,"savedalton")==0) {
     // Save basis in Dalton format
 
@@ -298,6 +335,7 @@ int main(int argc, char **argv) {
 
     std::string fileout=argv[3];
     bas.save_dalton(fileout);
+
   } else if(stricmp(cmd,"sort")==0) {
     // Sort basis set
 

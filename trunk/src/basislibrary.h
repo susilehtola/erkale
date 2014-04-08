@@ -140,6 +140,23 @@ class ElementBasisSet {
 
   /// Get exponents and contraction coefficients of angular momentum shell am
   void get_primitives(arma::vec & exps, arma::mat & coeffs, int am) const;
+  /// Get free primitives and generally contracted part
+  void get_primitives(arma::vec & zfree, arma::vec & zgen, arma::mat & cgen, int am) const;
+
+  /// Orthonormalize generally contracted functions. NB! This can screw up your computational efficiency!
+  void orthonormalize();
+
+  /**
+   * P-orthogonalization of basis set.
+   * A refinement on the Davidson refinement (a.k.a. "Davidson rotation").
+   *
+   * The procedure is based on the article
+   * 
+   * F. Jensen, "Unifying General and Segmented Contracted Basis
+   * Sets. Segmented Polarization Consistent Basis Sets",
+   * J. Chem. Theory Comput. 10, 1074 (2014).
+   */
+  void P_orthogonalize(double cutoff=1e-4, double Cortho=1e-4);
 
   /// Get maximum angular momentum used in the shells
   int get_max_am() const;
@@ -158,6 +175,17 @@ class ElementBasisSet {
   friend class BasisSetLibrary;
 };
 
+/// Helper for P-orthogonalization - compute inner product for inside out purification
+double P_innerprod_inout(const arma::vec & ai, const arma::mat & S, const arma::vec & aj, size_t P);
+/// Helper for P-orthogonalization - compute inner product for outside in purification
+double P_innerprod_outin(const arma::vec & ai, const arma::mat & S, const arma::vec & aj, size_t P);
+
+/// Helper for P-orthogonalization - count amount of shared exponents
+size_t count_shared(const arma::vec & ai, const arma::vec & aj);
+/// Helper for P-orthogonalization: check if functions have already been treated
+bool treated_inout(const arma::mat & c, size_t i, size_t j);
+/// Helper for P-orthogonalization: check if functions have already been treated
+bool treated_outin(const arma::mat & c, size_t i, size_t j);
 
 /**
  * \class BasisSetLibrary
@@ -222,8 +250,20 @@ class BasisSetLibrary {
   /// Normalize coefficients
   void normalize();
 
+  /// Orthonormalize generally contracted functions. NB! This can screw up your computational efficiency!
+  void orthonormalize();
+
   /// Decontract basis set
   void decontract();
+
+  /**
+   * P-orthogonalization [F. Jensen, JCTC 10, 1074 (2014)].
+   *
+   * The cutoff drops out primitives with coefficients smaller than
+   * the threshold in the intermediate normalization (largest
+   * coefficient is set to unity).
+   */
+  void P_orthogonalize(double cutoff=1e-4, double Cortho=1e-4);
 
   /// Augment the basis
   void augment(int naug);
