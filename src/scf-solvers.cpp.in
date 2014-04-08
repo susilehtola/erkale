@@ -416,7 +416,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 #else
       uscf_t refsol;
 #endif
-      if(iiter!=1 && !strict && verbose && !densityfit)
+      if(iiter!=1 && direct && !strict && verbose && !densityfit)
 	printf("Restarting Fock matrix formation from scratch.\n");
       
       form_fock(sol,refsol);
