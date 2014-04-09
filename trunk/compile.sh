@@ -51,9 +51,10 @@ MAXDERIV="5"
 
 # Current versions of libraries
 export GSLVER="1.16"
-export XCVER="2.0.2"
-export INTVER="1.1.5"
-export ARMAVER="4.000.1"
+export XCVER="2.1.0"
+# libint 1.1.6
+export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
+export ARMAVER="4.200.0"
 export CMAKEVER="2.8.12"
 export HDF5VER="1.8.12"
 
@@ -158,7 +159,7 @@ if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a
  if [ ! -d ${builddir}/libint-${INTVER} ]; then
   if [ ! -f ${srcdir}/libint-${INTVER}.tar.gz ]; then
    cd ${srcdir}
-   wget -O libint-${INTVER}.tar.gz "http://sourceforge.net/projects/libint/files/v1-releases/libint-${INTVER}.tar.gz/download"
+   wget -O libint-${INTVER}.tar.gz "https://github.com/evaleev/libint/archive/${INTVER}/libint-${INTVER}.tar.gz"
   fi
   cd ${builddir}
   tar zxf ${srcdir}/libint-${INTVER}.tar.gz
