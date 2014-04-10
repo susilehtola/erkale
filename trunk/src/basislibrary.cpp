@@ -308,6 +308,13 @@ std::vector<FunctionShell> ElementBasisSet::get_shells(int am) const {
   return ret;
 }
 
+int ElementBasisSet::get_Nbf() const {
+  int n=0;
+  for(size_t i=0;i<bf.size();i++)
+    n+=2*bf[i].get_am()+1; // 2l+1 degeneracy
+  return n;
+}
+
 void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int am) const {
   // Count number of exponents and shells that have angular momentum am
   int nsh=0;

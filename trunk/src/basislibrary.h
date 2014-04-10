@@ -162,6 +162,8 @@ class ElementBasisSet {
   int get_max_am() const;
   /// Get angular momentum of i:th shell
   int get_am(size_t ind) const;
+  /// Get amount of functions
+  int get_Nbf() const;
 
   /// Normalize coefficients
   void normalize();
