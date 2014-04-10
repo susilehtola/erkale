@@ -206,7 +206,7 @@ arma::cx_vec solve_roots_cplx(const arma::cx_vec & v);
 arma::cx_vec solve_roots_cplx(const arma::vec & v);
 /// Solve roots of v0 + v1*x + v2*x^2 + ... + v^(N-1)*x^N
 arma::vec solve_roots(const arma::vec & v);
-/// Get smallest positive root
+/// Get smallest positive element
 double smallest_positive(const arma::vec & v);
 
 
