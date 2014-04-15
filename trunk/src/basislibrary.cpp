@@ -220,7 +220,7 @@ void FunctionShell::normalize() {
 void FunctionShell::print() const {
   printf("\tam = %i, %i functions\n",am, (int) C.size());
   for(size_t i=0;i<C.size();i++)
-    printf("\t\t%e\t%e\n",C[i].c,C[i].z);
+    printf("\t\t% e\t%e\n",C[i].c,C[i].z);
 }
 
 bool FunctionShell::operator<(const FunctionShell & rhs) const {
