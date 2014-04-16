@@ -33,37 +33,26 @@ extern "C" {
 #define NFMAX 50
 
 arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t * p) {
-  // Collect elements of x
-  arma::vec x(xv->size);
-  for(size_t i=0;i<x.n_elem;i++)
-    x(i)=gsl_vector_get(xv,i);
-
-  // Take absolute value and sort into ascending order
-  x=sort(arma::abs(x),0);
-
   // Get exponent values
   arma::vec A;
 
   // Is the amount of parameters even or odd?
-  if(p->odd) {
-    A.zeros(2*x.n_elem-1);
-    
-    // Smallest exponent is at the center
-    A(0)=exp(x(0));
-    // followed by the other exponents, symmetrically copied
-    for(size_t i=1;i<x.n_elem;i++) {
-      A(2*i-1)=exp(x(i));
-      A(2*i)=exp(-x(i));
-    }
-    
-  } else {
-    A.zeros(2*x.n_elem);
-    for(size_t i=0;i<x.n_elem;i++) {
-      // Exponents are placed symmetrically around the origin.
-      A(2*i)=exp(x(i));
-      A(2*i+1)=exp(-x(i));
-    }
+  size_t N=xv->size;
+  if(p->odd)
+    A.zeros(2*N+1);
+  else
+    A.zeros(2*N);
+
+  // Place the exponents symmetrically around the origin
+  for(size_t i=0;i<N;i++) {
+    double expx=exp(gsl_vector_get(xv,i));
+    A(2*i)=expx;
+    A(2*i+1)=1.0/expx;
   }
+
+  // Center exponent?
+  if(p->odd)
+    A(A.n_elem-1)=1.0; // exp(0)
 
   return sort(A);
 }
@@ -168,10 +157,9 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
 
   // Optimized profile will be always symmetric around the midpoint,
   // so we can use this to reduce the amount of degrees of freedom in
-  // the optimization.
+  // the optimization. For even amount of exponents, the mid exponent
+  // is pinned to the midway of the interval.
   int Ndof=Nf/2;
-  if(Nf%2)
-    Ndof++;
 
   // Length of interval is
   double len=max-min;
