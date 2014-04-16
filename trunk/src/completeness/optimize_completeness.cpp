@@ -32,13 +32,40 @@ extern "C" {
 // Maximum number of functions allowed in completeness optimization
 #define NFMAX 50
 
-arma::vec get_exponents(const gsl_vector *x) {
-  // Get exponent values
-  arma::vec A(x->size);
-  for(size_t i=0;i<x->size;i++)
-    A(i)=exp(gsl_vector_get(x,i));
+arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t * p) {
+  // Collect elements of x
+  arma::vec x(xv->size);
+  for(size_t i=0;i<x.n_elem;i++)
+    x(i)=gsl_vector_get(xv,i);
 
-  return A;
+  // Take absolute value and sort into ascending order
+  x=sort(arma::abs(x),0);
+
+  // Get exponent values
+  arma::vec A;
+
+  // Is the amount of parameters even or odd?
+  if(p->odd) {
+    A.zeros(2*x.n_elem-1);
+    
+    // Smallest exponent is at the center
+    A(0)=exp(x(0));
+    // followed by the other exponents, symmetrically copied
+    for(size_t i=1;i<x.n_elem;i++) {
+      A(2*i-1)=exp(x(i));
+      A(2*i)=exp(-x(i));
+    }
+    
+  } else {
+    A.zeros(2*x.n_elem);
+    for(size_t i=0;i<x.n_elem;i++) {
+      // Exponents are placed symmetrically around the origin.
+      A(2*i)=exp(x(i));
+      A(2*i+1)=exp(-x(i));
+    }
+  }
+
+  return sort(A);
 }
 
 arma::mat self_overlap(const arma::vec & z, int am) {
@@ -62,7 +89,7 @@ arma::vec completeness_profile(const gsl_vector * x, void * params) {
   completeness_scan_t *par=(completeness_scan_t *) params;
 
   // Get exponents
-  arma::vec z=get_exponents(x);
+  arma::vec z=get_exponents(x,par);
 
   // Get self-overlap
   arma::mat Suv=self_overlap(z,par->am);
@@ -135,9 +162,19 @@ double compl_mog(const gsl_vector * x, void * params) {
   return phi;
 }
 
-std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n, bool verbose, double *mog) {
+arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, bool verbose, double *mog) {
   // Time minimization
   Timer tmin;
+
+  // Optimized profile will be always symmetric around the midpoint,
+  // so we can use this to reduce the amount of degrees of freedom in
+  // the optimization.
+  int Ndof=Nf/2;
+  if(Nf%2)
+    Ndof++;
+
+  // Length of interval is
+  double len=max-min;
 
   // Parameters for the optimization.
   completeness_scan_t pars;
@@ -146,7 +183,9 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   // Moment to optimize
   pars.n=n;
   // Scanning exponents
-  pars.scanexp=get_scanning_exponents(min,max,50*Nf+1);
+  pars.scanexp=get_scanning_exponents(-len/2.0,len/2.0,50*Nf+1);
+  // Odd amount of exponents?
+  pars.odd=Nf%2;
 
   // Maximum number of iterations
   size_t maxiter = 10000;
@@ -161,20 +200,20 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   double size;
 
   /* Starting point */
-  gsl_vector *x = gsl_vector_alloc (Nf);
-  for(int i=0;i<Nf;i++)
-    gsl_vector_set(x,i,log(10.0)*(min + (i+0.5)*(max-min)/Nf));
+  gsl_vector *x = gsl_vector_alloc (Ndof);
+  for(int i=0;i<Ndof;i++)
+    gsl_vector_set(x,i,log(10.0)*((i+0.5)*len/(2.0*Ndof)));
 
   /* Set initial step sizes to unity */
-  gsl_vector *ss = gsl_vector_alloc (Nf);
+  gsl_vector *ss = gsl_vector_alloc (Ndof);
   gsl_vector_set_all (ss, 1.0);
 
   /* Initialize method and iterate */
-  minfunc.n = Nf;
+  minfunc.n = Ndof;
   minfunc.f = compl_mog;
   minfunc.params = (void *) &pars;
 
-  s = gsl_multimin_fminimizer_alloc (T, Nf);
+  s = gsl_multimin_fminimizer_alloc (T, Ndof);
   gsl_multimin_fminimizer_set (s, &minfunc, x, ss);
 
   // Progress timer
@@ -210,7 +249,7 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
       if(verbose) {
 	t.set();
 	printf("%4u ",(unsigned int) iter);
-	for(int i=0;i<Nf;i++)
+	for(int i=0;i<Ndof;i++)
 	  // Convert to 10-base logarithm
 	  printf("% 9.5f ",log10(M_E)*gsl_vector_get(s->x,i));
 	printf(" %e  %e\n",pow(s->fval,1.0/n),size);
@@ -225,7 +264,9 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
     *mog=pow(s->fval,1.0/n);
 
   // The optimized exponents in descending order
-  arma::vec exps=arma::sort(get_exponents(s->x),1);
+  arma::vec exps=arma::sort(get_exponents(s->x,&pars),1);
+  // Move starting point to start
+  exps*=pow(10.0,min+len/2.0);
 
   gsl_vector_free(x);
   gsl_vector_free(ss);
@@ -234,24 +275,20 @@ std::vector<double> optimize_completeness(int am, double min, double max, int Nf
   if(verbose)
     printf("\nMinimization completed in %s.\n",tmin.elapsed().c_str());
 
-  // Retuned exponents
-  std::vector<double> ret(exps.n_elem);
-  for(size_t i=0;i<exps.n_elem;i++)
-    ret[i]=exps(i);
-  return ret;
+  return exps;
 }
 
 double maxwidth(int am, double tol, int nexp, int nval) {
   // Dummy value
   double width=-1.0;
-  std::vector<double> exps=maxwidth_exps(am,tol,nexp,&width,nval);
+  maxwidth_exps(am,tol,nexp,&width,nval);
   return width;
 }
 
-std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, int nval) {
+arma::vec maxwidth_exps(int am, double tol, int nexp, double *width, int nval) {
   // Error check
   if(nexp<=0) {
-    std::vector<double> exps;
+    arma::vec exps;
     return exps;
   }
 
@@ -268,7 +305,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
   double rval;
 
   // Check that right value is OK
-  std::vector<double> rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
+  arma::vec rexps=optimize_completeness(am,0.0,right,nexp,nval,false,&rval);
   while(rval<tol) {
     left=right;
     right*=2.0;
@@ -278,7 +315,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
   // Left value
   if(left==0.0) {
     double lval=rval;
-    std::vector<double> lexps;
+    arma::vec lexps;
     while(lval>tol) {
       left/=2.0;
       lexps=optimize_completeness(am,0.0,left,nexp,nval,false,&lval);
@@ -292,7 +329,7 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
 #endif
   
   // Worker stack  
-  std::vector< std::vector<double> > expstack(nth);
+  std::vector<arma::vec> expstack(nth);
   // Widths
   std::vector<double> wstack(nth);
   // Tolerances
@@ -344,18 +381,19 @@ std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, i
 
 
 /// Perform completeness-optimization of exponents
-std::vector<double> get_exponents(int am, double start, double end, double tol, int nval, bool verbose) {
+arma::vec get_exponents(int am, double start, double end, double tol, int nval, bool verbose) {
   // Exponents
-  std::vector<double> exps;
+  arma::vec exps;
   bool succ=false;
 
   // Work array
-  std::vector< std::vector<double> > expwrk;
+  std::vector<arma::vec> expwrk;
   std::vector<double> mog;
 
   // Sanity check
   if(tol<MINTAU) {
-    printf("Renormalized CO tolerance to 1e-5.\n");
+    if(verbose)
+      printf("Renormalized CO tolerance to %e.\n",MINTAU);
     tol=MINTAU;
   }
 

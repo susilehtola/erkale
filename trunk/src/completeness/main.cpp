@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
   double max=atof(argv[4]);
 
   // Form optimized set of primitives
-  std::vector<double> exps;
+  arma::vec exps;
 
   // Did we get a tolerance, or a number of functions?
   double tol=atof(argv[5]);
