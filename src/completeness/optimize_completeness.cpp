@@ -152,117 +152,130 @@ double compl_mog(const gsl_vector * x, void * params) {
 }
 
 arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, bool verbose, double *mog) {
-  // Time minimization
-  Timer tmin;
-
-  // Optimized profile will be always symmetric around the midpoint,
-  // so we can use this to reduce the amount of degrees of freedom in
-  // the optimization. For even amount of exponents, the mid exponent
-  // is pinned to the midway of the interval.
-  int Ndof=Nf/2;
+  // Optimized exponents
+  arma::vec exps;
 
   // Length of interval is
   double len=max-min;
 
-  // Parameters for the optimization.
-  completeness_scan_t pars;
-  // Angular momentum
-  pars.am=am;
-  // Moment to optimize
-  pars.n=n;
-  // Scanning exponents
-  pars.scanexp=get_scanning_exponents(-len/2.0,len/2.0,50*Nf+1);
-  // Odd amount of exponents?
-  pars.odd=Nf%2;
+  if(Nf<1) {
+    throw std::runtime_error("Cannot completeness-optimize less than one primitive.\n");
 
-  // Maximum number of iterations
-  size_t maxiter = 10000;
+  } else if(Nf==1) {
+    // Only single exponent at exp(0) = 1.0
+    exps.ones(1);
 
-  // GSL stuff
-  const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
-  gsl_multimin_fminimizer *s = NULL;
-  gsl_multimin_function minfunc;
+  } else {
+    // Time minimization
+    Timer tmin;
+    
+    // Optimized profile will be always symmetric around the midpoint,
+    // so we can use this to reduce the amount of degrees of freedom in
+    // the optimization. For even amount of exponents, the mid exponent
+    // is pinned to the midway of the interval.
+    int Ndof=Nf/2;
 
-  size_t iter = 0;
-  int status;
-  double size;
+    // Parameters for the optimization.
+    completeness_scan_t pars;
+    // Angular momentum
+    pars.am=am;
+    // Moment to optimize
+    pars.n=n;
+    // Scanning exponents
+    pars.scanexp=get_scanning_exponents(-len/2.0,len/2.0,50*Nf+1);
+    // Odd amount of exponents?
+    pars.odd=Nf%2;
 
-  /* Starting point */
-  gsl_vector *x = gsl_vector_alloc (Ndof);
-  for(int i=0;i<Ndof;i++)
-    gsl_vector_set(x,i,log(10.0)*((i+0.5)*len/(2.0*Ndof)));
+    // Maximum number of iterations
+    size_t maxiter = 10000;
 
-  /* Set initial step sizes to unity */
-  gsl_vector *ss = gsl_vector_alloc (Ndof);
-  gsl_vector_set_all (ss, 1.0);
+    // GSL stuff
+    const gsl_multimin_fminimizer_type *T = gsl_multimin_fminimizer_nmsimplex2;
+    gsl_multimin_fminimizer *s = NULL;
+    gsl_multimin_function minfunc;
 
-  /* Initialize method and iterate */
-  minfunc.n = Ndof;
-  minfunc.f = compl_mog;
-  minfunc.params = (void *) &pars;
+    size_t iter = 0;
+    int status;
+    double size;
 
-  s = gsl_multimin_fminimizer_alloc (T, Ndof);
-  gsl_multimin_fminimizer_set (s, &minfunc, x, ss);
+    /* Starting point */
+    gsl_vector *x = gsl_vector_alloc (Ndof);
+    for(int i=0;i<Ndof;i++)
+      gsl_vector_set(x,i,log(10.0)*((i+0.5)*len/(2.0*Ndof)));
 
-  // Progress timer
-  Timer t;
+    /* Set initial step sizes to unity */
+    gsl_vector *ss = gsl_vector_alloc (Ndof);
+    gsl_vector_set_all (ss, 1.0);
 
-  // Legend
-  if(verbose) {
-    printf("Optimizing tau_%i for a=[%.3f ... %.3f] of %c shell with %i exponents.\n\n",n,min,max,shell_types[am],Nf);
+    /* Initialize method and iterate */
+    minfunc.n = Ndof;
+    minfunc.f = compl_mog;
+    minfunc.params = (void *) &pars;
 
-    printf("iter ");
-    char num[80];
-    for(int i=0;i<Nf;i++) {
-      sprintf(num,"lg exp%i",i+1);
-      printf("%9s ",num);
+    s = gsl_multimin_fminimizer_alloc (T, Ndof);
+    gsl_multimin_fminimizer_set (s, &minfunc, x, ss);
+
+    // Progress timer
+    Timer t;
+
+    // Legend
+    if(verbose) {
+      printf("Optimizing tau_%i for a=[%.3f ... %.3f] of %c shell with %i exponents.\n\n",n,min,max,shell_types[am],Nf);
+
+      printf("iter ");
+      char num[80];
+      for(int i=0;i<Nf;i++) {
+	sprintf(num,"lg exp%i",i+1);
+	printf("%9s ",num);
+      }
+      printf(" %12s  %12s\n","tau","size");
     }
-    printf(" %12s  %12s\n","tau","size");
+
+    do
+      {
+	iter++;
+	status = gsl_multimin_fminimizer_iterate(s);
+
+	if (status)
+	  break;
+
+	size = gsl_multimin_fminimizer_size (s);
+	status = gsl_multimin_test_size (size, 1e-3);
+
+	if (status == GSL_SUCCESS && verbose)
+	  printf ("converged to minimum at\n");
+
+	if(verbose) {
+	  t.set();
+	  printf("%4u ",(unsigned int) iter);
+	  for(int i=0;i<Ndof;i++)
+	    // Convert to 10-base logarithm
+	    printf("% 9.5f ",log10(M_E)*gsl_vector_get(s->x,i));
+	  printf(" %e  %e\n",pow(s->fval,1.0/n),size);
+
+	  // print_gradient(s->x,(void *) &pars);
+	}
+      }
+    while (status == GSL_CONTINUE && iter < maxiter);
+
+    // Save mog
+    if(mog!=NULL)
+      *mog=pow(s->fval,1.0/n);
+
+    // The optimized exponents in descending order
+    exps=arma::sort(get_exponents(s->x,&pars),1);
+  
+    gsl_vector_free(x);
+    gsl_vector_free(ss);
+    gsl_multimin_fminimizer_free (s);
+  
+    if(verbose)
+      printf("\nMinimization completed in %s.\n",tmin.elapsed().c_str());
   }
 
-  do
-    {
-      iter++;
-      status = gsl_multimin_fminimizer_iterate(s);
-
-      if (status)
-	break;
-
-      size = gsl_multimin_fminimizer_size (s);
-      status = gsl_multimin_test_size (size, 1e-3);
-
-      if (status == GSL_SUCCESS && verbose)
-	printf ("converged to minimum at\n");
-
-      if(verbose) {
-	t.set();
-	printf("%4u ",(unsigned int) iter);
-	for(int i=0;i<Ndof;i++)
-	  // Convert to 10-base logarithm
-	  printf("% 9.5f ",log10(M_E)*gsl_vector_get(s->x,i));
-	printf(" %e  %e\n",pow(s->fval,1.0/n),size);
-
-	// print_gradient(s->x,(void *) &pars);
-      }
-    }
-  while (status == GSL_CONTINUE && iter < maxiter);
-
-  // Save mog
-  if(mog!=NULL)
-    *mog=pow(s->fval,1.0/n);
-
-  // The optimized exponents in descending order
-  arma::vec exps=arma::sort(get_exponents(s->x,&pars),1);
-  // Move starting point to start
-  exps*=pow(10.0,min+len/2.0);
-
-  gsl_vector_free(x);
-  gsl_vector_free(ss);
-  gsl_multimin_fminimizer_free (s);
-
-  if(verbose)
-    printf("\nMinimization completed in %s.\n",tmin.elapsed().c_str());
-
+  // Move starting point from 0 to start
+  exps*=std::pow(10.0,min+len/2.0);
+  
   return exps;
 }
 
