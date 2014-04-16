@@ -38,8 +38,8 @@ BasisSet form_basis(const Storage & stor);
 /// Form the density matrix
 arma::mat form_density(const Storage & stor, const std::string & kw);
 
-/// Form the density matrix
-arma::mat form_density(const Storage & stor, bool spin=false);
+/// Form the density matrix. spin toggles spin density, scf toggles reading scf density (post-HF by default if available)
+arma::mat form_density(const Storage & stor, bool spin=false, bool scf=false);
 
 /// Get the orbital coefficient matrix
 arma::mat form_orbital_C(const Storage & stor, const std::string & name);

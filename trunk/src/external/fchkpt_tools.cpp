@@ -459,7 +459,7 @@ std::vector<size_t> ge_indarr(const Storage & stor) {
 }
 
 
-arma::mat form_density(const Storage & stor, bool spin) {
+arma::mat form_density(const Storage & stor, bool spin, bool scf) {
   // Check what kind of densities are available
   std::vector<std::string> keys=stor.find_double_vec("Density");
   if(spin) {
@@ -481,16 +481,29 @@ arma::mat form_density(const Storage & stor, bool spin) {
   // The density matrix
   std::string key;
   if(keys.size()==1)
+    // Only single density matrix available
     key=keys[0];
-  else {
-    if(splitline(keys[0])[1]!="SCF")
-      key=keys[0];
-    else if(splitline(keys[1])[1]!="SCF")
-      key=keys[1];
-    else {
-      ERROR_INFO();
-      throw std::runtime_error("Could not find density matrix to use!\n");
-    }
+
+  else if(keys.size()==2) {
+    // Which index to pick?
+    int ind;
+
+    // Find SCF density
+    if(splitline(keys[0])[1]=="SCF")
+      ind=0;
+    else
+      ind=1;
+
+    // Post-HF density?
+    if(!scf)
+      ind=!ind;
+
+    // Store key
+    key=keys[ind];
+
+  } else {
+    ERROR_INFO();
+    throw std::runtime_error("Could not find density matrix to use!\n");
   }
 
   return form_density(stor,key);
