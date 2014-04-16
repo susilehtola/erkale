@@ -37,10 +37,12 @@ typedef struct {
 
   /// Scanning exponents to optimize against
   arma::vec scanexp;
+  /// Odd number of exponents?
+  bool odd;
 } completeness_scan_t;
 
 /// Get exponents. x contains the natural logarithms
-arma::vec get_exponents(const gsl_vector *x);
+arma::vec get_exponents(const gsl_vector *x, const completeness_scan_t *p);
 
 /// Compute self-overlap \f$ S_{ij} \f$
 arma::mat self_overlap(const arma::vec & z, int am);
@@ -58,15 +60,15 @@ double compl_mog(const gsl_vector * x, void * params);
  *
  * This routine uses the Nead-Miller algorithm.
  */
-std::vector<double> optimize_completeness(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL);
+arma::vec optimize_completeness(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL);
 
 /// Calculate maximum width to obtain tolerance with given amount of exponents
 double maxwidth(int am, double tol, int nexp, int n=1);
 
 /// Calculate exponents corresponding to maximum width to obtain tolerance with given amount of exponents
-std::vector<double> maxwidth_exps(int am, double tol, int nexp, double *width, int n=1);
+arma::vec maxwidth_exps(int am, double tol, int nexp, double *width, int n=1);
 
 /// Perform completeness-optimization of exponents
-std::vector<double> get_exponents(int am, double start, double end, double tol, int n=1, bool verbose=false);
+arma::vec get_exponents(int am, double start, double end, double tol, int n=1, bool verbose=false);
 
 #endif
