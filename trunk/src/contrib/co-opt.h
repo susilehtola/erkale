@@ -170,7 +170,6 @@ class CompletenessOptimizer {
     // Generate initial profile
     printf("\nStarting composition:\n");
     for(size_t am=0;am<nel.size();am++) {
-      printf("%c n=%i: ",shell_types[am],nexp*nel[am]);
       exps[am]=maxwidth_exps_table(am,cpl[am].tol,nexp*nel[am],&widths[am],OPTMOMIND);
       cpl[am].start=0.0;
       cpl[am].end=widths[am];
