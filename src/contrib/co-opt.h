@@ -118,7 +118,7 @@ class CompletenessOptimizer {
   /// Form a basis set
   virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl)=0;
   /// Form a contracted basis set. Porth toggles P-orthogonalization
-  virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl, std::vector<int> contract, bool Porth=true) {
+  virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl, std::vector<size_t> contract, bool Porth=true) {
     /// Dummy declarations
     (void) contract;
     (void) Porth;
@@ -145,32 +145,36 @@ class CompletenessOptimizer {
    * Generate initial profile by minimizing the energy.
    * Place nexp functions per occupied electronic shell, given with nel argument.
    */
-  std::vector<coprof_t> initial_profile(const std::vector<int> & nel, double cotol=1e-4, int nexp=3) {
+  std::vector<coprof_t> initial_profile(const std::vector<int> & nshells, int nexp, double cotol=1e-4) {
+    std::vector<size_t> nfuncs(nshells.begin(),nshells.end());
+    for(size_t i=0;i<nfuncs.size();i++)
+      nfuncs[i]*=nexp;
+    return initial_profile(nfuncs,cotol);
+  }
+
+  /**
+   * Generate initial profile by minimizing the energy.
+   * Amount of functions of each angular momentum given in nfuncs.
+   */
+  std::vector<coprof_t> initial_profile(const std::vector<size_t> & nfuncs, double cotol=1e-4) {
     Timer t;
     
     // Initialize profile
-    std::vector<coprof_t> cpl(nel.size());
+    std::vector<coprof_t> cpl(nfuncs.size());
     for(size_t i=0;i<cpl.size();i++) {
       cpl[i].start=0.0;
       cpl[i].end=0.0;
       cpl[i].tol=cotol;
     }
 
-    // Print amount of shells
-    printf("Shell composition:");
-    for(size_t am=0;am<nel.size();am++)
-      printf(" %i%c",nel[am],shell_types[am]);
-    printf("\n");
-    printf("Plugging in %i functions per shell.\n",nexp);
-    
     // Exponents
-    std::vector<arma::vec> exps(nel.size());
-    arma::vec widths(nel.size());
+    std::vector<arma::vec> exps(cpl.size());
+    arma::vec widths(cpl.size());
     
     // Generate initial profile
     printf("\nStarting composition:\n");
-    for(size_t am=0;am<nel.size();am++) {
-      exps[am]=maxwidth_exps_table(am,cpl[am].tol,nexp*nel[am],&widths[am],OPTMOMIND);
+    for(size_t am=0;am<cpl.size();am++) {
+      exps[am]=maxwidth_exps_table(am,cpl[am].tol,nfuncs[am],&widths[am],OPTMOMIND);
       cpl[am].start=0.0;
       cpl[am].end=widths[am];
       cpl[am].exps=exps[am];
@@ -195,15 +199,15 @@ class CompletenessOptimizer {
       Timer tstep;
 
       // Conjugate gradient step?
-      bool cg=iiter%nel.size()!=0;
+      bool cg=iiter%cpl.size()!=0;
       if(cg)
 	printf("\nConjugate gradient iteration %i\n",(int) iiter+1);
       else
 	printf("\nSteepest descent   iteration %i\n",(int) iiter+1);
 
       // Compute finite difference gradient
-      arma::vec g(nel.size());
-      for(size_t am=0;am<nel.size();am++) {
+      arma::vec g(cpl.size());
+      for(size_t am=0;am<cpl.size();am++) {
 	// Step size to use for shell
 	double h=h0*relw(am);
 
@@ -437,7 +441,7 @@ class CompletenessOptimizer {
     static size_t iter=0;
 
     // Allocate sufficient memory
-    if(cpl.size()<=addam) {
+    if(cpl.size() <= (size_t) addam) {
       cpl.resize(addam+1);
       // Set tolerance
       cpl[addam].tol=cotol;
@@ -1058,7 +1062,7 @@ class CompletenessOptimizer {
   }
 
   /// Update the contraction coefficients, return the amount of electrons in each am shell.
-  virtual std::vector<int> update_contraction(const std::vector<coprof_t> & cpl, double cutoff)=0;
+  virtual std::vector<size_t> update_contraction(const std::vector<coprof_t> & cpl, double cutoff)=0;
 
   /// Contract basis set. nel holds amount of states of each angular momentum. P toggles intermediate P-orthogonalization; returned basis is always generally contracted.
   BasisSetLibrary contract_basis(const std::vector<coprof_t> & cpl, const ValueType & refval, double tol, double nelcutoff, bool Porth=true) {
@@ -1067,14 +1071,14 @@ class CompletenessOptimizer {
     fflush(stdout);
 
     // Update the coefficients, get amount of electrons in each am shell
-    std::vector<int> nel=update_contraction(cpl,nelcutoff);
+    std::vector<size_t> nel=update_contraction(cpl,nelcutoff);
 
     Timer ttot;
 
     // How many functions to contract, counting from the tightest functions.
     // Initialize with amount of contractions on each shell; this
     // doesn't yet affect the variational freedom of the basis set.
-    std::vector<int> contract(nel);
+    std::vector<size_t> contract(nel);
     
     // Do the contraction.
     double minmog=0.0;
@@ -1091,7 +1095,7 @@ class CompletenessOptimizer {
 	  Timer tl;
 
 	  // Trial contraction
-	  std::vector<int> trial(contract);
+	  std::vector<size_t> trial(contract);
 	  trial[am]++;
 	  // Trial basis
 	  BasisSetLibrary baslib=form_basis(cpl,trial,Porth);	 
@@ -1125,7 +1129,7 @@ class CompletenessOptimizer {
     
       // Accept move?
       if(minmog<=tol) {
-	for(int am=mogs.size()-1;am<mogs.size();am--)
+	for(size_t am=mogs.size()-1;am<mogs.size();am--)
 	  if(mogs[am]==minmog) {
 	    printf("Contracting a %c function, mog is %e (%s).\n\n",shell_types[am],minmog,tc.elapsed().c_str());
 	    fflush(stdout);
