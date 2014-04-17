@@ -5,8 +5,8 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Susi Lehtola
+ * Written by Susi Lehtola, 2010-2014
+ * Copyright (c) 2010-2014, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
