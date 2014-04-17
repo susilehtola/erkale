@@ -35,26 +35,38 @@ int main(int argc, char **argv) {
   // Read in data
   for(int i=1;i<argc;i++) {
     FILE *in=fopen(argv[i],"r");
-    if(!in)
-      throw std::runtime_error("Error opening input file.\n");
+    if(!in) {
+      std::ostringstream oss;
+      oss << "Error opening input file " << argv[i] << ".\n";
+      throw std::runtime_error(oss.str());
+    }
 
     // Allocate memory
     cpls[i-1].resize(max_am+1);
 
     // Read in maximum am
     int maxam;
-    if(fscanf(in,"%i",&maxam)!=1)
-      throw std::runtime_error("Error reading maximum angular momentum.\n");
+    if(fscanf(in,"%i",&maxam)!=1) {
+      std::ostringstream oss;
+      oss << "Error reading maximum angular momentum from input file " << argv[i] << ".\n";
+      throw std::runtime_error(oss.str());
+    }
 
     // Read in ranges
     for(int am=0;am<=maxam;am++) {
       int hlp;
-      if(fscanf(in,"%i %lf %lf %lf %i",&hlp,&cpls[i-1][am].min,&cpls[i-1][am].max,&cpls[i-1][am].tol,&cpls[i-1][am].Nexp)!=5)
-	throw std::runtime_error("Error reading limits.\n");
+      if(fscanf(in,"%i %lf %lf %lf %i",&hlp,&cpls[i-1][am].min,&cpls[i-1][am].max,&cpls[i-1][am].tol,&cpls[i-1][am].Nexp)!=5) {
+	std::ostringstream oss;
+	oss << "Error reading limits from input file " << argv[i] << ".\n";
+	throw std::runtime_error(oss.str());
+      }
 
       // Check am
-      if(hlp!=am)
-	throw std::runtime_error("Error - am doesn't match!\n");
+      if(hlp!=am) {
+	std::ostringstream oss;
+	oss << "Error: angular momentum doesn't match in input file " << argv[i] << ".\n";
+	throw std::runtime_error(oss.str());
+      }
     }
 
     // Close input
