@@ -158,12 +158,30 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
   // Length of interval is
   double len=max-min;
 
+  // Parameters for the optimization.
+  completeness_scan_t pars;
+  // Angular momentum
+  pars.am=am;
+  // Moment to optimize
+  pars.n=n;
+  // Scanning exponents
+  pars.scanexp=get_scanning_exponents(-len/2.0,len/2.0,50*Nf+1);
+  // Odd amount of exponents?
+  pars.odd=Nf%2;
+
   if(Nf<1) {
     throw std::runtime_error("Cannot completeness-optimize less than one primitive.\n");
 
   } else if(Nf==1) {
-    // Only single exponent at exp(0) = 1.0
-    exps.ones(1);
+    // Only single exponent at exp(0) = 1.0.
+    gsl_vector x;
+    x.size=0;
+
+    // Get exponent
+    exps=get_exponents(&x,&pars);
+    // and the mog
+    if(mog!=NULL)
+      *mog=compl_mog(&x,(void *) &pars);
 
   } else {
     // Time minimization
@@ -174,17 +192,6 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
     // the optimization. For even amount of exponents, the mid exponent
     // is pinned to the midway of the interval.
     int Ndof=Nf/2;
-
-    // Parameters for the optimization.
-    completeness_scan_t pars;
-    // Angular momentum
-    pars.am=am;
-    // Moment to optimize
-    pars.n=n;
-    // Scanning exponents
-    pars.scanexp=get_scanning_exponents(-len/2.0,len/2.0,50*Nf+1);
-    // Odd amount of exponents?
-    pars.odd=Nf%2;
 
     // Maximum number of iterations
     size_t maxiter = 10000;
