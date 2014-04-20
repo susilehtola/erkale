@@ -115,7 +115,6 @@ int main(int argc, char **argv) {
   // Determine proper limits
   fprintf(stderr,"\nOutput:\n");
   for(int am=0;am<=maxam;am++) {
-    prof[am].start=cpl[am].min;
     prof[am].tol=cpl[am].tol;
 
     // Wanted width is
@@ -132,8 +131,10 @@ int main(int argc, char **argv) {
 	break;
     }
 
-    // Adjust ending point
-    prof[am].end=cpl[am].max + (w-width);
+    // Adjust limits
+    double dw=w-width;
+    prof[am].start=cpl[am].min - dw/2.0;
+    prof[am].end=cpl[am].max   + dw/2.0;
     prof[am].exps=move_exps(exps,prof[am].start);
     fprintf(stderr,"%c % .3f % .3f %e %i\n",shell_types[am],prof[am].start,prof[am].end,prof[am].tol,(int) prof[am].exps.size());
     fflush(stderr);
@@ -142,7 +143,7 @@ int main(int argc, char **argv) {
 
   printf("%i\n",maxam);
   for(int am=0;am<=maxam;am++)
-    printf("%c % .16e % .16e %e %i\n",shell_types[am],prof[am].start,prof[am].end,prof[am].tol,(int) prof[am].exps.size());
+    printf("%i % .16e % .16e %e %i\n",am,prof[am].start,prof[am].end,prof[am].tol,(int) prof[am].exps.size());
   
   return 0;
 }
