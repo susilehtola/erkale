@@ -63,7 +63,7 @@ void print_limits(const std::vector<coprof_t> & cpl, const char *msg) {
     printf("%s\n",msg);
   for(int am=0;am<=maxam(cpl);am++)
     printf("%c % .3f % .3f %e %2i\n",shell_types[am],cpl[am].start,cpl[am].end,cpl[am].tol,(int) cpl[am].exps.size());
-  printf("Totalling %i functions.\n\n",get_nfuncs(cpl));
+  printf("Totaling %i functions.\n\n",get_nfuncs(cpl));
   fflush(stdout);
 }
 
