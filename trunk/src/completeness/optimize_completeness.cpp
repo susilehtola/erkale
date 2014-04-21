@@ -146,8 +146,6 @@ double compl_mog(const gsl_vector * x, void * params) {
   // Plug in normalization factors
   phi/=6.0*nint;
 
-  //  printf("MOG is %e.\n",phi);
-
   return phi;
 }
 
@@ -156,48 +154,35 @@ void compl_mog_df(const gsl_vector * x, void * params, gsl_vector * g) {
   // should be always OK.
   double h=1e-4;
 
-#ifdef _OPENMP
-  int nth=omp_get_max_threads();
-#else
-  int nth=1;
-#endif
-  // Helper vectors for parameters
-  std::vector<gsl_vector *> stack(nth);
-  for(int i=0;i<nth;i++)
-    stack[i]=gsl_vector_alloc(x->size);
+  // It'd be nice to parallellize here, but it seems it causes
+  // problems with large amounts of exponents... and I have no idea
+  // why.
+
+  // Helper for parameters
+  gsl_vector *tmp=gsl_vector_alloc(x->size);
 
   // Compute gradient using central difference
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
   for(size_t ip=0; ip < x->size; ip++) {
-#ifdef _OPENMP
-    int ith=omp_get_thread_num();
-#else
-    int ith=0;
-#endif
-
     // Initialize helper vector
-    gsl_vector_memcpy(stack[ith],x);
+    gsl_vector_memcpy(tmp,x);
 
     // Original parameter value
     double x0=gsl_vector_get(x,ip);
 
     // RH value
-    gsl_vector_set(stack[ith],ip,x0+h);
-    double rh=compl_mog(stack[ith],params);
+    gsl_vector_set(tmp,ip,x0+h);
+    double rh=compl_mog(tmp,params);
 
     // LH value
-    gsl_vector_set(stack[ith],ip,x0-h);
-    double lh=compl_mog(stack[ith],params);
+    gsl_vector_set(tmp,ip,x0-h);
+    double lh=compl_mog(tmp,params);
 
     // Gradient value is
     gsl_vector_set(g,ip, (rh-lh)/(2.0*h));
   }
 
   // Free memory
-  for(int i=0;i<nth;i++)
-    gsl_vector_free(stack[i]);
+  gsl_vector_free(tmp);
 }
 
 void compl_mog_fdf(const gsl_vector * x, void * params, double * f, gsl_vector * g) {
