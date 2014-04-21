@@ -288,6 +288,129 @@ void potential_cube(const BasisSet & bas, const arma::mat & P, const std::vector
   fclose(out);
 }
 
+void elf_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, std::string fname) {
+  // Open output file.
+  fname=fname+".cube";
+  FILE *out=fopen(fname.c_str(),"w");
+
+  // Compute the density in batches, allowing
+  // parallellization.
+#ifdef _OPENMP
+  // The number of points per batch
+  const size_t Nbatch_p=100*omp_get_max_threads();
+#else
+  const size_t Nbatch_p=100;
+#endif
+
+  // The total number of point is
+  const size_t N=x_arr.size()*y_arr.size()*z_arr.size();
+  // The necessary amount of batches is
+  size_t Nbatch=N/Nbatch_p;
+  if(N%Nbatch_p!=0)
+    Nbatch++;
+
+  // Write out comment fields
+  Timer t;
+  fprintf(out,"ERKALE electron localization function output\n");
+  fprintf(out,"Generated on %s.\n",t.current_time().c_str());
+
+  // Spacing
+  double dx=0.0;
+  if(x_arr.size()>1)
+    dx=(x_arr[x_arr.size()-1]-x_arr[0])/(x_arr.size()-1);
+  double dy=0.0;
+  if(y_arr.size()>1)
+    dy=(y_arr[y_arr.size()-1]-y_arr[0])/(y_arr.size()-1);
+  double dz=0.0;
+  if(z_arr.size()>1)
+    dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
+
+  // Write out starting point
+  fprintf(out,"%7i % g % g % g\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  // Print amount of points and step sizes in the directions
+  fprintf(out,"%7i % g % g % g\n",(int) x_arr.size(),dx,0.0,0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) y_arr.size(),0.0,dy,0.0);
+  fprintf(out,"%7i % g % g % g\n",(int) z_arr.size(),0.0,0.0,dz);
+  // Print out atoms
+  for(size_t i=0;i<bas.get_Nnuc();i++) {
+    nucleus_t nuc=bas.get_nucleus(i);
+    fprintf(out,"%7i %g % g % g % g\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+  }
+
+  // The points in the batch
+  cubecoord_t r[Nbatch_p];
+  // The values of the localization function in the batch
+  double locf[Nbatch_p];
+
+  // Number of points to compute in the batch
+  size_t np;
+  // Total number of points computed
+  size_t ntot=0;
+  // Indices of x, y and z
+  size_t xind=0, yind=0, zind=0;
+
+  // Index of points written
+  size_t idx=0;
+
+  // Loop over batches.
+  for(size_t ib=0;ib<Nbatch;ib++) {
+    // Zero amount of points in current batch.
+    np=0;
+
+    // Form list of points to compute.
+    while(np<Nbatch_p && ntot+np<N) {
+      r[np].r.x=x_arr[xind];
+      r[np].r.y=y_arr[yind];
+      r[np].r.z=z_arr[zind];
+      r[np].newline=false;
+
+      // Increment number of points
+      np++;
+
+      // Determine next point.
+      if(zind+1<z_arr.size())
+	zind++;
+      else {
+	// z coordinate changes, break line here
+	zind=0;
+	r[np-1].newline=true;
+
+	if(yind+1<y_arr.size())
+	  yind++;
+	else {
+	  yind=0;
+	  xind++;
+	}
+      }
+    }
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    // Loop over the points in the batch
+    for(size_t ip=0;ip<np;ip++)
+      locf[ip]=compute_elf(P,bas,r[ip].r);
+
+    // Save data values
+    for(size_t ip=0;ip<np;ip++) {
+      fprintf(out," % .5e",locf[ip]);
+      idx++;
+      if(idx==6 || r[ip].newline) {
+	idx=0;
+	fprintf(out,"\n");
+      }
+    }
+    
+    // Increment number of computed points
+    ntot+=np;
+  }
+
+  // Close output file.
+  if(idx!=0)
+    fprintf(out,"\n");
+  fclose(out);
+}
+
 void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, const std::vector<size_t> & orbidx, std::string fname, bool split, arma::vec & norms) {
   // Check that C is orthonormal
   arma::mat S=bas.overlap();
@@ -513,6 +636,7 @@ int main(int argc, char **argv) {
   set.add_bool("SplitOrbs", "Split orbital plots into different files?", false);
   set.add_bool("Potential", "Compute electrostatic potential on the cube?", false);
   set.add_bool("SICOrbs", "Compute PZ-SIC orbitals on the cube?", false);
+  set.add_bool("ELF", "Compute electron localization function?", false);
 
   if(argc==2)
     set.parse(argv[1]);
@@ -783,6 +907,26 @@ int main(int argc, char **argv) {
     fflush(stdout); t.set();
     potential_cube(basis,P,x,y,z,"potential");
     printf("done (%s).\n",t.elapsed().c_str());
+  }
+
+  // Calculate localization function on cube
+  if(set.get_bool("ELF")) {
+    if(restr) {
+      printf("Calculating electron localization function ... ");
+      fflush(stdout); t.set();
+      elf_cube(basis,P/2.0,x,y,z,"elf");
+      printf("done (%s).\n",t.elapsed().c_str());
+    } else {
+      printf("Calculating alpha localization function ... ");
+      fflush(stdout); t.set();
+      elf_cube(basis,Pa,x,y,z,"elf-a");
+      printf("done (%s).\n",t.elapsed().c_str());
+
+      printf("Calculating beta  localzation function ... ");
+      fflush(stdout); t.set();
+      elf_cube(basis,Pb,x,y,z,"elf-b");
+      printf("done (%s).\n",t.elapsed().c_str());
+    }
   }
 
   return 0;

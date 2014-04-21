@@ -3371,6 +3371,32 @@ double compute_potential(const arma::mat & P, const BasisSet & bas, const coords
   return nucphi+elphi;
 }
 
+double compute_elf(const arma::mat & P, const BasisSet & bas, const coords_t & r) {
+  // Evaluate basis functions
+  arma::vec bf=bas.eval_func(r.x,r.y,r.z);
+  // and gradients
+  arma::mat grad=bas.eval_grad(r.x,r.y,r.z);
+
+  // Compute kinetic energy term (eqn 9)
+  double tau=arma::trace(arma::trans(grad)*P*grad);
+
+  // Compute rho and grad rho
+  double rho=arma::as_scalar(arma::trans(bf)*P*bf);
+  // and the gradient
+  arma::vec grho=arma::trans(arma::trans(bf)*P*grad);
+
+  // The D value (eqn 10) is
+  double D  = tau - 0.25*arma::dot(grho,grho)/rho;
+  // and the corresponding isotropic D is (eqn 13)
+  double D0 = 3.0/5.0 * std::pow(6.0*M_PI*M_PI,2.0/3.0) * std::pow(rho,5.0/3.0);
+
+  // from which the chi value is
+  double chi = D/D0;
+
+  // making the ELF
+  return 1.0 / (1.0 + chi*chi);
+}
+
 std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
   // Returned list of identical basis functions
   std::vector< std::vector<size_t> > ret;
