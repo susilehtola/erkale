@@ -620,6 +620,15 @@ void compute_density_gradient_hessian(const arma::mat & P, const BasisSet & bas,
 /// Compute electrostatic potential at given point
 double compute_potential(const arma::mat & P, const BasisSet & bas, const coords_t & r);
 
+/**
+ * Compute electron localization function
+ *
+ * A. D. Becke and K. E. Edgecombe, "A simple measure of electron
+ * localization in atomic and molecular systems", J. Chem. Phys. 92,
+ * 5397 (1990).
+ */
+double compute_elf(const arma::mat & P, const BasisSet & bas, const coords_t & r);
+
 /// Check orthonormality of molecular orbitals
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
 
