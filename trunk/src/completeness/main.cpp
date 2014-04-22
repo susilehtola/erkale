@@ -35,14 +35,15 @@ int main(int argc, char **argv) {
   print_copyright();
   print_license();
 
-  if(argc!=6 && argc!=7) {
-    printf("Usage:   %s am n min max Nf/tol (coulomb)\n",argv[0]);
+  if(argc!=7 && argc!=8) {
+    printf("Usage:   %s am n min max Nf/tol nfull (coulomb)\n",argv[0]);
     printf("am:      angular momentum of shell to optimize for\n");
     printf("n:       moment to optimize for.\n");
     printf("         1 for maximal area, 2 for minimal rms deviation from unity.\n");
     printf("min:     lower limit of exponent range to optimize, in log10\n");
     printf("max:     upper limit of exponent range to optimize, in log10\n");
     printf("Nf/tol:  number of functions to place on shell, or wanted tolerance.\n");
+    printf("nfull:   number of outermost functions to fully optimize\n");
     printf("coulomb: use Coulomb metric?\n");
     return 1;
   }
@@ -58,9 +59,10 @@ int main(int argc, char **argv) {
 
   // Did we get a tolerance, or a number of functions?
   double tol=atof(argv[5]);
+  int nfull=atoi(argv[6]);
   bool coulomb=false;
-  if(argc==7)
-    coulomb=atoi(argv[6]);
+  if(argc==8)
+    coulomb=atoi(argv[7]);
 
   // The Coulomb metric is equivalent to the normal metric with am-1
   if(coulomb)
@@ -71,7 +73,7 @@ int main(int argc, char **argv) {
     exps=get_exponents(am,min,max,tol,n,true);
   } else {
     // Number of functions given.
-    exps=optimize_completeness(am,min,max,atoi(argv[5]),n,true,&tau);
+    exps=optimize_completeness(am,min,max,atoi(argv[5]),n,true,&tau,nfull);
   }
 
   // Sort into ascending order

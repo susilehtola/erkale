@@ -37,8 +37,13 @@ typedef struct {
 
   /// Scanning exponents to optimize against
   arma::vec scanexp;
-  /// Odd number of exponents?
+
+  /// Add in exponent at the center?
   bool odd;
+  /// Amount of even-tempered exponents near the center
+  size_t neven;
+  /// Amount of fully optimized exponents at the edges
+  size_t nfull;
 } completeness_scan_t;
 
 /// Get exponents. x contains the natural logarithms
@@ -65,8 +70,12 @@ void compl_mog_fdf(const gsl_vector * x, void * params, double * f, gsl_vector *
  * (1 for maximal area, 2 for minimal rms deviation from unity).
  *
  * This routine uses Fletcher-Reeves conjugate gradients.
+ *
+ * By default, only the 4 outermost exponents on each end are fully
+ * optimized, while the inner exponents are well described by an
+ * even-tempered formula. If nfull>=Nf, a full optimization is performed.
  */
-arma::vec optimize_completeness(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL);
+arma::vec optimize_completeness(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL, int nfull=4);
 
 /**
  * Optimize completeness profile for angular momentum am in exponent
@@ -74,8 +83,13 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n=1,
  * (1 for maximal area, 2 for minimal rms deviation from unity).
  *
  * This is the old version of the routine, which uses the Nead-Miller algorithm.
+ *
+ * By default, only the 4 outermost exponents on each end are fully
+ * optimized, while the inner exponents are well described by an
+ * even-tempered formula. If nfull>=Nf, a full optimization is
+ * performed.
  */
-arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL);
+arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL, int nfull=4);
 
 /// Calculate maximum width to obtain tolerance with given amount of exponents
 double maxwidth(int am, double tol, int nexp, int n=1);

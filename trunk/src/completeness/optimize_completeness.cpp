@@ -33,28 +33,64 @@ extern "C" {
 #define NFMAX 50
 
 arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t * p) {
-  // Get exponent values
-  arma::vec A;
-
-  // Is the amount of parameters even or odd?
-  size_t N=xv->size;
-  if(p->odd)
-    A.zeros(2*N+1);
-  else
-    A.zeros(2*N);
-
-  // Place the exponents symmetrically around the origin
-  for(size_t i=0;i<N;i++) {
-    double expx=exp(gsl_vector_get(xv,i));
-    A(2*i)=expx;
-    A(2*i+1)=1.0/expx;
+  // Check parameter consistency
+  size_t np=p->nfull;
+  if(p->neven)
+    np++;
+  if(np != xv->size) {
+    std::ostringstream oss;
+    oss << "Expected " << np << " parameters but was given " << xv->size << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
-  // Center exponent?
-  if(p->odd)
-    A(A.n_elem-1)=1.0; // exp(0)
+  // One-sided exponents
+  size_t nside=p->neven + p->nfull;
+  arma::vec A(nside);
+  A.zeros();
+  
+  // Plug in the even-tempered exponents
+  if(p->neven) {
+    double lge=gsl_vector_get(xv,0);
 
-  return sort(A);
+    if(p->odd)
+      for(size_t i=0;i < p->neven;i++)
+	A(i)=(i+1.0)*lge;
+    else
+      // In the even case, the first exponent is placed halfway
+      for(size_t i=0;i < p->neven;i++)
+	A(i)=(i+0.5)*lge;
+  }
+
+  // x index offset
+  size_t xoff = p->neven ? 1 : 0;
+  size_t eoff = p->neven;
+  
+  // Fully optimized exponents
+  for(size_t i=0;i < p->nfull;i++) {
+    A(i+eoff)=gsl_vector_get(xv,i+xoff);
+  }
+
+  //  A.subvec(0,eoff-1).t().print("Even-tempered");
+  //  A.subvec(eoff,A.n_elem-1).t().print("Full");
+  //  A.t().print("A");
+
+  // Convert to natural logarithm
+  A*=log(10.0);
+
+  // Full set of exponents
+  size_t nexp=2*A.n_elem;
+  if(p->odd)
+    nexp++;
+
+  arma::vec exps(nexp);
+  exps.subvec(0,A.n_elem-1)=arma::exp(-A);
+  if(p->odd) {
+    exps(A.n_elem)=1.0;
+    exps.subvec(A.n_elem+1,2*A.n_elem)=arma::exp(A);
+  } else 
+    exps.subvec(A.n_elem,2*A.n_elem-1)=arma::exp(A);
+
+  return exps;
 }
 
 arma::mat self_overlap(const arma::vec & z, int am) {
@@ -190,7 +226,7 @@ void compl_mog_fdf(const gsl_vector * x, void * params, double * f, gsl_vector *
   compl_mog_df(x,params,g);
 }
 
-arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, int n, bool verbose, double *mog) {
+arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, int n, bool verbose, double *mog, int nfull) {
   // Optimized exponents
   arma::vec exps;
 
@@ -205,8 +241,15 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
   pars.n=n;
   // Scanning exponents
   pars.scanexp=get_scanning_exponents(-len/2.0,len/2.0,50*Nf+1);
+
   // Odd amount of exponents?
   pars.odd=Nf%2;
+  // Amount of fully optimized exponents
+  pars.nfull=std::min(Nf/2,nfull);
+  // Amount of even-tempered exponents
+  pars.neven=Nf/2-pars.nfull;
+
+  printf("%i exponents fully optimized, %i even-tempered exponents.\n",(int)pars.nfull,(int)pars.neven);
 
   if(Nf<1) {
     throw std::runtime_error("Cannot completeness-optimize less than one primitive.\n");
@@ -230,7 +273,9 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
     // so we can use this to reduce the amount of degrees of freedom in
     // the optimization. For even amount of exponents, the mid exponent
     // is pinned to the midway of the interval.
-    int Ndof=Nf/2;
+    int Ndof=pars.nfull;
+    if(pars.neven)
+      Ndof++;
 
     // Maximum number of iterations
     size_t maxiter = 10000;
@@ -244,14 +289,27 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
     int status;
     double size;
 
-    /* Starting point */
-    gsl_vector *x = gsl_vector_alloc (Ndof);
-    for(int i=0;i<Ndof;i++)
-      gsl_vector_set(x,i,log(10.0)*((i+0.5)*len/(2.0*Ndof)));
+    /* Starting point: even-tempered exponents */
+    arma::vec sp(Nf/2);
+    for(int i=0;i<Nf/2;i++)
+      sp(i)=log(10.0)*((i+0.5)*len/(2.0*Nf));
 
-    /* Set initial step sizes to unity */
+    gsl_vector *x = gsl_vector_alloc (Ndof);
+    if(pars.neven) {
+      // Even-tempered parameter
+      gsl_vector_set(x,0,sp(1)-sp(0));
+      // Free exponents
+      for(size_t fi=0;fi<pars.nfull;fi++)
+        gsl_vector_set(x,1+fi,sp(pars.neven+fi));
+    } else {
+      // Free exponents
+      for(size_t fi=0;fi<pars.nfull;fi++)
+	gsl_vector_set(x,fi,sp(fi));
+    }
+
+    /* Set initial step sizes to 0.1 */
     gsl_vector *ss = gsl_vector_alloc (Ndof);
-    gsl_vector_set_all (ss, 1.0);
+    gsl_vector_set_all (ss, 0.1);
 
     /* Initialize method and iterate */
     minfunc.n = Ndof;
@@ -325,7 +383,7 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
   return exps;
 }
 
-arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, bool verbose, double *mog) {
+arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, bool verbose, double *mog, int nfull) {
   // Optimized exponents
   arma::vec exps;
 
@@ -340,8 +398,15 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
   pars.n=n;
   // Scanning exponents
   pars.scanexp=get_scanning_exponents(-len/2.0,len/2.0,50*Nf+1);
+
   // Odd amount of exponents?
   pars.odd=Nf%2;
+  // Amount of fully optimized exponents
+  pars.nfull=std::min(Nf/2,nfull);
+  // Amount of even-tempered exponents
+  pars.neven=Nf/2-pars.nfull;
+
+  printf("%i exponents fully optimized, %i even-tempered exponents.\n",(int)pars.nfull,(int)pars.neven);
 
   if(Nf<1) {
     throw std::runtime_error("Cannot completeness-optimize less than one primitive.\n");
@@ -365,7 +430,9 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
     // so we can use this to reduce the amount of degrees of freedom in
     // the optimization. For even amount of exponents, the mid exponent
     // is pinned to the midway of the interval.
-    int Ndof=Nf/2;
+    int Ndof=pars.nfull;
+    if(pars.neven)
+      Ndof++;
 
     // Maximum number of iterations
     size_t maxiter = 10000;
@@ -378,14 +445,25 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
     size_t iter = 0;
     int status;
 
-    /* Starting point */
-    gsl_vector *x = gsl_vector_alloc (Ndof);
-    for(int i=0;i<Ndof;i++)
-      gsl_vector_set(x,i,log(10.0)*((i+0.5)*len/(2.0*Ndof)));
+    /* Starting point: even-tempered exponents */
+    arma::vec sp(Nf/2);
+    for(int i=0;i<Nf/2;i++)
+      sp(i)=log(10.0)*((i+0.5)*len/(2.0*Nf));
 
-    /* Set initial step sizes to unity */
-    gsl_vector *ss = gsl_vector_alloc (Ndof);
-    gsl_vector_set_all (ss, 1.0);
+    gsl_vector *x = gsl_vector_alloc (Ndof);
+    if(pars.neven) {
+      // Even-tempered parameter
+      gsl_vector_set(x,0,sp(1)-sp(0));
+      // Free exponents
+      for(size_t fi=0;fi<pars.nfull;fi++)
+	gsl_vector_set(x,1+fi,sp(pars.neven+fi));
+    } else {
+      // Free exponents
+      for(size_t fi=0;fi<pars.nfull;fi++)
+	gsl_vector_set(x,fi,sp(fi));
+    }
+
+    get_exponents(x,&pars);
 
     /* Initialize method and iterate */
     minfunc.n = Ndof;
@@ -454,7 +532,6 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
     exps=arma::sort(get_exponents(s->x,&pars),1);
 
     gsl_vector_free(x);
-    gsl_vector_free(ss);
     gsl_multimin_fdfminimizer_free (s);
 
     if(verbose)
