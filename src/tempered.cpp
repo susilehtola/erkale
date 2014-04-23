@@ -24,33 +24,33 @@ extern "C" {
 }
 
 // Construct even-tempered set of exponents
-std::vector<double> eventempered_set(double alpha, double beta, int Nf) {
-  std::vector<double> ret;
+arma::vec eventempered_set(double alpha, double beta, int Nf) {
+  arma::vec ret(Nf);
 
-  for(int i=0;i<Nf;i++)
-    ret.push_back(alpha*pow(beta,i));
+  ret(0)=alpha;
+  for(int i=1;i<Nf;i++)
+    ret(i)=ret(i-1)*beta;
 
   return ret;
 }
 
 // Construct well-tempered set of exponents
-std::vector<double> welltempered_set(double alpha, double beta, double gamma, double delta, size_t Nf) {
-  std::vector<double> ret;
-
+arma::vec welltempered_set(double alpha, double beta, double gamma, double delta, size_t Nf) {
   /*
   // WT-F1
   for(int i=0;i<Nf;i++)
     ret.push_back(alpha*pow(beta,i)*(1.0 + gamma*pow(i*1.0/Nf,delta)));
   */
 
+  arma::vec ret(Nf);
   // WT-F2
   if(Nf>=1)
-    ret.push_back(alpha);
+    ret(0)=alpha;
   if(Nf>=2)
-    ret.push_back(alpha*beta);
+    ret(1)=alpha*beta;
   for(size_t i=2;i<Nf;i++)
-    ret.push_back(ret[i-1]*beta*(1.0 + gamma*pow((i+1.0)/Nf,delta)));
-
+    ret(i)=ret(i-1)*beta*(1.0 + gamma*pow((i+1.0)/Nf,delta));
+  
   return ret;
 }
 

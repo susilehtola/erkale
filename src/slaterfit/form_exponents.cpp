@@ -54,22 +54,22 @@ std::vector<double> get_exps_full(const gsl_vector *v, size_t Nf) {
 
 std::vector<double> get_exps_welltempered(const gsl_vector *v, int Nf) {
 
-  std::vector<double> exps=welltempered_set(exp(gsl_vector_get(v,0)),exp(gsl_vector_get(v,1)),exp(gsl_vector_get(v,2)),exp(gsl_vector_get(v,3)),Nf);
+  arma::vec exps=welltempered_set(exp(gsl_vector_get(v,0)),exp(gsl_vector_get(v,1)),exp(gsl_vector_get(v,2)),exp(gsl_vector_get(v,3)),Nf);
 
   // Sort exponents
-  stable_sort(exps.begin(),exps.end());
+  exps=arma::sort(exps);
 
-  return exps;
+  return arma::conv_to< std::vector<double> >::from(exps);
 }
 
 std::vector<double> get_exps_eventempered(const gsl_vector *v, int Nf) {
 
-  std::vector<double> exps=eventempered_set(exp(gsl_vector_get(v,0)),exp(gsl_vector_get(v,1)),Nf);
+  arma::vec exps=eventempered_set(exp(gsl_vector_get(v,0)),exp(gsl_vector_get(v,1)),Nf);
 
   // Sort exponents
-  stable_sort(exps.begin(),exps.end());
+  exps=arma::sort(exps);
 
-  return exps;
+  return arma::conv_to< std::vector<double> >::from(exps);
 }
 
 std::vector<double> get_exps_legendre(const gsl_vector *v, int Nf) {
