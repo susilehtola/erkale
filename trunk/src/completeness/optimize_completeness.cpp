@@ -249,7 +249,8 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
   // Amount of even-tempered exponents
   pars.neven=Nf/2-pars.nfull;
 
-  printf("%i exponents fully optimized, %i even-tempered exponents.\n",(int)pars.nfull,(int)pars.neven);
+  if(verbose)
+    printf("%i exponents fully optimized, %i even-tempered exponents.\n",(int)pars.nfull,(int)pars.neven);
 
   if(Nf<1) {
     throw std::runtime_error("Cannot completeness-optimize less than one primitive.\n");
@@ -406,7 +407,8 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
   // Amount of even-tempered exponents
   pars.neven=Nf/2-pars.nfull;
 
-  printf("%i exponents fully optimized, %i even-tempered exponents.\n",(int)pars.nfull,(int)pars.neven);
+  if(verbose)
+    printf("%i exponents fully optimized, %i even-tempered exponents.\n",(int)pars.nfull,(int)pars.neven);
 
   if(Nf<1) {
     throw std::runtime_error("Cannot completeness-optimize less than one primitive.\n");
