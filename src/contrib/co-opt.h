@@ -261,8 +261,9 @@ class CompletenessOptimizer {
 
       // Step sizes
       h(0)=0.0;
+      double hs=10*h0;
       for(size_t i=1;i<Ntr;i++)
-	h(i)=h0*std::pow(2.0,i-1);
+	h(i)=hs*std::pow(2.0,i-1);
 
       printf("\n\tLine search:\n");
       printf("\t%5s %12s %13s %13s\n","trial","step","E","dE");
