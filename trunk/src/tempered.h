@@ -25,7 +25,7 @@
 #include <armadillo>
 
 /// Form a set of even-tempered exponents: \f$ \zeta_i = \alpha \beta^{i-1}, \ i=1,\dots,N_f \f$
-std::vector<double> eventempered_set(double alpha, double beta, int Nf);
+arma::vec eventempered_set(double alpha, double beta, int Nf);
 
 /**
  * Form a well-tempered set of exponents with
@@ -39,7 +39,7 @@ std::vector<double> eventempered_set(double alpha, double beta, int Nf);
  * for the calculation of matrix Hartree-Fock wavefunctions",
  * Chem. Phys. Lett. 212 (1993), pp. 260 - 264.
  */
-std::vector<double> welltempered_set(double alpha, double beta, double gamma, double delta, size_t Nf);
+arma::vec welltempered_set(double alpha, double beta, double gamma, double delta, size_t Nf);
 
 /**
  * Expansion in orthonormal Legendre polynomials:

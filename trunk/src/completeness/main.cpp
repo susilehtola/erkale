@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
 
   double tau;
   if(tol<1) {
-    exps=get_exponents(am,min,max,tol,n,true);
+    exps=get_exponents(am,min,max,tol,n,true,nfull);
   } else {
     // Number of functions given.
     exps=optimize_completeness(am,min,max,atoi(argv[5]),n,true,&tau,nfull);

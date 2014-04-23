@@ -47,7 +47,7 @@ typedef struct {
 } completeness_scan_t;
 
 /// Get exponents. x contains the natural logarithms
-arma::vec get_exponents(const gsl_vector *x, const completeness_scan_t *p);
+arma::vec get_exponents(const gsl_vector *x, const completeness_scan_t & p);
 
 /// Compute self-overlap \f$ S_{ij} \f$
 arma::mat self_overlap(const arma::vec & z, int am);
@@ -69,13 +69,24 @@ void compl_mog_fdf(const gsl_vector * x, void * params, double * f, gsl_vector *
  * range from 10^{min} to 10^{max}. n gives the moment to optimize for
  * (1 for maximal area, 2 for minimal rms deviation from unity).
  *
+ * By default, only the 4 outermost exponents on each end are fully
+ * optimized, while the inner exponents are well described by an
+ * even-tempered formula. If nfull>=Nf, a full optimization is performed.
+ */
+arma::vec optimize_completeness(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL, int nfull=4);
+
+/**
+ * Optimize completeness profile for angular momentum am in exponent
+ * range from 10^{min} to 10^{max}. n gives the moment to optimize for
+ * (1 for maximal area, 2 for minimal rms deviation from unity).
+ *
  * This routine uses Fletcher-Reeves conjugate gradients.
  *
  * By default, only the 4 outermost exponents on each end are fully
  * optimized, while the inner exponents are well described by an
  * even-tempered formula. If nfull>=Nf, a full optimization is performed.
  */
-arma::vec optimize_completeness(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL, int nfull=4);
+arma::vec optimize_completeness_cg(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL, int nfull=4);
 
 /**
  * Optimize completeness profile for angular momentum am in exponent
@@ -92,12 +103,12 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n=1,
 arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, int n=1, bool verbose=true, double *mog=NULL, int nfull=4);
 
 /// Calculate maximum width to obtain tolerance with given amount of exponents
-double maxwidth(int am, double tol, int nexp, int n=1);
+double maxwidth(int am, double tol, int nexp, int n=1, int nfull=4);
 
 /// Calculate exponents corresponding to maximum width to obtain tolerance with given amount of exponents
-arma::vec maxwidth_exps(int am, double tol, int nexp, double *width, int n=1);
+arma::vec maxwidth_exps(int am, double tol, int nexp, double *width, int n=1, int nfull=4);
 
 /// Perform completeness-optimization of exponents
-arma::vec get_exponents(int am, double start, double end, double tol, int n=1, bool verbose=false);
+arma::vec get_exponents(int am, double start, double end, double tol, int n=1, bool verbose=false, int nfull=4);
 
 #endif
