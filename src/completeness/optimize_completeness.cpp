@@ -249,9 +249,6 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
   // Amount of even-tempered exponents
   pars.neven=Nf/2-pars.nfull;
 
-  if(verbose)
-    printf("%i exponents fully optimized, %i even-tempered exponents.\n",(int)pars.nfull,(int)pars.neven);
-
   if(Nf<1) {
     throw std::runtime_error("Cannot completeness-optimize less than one primitive.\n");
 
@@ -325,7 +322,14 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
 
     // Legend
     if(verbose) {
-      printf("Optimizing tau_%i for a=[%.3f ... %.3f] of %c shell with %i exponents.\n\n",n,min,max,shell_types[am],Nf);
+      printf("Optimizing tau_%i for a=[%.3f ... %.3f] of %c shell with %i exponents.\n",n,min,max,shell_types[am],Nf);
+      if(pars.odd)
+	printf("One exponent is fixed at the center of the interval.\n");
+      if(pars.neven)
+	printf("%i exponents at the both sides of the center are represented by an even-tempered formula.\n",(int)(pars.neven));
+      if(pars.nfull)
+	printf("%i exponents at both edges are fully optimized.\n",(int)(pars.nfull));
+      printf("\n");
 
       printf("iter ");
       char num[80];
@@ -407,9 +411,6 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
   // Amount of even-tempered exponents
   pars.neven=Nf/2-pars.nfull;
 
-  if(verbose)
-    printf("%i exponents fully optimized, %i even-tempered exponents.\n",(int)pars.nfull,(int)pars.neven);
-
   if(Nf<1) {
     throw std::runtime_error("Cannot completeness-optimize less than one primitive.\n");
 
@@ -484,7 +485,14 @@ arma::vec optimize_completeness(int am, double min, double max, int Nf, int n, b
 
     // Legend
     if(verbose) {
-      printf("Optimizing tau_%i for a=[%.3f ... %.3f] of %c shell with %i exponents.\n\n",n,min,max,shell_types[am],Nf);
+      printf("Optimizing tau_%i for a=[%.3f ... %.3f] of %c shell with %i exponents.\n",n,min,max,shell_types[am],Nf);
+      if(pars.odd)
+	printf("One exponent is fixed at the center of the interval.\n");
+      if(pars.neven)
+	printf("%i exponents at the both sides of the center are represented by an even-tempered formula.\n",(int)(pars.neven));
+      if(pars.nfull)
+	printf("%i exponents at both edges are fully optimized.\n",(int)(pars.nfull));
+      printf("\n");
 
       printf("iter ");
       char num[80];
