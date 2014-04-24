@@ -59,7 +59,7 @@
 #endif
 
 /// Maximum amount of functions
-#define NFMAX 50
+#define NFMAX 70
 /// Moment to optimize: area
 #define OPTMOMIND 1
 
@@ -82,6 +82,11 @@ int maxam(const std::vector<coprof_t> & cpl);
 int get_nfuncs(const std::vector<coprof_t> & cpl);
 /// Print out the limits of the profile
 void print_limits(const std::vector<coprof_t> & cpl, const char *msg=NULL);
+
+/// Save limits to file
+void save_limits(const std::vector<coprof_t> & cpl, const std::string & fname);
+/// Load limits from file
+void load_limits(std::vector<coprof_t> & cpl, const std::string & fname);
 
 /// Augment basis set with additional diffuse and/or tight functions
 std::vector<coprof_t> augment_basis(const std::vector<coprof_t> & cplo, int ndiffuse, int ntight);
@@ -578,6 +583,182 @@ class CompletenessOptimizer {
     return maxmog;
   }
   
+  /**
+   * Scan stability of an existing shell by placing in an additional exponent.
+   *
+   * Parameters
+   * scanam:    angular momentum to scan
+   * minpol:    ~ minimal allowed value for polarization exponent (log10 scale)
+   * maxpol:    ~ maximal allowed value for polarization exponent (log10 scale)
+   * dpol:      amount of points used per completeness range
+   * polinterp: toggle interpolation of mog to find maximum
+   * cotol:     deviation from completeness
+   * nx:        amounts of exponents to place on the shell
+   */
+  double scan_profile(std::vector<coprof_t> & cpl, ValueType & curval, int scanam, double minpol, double maxpol, double dpol) {
+   
+    Timer t;
+    Timer tpol;
+
+    if(dpol<=0) {
+      std::ostringstream oss;
+      oss << "Invalid value " << dpol << " for DPol.\n";
+      throw std::runtime_error(oss.str());
+    }
+
+    // Compute step size
+    double step;
+    {
+      double nextw;
+      maxwidth_exps_table(scanam,cpl[scanam].tol,cpl[scanam].exps.size()+1,&nextw,OPTMOMIND);
+      double curw;
+      maxwidth_exps_table(scanam,cpl[scanam].tol,cpl[scanam].exps.size(),&curw,OPTMOMIND);
+      step=nextw-curw;
+    }
+
+    // Width to check is
+    double ww=maxpol-minpol;
+    // Amount of points to use
+    size_t Np=1+round(ww/step);
+    // Actual width is
+    double width=step*Np;
+
+    // so actual minimum and maximum are
+    double minp=minpol;
+    double maxp=maxpol+(width-ww);
+
+    // Starting points
+    arma::vec startp=arma::linspace(minp,maxp,Np);
+
+    // Trial mogs
+    arma::vec mogs(startp.n_elem);
+    mogs.zeros();
+    
+    printf("Scanning for stability of %c shell.\n", shell_types[scanam]);
+    printf("Spacing between points is %.5f.\n\n",step);
+    
+    printf("%11s %8s %12s %8s\n","trial","exponent","mog","t (s)");
+    fflush(stdout);
+    
+    static size_t iter=0;
+
+    // Get elemental libraries
+    const std::vector<ElementBasisSet> els=form_basis(cpl).get_elements();
+
+    // Perform scan
+    Timer tptot;
+    for(size_t iexp=0;iexp<startp.n_elem;iexp++) {
+      Timer tp;
+
+      // Check if we are inside filled completeness profile
+      bool inside=true;
+      if(startp(iexp)+step < cpl[scanam].start)
+	inside=false;
+      if(startp(iexp)-step > cpl[scanam].end)
+	inside=false;
+      if(inside) {
+	mogs(iexp)=0.0;
+	continue;
+      }
+
+      // Trial basis set
+      BasisSetLibrary trbas;
+      // Add the function
+      for(size_t iel=0;iel<els.size();iel++) {
+	ElementBasisSet elbas(els[iel]);
+
+	FunctionShell sh(scanam);
+	sh.add_exponent(1.0,startp(iexp));
+	elbas.add_function(sh);
+	
+	// and the element to the new library
+	trbas.add_element(elbas);
+      }	
+
+      // Compute trial value
+      ValueType trval;
+      try {
+	trval=compute_value(trbas);
+	// and store the mog
+	mogs(iexp)=compute_mog(trval,curval);
+
+      } catch(...) {
+	// Calculation failed, set zero mog.
+	mogs(iexp)=0.0;
+      }
+    
+      printf("%5i/%-5i % 7.5f %e %8.2f\n",(int) iexp+1, (int) startp.n_elem, startp(iexp), mogs(iexp), tp.get());
+      fflush(stdout);
+    }
+
+    { // Save out the results of the mog scan
+      // Filename to use
+      std::ostringstream fname;
+      fname << "scanmog_" << shell_types[scanam] << "_" << iter << ".dat";
+      
+      arma::mat savemog(mogs.n_rows,2);
+      savemog.col(0)=startp;
+      savemog.col(1)=mogs;
+      savemog.save(fname.str(),arma::raw_ascii);
+      
+      iter++;
+    }
+
+    // Find maximum mog
+    arma::uword imax;
+    double maxmog=mogs.max(imax);
+
+    printf("\n");
+    printf("%11s % 7.5f %e\n","max mog",startp(imax),maxmog);
+    fflush(stdout);
+
+    if(maxmog>0.0) {
+      // Adjust profile
+      if(startp(imax) < cpl[scanam].start) {
+	
+	// Necessary width is
+	double nw=cpl[scanam].end-startp(imax);
+	
+	// Determine necessary amount of exponents
+	arma::vec exps;
+	double w;
+	for(size_t nf=cpl[scanam].exps.size()+1;nf<=NFMAX;nf++) {
+	  exps=maxwidth_exps_table(scanam,cpl[scanam].tol,nf,&w);
+	  if(w>=nw)
+	    break;
+	}
+	
+	// Adjust profile
+	cpl[scanam].start-=w-nw;
+	cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
+      } else {
+	// Necessary width is
+	double nw=startp(imax)-cpl[scanam].start;
+	
+	// Determine necessary amount of exponents
+	arma::vec exps;
+	double w;
+	for(size_t nf=cpl[scanam].exps.size()+1;nf<=NFMAX;nf++) {
+	  exps=maxwidth_exps_table(scanam,cpl[scanam].tol,nf,&w);
+	  if(w>=nw)
+	    break;
+	}
+	
+	// Adjust profile
+	cpl[scanam].end+=w-nw;
+	cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
+      }
+      
+      printf("\nOptimal %c shell is: % .3f ... % .3f (%i funcs) with tolerance %e, mog = %e. (%s)\n\n",shell_types[scanam],cpl[scanam].start,cpl[scanam].end,(int) cpl[scanam].exps.size(),cpl[scanam].tol,maxmog,tpol.elapsed().c_str());
+      fflush(stdout);
+      
+      // Update current value
+      curval=compute_value(cpl);
+    }
+
+    return maxmog;
+  }
+  
   /// Extend the current shells until mog < tau. Returns maximal mog
   double extend_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, bool domiddle=true, bool strict=true, int nxadd=1) {
     printf("\n\n%s\n",print_bar("PROFILE EXTENSION").c_str());
@@ -645,7 +826,7 @@ class CompletenessOptimizer {
 	right[am].end=cpl[am].end+step;
 	right[am].exps=move_exps(exps,right[am].start);
       
-	printf("(%s), step size is %7.5f.\n",t.elapsed().c_str(),step);
+	printf("step size is %7.5f (%s).\n",step,t.elapsed().c_str());
 	fflush(stdout);
 	t.set();
 
@@ -948,7 +1129,7 @@ class CompletenessOptimizer {
     fflush(stdout);
 	
     if(tol==0.0)
-      printf("Running until would drop last function of highest shell.\n");
+      printf("Running until would drop last function of %c shell.\n",shell_types[maxam(cpl)]);
     else
       printf("Running until mog >= %e.\n",tol);
     fflush(stdout);
@@ -1039,7 +1220,7 @@ class CompletenessOptimizer {
 	  del[am].end=0.0;
 	  del[am].exps.clear();
 	}
-	printf("(%s), step size is %7.5f.\n",t.elapsed().c_str(),step);
+	printf("step size is %7.5f (%s).\n",step,t.elapsed().c_str());
 	t.set();
 
 	if(!oldmog(am)) {
@@ -1232,7 +1413,7 @@ class CompletenessOptimizer {
   virtual std::vector<size_t> update_contraction(const std::vector<coprof_t> & cpl, double cutoff)=0;
 
   /// Contract basis set. nel holds amount of states of each angular momentum. P toggles intermediate P-orthogonalization; returned basis is always generally contracted.
-  BasisSetLibrary contract_basis(const std::vector<coprof_t> & cpl, const ValueType & refval, double tol, double nelcutoff, bool Porth=true) {
+  BasisSetLibrary contract_basis(const std::vector<coprof_t> & cpl, const ValueType & refval, double tol, double nelcutoff, bool Porth=true, bool restr=true) {
 
     printf("\n\n%s\n",print_bar("BASIS CONTRACTION").c_str());
     fflush(stdout);
@@ -1256,9 +1437,30 @@ class CompletenessOptimizer {
       // Compute mogs of contracting one more function on each shell
       arma::vec mogs(contract.size());
       for(size_t am=0;am<contract.size();am++) {
+	// Check if there are free functions left
+	bool free=true;
+
+	// No free functions available.
+	if(contract[am] >= cpl[am].exps.size())
+	  free=false;
+
+	if(restr && am+1<cpl.size()) {
+	  // Check that the shell has more functions than the one above.
+	  int Ncur=cpl[am].exps.size()-contract[am];
+	  int Nnext=cpl[am+1].exps.size();
+	  if(am+1<contract.size())
+	    Nnext-=contract[am+1];
+
+	  // If the amount of functions is the same or smaller, don't try to contract.
+	  if(Ncur<=Nnext) {
+	    printf("Ncur = %i, Nnext = %i\n",Ncur,Nnext);
+	    printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
+	    free=false;
+	  }
+	}
 
 	// We still have free functions left, calculate mog
-	if(contract[am] < cpl[am].exps.size()) {
+	if(free) {
 	  Timer tl;
 
 	  // Trial contraction

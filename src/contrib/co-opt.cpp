@@ -46,25 +46,102 @@ int maxam(const std::vector<coprof_t> & cpl) {
   for(size_t i=cpl.size()-1;i<cpl.size();i--)
     if(cpl[i].exps.size()>0)
       return (int) i;
-  
+
   // Dummy statement
   return -1;
 }
-  
+
 int get_nfuncs(const std::vector<coprof_t> & cpl) {
   int n=0;
   for(int am=0;am<=maxam(cpl);am++)
     n+=(2*am+1)*cpl[am].exps.size();
   return n;
 }
-  
-void print_limits(const std::vector<coprof_t> & cpl, const char *msg) { 
+
+void print_limits(const std::vector<coprof_t> & cpl, const char *msg) {
   if(msg)
     printf("%s\n",msg);
   for(int am=0;am<=maxam(cpl);am++)
     printf("%c % .3f % .3f %e %2i\n",shell_types[am],cpl[am].start,cpl[am].end,cpl[am].tol,(int) cpl[am].exps.size());
   printf("Totaling %i functions.\n\n",get_nfuncs(cpl));
   fflush(stdout);
+}
+
+void save_limits(const std::vector<coprof_t> & cpl, const std::string & fname) {
+  FILE *out=fopen(fname.c_str(),"w");
+  if(!out)
+    throw std::runtime_error("Error opening completeness range output file.\n");
+
+  fprintf(out,"%i\n",maxam(cpl));
+  for(int am=0;am<=maxam(cpl);am++)
+    fprintf(out,"%i % .16e % .16e %.16e %i\n",am,cpl[am].start,cpl[am].end,cpl[am].tol,(int) cpl[am].exps.size());
+  fclose(out);
+}
+
+void load_limits(std::vector<coprof_t> & cpl, const std::string & fname) {
+  FILE *in=fopen(fname.c_str(),"r");
+  if(!in)
+    throw std::runtime_error("Error opening completeness range file.\n");
+
+  int max;
+  if(fscanf(in,"%i",&max)!=1)
+    throw std::runtime_error("Could not read maximum angular momentum from file.\n");
+  if(max<0 || max>max_am) {
+    std::ostringstream oss;
+    oss << "Error - read in maximum angular momentum " << max << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Allocate memory
+  cpl.clear();
+  cpl.resize(max+1);
+
+  // Read in ranges and make exponents
+  for(int am=0;am<=max;am++) {
+    // Supposed angular momentum, and amount of exponents
+    int amt, nexp;
+    // Tolerance
+    double ctol;
+
+    // Read range
+    if(fscanf(in,"%i %lf %lf %lf %i",&amt,&cpl[am].start,&cpl[am].end,&ctol,&nexp)!=5) {
+      std::ostringstream oss;
+      oss << "Error reading completeness range for " << shell_types[am] << " shell!\n";
+      throw std::runtime_error(oss.str());
+    }
+    // Check am is OK
+    if(am!=amt) {
+      std::ostringstream oss;
+      oss << "Read in am " << amt << " does not match supposed am " << am << "!\n";
+      throw std::runtime_error(oss.str());
+    }
+
+    // Get exponents
+    arma::vec exps=optimize_completeness(am,0.0,cpl[am].end-cpl[am].start,nexp,OPTMOMIND,false,&cpl[am].tol);
+
+    // Check that tolerances agree
+    if(fabs(ctol-cpl[am].tol)>1e-3*cpl[am].tol) {
+      std::ostringstream oss;
+      oss << "Obtained tolerance " << cpl[am].tol << " for " << shell_types[am] << " shell does not match supposed tolerance " << ctol << "!\n";
+      //      throw std::runtime_error(oss.str());
+      printf("Warning: %s",oss.str().c_str());
+      fflush(stdout);
+
+      // Find correct width
+      double width=cpl[am].end-cpl[am].start;
+
+      // Get exponents
+      double w;
+      exps=maxwidth_exps_table(am,cpl[am].tol,nexp,&w,OPTMOMIND);
+
+      // Store exponents
+      double dw=w-width;
+      cpl[am].start-=dw/2.0;
+      cpl[am].end+=dw/2.0;
+    }
+
+    cpl[am].exps=move_exps(exps,cpl[am].start);
+  }
 }
 
 void print_scheme(const BasisSetLibrary & baslib, int len) {
@@ -123,16 +200,16 @@ void print_scheme(const BasisSetLibrary & baslib, int len) {
 }
 
 arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double *width, int n) {
-    
+
   // Optimized exponents
   static std::vector<co_exps_t> opt(max_am+1);
-    
+
   // Check if we already have the exponents in store
   if(opt[am].tol!=tol || opt[am].exps.size()!=nexp) {
     opt[am].tol=tol;
     opt[am].exps=maxwidth_exps(am,tol,nexp,&opt[am].w,n);
   }
-    
+
   *width=opt[am].w;
 
   if(opt[am].exps.size() != nexp) {
@@ -179,7 +256,7 @@ std::vector<coprof_t> augment_basis(const std::vector<coprof_t> & cplo, int ndif
     // New width and exponents
     double w;
     arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+ndiffuse+ntight,&w,OPTMOMIND);
-    
+
     // Additional width is
     double dw=w-width;
 
@@ -201,4 +278,3 @@ BasisSetLibrary get_library(const std::vector<coprof_t> & cpl) {
 
   return baslib;
 }
-
