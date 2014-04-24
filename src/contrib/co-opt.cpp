@@ -132,7 +132,7 @@ void load_limits(std::vector<coprof_t> & cpl, const std::string & fname) {
 
       // Get exponents
       double w;
-      exps=maxwidth_exps_table(am,cpl[am].tol,nexp,&w,OPTMOMIND);
+      exps=maxwidth_exps_table(am,cpl[am].tol,nexp,w,OPTMOMIND);
 
       // Store exponents
       double dw=w-width;
@@ -199,7 +199,7 @@ void print_scheme(const BasisSetLibrary & baslib, int len) {
   }
 }
 
-arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double *width, int n) {
+arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width, int n) {
 
   // Optimized exponents
   static std::vector<co_exps_t> opt(max_am+1);
@@ -209,8 +209,8 @@ arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double *width, in
     opt[am].tol=tol;
     opt[am].exps=maxwidth_exps(am,tol,nexp,&opt[am].w,n);
   }
-
-  *width=opt[am].w;
+  
+  width=opt[am].w;
 
   if(opt[am].exps.size() != nexp) {
     std::ostringstream oss;
@@ -220,6 +220,29 @@ arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double *width, in
 
   return opt[am].exps;
 }
+
+arma::vec span_width(int am, double tol, double & width, int nx, int n) {
+  // Check starting point
+  if(n<0)
+    n=0;
+
+  // Determine necessary amount of exponents                                                                                                                                                                 
+  arma::vec exps;
+  double w;
+
+  for(nx++;nx<=NFMAX;nx++) {
+    exps=maxwidth_exps_table(am,tol,nx,w,n);
+    if(w>=width)
+      break;
+  }
+
+  // Store real width
+  width=w;
+
+  // Return exponents
+  return exps;
+}
+
 
 arma::vec move_exps(const arma::vec & exps, double x) {
   return exps*std::pow(10.0,x);
@@ -255,7 +278,7 @@ std::vector<coprof_t> augment_basis(const std::vector<coprof_t> & cplo, int ndif
 
     // New width and exponents
     double w;
-    arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+ndiffuse+ntight,&w,OPTMOMIND);
+    arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+ndiffuse+ntight,w,OPTMOMIND);
 
     // Additional width is
     double dw=w-width;
