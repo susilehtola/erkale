@@ -161,7 +161,7 @@ void Settings::add_dft_settings() {
   add_int("PZseed", "Seed number for randomized matrices?", 0);
 }
 
-void Settings::add_double(std::string name, std::string comment, double val) {
+void Settings::add_double(std::string name, std::string comment, double val, bool negative) {
   // Check that setting does not exist
   if(is_double(name)) {
     std::ostringstream oss;
@@ -169,7 +169,7 @@ void Settings::add_double(std::string name, std::string comment, double val) {
     throw std::runtime_error(oss.str());
   }
 
-  dset.push_back(gend(name,comment,val));
+  dset.push_back(gend(name,comment,val,negative));
 }
 
 void Settings::add_bool(std::string name, std::string comment, bool val) {
@@ -183,7 +183,7 @@ void Settings::add_bool(std::string name, std::string comment, bool val) {
   bset.push_back(genb(name,comment,val));
 }
 
-void Settings::add_int(std::string name, std::string comment, int val) {
+void Settings::add_int(std::string name, std::string comment, int val, bool negative) {
   // Check that setting does not exist
   if(is_int(name)) {
     std::ostringstream oss;
@@ -191,7 +191,7 @@ void Settings::add_int(std::string name, std::string comment, int val) {
     throw std::runtime_error(oss.str());
   }
 
-  iset.push_back(geni(name,comment,val));
+  iset.push_back(geni(name,comment,val,negative));
 }
 
 void Settings::add_string(std::string name, std::string comment, std::string val) {
@@ -205,15 +205,14 @@ void Settings::add_string(std::string name, std::string comment, std::string val
 }
 
 void Settings::set_double(std::string name, double val) {
-  if(val<0.0) {
-    std::ostringstream oss;
-    oss << "Error: settings must have positive value.\n";
-    throw std::runtime_error(oss.str());
-  }
-
   // Find setting in table
   for(size_t i=0;i<dset.size();i++)
     if(stricmp(name,dset[i].name)==0) {
+      if(val<0.0 && !dset[i].negative) {
+	std::ostringstream oss;
+	oss << "Error: setting " << name << " must have non-negative value.\n";
+	throw std::runtime_error(oss.str());
+      }
       dset[i].val=val;
       return;
     }
@@ -240,6 +239,11 @@ void Settings::set_int(std::string name, int val) {
   // Find setting in table
   for(size_t i=0;i<iset.size();i++)
     if(stricmp(name,iset[i].name)==0) {
+      if(val<0 && !iset[i].negative) {
+	std::ostringstream oss;
+	oss << "Error: setting " << name << " must have non-negative value.\n";
+	throw std::runtime_error(oss.str());
+      }
       iset[i].val=val;
       return;
     }
@@ -493,11 +497,12 @@ void Settings::print() const {
   printf("\n");
 }
 
-doubleset_t gend(std::string name, std::string comment, double val) {
+doubleset_t gend(std::string name, std::string comment, double val, bool negative) {
   doubleset_t ret;
   ret.name=name;
   ret.comment=comment;
   ret.val=val;
+  ret.negative=negative;
   return ret;
 }
 
@@ -509,11 +514,12 @@ boolset_t genb(std::string name, std::string comment, bool val) {
   return ret;
 }
 
-intset_t geni(std::string name, std::string comment, int val) {
+intset_t geni(std::string name, std::string comment, int val, bool negative) {
   intset_t ret;
   ret.name=name;
   ret.comment=comment;
   ret.val=val;
+  ret.negative=negative;
   return ret;
 }
 
