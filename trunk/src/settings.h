@@ -34,6 +34,9 @@ typedef struct {
   std::string comment;
   /// The value of the setting
   double val;
+
+  /// Is the value allowed to be negative?
+  bool negative;
 } doubleset_t;
 
 /// Setting with a boolean value
@@ -54,6 +57,9 @@ typedef struct {
   std::string comment;
   /// The value of the setting
   int val;
+
+  /// Is the value allowed to be negative?
+  bool negative;
 } intset_t;
 
 /// Setting with a string value
@@ -89,11 +95,11 @@ class Settings {
   void add_dft_settings();
 
   /// Add a double valued setting
-  void add_double(std::string name, std::string comment, double val);
+  void add_double(std::string name, std::string comment, double val, bool negative=false);
   /// Add a boolean valued setting
   void add_bool(std::string name, std::string comment, bool val);
   /// Add an integer valued setting
-  void add_int(std::string name, std::string comment, int val);
+  void add_int(std::string name, std::string comment, int val, bool negative=false);
   /// Add a string valued setting
   void add_string(std::string name, std::string comment, std::string val);
 
@@ -132,11 +138,11 @@ class Settings {
 };
 
 /// Generate setting of double value
-doubleset_t gend(std::string name, std::string comment, double val);
+doubleset_t gend(std::string name, std::string comment, double val, bool negative);
 /// Generate setting of boolean value
 boolset_t genb(std::string name, std::string comment, bool val);
 /// Generate setting of integer value
-intset_t geni(std::string name, std::string comment, int val);
+intset_t geni(std::string name, std::string comment, int val, bool negative);
 /// Generate setting of string value
 stringset_t gens(std::string name, std::string comment, std::string val);
 
