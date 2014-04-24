@@ -82,8 +82,13 @@ int main(int argc, char **argv) {
   
   // Collect data
   std::vector<corange_t> cpl(cpls[0]);
+  for(int am=0;am<=max_am;am++)
+    cpl[am].tol=DBL_MAX;
+
   for(size_t i=1;i<cpls.size();i++)
     for(int am=0;am<=max_am;am++) {
+      if(!cpls[i][am].Nexp)
+	continue;
 
       if(cpls[i][am].min<cpl[am].min)
 	cpl[am].min=cpls[i][am].min;
@@ -143,7 +148,7 @@ int main(int argc, char **argv) {
 
   printf("%i\n",maxam);
   for(int am=0;am<=maxam;am++)
-    printf("%i % .16e % .16e %e %i\n",am,prof[am].start,prof[am].end,prof[am].tol,(int) prof[am].exps.size());
+    printf("%i % .16e % .16e % .16e %i\n",am,prof[am].start,prof[am].end,prof[am].tol,(int) prof[am].exps.size());
   
   return 0;
 }
