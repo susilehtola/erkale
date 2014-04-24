@@ -110,7 +110,9 @@ typedef struct {
 } co_exps_t;
 
 /// Store optimized exponents
-arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double *width, int n=OPTMOMIND);
+arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width, int n=OPTMOMIND);
+/// Get exponents with wanted tolerance that span at least the wanted width. nx gives starting point for search (nx+1 is the first one tried)
+arma::vec span_width(int am, double tol, double & width, int nx=0, int n=OPTMOMIND);
 /// Move exponents in logarithmic scale to start at x instead of 0.0
 arma::vec move_exps(const arma::vec & exps, double start);
 
@@ -177,7 +179,7 @@ class CompletenessOptimizer {
     // Generate initial profile
     printf("\nStarting composition:\n");
     for(size_t am=0;am<cpl.size();am++) {
-      exps[am]=maxwidth_exps_table(am,cpl[am].tol,nfuncs[am],&widths[am],OPTMOMIND);
+      exps[am]=maxwidth_exps_table(am,cpl[am].tol,nfuncs[am],widths[am],OPTMOMIND);
       cpl[am].start=0.0;
       cpl[am].end=widths[am];
       cpl[am].exps=exps[am];
@@ -409,7 +411,7 @@ class CompletenessOptimizer {
 
     // Exponent to add: l=max+1, tolerance is cotol, 1 function.
     const int addam=max+1;
-    arma::vec pexp=maxwidth_exps_table(addam,cotol,nx,&pw,OPTMOMIND);
+    arma::vec pexp=maxwidth_exps_table(addam,cotol,nx,pw,OPTMOMIND);
 
     if(dpol<=0) {
       std::ostringstream oss;
@@ -419,7 +421,7 @@ class CompletenessOptimizer {
 
     // Compute spacing
     double sp;
-    maxwidth_exps_table(addam,cotol,pexp.size()+1,&sp,OPTMOMIND);
+    maxwidth_exps_table(addam,cotol,pexp.size()+1,sp,OPTMOMIND);
     sp/=dpol*pexp.size();
     // Wanted width is
     double ww=maxpol-minpol;
@@ -610,10 +612,16 @@ class CompletenessOptimizer {
     double step;
     {
       double nextw;
-      maxwidth_exps_table(scanam,cpl[scanam].tol,cpl[scanam].exps.size()+1,&nextw,OPTMOMIND);
+      maxwidth_exps_table(scanam,cpl[scanam].tol,cpl[scanam].exps.size()+1,nextw,OPTMOMIND);
       double curw;
-      maxwidth_exps_table(scanam,cpl[scanam].tol,cpl[scanam].exps.size(),&curw,OPTMOMIND);
+      maxwidth_exps_table(scanam,cpl[scanam].tol,cpl[scanam].exps.size(),curw,OPTMOMIND);
       step=nextw-curw;
+    }
+
+    // Is there anything to do?
+    if(minpol > cpl[scanam].start-step && maxpol < cpl[scanam].end+step) {
+      printf("%c shell already spans scanning limits.\n",shell_types[scanam]);
+      return 0.0;
     }
 
     // Width to check is
@@ -658,6 +666,8 @@ class CompletenessOptimizer {
 	inside=false;
       if(inside) {
 	mogs(iexp)=0.0;
+	printf("%5i/%-5i % 7.5f %e %8.2f\n",(int) iexp+1, (int) startp.n_elem, startp(iexp), mogs(iexp), tp.get());
+	fflush(stdout);
 	continue;
       }
 
@@ -712,50 +722,52 @@ class CompletenessOptimizer {
     printf("%11s % 7.5f %e\n","max mog",startp(imax),maxmog);
     fflush(stdout);
 
+    double moved;
+
     if(maxmog>0.0) {
-      // Adjust profile
+      // Adjust profile.
       if(startp(imax) < cpl[scanam].start) {
-	
+	// Current width is
+	double curw=cpl[scanam].end-cpl[scanam].start;
 	// Necessary width is
 	double nw=cpl[scanam].end-startp(imax);
-	
-	// Determine necessary amount of exponents
-	arma::vec exps;
-	double w;
-	for(size_t nf=cpl[scanam].exps.size()+1;nf<=NFMAX;nf++) {
-	  exps=maxwidth_exps_table(scanam,cpl[scanam].tol,nf,&w);
-	  if(w>=nw)
-	    break;
-	}
+	// Get real width
+	double realw(nw);
+	arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
 	
 	// Adjust profile
-	cpl[scanam].start-=w-nw;
+	cpl[scanam].start-=realw-curw;
 	cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
-      } else {
+	moved=-(realw-curw);
+
+      } else if(startp(imax) > cpl[scanam].end) {
+	// Current width is
+	double curw=cpl[scanam].end-cpl[scanam].start;
 	// Necessary width is
 	double nw=startp(imax)-cpl[scanam].start;
-	
-	// Determine necessary amount of exponents
-	arma::vec exps;
-	double w;
-	for(size_t nf=cpl[scanam].exps.size()+1;nf<=NFMAX;nf++) {
-	  exps=maxwidth_exps_table(scanam,cpl[scanam].tol,nf,&w);
-	  if(w>=nw)
-	    break;
-	}
+	// Get real width
+	double realw(nw);
+	arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
 	
 	// Adjust profile
-	cpl[scanam].end+=w-nw;
+	cpl[scanam].end+=realw-curw;
 	cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
+	moved=+(realw-curw);
+
+      } else {
+	throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
       }
-      
-      printf("\nOptimal %c shell is: % .3f ... % .3f (%i funcs) with tolerance %e, mog = %e. (%s)\n\n",shell_types[scanam],cpl[scanam].start,cpl[scanam].end,(int) cpl[scanam].exps.size(),cpl[scanam].tol,maxmog,tpol.elapsed().c_str());
+
+      if(moved>0.0)
+	printf("\n%c upper limit should be moved by % .3f (% .3f steps), mog = %e. (%s)\n\n",shell_types[scanam],moved,moved/step,maxmog,tpol.elapsed().c_str());
+      else
+	printf("\n%c lower limit should be moved by % .3f (% .3f steps), mog = %e. (%s)\n\n",shell_types[scanam],-moved,-moved/step,maxmog,tpol.elapsed().c_str());
       fflush(stdout);
       
       // Update current value
       curval=compute_value(cpl);
     }
-
+    
     return maxmog;
   }
   
@@ -813,7 +825,7 @@ class CompletenessOptimizer {
 	double step;
 
 	double width;
-	arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+nxadd,&width,OPTMOMIND);
+	arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+nxadd,width,OPTMOMIND);
       
 	step=width-(cpl[am].end-cpl[am].start);
 	left[am].start=cpl[am].start-step;
@@ -1185,7 +1197,7 @@ class CompletenessOptimizer {
 
 	if(cpl[am].exps.size()>1) {
 	  double width;
-	  arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()-1,&width,OPTMOMIND);
+	  arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()-1,width,OPTMOMIND);
 
 	  step=cpl[am].end-cpl[am].start-width;
 	  left[am].start=cpl[am].start+step;
