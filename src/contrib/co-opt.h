@@ -453,9 +453,6 @@ class CompletenessOptimizer {
     printf("Scanning for optimal placement of %i exponents on %c shell.\n",(int) pexp.size(), shell_types[addam]);
     printf("Using %.3f points per exponent interval, so spacing between points is %.5f.\n\n",dpol,sp);
     
-    printf("%11s %8s %12s %8s\n","trial","exponent","mog","t (s)");
-    fflush(stdout);
-    
     static size_t iter=0;
 
     // Allocate sufficient memory
@@ -478,6 +475,8 @@ class CompletenessOptimizer {
     std::vector<ValueType> vals=compute_values(cpls);
 
     // Resulting mogs
+    printf("%11s %8s %12s\n","trial   ","exponent","mog");
+    fflush(stdout);
     arma::vec mogs(startp.n_elem);
     for(size_t i=0;i<vals.size();i++) {
       // Set failed values to zero
@@ -634,9 +633,6 @@ class CompletenessOptimizer {
     printf("Scanning for stability of %c shell.\n", shell_types[scanam]);
     printf("Spacing between points is %.5f.\n\n",step);
     
-    printf("%11s %8s %12s %8s\n","trial","exponent","mog","t (s)");
-    fflush(stdout);
-    
     static size_t iter=0;
 
     // Get elemental libraries
@@ -687,6 +683,8 @@ class CompletenessOptimizer {
     std::vector<ValueType> trvals=compute_values(trbas);
 
     // and the mogs
+    printf("%11s %8s %12s\n","trial   ","exponent","mog");
+    fflush(stdout);
     arma::vec mogs(trvals.size());
     for(size_t iexp=0;iexp<mogs.n_elem;iexp++) {
       mogs(iexp)=compute_mog(trvals[iexp],curval,0.0);
