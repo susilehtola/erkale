@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
     double w;
     arma::vec exps;
     for(Nf=cpl[am].Nexp;Nf<=NFMAX;Nf++) {
-      exps=maxwidth_exps(am,cpl[am].tol,Nf,&w);
+      exps=maxwidth_exps(am,cpl[am].tol,Nf,w);
 
       if(w>=width)
 	break;

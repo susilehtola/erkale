@@ -1135,6 +1135,135 @@ class CompletenessOptimizer {
     }
   }
 
+  /// Get SCF free-atom angular momentum
+  virtual int atom_am()=0;
+
+  /// Print value
+  virtual void print_value(const ValueType & value, std::string msg)=0;
+
+  /// Extend the basis set till the CBS limit.
+  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool strict=true, bool scan=true, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, double delta=0.9) {
+    // Amount of polarization shells
+    int npol=maxam(cpl)-atom_am();
+    
+    // Compute initial value
+    curval=compute_value(form_basis(cpl));
+    print_value(curval,"Starting value");
+	
+    // Compute mog of next polarization shell
+    double tau;
+    {
+      std::vector<coprof_t> polcpl(cpl);
+      ValueType polval(curval);
+      tau=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol);
+    }
+
+    while(true) {
+      // Extend existing shells
+      double extmog=extend_profile(cpl,curval,tau,domiddle,strict,nxext);
+      // Tighten existing shells
+      if(doadd) {
+	double amog=tighten_profile(cpl,curval,tau,strict,1);
+	extmog=std::max(extmog,amog);
+      }
+     
+      // Compute mog of further polarization shell
+      std::vector<coprof_t> polcpl(cpl);
+      arma::mat polval(curval);
+      double polmog=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol);
+
+      // What is the maximum mog? Because we are here, std::max(monomog,anmog)<=tau.
+      if(extmog >= polmog) {
+	// Need to expand existing shells.
+	tau=exp((1.0-delta)*log(extmog) + delta*log(polmog));
+
+      } else {
+	// Here extmog < polmog.
+	// Going to add new polarization shell in next iteration; we are converged here.
+
+	if(scan) {
+	  printf("\n\n%s\n",print_bar("SHELL STABILITY").c_str());
+	  fflush(stdout);
+
+	  // Before adding new polarization shell, scan the stability of the existing shells.
+	  std::vector< std::vector<coprof_t> > scancpl(maxam(cpl)+1);
+	  std::vector<ValueType> scanval(maxam(cpl)+1);
+	  arma::vec scanmog(maxam(cpl)+1);
+	  for(int am=0;am<=maxam(cpl);am++) {
+	    scancpl[am]=cpl;
+	    scanval[am]=curval;
+	    scanmog[am]=scan_profile(scancpl[am],scanval[am],am,minpol,maxpol,dpol);
+	  }
+
+	  // Get maximum value
+	  arma::uword maxind;
+	  double scanm=scanmog.max(maxind);
+
+	  if(scanm>=polmog) {
+	    // Unstability detected.
+	    cpl=scancpl[maxind];
+	    curval=scanval[maxind];
+	    printf("\n\nUnstability detected on %c shell, restarting extension.\n",shell_types[maxind]);
+
+	    print_limits(cpl,"Current limits");
+	    curval.print("Current value");
+
+	    continue;
+	  }
+	}
+
+	// Switch to polarized basis.
+	cpl=polcpl;
+	curval=polval;
+	npol++;
+
+	printf("\n\n%s\n",print_bar("CONVERGENCE ACHIEVED",'#').c_str());
+	printf("\nConverged: extension mog was %e, polarization mog %e.\n",extmog,polmog);
+
+	printf("\nFinal composition for %i polarization shells (tau = %e):\n",npol,polmog);
+	print_limits(cpl);
+	print_value(curval,"Current value");
+
+	// Save basis set
+	{
+	  BasisSetLibrary baslib=form_basis(cpl);
+	  char fname[180];
+	  sprintf(fname,"un-co-ref-%i.gbs",npol);
+	  baslib.save_gaussian94(fname);
+
+	  // Save completeness range
+	  sprintf(fname,"completeness-%i.dat",npol);
+	  save_limits(cpl,fname);
+	}
+	
+	// Converged?
+	if(npol==am_max) {
+	  // Check shell extension
+	  extend_profile(cpl,curval,polmog,domiddle,nxext);
+	  if(doadd)
+	    tighten_profile(cpl,curval,polmog);
+	  break;
+	}
+	
+	// Reduce tau.
+	tau=std::min(tau,extmog);
+      }
+    }
+
+    print_limits(cpl,"\nFinal composition:");
+
+    // Save basis set
+    {
+      BasisSetLibrary baslib=form_basis(cpl);
+      char fname[180];
+      sprintf(fname,"un-co-ref.gbs");
+      baslib.save_gaussian94(fname);
+    }
+    
+    // Save completeness range
+    save_limits(cpl,"completeness.dat");
+  }
+
   /// Reduce the profile until only a single function is left on the highest am shell (polarization / correlation consistence)
   double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, bool domiddle=true, bool strict=true) {
     printf("\n\n%s\n",print_bar("PROFILE REDUCTION").c_str());
@@ -1420,6 +1549,70 @@ class CompletenessOptimizer {
 
     return minmog;
   }
+
+  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, bool strict=true, bool domiddle=true, bool docontr=true, bool restr=true, double nelcutoff=0.01) {
+    // Reference value
+    const ValueType cbsval(compute_value(form_basis(cbscpl)));
+
+    print_limits(cbscpl,"CBS limit basis");
+    print_limits(cpl,"Starting point");
+
+    // Amount of polarization functions
+    int npol=maxam(cpl)-atom_am();
+
+    // Current value
+    ValueType curval(compute_value(form_basis(cpl)));
+
+    while(npol>=1) {
+      // Reduce the profile
+      double tau=reduce_profile(cpl,curval,cbsval,0.0,domiddle,strict);
+      
+      printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
+      print_limits(cpl);
+      curval.print("Current value");
+
+      // Save basis set
+      {
+	char fname[180];
+	sprintf(fname,"un-co-%i.gbs",npol);
+	form_basis(cpl).save_gaussian94(fname);
+
+	sprintf(fname,"reduced-%i.dat",npol);
+	save_limits(cpl,fname);
+      }
+
+      // Contract the basis
+      if(docontr) {
+	// Use CBS value as reference for contraction
+	// ValueType contrref(cbsval);
+
+	// Use current value as reference for contraction
+	ValueType contrref(curval);
+
+	// Contract the basis, compute mog using P-orthogonalization
+	BasisSetLibrary contrbas=contract_basis(cpl,contrref,tau,nelcutoff,true,restr);
+
+	char fname[180];
+	// General contractions
+	sprintf(fname,"co-general-%i.gbs",npol);
+	contrbas.save_gaussian94(fname);
+
+	// Segmented contractions
+	contrbas.P_orthogonalize();
+	sprintf(fname,"co-segmented-%i.gbs",npol);
+	contrbas.save_gaussian94(fname);
+      }
+      
+      // Erase polarization shell
+      int delam=maxam(cpl);
+      cpl[delam].start=0.0;
+      cpl[delam].end=0.0;
+      cpl[delam].exps.clear();
+      npol--;
+    }
+  }
+
+
 
   /// Update the contraction coefficients, return the amount of electrons in each am shell.
   virtual std::vector<size_t> update_contraction(const std::vector<coprof_t> & cpl, double cutoff)=0;

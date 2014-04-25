@@ -207,7 +207,7 @@ arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width, i
   // Check if we already have the exponents in store
   if(opt[am].tol!=tol || opt[am].exps.size()!=nexp) {
     opt[am].tol=tol;
-    opt[am].exps=maxwidth_exps(am,tol,nexp,&opt[am].w,n);
+    opt[am].exps=maxwidth_exps(am,tol,nexp,opt[am].w,n);
   }
   
   width=opt[am].w;
