@@ -1113,6 +1113,10 @@ class CompletenessOptimizer {
 	std::vector<coprof_t> right(cpl);
 	std::vector<coprof_t> del(cpl);
 
+	// Sanity check
+	if(!cpl[am].exps.size())
+	  continue;
+
 	// Get exponents
 	char msg[200];
 
@@ -1127,7 +1131,7 @@ class CompletenessOptimizer {
 	  double step=cpl[am].end-cpl[am].start-width;
 
 	  printf("step size is %7.5f (%s).\n",step,t.elapsed().c_str());
-	  t.set();
+	  fflush(stdout);
 	  
 	  left[am].start=cpl[am].start+step;
 	  left[am].exps=move_exps(exps,left[am].start);
@@ -1155,13 +1159,22 @@ class CompletenessOptimizer {
 	  sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
 	  descr.push_back(msg);
 	  tram.push_back(am);
+	  
+	  del[am].exps=optimize_completeness(am,del[am].start,del[am].end,del[am].exps.size()-1,OPTMOMIND,false,&del[am].tol);
+	  trials.push_back(del);
+	  sprintf(msg,"Dropped exponent from   %c shell",shell_types[am]);
+	  descr.push_back(msg);
+	  tram.push_back(am);
+	} else if(cpl[am].exps.size()==1) {
+	  del[am].exps.clear();
+	  del[am].start=0.0;
+	  del[am].end=0.0;
+	  
+	  trials.push_back(del);
+	  sprintf(msg,"Dropped last exponent from   %c shell",shell_types[am]);
+	  descr.push_back(msg);
+	  tram.push_back(am);
 	}
-	
-	del[am].exps=optimize_completeness(am,del[am].start,del[am].end,del[am].exps.size()-1,OPTMOMIND,false,&del[am].tol);
-	trials.push_back(del);
-	sprintf(msg,"Dropped exponent from   %c shell",shell_types[am]);
-	descr.push_back(msg);
-	tram.push_back(am);
       }
 
       // Compute values
