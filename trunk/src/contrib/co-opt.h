@@ -53,6 +53,7 @@
 #include "timer.h"
 #include "linalg.h"
 #include "stringutil.h"
+#include "elements.h"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -122,8 +123,16 @@ class CompletenessOptimizer {
  private:
   /// Compute the energy
   virtual double compute_energy(const std::vector<coprof_t> & cpl)=0;
+
   /// Form a basis set
-  virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl)=0;
+  virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl) {
+    BasisSetLibrary baslib;
+    for(int Z=1;Z<=maxZ;Z++)
+      baslib.add_element(get_element_library(element_symbols[Z],cpl));
+
+    return baslib;
+  }
+
   /// Form a contracted basis set. Porth toggles P-orthogonalization
   virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl, std::vector<size_t> contract, bool Porth=true) {
     /// Dummy declarations
@@ -131,6 +140,7 @@ class CompletenessOptimizer {
     (void) Porth;
     return form_basis(cpl);
   }
+
   /// Update reference wave function
   virtual void update_reference(const std::vector<coprof_t> & cpl) {
     /// Dummy declaration
@@ -368,15 +378,18 @@ class CompletenessOptimizer {
     return cpl;
   }
 
+  /// Compute values with given basis sets (implementation can be parallellized)
+  virtual std::vector<ValueType> compute_values(const std::vector<BasisSetLibrary> & baslib)=0;
   /// Compute value with given basis set
-  virtual ValueType compute_value(const BasisSetLibrary & baslib)=0;
-  /// Compute value with given basis set
-  ValueType compute_value(const std::vector<coprof_t> & cpl) {
-    return compute_value(form_basis(cpl));
+  std::vector<ValueType> compute_values(const std::vector< std::vector<coprof_t> > & cpl) {
+    std::vector<BasisSetLibrary> baslibs(cpl.size());
+    for(size_t i=0;i<cpl.size();i++)
+      baslibs[i]=form_basis(cpl[i]);
+    return compute_values(baslibs);
   }
   
-  /// Compute distance of two values
-  virtual double compute_mog(const ValueType & val, const ValueType & ref)=0;
+  // Compute distance of two values. If calculation of val failed, set mog to failval.
+  virtual double compute_mog(const ValueType & val, const ValueType & ref, double failval)=0;
 
   /**
    * Compute the mog of a new polarization shell. Returns maximal mog. cpl and curval are modified.
@@ -437,15 +450,6 @@ class CompletenessOptimizer {
     // Starting points
     arma::vec startp=arma::linspace(minp,maxp,Np);
 
-    // Trials
-    std::vector< std::vector<coprof_t> > cpls(startp.n_elem);
-    // Values
-    std::vector<ValueType> vals(startp.n_elem);
-
-    // Resulting mogs
-    arma::vec mogs(startp.n_elem);
-    mogs.zeros();
-    
     printf("Scanning for optimal placement of %i exponents on %c shell.\n",(int) pexp.size(), shell_types[addam]);
     printf("Using %.3f points per exponent interval, so spacing between points is %.5f.\n\n",dpol,sp);
     
@@ -461,35 +465,24 @@ class CompletenessOptimizer {
       cpl[addam].tol=cotol;
     }
 
-    // Fill in exponents and mogs
-    Timer tptot;
+    // Form trials
+    std::vector< std::vector<coprof_t> > cpls(startp.n_elem,cpl);
     for(size_t iexp=0;iexp<startp.n_elem;iexp++) {
-      Timer tp;
-
       // Completeness profile
-      std::vector<coprof_t> trcpl(cpl);
-      trcpl[addam].start=startp(iexp)-pw/2.0;
-      trcpl[addam].end=startp(iexp)+pw/2.0;
-      trcpl[addam].exps=move_exps(pexp,trcpl[addam].start);
+      cpls[iexp][addam].start=startp(iexp)-pw/2.0;
+      cpls[iexp][addam].end=startp(iexp)+pw/2.0;
+      cpls[iexp][addam].exps=move_exps(pexp,cpls[iexp][addam].start);
+    }
 
-      // Compute trial value
-      ValueType trval;
-      try {
-	trval=compute_value(trcpl);
-	// and store the mog
-	mogs(iexp)=compute_mog(trval,curval);
+    // Calculate trial values
+    std::vector<ValueType> vals=compute_values(cpls);
 
-      } catch(...) {
-	// Calculation failed, set zero mog.
-	mogs(iexp)=0.0;
-      }
-    
-      printf("%5i/%-5i % 7.5f %e %8.2f\n",(int) iexp+1, (int) startp.n_elem, startp(iexp), mogs(iexp), tp.get());
-      fflush(stdout);
-
-      // Store exponent and mog
-      cpls[iexp]=trcpl;
-      vals[iexp]=trval;
+    // Resulting mogs
+    arma::vec mogs(startp.n_elem);
+    for(size_t i=0;i<vals.size();i++) {
+      // Set failed values to zero
+      mogs(i)=compute_mog(vals[i],curval,0.0);
+      printf("%5i/%-5i % 7.5f %e\n",(int) i+1, (int) startp.n_elem, startp(i), mogs(i));
     }
 
     { // Save out the results of the mog scan
@@ -529,19 +522,19 @@ class CompletenessOptimizer {
 
       if(intmean>maxmog) {
 	// Trial profile
-	std::vector<coprof_t> intcpl(cpl);
-	intcpl[addam].start=finergrid(iintmean)-pw/2.0;
-	intcpl[addam].end=finergrid(iintmean)+pw/2.0;
-	intcpl[addam].exps=move_exps(pexp,intcpl[addam].start);
+	std::vector< std::vector<coprof_t> > intcpl(1,cpl);
+	intcpl[0][addam].start=finergrid(iintmean)-pw/2.0;
+	intcpl[0][addam].end=finergrid(iintmean)+pw/2.0;
+	intcpl[0][addam].exps=move_exps(pexp,intcpl[0][addam].start);
 
 	// Calculate real mog
 	double intmog;
 	ValueType intval;
 	try {
 	  // Compute value
-	  intval=compute_value(intcpl);
+	  intval=compute_values(intcpl)[0];
 	  // and mog
-	  intmog=compute_mog(intval,curval);
+	  intmog=compute_mog(intval,curval,0.0);
 	} catch(...) {
 	  // Interpolation calculation failed.
 	  intmog=0.0;
@@ -554,7 +547,7 @@ class CompletenessOptimizer {
 	  printf("Interpolation accepted.\n");
 
 	  // Switch values.
-	  cpl=intcpl;
+	  cpl=intcpl[0];
 	  curval=intval;
 	} else {
 	  printf("Interpolation rejected.\n");
@@ -638,10 +631,6 @@ class CompletenessOptimizer {
     // Starting points
     arma::vec startp=arma::linspace(minp,maxp,Np);
 
-    // Trial mogs
-    arma::vec mogs(startp.n_elem);
-    mogs.zeros();
-    
     printf("Scanning for stability of %c shell.\n", shell_types[scanam]);
     printf("Spacing between points is %.5f.\n\n",step);
     
@@ -655,6 +644,13 @@ class CompletenessOptimizer {
 
     // Perform scan
     Timer tptot;
+    
+    // Trial exponents
+    std::vector< double > trexp;
+    // Trial basis sets
+    std::vector< BasisSetLibrary > trbas;
+
+    // Construct trials
     for(size_t iexp=0;iexp<startp.n_elem;iexp++) {
       Timer tp;
 
@@ -665,14 +661,14 @@ class CompletenessOptimizer {
       if(startp(iexp)-step > cpl[scanam].end)
 	inside=false;
       if(inside) {
-	mogs(iexp)=0.0;
-	printf("%5i/%-5i % 7.5f %e %8.2f\n",(int) iexp+1, (int) startp.n_elem, startp(iexp), mogs(iexp), tp.get());
-	fflush(stdout);
 	continue;
       }
+      
+      // Add trial exponent
+      trexp.push_back(startp(iexp));
 
       // Trial basis set
-      BasisSetLibrary trbas;
+      BasisSetLibrary baslib;
       // Add the function
       for(size_t iel=0;iel<els.size();iel++) {
 	ElementBasisSet elbas(els[iel]);
@@ -682,32 +678,30 @@ class CompletenessOptimizer {
 	elbas.add_function(sh);
 	
 	// and the element to the new library
-	trbas.add_element(elbas);
+	baslib.add_element(elbas);
       }	
-
-      // Compute trial value
-      ValueType trval;
-      try {
-	trval=compute_value(trbas);
-	// and store the mog
-	mogs(iexp)=compute_mog(trval,curval);
-
-      } catch(...) {
-	// Calculation failed, set zero mog.
-	mogs(iexp)=0.0;
-      }
-    
-      printf("%5i/%-5i % 7.5f %e %8.2f\n",(int) iexp+1, (int) startp.n_elem, startp(iexp), mogs(iexp), tp.get());
-      fflush(stdout);
+      trbas.push_back(baslib);
     }
 
-    { // Save out the results of the mog scan
+    // Compute trial values
+    std::vector<ValueType> trvals=compute_values(trbas);
+
+    // and the mogs
+    arma::vec mogs(trvals.size());
+    for(size_t iexp=0;iexp<mogs.n_elem;iexp++) {
+      mogs(iexp)=compute_mog(trvals[iexp],curval,0.0);
+      printf("%5i/%-5i % 7.5f %e\n",(int) iexp+1, (int) mogs.n_elem, trexp[iexp], mogs(iexp));
+      fflush(stdout);
+    }
+    
+    {
+      // Save out the results of the mog scan
       // Filename to use
       std::ostringstream fname;
       fname << "scanmog_" << shell_types[scanam] << "_" << iter << ".dat";
       
       arma::mat savemog(mogs.n_rows,2);
-      savemog.col(0)=startp;
+      savemog.col(0)=arma::conv_to<arma::vec>::from(trexp);
       savemog.col(1)=mogs;
       savemog.save(fname.str(),arma::raw_ascii);
       
@@ -719,18 +713,18 @@ class CompletenessOptimizer {
     double maxmog=mogs.max(imax);
 
     printf("\n");
-    printf("%11s % 7.5f %e\n","max mog",startp(imax),maxmog);
+    printf("%11s % 7.5f %e\n","max mog",trexp[imax],maxmog);
     fflush(stdout);
 
     double moved;
 
     if(maxmog>0.0) {
       // Adjust profile.
-      if(startp(imax) < cpl[scanam].start) {
+      if(trexp[imax] < cpl[scanam].start) {
 	// Current width is
 	double curw=cpl[scanam].end-cpl[scanam].start;
 	// Necessary width is
-	double nw=cpl[scanam].end-startp(imax);
+	double nw=cpl[scanam].end-trexp[imax];
 	// Get real width
 	double realw(nw);
 	arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
@@ -740,11 +734,11 @@ class CompletenessOptimizer {
 	cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
 	moved=-(realw-curw);
 
-      } else if(startp(imax) > cpl[scanam].end) {
+      } else if(trexp[imax] > cpl[scanam].end) {
 	// Current width is
 	double curw=cpl[scanam].end-cpl[scanam].start;
 	// Necessary width is
-	double nw=startp(imax)-cpl[scanam].start;
+	double nw=trexp[imax]-cpl[scanam].start;
 	// Get real width
 	double realw(nw);
 	arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
@@ -765,14 +759,15 @@ class CompletenessOptimizer {
       fflush(stdout);
       
       // Update current value
-      curval=compute_value(cpl);
+      std::vector< std::vector<coprof_t> > hlp(1,cpl);
+      curval=compute_values(hlp)[0];
     }
     
     return maxmog;
   }
   
   /// Extend the current shells until mog < tau. Returns maximal mog
-  double extend_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, bool domiddle=true, bool strict=true, int nxadd=1) {
+  double extend_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, bool domiddle=true, int nxadd=1) {
     printf("\n\n%s\n",print_bar("PROFILE EXTENSION").c_str());
     printf("Final tolerance is %e.\n",tau);
     fflush(stdout);
@@ -780,39 +775,21 @@ class CompletenessOptimizer {
     if(tau<=0.0)
       throw std::runtime_error("Tolerance must be positive!\n");
 
-    // Trials, consisting of either the move of the starting or the ending point
-    std::vector< std::vector<coprof_t> > trials(maxam(cpl)+1);
-    
-    // Trial values
-    std::vector<ValueType> trvals(maxam(cpl)+1);
-    
-    // Mogs
-    arma::vec trmog=DBL_MAX*arma::ones(1,maxam(cpl)+1);
-    arma::ivec dir(maxam(cpl)+1);
-    dir.zeros();
-
-    // Use old mog?
-    arma::ivec oldmog(maxam(cpl)+1);
-    oldmog.zeros();
-    
     while(true) {
-      // Recalculate everything every iteration
-      if(strict)
-	oldmog.zeros();
-      
-      // Was mog computed?
-      arma::ivec computed(maxam(cpl)+1);
-      computed.zeros();
-      
       Timer ttot;
-
+      
       // Separator
       printf("\n");
       fflush(stdout);
+      
+      // Form trial profiles
+      std::vector< std::vector<coprof_t> > trials;
+      std::vector< std::string > descr;
+      std::vector< int > tram;
 
       for(int am=0;am<=maxam(cpl);am++) {
 	Timer t;
-
+	
 	// Form trials
 	std::vector<coprof_t> left(cpl);
 	std::vector<coprof_t> middle(cpl);
@@ -823,7 +800,6 @@ class CompletenessOptimizer {
 	fflush(stdout);
 
 	double step;
-
 	double width;
 	arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+nxadd,width,OPTMOMIND);
       
@@ -842,130 +818,42 @@ class CompletenessOptimizer {
 	fflush(stdout);
 	t.set();
 
-	if(!oldmog(am)) {
-	  
-	  printf("Computing extension of %c shell (%2i funcs)",shell_types[am],(int) cpl[am].exps.size());
-	  fflush(stdout);
+	// Add the trials to the stacks
+	char msg[200];
+	trials.push_back(left);
+	sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
+	descr.push_back(msg);
+	tram.push_back(am);
 
-	  // Compute values
-	  ValueType lval(curval);
-	  ValueType mval(curval);
-	  ValueType rval(curval);
-
-	  bool lvalfail=false, mvalfail=false, rvalfail=false;
-      
-	  try {
-	    lval=compute_value(left);
-	  } catch(std::runtime_error) {
-	    lvalfail=true;
-	  }
-
-	  if(domiddle) {
-	    try {
-	      mval=compute_value(middle);
-	    } catch(std::runtime_error) {
-	      mvalfail=true;
-	    }
-	  } else
-	    mvalfail=true;
-	
-	  try {
-	    rval=compute_value(right);
-	  } catch(std::runtime_error) {
-	    rvalfail=true;
-	  }	  
-      
-	  // and mogs
-	  double lmog=0.0, mmog=0.0, rmog=0.0;
-	
-	  if(lvalfail) {
-	    lmog=0.0;
-	  } else {
-	    lmog=compute_mog(lval,curval);
-	  }
-
-	  if(mvalfail) {
-	    mmog=0.0;
-	  } else {
-	    mmog=compute_mog(mval,curval);
-	  }
-
-	  if(rvalfail) {
-	    rmog=0.0;
-	  } else {
-	    rmog=compute_mog(rval,curval);
-	  }
-
-	  double ammog=std::max(std::max(lmog,rmog),mmog);
-
-	  // Check which trial to try.
-	  if(lmog==ammog) {
-	    // Move left end
-	    trmog[am]=lmog;
-	    trvals[am]=lval;
-	    trials[am]=left;
-	    dir[am]=-1;
-	  } else if(mmog==ammog) {
-	    // Move symmerically
-	    trmog[am]=mmog;
-	    trvals[am]=mval;
-	    trials[am]=middle;
-	    dir[am]=0;
-	  } else {
-	    // Move right end
-	    trmog[am]=rmog;
-	    trvals[am]=rval;
-	    trials[am]=right;
-	    dir[am]=1;
-	  }
-	
-	  printf(", mog is %e (%s)\n",trmog[am],t.elapsed().c_str());
-	  computed(am)=true;
-
-	} else {
-	  printf("Reusing   extension of %c shell (%2i funcs)",shell_types[am],(int) cpl[am].exps.size());
-	  printf(", mog is %e (%s)\n",trmog[am],t.elapsed().c_str());
+	if(domiddle) {
+	  trials.push_back(middle);
+	  sprintf(msg,"Moved both ends      of %c shell by %.3f",shell_types[am],step/2.0);
+	  descr.push_back(msg);
+	  tram.push_back(am);
 	}
 
-	fflush(stdout);
+	trials.push_back(right);
+	sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
+	descr.push_back(msg);
+	tram.push_back(am);
       }
-      
+
+      // Compute values
+      std::vector<ValueType> trvals=compute_values(trials);
+
+      // Compute mogs
+      arma::vec mogs(trvals.size());
+      for(size_t i=0;i<trvals.size();i++)
+	mogs(i)=compute_mog(trvals[i],curval,0.0);
+
       // Figure out maximal mog
-      int maxind=maxam(cpl);
-      // Do search manually to favor large am here if degeneracies occur
-      double maxmog=trmog(maxind);
-      for(int am=maxam(cpl)-1;am>=0;am--)
-	if(trmog(am)>maxmog) {
-	  maxind=am;
-	  maxmog=trmog(maxind);
-	}
+      arma::uword maxind;
+      double maxmog=mogs.max(maxind);
 
-      // Sanity check - did we compute the maximal value now?
-      if(!computed(maxind)) {
-	// No - it's an old value. Reuse values for what we've
-	// calculated now and redo the others.
-	oldmog=computed;
-	printf("Maximal mog for %c shell, recomputing.\n",shell_types[maxind]);
-	fflush(stdout);
-	continue;
-      } else {
-	// Update oldmog
-	oldmog+=computed;
-	// but maxind is reset
-	oldmog(maxind)=false;
-      }
-      
       // Converged?
       if(maxmog < tau) {
 	printf("Maximal mog is %e, converged.\n\n",maxmog);
 	fflush(stdout);
-
-	if(!strict && arma::min(computed)==0) {
-	  // Do a final iteration in strict mode
-	  strict=true;
-	  continue;
-	}
-
 	print_limits(cpl,"Final limits");
 
 	return maxmog;
@@ -978,13 +866,8 @@ class CompletenessOptimizer {
 	// Update current value
 	curval=trvals[maxind];
 	
-	if(dir[maxind]==1)
-	  printf("Moved   ending point of %c shell, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",shell_types[maxind],cpl[maxind].start,cpl[maxind].end,(int) cpl[maxind].exps.size(),cpl[maxind].tol,maxmog,ttot.elapsed().c_str());
-	else if(dir[maxind]==-1)
-	  printf("Moved starting point of %c shell, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",shell_types[maxind],cpl[maxind].start,cpl[maxind].end,(int) cpl[maxind].exps.size(),cpl[maxind].tol,maxmog,ttot.elapsed().c_str());
-	else if(dir[maxind]==0)
-	  printf("Moved    both limits of %c shell, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",shell_types[maxind],cpl[maxind].start,cpl[maxind].end,(int) cpl[maxind].exps.size(),cpl[maxind].tol,maxmog,ttot.elapsed().c_str());
-	fflush(stdout);
+	// Print message
+	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e.\n",descr[maxind].c_str(),cpl[tram[maxind]].start,cpl[tram[maxind]].end,(int) cpl[tram[maxind]].exps.size(),cpl[tram[maxind]].tol,maxmog);
 
 	// Update references
 	update_reference(cpl);
@@ -994,39 +877,21 @@ class CompletenessOptimizer {
 
 
   /// Tighten the shells until mog < tau. Returns maximal mog.
-  double tighten_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, bool strict=true, int nxadd=1) {
+  double tighten_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, int nxadd=1) {
     printf("\n\n%s\n",print_bar("PROFILE TIGHTENING").c_str());
     printf("Final tolerance is %e.\n",tau);
     fflush(stdout);
 
-    // Trials for each am
-    std::vector< std::vector<coprof_t> > trials(maxam(cpl)+1);
-    
-    // Trial values
-    std::vector<ValueType> trvals(maxam(cpl)+1);
-    
-    // Mogs
-    arma::vec trmog=DBL_MAX*arma::ones(1,maxam(cpl)+1);    
-
-    // Use old mog?
-    arma::ivec oldmog(maxam(cpl)+1);
-    oldmog.zeros();
-    
     while(true) {
-      // Recalculate everything every iteration
-      if(strict)
-	oldmog.zeros();
-      
-      // Was mog computed?
-      arma::ivec computed(maxam(cpl)+1);
-      computed.zeros();
-
       Timer ttot;
 
       // Separator
       printf("\n");
       fflush(stdout);
-
+      
+      // Form trials
+      std::vector< std::vector<coprof_t> > trials;
+      std::vector< int > tram;
       for(int am=0;am<=maxam(cpl);am++) {
 	Timer t;
 
@@ -1036,105 +901,53 @@ class CompletenessOptimizer {
 	// Get exponents
 	printf("Determining exponents for %c shell ... ",shell_types[am]);
 	fflush(stdout);
-
+	
 	add[am].exps=optimize_completeness(am,add[am].start,add[am].end,add[am].exps.size()+nxadd,OPTMOMIND,false,&add[am].tol);
-	bool tryadd=(add[am].tol>=MINTAU);
-
 	printf("(%s)\n",t.elapsed().c_str());
 	t.set();
-      
-	printf("Computing tightening of %c shell (%2i funcs)",shell_types[am],(int) cpl[am].exps.size());
-	fflush(stdout);
-	  
-	if(!oldmog(am)) {
-	  
-
-	  // Compute values
-	  ValueType aval(curval);
-	  bool avalfail=false;
-
-	  if(tryadd) {
-	    try {
-	      aval=compute_value(add);
-	    } catch(std::runtime_error) {
-	      avalfail=true;
-	    }
-	  }
-	  
-	  // and mogs
-	  double amog;
-      
-	  if(avalfail) {
-	    amog=0.0;
-	  } else {
-	    amog=compute_mog(aval,curval);
-	  }
-	  
-	  trmog[am]=amog;
-	  trvals[am]=aval;
-	  trials[am]=add;
-
-	  computed(am)=true;
-	  printf(", mog is %e (%s)\n",trmog[am],t.elapsed().c_str());
-
-	} else {
-	  printf("Reusing   tightening of %c shell (%2i funcs)",shell_types[am],(int) cpl[am].exps.size());
-	  printf(", mog is %e (%s)\n",trmog[am],t.elapsed().c_str());
+	
+	if (add[am].tol>=MINTAU) {
+	  trials.push_back(add);
+	  tram.push_back(am);
 	}
-
-	fflush(stdout);
       }
+
+      // Compute values
+      std::vector<ValueType> trvals=compute_values(trials);
+      // and mogs
+      arma::vec trmog(trvals.size());
+      for(size_t i=0;i<trvals.size();i++)
+	trmog(i)=compute_mog(trvals[i],curval,0.0);
     
       // Figure out maximal mog
       arma::uword maxind;
       double maxmog=trmog.max(maxind);
-
-      // Sanity check - did we compute the maximal value now?
-      if(!computed(maxind)) {
-	// No - it's an old value. Reuse values for what we've
-	// calculated now and redo the others.
-	oldmog=computed;
-	printf("Maximal mog for %c shell, recomputing.\n",shell_types[maxind]);
-	fflush(stdout);
-	continue;
-      } else {
-	// Update oldmog
-	oldmog+=computed;
-	// but maxind is reset
-	oldmog(maxind)=false;
-      }
     
       // Converged?
       if(maxmog < tau) {
 	printf("Maximal mog is %e, converged.\n\n",maxmog);
 	fflush(stdout);
 
-	if(!strict && arma::min(computed)==0) {
-	  // Do a final iteration in strict mode
-	  strict=true;
-	  continue;
-	}
-
 	print_limits(cpl,"Final tolerances");
 	return maxmog;
       
       } else {
 	// Still stuff to add
-      
+	
 	// Update profile
 	cpl=trials[maxind];
 	// Update current value
 	curval=trvals[maxind];
-      
+	
 	printf("Added exponent to %c shell, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog = %e (%s).\n",shell_types[maxind],cpl[maxind].start,cpl[maxind].end,(int) cpl[maxind].exps.size(),cpl[maxind].tol,maxmog,ttot.elapsed().c_str());
 	fflush(stdout);
       }
-    
+      
       // Update references
       update_reference(cpl);
     }
   }
-
+  
   /// Get SCF free-atom angular momentum
   virtual int atom_am()=0;
 
@@ -1142,12 +955,15 @@ class CompletenessOptimizer {
   virtual void print_value(const ValueType & value, std::string msg)=0;
 
   /// Extend the basis set till the CBS limit.
-  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool strict=true, bool scan=true, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, double delta=0.9) {
+  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool scan=true, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, double delta=0.9) {
     // Amount of polarization shells
     int npol=maxam(cpl)-atom_am();
     
     // Compute initial value
-    curval=compute_value(form_basis(cpl));
+    {
+      std::vector< std::vector<coprof_t> > hlp(1,cpl);
+      curval=compute_values(hlp)[0];
+    }
     print_value(curval,"Starting value");
 	
     // Compute mog of next polarization shell
@@ -1160,16 +976,16 @@ class CompletenessOptimizer {
 
     while(true) {
       // Extend existing shells
-      double extmog=extend_profile(cpl,curval,tau,domiddle,strict,nxext);
+      double extmog=extend_profile(cpl,curval,tau,domiddle,nxext);
       // Tighten existing shells
       if(doadd) {
-	double amog=tighten_profile(cpl,curval,tau,strict,1);
+	double amog=tighten_profile(cpl,curval,tau,1);
 	extmog=std::max(extmog,amog);
       }
      
       // Compute mog of further polarization shell
       std::vector<coprof_t> polcpl(cpl);
-      arma::mat polval(curval);
+      ValueType polval(curval);
       double polmog=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol);
 
       // What is the maximum mog? Because we are here, std::max(monomog,anmog)<=tau.
@@ -1206,7 +1022,7 @@ class CompletenessOptimizer {
 	    printf("\n\nUnstability detected on %c shell, restarting extension.\n",shell_types[maxind]);
 
 	    print_limits(cpl,"Current limits");
-	    curval.print("Current value");
+	    print_value(curval,"Current value");
 
 	    continue;
 	  }
@@ -1265,7 +1081,7 @@ class CompletenessOptimizer {
   }
 
   /// Reduce the profile until only a single function is left on the highest am shell (polarization / correlation consistence)
-  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, bool domiddle=true, bool strict=true) {
+  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, bool domiddle=true) {
     printf("\n\n%s\n",print_bar("PROFILE REDUCTION").c_str());
     fflush(stdout);
 	
@@ -1278,40 +1094,18 @@ class CompletenessOptimizer {
     // Do the reduction.
     double minmog=0.0;
 
-    // Trials, consisting of either the move of the starting or the ending point or the removal of an exponent
-    std::vector< std::vector<coprof_t> > trials(maxam(cpl)+1);
-    
-    // Trial values
-    std::vector<ValueType> trvals(maxam(cpl)+1);
-    
-    // Mogs
-    arma::vec trmog=DBL_MAX*arma::ones(1,maxam(cpl)+1);
-    arma::ivec dir(maxam(cpl)+1);
-    dir.zeros();
-
-    // Use old mog?
-    arma::ivec oldmog(maxam(cpl)+1);
-    oldmog.zeros();
-
     while(true) {
-      // Recalculate everything every iteration
-      if(strict)
-	oldmog.zeros();
-      
-      // Was mog computed?
-      arma::ivec computed(maxam(cpl)+1);
-      computed.zeros();
-      
       Timer ttot;
 
       // Separator
       printf("\n");
       fflush(stdout);
 
-      minmog=0.0;
+      // Form trial profiles
+      std::vector< std::vector<coprof_t> > trials;
+      std::vector< std::string > descr;
+      std::vector< int > tram;
       for(int am=0;am<=maxam(cpl);am++) {
-	Timer t;
-
 	// Form trials
 	std::vector<coprof_t> left(cpl);
 	std::vector<coprof_t> middle(cpl);
@@ -1319,198 +1113,70 @@ class CompletenessOptimizer {
 	std::vector<coprof_t> del(cpl);
 
 	// Get exponents
-	printf("Determining exponents for %c shell ... ",shell_types[am]);
-	fflush(stdout);
-
-	double step;
+	char msg[200];
 
 	if(cpl[am].exps.size()>1) {
+	  Timer t;
+	  printf("Determining exponents for %c shell ... ",shell_types[am]);
+	  fflush(stdout);
+
 	  double width;
 	  arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()-1,width,OPTMOMIND);
+	  // Step size is
+	  double step=cpl[am].end-cpl[am].start-width;
 
-	  step=cpl[am].end-cpl[am].start-width;
+	  printf("step size is %7.5f (%s).\n",step,t.elapsed().c_str());
+	  t.set();
+	  
 	  left[am].start=cpl[am].start+step;
 	  left[am].exps=move_exps(exps,left[am].start);
 
 	  middle[am].start=cpl[am].start+step/2.0;
 	  middle[am].end=cpl[am].end-step/2.0;
 	  middle[am].exps=move_exps(exps,middle[am].start);
-
+	  
 	  right[am].end=cpl[am].end-step;
 	  right[am].exps=move_exps(exps,right[am].start);
 
-	  del[am].exps=optimize_completeness(am,del[am].start,del[am].end,del[am].exps.size()-1,OPTMOMIND,false,&del[am].tol);
+	  trials.push_back(left);
+	  sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
+	  descr.push_back(msg);
+	  tram.push_back(am);
 
-	} else {
-	  step=left[am].end-left[am].start;
-
-	  // Dummy tries
-	  left[am].start=0.0;
-	  left[am].end=0.0;
-	  left[am].exps.clear();
-
-	  middle[am].start=0.0;
-	  middle[am].end=0.0;
-	  middle[am].exps.clear();
-
-	  right[am].start=0.0;
-	  right[am].end=0.0;
-	  right[am].exps.clear();
-
-	  del[am].start=0.0;
-	  del[am].end=0.0;
-	  del[am].exps.clear();
-	}
-	printf("step size is %7.5f (%s).\n",step,t.elapsed().c_str());
-	t.set();
-
-	if(!oldmog(am)) {
-	  printf("Computing reduction of %c shell (%2i funcs)",shell_types[am],(int) cpl[am].exps.size());
-	  fflush(stdout);
-
-	  // Compute values
-	  ValueType lval(curval);
-	  ValueType mval(curval);
-	  ValueType rval(curval);
-	  ValueType dval(curval);
-
-	  bool lvalfail=false, mvalfail=false, rvalfail=false, dvalfail=false;
-	
-	  if(cpl[am].exps.size()>1) {
-	    try {
-	      lval=compute_value(left);
-	    } catch(std::runtime_error) {
-	      lvalfail=true;
-	    }
-
-	    if(domiddle) {
-	      try {
-		mval=compute_value(middle);
-	      } catch(std::runtime_error) {
-		mvalfail=true;
-	      }
-	    } else
-	      mvalfail=true;
-
-	    try {
-	      rval=compute_value(right);
-	    } catch(std::runtime_error) {
-	      rvalfail=true;
-	    }
+	  if(domiddle) {
+	    trials.push_back(middle);
+	    sprintf(msg,"Moved both ends      of %c shell by %.3f",shell_types[am],step/2.0);
+	    descr.push_back(msg);
+	    tram.push_back(am);
+	  }
 	  
-	  } else {
-	    // Trying to drop last exponent, make these dummy tries
-	    // since they will be equal to the one below
-	    lvalfail=true;
-	    mvalfail=true;
-	    rvalfail=true;
-	  }
-	
-	  // Safeguard
-	  if(cpl[am].exps.size())
-	    try {
-	      dval=compute_value(del);
-	    } catch(std::runtime_error) {
-	    dvalfail=true;
-	  }
-	  else dvalfail=true;
-	
-	  // and mogs
-	  double lmog, mmog, rmog, dmog;
-      
-	  if(lvalfail) {
-	    lmog=DBL_MAX;
-	  } else {
-	    lmog=compute_mog(lval,refval);
-	  }
-
-	  if(mvalfail) {
-	    mmog=DBL_MAX;
-	  } else {
-	    mmog=compute_mog(mval,refval);
-	  }
-
-	  if(rvalfail) {
-	    rmog=DBL_MAX;
-	  } else {
-	    rmog=compute_mog(rval,refval);
-	  }
-
-	  if(dvalfail) {
-	    dmog=DBL_MAX;
-	  } else {
-	    dmog=compute_mog(dval,refval);
-	  }
-
-	  minmog=std::min(std::min(lmog,rmog),std::min(mmog,dmog));
-
-	  // Check which trial to try.
-	  if(lmog==minmog) {
-	    // Move left end
-	    trmog[am]=lmog;
-	    trvals[am]=lval;
-	    trials[am]=left;
-	    dir[am]=1;
-	  } else if(mmog==minmog) {
-	    // Move symmerically
-	    trmog[am]=mmog;
-	    trvals[am]=mval;
-	    trials[am]=middle;
-	    dir[am]=2;
-	  } else if(dmog==minmog) {
-	    // Drop a function.
-	    trmog[am]=dmog;
-	    trvals[am]=dval;
-	    trials[am]=del;
-	    dir[am]=0;
-	  } else {
-	    // Move right end
-	    trmog[am]=rmog;
-	    trvals[am]=rval;
-	    trials[am]=right;
-	    dir[am]=-1;
-	  }
-      
-	  printf(", mog is %e (%s)\n",trmog[am],t.elapsed().c_str());
-	  computed(am)=true;
-	  fflush(stdout);
-
-	} else {
-	  printf("Reusing   reduction of %c shell (%2i funcs)",shell_types[am],(int) cpl[am].exps.size());
-	  printf(", mog is %e (%s)\n",trmog[am],t.elapsed().c_str());
-	  fflush(stdout);
+	  trials.push_back(right);
+	  sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
+	  descr.push_back(msg);
+	  tram.push_back(am);
 	}
+	
+	del[am].exps=optimize_completeness(am,del[am].start,del[am].end,del[am].exps.size()-1,OPTMOMIND,false,&del[am].tol);
+	trials.push_back(del);
+	sprintf(msg,"Dropped exponent from   %c shell",shell_types[am]);
+	descr.push_back(msg);
+	tram.push_back(am);
       }
+
+      // Compute values
+      std::vector<ValueType> trvals=compute_values(trials);
+      // and mogs
+      arma::vec trmog(trvals.size());
+      for(size_t i=0;i<trvals.size();i++)
+	trmog[i]=compute_mog(trvals[i],refval,DBL_MAX);
       
       // Figure out minimal mog
       arma::uword minind;
       minmog=trmog.min(minind);
 
-      // Sanity check - did we compute the minimal value now?
-      if(!computed(minind)) {
-	// No - it's an old value. Reuse values for what we've
-	// calculated now and redo the others.
-	oldmog=computed;
-	printf("Minimal mog for %c shell, recomputing.\n",shell_types[minind]);
-	fflush(stdout);
-	continue;
-      } else {
-	// Update oldmog
-	oldmog+=computed;
-	// but maxind is reset
-	oldmog(minind)=false;
-      }
-    
       // Converged?
-      if(tol==0.0 && ((int) minind == maxam(cpl)) && (cpl[minind].exps.size()==1)) {
-	printf("Would remove last exponent of %c shell with mog %e, converged.\n\n",shell_types[minind],minmog);
-
-	if(!strict && arma::min(computed)==0) {
-	  // Do a final iteration in strict mode
-	  strict=true;
-	  continue;
-	}
-
+      if(tol==0.0 && ((int) tram[minind] == maxam(cpl)) && (cpl[tram[minind]].exps.size()==1)) {
+	printf("Would remove last exponent of %c shell with mog %e, converged.\n\n",shell_types[tram[minind]],minmog);
 	print_limits(cpl,"Final limits");
 	fflush(stdout);
 
@@ -1518,7 +1184,7 @@ class CompletenessOptimizer {
 
       } else if(tol>0.0 && minmog>tol) {
       
-	printf("Minimal mog is %e for %c shell, converged.\n\n",minmog,shell_types[minind]);
+	printf("Minimal mog is %e for %c shell, converged.\n\n",minmog,shell_types[tram[minind]]);
 	print_limits(cpl,"Final limits");
 	fflush(stdout);
 	return minmog;
@@ -1530,16 +1196,8 @@ class CompletenessOptimizer {
 	cpl=trials[minind];
 	// Update current value
 	curval=trvals[minind];
-      
-	if(dir[minind]==-1)
-	  printf("Moved   ending point of %c shell, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",shell_types[minind],cpl[minind].start,cpl[minind].end,(int) cpl[minind].exps.size(),cpl[minind].tol,minmog,ttot.elapsed().c_str());
-	else if(dir[minind]==1)
-	  printf("Moved starting point of %c shell, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",shell_types[minind],cpl[minind].start,cpl[minind].end,(int) cpl[minind].exps.size(),cpl[minind].tol,minmog,ttot.elapsed().c_str());
-	else if(dir[minind]==2)
-	  printf("Moved    both limits of %c shell, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",shell_types[minind],cpl[minind].start,cpl[minind].end,(int) cpl[minind].exps.size(),cpl[minind].tol,minmog,ttot.elapsed().c_str());
-	else if(dir[minind]==0)
-	  printf("Dropped exponent   from %c shell, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",shell_types[minind],cpl[minind].start,cpl[minind].end,(int) cpl[minind].exps.size(),cpl[minind].tol,minmog,ttot.elapsed().c_str());
-
+	// Print message
+	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e.\n",descr[minind].c_str(),cpl[tram[minind]].start,cpl[tram[minind]].end,(int) cpl[tram[minind]].exps.size(),cpl[tram[minind]].tol,minmog);
 	fflush(stdout);
       }
 
@@ -1550,9 +1208,14 @@ class CompletenessOptimizer {
     return minmog;
   }
 
-  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, bool strict=true, bool domiddle=true, bool docontr=true, bool restr=true, double nelcutoff=0.01) {
+  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, bool domiddle=true, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true) {
     // Reference value
-    const ValueType cbsval(compute_value(form_basis(cbscpl)));
+    ValueType curval;
+    {
+      std::vector< std::vector<coprof_t> > hlp(1,cbscpl);
+      curval=compute_values(hlp)[0];
+    }
+    const ValueType cbsval(curval);
 
     print_limits(cbscpl,"CBS limit basis");
     print_limits(cpl,"Starting point");
@@ -1561,15 +1224,18 @@ class CompletenessOptimizer {
     int npol=maxam(cpl)-atom_am();
 
     // Current value
-    ValueType curval(compute_value(form_basis(cpl)));
+    {
+      std::vector< std::vector<coprof_t> > hlp(1,cpl);
+      curval=compute_values(hlp)[0];
+    }
 
     while(npol>=1) {
       // Reduce the profile
-      double tau=reduce_profile(cpl,curval,cbsval,0.0,domiddle,strict);
+      double tau=reduce_profile(cpl,curval,cbsval,0.0,domiddle);
       
       printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
       print_limits(cpl);
-      curval.print("Current value");
+      print_value(curval,"Current value");
 
       // Save basis set
       {
@@ -1589,8 +1255,8 @@ class CompletenessOptimizer {
 	// Use current value as reference for contraction
 	ValueType contrref(curval);
 
-	// Contract the basis, compute mog using P-orthogonalization
-	BasisSetLibrary contrbas=contract_basis(cpl,contrref,tau,nelcutoff,true,restr);
+	// Contract the basis, compute mog possibly using P-orthogonalization 
+	BasisSetLibrary contrbas=contract_basis(cpl,contrref,tau,nelcutoff,Porth,restr);
 
 	char fname[180];
 	// General contractions
@@ -1634,28 +1300,28 @@ class CompletenessOptimizer {
     std::vector<size_t> contract(nel);
     
     // Do the contraction.
-    double minmog=0.0;
-
     while(true) {
       Timer tc;
 
-      // Compute mogs of contracting one more function on each shell
-      arma::vec mogs(contract.size());
+      // Trial contractions and basis sets
+      std::vector< std::vector<size_t> > trials;
+      std::vector<BasisSetLibrary> trbas;
+      std::vector<int> tram;
       for(size_t am=0;am<contract.size();am++) {
 	// Check if there are free functions left
 	bool free=true;
-
+	
 	// No free functions available.
 	if(contract[am] >= cpl[am].exps.size())
 	  free=false;
-
+	
 	if(restr && am+1<cpl.size()) {
 	  // Check that the shell has more functions than the one above.
 	  int Ncur=cpl[am].exps.size()-contract[am];
 	  int Nnext=cpl[am+1].exps.size();
 	  if(am+1<contract.size())
 	    Nnext-=contract[am+1];
-
+	  
 	  // If the amount of functions is the same or smaller, don't try to contract.
 	  if(Ncur<=Nnext) {
 	    printf("Ncur = %i, Nnext = %i\n",Ncur,Nnext);
@@ -1664,58 +1330,47 @@ class CompletenessOptimizer {
 	  }
 	}
 
-	// We still have free functions left, calculate mog
 	if(free) {
-	  Timer tl;
-
-	  // Trial contraction
-	  std::vector<size_t> trial(contract);
-	  trial[am]++;
-	  // Trial basis
-	  BasisSetLibrary baslib=form_basis(cpl,trial,Porth);	 
-
-	  // Trial value
-	  ValueType trval;
-	  double trmog;
-	  try {
-	    trval=compute_value(baslib);
-	    trmog=compute_mog(refval,trval);
-	  } catch(std::runtime_error) {
-	    trmog=DBL_MAX;
-	  }
-
-	  // Store mog
-	  mogs[am]=trmog;
-
-	  print_scheme(baslib,40);
-	  printf("%e %s\n",mogs[am],tl.elapsed().c_str());
-	  fflush(stdout);
-
-	} else
-	  // No free primitives left.
-	  mogs[am]=DBL_MAX;
+	  // We still have free functions left, form trial contraction
+	  std::vector<size_t> tr(contract);
+	  tr[am]++;
+	  
+	  trials.push_back(tr);
+	  trbas.push_back(form_basis(cpl,tr,Porth));
+	  tram.push_back(am);
+	}
       }
+
+      if(!trbas.size()) {
+	printf("No functions left to contract.\n");
+	break;
+      }
+
+      // Compute values
+      std::vector<ValueType> trvals=compute_values(trbas);
+      // and mogs
+      arma::vec trmogs(trvals.size());
+      for(size_t i=0;i<trvals.size();i++) {
+	trmogs(i)=compute_mog(trvals[i],refval,DBL_MAX);
+	print_scheme(trbas[i],40);
+	printf("%e\n",trmogs(i));
+      }
+      fflush(stdout);
     
       // Determine minimal mog
-      minmog=DBL_MAX;
-      for(size_t am=0;am<mogs.size();am++)
-	minmog=std::min(minmog,mogs[am]);
-    
+      arma::uword minind;
+      double minmog=trmogs.min(minind);
+      
       // Accept move?
       if(minmog<=tol) {
-	for(size_t am=mogs.size()-1;am<mogs.size();am--)
-	  if(mogs[am]==minmog) {
-	    printf("Contracting a %c function, mog is %e (%s).\n\n",shell_types[am],minmog,tc.elapsed().c_str());
-	    fflush(stdout);
-	    contract[am]++;
-	    break;
-	  }
+	printf("Contracting a %c function, mog is %e (%s).\n\n",shell_types[tram[minind]],minmog,tc.elapsed().c_str());
+	fflush(stdout);
+	contract=trials[minind];
       } else {
 	// Converged
-	if(minmog==DBL_MAX)
-	  printf("No functions left to contract. Scheme is ");
-	else
-	  printf("Minimal mog is %e, converged (%s). Scheme is ",minmog,tc.elapsed().c_str());
+	printf("Minimal mog is %e, converged (%s). Scheme is ",minmog,tc.elapsed().c_str());
+
+	// Break while loop
 	break;
       }
     }
