@@ -624,11 +624,11 @@ arma::vec optimize_completeness_cg(int am, double min, double max, int Nf, int n
 double maxwidth(int am, double tol, int nexp, int nval, int nfull) {
   // Dummy value
   double width=-1.0;
-  maxwidth_exps(am,tol,nexp,&width,nval,nfull);
+  maxwidth_exps(am,tol,nexp,width,nval,nfull);
   return width;
 }
 
-arma::vec maxwidth_exps(int am, double tol, int nexp, double *width, int nval, int nfull) {
+arma::vec maxwidth_exps(int am, double tol, int nexp, double & width, int nval, int nfull) {
   // Error check
   if(nexp<=0) {
     arma::vec exps;
@@ -703,11 +703,11 @@ arma::vec maxwidth_exps(int am, double tol, int nexp, double *width, int nval, i
     throw std::runtime_error("Error finding limits in maxwidth_exps.\n");
 
   // Interpolate to the exact value
-  *width=left + (tol-lval)/(rval-lval)*(right-left);
+  width=left + (tol-lval)/(rval-lval)*(right-left);
 
   // Exponents and realized value of tau are
   double tau;
-  arma::vec exps=optimize_completeness(am,0.0,*width,nexp,nval,false,&tau,nfull);
+  arma::vec exps=optimize_completeness(am,0.0,width,nexp,nval,false,&tau,nfull);
 
   //  printf("Interpolation from w = %e .. %e with tau = %e .. %e yielded w = %e, tau = %e.\n",left,right,lval,rval,*width,tau);
 

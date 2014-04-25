@@ -106,7 +106,7 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
 double maxwidth(int am, double tol, int nexp, int n=1, int nfull=4);
 
 /// Calculate exponents corresponding to maximum width to obtain tolerance with given amount of exponents
-arma::vec maxwidth_exps(int am, double tol, int nexp, double *width, int n=1, int nfull=4);
+arma::vec maxwidth_exps(int am, double tol, int nexp, double & width, int n=1, int nfull=4);
 
 /// Perform completeness-optimization of exponents
 arma::vec get_exponents(int am, double start, double end, double tol, int n=1, bool verbose=false, int nfull=4);
