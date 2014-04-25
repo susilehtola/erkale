@@ -852,8 +852,9 @@ class CompletenessOptimizer {
       if(maxmog < tau) {
 	printf("Maximal mog is %e, converged.\n\n",maxmog);
 	fflush(stdout);
+	print_value(curval,"Final value");
 	print_limits(cpl,"Final limits");
-
+	
 	return maxmog;
 	
       } else {
@@ -926,6 +927,7 @@ class CompletenessOptimizer {
 	printf("Maximal mog is %e, converged.\n\n",maxmog);
 	fflush(stdout);
 
+	print_value(curval,"Final value");
 	print_limits(cpl,"Final tolerances");
 	return maxmog;
       
@@ -1019,8 +1021,8 @@ class CompletenessOptimizer {
 	    curval=scanval[maxind];
 	    printf("\n\nUnstability detected on %c shell, restarting extension.\n",shell_types[maxind]);
 
-	    print_limits(cpl,"Current limits");
 	    print_value(curval,"Current value");
+	    print_limits(cpl,"Current limits");
 
 	    continue;
 	  }
@@ -1035,8 +1037,8 @@ class CompletenessOptimizer {
 	printf("\nConverged: extension mog was %e, polarization mog %e.\n",extmog,polmog);
 
 	printf("\nFinal composition for %i polarization shells (tau = %e):\n",npol,polmog);
-	print_limits(cpl);
 	print_value(curval,"Current value");
+	print_limits(cpl);
 
 	// Save basis set
 	{
@@ -1064,7 +1066,8 @@ class CompletenessOptimizer {
       }
     }
 
-    print_limits(cpl,"\nFinal composition:");
+    print_value(curval,"\nFinal value");
+    print_limits(cpl,"Final composition:");
 
     // Save basis set
     {
@@ -1175,6 +1178,7 @@ class CompletenessOptimizer {
       // Converged?
       if(tol==0.0 && ((int) tram[minind] == maxam(cpl)) && (cpl[tram[minind]].exps.size()==1)) {
 	printf("Would remove last exponent of %c shell with mog %e, converged.\n\n",shell_types[tram[minind]],minmog);
+	print_value(curval,"Final value");
 	print_limits(cpl,"Final limits");
 	fflush(stdout);
 
@@ -1183,6 +1187,7 @@ class CompletenessOptimizer {
       } else if(tol>0.0 && minmog>tol) {
       
 	printf("Minimal mog is %e for %c shell, converged.\n\n",minmog,shell_types[tram[minind]]);
+	print_value(curval,"Final value");
 	print_limits(cpl,"Final limits");
 	fflush(stdout);
 	return minmog;
@@ -1215,8 +1220,8 @@ class CompletenessOptimizer {
     }
     const ValueType cbsval(curval);
 
+    print_value(curval,"CBS limit value");
     print_limits(cbscpl,"CBS limit basis");
-    print_limits(cpl,"Starting point");
 
     // Amount of polarization functions
     int npol=maxam(cpl)-atom_am();
@@ -1227,13 +1232,16 @@ class CompletenessOptimizer {
       curval=compute_values(hlp)[0];
     }
 
+    print_value(curval,"Starting point value");
+    print_limits(cpl,"Starting point basis");
+
     while(npol>=1) {
       // Reduce the profile
       double tau=reduce_profile(cpl,curval,cbsval,0.0,domiddle);
       
       printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
-      print_limits(cpl);
       print_value(curval,"Current value");
+      print_limits(cpl);
 
       // Save basis set
       {
