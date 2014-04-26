@@ -604,8 +604,14 @@ class CompletenessOptimizer {
     // Compute step size
     double step;
     {
-      // Use at least 4 exponents to get into the even-tempered region
-      size_t nexp=std::max(cpl[scanam].exps.n_elem,(arma::uword) 4);
+      // We now have nx exponents. Because the extension has already
+      // been done, expanding the profile by the step size
+      // w(nx+1)-w(nx) is not enough to get a notable change in the
+      // mog. Thus, the profile will get at least two new
+      // functions. So, we can use a bigger step size w(nx+2)-w(nx+1)
+      // here.
+
+      arma::uword nexp=cpl[scanam].exps.n_elem+1;
 
       double nextw;
       maxwidth_exps_table(scanam,cpl[scanam].tol,nexp+1,nextw,OPTMOMIND);
