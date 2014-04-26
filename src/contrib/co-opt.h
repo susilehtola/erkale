@@ -452,6 +452,7 @@ class CompletenessOptimizer {
 
     printf("Scanning for optimal placement of %i exponents on %c shell.\n",(int) pexp.size(), shell_types[addam]);
     printf("Using %.3f points per exponent interval, so spacing between points is %.5f.\n\n",dpol,sp);
+    fflush(stdout);
     
     static size_t iter=0;
 
@@ -635,6 +636,7 @@ class CompletenessOptimizer {
 
     printf("Scanning for stability of %c shell.\n", shell_types[scanam]);
     printf("Spacing between points is %.5f.\n\n",step);
+    fflush(stdout);
     
     static size_t iter=0;
 
@@ -854,10 +856,10 @@ class CompletenessOptimizer {
       // Converged?
       if(maxmog < tau) {
 	printf("Maximal mog is %e, converged.\n\n",maxmog);
-	fflush(stdout);
 	print_value(curval,"Final value");
 	print_limits(cpl,"Final limits");
-	
+	fflush(stdout);
+
 	return maxmog;
 	
       } else {
@@ -870,6 +872,7 @@ class CompletenessOptimizer {
 	
 	// Print message
 	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e.\n",descr[maxind].c_str(),cpl[tram[maxind]].start,cpl[tram[maxind]].end,(int) cpl[tram[maxind]].exps.size(),cpl[tram[maxind]].tol,maxmog);
+	fflush(stdout);
 
 	// Update references
 	update_reference(cpl);
@@ -928,10 +931,10 @@ class CompletenessOptimizer {
       // Converged?
       if(maxmog < tau) {
 	printf("Maximal mog is %e, converged.\n\n",maxmog);
-	fflush(stdout);
-
 	print_value(curval,"Final value");
 	print_limits(cpl,"Final tolerances");
+	fflush(stdout);
+
 	return maxmog;
       
       } else {
@@ -1042,6 +1045,7 @@ class CompletenessOptimizer {
 	printf("\nFinal composition for %i polarization shells (tau = %e):\n",npol,polmog);
 	print_value(curval,"Current value");
 	print_limits(cpl);
+	fflush(stdout);
 
 	// Save basis set
 	{
@@ -1071,6 +1075,7 @@ class CompletenessOptimizer {
 
     print_value(curval,"\nFinal value");
     print_limits(cpl,"Final composition:");
+    fflush(stdout);
 
     // Save basis set
     {
@@ -1087,8 +1092,6 @@ class CompletenessOptimizer {
   /// Reduce the profile until only a single function is left on the highest am shell (polarization / correlation consistence)
   double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, bool domiddle=true) {
     printf("\n\n%s\n",print_bar("PROFILE REDUCTION").c_str());
-    fflush(stdout);
-	
     if(tol==0.0)
       printf("Running until would drop last function of %c shell.\n",shell_types[maxam(cpl)]);
     else
@@ -1238,7 +1241,8 @@ class CompletenessOptimizer {
 
     print_value(curval,"CBS limit value");
     print_limits(cbscpl,"CBS limit basis");
-
+    fflush(stdout);
+	
     // Amount of polarization functions
     int npol=maxam(cpl)-atom_am();
 
@@ -1250,7 +1254,8 @@ class CompletenessOptimizer {
 
     print_value(curval,"Starting point value");
     print_limits(cpl,"Starting point basis");
-
+    fflush(stdout);
+	
     while(npol>=1) {
       // Reduce the profile
       double tau=reduce_profile(cpl,curval,cbsval,0.0,domiddle);
@@ -1258,6 +1263,7 @@ class CompletenessOptimizer {
       printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
       print_value(curval,"Current value");
       print_limits(cpl);
+      fflush(stdout);	
 
       // Save basis set
       {
@@ -1348,7 +1354,8 @@ class CompletenessOptimizer {
 	  if(Ncur<=Nnext) {
 	    printf("Ncur = %i, Nnext = %i\n",Ncur,Nnext);
 	    printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
-	    free=false;
+	    fflush(stdout);
+    	    free=false;
 	  }
 	}
 
@@ -1365,6 +1372,7 @@ class CompletenessOptimizer {
 
       if(!trbas.size()) {
 	printf("No functions left to contract.\n");
+	fflush(stdout);
 	break;
       }
 
@@ -1391,7 +1399,7 @@ class CompletenessOptimizer {
       } else {
 	// Converged
 	printf("Minimal mog is %e, converged (%s). Scheme is ",minmog,tc.elapsed().c_str());
-
+	fflush(stdout);
 	// Break while loop
 	break;
       }
