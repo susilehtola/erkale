@@ -147,6 +147,30 @@ class CompletenessOptimizer {
     (void) cpl;
   };
 
+  /// Decompose vectorized mogs per angular momentum
+  void mog_decompose(const std::vector<int> & tram, const arma::vec & mogs, std::vector<arma::uvec> & amidx, std::vector<arma::vec> & ammog) const {
+    // Maximum angular momentum
+    int maxam=arma::conv_to<arma::ivec>::from(tram).max();
+
+    amidx.resize(maxam+1);
+    ammog.resize(maxam+1);
+
+    for(int am=0;am<=maxam;am++) {
+      // Mog of current am
+      std::vector<double> amm;
+      // Indices
+      std::vector<arma::uword> ami;
+      for(arma::uword i=0;i<tram.size();i++)
+	if(tram[i]==am) {
+	  ami.push_back(i);
+	  amm.push_back(mogs(i));
+	}
+
+      // Store
+      amidx[am]=arma::conv_to<arma::uvec>::from(ami);
+      ammog[am]=arma::conv_to<arma::vec>::from(amm);
+    }
+  }
 
  public:  
   /// Constructor
@@ -432,10 +456,16 @@ class CompletenessOptimizer {
       throw std::runtime_error(oss.str());
     }
 
-    // Compute spacing
+    // Compute spacing with 5 exponents; this is already pretty much saturated.
     double sp;
-    maxwidth_exps_table(addam,cotol,pexp.size()+1,sp,OPTMOMIND);
-    sp/=dpol*pexp.size();
+    {
+      int nexp=5;
+      double wnext;
+      maxwidth_exps_table(addam,cotol,nexp+1,wnext,OPTMOMIND);
+      double wcur;
+      maxwidth_exps_table(addam,cotol,nexp,wcur,OPTMOMIND);
+      sp=(wnext-wcur)/dpol;
+    }
     // Wanted width is
     double ww=maxpol-minpol;
     // Amount of points to use
@@ -577,111 +607,85 @@ class CompletenessOptimizer {
     
     return maxmog;
   }
-  
+
   /**
    * Scan stability of an existing shell by placing in an additional exponent.
    *
    * Parameters
    * scanam:    angular momentum to scan
-   * minpol:    ~ minimal allowed value for polarization exponent (log10 scale)
-   * maxpol:    ~ maximal allowed value for polarization exponent (log10 scale)
-   * dpol:      amount of points used per completeness range
-   * polinterp: toggle interpolation of mog to find maximum
-   * cotol:     deviation from completeness
-   * nx:        amounts of exponents to place on the shell
+   * npoints:   amount of steps to go in each direction
    */
-  double scan_profile(std::vector<coprof_t> & cpl, ValueType & curval, int scanam, double minpol, double maxpol, double dpol) {
-   
-    Timer t;
-    Timer tpol;
-
-    if(dpol<=0) {
-      std::ostringstream oss;
-      oss << "Invalid value " << dpol << " for DPol.\n";
-      throw std::runtime_error(oss.str());
-    }
-
-    // Compute step size
-    double step;
-    {
-      // We now have nx exponents. Because the extension has already
-      // been done, expanding the profile by the step size
-      // w(nx+1)-w(nx) is not enough to get a notable change in the
-      // mog. Thus, the profile will get at least two new
-      // functions. So, we can use a bigger step size w(nx+2)-w(nx+1)
-      // here.
-
-      arma::uword nexp=cpl[scanam].exps.n_elem+1;
-
-      double nextw;
-      maxwidth_exps_table(scanam,cpl[scanam].tol,nexp+1,nextw,OPTMOMIND);
-      double curw;
-      maxwidth_exps_table(scanam,cpl[scanam].tol,nexp,curw,OPTMOMIND);
-      step=nextw-curw;
-    }
-
-    // Is there anything to do?
-    if(minpol > cpl[scanam].start-step && maxpol < cpl[scanam].end+step) {
-      printf("%c shell already spans scanning limits.\n",shell_types[scanam]);
-      return 0.0;
-    }
-
-    // Width to check is
-    double ww=maxpol-minpol;
-    // Amount of points to use
-    size_t Np=1+round(ww/step);
-    // Actual width is
-    double width=step*Np;
-
-    // so actual minimum and maximum are
-    double minp=minpol;
-    double maxp=maxpol+(width-ww);
-
-    // Starting points
-    arma::vec startp=arma::linspace(minp,maxp,Np);
-
-    printf("Scanning for stability of %c shell.\n", shell_types[scanam]);
-    printf("Spacing between points is %.5f.\n\n",step);
-    fflush(stdout);
+  double scan_profile(std::vector<coprof_t> & cpl, ValueType & curval, int npoints, double dpol) {
     
-    static size_t iter=0;
+    printf("\n\n%s\n",print_bar("SHELL STABILITY").c_str());
+    fflush(stdout);
 
     // Get elemental libraries
     const std::vector<ElementBasisSet> els=form_basis(cpl).get_elements();
-
-    // Perform scan
-    Timer tptot;
     
-    // Trial exponents
-    std::vector< double > trexp;
+    // Perform scan
+    Timer t;
+
+    printf("Scanning for shell stability.\n");
+    printf("Using %.3f points per exponent interval.\n\n",dpol);
+    fflush(stdout);
+
+    // Trial exponents and am
+    std::vector<double> trexp;
+    std::vector<int> tram;
+
+    // Step sizes
+    arma::vec spacing(maxam(cpl)+1);
+    for(int scanam=0;scanam<=maxam(cpl);scanam++) {
+      // Compute step size
+      double step;
+      {
+	// We now have nx exponents. Because the extension has already
+	// been done, expanding the profile by the step size
+	// w(nx+1)-w(nx) is not enough to get a notable change in the
+	// mog. Thus, the profile will get at least two new
+	// functions. So, we can use a bigger step size w(nx+2)-w(nx+1)
+	// here.
+	
+	arma::uword nexp=cpl[scanam].exps.n_elem+1;
+	
+	double nextw;
+	maxwidth_exps_table(scanam,cpl[scanam].tol,nexp+1,nextw,OPTMOMIND);
+	double curw;
+	maxwidth_exps_table(scanam,cpl[scanam].tol,nexp,curw,OPTMOMIND);
+	step=nextw-curw;
+
+	// Store spacing
+	spacing(scanam)=step;
+      }
+
+      printf("Spacing between points on %c shell is %.5f\n",shell_types[scanam],step);
+      fflush(stdout);
+
+      // Require the closest point is at least one step away
+      int nmin=(int) std::max(1,(int) std::ceil(dpol));
+      int nmax=(int) std::ceil(npoints*dpol);
+      for(int n=nmax;n>=nmin;n--) {
+	trexp.push_back(cpl[scanam].start-n*step/dpol);
+	tram.push_back(scanam);
+      }
+      for(int n=nmin;n<=nmax;n++) {
+	trexp.push_back(cpl[scanam].end+n*step/dpol);
+	tram.push_back(scanam);
+      }
+    }
+    
     // Trial basis sets
     std::vector< BasisSetLibrary > trbas;
-
-    // Construct trials
-    for(size_t iexp=0;iexp<startp.n_elem;iexp++) {
-      Timer tp;
-
-      // Check if we are inside filled completeness profile
-      bool inside=true;
-      if(startp(iexp)+step < cpl[scanam].start)
-	inside=false;
-      if(startp(iexp)-step > cpl[scanam].end)
-	inside=false;
-      if(inside) {
-	continue;
-      }
-      
-      // Add trial exponent
-      trexp.push_back(startp(iexp));
-
+    for(size_t iexp=0;iexp<trexp.size();iexp++) {
       // Trial basis set
       BasisSetLibrary baslib;
       // Add the function
       for(size_t iel=0;iel<els.size();iel++) {
 	ElementBasisSet elbas(els[iel]);
 
-	FunctionShell sh(scanam);
-	sh.add_exponent(1.0,std::pow(10.0,startp(iexp)));
+	FunctionShell sh(tram[iexp]);
+	sh.add_exponent(1.0,std::pow(10.0,trexp[iexp]));
 	elbas.add_function(sh);
 	
 	// and the element to the new library
@@ -694,40 +698,62 @@ class CompletenessOptimizer {
     std::vector<ValueType> trvals=compute_values(trbas);
 
     // and the mogs
-    printf("%11s %8s %12s\n","trial   ","exponent","mog");
+    printf("%11s %2s %8s %12s\n","trial   ","am","exponent","mog");
     fflush(stdout);
     arma::vec mogs(trvals.size());
     for(size_t iexp=0;iexp<mogs.n_elem;iexp++) {
       mogs(iexp)=compute_mog(trvals[iexp],curval,0.0);
-      printf("%5i/%-5i % 7.5f %e\n",(int) iexp+1, (int) mogs.n_elem, trexp[iexp], mogs(iexp));
+      printf("%5i/%-5i %-2c % 7.5f %e\n",(int) iexp+1, (int) mogs.n_elem, shell_types[tram[iexp]], trexp[iexp], mogs(iexp));
       fflush(stdout);
     }
-    
+
+    // Decompose mogs per angular momentum
+    std::vector<arma::uvec> amidx;
+    std::vector<arma::vec> ammog;
+    mog_decompose(tram,mogs,amidx,ammog);
+    printf("\n%2s %8s %12s\n","am","exponent","mog");
+    for(int am=0;am<=maxam(cpl);am++) {
+      // Find location of maximum
+      arma::uword maxind;
+      double maxmog=ammog[am].max(maxind);
+      printf("%-2c % 7.5f %e\n",shell_types[am],trexp[amidx[am](maxind)],maxmog);
+    }
+    fflush(stdout);
+
     {
+      static size_t iter=0;
+
       // Save out the results of the mog scan
-      // Filename to use
-      std::ostringstream fname;
-      fname << "scanmog_" << shell_types[scanam] << "_" << iter << ".dat";
-      
-      arma::mat savemog(mogs.n_rows,2);
-      savemog.col(0)=arma::conv_to<arma::vec>::from(trexp);
-      savemog.col(1)=mogs;
-      savemog.save(fname.str(),arma::raw_ascii);
-      
+      for(int am=0;am<=maxam(cpl);am++) {
+	std::ostringstream fname;
+	fname << "scanmog_" << iter << "_" << shell_types[am] << ".dat";
+
+	// Collect exponent values
+	arma::vec expval(ammog[am].n_elem);
+	for(size_t i=0;i<ammog[am].n_elem;i++)
+	  expval(i)=trexp[amidx[am][i]];
+	
+	arma::mat savemog(expval.n_elem,2);
+	savemog.col(0)=expval;
+	savemog.col(1)=ammog[am];
+	savemog.save(fname.str(),arma::raw_ascii);
+      }
+
       iter++;
     }
-
+    
     // Find maximum mog
     arma::uword imax;
     double maxmog=mogs.max(imax);
-
+    
     printf("\n");
-    printf("%11s % 7.5f %e\n","max mog",trexp[imax],maxmog);
+    printf("%11s %-2c % 7.5f %e\n","max mog",shell_types[tram[imax]],trexp[imax],maxmog);
     fflush(stdout);
 
     double moved;
 
     if(maxmog>0.0) {
+      int scanam=tram[imax];
       // Adjust profile.
       if(trexp[imax] < cpl[scanam].start) {
 	// Current width is
@@ -756,15 +782,15 @@ class CompletenessOptimizer {
 	cpl[scanam].end+=realw-curw;
 	cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
 	moved=+(realw-curw);
-
+	
       } else {
 	throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
       }
-
+      
       if(moved>0.0)
-	printf("\n%c upper limit should be moved by % .3f (% .3f steps), mog = %e. (%s)\n\n",shell_types[scanam],moved,moved/step,maxmog,tpol.elapsed().c_str());
+	printf("\n%c upper limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n\n",shell_types[scanam],moved,moved/spacing(scanam),maxmog,t.elapsed().c_str());
       else
-	printf("\n%c lower limit should be moved by % .3f (% .3f steps), mog = %e. (%s)\n\n",shell_types[scanam],-moved,-moved/step,maxmog,tpol.elapsed().c_str());
+	printf("\n%c lower limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n\n",shell_types[scanam],-moved,-moved/spacing(scanam),maxmog,t.elapsed().c_str());
       fflush(stdout);
       
       // Update current value
@@ -855,6 +881,15 @@ class CompletenessOptimizer {
       for(size_t i=0;i<trvals.size();i++)
 	mogs(i)=compute_mog(trvals[i],curval,0.0);
 
+      // Decompose mogs per angular momentum
+      std::vector<arma::uvec> amidx;
+      std::vector<arma::vec> ammog;
+      mog_decompose(tram,mogs,amidx,ammog);
+      printf("\n%2s %12s\n","am","mog");
+      for(int am=0;am<=maxam(cpl);am++)
+	printf("%-2c %e\n",shell_types[am],arma::max(ammog[am]));
+      fflush(stdout);
+
       // Figure out maximal mog
       arma::uword maxind;
       double maxmog=mogs.max(maxind);
@@ -929,6 +964,15 @@ class CompletenessOptimizer {
       arma::vec trmog(trvals.size());
       for(size_t i=0;i<trvals.size();i++)
 	trmog(i)=compute_mog(trvals[i],curval,0.0);
+
+      // Decompose mogs per angular momentum
+      std::vector<arma::uvec> amidx;
+      std::vector<arma::vec> ammog;
+      mog_decompose(tram,trmog,amidx,ammog);
+      printf("\n%2s %12s\n","am","mog");
+      for(int am=0;am<=maxam(cpl);am++)
+	printf("%-2c %e\n",shell_types[am],arma::max(ammog[am]));
+      fflush(stdout);
     
       // Figure out maximal mog
       arma::uword maxind;
@@ -967,7 +1011,7 @@ class CompletenessOptimizer {
   virtual void print_value(const ValueType & value, std::string msg)=0;
 
   /// Extend the basis set till the CBS limit.
-  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool scan=true, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, double delta=0.9) {
+  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, double delta=0.9) {
     // Amount of polarization shells
     int npol=maxam(cpl)-atom_am();
     
@@ -1010,32 +1054,22 @@ class CompletenessOptimizer {
 	// Going to add new polarization shell in next iteration; we are converged here.
 
 	if(scan) {
-	  printf("\n\n%s\n",print_bar("SHELL STABILITY").c_str());
-	  fflush(stdout);
-
 	  // Before adding new polarization shell, scan the stability of the existing shells.
-	  std::vector< std::vector<coprof_t> > scancpl(maxam(cpl)+1);
-	  std::vector<ValueType> scanval(maxam(cpl)+1);
-	  arma::vec scanmog(maxam(cpl)+1);
-	  for(int am=0;am<=maxam(cpl);am++) {
-	    scancpl[am]=cpl;
-	    scanval[am]=curval;
-	    scanmog[am]=scan_profile(scancpl[am],scanval[am],am,minpol,maxpol,dpol);
-	  }
+	  std::vector<coprof_t> scancpl(cpl);
+	  ValueType scanval(curval);
+	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol);
 
-	  // Get maximum value
-	  arma::uword maxind;
-	  double scanm=scanmog.max(maxind);
-
-	  if(scanm>=polmog) {
-	    // Unstability detected.
-	    cpl=scancpl[maxind];
-	    curval=scanval[maxind];
-	    printf("\n\nUnstability detected on %c shell, restarting extension.\n",shell_types[maxind]);
-
+	  if(scanmog>=polmog) {
+	    // Instability detected, real mog is
+	    double mog=compute_mog(scanval,curval,0.0);
+	    
+	    cpl=scancpl;
+	    curval=scanval;
+	    printf("\n\nInstability detected with real mog = %e, restarting extension.\n",mog);
+	    
 	    print_value(curval,"Current value");
 	    print_limits(cpl,"Current limits");
-
+	    
 	    continue;
 	  }
 	}
@@ -1196,6 +1230,15 @@ class CompletenessOptimizer {
       for(size_t i=0;i<trvals.size();i++)
 	trmog[i]=compute_mog(trvals[i],refval,DBL_MAX);
       
+      // Decompose mogs per angular momentum
+      std::vector<arma::uvec> amidx;
+      std::vector<arma::vec> ammog;
+      mog_decompose(tram,trmog,amidx,ammog);
+      printf("\n%2s %12s\n","am","mog");
+      for(int am=0;am<=maxam(cpl);am++)
+	printf("%-2c %e\n",shell_types[am],arma::max(ammog[am]));
+      fflush(stdout);
+
       // Figure out minimal mog
       arma::uword minind;
       minmog=trmog.min(minind);
