@@ -170,12 +170,21 @@ FunctionShell::FunctionShell(int amval) {
 FunctionShell::FunctionShell(int amval, const std::vector<contr_t> & c) {
   am=amval;
   C=c;
+
+  for(size_t i=0;i<c.size();i++)
+    if(C[i].z<=0.0) {
+      throw std::runtime_error("Negative gaussian exponent in basis set!\n");
+    }
 }
 
 FunctionShell::~FunctionShell() {
 }
 
 void FunctionShell::add_exponent(double Cv, double zv) {
+  if(zv<=0.0) {
+    throw std::runtime_error("Negative gaussian exponent in basis set!\n");
+  }
+
   contr_t tmp;
   tmp.c=Cv;
   tmp.z=zv;
