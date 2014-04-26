@@ -603,10 +603,13 @@ class CompletenessOptimizer {
     // Compute step size
     double step;
     {
+      // Use at least 4 exponents to get into the even-tempered region
+      size_t nexp=std::max(cpl[scanam].exps.n_elem,(arma::uword) 4);
+
       double nextw;
-      maxwidth_exps_table(scanam,cpl[scanam].tol,cpl[scanam].exps.size()+1,nextw,OPTMOMIND);
+      maxwidth_exps_table(scanam,cpl[scanam].tol,nexp+1,nextw,OPTMOMIND);
       double curw;
-      maxwidth_exps_table(scanam,cpl[scanam].tol,cpl[scanam].exps.size(),curw,OPTMOMIND);
+      maxwidth_exps_table(scanam,cpl[scanam].tol,nexp,curw,OPTMOMIND);
       step=nextw-curw;
     }
 
@@ -670,7 +673,7 @@ class CompletenessOptimizer {
 	ElementBasisSet elbas(els[iel]);
 
 	FunctionShell sh(scanam);
-	sh.add_exponent(1.0,startp(iexp));
+	sh.add_exponent(1.0,std::pow(10.0,startp(iexp)));
 	elbas.add_function(sh);
 	
 	// and the element to the new library
