@@ -243,11 +243,6 @@ arma::vec span_width(int am, double tol, double & width, int nx, int n) {
   return exps;
 }
 
-
-arma::vec move_exps(const arma::vec & exps, double x) {
-  return exps*std::pow(10.0,x);
-}
-
 ElementBasisSet get_element_library(const std::string & el, const std::vector<coprof_t> & cpl) {
   ElementBasisSet elbas(el);
   for(size_t am=0;am<cpl.size();am++)

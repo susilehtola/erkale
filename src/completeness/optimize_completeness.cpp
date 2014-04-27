@@ -714,6 +714,9 @@ arma::vec maxwidth_exps(int am, double tol, int nexp, double & width, int nval, 
   return exps;
 }
 
+arma::vec move_exps(const arma::vec & exps, double x) {
+  return exps*std::pow(10.0,x);
+}
 
 /// Perform completeness-optimization of exponents
 arma::vec get_exponents(int am, double start, double end, double tol, int nval, bool verbose, int nfull) {

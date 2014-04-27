@@ -114,8 +114,6 @@ typedef struct {
 arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width, int n=OPTMOMIND);
 /// Get exponents with wanted tolerance that span at least the wanted width. nx gives starting point for search (nx+1 is the first one tried)
 arma::vec span_width(int am, double tol, double & width, int nx=0, int n=OPTMOMIND);
-/// Move exponents in logarithmic scale to start at x instead of 0.0
-arma::vec move_exps(const arma::vec & exps, double start);
 
 /// Completeness optimizer class
 template<typename ValueType>
