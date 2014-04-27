@@ -1029,7 +1029,7 @@ class CompletenessOptimizer {
   virtual void print_value(const ValueType & value, std::string msg)=0;
 
   /// Extend the basis set till the CBS limit.
-  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, double delta=0.9) {
+  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, bool cbsinterp=true, double delta=0.9) {
     // Amount of polarization shells
     int npol=maxam(cpl)-atom_am();
 
@@ -1047,6 +1047,9 @@ class CompletenessOptimizer {
       ValueType polval(curval);
       tau=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol);
     }
+
+    // Mogs of added polarization shells
+    std::vector<double> polmogs;
 
     while(true) {
       // Extend existing shells
@@ -1095,6 +1098,9 @@ class CompletenessOptimizer {
 	  }
 	}
 
+	// Save polarization mog
+	polmogs.push_back(polmog);
+
 	// Switch to polarized basis.
 	cpl=polcpl;
 	curval=polval;
@@ -1122,10 +1128,24 @@ class CompletenessOptimizer {
 
 	// Converged?
 	if(npol==am_max) {
+	  // Use current polarization mog to extend profile
+	  tau=polmog;
+	  // Interpolate to next polarization mog?
+	  if(cbsinterp && polmogs.size()>=2) {
+	    // Mog of highest shell is
+	    double hmog=polmogs[polmogs.size()-1];
+	    // and the one before that
+	    double lmog=polmogs[polmogs.size()-2];
+	    
+	    // Fit slope: log(mog) = a (delta L) + b,
+	    // so the next shell occurs at
+	    tau=hmog*hmog/lmog;
+	  }
+
 	  // Check shell extension
-	  extend_profile(cpl,curval,polmog,domiddle,nxext);
+	  extend_profile(cpl,curval,tau,domiddle,nxext);
 	  if(doadd)
-	    tighten_profile(cpl,curval,polmog);
+	    tighten_profile(cpl,curval,tau);
 	  break;
 	}
 
