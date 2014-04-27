@@ -1136,16 +1136,46 @@ class CompletenessOptimizer {
 	    double hmog=polmogs[polmogs.size()-1];
 	    // and the one before that
 	    double lmog=polmogs[polmogs.size()-2];
-	    
+
 	    // Fit slope: log(mog) = a (delta L) + b,
 	    // so the next shell occurs at
 	    tau=hmog*hmog/lmog;
 	  }
 
-	  // Check shell extension
-	  extend_profile(cpl,curval,tau,domiddle,nxext);
-	  if(doadd)
-	    tighten_profile(cpl,curval,tau);
+	  while(true) {
+	    // Check shell extension
+	    extend_profile(cpl,curval,tau,domiddle,nxext);
+	    if(doadd)
+	      tighten_profile(cpl,curval,tau);
+
+	    double scanmog=0.0;
+	    if(scan) {
+	      // Before adding new polarization shell, scan the stability of the existing shells.
+	      std::vector<coprof_t> scancpl(cpl);
+	      ValueType scanval(curval);
+	      scanmog=scan_profile(scancpl,scanval,nscan,dpol);
+
+	      if(scanmog>=tau) {
+		// Instability detected, real mog is
+		double mog=compute_mog(scanval,curval,0.0);
+
+		cpl=scancpl;
+		curval=scanval;
+		printf("\n\nInstability detected with real mog = %e, restarting extension.\n",mog);
+		
+		print_value(curval,"Current value");
+		print_limits(cpl,"Current limits");
+
+		// Restart extension
+		continue;
+	      }
+	    }
+	    
+	    // Break last shell extension loop
+	    break;
+	  }
+	  
+	  // Break polarization loop
 	  break;
 	}
 
