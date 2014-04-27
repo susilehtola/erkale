@@ -467,7 +467,7 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
   const double steplen=0.1;
   double dr(steplen);
   // Maximum amount of steps to take in line search
-  const int nline=5;
+  const size_t nline=5;
     
   // Density and gradient
   double d;
