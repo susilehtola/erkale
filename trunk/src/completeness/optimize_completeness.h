@@ -108,7 +108,10 @@ double maxwidth(int am, double tol, int nexp, int n=1, int nfull=4);
 /// Calculate exponents corresponding to maximum width to obtain tolerance with given amount of exponents
 arma::vec maxwidth_exps(int am, double tol, int nexp, double & width, int n=1, int nfull=4);
 
-/// Perform completeness-optimization of exponents
+/// Move exponents in logarithmic scale to start at x instead of 0.0
+arma::vec move_exps(const arma::vec & exps, double start);
+
+/// Get exponents that span [start,end] with tau <= tol
 arma::vec get_exponents(int am, double start, double end, double tol, int n=1, bool verbose=false, int nfull=4);
 
 #endif
