@@ -1067,23 +1067,29 @@ void BasisSetLibrary::save_gaussian94(const char * filename, bool append) const 
 
 void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
   FILE *out;
-  if(append)
+  if(append) {
     out=fopen(filename,"a");
-  else
+    if(!out) {
+      std::ostringstream oss;
+      oss << "Error opening basis set output file \"" << filename << "\".\n";
+      throw std::runtime_error(oss.str());
+    }
+  } else {
     out=fopen(filename,"w");
   
-  if(!out) {
-    std::ostringstream oss;
-    oss << "Error opening basis set output file \"" << filename << "\".\n";
-    throw std::runtime_error(oss.str());
+    if(!out) {
+      std::ostringstream oss;
+      oss << "Error opening basis set output file \"" << filename << "\".\n";
+      throw std::runtime_error(oss.str());
+    }
+
+    fprintf(out,"$ Supported elements\n$");
+    for(size_t i=0;i<elements.size();i++)
+      fprintf(out," %s",elements[i].get_symbol().c_str());
+    fprintf(out,"\n");
+    
+    fprintf(out,"************************************************************************\n");
   }
-  
-  fprintf(out,"$ Supported elements\n$");
-  for(size_t i=0;i<elements.size();i++)
-    fprintf(out," %s",elements[i].get_symbol().c_str());
-  fprintf(out,"\n");
-  
-  fprintf(out,"************************************************************************\n");
 
   // Loop over elements
   for(size_t iel=0;iel<elements.size();iel++) {
