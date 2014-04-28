@@ -1475,7 +1475,6 @@ class CompletenessOptimizer {
 
 	  // If the amount of functions is the same or smaller, don't try to contract.
 	  if(Ncur<=Nnext) {
-	    printf("Ncur = %i, Nnext = %i\n",Ncur,Nnext);
 	    printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
 	    fflush(stdout);
 	    free=false;
