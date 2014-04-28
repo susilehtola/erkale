@@ -1127,7 +1127,7 @@ class CompletenessOptimizer {
 	}
 
 	// Converged?
-	if(npol==am_max) {
+	if(maxam(cpl)==am_max) {
 	  // Use current polarization mog to extend profile
 	  tau=polmog;
 	  // Interpolate to next polarization mog?
