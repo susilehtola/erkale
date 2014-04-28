@@ -228,7 +228,7 @@ arma::vec span_width(int am, double tol, double & width, int nx, int n) {
 
   // Determine necessary amount of exponents                                                                                                                                                                 
   arma::vec exps;
-  double w;
+  double w=0.0;
 
   for(nx++;nx<=NFMAX;nx++) {
     exps=maxwidth_exps_table(am,tol,nx,w,n);
