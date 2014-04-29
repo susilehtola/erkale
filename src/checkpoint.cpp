@@ -345,7 +345,7 @@ void Checkpoint::write(const BasisSet & basis) {
   for(size_t i=0;i<Nnuc;i++) {
     // Get nucleus
     nucleus_t n=basis.get_nucleus(i);
-    
+
     // Store data
     nucs[i].ind=n.ind;
     nucs[i].rx=n.r.x;
@@ -1011,4 +1011,31 @@ void Checkpoint::read(const std::string & name, std::string & val) {
 bool file_exists(const std::string & name) {
   std::ifstream file(name.c_str());
   return file.good();
+}
+
+std::string get_cwd() {
+  char *dir=get_current_dir_name();
+  std::string cwd(dir);
+  free(dir);
+  return cwd;
+}
+
+void change_dir(std::string dir, bool create) {
+  if(create) {
+    std::string cmd="mkdir -p "+dir;
+    int err=system(cmd.c_str());
+    if(err) {
+      std::ostringstream oss;
+      oss << "Could not create directory \"" << dir << "\".\n";
+      throw std::runtime_error(oss.str());
+    }
+  }
+
+  // Go to directory
+  int direrr=chdir(dir.c_str());
+  if(direrr) {
+    std::ostringstream oss;
+    oss << "Could not change to directory \"" << dir << "\".\n";
+    throw std::runtime_error(oss.str());
+  }
 }
