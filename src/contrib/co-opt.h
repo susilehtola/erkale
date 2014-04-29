@@ -153,6 +153,12 @@ class CompletenessOptimizer {
       throw std::runtime_error(oss.str());
     }
 
+    // Sanity check
+    if(!tram.size()) {
+      amidx.clear();
+      ammog.clear();
+    }
+
     // Maximum angular momentum
     int maxam=arma::conv_to<arma::ivec>::from(tram).max();
 
