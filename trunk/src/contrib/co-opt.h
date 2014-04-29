@@ -710,7 +710,13 @@ class CompletenessOptimizer {
       }
       trbas.push_back(baslib);
     }
-
+    
+    // Sanity check
+    if(!trbas.size()) {
+      printf("No shells to scan stability of.\n");
+      return 0.0;
+    }
+    
     // Compute trial values
     std::vector<ValueType> trvals=compute_values(trbas);
 
@@ -890,6 +896,12 @@ class CompletenessOptimizer {
 	sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
 	descr.push_back(msg);
 	tram.push_back(am);
+      }
+
+      // Sanity check
+      if(!trials.size()) {
+	printf("No shells can be extended.\n");
+	return 0.0;
       }
 
       // Compute values
