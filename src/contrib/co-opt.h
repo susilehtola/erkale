@@ -980,6 +980,12 @@ class CompletenessOptimizer {
 	}
       }
 
+      // Sanity check
+      if(!trials.size()) {
+	printf("No shells can be tightened.\n");
+	return 0.0;
+      }
+
       // Compute values
       std::vector<ValueType> trvals=compute_values(trials);
       // and mogs
