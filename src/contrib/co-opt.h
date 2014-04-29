@@ -157,6 +157,7 @@ class CompletenessOptimizer {
     if(!tram.size()) {
       amidx.clear();
       ammog.clear();
+      return;
     }
 
     // Maximum angular momentum
