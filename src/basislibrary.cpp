@@ -868,10 +868,6 @@ BasisSetLibrary::BasisSetLibrary() {
 BasisSetLibrary::~BasisSetLibrary() {
 }
 
-void BasisSetLibrary::load_gaussian94(const char * filename, bool verbose) {
-  load_gaussian94(std::string(filename),verbose);
-}
-
 void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
   // First, find out file where basis set is
   std::string filename=find_basis(basis,verbose);
@@ -1061,21 +1057,17 @@ void BasisSetLibrary::save_gaussian94(const std::string & filename, bool append)
   fclose(out);
 }
 
-void BasisSetLibrary::save_gaussian94(const char * filename, bool append) const {
-  save_gaussian94(filename,append);
-}
-
-void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
+void BasisSetLibrary::save_dalton(const std::string & filename, bool append) const {
   FILE *out;
   if(append) {
-    out=fopen(filename,"a");
+    out=fopen(filename.c_str(),"a");
     if(!out) {
       std::ostringstream oss;
       oss << "Error opening basis set output file \"" << filename << "\".\n";
       throw std::runtime_error(oss.str());
     }
   } else {
-    out=fopen(filename,"w");
+    out=fopen(filename.c_str(),"w");
   
     if(!out) {
       std::ostringstream oss;
@@ -1134,10 +1126,6 @@ void BasisSetLibrary::save_dalton(const char * filename, bool append) const {
     }
   }
   fclose(out);
-}
-
-void BasisSetLibrary::save_dalton(const std::string & filename, bool append) const {
-  save_dalton(filename.c_str(),append);
 }
 
 void BasisSetLibrary::add_element(const ElementBasisSet & el) {
