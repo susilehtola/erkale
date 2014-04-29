@@ -946,7 +946,7 @@ class CompletenessOptimizer {
 	curval=trvals[maxind];
 
 	// Print message
-	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e.\n",descr[maxind].c_str(),cpl[tram[maxind]].start,cpl[tram[maxind]].end,(int) cpl[tram[maxind]].exps.size(),cpl[tram[maxind]].tol,maxmog);
+	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",descr[maxind].c_str(),cpl[tram[maxind]].start,cpl[tram[maxind]].end,(int) cpl[tram[maxind]].exps.size(),cpl[tram[maxind]].tol,maxmog,ttot.elapsed().c_str());
 	fflush(stdout);
 
 	// Update references
@@ -1367,7 +1367,7 @@ class CompletenessOptimizer {
 	// Update current value
 	curval=trvals[minind];
 	// Print message
-	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e.\n",descr[minind].c_str(),cpl[tram[minind]].start,cpl[tram[minind]].end,(int) cpl[tram[minind]].exps.size(),cpl[tram[minind]].tol,minmog);
+	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",descr[minind].c_str(),cpl[tram[minind]].start,cpl[tram[minind]].end,(int) cpl[tram[minind]].exps.size(),cpl[tram[minind]].tol,minmog,ttot.elapsed().c_str());
 	fflush(stdout);
       }
 
