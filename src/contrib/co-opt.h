@@ -1054,7 +1054,7 @@ class CompletenessOptimizer {
   virtual void print_value(const ValueType & value, std::string msg)=0;
 
   /// Extend the basis set till the CBS limit.
-  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, bool cbsinterp=true, double delta=0.9) {
+  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, bool cbsinterp=true, double cbsthr=0.0, double delta=0.9) {
     // Amount of polarization shells
     int npol=maxam(cpl)-atom_am();
 
@@ -1090,50 +1090,51 @@ class CompletenessOptimizer {
       ValueType polval(curval);
       double polmog=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol);
 
-      // What is the maximum mog? Because we are here, std::max(monomog,anmog)<=tau.
-      if(extmog >= polmog) {
+      // What is the maximum mog?
+      if(extmog >= std::max(polmog,cbsthr)) {
 	// Need to expand existing shells.
-	tau=exp((1.0-delta)*log(extmog) + delta*log(polmog));
+	tau=exp((1.0-delta)*log(extmog) + delta*log(std::max(polmog,cbsthr)));
 
       } else {
-	// Here extmog < polmog.
+	// Here extmog < max(polmog,cbsthr).
 	// Going to add new polarization shell in next iteration; we are converged here.
-
+	
 	if(scan) {
 	  // Before adding new polarization shell, scan the stability of the existing shells.
 	  std::vector<coprof_t> scancpl(cpl);
 	  ValueType scanval(curval);
 	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol);
-
+	  
 	  // Update extension mog
 	  extmog=std::max(extmog,scanmog);
-
-	  if(scanmog>=polmog) {
+	  
+	  if(scanmog>=std::max(polmog,cbsthr)) {
 	    // Instability detected, real mog is
 	    double mog=compute_mog(scanval,curval,0.0);
-
+	    
 	    cpl=scancpl;
 	    curval=scanval;
 	    printf("\n\nInstability detected with real mog = %e, restarting extension.\n",mog);
-
+	    
 	    print_value(curval,"Current value");
 	    print_limits(cpl,"Current limits");
-
+	    
 	    continue;
 	  }
 	}
 
 	// Save polarization mog
-	polmogs.push_back(polmog);
-
+	if(maxam(polcpl)>maxam(cpl))
+	  polmogs.push_back(polmog);
+	
 	// Switch to polarized basis.
 	cpl=polcpl;
 	curval=polval;
 	npol++;
-
+	
 	printf("\n\n%s\n",print_bar("CONVERGENCE ACHIEVED",'#').c_str());
 	printf("\nConverged: extension mog was %e, polarization mog %e.\n",extmog,polmog);
-
+	
 	printf("\nFinal composition for %i polarization shells (tau = %e):\n",npol,polmog);
 	print_value(curval,"Current value");
 	print_limits(cpl);
@@ -1152,7 +1153,13 @@ class CompletenessOptimizer {
 	}
 
 	// Converged?
-	if(maxam(cpl)==am_max) {
+	if(cbsthr>0.0) {
+	  // CBS threshold overrides am convergence check
+	  if(std::max(extmog,polmog)<cbsthr) {
+	    printf("\nCBS threshold reached: extension mog was %e, polarization mog %e.\n",extmog,polmog);
+	    break;
+	  }
+	} else if(maxam(cpl)==am_max) {
 	  // Use current polarization mog to extend profile
 	  tau=polmog;
 	  // Interpolate to next polarization mog?
@@ -1209,11 +1216,11 @@ class CompletenessOptimizer {
 	  tau=std::min(tau,extmog);
       }
     }
-
+    
     print_value(curval,"\nFinal value");
     print_limits(cpl,"Final composition:");
     fflush(stdout);
-
+    
     // Save basis set
     {
       BasisSetLibrary baslib=form_basis(cpl);
@@ -1221,7 +1228,7 @@ class CompletenessOptimizer {
       sprintf(fname,"un-co-ref.gbs");
       baslib.save_gaussian94(fname);
     }
-
+    
     // Save completeness range
     save_limits(cpl,"completeness.dat");
   }
