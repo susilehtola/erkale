@@ -521,6 +521,11 @@ class CompletenessOptimizer {
 
     // Calculate trial values
     std::vector<ValueType> vals=compute_values(cpls);
+    if(vals.size()!=cpls.size()) {
+      std::ostringstream oss;
+      oss << "Error - requested computation of " << cpls.size() << " but got only " << vals.size() << "!\n";
+      throw std::runtime_error(oss.str());
+    }
 
     // Resulting mogs
     printf("%11s %8s %12s\n","trial   ","exponent","mog");
@@ -578,8 +583,15 @@ class CompletenessOptimizer {
 	double intmog;
 	ValueType intval;
 	try {
+	  std::vector<ValueType> intvals(compute_values(intcpl));
+	  if(intvals.size()!=1) {
+	    std::ostringstream oss;
+	    oss << "Error - requested computation of " << 1 << " values but got only " << intvals.size() << "!\n";
+	    throw std::runtime_error(oss.str());
+	  }
+	  
 	  // Compute value
-	  intval=compute_values(intcpl)[0];
+	  intval=intvals[0];
 	  // and mog
 	  intmog=compute_mog(intval,curval,0.0);
 	} catch(...) {
@@ -719,6 +731,11 @@ class CompletenessOptimizer {
     
     // Compute trial values
     std::vector<ValueType> trvals=compute_values(trbas);
+    if(trvals.size()!=trbas.size()) {
+      std::ostringstream oss;
+      oss << "Error - requested computation of " << trbas.size() << " values but got only " << trvals.size() << "!\n";
+      throw std::runtime_error(oss.str());
+    }
 
     // and the mogs
     printf("%11s %2s %8s %12s\n","trial   ","am","exponent","mog");
@@ -820,7 +837,13 @@ class CompletenessOptimizer {
 
       // Update current value
       std::vector< std::vector<coprof_t> > hlp(1,cpl);
-      curval=compute_values(hlp)[0];
+      std::vector<ValueType> hlpvals(compute_values(hlp));
+      if(hlpvals.size()!=1) {
+	std::ostringstream oss;
+	oss << "Error - requested computation of " << 1 << " values but got only " << hlpvals.size() << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+      curval=hlpvals[0];
     }
 
     return maxmog;
@@ -906,6 +929,12 @@ class CompletenessOptimizer {
 
       // Compute values
       std::vector<ValueType> trvals=compute_values(trials);
+      if(trvals.size()!=trials.size()) {
+	std::ostringstream oss;
+	oss << "Error - requested computation of " << trials.size() << " values but got only " << trvals.size() << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+
 
       // Compute mogs
       arma::vec mogs(trvals.size());
@@ -1000,6 +1029,12 @@ class CompletenessOptimizer {
 
       // Compute values
       std::vector<ValueType> trvals=compute_values(trials);
+      if(trvals.size()!=trials.size()) {
+	std::ostringstream oss;
+	oss << "Error - requested computation of " << trials.size() << " values but got only " << trvals.size() << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+
       // and mogs
       arma::vec trmog(trvals.size());
       for(size_t i=0;i<trvals.size();i++)
@@ -1061,7 +1096,13 @@ class CompletenessOptimizer {
     // Compute initial value
     {
       std::vector< std::vector<coprof_t> > hlp(1,cpl);
-      curval=compute_values(hlp)[0];
+      std::vector<ValueType> hlpvals(compute_values(hlp));
+      if(hlpvals.size()!=1) {
+	std::ostringstream oss;
+	oss << "Error - requested computation of " << 1 << " values but got only " << hlpvals.size() << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+      curval=hlpvals[0];
     }
     print_value(curval,"Starting value");
 
@@ -1329,6 +1370,12 @@ class CompletenessOptimizer {
 
       // Compute values
       std::vector<ValueType> trvals=compute_values(trials);
+      if(trvals.size()!=trials.size()) {
+	std::ostringstream oss;
+	oss << "Error - requested computation of " << trials.size() << " values but got only " << trvals.size() << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+
       // and mogs
       arma::vec trmog(trvals.size());
       for(size_t i=0;i<trvals.size();i++)
@@ -1391,7 +1438,13 @@ class CompletenessOptimizer {
     ValueType curval;
     {
       std::vector< std::vector<coprof_t> > hlp(1,cbscpl);
-      curval=compute_values(hlp)[0];
+      std::vector<ValueType> hlpvals(compute_values(hlp));
+      if(hlpvals.size()!=1) {
+	std::ostringstream oss;
+	oss << "Error - requested computation of " << 1 << " values but got only " << hlpvals.size() << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+      curval=hlpvals[0];
     }
     const ValueType cbsval(curval);
 
@@ -1405,7 +1458,13 @@ class CompletenessOptimizer {
     // Current value
     {
       std::vector< std::vector<coprof_t> > hlp(1,cpl);
-      curval=compute_values(hlp)[0];
+      std::vector<ValueType> hlpvals(compute_values(hlp));
+      if(hlpvals.size()!=1) {
+	std::ostringstream oss;
+	oss << "Error - requested computation of " << 1 << " values but got only " << hlpvals.size() << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+      curval=hlpvals[0];
     }
 
     print_value(curval,"Starting point value");
@@ -1533,6 +1592,12 @@ class CompletenessOptimizer {
 
       // Compute values
       std::vector<ValueType> trvals=compute_values(trbas);
+      if(trvals.size()!=trbas.size()) {
+	std::ostringstream oss;
+	oss << "Error - requested computation of " << trbas.size() << " values but got only " << trvals.size() << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+
       // and mogs
       arma::vec trmogs(trvals.size());
       for(size_t i=0;i<trvals.size();i++) {
