@@ -1275,7 +1275,7 @@ class CompletenessOptimizer {
   }
 
   /// Reduce the profile until only a single function is left on the highest am shell (polarization / correlation consistence)
-  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, bool domiddle=true) {
+  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, bool domiddle=true, bool saveall=false) {
     printf("\n\n%s\n",print_bar("PROFILE REDUCTION").c_str());
     if(tol==0.0)
       printf("Running until would drop last function of %c shell.\n",shell_types[maxam(cpl)]);
@@ -1425,15 +1425,24 @@ class CompletenessOptimizer {
 	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",descr[minind].c_str(),cpl[tram[minind]].start,cpl[tram[minind]].end,(int) cpl[tram[minind]].exps.size(),cpl[tram[minind]].tol,minmog,ttot.elapsed().c_str());
 	fflush(stdout);
       }
-
+      
+      // Save out interim basis set
+      if(saveall) {
+	static size_t isave=0;
+	std::ostringstream oss;
+	oss << "reduce_" << isave << ".gbs";
+	form_basis(cpl).save_gaussian94(oss.str());
+	isave++;
+      }
+      
       // Update references
       update_reference(cpl);
     }
-
+    
     return minmog;
   }
 
-  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, bool domiddle=true, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true) {
+  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, bool domiddle=true, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true, double saveall=false, double tol=0.0) {
     // Reference value
     ValueType curval;
     {
@@ -1471,25 +1480,43 @@ class CompletenessOptimizer {
     print_limits(cpl,"Starting point basis");
     fflush(stdout);
 
-    while(npol>=1) {
+    double tau=DBL_MAX;
+    while((tol>0.0 && tau>tol) || (tol==0.0 && npol>=1)) {
       // Reduce the profile
-      double tau=reduce_profile(cpl,curval,cbsval,0.0,domiddle);
+      tau=reduce_profile(cpl,curval,cbsval,tol,domiddle,saveall);
 
-      printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
-      print_value(curval,"Current value");
-      print_limits(cpl);
-      fflush(stdout);
-
-      // Save basis set
-      {
-	char fname[180];
-	sprintf(fname,"un-co-%i.gbs",npol);
-	form_basis(cpl).save_gaussian94(fname);
-
-	sprintf(fname,"reduced-%i.dat",npol);
-	save_limits(cpl,fname);
+      if(tol==0.0) {
+	printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
+	print_value(curval,"Current value");
+	print_limits(cpl);
+	fflush(stdout);
+	
+	// Save basis set
+	{
+	  char fname[180];
+	  sprintf(fname,"un-co-%i.gbs",npol);
+	  form_basis(cpl).save_gaussian94(fname);
+	  
+	  sprintf(fname,"reduced-%i.dat",npol);
+	  save_limits(cpl,fname);
+	}
+      } else {
+	printf("Final composition for tol = %e, mog = %e:\n",tol,tau);
+	print_value(curval,"Current value");
+	print_limits(cpl);
+	fflush(stdout);
+	
+	// Save basis set
+	{
+	  char fname[180];
+	  sprintf(fname,"un-co-%e.gbs",tol);
+	  form_basis(cpl).save_gaussian94(fname);
+	  
+	  sprintf(fname,"reduced-%e.dat",tol);
+	  save_limits(cpl,fname);
+	}
       }
-
+	
       // Contract the basis
       if(docontr) {
 	// Use CBS value as reference for contraction
@@ -1498,30 +1525,48 @@ class CompletenessOptimizer {
 	// Use current value as reference for contraction
 	ValueType contrref(curval);
 
+	// Threshold to use
+	double thr;
+	if(tol==0.0)
+	  thr=tau;
+	else
+	  thr=tol;
+
 	// Contract the basis, compute mog possibly using P-orthogonalization
-	BasisSetLibrary contrbas=contract_basis(cpl,contrref,tau,nelcutoff,Porth,restr);
+	BasisSetLibrary contrbas=contract_basis(cpl,contrref,thr,nelcutoff,Porth,restr);
 
 	char fname[180];
-	// General contractions
-	sprintf(fname,"co-general-%i.gbs",npol);
-	contrbas.save_gaussian94(fname);
-
-	// Segmented contractions
-	contrbas.P_orthogonalize();
-	sprintf(fname,"co-segmented-%i.gbs",npol);
-	contrbas.save_gaussian94(fname);
+	if(tol==0.0) {
+	  // General contractions
+	  sprintf(fname,"co-general-%i.gbs",npol);
+	  contrbas.save_gaussian94(fname);
+	  
+	  // Segmented contractions
+	  contrbas.P_orthogonalize();
+	  sprintf(fname,"co-segmented-%i.gbs",npol);
+	  contrbas.save_gaussian94(fname);
+	} else {
+	  // General contractions
+	  sprintf(fname,"co-general-%e.gbs",tol);
+	  contrbas.save_gaussian94(fname);
+	  
+	  // Segmented contractions
+	  contrbas.P_orthogonalize();
+	  sprintf(fname,"co-segmented-%e.gbs",tol);
+	  contrbas.save_gaussian94(fname);
+	}
       }
 
-      // Erase polarization shell
-      int delam=maxam(cpl);
-      cpl[delam].start=0.0;
-      cpl[delam].end=0.0;
-      cpl[delam].exps.clear();
-      npol--;
+      if(tol==0.0) {
+	// Erase polarization shell
+	int delam=maxam(cpl);
+	cpl[delam].start=0.0;
+	cpl[delam].end=0.0;
+	cpl[delam].exps.clear();
+	npol--;
+      }
     }
   }
-
-
 
   /// Update the contraction coefficients, return the amount of electrons in each am shell.
   virtual std::vector<size_t> update_contraction(const std::vector<coprof_t> & cpl, double cutoff)=0;
