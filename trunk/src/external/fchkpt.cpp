@@ -289,7 +289,7 @@ void load_fchk(const Settings & set, double tol) {
   int Nel=stor.get_int("Number of electrons");
   int Nela=stor.get_int("Number of alpha electrons");
   int Nelb=stor.get_int("Number of beta electrons");
-  
+
   // Special handling for ROHF
   if(stor.get_int("IROHF")==1) {
     P.zeros();
@@ -390,7 +390,7 @@ void load_fchk(const Settings & set, double tol) {
 
     // Compute deviation from orthonormality
     double Camax=arma::max(arma::abs(arma::diagvec(arma::trans(Ca)*S*Ca)-1.0));
-    
+
     // Compute Ca overlap
     Ca=orthonormalize(S,Ca);
 
@@ -401,7 +401,7 @@ void load_fchk(const Settings & set, double tol) {
       double Cbmax=arma::max(arma::abs(arma::diagvec(arma::trans(Cb)*S*Cb)-1.0));
 
       Cb=orthonormalize(S,Cb);
-      
+
       printf("done (%s).\nMaximum deviation from orthonormality was %e %e.\n",t.elapsed().c_str(),Camax,Cbmax);
     }
   }
@@ -477,7 +477,7 @@ void save_fchk(const Settings & set) {
   bool usexz=false;
   if(strstr(savename.c_str(),".xz")!=NULL)
     usexz=true;
-  
+
   std::string bz2cmd="bzip2 ";
   bool usebz2=false;
   if(strstr(savename.c_str(),".bz2")!=NULL)
@@ -619,7 +619,7 @@ void save_fchk(const Settings & set) {
 
     printf("File compressed in %s.\n",t.elapsed().c_str());
   }
-    
+
 }
 
 int main(int argc, char **argv) {
@@ -647,6 +647,7 @@ int main(int argc, char **argv) {
 
   // Parse settings
   set.parse(argv[1]);
+  set.print();
 
   bool loadfchk=(set.get_string("LoadFchk")!="");
   bool savefchk=(set.get_string("SaveFchk")!="");
