@@ -644,7 +644,7 @@ class CompletenessOptimizer {
    * scanam:    angular momentum to scan
    * npoints:   amount of steps to go in each direction
    */
-  double scan_profile(std::vector<coprof_t> & cpl, ValueType & curval, int npoints, double dpol) {
+  double scan_profile(std::vector<coprof_t> & cpl, ValueType & curval, int npoints, double dpol, double tol) {
 
     printf("\n\n%s\n",print_bar("SHELL STABILITY").c_str());
     fflush(stdout);
@@ -794,46 +794,62 @@ class CompletenessOptimizer {
 
     double moved;
 
-    if(maxmog>0.0) {
-      int scanam=tram[imax];
-      // Adjust profile.
-      if(trexp[imax] < cpl[scanam].start) {
-	// Current width is
-	double curw=cpl[scanam].end-cpl[scanam].start;
-	// Necessary width is
-	double nw=cpl[scanam].end-trexp[imax];
-	// Get real width
-	double realw(nw);
-	arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
+    if(maxmog>=tol) {
+      // Loop over angular momentum
+      for(int scanam=0;scanam<=maxam(cpl);scanam++) {
+	Timer tam;
 
-	// Adjust profile
-	cpl[scanam].start-=realw-curw;
-	cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
-	moved=-(realw-curw);
+	if(!ammog[scanam].n_elem)
+	  continue;
 
-      } else if(trexp[imax] > cpl[scanam].end) {
-	// Current width is
-	double curw=cpl[scanam].end-cpl[scanam].start;
-	// Necessary width is
-	double nw=trexp[imax]-cpl[scanam].start;
-	// Get real width
-	double realw(nw);
-	arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
+	// Get maximum mog for this am
+	arma::uword amind;
+	double ammax=ammog[scanam].max(amind);
 
-	// Adjust profile
-	cpl[scanam].end+=realw-curw;
-	cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
-	moved=+(realw-curw);
+	// Index of trial is
+	imax=amidx[scanam](amind);
+	
+	// Adjust profile?
+	if(ammax>=tol) {
+	  if(trexp[imax] < cpl[scanam].start) {
+	    // Current width is
+	    double curw=cpl[scanam].end-cpl[scanam].start;
+	    // Necessary width is
+	    double nw=cpl[scanam].end-trexp[imax];
+	    // Get real width
+	    double realw(nw);
+	    arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
+	    
+	    // Adjust profile
+	    cpl[scanam].start-=realw-curw;
+	    cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
+	    moved=-(realw-curw);
+	    
+	  } else if(trexp[imax] > cpl[scanam].end) {
+	    // Current width is
+	    double curw=cpl[scanam].end-cpl[scanam].start;
+	    // Necessary width is
+	    double nw=trexp[imax]-cpl[scanam].start;
+	    // Get real width
+	    double realw(nw);
+	    arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
 
-      } else {
-	throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
+	    // Adjust profile
+	    cpl[scanam].end+=realw-curw;
+	    cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
+	    moved=+(realw-curw);
+	    
+	  } else {
+	    throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
+	  }
+	  
+	  if(moved>0.0)
+	    printf("\n%c upper limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n",shell_types[scanam],moved,moved/spacing(scanam),ammax,tam.elapsed().c_str());
+	  else
+	    printf("\n%c lower limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n",shell_types[scanam],-moved,-moved/spacing(scanam),ammax,tam.elapsed().c_str());
+	  fflush(stdout);
+	}
       }
-
-      if(moved>0.0)
-	printf("\n%c upper limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n\n",shell_types[scanam],moved,moved/spacing(scanam),maxmog,t.elapsed().c_str());
-      else
-	printf("\n%c lower limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n\n",shell_types[scanam],-moved,-moved/spacing(scanam),maxmog,t.elapsed().c_str());
-      fflush(stdout);
 
       // Update current value
       std::vector< std::vector<coprof_t> > hlp(1,cpl);
@@ -845,7 +861,10 @@ class CompletenessOptimizer {
       }
       curval=hlpvals[0];
     }
-
+    
+    printf("Stability scan done in %s.\n\n",t.elapsed().c_str());
+    fflush(stdout);
+    
     return maxmog;
   }
 
@@ -1144,7 +1163,7 @@ class CompletenessOptimizer {
 	  // Before adding new polarization shell, scan the stability of the existing shells.
 	  std::vector<coprof_t> scancpl(cpl);
 	  ValueType scanval(curval);
-	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol);
+	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol,std::max(polmog,cbsthr));
 	  
 	  // Update extension mog
 	  extmog=std::max(extmog,scanmog);
@@ -1226,7 +1245,7 @@ class CompletenessOptimizer {
 	      // Before adding new polarization shell, scan the stability of the existing shells.
 	      std::vector<coprof_t> scancpl(cpl);
 	      ValueType scanval(curval);
-	      scanmog=scan_profile(scancpl,scanval,nscan,dpol);
+	      scanmog=scan_profile(scancpl,scanval,nscan,dpol,tau);
 
 	      if(scanmog>=tau) {
 		// Instability detected, real mog is
