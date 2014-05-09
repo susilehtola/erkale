@@ -251,7 +251,7 @@ int main(int argc, char **argv) {
     // Loop over atoms in system
     for(size_t iat=0;iat<atoms.size();iat++) {
       bool found=false;
-      
+
       // First, check if there is a special basis for the atom.
       for(size_t iel=0;iel<els.size();iel++)
 	if(stricmp(atoms[iat].el,els[iel].get_symbol())==0 && atoms[iat].num == els[iel].get_number()) {
@@ -260,7 +260,7 @@ int main(int argc, char **argv) {
 	  found=true;
 	  break;
 	}
-      
+
       // Otherwise, check if a general basis is already in the basis
       if(!found) {
 	std::vector<ElementBasisSet> added=elbas.get_elements();
@@ -287,9 +287,9 @@ int main(int argc, char **argv) {
       }
     }
     elbas.save_gaussian94(fileout);
-    
+
   } else if(stricmp(cmd,"orth")==0) {
-    // Sort basis set
+    // Orthogonalize basis
 
     if(argc!=4) {
       printf("\nUsage: %s input.gbs orth output.gbs\n",argv[0]);
@@ -301,7 +301,7 @@ int main(int argc, char **argv) {
     bas.save_gaussian94(fileout);
 
   } else if(stricmp(cmd,"Porth")==0) {
-    // Sort basis set
+    // P-orthogonalize basis
 
     if(argc!=6) {
       printf("\nUsage: %s input.gbs Porth cutoff Cortho output.gbs\n",argv[0]);
@@ -315,7 +315,7 @@ int main(int argc, char **argv) {
     bas.save_gaussian94(fileout);
 
   } else if(stricmp(cmd,"save")==0) {
-    // Save basis 
+    // Save basis
 
     if(argc!=4) {
       printf("\nUsage: %s input.gbs save output.gbs\n",argv[0]);
