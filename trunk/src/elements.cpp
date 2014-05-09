@@ -18,18 +18,19 @@
 
 #include "elements.h"
 #include "global.h"
+#include "stringutil.h"
 #include <cstdio>
 #include <sstream>
 #include <stdexcept>
 
 int get_Z(std::string el) {
   for(int Z=1;Z<(int) (sizeof(element_symbols)/sizeof(element_symbols[0]));Z++)
-    if(el==element_symbols[Z])
+    if(stricmp(el,element_symbols[Z])==0)
       return Z;
 
   ERROR_INFO();
   std::ostringstream oss;
-  oss << "Element \"" << el << "\" not found in element library!\n";
+  oss << "Element \"" << el << "\" not found in table of elements!\n";
   throw std::runtime_error(oss.str());
 
   // Not found, return dummy charge.
