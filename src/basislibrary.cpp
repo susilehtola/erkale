@@ -904,6 +904,9 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 
 	// The symbol of the element is
 	std::string sym=line_split[0];
+	// Check element type
+	sym=element_symbols[get_Z(sym)];
+	
 	// and the atom number the basis is for is
 	size_t num=readint(line_split[1]);
 
