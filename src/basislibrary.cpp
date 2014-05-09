@@ -991,15 +991,26 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	    } else {
 	      // AM given with L=%i
 
-	      if(shelltype.size()<3)
-		throw std::runtime_error("Unrecognized shell type!\n");
+	      if(shelltype.size()<3) {
+		std::ostringstream oss;
+		oss << "Unrecognized shell type \"" << shelltype << "\"!\n";
+		throw std::runtime_error(oss.str());
+	      }
 
 	      // Check beginning
-	      if(stricmp(shelltype.substr(0,2),"L=")!=0)
-		throw std::runtime_error("Could not parse shell type.\n");
+	      if(stricmp(shelltype.substr(0,2),"L=")!=0) {
+		std::ostringstream oss;
+		oss << "Could not parse shell type: \"" << shelltype << "\"!\n";
+		throw std::runtime_error(oss.str());
+	      }
 
 	      // Now get the shell type
 	      int am=readint(shelltype.substr(2));
+	      if(am<0 || am>=max_am) {
+		std::ostringstream oss;
+		oss << "Invalid value " << am << "for shell angular momentum!\n";
+		throw std::runtime_error(oss.str());
+	      }
 
 	      // and add the exponents
               FunctionShell sh(am);
