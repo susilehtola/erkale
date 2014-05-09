@@ -236,9 +236,14 @@ bool FunctionShell::operator<(const FunctionShell & rhs) const {
   // First, check if angular momentum is lower.
   if(am!=rhs.am)
     return am<rhs.am;
-  else
-    // Same angular momentum, sort by first exponent.
-    return C[0]<rhs.C[0];
+
+  // Then, sort by decreasing first exponent
+  if(C[0].z != rhs.C[0].z)
+    return C[0].z > rhs.C[0].z;
+
+  // Last, sort by decreasing contraction depth
+  //  if(C.size() != rhs.C.size())
+  return C.size() > rhs.C.size();
 }
 
 int FunctionShell::get_am() const {
