@@ -18,7 +18,7 @@
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
 
-std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "orth", "Porth", "save", "savedalton", "sort", "taug"};
+std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "norm", "orth", "Porth", "save", "savedalton", "sort", "taug"};
 
 
 void help() {
@@ -43,7 +43,6 @@ int main(int argc, char **argv) {
   // Load input
   BasisSetLibrary bas;
   bas.load_gaussian94(filein);
-  bas.normalize();
 
   // Get command
   std::string cmd(argv[2]);
@@ -287,6 +286,18 @@ int main(int argc, char **argv) {
       }
     }
     elbas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"norm")==0) {
+    // Normalize basis
+
+    if(argc!=4) {
+      printf("\nUsage: %s input.gbs norm output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    std::string fileout=argv[3];
+    bas.normalize();
+    bas.save_gaussian94(fileout);
 
   } else if(stricmp(cmd,"orth")==0) {
     // Orthogonalize basis
