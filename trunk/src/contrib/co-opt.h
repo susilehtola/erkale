@@ -795,6 +795,8 @@ class CompletenessOptimizer {
     double moved;
 
     if(maxmog>=tol) {
+      printf("\n");
+
       // Loop over angular momentum
       for(int scanam=0;scanam<=maxam(cpl);scanam++) {
 	Timer tam;
@@ -844,12 +846,13 @@ class CompletenessOptimizer {
 	  }
 	  
 	  if(moved>0.0)
-	    printf("\n%c upper limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n",shell_types[scanam],moved,moved/spacing(scanam),ammax,tam.elapsed().c_str());
+	    printf("%c upper limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n",shell_types[scanam],moved,moved/spacing(scanam),ammax,tam.elapsed().c_str());
 	  else
-	    printf("\n%c lower limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n",shell_types[scanam],-moved,-moved/spacing(scanam),ammax,tam.elapsed().c_str());
+	    printf("%c lower limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n",shell_types[scanam],-moved,-moved/spacing(scanam),ammax,tam.elapsed().c_str());
 	  fflush(stdout);
 	}
       }
+      printf("\n");
 
       // Update current value
       std::vector< std::vector<coprof_t> > hlp(1,cpl);
