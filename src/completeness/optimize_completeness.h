@@ -18,7 +18,7 @@
 #define ERKALE_OPTCOMP
 
 /// Minimum allowed value of deviation from completeness (for numerical stability)
-#define MINTAU pow(10.0,-6.0)
+#define MINTAU pow(10.0,-5.5)
 
 #include "../global.h"
 #include <armadillo>
