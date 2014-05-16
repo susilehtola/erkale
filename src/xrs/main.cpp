@@ -229,7 +229,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
       // Fixed size grid
       grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
     }
-    
+
     // No need for extreme accuracy
     double tol=ROUGHTOL;
 
@@ -651,15 +651,15 @@ void save_spectrum(const std::vector<spectrum_t> & sp, const char *fname="dipole
 
   for(size_t i=0;i<sp.size();i++) {
     // Print out energy in eV oscillator strength and its components
-    fprintf(out,"%e\t%e",sp[i].E*HARTREEINEV,sp[i].w);
+    fprintf(out,"%e %e",sp[i].E*HARTREEINEV,sp[i].w);
     for(size_t j=0;j<sp[i].wdec.size();j++)
-      fprintf(out,"\t%e",sp[i].wdec[j]);
+      fprintf(out," % e",sp[i].wdec[j]);
     fprintf(out,"\n");
   }
   fclose(out);
 }
 
-enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, uscf_t & sol, arma::mat & frozen) {
+enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, uscf_t & sol, arma::vec & core) {
   // Was the load a success?
   enum loadresult ok=LOAD_SUCC;
 
@@ -748,11 +748,14 @@ enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & 
   }
 
   if(ok) {
-    // Everything is OK, finish by loading frozen core orbitals
-    if(chkpt.exist("XRSFrozen")) {
-      printf("Loaded frozen core orbitals from checkpoint.\n");
-      chkpt.read("XRSFrozen",frozen);
-    }
+    // Everything is OK, finish by loading initial state core orbital
+    if(chkpt.exist("Ccore")) {
+      printf("Loaded initial state orbital from checkpoint.\n");
+      chkpt.read("Ccore",core);
+    } else
+      // Failed to read core orbital
+      ok=LOAD_FAIL;
+    
   } else {
     // Failed to load or solution was not consistent.
     sol.Ca=arma::mat();
@@ -809,9 +812,9 @@ int main(int argc, char **argv) {
   set.add_string("AugChk","Save augmented calculation to file (if applicable)","erkale_xrs_aug.chk");
 
   set.add_string("XRSDoubleBasis","The augmentation basis to use for double-basis set calculations","X-AUTO");
-  set.add_bool("XRSLocalize","Localize and freeze orbitals? (Needs ground-state calculation)",false);
 
   set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false);
+  set.add_string("XRSInitialState","Initial atomic state to excite","1s");
   set.add_string("XRSMethod", "Which kind of calculation to perform: TP, XCH or FCH","TP");
 
   set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3:5,10","");
@@ -922,12 +925,15 @@ int main(int argc, char **argv) {
   energy_t gsen;
   bool didgs=false;
 
+  // Initial state
+  std::string state=set.get_string("XRSInitialState");
+
   // Try to load orbitals and energies
-  arma::mat frozen(0,0);
+  arma::vec core;
   enum loadresult loadok=LOAD_FAIL;
   if(file_exists(set.get_string("SaveChk"))) {
     Checkpoint testload(set.get_string("SaveChk"),false);
-    loadok=load(basis,set,testload,sol,frozen);
+    loadok=load(basis,set,testload,sol,core);
 
     if(loadok==LOAD_SUCC)
       fprintf(stderr,"Loaded converged calculation from checkpoint file.\n");
@@ -954,11 +960,14 @@ int main(int argc, char **argv) {
     chkpt.write("XRSSpin",set.get_bool("XRSSpin"));
     chkpt.write("XRSMethod",set.get_string("XRSMethod"));
 
-    // Amount of (orbital rotation) localized orbitals (nloc-1 are then frozen)
-    size_t nloc=0;
+    // Index of core orbital
+    int icore=-1;
 
     // Initialize calculation with ground state if necessary
-    if(loadok==LOAD_FAIL && stricmp(set.get_string("LoadChk"),"")!=0) {
+    if(loadok==LOAD_FAIL) {
+      if(set.get_string("LoadChk").size()==0)
+	throw std::runtime_error("Need a ground-state calculation in LoadChk to do calculation!\n");
+
       printf("Initializing with ground-state calculation from %s.\n",set.get_string("LoadChk").c_str());
 
       // Read checkpoint file
@@ -984,73 +993,59 @@ int main(int argc, char **argv) {
       if(restr) {
 	load.read("C",sol.Ca);
 	load.read("E",sol.Ea);
+	load.read("H",sol.Ha);
 	sol.Eb=sol.Ea;
 	sol.Cb=sol.Ca;
+	sol.Hb=sol.Ha;
       } else {
 	// Load energies and orbitals
 	load.read("Ca",sol.Ca);
 	load.read("Ea",sol.Ea);
+	load.read("Ha",sol.Ha);
 	load.read("Cb",sol.Cb);
 	load.read("Eb",sol.Eb);
+	load.read("Hb",sol.Hb);
       }
 
-      if(set.get_bool("XRSLocalize")) {
-	if(spin)
-	  nloc=localize(basis,noccb,xcatom,sol.Cb);
-	else
-	  nloc=localize(basis,nocca,xcatom,sol.Ca);
-      }
-
-      // Find excited orbital
-      size_t ixc_orb;
-      lmtrans lmground;
+      // Determine orbitals and update energies
       if(spin) {
-	ixc_orb=find_excited_orb(sol.Cb,basis,xcatom,noccb);
-	// Do local expansion
-	lmground=lmtrans(sol.Cb.submat(0,ixc_orb,sol.Cb.n_rows,ixc_orb),basis,basis.get_nuclear_coords(xcatom));
+	icore=localize(basis,noccb,xcatom,sol.Cb,state);
+	sol.Eb=arma::trans(sol.Cb)*sol.Hb*sol.Cb;
+      } else {
+	icore=localize(basis,nocca,xcatom,sol.Ca,state);
+	sol.Ea=arma::trans(sol.Ca)*sol.Ha*sol.Ca;
       }
-      else {
-	ixc_orb=find_excited_orb(sol.Ca,basis,xcatom,nocca);
-	// Do local expansion
-	lmground=lmtrans(sol.Ca.submat(0,ixc_orb,sol.Ca.n_rows,ixc_orb),basis,basis.get_nuclear_coords(xcatom));
-      }
-      // Save localized orbital
-      lmground.write_prob(0,"ground_orb.dat");
-    } else {
-      if(loadok==LOAD_FAIL && set.get_bool("XRSLocalize"))
-	throw std::runtime_error("Need a ground-state calculation in LoadChk to perform localization!\n");
     }
 
     // Proceed with TP calculation. Initialize solver
     XRSSCF solver(basis,set,chkpt,spin);
+
+    // Set initial state core orbital
+    if(loadok==LOAD_FAIL) { // LOAD_FAIL
+      if(spin)
+	solver.set_core(sol.Cb.col(icore));
+      else
+	solver.set_core(sol.Ca.col(icore));
+    } else
+      // LOAD_DIFF
+      solver.set_core(core);
 
     // Write number of electrons to file
     chkpt.write("Nel",nocca+noccb);
     chkpt.write("Nel-a",nocca);
     chkpt.write("Nel-b",noccb);
 
+    // Store core orbital
+    chkpt.write("Ccore",solver.get_core());
+
     // Do we have the ground state energy?
     if(didgs)
       chkpt.write("E_GS",gsen.E);
 
-    // Set frozen orbitals
-    if(loadok==LOAD_FAIL && nloc>0) {
-      if(spin) {
-	solver.set_frozen(sol.Cb.submat(0,1,sol.Cb.n_rows-1,nloc-1),0);
-	chkpt.write("XRSFrozen",sol.Cb.submat(0,1,sol.Cb.n_rows-1,nloc-1));
-      } else {
-	solver.set_frozen(sol.Ca.submat(0,1,sol.Ca.n_rows-1,nloc-1),0);
-	chkpt.write("XRSFrozen",sol.Ca.submat(0,1,sol.Cb.n_rows-1,nloc-1));
-      }
-    } else if(loadok==LOAD_DIFF && frozen.n_elem>0) {
-      solver.set_frozen(frozen,0);
-      chkpt.write("XRSFrozen",frozen);
-    }
-
     // Do calculation
     if(method==FCH || method==XCH) {
-      xcorb=solver.full_hole(xcatom,sol,init_conv,dft_init,method==XCH);
-      xcorb=solver.full_hole(xcatom,sol,conv,dft,method==XCH);
+      xcorb=solver.full_hole(sol,init_conv,dft_init,method==XCH);
+      xcorb=solver.full_hole(sol,conv,dft,method==XCH);
 
       // Get excited state energy
       energy_t excen;
@@ -1070,15 +1065,18 @@ int main(int argc, char **argv) {
 	fprintf(stderr,"Cannot estimate excitation energy without a ground state calculation.\n");
       }
     } else {
-      xcorb=solver.half_hole(xcatom,sol,init_conv,dft_init);
-      xcorb=solver.half_hole(xcatom,sol,conv,dft);
+      xcorb=solver.half_hole(sol,init_conv,dft_init);
+      xcorb=solver.half_hole(sol,conv,dft);
     }
     printf("\n\n");
+
   } else {
+    // Loaded calculation, just find excited state
+
     if(spin)
-      xcorb=find_excited_orb(sol.Cb,basis,xcatom,noccb);
+      xcorb=find_excited_orb(basis,core,sol.Cb,noccb);
     else
-      xcorb=find_excited_orb(sol.Ca,basis,xcatom,nocca);
+      xcorb=find_excited_orb(basis,core,sol.Ca,nocca);
   }
 
   // Augment the solutions if necessary

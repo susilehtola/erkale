@@ -30,10 +30,10 @@ void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<
 void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv)
 
 #elif defined(DFT) && defined(FULLHOLE)
-size_t XRSSCF::full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch)
+size_t XRSSCF::full_hole(uscf_t & sol, convergence_t conv, dft_t dft, bool xch)
 
 #elif defined(DFT) && defined(HALFHOLE)
-size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft)
+size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #endif
 {
 
@@ -65,7 +65,7 @@ size_t XRSSCF::half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t 
 
   /// Find excited orbital
 #if defined(FULLHOLE) || defined(HALFHOLE)
-#define find_exc(sol) if(spin) {ixc_orb=find_excited_orb(sol.Cb,*basisp,xcatom,noccb);} else {ixc_orb=find_excited_orb(sol.Ca,*basisp,xcatom,nocca);}
+#define find_exc(sol) if(spin) {ixc_orb=find_excited_orb(*basisp,coreorb,sol.Cb,noccb);} else {ixc_orb=find_excited_orb(*basisp,coreorb,sol.Ca,nocca);}
 #endif
 
   /// Occupancy update

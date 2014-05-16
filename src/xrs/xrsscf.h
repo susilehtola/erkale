@@ -39,16 +39,24 @@ class XRSSCF : public SCF {
   /// Number of beta electrons
   int noccb;
 
+  /// Initial core hole orbital, used to identify the state by maximal overlap
+  arma::vec coreorb;
+
  public:
   /// Constructor
   XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool spin);
   /// Destructor
   ~XRSSCF();
 
+  /// Set core hole state [Iannuzzi and Hütter, PCCP 9, 1559 (2007)]
+  void set_core(const arma::vec & c);
+  /// Get core hole state
+  arma::vec get_core() const;
+
   /// Compute 1st core-excited state
-  size_t full_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch);
+  size_t full_hole(uscf_t & sol, convergence_t conv, dft_t dft, bool xch);
   /// Compute TP solution
-  size_t half_hole(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft);
+  size_t half_hole(uscf_t & sol, convergence_t conv, dft_t dft);
 
   /// Compute 1st core-excited state using line search (slow!)
   size_t full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch);
@@ -61,17 +69,14 @@ class XRSSCF : public SCF {
   void Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, double tol) const;
 };
 
+/// Find excited core orbital
+size_t find_excited_orb(const BasisSet & basis, const arma::vec & xco, const arma::mat & C, int nocc);
+
 /// Get excited atom from atomlist
 size_t get_excited_atom_idx(std::vector<atom_t> & at);
 
-/// Compute center and rms width of orbitals.
-arma::mat compute_center_width(const arma::mat & C, const BasisSet & basis, size_t nocc);
-
-/// Find excited core orbital, located on atom idx
-size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom_idx, size_t nocc);
-
-/// Print information about orbitals
-void print_info(const arma::mat & C, const arma::vec & E, const BasisSet & basis);
+/// Construct list of atoms of the same type
+std::vector<size_t> atom_list(const BasisSet & basis, size_t xcatom, bool verbose);
 
 /// Aufbau occupation
 std::vector<double> norm_occ(size_t nocc);
@@ -82,7 +87,7 @@ std::vector<double> xch_occ(size_t excited, size_t nocc);
 /// Full hole; core orbital is not occupied
 std::vector<double> fch_occ(size_t excited, size_t nocc);
 
-/// Localize orbitals, returns number of localized orbitals.
-size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C);
+/// Localize orbitals on wanted atom. Return index of core orbital.
+size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, const std::string & state);
 
 #endif
