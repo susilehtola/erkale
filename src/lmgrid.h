@@ -60,6 +60,25 @@ typedef struct {
 } expansion_t;
 
 /// Compute expansion of orbitals around cen, return clm[norbs][l,m][nrad] up to lmax. Quadrature uses lquad:th order
-expansion_t expand_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & cen, size_t Nrad, int lmax, int lquad);
+expansion_t expand_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & cen, bool verbose=true, size_t Nrad=200, int lmax=5, int lquad=30);
+
+/// Expansion of orbitals
+typedef struct {
+  /// Radial grid
+  std::vector<radial_grid_t> grid;
+  /// Expansion coefficients of orbitals clm[norbs][l,m][nrad]
+  std::vector< std::vector< std::vector< double > > > clm;
+} real_expansion_t;
+
+/// Compute expansion of orbitals around cen, return clm[norbs][l,m][nrad] up to lmax. Quadrature uses lquad:th order
+real_expansion_t expand_orbitals_real(const arma::mat & C, const BasisSet & bas, const coords_t & cen, bool verbose=true, size_t Nrad=200, int lmax=5, int lquad=30);
+
+/// Compute weight decomposition. If total, last column contains total norm of orbital
+arma::mat weight_decomposition(const real_expansion_t & exp, bool total=true);
+/// Compute weight decomposition. If total, last column contains total norm of orbital
+arma::mat weight_decomposition(const expansion_t & exp, bool total=true);
+
+/// Compute angular decomposition - weights for (l,m)
+arma::mat angular_decomposition(const real_expansion_t & exp, int l);
 
 #endif
