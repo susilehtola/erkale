@@ -108,11 +108,11 @@ class rADIIS: public ADIIS {
 
   /// Add new matrices to stacks
   void update(const arma::mat & P, const arma::mat & F, double E);
+  /// Update PiF stack
+  void PiF_update();
 
   /// Get new Fock matrix
   void get_F(arma::mat & F, bool verbose=false) const;
-  /// or density matrix
-  void get_P(arma::mat & P, bool verbose=false) const;
 
   /// Drop everything in memory
   void clear();
@@ -131,11 +131,11 @@ class uADIIS: public ADIIS {
 
   /// Add new matrices to stacks
   void update(const arma::mat & Pa, const arma::mat & Pb, const arma::mat & Fa, const arma::mat & Fb, double E);
+  /// Update PiF stack
+  void PiF_update();
 
   /// Get new Fock matrix
   void get_F(arma::mat & Fa, arma::mat & Fb, bool verbose=false) const;
-  /// or density matrix
-  void get_P(arma::mat & Pa, arma::mat & Pb, bool verbose=false) const;
 
   /// Drop everything in memory
   void clear();
