@@ -2,8 +2,6 @@ System ../h2o-dimer-xrs.xyz
 Method lda_x-lda_c_vwn
 Basis cc-pVDZ
 
-# Force localization of the core hole
-XRSLocalize true
 # ... with the ground-state density given by
 LoadChk ../scf/lda.chk
 
