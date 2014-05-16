@@ -25,9 +25,12 @@
 #include "linalg.h"
 #include "mathf.h"
 #include "stringutil.h"
+#include "solidharmonics.h"
+#include "elements.h"
 #include "timer.h"
 #include "trdsm.h"
 #include "trrh.h"
+#include "lmgrid.h"
 
 XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool sp) : SCF(basis,set,chkpt) {
   spin=sp;
@@ -37,6 +40,14 @@ XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt,
 }
 
 XRSSCF::~XRSSCF() {
+}
+
+void XRSSCF::set_core(const arma::vec & c) {
+  coreorb=c;
+}
+
+arma::vec XRSSCF::get_core() const {
+  return coreorb;
 }
 
 /// Get excited atom from atomlist
@@ -67,119 +78,24 @@ size_t get_excited_atom_idx(std::vector<atom_t> & at) {
   }
 }
 
-/// Compute center and rms width of orbitals.
-arma::mat compute_center_width(const arma::mat & C, const BasisSet & basis, size_t nocc) {
-  // ret(io,0-2) = x,y,z, ret(io,3) = width
-  arma::mat ret(nocc,4);
+/// Find excited core orbital
+size_t find_excited_orb(const BasisSet & basis, const arma::vec & xco, const arma::mat & C, int nocc) {
+  // Overlap matrix
+  arma::mat S(basis.overlap());
 
-  // Moment matrix
-  std::vector<arma::mat> mom1=basis.moment(1);
+  // Determine overlap with current orbitals
+  arma::vec ovl=arma::abs(arma::trans(xco)*S*C.submat(0,0,C.n_rows-1,nocc-1));
+  // Convert to probabilities by squaring the amplitudes
+  ovl=arma::pow(ovl,2);
 
-  // Compute centers and widths
-  for(size_t io=0;io<nocc;io++) {
-    // Electron density for orbital
-    arma::mat dens=C.col(io)*arma::trans(C.col(io));
+  //  print_mat(ovl," % .3f");
 
-    // Compute center of orbital
-    ret(io,0)=arma::trace(dens*mom1[getind(1,0,0)]);
-    ret(io,1)=arma::trace(dens*mom1[getind(0,1,0)]);
-    ret(io,2)=arma::trace(dens*mom1[getind(0,0,1)]);
+  // Determine maximal overlap
+  arma::uword maxind;
+  ovl.max(maxind);
 
-    // Then, compute r_{rms}=\sqrt{<r^2>} around center
-    std::vector<arma::mat> mom2=basis.moment(2,ret(io,0),ret(io,1),ret(io,2));
-    ret(io,3)=sqrt(arma::trace(dens*(mom2[getind(2,0,0)]+mom2[getind(0,2,0)]+mom2[getind(0,0,2)])));
-  }
-
-  return ret;
-}
-
-
-/// Find excited core orbital, located on atom idx
-size_t find_excited_orb(const arma::mat & C, const BasisSet & basis, size_t atom_idx, size_t nocc) {
-  // Coordinates of the excited atom
-  coords_t xccoord=basis.get_nuclear_coords(atom_idx);
-
-  // Measures of goodness for orbitals.
-  arma::vec mog(nocc);
-  // Compute centers and widths
-  arma::mat cenwidth=compute_center_width(C,basis,nocc);
-
-  for(size_t io=0;io<nocc;io++) {
-    double dx=xccoord.x-cenwidth(io,0);
-    double dy=xccoord.y-cenwidth(io,1);
-    double dz=xccoord.z-cenwidth(io,2);
-    double w=cenwidth(io,3);
-
-    // Compute measure of goodness - this should be quite small.
-    mog(io)=w*sqrt(dx*dx+dy*dy+dz*dz);
-  }
-
-  // Find minimum mog
-  double minmog=mog(0);
-  size_t minind=0;
-  for(size_t io=1;io<nocc;io++)
-    if(mog(io)<minmog) {
-      minmog=mog(io);
-      minind=io;
-    }
-
-  // Amount of orbitals localized on atom.
-  std::vector<size_t> loc_idx;
-
-  printf("\nOrbital analysis:\n");
-  // Loop over orbitals.
-  for(size_t io=0;io<nocc;io++) {
-    // Index of localization.
-    double mindist=DBL_MAX;
-    size_t locind=0;
-
-    // Determine localization of orbital. Loop over nuclei
-    for(size_t iat=0;iat<basis.get_Nnuc();iat++) {
-      // Coordinates of nucleus
-      coords_t atcoord=basis.get_nuclear_coords(iat);
-
-      double dx=atcoord.x-cenwidth(io,0);
-      double dy=atcoord.y-cenwidth(io,1);
-      double dz=atcoord.z-cenwidth(io,2);
-      double dist=sqrt(dx*dx+dy*dy+dz*dz);
-
-      if(dist<mindist) {
-	mindist=dist;
-	locind=iat;
-      }
-    }
-
-    // Determine localization
-    if(mindist<1e-3 && cenwidth(io,3)<1) {
-      printf("Orbital %i is centered on nucleus %i with rms width %e Å.\n",(int) io+1,(int) locind+1,cenwidth(io,3)/ANGSTROMINBOHR);
-
-      if(locind==atom_idx)
-	loc_idx.push_back(io);
-    } else {
-      printf("Orbital %i is unlocalized.\n",(int) io+1);
-    }
-  }
-
-  printf("\n");
-
-  if(loc_idx.size()==0) {
-    throw std::runtime_error("Error - could not localize core orbital!\n");
-  } else if(loc_idx.size()>1)
-    printf("Warning - there is more than one orbital localized on wanted atom.\n");
-
-  // Return index of orbital localized on atom
-  return minind;
-}
-
-void print_info(const arma::mat & C, const arma::vec & E, const BasisSet & basis) {
-  // Compute centers and widths
-  arma::vec cw=compute_center_width(C,basis,C.n_cols);
-
-  arma::mat S=basis.overlap();
-
-  for(size_t i=0;i<C.n_cols;i++) {
-    printf("Orbital %i with energy %f is centered at (% f,% f,% f) Å with rms width %e Å and has norm %e.\n",(int) i+1,E(i),cw(i,0)/ANGSTROMINBOHR,cw(i,1)/ANGSTROMINBOHR,cw(i,2)/ANGSTROMINBOHR,cw(i,3)/ANGSTROMINBOHR,arma::as_scalar(arma::trans(C.col(i))*S*C.col(i)));
-  }
+  // Return index of orbital
+  return maxind;
 }
 
 /// Normal Aufbau occupation
@@ -224,85 +140,156 @@ std::vector<double> fch_occ(size_t excited, size_t nocc) {
   return ret;
 }
 
-size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C) {
-  // Check orthonormality
-  arma::mat S=basis.overlap();
-  check_orth(C,S,false);
-
-  // First, figure out which centers need to be localized upon.
-  std::vector<ovl_sort_t> locind;
+std::vector<size_t> atom_list(const BasisSet & basis, size_t xcatom, bool verbose) {
   // Localize on all the atoms of the same type than the excited atom
+  std::vector<ovl_sort_t> locind;
   for(size_t i=0;i<basis.get_Nnuc();i++)
     if(!basis.get_nucleus(i).bsse && stricmp(basis.get_symbol(i),basis.get_symbol(xcatom))==0) {
-	ovl_sort_t tmp;
-	tmp.idx=i;
-	tmp.S=norm(basis.get_nuclear_coords(i)-basis.get_nuclear_coords(xcatom));
-	locind.push_back(tmp);
-      }
+      ovl_sort_t tmp;
+      tmp.idx=i;
+      tmp.S=norm(basis.get_nuclear_coords(i)-basis.get_nuclear_coords(xcatom));
+      locind.push_back(tmp);
+    }
   // Sort in increasing distance
   std::stable_sort(locind.begin(),locind.end());
   std::reverse(locind.begin(),locind.end());
 
-  printf("\nDistances of atoms from the center\n");
+  std::vector<size_t> list(locind.size());
   for(size_t i=0;i<locind.size();i++)
-    printf("%i\t%e\n",(int) locind[i].idx+1,locind[i].S);
+    list[i]=locind[i].idx;
 
-  printf("\nLocalizing on centers:");
-  for(size_t i=0;i<locind.size();i++)
-    printf(" %i",(int) locind[i].idx+1);
-  printf("\n\n");
-  printf("There are %i occupied states, from which the %i frozen orbitals are determined.\n",(int) nocc, (int) locind.size()-1);
-  fflush(stdout);
-
-  // Amount of orbitals already localized
-  size_t locd=0;
-  // Amount of basis functions
-  size_t Nbf=basis.get_Nbf();
-
-  // Perform the localization.
-  for(size_t i=0;i<locind.size();i++) {
-    // The nucleus is
-    size_t inuc=locind[i].idx;
-    // and it is located at
-    coords_t cen=basis.get_nuclear_coords(inuc);
-
-    // Compute moment integrals around the nucleus
-    std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
-    // Get matrix which transforms into occupied MO basis
-    arma::mat transmat=C.submat(0,locd,Nbf-1,nocc-1);
-
-    // Sum together to get x^2 + y^2 + z^2
-    arma::mat rsqmat=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
-    // and transform into the occupied MO basis
-    rsqmat=arma::trans(transmat)*rsqmat*transmat;
-
-    // Diagonalize rsq_mo
-    arma::vec reig;
-    arma::mat rvec;
-    eig_sym_ordered(reig,rvec,rsqmat);
-
-    /*
-    printf("\nLocalization around center %i, eigenvalues (Å):",(int) locind[i].ind+1);
-    for(size_t ii=0;ii<reig.n_elem;ii++)
-      printf(" %e",sqrt(reig(ii))/ANGSTROMINBOHR);
-    printf("\n");
-    fflush(stdout);
-    */
-
-    // Rotate occupied orbitals
-    C.submat(0,locd,Nbf-1,nocc-1)=transmat*rvec;
-
-    // Increase number of localized orbitals
-    locd++;
-
-    printf("Localized orbital around nucleus %i with Rrms=%e Å.\n",(int) inuc+1,sqrt(reig(0))/ANGSTROMINBOHR);
-    fflush(stdout);
+  if(verbose) {
+    printf("\nDistances of atoms from the center\n");
+    for(size_t i=0;i<locind.size();i++)
+      printf("%i\t%e\n",(int) locind[i].idx+1,locind[i].S);
   }
-  printf("\n");
 
-  // Check orthonormality
-  check_orth(C,S,false);
-
-  return locd;
+  return list;
 }
 
+size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, const std::string & state) {
+  // Check orthonormality
+  arma::mat S=basis.overlap();
+  check_orth(C,S,false);
+
+  // Decrypt state index
+  int nxc;
+  {
+    char tmp[2];
+    tmp[0]=state[0];
+    tmp[1]='\0';
+    nxc=readint(tmp);
+  }
+  int lxc=find_am(state[1]);
+
+  // Charge of atom is
+  int Z=basis.get_nucleus(xcatom).Z;
+
+  // Determine amount of orbitals to localize on atom.
+  int nloc=0;
+  for(size_t i=0;i<sizeof(shell_order)/sizeof(shell_order[0]);i++) {
+    // Still electrons left.
+    int l=shell_order[i];
+    int nsh=2*l+1; // Degeneracy
+
+    // Account for spin
+    if(2*(nloc+nsh) < Z)
+      nloc+=nsh;
+    else
+      break;
+  }      
+
+  // The atom is located at
+  coords_t cen=basis.get_nuclear_coords(xcatom);
+      
+  // Compute moment integrals around the nucleus
+  std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
+  // Get matrix which transforms into non-localized block of occupied MO basis
+  arma::mat locblock=C.submat(0,0,C.n_rows-1,nocc-1);
+      
+  // Sum together to get x^2 + y^2 + z^2
+  arma::mat rsqmat_AO=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
+  // and transform into the occupied MO basis
+  arma::mat rsqmat(arma::trans(locblock)*rsqmat_AO*locblock);
+  
+  // Diagonalize rsq_mo
+  arma::vec reig;
+  arma::mat rvec;
+  eig_sym_ordered(reig,rvec,rsqmat);
+  
+  // and rotate orbitals to the new basis
+  C.submat(0,0,C.n_rows-1,nocc-1)=locblock*rvec;
+
+  // Orbitals to consider
+  arma::mat Cc(C.submat(0,0,C.n_rows-1,nloc-1));
+  
+  // Run lm decomposition of orbitals
+  const real_expansion_t orbexp(expand_orbitals_real(Cc,basis,cen,false));
+  const arma::mat dec=weight_decomposition(orbexp,false); // Don't include total norm
+  
+  // Orbital angular momenta
+  arma::uvec lval(nloc);
+  for(int io=0;io<nloc;io++) {
+    arma::vec orbl=dec.row(io);
+    orbl.max(lval(io));
+
+    // Sanity check
+    if(dec(io,lval(io))<0.7)
+      printf("Warning - %c orbital %i has small norm %e\n",shell_types[lval(io)],(int) io+1,dec(io,lval(io)));
+  }
+  //  lval.subvec(0,nloc-1).t().print("Angular momentum");
+
+  // Orbital indices
+  arma::ivec orbidx;
+  {
+    int lmax=4;
+    orbidx.zeros(lmax);
+    for(int l=0;l<lmax;l++)
+      orbidx(l)=l+1;
+  }
+
+  // Index of wanted state
+  int ixc=0;
+  
+  printf("\nLocalizing %i orbitals on center %i.\n",nloc,(int) xcatom+1);
+
+  // Loop over orbitals
+  int iloc=0;
+  while(iloc<nloc) {
+    // Angular momentum is
+    int am=lval(iloc);
+    
+    // Degeneracy is
+    double deg=2*am+1;
+    // Check the next ones are OK as well
+    for(int oi=1;oi<deg;oi++)
+      if(lval(iloc+oi)!=lval(iloc)) {
+	lval.t().print("Orbital angular momentum");
+	fflush(stdout);
+	std::ostringstream oss;
+	oss << "Error localizing orbitals " << iloc+1 << " to " << iloc+deg << ".\n";
+	throw std::runtime_error(oss.str());
+      }
+    
+    printf("Localized %i%c shell (orbitals %3i .. %3i) with Rrms=%6.3f Å ... %6.3f Å.\n",orbidx(am),shell_types[am],(int)(iloc+1),(int) (iloc+deg),reig(iloc)/ANGSTROMINBOHR,reig(iloc+deg-1)/ANGSTROMINBOHR);
+    
+    // Store index of initial orbital?
+    if(am == lxc && orbidx(am) == nxc)
+      ixc=iloc;
+    
+    // Increment shell count
+    orbidx(am)++;
+    
+    // Increment localization count
+    iloc+=deg;
+  }
+  
+  // Check orthonormality
+  check_orth(C,S,false);
+  
+  printf("\n");
+  fflush(stdout);
+  
+  // Return index of localized orbital
+  return ixc;
+}
