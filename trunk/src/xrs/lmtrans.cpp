@@ -28,7 +28,7 @@ lmtrans::lmtrans() {
 }
 
 lmtrans::lmtrans(const arma::mat & C, const BasisSet & bas, const coords_t & cen, size_t Nrad, int l, int lquad) {
-  exp=expand_orbitals(C,bas,cen,Nrad,l,lquad);
+  exp=expand_orbitals(C,bas,cen,true,Nrad,l,lquad);
 
   // Compute maximum value of l
   lmax=0;
@@ -166,35 +166,14 @@ arma::cx_mat lmtrans::transition_amplitude(const rad_int_t & rad, double qx, dou
   return A;
 }
 
-
 void lmtrans::print_info() const {
-  // Loop over orbitals
+  // Get decomposition
+  arma::mat dec=::weight_decomposition(exp,true);
   for(size_t io=0;io<exp.clm.size();io++) {
     printf("Orbital %3i: ",(int) io+1);
-
-    double wtot=0.0;
-
-    // Loop over angular part
-    for(int l=0;l<=lmax;l++) {
-      std::vector<double> angtype(2*l+1);
-
-      // Compute components
-      //      printf("l = %i\n",l);
-      for(int m=-l;m<=l;m++) {
-	angtype[m+l]=0.0;
-	// Loop over radial points
-	for(size_t irad=0;irad<exp.grid.size();irad++)
-	  angtype[m+l]+=norm(exp.clm[io][lmind(l,m)][irad])*exp.grid[irad].w;
-	//	printf("\tm = % i\t%e\n",m,angtype[m+l]);
-      }
-
-      double ltot=0.0;
-      for(int m=-l;m<=l;m++)
-	ltot+=angtype[m+l];
-      wtot+=ltot;
-      printf(" %.2e",ltot);
-    }
-    printf(" norm %e\n",wtot);
+    for(int l=0;l<=lmax;l++)
+      printf(" %.2e",dec(io,l));
+    printf(" norm %e\n",dec(io,lmax+1));
   }
 }
 
