@@ -49,11 +49,18 @@ void rADIIS::update(const arma::mat & Pn, const arma::mat & Fn, double En) {
     stack.erase(stack.begin());
   }
 
+  PiF_update();
+}
+
+void rADIIS::PiF_update() {
+  arma::mat Fn=stack[stack.size()-1].F;
+  arma::mat Pn=stack[stack.size()-1].P;
+  
   // Update matrices
   PiF.zeros(stack.size());
   for(size_t i=0;i<stack.size();i++)
     PiF(i)=arma::trace((stack[i].P-Pn)*Fn);
-
+  
   PiFj.zeros(stack.size(),stack.size());
   for(size_t i=0;i<stack.size();i++)
     for(size_t j=0;j<stack.size();j++)
@@ -72,6 +79,15 @@ void uADIIS::update(const arma::mat & Pan, const arma::mat & Pbn, const arma::ma
   if(stack.size()>max) {
     stack.erase(stack.begin());
   }
+
+  PiF_update();
+}
+
+void uADIIS::PiF_update() {
+  arma::mat Fan=stack[stack.size()-1].Fa;
+  arma::mat Fbn=stack[stack.size()-1].Fb;
+  arma::mat Pan=stack[stack.size()-1].Pa;
+  arma::mat Pbn=stack[stack.size()-1].Pb;
 
   // Update matrices
   PiF.zeros(stack.size());
@@ -92,34 +108,37 @@ void uADIIS::clear() {
   stack.clear();
 }
 
-void rADIIS::get_P(arma::mat & P, bool verbose) const {
-  // Get coefficients
-  arma::vec c=get_c(verbose);
-
-  P.zeros(stack[0].P.n_rows,stack[0].P.n_cols);
-  for(size_t i=0;i<stack.size();i++)
-    P+=c[i]*stack[i].P;
-}
-
-void uADIIS::get_P(arma::mat & Pa, arma::mat & Pb, bool verbose) const {
-  // Get coefficients
-  arma::vec c=get_c(verbose);
-  
-  Pa.zeros(stack[0].Pa.n_rows,stack[0].Pa.n_cols);
-  Pb.zeros(stack[0].Pb.n_rows,stack[0].Pb.n_cols);
-  for(size_t i=0;i<stack.size();i++) {
-    Pa+=c[i]*stack[i].Pa;
-    Pb+=c[i]*stack[i].Pb;
-  }
-}
-
 void rADIIS::get_F(arma::mat & F, bool verbose) const {
   // Get coefficients
   arma::vec c=get_c(verbose);
-
   F.zeros(stack[0].F.n_rows,stack[0].F.n_cols);
   for(size_t i=0;i<stack.size();i++)
     F+=c[i]*stack[i].F;
+
+  // Sanity check coefficients
+  if(c.n_elem>1) {
+    arma::vec ctest(arma::abs(c));
+    // Original norm
+    double orignorm=arma::norm(ctest,2);
+    // Find maximum absolute coefficient
+    arma::uword idx;
+    ctest.max(idx);
+    // Set it to zero
+    ctest(idx)=0.0;
+    // Test norm
+    double testnorm=arma::norm(ctest,2);
+    
+    if(idx != c.n_elem-1 && testnorm < 1e-6*orignorm) {
+      // Bad behavior - modify mixing by dropping the matrix
+      if(verbose)
+	printf("Bad behavior detected - dropping matrix.\n");
+      
+      rADIIS helper(*this);
+      helper.stack.erase(helper.stack.begin()+idx);
+      helper.PiF_update();
+      helper.get_F(F,verbose);
+    }
+  }    
 }
 
 void uADIIS::get_F(arma::mat & Fa, arma::mat & Fb, bool verbose) const {
@@ -132,6 +151,31 @@ void uADIIS::get_F(arma::mat & Fa, arma::mat & Fb, bool verbose) const {
     Fa+=c[i]*stack[i].Fa;
     Fb+=c[i]*stack[i].Fb;
   }
+
+  // Sanity check coefficients
+  if(c.n_elem>1) {
+    arma::vec ctest(arma::abs(c));
+    // Original norm
+    double orignorm=arma::norm(ctest,2);
+    // Find maximum absolute coefficient
+    arma::uword idx;
+    ctest.max(idx);
+    // Set it to zero
+    ctest(idx)=0.0;
+    // Test norm
+    double testnorm=arma::norm(ctest,2);
+    
+    if(idx != c.n_elem-1 && testnorm < 1e-6*orignorm) {
+      // Bad behavior - modify mixing by dropping the matrix
+      if(verbose)
+	printf("Bad behavior detected - dropping matrix.\n");
+      
+      uADIIS helper(*this);
+      helper.stack.erase(helper.stack.begin()+idx);
+      helper.PiF_update();
+      helper.get_F(Fa,Fb,verbose);
+    }
+  }    
 }
 
 arma::vec ADIIS::get_c(bool verbose) const {
