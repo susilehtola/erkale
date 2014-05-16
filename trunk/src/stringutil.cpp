@@ -195,8 +195,9 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
       skipline=1;
   }
 
-  char fmt[] ="% 13.6f*";
-  char fmtv[]="% 13.6f ";
+  char fmt_occ[] ="% 13.6f*";
+  char fmt_half[] ="% 13.6fo";
+  char fmt_virt[]="% 13.6f ";
 
   // Compute gap. Find HOMO and LUMO
   if(occ.size()) {
@@ -230,10 +231,12 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
   // Loop over states
   for(size_t i=0;i<Ntot;i++) {
     // Is state occupied?
-    if(i<occ.size() && occ[i]>0.0)
-      printf(fmt,E(i));
+    if(i<occ.size() && occ[i]>=1.0)
+      printf(fmt_occ,E(i));
+    else if(i<occ.size() && occ[i]==0.5)
+      printf(fmt_half,E(i));
     else
-      printf(fmtv,E(i));
+      printf(fmt_virt,E(i));
     // Return line if necessary
     if(i%nelem==nelem-1)
       printf("\n");
@@ -286,7 +289,7 @@ std::string memory_size(size_t memsize) {
   return std::string(ret.str());
 }
 
-void print_sym(const arma::mat &mat, bool floatformat, double cutoff) {
+void print_symmat(const arma::mat &mat, bool floatformat, double cutoff) {
   // Determine cutoff
   cutoff*=max_abs(mat);
 
@@ -312,6 +315,14 @@ void print_sym(const arma::mat &mat, bool floatformat, double cutoff) {
       }
       printf("\n");
     }
+  }
+}
+
+void print_mat(const arma::mat & mat, const char *fmt) {
+  for(size_t ir=0;ir<mat.n_rows;ir++) {
+    for(size_t ic=0;ic<mat.n_cols;ic++)
+      printf(fmt,mat(ir,ic));
+    printf("\n");
   }
 }
 

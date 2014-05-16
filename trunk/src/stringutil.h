@@ -62,7 +62,9 @@ void print_E(const arma::vec & E, const std::vector<double> & occ);
 std::string memory_size(size_t size);
 
 /// Pretty-print symmetric matrix
-void print_sym(const arma::mat &mat, bool floatformat=0, double cutoff=1e-3);
+void print_symmat(const arma::mat &mat, bool floatformat=0, double cutoff=1e-3);
+/// Print matrix
+void print_mat(const arma::mat & mat, const char *fmt=" % .e");
 
 /// Print orbital energies and coefficients
 void print_orb(const arma::mat & C, const arma::vec & E);
