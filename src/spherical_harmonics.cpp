@@ -44,6 +44,18 @@ std::complex<double> spherical_harmonics(int l, int m, double cth, double phi) {
   return ylm;
 }
 
+double solid_harmonics(int l, int m, double cth, double phi) {
+  // Value of normalized Legendre polynomial is
+  double Plm=gsl_sf_legendre_sphPlm(l,abs(m),cth);
+
+  if(m>0)
+    return sqrt(2)*Plm*cos(m*phi);
+  else if(m==0)
+    return Plm;
+  else
+    return sqrt(2)*Plm*sin(m*phi);
+}
+
 std::vector< std::complex<double> > cplx_Ylm_coeff(int l, int m) {
   // Absolute value of m
   int absm=abs(m);

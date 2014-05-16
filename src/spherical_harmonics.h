@@ -25,6 +25,9 @@
 /// Calculate value of \f$ Y_{l}^{m} (\cos \theta, \phi) = (-1)^m \sqrt{ \frac {2l +1} {4 \pi} \frac {(l-m)!} {(l+m)!} } P_l^m (\cos \theta) e^{i m \phi} \f$
 std::complex<double> spherical_harmonics(int l, int m, double cth, double phi);
 
+/// Calculate value of \f$ Y_{lm} (\cos \theta, \phi) \f$
+double solid_harmonics(int l, int m, double cth, double phi);
+
 /// Calculate expansion coefficients for cartesian terms from solid harmonics expansion
 std::vector< std::complex<double> > cplx_Ylm_coeff(int l, int m);
 
