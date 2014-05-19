@@ -1200,7 +1200,7 @@ class CompletenessOptimizer {
 	
 	printf("\nFinal composition for %i polarization shells (tau = %e):\n",npol,polmog);
 	print_value(curval,"Current value");
-	print_limits(cpl);
+	print_limits(cpl,"Current limits");
 	fflush(stdout);
 
 	// Save basis set
@@ -1510,7 +1510,7 @@ class CompletenessOptimizer {
       if(tol==0.0) {
 	printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
 	print_value(curval,"Current value");
-	print_limits(cpl);
+	print_limits(cpl,"Current limits");
 	fflush(stdout);
 	
 	// Save basis set
@@ -1525,7 +1525,7 @@ class CompletenessOptimizer {
       } else {
 	printf("Final composition for tol = %e, mog = %e:\n",tol,tau);
 	print_value(curval,"Current value");
-	print_limits(cpl);
+	print_limits(cpl,"Current limits");
 	fflush(stdout);
 	
 	// Save basis set
