@@ -1415,9 +1415,14 @@ class CompletenessOptimizer {
 	  printf("\t%-2c %8s %e\n",shell_types[am],"",0.0);
       fflush(stdout);
 
-      // Figure out minimal mog
+      // Figure out minimal mog.
       arma::uword minind;
       minmog=trmog.min(minind);
+
+      // Check if a higher am can be achieved with the same mog
+      for(size_t i=0;i<trmog.n_elem;i++)
+	if(trmog[i] == minmog && tram[i] > tram[minind])
+	  minind=i;	  
 
       // Converged?
       if(tol==0.0 && ((int) tram[minind] == maxam(cpl)) && (cpl[tram[minind]].exps.size()==1)) {
