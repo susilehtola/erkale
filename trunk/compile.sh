@@ -169,7 +169,8 @@ if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a
  # Use more conservative optimization flags, since libint is already highly optimized.
  export ICFLAGS=`echo ${CFLAGS} |sed 's|-O2|-O1|g'`
  export ICXXFLAGS=`echo ${CXXFLAGS} |sed 's|-O2|-O1|g'`
- 
+ aclocal -I lib/autoconf
+ autoconf
  ./configure --enable-static --disable-shared \
   --prefix=${topdir}/libint --exec-prefix=${topdir}/libint \
   --with-libint-max-am=${MAXAM} --with-libint-opt-am=${OPTAM} \
