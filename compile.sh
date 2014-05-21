@@ -233,6 +233,14 @@ cd ${builddir}
 svn checkout http://erkale.googlecode.com/svn/trunk/ erkale
 echo "Done"
 
+# Generate version file
+cd erkale
+echo "#ifndef ERKALE_VERSION" > src/version.h
+svnrev=$(svnversion)
+echo "#define SVNREVISION \"$svnrev\"" >> src/version.h
+echo "#endif" >> src/version.h
+cd ..
+
 ### Create config files
 
 # Armadillo
@@ -277,6 +285,7 @@ cd openmp
 FC=${FC} CC=${CC} CXX=${CXX} \
  FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  ${topdir}/cmake/bin/cmake .. \
+ -DSVN_VERSION=ON -DUSE_OPENMP=ON \
  -DLAPACK_LIBRARIES="${LAPACK}" \
  -DBLAS_LIBRARIES="${BLAS}" \
  -DCMAKE_INSTALL_PREFIX=${topdir}/erkale
@@ -291,10 +300,10 @@ cd serial
 FC=${FC} CC=${CC} CXX=${CXX} \
  FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  ${topdir}/cmake/bin/cmake .. \
+ -DSVN_VERSION=ON -DUSE_OPENMP=OFF \
  -DLAPACK_LIBRARIES="${LAPACK}" \
  -DBLAS_LIBRARIES="${BLAS}" \
- -DCMAKE_INSTALL_PREFIX=${topdir}/erkale \
- -DUSE_OPENMP=OFF
+ -DCMAKE_INSTALL_PREFIX=${topdir}/erkale
 make -j ${nprocs} VERBOSE=1
 make install
 cd ..

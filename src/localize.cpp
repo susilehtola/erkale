@@ -31,6 +31,10 @@
 #include <omp.h>
 #endif
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string filename, const std::vector<size_t> & printidx) {
   // Get the r_i^2 r_j^2 matrices
   std::vector<arma::mat> momstack=basis.moment(4);
@@ -391,6 +395,9 @@ int main(int argc, char **argv) {
 #endif
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
 
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);

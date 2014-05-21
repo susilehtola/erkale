@@ -49,6 +49,13 @@ else()
  set(SUFFIX "")
 endif()
 
+# Add in svn version information?
+option(SVN_VERSION "Add in svn version information? (Need to generate version.h)" OFF)
+if(SVN_VERSION)
+  # Add flag to CXX flags
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSVNRELEASE")
+endif()
+
 # Find cat
 find_program(CAT cat)
 

@@ -1,7 +1,6 @@
 # Make sure the headers are found
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
-
 add_library (liberkale_xrs bfprod.cpp fourierprod.cpp lmtrans.cpp
 momentum_series.cpp xrsscf-base.cpp xrsscf-fock.cpp 
 xrsscf-solvers.cpp)
