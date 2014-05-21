@@ -1,5 +1,5 @@
 #!/bin/bash
-# This is a script for downloading, compiling and 
+# This is a script for downloading, compiling and
 # installing ERKALE with all of its prerequisite libraries and CMake.
 # 2011-11-12 Susi Lehtola
 
@@ -24,7 +24,7 @@ export CPP="${CC} -E"
 # Fortran preprocessor
 export FCCPP="${FC} -E"
 
-# C flags to use. 
+# C flags to use.
 #For new versions of GCC on modern x86 hardware
 #export CFLAGS="-Wall -O2 -funroll-loops -fPIC -march=native -msse3"
 #For older versions
@@ -41,21 +41,24 @@ LAPACK="-llapack -lblas -lgfortran"
 BLAS="-lblas -lgfortran"
 
 # Maximum supported angular momentum (affects libint)
-# If this is very high, libint compilation will take ages and the
-# resulting libraries will be HUGE.
 MAXAM="6"
+# Maximum optimized angular momentum (affects libint). If this is very
+# large, libint compilation will take ages and the resulting libraries
+# will be HUGE.
+OPTAM="4"
 # Maximum angular momentum for first ERI derivatives
 MAXDERIV="5"
 
 # Current versions of libraries
 export GSLVER="1.16"
-export XCVER="2.0.2"
-export INTVER="1.1.4"
-export ARMAVER="3.920.2"
-export HDF5VER="1.8.11"
+export XCVER="2.1.0"
+# libint 1.1.6
+export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
+export ARMAVER="4.200.0"
+export HDF5VER="1.8.12"
 
 # Silence cmake warnings about changed behavior
-export CMAKE_LEGACY_CYGWIN_WIN32=0 
+export CMAKE_LEGACY_CYGWIN_WIN32=0
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -76,7 +79,7 @@ fi
 # GSL
 if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
  echo -n "Compiling GSL ..."
- 
+
  if [ ! -d ${builddir}/gsl-${GSLVER} ]; then
   if [ ! -f ${srcdir}/gsl-${GSLVER}.tar.gz ]; then
    cd ${srcdir}
@@ -85,19 +88,19 @@ if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
   cd ${builddir}
   tar zxf ${srcdir}/gsl-${GSLVER}.tar.gz
  fi
- 
+
  cd ${builddir}/gsl-${GSLVER}/
  ./configure --enable-static --disable-shared --prefix=${topdir}/gsl --exec-prefix=${topdir}/gsl &>configure.log
  make -j ${nprocs} &> make.log
  make install &> install.log
  make clean &> clean.log
  echo " done"
-fi 
+fi
 
 # HDF5
 if [ ! -f ${topdir}/hdf5/lib/libhdf5.a ]; then
  echo -n "Compiling HDF5 ..."
- 
+
  if [ ! -d ${builddir}/hdf5-${HDF5VER} ]; then
   if [ ! -f ${srcdir}/hdf5-${HDF5VER}.tar.gz ]; then
    cd ${srcdir}
@@ -106,19 +109,19 @@ if [ ! -f ${topdir}/hdf5/lib/libhdf5.a ]; then
   cd ${builddir}
   tar zxf ${srcdir}/hdf5-${HDF5VER}.tar.gz
  fi
- 
+
  cd ${builddir}/hdf5-${HDF5VER}/
  ./configure --enable-static --disable-shared --prefix=${topdir}/hdf5 --exec-prefix=${topdir}/hdf5 &>configure.log
  make -j ${nprocs} VERBOSE=1 &> make.log
  make install &> install.log
  make clean &> clean.log
  echo " done"
-fi 
+fi
 
 # libXC
 if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
  echo -n "Compiling libxc ..."
- 
+
  if [ ! -d ${builddir}/libxc-${XCVER} ]; then
   if [ ! -f ${srcdir}/libxc-${XCVER}.tar.gz ]; then
    cd ${srcdir}
@@ -129,15 +132,15 @@ if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
 
   # Patch to conform to standards
   if(( $libxc_patch )); then
-   patch libxc-${XCVER}/src/libxc_master.F90 &> patch.log <<EOF 
+   patch libxc-${XCVER}/src/libxc_master.F90 &> patch.log <<EOF
 21c21
 < #  define XC_F90(x) xc_s_f90_ ## x
 ---
-> #  define XC_F90(x) xc_s_f90_/**/x  
+> #  define XC_F90(x) xc_s_f90_/**/x
 23c23
 < #  define XC_F90(x) xc_f90_ ## x
 ---
-> #  define XC_F90(x) xc_f90_/**/x  
+> #  define XC_F90(x) xc_f90_/**/x
 EOF
   fi
 
@@ -163,15 +166,18 @@ if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a
   cd ${builddir}
   tar zxf ${srcdir}/libint-${INTVER}.tar.gz
  fi
- 
+
  cd ${builddir}/libint-${INTVER}
  # Use more conservative optimization flags, since libint is already highly optimized.
  export ICFLAGS=`echo ${CFLAGS} |sed 's|-O2|-O1|g'`
  export ICXXFLAGS=`echo ${CXXFLAGS} |sed 's|-O2|-O1|g'`
- 
+
+ aclocal -I lib/autoconf
+ autoconf
  ./configure --enable-static --disable-shared \
   --prefix=${topdir}/libint --exec-prefix=${topdir}/libint \
-  --disable-r12 --with-libint-max-am=${MAXAM} --with-libderiv-max-am1=${MAXDERIV} \
+  --with-libint-max-am=${MAXAM} --with-libint-opt-am=${OPTAM} \
+  --with-libderiv-max-am1=${MAXDERIV}  --disable-r12 \
   --with-cc="${CC}" --with-cxx="${CXX}" --with-ar=${AR} \
   --with-cc-optflags="${ICFLAGS}" \
   --with-cxx-optflags="${ICXXFLAGS}" &>configure.log
@@ -201,8 +207,8 @@ if [ ! -d ${topdir}/armadillo-${ARMAVER} ]; then
 
  # Patch configuration
  cd armadillo-${ARMAVER}
- sed -i 's|// #define ARMA_USE_BLAS|#define ARMA_USE_BLAS|g' include/armadillo_bits/config.hpp 
- sed -i 's|// #define ARMA_USE_LAPACK|#define ARMA_USE_LAPACK|g' include/armadillo_bits/config.hpp 
+ sed -i 's|// #define ARMA_USE_BLAS|#define ARMA_USE_BLAS|g' include/armadillo_bits/config.hpp
+ sed -i 's|// #define ARMA_USE_LAPACK|#define ARMA_USE_LAPACK|g' include/armadillo_bits/config.hpp
  sed -i 's|// #define ARMA_NO_DEBUG|#define ARMA_NO_DEBUG|g' include/armadillo_bits/config.hpp
 fi
 
