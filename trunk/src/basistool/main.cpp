@@ -17,6 +17,9 @@
 #include "../basislibrary.h"
 #include "../stringutil.h"
 #include "../completeness/completeness_profile.h"
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
 
 std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "norm", "orth", "Porth", "save", "savedalton", "sort", "taug"};
 
@@ -31,6 +34,9 @@ int main(int argc, char **argv) {
   printf("ERKALE - Basis set tools from Hel.\n");
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
 
   if(argc<3) {
     printf("Usage: %s input.gbs command\n\n",argv[0]);

@@ -32,6 +32,10 @@
 #include <omp.h>
 #endif
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 void print_spectrum(const std::string & fname, const arma::mat & m) {
   FILE *out=fopen(fname.c_str(),"w");
   for(size_t it=0; it<m.n_rows; it++)
@@ -217,6 +221,9 @@ int main(int argc, char **argv) {
 #endif
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
 
   if(argc!=1 && argc!=2) {
     printf("Usage: $ %s (runfile)\n",argv[0]);

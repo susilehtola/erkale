@@ -18,9 +18,16 @@
 #include "solve_coefficients.h"
 #include "../basis.h"
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 int main(int argc, char **argv) {
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
 
   if(argc!=5) {
     printf("Usage: %s zeta l Nf method\n",argv[0]);

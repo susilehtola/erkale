@@ -24,6 +24,10 @@
 #include <omp.h>
 #endif
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 /// Maximum allowed number of functions
 #define NFMAX 40
 
@@ -35,6 +39,9 @@ int main(int argc, char **argv) {
 #endif
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
 
   if(argc!=7 && argc!=8) {
     printf("Usage:   %s am n min max Nf/tol nfull (coulomb)\n",argv[0]);

@@ -31,6 +31,10 @@
 #include <omp.h>
 #endif
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 extern "C" {
   /* ADF's keyed-file routines */
 #include "KFc.h"
@@ -339,6 +343,9 @@ int main(int argc, char **argv) {
 #endif
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
 
   if(argc!=2) {
     printf("Usage: %s file\n",argv[0]);

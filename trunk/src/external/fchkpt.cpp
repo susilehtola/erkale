@@ -41,6 +41,10 @@
 #include <omp.h>
 #endif
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 void print(const std::string & entry, int val, FILE *out) {
   fprintf(out,"%-42s I   %3s %11i\n",entry.c_str(),"",val);
   fflush(out);
@@ -630,6 +634,9 @@ int main(int argc, char **argv) {
 #endif
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
 
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);
