@@ -364,6 +364,16 @@ class CompletenessOptimizer {
    * Amount of functions of each angular momentum given in nfuncs.
    */
   std::vector<coprof_t> initial_profile(const std::vector<size_t> & nfuncs, double cotol=1e-4) {
+    std::vector<double> offsets(nfuncs.size(),0.0);
+    return initial_profile(nfuncs,offsets,cotol);
+  }
+
+  /**
+   * Generate initial profile by minimizing the energy.
+   * Amount of functions of each angular momentum given in nfuncs.
+   * Offset for start given in offsets.
+   */
+  std::vector<coprof_t> initial_profile(const std::vector<size_t> & nfuncs, std::vector<double> offsets, double cotol=1e-4) {
     Timer t;
 
     // Initialize profile
@@ -382,8 +392,8 @@ class CompletenessOptimizer {
     printf("\nStarting composition:\n");
     for(size_t am=0;am<cpl.size();am++) {
       exps[am]=maxwidth_exps_table(am,cpl[am].tol,nfuncs[am],widths[am]);
-      cpl[am].start=0.0;
-      cpl[am].end=widths[am];
+      cpl[am].start=offsets[am];
+      cpl[am].end=cpl[am].start+widths[am];
       cpl[am].exps=exps[am];
 
       printf("%c % .3f % .3f %e %2i\n",shell_types[am],cpl[am].start,cpl[am].end,cpl[am].tol,(int) cpl[am].exps.size());
@@ -466,7 +476,10 @@ class CompletenessOptimizer {
       const size_t Ntr=20; // This is ridiculously large to prevent runover
       arma::vec h(Ntr);
       arma::vec E(Ntr);
-      E.zeros();
+      // Initial value might be positive, so
+      // initialize to largest possible value
+      E.ones();
+      E*=DBL_MAX;
 
       // Step sizes
       h(0)=0.0;
