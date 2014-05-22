@@ -67,83 +67,6 @@ void print_limits(const std::vector<coprof_t> & cpl, const char *msg) {
   fflush(stdout);
 }
 
-void save_limits(const std::vector<coprof_t> & cpl, const std::string & fname) {
-  FILE *out=fopen(fname.c_str(),"w");
-  if(!out)
-    throw std::runtime_error("Error opening completeness range output file.\n");
-
-  fprintf(out,"%i\n",maxam(cpl));
-  for(int am=0;am<=maxam(cpl);am++)
-    fprintf(out,"%i % .16e % .16e %.16e %i\n",am,cpl[am].start,cpl[am].end,cpl[am].tol,(int) cpl[am].exps.size());
-  fclose(out);
-}
-
-void load_limits(std::vector<coprof_t> & cpl, const std::string & fname) {
-  FILE *in=fopen(fname.c_str(),"r");
-  if(!in)
-    throw std::runtime_error("Error opening completeness range file.\n");
-
-  int max;
-  if(fscanf(in,"%i",&max)!=1)
-    throw std::runtime_error("Could not read maximum angular momentum from file.\n");
-  if(max<0 || max>max_am) {
-    std::ostringstream oss;
-    oss << "Error - read in maximum angular momentum " << max << "!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  // Allocate memory
-  cpl.clear();
-  cpl.resize(max+1);
-
-  // Read in ranges and make exponents
-  for(int am=0;am<=max;am++) {
-    // Supposed angular momentum, and amount of exponents
-    int amt, nexp;
-    // Tolerance
-    double ctol;
-
-    // Read range
-    if(fscanf(in,"%i %lf %lf %lf %i",&amt,&cpl[am].start,&cpl[am].end,&ctol,&nexp)!=5) {
-      std::ostringstream oss;
-      oss << "Error reading completeness range for " << shell_types[am] << " shell!\n";
-      throw std::runtime_error(oss.str());
-    }
-    // Check am is OK
-    if(am!=amt) {
-      std::ostringstream oss;
-      oss << "Read in am " << amt << " does not match supposed am " << am << "!\n";
-      throw std::runtime_error(oss.str());
-    }
-
-    // Get exponents
-    arma::vec exps=optimize_completeness(am,0.0,cpl[am].end-cpl[am].start,nexp,OPTMOMIND,false,&cpl[am].tol);
-
-    // Check that tolerances agree
-    if(fabs(ctol-cpl[am].tol)>1e-3*cpl[am].tol) {
-      std::ostringstream oss;
-      oss << "Obtained tolerance " << cpl[am].tol << " for " << shell_types[am] << " shell does not match supposed tolerance " << ctol << "!\n";
-      //      throw std::runtime_error(oss.str());
-      printf("Warning: %s",oss.str().c_str());
-      fflush(stdout);
-
-      // Find correct width
-      double width=cpl[am].end-cpl[am].start;
-
-      // Get exponents
-      double w;
-      exps=maxwidth_exps_table(am,cpl[am].tol,nexp,w,OPTMOMIND);
-
-      // Store exponents
-      double dw=w-width;
-      cpl[am].start-=dw/2.0;
-      cpl[am].end+=dw/2.0;
-    }
-
-    cpl[am].exps=move_exps(exps,cpl[am].start);
-  }
-}
-
 void print_scheme(const BasisSetLibrary & baslib, int len) {
   // Get contraction scheme
   ElementBasisSet el=baslib.get_elements()[0];
@@ -223,8 +146,8 @@ arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width, i
 
 arma::vec span_width(int am, double tol, double & width, int nx, int n) {
   // Check starting point
-  if(n<0)
-    n=0;
+  if(nx<0)
+    nx=0;
 
   // Determine necessary amount of exponents                                                                                                                                                                 
   arma::vec exps;
@@ -256,7 +179,7 @@ ElementBasisSet get_element_library(const std::string & el, const std::vector<co
   return elbas;
 }
 
-std::vector<coprof_t> augment_basis(const std::vector<coprof_t> & cplo, int ndiffuse, int ntight) {
+std::vector<coprof_t> augment_basis(const std::vector<coprof_t> & cplo, int ndiffuse, int ntight, int n_tau) {
   // New profile
   std::vector<coprof_t> cpl(cplo);
   if(ndiffuse==0 && ntight==0)
@@ -273,7 +196,7 @@ std::vector<coprof_t> augment_basis(const std::vector<coprof_t> & cplo, int ndif
 
     // New width and exponents
     double w;
-    arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+ndiffuse+ntight,w,OPTMOMIND);
+    arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+ndiffuse+ntight,w,n_tau);
 
     // Additional width is
     double dw=w-width;
