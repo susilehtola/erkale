@@ -31,7 +31,7 @@ extern "C" {
 #endif
 
 // Maximum number of functions allowed in completeness optimization
-#define NFMAX 50
+#define NFMAX 70
 
 arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t & p) {
   // Check parameter consistency
