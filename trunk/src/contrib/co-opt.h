@@ -61,8 +61,6 @@
 
 /// Maximum amount of functions
 #define NFMAX 70
-/// Moment to optimize: area
-#define OPTMOMIND 1
 
 /// Structure for completeness-optimized basis set
 typedef struct {
@@ -83,11 +81,6 @@ int maxam(const std::vector<coprof_t> & cpl);
 int get_nfuncs(const std::vector<coprof_t> & cpl);
 /// Print out the limits of the profile
 void print_limits(const std::vector<coprof_t> & cpl, const char *msg=NULL);
-
-/// Save limits to file
-void save_limits(const std::vector<coprof_t> & cpl, const std::string & fname);
-/// Load limits from file
-void load_limits(std::vector<coprof_t> & cpl, const std::string & fname);
 
 /// Augment basis set with additional diffuse and/or tight functions
 std::vector<coprof_t> augment_basis(const std::vector<coprof_t> & cplo, int ndiffuse, int ntight);
@@ -111,14 +104,19 @@ typedef struct {
 } co_exps_t;
 
 /// Store optimized exponents
-arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width, int n=OPTMOMIND);
+arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width, int n_cpl=1);
 /// Get exponents with wanted tolerance that span at least the wanted width. nx gives starting point for search (nx+1 is the first one tried)
-arma::vec span_width(int am, double tol, double & width, int nx=0, int n=OPTMOMIND);
+arma::vec span_width(int am, double tol, double & width, int nx=0, int n_cpl=1);
 
 /// Completeness optimizer class
 template<typename ValueType>
 class CompletenessOptimizer {
  private:
+  /// Moment of profile to optimize
+  int n_tau;
+  /// Amount of fully optimized exponents on each end
+  int n_full;
+
   /// Compute the energy
   virtual double compute_energy(const std::vector<coprof_t> & cpl)=0;
 
@@ -192,10 +190,163 @@ class CompletenessOptimizer {
  public:
   /// Constructor
   CompletenessOptimizer() {
+    /// Optimize area
+    n_tau=1;
+    /// 4 fully optimized exponents
+    n_full=4;
   }
   /// Destructor
   ~CompletenessOptimizer() {
   }
+
+  /// Get moment of completeness profile to optimize
+  int get_ntau() const {
+    return n_tau;
+  }
+
+  /// Set moment of completeness profile to optimize
+  void set_ntau(int n) {
+    n_tau=n;
+  }
+
+  /// Get amount of fully optimized exponents
+  int get_nfull() const {
+    return n_full;
+  }
+
+  /// Set amount of fully optimized exponents
+  void set_nfull(int n) {
+    n_full=n;
+  }
+
+  /// Get exponents
+  arma::vec optimize_completeness(int am, double min, double max, int Nf, double & mog) {
+    return ::optimize_completeness(am, min, max, Nf, n_tau, false, &mog, n_full);
+  }
+
+  /// Get completeness-optimized exponents
+  arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width) {
+    // Optimized exponents
+    static std::vector<co_exps_t> opt(max_am+1);
+
+    // Check if we already have the exponents in store
+    if(opt[am].tol!=tol || opt[am].exps.size()!=nexp) {
+      opt[am].tol=tol;
+      opt[am].exps=maxwidth_exps(am,tol,nexp,opt[am].w,n_tau,n_full);
+    }
+
+    width=opt[am].w;
+
+    if(opt[am].exps.size() != nexp) {
+      std::ostringstream oss;
+      oss << "Required " << nexp << " completeness-optimized primitives but got " << opt[am].exps.size() << "!\n";
+      throw std::runtime_error(oss.str());
+    }
+
+    return opt[am].exps;
+  }
+
+  /// Span necessary width
+  arma::vec span_width(int am, double tol, double & width, int nx) {
+    // Check starting point
+    if(nx<0)
+      nx=0;
+
+    // Determine necessary amount of exponents
+    arma::vec exps;
+    double w=0.0;
+
+    for(nx++;nx<=NFMAX;nx++) {
+      exps=maxwidth_exps_table(am,tol,nx,w);
+      if(w>=width)
+	break;
+    }
+    
+    // Store real width
+    width=w;
+    
+    // Return exponents
+    return exps;
+  }
+
+  void save_limits(const std::vector<coprof_t> & cpl, const std::string & fname) const {
+    FILE *out=fopen(fname.c_str(),"w");
+    if(!out)
+      throw std::runtime_error("Error opening completeness range output file.\n");
+
+    fprintf(out,"%i\n",maxam(cpl));
+    for(int am=0;am<=maxam(cpl);am++)
+      fprintf(out,"%i % .16e % .16e %.16e %i\n",am,cpl[am].start,cpl[am].end,cpl[am].tol,(int) cpl[am].exps.size());
+    fclose(out);
+  }
+
+  std::vector<coprof_t> load_limits(const std::string & fname) {
+    FILE *in=fopen(fname.c_str(),"r");
+    if(!in)
+      throw std::runtime_error("Error opening completeness range file.\n");
+
+    int max;
+    if(fscanf(in,"%i",&max)!=1)
+      throw std::runtime_error("Could not read maximum angular momentum from file.\n");
+    if(max<0 || max>max_am) {
+      std::ostringstream oss;
+      oss << "Error - read in maximum angular momentum " << max << "!\n";
+      throw std::runtime_error(oss.str());
+    }
+
+    // Allocate memory
+    std::vector<coprof_t> cpl(max+1);
+
+    // Read in ranges and make exponents
+    for(int am=0;am<=max;am++) {
+      // Supposed angular momentum, and amount of exponents
+      int amt, nexp;
+      // Tolerance
+      double ctol;
+
+      // Read range
+      if(fscanf(in,"%i %lf %lf %lf %i",&amt,&cpl[am].start,&cpl[am].end,&ctol,&nexp)!=5) {
+	std::ostringstream oss;
+	oss << "Error reading completeness range for " << shell_types[am] << " shell!\n";
+	throw std::runtime_error(oss.str());
+      }
+      // Check am is OK
+      if(am!=amt) {
+	std::ostringstream oss;
+	oss << "Read in am " << amt << " does not match supposed am " << am << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+
+      // Get exponents
+      arma::vec exps=optimize_completeness(am,0.0,cpl[am].end-cpl[am].start,nexp,cpl[am].tol);
+
+      // Check that tolerances agree
+      if(fabs(ctol-cpl[am].tol)>1e-3*cpl[am].tol) {
+	std::ostringstream oss;
+	oss << "Obtained tolerance " << cpl[am].tol << " for " << shell_types[am] << " shell does not match supposed tolerance " << ctol << "!\n";
+	//      throw std::runtime_error(oss.str());
+	printf("Warning: %s",oss.str().c_str());
+	fflush(stdout);
+
+	// Find correct width
+	double width=cpl[am].end-cpl[am].start;
+
+	// Get exponents
+	double w;
+	exps=maxwidth_exps_table(am,cpl[am].tol,nexp,w);
+
+	// Store exponents
+	double dw=w-width;
+	cpl[am].start-=dw/2.0;
+	cpl[am].end+=dw/2.0;
+      }
+
+      cpl[am].exps=move_exps(exps,cpl[am].start);
+    }
+
+    return cpl;
+  }
+
 
   /**
    * Generate initial profile by minimizing the energy.
@@ -230,7 +381,7 @@ class CompletenessOptimizer {
     // Generate initial profile
     printf("\nStarting composition:\n");
     for(size_t am=0;am<cpl.size();am++) {
-      exps[am]=maxwidth_exps_table(am,cpl[am].tol,nfuncs[am],widths[am],OPTMOMIND);
+      exps[am]=maxwidth_exps_table(am,cpl[am].tol,nfuncs[am],widths[am]);
       cpl[am].start=0.0;
       cpl[am].end=widths[am];
       cpl[am].exps=exps[am];
@@ -465,7 +616,7 @@ class CompletenessOptimizer {
 
     // Exponent to add: l=max+1, tolerance is cotol, 1 function.
     const int addam=max+1;
-    arma::vec pexp=maxwidth_exps_table(addam,cotol,nx,pw,OPTMOMIND);
+    arma::vec pexp=maxwidth_exps_table(addam,cotol,nx,pw);
 
     if(dpol<=0) {
       std::ostringstream oss;
@@ -478,9 +629,9 @@ class CompletenessOptimizer {
     {
       int nexp=5;
       double wnext;
-      maxwidth_exps_table(addam,cotol,nexp+1,wnext,OPTMOMIND);
+      maxwidth_exps_table(addam,cotol,nexp+1,wnext);
       double wcur;
-      maxwidth_exps_table(addam,cotol,nexp,wcur,OPTMOMIND);
+      maxwidth_exps_table(addam,cotol,nexp,wcur);
       sp=(wnext-wcur)/dpol;
     }
     // Wanted width is
@@ -589,7 +740,7 @@ class CompletenessOptimizer {
 	    oss << "Error - requested computation of " << 1 << " values but got only " << intvals.size() << "!\n";
 	    throw std::runtime_error(oss.str());
 	  }
-	  
+
 	  // Compute value
 	  intval=intvals[0];
 	  // and mog
@@ -679,9 +830,9 @@ class CompletenessOptimizer {
 	arma::uword nexp=cpl[scanam].exps.n_elem+1;
 
 	double nextw;
-	maxwidth_exps_table(scanam,cpl[scanam].tol,nexp+1,nextw,OPTMOMIND);
+	maxwidth_exps_table(scanam,cpl[scanam].tol,nexp+1,nextw);
 	double curw;
-	maxwidth_exps_table(scanam,cpl[scanam].tol,nexp,curw,OPTMOMIND);
+	maxwidth_exps_table(scanam,cpl[scanam].tol,nexp,curw);
 	step=nextw-curw;
 
 	// Store spacing
@@ -722,13 +873,13 @@ class CompletenessOptimizer {
       }
       trbas.push_back(baslib);
     }
-    
+
     // Sanity check
     if(!trbas.size()) {
       printf("No shells to scan stability of.\n");
       return 0.0;
     }
-    
+
     // Compute trial values
     std::vector<ValueType> trvals=compute_values(trbas);
     if(trvals.size()!=trbas.size()) {
@@ -810,7 +961,7 @@ class CompletenessOptimizer {
 
 	// Index of trial is
 	imax=amidx[scanam](amind);
-	
+
 	// Adjust profile?
 	if(ammax>=tol) {
 	  if(trexp[imax] < cpl[scanam].start) {
@@ -821,12 +972,12 @@ class CompletenessOptimizer {
 	    // Get real width
 	    double realw(nw);
 	    arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
-	    
+
 	    // Adjust profile
 	    cpl[scanam].start-=realw-curw;
 	    cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
 	    moved=-(realw-curw);
-	    
+
 	  } else if(trexp[imax] > cpl[scanam].end) {
 	    // Current width is
 	    double curw=cpl[scanam].end-cpl[scanam].start;
@@ -840,11 +991,11 @@ class CompletenessOptimizer {
 	    cpl[scanam].end+=realw-curw;
 	    cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
 	    moved=+(realw-curw);
-	    
+
 	  } else {
 	    throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
 	  }
-	  
+
 	  if(moved>0.0)
 	    printf("%c upper limit should be moved by % .3f (% .3f spacings), mog = %e. (%s)\n",shell_types[scanam],moved,moved/spacing(scanam),ammax,tam.elapsed().c_str());
 	  else
@@ -864,10 +1015,10 @@ class CompletenessOptimizer {
       }
       curval=hlpvals[0];
     }
-    
+
     printf("Stability scan done in %s.\n\n",t.elapsed().c_str());
     fflush(stdout);
-    
+
     return maxmog;
   }
 
@@ -906,7 +1057,7 @@ class CompletenessOptimizer {
 
 	double step;
 	double width;
-	arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+nxadd,width,OPTMOMIND);
+	arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+nxadd,width);
 
 	step=width-(cpl[am].end-cpl[am].start);
 	left[am].start=cpl[am].start-step;
@@ -1033,7 +1184,7 @@ class CompletenessOptimizer {
 	printf("Determining exponents for %c shell ... ",shell_types[am]);
 	fflush(stdout);
 
-	add[am].exps=optimize_completeness(am,add[am].start,add[am].end,add[am].exps.size()+nxadd,OPTMOMIND,false,&add[am].tol);
+	add[am].exps=optimize_completeness(am,add[am].start,add[am].end,add[am].exps.size()+nxadd,add[am].tol);
 	printf("(%s)\n",t.elapsed().c_str());
 	t.set();
 
@@ -1161,27 +1312,27 @@ class CompletenessOptimizer {
       } else {
 	// Here extmog < max(polmog,cbsthr).
 	// Going to add new polarization shell in next iteration; we are converged here.
-	
+
 	if(scan) {
 	  // Before adding new polarization shell, scan the stability of the existing shells.
 	  std::vector<coprof_t> scancpl(cpl);
 	  ValueType scanval(curval);
 	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol,std::max(polmog,cbsthr));
-	  
+
 	  // Update extension mog
 	  extmog=std::max(extmog,scanmog);
-	  
+
 	  if(scanmog>=std::max(polmog,cbsthr)) {
 	    // Instability detected, real mog is
 	    double mog=compute_mog(scanval,curval,0.0);
-	    
+
 	    cpl=scancpl;
 	    curval=scanval;
 	    printf("\n\nInstability detected with real mog = %e, restarting extension.\n",mog);
-	    
+
 	    print_value(curval,"Current value");
 	    print_limits(cpl,"Current limits");
-	    
+
 	    continue;
 	  }
 	}
@@ -1189,15 +1340,15 @@ class CompletenessOptimizer {
 	// Save polarization mog
 	if(maxam(polcpl)>maxam(cpl))
 	  polmogs.push_back(polmog);
-	
+
 	// Switch to polarized basis.
 	cpl=polcpl;
 	curval=polval;
 	npol++;
-	
+
 	printf("\n\n%s\n",print_bar("CONVERGENCE ACHIEVED",'#').c_str());
 	printf("\nConverged: extension mog was %e, polarization mog %e.\n",extmog,polmog);
-	
+
 	printf("\nFinal composition for %i polarization shells (tau = %e):\n",npol,polmog);
 	print_value(curval,"Current value");
 	print_limits(cpl,"Current limits");
@@ -1257,7 +1408,7 @@ class CompletenessOptimizer {
 		cpl=scancpl;
 		curval=scanval;
 		printf("\n\nInstability detected with real mog = %e, restarting extension.\n",mog);
-		
+
 		print_value(curval,"Current value");
 		print_limits(cpl,"Current limits");
 
@@ -1265,25 +1416,25 @@ class CompletenessOptimizer {
 		continue;
 	      }
 	    }
-	    
+
 	    // Break last shell extension loop
 	    break;
 	  }
-	  
+
 	  // Break polarization loop
 	  break;
 	}
 
 	// Reduce tau. Sanity check for no functions
-	if(extmog>0.0) 
+	if(extmog>0.0)
 	  tau=std::min(tau,extmog);
       }
     }
-    
+
     print_value(curval,"\nFinal value");
     print_limits(cpl,"Final composition:");
     fflush(stdout);
-    
+
     // Save basis set
     {
       BasisSetLibrary baslib=form_basis(cpl);
@@ -1291,7 +1442,7 @@ class CompletenessOptimizer {
       sprintf(fname,"un-co-ref.gbs");
       baslib.save_gaussian94(fname);
     }
-    
+
     // Save completeness range
     save_limits(cpl,"completeness.dat");
   }
@@ -1339,7 +1490,7 @@ class CompletenessOptimizer {
 	  fflush(stdout);
 
 	  double width;
-	  arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()-1,width,OPTMOMIND);
+	  arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()-1,width);
 	  // Step size is
 	  double step=cpl[am].end-cpl[am].start-width;
 
@@ -1373,7 +1524,7 @@ class CompletenessOptimizer {
 	  descr.push_back(msg);
 	  tram.push_back(am);
 
-	  del[am].exps=optimize_completeness(am,del[am].start,del[am].end,del[am].exps.size()-1,OPTMOMIND,false,&del[am].tol);
+	  del[am].exps=optimize_completeness(am,del[am].start,del[am].end,del[am].exps.size()-1,del[am].tol);
 	  trials.push_back(del);
 	  sprintf(msg,"Dropped exponent from   %c shell",shell_types[am]);
 	  descr.push_back(msg);
@@ -1422,7 +1573,7 @@ class CompletenessOptimizer {
       // Check if a higher am can be achieved with the same mog
       for(size_t i=0;i<trmog.n_elem;i++)
 	if(trmog[i] == minmog && tram[i] > tram[minind])
-	  minind=i;	  
+	  minind=i;
 
       // Converged?
       if(tol==0.0 && ((int) tram[minind] == maxam(cpl)) && (cpl[tram[minind]].exps.size()==1)) {
@@ -1452,7 +1603,7 @@ class CompletenessOptimizer {
 	printf("%s, range is now % .3f ... % .3f (%2i funcs), tol = %e, mog %e (%s).\n",descr[minind].c_str(),cpl[tram[minind]].start,cpl[tram[minind]].end,(int) cpl[tram[minind]].exps.size(),cpl[tram[minind]].tol,minmog,ttot.elapsed().c_str());
 	fflush(stdout);
       }
-      
+
       // Save out interim basis set
       if(saveall) {
 	static size_t isave=0;
@@ -1461,11 +1612,11 @@ class CompletenessOptimizer {
 	form_basis(cpl).save_gaussian94(oss.str());
 	isave++;
       }
-      
+
       // Update references
       update_reference(cpl);
     }
-    
+
     return minmog;
   }
 
@@ -1517,13 +1668,13 @@ class CompletenessOptimizer {
 	print_value(curval,"Current value");
 	print_limits(cpl,"Current limits");
 	fflush(stdout);
-	
+
 	// Save basis set
 	{
 	  char fname[180];
 	  sprintf(fname,"un-co-%i.gbs",npol);
 	  form_basis(cpl).save_gaussian94(fname);
-	  
+
 	  sprintf(fname,"reduced-%i.dat",npol);
 	  save_limits(cpl,fname);
 	}
@@ -1532,18 +1683,18 @@ class CompletenessOptimizer {
 	print_value(curval,"Current value");
 	print_limits(cpl,"Current limits");
 	fflush(stdout);
-	
+
 	// Save basis set
 	{
 	  char fname[180];
 	  sprintf(fname,"un-co-%e.gbs",tol);
 	  form_basis(cpl).save_gaussian94(fname);
-	  
+
 	  sprintf(fname,"reduced-%e.dat",tol);
 	  save_limits(cpl,fname);
 	}
       }
-	
+
       // Contract the basis
       if(docontr) {
 	// Use CBS value as reference for contraction
@@ -1567,7 +1718,7 @@ class CompletenessOptimizer {
 	  // General contractions
 	  sprintf(fname,"co-general-%i.gbs",npol);
 	  contrbas.save_gaussian94(fname);
-	  
+
 	  // Segmented contractions
 	  contrbas.P_orthogonalize();
 	  sprintf(fname,"co-segmented-%i.gbs",npol);
@@ -1576,7 +1727,7 @@ class CompletenessOptimizer {
 	  // General contractions
 	  sprintf(fname,"co-general-%e.gbs",tol);
 	  contrbas.save_gaussian94(fname);
-	  
+
 	  // Segmented contractions
 	  contrbas.P_orthogonalize();
 	  sprintf(fname,"co-segmented-%e.gbs",tol);
