@@ -27,9 +27,6 @@
 #include "version.h"
 #endif
 
-/// Maximum allowed number of functions
-#define NFMAX 40
-
 int main(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - Completeness optimization from Hel. OpenMP version, running on %i cores.\n",omp_get_max_threads());
