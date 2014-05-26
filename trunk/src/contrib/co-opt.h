@@ -1574,7 +1574,7 @@ class CompletenessOptimizer {
       printf("\n\t%2s %12s\n","am","mog");
       for(size_t am=0;am<amidx.size();am++)
 	if(amidx[am].n_elem) {
-	  printf("\t%-2c %e\n",shell_types[am],arma::max(ammog[am]));
+	  printf("\t%-2c %e\n",shell_types[am],arma::min(ammog[am]));
 	} else
 	  printf("\t%-2c %8s %e\n",shell_types[am],"",0.0);
       fflush(stdout);
