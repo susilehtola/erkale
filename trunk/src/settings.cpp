@@ -142,6 +142,8 @@ void Settings::add_dft_settings() {
   add_bool("PZloc", "Initial localization before SIC calculation?", true);
   // Mode to use PZ-SIC
   add_string("PZmode", "Mode to use PZ-SIC in. Coul, CoulX, CoulC, CoulXC", "CoulXC");
+  // PZ-SIC Hamiltonian
+  add_string("PZHam", "Hamiltonian to use in PZ-SIC: Symm, United", "Symm");
   // PZ-SIC kappa max
   add_double("PZKmax", "Threshold for kappa max in unitary optimization", 1e-3);
   // PZ-SIC kappa rms

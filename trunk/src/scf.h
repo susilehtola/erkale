@@ -195,6 +195,17 @@ enum pzmet {
 // Parse PZ method
 enum pzmet parse_pzmet(const std::string & str);
 
+/// P-Z Hamiltonian
+enum pzham {
+  /// Symmetrize
+  PZSYMM,
+  /// United Hamiltonian
+  PZUNITED
+};
+
+// Parse PZ hamiltonian
+enum pzham parse_pzham(const std::string & str);
+
 class SCF {
  protected:
  /// Overlap matrix
@@ -294,7 +305,7 @@ class SCF {
   std::vector<arma::mat> freeze;
 
   /// Helper routine for PZ-SIC
-  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, DFTGrid & grid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool real);
+  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, enum pzham pzh, DFTGrid & grid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool real);
 
  public:
   /// Constructor
@@ -352,9 +363,9 @@ class SCF {
   arma::vec force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol);
 
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);
@@ -702,7 +713,6 @@ class Edmiston : public Unitary {
   void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
 };
 
-
 /// Perdew-Zunger self-interaction correction
 class PZSIC : public Unitary {
   /// SCF object for constructing Fock matrix
@@ -718,6 +728,9 @@ class PZSIC : public Unitary {
   double occnum;
   /// Coefficient for PZ-SIC
   double pzcor;
+
+  /// Hamiltonian method
+  enum pzham ham;
 
   /// Convergence criterion: rms kappa
   double rmstol;
@@ -753,7 +766,7 @@ class PZSIC : public Unitary {
 
  public:
   /// Constructor
-  PZSIC(SCF *solver, dft_t dft, DFTGrid * grid, double Etol, double maxtol, double rmstol, bool verbose=true);
+  PZSIC(SCF *solver, dft_t dft, DFTGrid * grid, double Etol, double maxtol, double rmstol, enum pzham ham, bool verbose=true);
   /// Destructor
   ~PZSIC();
 
