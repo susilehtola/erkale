@@ -41,21 +41,22 @@ BLAS="-L/usr/lib64/atlas -lf77blas -lcblas -latlas"
 # LAPACK="-llapack -lblas -lgfortran"
 # BLAS="-lblas -lgfortran"
 
-# Maximum supported angular momentum (affects libint)
-MAXAM="6"
-# Maximum optimized angular momentum (affects libint). If this is very
-# large, libint compilation will take ages and the resulting libraries
-# will be HUGE.
-OPTAM="4"
-# Maximum angular momentum for first ERI derivatives
-MAXDERIV="5"
-
 # Use system packages?
 system_cmake=1
 system_gsl=1
-system_libxc=0
-system_libint=0
-system_hdf5=0
+system_libxc=1
+system_libint=1
+system_hdf5=1
+
+# Maximum supported angular momentum (affects libint if it's compiled)
+MAXAM="6"
+# Maximum optimized angular momentum (affects libint if it's
+# compiled). If this is very large, libint compilation will take ages
+# and the resulting libraries will be HUGE.
+OPTAM="4"
+# Maximum angular momentum for first ERI derivatives (affects libint
+# if it's compiled)
+MAXDERIV="5"
 
 # Running on cygwin?
 if [[ "$CYGWIN" != "" ]]; then
@@ -63,8 +64,7 @@ if [[ "$CYGWIN" != "" ]]; then
     export CMAKE_LEGACY_CYGWIN_WIN32=0
 fi
 
-
-# Current versions of libraries
+# Current versions of libraries, if they are to be compiled
 export GSLVER="1.16"
 export XCVER="2.1.0"
 # libint 1.1.6
