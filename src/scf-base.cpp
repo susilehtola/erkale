@@ -410,7 +410,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 }
 
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
   // Set xc functionals
   if(pzmet==COUL) {
     dft.x_func=0;
@@ -496,7 +496,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	if(pzmet!=COUL) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsol,W,dum,pzcor,grid,Etol*1000,maxtol*100,rmstol*100,niter*10,canonical,real);
+	  PZSIC_calculate(sicsol,W,dum,pzcor,pzh,grid,Etol*1000,maxtol*100,rmstol*100,niter*10,canonical,real);
 	}
       }
     }
@@ -539,7 +539,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   if(verbose && !canonical) {
     fprintf(stderr,"SIC unitary optimization\n");
   }
-  PZSIC_calculate(sicsol,W,dft,pzcor,grid,Etol,maxtol,rmstol,niter,canonical,real);
+  PZSIC_calculate(sicsol,W,dft,pzcor,pzh,grid,Etol,maxtol,rmstol,niter,canonical,real);
   if(verbose && !canonical) {
     fprintf(stderr,"Unitary optimization performed in %s.\n\n",tsic.elapsed().c_str());
   }
@@ -564,7 +564,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   sol.en.E  +=2*sicsol.en.E;
 }
 
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, const DFTGrid & ogrid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
   // Set xc functionals
   if(pzmet==COUL) {
     dft.x_func=0;
@@ -678,7 +678,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(pzmet!=COUL) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsola,Wa,dum,pzcor,grid,Etol*1000,maxtol*100,rmstol*100,niter*10,canonical,real);
+	  PZSIC_calculate(sicsola,Wa,dum,pzcor,pzh,grid,Etol*1000,maxtol*100,rmstol*100,niter*10,canonical,real);
 	}
       }
     }
@@ -715,7 +715,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(pzmet!=COUL) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsolb,Wb,dum,pzcor,grid,Etol*1000,maxtol*100,rmstol*100,niter*10,canonical,real);
+	  PZSIC_calculate(sicsolb,Wb,dum,pzcor,pzh,grid,Etol*1000,maxtol*100,rmstol*100,niter*10,canonical,real);
 	}
       }
     }
@@ -764,7 +764,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     else
       fprintf(stderr,"SIC canonical calculation, alpha spin\n");
   }
-  PZSIC_calculate(sicsola,Wa,dft,pzcor,grid,Etol,maxtol,rmstol,niter,canonical,real);
+  PZSIC_calculate(sicsola,Wa,dft,pzcor,pzh,grid,Etol,maxtol,rmstol,niter,canonical,real);
   chkptp->cwrite("CWa",sicsola.C*Wa);
   chkptp->write("ESICa",sicsola.E);
   // Compute projected energies
@@ -784,7 +784,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       else
 	fprintf(stderr,"SIC canonical calculation,  beta spin\n");
     }
-    PZSIC_calculate(sicsolb,Wb,dft,pzcor,grid,Etol,maxtol,rmstol,niter,canonical,real);
+    PZSIC_calculate(sicsolb,Wb,dft,pzcor,pzh,grid,Etol,maxtol,rmstol,niter,canonical,real);
     chkptp->cwrite("CWb",sicsolb.C*Wb);
     chkptp->write("ESICb",sicsolb.E);
     // Compute projected energies
@@ -818,9 +818,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   }
 }
 
-void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, DFTGrid & grid, double Etol, double maxtol, double rmstol, size_t nmax, bool canonical, bool real) {
+void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, enum pzham pzh, DFTGrid & grid, double Etol, double maxtol, double rmstol, size_t nmax, bool canonical, bool real) {
   // Initialize the worker
-  PZSIC worker(this,dft,&grid,Etol,maxtol,rmstol,verbose);
+  PZSIC worker(this,dft,&grid,Etol,maxtol,rmstol,pzh,verbose);
   worker.set(sol,pzcor);
 
   double ESIC;
@@ -1397,6 +1397,22 @@ enum pzmet parse_pzmet(const std::string & pzmod) {
   return mode;
 }
 
+enum pzham parse_pzham(const std::string & pzh) {
+  enum pzham ham;
+
+  if(stricmp(pzh,"Symm")==0)
+    ham=PZSYMM;
+  else if(stricmp(pzh,"United")==0)
+    ham=PZUNITED;
+  else {
+    std::ostringstream oss;
+    oss << "Unknown PZ-SIC Hamiltonian \"" << pzh << "\"!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  return ham;
+}
+
 void calculate(const BasisSet & basis, Settings & set, bool force) {
   // Checkpoint files to load and save
   std::string loadname=set.get_string("LoadChk");
@@ -1593,6 +1609,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
       // Perdew-Zunger?
       enum pzrun pz=parse_pzsic(set.get_string("PZ"));
+      enum pzham pzh=parse_pzham(set.get_string("PZHam"));
       if(pz==NO) {
 	if(adaptive) {
 	  // Solve restricted DFT problem first on a rough grid
@@ -1656,7 +1673,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 	  
 	  // Get SIC potential
-	  solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
+	  solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	  
 	  // Perturbative calculation - no need for self-consistency
 	  // Diagonalize to get new orbitals and energies
@@ -1683,7 +1700,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
 	      
 	      // Get new SIC potential
-	      solver.PZSIC_RDFT(sol,occs,initdft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
+	      solver.PZSIC_RDFT(sol,occs,initdft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	      pziter++;
 	      
 	      // Solve self-consistent field equations in presence of new SIC potential
@@ -1739,7 +1756,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 	  
 	    // Get new SIC potential
-	    solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
+	    solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	    pziter++;
 
 	    // Solve self-consistent field equations in presence of new SIC potential
@@ -1912,6 +1929,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
       // Perdew-Zunger?
       enum pzrun pz=parse_pzsic(set.get_string("PZ"));
+      enum pzham pzh=parse_pzham(set.get_string("PZHam"));
       if(pz==NO) {
 	if(adaptive) {
 	  // Solve unrestricted DFT problem first on a rough grid
@@ -1970,7 +1988,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 
 	  // Get SIC potential
-	  solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
+	  solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 
           // Perturbative calculation - no need for self-consistency
     	  // Diagonalize to get new orbitals and energies
@@ -2002,7 +2020,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 		grid.construct(initdft.nrad,initdft.lmax,initdft.x_func,initdft.c_func);
 	      
 	      // Get new SIC potential
-	      solver.PZSIC_UDFT(sol,occa,occb,initdft,pzmet,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
+	      solver.PZSIC_UDFT(sol,occa,occb,initdft,pzmet,pzh,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	      pziter++;
 	      
 	      // Solve self-consistent field equations in presence of new SIC potential
@@ -2064,7 +2082,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 	    
 	    // Get new SIC potential
-	    solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
+	    solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzh,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	    pziter++;
 	    
 	    // Solve self-consistent field equations in presence of new SIC potential
@@ -3563,7 +3581,7 @@ void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
       der(a,b) =2.0 * arma::as_scalar( arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b) );
 }
 
-PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, double Etolv, double maxtolv, double rmstolv, bool verb) : Unitary(4,0.0,0.0,true,verb) {
+PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, double Etolv, double maxtolv, double rmstolv, enum pzham hm, bool verb) : Unitary(4,0.0,0.0,true,verb) {
   solver=solverp;
   dft=dftp;
   grid=gridp;
@@ -3572,6 +3590,9 @@ PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, double Etolv, double max
   Etol=Etolv;
   rmstol=rmstolv;
   maxtol=maxtolv;
+
+  // Hamiltonian
+  ham=hm;
 }
 
 PZSIC::~PZSIC() {
@@ -3616,16 +3637,52 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   // Compute orbital-dependent Fock matrices
   solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid);
 
-  // and the total SIC contribution
+  // and the total SIC contribution.
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
-  arma::mat S=solver->get_S();
-  for(size_t io=0;io<Ctilde.n_cols;io++) {
-    arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
-    arma::mat Fio=Forb[io];
-    HSIC+=Fio*Pio*S;
+  if(ham==PZSYMM) {
+    // Symmetrized operator
+
+    arma::mat S=solver->get_S();
+    for(size_t io=0;io<Ctilde.n_cols;io++) {
+      arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+      arma::mat Fio=Forb[io];
+      HSIC+=Fio*Pio*S;
+    }
+    // Symmetrize.
+    HSIC=0.5*(HSIC+arma::trans(HSIC));
+
+  } else if(ham==PZUNITED) {
+    // United Hamiltonian. See
+    // J. G. Harrison, R. A. Heaton, and C. C. Lin, "Self-interaction
+    // correction to the local density Hartree-Fock atomic
+    // calculations of excited and ground states", J. Phys. B:
+    // At. Mol. Phys. 16, 2079 (1983).
+
+    arma::mat S=solver->get_S();
+    arma::mat Sinvh=solver->get_Sinvh();
+
+    // Construct virtual space projector
+    arma::mat O(S);
+    O.zeros();
+    // Add in total possible density
+    for(size_t i=0;i<Sinvh.n_cols;i++)
+      O+=Sinvh.col(i)*arma::trans(Sinvh.col(i));
+    // and substract the occupied density
+    for(size_t io=0;io<sol.C.n_cols;io++)
+      O-=sol.C.col(io)*arma::trans(sol.C.col(io));
+    
+    // Construct Hamiltonian
+    for(size_t io=0;io<Ctilde.n_cols;io++) {
+      arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+      arma::mat Fio=Forb[io];
+      HSIC+=S*( Pio*Fio*Pio + O*Fio*Pio + Pio*Fio*O )*S;
+    }
+
+  } else {
+    std::ostringstream oss;
+    oss << "Unsupported PZ-SIC Hamiltonian!\n";
+    throw std::runtime_error(oss.str());
   }
-  // Symmetrize.
-  HSIC=0.5*(HSIC+arma::trans(HSIC));
 
   // SI energy is
   f=arma::sum(Eorb);
