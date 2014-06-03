@@ -45,8 +45,9 @@ std::vector<atom_t> load_xyz(std::string filename) {
     // Reserve enough memory.
     atoms.reserve(Nat);
 
-    // The next line contains the comment, skip it.
-    line=readline(in);
+    // The next line contains the comment, skip through it. Also
+    // accept an empty line.
+    line=readline(in,false);
 
     // Now, proceed with reading in the atoms.
     for(int i=0;i<Nat;i++) {

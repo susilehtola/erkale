@@ -43,13 +43,18 @@ int stricmp(const std::string &str1, const std::string& str2) {
   return strcasecmp(str1.c_str(),str2.c_str());
 }
 
-std::string readline(std::istream & in) {
+std::string readline(std::istream & in, bool skipempty) {
   std::string ret;
 
   // Get line from input
   while(in.good()) {
     // Get line from file
     getline(in,ret);
+
+    // Skip empty lines?
+    if(!skipempty)
+      return ret;
+    
     // Check that line is not a comment
     if(ret.size() && !(ret[0]=='!' || ret[0]=='#')) {
       // Check if there is something on the line
@@ -58,7 +63,7 @@ std::string readline(std::istream & in) {
 	  return ret;
     }
   }
-
+  
   // Reached end of file
   return std::string();
 }
