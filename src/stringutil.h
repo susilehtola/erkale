@@ -35,7 +35,7 @@ std::string toupper(const std::string & in);
 int stricmp(const std::string & str1, const std::string & str2);
 
 /// Read line from input (skip empty lines)
-std::string readline(std::istream & in);
+std::string readline(std::istream & in, bool skipempty=true);
 
 /// Get a line from the file (not skipping anything)
 std::string readline(FILE *in);
