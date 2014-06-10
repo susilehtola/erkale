@@ -3673,9 +3673,9 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
     
     // Construct Hamiltonian
     for(size_t io=0;io<Ctilde.n_cols;io++) {
-      arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+      arma::cx_mat Pio=Ctilde.col(io)*arma::trans(Ctilde.col(io));
       arma::mat Fio=Forb[io];
-      HSIC+=S*( Pio*Fio*Pio + O*Fio*Pio + Pio*Fio*O )*S;
+      HSIC+=arma::real(S*( Pio*Fio*Pio + O*Fio*Pio + Pio*Fio*O )*S);
     }
 
   } else {
