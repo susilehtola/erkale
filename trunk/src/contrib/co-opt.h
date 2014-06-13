@@ -1440,7 +1440,7 @@ class CompletenessOptimizer {
 
 	// Reduce tau. Sanity check for no functions
 	if(extmog>0.0)
-	  tau=std::min(tau,extmog);
+	  tau=std::min(tau,std::max(extmog,cbsthr));
       }
     }
 
