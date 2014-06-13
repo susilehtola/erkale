@@ -789,7 +789,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     chkptp->write("ESICb",sicsolb.E);
     // Compute projected energies
     if(sol.Hb.n_elem == sicsolb.H.n_elem) {
-      arma::cx_mat CW=sicsolb.C*Wa;
+      arma::cx_mat CW=sicsolb.C*Wb;
       arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Hb+sicsolb.H)*CW));
       chkptp->write("EpSICb",Ep);
     }
