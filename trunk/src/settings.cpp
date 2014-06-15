@@ -78,7 +78,7 @@ void Settings::add_scf_settings() {
   add_bool("LineSearch", "Do line search in level shift (EXPENSIVE!)", false);
 
   // Total charge of system
-  add_int("Charge", "Total charge of system", 0);
+  add_int("Charge", "Total charge of system", 0, true);
   // Multiplicity
   add_int("Multiplicity", "Spin multiplicity", 1);
   // Occupancies
