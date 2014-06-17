@@ -55,6 +55,10 @@ void is_gga_mgga(int func_id, bool & gga, bool & mgga);
 
 /// Get fraction of exact exchange
 double exact_exchange(int func_id);
+/// Is the functional range separated?
+bool is_range_separated(int func_id);
+/// Get range separation constants
+void range_separation(int func_id, double & omega, double & alpha, double & beta);
 
 /// Is gradient necessary to use given functional?
 bool gradient_needed(int func);
