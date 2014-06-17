@@ -371,6 +371,40 @@ double exact_exchange(int func_id) {
   return f;
 }
 
+bool is_range_separated(int func_id) {
+  // Functional is range separated if w!=0
+  double w, a, b;
+  range_separation(func_id,w,a,b);
+  return w!=0.0;
+}
+
+void range_separation(int func_id, double & omega, double & alpha, double & beta) {
+  // Defaults
+  omega=0.0;
+  alpha=0.0;
+  beta=0.0;
+
+  if(func_id>0) {
+    xc_func_type func;
+    if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Functional "<<func_id<<" not found!";
+      throw std::runtime_error(oss.str());
+    }
+
+    switch(func.info->family)
+      {
+      case XC_FAMILY_HYB_GGA:
+      case XC_FAMILY_HYB_MGGA:
+	XC(hyb_cam_coef(&func,&omega,&alpha,&beta));
+	break;
+      }
+
+    xc_func_end(&func);
+  }
+}
+
 
 bool gradient_needed(int func_id) {
   // Is gradient necessary?
