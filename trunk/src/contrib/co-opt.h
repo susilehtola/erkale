@@ -1554,6 +1554,10 @@ class CompletenessOptimizer {
 	}
       }
 
+      // Empty basis set - nothing to remove
+      if(!trials.size())
+	return DBL_MAX;
+
       // Compute values
       std::vector<ValueType> trvals=compute_values(trials);
       if(trvals.size()!=trials.size()) {
@@ -1671,8 +1675,8 @@ class CompletenessOptimizer {
     print_limits(cpl,"Starting point basis");
     fflush(stdout);
 
-    double tau=DBL_MAX;
-    while((tol>0.0 && tau>tol) || (tol==0.0 && npol>=1)) {
+    double tau=0.0;
+    while((tol>0.0 && tau<tol) || (tol==0.0 && npol>=1)) {
       // Reduce the profile
       tau=reduce_profile(cpl,curval,cbsval,tol,domiddle,saveall);
 
