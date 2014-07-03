@@ -258,7 +258,6 @@ void GaussianShell::coulomb_normalize() {
   eri.compute(this,&dummy,this,&dummy);
   const std::vector<double> * erip=eri.getp();
 
-
   if(!uselm) {
     // Cartesian functions
     for(size_t i=0;i<Ncart;i++)

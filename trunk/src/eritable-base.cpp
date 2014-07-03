@@ -36,9 +36,24 @@
 
 
 ERItable::ERItable() {
+  omega=0.0;
+  alpha=1.0;
+  beta=0.0;
 }
 
 ERItable::~ERItable() {
+}
+
+void ERItable::set_range_separation(double w, double a, double b) {
+  omega=w;
+  alpha=a;
+  beta=b;
+}
+
+void ERItable::get_range_separation(double & w, double & a, double & b) {
+  w=omega;
+  a=alpha;
+  b=beta;
 }
 
 size_t ERItable::N_ints(const BasisSet * basp) const {
@@ -91,6 +106,10 @@ double ERItable::getERI(size_t i, size_t j, size_t k, size_t l) const {
 
 std::vector<double> & ERItable::get() {
   return ints;
+}
+
+size_t ERItable::get_N() const {
+  return ints.size();
 }
 
 arma::mat ERItable::calcJ(const arma::mat & R) const {

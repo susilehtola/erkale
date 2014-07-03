@@ -261,14 +261,39 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   */
 
 #ifdef DFT
-  // Fraction of exact exchange
-  double kfrac=exact_exchange(dft.x_func);
+  // Range separation constants
+  double omega, klong, kshort;
+  range_separation(dft.x_func,omega,klong,kshort);
 
   if(verbose) {
-    if(kfrac!=0.0)
-      printf("\nUsing hybrid exchange with % .3f %% of exact exchange.\n",kfrac*100);
+    if(omega!=0.0) {
+      printf("\nUsing range separated exchange with range separation constant omega = % .3f.\n",omega);
+      printf("Using % .3f %% short range and % .3f %% long range exchange.\n",kshort*100,klong*100);
+    } else if(klong!=0.0)
+      printf("\nUsing hybrid exchange with % .3f %% of exact exchange.\n",klong*100);
     else
       printf("\nA pure exchange functional used, no exact exchange.\n");
+  }
+
+  // Evaluators for range separated part
+  if(omega!=0.0) {
+    if(!direct) {
+      bool fill;
+      if(!tab_rs.get_N()) {
+	fill=true;
+      } else {
+	double o, kl, ks;
+	tab_rs.get_range_separation(o,kl,ks);
+	fill=!(o==omega);
+      }
+      if(fill) {
+	tab_rs.set_range_separation(omega,0.0,1.0);
+	tab_rs.fill(basisp);
+      }
+    } else {
+      scr_rs.set_range_separation(omega,0.0,1.0);
+      scr_rs.fill(basisp);
+    }
   }
 
   DFTGrid grid(basisp,verbose,dft_lobatto);

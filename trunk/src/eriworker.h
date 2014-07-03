@@ -60,6 +60,12 @@ class IntegralWorker {
   /// Output array
   std::vector<double> * output;
 
+  /// Integral kernel (i.e. Boys' function for Coulomb integrals)
+  arma::vec Gn;
+
+  /// Compute the integral kernel
+  virtual void compute_G(double rho, double T, int nmax);
+  
   /// Reorder integrals
   void reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
 
@@ -90,13 +96,13 @@ class ERIWorker: public IntegralWorker {
   /// Compute the cartesian ERIs
   void compute_cartesian(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Compute data for libint
-  void compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t &jp, int mmax);
+  void compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax);
 
  public:
   /// Constructor
   ERIWorker(int maxam, int maxcontr);
   /// Destructor
-  ~ERIWorker();
+  virtual ~ERIWorker();
 
   /// Compute eris
   void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
@@ -133,7 +139,7 @@ class dERIWorker: public IntegralWorker {
 
  public:
   dERIWorker(int maxam, int maxcontr);
-  ~dERIWorker();
+  virtual ~dERIWorker();
 
   /// Compute derivatives
   void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
@@ -145,5 +151,48 @@ class dERIWorker: public IntegralWorker {
   /// Compute the derivatives, debug version
   std::vector<double> get_debug(int idx);
 };
+
+/// Worker for computing short- and long-range electron repulsion integrals
+class ERIWorker_srlr: public ERIWorker {
+  /// Compute the kernel
+  void compute_G(double rho, double T, int nmax);
+
+  /// Range separation constant
+  double omega;
+  /// Weight for long-range (i.e. normal HF) exchange
+  double alpha;
+  /// Weight for short-range exchange
+  double beta;
+
+  /// Short and long range Boys functions
+  arma::vec bf_short, bf_long;
+
+ public:
+  /// Constructor
+  ERIWorker_srlr(int maxam, int maxcontr, double omega, double alpha, double beta);
+  /// Destructor
+  ~ERIWorker_srlr();
+};
+
+/// Worker for computing short- and long-range electron repulsion integrals
+class dERIWorker_srlr: public dERIWorker {
+  /// Compute the kernel
+  void compute_G(double rho, double T, int nmax);
+
+  /// Range separation constant
+  double omega;
+  /// Factor of long-range exchange
+  double alpha;
+  /// Factor of short-range exchange
+  double beta;
+
+  /// Short and long range Boys functions
+  arma::vec bf_short, bf_long;
+
+ public:
+  dERIWorker_srlr(int maxam, int maxcontr, double omega, double alpha, double beta);
+  ~dERIWorker_srlr();
+};
+
 
 #endif

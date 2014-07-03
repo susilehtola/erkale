@@ -43,7 +43,7 @@ double bessel_jl(int l, double x);
 /// Computes the Boys function
 double boysF(int m, double x);
 /// Computes an array of Boys function
-std::vector<double> boysF_arr(int mmax, double x);
+void boysF_arr(int mmax, double x, arma::vec & bf);
 
 /// Computes the confluent hypergeometric function
 double hyperg_1F1(double a, double b, double x);

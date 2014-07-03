@@ -407,7 +407,7 @@ void Settings::parse(std::string filename, bool scf) {
 	  // Hybrid functional? Do we turn off density fitting by default?
 	  int xfunc, cfunc;
 	  parse_xc_func(xfunc,cfunc,words[1]);
-	  if(exact_exchange(xfunc)!=0.0)
+	  if(exact_exchange(xfunc)!=0.0 || is_range_separated(xfunc))
 	    set_bool("DensityFitting",false);
 	}
 	
