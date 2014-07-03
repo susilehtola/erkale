@@ -738,7 +738,8 @@ arma::mat nuclear_ints_os(double xa, double ya, double za, double zetaa, int am_
   // Argument of Boys' function
   const double boysarg=zeta*(PCx*PCx + PCy*PCy + PCz*PCz);
   // Evaluate Boys' function
-  std::vector<double> bf=boysF_arr(mmax,boysarg);
+  arma::vec bf;
+  boysF_arr(mmax,boysarg,bf);
 
   // Constant prefactor for auxiliary integrals
   const double prefac=2.0*M_PI/zeta*exp(-zetaa*zetab*ABsq/zeta);
@@ -1068,7 +1069,8 @@ std::vector<arma::mat> nuclear_int_pulay_os(double xa, double ya, double za, dou
   // Argument of Boys' function
   const double boysarg=zeta*(PCx*PCx + PCy*PCy + PCz*PCz);
   // Evaluate Boys' function
-  std::vector<double> bf=boysF_arr(mmax,boysarg);
+  arma::vec bf;
+  boysF_arr(mmax,boysarg,bf);
 
   // Constant prefactor for auxiliary integrals
   const double prefac=2.0*M_PI/zeta*exp(-zetaa*zetab*ABsq/zeta);
@@ -1384,7 +1386,8 @@ std::vector<arma::mat> nuclear_int_ders_os(double xa, double ya, double za, doub
   // Argument of Boys' function
   const double boysarg=zeta*(PCx*PCx + PCy*PCy + PCz*PCz);
   // Evaluate Boys' function
-  std::vector<double> bf=boysF_arr(mmax+1,boysarg);
+  arma::vec bf;
+  boysF_arr(mmax+1,boysarg,bf);
 
   // Constant prefactor for auxiliary integrals
   const double prefac=2.0*M_PI/zeta*exp(-zetaa*zetab*ABsq/zeta);

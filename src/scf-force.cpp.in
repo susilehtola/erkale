@@ -32,94 +32,114 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 #endif
 {
 
-    arma::mat W;
+  arma::mat W;
 #ifdef RESTRICTED
-    W=form_density(sol.E,sol.C,occs);
+  W=form_density(sol.E,sol.C,occs);
 #else
-    W=form_density(sol.Ea,sol.Ca,occa)+form_density(sol.Eb,sol.Cb,occb);
+  W=form_density(sol.Ea,sol.Ca,occa)+form_density(sol.Eb,sol.Cb,occb);
 #endif
 
-    // Compute force
-    arma::vec fpul_kin=basisp->kinetic_pulay(sol.P);
-    //    interpret_force(fpul_kin).print("Kinetic Pulay");
+  // Compute force
+  arma::vec fpul_kin=basisp->kinetic_pulay(sol.P);
+  //    interpret_force(fpul_kin).print("Kinetic Pulay");
 
-    arma::vec fpul_nuc=basisp->nuclear_pulay(sol.P);
-    //    interpret_force(fpul_nuc).print("Nuclear Pulay");
+  arma::vec fpul_nuc=basisp->nuclear_pulay(sol.P);
+  //    interpret_force(fpul_nuc).print("Nuclear Pulay");
 
-    arma::vec fnuc=basisp->nuclear_der(sol.P);
-    //    interpret_force(fnuc).print("Hellman-Feynman");
+  arma::vec fnuc=basisp->nuclear_der(sol.P);
+  //    interpret_force(fnuc).print("Hellman-Feynman");
 
-    arma::vec forth=basisp->overlap_der(W);
-    //    interpret_force(forth).print("Orthonormality");
+  arma::vec forth=basisp->overlap_der(W);
+  //    interpret_force(forth).print("Orthonormality");
 
-    arma::vec frep=basisp->nuclear_force();
-    //    interpret_force(frep).print("Nuclear repulsion");
+  arma::vec frep=basisp->nuclear_force();
+  //    interpret_force(frep).print("Nuclear repulsion");
 
 #ifdef DFT
-    // Get fraction of exact exchange
-    double kfrac=exact_exchange(dft.x_func);
+  // Get range separation info
+  double omega, klong, kshort;
+  range_separation(dft.x_func,omega,klong,kshort);
 #endif
 
-    arma::vec fcoul;
-    arma::vec fxchf;
+  arma::vec fcoul;
+  arma::vec fx_short, fx_long;
+  fx_short.zeros(fnuc.n_elem);
+  fx_long.zeros(fnuc.n_elem);
 
-#ifdef DFT
-    if(kfrac!=0) {
-#endif
+#ifdef DFT      
+  if(klong==0.0) {
+      
+    if(densityfit) {
+      if(kshort!=0.0)
+	throw std::runtime_error("Forces not implemented for range separation with density fitting.\n");
+	
+      fcoul=dfit.force_J(sol.P);
+    } else {
       if(!direct)
 	scr.fill(basisp);
-
-#ifdef RESTRICTED
-      scr.forceJK(sol.P,fcoul,fxchf,tol,NULL);
-#else
-      arma::vec faxchf, fbxchf;
-      scr.forceJK(sol.Pa,sol.Pb,fcoul,faxchf,fbxchf,tol,NULL);
-      fxchf=faxchf+fbxchf;
-
-      //      interpret_force(faxch).print("alpha exchange");
-      //      interpret_force(fbxch).print("beta exchange");
+      
+      fcoul=scr.forceJ(sol.P,tol,NULL);
+    }
+  } else {
 #endif
-      //    interpret_force(fxchf).print("Exchange");
-      //    interpret_force(fcoul+fxchf).print("2-electron contribution");
+      
+    if(!direct)
+      scr.fill(basisp);
+    
+#ifdef RESTRICTED
+    scr.forceJK(sol.P,fcoul,fx_long,tol,NULL);
+#else
+    arma::vec fxa_long, fxb_long;
+    scr.forceJK(sol.Pa,sol.Pb,fcoul,fxa_long,fxb_long,tol,NULL);
+    fx_long=fxa_long+fxb_long;
+#endif
+      
+    //      interpret_force(fxa_long).print("alpha exchange");
+    //      interpret_force(fxb_long).print("beta exchange");
+    //    interpret_force(fx_long).print("Exchange");
+    //    interpret_force(fcoul+fx_long).print("2-electron contribution");
 
 #ifdef DFT
-    } else {
+  }
 
-      if(densityfit)
-	fcoul=dfit.force_J(sol.P);
-      else {
-	if(!direct)
-	  scr.fill(basisp);
-
-	fcoul=scr.forceJ(sol.P,tol,NULL);
-      }
-    }
-
-    // Get the DFT contribution
-    arma::vec fxc;
+  if(omega != 0.0) {
+    // Set range separation and fill (low-cost compared to forces anyway)
+    scr_rs.set_range_separation(omega,0.0,1.0);
+    scr_rs.fill(basisp);
+      
+    // Exchange forces
 #ifdef RESTRICTED
-    fxc=grid.eval_force(dft.x_func,dft.c_func,sol.P);
+    fx_short=scr_rs.forceK(sol.P,tol,NULL);
 #else
-    fxc=grid.eval_force(dft.x_func,dft.c_func,sol.Pa,sol.Pb);
+    arma::vec fxa_short, fxb_short;
+    scr_rs.forceK(sol.Pa,sol.Pb,fxa_short,fxb_short,tol,NULL);
+    fx_short=fxa_short+fxb_short;
+#endif
+  }
+    
+  // Get the DFT contribution
+  arma::vec fxc;
+#ifdef RESTRICTED
+  fxc=grid.eval_force(dft.x_func,dft.c_func,sol.P);
+#else
+  fxc=grid.eval_force(dft.x_func,dft.c_func,sol.Pa,sol.Pb);
 #endif
 
-    //    interpret_force(fxc).print("XC force");
+  //    interpret_force(fxc).print("XC force");
 
 #endif // DFT
 
-    //    interpret_force(fcoul).print("Coulomb");
+  //    interpret_force(fcoul).print("Coulomb");
 
-    arma::vec ftot=fpul_kin+fpul_nuc+fnuc+forth+frep;
-    //    interpret_force(ftot).print("Total (w.o. 2-electron)");
+  arma::vec ftot=fpul_kin+fpul_nuc+fnuc+forth+frep;
+  //    interpret_force(ftot).print("Total (w.o. 2-electron)");
 
 #ifndef DFT
-    arma::vec ffull=ftot+fcoul+fxchf;
+  arma::vec ffull=ftot+fcoul+fx_long;
 #else
-    arma::vec ffull=ftot+fcoul+fxc;
-    if(kfrac!=0.0)
-      ffull+=kfrac*fxchf;
+  arma::vec ffull=ftot+fcoul+fxc + klong*fx_long + kshort*fx_short;
 #endif
-    //    interpret_force(ffull).print("Total");
-
-    return ffull;
+  //    interpret_force(ffull).print("Total");
+    
+  return ffull;
 }

@@ -36,6 +36,17 @@ void ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & 
   arma::mat P=Pa+Pb;
 #endif
 
+#if defined(CALCKab)
+#ifndef FORCE
+void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const
+#else
+void ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fKa, arma::vec & fKb, double tol, double *eff) const
+#endif
+{
+  // Compute total density for Coulomb matrix
+  arma::mat P=Pa+Pb;
+#endif
+
 
 #if defined(CALCJK)
 #ifndef FORCE
@@ -82,7 +93,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
   K.zeros(Nbf,Nbf);
 #endif
 
-#if defined(CALCJKab)
+#if defined(CALCJKab) || defined(CALCKab)
   Ka.zeros(Nbf,Nbf);
   Kb.zeros(Nbf,Nbf);
 #endif
@@ -99,14 +110,14 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
   fK.zeros(3*basp->get_Nnuc());
 #endif
 
-#if defined(CALCJKab)
+#if defined(CALCJKab) || defined(CALCKab)
   fKa.zeros(3*basp->get_Nnuc());
   fKb.zeros(3*basp->get_Nnuc());
 #endif
 #endif // FORCE
 
 
-#if defined(CALCJKab)
+#if defined(CALCJKab) || defined(CALCKab)
 #define DO_Kab
   MAT_SIZE_CHECK(Pa,Nbf,Nbf);
   MAT_SIZE_CHECK(Pb,Nbf,Nbf);
@@ -213,12 +224,25 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 
 #ifndef FORCE
     /// ERI worker
-    ERIWorker eri(basp->get_max_am(),basp->get_max_Ncontr());
+    ERIWorker *eri;
 #else
     /// ERI worker
-    dERIWorker deri(basp->get_max_am(),basp->get_max_Ncontr());
+    dERIWorker *deri;
 #endif
-
+    
+    
+#ifndef FORCE
+    if(omega==0.0)
+      eri=new ERIWorker(basp->get_max_am(),basp->get_max_Ncontr());
+    else
+      eri=new ERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
+#else
+    if(omega==0.0)
+      deri=new dERIWorker(basp->get_max_am(),basp->get_max_Ncontr());
+    else
+      deri=new dERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
+#endif
+    
     /// Integral array
     const std::vector<double> * erip;
 
@@ -304,7 +328,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 #else
 	// Screening wrt contribution to energy
 	if(intmax*Psh(is,js)*Psh(ks,ls)>=tol)
-	  coulskip=true;
+	  coulskip=false;
 #endif
 #endif
 
@@ -333,8 +357,8 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 
 #ifndef FORCE
 	// Compute integrals
-	eri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
-	erip=eri.getp();
+	eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	erip=eri->getp();
 
 #ifdef ERITABLE
 	// Store integrals
@@ -696,7 +720,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  continue;
 
 	// Compute the derivatives.
-	deri.compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	deri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
 
 #ifdef DO_J
 	  arma::vec Jforce(12);
@@ -779,7 +803,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  // Increment the forces.
 	  for(int idx=0;idx<12;idx++) {
 	    // Get the integral derivatives
-	    erip=deri.getp(idx);
+	    erip=deri->getp(idx);
 
 #ifdef DO_J
 	    {
@@ -974,7 +998,12 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 #endif
       }
 #endif
-
+      
+#ifndef FORCE
+      delete eri;
+#else
+      delete deri;
+#endif
     } // end parallel region
 
 #ifndef ERITABLE

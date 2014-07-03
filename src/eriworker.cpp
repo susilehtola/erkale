@@ -935,6 +935,12 @@ eri_precursor_t IntegralWorker::compute_precursor(const GaussianShell *is, const
   return r;
 }
 
+void IntegralWorker::compute_G(double rho, double T, int nmax) {
+  // Evaluate Boys' function
+  (void) rho;
+  boysF_arr(nmax,T,Gn);
+}
+
 void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax) {
   // Store AB and CD
   for(int i=0;i<3;i++) {
@@ -1014,24 +1020,23 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 	  data.poz=rho/zeta;
 	  data.pon=rho/eta;
 
-	  // Prefactor of Boys' function is
+	  // Kernel prefactor is
 	  double prefac=2.0*sqrt(rho/M_PI)*S12*S34;
-	  // and its argument is
-	  double boysarg=rho*rpqsq;
-	  // Evaluate Boys' function
-	  std::vector<double> bf=boysF_arr(mmax,boysarg);
 
-	  // Store auxiliary integrals
+	  // Compute the kernel
+	  compute_G(rho,rho*rpqsq,mmax);
+
+	  // Store the integrals
 	  for(int i=0;i<=mmax;i++)
-	    data.F[i]=prefac*bf[i];
-
+	    data.F[i]=prefac*Gn(i);
+	  
 	  // We have all necessary data; store quartet.
 	  libint.PrimQuartet[ind++]=data;
 	}
     }
 }
 
-void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_precursor_t &jp, int mmax) {
+void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax) {
   // Store AB and CD
   for(int i=0;i<3;i++) {
     libderiv.AB[i]=ip.AB(i);
@@ -1118,16 +1123,15 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 	  data.poz=rho/zeta;
 	  data.pon=rho/eta;
 
-	  // Prefactor of Boys' function is
+	  // Kernel prefactor is
 	  double prefac=2.0*sqrt(rho/M_PI)*S12*S34;
-	  // and its argument is
-	  double boysarg=rho*rpqsq;
-	  // Evaluate Boys' function
-	  std::vector<double> bf=boysF_arr(mmax+1,boysarg);
+
+	  // Compute the kernel
+	  compute_G(rho,rho*rpqsq,mmax+1);
 
 	  // Store auxiliary integrals
 	  for(int i=0;i<=mmax+1;i++)
-	    data.F[i]=prefac*bf[i];
+	    data.F[i]=prefac*Gn[i];
 
 	  // We have all necessary data; store quartet.
 	  libderiv.PrimQuartet[ind++]=data;
@@ -1311,4 +1315,62 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
 
   // Swap arrays
   std::swap(input,output);
+}
+
+ERIWorker_srlr::ERIWorker_srlr(int maxam, int maxcontr, double w, double a, double b) : ERIWorker(maxam,maxcontr) {
+  omega=w;
+  alpha=a;
+  beta=b;
+}
+
+ERIWorker_srlr::~ERIWorker_srlr() {
+}
+
+dERIWorker_srlr::dERIWorker_srlr(int maxam, int maxcontr, double w, double a, double b) : dERIWorker(maxam,maxcontr) {
+  omega=w;
+  alpha=a;
+  beta=b;
+}
+
+dERIWorker_srlr::~dERIWorker_srlr() {
+}
+
+void ERIWorker_srlr::compute_G(double rho, double T, int nmax) {
+  // Compute helpers
+  double omegasq=omega*omega;
+  double rhomegasq=omegasq / (omegasq + rho);
+
+  // Evaluate Boys' functions
+  boysF_arr(nmax,T,bf_long);
+  boysF_arr(nmax,T*rhomegasq,bf_short);
+
+  // Store values
+  Gn.zeros(nmax+1);
+
+  // [ w^2 / (w^2 + r) ]^(n+0.5)
+  double w2_wrN=sqrt(rhomegasq);
+  for(int i=0;i<=nmax;i++) {
+    Gn(i)=(alpha+beta)*bf_long(i) - beta*w2_wrN*bf_short(i);
+    w2_wrN*=rhomegasq;
+  }
+}
+
+void dERIWorker_srlr::compute_G(double rho, double T, int nmax) {
+  // Compute helpers
+  double omegasq=omega*omega;
+  double rhomegasq=omegasq / (omegasq + rho);
+
+  // Evaluate Boys' functions
+  boysF_arr(nmax,T,bf_long);
+  boysF_arr(nmax,T*rhomegasq,bf_short);
+
+  // Store values
+  Gn.zeros(nmax+1);
+
+  // [ w^2 / (w^2 + r) ]^(n+0.5)
+  double w2_wrN=sqrt(rhomegasq);
+  for(int i=0;i<=nmax;i++) {
+    Gn(i)=(alpha+beta)*bf_long(i) - beta*w2_wrN*bf_short(i);
+    w2_wrN*=rhomegasq;
+  }
 }

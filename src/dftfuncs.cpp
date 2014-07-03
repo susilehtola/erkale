@@ -103,15 +103,19 @@ void parse_xc_func(int & x_func, int & c_func, const std::string & xc) {
     c_func=0;
   }
 
+  /*
   // Check functionals
   if(is_correlation(x_func) && !is_exchange_correlation(x_func)) {
     ERROR_INFO();
+    print_info(x_func,0);
     throw std::runtime_error("Refusing to use a correlation functional as exchange.\n");
   }
   if(is_exchange(c_func)) {
     ERROR_INFO();
+    print_info(c_func,0);
     throw std::runtime_error("Refusing to use an exchange functional as correlation.\n");
   }
+  */
 
   // Sanity check: don't try to use kinetic energy functionals.
   if(is_kinetic(x_func)) {

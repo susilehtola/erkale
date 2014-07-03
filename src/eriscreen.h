@@ -53,11 +53,23 @@ class ERIscreen {
   /// Index helper
   std::vector<size_t> iidx;
 
+  /// Range separation parameter
+  double omega;
+  /// Fraction of long-range exchange
+  double alpha;
+  /// Fraction of short-range exchange
+  double beta;
+
  public:
   /// Constructor
   ERIscreen();
   /// Destructor
   ~ERIscreen();
+
+  /// Set range separation
+  void set_range_separation(double omega, double alpha, double beta);
+  /// Get range separation
+  void get_range_separation(double & omega, double & alpha, double & beta);
 
   /// Form screening matrix
   void fill(const BasisSet * basis=NULL);
@@ -66,6 +78,8 @@ class ERIscreen {
   arma::mat calcJ(const arma::mat & R, double tol, double *eff=NULL) const;
   /// Calculate exchange matrix with tolerance tol for integrals, store efficiency of screening in *eff
   arma::mat calcK(const arma::mat & R, double tol, double *eff=NULL) const;
+  /// Calculate  exchange matrices with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
+  void calcK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & Ka, arma::mat & Kb, double tol, double *eff=NULL) const;
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff
   void calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff=NULL) const;
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
@@ -77,6 +91,8 @@ class ERIscreen {
   arma::vec forceJ(const arma::mat & R, double tol, double *eff=NULL) const;
   /// Calculate exchange force with tolerance tol for integrals, store efficiency of screening in *eff
   arma::vec forceK(const arma::mat & R, double tol, double *eff=NULL) const;
+  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
+  void forceK(const arma::mat & Ra, const arma::mat & Rb, arma::vec & fKa, arma::vec & fKb, double tol, double *eff=NULL) const;
   /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, store efficiency of screening in *eff
   void forceJK(const arma::mat & R, arma::vec & fJ, arma::vec & fK, double tol, double *eff=NULL) const;
   /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation

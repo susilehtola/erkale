@@ -131,14 +131,9 @@ double boysF(int m, double x) {
     return 0.5*gsl_sf_gamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
 }
 
-std::vector<double> boysF_arr(int mmax, double x) {
-
-  // Returned array
-  std::vector<double> F;
-
+void boysF_arr(int mmax, double x, arma::vec & F) {
   // Resize array
-  F.reserve(mmax+1);
-  F.resize(mmax+1);
+  F.zeros(mmax+1);
 
   // Fill in highest value
   F[mmax]=boysF(mmax,x);
@@ -147,8 +142,6 @@ std::vector<double> boysF_arr(int mmax, double x) {
 
   for(int m=mmax-1;m>=0;m--)
     F[m]=(2*x*F[m+1]+emx)/(2*m+1);
-
-  return F;
 }
 
 double hyperg_1F1(double a, double b, double x) {

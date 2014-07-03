@@ -291,8 +291,12 @@ class SCF {
 
   /// Electron repulsion table
   ERItable tab;
+  /// Electron repulsion table, range separation
+  ERItable tab_rs;
   /// Electron repulsion screening table (for direct calculations)
   ERIscreen scr;
+  /// Electron repulsion screening table, range separation
+  ERIscreen scr_rs;
   /// Density fitting table
   DensityFit dfit;
 

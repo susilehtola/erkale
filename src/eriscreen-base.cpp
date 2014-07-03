@@ -52,9 +52,24 @@ size_t idx(size_t i, size_t j, size_t k, size_t l) {
 
 
 ERIscreen::ERIscreen() {
+  omega=0.0;
+  alpha=1.0;
+  beta=0.0;
 }
 
 ERIscreen::~ERIscreen() {
+}
+
+void ERIscreen::set_range_separation(double w, double a, double b) {
+  omega=w;
+  alpha=a;
+  beta=b;
+}
+
+void ERIscreen::get_range_separation(double & w, double & a, double & b) {
+  w=omega;
+  a=alpha;
+  b=beta;
 }
 
 void ERIscreen::fill(const BasisSet * basisv) {

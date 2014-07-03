@@ -1476,7 +1476,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
   }
 
   // Check consistency of parameters
-  if(!hf && !rohf && exact_exchange(dft.x_func)!=0.0)
+  if(!hf && !rohf && (exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
     if(set.get_bool("DensityFitting") && (stricmp(set.get_string("FittingBasis"),"Auto")==0)) {
       throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
     }
@@ -2776,7 +2776,9 @@ arma::mat interpret_force(const arma::vec & f) {
 
   arma::mat force(f);
   force.reshape(3,f.n_elem/3);
+  return force;
 
+  /*
   // Calculate magnitude in fourth column
   arma::mat retf(f.n_elem/3,4);
   retf.submat(0,0,f.n_elem/3-1,2)=arma::trans(force);
@@ -2784,6 +2786,7 @@ arma::mat interpret_force(const arma::vec & f) {
     retf(i,3)=sqrt( pow(retf(i,0),2) + pow(retf(i,1),2) + pow(retf(i,2),2) );
 
   return retf;
+  */
 }
 
 Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4*nv,Gth,Fth,delocalize,ver) {

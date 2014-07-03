@@ -59,13 +59,26 @@ class ERItable {
   /// List of pairs
   std::vector<bfpair_t> pairs;
 
+  /// Range separation parameter
+  double omega;
+  /// Fraction of long-range (i.e. exact) exchange
+  double alpha;
+  /// Fraction of short-range exchange
+  double beta;
+
   /// Calculate index in integral table
   virtual size_t idx(size_t i, size_t j, size_t k, size_t l) const;
+
  public:
   /// Constructor
   ERItable();
   /// Destructor
   ~ERItable();
+
+  /// Set range separation
+  void set_range_separation(double omega, double alpha, double beta);
+  /// Get range separation
+  void get_range_separation(double & omega, double & alpha, double & beta);
 
   /// Fill table
   void fill(const BasisSet * basis, double tol=DBL_EPSILON);
@@ -86,6 +99,8 @@ class ERItable {
 
   /// Get ERI table
   std::vector<double> & get();
+  /// Get size of ERI table
+  size_t get_N() const;
 
   /// Form Coulomb matrix
   arma::mat calcJ(const arma::mat & R) const;
