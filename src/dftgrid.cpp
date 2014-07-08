@@ -1830,6 +1830,11 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   // and its coordinates
   ret.cen=bas.get_nuclear_coords(cenind);
 
+  if(x_func == 0 && c_func == 0) {
+    // No exchange or correlation!
+    return ret;
+  }
+
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
 
@@ -1947,6 +1952,11 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   ret.atind=cenind;
   // and its coordinates
   ret.cen=bas.get_nuclear_coords(cenind);
+
+  if(x_func == 0 && c_func == 0) {
+    // No exchange or correlation!
+    return ret;
+  }
 
   // Compute necessary number of radial points
   size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
