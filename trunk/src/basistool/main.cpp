@@ -21,7 +21,7 @@
 #include "version.h"
 #endif
 
-std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "norm", "orth", "Porth", "save", "savedalton", "sort", "taug"};
+std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "norm", "orth", "Porth", "save", "savedalton", "savemolpro", "sort", "taug"};
 
 
 void help() {
@@ -352,6 +352,17 @@ int main(int argc, char **argv) {
 
     std::string fileout=argv[3];
     bas.save_dalton(fileout);
+
+  } else if(stricmp(cmd,"savemolpro")==0) {
+    // Save basis in Molpro format
+
+    if(argc!=4) {
+      printf("\nUsage: %s input.gbs savemolpro output.mol\n",argv[0]);
+      return 1;
+    }
+
+    std::string fileout=argv[3];
+    bas.save_molpro(fileout);
 
   } else if(stricmp(cmd,"sort")==0) {
     // Sort basis set

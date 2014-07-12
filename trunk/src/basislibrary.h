@@ -222,6 +222,8 @@ class BasisSetLibrary {
 
   /// Save basis set to file in Dalton format
   void save_dalton(const std::string & filename, bool append=false) const;
+  /// Save basis set to file in Molpro format
+  void save_molpro(const std::string & filename, bool append=false) const;
 
   /// Add element to basis set
   void add_element(const ElementBasisSet & el);
