@@ -1147,6 +1147,69 @@ void BasisSetLibrary::save_dalton(const std::string & filename, bool append) con
   fclose(out);
 }
 
+void BasisSetLibrary::save_molpro(const std::string & filename, bool append) const {
+  FILE *out;
+  if(append) {
+    out=fopen(filename.c_str(),"a");
+    if(!out) {
+      std::ostringstream oss;
+      oss << "Error opening basis set output file \"" << filename << "\".\n";
+      throw std::runtime_error(oss.str());
+    }
+  } else {
+    out=fopen(filename.c_str(),"w");
+  
+    if(!out) {
+      std::ostringstream oss;
+      oss << "Error opening basis set output file \"" << filename << "\".\n";
+      throw std::runtime_error(oss.str());
+    }
+  }
+  
+  // Loop over elements
+  for(size_t iel=0;iel<elements.size();iel++) {
+    // Get element
+    ElementBasisSet el=elements[iel];
+    // Loop over angular momentum
+    for(int am=0;am<=el.get_max_am();am++) {
+      // Get exponents and contraction coefficients
+      arma::vec exps;
+      arma::mat coeffs;
+      el.get_primitives(exps,coeffs,am);
+
+      // Print am and element
+      fprintf(out,"%c,%s",shell_types[am],el.get_symbol().c_str());
+      // Print primitives
+      for(size_t iexp=0;iexp<exps.n_elem;iexp++) {
+	fprintf(out,",%.10e",exps(iexp));
+      }
+      fprintf(out,";\n");
+
+      // Print contractions
+      for(size_t ic=0;ic<coeffs.n_cols;ic++) {
+	// Coefficient vector
+	arma::rowvec cx=coeffs.col(ic);
+	// Find first and last contracted exponent
+	size_t ifirst=0;
+	while(cx(ifirst)==0)
+	  ifirst++;
+	size_t ilast=cx.n_elem-1;
+	while(cx(ilast)==0.0)
+	  ilast--;
+
+	fprintf(out,"c,%i,%i",(int) ifirst+1,(int) ilast+1);
+	
+	// Coefficients
+	for(size_t ix=ifirst;ix<=ilast;ix++)
+	  fprintf(out,",%.10e",coeffs(ix,ic));
+	fprintf(out,";\n");
+      }
+    }
+  }
+
+  fclose(out);
+}
+
 void BasisSetLibrary::add_element(const ElementBasisSet & el) {
   elements.push_back(el);
 }
