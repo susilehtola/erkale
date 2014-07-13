@@ -220,6 +220,8 @@ class BasisSetLibrary {
   /// Save basis set to file in Gaussian'94 format
   void save_gaussian94(const std::string & filename, bool append=false) const;
 
+  /// Save basis set to file in CFOUR format
+  void save_cfour(const std::string & filename, const std::string & basisname, bool newformat=true, bool append=false) const;
   /// Save basis set to file in Dalton format
   void save_dalton(const std::string & filename, bool append=false) const;
   /// Save basis set to file in Molpro format
