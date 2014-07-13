@@ -21,7 +21,7 @@
 #include "version.h"
 #endif
 
-std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "norm", "orth", "Porth", "save", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"completeness", "composition", "daug", "decontract", "dump", "dumpdec", "genbas", "norm", "orth", "Porth", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 
 void help() {
@@ -341,6 +341,18 @@ int main(int argc, char **argv) {
 
     std::string fileout=argv[3];
     bas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"savecfour")==0) {
+    // Save basis in CFOUR format
+
+    if(argc!=5) {
+      printf("\nUsage: %s input.gbs savecfour name basis.cfour\n",argv[0]);
+      return 1;
+    }
+
+    std::string fileout=argv[3];
+    std::string name=argv[4];
+    bas.save_cfour(name,fileout);
 
   } else if(stricmp(cmd,"savedalton")==0) {
     // Save basis in Dalton format
