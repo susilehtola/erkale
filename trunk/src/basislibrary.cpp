@@ -176,6 +176,15 @@ FunctionShell::FunctionShell(int amval, const std::vector<contr_t> & c) {
     if(C[i].z<=0.0) {
       throw std::runtime_error("Negative gaussian exponent in basis set!\n");
     }
+  
+  for(size_t i=0;i<c.size();i++) {
+    if(!std::isnormal(C[i].z)) {
+      throw std::runtime_error("Abnormal gaussian exponent in basis set!\n");
+    }
+    if(!std::isnormal(C[i].c)) {
+      throw std::runtime_error("Abnormal gaussian coefficient in basis set!\n");
+    }
+  }
 }
 
 FunctionShell::~FunctionShell() {
@@ -1086,6 +1095,9 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
       oss << "Error opening basis set output file \"" << filename << "\".\n";
       throw std::runtime_error(oss.str());
     }
+
+    // Print empty line
+    fprintf(out,"\n");
   } else {
     out=fopen(filename.c_str(),"w");
   
