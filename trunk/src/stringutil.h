@@ -33,6 +33,8 @@ std::string toupper(const std::string & in);
 
 /// Case insensitive comparison of two strings
 int stricmp(const std::string & str1, const std::string & str2);
+/// Case sensitive comparison of two strings
+int strcmp(const std::string & str1, const std::string & str2);
 
 /// Read line from input (skip empty lines)
 std::string readline(std::istream & in, bool skipempty=true);
