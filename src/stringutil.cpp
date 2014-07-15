@@ -43,6 +43,10 @@ int stricmp(const std::string &str1, const std::string& str2) {
   return strcasecmp(str1.c_str(),str2.c_str());
 }
 
+int strcmp(const std::string &str1, const std::string& str2) {
+  return strcmp(str1.c_str(),str2.c_str());
+}
+
 std::string readline(std::istream & in, bool skipempty) {
   std::string ret;
 
