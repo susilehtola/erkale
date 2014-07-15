@@ -1095,9 +1095,6 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
       oss << "Error opening basis set output file \"" << filename << "\".\n";
       throw std::runtime_error(oss.str());
     }
-
-    // Print empty line
-    fprintf(out,"\n");
   } else {
     out=fopen(filename.c_str(),"w");
   
