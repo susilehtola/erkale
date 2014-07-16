@@ -350,6 +350,123 @@ class CompletenessOptimizer {
     return cpl;
   }
 
+  /// Generate limits from existing basis set
+  std::vector<coprof_t> load_limits(const BasisSetLibrary & baslib, double tol, int maxam) {
+    // Threshold for completeness in initial set
+    double cplthr=1.0-tol;
+  
+    // Returned array
+    std::vector<coprof_t> cpl(max_am+1);
+    for(size_t i=0;i<cpl.size();i++) {
+      cpl[i].start=0.0;
+      cpl[i].end=0.0;
+      cpl[i].tol=tol;
+    }
+
+    // Get elements
+    std::vector<ElementBasisSet> els=baslib.get_elements();
+
+    // Loop over elements.
+    for(size_t iel=0;iel<els.size();iel++) {
+      // Get elemental basis
+      ElementBasisSet elbas=els[iel];
+      // and decontract it
+      elbas.decontract();
+
+      // Compute completeness profile
+      compprof_t prof=compute_completeness(elbas);
+
+      // Loop over angular momentum
+      for(size_t am=0;am<prof.shells.size();am++) {
+	// Determine lower limit
+	double low=DBL_MAX;
+	for(size_t ia=0;ia<prof.lga.size();ia++)
+	  if(prof.shells[am].Y[ia]>=cplthr) {
+	    low=prof.lga[ia];
+	    break;
+	  }
+
+	// Determine upper limit
+	double high=-DBL_MAX;
+	for(size_t ia=prof.lga.size()-1;ia<prof.lga.size();ia--)
+	  if(prof.shells[am].Y[ia]>=cplthr) {
+	    high=prof.lga[ia];
+	    break;
+	  }
+      
+	if(cpl[am].start>low)
+	  cpl[am].start=low;
+	if(cpl[am].end<high)
+	  cpl[am].end=high;
+      }
+    }
+
+    // Clear out extra shells
+    for(int am=maxam;am<max_am;am++) {
+      cpl[am].start=0.0;
+      cpl[am].end=0.0;
+      cpl[am].exps.clear();
+    }
+    // Dummy check
+    for(int am=0;am<std::min(maxam,max_am);am++)
+      if(cpl[am].start==DBL_MAX && cpl[am].end==-DBL_MAX) {
+	cpl[am].start=0.0;
+	cpl[am].end=0.0;
+      }
+
+    printf("Initial composition:\n");
+
+    // Form exponents.
+    for(int am=0;am<max_am;am++) {
+      if(cpl[am].start == 0.0 && cpl[am].end == 0.0)
+	continue;
+
+      // Compute width
+      double width=cpl[am].end-cpl[am].start;
+    
+      // Determine amount of exponents necessary to obtain width
+      std::vector<double> widths;
+      std::vector< std::vector<double> > explist;
+
+      widths.push_back(0.0);
+      explist.resize(1);
+
+      for(int nf=1;nf<=NFMAX;nf++) {
+	double w;
+	std::vector<double> exps=maxwidth_exps_table(am,cpl[am].tol,nf,w);
+
+	widths.push_back(w);
+	explist.push_back(exps);
+
+	// Have we reached the necessary width?
+	if(w>width)
+	  break;
+      }
+
+      // Which amount of functions is closest?
+      size_t nf=0;
+      double mind=DBL_MAX;
+      for(size_t i=0;i<widths.size();i++)
+	if(fabs(widths[i]-width)<mind) {
+	  nf=i;
+	  mind=fabs(widths[i]-width);
+	}
+
+      // Yes, we have. Adjust starting and ending points
+      cpl[am].start-=(widths[nf]-width)/2.0;
+      cpl[am].end+=(widths[nf]-width)/2.0;
+      // and store exponents, moving starting point to the correct location
+      cpl[am].exps=move_exps(explist[nf],cpl[am].start);
+    
+      printf("%c % .2f % .2f %2i\n",shell_types[am],cpl[am].start,cpl[am].end,(int) cpl[am].exps.size());
+      fflush(stdout);
+    }
+
+    printf("\n");
+
+    return cpl;
+  }
+
 
   /**
    * Generate initial profile by minimizing the energy.
@@ -1278,7 +1395,7 @@ class CompletenessOptimizer {
   }
 
   /// Get SCF free-atom angular momentum
-  virtual int atom_am()=0;
+  virtual int atom_am() const=0;
 
   /// Print value
   virtual void print_value(const ValueType & value, std::string msg)=0;
