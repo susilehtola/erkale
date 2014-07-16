@@ -120,15 +120,6 @@ class CompletenessOptimizer {
   /// Compute the energy
   virtual double compute_energy(const std::vector<coprof_t> & cpl)=0;
 
-  /// Form a basis set
-  virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl) {
-    BasisSetLibrary baslib;
-    for(int Z=1;Z<=maxZ;Z++)
-      baslib.add_element(get_element_library(element_symbols[Z],cpl));
-
-    return baslib;
-  }
-
   /// Form a contracted basis set. Porth toggles P-orthogonalization
   virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl, std::vector<size_t> contract, bool Porth=true) {
     /// Dummy declarations
@@ -269,6 +260,17 @@ class CompletenessOptimizer {
     return exps;
   }
 
+
+  /// Form a basis set
+  virtual BasisSetLibrary form_basis(const std::vector<coprof_t> & cpl) {
+    BasisSetLibrary baslib;
+    for(int Z=1;Z<=maxZ;Z++)
+      baslib.add_element(get_element_library(element_symbols[Z],cpl));
+
+    return baslib;
+  }
+
+  /// Save the limits
   void save_limits(const std::vector<coprof_t> & cpl, const std::string & fname) const {
     FILE *out=fopen(fname.c_str(),"w");
     if(!out)
@@ -280,6 +282,7 @@ class CompletenessOptimizer {
     fclose(out);
   }
 
+  /// Load limits
   std::vector<coprof_t> load_limits(const std::string & fname) {
     FILE *in=fopen(fname.c_str(),"r");
     if(!in)
@@ -443,8 +446,14 @@ class CompletenessOptimizer {
 	double El=compute_energy(lcpl);
 	double Er=compute_energy(rcpl);
 
+	bool Elok=(std::isfinite(El) && fabs(El)!=DBL_MAX);
+	bool Erok=(std::isfinite(Er) && fabs(Er)!=DBL_MAX);
 	// Finite difference gradient. Absorb relative width here
-	g(am)=(Er-El)/(2*h) * relw(am);
+	if(Elok && Erok)
+	  g(am)=(Er-El)/(2*h) * relw(am);
+	else
+	  // Something wrong with gradient.
+	  g(am)=0.0;
 	printf("\t-grad(%c)  = % e\n", shell_types[am], -g(am));
 	fflush(stdout);
       }
