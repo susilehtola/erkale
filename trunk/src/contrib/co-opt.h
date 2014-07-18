@@ -1458,6 +1458,9 @@ class CompletenessOptimizer {
 	  ValueType scanval(curval);
 	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol,std::max(polmog,cbsthr));
 
+	  print_value(scanval,"Compound value");
+	  print_limits(scancpl,"Compound limits");
+	  
 	  // Did the scan fail?
 	  bool scanfail=false;
 
