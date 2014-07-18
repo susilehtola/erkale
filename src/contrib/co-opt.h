@@ -1458,6 +1458,9 @@ class CompletenessOptimizer {
 	  ValueType scanval(curval);
 	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol,std::max(polmog,cbsthr));
 
+	  // Did the scan fail?
+	  bool scanfail=false;
+
 	  // Update extension mog
 	  extmog=std::max(extmog,scanmog);
 
@@ -1465,14 +1468,59 @@ class CompletenessOptimizer {
 	    // Instability detected, real mog is
 	    double mog=compute_mog(scanval,curval,0.0);
 
-	    cpl=scancpl;
-	    curval=scanval;
-	    printf("\n\nInstability detected with real mog = %e, restarting extension.\n",mog);
+	    // Sanity check
+	    if(mog>0.0) {
+	      cpl=scancpl;
+	      curval=scanval;
+	      printf("\n\nInstability detected with real mog = %e, restarting extension.\n",mog);
 
+	    } else {
+	      // Calculation didn't converge :(
+
+	      printf("\n\nInstability detected, but compound calculation failed to converge.\n");
+	      printf("Forming new, individual trials.\n");
+
+	      // Form new trials for the changed ams
+	      std::vector< std::vector<coprof_t> > trials;
+	      std::vector<int> tram;
+	      for(int am=0;am<=maxam(cpl);am++)
+		if(scancpl[am].exps.size() != cpl[am].exps.size()) {
+		  // Form trial
+		  std::vector<coprof_t> tr(cpl);
+		  tr[am]=scancpl[am];
+		  // and add it to the stack
+		  trials.push_back(tr);
+		  tram.push_back(am);
+		}
+
+	      // Compute new values
+	      std::vector<ValueType> trvals=compute_values(trials);
+	      // and the corresponding mogs
+	      arma::vec trmog(trvals.size());
+	      for(size_t i=0;i<trvals.size();i++)
+		trmog[i]=compute_mog(trvals[i],curval,0.0);
+
+	      printf("\n\t%2s %12s\n","am","mog");
+	      for(size_t i=0;i<tram.size();i++)
+		printf("\t%-2c %e\n",shell_types[tram[i]],trmog[i]);
+	      fflush(stdout);
+	      	      
+	      // Pick out maximum
+	      arma::uword maxind;
+	      double maxmog=trmog.max(maxind);
+	      if(maxmog>0.0) {
+		// Switch values
+		cpl=trials[maxind];
+		curval=trvals[maxind];
+	      } else
+		scanfail=true;
+	    }
+	    
 	    print_value(curval,"Current value");
 	    print_limits(cpl,"Current limits");
-
-	    continue;
+	    
+	    if(!scanfail)
+	      continue;
 	  }
 	}
 
