@@ -1104,6 +1104,9 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
       throw std::runtime_error(oss.str());
     }
   }
+
+  // Group free exponents in shells of nfsh exponents
+  int nfrsh=3;
   
   // Loop over elements
   for(size_t iel=0;iel<elements.size();iel++) {
@@ -1112,16 +1115,25 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 
     // Exponents and contractions
     std::vector<arma::vec> exps(el.get_max_am()+1);
+    std::vector<arma::vec> frexps(el.get_max_am()+1);
     std::vector<arma::mat> coeffs(el.get_max_am()+1);
     for(int am=0;am<=el.get_max_am();am++)
-      el.get_primitives(exps[am],coeffs[am],am);
+      el.get_primitives(frexps[am],exps[am],coeffs[am],am);
 
     // Count non-trivial shells
     int nsh=0;
-    for(int am=0;am<=el.get_max_am();am++)
+    for(int am=0;am<=el.get_max_am();am++) {
       if(exps[am].n_elem)
 	nsh++;
 
+      // Amount of free shells
+      size_t nfr=frexps[am].n_elem/nfrsh;
+      if(frexps[am].n_elem%nfrsh)
+	nfr++;
+
+      nsh+=nfr;
+    }
+    
     // Element and name of the basis set
     fprintf(out,"%s:%s\n",toupper(el.get_symbol()).c_str(),basname.c_str());
     
@@ -1137,76 +1149,233 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
     // Number of shells in the basis set
     fprintf(out,"%3i\n",nsh);
 
+    // Did we just change the line?
+    bool cl;
+    // Amount of printed entries
+    size_t np;
+    // Change line every n entries
+    const size_t nint=10;
+    const size_t ndbl=5;
+
     // Angular momentum for each shell
-    for(int am=0;am<=el.get_max_am();am++)
-      if(exps[am].n_elem)
+    np=0;
+    cl=true;
+    for(int am=0;am<=el.get_max_am();am++) {
+      // Contracted exponents
+      if(exps[am].n_elem) {
 	fprintf(out,"%5i",am);
-    fprintf(out,"\n");
+	np++;
+	cl=false;
+	
+	if(np%nint==0) {
+	  fprintf(out,"\n");
+	  np=0;
+	  cl=true;
+	}
+      }
+
+      // Free exponent shells
+      size_t nfr=frexps[am].n_elem/nfrsh;
+      if(frexps[am].n_elem%nfrsh)
+	nfr++;
+      for(size_t i=0;i<nfr;i++) {
+	fprintf(out,"%5i",am);
+	np++;
+	cl=false;
+	
+	if(np%nint==0) {
+	  fprintf(out,"\n");
+	  np=0;
+	  cl=true;
+	}
+      }
+    }
+    if(!cl)
+      fprintf(out,"\n");
 
     // Number of contracted basis functions for each shell
-    for(int am=0;am<=el.get_max_am();am++)
-      if(exps[am].n_elem)
+    np=0;
+    cl=true;
+    for(int am=0;am<=el.get_max_am();am++) {
+      // Contracted exponents
+      if(exps[am].n_elem) {
 	fprintf(out,"%5i",(int) coeffs[am].n_cols);
-    fprintf(out,"\n");
+	
+	np++;
+	cl=false;
+	
+	if(np%nint==0) {
+	  fprintf(out,"\n");
+	  np=0;
+	  cl=true;
+	}
+      }
+
+      // Free exponents
+      size_t ifr=0;
+      while(ifr<frexps[am].n_elem) {
+	// Upper limit
+	size_t ufr=std::min(ifr+nfrsh,(size_t) frexps[am].n_elem);
+	fprintf(out,"%5i",(int) (ufr-ifr));
+	np++;
+	cl=false;
+	
+	if(np%nint==0) {
+	  fprintf(out,"\n");
+	  np=0;
+	  cl=true;
+	}
+
+	// Switch limits
+	ifr=ufr;
+      }
+    }
+    if(!cl)
+      fprintf(out,"\n");
 
     // Number of primitive basis functions for each shell
-    for(int am=0;am<=el.get_max_am();am++)
-      if(exps[am].n_elem)
+    np=0;
+    cl=true;
+    for(int am=0;am<=el.get_max_am();am++) {
+      // Contracted exponents
+      if(exps[am].n_elem) {
 	fprintf(out,"%5i",(int) coeffs[am].n_rows);
-    fprintf(out,"\n");
+	
+	np++;
+	cl=false;
+	
+	if(np%nint==0) {
+	  fprintf(out,"\n");
+	  np=0;
+	  cl=true;
+	}
+      }
+
+      // Free exponents
+      size_t ifr=0;
+      while(ifr<frexps[am].n_elem) {
+	// Upper limit
+	size_t ufr=std::min(ifr+nfrsh,(size_t) frexps[am].n_elem);
+	fprintf(out,"%5i",(int) (ufr-ifr));
+	np++;
+	cl=false;
+	
+	if(np%nint==0) {
+	  fprintf(out,"\n");
+	  np=0;
+	  cl=true;
+	}
+
+	// Switch limits
+	ifr=ufr;
+      }
+    }
+    if(!cl)
+      fprintf(out,"\n");
 
     // Blank line
     fprintf(out,"\n");
 
     // Loop over shells
+    np=0;
+    cl=true;
     for(int am=0;am<=el.get_max_am();am++) {
-      if(!exps[am].n_elem)
-	continue;
-
-      // Print exponents
-      bool cl=true; // Changed line?
-      for(size_t ix=0;ix<exps[am].n_elem;ix++) {
-	if(newformat)
-	  fprintf(out," % .10e",exps[am](ix));
-	else
-	  fprintf(out," %14.7f",exps[am](ix));
+      if(exps[am].n_elem) {
+	// Print exponents
 	cl=false;
-
-	if((ix+1)%4==0) {
-	  fprintf(out,"\n");
-	  cl=true;
-	}
-      }
-      if(!cl)
-	fprintf(out,"\n");
-
-      // Blank line
-      fprintf(out,"\n");
-      
-      // Coefficients
-      for(size_t ix=0;ix<coeffs[am].n_rows;ix++) {
-	for(size_t ic=0;ic<coeffs[am].n_cols;ic++) {
+	np=0;
+	for(size_t ix=0;ix<exps[am].n_elem;ix++) {
 	  if(newformat)
-	    fprintf(out," % .10e",coeffs[am](ix,ic));
+	    fprintf(out," % .10e",exps[am](ix));
 	  else
-	    fprintf(out," % 10.7f",coeffs[am](ix,ic));
+	    fprintf(out," %14.7f",exps[am](ix));
 	  cl=false;
+	  np++;
 	  
-	  if((ic+1)%4==0) {
+	  if(np%ndbl==0) {
 	    fprintf(out,"\n");
+	    np=0;
 	    cl=true;
 	  }
 	}
-	
 	if(!cl)
 	  fprintf(out,"\n");
+	
+	// Blank line
+	fprintf(out,"\n");
+	
+	// Coefficients - contractions in columns
+	for(size_t ix=0;ix<coeffs[am].n_rows;ix++) {
+	  for(size_t ic=0;ic<coeffs[am].n_cols;ic++) {
+	    if(newformat)
+	      fprintf(out," % .10e",coeffs[am](ix,ic));
+	    else
+	      fprintf(out," % 10.7f",coeffs[am](ix,ic));
+	  }
+	  fprintf(out,"\n");
+	}
+	
+	// Blank line
+	fprintf(out,"\n");
       }
+      
 
-      // Blank line
-      fprintf(out,"\n");
+      // Free exponents
+      size_t ifr=0;
+      while(ifr<frexps[am].n_elem) {
+	// Upper limit
+	size_t ufr=std::min(ifr+nfrsh,(size_t) frexps[am].n_elem);
+
+	// Print exponents
+	cl=false;
+	np=0;
+	for(size_t ix=ifr;ix<ufr;ix++) {
+	  if(newformat)
+	    fprintf(out," % .10e",frexps[am](ix));
+	  else
+	    fprintf(out," %14.7f",frexps[am](ix));
+	  cl=false;
+	  np++;
+	  
+	  if(np%ndbl==0) {
+	    fprintf(out,"\n");
+	    np=0;
+	    cl=true;
+	  }
+	}
+	if(!cl)
+	  fprintf(out,"\n");
+	
+	// Blank line
+	fprintf(out,"\n");
+	
+	// Coefficients - contractions in columns
+	for(size_t ix=ifr;ix<ufr;ix++) {
+	  for(size_t ic=ifr;ic<ufr;ic++) {
+	    if(newformat) {
+	      if(ix==ic)
+		fprintf(out," % .10e",1.0);
+	      else
+		fprintf(out," % .10e",0.0);
+	    } else {
+	      if(ix==ic)
+		fprintf(out," % 10.7f",1.0);
+	      else
+		fprintf(out," % 10.7f",0.0);
+	    }
+	  }
+	  fprintf(out,"\n");
+	}
+	
+	// Blank line
+	fprintf(out,"\n");
+	
+	// Switch limits
+	ifr=ufr;
+      }
     }
   }
-
+  
   fclose(out);
 }
 
