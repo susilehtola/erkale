@@ -830,7 +830,7 @@ class CompletenessOptimizer {
     { // Save out the results of the mog scan
       // Filename to use
       std::ostringstream fname;
-      fname << "polmog_" << shell_types[addam] << "_" << iter << ".dat";
+      fname << "polmog_" << "_" << iter << shell_types[addam] << ".dat";
 
       arma::mat savemog(mogs.n_rows,2);
       savemog.col(0)=startp;
@@ -1457,12 +1457,13 @@ class CompletenessOptimizer {
 	  std::vector<coprof_t> scancpl(cpl);
 	  ValueType scanval(curval);
 	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol,std::max(polmog,cbsthr));
-
+	  
 	  print_value(scanval,"Compound value");
 	  print_limits(scancpl,"Compound limits");
+	  fflush(stdout);
 	  
 	  // Did the scan fail?
-	  bool scanfail=false;
+	  bool scanfail;
 
 	  // Update extension mog
 	  extmog=std::max(extmog,scanmog);
@@ -1470,9 +1471,10 @@ class CompletenessOptimizer {
 	  if(scanmog>=std::max(polmog,cbsthr)) {
 	    // Instability detected, real mog is
 	    double mog=compute_mog(scanval,curval,0.0);
-
+	    
 	    // Sanity check
 	    if(mog>0.0) {
+	      scanfail=false;
 	      cpl=scancpl;
 	      curval=scanval;
 	      printf("\n\nInstability detected with real mog = %e, restarting extension.\n",mog);
@@ -1515,6 +1517,7 @@ class CompletenessOptimizer {
 		// Switch values
 		cpl=trials[maxind];
 		curval=trvals[maxind];
+		scanfail=false;
 	      } else
 		scanfail=true;
 	    }
