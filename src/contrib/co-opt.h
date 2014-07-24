@@ -830,7 +830,7 @@ class CompletenessOptimizer {
     { // Save out the results of the mog scan
       // Filename to use
       std::ostringstream fname;
-      fname << "polmog_" << "_" << iter << shell_types[addam] << ".dat";
+      fname << "polmog_"  << iter << "_" << shell_types[addam] << ".dat";
 
       arma::mat savemog(mogs.n_rows,2);
       savemog.col(0)=startp;
