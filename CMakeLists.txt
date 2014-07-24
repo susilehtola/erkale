@@ -2,6 +2,7 @@
 # refer to the root source directory of the project as ${ERKALE_SOURCE_DIR} and
 # to the root binary directory of the project as ${ERKALE_BINARY_DIR}.
 project (ERKALE)
+set(PROJECT_TYPE CXX)
 
 # Require CMake version 2.8 (might work with older ones, too)
 cmake_minimum_required(VERSION 2.6)
@@ -99,11 +100,11 @@ message("")
 # Find out how to preprocess C++ source code files
 if(CMAKE_COMPILER_IS_GNUCXX)
  set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${DFTFLAGS} ${OpenMP_CXX_FLAGS})
-elseif( CMAKE_CXX_COMPILER_ID strequal "PGI" )
+elseif( ${CMAKE_CXX_COMPILER_ID} strequal "PGI" )
  set( PPROC ${CMAKE_CXX_COMPILER} -E ${DFTFLAGS} ${OpenMP_CXX_FLAGS})
-elseif( CMAKE_CXX_COMPILER_ID strequal "PathScale" )
+elseif( ${CMAKE_CXX_COMPILER_ID} strequal "PathScale" )
  set( PPROC ${CMAKE_CXX_COMPILER} -E ${DFTFLAGS} ${OpenMP_CXX_FLAGS})
-elseif( CMAKE_CXX_COMPILER_ID strequal "Intel" )
+elseif( ${CMAKE_CXX_COMPILER_ID} strequal "Intel" )
  set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${DFTFLAGS} ${OpenMP_CXX_FLAGS})
 else()
  set( PPROC "" )
