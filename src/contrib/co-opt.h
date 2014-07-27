@@ -117,6 +117,9 @@ class CompletenessOptimizer {
   /// Amount of fully optimized exponents on each end
   int n_full;
 
+  /// Iteration number (for saving out polarization and stability scans)
+  size_t politer;
+
   /// Compute the energy
   virtual double compute_energy(const std::vector<coprof_t> & cpl)=0;
 
@@ -185,6 +188,8 @@ class CompletenessOptimizer {
     n_tau=1;
     /// 4 fully optimized exponents
     n_full=4;
+    /// Iteration number
+    politer=0;
   }
   /// Destructor
   ~CompletenessOptimizer() {
@@ -791,8 +796,6 @@ class CompletenessOptimizer {
     printf("Using %.3f points per exponent interval, so spacing between points is %.5f.\n\n",dpol,sp);
     fflush(stdout);
 
-    static size_t iter=0;
-
     // Allocate sufficient memory
     if(cpl.size() <= (size_t) addam) {
       cpl.resize(addam+1);
@@ -827,17 +830,19 @@ class CompletenessOptimizer {
       printf("%5i/%-5i % 7.5f %e\n",(int) i+1, (int) startp.n_elem, startp(i), mogs(i));
     }
 
-    { // Save out the results of the mog scan
+    {
+      // Save out the results of the mog scan.
+      // Increment counter.
+      politer++;
+
       // Filename to use
       std::ostringstream fname;
-      fname << "polmog_"  << iter << "_" << shell_types[addam] << ".dat";
+      fname << "polmog_"  << politer << "_" << shell_types[addam] << ".dat";
 
       arma::mat savemog(mogs.n_rows,2);
       savemog.col(0)=startp;
       savemog.col(1)=mogs;
       savemog.save(fname.str(),arma::raw_ascii);
-
-      iter++;
     }
 
     // Find maximum mog
@@ -1053,12 +1058,10 @@ class CompletenessOptimizer {
     fflush(stdout);
 
     {
-      static size_t iter=0;
-
       // Save out the results of the mog scan
       for(int am=0;am<=maxam(cpl);am++) {
 	std::ostringstream fname;
-	fname << "scanmog_" << iter << "_" << shell_types[am] << ".dat";
+	fname << "scanmog_" << politer << "_" << shell_types[am] << ".dat";
 
 	// Collect exponent values
 	arma::vec expval(ammog[am].n_elem);
@@ -1070,8 +1073,6 @@ class CompletenessOptimizer {
 	savemog.col(1)=ammog[am];
 	savemog.save(fname.str(),arma::raw_ascii);
       }
-
-      iter++;
     }
 
     // Find maximum mog
