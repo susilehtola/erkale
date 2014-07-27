@@ -836,13 +836,47 @@ class CompletenessOptimizer {
       politer++;
 
       // Filename to use
-      std::ostringstream fname;
-      fname << "polmog_"  << politer << "_" << shell_types[addam] << ".dat";
+      std::string fname;
+      {
+	std::ostringstream oss;
+	oss << "polmog_"  << politer << "_" << shell_types[addam] << ".dat";
+	fname=oss.str();
+      }
 
       arma::mat savemog(mogs.n_rows,2);
       savemog.col(0)=startp;
       savemog.col(1)=mogs;
-      savemog.save(fname.str(),arma::raw_ascii);
+      savemog.save(fname,arma::raw_ascii);
+
+      // Save limits
+      for(int am=0;am<=maxam(cpl);am++) {
+	// Form limits
+	arma::mat lim(2,2);
+
+	// y from 0 to infinity
+	lim(0,1)=0.0;
+	lim(1,1)=DBL_MAX;
+
+	// Starting point
+	{
+	  std::ostringstream oss;
+	  oss << "limits_"  << politer << "_" << shell_types[am] << "_start.dat";
+	  
+	  lim(0,0)=cpl[am].start;
+	  lim(1,0)=cpl[am].start;
+	  lim.save(oss.str(),arma::raw_ascii);
+	}
+	
+	// Ending point
+	{
+	  std::ostringstream oss;
+	  oss << "limits_"  << politer << "_" << shell_types[am] << "_end.dat";
+	  
+	  lim(0,0)=cpl[am].end;
+	  lim(1,0)=cpl[am].end;
+	  lim.save(oss.str(),arma::raw_ascii);
+	}	
+      }
     }
 
     // Find maximum mog
