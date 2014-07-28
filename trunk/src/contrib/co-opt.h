@@ -851,31 +851,24 @@ class CompletenessOptimizer {
       // Save limits
       for(int am=0;am<=maxam(cpl);am++) {
 	// Form limits
-	arma::mat lim(2,2);
+	arma::mat lim(2,3);
 
 	// y from 0 to infinity
-	lim(0,1)=0.0;
-	lim(1,1)=DBL_MAX;
+	lim(0,0)=0.0;
+	lim(1,0)=DBL_MAX;
 
 	// Starting point
-	{
-	  std::ostringstream oss;
-	  oss << "limits_"  << politer << "_" << shell_types[am] << "_start.dat";
-	  
-	  lim(0,0)=cpl[am].start;
-	  lim(1,0)=cpl[am].start;
-	  lim.save(oss.str(),arma::raw_ascii);
-	}
-	
+	lim(0,1)=cpl[am].start;
+	lim(1,1)=cpl[am].start;
+
 	// Ending point
-	{
-	  std::ostringstream oss;
-	  oss << "limits_"  << politer << "_" << shell_types[am] << "_end.dat";
-	  
-	  lim(0,0)=cpl[am].end;
-	  lim(1,0)=cpl[am].end;
-	  lim.save(oss.str(),arma::raw_ascii);
-	}	
+	lim(0,2)=cpl[am].end;
+	lim(1,2)=cpl[am].end;
+
+	// Output
+	std::ostringstream oss;
+	oss << "limits_"  << politer << "_" << shell_types[am] << ".dat";
+	lim.save(oss.str(),arma::raw_ascii);
       }
     }
 
