@@ -1020,8 +1020,8 @@ class CompletenessOptimizer {
       printf("Spacing between points on %c shell is %.5f\n",shell_types[scanam],step);
       fflush(stdout);
 
-      // Require the closest point is at least one step away
-      int nmin=(int) std::max(1,(int) std::ceil(dpol));
+      // Generate points
+      int nmin=0;
       int nmax=(int) std::ceil(npoints*dpol);
       for(int n=nmax;n>=nmin;n--) {
 	trexp.push_back(cpl[scanam].start-n*step/dpol);
