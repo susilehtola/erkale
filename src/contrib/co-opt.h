@@ -257,10 +257,10 @@ class CompletenessOptimizer {
       if(w>=width)
 	break;
     }
-    
+
     // Store real width
     width=w;
-    
+
     // Return exponents
     return exps;
   }
@@ -359,7 +359,7 @@ class CompletenessOptimizer {
   std::vector<coprof_t> load_limits(const BasisSetLibrary & baslib, double tol, int maxam) {
     // Threshold for completeness in initial set
     double cplthr=1.0-tol;
-  
+
     // Returned array
     std::vector<coprof_t> cpl(max_am+1);
     for(size_t i=0;i<cpl.size();i++) {
@@ -398,7 +398,7 @@ class CompletenessOptimizer {
 	    high=prof.lga[ia];
 	    break;
 	  }
-      
+
 	if(cpl[am].start>low)
 	  cpl[am].start=low;
 	if(cpl[am].end<high)
@@ -428,7 +428,7 @@ class CompletenessOptimizer {
 
       // Compute width
       double width=cpl[am].end-cpl[am].start;
-    
+
       // Determine amount of exponents necessary to obtain width
       std::vector<double> widths;
       std::vector< std::vector<double> > explist;
@@ -462,7 +462,7 @@ class CompletenessOptimizer {
       cpl[am].end+=(widths[nf]-width)/2.0;
       // and store exponents, moving starting point to the correct location
       cpl[am].exps=move_exps(explist[nf],cpl[am].start);
-    
+
       printf("%c % .2f % .2f %2i\n",shell_types[am],cpl[am].start,cpl[am].end,(int) cpl[am].exps.size());
       fflush(stdout);
     }
@@ -870,6 +870,13 @@ class CompletenessOptimizer {
 	oss << "limits_"  << politer << "_" << shell_types[am] << ".dat";
 	lim.save(oss.str(),arma::raw_ascii);
       }
+
+      // Save basis set
+      {
+	std::ostringstream oss;
+	oss << "polbas_"  << politer << ".gbs";
+	form_basis(cpl).save_gaussian94(oss.str());
+      }
     }
 
     // Find maximum mog
@@ -1190,13 +1197,15 @@ class CompletenessOptimizer {
   }
 
   /// Extend the current shells until mog < tau. Returns maximal mog
-  double extend_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, bool domiddle=true, int nxadd=1) {
+  double extend_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, int next=3, int nxadd=1) {
     printf("\n\n%s\n",print_bar("PROFILE EXTENSION").c_str());
     printf("Final tolerance is %e.\n",tau);
     fflush(stdout);
 
     if(tau<=0.0)
       throw std::runtime_error("Tolerance must be positive!\n");
+    if(next<2)
+      throw std::runtime_error("The NExt parameter must be at least two.\n");
 
     while(true) {
       Timer ttot;
@@ -1205,18 +1214,15 @@ class CompletenessOptimizer {
       printf("\n");
       fflush(stdout);
 
-      // Form trial profiles
+      // Trial profiles
       std::vector< std::vector<coprof_t> > trials;
+      // Descriptions
       std::vector< std::string > descr;
+      // Trial angular momentum
       std::vector< int > tram;
 
       for(int am=0;am<=maxam(cpl);am++) {
 	Timer t;
-
-	// Form trials
-	std::vector<coprof_t> left(cpl);
-	std::vector<coprof_t> middle(cpl);
-	std::vector<coprof_t> right(cpl);
 
 	// Get exponents
 	printf("Determining exponents for %c shell ... ",shell_types[am]);
@@ -1227,38 +1233,33 @@ class CompletenessOptimizer {
 	arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()+nxadd,width);
 
 	step=width-(cpl[am].end-cpl[am].start);
-	left[am].start=cpl[am].start-step;
-	left[am].exps=move_exps(exps,left[am].start);
-
-	middle[am].start=cpl[am].start-step/2.0;
-	middle[am].end=cpl[am].end+step/2.0;
-	middle[am].exps=move_exps(exps,middle[am].start);
-
-	right[am].end=cpl[am].end+step;
-	right[am].exps=move_exps(exps,right[am].start);
-
 	printf("step size is %7.5f (%s).\n",step,t.elapsed().c_str());
 	fflush(stdout);
 	t.set();
 
-	// Add the trials to the stacks
-	char msg[200];
-	trials.push_back(left);
-	sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
-	descr.push_back(msg);
-	tram.push_back(am);
+	// Form trials.
+	for(int itr=0;itr<next;itr++) {
+	  // Displacement fraction is
+	  double d=itr*1.0/(next-1);
 
-	if(domiddle) {
-	  trials.push_back(middle);
-	  sprintf(msg,"Moved both ends      of %c shell by %.3f",shell_types[am],step/2.0);
-	  descr.push_back(msg);
+	  std::vector<coprof_t> trcpl(cpl);
+	  trcpl[am].start=cpl[am].start-d*step;
+	  trcpl[am].end=cpl[am].end+(1.0-d)*step;
+	  trcpl[am].exps=move_exps(exps,trcpl[am].start);
+
+	  // Add the trial to the stack
+	  trials.push_back(trcpl);
 	  tram.push_back(am);
-	}
 
-	trials.push_back(right);
-	sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
-	descr.push_back(msg);
-	tram.push_back(am);
+	  char msg[200];
+	  if(itr==0)
+	    sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
+	  else if(itr==next-1)
+	    sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
+	  else
+	    sprintf(msg,"Moved starting point of %c shell by %.3f and ending point by %.3f",shell_types[am],d*step,(1.0-d)*step);
+	  descr.push_back(msg);
+	}
       }
 
       // Sanity check
@@ -1274,7 +1275,6 @@ class CompletenessOptimizer {
 	oss << "Error - requested computation of " << trials.size() << " values but got only " << trvals.size() << "!\n";
 	throw std::runtime_error(oss.str());
       }
-
 
       // Compute mogs
       arma::vec mogs(trvals.size());
@@ -1429,10 +1429,14 @@ class CompletenessOptimizer {
   virtual void print_value(const ValueType & value, std::string msg)=0;
 
   /// Extend the basis set till the CBS limit.
-  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool domiddle=true, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, bool cbsinterp=true, double cbsthr=0.0, double delta=0.9) {
+  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool extend=true, int next=3, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, bool cbsinterp=true, double cbsthr=0.0, double delta=0.9) {
     // Amount of polarization shells
     int npol=maxam(cpl)-atom_am();
 
+    // Check sanity
+    if(!extend && !scan)
+      throw std::runtime_error("You need to check for profile expansion either by scans or extension, or both!\n");
+    
     // Compute initial value
     {
       std::vector< std::vector<coprof_t> > hlp(1,cpl);
@@ -1459,7 +1463,10 @@ class CompletenessOptimizer {
 
     while(true) {
       // Extend existing shells
-      double extmog=extend_profile(cpl,curval,tau,domiddle,nxext);
+      double extmog=0.0;
+
+      if(extend)
+	extend_profile(cpl,curval,tau,next,nxext);
       // Tighten existing shells
       if(doadd) {
 	double amog=tighten_profile(cpl,curval,tau,1);
@@ -1485,11 +1492,11 @@ class CompletenessOptimizer {
 	  std::vector<coprof_t> scancpl(cpl);
 	  ValueType scanval(curval);
 	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol,std::max(polmog,cbsthr));
-	  
+
 	  print_value(scanval,"Compound value");
 	  print_limits(scancpl,"Compound limits");
 	  fflush(stdout);
-	  
+
 	  // Did the scan fail?
 	  bool scanfail;
 
@@ -1499,7 +1506,7 @@ class CompletenessOptimizer {
 	  if(scanmog>=std::max(polmog,cbsthr)) {
 	    // Instability detected, real mog is
 	    double mog=compute_mog(scanval,curval,0.0);
-	    
+
 	    // Sanity check
 	    if(mog>0.0) {
 	      scanfail=false;
@@ -1537,7 +1544,7 @@ class CompletenessOptimizer {
 	      for(size_t i=0;i<tram.size();i++)
 		printf("\t%-2c %e\n",shell_types[tram[i]],trmog[i]);
 	      fflush(stdout);
-	      	      
+
 	      // Pick out maximum
 	      arma::uword maxind;
 	      double maxmog=trmog.max(maxind);
@@ -1549,10 +1556,10 @@ class CompletenessOptimizer {
 	      } else
 		scanfail=true;
 	    }
-	    
+
 	    print_value(curval,"Current value");
 	    print_limits(cpl,"Current limits");
-	    
+
 	    if(!scanfail)
 	      continue;
 	  }
@@ -1611,7 +1618,7 @@ class CompletenessOptimizer {
 
 	  while(true) {
 	    // Check shell extension
-	    extend_profile(cpl,curval,tau,domiddle,nxext);
+	    extend_profile(cpl,curval,tau,next,nxext);
 	    if(doadd)
 	      tighten_profile(cpl,curval,tau);
 
@@ -1669,13 +1676,16 @@ class CompletenessOptimizer {
   }
 
   /// Reduce the profile until only a single function is left on the highest am shell (polarization / correlation consistence)
-  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, bool domiddle=true, bool saveall=false) {
+  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, int nred=3, bool saveall=false) {
     printf("\n\n%s\n",print_bar("PROFILE REDUCTION").c_str());
     if(tol==0.0)
       printf("Running until would drop last function of %c shell.\n",shell_types[maxam(cpl)]);
     else
       printf("Running until mog >= %e.\n",tol);
     fflush(stdout);
+
+    if(nred<2)
+      throw std::runtime_error("The NRed parameter must be at least two.\n");
 
     // Do the reduction.
     double minmog=0.0;
@@ -1691,77 +1701,68 @@ class CompletenessOptimizer {
       std::vector< std::vector<coprof_t> > trials;
       std::vector< std::string > descr;
       std::vector< int > tram;
-      for(int am=0;am<=maxam(cpl);am++) {
-	// Form trials
-	std::vector<coprof_t> left(cpl);
-	std::vector<coprof_t> middle(cpl);
-	std::vector<coprof_t> right(cpl);
-	std::vector<coprof_t> del(cpl);
 
-	// Sanity check
+      for(int am=0;am<=maxam(cpl);am++) {
 	if(!cpl[am].exps.size())
 	  continue;
+	
+	// Form trials.
+	if(cpl[am].exps.size()==1) {
+	  std::vector<coprof_t> trcpl(cpl);
+	  trcpl[am].start=0.0;
+	  trcpl[am].end=0.0;
+	  trcpl[am].start=0.0;
 
-	// Get exponents
-	char msg[200];
+	  // Add the trial to the stack
+	  trials.push_back(trcpl);
+	  tram.push_back(am);
 
-	if(cpl[am].exps.size()>1) {
+	  char msg[200];
+	  sprintf(msg,"Dropped last exponent of %c shell",shell_types[am]);
+	  descr.push_back(msg);
+
+        } else {
+
 	  Timer t;
+
+	  // Get exponents
 	  printf("Determining exponents for %c shell ... ",shell_types[am]);
 	  fflush(stdout);
 
+	  double step;
 	  double width;
 	  arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()-1,width);
-	  // Step size is
-	  double step=cpl[am].end-cpl[am].start-width;
 
+	  step=width-(cpl[am].end-cpl[am].start);
 	  printf("step size is %7.5f (%s).\n",step,t.elapsed().c_str());
 	  fflush(stdout);
+	  t.set();
 
-	  left[am].start=cpl[am].start+step;
-	  left[am].exps=move_exps(exps,left[am].start);
+	  // Form trials
+	  for(int itr=0;itr<nred;itr++) {
+	    // Displacement fraction is
+	    double d=itr*1.0/(nred-1);
 
-	  middle[am].start=cpl[am].start+step/2.0;
-	  middle[am].end=cpl[am].end-step/2.0;
-	  middle[am].exps=move_exps(exps,middle[am].start);
+	    std::vector<coprof_t> trcpl(cpl);
+	    trcpl[am].start=cpl[am].start+(1.0-d)*step;
+	    trcpl[am].end=cpl[am].end-d*step;
+	    trcpl[am].exps=move_exps(exps,trcpl[am].start);
 
-	  right[am].end=cpl[am].end-step;
-	  right[am].exps=move_exps(exps,right[am].start);
-
-	  trials.push_back(left);
-	  sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
-	  descr.push_back(msg);
-	  tram.push_back(am);
-
-	  if(domiddle) {
-	    trials.push_back(middle);
-	    sprintf(msg,"Moved both ends      of %c shell by %.3f",shell_types[am],step/2.0);
-	    descr.push_back(msg);
+	    // Add the trial to the stack
+	    trials.push_back(trcpl);
 	    tram.push_back(am);
+
+	    char msg[200];
+	    if(itr==0)
+	      sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
+	    else if(itr==nred-1)
+	      sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
+	    else	
+	      sprintf(msg,"Moved starting point of %c shell by %.3f and ending point by %.3f",shell_types[am],(1.0-d)*step,d*step);
+	    descr.push_back(msg);
 	  }
-
-	  trials.push_back(right);
-	  sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
-	  descr.push_back(msg);
-	  tram.push_back(am);
-
-	  del[am].exps=optimize_completeness(am,del[am].start,del[am].end,del[am].exps.size()-1,del[am].tol);
-	  trials.push_back(del);
-	  sprintf(msg,"Dropped exponent from   %c shell",shell_types[am]);
-	  descr.push_back(msg);
-	  tram.push_back(am);
-	} else if(cpl[am].exps.size()==1) {
-	  del[am].exps.clear();
-	  del[am].start=0.0;
-	  del[am].end=0.0;
-
-	  trials.push_back(del);
-	  sprintf(msg,"Dropped last exponent from   %c shell",shell_types[am]);
-	  descr.push_back(msg);
-	  tram.push_back(am);
 	}
       }
-
       // Empty basis set - nothing to remove
       if(!trials.size())
 	return DBL_MAX;
@@ -1845,7 +1846,7 @@ class CompletenessOptimizer {
     return minmog;
   }
 
-  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, bool domiddle=true, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true, double saveall=false, double tol=0.0) {
+  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, int nred=3, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true, double saveall=false, double tol=0.0) {
     // Reference value
     ValueType curval;
     {
@@ -1886,7 +1887,7 @@ class CompletenessOptimizer {
     double tau=0.0;
     while((tol>0.0 && tau<tol) || (tol==0.0 && npol>=1)) {
       // Reduce the profile
-      tau=reduce_profile(cpl,curval,cbsval,tol,domiddle,saveall);
+      tau=reduce_profile(cpl,curval,cbsval,tol,nred,saveall);
 
       if(tol==0.0) {
 	printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
