@@ -1774,8 +1774,7 @@ class CompletenessOptimizer {
 	  double step;
 	  double width;
 	  arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()-1,width);
-
-	  step=width-(cpl[am].end-cpl[am].start);
+	  step=(cpl[am].end-cpl[am].start)-width;
 	  printf("step size is %7.5f (%s).\n",step,t.elapsed().c_str());
 	  fflush(stdout);
 	  t.set();
@@ -1803,8 +1802,21 @@ class CompletenessOptimizer {
 	      sprintf(msg,"Moved starting point of %c shell by %.3f and ending point by %.3f",shell_types[am],(1.0-d)*step,d*step);
 	    descr.push_back(msg);
 	  }
+
+	  // Keep limits but drop a function
+	  {
+	    std::vector<coprof_t> trcpl(cpl);
+	    trcpl[am].exps=optimize_completeness(am,trcpl[am].start,trcpl[am].end,trcpl[am].exps.size()-1,trcpl[am].tol); 
+	    trials.push_back(trcpl); 
+	    
+	    char msg[200];
+	    sprintf(msg,"Dropped exponent from %c shell",shell_types[am]); 
+	    descr.push_back(msg); 
+	    tram.push_back(am); 
+	  }
 	}
       }
+
       // Empty basis set - nothing to remove
       if(!trials.size())
 	return DBL_MAX;
