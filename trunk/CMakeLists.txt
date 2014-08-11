@@ -100,6 +100,8 @@ message("")
 # Find out how to preprocess C++ source code files
 if(CMAKE_COMPILER_IS_GNUCXX)
  set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${DFTFLAGS} ${OpenMP_CXX_FLAGS})
+elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" )
+ set( PPROC ${CMAKE_CXX_COMPILER} -x c++ -E ${DFTFLAGS} ${OpenMP_CXX_FLAGS})
 elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "PGI" )
  set( PPROC ${CMAKE_CXX_COMPILER} -E ${DFTFLAGS} ${OpenMP_CXX_FLAGS})
 elseif( ${CMAKE_CXX_COMPILER_ID} STREQUAL "PathScale" )
