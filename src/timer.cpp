@@ -23,6 +23,11 @@
 
 #include "timer.h"
 
+#ifdef __MACH__
+#include <mach/clock.h>
+#include <mach/mach.h>
+#endif
+
 Timer::Timer() {
   set();
 }
@@ -30,20 +35,33 @@ Timer::Timer() {
 Timer::~Timer() {
 }
 
+void Timer::read(struct timespec *t) const {
+#ifdef __MACH__
+  clock_serv_t cclock;
+  mach_timespec_t mts;
+  host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+  clock_get_time(cclock, &mts);
+  mach_port_deallocate(mach_task_self(), cclock);
+  t->tv_sec = mts.tv_sec;
+  t->tv_nsec = mts.tv_nsec;
+#else
+  clock_gettime(CLOCK_REALTIME,&tstop);
+#endif
+}
+
 void Timer::stop() {
   struct timespec tstop;
-  clock_gettime(CLOCK_REALTIME,&tstop);
-
+  read(&tstop);
   elapsd+=(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_nsec-tstart.tv_nsec)*1.0e-9;
 }
 
 void Timer::cont() {
-  clock_gettime(CLOCK_REALTIME,&tstart);
+  read(&tstart);
 }
 
 void Timer::set() {
   // Get time.
-  clock_gettime(CLOCK_REALTIME,&tstart);
+  read(&tstart);
   elapsd=0.0;
 }
 
@@ -76,7 +94,7 @@ void Timer::print_time() const {
 
 double Timer::get() const {
   struct timespec tstop;
-  clock_gettime(CLOCK_REALTIME,&tstop);
+  read(&tstop);
 
   return elapsd+(tstop.tv_sec-tstart.tv_sec)+(tstop.tv_nsec-tstart.tv_nsec)*1.0e-9;
 }

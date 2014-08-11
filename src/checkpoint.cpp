@@ -1014,9 +1014,25 @@ bool file_exists(const std::string & name) {
 }
 
 std::string get_cwd() {
-  char *dir=get_current_dir_name();
-  std::string cwd(dir);
-  free(dir);
+  // Initial array size
+  size_t m=1024;
+  char *p=(char *) malloc(m);
+  char *r=NULL;
+
+  while(true) {
+    // Get cwd in array p
+    r=getcwd(p,m);
+    // Success?
+    if(r==p)
+      break;
+    
+    // Failed, increase m
+    m*=2;
+    p=(char *) realloc(p,m);
+  }
+
+  std::string cwd(p);
+  free(p);
   return cwd;
 }
 
