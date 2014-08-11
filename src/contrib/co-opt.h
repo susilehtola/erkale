@@ -604,7 +604,7 @@ class CompletenessOptimizer {
       gold=g;
 
       // Line search
-      const size_t Ntr=20; // This is ridiculously large to prevent runover
+      const int Ntr=20; // This is ridiculously large to prevent runover
       arma::vec h(Ntr);
       arma::vec E(Ntr);
       // Initial value might be positive, so
@@ -615,7 +615,7 @@ class CompletenessOptimizer {
       // Step sizes
       h(0)=0.0;
       double hs=10*h0;
-      for(size_t i=1;i<Ntr;i++)
+      for(int i=1;i<Ntr;i++)
 	h(i)=hs*std::pow(2.0,i-1);
 
       printf("\n\tLine search:\n");
