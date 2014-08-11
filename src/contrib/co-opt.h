@@ -1771,6 +1771,11 @@ class CompletenessOptimizer {
 	  printf("Determining exponents for %c shell ... ",shell_types[am]);
 	  fflush(stdout);
 
+	  // Keep limits but drop flatness
+	  std::vector<coprof_t> delcpl(cpl);
+	  delcpl[am].exps=optimize_completeness(am,delcpl[am].start,delcpl[am].end,delcpl[am].exps.size()-1,delcpl[am].tol); 
+
+	  // Keep flatness but change limits
 	  double step;
 	  double width;
 	  arma::vec exps=maxwidth_exps_table(am,cpl[am].tol,cpl[am].exps.size()-1,width);
@@ -1805,9 +1810,7 @@ class CompletenessOptimizer {
 
 	  // Keep limits but drop a function
 	  {
-	    std::vector<coprof_t> trcpl(cpl);
-	    trcpl[am].exps=optimize_completeness(am,trcpl[am].start,trcpl[am].end,trcpl[am].exps.size()-1,trcpl[am].tol); 
-	    trials.push_back(trcpl); 
+	    trials.push_back(delcpl); 
 	    
 	    char msg[200];
 	    sprintf(msg,"Dropped exponent from %c shell",shell_types[am]); 
