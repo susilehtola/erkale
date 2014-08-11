@@ -47,6 +47,9 @@ class Timer {
   /// Elapsed time
   double elapsd;
 
+  /// Read time
+  void read(struct timespec *t) const;
+
  public:
   /// Constructor
   Timer();
