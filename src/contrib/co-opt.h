@@ -622,7 +622,7 @@ class CompletenessOptimizer {
       printf("\t%5s %12s %13s %13s\n","trial","step","E","dE");
       fflush(stdout);
 
-      size_t itr;
+      int itr;
       for(itr=0;itr<Ntr;itr++) {
 	// Profile
 	std::vector<coprof_t> trcpl(cpl);
