@@ -45,7 +45,7 @@ void Timer::read(struct timespec *t) const {
   t->tv_sec = mts.tv_sec;
   t->tv_nsec = mts.tv_nsec;
 #else
-  clock_gettime(CLOCK_REALTIME,&tstop);
+  clock_gettime(CLOCK_REALTIME,t);
 #endif
 }
 
