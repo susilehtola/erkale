@@ -1132,7 +1132,7 @@ class CompletenessOptimizer {
 
 	if(!allam && ((arma::uword) scanam != imax))
 	  // Don't examine this trial
-	  continue;	  
+	  continue;
 
 	if(!ammog[scanam].n_elem)
 	  continue;
@@ -1158,7 +1158,7 @@ class CompletenessOptimizer {
 	  // Form armadillo vectors
 	  arma::vec stm(arma::conv_to<arma::vec>::from(stmog));
 	  arma::vec dfm(arma::conv_to<arma::vec>::from(dfmog));
-	  
+
 	  // Get maximum mogs and indices
 	  arma::uword stind, dfind;
 	  double stmax=stm.max(stind);
@@ -1171,7 +1171,7 @@ class CompletenessOptimizer {
 	  // Get maximum mog for this am
 	  arma::uword amind;
 	  double ammax=ammog[scanam].max(amind);
-	  
+
 	  // Index of trial is
 	  if(ammax>=tol)
 	    idxlist.push_back(amidx[scanam](amind));
@@ -1188,12 +1188,12 @@ class CompletenessOptimizer {
 	    // Get real width
 	    double realw(nw);
 	    arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
-	      
+
 	    // Adjust profile
 	    cpl[scanam].start-=realw-curw;
 	    cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
 	    moved=-(realw-curw);
-	      
+
 	  } else if(trexp[imax] > cpl[scanam].end) {
 	    // Current width is
 	    double curw=cpl[scanam].end-cpl[scanam].start;
@@ -1202,16 +1202,16 @@ class CompletenessOptimizer {
 	    // Get real width
 	    double realw(nw);
 	    arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
-	      
+
 	    // Adjust profile
 	    cpl[scanam].end+=realw-curw;
 	    cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
 	    moved=+(realw-curw);
-	      
+
 	  } else {
 	    throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
 	  }
-	    
+
 	  if(moved>0.0)
 	    printf("%c upper limit should be moved by % .3f (% .3f spacings). (%s)\n",shell_types[scanam],moved,moved/spacing(scanam),tam.elapsed().c_str());
 	  else
@@ -1220,7 +1220,7 @@ class CompletenessOptimizer {
 	}
       }
       printf("\n");
-      
+
       // Update current value
       std::vector< std::vector<coprof_t> > hlp(1,cpl);
       std::vector<ValueType> hlpvals(compute_values(hlp));
@@ -1231,13 +1231,13 @@ class CompletenessOptimizer {
       }
       curval=hlpvals[0];
     }
-    
+
     printf("Stability scan done in %s.\n\n",t.elapsed().c_str());
     fflush(stdout);
-    
+
     return maxmog;
   }
-  
+
   /// Extend the current shells until mog < tau. Returns maximal mog
   double extend_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, int next=3, int nxadd=1) {
     printf("\n\n%s\n",print_bar("PROFILE EXTENSION").c_str());
@@ -1478,7 +1478,7 @@ class CompletenessOptimizer {
     // Check sanity
     if(!extend && !scan)
       throw std::runtime_error("You need to check for profile expansion either by scans or extension, or both!\n");
-    
+
     // Compute initial value
     {
       std::vector< std::vector<coprof_t> > hlp(1,cpl);
@@ -1747,7 +1747,7 @@ class CompletenessOptimizer {
       for(int am=0;am<=maxam(cpl);am++) {
 	if(!cpl[am].exps.size())
 	  continue;
-	
+
 	// Form trials.
 	if(cpl[am].exps.size()==1) {
 	  std::vector<coprof_t> trcpl(cpl);
@@ -1773,7 +1773,7 @@ class CompletenessOptimizer {
 
 	  // Keep limits but drop flatness
 	  std::vector<coprof_t> delcpl(cpl);
-	  delcpl[am].exps=optimize_completeness(am,delcpl[am].start,delcpl[am].end,delcpl[am].exps.size()-1,delcpl[am].tol); 
+	  delcpl[am].exps=optimize_completeness(am,delcpl[am].start,delcpl[am].end,delcpl[am].exps.size()-1,delcpl[am].tol);
 
 	  // Keep flatness but change limits
 	  double step;
@@ -1803,19 +1803,24 @@ class CompletenessOptimizer {
 	      sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
 	    else if(itr==nred-1)
 	      sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
-	    else	
+	    else
 	      sprintf(msg,"Moved starting point of %c shell by %.3f and ending point by %.3f",shell_types[am],(1.0-d)*step,d*step);
 	    descr.push_back(msg);
 	  }
 
-	  // Keep limits but drop a function
-	  {
-	    trials.push_back(delcpl); 
-	    
+	  // Keep limits but drop a function. The deviation from
+	  // completeness should increase monotonically with increasing am.
+	  bool dodrop=true;
+	  for(int ham=am;ham<=maxam(cpl);ham++)
+	    if(delcpl[am].tol > delcpl[ham].tol)
+	      dodrop=false;
+	  if(dodrop) {
+	    trials.push_back(delcpl);
+
 	    char msg[200];
-	    sprintf(msg,"Dropped exponent from %c shell",shell_types[am]); 
-	    descr.push_back(msg); 
-	    tram.push_back(am); 
+	    sprintf(msg,"Dropped exponent from %c shell",shell_types[am]);
+	    descr.push_back(msg);
+	    tram.push_back(am);
 	  }
 	}
       }
