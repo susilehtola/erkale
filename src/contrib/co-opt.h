@@ -1811,8 +1811,10 @@ class CompletenessOptimizer {
 	  // Keep limits but drop a function. The deviation from
 	  // completeness should increase monotonically with increasing am.
 	  bool dodrop=true;
-	  for(int ham=am;ham<=maxam(cpl);ham++)
-	    if(delcpl[am].tol > delcpl[ham].tol)
+	  for(int ham=am+1;ham<=maxam(cpl);ham++)
+	    // Need to have at least two exponents for the restriction
+	    // for the deviation from completeness to make sense
+	    if(delcpl[ham].exps.size()>1 && delcpl[am].tol > delcpl[ham].tol)
 	      dodrop=false;
 	  if(dodrop) {
 	    trials.push_back(delcpl);
