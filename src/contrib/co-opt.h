@@ -1508,7 +1508,7 @@ class CompletenessOptimizer {
       double extmog=0.0;
 
       if(extend)
-	extend_profile(cpl,curval,tau,next,nxext);
+	extmog=extend_profile(cpl,curval,tau,next,nxext);
       // Tighten existing shells
       if(doadd) {
 	double amog=tighten_profile(cpl,curval,tau,1);
