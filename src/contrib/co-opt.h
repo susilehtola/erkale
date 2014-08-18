@@ -1747,6 +1747,20 @@ class CompletenessOptimizer {
       for(int am=0;am<=maxam(cpl);am++) {
 	if(!cpl[am].exps.size())
 	  continue;
+	
+	// Sanity check
+	bool tryred=true;
+	for(int sam=am+1;sam<=maxam(cpl);sam++) {
+	  // Check that the shell has more functions than the one above.
+	  if(cpl[am].exps.size()<=cpl[sam].exps.size()) {
+	    printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
+	    fflush(stdout);
+	    tryred=false;
+	    break;
+	  }
+	}
+	if(!tryred)
+	  continue;
 
 	// Form trials.
 	if(cpl[am].exps.size()==1) {
