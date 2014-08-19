@@ -1332,7 +1332,7 @@ class CompletenessOptimizer {
 	if(amidx[am].n_elem) {
 	  printf("\t%-2c %e\n",shell_types[am],arma::max(ammog[am]));
 	} else
-	  printf("\t%-2c %8s %e\n",shell_types[am],"",0.0);
+	  printf("\t%-2c %e\n",shell_types[am],0.0);
       fflush(stdout);
 
       // Figure out maximal mog
