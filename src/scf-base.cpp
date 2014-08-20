@@ -893,8 +893,6 @@ double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him
   
   // MO overlap matrix
   arma::cx_mat MOovl=arma::trans(C.submat(0,0,C.n_rows-1,Nel-1))*S*Corbs.submat(0,0,Corbs.n_rows-1,Nel-1);
-  arma::real(MOovl).eval().save("MOovl_re.dat",arma::raw_ascii);
-  arma::imag(MOovl).eval().save("MOovl_im.dat",arma::raw_ascii);
   
   // Fraction of occupied subspace spanned is
   return std::real(arma::trace(MOovl*arma::trans(MOovl)))/Nel;
