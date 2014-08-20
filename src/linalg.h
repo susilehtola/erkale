@@ -29,6 +29,11 @@
  * of eigenvalue ordering from smallest to biggest */
 void eig_sym_ordered(arma::colvec & eigval, arma::mat & eigvec, const arma::mat & X);
 
+/**
+ * Solve eigenvalues of Hermitian matrix with guarantee
+ * of eigenvalue ordering from smallest to biggest */
+void eig_sym_ordered(arma::vec & eigval, arma::cx_mat & eigvec, const arma::cx_mat & X);
+
 /// Helper for sorts
 typedef struct {
   /// Energy
@@ -47,7 +52,6 @@ typedef struct {
   /// Eigenvector
   arma::cx_vec c;
 } corbital_t;
-
 
 /// Helper for sorts
 bool operator<(const corbital_t & lhs, const corbital_t & rhs);

@@ -548,16 +548,17 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   // Save SI energies
   chkptp->write("ESIC",sicsol.E);
   // Compute projected energies
-  if(sol.H.n_elem == sicsol.H.n_elem) {
+  if(sol.H.n_elem == sicsol.Heff.n_elem) {
     arma::cx_mat CW=sicsol.C*W;
-    arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sicsol.H)*CW));
+    arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sicsol.Heff)*CW));
     chkptp->write("EpSIC",Ep);
   }
 
   // Update current solution
-  sol.Heff=sicsol.H;
-  if(sol.H.n_elem == sicsol.H.n_elem)
-    sol.H  +=sicsol.H;
+  sol.Heff=sicsol.Heff;
+  sol.Heff_im=sicsol.Heff_im;
+  if(sol.H.n_elem == sicsol.Heff.n_elem)
+    sol.H  +=sicsol.Heff;
   // Remember there are two electrons in each orbital
   sol.en.Eeff=2*sicsol.en.E;
   sol.en.Eel+=2*sicsol.en.E;
@@ -801,13 +802,15 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   }
 
   // Update current solution
-  sol.Heffa=sicsola.H;
+  sol.Heffa=sicsola.Heff;
+  sol.Heffa_im=sicsola.Heff_im;
   if(sol.Ha.n_elem == sicsola.H.n_elem)
-    sol.Ha  +=sicsola.H;
+    sol.Ha  +=sicsola.Heff;
   if(Wb.n_cols) {
-    sol.Heffb=sicsolb.H;
+    sol.Heffb=sicsolb.Heff;
+    sol.Heffb_im=sicsolb.Heff_im;
     if(sol.Hb.n_elem == sicsolb.H.n_elem)
-      sol.Hb  +=sicsolb.H;
+      sol.Hb  +=sicsolb.Heff;
     sol.en.Eeff=sicsola.en.E+sicsolb.en.E;
     sol.en.Eel+=sicsola.en.E+sicsolb.en.E;
     sol.en.E  +=sicsola.en.E+sicsolb.en.E;
@@ -842,10 +845,11 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   }
 
   // Get SI energy and hamiltonian
-  arma::mat HSIC=worker.get_HSIC();
+  arma::cx_mat HSIC=worker.get_HSIC();
 
   // Adjust Fock operator for SIC
-  sol.H=-pzcor*HSIC;
+  sol.Heff=-pzcor*arma::real(HSIC);
+  sol.Heff_im=-pzcor*arma::imag(HSIC);
   // Need to adjust energy as well as this was calculated in the Fock routines
   sol.en.E=-pzcor*ESIC;
 
@@ -864,6 +868,36 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
       printf("\t%4i\t% f\n",(int) io+1,sol.E(io));
     fflush(stdout);
   }
+}
+
+double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him, double shift, const arma::mat & S, const arma::mat & Sinvh, const arma::mat & Pone) {
+  // Matrix is really
+  arma::cx_mat Htr=H+std::complex<double>(0.0,1.0)*Him;
+  
+  // Hamiltonian in orthonormal basis
+  if(shift==0.0)
+    Htr=arma::trans(Sinvh)*Htr*Sinvh;
+  else
+    Htr=arma::trans(Sinvh)*(Htr-shift*S*Pone*S)*Sinvh;
+  
+  // Compute eigenvectors
+  arma::vec Ecplx;
+  arma::cx_mat Corbs;
+  eig_sym_ordered(Ecplx,Corbs,Htr);
+  
+  // Transform back to non-orthogonal basis
+  Corbs=Sinvh*Corbs;
+  
+  // Compute amount of electrons
+  int Nel=(int) round(arma::trace(Pone*S));
+  
+  // MO overlap matrix
+  arma::cx_mat MOovl=arma::trans(C.submat(0,0,C.n_rows-1,Nel-1))*S*Corbs.submat(0,0,Corbs.n_rows-1,Nel-1);
+  arma::real(MOovl).eval().save("MOovl_re.dat",arma::raw_ascii);
+  arma::imag(MOovl).eval().save("MOovl_im.dat",arma::raw_ascii);
+  
+  // Fraction of occupied subspace spanned is
+  return std::real(arma::trace(MOovl*arma::trans(MOovl)))/Nel;
 }
 
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift) {
@@ -1678,6 +1712,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	  // Perturbative calculation - no need for self-consistency
 	  // Diagonalize to get new orbitals and energies
 	  diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
+
 	  // and update density matrices
 	  sol.P=form_density(sol.C,occs);
 	  
@@ -3644,15 +3679,12 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
   if(ham==PZSYMM) {
     // Symmetrized operator
-
     arma::mat S=solver->get_S();
     for(size_t io=0;io<Ctilde.n_cols;io++) {
-      arma::mat Pio=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+      arma::cx_mat Pio=Ctilde.col(io)*arma::trans(Ctilde.col(io));
       arma::mat Fio=Forb[io];
-      HSIC+=Fio*Pio*S;
+      HSIC+=(Fio*Pio*S + S*Pio*Fio)/2.0;
     }
-    // Symmetrize.
-    HSIC=0.5*(HSIC+arma::trans(HSIC));
 
   } else if(ham==PZUNITED) {
     // United Hamiltonian. See
@@ -3678,7 +3710,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       arma::cx_mat Pio=Ctilde.col(io)*arma::trans(Ctilde.col(io));
       arma::mat Fio=Forb[io];
-      HSIC+=arma::real(S*( Pio*Fio*Pio + O*Fio*Pio + Pio*Fio*O )*S);
+      HSIC+=S*( Pio*Fio*Pio + O*Fio*Pio + Pio*Fio*O )*S;
     }
 
   } else {
@@ -3787,6 +3819,6 @@ arma::vec PZSIC::get_Eorb() const {
   return Eorb;
 }
 
-arma::mat PZSIC::get_HSIC() const {
+arma::cx_mat PZSIC::get_HSIC() const {
   return HSIC;
 }

@@ -118,6 +118,7 @@ typedef struct {
 
   // Effective potential
   arma::mat Heff;
+  arma::mat Heff_im;
 
   /// Energy information
   energy_t en;
@@ -143,6 +144,7 @@ typedef struct {
 
   // Effective potentials
   arma::mat Heffa, Heffb;
+  arma::mat Heffa_im, Heffb_im;
   
   /// Energy information
   energy_t en;
@@ -387,6 +389,9 @@ class SCF {
   /// Get core Hamiltonian matrix
   arma::mat get_Hcore() const;
 };
+
+/// Determine effect of imaginary part of Fock operator on eigenvectors
+double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him, double shift, const arma::mat & S, const arma::mat & Sinvh, const arma::mat & Pone);
 
 /// Diagonalize Fock matrix
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift=0.0);
@@ -751,7 +756,7 @@ class PZSIC : public Unitary {
   arma::cx_mat kappa;
 
   /// SIC Fock operator
-  arma::mat HSIC;
+  arma::cx_mat HSIC;
 
   /// Calculate kappa rms and kappa max
   void get_k_rms_max(double & Krms, double & Kmax) const;
@@ -789,7 +794,7 @@ class PZSIC : public Unitary {
   /// Get orbital-by-orbital SIC
   arma::vec get_Eorb() const;
   /// Get SIC Hamiltonian
-  arma::mat get_HSIC() const;
+  arma::cx_mat get_HSIC() const;
 };
 
 /// Orbital localization. Density matrix is only used for construction of Bader grid (if applicable)

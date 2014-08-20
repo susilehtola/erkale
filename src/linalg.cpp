@@ -21,7 +21,24 @@
 #include "mathf.h"
 #include "stringutil.h"
 
-void eig_sym_ordered(arma::colvec & eigval, arma::mat & eigvec, const arma::mat & X) {
+void eig_sym_ordered(arma::vec & eigval, arma::mat & eigvec, const arma::mat & X) {
+  /* Solve eigenvalues of symmetric matrix with guarantee
+     of ordering of eigenvalues from smallest to biggest */
+
+  // Solve eigenvalues and eigenvectors
+  bool ok=arma::eig_sym(eigval,eigvec,X);
+  if(!ok) {
+    ERROR_INFO();
+    printf("Unable to diagonalize matrix!\n");
+    X.print("X");
+    throw std::runtime_error("Error in eig_sym.\n");
+  }
+
+  // Sort vectors
+  sort_eigvec(eigval,eigvec);
+}
+
+void eig_sym_ordered(arma::vec & eigval, arma::cx_mat & eigvec, const arma::cx_mat & X) {
   /* Solve eigenvalues of symmetric matrix with guarantee
      of ordering of eigenvalues from smallest to biggest */
 
