@@ -147,14 +147,14 @@ void Settings::add_dft_settings() {
   // PZ-SIC kappa max
   add_double("PZKmax", "Threshold for kappa max in unitary optimization", 1e-3);
   // PZ-SIC kappa rms
-  add_double("PZKrms", "Threshold for kappa rms in unitary optimization", 1e-3);
+  add_double("PZKrms", "Threshold for kappa rms in unitary optimization", 1e-4);
   // PZ-SIC energy max
-  add_double("PZEmax", "Threshold for energy change in unitary optimization", 1e-3);
+  add_double("PZEmax", "Threshold for energy change in unitary optimization", 1e-6);
   // PZ-SIC energy threshold
-  add_double("PZdEmax", "Tolerance threshold for energy convergence", 1e-3);
+  add_double("PZdEmax", "Tolerance threshold for energy convergence", 1e-5);
   // PZ-SIC density threshold
-  add_double("PZdPmax", "Tolerance threshold for density convergence", 1e-4);
-  add_double("PZdPrms", "Tolerance threshold for density convergence", 1e-5);
+  add_double("PZdPmax", "Tolerance threshold for density convergence", 1e-5);
+  add_double("PZdPrms", "Tolerance threshold for density convergence", 1e-6);
   // PZ-SIC maximum number of iterations in unitary optimization
   add_int("PZunit", "Max number of iterations in unitary optimization", 10);
   // PZ-SIC maximum number of iterations in self-consistency cycle
