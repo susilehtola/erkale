@@ -769,9 +769,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   chkptp->cwrite("CWa",sicsola.C*Wa);
   chkptp->write("ESICa",sicsola.E);
   // Compute projected energies
-  if(sol.Ha.n_elem == sicsola.H.n_elem) {
+  if(sol.Ha.n_elem == sicsola.Heff.n_elem) {
     arma::cx_mat CW=sicsola.C*Wa;
-    arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Ha+sicsola.H)*CW));
+    arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Ha+sicsola.Heff)*CW));
     chkptp->write("EpSICa",Ep);
   }
 
@@ -789,9 +789,9 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     chkptp->cwrite("CWb",sicsolb.C*Wb);
     chkptp->write("ESICb",sicsolb.E);
     // Compute projected energies
-    if(sol.Hb.n_elem == sicsolb.H.n_elem) {
+    if(sol.Hb.n_elem == sicsolb.Heff.n_elem) {
       arma::cx_mat CW=sicsolb.C*Wb;
-      arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Hb+sicsolb.H)*CW));
+      arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Hb+sicsolb.Heff)*CW));
       chkptp->write("EpSICb",Ep);
     }
   }
