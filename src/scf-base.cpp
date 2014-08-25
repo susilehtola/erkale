@@ -548,7 +548,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   // Save SI energies
   chkptp->write("ESIC",sicsol.E);
   // Compute projected energies
-  if(sol.H.n_elem == sicsol.Heff.n_elem) {
+  if(sol.H.n_rows == sicsol.Heff.n_rows && sol.H.n_cols == sicsol.Heff.n_cols) {
     arma::cx_mat CW=sicsol.C*W;
     arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sicsol.Heff)*CW));
     chkptp->write("EpSIC",Ep);
@@ -557,7 +557,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   // Update current solution
   sol.Heff=sicsol.Heff;
   sol.Heff_im=sicsol.Heff_im;
-  if(sol.H.n_elem == sicsol.Heff.n_elem)
+  if(sol.H.n_rows == sicsol.Heff.n_rows && sol.H.n_cols == sicsol.Heff.n_cols)
     sol.H  +=sicsol.Heff;
   // Remember there are two electrons in each orbital
   sol.en.Eeff=2*sicsol.en.E;
@@ -769,7 +769,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   chkptp->cwrite("CWa",sicsola.C*Wa);
   chkptp->write("ESICa",sicsola.E);
   // Compute projected energies
-  if(sol.Ha.n_elem == sicsola.Heff.n_elem) {
+  if(sol.Ha.n_rows == sicsola.Heff.n_rows && sol.Ha.n_cols == sicsola.Heff.n_cols) {
     arma::cx_mat CW=sicsola.C*Wa;
     arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Ha+sicsola.Heff)*CW));
     chkptp->write("EpSICa",Ep);
@@ -789,7 +789,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     chkptp->cwrite("CWb",sicsolb.C*Wb);
     chkptp->write("ESICb",sicsolb.E);
     // Compute projected energies
-    if(sol.Hb.n_elem == sicsolb.Heff.n_elem) {
+  if(sol.Hb.n_rows == sicsolb.Heff.n_rows && sol.Hb.n_cols == sicsolb.Heff.n_cols) {
       arma::cx_mat CW=sicsolb.C*Wb;
       arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Hb+sicsolb.Heff)*CW));
       chkptp->write("EpSICb",Ep);
@@ -804,12 +804,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   // Update current solution
   sol.Heffa=sicsola.Heff;
   sol.Heffa_im=sicsola.Heff_im;
-  if(sol.Ha.n_elem == sicsola.H.n_elem)
+  if(sol.Ha.n_rows == sicsola.Heff.n_rows && sol.Ha.n_cols == sicsola.Heff.n_cols)
     sol.Ha  +=sicsola.Heff;
   if(Wb.n_cols) {
     sol.Heffb=sicsolb.Heff;
     sol.Heffb_im=sicsolb.Heff_im;
-    if(sol.Hb.n_elem == sicsolb.H.n_elem)
+    if(sol.Hb.n_rows == sicsolb.Heff.n_rows && sol.Hb.n_cols == sicsolb.Heff.n_cols)
       sol.Hb  +=sicsolb.Heff;
     sol.en.Eeff=sicsola.en.E+sicsolb.en.E;
     sol.en.Eel+=sicsola.en.E+sicsolb.en.E;
@@ -873,27 +873,27 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
 double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him, double shift, const arma::mat & S, const arma::mat & Sinvh, const arma::mat & Pone) {
   // Matrix is really
   arma::cx_mat Htr=H+std::complex<double>(0.0,1.0)*Him;
-  
+
   // Hamiltonian in orthonormal basis
   if(shift==0.0)
     Htr=arma::trans(Sinvh)*Htr*Sinvh;
   else
     Htr=arma::trans(Sinvh)*(Htr-shift*S*Pone*S)*Sinvh;
-  
+
   // Compute eigenvectors
   arma::vec Ecplx;
   arma::cx_mat Corbs;
   eig_sym_ordered(Ecplx,Corbs,Htr);
-  
+
   // Transform back to non-orthogonal basis
   Corbs=Sinvh*Corbs;
-  
+
   // Compute amount of electrons
   int Nel=(int) round(arma::trace(Pone*S));
-  
+
   // MO overlap matrix
   arma::cx_mat MOovl=arma::trans(C.submat(0,0,C.n_rows-1,Nel-1))*S*Corbs.submat(0,0,Corbs.n_rows-1,Nel-1);
-  
+
   // Fraction of occupied subspace spanned is
   return std::real(arma::trace(MOovl*arma::trans(MOovl)))/Nel;
 }
@@ -1578,7 +1578,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Need to generate the starting guess.
       std::string name;
       molecular_guess(basis,set,name);
-      
+
       // Load guess orbitals
       {
 	Checkpoint guesschk(name,false);
@@ -1646,7 +1646,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	if(adaptive) {
 	  // Solve restricted DFT problem first on a rough grid
 	  solver.RDFT(sol,occs,initconv,initdft);
-	  
+
 	  if(verbose) {
 	    fprintf(stderr,"\n");
 	    fflush(stderr);
@@ -1688,7 +1688,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	  if(adaptive) {
 	    // Solve restricted DFT problem first on a rough grid
 	    solver.RDFT(sol,occs,initconv,initdft);
-	    
+
 	    if(verbose) {
 	      fprintf(stderr,"\n");
 	      fflush(stderr);
@@ -1697,79 +1697,79 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	  // ... and then on the more accurate grid
 	  solver.RDFT(sol,occs,conv,dft);
-	  
+
 	  // DFT grid
 	  DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
 	  if(!adaptive)
 	    // Fixed size grid
 	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
-	  
+
 	  // Get SIC potential
 	  solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
-	  
+
 	  // Perturbative calculation - no need for self-consistency
 	  // Diagonalize to get new orbitals and energies
 	  diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
 
 	  // and update density matrices
 	  sol.P=form_density(sol.C,occs);
-	  
+
 	} else { // Self-consistent treatment
-	  
+
 	  if(verbose)
 	    printf("\nRunning SIC cycle until energy converged to %e and density to %e max, %e rms.\n\n",thr_dEmax,thr_dPmax,thr_dPrms);
-	  
+
 	  // Iteration number
 	  int pziter=0;
 
 	  Timer tsic;
-	  
+
 	  if(adaptive) {
 	    while(true) {
 	      // Change reference values
 	      oldsol=sol;
-	      
+
 	      // DFT grid
 	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
-	      
+
 	      // Get new SIC potential
 	      solver.PZSIC_RDFT(sol,occs,initdft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	      pziter++;
-	      
+
 	      // Solve self-consistent field equations in presence of new SIC potential
 	      solver.RDFT(sol,occs,conv,initdft);
-	      
+
 	      // Energy difference
 	      double dE=sol.en.E-oldsol.en.E;
 	      // Density differences
 	      double dP_rms=rms_norm((sol.P-oldsol.P)/2.0);
 	      double dP_max=max_abs((sol.P-oldsol.P)/2.0);
-	      
+
 	      // Print out changes
 	      if(verbose) {
 		fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
-		
+
 		if(fabs(dE)<thr_dEmax)
 		  fprintf(stderr," % 10.3e*",dE);
 		else
 		  fprintf(stderr," % 10.3e ",dE);
-		
+
 		if(dP_rms<thr_dPrms)
 		  fprintf(stderr," %9.3e*",dP_rms);
 		else
 		  fprintf(stderr," %9.3e ",dP_rms);
-		
+
 		if(dP_max<thr_dPmax)
 		  fprintf(stderr," %9.3e*",dP_max);
 		else
 		  fprintf(stderr," %9.3e ",dP_max);
-		
+
 		fprintf(stderr,"\n");
-		
+
 		printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
 		printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
 	      }
-	      
+
 	      if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
 		break;
 	      if(pziter==pzniter)
@@ -1777,17 +1777,17 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    }
 	    pziter=0;
 	  }
-	  
+
 	  while(true) {
 	    // Change reference values
 	    oldsol=sol;
-	    
+
 	    // DFT grid
 	    DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
 	    if(!adaptive)
 	      // Fixed size grid
 	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
-	  
+
 	    // Get new SIC potential
 	    solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	    pziter++;
@@ -1800,49 +1800,49 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    // Density differences
 	    double dP_rms=rms_norm((sol.P-oldsol.P)/2.0);
 	    double dP_max=max_abs((sol.P-oldsol.P)/2.0);
-	    
+
 	    // Print out changes
 	    if(verbose) {
 	      fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
-	      
+
 	      if(fabs(dE)<thr_dEmax)
 		fprintf(stderr," % 10.3e*",dE);
 	      else
 		fprintf(stderr," % 10.3e ",dE);
-	      
+
 	      if(dP_rms<thr_dPrms)
 		fprintf(stderr," %9.3e*",dP_rms);
 	      else
 		fprintf(stderr," %9.3e ",dP_rms);
-	      
+
 	      if(dP_max<thr_dPmax)
 		fprintf(stderr," %9.3e*",dP_max);
 	      else
 		fprintf(stderr," %9.3e ",dP_max);
-	      
+
 	      fprintf(stderr,"\n");
-	      
+
 	      printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
 	      printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
 	    }
-	    
+
 	    if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
 	      break;
 	    if(pziter==pzniter)
 	      break;
 	  }
-	  
+
 	  if(verbose)
 	    fprintf(stderr,"\nSIC self-consistency solved in %s.\n",tsic.elapsed().c_str());
 	}
       }
-      
+
       // and update checkpoint file entries
       chkpt.write("C",sol.C);
       chkpt.write("E",sol.E);
       chkpt.write("P",sol.P);
       chkpt.write(sol.en);
-      
+
       // Do we need forces?
       if(force) {
 	solver.do_force(true);
@@ -1924,7 +1924,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     sol.Pa=form_density(sol.Ca,occa);
     sol.Pb=form_density(sol.Cb,occb);
     sol.P=sol.Pa+sol.Pb;
-    
+
     // Freeze core orbitals?
     if(freezecore) {
       // Get the natural orbitals
@@ -1967,7 +1967,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	if(adaptive) {
 	  // Solve unrestricted DFT problem first on a rough grid
 	  solver.UDFT(sol,occa,occb,initconv,initdft);
-	  
+
 	  if(verbose) {
 	    fprintf(stderr,"\n");
 	    fflush(stderr);
@@ -2004,7 +2004,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	  if(adaptive) {
 	    // Solve restricted DFT problem first on a rough grid
 	    solver.UDFT(sol,occa,occb,initconv,initdft);
-	    
+
 	    if(verbose) {
 	      fprintf(stderr,"\n");
 	      fflush(stderr);
@@ -2013,7 +2013,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	  // ... and then on the more accurate grid
 	  solver.UDFT(sol,occa,occb,conv,dft);
-	  
+
 	  // DFT grid
 	  DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
 	  if(!adaptive)
@@ -2030,35 +2030,35 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	  sol.Pa=form_density(sol.Ca,occa);
 	  sol.Pb=form_density(sol.Cb,occb);
 	  sol.P=sol.Pa+sol.Pb;
-	  
+
 	} else {
 	  if(verbose)
 	    printf("\nRunning SIC cycle until energy converged to %e and density to %e max, %e rms.\n\n",thr_dEmax,thr_dPmax,thr_dPrms);
-	  
+
 	  // Solution to last iteration
 	  uscf_t oldsol;
 
 	  // Iteration number
 	  int pziter=0;
-	  
+
 	  if(adaptive) {
 	    while(true) {
 	      // Change reference values
 	      oldsol=sol;
-	      
+
 	      // DFT grid
 	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
 	      if(!adaptive)
 		// Fixed size grid
 		grid.construct(initdft.nrad,initdft.lmax,initdft.x_func,initdft.c_func);
-	      
+
 	      // Get new SIC potential
 	      solver.PZSIC_UDFT(sol,occa,occb,initdft,pzmet,pzh,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	      pziter++;
-	      
+
 	      // Solve self-consistent field equations in presence of new SIC potential
 	      solver.UDFT(sol,occa,occb,conv,dft);
-	      
+
 	      // Energy difference
 	      double dE=sol.en.E-oldsol.en.E;
 	      // Density differences
@@ -2068,34 +2068,34 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	      double dPb_max=max_abs(sol.Pb-oldsol.Pb);
 	      double dP_rms=std::max(dPa_rms,dPb_rms);
 	      double dP_max=std::max(dPa_max,dPb_max);
-	      
+
 	      // Print out changes
 	      if(verbose) {
 		fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
-		
+
 		if(fabs(dE)<thr_dEmax)
 		  fprintf(stderr," % 10.3e*",dE);
 		else
 		  fprintf(stderr," % 10.3e ",dE);
-		
+
 		if(dP_rms<thr_dPrms)
 		  fprintf(stderr," %9.3e*",dP_rms);
 		else
 		  fprintf(stderr," %9.3e ",dP_rms);
-		
+
 		if(dP_max<thr_dPmax)
 		  fprintf(stderr," %9.3e*",dP_max);
 		else
 		  fprintf(stderr," %9.3e ",dP_max);
-		
+
 		fprintf(stderr,"\n");
-		
+
 		printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
 		printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
 		printf("%7s %13s %e %e\n","alpha","",dPa_max,dPa_rms);
 		printf("%7s %13s %e %e\n","beta","",dPb_max,dPb_rms);
 	      }
-	      
+
 	      if(fabs(dE)<thr_dEmax && std::max(dPa_rms,dPb_rms)<thr_dPrms && std::max(dPa_max,dPb_max)<thr_dPmax)
 		break;
 	      if(pziter==pzniter)
@@ -2103,24 +2103,24 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    }
 	    pziter=0;
 	  }
-	    
+
 	  while(true) {
 	    // Change reference values
 	    oldsol=sol;
-	    
+
 	    // DFT grid
 	    DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
 	    if(!adaptive)
 	      // Fixed size grid
 	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
-	    
+
 	    // Get new SIC potential
 	    solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzh,pzcor,grid,adaptive,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	    pziter++;
-	    
+
 	    // Solve self-consistent field equations in presence of new SIC potential
 	    solver.UDFT(sol,occa,occb,conv,dft);
-	    
+
 	    // Energy difference
 	    double dE=sol.en.E-oldsol.en.E;
 	    // Density differences
@@ -2130,34 +2130,34 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    double dPb_max=max_abs(sol.Pb-oldsol.Pb);
 	    double dP_rms=rms_norm(sol.P-oldsol.P);
 	    double dP_max=max_abs(sol.P-oldsol.P);
-	    
+
 	    // Print out changes
 	    if(verbose) {
 	      fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
-	      
+
 	      if(fabs(dE)<thr_dEmax)
 		fprintf(stderr," % 10.3e*",dE);
 	      else
 		fprintf(stderr," % 10.3e ",dE);
-	      
+
 	      if(dP_rms<thr_dPrms)
 		fprintf(stderr," %9.3e*",dP_rms);
 	      else
 		fprintf(stderr," %9.3e ",dP_rms);
-	      
+
 	      if(dP_max<thr_dPmax)
 		fprintf(stderr," %9.3e*",dP_max);
 	      else
 		fprintf(stderr," %9.3e ",dP_max);
-	      
+
 	      fprintf(stderr,"\n");
-	      
+
 	      printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
 	      printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
 	      printf("%7s %13s %e %e\n","alpha","",dPa_max,dPa_rms);
 	      printf("%7s %13s %e %e\n","beta","",dPb_max,dPb_rms);
 	    }
-	    
+
 	    if(fabs(dE)<thr_dEmax && std::max(dPa_rms,dPb_rms)<thr_dPrms && std::max(dPa_max,dPb_max)<thr_dPmax)
 	      break;
 	    if(pziter==pzniter)
@@ -2167,7 +2167,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	  if(verbose)
 	    fprintf(stderr,"\nSIC self-consistency solved in %s.\n",tsic.elapsed().c_str());
 	}
-	
+
 	// and update checkpoint file entries
 	chkpt.write("Ca",sol.Ca);
 	chkpt.write("Cb",sol.Cb);
@@ -2177,16 +2177,16 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	chkpt.write("Pb",sol.Pb);
 	chkpt.write("P",sol.P);
 	chkpt.write(sol.en);
-	
+
 	// Do we need forces?
 	if(force) {
 	  solver.do_force(true);
 	  solver.UDFT(sol,occa,occb,conv,dft);
 	}
-	
+
       }
     }
-    
+
     if(verbose) {
       population_analysis(basis,sol.Pa,sol.Pb);
     }
@@ -3703,7 +3703,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
     // and substract the occupied density
     for(size_t io=0;io<sol.C.n_cols;io++)
       O-=sol.C.col(io)*arma::trans(sol.C.col(io));
-    
+
     // Construct Hamiltonian
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       arma::cx_mat Pio=Ctilde.col(io)*arma::trans(Ctilde.col(io));
