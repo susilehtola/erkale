@@ -158,7 +158,9 @@ enum guess_t {
   /// Atomic guess
   ATOMGUESS,
   /// Molecular guess
-  MOLGUESS
+  MOLGUESS,
+  /// Generalized Wolfsberg--Helmholz
+  GWHGUESS
 };
 
 /// Perdew-Zunger SIC run mode
@@ -388,6 +390,16 @@ class SCF {
   arma::mat get_Sinvh() const;
   /// Get core Hamiltonian matrix
   arma::mat get_Hcore() const;
+
+  /// Do core guess
+  void core_guess(rscf_t & sol) const;
+  /// Do core guess
+  void core_guess(uscf_t & sol) const;
+
+  /// Do GWH guess
+  void gwh_guess(rscf_t & sol) const;
+  /// Do GWH guess
+  void gwh_guess(uscf_t & sol) const;
 };
 
 /// Determine effect of imaginary part of Fock operator on eigenvectors
