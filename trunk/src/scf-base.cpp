@@ -49,6 +49,8 @@ extern "C" {
 enum guess_t parse_guess(const std::string & val) {
   if(stricmp(val,"Core")==0)
     return COREGUESS;
+  else if(stricmp(val,"GWH")==0)
+    return GWHGUESS;
   else if(stricmp(val,"Atomic")==0)
     return ATOMGUESS;
   else if(stricmp(val,"Molecular")==0)
@@ -870,6 +872,48 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   }
 }
 
+void SCF::core_guess(rscf_t & sol) const {
+  // Get core Hamiltonian
+  sol.H=Hcore;
+  // and diagonalize it to get the orbitals
+  diagonalize(S,Sinvh,sol);
+}
+
+void SCF::core_guess(uscf_t & sol) const {
+  // Get core Hamiltonian
+  sol.Ha=Hcore;
+  sol.Hb=Hcore;
+  // and diagonalize it to get the orbitals
+  diagonalize(S,Sinvh,sol);
+}
+
+void SCF::gwh_guess(rscf_t & sol) const {
+  // Initialize matrix
+  sol.H=Hcore;
+  for(size_t i=0;i<Hcore.n_rows;i++) {
+    sol.H(i,i)=Hcore(i,i);
+    for(size_t j=0;j<Hcore.n_cols;j++) {
+      sol.H(i,j)=0.875*S(i,j)*(Hcore(i,i)+Hcore(j,j));
+      sol.H(j,i)=sol.H(i,j);
+    }
+  }
+  diagonalize(S,Sinvh,sol);
+}
+
+void SCF::gwh_guess(uscf_t & sol) const {
+  // Initialize matrix
+  sol.Ha=Hcore;
+  for(size_t i=0;i<Hcore.n_rows;i++) {
+    sol.Ha(i,i)=Hcore(i,i);
+    for(size_t j=0;j<i;j++) {
+      sol.Ha(i,j)=0.875*S(i,j)*(Hcore(i,i)+Hcore(j,j));
+      sol.Ha(j,i)=sol.Ha(i,j);
+    }
+  }
+  sol.Hb=sol.Ha;
+  diagonalize(S,Sinvh,sol);
+}
+
 double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him, double shift, const arma::mat & S, const arma::mat & Sinvh, const arma::mat & Pone) {
   // Matrix is really
   arma::cx_mat Htr=H+std::complex<double>(0.0,1.0)*Him;
@@ -1527,6 +1571,8 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
   bool freezecore=set.get_bool("FreezeCore");
   if(freezecore && guess==COREGUESS)
     throw std::runtime_error("Cannot freeze core orbitals with core guess!\n");
+  if(freezecore && guess==GWHGUESS)
+    throw std::runtime_error("Cannot freeze core orbitals with GWH guess!\n");
 
   if(doload) {
     Checkpoint load(loadname,false);
@@ -1611,12 +1657,11 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     SCF solver(basis,set,chkpt);
 
     // Core guess?
-    if(guess==COREGUESS) {
-      // Get core Hamiltonian
-      sol.H=solver.get_Hcore();
-      // and diagonalize it to get the orbitals
-      diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
-    }
+    if(guess==COREGUESS)
+      solver.core_guess(sol);
+    else if(guess==GWHGUESS)
+      solver.gwh_guess(sol);
+
     // Form density matrix
     sol.P=form_density(sol.C,occs);
 
@@ -1913,13 +1958,10 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     SCF solver(basis,set,chkpt);
 
     // Core guess?
-    if(guess==COREGUESS) {
-      // Get core Hamiltonian
-      sol.Ha=solver.get_Hcore();
-      sol.Hb=sol.Ha;
-      // and diagonalize it to get the orbitals
-      diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
-    }
+    if(guess==COREGUESS)
+      solver.core_guess(sol);
+    else if(guess==GWHGUESS)
+      solver.gwh_guess(sol);
     // Form density matrix
     sol.Pa=form_density(sol.Ca,occa);
     sol.Pb=form_density(sol.Cb,occb);
