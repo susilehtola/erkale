@@ -1718,7 +1718,7 @@ class CompletenessOptimizer {
   }
 
   /// Reduce the profile until only a single function is left on the highest am shell (polarization / correlation consistence)
-  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, int nred=3, bool saveall=false) {
+  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, int nred=3, bool saveall=false, bool allelectron=true) {
     printf("\n\n%s\n",print_bar("PROFILE REDUCTION").c_str());
     if(tol==0.0)
       printf("Running until would drop last function of %c shell.\n",shell_types[maxam(cpl)]);
@@ -1750,15 +1750,17 @@ class CompletenessOptimizer {
 	
 	// Sanity check
 	bool tryred=true;
-	for(int sam=am+1;sam<=maxam(cpl);sam++) {
-	  // Check that the shell has more functions than the one above.
-	  if(cpl[am].exps.size()<=cpl[sam].exps.size()) {
-	    printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
-	    fflush(stdout);
-	    tryred=false;
-	    break;
+	if(allelectron)
+	  // Only do composition check for all-electron calculations
+	  for(int sam=am+1;sam<=maxam(cpl);sam++) {
+	    // Check that the shell has more functions than the one above.
+	    if(cpl[am].exps.size()<=cpl[sam].exps.size()) {
+	      printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
+	      fflush(stdout);
+	      tryred=false;
+	      break;
+	    }
 	  }
-	}
 	if(!tryred)
 	  continue;
 
@@ -1924,7 +1926,7 @@ class CompletenessOptimizer {
     return minmog;
   }
 
-  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, int nred=3, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true, double saveall=false, double tol=0.0) {
+  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, int nred=3, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true, double saveall=false, double tol=0.0, bool allelectron=true) {
     // Reference value
     ValueType curval;
     {
@@ -1965,7 +1967,7 @@ class CompletenessOptimizer {
     double tau=0.0;
     while((tol>0.0 && tau<tol) || (tol==0.0 && npol>=1)) {
       // Reduce the profile
-      tau=reduce_profile(cpl,curval,cbsval,tol,nred,saveall);
+      tau=reduce_profile(cpl,curval,cbsval,tol,nred,saveall,allelectron);
 
       if(tol==0.0) {
 	printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
