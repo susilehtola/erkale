@@ -1767,9 +1767,9 @@ class CompletenessOptimizer {
 	// Form trials.
 	if(cpl[am].exps.size()==1) {
 	  std::vector<coprof_t> trcpl(cpl);
+	  trcpl[am].exps.clear();
 	  trcpl[am].start=0.0;
 	  trcpl[am].end=0.0;
-	  trcpl[am].start=0.0;
 
 	  // Add the trial to the stack
 	  trials.push_back(trcpl);
