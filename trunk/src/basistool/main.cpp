@@ -301,67 +301,10 @@ int main(int argc, char **argv) {
       return 1;
     }
 
-    // Output basis
-    BasisSetLibrary out;
     // Cutoff value
     double cutoff=atof(argv[3]);
-
-    // Elemental basis sets
-    std::vector<ElementBasisSet> elbases=bas.get_elements();
-
-    // Loop over elements
-    for(size_t iel=0;iel<elbases.size();iel++) {
-      // Decontract basis set (and sort exponents)
-      elbases[iel].decontract();
-
-      // Pruned exponents
-      std::vector<arma::vec> exps(elbases[iel].get_max_am()+1);
-      for(int am=0;am<=elbases[iel].get_max_am();am++) {
-	// Get exponents
-	arma::mat contr;
-	elbases[iel].get_primitives(exps[am],contr,am);
-	
-	// Prune the exponents
-	while(true) {
-	  // Compute overlap matrix
-	  arma::mat S=overlap(exps[am],exps[am],am);
-	  // Remove diagonal part
-	  S-=arma::eye(S.n_rows,S.n_cols);
-
-	  // Find maximum element
-	  arma::uword irow, icol;
-	  double Smax=S.max(irow,icol);
-
-	  // Break loop?
-	  if(Smax<cutoff)
-	    break;
-
-	  // Too large overlap. Merge exponents
-	  std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
-	  merged[irow]=sqrt(exps[am][irow]*exps[am][icol]);
-	  merged[icol]=merged[irow];
-	  printf("%-2s: merged %c exponents %e and %e with overlap %e to %e.\n",elbases[iel].get_symbol().c_str(),shell_types[am],exps[am][irow],exps[am][icol],Smax,merged[icol]);
-	  
-	  // Remove second value
-	  merged.erase(merged.begin()+irow);
-	  exps[am]=arma::conv_to<arma::vec>::from(merged);
-	}
-      }
-
-      // Form basis
-      ElementBasisSet newel(elbases[iel].get_symbol());
-      for(int am=0;am<=elbases[iel].get_max_am();am++)
-	for(size_t ix=0;ix<exps[am].n_elem;ix++) {
-	  FunctionShell fx(am);
-	  fx.add_exponent(1.0,exps[am](ix));
-	  newel.add_function(fx);
-	}
-
-      // Add element to new basis
-      out.add_element(newel);
-    }
-
-    out.save_gaussian94(argv[4]);
+    bas.merge(cutoff);
+    bas.save_gaussian94(argv[4]);
 
   } else if(stricmp(cmd,"norm")==0) {
     // Normalize basis
