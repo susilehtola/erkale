@@ -158,6 +158,9 @@ class ElementBasisSet {
    */
   void P_orthogonalize(double cutoff=1e-8, double Cortho=1e-4);
 
+  /// Merge primitives with large overlap (also decontracts basis)
+  void merge(double cutoff=0.9, bool verbose=true);
+
   /// Get maximum angular momentum used in the shells
   int get_max_am() const;
   /// Get angular momentum of i:th shell
@@ -263,6 +266,9 @@ class BasisSetLibrary {
    * coefficient is set to unity).
    */
   void P_orthogonalize(double cutoff=1e-8, double Cortho=1e-4);
+
+  /// Merge primitives with large overlap (also decontracts basis)
+  void merge(double cutoff=0.9, bool verbose=true);
 
   /// Augment the basis
   void augment(int naug);

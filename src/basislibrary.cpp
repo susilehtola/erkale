@@ -876,6 +876,127 @@ void ElementBasisSet::augment(int naug) {
   sort();
 }
 
+void ElementBasisSet::merge(double cutoff, bool verbose) {
+  // Pruned exponents
+  std::vector<arma::vec> exps(get_max_am()+1);
+  for(int am=0;am<=get_max_am();am++) {
+    // Get exponents
+    arma::mat contr;
+    get_primitives(exps[am],contr,am);
+
+    // Get contractions
+    arma::vec zfree, zgen;
+    arma::mat cgen;
+    get_primitives(zfree,zgen,cgen,am);
+
+    // Original exponents
+    const arma::vec E0(exps[am]);
+    
+    // Prune the exponents
+    while(true) {
+      // Compute overlap matrix
+      arma::mat S=overlap(exps[am],exps[am],am);
+      // Remove diagonal part
+      S-=arma::eye(S.n_rows,S.n_cols);
+      
+      // Find maximum element
+      arma::uword irow, icol;
+      double Smax=S.max(irow,icol);
+      
+      // Break loop?
+      if(Smax<cutoff)
+	break;
+      
+      // Too large overlap. Check for originality of exponents
+      bool roworig=false, colorig=false;
+      arma::uword rowix=0, colix=0;
+      for(size_t ix=0;ix<E0.n_elem;ix++) {
+	if(E0(ix) == exps[am](irow)) {
+	  roworig=true;
+	  rowix=ix;
+	}
+	if(E0(ix) == exps[am](icol)) {
+	  colorig=true;
+	  colix=ix;
+	}
+      }
+
+      bool dropped=false;
+
+      // Check if one was contracted
+      if(roworig && colorig) {
+	bool rowcontr=false, colcontr=false;
+	for(size_t ix=0;ix<zgen.n_elem;ix++) {
+	  if(zgen(ix)==E0(rowix))
+	    rowcontr=true;
+	  if(zgen(ix)==E0(colix))
+	    colcontr=true;
+	}
+
+	if(rowcontr && !colcontr) {
+	  // Drop col idx
+	  if(verbose)
+	    printf("%-2s: %c exponents %e and %e with overlap %e, dropped free primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](icol));
+
+	  std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
+	  merged.erase(merged.begin()+icol);
+	  exps[am]=arma::conv_to<arma::vec>::from(merged);
+	  dropped=true;
+	} else if(!rowcontr && colcontr) {
+	  // Drop row idx
+	  if(verbose)
+	    printf("%-2s: %c exponents %e and %e with overlap %e, dropped free primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](irow));
+	  
+	  std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
+	  merged.erase(merged.begin()+irow);
+	  exps[am]=arma::conv_to<arma::vec>::from(merged);
+	  dropped=true;
+	}
+	
+      } else if(roworig && !colorig) {
+	if(verbose)
+	  printf("%-2s: %c exponents %e and %e with overlap %e, dropped merged primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](icol));
+	
+	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
+	merged.erase(merged.begin()+icol);
+	exps[am]=arma::conv_to<arma::vec>::from(merged);
+	dropped=true;
+	
+      } else if(!roworig && colorig) {
+	// Drop row idx
+	if(verbose)
+	  printf("%-2s: %c exponents %e and %e with overlap %e, dropped merged primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](irow));
+	
+	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
+	merged.erase(merged.begin()+irow);
+	exps[am]=arma::conv_to<arma::vec>::from(merged);
+	dropped=true;
+      }
+      
+      if(!dropped) {
+	// Merge exponents
+	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
+	merged[irow]=sqrt(exps[am](irow)*exps[am](icol));
+	merged[icol]=merged[irow];
+	if(verbose)
+	  printf("%-2s: merged %c exponents %e and %e with overlap %e to %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,merged[icol]);
+	
+	// Remove second value
+	merged.erase(merged.begin()+irow);
+	exps[am]=arma::conv_to<arma::vec>::from(merged);
+      }
+    }
+  }
+  
+  // Replace shells
+  bf.clear();
+  for(size_t am=0;am<exps.size();am++)
+    for(size_t ix=0;ix<exps[am].n_elem;ix++) {
+      FunctionShell sh(am);
+      sh.add_exponent(1.0,exps[am](ix));
+      add_function(sh);
+    }
+}
 
 BasisSetLibrary::BasisSetLibrary() {
 }
@@ -1614,3 +1735,9 @@ void BasisSetLibrary::augment(int naug){
   for(size_t iel=0;iel<elements.size();iel++)
     elements[iel].augment(naug);
 }
+
+void BasisSetLibrary::merge(double cutoff, bool verbose) {
+  for(size_t iel=0;iel<elements.size();iel++)
+    elements[iel].merge(cutoff,verbose);
+}
+
