@@ -48,6 +48,9 @@ void Settings::add_scf_settings() {
   // Input system
   add_string("System", "System as an xyz file", "atoms.xyz");
 
+  // Electric field
+  add_string("EField", "Electric field", "0.0 0.0 0.0");
+
   // Log file
   add_string("Logfile", "File to print out full information, stdout for screen", "erkale.log");
 
