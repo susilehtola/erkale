@@ -67,6 +67,10 @@
 
 // Disable bounds checking in Armadillo.
 #define ARMA_NO_DEBUG
+// We need BLAS
+#define ARMA_USE_BLAS
+// and LAPACK
+#define ARMA_USE_LAPACK
 
 // Ångström in atomic units
 #define ANGSTROMINBOHR 1.8897261
