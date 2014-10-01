@@ -165,8 +165,41 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   if(verbose)
     printf("done (%s)\n",t.elapsed().c_str());
 
+  // Electric field?
+  arma::mat H_E(T.n_rows,T.n_cols);
+  H_E.zeros();
+
+  std::vector<std::string> Ef=splitline(set.get_string("EField"));
+  if(Ef.size()!=3)
+    throw std::runtime_error("EField must have 3 components!\n");
+  std::vector<double> E(Ef.size());
+  for(size_t i=0;i<Ef.size();i++)
+    E[i]=readdouble(Ef[i]);
+  if(E[0]!=0.0 || E[1] != 0.0 || E[2] != 0.0) {
+    // Compute center of charge
+    coords_t cen;
+    cen.x=cen.y=cen.z=0.0;
+    int Ztot=0;
+    for(size_t i=0;i<basis.get_Nnuc();i++) {
+      nucleus_t nuc=basis.get_nucleus(i);
+      if(!nuc.bsse) {
+	cen=cen+nuc.r*nuc.Z;
+	Ztot+=nuc.Z;
+      }
+    }
+    cen=cen/Ztot;
+    fprintf(stderr,"Center of charge at % .3f % .3f % .3f\n",cen.x/ANGSTROMINBOHR,cen.y/ANGSTROMINBOHR,cen.z/ANGSTROMINBOHR);
+
+    // Get dipole integrals
+    std::vector<arma::mat> dipint(basis.moment(1,cen.x,cen.y,cen.z));
+    // Accumulate
+    for(size_t i=0;i<E.size();i++)
+      // H_e = - E . qr
+      H_E+=E[i]*dipint[i];
+  }
+
   // Form core Hamiltonian
-  Hcore=T+Vnuc;
+  Hcore=T+Vnuc+H_E;
 
   if(verbose) {
     printf("\n");
