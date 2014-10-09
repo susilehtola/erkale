@@ -266,6 +266,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
 
   printf("\nLocalizing %i orbitals on center %i.\n",nloc,(int) xcatom+1);
 
+  printf("\t%2s %1s  %8s %7s\n","sh","i","occ","R [Å]");
   // Loop over orbitals
   int iloc=0;
   while(iloc<nloc) {
@@ -274,27 +275,30 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
 
     // Degeneracy is
     double deg=2*am+1;
-    // Check the next ones are OK as well
-    for(int oi=1;oi<deg;oi++)
-      if(lval(iloc+oi)!=lval(iloc)) {
-	lval.t().print("Orbital angular momentum");
-	fflush(stdout);
-	std::ostringstream oss;
-	oss << "Error localizing orbitals " << iloc+1 << " to " << iloc+deg << ".\n";
-	throw std::runtime_error(oss.str());
+    // Calculate amount of orbitals
+    int norb;
+    for(norb=0;norb<deg;norb++)
+      if(lval(iloc+norb)!=lval(iloc)) {
+	break;
       }
 
-    printf("Localized %i%c shell (orbitals %3i .. %3i) with Rrms=%6.3f Å ... %6.3f Å.\n",orbidx(am),shell_types[am],(int)(iloc+1),(int) (iloc+deg),reig(iloc)/ANGSTROMINBOHR,reig(iloc+deg-1)/ANGSTROMINBOHR);
-
     // Store index of initial orbital?
-    if(am == lxc && orbidx(am) == nxc)
+    if(am == lxc && orbidx(am) == nxc) {
       ixc=iloc;
+
+      printf("\t%i%c %1i* %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),1,dec(iloc,lval(iloc)),reig(iloc)/ANGSTROMINBOHR);
+      for(int i=1;i<norb;i++)
+	printf("\t%i%c %1i  %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
+    } else {
+      for(int i=0;i<norb;i++)
+	printf("\t%i%c %1i  %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
+    }
 
     // Increment shell count
     orbidx(am)++;
-
+    
     // Increment localization count
-    iloc+=deg;
+    iloc+=norb;
   }
 
   // Check orthonormality
