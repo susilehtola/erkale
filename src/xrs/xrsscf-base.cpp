@@ -184,6 +184,15 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
 
   // Charge of atom is
   int Z=basis.get_nucleus(xcatom).Z;
+  // Pad to next noble atom to account for multiplicity and state
+  for(size_t i=0;i<sizeof(magicno)/sizeof(magicno[0])-1;i++) {
+    if(Z==magicno[i])
+      break;
+    else if(Z>magicno[i] && Z<=magicno[i+1]) {
+      Z=magicno[i+1];
+      break;
+    }
+  }
 
   // Determine amount of orbitals to localize on atom.
   int nloc=0;
@@ -197,36 +206,40 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
       nloc+=nsh;
     else
       break;
-  }      
+  }
+
+  // Sanity check
+  if(nloc>nocc)
+    nloc=nocc;
 
   // The atom is located at
   coords_t cen=basis.get_nuclear_coords(xcatom);
-      
+
   // Compute moment integrals around the nucleus
   std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
   // Get matrix which transforms into non-localized block of occupied MO basis
   arma::mat locblock=C.submat(0,0,C.n_rows-1,nocc-1);
-      
+
   // Sum together to get x^2 + y^2 + z^2
   arma::mat rsqmat_AO=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
   // and transform into the occupied MO basis
   arma::mat rsqmat(arma::trans(locblock)*rsqmat_AO*locblock);
-  
+
   // Diagonalize rsq_mo
   arma::vec reig;
   arma::mat rvec;
   eig_sym_ordered(reig,rvec,rsqmat);
-  
+
   // and rotate orbitals to the new basis
   C.submat(0,0,C.n_rows-1,nocc-1)=locblock*rvec;
 
   // Orbitals to consider
   arma::mat Cc(C.submat(0,0,C.n_rows-1,nloc-1));
-  
+
   // Run lm decomposition of orbitals
   const real_expansion_t orbexp(expand_orbitals_real(Cc,basis,cen,false));
   const arma::mat dec=weight_decomposition(orbexp,false); // Don't include total norm
-  
+
   // Orbital angular momenta
   arma::uvec lval(nloc);
   for(int io=0;io<nloc;io++) {
@@ -250,7 +263,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
 
   // Index of wanted state
   int ixc=0;
-  
+
   printf("\nLocalizing %i orbitals on center %i.\n",nloc,(int) xcatom+1);
 
   // Loop over orbitals
@@ -258,7 +271,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
   while(iloc<nloc) {
     // Angular momentum is
     int am=lval(iloc);
-    
+
     // Degeneracy is
     double deg=2*am+1;
     // Check the next ones are OK as well
@@ -270,26 +283,26 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
 	oss << "Error localizing orbitals " << iloc+1 << " to " << iloc+deg << ".\n";
 	throw std::runtime_error(oss.str());
       }
-    
+
     printf("Localized %i%c shell (orbitals %3i .. %3i) with Rrms=%6.3f Å ... %6.3f Å.\n",orbidx(am),shell_types[am],(int)(iloc+1),(int) (iloc+deg),reig(iloc)/ANGSTROMINBOHR,reig(iloc+deg-1)/ANGSTROMINBOHR);
-    
+
     // Store index of initial orbital?
     if(am == lxc && orbidx(am) == nxc)
       ixc=iloc;
-    
+
     // Increment shell count
     orbidx(am)++;
-    
+
     // Increment localization count
     iloc+=deg;
   }
-  
+
   // Check orthonormality
   check_orth(C,S,false);
-  
+
   printf("\n");
   fflush(stdout);
-  
+
   // Return index of localized orbital
   return ixc;
 }
