@@ -1017,10 +1017,10 @@ int main(int argc, char **argv) {
       // Determine orbitals and update energies
       if(spin) {
 	icore=localize(basis,noccb,xcatom,sol.Cb,state);
-	sol.Eb=arma::trans(sol.Cb)*sol.Hb*sol.Cb;
+	sol.Eb=arma::diagvec(arma::trans(sol.Cb)*sol.Hb*sol.Cb);
       } else {
 	icore=localize(basis,nocca,xcatom,sol.Ca,state);
-	sol.Ea=arma::trans(sol.Ca)*sol.Ha*sol.Ca;
+	sol.Ea=arma::diagvec(arma::trans(sol.Ca)*sol.Ha*sol.Ca);
       }
     }
 
