@@ -81,7 +81,7 @@ class ERItable {
   void get_range_separation(double & omega, double & alpha, double & beta);
 
   /// Fill table
-  void fill(const BasisSet * basis, double tol=DBL_EPSILON);
+  void fill(const BasisSet * basis, double shtol, double tol=DBL_EPSILON, bool verbose=true);
 
   /// Compute number of integrals
   size_t N_ints(const BasisSet * basis) const;

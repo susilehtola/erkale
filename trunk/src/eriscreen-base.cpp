@@ -72,7 +72,7 @@ void ERIscreen::get_range_separation(double & w, double & a, double & b) {
   b=beta;
 }
 
-void ERIscreen::fill(const BasisSet * basisv) {
+void ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
   // Form screening table.
 
   if(basisv==NULL)
@@ -84,7 +84,7 @@ void ERIscreen::fill(const BasisSet * basisv) {
   iidx=i_idx(basp->get_Nbf());
 
   // Screening matrix and pairs
-  shpairs=basp->get_eripairs(screen);
+  shpairs=basp->get_eripairs(screen,shtol,verbose);
 
   // Get minimum of screening matrix
   //  double minval=min(min(screen));

@@ -76,7 +76,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       fcoul=dfit.force_J(sol.P);
     } else {
       if(!direct)
-	scr.fill(basisp);
+	scr.fill(basisp,shpairthr,verbose);
       
       fcoul=scr.forceJ(sol.P,tol,NULL);
     }
@@ -84,7 +84,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 #endif
       
     if(!direct)
-      scr.fill(basisp);
+      scr.fill(basisp,shpairthr,verbose);
     
 #ifdef RESTRICTED
     scr.forceJK(sol.P,fcoul,fx_long,tol,NULL);
@@ -105,7 +105,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   if(omega != 0.0) {
     // Set range separation and fill (low-cost compared to forces anyway)
     scr_rs.set_range_separation(omega,0.0,1.0);
-    scr_rs.fill(basisp);
+    scr_rs.fill(basisp,shpairthr,verbose);
       
     // Exchange forces
 #ifdef RESTRICTED

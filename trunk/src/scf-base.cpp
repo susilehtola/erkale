@@ -92,6 +92,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   direct=set.get_bool("Direct");
   decfock=set.get_bool("DecFock");
   strictint=set.get_bool("StrictIntegrals");
+  shpairthr=set.get_double("ShPairThr");
 
   doforce=false;
 
@@ -286,10 +287,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
       if(decfock)
 	// Use decontracted basis
-	scr.fill(&decbas);
+	scr.fill(&decbas,shpairthr,verbose);
       else
 	// Use contracted basis
-	scr.fill(&basis);
+	scr.fill(&basis,shpairthr,verbose);
 
     } else {
       // Compute memory requirement
@@ -301,7 +302,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	fflush(stdout);
       }
       // Don't compute small integrals
-      tab.fill(&basis,STRICTTOL);
+      tab.fill(&basis,shpairthr,STRICTTOL,verbose);
     }
 
     if(verbose)

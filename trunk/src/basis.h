@@ -242,7 +242,7 @@ class BasisSet {
   std::vector<shellpair_t> get_unique_shellpairs() const;
 
   /// Get list of ERI pairs. Screening matrix will also be calculated
-  std::vector<eripair_t> get_eripairs(arma::mat & screen) const;
+  std::vector<eripair_t> get_eripairs(arma::mat & screen, double thr=1e-11, bool verbose=false) const;
 
   /// Convert contractions from normalized primitives to unnormalized primitives
   void convert_contractions();
