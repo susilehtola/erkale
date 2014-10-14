@@ -72,7 +72,7 @@ class ERIscreen {
   void get_range_separation(double & omega, double & alpha, double & beta);
 
   /// Form screening matrix
-  void fill(const BasisSet * basis=NULL);
+  void fill(const BasisSet * basis, double shtol, bool verbose=true);
 
   /// Calculate Coulomb matrix with tolerance tol for integrals, store efficiency of screening in *eff
   arma::mat calcJ(const arma::mat & R, double tol, double *eff=NULL) const;

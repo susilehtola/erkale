@@ -277,6 +277,8 @@ class SCF {
   bool decfock;
   /// Strict integrals?
   bool strictint;
+  /// Shell pair screening threshold
+  double shpairthr;
   /// Density fitting calculation?
   bool densityfit;
   /// Memory allocation for density fitting
