@@ -738,8 +738,9 @@ class CompletenessOptimizer {
    * polinterp: toggle interpolation of mog to find maximum
    * cotol:     deviation from completeness
    * nx:        amounts of exponents to place on the shell
+   * forcesub:  force the subset composition: ..., d subset p, p subset s
    */
-  double check_polarization(std::vector<coprof_t> & cpl, ValueType & curval, int am_max, double minpol, double maxpol, double dpol, bool polinterp, double cotol, int nx) {
+  double check_polarization(std::vector<coprof_t> & cpl, ValueType & curval, int am_max, double minpol, double maxpol, double dpol, bool polinterp, double cotol, int nx, bool forcesub=false) {
 
     printf("\n\n%s\n",print_bar("POLARIZATION SHELLS").c_str());
     fflush(stdout);
@@ -960,12 +961,99 @@ class CompletenessOptimizer {
       curval=vals[imax];
     }
 
-    printf("\nOptimal %c shell is: % .3f ... % .3f (%i funcs) with tolerance %e, mog = %e. (%s)\n\n",shell_types[addam],cpl[addam].start,cpl[addam].end,(int) cpl[addam].exps.size(),cpl[addam].tol,maxmog,tpol.elapsed().c_str());
+    printf("\nOptimal %c shell is: % .3f ... % .3f (%i funcs) with tolerance %e, mog = %e. (%s)\n",shell_types[addam],cpl[addam].start,cpl[addam].end,(int) cpl[addam].exps.size(),cpl[addam].tol,maxmog,tpol.elapsed().c_str());
+    print_value(curval,"Polarized value");
     fflush(stdout);
-
+    
+    if(forcesub)
+      comply_subset(cpl,curval);
+    
     return maxmog;
   }
+  
+  /// Reform to comply to subset requirement
+  bool comply_subset(std::vector<coprof_t> & cpl, ValueType & curval) {
 
+    // Need update?
+    bool upd=false;
+    // Message printed?
+    bool printed=false;
+    
+    for(int am=maxam(cpl);am>=0;am--) {
+      // Move ends by
+      double smove=0.0;
+      double emove=0.0;
+      coprof_t Yam(cpl[am]);
+      
+      // Figure out moves
+      for(int ham=am+1;ham<=maxam(cpl);ham++) {
+	double ds=cpl[am].start-cpl[ham].start;
+	double de=cpl[ham].end-cpl[am].end;
+	
+	smove=std::max(ds,smove);
+	emove=std::max(de,emove);
+	if(cpl[ham].tol<Yam.tol)
+	  Yam.tol=cpl[ham].tol;
+      }
+      
+      Timer tam;
+      
+      // Move ends by
+      double tmove=smove+emove;
+      if(tmove==0.0 && Yam.tol==cpl[am].tol)
+	continue;
+
+      // Print out info bar
+      if(!printed) {
+	printf("\n\n%s\n",print_bar("Subset check",'-').c_str());
+	fflush(stdout);
+	printed=true;
+      }
+      
+      // Current width is
+      double curw=cpl[am].end-cpl[am].start;
+      // Necessary width is
+      double nw=curw+tmove;
+      
+      // Get real width
+      double realw(nw);
+      arma::vec exps=span_width(am,Yam.tol,realw,Yam.exps.size());
+      
+      // Adjust profile
+      int nadd=(int) (exps.size()-cpl[am].exps.size());
+      double sreal=(realw-curw)*smove/tmove;
+      double ereal=(realw-curw)*emove/tmove;
+
+      if(smove>0.0)
+	printf("%c lower limit should be moved by % .3f; moved by % .3f.\n",shell_types[am],smove,sreal);
+      if(emove>0.0)
+	printf("%c upper limit should be moved by % .3f; moved by % .3f.\n",shell_types[am],emove,ereal);
+      if(cpl[am].tol != Yam.tol)
+	printf("%c tolerance reduced from %e to %e.\n",shell_types[am],cpl[am].tol,Yam.tol);
+      printf("%i exponents added to %c shell (%s)\n\n",nadd,shell_types[am],tam.elapsed().c_str());
+      fflush(stdout);
+      
+      Yam.start-=sreal;
+      Yam.end+=ereal;
+      Yam.exps=move_exps(exps,Yam.start);
+      upd=true;
+      cpl[am]=Yam;
+    }
+
+    if(upd) {
+      // Update current value
+      std::vector< std::vector<coprof_t> > cplv(1,cpl);
+      std::vector<ValueType> rval(compute_values(cplv));
+      curval=rval[0];
+      print_value(curval,"Updated value");
+      print_limits(cpl,"Updated limits");
+
+      printf("%s\n\n",print_bar("End check",'-').c_str());
+    }
+
+    return upd;
+  }
+  
   /**
    * Scan stability of an existing shell by placing in an additional exponent.
    *
@@ -976,8 +1064,9 @@ class CompletenessOptimizer {
    * tol:       tolerance threshold
    * allam:     accept trials for all am at once
    * bothsd:    accept trials for steep and diffuse directions simultaneously
+   * forcesub:  force the subset composition: ..., d subset p, p subset s
    */
-  double scan_profile(std::vector<coprof_t> & cpl, ValueType & curval, int npoints, double dpol, double tol, bool allam=true, bool bothsd=true) {
+  double scan_profile(std::vector<coprof_t> & cpl, ValueType & curval, int npoints, double dpol, double tol, bool allam=true, bool bothsd=true, bool forcesub=false) {
 
     printf("\n\n%s\n",print_bar("SHELL STABILITY").c_str());
     fflush(stdout);
@@ -1180,43 +1269,53 @@ class CompletenessOptimizer {
 	// Adjust profile
 	for(size_t i=0;i<idxlist.size();i++) {
 	  imax=idxlist[i];
-	  if(trexp[imax] < cpl[scanam].start) {
-	    // Current width is
-	    double curw=cpl[scanam].end-cpl[scanam].start;
-	    // Necessary width is
-	    double nw=cpl[scanam].end-trexp[imax];
-	    // Get real width
-	    double realw(nw);
-	    arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
 
-	    // Adjust profile
-	    cpl[scanam].start-=realw-curw;
-	    cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
-	    moved=-(realw-curw);
+	  int minam=scanam;
+	  int maxam=scanam;
+	  if(forcesub)
+	    minam=0;
 
-	  } else if(trexp[imax] > cpl[scanam].end) {
-	    // Current width is
-	    double curw=cpl[scanam].end-cpl[scanam].start;
-	    // Necessary width is
-	    double nw=trexp[imax]-cpl[scanam].start;
-	    // Get real width
-	    double realw(nw);
-	    arma::vec exps=span_width(scanam,cpl[scanam].tol,realw,cpl[scanam].exps.size());
+	  for(int am=minam;am<=maxam;am++) {
+	    moved=0.0;
 
-	    // Adjust profile
-	    cpl[scanam].end+=realw-curw;
-	    cpl[scanam].exps=move_exps(exps,cpl[scanam].start);
-	    moved=+(realw-curw);
-
-	  } else {
-	    throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
+	    if(trexp[imax] < cpl[am].start) {
+	      // Current width is
+	      double curw=cpl[am].end-cpl[am].start;
+	      // Necessary width is
+	      double nw=cpl[am].end-trexp[imax];
+	      // Get real width
+	      double realw(nw);
+	      arma::vec exps=span_width(am,cpl[am].tol,realw,cpl[am].exps.size());
+	      
+	      // Adjust profile
+	      cpl[am].start-=realw-curw;
+	      cpl[am].exps=move_exps(exps,cpl[am].start);
+	      moved=-(realw-curw);
+	      
+	    } else if(trexp[imax] > cpl[am].end) {
+	      // Current width is
+	      double curw=cpl[am].end-cpl[am].start;
+	      // Necessary width is
+	      double nw=trexp[imax]-cpl[am].start;
+	      // Get real width
+	      double realw(nw);
+	      arma::vec exps=span_width(am,cpl[am].tol,realw,cpl[am].exps.size());
+	      
+	      // Adjust profile
+	      cpl[am].end+=realw-curw;
+	      cpl[am].exps=move_exps(exps,cpl[am].start);
+	      moved=+(realw-curw);
+	      
+	    } else if(am==scanam) {
+	      throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
+	    }
+	    
+	    if(moved>0.0)
+	      printf("%c upper limit should be moved by % .3f (% .3f spacings). (%s)\n",shell_types[am],moved,moved/spacing(am),tam.elapsed().c_str());
+	    else if(moved<0.0)
+	      printf("%c lower limit should be moved by % .3f (% .3f spacings). (%s)\n",shell_types[am],-moved,-moved/spacing(am),tam.elapsed().c_str());
+	    fflush(stdout);
 	  }
-
-	  if(moved>0.0)
-	    printf("%c upper limit should be moved by % .3f (% .3f spacings). (%s)\n",shell_types[scanam],moved,moved/spacing(scanam),tam.elapsed().c_str());
-	  else
-	    printf("%c lower limit should be moved by % .3f (% .3f spacings). (%s)\n",shell_types[scanam],-moved,-moved/spacing(scanam),tam.elapsed().c_str());
-	  fflush(stdout);
 	}
       }
       printf("\n");
@@ -1239,7 +1338,7 @@ class CompletenessOptimizer {
   }
 
   /// Extend the current shells until mog < tau. Returns maximal mog
-  double extend_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, int next=3, int nxadd=1) {
+  double extend_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, int next=3, int nxadd=1, bool forcesub=false) {
     printf("\n\n%s\n",print_bar("PROFILE EXTENSION").c_str());
     printf("Final tolerance is %e.\n",tau);
     fflush(stdout);
@@ -1345,6 +1444,12 @@ class CompletenessOptimizer {
 	print_value(curval,"Final value");
 	print_limits(cpl,"Final limits");
 	fflush(stdout);
+	
+	if(forcesub) {
+	  bool upd=comply_subset(cpl,curval);
+	  if(upd)
+	    continue;
+	}
 
 	return maxmog;
 
@@ -1368,7 +1473,7 @@ class CompletenessOptimizer {
 
 
   /// Tighten the shells until mog < tau. Returns maximal mog.
-  double tighten_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, int nxadd=1) {
+  double tighten_profile(std::vector<coprof_t> & cpl, ValueType & curval, double tau, int nxadd=1, bool forcesub=false) {
     printf("\n\n%s\n",print_bar("PROFILE TIGHTENING").c_str());
     printf("Final tolerance is %e.\n",tau);
     fflush(stdout);
@@ -1445,6 +1550,9 @@ class CompletenessOptimizer {
 	print_limits(cpl,"Final tolerances");
 	fflush(stdout);
 
+	if(forcesub)
+	  comply_subset(cpl,curval);
+
 	return maxmog;
 
       } else {
@@ -1471,7 +1579,7 @@ class CompletenessOptimizer {
   virtual void print_value(const ValueType & value, std::string msg)=0;
 
   /// Extend the basis set till the CBS limit.
-  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool extend=true, int next=3, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, bool cbsinterp=true, double cbsthr=0.0, double delta=0.9) {
+  void find_cbs_limit(std::vector<coprof_t> & cpl, ValueType & curval, double cotol, double minpol, double maxpol, double dpol, bool extend=true, int next=3, bool scan=true, int nscan=5, bool polinterp=true, int nxpol=1, bool doadd=true, int nxext=1, int am_max=max_am, bool cbsinterp=true, double cbsthr=0.0, double delta=0.9, bool allam=true, bool bothsd=true, bool forcesub=false) {
     // Amount of polarization shells
     int npol=maxam(cpl)-atom_am();
 
@@ -1497,7 +1605,7 @@ class CompletenessOptimizer {
     {
       std::vector<coprof_t> polcpl(cpl);
       ValueType polval(curval);
-      tau=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol);
+      tau=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol,forcesub);
     }
 
     // Mogs of added polarization shells
@@ -1508,17 +1616,17 @@ class CompletenessOptimizer {
       double extmog=0.0;
 
       if(extend)
-	extmog=extend_profile(cpl,curval,tau,next,nxext);
+	extmog=extend_profile(cpl,curval,tau,next,nxext,forcesub);
       // Tighten existing shells
       if(doadd) {
-	double amog=tighten_profile(cpl,curval,tau,1);
+	double amog=tighten_profile(cpl,curval,tau,1,forcesub);
 	extmog=std::max(extmog,amog);
       }
 
       // Compute mog of further polarization shell
       std::vector<coprof_t> polcpl(cpl);
       ValueType polval(curval);
-      double polmog=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol);
+      double polmog=check_polarization(polcpl,polval,am_max,minpol,maxpol,dpol,polinterp,cotol,nxpol,forcesub);
 
       // What is the maximum mog?
       if(extmog >= std::max(polmog,cbsthr)) {
@@ -1533,7 +1641,7 @@ class CompletenessOptimizer {
 	  // Before adding new polarization shell, scan the stability of the existing shells.
 	  std::vector<coprof_t> scancpl(cpl);
 	  ValueType scanval(curval);
-	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol,std::max(polmog,cbsthr));
+	  double scanmog=scan_profile(scancpl,scanval,nscan,dpol,std::max(polmog,cbsthr),allam,bothsd,forcesub);
 
 	  print_value(scanval,"Compound value");
 	  print_limits(scancpl,"Compound limits");
@@ -1660,16 +1768,16 @@ class CompletenessOptimizer {
 
 	  while(true) {
 	    // Check shell extension
-	    extend_profile(cpl,curval,tau,next,nxext);
+	    extend_profile(cpl,curval,tau,next,nxext,forcesub);
 	    if(doadd)
-	      tighten_profile(cpl,curval,tau);
+	      tighten_profile(cpl,curval,tau,1,forcesub);
 
 	    double scanmog=0.0;
 	    if(scan) {
 	      // Before adding new polarization shell, scan the stability of the existing shells.
 	      std::vector<coprof_t> scancpl(cpl);
 	      ValueType scanval(curval);
-	      scanmog=scan_profile(scancpl,scanval,nscan,dpol,tau);
+	      scanmog=scan_profile(scancpl,scanval,nscan,dpol,tau,allam,bothsd,forcesub);
 
 	      if(scanmog>=tau) {
 		// Instability detected, real mog is
@@ -1718,7 +1826,7 @@ class CompletenessOptimizer {
   }
 
   /// Reduce the profile until only a single function is left on the highest am shell (polarization / correlation consistence)
-  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, int nred=3, bool saveall=false, bool allelectron=true) {
+  double reduce_profile(std::vector<coprof_t> & cpl, ValueType & curval, const ValueType & refval, double tol=0.0, int nred=3, bool saveall=false, bool allelectron=true, bool forcesub=false) {
     printf("\n\n%s\n",print_bar("PROFILE REDUCTION").c_str());
     if(tol==0.0)
       printf("Running until would drop last function of %c shell.\n",shell_types[maxam(cpl)]);
@@ -1753,8 +1861,8 @@ class CompletenessOptimizer {
 	if(allelectron)
 	  // Only do composition check for all-electron calculations
 	  for(int sam=am+1;sam<=maxam(cpl);sam++) {
-	    // Check that the shell has more functions than the one above.
-	    if(cpl[am].exps.size()<=cpl[sam].exps.size()) {
+	    // Check that the reduced shell would have more functions than the ones above.
+	    if(cpl[am].exps.size()<=cpl[sam].exps.size()+2) {
 	      printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
 	      fflush(stdout);
 	      tryred=false;
@@ -1809,19 +1917,32 @@ class CompletenessOptimizer {
 	    trcpl[am].start=cpl[am].start+(1.0-d)*step;
 	    trcpl[am].end=cpl[am].end-d*step;
 	    trcpl[am].exps=move_exps(exps,trcpl[am].start);
+	    
+	    bool dotrial=true;
+	    if(forcesub) {
+	      // Sanity check trial
+	      for(int ham=am+1;ham<=maxam(cpl);ham++) {
+		if(cpl[ham].start<trcpl[am].start)
+		  dotrial=false;
+		if(cpl[ham].end>trcpl[am].end)
+		  dotrial=false;
+	      }
+	    }
 
 	    // Add the trial to the stack
-	    trials.push_back(trcpl);
-	    tram.push_back(am);
-
-	    char msg[200];
-	    if(itr==0)
-	      sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
-	    else if(itr==nred-1)
-	      sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
-	    else
-	      sprintf(msg,"Moved starting point of %c shell by %.3f and ending point by %.3f",shell_types[am],(1.0-d)*step,d*step);
-	    descr.push_back(msg);
+	    if(dotrial) {
+	      trials.push_back(trcpl);
+	      tram.push_back(am);
+	      
+	      char msg[200];
+	      if(itr==0)
+		sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
+	      else if(itr==nred-1)
+		sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
+	      else
+		sprintf(msg,"Moved starting point of %c shell by %.3f and ending point by %.3f",shell_types[am],(1.0-d)*step,d*step);
+	      descr.push_back(msg);
+	    }
 	  }
 
 	  // Keep limits but drop a function. The deviation from
@@ -1926,7 +2047,7 @@ class CompletenessOptimizer {
     return minmog;
   }
 
-  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, int nred=3, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true, double saveall=false, double tol=0.0, bool allelectron=true) {
+  void reduce_basis(const std::vector<coprof_t> & cbscpl, std::vector<coprof_t> & cpl, int nred=3, bool docontr=true, bool restr=true, double nelcutoff=0.01, double Porth=true, double saveall=false, double tol=0.0, bool allelectron=true, bool forcesub=false) {
     // Reference value
     ValueType curval;
     {
@@ -1967,7 +2088,7 @@ class CompletenessOptimizer {
     double tau=0.0;
     while((tol>0.0 && tau<tol) || (tol==0.0 && npol>=1)) {
       // Reduce the profile
-      tau=reduce_profile(cpl,curval,cbsval,tol,nred,saveall,allelectron);
+      tau=reduce_profile(cpl,curval,cbsval,tol,nred,saveall,allelectron,forcesub);
 
       if(tol==0.0) {
 	printf("Final composition for %i polarization shells (mog = %e):\n",npol,tau);
@@ -2088,7 +2209,7 @@ class CompletenessOptimizer {
 	  free=false;
 
 	if(restr && am+1<cpl.size()) {
-	  // Check that the shell has more functions than the one above.
+	  // Check that the shell has more free functions than the one above.
 	  int Ncur=cpl[am].exps.size()-contract[am];
 	  int Nnext=cpl[am+1].exps.size();
 	  if(am+1<contract.size())
@@ -2096,12 +2217,12 @@ class CompletenessOptimizer {
 
 	  // If the amount of functions is the same or smaller, don't try to contract.
 	  if(Ncur<=Nnext) {
-	    printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
+	    printf("%c shell (%i free funcs) limited due to %c shell (%i free funcs).\n",shell_types[am],Ncur,shell_types[am+1],Nnext);
 	    fflush(stdout);
 	    free=false;
 	  }
 	}
-
+	
 	if(free) {
 	  // We still have free functions left, form trial contraction
 	  std::vector<size_t> tr(contract);
