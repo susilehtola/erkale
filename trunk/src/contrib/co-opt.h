@@ -1536,7 +1536,7 @@ class CompletenessOptimizer {
 	if(amidx[am].n_elem) {
 	  printf("\t%-2c %e\n",shell_types[am],arma::max(ammog[am]));
 	} else
-	  printf("\t%-2c %8s %e\n",shell_types[am],"",0.0);
+	  printf("\t%-2c %e\n",shell_types[am],"",0.0);
       fflush(stdout);
 
       // Figure out maximal mog
@@ -1862,7 +1862,7 @@ class CompletenessOptimizer {
 	  // Only do composition check for all-electron calculations
 	  for(int sam=am+1;sam<=maxam(cpl);sam++) {
 	    // Check that the reduced shell would have more functions than the ones above.
-	    if(cpl[am].exps.size()<=cpl[sam].exps.size()+2) {
+	    if(cpl[am].exps.size()-1 <= cpl[sam].exps.size()) {
 	      printf("%c shell limited due to %c shell.\n",shell_types[am],shell_types[am+1]);
 	      fflush(stdout);
 	      tryred=false;
@@ -1990,7 +1990,7 @@ class CompletenessOptimizer {
 	if(amidx[am].n_elem) {
 	  printf("\t%-2c %e\n",shell_types[am],arma::min(ammog[am]));
 	} else
-	  printf("\t%-2c %8s %e\n",shell_types[am],"",0.0);
+	  printf("\t%-2c %e\n",shell_types[am],"",0.0);
       fflush(stdout);
 
       // Figure out minimal mog.
