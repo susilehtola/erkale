@@ -77,7 +77,7 @@ arma::vec legendre_set(const arma::vec & A, int Nf) {
   // Get Pk matrix
   arma::mat Pk=legendre_P_mat(Nf,A.n_elem);
   // Exponents are
-  arma::vec exps=arma::exp(Pk*A);
+  arma::vec exps=arma::exp10(Pk*A);
 
   return exps;
 }
