@@ -19,12 +19,11 @@
 #ifndef ERKALE_SETTINGS
 #define ERKALE_SETTINGS
 
+#include "global.h"
+#include "stringutil.h"
+#include <armadillo>
 #include <vector>
 #include <string>
-
-#define ISDOUBLE 0
-#define ISINT 1
-#define ISSTRING 2
 
 /// Setting with a double-type value
 typedef struct {
@@ -120,6 +119,13 @@ class Settings {
   int get_int(std::string name) const;
   /// Get a string valued setting
   std::string get_string(std::string name) const;
+
+  /// Get a string setting and parse it as a vector
+  arma::vec  get_vec(std::string name)  const;
+  /// Get a string setting and parse it as an integer vector
+  arma::ivec get_ivec(std::string name) const;
+  /// Get a string setting and parse it as an unsigned integer vector
+  arma::uvec get_uvec(std::string name) const;
 
   /// Is "name" a setting of double type? Returns index + 1 if found, else 0.
   size_t is_double(std::string name) const;

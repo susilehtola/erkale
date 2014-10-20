@@ -332,6 +332,30 @@ std::string Settings::get_string(std::string name) const {
   return "";
 }
 
+arma::vec Settings::get_vec(std::string name) const {
+  std::vector<std::string> v(splitline(get_string(name)));
+
+  arma::vec x(v.size());
+  for(size_t i=0;i<x.n_elem;i++)
+    x(i)=readdouble(v[i]);
+
+  return x;
+}
+
+arma::ivec Settings::get_ivec(std::string name) const {
+  std::vector<std::string> v(splitline(get_string(name)));
+
+  arma::ivec x(v.size());
+  for(size_t i=0;i<x.n_elem;i++)
+    x(i)=readint(v[i]);
+
+  return x;
+}
+
+arma::uvec Settings::get_uvec(std::string name) const {
+  return arma::conv_to<arma::uvec>::from(get_ivec(name));
+}
+
 size_t Settings::is_double(std::string name) const {
   for(size_t i=0;i<dset.size();i++)
     if(stricmp(name,dset[i].name)==0)
