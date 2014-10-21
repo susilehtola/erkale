@@ -15,6 +15,12 @@
  */
 
 /**
+ * NOTE - THIS FILE HAS BEEN DEPRECATED IN FAVOR OF THE MORE MODERN,
+ * GENERAL ROUTINES IN THE FILE co-opt.h AND WILL PROBABLY NOT EVEN
+ * COMPILE, BUT IS INCLUDED FOR HISTORIC REFERENCE.
+ */
+
+/**
  * This file contains routines for the automatical formation of
  * application-specific basis sets.
  *
