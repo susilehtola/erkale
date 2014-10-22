@@ -54,8 +54,10 @@ class EnergyOptimizer {
 
   /// Get exponents
   std::vector<arma::vec> get_exps(const arma::vec & x) const;
-  /// Calculate gradient
-  arma::vec calcG(const arma::vec & x);
+  /// Calculate gradient. Check enables sanity checks
+  arma::vec calcG(const arma::vec & x, bool check=true);
+  /// Calculate Hessian
+  arma::mat calcH(const arma::vec & x);
   /// Pad vector to fit into x
   arma::vec pad_vec(const arma::vec & sd) const;
 
@@ -76,8 +78,10 @@ class EnergyOptimizer {
   /// Calculate energy for basis set
   virtual std::vector<double> calcE(const std::vector<BasisSetLibrary> & baslib)=0;
 
-  /// Run optimization. Returns energy, and optimized parameters in x
-  double optimize(arma::vec & x, size_t maxiter);
+  /// Run optimization. Returns energy, and optimized parameters in
+  /// x. Use conjugate gradients till |g|<=nrthr, after which toggle
+  /// Newton-Raphson procedure. Determine convergence by |g|<gthr
+  double optimize(arma::vec & x, size_t maxiter, double nrthr, double gthr);
 
   /// Look for optimal polarization exponent
   double scan(arma::vec & x, double xmin, double xmax, double dx);
