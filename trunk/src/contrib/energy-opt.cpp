@@ -375,7 +375,7 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
       fflush(stdout);
 
       // Initial energy?
-      if(E.size()==0)
+      if(iloop==0 && E.size()==0)
 	Einit=batchE[0];
       // Add to total list
       for(size_t i=0;i<batchE.size();i++) {
