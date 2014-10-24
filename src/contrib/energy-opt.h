@@ -56,10 +56,16 @@ class EnergyOptimizer {
   std::vector<arma::vec> get_exps(const arma::vec & x) const;
   /// Calculate gradient. Check enables sanity checks
   arma::vec calcG(const arma::vec & x, bool check=true);
+  /// Calculate gradient. Check enables sanity checks
+  arma::vec calcG(const arma::vec & x, arma::sword am, bool check=true);
   /// Calculate Hessian
-  arma::mat calcH(const arma::vec & x);
+  arma::mat calcH(const arma::vec & x, bool check=true);
+  /// Calculate Hessian
+  arma::mat calcH(const arma::vec & x, arma::sword am, bool check=true);
   /// Pad vector to fit into x
   arma::vec pad_vec(const arma::vec & sd) const;
+  /// Pad vector to fit into x
+  arma::vec pad_vec(const arma::vec & sd, arma::sword am) const;
 
  protected:
   /// Element to optimize
@@ -82,12 +88,20 @@ class EnergyOptimizer {
   /// x. Use conjugate gradients till |g|<=nrthr, after which toggle
   /// Newton-Raphson procedure. Determine convergence by |g|<gthr
   double optimize(arma::vec & x, size_t maxiter, double nrthr, double gthr);
+  /// Run optimization. Returns energy, and optimized parameters in
+  /// x. Use conjugate gradients till |g|<=nrthr, after which toggle
+  /// Newton-Raphson procedure. Determine convergence by |g|<gthr
+  double optimize_full(arma::vec & x, size_t maxiter, double nrthr, double gthr);
 
   /// Look for optimal polarization exponent
   double scan(arma::vec & x, double xmin, double xmax, double dx);
 
+  /// Get optimized shell index vector
+  arma::uvec sh_vec() const;
   /// Get parameter index vector
   arma::uvec idx_vec() const;
+  /// Get parameter index vector
+  arma::uvec idx_vec(arma::sword am) const;
   /// Print parameter info
   void print_info(const arma::vec & x, const std::string & msg) const;
 };
