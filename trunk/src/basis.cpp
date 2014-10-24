@@ -1463,6 +1463,7 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double 
   if(ulimit<list.size())
     list.resize(ulimit+1);
 
+  (void) verbose;
   //  if(verbose)
   //    printf("%u shell pairs out of %u are significant.\n",(unsigned int) list.size(),(unsigned int) shellpairs.size());
   
