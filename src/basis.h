@@ -183,6 +183,16 @@ class BasisSet {
   /// Ranges of shells
   std::vector<double> shell_ranges;
 
+  /// Check for same geometry
+  bool same_geometry(const BasisSet & rhs) const;
+  /// Check for same shells
+  bool same_shells(const BasisSet & rhs) const;
+
+  /// Translate orbitals to new geometry within same basis set
+  void MO_translate(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const;
+  /// Project orbitals to new basis set, assuming same geometry
+  void MO_project(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const;
+
  public:
   /// Dummy constructor
   BasisSet();
@@ -427,8 +437,10 @@ class BasisSet {
   /// Calculate nuclear repulsion energy
   double Enuc() const;
 
-  /// Project MOs from other basis set
+  /// Project MOs to new basis set
   void projectMOs(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const;
+  /// Translate OMOs to new geometry, assuming same basis set
+  void projectOMOs(const BasisSet & old, const arma::cx_mat & oldOMOs, arma::cx_mat & OMOs) const;
 
   /// Are the basis sets the same?
   bool operator==(const BasisSet & rhs) const;
@@ -631,6 +643,8 @@ double compute_elf(const arma::mat & P, const BasisSet & bas, const coords_t & r
 
 /// Check orthonormality of molecular orbitals
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose);
+/// Check orthonormality of molecular orbitals
+double check_omorth(const arma::cx_mat & C, const arma::mat & S, bool verbose);
 
 #include "eriworker.h"
 
