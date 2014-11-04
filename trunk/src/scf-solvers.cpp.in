@@ -836,16 +836,16 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 	printf("done (%s)\n",t.elapsed().c_str());
       
 #ifdef RESTRICTED
-      if(verbose && sol.Heff_im.n_elem) {
+      if(verbose && rms_norm(sol.Heff_im)>10*DBL_EPSILON) {
 	double frac=imag_diag(sol.C,sol.H,sol.Heff_im,shift,S,Sinvh,sol.P/2);
 	printf("Fraction of occupied subspace retained in real approximation is %f (%e lost).\n",frac,1.0-frac);
       }
 #else
-      if(verbose && sol.Heffa_im.n_elem) {
+      if(verbose && rms_norm(sol.Heffa_im)>10*DBL_EPSILON) {
 	double frac=imag_diag(sol.Ca,sol.Ha,sol.Heffa_im,shift,S,Sinvh,sol.Pa);
 	printf("Fraction of occupied subspace retained in real approximation is %f (%e lost).\n",frac,1.0-frac);
       }
-      if(verbose && sol.Heffb_im.n_elem) {
+      if(verbose && rms_norm(sol.Heffb_im)>10*DBL_EPSILON) {
 	double frac=imag_diag(sol.Cb,sol.Hb,sol.Heffb_im,shift,S,Sinvh,sol.Pb);
 	printf("Fraction of occupied subspace retained in real approximation is %f (%e lost).\n",frac,1.0-frac);
       }
