@@ -23,6 +23,7 @@
 
 #include <armadillo>
 #include <vector>
+#include <cfloat>
 
 /// Computes the double factorial n!!
 double doublefact(int n);
@@ -128,5 +129,13 @@ arma::cx_mat complex_unitary(size_t N, unsigned long int seed=0);
 /// Round to n:th decimal
 double round(double x, unsigned n);
 
+/**
+ * Find minima in input data, performing a running average over runave
+ * nearest neighbors. Returns the locations of the minima.
+ *
+ * To further safeguard against spurious minima, the procedure screens
+ * out minima with y values over the given threshold.
+ */
+arma::vec find_minima(const arma::vec & x, const arma::vec & y, size_t runave=0, double thr=DBL_MAX);
 
 #endif
