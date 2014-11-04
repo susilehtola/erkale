@@ -174,6 +174,11 @@ GaussianShell::GaussianShell(int amv, bool lm, const std::vector<contr_t> & C) {
       n++;
     }
   }
+
+  // Default values
+  indstart=0;
+  cenind=0;
+  cen.x=cen.y=cen.z=0.0;
 }
 
 GaussianShell::~GaussianShell() {
@@ -301,7 +306,7 @@ std::vector<shellf_t> GaussianShell::get_cart() const {
 
 std::vector<contr_t> GaussianShell::get_contr_normalized() const {
   // Returned array
-  std::vector<contr_t> cn=c;
+  std::vector<contr_t> cn(c);
 
   // Note - these refer to cartesian functions!
   double fac=pow(M_2_PI,0.75)*pow(2,am)/sqrt(doublefact(2*am-1));
@@ -468,7 +473,7 @@ void GaussianShell::print() const {
   printf("\t\tCenter of shell is at % 0.4f % 0.4f % 0.4f Å.\n",cen.x/ANGSTROMINBOHR,cen.y/ANGSTROMINBOHR,cen.z/ANGSTROMINBOHR);
 
   // Get contraction of normalized primitives
-  std::vector<contr_t> cn=get_contr_normalized();
+  std::vector<contr_t> cn(get_contr_normalized());
 
   printf("\t\tExponential contraction is\n");
   printf("\t\t\tzeta\t\tprimitive coeff\ttotal coeff\n");
@@ -1251,7 +1256,7 @@ arma::vec GaussianShell::integral() const {
 
 BasisSet::BasisSet() {
   // Use spherical harmonics by default.
-  uselm=1;
+  uselm=true;
 }
 
 BasisSet::BasisSet(size_t Nat, const Settings & set) {
@@ -1334,7 +1339,7 @@ void BasisSet::update_nuclear_shell_list() {
   // First, clear the list on all nuclei.
   for(size_t inuc=0;inuc<nuclei.size();inuc++)
     nuclei[inuc].shells.clear();
-
+  
   // Then, update the lists. Loop over shells
   for(size_t ish=0;ish<shells.size();ish++) {
     // Find out nuclear index
@@ -2644,8 +2649,173 @@ double BasisSet::Enuc() const {
   return En;
 }
 
-void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const {
+
+void BasisSet::MO_translate(const BasisSet & oldbas, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const {
+  if(!same_shells(oldbas)) {
+    ERROR_INFO();
+    throw std::runtime_error("Basis sets must differ only in the nuclear geometry!\n");
+  }
+  
+  // Check if we need to do something
+  if(same_geometry(oldbas)) {
+    // No need to do anything
+    E=oldE;
+    MOs=oldMOs;
+    return;
+  }
+
+  // Get number of basis functions
+  const size_t Nbf=get_Nbf();
+  // Cutoff
+  const double cutoff=LINTHRES;
+  
+  // Get overlap matrix
+  arma::mat S11=overlap();
+  // and overlap with old basis
+  arma::mat S12=overlap(oldbas);
+
+  // Form orthogonalizing matrix
+  arma::mat Svec;
+  arma::vec Sval;
+  eig_sym_ordered(Sval,Svec,S11);
+
+  // Count number of eigenvalues that are above cutoff
+  size_t Nind=0;
+  for(size_t i=0;i<Nbf;i++)
+    if(Sval(i)>=cutoff)
+      Nind++;
+  // Number of linearly dependent basis functions
+  const size_t Ndep=Nbf-Nind;
+  // Get rid of linearly dependent eigenvalues and eigenvectors
+  Sval=Sval.subvec(Ndep,Nbf-1);
+  Svec=Svec.submat(0,Ndep,Nbf-1,Nbf-1);
+
+  // Form canonical orthonormalization matrix
+  arma::mat Sinvh(Nbf,Nind);
+  for(size_t i=0;i<Nind;i++)
+    Sinvh.col(i)=Svec.col(i)/sqrt(Sval(i));
+  
+  // and the real S^-1
+  arma::mat Sinv=Sinvh*arma::trans(Sinvh);
+  
+  // Linearly independent size of old basis set
+  const size_t Nmo_old=oldMOs.n_cols;
+  if(Nmo_old==0)
+    throw std::runtime_error("No orbitals to project!\n");
+
+  // How many MOs do we transform?
+  size_t Nmo=std::min(Nmo_old,Nind);
+
+  // Reorthogonalize the old orbitals in the new basis
+  MOs.zeros(Sinvh.n_rows,Nind);
+  E.zeros(Nind);
+
+  // Orbital overlap is
+  arma::mat SMO=arma::trans(oldMOs)*S11*oldMOs;
+
+  // Do eigendecomposition
+  arma::mat SMOvec;
+  arma::vec SMOval;
+  eig_sym_ordered(SMOval,SMOvec,SMO);
+  // Orthogonalizing matrix is
+  arma::mat orthmat=SMOvec*arma::diagmat(1.0/sqrt(SMOval))*trans(SMOvec);
+
+  // Projected orbitals are
+  MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1)=oldMOs*orthmat;
+  // and energies
+  E.subvec(0,Nmo-1)=arma::trans(orthmat)*oldE;
+
+  // Check orthogonality
+  SMO=arma::trans(oldMOs*orthmat)*S11*oldMOs*orthmat;
+
+  // If the old basis had less functions than the new basis, then we
+  // need to form the rest of the orbitals. To do this we consider all
+  // of the linearly independent eigenvectors of the new basis, and
+  // remove the Nmo with the maximum absolute overlap with the
+  // MOs. The leftovers are then orthonormalized with respect to the
+  // MOs.
+  if(Nmo<Nind) {
+    // MO submatrix
+    arma::mat C=MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1);
+
+    // Generate other vectors. Compute overlap of functions
+    arma::mat X=arma::trans(Sinvh)*S11*C;
+    // and perform SVD
+    arma::mat U, V;
+    arma::vec s;
+    bool svdok=arma::svd(U,s,V,X);
+    if(!svdok)
+      throw std::runtime_error("SVD decomposition failed!\n");
+
+    // Rotate eigenvectors
+    //Sinvh=Sinvh*U;
+
+    std::vector<size_t> idx(Sinvh.n_cols);
+    for(size_t i=0;i<Sinvh.n_cols;i++)
+      idx[i]=i;
+
+    // Remove Nmo eigenvectors with largest overlap with occupied vectors
+    for(size_t ii=0;ii<Nmo;ii++) {
+      // Overlap between occupied orbitals and vectors
+      arma::vec ovl(idx.size());
+      for(size_t i=0;i<idx.size();i++) {
+	arma::vec t=arma::trans(C)*S11*Sinvh.col(idx[i]);
+	ovl(i)=arma::dot(t,t);
+      }
+      
+      // Find out maximum value
+      arma::uword imax;
+      ovl.max(imax);
+      
+      // Remove vector with maximum overlap
+      fprintf(stdout,"Erasing vector %3i with overlap %e\n",(int) idx[imax],ovl(imax)); fflush(stdout);
+      idx.erase(idx.begin()+imax);
+    }
+    
+    // Set the remaining orbitals
+    for(size_t io=0;io<idx.size();io++) {
+      // Orbital coefficients
+      arma::vec mo=Sinvh.col(idx[io]);
+      
+      // Orthogonalize wrt occupied orbitals
+      for(size_t jo=0;jo<Nmo+io;jo++)
+	// Remove overlaps
+	mo -= arma::as_scalar(arma::trans(MOs.col(jo))*S11*mo)*MOs.col(jo);
+      // and normalize
+      mo /= sqrt(arma::as_scalar(arma::trans(mo)*S11*mo));
+      
+      // Store orbital
+      MOs.col(Nmo+io)=mo;
+      // and dummy value for energy
+      E(Nmo+io)=E(Nmo-1);
+    }
+  }
+  
+  // Failsafe
+  try {
+    // Check orthogonality of orbitals
+    check_orth(MOs,S11,false);
+  } catch(std::runtime_error err) {
+    std::ostringstream oss;
+    oss << "Orbitals generated by MO_translate are not orthonormal. Please try without projection.\n";
+    throw std::runtime_error(oss.str());
+  }
+}
+
+void BasisSet::MO_project(const BasisSet & oldbas, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const {
   // Project MOs from old basis to new basis (this one)
+  // Check that the nuclear geometry is the same
+  if(nuclei.size() != oldbas.nuclei.size())
+    throw std::runtime_error("Won't project orbitals between different systems!\n");
+  if(!same_geometry(oldbas))
+    fprintf(stderr,"Warning - MO_project should only be used at the same geometry!\n");
+
+  // Do we need to do something?
+  if(same_shells(oldbas)) {
+    E=oldE;
+    MOs=oldMOs;
+    return;
+  }
 
   // Get number of basis functions
   const size_t Nbf=get_Nbf();
@@ -2725,46 +2895,26 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
   // MOs. The leftovers are then orthonormalized with respect to the
   // MOs.
   if(Nmo<Nind) {
-    // Index vector
-    std::vector<size_t> idx(Nind);
-    for(size_t i=0;i<Nind;i++)
-      idx[i]=i;
-    
     // MO submatrix
     arma::mat C=MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1);
-    
-    // Remove Nmo eigenvectors with largest overlap with occupied vectors
-    for(size_t ii=0;ii<Nmo;ii++) {
-      // Overlap between occupied orbitals and vectors
-      arma::mat ovl(idx.size(),Nmo);
-      for(size_t i=0;i<idx.size();i++)
-	ovl.row(i)=arma::abs(arma::trans(Sinvh.col(idx[i]))*S11*C);
-      
-      // Find out maximum value
-      arma::uword rowi, coli;
-      ovl.max(rowi,coli);
-      
-      // Remove vector with maximum overlap
-      idx.erase(idx.begin()+rowi);
-    }
-    
-    // Set the remaining orbitals
-    for(size_t io=0;io<idx.size();io++) {
-      // Orbital coefficients
-      arma::vec mo=Sinvh.col(idx[io]);
 
-      // Orthogonalize wrt occupied orbitals
-      for(size_t jo=0;jo<Nmo+io;jo++)
-	// Remove overlaps
-	mo -= arma::as_scalar(arma::trans(MOs.col(jo))*S11*mo)*MOs.col(jo);
-      // and normalize
-      mo /= sqrt(arma::as_scalar(arma::trans(mo)*S11*mo));
-      
-      // Store orbital
-      MOs.col(Nmo+io)=mo;
-      // and dummy value for energy
-      E(Nmo+io)=E(Nmo-1);
-    }
+    // Generate other vectors. Compute overlap of functions
+    arma::mat X=arma::trans(Sinvh)*S11*C;
+    // and perform SVD
+    arma::mat U, V;
+    arma::vec s;
+    bool svdok=arma::svd(U,s,V,X);
+    if(!svdok)
+      throw std::runtime_error("SVD decomposition failed!\n");
+
+    // Rotate eigenvectors.
+    Sinvh=Sinvh*U;
+
+    // Now, the subspace of the small basis set is found in the first
+    // Nmo eigenvectors. 
+    MOs.submat(0,Nmo,Nbf-1,Nind-1)=Sinvh.submat(0,Nmo,Nbf-1,Nind-1);
+    // Set dummy value for energy
+    E.subvec(Nmo,Nind-1)=E(Nmo-1)*arma::ones(Nind-Nmo,1);
   }
   
   // Failsafe
@@ -2773,7 +2923,126 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
     check_orth(MOs,S11,false);
   } catch(std::runtime_error err) {
     std::ostringstream oss;
-    oss << "Orbitals generated by projectMOs are not orthonormal. Please try without projection.\n";
+    oss << "Orbitals generated by MO_project are not orthonormal. Please try without projection.\n";
+    throw std::runtime_error(oss.str());
+  }
+}
+
+void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const {
+  // We do the projection in two different steps. First, we translate
+  // the orbitals to the new geometry within the old basis, and then
+  // we project them to the new basis.
+
+  if(nuclei.size() != oldbas.nuclei.size())
+    throw std::runtime_error("Won't project orbitals between different systems!\n");
+
+  BasisSet transbas(oldbas);
+  transbas.nuclei=nuclei;
+  // Store new geometries
+  for(size_t i=0;i<oldbas.shells.size();i++) {
+    // Index of center in the old basis is
+    size_t idx=oldbas.shells[i].get_center_ind();
+    // Set new coordinates
+    transbas.shells[i].set_center(nuclei[idx].r,idx);
+  }
+  transbas.finalize();
+
+  // Translated energies and orbitals
+  arma::mat tMOs;
+  arma::vec tE;
+  transbas.MO_translate(oldbas,oldE,oldMOs,tE,tMOs);
+
+  // Then, project the orbitals to the new basis
+  MO_project(transbas,tE,tMOs,E,MOs);
+}
+
+
+void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs, arma::cx_mat & OMOs) const {
+  // Project MOs from old geometry to new geometry
+  if(! (*this == oldbas)) {
+    ERROR_INFO();
+    throw std::runtime_error("Basis sets must differ only in the nuclear geometry!\n");
+  }
+
+  // Get number of basis functions
+  const size_t Nbf=get_Nbf();
+  // Cutoff
+  const double cutoff=LINTHRES;
+
+  // Get overlap matrix
+  arma::mat S11=overlap();
+  // and overlap with old basis
+  arma::mat S12=overlap(oldbas);
+
+  // Form orthogonalizing matrix
+  arma::mat Svec;
+  arma::vec Sval;
+  eig_sym_ordered(Sval,Svec,S11);
+
+  // Count number of eigenvalues that are above cutoff
+  size_t Nind=0;
+  for(size_t i=0;i<Nbf;i++)
+    if(Sval(i)>=cutoff)
+      Nind++;
+  // Number of linearly dependent basis functions
+  const size_t Ndep=Nbf-Nind;
+  // Get rid of linearly dependent eigenvalues and eigenvectors
+  Sval=Sval.subvec(Ndep,Nbf-1);
+  Svec=Svec.submat(0,Ndep,Nbf-1,Nbf-1);
+
+  // Form canonical orthonormalization matrix
+  arma::mat Sinvh(Nbf,Nind);
+  for(size_t i=0;i<Nind;i++)
+    Sinvh.col(i)=Svec.col(i)/sqrt(Sval(i));
+
+  // and the real S^-1
+  arma::mat Sinv=Sinvh*arma::trans(Sinvh);
+
+  // Linearly independent size of old basis set
+  const size_t Nmo_old=oldOMOs.n_cols;
+  if(Nmo_old==0)
+    throw std::runtime_error("No orbitals to project!\n");
+
+  // How many MOs do we transform?
+  size_t Nmo=std::min(Nmo_old,Nind);
+  if(Nmo!=Nmo_old)
+    throw std::runtime_error("Can't project OMOs, basis set is screwed up!\n");
+
+  // OK, now we are ready to calculate the projections.
+  // Initialize MO matrix
+  OMOs.zeros(Sinvh.n_rows,Nmo);
+  
+  // Projected orbitals
+  // TEST
+  if(S11.n_cols == S12.n_cols)
+    // Just use the old OMOs but reorthonormalize them
+    OMOs=oldOMOs;
+  else
+    OMOs=Sinv*S12*oldOMOs;
+  
+  // Schmidt orthonormalize the projected orbitals.
+  for(size_t io=0;io<Nmo;io++) {
+    // Orbital coefficients
+    arma::cx_vec omo=OMOs.col(io);
+    
+    // Orthogonalize wrt occupied orbitals
+    for(size_t jo=0;jo<io;jo++)
+      // Remove overlaps
+      omo -= arma::as_scalar(arma::trans(OMOs.col(jo))*S11*omo)*OMOs.col(jo);
+    // and normalize
+    omo /= sqrt(arma::as_scalar(arma::real(arma::trans(omo)*S11*omo)));
+    
+    // Store orbital
+    OMOs.col(io)=omo;
+  }
+  
+  // Failsafe
+  try {
+    // Check orthogonality of orbitals
+    check_omorth(OMOs,S11,false);
+  } catch(std::runtime_error err) {
+    std::ostringstream oss;
+    oss << "Orbitals generated by projectOMOs are not orthonormal. Please try without projection.\n";
     throw std::runtime_error(oss.str());
   }
 }
@@ -3034,16 +3303,20 @@ BasisSet BasisSet::exchange_fitting() const {
   return fit;
 }
 
-bool BasisSet::operator==(const BasisSet & rhs) const {
+bool BasisSet::same_geometry(const BasisSet & rhs) const {
   if(nuclei.size() != rhs.nuclei.size())
     return false;
-
+  
   for(size_t i=0;i<nuclei.size();i++)
     if(!(nuclei[i]==rhs.nuclei[i])) {
       //      fprintf(stderr,"Nuclei %i differ!\n",(int) i);
       return false;
     }
 
+  return true;
+}
+
+bool BasisSet::same_shells(const BasisSet & rhs) const {
   if(shells.size() != rhs.shells.size())
     return false;
 
@@ -3054,6 +3327,10 @@ bool BasisSet::operator==(const BasisSet & rhs) const {
     }
 
   return true;
+}
+
+bool BasisSet::operator==(const BasisSet & rhs) const {
+  return same_geometry(rhs) && same_shells(rhs);
 }
 
 BasisSet BasisSet::decontract(arma::mat & m) const {
@@ -3419,7 +3696,7 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
     std::vector<shellf_t> shell_cart=shells[ish].get_cart();
 
     // Try to find the shell on the current list of identicals
-    bool found=0;
+    bool found=false;
     for(size_t iident=0;iident<ret.size();iident++) {
 
       // Check first cartesian part.
@@ -3427,15 +3704,15 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
 
       if(shell_cart.size()==cmp_cart.size()) {
 	// Default value
-	found=1;
+	found=true;
 
 	for(size_t icart=0;icart<shell_cart.size();icart++)
 	  if(shell_cart[icart].l!=cmp_cart[icart].l || shell_cart[icart].m!=cmp_cart[icart].m || shell_cart[icart].n!=cmp_cart[icart].n)
-	    found=0;
+	    found=false;
 
 	// Check that usage of spherical harmonics matches, too
 	if(shells[ish].lm_in_use() != shells[ret[iident][0]].lm_in_use())
-	  found=0;
+	  found=false;
 
 	// If cartesian parts match, check also exponents and contraction coefficients
 	if(found) {
@@ -3446,9 +3723,9 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
 	  if(shell_contr.size()==cmp_contr.size()) {
 	    for(size_t ic=0;ic<shell_contr.size();ic++)
 	      if(!(shell_contr[ic]==cmp_contr[ic]))
-		found=0;
+		found=false;
 	  } else
-	    found=0;
+	    found=false;
 	}
 
 	// If everything matches, add the function to the current list.
@@ -3493,6 +3770,38 @@ double check_orth(const arma::mat & C, const arma::mat & S, bool verbose) {
 	if(fabs(MOovl(i,j))<10*DBL_EPSILON)
 	  MOovl(i,j)=0.0;
 
+    MOovl.save("MOovl.dat",arma::raw_ascii);
+
+    std::ostringstream oss;
+    oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality is " << maxerr <<".\nCheck the used LAPACK implementation.\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  return maxerr;
+}
+
+double check_omorth(const arma::cx_mat & C, const arma::mat & S, bool verbose) {
+  // Compute overlap matrix
+  arma::cx_mat MOovl=arma::trans(C)*S*C;
+  // and remove the unit from the diagonal
+  for(size_t i=0;i<MOovl.n_cols;i++)
+    MOovl(i,i)-=1.0;
+
+  // Get maximum error
+  double maxerr=max(max(abs(MOovl)));
+
+  if(verbose) {
+    printf("Maximum deviation from orthogonality is %e.\n",maxerr);
+    fflush(stdout);
+  }
+
+  if(maxerr>=sqrt(DBL_EPSILON)) {
+    // Clean up
+    for(size_t i=0;i<MOovl.n_cols;i++)
+      for(size_t j=0;j<MOovl.n_cols;j++)
+	if(std::abs(MOovl(i,j))<10*DBL_EPSILON)
+	  MOovl(i,j)=0.0;
+    
     MOovl.save("MOovl.dat",arma::raw_ascii);
 
     std::ostringstream oss;
