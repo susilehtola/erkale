@@ -373,3 +373,47 @@ double round(double x, unsigned n) {
   double fac=pow(10.0,n);
   return round(fac*x)/fac;
 }
+
+arma::vec find_minima(const arma::vec & x, const arma::vec & y, size_t runave, double thr) {
+  if(x.n_elem != y.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Input vectors are of inconsistent size!\n");
+  }
+
+  // Create averaged vectors
+  arma::vec xave(x.n_elem-2*runave);
+  arma::vec yave(y.n_elem-2*runave);
+  if(runave==0) {
+    xave=x;
+    yave=y;
+  } else {
+    for(arma::uword i=runave;i<x.n_elem-runave;i++) {
+      xave(i-runave)=arma::mean(x.subvec(i-runave,i+runave));
+      yave(i-runave)=arma::mean(y.subvec(i-runave,i+runave));
+    }
+  }
+
+  // Find minima
+  std::vector<size_t> minloc;
+  if(yave(0)<yave(1))
+    minloc.push_back(0);
+  
+  for(arma::uword i=1;i<yave.n_elem-1;i++)
+    if(yave(i)<yave(i-1) && yave(i)<yave(i+1))
+      minloc.push_back(i);
+  
+  if(yave(yave.n_elem-1)<yave(yave.n_elem-2))
+    minloc.push_back(yave.n_elem-1);
+  
+  // Check the minimum values
+  for(size_t i=minloc.size()-1;i<minloc.size();i--)
+    if(yave(minloc[i]) >= thr)
+      minloc.erase(minloc.begin()+i);
+
+  // Returned minima
+  arma::vec ret(minloc.size());
+  for(size_t i=0;i<minloc.size();i++)
+    ret(i)=xave(minloc[i]);
+  
+  return ret;
+}
