@@ -70,12 +70,24 @@ class EnergyOptimizer {
  protected:
   /// Element to optimize
   std::string el;
+
+  /// Verbose operation?
+  bool verbose;
+  /// Initialization mode? (Sloppier convergence)
+  bool init;
   
  public:
   /// Constructor
-  EnergyOptimizer(const std::string & el, const arma::ivec & am, const arma::uvec & nf, const arma::uvec & npar, const arma::uvec & optsh);
+  EnergyOptimizer(const std::string & el, bool verbose=true);
   /// Destructor
   ~EnergyOptimizer();
+
+  /// Set parameters
+  void set_params(const arma::ivec & am, const arma::uvec & nf, const arma::uvec & npar, const arma::uvec & optsh);
+  /// Get element
+  std::string get_el() const;
+  /// Initialize?
+  void toggle_init(bool init);
 
   /// Generate basis set
   virtual BasisSetLibrary form_basis(const arma::vec & x) const;
