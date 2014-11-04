@@ -2747,48 +2747,14 @@ void BasisSet::MO_translate(const BasisSet & oldbas, const arma::colvec & oldE, 
     if(!svdok)
       throw std::runtime_error("SVD decomposition failed!\n");
 
-    // Rotate eigenvectors
-    //Sinvh=Sinvh*U;
+    // Rotate eigenvectors.
+    Sinvh=Sinvh*U;
 
-    std::vector<size_t> idx(Sinvh.n_cols);
-    for(size_t i=0;i<Sinvh.n_cols;i++)
-      idx[i]=i;
-
-    // Remove Nmo eigenvectors with largest overlap with occupied vectors
-    for(size_t ii=0;ii<Nmo;ii++) {
-      // Overlap between occupied orbitals and vectors
-      arma::vec ovl(idx.size());
-      for(size_t i=0;i<idx.size();i++) {
-	arma::vec t=arma::trans(C)*S11*Sinvh.col(idx[i]);
-	ovl(i)=arma::dot(t,t);
-      }
-      
-      // Find out maximum value
-      arma::uword imax;
-      ovl.max(imax);
-      
-      // Remove vector with maximum overlap
-      fprintf(stdout,"Erasing vector %3i with overlap %e\n",(int) idx[imax],ovl(imax)); fflush(stdout);
-      idx.erase(idx.begin()+imax);
-    }
-    
-    // Set the remaining orbitals
-    for(size_t io=0;io<idx.size();io++) {
-      // Orbital coefficients
-      arma::vec mo=Sinvh.col(idx[io]);
-      
-      // Orthogonalize wrt occupied orbitals
-      for(size_t jo=0;jo<Nmo+io;jo++)
-	// Remove overlaps
-	mo -= arma::as_scalar(arma::trans(MOs.col(jo))*S11*mo)*MOs.col(jo);
-      // and normalize
-      mo /= sqrt(arma::as_scalar(arma::trans(mo)*S11*mo));
-      
-      // Store orbital
-      MOs.col(Nmo+io)=mo;
-      // and dummy value for energy
-      E(Nmo+io)=E(Nmo-1);
-    }
+    // Now, the subspace of the small basis set is found in the first
+    // Nmo eigenvectors. 
+    MOs.submat(0,Nmo,Nbf-1,Nind-1)=Sinvh.submat(0,Nmo,Nbf-1,Nind-1);
+    // Set dummy value for energy
+    E.subvec(Nmo,Nind-1)=E(Nmo-1)*arma::ones(Nind-Nmo,1);
   }
   
   // Failsafe
