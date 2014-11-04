@@ -1599,6 +1599,9 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
   arma::mat Cold, Caold, Cbold;
   arma::mat Pold;
 
+  arma::cx_mat CW, CWa, CWb;
+  bool doCW=false;
+
   // Which guess to use
   enum guess_t guess=parse_guess(set.get_string("Guess"));
   // Freeze core orbitals?
@@ -1624,12 +1627,30 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Load energies and orbitals
       load.read("C",Cold);
       load.read("E",Eold);
+
+      if(load.exist("CW.re")) {
+	arma::cx_mat CWold;
+	load.cread("CW",CWold);
+
+	basis.projectOMOs(oldbas,CWold,CW);
+	doCW=true;
+      }
     } else {
       // Load energies and orbitals
       load.read("Ca",Caold);
       load.read("Ea",Eaold);
       load.read("Cb",Cbold);
       load.read("Eb",Ebold);
+
+      if(load.exist("CWa.re") && load.exist("CWb.re")) {
+	arma::cx_mat CWaold, CWbold;
+	load.cread("CWa",CWaold);
+	load.cread("CWb",CWbold);
+
+	basis.projectOMOs(oldbas,CWaold,CWa);
+	basis.projectOMOs(oldbas,CWbold,CWb);
+	doCW=true;
+      }
     }
   }
 
@@ -1651,6 +1672,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	Eold=Eaold;
       }
 
+      // Orbitals
       basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
     } else if(guess == ATOMGUESS) {
       atomic_guess(basis,sol.C,sol.E,set);
@@ -1683,6 +1705,14 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     chkpt.write("Nel",Nel);
     chkpt.write("Nel-a",Nel_alpha);
     chkpt.write("Nel-b",Nel_beta);
+
+    // Write OMOs
+    if(doCW) {
+      if(!oldrestr)
+	fprintf(stderr,"Projection of OMO matrix between restricted and unrestricted calculations is not supported.\n");
+      else
+	chkpt.cwrite("CW",CW);
+    }
 
     // Write method
     chkpt.write("Method",set.get_string("Method"));
@@ -1987,6 +2017,16 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     chkpt.write("Nel",Nel);
     chkpt.write("Nel-a",Nel_alpha);
     chkpt.write("Nel-b",Nel_beta);
+
+    // Write OMOs
+    if(doCW) {
+      if(!oldrestr)
+	fprintf(stderr,"Projection of OMO matrix between restricted and unrestricted calculations is not supported.\n");
+      else {
+	chkpt.cwrite("CWa",CWa);
+	chkpt.cwrite("CWb",CWb);
+      }
+    }
 
     // Solver
     SCF solver(basis,set,chkpt);
