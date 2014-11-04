@@ -2370,6 +2370,11 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
   Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
 
+  // Form Sinvh
+  arma::mat Sinvh(Ntot,Nind);
+  for(size_t i=0;i<Nind;i++)
+    Sinvh.col(i)=Svec.col(i)/sqrt(Sval(i));
+
   // Form the new C matrix.
   arma::mat C(Ntot,Nind);
   C.zeros();
@@ -2378,88 +2383,30 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   for(size_t i=0;i<Nold;i++)
     for(size_t ish=0;ish<origshellidx.size();ish++)
       C.submat(augshells[origshellidx[ish]].get_first_ind(),i,augshells[origshellidx[ish]].get_last_ind(),i)=Cold.submat(origshells[ish].get_first_ind(),i,origshells[ish].get_last_ind(),i);
+  
+  // Determine the rest. Compute the overlap of the functions
+  arma::mat X=arma::trans(Sinvh)*S*C.submat(0,0,Ntot-1,Nold-1);
+  // and perform SVD
+  arma::mat U, V;
+  arma::vec s;
+  bool svdok=arma::svd(U,s,V,X);
+  if(!svdok)
+    throw std::runtime_error("SVD decomposition failed!\n");
 
-  // Do a Gram-Schmidt orthogonalization to find the rest of the
-  // orthonormal vectors. But first we need to drop the eigenvectors
-  // of S with the largest projection to the occupied orbitals, in
-  // order to avoid linear dependency problems with the Gram-Schmidt
-  // method.
+  // Rotate eigenvectors.
+  Sinvh=Sinvh*U;
 
-  // Indices to keep in the treatment
-  std::vector<size_t> keepidx;
-  for(size_t i=0;i<Svec.n_cols;i++)
-    keepidx.push_back(i);
+  // Now, the subspace of the small basis set is found in the first
+  // Nmo eigenvectors. 
+  C.submat(0,Nold,Ntot-1,Nind-1)=Sinvh.submat(0,Nold,Ntot-1,Nind-1);
 
-  // Deleted functions
-  std::vector<ovl_sort_t> delidx;
-
-  // Drop the functions with the maximum overlap
-  for(size_t j=0;j<Nold;j++) {
-    // Find maximum overlap
-    double maxovl=0.0;
-    size_t maxind=-1;
-
-    // Helper vector
-    arma::vec hlp=S*C.col(j);
-
-    for(size_t ii=0;ii<keepidx.size();ii++) {
-      // Index of eigenvector is
-      size_t i=keepidx[ii];
-      // Compute projection
-      double ovl=fabs(arma::dot(Svec.col(i),hlp))/sqrt(Sval(i));
-      // Check if it has the maximal value
-      if(fabs(ovl)>maxovl) {
-	maxovl=ovl;
-	maxind=ii;
-      }
-    }
-
-    // Add the function to the deleted functions' list
-    ovl_sort_t tmp;
-    tmp.S=maxovl;
-    tmp.idx=keepidx[maxind];
-    delidx.push_back(tmp);
-
-    //    printf("%4i/%4i deleted function %i with overlap %e.\n",(int) j+1, (int) Nold, (int) keepidx[maxind],maxovl);
-
-    // Delete the index
-    fflush(stdout);
-    keepidx.erase(keepidx.begin()+maxind);
-  }
-
-  // Print deleted functions
-  std::stable_sort(delidx.begin(),delidx.end());
-  for(size_t i=0;i<delidx.size();i++) {
-    printf("%4i/%4i deleted function %4i with overlap %e.\n",(int) i+1, (int) Nold, (int) delidx[i].idx,delidx[i].S);
-  }
-  fflush(stdout);
-
-  // Fill in the rest of the vectors
-  for(size_t i=0;i<keepidx.size();i++) {
-    // The index of the vector to use is
-    size_t ind=keepidx[i];
-    // Normalize it, too
-    C.col(Nold+i)=Svec.col(ind)/sqrt(Sval(ind));
-  }
-
-  // Run the orthonormalization of the set
-  for(size_t i=0;i<Nind;i++) {
-    double norm=arma::as_scalar(arma::trans(C.col(i))*S*C.col(i));
-    // printf("Initial norm of vector %i is %e.\n",(int) i,norm);
-
-    // Remove projections of already orthonormalized set
-    for(size_t j=0;j<i;j++) {
-      double proj=arma::as_scalar(arma::trans(C.col(j))*S*C.col(i));
-
-      //    printf("%i - %i was %e\n",(int) i, (int) j, proj);
-      C.col(i)-=proj*C.col(j);
-    }
-
-    norm=arma::as_scalar(arma::trans(C.col(i))*S*C.col(i));
-    // printf("Norm of vector %i is %e.\n",(int) i,norm);
-
-    // and normalize
-    C.col(i)/=sqrt(norm);
+  try {
+    // Check orthogonality of orbitals
+    check_orth(C,S,false);
+  } catch(std::runtime_error err) {
+    std::ostringstream oss;
+    oss << "Projected orbitals are not orthonormal. Please report this bug.";
+    throw std::runtime_error(oss.str());
   }
 
   printf("Projected orbitals in %s.\n",ttot.elapsed().c_str());
