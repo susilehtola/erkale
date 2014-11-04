@@ -84,7 +84,7 @@ size_t find_excited_orb(const BasisSet & basis, const arma::vec & xco, const arm
   arma::mat S(basis.overlap());
 
   // Determine overlap with current orbitals
-  arma::vec ovl=arma::abs(arma::trans(xco)*S*C.submat(0,0,C.n_rows-1,nocc-1));
+  arma::rowvec ovl=arma::abs(arma::trans(xco)*S*C.submat(0,0,C.n_rows-1,nocc-1));
   // Convert to probabilities by squaring the amplitudes
   ovl=arma::pow(ovl,2);
 
@@ -243,7 +243,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
   // Orbital angular momenta
   arma::uvec lval(nloc);
   for(int io=0;io<nloc;io++) {
-    arma::vec orbl=dec.row(io);
+    arma::rowvec orbl=dec.row(io);
     orbl.max(lval(io));
 
     // Sanity check
