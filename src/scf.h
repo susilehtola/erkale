@@ -811,6 +811,12 @@ class PZSIC : public Unitary {
   arma::cx_mat get_HSIC() const;
 };
 
+/// Analyze orbitals if they really are complex
+void analyze_orbitals(const BasisSet & basis, const arma::cx_mat & C);
+
+/// Analyze orbital if it really is complex
+double analyze_orbital(const arma::mat & S, const arma::cx_vec & C);
+
 /// Orbital localization. Density matrix is only used for construction of Bader grid (if applicable)
 void orbital_localization(enum locmet method, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & U, bool verbose=true, bool real=true, int maxiter=50000, double Gthr=1e-6, double Fthr=1e-7, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, bool delocalize=false, std::string logfile="", bool debug=false);
 
