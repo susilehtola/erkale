@@ -578,6 +578,12 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   PZSIC_calculate(sicsol,W,dft,pzcor,pzh,grid,Etol,maxtol,rmstol,niter,canonical,real);
   if(verbose && !canonical) {
     fprintf(stderr,"Unitary optimization performed in %s.\n\n",tsic.elapsed().c_str());
+
+    /*
+    printf("\n");
+    analyze_orbitals(*basisp,sicsol.C*W);
+    printf("\n");
+    */
   }
   // Save matrix
   chkptp->cwrite("CW",sicsol.C*W);
@@ -815,6 +821,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     if(verbose) {
       fprintf(stderr,"Unitary optimization performed in %s.\n",tsic.elapsed().c_str());
       tsic.set();
+      
+      /*
+	printf("\n");
+	analyze_orbitals(*basisp,sicsol.C*W);
+	printf("\n");
+      */
 
       if(!canonical && Wb.n_cols>1)
 	fprintf(stderr,"SIC unitary optimization,   beta spin\n");
@@ -835,6 +847,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   if(verbose && !canonical) {
     fprintf(stderr,"Unitary optimization performed in %s.\n\n",tsic.elapsed().c_str());
     tsic.set();
+
+    /*
+      printf("\n");
+      analyze_orbitals(*basisp,sicsol.C*W);
+      printf("\n");
+    */
   }
 
   // Update current solution
@@ -3882,4 +3900,36 @@ arma::vec PZSIC::get_Eorb() const {
 
 arma::cx_mat PZSIC::get_HSIC() const {
   return HSIC;
+}
+
+inline double complex_norm(double phi, const arma::mat & S, const arma::cx_vec & C) {
+  // Get the imaginary norm of C rotated by exp(i phi)
+  arma::vec c=arma::imag(C*exp(std::complex<double>(0.0,phi)));
+  return as_scalar(arma::trans(c)*S*c);
+}
+
+double analyze_orbital(const arma::mat & S, const arma::cx_vec & C) {
+  // Just do a full scan
+  arma::vec phi(arma::linspace(0.0,2*M_PI,201));
+  
+  arma::vec cn(phi.n_elem);
+  for(arma::uword i=0;i<cn.n_elem;i++)
+    cn(i)=complex_norm(phi(i),S,C);
+  
+  return cn.min();
+}
+
+void analyze_orbitals(const BasisSet & basis, const arma::cx_mat & C) {
+  arma::mat S(basis.overlap());
+  arma::vec cnorms(C.n_cols);
+  
+  // Loop over orbitals
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(arma::uword i=0;i<C.n_cols;i++)
+    cnorms(i)=analyze_orbital(S,C.col(i));
+
+  for(arma::uword i=0;i<C.n_cols;i++)
+    printf("Orbital %3i: norm of imaginary part %e\n",(int) i+1,cnorms(i));
 }
