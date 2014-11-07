@@ -3714,7 +3714,7 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
   return ret;
 }
 
-double check_orth(const arma::mat & C, const arma::mat & S, bool verbose) {
+double check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double thr) {
   // Compute overlap matrix
   arma::mat MOovl=arma::trans(C)*S*C;
   // and remove the unit from the diagonal
@@ -3729,14 +3729,14 @@ double check_orth(const arma::mat & C, const arma::mat & S, bool verbose) {
     fflush(stdout);
   }
 
-  if(maxerr>=sqrt(DBL_EPSILON)) {
+  if(maxerr>thr) {
     // Clean up
     for(size_t i=0;i<MOovl.n_cols;i++)
       for(size_t j=0;j<MOovl.n_cols;j++)
 	if(fabs(MOovl(i,j))<10*DBL_EPSILON)
 	  MOovl(i,j)=0.0;
 
-    MOovl.save("MOovl.dat",arma::raw_ascii);
+    MOovl.save("MOovl_diff.dat",arma::raw_ascii);
 
     std::ostringstream oss;
     oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality is " << maxerr <<".\nCheck the used LAPACK implementation.\n";
@@ -3746,7 +3746,7 @@ double check_orth(const arma::mat & C, const arma::mat & S, bool verbose) {
   return maxerr;
 }
 
-double check_omorth(const arma::cx_mat & C, const arma::mat & S, bool verbose) {
+double check_omorth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr) {
   // Compute overlap matrix
   arma::cx_mat MOovl=arma::trans(C)*S*C;
   // and remove the unit from the diagonal
@@ -3761,14 +3761,14 @@ double check_omorth(const arma::cx_mat & C, const arma::mat & S, bool verbose) {
     fflush(stdout);
   }
 
-  if(maxerr>=sqrt(DBL_EPSILON)) {
+  if(maxerr>thr) {
     // Clean up
     for(size_t i=0;i<MOovl.n_cols;i++)
       for(size_t j=0;j<MOovl.n_cols;j++)
 	if(std::abs(MOovl(i,j))<10*DBL_EPSILON)
 	  MOovl(i,j)=0.0;
     
-    MOovl.save("MOovl.dat",arma::raw_ascii);
+    MOovl.save("OMOovl_diff.dat",arma::raw_ascii);
 
     std::ostringstream oss;
     oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality is " << maxerr <<".\nCheck the used LAPACK implementation.\n";
