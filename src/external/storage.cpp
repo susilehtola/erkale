@@ -110,6 +110,77 @@ std::string Storage::get_string(const std::string & name) const {
 }
 
 
+void Storage::set_int(const std::string & name, int val) {
+  for(size_t i=0;i<ints.size();i++)
+    if(ints[i].name==name) {
+      ints[i].val=val;
+      return;
+    }
+
+  std::ostringstream oss;
+  oss << "\nThe entry "<<name<<" was not found!\n";
+  throw std::runtime_error(oss.str());
+
+  return;
+}
+
+void Storage::set_double(const std::string & name, double val) {
+  for(size_t i=0;i<doubles.size();i++)
+    if(doubles[i].name==name) {
+      doubles[i].val=val;
+      return;
+    }
+
+  std::ostringstream oss;
+  oss << "\nThe entry "<<name<<" was not found!\n";
+  throw std::runtime_error(oss.str());
+
+  return;
+}
+
+void Storage::set_int_vec(const std::string & name, const std::vector<int> & val) {
+  for(size_t i=0;i<intvec.size();i++)
+    if(intvec[i].name==name) {
+      intvec[i].val=val;
+      return;
+    }
+
+  std::ostringstream oss;
+  oss << "\nThe entry "<<name<<" was not found!\n";
+  throw std::runtime_error(oss.str());
+
+  return;
+}
+
+void Storage::set_double_vec(const std::string & name, const std::vector<double> & val) {
+  for(size_t i=0;i<doublevec.size();i++)
+    if(doublevec[i].name==name) {
+      doublevec[i].val=val;
+      return;
+    }
+
+  std::ostringstream oss;
+  oss << "\nThe entry "<<name<<" was not found!\n";
+  throw std::runtime_error(oss.str());
+
+  return;
+}
+
+void Storage::set_string(const std::string & name, const std::string & val) {
+  for(size_t i=0;i<strings.size();i++)
+    if(strings[i].name==name) {
+      strings[i].val=val;
+      return;
+    }
+
+  std::ostringstream oss;
+  oss << "\nThe entry "<<name<<" was not found!\n";
+  throw std::runtime_error(oss.str());
+
+  return;
+}
+
+
 std::vector<std::string> Storage::find_int(const std::string & name) const {
   std::vector<std::string> ret;
 
@@ -164,17 +235,17 @@ void Storage::print(bool vals) const {
   if(ints.size())
     printf("Integers:\n");
   for(size_t i=0;i<ints.size();i++)
-    printf("\t%s\t%i\n",ints[i].name.c_str(),ints[i].val);
+    printf("\t\"%s\"\t%i\n",ints[i].name.c_str(),ints[i].val);
 
   if(doubles.size())
     printf("\nDoubles:\n");
   for(size_t i=0;i<doubles.size();i++)
-    printf("\t%s\t%e\n",doubles[i].name.c_str(),doubles[i].val);
+    printf("\t\"%s\"\t%e\n",doubles[i].name.c_str(),doubles[i].val);
 
   if(intvec.size())
     printf("\nInteger vectors:\n");
   for(size_t i=0;i<intvec.size();i++) {
-    printf("\t%s\t",intvec[i].name.c_str());
+    printf("\t\"%s\"\t",intvec[i].name.c_str());
     if(vals) {
       for(size_t j=0;j<intvec[i].val.size();j++)
 	printf("%i ",intvec[i].val[j]);
@@ -187,7 +258,7 @@ void Storage::print(bool vals) const {
   if(doublevec.size())
     printf("\nDouble vectors:\n");
   for(size_t i=0;i<doublevec.size();i++) {
-    printf("\t%s\t",doublevec[i].name.c_str());
+    printf("\t\"%s\"\t",doublevec[i].name.c_str());
     if(vals) {
       for(size_t j=0;j<doublevec[i].val.size();j++)
 	printf("%e ",doublevec[i].val[j]);
@@ -200,9 +271,9 @@ void Storage::print(bool vals) const {
   if(strings.size())
     printf("\nStrings:\n");
   for(size_t i=0;i<strings.size();i++) {
-    printf("\t%s\t",strings[i].name.c_str());
+    printf("\t\"%s\"\t",strings[i].name.c_str());
     if(vals) {
-      printf("%s ",strings[i].val.c_str());
+      printf("\"%s\" ",strings[i].val.c_str());
     } else {
       printf("%i chars\n",(int) strings[i].val.size());
     }
