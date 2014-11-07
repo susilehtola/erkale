@@ -103,6 +103,17 @@ class Storage {
   /// Get string
   std::string get_string(const std::string & name) const;
 
+  /// Set integer value
+  void set_int(const std::string & name, int val);
+  /// Set double precision value
+  void set_double(const std::string & name, double val);
+  /// Set integer vector
+  void set_int_vec(const std::string & name, const std::vector<int> & val);
+  /// Get double precision vector
+  void set_double_vec(const std::string & name, const std::vector<double> & val);
+  /// Get string
+  void set_string(const std::string & name, const std::string & val);
+
   /// Get possible integer keywords
   std::vector<std::string> find_int(const std::string & name) const;
   /// Get possible double keywords
