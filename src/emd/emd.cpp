@@ -711,9 +711,9 @@ void EMD::initial_fill(bool verbose) {
     fflush(stdout);
   }
 
-  // Fill a grid with initial spacing 0.1 for q = 0 .. 1.0.
-  // Multiply upper limit and spacing by factor 2 every interval.
-  fixed_fill(false,0.01,1.0,2.0,2.0);
+  // Fill a grid with initial spacing 0.1 for q = 0 .. 1.0.  Multiply
+  // upper limit and spacing by factor 10.0 at every interval.
+  fixed_fill(false,0.01,1.0,10.0,10.0);
   
   if(verbose)
     printf("done.\n");
@@ -931,6 +931,9 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
   double len(len0);
   double h(h0);
 
+  // Cutoff
+  const double cutoff=std::pow(DBL_EPSILON,2);
+
   while(true) {
     // Compute the length of the interval
     size_t Nint=(size_t) round((len-pmin)/(4*h));
@@ -953,8 +956,8 @@ void EMD::fixed_fill(bool verbose, double h0, double len0, double hfac, double l
     h*=hfac;
     len*=lfac;
 
-    // Check if density has vanished
-    if(dens[dens.size()-1].d==0.0 && dens[dens.size()-2].d==0.0)
+    // Check if density is insignificant (Slater functions die pretty slowly)
+    if(dens[dens.size()-1].d*std::pow(dens[dens.size()-1].p,4)<=cutoff && dens[dens.size()-2].d*std::pow(dens[dens.size()-1].p,4)<=cutoff)
       break;
   }
 
