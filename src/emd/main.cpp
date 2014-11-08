@@ -78,6 +78,7 @@ int main(int argc, char **argv) {
     set.parse(argv[1]);
   else
     printf("Using default settings.\n");
+  set.print();
 
   // Get the tolerance
   double tol=set.get_double("EMDTol");
@@ -175,10 +176,10 @@ int main(int argc, char **argv) {
 
 	Timer temd;
 
-	GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,P,l,std::abs(m));
+	GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,Pdum,l,std::abs(m));
 	GaussianEMDEvaluator *negeval;
 	if(m!=0)
-	  negeval=new GaussianEMDEvaluator(basis,P,l,-std::abs(m));
+	  negeval=new GaussianEMDEvaluator(basis,Pdum,l,-std::abs(m));
 	else
 	  negeval=NULL;
 
