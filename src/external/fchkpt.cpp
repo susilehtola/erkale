@@ -295,16 +295,18 @@ void load_fchk(const Settings & set, double tol) {
   int Nelb=stor.get_int("Number of beta electrons");
 
   // Special handling for ROHF
-  if(stor.get_int("IROHF")==1) {
-    P.zeros();
-    arma::mat Ca=form_orbital_C(stor,"Alpha MO coefficients");
-
-    P.zeros();
-    for(int i=0;i<Nela;i++)
-      P+=Ca.col(i)*arma::trans(Ca.col(i));
-    for(int i=0;i<Nelb;i++)
-      P+=Ca.col(i)*arma::trans(Ca.col(i));
-  }
+  try {
+    if(stor.get_int("IROHF")==1) {
+      P.zeros();
+      arma::mat Ca=form_orbital_C(stor,"Alpha MO coefficients");
+      
+      P.zeros();
+      for(int i=0;i<Nela;i++)
+	P+=Ca.col(i)*arma::trans(Ca.col(i));
+      for(int i=0;i<Nelb;i++)
+	P+=Ca.col(i)*arma::trans(Ca.col(i));
+    }
+  } catch(std::runtime_error) {};
 
   // Form orbitals
   arma::mat Ca, Cb;
@@ -317,10 +319,12 @@ void load_fchk(const Settings & set, double tol) {
     restr=true;
 
     // but check again if we have the ROHF bug
-    if(stor.get_int("IROHF")==1) {
-      restr=false;
-      Cb=Ca;
-    }
+    try {
+      if(stor.get_int("IROHF")==1) {
+	restr=false;
+	Cb=Ca;
+      }
+    } catch(std::runtime_error) {};
   }
 
   // Energies
@@ -344,6 +348,10 @@ void load_fchk(const Settings & set, double tol) {
   fflush(stdout);
   arma::mat S=basis.overlap();
   printf("done (%s)\n",t.elapsed().c_str());
+
+  check_orth(Ca,S,true,tol);
+  if(!restr)
+    check_orth(Cb,S,true,tol);
 
   double nelnum=arma::trace(P*S);
   double neldiff=nelnum-Nel;
