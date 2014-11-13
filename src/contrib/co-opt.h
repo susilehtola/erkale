@@ -351,6 +351,7 @@ class CompletenessOptimizer {
 
       cpl[am].exps=move_exps(exps,cpl[am].start);
     }
+    fclose(in);
 
     return cpl;
   }

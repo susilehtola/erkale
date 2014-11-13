@@ -459,7 +459,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 
   // Count amount of occupied orbitals
   size_t nocc=0;
-  while(occs[nocc]!=0.0 && nocc<occs.size())
+  while(nocc<occs.size() && occs[nocc]!=0.0)
     nocc++;
 
   // Check occupations
@@ -620,10 +620,10 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
   // Count amount of occupied orbitals
   size_t nocca=0;
-  while(occa[nocca]!=0.0 && nocca<occa.size())
+  while(nocca<occa.size() && occa[nocca]!=0.0)
     nocca++;
   size_t noccb=0;
-  while(occa[noccb]!=0.0 && noccb<occb.size())
+  while(noccb<occb.size() && occb[noccb]!=0.0)
     noccb++;
 
   // Check occupations
@@ -2062,17 +2062,17 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
     // Freeze core orbitals?
     if(freezecore) {
       // Get the natural orbitals
-      arma::mat NO;
+      arma::mat natorb;
       arma::vec occs;
-      form_NOs(sol.P,basis.overlap(),NO,occs);
+      form_NOs(sol.P,basis.overlap(),natorb,occs);
 
       // Then, localize the core orbitals within the occupied space
-      size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),NO);
+      size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),natorb);
       // and freeze them
-      solver.set_frozen(NO.submat(0,0,NO.n_rows-1,nloc-1),0);
+      solver.set_frozen(natorb.submat(0,0,natorb.n_rows-1,nloc-1),0);
       // Update the current orbitals as well
-      sol.Ca=NO;
-      sol.Cb=NO;
+      sol.Ca=natorb;
+      sol.Cb=natorb;
     }
 
     if(hf) {
@@ -2421,7 +2421,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   try {
     // Check orthogonality of orbitals
     check_orth(C,S,false);
-  } catch(std::runtime_error err) {
+  } catch(std::runtime_error & err) {
     std::ostringstream oss;
     oss << "Projected orbitals are not orthonormal. Please report this bug.";
     throw std::runtime_error(oss.str());

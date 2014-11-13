@@ -113,7 +113,7 @@ BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
     try {
       // Check first if a special set is wanted for given center
       elbas=augbaslib.get_element(el,ind+1);
-    } catch(std::runtime_error err) {
+    } catch(std::runtime_error & err) {
       // Did not find a special basis, use the general one instead.
       elbas=augbaslib.get_element(el,0);
     }
@@ -326,7 +326,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     }
 
     // Return variables
-    if(ispin==spin) {
+    if((bool) ispin==spin) {
       Eaug=Ea;
       Caug=Ca;
     }
@@ -679,7 +679,7 @@ enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & 
     chkpt.read("Pb",sol.Pb);
 
     chkpt.read(loadbas);
-  } catch(std::runtime_error err) {
+  } catch(std::runtime_error & err) {
     ok=LOAD_FAIL;
     //    fprintf(stderr,"Loading failed due to \"%s\".\n",err.what());
   }
@@ -1051,7 +1051,7 @@ int main(int argc, char **argv) {
 
     // Do calculation
     if(method==FCH || method==XCH) {
-      xcorb=solver.full_hole(sol,init_conv,dft_init,method==XCH);
+      solver.full_hole(sol,init_conv,dft_init,method==XCH);
       xcorb=solver.full_hole(sol,conv,dft,method==XCH);
 
       // Get excited state energy
@@ -1072,7 +1072,7 @@ int main(int argc, char **argv) {
 	fprintf(stderr,"Cannot estimate excitation energy without a ground state calculation.\n");
       }
     } else {
-      xcorb=solver.half_hole(sol,init_conv,dft_init);
+      solver.half_hole(sol,init_conv,dft_init);
       xcorb=solver.half_hole(sol,conv,dft);
     }
     printf("\n\n");

@@ -52,13 +52,13 @@ arma::vec form_orbital_E(const Storage & stor, const std::string & name);
  */
 
 /// Form the ERKALE to Gaussian index conversion array
-std::vector<size_t> eg_indarr(const std::vector<int> shtype, size_t Nbf);
+std::vector<size_t> eg_indarr(const std::vector<int> & shtype, size_t Nbf);
 
 /// Form the ERKALE to Gaussian index conversion array
 std::vector<size_t> eg_indarr(const Storage & stor);
 
 /// Form the Gaussian to ERKALE index conversion array
-std::vector<size_t> ge_indarr(const std::vector<int> shtype, size_t Nbf);
+std::vector<size_t> ge_indarr(const std::vector<int> & shtype, size_t Nbf);
 
 /// Form the Gaussian to ERKALE index conversion array
 std::vector<size_t> ge_indarr(const Storage & stor);
