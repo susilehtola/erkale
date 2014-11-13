@@ -73,9 +73,7 @@ HirshfeldAtom::HirshfeldAtom(const BasisSet & basis, const arma::mat & P, double
   }
 }
 
-HirshfeldAtom::HirshfeldAtom(double drv, const std::vector<double> & rhov) {
-  dr=drv;
-  rho=rhov;
+HirshfeldAtom::HirshfeldAtom(double drv, const std::vector<double> & rhov) : dr(drv), rho(rhov) {
 }
 
 HirshfeldAtom::~HirshfeldAtom() {

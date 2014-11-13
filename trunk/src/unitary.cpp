@@ -1024,11 +1024,10 @@ Brockett::Brockett(size_t N, unsigned long int seed) : Unitary(2, sqrt(DBL_EPSIL
   for(size_t i=0;i<N;i++)
     Nmat(i,i)=i+1;
 
-  log=fopen("brockett.dat","w");
+  open_log("brockett.dat");
 }
 
 Brockett::~Brockett() {
-  fclose(log);
 }
 
 bool Brockett::converged(const arma::cx_mat & W) {

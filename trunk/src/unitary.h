@@ -220,9 +220,6 @@ class Brockett : public Unitary {
   /// Unitarity and diagonality criteria
   double unit, diag;
 
-  /// Log file
-  FILE *log;
-
   /// Print legend
   void print_legend() const;
   /// Print progress

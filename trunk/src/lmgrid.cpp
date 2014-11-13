@@ -226,7 +226,7 @@ expansion_t expand_orbitals(const arma::mat & C, const BasisSet & bas, const coo
 	}
 
   if(verbose)
-    printf("Checked the orthonormality of spherical harmonics: %lu succ, %lu fail.\n",nsucc,nfail);
+    printf("Checked the orthonormality of spherical harmonics: %u succ, %u fail.\n",(unsigned int) nsucc,(unsigned int) nfail);
 
 #endif
 
@@ -315,7 +315,7 @@ real_expansion_t expand_orbitals_real(const arma::mat & C, const BasisSet & bas,
 	}
 
   if(verbose)
-    printf("Checked the orthonormality of solid harmonics: %lu succ, %lu fail.\n",nsucc,nfail);
+    printf("Checked the orthonormality of solid harmonics: %u succ, %u fail.\n",(unsigned int) nsucc,(unsigned int) nfail);
 #endif
 
   // Form radial grid

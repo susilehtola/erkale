@@ -227,7 +227,7 @@ Storage parse_fchk(const std::string & name) {
 }
 
 /// Form the ERKALE to Gaussian index conversion array
- std::vector<size_t> eg_indarr(const std::vector<int> shtype, size_t Nbf) {
+ std::vector<size_t> eg_indarr(const std::vector<int> & shtype, size_t Nbf) {
   // Returned index list
   std::vector<size_t> idx(Nbf,0);
 
@@ -435,7 +435,7 @@ std::vector<size_t> eg_indarr(const Storage & stor) {
 }
 
 /// Form the Gaussian to ERKALE index conversion array
-std::vector<size_t> ge_indarr(const std::vector<int> shtype, size_t Nbf) {
+std::vector<size_t> ge_indarr(const std::vector<int> & shtype, size_t Nbf) {
   // Erkale to Gaussian
   std::vector<size_t> eg=eg_indarr(shtype, Nbf);
 

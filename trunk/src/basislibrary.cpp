@@ -1047,7 +1047,7 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	size_t num=readint(line_split[1]);
 
 	// Check that there is no duplicate entry
-	bool dupl=0, numfound=0;
+	int dupl=0, numfound=0;
 	for(size_t i=0;i<elements.size();i++) {
 
 	  if(elements[i].get_number()==num) {
@@ -1099,7 +1099,7 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	    // The amount of exponents is
 	    int nc=readint(words[1]);
 
-	    if(strcmp(shelltype.c_str(),"SP")==0) {
+	    if(strcmp(shelltype,"SP")==0) {
 	      // SP shell
 	      FunctionShell S(0), P(1);
 
