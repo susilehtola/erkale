@@ -21,6 +21,7 @@
 #include "stringutil.h"
 #include "timer.h"
 #include "linalg.h"
+#include "localization.h"
 
 #include <algorithm>
 #include <cstdlib>
