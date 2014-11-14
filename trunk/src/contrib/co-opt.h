@@ -24,7 +24,6 @@
  * Using Completeness-Optimized Primitive Sets. A Case for Magnetic
  * Properties", J. Comp. Chem. 27, 434 (2006).
  *
- *
  * The automatic algorithm for generating primitive basis sets was
  * introduced in
  *
@@ -37,6 +36,11 @@
  * S. Lehtola, P. Manninen, M. Hakala, and K. Hämäläinen, "Contraction
  * of completeness-optimized basis sets: Application to ground-state
  * electron momentum densities", J. Chem. Phys. 138, 044109 (2013).
+ *
+ * The algorithm itself has been described in
+ *
+ * S. Lehtola, "Automatic algorithms for completeness-optimization of
+ * Gaussian basis sets", J. Comput. Chem., in press.
  */
 
 #ifndef ERKALE_CO_OPT
