@@ -20,6 +20,7 @@
 #include "stringutil.h"
 #include "properties.h"
 #include "bader.h"
+#include "timer.h"
 
 #ifdef _OPENMP
 #include <omp.h>

@@ -19,6 +19,7 @@
 #include "mathf.h"
 #include "checkpoint.h"
 #include "stringutil.h"
+#include "timer.h"
 
 #ifdef _OPENMP
 #include <omp.h>
