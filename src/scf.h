@@ -334,18 +334,6 @@ class SCF {
   /// Calculate unrestricted density-functional theory solution
   void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
 
-  /// Calculate restricted Hartree-Fock solution using line search (slow!)
-  void RHF_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv);
-  /// Calculate restricted open-shell Hartree-Fock solution using line search (slow!)
-  void ROHF_ls(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv);
-  /// Calculate unrestricted Hartree-Fock solution using line search (slow!)
-  void UHF_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv);
-
-  /// Calculate restricted density-functional theory solution using line search (slow!)
-  void RDFT_ls(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft);
-  /// Calculate unrestricted density-functional theory solution using line search (slow!)
-  void UDFT_ls(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
-
   /// Calculate restricted Hartree-Fock operator
   void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const rscf_t & oldsol, double tol) const;
   /// Calculate restricted open-shell Hartree-Fock operator
