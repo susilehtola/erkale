@@ -325,7 +325,7 @@ class SCF {
   /// Calculate restricted Hartree-Fock solution
   void RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv);
   /// Calculate restricted open-shell Hartree-Fock solution
-  void ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv);
+  void ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv);
   /// Calculate unrestricted Hartree-Fock solution
   void UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv);
 
@@ -337,7 +337,7 @@ class SCF {
   /// Calculate restricted Hartree-Fock operator
   void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const rscf_t & oldsol, double tol) const;
   /// Calculate restricted open-shell Hartree-Fock operator
-  void Fock_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const uscf_t & oldsol, double tol) const;
+  void Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const;
   /// Calculate unrestricted Hartree-Fock operator
   void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const;
 
@@ -419,7 +419,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
  * unrestricted mean-field methods for controlling
  * spin-contamination", J. Chem. Phys. 134, 064101 (2011).
  */
-void ROHF_update(arma::mat & Fa, arma::mat & Fb, const arma::mat & P, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose=true, bool atomic=false);
+void ROHF_update(arma::mat & Fa, arma::mat & Fb, const arma::mat & P, const arma::mat & S, std::vector<double> occa, std::vector<double> occb, bool verbose=true);
 
 
 /// Update occupations by occupying states with maximum overlap

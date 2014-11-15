@@ -208,7 +208,9 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
       int Nel_alpha;
       int Nel_beta;
       get_Nel_alpha_beta(Z,gs.mult,Nel_alpha,Nel_beta);
-      ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose,true);
+      std::vector<double> occa=atomic_occupancy(Nel_alpha);
+      std::vector<double> occb=atomic_occupancy(Nel_beta);
+      ROHF_update(sol.Ha,sol.Hb,sol.P,S,occa,occb,verbose);
     }
 
     // Calculate energy

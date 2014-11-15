@@ -30,7 +30,7 @@ void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::v
 void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-void SCF::Fock_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const uscf_t & oldsol, double tol) const
+void SCF::Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const
 
 #elif defined(DFT) && defined(FULLHOLE)
 void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, double tol) const
@@ -48,21 +48,6 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   MAT_SIZE_CHECK(sol.Pb,Nbf,Nbf);
 #endif
 
-
-#if defined(_ROHF)
-  // Occupations
-  std::vector<double> occa;
-  std::vector<double> occb;
-  
-  if(basisp->get_Nnuc()==1) {
-    occa=atomic_occupancy(Nel_alpha);
-    occb=atomic_occupancy(Nel_beta);
-  } else {
-    occa=std::vector<double>(Nel_alpha,1.0);
-    occb=std::vector<double>(Nel_beta,1.0);
-  }
-#endif
-  
   // Coulomb and exchange matrices
   sol.J.zeros(Nbf,Nbf);
 #ifdef RESTRICTED
@@ -613,7 +598,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 #ifdef _ROHF
   // Constrain Fock operators to correspond to ROHF
-  ROHF_update(sol.Ha,sol.Hb,sol.P,S,Nel_alpha,Nel_beta,verbose,basisp->get_Nnuc()==1);
+  ROHF_update(sol.Ha,sol.Hb,sol.P,S,occa,occb,verbose);
 #endif
 
 

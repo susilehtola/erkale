@@ -27,7 +27,7 @@ void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector
 void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-void SCF::ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, const convergence_t conv)
+void SCF::ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
 
 #elif defined(DFT) && defined(FULLHOLE)
 size_t XRSSCF::full_hole(uscf_t & sol, convergence_t conv, dft_t dft, bool xch)
@@ -54,10 +54,8 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #define form_fock(sol,ref) Fock_full_hole(sol,dft,occa,occb,ref,grid,tol); nfock++;
 
   // Conventional HF and DFT
-#elif defined(HF)
+#elif defined(HF) || defined(_ROHF)
 #define form_fock(sol,ref) Fock_UHF(sol,occa,occb,ref,tol); nfock++;
-#elif defined(_ROHF)
-#define form_fock(sol,ref) Fock_ROHF(sol,Nel_alpha,Nel_beta,ref,tol); nfock++;
 #elif defined(DFT)
 #define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,dft,ref,grid,tol); nfock++;
 #endif
@@ -92,14 +90,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #endif // ifdef RESTRICTED
 
 
-#if defined(_ROHF)
-  // Occupations. TODO - this does not apply for fractional occupations..
-  std::vector<double> occa;
-  std::vector<double> occb;
-  occa=std::vector<double>(Nel_alpha,1.0);
-  occb=std::vector<double>(Nel_beta,1.0);
-
-#elif ( defined(HALFHOLE) || defined(FULLHOLE) )
+#if ( defined(HALFHOLE) || defined(FULLHOLE) )
   // Occupation vector of spin up and spin down
   std::vector<double> occa;
   std::vector<double> occb;
@@ -108,10 +99,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   // Determine number of occupied states
 #if !defined(HALFHOLE) && !defined(FULLHOLE)
 
-#ifdef _ROHF
-  size_t nocca=Nel_alpha;
-  size_t noccb=Nel_beta;
-#elif defined(RESTRICTED)
+#if defined(RESTRICTED)
   size_t nocc;
   for(nocc=occs.size()-1;nocc<occs.size();nocc--)
     if(occs[nocc]>0)
@@ -303,16 +291,19 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   // Sparse output to stderr
   if(verbose) {
     fprintf(stderr,"Running ");
-#if defined(RESTRICTED) || defined(_ROHF)
+#if defined(RESTRICTED)
     fprintf(stderr,"restricted ");
 #else
+# if defined(_ROHF)
+    fprintf(stderr,"restricted open-shell ");
+#else
+#if defined(UNRESTRICTED)
     fprintf(stderr,"unrestricted ");
+#endif
+#endif
 #endif
 
 #ifndef DFT
-#ifdef _ROHF
-    fprintf(stderr,"open-shell ");
-#endif
     fprintf(stderr,"HF ");
 #else
     if(dft.c_func>0) {
