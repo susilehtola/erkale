@@ -1083,7 +1083,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   form_NOs(P,S,AO_to_NO,tmp,occs);
 }
 
-void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, int Nel_alpha, int Nel_beta, bool verbose, bool atomic) {
+void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, std::vector<double> occa, std::vector<double> occb, bool verbose) {
   /*
    * T. Tsuchimochi and G. E. Scuseria, "Constrained active space
    * unrestricted mean-field methods for controlling
@@ -1103,42 +1103,20 @@ void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, c
   // and take it to the NO basis.
   arma::mat Delta_NO=arma::trans(AO_to_NO)*Delta_AO*AO_to_NO;
 
+  // Get rid of trailing zeros
+  while(occa[occa.size()-1]==0.0)
+    occa.erase(occa.begin()+occa.size()-1);
+  while(occb[occb.size()-1]==0.0)
+    occb.erase(occb.begin()+occb.size()-1);
+
   // Amount of independent orbitals is
   size_t Nind=AO_to_NO.n_cols;
   // Amount of core orbitals is
-  size_t Nc=std::min(Nel_alpha,Nel_beta);
+  size_t Nc=std::min(occa.size(),occb.size());
   // Amount of active space orbitals is
-  size_t Na=std::max(Nel_alpha,Nel_beta)-Nc;
+  size_t Na=std::max(occa.size(),occb.size())-Nc;
   // Amount of virtual orbitals (in NO space) is
   size_t Nv=Nind-Na-Nc;
-
-  if(atomic) {
-    // Get atomic occupations
-    std::vector<double> occa=atomic_occupancy(Nel_alpha);
-    std::vector<double> occb=atomic_occupancy(Nel_beta);
-    // and update the values
-    Nc=std::min(occa.size(),occb.size());
-    Na=std::max(occa.size(),occb.size())-Nc;
-    Nv=Nind-Na-Nc;
-  }
-
-  /*
-    double tot=0.0;
-    printf("Core orbital occupations:");
-    for(size_t c=Nind-1;c>=Nind-Nc && c<Nind;c--) {
-    printf(" %f",occs(c));
-    tot+=occs(c);
-    }
-    printf("\n");
-
-    printf("Active orbital occupations:");
-    for(size_t a=Nind-Nc-1;a>=Nind-Nc-Na && a<Nind;a--) {
-    printf(" %f",occs(a));
-    tot+=occs(a);
-    }
-    printf("\n");
-    printf("Total occupancy of core and active is %f.\n",tot);
-  */
 
   // Form lambda by flipping the signs of the cv and vc blocks and
   // zeroing out everything else.
@@ -2084,7 +2062,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Solve restricted open-shell Hartree-Fock
 
       // Solve ROHF
-      solver.ROHF(sol,Nel_alpha,Nel_beta,conv);
+      solver.ROHF(sol,occa,occb,conv);
 
       // Set occupancies right
       get_unrestricted_occupancy(set,basis,occa,occb);
