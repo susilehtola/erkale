@@ -18,6 +18,7 @@
 #include "dftgrid.h"
 #include "stringutil.h"
 #include "dftfuncs.h"
+#include "timer.h"
 
 #include <cstdio>
 
@@ -68,7 +69,8 @@ int main(int argc, char **argv) {
   chkpt.read("Restricted",restr);
   
   // Functional id
-  int func_id=find_func(set.get_string("Method"));
+  int x_func, c_func;
+  parse_xc_func(x_func,c_func,set.get_string("Method"));
 
   // DFT grid, verbose operation
   DFTGrid grid(&basis,true);
@@ -94,11 +96,15 @@ int main(int argc, char **argv) {
 
   if(restr) {
     if(adaptive)
-      grid.construct(P,gridtol,func_id,0);
+      grid.construct(P,gridtol,x_func,c_func);
     else
-      grid.construct(nrad,lmax,func_id,0);
+      grid.construct(nrad,lmax,x_func,c_func);
     
-    grid.print_density_potential(func_id,P);
+    grid.print_density(P);
+    if(x_func)
+      grid.print_potential(x_func,P/2.0,P/2.0,"Vx.dat");
+    if(c_func)
+      grid.print_potential(c_func,P/2.0,P/2.0,"Vc.dat");
     
   } else {
     arma::mat Pa, Pb;
@@ -106,11 +112,15 @@ int main(int argc, char **argv) {
     chkpt.read("Pb",Pb);
 
     if(adaptive)
-      grid.construct(Pa,Pb,gridtol,func_id,0);
+      grid.construct(Pa,Pb,gridtol,x_func,c_func);
     else
-      grid.construct(nrad,lmax,func_id,0);
+      grid.construct(nrad,lmax,x_func,c_func);
 
-    grid.print_density_potential(func_id,Pa,Pb);
+    grid.print_density(Pa+Pb);
+    if(x_func)
+      grid.print_potential(x_func,Pa,Pb);
+    if(c_func)
+      grid.print_potential(c_func,Pa,Pb);
   }
 
   return 0;

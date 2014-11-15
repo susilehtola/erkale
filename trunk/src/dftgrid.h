@@ -447,9 +447,9 @@ class DFTGrid {
   arma::vec eval_force(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb);
 
   /// Print out density data
-  void print_density_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string densname="density.dat", std::string potname="potential.dat");
-  /// Print out density data
-  void print_density_potential(int func_id, const arma::mat & P, std::string densname="density.dat", std::string potname="potential.dat");
+  void print_density(const arma::mat & P, std::string densname="density.dat");
+  /// Print out potential data
+  void print_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string potname="potential.dat");
 };
 
 
