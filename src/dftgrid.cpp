@@ -3591,18 +3591,15 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
   return f;
 }
 
-void DFTGrid::print_density_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string densname, std::string potname) {
-
+void DFTGrid::print_density(const arma::mat & P, std::string densname) {
   // Open output files
   FILE *dens=fopen(densname.c_str(),"w");
-  FILE *pot=fopen(potname.c_str(),"w");
 
   fprintf(dens,"%i\n",(int) get_Npoints());
-  fprintf(pot,"%i\n",(int) get_Npoints());
 
   Timer t;
   if(verbose) {
-    printf("\nSaving density and potential data in %s and %s ... ",densname.c_str(),potname.c_str());
+    printf("\nSaving density data in %s ... ",densname.c_str());
     fflush(stdout);
   } 
   
@@ -3627,13 +3624,7 @@ void DFTGrid::print_density_potential(int func_id, const arma::mat & Pa, const a
       wrk[ith].compute_bf(*basp,grids[i]);
 
       // Update density
-      wrk[ith].update_density(Pa,Pb);
-
-      // Initialize the arrays
-      wrk[ith].init_xc();
-      // Compute the functionals
-      if(func_id>0)
-        wrk[ith].compute_xc(func_id);
+      wrk[ith].update_density(P);
 
       // Write out density and potential data
 #ifdef _OPENMP
@@ -3641,7 +3632,6 @@ void DFTGrid::print_density_potential(int func_id, const arma::mat & Pa, const a
 #endif
       {
 	wrk[ith].print_density(dens);
-	wrk[ith].print_potential(func_id,pot);
       }
 
       // Free memory
@@ -3651,22 +3641,18 @@ void DFTGrid::print_density_potential(int func_id, const arma::mat & Pa, const a
 
   // Close output files
   fclose(dens);
-  fclose(pot);
 
   printf("done (%s)\n",t.elapsed().c_str());
 }
 
-void DFTGrid::print_density_potential(int func_id, const arma::mat & P, std::string densname, std::string potname) {
+void DFTGrid::print_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string potname) {
   // Open output files
-  FILE *dens=fopen(densname.c_str(),"w");
   FILE *pot=fopen(potname.c_str(),"w");
-
-  fprintf(dens,"%i\n",(int) get_Npoints());
   fprintf(pot,"%i\n",(int) get_Npoints());
   
   Timer t;
   if(verbose) {
-    printf("\nSaving density and potential data in %s and %s ... ",densname.c_str(),potname.c_str());
+    printf("\nSaving potential data in %s ... ",potname.c_str());
     fflush(stdout);
   } 
 
@@ -3690,7 +3676,7 @@ void DFTGrid::print_density_potential(int func_id, const arma::mat & P, std::str
       wrk[ith].compute_bf(*basp,grids[i]);
 
       // Update density
-      wrk[ith].update_density(P);
+      wrk[ith].update_density(Pa,Pb);
 
       // Initialize the arrays
       wrk[ith].init_xc();
@@ -3703,7 +3689,6 @@ void DFTGrid::print_density_potential(int func_id, const arma::mat & P, std::str
 #pragma omp critical
 #endif
       {
-	wrk[ith].print_density(dens);
 	wrk[ith].print_potential(func_id,pot);
       }
       
@@ -3713,7 +3698,6 @@ void DFTGrid::print_density_potential(int func_id, const arma::mat & P, std::str
   } // End parallel region
 
   // Close output files
-  fclose(dens);
   fclose(pot);
 
   printf("done (%s)\n",t.elapsed().c_str());
