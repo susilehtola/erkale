@@ -251,6 +251,8 @@ class Edmiston : public UnitaryFunction {
   DensityFit dfit;
   /// Orbitals
   arma::mat C;
+  /// Orbital Coulomb matrices
+  std::vector<arma::mat> Jorb;
 
  public:
   /// Constructor
@@ -259,6 +261,8 @@ class Edmiston : public UnitaryFunction {
   ~Edmiston();
   /// Copy
   Edmiston * copy() const;
+  /// Set transformation matrix
+  void setW(const arma::cx_mat & W);
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
