@@ -122,7 +122,7 @@ enum chgmet {
 };
 
 /// Boys localization
-class Boys : public Unitary {
+class Boys : public UnitaryFunction {
   /// Penalty
   int n;
 
@@ -137,9 +137,11 @@ class Boys : public Unitary {
 
  public:
   /// Constructor. n gives the penalty power to use
-  Boys(const BasisSet & basis, const arma::mat & C, int n, double Gthr=1e-5, double Fthr=1e-6,  bool verbose=true, bool delocalize=false);
+  Boys(const BasisSet & basis, const arma::mat & C, int n,  bool verbose=true, bool delocalize=false);
   /// Destructor
   ~Boys();
+  /// Copy
+  Boys * copy() const;
 
   /// Reset penalty
   void set_n(int n);
@@ -153,7 +155,7 @@ class Boys : public Unitary {
 };
 
 /// Fourth moment localization
-class FMLoc : public Unitary {
+class FMLoc : public UnitaryFunction {
   /// Penalty
   int n;
 
@@ -170,9 +172,11 @@ class FMLoc : public Unitary {
 
  public:
   /// Constructor. n gives the penalty power to use
-  FMLoc(const BasisSet & basis, const arma::mat & C, int n, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
+  FMLoc(const BasisSet & basis, const arma::mat & C, int n, bool verbose=true, bool delocalize=false);
   /// Destructor
   ~FMLoc();
+  /// Copy
+  FMLoc * copy() const;
 
   /// Reset penalty
   void set_n(int n);
@@ -187,7 +191,7 @@ class FMLoc : public Unitary {
 
 
 /// Pipek-Mezey localization
-class Pipek : public Unitary {
+class Pipek : public UnitaryFunction {
   // The localization is based on partial charches on atoms, so the
   // memory requirement would be Nat * Nocc^2, limiting the routine to
   // small systems. Instead, we calculate everything on-the-fly, so
@@ -226,8 +230,12 @@ class Pipek : public Unitary {
   arma::mat get_charge(size_t i);
 
  public:
-  Pipek(enum chgmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double p=2.0, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
+  /// Constructor
+  Pipek(enum chgmet chg, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double p=2.0, bool verbose=true, bool delocalize=false);
+  /// Destructor
   ~Pipek();
+  /// Copy
+  Pipek * copy() const;
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
@@ -238,15 +246,19 @@ class Pipek : public Unitary {
 };
 
 /// Edmiston-Ruedenberg localization
-class Edmiston : public Unitary {
+class Edmiston : public UnitaryFunction {
   /// Density fitting object
   DensityFit dfit;
   /// Orbitals
   arma::mat C;
 
  public:
-  Edmiston(const BasisSet & basis, const arma::mat & C, double Gthr=1e-5, double Fthr=1e-6, bool verbose=true, bool delocalize=false);
+  /// Constructor
+  Edmiston(const BasisSet & basis, const arma::mat & C, bool delocalize=false);
+  /// Destructor
   ~Edmiston();
+  /// Copy
+  Edmiston * copy() const;
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
@@ -257,7 +269,7 @@ class Edmiston : public Unitary {
 };
 
 /// Perdew-Zunger self-interaction correction
-class PZSIC : public Unitary {
+class PZSIC : public UnitaryFunction {
   /// SCF object for constructing Fock matrix
   SCF * solver;
   /// Settings for DFT calculation
@@ -279,8 +291,6 @@ class PZSIC : public Unitary {
   double rmstol;
   /// Convergence criterion: max kappa
   double maxtol;
-  /// Convergence criterion: change of energy
-  double Etol;
 
   /// Orbital Fock matrices
   std::vector<arma::mat> Forb;
@@ -296,25 +306,27 @@ class PZSIC : public Unitary {
   void get_k_rms_max(double & Krms, double & Kmax) const;
 
   /// Print legend
-  void print_legend() const;
+  std::string legend() const;
   /// Print progress
-  void print_progress(size_t k) const;
+  std::string status(bool lfmt) const;
   /// Print progress
   void print_time(const Timer & t) const;
 
-  /// Initialize convergence criterion
-  void initialize(const arma::cx_mat & W0);
   /// Check convergence
-  bool converged(const arma::cx_mat & W);
+  bool converged() const;
 
  public:
   /// Constructor
-  PZSIC(SCF *solver, dft_t dft, DFTGrid * grid, double Etol, double maxtol, double rmstol, enum pzham ham, bool verbose=true);
+  PZSIC(SCF *solver, dft_t dft, DFTGrid * grid, double maxtol, double rmstol, enum pzham ham);
   /// Destructor
   ~PZSIC();
+  /// Copy
+  PZSIC * copy() const;
 
   /// Set orbitals
   void set(const rscf_t & ref, double pzcor);
+  /// Set transformation matrix
+  void setW(const arma::cx_mat & W);
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);

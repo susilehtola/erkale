@@ -40,326 +40,314 @@
 #include "timer.h"
 #include "trdsm.h"
 #include "trrh.h"
-#include "unitary.h"
 
-void orbital_localization(enum locmet met, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & U, bool verbose, bool real, int maxiter, double Gthr, double Fthr, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
+void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & W, bool verbose, bool real, int maxiter, double Gthr, double Fthr, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
   Timer t;
 
-  // Real part of U
-  arma::mat Ureal;
+  // Optimizer
+  UnitaryOptimizer opt(Gthr,Fthr,verbose,real);
+  // Cost function
+  UnitaryFunction *func;
+
+  // Real operation?
   if(real)
-    Ureal=arma::real(U);
+    W=arma::real(W)*std::complex<double>(1.0,0.0);
 
-  // Worker
-  if(met==BOYS || met==BOYS_2 || met==BOYS_3 || met==BOYS_4) {
-    int n=0;
-    if(met==BOYS)
-      n=1;
-    else if(met==BOYS_2)
-      n=2;
-    else if(met==BOYS_3)
-      n=3;
-    else if(met==BOYS_4)
-      n=4;
+  // Worker stack
+  std::vector<enum locmet> metstack;
 
-    Boys worker(basis,C,n,Gthr,Fthr,verbose,delocalize);
-    // Perform initial localization
-    if(n>1) {
-      for(int nv=1;nv<n;nv++) {
-	if(verbose) printf("\nInitial localization with p=%i\n",nv);
-	worker.set_n(nv);
-	if(real)
-	  measure=worker.optimize(Ureal,umet,uacc,maxiter);
-	else
-	  measure=worker.optimize(U,umet,uacc,maxiter);
+  switch(met0) {
+  case(BOYS_2):
+    // Initialize with Boys
+    metstack.push_back(BOYS);
+    metstack.push_back(BOYS_2);
+    break;
+
+  case(BOYS_3):
+    // Initialize with Boys
+    metstack.push_back(BOYS);
+    metstack.push_back(BOYS_2);
+    metstack.push_back(BOYS_3);
+    break;
+
+  case(BOYS_4):
+    // Initialize with Boys
+    metstack.push_back(BOYS);
+    metstack.push_back(BOYS_2);
+    metstack.push_back(BOYS_3);
+    metstack.push_back(BOYS_4);
+    break;
+
+  case(FM_2):
+    // Initialize with FM
+    metstack.push_back(BOYS);
+    metstack.push_back(FM_1);
+    metstack.push_back(FM_2);
+    break;
+
+  case(FM_3):
+    // Initialize with FM
+    metstack.push_back(BOYS);
+    metstack.push_back(FM_1);
+    metstack.push_back(FM_2);
+    metstack.push_back(FM_3);
+    break;
+
+  case(FM_4):
+    // Initialize with FM
+    metstack.push_back(BOYS);
+    metstack.push_back(FM_1);
+    metstack.push_back(FM_2);
+    metstack.push_back(FM_3);
+    metstack.push_back(FM_4);
+    break;
+    
+  default:
+    // Default - just do the one thing
+    metstack.push_back(met0);
+  }
+
+  // Loop over localization
+  for(size_t im=0;im<metstack.size();im++) {
+    enum locmet met(metstack[im]);
+
+    if(met==BOYS || met==BOYS_2 || met==BOYS_3 || met==BOYS_4) {
+      int n=0;
+      if(met==BOYS)
+	n=1;
+      else if(met==BOYS_2)
+	n=2;
+      else if(met==BOYS_3)
+	n=3;
+      else if(met==BOYS_4)
+	n=4;
+      
+      func=new Boys(basis,C,n,verbose,delocalize);
+
+    } else if(met==FM_1 || met==FM_2 || met==FM_3 || met==FM_4) {
+      int n=0;
+      if(met==FM_1)
+	n=1;
+      else if(met==FM_2)
+	n=2;
+      else if(met==FM_3)
+	n=3;
+      else if(met==FM_4)
+	n=4;
+
+      func=new FMLoc(basis,C,n,verbose,delocalize);
+
+    } else if(met==PIPEK_MULLIKENH    ||	\
+	      met==PIPEK_MULLIKEN2    ||	\
+	      met==PIPEK_MULLIKEN4    ||	\
+	      met==PIPEK_LOWDINH      ||	\
+	      met==PIPEK_LOWDIN2      ||	\
+	      met==PIPEK_LOWDIN4      ||	\
+	      met==PIPEK_BADERH       ||	\
+	      met==PIPEK_BADER2       ||	\
+	      met==PIPEK_BADER4       ||	\
+	      met==PIPEK_BECKEH       ||	\
+	      met==PIPEK_BECKE2       ||	\
+	      met==PIPEK_BECKE4       ||	\
+	      met==PIPEK_HIRSHFELDH   ||	\
+	      met==PIPEK_HIRSHFELD2   ||	\
+	      met==PIPEK_HIRSHFELD4   ||	\
+	      met==PIPEK_ITERHIRSHH   ||	\
+	      met==PIPEK_ITERHIRSH2   ||	\
+	      met==PIPEK_ITERHIRSH4   ||	\
+	      met==PIPEK_IAOH         ||	\
+	      met==PIPEK_IAO2         ||	\
+	      met==PIPEK_IAO4         ||	\
+	      met==PIPEK_STOCKHOLDERH ||	\
+	      met==PIPEK_STOCKHOLDER2 ||	\
+	      met==PIPEK_STOCKHOLDER4 ||	\
+	      met==PIPEK_VORONOIH     ||	\
+	      met==PIPEK_VORONOI2     ||	\
+	      met==PIPEK_VORONOI4) {
+      
+      // Penalty exponent
+      double p;
+      enum chgmet chg;
+      
+      switch(met) {
+      case(PIPEK_MULLIKENH):
+	p=1.5;
+	chg=MULLIKEN;
+	break;
+	
+      case(PIPEK_MULLIKEN2):
+	p=2.0;
+	chg=MULLIKEN;
+	break;
+	
+      case(PIPEK_MULLIKEN4):
+	p=4.0;
+	chg=MULLIKEN;
+	break;
+	
+      case(PIPEK_LOWDINH):
+	p=1.5;
+	chg=LOWDIN;
+	break;
+	
+      case(PIPEK_LOWDIN2):
+	p=2.0;
+	chg=LOWDIN;
+	break;
+	
+      case(PIPEK_LOWDIN4):
+	p=4.0;
+	chg=LOWDIN;
+	break;
+	
+      case(PIPEK_BADERH):
+	p=1.5;
+	chg=BADER;
+	break;
+
+      case(PIPEK_BADER2):
+	p=2.0;
+	chg=BADER;
+	break;
+
+      case(PIPEK_BADER4):
+	p=4.0;
+	chg=BADER;
+	break;
+
+      case(PIPEK_BECKEH):
+	p=1.5;
+	chg=BECKE;
+	break;
+
+      case(PIPEK_BECKE2):
+	p=2.0;
+	chg=BECKE;
+	break;
+
+      case(PIPEK_BECKE4):
+	p=4.0;
+	chg=BECKE;
+	break;
+
+      case(PIPEK_VORONOIH):
+	p=1.5;
+	chg=VORONOI;
+	break;
+
+      case(PIPEK_VORONOI2):
+	p=2.0;
+	chg=VORONOI;
+	break;
+
+      case(PIPEK_VORONOI4):
+	p=4.0;
+	chg=VORONOI;
+	break;
+
+      case(PIPEK_IAOH):
+	p=1.5;
+	chg=IAO;
+	break;
+
+      case(PIPEK_IAO2):
+	p=2.0;
+	chg=IAO;
+	break;
+
+      case(PIPEK_IAO4):
+	p=4.0;
+	chg=IAO;
+	break;
+
+      case(PIPEK_HIRSHFELDH):
+	p=1.5;
+	chg=HIRSHFELD;
+	break;
+
+      case(PIPEK_HIRSHFELD2):
+	p=2.0;
+	chg=HIRSHFELD;
+	break;
+
+      case(PIPEK_HIRSHFELD4):
+	p=4.0;
+	chg=HIRSHFELD;
+	break;
+
+      case(PIPEK_ITERHIRSHH):
+	p=1.5;
+	chg=ITERHIRSH;
+	break;
+
+      case(PIPEK_ITERHIRSH2):
+	p=2.0;
+	chg=ITERHIRSH;
+	break;
+
+      case(PIPEK_ITERHIRSH4):
+	p=4.0;
+	chg=ITERHIRSH;
+	break;
+
+      case(PIPEK_STOCKHOLDERH):
+	p=1.5;
+	chg=STOCKHOLDER;
+	break;
+
+      case(PIPEK_STOCKHOLDER2):
+	p=2.0;
+	chg=STOCKHOLDER;
+	break;
+
+      case(PIPEK_STOCKHOLDER4):
+	p=4.0;
+	chg=STOCKHOLDER;
+	break;
+
+      default:
+	ERROR_INFO();
+	throw std::runtime_error("Not implemented.\n");
       }
-      worker.set_n(n);
-      if(verbose) printf("\n");
-    }
-    // Final optimization
-    if(fname.length()) worker.open_log(fname);
-    worker.set_debug(debug);
-    if(real)
-      measure=worker.optimize(Ureal,umet,uacc,maxiter);
-    else
-      measure=worker.optimize(U,umet,uacc,maxiter);
+      
+      // If only one nucleus - nothing to do!
+      if(basis.get_Nnuc()==1)
+	continue;
 
-  } else if(met==FM_1 || met==FM_2 || met==FM_3 || met==FM_4) {
-    int n=0;
-    if(met==FM_1)
-      n=1;
-    else if(met==FM_2)
-      n=2;
-    else if(met==FM_3)
-      n=3;
-    else if(met==FM_4)
-      n=4;
+      func=new Pipek(chg,basis,C,P,p,verbose);
+    
+    } else if(met==EDMISTON) {
+      func=new Edmiston(basis,C);
 
-    {
-      // Initial localization with Boys
-      Boys worker(basis,C,n,Gthr,Fthr,verbose,delocalize);
-      if(verbose) printf("\nInitial localization with Foster-Boys\n");
-      if(real)
-	measure=worker.optimize(Ureal,umet,uacc,maxiter);
-      else
-	measure=worker.optimize(U,umet,uacc,maxiter);
-      if(verbose) printf("\n");
-    }
-
-
-    FMLoc worker(basis,C,n,Gthr,Fthr,verbose,delocalize);
-    // Perform initial localization
-    if(n>1) {
-      for(int nv=1;nv<n;nv++) {
-	if(verbose) printf("\nInitial localization with p=%i\n",nv);
-	worker.set_n(nv);
-
-	if(real)
-	  measure=worker.optimize(Ureal,umet,uacc,maxiter);
-	else
-	  measure=worker.optimize(U,umet,uacc,maxiter);
-      }
-
-      if(verbose) printf("\n");
-      worker.set_n(n);
-    }
-    if(fname.length()) worker.open_log(fname);
-    worker.set_debug(debug);
-    if(real)
-      measure=worker.optimize(Ureal,umet,uacc,maxiter);
-    else
-      measure=worker.optimize(U,umet,uacc,maxiter);
-
-  } else if(met==PIPEK_MULLIKENH    ||		\
-	    met==PIPEK_MULLIKEN2    ||		\
-	    met==PIPEK_MULLIKEN4    ||		\
-	    met==PIPEK_LOWDINH      ||		\
-	    met==PIPEK_LOWDIN2      ||		\
-	    met==PIPEK_LOWDIN4      ||		\
-	    met==PIPEK_BADERH       ||		\
-	    met==PIPEK_BADER2       ||		\
-	    met==PIPEK_BADER4       ||		\
-	    met==PIPEK_BECKEH       ||		\
-	    met==PIPEK_BECKE2       ||		\
-	    met==PIPEK_BECKE4       ||		\
-	    met==PIPEK_HIRSHFELDH   ||		\
-	    met==PIPEK_HIRSHFELD2   ||		\
-	    met==PIPEK_HIRSHFELD4   ||		\
-	    met==PIPEK_ITERHIRSHH   ||		\
-	    met==PIPEK_ITERHIRSH2   ||		\
-	    met==PIPEK_ITERHIRSH4   ||		\
-	    met==PIPEK_IAOH         ||		\
-	    met==PIPEK_IAO2         ||		\
-	    met==PIPEK_IAO4         ||		\
-	    met==PIPEK_STOCKHOLDERH ||		\
-	    met==PIPEK_STOCKHOLDER2 ||		\
-	    met==PIPEK_STOCKHOLDER4 ||		\
-	    met==PIPEK_VORONOIH     ||		\
-	    met==PIPEK_VORONOI2     ||		\
-	    met==PIPEK_VORONOI4) {
-
-    // Penalty exponent
-    double p;
-    enum chgmet chg;
-
-    switch(met) {
-    case(PIPEK_MULLIKENH):
-      p=1.5;
-      chg=MULLIKEN;
-      break;
-
-    case(PIPEK_MULLIKEN2):
-      p=2.0;
-      chg=MULLIKEN;
-      break;
-
-    case(PIPEK_MULLIKEN4):
-      p=4.0;
-      chg=MULLIKEN;
-      break;
-
-    case(PIPEK_LOWDINH):
-      p=1.5;
-      chg=LOWDIN;
-      break;
-
-    case(PIPEK_LOWDIN2):
-      p=2.0;
-      chg=LOWDIN;
-      break;
-
-    case(PIPEK_LOWDIN4):
-      p=4.0;
-      chg=LOWDIN;
-      break;
-
-    case(PIPEK_BADERH):
-      p=1.5;
-      chg=BADER;
-      break;
-
-    case(PIPEK_BADER2):
-      p=2.0;
-      chg=BADER;
-      break;
-
-    case(PIPEK_BADER4):
-      p=4.0;
-      chg=BADER;
-      break;
-
-    case(PIPEK_BECKEH):
-      p=1.5;
-      chg=BECKE;
-      break;
-
-    case(PIPEK_BECKE2):
-      p=2.0;
-      chg=BECKE;
-      break;
-
-    case(PIPEK_BECKE4):
-      p=4.0;
-      chg=BECKE;
-      break;
-
-    case(PIPEK_VORONOIH):
-      p=1.5;
-      chg=VORONOI;
-      break;
-
-    case(PIPEK_VORONOI2):
-      p=2.0;
-      chg=VORONOI;
-      break;
-
-    case(PIPEK_VORONOI4):
-      p=4.0;
-      chg=VORONOI;
-      break;
-
-    case(PIPEK_IAOH):
-      p=1.5;
-      chg=IAO;
-      break;
-
-    case(PIPEK_IAO2):
-      p=2.0;
-      chg=IAO;
-      break;
-
-    case(PIPEK_IAO4):
-      p=4.0;
-      chg=IAO;
-      break;
-
-    case(PIPEK_HIRSHFELDH):
-      p=1.5;
-      chg=HIRSHFELD;
-      break;
-
-    case(PIPEK_HIRSHFELD2):
-      p=2.0;
-      chg=HIRSHFELD;
-      break;
-
-    case(PIPEK_HIRSHFELD4):
-      p=4.0;
-      chg=HIRSHFELD;
-      break;
-
-    case(PIPEK_ITERHIRSHH):
-      p=1.5;
-      chg=ITERHIRSH;
-      break;
-
-    case(PIPEK_ITERHIRSH2):
-      p=2.0;
-      chg=ITERHIRSH;
-      break;
-
-    case(PIPEK_ITERHIRSH4):
-      p=4.0;
-      chg=ITERHIRSH;
-      break;
-
-    case(PIPEK_STOCKHOLDERH):
-      p=1.5;
-      chg=STOCKHOLDER;
-      break;
-
-    case(PIPEK_STOCKHOLDER2):
-      p=2.0;
-      chg=STOCKHOLDER;
-      break;
-
-    case(PIPEK_STOCKHOLDER4):
-      p=4.0;
-      chg=STOCKHOLDER;
-      break;
-
-    default:
+    } else {
       ERROR_INFO();
-      throw std::runtime_error("Not implemented.\n");
+      throw std::runtime_error("Method not implemented.\n");
     }
 
-    // If only one nucleus - nothing to do!
-    if(basis.get_Nnuc()>1) {
-      Pipek worker(chg,basis,C,P,p,Gthr,Fthr,verbose);
-      if(fname.length()) worker.open_log(fname);
-      worker.set_debug(debug);
-      if(real)
-	measure=worker.optimize(Ureal,umet,uacc,maxiter);
-      else
-	measure=worker.optimize(U,umet,uacc,maxiter);
+    // Set matrix
+    func->setW(W);
+    // Log file?
+    if(im==metstack.size()-1) {
+      opt.open_log(fname);
+      opt.set_debug(debug);
     }
-
-  } else if(met==EDMISTON) {
-    Edmiston worker(basis,C,Gthr,Fthr,verbose);
-    if(fname.length()) worker.open_log(fname);
-    worker.set_debug(debug);
-    if(real)
-      measure=worker.optimize(Ureal,umet,uacc,maxiter);
-    else
-      measure=worker.optimize(U,umet,uacc,maxiter);
-  } else {
-    ERROR_INFO();
-    throw std::runtime_error("Method not implemented.\n");
+    // Run optimization
+    opt.optimize(func,umet,uacc,maxiter);
+    // Get updated matrix
+    W=func->getW();
+    // and cost function value
+    measure=func->getf();
+    // Free worker
+    delete func;
   }
 
   if(verbose) {
     printf("Localization done in %s.\n",t.elapsed().c_str());
     fflush(stdout);
   }
-
-  if(real) {
-    // Save U
-    U=Ureal*std::complex<double>(1.0,0.0);
-  }
 }
 
-arma::mat interpret_force(const arma::vec & f) {
-  if(f.n_elem%3!=0) {
-    ERROR_INFO();
-    throw std::runtime_error("Invalid argument for interpret_force.\n");
-  }
-
-  arma::mat force(f);
-  force.reshape(3,f.n_elem/3);
-  return force;
-
-  /*
-  // Calculate magnitude in fourth column
-  arma::mat retf(f.n_elem/3,4);
-  retf.submat(0,0,f.n_elem/3-1,2)=arma::trans(force);
-  for(size_t i=0;i<retf.n_rows;i++)
-    retf(i,3)=sqrt( pow(retf(i,0),2) + pow(retf(i,1),2) + pow(retf(i,2),2) );
-
-  return retf;
-  */
-}
-
-Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4*nv,Gth,Fth,delocalize,ver) {
+Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool delocalize) : UnitaryFunction(4*nv,delocalize) {
   // Save n
   n=nv;
 
@@ -391,15 +379,21 @@ Boys::Boys(const BasisSet & basis, const arma::mat & C, int nv, double Gth, doub
 Boys::~Boys() {
 }
 
+Boys* Boys::copy() const {
+  return new Boys(*this);
+}
+
 void Boys::set_n(int nv) {
   n=nv;
 
   // Set q accordingly
-  set_q(4*(n+1));
+  q=4*(n+1);
 }
 
 
-double Boys::cost_func(const arma::cx_mat & W) {
+double Boys::cost_func(const arma::cx_mat & Wv) {
+  W=Wv;
+
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
@@ -407,7 +401,9 @@ double Boys::cost_func(const arma::cx_mat & W) {
 
   if(W.n_rows != rsq.n_rows) {
     ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << rsq.n_rows << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
   double B=0;
@@ -436,19 +432,24 @@ double Boys::cost_func(const arma::cx_mat & W) {
     // Add to total
     B+=pow(w,n);
   }
-
-  return B;
+  f=B;
+  
+  return f;
 }
 
-arma::cx_mat Boys::cost_der(const arma::cx_mat & W) {
+arma::cx_mat Boys::cost_der(const arma::cx_mat & Wv) {
+  W=Wv;
+
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(W.n_rows != rsq.n_rows) {
+  if(W.n_rows != rsq.n_cols) {
     ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << rsq.n_cols << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
   // Returned matrix
@@ -484,13 +485,13 @@ arma::cx_mat Boys::cost_der(const arma::cx_mat & W) {
   return Bder;
 }
 
-void Boys::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
-  f=cost_func(W);
-  der=cost_der(W);
+void Boys::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & der) {
+  fv=cost_func(Wv);
+  der=cost_der(Wv);
 }
 
 
-FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(8*nv,Gth,Fth,delocalize,ver) {
+FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, bool ver, bool delocalize) : UnitaryFunction(8*nv,delocalize) {
   // Save n
   n=nv;
 
@@ -566,14 +567,20 @@ FMLoc::FMLoc(const BasisSet & basis, const arma::mat & C, int nv, double Gth, do
 FMLoc::~FMLoc() {
 }
 
+FMLoc* FMLoc::copy() const {
+  return new FMLoc(*this);
+}
+
 void FMLoc::set_n(int nv) {
   n=nv;
 
   // Set q accordingly
-  set_q(8*(nv+1));
+  q=8*(nv+1);
 }
 
-double FMLoc::cost_func(const arma::cx_mat & W) {
+double FMLoc::cost_func(const arma::cx_mat & Wv) {
+  W=Wv;
+  
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
@@ -581,7 +588,9 @@ double FMLoc::cost_func(const arma::cx_mat & W) {
 
   if(W.n_rows != rsq.n_rows) {
     ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << rsq.n_rows << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
   double B=0;
@@ -640,11 +649,14 @@ double FMLoc::cost_func(const arma::cx_mat & W) {
     // Add to total
     B+=pow(w,n);
   }
+  f=B;
 
   return B;
 }
 
-arma::cx_mat FMLoc::cost_der(const arma::cx_mat & W) {
+arma::cx_mat FMLoc::cost_der(const arma::cx_mat & Wv) {
+  W=Wv;
+
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
@@ -652,7 +664,9 @@ arma::cx_mat FMLoc::cost_der(const arma::cx_mat & W) {
 
   if(W.n_rows != rsq.n_rows) {
     ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << rsq.n_rows << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
   // Returned matrix
@@ -746,13 +760,13 @@ arma::cx_mat FMLoc::cost_der(const arma::cx_mat & W) {
   return Bder;
 }
 
-void FMLoc::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
-  f=cost_func(W);
-  der=cost_der(W);
+void FMLoc::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & der) {
+  fv=cost_func(Wv);
+  der=cost_der(Wv);
 }
 
 
-Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, double pv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(2*pv,Gth,Fth,!delocalize,ver) {
+Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, double pv, bool ver, bool delocalize) : UnitaryFunction(2*pv,!delocalize) {
   // Store used method
   chg=chgv;
   C=Cv;
@@ -897,6 +911,10 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
 Pipek::~Pipek() {
 }
 
+Pipek* Pipek::copy() const {
+  return new Pipek(*this);
+}
+
 arma::mat Pipek::get_charge(size_t iat) {
   arma::mat Q;
 
@@ -961,7 +979,9 @@ arma::mat Pipek::get_charge(size_t iat) {
   return Q;
 }
 
-double Pipek::cost_func(const arma::cx_mat & W) {
+double Pipek::cost_func(const arma::cx_mat & Wv) {
+  W=Wv;
+
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
@@ -988,11 +1008,14 @@ double Pipek::cost_func(const arma::cx_mat & W) {
       Dinv+=std::real(std::pow(Qa,p));
     }
   }
+  f=Dinv;
 
   return Dinv;
 }
 
-arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
+arma::cx_mat Pipek::cost_der(const arma::cx_mat & Wv) {
+  W=Wv;
+
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
@@ -1046,7 +1069,9 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & W) {
   return Dder;
 }
 
-void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & Dder) {
+void Pipek::cost_func_der(const arma::cx_mat & Wv, double & Dinv, arma::cx_mat & Dder) {
+  W=Wv;
+
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
@@ -1099,9 +1124,10 @@ void Pipek::cost_func_der(const arma::cx_mat & W, double & Dinv, arma::cx_mat & 
   }
 
   Dinv=D;
+  f=D;
 }
 
-Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double Gth, double Fth, bool ver, bool delocalize) : Unitary(4,Gth,Fth,!delocalize,ver) {
+Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, bool delocalize) : UnitaryFunction(4,!delocalize) {
   // Store orbitals
   C=Cv;
   // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, use Hartree-Fock routine since it has better tolerance for linear dependencies
@@ -1111,21 +1137,25 @@ Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, double Gth, dou
 Edmiston::~Edmiston() {
 }
 
-double Edmiston::cost_func(const arma::cx_mat & W) {
-  double f;
+Edmiston* Edmiston::copy() const {
+  return new Edmiston(*this);
+}
+
+double Edmiston::cost_func(const arma::cx_mat & Wv) {
   arma::cx_mat der;
-  cost_func_der(W,f,der);
+  cost_func_der(Wv,f,der);
   return f;
 }
 
-arma::cx_mat Edmiston::cost_der(const arma::cx_mat & W) {
-  double f;
+arma::cx_mat Edmiston::cost_der(const arma::cx_mat & Wv) {
   arma::cx_mat der;
-  cost_func_der(W,f,der);
+  cost_func_der(Wv,f,der);
   return der;
 }
 
-void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
+void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & der) {
+  W=Wv;
+
   if(W.n_cols != C.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Invalid matrix size.\n");
@@ -1146,6 +1176,7 @@ void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
   f=0.0;
   for(size_t io=0;io<W.n_cols;io++)
     f+=arma::trace(Porb[io]*Jorb[io]);
+  fv=f;
 
   // Compute derivative
   der.zeros(W.n_cols,W.n_cols);
@@ -1154,13 +1185,12 @@ void Edmiston::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & 
       der(a,b) =2.0 * arma::as_scalar( arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b) );
 }
 
-PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, double Etolv, double maxtolv, double rmstolv, enum pzham hm, bool verb) : Unitary(4,0.0,0.0,true,verb) {
+PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, double maxtolv, double rmstolv, enum pzham hm) : UnitaryFunction(4,true) {
   solver=solverp;
   dft=dftp;
   grid=gridp;
 
   // Convergence criteria
-  Etol=Etolv;
   rmstol=rmstolv;
   maxtol=maxtolv;
 
@@ -1171,44 +1201,61 @@ PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, double Etolv, double max
 PZSIC::~PZSIC() {
 }
 
+PZSIC* PZSIC::copy() const {
+  return new PZSIC(*this);
+}
+
 void PZSIC::set(const rscf_t & solp, double pz) {
   sol=solp;
   pzcor=pz;
 }
 
-double PZSIC::cost_func(const arma::cx_mat & W) {
+void PZSIC::setW(const arma::cx_mat & Wv) {
+  // We need to update everything to match W
+  arma::cx_mat der;
+  cost_func_der(Wv,f,der);  
+}
+
+double PZSIC::cost_func(const arma::cx_mat & Wv) {
   // Evaluate SI energy.
 
   arma::cx_mat der;
   double ESIC;
-  cost_func_der(W,ESIC,der);
+  cost_func_der(Wv,ESIC,der);
   return ESIC;
 }
 
-arma::cx_mat PZSIC::cost_der(const arma::cx_mat & W) {
+arma::cx_mat PZSIC::cost_der(const arma::cx_mat & Wv) {
+  // Evaluate derivative
 
   arma::cx_mat der;
   double ESIC;
-  cost_func_der(W,ESIC,der);
+  cost_func_der(Wv,ESIC,der);
   return der;
 }
 
-void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
-  if(W.n_rows != W.n_cols) {
+void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & der) {
+  if(Wv.n_rows != Wv.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(W.n_rows != sol.C.n_cols) {
+  if(Wv.n_rows != sol.C.n_cols) {
     ERROR_INFO();
-    throw std::runtime_error("Matrix does not match size of problem!\n");
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << sol.C.n_cols << "!\n";
+    throw std::runtime_error(oss.str());
   }
 
   // Get transformed orbitals
-  arma::cx_mat Ctilde=sol.C*W;
-
-  // Compute orbital-dependent Fock matrices
-  solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid);
+  arma::cx_mat Ctilde=sol.C*Wv;
+  
+  // Check if we need to do something
+  if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
+    // Compute orbital-dependent Fock matrices
+    W=Wv;
+    solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid);
+  }
 
   // and the total SIC contribution.
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
@@ -1255,7 +1302,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
   }
 
   // SI energy is
-  f=arma::sum(Eorb);
+  fv=f=arma::sum(Eorb);
 
   // Derivative is
   der.zeros(Ctilde.n_cols,Ctilde.n_cols);
@@ -1270,42 +1317,30 @@ void PZSIC::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der
       kappa(io,jo)=arma::as_scalar(arma::trans(Ctilde.col(io))*(Forb[jo]-Forb[io])*Ctilde.col(jo));
 }
 
-
-void PZSIC::print_legend() const {
-  fprintf(stderr,"\t%4s\t%13s\t%13s\t%13s\t%14s\t%10s\n","iter","kappa max ","kappa rms ","E-SIC","change ","time (s)");
-  fflush(stderr);
+std::string PZSIC::legend() const {
+  char leg[80];
+  sprintf(leg,"%12s   %12s ","Kmax","Krms");
+  return std::string(leg);
 }
 
-void PZSIC::print_progress(size_t k) const {
+std::string PZSIC::status(bool lfmt) const {
   double Krms, Kmax;
   get_k_rms_max(Krms,Kmax);
 
-  fprintf(stderr,"\t%4i",(int) k);
+  char Km[80], Kr[80];
+  char mc=(Kmax<maxtol) ? '*' : ' ';
+  char rc=(Krms<rmstol) ? '*' : ' ';
 
-  if(Kmax<maxtol)
-    fprintf(stderr,"\t%e*",Kmax);
-  else
-    fprintf(stderr,"\t%e ",Kmax);
+  if(lfmt) {
+    sprintf(Km,"%.16e",Kmax);
+    sprintf(Kr,"%.16e",Krms);
+  } else {
+    sprintf(Km,"%e%c",Kmax,mc);
+    sprintf(Kr,"%e%c",Krms,rc);
+  }
 
-  if(Krms<rmstol)
-    fprintf(stderr,"\t%e*",Krms);
-  else
-    fprintf(stderr,"\t%e ",Krms);
-
-  fprintf(stderr,"\t% e",J);
-
-  if(k>1) {
-    if(fabs(J-oldJ)<Etol)
-      fprintf(stderr,"\t% e*",J-oldJ);
-    else
-      fprintf(stderr,"\t% e",J-oldJ);
-  } else
-    fprintf(stderr,"\t%14s","");
-  fflush(stderr);
-
-  printf("\nSIC iteration %i\n",(int) k);
-  printf("E-SIC = % 16.8f, dE = % e, Kmax = %e, Krms = %e\n",J,J-oldJ,Kmax,Krms);
-  fflush(stdout);
+  std::string stat=std::string(Km)+"  "+std::string(Kr);
+  return stat;
 }
 
 void PZSIC::print_time(const Timer & t) const {
@@ -1322,23 +1357,12 @@ void PZSIC::get_k_rms_max(double & Krms, double & Kmax) const {
   Kmax=max_cabs(kappa);
 }
 
-void PZSIC::initialize(const arma::cx_mat & W0) {
-  // Form matrices
-  arma::cx_mat der;
-  double f;
-  cost_func_der(W0,f,der);
-
-  // Compute K/R
-  double Krms, Kmax;
-  get_k_rms_max(Krms,Kmax);
-}
-
-bool PZSIC::converged(const arma::cx_mat & W) {
+bool PZSIC::converged() const {
   double Krms, Kmax;
   get_k_rms_max(Krms,Kmax);
   (void) W;
 
-  if(Kmax<maxtol && Krms<rmstol && fabs(J-oldJ)<Etol)
+  if(Kmax<maxtol && Krms<rmstol)
     // Converged
     return true;
   else
@@ -1347,7 +1371,7 @@ bool PZSIC::converged(const arma::cx_mat & W) {
 }
 
 double PZSIC::get_ESIC() const {
-  return J;
+  return f;
 }
 
 arma::vec PZSIC::get_Eorb() const {

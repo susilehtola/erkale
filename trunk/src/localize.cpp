@@ -420,7 +420,7 @@ int main(int argc, char **argv) {
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
   set.add_string("SizeDistribution","File to save orbital size distribution in","");
   set.add_double("GThreshold","Threshold for convergence: norm of Riemannian gradient",1e-7);
-  set.add_double("FThreshold","Threshold for convergence: relative change in function",1e-7);
+  set.add_double("FThreshold","Threshold for convergence: absolute change in function",1e-7);
   set.add_int("Maxiter","Maximum number of iterations",50000);
   set.add_int("Seed","Random number seed",0);
   set.add_bool("Debug","Print out line search every iteration",false);
@@ -539,8 +539,6 @@ int main(int argc, char **argv) {
     umet=POLY_DF;
   else if(stricmp(umets,"poly_f")==0)
     umet=POLY_F;
-  else if(stricmp(umets,"poly_fdf")==0)
-    umet=POLY_FDF;
   else if(stricmp(umets,"armijo")==0)
     umet=ARMIJO;
   else if(stricmp(umets,"fourier_df")==0)

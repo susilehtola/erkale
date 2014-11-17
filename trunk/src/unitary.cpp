@@ -19,50 +19,83 @@
 #include "mathf.h"
 #include <cfloat>
 
-Unitary::Unitary(int qv, double Gthrv, double Fthrv, bool max, bool ver, bool realv) {
-  q=qv;
-  Gthr=Gthrv;
-  Fthr=Fthrv;
-  verbose=ver;
-  real=realv;
-  debug=false;
+#define UNIT std::complex<double>(1.0,0.0)
+#define IMAG std::complex<double>(0.0,1.0)
 
+UnitaryFunction::UnitaryFunction(int qv, bool max): W(arma::cx_mat()), f(0.0), q(qv) {
   /// Maximize or minimize?
-  if(max)
-    sign=1;
-  else
-    sign=-1;
+  sign = max ? 1 : -1;
+}
+
+UnitaryFunction::~UnitaryFunction() {
+}
+
+void UnitaryFunction::setW(const arma::cx_mat & Wv) {
+  W=Wv;
+}
+
+arma::cx_mat UnitaryFunction::getW() const {
+  return W;
+}
+
+int UnitaryFunction::getq() const {
+  return q;
+}
+
+double UnitaryFunction::getf() const {
+  return f;
+}
+
+int UnitaryFunction::getsign() const {
+  return sign;
+}
+
+bool UnitaryFunction::converged() const {
+  /// Dummy default function
+  return true;
+}
+
+std::string UnitaryFunction::legend() const {
+  /// Dummy default function
+  return "";
+}
+
+std::string UnitaryFunction::status(bool lfmt) const {
+  /// Dummy default function
+  (void) lfmt;
+  return "";
+}
+
+UnitaryOptimizer::UnitaryOptimizer(double Gthrv, double Fthrv, bool ver, bool realv) : G(arma::cx_mat()), H(arma::cx_mat()), Hvec(arma::cx_mat()), Hval(arma::vec()), Tmu(0.0), verbose(ver), real(realv), Gthr(Gthrv), Fthr(Fthrv) {
 
   // Defaults
   // use 3rd degree polynomial to fit derivative
   polynomial_degree=4;
   // and in the fourier transform use
+  fourier_periods=5; // five quasi-periods
   fourier_samples=3; // three points per period
-  fourier_periods=5; // five quasio-periods
+
+  debug=false;
 
   // Logfile is closed
   log=NULL;
 }
 
-Unitary::~Unitary() {
+UnitaryOptimizer::~UnitaryOptimizer() {
   if(log!=NULL)
     fclose(log);
 }
 
-void Unitary::set_q(int qv) {
-  q=qv;
-}
-
-void Unitary::set_debug(bool d) {
+void UnitaryOptimizer::set_debug(bool d) {
   debug=d;
 }
 
-void Unitary::set_thr(double Geps, double Feps) {
+void UnitaryOptimizer::set_thr(double Geps, double Feps) {
   Gthr=Geps;
   Fthr=Feps;
 }
 
-void Unitary::open_log(const std::string & fname) {
+void UnitaryOptimizer::open_log(const std::string & fname) {
   if(log!=NULL)
     fclose(log);
   
@@ -70,116 +103,91 @@ void Unitary::open_log(const std::string & fname) {
     log=fopen(fname.c_str(),"w");
 }
 
-void Unitary::check_unitary(const arma::cx_mat & W) const {
-  arma::cx_mat prod=arma::trans(W)*W;
-  for(size_t i=0;i<prod.n_cols;i++)
-    prod(i,i)-=1.0;
+void UnitaryOptimizer::check_unitary(const arma::cx_mat & W) const {
+  arma::cx_mat prod=arma::trans(W)*W-arma::eye(W.n_cols,W.n_cols);
   double norm=rms_cnorm(prod);
   if(norm>=sqrt(DBL_EPSILON))
     throw std::runtime_error("Matrix is not unitary!\n");
 }
 
-arma::cx_mat Unitary::get_rotation(double step) const {
-  // Imaginary unit
-  std::complex<double> imagI(0,1.0);
-
+arma::cx_mat UnitaryOptimizer::get_rotation(double step) const {
   // Rotation matrix is
-  arma::cx_mat rot=Hvec*arma::diagmat(arma::exp(sign*step*imagI*Hval))*arma::trans(Hvec);
+  arma::cx_mat rot=Hvec*arma::diagmat(arma::exp(step*IMAG*Hval))*arma::trans(Hvec);
   if(real)
     // Zero out possible imaginary part
-    rot=arma::real(rot)*std::complex<double>(1.0,0.0);
+    rot=arma::real(rot)*UNIT;
   
   return rot;
 }
 
-void Unitary::set_poly(int deg) {
+void UnitaryOptimizer::set_poly(int deg) {
   polynomial_degree=deg;
 }
 
-void Unitary::set_fourier(int samples, int pers) {
+void UnitaryOptimizer::set_fourier(int samples, int pers) {
   fourier_periods=pers;
   fourier_samples=samples;
 }
 
-void Unitary::initialize(const arma::cx_mat & W0) {
-  (void) W0;
-}
-
-bool Unitary::converged(const arma::cx_mat & W) {
-  /// Dummy default function, just check norm of gradient
-  (void) W;
-  return false;
-}
-
-void Unitary::update_gradient(const arma::cx_mat & W) {
+void UnitaryOptimizer::update_gradient(const arma::cx_mat & W, UnitaryFunction *f) {
   // Euclidean gradient
   arma::cx_mat Gammak;
-  cost_func_der(W,J,Gammak);
+  double J;
+  f->cost_func_der(W,J,Gammak);
+  // Fix sign
+  //  Gammak*=f->getsign();
 
   // Riemannian gradient, Abrudan 2009 table 3 step 2
   G=Gammak*arma::trans(W) - W*arma::trans(Gammak);
 }
 
-void Unitary::update_search_direction() {
-  // Imaginary unit
-  std::complex<double> imagI(0,1.0);
-  
+void UnitaryOptimizer::update_search_direction(int q) {
   // Diagonalize -iH to find eigenvalues purely imaginary
   // eigenvalues iw_i of H; Abrudan 2009 table 3 step 1.
-  bool diagok=arma::eig_sym(Hval,Hvec,-imagI*H);
+  bool diagok=arma::eig_sym(Hval,Hvec,-IMAG*H);
   if(!diagok) {
     ERROR_INFO();
     throw std::runtime_error("Unitary optimization: error diagonalizing H.\n");
   }
+
+  // Max step length
+  double wmax=arma::max(arma::abs(Hval));
+  Tmu=2.0*M_PI/(q*wmax);
 }
 
-double Unitary::optimize(arma::cx_mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter) {
-  // Operating on complex matrix.
-  real=false;
-  return optimizer(W,met,acc,maxiter);
-}
+double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enum unitacc acc, size_t maxiter) {
+  // Get the matrix
+  arma::cx_mat W=f->getW();
+  if(real)
+    W=arma::real(W)*UNIT;
 
-double Unitary::optimize(arma::mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter) {
-  // Operating on real matrix.
-  real=true;
-
-  arma::cx_mat Whlp=W*std::complex<double>(1.0,0.0);
-  double o=optimizer(Whlp,met,acc,maxiter);
-  W=arma::real(Whlp);
-
-  return o;
-}
-
-double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter) {
-  // Old gradient
+  // Current and old gradient
   arma::cx_mat oldG;
   G.zeros(W.n_cols,W.n_cols);
-  // Old search direction
+  // Current and old search direction
   arma::cx_mat oldH;
   H.zeros(W.n_cols,W.n_cols);
-
+  
   if(W.n_cols<2) {
     // No optimization is necessary.
     W.eye();
-    J=cost_func(W);
-    return 0.0;
+    return f->cost_func(W);
   }
 
   // Check matrix
   check_unitary(W);
   // Check derivative
-  check_derivative(W);
+  check_derivative(f);
 
-  // Perform any necessary initialization
-  initialize(W);
+  // Info from previous iteration
+  UnitaryFunction *oldf=NULL;
 
   // Iteration number
   size_t k=0;
-  J=0;
 
   // Print out the legend
   if(verbose)
-    print_legend();
+    print_legend(f);
 
   while(true) {
     // Increase iteration number
@@ -187,17 +195,12 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
 
     Timer t;
 
-    // Store old values
-    oldJ=J;
+    // Store old gradient and search direction
     oldG=G;
     oldH=H;
 
     // Compute the cost function and the euclidean derivative, Abrudan 2009 table 3 step 2
-    update_gradient(W);
-
-    // Print progress
-    if(verbose)
-      print_progress(k);
+    update_gradient(W,f);
 
     // Compute update coefficient
     double gamma=0.0;
@@ -232,15 +235,18 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
 	printf("CG search direction reset.\n");
       }
     }
-    
+    // Update search direction
+    update_search_direction(f->getq());
+
     // Check for convergence. Don't do the check in the first
     // iteration, because for canonical orbitals it can be a really
     // bad saddle point
-    if(k>1 && ( (bracket(G,G)<Gthr) || (fabs(J-oldJ)<Fthr*std::max(fabs(oldJ),fabs(J))) || converged(W) ) ) {
+    double J=f->getf();
+
+    double oldJ = (oldf==NULL) ? 0.0 : oldf->getf();
+    if(k>1 && ( (bracket(G,G)<Gthr) && fabs(J-oldJ)<Fthr && f->converged() ) ) {
 
       if(verbose) {
-	print_step(met,0.0);
-	print_time(t);
 	printf("Converged.\n");
 	fflush(stdout);
 
@@ -251,9 +257,6 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
       break;
     } else if(k==maxiter) {
       if(verbose) {
-	print_step(met,0.0);
-	print_time(t);
-
 	printf(" %s\nNot converged.\n",t.elapsed().c_str());
 	fflush(stdout);
       }
@@ -261,89 +264,81 @@ double Unitary::optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc ac
       break;
     }
 
-    // Compute new search direction
-    update_search_direction();
-
-    // Find maximal eigenvalue
-    double wmax=arma::max(arma::abs(Hval));
-    if(wmax==0.0) {
-      continue;
-    }
-
-    // Compute maximal step size.
-    // Order of the cost function in the coefficients of W.
-    Tmu=2.0*M_PI/(q*wmax);
-
     if(debug) {
       char fname[80];
       sprintf(fname,"unitary_%04i.dat",(int) k);
       FILE *p=fopen(fname,"w");
-      
+      UnitaryFunction *uf=f->copy();      
       for(int i=-80;i<=80;i++) {
 	double x=i*0.05;
 	double xT=x*Tmu;
-	double y=cost_func(get_rotation(xT)*W);
-	fprintf(p,"%e %e % e\n",x,xT,y);
+
+	double y=uf->cost_func(get_rotation(xT)*W);
+	fprintf(p,"% e % e % e\n",x,xT,y);
       }
       fclose(p);
+      delete uf;
     }
 
-    // Find optimal step size
-    double step;
+    // Save old iteration data
+    if(oldf)
+      delete oldf;
+    oldf=f->copy();
+
+    // Take a step
     if(met==POLY_DF) {
-      step=polynomial_step_df(W);
+      polynomial_step_df(f);
     } else if(met==POLY_F) {
-      step=polynomial_step_f(W);
-    } else if(met==POLY_FDF) {
-      step=polynomial_step_fdf(W);
+      polynomial_step_f(f);
     } else if(met==FOURIER_DF) {
-      step=fourier_step_df(W);
+      fourier_step_df(f);
     } else if(met==ARMIJO) {
-      step=armijo_step(W);
+      armijo_step(f);
     } else {
       ERROR_INFO();
       throw std::runtime_error("Method not implemented.\n");
     }
-
-    // Check step size
-    if(step<0.0) throw std::runtime_error("Negative step size!\n");
-    if(step==DBL_MAX) throw std::runtime_error("Could not find step size!\n");
-
+    
+    // Print progress
     if(verbose)
-      print_step(met,step);
-
-    // Take step
-    if(step!=0.0) {
-      W=get_rotation(step)*W;
-    }
+      print_progress(k,f,oldf);
 
     if(verbose) {
       print_time(t);
     }
+    
+    // Get new matrix
+    W=f->getW();
   }
 
-  return J;
+  if(oldf)
+    delete oldf;
+
+  return f->getf();
 }
 
-void Unitary::print_legend() const {
-  printf("\t%4s\t%13s\t%13s\t%12s\n","iter","J","delta J","<G,G>");
+void UnitaryOptimizer::print_legend(const UnitaryFunction *f) const {
+  printf("  %4s  %13s  %13s  %12s  %s\n","iter","J","delta J","<G,G>",f->legend().c_str());
 }
 
-void Unitary::print_progress(size_t k) const {
-  if(k==1)
+void UnitaryOptimizer::print_progress(size_t k, const UnitaryFunction *f, const UnitaryFunction *fold) const {
+  double J=f->getf();
+  if(fold==NULL)
     // No info on delta J
-    printf("\t%4i\t% e\t%13s\t%e ",(int) k,J,"",bracket(G,G));
-  else
-    printf("\t%4i\t% e\t% e\t%e ",(int) k,J,J-oldJ,bracket(G,G));
+    printf("  %4i  % e  %13s %e  %s",(int) k,J,"",bracket(G,G),f->status().c_str());
+  else {
+    double oldJ=fold->getf();
+    printf("  %4i  % e  % e  %e  %s",(int) k,J,J-oldJ,bracket(G,G),f->status().c_str());
+  }
   fflush(stdout);
 
   if(log!=NULL) {
-    fprintf(log,"%4i % .16e %.16e ",(int) k,J,bracket(G,G));
+    fprintf(log,"%4i % .16e %.16e %s",(int) k,J,bracket(G,G),f->status(true).c_str());
     fflush(log);
   }
 }
 
-void Unitary::print_time(const Timer & t) const {
+void UnitaryOptimizer::print_time(const Timer & t) const {
   printf(" %s\n",t.elapsed().c_str());
   fflush(stdout);
 
@@ -353,7 +348,7 @@ void Unitary::print_time(const Timer & t) const {
   }
 }
 
-void Unitary::print_step(enum unitmethod & met, double step) const {
+void UnitaryOptimizer::print_step(enum unitmethod & met, double step) const {
   /*
   if(met==POLY_DF)
     printf("Polynomial_df  step %e (%e of Tmu)\n",step,step/Tmu);
@@ -370,13 +365,12 @@ void Unitary::print_step(enum unitmethod & met, double step) const {
   */
 
   (void) met;
-  if(log!=NULL) {
-    fprintf(log,"%e %e ",step,Tmu);
-    fflush(log);
-  }
+  (void) step;
+  if(log!=NULL)
+    fprintf(log,"%e\n",step);
 }
 
-void Unitary::classify(const arma::cx_mat & W) const {
+void UnitaryOptimizer::classify(const arma::cx_mat & W) const {
   if(real)
     return;
   
@@ -395,35 +389,28 @@ void Unitary::classify(const arma::cx_mat & W) const {
   printf(", re norm %e, im norm %e\n",realpart,imagpart);
 }
 
-void Unitary::check_derivative(const arma::cx_mat & W0) {
-  // Compute gradient
-  update_gradient(W0);
-  // and the search direction
-  H=G;
-  update_search_direction();
-
-  // Determine step size
-  double wmax=arma::max(arma::abs(Hval));
-  if(wmax==0.0) {
-    // Derivative vanishes - don't do anything
-    return;
-  }
+void UnitaryOptimizer::check_derivative(const UnitaryFunction *fp0) {
+  UnitaryFunction *fp=fp0->copy();
   
-  // Compute maximal step size.
-  // Order of the cost function in the coefficients of W.
-  Tmu=2.0*M_PI/(q*wmax);
+  arma::cx_mat W0=fp0->getW();
+
+  // Compute gradient
+  update_gradient(W0,fp);
+  // and the search direction
+  arma::cx_mat Hs=G;
+  update_search_direction(fp->getq());
 
   // Get cost function and derivative matrix
   arma::cx_mat der;
   double Jo;
-  cost_func_der(W0,Jo,der);
+  fp->cost_func_der(W0,Jo,der);
   // The derivative is
   double dfdmu=step_der(W0,der);
 
   // Compute trial value.
   double trstep=Tmu*sqrt(DBL_EPSILON);
-  arma::cx_mat Wtr=get_rotation(trstep)*W0;
-  double Jtr=cost_func(Wtr);
+  arma::cx_mat Wtr=get_rotation(trstep*fp0->getsign())*W0;
+  double Jtr=fp->cost_func(Wtr);
   
   // Estimated change in function is
   double dfest=trstep*dfdmu;
@@ -431,7 +418,7 @@ void Unitary::check_derivative(const arma::cx_mat & W0) {
   double dfreal=Jtr-Jo;
 
   // Is the difference ok? Check absolute or relative magnitude
-  if(fabs(dfest)>sqrt(DBL_EPSILON)*std::max(1.0,fabs(J)) && fabs(dfest-dfreal)>1e-2*fabs(dfest)) {
+  if(fabs(dfest)>sqrt(DBL_EPSILON)*std::max(1.0,fabs(fp->getf())) && fabs(dfest-dfreal)>1e-2*fabs(dfest)) {
     fprintf(stderr,"\nDerivative mismatch error!\n");
     fprintf(stderr,"Used step size %e, value of function % e.\n",trstep,Jo);
     fprintf(stderr,"Estimated change of function % e\n",dfest);
@@ -440,29 +427,37 @@ void Unitary::check_derivative(const arma::cx_mat & W0) {
     fprintf(stderr,"Relative error in changes    % e\n",(dfest-dfreal)/dfest);
     throw std::runtime_error("Derivative mismatch! Check your cost function and its derivative.\n");
   }
+
+  delete fp;
 }
 
-double Unitary::polynomial_step_f(const arma::cx_mat & W) {
+void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
   // Amount of points to use is
   int npoints=polynomial_degree;
-
   // Spacing
   double deltaTmu=Tmu/(npoints-1);
   // Step size
   double step=0.0;
-  
+  arma::cx_mat W=fp->getW();
+    
+  UnitaryFunction* fline[npoints];
+  for(int i=0;i<npoints;i++)
+    fline[i]=fp->copy();
+
   while(step==0.0) {
     // Evaluate the cost function at the expansion points
     arma::vec mu(npoints);
     arma::vec f(npoints);
+
+    // 0th point is current point!
     for(int i=0;i<npoints;i++) {
       // Mu in the point is
       mu(i)=i*deltaTmu;
       
       // Trial matrix is
-      arma::cx_mat Wtr=get_rotation(mu(i))*W;
+      arma::cx_mat Wtr=get_rotation(mu(i)*fp->getsign())*W;
       // and the function is
-      f(i)=cost_func(Wtr);
+      f(i)=fline[i]->cost_func(Wtr);
     }
     
     // Fit to polynomial of order p
@@ -470,216 +465,239 @@ double Unitary::polynomial_step_f(const arma::cx_mat & W) {
     
     // Find out zeros of the derivative polynomial
     arma::vec roots=solve_roots(derivative_coefficients(coeff));
-    // and return the smallest positive one
+    // get the smallest positive one
     step=smallest_positive(roots);
-    
-    // If root vanishes, go to minimum value
-    if(step==0.0 || step > Tmu) {
-      double minval=arma::min(f);
-      for(size_t i=0;i<mu.n_elem;i++)
-	if(minval==f(i)) {
-	  step=mu(i);
-	  break;
-	}
-    }
-
     if(step==0.0) {
       deltaTmu/=2.0;
       printf("No root found, halving step size to %e.\n",deltaTmu);
+      continue;
+    }
+
+    // Is the step length in the allowed region?
+    if(step>0.0 && step <=Tmu) {
+      // Yes. Calculate the new value
+      arma::cx_mat Wtr=get_rotation(step*fp->getsign())*W;
+      UnitaryFunction *newf=fp->copy();
+
+      double J=fp->getf();
+      double Jtr=newf->cost_func(Wtr);
+
+      // Accept the step?
+      if( fp->getsign()*(Jtr-J) > 0.0) {
+	// Yes.
+	delete fp;
+	fp=newf;
+	// Free memory
+	for(int i=0;i<npoints;i++)
+	  delete fline[i];
+
+	return;
+      } else
+	delete newf;
+    }
+    
+    // If we are still here, then just get the minimum value
+    if(step==0.0 || step > Tmu) {
+      double minval=arma::max(fp->getsign()*f);
+      for(size_t i=0;i<mu.n_elem;i++)
+	if(minval==f(i)) {
+	  delete fp;
+	  fp=fline[i];
+	  break;
+	}
     }
   }
+  
+  for(int i=0;i<npoints;i++)
+    delete fline[i];
 
-  return step;
+  return;
 }
 
-double Unitary::step_der(const arma::cx_mat & W, const arma::cx_mat & der) const {
-  return sign*2.0*std::real(arma::trace(der*arma::trans(W)*arma::trans(H)));
-}
-
-double Unitary::polynomial_step_df(const arma::cx_mat & W) {
+void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
+  // Matrix
+  arma::cx_mat W=fp->getW();
   // Amount of points to use is
   int npoints=polynomial_degree;
-
-  // Step size
-  double step=0.0;
   // Spacing
   double deltaTmu=Tmu/(npoints-1);
+  int halved=0;
 
-  while(step==0.0) {
-    // Evaluate the first-order derivative of the cost function at the expansion points
+  UnitaryFunction* fline[npoints];
+  for(int i=0;i<npoints;i++)
+    fline[i]=fp->copy();
+
+  while(true) {
+    // Evaluate the cost function at the expansion points
     arma::vec mu(npoints);
-    arma::vec fp(npoints);
+    arma::vec fd(npoints);
+    arma::vec fv(npoints);
+
     for(int i=0;i<npoints;i++) {
       // Mu in the point is
       mu(i)=i*deltaTmu;
       
       // Trial matrix is
-      arma::cx_mat Wtr=get_rotation(mu(i))*W;
-      // Compute derivative matrix
-      arma::cx_mat der=cost_der(Wtr);
-      // so the derivative wrt the step is
-      fp(i)=step_der(Wtr,der);
+      arma::cx_mat Wtr=get_rotation(mu(i)*fp->getsign())*W;
+      // and the function is
+      arma::cx_mat der;
+      //der=fline[i]->cost_der(Wtr);
+      fline[i]->cost_func_der(Wtr,fv(i),der);
+      // and the derivative is
+      fd(i)=step_der(Wtr,der);
     }
-    
+
     // Sanity check - is derivative of the right sign?
-    if(sign*fp[0]<0.0) {
+    if(fd(0)<0.0) {
       printf("Derivative is of the wrong sign!\n");
       arma::trans(mu).print("mu");
-      arma::trans(fp).print("J'(mu)");
+      arma::trans(fd).print("J'(mu)");
       //      throw std::runtime_error("Derivative consistency error.\n");
       fprintf(stderr,"Warning - inconsistent sign of derivative.\n");
     }
     
-    // Fit derivative to polynomial of order p: J'(mu) = a0 + a1*mu + ... + ap*mu^p
-    arma::vec coeff=fit_polynomial(mu,fp);
+    // Fit to polynomial of order p
+    arma::vec coeff=fit_polynomial(mu,fd);
     
     // Find out zeros of the polynomial
     arma::vec roots=solve_roots(coeff);
-    // and return the smallest positive one
-    step=smallest_positive(roots);
+    // get the smallest positive one
+    double step=smallest_positive(roots);
 
-    if(step==0.0) {
-      deltaTmu/=2.0;
-      printf("No root found, halving step size to %e.\n",deltaTmu);
-    }
-  }
-
-  return step;
-}
-
-double Unitary::polynomial_step_fdf(const arma::cx_mat & W) {
-  // Amount of points to use is
-  int npoints=(int) ceil((polynomial_degree+1)/2.0);
-
-  // Step size
-  double step=0.0;
-  // Spacing
-  double deltaTmu=Tmu/(npoints-1);
-
-  while(true) {
-    // Evaluate the first-order derivative of the cost function at the expansion points
-    arma::vec mu(npoints);
-    arma::vec f(npoints);
-    arma::vec fp(npoints);
-    for(int i=0;i<npoints;i++) {
-      // Value of mu is
-      mu(i)=i*deltaTmu;
-      
-      // Trial matrix is
-      arma::cx_mat Wtr=get_rotation(mu(i))*W;
-      arma::cx_mat der;
-      cost_func_der(Wtr,f(i),der);
-      
-      // Compute the derivative
-      fp(i)=step_der(Wtr,der);
-    }
+    /*
+    printf("Trial step size is %e.\n",step);
+    mu.t().print("mu");
+    fd.t().print("f'");
+    fv.t().print("f");
+    */
     
-    // Sanity check - is derivative of the right sign?
-    if(sign*fp[0]<0.0) {
-      printf("Derivative is of the wrong sign!\n");
-      arma::trans(mu).print("mu");
-      arma::trans(fp).print("J'(mu)");
-      //      throw std::runtime_error("Derivative consistency error.\n");
-      fprintf(stderr,"Warning - inconsistent sign of derivative.\n");
-    }
-    
-    // Fit function to polynomial of order p
-    //  J(mu)  = a_0 + a_1*mu + ... + a_(p-1)*mu^(p-1)
-    // and its derivative to the function
-    //  J'(mu) = a_1 + 2*a_2*mu + ... + (p-1)*a_(p-1)*mu^(p-2).
-    // Pull out coefficients of derivative
-    arma::vec ader=derivative_coefficients(fit_polynomial_fdf(mu,f,fp,polynomial_degree));
-    
-    // Find out zeros of the polynomial
-    arma::vec roots=solve_roots(ader);
-    // and get the smallest positive one
-    step=smallest_positive(roots);
-    
-    // If root vanishes, go to minimum value
-    if(step==0.0 || step > Tmu) {
-      double minval=arma::min(f);
-      for(size_t i=0;i<mu.n_elem;i++)
-	if(minval==f(i)) {
-	  step=mu(i);
-	  break;
+    // Is the step length in the allowed region?
+    if(step>0.0 && step <=Tmu) {
+      // Yes. Calculate the new value
+      arma::cx_mat Wtr=get_rotation(step*fp->getsign())*W;
+      UnitaryFunction *newf=fp->copy();
+
+      double J=fp->getf();
+      double Jtr=newf->cost_func(Wtr);
+
+      // Accept the step?
+      if( fp->getsign()*(Jtr-J) > 0.0) {
+	// Yes.
+	//	printf("Function value changed by %e, accept.\n",Jtr-J);
+	delete fp;
+	fp=newf;
+	break;
+      } else {
+	//	printf("Function value changed by %e, reject.\n",Jtr-J);
+	if(halved<4) {
+	  delete newf;
+	  halved++;
+	  deltaTmu/=2.0;
+	  continue;
+	} else {
+	  ERROR_INFO();
+	  throw std::runtime_error("Problem in polynomial line search - could not find suitable extremum!\n");
 	}
-    }
+      }
 
-    // Check step
-    if(step==0.0) {
-      deltaTmu/=2.0;
-      printf("No root found, halving step size to %e.\n",deltaTmu);
+      delete newf;
+    } else {
+
+      if(halved<4) {
+	halved++;
+	deltaTmu/=2.0;
+	continue;
+      } else {
+	ERROR_INFO();
+	  throw std::runtime_error("Problem in polynomial line search - could not find suitable extremum!\n");
+      }
     }
   }
 
-  return step;
+  for(int i=0;i<npoints;i++)
+    delete fline[i];
 }
 
-double Unitary::armijo_step(const arma::cx_mat & W) {
+double UnitaryOptimizer::step_der(const arma::cx_mat & W, const arma::cx_mat & der) const {
+  return 2.0*std::real(arma::trace(der*arma::trans(W)*arma::trans(H)));
+}
+
+void UnitaryOptimizer::armijo_step(UnitaryFunction* & fp) {
   // Start with half of maximum.
   double step=Tmu/2.0;
 
   // Initial rotation matrix
-  arma::cx_mat R=get_rotation(step);
+  arma::cx_mat R=get_rotation(step*fp->getsign());
+
+  // Helper
+  UnitaryFunction *hlp=fp->copy();
+
+  // Original rotation
+  arma::cx_mat W(fp->getW());
+
+  // Current value
+  double J=fp->getf();
 
   // Evaluate function at R2
-  double J2=cost_func(R*R*W);
+  double J2=hlp->cost_func(R*R*W);
 
-  if(sign==-1) {
+  if(fp->getsign()==-1) {
     // Minimization.
 
     // First condition: f(W) - f(R^2 W) >= mu*<G,H>
     while(J-J2 >= step*bracket(G,H)) {
       // Increase step size.
       step*=2.0;
-      R=get_rotation(step);
+      R=get_rotation(step*fp->getsign());
 
       // and re-evaluate J2
-      J2=cost_func(R*R*W);
+      J2=hlp->cost_func(R*R*W);
     }
 
     // Evaluate function at R
-    double J1=cost_func(R*W);
+    double J1=hlp->cost_func(R*W);
 
     // Second condition: f(W) - f(R W) <= mu/2*<G,H>
     while(J-J1 < step/2.0*bracket(G,H)) {
       // Decrease step size.
       step/=2.0;
-      R=get_rotation(step);
+      R=get_rotation(step*fp->getsign());
 
       // and re-evaluate J1
-      J1=cost_func(R*W);
+      J1=hlp->cost_func(R*W);
     }
 
-  } else if(sign==1) {
+  } else if(fp->getsign()==1) {
     // Maximization
 
     // First condition: f(W) - f(R^2 W) >= mu*<G,H>
     while(J-J2 <= -step*bracket(G,H)) {
       // Increase step size.
       step*=2.0;
-      R=get_rotation(step);
+      R=get_rotation(step*fp->getsign());
 
       // and re-evaluate J2
-      J2=cost_func(R*R*W);
+      J2=hlp->cost_func(R*R*W);
     }
 
     // Evaluate function at R
-    double J1=cost_func(R*W);
+    double J1=hlp->cost_func(R*W);
 
     // Second condition: f(W) - f(R W) <= mu/2*<G,H>
     while(J-J1 > -step/2.0*bracket(G,H)) {
       // Decrease step size.
       step/=2.0;
-      R=get_rotation(step);
+      R=get_rotation(step*fp->getsign());
 
       // and re-evaluate J1
-      J1=cost_func(R*W);
+      J1=hlp->cost_func(R*W);
     }
   } else
     throw std::runtime_error("Invalid optimization direction!\n");
 
-  return step;
+  // Update solution
+  delete fp;
+  fp=hlp;
 }
 
 arma::cx_vec fourier_shift(const arma::cx_vec & c) {
@@ -703,7 +721,7 @@ arma::cx_vec fourier_shift(const arma::cx_vec & c) {
   return ret;
 }
 
-double Unitary::fourier_step_df(const arma::cx_mat & W) {
+void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
   // Length of DFT interval
   double fourier_interval=fourier_periods*Tmu;
   // and of the transform. We want integer division here!
@@ -711,22 +729,28 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
     
   // Step length is
   double deltaTmu=fourier_interval/fourier_length;
+
+  // Helpers
+  UnitaryFunction * fs[fourier_length];
+  for(int i=0;i<fourier_length;i++)
+    fs[i]=f->copy();
+  arma::cx_mat W=f->getW();
   
   // Values of mu, J(mu) and J'(mu)
   arma::vec mu(fourier_length);
-  arma::vec f(fourier_length);
+  arma::vec fv(fourier_length);
   arma::vec fp(fourier_length);
   for(int i=0;i<fourier_length;i++) {
     // Value of mu is
     mu(i)=i*deltaTmu;
     
     // Trial matrix is
-    arma::cx_mat Wtr=get_rotation(mu(i))*W;
+    arma::cx_mat Wtr=get_rotation(mu(i)*f->getsign())*W;
     arma::cx_mat der;
-    cost_func_der(Wtr,f(i),der);
+    fs[i]->cost_func_der(Wtr,fv(i),der);
     
     // Compute the derivative
-    fp[i]=step_der(Wtr,der);
+    fp(i)=step_der(Wtr,der);
   }
   
   // Compute Hann window
@@ -773,23 +797,28 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
   std::sort(muval.begin(),muval.end());
   
   // Sanity check
-  if(!muval.size() || fabs(windowed(0))<sqrt(DBL_EPSILON)) {
-    // Failed. Reduce Tmu and try again
+  if(!muval.size()) {
+    // Failed. Use polynomial step instead.
     printf("No root found, falling back to polynomial step.\n");
-    return polynomial_step_df(W);
+    polynomial_step_df(f);
+    return;
+  }
+
+  if( fabs(windowed(0))<sqrt(DBL_EPSILON)) {
+    // Failed. Use polynomial step instead.
+    printf("Derivative value %e %e too small, falling back to polynomial step.\n",fp(0),windowed(0));
+    polynomial_step_df(f);
+    return;
   }
   
   // Figure out where the function goes to the wanted direction
   double findJ;
-  if(sign==1)
-    findJ=arma::max(f);
-  else
-    findJ=arma::min(f);
+  findJ=arma::max(f->getsign()*fv);
   
   // and the corresponding value of mu is
   double findmu=mu(0);
-  for(int i=1;i<fourier_length;i++)
-    if(f(i)==findJ) {
+  for(int i=0;i<fourier_length;i++)
+    if(f->getsign()*fv(i)==findJ) {
       findmu=mu(i);
       // Stop at closest extremum
       break;
@@ -805,7 +834,44 @@ double Unitary::fourier_step_df(const arma::cx_mat & W) {
     }
   
   // Optimized step size is
-  return muval[rootind];
+  double step=muval[rootind];
+
+  // Is the step length in the allowed region?
+  if(step>0.0 && step <=fourier_interval) {
+    // Yes. Calculate the new value
+    arma::cx_mat Wtr=get_rotation(step*f->getsign())*W;
+    UnitaryFunction *newf=f->copy();
+    
+    double J=f->getf();
+    double Jtr=newf->cost_func(Wtr);
+    
+    // Accept the step?
+    if( f->getsign()*(Jtr-J) > 0.0) {
+      // Yes.
+      delete f;
+      f=newf;
+      // Free memory
+      for(int i=0;i<fourier_length;i++)
+	delete fs[i];
+      
+      return;
+    } else
+      delete newf;
+  }
+  
+  // If we are still here, then just get the minimum value
+  if(step==0.0 || step > Tmu) {
+    double minval=arma::max(f->getsign()*fv);
+    for(size_t i=0;i<mu.n_elem;i++)
+      if(minval==fv(i)) {
+	delete f;
+	f=fs[i];
+	break;
+      }
+  }
+  
+  for(int i=0;i<fourier_length;i++)
+    delete fs[i];
 }
 
 double bracket(const arma::cx_mat & X, const arma::cx_mat & Y) {
@@ -840,7 +906,7 @@ arma::cx_mat companion_matrix(const arma::cx_vec & c) {
 }
 
 arma::cx_vec solve_roots_cplx(const arma::vec & a) {
-  return solve_roots_cplx(std::complex<double>(1.0,0.0)*a);
+  return solve_roots_cplx(a*UNIT);
 }
 
 arma::cx_vec solve_roots_cplx(const arma::cx_vec & a) {
@@ -1014,60 +1080,56 @@ arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arm
 }
 
 
-Brockett::Brockett(size_t N, unsigned long int seed) : Unitary(2, sqrt(DBL_EPSILON), true, true) {
+Brockett::Brockett(size_t N, unsigned long int seed) : UnitaryFunction(2, true) {
   // Get random complex matrix
-  sigma=randn_mat(N,N,seed)+std::complex<double>(0.0,1.0)*randn_mat(N,N,seed+1);
+  sigma=randn_mat(N,N,seed)+IMAG*randn_mat(N,N,seed+1);
   // Hermitize it
   sigma=sigma+arma::trans(sigma);
   // Get N matrix
   Nmat.zeros(N,N);
   for(size_t i=0;i<N;i++)
     Nmat(i,i)=i+1;
-
-  open_log("brockett.dat");
 }
 
 Brockett::~Brockett() {
 }
 
-bool Brockett::converged(const arma::cx_mat & W) {
-  // Update diagonality and unitarity criteria
-  unit=unitarity(W);
-  diag=diagonality(W);
-  // Dummy return
-  return false;
+Brockett* Brockett::copy() const {
+  return new Brockett(*this);
 }
 
-double Brockett::cost_func(const arma::cx_mat & W) {
-  return std::real(arma::trace(arma::trans(W)*sigma*W*Nmat));
+double Brockett::cost_func(const arma::cx_mat & Wv) {
+  W=Wv;
+  f=std::real(arma::trace(arma::trans(W)*sigma*W*Nmat));
+  return f;
 }
 
-arma::cx_mat Brockett::cost_der(const arma::cx_mat & W) {
+arma::cx_mat Brockett::cost_der(const arma::cx_mat & Wv) {
+  W=Wv;
   return sigma*W*Nmat;
 }
 
-void Brockett::cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der) {
-  f=cost_func(W);
-  der=cost_der(W);
+void Brockett::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & der) {
+  fv=cost_func(Wv);
+  der=cost_der(Wv);
 }
 
-void Brockett::print_legend() const {
-  printf("%4s %13s %13s %13s %13s\n","iter","J","<G,G>","diag","unit");
+std::string Brockett::legend() const {
+  char stat[1024];
+  sprintf(stat,"%13s  %13s", "diag", "unit");
+  return std::string(stat);
 }
 
-void Brockett::print_progress(size_t k) const {
-  printf("%4i % e % e % e % e",(int) k, J, bracket(G,G), diag, unit);
-
-  fprintf(log,"%4i % e % e % e % e\n",(int) k, J, 10*log10(bracket(G,G)), diag, unit);
-  fflush(log);
+std::string Brockett::status(bool lfmt) const {
+  char stat[1024];
+  if(lfmt)
+    sprintf(stat,"% .16e  % .16e", diagonality(), unitarity());
+  else
+    sprintf(stat,"% e  % e", diagonality(), unitarity());
+  return std::string(stat);
 }
 
-void Brockett::print_step(enum unitmethod & met, double step) const {
-  (void) met;
-  (void) step;
-}
-
-double Brockett::diagonality(const arma::cx_mat & W) const {
+double Brockett::diagonality() const {
   arma::cx_mat WSW=arma::trans(W)*sigma*W;
 
   double off=0.0;
@@ -1086,7 +1148,7 @@ double Brockett::diagonality(const arma::cx_mat & W) const {
   return 10*log10(off/dg);
 }
 
-double Brockett::unitarity(const arma::cx_mat & W) const {
+double Brockett::unitarity() const {
   arma::cx_mat U=W*arma::trans(W);
   arma::cx_mat eye(W);
   eye.eye();
