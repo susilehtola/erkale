@@ -40,8 +40,6 @@ enum unitmethod {
   POLY_F,
   /// Polynomial search, fit derivative <--- the default
   POLY_DF,
-  /// Polynomial search, fit function and derivative
-  POLY_FDF,
   /// Fourier transform
   FOURIER_DF,
   /// Armijo method
@@ -59,15 +57,71 @@ enum unitacc {
   CGHS
 };
 
-/// Unitary optimization worker
-class Unitary {
+
+/// Unitary function optimizer, used to hold values during the optimization
+class UnitaryFunction {
  protected:
-  /// Order of cost function in the unitary matrix W
+  /// Present matrix
+  arma::cx_mat W;
+  /// Present value
+  double f;
+  /// Order in W
   int q;
-  /// Verbose operation?
-  bool verbose;
   /// Maximization or minimization?
   int sign;
+  
+ public:
+  /// Constructor
+  UnitaryFunction(int q, bool max);
+  /// Destructor
+  virtual ~UnitaryFunction();
+
+  /// Set matrix
+  virtual void setW(const arma::cx_mat & W);
+  /// Get matrix
+  arma::cx_mat getW() const;
+
+  /// Get q
+  int getq() const;
+  /// Get function value
+  double getf() const;
+  /// Get sign
+  int getsign() const;
+
+  /// Copy constructor
+  virtual UnitaryFunction *copy() const=0;
+  /// Evaluate cost function
+  virtual double cost_func(const arma::cx_mat & W)=0;
+  /// Evaluate derivative of cost function
+  virtual arma::cx_mat cost_der(const arma::cx_mat & W)=0;
+  /// Evaluate cost function and its derivative
+  virtual void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)=0;
+
+  /// Get status legend
+  virtual std::string legend() const;
+  /// Print status information, possibly in a longer format
+  virtual std::string status(bool lfmt=false) const;
+  /// Check convergence
+  virtual bool converged() const;
+};
+
+/// Unitary optimization worker
+class UnitaryOptimizer {
+ private:
+  /// Gradient
+  arma::cx_mat G;
+  /// Search direction
+  arma::cx_mat H;
+  /// Eigenvectors of search direction
+  arma::cx_mat Hvec;
+  /// Eigenvalues of search direction
+  arma::vec Hval;
+  /// Maximum step size
+  double Tmu;
+
+ protected:
+  /// Verbose operation?
+  bool verbose;
   /// Operate with real or complex matrices?
   bool real;
 
@@ -87,50 +141,29 @@ class Unitary {
   /// Debugging mode - print out line search every iteration
   bool debug;
 
-  /// Value of cost function
-  double J;
-  /// Old value
-  double oldJ;
-  /// G matrix
-  arma::cx_mat G;
-  /// H matrix
-  arma::cx_mat H;
-
-  /// Eigendecomposition of -iH
-  arma::vec Hval;
-  /// Eigendecomposition of -iH
-  arma::cx_mat Hvec;
-  /// Maximum step size
-  double Tmu;
-
   /// Log file
   FILE *log;
 
-  /// Initialize possible convergence criteria
-  virtual void initialize(const arma::cx_mat & W0);
-  /// Check convergence
-  virtual bool converged(const arma::cx_mat & W);
-
   /// Print legend
-  virtual void print_legend() const;
+  virtual void print_legend(const UnitaryFunction *f) const;
   /// Print progress
-  virtual void print_progress(size_t k) const;
+  virtual void print_progress(size_t k, const UnitaryFunction *f, const UnitaryFunction *fold) const;
   /// Print time
   virtual void print_time(const Timer & t) const;
   /// Print chosen step length
   virtual void print_step(enum unitmethod & met, double step) const;
-
+  
   /// Check that the matrix is unitary
   void check_unitary(const arma::cx_mat & W) const;
   /// Check that the programmed cost function and its derivative are OK
-  void check_derivative(const arma::cx_mat & W0);
+  void check_derivative(const UnitaryFunction *f);
   /// Classify matrix
   void classify(const arma::cx_mat & W) const;
 
-  /// Update cost function value and spherical gradient vector
-  void update_gradient(const arma::cx_mat & W);
-  /// Compute new search direction (diagonalize H)
-  void update_search_direction();
+  /// Get new gradient direction
+  void update_gradient(const arma::cx_mat & W, UnitaryFunction *f);
+  /// Compute new search direction (diagonalize H) and max step length
+  void update_search_direction(int q);
 
   /// Get rotation matrix with wanted step size
   arma::cx_mat get_rotation(double step) const;
@@ -140,32 +173,20 @@ class Unitary {
   /// Set degree
   void set_q(int q);
 
-  /// Armijo step, return step length
-  double armijo_step(const arma::cx_mat & W);
-  /// Polynomial step (fit function), return step length
-  double polynomial_step_f(const arma::cx_mat & W);
-  /// Polynomial step (fit only derivative), return step length
-  double polynomial_step_df(const arma::cx_mat & W);
-  /// Polynomial step (fit function and derivative), return step length
-  double polynomial_step_fdf(const arma::cx_mat & W);
+  /// Armijo step
+  void armijo_step(UnitaryFunction* & f);
+  /// Polynomial step (fit function)
+  void polynomial_step_f(UnitaryFunction* & f);
+  /// Polynomial step (fit only derivative)
+  void polynomial_step_df(UnitaryFunction* & f);
   /// Fourier step
-  double fourier_step_df(const arma::cx_mat & W);
-
-  /// Optimizer routine
-  double optimizer(arma::cx_mat & W, enum unitmethod met, enum unitacc acc, size_t maxiter);
+  void fourier_step_df(UnitaryFunction* & f);
 
  public:
   /// Constructor
-  Unitary(int q, double Gthr, double Fthr, bool maximize, bool verbose=true, bool real=false);
+  UnitaryOptimizer(double Gthr, double Fthr, bool verbose=true, bool real=false);
   /// Destructor
-  ~Unitary();
-
-  /// Evaluate cost function
-  virtual double cost_func(const arma::cx_mat & W)=0;
-  /// Evaluate derivative of cost function
-  virtual arma::cx_mat cost_der(const arma::cx_mat & W)=0;
-  /// Evaluate cost function and its derivative
-  virtual void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der)=0;
+  ~UnitaryOptimizer();
 
   /// Open log file
   void open_log(const std::string & fname);
@@ -180,9 +201,7 @@ class Unitary {
   void set_thr(double Gtol, double Ftol);
 
   /// Unitary optimization
-  double optimize(arma::cx_mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=50000);
-  /// Orthogonal optimization
-  double optimize(arma::mat & W, enum unitmethod met=POLY_DF, enum unitacc acc=CGPR, size_t maxiter=50000);
+  double optimize(UnitaryFunction* & f, enum unitmethod met, enum unitacc acc, size_t maxiter);
 };
 
 
@@ -211,33 +230,28 @@ double smallest_positive(const arma::vec & v);
 
 
 /// Brockett
-class Brockett : public Unitary {
+class Brockett : public UnitaryFunction {
   /// Sigma matrix
   arma::cx_mat sigma;
   /// N matrix
   arma::mat Nmat;
 
-  /// Unitarity and diagonality criteria
-  double unit, diag;
-
   /// Print legend
-  void print_legend() const;
+  std::string legend() const;
   /// Print progress
-  void print_progress(size_t k) const;
-  /// Don't print step length
-  void print_step(enum unitmethod & met, double step) const;
+  std::string status(bool lfmt=false) const;
 
-  /// Check convergence
-  bool converged(const arma::cx_mat & W);
   /// Compute diagonality criterion
-  double diagonality(const arma::cx_mat & W) const;
+  double diagonality() const;
   /// Compute unitarity criterion
-  double unitarity(const arma::cx_mat & W) const;
+  double unitarity() const;
 
  public:
   Brockett(size_t N, unsigned long int seed=0);
   ~Brockett();
 
+  /// Copy constructor
+  Brockett *copy() const;
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
   /// Evaluate derivative of cost function

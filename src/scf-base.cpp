@@ -878,29 +878,32 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
 void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, enum pzham pzh, DFTGrid & grid, double Etol, double maxtol, double rmstol, size_t nmax, bool canonical, bool real) {
   // Initialize the worker
-  PZSIC worker(this,dft,&grid,Etol,maxtol,rmstol,pzh,verbose);
-  worker.set(sol,pzcor);
+  PZSIC* worker=new PZSIC(this,dft,&grid,maxtol,rmstol,pzh);
+  worker->set(sol,pzcor);
 
   double ESIC;
   if(canonical || W.n_cols==1) {
     // Use canonical orbitals for SIC
-    ESIC=worker.cost_func(W);
+    ESIC=worker->cost_func(W);
   } else {
     //	Perform unitary optimization, take at max nmax iterations
     if(real) {
       // Real optimization
-      arma::mat Wr=arma::real(W);
-      worker.optimize(Wr,POLY_DF,CGPR,nmax);
-      W=Wr*std::complex<double>(1.0,0.0);
-    } else
-      // Complex optimization
-      worker.optimize(W,POLY_DF,CGPR,nmax);
-
-    ESIC=worker.get_ESIC();
+      W=arma::real(W)*std::complex<double>(1.0,0.0);
+    }
+    worker->setW(W);
+    
+    // Optimizer
+    UnitaryOptimizer opt(DBL_MAX,Etol,verbose,real);
+    UnitaryFunction *hlp=worker;
+    opt.optimize(hlp,POLY_DF,CGPR,nmax);
+    worker=(PZSIC *) hlp;
+    
+    ESIC=worker->get_ESIC();
   }
 
   // Get SI energy and hamiltonian
-  arma::cx_mat HSIC=worker.get_HSIC();
+  arma::cx_mat HSIC=worker->get_HSIC();
 
   // Adjust Fock operator for SIC
   sol.Heff=-pzcor*arma::real(HSIC);
@@ -909,7 +912,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   sol.en.E=-pzcor*ESIC;
 
   // Get orbital energies
-  sol.E=worker.get_Eorb();
+  sol.E=worker->get_Eorb();
 
   // Sort orbitals
   sort_eigvec(sol.E,W);
@@ -923,6 +926,8 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
       printf("\t%4i\t% f\n",(int) io+1,sol.E(io));
     fflush(stdout);
   }
+
+  delete worker;
 }
 
 void SCF::core_guess(rscf_t & sol) const {
@@ -2564,4 +2569,16 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 
   return locd;
 }
+
+arma::mat interpret_force(const arma::vec & f) {
+  if(f.n_elem%3!=0) {
+    ERROR_INFO();
+    throw std::runtime_error("Invalid argument for interpret_force.\n");
+  }
+
+  arma::mat force(f);
+  force.reshape(3,f.n_elem/3);
+  return force;
+}
+
 
