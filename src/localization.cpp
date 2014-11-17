@@ -1141,6 +1141,12 @@ Edmiston* Edmiston::copy() const {
   return new Edmiston(*this);
 }
 
+void Edmiston::setW(const arma::cx_mat & Wv) {
+  // We need to update everything to match W
+  arma::cx_mat der;
+  cost_func_der(Wv,f,der);  
+}
+
 double Edmiston::cost_func(const arma::cx_mat & Wv) {
   arma::cx_mat der;
   cost_func_der(Wv,f,der);
@@ -1154,23 +1160,32 @@ arma::cx_mat Edmiston::cost_der(const arma::cx_mat & Wv) {
 }
 
 void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & der) {
-  W=Wv;
-
-  if(W.n_cols != C.n_cols) {
+  if(Wv.n_rows != Wv.n_cols) {
     ERROR_INFO();
-    throw std::runtime_error("Invalid matrix size.\n");
+    throw std::runtime_error("Matrix is not square!\n");
   }
 
-  // Transformed orbitals
-  arma::cx_mat Ctilde=C*W;
+  if(Wv.n_rows != C.n_cols) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << C.n_cols << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Get transformed orbitals
+  arma::cx_mat Ctilde=C*Wv;
 
   // Orbital density matrices
-  std::vector<arma::mat> Porb(W.n_cols);
-  for(size_t io=0;io<W.n_cols;io++)
+  std::vector<arma::mat> Porb(Wv.n_cols);
+  for(size_t io=0;io<Wv.n_cols;io++)
     Porb[io]=arma::real( Ctilde.col(io)*arma::trans(Ctilde.col(io)) );
-
-  // Orbital Coulomb matrices
-  std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
+  
+  // Check if we need to do something
+  if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
+    // Compute orbital-dependent Fock matrices
+    W=Wv;
+    Jorb=dfit.calc_J(Porb);
+  }
 
   // Compute self-repulsion
   f=0.0;
