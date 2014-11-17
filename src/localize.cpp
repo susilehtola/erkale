@@ -420,7 +420,7 @@ int main(int argc, char **argv) {
   set.add_bool("Delocalize","Run delocalization instead of localization",false);
   set.add_string("SizeDistribution","File to save orbital size distribution in","");
   set.add_double("GThreshold","Threshold for convergence: norm of Riemannian gradient",1e-7);
-  set.add_double("FThreshold","Threshold for convergence: absolute change in function",1e-7);
+  set.add_double("FThreshold","Threshold for convergence: absolute change in function",DBL_MAX);
   set.add_int("Maxiter","Maximum number of iterations",50000);
   set.add_int("Seed","Random number seed",0);
   set.add_bool("Debug","Print out line search every iteration",false);
