@@ -498,6 +498,8 @@ void UnitaryOptimizer::polynomial_step_f(UnitaryFunction* & fp) {
     
     // If we are still here, then just get the minimum value
     if(step==0.0 || step > Tmu) {
+      fprintf(stderr,"Line search interpolation failed.\n");
+      fflush(stderr);
       double minval=arma::max(fp->getsign()*f);
       for(size_t i=0;i<mu.n_elem;i++)
 	if(minval==f(i)) {
@@ -588,7 +590,8 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
 	fp=newf;
 	break;
       } else {
-	//	printf("Function value changed by %e, reject.\n",Jtr-J);
+	fprintf(stderr,"Line search interpolation failed.\n");
+	fflush(stderr);
 	if(halved<4) {
 	  delete newf;
 	  halved++;
@@ -602,7 +605,8 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
 
       delete newf;
     } else {
-
+      fprintf(stderr,"Line search interpolation failed.\n");
+      fflush(stderr);
       if(halved<4) {
 	halved++;
 	deltaTmu/=2.0;
