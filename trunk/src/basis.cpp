@@ -2688,7 +2688,7 @@ void BasisSet::MO_translate(const BasisSet & oldbas, const arma::colvec & oldE, 
   const size_t Ndep=Nbf-Nind;
   // Get rid of linearly dependent eigenvalues and eigenvectors
   Sval=Sval.subvec(Ndep,Nbf-1);
-  Svec=Svec.submat(0,Ndep,Nbf-1,Nbf-1);
+  Svec=Svec.cols(Ndep,Nbf-1);
 
   // Form canonical orthonormalization matrix
   arma::mat Sinvh(Nbf,Nind);
@@ -2721,7 +2721,7 @@ void BasisSet::MO_translate(const BasisSet & oldbas, const arma::colvec & oldE, 
   arma::mat orthmat=SMOvec*arma::diagmat(1.0/sqrt(SMOval))*trans(SMOvec);
 
   // Projected orbitals are
-  MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1)=oldMOs*orthmat;
+  MOs.cols(0,Nmo-1)=oldMOs*orthmat;
   // and energies
   E.subvec(0,Nmo-1)=arma::trans(orthmat)*oldE;
 
@@ -2736,7 +2736,7 @@ void BasisSet::MO_translate(const BasisSet & oldbas, const arma::colvec & oldE, 
   // MOs.
   if(Nmo<Nind) {
     // MO submatrix
-    arma::mat C=MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1);
+    arma::mat C=MOs.cols(0,Nmo-1);
 
     // Generate other vectors. Compute overlap of functions
     arma::mat X=arma::trans(Sinvh)*S11*C;
@@ -2752,7 +2752,7 @@ void BasisSet::MO_translate(const BasisSet & oldbas, const arma::colvec & oldE, 
 
     // Now, the subspace of the small basis set is found in the first
     // Nmo eigenvectors. 
-    MOs.submat(0,Nmo,Nbf-1,Nind-1)=Sinvh.submat(0,Nmo,Nbf-1,Nind-1);
+    MOs.cols(Nmo,Nind-1)=Sinvh.cols(Nmo,Nind-1);
     // Set dummy value for energy
     E.subvec(Nmo,Nind-1)=E(Nmo-1)*arma::ones(Nind-Nmo,1);
   }
@@ -2807,7 +2807,7 @@ void BasisSet::MO_project(const BasisSet & oldbas, const arma::colvec & oldE, co
   const size_t Ndep=Nbf-Nind;
   // Get rid of linearly dependent eigenvalues and eigenvectors
   Sval=Sval.subvec(Ndep,Nbf-1);
-  Svec=Svec.submat(0,Ndep,Nbf-1,Nbf-1);
+  Svec=Svec.cols(Ndep,Nbf-1);
 
   // Form canonical orthonormalization matrix
   arma::mat Sinvh(Nbf,Nind);
@@ -2833,7 +2833,7 @@ void BasisSet::MO_project(const BasisSet & oldbas, const arma::colvec & oldE, co
   E=arma::vec(Nind);
 
   // Projected orbitals
-  MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1)=Sinv*S12*oldMOs.submat(0,0,oldMOs.n_rows-1,Nmo-1);
+  MOs.cols(0,Nmo-1)=Sinv*S12*oldMOs.cols(0,Nmo-1);
   // and energies
   E.subvec(0,Nmo-1)=oldE.subvec(0,Nmo-1);
 
@@ -2862,7 +2862,7 @@ void BasisSet::MO_project(const BasisSet & oldbas, const arma::colvec & oldE, co
   // MOs.
   if(Nmo<Nind) {
     // MO submatrix
-    arma::mat C=MOs.submat(0,0,Sinvh.n_rows-1,Nmo-1);
+    arma::mat C=MOs.cols(0,Nmo-1);
 
     // Generate other vectors. Compute overlap of functions
     arma::mat X=arma::trans(Sinvh)*S11*C;
@@ -2878,7 +2878,7 @@ void BasisSet::MO_project(const BasisSet & oldbas, const arma::colvec & oldE, co
 
     // Now, the subspace of the small basis set is found in the first
     // Nmo eigenvectors. 
-    MOs.submat(0,Nmo,Nbf-1,Nind-1)=Sinvh.submat(0,Nmo,Nbf-1,Nind-1);
+    MOs.cols(Nmo,Nind-1)=Sinvh.cols(Nmo,Nind-1);
     // Set dummy value for energy
     E.subvec(Nmo,Nind-1)=E(Nmo-1)*arma::ones(Nind-Nmo,1);
   }
@@ -2954,7 +2954,7 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
   const size_t Ndep=Nbf-Nind;
   // Get rid of linearly dependent eigenvalues and eigenvectors
   Sval=Sval.subvec(Ndep,Nbf-1);
-  Svec=Svec.submat(0,Ndep,Nbf-1,Nbf-1);
+  Svec=Svec.cols(0,Nbf-1);
 
   // Form canonical orthonormalization matrix
   arma::mat Sinvh(Nbf,Nind);
