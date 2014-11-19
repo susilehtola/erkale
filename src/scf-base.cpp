@@ -414,11 +414,6 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
     grid.eval_Fxc(dft.x_func,dft.c_func,Porb,XC,Exc,Nelnum);
 
-    if(kfrac!=0.0) {
-      ERROR_INFO();
-      throw std::runtime_error("HF energy correction not implemented.\n");
-    }
-
     // Add in the XC part to the Fock matrix and energy
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       Forb[io]+=XC[io];
@@ -885,6 +880,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
     worker=(PZSIC *) hlp;
     
     ESIC=worker->get_ESIC();
+    W=worker->getW();
   }
 
   // Get SI energy and hamiltonian
