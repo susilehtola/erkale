@@ -117,7 +117,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
 
     // and drop the linearly dependent ones
     abval=abval.subvec(abval.n_elem-Nind,abval.n_elem-1);
-    abvec=abvec.submat(0,abvec.n_cols-Nind,abvec.n_rows-1,abvec.n_cols-1);
+    abvec=abvec.cols(abvec.n_cols-Nind,abvec.n_cols-1);
 
     // Form matrices
     ab_inv.zeros(abvec.n_rows,abvec.n_rows);

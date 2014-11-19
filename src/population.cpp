@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
       chkpt.read("C",C);
 
       // Do analysis
-      IAO_analysis(basis,C.submat(0,0,C.n_rows-1,Nela-1),P,minbas);
+      IAO_analysis(basis,C.cols(0,Nela-1),P,minbas);
     } else {
       // Get amount of occupied orbitals
       int Nela, Nelb;
@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
       chkpt.read("Cb",Cb);
 
       // Do analysis
-      IAO_analysis(basis,Ca.submat(0,0,Ca.n_rows-1,Nela-1),Cb.submat(0,0,Cb.n_rows-1,Nelb-1),Pa,Pb,minbas);
+      IAO_analysis(basis,Ca.cols(0,Nela-1),Cb.cols(0,Nelb-1),Pa,Pb,minbas);
     }
   }
 

@@ -990,7 +990,7 @@ double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him
   int Nel=(int) round(arma::trace(Pone*S));
 
   // MO overlap matrix
-  arma::cx_mat MOovl=arma::trans(C.submat(0,0,C.n_rows-1,Nel-1))*S*Corbs.submat(0,0,Corbs.n_rows-1,Nel-1);
+  arma::cx_mat MOovl=arma::trans(C.cols(0,Nel-1))*S*Corbs.cols(0,Nel-1);
 
   // Fraction of occupied subspace spanned is
   return std::real(arma::trace(MOovl*arma::trans(MOovl)))/Nel;
@@ -1732,7 +1732,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Localize the core orbitals within the occupied space
       size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),sol.C,verbose);
       // and freeze them
-      solver.set_frozen(sol.C.submat(0,0,sol.C.n_rows-1,nloc-1),0);
+      solver.set_frozen(sol.C.cols(0,nloc-1),0);
     }
 
     if(hf || rohf) {
@@ -2049,7 +2049,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Then, localize the core orbitals within the occupied space
       size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),natorb);
       // and freeze them
-      solver.set_frozen(natorb.submat(0,0,natorb.n_rows-1,nloc-1),0);
+      solver.set_frozen(natorb.cols(0,nloc-1),0);
       // Update the current orbitals as well
       sol.Ca=natorb;
       sol.Cb=natorb;
@@ -2366,7 +2366,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
 
   // Drop linearly dependent ones.
   Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
-  Svec=Svec.submat(0,Svec.n_cols-Nind,Svec.n_rows-1,Svec.n_cols-1);
+  Svec=Svec.cols(Svec.n_cols-Nind,Svec.n_cols-1);
 
   // Form Sinvh
   arma::mat Sinvh(Ntot,Nind);
@@ -2383,7 +2383,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
       C.submat(augshells[origshellidx[ish]].get_first_ind(),i,augshells[origshellidx[ish]].get_last_ind(),i)=Cold.submat(origshells[ish].get_first_ind(),i,origshells[ish].get_last_ind(),i);
   
   // Determine the rest. Compute the overlap of the functions
-  arma::mat X=arma::trans(Sinvh)*S*C.submat(0,0,Ntot-1,Nold-1);
+  arma::mat X=arma::trans(Sinvh)*S*C.cols(0,Nold-1);
   // and perform SVD
   arma::mat U, V;
   arma::vec s;
@@ -2396,7 +2396,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
 
   // Now, the subspace of the small basis set is found in the first
   // Nmo eigenvectors. 
-  C.submat(0,Nold,Ntot-1,Nind-1)=Sinvh.submat(0,Nold,Ntot-1,Nind-1);
+  C.cols(Nold,Nind-1)=Sinvh.cols(Nold,Nind-1);
 
   try {
     // Check orthogonality of orbitals
@@ -2513,9 +2513,6 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 
   // Amount of orbitals already localized
   size_t locd=0;
-  // Amount of basis functions
-  size_t Nbf=basis.get_Nbf();
-
   // Perform the localization.
   for(size_t inuc=0;inuc<locno.size();inuc++) {
     if(locno[inuc]==0)
@@ -2527,7 +2524,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
     // Compute moment integrals around the nucleus
     std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
     // Get matrix which transforms into occupied MO basis
-    arma::mat transmat=C.submat(0,locd,Nbf-1,nocc-1);
+    arma::mat transmat=C.cols(locd,nocc-1);
 
     // Sum together to get x^2 + y^2 + z^2
     arma::mat rsqmat=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
@@ -2548,7 +2545,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
     */
 
     // Rotate yet unlocalized orbitals
-    C.submat(0,locd,Nbf-1,nocc-1)=transmat*rvec;
+    C.cols(locd,nocc-1)=transmat*rvec;
 
     // Increase number of localized orbitals
     locd+=locno[inuc];

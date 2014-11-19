@@ -84,7 +84,7 @@ size_t find_excited_orb(const BasisSet & basis, const arma::vec & xco, const arm
   arma::mat S(basis.overlap());
 
   // Determine overlap with current orbitals
-  arma::rowvec ovl=arma::abs(arma::trans(xco)*S*C.submat(0,0,C.n_rows-1,nocc-1));
+  arma::rowvec ovl=arma::abs(arma::trans(xco)*S*C.cols(0,nocc-1));
   // Convert to probabilities by squaring the amplitudes
   ovl=arma::pow(ovl,2);
 
@@ -218,7 +218,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
   // Compute moment integrals around the nucleus
   std::vector<arma::mat> momstack=basis.moment(2,cen.x,cen.y,cen.z);
   // Get matrix which transforms into non-localized block of occupied MO basis
-  arma::mat locblock=C.submat(0,0,C.n_rows-1,nocc-1);
+  arma::mat locblock=C.cols(0,nocc-1);
 
   // Sum together to get x^2 + y^2 + z^2
   arma::mat rsqmat_AO=momstack[getind(2,0,0)]+momstack[getind(0,2,0)]+momstack[getind(0,0,2)];
@@ -231,10 +231,10 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
   eig_sym_ordered(reig,rvec,rsqmat);
 
   // and rotate orbitals to the new basis
-  C.submat(0,0,C.n_rows-1,nocc-1)=locblock*rvec;
+  C.cols(0,nocc-1)=locblock*rvec;
 
   // Orbitals to consider
-  arma::mat Cc(C.submat(0,0,C.n_rows-1,nloc-1));
+  arma::mat Cc(C.cols(0,nloc-1));
 
   // Run lm decomposition of orbitals
   const real_expansion_t orbexp(expand_orbitals_real(Cc,basis,cen,false));

@@ -280,7 +280,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
     // Convert Fock operator to unoccupied MO basis.
     taug.set();
-    arma::mat H_MO=arma::trans(AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1))*H*AOtoO.submat(0,nocc,AOtoO.n_rows-1,AOtoO.n_cols-1);
+    arma::mat H_MO=arma::trans(AOtoO.cols(nocc,AOtoO.n_cols-1))*H*AOtoO.cols(nocc,AOtoO.n_cols-1);
     if(verbose) {
       printf("H_MO formed in %s.\n",taug.elapsed().c_str());
       fflush(stdout);
@@ -314,7 +314,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     // Occupied orbitals, padded with zeros
     Ca.submat(0,0,Nbf-1,nocc-1)=AOtoO.submat(0,0,Nbf-1,nocc-1);
     // Unoccupied orbitals
-    Ca.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)=AOtoO.submat(0,nocc,Ntot-1,AOtoO.n_cols-1)*Evec;
+    Ca.cols(nocc,AOtoO.n_cols-1)=AOtoO.cols(nocc,AOtoO.n_cols-1)*Evec;
 
     // Save results
     if(!ispin) {

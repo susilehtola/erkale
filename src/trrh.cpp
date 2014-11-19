@@ -40,8 +40,6 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
   // Transform Fock matrix into MO basis
   const arma::mat F_MO=arma::trans(C)*F_AO*C;
 
-  // Number of basis functions
-  const size_t nbf=C.n_rows;
   // Number of orbitals
   const size_t norbs=C.n_cols;
   // Number of virtual orbitals
@@ -61,8 +59,8 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
 
   // Transform orbitals into new basis
   arma::mat C_ov(C);
-  C_ov.submat(0,0,nbf-1,nocc-1)=C.submat(0,0,nbf-1,nocc-1)*oo_vec;
-  C_ov.submat(0,nocc,nbf-1,norbs-1)=C.submat(0,nocc,nbf-1,norbs-1)*vv_vec;
+  C_ov.cols(0,nocc-1)=C.cols(0,nocc-1)*oo_vec;
+  C_ov.cols(nocc,norbs-1)=C.cols(nocc,norbs-1)*vv_vec;
 
   // Compute Fock matrix in new basis
   arma::mat F_ov=arma::trans(C_ov)*F_AO*C_ov;
@@ -137,7 +135,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
 
     // Calculate minimal projection.
     amin=DBL_MAX;
-    arma::mat proj=arma::trans(C.submat(0,0,nbf-1,nocc-1))*S*Cnew.submat(0,0,nbf-1,nocc-1);
+    arma::mat proj=arma::trans(C.cols(0,nocc-1))*S*Cnew.cols(0,nocc-1);
     for(size_t i=0;i<nocc;i++) {
       // Compute projection
       double a=arma::dot(proj.row(i),proj.row(i));
