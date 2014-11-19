@@ -640,7 +640,7 @@ void check_array(const std::vector<double> & x, size_t n, std::vector<size_t> & 
   }
 }
 
-void AtomGrid::compute_xc(int func_id) {
+void AtomGrid::compute_xc(int func_id, bool pot) {
   // Compute exchange-correlation functional
 
   // Which functional is in question?
@@ -679,24 +679,35 @@ void AtomGrid::compute_xc(int func_id) {
   }
 
   // Evaluate functionals.
-  if(mgga) // meta-GGA
-    xc_mgga_exc_vxc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0], &vlapl_wrk[0], &vtau_wrk[0]);
-  else if(gga) // GGA
-    xc_gga_exc_vxc(&func, N, &rho[0], &sigma[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0]);
-  else // LDA
-    xc_lda_exc_vxc(&func, N, &rho[0], &exc_wrk[0], &vxc_wrk[0]);
+  if(pot) {
+    if(mgga) // meta-GGA
+      xc_mgga_exc_vxc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0], &vlapl_wrk[0], &vtau_wrk[0]);
+    else if(gga) // GGA
+      xc_gga_exc_vxc(&func, N, &rho[0], &sigma[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0]);
+    else // LDA
+      xc_lda_exc_vxc(&func, N, &rho[0], &exc_wrk[0], &vxc_wrk[0]);
+  } else {
+    if(mgga) // meta-GGA
+      xc_mgga_exc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc_wrk[0]);
+    else if(gga) // GGA
+      xc_gga_exc(&func, N, &rho[0], &sigma[0], &exc_wrk[0]);
+    else // LDA
+      xc_lda_exc(&func, N, &rho[0], &exc_wrk[0]);
+  }
 
   // Sum to total arrays containing both exchange and correlation
   for(size_t i=0;i<exc.size();i++)
     exc[i]+=exc_wrk[i];
-  for(size_t i=0;i<vxc.size();i++)
-    vxc[i]+=vxc_wrk[i];
-  for(size_t i=0;i<vsigma.size();i++)
-    vsigma[i]+=vsigma_wrk[i];
-  for(size_t i=0;i<vlapl.size();i++)
-    vlapl[i]+=vlapl_wrk[i];
-  for(size_t i=0;i<vtau.size();i++)
-    vtau[i]+=vtau_wrk[i];
+  if(pot) {
+    for(size_t i=0;i<vxc.size();i++)
+      vxc[i]+=vxc_wrk[i];
+    for(size_t i=0;i<vsigma.size();i++)
+      vsigma[i]+=vsigma_wrk[i];
+    for(size_t i=0;i<vlapl.size();i++)
+      vlapl[i]+=vlapl_wrk[i];
+    for(size_t i=0;i<vtau.size();i++)
+      vtau[i]+=vtau_wrk[i];
+  }
 
   // Free functional
   xc_func_end(&func);
@@ -1893,9 +1904,9 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
       init_xc();
       // Compute the functionals
       if(x_func>0)
-	compute_xc(x_func);
+	compute_xc(x_func,true);
       if(c_func>0)
-	compute_xc(c_func);
+	compute_xc(c_func,true);
 
       // Construct the Fock matrix
       Hnew.zeros();
@@ -2019,9 +2030,9 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
       init_xc();
       // Compute the functionals
       if(x_func>0)
-	compute_xc(x_func);
+	compute_xc(x_func,true);
       if(c_func>0)
-	compute_xc(c_func);
+	compute_xc(c_func,true);
       // and construct the Fock matrices
       Hanew.zeros();
       Hbnew.zeros();
@@ -3254,9 +3265,9 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       wrk[ith].init_xc();
       // Compute the functionals
       if(x_func>0)
-	wrk[ith].compute_xc(x_func);
+	wrk[ith].compute_xc(x_func,true);
       if(c_func>0)
-	wrk[ith].compute_xc(c_func);
+	wrk[ith].compute_xc(c_func,true);
 
       // Evaluate the energy
       Exc+=wrk[ith].eval_Exc();
@@ -3335,9 +3346,9 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       wrk[ith].init_xc();
       // Compute the functionals
       if(x_func>0)
-        wrk[ith].compute_xc(x_func);
+        wrk[ith].compute_xc(x_func,true);
       if(c_func>0)
-        wrk[ith].compute_xc(c_func);
+        wrk[ith].compute_xc(c_func,true);
 
       // Evaluate the energy
       Exc+=wrk[ith].eval_Exc();
@@ -3366,11 +3377,13 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 }
 
 
-void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa, std::vector<arma::mat> & Ha, std::vector<double> & Exc, std::vector<double> & Nel) {
+void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa, std::vector<arma::mat> & Ha, std::vector<double> & Exc, std::vector<double> & Nel, bool fock) {
   // Clear Hamiltonian
-  Ha.resize(Pa.size());
-  for(size_t ip=0;ip<Pa.size();ip++)
-    Ha[ip].zeros(Pa[ip].n_rows,Pa[ip].n_cols);
+  if(fock) {
+    Ha.resize(Pa.size());
+    for(size_t ip=0;ip<Pa.size();ip++)
+      Ha[ip].zeros(Pa[ip].n_rows,Pa[ip].n_cols);
+  }
 
   // Clear exchange-correlation energy
   Exc.assign(Pa.size(),0.0);
@@ -3413,20 +3426,22 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
 	wrk[ith].init_xc();
 	// Compute the functionals
 	if(x_func>0)
-	  wrk[ith].compute_xc(x_func);
+	  wrk[ith].compute_xc(x_func,fock);
 	if(c_func>0)
-	  wrk[ith].compute_xc(c_func);
+	  wrk[ith].compute_xc(c_func,fock);
 
 	// Evaluate the energy
 #pragma omp atomic
 	Exc[ip]+=wrk[ith].eval_Exc();
 	// and construct the Fock matrices
-	Hwrk.zeros(); // need to clear this here
-	wrk[ith].eval_Fxc(Hwrk,Hdum);
-
-	// Accumulate Fock matrix
+	if(fock) {
+	  Hwrk.zeros(); // need to clear this here
+	  wrk[ith].eval_Fxc(Hwrk,Hdum);
+	  
+	  // Accumulate Fock matrix
 #pragma omp critical
-	Ha[ip]+=Hwrk;
+	  Ha[ip]+=Hwrk;
+	}
       }
     }
 
@@ -3459,14 +3474,15 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
 	wrk[0].init_xc();
 	// Compute the functionals
 	if(x_func>0)
-	  wrk[0].compute_xc(x_func);
+	  wrk[0].compute_xc(x_func,fock);
 	if(c_func>0)
-	  wrk[0].compute_xc(c_func);
+	  wrk[0].compute_xc(c_func,fock);
 
 	// Evaluate the energy
 	Exc[ip]+=wrk[0].eval_Exc();
 	// and construct the Fock matrices
-	wrk[0].eval_Fxc(Ha[ip],Hdum);
+	if(fock)
+	  wrk[0].eval_Fxc(Ha[ip],Hdum);
     }
 
     // Free memory
@@ -3509,9 +3525,9 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
       wrk[ith].init_xc();
       // Compute the functionals
       if(x_func>0)
-	wrk[ith].compute_xc(x_func);
+	wrk[ith].compute_xc(x_func,true);
       if(c_func>0)
-	wrk[ith].compute_xc(c_func);
+	wrk[ith].compute_xc(c_func,true);
 
       // Calculate the force on the atom
 #ifdef _OPENMP
@@ -3567,9 +3583,9 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
       wrk[ith].init_xc();
       // Compute the functionals
       if(x_func>0)
-	wrk[ith].compute_xc(x_func);
+	wrk[ith].compute_xc(x_func,true);
       if(c_func>0)
-	wrk[ith].compute_xc(c_func);
+	wrk[ith].compute_xc(c_func,true);
 
       // Calculate the force on the atom
 #ifdef _OPENMP
@@ -3682,7 +3698,7 @@ void DFTGrid::print_potential(int func_id, const arma::mat & Pa, const arma::mat
       wrk[ith].init_xc();
       // Compute the functionals
       if(func_id>0)
-	wrk[ith].compute_xc(func_id);
+	wrk[ith].compute_xc(func_id,true);
 
       // Write out density and potential data
 #ifdef _OPENMP

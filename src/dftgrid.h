@@ -320,8 +320,9 @@ class AtomGrid {
 
   /// Initialize XC arrays
   void init_xc();
-  /// Compute XC functional from density and add to total XC array
-  void compute_xc(int func_id);
+  /// Compute XC functional from density and add to total XC
+  /// array. Pot toggles evaluation of potential
+  void compute_xc(int func_id, bool pot);
   /// Evaluate exchange/correlation energy
   double eval_Exc() const;
 
@@ -425,7 +426,7 @@ class DFTGrid {
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel);
 
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, SIC calculation
-  void eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & P, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel);
+  void eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & P, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
 
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();

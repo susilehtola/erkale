@@ -1233,11 +1233,38 @@ void PZSIC::setW(const arma::cx_mat & Wv) {
 
 double PZSIC::cost_func(const arma::cx_mat & Wv) {
   // Evaluate SI energy.
+  if(Wv.n_rows != Wv.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Matrix is not square!\n");
+  }
+  
+  if(Wv.n_rows != sol.C.n_cols) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << sol.C.n_cols << "!\n";
+    throw std::runtime_error(oss.str());
+  }
 
-  arma::cx_mat der;
-  double ESIC;
-  cost_func_der(Wv,ESIC,der);
-  return ESIC;
+  // Get transformed orbitals
+  arma::cx_mat Ctilde=sol.C*Wv;
+  
+  // Check if we need to do something
+  if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
+    // Compute orbital energies
+    W=Wv;
+    Forb.clear();
+    solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid,false);
+  }
+  if(Eorb.size() != sol.C.n_cols) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Problem in PZSIC: have " << sol.C.n_cols << " orbitals but " << Eorb.size() << " energies!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // SI energy is
+  f=arma::sum(Eorb);
+  return f;
 }
 
 arma::cx_mat PZSIC::cost_der(const arma::cx_mat & Wv) {
@@ -1250,7 +1277,7 @@ arma::cx_mat PZSIC::cost_der(const arma::cx_mat & Wv) {
 }
 
 void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & der) {
-  if(Wv.n_rows != Wv.n_cols) {
+   if(Wv.n_rows != Wv.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
   }
@@ -1266,10 +1293,22 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
   arma::cx_mat Ctilde=sol.C*Wv;
   
   // Check if we need to do something
-  if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
+  if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON || Forb.size() != sol.C.n_cols) {
     // Compute orbital-dependent Fock matrices
     W=Wv;
-    solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid);
+    solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid,true);
+  }
+  if(Eorb.size() != sol.C.n_cols) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Problem in PZSIC: have " << sol.C.n_cols << " orbitals but " << Eorb.size() << " energies!\n";
+    throw std::runtime_error(oss.str());
+  }
+  if(Forb.size() != sol.C.n_cols) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Problem in PZSIC: have " << sol.C.n_cols << " orbitals but " << Forb.size() << " potentials!\n";
+    throw std::runtime_error(oss.str());
   }
 
   // and the total SIC contribution.
@@ -1284,7 +1323,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
     }
 
   } else if(ham==PZUNITED) {
-    // United Hamiltonian. See
+    // Unified Hamiltonian. See
     // J. G. Harrison, R. A. Heaton, and C. C. Lin, "Self-interaction
     // correction to the local density Hartree-Fock atomic
     // calculations of excited and ground states", J. Phys. B:

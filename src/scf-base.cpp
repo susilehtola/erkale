@@ -349,10 +349,11 @@ arma::mat SCF::get_Hcore() const {
   return Hcore;
 }
 
-void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid) {
+void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid, bool fock) {
   // Compute the orbital-dependent Fock matrices
-  Forb.resize(Ctilde.n_cols);
   Eorb.resize(Ctilde.n_cols);
+  if(fock)
+    Forb.resize(Ctilde.n_cols);
 
   // Fraction of exact exchange
   double kfrac=exact_exchange(dft.x_func);
@@ -368,25 +369,32 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   Timer t;
 
   if(verbose) {
-    printf("Constructing orbital Coulomb matrices ...");
+    if(fock)
+      printf("Constructing orbital Coulomb matrices ...");
+    else
+      printf("Computing    orbital Coulomb energies ...");
     fflush(stdout);
   }
 
   if(densityfit) {
     // Coulomb matrices
     std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
-    for(size_t io=0;io<Ctilde.n_cols;io++) {
-      Forb[io]=(1-kfrac)*Jorb[io];
+    for(size_t io=0;io<Ctilde.n_cols;io++)
       Eorb[io]=0.5*(1-kfrac)*arma::trace(Porb[io]*Jorb[io]);
-    }
+    if(fock)
+      for(size_t io=0;io<Ctilde.n_cols;io++)
+	Forb[io]=(1-kfrac)*Jorb[io];
+    
   } else {
     if(!direct) {
       // Tabled integrals
       for(size_t io=0;io<Ctilde.n_cols;io++) {
 	// Calculate Coulomb term; exchange coincides with Coulomb
-	Forb[io]=(1-kfrac)*tab.calcJ(Porb[io]);
+	arma::mat Jorb=(1-kfrac)*tab.calcJ(Porb[io]);
 	// and Coulomb energy
-	Eorb[io]=0.5*(1-kfrac)*arma::trace(Porb[io]*Forb[io]);
+	Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
+	if(fock)
+	  Forb[io]=Jorb;
       }
     } else {
       // HF coulomb/exchange not implemented
@@ -394,7 +402,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       throw std::runtime_error("Direct formation of conventional Coulomb matrices not implemented!\n");
     }
   }
-
+  
   if(verbose) {
     printf(" done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
@@ -403,7 +411,10 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   // Exchange-correlation
   if(dft.x_func != 0 || dft.c_func != 0) {
     if(verbose) {
-      printf("Constructing orbital XC matrices ...");
+      if(fock)
+	printf("Constructing orbital XC matrices ...");
+      else
+	printf("Computing    orbital XC energies ...");
       fflush(stdout);
     }
     t.set();
@@ -412,14 +423,18 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
     std::vector<arma::mat> XC; // Exchange-correlation matrices
     std::vector<double> Exc; // Exchange-correlation energy
 
-    grid.eval_Fxc(dft.x_func,dft.c_func,Porb,XC,Exc,Nelnum);
+    grid.eval_Fxc(dft.x_func,dft.c_func,Porb,XC,Exc,Nelnum,fock);
 
-    // Add in the XC part to the Fock matrix and energy
+    // Add in the XC part to the energy
     for(size_t io=0;io<Ctilde.n_cols;io++) {
-      Forb[io]+=XC[io];
       Eorb[io]+=Exc[io];
     }
-
+    
+    // and the Fock matrix
+    if(fock)
+      for(size_t io=0;io<Ctilde.n_cols;io++)
+	Forb[io]+=XC[io];
+    
     if(verbose) {
       printf(" done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
