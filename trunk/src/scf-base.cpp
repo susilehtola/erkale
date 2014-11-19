@@ -356,6 +356,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
   // Fraction of exact exchange
   double kfrac=exact_exchange(dft.x_func);
+  if(is_range_separated(dft.x_func)) {
+    throw std::runtime_error("Range separated functionals not currently supported with PZ-SIC!\n");
+  }
 
   // Orbital density matrices
   std::vector<arma::mat> Porb(Ctilde.n_cols);
@@ -372,41 +375,23 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   if(densityfit) {
     // Coulomb matrices
     std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
-    if(kfrac!=0.0)
-      throw std::runtime_error("Not implemented!\n");
-
-    // Collect matrices
     for(size_t io=0;io<Ctilde.n_cols;io++) {
-      Forb[io]=Jorb[io];
-      Eorb[io]=0.5*arma::trace(Porb[io]*Jorb[io]);
+      Forb[io]=(1-kfrac)*Jorb[io];
+      Eorb[io]=0.5*(1-kfrac)*arma::trace(Porb[io]*Jorb[io]);
     }
-
   } else {
-
     if(!direct) {
       // Tabled integrals
       for(size_t io=0;io<Ctilde.n_cols;io++) {
-	// Calculate Coulomb term
-	Forb[io]=tab.calcJ(Porb[io]);
+	// Calculate Coulomb term; exchange coincides with Coulomb
+	Forb[io]=(1-kfrac)*tab.calcJ(Porb[io]);
 	// and Coulomb energy
-	Eorb[io]=0.5*arma::trace(Porb[io]*Forb[io]);
-      }
-
-      // Exchange?
-      if(kfrac!=0.0) {
-	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Calculate exchange term
-	  arma::mat Ko=tab.calcK(Porb[io]);
-
-	  // Change to Fock matrix and energy
-	  Forb[io]-=0.5*kfrac*Ko;
-	  Eorb[io]-=0.25*kfrac*arma::trace(Porb[io]*Ko);
-	}
+	Eorb[io]=0.5*(1-kfrac)*arma::trace(Porb[io]*Forb[io]);
       }
     } else {
       // HF coulomb/exchange not implemented
       ERROR_INFO();
-      throw std::runtime_error("Analytical Coulomb/exchange matrix not implemented!\n");
+      throw std::runtime_error("Direct formation of conventional Coulomb matrices not implemented!\n");
     }
   }
 
