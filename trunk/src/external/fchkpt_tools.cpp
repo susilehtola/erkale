@@ -395,21 +395,17 @@ Storage parse_fchk(const std::string & name) {
 	sh.push_back(hlp);
 
       } else {
-	// Normal ordering as in ERKALE
+	// Order is like in ERKALE but different
 
 	int am=shtype[ish];
-	for(int i=0; i<=am; i++) {
-	  int nx = am - i;
-	  for(int j=0; j<=i; j++) {
-	    int ny = i-j;
-	    int nz = j;
-
+	for(int nx=0;nx<=am;nx++)
+	  for(int ny=0;ny<=am-nx;ny++) {
+	    int nz=am-nx-ny;
 	    hlp.l=nx;
 	    hlp.m=ny;
 	    hlp.n=nz;
 	    sh.push_back(hlp);
 	  }
-	}
       }
 
       // Add shells
