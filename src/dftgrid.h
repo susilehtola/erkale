@@ -249,6 +249,8 @@ class AtomGrid {
   atomgrid_t construct(const BasisSet & bas, const arma::mat & P, size_t cenind, int x_func, int c_func, bool verbose);
   /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
   atomgrid_t construct(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, int x_func, int c_func, bool verbose);
+  /// Construct adaptively a grid centered on the cenind:th center, SIC calculation
+  atomgrid_t construct(const BasisSet & bas, const arma::cx_vec & C, size_t cenind, int x_func, int c_func, bool verbose);
 
   /// Construct a dummy grid that is only meant for the overlap matrix (Becke charges)
   atomgrid_t construct_becke(const BasisSet & bas, size_t cenind, bool verbose);
@@ -296,13 +298,21 @@ class AtomGrid {
   void update_density(const arma::mat & P);
   /// Update values of density, unrestricted calculation
   void update_density(const arma::mat & Pa, const arma::mat & Pb);
+  /// Update values of density, self-interaction correction
+  void update_density(const arma::cx_vec & C);
 
   /// Evaluate density at a point
   double eval_dens(const arma::mat & P, size_t ip) const;
+  /// Evaluate density at a point (for PZ-SIC)
+  double eval_dens(const arma::cx_vec & C, size_t ip) const;
   /// Evaluate gradient at a point
   void eval_grad(const arma::mat & P, size_t ip, double *g) const;
+  /// Evaluate gradient at a point (for PZ-SIC)
+  void eval_grad(const arma::cx_vec & C, size_t ip, double *g) const;
   /// Evaluate laplacian of density and kinetic density at a point
   void eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl, double & kin) const;
+  /// Evaluate laplacian of density and kinetic density at a point (for PZ-SIC)
+  void eval_lapl_kin_dens(const arma::cx_vec & C, size_t ip, double & lapl, double & kin) const;
 
   /// Evaluate density
   void eval_dens(const arma::mat & P, std::vector<dens_list_t> & d) const;
@@ -335,11 +345,15 @@ class AtomGrid {
   void eval_Fxc(arma::mat & H) const;
   /// Evaluate Fock matrix, unrestricted calculation
   void eval_Fxc(arma::mat & Ha, arma::mat & Hb) const;
+  /// Evaluate Fock matrix, SIC calculation
+  void eval_Fxc(const arma::mat & C, size_t nocc, arma::mat & H) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
   void eval_diag_Fxc(arma::vec & H) const;
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
   void eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const;
+  /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
+  void eval_diag_Fxc_SIC(arma::vec & H) const;
 
   /// Evaluate force
   arma::vec eval_force(const BasisSet & bas, const arma::mat & P) const;
@@ -403,7 +417,7 @@ class DFTGrid {
   void construct_hirshfeld(const Hirshfeld & hirsh, double tol);
 
   /// Create grid for SIC calculation
-  void construct(const std::vector<arma::mat> & Porb, double tol, int x_func, int c_func);
+  void construct(const arma::cx_mat & C, double tol, int x_func, int c_func);
 
   /// Get amount of points
   size_t get_Npoints() const;
@@ -425,8 +439,12 @@ class DFTGrid {
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, unrestricted case
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel);
 
-  /// Compute Fock matrix, exchange-correlation energy and integrated electron density, SIC calculation
-  void eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & P, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
+  /** 
+   * Compute Fock matrix, exchange-correlation energy and integrated
+   * electron density, SIC calculation. Note that all orbitals are
+   * necessary here.
+   */
+  void eval_Fxc(int x_func, int c_func, const arma::mat & C, const arma::cx_mat & W, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
 
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();
