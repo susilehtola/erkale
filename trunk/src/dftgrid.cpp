@@ -674,9 +674,10 @@ void AtomGrid::eval_lapl_kin_dens(const arma::cx_vec & C, size_t ip, double & la
     lap    +=C(i)*llist[ii];
   }
 
-  // Collect results
+  // Collect results. Kinetic energy: 0.5 * |g psi|^2
   kin=0.5*(std::norm(grad[0])+std::norm(grad[1])+std::norm(grad[2]));
-  lapl=2.0*(kin + std::real(std::conj(val)*lap));
+  // Laplacian of density: lapl (psi* psi) = 
+  lapl=4.0*kin + 2.0*std::real(std::conj(val)*lap);
 }
 
 void AtomGrid::eval_dens(const arma::mat & P, std::vector<dens_list_t> & list) const {
