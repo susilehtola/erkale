@@ -1075,17 +1075,16 @@ void AtomGrid::eval_diag_overlap(arma::vec & S) const {
 }
 
 void AtomGrid::eval_Fxc(arma::mat & H) const {
-  double xcfac;
-
   if(polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
   // LDA part
+  double ldafac;
   for(size_t ip=0;ip<grid.size();ip++) {
     // Factor in common for basis functions
-    xcfac=grid[ip].w*vxc[ip];
+    ldafac=grid[ip].w*vxc[ip];
 
     // Loop over functions on grid point
     size_t first=grid[ip].f0;
@@ -1097,19 +1096,19 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
       for(size_t jj=first;jj<last;jj++) {
 	size_t j=flist[jj].ind;
 
-	H(i,j)+=xcfac*flist[ii].f*flist[jj].f;
+	H(i,j)+=ldafac*flist[ii].f*flist[jj].f;
       }
     }
   }
 
   // GGA part
   if(do_gga) {
-    double xcvec[3];
+    double ggafac[3];
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factor in common for basis functions
       for(int ic=0;ic<3;ic++)
-	xcvec[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
+	ggafac[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
 
       // Loop over functions on grid point
       size_t first=grid[ip].f0;
@@ -1122,9 +1121,9 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
 	for(size_t jj=first;jj<last;jj++) {
 	  size_t j=flist[jj].ind;
 
-	  H(i,j)+=xcvec[0]*(glist[3*ii]*flist[jj].f + flist[ii].f*glist[3*jj])
-	    +     xcvec[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
-	    +     xcvec[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2]);
+	  H(i,j)+=ggafac[0]*(glist[3*ii]*flist[jj].f + flist[ii].f*glist[3*jj])
+	    +     ggafac[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
+	    +     ggafac[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2]);
 	}
       }
     }
@@ -1165,17 +1164,16 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
 }
 
 void AtomGrid::eval_diag_Fxc(arma::vec & H) const {
-  double xcfac;
-
   if(polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
   // LDA part
+  double ldafac;
   for(size_t ip=0;ip<grid.size();ip++) {
     // Factor in common for basis functions
-    xcfac=grid[ip].w*vxc[ip];
+    ldafac=grid[ip].w*vxc[ip];
 
     // Loop over functions on grid point
     size_t first=grid[ip].f0;
@@ -1185,18 +1183,18 @@ void AtomGrid::eval_diag_Fxc(arma::vec & H) const {
       // Get index of function
       size_t i=flist[ii].ind;
 
-      H[i]+=xcfac*flist[ii].f*flist[ii].f;
+      H[i]+=ldafac*flist[ii].f*flist[ii].f;
     }
   }
 
   // GGA part
   if(do_gga) {
-    double xcvec[3];
+    double ggafac[3];
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factor in common for basis functions
       for(int ic=0;ic<3;ic++)
-	xcvec[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
+	ggafac[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
 
       // Loop over functions on grid point
       size_t first=grid[ip].f0;
@@ -1207,7 +1205,7 @@ void AtomGrid::eval_diag_Fxc(arma::vec & H) const {
 	size_t i=flist[ii].ind;
 
 	for(int ic=0;ic<3;ic++) {
-	  H[i]+=xcvec[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
+	  H[i]+=ggafac[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
 	}
       }
     }
@@ -1245,18 +1243,17 @@ void AtomGrid::eval_diag_Fxc(arma::vec & H) const {
 }
 
 void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
-  double xcfaca, xcfacb;
-
   if(!polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
   }
 
   // LDA part
+  double ldafaca, ldafacb;
   for(size_t ip=0;ip<grid.size();ip++) {
     // Factor in common for basis functions
-    xcfaca=grid[ip].w*vxc[2*ip];
-    xcfacb=grid[ip].w*vxc[2*ip+1];
+    ldafaca=grid[ip].w*vxc[2*ip];
+    ldafacb=grid[ip].w*vxc[2*ip+1];
 
     // Loop over functions on grid point
     size_t first=grid[ip].f0;
@@ -1268,21 +1265,21 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
       for(size_t jj=first;jj<last;jj++) {
 	size_t j=flist[jj].ind;
 
-	Ha(i,j)+=xcfaca*flist[ii].f*flist[jj].f;
-	Hb(i,j)+=xcfacb*flist[ii].f*flist[jj].f;
+	Ha(i,j)+=ldafaca*flist[ii].f*flist[jj].f;
+	Hb(i,j)+=ldafacb*flist[ii].f*flist[jj].f;
       }
     }
   }
 
   // GGA part
   if(do_gga) {
-    double xcveca[3], xcvecb[3];
+    double ggafaca[3], ggafacb[3];
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factor in common for basis functions
       for(int ic=0;ic<3;ic++) {
-	xcveca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
-	xcvecb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
+	ggafaca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
+	ggafacb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
       }
 
       // Loop over functions on grid point
@@ -1296,8 +1293,8 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
 	  size_t j=flist[jj].ind;
 
 	  for(int ic=0;ic<3;ic++) {
-	    Ha(i,j)+=xcveca[ic]*(glist[3*ii+ic]*flist[jj].f + flist[ii].f*glist[3*jj+ic]);
-	    Hb(i,j)+=xcvecb[ic]*(glist[3*ii+ic]*flist[jj].f + flist[ii].f*glist[3*jj+ic]);
+	    Ha(i,j)+=ggafaca[ic]*(glist[3*ii+ic]*flist[jj].f + flist[ii].f*glist[3*jj+ic]);
+	    Hb(i,j)+=ggafacb[ic]*(glist[3*ii+ic]*flist[jj].f + flist[ii].f*glist[3*jj+ic]);
 	  }
 	}
       }
@@ -1343,18 +1340,17 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
 }
 
 void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
-  double xcfaca, xcfacb;
-
   if(!polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
   }
 
   // LDA part
+  double ldafaca, ldafacb;
   for(size_t ip=0;ip<grid.size();ip++) {
     // Factor in common for basis functions
-    xcfaca=grid[ip].w*vxc[2*ip];
-    xcfacb=grid[ip].w*vxc[2*ip+1];
+    ldafaca=grid[ip].w*vxc[2*ip];
+    ldafacb=grid[ip].w*vxc[2*ip+1];
 
     // Loop over functions on grid point
     size_t first=grid[ip].f0;
@@ -1364,20 +1360,20 @@ void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
       // Get index of function
       size_t i=flist[ii].ind;
 
-      Ha[i]+=xcfaca*flist[ii].f*flist[ii].f;
-      Hb[i]+=xcfacb*flist[ii].f*flist[ii].f;
+      Ha[i]+=ldafaca*flist[ii].f*flist[ii].f;
+      Hb[i]+=ldafacb*flist[ii].f*flist[ii].f;
     }
   }
 
   // GGA part
   if(do_gga) {
-    double xcveca[3], xcvecb[3];
+    double ggafaca[3], ggafacb[3];
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factor in common for basis functions
       for(int ic=0;ic<3;ic++) {
-	xcveca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
-	xcvecb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
+	ggafaca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
+	ggafacb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
       }
 
       // Loop over functions on grid point
@@ -1389,8 +1385,8 @@ void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
 	size_t i=flist[ii].ind;
 
 	for(int ic=0;ic<3;ic++) {
-	  Ha[i]+=xcveca[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
-	  Hb[i]+=xcvecb[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
+	  Ha[i]+=ggafaca[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
+	  Hb[i]+=ggafacb[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
 	}
       }
     }
@@ -1653,17 +1649,16 @@ void AtomGrid::eval_Fxc(const arma::mat & C, size_t nocc, arma::mat & H) const {
 }
 
 void AtomGrid::eval_diag_Fxc_SIC(arma::vec & H) const {
-  double xcfac;
-
   if(!polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
   // LDA part
+  double ldafac;
   for(size_t ip=0;ip<grid.size();ip++) {
     // Factor in common for basis functions
-    xcfac=grid[ip].w*vxc[2*ip];
+    ldafac=grid[ip].w*vxc[2*ip];
 
     // Loop over functions on grid point
     size_t first=grid[ip].f0;
@@ -1673,18 +1668,18 @@ void AtomGrid::eval_diag_Fxc_SIC(arma::vec & H) const {
       // Get index of function
       size_t i=flist[ii].ind;
 
-      H[i]+=xcfac*flist[ii].f*flist[ii].f;
+      H[i]+=ldafac*flist[ii].f*flist[ii].f;
     }
   }
 
   // GGA part
   if(do_gga) {
-    double xcvec[3];
+    double ggafac[3];
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factor in common for basis functions
       for(int ic=0;ic<3;ic++)
-	xcvec[ic]=2.0*grid[ip].w*vsigma[3*ip]*grho[6*ip+ic];
+	ggafac[ic]=2.0*grid[ip].w*vsigma[3*ip]*grho[6*ip+ic];
       
       // Loop over functions on grid point
       size_t first=grid[ip].f0;
@@ -1695,7 +1690,7 @@ void AtomGrid::eval_diag_Fxc_SIC(arma::vec & H) const {
 	size_t i=flist[ii].ind;
 
 	for(int ic=0;ic<3;ic++) {
-	  H[i]+=xcvec[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
+	  H[i]+=ggafac[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
 	}
       }
     }
