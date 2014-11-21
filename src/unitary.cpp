@@ -190,9 +190,6 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
     print_legend(f);
 
   while(true) {
-    // Increase iteration number
-    k++;
-
     Timer t;
 
     // Store old gradient and search direction
@@ -238,48 +235,6 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
     // Update search direction
     update_search_direction(f->getq());
 
-    // Check for convergence. Don't do the check in the first
-    // iteration, because for canonical orbitals it can be a really
-    // bad saddle point
-    double J=f->getf();
-
-    double oldJ = (oldf==NULL) ? 0.0 : oldf->getf();
-    if(k>1 && ( (bracket(G,G)<Gthr) && fabs(J-oldJ)<Fthr && f->converged() ) ) {
-
-      if(verbose) {
-	printf("Converged.\n");
-	fflush(stdout);
-
-	// Print classification
-	classify(W);
-      }
-
-      break;
-    } else if(k==maxiter) {
-      if(verbose) {
-	printf(" %s\nNot converged.\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
-
-      break;
-    }
-
-    if(debug) {
-      char fname[80];
-      sprintf(fname,"unitary_%04i.dat",(int) k);
-      FILE *p=fopen(fname,"w");
-      UnitaryFunction *uf=f->copy();      
-      for(int i=-80;i<=80;i++) {
-	double x=i*0.05;
-	double xT=x*Tmu;
-
-	double y=uf->cost_func(get_rotation(xT)*W);
-	fprintf(p,"% e % e % e\n",x,xT,y);
-      }
-      fclose(p);
-      delete uf;
-    }
-
     // Save old iteration data
     if(oldf)
       delete oldf;
@@ -299,17 +254,59 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
       throw std::runtime_error("Method not implemented.\n");
     }
     
-    // Print progress
-    if(verbose)
-      print_progress(k,f,oldf);
+    // Increase iteration number
+    k++;
+    // Update matrix
+    W=f->getW();
 
+    // Print progress
     if(verbose) {
+      print_progress(k,f,oldf);
       print_time(t);
     }
     
-    // Get new matrix
-    W=f->getW();
+    // Check for convergence. Don't do the check in the first
+    // iteration, because for canonical orbitals it can be a really
+    // bad saddle point
+    double J=f->getf();
+    
+    double oldJ = (oldf==NULL) ? 0.0 : oldf->getf();
+    if(k>1 && ( (bracket(G,G)<Gthr) && fabs(J-oldJ)<Fthr && f->converged() ) ) {
+      if(verbose) {
+	printf("Converged.\n");
+	fflush(stdout);
+	
+	// Print classification
+	classify(W);
+      }
+
+      break;
+    } else if(k==maxiter) {
+      if(verbose) {
+	printf(" %s\nNot converged.\n",t.elapsed().c_str());
+	fflush(stdout);
+      }
+      
+      break;
+    }
+    
+    if(debug) {
+      char fname[80];
+      sprintf(fname,"unitary_%04i.dat",(int) k);
+      FILE *p=fopen(fname,"w");
+      UnitaryFunction *uf=f->copy();      
+      for(int i=-80;i<=80;i++) {
+	double x=i*0.05;
+	double xT=x*Tmu;
+
+	double y=uf->cost_func(get_rotation(xT)*W);
+	fprintf(p,"% e % e % e\n",x,xT,y);
+      }
+      fclose(p);
+      delete uf;
+    }
   }
+
 
   if(oldf)
     delete oldf;
