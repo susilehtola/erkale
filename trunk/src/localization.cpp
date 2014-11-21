@@ -1238,27 +1238,24 @@ double PZSIC::cost_func(const arma::cx_mat & Wv) {
     throw std::runtime_error("Matrix is not square!\n");
   }
   
-  if(Wv.n_rows != sol.C.n_cols) {
+  if(Wv.n_rows > sol.C.n_cols) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << sol.C.n_cols << "!\n";
+    oss << "Matrix does not match size of problem: " << Wv.n_rows << " rotations vs " << sol.C.n_cols << "CMOs!\n";
     throw std::runtime_error(oss.str());
   }
 
-  // Get transformed orbitals
-  arma::cx_mat Ctilde=sol.C*Wv;
-  
   // Check if we need to do something
   if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
     // Compute orbital energies
     W=Wv;
     Forb.clear();
-    solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid,false);
+    solver->PZSIC_Fock(Forb,Eorb,sol.C,Wv,dft,*grid,false);
   }
-  if(Eorb.size() != sol.C.n_cols) {
+  if(Eorb.size() != Wv.n_cols) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Problem in PZSIC: have " << sol.C.n_cols << " orbitals but " << Eorb.size() << " energies!\n";
+    oss << "Problem in PZSIC: have " << Wv.n_cols << " orbitals but " << Eorb.size() << " energies!\n";
     throw std::runtime_error(oss.str());
   }
 
@@ -1282,35 +1279,34 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(Wv.n_rows != sol.C.n_cols) {
+  if(Wv.n_rows > sol.C.n_cols) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << sol.C.n_cols << "!\n";
+    oss << "Matrix does not match size of problem: " << Wv.n_rows << " rotations vs " << sol.C.n_cols << "CMOs!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Check if we need to do something
+  if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON || Forb.size() != Wv.n_cols) {
+    // Compute orbital-dependent Fock matrices
+    W=Wv;
+    solver->PZSIC_Fock(Forb,Eorb,sol.C,Wv,dft,*grid,true);
+  }
+  if(Eorb.size() != Wv.n_cols) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Problem in PZSIC: have " << Wv.n_cols << " orbitals but " << Eorb.size() << " energies!\n";
+    throw std::runtime_error(oss.str());
+  }
+  if(Forb.size() != Wv.n_cols) {
+    ERROR_INFO();
+    std::ostringstream oss;
+    oss << "Problem in PZSIC: have " << Wv.n_cols << " orbitals but " << Forb.size() << " potentials!\n";
     throw std::runtime_error(oss.str());
   }
 
   // Get transformed orbitals
-  arma::cx_mat Ctilde=sol.C*Wv;
-  
-  // Check if we need to do something
-  if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON || Forb.size() != sol.C.n_cols) {
-    // Compute orbital-dependent Fock matrices
-    W=Wv;
-    solver->PZSIC_Fock(Forb,Eorb,Ctilde,dft,*grid,true);
-  }
-  if(Eorb.size() != sol.C.n_cols) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Problem in PZSIC: have " << sol.C.n_cols << " orbitals but " << Eorb.size() << " energies!\n";
-    throw std::runtime_error(oss.str());
-  }
-  if(Forb.size() != sol.C.n_cols) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Problem in PZSIC: have " << sol.C.n_cols << " orbitals but " << Forb.size() << " potentials!\n";
-    throw std::runtime_error(oss.str());
-  }
-
+  arma::cx_mat Ctilde=sol.C.cols(0,Wv.n_cols-1)*Wv;
   // and the total SIC contribution.
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
   if(ham==PZSYMM) {

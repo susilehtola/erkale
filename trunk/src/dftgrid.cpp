@@ -369,7 +369,6 @@ void AtomGrid::update_density(const arma::mat & P) {
 
 void AtomGrid::update_density(const arma::mat & Pa, const arma::mat & Pb) {
   // Update values of densitty
-
   if(!Pa.n_elem || !Pb.n_elem) {
     ERROR_INFO();
     throw std::runtime_error("Error - density matrix is empty!\n");
@@ -439,6 +438,74 @@ void AtomGrid::update_density(const arma::mat & Pa, const arma::mat & Pb) {
   }
 }
 
+void AtomGrid::update_density(const arma::cx_vec & C) {
+  // Update values of densitty
+
+  if(!C.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Error - coefficient vector is empty!\n");
+  }
+
+  // Polarized calculation.
+  polarized=true;
+
+  // Check consistency of allocation
+  if(rho.size()!=2*grid.size())
+    rho.resize(2*grid.size());
+
+  // Loop over points
+  for(size_t ip=0;ip<grid.size();ip++) {
+    // Compute densities
+    rho[2*ip]=eval_dens(C,ip);
+    rho[2*ip+1]=0.0;
+  }
+
+  if(do_grad) {
+    if(grho.size()!=6*rho.size())
+      grho.resize(6*rho.size());
+    if(sigma.size()!=3*grid.size())
+      sigma.resize(3*grid.size());
+
+    double grada[3];
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Compute gradients
+      eval_grad(C,ip,grada);
+      // and store them
+      for(int ic=0;ic<3;ic++) {
+	grho[6*ip+ic]=grada[ic];
+	grho[6*ip+3+ic]=0.0;
+      }
+
+      // Compute values of sigma
+      sigma[3*ip]  =grada[0]*grada[0] + grada[1]*grada[1] + grada[2]*grada[2];
+      sigma[3*ip+1]=0.0;
+      sigma[3*ip+2]=0.0;
+    }
+  }
+
+  if(do_lapl) {
+    // Adjust size of grid
+    if(lapl_rho.size()!=rho.size())
+      lapl_rho.resize(rho.size());
+    if(tau.size()!=rho.size())
+      tau.resize(rho.size());
+
+    double lapla, kina;
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Evaluate laplacian and kinetic energy densities
+      eval_lapl_kin_dens(C,ip,lapla,kina);
+      // and add them to the stack
+      lapl_rho[2*ip]=lapla;
+      lapl_rho[2*ip+1]=0.0;
+
+      tau[2*ip]=kina;
+      tau[2*ip+1]=0.0;
+    }
+  }
+}
+
 double AtomGrid::eval_dens(const arma::mat & P, size_t ip) const {
   // Density
   double d=0.0;
@@ -459,6 +526,23 @@ double AtomGrid::eval_dens(const arma::mat & P, size_t ip) const {
   }
 
   return d;
+}
+
+double AtomGrid::eval_dens(const arma::cx_vec & C, size_t ip) const {
+  // Value of orbital on grid point
+  std::complex<double> val=0.0;
+  // Loop over functions on point
+  size_t first=grid[ip].f0;
+  size_t last=first+grid[ip].nf;
+  size_t i;
+
+  for(size_t ii=first;ii<last;ii++) {
+    // Index of function is
+    i=flist[ii].ind;
+    val+=C(i)*flist[ii].f;
+  }
+  
+  return std::norm(val);
 }
 
 void AtomGrid::eval_grad(const arma::mat & P, size_t ip, double *g) const {
@@ -489,6 +573,40 @@ void AtomGrid::eval_grad(const arma::mat & P, size_t ip, double *g) const {
 
   for(int ic=0;ic<3;ic++)
     g[ic]*=2.0;
+}
+
+void AtomGrid::eval_grad(const arma::cx_vec & C, size_t ip, double *g) const {
+  // Initialize gradient
+  for(int i=0;i<3;i++)
+    g[i]=0.0;
+
+  // Value of orbital on point
+  std::complex<double> val=0.0;
+  // Value of orbital gradient on point
+  std::complex<double> grad[3];
+  grad[0]=grad[1]=grad[2]=0.0;
+
+  // Loop over functions on point
+  size_t first=grid[ip].f0;
+  size_t last=first+grid[ip].nf;
+  size_t i;
+
+  // Increment: phi and gphi
+  for(size_t ii=first;ii<last;ii++) {
+    // Index of function is
+    i=flist[ii].ind;
+    
+    // Value of orbital in point
+    val+=C(i)*flist[ii].f;
+    // Gradient of orbital in point
+    grad[0]+=C(i)*glist[3*ii  ];
+    grad[1]+=C(i)*glist[3*ii+1];
+    grad[2]+=C(i)*glist[3*ii+2];
+  }
+
+  // Compute gradient: grad rho = ( phi* gphi + phi gphi* ) = 2 Re (phi* gphi)
+  for(int ic=0;ic<3;ic++)
+    g[ic]=2.0*std::real(grad[ic]*std::conj(val));
 }
 
 void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl, double & kin) const {
@@ -525,6 +643,40 @@ void AtomGrid::eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl,
       kin+=0.5*P(i,j)*bf_gdot;
     }
   }
+}
+
+void AtomGrid::eval_lapl_kin_dens(const arma::cx_vec & C, size_t ip, double & lapl, double & kin) const {
+  // Loop over functions on point
+  size_t first=grid[ip].f0;
+  size_t last=first+grid[ip].nf;
+
+  size_t i;
+
+  // Value of orbital
+  std::complex<double> val=0.0;
+  // Value of orbital gradient
+  std::complex<double> grad[3];
+  grad[0]=grad[1]=grad[2]=0.0;
+  // and the laplacian
+  std::complex<double> lap=0.0;
+
+  for(size_t ii=first;ii<last;ii++) {
+    // Index of function is
+    i=flist[ii].ind;
+
+    // Orbital value
+    val    +=C(i)*flist[ii].f;
+    // Gradient value
+    grad[0]+=C(i)*glist[3*ii  ];
+    grad[1]+=C(i)*glist[3*ii+1];
+    grad[2]+=C(i)*glist[3*ii+2];
+    // Laplacian value
+    lap    +=C(i)*llist[ii];
+  }
+
+  // Collect results
+  kin=0.5*(std::norm(grad[0])+std::norm(grad[1])+std::norm(grad[2]));
+  lapl=2.0*(kin + std::real(std::conj(val)*lap));
 }
 
 void AtomGrid::eval_dens(const arma::mat & P, std::vector<dens_list_t> & list) const {
@@ -1273,6 +1425,307 @@ void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
 
 	Ha[i]+=0.5*kfaca*bf_gdot + lfaca*bf_lapl;
 	Hb[i]+=0.5*kfacb*bf_gdot + lfacb*bf_lapl;
+      }
+    }
+  }
+}
+
+void AtomGrid::eval_Fxc(const arma::mat & C, size_t nocc, arma::mat & H) const {
+  if(!polarized) {
+    ERROR_INFO();
+    throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
+  }
+
+  // Canonical orbital values on grid point
+  size_t norb=C.n_cols;
+
+  // Meta-GGA
+  if(do_mgga) {
+    arma::vec oval(norb);
+    arma::mat gval(norb,3);
+    arma::vec lval(norb);
+    double ldafac;
+    double ggafac[3];
+    double kfac;
+    double lfac;
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+      
+      // Orbital value and gradient
+      oval.zeros();
+      gval.zeros();
+      lval.zeros();
+      for(size_t io=0;io<C.n_cols;io++) {
+	arma::vec c=C.col(io);
+	for(size_t ii=first;ii<last;ii++) {
+	  // Get index of function
+	  size_t i=flist[ii].ind;
+	  oval(io)+=c(i)*flist[ii].f;
+	}
+	for(size_t ii=first;ii<last;ii++) {
+	  // Get index of function
+	  size_t i=flist[ii].ind;
+	  gval(io,0)+=c(i)*glist[3*ii  ];
+	  gval(io,1)+=c(i)*glist[3*ii+1];
+	  gval(io,2)+=c(i)*glist[3*ii+2];
+	}
+	for(size_t ii=first;ii<last;ii++) {
+	  // Get index of function
+	  size_t i=flist[ii].ind;
+	  lval(io)+=c(i)*llist[ii];
+	}
+      }
+
+      // LDA part. Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[2*ip];
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+      // occ-virt
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=nocc;jo<norb;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+      // virt-occ
+      for(size_t io=nocc;io<norb;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+
+      // GGA part
+      for(int ic=0;ic<3;ic++) {
+	ggafac[ic]=grid[ip].w*(2.0*vsigma[3*ip]*grho[6*ip+ic]);
+      }
+      // occ-occ
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  for(int ic=0;ic<3;ic++)
+	    H(io,jo)+=ggafac[ic]*(oval(io)*gval(jo,ic) + gval(io,ic)*oval(jo));
+      // occ-virt
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=nocc;jo<norb;jo++)
+	  for(int ic=0;ic<3;ic++)
+	    H(io,jo)+=ggafac[ic]*(oval(io)*gval(jo,ic) + gval(io,ic)*oval(jo));
+      // virt-occ
+      for(size_t io=nocc;io<norb;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  for(int ic=0;ic<3;ic++)
+	    H(io,jo)+=ggafac[ic]*(oval(io)*gval(jo,ic) + gval(io,ic)*oval(jo));
+
+
+      // MGGA part
+      lfac=grid[ip].w*vlapl[2*ip];
+      kfac=grid[ip].w*vtau[2*ip];
+      // occ-occ
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=0;jo<nocc;jo++) {
+	  // Gradient
+	  double gdot=gval(io,0)*gval(jo,0) + gval(io,1)*gval(jo,1) + gval(io,2)*gval(jo,2);
+	  // Laplacian
+	  double lapl=oval(io)*lval(jo) + lval(io)*oval(jo) + 2.0*gdot;
+	  H(io,jo)+=0.5*kfac*gdot + lfac*lapl;
+	}
+      // occ-virt
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=nocc;jo<norb;jo++) {
+	  // Gradient
+	  double gdot=gval(io,0)*gval(jo,0) + gval(io,1)*gval(jo,1) + gval(io,2)*gval(jo,2);
+	  // Laplacian
+	  double lapl=oval(io)*lval(jo) + lval(io)*oval(jo) + 2.0*gdot;
+	  H(io,jo)+=0.5*kfac*gdot + lfac*lapl;
+	}
+      // virt-occ
+      for(size_t io=nocc;io<norb;io++)
+	for(size_t jo=0;jo<nocc;jo++) {
+	  // Gradient
+	  double gdot=gval(io,0)*gval(jo,0) + gval(io,1)*gval(jo,1) + gval(io,2)*gval(jo,2);
+	  // Laplacian
+	  double lapl=oval(io)*lval(jo) + lval(io)*oval(jo) + 2.0*gdot;
+	  H(io,jo)+=0.5*kfac*gdot + lfac*lapl;
+	}
+    }
+
+
+    // GGA
+  } else if(do_gga) {
+    arma::vec oval(norb);
+    arma::mat gval(norb,3);
+    double ldafac;
+    double ggafac[3];
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+      
+      // Orbital value and gradient
+      oval.zeros();
+      gval.zeros();
+      for(size_t io=0;io<C.n_cols;io++) {
+	arma::vec c=C.col(io);
+	for(size_t ii=first;ii<last;ii++) {
+	  // Get index of function
+	  size_t i=flist[ii].ind;
+	  oval(io)+=c(i)*flist[ii].f;
+	}
+	for(size_t ii=first;ii<last;ii++) {
+	  // Get index of function
+	  size_t i=flist[ii].ind;
+	  gval(io,0)+=c(i)*glist[3*ii  ];
+	  gval(io,1)+=c(i)*glist[3*ii+1];
+	  gval(io,2)+=c(i)*glist[3*ii+2];
+	}
+      }
+
+      // LDA part. Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[2*ip];
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+      // occ-virt
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=nocc;jo<norb;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+      // virt-occ
+      for(size_t io=nocc;io<norb;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+
+      // GGA part
+      for(int ic=0;ic<3;ic++) {
+	ggafac[ic]=grid[ip].w*(2.0*vsigma[3*ip]*grho[6*ip+ic]);
+      }
+      // occ-occ
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  for(int ic=0;ic<3;ic++)
+	    H(io,jo)+=ggafac[ic]*(oval(io)*gval(jo,ic) + gval(io,ic)*oval(jo));
+      // occ-virt
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=nocc;jo<norb;jo++)
+	  for(int ic=0;ic<3;ic++)
+	    H(io,jo)+=ggafac[ic]*(oval(io)*gval(jo,ic) + gval(io,ic)*oval(jo));
+      // virt-occ
+      for(size_t io=nocc;io<norb;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  for(int ic=0;ic<3;ic++)
+	    H(io,jo)+=ggafac[ic]*(oval(io)*gval(jo,ic) + gval(io,ic)*oval(jo));
+    }
+
+    // LDA
+  } else {
+    arma::vec oval(norb);
+    double ldafac;
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+      
+      // Orbital value and gradient
+      oval.zeros();
+      for(size_t io=0;io<C.n_cols;io++) {
+	arma::vec c=C.col(io);
+	for(size_t ii=first;ii<last;ii++) {
+	  // Get index of function
+	  size_t i=flist[ii].ind;
+	  oval(io)+=c(i)*flist[ii].f;
+	}
+      }
+
+      // LDA part. Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[2*ip];
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+      // occ-virt
+      for(size_t io=0;io<nocc;io++)
+	for(size_t jo=nocc;jo<norb;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+      // virt-occ
+      for(size_t io=nocc;io<norb;io++)
+	for(size_t jo=0;jo<nocc;jo++)
+	  H(io,jo)+=ldafac*oval(io)*oval(jo);
+    }
+  }
+}
+
+void AtomGrid::eval_diag_Fxc_SIC(arma::vec & H) const {
+  double xcfac;
+
+  if(!polarized) {
+    ERROR_INFO();
+    throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
+  }
+
+  // LDA part
+  for(size_t ip=0;ip<grid.size();ip++) {
+    // Factor in common for basis functions
+    xcfac=grid[ip].w*vxc[2*ip];
+
+    // Loop over functions on grid point
+    size_t first=grid[ip].f0;
+    size_t last=first+grid[ip].nf;
+
+    for(size_t ii=first;ii<last;ii++) {
+      // Get index of function
+      size_t i=flist[ii].ind;
+
+      H[i]+=xcfac*flist[ii].f*flist[ii].f;
+    }
+  }
+
+  // GGA part
+  if(do_gga) {
+    double xcvec[3];
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      for(int ic=0;ic<3;ic++)
+	xcvec[ic]=2.0*grid[ip].w*vsigma[3*ip]*grho[6*ip+ic];
+      
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	for(int ic=0;ic<3;ic++) {
+	  H[i]+=xcvec[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
+	}
+      }
+    }
+  }
+
+  // Meta-GGA
+  if(do_mgga) {
+    double bf_gdot;
+    double bf_lapl;
+
+    double kfac;
+    double lfac;
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factors in common for basis functions
+      lfac=grid[ip].w*vlapl[2*ip];
+      kfac=grid[ip].w*vtau[2*ip];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	// Laplacian and kinetic energy density
+	bf_gdot=glist[3*ii]*glist[3*ii] + glist[3*ii+1]*glist[3*ii+1] + glist[3*ii+2]*glist[3*ii+2];
+	bf_lapl=2.0*flist[ii].f*llist[ii] + 2.0*bf_gdot;
+
+	H[i]+=0.5*kfac*bf_gdot + lfac*bf_lapl;
       }
     }
   }
@@ -2074,6 +2527,130 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   return ret;
 }
 
+atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::cx_vec & C, size_t cenind, int x_func, int c_func, bool verbose) {
+  // Construct a grid centered on (x0,y0,z0)
+  // with nrad radial shells
+  // See Köster et al for specifics.
+
+  Timer t;
+
+  // Returned info
+  atomgrid_t ret;
+  ret.ngrid=0;
+  ret.nfunc=0;
+
+  // Store index of center
+  ret.atind=cenind;
+  // and its coordinates
+  ret.cen=bas.get_nuclear_coords(cenind);
+
+  if(x_func == 0 && c_func == 0) {
+    // No exchange or correlation!
+    return ret;
+  }
+
+  // Compute necessary number of radial points
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
+
+  // Get Chebyshev nodes and weights for radial part
+  std::vector<double> rad, wrad;
+  radial_chebyshev(nrad,rad,wrad);
+  nrad=rad.size(); // Sanity check
+
+  // Allocate memory
+  ret.sh.resize(nrad);
+  // Loop over radii
+  for(size_t ir=0;ir<rad.size();ir++) {
+    // Store shell data
+    ret.sh[ir].r=rad[ir];
+    ret.sh[ir].w=wrad[ir]*rad[ir]*rad[ir];
+    ret.sh[ir].l=3;
+  }
+
+  // Number of basis functions
+  size_t Nbf=bas.get_Nbf();
+
+  // Determine limit for angular quadrature
+  int lmax=(int) ceil(5.0-6.0*log10(tol));
+
+  // Old and new diagonal elements of Hamiltonian
+  arma::vec Hold(Nbf);
+  arma::vec Hnew(Nbf);
+
+  Hold.zeros();
+
+  // Maximum difference of diagonal elements of Hamiltonian
+  double maxdiff;
+
+  // Now, determine actual quadrature limits shell by shell
+  for(size_t ir=0;ir<ret.sh.size();ir++) {
+
+    do {
+      // Clear current grid points and function values
+      free();
+
+      // Form radial shell
+      if(use_lobatto)
+	add_lobatto_shell(ret,ir);
+      else
+	add_lebedev_shell(ret,ir);
+      // Compute Becke weights for radial shell
+      becke_weights(bas,ret,ir);
+      // Prune points with small weight
+      prune_points(1e-8*tol,ret.sh[ir]);
+
+      // Compute values of basis functions
+      compute_bf(bas,ret,ir);
+
+      // Compute density
+      update_density(C);
+
+      // Compute exchange and correlation.
+      init_xc();
+      // Compute the functionals
+      if(x_func>0)
+	compute_xc(x_func,true);
+      if(c_func>0)
+	compute_xc(c_func,true);
+      // and construct the Fock matrices
+      Hnew.zeros();
+      eval_diag_Fxc_SIC(Hnew);
+
+      // Compute maximum difference of diagonal elements of Fock matrix
+      maxdiff=arma::max(arma::abs(Hold-Hnew));
+
+      // Copy contents
+      std::swap(Hold,Hnew);
+
+      // Increment order if tolerance not achieved.
+      if(maxdiff>tol/rad.size()) {
+	if(use_lobatto)
+	  ret.sh[ir].l+=2;
+	else {
+	  // Need to determine what is next order of Lebedev
+	  // quadrature that is supported.
+	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
+	}
+      }
+    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
+
+    // Increase number of points and function values
+    ret.ngrid+=grid.size();
+    ret.nfunc+=flist.size();
+  }
+
+  // Free memory once more
+  free();
+
+  if(verbose) {
+    //    printf("\t%4u  %7s  %10s  %s\n",(unsigned int) ret.atind+1,space_number(ret.ngrid).c_str(),space_number(ret.nfunc).c_str(),t.elapsed().c_str());
+    printf("\t%4u  %7u  %10u  %s\n",(unsigned int) ret.atind+1,(unsigned int)ret.ngrid,(unsigned int) ret.nfunc,t.elapsed().c_str());
+    fflush(stdout);
+  }
+
+  return ret;
+}
+
 atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool verbose) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells
@@ -2658,7 +3235,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
   }
 }
 
-void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func, int c_func) {
+void DFTGrid::construct(const arma::cx_mat & Ctilde, double tol, int x_func, int c_func) {
   // Add all atoms
   if(verbose) {
     printf("\t%4s  %4s  %7s  %10s  %s\n","atom","orb","Npoints","Nfuncs","t");
@@ -2675,16 +3252,12 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
   Timer t;
 
   const size_t Nat=basp->get_Nnuc();
-  const size_t Norb=P.size();
+  const size_t Norb=Ctilde.n_cols;
 
   // Orbital grid lists
   std::vector< std::vector<atomgrid_t> > orbgrid(Norb);
   for(size_t iorb=0;iorb<Norb;iorb++)
     orbgrid[iorb].resize(Nat);
-
-  // Dummy density matrix
-  arma::mat Pdum(P[0]);
-  Pdum.zeros();
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -2703,7 +3276,7 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
 	Timer toa;
 
 	// Construct the grid
-	orbgrid[iorb][iat]=wrk[ith].construct(*basp,P[iorb],Pdum,iat,x_func,c_func,false);
+	orbgrid[iorb][iat]=wrk[ith].construct(*basp,Ctilde.col(iorb),iat,x_func,c_func,false);
 
 	// Print out info
 	if(verbose) {
@@ -2717,7 +3290,7 @@ void DFTGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func
     for(size_t iat=0;iat<Nat;iat++) {
       Timer toa;
 
-      orbgrid[iorb][iat]=wrk[0].construct(*basp,P[iorb],Pdum,iat,x_func,c_func,false);
+      orbgrid[iorb][iat]=wrk[0].construct(*basp,Ctilde.col(iorb),iat,x_func,c_func,false);
 
       // Print out info
       if(verbose) {
@@ -3377,30 +3950,32 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 }
 
 
-void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa, std::vector<arma::mat> & Ha, std::vector<double> & Exc, std::vector<double> & Nel, bool fock) {
-  // Clear Hamiltonian
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & C, const arma::cx_mat & W, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock) {
+  size_t nocc=W.n_cols;
+  // Optimal orbitals
+  arma::cx_mat CW=C.cols(0,nocc-1)*W;
+
+  // Allocate memory
   if(fock) {
-    Ha.resize(Pa.size());
-    for(size_t ip=0;ip<Pa.size();ip++)
-      Ha[ip].zeros(Pa[ip].n_rows,Pa[ip].n_cols);
+    H.resize(nocc);
+    // Hamiltonians computed in MO space
+    for(size_t ip=0;ip<nocc;ip++)
+      H[ip].zeros(C.n_cols,C.n_cols);
   }
-
+  
   // Clear exchange-correlation energy
-  Exc.assign(Pa.size(),0.0);
+  Exc.assign(nocc,0.0);
   // Clear number of electrons
-  Nel.assign(Pa.size(),0.0);
-
+  Nel.assign(nocc,0.0);
+  
 #ifdef _OPENMP
 #pragma omp parallel
   { // Begin parallel region
-
-    arma::mat Hdum(Pa[0]);
-    Hdum.zeros();
-    arma::mat Pdum(Pa[0]);
-    Pdum.zeros();
-
-    arma::mat Hwrk(Hdum);
-    Hwrk.zeros();
+    arma::mat Hwrk;
+    if(fock) {
+      Hwrk=H[0];
+      Hwrk.zeros();
+    }
 
     // Current thread is
     int ith=omp_get_thread_num();
@@ -3415,9 +3990,9 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
       wrk[ith].compute_bf(*basp,grids[i]);
 
       // Loop over densities
-      for(size_t ip=0;ip<Pa.size();ip++) {
+      for(size_t ip=0;ip<nocc;ip++) {
 	// Update density
-	wrk[ith].update_density(Pa[ip],Pdum);
+	wrk[ith].update_density(CW.col(ip));
 	// Update number of electrons
 #pragma omp atomic
 	Nel[ip]+=wrk[ith].compute_Nel();
@@ -3436,11 +4011,9 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
 	// and construct the Fock matrices
 	if(fock) {
 	  Hwrk.zeros(); // need to clear this here
-	  wrk[ith].eval_Fxc(Hwrk,Hdum);
-	  
-	  // Accumulate Fock matrix
+	  wrk[ith].eval_Fxc(C,nocc,Hwrk);
 #pragma omp critical
-	  Ha[ip]+=Hwrk;
+	  H[ip]+=Hwrk;
 	}
       }
     }
@@ -3451,10 +4024,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
   } // End parallel region
 #else
 
-  arma::mat Hdum(Pa[0]);
-  Hdum.zeros();
-  arma::mat Pdum(Pa[0]);
-  Pdum.zeros();
+  Timer t;
 
   // Loop over atoms
   for(size_t i=0;i<grids.size();i++) {
@@ -3464,31 +4034,38 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const std::vector<arma::mat> & Pa
     wrk[0].compute_bf(*basp,grids[i]);
 
     // Loop over densities
-    for(size_t ip=0;ip<Pa.size();ip++) {
-	// Update density
-	wrk[0].update_density(Pa[ip],Pdum);
-	// Update number of electrons
-	Nel[ip]+=wrk[0].compute_Nel();
+    for(size_t ip=0;ip<nocc;ip++) {
+      // Update density
+      wrk[0].update_density(CW.col(ip));
+      // Update number of electrons
+      Nel[ip]+=wrk[0].compute_Nel();
+      
+      // Initialize the arrays
+      wrk[0].init_xc();
+      // Compute the functionals
+      if(x_func>0)
+	wrk[0].compute_xc(x_func,fock);
+      if(c_func>0)
+	wrk[0].compute_xc(c_func,fock);
 
-	// Initialize the arrays
-	wrk[0].init_xc();
-	// Compute the functionals
-	if(x_func>0)
-	  wrk[0].compute_xc(x_func,fock);
-	if(c_func>0)
-	  wrk[0].compute_xc(c_func,fock);
-
-	// Evaluate the energy
-	Exc[ip]+=wrk[0].eval_Exc();
-	// and construct the Fock matrices
-	if(fock)
-	  wrk[0].eval_Fxc(Ha[ip],Hdum);
+      // Evaluate the energy
+      Exc[ip]+=wrk[0].eval_Exc();
+      // and construct the Fock matrices
+      if(fock)
+	wrk[0].eval_Fxc(C,nocc,H[ip]);
     }
-
+    
     // Free memory
     wrk[0].free();
   }
 #endif
+  
+  // Transform Hamiltonians back into AO space
+  if(fock) {
+    arma::mat S(basp->overlap());
+    for(size_t ip=0;ip<nocc;ip++)
+      H[ip]=S*C*H[ip]*arma::trans(C)*S;
+  }
 }
 
 arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {

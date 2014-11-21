@@ -349,11 +349,11 @@ arma::mat SCF::get_Hcore() const {
   return Hcore;
 }
 
-void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid, bool fock) {
+void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock) {
   // Compute the orbital-dependent Fock matrices
-  Eorb.resize(Ctilde.n_cols);
+  Eorb.resize(W.n_cols);
   if(fock)
-    Forb.resize(Ctilde.n_cols);
+    Forb.resize(W.n_cols);
 
   // Fraction of exact exchange
   double kfrac=exact_exchange(dft.x_func);
@@ -361,6 +361,8 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
     throw std::runtime_error("Range separated functionals not currently supported with PZ-SIC!\n");
   }
 
+  // Optimal orbitals
+  arma::cx_mat Ctilde=C.cols(0,W.n_rows-1)*W;
   // Orbital density matrices
   std::vector<arma::mat> Porb(Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
@@ -423,7 +425,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
     std::vector<arma::mat> XC; // Exchange-correlation matrices
     std::vector<double> Exc; // Exchange-correlation energy
 
-    grid.eval_Fxc(dft.x_func,dft.c_func,Porb,XC,Exc,Nelnum,fock);
+    grid.eval_Fxc(dft.x_func,dft.c_func,C,W,XC,Exc,Nelnum,fock);
 
     // Add in the XC part to the energy
     for(size_t io=0;io<Ctilde.n_cols;io++) {
@@ -478,9 +480,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   rscf_t sicsol;
   sicsol.H=sol.H;
   sicsol.P=sol.P/2.0;
-  sicsol.C.zeros(sol.C.n_rows,nocc);
-  for(size_t i=0;i<nocc;i++)
-    sicsol.C.col(i)=sol.C.col(i);
+  sicsol.C=sol.C;
 
   // Grid to use in integration
   DFTGrid grid(ogrid);
@@ -494,7 +494,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     arma::cx_mat CW;
     chkptp->cread("CW",CW);
     // The starting guess is the unitarized version of the overlap
-    W=unitarize(arma::trans(sicsol.C)*S*CW);
+    W=unitarize(arma::trans(sicsol.C.cols(0,CW.n_cols-1))*S*CW);
   }
   // Check that it is sane
   if(W.n_rows != nocc || W.n_cols != nocc) {
@@ -515,8 +515,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	if(verbose) printf("\nInitial localization.\n");
 	double measure;
 	// Max 1e5 iterations, gradient norm <= 1e-3
-	orbital_localization(PIPEK_IAO2,*basisp,sicsol.C,sol.P,measure,W,verbose,real,1e5,1e-3);
-
+	orbital_localization(PIPEK_IAO2,*basisp,sicsol.C.cols(0,nocc-1),sol.P,measure,W,verbose,real,1e5,1e-3);
 	if(verbose) {
 	  printf("\n");
 
@@ -539,7 +538,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     // are properly integrated over.
 
     // Update Ctilde
-    arma::cx_mat Ctilde=sicsol.C*W;
+    arma::cx_mat Ctilde=sicsol.C.cols(0,W.n_cols-1)*W;
 
     // Stack of density matrices
     std::vector<arma::mat> Pv(nocc);
@@ -553,7 +552,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       fprintf(stderr,"\n");
       fflush(stdout);
     }
-    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func);
+    grid.construct(Ctilde,dft.gridtol,dft.x_func,dft.c_func);
     if(verbose) {
       printf("\n");
       fflush(stdout);
@@ -582,12 +581,12 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     */
   }
   // Save matrix
-  chkptp->cwrite("CW",sicsol.C*W);
+  chkptp->cwrite("CW",sicsol.C.cols(0,W.n_rows-1)*W);
   // Save SI energies
   chkptp->write("ESIC",sicsol.E);
   // Compute projected energies
   if(sol.H.n_rows == sicsol.Heff.n_rows && sol.H.n_cols == sicsol.Heff.n_cols) {
-    arma::cx_mat CW=sicsol.C*W;
+    arma::cx_mat CW=sicsol.C.cols(0,W.n_cols-1)*W;
     arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sicsol.Heff)*CW));
     chkptp->write("EpSIC",Ep);
   }
@@ -650,16 +649,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   rscf_t sicsola;
   sicsola.H=sol.Ha;
   sicsola.P=sol.Pa;
-  sicsola.C.zeros(sol.Ca.n_rows,nocca);
-  for(size_t i=0;i<nocca;i++)
-    sicsola.C.col(i)=sol.Ca.col(i);
+  sicsola.C=sol.Ca;
 
   rscf_t sicsolb;
   sicsolb.H=sol.Hb;
   sicsolb.P=sol.Pb;
-  sicsolb.C.zeros(sol.Cb.n_rows,noccb);
-  for(size_t i=0;i<noccb;i++)
-    sicsolb.C.col(i)=sol.Cb.col(i);
+  sicsolb.C=sol.Cb;
 
   // Grid to use in integration
   DFTGrid grid(ogrid);
@@ -673,7 +668,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     arma::cx_mat CWa;
     chkptp->cread("CWa",CWa);
     // The starting guess is the unitarized version of the overlap
-    Wa=unitarize(arma::trans(sicsola.C)*S*CWa);
+    Wa=unitarize(arma::trans(sicsola.C.cols(0,CWa.n_cols-1))*S*CWa);
   }
   if(chkptp->exist("CWb.re")) {
     if(verbose) printf("Read beta localization matrix from checkpoint.\n");
@@ -682,7 +677,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     arma::cx_mat CWb;
     chkptp->cread("CWb",CWb);
     // The starting guess is the unitarized version of the overlap
-    Wb=unitarize(arma::trans(sicsolb.C)*S*CWb);
+    Wb=unitarize(arma::trans(sicsolb.C.cols(0,CWb.n_cols-1))*S*CWb);
   }
 
   // Check that they are sane
@@ -704,7 +699,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(verbose) printf("\nInitial alpha localization.\n");
 	double measure;
 	// Max 1e5 iterations, gradient norm <= 1e-3
-	orbital_localization(PIPEK_IAO2,*basisp,sicsola.C,sol.P,measure,Wa,verbose,real,1e5,1e-3);
+	orbital_localization(PIPEK_IAO2,*basisp,sicsola.C.cols(0,nocca-1),sol.P,measure,Wa,verbose,real,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -741,7 +736,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(verbose) printf("\nInitial beta localization.\n");
 	double measure;
 	// Max 1e5 iterations, gradient norm <= 1e-3
-	orbital_localization(PIPEK_IAO2,*basisp,sicsolb.C,sol.P,measure,Wb,verbose,real,1e5,1e-3);
+	orbital_localization(PIPEK_IAO2,*basisp,sicsolb.C.cols(0,noccb-1),sol.P,measure,Wb,verbose,real,1e5,1e-3);
 
 	if(verbose) {
 	  printf("\n");
@@ -765,8 +760,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     // are properly integrated over.
 
     // Update Ctilde
-    arma::cx_mat Catilde=sicsola.C*Wa;
-    arma::cx_mat Cbtilde=sicsolb.C*Wb;
+    arma::cx_mat Catilde=sicsola.C.cols(0,Wa.n_rows-1)*Wa;
+    arma::cx_mat Cbtilde=sicsolb.C.cols(0,Wb.n_rows-1)*Wb;
 
     // Stack of density matrices
     std::vector<arma::mat> Pv(nocca+noccb);
@@ -782,7 +777,13 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       fflush(stdout);
       fprintf(stderr,"\n");
     }
-    grid.construct(Pv,dft.gridtol,dft.x_func,dft.c_func);
+    {
+      // Combined orbitals
+      arma::cx_mat Ctilde(Catilde.n_rows,Catilde.n_cols+Cbtilde.n_cols);
+      Ctilde.cols(0,Catilde.n_cols-1)=Catilde;
+      Ctilde.cols(Catilde.n_cols,Catilde.n_cols+Cbtilde.n_cols-1)=Cbtilde;
+      grid.construct(Ctilde,dft.gridtol,dft.x_func,dft.c_func);
+    }
     if(verbose) {
       printf("\n");
       fflush(stdout);
@@ -804,11 +805,11 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       fprintf(stderr,"SIC canonical calculation, alpha spin\n");
   }
   PZSIC_calculate(sicsola,Wa,dft,pzcor,pzh,grid,Etol,maxtol,rmstol,niter,canonical,real);
-  chkptp->cwrite("CWa",sicsola.C*Wa);
+  chkptp->cwrite("CWa",sicsola.C.cols(0,Wa.n_rows-1)*Wa);
   chkptp->write("ESICa",sicsola.E);
   // Compute projected energies
   if(sol.Ha.n_rows == sicsola.Heff.n_rows && sol.Ha.n_cols == sicsola.Heff.n_cols) {
-    arma::cx_mat CW=sicsola.C*Wa;
+    arma::cx_mat CW=sicsola.C.cols(0,Wa.n_rows-1)*Wa;
     arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Ha+sicsola.Heff)*CW));
     chkptp->write("EpSICa",Ep);
   }
@@ -830,11 +831,11 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	fprintf(stderr,"SIC canonical calculation,  beta spin\n");
     }
     PZSIC_calculate(sicsolb,Wb,dft,pzcor,pzh,grid,Etol,maxtol,rmstol,niter,canonical,real);
-    chkptp->cwrite("CWb",sicsolb.C*Wb);
+    chkptp->cwrite("CWb",sicsolb.C.cols(0,Wb.n_rows-1)*Wb);
     chkptp->write("ESICb",sicsolb.E);
     // Compute projected energies
   if(sol.Hb.n_rows == sicsolb.Heff.n_rows && sol.Hb.n_cols == sicsolb.Heff.n_cols) {
-      arma::cx_mat CW=sicsolb.C*Wb;
+    arma::cx_mat CW=sicsolb.C.cols(0,Wb.n_rows-1)*Wb;
       arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Hb+sicsolb.Heff)*CW));
       chkptp->write("EpSICb",Ep);
     }
