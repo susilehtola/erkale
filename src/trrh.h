@@ -31,11 +31,7 @@
  * Output: new orbital coefficients Cnew and pseudo-orbital energies Enew
  */
 void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, double minshift=0.1, bool verbose=true);
-
-namespace TRRH {
-  /// Form the rotation matrix exp(K)
-  arma::mat make_expK(const arma::mat & k);
-};
-
+/// Same, but for complex matrices
+void TRRH_update(const arma::cx_mat & F_AO, const arma::cx_mat & C, const arma::mat & S, arma::cx_mat & Cnew, arma::vec & Enew, size_t nocc, double minshift=0.1, bool verbose=true);
 
 #endif
