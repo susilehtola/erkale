@@ -642,10 +642,10 @@ double compute_potential(const arma::mat & P, const BasisSet & bas, const coords
  */
 double compute_elf(const arma::mat & P, const BasisSet & bas, const coords_t & r);
 
-/// Check orthonormality of molecular orbitals
+/// Check orthonormality of real molecular orbitals
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
-/// Check orthonormality of molecular orbitals
-double check_omorth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
+/// Check orthonormality of complex molecular orbitals
+double check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
 
 #include "eriworker.h"
 
