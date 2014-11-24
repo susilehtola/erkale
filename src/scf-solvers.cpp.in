@@ -139,8 +139,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   rDIIS diis(S,Sinvh,diisorder);
   // ADIIS
   rADIIS adiis;
-  // TRDSM
-  TRDSM trdsm(S);
   // Broyden
   Broyden broyd(verbose);
 
@@ -153,10 +151,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   uDIIS diis(S,Sinvh,diisorder);
   // ADIIS
   uADIIS adiis;
-
-  // TRDSM
-  TRDSM trdsma(S);
-  TRDSM trdsmb(S);
 
   // Broyden
   Broyden broyd_sum(verbose);
@@ -452,17 +446,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #endif
     }
 
-    // Update TRDSM stacks
-    if(usetrdsm) {
-#ifdef RESTRICTED
-      // Need to divide density by two for purification to make sense
-      trdsm.push(sol.en.E,sol.P/2.0,sol.H);
-#else
-      trdsma.push(sol.en.E,sol.Pa,sol.Ha);
-      trdsmb.push(sol.en.E,sol.Pb,sol.Hb);
-#endif
-    }
-
     if(iiter>1 && usebroyden) {
 #ifdef RESTRICTED
       // Update Broyden mixer
@@ -530,26 +513,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
       if(verbose)
 	printf("ADIIS interpolation done in %s.\n",t.elapsed().c_str());
-    }
-
-    // Perform TRDSM update
-    if(usetrdsm) {
-      if(verbose) {
-	printf("Performing trust-region DSM update of Fock operator ... ");
-	fflush(stdout);
-	t.set();
-      }
-#ifdef RESTRICTED
-      sol.H=trdsm.solve();
-#else
-      sol.Ha=trdsma.solve();
-      sol.Hb=trdsmb.solve();
-#endif
-
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
     }
 
     // Perform Broyden interpolation

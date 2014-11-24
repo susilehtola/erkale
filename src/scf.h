@@ -259,8 +259,6 @@ class SCF {
   bool usebroyden;
   /// Use Trust-Region Roothaan-Hall?
   bool usetrrh;
-  /// Use trust-region DSM?
-  bool usetrdsm;
   /// Do line search in level shift?
   bool linesearch;
 

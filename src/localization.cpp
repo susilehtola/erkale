@@ -38,8 +38,6 @@
 #include "stringutil.h"
 #include "stockholder.h"
 #include "timer.h"
-#include "trdsm.h"
-#include "trrh.h"
 
 void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & W, bool verbose, bool real, int maxiter, double Gthr, double Fthr, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
   Timer t;
