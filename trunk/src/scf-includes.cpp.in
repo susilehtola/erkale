@@ -35,7 +35,6 @@
 #include "scf.h"
 #include "stringutil.h"
 #include "timer.h"
-#include "trdsm.h"
 #include "trrh.h"
 
 extern "C" {

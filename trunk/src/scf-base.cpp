@@ -29,18 +29,14 @@
 #include "diis.h"
 #include "global.h"
 #include "guess.h"
-#include "hirshfeldi.h"
 #include "linalg.h"
-#include "localization.h"
 #include "mathf.h"
 #include "properties.h"
 #include "scf.h"
 #include "stringutil.h"
-#include "stockholder.h"
 #include "timer.h"
-#include "trdsm.h"
 #include "trrh.h"
-#include "unitary.h"
+#include "localization.h"
 
 extern "C" {
 #include <gsl/gsl_poly.h>
@@ -83,7 +79,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   useadiis=set.get_bool("UseADIIS");
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
-  usetrdsm=set.get_bool("UseTRDSM");
   linesearch=set.get_bool("LineSearch");
 
   maxiter=set.get_int("MaxIter");
@@ -103,14 +98,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   }
 
-  if(!usediis && !useadiis && !usebroyden && !usetrrh && !usetrdsm && !linesearch && (shift==0.0)) {
+  if(!usediis && !useadiis && !usebroyden && !usetrrh && !linesearch && (shift==0.0)) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to run calculation without an update scheme.\n");
-  }
-
-  if(usetrdsm && (useadiis || usediis || usebroyden || !usetrrh)) {
-    ERROR_INFO();
-    throw std::runtime_error("Use of TRDSM requires use of TRRH and turning off (AE)DIIS and Broyden.\n");
   }
 
   // Nuclear repulsion

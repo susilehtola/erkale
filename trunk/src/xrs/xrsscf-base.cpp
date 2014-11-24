@@ -28,7 +28,6 @@
 #include "solidharmonics.h"
 #include "elements.h"
 #include "timer.h"
-#include "trdsm.h"
 #include "trrh.h"
 #include "lmgrid.h"
 
