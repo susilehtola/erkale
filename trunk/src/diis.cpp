@@ -125,26 +125,26 @@ void uDIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat &
   std::stable_sort(stack.begin(),stack.end());
 }
 
-std::vector<arma::vec> rDIIS::get_error() const {
-  std::vector<arma::vec> err(stack.size());
+arma::mat rDIIS::get_error() const {
+  arma::mat err(stack[0].err.n_elem,stack.size());
   for(size_t i=0;i<stack.size();i++)
-    err[i]=stack[i].err;
+    err.col(i)=stack[i].err;
   return err;
 }
 
-std::vector<arma::vec> uDIIS::get_error() const {
-  std::vector<arma::vec> err(stack.size());
+arma::mat uDIIS::get_error() const {
+  arma::mat err(stack[0].err.n_elem,stack.size());
   for(size_t i=0;i<stack.size();i++)
-    err[i]=stack[i].err;
+    err.col(i)=stack[i].err;
   return err;
 }
 
 arma::vec DIIS::get_weights(bool verbose, bool c1) {
   // Collect error vectors
-  std::vector<arma::vec> errs=get_error();
+  arma::mat errs=get_error();
 
   // Size of LA problem
-  int N=(int) errs.size();
+  int N=(int) errs.n_cols;
 
   // DIIS weights
   arma::vec sol(N);
@@ -156,14 +156,10 @@ arma::vec DIIS::get_weights(bool verbose, bool c1) {
     // Array holding the errors
     arma::mat B(N+1,N+1);
     B.zeros();
-    // RHS vector
-    arma::vec A(N+1);
-    A.zeros();
-
     // Compute errors
     for(int i=0;i<N;i++)
       for(int j=0;j<N;j++) {
-	B(i,j)=arma::dot(errs[i],errs[j]);
+	B(i,j)=arma::dot(errs.col(i),errs.col(j));
       }
     // Fill in the rest of B
     for(int i=0;i<N;i++) {
@@ -171,7 +167,9 @@ arma::vec DIIS::get_weights(bool verbose, bool c1) {
       B(N,i)=-1.0;
     }
 
-    // Fill in A
+    // RHS vector
+    arma::vec A(N+1);
+    A.zeros();
     A(N)=-1.0;
 
     // Solve B*X = A
@@ -181,18 +179,15 @@ arma::vec DIIS::get_weights(bool verbose, bool c1) {
     succ=arma::solve(X,B,A);
 
     if(succ) {
-      // Check that weights are within tolerance
-      for(int i=0;i<N;i++)
-	if(fabs(X(i))>=MAXWEIGHT) {
-	  printf("Large coefficient produced by DIIS. Reducing to %i matrices.\n",N-1);
-	  erase_last();
-	  return get_weights(verbose,c1);
-	}
-
       // Solution is (last element of X is DIIS error)
-      sol.zeros();
-      for(int i=0;i<N;i++)
-	sol(i)=X(i);
+      sol=X.subvec(0,N-1);
+
+      // Check that weights are within tolerance
+      if(arma::max(arma::abs(sol))>=MAXWEIGHT) {
+	printf("Large coefficient produced by DIIS. Reducing to %i matrices.\n",N-1);
+	erase_last();
+	return get_weights(verbose,c1);
+      }
     }
 
     if(!succ) {
@@ -208,11 +203,10 @@ arma::vec DIIS::get_weights(bool verbose, bool c1) {
     // Array holding the errors
     arma::mat B(N,N);
     B.zeros();
-
     // Compute errors
     for(int i=0;i<N;i++)
       for(int j=0;j<N;j++) {
-	B(i,j)=arma::dot(errs[i],errs[j]);
+	B(i,j)=arma::dot(errs.col(i),errs.col(j));
       }
 
     // Solve eigenvectors of B
@@ -222,23 +216,15 @@ arma::vec DIIS::get_weights(bool verbose, bool c1) {
 
     // Normalize weights
     for(int i=0;i<N;i++) {
-      double s=0;
-      s=sum(Q.col(i));
-      Q.col(i)/=s;
+      Q.col(i)/=arma::sum(Q.col(i));
     }
 
     // Choose solution by picking out solution with smallest error
-    std::vector<double> errors(N);
-    // Helper array
-    arma::vec werr(errs[0].n_elem);
+    arma::vec errors(N);
+    arma::mat eQ=errs*Q;
+    // The weighted error is
     for(int i=0;i<N;i++) {
-      // Zero out helper
-      werr.zeros();
-      // Compute weighed error
-      for(int j=0;j<N;j++)
-	werr+=Q(j,i)*errs[j];
-      // The error is
-      errors[i]=arma::dot(werr,werr);
+      errors(i)=arma::norm(eQ.col(i),2);
     }
 
     // Find minimal error
@@ -247,13 +233,9 @@ arma::vec DIIS::get_weights(bool verbose, bool c1) {
     for(int i=0;i<N;i++) {
       if(errors[i]<mine) {
 	// Check weights
-	bool ok=1;
-	for(int j=0;j<N;j++)
-	  if(fabs(Q(j,i))>=MAXWEIGHT)
-	    ok=0;
-
+	bool ok=arma::max(arma::abs(Q.col(i)))<MAXWEIGHT;
 	if(ok) {
-	  mine=errors[i];
+	  mine=errors(i);
 	  minloc=i;
 	}
       }
@@ -264,16 +246,16 @@ arma::vec DIIS::get_weights(bool verbose, bool c1) {
       sol=Q.col(minloc);
     } else {
       printf("C2-DIIS did not find a suitable solution. Mixing matrices instead.\n");
-
+      
       sol.zeros();
       sol(0)=0.5;
       sol(1)=0.5;
     }
   }
-
+  
   if(verbose)
     arma::trans(sol).print("DIIS weights");
-
+  
   return sol;
 }
 
