@@ -96,7 +96,7 @@ class DIIS {
   size_t imax;
 
   /// Get errors
-  virtual std::vector<arma::vec> get_error() const=0;
+  virtual arma::mat get_error() const=0;
   /// Reduce size of stack by one
   virtual void erase_last()=0;
 
@@ -119,7 +119,7 @@ class rDIIS: protected DIIS {
   std::vector<diis_unpol_entry_t> stack;
 
   /// Get errors
-  std::vector<arma::vec> get_error() const;
+  arma::mat get_error() const;
   /// Reduce size of stack by one
   void erase_last();
 
@@ -148,7 +148,7 @@ class uDIIS: protected DIIS {
   std::vector<diis_pol_entry_t> stack;
 
   /// Get errors
-  std::vector<arma::vec> get_error() const;
+  arma::mat get_error() const;
   /// Reduce size of stack by one
   void erase_last();
 
