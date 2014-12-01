@@ -110,4 +110,14 @@ arma::mat orthonormalize(const arma::mat & S, const arma::mat & C);
 /// Incomplete Cholesky factorization of matrix M, use n vectors
 arma::mat incomplete_cholesky(const arma::mat & M, size_t n);
 
+/**
+ * Find natural orbitals from P. Orbitals returned in decreasing occupation number.
+ */
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs);
+
+/**
+ * Find natural orbitals from P. Orbitals returned in decreasing occupation number.
+ */
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::vec & occs);
+
 #endif

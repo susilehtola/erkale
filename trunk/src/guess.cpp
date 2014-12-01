@@ -16,7 +16,7 @@
 
 #include "guess.h"
 #include "checkpoint.h"
-#include "scf.h"
+#include "linalg.h"
 #include "stringutil.h"
 #include "timer.h"
 #include <algorithm>
