@@ -528,3 +528,45 @@ arma::mat incomplete_cholesky(const arma::mat & M, size_t n) {
 
   return C;
 }
+
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {
+  // Get canonical half-overlap and half-inverse overlap matrices
+  arma::mat Sh, Sinvh;
+  S_half_invhalf(S,Sh,Sinvh,true);
+
+  // P in orthonormal basis is
+  arma::mat P_orth=arma::trans(Sh)*P*Sh;
+
+  // Diagonalize P to get NOs in orthonormal basis.
+  arma::vec Pval;
+  arma::mat Pvec;
+  eig_sym_ordered(Pval,Pvec,P_orth);
+
+  // Reverse ordering to get decreasing eigenvalues
+  occs.zeros(Pval.n_elem);
+  arma::mat Pv(Pvec.n_rows,Pvec.n_cols);
+  for(size_t i=0;i<Pval.n_elem;i++) {
+    size_t idx=Pval.n_elem-1-i;
+    occs(i)=Pval(idx);
+    Pv.col(i)=Pvec.col(idx);
+  }
+
+  /* Get NOs in AO basis. The natural orbital is written in the
+     orthonormal basis as
+
+     |i> = x_ai |a> = x_ai s_ja |j>
+     = s_ja x_ai |j>
+  */
+
+  // The matrix that takes us from AO to NO is
+  AO_to_NO=Sinvh*Pv;
+  // and the one that takes us from NO to AO is
+  NO_to_AO=arma::trans(Sh*Pv);
+}
+
+
+void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::vec & occs) {
+  arma::mat tmp;
+  form_NOs(P,S,AO_to_NO,tmp,occs);
+}
+
