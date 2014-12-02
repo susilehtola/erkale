@@ -21,85 +21,22 @@
 #include "mathf.h"
 #include "stringutil.h"
 
-void eig_sym_ordered(arma::vec & eigval, arma::mat & eigvec, const arma::mat & X) {
-  /* Solve eigenvalues of symmetric matrix with guarantee
-     of ordering of eigenvalues from smallest to biggest */
-
-  // Solve eigenvalues and eigenvectors
-  bool ok=arma::eig_sym(eigval,eigvec,X);
-  if(!ok) {
-    ERROR_INFO();
-    printf("Unable to diagonalize matrix!\n");
-    X.print("X");
-    throw std::runtime_error("Error in eig_sym.\n");
-  }
-
-  // Sort vectors
-  sort_eigvec(eigval,eigvec);
+void sort_eigvec(arma::vec & eigval, arma::mat & eigvec) {
+  sort_eigvec_wrk<double>(eigval,eigvec);
 }
+
+void sort_eigvec(arma::vec & eigval, arma::cx_mat & eigvec) {
+  sort_eigvec_wrk< std::complex<double> >(eigval,eigvec);
+}
+
+void eig_sym_ordered(arma::vec & eigval, arma::mat & eigvec, const arma::mat & X) {
+  eig_sym_ordered_wrk<double>(eigval,eigvec,X);
+} 
 
 void eig_sym_ordered(arma::vec & eigval, arma::cx_mat & eigvec, const arma::cx_mat & X) {
-  /* Solve eigenvalues of symmetric matrix with guarantee
-     of ordering of eigenvalues from smallest to biggest */
+  eig_sym_ordered_wrk< std::complex<double> >(eigval,eigvec,X);
+} 
 
-  // Solve eigenvalues and eigenvectors
-  bool ok=arma::eig_sym(eigval,eigvec,X);
-  if(!ok) {
-    ERROR_INFO();
-    printf("Unable to diagonalize matrix!\n");
-    X.print("X");
-    throw std::runtime_error("Error in eig_sym.\n");
-  }
-
-  // Sort vectors
-  sort_eigvec(eigval,eigvec);
-}
-
-bool operator<(const orbital_t & lhs, const orbital_t & rhs) {
-  return lhs.E < rhs.E;
-}
-
-bool operator<(const corbital_t & lhs, const corbital_t & rhs) {
-  return lhs.E < rhs.E;
-}
-
-void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec) {
-  if(eigval.n_elem != eigvec.n_cols) {
-    ERROR_INFO();
-    throw std::runtime_error("Eigenvalue vector does not correspond to eigenvector matrix!\n");
-  }
-
-  // Helper
-  std::vector<orbital_t> orbs(eigval.n_elem);
-  for(size_t io=0;io<eigval.n_elem;io++) {
-    orbs[io].E=eigval(io);
-    orbs[io].c=eigvec.col(io);
-  }
-  std::stable_sort(orbs.begin(),orbs.end());
-  for(size_t io=0;io<eigval.n_elem;io++) {
-    eigval(io)=orbs[io].E;
-    eigvec.col(io)=orbs[io].c;
-  }
-}
-
-void sort_eigvec(arma::colvec & eigval, arma::cx_mat & eigvec) {
-  if(eigval.n_elem != eigvec.n_cols) {
-    ERROR_INFO();
-    throw std::runtime_error("Eigenvalue vector does not correspond to eigenvector matrix!\n");
-  }
-
-  // Helper
-  std::vector<corbital_t> orbs(eigval.n_elem);
-  for(size_t io=0;io<eigval.n_elem;io++) {
-    orbs[io].E=eigval(io);
-    orbs[io].c=eigvec.col(io);
-  }
-  std::stable_sort(orbs.begin(),orbs.end());
-  for(size_t io=0;io<eigval.n_elem;io++) {
-    eigval(io)=orbs[io].E;
-    eigvec.col(io)=orbs[io].c;
-  }
-}
 
 arma::mat CholeskyOrth(const arma::mat & S) {
   // Cholesky orthogonalization

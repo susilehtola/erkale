@@ -54,11 +54,11 @@ template<typename T> arma::Mat<T> make_expK(const arma::Mat<T> & kappa) {
   // Do eigendecomposition
   arma::vec kktval;
   arma::Mat<T> kktvec;
-  eig_sym_ordered(kktval,kktvec,kkt);
+  eig_sym_ordered_wrk<T>(kktval,kktvec,kkt);
 
   arma::vec ktkval;
   arma::Mat<T> ktkvec;
-  eig_sym_ordered(ktkval,ktkvec,ktk);
+  eig_sym_ordered_wrk<T>(ktkval,ktkvec,ktk);
 
   // Clean up eigenvalues
   for(size_t i=0;i<kktval.n_elem;i++) {
@@ -147,11 +147,11 @@ template<typename T> void TRRH_update_wrk(const arma::Mat<T> & F_AO, const arma:
 
   arma::Mat<T> oo_vec;
   arma::vec oo_eig;
-  eig_sym_ordered(oo_eig,oo_vec,F_oo);
+  eig_sym_ordered_wrk<T>(oo_eig,oo_vec,F_oo);
 
   arma::Mat<T> vv_vec;
   arma::vec vv_eig;
-  eig_sym_ordered(vv_eig,vv_vec,F_vv);
+  eig_sym_ordered_wrk<T>(vv_eig,vv_vec,F_vv);
 
   // Transform orbitals into new basis
   arma::Mat<T> C_ov(C);
