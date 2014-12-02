@@ -188,3 +188,39 @@ arma::mat ERItable::calcK(const arma::mat & R) const {
 
   return K;
 }
+
+arma::cx_mat ERItable::calcK(const arma::cx_mat & R) const {
+  // Calculate exchange matrix
+
+  // Size of basis set
+  size_t N=R.n_cols;
+
+  // Returned matrix
+  arma::cx_mat K(N,N);
+  K.zeros();
+
+  // Loop over matrix elements
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ip=0;ip<pairs.size();ip++) {
+    // The relevant indices are
+    size_t i=pairs[ip].i;
+    size_t j=pairs[ip].j;
+
+    // The (ij) element in the K array
+    std::complex<double> el=0.0;
+
+    // Loop over density matrix
+    for(size_t k=0;k<N;k++)
+      for(size_t l=0;l<N;l++) {
+	el+=R(k,l)*getERI(i,k,j,l);
+      }
+
+    // Store result
+    K(i,j)=el;
+    K(j,i)=el;
+  }
+
+  return K;
+}

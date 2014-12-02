@@ -103,9 +103,11 @@ class ERItable {
   size_t get_N() const;
 
   /// Form Coulomb matrix
-  arma::mat calcJ(const arma::mat & R) const;
+  arma::mat calcJ(const arma::mat & P) const;
   /// Form exchange matrix
-  arma::mat calcK(const arma::mat & R) const;
+  arma::mat calcK(const arma::mat & P) const;
+  /// Form exchange matrix
+  arma::cx_mat calcK(const arma::cx_mat & P) const;
 };
 
 #include "basis.h"
