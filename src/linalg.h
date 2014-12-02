@@ -24,42 +24,73 @@
 
 #include <armadillo>
 
+/// Helper for eigenvector sorts
+template<typename T> struct eigenvector {
+  /// Energy
+  double E;
+  /// Eigenvector
+  arma::Col<T> c;
+};
+
+/// Helper for sorts
+template<typename T> inline bool operator<(const struct eigenvector<T> & lhs, const struct eigenvector<T> & rhs) {
+  return lhs.E < rhs.E;
+}
+
+/// Sort vectors in order of increasing eigenvalue
+template<typename T> inline void sort_eigvec_wrk(arma::vec & eigval, arma::Mat<T> & eigvec) {
+  if(eigval.n_elem != eigvec.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Eigenvalue vector does not correspond to eigenvector matrix!\n");
+  }
+
+  // Helper
+  std::vector< struct eigenvector<T> > orbs(eigval.n_elem);
+  for(size_t io=0;io<eigval.n_elem;io++) {
+    orbs[io].E=eigval(io);
+    orbs[io].c=eigvec.col(io);
+  }
+  std::stable_sort(orbs.begin(),orbs.end());
+  for(size_t io=0;io<eigval.n_elem;io++) {
+    eigval(io)=orbs[io].E;
+    eigvec.col(io)=orbs[io].c;
+  }
+}
+
+/// Wrapper
+void sort_eigvec(arma::vec & eigval, arma::mat & eigvec);
+/// Sort vectors in order of increasing eigenvalue
+void sort_eigvec(arma::vec & eigval, arma::cx_mat & eigvec);
+
 /**
  * Solve eigenvalues of symmetric matrix with guarantee
  * of eigenvalue ordering from smallest to biggest */
-void eig_sym_ordered(arma::colvec & eigval, arma::mat & eigvec, const arma::mat & X);
+template<typename T> inline void eig_sym_ordered_wrk(arma::vec & eigval, arma::Mat<T> & eigvec, const arma::Mat<T> & X) {
+  /* Solve eigenvalues of symmetric matrix with guarantee
+     of ordering of eigenvalues from smallest to biggest */
 
+  // Solve eigenvalues and eigenvectors
+  bool ok=arma::eig_sym(eigval,eigvec,X);
+  if(!ok) {
+    ERROR_INFO();
+    printf("Unable to diagonalize matrix!\n");
+    X.print("X");
+    throw std::runtime_error("Error in eig_sym.\n");
+  }
+
+  // Sort vectors
+  sort_eigvec_wrk<T>(eigval,eigvec);
+}
+
+
+/**
+ * Solve eigenvalues of symmetric matrix with guarantee
+ * of eigenvalue ordering from smallest to biggest */
+void eig_sym_ordered(arma::vec & eigval, arma::mat & eigvec, const arma::mat & X);
 /**
  * Solve eigenvalues of Hermitian matrix with guarantee
  * of eigenvalue ordering from smallest to biggest */
 void eig_sym_ordered(arma::vec & eigval, arma::cx_mat & eigvec, const arma::cx_mat & X);
-
-/// Helper for sorts
-typedef struct {
-  /// Energy
-  double E;
-  /// Eigenvector
-  arma::vec c;
-} orbital_t;
-
-/// Helper for sorts
-bool operator<(const orbital_t & lhs, const orbital_t & rhs);
-
-/// Helper for sorts
-typedef struct {
-  /// Energy
-  double E;
-  /// Eigenvector
-  arma::cx_vec c;
-} corbital_t;
-
-/// Helper for sorts
-bool operator<(const corbital_t & lhs, const corbital_t & rhs);
-
-/// Sort vectors in order of increasing eigenvalue
-void sort_eigvec(arma::colvec & eigval, arma::mat & eigvec);
-/// Sort vectors in order of increasing eigenvalue
-void sort_eigvec(arma::colvec & eigval, arma::cx_mat & eigvec);
 
 /* Orthogonalization routines */
 

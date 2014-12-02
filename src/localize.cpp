@@ -152,7 +152,7 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
   arma::mat S=basis.overlap();
 
   // Atomic orbitals
-  std::vector<orbital_t> orbs;
+  std::vector<struct eigenvector<double> > orbs;
 
   // Loop over atoms
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
@@ -183,7 +183,7 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
     
     // Store the orbitals
     for(size_t iorb=0;iorb<Cat.n_cols;iorb++) {
-      orbital_t hlp;
+      struct eigenvector<double> hlp;
       // Occupation
       hlp.E=occs(iorb);
       // Orbital coefficients
