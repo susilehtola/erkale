@@ -58,6 +58,7 @@
 #include "linalg.h"
 #include "stringutil.h"
 #include "elements.h"
+#include "unitary.h"
 
 #ifdef _OPENMP
 #include <omp.h>
