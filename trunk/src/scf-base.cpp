@@ -974,32 +974,34 @@ void SCF::gwh_guess(uscf_t & sol) const {
   diagonalize(S,Sinvh,sol);
 }
 
-double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him, double shift, const arma::mat & S, const arma::mat & Sinvh, const arma::mat & Pone) {
-  // Matrix is really
-  arma::cx_mat Htr=H+std::complex<double>(0.0,1.0)*Him;
-
-  // Hamiltonian in orthonormal basis
-  if(shift==0.0)
-    Htr=arma::trans(Sinvh)*Htr*Sinvh;
-  else
-    Htr=arma::trans(Sinvh)*(Htr-shift*S*Pone*S)*Sinvh;
-
-  // Compute eigenvectors
-  arma::vec Ecplx;
-  arma::cx_mat Corbs;
-  eig_sym_ordered(Ecplx,Corbs,Htr);
-
-  // Transform back to non-orthogonal basis
-  Corbs=Sinvh*Corbs;
-
+void imag_lost(const rscf_t & sol, const arma::mat & S, double & d) {
   // Compute amount of electrons
-  int Nel=(int) round(arma::trace(Pone*S));
+  int Nel=(int) round(arma::trace(S*sol.P))/2;
+  
+  // MO overlap matrix
+  arma::cx_mat MOovl=arma::trans(sol.C.cols(0,Nel-1))*S*sol.cC.cols(0,Nel-1);
+  
+  // Fraction of occupied subspace spanned is
+  d=std::real(arma::trace(MOovl*arma::trans(MOovl)));
+}
+
+void imag_lost(const uscf_t & sol, const arma::mat & S, double & da, double & db) {
+  // Compute amount of electrons
+  int Nela=(int) round(arma::trace(S*sol.Pa));
+  int Nelb=(int) round(arma::trace(S*sol.Pb));
 
   // MO overlap matrix
-  arma::cx_mat MOovl=arma::trans(C.cols(0,Nel-1))*S*Corbs.cols(0,Nel-1);
-
-  // Fraction of occupied subspace spanned is
-  return std::real(arma::trace(MOovl*arma::trans(MOovl)))/Nel;
+  if(sol.cCa.n_cols == sol.Ca.n_cols) {
+    arma::cx_mat MOovla=arma::trans(sol.Ca.cols(0,Nela-1))*S*sol.cCa.cols(0,Nela-1);
+    da=std::real(arma::trace(MOovla*arma::trans(MOovla)));
+  } else
+    da=0.0;
+  
+  if(sol.cCa.n_cols == sol.Ca.n_cols) {
+    arma::cx_mat MOovlb=arma::trans(sol.Cb.cols(0,Nelb-1))*S*sol.cCb.cols(0,Nelb-1);
+    db=std::real(arma::trace(MOovlb*arma::trans(MOovlb)));
+  } else
+    db=0.0;
 }
 
 template<typename T> void diagonalize_wrk(const arma::mat & S, const arma::mat & Sinvh, const arma::mat & P, const arma::Mat<T> & H, double shift, arma::Mat<T> & C, arma::vec & E) {

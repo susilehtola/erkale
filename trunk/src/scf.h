@@ -397,7 +397,9 @@ class SCF {
 };
 
 /// Determine effect of imaginary part of Fock operator on eigenvectors
-double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him, double shift, const arma::mat & S, const arma::mat & Sinvh, const arma::mat & Pone);
+void imag_lost(const rscf_t & sol, const arma::mat & S, double & d);
+/// Determine effect of imaginary part of Fock operator on eigenvectors
+void imag_lost(const uscf_t & sol, const arma::mat & S, double & da, double & db);
 
 /// Diagonalize Fock matrix
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift=0.0);
