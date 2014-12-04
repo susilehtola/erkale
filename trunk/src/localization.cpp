@@ -14,8 +14,6 @@
  * of the License, or (at your option) any later version.
  */
 
-
-
 #include <armadillo>
 #include <cstdio>
 #include <cfloat>
@@ -38,6 +36,8 @@
 #include "stringutil.h"
 #include "stockholder.h"
 #include "timer.h"
+
+#define COMPLEX1 std::complex<double>(1.0,0.0)
 
 void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & W, bool verbose, bool real, int maxiter, double Gthr, double Fthr, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
   Timer t;
@@ -1236,10 +1236,10 @@ double PZSIC::cost_func(const arma::cx_mat & Wv) {
     throw std::runtime_error("Matrix is not square!\n");
   }
   
-  if(Wv.n_rows > sol.C.n_cols) {
+  if(Wv.n_rows > sol.cC.n_cols) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << Wv.n_rows << " rotations vs " << sol.C.n_cols << "CMOs!\n";
+    oss << "Matrix does not match size of problem: " << Wv.n_rows << " rotations vs " << sol.cC.n_cols << "CMOs!\n";
     throw std::runtime_error(oss.str());
   }
 
@@ -1248,7 +1248,7 @@ double PZSIC::cost_func(const arma::cx_mat & Wv) {
     // Compute orbital energies
     W=Wv;
     Forb.clear();
-    solver->PZSIC_Fock(Forb,Eorb,sol.C,Wv,dft,*grid,false);
+    solver->PZSIC_Fock(Forb,Eorb,sol.cC,Wv,dft,*grid,false);
   }
   if(Eorb.size() != Wv.n_cols) {
     ERROR_INFO();
@@ -1277,10 +1277,10 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
     throw std::runtime_error("Matrix is not square!\n");
   }
 
-  if(Wv.n_rows > sol.C.n_cols) {
+  if(Wv.n_rows > sol.cC.n_cols) {
     ERROR_INFO();
     std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << Wv.n_rows << " rotations vs " << sol.C.n_cols << "CMOs!\n";
+    oss << "Matrix does not match size of problem: " << Wv.n_rows << " rotations vs " << sol.cC.n_cols << "CMOs!\n";
     throw std::runtime_error(oss.str());
   }
 
@@ -1288,7 +1288,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
   if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON || Forb.size() != Wv.n_cols) {
     // Compute orbital-dependent Fock matrices
     W=Wv;
-    solver->PZSIC_Fock(Forb,Eorb,sol.C,Wv,dft,*grid,true);
+    solver->PZSIC_Fock(Forb,Eorb,sol.cC,Wv,dft,*grid,true);
   }
   if(Eorb.size() != Wv.n_cols) {
     ERROR_INFO();
@@ -1304,7 +1304,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
   }
 
   // Get transformed orbitals
-  arma::cx_mat Ctilde=sol.C.cols(0,Wv.n_cols-1)*Wv;
+  arma::cx_mat Ctilde=sol.cC.cols(0,Wv.n_cols-1)*Wv;
   // and the total SIC contribution.
   HSIC.zeros(Ctilde.n_rows,Ctilde.n_rows);
   if(ham==PZSYMM) {
@@ -1312,7 +1312,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
     arma::mat S=solver->get_S();
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       arma::cx_mat Pio=Ctilde.col(io)*arma::trans(Ctilde.col(io));
-      arma::mat Fio=Forb[io];
+      arma::cx_mat Fio=Forb[io];
       HSIC+=(Fio*Pio*S + S*Pio*Fio)/2.0;
     }
 
@@ -1327,19 +1327,19 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
     arma::mat Sinvh=solver->get_Sinvh();
 
     // Construct virtual space projector
-    arma::mat O(S);
+    arma::cx_mat O(S*COMPLEX1);
     O.zeros();
     // Add in total possible density
     for(size_t i=0;i<Sinvh.n_cols;i++)
-      O+=Sinvh.col(i)*arma::trans(Sinvh.col(i));
+      O+=Sinvh.col(i)*arma::trans(Sinvh.col(i))*COMPLEX1;
     // and substract the occupied density
-    for(size_t io=0;io<sol.C.n_cols;io++)
-      O-=sol.C.col(io)*arma::trans(sol.C.col(io));
+    for(size_t io=0;io<sol.cC.n_cols;io++)
+      O-=sol.cC.col(io)*arma::trans(sol.cC.col(io));
 
     // Construct Hamiltonian
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       arma::cx_mat Pio=Ctilde.col(io)*arma::trans(Ctilde.col(io));
-      arma::mat Fio=Forb[io];
+      arma::cx_mat Fio=Forb[io];
       HSIC+=S*( Pio*Fio*Pio + O*Fio*Pio + Pio*Fio*O )*S;
     }
 
@@ -1356,7 +1356,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
   der.zeros(Ctilde.n_cols,Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
     for(size_t jo=0;jo<Ctilde.n_cols;jo++)
-      der(io,jo)=arma::as_scalar(arma::trans(sol.C.col(io))*Forb[jo]*Ctilde.col(jo));
+      der(io,jo)=arma::as_scalar(arma::trans(sol.cC.col(io))*Forb[jo]*Ctilde.col(jo));
 
   // Kappa is
   kappa.zeros(Ctilde.n_cols,Ctilde.n_cols);

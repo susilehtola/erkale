@@ -42,6 +42,8 @@ extern "C" {
 #include <gsl/gsl_poly.h>
 }
 
+#define COMPLEX1 std::complex<double>(1.0,0.0)
+#define COMPLEXI std::complex<double>(0.0,1.0)
 
 enum guess_t parse_guess(const std::string & val) {
   if(stricmp(val,"Core")==0)
@@ -339,7 +341,7 @@ arma::mat SCF::get_Hcore() const {
   return Hcore;
 }
 
-void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock) {
+void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock) {
   // Compute the orbital-dependent Fock matrices
   Eorb.resize(W.n_cols);
   if(fock)
@@ -375,7 +377,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       Eorb[io]=0.5*(1-kfrac)*arma::trace(Porb[io]*Jorb[io]);
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
-	Forb[io]=(1-kfrac)*Jorb[io];
+	Forb[io]=(1-kfrac)*Jorb[io]*COMPLEX1;
     
   } else {
     if(!direct) {
@@ -386,7 +388,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	// and Coulomb energy
 	Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
 	if(fock)
-	  Forb[io]=Jorb;
+	  Forb[io]=Jorb*COMPLEX1;
       }
     } else {
       // HF coulomb/exchange not implemented
@@ -412,7 +414,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
     t.set();
 
     std::vector<double> Nelnum; // Numerically integrated density
-    std::vector<arma::mat> XC; // Exchange-correlation matrices
+    std::vector<arma::cx_mat> XC; // Exchange-correlation matrices
     std::vector<double> Exc; // Exchange-correlation energy
 
     grid.eval_Fxc(dft.x_func,dft.c_func,C,W,XC,Exc,Nelnum,fock);
@@ -471,6 +473,10 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   sicsol.H=sol.H;
   sicsol.P=sol.P/2.0;
   sicsol.C=sol.C;
+  if(sol.cC.n_rows == sol.C.n_rows && sol.cC.n_cols == sol.C.n_cols)
+    sicsol.cC=sol.cC;
+  else
+    sicsol.cC=sol.C*COMPLEX1;
 
   // Grid to use in integration
   DFTGrid grid(ogrid);
@@ -484,7 +490,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     arma::cx_mat CW;
     chkptp->cread("CW",CW);
     // The starting guess is the unitarized version of the overlap
-    W=unitarize(arma::trans(sicsol.C.cols(0,CW.n_cols-1))*S*CW);
+    W=unitarize(arma::trans(sicsol.cC.cols(0,CW.n_cols-1))*S*CW);
   }
   // Check that it is sane
   if(W.n_rows != nocc || W.n_cols != nocc) {
@@ -528,7 +534,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     // are properly integrated over.
 
     // Update Ctilde
-    arma::cx_mat Ctilde=sicsol.C.cols(0,W.n_cols-1)*W;
+    arma::cx_mat Ctilde=sicsol.cC.cols(0,W.n_cols-1)*W;
 
     // Stack of density matrices
     std::vector<arma::mat> Pv(nocc);
@@ -566,17 +572,17 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 
     /*
     printf("\n");
-    analyze_orbitals(*basisp,sicsol.C*W);
+    analyze_orbitals(*basisp,sicsol.cC*W);
     printf("\n");
     */
   }
   // Save matrix
-  chkptp->cwrite("CW",sicsol.C.cols(0,W.n_rows-1)*W);
+  chkptp->cwrite("CW",sicsol.cC.cols(0,W.n_rows-1)*W);
   // Save SI energies
   chkptp->write("ESIC",sicsol.E);
   // Compute projected energies
   if(sol.H.n_rows == sicsol.Heff.n_rows && sol.H.n_cols == sicsol.Heff.n_cols) {
-    arma::cx_mat CW=sicsol.C.cols(0,W.n_cols-1)*W;
+    arma::cx_mat CW=sicsol.cC.cols(0,W.n_cols-1)*W;
     arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sicsol.Heff)*CW));
     chkptp->write("EpSIC",Ep);
   }
@@ -640,11 +646,20 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   sicsola.H=sol.Ha;
   sicsola.P=sol.Pa;
   sicsola.C=sol.Ca;
+  if(sol.cCa.n_rows == sol.Ca.n_rows && sol.cCa.n_cols == sol.Ca.n_cols)
+    sicsola.cC=sol.cCa;
+  else
+    sicsola.cC=sol.Ca*COMPLEX1;
 
   rscf_t sicsolb;
   sicsolb.H=sol.Hb;
   sicsolb.P=sol.Pb;
   sicsolb.C=sol.Cb;
+  sicsola.cC=sol.cCa;
+  if(sol.cCb.n_rows == sol.Cb.n_rows && sol.cCb.n_cols == sol.Cb.n_cols)
+    sicsolb.cC=sol.cCb;
+  else
+    sicsolb.cC=sol.Cb*COMPLEX1;
 
   // Grid to use in integration
   DFTGrid grid(ogrid);
@@ -658,7 +673,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     arma::cx_mat CWa;
     chkptp->cread("CWa",CWa);
     // The starting guess is the unitarized version of the overlap
-    Wa=unitarize(arma::trans(sicsola.C.cols(0,CWa.n_cols-1))*S*CWa);
+    Wa=unitarize(arma::trans(sicsola.cC.cols(0,CWa.n_cols-1))*S*CWa);
   }
   if(chkptp->exist("CWb.re")) {
     if(verbose) printf("Read beta localization matrix from checkpoint.\n");
@@ -667,7 +682,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     arma::cx_mat CWb;
     chkptp->cread("CWb",CWb);
     // The starting guess is the unitarized version of the overlap
-    Wb=unitarize(arma::trans(sicsolb.C.cols(0,CWb.n_cols-1))*S*CWb);
+    Wb=unitarize(arma::trans(sicsolb.cC.cols(0,CWb.n_cols-1))*S*CWb);
   }
 
   // Check that they are sane
@@ -750,8 +765,8 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     // are properly integrated over.
 
     // Update Ctilde
-    arma::cx_mat Catilde=sicsola.C.cols(0,Wa.n_rows-1)*Wa;
-    arma::cx_mat Cbtilde=sicsolb.C.cols(0,Wb.n_rows-1)*Wb;
+    arma::cx_mat Catilde=sicsola.cC.cols(0,Wa.n_rows-1)*Wa;
+    arma::cx_mat Cbtilde=sicsolb.cC.cols(0,Wb.n_rows-1)*Wb;
 
     // Stack of density matrices
     std::vector<arma::mat> Pv(nocca+noccb);
@@ -795,11 +810,11 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       fprintf(stderr,"SIC canonical calculation, alpha spin\n");
   }
   PZSIC_calculate(sicsola,Wa,dft,pzcor,pzh,grid,Etol,maxtol,rmstol,niter,canonical,real);
-  chkptp->cwrite("CWa",sicsola.C.cols(0,Wa.n_rows-1)*Wa);
+  chkptp->cwrite("CWa",sicsola.cC.cols(0,Wa.n_rows-1)*Wa);
   chkptp->write("ESICa",sicsola.E);
   // Compute projected energies
   if(sol.Ha.n_rows == sicsola.Heff.n_rows && sol.Ha.n_cols == sicsola.Heff.n_cols) {
-    arma::cx_mat CW=sicsola.C.cols(0,Wa.n_rows-1)*Wa;
+    arma::cx_mat CW=sicsola.cC.cols(0,Wa.n_rows-1)*Wa;
     arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Ha+sicsola.Heff)*CW));
     chkptp->write("EpSICa",Ep);
   }
@@ -811,7 +826,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       
       /*
 	printf("\n");
-	analyze_orbitals(*basisp,sicsol.C*W);
+	analyze_orbitals(*basisp,sicsol.cC*W);
 	printf("\n");
       */
 
@@ -821,11 +836,11 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	fprintf(stderr,"SIC canonical calculation,  beta spin\n");
     }
     PZSIC_calculate(sicsolb,Wb,dft,pzcor,pzh,grid,Etol,maxtol,rmstol,niter,canonical,real);
-    chkptp->cwrite("CWb",sicsolb.C.cols(0,Wb.n_rows-1)*Wb);
+    chkptp->cwrite("CWb",sicsolb.cC.cols(0,Wb.n_rows-1)*Wb);
     chkptp->write("ESICb",sicsolb.E);
     // Compute projected energies
   if(sol.Hb.n_rows == sicsolb.Heff.n_rows && sol.Hb.n_cols == sicsolb.Heff.n_cols) {
-    arma::cx_mat CW=sicsolb.C.cols(0,Wb.n_rows-1)*Wb;
+    arma::cx_mat CW=sicsolb.cC.cols(0,Wb.n_rows-1)*Wb;
       arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Hb+sicsolb.Heff)*CW));
       chkptp->write("EpSICb",Ep);
     }
@@ -837,7 +852,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 
     /*
       printf("\n");
-      analyze_orbitals(*basisp,sicsol.C*W);
+      analyze_orbitals(*basisp,sicsol.cC*W);
       printf("\n");
     */
   }
@@ -987,52 +1002,71 @@ double imag_diag(const arma::mat & C, const arma::mat & H, const arma::mat & Him
   return std::real(arma::trace(MOovl*arma::trans(MOovl)))/Nel;
 }
 
-void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift) {
-  arma::mat Horth;
-  arma::mat orbs;
+template<typename T> void diagonalize_wrk(const arma::mat & S, const arma::mat & Sinvh, const arma::mat & P, const arma::Mat<T> & H, double shift, arma::Mat<T> & C, arma::vec & E) {
   // Transform Hamiltonian into orthogonal basis
+  arma::Mat<T> Horth;
   if(shift==0.0)
-    Horth=arma::trans(Sinvh)*sol.H*Sinvh;
+    Horth=arma::trans(Sinvh)*H*Sinvh;
   else
-    Horth=arma::trans(Sinvh)*(sol.H-shift*S*sol.P/2.0*S)*Sinvh;
+    Horth=arma::trans(Sinvh)*(H-shift*S*P/2.0*S)*Sinvh;
   // Update orbitals and energies
-  eig_sym_ordered(sol.E,orbs,Horth);
+  arma::Mat<T> orbs;
+  eig_sym_ordered_wrk(E,orbs,Horth);
   // Transform back to non-orthogonal basis
-  sol.C=Sinvh*orbs;
-
+  C=Sinvh*orbs;
+  
   if(shift!=0.0) {
     // Orbital energies occupied by shift, so recompute these
-    sol.E=arma::diagvec(arma::trans(sol.C)*sol.H*sol.C);
+    E=arma::real(arma::diagvec(arma::trans(C)*H*C));
   }
+}
 
-  // Check orthonormality
+void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift) {
+  diagonalize_wrk<double>(S,Sinvh,sol.P/2.0,sol.H,shift,sol.C,sol.E);
   check_orth(sol.C,S,false);
+
+  // Complex orbitals?
+  if(sol.Heff_im.n_rows == sol.H.n_rows && sol.Heff_im.n_cols == sol.H.n_cols) {
+    // Generate complex hamiltonian
+    arma::cx_mat Hc(sol.H*COMPLEX1 + sol.Heff_im*COMPLEXI);
+    arma::vec Etmp;
+    diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.P/2.0,Hc,shift,sol.cC,Etmp);
+  } else {
+    arma::cx_mat Ch;
+    sol.cC=Ch;
+  }
 }
 
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol, double shift) {
-  arma::mat Horth;
-  arma::mat orbs;
-
-  if(shift==0.0)
-    Horth=trans(Sinvh)*sol.Ha*Sinvh;
-  else
-    Horth=trans(Sinvh)*(sol.Ha-shift*S*sol.Pa*S)*Sinvh;
-  eig_sym_ordered(sol.Ea,orbs,Horth);
-  sol.Ca=Sinvh*orbs;
+  diagonalize_wrk<double>(S,Sinvh,sol.Pa,sol.Ha,shift,sol.Ca,sol.Ea);
   check_orth(sol.Ca,S,false);
-  if(shift!=0.0)
-    sol.Ea=arma::diagvec(arma::trans(sol.Ca)*sol.Ha*sol.Ca);
 
-  if(shift==0.0)
-    Horth=trans(Sinvh)*sol.Hb*Sinvh;
-  else
-    Horth=trans(Sinvh)*(sol.Hb-shift*S*sol.Pb*S)*Sinvh;
-  eig_sym_ordered(sol.Eb,orbs,Horth);
-  sol.Cb=Sinvh*orbs;
+  // Complex orbitals?
+  if(sol.Heffa_im.n_rows == sol.Ha.n_rows && sol.Heffa_im.n_cols == sol.Ha.n_cols) {
+    // Generate complex hamiltonian
+    arma::cx_mat Hc(sol.Ha*COMPLEX1 + sol.Heffa_im*COMPLEXI);
+    arma::vec Etmp;
+    diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.Pa,Hc,shift,sol.cCa,Etmp);
+  } else {
+    arma::cx_mat Ch;
+    sol.cCa=Ch;
+  }
+
+  diagonalize_wrk<double>(S,Sinvh,sol.Pb,sol.Hb,shift,sol.Cb,sol.Eb);
   check_orth(sol.Cb,S,false);
-  if(shift!=0.0)
-    sol.Eb=arma::diagvec(arma::trans(sol.Cb)*sol.Hb*sol.Cb);
+
+  // Complex orbitals?
+  if(sol.Heffb_im.n_rows == sol.Hb.n_rows && sol.Heffb_im.n_cols == sol.Hb.n_cols) {
+    // Generbte complex hamiltonian
+    arma::cx_mat Hc(sol.Hb*COMPLEX1 + sol.Heffb_im*COMPLEXI);
+    arma::vec Etmp;
+    diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.Pb,Hc,shift,sol.cCb,Etmp);
+  } else {
+    arma::cx_mat Ch;
+    sol.cCb=Ch;
+  }
 }
+
 
 void ROHF_update(arma::mat & Fa_AO, arma::mat & Fb_AO, const arma::mat & P_AO, const arma::mat & S, std::vector<double> occa, std::vector<double> occb, bool verbose) {
   /*
@@ -1126,27 +1160,65 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
     }
 }
 
-arma::mat form_density(const arma::mat & C, size_t nocc) {
-  std::vector<double> occs(nocc,1.0);
+arma::mat form_density(const arma::mat & C, int nocc) {
+  arma::vec occs(C.n_cols);
+  occs.subvec(0,nocc-1).ones();
   return form_density(C,occs);
 }
 
-arma::mat form_density(const arma::mat & C, const std::vector<double> & nocc) {
-  if(nocc.size()>C.n_cols) {
-    std::ostringstream oss;
-    oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): there should be " << nocc.size() << " occupied orbitals but only " << C.n_cols << " orbitals exist!\n";
-    throw std::runtime_error(oss.str());
+arma::mat form_density(const arma::mat & C, const arma::vec & occs0) {
+  arma::vec occs(C.n_cols);
+  occs.zeros();
+  occs.subvec(0,occs0.n_elem-1)=occs0;
+  return C*arma::diagmat(occs)*arma::trans(C);
+}
+
+void form_density(rscf_t & sol, size_t nocc) {
+  arma::vec occs(sol.C.n_cols);
+  occs.zeros();
+  occs.subvec(0,nocc-1)=2.0*arma::ones(nocc);
+  form_density(sol,occs);
+}
+
+void form_density(rscf_t & sol, const arma::vec & occs0) {
+  arma::vec occs(sol.C.n_cols);
+  occs.zeros();
+  occs.subvec(0,occs0.n_elem-1)=occs0;
+
+  if(sol.cC.n_cols == sol.C.n_cols) {
+    // Use complex orbitals
+    sol.P=arma::real(sol.cC*arma::diagmat(occs)*arma::trans(sol.cC));
+  } else {
+    // Use real orbitals
+    sol.P=sol.C*arma::diagmat(occs)*arma::trans(sol.C);
+  }
+}
+
+void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0) {
+  arma::vec occa(sol.Ca.n_cols);
+  occa.zeros();
+  occa.subvec(0,occa0.n_elem-1)=occa0;
+  arma::vec occb(sol.Cb.n_cols);
+  occb.zeros();
+  occb.subvec(0,occb0.n_elem-1)=occb0;
+
+  if(sol.cCa.n_cols == sol.Ca.n_cols) {
+    // Use complex orbitals
+    sol.Pa=arma::real(sol.cCa*arma::diagmat(occa)*arma::trans(sol.cCa));
+  } else {
+    // Use real orbitals
+    sol.Pa=sol.Ca*arma::diagmat(occa)*arma::trans(sol.Ca);
   }
 
-  // Zero matrix
-  arma::mat P(C.n_rows,C.n_rows);
-  P.zeros();
-  // Formulate density
-  for(size_t n=0;n<nocc.size();n++)
-    if(nocc[n]>0.0)
-      P+=nocc[n]*C.col(n)*arma::trans(C.col(n));
+  if(sol.cCb.n_cols == sol.Cb.n_cols) {
+    // Use complex orbitals
+    sol.Pb=arma::real(sol.cCb*arma::diagmat(occb)*arma::trans(sol.cCb));
+  } else {
+    // Use real orbitals
+    sol.Pb=sol.Cb*arma::diagmat(occb)*arma::trans(sol.Cb);
+  }
 
-  return P;
+  sol.P=sol.Pa+sol.Pb;
 }
 
 arma::mat form_density(const arma::vec & E, const arma::mat & C, const std::vector<double> & nocc) {

@@ -109,16 +109,19 @@ typedef struct {
   /// Density matrix
   arma::mat P;
 
-  // Coulomb operator
+  /// Coulomb operator
   arma::mat J;
-  // Exchange operator
+  /// Exchange operator
   arma::mat K;
-  // KS-XC matrix
+  /// KS-XC matrix
   arma::mat XC;
 
-  // Effective potential
+  /// Effective potential
   arma::mat Heff;
   arma::mat Heff_im;
+
+  /// Complex orbitals (for SIC)
+  arma::cx_mat cC;
 
   /// Energy information
   energy_t en;
@@ -135,17 +138,20 @@ typedef struct {
   /// Density matrices
   arma::mat P, Pa, Pb;
 
-  // Coulomb operator
+  /// Coulomb operator
   arma::mat J;
-  // Exchange operators
+  /// Exchange operators
   arma::mat Ka, Kb;
-  // KS-XC matrix
+  /// KS-XC matrix
   arma::mat XCa, XCb;
 
   // Effective potentials
   arma::mat Heffa, Heffb;
   arma::mat Heffa_im, Heffb_im;
   
+  /// Complex orbitals (for SIC)
+  arma::cx_mat cCa, cCb;
+
   /// Energy information
   energy_t en;
 } uscf_t;
@@ -345,7 +351,7 @@ class SCF {
   void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, double tol) const;
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
-  void PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock);
+  void PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock);
 
   /// Calculate force in restricted Hartree-Fock
   arma::vec force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol);
@@ -415,8 +421,14 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
 
 /// Form density matrix by occupying nocc lowest lying states
 arma::mat form_density(const arma::mat & C, size_t nocc);
+/// Form density matrix by occupying nocc lowest lying states
+arma::mat form_density(const arma::mat & C, const arma::vec & occs);
+/// Form density matrix by occupying nocc lowest lying states
+void form_density(rscf_t & sol, size_t nocc);
 /// Form density matrix with occupations nocc
-arma::mat form_density(const arma::mat & C, const std::vector<double> & nocc);
+void form_density(rscf_t & sol, const arma::vec & occa);
+/// Form density matrix with occupations nocc
+void form_density(uscf_t & sol, const arma::vec & occa, const arma::vec & occb);
 /// Form energy weighted density matrix
 arma::mat form_density(const arma::vec & E, const arma::mat & C, const std::vector<double> & nocc);
 /// Purify the density matrix (N.B. requires occupations to be 0<=n<=1 !)
