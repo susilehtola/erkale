@@ -77,9 +77,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
   /// Density formation
 #ifdef RESTRICTED
-#define form_dens(sol) sol.P=form_density(sol.C,occs);
+#define form_dens(sol) form_density(sol,occs);
 #else
-#define form_dens_ur(sol) sol.Pa=form_density(sol.Ca,occa); sol.Pb=form_density(sol.Cb,occb); sol.P=sol.Pa+sol.Pb;
+#define form_dens_ur(sol) form_density(sol,occa,occb);
 
 #if defined(HALFHOLE) || defined(FULLHOLE)
 #define form_dens(sol) find_exc(sol); upd_occa(); upd_occb(); form_dens_ur(sol);

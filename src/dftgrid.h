@@ -346,7 +346,7 @@ class AtomGrid {
   /// Evaluate Fock matrix, unrestricted calculation
   void eval_Fxc(arma::mat & Ha, arma::mat & Hb) const;
   /// Evaluate Fock matrix, SIC calculation
-  void eval_Fxc(const arma::mat & C, size_t nocc, arma::mat & H) const;
+  void eval_Fxc(const arma::cx_mat & C, size_t nocc, arma::cx_mat & H) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
   void eval_diag_Fxc(arma::vec & H) const;
@@ -444,7 +444,7 @@ class DFTGrid {
    * electron density, SIC calculation. Note that all orbitals are
    * necessary here.
    */
-  void eval_Fxc(int x_func, int c_func, const arma::mat & C, const arma::cx_mat & W, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
+  void eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arma::cx_mat & W, std::vector<arma::cx_mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
 
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();

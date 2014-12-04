@@ -297,7 +297,7 @@ class PZSIC : public UnitaryFunction {
   double maxtol;
 
   /// Orbital Fock matrices
-  std::vector<arma::mat> Forb;
+  std::vector<arma::cx_mat> Forb;
   /// Orbital SIC energies
   arma::vec Eorb;
   /// Kappa matrix
