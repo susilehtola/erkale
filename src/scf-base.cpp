@@ -1164,28 +1164,32 @@ void determine_occ(arma::vec & nocc, const arma::mat & C, const arma::vec & nocc
 
 arma::mat form_density(const arma::mat & C, int nocc) {
   arma::vec occs(C.n_cols);
-  occs.subvec(0,nocc-1).ones();
+  if(nocc)
+    occs.subvec(0,nocc-1).ones();
   return form_density(C,occs);
 }
 
 arma::mat form_density(const arma::mat & C, const arma::vec & occs0) {
   arma::vec occs(C.n_cols);
   occs.zeros();
-  occs.subvec(0,occs0.n_elem-1)=occs0;
+  if(occs0.n_elem)
+    occs.subvec(0,occs0.n_elem-1)=occs0;
   return C*arma::diagmat(occs)*arma::trans(C);
 }
 
 void form_density(rscf_t & sol, size_t nocc) {
   arma::vec occs(sol.C.n_cols);
   occs.zeros();
-  occs.subvec(0,nocc-1)=2.0*arma::ones(nocc);
+  if(nocc)
+    occs.subvec(0,nocc-1)=2.0*arma::ones(nocc);
   form_density(sol,occs);
 }
 
 void form_density(rscf_t & sol, const arma::vec & occs0) {
   arma::vec occs(sol.C.n_cols);
   occs.zeros();
-  occs.subvec(0,occs0.n_elem-1)=occs0;
+  if(occs0.n_elem)
+    occs.subvec(0,occs0.n_elem-1)=occs0;
 
   if(sol.cC.n_cols == sol.C.n_cols) {
     // Use complex orbitals
@@ -1200,10 +1204,12 @@ void form_density(rscf_t & sol, const arma::vec & occs0) {
 void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0) {
   arma::vec occa(sol.Ca.n_cols);
   occa.zeros();
-  occa.subvec(0,occa0.n_elem-1)=occa0;
+  if(occa0.n_elem)
+    occa.subvec(0,occa0.n_elem-1)=occa0;
   arma::vec occb(sol.Cb.n_cols);
   occb.zeros();
-  occb.subvec(0,occb0.n_elem-1)=occb0;
+  if(occb0.n_elem)
+    occb.subvec(0,occb0.n_elem-1)=occb0;
 
   if(sol.cCa.n_cols == sol.Ca.n_cols) {
     // Use complex orbitals
