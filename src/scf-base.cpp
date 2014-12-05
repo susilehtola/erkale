@@ -982,7 +982,7 @@ void imag_lost(const rscf_t & sol, const arma::mat & S, double & d) {
   arma::cx_mat MOovl=arma::trans(sol.C.cols(0,Nel-1))*S*sol.cC.cols(0,Nel-1);
   
   // Fraction of occupied subspace spanned is
-  d=std::real(arma::trace(MOovl*arma::trans(MOovl)));
+  d=Nel-std::real(arma::trace(MOovl*arma::trans(MOovl)));
 }
 
 void imag_lost(const uscf_t & sol, const arma::mat & S, double & da, double & db) {
@@ -993,13 +993,13 @@ void imag_lost(const uscf_t & sol, const arma::mat & S, double & da, double & db
   // MO overlap matrix
   if(sol.cCa.n_cols == sol.Ca.n_cols) {
     arma::cx_mat MOovla=arma::trans(sol.Ca.cols(0,Nela-1))*S*sol.cCa.cols(0,Nela-1);
-    da=std::real(arma::trace(MOovla*arma::trans(MOovla)));
+    da=Nela-std::real(arma::trace(MOovla*arma::trans(MOovla)));
   } else
     da=0.0;
   
   if(sol.cCa.n_cols == sol.Ca.n_cols) {
     arma::cx_mat MOovlb=arma::trans(sol.Cb.cols(0,Nelb-1))*S*sol.cCb.cols(0,Nelb-1);
-    db=std::real(arma::trace(MOovlb*arma::trans(MOovlb)));
+    db=Nelb-std::real(arma::trace(MOovlb*arma::trans(MOovlb)));
   } else
     db=0.0;
 }
