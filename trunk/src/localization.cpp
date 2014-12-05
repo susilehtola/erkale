@@ -1371,7 +1371,7 @@ std::string PZSIC::legend() const {
   return std::string(leg);
 }
 
-std::string PZSIC::status(bool lfmt) const {
+std::string PZSIC::status(bool lfmt) {
   double Krms, Kmax;
   get_k_rms_max(Krms,Kmax);
 
@@ -1399,13 +1399,17 @@ void PZSIC::print_time(const Timer & t) const {
   fflush(stderr);
 }
 
-void PZSIC::get_k_rms_max(double & Krms, double & Kmax) const {
+void PZSIC::get_k_rms_max(double & Krms, double & Kmax) {
+  // Check kappa is up to date
+  double fv;
+  arma::cx_mat der;
+  cost_func_der(W,fv,der);
   // Difference from Pedersen condition is
   Krms=rms_cnorm(kappa);
   Kmax=max_cabs(kappa);
 }
 
-bool PZSIC::converged() const {
+bool PZSIC::converged() {
   double Krms, Kmax;
   get_k_rms_max(Krms,Kmax);
   (void) W;
@@ -1426,7 +1430,11 @@ arma::vec PZSIC::get_Eorb() const {
   return Eorb;
 }
 
-arma::cx_mat PZSIC::get_HSIC() const {
+arma::cx_mat PZSIC::get_HSIC() {
+  // Make sure HSIC is up to date
+  double fv;
+  arma::cx_mat der;
+  cost_func_der(W,fv,der);
   return HSIC;
 }
 

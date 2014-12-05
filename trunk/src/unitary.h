@@ -102,7 +102,7 @@ class UnitaryFunction {
   /// Print status information, possibly in a longer format
   virtual std::string status(bool lfmt=false) const;
   /// Check convergence
-  virtual bool converged() const;
+  virtual bool converged();
 };
 
 /// Unitary optimization worker

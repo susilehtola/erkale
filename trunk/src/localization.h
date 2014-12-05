@@ -307,17 +307,17 @@ class PZSIC : public UnitaryFunction {
   arma::cx_mat HSIC;
 
   /// Calculate kappa rms and kappa max
-  void get_k_rms_max(double & Krms, double & Kmax) const;
+  void get_k_rms_max(double & Krms, double & Kmax);
 
   /// Print legend
   std::string legend() const;
   /// Print progress
-  std::string status(bool lfmt) const;
+  std::string status(bool lfmt);
   /// Print progress
   void print_time(const Timer & t) const;
 
   /// Check convergence
-  bool converged() const;
+  bool converged();
 
  public:
   /// Constructor
@@ -344,7 +344,7 @@ class PZSIC : public UnitaryFunction {
   /// Get orbital-by-orbital SIC
   arma::vec get_Eorb() const;
   /// Get SIC Hamiltonian
-  arma::cx_mat get_HSIC() const;
+  arma::cx_mat get_HSIC();
 };
 
 /// Analyze orbitals if they really are complex
