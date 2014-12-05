@@ -655,7 +655,6 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
   sicsolb.H=sol.Hb;
   sicsolb.P=sol.Pb;
   sicsolb.C=sol.Cb;
-  sicsola.cC=sol.cCa;
   if(sol.cCb.n_rows == sol.Cb.n_rows && sol.cCb.n_cols == sol.Cb.n_cols)
     sicsolb.cC=sol.cCb;
   else
@@ -765,8 +764,12 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     // are properly integrated over.
 
     // Update Ctilde
-    arma::cx_mat Catilde=sicsola.cC.cols(0,Wa.n_rows-1)*Wa;
-    arma::cx_mat Cbtilde=sicsolb.cC.cols(0,Wb.n_rows-1)*Wb;
+    arma::cx_mat Catilde;
+    if(Wa.n_rows)
+      Catilde=sicsola.cC.cols(0,Wa.n_rows-1)*Wa;
+    arma::cx_mat Cbtilde;
+    if(Wb.n_rows)
+      Cbtilde=sicsolb.cC.cols(0,Wb.n_rows-1)*Wb;
 
     // Stack of density matrices
     std::vector<arma::mat> Pv(nocca+noccb);
@@ -785,8 +788,10 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     {
       // Combined orbitals
       arma::cx_mat Ctilde(Catilde.n_rows,Catilde.n_cols+Cbtilde.n_cols);
-      Ctilde.cols(0,Catilde.n_cols-1)=Catilde;
-      Ctilde.cols(Catilde.n_cols,Catilde.n_cols+Cbtilde.n_cols-1)=Cbtilde;
+      if(Catilde.n_cols)
+	Ctilde.cols(0,Catilde.n_cols-1)=Catilde;
+      if(Cbtilde.n_cols)
+	Ctilde.cols(Catilde.n_cols,Catilde.n_cols+Cbtilde.n_cols-1)=Cbtilde;
       grid.construct(Ctilde,dft.gridtol,dft.x_func,dft.c_func);
     }
     if(verbose) {
@@ -997,7 +1002,7 @@ void imag_lost(const uscf_t & sol, const arma::mat & S, double & da, double & db
   } else
     da=0.0;
   
-  if(sol.cCa.n_cols == sol.Ca.n_cols) {
+  if(sol.cCb.n_cols == sol.Cb.n_cols) {
     arma::cx_mat MOovlb=arma::trans(sol.Cb.cols(0,Nelb-1))*S*sol.cCb.cols(0,Nelb-1);
     db=Nelb-std::real(arma::trace(MOovlb*arma::trans(MOovlb)));
   } else
