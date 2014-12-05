@@ -981,8 +981,8 @@ void imag_lost(const rscf_t & sol, const arma::mat & S, double & d) {
   // MO overlap matrix
   arma::cx_mat MOovl=arma::trans(sol.C.cols(0,Nel-1))*S*sol.cC.cols(0,Nel-1);
   
-  // Fraction of occupied subspace spanned is
-  d=Nel-std::real(arma::trace(MOovl*arma::trans(MOovl)));
+  // Amount of electrons lost in the approximation
+  d=2.0*(Nel-std::real(arma::trace(MOovl*arma::trans(MOovl))));
 }
 
 void imag_lost(const uscf_t & sol, const arma::mat & S, double & da, double & db) {
