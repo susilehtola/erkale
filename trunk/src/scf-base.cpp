@@ -1194,6 +1194,7 @@ void form_density(rscf_t & sol, const arma::vec & occs0) {
     // Use real orbitals
     sol.P=sol.C*arma::diagmat(occs)*arma::trans(sol.C);
   }
+  sol.rP=sol.C*arma::diagmat(occs)*arma::trans(sol.C);
 }
 
 void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0) {
@@ -1211,6 +1212,7 @@ void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0
     // Use real orbitals
     sol.Pa=sol.Ca*arma::diagmat(occa)*arma::trans(sol.Ca);
   }
+  sol.rPa=sol.Ca*arma::diagmat(occa)*arma::trans(sol.Ca);
 
   if(sol.cCb.n_cols == sol.Cb.n_cols) {
     // Use complex orbitals
@@ -1219,6 +1221,7 @@ void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0
     // Use real orbitals
     sol.Pb=sol.Cb*arma::diagmat(occb)*arma::trans(sol.Cb);
   }
+  sol.rPb=sol.Cb*arma::diagmat(occb)*arma::trans(sol.Cb);
 
   sol.P=sol.Pa+sol.Pb;
 }

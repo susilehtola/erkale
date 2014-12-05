@@ -122,6 +122,8 @@ typedef struct {
 
   /// Complex orbitals (for SIC)
   arma::cx_mat cC;
+  /// Real-CMO density matrix (for DIIS with SIC)
+  arma::mat rP;
 
   /// Energy information
   energy_t en;
@@ -151,6 +153,8 @@ typedef struct {
   
   /// Complex orbitals (for SIC)
   arma::cx_mat cCa, cCb;
+  /// Real-CMO density matrix (for DIIS with SIC)
+  arma::mat rPa, rPb;
 
   /// Energy information
   energy_t en;
