@@ -50,7 +50,7 @@ int UnitaryFunction::getsign() const {
   return sign;
 }
 
-bool UnitaryFunction::converged() const {
+bool UnitaryFunction::converged() {
   /// Dummy default function
   return true;
 }
