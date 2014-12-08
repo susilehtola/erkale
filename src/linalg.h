@@ -122,13 +122,17 @@ arma::mat VecToMat(const arma::vec & v, size_t nrows, size_t ncols);
 arma::vec slicevec(const arma::cube & c, size_t i, size_t j);
 
 /// Compute cosine of matrix
-arma::mat cos(const arma::mat & U);
+arma::mat cosmat(const arma::mat & M);
 /// Compute sine of matrix
-arma::mat sin(const arma::mat & U);
+arma::mat sinmat(const arma::mat & M);
 /// Compute sin(x)/x of matrix
-arma::mat sinc(const arma::mat & U);
+arma::mat sincmat(const arma::mat & M);
 /// Compute square root of matrix
-arma::mat sqrt(const arma::mat & M);
+arma::mat sqrtmat(const arma::mat & M);
+/// Compute exponential of matrix
+arma::mat expmat(const arma::mat & M);
+/// Compute exponential of matrix
+arma::cx_mat expmat(const arma::cx_mat & M);
 
 /// Orthogonalize
 arma::mat orthogonalize(const arma::mat & M);

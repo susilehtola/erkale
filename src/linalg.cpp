@@ -254,7 +254,7 @@ arma::vec slicevec(const arma::cube & c, size_t i, size_t j) {
 }
 
 
-arma::mat cos(const arma::mat & U) {
+arma::mat cosmat(const arma::mat & U) {
   // Compute eigendecomposition
   arma::vec evals;
   arma::mat evec;
@@ -289,7 +289,7 @@ arma::mat cos(const arma::mat & U) {
   return cosU;
 }
 
-arma::mat sin(const arma::mat & U) {
+arma::mat sinmat(const arma::mat & U) {
   // Compute eigendecomposition
   arma::vec evals;
   arma::mat evec;
@@ -323,7 +323,7 @@ arma::mat sin(const arma::mat & U) {
   return sinU;
 }
 
-arma::mat sinc(const arma::mat & U) {
+arma::mat sincmat(const arma::mat & U) {
   // Compute eigendecomposition
   arma::vec evals;
   arma::mat evec;
@@ -357,7 +357,7 @@ arma::mat sinc(const arma::mat & U) {
   return sincU;
 }
 
-arma::mat sqrt(const arma::mat & M) {
+arma::mat sqrtmat(const arma::mat & M) {
   arma::vec evals;
   arma::mat evec;
   eig_sym_ordered(evals,evec,M);
@@ -375,6 +375,22 @@ arma::mat sqrt(const arma::mat & M) {
     sqrtM+=std::sqrt(evals(i))*evec.col(i)*arma::trans(evec.col(i));
 
   return sqrtM;
+}
+
+arma::mat expmat(const arma::mat & M) {
+  arma::vec eval;
+  arma::mat evec;
+  eig_sym_ordered(eval,evec,M);
+
+  return evec*arma::diagmat(arma::exp(eval))*arma::trans(evec);
+}
+
+arma::cx_mat expmat(const arma::cx_mat & M) {
+  arma::vec eval;
+  arma::cx_mat evec;
+  eig_sym_ordered(eval,evec,M);
+
+  return evec*arma::diagmat(arma::exp(eval))*arma::trans(evec);
 }
 
 arma::mat orthogonalize(const arma::mat & M) {
