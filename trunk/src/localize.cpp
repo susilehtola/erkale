@@ -429,7 +429,7 @@ int main(int argc, char **argv) {
 
   printf("Please read and cite the reference:\n%s\n%s\n%s\n\n", \
 	 "S. Lehtola and H. Jónsson",         \
-	 "Unitary optimization of localized molecular orbitals", \
+	 "Unitary Optimization of Localized Molecular Orbitals", \
 	 "J. Chem. Theory Comput. 9 (2013), pp. 5365 - 5372.");
 
   std::string logfile=set.get_string("Logfile");
@@ -518,6 +518,13 @@ int main(int argc, char **argv) {
   else if(stricmp(mets,"ER")==0)
     method=EDMISTON;
   else throw std::runtime_error("Localization method not implemented.\n");
+
+  if(method>=PIPEK_MULLIKENH && method<=PIPEK_VORONOI4) {
+    printf("Please read and cite the reference:\n%s\n%s\n%s\n\n",	\
+	   "S. Lehtola and H. Jónsson",					\
+	   "Pipek–Mezey Orbital Localization Using Various Partial Charge Estimates",	\
+	   "J. Chem. Theory Comput. 10 (2014), pp. 642 - 649.");
+  }
 
   // Determine accelerator
   enum unitacc acc;
