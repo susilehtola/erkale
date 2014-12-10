@@ -3602,11 +3602,12 @@ void compute_density_gradient_hessian(const arma::mat & P, const BasisSet & bas,
   g=arma::trans(arma::trans(bf)*P*grad);
 
   // First part of hessian is
-  arma::vec hf=2.0*arma::trans(bf)*P*hess;
+  arma::vec hf=arma::trans(bf)*P*hess;
   // and second part
   arma::mat hs=arma::trans(grad)*P*grad;
+
   // Convert to matrix form
-  h=arma::reshape(hf,3,3)+hs;
+  h=2.0*(arma::reshape(hf,3,3)+hs);
 }
 
 double compute_potential(const arma::mat & P, const BasisSet & bas, const coords_t & r) {
