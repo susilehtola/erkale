@@ -87,7 +87,7 @@ std::vector<double> xch_occ(size_t excited, size_t nocc);
 /// Full hole; core orbital is not occupied
 std::vector<double> fch_occ(size_t excited, size_t nocc);
 
-/// Localize orbitals on wanted atom. Return index of core orbital.
-size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, const std::string & state);
+/// Localize orbitals on wanted atom. Return index of wanted core orbital.
+size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, const std::string & state, int iorb);
 
 #endif
