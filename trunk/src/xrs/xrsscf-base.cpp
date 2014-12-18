@@ -166,7 +166,7 @@ std::vector<size_t> atom_list(const BasisSet & basis, size_t xcatom, bool verbos
   return list;
 }
 
-size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, const std::string & state) {
+size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, const std::string & state, int iorb) {
   // Check orthonormality
   arma::mat S=basis.overlap();
   check_orth(C,S,false);
@@ -181,6 +181,9 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
   }
   int lxc=find_am(state[1]);
 
+  if(iorb<0 || iorb>=(2*lxc+1))
+    throw std::runtime_error("Invalid number of initial orbital.\n");
+  
   // Charge of atom is
   int Z=basis.get_nucleus(xcatom).Z;
   // Pad to next noble atom to account for multiplicity and state
@@ -283,11 +286,13 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
 
     // Store index of initial orbital?
     if(am == lxc && orbidx(am) == nxc) {
-      ixc=iloc;
-
-      printf("\t%i%c %1i* %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),1,dec(iloc,lval(iloc)),reig(iloc)/ANGSTROMINBOHR);
-      for(int i=1;i<norb;i++)
-	printf("\t%i%c %1i  %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
+      ixc=iloc+iorb;
+      for(int i=0;i<norb;i++) {
+	if(i==iorb)
+	  printf("\t%i%c %1i* %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
+	else
+	  printf("\t%i%c %1i  %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
+      }
     } else {
       for(int i=0;i<norb;i++)
 	printf("\t%i%c %1i  %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);

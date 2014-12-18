@@ -822,6 +822,7 @@ int main(int argc, char **argv) {
 
   set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false);
   set.add_string("XRSInitialState","Initial atomic state to excite","1s");
+  set.add_int("XRSInitialOrbital","Index of orbital in state to excite", 1);
   set.add_string("XRSMethod", "Which kind of calculation to perform: TP, XCH or FCH","TP");
 
   set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3:5,10","");
@@ -934,7 +935,9 @@ int main(int argc, char **argv) {
 
   // Initial state
   std::string state=set.get_string("XRSInitialState");
-
+  // Initial orbital
+  int iorb=set.get_int("XRSInitialOrbital")-1;
+  
   // Try to load orbitals and energies
   arma::vec core;
   enum loadresult loadok=LOAD_FAIL;
@@ -1016,10 +1019,10 @@ int main(int argc, char **argv) {
 
       // Determine orbitals and update energies
       if(spin) {
-	icore=localize(basis,noccb,xcatom,sol.Cb,state);
+	icore=localize(basis,noccb,xcatom,sol.Cb,state,iorb);
 	sol.Eb=arma::diagvec(arma::trans(sol.Cb)*sol.Hb*sol.Cb);
       } else {
-	icore=localize(basis,nocca,xcatom,sol.Ca,state);
+	icore=localize(basis,nocca,xcatom,sol.Ca,state,iorb);
 	sol.Ea=arma::diagvec(arma::trans(sol.Ca)*sol.Ha*sol.Ca);
       }
     }
