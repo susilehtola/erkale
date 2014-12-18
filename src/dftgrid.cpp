@@ -835,20 +835,32 @@ void AtomGrid::compute_xc(int func_id, bool pot) {
   }
 
   // Evaluate functionals.
-  if(pot) {
-    if(mgga) // meta-GGA
-      xc_mgga_exc_vxc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0], &vlapl_wrk[0], &vtau_wrk[0]);
-    else if(gga) // GGA
-      xc_gga_exc_vxc(&func, N, &rho[0], &sigma[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0]);
-    else // LDA
-      xc_lda_exc_vxc(&func, N, &rho[0], &exc_wrk[0], &vxc_wrk[0]);
+  if(has_exc(func_id)) {
+    if(pot) {
+      if(mgga) // meta-GGA
+	xc_mgga_exc_vxc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0], &vlapl_wrk[0], &vtau_wrk[0]);
+      else if(gga) // GGA
+	xc_gga_exc_vxc(&func, N, &rho[0], &sigma[0], &exc_wrk[0], &vxc_wrk[0], &vsigma_wrk[0]);
+      else // LDA
+	xc_lda_exc_vxc(&func, N, &rho[0], &exc_wrk[0], &vxc_wrk[0]);
+    } else {
+      if(mgga) // meta-GGA
+	xc_mgga_exc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc_wrk[0]);
+      else if(gga) // GGA
+	xc_gga_exc(&func, N, &rho[0], &sigma[0], &exc_wrk[0]);
+      else // LDA
+	xc_lda_exc(&func, N, &rho[0], &exc_wrk[0]);
+    }
+
   } else {
-    if(mgga) // meta-GGA
-      xc_mgga_exc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &exc_wrk[0]);
-    else if(gga) // GGA
-      xc_gga_exc(&func, N, &rho[0], &sigma[0], &exc_wrk[0]);
-    else // LDA
-      xc_lda_exc(&func, N, &rho[0], &exc_wrk[0]);
+    if(pot) {
+      if(mgga) // meta-GGA
+	xc_mgga_vxc(&func, N, &rho[0], &sigma[0], &lapl_rho[0], &tau[0], &vxc_wrk[0], &vsigma_wrk[0], &vlapl_wrk[0], &vtau_wrk[0]);
+      else if(gga) // GGA
+	xc_gga_vxc(&func, N, &rho[0], &sigma[0], &vxc_wrk[0], &vsigma_wrk[0]);
+      else // LDA
+	xc_lda_vxc(&func, N, &rho[0], &vxc_wrk[0]);
+    }
   }
 
   // Sum to total arrays containing both exchange and correlation
