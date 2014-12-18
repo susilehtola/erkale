@@ -163,7 +163,7 @@ void print_info(int func_id) {
       throw std::runtime_error(oss.str());
     }
 
-    printf("'%s', defined in the reference(s):\n%s\n", func.info->name, func.info->refs);
+    //    printf("'%s', defined in the reference(s):\n%s\n", func.info->name, func.info->refs);
     xc_func_end(&func);
   }
 }
@@ -466,4 +466,24 @@ bool laplacian_needed(int func_id) {
   }
 
   return lapl;
+}
+
+bool has_exc(int func_id) {
+  bool ans=false;
+
+  if(func_id>0) {
+    xc_func_type func;
+    if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Functional "<<func_id<<" not found!";
+      throw std::runtime_error(oss.str());
+    }
+    // Get flag
+    ans=func.info->flags & XC_FLAGS_HAVE_EXC;
+    // Free functional
+    xc_func_end(&func);
+  }
+  
+  return ans;
 }

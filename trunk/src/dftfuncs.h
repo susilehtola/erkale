@@ -65,4 +65,7 @@ bool gradient_needed(int func);
 /// Is laplacian necessary to use given functional?
 bool laplacian_needed(int func);
 
+/// Does functional have energy density implemented?
+bool has_exc(int func);
+
 #endif
