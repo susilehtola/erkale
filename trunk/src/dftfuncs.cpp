@@ -163,8 +163,11 @@ void print_info(int func_id) {
       throw std::runtime_error(oss.str());
     }
 
-    //    printf("'%s', defined in the reference(s):\n%s\n", func.info->name, func.info->refs);
+    printf("'%s', defined in the reference(s):\n%s\n", func.info->name, func.info->refs);
     xc_func_end(&func);
+  }
+  if(!has_exc(func_id)) {
+    printf("The functional doesn't have an energy density, so the calculated energy is incorrect.");
   }
 }
 
