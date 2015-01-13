@@ -2067,7 +2067,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
     // Write OMOs
     if(doCW) {
-      if(!oldrestr)
+      if(oldrestr)
 	fprintf(stderr,"Projection of OMO matrix between restricted and unrestricted calculations is not supported.\n");
       else {
 	chkpt.cwrite("CWa",CWa);
