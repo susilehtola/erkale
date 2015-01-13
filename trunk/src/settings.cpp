@@ -145,6 +145,8 @@ void Settings::add_dft_settings() {
   add_string("PZ", "Perform Perdew-Zunger self-interaction correction? No, Pert, Full, Can, CanPert","No");
   // Initialize PZ-SIC with localized orbitals?
   add_bool("PZloc", "Initial localization before SIC calculation?", true);
+  // Run stability analysis for PZ-SIC?
+  add_int("PZstab", "Stability analysis for PZ-SIC? 0 for no, 1 for oo block, 2 for full analysis", 0);
   // Mode to use PZ-SIC
   add_string("PZmode", "Mode to use PZ-SIC in. Coul, CoulX, CoulC, CoulXC", "CoulXC");
   // PZ-SIC Hamiltonian
