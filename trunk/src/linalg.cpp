@@ -5,16 +5,14 @@
  *                             -
  *                       DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Susi Lehtola
+ * Written by Susi Lehtola, 2010-2014
+ * Copyright (c) 2010-2014, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
  */
-
-
 
 #include <cfloat>
 #include "linalg.h"
@@ -523,3 +521,61 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   form_NOs(P,S,AO_to_NO,tmp,occs);
 }
 
+void check_lapack_thread() {
+#ifdef _OPENMP
+  // Size of problem
+  size_t N=100;
+  // Allocate memory
+  arma::mat M(N,N);
+  // Fill with random data
+  M.randn();
+  // Symmetrize
+  M=(M+arma::trans(M))/2.0;
+
+  // Eigendecomposition
+  arma::vec eval;
+  arma::mat evec;
+  eig_sym_ordered(eval,evec,M);
+
+  // Avoid possible degeneracies - reset eigenvalues
+  for(size_t i=0;i<N;i++)
+    eval(i)=i+1;
+  // and recreate matrix
+  M=evec*arma::diagmat(eval)*arma::trans(evec);
+  // and rerun decomposition
+  eig_sym_ordered(eval,evec,M);
+  evec.save("seq.dat",arma::raw_ascii);
+      
+  // Difference matrix
+  arma::mat dmat(omp_get_max_threads(),N+1);
+  dmat.zeros();
+
+  // Thread check
+#pragma omp parallel
+  {
+    arma::vec thval;
+    arma::mat thvec;
+    eig_sym_ordered(thval,thvec,M);
+    
+    int ith=omp_get_thread_num();
+    std::ostringstream oss;
+    oss << "th_" << ith << ".dat";
+    thvec.save(oss.str(),arma::raw_ascii);
+
+    // Calculate eigenvector errors
+    for(size_t i=0;i<N;i++)
+      dmat(ith,i)=arma::norm(evec.col(i)-thvec.col(i),2);
+    // Eigenvalues
+    dmat(ith,N)=arma::norm(thval-eval,2);
+  }
+  
+  dmat.print("RMS difference norms");
+
+  if(arma::max(arma::max(dmat)) > 1e-8) {
+    printf("Warning - LAPACK library doesn't seem to be thread safe!\n");
+    fprintf(stderr,"Warning - LAPACK library doesn't seem to be thread safe!\n");
+  } else {
+    printf("LAPACK checks out fine.\n");
+  }
+#endif
+}

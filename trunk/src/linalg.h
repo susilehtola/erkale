@@ -155,4 +155,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
  */
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::vec & occs);
 
+/// Check thread safety of LAPACK library
+void check_lapack_thread();
+
 #endif
