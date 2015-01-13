@@ -76,6 +76,8 @@ class Timer {
   double get() const;
   /// Get pretty-printed elapsed time
   std::string elapsed() const;
+  /// Get pretty-printed time
+  std::string parse(double t) const;
 };
 
 #endif

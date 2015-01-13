@@ -100,10 +100,11 @@ double Timer::get() const {
 }
 
 std::string Timer::elapsed() const {
-  std::ostringstream ret;
+  return parse(get());
+}
 
-  // Get elapsed time
-  double telapsed=get();
+std::string Timer::parse(double telapsed) const {
+  std::ostringstream ret;
 
   // Minute is 60 sec
   size_t min=60;
