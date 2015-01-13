@@ -379,6 +379,11 @@ class SCF {
   /// Set the density-fitting basis set
   void set_fitting(const BasisSet & fitbas);
 
+  /// Set verbose setting
+  void set_verbose(bool verb);
+  /// Set verbose setting
+  bool get_verbose() const;
+
   /// Toggle calculation of forces
   void do_force(bool val);
 
@@ -388,6 +393,8 @@ class SCF {
   arma::mat get_Sinvh() const;
   /// Get core Hamiltonian matrix
   arma::mat get_Hcore() const;
+  /// Get checkpoint file
+  Checkpoint *get_checkpoint() const;
 
   /// Do core guess
   void core_guess(rscf_t & sol) const;

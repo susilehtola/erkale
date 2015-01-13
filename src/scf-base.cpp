@@ -37,6 +37,7 @@
 #include "timer.h"
 #include "trrh.h"
 #include "localization.h"
+#include "pzstability.h"
 
 extern "C" {
 #include <gsl/gsl_poly.h>
@@ -329,6 +330,14 @@ void SCF::do_force(bool val) {
   doforce=val;
 }
 
+bool SCF::get_verbose() const {
+  return verbose;
+}
+
+void SCF::set_verbose(bool verb) {
+  verbose=verb;
+}
+
 arma::mat SCF::get_S() const {
   return S;
 }
@@ -339,6 +348,10 @@ arma::mat SCF::get_Sinvh() const {
 
 arma::mat SCF::get_Hcore() const {
   return Hcore;
+}
+
+Checkpoint *SCF::get_checkpoint() const {
+  return chkptp;
 }
 
 void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock) {
@@ -535,11 +548,6 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 
     // Update Ctilde
     arma::cx_mat Ctilde=sicsol.cC.cols(0,W.n_cols-1)*W;
-
-    // Stack of density matrices
-    std::vector<arma::mat> Pv(nocc);
-    for(size_t io=0;io<nocc;io++)
-      Pv[io]=occs[0]*arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
 
     // Update DFT grid
     Timer tgrid;
@@ -770,13 +778,6 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     arma::cx_mat Cbtilde;
     if(Wb.n_rows)
       Cbtilde=sicsolb.cC.cols(0,Wb.n_rows-1)*Wb;
-
-    // Stack of density matrices
-    std::vector<arma::mat> Pv(nocca+noccb);
-    for(size_t io=0;io<nocca;io++)
-      Pv[io]=arma::real(Catilde.col(io)*arma::trans(Catilde.col(io)));
-    for(size_t io=0;io<noccb;io++)
-      Pv[io+nocca]=arma::real(Cbtilde.col(io)*arma::trans(Cbtilde.col(io)));
 
     // Update DFT grid
     Timer tgrid;
@@ -1790,6 +1791,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Perdew-Zunger?
       enum pzrun pz=parse_pzsic(set.get_string("PZ"));
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
+      int pzstab=set.get_int("PZstab");
       if(pz==NO) {
 	if(adaptive) {
 	  // Solve restricted DFT problem first on a rough grid
@@ -1982,6 +1984,12 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	  if(verbose)
 	    fprintf(stderr,"\nSIC self-consistency solved in %s.\n",tsic.elapsed().c_str());
+
+	  // Stability analysis
+	  if(pzstab) {
+	    PZStability stab(&solver,dft);
+	    stab.check(sol,true,pzstab==2);
+	  }
 	}
       }
 
@@ -2118,6 +2126,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Perdew-Zunger?
       enum pzrun pz=parse_pzsic(set.get_string("PZ"));
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
+      int pzstab=set.get_int("PZstab");
       if(pz==NO) {
 	if(adaptive) {
 	  // Solve unrestricted DFT problem first on a rough grid
@@ -2321,6 +2330,12 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	  if(verbose)
 	    fprintf(stderr,"\nSIC self-consistency solved in %s.\n",tsic.elapsed().c_str());
+
+	  // Stability analysis
+	  if(pzstab) {
+	    PZStability stab(&solver,dft);
+	    stab.check(sol,true,pzstab==2);
+	  }
 	}
 
 	// and update checkpoint file entries
