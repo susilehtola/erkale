@@ -18,11 +18,16 @@
 #define ERKALE_PZSTAB
 
 #include "scf.h"
+#include "timer.h"
 
 class FDHessian {
   /// Step size
   double ss;
 
+ protected:
+  /// Print optimization status
+  virtual void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
+  
  public:
   /// Constructor
   FDHessian();
@@ -33,19 +38,27 @@ class FDHessian {
   virtual size_t count_params() const=0;
   /// Evaluate function
   virtual double eval(const arma::vec & x)=0;
+  /// Update solution
+  virtual void update(const arma::vec & x);
 
   /// Evaluate finite difference gradient
   arma::vec gradient();
   /// Evaluate finite difference Hessian
   arma::mat hessian();
+
+  /// Run optimization
+  void optimize(size_t maxiter=1000, double gthr=1e-5, bool max=false);
 };
 
   
 class PZStability: public FDHessian {
+ protected:
   /// SCF solver, used for energy calculations
   SCF * solverp;
+  /// Basis set
+  BasisSet basis;
   /// DFT grid
-  DFTGrid * grid;
+  DFTGrid grid;
   /// Method
   dft_t method;
 
@@ -86,17 +99,25 @@ class PZStability: public FDHessian {
 
   /// Evaluate function
   double eval(const arma::vec & x);
+  /// Update solution
+  void update(const arma::vec & x);
+
+  /// Print status of optimization
+  void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
 
  public:
   /// Constructor
   PZStability(SCF *solver, dft_t method);
   /// Destructor
   ~PZStability();
+
+  /// Set parameters. cplx: complex rotations? ov: ov rotations? oo: oo rotations?
+  void set(const rscf_t & sol, bool cplx, bool ov, bool oo=true);
+  /// Set parameters. cplx: complex rotations? ov: ov rotations? oo: oo rotations?
+  void set(const uscf_t & sol, bool cplx, bool ov, bool oo=true);
   
-  /// Check stability of solution. cplx: complex rotations? can: check stability of canonical orbitals
-  void check(const rscf_t & sol, bool cplx, bool can);
-    /// Check stability of solution. cplx: complex rotations? can: check stability of canonical orbitals
-  void check(const uscf_t & sol, bool cplx, bool can);
+  /// Check stability of solution.
+  void check();
 };
 
 #endif
