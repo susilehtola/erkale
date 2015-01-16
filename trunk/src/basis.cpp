@@ -2925,7 +2925,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
 
 void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs, arma::cx_mat & OMOs) const {
   // Project MOs from old geometry to new geometry
-  if(! (*this == oldbas)) {
+  if(!same_shells(oldbas)) {
     ERROR_INFO();
     throw std::runtime_error("Basis sets must differ only in the nuclear geometry!\n");
   }
