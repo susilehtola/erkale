@@ -189,128 +189,128 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
   if(verbose)
     print_legend(f);
 
-  while(true) {
-    Timer t;
+  if(maxiter>0)
+    while(true) {
+      Timer t;
 
-    // Store old gradient and search direction
-    oldG=G;
-    oldH=H;
+      // Store old gradient and search direction
+      oldG=G;
+      oldH=H;
 
-    // Compute the cost function and the euclidean derivative, Abrudan 2009 table 3 step 2
-    update_gradient(W,f);
+      // Compute the cost function and the euclidean derivative, Abrudan 2009 table 3 step 2
+      update_gradient(W,f);
 
-    // Compute update coefficient
-    double gamma=0.0;
-    if(acc==SDSA || (k-1)%W.n_cols==0) {
-      // Reset step in CG, or steepest descent / steepest ascent
-      gamma=0.0;
-    } else if(acc==CGPR) {
-      // Compute Polak-Ribière coefficient
-      gamma=bracket(G - oldG, G) / bracket(oldG, oldG);
-    } else if(acc==CGFR) {
-      // Fletcher-Reeves
-      gamma=bracket(G, G) / bracket(oldG, oldG);
-    } else if(acc==CGHS) {
-      // Hestenes-Stiefel
-      gamma=bracket(G - oldG, G) / bracket(G - oldG, oldH);
-    } else
-      throw std::runtime_error("Unsupported update.\n");
+      // Compute update coefficient
+      double gamma=0.0;
+      if(acc==SDSA || (k-1)%W.n_cols==0) {
+	// Reset step in CG, or steepest descent / steepest ascent
+	gamma=0.0;
+      } else if(acc==CGPR) {
+	// Compute Polak-Ribière coefficient
+	gamma=bracket(G - oldG, G) / bracket(oldG, oldG);
+      } else if(acc==CGFR) {
+	// Fletcher-Reeves
+	gamma=bracket(G, G) / bracket(oldG, oldG);
+      } else if(acc==CGHS) {
+	// Hestenes-Stiefel
+	gamma=bracket(G - oldG, G) / bracket(G - oldG, oldH);
+      } else
+	throw std::runtime_error("Unsupported update.\n");
     
-    // Perform update
-    if(gamma==0.0) {
-      // Use gradient direction
-      H=G;
-    } else {
-      // Compute update
-      H=G+gamma*H;
-      // Make sure H stays skew symmetric
-      H=0.5*(H-arma::trans(H));
-      
-      // Check that update is OK
-      if(bracket(G,H)<0.0) {
+      // Perform update
+      if(gamma==0.0) {
+	// Use gradient direction
 	H=G;
-	printf("CG search direction reset.\n");
-      }
-    }
-    // Update search direction
-    update_search_direction(f->getq());
-
-    // Save old iteration data
-    if(oldf)
-      delete oldf;
-    oldf=f->copy();
-
-    // Take a step
-    if(met==POLY_DF) {
-      polynomial_step_df(f);
-    } else if(met==POLY_F) {
-      polynomial_step_f(f);
-    } else if(met==FOURIER_DF) {
-      fourier_step_df(f);
-    } else if(met==ARMIJO) {
-      armijo_step(f);
-    } else {
-      ERROR_INFO();
-      throw std::runtime_error("Method not implemented.\n");
-    }
-    
-    // Increase iteration number
-    k++;
-    // Update matrix
-    W=f->getW();
-
-    // Print progress
-    if(verbose) {
-      print_progress(k,f,oldf);
-      print_time(t);
-    }
-    
-    // Check for convergence. Don't do the check in the first
-    // iteration, because for canonical orbitals it can be a really
-    // bad saddle point
-    double J=f->getf();
-    
-    double oldJ = (oldf==NULL) ? 0.0 : oldf->getf();
-    if(k>1 && ( (bracket(G,G)<Gthr) && fabs(J-oldJ)<Fthr && f->converged() ) ) {
-      if(verbose) {
-	printf("Converged.\n");
-	fflush(stdout);
-	
-	// Print classification
-	classify(W);
-      }
-
-      break;
-    } else if(k==maxiter) {
-      if(verbose) {
-	printf(" %s\nNot converged.\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
+      } else {
+	// Compute update
+	H=G+gamma*H;
+	// Make sure H stays skew symmetric
+	H=0.5*(H-arma::trans(H));
       
-      break;
-    }
-    
-    if(debug) {
-      char fname[80];
-      sprintf(fname,"unitary_%04i.dat",(int) k);
-      FILE *p=fopen(fname,"w");
-      UnitaryFunction *uf=f->copy();      
-      for(int i=-80;i<=80;i++) {
-	double x=i*0.05;
-	double xT=x*Tmu;
-
-	double y=uf->cost_func(get_rotation(xT)*W);
-	fprintf(p,"% e % e % e\n",x,xT,y);
+	// Check that update is OK
+	if(bracket(G,H)<0.0) {
+	  H=G;
+	  printf("CG search direction reset.\n");
+	}
       }
-      fclose(p);
-      delete uf;
+      // Update search direction
+      update_search_direction(f->getq());
+
+      // Save old iteration data
+      if(oldf)
+	delete oldf;
+      oldf=f->copy();
+
+      // Take a step
+      if(met==POLY_DF) {
+	polynomial_step_df(f);
+      } else if(met==POLY_F) {
+	polynomial_step_f(f);
+      } else if(met==FOURIER_DF) {
+	fourier_step_df(f);
+      } else if(met==ARMIJO) {
+	armijo_step(f);
+      } else {
+	ERROR_INFO();
+	throw std::runtime_error("Method not implemented.\n");
+      }
+    
+      // Increase iteration number
+      k++;
+      // Update matrix
+      W=f->getW();
+
+      // Print progress
+      if(verbose) {
+	print_progress(k,f,oldf);
+	print_time(t);
+      }
+    
+      // Check for convergence. Don't do the check in the first
+      // iteration, because for canonical orbitals it can be a really
+      // bad saddle point
+      double J=f->getf();
+    
+      double oldJ = (oldf==NULL) ? 0.0 : oldf->getf();
+      if(k>1 && ( (bracket(G,G)<Gthr) && fabs(J-oldJ)<Fthr && f->converged() ) ) {
+	if(verbose) {
+	  printf("Converged.\n");
+	  fflush(stdout);
+	
+	  // Print classification
+	  classify(W);
+	}
+
+	break;
+      } else if(k==maxiter) {
+	if(verbose) {
+	  printf(" %s\nNot converged.\n",t.elapsed().c_str());
+	  fflush(stdout);
+	}
+      
+	break;
+      }
+    
+      if(debug) {
+	char fname[80];
+	sprintf(fname,"unitary_%04i.dat",(int) k);
+	FILE *p=fopen(fname,"w");
+	UnitaryFunction *uf=f->copy();      
+	for(int i=-80;i<=80;i++) {
+	  double x=i*0.05;
+	  double xT=x*Tmu;
+
+	  double y=uf->cost_func(get_rotation(xT)*W);
+	  fprintf(p,"% e % e % e\n",x,xT,y);
+	}
+	fclose(p);
+	delete uf;
+      }
     }
-  }
-
-
+  
   if(oldf)
     delete oldf;
-
+  
   return f->getf();
 }
 
