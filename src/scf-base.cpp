@@ -1808,7 +1808,6 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	solver.RDFT(sol,occs,conv,dft);
 
       } else {
-
 	// Run Perdew-Zunger calculation.
 	rscf_t oldsol(sol);
 	sol.P.zeros();
@@ -1922,73 +1921,82 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	      if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
 		break;
-	      if(pziter==pzniter)
+	      if(pziter>=pzniter)
 		break;
 	    }
 	    pziter=0;
 	  }
 
-	  while(true) {
-	    // Change reference values
-	    oldsol=sol;
+	  if(pzniter)
+	    while(true) {
+	      // Change reference values
+	      oldsol=sol;
+	      
+	      // DFT grid
+	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
+	      if(!adaptive)
+		// Fixed size grid
+		grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
 
-	    // DFT grid
-	    DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
-	    if(!adaptive)
-	      // Fixed size grid
-	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+	      // Get new SIC potential
+	      solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
+	      pziter++;
 
-	    // Get new SIC potential
-	    solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzh,pzcor,grid,adaptive,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
-	    pziter++;
+	      // Solve self-consistent field equations in presence of new SIC potential
+	      solver.RDFT(sol,occs,conv,dft);
 
-	    // Solve self-consistent field equations in presence of new SIC potential
-	    solver.RDFT(sol,occs,conv,dft);
+	      // Energy difference
+	      double dE=sol.en.E-oldsol.en.E;
+	      // Density differences
+	      double dP_rms=rms_norm((sol.P-oldsol.P)/2.0);
+	      double dP_max=max_abs((sol.P-oldsol.P)/2.0);
 
-	    // Energy difference
-	    double dE=sol.en.E-oldsol.en.E;
-	    // Density differences
-	    double dP_rms=rms_norm((sol.P-oldsol.P)/2.0);
-	    double dP_max=max_abs((sol.P-oldsol.P)/2.0);
+	      // Print out changes
+	      if(verbose) {
+		fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
 
-	    // Print out changes
-	    if(verbose) {
-	      fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
+		if(fabs(dE)<thr_dEmax)
+		  fprintf(stderr," % 10.3e*",dE);
+		else
+		  fprintf(stderr," % 10.3e ",dE);
 
-	      if(fabs(dE)<thr_dEmax)
-		fprintf(stderr," % 10.3e*",dE);
-	      else
-		fprintf(stderr," % 10.3e ",dE);
+		if(dP_rms<thr_dPrms)
+		  fprintf(stderr," %9.3e*",dP_rms);
+		else
+		  fprintf(stderr," %9.3e ",dP_rms);
 
-	      if(dP_rms<thr_dPrms)
-		fprintf(stderr," %9.3e*",dP_rms);
-	      else
-		fprintf(stderr," %9.3e ",dP_rms);
+		if(dP_max<thr_dPmax)
+		  fprintf(stderr," %9.3e*",dP_max);
+		else
+		  fprintf(stderr," %9.3e ",dP_max);
 
-	      if(dP_max<thr_dPmax)
-		fprintf(stderr," %9.3e*",dP_max);
-	      else
-		fprintf(stderr," %9.3e ",dP_max);
+		fprintf(stderr,"\n");
 
-	      fprintf(stderr,"\n");
+		printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
+		printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
+	      }
 
-	      printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
-	      printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
+	      if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
+		break;
+	      if(pziter==pzniter)
+		break;
 	    }
-
-	    if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
-	      break;
-	    if(pziter==pzniter)
-	      break;
-	  }
-
+	  
 	  if(verbose)
 	    fprintf(stderr,"\nSIC self-consistency solved in %s.\n",tsic.elapsed().c_str());
-
+	  
 	  // Stability analysis
 	  if(pzstab) {
 	    PZStability stab(&solver,dft);
-	    stab.check(sol,true,pzstab==2);
+
+	    /*
+	    // Optimize
+	    stab.set(sol,pz!=REAL,true,true);
+	    stab.optimize();
+	    */
+	    
+	    stab.set(sol,true,abs(pzstab)==2);
+	    stab.check();
 	  }
 	}
       }
@@ -2334,7 +2342,15 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	  // Stability analysis
 	  if(pzstab) {
 	    PZStability stab(&solver,dft);
-	    stab.check(sol,true,pzstab==2);
+
+	    /*
+	    // Optimize
+	    stab.set(sol,pz!=REAL,true,true);
+	    stab.optimize();
+	    */
+
+	    stab.set(sol,true,abs(pzstab)==2);
+	    stab.check();
 	  }
 	}
 
