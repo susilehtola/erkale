@@ -66,12 +66,12 @@ fi
 
 # Current versions of libraries, if they are to be compiled
 export GSLVER="1.16"
-export XCVER="2.1.0"
+export XCVER="2.2.1"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="4.200.0"
-export CMAKEVER="2.8.12"
-export HDF5VER="1.8.12"
+export ARMAVER="4.600.0"
+export CMAKEVER="3.1.0"
+export HDF5VER="1.8.14"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -247,7 +247,7 @@ if(( ! ${system_cmake} )); then
 	if [ ! -d ${builddir}/cmake-${CMAKEVER} ]; then
 	    if [ ! -f ${srcdir}/cmake-${CMAKEVER}.tar.gz ]; then
 		cd ${srcdir}
-		wget -O cmake-${CMAKEVER}.tar.gz http://www.cmake.org/files/v2.8/cmake-${CMAKEVER}.tar.gz
+		wget -O cmake-${CMAKEVER}.tar.gz http://www.cmake.org/files/v3.1/cmake-${CMAKEVER}.tar.gz
 	    fi
 	    cd ${builddir}
 	    tar zxf ${srcdir}/cmake-${CMAKEVER}.tar.gz
