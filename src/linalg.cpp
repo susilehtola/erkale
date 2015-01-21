@@ -19,6 +19,10 @@
 #include "mathf.h"
 #include "stringutil.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 void sort_eigvec(arma::vec & eigval, arma::mat & eigvec) {
   sort_eigvec_wrk<double>(eigval,eigvec);
 }
