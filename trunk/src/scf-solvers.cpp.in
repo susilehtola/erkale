@@ -793,17 +793,35 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       if(verbose) {
 	double lost;
 	imag_lost(sol,S,lost);
-	if(fabs(lost)>10*DBL_EPSILON)
-	  printf("Use of real CMOs would lose %e electrons.\n",lost);
+	if(fabs(lost)>10*DBL_EPSILON) {
+	  if(realcmos)
+	    printf("Use of real CMOs loses %e electrons.\n",lost);
+	  else
+	    printf("Use of real CMOs would lose %e electrons.\n",lost);
+	}
       }
+      // Switch back to real CMOs
+      if(realcmos)
+	sol.cC=sol.C*std::complex<double>(1.0,0.0);
 #else
       if(verbose) {
 	double losta, lostb;
 	imag_lost(sol,S,losta,lostb);
-	if(fabs(losta)>10*DBL_EPSILON)
-	  printf("Use of real CMOs would lose %e alpha electrons.\n",losta);
-	if(fabs(lostb)>10*DBL_EPSILON)
-	  printf("Use of real CMOs would lose %e beta  electrons.\n",lostb);
+	if(realcmos) {
+	  if(fabs(losta)>10*DBL_EPSILON)
+	    printf("Use of real CMOs loses %e alpha electrons.\n",losta);
+	  if(fabs(lostb)>10*DBL_EPSILON)
+	    printf("Use of real CMOs loses %e beta  electrons.\n",lostb);
+	} else {
+	  if(fabs(losta)>10*DBL_EPSILON)
+	    printf("Use of real CMOs would lose %e alpha electrons.\n",losta);
+	  if(fabs(lostb)>10*DBL_EPSILON)
+	    printf("Use of real CMOs would lose %e beta  electrons.\n",lostb);
+	}
+      }
+      if(realcmos) {
+	sol.cCa=sol.Ca*std::complex<double>(1.0,0.0);
+	sol.cCb=sol.Cb*std::complex<double>(1.0,0.0);
       }
 #endif
     }

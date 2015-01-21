@@ -142,7 +142,7 @@ void Settings::add_dft_settings() {
   // Use Perdew-Zunger self-interaction correction?
   add_double("PZw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
   // Perturbative SIC?
-  add_string("PZ", "Perform Perdew-Zunger self-interaction correction? No, Pert, Full, Can, CanPert","No");
+  add_string("PZ", "Perform Perdew-Zunger self-interaction correction? No, Pert, Full, OldFull, Real, Can, CanPert","No");
   // Initialize PZ-SIC with localized orbitals?
   add_bool("PZloc", "Initial localization before SIC calculation?", true);
   // Run stability analysis for PZ-SIC?
