@@ -84,6 +84,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   usetrrh=set.get_bool("UseTRRH");
   linesearch=set.get_bool("LineSearch");
 
+  realcmos=false;
+
   maxiter=set.get_int("MaxIter");
   shift=set.get_double("Shift");
   verbose=set.get_bool("Verbose");
@@ -391,7 +393,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
 	Forb[io]=(1-kfrac)*Jorb[io]*COMPLEX1;
-    
+
   } else {
     if(!direct) {
       // Tabled integrals
@@ -409,7 +411,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
       throw std::runtime_error("Direct formation of conventional Coulomb matrices not implemented!\n");
     }
   }
-  
+
   if(verbose) {
     printf(" done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
@@ -436,12 +438,12 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       Eorb[io]+=Exc[io];
     }
-    
+
     // and the Fock matrix
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
 	Forb[io]+=XC[io];
-    
+
     if(verbose) {
       printf(" done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
@@ -829,7 +831,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     if(verbose) {
       fprintf(stderr,"Unitary optimization performed in %s.\n",tsic.elapsed().c_str());
       tsic.set();
-      
+
       /*
 	printf("\n");
 	analyze_orbitals(*basisp,sicsol.cC*W);
@@ -899,13 +901,13 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
       W=arma::real(W)*std::complex<double>(1.0,0.0);
     }
     worker->setW(W);
-    
+
     // Optimizer
     UnitaryOptimizer opt(DBL_MAX,Etol,verbose,real);
     UnitaryFunction *hlp=worker;
     opt.optimize(hlp,POLY_DF,CGPR,nmax);
     worker=(PZSIC *) hlp;
-    
+
     ESIC=worker->get_ESIC();
     W=worker->getW();
   }
@@ -980,14 +982,22 @@ void SCF::gwh_guess(uscf_t & sol) const {
   diagonalize(S,Sinvh,sol);
 }
 
+bool SCF::get_real_cmos() const {
+  return realcmos;
+}
+
+void SCF::set_real_cmos(bool real) {
+  realcmos=real;
+}
+
 void imag_lost(const rscf_t & sol, const arma::mat & S, double & d) {
   // Compute amount of electrons
   int Nel=(int) round(arma::trace(S*sol.P))/2;
-  
+
   // MO overlap matrix
   if(sol.cC.n_cols == sol.C.n_cols) {
     arma::cx_mat MOovl=arma::trans(sol.C.cols(0,Nel-1))*S*sol.cC.cols(0,Nel-1);
-    
+
     // Amount of electrons lost in the approximation
     d=2.0*(Nel-std::real(arma::trace(MOovl*arma::trans(MOovl))));
   } else
@@ -1005,7 +1015,7 @@ void imag_lost(const uscf_t & sol, const arma::mat & S, double & da, double & db
     da=Nela-std::real(arma::trace(MOovla*arma::trans(MOovla)));
   } else
     da=0.0;
-  
+
   if(sol.cCb.n_cols == sol.Cb.n_cols) {
     arma::cx_mat MOovlb=arma::trans(sol.Cb.cols(0,Nelb-1))*S*sol.cCb.cols(0,Nelb-1);
     db=Nelb-std::real(arma::trace(MOovlb*arma::trans(MOovlb)));
@@ -1025,7 +1035,7 @@ template<typename T> void diagonalize_wrk(const arma::mat & S, const arma::mat &
   eig_sym_ordered_wrk(E,orbs,Horth);
   // Transform back to non-orthogonal basis
   C=Sinvh*orbs;
-  
+
   if(shift!=0.0) {
     // Orbital energies occupied by shift, so recompute these
     E=arma::real(arma::diagvec(arma::trans(C)*H*C));
@@ -1506,12 +1516,14 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
   Nel_beta=Nel-Nel_alpha;
 }
 
-enum pzrun parse_pzsic(const std::string & pzs) {
+enum pzrun parse_pzrun(const std::string & pzs) {
   enum pzrun pz;
 
   // Perdew-Zunger SIC?
   if(stricmp(pzs,"Full")==0)
     pz=FULL;
+  else if(stricmp(pzs,"OldFull")==0)
+    pz=OLDFULL;
   else if(stricmp(pzs,"Pert")==0)
     pz=PERT;
   else if(stricmp(pzs,"Real")==0)
@@ -1789,7 +1801,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       bool adaptive=(stricmp(set.get_string("DFTGrid"),"Auto")==0);
 
       // Perdew-Zunger?
-      enum pzrun pz=parse_pzsic(set.get_string("PZ"));
+      enum pzrun pz=parse_pzrun(set.get_string("PZ"));
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
       int pzstab=set.get_int("PZstab");
       if(pz==NO) {
@@ -1873,6 +1885,12 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
 	  Timer tsic;
 
+	  // Real canonical CMOs?
+	  if(pz==OLDFULL)
+	    solver.set_real_cmos(true);
+	  else
+	    solver.set_real_cmos(false);
+
 	  if(adaptive) {
 	    while(true) {
 	      // Change reference values
@@ -1931,7 +1949,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    while(true) {
 	      // Change reference values
 	      oldsol=sol;
-	      
+
 	      // DFT grid
 	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
 	      if(!adaptive)
@@ -1981,10 +1999,10 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	      if(pziter==pzniter)
 		break;
 	    }
-	  
+
 	  if(verbose)
 	    fprintf(stderr,"\nSIC self-consistency solved in %s.\n",tsic.elapsed().c_str());
-	  
+
 	  // Stability analysis
 	  if(pzstab) {
 	    PZStability stab(&solver,dft);
@@ -1994,7 +2012,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	    stab.set(sol,pz!=REAL,true,true);
 	    stab.optimize();
 	    */
-	    
+
 	    stab.set(sol,true,abs(pzstab)==2);
 	    stab.check();
 	  }
@@ -2132,7 +2150,7 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       bool adaptive=(stricmp(set.get_string("DFTGrid"),"Auto")==0);
 
       // Perdew-Zunger?
-      enum pzrun pz=parse_pzsic(set.get_string("PZ"));
+      enum pzrun pz=parse_pzrun(set.get_string("PZ"));
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
       int pzstab=set.get_int("PZstab");
       if(pz==NO) {
@@ -2206,6 +2224,12 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	} else {
 	  if(verbose)
 	    printf("\nRunning SIC cycle until energy converged to %e and density to %e max, %e rms.\n\n",thr_dEmax,thr_dPmax,thr_dPrms);
+
+	  // Real canonical CMOs?
+	  if(pz==OLDFULL)
+	    solver.set_real_cmos(true);
+	  else
+	    solver.set_real_cmos(false);
 
 	  // Solution to last iteration
 	  uscf_t oldsol;
@@ -2453,7 +2477,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   for(size_t i=0;i<Nold;i++)
     for(size_t ish=0;ish<origshellidx.size();ish++)
       C.submat(augshells[origshellidx[ish]].get_first_ind(),i,augshells[origshellidx[ish]].get_last_ind(),i)=Cold.submat(origshells[ish].get_first_ind(),i,origshells[ish].get_last_ind(),i);
-  
+
   // Determine the rest. Compute the overlap of the functions
   arma::mat X=arma::trans(Sinvh)*S*C.cols(0,Nold-1);
   // and perform SVD
@@ -2467,7 +2491,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   Sinvh=Sinvh*U;
 
   // Now, the subspace of the small basis set is found in the first
-  // Nmo eigenvectors. 
+  // Nmo eigenvectors.
   C.cols(Nold,Nind-1)=Sinvh.cols(Nold,Nind-1);
 
   try {
@@ -2645,5 +2669,3 @@ arma::mat interpret_force(const arma::vec & f) {
   force.reshape(3,f.n_elem/3);
   return force;
 }
-
-

@@ -179,6 +179,8 @@ enum pzrun {
   NO,
   /// Full correction.
   FULL,
+  /// Full correction but with approximation to real CMOs
+  OLDFULL,
   /// Perturbative correction, after SCF convergence
   PERT,
   /// Full correction with real orbitals
@@ -271,6 +273,8 @@ class SCF {
   bool usetrrh;
   /// Do line search in level shift?
   bool linesearch;
+  /// Use real CMOs to do SIC?
+  bool realcmos;
 
   /// Maximum number of iterations
   int maxiter;
@@ -396,6 +400,11 @@ class SCF {
   /// Get checkpoint file
   Checkpoint *get_checkpoint() const;
 
+  /// Use real CMOs to do SIC?
+  bool get_real_cmos() const;
+  /// Use real CMOs to do SIC?
+  void set_real_cmos(bool real);
+  
   /// Do core guess
   void core_guess(rscf_t & sol) const;
   /// Do core guess
