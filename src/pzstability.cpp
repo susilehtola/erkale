@@ -23,6 +23,9 @@
 #define COMPLEX1 std::complex<double>(1.0,0.0)
 #define COMPLEXI std::complex<double>(0.0,1.0)
 
+// Mode to evaluate gradient and hessian in: 0 for full calculation, 1 for wrt reference
+#define GHMODE 1
+
 FDHessian::FDHessian() {
   // Rotation step size
   ss=cbrt(DBL_EPSILON);
@@ -50,11 +53,11 @@ arma::vec FDHessian::gradient() {
 
     // LHS value
     x(i)=-ss;
-    double yl=eval(x);
+    double yl=eval(x,GHMODE);
 
     // RHS value
     x(i)=ss;
-    double yr=eval(x);
+    double yr=eval(x,GHMODE);
 
     // Derivative
     g(i)=(yr-yl)/(2*ss);
@@ -98,25 +101,25 @@ arma::mat FDHessian::hessian() {
     x.zeros();
     x(i)+=ss;
     x(j)+=ss;
-    double yrr=eval(x);
+    double yrr=eval(x,GHMODE);
 
     // RH,LH
     x.zeros();
     x(i)+=ss;
     x(j)-=ss;
-    double yrl=eval(x);
+    double yrl=eval(x,GHMODE);
 
     // LH,RH
     x.zeros();
     x(i)-=ss;
     x(j)+=ss;
-    double ylr=eval(x);
+    double ylr=eval(x,GHMODE);
 
     // LH,LH
     x.zeros();
     x(i)-=ss;
     x(j)-=ss;
-    double yll=eval(x);
+    double yll=eval(x,GHMODE);
 
     // Values
     h(i,j)=(yrr - yrl - ylr + yll)/(4.0*ss*ss);
@@ -291,81 +294,280 @@ size_t PZStability::count_params() const {
 }
 
 double PZStability::eval(const arma::vec & x) {
+  return eval(x,false);
+}
+  
+std::vector<size_t> check_ov(const arma::cx_mat & Rov, double rotcut) {
+  // Get list of changed occupied orbitals
+  std::vector<size_t> chkorb;
+  for(size_t o=0;o<Rov.n_rows;o++)
+    for(size_t v=0;v<Rov.n_cols;v++)
+      if(std::abs(Rov(o,v))>=rotcut) {
+	chkorb.push_back(o);
+	break;
+      }
+  return chkorb;
+}
+
+static void add_to_list(std::vector<size_t> & list, size_t num) {
+  bool found=false;
+  for(size_t i=0;i<list.size();i++)
+    if(list[i]==num) {
+      found=true;
+      break;
+    }
+  if(!found)
+    list.push_back(num);
+}
+
+static void check_oo(std::vector<size_t> & chkorb, const arma::cx_mat & Roo, double rotcut) {
+  // Get list of changed occupied orbitals
+  for(size_t o1=0;o1<Roo.n_rows;o1++)
+    for(size_t o2=0;o2<o1;o2++)
+      if(std::abs(Roo(o1,o2))>=rotcut) {
+	// Add both orbitals to the list
+	add_to_list(chkorb,o1);
+	add_to_list(chkorb,o2);
+      }
+}
+
+double PZStability::eval(const arma::vec & x, int mode) {
   double focktol=ROUGHTOL;
 
+  // Rotation cutoff
+  double rotcut=10*DBL_EPSILON;
+  
   if(restr) {
     rscf_t tmp(rsol);
 
-    // Perform ov rotation
-    if(cancheck) {
-      arma::cx_mat Rov=ov_rotation(x,false);
-      tmp.cC=tmp.cC*Rov;
+    // List of occupieds to check
+    std::vector<size_t> chkorb;
+    if(mode==-1 || mode == 0) {
+      for(size_t o=0;o<oa;o++)
+	chkorb.push_back(o);
     }
+    
+    // Get rotation matrix
+    arma::cx_mat Rov;
+    if(cancheck) {
+      // ov rotation matrix
+      Rov=ov_rotation(x,false);
+      // Get list of changed occupied orbitals
+      if(mode==1)
+	chkorb=check_ov(Rov.submat(0,oa,oa-1,Rov.n_cols-1),rotcut);
+    }
+    
+    // Do we need to do the reference part?
+    if(chkorb.size() || mode==-1 || mode==0) {
+      if(cancheck) {
+	// Rotate orbitals
+	tmp.cC=tmp.cC*Rov;
+	
+	// Update density matrix
+	tmp.P=2.0*arma::real(tmp.cC.cols(0,oa-1)*arma::trans(tmp.cC.cols(0,oa-1)));
+      }
+      
+      // Dummy occupation vector
+      std::vector<double> occa(oa,2.0);
+      
+      // Build global Fock operator
+      rscf_t dum;
+      solverp->Fock_RDFT(tmp,occa,method,dum,grid,focktol);
 
-    // Update density matrix
-    tmp.P=2.0*arma::real(tmp.cC.cols(0,oa-1)*arma::trans(tmp.cC.cols(0,oa-1)));
-
-    // Dummy occupation vector
-    std::vector<double> occa(oa,1.0);
-
+      // Update reference energy
+      if(mode==-1)
+	ref_E0=tmp.en.E;
+      
+    } else if(mode==1) {
+      // No, we don't. Set energy
+      tmp.en.E=ref_E0;
+    } else {
+      ERROR_INFO();
+      throw std::runtime_error("Shouldn't be here!\n");
+    }
+    
     // Get oo rotation
     arma::cx_mat Roo;
-    if(oocheck)
+    if(oocheck) {
       Roo=oo_rotation(x,false);
-    else
+      if(mode==1)
+	check_oo(chkorb,Roo,rotcut);
+    } else
       Roo.eye(oa,oa);
 
-    // Build global Fock operator
-    rscf_t dum;
-    solverp->Fock_RDFT(tmp,occa,method,dum,grid,focktol);
-    
-    // Build the SI part
-    std::vector<arma::cx_mat> Forb;
-    arma::vec Eorb;
-    solverp->PZSIC_Fock(Forb,Eorb,tmp.cC.cols(0,oa-1),Roo,method,grid,false);
-    
-    return tmp.en.E-arma::sum(Eorb);
+    // Orbital SI energies
+    arma::vec Eo(ref_Eo);
+
+    // Do we need to do anything for the oo part?
+    if(chkorb.size() || mode == 0 || mode == -1) {
+      // Collect list of changed occupied orbitals
+      arma::uvec orblist(arma::sort(arma::conv_to<arma::uvec>::from(chkorb)));
+      
+      // Transformed oo block
+      arma::cx_mat Ct=tmp.cC.cols(0,oa-1)*Roo;
+      // Dummy matrix
+      arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
+      
+      // Build the SI part
+      std::vector<arma::cx_mat> Forb;
+      arma::vec Eorb;
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
+
+      if(mode==1) {
+	for(size_t i=0;i<orblist.n_elem;i++)
+	  Eo(orblist(i))=Eorb(i);
+      } else {
+	Eo=Eorb;
+
+	if(mode==-1)
+	  // Update reference
+	  ref_Eo=Eorb;
+      }
+    }
+
+    // Account for spin
+    return tmp.en.E - 2.0*arma::sum(Eo);
+
   } else {
     uscf_t tmp(usol);
 
-    // Perform ov rotation
-    if(cancheck) {
-      arma::cx_mat Rova=ov_rotation(x,false);
-      tmp.cCa=tmp.cCa*Rova;
-
-      arma::cx_mat Rovb=ov_rotation(x,true);
-      tmp.cCb=tmp.cCb*Rovb;
+    // List of occupieds to check
+    std::vector<size_t> chkorba, chkorbb;
+    if(mode==-1 || mode==0) {
+      for(size_t o=0;o<oa;o++)
+	chkorba.push_back(o);
+      for(size_t o=0;o<ob;o++)
+	chkorbb.push_back(o);
     }
+      
+    // Get rotation matrix
+    arma::cx_mat Rova, Rovb;
+    if(cancheck) {
+      // ov rotation matrix
+      Rova=ov_rotation(x,false);
+      Rovb=ov_rotation(x,true);
+      // Get list of changed occupied orbitals
+      if(mode==1) {
+	chkorba=check_ov(Rova.submat(0,oa,oa-1,N-1),rotcut);
+	chkorbb=check_ov(Rovb.submat(0,ob,ob-1,N-1),rotcut);
+      }
+    }
+    
+    // Do we need to do the reference part?
+    if(chkorba.size() || chkorbb.size() || mode==-1 || mode==0) {
+      if(cancheck) {
+	// Rotate orbitals
+	tmp.cCa=tmp.cCa*Rova;
+	tmp.cCb=tmp.cCb*Rovb;
+      
+	// Update density matrix
+	tmp.Pa=arma::real(tmp.cCa.cols(0,oa-1)*arma::trans(tmp.cCa.cols(0,oa-1)));
+	tmp.Pb=arma::real(tmp.cCb.cols(0,ob-1)*arma::trans(tmp.cCb.cols(0,ob-1)));
+	tmp.P=tmp.Pa+tmp.Pb;
+      }
+      
+      // Dummy occupation vector
+      std::vector<double> occa(oa,1.0);
+      std::vector<double> occb(ob,1.0);
+      
+      // Build global Fock operator
+      uscf_t dum;
+      solverp->Fock_UDFT(tmp,occa,occb,method,dum,grid,focktol);
 
-    // Update density matrices
-    tmp.Pa=arma::real(tmp.cCa.cols(0,oa-1)*arma::trans(tmp.cCa.cols(0,oa-1)));
-    tmp.Pb=arma::real(tmp.cCb.cols(0,ob-1)*arma::trans(tmp.cCb.cols(0,ob-1)));
-    tmp.P=tmp.Pa+tmp.Pb;
-
-    // Dummy occupation vector
-    std::vector<double> occa(oa,1.0), occb(ob,1.0);
-
+      // Update reference energy
+      if(mode==-1)
+	ref_E0=tmp.en.E;
+      
+    } else if(mode==1) {
+      // No, we don't. Set energy
+      tmp.en.E=ref_E0;
+    } else {
+      ERROR_INFO();
+      throw std::runtime_error("Shouldn't be here!\n");
+    }
+    
     // Get oo rotation
     arma::cx_mat Rooa, Roob;
     if(oocheck) {
       Rooa=oo_rotation(x,false);
       Roob=oo_rotation(x,true);
+
+      if(mode==1) {
+	check_oo(chkorba,Rooa,rotcut);
+	check_oo(chkorbb,Roob,rotcut);
+      }
     } else {
       Rooa.eye(oa,oa);
       Roob.eye(ob,ob);
     }
+    
+    // Orbital SI energies
+    arma::vec Eoa(ref_Eoa), Eob(ref_Eob);
 
-    // Build global Fock operator
-    uscf_t dum;
-    solverp->Fock_UDFT(tmp,occa,occb,method,dum,grid,focktol);
+    // Do we need to do anything for the oo part?
+    if(chkorba.size() || mode == 0 || mode == -1) {
+      // Collect list of changed occupied orbitals
+      arma::uvec orblist(arma::sort(arma::conv_to<arma::uvec>::from(chkorba)));
+      
+      // Transformed oo block
+      arma::cx_mat Ct=tmp.cCa.cols(0,oa-1)*Rooa;
+      // Dummy matrix
+      arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
+      
+      // Build the SI part
+      std::vector<arma::cx_mat> Forb;
+      arma::vec Eorb;
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
+
+      // Collect energies
+      Eoa.t().print("Eoa, old");
+
+      if(mode==1) {
+	for(size_t i=0;i<orblist.n_elem;i++)
+	  Eoa(orblist(i))=Eorb(i);
+      } else {
+	Eoa=Eorb;
+
+	if(mode==-1)
+	  // Update reference
+	  ref_Eoa=Eorb;
+      }
+      
+      Eoa.t().print("Eoa, new");
+    }
+    if(chkorbb.size() || mode == 0 || mode == -1) {
+      // Collect list of changed occupied orbitals
+      arma::uvec orblist(arma::sort(arma::conv_to<arma::uvec>::from(chkorbb)));
+      
+      // Transformed oo block
+      arma::cx_mat Ct=tmp.cCb.cols(0,oa-1)*Roob;
+      // Dummy matrix
+      arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
+      
+      // Build the SI part
+      std::vector<arma::cx_mat> Forb;
+      arma::vec Eorb;
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
+      
+      // Collect energies
+      Eob.t().print("Eob, old");
+
+      if(mode==1) {
+	for(size_t i=0;i<orblist.n_elem;i++)
+	  Eob(orblist(i))=Eorb(i);
+      } else {
+	Eob=Eorb;
+	
+	if(mode==-1)
+	  // Update reference
+	  ref_Eob=Eorb;
+      }
+      
+      Eob.t().print("Eoa, new");
+    }
     
-    // Build the SI part
-    std::vector<arma::cx_mat> Forba, Forbb;
-    arma::vec Eorba, Eorbb;
-    solverp->PZSIC_Fock(Forba,Eorba,tmp.cCa.cols(0,oa-1),Rooa,method,grid,false);
-    solverp->PZSIC_Fock(Forbb,Eorbb,tmp.cCb.cols(0,ob-1),Roob,method,grid,false);
-    
-    return tmp.en.E-arma::sum(Eorba)-arma::sum(Eorbb);
+    // Result is
+    return tmp.en.E-arma::sum(Eoa)-arma::sum(Eob);
   }
 }
 
@@ -402,8 +604,13 @@ void PZStability::update(const arma::vec & x) {
     chkptp->cwrite("CW",rsol.cC.cols(0,oa-1));
   else {
     chkptp->cwrite("CWa",usol.cCa.cols(0,oa-1));
-    chkptp->cwrite("CWb",usol.cCb.cols(0,ob-1));
+    chkptp->cwrite("CWb",usol.cCb.cols(0,ob-1));   
   }
+  
+  // Update reference
+  arma::vec x0(count_params());
+  x0.zeros();
+  eval(x0,true);
 }
 
 arma::cx_mat PZStability::ov_rotation(const arma::vec & x, bool spin) const {
@@ -609,6 +816,10 @@ void PZStability::set(const rscf_t & sol, bool cplx_, bool can, bool oo) {
   else
     grid.construct(method.nrad,method.lmax,method.x_func,method.c_func);
 
+  // Update reference
+  arma::vec x(count_params());
+  x.zeros();
+  eval(x,-1);
 }
 
 void PZStability::set(const uscf_t & sol, bool cplx_, bool can, bool oo) {
@@ -650,6 +861,11 @@ void PZStability::set(const uscf_t & sol, bool cplx_, bool can, bool oo) {
     grid.construct(Ctilde,method.gridtol,method.x_func,method.c_func);
   } else
     grid.construct(method.nrad,method.lmax,method.x_func,method.c_func);
+
+  // Update reference
+  arma::vec x(count_params());
+  x.zeros();
+  eval(x,-1);
 }
 
 void PZStability::check() {
@@ -658,9 +874,13 @@ void PZStability::check() {
     // Test value
     arma::vec x0(count_params());
     x0.zeros();
-
+    if(x0.n_elem)
+      x0(0)=0.1;
+    if(x0.n_elem>=2)
+      x0(1)=-0.1;
+    
     Timer t;
-    eval(x0);
+    eval(x0,GHMODE);
     double dt=t.get();
 
     // Total time is

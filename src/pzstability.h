@@ -38,6 +38,8 @@ class FDHessian {
   virtual size_t count_params() const=0;
   /// Evaluate function
   virtual double eval(const arma::vec & x)=0;
+  /// Evaluate function
+  virtual double eval(const arma::vec & x, int mode)=0;
   /// Update solution
   virtual void update(const arma::vec & x);
 
@@ -66,6 +68,15 @@ class PZStability: public FDHessian {
   rscf_t rsol;
   /// or unrestricted
   uscf_t usol;
+
+  /// Use reference to do evaluations?
+  bool useref;
+  /// Reference SCF energy
+  double ref_E0;
+  /// Reference orbital energies
+  arma::vec ref_Eo;
+  /// Reference orbital energies
+  arma::vec ref_Eoa, ref_Eob;
   
   /// Complex transformations?
   bool cplx;
@@ -99,6 +110,9 @@ class PZStability: public FDHessian {
 
   /// Evaluate function
   double eval(const arma::vec & x);
+    /// Evaluate function. mode: -1 for reference update, 0 for full
+    /// evaluation, 1 for evaluation wrt a reference
+  double eval(const arma::vec & x, int mode);
   /// Update solution
   void update(const arma::vec & x);
 
