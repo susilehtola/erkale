@@ -913,6 +913,15 @@ void PZStability::check() {
   Timer t;
   arma::vec g(gradient());
   printf("Gradient norm is %e (%s)\n",arma::norm(g,2),t.elapsed().c_str()); fflush(stdout);
+  if(cancheck && oocheck) {
+    size_t nov=count_ov_params(oa,va);
+    if(!restr)
+      nov+=count_ov_params(ob,vb);
+
+    double ovnorm=arma::norm(g.subvec(0,nov-1),2);
+    double oonorm=arma::norm(g.subvec(nov,g.n_elem-1),2);
+    printf("OV norm %e, OO norm %e.\n",ovnorm,oonorm);
+  }
   t.set();
 
   // Evaluate Hessian
