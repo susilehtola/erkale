@@ -91,8 +91,6 @@ class PZStability: public FDHessian {
   size_t oa, ob;
   /// Amount of virtual orbitals
   size_t va, vb;
-  /// Total amount of orbitals
-  size_t N;
 
   /// Count amount of parameters for rotations
   size_t count_ov_params(size_t o, size_t v) const;
@@ -125,10 +123,10 @@ class PZStability: public FDHessian {
   /// Destructor
   ~PZStability();
 
-  /// Set parameters. cplx: complex rotations? ov: ov rotations? oo: oo rotations?
-  void set(const rscf_t & sol, bool cplx, bool ov, bool oo=true);
-  /// Set parameters. cplx: complex rotations? ov: ov rotations? oo: oo rotations?
-  void set(const uscf_t & sol, bool cplx, bool ov, bool oo=true);
+  /// Set parameters. drop: drop orbitals from calculation. cplx: complex rotations? ov: ov rotations? oo: oo rotations?
+  void set(const rscf_t & sol, const arma::uvec & drop, bool cplx, bool ov, bool oo=true);
+  /// Set parameters. dropa, dropb: drop orbitals from calculation. cplx: complex rotations? ov: ov rotations? oo: oo rotations?
+  void set(const uscf_t & sol, const arma::uvec & dropa, const arma::uvec & dropb, bool cplx, bool ov, bool oo=true);
   
   /// Check stability of solution.
   void check();

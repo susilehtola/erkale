@@ -924,16 +924,40 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   // Get orbital energies
   sol.E=worker->get_Eorb();
 
-  // Sort orbitals
-  sort_eigvec(sol.E,W);
+  // Projected energies
+  arma::vec Ep;
+  // Sort index
+  arma::uvec idx;
+  
+  if(sol.H.n_rows == sol.Heff.n_rows && sol.H.n_cols == sol.Heff.n_cols) {
+    // Sort orbitals wrt projected energy
+    arma::cx_mat CW=sol.cC.cols(0,W.n_cols-1)*W;
+    Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sol.Heff)*CW));
+    // Get index
+    idx=arma::stable_sort_index(Ep);
+    // Rearrange everything
+    Ep=Ep(idx);
+  } else {
+    // Sort orbitals wrt decreasing SI energy
+    idx=arma::stable_sort_index(sol.E,"descend");
+  }
+  
+  sol.E=sol.E(idx);
+  W=W.cols(idx);
 
   // Get orbital self-interaction energies
   if(verbose) {
     printf("Self-interaction energy is %e.\n",ESIC);
 
-    printf("Decomposition of self-interaction (in increasing order):\n");
-    for(size_t io=0;io<sol.E.n_elem;io++)
-      printf("\t%4i\t% f\n",(int) io+1,sol.E(io));
+    printf("Decomposition of self-interaction energies:\n");
+    printf("\t%4s\t%8s\t%8s\n","io","E(orb)","E(SI)");
+    if(Ep.n_elem == sol.E.n_elem) {
+      for(size_t io=0;io<sol.E.n_elem;io++)
+	printf("\t%4i\t% 8.3f\t% 8.3f\n",(int) io+1,Ep(io),sol.E(io));
+    } else {
+      for(size_t io=0;io<sol.E.n_elem;io++)
+	printf("\t%4i\t%8s\t% 8.3f\n",(int) io+1,"",sol.E(io));
+    }
     fflush(stdout);
   }
 
@@ -1804,6 +1828,8 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       enum pzrun pz=parse_pzrun(set.get_string("PZ"));
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
       int pzstab=set.get_int("PZstab");
+      std::string pzstabfz=set.get_string("PZstabFz");
+      
       if(pz==NO) {
 	if(adaptive) {
 	  // Solve restricted DFT problem first on a rough grid
@@ -2007,13 +2033,19 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	  if(pzstab) {
 	    PZStability stab(&solver,dft);
 
+	    arma::uvec drop;
+	    if(pzstabfz.size()) {
+	      // Convert to C++ indexing
+	      drop=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
+	    }
+	    
 	    /*
 	    // Optimize
 	    stab.set(sol,pz!=REAL,true,true);
 	    stab.optimize();
 	    */
 
-	    stab.set(sol,true,abs(pzstab)==2);
+	    stab.set(sol,drop,true,abs(pzstab)==2);
 	    stab.check();
 	  }
 	}
@@ -2152,7 +2184,10 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       // Perdew-Zunger?
       enum pzrun pz=parse_pzrun(set.get_string("PZ"));
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
+
       int pzstab=set.get_int("PZstab");
+      std::string pzstabfz=set.get_string("PZstabFz");
+      
       if(pz==NO) {
 	if(adaptive) {
 	  // Solve unrestricted DFT problem first on a rough grid
@@ -2367,13 +2402,19 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	  if(pzstab) {
 	    PZStability stab(&solver,dft);
 
+	    arma::uvec dropa, dropb;
+	    if(pzstabfz.size()) {
+	      // Get ranges and convert to C++ indexing
+	      dropa=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
+	      dropb=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[1]))-1;
+	    }
 	    /*
 	    // Optimize
 	    stab.set(sol,pz!=REAL,true,true);
 	    stab.optimize();
 	    */
 
-	    stab.set(sol,true,abs(pzstab)==2);
+	    stab.set(sol,dropa,dropb,true,abs(pzstab)==2);
 	    stab.check();
 	  }
 	}
