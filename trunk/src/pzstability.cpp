@@ -242,7 +242,6 @@ PZStability::PZStability(SCF * solver, dft_t dft) {
   restr=true;
   oa=ob=0;
   va=vb=0;
-  N=0;
 }
 
 PZStability::~PZStability() {
@@ -448,8 +447,8 @@ double PZStability::eval(const arma::vec & x, int mode) {
       Rovb=ov_rotation(x,true);
       // Get list of changed occupied orbitals
       if(mode==1) {
-	chkorba=check_ov(Rova.submat(0,oa,oa-1,N-1),rotcut);
-	chkorbb=check_ov(Rovb.submat(0,ob,ob-1,N-1),rotcut);
+	chkorba=check_ov(Rova.submat(0,oa,oa-1,oa+va-1),rotcut);
+	chkorbb=check_ov(Rovb.submat(0,ob,ob-1,ob+vb-1),rotcut);
       }
     }
     
@@ -668,10 +667,10 @@ arma::cx_mat PZStability::ov_rotation(const arma::vec & x, bool spin) const {
   }
 
   // Construct full, padded rotation matrix
-  arma::cx_mat R(N,N);
+  arma::cx_mat R(o+v,o+v);
   R.zeros();
-  R.submat(0,o,o-1,N-1)=r;
-  R.submat(o,0,N-1,o-1)=-arma::trans(r);
+  R.submat(0,o,o-1,o+v-1)=r;
+  R.submat(o,0,o+v-1,o-1)=-arma::trans(r);
 
   // R is anti-hermitian. Get its eigenvalues and eigenvectors
   arma::cx_mat Rvec;
@@ -784,7 +783,7 @@ arma::cx_mat PZStability::oo_rotation(const arma::vec & x, bool spin) const {
   return Roo;
 }
 
-void PZStability::set(const rscf_t & sol, bool cplx_, bool can, bool oo) {
+void PZStability::set(const rscf_t & sol, const arma::uvec & drop, bool cplx_, bool can, bool oo) {
   cplx=cplx_;
   cancheck=can;
   oocheck=oo;
@@ -796,17 +795,25 @@ void PZStability::set(const rscf_t & sol, bool cplx_, bool can, bool oo) {
   chkptp->read(basis);
   grid=DFTGrid(&basis,true,false);
 
+  // Update solution
+  rsol=sol;
+  rsol.cC.cols(0,CW.n_cols-1)=CW;
+
+  // Drop orbitals
+  if(!cancheck) {
+    arma::uvec dr(arma::sort(drop,"descend"));
+    for(size_t i=0;i<dr.n_elem;i++) {
+      rsol.cC.shed_col(dr(i));
+      CW.shed_col(0);
+    }
+  }
+
   // Update size parameters
   restr=true;
   oa=ob=CW.n_cols;
-  N=sol.C.n_rows;
-  va=vb=N-oa;
+  va=vb=rsol.cC.n_cols-oa;
 
-  // Update solution
-  rsol=sol;
-  rsol.cC.cols(0,oa-1)=CW;
-
-  fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i, N = %i\n",(int) oa, (int) ob, (int) va, (int) vb, (int) N);
+  fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
   fprintf(stderr,"There are %i parameters.\n",(int) count_params());
   fflush(stdout);
 
@@ -822,7 +829,7 @@ void PZStability::set(const rscf_t & sol, bool cplx_, bool can, bool oo) {
   eval(x,-1);
 }
 
-void PZStability::set(const uscf_t & sol, bool cplx_, bool can, bool oo) {
+void PZStability::set(const uscf_t & sol, const arma::uvec & dropa, const arma::uvec & dropb, bool cplx_, bool can, bool oo) {
   cplx=cplx_;
   cancheck=can;
   oocheck=oo;
@@ -835,20 +842,33 @@ void PZStability::set(const uscf_t & sol, bool cplx_, bool can, bool oo) {
   chkptp->read(basis);
   grid=DFTGrid(&basis,true,false);
 
+  // Update solution
+  usol=sol;
+  usol.cCa.cols(0,CWa.n_cols-1)=CWa;
+  usol.cCb.cols(0,CWb.n_cols-1)=CWb;
+
+  // Drop orbitals
+  if(!cancheck) {
+    arma::uvec dra(arma::sort(dropa,"descend"));
+    for(size_t i=0;i<dra.n_elem;i++) {
+      usol.cCa.shed_col(dra(i));
+      CWa.shed_col(0);
+    }
+    arma::uvec drb(arma::sort(dropb,"descend"));
+    for(size_t i=0;i<drb.n_elem;i++) {
+      usol.cCb.shed_col(drb(i));
+      CWb.shed_col(0);
+    }
+  }
+  
   // Update size parameters
   restr=false;
   oa=CWa.n_cols;
   ob=CWb.n_cols;
-  N=sol.Ca.n_rows;
-  va=N-oa;
-  vb=N-ob;
+  va=usol.cCa.n_cols-oa;
+  vb=usol.cCb.n_cols-ob;
 
-  // Update solution
-  usol=sol;
-  usol.cCa.cols(0,oa-1)=CWa;
-  usol.cCb.cols(0,ob-1)=CWb;
-
-  fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i, N = %i\n",(int) oa, (int) ob, (int) va, (int) vb, (int) N);
+  fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
   fprintf(stderr,"There are %i parameters.\n",(int) count_params());
   fflush(stdout);
 
