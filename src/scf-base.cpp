@@ -29,6 +29,7 @@
 #include "diis.h"
 #include "global.h"
 #include "guess.h"
+#include "lebedev.h"
 #include "linalg.h"
 #include "mathf.h"
 #include "properties.h"
@@ -1642,9 +1643,22 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
       dft.adaptive=false;
       dft.nrad=readint(opts[0]);
       dft.lmax=readint(opts[1]);
-      if(dft.nrad<1 || dft.lmax<1) {
-	throw std::runtime_error("Invalid DFT grid specified.\n");
+      if(dft.nrad<1 || dft.lmax==0) {
+	throw std::runtime_error("Invalid DFT radial grid specified.\n");
       }
+
+      // Check if l was given in number of points
+      if(dft.lmax<0) {
+	// Try to find corresponding Lebedev grid
+	for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
+	  if(lebedev_degrees[i]==-dft.lmax) {
+	    dft.lmax=lebedev_orders[i];
+	    break;
+	  }
+	if(dft.lmax<0)
+	  throw std::runtime_error("Invalid DFT angular grid specified.\n");
+      }
+      
       printf("dft.nrad = %i, dft.lmax = %i\n",dft.nrad,dft.lmax);
 
     } else {
