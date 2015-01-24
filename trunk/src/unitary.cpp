@@ -589,14 +589,19 @@ void UnitaryOptimizer::polynomial_step_df(UnitaryFunction* & fp) {
       } else {
 	fprintf(stderr,"Line search interpolation failed.\n");
 	fflush(stderr);
-	if(halved<4) {
+	if(halved<1) {
 	  delete newf;
 	  halved++;
 	  deltaTmu/=2.0;
 	  continue;
 	} else {
+	  // Try an Armijo step
+	  return armijo_step(fp);
+	  
+	  /*
 	  ERROR_INFO();
 	  throw std::runtime_error("Problem in polynomial line search - could not find suitable extremum!\n");
+	  */
 	}
       }
 
