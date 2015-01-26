@@ -1093,7 +1093,12 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	  } else {
 	    // Nope, there is a shell.
 	    std::vector<std::string> words=splitline(line);
-
+	    if(words.size()!=2 && words.size()!=3) {
+	      std::ostringstream oss;
+	      oss << "Error parsing input line \"" << line << "\".\nExpected a shell type and amount of functions.\n";
+	      throw std::runtime_error(oss.str());
+	    }
+	    
 	    // The shell type is
 	    std::string shelltype=words[0];
 	    // The amount of exponents is
