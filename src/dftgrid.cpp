@@ -1095,57 +1095,11 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
-  // LDA part
-  double ldafac;
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Factor in common for basis functions
-    ldafac=grid[ip].w*vxc[ip];
-
-    // Loop over functions on grid point
-    size_t first=grid[ip].f0;
-    size_t last=first+grid[ip].nf;
-
-    for(size_t ii=first;ii<last;ii++) {
-      // Get index of function
-      size_t i=flist[ii].ind;
-      for(size_t jj=first;jj<last;jj++) {
-	size_t j=flist[jj].ind;
-
-	H(i,j)+=ldafac*flist[ii].f*flist[jj].f;
-      }
-    }
-  }
-
-  // GGA part
-  if(do_gga) {
-    double ggafac[3];
-
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Factor in common for basis functions
-      for(int ic=0;ic<3;ic++)
-	ggafac[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
-
-      // Loop over functions on grid point
-      size_t first=grid[ip].f0;
-      size_t last=first+grid[ip].nf;
-
-      for(size_t ii=first;ii<last;ii++) {
-	// Get index of function
-	size_t i=flist[ii].ind;
-
-	for(size_t jj=first;jj<last;jj++) {
-	  size_t j=flist[jj].ind;
-
-	  H(i,j)+=ggafac[0]*(glist[3*ii]*flist[jj].f + flist[ii].f*glist[3*jj])
-	    +     ggafac[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
-	    +     ggafac[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2]);
-	}
-      }
-    }
-  }
-
   // Meta-GGA
   if(do_mgga) {
+    double ldafac;
+    double ggafac[3];
+
     double bf_lapl;
     double bf_gdot;
 
@@ -1153,6 +1107,9 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
+      ldafac=grid[ip].w*vxc[ip];
+      for(int ic=0;ic<3;ic++)
+	ggafac[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
       kfac=grid[ip].w*vtau[ip];
       lfac=grid[ip].w*vlapl[ip];
 
@@ -1171,7 +1128,62 @@ void AtomGrid::eval_Fxc(arma::mat & H) const {
 	  bf_lapl=flist[ii].f*llist[jj] + llist[ii]*flist[jj].f + 2.0*bf_gdot;
 
 	  // Contribution is
-	  H(i,j)+=0.5*kfac*bf_gdot + lfac*bf_lapl;
+	  H(i,j)+=ldafac*flist[ii].f*flist[jj].f
+	    +     ggafac[0]*(glist[3*ii]*flist[jj].f + flist[ii].f*glist[3*jj])
+	    +     ggafac[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
+	    +     ggafac[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2])
+	    +     0.5*kfac*bf_gdot + lfac*bf_lapl;
+	}
+      }
+    }
+
+  } else if(do_gga) {
+    double ldafac;
+    double ggafac[3];
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[ip];
+      for(int ic=0;ic<3;ic++)
+	ggafac[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	for(size_t jj=first;jj<last;jj++) {
+	  size_t j=flist[jj].ind;
+
+	  H(i,j)+=ldafac*flist[ii].f*flist[jj].f
+	    +     ggafac[0]*(glist[3*ii]*flist[jj].f + flist[ii].f*glist[3*jj])
+	    +     ggafac[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
+	    +     ggafac[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2]);
+	}
+      }
+    }
+
+  } else {
+    // LDA part
+    double ldafac;
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[ip];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+	for(size_t jj=first;jj<last;jj++) {
+	  size_t j=flist[jj].ind;
+
+	  H(i,j)+=ldafac*flist[ii].f*flist[jj].f;
 	}
       }
     }
@@ -1184,50 +1196,11 @@ void AtomGrid::eval_diag_Fxc(arma::vec & H) const {
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
-  // LDA part
-  double ldafac;
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Factor in common for basis functions
-    ldafac=grid[ip].w*vxc[ip];
-
-    // Loop over functions on grid point
-    size_t first=grid[ip].f0;
-    size_t last=first+grid[ip].nf;
-
-    for(size_t ii=first;ii<last;ii++) {
-      // Get index of function
-      size_t i=flist[ii].ind;
-
-      H[i]+=ldafac*flist[ii].f*flist[ii].f;
-    }
-  }
-
-  // GGA part
-  if(do_gga) {
-    double ggafac[3];
-
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Factor in common for basis functions
-      for(int ic=0;ic<3;ic++)
-	ggafac[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
-
-      // Loop over functions on grid point
-      size_t first=grid[ip].f0;
-      size_t last=first+grid[ip].nf;
-
-      for(size_t ii=first;ii<last;ii++) {
-	// Get index of function
-	size_t i=flist[ii].ind;
-
-	for(int ic=0;ic<3;ic++) {
-	  H[i]+=ggafac[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
-	}
-      }
-    }
-  }
 
   // Meta-GGA
   if(do_mgga) {
+    double ldafac;
+    double ggafac[3];
     double bf_gdot;
     double bf_lapl;
 
@@ -1236,6 +1209,9 @@ void AtomGrid::eval_diag_Fxc(arma::vec & H) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
+      ldafac=grid[ip].w*vxc[ip];
+      for(int ic=0;ic<3;ic++)
+	ggafac[ic]=4.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
       lfac=grid[ip].w*vlapl[ip];
       kfac=grid[ip].w*vtau[ip];
 
@@ -1251,7 +1227,57 @@ void AtomGrid::eval_diag_Fxc(arma::vec & H) const {
 	bf_gdot=glist[3*ii]*glist[3*ii] + glist[3*ii+1]*glist[3*ii+1] + glist[3*ii+2]*glist[3*ii+2];
 	bf_lapl=2.0*flist[ii].f*llist[ii] + 2.0*bf_gdot;
 
-	H[i]+=0.5*kfac*bf_gdot + lfac*bf_lapl;
+	H[i]+=(ldafac*flist[ii].f
+	       +   ggafac[0]*glist[3*ii  ]
+	       +   ggafac[1]*glist[3*ii+1]
+	       +   ggafac[2]*glist[3*ii+2])*flist[ii].f
+	  +0.5*kfac*bf_gdot + lfac*bf_lapl;
+      }
+    }
+
+  } else if(do_gga) {
+    // GGA part
+    double ldafac;
+    double ggafac[3];
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[ip];
+      for(int ic=0;ic<3;ic++)
+	ggafac[ic]=2.0*grid[ip].w*vsigma[ip]*grho[3*ip+ic];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	H[i]+=(ldafac*flist[ii].f
+	       +   ggafac[0]*glist[3*ii  ]
+	       +   ggafac[1]*glist[3*ii+1]
+	       +   ggafac[2]*glist[3*ii+2])*flist[ii].f;
+      }
+    }
+
+  } else {
+    // LDA part
+    double ldafac;
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[ip];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	H[i]+=ldafac*flist[ii].f*flist[ii].f;
       }
     }
   }
@@ -1263,61 +1289,11 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
   }
 
-  // LDA part
-  double ldafaca, ldafacb;
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Factor in common for basis functions
-    ldafaca=grid[ip].w*vxc[2*ip];
-    ldafacb=grid[ip].w*vxc[2*ip+1];
-
-    // Loop over functions on grid point
-    size_t first=grid[ip].f0;
-    size_t last=first+grid[ip].nf;
-
-    for(size_t ii=first;ii<last;ii++) {
-      // Get index of function
-      size_t i=flist[ii].ind;
-      for(size_t jj=first;jj<last;jj++) {
-	size_t j=flist[jj].ind;
-
-	Ha(i,j)+=ldafaca*flist[ii].f*flist[jj].f;
-	Hb(i,j)+=ldafacb*flist[ii].f*flist[jj].f;
-      }
-    }
-  }
-
-  // GGA part
-  if(do_gga) {
-    double ggafaca[3], ggafacb[3];
-
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Factor in common for basis functions
-      for(int ic=0;ic<3;ic++) {
-	ggafaca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
-	ggafacb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
-      }
-
-      // Loop over functions on grid point
-      size_t first=grid[ip].f0;
-      size_t last=first+grid[ip].nf;
-
-      for(size_t ii=first;ii<last;ii++) {
-	// Get index of function
-	size_t i=flist[ii].ind;
-	for(size_t jj=first;jj<last;jj++) {
-	  size_t j=flist[jj].ind;
-
-	  for(int ic=0;ic<3;ic++) {
-	    Ha(i,j)+=ggafaca[ic]*(glist[3*ii+ic]*flist[jj].f + flist[ii].f*glist[3*jj+ic]);
-	    Hb(i,j)+=ggafacb[ic]*(glist[3*ii+ic]*flist[jj].f + flist[ii].f*glist[3*jj+ic]);
-	  }
-	}
-      }
-    }
-  }
-
   // Meta-GGA
   if(do_mgga) {
+    double ldafaca, ldafacb;
+    double ggafaca[3], ggafacb[3];
+
     double bf_gdot;
     double bf_lapl;
 
@@ -1326,6 +1302,14 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
+      ldafaca=grid[ip].w*vxc[2*ip];
+      ldafacb=grid[ip].w*vxc[2*ip+1];
+
+      for(int ic=0;ic<3;ic++) {
+	ggafaca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
+	ggafacb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
+      }
+
       lfaca=grid[ip].w*vlapl[2*ip];
       lfacb=grid[ip].w*vlapl[2*ip+1];
 
@@ -1346,46 +1330,31 @@ void AtomGrid::eval_Fxc(arma::mat & Ha, arma::mat & Hb) const {
 	  bf_gdot=glist[3*ii]*glist[3*jj] + glist[3*ii+1]*glist[3*jj+1] + glist[3*ii+2]*glist[3*jj+2];
 	  bf_lapl=flist[ii].f*llist[jj] + llist[ii]*flist[jj].f + 2.0*bf_gdot;
 
-	  Ha(i,j)+=0.5*kfaca*bf_gdot + lfaca*bf_lapl;
-	  Hb(i,j)+=0.5*kfacb*bf_gdot + lfacb*bf_lapl;
+	  Ha(i,j)+=ldafaca*flist[ii].f*flist[jj].f
+	    + ggafaca[0]*(glist[3*ii  ]*flist[jj].f + flist[ii].f*glist[3*jj  ])
+	    + ggafaca[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
+	    + ggafaca[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2])
+	    + 0.5*kfaca*bf_gdot + lfaca*bf_lapl;
+
+	  Hb(i,j)+=ldafacb*flist[ii].f*flist[jj].f
+	    + ggafacb[0]*(glist[3*ii  ]*flist[jj].f + flist[ii].f*glist[3*jj  ])
+	    + ggafacb[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
+	    + ggafacb[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2])
+	    + 0.5*kfacb*bf_gdot + lfacb*bf_lapl;
 	}
       }
     }
-  }
-}
 
-void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
-  if(!polarized) {
-    ERROR_INFO();
-    throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
-  }
-
-  // LDA part
-  double ldafaca, ldafacb;
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Factor in common for basis functions
-    ldafaca=grid[ip].w*vxc[2*ip];
-    ldafacb=grid[ip].w*vxc[2*ip+1];
-
-    // Loop over functions on grid point
-    size_t first=grid[ip].f0;
-    size_t last=first+grid[ip].nf;
-
-    for(size_t ii=first;ii<last;ii++) {
-      // Get index of function
-      size_t i=flist[ii].ind;
-
-      Ha[i]+=ldafaca*flist[ii].f*flist[ii].f;
-      Hb[i]+=ldafacb*flist[ii].f*flist[ii].f;
-    }
-  }
-
-  // GGA part
-  if(do_gga) {
+  } else if(do_gga) {
+    // GGA part
+    double ldafaca, ldafacb;
     double ggafaca[3], ggafacb[3];
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factor in common for basis functions
+      ldafaca=grid[ip].w*vxc[2*ip];
+      ldafacb=grid[ip].w*vxc[2*ip+1];
+
       for(int ic=0;ic<3;ic++) {
 	ggafaca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
 	ggafacb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
@@ -1398,17 +1367,60 @@ void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
       for(size_t ii=first;ii<last;ii++) {
 	// Get index of function
 	size_t i=flist[ii].ind;
+	for(size_t jj=first;jj<last;jj++) {
+	  size_t j=flist[jj].ind;
 
-	for(int ic=0;ic<3;ic++) {
-	  Ha[i]+=ggafaca[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
-	  Hb[i]+=ggafacb[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
+	  Ha(i,j)+=ldafaca*flist[ii].f*flist[jj].f
+	    + ggafaca[0]*(glist[3*ii  ]*flist[jj].f + flist[ii].f*glist[3*jj  ])
+	    + ggafaca[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
+	    + ggafaca[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2]);
+
+	  Hb(i,j)+=ldafacb*flist[ii].f*flist[jj].f
+	    + ggafacb[0]*(glist[3*ii  ]*flist[jj].f + flist[ii].f*glist[3*jj  ])
+	    + ggafacb[1]*(glist[3*ii+1]*flist[jj].f + flist[ii].f*glist[3*jj+1])
+	    + ggafacb[2]*(glist[3*ii+2]*flist[jj].f + flist[ii].f*glist[3*jj+2]);
+	}
+      }
+    }
+
+  } else {
+    // LDA part
+    double ldafaca, ldafacb;
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      ldafaca=grid[ip].w*vxc[2*ip];
+      ldafacb=grid[ip].w*vxc[2*ip+1];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+	for(size_t jj=first;jj<last;jj++) {
+	  size_t j=flist[jj].ind;
+
+	  Ha(i,j)+=ldafaca*flist[ii].f*flist[jj].f;
+	  Hb(i,j)+=ldafacb*flist[ii].f*flist[jj].f;
 	}
       }
     }
   }
+}
+
+void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
+  if(!polarized) {
+    ERROR_INFO();
+    throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
+  }
 
   // Meta-GGA
   if(do_mgga) {
+    double ldafaca, ldafacb;
+    double ggafaca[3], ggafacb[3];
+
     double bf_lapl;
     double bf_gdot;
 
@@ -1417,6 +1429,14 @@ void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
+      ldafaca=grid[ip].w*vxc[2*ip];
+      ldafacb=grid[ip].w*vxc[2*ip+1];
+
+      for(int ic=0;ic<3;ic++) {
+	ggafaca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
+	ggafacb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
+      }
+
       lfaca=grid[ip].w*vlapl[2*ip];
       lfacb=grid[ip].w*vlapl[2*ip+1];
 
@@ -1435,8 +1455,73 @@ void AtomGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
 	bf_gdot=glist[3*ii]*glist[3*ii] + glist[3*ii+1]*glist[3*ii+1] + glist[3*ii+2]*glist[3*ii+2];
 	bf_lapl=2.0*flist[ii].f*llist[ii] + 2.0*bf_gdot;
 
-	Ha[i]+=0.5*kfaca*bf_gdot + lfaca*bf_lapl;
-	Hb[i]+=0.5*kfacb*bf_gdot + lfacb*bf_lapl;
+	Ha[i]+=(ldafaca*flist[ii].f
+		+ ggafaca[0]*2.0*glist[3*ii+0]
+		+ ggafaca[1]*2.0*glist[3*ii+1]
+		+ ggafaca[2]*2.0*glist[3*ii+2])*flist[ii].f
+	  + 0.5*kfaca*bf_gdot + lfaca*bf_lapl;
+
+	Hb[i]+=(ldafacb*flist[ii].f
+		+ ggafacb[0]*2.0*glist[3*ii  ]
+		+ ggafacb[1]*2.0*glist[3*ii+1]
+		+ ggafacb[2]*2.0*glist[3*ii+2])*flist[ii].f
+	  + 0.5*kfacb*bf_gdot + lfacb*bf_lapl;
+      }
+    }
+
+  } else if(do_gga) {
+    // GGA part
+    double ldafaca, ldafacb;
+    double ggafaca[3], ggafacb[3];
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factors in common for basis functions
+      ldafaca=grid[ip].w*vxc[2*ip];
+      ldafacb=grid[ip].w*vxc[2*ip+1];
+
+      for(int ic=0;ic<3;ic++) {
+	ggafaca[ic]=grid[ip].w*(2.0*vsigma[3*ip]  *grho[6*ip+ic]   + vsigma[3*ip+1]*grho[6*ip+3+ic]);
+	ggafacb[ic]=grid[ip].w*(2.0*vsigma[3*ip+2]*grho[6*ip+3+ic] + vsigma[3*ip+1]*grho[6*ip+ic]);
+      }
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	Ha[i]+=(ldafaca*flist[ii].f
+		+ ggafaca[0]*2.0*glist[3*ii+0]
+		+ ggafaca[1]*2.0*glist[3*ii+1]
+		+ ggafaca[2]*2.0*glist[3*ii+2])*flist[ii].f;
+
+	Hb[i]+=(ldafacb*flist[ii].f
+		+ ggafacb[0]*2.0*glist[3*ii  ]
+		+ ggafacb[1]*2.0*glist[3*ii+1]
+		+ ggafacb[2]*2.0*glist[3*ii+2])*flist[ii].f;
+      }
+    }
+
+  } else {
+    // LDA part
+    double ldafaca, ldafacb;
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      ldafaca=grid[ip].w*vxc[2*ip];
+      ldafacb=grid[ip].w*vxc[2*ip+1];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	Ha[i]+=ldafaca*flist[ii].f*flist[ii].f;
+	Hb[i]+=ldafacb*flist[ii].f*flist[ii].f;
       }
     }
   }
@@ -1491,44 +1576,14 @@ void AtomGrid::eval_Fxc(const arma::cx_mat & C, size_t nocc, arma::cx_mat & H) c
 	}
       }
 
-      // LDA part. Factor in common for basis functions
+      // Factor in common for basis functions
       ldafac=grid[ip].w*vxc[2*ip];
-      for(size_t io=0;io<nocc;io++)
-	for(size_t jo=0;jo<nocc;jo++)
-	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo);
-      // occ-virt
-      for(size_t io=0;io<nocc;io++)
-	for(size_t jo=nocc;jo<norb;jo++)
-	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo);
-      // virt-occ
-      for(size_t io=nocc;io<norb;io++)
-	for(size_t jo=0;jo<nocc;jo++)
-	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo);
-
-      // GGA part
       for(int ic=0;ic<3;ic++) {
 	ggafac[ic]=grid[ip].w*(2.0*vsigma[3*ip]*grho[6*ip+ic]);
       }
-      // occ-occ
-      for(size_t io=0;io<nocc;io++)
-	for(size_t jo=0;jo<nocc;jo++)
-	  for(int ic=0;ic<3;ic++)
-	    H(io,jo)+=ggafac[ic]*(std::conj(oval(io))*gval(jo,ic) + std::conj(gval(io,ic))*oval(jo));
-      // occ-virt
-      for(size_t io=0;io<nocc;io++)
-	for(size_t jo=nocc;jo<norb;jo++)
-	  for(int ic=0;ic<3;ic++)
-	    H(io,jo)+=ggafac[ic]*(std::conj(oval(io))*gval(jo,ic) + std::conj(gval(io,ic))*oval(jo));
-      // virt-occ
-      for(size_t io=nocc;io<norb;io++)
-	for(size_t jo=0;jo<nocc;jo++)
-	  for(int ic=0;ic<3;ic++)
-	    H(io,jo)+=ggafac[ic]*(std::conj(oval(io))*gval(jo,ic) + std::conj(gval(io,ic))*oval(jo));
-
-
-      // MGGA part
       lfac=grid[ip].w*vlapl[2*ip];
       kfac=grid[ip].w*vtau[2*ip];
+
       // occ-occ
       for(size_t io=0;io<nocc;io++)
 	for(size_t jo=0;jo<nocc;jo++) {
@@ -1536,24 +1591,44 @@ void AtomGrid::eval_Fxc(const arma::cx_mat & C, size_t nocc, arma::cx_mat & H) c
 	  std::complex<double> gdot=std::conj(gval(io,0))*gval(jo,0) + std::conj(gval(io,1))*gval(jo,1) + std::conj(gval(io,2))*gval(jo,2);
 	  // Laplacian
 	  std::complex<double> lapl=std::conj(oval(io))*lval(jo) + std::conj(lval(io))*oval(jo) + 2.0*gdot;
-	  H(io,jo)+=0.5*kfac*gdot + lfac*lapl;
+
+	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo)
+	    + ggafac[0]*(std::conj(oval(io))*gval(jo,0) + std::conj(gval(io,0))*oval(jo))
+	    + ggafac[1]*(std::conj(oval(io))*gval(jo,1) + std::conj(gval(io,1))*oval(jo))
+	    + ggafac[2]*(std::conj(oval(io))*gval(jo,2) + std::conj(gval(io,2))*oval(jo))
+	    + 0.5*kfac*gdot + lfac*lapl;
 	}
+
       // occ-virt
       for(size_t io=0;io<nocc;io++)
 	for(size_t jo=nocc;jo<norb;jo++) {
+	  // Gradient
 	  std::complex<double> gdot=std::conj(gval(io,0))*gval(jo,0) + std::conj(gval(io,1))*gval(jo,1) + std::conj(gval(io,2))*gval(jo,2);
+	  // Laplacian
 	  std::complex<double> lapl=std::conj(oval(io))*lval(jo) + std::conj(lval(io))*oval(jo) + 2.0*gdot;
-	  H(io,jo)+=0.5*kfac*gdot + lfac*lapl;
+
+	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo)
+	    + ggafac[0]*(std::conj(oval(io))*gval(jo,0) + std::conj(gval(io,0))*oval(jo))
+	    + ggafac[1]*(std::conj(oval(io))*gval(jo,1) + std::conj(gval(io,1))*oval(jo))
+	    + ggafac[2]*(std::conj(oval(io))*gval(jo,2) + std::conj(gval(io,2))*oval(jo))
+	    + 0.5*kfac*gdot + lfac*lapl;
 	}
+
       // virt-occ
       for(size_t io=nocc;io<norb;io++)
 	for(size_t jo=0;jo<nocc;jo++) {
+	  // Gradient
 	  std::complex<double> gdot=std::conj(gval(io,0))*gval(jo,0) + std::conj(gval(io,1))*gval(jo,1) + std::conj(gval(io,2))*gval(jo,2);
+	  // Laplacian
 	  std::complex<double> lapl=std::conj(oval(io))*lval(jo) + std::conj(lval(io))*oval(jo) + 2.0*gdot;
-	  H(io,jo)+=0.5*kfac*gdot + lfac*lapl;
+
+	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo)
+	    + ggafac[0]*(std::conj(oval(io))*gval(jo,0) + std::conj(gval(io,0))*oval(jo))
+	    + ggafac[1]*(std::conj(oval(io))*gval(jo,1) + std::conj(gval(io,1))*oval(jo))
+	    + ggafac[2]*(std::conj(oval(io))*gval(jo,2) + std::conj(gval(io,2))*oval(jo))
+	    + 0.5*kfac*gdot + lfac*lapl;
 	}
     }
-
 
     // GGA
   } else if(do_gga) {
@@ -1586,39 +1661,32 @@ void AtomGrid::eval_Fxc(const arma::cx_mat & C, size_t nocc, arma::cx_mat & H) c
 	}
       }
 
-      // LDA part. Factor in common for basis functions
+      // Factor in common for basis functions
       ldafac=grid[ip].w*vxc[2*ip];
-      for(size_t io=0;io<nocc;io++)
-	for(size_t jo=0;jo<nocc;jo++)
-	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo);
-      // occ-virt
-      for(size_t io=0;io<nocc;io++)
-	for(size_t jo=nocc;jo<norb;jo++)
-	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo);
-      // virt-occ
-      for(size_t io=nocc;io<norb;io++)
-	for(size_t jo=0;jo<nocc;jo++)
-	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo);
-
-      // GGA part
       for(int ic=0;ic<3;ic++) {
 	ggafac[ic]=grid[ip].w*(2.0*vsigma[3*ip]*grho[6*ip+ic]);
       }
       // occ-occ
       for(size_t io=0;io<nocc;io++)
 	for(size_t jo=0;jo<nocc;jo++)
-	  for(int ic=0;ic<3;ic++)
-	    H(io,jo)+=ggafac[ic]*(std::conj(oval(io))*gval(jo,ic) + std::conj(gval(io,ic))*oval(jo));
+	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo)
+	    + ggafac[0]*(std::conj(oval(io))*gval(jo,0) + std::conj(gval(io,0))*oval(jo))
+	    + ggafac[1]*(std::conj(oval(io))*gval(jo,1) + std::conj(gval(io,1))*oval(jo))
+	    + ggafac[2]*(std::conj(oval(io))*gval(jo,2) + std::conj(gval(io,2))*oval(jo));
       // occ-virt
       for(size_t io=0;io<nocc;io++)
 	for(size_t jo=nocc;jo<norb;jo++)
-	  for(int ic=0;ic<3;ic++)
-	    H(io,jo)+=ggafac[ic]*(std::conj(oval(io))*gval(jo,ic) + std::conj(gval(io,ic))*oval(jo));
+	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo)
+	    + ggafac[0]*(std::conj(oval(io))*gval(jo,0) + std::conj(gval(io,0))*oval(jo))
+	    + ggafac[1]*(std::conj(oval(io))*gval(jo,1) + std::conj(gval(io,1))*oval(jo))
+	    + ggafac[2]*(std::conj(oval(io))*gval(jo,2) + std::conj(gval(io,2))*oval(jo));
       // virt-occ
       for(size_t io=nocc;io<norb;io++)
 	for(size_t jo=0;jo<nocc;jo++)
-	  for(int ic=0;ic<3;ic++)
-	    H(io,jo)+=ggafac[ic]*(std::conj(oval(io))*gval(jo,ic) + std::conj(gval(io,ic))*oval(jo));
+	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo)
+	    + ggafac[0]*(std::conj(oval(io))*gval(jo,0) + std::conj(gval(io,0))*oval(jo))
+	    + ggafac[1]*(std::conj(oval(io))*gval(jo,1) + std::conj(gval(io,1))*oval(jo))
+	    + ggafac[2]*(std::conj(oval(io))*gval(jo,2) + std::conj(gval(io,2))*oval(jo));
     }
 
     // LDA
@@ -1642,8 +1710,9 @@ void AtomGrid::eval_Fxc(const arma::cx_mat & C, size_t nocc, arma::cx_mat & H) c
 	}
       }
 
-      // LDA part. Factor in common for basis functions
+      // Factor in common for basis functions
       ldafac=grid[ip].w*vxc[2*ip];
+      // occ-occ
       for(size_t io=0;io<nocc;io++)
 	for(size_t jo=0;jo<nocc;jo++)
 	  H(io,jo)+=ldafac*std::conj(oval(io))*oval(jo);
@@ -1665,50 +1734,11 @@ void AtomGrid::eval_diag_Fxc_SIC(arma::vec & H) const {
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
-  // LDA part
-  double ldafac;
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Factor in common for basis functions
-    ldafac=grid[ip].w*vxc[2*ip];
-
-    // Loop over functions on grid point
-    size_t first=grid[ip].f0;
-    size_t last=first+grid[ip].nf;
-
-    for(size_t ii=first;ii<last;ii++) {
-      // Get index of function
-      size_t i=flist[ii].ind;
-
-      H[i]+=ldafac*flist[ii].f*flist[ii].f;
-    }
-  }
-
-  // GGA part
-  if(do_gga) {
-    double ggafac[3];
-
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Factor in common for basis functions
-      for(int ic=0;ic<3;ic++)
-	ggafac[ic]=2.0*grid[ip].w*vsigma[3*ip]*grho[6*ip+ic];
-
-      // Loop over functions on grid point
-      size_t first=grid[ip].f0;
-      size_t last=first+grid[ip].nf;
-
-      for(size_t ii=first;ii<last;ii++) {
-	// Get index of function
-	size_t i=flist[ii].ind;
-
-	for(int ic=0;ic<3;ic++) {
-	  H[i]+=ggafac[ic]*2.0*glist[3*ii+ic]*flist[ii].f;
-	}
-      }
-    }
-  }
 
   // Meta-GGA
   if(do_mgga) {
+    double ldafac;
+    double ggafac[3];
     double bf_gdot;
     double bf_lapl;
 
@@ -1717,6 +1747,9 @@ void AtomGrid::eval_diag_Fxc_SIC(arma::vec & H) const {
 
     for(size_t ip=0;ip<grid.size();ip++) {
       // Factors in common for basis functions
+      ldafac=grid[ip].w*vxc[2*ip];
+      for(int ic=0;ic<3;ic++)
+	ggafac[ic]=2.0*grid[ip].w*vsigma[3*ip]*grho[6*ip+ic];
       lfac=grid[ip].w*vlapl[2*ip];
       kfac=grid[ip].w*vtau[2*ip];
 
@@ -1732,7 +1765,56 @@ void AtomGrid::eval_diag_Fxc_SIC(arma::vec & H) const {
 	bf_gdot=glist[3*ii]*glist[3*ii] + glist[3*ii+1]*glist[3*ii+1] + glist[3*ii+2]*glist[3*ii+2];
 	bf_lapl=2.0*flist[ii].f*llist[ii] + 2.0*bf_gdot;
 
-	H[i]+=0.5*kfac*bf_gdot + lfac*bf_lapl;
+	H[i]+=(ldafac*flist[ii].f
+	       + ggafac[0]*2.0*glist[3*ii  ]
+	       + ggafac[1]*2.0*glist[3*ii+1]
+	       + ggafac[2]*2.0*glist[3*ii+2])*flist[ii].f
+	  + 0.5*kfac*bf_gdot + lfac*bf_lapl;
+      }
+    }
+
+  } else if(do_gga) {
+    // GGA part
+    double ldafac;
+    double ggafac[3];
+
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[2*ip];
+      for(int ic=0;ic<3;ic++)
+	ggafac[ic]=2.0*grid[ip].w*vsigma[3*ip]*grho[6*ip+ic];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	H[i]+=(ldafac*flist[ii].f
+	       + ggafac[0]*2.0*glist[3*ii  ]
+	       + ggafac[1]*2.0*glist[3*ii+1]
+	       + ggafac[2]*2.0*glist[3*ii+2])*flist[ii].f;
+	  }
+    }
+
+  } else {
+    // LDA part
+    double ldafac;
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Factor in common for basis functions
+      ldafac=grid[ip].w*vxc[2*ip];
+
+      // Loop over functions on grid point
+      size_t first=grid[ip].f0;
+      size_t last=first+grid[ip].nf;
+
+      for(size_t ii=first;ii<last;ii++) {
+	// Get index of function
+	size_t i=flist[ii].ind;
+
+	H[i]+=ldafac*flist[ii].f*flist[ii].f;
       }
     }
   }
@@ -3282,10 +3364,10 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double tol, int x_func, int
 #endif
 	{
 	  Timer toa;
-	  
+
 	  // Construct the grid
 	  orbgrid[iorb][iat]=wrk[ith].construct(*basp,Ctilde.col(iorb),iat,x_func,c_func,false);
-	  
+
 	  // Print out info
 	  if(verbose) {
 	    printf("\t%4u  %4u  %7u  %10u  %s\n",(unsigned int) iat+1,(unsigned int) iorb+1,(unsigned int) orbgrid[iorb][iat].ngrid,(unsigned int) orbgrid[iorb][iat].nfunc,toa.elapsed().c_str());
@@ -3297,9 +3379,9 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double tol, int x_func, int
   for(size_t iorb=0;iorb<Norb;iorb++)
     for(size_t iat=0;iat<Nat;iat++) {
       Timer toa;
-      
+
       orbgrid[iorb][iat]=wrk[0].construct(*basp,Ctilde.col(iorb),iat,x_func,c_func,false);
-      
+
       // Print out info
       if(verbose) {
 	printf("\t%4u  %4u  %7u  %10u  %s\n",(unsigned int) iat+1,(unsigned int) iorb+1,(unsigned int) orbgrid[iorb][iat].ngrid,(unsigned int) orbgrid[iorb][iat].nfunc,toa.elapsed().c_str());
@@ -3313,33 +3395,33 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double tol, int x_func, int
   for(size_t iat=0;iat<orbgrid[0].size();iat++) {
     // Initialize atomic grid
     grids[iat]=orbgrid[0][iat];
-    
+
     // Loop over radial shells
     for(size_t irad=0;irad<grids[iat].sh.size();irad++) {
       // Rule order
       int l=orbgrid[0][iat].sh[irad].l;
-      
+
       // Loop over orbitals
       for(size_t iorb=1;iorb<orbgrid.size();iorb++)
 	l=std::max(l,orbgrid[iorb][iat].sh[irad].l);
-      
+
       // Store l
       grids[iat].sh[irad].l=l;
     }
   }
-  
+
   // Update grid sizes
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-    
+
 #ifdef _OPENMP
     int ith=omp_get_thread_num();
 #else
     int ith=0;
 #endif
-    
+
 #ifdef _OPENMP
 #pragma omp for
 #endif
@@ -3352,8 +3434,8 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double tol, int x_func, int
       wrk[ith].free();
     }
   }
-  
-  
+
+
   // Print out info
   if(verbose) {
     printf("Final grid size\n\t%4s  %7s  %10s\n","atom","Npoints","Nfuncs");
@@ -3365,7 +3447,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double tol, int x_func, int
 }
 
 void DFTGrid::construct_becke(double tol) {
-  
+
   // Add all atoms
   if(verbose) {
     printf("Constructing Becke grid.\n");
@@ -4081,7 +4163,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
       // and construct the Fock matrices
       if(fock) {
 	wrk[0].eval_Fxc(C,nocc,H[ip]);
-	  
+
 #ifdef SICCHECK
 	arma::mat Hdum(C.n_rows,C.n_rows);
 	wrk[0].eval_Fxc(Hfull[ip],Hdum);
@@ -4106,7 +4188,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
       if(diff>1e-8) {
 	printf("Hamiltonians for orbital %i differ by %e.\n",(int) ip+1,diff);
 
-	{	
+	{
 	  std::ostringstream oss;
 	  oss << "Hfull_" << iter << "." << ip << "_re.dat";
 	  arma::mat Ht=arma::real(Hp);
@@ -4120,7 +4202,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
 	  Ht.save(oss.str(),arma::raw_ascii);
 	}
 
-	{	
+	{
 	  std::ostringstream oss;
 	  oss << "H_" << iter << "." << ip << "_re.dat";
 	  arma::mat Ht=arma::real(H[ip]);
