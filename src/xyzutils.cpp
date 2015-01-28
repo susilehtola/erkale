@@ -100,6 +100,8 @@ std::vector<atom_t> load_xyz(std::string filename) {
       tmp.x=readdouble(words[1])*ANGSTROMINBOHR;
       tmp.y=readdouble(words[2])*ANGSTROMINBOHR;
       tmp.z=readdouble(words[3])*ANGSTROMINBOHR;
+      // Charge defined?
+      tmp.Q=words.size()==5 ? readint(words[4]) : 0;
       // and add the atom to the list.
       atoms.push_back(tmp);
     }

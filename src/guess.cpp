@@ -164,7 +164,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   free(tmpname);
 }
 
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, bool dropshells, bool sphave, int Q) {
+void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, bool dropshells, bool sphave) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -215,7 +215,7 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     std::vector<size_t> shellidx;
 
     // Perform the guess
-    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,dropshells,sphave,Q);
+    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,dropshells,sphave,basis.get_nucleus(idnuc[i][0]).Q);
     // Get the atomic shells
     std::vector<GaussianShell> shells=atbas.get_funcs(0);
     
@@ -458,6 +458,9 @@ std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {
 
       // Check nuclear type
       if(basis.get_symbol(i).compare(basis.get_symbol(ret[j][0]))!=0)
+	continue;
+      // Check charge status
+      if(basis.get_nucleus(i).Q != basis.get_nucleus(ret[j][0]).Q)
 	continue;
 
       // Do comparison

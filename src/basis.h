@@ -68,8 +68,10 @@ typedef struct {
 
   /// Type of nucleus
   std::string symbol;
-  /// Charge
+  /// Nuclear charge
   int Z;
+  /// Net charge in system (used for atomic guess)
+  int Q;
 
   /// List of shells located on nucleus
   std::vector<const GaussianShell *> shells;
