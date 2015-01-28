@@ -3463,6 +3463,7 @@ BasisSet construct_basis(const std::vector<nucleus_t> & nuclei, const BasisSetLi
     atoms[i].x=nuclei[i].r.x;
     atoms[i].y=nuclei[i].r.y;
     atoms[i].z=nuclei[i].r.z;
+    atoms[i].Q=nuclei[i].Q;
     atoms[i].num=nuclei[i].ind;
     atoms[i].el=nuclei[i].symbol;
   }
@@ -3504,6 +3505,8 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
     nuc.r.x=atoms[i].x;
     nuc.r.y=atoms[i].y;
     nuc.r.z=atoms[i].z;
+    // Charge status
+    nuc.Q=atoms[i].Q;
 
     // Get symbol in raw form
     std::string el=atoms[i].el;

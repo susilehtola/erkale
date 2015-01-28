@@ -34,6 +34,8 @@ typedef struct {
   double y;
   /// z coordinate
   double z;
+  /// Charge
+  int Q;
 } atom_t;
 
 /// Load atoms from xyz file, return list of atoms. Returns everything in atomic units.
