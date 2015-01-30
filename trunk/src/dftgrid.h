@@ -225,6 +225,26 @@ class AtomGrid {
   /// Use Lobatto quadrature? (Default is Lebedev)
   bool use_lobatto;
 
+  /// Extract weights
+  arma::rowvec get_weights() const;
+  /// Extract function values: N x Ngrid
+  arma::mat get_fval(size_t N) const;
+  /// Extract gradient values
+  arma::cube get_gval(size_t N) const;
+  /// Extract laplacian values: N x Ngrid
+  arma::mat get_lval(size_t N) const;
+  
+  /// Extract LDA potential
+  arma::rowvec get_vxc(bool spin) const;
+  /// Extract density gradient
+  arma::mat get_grho(bool spin) const;
+  /// Extract GGA potential
+  arma::rowvec get_vsigma(int c) const;
+  /// Extract MGGA potential
+  arma::rowvec get_vtau(bool spin) const;
+  /// Extract MGGA potential
+  arma::rowvec get_vlapl(bool spin) const;
+  
   /// Get density data for wanted point
   libxc_dens_t get_dens(size_t idx) const;
   /// Get potential data for wanted point
@@ -296,6 +316,8 @@ class AtomGrid {
 
   /// Update values of density, restricted calculation
   void update_density(const arma::mat & P);
+  /// Update values of density using BLAS routines, restricted calculation. This is slower than the normal routine...
+  void update_density_blas(const arma::mat & P);
   /// Update values of density, unrestricted calculation
   void update_density(const arma::mat & Pa, const arma::mat & Pb);
   /// Update values of density, self-interaction correction
@@ -343,8 +365,12 @@ class AtomGrid {
 
   /// Evaluate Fock matrix, restricted calculation
   void eval_Fxc(arma::mat & H) const;
+  /// Evaluate Fock matrix using BLAS routines, restricted calculation
+  void eval_Fxc_blas(arma::mat & H) const;
   /// Evaluate Fock matrix, unrestricted calculation
   void eval_Fxc(arma::mat & Ha, arma::mat & Hb) const;
+  /// Evaluate Fock matrix using BLAS routines, unrestricted calculation
+  void eval_Fxc_blas(arma::mat & Ha, arma::mat & Hb, bool beta=true) const;
   /// Evaluate Fock matrix, SIC calculation
   void eval_Fxc(const arma::cx_mat & C, size_t nocc, arma::cx_mat & H) const;
 
@@ -444,7 +470,7 @@ class DFTGrid {
    * electron density, SIC calculation. Note that all orbitals are
    * necessary here.
    */
-  void eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arma::cx_mat & W, std::vector<arma::cx_mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
+  void eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arma::cx_mat & W, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
 
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();

@@ -357,7 +357,7 @@ Checkpoint *SCF::get_checkpoint() const {
   return chkptp;
 }
 
-void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock) {
+void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock) {
   // Compute the orbital-dependent Fock matrices
   Eorb.resize(W.n_cols);
   if(fock)
@@ -393,7 +393,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
       Eorb[io]=0.5*(1-kfrac)*arma::trace(Porb[io]*Jorb[io]);
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
-	Forb[io]=(1-kfrac)*Jorb[io]*COMPLEX1;
+	Forb[io]=(1-kfrac)*Jorb[io];
 
   } else {
     if(!direct) {
@@ -404,7 +404,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 	// and Coulomb energy
 	Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
 	if(fock)
-	  Forb[io]=Jorb*COMPLEX1;
+	  Forb[io]=Jorb;
       }
     } else {
       // HF coulomb/exchange not implemented
@@ -430,7 +430,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
     t.set();
 
     std::vector<double> Nelnum; // Numerically integrated density
-    std::vector<arma::cx_mat> XC; // Exchange-correlation matrices
+    std::vector<arma::mat> XC; // Exchange-correlation matrices
     std::vector<double> Exc; // Exchange-correlation energy
 
     grid.eval_Fxc(dft.x_func,dft.c_func,C,W,XC,Exc,Nelnum,fock);
