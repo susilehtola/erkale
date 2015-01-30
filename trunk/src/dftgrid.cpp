@@ -386,11 +386,11 @@ void AtomGrid::update_density_blas(const arma::mat & P) {
   // Evaluate density
   arma::vec dens=arma::diagvec(arma::trans(f)*P*f); // Ngrid
   rho=arma::conv_to< std::vector<double> >::from(dens);
-  
+
   if(do_grad) {
     // Get gradient values
     arma::cube gf(get_gval(P.n_rows)); // N x Ngrid x 3
-    
+
     // Evaluate gradient components
     arma::mat g(grid.size(),3);
     for(int ic=0;ic<3;ic++)
@@ -406,7 +406,7 @@ void AtomGrid::update_density_blas(const arma::mat & P) {
       // Compute sigma as well
       sigma[i]=g(i,0)*g(i,0) + g(i,1)*g(i,1) + g(i,2)*g(i,2);
     }
-    
+
     if(do_lapl) {
       // Get laplacian
       arma::mat L(get_lval(P.n_rows));
@@ -417,7 +417,7 @@ void AtomGrid::update_density_blas(const arma::mat & P) {
       for(int ic=0;ic<3;ic++)
 	kin+=0.5*arma::diagvec(arma::trans(gf.slice(ic))*P*gf.slice(ic));
       tau=arma::conv_to< std::vector<double> >::from(kin);
-      
+
       // Compute density laplacian
       arma::vec dl(2.0*arma::diagvec(arma::trans(f)*P*L)+4.0*kin);
       lapl_rho=arma::conv_to< std::vector<double> >::from(dl);
@@ -888,7 +888,7 @@ void AtomGrid::compute_xc(int func_id, bool pot) {
     oss << "Functional "<<func_id<<" not found!";
     throw std::runtime_error(oss.str());
   }
-  
+
   // Evaluate functionals.
   if(has_exc(func_id)) {
     if(pot) {
@@ -969,7 +969,7 @@ arma::rowvec AtomGrid::get_weights() const {
   for(size_t pi=0;pi<grid.size();pi++)
     w(pi)=grid[pi].w;
   return w;
-}    
+}
 
 arma::mat AtomGrid::get_fval(size_t N) const {
   arma::mat f(N,grid.size());
@@ -987,7 +987,7 @@ arma::mat AtomGrid::get_fval(size_t N) const {
   }
 
   return f;
-}    
+}
 
 arma::cube AtomGrid::get_gval(size_t N) const {
   arma::cube g(N,grid.size(),3);
@@ -1004,7 +1004,7 @@ arma::cube AtomGrid::get_gval(size_t N) const {
       }
     }
   return g;
-}  
+}
 
 arma::mat AtomGrid::get_lval(size_t N) const {
   arma::mat f(N,grid.size());
@@ -1022,7 +1022,7 @@ arma::mat AtomGrid::get_lval(size_t N) const {
   }
 
   return f;
-}    
+}
 
 arma::rowvec AtomGrid::get_vxc(bool spin) const {
   if(!polarized) {
@@ -1037,7 +1037,7 @@ arma::rowvec AtomGrid::get_vxc(bool spin) const {
 	vrho(i)=vxc[2*i+1];
     return vrho;
   }
-}    
+}
 
 arma::rowvec AtomGrid::get_vsigma(int c) const {
   if(c<0 || c>2) {
@@ -1052,7 +1052,7 @@ arma::rowvec AtomGrid::get_vsigma(int c) const {
       v(i)=vsigma[3*i+c];
     return v;
   }
-}  
+}
 
 arma::rowvec AtomGrid::get_vtau(bool spin) const {
   if(!polarized) {
@@ -1067,7 +1067,7 @@ arma::rowvec AtomGrid::get_vtau(bool spin) const {
 	v(i)=vtau[2*i+1];
     return v;
   }
-}    
+}
 
 arma::rowvec AtomGrid::get_vlapl(bool spin) const {
   if(!polarized) {
@@ -1082,7 +1082,7 @@ arma::rowvec AtomGrid::get_vlapl(bool spin) const {
 	v(i)=vlapl[2*i+1];
     return v;
   }
-}    
+}
 
 arma::mat AtomGrid::get_grho(bool spin) const {
   arma::mat g(grid.size(),3);
@@ -1095,7 +1095,7 @@ arma::mat AtomGrid::get_grho(bool spin) const {
       g(i,2)=grho[3*i+2];
     }
     return g;
-    
+
   } else {
     if(spin) {
       for(size_t i=0;i<grid.size();i++) {
@@ -1296,14 +1296,25 @@ void AtomGrid::eval_diag_overlap(arma::vec & S) const {
 }
 
 template<typename T> inline void increment_lda(arma::Mat<T> & H, const arma::rowvec & vxc, const arma::Mat<T> & fval) {
+  if(fval.n_cols != vxc.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+
   // Form helper matrix
   arma::Mat<T> fhlp(fval);
   for(size_t i=0;i<fhlp.n_rows;i++)
-    fhlp.row(i)%=vxc;
+    for(size_t j=0;j<fhlp.n_cols;j++)
+      fhlp(i,j)*=vxc(j);
   H+=fhlp*arma::trans(fval);
 }
 
 template<typename T> inline void increment_gga(arma::Mat<T> & H, const arma::mat & gr, const arma::Mat<T> & fval, const arma::Cube<T> & gf) {
+  if(gf.n_cols != gr.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+
   // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
   //                 (N, Np)    =        (N Np; c)    (Np, 3)
   arma::Mat<T> gamma(H.n_rows,gr.n_rows);
@@ -1315,17 +1326,23 @@ template<typename T> inline void increment_gga(arma::Mat<T> & H, const arma::mat
     arma::rowvec gc=arma::trans(gr.col(ic));
     // Loop over orbitals
     for(size_t i=0;i<gi.n_rows;i++)
-      gi.row(i)=gi.row(i)%gc;
-    
+      for(size_t j=0;j<gi.n_cols;j++)
+	gi(i,j)=gi(i,j)*gc(j);
+
     // Increment helper
     gamma+=gi;
   }
-  
+
   // Form Fock matrix
   H+=gamma*arma::trans(fval) + fval*arma::trans(gamma);
 }
 
 template<typename T> inline void increment_mgga_kin(arma::Mat<T> & H, const arma::rowvec & vtaul, const arma::Cube<T> & gf) {
+  if(gf.n_cols != vtaul.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+
   arma::mat kin(H.n_rows,vtaul.n_elem);
   for(int ic=0;ic<3;ic++) {
     kin.zeros();
@@ -1333,19 +1350,26 @@ template<typename T> inline void increment_mgga_kin(arma::Mat<T> & H, const arma
     arma::Mat<T> gi=gf.slice(ic);
     // Absorb potential
     for(size_t i=0;i<gi.n_rows;i++)
-      gi.row(i)=gi.row(i)%vtaul;
-    
+      for(size_t j=0;j<gi.n_cols;j++)
+	gi(i,j)=gi(i,j)*vtaul(j);
+
     // Increment Fock matrix
     H+=gi*arma::trans(gf.slice(ic));
   }
 }
 
 template<typename T> inline void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowvec & vl, const arma::Mat<T> & fval, const arma::Mat<T> & fl) {
+  if(fl.n_cols != vl.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+
   // Compute laplace term.
   arma::Mat<T> lap(fl);
   // and absorb the potential
   for(size_t i=0;i<fl.n_rows;i++)
-    lap.row(i)=lap.row(i)%vl;
+    for(size_t j=0;j<fl.n_cols;j++)
+      lap(i,j)=lap(i,j)*vl(j);
   // Fock matrix contribution is
   H+=lap*arma::trans(fval) + fval*arma::trans(lap);
 }
@@ -1469,7 +1493,7 @@ void AtomGrid::eval_Fxc_blas(arma::mat & H) const {
     // Increment matrix
     increment_lda<double>(H,vrho,fval);
   }
-  
+
   if(do_gga) {
     // Get vsigma
     arma::rowvec vs(get_vsigma(0));
@@ -1479,8 +1503,9 @@ void AtomGrid::eval_Fxc_blas(arma::mat & H) const {
     arma::cube gf(get_gval(H.n_rows));
 
     // Multiply grad rho by vsigma and the weights
-    for(int ic=0;ic<3;ic++)
-      gr.col(ic)=arma::trans(w%(2.0*vs%arma::trans(gr.col(ic))));
+    for(size_t i=0;i<gr.n_rows;i++)
+      for(int ic=0;ic<3;ic++)
+	gr(i,ic)=2.0*w(i)*vs(i)*gr(i,ic);
     // Increment matrix
     increment_gga<double>(H,gr,fval,gf);
 
@@ -1498,7 +1523,7 @@ void AtomGrid::eval_Fxc_blas(arma::mat & H) const {
       // Evaluate laplacian contribution. Get function laplacian
       arma::mat fl(get_lval(H.n_rows));
       increment_mgga_lapl<double>(H,vl,fval,fl);
-    }      
+    }
   }
 }
 
@@ -1746,12 +1771,12 @@ void AtomGrid::eval_Fxc_blas(arma::mat & Ha, arma::mat & Hb, bool beta) const {
       increment_lda<double>(Hb,vrhob,fval);
     }
   }
-  
+
   if(do_gga) {
     // Get vsigma
     arma::rowvec vs_aa(get_vsigma(0));
     arma::rowvec vs_ab(get_vsigma(1));
-    
+
     // Get grad rho
     arma::mat gr_a0(get_grho(false));
     arma::mat gr_b0(get_grho(true));
@@ -1760,16 +1785,18 @@ void AtomGrid::eval_Fxc_blas(arma::mat & Ha, arma::mat & Hb, bool beta) const {
 
     // Multiply grad rho by vsigma and the weights
     arma::mat gr_a(gr_a0);
-    for(int ic=0;ic<3;ic++)
-      gr_a.col(ic)=arma::trans(w%(2.0*vs_aa%arma::trans(gr_a0.col(ic)) + vs_ab%arma::trans(gr_b0.col(ic))));
+    for(size_t i=0;i<w.n_elem;i++)
+      for(int ic=0;ic<3;ic++)
+	gr_a(i,ic)=w(i)*(2.0*vs_aa(i)*gr_a0(i,ic) + vs_ab(i)*gr_b0(i,ic));
     // Increment matrix
     increment_gga<double>(Ha,gr_a,fval,gf);
 
-    if(beta) { 
+    if(beta) {
       arma::rowvec vs_bb(get_vsigma(2));
       arma::mat gr_b(gr_b0);
-      for(int ic=0;ic<3;ic++)
-	gr_b.col(ic)=arma::trans(w%(2.0*vs_bb%arma::trans(gr_b0.col(ic)) + vs_ab%arma::trans(gr_a0.col(ic))));
+      for(size_t i=0;i<w.n_elem;i++)
+	for(int ic=0;ic<3;ic++)
+	  gr_b(i,ic)=w(i)*(2.0*vs_bb(i)*gr_b0(i,ic) + vs_ab(i)*gr_a0(i,ic));
       increment_gga<double>(Hb,gr_b,fval,gf);
     }
 
@@ -1792,12 +1819,12 @@ void AtomGrid::eval_Fxc_blas(arma::mat & Ha, arma::mat & Hb, bool beta) const {
       if(beta) {
 	arma::rowvec vt_b(get_vtau(true));
 	arma::rowvec vl_b(get_vlapl(true));
-	vl_b%=w;
 	vt_b%=w;
+	vl_b%=w;
 	increment_mgga_kin<double>(Hb,0.5*vt_b + 2.0*vl_b,gf);
 	increment_mgga_lapl<double>(Hb,vl_b,fval,fl);
       }
-    }     
+    }
   }
 }
 
@@ -4335,7 +4362,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       //wrk[ith].eval_Fxc(H);
       wrk[ith].eval_Fxc_blas(H);
 #endif
-      
+
       // Free memory
       wrk[ith].free();
     }
@@ -4451,7 +4478,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
   // Worker stack
   std::vector<arma::cx_mat> H;
 #endif
-  
+
   // Allocate memory
   if(fock) {
     H.resize(nocc);
@@ -4523,13 +4550,13 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
 	if(fock) {
 	  Hwrk.zeros(); // need to clear this here
 
-#ifdef SIC_REDUCED	  
+#ifdef SIC_REDUCED
 	  wrk[ith].eval_Fxc(C,nocc,Hwrk);
 #else
 	  //wrk[ith].eval_Fxc(Hwrk,Hdum);
 	  wrk[ith].eval_Fxc_blas(Hwrk,Hdum,false);
 #endif
-	  
+
 #pragma omp critical
 	  H[ip]+=Hwrk;
 	}
@@ -4579,7 +4606,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
 #endif
       }
     }
-    
+
     // Free memory
     wrk[0].free();
   }
