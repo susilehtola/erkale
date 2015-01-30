@@ -408,7 +408,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
       
       // Build the SI part
-      std::vector<arma::cx_mat> Forb;
+      std::vector<arma::mat> Forb;
       arma::vec Eorb;
       solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
 
@@ -514,7 +514,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
       
       // Build the SI part
-      std::vector<arma::cx_mat> Forb;
+      std::vector<arma::mat> Forb;
       arma::vec Eorb;
       solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
 
@@ -544,7 +544,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
       
       // Build the SI part
-      std::vector<arma::cx_mat> Forb;
+      std::vector<arma::mat> Forb;
       arma::vec Eorb;
       solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
       

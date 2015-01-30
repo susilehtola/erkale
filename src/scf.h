@@ -359,7 +359,7 @@ class SCF {
   void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, double tol) const;
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
-  void PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock);
+  void PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock);
 
   /// Calculate force in restricted Hartree-Fock
   arma::vec force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol);
