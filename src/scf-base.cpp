@@ -922,7 +922,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   // Need to adjust energy as well as this was calculated in the Fock routines
   sol.en.E=-pzcor*ESIC;
 
-  // Get orbital energies
+  // Get orbital self-interaction energies
   sol.E=worker->get_Eorb();
 
   // Projected energies
