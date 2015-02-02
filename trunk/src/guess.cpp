@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "dftfuncs.h"
 #include "guess.h"
 #include "checkpoint.h"
 #include "linalg.h"
@@ -186,7 +187,27 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     method=set.get_string("AtomGuess");
   
   if(verbose) {
-    printf("Performing atomic guess for atoms:\n");
+    // Parse method
+    bool hf= (stricmp(method,"HF")==0);
+    if(hf)
+      method="HF";
+    else {   
+      bool rohf=(stricmp(method,"ROHF")==0);
+      if(rohf)
+	method="ROHF";
+      else {
+	// Parse functional
+	dft_t dft;
+	parse_xc_func(dft.x_func,dft.c_func,method);
+	if(dft.c_func>0) {
+	  // Correlation exists.
+	  method=get_keyword(dft.x_func)+"-"+get_keyword(dft.c_func);
+	} else
+	  method=get_keyword(dft.x_func);
+      }
+    }
+    
+    printf("Performing %s guess for atoms:\n",method.c_str());
     fprintf(stderr,"Calculating initial atomic guess ... ");
     fflush(stdout);
     fflush(stderr);
