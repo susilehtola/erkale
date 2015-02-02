@@ -3637,7 +3637,7 @@ DFTGrid::~DFTGrid() {
 
 void DFTGrid::construct(int nrad, int lmax, int x_func, int c_func) {
   if(verbose) {
-    printf("Composition of static DFT grid:\n");
+    printf("Composition of static nrad=%i lmax=%i DFT grid:\n",nrad,lmax);
     printf("\t%4s  %7s  %10s\n","atom","Npoints","Nfuncs");
     fflush(stdout);
   }
