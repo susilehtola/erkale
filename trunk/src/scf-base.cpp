@@ -1658,8 +1658,6 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 	if(dft.lmax<0)
 	  throw std::runtime_error("Invalid DFT angular grid specified.\n");
       }
-      
-      printf("dft.nrad = %i, dft.lmax = %i\n",dft.nrad,dft.lmax);
 
     } else {
       dft.adaptive=true;
