@@ -539,7 +539,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	if(pzmet!=COUL) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsol,W,dum,pzcor,pzh,grid,1.0,0.1,0.1,100,canonical,real);
+	  PZSIC_calculate(sicsol,W,dum,pzcor,pzh,grid,0.0,0.1,0.1,100,canonical,real);
 	}
       }
     }
@@ -727,7 +727,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(pzmet!=COUL) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsola,Wa,dum,pzcor,pzh,grid,1.0,0.1,0.1,100,canonical,real);
+	  PZSIC_calculate(sicsola,Wa,dum,pzcor,pzh,grid,0.0,0.1,0.1,100,canonical,real);
 	}
       }
     }
@@ -764,7 +764,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	if(pzmet!=COUL) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsolb,Wb,dum,pzcor,pzh,grid,1.0,0.1,0.1,100,canonical,real);
+	  PZSIC_calculate(sicsolb,Wb,dum,pzcor,pzh,grid,0.0,0.1,0.1,100,canonical,real);
 	}
       }
     }

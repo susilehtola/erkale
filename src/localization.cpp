@@ -1412,7 +1412,6 @@ void PZSIC::get_k_rms_max(double & Krms, double & Kmax) {
 bool PZSIC::converged() {
   double Krms, Kmax;
   get_k_rms_max(Krms,Kmax);
-  (void) W;
 
   if(Kmax<maxtol && Krms<rmstol)
     // Converged
