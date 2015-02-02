@@ -100,7 +100,7 @@ class UnitaryFunction {
   /// Get status legend
   virtual std::string legend() const;
   /// Print status information, possibly in a longer format
-  virtual std::string status(bool lfmt=false) const;
+  virtual std::string status(bool lfmt=false);
   /// Check convergence
   virtual bool converged();
 };
@@ -147,7 +147,7 @@ class UnitaryOptimizer {
   /// Print legend
   virtual void print_legend(const UnitaryFunction *f) const;
   /// Print progress
-  virtual void print_progress(size_t k, const UnitaryFunction *f, const UnitaryFunction *fold) const;
+  virtual void print_progress(size_t k, UnitaryFunction *f, const UnitaryFunction *fold) const;
   /// Print time
   virtual void print_time(const Timer & t) const;
   /// Print chosen step length

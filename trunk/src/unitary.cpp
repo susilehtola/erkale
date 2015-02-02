@@ -60,7 +60,7 @@ std::string UnitaryFunction::legend() const {
   return "";
 }
 
-std::string UnitaryFunction::status(bool lfmt) const {
+std::string UnitaryFunction::status(bool lfmt) {
   /// Dummy default function
   (void) lfmt;
   return "";
@@ -272,7 +272,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
       double J=f->getf();
     
       double oldJ = (oldf==NULL) ? 0.0 : oldf->getf();
-      if(k>1 && ( (bracket(G,G)<Gthr) && fabs(J-oldJ)<Fthr && f->converged() ) ) {
+      if( k>1 && (f->converged() || (bracket(G,G)<Gthr && fabs(J-oldJ)<Fthr))) {
 	if(verbose) {
 	  printf("Converged.\n");
 	  fflush(stdout);
@@ -318,7 +318,7 @@ void UnitaryOptimizer::print_legend(const UnitaryFunction *f) const {
   printf("  %4s  %13s  %13s  %12s  %s\n","iter","J","delta J","<G,G>",f->legend().c_str());
 }
 
-void UnitaryOptimizer::print_progress(size_t k, const UnitaryFunction *f, const UnitaryFunction *fold) const {
+void UnitaryOptimizer::print_progress(size_t k, UnitaryFunction *f, const UnitaryFunction *fold) const {
   double J=f->getf();
   if(fold==NULL)
     // No info on delta J
