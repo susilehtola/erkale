@@ -20,13 +20,11 @@
 #include <cstdio>
 #include <cfloat>
 
-#include "adiis.h"
 #include "basis.h"
 #include "broyden.h"
 #include "elements.h"
 #include "dftfuncs.h"
 #include "dftgrid.h"
-#include "diis.h"
 #include "global.h"
 #include "guess.h"
 #include "lebedev.h"
@@ -79,6 +77,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   usediis=set.get_bool("UseDIIS");
   diis_c1=set.get_bool("C1-DIIS");
   diisorder=set.get_int("DIISOrder");
+  diiseps=set.get_double("DIISEps");
   diisthr=set.get_double("DIISThr");
   useadiis=set.get_bool("UseADIIS");
   usebroyden=set.get_bool("UseBroyden");

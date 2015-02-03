@@ -67,10 +67,12 @@ void Settings::add_scf_settings() {
   // Number of DIIS matrices to use?
   add_int("DIISOrder", "How many DIIS iterations to keep in memory?", 10);
   // DIIS threshold
-  add_double("DIISThr", "DIIS error threshold for DIIS updates", 0.05);
-
+  add_double("DIISEps", "Start mixing in DIIS when error is", 0.1);
+  // DIIS threshold
+  add_double("DIISThr", "DIIS error threshold for DIIS updates", 0.01);
   // Use ADIIS?
-  add_bool("UseADIIS", "Use ADIIS for Fock matrix interpolation? (DIIS takes preference)", true);
+  add_bool("UseADIIS", "Use ADIIS for Fock matrix interpolation?", true);
+
   // Use Broyden mixing?
   add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);
   // Use Trust-Region Roothaan-Hall?

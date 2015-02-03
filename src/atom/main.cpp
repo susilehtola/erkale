@@ -18,8 +18,6 @@
 #include "linalg.h"
 #include "stringutil.h"
 #include "basis.h"
-#include "diis.h"
-#include "adiis.h"
 #include "guess.h"
 #include "mathf.h"
 #include "scf.h"

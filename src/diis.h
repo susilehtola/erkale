@@ -15,13 +15,13 @@
  */
 
 
-#include "global.h"
-
 #ifndef ERKALE_DIIS
 #define ERKALE_DIIS
 
+#include "global.h"
 #include <armadillo>
 #include <vector>
+#include <gsl/gsl_multimin.h>
 
 /// Spin-polarized entry
 typedef struct {
@@ -61,9 +61,11 @@ bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs);
 /**
  * \class DIIS
  *
- * \brief DIIS - Direct Inversion in the Iterative Subspace
+ * \brief DIIS - Direct Inversion in the Iterative Subspace and ADIIS
  *
- * This class contains the DIIS convergence accelerator.
+ * This class contains the DIIS and ADIIS convergence accelerators.
+ *
+ *
  * The original DIIS (C1-DIIS) is based on the articles
  *
  * P. Pulay, "Convergence acceleration of iterative sequences. The
@@ -74,15 +76,21 @@ bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs);
  * P. Pulay, "Improved SCF Convergence Acceleration", J. Comp. Chem. 3
  * (1982), pp. 556 - 560.
  *
- *
  * Using C1-DIIS is, however, not recommended. What is used by
  * default, instead, is C2-DIIS, which is documented in the article
  *
  * H. Sellers, "The C2-DIIS convergence acceleration algorithm",
  * Int. J. Quant. Chem. 45 (1993), pp. 31 - 41
  *
+ *
+ * The ADIIS algorithm is described in
+ *
+ * X. Hu and W. Yang, "Accelerating self-consistent field convergence
+ * with the augmented Roothaan–Hall energy function",
+ * J. Chem. Phys. 132 (2010), 054109.
+ *
  * \author Susi Lehtola
- * \date 2011/04/20 15:37
+ * \date 2011/05/08 19:32
  */
 
 class DIIS {
@@ -92,25 +100,64 @@ class DIIS {
   /// Half-inverse overlap matrix
   arma::mat Sinvh;
 
+  /// Use DIIS?
+  bool usediis;
+  /// C1-DIIS?
+  bool c1diis;
+  /// Use ADIIS?
+  bool useadiis;
+  /// Verbose operation?
+  bool verbose;
+
+  /// When to start using DIIS weights
+  double diiseps;
+  /// When to start using DIIS exclusively
+  double diisthr;
+  /// Counter for not using DIIS
+  int cooloff;
+  
   /// Maximum amount of matrices to store
   size_t imax;
-
+  /// Get energies
+  virtual arma::vec get_energies() const=0;
   /// Get errors
-  virtual arma::mat get_error() const=0;
+  virtual arma::mat get_diis_error() const=0;
   /// Reduce size of stack by one
   virtual void erase_last()=0;
 
-  /// Compute weights, use C1-DIIS if wanted
-  arma::vec get_weights(bool verbose, bool c1_diis);
+  // Helpers for speeding up ADIIS evaluation
+  /// < P_i - P_n | F(D_n) >   or   < Pa_i - Pa_n | Fa(P_n) > + < Pb_i - Pb_n | Fb(P_n) >
+  arma::vec PiF;
+  /// < P_i - P_n | F(D_j) - F(D_n) >   or    < Pa_i - Pa_n | Fa(P_j) - Fa(P_n) > + < Pb_i - Pb_n | Fb(P_j) - Fb(P_n) >
+  arma::mat PiFj;
 
+  /// Compute weights
+  arma::vec get_w();
+  /// Compute DIIS weights
+  arma::vec get_w_diis() const;
+  /// Compute DIIS weights, worker routine
+  arma::vec get_w_diis_wrk(const arma::mat & err) const;
+  /// Compute ADIIS weights
+  arma::vec get_w_adiis() const;
+
+  /// Solve coefficients
+  arma::vec get_c_adiis(bool verbose=false) const;
+  
  public:
   /// Constructor
-  DIIS(const arma::mat & S, const arma::mat & Sinvh, size_t imax=20);
+  DIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
   /// Destructor
   ~DIIS();
 
   /// Clear Fock matrices and errors
   virtual void clear()=0;
+
+  /// Compute energy and its derivative with contraction coefficients \f$ c_i = x_i^2 / \left[ \sum_j x_j^2 \right] \f$
+  double get_E_adiis(const gsl_vector * x) const;
+  /// Compute derivative wrt contraction coefficients
+  void get_dEdx_adiis(const gsl_vector * x, gsl_vector * dEdx) const;
+  /// Compute energy and derivative wrt contraction coefficients
+  void get_E_dEdx_adiis(const gsl_vector * x, double * E, gsl_vector * dEdx) const;
 };
 
 /// Spin-restricted DIIS
@@ -118,14 +165,18 @@ class rDIIS: protected DIIS {
   /// Fock matrices in AO basis
   std::vector<diis_unpol_entry_t> stack;
 
+  /// Get energies
+  arma::vec get_energies() const;
   /// Get errors
-  arma::mat get_error() const;
+  arma::mat get_diis_error() const;
   /// Reduce size of stack by one
   void erase_last();
-
+  /// ADIIS update
+  void PiF_update();
+  
  public:
   /// Constructor
-  rDIIS(const arma::mat & S, const arma::mat & Sinvh, size_t imax=20);
+  rDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
   /// Destructor
   ~rDIIS();
 
@@ -133,10 +184,10 @@ class rDIIS: protected DIIS {
   void update(const arma::mat & F, const arma::mat & P, double E, double & error);
 
   /// Compute new Fock matrix, use C1-DIIS if wanted
-  void solve_F(arma::mat & F, bool verbose=true, bool c1_diis=false);
+  void solve_F(arma::mat & F);
 
   /// Compute new density matrix, use C1-DIIS if wanted
-  void solve_P(arma::mat & P, bool verbose=true, bool c1_diis=false);
+  void solve_P(arma::mat & P);
 
   /// Clear Fock matrices and errors
   void clear();
@@ -147,14 +198,18 @@ class uDIIS: protected DIIS {
   /// Fock matrices in AO basis - spin polarized
   std::vector<diis_pol_entry_t> stack;
 
+  /// Get energies
+  arma::vec get_energies() const;
   /// Get errors
-  arma::mat get_error() const;
+  arma::mat get_diis_error() const;
   /// Reduce size of stack by one
   void erase_last();
-
+  /// ADIIS update
+  void PiF_update();
+  
  public:
   /// Constructor
-  uDIIS(const arma::mat & S, const arma::mat & Sinvh, size_t imax=20);
+  uDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
   /// Destructor
   ~uDIIS();
 
@@ -162,13 +217,27 @@ class uDIIS: protected DIIS {
   void update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & Pa, const arma::mat & Pb, double E, double & error);
 
   /// Compute new Fock matrix, use C1-DIIS if wanted
-  void solve_F(arma::mat & Fa, arma::mat & Fb, bool verbose=true, bool c1_diis=false);
+  void solve_F(arma::mat & Fa, arma::mat & Fb);
 
   /// Compute new density matrix, use C1-DIIS if wanted
-  void solve_P(arma::mat & Pa, arma::mat & Pb, bool verbose=true, bool c1_diis=false);
+  void solve_P(arma::mat & Pa, arma::mat & Pb);
 
   /// Clear Fock matrices and errors
   void clear();
+};
+
+namespace adiis {
+  /// Compute weights
+  arma::vec compute_c(const gsl_vector * x);
+  /// Compute jacobian
+  arma::mat compute_jac(const gsl_vector * x);
+
+  /// Compute energy
+  double min_f(const gsl_vector * x, void * params);
+  /// Compute derivative
+  void min_df(const gsl_vector * x, void * params, gsl_vector * g);
+  /// Compute energy and derivative
+  void min_fdf(const gsl_vector * x, void * params, double * f, gsl_vector * g);
 };
 
 

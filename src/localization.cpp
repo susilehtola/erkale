@@ -18,13 +18,10 @@
 #include <cstdio>
 #include <cfloat>
 
-#include "adiis.h"
 #include "basis.h"
-#include "broyden.h"
 #include "elements.h"
 #include "dftfuncs.h"
 #include "dftgrid.h"
-#include "diis.h"
 #include "global.h"
 #include "guess.h"
 #include "hirshfeldi.h"

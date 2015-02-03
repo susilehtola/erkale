@@ -17,7 +17,6 @@
 
 #include <cfloat>
 #include "xrsscf.h"
-#include "adiis.h"
 #include "diis.h"
 #include "broyden.h"
 #include "dftfuncs.h"
