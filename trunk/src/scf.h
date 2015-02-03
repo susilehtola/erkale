@@ -263,6 +263,8 @@ class SCF {
   /// Number of DIIS matrices to use
   int diisorder;
   /// Threshold of enabling use of DIIS
+  double diiseps;
+  /// Threshold of enabling full use of DIIS
   double diisthr;
 
   /// Use ADIIS?

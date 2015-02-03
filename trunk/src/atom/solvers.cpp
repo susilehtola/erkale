@@ -19,7 +19,6 @@
 #include "linalg.h"
 #include "timer.h"
 #include "diis.h"
-#include "adiis.h"
 #include "guess.h"
 #include "mathf.h"
 
@@ -171,9 +170,13 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     fflush(stdout);
   }
 
-  uDIIS diis(S,Sinvh);
-  const double diisthr=0.05;
-  uADIIS adiis;
+  bool usediis=true;
+  bool diis_c1=false;
+  const double diiseps=0.1;
+  const double diisthr=0.01;
+  bool useadiis=true;
+  const int diisorder=10;
+  uDIIS diis(S,Sinvh,usediis,diis_c1,diiseps,diisthr,useadiis,diisorder,verbose);
 
   arma::mat oldHa, oldHb;
   sol.Ha.zeros();
@@ -227,19 +230,12 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
 
     //    printf("Exc=%e, Ekin=%e, Enuc=%e, Ecoul=%e\n",Exc,Ekin,Enuc,Ecoul);
 
-    // Update ADIIS stacks
-    adiis.update(sol.Pa,sol.Pb,sol.Ha,sol.Hb,sol.en.E);
-
     // Update DIIS stacks
     double diiserr;
     diis.update(sol.Ha,sol.Hb,sol.Pa,sol.Pb,sol.en.E,diiserr);
-
-    if(diiserr<diisthr) {
-      diis.solve_F(sol.Ha,sol.Hb);
-    } else {
-      adiis.get_F(sol.Ha,sol.Hb);
-    }
-
+    // and solve the updated matrices
+    diis.solve_F(sol.Ha,sol.Hb);
+    
     // Solve new orbitals
     diagonalize(S,Sinvh,sol);
 
@@ -313,9 +309,13 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     fflush(stdout);
   }
 
-  rADIIS adiis;
-  rDIIS diis(S,Sinvh);
-  const double diisthr=0.05;
+  bool usediis=true;
+  bool diis_c1=false;
+  const double diiseps=0.01;
+  const double diisthr=0.01;
+  bool useadiis=true;
+  const int diisorder=10;
+  rDIIS diis(S,Sinvh,usediis,diis_c1,diiseps,diisthr,useadiis,diisorder,verbose);
 
   arma::mat oldH;
   sol.H.zeros(Nbf,Nbf);
@@ -358,19 +358,12 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
 
     //    printf("Exc=%e, Ekin=%e, Enuc=%e, Ecoul=%e\n",Exc,Ekin,Enuc,Ecoul);
 
-    // Update ADIIS stacks
-    adiis.update(sol.P,sol.H,sol.en.E);
-
     // Update DIIS stacks
     double diiserr;
     diis.update(sol.H,sol.P,sol.en.E,diiserr);
-
-    if(diiserr<diisthr) {
-      diis.solve_F(sol.H);
-    } else {
-      adiis.get_F(sol.H);
-    }
-
+    // and solve for the new matrices
+    diis.solve_F(sol.H);
+    
     // Solve new orbitals
     diagonalize(S,Sinvh,sol);
 

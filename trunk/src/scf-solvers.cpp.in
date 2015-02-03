@@ -136,9 +136,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
 #ifdef RESTRICTED
   // DIIS iterator
-  rDIIS diis(S,Sinvh,diisorder);
-  // ADIIS
-  rADIIS adiis;
+  rDIIS diis(S,Sinvh,usediis,diis_c1,diiseps,diisthr,useadiis,verbose,diisorder);
   // Broyden
   Broyden broyd(verbose);
 
@@ -148,9 +146,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   K.zeros();
 #else
   // DIIS iterator
-  uDIIS diis(S,Sinvh,diisorder);
-  // ADIIS
-  uADIIS adiis;
+  uDIIS diis(S,Sinvh,usediis,diis_c1,diiseps,diisthr,useadiis,verbose,diisorder);
 
   // Broyden
   Broyden broyd_sum(verbose);
@@ -437,14 +433,14 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     // Compute change of energy
     deltaE=sol.en.E-oldsol.en.E;
 
-    // Update ADIIS stacks.
-    if(useadiis) {
+
 #ifdef RESTRICTED
-      adiis.update(sol.P,sol.H,sol.en.E);
+    // Update DIIS stack of matrices
+    diis.update(sol.H,sol.rP,sol.en.E,diiserr);
 #else
-      adiis.update(sol.Pa,sol.Pb,sol.Ha,sol.Hb,sol.en.E);
+    // Update DIIS stacks of matrices
+    diis.update(sol.Ha,sol.Hb,sol.rPa,sol.rPb,sol.en.E,diiserr);
 #endif
-    }
 
     if(iiter>1 && usebroyden) {
 #ifdef RESTRICTED
@@ -469,55 +465,22 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     }
 
     // Solve DIIS
-    if(usediis) {
-
+    try {
 #ifdef RESTRICTED
-      // Update DIIS stack of matrices
-      diis.update(sol.H,sol.rP,sol.en.E,diiserr);
+      // Solve new matrix
+      diis.solve_F(sol.H);
 #else
-      // Update DIIS stacks of matrices
-      diis.update(sol.Ha,sol.Hb,sol.rPa,sol.rPb,sol.en.E,diiserr);
+      // Solve new matrices
+      diis.solve_F(sol.Ha,sol.Hb);
 #endif
-
-      if(diiserr<diisthr) {
-	if(verbose)
-	  printf("\nUsing DIIS extrapolated Fock operator.\n");
-
-#ifdef RESTRICTED
-	// Solve new matrix
-	diis.solve_F(sol.H,verbose,diis_c1);
-#else
-	// Solve new matrices
-	diis.solve_F(sol.Ha,sol.Hb,verbose,diis_c1);
-#endif
-
-	diissucc=true;
-      } else {
-	if(verbose)
-	  printf("\nDIIS error %e too large, not using DIIS extrapolation.\n",diiserr);
-	diissucc=false;
-      }
-    }
-
-    // Perform ADIIS interpolation
-    if(useadiis && ((usediis && !diissucc) || !usediis)) {
-      if(verbose)
-	t.set();
-
       diissucc=true;
-#ifdef RESTRICTED
-      adiis.get_F(sol.H,verbose);
-#else
-      adiis.get_F(sol.Ha,sol.Hb,verbose);
-#endif
-
-      if(verbose)
-	printf("ADIIS interpolation done in %s.\n",t.elapsed().c_str());
+    } catch(std::runtime_error) {
+      diissucc=false;
     }
 
     // Perform Broyden interpolation
-    if(usebroyden && ((usediis && !diissucc) || !usediis) && iiter>1) {
-
+    if(usebroyden && !diissucc && iiter>1) {
+      
       if(verbose) {
 	printf("Performing Broyden interpolation of Fock operator ... ");
 	fflush(stdout);
@@ -993,7 +956,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 	  fflush(stdout);
 	}
 	diis.clear();
-	adiis.clear();
 #ifdef RESTRICTED
 	broyd.clear();
 #else
