@@ -98,8 +98,11 @@ class PZStability: public FDHessian {
   size_t count_oo_params(size_t o) const;
   /// Count amount of parameters for rotations
   size_t count_params(size_t o, size_t v) const;
-    /// Count amount of parameters
+  /// Count amount of parameters
   size_t count_params() const;
+  
+  /// Get indices of real and imaginary parameters
+  void real_imag_idx(arma::uvec & idxr, arma::uvec & idxi) const;
 
   /// Get oo rotation matrix
   arma::cx_mat oo_rotation(const arma::vec & x, bool spin=false) const;
