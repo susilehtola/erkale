@@ -292,6 +292,110 @@ size_t PZStability::count_params() const {
   return npar;
 }
 
+void PZStability::real_imag_idx(arma::uvec & idxr, arma::uvec & idxi) const {
+  if(!cplx) {
+    ERROR_INFO();
+    throw std::runtime_error("Should not call real_imag_idx for purely real calculation!\n");
+  }
+  
+  // Count amount of parameters
+  size_t nreal=0, nimag=0;
+  if(cancheck) {
+    nreal+=oa*va;
+    nimag+=oa*va;
+    if(!restr) {
+      nreal+=ob*vb;
+      nimag+=ob*vb;
+    }
+  }
+  if(oocheck) {
+    nreal+=oa*(oa-1)/2;
+    if(cplx)
+      nimag+=oa*(oa+1)/2;
+    
+    if(!restr) {
+      nreal+=ob*(ob-1)/2;
+      if(cplx)
+	nimag+=ob*(ob+1)/2;
+    }
+  }
+
+  // Sanity check
+  if(nreal+nimag != count_params()) {
+    ERROR_INFO();
+    throw std::runtime_error("Parameter count is wrong!\n");
+  }
+  
+  // Parameter indices
+  idxr.zeros(nreal);
+  idxi.zeros(nimag);
+  
+  // Fill indices.
+  size_t ir=0, ii=0;
+  
+  // Offset
+  size_t ioff=0;
+  
+  if(cancheck) {
+    // First are the real parameters
+    for(size_t irot=0;irot<oa*va;irot++) {
+      idxr(ir++)=irot;
+    }
+    ioff+=oa*va;
+    // followed by the imaginary parameters
+    for(size_t irot=0;irot<oa*va;irot++)
+      idxi(ii++)=irot+ioff;
+    ioff+=oa*va;
+    
+    if(!restr) {
+      // and then again the real parameters
+      for(size_t irot=0;irot<ob*vb;irot++)
+	idxr(ir++)=irot + ioff;
+      ioff+=ob*vb;
+      // followed by the imaginary parameters
+      for(size_t irot=0;irot<ob*vb;irot++)
+	idxi(ii++)=irot + ioff;
+      ioff+=ob*vb;
+    }
+  }
+    
+  if(oocheck) {
+    // First are the real parameters
+    for(size_t irot=0;irot<oa*(oa-1)/2;irot++) {
+      idxr(ir++)=irot+ioff;
+    }
+    ioff+=oa*(oa-1)/2;
+    // and then the imaginary parameters
+    for(size_t irot=0;irot<oa*(oa+1)/2;irot++)
+      idxi(ii++)=irot + ioff;
+    ioff+=oa*(oa+1)/2;
+
+    if(!restr) {
+      // First are the real parameters
+      for(size_t irot=0;irot<ob*(ob-1)/2;irot++) {
+	idxr(ir++)=irot+ioff;
+      }
+      ioff+=ob*(ob-1)/2;
+      // and then the imaginary parameters
+      for(size_t irot=0;irot<ob*(ob+1)/2;irot++)
+	idxi(ii++)=irot + ioff;
+      ioff+=ob*(ob+1)/2;
+    }
+  }
+
+  // Sanity check
+  arma::uvec idx(nreal+nimag);
+  idx.subvec(0,nreal-1)=idxr;
+  idx.subvec(nreal,nreal+nimag-1)=idxi;
+  idx=arma::sort(idx,"ascending");
+  for(size_t i=0;i<idx.n_elem;i++)
+    if(idx(i)!=i) {
+      std::ostringstream oss;
+      oss << "Element " << i << " of compound index is wrong: " << idx(i) << "!\n";
+      throw std::runtime_error(oss.str());
+    }
+}
+
 double PZStability::eval(const arma::vec & x) {
   return eval(x,false);
 }
@@ -519,8 +623,6 @@ double PZStability::eval(const arma::vec & x, int mode) {
       solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
 
       // Collect energies
-      Eoa.t().print("Eoa, old");
-
       if(mode==1) {
 	for(size_t i=0;i<orblist.n_elem;i++)
 	  Eoa(orblist(i))=Eorb(i);
@@ -531,8 +633,6 @@ double PZStability::eval(const arma::vec & x, int mode) {
 	  // Update reference
 	  ref_Eoa=Eorb;
       }
-      
-      Eoa.t().print("Eoa, new");
     }
     if(chkorbb.size() || mode == 0 || mode == -1) {
       // Collect list of changed occupied orbitals
@@ -549,8 +649,6 @@ double PZStability::eval(const arma::vec & x, int mode) {
       solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
       
       // Collect energies
-      Eob.t().print("Eob, old");
-
       if(mode==1) {
 	for(size_t i=0;i<orblist.n_elem;i++)
 	  Eob(orblist(i))=Eorb(i);
@@ -561,8 +659,6 @@ double PZStability::eval(const arma::vec & x, int mode) {
 	  // Update reference
 	  ref_Eob=Eorb;
       }
-      
-      Eob.t().print("Eoa, new");
     }
     
     // Result is
@@ -889,6 +985,8 @@ void PZStability::set(const uscf_t & sol, const arma::uvec & dropa, const arma::
 }
 
 void PZStability::check() {
+  Timer tfull;
+  
   // Estimate runtime
   {
     // Test value
@@ -952,10 +1050,36 @@ void PZStability::check() {
     hval.t().print("Optimal orbital stability");
   }
 
+  if(cplx) {
+    // Collect real and imaginary parts of Hessian.
+    arma::uvec rp, ip;
+    real_imag_idx(rp,ip);
+
+    arma::mat rh(rp.n_elem,rp.n_elem);
+    for(size_t i=0;i<rp.n_elem;i++)
+      for(size_t j=0;j<rp.n_elem;j++)
+	rh(i,j)=h(rp(i),rp(j));
+
+    arma::mat ih(ip.n_elem,ip.n_elem);
+    for(size_t i=0;i<ip.n_elem;i++)
+      for(size_t j=0;j<ip.n_elem;j++)
+	ih(i,j)=h(ip(i),ip(j));
+
+    eig_sym_ordered(hval,hvec,rh);
+    printf("\nReal part of Hessian diagonalized (%s)\n",t.elapsed().c_str()); fflush(stdout);
+    hval.t().print("Real orbital stability");
+    
+    eig_sym_ordered(hval,hvec,ih);
+    printf("\nImaginary part of Hessian diagonalized (%s)\n",t.elapsed().c_str()); fflush(stdout);
+    hval.t().print("Imaginary orbital stability");
+  }
+   
   // Total stability
   eig_sym_ordered(hval,hvec,h);
   printf("\nFull Hessian diagonalized (%s)\n",t.elapsed().c_str()); fflush(stdout);
   hval.t().print("Orbital stability");
+
+  fprintf(stderr,"Check completed in %s.\n",tfull.elapsed().c_str());
 }
 
 void PZStability::print_status(size_t iiter, const arma::vec & g, const Timer & t) const {
