@@ -61,6 +61,14 @@ arma::vec FDHessian::gradient() {
 
     // Derivative
     g(i)=(yr-yl)/(2*ss);
+
+    if(std::isnan(g(i))) {
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Element " << i << " of gradient gives NaN.\n";
+      oss << "Step size is " << ss << ", and left and right values are " << yl << " and " << yr << ".\n";
+      throw std::runtime_error(oss.str());
+    }
   }
 
   return g;
@@ -125,6 +133,18 @@ arma::mat FDHessian::hessian() {
     h(i,j)=(yrr - yrl - ylr + yll)/(4.0*ss*ss);
     // Symmetrize
     h(j,i)=h(i,j);
+
+    if(std::isnan(h(i,j))) {
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Element (" << i << "," << j << ") of Hessian gives NaN.\n";
+      oss << "Step size is " << ss << ". Stencil values\n";
+      oss << "yrr = " << yrr << "\n";
+      oss << "yrl = " << yrl << "\n";
+      oss << "ylr = " << ylr << "\n";
+      oss << "yll = " << yll << "\n";
+      throw std::runtime_error(oss.str());
+    }
   }
 
   return h;
@@ -639,7 +659,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       arma::uvec orblist(arma::sort(arma::conv_to<arma::uvec>::from(chkorbb)));
       
       // Transformed oo block
-      arma::cx_mat Ct=tmp.cCb.cols(0,oa-1)*Roob;
+      arma::cx_mat Ct=tmp.cCb.cols(0,ob-1)*Roob;
       // Dummy matrix
       arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
       
