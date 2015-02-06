@@ -54,8 +54,10 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #define form_fock(sol,ref) Fock_full_hole(sol,dft,occa,occb,ref,grid,tol); nfock++;
 
   // Conventional HF and DFT
-#elif defined(HF) || defined(_ROHF)
+#elif defined(HF)
 #define form_fock(sol,ref) Fock_UHF(sol,occa,occb,ref,tol); nfock++;
+#elif defined(_ROHF)
+#define form_fock(sol,ref) Fock_ROHF(sol,occa,occb,ref,tol); nfock++;
 #elif defined(DFT)
 #define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,dft,ref,grid,tol); nfock++;
 #endif
