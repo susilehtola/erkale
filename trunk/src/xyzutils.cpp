@@ -55,7 +55,6 @@ std::vector<atom_t> load_xyz(std::string filename) {
       atom_t tmp;
 
       if(!in.good()) {
-	ERROR_INFO();
 	std::ostringstream oss;
 	oss << "File \""<<filename<<"\" ended unexpectedly!\n";
 	throw std::runtime_error(oss.str());
@@ -67,13 +66,11 @@ std::vector<atom_t> load_xyz(std::string filename) {
       words=splitline(line);
 
       if(!words.size()) {
-	ERROR_INFO();
 	std::ostringstream oss;
 	oss << "File \""<<filename<<"\" ended unexpectedly!\n";
 	throw std::runtime_error(oss.str());
       }
       if(words.size()<4) {
-	ERROR_INFO();
 	std::ostringstream oss;
 	oss << "Malformed xyz file \"" << filename << "\"!\n";
 	throw std::runtime_error(oss.str());
@@ -85,8 +82,9 @@ std::vector<atom_t> load_xyz(std::string filename) {
       if(isdigit(words[0][0])) {
 	int Z=readint(words[0]);
 	if(Z> (int) (sizeof(element_symbols)/sizeof(element_symbols[0]))) {
-	  ERROR_INFO();
-	  throw std::runtime_error("Too heavy atom requested in xyz file.\n");
+	  std::ostringstream oss;
+	  oss << "Too heavy atom Z =" << Z << " requested in xyz file.\n";
+	  throw std::runtime_error(oss.str());
 	} else if(Z<0) {
 	  throw std::runtime_error("Can't have nucleus with negative charge.\n");
 	}
@@ -106,14 +104,12 @@ std::vector<atom_t> load_xyz(std::string filename) {
       atoms.push_back(tmp);
     }
   } else {
-    ERROR_INFO();
     std::ostringstream oss;
     oss << "Could not open xyz file \""<<filename<<"\"!\n";
     throw std::runtime_error(oss.str());
   }
 
   if(atoms.size()==0) {
-    ERROR_INFO();
     std::ostringstream oss;
     oss << "File \""<<filename<<"\" contains no atoms!\n";
     throw std::runtime_error(oss.str());
