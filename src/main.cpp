@@ -92,7 +92,20 @@ int main(int argc, char **argv) {
   // Read in atoms.
   std::vector<atom_t> atoms;
   std::string atomfile=set.get_string("System");
-  atoms=load_xyz(atomfile);
+  if(file_exists(atomfile))
+    atoms=load_xyz(atomfile);
+  else {
+    // Check if a directory has been set
+    char * libloc=getenv("ERKALE_SYSDIR");
+    if(libloc) {
+      std::string filename=std::string(libloc)+"/"+atomfile;
+      if(file_exists(filename))
+	atoms=load_xyz(filename);
+      else
+	throw std::runtime_error("Unable to open xyz input file!\n");
+    } else
+      throw std::runtime_error("Unable to open xyz input file!\n");
+  }    
 
   // Read in basis set
   BasisSetLibrary baslib;
