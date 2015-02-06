@@ -759,7 +759,7 @@ enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & 
     } else
       // Failed to read core orbital
       ok=LOAD_FAIL;
-    
+
   } else {
     // Failed to load or solution was not consistent.
     sol.Ca=arma::mat();
@@ -785,6 +785,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=2) {
     printf("Usage: $ %s runfile\n",argv[0]);
@@ -859,7 +860,7 @@ int main(int argc, char **argv) {
   // Print out settings
   if(verbose)
     set.print();
-  
+
   // Read in atoms.
   std::vector<atom_t> atoms;
   std::string atomfile=set.get_string("System");
@@ -877,7 +878,7 @@ int main(int argc, char **argv) {
     } else
       throw std::runtime_error("Unable to open xyz input file!\n");
   }
-  
+
   // Get index of excited atom
   size_t xcatom=get_excited_atom_idx(atoms);
 
@@ -950,7 +951,7 @@ int main(int argc, char **argv) {
   std::string state=set.get_string("XRSInitialState");
   // Initial orbital
   int iorb=set.get_int("XRSInitialOrbital")-1;
-  
+
   // Try to load orbitals and energies
   arma::vec core;
   enum loadresult loadok=LOAD_FAIL;

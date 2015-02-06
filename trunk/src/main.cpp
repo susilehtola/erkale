@@ -55,6 +55,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=2) {
     printf("Usage: $ %s runfile\n",argv[0]);
@@ -105,7 +106,7 @@ int main(int argc, char **argv) {
 	throw std::runtime_error("Unable to open xyz input file!\n");
     } else
       throw std::runtime_error("Unable to open xyz input file!\n");
-  }    
+  }
 
   // Read in basis set
   BasisSetLibrary baslib;

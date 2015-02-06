@@ -26,6 +26,10 @@
 #include <omp.h>
 #endif
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 double compute_threshold(DFTGrid & intgrid, const arma::mat & Po, double thr, bool dens) {
   // Get the list of orbital density values
   std::vector<dens_list_t> list=intgrid.eval_dens_list(Po);
@@ -59,6 +63,10 @@ int main(int argc, char **argv) {
 #endif
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
+  print_hostname();
 
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);
@@ -85,10 +93,10 @@ int main(int argc, char **argv) {
   set.add_bool("DensThr", "Compute total density thresholds", false);
   set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
   set.add_double("OrbThrGrid", "Accuracy of orbital density threshold integration grid", 1e-3);
-  
+
   // Parse settings
   set.parse(argv[1]);
-    
+
   // Print settings
   set.print();
 
@@ -225,7 +233,7 @@ int main(int argc, char **argv) {
       printf("\n%4s %9s %8s\n","orb","thr","t (s)");
       for(int io=0;io<Nela;io++) {
 	Timer t;
-	
+
 	// Orbital density matrix is
 	arma::mat Po=C.col(io)*arma::trans(C.col(io));
 	double val=compute_threshold(intgrid,Po,thr,false);
@@ -257,7 +265,7 @@ int main(int argc, char **argv) {
 	if(io<Nelb) {
 	  Po=Cb.col(io)*arma::trans(Cb.col(io));
 	  double valb=compute_threshold(intgrid,Po,thr,false);
-	  
+
 	  // Print out orbital threshold
 	  printf("%4i %8.3e %8.3e %8.3f\n", io+1, vala, valb, t.get());
 	  fflush(stdout);
@@ -265,8 +273,8 @@ int main(int argc, char **argv) {
 	  printf("%4i %8.3e %9s %8.3f\n", io+1, vala, "****", t.get());
 	  fflush(stdout);
 	}
-      }	
-      
+      }
+
     }
   }
 
@@ -288,7 +296,7 @@ int main(int argc, char **argv) {
       printf("\n%4s %9s %8s\n","orb","thr","t (s)");
       for(size_t io=0;io<CW.n_cols;io++) {
 	Timer t;
-	
+
 	// Orbital density matrix is
 	arma::mat Po=arma::real(CW.col(io)*arma::trans(CW.col(io)));
 	double val=compute_threshold(intgrid,Po,thr,false);
@@ -311,11 +319,11 @@ int main(int argc, char **argv) {
 	// Orbital density matrix is
 	arma::mat Po=arma::real(CWa.col(io)*arma::trans(CWa.col(io)));
 	double vala=compute_threshold(intgrid,Po,thr,false);
-	
+
 	if(io<CWb.n_cols) {
 	  Po=arma::real(CWb.col(io)*arma::trans(CWb.col(io)));
 	  double valb=compute_threshold(intgrid,Po,thr,false);
-	  
+
 	  // Print out orbital threshold
 	  printf("%4i %8.3e %8.3e %8.3f\n", (int) io+1, vala, valb, t.get());
 	  fflush(stdout);
@@ -323,7 +331,7 @@ int main(int argc, char **argv) {
 	  printf("%4i %8.3e %9s %8.3f\n", (int) io+1, vala, "****", t.get());
 	  fflush(stdout);
 	}
-      }	
+      }
     }
   }
 
@@ -345,7 +353,7 @@ int main(int argc, char **argv) {
       printf("%10s %8.3e %8.3f\n", "alpha", aval, t.get());
       fflush(stdout);
       t.set();
-      
+
       double bval=compute_threshold(intgrid,Pb,thr*arma::trace(P*basis.overlap()),true);
       printf("%10s %8.3e %8.3f\n", "beta", bval, t.get());
       fflush(stdout);
@@ -356,7 +364,7 @@ int main(int argc, char **argv) {
     printf("%10s %8.3e %8.3f\n", "total", val, t.get());
     fflush(stdout);
   }
-  
+
 
   return 0;
 }

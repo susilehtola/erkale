@@ -169,7 +169,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
     else
       return ECALC;
   }
-  
+
   // Was the calculation converged?
   bool convd;
   BasisSet oldbas;
@@ -200,7 +200,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
       throw std::runtime_error("Failed to copy checkpoint file.\n");
     }
   }
-  
+
   // Check if the basis set is different
   if(!(basis==oldbas)) {
     // Basis set is different or calculation was not converged - need
@@ -265,12 +265,12 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
 	chkpt.write("Pb",sol.Pb);
 	chkpt.write("P",sol.P);
       }
-      
+
       // Calculation is now not converged
       bool conv=false;
       chkpt.write("Converged",conv);
     }
-    
+
     // Now we can do the SCF calculation
     calculate(basis,set,force);
     if(force)
@@ -300,7 +300,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
     dft.gridtol=0.0;
-    
+
     if(stricmp(set.get_string("DFTGrid"),"Auto")!=0) {
       std::vector<std::string> opts=splitline(set.get_string("DFTGrid"));
       if(opts.size()!=2) {
@@ -353,7 +353,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
 	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
       f=solver.force_RDFT(sol,occs,dft,grid,FINETOL);
     }
-    
+
   } else {
 
     uscf_t sol;
@@ -378,7 +378,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
       int Nela, Nelb;
       chkpt.read("Nel-a",Nela);
       chkpt.read("Nel-b",Nelb);
-      
+
       throw std::runtime_error("Not implemented!\n");
       //      f=solver.force_ROHF(sol,Nela,Nelb,tol);
     } else {
@@ -514,6 +514,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=2) {
     printf("Usage: $ %s runfile\n",argv[0]);
@@ -527,7 +528,7 @@ int main(int argc, char **argv) {
 
   Timer tprog;
   tprog.print_time();
-  
+
   // Parse settings
   Settings set;
   set.add_scf_settings();
@@ -819,10 +820,10 @@ int main(int argc, char **argv) {
     // Store old force
     oldf=interpret_force(s->gradient);
   }
-  
+
   if(convd)
     save_xyz(get_atoms(s->x,pars),"Optimized geometry",result);
-  
+
   gsl_multimin_fdfminimizer_free (s);
 
   gsl_vector_free (x);

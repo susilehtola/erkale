@@ -346,6 +346,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=2) {
     printf("Usage: %s file\n",argv[0]);
