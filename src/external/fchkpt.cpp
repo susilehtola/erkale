@@ -299,7 +299,7 @@ void load_fchk(const Settings & set, double tol) {
     if(stor.get_int("IROHF")==1) {
       P.zeros();
       arma::mat Ca=form_orbital_C(stor,"Alpha MO coefficients");
-      
+
       P.zeros();
       for(int i=0;i<Nela;i++)
 	P+=Ca.col(i)*arma::trans(Ca.col(i));
@@ -645,6 +645,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);

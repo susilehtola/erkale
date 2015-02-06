@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=7 && argc!=8) {
     printf("Usage:   %s am n min max Nf/tol nfull (coulomb)\n",argv[0]);

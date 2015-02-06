@@ -92,7 +92,7 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
   for(size_t i=0;i<printidx.size();i++) {
     // Orbital index is
     size_t iorb=printidx[i];
-   
+
     // r^4 term
     double rfour_t=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rfour*C.col(iorb)));
 
@@ -158,7 +158,7 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
   for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
     // Get functions on center inuc
     std::vector<GaussianShell> shells=basis.get_funcs(inuc);
-    
+
     // and store their indices
     std::vector<size_t> idx;
     for(size_t is=0;is<shells.size();is++) {
@@ -175,12 +175,12 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
 	Pat(ii,jj)=P(idx[ii],idx[jj]);
 	Sat(ii,jj)=S(idx[ii],idx[jj]);
       }
-    
+
     // Get natural orbitals
     arma::mat Cat;
     arma::vec occs;
     form_NOs(Pat,Sat,Cat,occs);
-    
+
     // Store the orbitals
     for(size_t iorb=0;iorb<Cat.n_cols;iorb++) {
       struct eigenvector<double> hlp;
@@ -190,7 +190,7 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
       hlp.c.zeros(basis.get_Nbf());
       for(size_t ii=0;ii<idx.size();ii++)
 	hlp.c(idx[ii])=Cat(ii,iorb);
-      
+
       orbs.push_back(hlp);
     }
   }
@@ -208,7 +208,7 @@ arma::cx_mat atomic_orbital_guess(const BasisSet & basis, const arma::mat & P, c
   for(size_t i=0;i<orbs.size();i++)
     printf("%4i %e\n",(int) i+1,orbs[i].E);
   */
-  
+
   // Collect the coefficients
   arma::mat Cat(basis.get_Nbf(),C.n_cols);
   for(size_t i=0;i<C.n_cols;i++)
@@ -229,13 +229,13 @@ arma::cx_mat cholesky_guess(const BasisSet & basis, const arma::mat & C) {
   P.zeros();
   for(size_t i=0;i<C.n_cols;i++)
     P+=C.col(i)*arma::trans(C.col(i));
-  
+
   // Perform Cholesky factorization of density matrix
   arma::mat Cchol=incomplete_cholesky(P,C.n_cols);
 
   // Overlap matrix
   arma::mat S=basis.overlap();
-  
+
   // Compute transformation
   arma::cx_mat ret=orthogonalize(arma::trans(Cchol)*S*C)*std::complex<double>(1.0,0.0);
 
@@ -265,15 +265,15 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
 
   // Save indices
   std::vector<size_t> printidx(locorb);
-    
+
   // Loop over orbitals
   while(locorb.size()) {
     // Orbitals to treat in this run
     std::vector<size_t> orbidx;
-    
+
     // Occupation number
     double occno=occs[locorb[0]];
-    
+
     for(size_t io=locorb.size()-1;io<locorb.size();io--)
       // Degeneracy in occupation?
       if(fabs(occs[locorb[io]]-occno)<1e-6) {
@@ -281,9 +281,9 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
 	orbidx.push_back(locorb[io]);
 	locorb.erase(locorb.begin()+io);
       }
-    
+
     std::sort(orbidx.begin(),orbidx.end());
-    
+
     // Collect orbitals
     arma::mat Cwrk(C.n_rows,orbidx.size());
     for(size_t io=0;io<orbidx.size();io++)
@@ -291,7 +291,7 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
     // and orbital energies
     arma::vec Ewrk(orbidx.size());
     for(size_t io=0;io<orbidx.size();io++)
-      Ewrk(io)=E(orbidx[io]);    
+      Ewrk(io)=E(orbidx[io]);
 
     // Localizing matrix
     arma::cx_mat U;
@@ -315,7 +315,7 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
 
     // Measure
     double measure;
-    
+
     // Run localization
     if(delocalize)
       printf("Delocalizing orbitals:");
@@ -332,12 +332,12 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       arma::cx_mat Cloc=Cwrk*U;
       for(size_t io=0;io<orbidx.size();io++)
 	Cplx.col(orbidx[io])=Cloc.col(io);
-      
+
     } else {
       // Update orbitals and energies, real case
 
       // Convert U to real form
-      arma::mat Ur=orthogonalize(arma::real(U));    
+      arma::mat Ur=orthogonalize(arma::real(U));
       // Transform orbitals
       arma::mat Cloc=Cwrk*Ur;
       // and energies
@@ -350,10 +350,10 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       } else
 	// No Fock operator given
 	Eloc=arma::diagvec(arma::trans(Ur)*arma::diagmat(Ewrk)*Ur);
-      
+
       // and sort them in the new energy order
       sort_eigvec(Eloc,Cloc);
-      
+
       // Update orbitals and energies
       for(size_t io=0;io<orbidx.size();io++)
 	C.col(orbidx[io])=Cloc.col(io);
@@ -361,7 +361,7 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
 	E(orbidx[io])=Eloc(io);
     }
   }
-  
+
   // Compute size distribution
   if(size) {
     if(start==UNITMAT)
@@ -399,6 +399,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);
@@ -551,7 +552,7 @@ int main(int argc, char **argv) {
   else if(stricmp(umets,"fourier_df")==0)
     umet=FOURIER_DF;
   else throw std::runtime_error("Accelerator not implemented.\n");
-  
+
   if(stricmp(loadname,savename)!=0) {
     // Copy checkpoint
     std::ostringstream oss;
@@ -592,7 +593,7 @@ int main(int argc, char **argv) {
 
   // Open checkpoint in read-write mode, don't truncate
   Checkpoint chkpt(savename,true,false);
-    
+
   // Basis set
   BasisSet basis;
   chkpt.read(basis);

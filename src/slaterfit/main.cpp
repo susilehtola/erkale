@@ -28,6 +28,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=5) {
     printf("Usage: %s zeta l Nf method\n",argv[0]);

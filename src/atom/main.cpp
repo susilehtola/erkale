@@ -30,6 +30,10 @@
 #include <omp.h>
 #endif
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 void testexch(const std::vector<bf_t> & basis) {
   for(size_t i=0;i<basis.size();i++)
     for(size_t j=0;j<=i;j++) {
@@ -145,6 +149,10 @@ int main(int argc, char **argv) {
 #endif
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
+  print_hostname();
 
   init_libint_base();
   //  test();

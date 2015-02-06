@@ -35,6 +35,10 @@ int main(int argc, char **argv) {
 #endif
   print_copyright();
   print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
+  print_hostname();
 
   if(argc!=1 && argc!=2) {
     printf("Usage: $ %s (runfile)\n",argv[0]);
@@ -55,7 +59,7 @@ int main(int argc, char **argv) {
 
   // Load checkpoint
   Checkpoint chkpt(set.get_string("LoadChk"),false);
-  
+
   // Load basis set
   BasisSet basis;
   chkpt.read(basis);
@@ -67,7 +71,7 @@ int main(int argc, char **argv) {
   // Restricted calculation?
   int restr;
   chkpt.read("Restricted",restr);
-  
+
   // Functional id
   int x_func, c_func;
   parse_xc_func(x_func,c_func,set.get_string("Method"));
@@ -99,13 +103,13 @@ int main(int argc, char **argv) {
       grid.construct(P,gridtol,x_func,c_func);
     else
       grid.construct(nrad,lmax,x_func,c_func);
-    
+
     grid.print_density(P);
     if(x_func)
       grid.print_potential(x_func,P/2.0,P/2.0,"Vx.dat");
     if(c_func)
       grid.print_potential(c_func,P/2.0,P/2.0,"Vc.dat");
-    
+
   } else {
     arma::mat Pa, Pb;
     chkpt.read("Pa",Pa);

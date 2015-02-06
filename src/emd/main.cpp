@@ -52,6 +52,7 @@ int main(int argc, char **argv) {
 #ifdef SVNRELEASE
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
+  print_hostname();
 
   if(argc!=1 && argc!=2) {
     printf("Usage: $ %s (runfile)\n",argv[0]);
@@ -93,7 +94,7 @@ int main(int argc, char **argv) {
   // Load density matrix
   arma::mat P;
   chkpt.read("P",P);
-  
+
   // The projection to calculate
   int l=0, m=0;
   std::string lmstr=set.get_string("EMDlm");
@@ -106,7 +107,7 @@ int main(int argc, char **argv) {
     m=readint(lmval[1]);
   }
   bool adaptive=set.get_bool("EMDAdapt");
-  
+
   // Compute orbital EMDs?
   if(set.get_string("EMDOrbitals")!="") {
     // Get orbitals
@@ -170,7 +171,7 @@ int main(int argc, char **argv) {
 	    sprintf(Jintname,"compton-interp-b-%i%s",(int) idx[i]+1,suffix);
 	  }
 	}
-	
+
 	// Generate dummy density matrix
 	arma::mat Pdum=C.col(idx[i])*arma::trans(C.col(idx[i]));
 
@@ -217,16 +218,16 @@ int main(int argc, char **argv) {
       printf("\nComputing the (%i %+i) projection of the EMD.\n",l,m);
     else
       printf("\nComputing the isotropic projection of the EMD.\n");
-    
+
     // Amount of electrons is
     int Nel;
     chkpt.read("Nel",Nel);
-    
+
     // Construct EMD evaluators
     Timer temd;
     GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,P,l,std::abs(m));
     GaussianEMDEvaluator *negeval;
-    if(m!=0) 
+    if(m!=0)
       negeval=new GaussianEMDEvaluator(basis,P,l,-std::abs(m));
     else
       negeval=NULL;
@@ -239,7 +240,7 @@ int main(int argc, char **argv) {
       emd.optimize_moments(true,tol);
     } else
       emd.fixed_fill();
-    
+
     if(l==0 && m==0) {
       emd.save("emd.txt");
       emd.moments("moments.txt");
@@ -251,7 +252,7 @@ int main(int argc, char **argv) {
       emd.save(fname);
 
       sprintf(fname,"moments_%i_%i.txt",l,m);
-      emd.moments(fname);      
+      emd.moments(fname);
     }
 
     if(l==0 && m==0)
@@ -262,7 +263,7 @@ int main(int argc, char **argv) {
     delete poseval;
     if(m!=0) delete negeval;
   }
-    
+
   // Do EMD on a cube?
   if(stricmp(set.get_string("EMDCube"),"")!=0) {
     t.print_time();
