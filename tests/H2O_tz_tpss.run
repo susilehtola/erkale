@@ -1,0 +1,8 @@
+# Water molecule
+System H2O.xyz
+Method mgga_x_tpss-mgga_c_tpss
+Basis cc-pVTZ
+Logfile H2O_tz_tpss.log
+SaveChk H2O_tz_tpss.chk
+Direct false
+DensityFitting false

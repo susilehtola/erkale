@@ -1,0 +1,7 @@
+# Neon atom
+System Ne.xyz
+Method HF
+Basis cc-pVTZ
+Guess Core
+Logfile Ne_tz.log
+SaveChk Ne_tz.chk

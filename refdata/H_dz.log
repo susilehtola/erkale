@@ -1,0 +1,177 @@
+Basis set cc-pVDZ found in file cc-pVDZ.gbs in /usr/share/erkale/basis/.
+
+
+Current Settings used by ERKALE:
+     AtomGuess      	                Auto	Method used for atomic guess (Auto for same as method)
+     Basis          	             cc-pVDZ	Basis set used in calculation
+     BasisCutoff    	           1.000e-08	Cutoff for dropping out small primitives from contraction
+     BasisOrth      	                Auto	Method of orthonormalization of basis set
+     BasisRotate    	                true	Rotate basis set to remove redundant functions?
+     C1-DIIS        	               false	Use older version of DIIS (C1-DIIS instead of C2-DIIS)?
+     Charge         	                   0	Total charge of system
+     DIISEps        	           1.000e-01	Start mixing in DIIS when error is
+     DIISOrder      	                  10	How many DIIS iterations to keep in memory?
+     DIISThr        	           1.000e-02	DIIS error threshold for DIIS updates
+     DecFock        	               false	Use decontracted basis to calculate Fock matrix (direct HF)
+     Decontract     	                    	Indices of atoms to decontract basis set for
+     DeltaEmax      	           1.000e-06	Maximum allowed change of energy
+     DeltaPmax      	           1.000e-06	Maximum allowed maximum difference of density matrix
+     DeltaPrms      	           1.000e-08	Maximum allowed RMS difference of density matrix
+     DensityFitting 	               false	Use density fitting / RI?
+     Direct         	               false	Calculate two-electron integrals (or density fitting) on-the-fly?
+     EField         	         0.0 0.0 0.0	Electric field
+     FittingBasis   	                Auto	Basis to use for density fitting / RI (Auto for automatic)
+     FittingMemory  	                1000	Amount of memory in MB to use for exchange fitting
+     FittingThreshold	           1.000e-08	Linear dependence threshold for Coulomb integrals in density fitting
+     ForcePol       	               false	Force polarized calculation
+     FreezeCore     	               false	Freeze the atomic cores?
+     Guess          	                Core	Used guess: atomic (default), core, or GWH
+     LineSearch     	               false	Do line search in level shift (EXPENSIVE!)
+     LoadChk        	                    	File to load old results from
+     Logfile        	            H_dz.log	File to print out full information, stdout for screen
+     MaxIter        	                 100	Maximum number of iterations in SCF cycle
+     Method         	                  HF	Method used in calculation (HF or a DFT functional)
+     Multiplicity   	                   2	Spin multiplicity
+     Occupancies    	                    	Orbital occupancies
+     SaveChk        	            H_dz.chk	File to use as checkpoint
+     ShPairThr      	           1.000e-14	Threshold for shell pair screening, (ij|ij)<thr
+     Shift          	           0.000e+00	Level shift to use in Hartree
+     StrictIntegrals	               false	Use strict integrals?
+     System         	               H.xyz	System as an xyz file
+     UseADIIS       	                true	Use ADIIS for Fock matrix interpolation?
+     UseBroyden     	               false	Use Broyden mixing of Fock matrices?
+     UseDIIS        	                true	Use Pulay's Direct Inversion in the Iterative Subspace?
+     UseLM          	                true	Use a spherical harmonics basis set by default?
+     UseTRDSM       	               false	Use Trust-Region DSM?
+     UseTRRH        	               false	Use Trust-Region Roothaan-Hall?
+     Verbose        	                true	Verbose calculation?
+
+There are 3 shells and 1 nuclei in the basis set.
+
+List of nuclei, geometry in Ångström with three decimal places:
+		 Z	    x	    y	    z
+1	H	 1	  0.000	  0.000	  0.000
+
+List of basis functions:
+Shell    1	S cart shell at nucleus   1 with with basis functions    1-1   
+Shell    2	S cart shell at nucleus   1 with with basis functions    2-2   
+Shell    3	P cart shell at nucleus   1 with with basis functions    3-5   
+
+Basis set contains 5 functions, maximum angular momentum is 1.
+Spherical harmonic Gaussians are used by default, there are 5 cartesians.
+
+Forming overlap matrix ... done (0.00 s)
+Forming kinetic energy matrix ... done (0.00 s)
+Forming nuclear attraction matrix ... done (0.00 s)
+
+Smallest eigenvalue of overlap matrix is 3.15e-01, ratio to largest is 1.87e-01.
+Using symmetric orthogonalization.
+Basis set diagonalized in 0.00 s.
+
+Forming table of 960 ERIs, requiring  of memory ... done (0.00 s)
+
+Initialization of computation done in 0.00 s.
+
+alpha: HOMO-LUMO gap is   18.54 eV. Energies of lowest lying states:
+    -0.499278*     0.181933      0.910419      0.910419      0.910419 
+beta:  Energies of lowest lying states:
+    -0.499278      0.181933      0.910419      0.910419      0.910419 
+
+ ******* Iteration    1 ********
+Forming HF Coulomb and exchange matrices ... done (0.00 s)
+ADIIS weights
+ 1.00e+00 
+CDIIS weights
+ 1.00e+00 
+ DIIS weights
+ 1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+alpha: HOMO-LUMO gap is   29.16 eV. Energies of lowest lying states:
+    -0.499278*     0.572445      1.443027      1.443027      1.443027 
+beta:  Energies of lowest lying states:
+     0.073347      0.753292      1.573636      1.573636      1.573636 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	 0.00000000	 0.00000000	 0.000000e+00
+Energy:	electronic	total		virial		energy change
+	-0.49927840	-0.49927840	 0.99997750	-0.499278
+	kinetic		nuclear		Coulomb		Exchange
+	 0.49928964	-0.99856804	 0.31263165	-0.31263165
+Errors:	Max dens	RMS dens	DIIS
+alpha	1.110223e-16	2.719480e-17	9.036419e-17
+beta	0.000000e+00	0.000000e+00
+
+Iteration took 0.00 s.
+
+ ******* Iteration    2 ********
+Forming HF Coulomb and exchange matrices ... done (0.00 s)
+ADIIS weights
+ 1.00e+00  4.44e-06 
+CDIIS weights
+ 1.00e+00  0.00e+00 
+ DIIS weights
+ 1.00e+00  0.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+alpha: HOMO-LUMO gap is   29.16 eV. Energies of lowest lying states:
+    -0.499278*     0.572445      1.443027      1.443027      1.443027 
+beta:  Energies of lowest lying states:
+     0.073347      0.753292      1.573636      1.573636      1.573636 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	 0.00000000	 0.00000000	 0.000000e+00
+Energy:	electronic	total		virial		energy change
+	-0.49927840	-0.49927840	 0.99997750	 1.11022e-16
+	kinetic		nuclear		Coulomb		Exchange
+	 0.49928964	-0.99856804	 0.31263165	-0.31263165
+Errors:	Max dens	RMS dens	DIIS
+alpha	0.000000e+00	0.000000e+00	7.618101e-17
+beta	0.000000e+00	0.000000e+00
+
+Iteration took 0.00 s.
+
+ ******* Iteration    3 ********
+Forming HF Coulomb and exchange matrices ... done (0.00 s)
+ADIIS weights
+ 9.89e-01  5.37e-03  5.37e-03 
+CDIIS weights
+ 1.00e+00 -5.55e-17  0.00e+00 
+ DIIS weights
+ 1.00e+00 -5.55e-17  0.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+alpha: HOMO-LUMO gap is   29.16 eV. Energies of lowest lying states:
+    -0.499278*     0.572445      1.443027      1.443027      1.443027 
+beta:  Energies of lowest lying states:
+     0.073347      0.753292      1.573636      1.573636      1.573636 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	 0.00000000	 0.00000000	 0.000000e+00
+Energy:	electronic	total		virial		energy change
+	-0.49927840	-0.49927840	 0.99997750	 0
+	kinetic		nuclear		Coulomb		Exchange
+	 0.49928964	-0.99856804	 0.31263165	-0.31263165
+Errors:	Max dens	RMS dens	DIIS
+alpha	0.000000e+00	0.000000e+00	7.618101e-17
+beta	0.000000e+00	0.000000e+00
+
+Iteration took 0.00 s.
+
+ ******* Convergence achieved ********
+Dipole moment is (0.000000,0.000000,0.000000) D, |mu|=0.000000 D.
+Solution of UHF took 0.00 s.
+
+Mulliken charges: alpha, beta, total (incl. nucleus)
+   1 H           -1.000000        0.000000        0.000000
+Sum of Mulliken charges 4.440892e-16
+
+Mulliken spin charges
+   1 H            1.000000
+Sum of Mulliken spin charges 1.000000e+00
+
+Electron density at nuclei: alpha, beta, total
+   1 H            0.268755        0.000000        0.268755
+
+Running program took 0.02 s.
+Current time is Fri 06 Feb 2015 05:52:13.

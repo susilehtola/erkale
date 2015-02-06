@@ -1,0 +1,8 @@
+# Neon atom
+System Ne.xyz
+Method HF
+Basis cc-pVTZ
+UseLM false
+Guess Core
+Logfile Ne_tz_cart.log
+SaveChk Ne_tz_cart.chk

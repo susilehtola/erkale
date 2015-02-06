@@ -1,0 +1,10 @@
+# Water dimer
+System water_dimer_xrs.xyz
+Method hyb_mgga_xc_tpssh
+Basis aug-cc-pVDZ
+Logfile water_dimer_tpssh_fch.log
+SaveChk water_dimer_tpssh_fch.chk
+DensityFitting false
+Direct false
+XRSMethod fch
+LoadChk water_dimer_tpssh.chk

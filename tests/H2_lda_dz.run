@@ -1,0 +1,8 @@
+# Hydrogen molecule
+System H2.xyz
+Method lda_x-lda_c_pw
+Basis cc-pVDZ
+Guess Core
+Logfile H2_lda_dz.log
+SaveChk H2_lda_dz.chk
+DensityFitting false

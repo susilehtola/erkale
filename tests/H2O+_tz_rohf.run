@@ -1,0 +1,10 @@
+# Water molecule
+System H2O.xyz
+Charge 1
+Multiplicity 2
+Method ROHF
+Basis cc-pVTZ
+Logfile H2O+_tz_rohf.log
+SaveChk H2O+_tz_rohf.chk
+Direct false
+DensityFitting false

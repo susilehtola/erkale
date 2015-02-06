@@ -1,0 +1,10 @@
+# Fluorine atom
+System F.xyz
+Method gga_x_pbe-gga_c_pbe
+Multiplicity 2
+Basis cc-pVTZ
+Guess Core
+DFTGrid 50 -302
+Logfile F_pbe_tz.log
+SaveChk F_pbe_tz.chk
+DensityFitting false

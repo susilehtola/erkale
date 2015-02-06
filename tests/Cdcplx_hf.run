@@ -1,0 +1,6 @@
+# Cadmium complex
+System cd-cplx.xyz
+Method HF
+Basis 3-21G
+Logfile Cdcplx_hf.log
+SaveChk Cdcplx_hf.chk

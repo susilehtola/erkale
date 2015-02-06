@@ -1,0 +1,8 @@
+# Neon atom
+System Ne.xyz
+Method lda_x-lda_c_pw
+Basis cc-pVQZ
+Guess Core
+DFTGrid 50 -302
+Logfile Ne_lda_qz.log
+SaveChk Ne_lda_qz.chk

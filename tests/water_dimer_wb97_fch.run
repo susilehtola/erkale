@@ -1,0 +1,10 @@
+# Water dimer
+System water_dimer_xrs.xyz
+Method hyb_gga_xc_wb97
+Basis aug-cc-pVDZ
+Logfile water_dimer_wb97_fch.log
+SaveChk water_dimer_wb97_fch.chk
+DensityFitting false
+Direct false
+XRSMethod fch
+LoadChk water_dimer_wb97.chk
