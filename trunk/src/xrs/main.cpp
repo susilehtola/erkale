@@ -806,7 +806,7 @@ int main(int argc, char **argv) {
   // Change default log file
   set.set_string("Logfile","erkale_xrs.log");
 
-  // Use convergence settings similar to StoBe. Full hole calculations
+  // Use convergence settings similar to StoBe. XCH calculations
   // are hard to converge to the otherwise default settings.
   set.set_double("DeltaEmax",1e-6);
   set.set_double("DeltaPmax",1e-5);
@@ -835,7 +835,7 @@ int main(int argc, char **argv) {
   set.add_int("XRSLmax","Local: expand orbitals up to Lmax",5);
   set.add_int("XRSLquad","Local: perform angular expansion using quadrature of Lquad order",30);
 
-  set.parse(std::string(argv[1]));
+  set.parse(std::string(argv[1]),true);
 
   // Redirect output?
   std::string logfile=set.get_string("Logfile");
@@ -859,12 +859,25 @@ int main(int argc, char **argv) {
   // Print out settings
   if(verbose)
     set.print();
-
+  
   // Read in atoms.
   std::vector<atom_t> atoms;
   std::string atomfile=set.get_string("System");
-  atoms=load_xyz(atomfile);
-
+  if(file_exists(atomfile))
+    atoms=load_xyz(atomfile);
+  else {
+    // Check if a directory has been set
+    char * libloc=getenv("ERKALE_SYSDIR");
+    if(libloc) {
+      std::string filename=std::string(libloc)+"/"+atomfile;
+      if(file_exists(filename))
+	atoms=load_xyz(filename);
+      else
+	throw std::runtime_error("Unable to open xyz input file!\n");
+    } else
+      throw std::runtime_error("Unable to open xyz input file!\n");
+  }
+  
   // Get index of excited atom
   size_t xcatom=get_excited_atom_idx(atoms);
 
