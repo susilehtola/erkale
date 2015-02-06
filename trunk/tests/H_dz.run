@@ -1,0 +1,8 @@
+# Hydrogen atom
+System H.xyz
+Multiplicity 2
+Method HF
+Basis cc-pVDZ
+Guess Core
+Logfile H_dz.log
+SaveChk H_dz.chk

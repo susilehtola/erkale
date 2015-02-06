@@ -1,0 +1,435 @@
+Basis set cc-pVQZ found in file cc-pVQZ.gbs in /usr/share/erkale/basis/.
+
+
+Current Settings used by ERKALE:
+     AtomGuess      	                Auto	Method used for atomic guess (Auto for same as method)
+     Basis          	             cc-pVQZ	Basis set used in calculation
+     BasisCutoff    	           1.000e-08	Cutoff for dropping out small primitives from contraction
+     BasisOrth      	                Auto	Method of orthonormalization of basis set
+     BasisRotate    	                true	Rotate basis set to remove redundant functions?
+     C1-DIIS        	               false	Use older version of DIIS (C1-DIIS instead of C2-DIIS)?
+     Charge         	                   0	Total charge of system
+     DFTDelta       	           5.000e+03	Switch to final DFT grid, relative to deltaE and deltaP
+     DFTDirect      	               false	Save memory by not storing values of basis functions in memory
+     DFTFinalTol    	           1.000e-05	Tolerance of final DFT grid
+     DFTGrid        	             50 -302	DFT integration grid to use: nrad lmax or Auto for adaptive
+     DFTInitialTol  	           1.000e-04	Tolerance of initial DFT grid
+     DFTLobatto     	               false	Use Lobatto quadrature instead of Lebedev quadrature?
+     DIISEps        	           1.000e-01	Start mixing in DIIS when error is
+     DIISOrder      	                  10	How many DIIS iterations to keep in memory?
+     DIISThr        	           1.000e-02	DIIS error threshold for DIIS updates
+     DecFock        	               false	Use decontracted basis to calculate Fock matrix (direct HF)
+     Decontract     	                    	Indices of atoms to decontract basis set for
+     DeltaEmax      	           1.000e-06	Maximum allowed change of energy
+     DeltaPmax      	           1.000e-06	Maximum allowed maximum difference of density matrix
+     DeltaPrms      	           1.000e-08	Maximum allowed RMS difference of density matrix
+     DensityFitting 	                true	Use density fitting / RI?
+     Direct         	               false	Calculate two-electron integrals (or density fitting) on-the-fly?
+     EField         	         0.0 0.0 0.0	Electric field
+     FittingBasis   	                Auto	Basis to use for density fitting / RI (Auto for automatic)
+     FittingMemory  	                1000	Amount of memory in MB to use for exchange fitting
+     FittingThreshold	           1.000e-08	Linear dependence threshold for Coulomb integrals in density fitting
+     ForcePol       	               false	Force polarized calculation
+     FreezeCore     	               false	Freeze the atomic cores?
+     Guess          	                Core	Used guess: atomic (default), core, or GWH
+     LineSearch     	               false	Do line search in level shift (EXPENSIVE!)
+     LoadChk        	                    	File to load old results from
+     Logfile        	       Ne_lda_qz.log	File to print out full information, stdout for screen
+     MaxIter        	                 100	Maximum number of iterations in SCF cycle
+     Method         	      lda_x-lda_c_pw	Method used in calculation (HF or a DFT functional)
+     Multiplicity   	                   1	Spin multiplicity
+     Occupancies    	                    	Orbital occupancies
+     PZ             	                  No	Perform Perdew-Zunger self-interaction correction? No, Pert, Full, OldFull, Real, Can, CanPert
+     PZEmax         	           1.000e-06	Threshold for energy change in unitary optimization
+     PZHam          	                Symm	Hamiltonian to use in PZ-SIC: Symm, United
+     PZKmax         	           1.000e-03	Threshold for kappa max in unitary optimization
+     PZKrms         	           1.000e-04	Threshold for kappa rms in unitary optimization
+     PZdEmax        	           1.000e-05	Tolerance threshold for energy convergence
+     PZdPmax        	           1.000e-05	Tolerance threshold for density convergence
+     PZdPrms        	           1.000e-06	Tolerance threshold for density convergence
+     PZiter         	                  20	Max number of iterations in self-consistency iteration
+     PZloc          	                true	Initial localization before SIC calculation?
+     PZmode         	              CoulXC	Mode to use PZ-SIC in. Coul, CoulX, CoulC, CoulXC
+     PZseed         	                   0	Seed number for randomized matrices?
+     PZstab         	                   0	Stability analysis for PZ-SIC? 0 for no, 1 for oo block, 2 for full analysis
+     PZstabFz       	                    	Orbitals to freeze for stability analysis (only oo!)
+     PZunit         	                  10	Max number of iterations in unitary optimization
+     PZw            	           1.000e+00	Weight for Perdew-Zunger self-interaction correction
+     SaveChk        	       Ne_lda_qz.chk	File to use as checkpoint
+     ShPairThr      	           1.000e-14	Threshold for shell pair screening, (ij|ij)<thr
+     Shift          	           0.000e+00	Level shift to use in Hartree
+     StrictIntegrals	               false	Use strict integrals?
+     System         	              Ne.xyz	System as an xyz file
+     UseADIIS       	                true	Use ADIIS for Fock matrix interpolation?
+     UseBroyden     	               false	Use Broyden mixing of Fock matrices?
+     UseDIIS        	                true	Use Pulay's Direct Inversion in the Iterative Subspace?
+     UseLM          	                true	Use a spherical harmonics basis set by default?
+     UseTRDSM       	               false	Use Trust-Region DSM?
+     UseTRRH        	               false	Use Trust-Region Roothaan-Hall?
+     Verbose        	                true	Verbose calculation?
+
+There are 15 shells and 1 nuclei in the basis set.
+
+List of nuclei, geometry in Ångström with three decimal places:
+		 Z	    x	    y	    z
+1	Ne	 10	  0.000	  0.000	  0.000
+
+List of basis functions:
+Shell    1	S cart shell at nucleus   1 with with basis functions    1-1   
+Shell    2	S cart shell at nucleus   1 with with basis functions    2-2   
+Shell    3	S cart shell at nucleus   1 with with basis functions    3-3   
+Shell    4	S cart shell at nucleus   1 with with basis functions    4-4   
+Shell    5	S cart shell at nucleus   1 with with basis functions    5-5   
+Shell    6	P cart shell at nucleus   1 with with basis functions    6-8   
+Shell    7	P cart shell at nucleus   1 with with basis functions    9-11  
+Shell    8	P cart shell at nucleus   1 with with basis functions   12-14  
+Shell    9	P cart shell at nucleus   1 with with basis functions   15-17  
+Shell   10	D  sph shell at nucleus   1 with with basis functions   18-22  
+Shell   11	D  sph shell at nucleus   1 with with basis functions   23-27  
+Shell   12	D  sph shell at nucleus   1 with with basis functions   28-32  
+Shell   13	F  sph shell at nucleus   1 with with basis functions   33-39  
+Shell   14	F  sph shell at nucleus   1 with with basis functions   40-46  
+Shell   15	G  sph shell at nucleus   1 with with basis functions   47-55  
+
+Basis set contains 55 functions, maximum angular momentum is 4.
+Spherical harmonic Gaussians are used by default, there are 70 cartesians.
+
+Forming overlap matrix ... done (0.00 s)
+Forming kinetic energy matrix ... done (0.00 s)
+Forming nuclear attraction matrix ... done (0.00 s)
+
+Smallest eigenvalue of overlap matrix is 2.85e-02, ratio to largest is 9.48e-03.
+Using symmetric orthogonalization.
+Basis set diagonalized in 0.00 s.
+
+Computing density fitting integrals, requiring 3 Mi 661 ki memory ... done (0.04 s)
+Auxiliary basis contains 237 functions.
+
+Initialization of computation done in 0.05 s.
+
+Used exchange functional is lda_x, 'Slater exchange', defined in the reference(s):
+P. A. M. Dirac, Math. Proc. Cambridge Philos. Soc. 26, 376 (1930) (DOI 10.1017/S0305004100016108)
+F. Bloch, Z. Phys. 57, 545 (1929) (DOI 10.1007/BF01340281)
+
+Used correlation functional is lda_c_pw, 'Perdew & Wang', defined in the reference(s):
+J. P. Perdew and Y. Wang, Phys. Rev. B 45, 13244 (1992) (DOI 10.1103/PhysRevB.45.13244)
+
+HOMO-LUMO gap is  188.30 eV. Energies of lowest lying states:
+   -49.994120*   -12.495601*   -12.495601*   -12.495601*   -12.464364*
+    -5.544373     -5.544373     -5.544373     -5.541130     -5.541130 
+
+A pure exchange functional used, no exact exchange.
+Composition of static nrad=50 lmax=29 DFT grid:
+	atom  Npoints      Nfuncs
+	   1    15100      578330
+
+ ******* Iteration    1 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.07 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 1.00e+00 
+CDIIS weights
+ 1.00e+00 
+ DIIS weights
+ 1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   31.49 eV. Energies of lowest lying states:
+   -23.199982*     0.109705*     0.484934*     0.484934*     0.484934*
+     1.642015      1.758400      1.758400      1.758400      2.218796 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	 0.00000000	 8.523399e-15
+Energy:	electronic	total		virial		energy change
+	-112.15723391	-112.15723391	 0.56402642	-112.157
+	kinetic		nuclear		Coulomb		XC
+	 198.85102970	-398.74160664	 104.60708981	-16.87374678
+Errors:	Max dens	RMS dens	DIIS
+	 1.190408e+00	 5.196931e-02	 7.679520e+00
+
+Iteration took 0.07 s.
+
+ ******* Iteration    2 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 4.26e-01  5.74e-01 
+CDIIS weights
+ 1.21e-01  8.79e-01 
+ DIIS weights
+ 4.26e-01  5.74e-01 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   44.86 eV. Energies of lowest lying states:
+   -30.867281*    -2.177718*    -1.317503*    -1.317503*    -1.317503*
+     0.330985      0.330985      0.330985      0.340382      1.165021 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	 0.00000000	-0.00000000	-6.958066e-15
+Energy:	electronic	total		virial		energy change
+	-115.98446832	-115.98446832	 1.22535697	-3.82723
+	kinetic		nuclear		Coulomb		XC
+	 94.65361607	-238.96926470	 36.54391204	-8.21273172
+Errors:	Max dens	RMS dens	DIIS
+	 1.169778e+00	 4.588571e-02	 2.853806e+00
+
+Iteration took 0.06 s.
+
+ ******* Iteration    3 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 3.61e-24  5.36e-24  1.00e+00 
+CDIIS weights
+-9.77e-03  1.33e-01  8.77e-01 
+ DIIS weights
+ 3.61e-24  5.36e-24  1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   23.61 eV. Energies of lowest lying states:
+   -29.268456*    -0.878191*    -0.084632*    -0.084632*    -0.084632*
+     0.782838      0.782838      0.782838      0.854335      1.822476 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	-0.00000000	 0.00000000	 9.259295e-16
+Energy:	electronic	total		virial		energy change
+	-127.80651019	-127.80651019	 0.95711632	-11.822
+	kinetic		nuclear		Coulomb		XC
+	 133.53289253	-320.78634721	 71.92617071	-12.47922622
+Errors:	Max dens	RMS dens	DIIS
+	 2.517112e-01	 1.457225e-02	 5.455827e-01
+
+Iteration took 0.07 s.
+
+ ******* Iteration    4 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 2.19e-18  7.50e-18  6.72e-01  3.28e-01 
+CDIIS weights
+ 1.46e-02 -5.57e-02  5.62e-01  4.79e-01 
+ DIIS weights
+ 2.19e-18  7.50e-18  6.72e-01  3.28e-01 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   28.32 eV. Energies of lowest lying states:
+   -30.174046*    -1.255990*    -0.430523*    -0.430523*    -0.430523*
+     0.610333      0.610333      0.610333      0.691523      1.671556 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	 0.00000000	-0.00000000	-2.182040e-15
+Energy:	electronic	total		virial		energy change
+	-127.32783491	-127.32783491	 1.08179131	 0.478675
+	kinetic		nuclear		Coulomb		XC
+	 117.70092280	-291.01703698	 56.56290854	-10.57462927
+Errors:	Max dens	RMS dens	DIIS
+	 1.508711e-01	 7.236341e-03	 8.540707e-01
+
+Iteration took 0.06 s.
+
+ ******* Iteration    5 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 5.77e-18  3.09e-17  5.83e-14  6.48e-17  1.00e+00 
+CDIIS weights
+ 3.53e-03  9.60e-03  5.11e-02 -1.03e-01  1.04e+00 
+ DIIS weights
+ 5.77e-18  3.09e-17  5.83e-14  6.48e-17  1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   30.50 eV. Energies of lowest lying states:
+   -30.488770*    -1.395232*    -0.570088*    -0.570088*    -0.570088*
+     0.550609      0.550609      0.550609      0.631024      1.618474 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	 0.00000000	 8.831450e-15
+Energy:	electronic	total		virial		energy change
+	-128.21266200	-128.21266200	 1.01322291	-0.884827
+	kinetic		nuclear		Coulomb		XC
+	 126.53944183	-307.91602997	 64.74977955	-11.58585340
+Errors:	Max dens	RMS dens	DIIS
+	 2.646110e-02	 1.889919e-03	 9.949646e-02
+
+Iteration took 0.07 s.
+
+ ******* Iteration    6 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 2.10e-18  2.43e-17  1.97e-14  1.06e-15  6.30e-01  3.70e-01 
+CDIIS weights
+-3.64e-04  2.72e-03  1.31e-02 -1.24e-02  6.19e-01  3.78e-01 
+ DIIS weights
+ 2.10e-18  2.43e-17  1.97e-14  1.06e-15  6.30e-01  3.70e-01 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   29.26 eV. Energies of lowest lying states:
+   -30.319042*    -1.326659*    -0.501348*    -0.501348*    -0.501348*
+     0.574080      0.574080      0.574080      0.656028      1.643002 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	 0.00000000	 0.00000000	-7.719977e-15
+Energy:	electronic	total		virial		energy change
+	-128.20319723	-128.20319723	 0.99037247	 0.00946476
+	kinetic		nuclear		Coulomb		XC
+	 129.44947655	-312.98831356	 67.23219417	-11.89655439
+Errors:	Max dens	RMS dens	DIIS
+	 1.297188e-02	 9.609828e-04	 1.384334e-01
+
+Iteration took 0.06 s.
+
+ ******* Iteration    7 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 3.06e-19  8.13e-19  3.35e-15  2.21e-15  5.82e-14  5.48e-14  1.00e+00 
+CDIIS weights
+ 3.72e-06 -6.54e-05 -3.40e-04  3.55e-03  1.48e-02 -1.13e-01  1.10e+00 
+ DIIS weights
+ 3.40e-06 -5.97e-05 -3.11e-04  3.24e-03  1.35e-02 -1.04e-01  1.09e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   29.06 eV. Energies of lowest lying states:
+   -30.291392*    -1.315210*    -0.490004*    -0.490004*    -0.490004*
+     0.577831      0.577831      0.577831      0.660013      1.647012 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	 0.00000000	-0.00000000	 3.630182e-16
+Energy:	electronic	total		virial		energy change
+	-128.22363414	-128.22363414	 1.00199117	-0.0204369
+	kinetic		nuclear		Coulomb		XC
+	 127.96882627	-310.44079953	 65.98865268	-11.74031357
+Errors:	Max dens	RMS dens	DIIS
+	 2.497747e-03	 1.724497e-04	 1.782015e-02
+
+Iteration took 0.06 s.
+
+ ******* Iteration    8 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 1.14e-18  1.62e-17  1.26e-15  1.91e-16  2.98e-16  6.16e-12  6.55e-10  1.00e+00 
+CDIIS weights
+-4.39e-06  1.14e-05  4.14e-05 -5.63e-04  7.93e-04  2.03e-02 -4.46e-02  1.02e+00 
+ DIIS weights
+-4.39e-06  1.14e-05  4.14e-05 -5.63e-04  7.93e-04  2.03e-02 -4.46e-02  1.02e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   29.08 eV. Energies of lowest lying states:
+   -30.294564*    -1.316523*    -0.491305*    -0.491305*    -0.491305*
+     0.577346      0.577346      0.577346      0.659506      1.646521 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	 0.00000000	 0.00000000	 6.564659e-15
+Energy:	electronic	total		virial		energy change
+	-128.22400693	-128.22400693	 1.00398029	-0.000372788
+	kinetic		nuclear		Coulomb		XC
+	 127.71566162	-309.99741077	 65.77076905	-11.71302683
+Errors:	Max dens	RMS dens	DIIS
+	 2.758664e-04	 1.894944e-05	 2.220791e-03
+
+Iteration took 0.06 s.
+
+ ******* Iteration    9 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 8.28e-14  1.06e-14  9.31e-12  9.29e-12  1.87e-08  3.24e-08  1.15e-04  3.64e-02  9.63e-01 
+CDIIS weights
+-8.87e-09 -1.98e-08 -5.04e-10 -1.46e-07 -5.33e-05  5.17e-05 -9.01e-04 -2.78e-04  1.00e+00 
+ DIIS weights
+-8.87e-09 -1.98e-08 -5.04e-10 -1.46e-07 -5.33e-05  5.17e-05 -9.01e-04 -2.78e-04  1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   29.08 eV. Energies of lowest lying states:
+   -30.294559*    -1.316521*    -0.491303*    -0.491303*    -0.491303*
+     0.577346      0.577346      0.577346      0.659506      1.646521 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	 0.00000000	 0.00000000	-3.272008e-15
+Energy:	electronic	total		virial		energy change
+	-128.22401278	-128.22401278	 1.00375868	-5.85048e-06
+	kinetic		nuclear		Coulomb		XC
+	 127.74386396	-310.04670539	 65.79487676	-11.71604811
+Errors:	Max dens	RMS dens	DIIS
+	 5.110032e-07	 3.427533e-08	 2.932766e-06
+
+Iteration took 0.07 s.
+
+ ******* Iteration   10 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 2.02e-15  1.28e-15  5.61e-13  1.84e-12  4.83e-13  2.16e-12  2.27e-08  2.18e-04  5.00e-01  5.00e-01 
+CDIIS weights
+ 4.38e-11 -4.53e-11  3.22e-09  2.57e-09  1.74e-07 -3.89e-07  7.93e-06  1.66e-05 -1.37e-04  1.00e+00 
+ DIIS weights
+ 4.38e-11 -4.53e-11  3.22e-09  2.57e-09  1.74e-07 -3.89e-07  7.93e-06  1.66e-05 -1.37e-04  1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   29.08 eV. Energies of lowest lying states:
+   -30.294559*    -1.316521*    -0.491303*    -0.491303*    -0.491303*
+     0.577346      0.577346      0.577346      0.659506      1.646521 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	 0.00000000	-2.569670e-15
+Energy:	electronic	total		virial		energy change
+	-128.22401278	-128.22401278	 1.00375901	-1.32445e-11
+	kinetic		nuclear		Coulomb		XC
+	 127.74382240	-310.04663164	 65.79483995	-11.71604349
+Errors:	Max dens	RMS dens	DIIS
+	 4.940591e-09	 3.342479e-10	 3.286179e-08
+
+Iteration took 0.06 s.
+
+ ******* Iteration   11 ********
+Forming density fitted Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.06 s)
+Numerically integrated density is 10.00000 (+0.0000 %).
+ADIIS weights
+ 2.08e-19  5.89e-17  4.35e-16  1.58e-12  1.55e-13  2.69e-11  4.66e-06  3.34e-01  3.33e-01  3.33e-01 
+CDIIS weights
+-5.19e-13 -7.85e-13  3.23e-11 -5.32e-11 -7.26e-10 -7.26e-09 -1.61e-07 -1.36e-05  1.05e-06  1.00e+00 
+ DIIS weights
+-5.19e-13 -7.85e-13  3.23e-11 -5.32e-11 -7.26e-10 -7.26e-09 -1.61e-07 -1.36e-05  1.05e-06  1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   29.08 eV. Energies of lowest lying states:
+   -30.294559*    -1.316521*    -0.491303*    -0.491303*    -0.491303*
+     0.577346      0.577346      0.577346      0.659506      1.646521 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	 0.00000000	 0.00000000	-1.295736e-15
+Energy:	electronic	total		virial		energy change
+	-128.22401278	-128.22401278	 1.00375901	 2.27374e-13
+	kinetic		nuclear		Coulomb		XC
+	 127.74382284	-310.04663242	 65.79484034	-11.71604354
+Errors:	Max dens	RMS dens	DIIS
+	 6.158005e-12	 4.934294e-13	 7.316480e-11
+
+Iteration took 0.07 s.
+
+ ******* Convergence achieved ********
+Dipole moment is (0.000000,0.000000,0.000000) D, |mu|=0.000000 D.
+Solution of RDFT took 0.76 s.
+
+Mulliken charges
+   1 Ne          -0.000000
+Sum of Mulliken charges -3.552714e-15
+
+Electron density at nuclei
+   1 Ne         600.876927
+
+Running program took 0.82 s.
+Current time is Fri 06 Feb 2015 05:52:15.

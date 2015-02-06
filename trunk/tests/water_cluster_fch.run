@@ -1,0 +1,10 @@
+# Water cluster
+System water_cluster_xrs.xyz
+Method gga_x_pbe-gga_c_pbe
+Basis aug-cc-pVDZ
+LoadChk water_cluster.chk
+Logfile water_cluster_fch.log
+SaveChk water_cluster_fch.chk
+DensityFitting true
+Direct true
+XRSMethod FCH

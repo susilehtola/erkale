@@ -1,0 +1,8 @@
+# Water cluster
+System water_cluster.xyz
+Method gga_x_pbe-gga_c_pbe
+Basis aug-cc-pVDZ
+Logfile water_cluster.log
+SaveChk water_cluster.chk
+DensityFitting true
+Direct true

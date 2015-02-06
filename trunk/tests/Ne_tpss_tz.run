@@ -1,0 +1,9 @@
+# Neon atom
+System Ne.xyz
+Method mgga_x_tpss-mgga_c_tpss
+Basis cc-pVTZ
+Guess Core
+DFTGrid 50 -302
+Logfile Ne_tpss_tz.log
+SaveChk Ne_tpss_tz.chk
+DensityFitting false

@@ -1,0 +1,7 @@
+# Hydrogen molecule
+System H2.xyz
+Method HF
+Basis cc-pVDZ
+Guess Core
+Logfile H2_dz.log
+SaveChk H2_dz.chk

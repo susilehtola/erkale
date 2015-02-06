@@ -1,0 +1,403 @@
+Basis set cc-pVQZ found in file cc-pVQZ.gbs in /usr/share/erkale/basis/.
+
+
+Current Settings used by ERKALE:
+     AtomGuess      	                Auto	Method used for atomic guess (Auto for same as method)
+     Basis          	             cc-pVQZ	Basis set used in calculation
+     BasisCutoff    	           1.000e-08	Cutoff for dropping out small primitives from contraction
+     BasisOrth      	                Auto	Method of orthonormalization of basis set
+     BasisRotate    	                true	Rotate basis set to remove redundant functions?
+     C1-DIIS        	               false	Use older version of DIIS (C1-DIIS instead of C2-DIIS)?
+     Charge         	                   0	Total charge of system
+     DIISEps        	           1.000e-01	Start mixing in DIIS when error is
+     DIISOrder      	                  10	How many DIIS iterations to keep in memory?
+     DIISThr        	           1.000e-02	DIIS error threshold for DIIS updates
+     DecFock        	               false	Use decontracted basis to calculate Fock matrix (direct HF)
+     Decontract     	                    	Indices of atoms to decontract basis set for
+     DeltaEmax      	           1.000e-06	Maximum allowed change of energy
+     DeltaPmax      	           1.000e-06	Maximum allowed maximum difference of density matrix
+     DeltaPrms      	           1.000e-08	Maximum allowed RMS difference of density matrix
+     DensityFitting 	               false	Use density fitting / RI?
+     Direct         	               false	Calculate two-electron integrals (or density fitting) on-the-fly?
+     EField         	         0.0 0.0 0.0	Electric field
+     FittingBasis   	                Auto	Basis to use for density fitting / RI (Auto for automatic)
+     FittingMemory  	                1000	Amount of memory in MB to use for exchange fitting
+     FittingThreshold	           1.000e-08	Linear dependence threshold for Coulomb integrals in density fitting
+     ForcePol       	               false	Force polarized calculation
+     FreezeCore     	               false	Freeze the atomic cores?
+     Guess          	                Core	Used guess: atomic (default), core, or GWH
+     LineSearch     	               false	Do line search in level shift (EXPENSIVE!)
+     LoadChk        	                    	File to load old results from
+     Logfile        	           Ne_qz.log	File to print out full information, stdout for screen
+     MaxIter        	                 100	Maximum number of iterations in SCF cycle
+     Method         	                  HF	Method used in calculation (HF or a DFT functional)
+     Multiplicity   	                   1	Spin multiplicity
+     Occupancies    	                    	Orbital occupancies
+     SaveChk        	           Ne_qz.chk	File to use as checkpoint
+     ShPairThr      	           1.000e-14	Threshold for shell pair screening, (ij|ij)<thr
+     Shift          	           0.000e+00	Level shift to use in Hartree
+     StrictIntegrals	               false	Use strict integrals?
+     System         	              Ne.xyz	System as an xyz file
+     UseADIIS       	                true	Use ADIIS for Fock matrix interpolation?
+     UseBroyden     	               false	Use Broyden mixing of Fock matrices?
+     UseDIIS        	                true	Use Pulay's Direct Inversion in the Iterative Subspace?
+     UseLM          	                true	Use a spherical harmonics basis set by default?
+     UseTRDSM       	               false	Use Trust-Region DSM?
+     UseTRRH        	               false	Use Trust-Region Roothaan-Hall?
+     Verbose        	                true	Verbose calculation?
+
+There are 15 shells and 1 nuclei in the basis set.
+
+List of nuclei, geometry in Ångström with three decimal places:
+		 Z	    x	    y	    z
+1	Ne	 10	  0.000	  0.000	  0.000
+
+List of basis functions:
+Shell    1	S cart shell at nucleus   1 with with basis functions    1-1   
+Shell    2	S cart shell at nucleus   1 with with basis functions    2-2   
+Shell    3	S cart shell at nucleus   1 with with basis functions    3-3   
+Shell    4	S cart shell at nucleus   1 with with basis functions    4-4   
+Shell    5	S cart shell at nucleus   1 with with basis functions    5-5   
+Shell    6	P cart shell at nucleus   1 with with basis functions    6-8   
+Shell    7	P cart shell at nucleus   1 with with basis functions    9-11  
+Shell    8	P cart shell at nucleus   1 with with basis functions   12-14  
+Shell    9	P cart shell at nucleus   1 with with basis functions   15-17  
+Shell   10	D  sph shell at nucleus   1 with with basis functions   18-22  
+Shell   11	D  sph shell at nucleus   1 with with basis functions   23-27  
+Shell   12	D  sph shell at nucleus   1 with with basis functions   28-32  
+Shell   13	F  sph shell at nucleus   1 with with basis functions   33-39  
+Shell   14	F  sph shell at nucleus   1 with with basis functions   40-46  
+Shell   15	G  sph shell at nucleus   1 with with basis functions   47-55  
+
+Basis set contains 55 functions, maximum angular momentum is 4.
+Spherical harmonic Gaussians are used by default, there are 70 cartesians.
+
+Forming overlap matrix ... done (0.00 s)
+Forming kinetic energy matrix ... done (0.00 s)
+Forming nuclear attraction matrix ... done (0.00 s)
+
+Smallest eigenvalue of overlap matrix is 2.85e-02, ratio to largest is 9.48e-03.
+Using symmetric orthogonalization.
+Basis set diagonalized in 0.00 s.
+
+Forming table of 9492560 ERIs, requiring 9 Mi 54 ki of memory ... done (0.05 s)
+
+Initialization of computation done in 0.05 s.
+
+HOMO-LUMO gap is  188.30 eV. Energies of lowest lying states:
+   -49.994120*   -12.495601*   -12.495601*   -12.495601*   -12.464364*
+    -5.544373     -5.544373     -5.544373     -5.541130     -5.541130 
+
+ ******* Iteration    1 ********
+Forming HF Coulomb and exchange matrices ... done (0.01 s)
+ADIIS weights
+ 1.00e+00 
+CDIIS weights
+ 1.00e+00 
+ DIIS weights
+ 1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   24.24 eV. Energies of lowest lying states:
+   -26.008808*    -0.142786*     0.496399*     0.496399*     0.496399*
+     1.387023      1.541280      1.541280      1.541280      2.400279 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	 0.00000000	 1.987345e-14
+Energy:	electronic	total		virial		energy change
+	-112.65674061	-112.65674061	 0.56653838	-112.657
+	kinetic		nuclear		Coulomb		Exchange
+	 198.85102970	-398.74160664	 104.60709325	-17.37325691
+Errors:	Max dens	RMS dens	DIIS
+	 1.109916e+00	 4.581988e-02	 7.756542e+00
+
+Iteration took 0.02 s.
+
+ ******* Iteration    2 ********
+Forming HF Coulomb and exchange matrices ... done (0.01 s)
+ADIIS weights
+ 2.96e-01  7.04e-01 
+CDIIS weights
+ 1.13e-01  8.87e-01 
+ DIIS weights
+ 2.96e-01  7.04e-01 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   55.17 eV. Energies of lowest lying states:
+   -34.525911*    -2.948345*    -1.727607*    -1.727607*    -1.727607*
+     0.299717      0.299717      0.299717      0.338560      1.341017 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	-0.00000000	-1.746512e-14
+Energy:	electronic	total		virial		energy change
+	-119.59347230	-119.59347230	 1.19416515	-6.93673
+	kinetic		nuclear		Coulomb		Exchange
+	 100.14818491	-250.49715913	 39.62434306	-8.86884114
+Errors:	Max dens	RMS dens	DIIS
+	 9.881602e-01	 3.729199e-02	 2.331292e+00
+
+Iteration took 0.02 s.
+
+ ******* Iteration    3 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 3.87e-27  3.07e-27  1.00e+00 
+CDIIS weights
+-7.46e-02  1.49e-01  9.26e-01 
+ DIIS weights
+ 3.87e-27  3.07e-27  1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   36.11 eV. Energies of lowest lying states:
+   -31.434618*    -1.475658*    -0.419409*    -0.419409*    -0.419409*
+     0.907732      0.907732      0.907732      1.060342      2.149405 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	 0.00000000	-0.00000000	 8.177267e-16
+Energy:	electronic	total		virial		energy change
+	-127.96260167	-127.96260167	 0.92935738	-8.36913
+	kinetic		nuclear		Coulomb		Exchange
+	 137.68933694	-326.13903719	 73.55574376	-13.06864519
+Errors:	Max dens	RMS dens	DIIS
+	 1.013638e-01	 8.180199e-03	 8.491328e-01
+
+Iteration took 0.02 s.
+
+ ******* Iteration    4 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 1.23e-21  2.03e-21  4.83e-02  9.52e-01 
+CDIIS weights
+ 4.55e-03 -6.16e-02  2.72e-01  7.85e-01 
+ DIIS weights
+ 1.23e-21  2.03e-21  4.83e-02  9.52e-01 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   49.63 eV. Energies of lowest lying states:
+   -33.428833*    -2.172669*    -1.077910*    -1.077910*    -1.077910*
+     0.745975      0.745975      0.745975      0.852559      1.900223 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	 0.00000000	-0.00000000	 3.438408e-15
+Energy:	electronic	total		virial		energy change
+	-128.37147318	-128.37147318	 1.03942369	-0.408872
+	kinetic		nuclear		Coulomb		Exchange
+	 123.50254651	-302.35274850	 62.05599917	-11.57727036
+Errors:	Max dens	RMS dens	DIIS
+	 6.263868e-02	 4.399399e-03	 3.685271e-01
+
+Iteration took 0.02 s.
+
+ ******* Iteration    5 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 2.35e-19  2.27e-17  2.09e-16  3.14e-14  1.00e+00 
+CDIIS weights
+-2.46e-03 -1.06e-02 -3.72e-02  3.07e-01  7.43e-01 
+ DIIS weights
+ 2.35e-19  2.27e-17  2.09e-16  3.14e-14  1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   42.88 eV. Energies of lowest lying states:
+   -32.437480*    -1.815812*    -0.740776*    -0.740776*    -0.740776*
+     0.834865      0.834865      0.834865      0.969247      2.037939 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	-0.00000000	-0.00000000	-3.939018e-15
+Energy:	electronic	total		virial		energy change
+	-128.50937632	-128.50937632	 0.98152976	-0.137903
+	kinetic		nuclear		Coulomb		Exchange
+	 130.92764119	-315.04651947	 67.95193421	-12.34243225
+Errors:	Max dens	RMS dens	DIIS
+	 2.327468e-02	 1.943382e-03	 2.079346e-01
+
+Iteration took 0.02 s.
+
+ ******* Iteration    6 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 1.08e-19  6.58e-18  3.03e-21  3.47e-15  2.82e-02  9.72e-01 
+CDIIS weights
+ 1.25e-05  5.25e-04 -6.45e-03 -1.00e-01  2.50e-01  8.56e-01 
+ DIIS weights
+ 2.99e-07  1.26e-05 -1.55e-04 -2.41e-03  3.35e-02  9.69e-01 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   46.18 eV. Energies of lowest lying states:
+   -32.927883*    -1.984756*    -0.901464*    -0.901464*    -0.901464*
+     0.795647      0.795647      0.795647      0.918019      1.976992 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	-0.00000000	 0.00000000	 1.030709e-14
+Energy:	electronic	total		virial		energy change
+	-128.53431463	-128.53431463	 1.00940997	-0.0249383
+	kinetic		nuclear		Coulomb		Exchange
+	 127.33608630	-309.09932163	 65.21669341	-11.98777272
+Errors:	Max dens	RMS dens	DIIS
+	 1.231391e-02	 9.964461e-04	 9.784135e-02
+
+Iteration took 0.02 s.
+
+ ******* Iteration    7 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 6.96e-18  8.82e-18  1.59e-15  1.40e-14  1.18e-15  1.80e-10  1.00e+00 
+CDIIS weights
+ 2.71e-05  9.20e-05  1.64e-03  5.30e-03 -1.64e-01  1.40e-01  1.02e+00 
+ DIIS weights
+ 1.58e-05  5.37e-05  9.59e-04  3.09e-03 -9.57e-02  8.17e-02  1.01e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   44.89 eV. Energies of lowest lying states:
+   -32.738352*    -1.917883*    -0.838032*    -0.838032*    -0.838032*
+     0.811554      0.811554      0.811554      0.939091      2.001973 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	-0.00000000	-7.320594e-15
+Energy:	electronic	total		virial		energy change
+	-128.54154120	-128.54154120	 0.99562889	-0.00722657
+	kinetic		nuclear		Coulomb		Exchange
+	 129.10587734	-312.06899653	 66.58724761	-12.16566962
+Errors:	Max dens	RMS dens	DIIS
+	 4.300832e-03	 3.730204e-04	 4.745593e-02
+
+Iteration took 0.02 s.
+
+ ******* Iteration    8 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 2.23e-18  1.83e-19  1.82e-16  3.63e-16  4.70e-14  1.01e-14  9.93e-11  1.00e+00 
+CDIIS weights
+ 2.19e-07  6.62e-06 -2.66e-04  1.72e-03  1.71e-02 -8.79e-02 -1.25e-02  1.08e+00 
+ DIIS weights
+ 2.19e-07  6.62e-06 -2.66e-04  1.72e-03  1.71e-02 -8.79e-02 -1.25e-02  1.08e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   45.11 eV. Energies of lowest lying states:
+   -32.771512*    -1.929345*    -0.848964*    -0.848964*    -0.848964*
+     0.808902      0.808902      0.808902      0.935596      1.997808 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	-0.00000000	 7.143822e-15
+Energy:	electronic	total		virial		energy change
+	-128.54338271	-128.54338271	 1.00092516	-0.00184151
+	kinetic		nuclear		Coulomb		Exchange
+	 128.42456989	-310.93645463	 66.06664437	-12.09814235
+Errors:	Max dens	RMS dens	DIIS
+	 7.868333e-04	 6.593880e-05	 9.892370e-03
+
+Iteration took 0.02 s.
+
+ ******* Iteration    9 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 1.18e-17  1.64e-17  1.98e-15  1.34e-16  1.05e-14  3.81e-12  9.40e-12  1.06e-08  1.00e+00 
+CDIIS weights
+ 1.63e-07  1.40e-06  1.56e-05 -7.15e-05 -1.19e-03  4.65e-03  6.11e-04 -6.35e-02  1.06e+00 
+ DIIS weights
+ 1.63e-07  1.40e-06  1.56e-05 -7.15e-05 -1.19e-03  4.65e-03  6.11e-04 -6.35e-02  1.06e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   45.11 eV. Energies of lowest lying states:
+   -32.771498*    -1.929339*    -0.848960*    -0.848960*    -0.848960*
+     0.808904      0.808904      0.808904      0.935599      1.997811 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	-0.00000000	-0.00000000	-7.489232e-15
+Energy:	electronic	total		virial		energy change
+	-128.54346966	-128.54346966	 0.99999982	-8.69484e-05
+	kinetic		nuclear		Coulomb		Exchange
+	 128.54349338	-311.13505997	 66.15810654	-12.11000961
+Errors:	Max dens	RMS dens	DIIS
+	 1.364483e-06	 5.267413e-08	 7.351969e-06
+
+Iteration took 0.02 s.
+
+ ******* Iteration   10 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 3.76e-20  8.82e-20  1.90e-15  9.38e-15  4.91e-14  1.83e-13  4.03e-12  1.02e-09  5.00e-01  5.00e-01 
+CDIIS weights
+-2.67e-08 -8.41e-08 -3.08e-06  1.51e-05  1.14e-04 -6.94e-04  7.01e-04  1.18e-02 -2.82e-01  1.27e+00 
+ DIIS weights
+-2.67e-08 -8.41e-08 -3.08e-06  1.51e-05  1.14e-04 -6.94e-04  7.01e-04  1.18e-02 -2.82e-01  1.27e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   45.11 eV. Energies of lowest lying states:
+   -32.771496*    -1.929338*    -0.848959*    -0.848959*    -0.848959*
+     0.808904      0.808904      0.808904      0.935600      1.997811 
+
+Dipole:	x		y		z		dipole change
+	-0.00000000	-0.00000000	-0.00000000	-1.131302e-15
+Energy:	electronic	total		virial		energy change
+	-128.54346966	-128.54346966	 1.00000029	-3.47029e-11
+	kinetic		nuclear		Coulomb		Exchange
+	 128.54343269	-311.13496025	 66.15806148	-12.11000359
+Errors:	Max dens	RMS dens	DIIS
+	 2.673663e-07	 1.245341e-08	 1.082028e-06
+
+Iteration took 0.02 s.
+
+ ******* Iteration   11 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 5.24e-19  8.31e-16  5.84e-15  1.17e-14  3.64e-14  5.73e-16  2.06e-09  3.33e-01  3.33e-01  3.33e-01 
+CDIIS weights
+ 2.10e-09  7.72e-08 -3.00e-07 -1.59e-06  1.40e-05 -2.53e-05 -2.74e-04  8.40e-03 -7.54e-03  9.99e-01 
+ DIIS weights
+ 2.10e-09  7.72e-08 -3.00e-07 -1.59e-06  1.40e-05 -2.53e-05 -2.74e-04  8.40e-03 -7.54e-03  9.99e-01 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   45.11 eV. Energies of lowest lying states:
+   -32.771496*    -1.929338*    -0.848959*    -0.848959*    -0.848959*
+     0.808904      0.808904      0.808904      0.935600      1.997811 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	 0.00000000	-1.542209e-15
+Energy:	electronic	total		virial		energy change
+	-128.54346966	-128.54346966	 1.00000039	-1.47793e-12
+	kinetic		nuclear		Coulomb		Exchange
+	 128.54341968	-311.13493718	 66.15804987	-12.11000203
+Errors:	Max dens	RMS dens	DIIS
+	 8.746737e-09	 3.392859e-10	 3.178420e-08
+
+Iteration took 0.02 s.
+
+ ******* Iteration   12 ********
+Forming HF Coulomb and exchange matrices ... done (0.02 s)
+ADIIS weights
+ 3.59e-18  4.86e-15  1.54e-15  4.52e-14  1.72e-11  2.98e-10  2.50e-01  2.50e-01  2.50e-01  2.50e-01 
+CDIIS weights
+ 1.04e-09 -1.14e-08 -2.94e-08  4.49e-07 -6.15e-07 -7.46e-06  9.97e-05 -1.22e-03 -1.41e-04  1.00e+00 
+ DIIS weights
+ 1.04e-09 -1.14e-08 -2.94e-08  4.49e-07 -6.15e-07 -7.46e-06  9.97e-05 -1.22e-03 -1.41e-04  1.00e+00 
+
+Solving SCF equations ... done (0.00 s)
+HOMO-LUMO gap is   45.11 eV. Energies of lowest lying states:
+   -32.771496*    -1.929338*    -0.848959*    -0.848959*    -0.848959*
+     0.808904      0.808904      0.808904      0.935600      1.997811 
+
+Dipole:	x		y		z		dipole change
+	 0.00000000	-0.00000000	-0.00000000	 6.163516e-15
+Energy:	electronic	total		virial		energy change
+	-128.54346966	-128.54346966	 1.00000039	 1.7053e-13
+	kinetic		nuclear		Coulomb		Exchange
+	 128.54342003	-311.13493780	 66.15805019	-12.11000207
+Errors:	Max dens	RMS dens	DIIS
+	 2.298470e-10	 1.171680e-11	 1.095290e-09
+
+Iteration took 0.02 s.
+
+ ******* Convergence achieved ********
+Dipole moment is (0.000000,-0.000000,-0.000000) D, |mu|=0.000000 D.
+Solution of RHF took 0.25 s.
+
+Mulliken charges
+   1 Ne          -0.000000
+Sum of Mulliken charges -5.329071e-15
+
+Electron density at nuclei
+   1 Ne         608.773911
+
+Running program took 0.32 s.
+Current time is Fri 06 Feb 2015 05:52:18.

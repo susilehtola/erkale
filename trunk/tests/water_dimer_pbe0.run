@@ -1,0 +1,8 @@
+# Water dimer
+System water_dimer.xyz
+Method hyb_gga_xc_pbeh
+Basis aug-cc-pVDZ
+Logfile water_dimer_pbe0.log
+SaveChk water_dimer_pbe0.chk
+DensityFitting false
+Direct false

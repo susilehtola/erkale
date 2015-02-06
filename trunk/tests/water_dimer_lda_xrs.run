@@ -1,0 +1,10 @@
+# Water dimer
+System water_dimer_xrs.xyz
+Method lda_x-lda_c_pw
+Basis aug-cc-pVDZ
+Logfile water_dimer_lda_xrs.log
+SaveChk water_dimer_lda_xrs.chk
+DensityFitting false
+Direct false
+XRSMethod tp
+LoadChk water_dimer_lda.chk

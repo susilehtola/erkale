@@ -1,0 +1,6 @@
+# Cadmium complex
+System cd-cplx.xyz
+Method hyb_gga_xc_b3lyp
+Basis 3-21G
+Logfile Cdcplx_b3lyp.log
+SaveChk Cdcplx_b3lyp.chk

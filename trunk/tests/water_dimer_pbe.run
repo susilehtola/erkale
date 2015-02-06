@@ -1,0 +1,8 @@
+# Water dimer
+System water_dimer.xyz
+Method gga_x_pbe-gga_c_pbe
+Basis aug-cc-pVDZ
+Logfile water_dimer_pbe.log
+SaveChk water_dimer_pbe.chk
+DensityFitting false
+Direct false

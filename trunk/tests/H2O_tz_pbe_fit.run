@@ -1,0 +1,8 @@
+# Water molecule
+System H2O.xyz
+Method gga_x_pbe-gga_c_pbe
+Basis cc-pVTZ
+Logfile H2O_tz_pbe_fit.log
+SaveChk H2O_tz_pbe_fit.chk
+Direct false
+DensityFitting true

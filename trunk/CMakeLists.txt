@@ -115,3 +115,7 @@ endif()
 
 # Recurse into the "src" subdirectory.
 add_subdirectory (src)
+
+# Testing
+enable_testing()
+add_subdirectory (tests)

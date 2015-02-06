@@ -1,0 +1,9 @@
+# Neon atom
+System Ne.xyz
+Method gga_x_pbe-gga_c_pbe
+Basis cc-pVTZ
+Guess Core
+DFTGrid 50 -302
+Logfile Ne_pbe_tz.log
+SaveChk Ne_pbe_tz.chk
+DensityFitting false

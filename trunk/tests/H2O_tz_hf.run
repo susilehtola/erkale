@@ -1,0 +1,8 @@
+# Water molecule
+System H2O.xyz
+Method HF
+Basis cc-pVTZ
+Logfile H2O_tz_hf.log
+SaveChk H2O_tz_hf.chk
+Direct false
+DensityFitting false

@@ -1,0 +1,7 @@
+# Helium atom
+System He.xyz
+Method HF
+Basis cc-pVDZ
+Guess Core
+Logfile He_dz.log
+SaveChk He_dz.chk

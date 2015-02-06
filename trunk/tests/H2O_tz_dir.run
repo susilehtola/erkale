@@ -1,0 +1,7 @@
+# Water molecule
+System H2O.xyz
+Method HF
+Basis cc-pVTZ
+Logfile H2O_tz_dir.log
+SaveChk H2O_tz_dir.chk
+Direct true
