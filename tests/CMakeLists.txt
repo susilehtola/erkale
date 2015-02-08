@@ -29,5 +29,13 @@ function(run_xrs target dep)
   set_property(TEST ${target} APPEND PROPERTY DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.chk)
 endfunction()
 
+# First, compile and run the basic test
+add_test(build_basictests  "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target basictests)
+add_test(NAME basictests COMMAND basictests)
+
+# To run any tests we need to check that ERKALE and the test comparison binary have been built
+add_test(build_erkale     "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target erkale)
+add_test(build_chkcompare "${CMAKE_COMMAND}" --build ${CMAKE_BINARY_DIR} --target chkcompare)
+
 # Generate list with genlist.sh
 include(TestList.txt)
