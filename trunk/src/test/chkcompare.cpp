@@ -349,6 +349,7 @@ int main(int argc, char ** argv) {
     cur.read(Ec);
     double dE=Ec.E-Er.E;
     printf("Total energy difference %e\n",dE);
+    fflush(stdout);
     if(fabs(dE) > Etol)
       throw std::runtime_error("Total energies don't match!\n");
     
@@ -359,18 +360,18 @@ int main(int argc, char ** argv) {
 
     // Check norm
     double Nelnum=arma::trace(Pcur*S);
-    if(fabs(Nelnum-Nelc)>dPtol) {
-      bcur.print(true);
-      Pcur.print("P");
-      S.print("S");
+    double dNel=Nelnum-Nelc;
+    printf("Electron count difference %e\n",dNel);
+    fflush(stdout);
+    if(fabs(dNel)>dPtol)
       throw std::runtime_error("Norm of density matrix is wrong.\n");
-    }
+    
     // Check difference
     double dP=rms_norm(Pcur-Pref);
     printf("Density matrix difference %e\n",dP);
     if(dP>dPtol)
       throw std::runtime_error("Density matrices differ!\n");
-
+    
     // Orbitals    
     arma::mat Cref, Ccur;
     ref.read("C",Cref);
@@ -384,10 +385,8 @@ int main(int argc, char ** argv) {
     // Calculate difference
     double dC=rms_norm(Cref-Ccur);
     printf("Orbital matrix difference %e\n",dC);
+    fflush(stdout);
     if(dC>dCtol) {
-      arma::mat o(Cref.t()*S*Ccur);
-      printf("Orbital verlap with reference");
-      print_mat(o," % .2f");
       throw std::runtime_error("Orbital coefficients differ!\n");
     }
 
@@ -397,6 +396,7 @@ int main(int argc, char ** argv) {
     cur.read("E",Ecur);
     double dEo=arma::max(arma::abs((Ecur-Eref)/Eref));
     printf("Orbital energy difference %e\n",dEo);
+    fflush(stdout);
     if(dEo > dEtol)
       throw std::runtime_error("Orbital energies differ!\n");
 
@@ -417,6 +417,7 @@ int main(int argc, char ** argv) {
     double p2diff=mom(4,1)-2.0*Ec.Ekin;
     double p2err=mom(4,2);
     printf("<p^2> - T = % e, d<p^2> = %e\n",p2diff,p2err);
+    fflush(stdout);
     if(fabs(p0diff)>=2*p0err || fabs(p2diff)>P2TOL*p2err)
       throw std::runtime_error("EMD failed.\n");
 
@@ -439,6 +440,7 @@ int main(int argc, char ** argv) {
     cur.read(Ec);
     double dE=Ec.E-Er.E;
     printf("Total energy difference %e\n",dE);
+    fflush(stdout);
     if(fabs(dE) > Etol)
       throw std::runtime_error("Total energies don't match!\n");
     
@@ -468,58 +470,44 @@ int main(int argc, char ** argv) {
       xrs=false;
     }
 
-    // Alpha electron count
-    if(fabs(Nelanum-Nelac)>dPtol) {
-      // Check special cases
+    // Alpha electron count error
+    double dNela;
+    if(xrs && stricmp(xrsmethod,"TP")==0  && !xrsspin)
+      dNela=Nelanum + 0.5 - Nelac;
+    else if(xrs && stricmp(xrsmethod,"FCH")==0 && !xrsspin)
+      dNela=Nelanum + 1.0 - Nelac;
+    else
+      dNela=Nelanum - Nelac;
+    printf("Alpha electron count difference %e\n",dNela);
+    fflush(stdout);
+    if(fabs(dNela)>dPtol)
+      throw std::runtime_error("Norm of alpha density matrix is wrong.\n");
 
-      // Error?
-      bool error=true;
-      // Check special cases
-      if(xrs && stricmp(xrsmethod,"TP")==0  && !xrsspin && fabs(Nelanum+0.5-Nelac)<=dPtol)
-	error=false;
-      if(xrs && stricmp(xrsmethod,"FCH")==0 && !xrsspin && fabs(Nelanum+1.0-Nelac)<=dPtol)
-	error=false;
-      if(error) {
-	fprintf(stderr,"Counted % .3f alpha electrons instead of %i.\n",Nelanum,Nelac);
-	fflush(stderr);
-	throw std::runtime_error("Norm of alpha density matrix is wrong.\n");
-      }
-    }
-    // Beta electron count
-    if(fabs(Nelbnum-Nelbc)>dPtol) {
-      // Check special cases
+    // Beta electron count error
+    double dNelb;
+    if(xrs && stricmp(xrsmethod,"TP")==0  && xrsspin)
+      dNelb=Nelbnum + 0.5 - Nelbc;
+    else if(xrs && stricmp(xrsmethod,"FCH")==0 && xrsspin)
+      dNelb=Nelbnum + 1.0 - Nelbc;
+    else
+      dNelb=Nelbnum - Nelbc;
+    printf("Beta  electron count difference %e\n",dNela);
+    fflush(stdout);
+    if(fabs(dNelb)>dPtol)
+      throw std::runtime_error("Norm of beta  density matrix is wrong.\n");
 
-      // Error?
-      bool error=true;
-      // Check special cases
-      if(xrs && stricmp(xrsmethod,"TP")==0  && xrsspin && fabs(Nelbnum+0.5-Nelbc)<=dPtol)
-	error=false;
-      if(xrs && stricmp(xrsmethod,"FCH")==0 && xrsspin && fabs(Nelbnum+1.0-Nelbc)<=dPtol)
-	error=false;
-      if(error) {
-	fprintf(stderr,"Counted % .3f beta  electrons instead of %i.\n",Nelbnum,Nelbc);
-	fflush(stderr);
-	throw std::runtime_error("Norm of beta  density matrix is wrong.\n");
-      }
-    }
-    // Total electron count
-    if(fabs(Nelnum-Nelc)>dPtol) {
-      // Check special cases
-
-      // Error?
-      bool error=true;
-      // Check special cases
-      if(xrs && stricmp(xrsmethod,"TP")==0 && fabs(Nelnum+0.5-Nelc)<=dPtol)
-	error=false;
-      if(xrs && stricmp(xrsmethod,"FCH")==0 && fabs(Nelnum+1.0-Nelc)<=dPtol)
-	error=false;
-      if(error) {
-	fprintf(stderr,"Counted % .3f       electrons instead of %i.\n",Nelnum,Nelc);
-	fflush(stderr);
-	throw std::runtime_error("Norm of total density matrix is wrong.\n");
-      }
-    }
-
+    double dNel;
+    if(xrs && stricmp(xrsmethod,"TP")==0)
+      dNel=Nelnum + 0.5 - Nelc;
+    else if(xrs && stricmp(xrsmethod,"FCH")==0)
+      dNel=Nelnum + 1.0 - Nelc;
+    else
+      dNel=Nelnum - Nelc;
+    printf("Total electron count difference %e\n",dNela);
+    fflush(stdout);
+    if(fabs(dNel)>dPtol)
+      throw std::runtime_error("Norm of total density matrix is wrong.\n");
+    
     // Check differences
     double dPa=rms_norm(Pacur-Paref);
     printf("Alpha density matrix difference %e\n",dPa);
