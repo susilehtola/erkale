@@ -1440,8 +1440,9 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
       occa.resize(Nel_alpha);
       for(size_t i=0;i<occa.size();i++)
 	occa[i]=1.0;
-
-      occb.resize(Nel_beta);
+      
+      fprintf(stderr,"Nel_beta = %i\n",Nel_beta);
+	occb.resize(Nel_beta);
       for(size_t i=0;i<occb.size();i++)
 	occb[i]=1.0;
     }
@@ -1538,6 +1539,16 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
 
   // The rest are spin down
   Nel_beta=Nel-Nel_alpha;
+
+  if(Nel_alpha<0) {
+    std::ostringstream oss;
+    oss << "A multiplicity of " << mult << " would mean " << Nel_alpha << " alpha electrons!\n";
+    throw std::runtime_error(oss.str());
+  } else if(Nel_beta<0) {
+    std::ostringstream oss;
+    oss << "A multiplicity of " << mult << " would mean " << Nel_beta << " beta electrons!\n";
+    throw std::runtime_error(oss.str());
+  }
 }
 
 enum pzrun parse_pzrun(const std::string & pzs) {
