@@ -1,8 +1,0 @@
-# Fluorine atom
-System F.xyz
-Method HF
-Multiplicity 2
-Basis cc-pVTZ
-Guess Core
-Logfile F_tz.log
-SaveChk F_tz.chk

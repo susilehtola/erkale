@@ -20,7 +20,7 @@ for j in $(ls *.run | sed "s|.run||g"); do
     if [[ -f $reflog ]]; then
 	Nbf=$(grep "Basis set contains" $reflog | awk '{print $4}')
     else
-	Nbf=10000
+	Nbf=0
     fi
 
     # Generate input
