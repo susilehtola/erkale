@@ -385,7 +385,7 @@ double exact_exchange(int func_id) {
   return f;
 }
 
-bool is_range_separated(int func_id) {
+bool is_range_separated(int func_id, bool check) {
   bool ans=false;
   
   if(func_id>0) {
@@ -401,20 +401,22 @@ bool is_range_separated(int func_id) {
     // Free functional
     xc_func_end(&func);
   }
-  
-  // Sanity check
-  double w, a, b;
-  range_separation(func_id,w,a,b);
 
-  if(ans && w==0.0)
-    fprintf(stderr,"Error in libxc detected - functional is marked range separated but with vanishing omega!\n");
-  else if(!ans && w!=0.0)
-    fprintf(stderr,"Error in libxc detected - functional is not marked range separated but has nonzero omega!\n");
+  if(check) {
+    // Sanity check
+    double w, a, b;
+    range_separation(func_id,w,a,b);
+    
+    if(ans && w==0.0)
+      fprintf(stderr,"Error in libxc detected - functional is marked range separated but with vanishing omega!\n");
+    else if(!ans && w!=0.0)
+      fprintf(stderr,"Error in libxc detected - functional is not marked range separated but has nonzero omega!\n");
+  }
   
   return ans;
 }
 
-void range_separation(int func_id, double & omega, double & alpha, double & beta) {
+void range_separation(int func_id, double & omega, double & alpha, double & beta, bool check) {
   // Defaults
   omega=0.0;
   alpha=0.0;
@@ -439,6 +441,19 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
 
     xc_func_end(&func);
   }
+
+  if(check) {
+    bool ans=is_range_separated(func_id,false);
+    if(ans && omega==0.0) {
+      fprintf(stderr,"Error in libxc detected - functional is marked range separated but with vanishing omega!\n");
+      printf("Error in libxc detected - functional is marked range separated but with vanishing omega!\n");
+    } else if(!ans && omega!=0.0) {
+      fprintf(stderr,"Error in libxc detected - functional is not marked range separated but has nonzero omega!\n");
+      printf("Error in libxc detected - functional is not marked range separated but has nonzero omega!\n");
+    }
+  }
+  
+
 }
 
 
