@@ -47,7 +47,7 @@ int strcmp(const std::string &str1, const std::string& str2) {
   return strcmp(str1.c_str(),str2.c_str());
 }
 
-std::string readline(std::istream & in, bool skipempty) {
+std::string readline(std::istream & in, bool skipempty, const std::string cchars) {
   std::string ret;
 
   // Get line from input
@@ -60,16 +60,28 @@ std::string readline(std::istream & in, bool skipempty) {
       return ret;
     
     // Check that line is not a comment
-    if(ret.size() && !(ret[0]=='!' || ret[0]=='#')) {
-      // Check if there is something on the line
-      for(size_t i=0;i<ret.size();i++)
-	if(!isblank(ret[i]))
-	  return ret;
+    if(ret.size()) {
+      bool cmt=false;
+      for(size_t j=0;j<cchars.size();j++)
+	if(ret[0]==cchars[j])
+	  cmt=true;
+
+      if(!cmt && !isblank(ret))
+	return ret;
     }
   }
   
   // Reached end of file
   return std::string();
+}
+
+bool isblank(const std::string & line) {
+  bool blank(true);
+  for(size_t i=0;i<line.size();i++)
+    if(!isblank(line[i]))
+      blank=false;
+
+  return blank;
 }
 
 std::string readline(FILE *in) {
