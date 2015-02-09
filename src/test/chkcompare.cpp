@@ -92,35 +92,26 @@ void fix_signs(arma::mat & C, const arma::mat & Cr, const arma::mat & S) {
   }
 }
 
-double C_diff(const arma::mat & Cr, const arma::mat & S, const arma::mat & Cc0, const arma::vec & E) {
-  arma::mat Cc(Cc0);
-
-  // Indices of orbitals to check
-  arma::uvec idx;
-  
+double C_diff(const arma::mat & Cr, const arma::mat & S, arma::mat & Cc, const arma::vec & E) {
   size_t io=0;
   while(io<Cc.n_cols-1) {
     // Check for degenerate orbitals
     size_t jo=io;
-    while(jo+1 < Cc.n_cols && fabs(E(io)-E(jo))<odegthr)
+    while(jo+1 < Cc.n_cols && fabs(E(io)-E(jo+1))<odegthr)
       jo++;
     if(jo!=io) {
       // Calculate projection of orbitals
-      arma::mat Op=arma::trans(Cc.cols(io,jo))*S*Cr.cols(io,jo);
+      arma::mat Op(arma::trans(Cc.cols(io,jo))*S*Cr.cols(io,jo));
       // Rotate orbitals to match original ones
       Cc.cols(io,jo)=Cc.cols(io,jo)*Op;
-      
-      // Next orbital
-      io=jo+1;
-    } else {
-      // Check the orbital
-      idx.resize(idx.n_elem+1);
-      idx(idx.n_elem-1)=io;
     }
+
+    // Next orbital
+    io=jo+1;
   }
   
   // Get norm
-  return rms_norm(Cc.cols(idx)-Cr.cols(idx));
+  return rms_norm(Cc-Cr);
 }
   
 int main(int argc, char ** argv) {
@@ -237,9 +228,8 @@ int main(int argc, char ** argv) {
     double dC=C_diff(Cref,S,Ccur,Ecur);
     printf("Orbital matrix difference %e\n",dC);
     fflush(stdout);
-    if(dC>dCtol) {
+    if(dC>dCtol)
       throw std::runtime_error("Orbital coefficients differ!\n");
-    }
 
     // Orbital energy differences
     double dEo=arma::max(arma::abs((Ecur-Eref)/Eref));
@@ -400,11 +390,11 @@ int main(int argc, char ** argv) {
     double dCa=C_diff(Caref,S,Cacur,Eacur);
     printf("Alpha orbital matrix difference %e\n",dCa);
     if(dCa>dCtol)
-      throw std::runtime_error("Alpha orbital matrices differ!\n");
+      throw std::runtime_error("Alpha orbital coefficients differ!\n");
     double dCb=C_diff(Cbref,S,Cbcur,Ebcur);
     printf("Beta  orbital matrix difference %e\n",dCb);
     if(dCb>dCtol)
-      throw std::runtime_error("Beta  orbital matrices differ!\n");
+      throw std::runtime_error("Beta  orbital coefficients differ!\n");
     
     double dEoa=arma::max(arma::abs((Eacur-Earef)/Earef));
     printf("Alpha orbital energy difference %e\n",dEoa);
