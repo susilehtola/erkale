@@ -25,7 +25,7 @@ const double normtol=1e-10;
 const double Etol=1e-6;
 /// Absolute tolerance for density matrix difference
 const double dPtol=1e-7;
-/// Absolute olerance for orbital matrix difference
+/// Absolute tolerance for orbital matrix difference
 const double dCtol=1e-6;
 /// Relative tolerance in orbital energies
 const double dEtol=1e-5;
@@ -112,6 +112,14 @@ double C_diff(const arma::mat & Cr, const arma::mat & S, arma::mat & Cc, const a
   
   // Get norm
   return rms_norm(Cc-Cr);
+}
+
+double E_diff(const arma::mat & Er, const arma::vec & Ec) {
+  // Normalization vector
+  arma::vec Enorm(arma::abs(Er));
+  Enorm=arma::max(Enorm,arma::ones(Er.n_elem));
+
+  return arma::max(arma::abs((Er-Ec)/Enorm));
 }
   
 int main(int argc, char ** argv) {
@@ -232,7 +240,7 @@ int main(int argc, char ** argv) {
       throw std::runtime_error("Orbital coefficients differ!\n");
 
     // Orbital energy differences
-    double dEo=arma::max(arma::abs((Ecur-Eref)/Eref));
+    double dEo=E_diff(Eref,Ecur);
     printf("Orbital energy difference %e\n",dEo);
     fflush(stdout);
     if(dEo > dEtol)
@@ -396,11 +404,11 @@ int main(int argc, char ** argv) {
     if(dCb>dCtol)
       throw std::runtime_error("Beta  orbital coefficients differ!\n");
     
-    double dEoa=arma::max(arma::abs((Eacur-Earef)/Earef));
+    double dEoa=E_diff(Earef,Eacur);
     printf("Alpha orbital energy difference %e\n",dEoa);
     if(dEoa > dEtol)
       throw std::runtime_error("Alpha orbital energies differ!\n");
-    double dEob=arma::max(arma::abs((Ebcur-Ebref)/Ebref));
+    double dEob=E_diff(Ebref,Ebcur);
     printf("Beta  orbital energy difference %e\n",dEob);
     if(dEob > dEtol)
       throw std::runtime_error("Beta orbital energies differ!\n");
