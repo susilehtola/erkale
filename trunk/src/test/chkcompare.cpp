@@ -24,7 +24,7 @@ const double normtol=1e-10;
 /// Absolute tolerance in total energy
 const double Etol=1e-6;
 /// Absolute tolerance for density matrix difference
-const double dPtol=1e-7;
+const double dPtol=1e-6;
 /// Absolute tolerance for orbital matrix difference
 const double dCtol=1e-6;
 /// Relative tolerance in orbital energies
