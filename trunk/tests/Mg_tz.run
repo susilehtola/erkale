@@ -1,0 +1,7 @@
+# Magnesium atom
+System Mg.xyz
+Method HF
+Basis cc-pVTZ
+Guess Core
+Logfile Mg_tz.log
+SaveChk Mg_tz.chk

@@ -1,0 +1,9 @@
+# Magnesium cation
+System Mg.xyz
+Method HF
+Charge 1
+Multiplicity 2
+Basis cc-pVDZ
+Guess Core
+Logfile Mg+_dz.log
+SaveChk Mg+_dz.chk

@@ -1,0 +1,9 @@
+# Beryllium atom
+System Be.xyz
+Method HF
+Charge 1
+Multiplicity 2
+Basis cc-pVDZ
+Guess Core
+Logfile Be+_dz.log
+SaveChk Be+_dz.chk

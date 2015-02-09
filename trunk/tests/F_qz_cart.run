@@ -1,9 +1,0 @@
-# Fluorine atom
-System F.xyz
-Method HF
-Multiplicity 2
-Basis cc-pVQZ
-Uselm false
-Guess Core
-Logfile F_qz_cart.log
-SaveChk F_qz_cart.chk

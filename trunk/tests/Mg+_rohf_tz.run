@@ -1,0 +1,9 @@
+# Magnesium cation
+System Mg.xyz
+Method ROHF
+Charge 1
+Multiplicity 2
+Basis cc-pVTZ
+Guess Core
+Logfile Mg+_rohf_tz.log
+SaveChk Mg+_rohf_tz.chk

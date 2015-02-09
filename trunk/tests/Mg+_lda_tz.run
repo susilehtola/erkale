@@ -1,0 +1,11 @@
+# Magnesium cation
+System Mg.xyz
+Method lda_x-lda_c_pw
+Charge 1
+Multiplicity 2
+Basis cc-pVTZ
+Guess Core
+DFTGrid 50 -302
+Logfile Mg+_lda_tz.log
+SaveChk Mg+_lda_tz.chk
+DensityFitting false

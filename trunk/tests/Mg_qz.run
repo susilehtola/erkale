@@ -1,0 +1,7 @@
+# Magnesium atom
+System Mg.xyz
+Method HF
+Basis cc-pVQZ
+Guess Core
+Logfile Mg_qz.log
+SaveChk Mg_qz.chk

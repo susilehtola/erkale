@@ -1,0 +1,9 @@
+# Magnesium atom
+System Mg.xyz
+Method mgga_x_tpss-mgga_c_tpss
+Basis cc-pVTZ
+Guess Core
+DFTGrid 50 -302
+Logfile Mg_tpss_tz.log
+SaveChk Mg_tpss_tz.chk
+DensityFitting false
