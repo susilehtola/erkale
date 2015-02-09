@@ -37,7 +37,9 @@ int stricmp(const std::string & str1, const std::string & str2);
 int strcmp(const std::string & str1, const std::string & str2);
 
 /// Read line from input (skip empty lines)
-std::string readline(std::istream & in, bool skipempty=true);
+std::string readline(std::istream & in, bool skipempty=true, const std::string cchars="#!");
+/// Check if a line is blank
+bool isblank(const std::string & line);
 
 /// Get a line from the file (not skipping anything)
 std::string readline(FILE *in);
