@@ -386,10 +386,32 @@ double exact_exchange(int func_id) {
 }
 
 bool is_range_separated(int func_id) {
-  // Functional is range separated if w!=0
+  bool ans=false;
+  
+  if(func_id>0) {
+    xc_func_type func;
+    if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Functional "<<func_id<<" not found!";
+      throw std::runtime_error(oss.str());
+    }
+    // Get flag
+    ans=func.info->flags & XC_FLAGS_HYB_CAM;
+    // Free functional
+    xc_func_end(&func);
+  }
+  
+  // Sanity check
   double w, a, b;
   range_separation(func_id,w,a,b);
-  return w!=0.0;
+
+  if(ans && w==0.0)
+    fprintf(stderr,"Error in libxc detected - functional is marked range separated but with vanishing omega!\n");
+  else if(!ans && w!=0.0)
+    fprintf(stderr,"Error in libxc detected - functional is not marked range separated but has nonzero omega!\n");
+  
+  return ans;
 }
 
 void range_separation(int func_id, double & omega, double & alpha, double & beta) {
