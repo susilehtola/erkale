@@ -442,8 +442,8 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
     xc_func_end(&func);
   }
 
+  bool ans=is_range_separated(func_id,false);
   if(check) {
-    bool ans=is_range_separated(func_id,false);
     if(ans && omega==0.0) {
       fprintf(stderr,"Error in libxc detected - functional is marked range separated but with vanishing omega!\n");
       printf("Error in libxc detected - functional is marked range separated but with vanishing omega!\n");
@@ -452,8 +452,12 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
       printf("Error in libxc detected - functional is not marked range separated but has nonzero omega!\n");
     }
   }
-  
 
+  // Work around libxc bug
+  if(!ans) {
+    omega=0.0;
+    beta=0.0;
+  }
 }
 
 
