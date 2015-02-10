@@ -1441,8 +1441,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
       for(size_t i=0;i<occa.size();i++)
 	occa[i]=1.0;
       
-      fprintf(stderr,"Nel_beta = %i\n",Nel_beta);
-	occb.resize(Nel_beta);
+      occb.resize(Nel_beta);
       for(size_t i=0;i<occb.size();i++)
 	occb[i]=1.0;
     }
