@@ -19,6 +19,7 @@
 #include "global.h"
 #include "xyzutils.h"
 #include "stringutil.h"
+#include "zmatrix.h"
 
 #include <sstream>
 #include <stdexcept>
@@ -28,7 +29,15 @@
 
 
 std::vector<atom_t> load_xyz(std::string filename) {
-
+  // Check if input is actually Z-Matrix
+  {
+    FILE *in=fopen(filename.c_str(),"r");
+    std::vector<std::string> words(splitline(readline(in)));
+    fclose(in);
+    if(stricmp(words[0],"#ZMATRIX")==0)
+      return load_zmat(filename);
+  }
+  
   // Input file
   std::ifstream in(filename.c_str());
   // Returned array

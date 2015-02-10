@@ -81,6 +81,9 @@
 // Fine structure constant
 #define FINESTRUCT 7.2973525540510957E-3
 
+// Degree in radians
+#define DEGINRAD (M_PI/180.0)
+
 // Initial tolerance, when density-based screening is used
 #define ROUGHTOL 1e-9
 // Fine tolance after initial convergence has been achieved (minimum)
