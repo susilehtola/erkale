@@ -1904,6 +1904,25 @@ void BasisSet::print(bool verbose) const {
     else
       printf("%i\t%s\t %i\t% 7.3f\t% 7.3f\t% 7.3f\n",(int) i+1,nuclei[i].symbol.c_str(),nuclei[i].Z,nuclei[i].r.x/ANGSTROMINBOHR,nuclei[i].r.y/ANGSTROMINBOHR,nuclei[i].r.z/ANGSTROMINBOHR);
   }
+
+  if(nuclei.size()>1 && nuclei.size()<=13) {
+    // Legend length is 7 + 6*(N-1) chars
+    
+    // Print legend
+    printf("\nInteratomic distance matrix:\n%7s","");
+    for(size_t i=0;i<nuclei.size()-1;i++)
+      printf(" %3i%-2s",(int) i+1,nuclei[i].symbol.c_str());
+    printf("\n");
+
+    // Print atomic entries
+    for(size_t i=1;i<nuclei.size();i++) {
+      printf(" %3i%-2s",(int) i+1,nuclei[i].symbol.c_str());
+      for(size_t j=0;j<i;j++)
+	printf(" %5.3f",norm(nuclei[i].r-nuclei[j].r)/ANGSTROMINBOHR);
+      printf("\n");
+    }
+  }
+  
   printf("\nList of basis functions:\n");
 
   if(verbose) {
