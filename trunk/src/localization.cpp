@@ -1195,10 +1195,11 @@ void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat 
       der(a,b) =2.0 * arma::as_scalar( arma::trans(C.col(a))*Jorb[b]*Ctilde.col(b) );
 }
 
-PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, double maxtolv, double rmstolv, enum pzham hm) : UnitaryFunction(4,true) {
+PZSIC::PZSIC(SCF *solverp, dft_t dftp, DFTGrid * gridp, DFTGrid * nlgridp, double maxtolv, double rmstolv, enum pzham hm) : UnitaryFunction(4,true) {
   solver=solverp;
   dft=dftp;
   grid=gridp;
+  nlgrid=nlgridp;
 
   // Convergence criteria
   rmstol=rmstolv;
@@ -1245,7 +1246,7 @@ double PZSIC::cost_func(const arma::cx_mat & Wv) {
     // Compute orbital energies
     W=Wv;
     Forb.clear();
-    solver->PZSIC_Fock(Forb,Eorb,sol.cC,Wv,dft,*grid,false);
+    solver->PZSIC_Fock(Forb,Eorb,sol.cC,Wv,dft,*grid,*nlgrid,false);
   }
   if(Eorb.size() != Wv.n_cols) {
     ERROR_INFO();
@@ -1285,7 +1286,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
   if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON || Forb.size() != Wv.n_cols) {
     // Compute orbital-dependent Fock matrices
     W=Wv;
-    solver->PZSIC_Fock(Forb,Eorb,sol.cC,Wv,dft,*grid,true);
+    solver->PZSIC_Fock(Forb,Eorb,sol.cC,Wv,dft,*grid,*nlgrid,true);
   }
   if(Eorb.size() != Wv.n_cols) {
     ERROR_INFO();

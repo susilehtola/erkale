@@ -18,13 +18,13 @@
 
 /* Restricted case */
 #if defined(RESTRICTED) && defined(DFT)
-void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, double tol) const
+void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
 
 #elif defined(RESTRICTED) && defined(HF)
 void SCF::Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const rscf_t & oldsol, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, double tol) const
+void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(HF)
 void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const
@@ -33,10 +33,10 @@ void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::ve
 void SCF::Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, double tol) const
+void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
 
 #elif defined(DFT) && defined(HALFHOLE)
-void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, double tol) const
+void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
 #endif
 {
   Timer t;
@@ -547,6 +547,29 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       std::cout << oss.str();
     //      throw std::runtime_error(oss.str());
   }
+
+  // Non-local correlation?
+  if(dft.nl) {
+    if(verbose) {
+      printf("Computing non-local correlation ... ");
+      fflush(stdout);
+      t.set();
+    }
+    
+#ifdef RESTRICTED
+    grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,sol.P,sol.XC,sol.en.Enl);
+#else
+    arma::mat XC(sol.XCa);
+    XC.zeros();
+    grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,sol.P,XC,sol.en.Enl);
+    sol.XCa+=XC;
+    sol.XCb+=XC;
+#endif
+    
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
+    }
+  }
 #endif
 
   // Update Hamiltonian
@@ -636,7 +659,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   sol.en.Ecoul=0.5*arma::trace(sol.P*sol.J);
 
   // Compute total energies
-  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Eeff;
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Eeff+sol.en.Enl;
   sol.en.E=sol.en.Eel+sol.en.Enucr;
 
   // Sanity checks

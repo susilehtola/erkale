@@ -280,6 +280,8 @@ class PZSIC : public UnitaryFunction {
   dft_t dft;
   /// XC grid
   DFTGrid * grid;
+  /// NL grid
+  DFTGrid * nlgrid;
 
   /// Solution
   rscf_t sol;
@@ -321,7 +323,7 @@ class PZSIC : public UnitaryFunction {
 
  public:
   /// Constructor
-  PZSIC(SCF *solver, dft_t dft, DFTGrid * grid, double maxtol, double rmstol, enum pzham ham);
+  PZSIC(SCF *solver, dft_t dft, DFTGrid * grid, DFTGrid * nlgrid, double maxtol, double rmstol, enum pzham ham);
   /// Destructor
   ~PZSIC();
   /// Copy

@@ -495,7 +495,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       
       // Build global Fock operator
       rscf_t dum;
-      solverp->Fock_RDFT(tmp,occa,method,dum,grid,focktol);
+      solverp->Fock_RDFT(tmp,occa,method,dum,grid,nlgrid,focktol);
 
       // Update reference energy
       if(mode==-1)
@@ -534,7 +534,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       // Build the SI part
       std::vector<arma::mat> Forb;
       arma::vec Eorb;
-      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,nlgrid,false);
 
       if(mode==1) {
 	for(size_t i=0;i<orblist.n_elem;i++)
@@ -595,7 +595,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       
       // Build global Fock operator
       uscf_t dum;
-      solverp->Fock_UDFT(tmp,occa,occb,method,dum,grid,focktol);
+      solverp->Fock_UDFT(tmp,occa,occb,method,dum,grid,nlgrid,focktol);
 
       // Update reference energy
       if(mode==-1)
@@ -640,7 +640,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       // Build the SI part
       std::vector<arma::mat> Forb;
       arma::vec Eorb;
-      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,nlgrid,false);
 
       // Collect energies
       if(mode==1) {
@@ -666,7 +666,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       // Build the SI part
       std::vector<arma::mat> Forb;
       arma::vec Eorb;
-      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,false);
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,nlgrid,false);
       
       // Collect energies
       if(mode==1) {
@@ -909,7 +909,8 @@ void PZStability::set(const rscf_t & sol, const arma::uvec & drop, bool cplx_, b
   chkptp->cread("CW",CW);
 
   chkptp->read(basis);
-  grid=DFTGrid(&basis,true,false);
+  grid=DFTGrid(&basis,true,method.lobatto);
+  nlgrid=DFTGrid(&basis,true,method.lobatto);
 
   // Update solution
   rsol=sol;
@@ -936,8 +937,11 @@ void PZStability::set(const rscf_t & sol, const arma::uvec & drop, bool cplx_, b
   // Reconstruct DFT grid
   if(method.adaptive)
     grid.construct(CW,method.gridtol,method.x_func,method.c_func);
-  else
+  else {
     grid.construct(method.nrad,method.lmax,method.x_func,method.c_func);
+    if(method.nl)
+      nlgrid.construct(method.nlnrad,method.nllmax,true,false,true);
+  }
 
   // Update reference
   arma::vec x(count_params());
@@ -956,7 +960,8 @@ void PZStability::set(const uscf_t & sol, const arma::uvec & dropa, const arma::
   chkptp->cread("CWb",CWb);
 
   chkptp->read(basis);
-  grid=DFTGrid(&basis,true,false);
+  grid=DFTGrid(&basis,true,method.lobatto);
+  nlgrid=DFTGrid(&basis,true,method.lobatto);
 
   // Update solution
   usol=sol;
@@ -995,8 +1000,12 @@ void PZStability::set(const uscf_t & sol, const arma::uvec & dropa, const arma::
     if(ob)
       Ctilde.cols(oa,oa+ob-1)=CWb;
     grid.construct(Ctilde,method.gridtol,method.x_func,method.c_func);
-  } else
+  } else {
     grid.construct(method.nrad,method.lmax,method.x_func,method.c_func);
+    
+    if(method.nl)
+      nlgrid.construct(method.nlnrad,method.nllmax,true,false,true);
+  }
 
   // Update reference
   arma::vec x(count_params());
