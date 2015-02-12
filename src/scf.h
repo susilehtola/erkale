@@ -485,8 +485,11 @@ double electron_spread(const arma::mat & P, const BasisSet & basis);
 /// Determine amount of alpha and beta electrons based on multiplicity
 void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta);
 
+/// Parse DFT grid settings
+dft_t parse_dft(const Settings & set, bool init);
+
 /// Run the calculation
-void calculate(const BasisSet & basis, Settings & set, bool doforce=false);
+void calculate(const BasisSet & basis, const Settings & set, bool doforce=false);
 
 /// Helper for sorting orbitals into maximum overlap
 typedef struct {
