@@ -141,6 +141,11 @@ void Settings::add_dft_settings() {
   // Relative factor for initialization
   add_double("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0);
 
+  // VV10?
+  add_bool("VV10","Use VV10 non-local correlation?",false);
+  add_string("NLGrid", "Integration grid to use for nonlocal correlation: nrad lmax", "50 -194");
+  add_string("VV10Pars","VV10 parameters: b C","6.0 0.01");
+
   // Use Perdew-Zunger self-interaction correction?
   add_double("PZw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
   // Perturbative SIC?

@@ -71,6 +71,13 @@ typedef struct {
   int nrad;
   /// Maximum angular quantum number to integrate exactly (if not adaptive)
   int lmax;
+  /// Use Lobatto quadrature?
+  bool lobatto;
+
+  // Non-local part?
+  bool nl;
+  double vv10_b, vv10_C;
+  int nlnrad, nllmax;
 } dft_t;
 
 /// Energy info
@@ -92,6 +99,8 @@ typedef struct {
   double Enucr;
   /// Effective energy
   double Eeff;
+  /// Non-local energy
+  double Enl;
 
   /// Total energy
   double E;
@@ -300,9 +309,6 @@ class SCF {
   /// Threshold for density fitting
   double fitthr;
 
-  /// Use Lobatto angular grid instead of Lebedev grid (DFT)
-  bool dft_lobatto;
-
   /// Calculate forces?
   bool doforce;
 
@@ -329,7 +335,7 @@ class SCF {
   std::vector<arma::mat> freeze;
 
   /// Helper routine for PZ-SIC
-  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, enum pzham pzh, DFTGrid & grid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool real);
+  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, enum pzham pzh, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool real);
 
  public:
   /// Constructor
@@ -356,12 +362,12 @@ class SCF {
   void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const;
 
   /// Calculate restricted density-functional theory KS-Fock operator
-  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, double tol) const;
+  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
   /// Calculate unrestricted density-functional theory KS-Fock operator
-  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, double tol) const;
+  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
-  void PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, bool fock);
+  void PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock);
 
   /// Calculate force in restricted Hartree-Fock
   arma::vec force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol);
@@ -370,14 +376,14 @@ class SCF {
   /// Calculate force in unrestricted Hartree-Fock
   arma::vec force_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol);
   /// Calculate force in restricted density-functional theory
-  arma::vec force_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol);
+  arma::vec force_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol);
   /// Calculate force in unrestricted density-functional theory
-  arma::vec force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol);
+  arma::vec force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol);
 
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
+  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
   /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, const DFTGrid & grid, bool reconstruct, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
+  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);

@@ -226,12 +226,15 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
     // Construct Fock matrix
     DFTGrid grid(&augbas,verbose,set.get_bool("DFTLobatto"));
+    DFTGrid nlgrid(&augbas,verbose,set.get_bool("DFTLobatto"));
     if(dft.adaptive) {
       // Form DFT quadrature grid
       grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
     } else {
       // Fixed size grid
       grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+      if(dft.nl)
+	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false);
     }
 
     // No need for extreme accuracy
@@ -241,12 +244,12 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
     switch(method) {
     case(TP):
-      solver.Fock_half_hole(augsol,dft,occa,occb,dummy,grid,tol);
+      solver.Fock_half_hole(augsol,dft,occa,occb,dummy,grid,nlgrid,tol);
       break;
 
     case(FCH):
     case(XCH):
-      solver.Fock_full_hole(augsol,dft,occa,occb,dummy,grid,tol);
+      solver.Fock_full_hole(augsol,dft,occa,occb,dummy,grid,nlgrid,tol);
     }
   }
 

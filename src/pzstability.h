@@ -61,6 +61,8 @@ class PZStability: public FDHessian {
   BasisSet basis;
   /// DFT grid
   DFTGrid grid;
+  /// NL grid
+  DFTGrid nlgrid;
   /// Method
   dft_t method;
 

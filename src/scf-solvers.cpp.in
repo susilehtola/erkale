@@ -42,16 +42,16 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #if defined(HF)
 #define form_fock(sol,ref) Fock_RHF(sol,occs,ref,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_RDFT(sol,occs,dft,ref,grid,tol); nfock++;
+#define form_fock(sol,ref) Fock_RDFT(sol,occs,dft,ref,grid,nlgrid,tol); nfock++;
 #endif
 
 #else
   // Unrestricted case: first core excited states
 
 #if defined(HALFHOLE)
-#define form_fock(sol,ref) Fock_half_hole(sol,dft,occa,occb,ref,grid,tol); nfock++;
+#define form_fock(sol,ref) Fock_half_hole(sol,dft,occa,occb,ref,grid,nlgrid,tol); nfock++;
 #elif defined(FULLHOLE)
-#define form_fock(sol,ref) Fock_full_hole(sol,dft,occa,occb,ref,grid,tol); nfock++;
+#define form_fock(sol,ref) Fock_full_hole(sol,dft,occa,occb,ref,grid,nlgrid,tol); nfock++;
 
   // Conventional HF and DFT
 #elif defined(HF)
@@ -59,7 +59,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #elif defined(_ROHF)
 #define form_fock(sol,ref) Fock_ROHF(sol,occa,occb,ref,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,dft,ref,grid,tol); nfock++;
+#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,dft,ref,grid,nlgrid,tol); nfock++;
 #endif
 #endif
 
@@ -276,7 +276,8 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     }
   }
 
-  DFTGrid grid(basisp,verbose,dft_lobatto);
+  DFTGrid grid(basisp,verbose,dft.lobatto);
+  DFTGrid nlgrid(basisp,verbose,dft.lobatto);
 #endif
 
 
@@ -342,6 +343,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   } else {
     // Fixed size grid
     grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+    // Nonlocal grid?
+    if(dft.nl)
+      nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,true);
   }
 
   if(verbose) {
@@ -848,6 +852,11 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #endif
       printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% 08.8f\n",sol.en.Ekin,sol.en.Enuca,sol.en.Ecoul,sol.en.Exc);
 
+#ifdef DFT
+      if(dft.nl)
+	printf("Non-local correlation energy % 08.8f\n",sol.en.Enl);
+#endif
+      
 #ifdef RESTRICTED
       if(usediis) {
 	printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
@@ -1015,10 +1024,10 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       f=force_UHF(sol,occa,occb,tol);
 #endif
 #if defined(RESTRICTED) && defined(DFT)
-      f=force_RDFT(sol,occs,dft,grid,tol);
+      f=force_RDFT(sol,occs,dft,grid,nlgrid,tol);
 #endif
 #if defined(UNRESTRICTED) && defined(DFT)
-      f=force_UDFT(sol,occa,occb,dft,grid,tol);
+      f=force_UDFT(sol,occa,occb,dft,grid,nlgrid,tol);
 #endif
 #if defined(_ROHF) || defined(FULLHOLE) || defined(HALFHOLE)
       ERROR_INFO();

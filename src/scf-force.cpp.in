@@ -16,13 +16,13 @@
 
 /* Restricted case */
 #if defined(RESTRICTED) && defined(DFT)
-arma::vec SCF::force_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, double tol)
+arma::vec SCF::force_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol)
 
 #elif defined(RESTRICTED) && defined(HF)
 arma::vec SCF::force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol)
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-arma::vec SCF::force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, double tol)
+arma::vec SCF::force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol)
 
 #elif defined(UNRESTRICTED) && defined(HF)
 arma::vec SCF::force_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol)
@@ -124,6 +124,10 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 #else
   fxc=grid.eval_force(dft.x_func,dft.c_func,sol.Pa,sol.Pb);
 #endif
+
+  // Non-local contribution to force
+  if(dft.nl)
+    fxc+=grid.eval_VV10_force(nlgrid,dft.vv10_b,dft.vv10_C,sol.P);
 
   //    interpret_force(fxc).print("XC force");
 

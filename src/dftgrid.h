@@ -219,6 +219,14 @@ class AtomGrid {
   /// Functional derivative of energy wrt kinetic energy density
   std::vector<double> vtau;
 
+  // VV10 stuff
+  /// \omega_0
+  arma::vec omega0;
+  /// \kappa
+  arma::vec kappa;
+  /// Density threshold
+  double VV10_thr;
+  
   /// Grid tolerance (for pruning grid)
   double tol;
 
@@ -262,6 +270,10 @@ class AtomGrid {
   void set_tolerance(double toler);
   /// Check necessity of computing gradient and laplacians, necessary for compute_bf!
   void check_grad_lapl(int x_func, int c_func);
+  /// Get necessity of computing gradient and laplacians
+  void get_grad_lapl(bool & grad, bool & lapl) const;
+  /// Set necessity of computing gradient and laplacians, necessary for compute_bf!
+  void set_grad_lapl(bool grad, bool lapl);
 
   /// Construct a fixed size grid
   atomgrid_t construct(const BasisSet & bas, size_t cenind, int nrad, int lmax, bool verbose);
@@ -302,6 +314,8 @@ class AtomGrid {
 
   /// Prune points with small weight
   void prune_points(double tol, const radshell_t & rg);
+  /// Prune points with small density
+  void prune_VV10();
 
   /// Add radial shell in Lobatto angular scheme, w/o Becke partitioning or pruning
   void add_lobatto_shell(atomgrid_t & g, size_t ir);
@@ -358,6 +372,19 @@ class AtomGrid {
   /// Evaluate exchange/correlation energy
   double eval_Exc() const;
 
+  /// Initialize VV10 calculation
+  void init_VV10(double b, double C, bool pot);
+  /**
+   * Evaluates VV10 energy and potential and add to total array
+   *
+   * Implementation is described in O. Vydrov and T. Van Voorhis,
+   * "Nonlocal van der Waals density functional: The simpler the
+   * better", J. Chem. Phys. 133, 244103 (2010).
+   */
+  void compute_VV10(AtomGrid & nlatom, double C);
+  /// Evaluate VV10 force
+  arma::vec compute_VV10_F(AtomGrid & nlatom);
+  
   /// Evaluate atomic contribution to overlap matrix
   void eval_overlap(arma::mat & S) const;
   /// Evaluate diagonal elements of overlap matrix
@@ -386,7 +413,6 @@ class AtomGrid {
   /// Evaluate force
   arma::vec eval_force(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb) const;
 };
-
 
 /**
  * \class DFTGrid
@@ -432,6 +458,8 @@ class DFTGrid {
 
   /// Create fixed size grid
   void construct(int nrad, int lmax, int x_func, int c_func);
+  /// Create fixed size grid
+  void construct(int nrad, int lmax, bool gga, bool mgga, bool nl);
   /// Create grid for restricted calculation
   void construct(const arma::mat & P, double tol, int x_func, int c_func);
   /// Create grid for unrestricted calculation
@@ -472,6 +500,9 @@ class DFTGrid {
    */
   void eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arma::cx_mat & W, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
 
+  /// Compute VV10
+  void eval_VV10(DFTGrid & nlgrid, double b, double C, const arma::mat & P, arma::mat & H, double & Exc);
+  
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();
   /// Evaluate overlap matrix numerically in the inuc:th region
@@ -490,6 +521,8 @@ class DFTGrid {
   arma::vec eval_force(int x_func, int c_func, const arma::mat & P);
   /// Evaluate force
   arma::vec eval_force(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb);
+  /// Evaluate NL force
+  arma::vec eval_VV10_force(DFTGrid & nlgrid, double b, double C, const arma::mat & P);
 
   /// Print out density data
   void print_density(const arma::mat & P, std::string densname="density.dat");
