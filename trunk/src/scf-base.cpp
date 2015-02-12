@@ -1606,7 +1606,97 @@ enum pzham parse_pzham(const std::string & pzh) {
   return ham;
 }
 
-void calculate(const BasisSet & basis, Settings & set, bool force) {
+dft_t parse_dft(const Settings & set, bool init) {
+  dft_t dft;
+  dft.gridtol=0.0;
+  dft.nl=false;
+  dft.vv10_b=0.0;
+  dft.vv10_C=0.0;
+  
+  // Use Lobatto quadrature?
+  dft.lobatto=set.get_bool("DFTLobatto");
+
+  // Tolerance
+  std::string tolkw = init ? "DFTInitialTol" : "DFTFinalTol";
+  
+  // Use static grid?
+  if(stricmp(set.get_string("DFTGrid"),"Auto")!=0) {
+    std::vector<std::string> opts=splitline(set.get_string("DFTGrid"));
+    if(opts.size()!=2) {
+      throw std::runtime_error("Invalid DFT grid specified.\n");
+    }
+    
+    dft.adaptive=false;
+    dft.nrad=readint(opts[0]);
+    dft.lmax=readint(opts[1]);
+    if(dft.nrad<1 || dft.lmax==0) {
+      throw std::runtime_error("Invalid DFT radial grid specified.\n");
+    }
+    
+    // Check if l was given in number of points
+    if(dft.lmax<0) {
+      // Try to find corresponding Lebedev grid
+      for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
+	if(lebedev_degrees[i]==-dft.lmax) {
+	  dft.lmax=lebedev_orders[i];
+	  break;
+	}
+      if(dft.lmax<0)
+	throw std::runtime_error("Invalid DFT angular grid specified.\n");
+    }
+    
+  } else {
+    dft.adaptive=true;
+    dft.gridtol=set.get_double(tolkw);
+  }
+  
+  if(set.get_bool("VV10")) {
+      dft.nl=true;
+      
+      if(dft.adaptive)
+	throw std::runtime_error("Adaptive DFT grids not supported with VV10.\n");
+      
+      std::vector<std::string> opts=splitline(set.get_string("NLGrid"));
+      dft.nlnrad=readint(opts[0]);
+      dft.nllmax=readint(opts[1]);
+      if(dft.nlnrad<1 || dft.nllmax==0) {
+	throw std::runtime_error("Invalid DFT radial grid specified.\n");
+      }
+      
+      // Check if l was given in number of points
+      if(dft.nllmax<0) {
+	// Try to find corresponding Lebedev grid
+	for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
+	  if(lebedev_degrees[i]==-dft.nllmax) {
+	    dft.nllmax=lebedev_orders[i];
+	    break;
+	  }
+	if(dft.nllmax<0)
+	  throw std::runtime_error("Invalid DFT angular grid specified.\n");
+      }
+      
+      // Check that xc grid is larger than nl grid
+      if(dft.nrad < dft.nlnrad || dft.lmax < dft.nllmax)
+	throw std::runtime_error("xc grid should be bigger than nl grid!\n");
+      
+      // Read in VV10 parameters
+      std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
+      dft.vv10_b=readdouble(vvopts[0]);
+      dft.vv10_C=readdouble(vvopts[1]);
+      if(dft.vv10_b <= 0.0 || dft.vv10_C <= 0.0) {
+	std::ostringstream oss;
+	oss << "VV10 parameters given b = " << dft.vv10_b << ", C = " << dft.vv10_C << " are not valid.\n";
+	throw std::runtime_error(oss.str());
+      }
+  }
+
+  // Parse functionals
+  parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
+  
+  return dft;
+}
+
+void calculate(const BasisSet & basis, const Settings & set, bool force) {
   // Checkpoint files to load and save
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
@@ -1638,85 +1728,9 @@ void calculate(const BasisSet & basis, Settings & set, bool force) {
 
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
-    dft.gridtol=0.0;
 
-    // Use Lobatto quadrature?
-    dft.lobatto=set.get_bool("DFTLobatto");
-
-    // Use static grid?
-    if(stricmp(set.get_string("DFTGrid"),"Auto")!=0) {
-      std::vector<std::string> opts=splitline(set.get_string("DFTGrid"));
-      if(opts.size()!=2) {
-	throw std::runtime_error("Invalid DFT grid specified.\n");
-      }
-
-      dft.adaptive=false;
-      dft.nrad=readint(opts[0]);
-      dft.lmax=readint(opts[1]);
-      if(dft.nrad<1 || dft.lmax==0) {
-	throw std::runtime_error("Invalid DFT radial grid specified.\n");
-      }
-
-      // Check if l was given in number of points
-      if(dft.lmax<0) {
-	// Try to find corresponding Lebedev grid
-	for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
-	  if(lebedev_degrees[i]==-dft.lmax) {
-	    dft.lmax=lebedev_orders[i];
-	    break;
-	  }
-	if(dft.lmax<0)
-	  throw std::runtime_error("Invalid DFT angular grid specified.\n");
-      }
-
-    } else {
-      dft.adaptive=true;
-      dft.gridtol=set.get_double("DFTFinalTol");
-    }
-
-    if(set.get_bool("VV10")) {
-      dft.nl=true;
-      
-      if(dft.adaptive)
-	throw std::runtime_error("Adaptive DFT grids not supported with VV10.\n");
-      
-      std::vector<std::string> opts=splitline(set.get_string("NLGrid"));
-      dft.nlnrad=readint(opts[0]);
-      dft.nllmax=readint(opts[1]);
-      if(dft.nlnrad<1 || dft.nllmax==0) {
-	throw std::runtime_error("Invalid DFT radial grid specified.\n");
-      }
-
-      // Check if l was given in number of points
-      if(dft.nllmax<0) {
-	// Try to find corresponding Lebedev grid
-	for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
-	  if(lebedev_degrees[i]==-dft.nllmax) {
-	    dft.nllmax=lebedev_orders[i];
-	    break;
-	  }
-	if(dft.nllmax<0)
-	  throw std::runtime_error("Invalid DFT angular grid specified.\n");
-      }
-
-      // Check that xc grid is larger than nl grid
-      if(dft.nrad < dft.nlnrad || dft.lmax < dft.nllmax)
-	throw std::runtime_error("xc grid should be bigger than nl grid!\n");
-
-      // Read in VV10 parameters
-      std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
-      dft.vv10_b=readdouble(vvopts[0]);
-      dft.vv10_C=readdouble(vvopts[1]);
-      if(dft.vv10_b <= 0.0 || dft.vv10_C <= 0.0) {
-	std::ostringstream oss;
-	oss << "VV10 parameters given b = " << dft.vv10_b << ", C = " << dft.vv10_C << " are not valid.\n";
-	throw std::runtime_error(oss.str());
-      }
-    }     
-    
-    initdft=dft;
-    if(dft.adaptive)
-      initdft.gridtol=set.get_double("DFTInitialTol");
+    initdft=parse_dft(set,true);
+    dft=parse_dft(set,false);
 
     initconv.deltaEmax*=set.get_double("DFTDelta");
     initconv.deltaPmax*=set.get_double("DFTDelta");

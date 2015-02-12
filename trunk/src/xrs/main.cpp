@@ -893,32 +893,9 @@ int main(int argc, char **argv) {
   // Construct basis set
   BasisSet basis=construct_basis(atoms,baslib,set);
 
-  // Get exchange and correlation functionals
-  dft_t dft; // Final tolerance
-  parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
-  dft.gridtol=set.get_double("DFTFinalTol");
-  if(stricmp(set.get_string("DFTGrid"),"Auto")!=0) {
-    std::vector<std::string> opts=splitline(set.get_string("DFTGrid"));
-    if(opts.size()!=2) {
-      throw std::runtime_error("Invalid DFT grid specified.\n");
-    }
-
-    dft.adaptive=false;
-    dft.nrad=readint(opts[0]);
-    dft.lmax=readint(opts[1]);
-    if(dft.nrad<1 || dft.lmax<1) {
-      throw std::runtime_error("Invalid DFT grid specified.\n");
-    }
-    printf("dft.nrad = %i, dft.lmax = %i\n",dft.nrad,dft.lmax);
-
-  } else {
-    dft.adaptive=true;
-    dft.gridtol=set.get_double("DFTFinalTol");
-  }
-
-  dft_t dft_init(dft); // Initial tolerance
-  if(dft.adaptive)
-    dft_init.gridtol=set.get_double("DFTInitialTol");
+  // Get exchange and correlation functionals and grid settings
+  dft_t dft_init(parse_dft(set,true));
+  dft_t dft(parse_dft(set,false));
 
   // Final convergence settings
   convergence_t conv;
