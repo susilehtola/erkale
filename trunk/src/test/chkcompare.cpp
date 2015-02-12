@@ -50,38 +50,6 @@ void check_norm(const BasisSet & bas) {
     }
 }
 
-/// Test checkpoints basis set stuff
-void test_checkpoint_basis(const BasisSet & bas) {
-  // Temporary file name
-  char *tmpfile=tempnam("./",".chk");
-
-  {
-    // Dummy checkpoint
-    Checkpoint chkpt(tmpfile,true);
-    
-    // Write basis
-    chkpt.write(bas);
-
-    // Read basis
-    BasisSet loadbas;
-    chkpt.read(loadbas);
-
-    // Get overlap matrices
-    arma::mat S=bas.overlap();
-    arma::mat Sload=loadbas.overlap();
-
-    double matnorm=rms_norm(S-Sload);
-    if(matnorm>DBL_EPSILON) {
-      printf("Basis set read-write error %e.\n",matnorm);
-      ERROR_INFO();
-      throw std::runtime_error("Error in basis set read/write.\n");
-    }
-  }
-
-  remove(tmpfile);
-  free(tmpfile);
-}
-
 void fix_signs(arma::mat & C, const arma::mat & Cr, const arma::mat & S) {
   for(size_t io=0;io<Cr.n_cols;io++) {
     // Get dot product
@@ -174,9 +142,6 @@ int main(int argc, char ** argv) {
   // Check normalization of basis
   check_norm(bref);
   check_norm(bcur);
-  // and checkpoints
-  test_checkpoint_basis(bref);
-  test_checkpoint_basis(bcur);
 
   // Overlap matrix
   arma::mat S(bcur.overlap());
