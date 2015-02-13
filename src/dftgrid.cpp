@@ -48,6 +48,10 @@
 // Reduced space construction of SIC XC matrices. No BLAS version available, at least for the moment.
 //#define SIC_REDUCED
 
+/// Screen out points with Becke weights smaller than 1e-8 * tol
+/// (Köster et al 2004)
+#define PRUNETHR 1e-8
+
 bool operator<(const dens_list_t &lhs, const dens_list_t & rhs) {
   // Sort in decreasing order
   return lhs.d > rhs.d;
@@ -278,7 +282,7 @@ void AtomGrid::prune_points(double tolv, const radshell_t & rg) {
   // First point on radial shell
   size_t ifirst=rg.ind0;
   // Last point on radial shell
-  size_t ilast=ifirst+rg.np;
+  size_t ilast=ifirst+rg.np-1;
 
   for(size_t i=ilast;(i>=ifirst && i<grid.size());i--)
     if(grid[i].w<tolv)
@@ -3065,7 +3069,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
       // Compute Becke weights for radial shell
       becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(1e-8*tol,ret.sh[ir]);
+      prune_points(PRUNETHR*tol,ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3191,7 +3195,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
       // Compute Becke weights for radial shell
       becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(1e-8*tol,ret.sh[ir]);
+      prune_points(PRUNETHR*tol,ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3317,7 +3321,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::cx_vec & C, siz
       // Compute Becke weights for radial shell
       becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(1e-8*tol,ret.sh[ir]);
+      prune_points(PRUNETHR*tol,ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3435,7 +3439,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
       // Compute Becke weights for radial shell
       becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(1e-8*tol,ret.sh[ir]);
+      prune_points(PRUNETHR*tol,ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3543,7 +3547,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
       // Compute Hirshfeld weights for radial shell
       hirshfeld_weights(hirsh,ret,ir);
       // Prune points with small weight
-      prune_points(1e-8*tol,ret.sh[ir]);
+      prune_points(PRUNETHR*tol,ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3608,7 +3612,7 @@ void AtomGrid::form_grid(const BasisSet & bas, atomgrid_t & g) {
     // Do Becke weights
     becke_weights(bas,g,ir);
     // Prune points with small weight
-    prune_points(1e-8*tol,g.sh[ir]);
+    prune_points(PRUNETHR*tol,g.sh[ir]);
   }
 
   // Store number of points
@@ -3633,7 +3637,7 @@ void AtomGrid::form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g) {
     // Do Becke weights
     hirshfeld_weights(hirsh,g,ir);
     // Prune points with small weight
-    prune_points(1e-8*tol,g.sh[ir]);
+    prune_points(PRUNETHR*tol,g.sh[ir]);
   }
 
   // Store number of points
