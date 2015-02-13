@@ -226,7 +226,7 @@ class AtomGrid {
   arma::vec kappa;
   /// Density threshold
   double VV10_thr;
-  
+
   /// Grid tolerance (for pruning grid)
   double tol;
 
@@ -241,7 +241,7 @@ class AtomGrid {
   arma::cube get_gval(size_t N) const;
   /// Extract laplacian values: N x Ngrid
   arma::mat get_lval(size_t N) const;
-  
+
   /// Extract LDA potential
   arma::rowvec get_vxc(bool spin) const;
   /// Extract density gradient
@@ -252,7 +252,7 @@ class AtomGrid {
   arma::rowvec get_vtau(bool spin) const;
   /// Extract MGGA potential
   arma::rowvec get_vlapl(bool spin) const;
-  
+
   /// Get density data for wanted point
   libxc_dens_t get_dens(size_t idx) const;
   /// Get potential data for wanted point
@@ -314,8 +314,6 @@ class AtomGrid {
 
   /// Prune points with small weight
   void prune_points(double tol, const radshell_t & rg);
-  /// Prune points with small density
-  void prune_VV10();
 
   /// Add radial shell in Lobatto angular scheme, w/o Becke partitioning or pruning
   void add_lobatto_shell(atomgrid_t & g, size_t ir);
@@ -374,6 +372,9 @@ class AtomGrid {
 
   /// Initialize VV10 calculation
   void init_VV10(double b, double C, bool pot);
+  /// Collect VV10 data
+  void collect_VV10(arma::mat & data, std::vector<size_t> & idx, bool nl) const;
+
   /**
    * Evaluates VV10 energy and potential and add to total array
    *
@@ -381,10 +382,10 @@ class AtomGrid {
    * "Nonlocal van der Waals density functional: The simpler the
    * better", J. Chem. Phys. 133, 244103 (2010).
    */
-  void compute_VV10(AtomGrid & nlatom, double C);
-  /// Evaluate VV10 force
-  arma::vec compute_VV10_F(AtomGrid & nlatom);
-  
+  void compute_VV10(const std::vector<arma::mat> & nldata, double C);
+  /// Same thing, but also evaluate the grid contribution to the force
+  arma::vec compute_VV10_F(const std::vector<arma::mat> & nldata, double C, size_t iat);
+
   /// Evaluate atomic contribution to overlap matrix
   void eval_overlap(arma::mat & S) const;
   /// Evaluate diagonal elements of overlap matrix
@@ -493,7 +494,7 @@ class DFTGrid {
   /// Compute Fock matrix, exchange-correlation energy and integrated electron density, unrestricted case
   void eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ha, arma::mat & Hb, double & Exc, double & Nel);
 
-  /** 
+  /**
    * Compute Fock matrix, exchange-correlation energy and integrated
    * electron density, SIC calculation. Note that all orbitals are
    * necessary here.
@@ -502,7 +503,7 @@ class DFTGrid {
 
   /// Compute VV10
   void eval_VV10(DFTGrid & nlgrid, double b, double C, const arma::mat & P, arma::mat & H, double & Exc);
-  
+
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();
   /// Evaluate overlap matrix numerically in the inuc:th region
