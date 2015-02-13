@@ -278,7 +278,7 @@ void AtomGrid::hirshfeld_weights(const Hirshfeld & hirsh, const atomgrid_t & g, 
 
 void AtomGrid::prune_points(double tolv, const radshell_t & rg) {
   // Prune points with small weight.
-
+  
   // First point on radial shell
   size_t ifirst=rg.ind0;
   // Last point on radial shell
@@ -287,21 +287,6 @@ void AtomGrid::prune_points(double tolv, const radshell_t & rg) {
   for(size_t i=ilast;(i>=ifirst && i<grid.size());i--)
     if(grid[i].w<tolv)
       grid.erase(grid.begin()+i);
-}
-
-void AtomGrid::prune_VV10() {
-  if(polarized)
-    throw std::runtime_error("prune_VV10 should be operating on a non-polarized grid!\n");
-  if(!do_grad || do_lapl)
-    throw std::runtime_error("prune_VV10 should be operating with a GGA grid!\n");
-
-  for(size_t i=grid.size()-1;i<grid.size();i--)
-    if(rho[i]<VV10_thr) {
-      // Drop grid[i], rho[i] and sigma[i]
-      grid.erase(grid.begin()+i);
-      rho.erase(rho.begin()+i);
-      sigma.erase(sigma.begin()+i);
-    }
 }
 
 void AtomGrid::free() {
@@ -1015,37 +1000,37 @@ void AtomGrid::init_VV10(double b, double C, bool pot) {
   }
 }
 
-void AtomGrid::compute_VV10(AtomGrid & nl, double C) {
-  if(polarized || nl.polarized) {
+arma::mat VV10_Kernel(const arma::mat & xc, const arma::mat & nl) {
+  // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
+  // Return array contains: nPhi, U, and W
+  arma::mat ret(xc.n_rows,3);
+
+  if(xc.n_cols !=5) {
     ERROR_INFO();
-    throw std::runtime_error("compute_VV10 should be run in non-polarized mode!\n");
+    throw std::runtime_error("xc matrix has the wrong size.\n");
+  }
+  if(nl.n_cols !=7) {
+    ERROR_INFO();
+    throw std::runtime_error("nl matrix has the wrong size.\n");
   }
 
-  Timer t;
-
-  // Calculate integral kernel
+  // Loop
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(size_t i=0;i<grid.size();i++) {
-    // Skip points with small density (nl grid is already pruned)
-    if(rho[i] < VV10_thr)
-      continue;
-
-    // integral \int d3r' n(r') Phi(r,r')
-    double nPhi=0.0;
-    // integral U = - \int d3r' n(r') Phi(r,r') ( 1/g(r) + 1/[g(r)+g(r')] )
-    double U=0.0;
-    // integral W = - \int d3r' n(r') |r-r'|^2 Phi(r,r') ( 1/g(r) + 1/[g(r)+g(r')] )
-    double W=0.0;
-
-    for(size_t j=0;j<nl.grid.size();j++) {
+  for(size_t i=0;i<xc.n_rows;i++) {
+    double nPhi=0.0, U=0.0, W=0.0;
+    
+    for(size_t j=0;j<nl.n_rows;j++) {
       // Distance between the grid points
-      double Rsq=normsq(grid[i].r - nl.grid[j].r);
-
+      double dx=xc(i,0)-nl(j,0);
+      double dy=xc(i,1)-nl(j,1);
+      double dz=xc(i,2)-nl(j,2);
+      double Rsq=dx*dx + dy*dy + dz*dz;
+      
       // g factors
-      double gi=   omega0(i)*Rsq +    kappa(i);
-      double gj=nl.omega0(j)*Rsq + nl.kappa(j);
+      double gi=xc(i,3)*Rsq + xc(i,4);
+      double gj=nl(j,3)*Rsq + nl(j,4);
       // Sum of the factors
       double gs=gi+gj;
       // Reciprocal sum
@@ -1054,8 +1039,8 @@ void AtomGrid::compute_VV10(AtomGrid & nl, double C) {
       // Integral kernel
       double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
       // Absorb grid point weight and density into kernel
-      Phi *= nl.grid[j].w * nl.rho[j];
-
+      Phi *= nl(j,5) * nl(j,6);
+      
       // Increment nPhi
       nPhi += Phi;
       // Increment U
@@ -1064,8 +1049,152 @@ void AtomGrid::compute_VV10(AtomGrid & nl, double C) {
       W    -= Phi * rgis * Rsq;
     }
 
+    // Store output
+    ret(i,0)=nPhi;
+    ret(i,1)=U;
+    ret(i,2)=W;
+  }
+
+  return ret;
+}
+
+arma::mat VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl) {
+  // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
+  // Return array contains: nPhi, U, W, and fx, fy, fz
+  arma::mat ret(xc.n_rows,6);
+
+  if(xc.n_cols !=5) {
+    ERROR_INFO();
+    throw std::runtime_error("xc matrix has the wrong size.\n");
+  }
+  if(nl.n_cols !=7) {
+    ERROR_INFO();
+    throw std::runtime_error("nl matrix has the wrong size.\n");
+  }
+  
+  // Loop
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<xc.n_rows;i++) {
+    double nPhi=0.0, U=0.0, W=0.0;
+    double fpx=0.0, fpy=0.0, fpz=0.0;    
+
+    for(size_t j=0;j<nl.n_rows;j++) {
+      // Distance between the grid points
+      double dx=xc(i,0)-nl(j,0);
+      double dy=xc(i,1)-nl(j,1);
+      double dz=xc(i,2)-nl(j,2);
+      double Rsq=dx*dx + dy*dy + dz*dz;
+
+      // g factors
+      double gi=xc(i,3)*Rsq + xc(i,4);
+      double gj=nl(j,3)*Rsq + nl(j,4);
+      // Sum of the factors
+      double gs=gi+gj;
+      // Reciprocal sum
+      double rgis=1.0/gi + 1.0/gs;
+
+      // Integral kernel
+      double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
+      // Absorb grid point weight and density into kernel
+      Phi *= nl(j,5) * nl(j,6);
+      
+      // Increment nPhi
+      nPhi += Phi;
+      // Increment U
+      U    -= Phi * rgis;
+      // Increment W
+      W    -= Phi * rgis * Rsq;
+      
+      // Q factor
+      double Q = -2.0 * Phi * (xc(i,3)/gi + nl(j,3)/gj + (xc(i,3)+nl(j,3))/gs );
+      // Increment force
+      fpx += Q * dx;
+      fpy += Q * dy;
+      fpz += Q * dz;
+    }
+
+    // Store output
+    ret(i,0)=nPhi;
+    ret(i,1)=U;
+    ret(i,2)=W;
+    ret(i,3)=fpx;
+    ret(i,4)=fpy;
+    ret(i,5)=fpz;
+  }
+
+  return ret;
+}
+
+void AtomGrid::collect_VV10(arma::mat & data, std::vector<size_t> & idx, bool nl) const {
+  // Create list of points with significant densities
+  idx.clear();
+  for(size_t i=0;i<grid.size();i++)
+    if(rho[i] >= VV10_thr)
+      idx.push_back(i);
+  
+  // Create input datas
+  if(nl)
+    data.zeros(idx.size(),7);
+  else
+    data.zeros(idx.size(),5);
+
+  for(size_t ii=0;ii<idx.size();ii++) {
+    size_t i=idx[ii];
+    data(ii,0)=grid[i].r.x;
+    data(ii,1)=grid[i].r.y;
+    data(ii,2)=grid[i].r.z;
+    data(ii,3)=omega0(i);
+    data(ii,4)=kappa(i);
+  }
+  if(nl) {
+    for(size_t ii=0;ii<idx.size();ii++) {
+      size_t i=idx[ii];
+      data(ii,5)=grid[i].w;
+      data(ii,6)=rho[i];
+    }
+  }
+}
+
+void AtomGrid::compute_VV10(const std::vector<arma::mat> & nldata, double C) {
+  if(polarized) {
+    ERROR_INFO();
+    throw std::runtime_error("compute_VV10 should be run in non-polarized mode!\n");
+  }
+  
+  Timer t;
+
+  // Create list of points with significant densities and input data
+  std::vector<size_t> idx;
+  arma::mat xc;
+  collect_VV10(xc, idx, false);
+
+  // Calculate integral kernel
+  arma::mat res(xc.n_rows,3);
+  res.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<nldata.size();i++) {
+    arma::mat k(VV10_Kernel(xc,nldata[i]));
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    res+=k;
+  }
+  
+  // Collect data
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t ii=0;ii<idx.size();ii++) {
+    // Index of grid point is
+    size_t i=idx[ii];
+    
     // Increment the energy density
-    exc[i] += 0.5 * nPhi;
+    exc[i] += 0.5 * res(ii,0);
 
     // Increment LDA and GGA parts of potential.
     double ri=rho[i];
@@ -1075,71 +1204,78 @@ void AtomGrid::compute_VV10(AtomGrid & nl, double C) {
     double dkdn  = kappa(i)/(6.0*ri); // d kappa / d n
     double dw0ds = C*si / ( w0 * ri4); // d omega0 / d sigma
     double dw0dn = 2.0/w0 * ( M_PI/3.0 - C*si*si / (ri*ri4)); // d omega0 / d n
-    vxc[i] += nPhi + ri *( dkdn * U + dw0dn * W);
-    vsigma[i] += ri * dw0ds * W;
+    vxc[i] += res(ii,0) + ri *( dkdn * res(ii,1) + dw0dn * res(ii,2));
+    vsigma[i] += ri * dw0ds * res(ii,2);
   }
 }
 
-arma::vec AtomGrid::compute_VV10_F(AtomGrid & nl) {
-  if(polarized || nl.polarized) {
+arma::vec AtomGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, double C, size_t iat) {
+  if(polarized) {
     ERROR_INFO();
-    throw std::runtime_error("compute_VV10 should be run in non-polarized mode!\n");
+    throw std::runtime_error("compute_VV10_F should be run in non-polarized mode!\n");
   }
 
-  Timer t;
+  // Create list of points with significant densities and input data
+  std::vector<size_t> idx;
+  arma::mat xc;
+  collect_VV10(xc, idx, false);
+  
+  // Calculate integral kernels
+  std::vector<arma::mat> ress(nldata.size());
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t i=0;i<nldata.size();i++)
+    ress[i]=VV10_Kernel_F(xc,nldata[i]);
 
+  // Evaluate sum
+  arma::mat res(ress[0]);
+  for(size_t i=1;i<nldata.size();i++)
+    res+=ress[i];
+
+  // Collect data
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t ii=0;ii<idx.size();ii++) {
+    // Index of grid point is
+    size_t i=idx[ii];
+    
+    // Increment the energy density
+    exc[i] += 0.5 * res(ii,0);
+    
+    // Increment LDA and GGA parts of potential.
+    double ri=rho[i];
+    double ri4=std::pow(ri,4);
+    double si=sigma[i];
+    double w0=omega0(i);
+    double dkdn  = kappa(i)/(6.0*ri); // d kappa / d n
+    double dw0ds = C*si / ( w0 * ri4); // d omega0 / d sigma
+    double dw0dn = 2.0/w0 * ( M_PI/3.0 - C*si*si / (ri*ri4)); // d omega0 / d n
+    vxc[i] += res(ii,0) + ri *( dkdn * res(ii,1) + dw0dn * res(ii,2));
+    vsigma[i] += ri * dw0ds * res(ii,2);
+  }
+
+  // Evaluate force contribution
   double fx=0.0, fy=0.0, fz=0.0;
-
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:fx,fy,fz)
 #endif
-  for(size_t i=0;i<grid.size();i++) {
-    // Skip points with small density (nl grid is already pruned)
-    if(rho[i] < VV10_thr)
-      continue;
-
-    // Force from point
-    double fpx=0.0, fpy=0.0, fpz=0.0;
-
-    for(size_t j=0;j<nl.grid.size();j++) {
-      // Distance between the grid points
-      double rx, ry, rz;
-      rx=grid[i].r.x - nl.grid[j].r.x;
-      ry=grid[i].r.y - nl.grid[j].r.y;
-      rz=grid[i].r.z - nl.grid[j].r.z;
-      double Rsq=rx*rx + ry*ry + rz*rz;
-
-      // g factors
-      double gi=   omega0(i)*Rsq +    kappa(i);
-      double gj=nl.omega0(j)*Rsq + nl.kappa(j);
-      double gs=gi + gj;
-
-      // Integral kernel
-      double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
-
-      // Q factor
-      double Q = -2.0 * Phi * (omega0(i)/gi + nl.omega0(j)/gj + (omega0(i)+nl.omega0(j))/gs );
-
-      // Force factor
-      double ffac=nl.grid[j].w*nl.rho[j]*Q;
-
-      // Increment force
-      fpx += ffac * rx;
-      fpy += ffac * ry;
-      fpz += ffac * rz;
-    }
-
-    // Increment total force
-    fx += grid[i].w*rho[i]*fpx;
-    fy += grid[i].w*rho[i]*fpy;
-    fz += grid[i].w*rho[i]*fpz;
+  for(size_t ii=0;ii<idx.size();ii++) {
+    // Index of grid point is
+    size_t i=idx[ii];
+    
+    // Increment total force, removing intra-atomic part
+    fx += grid[i].w*rho[i]*(res(ii,3)-ress[iat](ii,3));
+    fy += grid[i].w*rho[i]*(res(ii,4)-ress[iat](ii,4));
+    fz += grid[i].w*rho[i]*(res(ii,5)-ress[iat](ii,5));
   }
-
+  
   arma::vec F(3);
   F(0)=fx;
-  F(0)=fy;
-  F(0)=fz;
-
+  F(1)=fy;
+  F(2)=fz;
+  
   return F;
 }
 
@@ -3597,11 +3733,11 @@ AtomGrid::~AtomGrid() {
 void AtomGrid::form_grid(const BasisSet & bas, atomgrid_t & g) {
   // Clear anything that already exists
   free();
-
+  
   // Check allocation
   if(g.ngrid>grid.capacity())
     grid.reserve(g.ngrid);
-
+  
   // Loop over radial shells
   for(size_t ir=0;ir<g.sh.size();ir++) {
     // Add grid points
@@ -3863,9 +3999,9 @@ void DFTGrid::construct(int nrad, int lmax, int x_func, int c_func) {
 void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool nl) {
   if(verbose) {
     if(nl)
-      printf("Composition of static nrad=%i lmax=%i NL grid:\n",nrad,lmax);
+      printf("Composition of static nrad=%i lmax=%i NL grid pruned by small weight:\n",nrad,lmax);
     else
-      printf("Composition of static nrad=%i lmax=%i XC grid:\n",nrad,lmax);
+      printf("Composition of static nrad=%i lmax=%i XC grid pruned by small weight:\n",nrad,lmax);
     printf("\t%4s  %7s  %10s\n","atom","Npoints","Nfuncs");
     fflush(stdout);
   }
@@ -4856,22 +4992,59 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
 #endif
 }
 
-void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, arma::mat & H, double & Enl) {
-  // Clear correlation energy
-  Enl=0.0;
+void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, arma::mat & H, double & Enl_) {
+  // Reset energy
+  double Enl=0.0;
 
   // Original gradient and laplacian settings
   bool grad, lapl;
-  wrk[0].get_grad_lapl(grad,lapl);
+  wrk[0].get_grad_lapl(grad,lapl);  
 
-  // nl atom worker
-  AtomGrid nlatom(use_lobatto);
-  // Need gradient but no laplacian
-  nlatom.set_grad_lapl(true,false);
+  // Collect nl grid data
+  std::vector<arma::mat> nldata(nl.grids.size());
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifndef _OPENMP
+    const int ith=0;
+#else
+    // Current thread is
+    const int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<nl.grids.size();i++) {
+      // Need gradient but no laplacian
+      wrk[ith].set_grad_lapl(true,false);
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,nl.grids[i]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,nl.grids[i]);
+    
+      // Update density
+      wrk[ith].update_density(P);
+      // Calculate kappa and omega
+      wrk[ith].init_VV10(b,C,false);
 
-  const static int ith=0;
+      // Collect the data
+      std::vector<size_t> idx;
+      wrk[ith].collect_VV10(nldata[i],idx,true);
 
-  // Loop over atoms
+      wrk[ith].free();
+    }
+  } // End parallel region
+
+  if(verbose) {
+    size_t n=0;
+    for(size_t i=0;i<nldata.size();i++)
+      n+=nldata[i].n_rows;
+        
+    printf("%i points ... ",(int) n);
+    fflush(stdout);
+  }
+  
+  const int ith=0;
+  // Loop over atoms; parallellization is over kernel computation
   for(size_t i=0;i<grids.size();i++) {
     // Need gradient but no laplacian
     wrk[ith].set_grad_lapl(true,false);
@@ -4879,41 +5052,29 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
     wrk[ith].form_grid(*basp,grids[i]);
     // Compute basis functions
     wrk[ith].compute_bf(*basp,grids[i]);
-
+    
     // Update density
     wrk[ith].update_density(P);
     // Initialize the arrays
     wrk[ith].init_xc();
     // Calculate kappa and omega and plug in constant energy density
     wrk[ith].init_VV10(b,C,true);
-    // Grid is not pruned since that would screw up indexing; points
-    // with small densities are just skipped over
-
-    // Loop over nl grids
-    for(size_t j=0;j<nl.grids.size();j++) {
-      // Change atom and create grid
-      nlatom.form_grid(*basp,nl.grids[j]);
-      // Compute basis functions
-      nlatom.compute_bf(*basp,nl.grids[j]);
-      // Update density
-      nlatom.update_density(P);
-      // and prune points with vanishing density
-      nlatom.prune_VV10();
-      // Calculate kappa and omega
-      nlatom.init_VV10(b,C,false);
-      // Do nl integral
-      wrk[ith].compute_VV10(nlatom,C);
-    }
-
+    
+    // Calculate the integral over the nl grid
+    wrk[ith].compute_VV10(nldata,C);
+    
     // Evaluate the energy
     Enl+=wrk[ith].eval_Exc();
     // and construct the Fock matrices
     wrk[ith].eval_Fxc_blas(H);
-
+    
     // Free memory
     wrk[ith].free();
   }
-
+  
+  // Set return variable
+  Enl_=Enl;
+  
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_grad_lapl(grad,lapl);
 }
@@ -4928,10 +5089,10 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
   { // Begin parallel region
 
 #ifndef _OPENMP
-    int ith=0;
+    const int ith=0;
 #else
     // Current thread is
-    int ith=omp_get_thread_num();
+    const int ith=omp_get_thread_num();
 
     // Helper
     arma::vec fwrk(f);
@@ -4986,10 +5147,10 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
   { // Begin parallel region
 
 #ifndef _OPENMP
-    int ith=0;
+    const int ith=0;
 #else
     // Current thread is
-    int ith=omp_get_thread_num();
+    const int ith=omp_get_thread_num();
 
     // Helper
     arma::vec fwrk(f);
@@ -5041,16 +5202,46 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
 
   // Original gradient and laplacian settings
   bool grad, lapl;
-  wrk[0].get_grad_lapl(grad,lapl);
+  wrk[0].get_grad_lapl(grad,lapl);  
 
-  // nl atom worker
-  AtomGrid nlatom(use_lobatto);
-  // Need gradient but no laplacian
-  nlatom.set_grad_lapl(true,false);
+  // Collect nl grid data
+  std::vector<arma::mat> nldata(nl.grids.size());
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifndef _OPENMP
+    const int ith=0;
+#else
+    // Current thread is
+    const int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<nl.grids.size();i++) {
+      // Need gradient but no laplacian
+      wrk[ith].set_grad_lapl(true,false);
+      // Change atom and create grid
+      wrk[ith].form_grid(*basp,nl.grids[i]);
+      // Compute basis functions
+      wrk[ith].compute_bf(*basp,nl.grids[i]);
+    
+      // Update density
+      wrk[ith].update_density(P);
+      // Calculate kappa and omega
+      wrk[ith].init_VV10(b,C,false);
 
-  const static int ith=0;
+      // Collect the data
+      std::vector<size_t> idx;
+      wrk[ith].collect_VV10(nldata[i],idx,true);
 
-  // Loop over atoms
+      // Free memory
+      wrk[ith].free();
+
+    } // End nl grid loop
+  } // End parallel region
+  
+  const int ith=0;
+  // Loop over atoms; parallellization is over kernel computation
   for(size_t i=0;i<grids.size();i++) {
     // Need gradient but no laplacian
     wrk[ith].set_grad_lapl(true,false);
@@ -5058,7 +5249,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
     wrk[ith].form_grid(*basp,grids[i]);
     // Compute basis functions
     wrk[ith].compute_bf(*basp,grids[i]);
-
+    
     // Update density
     Timer tp;
     wrk[ith].update_density(P);
@@ -5066,55 +5257,19 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
     wrk[ith].init_xc();
     // Calculate kappa and omega and plug in constant energy density
     wrk[ith].init_VV10(b,C,true);
-    // Grid is not pruned since that would screw up indexing; points
-    // with small densities are just skipped over
-
-    // Loop over nl grids
-    for(size_t j=0;j<nl.grids.size();j++) {
-      // Change atom and create grid
-      nlatom.form_grid(*basp,nl.grids[j]);
-      // Compute basis functions
-      nlatom.compute_bf(*basp,nl.grids[j]);
-      // Update density
-      nlatom.update_density(P);
-      // and prune points with vanishing density
-      nlatom.prune_VV10();
-      // Calculate kappa and omega
-      nlatom.init_VV10(b,C,false);
-      // Do nl integral
-      wrk[ith].compute_VV10(nlatom,C);
-    }
-
-    // Evaluate the forces on the atoms
+    
+    // Evaluate the VV10 energy and potential and get the grid contribution
+    f.subvec(3*i,3*i+2)+=wrk[ith].compute_VV10_F(nldata,C,i);
+    // and now evaluate the forces on the atoms
     f+=wrk[ith].eval_force(*basp,P);
-
-    // Evaluate second contribution
-    for(size_t j=0;j<nl.grids.size();j++) {
-      if(j==i)
-	// Both grids move similarly so no contribution
-	continue;
-
-      // Change atom and create grid
-      nlatom.form_grid(*basp,nl.grids[j]);
-      // Compute basis functions
-      nlatom.compute_bf(*basp,nl.grids[j]);
-      // Update density
-      nlatom.update_density(P);
-      // and prune points with vanishing density
-      nlatom.prune_VV10();
-      // Calculate kappa and omega
-      nlatom.init_VV10(b,C,false);
-      // Do nl integral
-      f.subvec(3*i,3*i+2)+=wrk[ith].compute_VV10_F(nlatom);
-    }
-
+    
     // Free memory
     wrk[ith].free();
   }
 
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_grad_lapl(grad,lapl);
-
+  
   return f;
 }
 
@@ -5137,10 +5292,10 @@ void DFTGrid::print_density(const arma::mat & P, std::string densname) {
 
 #ifdef _OPENMP
     // Current thread is
-    int ith=omp_get_thread_num();
+    const int ith=omp_get_thread_num();
 #pragma omp for schedule(dynamic,1)
 #else
-    int ith=0;
+    const int ith=0;
 #endif
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
@@ -5190,10 +5345,10 @@ void DFTGrid::print_potential(int func_id, const arma::mat & Pa, const arma::mat
 
 #ifdef _OPENMP
     // Current thread is
-    int ith=omp_get_thread_num();
+    const int ith=omp_get_thread_num();
 #pragma omp for schedule(dynamic,1)
 #else
-    int ith=0;
+    const int ith=0;
 #endif
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
