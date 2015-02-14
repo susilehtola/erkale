@@ -1174,14 +1174,8 @@ void AtomGrid::compute_VV10(const std::vector<arma::mat> & nldata, double C) {
   arma::mat res(xc.n_rows,3);
   res.zeros();
 
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
   for(size_t i=0;i<nldata.size();i++) {
     arma::mat k(VV10_Kernel(xc,nldata[i]));
-#ifdef _OPENMP
-#pragma omp critical
-#endif
     res+=k;
   }
   
