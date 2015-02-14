@@ -226,6 +226,8 @@ class AtomGrid {
   arma::vec kappa;
   /// Density threshold
   double VV10_thr;
+  /// VV10 helper array
+  arma::mat VV10_arr;
 
   /// Grid tolerance (for pruning grid)
   double tol;

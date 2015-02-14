@@ -311,6 +311,9 @@ void AtomGrid::free() {
   vlapl.clear();
   tau.clear();
   vtau.clear();
+
+  // Free VV10 stuff
+  VV10_arr.clear();
 }
 
 void AtomGrid::update_density(const arma::mat & P) {
@@ -1000,10 +1003,9 @@ void AtomGrid::init_VV10(double b, double C, bool pot) {
   }
 }
 
-arma::mat VV10_Kernel(const arma::mat & xc, const arma::mat & nl) {
+void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
   // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
   // Return array contains: nPhi, U, and W
-  arma::mat ret(xc.n_rows,3);
 
   if(xc.n_cols !=5) {
     ERROR_INFO();
@@ -1012,6 +1014,9 @@ arma::mat VV10_Kernel(const arma::mat & xc, const arma::mat & nl) {
   if(nl.n_cols !=7) {
     ERROR_INFO();
     throw std::runtime_error("nl matrix has the wrong size.\n");
+  }
+  if(ret.n_rows != xc.n_rows || ret.n_cols != 3) {
+    throw std::runtime_error("Error - invalid size output array!\n");
   }
 
   // Loop
@@ -1054,14 +1059,11 @@ arma::mat VV10_Kernel(const arma::mat & xc, const arma::mat & nl) {
     ret(i,1)=U;
     ret(i,2)=W;
   }
-
-  return ret;
 }
 
-arma::mat VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl) {
+void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
   // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
   // Return array contains: nPhi, U, W, and fx, fy, fz
-  arma::mat ret(xc.n_rows,6);
 
   if(xc.n_cols !=5) {
     ERROR_INFO();
@@ -1070,6 +1072,9 @@ arma::mat VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl) {
   if(nl.n_cols !=7) {
     ERROR_INFO();
     throw std::runtime_error("nl matrix has the wrong size.\n");
+  }
+  if(ret.n_rows != xc.n_rows || ret.n_cols != 6) {
+    throw std::runtime_error("Error - invalid size output array!\n");
   }
   
   // Loop
@@ -1123,8 +1128,6 @@ arma::mat VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl) {
     ret(i,4)=fpy;
     ret(i,5)=fpz;
   }
-
-  return ret;
 }
 
 void AtomGrid::collect_VV10(arma::mat & data, std::vector<size_t> & idx, bool nl) const {
@@ -1171,13 +1174,9 @@ void AtomGrid::compute_VV10(const std::vector<arma::mat> & nldata, double C) {
   collect_VV10(xc, idx, false);
 
   // Calculate integral kernel
-  arma::mat res(xc.n_rows,3);
-  res.zeros();
-
-  for(size_t i=0;i<nldata.size();i++) {
-    arma::mat k(VV10_Kernel(xc,nldata[i]));
-    res+=k;
-  }
+  VV10_arr.zeros(xc.n_rows,3);
+  for(size_t i=0;i<nldata.size();i++)
+    VV10_Kernel(xc,nldata[i],VV10_arr);
   
   // Collect data
 #ifdef _OPENMP
@@ -1188,7 +1187,7 @@ void AtomGrid::compute_VV10(const std::vector<arma::mat> & nldata, double C) {
     size_t i=idx[ii];
     
     // Increment the energy density
-    exc[i] += 0.5 * res(ii,0);
+    exc[i] += 0.5 * VV10_arr(ii,0);
 
     // Increment LDA and GGA parts of potential.
     double ri=rho[i];
@@ -1198,8 +1197,8 @@ void AtomGrid::compute_VV10(const std::vector<arma::mat> & nldata, double C) {
     double dkdn  = kappa(i)/(6.0*ri); // d kappa / d n
     double dw0ds = C*si / ( w0 * ri4); // d omega0 / d sigma
     double dw0dn = 2.0/w0 * ( M_PI/3.0 - C*si*si / (ri*ri4)); // d omega0 / d n
-    vxc[i] += res(ii,0) + ri *( dkdn * res(ii,1) + dw0dn * res(ii,2));
-    vsigma[i] += ri * dw0ds * res(ii,2);
+    vxc[i] += VV10_arr(ii,0) + ri *( dkdn * VV10_arr(ii,1) + dw0dn * VV10_arr(ii,2));
+    vsigma[i] += ri * dw0ds * VV10_arr(ii,2);
   }
 }
 
@@ -1215,19 +1214,23 @@ arma::vec AtomGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, double
   collect_VV10(xc, idx, false);
   
   // Calculate integral kernels
-  std::vector<arma::mat> ress(nldata.size());
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+  VV10_arr.zeros(xc.n_rows,6);
   for(size_t i=0;i<nldata.size();i++)
-    ress[i]=VV10_Kernel_F(xc,nldata[i]);
+    if(i==iat) {
+      // No Q contribution!
+      //VV10_Kernel(xc,nldata[i],VV10_arr.cols(0,2));
 
-  // Evaluate sum
-  arma::mat res(ress[0]);
-  for(size_t i=1;i<nldata.size();i++)
-    res+=ress[i];
+      arma::mat Kat(xc.n_rows,3);
+      Kat.zeros();
+      VV10_Kernel(xc,nldata[i],Kat);
+      VV10_arr.cols(0,2)+=Kat;
+    } else
+      // Full contribution
+      VV10_Kernel_F(xc,nldata[i],VV10_arr);
 
-  // Collect data
+  // Evaluate force contribution
+  double fx=0.0, fy=0.0, fz=0.0;
+  
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -1236,7 +1239,7 @@ arma::vec AtomGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, double
     size_t i=idx[ii];
     
     // Increment the energy density
-    exc[i] += 0.5 * res(ii,0);
+    exc[i] += 0.5 * VV10_arr(ii,0);
     
     // Increment LDA and GGA parts of potential.
     double ri=rho[i];
@@ -1246,23 +1249,13 @@ arma::vec AtomGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, double
     double dkdn  = kappa(i)/(6.0*ri); // d kappa / d n
     double dw0ds = C*si / ( w0 * ri4); // d omega0 / d sigma
     double dw0dn = 2.0/w0 * ( M_PI/3.0 - C*si*si / (ri*ri4)); // d omega0 / d n
-    vxc[i] += res(ii,0) + ri *( dkdn * res(ii,1) + dw0dn * res(ii,2));
-    vsigma[i] += ri * dw0ds * res(ii,2);
-  }
+    vxc[i] += VV10_arr(ii,0) + ri *( dkdn * VV10_arr(ii,1) + dw0dn * VV10_arr(ii,2));
+    vsigma[i] += ri * dw0ds * VV10_arr(ii,2);
 
-  // Evaluate force contribution
-  double fx=0.0, fy=0.0, fz=0.0;
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:fx,fy,fz)
-#endif
-  for(size_t ii=0;ii<idx.size();ii++) {
-    // Index of grid point is
-    size_t i=idx[ii];
-    
-    // Increment total force, removing intra-atomic part
-    fx += grid[i].w*rho[i]*(res(ii,3)-ress[iat](ii,3));
-    fy += grid[i].w*rho[i]*(res(ii,4)-ress[iat](ii,4));
-    fz += grid[i].w*rho[i]*(res(ii,5)-ress[iat](ii,5));
+    // Increment total force
+    fx += grid[i].w*rho[i]*VV10_arr(ii,3);
+    fy += grid[i].w*rho[i]*VV10_arr(ii,4);
+    fz += grid[i].w*rho[i]*VV10_arr(ii,5);
   }
   
   arma::vec F(3);
