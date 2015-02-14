@@ -197,29 +197,31 @@ double readdouble(std::string num) {
   return no;
 }
 
-void print_E(const arma::vec & E, const std::vector<double> & occ) {
+void print_E(const arma::vec & E, const std::vector<double> & occ, bool all) {
   // Print first N elements of E
 
   // Print nelem entries per line
   size_t nelem=5;
   // Total amount of lines to print. Always print one additional line
   // of energies.
-  size_t Ntot=(size_t) ceil(occ.size()*1.0/nelem+1)*nelem;
-
-  // Skip additional line at the end?
-  bool skipline=0;
-
+  size_t Ntot=all ? E.n_elem : (size_t) ceil(occ.size()*1.0/nelem+1)*nelem;
+  
   // Safety check:
-  if(E.n_elem<Ntot) {
+  if(E.n_elem<Ntot){
     Ntot=E.n_elem;
-    if(E.n_elem%nelem!=0)
-      skipline=1;
   }
 
-  char fmt_occ[] ="% 13.6f*";
-  char fmt_half[] ="% 13.6fo";
-  char fmt_virt[]="% 13.6f ";
+  // Skip additional line at the end?
+  bool skipline= Ntot%nelem ? true : false;
 
+  // Printout format
+  char fmt_occ[] ="% 13.4f*";
+  char fmt_half[]="% 13.4fo";
+  char fmt_virt[]="% 13.4f ";
+  // Energy cutoff, determined from above
+  double cutoff=1e7;
+  char fmt_cut[]="************* ";
+  
   // Compute gap. Find HOMO and LUMO
   if(occ.size()) {
     size_t homo, lumo;
@@ -247,20 +249,26 @@ void print_E(const arma::vec & E, const std::vector<double> & occ) {
     }
   }
 
-  printf("Energies of lowest lying states:\n");
+  if(all)
+    printf("Orbital energies:\n");
+  else
+    printf("Energies of lowest lying orbitals:\n");
 
   // Loop over states
   for(size_t i=0;i<Ntot;i++) {
     // Is state occupied?
-    if(i<occ.size() && occ[i]>=1.0)
+    if(E(i)>=cutoff)
+      printf(fmt_cut);
+    else if(i<occ.size() && occ[i]>=1.0)
       printf(fmt_occ,E(i));
     else if(i<occ.size() && occ[i]==0.5)
       printf(fmt_half,E(i));
     else
       printf(fmt_virt,E(i));
     // Return line if necessary
-    if(i%nelem==nelem-1)
+    if(i%nelem==nelem-1) {
       printf("\n");
+    }
   }
   if(skipline)
     printf("\n");
