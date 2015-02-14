@@ -1228,6 +1228,12 @@ void PZSIC::setW(const arma::cx_mat & Wv) {
 }
 
 double PZSIC::cost_func(const arma::cx_mat & Wv) {
+  // Just do the derivative, too, since we need it anyhow to calculate kappa.
+  double fv;
+  arma::cx_mat der;
+  cost_func_der(Wv,fv,der);
+  return fv;
+    
   // Evaluate SI energy.
   if(Wv.n_rows != Wv.n_cols) {
     ERROR_INFO();
