@@ -563,7 +563,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
       printf("\n");
       fflush(stdout);
 
-      fprintf(stderr,"%-64s %10.3f\n","    SIC-DFT grid formation",tgrid.get());
+      fprintf(stderr,"%-65s %10.3f\n","    SIC-DFT grid formation",tgrid.get());
       fflush(stderr);
     }
   } else { // if(dft.adaptive)
@@ -798,7 +798,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
       printf("\n");
       fflush(stdout);
 
-      fprintf(stderr,"%-64s %10.3f\n","    SIC-DFT grid formation",tgrid.get());
+      fprintf(stderr,"%-65s %10.3f\n","    SIC-DFT grid formation",tgrid.get());
       fflush(stderr);
     }
   } else { // if(dft.adaptive)

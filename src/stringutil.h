@@ -60,7 +60,7 @@ int readint(std::string num);
 double readdouble(std::string num);
 
 /// Print the energies wrt occupancies
-void print_E(const arma::vec & E, const std::vector<double> & occ);
+void print_E(const arma::vec & E, const std::vector<double> & occ, bool all=false);
 
 /// Convert memory requirement to readable text
 std::string memory_size(size_t size);

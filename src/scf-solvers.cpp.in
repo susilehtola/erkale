@@ -158,7 +158,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
   // Dipole moment
   arma::vec dipmom;
-  double olddip;
 
   // Tolerance for screening and screening efficiency
   double tol;
@@ -199,46 +198,15 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   // Print orbital energies
   if(verbose) {
 #ifdef RESTRICTED
-    print_E(sol.E,occs);
+    print_E(sol.E,occs,false);
 #else
     printf("alpha: ");
-    print_E(sol.Ea,occa);
+    print_E(sol.Ea,occa,false);
     printf("beta:  ");
-    print_E(sol.Eb,occb);
+    print_E(sol.Eb,occb,false);
 #endif
     fflush(stdout);
   }
-
-  /*
-  // Print occupancies
-  if(verbose) {
-#ifdef RESTRICTED
-    printf("\nOrbital occupancies:\n");
-    for(size_t i=0;i<occs.size();i++) {
-      printf("%.3f ",occs[i]);
-      if((i+1)%12==0 && i!=occs.size()-1)
-	printf("\n");
-    }
-    printf("\n");
-#else
-    printf("\nAlpha orbital occupancies:\n");
-    for(size_t i=0;i<occa.size();i++) {
-      printf("%.3f ",occa[i]);
-      if((i+1)%12==0 && i!=occa.size()-1)
-	printf("\n");
-    }
-    printf("\n");
-    printf("Beta orbital occupancies:\n");
-    for(size_t i=0;i<occb.size();i++) {
-      printf("%.3f ",occb[i]);
-      if((i+1)%12==0 && i!=occb.size()-1)
-	printf("\n");
-    }
-    printf("\n");
-#endif
-    fflush(stdout);
-  }
-  */
 
 #ifdef DFT
   // Range separation constants
@@ -327,7 +295,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #endif
 
 #endif // end DFT clause
-    fprintf(stderr,".\n%4s %16s %10s  %9s  %9s  %8s %10s\n","iter","E","dE","RMS dens","MAX dens","dip mom","titer (s)");
+    fprintf(stderr,".\n%4s %16s %10s  %9s  %9s  %9s %10s\n","iter","E","dE","RMS dens","MAX dens","DIIS err","titer (s)");
   }
   fflush(stdout);
 
@@ -350,7 +318,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
   if(verbose) {
     fflush(stdout);
-    fprintf(stderr,"%-64s %10.3f\n","    DFT grid formation",t.get());
+    fprintf(stderr,"%-65s %10.3f\n","    DFT grid formation",t.get());
   }
 #endif // DFT
 
@@ -798,85 +766,49 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     // Form new density matrix
     form_dens(sol);
 
-#ifdef RESTRICTED
+    // Change-of-density matrices
     arma::mat deltaP=sol.P-oldsol.P;
-#else
-    // Compute change of polarized densities
+#ifndef RESTRICTED
     arma::mat deltaPa=sol.Pa-oldsol.Pa;
     arma::mat deltaPb=sol.Pb-oldsol.Pb;
 #endif
 
     // Compute dipole moment
-    olddip=arma::norm(dipmom,2);
     dipmom=dipole_moment(sol.P,*basisp);
 
     // Compute convergence criteria
-#ifdef RESTRICTED
     maxdiff=max_abs(deltaP/2.0);
     rmsdiff=rms_norm(deltaP/2.0);
-#else
+
+    // Convergence checked against
+    double maxdiff_cvd(maxdiff);
+    double rmsdiff_cvd(maxdiff);
+    
+#ifndef RESTRICTED
     maxdiffa=max_abs(deltaPa);
     maxdiffb=max_abs(deltaPb);
 
     rmsdiffa=rms_norm(deltaPa);
     rmsdiffb=rms_norm(deltaPb);
 
-    maxdiff=std::max(maxdiffa,maxdiffb);
-    rmsdiff=std::max(rmsdiffa,rmsdiffb);
-    //    rmsdiff=sqrt(rmsdiffa*rmsdiffa+rmsdiffb*rmsdiffb)/2.0;
+    maxdiff_cvd=std::max(maxdiffa,maxdiffb);
+    rmsdiff_cvd=std::max(rmsdiffa,rmsdiffb);
 #endif
 
     // Print out status information
     if(verbose) {
-
-#ifdef RESTRICTED
-      print_E(sol.E,occs);
-#else
-      printf("alpha: ");
-      print_E(sol.Ea,occa);
-      printf("beta:  ");
-      print_E(sol.Eb,occb);
+      printf("\n");
+      printf("%-30s: %e\n","DIIS error",diiserr);
+      printf("%-30s: %e\n","Max total density change",maxdiff);
+      printf("%-30s: %e\n","Max rms   density change",rmsdiff);
+#ifndef RESTRICTED
+      printf("%-30s: %e\n","Max total alpha density change",maxdiffa);
+      printf("%-30s: %e\n","Max rms   alpha density change",rmsdiffa);
+      printf("%-30s: %e\n","Max total beta  density change",maxdiffb);
+      printf("%-30s: %e\n","Max rms   beta  density change",rmsdiffb);
 #endif
-
-      printf("\nDipole:\tx\t\ty\t\tz\t\tdipole change\n");
-      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% e\n",dipmom(0),dipmom(1),dipmom(2),arma::norm(dipmom,2)-olddip);
-
-      printf("Energy:\telectronic\ttotal\t\tvirial\t\tenergy change\n");
-      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% g\n",sol.en.Eel,sol.en.E,-sol.en.E/sol.en.Ekin,deltaE);
-
-#ifdef DFT
-      printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tXC\n");
-#else
-      // No correlation in Hartree-Fock!
-      printf("\tkinetic\t\tnuclear\t\tCoulomb\t\tExchange\n");
-#endif
-      printf("\t% 08.8f\t% 08.8f\t% 08.8f\t% 08.8f\n",sol.en.Ekin,sol.en.Enuca,sol.en.Ecoul,sol.en.Exc);
-
-#ifdef DFT
-      if(dft.nl)
-	printf("Non-local correlation energy % 08.8f\n",sol.en.Enl);
-#endif
+      printf("Dipole mu = (% 08.8f, % 08.8f, % 08.8f) D\n",dipmom(0)/AUINDEBYE,dipmom(1)/AUINDEBYE,dipmom(2)/AUINDEBYE);
       
-#ifdef RESTRICTED
-      if(usediis) {
-	printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
-	printf("\t% e\t% e\t% e\n",maxdiff,rmsdiff,diiserr);
-      } else {
-	printf("Errors:\tMax dens\tRMS dens\n");
-	printf("\t% e\t% e\n",maxdiff,rmsdiff);
-      }
-#else
-      if(usediis) {
-	printf("Errors:\tMax dens\tRMS dens\tDIIS\n");
-	printf("alpha\t%e\t%e\t%e\n",maxdiffa,rmsdiffa,diiserr);
-	printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
-      } else {
-	printf("Errors:\tMax dens\tRMS dens\n");
-	printf("alpha\t%e\t%e\n",maxdiffa,rmsdiffa);
-	printf("beta\t%e\t%e\n",maxdiffb,rmsdiffb);
-      }
-#endif
-
       printf("\nIteration took %s.\n",titer.elapsed().c_str());
       fflush(stdout);
     }
@@ -890,20 +822,20 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       else
 	fprintf(stderr," % 10.3e ",deltaE);
 
-      if(rmsdiff<conv.deltaPrms)
-	fprintf(stderr," %9.3e*",rmsdiff);
+      if(rmsdiff_cvd<conv.deltaPrms)
+	fprintf(stderr," %9.3e*",rmsdiff_cvd);
       else
-	fprintf(stderr," %9.3e ",rmsdiff);
+	fprintf(stderr," %9.3e ",rmsdiff_cvd);
 
-      if(maxdiff<conv.deltaPmax)
-	fprintf(stderr," %9.3e*",maxdiff);
+      if(maxdiff_cvd<conv.deltaPmax)
+	fprintf(stderr," %9.3e*",maxdiff_cvd);
       else
-	fprintf(stderr," %9.3e ",maxdiff);
+	fprintf(stderr," %9.3e ",maxdiff_cvd);
 
-      fprintf(stderr," %8.3f %10.3f\n",arma::norm(dipmom,2),titer.get());
+      fprintf(stderr," %9.3e %10.3f\n",diiserr,titer.get());
     }
 
-    if(fabs(deltaE)<conv.deltaEmax && maxdiff<conv.deltaPmax && rmsdiff<conv.deltaPrms) {
+    if(fabs(deltaE)<=conv.deltaEmax && maxdiff_cvd<=conv.deltaPmax && rmsdiff_cvd<=conv.deltaPrms) {
       // Increment amount of converged iterations
       convd++;
 
@@ -983,14 +915,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     iiter++;
   } // End SCF cycle
 
-    // Compute dipole moment
   if(verbose) {
-    arma::vec dp=dipole_moment(sol.P,*basisp);
-    printf("Dipole moment is (%f,%f,%f) D, |mu|=%f D.\n",dp[0]/AUINDEBYE,dp[1]/AUINDEBYE,dp[2]/AUINDEBYE,arma::norm(dp,2)/AUINDEBYE);
-  }
 
-  if(converged) {
-    if(verbose) {
+    if(converged) {
       std::string method=
 #ifdef RESTRICTED
 	"R"
@@ -1005,7 +932,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 	"HF"
 #endif
 	;
-
+      
       printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
       fprintf(stderr,"%s converged in %s.\n",method.c_str(),ttot.elapsed().c_str());
 
@@ -1015,6 +942,40 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       }
     }
 
+    // Print total energy and its components
+    printf("\n");
+    printf("%-21s energy: % .16e\n","Kinetic",sol.en.Ekin);
+    printf("%-21s energy: % .16e\n","Nuclear attraction",sol.en.Enuca);
+    printf("%-21s energy: % .16e\n","Total one-electron",sol.en.Eone);
+    printf("%-21s energy: % .16e\n","Nuclear repulsion",sol.en.Enucr);
+    printf("%-21s energy: % .16e\n","Coulomb",sol.en.Ecoul);
+#ifndef DFT
+    printf("%-21s energy: % .16e\n","Exchange",sol.en.Exc);
+#else
+    printf("%-21s energy: % .16e\n","Exchange-correlation",sol.en.Exc);
+    printf("%-21s energy: % .16e\n","Non-local correlation",sol.en.Enl);
+    if(sol.en.Eeff)
+      printf("%-21s energy: % .16e\n","SIC",sol.en.Eeff);
+#endif
+    printf("-----------------------------------------------------\n");
+    printf("%28s: % .16e\n","Total energy",sol.en.E);
+    printf("%28s: % .16e\n","Virial factor",-sol.en.E/sol.en.Ekin);
+
+    printf("\nDipole mu = (% 08.8f, % 08.8f, % 08.8f) D\n",dipmom(0)/AUINDEBYE,dipmom(1)/AUINDEBYE,dipmom(2)/AUINDEBYE);
+
+    printf("\n");
+    // Print orbital energies
+#ifdef RESTRICTED
+    print_E(sol.E,occs,true);
+#else
+    printf("alpha: ");
+    print_E(sol.Ea,occa,true);
+    printf("beta:  ");
+    print_E(sol.Eb,occb,true);
+#endif
+  }
+  
+  if(converged) {
     if(doforce) {
       arma::vec f;
 #if defined(RESTRICTED) && defined(HF)
