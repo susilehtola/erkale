@@ -52,6 +52,86 @@
 /// (Köster et al 2004)
 #define PRUNETHR 1e-8
 
+
+template<typename T> inline void increment_lda(arma::Mat<T> & H, const arma::rowvec & vxc, const arma::Mat<T> & fval) {
+  if(fval.n_cols != vxc.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+
+  // Form helper matrix
+  arma::Mat<T> fhlp(fval);
+  for(size_t i=0;i<fhlp.n_rows;i++)
+    for(size_t j=0;j<fhlp.n_cols;j++)
+      fhlp(i,j)*=vxc(j);
+  H+=fhlp*arma::trans(fval);
+}
+
+template<typename T> inline void increment_gga(arma::Mat<T> & H, const arma::mat & gr, const arma::Mat<T> & fval, const arma::Cube<T> & gf) {
+  if(gf.n_cols != gr.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+
+  // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
+  //                 (N, Np)    =        (N Np; c)    (Np, 3)
+  arma::Mat<T> gamma(H.n_rows,gr.n_rows);
+  gamma.zeros();
+  for(int ic=0;ic<3;ic++) {
+    // Gradient component
+    arma::Mat<T> gi=gf.slice(ic);
+    // Gradient column
+    arma::rowvec gc=arma::trans(gr.col(ic));
+    // Loop over orbitals
+    for(size_t i=0;i<gi.n_rows;i++)
+      for(size_t j=0;j<gi.n_cols;j++)
+	gi(i,j)=gi(i,j)*gc(j);
+
+    // Increment helper
+    gamma+=gi;
+  }
+
+  // Form Fock matrix
+  H+=gamma*arma::trans(fval) + fval*arma::trans(gamma);
+}
+
+template<typename T> inline void increment_mgga_kin(arma::Mat<T> & H, const arma::rowvec & vtaul, const arma::Cube<T> & gf) {
+  if(gf.n_cols != vtaul.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+
+  arma::mat kin(H.n_rows,vtaul.n_elem);
+  for(int ic=0;ic<3;ic++) {
+    kin.zeros();
+    // Gradient component
+    arma::Mat<T> gi=gf.slice(ic);
+    // Absorb potential
+    for(size_t i=0;i<gi.n_rows;i++)
+      for(size_t j=0;j<gi.n_cols;j++)
+	gi(i,j)=gi(i,j)*vtaul(j);
+
+    // Increment Fock matrix
+    H+=gi*arma::trans(gf.slice(ic));
+  }
+}
+
+template<typename T> inline void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowvec & vl, const arma::Mat<T> & fval, const arma::Mat<T> & fl) {
+  if(fl.n_cols != vl.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+
+  // Compute laplace term.
+  arma::Mat<T> lap(fl);
+  // and absorb the potential
+  for(size_t i=0;i<fl.n_rows;i++)
+    for(size_t j=0;j<fl.n_cols;j++)
+      lap(i,j)=lap(i,j)*vl(j);
+  // Fock matrix contribution is
+  H+=lap*arma::trans(fval) + fval*arma::trans(lap);
+}
+
 bool operator<(const dens_list_t &lhs, const dens_list_t & rhs) {
   // Sort in decreasing order
   return lhs.d > rhs.d;
@@ -1610,6 +1690,15 @@ void AtomGrid::eval_overlap(arma::mat & S) const {
   }
 }
 
+void AtomGrid::eval_overlap_blas(arma::mat & S) const {
+  // Get function values
+  arma::mat fval(get_fval(S.n_rows));
+  // Get weights
+  arma::rowvec w(get_weights());
+  // Increment matrix
+  increment_lda(S,w,fval);
+}
+
 void AtomGrid::eval_diag_overlap(arma::vec & S) const {
   for(size_t ip=0;ip<grid.size();ip++) {
     // Loop over functions on grid point
@@ -1623,85 +1712,6 @@ void AtomGrid::eval_diag_overlap(arma::vec & S) const {
       S(i)+=grid[ip].w*flist[ii].f*flist[ii].f;
     }
   }
-}
-
-template<typename T> inline void increment_lda(arma::Mat<T> & H, const arma::rowvec & vxc, const arma::Mat<T> & fval) {
-  if(fval.n_cols != vxc.n_elem) {
-    ERROR_INFO();
-    throw std::runtime_error("Sizes of matrices doesn't match!\n");
-  }
-
-  // Form helper matrix
-  arma::Mat<T> fhlp(fval);
-  for(size_t i=0;i<fhlp.n_rows;i++)
-    for(size_t j=0;j<fhlp.n_cols;j++)
-      fhlp(i,j)*=vxc(j);
-  H+=fhlp*arma::trans(fval);
-}
-
-template<typename T> inline void increment_gga(arma::Mat<T> & H, const arma::mat & gr, const arma::Mat<T> & fval, const arma::Cube<T> & gf) {
-  if(gf.n_cols != gr.n_rows) {
-    ERROR_INFO();
-    throw std::runtime_error("Sizes of matrices doesn't match!\n");
-  }
-
-  // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
-  //                 (N, Np)    =        (N Np; c)    (Np, 3)
-  arma::Mat<T> gamma(H.n_rows,gr.n_rows);
-  gamma.zeros();
-  for(int ic=0;ic<3;ic++) {
-    // Gradient component
-    arma::Mat<T> gi=gf.slice(ic);
-    // Gradient column
-    arma::rowvec gc=arma::trans(gr.col(ic));
-    // Loop over orbitals
-    for(size_t i=0;i<gi.n_rows;i++)
-      for(size_t j=0;j<gi.n_cols;j++)
-	gi(i,j)=gi(i,j)*gc(j);
-
-    // Increment helper
-    gamma+=gi;
-  }
-
-  // Form Fock matrix
-  H+=gamma*arma::trans(fval) + fval*arma::trans(gamma);
-}
-
-template<typename T> inline void increment_mgga_kin(arma::Mat<T> & H, const arma::rowvec & vtaul, const arma::Cube<T> & gf) {
-  if(gf.n_cols != vtaul.n_elem) {
-    ERROR_INFO();
-    throw std::runtime_error("Sizes of matrices doesn't match!\n");
-  }
-
-  arma::mat kin(H.n_rows,vtaul.n_elem);
-  for(int ic=0;ic<3;ic++) {
-    kin.zeros();
-    // Gradient component
-    arma::Mat<T> gi=gf.slice(ic);
-    // Absorb potential
-    for(size_t i=0;i<gi.n_rows;i++)
-      for(size_t j=0;j<gi.n_cols;j++)
-	gi(i,j)=gi(i,j)*vtaul(j);
-
-    // Increment Fock matrix
-    H+=gi*arma::trans(gf.slice(ic));
-  }
-}
-
-template<typename T> inline void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowvec & vl, const arma::Mat<T> & fval, const arma::Mat<T> & fl) {
-  if(fl.n_cols != vl.n_elem) {
-    ERROR_INFO();
-    throw std::runtime_error("Sizes of matrices doesn't match!\n");
-  }
-
-  // Compute laplace term.
-  arma::Mat<T> lap(fl);
-  // and absorb the potential
-  for(size_t i=0;i<fl.n_rows;i++)
-    for(size_t j=0;j<fl.n_cols;j++)
-      lap(i,j)=lap(i,j)*vl(j);
-  // Fock matrix contribution is
-  H+=lap*arma::trans(fval) + fval*arma::trans(lap);
 }
 
 void AtomGrid::eval_Fxc(arma::mat & H) const {
@@ -4338,7 +4348,8 @@ arma::mat DFTGrid::eval_overlap(size_t inuc) {
   // Compute basis functions
   wrk[ith].compute_bf(*basp,grids[inuc]);
   // Evaluate overlap
-  wrk[ith].eval_overlap(Sat);
+  //  wrk[ith].eval_overlap(Sat);
+  wrk[ith].eval_overlap_blas(Sat);
   // Free memory
   wrk[ith].free();
 
@@ -4375,7 +4386,8 @@ std::vector<arma::mat> DFTGrid::eval_overlaps() {
       // Compute basis functions
       wrk[ith].compute_bf(*basp,grids[inuc]);
       // Evaluate overlap
-      wrk[ith].eval_overlap(Sat[inuc]);
+      // wrk[ith].eval_overlap(Sat[inuc]);
+      wrk[ith].eval_overlap_blas(Sat[inuc]);
       // Free memory
       wrk[ith].free();
     }
@@ -4403,7 +4415,8 @@ arma::mat DFTGrid::eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc) 
   // Compute basis functions
   wrk[ith].compute_bf(*basp,grids[inuc]);
   // Evaluate overlap
-  wrk[ith].eval_overlap(Sat);
+  //wrk[ith].eval_overlap(Sat);
+  wrk[ith].eval_overlap_blas(Sat);
   // Free memory
   wrk[ith].free();
 
@@ -4440,7 +4453,8 @@ std::vector<arma::mat> DFTGrid::eval_hirshfeld_overlaps(const Hirshfeld & hirsh)
       // Compute basis functions
       wrk[ith].compute_bf(*basp,grids[inuc]);
       // Evaluate overlap
-      wrk[ith].eval_overlap(Sat[inuc]);
+      //wrk[ith].eval_overlap(Sat[inuc]);
+      wrk[ith].eval_overlap_blas(Sat[inuc]);
       // Free memory
       wrk[ith].free();
     }

@@ -390,6 +390,8 @@ class AtomGrid {
 
   /// Evaluate atomic contribution to overlap matrix
   void eval_overlap(arma::mat & S) const;
+  /// Evaluate atomic contribution to overlap matrix
+  void eval_overlap_blas(arma::mat & S) const;
   /// Evaluate diagonal elements of overlap matrix
   void eval_diag_overlap(arma::vec & S) const;
 
