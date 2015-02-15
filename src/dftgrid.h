@@ -504,7 +504,7 @@ class DFTGrid {
   void eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arma::cx_mat & W, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
 
   /// Compute VV10
-  void eval_VV10(DFTGrid & nlgrid, double b, double C, const arma::mat & P, arma::mat & H, double & Exc);
+  void eval_VV10(DFTGrid & nlgrid, double b, double C, const arma::mat & P, arma::mat & H, double & Exc, bool fock=true);
 
   /// Evaluate overlap matrix numerically
   arma::mat eval_overlap();

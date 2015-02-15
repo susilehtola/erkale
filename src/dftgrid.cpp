@@ -4979,7 +4979,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
 #endif
 }
 
-void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, arma::mat & H, double & Enl_) {
+void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, arma::mat & H, double & Enl_, bool fock) {
   // Reset energy
   double Enl=0.0;
 
@@ -5053,7 +5053,8 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
     // Evaluate the energy
     Enl+=wrk[ith].eval_Exc();
     // and construct the Fock matrices
-    wrk[ith].eval_Fxc_blas(H);
+    if(fock)
+      wrk[ith].eval_Fxc_blas(H);
     
     // Free memory
     wrk[ith].free();
