@@ -406,7 +406,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   }
 
   if(verbose) {
-    printf(" done (%s)\n",t.elapsed().c_str());
+    printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
   }
 
@@ -414,9 +414,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   if(dft.x_func != 0 || dft.c_func != 0) {
     if(verbose) {
       if(fock)
-	printf("Constructing orbital XC matrices ...");
+	printf("Constructing orbital XC matrices ... ");
       else
-	printf("Computing    orbital XC energies ...");
+	printf("Computing    orbital XC energies ... ");
       fflush(stdout);
     }
     t.set();
@@ -427,43 +427,54 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
     grid.eval_Fxc(dft.x_func,dft.c_func,C,W,XC,Exc,Nelnum,fock);
 
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
+    
     if(dft.nl) {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+      if(verbose) {
+	if(fock)
+	  printf("Constructing orbital non-local correlation matrices ... ");
+	else
+	  printf("Computing    orbital non-local correlation energies ... ");
+	fflush(stdout);
+      }
+      t.set();
+      
+      // Parallellization inside VV10
       for(size_t i=0;i<Ctilde.n_cols;i++) {
-	double Enl;
+	double Enl=0.0;
 	arma::mat P(arma::real(Ctilde.col(i)*arma::trans(Ctilde.col(i))));
-	grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,P,XC[i],Enl);
+	grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,P,XC[i],Enl,fock);
+      }
+      
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	fflush(stdout);
       }
     }
+    
     // Add in the XC part to the energy
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       Eorb[io]+=Exc[io];
     }
-
+    
     // and the Fock matrix
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
 	Forb[io]+=XC[io];
-
-    if(verbose) {
-      printf(" done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
-    }
   }
 }
 
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
+void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, pzmet_t pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
   // Set xc functionals
-  if(pzmet==COUL) {
+  if(!pzmet.X)
     dft.x_func=0;
+  if(!pzmet.C)
     dft.c_func=0;
-  } else if(pzmet==COULX) {
-    dft.c_func=0;
-  } else if(pzmet==COULC) {
-    dft.x_func=0;
-  }
+  if(!pzmet.D)
+    dft.nl=false;
 
   // Count amount of occupied orbitals
   size_t nocc=0;
@@ -535,7 +546,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	}
 
 	// Initialize with Coulomb treatment?
-	if(pzmet!=COUL) {
+	if(pzmet.X || pzmet.C || pzmet.D) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
 	  PZSIC_calculate(sicsol,W,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
@@ -544,7 +555,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
     }
   }
 
-  if(dft.adaptive && pzmet!=COUL) {
+  if(dft.adaptive && (pzmet.X || pzmet.C || pzmet.D)) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
 
@@ -608,16 +619,15 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
   sol.en.E  +=2*sicsol.en.E;
 }
 
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, enum pzmet pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
+void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, pzmet_t pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
   // Set xc functionals
-  if(pzmet==COUL) {
+  // Set xc functionals
+  if(!pzmet.X)
     dft.x_func=0;
+  if(!pzmet.C)
     dft.c_func=0;
-  } else if(pzmet==COULX) {
-    dft.c_func=0;
-  } else if(pzmet==COULC) {
-    dft.x_func=0;
-  }
+  if(!pzmet.D)
+    dft.nl=false;
 
   // Count amount of occupied orbitals
   size_t nocca=0;
@@ -720,7 +730,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	}
 
 	// Initialize with Coulomb treatment?
-	if(pzmet!=COUL) {
+	if(pzmet.X || pzmet.C || pzmet.D) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
 	  PZSIC_calculate(sicsola,Wa,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
@@ -757,7 +767,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	}
 
 	// Initialize with Coulomb treatment?
-	if(pzmet!=COUL) {
+	if(pzmet.X || pzmet.C || pzmet.D) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
 	  PZSIC_calculate(sicsolb,Wb,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
@@ -766,7 +776,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
     }
   }
 
-  if(dft.adaptive && pzmet!=COUL) {
+  if(dft.adaptive && (pzmet.X || pzmet.C || pzmet.D)) {
     // Before proceeding, reform DFT grids so that localized orbitals
     // are properly integrated over.
 
@@ -1571,22 +1581,37 @@ enum pzrun parse_pzrun(const std::string & pzs) {
   return pz;
 }
 
-enum pzmet parse_pzmet(const std::string & pzmod) {
-  enum pzmet mode;
+pzmet_t parse_pzmet(const std::string & pzmod) {
+  pzmet_t mode;
+  mode.X=false;
+  mode.C=false;
+  mode.D=false;
 
-  if(stricmp(pzmod,"Coul")==0)
-    mode=COUL;
-  else if(stricmp(pzmod,"CoulX")==0)
-    mode=COULX;
-  else if(stricmp(pzmod,"CoulC")==0)
-    mode=COULC;
-  else if(stricmp(pzmod,"CoulXC")==0)
-    mode=COULXC;
-  else {
-    ERROR_INFO();
-    throw std::runtime_error("Invalid PZ-SICmode.\n");
-  }
+  for(size_t i=0;i<pzmod.size();i++)
+    switch(pzmod[i]) {
+    case('x'):
+    case('X'):
+      mode.X=true;
+    break;
 
+    case('c'):
+    case('C'):
+      mode.C=true;
+    break;
+
+    case('d'):
+    case('D'):
+      mode.D=true;
+    break;
+
+    case(' '):
+    case('\0'):
+      break;
+    
+    default:
+      throw std::runtime_error("Invalid PZmode\n");
+    }
+  
   return mode;
 }
 
@@ -1927,7 +1952,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// PZ weight
 	double pzcor=set.get_double("PZw");
 	// Run mode
-	enum pzmet pzmet=parse_pzmet(set.get_string("PZmode"));
+	pzmet_t pzmet=parse_pzmet(set.get_string("PZmode"));
 
 	// Localization?
 	bool pzloc=set.get_bool("PZloc");
@@ -1960,8 +1985,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  solver.RDFT(sol,occs,conv,dft);
 
 	  // DFT grid
-	  DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
-	  DFTGrid nlgrid(&basis,verbose,set.get_bool("DFTLobatto"));
+	  DFTGrid grid(&basis,verbose,dft.lobatto);
+	  DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	  if(!dft.adaptive) {
 	    // Fixed size grid
 	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
@@ -2001,8 +2026,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      oldsol=sol;
 
 	      // DFT grid
-	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
-	      DFTGrid nlgrid;
+	      DFTGrid grid(&basis,verbose,dft.lobatto);
+	      DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	      if(dft.nl) {
 		ERROR_INFO();
 		throw std::runtime_error("Should not end up here since adaptive grids are not supported with VV10.\n");
@@ -2060,8 +2085,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      oldsol=sol;
 
 	      // DFT grid
-	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
-	      DFTGrid nlgrid(&basis,verbose,set.get_bool("DFTLobatto"));
+	      DFTGrid grid(&basis,verbose,dft.lobatto);
+	      DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	      if(!dft.adaptive) {
 		// Fixed size grid
 		grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
@@ -2291,7 +2316,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// PZ weight
 	double pzcor=set.get_double("PZw");
 	// Run mode
-	enum pzmet pzmet=parse_pzmet(set.get_string("PZmode"));
+	pzmet_t pzmet=parse_pzmet(set.get_string("PZmode"));
 	// Localization?
 	bool pzloc=set.get_bool("PZloc");
 	// Seed
@@ -2325,8 +2350,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  solver.UDFT(sol,occa,occb,conv,dft);
 
 	  // DFT grid
-	  DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
-	  DFTGrid nlgrid(&basis,verbose,set.get_bool("DFTLobatto"));
+	  DFTGrid grid(&basis,verbose,dft.lobatto);
+	  DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	  if(!dft.adaptive) {
 	    // Fixed size grid
 	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
@@ -2367,8 +2392,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      oldsol=sol;
 
 	      // DFT grid
-	      DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
-	      DFTGrid nlgrid(&basis,verbose,set.get_bool("DFTLobatto"));
+	      DFTGrid grid(&basis,verbose,dft.lobatto);
+	      DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	      if(!dft.adaptive) {
 		// Fixed size grid
 		grid.construct(initdft.nrad,initdft.lmax,initdft.x_func,initdft.c_func);
@@ -2433,8 +2458,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    oldsol=sol;
 
 	    // DFT grid
-	    DFTGrid grid(&basis,verbose,set.get_bool("DFTLobatto"));
-	    DFTGrid nlgrid(&basis,verbose,set.get_bool("DFTLobatto"));
+	    DFTGrid grid(&basis,verbose,dft.lobatto);
+	    DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	    if(!dft.adaptive) {
 	      // Fixed size grid
 	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
