@@ -52,7 +52,7 @@ int UnitaryFunction::getsign() const {
 
 bool UnitaryFunction::converged() {
   /// Dummy default function
-  return true;
+  return false;
 }
 
 std::string UnitaryFunction::legend() const {
