@@ -219,7 +219,7 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & R) const {
 
     // Store result
     K(i,j)=el;
-    K(j,i)=el;
+    K(j,i)=std::conj(el);
   }
 
   return K;
