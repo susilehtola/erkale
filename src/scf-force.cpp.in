@@ -57,8 +57,8 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 
 #ifdef DFT
   // Get range separation info
-  double omega, klong, kshort;
-  range_separation(dft.x_func,omega,klong,kshort);
+  double omega, kfull, kshort;
+  range_separation(dft.x_func,omega,kfull,kshort);
 #endif
 
   arma::vec fcoul;
@@ -67,7 +67,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   fx_long.zeros(fnuc.n_elem);
 
 #ifdef DFT      
-  if(klong==0.0) {
+  if(kfull==0.0) {
       
     if(densityfit) {
       if(kshort!=0.0)
@@ -141,7 +141,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 #ifndef DFT
   arma::vec ffull=ftot+fcoul+fx_long;
 #else
-  arma::vec ffull=ftot+fcoul+fxc + klong*fx_long + kshort*fx_short;
+  arma::vec ffull=ftot+fcoul+fxc + kfull*fx_long + kshort*fx_short;
 #endif
   //    interpret_force(ffull).print("Total");
     

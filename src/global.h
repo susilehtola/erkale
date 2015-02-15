@@ -97,7 +97,9 @@
 // Threshold for linear independence
 #define LINTHRES 1e-5
 
-
+// Shorthands
+#define COMPLEX1 std::complex<double>(1.0,0.0)
+#define COMPLEXI std::complex<double>(0.0,1.0)
 
 // Error info
 #define ERROR_INFO() printf("\nError in function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__)
