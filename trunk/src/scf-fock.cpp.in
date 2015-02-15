@@ -56,7 +56,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   sol.Ka.zeros(Nbf,Nbf);
   sol.Kb.zeros(Nbf,Nbf);
 #endif
-  
+
 #if defined(DFT) && defined(RESTRICTED)
   // Exchange-correlation functional
   sol.XC.zeros(Nbf,Nbf);
@@ -69,21 +69,27 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 #ifdef DFT
   // Range separation constants
-  double omega, klong, kshort;
-  range_separation(dft.x_func,omega,klong,kshort);
+  double omega, kfull, kshort;
+  range_separation(dft.x_func,omega,kfull,kshort);
 #endif
 
   // Range-separated exchange matrices
 #ifdef RESTRICTED
-  arma::mat Klong, Kshort;
-  Klong.zeros(Nbf,Nbf);
+  arma::mat Kfull, Kfull_im, Kshort, Kshort_im;
+  Kfull.zeros(Nbf,Nbf);
+  Kfull_im.zeros(Nbf,Nbf);
   Kshort.zeros(Nbf,Nbf);
+  Kshort_im.zeros(Nbf,Nbf);
 #else
-  arma::mat Kalong, Kblong, Kashort, Kbshort;
-  Kalong.zeros(Nbf,Nbf);
-  Kblong.zeros(Nbf,Nbf);
+  arma::mat Kafull, Kafull_im, Kbfull, Kbfull_im, Kashort, Kashort_im, Kbshort, Kbshort_im;
+  Kafull.zeros(Nbf,Nbf);
+  Kafull_im.zeros(Nbf,Nbf);
+  Kbfull.zeros(Nbf,Nbf);
+  Kbfull_im.zeros(Nbf,Nbf);
   Kashort.zeros(Nbf,Nbf);
+  Kashort_im.zeros(Nbf,Nbf);
   Kbshort.zeros(Nbf,Nbf);
+  Kbshort_im.zeros(Nbf,Nbf);
 #endif
 
   // Form change-of-density matrices
@@ -135,11 +141,11 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
     }
-    fflush(stdout);
 
 #ifdef DFT
-    if(klong!=0.0) {
+    if(kfull!=0.0) {
 #endif
       if(verbose) {
 	printf("Forming density fitted exchange matrix ... ");
@@ -148,16 +154,16 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       }
 
 #ifdef RESTRICTED
-      Klong=dfit.calc_K(sol.C,occs,fitmem);
+      Kfull=dfit.calc_K(sol.C,occs,fitmem);
 #else
-      Kalong=dfit.calc_K(sol.Ca,occa,fitmem);
-      Kblong=dfit.calc_K(sol.Cb,occb,fitmem);
+      Kafull=dfit.calc_K(sol.Ca,occa,fitmem);
+      Kbfull=dfit.calc_K(sol.Cb,occb,fitmem);
 #endif
-      
+
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
+	fflush(stdout);
       }
-      fflush(stdout);
 
 #ifdef DFT
     }
@@ -169,7 +175,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #ifdef RESTRICTED
 
 #ifdef DFT
-      if(klong!=0.0) {
+      if(kfull!=0.0) {
 #endif
 	if(verbose) {
 	  printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
@@ -179,15 +185,15 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 	if(strictint) {
 	  if(!decfock)
-	    scr.calcJK(sol.P,sol.J,Klong,tol,&screeneff);
+	    scr.calcJK(sol.P,sol.J,Kfull,tol,&screeneff);
 	  else {
 	    // Helper matrices
 	    arma::mat Jhlp, Khlp;
 	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	    
+
 	    scr.calcJK(Phlp,Jhlp,Khlp,tol,&screeneff);
 	    sol.J=arma::trans(decconv)*Jhlp*decconv;
-	    Klong=arma::trans(decconv)*Khlp*decconv;
+	    Kfull=arma::trans(decconv)*Khlp*decconv;
 	  }
 
 	} else {
@@ -196,21 +202,21 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  if(!decfock) {
 	    scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
 	    sol.J+=dJ;
-	    Klong=dK;
+	    Kfull=dK;
 	  } else {
 	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-	    
+
 	    scr.calcJK(Phlp,dJ,dK,tol,&screeneff);
 	    sol.J+=arma::trans(decconv)*dJ*decconv;
-	    Klong=arma::trans(decconv)*dK*decconv;
+	    Kfull=arma::trans(decconv)*dK*decconv;
 	  }
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  fflush(stdout);
 	}
-	fflush(stdout);
 
 #ifdef DFT
       } else {
@@ -243,8 +249,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  fflush(stdout);
 	}
-	fflush(stdout);
 
       }
 
@@ -277,8 +283,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  fflush(stdout);
 	}
-	fflush(stdout);
       }
 #endif
 
@@ -286,7 +292,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #else
       // Unrestricted case
 #ifdef DFT
-      if(klong!=0.0) {
+      if(kfull!=0.0) {
 #endif
 	if(verbose) {
 	  printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
@@ -296,16 +302,16 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 	if(strictint) {
 	  if(!decfock)
-	    scr.calcJK(sol.Pa,sol.Pb,sol.J,Kalong,Kblong,tol,&screeneff);
+	    scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,tol,&screeneff);
 	  else {
 	    arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
 	    arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
-	    
+
 	    arma::mat Jhlp, Kahlp, Kbhlp;
 	    scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol,&screeneff);
 	    sol.J=arma::trans(decconv)*Jhlp*decconv;
-	    Kalong=arma::trans(decconv)*Kahlp*decconv;
-	    Kblong=arma::trans(decconv)*Kbhlp*decconv;
+	    Kafull=arma::trans(decconv)*Kahlp*decconv;
+	    Kbfull=arma::trans(decconv)*Kbhlp*decconv;
 	  }
 
 	} else {
@@ -313,25 +319,25 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  arma::mat dJ, dKa, dKb;
 
 	  if(!decfock) {
-	    scr.calcJK(deltaPa,deltaPb,dJ,Kalong,Kblong,tol,&screeneff);
+	    scr.calcJK(deltaPa,deltaPb,dJ,Kafull,Kbfull,tol,&screeneff);
 	    sol.J+=dJ;
 
 	  } else {
 	    arma::mat Pahlp=decconv*deltaPa*arma::trans(decconv);
 	    arma::mat Pbhlp=decconv*deltaPb*arma::trans(decconv);
 	    scr.calcJK(Pahlp,Pbhlp,dJ,dKa,dKb,tol,&screeneff);
-	    
+
 	    sol.J+=arma::trans(decconv)*dJ*decconv;
-	    Kalong=arma::trans(decconv)*dKa*decconv;
-	    Kblong=arma::trans(decconv)*dKb*decconv;
+	    Kafull=arma::trans(decconv)*dKa*decconv;
+	    Kbfull=arma::trans(decconv)*dKb*decconv;
 	  }
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  fflush(stdout);
 	}
-	fflush(stdout);
 
 
 #ifdef DFT
@@ -365,8 +371,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  fflush(stdout);
 	}
-	fflush(stdout);
 
       }
 
@@ -402,13 +408,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	    Kbshort=arma::trans(decconv)*Kbhlp*decconv;
 	  }
 	}
-	
+
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
+	  fflush(stdout);
 	}
-	fflush(stdout);
-	
       }
 #endif
 
@@ -418,60 +423,106 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       // Conventional mode - use tabled integrals
 
       if(verbose) {
-
-#ifdef DFT
-	if(klong==0.0)
-	  printf("Forming HF Coulomb matrix ... ");
-	else
-#endif
-	  printf("Forming HF Coulomb and exchange matrices ... ");
-
+	printf("Forming HF Coulomb matrix ... ");
 	fflush(stdout);
 	t.set();
       }
-      
-      sol.J=tab.calcJ(sol.P);
-      
-#ifdef DFT
-      if(klong!=0.0) {
-#endif
 
-#ifdef RESTRICTED
-	Klong=tab.calcK(sol.P);
-#else
-	Kalong=tab.calcK(sol.Pa);
-	Kblong=tab.calcK(sol.Pb);
-#endif
-	
-#ifdef DFT
-      }
-#endif
-      
+      sol.J=tab.calcJ(sol.P);
+
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
+	fflush(stdout);
       }
-      fflush(stdout);
-      
+
+#ifdef DFT
+      if(kfull!=0.0) {
+#endif
+
+	if(verbose) {
+	  printf("Forming HF exchange matrix ... ");
+	  fflush(stdout);
+	  t.set();
+	}
+
+#ifdef RESTRICTED
+	if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
+	  arma::cx_mat cK(tab.calcK(cP));
+	  Kfull=arma::real(cK);
+	  Kfull_im=arma::imag(cK);
+	} else
+	  Kfull=tab.calcK(sol.P);
+#else
+	if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
+	  arma::cx_mat cKa(tab.calcK(cPa));
+	  Kafull=arma::real(cKa);
+	  Kafull_im=arma::imag(cKa);
+	} else
+	  Kafull=tab.calcK(sol.Pa);
+	
+	if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
+	  arma::cx_mat cKb(tab.calcK(cPb));
+	  Kbfull=arma::real(cKb);
+	  Kbfull_im=arma::imag(cKb);
+	} else
+	  Kbfull=tab.calcK(sol.Pb);
+#endif
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  fflush(stdout);
+	}
+#ifdef DFT
+      }
+#endif
+
 #ifdef DFT
       if(kshort!=0.0) {
 
 	if(verbose) {
-	  printf("Forming screened HF exchange matrix ... ");
+	  printf("Forming short-range HF exchange matrix ... ");
 	  fflush(stdout);
 	  t.set();
 	}
-	
+
 #ifdef RESTRICTED
-	Kshort=tab_rs.calcK(sol.P);
+	if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
+	  arma::cx_mat cK(tab_rs.calcK(cP));
+	  Kshort=arma::real(cK);
+	  Kshort_im=arma::imag(cK);
+	} else
+	  Kshort=tab_rs.calcK(sol.P);
 #else
-	Kashort=tab_rs.calcK(sol.Pa);
-	Kbshort=tab_rs.calcK(sol.Pb);
-#endif
+	if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
+	  arma::cx_mat cKa(tab_rs.calcK(cPa));
+	  Kashort=arma::real(cKa);
+	  Kashort_im=arma::imag(cKa);
+	} else
+	  Kashort=tab_rs.calcK(sol.Pa);
 	
+	if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
+	  arma::cx_mat cKb(tab_rs.calcK(cPb));
+	  Kbshort=arma::real(cKb);
+	  Kbshort_im=arma::imag(cKb);
+	} else
+	  Kbshort=tab_rs.calcK(sol.Pb);
+#endif
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
+	  fflush(stdout);
 	}
-	fflush(stdout);
       }
 #endif
     }
@@ -481,37 +532,48 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #ifdef DFT
 // Combine short and long range exchanges
 #ifdef RESTRICTED
-  if(strictint || !direct)
-    sol.K=klong*Klong + kshort*Kshort;
-  else
-    sol.K+=klong*Klong + kshort*Kshort;
+  if(strictint || !direct) {
+    sol.K=kfull*Kfull + kshort*Kshort;
+    if(sol.P.n_rows == sol.P_im.n_rows && sol.P.n_cols == sol.P_im.n_cols)
+      sol.K_im=kfull*Kfull_im + kshort*Kshort_im;
+  } else {
+    sol.K+=kfull*Kfull + kshort*Kshort;
+    sol.K_im.clear();
+  }
 #else
   if(strictint || !direct) {
-    sol.Ka=klong*Kalong + kshort*Kashort;
-    sol.Kb=klong*Kblong + kshort*Kbshort;
+    sol.Ka=kfull*Kafull + kshort*Kashort;
+    if(sol.Pa.n_rows == sol.Pa_im.n_rows && sol.Pa.n_cols == sol.Pa_im.n_cols)
+      sol.Ka_im=kfull*Kafull_im + kshort*Kashort_im;
+    
+    sol.Kb=kfull*Kbfull + kshort*Kbshort;
+    if(sol.Pb.n_rows == sol.Pb_im.n_rows && sol.Pb.n_cols == sol.Pb_im.n_cols)
+      sol.Kb_im=kfull*Kbfull_im + kshort*Kbshort_im;
   } else {
-    sol.Ka+=klong*Kalong + kshort*Kashort;
-    sol.Kb+=klong*Kblong + kshort*Kbshort;
+    sol.Ka+=kfull*Kafull + kshort*Kashort;
+    sol.Ka_im.clear();
+    sol.Kb+=kfull*Kbfull + kshort*Kbshort;
+    sol.Kb_im.clear();
   }
 #endif
 #else
   // Hartree-Fock
 #ifdef RESTRICTED
   if(strictint || !direct)
-    sol.K=Klong;
+    sol.K=Kfull;
   else
-    sol.K+=Klong;
+    sol.K+=Kfull;
 #else
   if(strictint || !direct) {
-    sol.Ka=Kalong;
-    sol.Kb=Kblong;
+    sol.Ka=Kafull;
+    sol.Kb=Kbfull;
   } else {
-    sol.Ka+=Kalong;
-    sol.Kb+=Kblong;
+    sol.Ka+=Kafull;
+    sol.Kb+=Kbfull;
   }
 #endif
 #endif
-  
+
 #ifdef DFT
   if(verbose) {
     printf("Computing DFT exchange and correlation ... ");
@@ -555,7 +617,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       fflush(stdout);
       t.set();
     }
-    
+
 #ifdef RESTRICTED
     grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,sol.P,sol.XC,sol.en.Enl);
 #else
@@ -565,7 +627,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.XCa+=XC;
     sol.XCb+=XC;
 #endif
-    
+
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
     }
@@ -580,7 +642,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   else
     sol.H=Hcore+sol.J+sol.XC;
   // Add exact exchange if necessary
-  if(klong!=0.0 || kshort!=0.0) {
+  if(kfull!=0.0 || kshort!=0.0) {
     sol.H-=0.5*sol.K;
     sol.en.Exc-=0.25*arma::trace(sol.P*sol.K);
   }
@@ -604,7 +666,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.Ha=Hcore+sol.J+sol.XCa;
     sol.Hb=Hcore+sol.J+sol.XCb;
   }
-  if(kshort!=0.0 || klong!=0.0) {
+  if(kshort!=0.0 || kfull!=0.0) {
     sol.Ha-=sol.Ka;
     sol.Hb-=sol.Kb;
     sol.en.Exc-=0.5*(arma::trace(sol.Pa*sol.Ka)+arma::trace(sol.Pb*sol.Kb));
@@ -709,7 +771,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.Pb.print("Pb");
     sol.Ha.print("Ha");
     sol.Hb.print("Hb");
-#endif   
+#endif
 
     std::ostringstream oss;
     oss << "\nSomething wrong with total energy " << sol.en.E <<"?\nEnding program.\n";

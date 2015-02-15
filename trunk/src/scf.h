@@ -128,11 +128,15 @@ typedef struct {
   /// Effective potential
   arma::mat Heff;
   arma::mat Heff_im;
+  /// Imaginary exchange
+  arma::mat K_im;
 
   /// Complex orbitals (for SIC)
   arma::cx_mat cC;
-  /// Real-CMO density matrix (for DIIS with SIC)
+  /// Real-CMO density matrix (used for DIIS with SIC)
   arma::mat rP;
+  /// Imaginary part of complex-CMO density matrix (for complex exchange contribution)
+  arma::mat P_im;
 
   /// Energy information
   energy_t en;
@@ -159,12 +163,16 @@ typedef struct {
   // Effective potentials
   arma::mat Heffa, Heffb;
   arma::mat Heffa_im, Heffb_im;
+  /// Imaginary exchange
+  arma::mat Ka_im, Kb_im;
   
   /// Complex orbitals (for SIC)
   arma::cx_mat cCa, cCb;
   /// Real-CMO density matrix (for DIIS with SIC)
   arma::mat rPa, rPb;
-
+  /// Imaginary part of complex-CMO density matrix (for complex exchange contribution)
+  arma::mat Pa_im, Pb_im;
+  
   /// Energy information
   energy_t en;
 } uscf_t;

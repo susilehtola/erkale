@@ -19,9 +19,6 @@
 #include "mathf.h"
 #include <cfloat>
 
-#define UNIT std::complex<double>(1.0,0.0)
-#define IMAG std::complex<double>(0.0,1.0)
-
 UnitaryFunction::UnitaryFunction(int qv, bool max): W(arma::cx_mat()), f(0.0), q(qv) {
   /// Maximize or minimize?
   sign = max ? 1 : -1;
@@ -112,10 +109,10 @@ void UnitaryOptimizer::check_unitary(const arma::cx_mat & W) const {
 
 arma::cx_mat UnitaryOptimizer::get_rotation(double step) const {
   // Rotation matrix is
-  arma::cx_mat rot=Hvec*arma::diagmat(arma::exp(step*IMAG*Hval))*arma::trans(Hvec);
+  arma::cx_mat rot=Hvec*arma::diagmat(arma::exp(step*COMPLEXI*Hval))*arma::trans(Hvec);
   if(real)
     // Zero out possible imaginary part
-    rot=arma::real(rot)*UNIT;
+    rot=arma::real(rot)*COMPLEX1;
   
   return rot;
 }
@@ -144,7 +141,7 @@ void UnitaryOptimizer::update_gradient(const arma::cx_mat & W, UnitaryFunction *
 void UnitaryOptimizer::update_search_direction(int q) {
   // Diagonalize -iH to find eigenvalues purely imaginary
   // eigenvalues iw_i of H; Abrudan 2009 table 3 step 1.
-  bool diagok=arma::eig_sym(Hval,Hvec,-IMAG*H);
+  bool diagok=arma::eig_sym(Hval,Hvec,-COMPLEXI*H);
   if(!diagok) {
     ERROR_INFO();
     throw std::runtime_error("Unitary optimization: error diagonalizing H.\n");
@@ -159,7 +156,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
   // Get the matrix
   arma::cx_mat W=f->getW();
   if(real)
-    W=arma::real(W)*UNIT;
+    W=arma::real(W)*COMPLEX1;
 
   // Current and old gradient
   arma::cx_mat oldG;
@@ -912,7 +909,7 @@ arma::cx_mat companion_matrix(const arma::cx_vec & c) {
 }
 
 arma::cx_vec solve_roots_cplx(const arma::vec & a) {
-  return solve_roots_cplx(a*UNIT);
+  return solve_roots_cplx(a*COMPLEX1);
 }
 
 arma::cx_vec solve_roots_cplx(const arma::cx_vec & a) {
@@ -1088,7 +1085,7 @@ arma::vec fit_polynomial_fdf(const arma::vec & x, const arma::vec & y, const arm
 
 Brockett::Brockett(size_t N, unsigned long int seed) : UnitaryFunction(2, true) {
   // Get random complex matrix
-  sigma=randn_mat(N,N,seed)+IMAG*randn_mat(N,N,seed+1);
+  sigma=randn_mat(N,N,seed)+COMPLEXI*randn_mat(N,N,seed+1);
   // Hermitize it
   sigma=sigma+arma::trans(sigma);
   // Get N matrix

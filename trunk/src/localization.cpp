@@ -34,8 +34,6 @@
 #include "stockholder.h"
 #include "timer.h"
 
-#define COMPLEX1 std::complex<double>(1.0,0.0)
-
 void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double & measure, arma::cx_mat & W, bool verbose, bool real, int maxiter, double Gthr, double Fthr, enum unitmethod umet, enum unitacc uacc, bool delocalize, std::string fname, bool debug) {
   Timer t;
 

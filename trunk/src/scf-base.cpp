@@ -42,9 +42,6 @@ extern "C" {
 #include <gsl/gsl_poly.h>
 }
 
-#define COMPLEX1 std::complex<double>(1.0,0.0)
-#define COMPLEXI std::complex<double>(0.0,1.0)
-
 enum guess_t parse_guess(const std::string & val) {
   if(stricmp(val,"Core")==0)
     return COREGUESS;
@@ -355,11 +352,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   if(fock)
     Forb.resize(W.n_cols);
 
-  // Fraction of exact exchange
-  double kfrac=exact_exchange(dft.x_func);
-  if(is_range_separated(dft.x_func)) {
-    throw std::runtime_error("Range separated functionals not currently supported with PZ-SIC!\n");
-  }
+  // Range separation constants
+  double omega, kfull, kshort;
+  range_separation(dft.x_func,omega,kfull,kshort);
 
   // Optimal orbitals
   arma::cx_mat Ctilde=C.cols(0,W.n_rows-1)*W;
@@ -370,44 +365,118 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
   Timer t;
 
-  if(verbose) {
-    if(fock)
-      printf("Constructing orbital Coulomb matrices ...");
-    else
-      printf("Computing    orbital Coulomb energies ...");
-    fflush(stdout);
-  }
-
   if(densityfit) {
+    if(kfull!=0.0)
+      throw std::runtime_error("PZ-SIC hybrid functionals not supported with density fitting.\n");
+    if(kshort!=0.0)
+      throw std::runtime_error("PZ-SIC range separated functionals not supported with density fitting.\n");
+
+    if(verbose) {
+      if(fock)
+	printf("Constructing orbital Coulomb matrices ...");
+      else
+	printf("Computing    orbital Coulomb energies ...");
+      fflush(stdout);
+      t.set();
+    }
+
     // Coulomb matrices
     std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
     for(size_t io=0;io<Ctilde.n_cols;io++)
-      Eorb[io]=0.5*(1-kfrac)*arma::trace(Porb[io]*Jorb[io]);
+      Eorb[io]=0.5*(1-kfull)*arma::trace(Porb[io]*Jorb[io]);
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
-	Forb[io]=(1-kfrac)*Jorb[io];
+	Forb[io]=(1-kfull)*Jorb[io];
+
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
 
   } else {
     if(!direct) {
       // Tabled integrals
+
+      // Compute range separated integrals if necessary
+      if(is_range_separated(dft.x_func)) {
+	bool fill;
+	if(!tab_rs.get_N()) {
+	  fill=true;
+	} else {
+	  double o, kl, ks;
+	  tab_rs.get_range_separation(o,kl,ks);
+	  fill=(!(o==omega));
+	}
+	if(fill) {
+	  t.set();
+	  if(verbose) {
+	    printf("Computing short-range ERIs ... ");
+	    fflush(stdout);
+	  }
+
+	  tab_rs.set_range_separation(omega,0.0,1.0);
+	  tab_rs.fill(basisp,shpairthr,STRICTTOL,verbose);
+
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    fflush(stdout);
+	  }
+	}
+      }
+
+      if(verbose) {
+	if(fock)
+	  printf("Constructing orbital Coulomb matrices ...");
+	else
+	  printf("Computing    orbital Coulomb energies ...");
+	fflush(stdout);
+	t.set();
+      }
+
       for(size_t io=0;io<Ctilde.n_cols;io++) {
 	// Calculate Coulomb term; exchange coincides with Coulomb
-	arma::mat Jorb=(1-kfrac)*tab.calcJ(Porb[io]);
+	arma::mat Jorb=(1-kfull)*tab.calcJ(Porb[io]);
 	// and Coulomb energy
 	Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
 	if(fock)
 	  Forb[io]=Jorb;
+      }
+
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	fflush(stdout);
+      }
+
+      // Short-range part
+      if(kshort) {
+	if(verbose) {
+	  if(fock)
+	    printf("Constructing orbital short-range exchange matrices ...");
+	  else
+	    printf("Computing    orbital short-range exchange energies ...");
+	  fflush(stdout);
+	  t.set();
+	}
+
+	for(size_t io=0;io<Ctilde.n_cols;io++) {
+	  // Exchange coincides with Coulomb
+	  arma::mat Korb=-kshort*tab_rs.calcJ(Porb[io]);
+	  // and Coulomb energy
+	  Eorb[io]+=0.5*arma::trace(Porb[io]*Korb);
+	  if(fock)
+	    Forb[io]+=Korb;
+	}
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  fflush(stdout);
+	}
       }
     } else {
       // HF coulomb/exchange not implemented
       ERROR_INFO();
       throw std::runtime_error("Direct formation of conventional Coulomb matrices not implemented!\n");
     }
-  }
-
-  if(verbose) {
-    printf("done (%s)\n",t.elapsed().c_str());
-    fflush(stdout);
   }
 
   // Exchange-correlation
@@ -418,8 +487,8 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       else
 	printf("Computing    orbital XC energies ... ");
       fflush(stdout);
+      t.set();
     }
-    t.set();
 
     std::vector<double> Nelnum; // Numerically integrated density
     std::vector<arma::mat> XC; // Exchange-correlation matrices
@@ -431,7 +500,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       printf("done (%s)\n",t.elapsed().c_str());
       fflush(stdout);
     }
-    
+
     if(dft.nl) {
       if(verbose) {
 	if(fock)
@@ -439,27 +508,27 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	else
 	  printf("Computing    orbital non-local correlation energies ... ");
 	fflush(stdout);
+	t.set();
       }
-      t.set();
-      
+
       // Parallellization inside VV10
       for(size_t i=0;i<Ctilde.n_cols;i++) {
 	double Enl=0.0;
 	arma::mat P(arma::real(Ctilde.col(i)*arma::trans(Ctilde.col(i))));
 	grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,P,XC[i],Enl,fock);
       }
-      
+
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
 	fflush(stdout);
       }
     }
-    
+
     // Add in the XC part to the energy
     for(size_t io=0;io<Ctilde.n_cols;io++) {
       Eorb[io]+=Exc[io];
     }
-    
+
     // and the Fock matrix
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
@@ -935,7 +1004,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
   arma::vec Ep;
   // Sort index
   arma::uvec idx;
-  
+
   if(sol.H.n_rows == sol.Heff.n_rows && sol.H.n_cols == sol.Heff.n_cols) {
     // Sort orbitals wrt projected energy
     arma::cx_mat CW=sol.cC.cols(0,W.n_cols-1)*W;
@@ -948,7 +1017,7 @@ void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzco
     // Sort orbitals wrt decreasing SI energy
     idx=arma::stable_sort_index(sol.E,"descend");
   }
-  
+
   sol.E=sol.E(idx);
   W=W.cols(idx);
 
@@ -1081,6 +1150,9 @@ void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, dou
   if(sol.Heff_im.n_rows == sol.H.n_rows && sol.Heff_im.n_cols == sol.H.n_cols) {
     // Generate complex hamiltonian
     arma::cx_mat Hc(sol.H*COMPLEX1 + sol.Heff_im*COMPLEXI);
+    if(sol.K_im.n_rows == sol.H.n_rows && sol.K_im.n_cols == sol.H.n_cols)
+      Hc+=sol.K_im*COMPLEXI;
+
     arma::vec Etmp;
     diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.P/2.0,Hc,shift,sol.cC,Etmp);
   } else {
@@ -1097,6 +1169,9 @@ void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol, dou
   if(sol.Heffa_im.n_rows == sol.Ha.n_rows && sol.Heffa_im.n_cols == sol.Ha.n_cols) {
     // Generate complex hamiltonian
     arma::cx_mat Hc(sol.Ha*COMPLEX1 + sol.Heffa_im*COMPLEXI);
+    if(sol.Ka_im.n_rows == sol.Ha.n_rows && sol.Ka_im.n_cols == sol.Ha.n_cols)
+      Hc+=sol.Ka_im*COMPLEXI;
+
     arma::vec Etmp;
     diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.Pa,Hc,shift,sol.cCa,Etmp);
   } else {
@@ -1109,8 +1184,11 @@ void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol, dou
 
   // Complex orbitals?
   if(sol.Heffb_im.n_rows == sol.Hb.n_rows && sol.Heffb_im.n_cols == sol.Hb.n_cols) {
-    // Generbte complex hamiltonian
+    // Generate complex hamiltonian
     arma::cx_mat Hc(sol.Hb*COMPLEX1 + sol.Heffb_im*COMPLEXI);
+    if(sol.Kb_im.n_rows == sol.Hb.n_rows && sol.Kb_im.n_cols == sol.Hb.n_cols)
+      Hc+=sol.Kb_im*COMPLEXI;
+
     arma::vec Etmp;
     diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.Pb,Hc,shift,sol.cCb,Etmp);
   } else {
@@ -1243,10 +1321,13 @@ void form_density(rscf_t & sol, const arma::vec & occs0) {
 
   if(sol.cC.n_cols == sol.C.n_cols) {
     // Use complex orbitals
-    sol.P=arma::real(sol.cC*arma::diagmat(occs)*arma::trans(sol.cC));
+    arma::cx_mat cP=sol.cC*arma::diagmat(occs)*arma::trans(sol.cC);
+    sol.P=arma::real(cP);
+    sol.P_im=arma::imag(cP);
   } else {
     // Use real orbitals
     sol.P=sol.C*arma::diagmat(occs)*arma::trans(sol.C);
+    sol.P_im.clear();
   }
   sol.rP=sol.C*arma::diagmat(occs)*arma::trans(sol.C);
 }
@@ -1263,19 +1344,25 @@ void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0
 
   if(sol.cCa.n_cols == sol.Ca.n_cols) {
     // Use complex orbitals
-    sol.Pa=arma::real(sol.cCa*arma::diagmat(occa)*arma::trans(sol.cCa));
+    arma::cx_mat cPa=sol.cCa*arma::diagmat(occa)*arma::trans(sol.cCa);
+    sol.Pa=arma::real(cPa);
+    sol.Pa_im=arma::imag(cPa);
   } else {
     // Use real orbitals
     sol.Pa=sol.Ca*arma::diagmat(occa)*arma::trans(sol.Ca);
+    sol.Pa_im.clear();
   }
   sol.rPa=sol.Ca*arma::diagmat(occa)*arma::trans(sol.Ca);
 
   if(sol.cCb.n_cols == sol.Cb.n_cols) {
     // Use complex orbitals
-    sol.Pb=arma::real(sol.cCb*arma::diagmat(occb)*arma::trans(sol.cCb));
+    arma::cx_mat cPb=sol.cCb*arma::diagmat(occb)*arma::trans(sol.cCb);
+    sol.Pb=arma::real(cPb);
+    sol.Pb_im=arma::imag(cPb);
   } else {
     // Use real orbitals
     sol.Pb=sol.Cb*arma::diagmat(occb)*arma::trans(sol.Cb);
+    sol.Pb_im.clear();
   }
   sol.rPb=sol.Cb*arma::diagmat(occb)*arma::trans(sol.Cb);
 
@@ -1447,7 +1534,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
       occa.resize(Nel_alpha);
       for(size_t i=0;i<occa.size();i++)
 	occa[i]=1.0;
-      
+
       occb.resize(Nel_beta);
       for(size_t i=0;i<occb.size();i++)
 	occb[i]=1.0;
@@ -1607,11 +1694,11 @@ pzmet_t parse_pzmet(const std::string & pzmod) {
     case(' '):
     case('\0'):
       break;
-    
+
     default:
       throw std::runtime_error("Invalid PZmode\n");
     }
-  
+
   return mode;
 }
 
@@ -1637,27 +1724,27 @@ dft_t parse_dft(const Settings & set, bool init) {
   dft.nl=false;
   dft.vv10_b=0.0;
   dft.vv10_C=0.0;
-  
+
   // Use Lobatto quadrature?
   dft.lobatto=set.get_bool("DFTLobatto");
 
   // Tolerance
   std::string tolkw = init ? "DFTInitialTol" : "DFTFinalTol";
-  
+
   // Use static grid?
   if(stricmp(set.get_string("DFTGrid"),"Auto")!=0) {
     std::vector<std::string> opts=splitline(set.get_string("DFTGrid"));
     if(opts.size()!=2) {
       throw std::runtime_error("Invalid DFT grid specified.\n");
     }
-    
+
     dft.adaptive=false;
     dft.nrad=readint(opts[0]);
     dft.lmax=readint(opts[1]);
     if(dft.nrad<1 || dft.lmax==0) {
       throw std::runtime_error("Invalid DFT radial grid specified.\n");
     }
-    
+
     // Check if l was given in number of points
     if(dft.lmax<0) {
       // Try to find corresponding Lebedev grid
@@ -1669,25 +1756,25 @@ dft_t parse_dft(const Settings & set, bool init) {
       if(dft.lmax<0)
 	throw std::runtime_error("Invalid DFT angular grid specified.\n");
     }
-    
+
   } else {
     dft.adaptive=true;
     dft.gridtol=set.get_double(tolkw);
   }
-  
+
   if(set.get_bool("VV10")) {
       dft.nl=true;
-      
+
       if(dft.adaptive)
 	throw std::runtime_error("Adaptive DFT grids not supported with VV10.\n");
-      
+
       std::vector<std::string> opts=splitline(set.get_string("NLGrid"));
       dft.nlnrad=readint(opts[0]);
       dft.nllmax=readint(opts[1]);
       if(dft.nlnrad<1 || dft.nllmax==0) {
 	throw std::runtime_error("Invalid DFT radial grid specified.\n");
       }
-      
+
       // Check if l was given in number of points
       if(dft.nllmax<0) {
 	// Try to find corresponding Lebedev grid
@@ -1699,11 +1786,11 @@ dft_t parse_dft(const Settings & set, bool init) {
 	if(dft.nllmax<0)
 	  throw std::runtime_error("Invalid DFT angular grid specified.\n");
       }
-      
+
       // Check that xc grid is larger than nl grid
       if(dft.nrad < dft.nlnrad || dft.lmax < dft.nllmax)
 	throw std::runtime_error("xc grid should be bigger than nl grid!\n");
-      
+
       // Read in VV10 parameters
       std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
       dft.vv10_b=readdouble(vvopts[0]);
@@ -1717,7 +1804,7 @@ dft_t parse_dft(const Settings & set, bool init) {
 
   // Parse functionals
   parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
-  
+
   return dft;
 }
 
@@ -1928,7 +2015,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
       int pzstab=set.get_int("PZstab");
       std::string pzstabfz=set.get_string("PZstabFz");
-      
+
       if(pz==NO) {
 	if(dft.adaptive) {
 	  // Solve restricted DFT problem first on a rough grid
@@ -2032,7 +2119,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 		ERROR_INFO();
 		throw std::runtime_error("Should not end up here since adaptive grids are not supported with VV10.\n");
 	      }
-	      
+
 	      // Get new SIC potential
 	      solver.PZSIC_RDFT(sol,occs,initdft,pzmet,pzh,pzcor,grid,nlgrid,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
 	      pziter++;
@@ -2150,7 +2237,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      // Convert to C++ indexing
 	      drop=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
 	    }
-	    
+
 	    /*
 	    // Optimize
 	    stab.set(sol,pz!=REAL,true,true);
@@ -2297,7 +2384,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       int pzstab=set.get_int("PZstab");
       std::string pzstabfz=set.get_string("PZstabFz");
-      
+
       if(pz==NO) {
 	if(dft.adaptive) {
 	  // Solve unrestricted DFT problem first on a rough grid

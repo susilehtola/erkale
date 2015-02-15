@@ -20,9 +20,6 @@
 #include "timer.h"
 #include "mathf.h"
 
-#define COMPLEX1 std::complex<double>(1.0,0.0)
-#define COMPLEXI std::complex<double>(0.0,1.0)
-
 // Mode to evaluate gradient and hessian in: 0 for full calculation, 1 for wrt reference
 #define GHMODE 1
 
