@@ -1778,6 +1778,9 @@ dft_t parse_dft(const Settings & set, bool init) {
     dft.nl=true;
     
     std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
+    if(vvopts.size()!=2)
+      throw std::runtime_error("Invalid VV10Pars!\n");
+    
     dft.vv10_b=readdouble(vvopts[0]);
     dft.vv10_C=readdouble(vvopts[1]);
 
