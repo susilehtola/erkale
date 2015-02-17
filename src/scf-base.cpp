@@ -1762,48 +1762,66 @@ dft_t parse_dft(const Settings & set, bool init) {
     dft.gridtol=set.get_double(tolkw);
   }
 
-  if(set.get_bool("VV10")) {
-      dft.nl=true;
-
-      if(dft.adaptive)
-	throw std::runtime_error("Adaptive DFT grids not supported with VV10.\n");
-
-      std::vector<std::string> opts=splitline(set.get_string("NLGrid"));
-      dft.nlnrad=readint(opts[0]);
-      dft.nllmax=readint(opts[1]);
-      if(dft.nlnrad<1 || dft.nllmax==0) {
-	throw std::runtime_error("Invalid DFT radial grid specified.\n");
-      }
-
-      // Check if l was given in number of points
-      if(dft.nllmax<0) {
-	// Try to find corresponding Lebedev grid
-	for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
-	  if(lebedev_degrees[i]==-dft.nllmax) {
-	    dft.nllmax=lebedev_orders[i];
-	    break;
-	  }
-	if(dft.nllmax<0)
-	  throw std::runtime_error("Invalid DFT angular grid specified.\n");
-      }
-
-      // Check that xc grid is larger than nl grid
-      if(dft.nrad < dft.nlnrad || dft.lmax < dft.nllmax)
-	throw std::runtime_error("xc grid should be bigger than nl grid!\n");
-
-      // Read in VV10 parameters
-      std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
-      dft.vv10_b=readdouble(vvopts[0]);
-      dft.vv10_C=readdouble(vvopts[1]);
-      if(dft.vv10_b <= 0.0 || dft.vv10_C <= 0.0) {
-	std::ostringstream oss;
-	oss << "VV10 parameters given b = " << dft.vv10_b << ", C = " << dft.vv10_C << " are not valid.\n";
-	throw std::runtime_error(oss.str());
-      }
-  }
-
   // Parse functionals
   parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
+
+  // Parse VV10
+  std::string vv10s(set.get_string("VV10"));
+  if(stricmp(vv10s,"Auto")==0) {
+    // Determine automatically if VV10 is necessary
+    if(dft.x_func>0)
+      dft.nl=needs_VV10(dft.x_func,dft.vv10_b,dft.vv10_C);
+    if(!dft.nl && dft.c_func>0)
+      dft.nl=needs_VV10(dft.c_func,dft.vv10_b,dft.vv10_C);
+    
+  } else if(stricmp(vv10s,"True")==0 || stricmp(vv10s,"Yes")) {
+    dft.nl=true;
+    
+    std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
+    dft.vv10_b=readdouble(vvopts[0]);
+    dft.vv10_C=readdouble(vvopts[1]);
+
+  } else if(stricmp(vv10s,"False")==0 || stricmp(vv10s,"No")) {
+    // Do nothing
+    
+  } else if(vv10s.size()) {
+    
+    throw std::runtime_error("Error parsing VV10 setting.\n");
+  }
+  
+  if(dft.nl) {
+    if(dft.vv10_b <= 0.0 || dft.vv10_C <= 0.0) {
+      std::ostringstream oss;
+      oss << "VV10 parameters given b = " << dft.vv10_b << ", C = " << dft.vv10_C << " are not valid.\n";
+      throw std::runtime_error(oss.str());
+    }
+    
+    if(dft.adaptive)
+      throw std::runtime_error("Adaptive DFT grids not supported with VV10.\n");
+    
+    std::vector<std::string> opts=splitline(set.get_string("NLGrid"));
+    dft.nlnrad=readint(opts[0]);
+    dft.nllmax=readint(opts[1]);
+    if(dft.nlnrad<1 || dft.nllmax==0) {
+      throw std::runtime_error("Invalid DFT radial grid specified.\n");
+    }
+    
+    // Check if l was given in number of points
+    if(dft.nllmax<0) {
+      // Try to find corresponding Lebedev grid
+      for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
+	if(lebedev_degrees[i]==-dft.nllmax) {
+	  dft.nllmax=lebedev_orders[i];
+	  break;
+	}
+      if(dft.nllmax<0)
+	throw std::runtime_error("Invalid DFT angular grid specified.\n");
+    }
+    
+    // Check that xc grid is larger than nl grid
+    if(dft.nrad < dft.nlnrad || dft.lmax < dft.nllmax)
+      throw std::runtime_error("xc grid should be bigger than nl grid!\n");
+  }    
 
   return dft;
 }
@@ -2007,8 +2025,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       solver.RHF(sol,occs,conv);
     } else {
       // Print information about used functionals
-      if(verbose)
+      if(verbose) {
 	print_info(dft.x_func,dft.c_func);
+	if(dft.nl)
+	  printf("Using VV10 non-local correlation with b = % f, C = %f\n",dft.vv10_b,dft.vv10_C);
+      }
 
       // Perdew-Zunger?
       enum pzrun pz=parse_pzrun(set.get_string("PZ"));
@@ -2375,8 +2396,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       get_unrestricted_occupancy(set,basis,occa,occb);
     } else {
       // Print information about used functionals
-      if(verbose)
+      if(verbose) {
 	print_info(dft.x_func,dft.c_func);
+	if(dft.nl)
+	  printf("Using VV10 non-local correlation with b = % f, C = %f\n",dft.vv10_b,dft.vv10_C);
+      }
 
       // Perdew-Zunger?
       enum pzrun pz=parse_pzrun(set.get_string("PZ"));
