@@ -144,7 +144,7 @@ void Settings::add_dft_settings() {
   // VV10?
   add_string("VV10","Use VV10 non-local correlation?","Auto");
   add_string("NLGrid", "Integration grid to use for nonlocal correlation: nrad lmax", "50 -194");
-  add_string("VV10Pars","VV10 parameters: b C","6.0 0.01");
+  add_string("VV10Pars","VV10 parameters: b C","");
 
   // Use Perdew-Zunger self-interaction correction?
   add_double("PZw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
