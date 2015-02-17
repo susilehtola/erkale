@@ -60,6 +60,9 @@ bool is_range_separated(int func_id, bool check=true);
 /// Get range separation constants
 void range_separation(int func_id, double & omega, double & alpha, double & beta, bool check=true);
 
+/// Is VV10 needed?
+bool needs_VV10(int func_id, double & b, double & C);
+
 /// Is gradient necessary to use given functional?
 bool gradient_needed(int func);
 /// Is laplacian necessary to use given functional?

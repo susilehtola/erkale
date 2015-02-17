@@ -460,6 +460,31 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
   }
 }
 
+bool needs_VV10(int func_id, double & b, double & C) {
+  b=0.0;
+  C=0.0;
+  
+  bool ret=false;
+#ifdef XC_FLAGS_VV10
+  if(func_id>0) {
+    xc_func_type func;
+    if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Functional "<<func_id<<" not found!";
+      throw std::runtime_error(oss.str());
+    }
+    // Get flag
+    ret=func.info->flags & XC_FLAGS_VV10;
+    if(ret)
+      XC(nlc_coef)(&func, &b, &C);
+    // Free functional
+    xc_func_end(&func);
+  }
+#endif
+  
+  return ret;
+}
 
 bool gradient_needed(int func_id) {
   // Is gradient necessary?
