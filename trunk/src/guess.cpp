@@ -53,6 +53,8 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
     set.set_string("PZ","No");
   } catch(...) {
   }
+  // Also, turn off non-local correlation for initial guess
+  set.set_string("VV10","False");
   
   // Use default convergence settings
   set.set_bool("UseDIIS",true);
