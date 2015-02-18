@@ -373,9 +373,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
     if(verbose) {
       if(fock)
-	printf("Constructing orbital Coulomb matrices ...");
+	printf("Constructing orbital Coulomb matrices ... ");
       else
-	printf("Computing    orbital Coulomb energies ...");
+	printf("Computing    orbital Coulomb energies ... ");
       fflush(stdout);
       t.set();
     }
@@ -426,9 +426,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
       if(verbose) {
 	if(fock)
-	  printf("Constructing orbital Coulomb matrices ...");
+	  printf("Constructing orbital Coulomb matrices ... ");
 	else
-	  printf("Computing    orbital Coulomb energies ...");
+	  printf("Computing    orbital Coulomb energies ... ");
 	fflush(stdout);
 	t.set();
       }
@@ -451,9 +451,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       if(kshort) {
 	if(verbose) {
 	  if(fock)
-	    printf("Constructing orbital short-range exchange matrices ...");
+	    printf("Constructing orbital short-range exchange matrices ... ");
 	  else
-	    printf("Computing    orbital short-range exchange energies ...");
+	    printf("Computing    orbital short-range exchange energies ... ");
 	  fflush(stdout);
 	  t.set();
 	}
@@ -1744,7 +1744,7 @@ dft_t parse_dft(const Settings & set, bool init) {
     if(dft.nrad<1 || dft.lmax==0) {
       throw std::runtime_error("Invalid DFT radial grid specified.\n");
     }
-
+    
     // Check if l was given in number of points
     if(dft.lmax<0) {
       // Try to find corresponding Lebedev grid
@@ -1756,7 +1756,7 @@ dft_t parse_dft(const Settings & set, bool init) {
       if(dft.lmax<0)
 	throw std::runtime_error("Invalid DFT angular grid specified.\n");
     }
-
+    
   } else {
     dft.adaptive=true;
     dft.gridtol=set.get_double(tolkw);
@@ -1774,7 +1774,7 @@ dft_t parse_dft(const Settings & set, bool init) {
     if(!dft.nl && dft.c_func>0)
       dft.nl=needs_VV10(dft.c_func,dft.vv10_b,dft.vv10_C);
     
-  } else if(stricmp(vv10s,"True")==0 || stricmp(vv10s,"Yes")) {
+  } else if(stricmp(vv10s,"True")==0 || stricmp(vv10s,"Yes")==0) {
     dft.nl=true;
     
     std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
@@ -1784,7 +1784,7 @@ dft_t parse_dft(const Settings & set, bool init) {
     dft.vv10_b=readdouble(vvopts[0]);
     dft.vv10_C=readdouble(vvopts[1]);
 
-  } else if(stricmp(vv10s,"False")==0 || stricmp(vv10s,"No")) {
+  } else if(stricmp(vv10s,"False")==0 || stricmp(vv10s,"No")==0) {
     // Do nothing
     
   } else if(vv10s.size()) {
