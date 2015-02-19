@@ -40,26 +40,26 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   /// Formation of Fock matrix
 #ifdef RESTRICTED
 #if defined(HF)
-#define form_fock(sol,ref) Fock_RHF(sol,occs,ref,tol); nfock++;
+#define form_fock(sol) Fock_RHF(sol,occs,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_RDFT(sol,occs,dft,ref,grid,nlgrid,tol); nfock++;
+#define form_fock(sol) Fock_RDFT(sol,occs,dft,grid,nlgrid,tol); nfock++;
 #endif
 
 #else
   // Unrestricted case: first core excited states
 
 #if defined(HALFHOLE)
-#define form_fock(sol,ref) Fock_half_hole(sol,dft,occa,occb,ref,grid,nlgrid,tol); nfock++;
+#define form_fock(sol) Fock_half_hole(sol,dft,occa,occb,grid,nlgrid,tol); nfock++;
 #elif defined(FULLHOLE)
-#define form_fock(sol,ref) Fock_full_hole(sol,dft,occa,occb,ref,grid,nlgrid,tol); nfock++;
+#define form_fock(sol) Fock_full_hole(sol,dft,occa,occb,grid,nlgrid,tol); nfock++;
 
   // Conventional HF and DFT
 #elif defined(HF)
-#define form_fock(sol,ref) Fock_UHF(sol,occa,occb,ref,tol); nfock++;
+#define form_fock(sol) Fock_UHF(sol,occa,occb,tol); nfock++;
 #elif defined(_ROHF)
-#define form_fock(sol,ref) Fock_ROHF(sol,occa,occb,ref,tol); nfock++;
+#define form_fock(sol) Fock_ROHF(sol,occa,occb,tol); nfock++;
 #elif defined(DFT)
-#define form_fock(sol,ref) Fock_UDFT(sol,occa,occb,dft,ref,grid,nlgrid,tol); nfock++;
+#define form_fock(sol) Fock_UDFT(sol,occa,occb,dft,grid,nlgrid,tol); nfock++;
 #endif
 #endif
 
@@ -164,9 +164,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
   // Determine tolerance to use
   if(strictint)
-    tol=STRICTTOL;
+    tol=DBL_EPSILON;
   else
-    tol=ROUGHTOL;
+    tol=intthr;
   bool strict(strictint);
 
   // Change in energy from last iteration
@@ -399,9 +399,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       if(iiter!=1 && direct && !strict && verbose && !densityfit)
 	printf("Restarting Fock matrix formation from scratch.\n");
       
-      form_fock(sol,refsol);
+      form_fock(sol);
     } else {
-      form_fock(sol,oldsol);
+      form_fock(sol);
     }
 
     // Compute change of energy
@@ -502,7 +502,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       // Form LH solution - no level shift
       diagonalize(S,Sinvh,lhsol);
       form_dens(lhsol);
-      form_fock(lhsol,sol);
+      form_fock(lhsol);
       diagonalize(S,Sinvh,lhsol);
 
       if(verbose) {
@@ -525,7 +525,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #endif
 	diagonalize(S,Sinvh,rhsol);
 	form_dens(rhsol);
-	form_fock(rhsol,sol);
+	form_fock(rhsol);
 
 	diagonalize(S,Sinvh,rhsol);
 
@@ -598,7 +598,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 	  if(comp1) {
 	    diagonalize(S,Sinvh,sol1);
 	    form_dens(sol1);
-	    form_fock(sol1,sol);
+	    form_fock(sol1);
 	    diagonalize(S,Sinvh,sol1);
 	    if(verbose) {
 	      printf("\t%e\t%e\t%e\n",mu1,sol1.en.E,sol1.en.E-Emin0);
@@ -609,7 +609,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 	  if(comp2) {
 	    diagonalize(S,Sinvh,sol2);
 	    form_dens(sol2);
-	    form_fock(sol2,sol);
+	    form_fock(sol2);
 	    diagonalize(S,Sinvh,sol2);
 	    if(verbose) {
 	      printf("\t%e\t%e\t%e\n",mu2,sol2.en.E,sol2.en.E-Emin0);

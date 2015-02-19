@@ -241,16 +241,14 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     // No need for extreme accuracy
     double tol=ROUGHTOL;
 
-    uscf_t dummy;
-
     switch(method) {
     case(TP):
-      solver.Fock_half_hole(augsol,dft,occa,occb,dummy,grid,nlgrid,tol);
+      solver.Fock_half_hole(augsol,dft,occa,occb,grid,nlgrid,tol);
       break;
 
     case(FCH):
     case(XCH):
-      solver.Fock_full_hole(augsol,dft,occa,occb,dummy,grid,nlgrid,tol);
+      solver.Fock_full_hole(augsol,dft,occa,occb,grid,nlgrid,tol);
     }
   }
 

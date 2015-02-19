@@ -101,6 +101,8 @@ void Settings::add_scf_settings() {
   add_bool("DecFock", "Use decontracted basis to calculate Fock matrix (direct HF)", false);
   // Strict integrals?
   add_bool("StrictIntegrals", "Use strict integrals?", false);
+  // Integral threshold
+  add_double("IntegralThresh", "Integral screening threshold", 1e-10);
   // Shell pair screening cutoff
   add_double("ShPairThr", "Threshold for shell pair screening, (ij|ij)<thr", 1e-14);
 

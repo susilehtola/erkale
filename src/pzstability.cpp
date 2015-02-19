@@ -491,8 +491,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       std::vector<double> occa(oa,2.0);
       
       // Build global Fock operator
-      rscf_t dum;
-      solverp->Fock_RDFT(tmp,occa,method,dum,grid,nlgrid,focktol);
+      solverp->Fock_RDFT(tmp,occa,method,grid,nlgrid,focktol);
 
       // Update reference energy
       if(mode==-1)
@@ -591,8 +590,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
       std::vector<double> occb(ob,1.0);
       
       // Build global Fock operator
-      uscf_t dum;
-      solverp->Fock_UDFT(tmp,occa,occb,method,dum,grid,nlgrid,focktol);
+      solverp->Fock_UDFT(tmp,occa,occb,method,grid,nlgrid,focktol);
 
       // Update reference energy
       if(mode==-1)

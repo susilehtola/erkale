@@ -18,25 +18,25 @@
 
 /* Restricted case */
 #if defined(RESTRICTED) && defined(DFT)
-void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
+void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
 
 #elif defined(RESTRICTED) && defined(HF)
-void SCF::Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const rscf_t & oldsol, double tol) const
+void SCF::Fock_RHF(rscf_t & sol, const std::vector<double> & occs, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
+void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(HF)
-void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const
+void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol) const
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-void SCF::Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const
+void SCF::Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
+void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
 
 #elif defined(DFT) && defined(HALFHOLE)
-void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
+void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
 #endif
 {
   Timer t;
@@ -90,36 +90,6 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   Kashort_im.zeros(Nbf,Nbf);
   Kbshort.zeros(Nbf,Nbf);
   Kbshort_im.zeros(Nbf,Nbf);
-#endif
-
-  // Form change-of-density matrices
-#ifdef RESTRICTED
-  arma::mat deltaP(Nbf,Nbf);
-  if(oldsol.P.n_rows == Nbf && oldsol.P.n_cols == Nbf && oldsol.J.n_rows==Nbf && oldsol.J.n_cols==Nbf && oldsol.K.n_rows == Nbf && oldsol.K.n_cols == Nbf) {
-    sol.J=oldsol.J;
-    sol.K=oldsol.K;
-    deltaP=sol.P-oldsol.P;
-  } else {
-    sol.J.zeros();
-    sol.K.zeros();
-    deltaP=sol.P;
-  }
-#else
-  arma::mat deltaPa(Nbf,Nbf), deltaPb(Nbf,Nbf);
-  if(oldsol.Pa.n_rows==Nbf && oldsol.Pa.n_cols==Nbf && oldsol.Pb.n_rows==Nbf && oldsol.Pb.n_cols==Nbf && oldsol.J.n_rows == Nbf && oldsol.J.n_cols == Nbf && oldsol.Ka.n_rows == Nbf && oldsol.Ka.n_cols == Nbf && oldsol.Kb.n_rows == Nbf && oldsol.Kb.n_cols == Nbf) {
-    sol.J=oldsol.J;
-    sol.Ka=oldsol.Ka;
-    sol.Kb=oldsol.Kb;
-    deltaPa=sol.Pa-oldsol.Pa;
-    deltaPb=sol.Pb-oldsol.Pb;
-  } else {
-    sol.Ka.zeros();
-    sol.Kb.zeros();
-    sol.J.zeros();
-    deltaPa=sol.Pa;
-    deltaPb=sol.Pb;
-  }
-  arma::mat deltaP=deltaPa+deltaPb;
 #endif
 
   double screeneff;
@@ -183,35 +153,18 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(strictint) {
-	  if(!decfock)
-	    scr.calcJK(sol.P,sol.J,Kfull,tol,&screeneff);
-	  else {
-	    // Helper matrices
-	    arma::mat Jhlp, Khlp;
-	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-
-	    scr.calcJK(Phlp,Jhlp,Khlp,tol,&screeneff);
-	    sol.J=arma::trans(decconv)*Jhlp*decconv;
-	    Kfull=arma::trans(decconv)*Khlp*decconv;
-	  }
-
-	} else {
-	  arma::mat dJ, dK;
-
-	  if(!decfock) {
-	    scr.calcJK(deltaP,dJ,dK,tol,&screeneff);
-	    sol.J+=dJ;
-	    Kfull=dK;
-	  } else {
-	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-
-	    scr.calcJK(Phlp,dJ,dK,tol,&screeneff);
-	    sol.J+=arma::trans(decconv)*dJ*decconv;
-	    Kfull=arma::trans(decconv)*dK*decconv;
-	  }
+	if(!decfock)
+	  scr.calcJK(sol.P,sol.J,Kfull,tol,&screeneff);
+	else {
+	  // Helper matrices
+	  arma::mat Jhlp, Khlp;
+	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	  
+	  scr.calcJK(Phlp,Jhlp,Khlp,tol,&screeneff);
+	  sol.J=arma::trans(decconv)*Jhlp*decconv;
+	  Kfull=arma::trans(decconv)*Khlp*decconv;
 	}
-
+	
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
@@ -227,23 +180,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(strictint) {
-	  if(!decfock)
-	    sol.J=scr.calcJ(sol.P,tol,&screeneff);
-	  else {
-	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
-	    sol.J=arma::trans(decconv)*Jhlp*decconv;
-	  }
-
-	} else {
-	  if(!decfock)
-	    sol.J+=scr.calcJ(deltaP,tol,&screeneff);
-	  else {
-	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
-	    sol.J+arma::trans(decconv)*Jhlp*decconv;
-	  }
+	if(!decfock)
+	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
+	else {
+	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
+	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	}
 
 	if(verbose) {
@@ -261,23 +203,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(strictint) {
-	  if(!decfock)
-	    Kshort=scr_rs.calcK(sol.P,tol,&screeneff);
-	  else {
-	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	    arma::mat Khlp=scr_rs.calcK(Phlp,tol,&screeneff);
-	    Kshort=arma::trans(decconv)*Khlp*decconv;
-	  }
-
-	} else {
-	  if(!decfock)
-	    Kshort=scr_rs.calcK(deltaP,tol,&screeneff);
-	  else {
-	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-	    arma::mat Khlp=scr_rs.calcK(Phlp,tol,&screeneff);
-	    Kshort=arma::trans(decconv)*Khlp*decconv;
-	  }
+	if(!decfock)
+	  Kshort=scr_rs.calcK(sol.P,tol,&screeneff);
+	else {
+	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	  arma::mat Khlp=scr_rs.calcK(Phlp,tol,&screeneff);
+	  Kshort=arma::trans(decconv)*Khlp*decconv;
 	}
 
 	if(verbose) {
@@ -300,39 +231,19 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(strictint) {
-	  if(!decfock)
-	    scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,tol,&screeneff);
-	  else {
-	    arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
-	    arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
-
-	    arma::mat Jhlp, Kahlp, Kbhlp;
-	    scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol,&screeneff);
-	    sol.J=arma::trans(decconv)*Jhlp*decconv;
-	    Kafull=arma::trans(decconv)*Kahlp*decconv;
-	    Kbfull=arma::trans(decconv)*Kbhlp*decconv;
-	  }
-
-	} else {
-	  // Only calculate the changed part
-	  arma::mat dJ, dKa, dKb;
-
-	  if(!decfock) {
-	    scr.calcJK(deltaPa,deltaPb,dJ,Kafull,Kbfull,tol,&screeneff);
-	    sol.J+=dJ;
-
-	  } else {
-	    arma::mat Pahlp=decconv*deltaPa*arma::trans(decconv);
-	    arma::mat Pbhlp=decconv*deltaPb*arma::trans(decconv);
-	    scr.calcJK(Pahlp,Pbhlp,dJ,dKa,dKb,tol,&screeneff);
-
-	    sol.J+=arma::trans(decconv)*dJ*decconv;
-	    Kafull=arma::trans(decconv)*dKa*decconv;
-	    Kbfull=arma::trans(decconv)*dKb*decconv;
-	  }
+	if(!decfock)
+	  scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,tol,&screeneff);
+	else {
+	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
+	  arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
+	  
+	  arma::mat Jhlp, Kahlp, Kbhlp;
+	  scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol,&screeneff);
+	  sol.J=arma::trans(decconv)*Jhlp*decconv;
+	  Kafull=arma::trans(decconv)*Kahlp*decconv;
+	  Kbfull=arma::trans(decconv)*Kbhlp*decconv;
 	}
-
+	
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
@@ -349,23 +260,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(strictint) {
-	  if(!decfock)
-	    sol.J=scr.calcJ(sol.P,tol,&screeneff);
-	  else {
-	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
-	    sol.J=arma::trans(decconv)*Jhlp*decconv;
-	  }
-
-	} else {
-	  if(!decfock)
-	    sol.J+=scr.calcJ(deltaP,tol,&screeneff);
-	  else {
-	    arma::mat Phlp=decconv*deltaP*arma::trans(decconv);
-	    arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
-	    sol.J+=arma::trans(decconv)*Jhlp*decconv;
-	  }
+	if(!decfock)
+	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
+	else {
+	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
+	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	}
 
 	if(verbose) {
@@ -384,29 +284,15 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(strictint) {
-	  if(!decfock) {
-	    scr_rs.calcK(sol.Pa,sol.Pb,Kashort,Kbshort,tol,&screeneff);
-	  } else {
-	    arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
-	    arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
-	    arma::mat Kahlp, Kbhlp;
-	    scr_rs.calcK(Pahlp,Pbhlp,Kahlp,Kbhlp,tol,&screeneff);
-	    Kashort=arma::trans(decconv)*Kahlp*decconv;
-	    Kbshort=arma::trans(decconv)*Kbhlp*decconv;
-	  }
-
+	if(!decfock) {
+	  scr_rs.calcK(sol.Pa,sol.Pb,Kashort,Kbshort,tol,&screeneff);
 	} else {
-	  if(!decfock) {
-	    scr_rs.calcK(deltaPa,deltaPb,Kashort,Kbshort,tol,&screeneff);
-	  } else {
-	    arma::mat Pahlp=decconv*deltaPa*arma::trans(decconv);
-	    arma::mat Pbhlp=decconv*deltaPb*arma::trans(decconv);
-	    arma::mat Kahlp, Kbhlp;
-	    scr_rs.calcK(Pahlp,Pbhlp,Kahlp,Kbhlp,tol,&screeneff);
-	    Kashort=arma::trans(decconv)*Kahlp*decconv;
-	    Kbshort=arma::trans(decconv)*Kbhlp*decconv;
-	  }
+	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
+	  arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
+	  arma::mat Kahlp, Kbhlp;
+	  scr_rs.calcK(Pahlp,Pbhlp,Kahlp,Kbhlp,tol,&screeneff);
+	  Kashort=arma::trans(decconv)*Kahlp*decconv;
+	  Kbshort=arma::trans(decconv)*Kbhlp*decconv;
 	}
 
 	if(verbose) {
@@ -532,45 +418,31 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #ifdef DFT
 // Combine short and long range exchanges
 #ifdef RESTRICTED
-  if(strictint || !direct) {
-    sol.K=kfull*Kfull + kshort*Kshort;
-    if(sol.P.n_rows == sol.P_im.n_rows && sol.P.n_cols == sol.P_im.n_cols)
-      sol.K_im=kfull*Kfull_im + kshort*Kshort_im;
-  } else {
-    sol.K+=kfull*Kfull + kshort*Kshort;
+  sol.K=kfull*Kfull + kshort*Kshort;
+  if(sol.P.n_rows == sol.P_im.n_rows && sol.P.n_cols == sol.P_im.n_cols)
+    sol.K_im=kfull*Kfull_im + kshort*Kshort_im;
+  else
     sol.K_im.clear();
-  }
 #else
-  if(strictint || !direct) {
-    sol.Ka=kfull*Kafull + kshort*Kashort;
-    if(sol.Pa.n_rows == sol.Pa_im.n_rows && sol.Pa.n_cols == sol.Pa_im.n_cols)
-      sol.Ka_im=kfull*Kafull_im + kshort*Kashort_im;
-    
-    sol.Kb=kfull*Kbfull + kshort*Kbshort;
-    if(sol.Pb.n_rows == sol.Pb_im.n_rows && sol.Pb.n_cols == sol.Pb_im.n_cols)
-      sol.Kb_im=kfull*Kbfull_im + kshort*Kbshort_im;
-  } else {
-    sol.Ka+=kfull*Kafull + kshort*Kashort;
+  sol.Ka=kfull*Kafull + kshort*Kashort;
+  if(sol.Pa.n_rows == sol.Pa_im.n_rows && sol.Pa.n_cols == sol.Pa_im.n_cols)
+    sol.Ka_im=kfull*Kafull_im + kshort*Kashort_im;
+  else
     sol.Ka_im.clear();
-    sol.Kb+=kfull*Kbfull + kshort*Kbshort;
+  
+  sol.Kb=kfull*Kbfull + kshort*Kbshort;
+  if(sol.Pb.n_rows == sol.Pb_im.n_rows && sol.Pb.n_cols == sol.Pb_im.n_cols)
+    sol.Kb_im=kfull*Kbfull_im + kshort*Kbshort_im;
+  else
     sol.Kb_im.clear();
-  }
 #endif
 #else
   // Hartree-Fock
 #ifdef RESTRICTED
-  if(strictint || !direct)
-    sol.K=Kfull;
-  else
-    sol.K+=Kfull;
+  sol.K=Kfull;
 #else
-  if(strictint || !direct) {
-    sol.Ka=Kafull;
-    sol.Kb=Kbfull;
-  } else {
-    sol.Ka+=Kafull;
-    sol.Kb+=Kbfull;
-  }
+  sol.Ka=Kafull;
+  sol.Kb=Kbfull;
 #endif
 #endif
 

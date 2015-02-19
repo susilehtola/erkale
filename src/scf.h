@@ -306,6 +306,9 @@ class SCF {
   bool decfock;
   /// Strict integrals?
   bool strictint;
+  /// Integral screening threshold
+  double intthr;
+  
   /// Shell pair screening threshold
   double shpairthr;
   /// Density fitting calculation?
@@ -361,16 +364,16 @@ class SCF {
   void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
 
   /// Calculate restricted Hartree-Fock operator
-  void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, const rscf_t & oldsol, double tol) const;
+  void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, double tol) const;
   /// Calculate restricted open-shell Hartree-Fock operator
-  void Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const;
+  void Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol) const;
   /// Calculate unrestricted Hartree-Fock operator
-  void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, double tol) const;
+  void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol) const;
 
   /// Calculate restricted density-functional theory KS-Fock operator
-  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, const rscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
+  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
   /// Calculate unrestricted density-functional theory KS-Fock operator
-  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
+  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
   void PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock);
