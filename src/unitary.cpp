@@ -1123,7 +1123,7 @@ std::string Brockett::legend() const {
   return std::string(stat);
 }
 
-std::string Brockett::status(bool lfmt) const {
+std::string Brockett::status(bool lfmt) {
   char stat[1024];
   if(lfmt)
     sprintf(stat,"% .16e  % .16e", diagonality(), unitarity());
