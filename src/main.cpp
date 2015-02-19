@@ -90,41 +90,57 @@ int main(int argc, char **argv) {
       fprintf(stderr,"\n");
   }
 
-  // Read in atoms.
-  std::vector<atom_t> atoms;
-  std::string atomfile=set.get_string("System");
-  if(file_exists(atomfile))
-    atoms=load_xyz(atomfile);
-  else {
-    // Check if a directory has been set
-    char * libloc=getenv("ERKALE_SYSDIR");
-    if(libloc) {
-      std::string filename=std::string(libloc)+"/"+atomfile;
-      if(file_exists(filename))
-	atoms=load_xyz(filename);
-      else
+  // Basis set
+  BasisSet basis;
+  std::string basfile(set.get_string("Basis"));  
+  if(stricmp(basfile,"Read")==0) {
+    // Get checkpoint file
+    std::string chkf(set.get_string("LoadChk"));
+    if(!chkf.size())
+      throw std::runtime_error("Must specify LoadChk for Basis Read\n");
+    if(!file_exists(chkf))
+      throw std::runtime_error("Can't find LoadChk!\n");
+    Checkpoint chk(chkf,false);
+    chk.read(basis);
+    
+    printf("Basis set read in from checkpoint.\n\n");
+
+  } else {
+    // Read in atoms.
+    std::vector<atom_t> atoms;
+    std::string atomfile=set.get_string("System");
+    if(file_exists(atomfile))
+      atoms=load_xyz(atomfile);
+    else {
+      // Check if a directory has been set
+      char * libloc=getenv("ERKALE_SYSDIR");
+      if(libloc) {
+	std::string filename=std::string(libloc)+"/"+atomfile;
+	if(file_exists(filename))
+	  atoms=load_xyz(filename);
+	else
+	  throw std::runtime_error("Unable to open xyz input file!\n");
+      } else
 	throw std::runtime_error("Unable to open xyz input file!\n");
-    } else
-      throw std::runtime_error("Unable to open xyz input file!\n");
+    }
+    
+    // Read in basis set
+    BasisSetLibrary baslib;
+    baslib.load_gaussian94(basfile);
+    
+    // Construct basis set
+    construct_basis(basis,atoms,baslib,set);
   }
-
-  // Read in basis set
-  BasisSetLibrary baslib;
-  std::string basfile=set.get_string("Basis");
-  baslib.load_gaussian94(basfile);
-  printf("\n");
-
-  // Construct basis set
-  BasisSet basis=construct_basis(atoms,baslib,set);
-
+  
+  basis.print();
+  
   // Do the calculation
   calculate(basis,set);
-
+  
   if(set.get_bool("Verbose")) {
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
     t.print_time();
   }
-
-
+  
   return 0;
 }

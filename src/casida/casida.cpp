@@ -505,7 +505,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
     fitlib.load_gaussian94(set.get_string("FittingBasis"));
 
     // Construct fitting basis
-    dfitbas=construct_basis(basis.get_nuclei(),fitlib,set);
+    construct_basis(dfitbas,basis.get_nuclei(),fitlib,set);
   }
 
   // Amount of auxiliary functions

@@ -3476,7 +3476,7 @@ std::vector<size_t> i_idx(size_t N) {
   return ret;
 }
 
-BasisSet construct_basis(const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib, const Settings & set) {
+void construct_basis(BasisSet & basis, const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib, const Settings & set) {
   std::vector<atom_t> atoms(nuclei.size());
   for(size_t i=0;i<nuclei.size();i++) {
     atoms[i].x=nuclei[i].r.x;
@@ -3487,10 +3487,10 @@ BasisSet construct_basis(const std::vector<nucleus_t> & nuclei, const BasisSetLi
     atoms[i].el=nuclei[i].symbol;
   }
 
-  return construct_basis(atoms,baslib,set);
+  construct_basis(basis,atoms,baslib,set);
 }
 
-BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set) {
+void construct_basis(BasisSet & basis, const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set) {
   // Number of atoms is
   size_t Nat=atoms.size();
 
@@ -3514,7 +3514,7 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
   double cutoff=set.get_double("BasisCutoff");
 
   // Create basis set
-  BasisSet basis(Nat,set);
+  basis=BasisSet(Nat,set);
   // and add atoms to basis set
   for(size_t i=0;i<Nat;i++) {
     // First we need to add the nucleus itself.
@@ -3576,8 +3576,6 @@ BasisSet construct_basis(const std::vector<atom_t> & atoms, const BasisSetLibrar
 
   // Finalize basis set and convert contractions
   basis.finalize(true);
-
-  return basis;
 }
 
 arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r) {
@@ -3810,7 +3808,8 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
   set.add_scf_settings();
 
   // Construct minimal basis set
-  BasisSet minbas=construct_basis(basis.get_nuclei(),minao,set);
+  BasisSet minbas;
+  construct_basis(minbas,basis.get_nuclei(),minao,set);
 
   // Get indices
   idx.clear();
