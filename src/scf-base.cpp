@@ -1887,6 +1887,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   arma::cx_mat CW, CWa, CWb;
   bool doCW=false;
 
+  // Strict integrals?
+  bool strictint(set.get_bool("StrictIntegrals"));
+  
   // Which guess to use
   enum guess_t guess=parse_guess(set.get_string("Guess"));
   // Freeze core orbitals?
@@ -2100,9 +2103,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	  if(!dft.adaptive) {
 	    // Fixed size grid
-	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
 	    if(dft.nl)
-	      nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,true);
+	      nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
 	  }
 
 	  // Get SIC potential
@@ -2200,9 +2203,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	      if(!dft.adaptive) {
 		// Fixed size grid
-		grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+		grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
 		if(dft.nl)
-		  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,true);
+		  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
 	      }
 
 	      // Get new SIC potential
@@ -2468,9 +2471,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	  if(!dft.adaptive) {
 	    // Fixed size grid
-	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
 	    if(dft.nl)
-	      nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,true);
+	      nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
 	  }
 
 	  // Get SIC potential
@@ -2510,9 +2513,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	      if(!dft.adaptive) {
 		// Fixed size grid
-		grid.construct(initdft.nrad,initdft.lmax,initdft.x_func,initdft.c_func);
+		grid.construct(initdft.nrad,initdft.lmax,initdft.x_func,initdft.c_func,strictint);
 		if(dft.nl)
-		  nlgrid.construct(initdft.nlnrad,initdft.nllmax,true,false,true);
+		  nlgrid.construct(initdft.nlnrad,initdft.nllmax,true,false,strictint,true);
 	      }
 
 	      // Get new SIC potential
@@ -2576,9 +2579,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    DFTGrid nlgrid(&basis,verbose,dft.lobatto);
 	    if(!dft.adaptive) {
 	      // Fixed size grid
-	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
 	      if(dft.nl)
-		nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,true);
+		nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
 	    }
 
 	    // Get new SIC potential

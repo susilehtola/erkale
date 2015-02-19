@@ -935,9 +935,10 @@ void PZStability::set(const rscf_t & sol, const arma::uvec & drop, bool cplx_, b
   if(method.adaptive)
     grid.construct(CW,method.gridtol,method.x_func,method.c_func);
   else {
-    grid.construct(method.nrad,method.lmax,method.x_func,method.c_func);
+    bool strict(false);
+    grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
     if(method.nl)
-      nlgrid.construct(method.nlnrad,method.nllmax,true,false,true);
+      nlgrid.construct(method.nlnrad,method.nllmax,true,false,strict,true);
   }
 
   // Update reference
@@ -998,10 +999,10 @@ void PZStability::set(const uscf_t & sol, const arma::uvec & dropa, const arma::
       Ctilde.cols(oa,oa+ob-1)=CWb;
     grid.construct(Ctilde,method.gridtol,method.x_func,method.c_func);
   } else {
-    grid.construct(method.nrad,method.lmax,method.x_func,method.c_func);
-    
+    bool strict(false);
+    grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
     if(method.nl)
-      nlgrid.construct(method.nlnrad,method.nllmax,true,false,true);
+      nlgrid.construct(method.nlnrad,method.nllmax,true,false,strict,true);
   }
 
   // Update reference

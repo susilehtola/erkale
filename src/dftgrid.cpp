@@ -356,7 +356,7 @@ void AtomGrid::hirshfeld_weights(const Hirshfeld & hirsh, const atomgrid_t & g, 
   }
 }
 
-void AtomGrid::prune_points(double tolv, const radshell_t & rg) {
+void AtomGrid::prune_points(const radshell_t & rg) {
   // Prune points with small weight.
   
   // First point on radial shell
@@ -365,7 +365,7 @@ void AtomGrid::prune_points(double tolv, const radshell_t & rg) {
   size_t ilast=ifirst+rg.np-1;
 
   for(size_t i=ilast;(i>=ifirst && i<grid.size());i--)
-    if(grid[i].w<tolv)
+    if(grid[i].w<=tol)
       grid.erase(grid.begin()+i);
 }
 
@@ -3156,8 +3156,11 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
     return ret;
   }
 
+  // Fock tolerance is here
+  double ftoler=tol/PRUNETHR;
+  
   // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
@@ -3178,7 +3181,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
   size_t Nbf=bas.get_Nbf();
 
   // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(tol));
+  int lmax=(int) ceil(5.0-6.0*log10(ftoler));
 
   // Old and new diagonal elements of Hamiltonian
   arma::vec Hold(Nbf), Hnew(Nbf);
@@ -3202,7 +3205,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
       // Compute Becke weights for radial shell
       becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(PRUNETHR*tol,ret.sh[ir]);
+      prune_points(ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3229,7 +3232,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
       std::swap(Hold,Hnew);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/rad.size()) {
+      if(maxdiff>ftoler/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -3238,7 +3241,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & P, size_t
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>ftoler/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -3279,8 +3282,11 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
     return ret;
   }
 
+  // Fock tolerance is here
+  double ftoler=tol/PRUNETHR;
+  
   // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
@@ -3301,7 +3307,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
   size_t Nbf=bas.get_Nbf();
 
   // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(tol));
+  int lmax=(int) ceil(5.0-6.0*log10(ftoler));
 
   // Old and new diagonal elements of Hamiltonian
   arma::vec Haold(Nbf), Hbold(Nbf);
@@ -3328,7 +3334,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
       // Compute Becke weights for radial shell
       becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(PRUNETHR*tol,ret.sh[ir]);
+      prune_points(ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3356,7 +3362,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
       std::swap(Hbold,Hbnew);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/rad.size()) {
+      if(maxdiff>ftoler/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -3365,7 +3371,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::mat & Pa, const
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>ftoler/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -3406,8 +3412,11 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::cx_vec & C, siz
     return ret;
   }
 
+  // Fock tolerance is here
+  double ftoler=tol/PRUNETHR;
+  
   // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+6-element_row[bas.get_Z(ret.atind)])));
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
@@ -3428,7 +3437,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::cx_vec & C, siz
   size_t Nbf=bas.get_Nbf();
 
   // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(tol));
+  int lmax=(int) ceil(5.0-6.0*log10(ftoler));
 
   // Old and new diagonal elements of Hamiltonian
   arma::vec Hold(Nbf);
@@ -3454,7 +3463,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::cx_vec & C, siz
       // Compute Becke weights for radial shell
       becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(PRUNETHR*tol,ret.sh[ir]);
+      prune_points(ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3480,7 +3489,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::cx_vec & C, siz
       std::swap(Hold,Hnew);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/rad.size()) {
+      if(maxdiff>ftoler/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -3489,7 +3498,7 @@ atomgrid_t AtomGrid::construct(const BasisSet & bas, const arma::cx_vec & C, siz
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>ftoler/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -3525,8 +3534,11 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
   // and its coordinates
   ret.cen=bas.get_nuclear_coords(cenind);
 
+  // Overlap tolerance is here
+  double otoler=tol/PRUNETHR;
+  
   // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+8-element_row[bas.get_Z(ret.atind)])));
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
@@ -3548,7 +3560,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
   size_t Nbf=bas.get_Nbf();
 
   // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(tol));
+  int lmax=(int) ceil(5.0-6.0*log10(otoler));
 
   // Old and new diagonal elements of overlap
   arma::vec Sold(Nbf), Snew(Nbf);
@@ -3572,7 +3584,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
       // Compute Becke weights for radial shell
       becke_weights(bas,ret,ir);
       // Prune points with small weight
-      prune_points(PRUNETHR*tol,ret.sh[ir]);
+      prune_points(ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3588,7 +3600,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
       std::swap(Snew,Sold);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/rad.size()) {
+      if(maxdiff>otoler/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -3597,7 +3609,7 @@ atomgrid_t AtomGrid::construct_becke(const BasisSet & bas, size_t cenind, bool v
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>otoler/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -3633,8 +3645,10 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
   // and its coordinates
   ret.cen=bas.get_nuclear_coords(cenind);
 
+  // Overlap tolerance is here
+  double otoler=tol/PRUNETHR;
   // Compute necessary number of radial points
-  size_t nrad=std::max(20,(int) round(-5*(3*log10(tol)+8-element_row[bas.get_Z(ret.atind)])));
+  size_t nrad=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[bas.get_Z(ret.atind)])));
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
@@ -3656,7 +3670,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
   size_t Nbf=bas.get_Nbf();
 
   // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(tol));
+  int lmax=(int) ceil(5.0-6.0*log10(otoler));
 
   // Old and new diagonal elements of overlap
   arma::vec Sold(Nbf), Snew(Nbf);
@@ -3680,7 +3694,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
       // Compute Hirshfeld weights for radial shell
       hirshfeld_weights(hirsh,ret,ir);
       // Prune points with small weight
-      prune_points(PRUNETHR*tol,ret.sh[ir]);
+      prune_points(ret.sh[ir]);
 
       // Compute values of basis functions
       compute_bf(bas,ret,ir);
@@ -3696,7 +3710,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
       std::swap(Snew,Sold);
 
       // Increment order if tolerance not achieved.
-      if(maxdiff>tol/rad.size()) {
+      if(maxdiff>otoler/rad.size()) {
 	if(use_lobatto)
 	  ret.sh[ir].l+=2;
 	else {
@@ -3705,7 +3719,7 @@ atomgrid_t AtomGrid::construct_hirshfeld(const BasisSet & bas, size_t cenind, co
 	  ret.sh[ir].l=next_lebedev(ret.sh[ir].l);
 	}
       }
-    } while(maxdiff>tol/rad.size() && ret.sh[ir].l<=lmax);
+    } while(maxdiff>otoler/rad.size() && ret.sh[ir].l<=lmax);
 
     // Increase number of points and function values
     ret.ngrid+=grid.size();
@@ -3745,9 +3759,9 @@ void AtomGrid::form_grid(const BasisSet & bas, atomgrid_t & g) {
     // Do Becke weights
     becke_weights(bas,g,ir);
     // Prune points with small weight
-    prune_points(PRUNETHR*tol,g.sh[ir]);
+    prune_points(g.sh[ir]);
   }
-
+  
   // Store number of points
   g.ngrid=grid.size();
 }
@@ -3770,7 +3784,7 @@ void AtomGrid::form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g) {
     // Do Becke weights
     hirshfeld_weights(hirsh,g,ir);
     // Prune points with small weight
-    prune_points(PRUNETHR*tol,g.sh[ir]);
+    prune_points(g.sh[ir]);
   }
 
   // Store number of points
@@ -3985,15 +3999,15 @@ DFTGrid::DFTGrid(const BasisSet * bas, bool ver, bool lobatto) {
 DFTGrid::~DFTGrid() {
 }
 
-void DFTGrid::construct(int nrad, int lmax, int x_func, int c_func) {
+void DFTGrid::construct(int nrad, int lmax, int x_func, int c_func, bool strict) {
   // Check necessity of gradients and laplacians
   bool grad, lapl;
   wrk[0].check_grad_lapl(x_func,c_func);
   wrk[0].get_grad_lapl(grad,lapl);
-  construct(nrad,lmax,grad,lapl,false);
+  construct(nrad,lmax,grad,lapl,strict,false);
 }
 
-void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool nl) {
+void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool strict, bool nl) {
   if(verbose) {
     if(nl)
       printf("Composition of static nrad=%i lmax=%i NL grid pruned by small weight:\n",nrad,lmax);
@@ -4005,9 +4019,10 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool nl) {
 
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_grad_lapl(grad,lapl);
-  // Set screening tolerances
+  // Set grid point screening tolerances
+  double tol=strict ? 0.0 : DBL_EPSILON;
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_tolerance(DBL_EPSILON/PRUNETHR); // Total screening weight will be DBL_EPSILON
+    wrk[i].set_tolerance(tol);
 
   // Construct grids
   size_t Nat=basp->get_Nnuc();
@@ -4040,7 +4055,7 @@ void DFTGrid::construct(const arma::mat & P, double tol, int x_func, int c_func)
 
   // Set tolerances
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_tolerance(tol);
+    wrk[i].set_tolerance(tol*PRUNETHR); // Tolerance for grid point screening
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
@@ -4078,7 +4093,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double tol, 
 
   // Set tolerances
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_tolerance(tol);
+    wrk[i].set_tolerance(tol*PRUNETHR); // Tolerance for grid point screening
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
@@ -4115,7 +4130,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double tol, int x_func, int
 
   // Set tolerances
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_tolerance(tol);
+    wrk[i].set_tolerance(tol*PRUNETHR); // Tolerance for grid point screening
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
@@ -4239,7 +4254,7 @@ void DFTGrid::construct_becke(double tol) {
 
   // Set tolerances
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_tolerance(tol);
+    wrk[i].set_tolerance(tol*PRUNETHR); // Tolerance for grid point screening
 
   Timer t;
   size_t Nat=basp->get_Nnuc();
@@ -4278,7 +4293,7 @@ void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double tol) {
 
   // Set tolerances
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_tolerance(tol);
+    wrk[i].set_tolerance(tol*PRUNETHR); // Tolerance for grid point screening
 
   Timer t;
   size_t Nat=basp->get_Nnuc();

@@ -202,6 +202,9 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
     }
   }
 
+  // Strict integrals?
+  bool strictint(set.get_bool("StrictIntegrals"));
+  
   // Check if the basis set is different
   if(!(basis==oldbas)) {
     // Basis set is different or calculation was not converged - need
@@ -334,9 +337,9 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
       if(dft.adaptive)
 	grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
       else {
-	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
 	if(dft.nl)
-	  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,true);
+	  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
       }
       f=solver.force_RDFT(sol,occs,dft,grid,nlgrid,FINETOL);
     }
@@ -376,9 +379,9 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
       if(dft.adaptive)
 	grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
       else {
-	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
 	if(dft.nl)
-	  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,true);
+	  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
       }
       f=solver.force_UDFT(sol,occa,occb,dft,grid,nlgrid,tol);
     }

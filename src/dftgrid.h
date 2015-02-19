@@ -74,7 +74,7 @@ typedef struct {
   /// Number of function values
   size_t nfunc;
   /// Radial shells
-  std::vector<radshell_t> sh;
+  std::vector<radshell_t> sh;  
 } atomgrid_t;
 
 /// Helper for determining density cutoffs for plots
@@ -315,7 +315,7 @@ class AtomGrid {
   void hirshfeld_weights(const Hirshfeld & hirsh, const atomgrid_t & g, size_t ir);
 
   /// Prune points with small weight
-  void prune_points(double tol, const radshell_t & rg);
+  void prune_points(const radshell_t & rg);
 
   /// Add radial shell in Lobatto angular scheme, w/o Becke partitioning or pruning
   void add_lobatto_shell(atomgrid_t & g, size_t ir);
@@ -462,9 +462,9 @@ class DFTGrid {
   ~DFTGrid();
 
   /// Create fixed size grid
-  void construct(int nrad, int lmax, int x_func, int c_func);
+  void construct(int nrad, int lmax, int x_func, int c_func, bool strict);
   /// Create fixed size grid
-  void construct(int nrad, int lmax, bool gga, bool mgga, bool nl);
+  void construct(int nrad, int lmax, bool gga, bool mgga, bool strict, bool nl);
   /// Create grid for restricted calculation
   void construct(const arma::mat & P, double tol, int x_func, int c_func);
   /// Create grid for unrestricted calculation
