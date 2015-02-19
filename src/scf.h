@@ -309,8 +309,6 @@ class SCF {
   /// Integral screening threshold
   double intthr;
   
-  /// Shell pair screening threshold
-  double shpairthr;
   /// Density fitting calculation?
   bool densityfit;
   /// Memory allocation for density fitting

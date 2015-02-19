@@ -22,7 +22,7 @@
 /* Function definitions */
 
 #if defined(ERITABLE)
-void ERItable::fill(const BasisSet * basp, double shtol, double tol, bool verbose) {
+void ERItable::fill(const BasisSet * basp, double tol, bool verbose) {
 #endif
 
 #if defined(CALCJKab)
@@ -168,9 +168,6 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 
   // Number of calculated and skipped integrals
   size_t intskip=0, calcd=0;
-#ifndef ERITABLE
-  size_t denskip=0;
-#endif
 
   /* The filling algorithm may seem a bit complicated. This is because the ERIs
      are computed on a shell basis, and because the same algorithm is used here
@@ -180,36 +177,10 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 #ifdef ERITABLE
   // Get ERI screening matrix and list of unique shell pairs
   arma::mat screen;
-  std::vector<eripair_t> shpairs=basp->get_eripairs(screen,shtol,verbose);
+  std::vector<eripair_t> shpairs=basp->get_eripairs(screen,tol,verbose);
 #endif
   // Get number of shell pairs
   const size_t Npairs=shpairs.size();
-
-#if !defined(ERITABLE)
-  const size_t Nsh=basp->get_Nshells();
-  arma::mat Psh(Nsh,Nsh);
-  Psh.zeros();
-
-  // Collect maximum density
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for(size_t ip=0;ip<Npairs;ip++) {
-    // Shells are
-    size_t is=shpairs[ip].is;
-    size_t js=shpairs[ip].js;
-    // First functions on shells are
-    size_t i0=basp->get_first_ind(is);
-    size_t j0=basp->get_first_ind(js);
-    // Indices of last functions on shells
-    size_t ilast=basp->get_last_ind(is);
-    size_t jlast=basp->get_last_ind(js);
-
-    // Maximum value of density is
-    Psh(is,js)=max_abs(P.submat(i0,j0,ilast,jlast));
-    Psh(js,is)=Psh(is,js);
-  }
-#endif
 
   // Loop over first pairs
 #ifdef _OPENMP
@@ -217,7 +188,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 #ifdef ERITABLE
 #pragma omp parallel
 #else
-#pragma omp parallel reduction(+:calcd,intskip,denskip)
+#pragma omp parallel reduction(+:calcd,intskip)
 #endif
 #endif // ifdef _OPENMP
   { // Open parallel region
@@ -970,11 +941,8 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
     } // end parallel region
 
 #ifndef ERITABLE
-  // Compute screening efficiency
-  //  printf("Computed %lu shells, skipped %lu due to small absolute value and %lu due to small product.\n",calcd,intskip,denskip);
-
   if(eff!=NULL) {
-    *eff=calcd*100.0/(calcd+intskip+denskip);
+    *eff=calcd*100.0/(calcd+intskip);
   }
 #endif
 
