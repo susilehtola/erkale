@@ -91,7 +91,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   decfock=set.get_bool("DecFock");
   strictint=set.get_bool("StrictIntegrals");
   intthr=set.get_double("IntegralThresh");
-  shpairthr=set.get_double("ShPairThr");
+  if(strictint)
+    // Strict screening
+    intthr=DBL_EPSILON;
 
   doforce=false;
 
@@ -274,10 +276,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
       if(decfock)
 	// Use decontracted basis
-	scr.fill(&decbas,shpairthr,verbose);
+	scr.fill(&decbas,intthr,verbose);
       else
 	// Use contracted basis
-	scr.fill(&basis,shpairthr,verbose);
+	scr.fill(&basis,intthr,verbose);
 
     } else {
       // Compute memory requirement
@@ -289,7 +291,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	fflush(stdout);
       }
       // Don't compute small integrals
-      tab.fill(&basis,shpairthr,STRICTTOL,verbose);
+      tab.fill(&basis,intthr,verbose);
     }
 
     if(verbose)
@@ -416,7 +418,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	  }
 
 	  tab_rs.set_range_separation(omega,0.0,1.0);
-	  tab_rs.fill(basisp,shpairthr,STRICTTOL,verbose);
+	  tab_rs.fill(basisp,intthr,verbose);
 
 	  if(verbose) {
 	    printf("done (%s)\n",t.elapsed().c_str());

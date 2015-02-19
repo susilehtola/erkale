@@ -103,8 +103,6 @@ void Settings::add_scf_settings() {
   add_bool("StrictIntegrals", "Use strict integrals?", false);
   // Integral threshold
   add_double("IntegralThresh", "Integral screening threshold", 1e-10);
-  // Shell pair screening cutoff
-  add_double("ShPairThr", "Threshold for shell pair screening, (ij|ij)<thr", 1e-14);
 
   // Default orthogonalization method
   add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");

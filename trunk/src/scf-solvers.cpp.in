@@ -40,26 +40,26 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   /// Formation of Fock matrix
 #ifdef RESTRICTED
 #if defined(HF)
-#define form_fock(sol) Fock_RHF(sol,occs,tol); nfock++;
+#define form_fock(sol) Fock_RHF(sol,occs,intthr); nfock++;
 #elif defined(DFT)
-#define form_fock(sol) Fock_RDFT(sol,occs,dft,grid,nlgrid,tol); nfock++;
+#define form_fock(sol) Fock_RDFT(sol,occs,dft,grid,nlgrid,intthr); nfock++;
 #endif
 
 #else
   // Unrestricted case: first core excited states
 
 #if defined(HALFHOLE)
-#define form_fock(sol) Fock_half_hole(sol,dft,occa,occb,grid,nlgrid,tol); nfock++;
+#define form_fock(sol) Fock_half_hole(sol,dft,occa,occb,grid,nlgrid,intthr); nfock++;
 #elif defined(FULLHOLE)
-#define form_fock(sol) Fock_full_hole(sol,dft,occa,occb,grid,nlgrid,tol); nfock++;
+#define form_fock(sol) Fock_full_hole(sol,dft,occa,occb,grid,nlgrid,intthr); nfock++;
 
   // Conventional HF and DFT
 #elif defined(HF)
-#define form_fock(sol) Fock_UHF(sol,occa,occb,tol); nfock++;
+#define form_fock(sol) Fock_UHF(sol,occa,occb,intthr); nfock++;
 #elif defined(_ROHF)
-#define form_fock(sol) Fock_ROHF(sol,occa,occb,tol); nfock++;
+#define form_fock(sol) Fock_ROHF(sol,occa,occb,intthr); nfock++;
 #elif defined(DFT)
-#define form_fock(sol) Fock_UDFT(sol,occa,occb,dft,grid,nlgrid,tol); nfock++;
+#define form_fock(sol) Fock_UDFT(sol,occa,occb,dft,grid,nlgrid,intthr); nfock++;
 #endif
 #endif
 
@@ -159,16 +159,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   // Dipole moment
   arma::vec dipmom;
 
-  // Tolerance for screening and screening efficiency
-  double tol;
-
-  // Determine tolerance to use
-  if(strictint)
-    tol=DBL_EPSILON;
-  else
-    tol=intthr;
-  bool strict(strictint);
-
   // Change in energy from last iteration
   double deltaE=0;
 
@@ -236,11 +226,11 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       }
       if(fill) {
 	tab_rs.set_range_separation(omega,0.0,1.0);
-	tab_rs.fill(basisp,shpairthr,STRICTTOL,verbose);
+	tab_rs.fill(basisp,intthr,verbose);
       }
     } else {
       scr_rs.set_range_separation(omega,0.0,1.0);
-      scr_rs.fill(basisp,shpairthr,verbose);
+      scr_rs.fill(basisp,intthr,verbose);
     }
   }
 
@@ -378,7 +368,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   chkptp->write("Restricted",1);
 #endif
   chkptp->write("Converged",converged);
-  chkptp->write("tol",tol);
   chkptp->close();
 
   // Loop:
@@ -390,19 +379,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       printf("\n ******* Iteration %4i ********\n",iiter);
 
     // Form the Fock operator.
-    if(strict || (!strict && iiter%5==1)) {
-#ifdef RESTRICTED
-      rscf_t refsol;
-#else
-      uscf_t refsol;
-#endif
-      if(iiter!=1 && direct && !strict && verbose && !densityfit)
-	printf("Restarting Fock matrix formation from scratch.\n");
-      
-      form_fock(sol);
-    } else {
-      form_fock(sol);
-    }
+    form_fock(sol);
 
     // Compute change of energy
     deltaE=sol.en.E-oldsol.en.E;
@@ -884,32 +861,10 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     chkptp->write("Restricted",1);
 #endif
     chkptp->write("Converged",converged);
-    chkptp->write("tol",tol);
     chkptp->close();
 
-    // Update screening value
-    if(direct && !strict && !densityfit) {
-      // adapted from molpro
-      double newtol=std::min(std::min(fabs(conv.deltaEmax)*1e-2,FINETOL),tol);
-
-      // Clear out old accelerator stacks
-      if(tol!=newtol && rmsdiff<=TOLCHANGE) {
-	if(verbose) {
-	  printf("\nInitial convergence achieved. Turning off incremental formation.\n");
-	  fflush(stdout);
-	}
-	diis.clear();
-#ifdef RESTRICTED
-	broyd.clear();
-#else
-	broyd_sum.clear();
-	broyd_diff.clear();
-#endif
-	// Set new tolerance
-	tol=newtol;
-      } else if(converged)
-	break;
-    } else if(converged)
+    // Check convergence
+    if(converged)
       break;
 
     iiter++;
@@ -979,16 +934,16 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     if(doforce) {
       arma::vec f;
 #if defined(RESTRICTED) && defined(HF)
-      f=force_RHF(sol,occs,tol);
+      f=force_RHF(sol,occs,intthr);
 #endif
 #if defined(UNRESTRICTED) && defined(HF)
-      f=force_UHF(sol,occa,occb,tol);
+      f=force_UHF(sol,occa,occb,intthr);
 #endif
 #if defined(RESTRICTED) && defined(DFT)
-      f=force_RDFT(sol,occs,dft,grid,nlgrid,tol);
+      f=force_RDFT(sol,occs,dft,grid,nlgrid,intthr);
 #endif
 #if defined(UNRESTRICTED) && defined(DFT)
-      f=force_UDFT(sol,occa,occb,dft,grid,nlgrid,tol);
+      f=force_UDFT(sol,occa,occb,dft,grid,nlgrid,intthr);
 #endif
 #if defined(_ROHF) || defined(FULLHOLE) || defined(HALFHOLE)
       ERROR_INFO();
