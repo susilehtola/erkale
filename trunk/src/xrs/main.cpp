@@ -225,16 +225,17 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
     chkpt.read("occb",occb);
 
     // Construct Fock matrix
-    DFTGrid grid(&augbas,verbose,set.get_bool("DFTLobatto"));
-    DFTGrid nlgrid(&augbas,verbose,set.get_bool("DFTLobatto"));
+    DFTGrid grid(&augbas,verbose,dft.lobatto);
+    DFTGrid nlgrid(&augbas,verbose,dft.lobatto);
     if(dft.adaptive) {
       // Form DFT quadrature grid
       grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
     } else {
       // Fixed size grid
-      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
+      bool strictint(set.get_bool("StrictIntegrals"));
+      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
       if(dft.nl)
-	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false);
+	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
     }
 
     // No need for extreme accuracy
