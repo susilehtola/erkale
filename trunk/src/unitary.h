@@ -239,7 +239,7 @@ class Brockett : public UnitaryFunction {
   /// Print legend
   std::string legend() const;
   /// Print progress
-  std::string status(bool lfmt=false) const;
+  std::string status(bool lfmt=false);
 
   /// Compute diagonality criterion
   double diagonality() const;
