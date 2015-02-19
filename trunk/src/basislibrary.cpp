@@ -151,7 +151,7 @@ std::string find_basis(const std::string & basisname, bool verbose) {
       if(in.is_open()) {
 	// Found basis set!
 	if(verbose)
-	  printf("Basis set ""%s"" found in file %s in %s.\n",basisname.c_str(),trialnames[it].c_str(),dirs[id].c_str());
+	  printf("Basis set ""%s"" found in file %s in %s.\n\n",basisname.c_str(),trialnames[it].c_str(),dirs[id].c_str());
 	return fname;
       }
     }

@@ -235,7 +235,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       fitlib.load_gaussian94(set.get_string("FittingBasis"));
 
       // Construct fitting basis
-      dfitbas=construct_basis(basisp->get_nuclei(),fitlib,set);
+      construct_basis(dfitbas,basisp->get_nuclei(),fitlib,set);
     }
 
     // Compute memory estimate

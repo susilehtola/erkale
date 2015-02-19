@@ -892,7 +892,8 @@ int main(int argc, char **argv) {
   baslib.load_gaussian94(basfile);
 
   // Construct basis set
-  BasisSet basis=construct_basis(atoms,baslib,set);
+  BasisSet basis;
+  construct_basis(basis,atoms,baslib,set);
 
   // Get exchange and correlation functionals and grid settings
   dft_t dft_init(parse_dft(set,true));

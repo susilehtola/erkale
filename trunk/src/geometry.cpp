@@ -405,7 +405,8 @@ double calc_E(const gsl_vector *x, void *par) {
   //  print_xyz(atoms);
 
   // Construct basis set
-  BasisSet basis=construct_basis(atoms,p->baslib,p->set);
+  BasisSet basis;
+  construct_basis(basis,atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
   enum calcd mode=run_calc(basis,p->set,false);
@@ -440,7 +441,8 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   //  print_xyz(atoms);
 
   // Construct basis set
-  BasisSet basis=construct_basis(atoms,p->baslib,p->set);
+  BasisSet basis;
+  construct_basis(basis,atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
   enum calcd mode=run_calc(basis,p->set,true);
