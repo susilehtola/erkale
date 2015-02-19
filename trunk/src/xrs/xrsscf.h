@@ -64,9 +64,9 @@ class XRSSCF : public SCF {
   size_t half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft);
 
   /// Get Fock operator for 1st core-excited state
-  void Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
+  void Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
   /// Get Fock operator for TP state
-  void Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, const uscf_t & oldsol, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
+  void Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
 };
 
 /// Find excited core orbital

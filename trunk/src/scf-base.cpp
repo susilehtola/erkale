@@ -90,6 +90,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   direct=set.get_bool("Direct");
   decfock=set.get_bool("DecFock");
   strictint=set.get_bool("StrictIntegrals");
+  intthr=set.get_double("IntegralThresh");
   shpairthr=set.get_double("ShPairThr");
 
   doforce=false;

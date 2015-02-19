@@ -315,43 +315,6 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 	  break;
 	}
 
-#if !defined(ERITABLE)
-	// Do density screening?
-
-	// Coulomb
-	bool coulskip=true;
-#ifdef DO_J
-#ifndef FORCE
-	// Screening wrt contribution to Fock matrix
-	if(intmax*std::max(Psh(is,js),Psh(ks,ls))>=tol)
-	  coulskip=false;
-#else
-	// Screening wrt contribution to energy
-	if(intmax*Psh(is,js)*Psh(ks,ls)>=tol)
-	  coulskip=false;
-#endif
-#endif
-
-	// Exchange
-	bool exchskip=true;
-#if defined(DO_K) || defined(DO_Kab)
-#ifndef force
-	// Screening wrt contribution to Fock matrix
-	if(intmax*std::max(std::max(Psh(ks,ls),Psh(is,ls)),std::max(Psh(ks,js),Psh(is,js)))>=tol)
-	  exchskip=false;
-#else
-	// Screening wrt contribution to energy
-	if(intmax*std::max(Psh(ks,ls)*Psh(is,ls),Psh(ks,js)*Psh(is,js))>=tol)
-	  exchskip=false;
-#endif
-#endif
-
-	if(coulskip && exchskip) {
-	  denskip++;
-	  continue;
-	}
-#endif // if !defined(ERITABLE)
-
 	// Increment amount of calculated integrals
 	calcd++;
 
