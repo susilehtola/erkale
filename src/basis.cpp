@@ -1460,17 +1460,19 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double 
   // and sort it
   std::stable_sort(list.begin(),list.end());
 
-  // Find out which pairs are negligible
+  // Find out which pairs are negligible.
   size_t ulimit=list.size()-1;
-  double sqrttol=sqrt(tol);
-  while(list[ulimit].eri<sqrttol)
+  // An integral (ij|kl) <= sqrt( (ij|ij) (kl|kl) ). Since the
+  // integrals are in decreasing order, the integral threshold is
+  double thr=tol/list[0].eri;
+  while(list[ulimit].eri < thr)
     ulimit--;
   if(ulimit<list.size())
     list.resize(ulimit+1);
 
   (void) verbose;
   //  if(verbose)
-  //    printf("%u shell pairs out of %u are significant.\n",(unsigned int) list.size(),(unsigned int) shellpairs.size());
+  //  printf("%u shell pairs out of %u are significant.\n",(unsigned int) list.size(),(unsigned int) shellpairs.size());
   
   /*
   FILE *out=fopen("screen.dat","w");
