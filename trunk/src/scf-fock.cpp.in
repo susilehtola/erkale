@@ -92,8 +92,6 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   Kbshort_im.zeros(Nbf,Nbf);
 #endif
 
-  double screeneff;
-
   // Form Coulomb and exchange matrices
   if(densityfit) {
 
@@ -154,20 +152,19 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(!decfock)
-	  scr.calcJK(sol.P,sol.J,Kfull,tol,&screeneff);
+	  scr.calcJK(sol.P,sol.J,Kfull,tol);
 	else {
 	  // Helper matrices
 	  arma::mat Jhlp, Khlp;
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
 	  
-	  scr.calcJK(Phlp,Jhlp,Khlp,tol,&screeneff);
+	  scr.calcJK(Phlp,Jhlp,Khlp,tol);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	  Kfull=arma::trans(decconv)*Khlp*decconv;
 	}
 	
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
-	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  fflush(stdout);
 	}
 
@@ -181,16 +178,15 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(!decfock)
-	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
+	  sol.J=scr.calcJ(sol.P,tol);
 	else {
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
+	  arma::mat Jhlp=scr.calcJ(Phlp,tol);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
-	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  fflush(stdout);
 	}
 
@@ -204,16 +200,15 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(!decfock)
-	  Kshort=scr_rs.calcK(sol.P,tol,&screeneff);
+	  Kshort=scr_rs.calcK(sol.P,tol);
 	else {
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Khlp=scr_rs.calcK(Phlp,tol,&screeneff);
+	  arma::mat Khlp=scr_rs.calcK(Phlp,tol);
 	  Kshort=arma::trans(decconv)*Khlp*decconv;
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
-	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  fflush(stdout);
 	}
       }
@@ -232,13 +227,13 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(!decfock)
-	  scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,tol,&screeneff);
+	  scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,tol);
 	else {
 	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
 	  arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
 	  
 	  arma::mat Jhlp, Kahlp, Kbhlp;
-	  scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol,&screeneff);
+	  scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	  Kafull=arma::trans(decconv)*Kahlp*decconv;
 	  Kbfull=arma::trans(decconv)*Kbhlp*decconv;
@@ -246,7 +241,6 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
-	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  fflush(stdout);
 	}
 
@@ -261,16 +255,15 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(!decfock)
-	  sol.J=scr.calcJ(sol.P,tol,&screeneff);
+	  sol.J=scr.calcJ(sol.P,tol);
 	else {
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ(Phlp,tol,&screeneff);
+	  arma::mat Jhlp=scr.calcJ(Phlp,tol);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
-	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  fflush(stdout);
 	}
 
@@ -285,19 +278,18 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
 
 	if(!decfock) {
-	  scr_rs.calcK(sol.Pa,sol.Pb,Kashort,Kbshort,tol,&screeneff);
+	  scr_rs.calcK(sol.Pa,sol.Pb,Kashort,Kbshort,tol);
 	} else {
 	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
 	  arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
 	  arma::mat Kahlp, Kbhlp;
-	  scr_rs.calcK(Pahlp,Pbhlp,Kahlp,Kbhlp,tol,&screeneff);
+	  scr_rs.calcK(Pahlp,Pbhlp,Kahlp,Kbhlp,tol);
 	  Kashort=arma::trans(decconv)*Kahlp*decconv;
 	  Kbshort=arma::trans(decconv)*Kbhlp*decconv;
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
-	  printf("Due to screening, only %.2f %% of the shell integrals were computed.\n",screeneff);
 	  fflush(stdout);
 	}
       }
