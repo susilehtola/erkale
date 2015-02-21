@@ -90,10 +90,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   direct=set.get_bool("Direct");
   decfock=set.get_bool("DecFock");
   strictint=set.get_bool("StrictIntegrals");
+
+  // Integral threshold
   intthr=set.get_double("IntegralThresh");
-  if(strictint)
-    // Strict screening
-    intthr=DBL_EPSILON;
 
   doforce=false;
 

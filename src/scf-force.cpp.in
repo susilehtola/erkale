@@ -78,7 +78,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       if(!direct)
 	scr.fill(basisp,intthr,verbose);
       
-      fcoul=scr.forceJ(sol.P,tol,NULL);
+      fcoul=scr.forceJ(sol.P,tol);
     }
   } else {
 #endif
@@ -87,10 +87,10 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       scr.fill(basisp,intthr,verbose);
     
 #ifdef RESTRICTED
-    scr.forceJK(sol.P,fcoul,fx_long,tol,NULL);
+    scr.forceJK(sol.P,fcoul,fx_long,tol);
 #else
     arma::vec fxa_long, fxb_long;
-    scr.forceJK(sol.Pa,sol.Pb,fcoul,fxa_long,fxb_long,tol,NULL);
+    scr.forceJK(sol.Pa,sol.Pb,fcoul,fxa_long,fxb_long,tol);
     fx_long=fxa_long+fxb_long;
 #endif
       
@@ -109,10 +109,10 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       
     // Exchange forces
 #ifdef RESTRICTED
-    fx_short=scr_rs.forceK(sol.P,tol,NULL);
+    fx_short=scr_rs.forceK(sol.P,tol);
 #else
     arma::vec fxa_short, fxb_short;
-    scr_rs.forceK(sol.Pa,sol.Pb,fxa_short,fxb_short,tol,NULL);
+    scr_rs.forceK(sol.Pa,sol.Pb,fxa_short,fxb_short,tol);
     fx_short=fxa_short+fxb_short;
 #endif
   }

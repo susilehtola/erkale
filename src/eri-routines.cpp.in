@@ -27,9 +27,9 @@ void ERItable::fill(const BasisSet * basp, double tol, bool verbose) {
 
 #if defined(CALCJKab)
 #ifndef FORCE
-void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const
+void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol) const
 #else
-void ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fJ, arma::vec & fKa, arma::vec & fKb, double tol, double *eff) const
+void ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fJ, arma::vec & fKa, arma::vec & fKb, double tol) const
 #endif
 {
   // Compute total density for Coulomb matrix
@@ -38,9 +38,9 @@ void ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & 
 
 #if defined(CALCKab)
 #ifndef FORCE
-void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol, double *eff) const
+void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol) const
 #else
-void ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fKa, arma::vec & fKb, double tol, double *eff) const
+void ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fKa, arma::vec & fKb, double tol) const
 #endif
 {
   // Compute total density for Coulomb matrix
@@ -50,28 +50,28 @@ void ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & f
 
 #if defined(CALCJK)
 #ifndef FORCE
-void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol, double *eff) const {
+void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol) const {
 #else
-void ERIscreen::forceJK(const arma::mat & P, arma::vec & fJ, arma::vec & fK, double tol, double *eff) const {
+void ERIscreen::forceJK(const arma::mat & P, arma::vec & fJ, arma::vec & fK, double tol) const {
 #endif
 #endif
 
 #if defined(CALCK)
 #ifndef FORCE
-arma::mat ERIscreen::calcK(const arma::mat & P, double tol, double *eff) const {
+arma::mat ERIscreen::calcK(const arma::mat & P, double tol) const {
   arma::mat K;
 #else
-arma::vec ERIscreen::forceK(const arma::mat & P, double tol, double *eff) const {
+arma::vec ERIscreen::forceK(const arma::mat & P, double tol) const {
   arma::vec fK;
 #endif
 #endif
 
 #if defined(CALCJ)
 #ifndef FORCE
-arma::mat ERIscreen::calcJ(const arma::mat & P, double tol, double *eff) const {
+arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
   arma::mat J;
 #else
-arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const {
+arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
   arma::vec fJ;
 #endif
 #endif
@@ -940,11 +940,8 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol, double *eff) const 
 #endif
     } // end parallel region
 
-#ifndef ERITABLE
-  if(eff!=NULL) {
-    *eff=calcd*100.0/(calcd+intskip);
-  }
-#endif
+  double eff=calcd*100.0/(calcd+intskip);
+  (void) eff;
 
 #ifdef CALCJ
 #ifndef FORCE

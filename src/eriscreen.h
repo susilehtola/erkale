@@ -74,38 +74,38 @@ class ERIscreen {
   /// Form screening matrix
   void fill(const BasisSet * basis, double shtol, bool verbose=true);
 
-  /// Calculate Coulomb matrix with tolerance tol for integrals, store efficiency of screening in *eff
-  arma::mat calcJ(const arma::mat & R, double tol, double *eff=NULL) const;
-  /// Calculate exchange matrix with tolerance tol for integrals, store efficiency of screening in *eff
-  arma::mat calcK(const arma::mat & R, double tol, double *eff=NULL) const;
-  /// Calculate  exchange matrices with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
-  void calcK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & Ka, arma::mat & Kb, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff
-  void calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
-  void calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol, double *eff=NULL) const;
+  /// Calculate Coulomb matrix with tolerance tol for integrals
+  arma::mat calcJ(const arma::mat & R, double tol) const;
+  /// Calculate exchange matrix with tolerance tol for integrals
+  arma::mat calcK(const arma::mat & R, double tol) const;
+  /// Calculate  exchange matrices with tolerance tol for integrals
+  void calcK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & Ka, arma::mat & Kb, double tol) const;
+  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals
+  void calcJK(const arma::mat & R, arma::mat & J, arma::mat & K, double tol) const;
+  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, unrestricted calculation
+  void calcJK(const arma::mat & Ra, const arma::mat & Rb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol) const;
 
   /* Force calculation */
 
-  /// Calculate Coulomb force with tolerance tol for integrals, store efficiency of screening in *eff
-  arma::vec forceJ(const arma::mat & R, double tol, double *eff=NULL) const;
-  /// Calculate exchange force with tolerance tol for integrals, store efficiency of screening in *eff
-  arma::vec forceK(const arma::mat & R, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
-  void forceK(const arma::mat & Ra, const arma::mat & Rb, arma::vec & fKa, arma::vec & fKb, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, store efficiency of screening in *eff
-  void forceJK(const arma::mat & R, arma::vec & fJ, arma::vec & fK, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
-  void forceJK(const arma::mat & Ra, const arma::mat & Rb, arma::vec & fJ, arma::vec & fKa, arma::vec & fKb, double tol, double *eff=NULL) const;
+  /// Calculate Coulomb force with tolerance tol for integrals
+  arma::vec forceJ(const arma::mat & R, double tol) const;
+  /// Calculate exchange force with tolerance tol for integrals
+  arma::vec forceK(const arma::mat & R, double tol) const;
+  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, unrestricted calculation
+  void forceK(const arma::mat & Ra, const arma::mat & Rb, arma::vec & fKa, arma::vec & fKb, double tol) const;
+  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals
+  void forceJK(const arma::mat & R, arma::vec & fJ, arma::vec & fK, double tol) const;
+  /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, unrestricted calculation
+  void forceJK(const arma::mat & Ra, const arma::mat & Rb, arma::vec & fJ, arma::vec & fKa, arma::vec & fKb, double tol) const;
 
   /* Versions for SIC routines */
 
-  /// Calculate Coulomb matrix with tolerance tol for integrals, store efficiency of screening in *eff
-  std::vector<arma::mat> calcJ(const std::vector<arma::mat> & R, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff
-  void calcJK(const std::vector<arma::mat> & R, std::vector<arma::mat> & J, std::vector<arma::mat> & K, double tol, double *eff=NULL) const;
-  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, store efficiency of screening in *eff, unrestricted calculation
-  void calcJK(const std::vector<arma::mat> & Ra, const std::vector<arma::mat> & Rb, std::vector<arma::mat> & J, std::vector<arma::mat> & Ka, std::vector<arma::mat> & Kb, double tol, double *eff=NULL) const;
+  /// Calculate Coulomb matrix with tolerance tol for integrals
+  std::vector<arma::mat> calcJ(const std::vector<arma::mat> & R, double tol) const;
+  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals
+  void calcJK(const std::vector<arma::mat> & R, std::vector<arma::mat> & J, std::vector<arma::mat> & K, double tol) const;
+  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, unrestricted calculation
+  void calcJK(const std::vector<arma::mat> & Ra, const std::vector<arma::mat> & Rb, std::vector<arma::mat> & J, std::vector<arma::mat> & Ka, std::vector<arma::mat> & Kb, double tol) const;
 };
 
 #include "basis.h"

@@ -128,7 +128,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   Timer ttot;
 
   // DIIS error
-  double diiserr;
+  double diiserr=DBL_MAX;
   // Was DIIS succesful?
   bool diissucc=false;
 
@@ -372,6 +372,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
   // Loop:
   int iiter=1;
+  
   while(iiter<=maxiter) {
     Timer titer;
 
@@ -383,7 +384,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
     // Compute change of energy
     deltaE=sol.en.E-oldsol.en.E;
-
 
 #ifdef RESTRICTED
     // Update DIIS stack of matrices
