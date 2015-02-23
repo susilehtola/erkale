@@ -71,8 +71,8 @@ class ERIscreen {
   /// Get range separation
   void get_range_separation(double & omega, double & alpha, double & beta);
 
-  /// Form screening matrix
-  void fill(const BasisSet * basis, double shtol, bool verbose=true);
+  /// Form screening matrix, return amount of significant shell pairs
+  size_t fill(const BasisSet * basis, double shtol, bool verbose=true);
 
   /// Calculate Coulomb matrix with tolerance tol for integrals
   arma::mat calcJ(const arma::mat & R, double tol) const;
