@@ -80,8 +80,8 @@ class ERItable {
   /// Get range separation
   void get_range_separation(double & omega, double & alpha, double & beta);
 
-  /// Fill table
-  void fill(const BasisSet * basis, double thr, bool verbose=true);
+  /// Fill table, return amount of significant shell pairs
+  size_t fill(const BasisSet * basis, double thr, bool verbose=true);
 
   /// Compute number of integrals
   size_t N_ints(const BasisSet * basis) const;

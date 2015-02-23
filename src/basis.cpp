@@ -1446,9 +1446,9 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   return shellpairs;
 }
 
-std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double tol, bool verbose) const {
+std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double tol, double omega, double alpha, double beta, bool verbose) const {
   // Get the screening matrix
-  screen=eri_screening();
+  screen=eri_screening(omega,alpha,beta);
 
   // Fill out list
   std::vector<struct eripair_t> list(shellpairs.size());
@@ -1471,8 +1471,8 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double 
     list.resize(ulimit+1);
 
   (void) verbose;
-  //  if(verbose)
-  //  printf("%u shell pairs out of %u are significant.\n",(unsigned int) list.size(),(unsigned int) shellpairs.size());
+  //if(verbose)
+  // printf("%u shell pairs out of %u are significant.\n",(unsigned int) list.size(),(unsigned int) shellpairs.size());
   
   /*
   FILE *out=fopen("screen.dat","w");
@@ -2220,7 +2220,7 @@ arma::mat BasisSet::potential(coords_t r) const {
   return V;
 }
 
-arma::mat BasisSet::eri_screening() const {
+arma::mat BasisSet::eri_screening(double omega, double alpha, double beta) const {
  // Get unique pairs
  std::vector<shellpair_t> pairs=get_unique_shellpairs();
 
@@ -2230,9 +2230,14 @@ arma::mat BasisSet::eri_screening() const {
 #pragma omp parallel
 #endif
   {
-    ERIWorker eri(get_max_am(),get_max_Ncontr());
+    ERIWorker *eri;
     const std::vector<double> * erip;
-
+    
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri=new ERIWorker(get_max_am(),get_max_Ncontr());
+    else
+      eri=new ERIWorker_srlr(get_max_am(),get_max_Ncontr(),omega,alpha,beta);
+    
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
@@ -2241,8 +2246,8 @@ arma::mat BasisSet::eri_screening() const {
       size_t j=pairs[ip].js;
 
       // Compute integrals
-      eri.compute(&shells[i],&shells[j],&shells[i],&shells[j]);
-      erip=eri.getp();
+      eri->compute(&shells[i],&shells[j],&shells[i],&shells[j]);
+      erip=eri->getp();
       // Get maximum value
       double m=0.0;
       for(size_t k=0;k<(*erip).size();k++)
@@ -2252,6 +2257,8 @@ arma::mat BasisSet::eri_screening() const {
       screen(i,j)=m;
       screen(j,i)=m;
     }
+
+    delete eri;
   }
 
   return screen;

@@ -22,7 +22,7 @@
 /* Function definitions */
 
 #if defined(ERITABLE)
-void ERItable::fill(const BasisSet * basp, double tol, bool verbose) {
+size_t ERItable::fill(const BasisSet * basp, double tol, bool verbose) {
 #endif
 
 #if defined(CALCJKab)
@@ -177,7 +177,7 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
 #ifdef ERITABLE
   // Get ERI screening matrix and list of unique shell pairs
   arma::mat screen;
-  std::vector<eripair_t> shpairs=basp->get_eripairs(screen,tol,verbose);
+  std::vector<eripair_t> shpairs=basp->get_eripairs(screen,tol,omega,alpha,beta,verbose);
 #endif
   // Get number of shell pairs
   const size_t Npairs=shpairs.size();
@@ -943,6 +943,10 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
   double eff=calcd*100.0/(calcd+intskip);
   (void) eff;
 
+#ifdef ERITABLE
+  return shpairs.size();
+#endif
+  
 #ifdef CALCJ
 #ifndef FORCE
   return J;

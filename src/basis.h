@@ -255,7 +255,7 @@ class BasisSet {
   std::vector<shellpair_t> get_unique_shellpairs() const;
 
   /// Get list of ERI pairs. Screening matrix will also be calculated
-  std::vector<eripair_t> get_eripairs(arma::mat & screen, double thr=1e-11, bool verbose=false) const;
+  std::vector<eripair_t> get_eripairs(arma::mat & screen, double thr, double omega=0.0, double alpha=1.0, double beta=0.0, bool verbose=false) const;
 
   /// Convert contractions from normalized primitives to unnormalized primitives
   void convert_contractions();
@@ -415,7 +415,7 @@ class BasisSet {
   arma::mat potential(coords_t r) const;
 
   /// Calculate ERI screening matrix
-  arma::mat eri_screening() const;
+  arma::mat eri_screening(double omega=0.0, double alpha=1.0, double beta=0.0) const;
 
   /// Calculate nuclear Pulay forces
   arma::vec nuclear_pulay(const arma::mat & P) const;

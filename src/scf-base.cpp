@@ -262,22 +262,30 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   } else  {
     // Compute ERIs
     if(direct) {
-
+      size_t Npairs;
       // Form decontracted basis set and get the screening matrix
       decbas=basis.decontract(decconv);
-
+      
       if(verbose) {
 	t.set();
 	printf("Forming ERI screening matrix ... ");
 	fflush(stdout);
       }
-
+      
       if(decfock)
 	// Use decontracted basis
-	scr.fill(&decbas,intthr,verbose);
+	Npairs=scr.fill(&decbas,intthr,verbose);
       else
 	// Use contracted basis
-	scr.fill(&basis,intthr,verbose);
+	Npairs=scr.fill(&basis,intthr,verbose);
+      
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	if(decfock)
+	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) decbas.get_unique_shellpairs().size());
+	else
+	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+      }
 
     } else {
       // Compute memory requirement
@@ -289,11 +297,13 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	fflush(stdout);
       }
       // Don't compute small integrals
-      tab.fill(&basis,intthr,verbose);
-    }
+      size_t Npairs=tab.fill(&basis,intthr,verbose);
 
-    if(verbose)
-      printf("done (%s)\n",t.elapsed().c_str());
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+      }
+    }
   }
 
   if(verbose) {
@@ -411,15 +421,16 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	if(fill) {
 	  t.set();
 	  if(verbose) {
-	    printf("Computing short-range ERIs ... ");
+	    printf("Computing short-range repulsion integrals ... ");
 	    fflush(stdout);
 	  }
 
 	  tab_rs.set_range_separation(omega,0.0,1.0);
-	  tab_rs.fill(basisp,intthr,verbose);
+	  size_t Np=tab_rs.fill(basisp,intthr,verbose);
 
 	  if(verbose) {
 	    printf("done (%s)\n",t.elapsed().c_str());
+	    printf("%i short-range shell pairs are significant.\n",(int) Np);
 	    fflush(stdout);
 	  }
 	}
