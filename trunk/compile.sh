@@ -231,12 +231,6 @@ if [ ! -d ${topdir}/armadillo-${ARMAVER} ]; then
  if [ ! -h armadillo ]; then
   ln -sf armadillo-${ARMAVER} armadillo
  fi
-
- # Patch configuration
- cd armadillo-${ARMAVER}
- sed -i 's|// #define ARMA_USE_BLAS|#define ARMA_USE_BLAS|g' include/armadillo_bits/config.hpp 
- sed -i 's|// #define ARMA_USE_LAPACK|#define ARMA_USE_LAPACK|g' include/armadillo_bits/config.hpp 
- sed -i 's|// #define ARMA_NO_DEBUG|#define ARMA_NO_DEBUG|g' include/armadillo_bits/config.hpp
 fi
 
 echo "Done compiling libraries."
