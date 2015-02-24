@@ -19,12 +19,6 @@
 #include "scf.h"
 #include <sstream>
 
-// Screen integrals? (Direct calculations)
-#define SCREENING
-
-// Integral screening cutoff
-#define SCRTHR 1e-12
-
 // \delta parameter in Eichkorn et al
 #define DELTA 1e-9
 
@@ -48,6 +42,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   // Fill index helper
   iidx=i_idx(Nbf);
   // Fill list of shell pairs
+  arma::mat screen;
   orbpairs=orbbas.get_eripairs(screen,erithr);
 
   // Get orbital shells, auxiliary shells and dummy shell
@@ -230,13 +225,6 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
   // Memory taken up by  ( \alpha | \mu \nu)
   if(!dir)
     Nmem+=(Na*No*(No+1)/2)*sizeof(double);
-#ifdef SCREENING
-  else {
-    // Memory taken up by screening matrix
-    size_t Nsh=orbbas.get_Nshells();
-    Nmem+=Nsh*Nsh*sizeof(double);
-  }
-#endif
 
   // Memory taken by (\alpha | \beta) and its inverse
   Nmem+=2*Na*Na*sizeof(double);
@@ -285,12 +273,6 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	size_t imus=orbpairs[ip].is;
 	size_t inus=orbpairs[ip].js;
-
-#ifdef SCREENING
-	// Do we need to compute the integral?
-	if(screen(imus,inus)<SCRTHR)
-	  continue;
-#endif
 
 	size_t Nmu=orbshells[imus].get_Nbf();
 	size_t Nnu=orbshells[inus].get_Nbf();
@@ -394,12 +376,6 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	size_t imus=orbpairs[ip].is;
 	size_t inus=orbpairs[ip].js;
-
-#ifdef SCREENING
-	// Do we need to compute the integral?
-	if(screen(imus,inus)<SCRTHR)
-	  continue;
-#endif
 
 	size_t Nmu=orbshells[imus].get_Nbf();
 	size_t Nnu=orbshells[inus].get_Nbf();
@@ -519,13 +495,6 @@ arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
 	  size_t imus=orbpairs[ip].is;
 	  size_t inus=orbpairs[ip].js;
 
-
-#ifdef SCREENING
-	  // Do we need to compute the integral?
-	  if(screen(imus,inus)<SCRTHR)
-	    continue;
-#endif
-
 	  size_t Na=auxshells[ias].get_Nbf();
 	  size_t Nmu=orbshells[imus].get_Nbf();
 	  size_t Nnu=orbshells[inus].get_Nbf();
@@ -625,13 +594,6 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 	  size_t imus=orbpairs[ip].is;
 	  size_t inus=orbpairs[ip].js;
 
-
-#ifdef SCREENING
-	// Do we need to compute the integral?
-	  if(screen(imus,inus)<SCRTHR)
-	    continue;
-#endif
-
 	  size_t Na=auxshells[ias].get_Nbf();
 	  size_t Nmu=orbshells[imus].get_Nbf();
 	  size_t Nnu=orbshells[inus].get_Nbf();
@@ -712,13 +674,6 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
 
 	  size_t imus=orbpairs[ip].is;
 	  size_t inus=orbpairs[ip].js;
-
-
-#ifdef SCREENING
-	// Do we need to compute the integral?
-	  if(screen(imus,inus)<SCRTHR)
-	    continue;
-#endif
 
 	  size_t Na=auxshells[ias].get_Nbf();
 	  size_t Nmu=orbshells[imus].get_Nbf();
@@ -871,12 +826,6 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
       size_t imus=orbpairs[ip].is;
       size_t inus=orbpairs[ip].js;
 
-#ifdef SCREENING
-      // Do we need to compute the integral?
-      if(screen(imus,inus)<SCRTHR)
-	continue;
-#endif
-
       size_t Nmu=orbshells[imus].get_Nbf();
       size_t Nnu=orbshells[inus].get_Nbf();
 
@@ -1015,12 +964,6 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	size_t imus=orbpairs[ip].is;
 	size_t inus=orbpairs[ip].js;
-
-#ifdef SCREENING
-	// Do we need to compute the integral?
-	if(screen(imus,inus)<SCRTHR)
-	  continue;
-#endif
 
 	// Parallellize auxiliary loop to avoid critical sections.
 #ifdef _OPENMP
