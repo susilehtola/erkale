@@ -85,7 +85,7 @@ class DensityFit {
   size_t dummyind;
 
   /// List of unique orbital shell pairs
-  std::vector<shellpair_t> orbpairs;
+  std::vector<eripair_t> orbpairs;
 
   /// Index helper
   std::vector<size_t> iidx;
@@ -118,8 +118,9 @@ class DensityFit {
    * Compute integrals, use given linear dependency threshold. The HF
    * flag here controls formation of (a|b)^{-1/2} and (a|b)^{-1}; the
    * HF routine should be more tolerant of linear dependencies in the basis.
+   * Returns amount of significant orbital shell pairs.
    */
-  void fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double threshold, bool hf=false);
+  size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, bool hf=false);
   /// Compute index in integral table
   size_t idx(size_t ia, size_t imu, size_t inu) const;
 
