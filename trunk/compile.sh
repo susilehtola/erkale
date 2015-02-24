@@ -21,11 +21,9 @@ export CPP="${CC} -E"
 # Fortran preprocessor
 export FCCPP="${FC} -E"
 
-# C flags to use. 
-#For new versions of GCC on modern x86 hardware
-#export CFLAGS="-Wall -g -O2 -funroll-loops -fPIC -march=native -msse3"
-#For older versions
-export CFLAGS="-Wall -g -O2 -funroll-loops -fPIC -msse2"
+# C flags to use. For older compilers you may need to specify the architecture
+# by hand.
+export CFLAGS="-Wall -g -O2 -fPIC -march=native"
 
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
