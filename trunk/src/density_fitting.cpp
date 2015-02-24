@@ -35,7 +35,7 @@ DensityFit::~DensityFit() {
 }
 
 
-void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double threshold, bool hartreefock) {
+size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double erithr, double linthr, bool hartreefock) {
   // Construct density fitting basis
 
   // Store amount of functions
@@ -48,7 +48,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
   // Fill index helper
   iidx=i_idx(Nbf);
   // Fill list of shell pairs
-  orbpairs=orbbas.get_unique_shellpairs();
+  orbpairs=orbbas.get_eripairs(screen,erithr);
 
   // Get orbital shells, auxiliary shells and dummy shell
   orbshells=orbbas.get_shells();
@@ -112,7 +112,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     // Count linearly independent vectors
     size_t Nind=0;
     for(size_t i=0;i<abval.n_elem;i++)
-      if(abval(i)>=threshold)
+      if(abval(i)>=linthr)
 	Nind++;
 
     // and drop the linearly dependent ones
@@ -130,12 +130,6 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     // Just RI-J, so use faster method from Eichkorn et al to form ab_inv only
     ab_inv=arma::inv(ab + DELTA*arma::eye(ab.n_rows,ab.n_cols));
   }
-
-#ifdef SCREENING
-  // Then, form the screening matrix
-  if(direct)
-    form_screening();
-#endif
 
   // Then, compute the diagonal integrals
   a_mu.resize(Naux*Nbf);
@@ -212,38 +206,7 @@ void DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir
     }
   }
 
-}
-
-void DensityFit::form_screening() {
-  screen.zeros(orbshells.size(),orbshells.size());
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-    ERIWorker eri(maxam,maxcontr);
-    const std::vector<double> * erip;
-
-    for(size_t ip=0;ip<orbpairs.size();ip++) {
-      // The shells in question are
-      size_t is=orbpairs[ip].is;
-      size_t js=orbpairs[ip].js;
-
-      // Compute ERIs
-      eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
-      erip=eri.getp();
-
-	// Find out maximum value
-      double max=0.0;
-      for(size_t i=0;i<(*erip).size();i++)
-	if(fabs((*erip)[i])>max)
-	  max=(*erip)[i];
-      max=sqrt(max);
-
-      // Store value
-      screen(is,js)=max;
-      screen(js,is)=max;
-    }
-  }
+  return orbpairs.size();
 }
 
 size_t DensityFit::idx(size_t ia, size_t imu, size_t inu) const {
@@ -806,12 +769,6 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
   // The force
   arma::vec f(3*Nnuc);
   f.zeros();
-
-#ifdef SCREENING
-  // Form the screening matrix if not formed already
-  if(!direct)
-    form_screening();
-#endif
 
   // First part: f = *#* 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a  
 #ifdef _OPENMP

@@ -252,10 +252,11 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     }
 
     // Fill the basis
-    dfit.fill(*basisp,dfitbas,direct,fitthr,rik);
+    size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,rik);
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
+      printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
       printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
       fflush(stdout);
     }
