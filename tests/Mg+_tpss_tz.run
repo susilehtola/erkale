@@ -1,11 +1,13 @@
 # Magnesium cation
 System Mg.xyz
 Method mgga_x_tpss-mgga_c_tpss
+Basis cc-pVTZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
 Charge 1
 Multiplicity 2
-Basis cc-pVTZ
 Guess Core
 DFTGrid 50 -302
 Logfile Mg+_tpss_tz.log
 SaveChk Mg+_tpss_tz.chk
-DensityFitting false

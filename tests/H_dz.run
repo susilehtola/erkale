@@ -1,8 +1,13 @@
 # Hydrogen atom
 System H.xyz
-Multiplicity 2
 Method HF
 Basis cc-pVDZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
+Multiplicity 2
 Guess Core
+
+
 Logfile H_dz.log
 SaveChk H_dz.chk

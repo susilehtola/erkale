@@ -2,6 +2,9 @@
 System water_cluster_xrs.xyz
 Method gga_x_pbe-gga_c_pbe
 Basis aug-cc-pVDZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
 LoadChk water_cluster.chk
 Logfile water_cluster_xch.log
 SaveChk water_cluster_xch.chk

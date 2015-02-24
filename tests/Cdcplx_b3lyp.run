@@ -2,5 +2,12 @@
 System cd-cplx.xyz
 Method hyb_gga_xc_b3lyp
 Basis 3-21G
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
+
+
+
+
 Logfile Cdcplx_b3lyp.log
 SaveChk Cdcplx_b3lyp.chk

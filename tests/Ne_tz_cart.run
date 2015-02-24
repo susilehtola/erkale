@@ -2,6 +2,9 @@
 System Ne.xyz
 Method HF
 Basis cc-pVTZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
 UseLM false
 Guess Core
 Logfile Ne_tz_cart.log

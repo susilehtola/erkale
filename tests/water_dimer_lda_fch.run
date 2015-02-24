@@ -2,9 +2,12 @@
 System water_dimer_xrs.xyz
 Method lda_x-lda_c_pw
 Basis aug-cc-pVDZ
-Logfile water_dimer_lda_fch.log
-SaveChk water_dimer_lda_fch.chk
 DensityFitting false
 Direct false
+IntegralThresh 1e-14
 XRSMethod fch
+
+
 LoadChk water_dimer_lda.chk
+Logfile water_dimer_lda_fch.log
+SaveChk water_dimer_lda_fch.chk

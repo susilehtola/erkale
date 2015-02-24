@@ -2,9 +2,12 @@
 System water_cluster_xrs.xyz
 Method gga_x_pbe-gga_c_pbe
 Basis aug-cc-pVDZ
+DensityFitting true
+Direct true
+IntegralThresh 1e-14
+XRSMethod TP
+
+
 LoadChk water_cluster.chk
 Logfile water_cluster_xrs.log
 SaveChk water_cluster_xrs.chk
-DensityFitting true
-Direct true
-XRSMethod TP

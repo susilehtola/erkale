@@ -2,8 +2,14 @@
 System Ne.xyz
 Method mgga_x_tpss-mgga_c_tpss
 Basis cc-pVTZ
-Guess Core
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
+Guess Corex
 DFTGrid 50 -302
+
+
 Logfile Ne_tpss_tz.log
 SaveChk Ne_tpss_tz.chk
-DensityFitting false
+
+

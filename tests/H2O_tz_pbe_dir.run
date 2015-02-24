@@ -2,7 +2,13 @@
 System H2O.xyz
 Method gga_x_pbe-gga_c_pbe
 Basis cc-pVTZ
+DensityFitting false
+Direct true
+IntegralThresh 1e-14
+
+
+
+
 Logfile H2O_tz_pbe_dir.log
 SaveChk H2O_tz_pbe_dir.chk
-Direct true
-DensityFitting false
+

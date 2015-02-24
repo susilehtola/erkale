@@ -2,7 +2,12 @@
 System H2O.xyz
 Method mgga_x_tpss-mgga_c_tpss
 Basis cc-pVTZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
+
+
+
+
 Logfile H2O_tz_tpss.log
 SaveChk H2O_tz_tpss.chk
-Direct false
-DensityFitting false
