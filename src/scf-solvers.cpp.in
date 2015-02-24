@@ -795,6 +795,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     if(verbose) {
       printf("\n");
       printf("%-30s: %e\n","DIIS error",diiserr);
+      printf("%-30s: %e\n","Energy change",deltaE);
       printf("%-30s: %e\n","Max total density change",maxdiff);
       printf("%-30s: %e\n","Max rms   density change",rmsdiff);
 #ifndef RESTRICTED
