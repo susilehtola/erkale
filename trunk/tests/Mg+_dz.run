@@ -1,9 +1,13 @@
 # Magnesium cation
 System Mg.xyz
 Method HF
+Basis cc-pVDZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
+
+Guess Core
 Charge 1
 Multiplicity 2
-Basis cc-pVDZ
-Guess Core
 Logfile Mg+_dz.log
 SaveChk Mg+_dz.chk

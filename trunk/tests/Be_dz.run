@@ -2,6 +2,12 @@
 System Be.xyz
 Method HF
 Basis cc-pVDZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
 Guess Core
+
+
+
 Logfile Be_dz.log
 SaveChk Be_dz.chk

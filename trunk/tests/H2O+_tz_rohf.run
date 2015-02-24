@@ -1,10 +1,13 @@
 # Water molecule
 System H2O.xyz
-Charge 1
-Multiplicity 2
 Method ROHF
 Basis cc-pVTZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
+Charge 1
+Multiplicity 2
+
+
 Logfile H2O+_tz_rohf.log
 SaveChk H2O+_tz_rohf.chk
-Direct false
-DensityFitting false

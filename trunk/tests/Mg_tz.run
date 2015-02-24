@@ -2,6 +2,11 @@
 System Mg.xyz
 Method HF
 Basis cc-pVTZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
 Guess Core
+
+
 Logfile Mg_tz.log
 SaveChk Mg_tz.chk

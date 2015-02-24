@@ -2,8 +2,11 @@
 System H2O.xyz
 Method gga_x_pbe-gga_c_pbe
 Basis cc-pVTZ
-UseLM false
-Logfile H2O_tz_pbe_cart.log
-SaveChk H2O_tz_pbe_cart.chk
 Direct false
 DensityFitting false
+IntegralThresh 1e-14
+UseLM false
+
+
+Logfile H2O_tz_pbe_cart.log
+SaveChk H2O_tz_pbe_cart.chk

@@ -2,6 +2,12 @@
 System H2O.xyz
 Method HF
 Basis cc-pVQZ
+DensityFitting false
+Direct true
+IntegralThresh 1e-14
+
+
+
+
 Logfile H2O_qz_dir.log
 SaveChk H2O_qz_dir.chk
-Direct true

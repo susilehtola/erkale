@@ -2,8 +2,12 @@
 System Ne.xyz
 Method lda_x-lda_c_pw
 Basis cc-pVTZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
 Guess Core
 DFTGrid 50 -302
+
+
 Logfile Ne_lda_tz.log
 SaveChk Ne_lda_tz.chk
-DensityFitting false

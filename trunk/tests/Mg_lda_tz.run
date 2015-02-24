@@ -2,8 +2,13 @@
 System Mg.xyz
 Method lda_x-lda_c_pw
 Basis cc-pVTZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
 Guess Core
 DFTGrid 50 -302
+
+
 Logfile Mg_lda_tz.log
 SaveChk Mg_lda_tz.chk
-DensityFitting false
+
