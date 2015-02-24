@@ -17,6 +17,7 @@
 
 
 #include "eritable.h"
+#include "eri_digest.h"
 #include "integrals.h"
 #include "mathf.h"
 #include "stringutil.h"
@@ -56,170 +57,161 @@ void ERItable::get_range_separation(double & w, double & a, double & b) {
   b=beta;
 }
 
-size_t ERItable::N_ints(const BasisSet * basp) const {
-  // Number of basis functions
-  size_t Nbas=basp->get_Nbf();
-  // Number of symmetry irreducible integrals
-  size_t N=Nbas*(Nbas+1)*(Nbas*Nbas+Nbas+2)/8;
+size_t ERItable::N_ints(const BasisSet * basp, double thr) {
+  // Get ERI pairs
+  shpairs=basp->get_eripairs(screen, thr, omega, alpha, beta);
+  
+  // Form offset table and calculate amount of integrals
+  size_t N=0;
+  shoff.resize(shpairs.size());
 
+  shoff[0]=0;
+  for(size_t ip=0;ip<shpairs.size()-1;ip++) {
+    size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+    for(size_t jp=0;jp<=ip;jp++) {
+      N+=Nij*shpairs[jp].Ni*shpairs[jp].Nj;
+    }
+    shoff[ip+1]=N;
+  }
+
+  // Contribution from last shell (no importance to offset)
+  size_t ip=shpairs.size()-1;
+  size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+  for(size_t jp=0;jp<=ip;jp++) {
+    N+=Nij*shpairs[jp].Ni*shpairs[jp].Nj;
+  }
+  
   return N;
-}
-
-size_t ERItable::memory_estimate(const BasisSet * basp) const {
-  // Compute size of table
-  return sizeof(double)*N_ints(basp);
-}
-
-size_t ERItable::idx(size_t i, size_t j, size_t k, size_t l) const {
-  if(i<j)
-    std::swap(i,j);
-  if(k<l)
-    std::swap(k,l);
-
-  size_t ij=iidx[i]+j;
-  size_t kl=iidx[k]+l;
-
-  if(ij<kl)
-    std::swap(ij,kl);
-
-  return iidx[ij]+kl;
-}
-
-void ERItable::print() const {
-  for(size_t i=0;i<ints.size();i++)
-    printf("%i\t%e\n",(int) i,ints[i]);
-  printf("\n");
-}
-
-size_t ERItable::count_nonzero() const {
-  size_t n=0;
-  for(size_t i=0;i<ints.size();i++)
-    //    if(ints[i]>DBL_EPSILON)
-    if(ints[i]>DBL_MIN)
-      n++;
-  return n;
-}
-
-double ERItable::getERI(size_t i, size_t j, size_t k, size_t l) const {
-  return ints[idx(i,j,k,l)];
-}
-
-std::vector<double> & ERItable::get() {
-  return ints;
 }
 
 size_t ERItable::get_N() const {
   return ints.size();
 }
 
-arma::mat ERItable::calcJ(const arma::mat & R) const {
-  // Calculate Coulomb matrix
-
-  // Size of basis set
-  size_t N=R.n_cols;
-
-  // Returned matrix
-  arma::mat J(N,N);
+arma::mat ERItable::calcJ(const arma::mat & P) const {
+  arma::mat J(P);
   J.zeros();
 
-  // Index helpers
-  size_t i, j;
-  // The (ij) element in the J array
-  double tmp;
-
-  // Loop over matrix elements
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic) private(i,j,tmp)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<pairs.size();ip++) {
-    // The relevant indices are
-    i=pairs[ip].i;
-    j=pairs[ip].j;
+  {
+    arma::mat Jwrk(J);
 
-    // Loop over density matrix
-    tmp=0.0;
-    for(size_t k=0;k<N;k++)
-      for(size_t l=0;l<N;l++) {
-	tmp+=R(k,l)*getERI(i,j,k,l);
-	//	  printf("J(%i,%i) += %e * %e\t(%i %i %i %i)\n",i,j,R(k,l),getERI(i,j,k,l),i,j,k,l);
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t ip=0;ip<shpairs.size();ip++) {
+      // Loop over second pairs
+      for(size_t jp=0;jp<=ip;jp++) {
+	// Shells on first pair
+	size_t is=shpairs[ip].is;
+	size_t js=shpairs[ip].js;
+	// and those on the second pair
+	size_t ks=shpairs[jp].is;
+	size_t ls=shpairs[jp].js;
+
+        // Calculate offset in integrals table
+	size_t ioff0(shoff[ip]);
+	size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+	for(size_t jj=0;jj<jp;jj++)
+	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
+	
+	// Digest integral block
+	digest_J(shpairs,ip,jp,P,ints,ioff0,Jwrk);
       }
+    }
 
-    // Store result
-    J(i,j)=tmp;
-    J(j,i)=tmp;
-    //      J[i,j]=tmp;
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    J+=Jwrk;
   }
 
   return J;
 }
 
-arma::mat ERItable::calcK(const arma::mat & R) const {
-  // Calculate exchange matrix
-
-  // Size of basis set
-  size_t N=R.n_cols;
-
-  // Returned matrix
-  arma::mat K(N,N);
+arma::mat ERItable::calcK(const arma::mat & P) const {
+  arma::mat K(P);
   K.zeros();
-
-  // Loop over matrix elements
+  
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<pairs.size();ip++) {
-    // The relevant indices are
-    size_t i=pairs[ip].i;
-    size_t j=pairs[ip].j;
-
-    // The (ij) element in the K array
-    double el=0.0;
-
-    // Loop over density matrix
-    for(size_t k=0;k<N;k++)
-      for(size_t l=0;l<N;l++) {
-	el+=R(k,l)*getERI(i,k,j,l);
+  {
+    arma::mat Kwrk(K);
+    
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t ip=0;ip<shpairs.size();ip++) {
+      // Loop over second pairs
+      for(size_t jp=0;jp<=ip;jp++) {
+	// Shells on first pair
+	size_t is=shpairs[ip].is;
+	size_t js=shpairs[ip].js;
+	// and those on the second pair
+	size_t ks=shpairs[jp].is;
+	size_t ls=shpairs[jp].js;
+	
+	// Calculate offset in integrals table
+	size_t ioff0(shoff[ip]);
+	size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+	for(size_t jj=0;jj<jp;jj++)
+	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
+	
+	// Digest integral block
+	digest_K(shpairs,ip,jp,double,P,ints,ioff0,Kwrk);
       }
+    }
 
-    // Store result
-    K(i,j)=el;
-    K(j,i)=el;
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    K+=Kwrk;
   }
 
   return K;
 }
 
-arma::cx_mat ERItable::calcK(const arma::cx_mat & R) const {
-  // Calculate exchange matrix
-
-  // Size of basis set
-  size_t N=R.n_cols;
-
-  // Returned matrix
-  arma::cx_mat K(N,N);
+arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
+  arma::cx_mat K(P);
   K.zeros();
-
-  // Loop over matrix elements
+  
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t ip=0;ip<pairs.size();ip++) {
-    // The relevant indices are
-    size_t i=pairs[ip].i;
-    size_t j=pairs[ip].j;
+  {
+    arma::cx_mat Kwrk(K);
+    
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t ip=0;ip<shpairs.size();ip++) {
+      // Loop over second pairs
+      for(size_t jp=0;jp<=ip;jp++) {
+	// Shells on first pair
+	size_t is=shpairs[ip].is;
+	size_t js=shpairs[ip].js;
+	// and those on the second pair
+	size_t ks=shpairs[jp].is;
+	size_t ls=shpairs[jp].js;
 
-    // The (ij) element in the K array
-    std::complex<double> el=0.0;
-
-    // Loop over density matrix
-    for(size_t k=0;k<N;k++)
-      for(size_t l=0;l<N;l++) {
-	el+=R(k,l)*getERI(i,k,j,l);
+	// Calculate offset in integrals table
+	size_t ioff0(shoff[ip]);
+	size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+	for(size_t jj=0;jj<jp;jj++)
+	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
+	
+	// Digest integral block
+	digest_K(shpairs,ip,jp,std::complex<double>,P,ints,ioff0,Kwrk);
       }
+    }
 
-    // Store result
-    K(i,j)=el;
-    K(j,i)=std::conj(el);
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    K+=Kwrk;
   }
 
   return K;

@@ -292,12 +292,12 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       size_t N;
 
       if(verbose) {
-	N=tab.memory_estimate(&basis);
-	printf("Forming table of %lu ERIs, requiring %s of memory ... ",(long unsigned int) N,memory_size(N).c_str());
+	N=tab.N_ints(&basis,intthr);
+	printf("Forming table of %u ERIs, requiring %s of memory ... ",(unsigned int) N,memory_size(N*sizeof(double)).c_str());
 	fflush(stdout);
       }
       // Don't compute small integrals
-      size_t Npairs=tab.fill(&basis,intthr,verbose);
+      size_t Npairs=tab.fill(&basis,intthr);
 
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
@@ -426,7 +426,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	  }
 
 	  tab_rs.set_range_separation(omega,0.0,1.0);
-	  size_t Np=tab_rs.fill(basisp,intthr,verbose);
+	  size_t Np=tab_rs.fill(basisp,intthr);
 
 	  if(verbose) {
 	    printf("done (%s)\n",t.elapsed().c_str());

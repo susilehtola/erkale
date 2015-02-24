@@ -29,14 +29,6 @@
 // Forward declaration
 class BasisSet;
 
-/// Helper for parallellizing loops
-typedef struct {
-  /// First basis function
-  size_t i;
-  /// Second basis function
-  size_t j;
-} bfpair_t;
-
 /**
  * \class ERItable
  *
@@ -51,23 +43,21 @@ typedef struct {
  */
 class ERItable {
  protected:
+  /// Integral pairs sorted by value
+  std::vector<eripair_t> shpairs;
+  /// Screening matrix
+  arma::mat screen;
   /// Table of integrals
   std::vector<double> ints;
-
-  /// Index helper
-  std::vector<size_t> iidx;
-  /// List of pairs
-  std::vector<bfpair_t> pairs;
-
+  /// Offset lookup
+  std::vector<size_t> shoff;
+  
   /// Range separation parameter
   double omega;
   /// Fraction of long-range (i.e. exact) exchange
   double alpha;
   /// Fraction of short-range exchange
   double beta;
-
-  /// Calculate index in integral table
-  virtual size_t idx(size_t i, size_t j, size_t k, size_t l) const;
 
  public:
   /// Constructor
@@ -81,24 +71,14 @@ class ERItable {
   void get_range_separation(double & omega, double & alpha, double & beta);
 
   /// Fill table, return amount of significant shell pairs
-  size_t fill(const BasisSet * basis, double thr, bool verbose=true);
+  size_t fill(const BasisSet * basis, double thr);
 
   /// Compute number of integrals
-  size_t N_ints(const BasisSet * basis) const;
-  /// Compute estimate of necessary memory
-  size_t memory_estimate(const BasisSet * basis) const;
-
-  /// Get ERI from table
-  double getERI(size_t i, size_t j, size_t k, size_t l) const;
+  size_t N_ints(const BasisSet * basis, double thr);
 
   /// Print ERI table
   void print() const;
 
-  /// Count nonzero elements
-  size_t count_nonzero() const;
-
-  /// Get ERI table
-  std::vector<double> & get();
   /// Get size of ERI table
   size_t get_N() const;
 

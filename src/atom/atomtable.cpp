@@ -18,7 +18,7 @@
 #include "stringutil.h"
 #include "timer.h"
 
-AtomTable::AtomTable(): ERItable() {
+AtomTable::AtomTable() {
   Nbf=0;
 }
 
@@ -80,5 +80,87 @@ void AtomTable::fill(const std::vector<bf_t> & basis, bool verbose) {
   }
 }
 
+double AtomTable::getERI(size_t i, size_t j, size_t k, size_t l) const {
+  return ints[idx(i,j,k,l)];
+}
+
 AtomTable::~AtomTable() {
 }
+
+arma::mat AtomTable::calcJ(const arma::mat & R) const {
+  // Calculate Coulomb matrix
+
+  // Size of basis set
+  size_t N=R.n_cols;
+
+  // Returned matrix
+  arma::mat J(N,N);
+  J.zeros();
+
+  // Index helpers
+  size_t i, j;
+  // The (ij) element in the J array
+  double tmp;
+
+  // Loop over matrix elements
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic) private(i,j,tmp)
+#endif
+  for(size_t ip=0;ip<pairs.size();ip++) {
+    // The relevant indices are
+    i=pairs[ip].i;
+    j=pairs[ip].j;
+
+    // Loop over density matrix
+    tmp=0.0;
+    for(size_t k=0;k<N;k++)
+      for(size_t l=0;l<N;l++) {
+	tmp+=R(k,l)*getERI(i,j,k,l);
+	//	  printf("J(%i,%i) += %e * %e\t(%i %i %i %i)\n",i,j,R(k,l),getERI(i,j,k,l),i,j,k,l);
+      }
+
+    // Store result
+    J(i,j)=tmp;
+    J(j,i)=tmp;
+    //      J[i,j]=tmp;
+  }
+
+  return J;
+}
+
+arma::mat AtomTable::calcK(const arma::mat & R) const {
+  // Calculate exchange matrix
+
+  // Size of basis set
+  size_t N=R.n_cols;
+
+  // Returned matrix
+  arma::mat K(N,N);
+  K.zeros();
+
+  // Loop over matrix elements
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ip=0;ip<pairs.size();ip++) {
+    // The relevant indices are
+    size_t i=pairs[ip].i;
+    size_t j=pairs[ip].j;
+
+    // The (ij) element in the K array
+    double el=0.0;
+
+    // Loop over density matrix
+    for(size_t k=0;k<N;k++)
+      for(size_t l=0;l<N;l++) {
+	el+=R(k,l)*getERI(i,k,j,l);
+      }
+
+    // Store result
+    K(i,j)=el;
+    K(j,i)=el;
+  }
+
+  return K;
+}
+

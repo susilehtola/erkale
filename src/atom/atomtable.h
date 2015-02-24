@@ -17,15 +17,26 @@
 #ifndef ATOMTABLE_H
 #define ATOMTABLE_H
 
-#include "../eritable.h"
 #include "integrals.h"
 
-class AtomTable : public ERItable {
+/// Helper for parallellizing loops
+typedef struct {
+  /// First basis function
+  size_t i;
+  /// Second basis function
+  size_t j;
+} bfpair_t;
+
+class AtomTable {
   /// Amount of functions
   size_t Nbf;
-
   /// Calculate index in integral table
   size_t idx(size_t i, size_t j, size_t k, size_t l) const;
+  /// List of pairs
+  std::vector<bfpair_t> pairs;
+  /// Table of integrals
+  std::vector<double> ints;
+  
  public:
   /// Consructor
   AtomTable();
@@ -34,6 +45,13 @@ class AtomTable : public ERItable {
 
   /// Fill table
   void fill(const std::vector<bf_t> & bas, bool verbose);
+  /// Get ERI from table
+  double getERI(size_t i, size_t j, size_t k, size_t l) const;
+  
+  /// Form Coulomb matrix
+  arma::mat calcJ(const arma::mat & P) const;
+  /// Form exchange matrix
+  arma::mat calcK(const arma::mat & P) const;
 };
 
 #endif

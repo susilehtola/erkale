@@ -1454,7 +1454,13 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double 
   std::vector<struct eripair_t> list(shellpairs.size());
   for(size_t i=0;i<shellpairs.size();i++) {
     list[i].is=shellpairs[i].is;
+    list[i].i0=shells[shellpairs[i].is].get_first_ind();
+    list[i].Ni=shells[shellpairs[i].is].get_Nbf();
+    
     list[i].js=shellpairs[i].js;
+    list[i].j0=shells[shellpairs[i].js].get_first_ind();
+    list[i].Nj=shells[shellpairs[i].js].get_Nbf();
+    
     list[i].eri=screen(list[i].is,list[i].js);
   }
   // and sort it
