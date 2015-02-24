@@ -42,11 +42,11 @@ BLAS="-L/usr/lib64/atlas -lf77blas -lcblas -latlas"
 # BLAS="-lblas -lgfortran"
 
 # Use system packages?
-system_cmake=1
-system_gsl=1
-system_libxc=1
-system_libint=1
-system_hdf5=1
+system_cmake=0
+system_gsl=0
+system_libxc=0
+system_libint=0
+system_hdf5=0
 
 # Maximum supported angular momentum (affects libint if it's compiled)
 MAXAM="6"
@@ -69,8 +69,8 @@ export GSLVER="1.16"
 export XCVER="2.2.1"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="4.600.0"
-export CMAKEVER="3.1.0"
+export ARMAVER="4.650.0"
+export CMAKEVER="3.1.3"
 export HDF5VER="1.8.14"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
