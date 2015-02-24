@@ -104,9 +104,19 @@ bool operator<(const shellpair_t & lhs, const shellpair_t & rhs);
 struct eripair_t {
   /// First shell
   size_t is;
+  /// First function on shell
+  size_t i0;
+  /// Amount of functions on shell
+  size_t Ni;
+
   /// Second shell
   size_t js;
-  /// Integral
+    /// First function on shell
+  size_t j0;
+  /// Amount of functions on shell
+  size_t Nj;
+  
+  /// Maximum integral on the shell
   double eri;
 };
 
