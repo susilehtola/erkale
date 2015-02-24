@@ -90,9 +90,6 @@ class DensityFit {
   /// Index helper
   std::vector<size_t> iidx;
 
-  /// Screening matrix
-  arma::mat screen;
-
   /// Integrals \f$ ( \alpha | \mu \nu) \f$
   std::vector<double> a_munu;
   /// Integrals \f$ ( \alpha | \mu \mu) \f$ (needed for xc fitting)
