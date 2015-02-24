@@ -23,9 +23,9 @@ export FCCPP="${FC} -E"
 
 # C flags to use. 
 #For new versions of GCC on modern x86 hardware
-#export CFLAGS="-Wall -O2 -funroll-loops -fPIC -march=native -msse3"
+#export CFLAGS="-Wall -g -O2 -funroll-loops -fPIC -march=native -msse3"
 #For older versions
-export CFLAGS="-Wall -O2 -funroll-loops -fPIC -msse2"
+export CFLAGS="-Wall -g -O2 -funroll-loops -fPIC -msse2"
 
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
