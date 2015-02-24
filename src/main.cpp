@@ -132,8 +132,6 @@ int main(int argc, char **argv) {
     construct_basis(basis,atoms,baslib,set);
   }
   
-  basis.print();
-  
   // Do the calculation
   calculate(basis,set);
   
