@@ -127,7 +127,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   }
 
   // Then, compute the diagonal integrals
-  a_mu.resize(Naux*Nbf);
+  a_mu.zeros(Naux,Nbf);
   {
     ERIWorker eri(maxam,maxcontr);
     const std::vector<double> * erip;
@@ -149,7 +149,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 	  for(size_t muf=0;muf<Nmu;muf++) {
 	    size_t indmu=orbshells[imu].get_first_ind()+muf;
 
-	    a_mu[inda*Nbf+indmu]=(*erip)[(af*Nmu+muf)*Nmu+muf];
+	    a_mu(inda,indmu)=(*erip)[(af*Nmu+muf)*Nmu+muf];
 	  }
 	}
       }
@@ -157,13 +157,12 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 
   // Then, compute the three-center integrals
   if(!direct) {
-    a_munu.resize(Naux*Nbf*(Nbf+1)/2);
+    a_munu.zeros(Naux,Nbf*(Nbf+1)/2);
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
     {
-
       ERIWorker eri(maxam,maxcontr);
       const std::vector<double> * erip;
 
@@ -193,7 +192,7 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 	      for(size_t nuf=0;nuf<Nnu;nuf++) {
 		size_t indnu=orbshells[inu].get_first_ind()+nuf;
 
-		a_munu[idx(inda,indmu,indnu)]=(*erip)[(af*Nmu+muf)*Nnu+nuf];
+		a_munu(inda,idx(indmu,indnu))=(*erip)[(af*Nmu+muf)*Nnu+nuf];
 	      }
 	    }
 	  }
@@ -204,11 +203,10 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   return orbpairs.size();
 }
 
-size_t DensityFit::idx(size_t ia, size_t imu, size_t inu) const {
+size_t DensityFit::idx(size_t imu, size_t inu) const {
   if(imu<inu)
     std::swap(imu,inu);
-
-  return Naux*(iidx[imu]+inu)+ia;
+  return iidx[imu]+inu;
 }
 
 size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, bool dir) const {
@@ -226,6 +224,7 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
   if(!dir)
     Nmem+=(Na*No*(No+1)/2)*sizeof(double);
 
+
   // Memory taken by (\alpha | \beta) and its inverse
   Nmem+=2*Na*Na*sizeof(double);
   // Memory taken by gamma and expansion coefficients
@@ -240,22 +239,17 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 
   // Compute gamma
   if(!direct) {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(size_t ia=0;ia<Naux;ia++) {
-      gamma(ia)=0.0;
-
-      for(size_t imu=0;imu<Nbf;imu++) {
-	// Off-diagonal
-	for(size_t inu=0;inu<imu;inu++)
-	  gamma(ia)+=2.0*a_munu[idx(ia,imu,inu)]*P(imu,inu);
-	// Diagonal
-	gamma(ia)+=a_munu[idx(ia,imu,imu)]*P(imu,imu);
-      }
+    // Form density vector
+    arma::vec Pv(Nbf*(Nbf+1)/2);
+    for(size_t i=0;i<Nbf;i++) {
+      for(size_t j=0;j<i;j++)
+	Pv(idx(i,j))=2.0*P(i,j);
+      Pv(idx(i,i))=P(i,i);
     }
-  } else {
 
+    gamma=a_munu*Pv;
+
+  } else {
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -345,18 +339,16 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-    for(size_t ia=0;ia<Naux;ia++) {
-      for(size_t ip=0;ip<P.size();ip++)
-	gamma[ip](ia)=0.0;
-
-      for(size_t ip=0;ip<P.size();ip++)
-	for(size_t imu=0;imu<Nbf;imu++) {
-	  // Off-diagonal
-	  for(size_t inu=0;inu<imu;inu++)
-	    gamma[ip](ia)+=2.0*a_munu[idx(ia,imu,inu)]*P[ip](imu,inu);
-	  // Diagonal
-	  gamma[ip](ia)+=a_munu[idx(ia,imu,imu)]*P[ip](imu,imu);
-	}
+    for(size_t ip=0;ip<P.size();ip++) {
+      // Form density vector
+      arma::vec Pv(Nbf*(Nbf+1)/2);
+      for(size_t i=0;i<Nbf;i++) {
+	for(size_t j=0;j<i;j++)
+	  Pv(idx(i,j))=2.0*P[ip](i,j);
+	Pv(idx(i,i))=P[ip](i,i);
+      }
+      
+      gamma[ip]=a_munu*Pv;
     }
   } else {
 
@@ -420,7 +412,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 	  }
 	}
       }
-
+      
 #ifdef _OPENMP
 #pragma omp critical
       // Sum results together
@@ -456,25 +448,17 @@ arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
 
   // Compute Fock matrix elements
   if(!direct) {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for(size_t ia=0;ia<Naux;ia++) {
-      for(size_t imu=0;imu<Nbf;imu++) {
-	// Off-diagonal
-	for(size_t inu=0;inu<imu;inu++) {
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-	  H(imu,inu)+=xcg(ia)*a_munu[idx(ia,imu,inu)];
-#ifdef _OPENMP
-#pragma omp atomic
-#endif
-	  H(inu,imu)+=xcg(ia)*a_munu[idx(ia,imu,inu)];
-	}
-	// Diagonal
-	H(imu,imu)+=xcg(ia)*a_munu[idx(ia,imu,imu)];
+    // Get vector
+    arma::vec Hv(arma::trans(xcg)*a_munu);
+    // and unpack it
+    for(size_t imu=0;imu<Nbf;imu++) {
+      for(size_t inu=0;inu<imu;inu++) {
+	double el=Hv(idx(imu,inu));
+	H(imu,inu)+=el;
+	H(inu,imu)+=el;
       }
+      double el=Hv(idx(imu,imu));
+      H(imu,imu)+=el;
     }
   } else {
 
@@ -535,24 +519,11 @@ arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
 }
 
 arma::vec DensityFit::invert_expansion_diag(const arma::vec & xcgamma) const {
-  arma::vec H(Nbf,Nbf);
-  H.zeros();
-
   // Compute middle result
   arma::vec xcg=arma::trans(xcgamma)*ab_inv;
-
-  // Compute Fock matrix elements
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for(size_t ia=0;ia<Naux;ia++) {
-    for(size_t imu=0;imu<Nbf;imu++) {
-      // Diagonal
-      H(imu)+=xcg(ia)*a_mu[ia*Nbf+imu];
-    }
-  }
-
-  return H;
+  
+  // Get vector
+  return arma::trans(xcg)*a_mu;
 }
 
 arma::mat DensityFit::calc_J(const arma::mat & P) const {
@@ -563,18 +534,18 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
   J.zeros();
 
   if(!direct) {
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-    for(size_t imu=0;imu<Nbf;imu++)
-      for(size_t inu=0;inu<=imu;inu++) {
-	J(imu,inu)=0.0;
-
-	for(size_t ia=0;ia<Naux;ia++)
-	  J(imu,inu)+=a_munu[idx(ia,imu,inu)]*c(ia);
-
-	J(inu,imu)=J(imu,inu);
+    // Get vector
+    arma::vec Hv(arma::trans(c)*a_munu);
+    // and unpack it
+    for(size_t imu=0;imu<Nbf;imu++) {
+      for(size_t inu=0;inu<imu;inu++) {
+	double el=Hv(idx(imu,inu));
+	J(imu,inu)+=el;
+	J(inu,imu)+=el;
       }
+      double el=Hv(idx(imu,imu));
+      J(imu,imu)+=el;
+    }
 
   } else {
 
@@ -646,17 +617,20 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for(size_t imu=0;imu<Nbf;imu++)
-      for(size_t ig=0;ig<P.size();ig++)
-	for(size_t inu=0;inu<=imu;inu++) {
-	  J[ig](imu,inu)=0.0;
-
-	  for(size_t ia=0;ia<Naux;ia++)
-	    J[ig](imu,inu)+=a_munu[idx(ia,imu,inu)]*c[ig](ia);
-
-	  J[ig](inu,imu)=J[ig](imu,inu);
+    for(size_t ip=0;ip<P.size();ip++) {
+      // Get vector
+      arma::vec Hv(arma::trans(c[ip])*a_munu);
+      // and unpack it
+      for(size_t imu=0;imu<Nbf;imu++) {
+	for(size_t inu=0;inu<imu;inu++) {
+	  double el=Hv(idx(imu,inu));
+	  J[ip](imu,inu)+=el;
+	  J[ip](inu,imu)+=el;
 	}
-
+	double el=Hv(idx(imu,imu));
+	J[ip](imu,imu)+=el;
+      }
+    }
   } else {
 
 #ifdef _OPENMP
@@ -763,10 +737,10 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 	// Compute forces
 	const static int index[]={0, 1, 2, 6, 7, 8};
 	const size_t Nidx=sizeof(index)/sizeof(index[0]);
-	arma::vec ders(Nidx);	
-	ders.zeros();
+	double ders[Nidx];
 
 	for(size_t iid=0;iid<Nidx;iid++) {
+	  ders[iid]=0.0;
 	  // Index is
 	  int ic=index[iid];
 	  
@@ -781,20 +755,20 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 	      // The integral is
 	      double res=(*erip)[iia*Nb+iib];
 	      
-	      ders(iid)+= res*c(ia)*c(ib);
+	      ders[iid]+= res*c(ia)*c(ib);
 	    }
 	  }
+	  ders[iid]*=fac;
 	}
-	ders*=fac;
 
 	// Increment forces
 	for(int ic=0;ic<3;ic++) {
 #ifdef _OPENMP
-	  fwrk(3*anuc+ic)+=ders(ic);
-	  fwrk(3*bnuc+ic)+=ders(ic+3);
+	  fwrk(3*anuc+ic)+=ders[ic];
+	  fwrk(3*bnuc+ic)+=ders[ic+3];
 #else
-	  f(3*anuc+ic)+=ders(ic);
-	  f(3*bnuc+ic)+=ders(ic+3);
+	  f(3*anuc+ic)+=ders[ic];
+	  f(3*bnuc+ic)+=ders[ic+3];
 #endif
 	}
       }
@@ -856,8 +830,7 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 	// Compute forces
 	const static int index[]={0, 1, 2, 6, 7, 8, 9, 10, 11};
 	const size_t Nidx=sizeof(index)/sizeof(index[0]);
-	arma::vec ders(Nidx);
-	ders.zeros();
+	double ders[Nidx];
 
 	for(size_t iid=0;iid<Nidx;iid++) {
 	  // Index is
@@ -876,28 +849,22 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 		hlp(iia)+=(*erip)[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
 	      }
 	    }
-	  ders(iid)=fac*arma::dot(hlp,ca);
+	  ders[iid]=fac*arma::dot(hlp,ca);
 	}
 	
 	// Increment forces
 	for(int ic=0;ic<3;ic++) {
 #ifdef _OPENMP
-	  fwrk(3*anuc+ic)-=ders(ic);
-	  fwrk(3*inuc+ic)-=ders(ic+3);
-	  fwrk(3*jnuc+ic)-=ders(ic+6);
+	  fwrk(3*anuc+ic)-=ders[ic];
+	  fwrk(3*inuc+ic)-=ders[ic+3];
+	  fwrk(3*jnuc+ic)-=ders[ic+6];
 #else
-	  f(3*anuc+ic)-=ders(ic);
-	  f(3*inuc+ic)-=ders(ic+3);
-	  f(3*jnuc+ic)-=ders(ic+6);
+	  f(3*anuc+ic)-=ders[ic];
+	  f(3*inuc+ic)-=ders[ic+3];
+	  f(3*jnuc+ic)-=ders[ic+6];
 #endif
 	}
 
-	/*
-	std::ostringstream msg;
-	msg << "\nias = " << ias << ", imu = " << imus << ", inu = " << inus << ".\n";
-	msg << "am_a = " << auxshells[ias].get_am() << ", am_i = " << orbshells[imus].get_am() << ", am_j = " << orbshells[inus].get_am() << ".";
-	interpret_force(ders).print(msg.str());
-	*/
       }
     }
     
@@ -1035,7 +1002,7 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 	for(size_t io=0;io<Norb;io++)
 	  for(size_t nu=0;nu<Nbf;nu++)
 	    for(size_t ia=0;ia<Naux;ia++)
-	      iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu[idx(ia,mu,nu)];
+	      iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu(ia,idx(mu,nu));
     }
 
     // Plug in the half inverse, so iuP -> BiuQ
@@ -1073,7 +1040,7 @@ size_t DensityFit::get_Naux() const {
 
 double DensityFit::get_a_munu(size_t ia, size_t imu, size_t inu) const {
   if(!direct)
-    return a_munu[idx(ia,imu,inu)];
+    return a_munu(ia,idx(imu,inu));
   else {
     ERROR_INFO();
     throw std::runtime_error("get_a_munu not implemented for direct calculations!\n");

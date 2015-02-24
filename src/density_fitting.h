@@ -91,9 +91,9 @@ class DensityFit {
   std::vector<size_t> iidx;
 
   /// Integrals \f$ ( \alpha | \mu \nu) \f$
-  std::vector<double> a_munu;
+  arma::mat a_munu;
   /// Integrals \f$ ( \alpha | \mu \mu) \f$ (needed for xc fitting)
-  std::vector<double> a_mu;
+  arma::mat a_mu;
 
   /// \f$ ( \alpha | \beta) \f$
   arma::mat ab;
@@ -119,7 +119,7 @@ class DensityFit {
    */
   size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, bool hf=false);
   /// Compute index in integral table
-  size_t idx(size_t ia, size_t imu, size_t inu) const;
+  size_t idx(size_t imu, size_t inu) const;
 
   /// Compute estimate of necessary memory
   size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, bool direct) const;
