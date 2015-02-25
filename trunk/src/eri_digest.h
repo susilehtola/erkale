@@ -48,24 +48,6 @@ class JDigestor: public IntegralDigestor {
   arma::mat get_J() const;
 };
 
-/// Set of Coulomb matrix digestor
-class JvDigestor: public IntegralDigestor {
-  /// Density matrices
-  std::vector<arma::mat> P;
-  /// Coulomb matrices
-  std::vector<arma::mat> J;
- public:
-  /// Construct digestor
-  JvDigestor(const std::vector<arma::mat> & P);
-  /// Destruct digestor
-  ~JvDigestor();
-  
-  /// Digest integrals
-  void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
-  /// Get output
-  std::vector<arma::mat> get_J() const;
-};
-
 /// Exchange matrix digestor
 class KDigestor: public IntegralDigestor {
   /// Density matrix
@@ -84,66 +66,23 @@ class KDigestor: public IntegralDigestor {
   arma::mat get_K() const;
 };
 
-/// Coulomb and exchange
-class JKDigestor: public IntegralDigestor {
+/// Complex exchange matrix digestor
+class cxKDigestor: public IntegralDigestor {
   /// Density matrix
-  arma::mat P;
-  /// Coulomb and exchange matrices
-  arma::mat J, K;
+  arma::cx_mat P;
+  /// Exchange matrix
+  arma::cx_mat K;
  public:
   /// Construct digestor
-  JKDigestor(const arma::mat & P);
+  cxKDigestor(const arma::cx_mat & P);
   /// Destruct digestor
-  ~JKDigestor();
+  ~cxKDigestor();
   
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
   /// Get output
-  arma::mat get_J() const;
-  /// Get output
-  arma::mat get_K() const;
+  arma::cx_mat get_K() const;
 };
-
-class KabDigestor: public IntegralDigestor {
-  /// Density matrices
-  arma::mat Pa, Pb;
-  /// Exchange matrices
-  arma::mat Ka, Kb;
- public:
-  /// Construct digestor
-  KabDigestor(const arma::mat & Pa, const arma::mat & Pb);
-  /// Destruct digestor
-  ~KabDigestor();
-  
-  /// Digest integrals
-  void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
-  /// Get output
-  arma::mat get_Ka() const;
-  /// Get output
-  arma::mat get_Kb() const;
-};
-
-class JKabDigestor: public IntegralDigestor {
-  /// Density matrices
-  arma::mat P, Pa, Pb;
-  /// Coulomb and exchange matrices
-  arma::mat J, Ka, Kb;
- public:
-  /// Construct digestor
-  JKabDigestor(const arma::mat & Pa, const arma::mat & Pb);
-  /// Destruct digestor
-  ~JKabDigestor();
-  
-  /// Digest integrals
-  void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
-  /// Get output
-  arma::mat get_J() const;
-  /// Get output
-  arma::mat get_Ka() const;
-  /// Get output
-  arma::mat get_Kb() const;
-};
-
 
 /// Force digestor
 class ForceDigestor {

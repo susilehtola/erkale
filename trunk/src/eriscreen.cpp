@@ -92,7 +92,7 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
   return shpairs.size();
 }
 
-void ERIscreen::calculate(std::vector<IntegralDigestor *> digest, double tol) const {
+void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & digest, double tol) const {
   // Shells in basis set
   std::vector<GaussianShell> shells=basp->get_shells();
   // Get number of shell pairs
@@ -140,7 +140,8 @@ void ERIscreen::calculate(std::vector<IntegralDigestor *> digest, double tol) co
 	erip=eri->getp();
 
 	// Digest the integrals
-	digest[ith]->digest(shpairs,ip,jp,*erip,0);
+	for(size_t i=0;i<digest[ith].size();i++)
+	  digest[ith][i]->digest(shpairs,ip,jp,*erip,0);
       }
     }
 
@@ -221,24 +222,27 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
 #endif
 
   // Get workers
-  std::vector<IntegralDigestor *> p(nth);
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(int i=0;i<nth;i++)
-    p[i]=new JDigestor(P);
+  for(int i=0;i<nth;i++) {
+    p[i].resize(1);
+    p[i][0]=new JDigestor(P);
+  }
 
   // Do calculation
   calculate(p,tol);
 
   // Collect results
-  arma::mat J(((JDigestor *) p[0])->get_J());
+  arma::mat J(((JDigestor *) p[0][0])->get_J());
   for(int i=1;i<nth;i++)
-    J+=((JDigestor *) p[i])->get_J();
-
+    J+=((JDigestor *) p[i][0])->get_J();
+  
   // Free memory
-  for(int i=0;i<nth;i++)
-    delete p[i];
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
   
   return J;
 }
@@ -251,24 +255,60 @@ arma::mat ERIscreen::calcK(const arma::mat & P, double tol) const {
 #endif
 
   // Get workers
-  std::vector<IntegralDigestor *> p(nth);
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(int i=0;i<nth;i++)
-    p[i]=new KDigestor(P);
+  for(int i=0;i<nth;i++) {
+    p[i].resize(1);
+    p[i][0]=new KDigestor(P);
+  }
 
   // Do calculation
   calculate(p,tol);
 
   // Collect results
-  arma::mat K(((KDigestor *) p[0])->get_K());
+  arma::mat K(((KDigestor *) p[0][0])->get_K());
   for(int i=1;i<nth;i++)
-    K+=((KDigestor *) p[i])->get_K();
+    K+=((KDigestor *) p[i][0])->get_K();
 
   // Free memory
-  for(int i=0;i<nth;i++)
-    delete p[i];
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+  
+  return K;
+}
+
+arma::cx_mat ERIscreen::calcK(const arma::cx_mat & P, double tol) const {
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  // Get workers
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(1);
+    p[i][0]=new cxKDigestor(P);
+  }
+
+  // Do calculation
+  calculate(p,tol);
+
+  // Collect results
+  arma::cx_mat K(((cxKDigestor *) p[0][0])->get_K());
+  for(int i=1;i<nth;i++)
+    K+=((cxKDigestor *) p[i][0])->get_K();
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
   
   return K;
 }
@@ -281,27 +321,66 @@ void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka
 #endif
 
   // Get workers
-  std::vector<IntegralDigestor *> p(nth);
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(int i=0;i<nth;i++)
-    p[i]=new KabDigestor(Pa,Pb);
+  for(int i=0;i<nth;i++) {
+    p[i].resize(2);
+    p[i][0]=new KDigestor(Pa);
+    p[i][1]=new KDigestor(Pb);
+  }
 
   // Do calculation
   calculate(p,tol);
 
   // Collect results
-  Ka=((KabDigestor *) p[0])->get_Ka();
-  Kb=((KabDigestor *) p[0])->get_Kb();
+  Ka=((KDigestor *) p[0][0])->get_K();
+  Kb=((KDigestor *) p[0][1])->get_K();
   for(int i=1;i<nth;i++) {
-    Ka+=((KabDigestor *) p[i])->get_Ka();
-    Kb+=((KabDigestor *) p[i])->get_Kb();
+    Ka+=((KDigestor *) p[i][0])->get_K();
+    Kb+=((KDigestor *) p[i][1])->get_K();
   }
 
   // Free memory
-  for(int i=0;i<nth;i++)
-    delete p[i];
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+}
+
+void ERIscreen::calcK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const {
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  // Get workers
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(2);
+    p[i][0]=new cxKDigestor(Pa);
+    p[i][1]=new cxKDigestor(Pb);
+  }
+
+  // Do calculation
+  calculate(p,tol);
+
+  // Collect results
+  Ka=((cxKDigestor *) p[0][0])->get_K();
+  Kb=((cxKDigestor *) p[0][1])->get_K();
+  for(int i=1;i<nth;i++) {
+    Ka+=((cxKDigestor *) p[i][0])->get_K();
+    Kb+=((cxKDigestor *) p[i][1])->get_K();
+  }
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
 }
 
 void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol) const {
@@ -312,27 +391,66 @@ void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double
 #endif
 
   // Get workers
-  std::vector<IntegralDigestor *> p(nth);
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(int i=0;i<nth;i++)
-    p[i]=new JKDigestor(P);
+  for(int i=0;i<nth;i++) {
+    p[i].resize(2);
+    p[i][0]=new JDigestor(P);
+    p[i][1]=new KDigestor(P);
+  }
 
   // Do calculation
   calculate(p,tol);
 
   // Collect results
-  J=((JKDigestor *) p[0])->get_J();
-  K=((JKDigestor *) p[0])->get_K();
+  J=((JDigestor *) p[0][0])->get_J();
+  K=((KDigestor *) p[0][1])->get_K();
   for(int i=1;i<nth;i++) {
-    J+=((JKDigestor *) p[i])->get_J();
-    K+=((JKDigestor *) p[i])->get_K();
+    J+=((JDigestor *) p[i][0])->get_J();
+    K+=((KDigestor *) p[i][1])->get_K();
   }
 
   // Free memory
-  for(int i=0;i<nth;i++)
-    delete p[i];
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+}
+
+void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, double tol) const {
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  // Get workers
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(2);
+    p[i][0]=new JDigestor(arma::real(P));
+    p[i][1]=new cxKDigestor(P);
+  }
+
+  // Do calculation
+  calculate(p,tol);
+
+  // Collect results
+  J=((JDigestor *) p[0][0])->get_J();
+  K=((cxKDigestor *) p[0][1])->get_K();
+  for(int i=1;i<nth;i++) {
+    J+=((JDigestor *) p[i][0])->get_J();
+    K+=((cxKDigestor *) p[i][1])->get_K();
+  }
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
 }
 
 void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol) const {
@@ -343,29 +461,72 @@ void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J
 #endif
 
   // Get workers
-  std::vector<IntegralDigestor *> p(nth);
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(int i=0;i<nth;i++)
-    p[i]=new JKabDigestor(Pa,Pb);
+  for(int i=0;i<nth;i++) {
+    p[i].resize(3);
+    p[i][0]=new JDigestor(Pa+Pb);
+    p[i][1]=new KDigestor(Pa);
+    p[i][2]=new KDigestor(Pb);
+  }
 
   // Do calculation
   calculate(p,tol);
 
   // Collect results
-  J=((JKabDigestor *) p[0])->get_J();
-  Ka=((JKabDigestor *) p[0])->get_Ka();
-  Kb=((JKabDigestor *) p[0])->get_Kb();
+  J=((JDigestor *) p[0][0])->get_J();
+  Ka=((KDigestor *) p[0][1])->get_K();
+  Kb=((KDigestor *) p[0][2])->get_K();
   for(int i=1;i<nth;i++) {
-    J+=((JKabDigestor *) p[i])->get_J();
-    Ka+=((JKabDigestor *) p[i])->get_Ka();
-    Kb+=((JKabDigestor *) p[i])->get_Kb();
+    J+=((JDigestor *) p[i][0])->get_J();
+    Ka+=((KDigestor *) p[i][1])->get_K();
+    Kb+=((KDigestor *) p[i][2])->get_K();
   }
 
   // Free memory
-  for(int i=0;i<nth;i++)
-    delete p[i];
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+}
+
+void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const {
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  // Get workers
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(3);
+    p[i][0]=new JDigestor(arma::real(Pa+Pb));
+    p[i][1]=new cxKDigestor(Pa);
+    p[i][2]=new cxKDigestor(Pb);
+  }
+
+  // Do calculation
+  calculate(p,tol);
+
+  // Collect results
+  J=((JDigestor *) p[0][0])->get_J();
+  Ka=((cxKDigestor *) p[0][1])->get_K();
+  Kb=((cxKDigestor *) p[0][2])->get_K();
+  for(int i=1;i<nth;i++) {
+    J+=((JDigestor *) p[i][0])->get_J();
+    Ka+=((cxKDigestor *) p[i][1])->get_K();
+    Kb+=((cxKDigestor *) p[i][2])->get_K();
+  }
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
 }
 
 std::vector<arma::mat> ERIscreen::calcJ(const std::vector<arma::mat> & P, double tol) const {
@@ -376,27 +537,31 @@ std::vector<arma::mat> ERIscreen::calcJ(const std::vector<arma::mat> & P, double
 #endif
 
   // Get workers
-  std::vector<IntegralDigestor *> p(nth);
+  std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-  for(int i=0;i<nth;i++)
-    p[i]=new JvDigestor(P);
+  for(int i=0;i<nth;i++) {
+    p[i].resize(P.size());
+    for(size_t j=0;j<P.size();j++)
+      p[i][j]=new JDigestor(P[j]);
+  }
 
   // Do calculation
   calculate(p,tol);
 
   // Collect results
-  std::vector<arma::mat> J(((JvDigestor *) p[0])->get_J());
-  for(int i=1;i<nth;i++) {
-    std::vector<arma::mat> Jt(((JvDigestor *) p[i])->get_J());
-    for(size_t j=0;j<J.size();j++)
-      J[j]+=Jt[j];
-  }
+  std::vector<arma::mat> J(P.size());
+  for(size_t j=0;j<P.size();j++)
+    J[j]=((JDigestor *) p[0][j])->get_J();
+  for(int i=1;i<nth;i++)
+    for(size_t j=0;j<P.size();j++)
+      J[j]+=((JDigestor *) p[0][j])->get_J();
 
   // Free memory
-  for(int i=0;i<nth;i++)
-    delete p[i];
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
   
   return J;
 }
