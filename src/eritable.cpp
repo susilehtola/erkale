@@ -118,7 +118,7 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
 	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
 	
 	// Digest integral block
-	digest_J(shpairs,ip,jp,P,ints,ioff0,Jwrk);
+	digest_J(shpairs,ip,jp,ints,ioff0,P,Jwrk);
       }
     }
 
@@ -161,7 +161,7 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
 	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
 	
 	// Digest integral block
-	digest_K(shpairs,ip,jp,double,P,ints,ioff0,Kwrk);
+	digest_K(shpairs,ip,jp,ints,ioff0,double,P,Kwrk);
       }
     }
 
@@ -204,7 +204,7 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
 	
 	// Digest integral block
-	digest_K(shpairs,ip,jp,std::complex<double>,P,ints,ioff0,Kwrk);
+	digest_K(shpairs,ip,jp,ints,ioff0,std::complex<double>,P,Kwrk);
       }
     }
 
@@ -216,3 +216,100 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 
   return K;
 }
+
+size_t ERItable::fill(const BasisSet * basp, double tol) {
+  // Shells
+  std::vector<GaussianShell> shells=basp->get_shells();
+
+  // Compute memory requirements
+  size_t N;
+  N=N_ints(basp,tol);
+  
+  // Don't do DOS
+  if(N*sizeof(double)>14*1e9) {
+    ERROR_INFO();
+    throw std::out_of_range("Cowardly refusing to allocate more than 14 gigs of memory.\n");
+  }
+  
+  try {
+    ints.resize(N);
+  } catch(std::bad_alloc err) {
+    std::ostringstream oss;
+    
+    ERROR_INFO();
+    oss << "Was unable to reserve " << memory_size(N*sizeof(double)) << " of memory.\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Get number of shell pairs
+  const size_t Npairs=shpairs.size();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif // ifdef _OPENMP
+  {
+    // ERI worker
+    ERIWorker *eri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(basp->get_max_am(),basp->get_max_Ncontr()) : new ERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
+
+    // Integral array
+    const std::vector<double> * erip;
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<Npairs;ip++) {
+      // Loop over second pairs
+      for(size_t jp=0;jp<=ip;jp++) {
+	// Shells on first pair
+	size_t is=shpairs[ip].is;
+	size_t js=shpairs[ip].js;
+	// and those on the second pair
+	size_t ks=shpairs[jp].is;
+	size_t ls=shpairs[jp].js;
+	
+	// Calculate offset in integrals table
+	size_t ioff0(shoff[ip]);
+	size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+	for(size_t jj=0;jj<jp;jj++)
+	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
+
+	// Amount of functions on the first pair
+	size_t Ni=shpairs[ip].Ni;
+	size_t Nj=shpairs[ip].Nj;
+	// and on the second
+	size_t Nk=shpairs[jp].Ni;
+	size_t Nl=shpairs[jp].Nj;
+	// Initialize table
+	{
+	  size_t ioff(ioff0);
+	  for(size_t fi=0;fi<Ni;fi++)
+	    for(size_t fj=0;fj<Nj;fj++)
+	      for(size_t fk=0;fk<Nk;fk++)
+		for(size_t fl=0;fl<Nl;fl++) {
+		  ints[ioff++]=0.0;
+		}
+	}
+
+	// Maximum value of the 2-electron integrals on this shell pair
+	double intmax=screen(is,js)*screen(ks,ls);
+	if(intmax<tol) {
+	  // Skip due to small value of integral. Because the
+	  // integrals have been ordered, all the next ones will be
+	  // small as well!
+	  break;
+	}
+
+	// Compute integrals
+	eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+	erip=eri->getp();
+
+	// Store integrals
+	for(size_t ii=0;ii<Ni*Nj*Nk*Nl;ii++)
+	  ints[ioff0+ii]=(*erip)[ii];
+      }
+    }
+  }
+
+  return shpairs.size();
+}
+
