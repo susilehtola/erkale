@@ -29,12 +29,14 @@ Current Settings used by ERKALE:
      FittingMemory  	                1000	Amount of memory in MB to use for exchange fitting
      FittingThreshold	           1.000e-08	Linear dependence threshold for Coulomb integrals in density fitting
      Guess          	              Atomic	Used guess: atomic (default), core, or GWH
+     IntegralThresh 	           1.000e-14	Integral screening threshold
      LineSearch     	               false	Do line search in level shift (EXPENSIVE!)
      LoadChk        	water_dimer_tpssh.chk	Initialize with ground state calculation from file
      Logfile        	water_dimer_tpssh_fch.log	File to print out full information, stdout for screen
      MaxIter        	                 100	Maximum number of iterations in SCF cycle
      Method         	   hyb_mgga_xc_tpssh	Method used in calculation (HF or a DFT functional)
      Multiplicity   	                   1	Spin multiplicity
+     NLGrid         	             50 -194	Integration grid to use for nonlocal correlation: nrad lmax
      Occupancies    	                    	Orbital occupancies
      PZ             	                  No	Perform Perdew-Zunger self-interaction correction? No, Pert, Full, OldFull, Real, Can, CanPert
      PZEmax         	           1.000e-06	Threshold for energy change in unitary optimization
@@ -46,14 +48,13 @@ Current Settings used by ERKALE:
      PZdPrms        	           1.000e-06	Tolerance threshold for density convergence
      PZiter         	                  20	Max number of iterations in self-consistency iteration
      PZloc          	                true	Initial localization before SIC calculation?
-     PZmode         	              CoulXC	Mode to use PZ-SIC in. Coul, CoulX, CoulC, CoulXC
+     PZmode         	                  XC	Apply PZ to the operators (in addition to J): X C D
      PZseed         	                   0	Seed number for randomized matrices?
      PZstab         	                   0	Stability analysis for PZ-SIC? 0 for no, 1 for oo block, 2 for full analysis
      PZstabFz       	                    	Orbitals to freeze for stability analysis (only oo!)
      PZunit         	                  10	Max number of iterations in unitary optimization
      PZw            	           1.000e+00	Weight for Perdew-Zunger self-interaction correction
      SaveChk        	water_dimer_tpssh_fch.chk	Try initializing with and save results to file
-     ShPairThr      	           1.000e-14	Threshold for shell pair screening, (ij|ij)<thr
      Shift          	           0.000e+00	Level shift to use in Hartree
      StrictIntegrals	               false	Use strict integrals?
      System         	 water_dimer_xrs.xyz	System as an xyz file
@@ -63,6 +64,8 @@ Current Settings used by ERKALE:
      UseLM          	                true	Use a spherical harmonics basis set by default?
      UseTRDSM       	               false	Use Trust-Region DSM?
      UseTRRH        	               false	Use Trust-Region Roothaan-Hall?
+     VV10           	                Auto	Use VV10 non-local correlation?
+     VV10Pars       	                    	VV10 parameters: b C
      Verbose        	                true	Verbose calculation?
      XRSAugment     	                    	Which atoms to augment with diffuse functions? E.g. 1,3:5,10
      XRSDoubleBasis 	              X-AUTO	The augmentation basis to use for double-basis set calculations
@@ -77,7 +80,8 @@ Current Settings used by ERKALE:
      XRSQval        	                    	List or range of Q values to compute
      XRSSpin        	               false	Spin to excite (false for alpha, true for beta)
 
-Basis set aug-cc-pVDZ found in file aug-cc-pVDZ.gbs in /usr/share/erkale/basis/.
+Basis set aug-cc-pVDZ found in file aug-cc-pVDZ.gbs in /home/work/erkale/source/erkale/basis/.
+
 Initializing with ground-state calculation from water_dimer_tpssh.chk.
 
 Localizing 2 orbitals on center 1.
@@ -95,6 +99,14 @@ List of nuclei, geometry in Ångström with three decimal places:
 4	O	 8	  1.369	  0.146	 -0.395
 5	H	 1	  1.894	  0.486	  0.335
 6	H	 1	  0.451	  0.165	 -0.083
+
+Interatomic distance matrix:
+          1O    2H    3H    4O    5H 
+   2H  0.963
+   3H  0.962 1.532
+   4O  2.917 3.360 3.358
+   5H  3.380 3.911 3.910 0.961
+   6H  1.954 2.464 2.463 0.970 1.536
 
 List of basis functions:
 Shell    1	S cart shell at nucleus   1 with with basis functions    1-1   
@@ -147,33 +159,35 @@ Smallest eigenvalue of overlap matrix is 1.61e-03, ratio to largest is 2.11e-04.
 Using symmetric orthogonalization.
 Basis set diagonalized in 0.00 s.
 
-Forming table of 46335248 ERIs, requiring 44 Mi 193 ki of memory ... done (0.57 s)
+Forming table of 6085170 ERIs, requiring 46 Mi 436 ki of memory ... done (2.32 s)
+740 shell pairs out of 741 are significant.
 
-Initialization of computation done in 0.57 s.
+Initialization of computation done in 2.33 s.
 
-alpha: HOMO-LUMO gap is -499.54 eV. Energies of lowest lying states:
-   -19.096351     -0.941119*    -0.331358*    -0.492782*    -0.541501*
-    -0.758984*   -18.963993*    -0.268968*    -0.384692*    -0.738562*
-    -0.031961      0.008960      0.020722      0.056167      0.090811 
-beta:  HOMO-LUMO gap is    6.45 eV. Energies of lowest lying states:
-   -19.107566*   -19.051019*    -1.023404*    -0.966438*    -0.541542*
-    -0.490879*    -0.402867*    -0.346272*    -0.319381*    -0.268943*
-    -0.031961      0.008960      0.020722      0.056167      0.090811 
+alpha: HOMO-LUMO gap is -499.54 eV. Energies of lowest lying orbitals:
+     -19.0964       -0.9411*      -0.3314*      -0.4928*      -0.5415*
+      -0.7590*     -18.9640*      -0.2690*      -0.3847*      -0.7386*
+      -0.0320        0.0090        0.0207        0.0562        0.0908 
+beta:  HOMO-LUMO gap is    6.45 eV. Energies of lowest lying orbitals:
+     -19.1076*     -19.0510*      -1.0234*      -0.9664*      -0.5415*
+      -0.4909*      -0.4029*      -0.3463*      -0.3194*      -0.2689*
+      -0.0320        0.0090        0.0207        0.0562        0.0908 
 
 Using hybrid exchange with  10.000 % of exact exchange.
 	atom  Npoints      Nfuncs  t
-	   3     3366      213465  1.06 s
-	   2     3234      205390  1.10 s
-	   4     3872      249796  1.38 s
-	   1     4244      281679  1.56 s
-	   5     3294      200459  0.96 s
-	   6     3538      250459  1.32 s
-DFT XC grid constructed in 2.42 s.
+	   2     3134      213041  1.36 s
+	   3     3319      225764  1.62 s
+	   4     3690      267038  1.97 s
+	   1     3850      292243  2.34 s
+	   5     3227      211546  1.23 s
+	   6     3527      283790  1.80 s
+DFT XC grid constructed in 3.42 s.
 
  ******* Iteration    1 ********
-Forming HF Coulomb and exchange matrices ... done (0.14 s)
-Computing DFT exchange and correlation ... done (0.65 s)
-Numerically integrated density is 19.00000 (-0.0000 %).
+Forming HF Coulomb matrix ... done (0.10 s)
+Forming HF exchange matrix ... done (0.25 s)
+Computing DFT exchange and correlation ... done (1.11 s)
+Numerically integrated density is 19.00001 (+0.0000 %).
 ADIIS weights
  1.00e+00 
 CDIIS weights
@@ -182,31 +196,24 @@ CDIIS weights
  1.00e+00 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -580.76 eV. Energies of lowest lying states:
-   -21.800069    -19.232651*    -2.119733*    -1.615514*    -1.542339*
-    -1.504494*    -1.156797*    -0.683370*    -0.526993*    -0.457623*
-    -0.449803     -0.422258     -0.219441     -0.203914     -0.142015 
-beta:  HOMO-LUMO gap is    0.52 eV. Energies of lowest lying states:
-   -23.848326*   -19.232651*    -2.174069*    -1.658697*    -1.587706*
-    -1.549942*    -1.156835*    -0.683548*    -0.527094*    -0.469087*
-    -0.450039     -0.433608     -0.223281     -0.207822     -0.142619 
 
-Dipole:	x		y		z		dipole change
-	 8.74187324	 0.93704345	-0.72195668	 8.821543e+00
-Energy:	electronic	total		virial		energy change
-	-168.75306721	-132.25019511	 1.07988151	-132.25
-	kinetic		nuclear		Coulomb		XC
-	 122.46732043	-369.75149612	 94.61697923	-16.08587075
-Errors:	Max dens	RMS dens	DIIS
-alpha	5.167026e-01	2.231514e-02	7.493549e-01
-beta	5.511963e-01	2.348945e-02
+DIIS error                    :  7.493536e-01
+Energy change                 : -1.322502e+02
+Max total density change      :  5.339486e-01
+Max rms   density change      :  2.287071e-02
+Max total alpha density change:  5.167019e-01
+Max rms   alpha density change:  2.231490e-02
+Max total beta  density change:  5.511952e-01
+Max rms   beta  density change:  2.348921e-02
+Dipole mu = ( 22.21957827,  2.38217634, -1.83521309) D
 
-Iteration took 0.79 s.
+Iteration took 1.47 s.
 
  ******* Iteration    2 ********
-Forming HF Coulomb and exchange matrices ... done (0.13 s)
-Computing DFT exchange and correlation ... done (0.63 s)
-Numerically integrated density is 18.99994 (-0.0003 %).
+Forming HF Coulomb matrix ... done (0.10 s)
+Forming HF exchange matrix ... done (0.25 s)
+Computing DFT exchange and correlation ... done (0.97 s)
+Numerically integrated density is 18.99995 (-0.0003 %).
 ADIIS weights
  7.76e-01  2.24e-01 
 CDIIS weights
@@ -215,316 +222,302 @@ CDIIS weights
  7.76e-01  2.24e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -555.58 eV. Energies of lowest lying states:
-   -21.088851    -19.629005*    -1.747660*    -1.389399*    -1.239853*
-    -1.161145*    -1.109373*    -0.885571*    -0.750588*    -0.671819*
-    -0.327119     -0.267920     -0.232088     -0.152035     -0.142300 
-beta:  HOMO-LUMO gap is    9.12 eV. Energies of lowest lying states:
-   -23.113908*   -19.628998*    -1.799209*    -1.389398*    -1.275528*
-    -1.199819*    -1.149017*    -0.885774*    -0.750616*    -0.671812*
-    -0.336735     -0.278388     -0.234780     -0.153638     -0.144632 
 
-Dipole:	x		y		z		dipole change
-	-4.21959190	-0.01563952	 0.44705891	-4.578306e+00
-Energy:	electronic	total		virial		energy change
-	-166.94741090	-130.44453880	 0.97821042	 1.80566
-	kinetic		nuclear		Coulomb		XC
-	 133.35018306	-384.23550649	 101.13724752	-17.19933499
-Errors:	Max dens	RMS dens	DIIS
-alpha	4.305477e-01	1.840589e-02	7.713774e-01
-beta	4.305427e-01	1.843516e-02
+DIIS error                    :  7.713666e-01
+Energy change                 :  1.805661e+00
+Max total density change      :  4.305432e-01
+Max rms   density change      :  1.841617e-02
+Max total alpha density change:  4.305457e-01
+Max rms   alpha density change:  1.840560e-02
+Max total beta  density change:  4.305407e-01
+Max rms   beta  density change:  1.843487e-02
+Dipole mu = (-10.72511359, -0.03978552,  1.13630831) D
 
-Iteration took 0.76 s.
+Iteration took 1.32 s.
 
  ******* Iteration    3 ********
-Forming HF Coulomb and exchange matrices ... done (0.14 s)
-Computing DFT exchange and correlation ... done (0.67 s)
-Numerically integrated density is 18.99994 (-0.0003 %).
+Forming HF Coulomb matrix ... done (0.11 s)
+Forming HF exchange matrix ... done (0.26 s)
+Computing DFT exchange and correlation ... done (0.78 s)
+Numerically integrated density is 18.99995 (-0.0002 %).
 ADIIS weights
- 3.27e-01  2.54e-03  6.71e-01 
+ 3.27e-01  2.53e-03  6.71e-01 
 CDIIS weights
  3.80e-01  1.33e-01  4.87e-01 
  DIIS weights
- 3.27e-01  2.54e-03  6.71e-01 
+ 3.27e-01  2.53e-03  6.71e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -547.75 eV. Energies of lowest lying states:
-   -20.459653    -18.863906*    -1.559886*    -1.059519*    -1.011539*
-    -0.919524*    -0.862825*    -0.563701*    -0.390440*    -0.330126*
-    -0.309100     -0.263330     -0.140245     -0.134344     -0.104383 
-beta:  HOMO-LUMO gap is    0.84 eV. Energies of lowest lying states:
-   -22.459332*   -18.863894*    -1.606537*    -1.084326*    -1.011922*
-    -0.951882*    -0.896030*    -0.564227*    -0.390671*    -0.340238*
-    -0.309197     -0.273680     -0.142188     -0.137151     -0.105625 
 
-Dipole:	x		y		z		dipole change
-	 9.39359636	 1.11045877	-0.47577237	 5.227725e+00
-Energy:	electronic	total		virial		energy change
-	-169.09294173	-132.59006963	 0.98427219	-2.14553
-	kinetic		nuclear		Coulomb		XC
-	 134.70874376	-392.58117093	 106.52351224	-17.74402680
-Errors:	Max dens	RMS dens	DIIS
-alpha	4.415480e-01	1.625181e-02	4.139876e-01
-beta	4.415490e-01	1.664444e-02
+DIIS error                    :  4.139908e-01
+Energy change                 : -2.145538e+00
+Max total density change      :  4.415470e-01
+Max rms   density change      :  1.644071e-02
+Max total alpha density change:  4.415465e-01
+Max rms   alpha density change:  1.625178e-02
+Max total beta  density change:  4.415476e-01
+Max rms   beta  density change:  1.664439e-02
+Dipole mu = ( 23.87616950,  2.82262284, -1.20936747) D
 
-Iteration took 0.82 s.
+Iteration took 1.15 s.
 
  ******* Iteration    4 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (0.74 s)
-Numerically integrated density is 18.99994 (-0.0003 %).
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.20 s)
+Computing DFT exchange and correlation ... done (0.71 s)
+Numerically integrated density is 18.99995 (-0.0002 %).
 ADIIS weights
- 2.70e-01  2.10e-16  6.36e-01  9.39e-02 
+ 2.70e-01  2.12e-16  6.36e-01  9.39e-02 
 CDIIS weights
  1.92e-01 -1.91e-01  6.20e-01  3.79e-01 
  DIIS weights
- 2.70e-01  2.10e-16  6.36e-01  9.39e-02 
+ 2.70e-01  2.12e-16  6.36e-01  9.39e-02 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -542.88 eV. Energies of lowest lying states:
-   -20.362234    -19.081869*    -1.494442*    -1.123992*    -0.998174*
-    -0.864544*    -0.802993*    -0.655648*    -0.494965*    -0.411923*
-    -0.299162     -0.227711     -0.152086     -0.119816     -0.091024 
-beta:  HOMO-LUMO gap is    2.81 eV. Energies of lowest lying states:
-   -22.358610*   -19.081854*    -1.541002*    -1.123982*    -1.022492*
-    -0.896194*    -0.835406*    -0.656475*    -0.495106*    -0.411921*
-    -0.308659     -0.237596     -0.153976     -0.122351     -0.092011 
 
-Dipole:	x		y		z		dipole change
-	-3.60033993	-0.00635110	 0.29923398	-5.858203e+00
-Energy:	electronic	total		virial		energy change
-	-167.47255170	-130.96967960	 1.04886447	 1.62039
-	kinetic		nuclear		Coulomb		XC
-	 124.86806736	-368.81651051	 92.54304638	-16.06715493
-Errors:	Max dens	RMS dens	DIIS
-alpha	3.149702e-01	1.450676e-02	5.774115e-01
-beta	3.149336e-01	1.488372e-02
+DIIS error                    :  5.774119e-01
+Energy change                 :  1.620402e+00
+Max total density change      :  3.149499e-01
+Max rms   density change      :  1.468950e-02
+Max total alpha density change:  3.149682e-01
+Max rms   alpha density change:  1.450669e-02
+Max total beta  density change:  3.149317e-01
+Max rms   beta  density change:  1.488362e-02
+Dipole mu = (-9.15115166, -0.01616451,  0.76055555) D
 
-Iteration took 0.90 s.
+Iteration took 1.00 s.
 
  ******* Iteration    5 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (0.78 s)
-Numerically integrated density is 18.99997 (-0.0001 %).
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.19 s)
+Computing DFT exchange and correlation ... done (0.74 s)
+Numerically integrated density is 18.99998 (-0.0001 %).
 ADIIS weights
- 2.87e-16  1.99e-16  3.65e-02  5.50e-16  9.63e-01 
+ 2.42e-16  2.18e-16  3.65e-02  5.93e-16  9.63e-01 
 CDIIS weights
  3.83e-02 -3.37e-02  2.84e-01  1.46e-02  6.97e-01 
  DIIS weights
- 2.87e-16  1.99e-16  3.65e-02  5.50e-16  9.63e-01 
+ 2.42e-16  2.18e-16  3.65e-02  5.93e-16  9.63e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -546.24 eV. Energies of lowest lying states:
-   -20.615469    -19.471225*    -1.594881*    -1.239258*    -1.093430*
-    -0.970293*    -0.913114*    -0.743854*    -0.614261*    -0.541342*
-    -0.328771     -0.266343     -0.166702     -0.135841     -0.103685 
-beta:  HOMO-LUMO gap is    5.55 eV. Energies of lowest lying states:
-   -22.615950*   -19.471184*    -1.646756*    -1.239153*    -1.124806*
-    -1.008993*    -0.952699*    -0.744225*    -0.614249*    -0.541302*
-    -0.337304     -0.275408     -0.168756     -0.137428     -0.103324 
 
-Dipole:	x		y		z		dipole change
-	-3.88607816	 0.08750591	 0.62395597	 3.240646e-01
-Energy:	electronic	total		virial		energy change
-	-169.38877836	-132.88590626	 1.04519407	-1.91623
-	kinetic		nuclear		Coulomb		XC
-	 127.13993560	-378.26675601	 98.39810016	-16.66005810
-Errors:	Max dens	RMS dens	DIIS
-alpha	1.005236e-01	3.237056e-03	1.458339e-01
-beta	1.005304e-01	3.329475e-03
+DIIS error                    :  1.458363e-01
+Energy change                 : -1.916235e+00
+Max total density change      :  1.005279e-01
+Max rms   density change      :  3.279910e-03
+Max total alpha density change:  1.005245e-01
+Max rms   alpha density change:  3.237041e-03
+Max total beta  density change:  1.005312e-01
+Max rms   beta  density change:  3.329463e-03
+Dipole mu = (-9.87744641,  0.22240526,  1.58593415) D
 
-Iteration took 0.94 s.
+Iteration took 1.02 s.
 
  ******* Iteration    6 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (0.87 s)
-Numerically integrated density is 18.99996 (-0.0002 %).
-ADIIS weights
- 7.60e-16  7.06e-18  2.11e-14  2.78e-15  6.12e-01  3.88e-01 
-CDIIS weights
--1.62e-02  5.85e-03  7.70e-04  4.41e-04  5.81e-01  4.28e-01 
- DIIS weights
- 7.60e-16  7.06e-18  2.11e-14  2.78e-15  6.12e-01  3.88e-01 
-
-Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -546.56 eV. Energies of lowest lying states:
-   -20.539492    -19.252591*    -1.567006*    -1.156729*    -1.067829*
-    -0.940670*    -0.881239*    -0.676258*    -0.529924*    -0.453755*
-    -0.322905     -0.258927     -0.155218     -0.132603     -0.101138 
-beta:  HOMO-LUMO gap is    3.33 eV. Energies of lowest lying states:
-   -22.538108*   -19.252549*    -1.618104*    -1.156658*    -1.097638*
-    -0.978222*    -0.919750*    -0.676695*    -0.529966*    -0.453726*
-    -0.331368     -0.267904     -0.157108     -0.134242     -0.100770 
-
-Dipole:	x		y		z		dipole change
-	-3.71391494	 0.03363862	 0.43535566	-1.973278e-01
-Energy:	electronic	total		virial		energy change
-	-169.36293025	-132.86005815	 1.01313732	 0.0258481
-	kinetic		nuclear		Coulomb		XC
-	 131.13726628	-386.14468721	 102.88806846	-17.24357778
-Errors:	Max dens	RMS dens	DIIS
-alpha	5.427736e-02	1.685992e-03	2.100919e-01
-beta	5.429475e-02	1.687667e-03
-
-Iteration took 1.04 s.
-
- ******* Iteration    7 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (0.72 s)
-Numerically integrated density is 18.99996 (-0.0002 %).
-ADIIS weights
- 2.15e-15  7.35e-18  1.10e-16  5.99e-15  2.09e-11  1.81e-15  1.00e+00 
-CDIIS weights
- 5.37e-03 -1.74e-05 -3.78e-02 -6.11e-04  1.06e-01  6.93e-02  8.58e-01 
- DIIS weights
- 4.31e-03 -1.39e-05 -3.03e-02 -4.90e-04  8.51e-02  5.56e-02  8.86e-01 
-
-Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.44 eV. Energies of lowest lying states:
-   -20.490555    -19.232145*    -1.547305*    -1.149724*    -1.049690*
-    -0.919680*    -0.859284*    -0.670519*    -0.522262*    -0.446137*
-    -0.318031     -0.252776     -0.153371     -0.130102     -0.099623 
-beta:  HOMO-LUMO gap is    3.26 eV. Energies of lowest lying states:
-   -22.488568*   -19.232098*    -1.598183*    -1.149644*    -1.078745*
-    -0.956797*    -0.897318*    -0.671030*    -0.522314*    -0.446106*
-    -0.326210     -0.261463     -0.155214     -0.131689     -0.099104 
-
-Dipole:	x		y		z		dipole change
-	-3.68150060	 0.03477561	 0.42913595	-3.290543e-02
-Energy:	electronic	total		virial		energy change
-	-169.42347217	-132.92060007	 1.02834150	-0.0605419
-	kinetic		nuclear		Coulomb		XC
-	 129.25725612	-382.42667154	 100.71013575	-16.96419249
-Errors:	Max dens	RMS dens	DIIS
-alpha	1.266055e-02	3.725358e-04	2.780228e-02
-beta	1.168243e-02	3.512461e-04
-
-Iteration took 0.88 s.
-
- ******* Iteration    8 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (0.88 s)
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.19 s)
+Computing DFT exchange and correlation ... done (0.80 s)
 Numerically integrated density is 18.99997 (-0.0002 %).
 ADIIS weights
- 1.33e-16  4.00e-17  2.76e-16  1.21e-15  2.78e-13  1.86e-16  1.65e-07  1.00e+00 
+ 7.61e-16  7.01e-18  2.11e-14  2.78e-15  6.12e-01  3.88e-01 
 CDIIS weights
- 4.48e-04 -4.17e-05 -2.38e-03  2.28e-05  2.33e-03  9.12e-03  2.22e-01  7.69e-01 
+-1.62e-02  5.85e-03  7.77e-04  4.43e-04  5.81e-01  4.28e-01 
  DIIS weights
- 4.48e-04 -4.17e-05 -2.38e-03  2.28e-05  2.33e-03  9.12e-03  2.22e-01  7.69e-01 
+ 7.61e-16  7.01e-18  2.11e-14  2.78e-15  6.12e-01  3.88e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.61 eV. Energies of lowest lying states:
-   -20.499245    -19.237595*    -1.550497*    -1.152010*    -1.052513*
-    -0.923104*    -0.863032*    -0.672479*    -0.524867*    -0.448619*
-    -0.318649     -0.253603     -0.153897     -0.130442     -0.099796 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497705*   -19.237545*    -1.601739*    -1.151924*    -1.081991*
-    -0.960615*    -0.901427*    -0.672977*    -0.524914*    -0.448586*
-    -0.326676     -0.262121     -0.155737     -0.131979     -0.099172 
 
-Dipole:	x		y		z		dipole change
-	-3.68957002	 0.03506066	 0.43217952	 8.370439e-03
-Energy:	electronic	total		virial		energy change
-	-169.42454799	-132.92167589	 1.03167042	-0.00107582
-	kinetic		nuclear		Coulomb		XC
-	 128.84122016	-381.62696572	 100.26584858	-16.90465101
-Errors:	Max dens	RMS dens	DIIS
-alpha	2.078748e-03	7.267331e-05	6.909619e-03
-beta	2.766693e-03	8.527003e-05
+DIIS error                    :  2.100917e-01
+Energy change                 :  2.584671e-02
+Max total density change      :  5.428643e-02
+Max rms   density change      :  1.686407e-03
+Max total alpha density change:  5.427774e-02
+Max rms   alpha density change:  1.685990e-03
+Max total beta  density change:  5.429512e-02
+Max rms   beta  density change:  1.687667e-03
+Dipole mu = (-9.43984790,  0.08548139,  1.10654783) D
 
-Iteration took 1.05 s.
+Iteration took 1.08 s.
+
+ ******* Iteration    7 ********
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.19 s)
+Computing DFT exchange and correlation ... done (0.79 s)
+Numerically integrated density is 18.99997 (-0.0001 %).
+ADIIS weights
+ 1.79e-15  3.45e-19  1.42e-16  5.24e-15  2.24e-11  1.80e-15  1.00e+00 
+CDIIS weights
+ 5.37e-03 -1.76e-05 -3.78e-02 -6.11e-04  1.06e-01  6.93e-02  8.58e-01 
+ DIIS weights
+ 4.31e-03 -1.41e-05 -3.03e-02 -4.90e-04  8.51e-02  5.56e-02  8.86e-01 
+
+Solving SCF equations ... done (0.00 s)
+
+DIIS error                    :  2.780362e-02
+Energy change                 : -6.054138e-02
+Max total density change      :  1.217175e-02
+Max rms   density change      :  3.610750e-04
+Max total alpha density change:  1.266079e-02
+Max rms   alpha density change:  3.725430e-04
+Max total beta  density change:  1.168271e-02
+Max rms   beta  density change:  3.512543e-04
+Dipole mu = (-9.35747144,  0.08837356,  1.09074688) D
+
+Iteration took 1.06 s.
+
+ ******* Iteration    8 ********
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.19 s)
+Computing DFT exchange and correlation ... done (0.81 s)
+Numerically integrated density is 18.99998 (-0.0001 %).
+ADIIS weights
+ 3.22e-15  7.29e-21  1.83e-19  6.33e-17  1.97e-13  8.73e-14  3.01e-07  1.00e+00 
+CDIIS weights
+ 4.48e-04 -4.18e-05 -2.38e-03  2.28e-05  2.34e-03  9.12e-03  2.22e-01  7.69e-01 
+ DIIS weights
+ 4.48e-04 -4.18e-05 -2.38e-03  2.28e-05  2.34e-03  9.12e-03  2.22e-01  7.69e-01 
+
+Solving SCF equations ... done (0.00 s)
+
+DIIS error                    :  6.910113e-03
+Energy change                 : -1.075783e-03
+Max total density change      :  2.422924e-03
+Max rms   density change      :  7.862361e-05
+Max total alpha density change:  2.078962e-03
+Max rms   alpha density change:  7.267592e-05
+Max total beta  density change:  2.766886e-03
+Max rms   beta  density change:  8.527316e-05
+Dipole mu = (-9.37798106,  0.08909748,  1.09848064) D
+
+Iteration took 1.09 s.
 
  ******* Iteration    9 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (0.69 s)
-Numerically integrated density is 18.99996 (-0.0002 %).
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.19 s)
+Computing DFT exchange and correlation ... done (0.73 s)
+Numerically integrated density is 18.99997 (-0.0001 %).
 ADIIS weights
- 2.65e-15  4.77e-17  1.59e-16  4.26e-16  6.46e-17  7.19e-15  1.79e-10  1.16e-09  1.00e+00 
+ 2.55e-15  5.58e-16  6.08e-16  7.16e-18  2.15e-16  1.58e-15  5.93e-11  3.28e-08  1.00e+00 
 CDIIS weights
- 1.64e-05 -1.93e-05  2.80e-04  3.42e-05 -9.98e-04 -2.67e-04  1.30e-02  7.58e-02  9.12e-01 
+ 1.64e-05 -1.93e-05  2.80e-04  3.42e-05 -9.97e-04 -2.66e-04  1.30e-02  7.58e-02  9.12e-01 
  DIIS weights
- 1.64e-05 -1.93e-05  2.80e-04  3.42e-05 -9.98e-04 -2.67e-04  1.30e-02  7.58e-02  9.12e-01 
+ 1.64e-05 -1.93e-05  2.80e-04  3.42e-05 -9.97e-04 -2.66e-04  1.30e-02  7.58e-02  9.12e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.60 eV. Energies of lowest lying states:
-   -20.499164    -19.237576*    -1.550474*    -1.152011*    -1.052493*
-    -0.923064*    -0.863002*    -0.672467*    -0.524822*    -0.448601*
-    -0.318701     -0.253656     -0.153896     -0.130454     -0.099832 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497748*   -19.237525*    -1.601813*    -1.151922*    -1.082050*
-    -0.960674*    -0.901481*    -0.672966*    -0.524867*    -0.448567*
-    -0.326655     -0.262094     -0.155732     -0.131970     -0.099163 
 
-Dipole:	x		y		z		dipole change
-	-3.68943518	 0.03501811	 0.43202259	-1.525682e-04
-Energy:	electronic	total		virial		energy change
-	-169.42463940	-132.92176730	 1.03093120	-9.1406e-05
-	kinetic		nuclear		Coulomb		XC
-	 128.93369383	-381.80678935	 100.36654557	-16.91808945
-Errors:	Max dens	RMS dens	DIIS
-alpha	1.574283e-04	4.316433e-06	6.564516e-05
-beta	1.518412e-04	4.300715e-06
+DIIS error                    :  6.563016e-05
+Energy change                 : -9.141036e-05
+Max total density change      :  1.326559e-05
+Max rms   density change      :  8.429405e-07
+Max total alpha density change:  1.574419e-04
+Max rms   alpha density change:  4.316483e-06
+Max total beta  density change:  1.518353e-04
+Max rms   beta  density change:  4.300275e-06
+Dipole mu = (-9.37763896,  0.08898926,  1.09808202) D
 
-Iteration took 0.86 s.
+Iteration took 1.00 s.
 
  ******* Iteration   10 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (0.78 s)
-Numerically integrated density is 18.99996 (-0.0002 %).
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.19 s)
+Computing DFT exchange and correlation ... done (0.70 s)
+Numerically integrated density is 18.99997 (-0.0001 %).
 ADIIS weights
- 1.03e-16  3.59e-17  4.53e-16  2.09e-16  5.88e-14  1.31e-14  5.43e-13  8.11e-08  6.43e-05  1.00e+00 
+ 2.78e-17  1.30e-16  8.85e-16  5.20e-16  7.42e-14  1.23e-13  6.68e-10  2.94e-10  2.65e-03  9.97e-01 
 CDIIS weights
- 1.31e-05 -6.01e-07  3.66e-05  6.15e-06 -2.80e-04 -3.02e-04  3.57e-04  2.27e-03  1.58e-01  8.40e-01 
+ 1.31e-05 -6.05e-07  3.66e-05  6.14e-06 -2.80e-04 -3.02e-04  3.59e-04  2.27e-03  1.58e-01  8.40e-01 
  DIIS weights
- 1.31e-05 -6.01e-07  3.66e-05  6.15e-06 -2.80e-04 -3.02e-04  3.57e-04  2.27e-03  1.58e-01  8.40e-01 
+ 1.31e-05 -6.05e-07  3.66e-05  6.14e-06 -2.80e-04 -3.02e-04  3.59e-04  2.27e-03  1.58e-01  8.40e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.60 eV. Energies of lowest lying states:
-   -20.499139    -19.237556*    -1.550458*    -1.151993*    -1.052483*
-    -0.923053*    -0.862990*    -0.672451*    -0.524812*    -0.448587*
-    -0.318714     -0.253672     -0.153892     -0.130457     -0.099842 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497771*   -19.237503*    -1.601831*    -1.151903*    -1.082068*
-    -0.960697*    -0.901498*    -0.672950*    -0.524856*    -0.448552*
-    -0.326641     -0.262079     -0.155727     -0.131966     -0.099155 
 
-Dipole:	x		y		z		dipole change
-	-3.68942301	 0.03502419	 0.43203727	-1.032033e-05
-Energy:	electronic	total		virial		energy change
-	-169.42463955	-132.92176745	 1.03093265	-1.5667e-07
-	kinetic		nuclear		Coulomb		XC
-	 128.93351268	-381.80633531	 100.36626202	-16.91807895
-Errors:	Max dens	RMS dens	DIIS
-alpha	5.736414e-05	1.625039e-06	1.605088e-05
-beta	5.792150e-05	1.588850e-06
+DIIS error                    :  1.603537e-05
+Energy change                 : -1.566639e-07
+Max total density change      :  3.515004e-06
+Max rms   density change      :  2.105081e-07
+Max total alpha density change:  5.736037e-05
+Max rms   alpha density change:  1.624823e-06
+Max total beta  density change:  5.791568e-05
+Max rms   beta  density change:  1.588623e-06
+Dipole mu = (-9.37760800,  0.08900477,  1.09811938) D
 
-Iteration took 0.95 s.
+Iteration took 0.98 s.
 
  ******* Convergence achieved ********
-Dipole moment is (-9.377577,0.089023,1.098129) D, |mu|=9.442074 D.
-Solution of UDFT took 11.44 s.
-alpha: HOMO-LUMO gap is -545.60 eV. Energies of lowest lying states:
-   -20.499139    -19.237556*    -1.550458*    -1.151993*    -1.052483*
-    -0.923053*    -0.862990*    -0.672451*    -0.524812*    -0.448587*
-    -0.318714     -0.253672     -0.153892     -0.130457     -0.099842 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497771*   -19.237503*    -1.601831*    -1.151903*    -1.082068*
-    -0.960697*    -0.901498*    -0.672950*    -0.524856*    -0.448552*
-    -0.326641     -0.262079     -0.155727     -0.131966     -0.099155 
+Solution of UDFT took 14.61 s.
+
+Kinetic               energy:  1.2893349765789520e+02
+Nuclear attraction    energy: -3.8180631181766859e+02
+Total one-electron    energy: -2.5287281415977347e+02
+Nuclear repulsion     energy:  3.6502872099669482e+01
+Coulomb               energy:  1.0036625245395807e+02
+Exchange-correlation  energy: -1.6918080472072507e+01
+Non-local correlation energy:  0.0000000000000000e+00
+-----------------------------------------------------
+                Total energy: -1.3292177007821843e+02
+               Virial factor:  1.0309327870008265e+00
+
+Dipole mu = (-9.37760800,  0.08900477,  1.09811938) D
+
+alpha: HOMO-LUMO gap is -545.60 eV. Orbital energies:
+     -20.4991      -19.2376*      -1.5505*      -1.1520*      -1.0525*
+      -0.9231*      -0.8630*      -0.6725*      -0.5248*      -0.4486*
+      -0.3187       -0.2537       -0.1539       -0.1305       -0.0998 
+      -0.0980       -0.0806       -0.0422       -0.0319       -0.0251 
+      -0.0128       -0.0052        0.0173        0.0332        0.0439 
+       0.0530        0.0985        0.1318        0.1441        0.1743 
+       0.1961        0.1988        0.2093        0.2413        0.2607 
+       0.3006        0.3494        0.3884        0.4652        0.4770 
+       0.5199        0.6199        0.6261        0.6410        0.6774 
+       0.7485        0.7649        0.7991        0.8171        0.8563 
+       0.8687        0.9288        1.0702        1.1051        1.1257 
+       1.3497        1.4225        1.4582        1.5430        1.5851 
+       1.6295        1.6713        1.7525        1.7569        1.8241 
+       2.0227        2.0451        2.0484        2.1818        2.3063 
+       2.4362        2.5299        2.8807        2.8842        2.9990 
+       3.1488        3.1737        3.2061        3.2228        3.4445 
+       3.5903        3.8136 
+beta:  HOMO-LUMO gap is    3.32 eV. Orbital energies:
+     -22.4978*     -19.2375*      -1.6018*      -1.1519*      -1.0821*
+      -0.9607*      -0.9015*      -0.6729*      -0.5249*      -0.4486*
+      -0.3266       -0.2621       -0.1557       -0.1320       -0.0992 
+      -0.0969       -0.0814       -0.0415       -0.0326       -0.0259 
+      -0.0110       -0.0042        0.0172        0.0342        0.0451 
+       0.0535        0.0986        0.1299        0.1438        0.1737 
+       0.1956        0.1984        0.2088        0.2392        0.2624 
+       0.3015        0.3522        0.3883        0.4691        0.4768 
+       0.5159        0.6233        0.6249        0.6434        0.6768 
+       0.7367        0.7649        0.7960        0.8080        0.8531 
+       0.8558        0.9250        1.0653        1.1054        1.1242 
+       1.3524        1.4137        1.4619        1.5480        1.5853 
+       1.6298        1.6529        1.7451        1.7577        1.8086 
+       2.0228        2.0437        2.0529        2.1809        2.3063 
+       2.4360        2.5298        2.8738        2.8772        2.9931 
+       3.1489        3.1736        3.2062        3.2161        3.4369 
+       3.5900        3.8133 
+alpha: HOMO-LUMO gap is -545.60 eV. Energies of lowest lying orbitals:
+     -20.4991      -19.2376*      -1.5505*      -1.1520*      -1.0525*
+      -0.9231*      -0.8630*      -0.6725*      -0.5248*      -0.4486*
+      -0.3187       -0.2537       -0.1539       -0.1305       -0.0998 
+beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying orbitals:
+     -22.4978*     -19.2375*      -1.6018*      -1.1519*      -1.0821*
+      -0.9607*      -0.9015*      -0.6729*      -0.5249*      -0.4486*
+      -0.3266       -0.2621       -0.1557       -0.1320       -0.0992 
 
 Using hybrid exchange with  10.000 % of exact exchange.
 	atom  Npoints      Nfuncs  t
-	   3     8228      516050  3.36 s
-	   2     8204      517072  4.17 s
-	   1     8902      584631  4.21 s
-	   4     8374      534034  5.03 s
-	   5     7844      473169  2.85 s
-	   6     8636      600413  3.57 s
-DFT XC grid constructed in 7.74 s.
+	   2     7727      519617  2.83 s
+	   3     7723      519287  2.86 s
+	   4     7663      543853  2.96 s
+	   1     7967      601552  3.35 s
+	   5     7948      512460  2.63 s
+	   6     7792      617779  3.46 s
+DFT XC grid constructed in 6.32 s.
 
  ******* Iteration    1 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (2.04 s)
+Forming HF Coulomb matrix ... done (0.09 s)
+Forming HF exchange matrix ... done (0.22 s)
+Computing DFT exchange and correlation ... done (2.07 s)
 Numerically integrated density is 19.00000 (-0.0000 %).
 ADIIS weights
  1.00e+00 
@@ -534,165 +527,178 @@ CDIIS weights
  1.00e+00 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.57 eV. Energies of lowest lying states:
-   -20.498171    -19.237303*    -1.550358*    -1.152034*    -1.052486*
-    -0.923080*    -0.863026*    -0.672504*    -0.524888*    -0.448667*
-    -0.318707     -0.253682     -0.153903     -0.130447     -0.099820 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497836*   -19.237251*    -1.601903*    -1.151943*    -1.082086*
-    -0.960706*    -0.901499*    -0.673004*    -0.524932*    -0.448632*
-    -0.326644     -0.262067     -0.155736     -0.131946     -0.099113 
 
-Dipole:	x		y		z		dipole change
-	-3.68948880	 0.03506860	 0.43222372	 3.714886e+00
-Energy:	electronic	total		virial		energy change
-	-169.42459719	-132.92172510	 1.03093324	-132.922
-	kinetic		nuclear		Coulomb		XC
-	 128.93339694	-381.80605904	 100.36609022	-16.91802532
-Errors:	Max dens	RMS dens	DIIS
-alpha	1.118853e-04	5.082761e-06	2.694455e-04
-beta	1.112575e-04	4.761645e-06
+DIIS error                    :  2.694617e-04
+Energy change                 : -1.329217e+02
+Max total density change      :  1.121773e-04
+Max rms   density change      :  4.616978e-06
+Max total alpha density change:  1.124981e-04
+Max rms   alpha density change:  5.190578e-06
+Max total beta  density change:  1.118564e-04
+Max rms   beta  density change:  4.825477e-06
+Dipole mu = (-9.37774125,  0.08913254,  1.09861131) D
 
-Iteration took 2.21 s.
+Iteration took 2.38 s.
 
  ******* Iteration    2 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (2.01 s)
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.21 s)
+Computing DFT exchange and correlation ... done (1.98 s)
 Numerically integrated density is 19.00000 (-0.0000 %).
 ADIIS weights
- 4.94e-01  5.06e-01 
+ 4.92e-01  5.08e-01 
 CDIIS weights
- 3.79e-01  6.21e-01 
+ 3.80e-01  6.20e-01 
  DIIS weights
- 3.79e-01  6.21e-01 
+ 3.80e-01  6.20e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.58 eV. Energies of lowest lying states:
-   -20.498133    -19.236953*    -1.550342*    -1.151911*    -1.052474*
-    -0.923068*    -0.863012*    -0.672405*    -0.524762*    -0.448538*
-    -0.318704     -0.253679     -0.153888     -0.130444     -0.099818 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497793*   -19.236900*    -1.601893*    -1.151819*    -1.082076*
-    -0.960693*    -0.901485*    -0.672906*    -0.524806*    -0.448503*
-    -0.326639     -0.262061     -0.155721     -0.131942     -0.099110 
 
-Dipole:	x		y		z		dipole change
-	-3.68922182	 0.03495429	 0.43185007	-3.096908e-04
-Energy:	electronic	total		virial		energy change
-	-169.42459721	-132.92172511	 1.03091069	-1.47643e-08
-	kinetic		nuclear		Coulomb		XC
-	 128.93621826	-381.81155402	 100.36914158	-16.91840304
-Errors:	Max dens	RMS dens	DIIS
-alpha	8.812160e-05	2.644879e-06	1.882248e-04
-beta	8.840478e-05	2.662532e-06
-
-Iteration took 2.17 s.
-
- ******* Iteration    3 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (2.12 s)
-Numerically integrated density is 19.00000 (-0.0000 %).
-ADIIS weights
- 1.12e-03  4.85e-01  5.14e-01 
-CDIIS weights
--3.38e-03  4.01e-01  6.02e-01 
- DIIS weights
--3.38e-03  4.01e-01  6.02e-01 
-
-Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.58 eV. Energies of lowest lying states:
-   -20.498124    -19.237088*    -1.550334*    -1.151968*    -1.052466*
-    -0.923061*    -0.863006*    -0.672451*    -0.524819*    -0.448597*
-    -0.318702     -0.253677     -0.153894     -0.130442     -0.099818 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497782*   -19.237035*    -1.601889*    -1.151876*    -1.082071*
-    -0.960687*    -0.901480*    -0.672951*    -0.524862*    -0.448562*
-    -0.326634     -0.262055     -0.155727     -0.131941     -0.099108 
-
-Dipole:	x		y		z		dipole change
-	-3.68934016	 0.03500606	 0.43201770	 1.375117e-04
-Energy:	electronic	total		virial		energy change
-	-169.42459722	-132.92172512	 1.03093081	-8.90819e-09
-	kinetic		nuclear		Coulomb		XC
-	 128.93370134	-381.80634896	 100.36606876	-16.91801836
-Errors:	Max dens	RMS dens	DIIS
-alpha	3.602849e-05	1.146217e-06	1.246811e-04
-beta	3.581113e-05	1.108906e-06
+DIIS error                    :  1.890953e-04
+Energy change                 : -1.507036e-08
+Max total density change      :  8.864057e-05
+Max rms   density change      :  2.656699e-06
+Max total alpha density change:  8.849423e-05
+Max rms   alpha density change:  2.654713e-06
+Max total beta  density change:  8.878691e-05
+Max rms   beta  density change:  2.673986e-06
+Dipole mu = (-9.37706476,  0.08883967,  1.09765571) D
 
 Iteration took 2.28 s.
 
- ******* Iteration    4 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (2.04 s)
+ ******* Iteration    3 ********
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.19 s)
+Computing DFT exchange and correlation ... done (1.74 s)
 Numerically integrated density is 19.00000 (-0.0000 %).
 ADIIS weights
- 9.09e-03  2.00e-01  2.67e-01  5.24e-01 
+ 1.13e-03  4.84e-01  5.15e-01 
 CDIIS weights
--1.75e-03  1.88e-01  2.90e-01  5.24e-01 
+-3.49e-03  4.01e-01  6.03e-01 
  DIIS weights
--1.75e-03  1.88e-01  2.90e-01  5.24e-01 
+-3.49e-03  4.01e-01  6.03e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.58 eV. Energies of lowest lying states:
-   -20.498135    -19.237087*    -1.550338*    -1.151968*    -1.052470*
-    -0.923066*    -0.863011*    -0.672451*    -0.524818*    -0.448597*
-    -0.318703     -0.253679     -0.153894     -0.130443     -0.099818 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497795*   -19.237034*    -1.601895*    -1.151875*    -1.082076*
-    -0.960692*    -0.901486*    -0.672951*    -0.524862*    -0.448561*
-    -0.326635     -0.262056     -0.155728     -0.131941     -0.099108 
 
-Dipole:	x		y		z		dipole change
-	-3.68933870	 0.03500328	 0.43201036	-2.332277e-06
-Energy:	electronic	total		virial		energy change
-	-169.42459725	-132.92172515	 1.03092341	-2.89215e-08
-	kinetic		nuclear		Coulomb		XC
-	 128.93462631	-381.80828865	 100.36722886	-16.91816376
-Errors:	Max dens	RMS dens	DIIS
-alpha	2.005511e-06	5.913424e-08	6.971828e-06
-beta	4.582411e-06	1.200948e-07
+DIIS error                    :  1.250887e-04
+Energy change                 : -9.155457e-09
+Max total density change      :  3.604025e-05
+Max rms   density change      :  1.120073e-06
+Max total alpha density change:  3.615397e-05
+Max rms   alpha density change:  1.151671e-06
+Max total beta  density change:  3.592653e-05
+Max rms   beta  density change:  1.112614e-06
+Dipole mu = (-9.37736816,  0.08897109,  1.09808244) D
 
-Iteration took 2.21 s.
+Iteration took 2.02 s.
+
+ ******* Iteration    4 ********
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.20 s)
+Computing DFT exchange and correlation ... done (2.02 s)
+Numerically integrated density is 19.00000 (-0.0000 %).
+ADIIS weights
+ 9.20e-03  2.00e-01  2.68e-01  5.22e-01 
+CDIIS weights
+-1.84e-03  1.86e-01  2.89e-01  5.26e-01 
+ DIIS weights
+-1.84e-03  1.86e-01  2.89e-01  5.26e-01 
+
+Solving SCF equations ... done (0.00 s)
+
+DIIS error                    :  7.050387e-06
+Energy change                 : -2.908354e-08
+Max total density change      :  2.989307e-06
+Max rms   density change      :  8.423066e-08
+Max total alpha density change:  2.041903e-06
+Max rms   alpha density change:  6.035456e-08
+Max total beta  density change:  4.642650e-06
+Max rms   beta  density change:  1.221204e-07
+Dipole mu = (-9.37736331,  0.08896405,  1.09806391) D
+
+Iteration took 2.31 s.
 
  ******* Iteration    5 ********
-Forming HF Coulomb and exchange matrices ... done (0.16 s)
-Computing DFT exchange and correlation ... done (1.77 s)
+Forming HF Coulomb matrix ... done (0.08 s)
+Forming HF exchange matrix ... done (0.19 s)
+Computing DFT exchange and correlation ... done (1.84 s)
 Numerically integrated density is 19.00000 (-0.0000 %).
 ADIIS weights
- 5.23e-03  1.22e-01  1.83e-01  3.45e-01  3.44e-01 
+ 5.13e-03  1.23e-01  1.84e-01  3.44e-01  3.43e-01 
 CDIIS weights
- 3.44e-05  1.13e-02  2.34e-02  1.67e-01  7.99e-01 
+ 1.66e-05  1.19e-02  2.45e-02  1.70e-01  7.93e-01 
  DIIS weights
- 3.44e-05  1.13e-02  2.34e-02  1.67e-01  7.99e-01 
+ 1.66e-05  1.19e-02  2.45e-02  1.70e-01  7.93e-01 
 
 Solving SCF equations ... done (0.00 s)
-alpha: HOMO-LUMO gap is -545.58 eV. Energies of lowest lying states:
-   -20.498133    -19.237087*    -1.550337*    -1.151967*    -1.052469*
-    -0.923066*    -0.863010*    -0.672451*    -0.524818*    -0.448596*
-    -0.318704     -0.253679     -0.153894     -0.130443     -0.099818 
-beta:  HOMO-LUMO gap is    3.32 eV. Energies of lowest lying states:
-   -22.497793*   -19.237034*    -1.601895*    -1.151875*    -1.082076*
-    -0.960692*    -0.901486*    -0.672951*    -0.524861*    -0.448561*
-    -0.326634     -0.262056     -0.155728     -0.131941     -0.099108 
 
-Dipole:	x		y		z		dipole change
-	-3.68933595	 0.03500372	 0.43201094	-2.653531e-06
-Energy:	electronic	total		virial		energy change
-	-169.42459725	-132.92172515	 1.03092299	 2.08502e-10
-	kinetic		nuclear		Coulomb		XC
-	 128.93467986	-381.80838405	 100.36727793	-16.91817099
-Errors:	Max dens	RMS dens	DIIS
-alpha	2.262310e-06	6.004346e-08	1.397338e-06
-beta	1.323175e-06	4.485736e-08
+DIIS error                    :  1.451769e-06
+Energy change                 :  2.128786e-10
+Max total density change      :  5.390286e-07
+Max rms   density change      :  1.617708e-08
+Max total alpha density change:  2.274419e-06
+Max rms   alpha density change:  6.030122e-08
+Max total beta  density change:  1.302806e-06
+Max rms   beta  density change:  4.456615e-08
+Dipole mu = (-9.37735588,  0.08896530,  1.09806571) D
 
-Iteration took 1.94 s.
+Iteration took 2.13 s.
 
  ******* Convergence achieved ********
-Dipole moment is (-9.377356,0.088971,1.098062) D, |mu|=9.441846 D.
-Solution of UDFT took 18.55 s.
+Solution of UDFT took 17.45 s.
+
+Kinetic               energy:  1.2893468063562585e+02
+Nuclear attraction    energy: -3.8180838548864040e+02
+Total one-electron    energy: -2.5287370485301454e+02
+Nuclear repulsion     energy:  3.6502872099669482e+01
+Coulomb               energy:  1.0036727873896851e+02
+Exchange-correlation  energy: -1.6918171010003565e+01
+Non-local correlation energy:  0.0000000000000000e+00
+-----------------------------------------------------
+                Total energy: -1.3292172502438012e+02
+               Virial factor:  1.0309229787447320e+00
+
+Dipole mu = (-9.37735588,  0.08896530,  1.09806571) D
+
+alpha: HOMO-LUMO gap is -545.58 eV. Orbital energies:
+     -20.4981      -19.2371*      -1.5503*      -1.1520*      -1.0525*
+      -0.9231*      -0.8630*      -0.6725*      -0.5248*      -0.4486*
+      -0.3187       -0.2537       -0.1539       -0.1304       -0.0998 
+      -0.0980       -0.0806       -0.0422       -0.0319       -0.0251 
+      -0.0128       -0.0051        0.0173        0.0332        0.0439 
+       0.0530        0.0985        0.1318        0.1441        0.1743 
+       0.1961        0.1988        0.2093        0.2413        0.2607 
+       0.3006        0.3494        0.3884        0.4652        0.4770 
+       0.5199        0.6199        0.6261        0.6410        0.6773 
+       0.7485        0.7649        0.7991        0.8171        0.8563 
+       0.8687        0.9288        1.0701        1.1050        1.1257 
+       1.3497        1.4225        1.4581        1.5430        1.5851 
+       1.6295        1.6713        1.7525        1.7569        1.8241 
+       2.0227        2.0451        2.0484        2.1818        2.3063 
+       2.4362        2.5299        2.8807        2.8842        2.9991 
+       3.1489        3.1737        3.2062        3.2228        3.4445 
+       3.5903        3.8137 
+beta:  HOMO-LUMO gap is    3.32 eV. Orbital energies:
+     -22.4978*     -19.2370*      -1.6019*      -1.1519*      -1.0821*
+      -0.9607*      -0.9015*      -0.6730*      -0.5249*      -0.4486*
+      -0.3266       -0.2621       -0.1557       -0.1319       -0.0991 
+      -0.0968       -0.0814       -0.0415       -0.0325       -0.0259 
+      -0.0110       -0.0042        0.0172        0.0342        0.0451 
+       0.0535        0.0985        0.1299        0.1438        0.1737 
+       0.1956        0.1984        0.2088        0.2392        0.2624 
+       0.3015        0.3522        0.3883        0.4691        0.4768 
+       0.5159        0.6233        0.6249        0.6434        0.6768 
+       0.7367        0.7649        0.7960        0.8080        0.8531 
+       0.8559        0.9250        1.0653        1.1054        1.1242 
+       1.3524        1.4137        1.4619        1.5480        1.5852 
+       1.6298        1.6529        1.7451        1.7577        1.8086 
+       2.0228        2.0436        2.0529        2.1809        2.3063 
+       2.4360        2.5298        2.8738        2.8772        2.9931 
+       3.1489        3.1736        3.2063        3.2160        3.4368 
+       3.5901        3.8133 
 Vertical photoionization energy is 543.19 eV.
 
 
 
-Running program took 30.75 s.
-Current time is Fri 06 Feb 2015 06:02:25.
+Running program took 34.58 s.
+Current time is Wed 25 Feb 2015 01:29:14.
