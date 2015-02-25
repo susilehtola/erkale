@@ -61,7 +61,7 @@ class ERIscreen {
   double beta;
 
   /// Run calculation with given digestor
-  void calculate(std::vector<IntegralDigestor *> digest, double tol) const;
+  void calculate(std::vector< std::vector<IntegralDigestor *> > & digest, double tol) const;
   /// Run force calculation with given digestor
   void calculate_force(std::vector<IntegralDigestor *> digest, double tol) const;
 
@@ -86,12 +86,20 @@ class ERIscreen {
   arma::mat calcJ(const arma::mat & P, double tol) const;
   /// Calculate exchange matrix with tolerance tol for integrals
   arma::mat calcK(const arma::mat & P, double tol) const;
+    /// Calculate exchange matrix with tolerance tol for integrals
+  arma::cx_mat calcK(const arma::cx_mat & P, double tol) const;
   /// Calculate  exchange matrices with tolerance tol for integrals
   void calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol) const;
+  /// Calculate  exchange matrices with tolerance tol for integrals
+  void calcK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const;
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals
   void calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol) const;
+  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals
+  void calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, double tol) const;
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, unrestricted calculation
   void calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol) const;
+  /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals, unrestricted calculation
+  void calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const;
 
   /* Force calculation */
 
