@@ -23,18 +23,19 @@ LINK_DIRECTORIES(${HDF5_LIBRARY_DIRS})
 #sources
 
 add_library (liberkale basis.cpp basislibrary.cpp stringutil.cpp
-mathf.cpp integrals.cpp eritable.cpp eriscreen.cpp timer.cpp
-linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp scf-base.cpp
-localization.cpp scf-solvers.cpp scf-fock.cpp scf-force.cpp
-elements.cpp xyzutils.cpp zmatrix.cpp settings.cpp broyden.cpp
-tempered.cpp find_molecules.cpp properties.cpp checkpoint.cpp
-guess.cpp external/storage.cpp external/fchkpt_tools.cpp gaunt.cpp
-lmgrid.cpp spherical_harmonics.cpp trrh.cpp lobatto.cpp dftgrid.cpp
-dftfuncs.cpp xcfit.cpp chebyshev.cpp density_fitting.cpp lebedev.cpp
-eriworker_routines.cpp unitary.cpp pzstability.cpp hirshfeld.cpp
-hirshfeldi.cpp bader.cpp badergrid.cpp stockholder.cpp
-slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
-atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp)
+mathf.cpp integrals.cpp eri_digest.cpp eritable.cpp eriscreen.cpp
+timer.cpp linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp
+scf-base.cpp localization.cpp scf-solvers.cpp scf-fock.cpp
+scf-force.cpp elements.cpp xyzutils.cpp zmatrix.cpp settings.cpp
+broyden.cpp tempered.cpp find_molecules.cpp properties.cpp
+checkpoint.cpp guess.cpp external/storage.cpp
+external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
+trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfit.cpp chebyshev.cpp
+density_fitting.cpp lebedev.cpp eriworker_routines.cpp unitary.cpp
+pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
+stockholder.cpp slaterfit/solve_coefficients.cpp
+slaterfit/form_exponents.cpp atom/integrals.cpp atom/solvers.cpp
+atom/atomtable.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
@@ -204,36 +205,6 @@ add_custom_command(
  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eriworker.cpp
  COMMAND eriworker_gentransform > ${CMAKE_CURRENT_BINARY_DIR}/eriworker_routines.cpp
  COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eriworker.cpp >> ${CMAKE_CURRENT_BINARY_DIR}/eriworker_routines.cpp
-)
-
-# Recipe for building ERITable
-add_custom_command(
- OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
- COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eritable-base.cpp > ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
- COMMAND ${PPROC} -DERITABLE ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >> ${CMAKE_CURRENT_BINARY_DIR}/eritable.cpp
- DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in
- DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eritable-base.cpp
-)
-
-# Recipe for building ERIScreen
-add_custom_command(
- OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in
- DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/eriscreen-base.cpp
-
- COMMAND ${CAT} ${CMAKE_CURRENT_SOURCE_DIR}/eriscreen-base.cpp >${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
-
- COMMAND ${PPROC} -DCALCJKab ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${PPROC} -DCALCKab ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${PPROC} -DCALCJK ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${PPROC} -DCALCJ ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${PPROC} -DCALCK ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
-
- COMMAND ${PPROC} -DCALCJKab -DFORCE ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${PPROC} -DCALCKab -DFORCE ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${PPROC} -DCALCJK -DFORCE ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${PPROC} -DCALCJ -DFORCE ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
- COMMAND ${PPROC} -DCALCK -DFORCE ${CMAKE_CURRENT_SOURCE_DIR}/eri-routines.cpp.in >>${CMAKE_CURRENT_BINARY_DIR}/eriscreen.cpp
 )
 
 # Recipe for building SCF

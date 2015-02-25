@@ -393,7 +393,8 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
     }
 
     // Coulomb matrices
-    std::vector<arma::mat> Jorb=dfit.calc_J(Porb);
+    std::vector<arma::mat> Jorb;
+    Jorb=dfit.calc_J(Porb);
     for(size_t io=0;io<Ctilde.n_cols;io++)
       Eorb[io]=0.5*(1-kfull)*arma::trace(Porb[io]*Jorb[io]);
     if(fock)
@@ -486,12 +487,89 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	}
       }
     } else {
-      // HF coulomb/exchange not implemented
-      ERROR_INFO();
-      throw std::runtime_error("Direct formation of conventional Coulomb matrices not implemented!\n");
+      // Compute range separated integrals if necessary
+      if(is_range_separated(dft.x_func)) {
+	bool fill;
+	if(!scr_rs.get_N()) {
+	  fill=true;
+	} else {
+	  double o, kl, ks;
+	  scr_rs.get_range_separation(o,kl,ks);
+	  fill=(!(o==omega));
+	}
+	if(fill) {
+	  t.set();
+	  if(verbose) {
+	    printf("Computing short-range repulsion integrals ... ");
+	    fflush(stdout);
+	  }
+
+	  scr_rs.set_range_separation(omega,0.0,1.0);
+	  size_t Np=scr_rs.fill(basisp,intthr);
+
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    printf("%i short-range shell pairs are significant.\n",(int) Np);
+	    fflush(stdout);
+	  }
+	}
+      }
+
+      if(verbose) {
+	if(fock)
+	  printf("Constructing orbital Coulomb matrices ... ");
+	else
+	  printf("Computing    orbital Coulomb energies ... ");
+	fflush(stdout);
+	t.set();
+      }
+
+      // Calculate Coulomb term; exchange coincides with Coulomb
+      {
+	std::vector<arma::mat> Jorb=scr.calcJ(Porb,intthr);
+	for(size_t io=0;io<Ctilde.n_cols;io++) {
+	  // Coulomb energy is
+	  Eorb[io]=0.5*(1-kfull)*arma::trace(Porb[io]*Jorb[io]);
+	  if(fock)
+	    Forb[io]=(1-kfull)*Jorb[io];
+	}
+      }
+      
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	fflush(stdout);
+      }
+      
+      // Short-range part
+      if(kshort) {
+	if(verbose) {
+	  if(fock)
+	    printf("Constructing orbital short-range exchange matrices ... ");
+	  else
+	    printf("Computing    orbital short-range exchange energies ... ");
+	  fflush(stdout);
+	  t.set();
+	}
+
+	// Calculate Coulomb term; exchange coincides with Coulomb
+	{
+	  std::vector<arma::mat> Jorb=scr_rs.calcJ(Porb,intthr);
+	  for(size_t io=0;io<Ctilde.n_cols;io++) {
+	    // Coulomb energy is
+	    Eorb[io]-=0.5*kshort*arma::trace(Porb[io]*Jorb[io]);
+	    if(fock)
+	      Forb[io]-=kshort*Jorb[io];
+	  }
+	}
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  fflush(stdout);
+	}
+      }
     }
   }
-
+  
   // Exchange-correlation
   if(dft.x_func != 0 || dft.c_func != 0) {
     if(verbose) {
