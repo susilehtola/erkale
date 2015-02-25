@@ -30,7 +30,7 @@ extern "C" {
 }
 
 /// Checkpoint version.
-#define ERKALE_CHKVER 1
+#define ERKALE_CHKVER 2
 
 /// Fixed-length data for shell
 typedef struct {
