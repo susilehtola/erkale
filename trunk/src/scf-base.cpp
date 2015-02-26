@@ -92,6 +92,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   strictint=set.get_bool("StrictIntegrals");
   // Integral screening threshold
   intthr=strictint ? DBL_EPSILON : set.get_double("IntegralThresh");
+  // Sanity check
+  if(intthr>1e-6) {
+    fprintf(stderr,"Warning - spuriously large integral threshold %e\n",intthr);
+  }
 
   doforce=false;
 
