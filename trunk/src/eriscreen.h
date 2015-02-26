@@ -63,7 +63,7 @@ class ERIscreen {
   /// Run calculation with given digestor
   void calculate(std::vector< std::vector<IntegralDigestor *> > & digest, double tol) const;
   /// Run force calculation with given digestor
-  void calculate_force(std::vector<IntegralDigestor *> digest, double tol) const;
+  arma::vec calculate_force(std::vector< std::vector<ForceDigestor *> > & digest, double tol) const;
 
  public:
   /// Constructor
@@ -84,6 +84,9 @@ class ERIscreen {
 
   /// Calculate Coulomb matrix with tolerance tol for integrals
   arma::mat calcJ(const arma::mat & P, double tol) const;
+  /// Calculate set of Coulomb matrices with tolerance tol for integrals (for PZ-SIC)
+  std::vector<arma::mat> calcJ(const std::vector<arma::mat> & P, double tol) const;
+
   /// Calculate exchange matrix with tolerance tol for integrals
   arma::mat calcK(const arma::mat & P, double tol) const;
     /// Calculate exchange matrix with tolerance tol for integrals
@@ -92,6 +95,7 @@ class ERIscreen {
   void calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol) const;
   /// Calculate  exchange matrices with tolerance tol for integrals
   void calcK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const;
+
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals
   void calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol) const;
   /// Calculate Coulomb and exchange matrices at the same time with tolerance tol for integrals
@@ -106,17 +110,13 @@ class ERIscreen {
   /// Calculate Coulomb force with tolerance tol for integrals
   arma::vec forceJ(const arma::mat & P, double tol) const;
   /// Calculate exchange force with tolerance tol for integrals
-  arma::vec forceK(const arma::mat & P, double tol) const;
+  arma::vec forceK(const arma::mat & P, double tol, double kfrac) const;
   /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, unrestricted calculation
-  void forceK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fKa, arma::vec & fKb, double tol) const;
+  arma::vec forceK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const;
   /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals
-  void forceJK(const arma::mat & P, arma::vec & fJ, arma::vec & fK, double tol) const;
+  arma::vec forceJK(const arma::mat & P, double tol, double kfrac) const;
   /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, unrestricted calculation
-  void forceJK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fJ, arma::vec & fKa, arma::vec & fKb, double tol) const;
-
-  /* Version for SIC routines */
-  /// Calculate Coulomb matrices with tolerance tol for integrals
-  std::vector<arma::mat> calcJ(const std::vector<arma::mat> & P, double tol) const;
+  arma::vec forceJK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const;
 };
 
 #include "basis.h"

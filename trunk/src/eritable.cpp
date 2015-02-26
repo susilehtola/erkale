@@ -101,35 +101,26 @@ size_t ERItable::offset(size_t ip, size_t jp) const {
 arma::mat ERItable::calcJ(const arma::mat & P) const {
   arma::mat J(P);
   J.zeros();
-
+  
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-    arma::mat Jwrk(J);
-
+    // Integral digestor
+    JDigestor dig(P);
+    
 #ifdef _OPENMP
 #pragma omp for
 #endif
-    for(size_t ip=0;ip<shpairs.size();ip++) {
+    for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs
-      for(size_t jp=0;jp<=ip;jp++) {
-	// Shells on first pair
-	size_t is=shpairs[ip].is;
-	size_t js=shpairs[ip].js;
-	// and those on the second pair
-	size_t ks=shpairs[jp].is;
-	size_t ls=shpairs[jp].js;
-
-	// Digest integral block
-	digest_J(shpairs,ip,jp,ints,offset(ip,jp),P,Jwrk);
-      }
-    }
-
+      for(size_t jp=0;jp<=ip;jp++)
+	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
+    
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    J+=Jwrk;
+    J+=dig.get_J();
   }
 
   return J;
@@ -143,30 +134,21 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
 #pragma omp parallel
 #endif
   {
-    arma::mat Kwrk(K);
+    // Integral digestor
+    KDigestor dig(P);
     
 #ifdef _OPENMP
 #pragma omp for
 #endif
-    for(size_t ip=0;ip<shpairs.size();ip++) {
+    for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs
-      for(size_t jp=0;jp<=ip;jp++) {
-	// Shells on first pair
-	size_t is=shpairs[ip].is;
-	size_t js=shpairs[ip].js;
-	// and those on the second pair
-	size_t ks=shpairs[jp].is;
-	size_t ls=shpairs[jp].js;
-	
-	// Digest integral block
-	digest_K(shpairs,ip,jp,ints,offset(ip,jp),double,P,Kwrk);
-      }
-    }
-
+      for(size_t jp=0;jp<=ip;jp++)
+	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
+    
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    K+=Kwrk;
+    K+=dig.get_K();
   }
 
   return K;
@@ -182,28 +164,21 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
   {
     arma::cx_mat Kwrk(K);
     
+    // Integral digestor
+    cxKDigestor dig(P);
+    
 #ifdef _OPENMP
 #pragma omp for
 #endif
-    for(size_t ip=0;ip<shpairs.size();ip++) {
+    for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs
-      for(size_t jp=0;jp<=ip;jp++) {
-	// Shells on first pair
-	size_t is=shpairs[ip].is;
-	size_t js=shpairs[ip].js;
-	// and those on the second pair
-	size_t ks=shpairs[jp].is;
-	size_t ls=shpairs[jp].js;
-	
-	// Digest integral block
-	digest_K(shpairs,ip,jp,ints,offset(ip,jp),std::complex<double>,P,Kwrk);
-      }
-    }
-
+      for(size_t jp=0;jp<=ip;jp++)
+	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
+    
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-    K+=Kwrk;
+    K+=dig.get_K();
   }
 
   return K;

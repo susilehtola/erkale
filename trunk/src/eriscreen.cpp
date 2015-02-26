@@ -149,11 +149,15 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
   }
 }
 
-void ERIscreen::calculate_force(std::vector<IntegralDigestor *> digest, double tol) const {
+arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> > & digest, double tol) const {
   // Shells
   std::vector<GaussianShell> shells=basp->get_shells();
   // Get number of shell pairs
   const size_t Npairs=shpairs.size();
+
+  // Forces
+  arma::vec F(3*basp->get_Nnuc());
+  F.zeros();
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -162,13 +166,16 @@ void ERIscreen::calculate_force(std::vector<IntegralDigestor *> digest, double t
     /// ERI derivative worker
     dERIWorker *deri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new dERIWorker(basp->get_max_am(),basp->get_max_Ncontr()) : new dERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
 
-    /// Integral array
-    //    const std::vector<double> * erip;
-    (void) digest;
-
     // Shell centers
     size_t inuc, jnuc, knuc, lnuc;
 
+#ifndef _OPENMP
+    int ith=0;
+#else
+    int ith(omp_get_thread_num());
+    arma::vec Fwrk(F);
+#pragma omp for schedule(dynamic)
+#endif
     for(size_t ip=0;ip<Npairs;ip++) {
       for(size_t jp=0;jp<=ip;jp++) {
 	// Shells on first pair
@@ -201,17 +208,40 @@ void ERIscreen::calculate_force(std::vector<IntegralDigestor *> digest, double t
 	
 	// Compute the derivatives.
 	deri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
-
-	// Forces on the nuclei
+	
+	// Digest the forces on the nuclei
 	arma::vec f(12);
 	f.zeros();
-	// Digest into forces
+
+	// Digest the integrals
+	for(size_t i=0;i<digest[ith].size();i++)
+	  digest[ith][i]->digest(shpairs,ip,jp,*deri,f);
 	
+	// Increment forces
+#ifdef _OPENMP
+	Fwrk.subvec(3*inuc,3*inuc+2)+=f.subvec(0,2);
+	Fwrk.subvec(3*jnuc,3*jnuc+2)+=f.subvec(3,5);
+	Fwrk.subvec(3*knuc,3*knuc+2)+=f.subvec(6,8);
+	Fwrk.subvec(3*lnuc,3*lnuc+2)+=f.subvec(9,11);
+#else
+	F.subvec(3*inuc,3*inuc+2)+=f.subvec(0,2);
+	F.subvec(3*jnuc,3*jnuc+2)+=f.subvec(3,5);
+	F.subvec(3*knuc,3*knuc+2)+=f.subvec(6,8);
+	F.subvec(3*lnuc,3*lnuc+2)+=f.subvec(9,11);
+#endif
       }
     }
 
+    // Collect results
+#ifdef _OPENMP
+#pragma omp critical
+    F+=Fwrk;
+#endif
+
     delete deri;
   }
+
+  return F;
 }
 
 arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
@@ -568,46 +598,146 @@ std::vector<arma::mat> ERIscreen::calcJ(const std::vector<arma::mat> & P, double
 }
 
 arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
-  throw std::runtime_error("Force temporarily not available!\n");
-  (void) P;
-  (void) tol;
-  
-  arma::vec f;
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  // Get workers
+  std::vector< std::vector<ForceDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(1);
+    p[i][0]=new JFDigestor(P);
+  }
+
+  // Do calculation
+  arma::vec f=calculate_force(p,tol);
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+
   return f;
 }
 
-arma::vec ERIscreen::forceK(const arma::mat & P, double tol) const {
-  throw std::runtime_error("Force temporarily not available!\n");
-  (void) P;
-  (void) tol;
+arma::vec ERIscreen::forceK(const arma::mat & P, double tol, double kfrac) const {
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
 
-  arma::vec f;
+  // Get workers
+  std::vector< std::vector<ForceDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(1);
+    p[i][0]=new KFDigestor(P,kfrac,true);
+  }
+
+  // Do calculation
+  arma::vec f=calculate_force(p,tol);
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+
   return f;
 }
 
-void ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fKa, arma::vec & fKb, double tol) const {
-  throw std::runtime_error("Force temporarily not available!\n");
-  (void) Pa;
-  (void) Pb;
-  (void) fKa;
-  (void) fKb;
-  (void) tol;
+arma::vec ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const {
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  // Get workers
+  std::vector< std::vector<ForceDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(3);
+    p[i][0]=new JFDigestor(Pa+Pb);
+    p[i][1]=new KFDigestor(Pa,kfrac,false);
+    p[i][2]=new KFDigestor(Pb,kfrac,false);
+  }
+
+  // Do calculation
+  arma::vec f=calculate_force(p,tol);
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+
+  return f;
 }
 
-void ERIscreen::forceJK(const arma::mat & P, arma::vec & fJ, arma::vec & fK, double tol) const {
-  throw std::runtime_error("Force temporarily not available!\n");
-  (void) P;
-  (void) fJ;
-  (void) fK;
-  (void) tol;
+arma::vec ERIscreen::forceJK(const arma::mat & P, double tol, double kfrac) const {
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  // Get workers
+  std::vector< std::vector<ForceDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(2);
+    p[i][0]=new JFDigestor(P);
+    p[i][1]=new KFDigestor(P,kfrac,true);
+  }
+
+  // Do calculation
+  arma::vec f=calculate_force(p,tol);
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+
+  return f;
 }
 
-void ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, arma::vec & fJ, arma::vec & fKa, arma::vec & fKb, double tol) const {
-  throw std::runtime_error("Force temporarily not available!\n");
-  (void) Pa;
-  (void) Pb;
-  (void) fJ;
-  (void) fKa;
-  (void) fKb;
-  (void) tol;
+arma::vec ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const {
+#ifdef _OPENMP
+  int nth=omp_get_max_threads();
+#else
+  int nth=1;
+#endif
+
+  // Get workers
+  std::vector< std::vector<ForceDigestor *> > p(nth);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(int i=0;i<nth;i++) {
+    p[i].resize(3);
+    p[i][0]=new JFDigestor(Pa+Pb);
+    p[i][1]=new KFDigestor(Pa,kfrac,false);
+    p[i][2]=new KFDigestor(Pb,kfrac,false);
+  }
+
+  // Do calculation
+  arma::vec f=calculate_force(p,tol);
+
+  // Free memory
+  for(size_t i=0;i<p.size();i++)
+    for(size_t j=0;j<p[i].size();j++)
+      delete p[i][j];
+
+  return f;
 }
