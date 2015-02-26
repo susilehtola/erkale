@@ -612,7 +612,7 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 	      E.push_back(batchE[i]);
 	    }
 	    stepbatch.clear();
-	  
+	    
 	    // Check if converged
 	    bool convd=false;
 	    if(nr) {
@@ -637,6 +637,11 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 		  break;
 		}
 	    }
+
+	    // Check for too small step
+	    if(step[step.size()-1]>0.0 && step[step.size()-1]*arma::norm(sd,2)<DBL_EPSILON*arma::norm(x,2))
+	      convd=true;
+	    
 	    if(convd)
 	      break;
 	  }
