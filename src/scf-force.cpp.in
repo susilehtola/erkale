@@ -59,12 +59,17 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   // Get range separation info
   double omega, kfull, kshort;
   range_separation(dft.x_func,omega,kfull,kshort);
+#else
+  double kfull=1.0;
 #endif
 
-  arma::vec fcoul;
-  arma::vec fx_short, fx_long;
+  // Exact exchange and Coulomb
+  arma::vec fxc_full;
+  fxc_full.zeros(fnuc.n_elem);
+
+  // Short-range exchange
+  arma::vec fx_short;
   fx_short.zeros(fnuc.n_elem);
-  fx_long.zeros(fnuc.n_elem);
 
 #ifdef DFT      
   if(kfull==0.0) {
@@ -73,12 +78,12 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       if(kshort!=0.0)
 	throw std::runtime_error("Forces not implemented for range separation with density fitting.\n");
 	
-      fcoul=dfit.force_J(sol.P);
+      fxc_full=dfit.force_J(sol.P);
     } else {
       if(!direct)
 	scr.fill(basisp,intthr,verbose);
       
-      fcoul=scr.forceJ(sol.P,tol);
+      fxc_full=scr.forceJ(sol.P,tol);
     }
   } else {
 #endif
@@ -87,17 +92,10 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       scr.fill(basisp,intthr,verbose);
     
 #ifdef RESTRICTED
-    scr.forceJK(sol.P,fcoul,fx_long,tol);
+    fxc_full=scr.forceJK(sol.P,tol,kfull);
 #else
-    arma::vec fxa_long, fxb_long;
-    scr.forceJK(sol.Pa,sol.Pb,fcoul,fxa_long,fxb_long,tol);
-    fx_long=fxa_long+fxb_long;
+    fxc_full=scr.forceJK(sol.Pa,sol.Pb,tol,kfull);
 #endif
-      
-    //      interpret_force(fxa_long).print("alpha exchange");
-    //      interpret_force(fxb_long).print("beta exchange");
-    //    interpret_force(fx_long).print("Exchange");
-    //    interpret_force(fcoul+fx_long).print("2-electron contribution");
 
 #ifdef DFT
   }
@@ -109,11 +107,9 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       
     // Exchange forces
 #ifdef RESTRICTED
-    fx_short=scr_rs.forceK(sol.P,tol);
+    fx_short=scr_rs.forceK(sol.P,tol,kshort);
 #else
-    arma::vec fxa_short, fxb_short;
-    scr_rs.forceK(sol.Pa,sol.Pb,fxa_short,fxb_short,tol);
-    fx_short=fxa_short+fxb_short;
+    fx_short=scr_rs.forceK(sol.Pa,sol.Pb,tol,kshort);
 #endif
   }
     
@@ -129,21 +125,17 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   if(dft.nl)
     fxc+=grid.eval_VV10_force(nlgrid,dft.vv10_b,dft.vv10_C,sol.P);
 
-  //    interpret_force(fxc).print("XC force");
-
 #endif // DFT
 
-  //    interpret_force(fcoul).print("Coulomb");
-
   arma::vec ftot=fpul_kin+fpul_nuc+fnuc+forth+frep;
-  //    interpret_force(ftot).print("Total (w.o. 2-electron)");
-
-#ifndef DFT
-  arma::vec ffull=ftot+fcoul+fx_long;
-#else
-  arma::vec ffull=ftot+fcoul+fxc + kfull*fx_long + kshort*fx_short;
+  arma::vec ffull=ftot+fxc_full;  
+#ifdef DFT
+  ffull+=kshort*fx_short;
 #endif
-  //    interpret_force(ffull).print("Total");
+
+  //  interpret_force(fxc_full).print("Coulomb + exact exchange");
+  //  interpret_force(ftot).print("Total (w.o. 2-electron)");
+  //  interpret_force(ffull).print("Total");
     
   return ffull;
 }
