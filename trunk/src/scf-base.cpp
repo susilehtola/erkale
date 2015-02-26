@@ -1391,8 +1391,10 @@ arma::mat form_density(const arma::mat & C, int nocc) {
 arma::mat form_density(const arma::mat & C, const arma::vec & occs0) {
   arma::vec occs(C.n_cols);
   occs.zeros();
-  if(occs0.n_elem)
-    occs.subvec(0,occs0.n_elem-1)=occs0;
+  if(occs0.n_elem) {
+    size_t nel=std::min(occs.n_elem,occs0.n_elem);
+    occs.subvec(0,nel-1)=occs0.subvec(0,nel-1);
+  }
   return C*arma::diagmat(occs)*arma::trans(C);
 }
 
@@ -1407,9 +1409,11 @@ void form_density(rscf_t & sol, size_t nocc) {
 void form_density(rscf_t & sol, const arma::vec & occs0) {
   arma::vec occs(sol.C.n_cols);
   occs.zeros();
-  if(occs0.n_elem)
-    occs.subvec(0,occs0.n_elem-1)=occs0;
-
+  if(occs0.n_elem) {
+    size_t nel=std::min(occs.n_elem,occs0.n_elem);
+    occs.subvec(0,nel-1)=occs0.subvec(0,nel-1);
+  }
+  
   if(sol.cC.n_cols == sol.C.n_cols) {
     // Use complex orbitals
     arma::cx_mat cP=sol.cC*arma::diagmat(occs)*arma::trans(sol.cC);
@@ -1426,12 +1430,16 @@ void form_density(rscf_t & sol, const arma::vec & occs0) {
 void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0) {
   arma::vec occa(sol.Ca.n_cols);
   occa.zeros();
-  if(occa0.n_elem)
-    occa.subvec(0,occa0.n_elem-1)=occa0;
+  if(occa0.n_elem) {
+    size_t nel=std::min(occa.n_elem,occa0.n_elem);
+    occa.subvec(0,nel-1)=occa0.subvec(0,nel-1);
+  }
   arma::vec occb(sol.Cb.n_cols);
   occb.zeros();
-  if(occb0.n_elem)
-    occb.subvec(0,occb0.n_elem-1)=occb0;
+  if(occb0.n_elem) {
+    size_t nel=std::min(occb.n_elem,occb0.n_elem);
+    occb.subvec(0,nel-1)=occb0.subvec(0,nel-1);
+  }
 
   if(sol.cCa.n_cols == sol.Ca.n_cols) {
     // Use complex orbitals
@@ -3033,7 +3041,9 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 arma::mat interpret_force(const arma::vec & f) {
   if(f.n_elem%3!=0) {
     ERROR_INFO();
-    throw std::runtime_error("Invalid argument for interpret_force.\n");
+    std::ostringstream oss;
+    oss << "Error in intepret_force: expecting a vector containing forces, but given vector has " << f.n_elem << " elements!\n";
+    throw std::runtime_error(oss.str());
   }
 
   arma::mat force(f);
