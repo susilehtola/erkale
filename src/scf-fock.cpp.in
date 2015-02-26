@@ -151,16 +151,37 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(!decfock)
-	  scr.calcJK(sol.P,sol.J,Kfull,tol);
-	else {
-	  // Helper matrices
-	  arma::mat Jhlp, Khlp;
-	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
+	  arma::cx_mat cK;
 	  
-	  scr.calcJK(Phlp,Jhlp,Khlp,tol);
-	  sol.J=arma::trans(decconv)*Jhlp*decconv;
-	  Kfull=arma::trans(decconv)*Khlp*decconv;
+	  if(!decfock) {
+	    scr.calcJK(cP,sol.J,cK,tol);
+	  } else {
+	    // Helper matrices
+	    arma::cx_mat Phlp=decconv*cP*arma::trans(decconv);
+	    // Calculate
+	    scr.calcJK(Phlp,sol.J,cK,tol);
+	    // Convert back to contracted basis
+	    sol.J=arma::trans(decconv)*sol.J*decconv;
+	    cK=arma::trans(decconv)*cK*decconv;
+	  }
+	  
+	  Kfull=arma::real(cK);
+	  Kfull_im=arma::imag(cK);
+	} else {
+	  if(!decfock) {
+	    scr.calcJK(sol.P,sol.J,Kfull,tol);
+	  } else {
+	    // Helper matrices
+	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	    // Calculate
+	    scr.calcJK(Phlp,sol.J,Kfull,tol);
+	    // Convert back to contracted basis
+	    sol.J=arma::trans(decconv)*sol.J*decconv;
+	    Kfull=arma::trans(decconv)*Kfull*decconv;
+	  }
 	}
 	
 	if(verbose) {
@@ -199,12 +220,36 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(!decfock)
-	  Kshort=scr_rs.calcK(sol.P,tol);
-	else {
-	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Khlp=scr_rs.calcK(Phlp,tol);
-	  Kshort=arma::trans(decconv)*Khlp*decconv;
+	if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
+	  arma::cx_mat cK;
+	  
+	  if(!decfock) {
+	    cK=scr_rs.calcK(cP,tol);
+	  } else {
+	    // Helper matrices
+	    arma::cx_mat Phlp=decconv*cP*arma::trans(decconv);
+	    // Calculate
+	    cK=scr_rs.calcK(Phlp,tol);
+	    // Convert back to contracted basis
+	    cK=arma::trans(decconv)*cK*decconv;
+	  }
+	  
+	  Kshort=arma::real(cK);
+	  Kshort_im=arma::imag(cK);
+
+	} else {
+	  if(!decfock) {
+	    Kshort=scr_rs.calcK(sol.P,tol);
+	  } else {
+	    // Helper matrices
+	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
+	    // Calculate
+	    Kshort=scr_rs.calcK(Phlp,tol);
+	    // Convert back to contracted basis
+	    Kshort=arma::trans(decconv)*Kshort*decconv;
+	  }
 	}
 
 	if(verbose) {
@@ -226,17 +271,45 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(!decfock)
-	  scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,tol);
-	else {
-	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
-	  arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
+	if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
+	  arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
+	  arma::cx_mat cKa, cKb;
 	  
-	  arma::mat Jhlp, Kahlp, Kbhlp;
-	  scr.calcJK(Pahlp,Pbhlp,Jhlp,Kahlp,Kbhlp,tol);
-	  sol.J=arma::trans(decconv)*Jhlp*decconv;
-	  Kafull=arma::trans(decconv)*Kahlp*decconv;
-	  Kbfull=arma::trans(decconv)*Kbhlp*decconv;
+	  if(!decfock) {
+	    scr.calcJK(cPa,cPb,sol.J,cKa,cKb,tol);
+	  } else {
+	    // Helper matrices
+	    arma::cx_mat Pahlp=decconv*cPa*arma::trans(decconv);
+	    arma::cx_mat Pbhlp=decconv*cPb*arma::trans(decconv);
+	    // Calculate
+	    scr.calcJK(Pahlp,Pbhlp,sol.J,cKa,cKb,tol);
+	    // Convert back to contracted basis
+	    sol.J=arma::trans(decconv)*sol.J*decconv;
+	    cKa=arma::trans(decconv)*cKa*decconv;
+	    cKb=arma::trans(decconv)*cKb*decconv;
+	  }
+	  
+	  Kafull=arma::real(cKa);
+	  Kafull_im=arma::imag(cKa);
+	  Kbfull=arma::real(cKb);
+	  Kbfull_im=arma::imag(cKb);
+
+	} else {
+	  if(!decfock) {
+	    scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,tol);
+	  } else {
+	    // Helper matrices
+	    arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
+	    arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
+	    // Calculate
+	    scr.calcJK(Pahlp,Pbhlp,sol.J,Kafull,Kbfull,tol);
+	    // Convert back to contracted basis
+	    sol.J=arma::trans(decconv)*sol.J*decconv;
+	    Kafull=arma::trans(decconv)*Kafull*decconv;
+	    Kbfull=arma::trans(decconv)*Kbfull*decconv;
+	  }
 	}
 	
 	if(verbose) {
@@ -277,15 +350,43 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  t.set();
 	}
 
-	if(!decfock) {
-	  scr_rs.calcK(sol.Pa,sol.Pb,Kashort,Kbshort,tol);
+	if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
+	  // Complex density matrix is
+	  arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
+	  arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
+	  arma::cx_mat cKa, cKb;
+	  
+	  if(!decfock) {
+	    scr_rs.calcK(cPa,cPb,cKa,cKb,tol);
+	  } else {
+	    // Helper matrices
+	    arma::cx_mat Pahlp=decconv*cPa*arma::trans(decconv);
+	    arma::cx_mat Pbhlp=decconv*cPb*arma::trans(decconv);
+	    // Calculate
+	    scr_rs.calcK(Pahlp,Pbhlp,cKa,cKb,tol);
+	    // Convert back to contracted basis
+	    cKa=arma::trans(decconv)*cKa*decconv;
+	    cKb=arma::trans(decconv)*cKb*decconv;
+	  }
+	  
+	  Kashort=arma::real(cKa);
+	  Kashort_im=arma::imag(cKa);
+	  Kbshort=arma::real(cKb);
+	  Kbshort_im=arma::imag(cKb);
+
 	} else {
-	  arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
-	  arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
-	  arma::mat Kahlp, Kbhlp;
-	  scr_rs.calcK(Pahlp,Pbhlp,Kahlp,Kbhlp,tol);
-	  Kashort=arma::trans(decconv)*Kahlp*decconv;
-	  Kbshort=arma::trans(decconv)*Kbhlp*decconv;
+	  if(!decfock) {
+	    scr_rs.calcK(sol.Pa,sol.Pb,Kashort,Kbshort,tol);
+	  } else {
+	    // Helper matrices
+	    arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
+	    arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
+	    // Calculate
+	    scr_rs.calcK(Pahlp,Pbhlp,Kashort,Kbshort,tol);
+	    // Convert back to contracted basis
+	    Kashort=arma::trans(decconv)*Kashort*decconv;
+	    Kbshort=arma::trans(decconv)*Kbshort*decconv;
+	  }
 	}
 
 	if(verbose) {
