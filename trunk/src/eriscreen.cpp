@@ -542,6 +542,7 @@ std::vector<arma::mat> ERIscreen::calcJ(const std::vector<arma::mat> & P, double
 #pragma omp parallel for
 #endif
   for(int i=0;i<nth;i++) {
+    // Every thread holds copies of all the orbital matrices
     p[i].resize(P.size());
     for(size_t j=0;j<P.size();j++)
       p[i][j]=new JDigestor(P[j]);
@@ -552,11 +553,11 @@ std::vector<arma::mat> ERIscreen::calcJ(const std::vector<arma::mat> & P, double
 
   // Collect results
   std::vector<arma::mat> J(P.size());
-  for(size_t j=0;j<P.size();j++)
+  for(size_t j=0;j<P.size();j++) {
     J[j]=((JDigestor *) p[0][j])->get_J();
-  for(int i=1;i<nth;i++)
-    for(size_t j=0;j<P.size();j++)
-      J[j]+=((JDigestor *) p[0][j])->get_J();
+    for(int i=1;i<nth;i++)
+      J[j]+=((JDigestor *) p[i][j])->get_J();
+  }
 
   // Free memory
   for(size_t i=0;i<p.size();i++)
