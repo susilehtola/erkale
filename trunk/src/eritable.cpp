@@ -88,6 +88,16 @@ size_t ERItable::get_N() const {
   return ints.size();
 }
 
+size_t ERItable::offset(size_t ip, size_t jp) const {
+  // Calculate offset in integrals table
+  size_t ioff(shoff[ip]); 
+  size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
+  for(size_t jj=0;jj<jp;jj++)
+    ioff+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
+
+  return ioff;
+}
+
 arma::mat ERItable::calcJ(const arma::mat & P) const {
   arma::mat J(P);
   J.zeros();
@@ -111,14 +121,8 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
 	size_t ks=shpairs[jp].is;
 	size_t ls=shpairs[jp].js;
 
-        // Calculate offset in integrals table
-	size_t ioff0(shoff[ip]);
-	size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
-	for(size_t jj=0;jj<jp;jj++)
-	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
-	
 	// Digest integral block
-	digest_J(shpairs,ip,jp,ints,ioff0,P,Jwrk);
+	digest_J(shpairs,ip,jp,ints,offset(ip,jp),P,Jwrk);
       }
     }
 
@@ -154,14 +158,8 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
 	size_t ks=shpairs[jp].is;
 	size_t ls=shpairs[jp].js;
 	
-	// Calculate offset in integrals table
-	size_t ioff0(shoff[ip]);
-	size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
-	for(size_t jj=0;jj<jp;jj++)
-	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
-	
 	// Digest integral block
-	digest_K(shpairs,ip,jp,ints,ioff0,double,P,Kwrk);
+	digest_K(shpairs,ip,jp,ints,offset(ip,jp),double,P,Kwrk);
       }
     }
 
@@ -196,15 +194,9 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 	// and those on the second pair
 	size_t ks=shpairs[jp].is;
 	size_t ls=shpairs[jp].js;
-
-	// Calculate offset in integrals table
-	size_t ioff0(shoff[ip]);
-	size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
-	for(size_t jj=0;jj<jp;jj++)
-	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
 	
 	// Digest integral block
-	digest_K(shpairs,ip,jp,ints,ioff0,std::complex<double>,P,Kwrk);
+	digest_K(shpairs,ip,jp,ints,offset(ip,jp),std::complex<double>,P,Kwrk);
       }
     }
 
@@ -267,28 +259,19 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 	size_t ks=shpairs[jp].is;
 	size_t ls=shpairs[jp].js;
 	
-	// Calculate offset in integrals table
-	size_t ioff0(shoff[ip]);
-	size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
-	for(size_t jj=0;jj<jp;jj++)
-	  ioff0+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
-
 	// Amount of functions on the first pair
 	size_t Ni=shpairs[ip].Ni;
 	size_t Nj=shpairs[ip].Nj;
 	// and on the second
 	size_t Nk=shpairs[jp].Ni;
 	size_t Nl=shpairs[jp].Nj;
+	// Amount of integrals is
+	size_t Nints=Ni*Nj*Nk*Nl;
+	
 	// Initialize table
-	{
-	  size_t ioff(ioff0);
-	  for(size_t fi=0;fi<Ni;fi++)
-	    for(size_t fj=0;fj<Nj;fj++)
-	      for(size_t fk=0;fk<Nk;fk++)
-		for(size_t fl=0;fl<Nl;fl++) {
-		  ints[ioff++]=0.0;
-		}
-	}
+	size_t ioff(offset(ip,jp));
+	for(size_t i=0;i<Nints;i++)
+	  ints[ioff+i]=0.0;
 
 	// Maximum value of the 2-electron integrals on this shell pair
 	double intmax=screen(is,js)*screen(ks,ls);
@@ -304,8 +287,8 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 	erip=eri->getp();
 
 	// Store integrals
-	for(size_t ii=0;ii<Ni*Nj*Nk*Nl;ii++)
-	  ints[ioff0+ii]=(*erip)[ii];
+	for(size_t ii=0;ii<Nints;ii++)
+	  ints[ioff+ii]=(*erip)[ii];
       }
     }
   }
