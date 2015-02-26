@@ -59,6 +59,9 @@ class ERItable {
   /// Fraction of short-range exchange
   double beta;
 
+  /// Calculate offset in integrals table
+  size_t offset(size_t ip, size_t jp) const;
+  
  public:
   /// Constructor
   ERItable();
