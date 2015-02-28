@@ -18,11 +18,11 @@
 #ifndef ERKALE_LMTRANS
 #define ERKALE_LMTRANS
 
-#include "global.h"
+#include "../global.h"
 #include <armadillo>
 
-#include "gaunt.h"
-#include "lmgrid.h"
+#include "../gaunt.h"
+#include "../lmgrid.h"
 
 /// Radial integrals stack
 typedef struct {

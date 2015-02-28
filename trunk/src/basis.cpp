@@ -26,11 +26,13 @@
 #include <stdexcept>
 
 #include "basis.h"
+#include "eriworker.h"
 #include "elements.h"
 #include "integrals.h"
 #include "linalg.h"
 #include "mathf.h"
 #include "obara-saika.h"
+#include "settings.h"
 #include "solidharmonics.h"
 #include "stringutil.h"
 

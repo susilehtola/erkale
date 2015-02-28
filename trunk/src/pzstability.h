@@ -18,7 +18,9 @@
 #define ERKALE_PZSTAB
 
 #include "scf.h"
-#include "timer.h"
+#include "dftgrid.h"
+class Timer;
+
 
 class FDHessian {
   /// Step size
@@ -32,7 +34,7 @@ class FDHessian {
   /// Constructor
   FDHessian();
   /// Destructor
-  ~FDHessian();
+  virtual ~FDHessian();
 
   /// Get amount of parameters
   virtual size_t count_params() const=0;

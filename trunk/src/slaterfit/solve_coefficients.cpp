@@ -15,7 +15,7 @@
  */
 
 
-#include "global.h"
+#include "../global.h"
 #include "solve_coefficients.h"
 
 /* Hypergeometric functions */

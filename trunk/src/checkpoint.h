@@ -18,7 +18,7 @@
 #define ERKALE_CHECKPOINT
 
 #include "global.h"
-#include "basis.h"
+class BasisSet;
 #include "scf.h"
 
 #include <armadillo>

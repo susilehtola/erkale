@@ -19,7 +19,8 @@
 #include <cfloat>
 #include <cstdio>
 #include "bfprod.h"
-#include "mathf.h"
+#include "../mathf.h"
+#include "../basis.h"
 
 bool operator<(const prod_gaussian_1d_contr_t &lhs, const prod_gaussian_1d_contr_t &rhs) {
   return lhs.m < rhs.m;

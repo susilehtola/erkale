@@ -17,7 +17,7 @@
 
 
 #include "global.h"
-#include "settings.h"
+class Settings;
 
 #ifndef ERKALE_LINALG
 #define ERKALE_LINALG

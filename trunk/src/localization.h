@@ -22,6 +22,8 @@
 #include "basis.h"
 #include "scf.h"
 #include "unitary.h"
+#include "hirshfeld.h"
+#include "badergrid.h"
 
 /// Localization methods
 enum locmet {

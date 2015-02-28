@@ -18,6 +18,7 @@
 #include "guess.h"
 #include "checkpoint.h"
 #include "linalg.h"
+#include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
 #include <algorithm>

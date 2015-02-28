@@ -147,7 +147,7 @@ class DIIS {
   /// Constructor
   DIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
   /// Destructor
-  ~DIIS();
+  virtual ~DIIS();
 
   /// Clear Fock matrices and errors
   virtual void clear()=0;

@@ -18,6 +18,7 @@
 #include "basis.h"
 #include "mathf.h"
 #include "checkpoint.h"
+#include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
 

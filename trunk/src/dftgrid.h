@@ -20,7 +20,7 @@
 
 #include "global.h"
 #include "basis.h"
-#include "hirshfeld.h"
+class Hirshfeld;
 
 /**
  * Structure for value of basis function in a point (LDA). The

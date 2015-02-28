@@ -15,6 +15,7 @@
  */
 
 #include "gto_fourier.h"
+#include "../basis.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>

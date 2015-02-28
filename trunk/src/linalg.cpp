@@ -17,6 +17,7 @@
 #include <cfloat>
 #include "linalg.h"
 #include "mathf.h"
+#include "settings.h"
 #include "stringutil.h"
 
 #ifdef _OPENMP

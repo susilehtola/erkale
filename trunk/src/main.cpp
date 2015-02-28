@@ -30,6 +30,9 @@
 #include "stringutil.h"
 #include "timer.h"
 
+// Needed for libint init
+#include "eriworker.h"
+
 #include <armadillo>
 #include <cstdio>
 #include <cstdlib>

@@ -16,7 +16,8 @@
 
 
 #include "momentum_series.h"
-#include "mathf.h"
+#include "../mathf.h"
+#include "../basis.h"
 
 momentum_transfer_series::momentum_transfer_series(const BasisSet * b) {
   bas=b;

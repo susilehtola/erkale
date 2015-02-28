@@ -18,9 +18,9 @@
 #define ERKALE_XCFIT
 
 #include "global.h"
-#include "basis.h"
+class BasisSet;
 #include "dftgrid.h"
-#include "density_fitting.h"
+class DensityFit;
 
 /**
  * \class XCAtomGrid

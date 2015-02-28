@@ -28,7 +28,6 @@
 
 #include "../global.h"
 #include "../basislibrary.h"
-#include "../tempered.h"
 #include <string>
 #include <cstdlib>
 #include <armadillo>
@@ -77,7 +76,7 @@ class EnergyOptimizer {
   /// Constructor
   EnergyOptimizer(const std::string & el, bool verbose=true);
   /// Destructor
-  ~EnergyOptimizer();
+  virtual ~EnergyOptimizer();
 
   /// Set parameters
   void set_params(const arma::ivec & am, const arma::uvec & nf, const arma::uvec & npar, const arma::uvec & optsh);

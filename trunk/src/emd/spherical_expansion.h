@@ -21,7 +21,9 @@
 
 #include <complex>
 #include <vector>
-#include "basis.h"
+
+// Need to include for max_am
+#include "../basis.h"
 
 /// Coefficient of expansion in spherical harmonics \f$ \sum_{lm} c_{lm} Y_{lm} \f$
 typedef struct {

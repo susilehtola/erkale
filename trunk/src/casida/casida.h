@@ -41,13 +41,8 @@
 #ifndef ERKALE_CASIDA
 #define ERKALE_CASIDA
 
-#include "basis.h"
-#include "density_fitting.h"
-#include "dftgrid.h"
-#include "linalg.h"
-#include "scf.h"
-#include "settings.h"
-#include "../xrs/fourierprod.h"
+class BasisSet;
+class Settings;
 
 #include <armadillo>
 #include <cstdio>

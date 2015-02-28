@@ -17,8 +17,8 @@
 #ifndef ERKALE_ERIFIT
 #define ERKALE_ERIFIT
 
-#include "global.h"
-#include "basislibrary.h"
+#include "../global.h"
+#include "../basislibrary.h"
 
 namespace ERIfit {
   /// Basis function pair

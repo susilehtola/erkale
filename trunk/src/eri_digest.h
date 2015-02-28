@@ -18,7 +18,7 @@
 #define ERKALE_ERIDIGEST
 
 #include "basis.h"
-#include "eriworker.h"
+class dERIWorker;
 
 /// Integral digestor
 class IntegralDigestor {

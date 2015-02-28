@@ -14,9 +14,10 @@
  * of the License, or (at your option) any later version.
  */
 
-#include "checkpoint.h"
-#include "mathf.h"
+#include "../checkpoint.h"
+#include "../mathf.h"
 #include "../emd/emd_gto.h"
+#include "../stringutil.h"
 
 /// Absolute tolerance for normalization of basis functions
 const double normtol=1e-10;

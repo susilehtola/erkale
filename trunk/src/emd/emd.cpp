@@ -20,7 +20,7 @@
 #include "../mathf.h"
 #include "../stringutil.h"
 #include "../timer.h"
-#include "spherical_harmonics.h"
+#include "../spherical_harmonics.h"
 
 #include <cfloat>
 

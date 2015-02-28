@@ -18,6 +18,7 @@
 #include "basis.h"
 #include "checkpoint.h"
 #include "dftfuncs.h"
+#include "dftgrid.h"
 #include "elements.h"
 #include "emd/emd.h"
 #include "find_molecules.h"
@@ -30,6 +31,9 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
+
+// Needed for libint init
+#include "eriworker.h"
 
 #include <armadillo>
 #include <cstdio>

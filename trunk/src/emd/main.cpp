@@ -21,11 +21,11 @@
 //include "gto_fourier_ylm.h"
 #include "spherical_expansion.h"
 #include "../solidharmonics.h"
-#include "spherical_harmonics.h"
-#include "checkpoint.h"
-#include "settings.h"
-#include "stringutil.h"
-#include "timer.h"
+#include "../spherical_harmonics.h"
+#include "../checkpoint.h"
+#include "../settings.h"
+#include "../stringutil.h"
+#include "../timer.h"
 
 #include <armadillo>
 #include <cstdio>
@@ -37,7 +37,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "version.h"
+#include "../version.h"
 #endif
 
 int main(int argc, char **argv) {

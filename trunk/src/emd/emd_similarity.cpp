@@ -15,11 +15,11 @@
  */
 
 #include "emd_similarity.h"
-#include "lebedev.h"
-#include "chebyshev.h"
 #include "gto_fourier.h"
 #include "emd_gto.h"
-#include "timer.h"
+#include "../lebedev.h"
+#include "../chebyshev.h"
+#include "../timer.h"
 
 // Debug routines?
 //#define DEBUGSIM

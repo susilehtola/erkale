@@ -24,6 +24,7 @@
 #include "dftfuncs.h"
 #include "dftgrid.h"
 #include "elements.h"
+#include "hirshfeld.h"
 #include "mathf.h"
 // Lobatto or Lebedev for angular
 #include "lobatto.h"

@@ -18,9 +18,8 @@
 #ifndef ERKALE_EMDSTO
 #define ERKALE_EMDSTO
 
-#include "basis.h"
-#include "emd/emd.h"
-#include "external/storage.h"
+#include "emd.h"
+#include "../basis.h"
 
 #include <complex>
 #include <vector>

@@ -16,6 +16,7 @@
 
 #include "emdcube.h"
 #include "gto_fourier.h"
+#include "../basis.h"
 
 #ifdef _OPENMP
 #include <omp.h>

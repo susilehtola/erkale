@@ -21,8 +21,6 @@
 #include <complex>
 #include <vector>
 #include "basis.h"
-#include "chebyshev.h"
-#include "lobatto.h"
 
 /// Index of (l,m) in tables: l^2 + l + m
 #define lmind(l,m) ( ((size_t) (l))*(size_t (l)) + (size_t) (l) + (size_t) (m))

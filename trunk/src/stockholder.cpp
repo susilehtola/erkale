@@ -17,6 +17,7 @@
 #include "stockholder.h"
 #include "timer.h"
 #include "dftgrid.h"
+#include "lebedev.h"
 #include <cfloat>
 
 /// Maximum amount of iterations

@@ -22,12 +22,8 @@
 #ifndef ERKALE_FCHKPT
 #define ERKALE_FCHKPT
 
-#include "basis.h"
-#include "checkpoint.h"
-#include "mathf.h"
+#include "../basis.h"
 #include "storage.h"
-#include "stringutil.h"
-#include "timer.h"
 
 /// Parse formatted checkpoint file
 Storage parse_fchk(const std::string & name);

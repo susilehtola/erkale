@@ -19,7 +19,7 @@
 #include "../basis.h"
 
 #ifdef SVNRELEASE
-#include "version.h"
+#include "../version.h"
 #endif
 
 int main(int argc, char **argv) {

@@ -23,15 +23,16 @@
  * other program suites.
  */
 
-#include "global.h"
-#include "basis.h"
-#include "checkpoint.h"
-#include "linalg.h"
-#include "mathf.h"
 #include "storage.h"
-#include "stringutil.h"
-#include "timer.h"
 #include "fchkpt_tools.h"
+#include "../global.h"
+#include "../basis.h"
+#include "../checkpoint.h"
+#include "../linalg.h"
+#include "../mathf.h"
+#include "../settings.h"
+#include "../stringutil.h"
+#include "../timer.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -42,7 +43,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "version.h"
+#include "../version.h"
 #endif
 
 void print(const std::string & entry, int val, FILE *out) {

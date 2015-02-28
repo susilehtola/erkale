@@ -21,6 +21,7 @@
 // LibXC
 #include <xc.h>
 
+#include "density_fitting.h"
 #include "dftfuncs.h"
 #include "xcfit.h"
 #include "elements.h"

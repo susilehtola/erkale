@@ -18,7 +18,8 @@
 #define ERKALE_ATOMGUESS
 
 #include "global.h"
-#include "basis.h"
+class BasisSet;
+class Settings;
 
 #include <vector>
 #include <armadillo>

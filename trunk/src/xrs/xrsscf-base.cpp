@@ -17,18 +17,19 @@
 
 #include <cfloat>
 #include "xrsscf.h"
-#include "diis.h"
-#include "broyden.h"
-#include "dftfuncs.h"
-#include "dftgrid.h"
-#include "linalg.h"
-#include "mathf.h"
-#include "stringutil.h"
-#include "solidharmonics.h"
-#include "elements.h"
-#include "timer.h"
-#include "trrh.h"
-#include "lmgrid.h"
+#include "../diis.h"
+#include "../broyden.h"
+#include "../dftfuncs.h"
+#include "../dftgrid.h"
+#include "../linalg.h"
+#include "../mathf.h"
+#include "../stringutil.h"
+#include "../solidharmonics.h"
+#include "../elements.h"
+#include "../timer.h"
+#include "../settings.h"
+#include "../trrh.h"
+#include "../lmgrid.h"
 
 XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool sp) : SCF(basis,set,chkpt) {
   spin=sp;

@@ -16,11 +16,16 @@
 
 #include "global.h"
 #include "basis.h"
+#include "dftgrid.h"
 #include "checkpoint.h"
+#include "settings.h"
 #include "stringutil.h"
 #include "properties.h"
 #include "bader.h"
 #include "timer.h"
+
+// Needed for libint init
+#include "eriworker.h"
 
 #ifdef _OPENMP
 #include <omp.h>

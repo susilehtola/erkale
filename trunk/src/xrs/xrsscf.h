@@ -18,9 +18,9 @@
 #ifndef ERKALE_XRSSCF
 #define ERKALE_XRSSCF
 
-#include "global.h"
+#include "../global.h"
 #include <armadillo>
-#include "scf.h"
+#include "../scf.h"
 
 enum xrs_method {
   // Transition potential: one half electron in excited initial state, system has net charge +0.5

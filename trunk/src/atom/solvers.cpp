@@ -16,11 +16,11 @@
 
 #include "atomtable.h"
 #include "solvers.h"
-#include "linalg.h"
-#include "timer.h"
-#include "diis.h"
-#include "guess.h"
-#include "mathf.h"
+#include "../linalg.h"
+#include "../timer.h"
+#include "../diis.h"
+#include "../guess.h"
+#include "../mathf.h"
 
 void form_density(const arma::mat & Ca, const arma::mat & Cb, arma::mat & Pa, arma::mat & Pb, int Z) {
   // Get ground state

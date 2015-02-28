@@ -20,7 +20,7 @@
 
 #include <vector>
 #include <cstdlib>
-#include "basis.h"
+class BasisSet;
 
 /// Structure for contraction in 1d product
 typedef struct {
