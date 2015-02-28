@@ -16,25 +16,27 @@
 
 #include "bfprod.h"
 #include "fourierprod.h"
-
-#include "basis.h"
-#include "basislibrary.h"
-#include "dftgrid.h"
-#include "dftfuncs.h"
-#include "elements.h"
-#include "density_fitting.h"
-#include "linalg.h"
-#include "lmgrid.h"
 #include "lmtrans.h"
-#include "mathf.h"
 #include "momentum_series.h"
-#include "scf.h"
-#include "settings.h"
-#include "stringutil.h"
-#include "tempered.h"
-#include "timer.h"
+#include "../basis.h"
+#include "../basislibrary.h"
+#include "../dftgrid.h"
+#include "../dftfuncs.h"
+#include "../elements.h"
+#include "../density_fitting.h"
+#include "../linalg.h"
+#include "../lmgrid.h"
+#include "../mathf.h"
+#include "../scf.h"
+#include "../settings.h"
+#include "../stringutil.h"
+#include "../tempered.h"
+#include "../timer.h"
+#include "../xyzutils.h"
 #include "xrsscf.h"
-#include "xyzutils.h"
+
+// Needed for libint init
+#include "../eriworker.h"
 
 #include <algorithm>
 #include <armadillo>
@@ -48,7 +50,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "version.h"
+#include "../version.h"
 #endif
 
 /**

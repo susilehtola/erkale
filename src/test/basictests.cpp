@@ -14,9 +14,9 @@
  * of the License, or (at your option) any later version.
  */
 
-#include "solidharmonics.h"
-#include "checkpoint.h"
-#include "mathf.h"
+#include "../solidharmonics.h"
+#include "../checkpoint.h"
+#include "../mathf.h"
 
 /// Check orthogonality of spherical harmonics up to
 const int Lmax=10;

@@ -18,7 +18,7 @@
 #define FORM_EXPONENTS_H
 
 #include <vector>
-#include "basis.h"
+#include "../basis.h"
 
 /**
  * Fit Slater function with Gaussians.

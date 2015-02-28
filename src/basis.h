@@ -24,7 +24,9 @@
 #include <string>
 #include <cfloat>
 
-#include "settings.h"
+/// Forward declaration
+class Settings;
+
 #include "xyzutils.h"
 
 /// Angular momentum notation for shells
@@ -123,9 +125,9 @@ struct eripair_t {
 /// Comparison operator
 bool operator<(const struct eripair_t & lhs, const struct eripair_t & rhs);
 
-// Forward declarations
-class ElementBasisSet;
+// Forward declaration
 class BasisSetLibrary;
+class ElementBasisSet;
 
 /// Order shells solely on merit of exponents (for forming density fitting basis)
 bool exponent_compare(const GaussianShell & lhs, const GaussianShell & rhs);
@@ -658,8 +660,6 @@ double compute_elf(const arma::mat & P, const BasisSet & bas, const coords_t & r
 double check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
 /// Check orthonormality of complex molecular orbitals
 double check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
-
-#include "eriworker.h"
 
 /**
  * Construct intrinsic atomic orbitals.

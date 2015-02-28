@@ -17,7 +17,9 @@
 #ifndef ERKALE_POPULATION
 #define ERKALE_POPULATION
 
-#include "basis.h"
+#include "global.h"
+#include <armadillo>
+class BasisSet;
 
 /// Add in the nuclear charges to q
 arma::vec add_nuclear_charges(const BasisSet & basis, const arma::vec & q);

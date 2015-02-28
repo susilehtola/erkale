@@ -15,10 +15,10 @@
  */
 
 
-#include "lmgrid.h"
 #include "fourierprod.h"
-#include "mathf.h"
-#include "emd/gto_fourier.h"
+#include "../lmgrid.h"
+#include "../mathf.h"
+#include "../emd/gto_fourier.h"
 
 bool operator<(const prod_fourier_contr_t & lhs, const prod_fourier_contr_t & rhs) {
   // First, sort by l

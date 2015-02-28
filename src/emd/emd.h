@@ -29,8 +29,8 @@
 #ifndef ERKALE_RADEMD
 #define ERKALE_RADEMD
 
-#include "basis.h"
-#include "global.h"
+#include "../basis.h"
+#include "../global.h"
 #include "../emd/spherical_expansion.h"
 
 #include <complex>

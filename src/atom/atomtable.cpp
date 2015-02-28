@@ -15,8 +15,8 @@
  */
 
 #include "atomtable.h"
-#include "stringutil.h"
-#include "timer.h"
+#include "../stringutil.h"
+#include "../timer.h"
 
 AtomTable::AtomTable() {
   Nbf=0;

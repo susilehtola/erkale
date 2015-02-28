@@ -17,8 +17,10 @@
 #ifndef ERKALE_EMDSIM
 #define ERKALE_EMDSIM
 
-#include "global.h"
-#include "basis.h"
+#include "../global.h"
+#include <armadillo>
+class BasisSet;
+
 
 /**
  * Compute EMD overlap integrals

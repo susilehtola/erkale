@@ -19,6 +19,8 @@
 #ifndef ERKALE_FOURIER
 #define ERKALE_FOURIER
 
+#include "../global.h"
+#include <armadillo>
 #include <complex>
 #include <vector>
 #include <cstddef>
@@ -182,7 +184,7 @@ GTO_Fourier operator*(std::complex<double> fac, const GTO_Fourier & rhs);
 /// Scale Fourier transform of GTO by factor fac
 GTO_Fourier operator*(double fac, const GTO_Fourier & rhs);
 
-#include "basis.h"
+class BasisSet;
 
 /// Fourier transform basis set
 std::vector< std::vector<GTO_Fourier> > fourier_expand(const BasisSet & bas, std::vector< std::vector<size_t> > & idents);

@@ -14,12 +14,13 @@
  * of the License, or (at your option) any later version.
  */
 
-#include "gaunt.h"
-#include "linalg.h"
-#include "mathf.h"
+#include "../eriworker.h"
+#include "../gaunt.h"
+#include "../linalg.h"
+#include "../mathf.h"
 #include "integrals.h"
-#include "basis.h"
-#include "slaterfit/form_exponents.h"
+#include "../basis.h"
+#include "../slaterfit/form_exponents.h"
 
 /// A. Kumar and P. C. Mishra, Pramana 29 (1987), pp. 385-390.
 double Ul(int l, int n12, int n34, double z12, double z34) {

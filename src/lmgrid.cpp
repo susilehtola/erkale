@@ -18,6 +18,8 @@
 #include <algorithm>
 #include <cfloat>
 #include "lmgrid.h"
+#include "lobatto.h"
+#include "chebyshev.h"
 
 // Compute values of spherical harmonics
 #include "spherical_harmonics.h"

@@ -17,7 +17,7 @@
 #ifndef ERKALE_STORAGE
 #define ERKALE_STORAGE
 
-#include "global.h"
+#include "../global.h"
 
 #include <string>
 #include <vector>

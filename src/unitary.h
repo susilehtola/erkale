@@ -18,7 +18,7 @@
 #define ERKALE_UNITARY
 
 #include "global.h"
-#include "timer.h"
+class Timer;
 #include <armadillo>
 
 
@@ -186,7 +186,7 @@ class UnitaryOptimizer {
   /// Constructor
   UnitaryOptimizer(double Gthr, double Fthr, bool verbose=true, bool real=false);
   /// Destructor
-  ~UnitaryOptimizer();
+  virtual ~UnitaryOptimizer();
 
   /// Open log file
   void open_log(const std::string & fname);

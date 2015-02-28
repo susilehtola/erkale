@@ -15,7 +15,7 @@
  */
 
 #include "emd_sto.h"
-#include "mathf.h"
+#include "../mathf.h"
 #include <algorithm>
 
 RadialSlater::RadialSlater(int nv, int lv, double zetav) : RadialFourier(lv) {

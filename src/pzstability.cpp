@@ -16,6 +16,7 @@
 
 #include <cfloat>
 #include "pzstability.h"
+#include "checkpoint.h"
 #include "linalg.h"
 #include "timer.h"
 #include "mathf.h"

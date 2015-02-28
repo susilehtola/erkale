@@ -17,8 +17,10 @@
 #ifndef ERKALE_EMDCUBE
 #define ERKALE_EMDCUBE
 
+#include "../global.h"
+#include <armadillo>
 #include <vector>
-#include "../basis.h"
+class BasisSet;
 
 /**
  * Compute the EMD in a cube, save output to emdcube.dat

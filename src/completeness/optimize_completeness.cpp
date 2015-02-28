@@ -16,9 +16,10 @@
 
 #include "completeness_profile.h"
 #include "optimize_completeness.h"
-#include "linalg.h"
-#include "timer.h"
-#include "tempered.h"
+#include "../basis.h"
+#include "../linalg.h"
+#include "../timer.h"
+#include "../tempered.h"
 
 extern "C" {
 #include <gsl/gsl_blas.h>

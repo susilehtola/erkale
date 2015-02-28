@@ -15,11 +15,11 @@
  */
 
 
-#include <cfloat>
-#include "mathf.h"
 #include "lmtrans.h"
-#include "timer.h"
-#include "spherical_harmonics.h"
+#include <cfloat>
+#include "../mathf.h"
+#include "../timer.h"
+#include "../spherical_harmonics.h"
 
 // Tolerance for differing value of Q in Bessel table
 #define QTOL (1.01*q*DBL_EPSILON)

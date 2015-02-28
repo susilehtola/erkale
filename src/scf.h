@@ -23,13 +23,11 @@
 
 #include <armadillo>
 #include <vector>
-#include "dftgrid.h"
-#include "badergrid.h"
-#include "xcfit.h"
+class DFTGrid;
 #include "eritable.h"
 #include "eriscreen.h"
 #include "density_fitting.h"
-#include "settings.h"
+class Settings;
 
 class Checkpoint;
 
@@ -529,6 +527,7 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 /// Convert force vector to matrix
 arma::mat interpret_force(const arma::vec & f);
 
+/// Needed to get solvers to compilex
 #include "checkpoint.h"
 
 #endif

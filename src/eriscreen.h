@@ -32,7 +32,8 @@
 #ifndef ERKALE_ERISCREEN
 #define ERKALE_ERISCREEN
 
-#include "eri_digest.h"
+class IntegralDigestor;
+class ForceDigestor;
 #include "global.h"
 #include <armadillo>
 #include <vector>

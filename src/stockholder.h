@@ -18,7 +18,6 @@
 #define ERKALE_STOCKHOLDER
 
 #include "hirshfeld.h"
-#include "lebedev.h"
 #include "basis.h"
 
 /**

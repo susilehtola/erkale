@@ -20,7 +20,6 @@
 #define ERKALE_SETTINGS
 
 #include "global.h"
-#include "stringutil.h"
 #include <armadillo>
 #include <vector>
 #include <string>

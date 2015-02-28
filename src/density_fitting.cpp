@@ -15,6 +15,7 @@
  */
 
 #include "density_fitting.h"
+#include "eriworker.h"
 #include "linalg.h"
 #include "scf.h"
 #include <sstream>

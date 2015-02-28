@@ -20,6 +20,7 @@
 #include "diis.h"
 #include "linalg.h"
 #include "mathf.h"
+#include "stringutil.h"
 
 // Maximum allowed absolute weight for a Fockian.
 #define MAXWEIGHT 10.0

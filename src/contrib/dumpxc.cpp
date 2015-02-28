@@ -14,11 +14,11 @@
  * of the License, or (at your option) any later version.
  */
 
-#include "checkpoint.h"
-#include "dftgrid.h"
-#include "stringutil.h"
-#include "dftfuncs.h"
-#include "timer.h"
+#include "../checkpoint.h"
+#include "../dftgrid.h"
+#include "../stringutil.h"
+#include "../dftfuncs.h"
+#include "../timer.h"
 
 #include <cstdio>
 

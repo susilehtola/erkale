@@ -23,14 +23,12 @@
  * other program suites.
  */
 
-#include "basis.h"
-#include "checkpoint.h"
+#include "../checkpoint.h"
+#include "../elements.h"
+#include "../mathf.h"
+#include "../stringutil.h"
+#include "../timer.h"
 #include "fchkpt_tools.h"
-#include "elements.h"
-#include "mathf.h"
-#include "storage.h"
-#include "stringutil.h"
-#include "timer.h"
 
 #include <cstdlib>
 #include <cstring>

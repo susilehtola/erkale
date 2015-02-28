@@ -49,16 +49,14 @@
 #include <cstdio>
 #include <unistd.h>
 #include <iostream>
-#include "completeness/optimize_completeness.h"
-#include "completeness/completeness_profile.h"
-#include "external/fchkpt_tools.h"
-#include "basislibrary.h"
-#include "global.h"
-#include "timer.h"
-#include "linalg.h"
-#include "stringutil.h"
-#include "elements.h"
-#include "unitary.h"
+#include "../completeness/optimize_completeness.h"
+#include "../completeness/completeness_profile.h"
+#include "../external/fchkpt_tools.h"
+#include "../basislibrary.h"
+#include "../global.h"
+#include "../timer.h"
+#include "../stringutil.h"
+#include "../unitary.h"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -197,7 +195,7 @@ class CompletenessOptimizer {
     politer=0;
   }
   /// Destructor
-  ~CompletenessOptimizer() {
+  virtual ~CompletenessOptimizer() {
   }
 
   /// Get moment of completeness profile to optimize

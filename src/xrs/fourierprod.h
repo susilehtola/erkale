@@ -19,6 +19,9 @@
 #define ERKALE_FOURIERPROD
 
 #include "bfprod.h"
+#include <complex>
+#include "../global.h"
+#include <armadillo>
 
 /// Structure for contraction in transform
 typedef struct {

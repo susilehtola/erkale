@@ -15,9 +15,10 @@
  */
 
 #include "energy-opt.h"
-#include "unitary.h"
-#include "linalg.h"
-#include "timer.h"
+#include "../unitary.h"
+#include "../linalg.h"
+#include "../tempered.h"
+#include "../timer.h"
 #include <cfloat>
 
 #ifdef _OPENMP

@@ -22,6 +22,7 @@
 
 #include "basis.h"
 #include "broyden.h"
+#include "checkpoint.h"
 #include "elements.h"
 #include "dftfuncs.h"
 #include "dftgrid.h"
@@ -32,6 +33,7 @@
 #include "mathf.h"
 #include "properties.h"
 #include "scf.h"
+#include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
 #include "trrh.h"

@@ -18,8 +18,8 @@
 #ifndef ERKALE_MOMSER
 #define ERKALE_MOMSER
 
-#include "basis.h"
-#include "global.h"
+class BasisSet;
+#include "../global.h"
 #include <armadillo>
 #include <vector>
 

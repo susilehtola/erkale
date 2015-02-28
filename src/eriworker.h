@@ -22,6 +22,7 @@
 //#define DEBUGDERIV
 
 #include <vector>
+// Needed to define contr_t
 #include "basis.h"
 
 #include <libint/libint.h>
@@ -85,7 +86,7 @@ class IntegralWorker {
 
  public:
   IntegralWorker();
-  ~IntegralWorker();
+  virtual ~IntegralWorker();
 };
 
 /// Worker for computing electron repulsion integrals

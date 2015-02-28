@@ -18,10 +18,13 @@
 #include "basis.h"
 #include "checkpoint.h"
 #include "mathf.h"
+#include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
 #include "linalg.h"
 #include "localization.h"
+// Needed for libint init
+#include "eriworker.h"
 
 #include <algorithm>
 #include <cstdlib>

@@ -23,7 +23,7 @@
 #define ERKALE_CASIDAGRID
 
 #include "casida.h"
-#include "dftgrid.h"
+#include "../dftgrid.h"
 
 /// Perform integral over atomic grid
 class CasidaAtom : public AtomGrid {

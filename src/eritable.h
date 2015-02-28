@@ -15,7 +15,7 @@
  */
 
 #include "global.h"
-#include "scf.h"
+#include "basis.h"
 
 #ifndef ERKALE_ERITABLE
 #define ERKALE_ERITABLE
@@ -92,7 +92,5 @@ class ERItable {
   /// Form exchange matrix
   arma::cx_mat calcK(const arma::cx_mat & P) const;
 };
-
-#include "basis.h"
 
 #endif

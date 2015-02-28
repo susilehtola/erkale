@@ -14,10 +14,9 @@
  * of the License, or (at your option) any later version.
  */
 
-
-
 #include "eriscreen.h"
-#include "basis.h"
+#include "eri_digest.h"
+#include "eriworker.h"
 #include "mathf.h"
 
 #include <cstdio>

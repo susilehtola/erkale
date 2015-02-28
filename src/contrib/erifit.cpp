@@ -15,9 +15,10 @@
  */
 
 #include "erifit.h"
-#include "basis.h"
-#include "linalg.h"
-#include "eriworker.h"
+#include "../basis.h"
+#include "../linalg.h"
+#include "../settings.h"
+#include "../eriworker.h"
 
 namespace ERIfit {
 

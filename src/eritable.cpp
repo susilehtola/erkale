@@ -14,9 +14,8 @@
  * of the License, or (at your option) any later version.
  */
 
-
-
 #include "eritable.h"
+#include "eriworker.h"
 #include "eri_digest.h"
 #include "integrals.h"
 #include "mathf.h"

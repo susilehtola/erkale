@@ -15,12 +15,14 @@
  */
 
 #include "casida.h"
-#include "checkpoint.h"
-#include "settings.h"
-#include "stringutil.h"
-#include "timer.h"
+#include "../checkpoint.h"
+#include "../settings.h"
+#include "../stringutil.h"
+#include "../timer.h"
+#include "../dftfuncs.h"
 
-#include "dftfuncs.h"
+// Needed for libint init
+#include "../eriworker.h"
 
 #include <armadillo>
 #include <cstdio>
@@ -33,7 +35,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "version.h"
+#include "../version.h"
 #endif
 
 void print_spectrum(const std::string & fname, const arma::mat & m) {

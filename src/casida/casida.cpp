@@ -23,8 +23,12 @@
 #include "casida.h"
 #include "casida_grid.h"
 #include "../lmgrid.h"
-#include "stringutil.h"
-#include "timer.h"
+#include "../settings.h"
+#include "../xrs/fourierprod.h"
+#include "../linalg.h"
+#include "../eriworker.h"
+#include "../stringutil.h"
+#include "../timer.h"
 
 #include <cstdio>
 #include <cstdlib>

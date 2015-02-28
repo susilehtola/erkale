@@ -15,23 +15,25 @@
  */
 
 #include "integrals.h"
-#include "linalg.h"
-#include "stringutil.h"
-#include "basis.h"
-#include "guess.h"
-#include "mathf.h"
-#include "scf.h"
-#include "timer.h"
+#include "../linalg.h"
+#include "../stringutil.h"
+#include "../basis.h"
+#include "../guess.h"
+#include "../mathf.h"
+#include "../scf.h"
+#include "../timer.h"
 #include "solvers.h"
-
 #include <armadillo>
+
+// Needed for libint init
+#include "../eriworker.h"
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
 #ifdef SVNRELEASE
-#include "version.h"
+#include "../version.h"
 #endif
 
 void testexch(const std::vector<bf_t> & basis) {

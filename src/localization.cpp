@@ -18,7 +18,6 @@
 #include <cstdio>
 #include <cfloat>
 
-#include "basis.h"
 #include "elements.h"
 #include "dftfuncs.h"
 #include "dftgrid.h"
@@ -29,7 +28,6 @@
 #include "localization.h"
 #include "mathf.h"
 #include "properties.h"
-#include "scf.h"
 #include "stringutil.h"
 #include "stockholder.h"
 #include "timer.h"

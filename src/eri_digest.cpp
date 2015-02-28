@@ -15,6 +15,7 @@
  */
 
 #include "eri_digest.h"
+#include "eriworker.h"
 
 IntegralDigestor::IntegralDigestor() {
 }

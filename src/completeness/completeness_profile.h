@@ -18,7 +18,7 @@
 #define ERKALE_COMPPROF
 
 #include "../global.h"
-#include "../basislibrary.h"
+class ElementBasisSet;
 
 #include <armadillo>
 #include <vector>

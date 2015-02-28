@@ -14,13 +14,12 @@
  * of the License, or (at your option) any later version.
  */
 
-#include "mathf.h"
+#include "../../emd/emd_sto.h"
+#include "../../mathf.h"
+#include "../../stringutil.h"
+#include "../../lmgrid.h"
+#include "../../timer.h"
 #include "../storage.h"
-#include "stringutil.h"
-#include "lmgrid.h"
-#include "timer.h"
-
-#include "emd/emd_sto.h"
 
 #include <cfloat>
 #include <cstdlib>
@@ -32,7 +31,7 @@
 #endif
 
 #ifdef SVNRELEASE
-#include "version.h"
+#include "../../version.h"
 #endif
 
 extern "C" {
