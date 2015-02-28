@@ -212,7 +212,6 @@ namespace ERIfit {
 	    S(j0+jj,i0+ii)=mel;
 	  }
       }
-    S.print("S");
     
     // Do the eigendecomposition
     arma::vec Sval;
@@ -274,8 +273,6 @@ namespace ERIfit {
 	  }
 	}
       }
-
-    fitint.print("Fitint");
 
     //printf("fitint size is %i x %i\n",(int) fitint.n_rows, (int) fitint.n_cols);
     

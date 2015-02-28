@@ -35,7 +35,7 @@
 #include <vector>
 
 class EnergyOptimizer {
- private:
+ protected:
   /// Shell angular momentum
   arma::ivec sham;
   /// Amount of functions on the shells
@@ -52,8 +52,6 @@ class EnergyOptimizer {
   /// Amount of consecutive trials
   size_t ntr;
 
-  /// Get exponents
-  std::vector<arma::vec> get_exps(const arma::vec & x) const;
   /// Calculate gradient. Check enables sanity checks
   arma::vec calcG(const arma::vec & x, bool check=true);
   /// Calculate gradient. Check enables sanity checks
@@ -67,7 +65,6 @@ class EnergyOptimizer {
   /// Pad vector to fit into x
   arma::vec pad_vec(const arma::vec & sd, arma::sword am) const;
 
- protected:
   /// Element to optimize
   std::string el;
 
@@ -89,6 +86,8 @@ class EnergyOptimizer {
   /// Initialize?
   void toggle_init(bool init);
 
+  /// Get exponents
+  std::vector<arma::vec> get_exps(const arma::vec & x) const;
   /// Generate basis set
   virtual BasisSetLibrary form_basis(const arma::vec & x) const;
   /// Generate basis set
