@@ -179,10 +179,14 @@ FunctionShell::FunctionShell(int amval, const std::vector<contr_t> & c) {
   
   for(size_t i=0;i<c.size();i++) {
     if(!std::isnormal(C[i].z)) {
-      throw std::runtime_error("Abnormal gaussian exponent in basis set!\n");
+      std::ostringstream oss;
+      oss << "Abnormal gaussian exponent " << C[i].z << " in basis set!\n";
+      throw std::runtime_error(oss.str());
     }
     if(!std::isnormal(C[i].c)) {
-      throw std::runtime_error("Abnormal gaussian coefficient in basis set!\n");
+      std::ostringstream oss;
+      oss << "Abnormal gaussian coefficient " << C[i].c << " in basis set!\n";
+      throw std::runtime_error(oss.str());
     }
   }
 }
@@ -457,6 +461,224 @@ void ElementBasisSet::decontract() {
 
   // Change to decontracted set
   *this=decontr;
+}
+
+struct candidate_t {
+  // Exponent
+  double z;
+  // Angular momentum
+  int am;
+};
+
+bool operator<(const candidate_t & lhs, const candidate_t & rhs) {
+  return lhs.z < rhs.z;
+}
+
+ElementBasisSet ElementBasisSet::density_fitting(int lmaxinc, double fsam) const {
+  // Get primitives
+  std::vector<arma::vec> prims(get_max_am()+1);
+  for(size_t iam=0;iam<prims.size();iam++) {
+    arma::mat contr;
+    get_primitives(prims[iam],contr,iam);
+  }
+
+  // Element is
+  int Z=get_Z(get_symbol());
+  // Atomic am is
+  int lval;
+  if(Z<3)
+    lval=0;
+  else if(Z<19)
+    lval=1;
+  else if(Z<55)
+    lval=2;
+  else
+    lval=3;
+
+  // Generate candidates
+  std::vector<candidate_t> cand;
+  for(size_t iam=0;iam<prims.size();iam++)
+    for(size_t ix=0;ix<prims[iam].n_elem;ix++) {
+      // AM of generated function is (step 5)
+      int am=std::min(2*iam,(size_t) (lval+lmaxinc));
+      // and the exponent is (step 6)
+      double z=2*prims[iam](ix);
+      // Add to list of candidates (step 4)
+      bool found=false;
+      for(size_t j=0;j<cand.size();j++)
+	if(cand[j].z==z && cand[j].am==am)
+	  found=true;
+      if(!found) {
+	candidate_t c;
+	c.z=z;
+	c.am=iam;
+	cand.push_back(c);
+      }
+    }
+  
+  // Sort candidates in order of exponents
+  std::stable_sort(cand.begin(),cand.end());
+
+  // Final set
+  std::vector<candidate_t> set;
+
+  // While candidates are remaining
+  while(cand.size()) {
+    // Generate trial set.
+    std::vector<candidate_t> trial;
+    
+    // Candidate with largest exponent is moved to trial set (step 7)
+    trial.push_back(cand[cand.size()-1]);
+    cand.erase(cand.begin()+cand.size()-1);
+
+    // as well as other functions that have a similar exponent (step 8)
+    for(size_t i=cand.size()-1;i<cand.size();i--)
+      // Since exponents are in decreasing order, ratio is always greater than one..
+      if(trial[0].z/cand[i].z <= fsam) {
+	trial.push_back(cand[i]);
+	cand.erase(cand.begin()+i);
+      }
+
+    // Geometric average of exponents is calculated (step 9)
+    double z=0.0;
+    for(size_t i=0;i<trial.size();i++)
+      z+=log(trial[i].z);
+    z=std::exp(z/trial.size());
+
+    // and the angular momentum is determined (step 9)
+    int maxam=trial[0].am;
+    for(size_t i=1;i<trial.size();i++)
+      if(trial[i].am>maxam)
+	maxam=trial[i].am;
+    for(size_t i=0;i<set.size();i++)
+      if(set[i].am>maxam)
+	maxam=set[i].am;
+
+    // Function is added to final set
+    candidate_t f;
+    f.z=z;
+    f.am=maxam;
+    set.push_back(f);
+  }
+
+  // Generate final set
+  ElementBasisSet ret(*this);
+  ret.bf.clear();
+  for(size_t i=0;i<set.size();i++)
+    for(int am=0;am<=set[i].am;am++) {
+      // Contraction is
+      std::vector<contr_t> c(1);
+      c[0].c=1.0;
+      c[0].z=set[i].z;
+      FunctionShell sh(am,c);
+      ret.add_function(sh);
+    }
+  // Sort the set
+  ret.sort();
+  
+  return ret;
+}
+
+ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
+  // Get primitives
+  std::vector<arma::vec> prims(get_max_am()+1);
+  for(size_t iam=0;iam<prims.size();iam++) {
+    arma::mat contr;
+    get_primitives(prims[iam],contr,iam);
+  }
+
+  // Element is
+  int Z=get_Z(get_symbol());
+  // Atomic am is
+  int lval;
+  if(Z<3)
+    lval=0;
+  else if(Z<19)
+    lval=1;
+  else if(Z<55)
+    lval=2;
+  else
+    lval=3;
+
+  // Candidate exponents
+  std::vector< std::vector<double> > cand;
+  
+  // Loop over primitive ams
+  for(size_t iam=0;iam<prims.size();iam++)
+    for(size_t jam=0;jam<prims.size();jam++) {
+      // AM of generated function is
+      size_t am=std::min(iam+jam,(size_t) (lval+lmaxinc));
+      if(am>=cand.size())
+	cand.resize(am+1);
+      // Add exponents
+      for(size_t ix=0;ix<prims[iam].n_elem;ix++)
+	for(size_t jx=0;jx<prims[jam].n_elem;jx++) {
+	  // Exponent is
+	  double zeta=prims[iam](ix)+prims[jam](jx);
+	  
+	  // Loop over angular momentum
+	  for(size_t i=0;i<=am;i++) {
+	    // Check if exponent is on the list
+	    bool found=false;
+	    for(size_t j=0;j<cand[i].size();j++)
+	      if(cand[i][j]==zeta)
+		found=true;
+	    if(!found)
+	      cand[i].push_back(zeta);
+	  }
+	}
+    }
+  
+  // Sort candidates
+  for(size_t iam=0;iam<cand.size();iam++)
+    std::stable_sort(cand[iam].begin(),cand[iam].end());
+  
+  // Form final exponents by doing geometric averages
+  std::vector< std::vector<double> > fitexp(cand.size());
+  for(size_t iam=cand.size()-1;iam<cand.size();iam--)
+    while(cand[iam].size()) {
+      // Trial exponents
+      std::vector<double> trexp;
+      trexp.push_back(cand[iam][cand[iam].size()-1]);
+      cand[iam].erase(cand[iam].begin()+cand[iam].size()-1);
+
+      // Candidates
+      for(size_t i=cand[iam].size()-1;i<cand[iam].size();i--)
+	// Since exponents are in decreasing order, ratio is always greater than one..
+	if(trexp[0]/cand[iam][i] <= fsam) {
+	  trexp.push_back(cand[iam][i]);
+	  cand[iam].erase(cand[iam].begin()+i);
+	}
+
+      // Do geometric average
+      double z=0.0;
+      for(size_t i=0;i<trexp.size();i++)
+	z+=log(trexp[i]);
+      z=std::exp(z/trexp.size());
+
+      // Add to set
+      fitexp[iam].push_back(z);
+    }
+
+  // Sort fit exponents
+  for(size_t iam=0;iam<fitexp.size();iam++)
+    std::stable_sort(fitexp[iam].begin(),fitexp[iam].end());
+
+  // Generate product set
+  ElementBasisSet ret(*this);
+  ret.bf.clear();
+  for(size_t am=0;am<fitexp.size();am++)
+    for(size_t ix=0;ix<fitexp[am].size();ix++) {
+      // Contraction is
+      std::vector<contr_t> c(1);
+      c[0].c=1.0;
+      c[0].z=fitexp[am][ix];
+      FunctionShell sh(am,c);
+      ret.add_function(sh);
+    }
+  ret.sort();
+
+  return ret;
 }
 
 void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::mat & cgen, int am) const {
@@ -1726,6 +1948,22 @@ void BasisSetLibrary::decontract(){
   name="Decontracted "+name;
   for(size_t iel=0;iel<elements.size();iel++)
     elements[iel].decontract();
+}
+
+BasisSetLibrary BasisSetLibrary::density_fitting(int lvalinc, double fsam) const {
+  BasisSetLibrary ret(*this);
+  ret.name="Density fitting "+name;
+  for(size_t iel=0;iel<elements.size();iel++)
+    ret.elements[iel]=elements[iel].density_fitting(lvalinc,fsam);
+  return ret;
+}
+
+BasisSetLibrary BasisSetLibrary::product_set(int lvalinc, double fsam) const {
+  BasisSetLibrary ret(*this);
+  ret.name="Product set "+name;
+  for(size_t iel=0;iel<elements.size();iel++)
+    ret.elements[iel]=elements[iel].product_set(lvalinc,fsam);
+  return ret;
 }
 
 void BasisSetLibrary::orthonormalize() {

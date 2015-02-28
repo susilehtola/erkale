@@ -173,6 +173,23 @@ class ElementBasisSet {
 
   /// Decontract set
   void decontract();
+  /**
+   * Generate density fitting basis
+   *
+   * The procedure has been documented in the article
+   *
+   * R. Yang, A. P. Rendell and M. J. Frisch, "Automatically generated
+   * Coulomb fitting basis sets: Design and accuracy for systems
+   * containing H to Kr", J. Chem. Phys. 127 (2007), 074102.
+   */
+  ElementBasisSet density_fitting(int lmaxinc, double fsam) const;
+  /**
+   * Generate product basis set.
+   *
+   * Brute-force generation of orbital products, followed by merging
+   * product exponents that deviate by fsam at maximum.
+   */
+  ElementBasisSet product_set(int lmaxinc, double fsam) const;
 
   /// Augment the basis
   void augment(int naug);
@@ -257,6 +274,11 @@ class BasisSetLibrary {
 
   /// Decontract basis set
   void decontract();
+
+  /// Generate density fitting set
+  BasisSetLibrary density_fitting(int lvalinc, double fsam) const;
+  /// Generate product set
+  BasisSetLibrary product_set(int lvalinc, double fsam) const;
 
   /**
    * P-orthogonalization [F. Jensen, JCTC 10, 1074 (2014)].
