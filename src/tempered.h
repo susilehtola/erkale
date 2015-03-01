@@ -54,7 +54,10 @@ arma::vec welltempered_set(double alpha, double beta, double gamma, double delta
  */
 arma::vec legendre_set(const arma::vec & A, int Nf);
 
-/// Helper for the above
+/// Get the parameters of the Legendre expansion for a given set of exponents
+arma::vec legendre_pars(const arma::vec & zeta, int Np);
+
+/// Helper for the above routines
 arma::mat legendre_P_mat(int Nprim, int Npar);
 
 #endif

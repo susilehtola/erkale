@@ -81,3 +81,18 @@ arma::vec legendre_set(const arma::vec & A, int Nf) {
 
   return exps;
 }
+
+arma::vec legendre_pars(const arma::vec & z, int Np) {
+  // Get Pk matrix
+  arma::mat P(legendre_P_mat(z.n_elem,Np));
+  // Parameters are
+  arma::vec pars;
+  bool ok=arma::solve(pars,P,arma::log10(z));
+  if(!ok) {
+    ERROR_INFO();
+    throw std::runtime_error("Unable to solve set of Legendre parameters.\n");
+  }
+    
+  return pars;
+}
+
