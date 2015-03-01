@@ -394,7 +394,7 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, arma::sword am, bool check
   std::vector<double> Etr=calcE(trials);
   
   // Hessian
-  arma::vec h(idx.n_elem,idx.n_elem);
+  arma::mat h(idx.n_elem,idx.n_elem);
   for(arma::uword i=0;i<idx.n_elem;i++)
     for(arma::uword j=0;j<=i;j++) {
       // Offset is 4 * i(i+1)/2
@@ -687,6 +687,13 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
   
   if(verbose)
     printf("Optimization reduced the energy by %e.\n",Eval-Einit);
+
+  // Check that energy is at least initialized properly
+  if(Eval==0.0) {
+    std::vector<BasisSetLibrary> blib;
+    blib.push_back(form_basis(x));
+    Eval=calcE(blib)[0];
+  }
   
   return Eval;
 }
@@ -900,6 +907,13 @@ double EnergyOptimizer::optimize_full(arma::vec & x, size_t maxiter, double nrth
   
   if(verbose)
     printf("Optimization reduced the energy by %e.\n",Eval-Einit);
+
+  // Check that energy is at least initialized properly
+  if(Eval==0.0) {
+    std::vector<BasisSetLibrary> blib;
+    blib.push_back(form_basis(x));
+    Eval=calcE(blib)[0];
+  }
   
   return Eval;
 }
