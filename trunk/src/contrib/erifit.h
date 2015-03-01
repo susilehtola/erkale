@@ -38,11 +38,17 @@ namespace ERIfit {
   /// Comparison operator
   bool operator<(const bf_pair_t & lhs, const bf_pair_t & rhs);
 
-  /// Compute the exact integrals
+  /// Compute the exact repulsion integrals
   void compute_ERIs(const ElementBasisSet & orbel, arma::mat & eris);
 
-  /// Compute the fitted integrals. 
-  void compute_ERIfit(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, double linthr, arma::mat & fitint, arma::mat & fiteri);
+  /// Compute fitting integrals
+  void compute_fitint(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, arma::mat & fitint);
+    
+  /// Compute the fitted repulsion integrals using the supplied fitting integrals
+  void compute_ERIfit(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, double linthr, const arma::mat & fitint, arma::mat & fiteri);
+
+  /// Compute the transformation matrix to orthonormal orbitals
+  void orthonormal_ERI_trans(const ElementBasisSet & orbel, double linthr, arma::mat & trans);
 }
 
 #endif
