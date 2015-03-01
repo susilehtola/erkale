@@ -172,20 +172,22 @@ FunctionShell::FunctionShell(int amval, const std::vector<contr_t> & c) {
   am=amval;
   C=c;
 
-  for(size_t i=0;i<c.size();i++)
-    if(C[i].z<=0.0) {
-      throw std::runtime_error("Negative gaussian exponent in basis set!\n");
-    }
-  
   for(size_t i=0;i<c.size();i++) {
+    if(C[i].z<=0.0) {
+      std::ostringstream oss;
+      oss << "Negative gaussian exponent " << C[i].z << " in basis set!\n";
+      throw std::runtime_error(oss.str());
+    }
+    
     if(!std::isnormal(C[i].z)) {
       std::ostringstream oss;
       oss << "Abnormal gaussian exponent " << C[i].z << " in basis set!\n";
       throw std::runtime_error(oss.str());
     }
+    
     if(!std::isnormal(C[i].c)) {
       std::ostringstream oss;
-      oss << "Abnormal gaussian coefficient " << C[i].c << " in basis set!\n";
+      oss << "Abnormal contraction coefficient " << C[i].c << " in basis set!\n";
       throw std::runtime_error(oss.str());
     }
   }
@@ -196,9 +198,24 @@ FunctionShell::~FunctionShell() {
 
 void FunctionShell::add_exponent(double Cv, double zv) {
   if(zv<=0.0) {
-    throw std::runtime_error("Negative gaussian exponent in basis set!\n");
+    std::ostringstream oss;
+    oss << "Negative gaussian exponent " << zv << " in basis set!\n";
+    throw std::runtime_error(oss.str());
   }
 
+  if(!std::isnormal(zv)) {
+    std::ostringstream oss;
+    oss << "Abnormal gaussian exponent " << zv << " in basis set!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  if(!std::isnormal(Cv)) {
+    std::ostringstream oss;
+    oss << "Abnormal contraction coefficient " << Cv << " in basis set!\n";
+    throw std::runtime_error(oss.str());
+  }
+  
+  
   contr_t tmp;
   tmp.c=Cv;
   tmp.z=zv;
