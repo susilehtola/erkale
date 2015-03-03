@@ -446,45 +446,6 @@ arma::mat orthonormalize(const arma::mat & S, const arma::mat & C) {
   return Cnew;
 }
 
-arma::mat incomplete_cholesky(const arma::mat & M, size_t n) {
-  if(M.n_rows != M.n_cols) {
-    ERROR_INFO();
-    throw std::runtime_error("Can't do Cholesky decomposition of non-square matrix!\n");
-  }
-  // Residual matrix
-  arma::mat R(M);
-
-  // Check sanity of argument
-  if(n>M.n_rows)
-    n=M.n_rows;
-
-  // Returned matrix
-  arma::mat C(R.n_rows,n);
-
-  // Perform factorization
-  size_t N=M.n_cols;
-  for(size_t ii=0;ii<n;ii++) {
-    // Find maximum diagonal element of residual
-    size_t maxind=-1;
-    double maxval=0.0;
-    for(size_t j=0;j<N;j++)
-      if(R(j,j)>maxval) {
-        maxval=R(j,j);
-        maxind=j;
-      }
-    // Take square root
-    maxval=sqrt(maxval);
-
-    // Added vector is
-    C.col(ii)=R.col(maxind)/maxval;
-
-    // Update remainder
-    R-=C.col(ii)*arma::trans(C.col(ii));
-  }
-
-  return C;
-}
-
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {
   // Get canonical half-overlap and half-inverse overlap matrices
   arma::mat Sh, Sinvh;
@@ -576,6 +537,49 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps) {
 
   // Drop unnecessary columns
   L=L.cols(0,m-1);
+
+  return L;
+}
+
+// Same algorithm as above, only for a fixed amount of vectors
+arma::mat incomplete_cholesky(const arma::mat & A, size_t n) {
+  if(A.n_rows != A.n_cols)
+    throw std::runtime_error("Pivoted Cholesky requires a square matrix!\n");
+  
+  // Returned matrix
+  arma::mat L;
+  L.zeros(A.n_rows,n);
+  
+  // Diagonal element vector
+  arma::vec d(arma::diagvec(A));
+  
+  // Pivot index
+  arma::uvec pi(arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem));
+
+  for(size_t m=0;m<n;m++) {
+    // Errors in pivoted order
+    arma::vec errs(d(pi));
+    // Sort the upcoming errors so that largest one is first
+    arma::uvec idx=arma::stable_sort_index(errs.subvec(m,d.n_elem-1),"descend");
+    // Convert indexing and update pivot
+    idx+=m*arma::ones<arma::uvec>(d.n_elem-1-m);
+    pi.subvec(m,d.n_elem-1)=pi(idx);
+    
+    // Pivot index
+    size_t pim=pi(m);
+    
+    // Compute diagonal element
+    L(pim,m)=sqrt(d(pim));
+    
+    // Off-diagonal elements
+    for(size_t i=m+1;i<d.n_elem;i++) {
+      size_t pii=pi(i);
+      // Compute element
+      L(pii,m)=(A(pii,pim) - arma::dot(L.row(pim).subvec(0,m-1),L.row(pii).subvec(0,m-1)))/L(pim,m);
+      // Update d
+      d(pii)-=L(pii,m)*L(pii,m);
+    }
+  }
 
   return L;
 }
