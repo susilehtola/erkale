@@ -1400,9 +1400,9 @@ class CompletenessOptimizer {
 
 	  char msg[200];
 	  if(itr==0)
-	    sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
-	  else if(itr==next-1)
 	    sprintf(msg,"Moved ending   point of %c shell by %.3f",shell_types[am],step);
+	  else if(itr==next-1)
+	    sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
 	  else
 	    sprintf(msg,"Moved starting point of %c shell by %.3f and ending point by %.3f",shell_types[am],d*step,(1.0-d)*step);
 	  descr.push_back(msg);
