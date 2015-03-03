@@ -142,9 +142,6 @@ arma::cx_mat unitarize(const arma::cx_mat & M);
 /// Orthonormalize vectors
 arma::mat orthonormalize(const arma::mat & S, const arma::mat & C);
 
-/// Incomplete Cholesky factorization of matrix M, use n vectors
-arma::mat incomplete_cholesky(const arma::mat & M, size_t n);
-
 /**
  * Find natural orbitals from P. Orbitals returned in decreasing occupation number.
  */
@@ -164,6 +161,8 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
  * Appl. Num. Math. 62, 428 (2012).
  */
 arma::mat pivoted_cholesky(const arma::mat & M, double thr);
+/// Incomplete Cholesky factorization of matrix M, use n vectors
+arma::mat incomplete_cholesky(const arma::mat & M, size_t n);
 
 /// Check thread safety of LAPACK library
 void check_lapack_thread();
