@@ -138,4 +138,24 @@ double round(double x, unsigned n);
  */
 arma::vec find_minima(const arma::vec & x, const arma::vec & y, size_t runave=0, double thr=DBL_MAX);
 
+/// Sorted insertion
+template<typename T> size_t sorted_insertion(std::vector<T> & v, T t) {
+  // Get upper bound
+  typename std::vector<T>::iterator high;
+  high=std::upper_bound(v.begin(),v.end(),t);
+  
+  // Corresponding index is
+  size_t ind=high-v.begin();
+  
+  if(ind>0 && v[ind-1]==t) {
+    // Value already exists in vector - return position
+    return ind-1;
+  } else {
+    // Value doesn't exist in vector - add it
+    typename std::vector<T>::iterator pos=v.insert(high,t);
+    // and return the position
+    return pos-v.begin();
+  }
+}
+  
 #endif
