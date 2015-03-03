@@ -57,6 +57,8 @@
 #include "../timer.h"
 #include "../stringutil.h"
 #include "../unitary.h"
+#include "../elements.h"
+#include "../mathf.h"
 
 #ifdef _OPENMP
 #include <omp.h>
