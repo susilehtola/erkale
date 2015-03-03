@@ -155,6 +155,16 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
  */
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::vec & occs);
 
+/**
+ * Does a pivoted Cholesky decomposition. The algorithm is adapted
+ * from the reference
+ *
+ * H. Harbrecht, M. Peters, and R. Schneider, "On the low-rank
+ * approximation by the pivoted Cholesky decomposition",
+ * Appl. Num. Math. 62, 428 (2012).
+ */
+arma::mat pivoted_cholesky(const arma::mat & M, double thr);
+
 /// Check thread safety of LAPACK library
 void check_lapack_thread();
 

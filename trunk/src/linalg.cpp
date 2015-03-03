@@ -526,6 +526,60 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   form_NOs(P,S,AO_to_NO,tmp,occs);
 }
 
+arma::mat pivoted_cholesky(const arma::mat & A, double eps) {
+  if(A.n_rows != A.n_cols)
+    throw std::runtime_error("Pivoted Cholesky requires a square matrix!\n");
+
+  // Returned matrix
+  arma::mat L;
+  L.zeros(A.n_rows,A.n_cols);
+
+  // Loop index
+  size_t m(0);
+  // Diagonal element vector
+  arma::vec d(arma::diagvec(A));
+  // Error
+  double error(arma::sum(d));
+
+  // Pivot index
+  arma::uvec pi(arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem));
+
+  while(error>eps && m<d.n_elem) {
+    // Errors in pivoted order
+    arma::vec errs(d(pi));
+    // Sort the upcoming errors so that largest one is first
+    arma::uvec idx=arma::stable_sort_index(errs.subvec(m,d.n_elem-1),"descend");
+    // Convert indexing and update pivot
+    idx+=m*arma::ones<arma::uvec>(d.n_elem-1-m);
+    pi.subvec(m,d.n_elem-1)=pi(idx);
+
+    // Pivot index
+    size_t pim=pi(m);
+
+    // Compute diagonal element
+    L(pim,m)=sqrt(d(pim));
+    
+    // Off-diagonal elements
+    for(size_t i=m+1;i<d.n_elem;i++) {
+      size_t pii=pi(i);
+      // Compute element
+      L(pii,m)=(A(pii,pim) - arma::dot(L.row(pim).subvec(0,m-1),L.row(pii).subvec(0,m-1)))/L(pim,m);
+      // Update d
+      d(pii)-=L(pii,m)*L(pii,m);
+    }
+
+    // Update error
+    error=arma::sum(d(pi.subvec(m+1,pi.n_elem-1)));
+    // Increase m
+    m++;
+  }
+
+  // Drop unnecessary columns
+  L=L.cols(0,m-1);
+
+  return L;
+}
+
 void check_lapack_thread() {
 #ifdef _OPENMP
   // Size of problem
