@@ -19,6 +19,7 @@
 
 #include "../global.h"
 #include "../basislibrary.h"
+#include <set>
 
 namespace ERIfit {
   /// Basis function pair
@@ -40,12 +41,21 @@ namespace ERIfit {
 
   /// Compute the exact repulsion integrals
   void compute_ERIs(const ElementBasisSet & orbel, arma::mat & eris);
+  /// Compute the exact diagonal repulsion integrals
+  void compute_diag_ERIs(const ElementBasisSet & orbel, arma::mat & eris);
+
+  /// Find unique exponent pairs
+  void unique_exponent_pairs(const ElementBasisSet & orbel, std::vector< std::vector<shellpair_t> > & pairs, std::vector<double> & exps);
+  /// Compute the T matrix needed for Cholesky decomposition
+  void compute_cholesky_T(const ElementBasisSet & orbel, arma::mat & eris, arma::vec & exps);
 
   /// Compute fitting integrals
   void compute_fitint(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, arma::mat & fitint);
     
   /// Compute the fitted repulsion integrals using the supplied fitting integrals
   void compute_ERIfit(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, double linthr, const arma::mat & fitint, arma::mat & fiteri);
+  /// Compute the diagonal fitted repulsion integrals using the supplied fitting integrals
+  void compute_diag_ERIfit(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, double linthr, const arma::mat & fitint, arma::mat & fiteri);
 
   /// Compute the transformation matrix to orthonormal orbitals
   void orthonormal_ERI_trans(const ElementBasisSet & orbel, double linthr, arma::mat & trans);
