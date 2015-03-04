@@ -66,3 +66,18 @@ std::vector<int> shell_count(int Z) {
 
   return ret;
 }
+
+int atom_am(int Z) {
+  int atomam;
+  if(Z<5)
+    atomam=0;
+  else if(Z<21)
+    atomam=1;
+  else if(Z<57)
+    atomam=2;
+  else
+    atomam=3;
+
+  return atomam;
+}
+
