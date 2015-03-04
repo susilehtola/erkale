@@ -228,9 +228,9 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     Timer tsol;
 
     if(verbose) {
-      printf("\t");
+      printf("%-2s:",basis.get_nucleus(idnuc[i][0]).symbol.c_str());
       for(size_t iid=0;iid<idnuc[i].size();iid++)
-	printf("%i ",(int) idnuc[i][iid]+1);
+	printf(" %i",(int) idnuc[i][iid]+1);
       fflush(stdout);
     }
 
