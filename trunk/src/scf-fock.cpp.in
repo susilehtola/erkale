@@ -610,6 +610,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   if(kfull!=0.0 || kshort!=0.0) {
     sol.H-=0.5*sol.K;
     sol.en.Exc-=0.25*arma::trace(sol.P*sol.K);
+    if(sol.P.n_rows == sol.P_im.n_rows && sol.P.n_cols == sol.P_im.n_cols)
+      sol.en.Exc+=0.25*arma::trace(sol.P_im*sol.K_im);
   }
 
 #else
@@ -635,6 +637,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.Ha-=sol.Ka;
     sol.Hb-=sol.Kb;
     sol.en.Exc-=0.5*(arma::trace(sol.Pa*sol.Ka)+arma::trace(sol.Pb*sol.Kb));
+    if(sol.Pa.n_rows == sol.Pa_im.n_rows && sol.Pa.n_cols == sol.Pa_im.n_cols)
+      sol.en.Exc+=0.5*(arma::trace(sol.Pa_im*sol.Ka_im)+arma::trace(sol.Pb_im*sol.Kb_im));
   }
 #else
   if(sol.Heffa.n_elem == Hcore.n_elem && sol.Heffb.n_elem == Hcore.n_elem) {
