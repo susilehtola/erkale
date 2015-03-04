@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "elements.h"
 #include "dftfuncs.h"
 #include "guess.h"
 #include "checkpoint.h"
@@ -301,20 +302,6 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
     fflush(stderr);
   }
-}
-
-int atom_am(int Z) {
-  int atomam;
-  if(Z<5)
-    atomam=0;
-  else if(Z<21)
-    atomam=1;
-  else if(Z<57)
-    atomam=2;
-  else
-    atomam=3;
-
-  return atomam;
 }
 
 void molecular_guess(const BasisSet & basis, const Settings & set, std::string & chkname) {

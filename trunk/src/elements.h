@@ -82,4 +82,7 @@ const int magicno[]={0, 2, 10, 18, 36, 54, 86, 118};
 /// Get nuclear charge of element
 int get_Z(std::string el);
 
+/// Get atomic angular momentum
+int atom_am(int Z);
+
 #endif
