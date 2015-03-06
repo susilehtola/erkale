@@ -49,6 +49,11 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   set.set_bool("Verbose",false);
   set.set_bool("Direct",false);
   set.set_bool("DensityFitting",false);
+  // Use a rather large grid to make sure the calculation converges
+  // even in cases where the functional requires a large grid to be
+  // used. The other way would be to pass the user settings to this
+  // routine..
+  set.set_string("DFTGrid","100 17");
   
   // Don't do PZ-SIC for the initial guess.
   try {
