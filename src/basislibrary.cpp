@@ -939,7 +939,9 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	    else if(P==0) {
 	      // arma::trans(genc.col(i)).print("ai");
 	      // arma::trans(genc.col(j)).print("aj");
-	      throw std::runtime_error("Error in P-orthogonalization in-out routine.\n");
+	      //throw std::runtime_error("Error in P-orthogonalization in-out routine.\n");
+	      fprintf(stderr,"Warning - problem in Corth for %s\n",symbol.c_str());
+	      break;
 
 	    } else {
 	      // Decrement P
