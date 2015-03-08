@@ -30,7 +30,7 @@ scf-force.cpp elements.cpp xyzutils.cpp zmatrix.cpp settings.cpp
 broyden.cpp tempered.cpp find_molecules.cpp properties.cpp
 checkpoint.cpp guess.cpp external/storage.cpp
 external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
-trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp xcfit.cpp chebyshev.cpp
+trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp eriworker_routines.cpp unitary.cpp
 pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
 stockholder.cpp slaterfit/solve_coefficients.cpp
