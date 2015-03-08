@@ -536,7 +536,7 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
 
   if(!direct) {
     // Get vector
-    arma::vec Hv(arma::trans(c)*a_munu);
+    arma::rowvec Hv(arma::trans(c)*a_munu);
     // and unpack it
     for(size_t imu=0;imu<Nbf;imu++) {
       for(size_t inu=0;inu<imu;inu++) {
@@ -620,7 +620,7 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
 #endif
     for(size_t ip=0;ip<P.size();ip++) {
       // Get vector
-      arma::vec Hv(arma::trans(c[ip])*a_munu);
+      arma::rowvec Hv(arma::trans(c[ip])*a_munu);
       // and unpack it
       for(size_t imu=0;imu<Nbf;imu++) {
 	for(size_t inu=0;inu<imu;inu++) {
