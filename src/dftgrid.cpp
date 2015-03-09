@@ -1136,9 +1136,9 @@ void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
     }
 
     // Store output
-    ret(i,0)=nPhi;
-    ret(i,1)=U;
-    ret(i,2)=W;
+    ret(i,0)+=nPhi;
+    ret(i,1)+=U;
+    ret(i,2)+=W;
   }
 }
 
@@ -1202,12 +1202,12 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
     }
 
     // Store output
-    ret(i,0)=nPhi;
-    ret(i,1)=U;
-    ret(i,2)=W;
-    ret(i,3)=fpx;
-    ret(i,4)=fpy;
-    ret(i,5)=fpz;
+    ret(i,0)+=nPhi;
+    ret(i,1)+=U;
+    ret(i,2)+=W;
+    ret(i,3)+=fpx;
+    ret(i,4)+=fpy;
+    ret(i,5)+=fpz;
   }
 }
 
