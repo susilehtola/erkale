@@ -5,8 +5,10 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2015
- * Copyright (c) 2010-2015, Susi Lehtola
+ * Copyright © 2015 The Regents of the University of California 
+ * All Rights Reserved 
+ *
+ * Written by Susi Lehtola, Lawrence Berkeley National Laboratory
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
