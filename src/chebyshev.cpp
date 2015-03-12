@@ -77,3 +77,23 @@ void radial_chebyshev(int nrad, std::vector<double> & rad, std::vector<double> &
     }
   }
 }
+
+void radial_chebyshev_jac(int nrad, std::vector<double> & rad, std::vector<double> & wrad) {
+  std::vector<double> rc, wc;
+  radial_chebyshev(nrad,rc,wc);
+  
+  // Returned arrays
+  rad.clear();
+  rad.reserve(rc.size());
+  wrad.clear();
+  wrad.reserve(wc.size());
+  for(size_t i=0;i<rc.size();i++) {
+    double r(rc[i]);
+    double w(wc[i]*r*r);
+    if(w!=0.0) {
+      rad.push_back(r);
+      wrad.push_back(w);
+    }
+  }
+}
+       
