@@ -26,7 +26,7 @@
 #include "../dftgrid.h"
 
 /// Perform integral over atomic grid
-class CasidaAtom : public AtomGrid {
+class CasidaShell : public AngularGrid {
   /// Stack of values of orbitals at grid points: orbs[nspin][ngrid][norb]
   std::vector< std::vector< std::vector<double> > > orbs;
 
@@ -37,9 +37,9 @@ class CasidaAtom : public AtomGrid {
 
  public:
   /// Constructor. Need to set tolerance as well before using constructor!
-  CasidaAtom(bool lobatto=false, double tol=1e-4);
+  CasidaShell(bool lobatto=false);
   /// Destructor
-  ~CasidaAtom();
+  ~CasidaShell();
 
   /// Evaluate values of orbitals at grid points
   void compute_orbs(const std::vector<arma::mat> & C);
@@ -56,9 +56,9 @@ class CasidaAtom : public AtomGrid {
 /// Perform integral over molecular grid
 class CasidaGrid {
   /// Work grids
-  std::vector<CasidaAtom> wrk;
-  /// Atomic grids
-  std::vector<atomgrid_t> grids;
+  std::vector<CasidaShell> wrk;
+  /// Angular grids
+  std::vector<angshell_t> grids;
 
   /// Basis set
   const BasisSet * basp;
@@ -69,6 +69,8 @@ class CasidaGrid {
 
   /// Construct grid
   void construct(const std::vector<arma::mat> & P, double tol, int x_func, int c_func);
+  /// Prune shells without points
+  void prune_shells();
 
  public:
   CasidaGrid(const BasisSet * bas, bool verbose=false, bool lobatto=false);
@@ -76,6 +78,8 @@ class CasidaGrid {
 
   /// Evaluate Kxc
   void Kxc(const std::vector<arma::mat> & P, double tol, int x_func, int c_func, const std::vector<arma::mat> & C, const std::vector < std::vector<states_pair_t> > & pairs, arma::mat & Kx);
+  /// Print out grid composition
+  void print_grid() const;
 };
 
 #endif

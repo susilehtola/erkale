@@ -764,6 +764,9 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
   // and penalty exponent
   p=pv;
 
+  // Overlap matrix tolerance threshold
+  double otol=1e-5;
+
   Timer t;
   if(ver) {
     printf("Initializing Pipek-Mezey calculation with ");
@@ -791,14 +794,12 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
 
   if(chg==BADER || chg==VORONOI) {
     // Helper. Non-verbose operation
-    bader=BaderGrid(&basis,ver);
+    bader.set(basis,ver);
     // Construct integration grid
-    bader.construct(1e-5);
-    // Run classification
     if(chg==BADER)
-      bader.classify(P);
+      bader.construct_bader(P,otol);
     else
-      bader.classify_voronoi();
+      bader.construct_voronoi(otol);
     // Amount of regions
     N=bader.get_Nmax();
 
@@ -808,7 +809,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Grid
     grid=DFTGrid(&basis,ver);
     // Construct integration grid
-    grid.construct_becke(1e-5);
+    grid.construct_becke(otol);
 
   } else if(chg==HIRSHFELD) {
     // Amount of regions
@@ -820,7 +821,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     //      DFTGrid intgrid(&basis,false);
     grid=DFTGrid(&basis,ver);
     // Construct integration grid
-    grid.construct_hirshfeld(hirsh,1e-5);
+    grid.construct_hirshfeld(hirsh,otol);
 
   } else if(chg==ITERHIRSH) {
     // Amount of regions
@@ -835,7 +836,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     //      DFTGrid intgrid(&basis,false);
     grid=DFTGrid(&basis,ver);
     // Construct integration grid
-    grid.construct_hirshfeld(hirsh,1e-5);
+    grid.construct_hirshfeld(hirsh,otol);
 
   } else if(chg==IAO) {
     // Amount of regions
@@ -861,7 +862,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     //      DFTGrid intgrid(&basis,false);
     grid=DFTGrid(&basis,ver);
     // Construct integration grid
-    grid.construct_hirshfeld(hirsh,1e-5);
+    grid.construct_hirshfeld(hirsh,otol);
 
   } else if(chg==MULLIKEN) {
     // Amount of regions

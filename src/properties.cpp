@@ -639,11 +639,10 @@ void bader_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::ma
 
 arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol) {
   // Helper. Non-verbose operation
-  BaderGrid intgrid(&basis,true);
+  BaderGrid intgrid;
+  intgrid.set(basis,true);
   // Construct grid
-  intgrid.construct(tol);
-  // and run analysis
-  intgrid.classify(P);
+  intgrid.construct_bader(P,tol);
 
   // Get nuclear charges
   return intgrid.nuclear_charges(P);
@@ -651,11 +650,10 @@ arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol)
 
 arma::mat bader_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
   // Helper. Non-verbose operation
-  BaderGrid intgrid(&basis,true);
+  BaderGrid intgrid;
+  intgrid.set(basis,true);
   // Construct grid
-  intgrid.construct(tol);
-  // and run analysis
-  intgrid.classify(Pa+Pb);
+  intgrid.construct_bader(Pa+Pb,tol);
 
   arma::mat q(basis.get_Nnuc(),3);
   q.col(0)=intgrid.nuclear_charges(Pa);
@@ -684,11 +682,10 @@ void voronoi_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::
 
 arma::vec voronoi_charges(const BasisSet & basis, const arma::mat & P, double tol) {
   // Helper. Non-verbose operation
-  BaderGrid intgrid(&basis,true);
+  BaderGrid intgrid;
+  intgrid.set(basis,true);
   // Construct grid
-  intgrid.construct(tol);
-  // and run analysis
-  intgrid.classify_voronoi();
+  intgrid.construct_voronoi(tol);
 
   // Get nuclear charges
   return intgrid.nuclear_charges(P);
@@ -696,11 +693,10 @@ arma::vec voronoi_charges(const BasisSet & basis, const arma::mat & P, double to
 
 arma::mat voronoi_charges(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb, double tol) {
   // Helper. Non-verbose operation
-  BaderGrid intgrid(&basis,true);
+  BaderGrid intgrid;
+  intgrid.set(basis,true);
   // Construct grid
-  intgrid.construct(tol);
-  // and run analysis
-  intgrid.classify_voronoi();
+  intgrid.construct_voronoi(tol);
 
   arma::mat q(basis.get_Nnuc(),3);
   q.col(0)=intgrid.nuclear_charges(Pa);

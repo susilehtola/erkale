@@ -34,66 +34,37 @@
 /**
  * Integration over Bader regions
  */
-class BaderAtom: public AtomGrid {
- public:
-  /// Constructor
-  BaderAtom(bool lobatto, double tol=1e-4);
-  /// Destructor
-  ~BaderAtom();
-  
-  /// Classify points into regions. Returns region list
-  std::vector<arma::sword> classify(const BasisSet & basis, const arma::mat & P, std::vector<coords_t> & maxima, size_t & ndens, size_t & ngrad);
-  /// Classify points into Voronoi regions. Returns region list
-  std::vector<arma::sword> classify_voronoi(const BasisSet & basis);
-
-  /// Integrate charge
-  void charge(const BasisSet & basis, const arma::mat & P, const std::vector<arma::sword> & regions, arma::vec & q) const;
-
-  /// Calculate regional overlap matrices
-  void regional_overlap(const std::vector<arma::sword> & regions, std::vector<arma::mat> & stack) const;
-  /// Calculate regional overlap matrix
-  void regional_overlap(const std::vector<arma::sword> & regions, size_t ireg, arma::mat & Sat) const;
-};
-
-/**
- * Integration over Bader regions
- */
 class BaderGrid {
-  /// Work grid
-  std::vector<BaderAtom> wrk;
-  /// Atomic grids
-  std::vector<atomgrid_t> grids;
-
+  /// Basis set
+  const BasisSet *basp;
+  /// Grid worker
+  AngularGrid wrk;
+  
   /// Locations of maxima
   std::vector<coords_t> maxima;
-  /// Classifications of grid points
-  std::vector< std::vector<arma::sword> > regions;
+  /// Grid points corresponding to the regions
+  std::vector< std::vector<gridpoint_t> > reggrid;
+  /// Amount of nuclei
+  size_t Nnuc;
 
-  /// Basis set
-  const BasisSet * basp;
   /// Verbose operation?
   bool verbose;
-  /// Use Lobatto quadrature?
-  bool use_lobatto;
-
   /// Print maxima
   void print_maxima() const;
-  
+
  public:
-  /// Dummy constructor
-  BaderGrid();
   /// Constructor
-  BaderGrid(const BasisSet * bas, bool verbose=true, bool lobatto=false);
+  BaderGrid();
   /// Destructor
   ~BaderGrid();
 
-  /// Create grid for Bader charges (optimize overlap matrix)
-  void construct(double tol);
+  /// Set parameters
+  void set(const BasisSet & basis, bool verbose=true, bool lobatto=false);
 
-  /// Run classification
-  void classify(const arma::mat & P);
-  /// Run Voronoi classification
-  void classify_voronoi();
+  /// Construct grid with AO overlap matrix threshold thr and classify points into regions with P
+  void construct_bader(const arma::mat & P, double thr);
+  /// Construct grid with AO overlap matrix threshold thr and classify points into Voronoi regions
+  void construct_voronoi(double tol);
   /// Get amount of regions
   size_t get_Nmax() const;
 

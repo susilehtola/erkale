@@ -16,19 +16,17 @@
 
 #include <cfloat>
 #include "badergrid.h"
+#include "chebyshev.h"
 #include "timer.h"
 #include "stringutil.h"
 #include "unitary.h"
 #include "properties.h"
-
 #include "elements.h"
 #include "mathf.h"
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-
-//#define BADERDEBUG
 
 // Threshold for vanishingly small density
 #define SMALLDENSITY 1e-10
@@ -37,313 +35,300 @@
 #define CONVTHR 1e-3
 // Threshold distance for separation of maxima
 #define SAMEMAXIMUM (10*CONVTHR)
-
-BaderAtom::BaderAtom(bool lobatto, double tolv) : AtomGrid(lobatto,tolv) {
-}
-
-BaderAtom::~BaderAtom() {
-}
-
-std::vector<arma::sword> BaderAtom::classify(const BasisSet & basis, const arma::mat & P, std::vector<coords_t> & maxima, size_t & ndens, size_t & ngrad) {
-  // Returned classifications
-  std::vector<arma::sword> region;
-  region.assign(grid.size(),-1);
-  
-  // Nuclear coordinates
-  arma::mat nuccoord=basis.get_nuclear_coords();
-
-  size_t nd=0, ng=0;
-  
-  // Loop over points
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+:nd,ng)
-#endif
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Convergence check                                                                                                                                                                                         
-    if(compute_density(P,basis,grid[ip].r)<=SMALLDENSITY) {
-      // Zero density.                                                                                                                                                                                           
-#ifdef BADERDEBUG
-      printf("Point %4i at % f % f % f has small density %e, stopping.\n",(int) ip+1,grid[ip].r.x,grid[ip].r.y,grid[ip].r.z,compute_density(P,basis,grid[ip].r));
-#endif
-      region[ip]=0;
-      continue;
-    }
-    
-    // Otherwise, track the maximum
-    coords_t r=track_to_maximum(basis,P,grid[ip].r,nd,ng);
-
-    // Now that we have the maximum, check if the maximum is on the list of known maxima
-    bool found=false;
-    for(size_t i=0;i<maxima.size();i++)
-      if(norm(r-maxima[i])<=SAMEMAXIMUM) {
-	found=true;
-	region[ip]=i+1;
-#ifdef BADERDEBUG
-	printf("Point %4i with density %e ended up at maximum %i.\n\n",(int) ip+1,compute_density(P,basis,grid[ip].r),(int) i+1);
-#endif
-	break;
-      }
-    
-    // Maximum was not found, add it to the list
-    if(!found)
-#ifdef _OPENMP
-#pragma omp critical
-#endif
-      {
-	maxima.push_back(r);
-	region[ip]=maxima.size();
-#ifdef BADERDEBUG
-	printf("Point %4i with density %e found maximum %i at % f % f % f.\n\n",(int) ip+1,compute_density(P,basis,grid[ip].r),(int) maxima.size(),r.x,r.y,r.z);
-#endif
-      }
-  }
-
-  ndens+=nd;
-  ngrad+=ng;
-
-  return region;
-}
-
-std::vector<arma::sword> BaderAtom::classify_voronoi(const BasisSet & basis) {
-  // Returned classifications
-  std::vector<arma::sword> region;
-  region.assign(grid.size(),-1);
-  
-  // Nuclei
-  std::vector<nucleus_t> nuclei=basis.get_nuclei();
-
-  // Loop over points
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Compute distance of point to nuclei
-    double mindist=DBL_MAX;
-    size_t minind=-1;
-
-    for(size_t inuc=0;inuc<nuclei.size();inuc++) {
-      // Distance of point to nucleus
-      double dsq=normsq(grid[ip].r-nuclei[inuc].r);
-      // Check if minimal distance is here
-      if( dsq < mindist) {
-	mindist=dsq;
-	minind=inuc;
-      }
-    }
-
-    // Store the region - remember different indexing scheme used here!
-    region[ip]=minind+1;
-  }
-
-  return region;
-}
-
-void BaderAtom::charge(const BasisSet & basis, const arma::mat & P, const std::vector<arma::sword> & region, arma::vec & q) const {
-  // Loop over points
-#ifndef _OPENMP
-  for(size_t ip=0;ip<grid.size();ip++) {
-    if(region[ip]>0)
-      q(region[ip]-1)+=grid[ip].w*compute_density(P,basis,grid[ip].r);
-  }
-#else
-#pragma omp parallel for
-  for(arma::sword ireg=0;ireg<(arma::sword) q.n_elem;ireg++)
-    for(size_t ip=0;ip<grid.size();ip++)
-      if(region[ip]-1==ireg)
-	q(ireg)+=grid[ip].w*compute_density(P,basis,grid[ip].r);
-#endif
-}
-
-void BaderAtom::regional_overlap(const std::vector<arma::sword> & region, std::vector<arma::mat> & stack) const {
-#ifndef _OPENMP
-  for(size_t ip=0;ip<grid.size();ip++)
-    if(region[ip]>0) {
-      // Loop over functions on grid point
-      size_t first=grid[ip].f0;
-      size_t last=first+grid[ip].nf;
-      
-      size_t i, j;
-      for(size_t ii=first;ii<last;ii++) {
-	// Index of function is
-	i=flist[ii].ind;
-	for(size_t jj=first;jj<last;jj++) {
-	  j=flist[jj].ind;
-	  
-	  stack[region[ip]-1](i,j)+=grid[ip].w*flist[ii].f*flist[jj].f;
-	}
-      }
-    }
-#else
-#pragma omp parallel for schedule(dynamic,1)
-  for(arma::sword ireg=0;ireg<(arma::sword) stack.size();ireg++)
-    for(size_t ip=0;ip<grid.size();ip++)
-      if(region[ip]-1==ireg) {
-	// Loop over functions on grid point
-	size_t first=grid[ip].f0;
-	size_t last=first+grid[ip].nf;
-	
-	size_t i, j;
-	for(size_t ii=first;ii<last;ii++) {
-	  // Index of function is
-	  i=flist[ii].ind;
-	  for(size_t jj=first;jj<last;jj++) {
-	    j=flist[jj].ind;
-	    
-	    stack[ireg](i,j)+=grid[ip].w*flist[ii].f*flist[jj].f;
-	  }
-	}
-      }
-#endif
-}
-
-void BaderAtom::regional_overlap(const std::vector<arma::sword> & region, size_t ireg, arma::mat & Sat) const {
-  for(size_t ip=0;ip<grid.size();ip++)
-    if(region[ip]-1==(arma::sword) ireg) {
-      // Loop over functions on grid point
-      size_t first=grid[ip].f0;
-      size_t last=first+grid[ip].nf;
-      
-      size_t i, j;
-      for(size_t ii=first;ii<last;ii++) {
-	// Index of function is
-	i=flist[ii].ind;
-	for(size_t jj=first;jj<last;jj++) {
-	  j=flist[jj].ind;
-	  
-	  Sat(i,j)+=grid[ip].w*flist[ii].f*flist[jj].f;
-	}
-      }
-    }
-}
+// Radius small enough to force classification to nuclear region
+#define TRUSTRAD 0.1
 
 BaderGrid::BaderGrid() {
 }
-
-BaderGrid::BaderGrid(const BasisSet * bas, bool ver, bool lobatto) {
-  basp=bas;
-  verbose=ver;
-  use_lobatto=lobatto;
-
-  grids.resize(basp->get_Nnuc());
-
-  // Allocate work grids
-#ifdef _OPENMP
-  int nth=omp_get_max_threads();
-  for(int i=0;i<nth;i++)
-    wrk.push_back(BaderAtom(lobatto));
-#else
-  wrk.push_back(BaderAtom(lobatto));
-#endif
-}
-
+  
 BaderGrid::~BaderGrid() {
 }
 
-void BaderGrid::construct(double tol) {
-  
-  // Add all atoms
-  if(verbose) {
-    printf("Constructing Bader grid.\n");
-    printf("\t%4s  %7s  %10s  %s\n","atom","Npoints","Nfuncs","t");
-    fflush(stdout);
-  }
-  
-  // Set tolerances
-  for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_tolerance(tol);
+void BaderGrid::set(const BasisSet & basis, bool ver, bool lobatto) {
+  wrk=AngularGrid(lobatto);
+  wrk.set_basis(basis);
+  basp=&basis;
+  // Only need function values
+  wrk.set_grad_lapl(false,false);
 
+  verbose=ver;
+  basp=&basis;
+}
+
+void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
+  // Amount of radial shells on the atoms
+  std::vector<size_t> nrad(basp->get_Nnuc());
+  
   Timer t;
-  size_t Nat=basp->get_Nnuc();
 
+  size_t nd=0, ng=0;
+  
+  // Form radial shells
+  std::vector<angshell_t> grids;
+  for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
+    angshell_t sh;
+    sh.atind=iat;
+    sh.cen=basp->get_nuclear_coords(iat);
+    sh.tol=otoler*PRUNETHR;
+    
+    // Compute necessary number of radial points for atom
+    size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
+
+    // Get Chebyshev nodes and weights for radial part
+    std::vector<double> rad, wrad;
+    radial_chebyshev_jac(nr,rad,wrad);
+    nr=rad.size(); // Sanity check
+    nrad[iat]=nr;
+    
+    // Loop over radii
+    for(size_t irad=0;irad<nr;irad++) {
+      sh.R=rad[irad];
+      sh.w=wrad[irad];
+      grids.push_back(sh);
+    }
+  }
+
+  // List of grid points
+  std::vector<gridpoint_t> points;
+  // Initialize list of maxima
+  maxima.clear();
+  reggrid.clear();
+  for(size_t i=0;i<basp->get_Nnuc();i++) {
+    nucleus_t nuc(basp->get_nucleus(i));
+    if(!nuc.bsse) {
+      // Add to list
+      maxima.push_back(nuc.r);
+      std::vector<gridpoint_t> ghlp;
+      reggrid.push_back(ghlp);
+    }
+  }  
+  Nnuc=maxima.size();
+
+  // Block inside classification?
+  std::vector<bool> block(maxima.size(),false);
+  
+  // Index of last treated atom
+  size_t oldatom=-1;
+  for(size_t ig=0;ig<grids.size();ig++) {
+    // Construct the shell
+    wrk.set_grid(grids[ig]);
+    grids[ig]=wrk.construct_becke(otoler/nrad[grids[ig].atind]);
+    // Form the grid again
+    wrk.form_grid();
+    
+    // Extract the points on the shell
+    std::vector<gridpoint_t> shellpoints(wrk.get_grid());
+    if(!shellpoints.size())
+      continue;
+
+    // Are we inside an established trust radius, or are we close enough to a real nucleus?
+    bool inside=false;
+    if(grids[ig].R<=TRUSTRAD && !(basp->get_nucleus(grids[ig].atind).bsse))
+      inside=true;
+    
+    else if(!block[grids[ig].atind] && oldatom==grids[ig].atind) {
+      // Compute projection of density gradient of points on shell
+      arma::vec proj(shellpoints.size());
+      coords_t nuccoord(basp->get_nuclear_coords(grids[ig].atind));
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
-  { // Begin parallel section
-
-#ifndef _OPENMP
-    int ith=0;
-#else
-    int ith=omp_get_thread_num();
-#pragma omp for schedule(dynamic,1)
-#endif
-    for(size_t i=0;i<Nat;i++) {
-      grids[i]=wrk[ith].construct_becke(*basp,i,verbose);
+      for(size_t ip=0;ip<shellpoints.size();ip++) {
+	// Compute density gradient
+	double d;
+	arma::vec g;
+	compute_density_gradient(P,*basp,shellpoints[ip].r,d,g);
+	
+	// Vector pointing to nucleus
+	coords_t dRc=nuccoord-shellpoints[ip].r;
+	arma::vec dR(3);
+	dR(0)=dRc.x;
+	dR(1)=dRc.y;
+	dR(2)=dRc.z;
+	// Compute dot product with gradient
+	proj(ip)=arma::norm_dot(dR,g);
+      }
+      // Increment amount of gradient evaluations
+      ng+=shellpoints.size();
+      
+      // Check if all points are inside
+      const double cthcrit=cos(M_PI/4.0);
+      inside=(arma::min(proj) >= cthcrit);
     }
     
-  }   // End parallel section
+    // If we are not inside, we need to run a point by point classification.
+    if(!inside) {
+      Timer tc;
+      
+      // Reset the trust atom
+      oldatom=-1;
+      // and the current atom
+      block[grids[ig].atind]=true;	
+      
+      // Loop over points
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+      for(size_t ip=0;ip<shellpoints.size();ip++) {
+	if(compute_density(P,*basp,shellpoints[ip].r)<=SMALLDENSITY) {
+	  // Zero density - skip point
+	  continue;
+	}
+	
+	// Track the density to its maximum
+	coords_t r=track_to_maximum(*basp,P,shellpoints[ip].r,nd,ng);
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+	{
+	  // Now that we have the maximum, check if it is on the list of known maxima
+	  bool found=false;
+	  for(size_t im=0;im<maxima.size();im++)
+	    if(norm(r-maxima[im])<=SAMEMAXIMUM) {
+	      found=true;
+	      reggrid[im].push_back(shellpoints[ip]);
+	      break;
+	    }
+	  
+	  // Maximum was not found, add it to the list
+	  if(!found) {
+	    maxima.push_back(r);
+	    std::vector<gridpoint_t> ghlp;
+	    ghlp.push_back(shellpoints[ip]);
+	    reggrid.push_back(ghlp);
+	  }
+	}
+      }
+
+      // Continue with the next radial shell
+      continue;
+	
+    } else {
+      // If we are here, then all points belong to this nuclear maximum
+      oldatom=grids[ig].atind;
+      reggrid[ grids[ig].atind ].insert(reggrid[ grids[ig].atind ].end(), shellpoints.begin(), shellpoints.end());
+    }
+  }
+
   
   if(verbose) {
-    printf("Bader grid constructed in %s.\n",t.elapsed().c_str());
-    fflush(stdout);
-  }
-}
+    printf("Bader grid constructed in %s, taking %i density and %i gradient evaluations.\n",t.elapsed().c_str(),(int) nd, (int) ng);
+    print_maxima();
 
-
-void BaderGrid::classify(const arma::mat & P) {
-  Timer t;
-
-  // Destroy old classifications
-  regions.clear();
-  regions.resize(grids.size());
-  // and maxima
-  maxima.clear();
-
-  size_t denstot=0;
-  size_t gradtot=0;
-
-  if(verbose) {
-    printf("Running Bader classification.\n");
-    printf("\t%4s  %7s  %7s  %5s\n","atom","Ngrad","Ndens","Avg");
-    fflush(stdout);
-  }
-
-  for(size_t i=0;i<grids.size();i++) {
-    // Form the grid
-    wrk[0].form_grid(*basp,grids[i]);
-    // and run the classification
-    size_t ndens=0, ngrad=0;
-    regions[i]=wrk[0].classify(*basp,P,maxima,ndens,ngrad);
-    double densave=ndens*1.0/grids[i].ngrid;
-    if(verbose) {
-      //      printf("\t%4i  %7s  %7s  %4.2f\n",(int) i+1,space_number(ngrad).c_str(),space_number(ndens).c_str(),densave);
-      printf("\t%4i  %7u  %7u  %4.2f\n",(int) i+1,(unsigned int) ngrad,(unsigned int) ndens,densave);
-      fflush(stdout);
+    // Amount of integration points
+    arma::uvec np(basp->get_Nnuc());
+    np.zeros();
+    // Amount of function values
+    arma::uvec nf(basp->get_Nnuc());
+    nf.zeros();
+    
+    for(size_t i=0;i<grids.size();i++) {
+      np(grids[i].atind)+=grids[i].np;
+      nf(grids[i].atind)+=grids[i].nfunc;
     }
-    denstot+=ndens;
-    gradtot+=ngrad;
-  }
-
-  printf("Bader analysis done in %s.\nUsed %i density and %i gradient evaluations.\n",t.elapsed().c_str(),(int) denstot, (int) gradtot);
-  print_maxima();
-}
-
-void BaderGrid::classify_voronoi() {
-  Timer t;
-
-  // Destroy old classifications
-  regions.clear();
-  regions.resize(grids.size());
-  // and maxima
-  maxima.clear();
-
-  // The maxima are simply the nuclei.
-  for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++)
-    maxima.push_back(basp->get_nuclear_coords(inuc));
-
-  if(verbose) {
-    printf("Running Voronoi classification ... ");
+    printf("Composition of atomic integration grid:\n %7s %7s %10s\n","atom","Npoints","Nfuncs");
+    for(size_t i=0;i<basp->get_Nnuc();i++)
+      printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->get_symbol(i).c_str(), (int) np(i), (int) nf(i));
+    printf("\nAmount of grid points in the regions:\n %7s %7s\n","region","Npoints");
+    for(size_t i=0;i<reggrid.size();i++)
+      printf(" %4i %7i\n",(int) i+1, (int) reggrid[i].size());
     fflush(stdout);
   }
+}
 
-  for(size_t i=0;i<grids.size();i++) {
-    // Form the grid
-    wrk[0].form_grid(*basp,grids[i]);
-    // and run the classification
-    regions[i]=wrk[0].classify_voronoi(*basp);
+void BaderGrid::construct_voronoi(double otoler) {
+  // Amount of radial shells on the atoms
+  std::vector<size_t> nrad(basp->get_Nnuc());
+  
+  Timer t;
+  
+  // Form radial shells
+  std::vector<angshell_t> grids;
+  for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
+    angshell_t sh;
+    sh.atind=iat;
+    sh.cen=basp->get_nuclear_coords(iat);
+    sh.tol=otoler*PRUNETHR;
+    
+    // Compute necessary number of radial points for atom
+    size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
+    
+    // Get Chebyshev nodes and weights for radial part
+    std::vector<double> rad, wrad;
+    radial_chebyshev_jac(nr,rad,wrad);
+    nr=rad.size(); // Sanity check
+    nrad[iat]=nr;
+    
+    // Loop over radii
+    for(size_t irad=0;irad<nr;irad++) {
+      sh.R=rad[irad];
+      sh.w=wrad[irad];
+      grids.push_back(sh);
+    }
   }
 
-  printf("done (%s).\n",t.elapsed().c_str());
-  fflush(stdout);
+  // List of grid points
+  std::vector<gridpoint_t> points;
+  // Initialize list of maxima
+  maxima.clear();
+  reggrid.clear();
+  for(size_t i=0;i<basp->get_Nnuc();i++) {
+    nucleus_t nuc(basp->get_nucleus(i));
+    if(!nuc.bsse) {
+      // Add to list
+      maxima.push_back(nuc.r);
+      std::vector<gridpoint_t> ghlp;
+      reggrid.push_back(ghlp);
+    }
+  }
+  Nnuc=maxima.size();
+  
+  for(size_t ig=0;ig<grids.size();ig++) {
+    // Construct the shell
+    wrk.set_grid(grids[ig]);
+    grids[ig]=wrk.construct_becke(otoler/nrad[grids[ig].atind]);
+    // Form the grid again
+    wrk.form_grid();
+    
+    // Extract the points on the shell
+    std::vector<gridpoint_t> shellpoints(wrk.get_grid());
+
+    // Loop over the points on the shell
+    for(size_t ip=0;ip<shellpoints.size();ip++) {
+      // Compute distances to atoms
+      arma::vec dist(maxima.size());
+      for(size_t ia=0;ia<maxima.size();ia++)
+	dist(ia)=normsq(shellpoints[ip].r-maxima[ia]);
+      // Region is
+      arma::uword idx;
+      dist.min(idx);    
+      // Assign point to atom
+      reggrid[idx].push_back(shellpoints[ip]);
+    }
+  }
+
+  if(verbose) {
+    printf("Voronoi grid constructed in %s.\n",t.elapsed().c_str());
+    // Amount of integration points
+    arma::uvec np(basp->get_Nnuc());
+    np.zeros();
+    // Amount of function values
+    arma::uvec nf(basp->get_Nnuc());
+    nf.zeros();
+    
+    for(size_t i=0;i<grids.size();i++) {
+      np(grids[i].atind)+=grids[i].np;
+      nf(grids[i].atind)+=grids[i].nfunc;
+    }
+    printf("Composition of atomic integration grid:\n %7s %7s %10s\n","atom","Npoints","Nfuncs");
+    for(size_t i=0;i<basp->get_Nnuc();i++)
+      printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->get_symbol(i).c_str(), (int) np(i), (int) nf(i));
+    printf("\nAmount of grid points in the atomic regions:\n %7s %7s\n","region","Npoints");
+    for(size_t i=0;i<reggrid.size();i++)
+      printf(" %4i %7i\n",(int) i+1, (int) reggrid[i].size());
+    fflush(stdout);
+  }
 }
 
 size_t BaderGrid::get_Nmax() const {
@@ -379,12 +364,36 @@ void BaderGrid::print_maxima() const {
   }
 }
 
+arma::mat BaderGrid::regional_overlap(size_t ireg) {
+  if(ireg>=maxima.size()) {
+    ERROR_INFO();
+    throw std::runtime_error("Invalid region!\n");
+  }
+
+  // Function values in grid points
+  arma::mat bf(basp->get_Nbf(),reggrid[ireg].size());
+  arma::vec w(reggrid[ireg].size());
+  for(size_t ip=0;ip<reggrid[ireg].size();ip++) {
+    // Weight is
+    w(ip)=reggrid[ireg][ip].w;
+    // Basis function values are
+    bf.col(ip)=basp->eval_func(reggrid[ireg][ip].r.x,reggrid[ireg][ip].r.y,reggrid[ireg][ip].r.z);
+  }
+  
+  // Overlap matrix is
+  arma::mat Sreg(basp->get_Nbf(),basp->get_Nbf());
+  Sreg.zeros();
+  increment_lda<double>(Sreg,w,bf);
+
+  return Sreg;
+}
+
 arma::vec BaderGrid::regional_charges(const arma::mat & P) {
   arma::vec q(maxima.size());
   q.zeros();
-  for(size_t i=0;i<grids.size();i++) {
-    wrk[0].form_grid(*basp,grids[i]);
-    wrk[0].charge(*basp,P,regions[i],q);
+  for(size_t i=0;i<maxima.size();i++) {
+    arma::mat Sat(regional_overlap(i));
+    q(i)=arma::trace(P*Sat);
   }
 
   return -q;
@@ -393,16 +402,7 @@ arma::vec BaderGrid::regional_charges(const arma::mat & P) {
 arma::vec BaderGrid::nuclear_charges(const arma::mat & P) {
   // Get regional charges
   arma::vec qr=regional_charges(P);
-
-  // Nuclear charges
-  arma::vec q(basp->get_Nnuc());
-  q.zeros();
-  for(size_t i=0;i<grids.size();i++) {
-    if(regions[i][0]>0)
-      q[i]+=qr(regions[i][0]-1);
-  }
-
-  return q;
+  return qr.subvec(0,Nnuc-1);
 }
 
 std::vector<arma::mat> BaderGrid::regional_overlap() {
@@ -414,14 +414,7 @@ std::vector<arma::mat> BaderGrid::regional_overlap() {
 
   std::vector<arma::mat> stack(maxima.size());
   for(size_t i=0;i<stack.size();i++)
-    stack[i].zeros(basp->get_Nbf(),basp->get_Nbf());
-
-  for(size_t i=0;i<grids.size();i++) {
-    wrk[0].form_grid(*basp,grids[i]);
-    wrk[0].compute_bf(*basp,grids[i]);
-    wrk[0].regional_overlap(regions[i],stack);
-    wrk[0].free();
-  }
+    stack[i]=regional_overlap(i);
 
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
@@ -429,26 +422,6 @@ std::vector<arma::mat> BaderGrid::regional_overlap() {
   }
 
   return stack;
-}
-
-arma::mat BaderGrid::regional_overlap(size_t ireg) {
-  arma::mat Sreg(basp->get_Nbf(),basp->get_Nbf());
-  Sreg.zeros();
-
-#ifdef _OPENMP
-  int ith=omp_get_thread_num();
-#else
-  int ith=0;
-#endif
-
-  for(size_t i=0;i<grids.size();i++) {
-    wrk[ith].form_grid(*basp,grids[i]);
-    wrk[ith].compute_bf(*basp,grids[i]);
-    wrk[ith].regional_overlap(regions[i],ireg,Sreg);
-    wrk[ith].free();
-  }
-
-  return Sreg;
 }
 
 coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coords_t r0, size_t & nd, size_t & ng) {

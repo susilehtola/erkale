@@ -15,18 +15,21 @@
  */
 
 #include "casida_grid.h"
+#include "../chebyshev.h"
+#include "../elements.h"
+#include "../timer.h"
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
-CasidaAtom::CasidaAtom(bool lobatto, double tolv) : AtomGrid(lobatto,tolv) {
+CasidaShell::CasidaShell(bool lobatto) : AngularGrid(lobatto) {
 }
 
-CasidaAtom::~CasidaAtom() {
+CasidaShell::~CasidaShell() {
 }
 
-void CasidaAtom::compute_orbs(const std::vector<arma::mat> & C) {
+void CasidaShell::compute_orbs(const std::vector<arma::mat> & C) {
   if(C.size()==1 && polarized) {
     ERROR_INFO();
     throw std::runtime_error("Trying to calculate restricted orbitals with unrestricted grid.\n");
@@ -42,28 +45,25 @@ void CasidaAtom::compute_orbs(const std::vector<arma::mat> & C) {
 
   // Loop over grid points
   for(size_t ip=0;ip<grid.size();ip++) {
-
     // Initialize orbital values
     for(size_t ispin=0;ispin<C.size();ispin++) {
       orbs[ispin][ip].resize(C[ispin].n_cols);
       for(size_t io=0;io<C[ispin].n_cols;io++)
 	orbs[ispin][ip][io]=0.0;
     }
+  }
 
-    // Loop over functions on grid point
-    size_t first=grid[ip].f0;
-    size_t last=first+grid[ip].nf;
-
-    for(size_t ispin=0;ispin<C.size();ispin++)
-      for(size_t ii=first;ii<last;ii++) {
-	// Increment values of orbitals
-	for(size_t io=0;io<C[ispin].n_cols;io++)
-	  orbs[ispin][ip][io]+=C[ispin](flist[ii].ind,io)*flist[ii].f;
-      }
+  for(size_t ispin=0;ispin<C.size();ispin++) {
+    // Orbital values are
+    arma::mat Cval=arma::trans(C[ispin])*bf;
+    // Store values
+    for(size_t ip=0;ip<grid.size();ip++)
+      for(size_t io=0;io<Cval.n_rows;io++)
+	orbs[ispin][ip][io]=Cval(io,ip);
   }
 }
 
-void CasidaAtom::eval_fxc(int x_func, int c_func) {
+void CasidaShell::eval_fxc(int x_func, int c_func) {
   int nspin;
   if(!polarized)
     nspin=XC_UNPOLARIZED;
@@ -139,7 +139,7 @@ void CasidaAtom::eval_fxc(int x_func, int c_func) {
   }
 }
 
-void CasidaAtom::Kxc(const std::vector< std::vector<states_pair_t> > & pairs, arma::mat & K) const {
+void CasidaShell::Kxc(const std::vector< std::vector<states_pair_t> > & pairs, arma::mat & K) const {
   double wxc;
 
   if(polarized && pairs.size()!=2) {
@@ -200,74 +200,112 @@ void CasidaAtom::Kxc(const std::vector< std::vector<states_pair_t> > & pairs, ar
     }
 }
 
-void CasidaAtom::free() {
-  AtomGrid::free();
+void CasidaShell::free() {
+  AngularGrid::free();
   orbs.clear();
   fx.clear();
   fc.clear();
 }
 
 
-CasidaGrid::CasidaGrid(const BasisSet * bas, bool ver, bool lobatto) {
+CasidaGrid::CasidaGrid(const BasisSet * bas, bool lobatto, bool ver) {
   basp=bas;
   verbose=ver;
-  use_lobatto=lobatto;
-
-  grids.resize(basp->get_Nnuc());
 
   // Allocate work grids
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
   for(int i=0;i<nth;i++)
-    wrk.push_back(CasidaAtom(lobatto));
+    wrk.push_back(CasidaShell(lobatto));
 #else
-  wrk.push_back(CasidaAtom(lobatto));
+  wrk.push_back(CasidaShell(lobatto));
 #endif
+
+  for(size_t i=0;i<wrk.size();i++)
+    wrk[i].set_basis(*bas);
 }
 
 CasidaGrid::~CasidaGrid() {
 }
 
-void CasidaGrid::construct(const std::vector<arma::mat> & P, double tol, int x_func, int c_func) {
-  // Set tolerances
-  for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_tolerance(tol);
+void CasidaGrid::construct(const std::vector<arma::mat> & P, double ftoler, int x_func, int c_func) {
+  // Add all atoms
+  if(verbose) {
+    printf("Constructing XC grid.\n");
+    printf("\t%4s  %7s  %10s  %s\n","atom","Npoints","Nfuncs","t");
+    fflush(stdout);
+  }
+
+  Timer t;
+  
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
 
-  const size_t Nat=basp->get_Nnuc();
-
-  if(P.size()==1) {
-    // Restricted calculation
-
-#ifdef _OPENMP
-#pragma omp parallel
-    {
-      int ith=omp_get_thread_num();
-#pragma omp for schedule(dynamic,1)
-      for(size_t i=0;i<Nat;i++)
-	grids[i]=wrk[ith].construct(*basp,P[0],i,x_func,c_func,verbose);
+  // Amount of radial shells on the atoms
+  std::vector<size_t> nrad(basp->get_Nnuc());
+  
+  // Form radial shells
+  for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
+    angshell_t sh;
+    sh.atind=iat;
+    sh.cen=basp->get_nuclear_coords(iat);
+    sh.tol=ftoler*PRUNETHR;
+    
+    // Compute necessary number of radial points for atom
+    size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
+    // Get Chebyshev nodes and weights for radial part
+    std::vector<double> rad, wrad;
+    radial_chebyshev(nr,rad,wrad);
+    nr=rad.size(); // Sanity check
+    nrad[iat]=nr;
+  
+    // Loop over radii
+    for(size_t irad=0;irad<nr;irad++) {
+      sh.R=rad[irad];
+      sh.w=wrad[irad]*sh.R*sh.R;
+      grids.push_back(sh);
     }
-#else
-    for(size_t i=0;i<Nat;i++)
-      grids[i]=wrk[0].construct(*basp,P[0],i,x_func,c_func,verbose);
-#endif
-  } else {
-
-#ifdef _OPENMP
-#pragma omp parallel
-    {
-      int ith=omp_get_thread_num();
-#pragma omp for schedule(dynamic,1)
-      for(size_t i=0;i<Nat;i++)
-	grids[i]=wrk[ith].construct(*basp,P[0],P[1],i,x_func,c_func,verbose);
-    }
-#else
-    for(size_t i=0;i<Nat;i++)
-      grids[i]=wrk[0].construct(*basp,P[0],P[1],i,x_func,c_func,verbose);
-#endif
   }
+    
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifndef _OPENMP
+    int ith=0;
+#else
+    int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids.size();i++) {
+      wrk[ith].set_grid(grids[i]);
+      if(P.size()==1)
+	grids[i]=wrk[ith].construct(P[0],ftoler/nrad[grids[i].atind],x_func,c_func);
+      else if(P.size()==2)
+	grids[i]=wrk[ith].construct(P[0],P[1],ftoler/nrad[grids[i].atind],x_func,c_func);
+      else {
+	ERROR_INFO();
+	throw std::runtime_error("Problem in Casida routine.\n");
+      }
+    }
+  }
+
+  // Prune empty shells
+  prune_shells();
+
+  if(verbose) {
+    printf("DFT XC grid constructed in %s.\n",t.elapsed().c_str());
+    print_grid();
+    fflush(stdout);
+  }
+
+}
+
+void CasidaGrid::prune_shells() {
+  for(size_t i=grids.size()-1;i<grids.size();i--)
+    if(!grids[i].np || !grids[i].nfunc)
+      grids.erase(grids.begin()+i);
 }
 
 void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, int c_func, const std::vector<arma::mat> & C, const std::vector< std::vector<states_pair_t> > & pairs, arma::mat & Kx) {
@@ -287,16 +325,21 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
   // Now, loop over the atoms.
 #ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
-    int ith=omp_get_thread_num();
 
+#ifndef _OPENMP
+    int ith=0;
+#else
+    int ith=omp_get_thread_num();
+    
 #pragma omp for schedule(dynamic,1)
+#endif
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
-      wrk[ith].form_grid(*basp,grids[i]);
-      // Compute basis functions
-      wrk[ith].compute_bf(*basp,grids[i]);
-
+      wrk[ith].set_grid(grids[i]);
+      wrk[ith].form_grid();
+      
       // Update the density
       if(P.size()==1)
 	wrk[ith].update_density(P[0]);
@@ -304,44 +347,20 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
 	wrk[ith].update_density(P[0],P[1]);
       // and compute fxc
       wrk[ith].eval_fxc(x_func,c_func);
-
+      
       // Compute the values of the orbitals
       wrk[ith].compute_orbs(C);
-
+      
       // Compute Kxc's
+#ifdef _OPENMP
 #pragma omp critical
+#endif
       wrk[ith].Kxc(pairs, Kx);
-
+      
       // Free the memory
       wrk[ith].free();
     }
   }
-#else
-  for(size_t i=0;i<grids.size();i++) {
-    // Change atom and create grid
-    wrk[0].form_grid(*basp,grids[i]);
-    // Compute basis functions
-    wrk[0].compute_bf(*basp,grids[i]);
-
-    // Update the density
-    if(P.size()==1)
-      wrk[0].update_density(P[0]);
-    else
-      wrk[0].update_density(P[0],P[1]);
-    // and compute fxc
-    wrk[0].eval_fxc(x_func,c_func);
-
-    // Compute the values of the orbitals
-    wrk[0].compute_orbs(C);
-
-    // Compute Kxc's
-    wrk[0].Kxc(pairs, Kx);
-
-    // Free the memory
-    wrk[0].free();
-  }
-#endif
-
 
   // Symmetrize K if necessary
   for(size_t ispin=0;ispin<pairs.size();ispin++)
@@ -355,4 +374,22 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
 	Kx.submat(joff,ioff,joff+pairs[jspin].size()-1,ioff+pairs[ispin].size()-1)=arma::trans(Kx.submat(ioff,joff,ioff+pairs[ispin].size()-1,joff+pairs[jspin].size()-1));
       }
     }
+}
+
+void CasidaGrid::print_grid() const {
+  // Amount of integration points
+  arma::uvec np(basp->get_Nnuc());
+  np.zeros();
+  // Amount of function values
+  arma::uvec nf(basp->get_Nnuc());
+  nf.zeros();
+
+  for(size_t i=0;i<grids.size();i++) {
+    np(grids[i].atind)+=grids[i].np;
+    nf(grids[i].atind)+=grids[i].nfunc;
+  }
+
+  printf("Composition of %s grid:\n %7s %7s %10s\n","XC","atom","Npoints","Nfuncs");
+  for(size_t i=0;i<basp->get_Nnuc();i++)
+    printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->get_symbol(i).c_str(), (int) np(i), (int) nf(i));
 }
