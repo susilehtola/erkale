@@ -22,6 +22,10 @@
 #include "basis.h"
 class Hirshfeld;
 
+/// Screen out points with Becke weights smaller than 1e-8 * tol
+/// (Köster et al 2004). Used in DFTGrid as well as Bader and Casida
+#define PRUNETHR 1e-8
+
 /**
  * Structure for value of basis function in a point (LDA). The
  * gradients are stored in an array which uses the same indexing. */
@@ -49,33 +53,25 @@ typedef struct {
 
 /// Info for radial shell
 typedef struct {
+  /// Atomic index
+  size_t atind;
+  /// Coordinates of center
+  coords_t cen;
+  
   /// Radius of shell
-  double r;
+  double R;
   /// Radial weight
   double w;
   /// Order of quadrature rule
   int l;
+  /// Tolerance threshold
+  double tol;
 
-  /// First point in grid array of this shell
-  size_t ind0;
   /// Number of points on shell
   size_t np;
-} radshell_t;
-
-/// Info for atomic grid
-typedef struct {
-  /// Atomic inedx
-  size_t atind;
-  /// Coordinates
-  coords_t cen;
-
-  /// Number of grid points
-  size_t ngrid;
-  /// Number of function values
+  /// Number of functions on shell
   size_t nfunc;
-  /// Radial shells
-  std::vector<radshell_t> sh;  
-} atomgrid_t;
+} angshell_t;
 
 /// Helper for determining density cutoffs for plots
 typedef struct {
@@ -112,15 +108,16 @@ typedef struct {
   double vtaua, vtaub;
 } libxc_pot_t;
 
+/// Helper for getting data
 typedef struct {
   libxc_dens_t dens;
   libxc_pot_t pot;
 } libxc_debug_t;
 
 /**
- * \class AtomGrid
+ * \class AngularGrid
  *
- * \brief Integration grid for an atom
+ * \brief Angular integration grid on a radial shell of an atom
  *
  * This file contains routines for computing the matrix elements of
  * the used exchange-correlation functional for density-functional
@@ -164,17 +161,48 @@ typedef struct {
  * \date 2011/05/11 22:35
  */
 
-class AtomGrid {
+class AngularGrid {
  protected:
+  /// Shell info
+  angshell_t info;
+  /// Basis set pointer
+  const BasisSet *basp;
+  /// Use Lobatto quadrature? (Default is Lebedev)
+  bool use_lobatto;
+
   /// Integration points
   std::vector<gridpoint_t> grid;
 
-  /// Values of functions in grid points
-  std::vector<bf_f_t> flist;
-  /// Gradients, length 3*flist
-  std::vector<double> glist;
-  /// Laplacians, length flist
-  std::vector<double> llist;
+  /// List of potentially important shells
+  std::vector<size_t> pot_shells;
+  /// List of potentially important functions
+  arma::uvec pot_bf_ind;
+
+  /// List of important shells
+  std::vector<size_t> shells;
+  /// List of important functions
+  arma::uvec bf_ind;
+  /// List of important functions in potentials' list
+  arma::uvec bf_potind;
+  
+  /// Duplicate values of weights here
+  arma::rowvec w;
+  /// Values of important functions in grid points, Nbf * Ngrid
+  arma::mat bf;
+  /// x gradient
+  arma::mat bf_x;
+  /// y gradient
+  arma::mat bf_y;
+  /// z gradient
+  arma::mat bf_z;
+  /// Values of laplacians in grid points, Nbf * Ngrid * 3
+  arma::mat bf_lapl;
+
+  /// Density helper matrices: P_{uv} chi_v, and P_{uv} nabla(chi_v)
+  arma::mat Pv, Pv_x, Pv_y, Pv_z;
+  /// Same for spin-polarized
+  arma::mat Pav, Pav_x, Pav_y, Pav_z;
+  arma::mat Pbv, Pbv_x, Pbv_y, Pbv_z;
 
   /// Is gradient needed?
   bool do_grad;
@@ -191,69 +219,39 @@ class AtomGrid {
 
   // LDA stuff:
 
-  /// Density
-  std::vector<double> rho;
-  /// Energy density
-  std::vector<double> exc;
-  /// Functional derivative of energy wrt electron density
-  std::vector<double> vxc;
+  /// Density, Nrho x Npts
+  arma::mat rho;
+  /// Energy density, Npts
+  arma::vec exc;
+  /// Functional derivative of energy wrt electron density, Nrho x Npts
+  arma::mat vxc;
 
   // GGA stuff
 
-  /// Gradient of electron density
-  std::vector<double> grho;
-  /// Dot products of gradient of electron density
-  std::vector<double> sigma;
+  /// Gradient of electron density, (3 x Nrho) x Npts
+  arma::mat grho;
+  /// Dot products of gradient of electron density, N x Npts; N=1 for closed-shell and 3 for open-shell
+  arma::mat sigma;
   /// Functional derivative of energy wrt gradient of electron density
-  std::vector<double> vsigma;
+  arma::mat vsigma;
 
   // Meta-GGA stuff
 
   /// Laplacian of electron density
-  std::vector<double> lapl_rho;
+  arma::mat lapl;
   /// Kinetic energy density
-  std::vector<double> tau;
+  arma::mat tau;
 
   /// Functional derivative of energy wrt laplacian of electron density
-  std::vector<double> vlapl;
+  arma::mat vlapl;
   /// Functional derivative of energy wrt kinetic energy density
-  std::vector<double> vtau;
+  arma::mat vtau;
 
   // VV10 stuff
-  /// \omega_0
-  arma::vec omega0;
-  /// \kappa
-  arma::vec kappa;
   /// Density threshold
   double VV10_thr;
-  /// VV10 helper array
+  /// Helper array used in kernel computation to avoid memory thrashing
   arma::mat VV10_arr;
-
-  /// Grid tolerance (for pruning grid)
-  double tol;
-
-  /// Use Lobatto quadrature? (Default is Lebedev)
-  bool use_lobatto;
-
-  /// Extract weights
-  arma::rowvec get_weights() const;
-  /// Extract function values: N x Ngrid
-  arma::mat get_fval(size_t N) const;
-  /// Extract gradient values
-  arma::cube get_gval(size_t N) const;
-  /// Extract laplacian values: N x Ngrid
-  arma::mat get_lval(size_t N) const;
-
-  /// Extract LDA potential
-  arma::rowvec get_vxc(bool spin) const;
-  /// Extract density gradient
-  arma::mat get_grho(bool spin) const;
-  /// Extract GGA potential
-  arma::rowvec get_vsigma(int c) const;
-  /// Extract MGGA potential
-  arma::rowvec get_vtau(bool spin) const;
-  /// Extract MGGA potential
-  arma::rowvec get_vlapl(bool spin) const;
 
   /// Get density data for wanted point
   libxc_dens_t get_dens(size_t idx) const;
@@ -262,42 +260,56 @@ class AtomGrid {
   /// Get density and potential data for wanted point
   libxc_debug_t get_data(size_t idx) const;
 
- public:
-  /// Constructor. Need to set tolerance as well before using constructor!
-  AtomGrid(bool lobatto=false, double tol=1e-4);
-  /// Destructor
-  ~AtomGrid();
+  /// Add radial shell in Lobatto angular scheme, w/o Becke partitioning or pruning
+  void lobatto_shell();
+  /// Add radial shell in Lebedev scheme, w/o Becke partitioning or pruning
+  void lebedev_shell();
+  /// Update list of important basis functions
+  void update_shell_list();
+  /// Collect weights from grid into w array
+  void get_weights();
 
-  /// Set tolerance
-  void set_tolerance(double toler);
+ public:
+  /**
+   * Constructor. Need to set shell and basis set before using the
+   * construct() functions */
+  AngularGrid(bool lobatto=false);
+  /// Destructor
+  ~AngularGrid();
+
+  /// Set basis set
+  void set_basis(const BasisSet & basis);
+  /// Set radial shell
+  void set_grid(const angshell_t & shell);
+
+  /// Get the quadrature grid
+  std::vector<gridpoint_t> get_grid() const;
+
   /// Check necessity of computing gradient and laplacians, necessary for compute_bf!
   void check_grad_lapl(int x_func, int c_func);
   /// Get necessity of computing gradient and laplacians
   void get_grad_lapl(bool & grad, bool & lapl) const;
   /// Set necessity of computing gradient and laplacians, necessary for compute_bf!
   void set_grad_lapl(bool grad, bool lapl);
-
+  
   /// Construct a fixed size grid
-  atomgrid_t construct(const BasisSet & bas, size_t cenind, int nrad, int lmax, bool verbose);
+  angshell_t construct();
   /// Construct adaptively a grid centered on the cenind:th center, restricted calculation
-  atomgrid_t construct(const BasisSet & bas, const arma::mat & P, size_t cenind, int x_func, int c_func, bool verbose);
+  angshell_t construct(const arma::mat & P, double ftol, int x_func, int c_func);
   /// Construct adaptively a grid centered on the cenind:th center, unrestricted calculation
-  atomgrid_t construct(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb, size_t cenind, int x_func, int c_func, bool verbose);
+  angshell_t construct(const arma::mat & Pa, const arma::mat & Pb, double ftol, int x_func, int c_func);
   /// Construct adaptively a grid centered on the cenind:th center, SIC calculation
-  atomgrid_t construct(const BasisSet & bas, const arma::cx_vec & C, size_t cenind, int x_func, int c_func, bool verbose);
+  angshell_t construct(const arma::cx_vec & C, double ftol, int x_func, int c_func);
 
   /// Construct a dummy grid that is only meant for the overlap matrix (Becke charges)
-  atomgrid_t construct_becke(const BasisSet & bas, size_t cenind, bool verbose);
+  angshell_t construct_becke(double otol);
   /// Construct a dummy grid that is only meant for the overlap matrix (Hirshfeld charges)
-  atomgrid_t construct_hirshfeld(const BasisSet & bas, size_t cenind, const Hirshfeld & hirsh, bool verbose);
+  angshell_t construct_hirshfeld(const Hirshfeld & Hirsh, double otol);
 
-  /// Form shells on an atom, as according to list of radial shells
-  void form_grid(const BasisSet & bas, atomgrid_t & g);
-  /// Form shells on an atom, but using Hirshfeld weight instead of Becke weight
-  void form_hirshfeld_grid(const Hirshfeld & hirsh, atomgrid_t & g);
-
-  /// Compute values of basis functions in all grid points
-  void compute_bf(const BasisSet & bas, atomgrid_t & g);
+  /// Form radial shell and compute basis functions
+  void form_grid();
+  /// Form radial shell using Hirshfeld weights and compute basis functions
+  void form_hirshfeld_grid(const Hirshfeld & hirsh);
 
   /**
    * Compute Becke weight for grid points on shell irad.
@@ -310,55 +322,32 @@ class AtomGrid {
    * The default value for the constant a is 0.7, as in the Köster et
    * al. (2004) paper.
    */
-  void becke_weights(const BasisSet & bas, const atomgrid_t & g, size_t ir, double a=0.7);
-  /// Compute Hirshfeld weight for grid points on shell irad
-  void hirshfeld_weights(const Hirshfeld & hirsh, const atomgrid_t & g, size_t ir);
+  void becke_weights(double a=0.7);
+  /// Compute Hirshfeld weight for grid points
+  void hirshfeld_weights(const Hirshfeld & hirsh);
 
   /// Prune points with small weight
-  void prune_points(const radshell_t & rg);
-
-  /// Add radial shell in Lobatto angular scheme, w/o Becke partitioning or pruning
-  void add_lobatto_shell(atomgrid_t & g, size_t ir);
-  /// Add radial shell in Lebedev scheme, w/o Becke partitioning or pruning
-  void add_lebedev_shell(atomgrid_t & g, size_t ir);
-
-  /// Compute basis functions on grid points on shell irad
-  void compute_bf(const BasisSet & bas, const atomgrid_t & g, size_t irad);
-
+  void prune_points();
+  /// Compute basis functions on grid points
+  void compute_bf();
   /// Free memory
   void free();
 
   /// Update values of density, restricted calculation
   void update_density(const arma::mat & P);
-  /// Update values of density using BLAS routines, restricted calculation. This is slower than the normal routine...
-  void update_density_blas(const arma::mat & P);
   /// Update values of density, unrestricted calculation
   void update_density(const arma::mat & Pa, const arma::mat & Pb);
   /// Update values of density, self-interaction correction
   void update_density(const arma::cx_vec & C);
 
-  /// Evaluate density at a point
-  double eval_dens(const arma::mat & P, size_t ip) const;
-  /// Evaluate density at a point (for PZ-SIC)
-  double eval_dens(const arma::cx_vec & C, size_t ip) const;
-  /// Evaluate gradient at a point
-  void eval_grad(const arma::mat & P, size_t ip, double *g) const;
-  /// Evaluate gradient at a point (for PZ-SIC)
-  void eval_grad(const arma::cx_vec & C, size_t ip, double *g) const;
-  /// Evaluate laplacian of density and kinetic density at a point
-  void eval_lapl_kin_dens(const arma::mat & P, size_t ip, double & lapl, double & kin) const;
-  /// Evaluate laplacian of density and kinetic density at a point (for PZ-SIC)
-  void eval_lapl_kin_dens(const arma::cx_vec & C, size_t ip, double & lapl, double & kin) const;
-
-  /// Evaluate density
-  void eval_dens(const arma::mat & P, std::vector<dens_list_t> & d) const;
+  /// Get density list; used to determine isosurface values for orbital plots
+  void get_density(std::vector<dens_list_t> & list) const;
 
   /// Compute number of electrons
   double compute_Nel() const;
 
-  /// Print atomic grid
+  /// Print out grid information
   void print_grid() const;
-
   /// Print density information
   void print_density(FILE *f) const;
   /// Print potential information
@@ -375,7 +364,7 @@ class AtomGrid {
   /// Initialize VV10 calculation
   void init_VV10(double b, double C, bool pot);
   /// Collect VV10 data
-  void collect_VV10(arma::mat & data, std::vector<size_t> & idx, bool nl) const;
+  void collect_VV10(arma::mat & data, std::vector<size_t> & idx, double b, double C, bool nl) const;
 
   /**
    * Evaluates VV10 energy and potential and add to total array
@@ -384,27 +373,19 @@ class AtomGrid {
    * "Nonlocal van der Waals density functional: The simpler the
    * better", J. Chem. Phys. 133, 244103 (2010).
    */
-  void compute_VV10(const std::vector<arma::mat> & nldata, double C);
+  void compute_VV10(const std::vector<arma::mat> & nldata, double b, double C);
   /// Same thing, but also evaluate the grid contribution to the force
-  arma::vec compute_VV10_F(const std::vector<arma::mat> & nldata, double C, size_t iat);
+  arma::vec compute_VV10_F(const std::vector<arma::mat> & nldata, const std::vector<angshell_t> & nlgrids, double b, double C);
 
   /// Evaluate atomic contribution to overlap matrix
   void eval_overlap(arma::mat & S) const;
-  /// Evaluate atomic contribution to overlap matrix
-  void eval_overlap_blas(arma::mat & S) const;
   /// Evaluate diagonal elements of overlap matrix
   void eval_diag_overlap(arma::vec & S) const;
 
   /// Evaluate Fock matrix, restricted calculation
   void eval_Fxc(arma::mat & H) const;
-  /// Evaluate Fock matrix using BLAS routines, restricted calculation
-  void eval_Fxc_blas(arma::mat & H) const;
   /// Evaluate Fock matrix, unrestricted calculation
-  void eval_Fxc(arma::mat & Ha, arma::mat & Hb) const;
-  /// Evaluate Fock matrix using BLAS routines, unrestricted calculation
-  void eval_Fxc_blas(arma::mat & Ha, arma::mat & Hb, bool beta=true) const;
-  /// Evaluate Fock matrix, SIC calculation
-  void eval_Fxc(const arma::cx_mat & C, size_t nocc, arma::cx_mat & H) const;
+  void eval_Fxc(arma::mat & Ha, arma::mat & Hb, bool beta=true) const;
 
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), restricted calculation
   void eval_diag_Fxc(arma::vec & H) const;
@@ -414,9 +395,9 @@ class AtomGrid {
   void eval_diag_Fxc_SIC(arma::vec & H) const;
 
   /// Evaluate force
-  arma::vec eval_force(const BasisSet & bas, const arma::mat & P) const;
+  arma::vec eval_force(const arma::mat & P) const;
   /// Evaluate force
-  arma::vec eval_force(const BasisSet & bas, const arma::mat & Pa, const arma::mat & Pb) const;
+  arma::vec eval_force(const arma::mat & Pa, const arma::mat & Pb) const;
 };
 
 /**
@@ -442,16 +423,16 @@ class AtomGrid {
 
 class DFTGrid {
   /// Work grids
-  std::vector<AtomGrid> wrk;
-  /// Atomic grid
-  std::vector<atomgrid_t> grids;
-
+  std::vector<AngularGrid> wrk;
+  /// Radial grids
+  std::vector<angshell_t> grids;
   /// Basis set
   const BasisSet * basp;
   /// Verbose operation?
   bool verbose;
-  /// Use Lobatto quadrature?
-  bool use_lobatto;
+
+  /// Prune shells with no points
+  void prune_shells();
 
  public:
   /// Dummy constructor
@@ -466,17 +447,16 @@ class DFTGrid {
   /// Create fixed size grid
   void construct(int nrad, int lmax, bool gga, bool mgga, bool strict, bool nl);
   /// Create grid for restricted calculation
-  void construct(const arma::mat & P, double tol, int x_func, int c_func);
+  void construct(const arma::mat & P, double ftol, int x_func, int c_func);
   /// Create grid for unrestricted calculation
-  void construct(const arma::mat & Pa, const arma::mat & Pb, double tol, int x_func, int c_func);
+  void construct(const arma::mat & Pa, const arma::mat & Pb, double ftol, int x_func, int c_func);
+  /// Create grid for SIC calculation
+  void construct(const arma::cx_mat & C, double ftol, int x_func, int c_func);
 
   /// Create dummy grid for Becke charges (only overlap matrix)
-  void construct_becke(double tol);
+  void construct_becke(double stol);
   /// Create dummy grid for Hirshfeld charges (only overlap matrix)
-  void construct_hirshfeld(const Hirshfeld & hirsh, double tol);
-
-  /// Create grid for SIC calculation
-  void construct(const arma::cx_mat & C, double tol, int x_func, int c_func);
+  void construct_hirshfeld(const Hirshfeld & hirsh, double stol);
 
   /// Get amount of points
   size_t get_Npoints() const;
@@ -529,29 +509,113 @@ class DFTGrid {
   /// Evaluate NL force
   arma::vec eval_VV10_force(DFTGrid & nlgrid, double b, double C, const arma::mat & P);
 
+  /// Print out grid information
+  void print_grid(std::string met="XC") const;
+  
   /// Print out density data
   void print_density(const arma::mat & P, std::string densname="density.dat");
   /// Print out potential data
   void print_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string potname="potential.dat");
 };
 
-
-/* Partitioning functions */
-inline double f_p(double mu) {
-  return 1.5*mu-0.5*mu*mu*mu;
+/// BLAS routine for LDA-type quadrature
+template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & vxc, const arma::Mat<T> & f) {
+  if(f.n_cols != vxc.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+  if(H.n_rows != f.n_rows || H.n_cols != f.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
+  }
+  
+  // Form helper matrix
+  arma::Mat<T> fhlp(f);
+  for(size_t i=0;i<fhlp.n_rows;i++)
+    for(size_t j=0;j<fhlp.n_cols;j++)
+      fhlp(i,j)*=vxc(j);
+  H+=fhlp*arma::trans(f);
 }
 
-inline double f_q(double mu, double a) {
-  if(mu<-a)
-    return -1.0;
-  else if(mu<a)
-    return f_p(mu/a);
-  else
-    return 1.0;
+/// BLAS routine for GGA-type quadrature
+template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, const arma::Mat<T> & f, arma::Mat<T> f_x, arma::Mat<T> f_y, arma::Mat<T> f_z) {
+  if(gn.n_cols!=3) {
+    ERROR_INFO();
+    throw std::runtime_error("Grad rho must have three columns!\n");
+  }
+  if(f.n_rows != f_x.n_rows || f.n_cols != f_x.n_cols || f.n_rows != f_y.n_rows || f.n_cols != f_y.n_cols || f.n_rows != f_z.n_rows || f.n_cols != f_z.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function and derivative matrices doesn't match!\n");
+  }
+  if(H.n_rows != f.n_rows || H.n_cols != f.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
+  }
+    
+  // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
+  //                 (N, Np)    =        (N Np; c)    (Np, 3)
+  arma::Mat<T> gamma(f.n_rows,f.n_cols);
+  gamma.zeros();
+  {
+    // Helper
+    arma::rowvec gc;
+    
+    // x gradient
+    gc=arma::trans(gn.col(0));
+    for(size_t j=0;j<f_x.n_cols;j++)
+      for(size_t i=0;i<f_x.n_rows;i++)
+	f_x(i,j)*=gc(j);
+    gamma+=f_x;
+    
+    // x gradient
+    gc=arma::trans(gn.col(1));
+    for(size_t j=0;j<f_y.n_cols;j++)
+      for(size_t i=0;i<f_y.n_rows;i++)
+	f_y(i,j)*=gc(j);
+    gamma+=f_y;
+    
+    // z gradient
+    gc=arma::trans(gn.col(2));
+    for(size_t j=0;j<f_z.n_cols;j++)
+      for(size_t i=0;i<f_z.n_rows;i++)
+	f_z(i,j)*=gc(j);
+    gamma+=f_z;
+  }
+  
+  // Form Fock matrix
+  H+=gamma*arma::trans(f) + f*arma::trans(gamma);
 }
 
-inline double f_s(double mu, double a) {
-  return 0.5*(1.0-f_p(f_p(f_q(mu,a))));
+/// BLAS routine for meta-GGA kinetic energy type quadrature
+template<typename T> void increment_mgga_kin(arma::Mat<T> & H, const arma::rowvec & vtaul, const arma::Mat<T> & f_x, const arma::Mat<T> & f_y, const arma::Mat<T> & f_z) {
+  // This is equivalent to LDA incrementation on the three components!
+  increment_lda<T>(H,vtaul,f_x);
+  increment_lda<T>(H,vtaul,f_y);
+  increment_lda<T>(H,vtaul,f_z);
+}
+
+/// BLAS routine for meta-GGA laplacian type quadrature
+template<typename T> void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowvec & vl, const arma::Mat<T> & f, const arma::Mat<T> & f_lapl) {
+  if(f.n_rows != f_lapl.n_rows || f.n_cols != f_lapl.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function and laplacian matrices doesn't match!\n");
+  }
+  if(f.n_cols != vl.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function matrix and potential doesn't match!\n");
+  }
+  if(H.n_rows != f.n_rows || H.n_cols != f.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
+  }
+  
+  // Absorb the potential into the function values
+  arma::Mat<T> fhlp(f);
+  for(size_t i=0;i<fhlp.n_rows;i++)
+    for(size_t j=0;j<fhlp.n_cols;j++)
+      fhlp(i,j)*=vl(j);
+  // Fock matrix contribution is
+  H+=f_lapl*arma::trans(fhlp) + fhlp*arma::trans(f_lapl);
 }
 
 #endif
