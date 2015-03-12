@@ -23,6 +23,21 @@ Additionally:
      S. Lehtola and H. Jónsson, "Unitary optimization of localized
      molecular orbitals", J. Chem. Theory Comput. 9, 5365 (2013).
 
+   * if you are using the Pipek-Mezey style orbital localization
+     methods, please cite as well
+
+     S. Lehtola and H. Jónsson, "Pipek−Mezey Orbital Localization
+     Using Various Partial Charge Estimates", J. Chem. Theory
+     Comput. 10, 642 (2014).
+
+   * if you run calculations with the Perdew-Zunger self-interaction
+     correction, please cite
+
+     S. Lehtola and H. Jónsson, "Variational, Self-Consistent
+     Implementation of the Perdew-Zunger Self-Interaction Correction
+     with Complex Optimal Orbitals", J. Chem. Theory Comput. 10, 5324
+     (2014).
+
    * if you use the coemd basis sets, please cite
 
      J. Lehtola et al., "Completeness-optimized basis sets:
@@ -34,3 +49,9 @@ Additionally:
      S. Lehtola et al., "Contraction of completeness-optimized basis
      sets: Application to ground-state electron momentum densities",
      J. Chem. Phys. 138, 044109 (2013).
+
+   * if you use the automatic completeness-optimization routines,
+     please cite
+
+     S. Lehtola, "Automatic Algorithms for Completeness-Optimization
+     of Gaussian Basis Sets", J. Comput. Chem. 36, 335 (2015).
