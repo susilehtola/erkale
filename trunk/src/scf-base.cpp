@@ -712,7 +712,7 @@ void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, 
 	}
 
 	// Initialize with Coulomb treatment?
-	if(pzmet.X || pzmet.C || pzmet.D) {
+	if(densityfit && (pzmet.X || pzmet.C || pzmet.D)) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
 	  PZSIC_calculate(sicsol,W,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
@@ -896,7 +896,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	}
 
 	// Initialize with Coulomb treatment?
-	if(pzmet.X || pzmet.C || pzmet.D) {
+	if(densityfit && (pzmet.X || pzmet.C || pzmet.D)) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
 	  PZSIC_calculate(sicsola,Wa,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
@@ -933,7 +933,7 @@ void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::
 	}
 
 	// Initialize with Coulomb treatment?
-	if(pzmet.X || pzmet.C || pzmet.D) {
+	if(densityfit && (pzmet.X || pzmet.C || pzmet.D)) {
 	  dft_t dum(dft);
 	  dum.x_func=dum.c_func=0;
 	  PZSIC_calculate(sicsolb,Wb,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
