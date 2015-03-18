@@ -215,12 +215,12 @@ void print_E(const arma::vec & E, const std::vector<double> & occ, bool all) {
   bool skipline= Ntot%nelem ? true : false;
 
   // Printout format
-  char fmt_occ[] ="% 13.4f*";
-  char fmt_half[]="% 13.4fo";
-  char fmt_virt[]="% 13.4f ";
+  const char fmt_occ[] ="% 13.4f*";
+  const char fmt_half[]="% 13.4fo";
+  const char fmt_virt[]="% 13.4f ";
   // Energy cutoff, determined from above
   double cutoff=1e7;
-  char fmt_cut[]="************* ";
+  const char fmt_cut[]="************* ";
   
   // Compute gap. Find HOMO and LUMO
   if(occ.size()) {
@@ -258,7 +258,7 @@ void print_E(const arma::vec & E, const std::vector<double> & occ, bool all) {
   for(size_t i=0;i<Ntot;i++) {
     // Is state occupied?
     if(E(i)>=cutoff)
-      printf(fmt_cut);
+      printf("%s",fmt_cut);
     else if(i<occ.size() && occ[i]>=1.0)
       printf(fmt_occ,E(i));
     else if(i<occ.size() && occ[i]==0.5)
