@@ -117,5 +117,10 @@ endif()
 add_subdirectory (src)
 
 # Testing
-enable_testing()
-add_subdirectory (tests)
+if((${CMAKE_MAJOR_VERSION} GREATER 2) OR (${CMAKE_MAJOR_VERSION} EQUAL 2 AND (${CMAKE_MINOR_VERSION} EQUAL 8 OR ${CMAKE_MINOR_VERSION} GREATER 8)))
+  enable_testing()
+  add_subdirectory (tests)
+  message("Can run tests.")
+elseif()
+  message("Version of CMake too old to run tests; at least version 2.8 required.")
+endif()
