@@ -1,6 +1,11 @@
 Some things that would be nice.
 
-* Implement GGA in Casida.
+* Optimize DFT forces by rewriting them to use BLAS routines.
+
+* Optimize HF/Coulomb matrix force calculation by using intermediate
+  step in the contraction with the density matrix.
+
+* Implement GGA in Casida [Bauernschmitt and Ahlrichs, CPL 256, 454 (1996)].
 
 * Implement molecular dynamics.
 
@@ -8,4 +13,3 @@ Some things that would be nice.
 
 * Implement computation of two-electron completeness profiles.
 
-* Try to further speed up formation of Fock matrix.
