@@ -19,11 +19,16 @@
 #include "../stringutil.h"
 #include "../dftfuncs.h"
 #include "../timer.h"
+#include "../settings.h"
 
 #include <cstdio>
 
 #ifdef _OPENMP
 #include <omp.h>
+#endif
+
+#ifdef SVNRELEASE
+#include "../version.h"
 #endif
 
 int main(int argc, char **argv) {
@@ -102,7 +107,7 @@ int main(int argc, char **argv) {
     if(adaptive)
       grid.construct(P,gridtol,x_func,c_func);
     else
-      grid.construct(nrad,lmax,x_func,c_func);
+      grid.construct(nrad,lmax,x_func,c_func,false);
 
     grid.print_density(P);
     if(x_func)
@@ -118,7 +123,7 @@ int main(int argc, char **argv) {
     if(adaptive)
       grid.construct(Pa,Pb,gridtol,x_func,c_func);
     else
-      grid.construct(nrad,lmax,x_func,c_func);
+      grid.construct(nrad,lmax,x_func,c_func,false);
 
     grid.print_density(Pa+Pb);
     if(x_func)
