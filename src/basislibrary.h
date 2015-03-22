@@ -191,6 +191,9 @@ class ElementBasisSet {
    */
   ElementBasisSet product_set(int lmaxinc, double fsam) const;
 
+  /// Form compact Cholesky set
+  ElementBasisSet cholesky_set(double thr, int maxam) const;
+  
   /// Augment the basis
   void augment(int naug);
 
@@ -279,6 +282,8 @@ class BasisSetLibrary {
   BasisSetLibrary density_fitting(int lvalinc, double fsam) const;
   /// Generate product set
   BasisSetLibrary product_set(int lvalinc, double fsam) const;
+  /// Generate compact Cholesky set
+  BasisSetLibrary cholesky_set(double thr, int maxam) const;
 
   /**
    * P-orthogonalization [F. Jensen, JCTC 10, 1074 (2014)].

@@ -21,6 +21,7 @@
 #include "stringutil.h"
 #include "linalg.h"
 #include "timer.h"
+#include "erifit.h"
 
 #include <algorithm>
 #include <fstream>
@@ -703,6 +704,48 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
   ret.sort();
 
   return ret;
+}
+
+ElementBasisSet ElementBasisSet::cholesky_set(double thr, int maxam) const {
+  ElementBasisSet orbbas(*this);
+  orbbas.decontract();
+  
+  // Fitting set
+  ElementBasisSet fitel(orbbas.get_symbol());
+  
+  // Loop over angular momentum
+  for(int iam=0;iam<=orbbas.get_max_am();iam++)
+    for(int jam=0;jam<=iam;jam++) {
+      if(iam+jam>maxam)
+	break;
+      
+      // Get the T matrix
+      arma::mat T;
+      arma::vec exps;
+      arma::ivec am;
+      ERIfit::compute_cholesky_T(orbbas,iam,jam,T,exps);
+      
+      // Find out significant exponent pairs by a pivoted Cholesky decomposition of T
+      arma::uvec sigexpidx;
+      pivoted_cholesky(T,thr,sigexpidx);
+      
+      // Significant exponents
+      arma::vec sigexp(sigexpidx.size());
+      for(size_t ii=0;ii<sigexpidx.size();ii++) {
+	sigexp(ii)=exps(sigexpidx[ii]);
+      }
+      sigexp=arma::sort(sigexp,"descend");
+      
+      // Create the fitting set
+      for(arma::uword i=0;i<sigexp.n_elem;i++) {
+	std::vector<contr_t> c(1);
+	c[0].c=1.0;
+	c[0].z=sigexp(i);
+	fitel.add_function(FunctionShell(iam+jam,c));
+      }
+    }
+
+  return fitel;
 }
 
 void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::mat & cgen, int am) const {
@@ -2004,6 +2047,14 @@ BasisSetLibrary BasisSetLibrary::product_set(int lvalinc, double fsam) const {
   ret.name="Product set "+name;
   for(size_t iel=0;iel<elements.size();iel++)
     ret.elements[iel]=elements[iel].product_set(lvalinc,fsam);
+  return ret;
+}
+
+BasisSetLibrary BasisSetLibrary::cholesky_set(double thr, int maxam) const {
+  BasisSetLibrary ret(*this);
+  ret.name="Product set "+name;
+  for(size_t iel=0;iel<elements.size();iel++)
+    ret.elements[iel]=elements[iel].cholesky_set(thr,maxam);
   return ret;
 }
 
