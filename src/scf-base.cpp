@@ -384,8 +384,6 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   Timer t;
 
   if(densityfit) {
-    if(kfull!=0.0)
-      throw std::runtime_error("PZ-SIC hybrid functionals not supported with density fitting.\n");
     if(kshort!=0.0)
       throw std::runtime_error("PZ-SIC range separated functionals not supported with density fitting.\n");
 
