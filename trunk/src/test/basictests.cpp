@@ -207,6 +207,6 @@ int main(void) {
   try {
     check_lapack_thread();
   } catch(std::runtime_error) {
-    throw std::runtime_error("LAPACK library is not thread safe!\nThis will cause problems in e.g. PZ-SIC stability analysis!\n");
+    throw std::runtime_error("LAPACK library is not thread safe!\nThis might cause problems in some parts of ERKALE.\n");
   }
 }
