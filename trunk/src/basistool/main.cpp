@@ -16,12 +16,13 @@
 
 #include "../basislibrary.h"
 #include "../stringutil.h"
+#include "../eriworker.h"
 #include "../completeness/completeness_profile.h"
 #ifdef SVNRELEASE
 #include "../version.h"
 #endif
 
-std::string cmds[]={"completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"cholesky", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 
 void help() {
@@ -54,7 +55,28 @@ int main(int argc, char **argv) {
   // Get command
   std::string cmd(argv[2]);
   // and determine what to do.
-  if(stricmp(cmd,"completeness")==0) {
+  if(stricmp(cmd,"cholesky")==0) {
+    // Print completeness profile.
+
+    if(argc!=6) {
+      printf("\nUsage: %s input.gbs cholesky thr maxam output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    double thr(atof(argv[3]));
+    int maxam(atoi(argv[4]));
+    std::string outfile(argv[5]);
+
+    if(maxam>=LIBINT_MAX_AM) {
+      printf("Setting maxam = %i because limitations in used version of LIBINT.\n",LIBINT_MAX_AM-1);
+      maxam=LIBINT_MAX_AM-1;
+    }
+			       
+    init_libint_base();
+    BasisSetLibrary ret=bas.cholesky_set(thr,maxam);
+    ret.save_gaussian94(outfile);
+    
+  } else if(stricmp(cmd,"completeness")==0) {
     // Print completeness profile.
 
     if(argc!=5 && argc!=6) {

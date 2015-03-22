@@ -5,8 +5,10 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2015
- * Copyright (c) 2010-2015, Susi Lehtola
+ * Copyright © 2015 The Regents of the University of California 
+ * All Rights Reserved 
+ *
+ * Written by Susi Lehtola, Lawrence Berkeley National Laboratory
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -15,11 +17,11 @@
  */
 
 #include "erifit.h"
-#include "../basis.h"
-#include "../linalg.h"
-#include "../mathf.h"
-#include "../settings.h"
-#include "../eriworker.h"
+#include "basis.h"
+#include "linalg.h"
+#include "mathf.h"
+#include "settings.h"
+#include "eriworker.h"
 
 namespace ERIfit {
 
@@ -93,47 +95,6 @@ namespace ERIfit {
 
     // Print basis
     //    basis.print(true);
-
-    // Create pair list
-    std::vector<bf_pair_t> list;
-    for(size_t ip=0;ip<shpairs.size();ip++) {
-      size_t is=shpairs[ip].is;
-      size_t js=shpairs[ip].js;
-      size_t i0=shells[is].get_first_ind();
-      size_t j0=shells[js].get_first_ind();
-      size_t Ni=shells[is].get_Nbf();
-      size_t Nj=shells[js].get_Nbf();
-
-      // Loop over the functions
-      for(size_t ii=0;ii<Ni;ii++)
-	for(size_t jj=0;jj<Nj;jj++) {
-	  bf_pair_t hlp;
-	  hlp.i=i0+ii;
-	  hlp.j=j0+jj;
-	  hlp.is=is;
-	  hlp.js=js;
-	  hlp.idx=hlp.i*Nbf+hlp.j;
-	  list.push_back(hlp);
-	}
-      if(is!=js)
-	for(size_t ii=0;ii<Ni;ii++)
-	  for(size_t jj=0;jj<Nj;jj++) {
-	    bf_pair_t hlp;
-	    hlp.j=i0+ii;
-	    hlp.i=j0+jj;
-	    hlp.js=is;
-	    hlp.is=js;
-	    hlp.idx=hlp.i*Nbf+hlp.j;
-	    list.push_back(hlp);
-	  }
-    }
-    std::stable_sort(list.begin(),list.end());
-
-    /*
-      printf("Basis function pairs:\n");
-      for(size_t i=0;i<list.size();i++)
-      printf("%4i: functions %3i and %3i on shells %2i and %2i\n",(int) list[i].idx, (int) list[i].i, (int) list[i].j, (int) list[i].is, (int) list[i].js);
-    */
 
     // Allocate memory for the integrals
     eris.zeros(Nbf*Nbf,Nbf*Nbf);
@@ -214,7 +175,6 @@ namespace ERIfit {
     }
   }
 
-  
   void compute_diag_ERIs(const ElementBasisSet & orbel, arma::mat & eris) {
     // Form basis set library
     BasisSetLibrary blib;
@@ -233,47 +193,6 @@ namespace ERIfit {
 
     // Print basis
     //    basis.print(true);
-
-    // Create pair list
-    std::vector<bf_pair_t> list;
-    for(size_t ip=0;ip<shpairs.size();ip++) {
-      size_t is=shpairs[ip].is;
-      size_t js=shpairs[ip].js;
-      size_t i0=shells[is].get_first_ind();
-      size_t j0=shells[js].get_first_ind();
-      size_t Ni=shells[is].get_Nbf();
-      size_t Nj=shells[js].get_Nbf();
-
-      // Loop over the functions
-      for(size_t ii=0;ii<Ni;ii++)
-	for(size_t jj=0;jj<Nj;jj++) {
-	  bf_pair_t hlp;
-	  hlp.i=i0+ii;
-	  hlp.j=j0+jj;
-	  hlp.is=is;
-	  hlp.js=js;
-	  hlp.idx=hlp.i*Nbf+hlp.j;
-	  list.push_back(hlp);
-	}
-      if(is!=js)
-	for(size_t ii=0;ii<Ni;ii++)
-	  for(size_t jj=0;jj<Nj;jj++) {
-	    bf_pair_t hlp;
-	    hlp.j=i0+ii;
-	    hlp.i=j0+jj;
-	    hlp.js=is;
-	    hlp.is=js;
-	    hlp.idx=hlp.i*Nbf+hlp.j;
-	    list.push_back(hlp);
-	  }
-    }
-    std::stable_sort(list.begin(),list.end());
-
-    /*
-      printf("Basis function pairs:\n");
-      for(size_t i=0;i<list.size();i++)
-      printf("%4i: functions %3i and %3i on shells %2i and %2i\n",(int) list[i].idx, (int) list[i].i, (int) list[i].j, (int) list[i].is, (int) list[i].js);
-    */
 
     // Allocate memory for the integrals
     eris.zeros(Nbf,Nbf);
@@ -322,8 +241,7 @@ namespace ERIfit {
     }
   }
 
-  
-  void unique_exponent_pairs(const ElementBasisSet & orbel, std::vector< std::vector<shellpair_t> > & pairs, std::vector<double> & exps) {
+  void unique_exponent_pairs(const ElementBasisSet & orbel, int am1, int am2, std::vector< std::vector<shellpair_t> > & pairs, std::vector<double> & exps) {
     // Form orbital basis set library
     BasisSetLibrary orblib;
     orblib.add_element(orbel);
@@ -331,22 +249,22 @@ namespace ERIfit {
     // Form orbital basis set
     BasisSet basis;
     get_basis(basis,orblib,orbel);
-    basis.print(true);
 
     // Get shells
     std::vector<GaussianShell> shells(basis.get_shells());
     // and list of unique shell pairs
     std::vector<shellpair_t> shpairs(basis.get_unique_shellpairs());
 
-    // Initialize
-    pairs.clear();
-    exps.clear();
-
     // Create the exponent list
+    exps.clear();
     for(size_t ip=0;ip<shpairs.size();ip++) {
       // Shells are
       size_t is=shpairs[ip].is;
       size_t js=shpairs[ip].js;
+
+      // Check am
+      if(!( (shells[is].get_am()==am1 && shells[js].get_am()==am2) || (shells[is].get_am()==am2 && shells[js].get_am()==am1)))
+	continue;
       
       // Check that shells aren't contracted
       if(shells[is].get_Ncontr()!=1 || shells[js].get_Ncontr()!=1) {
@@ -358,24 +276,28 @@ namespace ERIfit {
       double zeta=shells[is].get_contr()[0].z + shells[js].get_contr()[0].z;
       sorted_insertion<double>(exps,zeta);
     }
-    
+
     // Create the pair list
     pairs.resize(exps.size());
     for(size_t ip=0;ip<shpairs.size();ip++) {
       // Shells are
       size_t is=shpairs[ip].is;
       size_t js=shpairs[ip].js;
+
+      // Check am
+      if(!( (shells[is].get_am()==am1 && shells[js].get_am()==am2) || (shells[is].get_am()==am2 && shells[js].get_am()==am1)))
+	continue;
       
-      // Exponent value is
+      // Pair is
       double zeta=shells[is].get_contr()[0].z + shells[js].get_contr()[0].z;
       size_t pos=sorted_insertion<double>(exps,zeta);
-
+      
       // Insert pair
       pairs[pos].push_back(shpairs[ip]);
     }
   }
   
-  void compute_cholesky_T(const ElementBasisSet & orbel, arma::mat & eris, arma::vec & exps_) {
+  void compute_cholesky_T(const ElementBasisSet & orbel, int am1, int am2, arma::mat & eris, arma::vec & exps_) {
     // Form basis set library
     BasisSetLibrary blib;
     blib.add_element(orbel);
@@ -386,13 +308,13 @@ namespace ERIfit {
     BasisSet basis;
     get_basis(basis,blib,orbel);
 
-    // Get shells in basis set
+    // Get shells in basis sets
     std::vector<GaussianShell> shells(basis.get_shells());
 
     // Get list of unique exponent pairs
     std::vector< std::vector<shellpair_t> > upairs;
     std::vector<double> exps;
-    unique_exponent_pairs(orbel,upairs,exps);
+    unique_exponent_pairs(orbel,am1,am2,upairs,exps);
 
     // Store exponents
     exps_=arma::conv_to<arma::vec>::from(exps);
@@ -439,8 +361,8 @@ namespace ERIfit {
 		  for(size_t kk=0;kk<Nk;kk++)
 		    for(size_t ll=0;ll<Nl;ll++) {
 		      double mel=std::abs((*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll]);
-		      mel=mel*mel;
-		      
+		      // mel*=mel;
+
 		      eris(iip,jjp)+=mel;
 		      if(iip!=jjp)
 			eris(jjp,iip)+=mel;

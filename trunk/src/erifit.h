@@ -5,8 +5,10 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2015
- * Copyright (c) 2010-2015, Susi Lehtola
+ * Copyright © 2015 The Regents of the University of California 
+ * All Rights Reserved 
+ *
+ * Written by Susi Lehtola, Lawrence Berkeley National Laboratory
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,8 +19,8 @@
 #ifndef ERKALE_ERIFIT
 #define ERKALE_ERIFIT
 
-#include "../global.h"
-#include "../basislibrary.h"
+#include "global.h"
+#include "basislibrary.h"
 #include <set>
 
 namespace ERIfit {
@@ -45,9 +47,9 @@ namespace ERIfit {
   void compute_diag_ERIs(const ElementBasisSet & orbel, arma::mat & eris);
 
   /// Find unique exponent pairs
-  void unique_exponent_pairs(const ElementBasisSet & orbel, std::vector< std::vector<shellpair_t> > & pairs, std::vector<double> & exps);
+  void unique_exponent_pairs(const ElementBasisSet & orbel, int am1, int am2, std::vector< std::vector<shellpair_t> > & pairs, std::vector<double> & exps);
   /// Compute the T matrix needed for Cholesky decomposition
-  void compute_cholesky_T(const ElementBasisSet & orbel, arma::mat & eris, arma::vec & exps);
+  void compute_cholesky_T(const ElementBasisSet & orbel, int am1, int am2, arma::mat & eris, arma::vec & exps);
 
   /// Compute fitting integrals
   void compute_fitint(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, arma::mat & fitint);
