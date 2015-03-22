@@ -158,7 +158,10 @@ class ElementBasisSet {
    */
   void P_orthogonalize(double cutoff=1e-8, double Cortho=1e-4);
 
-  /// Merge primitives with large overlap (also decontracts basis)
+  /// Prune primitives with large overlap, replacing them with the geometric average
+  void prune(double cutoff=0.9, bool coulomb=false);
+  
+  /// Merge primitives with large overlap (also decontracts basis). This routine is intended to merging core-correlation functions
   void merge(double cutoff=0.9, bool verbose=true, bool coulomb=false);
 
   /// Get maximum angular momentum used in the shells
@@ -192,7 +195,7 @@ class ElementBasisSet {
   ElementBasisSet product_set(int lmaxinc, double fsam) const;
 
   /// Form compact Cholesky set
-  ElementBasisSet cholesky_set(double thr, int maxam) const;
+  ElementBasisSet cholesky_set(double thr, int maxam, double ovlthr) const;
   
   /// Augment the basis
   void augment(int naug);
@@ -283,7 +286,7 @@ class BasisSetLibrary {
   /// Generate product set
   BasisSetLibrary product_set(int lvalinc, double fsam) const;
   /// Generate compact Cholesky set
-  BasisSetLibrary cholesky_set(double thr, int maxam) const;
+  BasisSetLibrary cholesky_set(double thr, int maxam, double ovlthr) const;
 
   /**
    * P-orthogonalization [F. Jensen, JCTC 10, 1074 (2014)].

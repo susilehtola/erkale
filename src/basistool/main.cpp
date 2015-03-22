@@ -58,14 +58,15 @@ int main(int argc, char **argv) {
   if(stricmp(cmd,"cholesky")==0) {
     // Print completeness profile.
 
-    if(argc!=6) {
-      printf("\nUsage: %s input.gbs cholesky thr maxam output.gbs\n",argv[0]);
+    if(argc!=7) {
+      printf("\nUsage: %s input.gbs cholesky thr maxam ovlthr output.gbs\n",argv[0]);
       return 1;
     }
 
     double thr(atof(argv[3]));
     int maxam(atoi(argv[4]));
-    std::string outfile(argv[5]);
+    double ovlthr(atof(argv[5]));
+    std::string outfile(argv[6]);
 
     if(maxam>=LIBINT_MAX_AM) {
       printf("Setting maxam = %i because limitations in used version of LIBINT.\n",LIBINT_MAX_AM-1);
@@ -73,7 +74,7 @@ int main(int argc, char **argv) {
     }
 			       
     init_libint_base();
-    BasisSetLibrary ret=bas.cholesky_set(thr,maxam);
+    BasisSetLibrary ret=bas.cholesky_set(thr,maxam,ovlthr);
     ret.save_gaussian94(outfile);
     
   } else if(stricmp(cmd,"completeness")==0) {

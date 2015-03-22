@@ -706,7 +706,7 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
   return ret;
 }
 
-ElementBasisSet ElementBasisSet::cholesky_set(double thr, int maxam) const {
+ElementBasisSet ElementBasisSet::cholesky_set(double thr, int maxam, double ovlthr) const {
   ElementBasisSet orbbas(*this);
   orbbas.decontract();
   
@@ -745,6 +745,8 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, int maxam) const {
       }
     }
 
+  fitel.prune(ovlthr,true);
+  
   return fitel;
 }
 
@@ -1167,6 +1169,51 @@ void ElementBasisSet::augment(int naug) {
   }
 
   sort();
+}
+
+void ElementBasisSet::prune(double cutoff, bool coulomb) {
+  // Pruned exponents
+  std::vector< std::vector<double> > pruned(get_max_am()+1);
+
+  for(int am=0;am<=get_max_am();am++) {
+    // Get exponents
+    arma::vec exps;
+    arma::mat contr;
+    get_primitives(exps,contr,am);
+    if(!exps.n_elem)
+      continue;
+
+    // Compute overlap matrix
+    int Sam = coulomb ? am-1 : am;
+    arma::mat S=overlap(exps,exps,Sam);
+
+    // Prune the exponents
+    size_t ioff=0;
+    while(ioff<S.n_cols) {
+      // Determine how many exponents are similar
+      size_t joff(ioff+1);
+      while(joff < S.n_cols && S(ioff,joff)>cutoff)
+	joff++;
+      
+      // Compute the geometric average of the current block
+      double ave=exp(arma::mean(arma::log(exps.subvec(ioff,joff-1))));
+      
+      // Add it to the pruned set
+      pruned[am].push_back(ave);
+      
+      // Increment offset
+      ioff=joff;
+    }
+  }
+  
+  // Replace shells
+  bf.clear();
+  for(size_t am=0;am<pruned.size();am++)
+    for(size_t ix=0;ix<pruned[am].size();ix++) {
+      FunctionShell sh(am);
+      sh.add_exponent(1.0,pruned[am][ix]);
+      add_function(sh);
+    }
 }
 
 void ElementBasisSet::merge(double cutoff, bool verbose, bool coulomb) {
@@ -2050,11 +2097,11 @@ BasisSetLibrary BasisSetLibrary::product_set(int lvalinc, double fsam) const {
   return ret;
 }
 
-BasisSetLibrary BasisSetLibrary::cholesky_set(double thr, int maxam) const {
+BasisSetLibrary BasisSetLibrary::cholesky_set(double thr, int maxam, double ovlthr) const {
   BasisSetLibrary ret(*this);
   ret.name="Product set "+name;
   for(size_t iel=0;iel<elements.size();iel++)
-    ret.elements[iel]=elements[iel].cholesky_set(thr,maxam);
+    ret.elements[iel]=elements[iel].cholesky_set(thr,maxam,ovlthr);
   return ret;
 }
 
