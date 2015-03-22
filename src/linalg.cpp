@@ -487,7 +487,7 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
   form_NOs(P,S,AO_to_NO,tmp,occs);
 }
 
-arma::mat pivoted_cholesky(const arma::mat & A, double eps) {
+arma::mat pivoted_cholesky(const arma::mat & A, double eps, arma::uvec & pivot) {
   if(A.n_rows != A.n_cols)
     throw std::runtime_error("Pivoted Cholesky requires a square matrix!\n");
 
@@ -537,8 +537,15 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps) {
 
   // Drop unnecessary columns
   L=L.cols(0,m-1);
+  // Store pivot
+  pivot=pi.subvec(0,m-1);
 
   return L;
+}
+
+arma::mat pivoted_cholesky(const arma::mat & A, double eps) {
+  arma::uvec p;
+  return pivoted_cholesky(A,eps,p);
 }
 
 // Same algorithm as above, only for a fixed amount of vectors
@@ -632,10 +639,11 @@ void check_lapack_thread() {
     dmat(ith,N)=arma::norm(thval-eval,2);
   }
   
-  dmat.print("RMS difference norms");
+  //  dmat.print("RMS difference norms");
 
   if(arma::max(arma::max(dmat)) > 1e-8) {
     printf("Warning - LAPACK library doesn't seem to be thread safe!\n");
+    printf("Max error in eigenvectors %e\n",arma::max(arma::max(dmat)));
     fprintf(stderr,"Warning - LAPACK library doesn't seem to be thread safe!\n");
   } else {
     printf("LAPACK checks out fine.\n");

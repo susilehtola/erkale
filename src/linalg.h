@@ -160,6 +160,8 @@ void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, ar
  * approximation by the pivoted Cholesky decomposition",
  * Appl. Num. Math. 62, 428 (2012).
  */
+arma::mat pivoted_cholesky(const arma::mat & M, double thr, arma::uvec & pivot);
+/// Same as above but doesn't return pivot
 arma::mat pivoted_cholesky(const arma::mat & M, double thr);
 /// Incomplete Cholesky factorization of matrix M, use n vectors
 arma::mat incomplete_cholesky(const arma::mat & M, size_t n);
