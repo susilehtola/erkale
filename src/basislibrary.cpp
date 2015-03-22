@@ -38,6 +38,20 @@ arma::mat overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
   arma::mat S(iexps.size(),jexps.size());
 
   switch(am) {
+  case(-1):
+    {
+      for(size_t i=0;i<iexps.n_elem;i++)
+	for(size_t j=0;j<jexps.n_elem;j++) {
+	  // Sum of exponents
+	  double zeta=iexps(i) + jexps(j);
+	  // Helpers
+	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
+	  double s_eta=sqrt(eta);
+	  S(i,j)=sqrt(s_eta);
+	}
+    }
+    break;
+
   case(0):
     {
       for(size_t i=0;i<iexps.n_elem;i++)
@@ -399,6 +413,11 @@ void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int 
 
   // Allocate returned contractions
   coeffs.zeros(exps.size(),nsh);
+  if((size_t) nsh > exps.size()) {
+    std::ostringstream oss;
+    oss << "Basis set has duplicate functions on the " << shell_types[am] << " shell!\n";
+    throw std::runtime_error(oss.str());
+  }
   
   // Collect contraction coefficients. Loop over exponents
   for(size_t iexp=0;iexp<expsv.n_elem;iexp++) {
@@ -430,18 +449,6 @@ void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int 
 	iish++;
       }
   }
-
-  /*
-  // Get overlap of primitives
-  arma::mat S=overlap(expsv,expsv,am);
-  
-  // Compute overlap of functions. First normalize
-  arma::mat genc(coeffs);
-  for(size_t i=0;i<genc.n_cols;i++)
-    genc.col(i)/=sqrt(arma::as_scalar(arma::trans(genc.col(i))*S*genc.col(i)));
-  arma::mat covl=arma::trans(genc)*S*genc;
-  covl.print("Contraction overlap");
-  */
 }
 
 int ElementBasisSet::get_max_am() const {
@@ -703,7 +710,7 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
   arma::vec exps;
   arma::mat coeffs;
   get_primitives(exps,coeffs,am);
-  
+
   // Find indices of free functions
   std::vector<size_t> freex, freec;
   for(size_t iexp=0;iexp<exps.n_elem;iexp++) {
@@ -712,11 +719,11 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
     for(size_t ic=0;ic<coeffs.n_cols;ic++)
       if(coeffs(iexp,ic)!=0.0)
 	icontr.push_back(ic);
-    
+      
     // Loop over contractions to check for free functions
     for(size_t ic=0;ic<icontr.size();ic++) {
       // Check if any other exponents appear in the contraction
-      arma::vec ch=coeffs.col(icontr[ic]);
+      arma::vec ch=arma::abs(coeffs.col(icontr[ic]));
       // Set to zero and check norm
       ch(iexp)=0.0;
       if(arma::dot(ch,ch) == 0.0) {
@@ -727,12 +734,14 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
       }
     }
   }
-
+  if(freex.size()>exps.size())
+    throw std::runtime_error("Something has gone awry.\n");
+  
   // Collect free functions
   zfree.zeros(freex.size());
   for(size_t i=0;i<freex.size();i++)
     zfree(i)=exps(freex[i]);
-  
+
   // Collect generally contracted exponents and their coefficients
   zgen.zeros(exps.n_elem-freex.size());
   cgen.zeros(zgen.n_elem,coeffs.n_cols-freec.size());
@@ -745,7 +754,7 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
       if(iexp == freex[i])
 	free=true;
     if(free) continue;
-    
+
     // Store exponent
     zgen(ix)=exps(iexp);
     
@@ -1117,13 +1126,15 @@ void ElementBasisSet::augment(int naug) {
   sort();
 }
 
-void ElementBasisSet::merge(double cutoff, bool verbose) {
+void ElementBasisSet::merge(double cutoff, bool verbose, bool coulomb) {
   // Pruned exponents
   std::vector<arma::vec> exps(get_max_am()+1);
   for(int am=0;am<=get_max_am();am++) {
     // Get exponents
     arma::mat contr;
     get_primitives(exps[am],contr,am);
+    if(!exps[am].n_elem)
+      continue;
 
     // Get contractions
     arma::vec zfree, zgen;
@@ -1136,7 +1147,8 @@ void ElementBasisSet::merge(double cutoff, bool verbose) {
     // Prune the exponents
     while(true) {
       // Compute overlap matrix
-      arma::mat S=overlap(exps[am],exps[am],am);
+      int Sam = coulomb ? am-1 : am;
+      arma::mat S=overlap(exps[am],exps[am],Sam);
       // Remove diagonal part
       S-=arma::eye(S.n_rows,S.n_cols);
       
@@ -1176,8 +1188,10 @@ void ElementBasisSet::merge(double cutoff, bool verbose) {
 
 	if(rowcontr && !colcontr) {
 	  // Drop col idx
-	  if(verbose)
+	  if(verbose) {
 	    printf("%-2s: %c exponents %e and %e with overlap %e, dropped free primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](icol));
+	    fflush(stdout);
+	  }
 
 	  std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
 	  merged.erase(merged.begin()+icol);
@@ -1185,8 +1199,10 @@ void ElementBasisSet::merge(double cutoff, bool verbose) {
 	  dropped=true;
 	} else if(!rowcontr && colcontr) {
 	  // Drop row idx
-	  if(verbose)
+	  if(verbose) {
 	    printf("%-2s: %c exponents %e and %e with overlap %e, dropped free primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](irow));
+	    fflush(stdout);
+	  }
 	  
 	  std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
 	  merged.erase(merged.begin()+irow);
@@ -1195,8 +1211,10 @@ void ElementBasisSet::merge(double cutoff, bool verbose) {
 	}
 	
       } else if(roworig && !colorig) {
-	if(verbose)
+	if(verbose) {
 	  printf("%-2s: %c exponents %e and %e with overlap %e, dropped merged primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](icol));
+	  fflush(stdout);
+	}
 	
 	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
 	merged.erase(merged.begin()+icol);
@@ -1205,8 +1223,10 @@ void ElementBasisSet::merge(double cutoff, bool verbose) {
 	
       } else if(!roworig && colorig) {
 	// Drop row idx
-	if(verbose)
+	if(verbose) {
 	  printf("%-2s: %c exponents %e and %e with overlap %e, dropped merged primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](irow));
+	  fflush(stdout);
+	}
 	
 	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
 	merged.erase(merged.begin()+irow);
@@ -1219,8 +1239,10 @@ void ElementBasisSet::merge(double cutoff, bool verbose) {
 	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
 	merged[irow]=sqrt(exps[am](irow)*exps[am](icol));
 	merged[icol]=merged[irow];
-	if(verbose)
+	if(verbose) {
 	  printf("%-2s: merged %c exponents %e and %e with overlap %e to %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,merged[icol]);
+	  fflush(stdout);
+	}
 	
 	// Remove second value
 	merged.erase(merged.begin()+irow);
