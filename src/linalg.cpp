@@ -34,11 +34,11 @@ void sort_eigvec(arma::vec & eigval, arma::cx_mat & eigvec) {
 
 void eig_sym_ordered(arma::vec & eigval, arma::mat & eigvec, const arma::mat & X) {
   eig_sym_ordered_wrk<double>(eigval,eigvec,X);
-} 
+}
 
 void eig_sym_ordered(arma::vec & eigval, arma::cx_mat & eigvec, const arma::cx_mat & X) {
   eig_sym_ordered_wrk< std::complex<double> >(eigval,eigvec,X);
-} 
+}
 
 
 arma::mat CholeskyOrth(const arma::mat & S) {
@@ -202,7 +202,7 @@ void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, b
       Shalf.col(i)=Svec.col(idx)*ss;
       Sinvh.col(i)=Svec.col(idx)/ss;
     }
-  } else {   
+  } else {
     // Symmetric matrices
     Shalf.zeros(Nbf,Nbf);
     Sinvh.zeros(Nbf,Nbf);
@@ -510,16 +510,18 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps, arma::uvec & pivot) 
     arma::vec errs(d(pi));
     // Sort the upcoming errors so that largest one is first
     arma::uvec idx=arma::stable_sort_index(errs.subvec(m,d.n_elem-1),"descend");
-    // Convert indexing and update pivot
-    idx+=m*arma::ones<arma::uvec>(d.n_elem-1-m);
-    pi.subvec(m,d.n_elem-1)=pi(idx);
+
+    // Update the pivot index
+    arma::uvec pisub(pi.subvec(m,d.n_elem-1));
+    pisub=pisub(idx);
+    pi.subvec(m,d.n_elem-1)=pisub;
 
     // Pivot index
     size_t pim=pi(m);
 
     // Compute diagonal element
     L(pim,m)=sqrt(d(pim));
-    
+
     // Off-diagonal elements
     for(size_t i=m+1;i<d.n_elem;i++) {
       size_t pii=pi(i);
@@ -552,14 +554,14 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps) {
 arma::mat incomplete_cholesky(const arma::mat & A, size_t n) {
   if(A.n_rows != A.n_cols)
     throw std::runtime_error("Pivoted Cholesky requires a square matrix!\n");
-  
+
   // Returned matrix
   arma::mat L;
   L.zeros(A.n_rows,n);
-  
+
   // Diagonal element vector
   arma::vec d(arma::diagvec(A));
-  
+
   // Pivot index
   arma::uvec pi(arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem));
 
@@ -568,16 +570,18 @@ arma::mat incomplete_cholesky(const arma::mat & A, size_t n) {
     arma::vec errs(d(pi));
     // Sort the upcoming errors so that largest one is first
     arma::uvec idx=arma::stable_sort_index(errs.subvec(m,d.n_elem-1),"descend");
-    // Convert indexing and update pivot
-    idx+=m*arma::ones<arma::uvec>(d.n_elem-1-m);
-    pi.subvec(m,d.n_elem-1)=pi(idx);
-    
+
+    // Update the pivot index
+    arma::uvec pisub(pi.subvec(m,d.n_elem-1));
+    pisub=pisub(idx);
+    pi.subvec(m,d.n_elem-1)=pisub;
+
     // Pivot index
     size_t pim=pi(m);
-    
+
     // Compute diagonal element
     L(pim,m)=sqrt(d(pim));
-    
+
     // Off-diagonal elements
     for(size_t i=m+1;i<d.n_elem;i++) {
       size_t pii=pi(i);
@@ -615,7 +619,7 @@ void check_lapack_thread() {
   // and rerun decomposition
   eig_sym_ordered(eval,evec,M);
   evec.save("seq.dat",arma::raw_ascii);
-      
+
   // Difference matrix
   arma::mat dmat(omp_get_max_threads(),N+1);
   dmat.zeros();
@@ -626,7 +630,7 @@ void check_lapack_thread() {
     arma::vec thval;
     arma::mat thvec;
     eig_sym_ordered(thval,thvec,M);
-    
+
     int ith=omp_get_thread_num();
     std::ostringstream oss;
     oss << "th_" << ith << ".dat";
@@ -638,7 +642,7 @@ void check_lapack_thread() {
     // Eigenvalues
     dmat(ith,N)=arma::norm(thval-eval,2);
   }
-  
+
   //  dmat.print("RMS difference norms");
 
   if(arma::max(arma::max(dmat)) > 1e-8) {
