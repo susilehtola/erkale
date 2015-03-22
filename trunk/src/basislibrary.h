@@ -159,7 +159,7 @@ class ElementBasisSet {
   void P_orthogonalize(double cutoff=1e-8, double Cortho=1e-4);
 
   /// Merge primitives with large overlap (also decontracts basis)
-  void merge(double cutoff=0.9, bool verbose=true);
+  void merge(double cutoff=0.9, bool verbose=true, bool coulomb=false);
 
   /// Get maximum angular momentum used in the shells
   int get_max_am() const;
