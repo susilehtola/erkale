@@ -42,10 +42,8 @@ arma::vec FDHessian::gradient() {
   arma::vec g(npar);
   g.zeros();
 
-#if 0
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
-#endif
 #endif
   for(size_t i=0;i<npar;i++) {
     arma::vec x(npar);
@@ -97,7 +95,7 @@ arma::mat FDHessian::hessian() {
     }
 
 #ifdef _OPENMP
-#pragma omp for schedule(dynamic,1)
+#pragma omp parallel for schedule(dynamic,1)
 #endif
   for(size_t ii=0;ii<idx.size();ii++) {
     size_t i=idx[ii].i;
@@ -492,9 +490,12 @@ double PZStability::eval(const arma::vec & x, int mode) {
       
       // Dummy occupation vector
       std::vector<double> occa(oa,2.0);
-      
+
+      // Work grids for thread safety
+      DFTGrid gridw(grid);
+      DFTGrid nlgridw(nlgrid);
       // Build global Fock operator
-      solverp->Fock_RDFT(tmp,occa,method,grid,nlgrid,focktol);
+      solverp->Fock_RDFT(tmp,occa,method,gridw,nlgridw,focktol);
 
       // Update reference energy
       if(mode==-1)
@@ -530,10 +531,13 @@ double PZStability::eval(const arma::vec & x, int mode) {
       // Dummy matrix
       arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
       
+      // Work grids for thread safety
+      DFTGrid gridw(grid);
+      DFTGrid nlgridw(nlgrid);
       // Build the SI part
       std::vector<arma::mat> Forb;
       arma::vec Eorb;
-      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,nlgrid,false);
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,gridw,nlgridw,false);
 
       if(mode==1) {
 	for(size_t i=0;i<orblist.n_elem;i++)
@@ -592,8 +596,11 @@ double PZStability::eval(const arma::vec & x, int mode) {
       std::vector<double> occa(oa,1.0);
       std::vector<double> occb(ob,1.0);
       
+      // Work grids for thread safety
+      DFTGrid gridw(grid);
+      DFTGrid nlgridw(nlgrid);
       // Build global Fock operator
-      solverp->Fock_UDFT(tmp,occa,occb,method,grid,nlgrid,focktol);
+      solverp->Fock_UDFT(tmp,occa,occb,method,gridw,nlgridw,focktol);
 
       // Update reference energy
       if(mode==-1)
@@ -635,10 +642,13 @@ double PZStability::eval(const arma::vec & x, int mode) {
       // Dummy matrix
       arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
       
+      // Work grids for thread safety
+      DFTGrid gridw(grid);
+      DFTGrid nlgridw(nlgrid);
       // Build the SI part
       std::vector<arma::mat> Forb;
       arma::vec Eorb;
-      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,nlgrid,false);
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,gridw,nlgridw,false);
 
       // Collect energies
       if(mode==1) {
@@ -661,10 +671,13 @@ double PZStability::eval(const arma::vec & x, int mode) {
       // Dummy matrix
       arma::cx_mat Rdum=arma::eye(orblist.n_elem,orblist.n_elem)*COMPLEX1;
       
+      // Work grids for thread safety
+      DFTGrid gridw(grid);
+      DFTGrid nlgridw(nlgrid);
       // Build the SI part
       std::vector<arma::mat> Forb;
       arma::vec Eorb;
-      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,grid,nlgrid,false);
+      solverp->PZSIC_Fock(Forb,Eorb,Ct.cols(orblist),Rdum,method,gridw,nlgridw,false);
       
       // Collect energies
       if(mode==1) {
