@@ -941,7 +941,7 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 	  ERIWorker eri(maxam,maxcontr);
 	  const std::vector<double> * erip;
 
-
+	  
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
@@ -1175,7 +1175,7 @@ arma::cx_mat DensityFit::calc_K(const arma::cx_mat & Corig, const std::vector<do
 	}
 
 	// and symmetrize
-	K(nu,mu)=K(mu,nu);
+	K(nu,mu)=std::conj(K(mu,nu));
       }
 
   } // End loop over orbital blocks
