@@ -348,7 +348,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 	  Pv(idx(i,j))=2.0*P[ip](i,j);
 	Pv(idx(i,i))=P[ip](i,i);
       }
-      
+
       gamma[ip]=a_munu*Pv;
     }
   } else {
@@ -413,7 +413,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 	  }
 	}
       }
-      
+
 #ifdef _OPENMP
 #pragma omp critical
       // Sum results together
@@ -522,7 +522,7 @@ arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
 arma::vec DensityFit::invert_expansion_diag(const arma::vec & xcgamma) const {
   // Compute middle result
   arma::vec xcg=arma::trans(xcgamma)*ab_inv;
-  
+
   // Get vector
   return arma::trans(xcg)*a_mu;
 }
@@ -700,7 +700,7 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
   arma::vec f(3*Nnuc);
   f.zeros();
 
-  // First part: f = *#* 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a  
+  // First part: f = *#* 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -744,18 +744,18 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 	  ders[iid]=0.0;
 	  // Index is
 	  int ic=index[iid];
-	  
+
 	  // Increment force, anuc
 	  erip=deri.getp(ic);
 	  for(size_t iia=0;iia<Na;iia++) {
 	    size_t ia=auxshells[ias].get_first_ind()+iia;
-	    
+
 	    for(size_t iib=0;iib<Nb;iib++) {
 	      size_t ib=auxshells[jas].get_first_ind()+iib;
-	      
+
 	      // The integral is
 	      double res=(*erip)[iia*Nb+iib];
-	      
+
 	      ders[iid]+= res*c(ia)*c(ib);
 	    }
 	  }
@@ -773,7 +773,7 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 #endif
 	}
       }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     // Sum results together
@@ -782,7 +782,7 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
   } // end parallel section
 
 
-  // Second part: f = 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a *#*  
+  // Second part: f = 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a *#*
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -837,7 +837,7 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 	  // Index is
 	  int ic=index[iid];
 	  arma::vec hlp(Na);
-	  
+
 	  erip=deri.getp(ic);
 	  hlp.zeros();
 	  for(size_t iia=0;iia<Na;iia++)
@@ -845,14 +845,14 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 	      size_t imu=orbshells[imus].get_first_ind()+iimu;
 	      for(size_t iinu=0;iinu<Nnu;iinu++) {
 		size_t inu=orbshells[inus].get_first_ind()+iinu;
-		
+
 		// The contracted integral
 		hlp(iia)+=(*erip)[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
 	      }
 	    }
 	  ders[iid]=fac*arma::dot(hlp,ca);
 	}
-	
+
 	// Increment forces
 	for(int ic=0;ic<3;ic++) {
 #ifdef _OPENMP
@@ -868,7 +868,7 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
 
       }
     }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
     // Sum results together
@@ -1020,6 +1020,158 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 	  //	    K(mu,nu)+=occs[orbstart+io]*iuP(io*Nbf+mu,ia)*iuP(io*Nbf+nu,ia);
 
 	  K(mu,nu)+=occs[orbstart+io]*arma::dot(iuP.row(io*Nbf+mu),iuP.row(io*Nbf+nu));
+	}
+
+	// and symmetrize
+	K(nu,mu)=K(mu,nu);
+      }
+
+  } // End loop over orbital blocks
+
+  return K;
+}
+
+arma::cx_mat DensityFit::calc_K(const arma::cx_mat & Corig, const std::vector<double> & occo, size_t memlimit) const {
+  // Compute orbital block size. The memory required for one orbital
+  // is (also need memory for the transformation)
+  const size_t mem1=2*Nbf*Naux;
+  // so the block size is
+  const size_t blocksize=memlimit/(mem1*sizeof(double));
+
+  // Count number of orbitals
+  size_t Nmo=0;
+  for(size_t i=0;i<occo.size();i++)
+    if(occo[i]>0)
+      Nmo++;
+
+  // Number of orbital blocks is thus
+  const size_t Nblocks=(size_t) ceil(Nmo*1.0/blocksize);
+
+  // Collect orbitals to use
+  arma::cx_mat C(Nbf,Nmo);
+  std::vector<double> occs(Nmo);
+  {
+    size_t io=0;
+    for(size_t i=0;i<occo.size();i++)
+      if(occo[i]>0) {
+	// Store orbital and occupation number
+	C.col(io)=Corig.col(i);
+	occs[io]=occo[i];
+	io++;
+      }
+  }
+
+  // Three-center integrals \f $(i \mu|P)$ \f
+  arma::cx_mat iuP(blocksize*Nbf,Naux);
+  iuP.zeros();
+
+  // Returned matrix
+  arma::cx_mat K(Nbf,Nbf);
+  K.zeros();
+
+  // Loop over orbital blocks
+  for(size_t iblock=0;iblock<Nblocks;iblock++) {
+
+    // Starting orbital index in the current block
+    size_t orbstart=iblock*blocksize;
+    // How many orbitals in the current block
+    size_t Norb=std::min(blocksize,Nmo);
+
+    //    printf("Orbitals %i - %i\n",(int) orbstart+1,(int) (orbstart+Norb));
+
+    if(direct) {
+      // Loop over basis function pairs
+      for(size_t ip=0;ip<orbpairs.size();ip++) {
+	size_t imus=orbpairs[ip].is;
+	size_t inus=orbpairs[ip].js;
+
+	// Parallellize auxiliary loop to avoid critical sections.
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+	{
+	  ERIWorker eri(maxam,maxcontr);
+	  const std::vector<double> * erip;
+
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+	  for(size_t ias=0;ias<auxshells.size();ias++) {
+
+	    // Amount of functions on shells
+	    size_t Na=auxshells[ias].get_Nbf();
+	    size_t Nmu=orbshells[imus].get_Nbf();
+	    size_t Nnu=orbshells[inus].get_Nbf();
+
+	    // Compute (a|mn)
+	    eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	    erip=eri.getp();
+
+	    // Increment iuP. Loop over auxiliary functions.
+	    for(size_t iia=0;iia<Na;iia++) {
+	      size_t ia=auxshells[ias].get_first_ind()+iia;
+
+	      // Loop over functions on the mu shell
+	      for(size_t imu=0;imu<Nmu;imu++) {
+		size_t mu=orbshells[imus].get_first_ind()+imu;
+
+		// Loop over orbitals
+		for(size_t io=0;io<Norb;io++)
+
+		  // Loop over functions on the nu shell
+		  for(size_t inu=0;inu<Nnu;inu++) {
+		    size_t nu=orbshells[inus].get_first_ind()+inu;
+
+		    iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*(*erip)[(iia*Nmu+imu)*Nnu+inu];
+		  }
+	      }
+	    }
+
+	    // Account for integral symmetry
+	    if(imus!=inus) {
+	      for(size_t iia=0;iia<Na;iia++) {
+		size_t ia=auxshells[ias].get_first_ind()+iia;
+
+		for(size_t imu=0;imu<Nmu;imu++) {
+		  size_t mu=orbshells[imus].get_first_ind()+imu;
+
+		  for(size_t io=0;io<Norb;io++)
+
+		    for(size_t inu=0;inu<Nnu;inu++) {
+		      size_t nu=orbshells[inus].get_first_ind()+inu;
+
+		      iuP(io*Nbf+nu,ia)+=C(mu,orbstart+io)*(*erip)[(iia*Nmu+imu)*Nnu+inu];
+		    }
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    } else {
+      // Loop over functions
+      for(size_t mu=0;mu<Nbf;mu++)
+	for(size_t io=0;io<Norb;io++)
+	  for(size_t nu=0;nu<Nbf;nu++)
+	    for(size_t ia=0;ia<Naux;ia++)
+	      iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu(ia,idx(mu,nu));
+    }
+
+    // Plug in the half inverse, so iuP -> BiuQ
+    iuP=iuP*ab_invh;
+
+    // Increment the exchange matrix. Loop over functions
+    for(size_t mu=0;mu<Nbf;mu++)
+      for(size_t nu=0;nu<=mu;nu++) {
+
+	// Compute the matrix element
+	for(size_t io=0;io<Norb;io++) {
+	  // Kuv -> BiuQ*BivQ
+	  //  	  for(size_t ia=0;ia<Naux;ia++)
+	  //	    K(mu,nu)+=occs[orbstart+io]*iuP(io*Nbf+mu,ia)*iuP(io*Nbf+nu,ia);
+
+	  K(mu,nu)+=occs[orbstart+io]*arma::cdot(iuP.row(io*Nbf+mu),iuP.row(io*Nbf+nu));
 	}
 
 	// and symmetrize

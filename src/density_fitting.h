@@ -144,6 +144,8 @@ class DensityFit {
 
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::mat calc_K(const arma::mat & C, const std::vector<double> & occs, size_t memlimit) const;
+  /// Get exchange matrix from orbitals with occupation numbers occs
+  arma::cx_mat calc_K(const arma::cx_mat & C, const std::vector<double> & occs, size_t memlimit) const;
 
   /// Get the number of orbital functions
   size_t get_Norb() const;

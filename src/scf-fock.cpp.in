@@ -96,8 +96,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   if(densityfit) {
 
 #ifdef DFT
-  if(omega!=0.0)
-    throw std::runtime_error("Density fitting not implemented for range separated functionals.\n");
+    if(omega!=0.0)
+      throw std::runtime_error("Density fitting not implemented for range separated functionals.\n");
 #endif
 
     if(verbose) {
@@ -122,10 +122,29 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       }
 
 #ifdef RESTRICTED
-      Kfull=dfit.calc_K(sol.C,occs,fitmem);
+      if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
+	// Complex exchange matrix is
+	arma::cx_mat cK(dfit.calc_K(sol.cC,occs,fitmem));
+	Kfull=arma::real(cK);
+	Kfull_im=arma::imag(cK);
+      } else
+	Kfull=dfit.calc_K(sol.C,occs,fitmem);
 #else
-      Kafull=dfit.calc_K(sol.Ca,occa,fitmem);
-      Kbfull=dfit.calc_K(sol.Cb,occb,fitmem);
+      if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
+	// Complex exchange matrix is
+	arma::cx_mat cKa(dfit.calc_K(sol.cCa,occa,fitmem));
+	Kafull=arma::real(cKa);
+	Kafull_im=arma::imag(cKa);
+      } else
+	Kafull=dfit.calc_K(sol.Ca,occa,fitmem);
+
+      if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
+	// Complex exchange matrix is
+	arma::cx_mat cKb(dfit.calc_K(sol.cCb,occb,fitmem));
+	Kbfull=arma::real(cKb);
+	Kbfull_im=arma::imag(cKb);
+      } else
+	Kbfull=dfit.calc_K(sol.Cb,occb,fitmem);
 #endif
 
       if(verbose) {
@@ -155,7 +174,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  // Complex density matrix is
 	  arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
 	  arma::cx_mat cK;
-	  
+
 	  if(!decfock) {
 	    scr.calcJK(cP,sol.J,cK,tol);
 	  } else {
@@ -167,7 +186,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	    sol.J=arma::trans(decconv)*sol.J*decconv;
 	    cK=arma::trans(decconv)*cK*decconv;
 	  }
-	  
+
 	  Kfull=arma::real(cK);
 	  Kfull_im=arma::imag(cK);
 	} else {
@@ -183,7 +202,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	    Kfull=arma::trans(decconv)*Kfull*decconv;
 	  }
 	}
-	
+
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  fflush(stdout);
@@ -224,7 +243,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  // Complex density matrix is
 	  arma::cx_mat cP(sol.P*COMPLEX1 + sol.P_im*COMPLEXI);
 	  arma::cx_mat cK;
-	  
+
 	  if(!decfock) {
 	    cK=scr_rs.calcK(cP,tol);
 	  } else {
@@ -235,7 +254,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	    // Convert back to contracted basis
 	    cK=arma::trans(decconv)*cK*decconv;
 	  }
-	  
+
 	  Kshort=arma::real(cK);
 	  Kshort_im=arma::imag(cK);
 
@@ -276,7 +295,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
 	  arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
 	  arma::cx_mat cKa, cKb;
-	  
+
 	  if(!decfock) {
 	    scr.calcJK(cPa,cPb,sol.J,cKa,cKb,tol);
 	  } else {
@@ -290,7 +309,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	    cKa=arma::trans(decconv)*cKa*decconv;
 	    cKb=arma::trans(decconv)*cKb*decconv;
 	  }
-	  
+
 	  Kafull=arma::real(cKa);
 	  Kafull_im=arma::imag(cKa);
 	  Kbfull=arma::real(cKb);
@@ -311,7 +330,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	    Kbfull=arma::trans(decconv)*Kbfull*decconv;
 	  }
 	}
-	
+
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  fflush(stdout);
@@ -355,7 +374,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  arma::cx_mat cPa(sol.Pa*COMPLEX1 + sol.Pa_im*COMPLEXI);
 	  arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
 	  arma::cx_mat cKa, cKb;
-	  
+
 	  if(!decfock) {
 	    scr_rs.calcK(cPa,cPb,cKa,cKb,tol);
 	  } else {
@@ -368,7 +387,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	    cKa=arma::trans(decconv)*cKa*decconv;
 	    cKb=arma::trans(decconv)*cKb*decconv;
 	  }
-	  
+
 	  Kashort=arma::real(cKa);
 	  Kashort_im=arma::imag(cKa);
 	  Kbshort=arma::real(cKb);
@@ -442,7 +461,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  Kafull_im=arma::imag(cKa);
 	} else
 	  Kafull=tab.calcK(sol.Pa);
-	
+
 	if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
 	  // Complex density matrix is
 	  arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
@@ -488,7 +507,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  Kashort_im=arma::imag(cKa);
 	} else
 	  Kashort=tab_rs.calcK(sol.Pa);
-	
+
 	if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
 	  // Complex density matrix is
 	  arma::cx_mat cPb(sol.Pb*COMPLEX1 + sol.Pb_im*COMPLEXI);
@@ -509,7 +528,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 
 #ifdef DFT
-// Combine short and long range exchanges
+  // Combine short and long range exchanges
 #ifdef RESTRICTED
   sol.K=kfull*Kfull + kshort*Kshort;
   if(sol.P.n_rows == sol.P_im.n_rows && sol.P.n_cols == sol.P_im.n_cols)
@@ -522,7 +541,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.Ka_im=kfull*Kafull_im + kshort*Kashort_im;
   else
     sol.Ka_im.clear();
-  
+
   sol.Kb=kfull*Kbfull + kshort*Kbshort;
   if(sol.Pb.n_rows == sol.Pb_im.n_rows && sol.Pb.n_cols == sol.Pb_im.n_cols)
     sol.Kb_im=kfull*Kbfull_im + kshort*Kbshort_im;
