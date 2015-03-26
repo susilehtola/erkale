@@ -1036,7 +1036,7 @@ arma::cx_mat DensityFit::calc_K(const arma::cx_mat & Corig, const std::vector<do
   // is (also need memory for the transformation)
   const size_t mem1=2*Nbf*Naux;
   // so the block size is
-  const size_t blocksize=memlimit/(mem1*sizeof(double));
+  const size_t blocksize=memlimit/(mem1*sizeof(std::complex<double>));
 
   // Count number of orbitals
   size_t Nmo=0;
