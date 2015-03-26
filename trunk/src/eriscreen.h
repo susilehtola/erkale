@@ -85,8 +85,8 @@ class ERIscreen {
 
   /// Calculate Coulomb matrix with tolerance tol for integrals
   arma::mat calcJ(const arma::mat & P, double tol) const;
-  /// Calculate set of Coulomb matrices with tolerance tol for integrals (for PZ-SIC)
-  std::vector<arma::mat> calcJ(const std::vector<arma::mat> & P, double tol) const;
+  /// Calculate set of Coulomb and exchange matrices with tolerance tol for integrals (for PZ-SIC)
+  std::vector<arma::mat> calcJK(const std::vector<arma::mat> & P, double jfrac, double kfrac, double tol) const;
 
   /// Calculate exchange matrix with tolerance tol for integrals
   arma::mat calcK(const arma::mat & P, double tol) const;
