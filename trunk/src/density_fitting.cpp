@@ -911,7 +911,6 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 
   // Three-center integrals \f $(i \mu|P)$ \f
   arma::mat iuP(blocksize*Nbf,Naux);
-  iuP.zeros();
 
   // Returned matrix
   arma::mat K(Nbf,Nbf);
@@ -919,6 +918,7 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
 
   // Loop over orbital blocks
   for(size_t iblock=0;iblock<Nblocks;iblock++) {
+    iuP.zeros();
 
     // Starting orbital index in the current block
     size_t orbstart=iblock*blocksize;
@@ -1063,7 +1063,6 @@ arma::cx_mat DensityFit::calc_K(const arma::cx_mat & Corig, const std::vector<do
 
   // Three-center integrals \f $(i \mu|P)$ \f
   arma::cx_mat iuP(blocksize*Nbf,Naux);
-  iuP.zeros();
 
   // Returned matrix
   arma::cx_mat K(Nbf,Nbf);
@@ -1071,6 +1070,7 @@ arma::cx_mat DensityFit::calc_K(const arma::cx_mat & Corig, const std::vector<do
 
   // Loop over orbital blocks
   for(size_t iblock=0;iblock<Nblocks;iblock++) {
+    iuP.zeros();
 
     // Starting orbital index in the current block
     size_t orbstart=iblock*blocksize;
