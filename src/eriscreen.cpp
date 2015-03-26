@@ -558,42 +558,61 @@ void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::m
       delete p[i][j];
 }
 
-std::vector<arma::mat> ERIscreen::calcJ(const std::vector<arma::mat> & P, double tol) const {
+std::vector<arma::mat> ERIscreen::calcJK(const std::vector<arma::mat> & P, double jfrac, double kfrac, double tol) const {
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
   int nth=1;
 #endif
 
+  bool doj(jfrac!=0.0);
+  bool dok(kfrac!=0.0);
+  
   // Get workers
   std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
   for(int i=0;i<nth;i++) {
-    // Every thread holds copies of all the orbital matrices
-    p[i].resize(P.size());
-    for(size_t j=0;j<P.size();j++)
-      p[i][j]=new JDigestor(P[j]);
+    if(doj) {
+      for(size_t j=0;j<P.size();j++)
+	p[i].push_back(new JDigestor(P[j]));
+    }
+    if(dok) {
+      for(size_t j=0;j<P.size();j++)
+	p[i].push_back(new KDigestor(P[j]));
+    }
   }
 
   // Do calculation
   calculate(p,tol);
 
   // Collect results
-  std::vector<arma::mat> J(P.size());
-  for(size_t j=0;j<P.size();j++) {
-    J[j]=((JDigestor *) p[0][j])->get_J();
-    for(int i=1;i<nth;i++)
-      J[j]+=((JDigestor *) p[i][j])->get_J();
-  }
+  std::vector<arma::mat> JK(P.size());
+  for(size_t i=0;i<JK.size();i++)
+    JK[i].zeros(P[i].n_rows,P[i].n_cols);
 
+  size_t joff=0;
+  if(doj) {
+    for(size_t j=0;j<P.size();j++)
+      for(int i=0;i<nth;i++)
+	JK[j]+=jfrac*((JDigestor *) p[i][j+joff])->get_J();
+    joff+=P.size();
+  }
+  // Exchange contribution
+  if(dok) {
+    for(size_t j=0;j<P.size();j++)
+      for(int i=0;i<nth;i++)
+	JK[j]+=kfrac*((KDigestor *) p[i][j+joff])->get_K();
+    joff+=P.size();
+  }
+  
   // Free memory
   for(size_t i=0;i<p.size();i++)
     for(size_t j=0;j<p[i].size();j++)
       delete p[i][j];
   
-  return J;
+  return JK;
 }
 
 arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
