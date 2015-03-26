@@ -468,7 +468,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       }
 
       // Full exchange
-      if(kfull) {
+      if(kfull!=0.0) {
 	if(verbose) {
 	  if(fock)
 	    printf("Constructing orbital exchange matrices ... ");
@@ -480,7 +480,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
 	  // Fock matrix
-	  arma::mat Korb=kshort*tab.calcK(Porb[io]);
+	  arma::mat Korb=kfull*tab.calcK(Porb[io]);
 	  // and energy
 	  Eorb[io]+=0.5*arma::trace(Porb[io]*Korb);
 	  if(fock)
@@ -494,7 +494,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       }
       
       // Short-range part
-      if(kshort) {
+      if(kshort!=0.0) {
 	if(verbose) {
 	  if(fock)
 	    printf("Constructing orbital short-range exchange matrices ... ");
@@ -517,6 +517,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	  fflush(stdout);
 	}
       }
+
     } else {
       // Compute range separated integrals if necessary
       if(is_range_separated(dft.x_func)) {
@@ -573,7 +574,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       }
       
       // Short-range part
-      if(kshort) {
+      if(kshort!=0.0) {
 	if(verbose) {
 	  if(fock)
 	    printf("Constructing orbital short-range exchange matrices ... ");
@@ -590,7 +591,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	    // Coulomb energy is
 	    Eorb[io]+=0.5*arma::trace(Porb[io]*Korb[io]);
 	    if(fock)
-	      Forb[io]+=kshort*Korb[io];
+	      Forb[io]+=Korb[io];
 	  }
 	}
 
