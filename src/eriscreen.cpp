@@ -603,7 +603,7 @@ std::vector<arma::mat> ERIscreen::calcJK(const std::vector<arma::mat> & P, doubl
   if(dok) {
     for(size_t j=0;j<P.size();j++)
       for(int i=0;i<nth;i++)
-	JK[j]+=kfrac*((KDigestor *) p[i][j+joff])->get_K();
+	JK[j]-=kfrac*((KDigestor *) p[i][j+joff])->get_K();
     joff+=P.size();
   }
   
