@@ -558,7 +558,7 @@ void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::m
       delete p[i][j];
 }
 
-std::vector<arma::mat> ERIscreen::calcJK(const std::vector<arma::mat> & P, double jfrac, double kfrac, double tol) const {
+std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P, double jfrac, double kfrac, double tol) const {
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -576,11 +576,11 @@ std::vector<arma::mat> ERIscreen::calcJK(const std::vector<arma::mat> & P, doubl
   for(int i=0;i<nth;i++) {
     if(doj) {
       for(size_t j=0;j<P.size();j++)
-	p[i].push_back(new JDigestor(P[j]));
+	p[i].push_back(new JDigestor(arma::real(P[j])));
     }
     if(dok) {
       for(size_t j=0;j<P.size();j++)
-	p[i].push_back(new KDigestor(P[j]));
+	p[i].push_back(new cxKDigestor(P[j]));
     }
   }
 
@@ -588,7 +588,7 @@ std::vector<arma::mat> ERIscreen::calcJK(const std::vector<arma::mat> & P, doubl
   calculate(p,tol);
 
   // Collect results
-  std::vector<arma::mat> JK(P.size());
+  std::vector<arma::cx_mat> JK(P.size());
   for(size_t i=0;i<JK.size();i++)
     JK[i].zeros(P[i].n_rows,P[i].n_cols);
 
@@ -596,14 +596,14 @@ std::vector<arma::mat> ERIscreen::calcJK(const std::vector<arma::mat> & P, doubl
   if(doj) {
     for(size_t j=0;j<P.size();j++)
       for(int i=0;i<nth;i++)
-	JK[j]+=jfrac*((JDigestor *) p[i][j+joff])->get_J();
+	JK[j]+=jfrac*((JDigestor *) p[i][j+joff])->get_J()*COMPLEX1;
     joff+=P.size();
   }
   // Exchange contribution
   if(dok) {
     for(size_t j=0;j<P.size();j++)
       for(int i=0;i<nth;i++)
-	JK[j]-=kfrac*((KDigestor *) p[i][j+joff])->get_K();
+	JK[j]-=kfrac*((cxKDigestor *) p[i][j+joff])->get_K();
     joff+=P.size();
   }
   
