@@ -482,9 +482,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	  // Fock matrix
 	  arma::mat Korb=kfull*tab.calcK(Porb[io]);
 	  // and energy
-	  Eorb[io]+=0.5*arma::trace(Porb[io]*Korb);
+	  Eorb[io]-=0.5*arma::trace(Porb[io]*Korb);
 	  if(fock)
-	    Forb[io]+=Korb;
+	    Forb[io]-=Korb;
 	}
 	
 	if(verbose) {
@@ -507,9 +507,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
 	  // Potential and energy
 	  arma::mat Korb=kshort*tab_rs.calcK(Porb[io]);
-	  Eorb[io]+=0.5*arma::trace(Porb[io]*Korb);
+	  Eorb[io]-=0.5*arma::trace(Porb[io]*Korb);
 	  if(fock)
-	    Forb[io]+=Korb;
+	    Forb[io]-=Korb;
 	}
 
 	if(verbose) {
@@ -561,7 +561,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       {
 	std::vector<arma::mat> JKorb=scr.calcJK(Porb,1.0,kfull,intthr);
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Coulomb energy is
+	  // Coulomb-exchange energy is
 	  Eorb[io]=0.5*arma::trace(Porb[io]*JKorb[io]);
 	  if(fock)
 	    Forb[io]=JKorb[io];
@@ -588,19 +588,19 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	{
 	  std::vector<arma::mat> Korb=scr_rs.calcJK(Porb,0.0,kshort,intthr);
 	  for(size_t io=0;io<Ctilde.n_cols;io++) {
-	    // Coulomb energy is
+	    // Short-range exchange energy is (sign already accounted for)
 	    Eorb[io]+=0.5*arma::trace(Porb[io]*Korb[io]);
 	    if(fock)
 	      Forb[io]+=Korb[io];
 	  }
 	}
-
+	
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  fflush(stdout);
 	}
       }
-}
+    }
   }
   
   // Exchange-correlation
