@@ -92,8 +92,6 @@ class DensityFit {
 
   /// Integrals \f$ ( \alpha | \mu \nu) \f$
   arma::mat a_munu;
-  /// Integrals \f$ ( \alpha | \mu \mu) \f$ (needed for xc fitting)
-  arma::mat a_mu;
 
   /// \f$ ( \alpha | \beta) \f$
   arma::mat ab;
@@ -128,11 +126,6 @@ class DensityFit {
   arma::vec compute_expansion(const arma::mat & P) const;
   /// Compute expansion coefficients c
   std::vector<arma::vec> compute_expansion(const std::vector<arma::mat> & P) const;
-
-  /// Invert expansion (needed for XC fitting)
-  arma::mat invert_expansion(const arma::vec & gamma) const;
-  /// Invert only the diagonal of the expansion
-  arma::vec invert_expansion_diag(const arma::vec & gamma) const;
 
   /// Get Coulomb matrix from P
   arma::mat calc_J(const arma::mat & P) const;

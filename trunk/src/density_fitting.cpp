@@ -127,35 +127,6 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
     ab_inv=arma::inv(ab + DELTA*arma::eye(ab.n_rows,ab.n_cols));
   }
 
-  // Then, compute the diagonal integrals
-  a_mu.zeros(Naux,Nbf);
-  {
-    ERIWorker eri(maxam,maxcontr);
-    const std::vector<double> * erip;
-
-    for(size_t ia=0;ia<auxshells.size();ia++)
-      for(size_t imu=0;imu<orbshells.size();imu++) {
-	// Amount of functions
-	size_t Na=auxshells[ia].get_Nbf();
-	size_t Nmu=orbshells[imu].get_Nbf();
-
-	// Compute (a|uu)
-	eri.compute(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[imu]);
-	erip=eri.getp();
-
-	// Store integrals
-	for(size_t af=0;af<Na;af++) {
-	  size_t inda=auxshells[ia].get_first_ind()+af;
-
-	  for(size_t muf=0;muf<Nmu;muf++) {
-	    size_t indmu=orbshells[imu].get_first_ind()+muf;
-
-	    a_mu(inda,indmu)=(*erip)[(af*Nmu+muf)*Nmu+muf];
-	  }
-	}
-      }
-  }
-
   // Then, compute the three-center integrals
   if(!direct) {
     a_munu.zeros(Naux,Nbf*(Nbf+1)/2);
@@ -438,93 +409,6 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
   }
 
   return gamma;
-}
-
-arma::mat DensityFit::invert_expansion(const arma::vec & xcgamma) const {
-  arma::mat H(Nbf,Nbf);
-  H.zeros();
-
-  // Compute middle result
-  arma::vec xcg=arma::trans(xcgamma)*ab_inv;
-
-  // Compute Fock matrix elements
-  if(!direct) {
-    // Get vector
-    arma::vec Hv(arma::trans(xcg)*a_munu);
-    // and unpack it
-    for(size_t imu=0;imu<Nbf;imu++) {
-      for(size_t inu=0;inu<imu;inu++) {
-	double el=Hv(idx(imu,inu));
-	H(imu,inu)+=el;
-	H(inu,imu)+=el;
-      }
-      double el=Hv(idx(imu,imu));
-      H(imu,imu)+=el;
-    }
-  } else {
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-
-      ERIWorker eri(maxam,maxcontr);
-      const std::vector<double> * erip;
-
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic)
-#endif
-      for(size_t ip=0;ip<orbpairs.size();ip++)
-	for(size_t ias=0;ias<auxshells.size();ias++) {
-
-	  size_t imus=orbpairs[ip].is;
-	  size_t inus=orbpairs[ip].js;
-
-	  size_t Na=auxshells[ias].get_Nbf();
-	  size_t Nmu=orbshells[imus].get_Nbf();
-	  size_t Nnu=orbshells[inus].get_Nbf();
-
-	  double symfac=1.0;
-	  if(imus==inus)
-	    symfac=0.0;
-
-	  // Compute (a|mn)
-	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-	  erip=eri.getp();
-
-	  // Increment H
-	  for(size_t iia=0;iia<Na;iia++) {
-	    // Account for orbital functions at the beginning of the basis set
-	    size_t ia=auxshells[ias].get_first_ind()+iia;
-
-	    for(size_t iimu=0;iimu<Nmu;iimu++) {
-	      size_t imu=orbshells[imus].get_first_ind()+iimu;
-
-	      for(size_t iinu=0;iinu<Nnu;iinu++) {
-		size_t inu=orbshells[inus].get_first_ind()+iinu;
-
-		// Contract result
-		double tmp=(*erip)[(iia*Nmu+iimu)*Nnu+iinu]*xcg(ia);
-
-		H(imu,inu)+=tmp;
-		// Need to symmetrize?
-		H(inu,imu)+=symfac*tmp;
-	      }
-	    }
-	  }
-	}
-    }
-  }
-
-  return H;
-}
-
-arma::vec DensityFit::invert_expansion_diag(const arma::vec & xcgamma) const {
-  // Compute middle result
-  arma::vec xcg=arma::trans(xcgamma)*ab_inv;
-
-  // Get vector
-  return arma::trans(xcg)*a_mu;
 }
 
 arma::mat DensityFit::calc_J(const arma::mat & P) const {
