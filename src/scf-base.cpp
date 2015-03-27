@@ -364,7 +364,7 @@ Checkpoint *SCF::get_checkpoint() const {
   return chkptp;
 }
 
-void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock) {
+void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock) {
   // Compute the orbital-dependent Fock matrices
   Eorb.resize(W.n_cols);
   if(fock)
@@ -377,9 +377,13 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
   // Optimal orbitals
   arma::cx_mat Ctilde=C.cols(0,W.n_rows-1)*W;
   // Orbital density matrices
+  std::vector<arma::cx_mat> Pcorb(Ctilde.n_cols);
+  for(size_t io=0;io<Ctilde.n_cols;io++)
+    Pcorb[io]=Ctilde.col(io)*arma::trans(Ctilde.col(io));
+
   std::vector<arma::mat> Porb(Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
-    Porb[io]=arma::real(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+    Porb[io]=arma::real(Pcorb[io]);
 
   Timer t;
   
@@ -405,7 +409,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
       Eorb[io]=0.5*arma::trace(Porb[io]*Jorb[io]);
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
-	Forb[io]=Jorb[io];
+	Forb[io]=Jorb[io]*COMPLEX1;
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
@@ -459,7 +463,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	// and Coulomb energy
 	Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
 	if(fock)
-	  Forb[io]=Jorb;
+	  Forb[io]=Jorb*COMPLEX1;
       }
 
       if(verbose) {
@@ -480,9 +484,9 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
 	  // Fock matrix
-	  arma::mat Korb=kfull*tab.calcK(Porb[io]);
+	  arma::cx_mat Korb=kfull*tab.calcK(Pcorb[io]);
 	  // and energy
-	  Eorb[io]-=0.5*arma::trace(Porb[io]*Korb);
+	  Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
 	  if(fock)
 	    Forb[io]-=Korb;
 	}
@@ -506,8 +510,8 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
 	  // Potential and energy
-	  arma::mat Korb=kshort*tab_rs.calcK(Porb[io]);
-	  Eorb[io]-=0.5*arma::trace(Porb[io]*Korb);
+	  arma::cx_mat Korb=kshort*tab_rs.calcK(Pcorb[io]);
+	  Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
 	  if(fock)
 	    Forb[io]-=Korb;
 	}
@@ -559,10 +563,10 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 
       // Calculate Coulomb and exchange terms
       {
-	std::vector<arma::mat> JKorb=scr.calcJK(Porb,1.0,kfull,intthr);
+	std::vector<arma::cx_mat> JKorb=scr.calcJK(Pcorb,1.0,kfull,intthr);
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
 	  // Coulomb-exchange energy is
-	  Eorb[io]=0.5*arma::trace(Porb[io]*JKorb[io]);
+	  Eorb[io]=0.5*std::real(arma::trace(Pcorb[io]*JKorb[io]));
 	  if(fock)
 	    Forb[io]=JKorb[io];
 	}
@@ -586,10 +590,10 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
 	
 	// Calculate exchange term
 	{
-	  std::vector<arma::mat> Korb=scr_rs.calcJK(Porb,0.0,kshort,intthr);
+	  std::vector<arma::cx_mat> Korb=scr_rs.calcJK(Pcorb,0.0,kshort,intthr);
 	  for(size_t io=0;io<Ctilde.n_cols;io++) {
 	    // Short-range exchange energy is (sign already accounted for)
-	    Eorb[io]+=0.5*arma::trace(Porb[io]*Korb[io]);
+	    Eorb[io]+=0.5*std::real(arma::trace(Pcorb[io]*Korb[io]));
 	    if(fock)
 	      Forb[io]+=Korb[io];
 	  }
@@ -656,7 +660,7 @@ void SCF::PZSIC_Fock(std::vector<arma::mat> & Forb, arma::vec & Eorb, const arma
     // and the Fock matrix
     if(fock)
       for(size_t io=0;io<Ctilde.n_cols;io++)
-	Forb[io]+=XC[io];
+	Forb[io]+=XC[io]*COMPLEX1;
   }
 }
 
