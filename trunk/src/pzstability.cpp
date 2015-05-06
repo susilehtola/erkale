@@ -23,7 +23,7 @@
 #include "timer.h"
 #include "mathf.h"
 
-// Mode to evaluate gradient and hessian in: 0 for full calculation, 1 for wrt reference
+// Mode to evaluate gradient and hessian in: 0 for full calculation, 1 for wrt reference. (-1 inside eval is for reference update)
 #define GHMODE 1
 
 FDHessian::FDHessian() {
@@ -581,7 +581,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
 	// Rotate orbitals
 	tmp.cCa=tmp.cCa*Rova;
 	tmp.cCb=tmp.cCb*Rovb;
-      
+	
 	// Update density matrix
 	tmp.Pa=arma::real(tmp.cCa.cols(0,oa-1)*arma::trans(tmp.cCa.cols(0,oa-1)));
 	tmp.Pb=arma::real(tmp.cCb.cols(0,ob-1)*arma::trans(tmp.cCb.cols(0,ob-1)));
@@ -626,7 +626,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
     arma::vec Eoa(ref_Eoa), Eob(ref_Eob);
 
     // Do we need to do anything for the oo part?
-    if(chkorba.size() || mode == 0 || mode == -1) {
+    if(chkorba.size() && (mode == 0 || mode == -1)) {
       // Collect list of changed occupied orbitals
       arma::uvec orblist(arma::sort(arma::conv_to<arma::uvec>::from(chkorba)));
       
@@ -652,7 +652,7 @@ double PZStability::eval(const arma::vec & x, int mode) {
 	  ref_Eoa=Eorb;
       }
     }
-    if(chkorbb.size() || mode == 0 || mode == -1) {
+    if(chkorbb.size() && (mode == 0 || mode == -1)) {
       // Collect list of changed occupied orbitals
       arma::uvec orblist(arma::sort(arma::conv_to<arma::uvec>::from(chkorbb)));
       
@@ -956,8 +956,9 @@ void PZStability::set(const uscf_t & sol, const arma::uvec & dropa, const arma::
   Checkpoint *chkptp=solverp->get_checkpoint();
   arma::cx_mat CWa, CWb;
   chkptp->cread("CWa",CWa);
-  chkptp->cread("CWb",CWb);
-
+  if(chkptp->exist("CWb"))
+    chkptp->cread("CWb",CWb);
+  
   chkptp->read(basis);
   grid=DFTGrid(&basis,true,method.lobatto);
   nlgrid=DFTGrid(&basis,true,method.lobatto);
@@ -965,7 +966,8 @@ void PZStability::set(const uscf_t & sol, const arma::uvec & dropa, const arma::
   // Update solution
   usol=sol;
   usol.cCa.cols(0,CWa.n_cols-1)=CWa;
-  usol.cCb.cols(0,CWb.n_cols-1)=CWb;
+  if(CWb.n_cols)
+    usol.cCb.cols(0,CWb.n_cols-1)=CWb;
 
   // Drop orbitals
   if(!cancheck) {
