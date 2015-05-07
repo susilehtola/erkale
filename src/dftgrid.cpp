@@ -353,6 +353,24 @@ void AngularGrid::free() {
   VV10_arr.clear();
 }
 
+arma::uvec AngularGrid::screen_density(double thr) const {
+  // List of points
+  std::vector<size_t> idx;
+  // Loop over grid
+  if(!polarized) {
+    for(size_t i=0;i<grid.size();i++)
+      if(rho(i)>=thr)
+	idx.push_back(i);
+  } else {
+    for(size_t i=0;i<grid.size();i++)
+      if(rho(2*i)+rho(2*i+1)>=thr)
+	idx.push_back(i);
+  }
+  
+  return arma::conv_to<arma::uvec>::from(idx);
+}
+
+  
 void AngularGrid::update_density(const arma::mat & P0) {
   // Update values of densitty
 
@@ -1277,6 +1295,9 @@ void AngularGrid::eval_Fxc(arma::mat & Ho) const {
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
+  // Screen quadrature points by small densities
+  arma::uvec screen(screen_density());
+
   // Work matrix
   arma::mat H(bf_ind.n_elem,bf_ind.n_elem);
   H.zeros();
@@ -1287,7 +1308,7 @@ void AngularGrid::eval_Fxc(arma::mat & Ho) const {
     // Multiply weights into potential
     vrho%=w;
     // Increment matrix
-    increment_lda<double>(H,vrho,bf);
+    increment_lda<double>(H,vrho,bf,screen);
   }
 
   if(do_gga) {
@@ -1301,7 +1322,7 @@ void AngularGrid::eval_Fxc(arma::mat & Ho) const {
       for(size_t ic=0;ic<gr.n_cols;ic++)
 	gr(i,ic)=2.0*w(i)*vs(i)*gr(i,ic);
     // Increment matrix
-    increment_gga<double>(H,gr,bf,bf_x,bf_y,bf_z);
+    increment_gga<double>(H,gr,bf,bf_x,bf_y,bf_z,screen);
   }
 
   if(do_mgga) {
@@ -1313,10 +1334,10 @@ void AngularGrid::eval_Fxc(arma::mat & Ho) const {
     vl%=w;
     
     // Evaluate kinetic contribution
-    increment_mgga_kin<double>(H,0.5*vt + 2.0*vl,bf_x,bf_y,bf_z);
+    increment_mgga_kin<double>(H,0.5*vt + 2.0*vl,bf_x,bf_y,bf_z,screen);
     
     // Evaluate laplacian contribution. Get function laplacian
-    increment_mgga_lapl<double>(H,vl,bf,bf_lapl);
+    increment_mgga_lapl<double>(H,vl,bf,bf_lapl,screen);
   }
 
   Ho(bf_ind,bf_ind)+=H;
@@ -1381,6 +1402,9 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
   }
 
+  // Screen quadrature points by small densities
+  arma::uvec screen(screen_density());
+  
   arma::mat Ha(bf_ind.n_elem,bf_ind.n_elem);
   Ha.zeros();
   arma::mat Hb;
@@ -1393,12 +1417,12 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     // Multiply weights into potential
     vrhoa%=w;
     // Increment matrix
-    increment_lda<double>(Ha,vrhoa,bf);
+    increment_lda<double>(Ha,vrhoa,bf,screen);
 
     if(beta) {
       arma::rowvec vrhob(vxc.row(1));
       vrhob%=w;
-      increment_lda<double>(Hb,vrhob,bf);
+      increment_lda<double>(Hb,vrhob,bf,screen);
     }
   }
 
@@ -1419,7 +1443,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
       for(size_t ic=0;ic<gr_a.n_cols;ic++)
 	gr_a(i,ic)=w(i)*(2.0*vs_aa(i)*gr_a0(i,ic) + vs_ab(i)*gr_b0(i,ic));
     // Increment matrix
-    increment_gga<double>(Ha,gr_a,bf,bf_x,bf_y,bf_z);
+    increment_gga<double>(Ha,gr_a,bf,bf_x,bf_y,bf_z,screen);
 
     if(beta) {
       arma::rowvec vs_bb(vsigma.row(2));
@@ -1427,7 +1451,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
       for(size_t i=0;i<gr_b.n_rows;i++)
 	for(size_t ic=0;ic<gr_b.n_cols;ic++)
 	  gr_b(i,ic)=w(i)*(2.0*vs_bb(i)*gr_b0(i,ic) + vs_ab(i)*gr_a0(i,ic));
-      increment_gga<double>(Hb,gr_b,bf,bf_x,bf_y,bf_z);
+      increment_gga<double>(Hb,gr_b,bf,bf_x,bf_y,bf_z,screen);
     }
   }
 
@@ -1441,18 +1465,18 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     vl_a%=w;
     
     // Evaluate kinetic contribution
-    increment_mgga_kin<double>(Ha,0.5*vt_a + 2.0*vl_a,bf_x,bf_y,bf_z);
+    increment_mgga_kin<double>(Ha,0.5*vt_a + 2.0*vl_a,bf_x,bf_y,bf_z,screen);
     
     // Evaluate laplacian contribution. Get function laplacian
-    increment_mgga_lapl<double>(Ha,vl_a,bf,bf_lapl);
+    increment_mgga_lapl<double>(Ha,vl_a,bf,bf_lapl,screen);
     
     if(beta) {
       arma::rowvec vt_b(vtau.row(1));
       arma::rowvec vl_b(vlapl.row(1));
       vt_b%=w;
       vl_b%=w;
-      increment_mgga_kin<double>(Hb,0.5*vt_b + 2.0*vl_b,bf_x,bf_y,bf_z);
-      increment_mgga_lapl<double>(Hb,vl_b,bf,bf_lapl);
+      increment_mgga_kin<double>(Hb,0.5*vt_b + 2.0*vl_b,bf_x,bf_y,bf_z,screen);
+      increment_mgga_lapl<double>(Hb,vl_b,bf,bf_lapl,screen);
     }
   }
 

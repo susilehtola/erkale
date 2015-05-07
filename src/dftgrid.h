@@ -333,6 +333,9 @@ class AngularGrid {
   /// Free memory
   void free();
 
+  /// Screen wrt small density, returns list of points with nonnegligible values
+  arma::uvec screen_density(double thr=1e-16) const;
+
   /// Update values of density, restricted calculation
   void update_density(const arma::mat & P);
   /// Update values of density, unrestricted calculation
@@ -537,8 +540,27 @@ template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & v
   H+=fhlp*arma::trans(f);
 }
 
+/// Same but with density-based screening
+template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & vxc, const arma::Mat<T> & f, const arma::uvec & screen) {
+  if(f.n_cols != vxc.n_elem) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+  }
+  if(H.n_rows != f.n_rows || H.n_cols != f.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
+  }
+  
+  // Form helper matrix
+  arma::Mat<T> fhlp(f);
+  for(size_t i=0;i<fhlp.n_rows;i++)
+    for(size_t j=0;j<fhlp.n_cols;j++)
+      fhlp(i,j)*=vxc(j);
+  H+=fhlp.cols(screen)*arma::trans(f.cols(screen));
+}
+
 /// BLAS routine for GGA-type quadrature
-template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, const arma::Mat<T> & f, arma::Mat<T> f_x, arma::Mat<T> f_y, arma::Mat<T> f_z) {
+template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, const arma::Mat<T> & f, arma::Mat<T> f_x, arma::Mat<T> f_y, arma::Mat<T> f_z, const arma::uvec & screen) {
   if(gn.n_cols!=3) {
     ERROR_INFO();
     throw std::runtime_error("Grad rho must have three columns!\n");
@@ -583,19 +605,19 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
   }
   
   // Form Fock matrix
-  H+=gamma*arma::trans(f) + f*arma::trans(gamma);
+  H+=gamma.cols(screen)*arma::trans(f.cols(screen)) + f.cols(screen)*arma::trans(gamma.cols(screen));
 }
 
 /// BLAS routine for meta-GGA kinetic energy type quadrature
-template<typename T> void increment_mgga_kin(arma::Mat<T> & H, const arma::rowvec & vtaul, const arma::Mat<T> & f_x, const arma::Mat<T> & f_y, const arma::Mat<T> & f_z) {
+template<typename T> void increment_mgga_kin(arma::Mat<T> & H, const arma::rowvec & vtaul, const arma::Mat<T> & f_x, const arma::Mat<T> & f_y, const arma::Mat<T> & f_z, const arma::uvec & screen) {
   // This is equivalent to LDA incrementation on the three components!
-  increment_lda<T>(H,vtaul,f_x);
-  increment_lda<T>(H,vtaul,f_y);
-  increment_lda<T>(H,vtaul,f_z);
+  increment_lda<T>(H,vtaul,f_x,screen);
+  increment_lda<T>(H,vtaul,f_y,screen);
+  increment_lda<T>(H,vtaul,f_z,screen);
 }
 
 /// BLAS routine for meta-GGA laplacian type quadrature
-template<typename T> void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowvec & vl, const arma::Mat<T> & f, const arma::Mat<T> & f_lapl) {
+template<typename T> void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowvec & vl, const arma::Mat<T> & f, const arma::Mat<T> & f_lapl, const arma::uvec & screen) {
   if(f.n_rows != f_lapl.n_rows || f.n_cols != f_lapl.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Sizes of basis function and laplacian matrices doesn't match!\n");
@@ -615,7 +637,7 @@ template<typename T> void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowv
     for(size_t j=0;j<fhlp.n_cols;j++)
       fhlp(i,j)*=vl(j);
   // Fock matrix contribution is
-  H+=f_lapl*arma::trans(fhlp) + fhlp*arma::trans(f_lapl);
+  H+=f_lapl.cols(screen)*arma::trans(fhlp.cols(screen)) + fhlp.cols(screen)*arma::trans(f_lapl.cols(screen));
 }
 
 #endif
