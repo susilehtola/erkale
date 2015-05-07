@@ -334,7 +334,7 @@ class AngularGrid {
   void free();
 
   /// Screen wrt small density, returns list of points with nonnegligible values
-  arma::uvec screen_density(double thr=1e-16) const;
+  arma::uvec screen_density(double thr=1e-10) const;
 
   /// Update values of density, restricted calculation
   void update_density(const arma::mat & P);
