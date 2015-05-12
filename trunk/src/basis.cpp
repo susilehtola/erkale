@@ -2947,7 +2947,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::colvec & oldE, co
     // Set new coordinates
     transbas.shells[i].set_center(nuclei[idx].r,idx);
   }
-  transbas.finalize();
+  transbas.finalize(false,false);
 
   // Translated energies and orbitals
   arma::mat tMOs;
