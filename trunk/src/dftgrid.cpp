@@ -572,7 +572,7 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
   for(size_t i=0;i<bf_ind.n_elem;i++)
     C(i)=C0(bf_ind(i));
     
-  arma::cx_vec Cv=arma::strans(C)*bf;
+  arma::cx_rowvec Cv=arma::strans(C)*bf;
   // Store densities
   rho.zeros(2,grid.size());
   for(size_t ip=0;ip<grid.size();ip++)
@@ -584,9 +584,9 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
     sigma.zeros(3,grid.size());
 
     // Compute orbital gradient
-    arma::cx_vec Cv_x=arma::strans(C)*bf_x;
-    arma::cx_vec Cv_y=arma::strans(C)*bf_y;
-    arma::cx_vec Cv_z=arma::strans(C)*bf_z;
+    arma::cx_rowvec Cv_x=arma::strans(C)*bf_x;
+    arma::cx_rowvec Cv_y=arma::strans(C)*bf_y;
+    arma::cx_rowvec Cv_z=arma::strans(C)*bf_z;
 
     // Gradient is
     for(size_t ip=0;ip<grid.size();ip++) {
@@ -604,7 +604,7 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
       tau.zeros(2,grid.size());
 
       // Compute orbital laplacian
-      arma::cx_vec Cv_lapl=arma::strans(C)*bf_lapl;
+      arma::cx_rowvec Cv_lapl=arma::strans(C)*bf_lapl;
 
       for(size_t ip=0;ip<grid.size();ip++) {
 	// Laplacian term
