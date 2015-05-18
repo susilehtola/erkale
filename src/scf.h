@@ -123,19 +123,13 @@ typedef struct {
   /// KS-XC matrix
   arma::mat XC;
 
-  /// Effective potential
-  arma::mat Heff;
-  arma::mat Heff_im;
-  /// Imaginary exchange
-  arma::mat K_im;
-
   /// Complex orbitals (for SIC)
   arma::cx_mat cC;
-  /// Real-CMO density matrix (used for DIIS with SIC)
-  arma::mat rP;
   /// Imaginary part of complex-CMO density matrix (for complex exchange contribution)
   arma::mat P_im;
-
+  /// Imaginary exchange
+  arma::mat K_im;
+  
   /// Energy information
   energy_t en;
 } rscf_t;
@@ -158,16 +152,11 @@ typedef struct {
   /// KS-XC matrix
   arma::mat XCa, XCb;
 
-  // Effective potentials
-  arma::mat Heffa, Heffb;
-  arma::mat Heffa_im, Heffb_im;
   /// Imaginary exchange
   arma::mat Ka_im, Kb_im;
   
   /// Complex orbitals (for SIC)
   arma::cx_mat cCa, cCb;
-  /// Real-CMO density matrix (for DIIS with SIC)
-  arma::mat rPa, rPb;
   /// Imaginary part of complex-CMO density matrix (for complex exchange contribution)
   arma::mat Pa_im, Pb_im;
   
@@ -187,29 +176,6 @@ enum guess_t {
   /// Generalized Wolfsberg--Helmholz
   GWHGUESS
 };
-
-/// Perdew-Zunger SIC run mode
-enum pzrun {
-  /// No correction.
-  NO,
-  /// Full correction.
-  FULL,
-  /// Full correction but with approximation to real CMOs
-  OLDFULL,
-  /// Perturbative correction, after SCF convergence
-  PERT,
-  /// Full correction with real orbitals
-  REAL,
-  /// Perturbative correction with real orbitals
-  REALPERT,
-  /// Full correction using canonical orbitals (no optimization of SIC energy)
-  CAN,
-  /// Perturbative correction using canonical orbitals
-  CANPERT
-};
-
-// Parse run mode
-enum pzrun parse_pzrun(const std::string & str);
 
 /// Perdew-Zunger SIC mode
 typedef struct {
@@ -339,9 +305,6 @@ class SCF {
   /// List of frozen orbitals by symmetry group. index+1 is symmetry group, group 0 contains all non-frozen orbitals
   std::vector<arma::mat> freeze;
 
-  /// Helper routine for PZ-SIC
-  void PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, enum pzham pzh, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool real);
-
  public:
   /// Constructor
   SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt);
@@ -372,7 +335,7 @@ class SCF {
   void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
-  void PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock);
+  void PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock);
 
   /// Calculate force in restricted Hartree-Fock
   arma::vec force_RHF(rscf_t & sol, const std::vector<double> & occs, double tol);
@@ -384,11 +347,6 @@ class SCF {
   arma::vec force_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol);
   /// Calculate force in unrestricted density-functional theory
   arma::vec force_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol);
-
-  /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, pzmet_t pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
-  /// Perform Perdew-Zunger self-interaction correction
-  void PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, pzmet_t pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical=false, bool localize=true, bool real=false, int seed=0);
 
   /// Set frozen orbitals in ind:th symmetry group. ind+1 is the resulting symmetry group, group 0 contains all non-frozen orbitals
   void set_frozen(const arma::mat & C, size_t ind);

@@ -347,6 +347,8 @@ class PZSIC : public UnitaryFunction {
   double get_ESIC() const;
   /// Get orbital-by-orbital SIC
   arma::vec get_Eorb() const;
+  /// Get orbital Fock matrices
+  std::vector<arma::cx_mat> get_Forb() const;
   /// Get SIC Hamiltonian
   arma::cx_mat get_HSIC();
 };

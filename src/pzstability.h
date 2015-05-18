@@ -25,10 +25,12 @@ class Timer;
 
 
 class FDHessian {
-  /// Step size
-  double ss;
-
  protected:
+  /// Finite difference derivative step size
+  double ss_fd;
+  /// Line search step size
+  double ss_ls;
+  
   /// Print optimization status
   virtual void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
   
@@ -42,18 +44,16 @@ class FDHessian {
   virtual size_t count_params() const=0;
   /// Evaluate function
   virtual double eval(const arma::vec & x)=0;
-  /// Evaluate function
-  virtual double eval(const arma::vec & x, int mode)=0;
   /// Update solution
-  virtual void update(const arma::vec & x);
+  virtual void update(const arma::vec & x, bool ref=true);
 
   /// Evaluate finite difference gradient
-  arma::vec gradient();
+  virtual arma::vec gradient();
   /// Evaluate finite difference Hessian
-  arma::mat hessian();
+  virtual arma::mat hessian();
 
   /// Run optimization
-  void optimize(size_t maxiter=1000, double gthr=1e-5, bool max=false);
+  virtual double optimize(size_t maxiter=1000, double gthr=1e-4, bool max=false);
 };
 
   
@@ -75,17 +75,10 @@ class PZStability: public FDHessian {
   /// or unrestricted
   uscf_t usol;
 
-  /// Use reference to do evaluations?
-  bool useref;
-  /// Reference SCF energy
-  double ref_E0;
-  /// Reference orbital energies
-  arma::vec ref_Eo;
-  /// Reference orbital energies
-  arma::vec ref_Eoa, ref_Eob;
-  
-  /// Complex transformations?
-  bool cplx;
+  /// Real part of transformations?
+  bool real;
+  /// Imaginary part of transformations?
+  bool imag;
   /// Check stability of canonical orbitals?
   bool cancheck;
   /// Check stability of oo block
@@ -98,6 +91,9 @@ class PZStability: public FDHessian {
   /// Amount of virtual orbitals
   size_t va, vb;
 
+  /// Maximum step size
+  double Tmu;
+  
   /// Count amount of parameters for rotations
   size_t count_ov_params(size_t o, size_t v) const;
   /// Count amount of parameters for rotations
@@ -110,22 +106,34 @@ class PZStability: public FDHessian {
   /// Get indices of real and imaginary parameters
   void real_imag_idx(arma::uvec & idxr, arma::uvec & idxi) const;
 
-  /// Get oo rotation matrix
-  arma::cx_mat oo_rotation(const arma::vec & x, bool spin=false) const;
-  /// Get ov rotation matrix
-  arma::cx_mat ov_rotation(const arma::vec & x, bool spin=false) const;
+  /// Calculate rotation matrix
+  arma::cx_mat rotation(const arma::vec & x, bool spin=false) const;
+  /// Form rotation parameter matrix
+  arma::cx_mat rotation_pars(const arma::vec & x, bool spin=false) const;
+  /// Calculate matrix exponential
+  arma::cx_mat matexp(const arma::cx_mat & X) const;
 
+  /// Evaluate analytic gradient
+  arma::vec gradient();
+  /// Evaluate semi-analytic Hessian
+  arma::mat hessian();
+  
+  /// Update step size
+  void update_step(const arma::vec & g);
+  /// Perform quasicanonical diagonalisation
+  void diagonalize();
+  
   /// Evaluate function
   double eval(const arma::vec & x);
-    /// Evaluate function. mode: -1 for reference update, 0 for full
-    /// evaluation, 1 for evaluation wrt a reference
-  double eval(const arma::vec & x, int mode);
   /// Update solution
-  void update(const arma::vec & x);
+  void update(const arma::vec & x, bool ref=true);
 
   /// Print status of optimization
   void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
 
+  /// Print information on solution
+  void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb);
+  
  public:
   /// Constructor
   PZStability(SCF *solver, dft_t method);
@@ -133,12 +141,25 @@ class PZStability: public FDHessian {
   ~PZStability();
 
   /// Set parameters. drop: drop orbitals from calculation. cplx: complex rotations? ov: ov rotations? oo: oo rotations?
-  void set(const rscf_t & sol, const arma::uvec & drop, bool cplx, bool ov, bool oo=true);
+  void set(const rscf_t & sol, const arma::uvec & drop, bool real, bool imag, bool ov, bool oo);
   /// Set parameters. dropa, dropb: drop orbitals from calculation. cplx: complex rotations? ov: ov rotations? oo: oo rotations?
-  void set(const uscf_t & sol, const arma::uvec & dropa, const arma::uvec & dropb, bool cplx, bool ov, bool oo=true);
+  void set(const uscf_t & sol, const arma::uvec & dropa, const arma::uvec & dropb, bool real, bool imag, bool ov, bool oo);
+
+  /// Get updated solution
+  rscf_t get_rsol() const;
+  /// Get updated solution
+  uscf_t get_usol() const;
   
   /// Check stability of solution.
   void check();
+  /// Print out a line search
+  void linesearch();
+
+  /// Print information
+  void print_info();
+
+  /// Run optimization
+  virtual double optimize(size_t maxiter=1000, double gthr=1e-4, bool max=false);
 };
 
 #endif

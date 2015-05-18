@@ -83,12 +83,12 @@ std::vector<gridpoint_t> AngularGrid::get_grid() const {
 
 void AngularGrid::lobatto_shell() {
   // Add points on ind:th radial shell.
-  
+
   // Get parameters of shell
   const double rad(info.R);
   const int l(info.l);
   const double wrad(info.w);
-  
+
   // Number of points in theta
   int nth=(l+3)/2;
 
@@ -311,7 +311,7 @@ void AngularGrid::free() {
   shells.clear();
   bf_ind.clear();
   bf_potind.clear();
-  
+
   // Free values of basis functions
   bf.clear();
   bf_x.clear();
@@ -366,11 +366,11 @@ arma::uvec AngularGrid::screen_density(double thr) const {
       if(rho(2*i)+rho(2*i+1)>=thr)
 	idx.push_back(i);
   }
-  
+
   return arma::conv_to<arma::uvec>::from(idx);
 }
 
-  
+
 void AngularGrid::update_density(const arma::mat & P0) {
   // Update values of densitty
 
@@ -385,7 +385,7 @@ void AngularGrid::update_density(const arma::mat & P0) {
   // Update density vector
   arma::mat P(P0.submat(bf_ind,bf_ind));
   Pv=P*bf;
-  
+
   // Calculate density
   rho.zeros(1,grid.size());
   for(size_t ip=0;ip<grid.size();ip++) {
@@ -394,7 +394,7 @@ void AngularGrid::update_density(const arma::mat & P0) {
       d+=Pv(j,ip)*bf(j,ip);
     rho(0,ip)=d;
   }
-  
+
   // Calculate gradient
   if(do_grad) {
     grho.zeros(3,grid.size());
@@ -409,7 +409,7 @@ void AngularGrid::update_density(const arma::mat & P0) {
 	gy+=Pv(j,ip)*bf_y(j,ip);
 	gz+=Pv(j,ip)*bf_z(j,ip);
       }
-      
+
       // Store values, including the missing factor 2
       grho(0,ip)=2.0*gx;
       grho(1,ip)=2.0*gy;
@@ -461,7 +461,7 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
   // Update density vector
   arma::mat Pa(Pa0.submat(bf_ind,bf_ind));
   arma::mat Pb(Pb0.submat(bf_ind,bf_ind));
-    
+
   Pav=Pa*bf;
   Pbv=Pb*bf;
 
@@ -481,7 +481,7 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
     if(fabs(da-na)>1e-6 || fabs(db-nb)>1e-6)
       printf("Density at point % .3f % .3f % .3f: %e vs %e, %e vs %e\n",grid[ip].r.x,grid[ip].r.y,grid[ip].r.z,da,na,db,nb);
   }
-  
+
   // Calculate gradient
   if(do_grad) {
     grho.zeros(6,grid.size());
@@ -496,12 +496,12 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
 	gax+=Pav(j,ip)*bf_x(j,ip);
 	gay+=Pav(j,ip)*bf_y(j,ip);
 	gaz+=Pav(j,ip)*bf_z(j,ip);
-	
+
 	gbx+=Pbv(j,ip)*bf_x(j,ip);
 	gby+=Pbv(j,ip)*bf_y(j,ip);
 	gbz+=Pbv(j,ip)*bf_z(j,ip);
       }
-      
+
       // Store values ang put in the missing factor 2
       grho(0,ip)=2.0*gax;
       grho(1,ip)=2.0*gay;
@@ -546,7 +546,7 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
 	lapb+=Pbv(j,ip)*bf_lapl(j,ip);
 	gradb+=Pbv_x(j,ip)*bf_x(j,ip) + Pbv_y(j,ip)*bf_y(j,ip) + Pbv_z(j,ip)*bf_z(j,ip);
       }
-      
+
       // Store values
       lapl(0,ip)=2.0*(lapa+grada);
       lapl(1,ip)=2.0*(lapb+gradb);
@@ -571,7 +571,7 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
   arma::cx_vec C(bf_ind.n_elem);
   for(size_t i=0;i<bf_ind.n_elem;i++)
     C(i)=C0(bf_ind(i));
-    
+
   arma::cx_rowvec Cv=arma::strans(C)*bf;
   // Store densities
   rho.zeros(2,grid.size());
@@ -593,11 +593,11 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
       grho(0,ip)=2.0*std::real(Cv_x(ip) * std::conj(Cv(ip)));
       grho(1,ip)=2.0*std::real(Cv_y(ip) * std::conj(Cv(ip)));
       grho(2,ip)=2.0*std::real(Cv_z(ip) * std::conj(Cv(ip)));
-      
+
       // Compute values of sigma
       sigma(0,ip) =std::pow(grho(0,ip),2) + std::pow(grho(1,ip),2) + std::pow(grho(2,ip),2);
     }
-    
+
     if(do_lapl) {
       // Adjust size of grid
       lapl.zeros(2,grid.size());
@@ -626,7 +626,7 @@ void AngularGrid::get_density(std::vector<dens_list_t> & list) const {
     ERROR_INFO();
     throw std::runtime_error("get_density() is supposed to be called with a non-polarized grid!\n");
   }
-  
+
   for(size_t ip=0;ip<grid.size();ip++) {
     dens_list_t hlp;
     hlp.d=rho(0,ip);
@@ -644,7 +644,7 @@ double AngularGrid::compute_Nel() const {
   else
     for(size_t ip=0;ip<grid.size();ip++)
       nel+=w(ip)*(rho(0,ip)+rho(1,ip));
-  
+
   return nel;
 }
 
@@ -679,7 +679,7 @@ void AngularGrid::init_xc() {
       vtau.zeros(2,N);
     }
   }
-  
+
   // Initial values
   do_gga=false;
   do_mgga=false;
@@ -737,7 +737,7 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   vsigma_wrk.zeros();
   vlapl_wrk.zeros();
   vtau_wrk.zeros();
-  
+
   // Spin variable for libxc
   int nspin;
   if(!polarized)
@@ -837,7 +837,7 @@ void AngularGrid::init_VV10(double b, double C, bool pot) {
 void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
   // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
   // Return array contains: nPhi, U, and W
-  
+
   if(xc.n_cols !=5) {
     ERROR_INFO();
     throw std::runtime_error("xc matrix has the wrong size.\n");
@@ -853,14 +853,14 @@ void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
   // Loop
   for(size_t i=0;i<xc.n_rows;i++) {
     double nPhi=0.0, U=0.0, W=0.0;
-    
+
     for(size_t j=0;j<nl.n_rows;j++) {
       // Distance between the grid points
       double dx=xc(i,0)-nl(j,0);
       double dy=xc(i,1)-nl(j,1);
       double dz=xc(i,2)-nl(j,2);
       double Rsq=dx*dx + dy*dy + dz*dz;
-      
+
       // g factors
       double gi=xc(i,3)*Rsq + xc(i,4);
       double gj=nl(j,3)*Rsq + nl(j,4);
@@ -873,7 +873,7 @@ void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
       double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
       // Absorb grid point weight and density into kernel
       Phi *= nl(j,5) * nl(j,6);
-      
+
       // Increment nPhi
       nPhi += Phi;
       // Increment U
@@ -904,11 +904,11 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
   if(ret.n_rows != xc.n_rows || ret.n_cols != 6) {
     throw std::runtime_error("Error - invalid size output array!\n");
   }
-  
+
   // Loop
   for(size_t i=0;i<xc.n_rows;i++) {
     double nPhi=0.0, U=0.0, W=0.0;
-    double fpx=0.0, fpy=0.0, fpz=0.0;    
+    double fpx=0.0, fpy=0.0, fpz=0.0;
 
     for(size_t j=0;j<nl.n_rows;j++) {
       // Distance between the grid points
@@ -929,14 +929,14 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
       double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
       // Absorb grid point weight and density into kernel
       Phi *= nl(j,5) * nl(j,6);
-      
+
       // Increment nPhi
       nPhi += Phi;
       // Increment U
       U    -= Phi * rgis;
       // Increment W
       W    -= Phi * rgis * Rsq;
-      
+
       // Q factor
       double Q = -2.0 * Phi * (xc(i,3)/gi + nl(j,3)/gj + (xc(i,3)+nl(j,3))/gs );
       // Increment force
@@ -960,13 +960,13 @@ void AngularGrid::collect_VV10(arma::mat & data, std::vector<size_t> & idx, doub
     ERROR_INFO();
     throw std::runtime_error("collect_VV10 can only be called in a non-polarized grid!\n");
   }
-  
+
   // Create list of points with significant densities
   idx.clear();
   for(size_t i=0;i<grid.size();i++)
     if(rho(0,i) >= VV10_thr)
       idx.push_back(i);
-  
+
   // Create input datas
   if(nl)
     data.zeros(idx.size(),7);
@@ -1000,7 +1000,7 @@ void AngularGrid::compute_VV10(const std::vector<arma::mat> & nldata, double b, 
     ERROR_INFO();
     throw std::runtime_error("compute_VV10 should be run in non-polarized mode!\n");
   }
-  
+
   Timer t;
 
   // Create list of points with significant densities and input data
@@ -1021,12 +1021,12 @@ void AngularGrid::compute_VV10(const std::vector<arma::mat> & nldata, double b, 
   VV10_arr.zeros(xc.n_rows,3);
   for(size_t i=0;i<nldata.size();i++)
     VV10_Kernel(xc,nldata[i],VV10_arr);
-  
+
   // Collect data
   for(size_t ii=0;ii<idx.size();ii++) {
     // Index of grid point is
     size_t i=idx[ii];
-    
+
     // Increment the energy density
     exc[i] += 0.5 * VV10_arr(ii,0);
 
@@ -1062,7 +1062,7 @@ arma::vec AngularGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, con
   std::vector<size_t> idx;
   arma::mat xc;
   collect_VV10(xc, idx, b, C, false);
-  
+
   // Calculate integral kernels
   VV10_arr.zeros(xc.n_rows,6);
   for(size_t i=0;i<nldata.size();i++)
@@ -1080,14 +1080,14 @@ arma::vec AngularGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, con
 
   // Evaluate force contribution
   double fx=0.0, fy=0.0, fz=0.0;
-  
+
   for(size_t ii=0;ii<idx.size();ii++) {
     // Index of grid point is
     size_t i=idx[ii];
-    
+
     // Increment the energy density
     exc[i] += 0.5 * VV10_arr(ii,0);
-    
+
     // Increment LDA and GGA parts of potential.
     double ri=rho(0,i);
     double ri4=std::pow(ri,4);
@@ -1104,12 +1104,12 @@ arma::vec AngularGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, con
     fy += grid[i].w*rho(0,i)*VV10_arr(ii,4);
     fz += grid[i].w*rho(0,i)*VV10_arr(ii,5);
   }
-  
+
   arma::vec F(3);
   F(0)=fx;
   F(1)=fy;
   F(2)=fz;
-  
+
   return F;
 }
 
@@ -1185,7 +1185,7 @@ libxc_dens_t AngularGrid::get_dens(size_t idx) const {
       ret.sigmaaa=ret.sigmaab=ret.sigmabb=sigma(0,idx)/4.0;
     }
   }
-    
+
   if(do_mgga) {
     if(polarized) {
       ret.lapla=lapl(0,idx);
@@ -1244,7 +1244,7 @@ libxc_pot_t AngularGrid::get_pot(size_t idx) const {
       ret.vsigmaaa=ret.vsigmaab=ret.vsigmabb=vsigma(0,idx)/4.0;
     }
   }
-    
+
   if(do_mgga) {
     if(polarized) {
       ret.vlapla=vlapl(0,idx);
@@ -1332,10 +1332,10 @@ void AngularGrid::eval_Fxc(arma::mat & Ho) const {
     // Scale both with weights
     vt%=w;
     vl%=w;
-    
+
     // Evaluate kinetic contribution
     increment_mgga_kin<double>(H,0.5*vt + 2.0*vl,bf_x,bf_y,bf_z,screen);
-    
+
     // Evaluate laplacian contribution. Get function laplacian
     increment_mgga_lapl<double>(H,vl,bf,bf_lapl,screen);
   }
@@ -1404,7 +1404,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
 
   // Screen quadrature points by small densities
   arma::uvec screen(screen_density());
-  
+
   arma::mat Ha(bf_ind.n_elem,bf_ind.n_elem);
   Ha.zeros();
   arma::mat Hb;
@@ -1436,7 +1436,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     arma::uvec idxb(arma::linspace<arma::uvec>(3,5,3));
     arma::mat gr_a0(arma::trans(grho.rows(idxa)));
     arma::mat gr_b0(arma::trans(grho.rows(idxb)));
-    
+
     // Multiply grad rho by vsigma and the weights
     arma::mat gr_a(gr_a0);
     for(size_t i=0;i<gr_a.n_rows;i++)
@@ -1459,17 +1459,17 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     // Get vtau and vlapl
     arma::rowvec vt_a(vtau.row(0));
     arma::rowvec vl_a(vlapl.row(0));
-    
+
     // Scale both with weights
     vt_a%=w;
     vl_a%=w;
-    
+
     // Evaluate kinetic contribution
     increment_mgga_kin<double>(Ha,0.5*vt_a + 2.0*vl_a,bf_x,bf_y,bf_z,screen);
-    
+
     // Evaluate laplacian contribution. Get function laplacian
     increment_mgga_lapl<double>(Ha,vl_a,bf,bf_lapl,screen);
-    
+
     if(beta) {
       arma::rowvec vt_b(vtau.row(1));
       arma::rowvec vl_b(vlapl.row(1));
@@ -1516,7 +1516,7 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
     arma::uvec idxb(arma::linspace<arma::uvec>(3,5,3));
     arma::mat gra0(arma::trans(grho.rows(idxa)));
     arma::mat grb0(arma::trans(grho.rows(idxb)));
-    
+
     // Multiply grad rho by vsigma and the weights
     arma::mat gra(gra0);
     for(size_t i=0;i<gra.n_rows;i++)
@@ -1526,7 +1526,7 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
     for(size_t ip=0;ip<grid.size();ip++)
       for(size_t j=0;j<bf.n_rows;j++)
 	Ha(bf_potind(j))+=2.0 * (gra(ip,0)*bf_x(j,ip) + gra(ip,1)*bf_y(j,ip) + gra(ip,2)*bf_z(j,ip)) * bf(j,ip);
-    
+
     arma::mat grb(grb0);
     for(size_t i=0;i<grb.n_rows;i++)
       for(size_t ic=0;ic<grb.n_cols;ic++)
@@ -1575,25 +1575,25 @@ arma::vec AngularGrid::eval_force(const arma::mat & Pa, const arma::mat & Pb) co
 
   // Get functions in basis set
   std::vector<GaussianShell> gshells=basp->get_shells();
-    
+
   // Loop over nuclei
   for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
 
     // LDA part. Loop over grid
     for(size_t ip=0;ip<grid.size();ip++) {
-      
+
       // Grad rho in current point
       arma::rowvec gradrhoa(3);
       gradrhoa.zeros();
       arma::rowvec gradrhob(3);
       gradrhob.zeros();
-      
+
       // Loop over shells on the nucleus
       for(size_t iish=0;iish<shells.size();iish++) {
 	if(basp->get_shell_center_ind(shells[iish]) != inuc)
 	  continue;
 	size_t ish=shells[iish];
-	
+
 	// First function on shell is
 	size_t mu0=gshells[ish].get_first_ind();
 
@@ -1604,12 +1604,12 @@ arma::vec AngularGrid::eval_force(const arma::mat & Pa, const arma::mat & Pb) co
 	for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
 	  // Function index is
 	  size_t mu=mu0+imu;
-	  
+
 	  // Loop over the functions on the grid point
 	  for(size_t inu=0;inu<bf_ind.size();inu++) {
 	    // Get index of function
 	    size_t nu(bf_ind(inu));
-	    
+
 	    gradrhoa+=Pa(mu,nu)*grad.row(imu)*bf(inu,ip);
 	    gradrhob+=Pb(mu,nu)*grad.row(imu)*bf(inu,ip);
 	  }
@@ -1642,7 +1642,7 @@ arma::vec AngularGrid::eval_force(const arma::mat & Pa, const arma::mat & Pb) co
 	// Loop over shells on the nucleus
 	for(size_t iish=0;iish<shells.size();iish++) {
 	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	    continue; 
+	    continue;
 	  size_t ish=shells[iish];
 
 	  // First function on shell is
@@ -1712,7 +1712,7 @@ arma::vec AngularGrid::eval_force(const arma::mat & Pa, const arma::mat & Pb) co
 	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
 	    continue;
 	  size_t ish=shells[iish];
-	  
+
 	  // First function on shell is
 	  size_t mu0=gshells[ish].get_first_ind();
 
@@ -1873,7 +1873,7 @@ arma::vec AngularGrid::eval_force(const arma::mat & P) const {
 	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
 	    continue;
 	  size_t ish=shells[iish];
-	
+
 	  // First function on shell is
 	  size_t mu0=gshells[ish].get_first_ind();
 
@@ -1979,7 +1979,7 @@ arma::vec AngularGrid::eval_force(const arma::mat & P) const {
 	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
 	    continue;
 	  size_t ish=shells[iish];
-	  
+
 	  // First function on shell is
 	  size_t mu0=gshells[ish].get_first_ind();
 
@@ -2002,7 +2002,7 @@ arma::vec AngularGrid::eval_force(const arma::mat & P) const {
 	  }
 	}
 	z*=2.0;
-	
+
 	// Increment total force
 	f.subvec(3*inuc,3*inuc+2)+=grid[ip].w*vlapl[ip]*z;
       }
@@ -2045,8 +2045,8 @@ angshell_t AngularGrid::construct() {
   // Return the updated info structure, holding the amount of grid
   // points and function values
   return info;
-} 
-  
+}
+
 angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_func) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells
@@ -2054,7 +2054,7 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
 
   // Start with
   info.l=3;
-  
+
   if(x_func == 0 && c_func == 0) {
     // No exchange or correlation!
     return info;
@@ -2075,7 +2075,7 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
   // Initialize vectors
   Hold.zeros(pot_bf_ind.n_elem);
   Hnew.zeros(pot_bf_ind.n_elem);
-  
+
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
 
@@ -2098,10 +2098,10 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
 
     // Compute maximum difference of diagonal elements of Fock matrix
     maxdiff=arma::max(arma::abs(Hold-Hnew));
-    
+
     // Switch contents
     std::swap(Hold,Hnew);
-    
+
     // Increment order if tolerance not achieved.
     if(maxdiff>ftoler) {
       if(use_lobatto)
@@ -2132,7 +2132,7 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
     // No exchange or correlation!
     return info;
   }
-  
+
   // Update shell list size
   form_grid();
   if(!info.nfunc)
@@ -2158,7 +2158,7 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
     form_grid();
     // Compute density
     update_density(Pa,Pb);
-    
+
     // Compute exchange and correlation.
     init_xc();
     // Compute the functionals
@@ -2173,11 +2173,11 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
 
     // Compute maximum difference of diagonal elements of Fock matrix
     maxdiff=std::max(arma::max(arma::abs(Haold-Hanew)),arma::max(arma::abs(Hbold-Hbnew)));
-    
+
     // Copy contents
     std::swap(Haold,Hanew);
     std::swap(Hbold,Hbnew);
-    
+
     // Increment order if tolerance not achieved.
     if(maxdiff>ftoler) {
       if(use_lobatto) {
@@ -2203,12 +2203,12 @@ angshell_t AngularGrid::construct(const arma::cx_vec & C, double ftoler, int x_f
 
   // Start with
   info.l=3;
-  
+
   if(x_func == 0 && c_func == 0) {
     // No exchange or correlation!
     return info;
   }
-  
+
   // Update shell list size
   form_grid();
   if(!info.nfunc)
@@ -2247,10 +2247,10 @@ angshell_t AngularGrid::construct(const arma::cx_vec & C, double ftoler, int x_f
 
     // Compute maximum difference of diagonal elements of Fock matrix
     maxdiff=arma::max(arma::abs(Hold-Hnew));
-    
+
     // Copy contents
     std::swap(Hold,Hnew);
-    
+
     // Increment order if tolerance not achieved.
     if(maxdiff>ftoler) {
       if(use_lobatto)
@@ -2282,7 +2282,7 @@ angshell_t AngularGrid::construct_becke(double otoler) {
   if(!info.nfunc)
     // No points!
     return info;
-  
+
   // Determine limit for angular quadrature
   int lmax=(int) ceil(2.0-3.0*log10(otoler));
 
@@ -2297,17 +2297,17 @@ angshell_t AngularGrid::construct_becke(double otoler) {
   do {
     // Form grid
     form_grid();
-    
+
     // Compute new overlap
     Snew.zeros();
     eval_diag_overlap(Snew);
-    
+
     // Compute maximum difference of diagonal elements
     maxdiff=arma::max(arma::abs(Snew-Sold));
-    
+
     // Copy contents
     std::swap(Snew,Sold);
-    
+
     // Increment order if tolerance not achieved.
     if(maxdiff>otoler) {
       if(use_lobatto)
@@ -2333,13 +2333,13 @@ angshell_t AngularGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otol
 
   // Start with
   info.l=3;
-  
+
   // Update shell list size
   form_grid();
   if(!info.nfunc)
     // No points!
     return info;
-  
+
   // Determine limit for angular quadrature
   int lmax=(int) ceil(2.0-3.0*log10(otoler));
 
@@ -2354,17 +2354,17 @@ angshell_t AngularGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otol
   do {
     // Form the grid
     form_hirshfeld_grid(hirsh);
-    
+
     // Compute new overlap
     Snew.zeros();
     eval_diag_overlap(Snew);
-    
+
     // Compute maximum difference of diagonal elements
     maxdiff=arma::max(arma::abs(Snew-Sold));
-    
+
     // Copy contents
     std::swap(Snew,Sold);
-    
+
     // Increment order if tolerance not achieved.
     if(maxdiff>otoler) {
       if(use_lobatto)
@@ -2386,7 +2386,7 @@ angshell_t AngularGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otol
 void AngularGrid::form_grid() {
   // Clear anything that already exists
   free();
-  
+
   // Add grid points
   if(use_lobatto)
     lobatto_shell();
@@ -2399,7 +2399,7 @@ void AngularGrid::form_grid() {
   prune_points();
   // Collect weights
   get_weights();
-  
+
   // Update shell list
   update_shell_list();
   // Compute basis functions
@@ -2409,7 +2409,7 @@ void AngularGrid::form_grid() {
 void AngularGrid::form_hirshfeld_grid(const Hirshfeld & hirsh) {
   // Clear anything that already exists
   free();
-  
+
   // Add grid points
   if(use_lobatto)
     lobatto_shell();
@@ -2422,7 +2422,7 @@ void AngularGrid::form_hirshfeld_grid(const Hirshfeld & hirsh) {
   prune_points();
   // Collect weights
   get_weights();
-  
+
   // Update shell list
   update_shell_list();
   // Compute basis functions
@@ -2434,7 +2434,7 @@ void AngularGrid::update_shell_list() {
   std::vector<double> shran=basp->get_shell_ranges();
   // Distances to other nuclei
   std::vector<double> nucdist=basp->get_nuclear_distances(info.atind);
-  
+
   // Current radius
   double rad=info.R;
   // Shells that might contribute, and the amount of functions
@@ -2446,7 +2446,7 @@ void AngularGrid::update_shell_list() {
     double dist=fabs(nucdist[inuc]-rad);
     // Get indices of shells centered on nucleus
     std::vector<size_t> shellinds=basp->get_shell_inds(inuc);
-    
+
     // Loop over shells on nucleus
     for(size_t ish=0;ish<shellinds.size();ish++) {
       // Shell is relevant if range is larger than minimal distance
@@ -2477,7 +2477,7 @@ void AngularGrid::update_shell_list() {
 void AngularGrid::compute_bf() {
   // Create list of shells that actually contribute. Shell ranges
   std::vector<double> shran=basp->get_shell_ranges();
-  
+
   shells.clear();
   size_t Nbf=0;
   for(size_t is=0;is<pot_shells.size();is++) {
@@ -2532,7 +2532,7 @@ void AngularGrid::compute_bf() {
 
   // Store number of function values
   info.nfunc=Nbf*grid.size();
-  
+
   bf.zeros(bf_ind.n_elem,grid.size());
   // Loop over points
   for(size_t ip=0;ip<grid.size();ip++) {
@@ -2584,10 +2584,10 @@ DFTGrid::DFTGrid() {
 DFTGrid::DFTGrid(const BasisSet * bas, bool ver, bool lobatto) {
   basp=bas;
   verbose=ver;
-  
+
   // Allocate atomic grids
   grids.resize(bas->get_Nnuc());
-  
+
   // Allocate work grids
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
@@ -2632,7 +2632,7 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool strict, b
   for(size_t i=0;i<wrk.size();i++) {
     wrk[i].set_grad_lapl(grad,lapl);
   }
-  
+
   // Set grid point screening tolerances
   double tol=strict ? 0.0 : DBL_EPSILON;
 
@@ -2640,7 +2640,7 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool strict, b
   std::vector<double> rad, wrad;
   radial_chebyshev_jac(nrad,rad,wrad);
   nrad=rad.size(); // Sanity check
-  
+
   // Construct grids
   size_t Nat=basp->get_Nnuc();
   grids.clear();
@@ -2652,7 +2652,7 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool strict, b
     sh.tol=tol;
     sh.np=0;
     sh.nfunc=0;
-    
+
     // Loop over radii
     for(int irad=0;irad<nrad;irad++) {
       sh.R=rad[irad];
@@ -2666,7 +2666,7 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool strict, b
 #pragma omp parallel
 #endif
   {
-    
+
 #ifndef _OPENMP
     const int ith=0;
 #else
@@ -2681,7 +2681,7 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool strict, b
 
   // Prune empty shells
   prune_shells();
-  
+
   if(verbose) {
     std::string met=nl ? "NL" : "XC";
     print_grid(met);
@@ -2697,21 +2697,21 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
   }
 
   Timer t;
-  
+
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
-  
+
   // Form radial shells
   for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
     sh.cen=basp->get_nuclear_coords(iat);
     sh.tol=ftoler*PRUNETHR;
-    
+
     // Compute necessary number of radial points for atom
     size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
     // Get Chebyshev nodes and weights for radial part
@@ -2719,7 +2719,7 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
     radial_chebyshev_jac(nr,rad,wrad);
     nr=rad.size(); // Sanity check
     nrad[iat]=nr;
-  
+
     // Loop over radii
     for(size_t irad=0;irad<nr;irad++) {
       sh.R=rad[irad];
@@ -2727,7 +2727,7 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
       grids.push_back(sh);
     }
   }
-    
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -2763,11 +2763,11 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
   }
 
   Timer t;
-  
+
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
-  
+
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
 
@@ -2777,7 +2777,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
     sh.atind=iat;
     sh.cen=basp->get_nuclear_coords(iat);
     sh.tol=ftoler*PRUNETHR;
-    
+
     // Compute necessary number of radial points for atom
     size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
     // Get Chebyshev nodes and weights for radial part
@@ -2785,7 +2785,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
     radial_chebyshev_jac(nr,rad,wrad);
     nr=rad.size(); // Sanity check
     nrad[iat]=nr;
-    
+
     // Loop over radii
     for(size_t irad=0;irad<nr;irad++) {
       sh.R=rad[irad];
@@ -2793,7 +2793,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
       grids.push_back(sh);
     }
   }
-    
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -2828,7 +2828,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
   }
 
   Timer t;
-    
+
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_lapl(x_func,c_func);
@@ -2842,7 +2842,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
     sh.atind=iat;
     sh.cen=basp->get_nuclear_coords(iat);
     sh.tol=ftoler*PRUNETHR;
-    
+
     // Compute necessary number of radial points for atom
     size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
     // Get Chebyshev nodes and weights for radial part
@@ -2850,7 +2850,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
     radial_chebyshev_jac(nr,rad,wrad);
     nr=rad.size(); // Sanity check
     nrad[iat]=nr;
-  
+
     // Loop over radii
     for(size_t irad=0;irad<nr;irad++) {
       sh.R=rad[irad];
@@ -2863,7 +2863,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
   std::vector< std::vector<angshell_t> > orbgrid(grids.size(),grids);
   for(size_t i=0;i<orbgrid.size();i++)
     orbgrid[i].resize(Ctilde.n_cols);
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -2872,7 +2872,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
     int ith=0;
 #else
     int ith=omp_get_thread_num();
-    
+
     // Collapse statement introduced in OpenMP 3.0 in May 2008
 #if _OPENMP >= 200805
 #pragma omp for schedule(dynamic,1) collapse(2)
@@ -2887,20 +2887,20 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
 	  orbgrid[ig][iorb]=wrk[ith].construct(Ctilde.col(iorb),ftoler/nrad[grids[ig].atind],x_func,c_func);
 	}
   }
-  
+
   // Update l values
   for(size_t ig=0;ig<grids.size();ig++) {
     grids[ig].l=orbgrid[ig][0].l;
     for(size_t io=1;io<orbgrid[ig].size();io++)
       grids[ig].l=std::max(orbgrid[ig][io].l,grids[ig].l);
   }
-  
+
   // Rerun construction to update function value sizes
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-    
+
 #ifndef _OPENMP
     const int ith=0;
 #else
@@ -2928,7 +2928,7 @@ void DFTGrid::construct_becke(double otoler) {
     printf("Constructing adaptive Becke grid with tolerance %e.\n",otoler);
     fflush(stdout);
   }
-  
+
   // Only need function values
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_grad_lapl(false,false);
@@ -2944,7 +2944,7 @@ void DFTGrid::construct_becke(double otoler) {
     sh.atind=iat;
     sh.cen=basp->get_nuclear_coords(iat);
     sh.tol=otoler*PRUNETHR;
-    
+
     // Compute necessary number of radial points for atom
     size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
 
@@ -2953,7 +2953,7 @@ void DFTGrid::construct_becke(double otoler) {
     radial_chebyshev_jac(nr,rad,wrad);
     nr=rad.size(); // Sanity check
     nrad[iat]=nr;
-    
+
     // Loop over radii
     for(size_t irad=0;irad<nr;irad++) {
       sh.R=rad[irad];
@@ -2993,7 +2993,7 @@ void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otoler) {
     printf("Constructing adaptive Hirshfeld grid with tolerance %e.\n",otoler);
     fflush(stdout);
   }
-      
+
   // Only need function values
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_grad_lapl(false,false);
@@ -3002,14 +3002,14 @@ void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otoler) {
   std::vector<size_t> nrad(basp->get_Nnuc());
 
   Timer t;
-    
+
   // Form radial shells
   for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
     sh.cen=basp->get_nuclear_coords(iat);
     sh.tol=otoler*PRUNETHR;
-    
+
     // Compute necessary number of radial points for atom
     size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
 
@@ -3018,7 +3018,7 @@ void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otoler) {
     radial_chebyshev_jac(nr,rad,wrad);
     nr=rad.size(); // Sanity check
     nrad[iat]=nr;
-    
+
     // Loop over radii
     for(size_t irad=0;irad<nr;irad++) {
       sh.R=rad[irad];
@@ -3070,11 +3070,11 @@ size_t DFTGrid::get_Nfuncs() const {
 arma::mat DFTGrid::eval_overlap() {
   // Amount of basis functions
   size_t N=basp->get_Nbf();
-  
+
   // Returned matrix
   arma::mat S(N,N);
   S.zeros();
-  
+
 #ifndef _OPENMP
   int ith=0;
 #else
@@ -3085,7 +3085,7 @@ arma::mat DFTGrid::eval_overlap() {
     // Work array
     arma::mat Swrk(S);
     Swrk.zeros();
-    
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
 #endif
@@ -3095,11 +3095,11 @@ arma::mat DFTGrid::eval_overlap() {
       wrk[ith].form_grid();
       // Evaluate overlap
       wrk[ith].eval_overlap(Swrk);
-      
+
       // Free memory
       wrk[ith].free();
     }
-    
+
 #ifdef _OPENMP
 #pragma omp critical
 #endif
@@ -3134,13 +3134,13 @@ arma::mat DFTGrid::eval_overlap(size_t inuc) {
     for(size_t i=0;i<grids.size();i++) {
       if(grids[i].atind!=inuc)
 	continue;
-      
+
       // Change atom and create grid
       wrk[ith].set_grid(grids[i]);
       wrk[ith].form_grid();
       // Evaluate overlap
       wrk[ith].eval_overlap(Swrk);
-      
+
       // Free memory
       wrk[ith].free();
     }
@@ -3150,7 +3150,7 @@ arma::mat DFTGrid::eval_overlap(size_t inuc) {
 #endif
     Sat+=Swrk;
   }
-  
+
   return Sat;
 }
 
@@ -3177,7 +3177,7 @@ std::vector<arma::mat> DFTGrid::eval_overlaps() {
     // Temporary matrix
     arma::mat Swrk(N,N);
     Swrk.zeros();
-    
+
     // Add atomic contributions
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
@@ -3186,19 +3186,19 @@ std::vector<arma::mat> DFTGrid::eval_overlaps() {
       // Change atom and create grid
       wrk[ith].set_grid(grids[i]);
       wrk[ith].form_grid();
-      
+
       // Evaluate overlap
       wrk[ith].eval_overlap(Swrk);
 #ifdef _OPENMP
 #pragma omp critical
 #endif
       Sat[grids[i].atind]+=Swrk;
-      
+
       // Free memory
       wrk[ith].free();
     }
   }
-  
+
   return Sat;
 }
 
@@ -3220,7 +3220,7 @@ arma::mat DFTGrid::eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc) 
   for(size_t i=0;i<grids.size();i++) {
     if(grids[i].atind!=inuc)
       continue;
-    
+
     wrk[ith].set_grid(grids[i]);
     wrk[ith].form_hirshfeld_grid(hirsh);
     // Evaluate overlap
@@ -3254,7 +3254,7 @@ std::vector<arma::mat> DFTGrid::eval_hirshfeld_overlaps(const Hirshfeld & hirsh)
     // Work array
     arma::mat Swrk(Sat[0]);
     Swrk.zeros();
-    
+
     // Add atomic contributions
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
@@ -3316,7 +3316,7 @@ std::vector<dens_list_t> DFTGrid::eval_dens_list(const arma::mat & P) {
 #endif
       // Add to full list
       list.insert(list.end(),hlp.begin(),hlp.end());
-      
+
       // Free memory
       wrk[ith].free();
     }
@@ -3427,12 +3427,12 @@ arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
 #pragma omp critical
 #endif
       Nel[grids[i].atind]+=dN;
-      
+
       // Free memory
       wrk[ith].free();
     }
   }
-  
+
   return Nel;
 }
 
@@ -3589,13 +3589,13 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
 #else
     int ith=0;
 #endif
-    
+
     // Loop over atoms
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
 #endif
     for(size_t i=0;i<grids.size();i++) {
-      
+
       // Change atom and create grid
       wrk[ith].set_grid(grids[i]);
       wrk[ith].form_grid();
@@ -3639,17 +3639,15 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
   Nelv=Nel;
 }
 
-void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arma::cx_mat & W, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock) {
-  size_t nocc=W.n_cols;
-  // Optimal orbitals
-  arma::cx_mat CW=C.cols(0,nocc-1)*W;
+void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & CW, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock) {
+  size_t nocc=CW.n_cols;
 
   // Allocate memory
   if(fock) {
     H.resize(nocc);
     // Hamiltonians computed in full space
     for(size_t ip=0;ip<nocc;ip++)
-      H[ip].zeros(C.n_rows,C.n_rows);
+      H[ip].zeros(CW.n_rows,CW.n_rows);
   }
 
   // Clear exchange-correlation energy
@@ -3668,7 +3666,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
 
     if(fock)
       // Initialize memory
-      Hwrk.zeros(C.n_rows,C.n_rows);
+      Hwrk.zeros(CW.n_rows,CW.n_rows);
 
 #ifndef _OPENMP
     int ith=0;
@@ -3686,7 +3684,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arm
       // Change atom and create grid
       wrk[ith].set_grid(grids[i]);
       wrk[ith].form_grid();
-      
+
       // Loop over densities
       for(size_t ip=0;ip<nocc;ip++) {
 	// Update density
@@ -3736,7 +3734,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
 
   // Original gradient and laplacian settings
   bool grad, lapl;
-  wrk[0].get_grad_lapl(grad,lapl);  
+  wrk[0].get_grad_lapl(grad,lapl);
 
   // Collect nl grid data
   std::vector<arma::mat> nldata(nl.grids.size());
@@ -3757,7 +3755,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
       wrk[ith].set_grad_lapl(true,false);
       // Create grid
       wrk[ith].form_grid();
-    
+
       // Update density
       wrk[ith].update_density(P);
 
@@ -3774,7 +3772,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
     size_t n=0;
     for(size_t i=0;i<nldata.size();i++)
       n+=nldata[i].n_rows;
-        
+
     printf("%i points ... ",(int) n);
     fflush(stdout);
   }
@@ -3787,7 +3785,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
       printf("\n");
     }
   */
-  
+
   // Loop over grids
 #ifdef _OPENMP
 #pragma omp parallel reduction(+:Enl)
@@ -3808,22 +3806,22 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
       wrk[ith].set_grad_lapl(true,false);
       // Initialize worker
       wrk[ith].form_grid();
-      
+
       // Update density
       wrk[ith].update_density(P);
       // Initialize the arrays
       wrk[ith].init_xc();
-      
+
       // Calculate the integral over the nl grid
       wrk[ith].init_VV10(b,C,true);
       wrk[ith].compute_VV10(nldata,b,C);
-      
+
       // Evaluate the energy
       Enl+=wrk[ith].eval_Exc();
       // and construct the Fock matrices
       if(fock)
 	wrk[ith].eval_Fxc(Hwrk);
-      
+
       // Free memory
       wrk[ith].free();
     }
@@ -3834,10 +3832,10 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
     if(fock)
       H+=Hwrk;
   }
-    
+
   // Set return variable
   Enl_=Enl;
-  
+
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_grad_lapl(grad,lapl);
 }
@@ -3961,7 +3959,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
 
   // Original gradient and laplacian settings
   bool grad, lapl;
-  wrk[0].get_grad_lapl(grad,lapl);  
+  wrk[0].get_grad_lapl(grad,lapl);
 
   // Collect nl grid data
   std::vector<arma::mat> nldata(nl.grids.size());
@@ -3982,7 +3980,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
       // Change atom and create grid
       wrk[ith].set_grid(nl.grids[i]);
       wrk[ith].form_grid();
-      
+
       // Update density
       wrk[ith].update_density(P);
 
@@ -3996,7 +3994,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
 
     } // End nl grid loop
   } // End parallel region
-  
+
 
   // Loop over grids
 #ifdef _OPENMP
@@ -4005,7 +4003,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
   {
     arma::vec fwrk(f);
     fwrk.zeros();
-    
+
 #ifndef _OPENMP
     const int ith=0;
 #else
@@ -4017,7 +4015,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
       wrk[ith].set_grad_lapl(true,false);
       // Change atom and create grid
       wrk[ith].form_grid();
-      
+
       // Update density
       Timer tp;
       wrk[ith].update_density(P);
@@ -4030,7 +4028,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
       fwrk.subvec(3*grids[i].atind,3*grids[i].atind+2)+=wrk[ith].compute_VV10_F(nldata,nl.grids,b,C);
       // and now evaluate the forces on the atoms
       fwrk+=wrk[ith].eval_force(P);
-      
+
       // Free memory
       wrk[ith].free();
     }
@@ -4040,10 +4038,10 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
 #endif
     f+=fwrk;
   }
-  
+
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].set_grad_lapl(grad,lapl);
-  
+
   return f;
 }
 
@@ -4172,7 +4170,7 @@ void DFTGrid::print_grid(std::string met) const {
   for(size_t i=0;i<grids.size();i++)
     printf("%6i %4i %8.3e %e %2i %7i %10i\n",(int) i, (int) grids[i].atind, grids[i].R, grids[i].w, grids[i].l, (int) grids[i].np, (int) grids[i].nfunc);
   */
-  
+
   printf("Composition of %s grid:\n %7s %7s %10s\n",met.c_str(),"atom","Npoints","Nfuncs");
   for(size_t i=0;i<basp->get_Nnuc();i++)
     printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->get_symbol(i).c_str(), (int) np(i), (int) nf(i));

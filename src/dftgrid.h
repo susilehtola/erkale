@@ -483,10 +483,9 @@ class DFTGrid {
 
   /**
    * Compute Fock matrix, exchange-correlation energy and integrated
-   * electron density, SIC calculation. Note that all orbitals are
-   * necessary here.
+   * electron density, SIC calculation.
    */
-  void eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, const arma::cx_mat & W, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
+  void eval_Fxc(int x_func, int c_func, const arma::cx_mat & C, std::vector<arma::mat> & H, std::vector<double> & Exc, std::vector<double> & Nel, bool fock);
 
   /// Compute VV10
   void eval_VV10(DFTGrid & nlgrid, double b, double C, const arma::mat & P, arma::mat & H, double & Exc, bool fock=true);
