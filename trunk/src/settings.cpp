@@ -149,33 +149,24 @@ void Settings::add_dft_settings() {
   // Use Perdew-Zunger self-interaction correction?
   add_double("PZw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
   // Perturbative SIC?
-  add_string("PZ", "Perform Perdew-Zunger self-interaction correction? No, Pert, Full, OldFull, Real, Can, CanPert","No");
+  add_bool("PZ", "Perform Perdew-Zunger self-interaction correction?",false);
+  add_bool("PZoo", "Optimize OO block?",true);
+  add_bool("PZov", "Optimize OV block?",true);
+  add_double("PZthr", "Threshold for orbital gradient convergence",1e-5);
   // Initialize PZ-SIC with localized orbitals?
   add_bool("PZloc", "Initial localization before SIC calculation?", true);
   // Run stability analysis for PZ-SIC?
-  add_int("PZstab", "Stability analysis for PZ-SIC? 0 for no, 1 for oo block, 2 for full analysis", 0);
-  add_bool("PZstabcplx", "Complex degrees of freedom in PZ stability?", true);
+  add_bool("PZstab", "Stability analysis for PZ-SIC?", false);
+  add_bool("PZreal", "Real degrees of freedom in PZ?", true);
+  add_bool("PZimag", "Imaginary degrees of freedom in PZ?", true);
   // Freeze orbitals in stability analysis
   add_string("PZstabFz", "Orbitals to freeze for stability analysis (only oo!)", "");
   // Mode to use PZ-SIC
   add_string("PZmode", "Apply PZ to the operators (in addition to J): X C D", "XC");
   // PZ-SIC Hamiltonian
   add_string("PZHam", "Hamiltonian to use in PZ-SIC: Symm, United", "Symm");
-  // PZ-SIC kappa max
-  add_double("PZKmax", "Threshold for kappa max in unitary optimization", 1e-3);
-  // PZ-SIC kappa rms
-  add_double("PZKrms", "Threshold for kappa rms in unitary optimization", 1e-4);
-  // PZ-SIC energy max
-  add_double("PZEmax", "Threshold for energy change in unitary optimization", 1e-6);
-  // PZ-SIC energy threshold
-  add_double("PZdEmax", "Tolerance threshold for energy convergence", 1e-5);
-  // PZ-SIC density threshold
-  add_double("PZdPmax", "Tolerance threshold for density convergence", 1e-5);
-  add_double("PZdPrms", "Tolerance threshold for density convergence", 1e-6);
-  // PZ-SIC maximum number of iterations in unitary optimization
-  add_int("PZunit", "Max number of iterations in unitary optimization", 10);
   // PZ-SIC maximum number of iterations in self-consistency cycle
-  add_int("PZiter", "Max number of iterations in self-consistency iteration", 20);
+  add_int("PZiter", "Max number of iterations in self-consistency iteration", 100);
   // PZ-SIC seed number
   add_int("PZseed", "Seed number for randomized matrices?", 0);
 }

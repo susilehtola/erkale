@@ -1249,7 +1249,7 @@ double PZSIC::cost_func(const arma::cx_mat & Wv) {
     // Compute orbital energies
     W=Wv;
     Forb.clear();
-    solver->PZSIC_Fock(Forb,Eorb,sol.cC,Wv,dft,*grid,*nlgrid,false);
+    solver->PZSIC_Fock(Forb,Eorb,sol.cC*Wv,dft,*grid,*nlgrid,false);
   }
   if(Eorb.size() != Wv.n_cols) {
     ERROR_INFO();
@@ -1289,7 +1289,7 @@ void PZSIC::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
   if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON || Forb.size() != Wv.n_cols) {
     // Compute orbital-dependent Fock matrices
     W=Wv;
-    solver->PZSIC_Fock(Forb,Eorb,sol.cC,Wv,dft,*grid,*nlgrid,true);
+    solver->PZSIC_Fock(Forb,Eorb,sol.cC*Wv,dft,*grid,*nlgrid,true);
   }
   if(Eorb.size() != Wv.n_cols) {
     ERROR_INFO();
@@ -1428,6 +1428,10 @@ double PZSIC::get_ESIC() const {
 
 arma::vec PZSIC::get_Eorb() const {
   return Eorb;
+}
+
+std::vector<arma::cx_mat> PZSIC::get_Forb() const {
+  return Forb;
 }
 
 arma::cx_mat PZSIC::get_HSIC() {

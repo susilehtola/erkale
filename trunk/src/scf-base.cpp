@@ -364,18 +364,16 @@ Checkpoint *SCF::get_checkpoint() const {
   return chkptp;
 }
 
-void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, const arma::cx_mat & W, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock) {
+void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock) {
   // Compute the orbital-dependent Fock matrices
-  Eorb.resize(W.n_cols);
+  Eorb.resize(Ctilde.n_cols);
   if(fock)
-    Forb.resize(W.n_cols);
+    Forb.resize(Ctilde.n_cols);
 
   // Range separation constants
   double omega, kfull, kshort;
   range_separation(dft.x_func,omega,kfull,kshort);
 
-  // Optimal orbitals
-  arma::cx_mat Ctilde=C.cols(0,W.n_rows-1)*W;
   // Orbital density matrices
   std::vector<arma::cx_mat> Pcorb(Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
@@ -622,7 +620,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
     std::vector<arma::mat> XC; // Exchange-correlation matrices
     std::vector<double> Exc; // Exchange-correlation energy
 
-    grid.eval_Fxc(dft.x_func,dft.c_func,C,W,XC,Exc,Nelnum,fock);
+    grid.eval_Fxc(dft.x_func,dft.c_func,Ctilde,XC,Exc,Nelnum,fock);
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
@@ -662,510 +660,6 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
       for(size_t io=0;io<Ctilde.n_cols;io++)
 	Forb[io]+=XC[io]*COMPLEX1;
   }
-}
-
-void SCF::PZSIC_RDFT(rscf_t & sol, const std::vector<double> & occs, dft_t dft, pzmet_t pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
-  // Set xc functionals
-  if(!pzmet.X)
-    dft.x_func=0;
-  if(!pzmet.C)
-    dft.c_func=0;
-  if(!pzmet.D)
-    dft.nl=false;
-
-  // Count amount of occupied orbitals
-  size_t nocc=0;
-  while(nocc<occs.size() && occs[nocc]!=0.0)
-    nocc++;
-
-  // Check occupations
-  {
-    bool ok=true;
-    for(size_t i=1;i<nocc;i++)
-      if(fabs(occs[i]-occs[0])>1e-6)
-	ok=false;
-    if(!ok)  {
-      fprintf(stderr,"Occupations:");
-      for(size_t i=0;i<nocc;i++)
-	fprintf(stderr," %e",occs[i]);
-      fprintf(stderr,"\n");
-
-      throw std::runtime_error("SIC not supported for orbitals with varying occupations.\n");
-    }
-  }
-
-  // Collect the orbitals
-  rscf_t sicsol;
-  sicsol.H=sol.H;
-  sicsol.P=sol.P/2.0;
-  sicsol.C=sol.C;
-  if(sol.cC.n_rows == sol.C.n_rows && sol.cC.n_cols == sol.C.n_cols)
-    sicsol.cC=sol.cC;
-  else
-    sicsol.cC=sol.C*COMPLEX1;
-
-  // The localizing matrix
-  arma::cx_mat W;
-  if(chkptp->exist("CW.re")) {
-    printf("Read localization matrix from checkpoint.\n");
-
-    // Get old localized orbitals
-    arma::cx_mat CW;
-    chkptp->cread("CW",CW);
-    // The starting guess is the unitarized version of the overlap
-    W=unitarize(arma::trans(sicsol.cC.cols(0,CW.n_cols-1))*S*CW);
-  }
-  // Check that it is sane
-  if(W.n_rows != nocc || W.n_cols != nocc) {
-    if(canonical)
-      // Use canonical orbitals
-      W.eye(nocc,nocc);
-    else {
-      // Initialize with a random unitary matrix.
-      if(real)
-	W=real_orthogonal(nocc,seed)*std::complex<double>(1.0,0.0);
-      else
-	W=complex_unitary(nocc,seed);
-
-      if(localization && nocc>1) {
-	Timer tloc;
-
-	// Localize starting guess
-	if(verbose) printf("\nInitial localization.\n");
-	double measure;
-	// Max 1e5 iterations, gradient norm <= 1e-3
-	orbital_localization(PIPEK_IAO2,*basisp,sicsol.C.cols(0,nocc-1),sol.P,measure,W,verbose,real,1e5,1e-3);
-	if(verbose) {
-	  printf("\n");
-
-	  fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-	  fflush(stderr);
-	}
-
-	// Initialize with Coulomb treatment?
-	if(densityfit && (pzmet.X || pzmet.C || pzmet.D)) {
-	  dft_t dum(dft);
-	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsol,W,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
-	}
-      }
-    }
-  }
-
-  if(dft.adaptive && (pzmet.X || pzmet.C || pzmet.D)) {
-    // Before proceeding, reform DFT grids so that localized orbitals
-    // are properly integrated over.
-
-    // Update Ctilde
-    arma::cx_mat Ctilde=sicsol.cC.cols(0,W.n_cols-1)*W;
-
-    // Update DFT grid
-    Timer tgrid;
-    if(verbose) {
-      printf("\nReconstructing SIC DFT grid.\n");
-      fprintf(stderr,"\n");
-      fflush(stdout);
-    }
-    grid.construct(Ctilde,dft.gridtol,dft.x_func,dft.c_func);
-    if(verbose) {
-      printf("\n");
-      fflush(stdout);
-
-      fprintf(stderr,"%-65s %10.3f\n","    SIC-DFT grid formation",tgrid.get());
-      fflush(stderr);
-    }
-  } else { // if(dft.adaptive)
-    if(verbose)
-      fprintf(stderr,"\n");
-  }
-
-  // Do the calculation
-  Timer tsic;
-  if(verbose && !canonical) {
-    fprintf(stderr,"SIC unitary optimization\n");
-  }
-  PZSIC_calculate(sicsol,W,dft,pzcor,pzh,grid,nlgrid,Etol,maxtol,rmstol,niter,canonical,real);
-  if(verbose && !canonical) {
-    fprintf(stderr,"Unitary optimization performed in %s.\n\n",tsic.elapsed().c_str());
-
-    /*
-    printf("\n");
-    analyze_orbitals(*basisp,sicsol.cC*W);
-    printf("\n");
-    */
-  }
-  // Save matrix
-  chkptp->cwrite("CW",sicsol.cC.cols(0,W.n_rows-1)*W);
-  // Save SI energies
-  chkptp->write("ESIC",sicsol.E);
-  // Compute projected energies
-  if(sol.H.n_rows == sicsol.Heff.n_rows && sol.H.n_cols == sicsol.Heff.n_cols) {
-    arma::cx_mat CW=sicsol.cC.cols(0,W.n_cols-1)*W;
-    arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sicsol.Heff)*CW));
-    chkptp->write("EpSIC",Ep);
-  }
-
-  // Update current solution
-  sol.Heff=sicsol.Heff;
-  sol.Heff_im=sicsol.Heff_im;
-  if(sol.H.n_rows == sicsol.Heff.n_rows && sol.H.n_cols == sicsol.Heff.n_cols)
-    sol.H  +=sicsol.Heff;
-  // Remember there are two electrons in each orbital
-  sol.en.Eeff=2*sicsol.en.E;
-  sol.en.Eel+=2*sicsol.en.E;
-  sol.en.E  +=2*sicsol.en.E;
-}
-
-void SCF::PZSIC_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, dft_t dft, pzmet_t pzmet, enum pzham pzh, double pzcor, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t niter, bool canonical, bool localization, bool real, int seed) {
-  // Set xc functionals
-  // Set xc functionals
-  if(!pzmet.X)
-    dft.x_func=0;
-  if(!pzmet.C)
-    dft.c_func=0;
-  if(!pzmet.D)
-    dft.nl=false;
-
-  // Count amount of occupied orbitals
-  size_t nocca=0;
-  while(nocca<occa.size() && occa[nocca]!=0.0)
-    nocca++;
-  size_t noccb=0;
-  while(noccb<occb.size() && occb[noccb]!=0.0)
-    noccb++;
-
-  // Check occupations
-  {
-    bool ok=true;
-    for(size_t i=1;i<nocca;i++)
-      if(fabs(occa[i]-occa[0])>1e-6)
-	ok=false;
-    for(size_t i=1;i<noccb;i++)
-      if(fabs(occb[i]-occb[0])>1e-6)
-	ok=false;
-    if(!ok) {
-      fprintf(stderr,"Alpha occupations:");
-      for(size_t i=0;i<nocca;i++)
-	fprintf(stderr," %e",occa[i]);
-      fprintf(stderr,"\n");
-
-      fprintf(stderr,"Beta occupations:");
-      for(size_t i=0;i<noccb;i++)
-	fprintf(stderr," %e",occb[i]);
-      fprintf(stderr,"\n");
-
-      throw std::runtime_error("SIC not supported for orbitals with varying occupations.\n");
-    }
-  }
-
-  // Collect the orbitals
-  rscf_t sicsola;
-  sicsola.H=sol.Ha;
-  sicsola.P=sol.Pa;
-  sicsola.C=sol.Ca;
-  if(sol.cCa.n_rows == sol.Ca.n_rows && sol.cCa.n_cols == sol.Ca.n_cols)
-    sicsola.cC=sol.cCa;
-  else
-    sicsola.cC=sol.Ca*COMPLEX1;
-
-  rscf_t sicsolb;
-  sicsolb.H=sol.Hb;
-  sicsolb.P=sol.Pb;
-  sicsolb.C=sol.Cb;
-  if(sol.cCb.n_rows == sol.Cb.n_rows && sol.cCb.n_cols == sol.Cb.n_cols)
-    sicsolb.cC=sol.cCb;
-  else
-    sicsolb.cC=sol.Cb*COMPLEX1;
-
-  // The localizing matrix
-  arma::cx_mat Wa, Wb;
-  if(chkptp->exist("CWa.re")) {
-    if(verbose) printf("Read alpha localization matrix from checkpoint.\n");
-
-    // Get old localized orbitals
-    arma::cx_mat CWa;
-    chkptp->cread("CWa",CWa);
-    // The starting guess is the unitarized version of the overlap
-    Wa=unitarize(arma::trans(sicsola.cC.cols(0,CWa.n_cols-1))*S*CWa);
-  }
-  if(chkptp->exist("CWb.re")) {
-    if(verbose) printf("Read beta localization matrix from checkpoint.\n");
-
-    // Get old localized orbitals
-    arma::cx_mat CWb;
-    chkptp->cread("CWb",CWb);
-    // The starting guess is the unitarized version of the overlap
-    Wb=unitarize(arma::trans(sicsolb.cC.cols(0,CWb.n_cols-1))*S*CWb);
-  }
-
-  // Check that they are sane
-  if(Wa.n_rows != nocca || Wa.n_cols != nocca) {
-    if(canonical)
-      // Use canonical orbitals
-      Wa.eye(nocca,nocca);
-    else {
-      // Initialize with a random unitary matrix.
-      if(real)
-	Wa=real_orthogonal(nocca,seed)*std::complex<double>(1.0,0.0);
-      else
-	Wa=complex_unitary(nocca,seed);
-
-      if(localization && nocca>1) {
-	Timer tloc;
-
-	// Localize starting guess
-	if(verbose) printf("\nInitial alpha localization.\n");
-	double measure;
-	// Max 1e5 iterations, gradient norm <= 1e-3
-	orbital_localization(PIPEK_IAO2,*basisp,sicsola.C.cols(0,nocca-1),sol.P,measure,Wa,verbose,real,1e5,1e-3);
-
-	if(verbose) {
-	  printf("\n");
-
-	  fprintf(stderr,"%-64s %10.3f\n","    Initial alpha localization",tloc.get());
-	  fflush(stderr);
-	}
-
-	// Initialize with Coulomb treatment?
-	if(densityfit && (pzmet.X || pzmet.C || pzmet.D)) {
-	  dft_t dum(dft);
-	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsola,Wa,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
-	}
-      }
-    }
-  }
-
-  if(Wb.n_rows != noccb || Wb.n_cols != noccb) {
-    if(canonical)
-      // Use canonical orbitals
-      Wb.eye(noccb,noccb);
-    else {
-      // Initialize with a random unitary matrix.
-      if(real)
-	Wb=real_orthogonal(noccb,seed)*std::complex<double>(1.0,0.0);
-      else
-	Wb=complex_unitary(noccb,seed);
-
-      if(localization && noccb>1) {
-	Timer tloc;
-
-	// Localize starting guess with threshold 10.0
-	if(verbose) printf("\nInitial beta localization.\n");
-	double measure;
-	// Max 1e5 iterations, gradient norm <= 1e-3
-	orbital_localization(PIPEK_IAO2,*basisp,sicsolb.C.cols(0,noccb-1),sol.P,measure,Wb,verbose,real,1e5,1e-3);
-
-	if(verbose) {
-	  printf("\n");
-
-	  fprintf(stderr,"%-64s %10.3f\n","    Initial beta localization",tloc.get());
-	  fflush(stderr);
-	}
-
-	// Initialize with Coulomb treatment?
-	if(densityfit && (pzmet.X || pzmet.C || pzmet.D)) {
-	  dft_t dum(dft);
-	  dum.x_func=dum.c_func=0;
-	  PZSIC_calculate(sicsolb,Wb,dum,pzcor,pzh,grid,nlgrid,0.0,0.1,0.1,100,canonical,real);
-	}
-      }
-    }
-  }
-
-  if(dft.adaptive && (pzmet.X || pzmet.C || pzmet.D)) {
-    // Before proceeding, reform DFT grids so that localized orbitals
-    // are properly integrated over.
-
-    // Update Ctilde
-    arma::cx_mat Catilde;
-    if(Wa.n_rows)
-      Catilde=sicsola.cC.cols(0,Wa.n_rows-1)*Wa;
-    arma::cx_mat Cbtilde;
-    if(Wb.n_rows)
-      Cbtilde=sicsolb.cC.cols(0,Wb.n_rows-1)*Wb;
-
-    // Update DFT grid
-    Timer tgrid;
-    if(verbose) {
-      printf("\nReconstructing SIC DFT grid.\n");
-      fflush(stdout);
-      fprintf(stderr,"\n");
-    }
-    {
-      // Combined orbitals
-      arma::cx_mat Ctilde(Catilde.n_rows,Catilde.n_cols+Cbtilde.n_cols);
-      if(Catilde.n_cols)
-	Ctilde.cols(0,Catilde.n_cols-1)=Catilde;
-      if(Cbtilde.n_cols)
-	Ctilde.cols(Catilde.n_cols,Catilde.n_cols+Cbtilde.n_cols-1)=Cbtilde;
-      grid.construct(Ctilde,dft.gridtol,dft.x_func,dft.c_func);
-    }
-    if(verbose) {
-      printf("\n");
-      fflush(stdout);
-
-      fprintf(stderr,"%-65s %10.3f\n","    SIC-DFT grid formation",tgrid.get());
-      fflush(stderr);
-    }
-  } else { // if(dft.adaptive)
-    if(verbose)
-      fprintf(stderr,"\n");
-  }
-
-  // Do the calculation
-  Timer tsic;
-  if(verbose) {
-    if(!canonical && Wa.n_cols>1)
-      fprintf(stderr,"SIC unitary optimization,  alpha spin\n");
-    else
-      fprintf(stderr,"SIC canonical calculation, alpha spin\n");
-  }
-  PZSIC_calculate(sicsola,Wa,dft,pzcor,pzh,grid,nlgrid,Etol,maxtol,rmstol,niter,canonical,real);
-  chkptp->cwrite("CWa",sicsola.cC.cols(0,Wa.n_rows-1)*Wa);
-  chkptp->write("ESICa",sicsola.E);
-  // Compute projected energies
-  if(sol.Ha.n_rows == sicsola.Heff.n_rows && sol.Ha.n_cols == sicsola.Heff.n_cols) {
-    arma::cx_mat CW=sicsola.cC.cols(0,Wa.n_rows-1)*Wa;
-    arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Ha+sicsola.Heff)*CW));
-    chkptp->write("EpSICa",Ep);
-  }
-
-  if(Wb.n_cols) {
-    if(verbose) {
-      fprintf(stderr,"Unitary optimization performed in %s.\n",tsic.elapsed().c_str());
-      tsic.set();
-
-      /*
-	printf("\n");
-	analyze_orbitals(*basisp,sicsol.cC*W);
-	printf("\n");
-      */
-
-      if(!canonical && Wb.n_cols>1)
-	fprintf(stderr,"SIC unitary optimization,   beta spin\n");
-      else
-	fprintf(stderr,"SIC canonical calculation,  beta spin\n");
-    }
-    PZSIC_calculate(sicsolb,Wb,dft,pzcor,pzh,grid,nlgrid,Etol,maxtol,rmstol,niter,canonical,real);
-    chkptp->cwrite("CWb",sicsolb.cC.cols(0,Wb.n_rows-1)*Wb);
-    chkptp->write("ESICb",sicsolb.E);
-    // Compute projected energies
-  if(sol.Hb.n_rows == sicsolb.Heff.n_rows && sol.Hb.n_cols == sicsolb.Heff.n_cols) {
-    arma::cx_mat CW=sicsolb.cC.cols(0,Wb.n_rows-1)*Wb;
-      arma::vec Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.Hb+sicsolb.Heff)*CW));
-      chkptp->write("EpSICb",Ep);
-    }
-  }
-
-  if(verbose && !canonical) {
-    fprintf(stderr,"Unitary optimization performed in %s.\n\n",tsic.elapsed().c_str());
-    tsic.set();
-
-    /*
-      printf("\n");
-      analyze_orbitals(*basisp,sicsol.cC*W);
-      printf("\n");
-    */
-  }
-
-  // Update current solution
-  sol.Heffa=sicsola.Heff;
-  sol.Heffa_im=sicsola.Heff_im;
-  if(sol.Ha.n_rows == sicsola.Heff.n_rows && sol.Ha.n_cols == sicsola.Heff.n_cols)
-    sol.Ha  +=sicsola.Heff;
-  if(Wb.n_cols) {
-    sol.Heffb=sicsolb.Heff;
-    sol.Heffb_im=sicsolb.Heff_im;
-    if(sol.Hb.n_rows == sicsolb.Heff.n_rows && sol.Hb.n_cols == sicsolb.Heff.n_cols)
-      sol.Hb  +=sicsolb.Heff;
-    sol.en.Eeff=sicsola.en.E+sicsolb.en.E;
-    sol.en.Eel+=sicsola.en.E+sicsolb.en.E;
-    sol.en.E  +=sicsola.en.E+sicsolb.en.E;
-  } else {
-    sol.en.Eeff=sicsola.en.E;
-    sol.en.Eel+=sicsola.en.E;
-    sol.en.E  +=sicsola.en.E;
-  }
-}
-
-void SCF::PZSIC_calculate(rscf_t & sol, arma::cx_mat & W, dft_t dft, double pzcor, enum pzham pzh, DFTGrid & grid, DFTGrid & nlgrid, double Etol, double maxtol, double rmstol, size_t nmax, bool canonical, bool real) {
-  // Initialize the worker
-  PZSIC* worker=new PZSIC(this,dft,&grid,&nlgrid,maxtol,rmstol,pzh);
-  worker->set(sol,pzcor);
-
-  double ESIC;
-  if(canonical || W.n_cols==1) {
-    // Use canonical orbitals for SIC
-    ESIC=worker->cost_func(W);
-  } else {
-    //	Perform unitary optimization, take at max nmax iterations
-    if(real) {
-      // Real optimization
-      W=arma::real(W)*std::complex<double>(1.0,0.0);
-    }
-    worker->setW(W);
-
-    // Optimizer
-    UnitaryOptimizer opt(DBL_MAX,Etol,verbose,real);
-    UnitaryFunction *hlp=worker;
-    opt.optimize(hlp,POLY_DF,CGPR,nmax);
-    worker=(PZSIC *) hlp;
-
-    ESIC=worker->get_ESIC();
-    W=worker->getW();
-  }
-
-  // Get SI energy and hamiltonian
-  arma::cx_mat HSIC=worker->get_HSIC();
-
-  // Adjust Fock operator for SIC
-  sol.Heff=-pzcor*arma::real(HSIC);
-  sol.Heff_im=-pzcor*arma::imag(HSIC);
-  // Need to adjust energy as well as this was calculated in the Fock routines
-  sol.en.E=-pzcor*ESIC;
-
-  // Get orbital self-interaction energies
-  sol.E=worker->get_Eorb();
-
-  // Projected energies
-  arma::vec Ep;
-  // Sort index
-  arma::uvec idx;
-
-  if(sol.H.n_rows == sol.Heff.n_rows && sol.H.n_cols == sol.Heff.n_cols) {
-    // Sort orbitals wrt projected energy
-    arma::cx_mat CW=sol.cC.cols(0,W.n_cols-1)*W;
-    Ep=arma::real(arma::diagvec(arma::trans(CW)*(sol.H+sol.Heff)*CW));
-    // Get index
-    idx=arma::stable_sort_index(Ep);
-    // Rearrange everything
-    Ep=Ep(idx);
-  } else {
-    // Sort orbitals wrt decreasing SI energy
-    idx=arma::stable_sort_index(sol.E,"descend");
-  }
-
-  sol.E=sol.E(idx);
-  W=W.cols(idx);
-
-  // Get orbital self-interaction energies
-  if(verbose) {
-    printf("Self-interaction energy is %e.\n",ESIC);
-
-    printf("Decomposition of self-interaction energies:\n");
-    printf("\t%4s\t%8s\t%8s\n","io","E(orb)","E(SI)");
-    if(Ep.n_elem == sol.E.n_elem) {
-      for(size_t io=0;io<sol.E.n_elem;io++)
-	printf("\t%4i\t% 8.3f\t% 8.3f\n",(int) io+1,Ep(io),sol.E(io));
-    } else {
-      for(size_t io=0;io<sol.E.n_elem;io++)
-	printf("\t%4i\t%8s\t% 8.3f\n",(int) io+1,"",sol.E(io));
-    }
-    fflush(stdout);
-  }
-
-  delete worker;
 }
 
 void SCF::core_guess(rscf_t & sol) const {
@@ -1273,56 +767,14 @@ template<typename T> void diagonalize_wrk(const arma::mat & S, const arma::mat &
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift) {
   diagonalize_wrk<double>(S,Sinvh,sol.P/2.0,sol.H,shift,sol.C,sol.E);
   check_orth(sol.C,S,false);
-
-  // Complex orbitals?
-  if(sol.Heff_im.n_rows == sol.H.n_rows && sol.Heff_im.n_cols == sol.H.n_cols) {
-    // Generate complex hamiltonian
-    arma::cx_mat Hc(sol.H*COMPLEX1 + sol.Heff_im*COMPLEXI);
-    if(sol.K_im.n_rows == sol.H.n_rows && sol.K_im.n_cols == sol.H.n_cols)
-      Hc+=sol.K_im*COMPLEXI;
-
-    arma::vec Etmp;
-    diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.P/2.0,Hc,shift,sol.cC,Etmp);
-  } else {
-    arma::cx_mat Ch;
-    sol.cC=Ch;
-  }
 }
 
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, uscf_t & sol, double shift) {
   diagonalize_wrk<double>(S,Sinvh,sol.Pa,sol.Ha,shift,sol.Ca,sol.Ea);
   check_orth(sol.Ca,S,false);
 
-  // Complex orbitals?
-  if(sol.Heffa_im.n_rows == sol.Ha.n_rows && sol.Heffa_im.n_cols == sol.Ha.n_cols) {
-    // Generate complex hamiltonian
-    arma::cx_mat Hc(sol.Ha*COMPLEX1 + sol.Heffa_im*COMPLEXI);
-    if(sol.Ka_im.n_rows == sol.Ha.n_rows && sol.Ka_im.n_cols == sol.Ha.n_cols)
-      Hc+=sol.Ka_im*COMPLEXI;
-
-    arma::vec Etmp;
-    diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.Pa,Hc,shift,sol.cCa,Etmp);
-  } else {
-    arma::cx_mat Ch;
-    sol.cCa=Ch;
-  }
-
   diagonalize_wrk<double>(S,Sinvh,sol.Pb,sol.Hb,shift,sol.Cb,sol.Eb);
   check_orth(sol.Cb,S,false);
-
-  // Complex orbitals?
-  if(sol.Heffb_im.n_rows == sol.Hb.n_rows && sol.Heffb_im.n_cols == sol.Hb.n_cols) {
-    // Generate complex hamiltonian
-    arma::cx_mat Hc(sol.Hb*COMPLEX1 + sol.Heffb_im*COMPLEXI);
-    if(sol.Kb_im.n_rows == sol.Hb.n_rows && sol.Kb_im.n_cols == sol.Hb.n_cols)
-      Hc+=sol.Kb_im*COMPLEXI;
-
-    arma::vec Etmp;
-    diagonalize_wrk< std::complex<double> >(S,Sinvh,sol.Pb,Hc,shift,sol.cCb,Etmp);
-  } else {
-    arma::cx_mat Ch;
-    sol.cCb=Ch;
-  }
 }
 
 
@@ -1450,18 +902,8 @@ void form_density(rscf_t & sol, const arma::vec & occs0) {
     size_t nel=std::min(occs.n_elem,occs0.n_elem);
     occs.subvec(0,nel-1)=occs0.subvec(0,nel-1);
   }
-  
-  if(sol.cC.n_cols == sol.C.n_cols) {
-    // Use complex orbitals
-    arma::cx_mat cP=sol.cC*arma::diagmat(occs)*arma::trans(sol.cC);
-    sol.P=arma::real(cP);
-    sol.P_im=arma::imag(cP);
-  } else {
-    // Use real orbitals
-    sol.P=sol.C*arma::diagmat(occs)*arma::trans(sol.C);
-    sol.P_im.clear();
-  }
-  sol.rP=sol.C*arma::diagmat(occs)*arma::trans(sol.C);
+
+  sol.P=sol.C*arma::diagmat(occs)*arma::trans(sol.C);
 }
 
 void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0) {
@@ -1477,31 +919,8 @@ void form_density(uscf_t & sol, const arma::vec & occa0, const arma::vec & occb0
     size_t nel=std::min(occb.n_elem,occb0.n_elem);
     occb.subvec(0,nel-1)=occb0.subvec(0,nel-1);
   }
-
-  if(sol.cCa.n_cols == sol.Ca.n_cols) {
-    // Use complex orbitals
-    arma::cx_mat cPa=sol.cCa*arma::diagmat(occa)*arma::trans(sol.cCa);
-    sol.Pa=arma::real(cPa);
-    sol.Pa_im=arma::imag(cPa);
-  } else {
-    // Use real orbitals
-    sol.Pa=sol.Ca*arma::diagmat(occa)*arma::trans(sol.Ca);
-    sol.Pa_im.clear();
-  }
-  sol.rPa=sol.Ca*arma::diagmat(occa)*arma::trans(sol.Ca);
-
-  if(sol.cCb.n_cols == sol.Cb.n_cols) {
-    // Use complex orbitals
-    arma::cx_mat cPb=sol.cCb*arma::diagmat(occb)*arma::trans(sol.cCb);
-    sol.Pb=arma::real(cPb);
-    sol.Pb_im=arma::imag(cPb);
-  } else {
-    // Use real orbitals
-    sol.Pb=sol.Cb*arma::diagmat(occb)*arma::trans(sol.Cb);
-    sol.Pb_im.clear();
-  }
-  sol.rPb=sol.Cb*arma::diagmat(occb)*arma::trans(sol.Cb);
-
+  sol.Pa=sol.Ca*arma::diagmat(occa)*arma::trans(sol.Ca);
+  sol.Pb=sol.Cb*arma::diagmat(occb)*arma::trans(sol.Cb);
   sol.P=sol.Pa+sol.Pb;
 }
 
@@ -1778,30 +1197,6 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
     oss << "A multiplicity of " << mult << " would mean " << Nel_beta << " beta electrons!\n";
     throw std::runtime_error(oss.str());
   }
-}
-
-enum pzrun parse_pzrun(const std::string & pzs) {
-  enum pzrun pz;
-
-  // Perdew-Zunger SIC?
-  if(stricmp(pzs,"Full")==0)
-    pz=FULL;
-  else if(stricmp(pzs,"OldFull")==0)
-    pz=OLDFULL;
-  else if(stricmp(pzs,"Pert")==0)
-    pz=PERT;
-  else if(stricmp(pzs,"Real")==0)
-    pz=REAL;
-  else if(stricmp(pzs,"RealPert")==0)
-    pz=REALPERT;
-  else if(stricmp(pzs,"Can")==0)
-    pz=CAN;
-  else if(stricmp(pzs,"CanPert")==0)
-    pz=CANPERT;
-  else
-    pz=NO;
-
-  return pz;
 }
 
 pzmet_t parse_pzmet(const std::string & pzmod) {
@@ -2174,256 +1569,125 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       }
 
       // Perdew-Zunger?
-      enum pzrun pz=parse_pzrun(set.get_string("PZ"));
+      bool pz=set.get_bool("PZ");
+      bool pzov=set.get_bool("PZov");
+      bool pzoo=set.get_bool("PZoo");
+      int pzmax=set.get_int("PZiter");
+      double pzthr=set.get_double("PZthr");
+      bool pzreal=set.get_bool("PZreal");
+      bool pzimag=set.get_bool("PZimag");
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
-      int pzstab=set.get_int("PZstab");
+      bool pzstab=set.get_bool("PZstab");
       std::string pzstabfz=set.get_string("PZstabFz");
-
-      if(pz==NO) {
-	if(dft.adaptive) {
-	  // Solve restricted DFT problem first on a rough grid
-	  solver.RDFT(sol,occs,initconv,initdft);
-
-	  if(verbose) {
-	    fprintf(stderr,"\n");
-	    fflush(stderr);
-	  }
-	}
-
-	// ... and then on the more accurate grid
-	solver.do_force(force);
-	solver.RDFT(sol,occs,conv,dft);
-
-      } else {
-	// Run Perdew-Zunger calculation.
-	rscf_t oldsol(sol);
-	sol.P.zeros();
-
-	// PZ weight
-	double pzcor=set.get_double("PZw");
-	// Run mode
-	pzmet_t pzmet=parse_pzmet(set.get_string("PZmode"));
-
-	// Localization?
-	bool pzloc=set.get_bool("PZloc");
-	// Seed
-	int seed=set.get_int("PZseed");
-	// Convergence thresholds
-	double thr_Kmax=set.get_double("PZKmax");
-	double thr_Krms=set.get_double("PZKrms");
-	double thr_Emax=set.get_double("PZEmax");
-	double thr_dPmax=set.get_double("PZdPmax");
-	double thr_dPrms=set.get_double("PZdPrms");
-	double thr_dEmax=set.get_double("PZdEmax");
-
-	size_t pznmax=set.get_int("PZunit");
-	int pzniter=set.get_int("PZiter");
-
-	if(pz==CANPERT || pz==REALPERT) { // Perturbative treatment
-
-	  if(dft.adaptive) {
-	    // Solve restricted DFT problem first on a rough grid
-	    solver.RDFT(sol,occs,initconv,initdft);
-
-	    if(verbose) {
-	      fprintf(stderr,"\n");
-	      fflush(stderr);
-	    }
-	  }
-
-	  // ... and then on the more accurate grid
-	  solver.RDFT(sol,occs,conv,dft);
-
-	  // DFT grid
-	  DFTGrid grid(&basis,verbose,dft.lobatto);
-	  DFTGrid nlgrid(&basis,verbose,dft.lobatto);
-	  if(!dft.adaptive) {
-	    // Fixed size grid
-	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
-	    if(dft.nl)
-	      nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
-	  }
-
-	  // Get SIC potential
-	  solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzh,pzcor,grid,nlgrid,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
-
-	  // Perturbative calculation - no need for self-consistency
-	  // Diagonalize to get new orbitals and energies
-	  diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
-
-	  // and update density matrices
-	  sol.P=form_density(sol.C,occs);
-
-	} else { // Self-consistent treatment
-
-	  if(verbose)
-	    printf("\nRunning SIC cycle until energy converged to %e and density to %e max, %e rms.\n\n",thr_dEmax,thr_dPmax,thr_dPrms);
-
-	  // Iteration number
-	  int pziter=0;
-
-	  Timer tsic;
-
-	  // Real canonical CMOs?
-	  if(pz==OLDFULL)
-	    solver.set_real_cmos(true);
-	  else
-	    solver.set_real_cmos(false);
-
-	  if(dft.adaptive) {
-	    while(true) {
-	      // Change reference values
-	      oldsol=sol;
-
-	      // DFT grid
-	      DFTGrid grid(&basis,verbose,dft.lobatto);
-	      DFTGrid nlgrid(&basis,verbose,dft.lobatto);
-	      if(dft.nl) {
-		ERROR_INFO();
-		throw std::runtime_error("Should not end up here since adaptive grids are not supported with VV10.\n");
-	      }
-
-	      // Get new SIC potential
-	      solver.PZSIC_RDFT(sol,occs,initdft,pzmet,pzh,pzcor,grid,nlgrid,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
-	      pziter++;
-
-	      // Solve self-consistent field equations in presence of new SIC potential
-	      solver.RDFT(sol,occs,conv,initdft);
-
-	      // Energy difference
-	      double dE=sol.en.E-oldsol.en.E;
-	      // Density differences
-	      double dP_rms=rms_norm((sol.P-oldsol.P)/2.0);
-	      double dP_max=max_abs((sol.P-oldsol.P)/2.0);
-
-	      // Print out changes
-	      if(verbose) {
-		fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
-
-		if(fabs(dE)<thr_dEmax)
-		  fprintf(stderr," % 10.3e*",dE);
-		else
-		  fprintf(stderr," % 10.3e ",dE);
-
-		if(dP_rms<thr_dPrms)
-		  fprintf(stderr," %9.3e*",dP_rms);
-		else
-		  fprintf(stderr," %9.3e ",dP_rms);
-
-		if(dP_max<thr_dPmax)
-		  fprintf(stderr," %9.3e*",dP_max);
-		else
-		  fprintf(stderr," %9.3e ",dP_max);
-
-		fprintf(stderr,"\n");
-
-		printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
-		printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
-	      }
-
-	      if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
-		break;
-	      if(pziter>=pzniter)
-		break;
-	    }
-	    pziter=0;
-	  }
-
-	  if(pzniter)
-	    while(true) {
-	      // Change reference values
-	      oldsol=sol;
-
-	      // DFT grid
-	      DFTGrid grid(&basis,verbose,dft.lobatto);
-	      DFTGrid nlgrid(&basis,verbose,dft.lobatto);
-	      if(!dft.adaptive) {
-		// Fixed size grid
-		grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
-		if(dft.nl)
-		  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
-	      }
-
-	      // Get new SIC potential
-	      solver.PZSIC_RDFT(sol,occs,dft,pzmet,pzh,pzcor,grid,nlgrid,thr_Emax,thr_Kmax,thr_Krms,pznmax,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
-	      pziter++;
-
-	      // Solve self-consistent field equations in presence of new SIC potential
-	      solver.RDFT(sol,occs,conv,dft);
-
-	      // Energy difference
-	      double dE=sol.en.E-oldsol.en.E;
-	      // Density differences
-	      double dP_rms=rms_norm((sol.P-oldsol.P)/2.0);
-	      double dP_max=max_abs((sol.P-oldsol.P)/2.0);
-
-	      // Print out changes
-	      if(verbose) {
-		fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
-
-		if(fabs(dE)<thr_dEmax)
-		  fprintf(stderr," % 10.3e*",dE);
-		else
-		  fprintf(stderr," % 10.3e ",dE);
-
-		if(dP_rms<thr_dPrms)
-		  fprintf(stderr," %9.3e*",dP_rms);
-		else
-		  fprintf(stderr," %9.3e ",dP_rms);
-
-		if(dP_max<thr_dPmax)
-		  fprintf(stderr," %9.3e*",dP_max);
-		else
-		  fprintf(stderr," %9.3e ",dP_max);
-
-		fprintf(stderr,"\n");
-
-		printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
-		printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
-	      }
-
-	      if(fabs(dE)<thr_dEmax && dP_rms<thr_dPrms && dP_max<thr_dPmax)
-		break;
-	      if(pziter==pzniter)
-		break;
-	    }
-
-	  if(verbose)
-	    fprintf(stderr,"\nSIC self-consistency solved in %s.\n",tsic.elapsed().c_str());
-
-	  // Stability analysis
-	  if(pzstab) {
-	    PZStability stab(&solver,dft);
-
-	    arma::uvec drop;
-	    if(pzstabfz.size()) {
-	      // Convert to C++ indexing
-	      drop=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
-	    }
-
-	    /*
-	    // Optimize
-	    stab.set(sol,pz!=REAL,true,true);
-	    stab.optimize();
-	    */
-
-	    stab.set(sol,drop,true,abs(pzstab)==2);
-	    stab.check();
-	  }
+      int seed=set.get_int("PZseed");
+            
+      if(dft.adaptive) {
+	// Solve restricted DFT problem first on a rough grid
+	solver.RDFT(sol,occs,initconv,initdft);
+	
+	if(verbose) {
+	  fprintf(stderr,"\n");
+	  fflush(stderr);
 	}
       }
 
+      if(!pz)
+	// ... and then on the more accurate grid
+	solver.do_force(force);
+
+      solver.RDFT(sol,occs,conv,dft);
+
+      if(pz) {
+	// The localizing matrix
+	arma::cx_mat W;
+	if(chkpt.exist("CW.re")) {
+	  printf("Read localization matrix from checkpoint.\n");
+	  
+	  // Get old localized orbitals
+
+	  chkpt.cread("CW",CW);
+	  // The starting guess is the unitarized version of the overlap
+	  W=unitarize(arma::trans(sol.C.cols(0,CW.n_cols-1))*basis.overlap()*CW);
+	}
+	// Check that it is sane
+	if(W.n_rows != (size_t) Nel_alpha || W.n_cols != (size_t) Nel_alpha) {
+	  // Initialize with a random unitary matrix.
+	  if(!pzimag)
+	    W=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
+	  else
+	    W=complex_unitary(Nel_alpha,seed);
+	  
+	  if(Nel_alpha>1) {
+	    Timer tloc;
+	    
+	    // Localize starting guess
+	    if(verbose) printf("\nInitial localization.\n");
+	    double measure;
+	    // Max 1e5 iterations, gradient norm <= 1e-3
+	    orbital_localization(PIPEK_IAO2,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,!pzimag,1e5,1e-3);
+	    if(verbose) {
+	      printf("\n");
+	      
+	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+	      fflush(stderr);
+	    }
+	  }
+	}
+
+	// Save the orbitals
+	CW=sol.C.cols(0,Nel_alpha-1)*W;
+	chkpt.cwrite("CW",CW);
+	
+	// Complex orbitals
+	sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
+	sol.cC.cols(0,Nel_alpha-1)=CW;
+	sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
+	
+	PZStability stab(&solver,dft);
+	arma::uvec drop;
+
+	if(pzov && pzoo) {
+	  double dEoo, dEov;
+	  //	  do {
+	    // First, optimize OO transformations
+	    stab.set(sol,drop,pzreal,pzimag,false,true);
+	    dEoo=stab.optimize(pzmax,pzthr);
+	    sol=stab.get_rsol();
+	    // Then, optimize OV transformations
+	    stab.set(sol,drop,pzreal,pzimag,true,false);
+	    dEov=stab.optimize(pzmax,pzthr);
+	    sol=stab.get_rsol();
+	    //	  } while(std::max(std::abs(dEoo),std::abs(dEov))>0.0);
+
+	    // Redo the OO transformations
+	    stab.set(sol,drop,pzreal,pzimag,false,true);
+	    dEoo=stab.optimize(pzmax,pzthr);
+	    sol=stab.get_rsol();
+	    // and do the full optimization
+	    stab.set(sol,drop,pzreal,pzimag,pzov,pzoo);
+	    stab.optimize(pzmax,pzthr);
+	    sol=stab.get_rsol();
+	} else {
+	  // Just one transform to optimize
+	  stab.set(sol,drop,pzreal,pzimag,pzov,pzoo);
+	  stab.optimize(pzmax,pzthr);
+	  sol=stab.get_rsol();
+	}
+
+	if(pzstab) {
+	  if(pzstabfz.size())
+	    // Convert to C++ indexing
+	    drop=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
+	  
+	  stab.set(sol,drop,pzreal,pzimag,pzov,pzoo);
+	  stab.check();
+	}
+      }
       // and update checkpoint file entries
       chkpt.write("C",sol.C);
       chkpt.write("E",sol.E);
       chkpt.write("P",sol.P);
       chkpt.write(sol.en);
-
-      // Do we need forces?
-      if(force) {
-	solver.do_force(true);
-	solver.RDFT(sol,occs,conv,dft);
-      }
     }
 
     // Do population analysis
@@ -2545,272 +1809,163 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       }
 
       // Perdew-Zunger?
-      enum pzrun pz=parse_pzrun(set.get_string("PZ"));
+      bool pz=set.get_bool("PZ");
+      bool pzov=set.get_bool("PZov");
+      bool pzoo=set.get_bool("PZoo");
+      int pzmax=set.get_int("PZiter");
+      double pzthr=set.get_double("PZthr");
+      bool pzreal=set.get_bool("PZreal");
+      bool pzimag=set.get_bool("PZimag");
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
 
-      int pzstab=set.get_int("PZstab");
+      bool pzstab=set.get_bool("PZstab");
       std::string pzstabfz=set.get_string("PZstabFz");
+      int seed=set.get_int("PZseed");
 
-      if(pz==NO) {
-	if(dft.adaptive) {
-	  // Solve unrestricted DFT problem first on a rough grid
-	  solver.UDFT(sol,occa,occb,initconv,initdft);
-
-	  if(verbose) {
-	    fprintf(stderr,"\n");
-	    fflush(stderr);
-	  }
+      if(dft.adaptive) {
+	// Solve unrestricted DFT problem first on a rough grid
+	solver.UDFT(sol,occa,occb,initconv,initdft);
+	
+	if(verbose) {
+	  fprintf(stderr,"\n");
+	  fflush(stderr);
 	}
-	// ... and then on the more accurate grid
+      }
+      // ... and then on the more accurate grid
+      if(!pz)
 	solver.do_force(force);
-	solver.UDFT(sol,occa,occb,conv,dft);
-
-      } else {
-	// PZ weight
-	double pzcor=set.get_double("PZw");
-	// Run mode
-	pzmet_t pzmet=parse_pzmet(set.get_string("PZmode"));
-	// Localization?
-	bool pzloc=set.get_bool("PZloc");
-	// Seed
-	int seed=set.get_int("PZseed");
-
-	// Convergence thresholds
-	double thr_Kmax=set.get_double("PZKmax");
-	double thr_Krms=set.get_double("PZKrms");
-	double thr_Emax=set.get_double("PZEmax");
-	double thr_dPmax=set.get_double("PZdPmax");
-	double thr_dPrms=set.get_double("PZdPrms");
-	double thr_dEmax=set.get_double("PZdEmax");
-	int pzunit=set.get_int("PZunit");
-	int pzniter=set.get_int("PZiter");
-
-	Timer tsic;
-
-	if(pz==CANPERT || pz==REALPERT) {
-
-	  if(dft.adaptive) {
-	    // Solve restricted DFT problem first on a rough grid
-	    solver.UDFT(sol,occa,occb,initconv,initdft);
-
+      solver.UDFT(sol,occa,occb,conv,dft);
+      
+      if(pz) {
+	// The localizing matrices
+	arma::cx_mat Wa, Wb;
+	if(chkpt.exist("CWa.re")) {
+	  printf("Read localization matrix from checkpoint.\n");
+	  
+	  // Get old localized orbitals
+	  chkpt.cread("CWa",CWa);
+	  // The starting guess is the unitarized version of the overlap
+	  Wa=unitarize(arma::trans(sol.Ca.cols(0,CWa.n_cols-1))*basis.overlap()*CWa);
+	}
+	// Check that it is sane
+	if(Wa.n_rows != (size_t) Nel_alpha || Wa.n_cols != (size_t) Nel_alpha) {
+	  // Initialize with a random unitary matrix.
+	  if(!pzimag)
+	    Wa=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
+	  else
+	    Wa=complex_unitary(Nel_alpha,seed);
+	  
+	  if(Nel_alpha>1) {
+	    Timer tloc;
+	    
+	    // Localize starting guess
+	    if(verbose) printf("\nInitial localization.\n");
+	    double measure;
+	    // Max 1e5 iterations, gradient norm <= 1e-3
+	    orbital_localization(PIPEK_IAO2,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,!pzimag,1e5,1e-3);
 	    if(verbose) {
-	      fprintf(stderr,"\n");
+	      printf("\n");
+	      
+	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
 	      fflush(stderr);
 	    }
 	  }
+	}
 
-	  // ... and then on the more accurate grid
-	  solver.UDFT(sol,occa,occb,conv,dft);
-
-	  // DFT grid
-	  DFTGrid grid(&basis,verbose,dft.lobatto);
-	  DFTGrid nlgrid(&basis,verbose,dft.lobatto);
-	  if(!dft.adaptive) {
-	    // Fixed size grid
-	    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
-	    if(dft.nl)
-	      nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
-	  }
-
-	  // Get SIC potential
-	  solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzh,pzcor,grid,nlgrid,thr_Emax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
-
-          // Perturbative calculation - no need for self-consistency
-    	  // Diagonalize to get new orbitals and energies
-	  diagonalize(solver.get_S(),solver.get_Sinvh(),sol);
-	  // update density matrices
-	  sol.Pa=form_density(sol.Ca,occa);
-	  sol.Pb=form_density(sol.Cb,occb);
-	  sol.P=sol.Pa+sol.Pb;
-
-	} else {
-	  if(verbose)
-	    printf("\nRunning SIC cycle until energy converged to %e and density to %e max, %e rms.\n\n",thr_dEmax,thr_dPmax,thr_dPrms);
-
-	  // Real canonical CMOs?
-	  if(pz==OLDFULL)
-	    solver.set_real_cmos(true);
+	if(chkpt.exist("CWb.re")) {
+	  printf("Read localization matrix from checkpoint.\n");
+	  
+	  // Get old localized orbitals
+	  chkpt.cread("CWb",CWb);
+	  // The starting guess is the unitarized version of the overlap
+	  Wb=unitarize(arma::trans(sol.Cb.cols(0,CWb.n_cols-1))*basis.overlap()*CWb);
+	}
+	// Check that it is sane
+	if(Nel_beta && (Wb.n_rows != (size_t) Nel_beta || Wb.n_cols != (size_t) Nel_beta)) {
+	  // Initialize with a random unitary matrix.
+	  if(!pzimag)
+	    Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
 	  else
-	    solver.set_real_cmos(false);
-
-	  // Solution to last iteration
-	  uscf_t oldsol;
-
-	  // Iteration number
-	  int pziter=0;
-
-	  if(dft.adaptive) {
-	    while(true) {
-	      // Change reference values
-	      oldsol=sol;
-
-	      // DFT grid
-	      DFTGrid grid(&basis,verbose,dft.lobatto);
-	      DFTGrid nlgrid(&basis,verbose,dft.lobatto);
-	      if(!dft.adaptive) {
-		// Fixed size grid
-		grid.construct(initdft.nrad,initdft.lmax,initdft.x_func,initdft.c_func,strictint);
-		if(dft.nl)
-		  nlgrid.construct(initdft.nlnrad,initdft.nllmax,true,false,strictint,true);
-	      }
-
-	      // Get new SIC potential
-	      solver.PZSIC_UDFT(sol,occa,occb,initdft,pzmet,pzh,pzcor,grid,nlgrid,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
-	      pziter++;
-
-	      // Solve self-consistent field equations in presence of new SIC potential
-	      solver.UDFT(sol,occa,occb,conv,dft);
-
-	      // Energy difference
-	      double dE=sol.en.E-oldsol.en.E;
-	      // Density differences
-	      double dPa_rms=rms_norm(sol.Pa-oldsol.Pa);
-	      double dPa_max=max_abs(sol.Pa-oldsol.Pa);
-	      double dPb_rms=rms_norm(sol.Pb-oldsol.Pb);
-	      double dPb_max=max_abs(sol.Pb-oldsol.Pb);
-	      double dP_rms=std::max(dPa_rms,dPb_rms);
-	      double dP_max=std::max(dPa_max,dPb_max);
-
-	      // Print out changes
-	      if(verbose) {
-		fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
-
-		if(fabs(dE)<thr_dEmax)
-		  fprintf(stderr," % 10.3e*",dE);
-		else
-		  fprintf(stderr," % 10.3e ",dE);
-
-		if(dP_rms<thr_dPrms)
-		  fprintf(stderr," %9.3e*",dP_rms);
-		else
-		  fprintf(stderr," %9.3e ",dP_rms);
-
-		if(dP_max<thr_dPmax)
-		  fprintf(stderr," %9.3e*",dP_max);
-		else
-		  fprintf(stderr," %9.3e ",dP_max);
-
-		fprintf(stderr,"\n");
-
-		printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
-		printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
-		printf("%7s %13s %e %e\n","alpha","",dPa_max,dPa_rms);
-		printf("%7s %13s %e %e\n","beta","",dPb_max,dPb_rms);
-	      }
-
-	      if(fabs(dE)<thr_dEmax && std::max(dPa_rms,dPb_rms)<thr_dPrms && std::max(dPa_max,dPb_max)<thr_dPmax)
-		break;
-	      if(pziter==pzniter)
-		break;
-	    }
-	    pziter=0;
-	  }
-
-	  while(true) {
-	    // Change reference values
-	    oldsol=sol;
-
-	    // DFT grid
-	    DFTGrid grid(&basis,verbose,dft.lobatto);
-	    DFTGrid nlgrid(&basis,verbose,dft.lobatto);
-	    if(!dft.adaptive) {
-	      // Fixed size grid
-	      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
-	      if(dft.nl)
-		nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
-	    }
-
-	    // Get new SIC potential
-	    solver.PZSIC_UDFT(sol,occa,occb,dft,pzmet,pzh,pzcor,grid,nlgrid,thr_dEmax,thr_Kmax,thr_Krms,pzunit,(pz==CAN || pz==CANPERT),pzloc,(pz==REAL || pz==REALPERT),seed);
-	    pziter++;
-
-	    // Solve self-consistent field equations in presence of new SIC potential
-	    solver.UDFT(sol,occa,occb,conv,dft);
-
-	    // Energy difference
-	    double dE=sol.en.E-oldsol.en.E;
-	    // Density differences
-	    double dPa_rms=rms_norm(sol.Pa-oldsol.Pa);
-	    double dPa_max=max_abs(sol.Pa-oldsol.Pa);
-	    double dPb_rms=rms_norm(sol.Pb-oldsol.Pb);
-	    double dPb_max=max_abs(sol.Pb-oldsol.Pb);
-	    double dP_rms=rms_norm(sol.P-oldsol.P);
-	    double dP_max=max_abs(sol.P-oldsol.P);
-
-	    // Print out changes
+	    Wb=complex_unitary(Nel_beta,seed);
+	  
+	  if(Nel_beta>1) {
+	    Timer tloc;
+	    
+	    // Localize starting guess
+	    if(verbose) printf("\nInitial localization.\n");
+	    double measure;
+	    // Max 1e5 iterations, gradient norm <= 1e-3
+	    orbital_localization(PIPEK_IAO2,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,!pzimag,1e5,1e-3);
 	    if(verbose) {
-	      fprintf(stderr,"%4i % 16.8f",pziter,sol.en.E);
-
-	      if(fabs(dE)<thr_dEmax)
-		fprintf(stderr," % 10.3e*",dE);
-	      else
-		fprintf(stderr," % 10.3e ",dE);
-
-	      if(dP_rms<thr_dPrms)
-		fprintf(stderr," %9.3e*",dP_rms);
-	      else
-		fprintf(stderr," %9.3e ",dP_rms);
-
-	      if(dP_max<thr_dPmax)
-		fprintf(stderr," %9.3e*",dP_max);
-	      else
-		fprintf(stderr," %9.3e ",dP_max);
-
-	      fprintf(stderr,"\n");
-
-	      printf("\n%7s %13s %12s %12s\n","Errors:","Energy","Max dens","RMS dens");
-	      printf("%7s % e %e %e\n","",dE,dP_max,dP_rms);
-	      printf("%7s %13s %e %e\n","alpha","",dPa_max,dPa_rms);
-	      printf("%7s %13s %e %e\n","beta","",dPb_max,dPb_rms);
+	      printf("\n");
+	      
+	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+	      fflush(stderr);
 	    }
-
-	    if(fabs(dE)<thr_dEmax && std::max(dPa_rms,dPb_rms)<thr_dPrms && std::max(dPa_max,dPb_max)<thr_dPmax)
-	      break;
-	    if(pziter==pzniter)
-	      break;
-	  }
-
-	  if(verbose)
-	    fprintf(stderr,"\nSIC self-consistency solved in %s.\n",tsic.elapsed().c_str());
-
-	  // Stability analysis
-	  if(pzstab) {
-	    PZStability stab(&solver,dft);
-
-	    arma::uvec dropa, dropb;
-	    if(pzstabfz.size()) {
-	      // Get ranges and convert to C++ indexing
-	      dropa=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
-	      dropb=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[1]))-1;
-	    }
-	    /*
-	    // Optimize
-	    stab.set(sol,pz!=REAL,true,true);
-	    stab.optimize();
-	    */
-
-	    stab.set(sol,dropa,dropb,true,abs(pzstab)==2);
-	    stab.check();
 	  }
 	}
 
-	// and update checkpoint file entries
-	chkpt.write("Ca",sol.Ca);
-	chkpt.write("Cb",sol.Cb);
-	chkpt.write("Ea",sol.Ea);
-	chkpt.write("Eb",sol.Eb);
-	chkpt.write("Pa",sol.Pa);
-	chkpt.write("Pb",sol.Pb);
-	chkpt.write("P",sol.P);
-	chkpt.write(sol.en);
-
-	// Do we need forces?
-	if(force) {
-	  solver.do_force(true);
-	  solver.UDFT(sol,occa,occb,conv,dft);
+	// Save the orbitals
+	CWa=sol.Ca.cols(0,Nel_alpha-1)*Wa;
+	chkpt.cwrite("CWa",CWa);
+	if(Nel_beta) {
+	  CWb=sol.Cb.cols(0,Nel_beta-1)*Wb;
+	  chkpt.cwrite("CWb",CWb);
 	}
+	
+	// Complex orbitals
+	sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
+	sol.cCa.cols(0,Nel_alpha-1)=CWa;
+	sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
 
+	sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+	if(Nel_beta)
+	  sol.cCb.cols(0,Nel_beta-1)=CWb;
+	sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
+	
+	PZStability stab(&solver,dft);
+	arma::uvec dropa, dropb;
+	if(pzov && pzoo) {
+	  double dEoo, dEov;
+	  do {
+	    // First, optimize OO transformations
+	    stab.set(sol,dropa,dropb,pzreal,pzimag,false,true);
+	    dEoo=stab.optimize(pzmax,pzthr);
+	    sol=stab.get_usol();
+	    // Then, optimize OV transformations
+	    stab.set(sol,dropa,dropb,pzreal,pzimag,true,false);
+	    dEov=stab.optimize(pzmax,pzthr);
+	    sol=stab.get_usol();
+	  } while(std::max(std::abs(dEoo),std::abs(dEov))>0.0);
+	} else {
+	  // Just one transform to optimize
+	  stab.set(sol,dropa,dropb,pzreal,pzimag,pzov,pzoo);
+	  stab.optimize(pzmax,pzthr);
+	  sol=stab.get_usol();
+	}
+	
+	if(pzstab) {
+	  if(pzstabfz.size()) {
+	    // Convert to C++ indexing
+	    dropa=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
+	    dropb=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[1]))-1;
+	  }
+	  
+	  stab.set(sol,dropa,dropb,pzreal,pzimag,pzov,pzoo);
+	  stab.check();
+	}
       }
+      // and update checkpoint file entries
+      chkpt.write("Ca",sol.Ca);
+      chkpt.write("Cb",sol.Cb);
+      chkpt.cwrite("CCa",sol.cCa);
+      chkpt.cwrite("CCb",sol.cCb);
+      chkpt.write("Ea",sol.Ea);
+      chkpt.write("Eb",sol.Eb);
+      chkpt.write("Pa",sol.Pa);
+      chkpt.write("Pb",sol.Pb);
+      chkpt.write("P",sol.P);
+      chkpt.write(sol.en);
     }
 
     if(verbose) {
