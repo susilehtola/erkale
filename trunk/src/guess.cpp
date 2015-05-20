@@ -80,8 +80,6 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   set.set_double("DeltaPmax",1e-5);
   set.set_double("DeltaPrms",1e-6);
 
-  set.print();
-  
   // Construct the basis set
   atbas=BasisSet(1,set);
   // Add the nucleus
