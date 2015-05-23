@@ -150,17 +150,19 @@ void Settings::add_dft_settings() {
   add_double("PZw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
   // Perturbative SIC?
   add_bool("PZ", "Perform Perdew-Zunger self-interaction correction?",false);
+  add_bool("PZprec", "Precondition OV block?",true);
   add_bool("PZoo", "Optimize OO block?",true);
   add_bool("PZov", "Optimize OV block?",true);
-  add_double("PZthr", "Threshold for orbital gradient convergence",1e-5);
+  add_double("PZIthr", "Threshold for initialization convergence (not too small!)",1e-1);
+  add_double("PZOOthr", "Threshold for OO orbital gradient convergence",1e-3);
+  add_double("PZOVthr", "Threshold for OV orbital gradient convergence",1e-6);
+  add_double("PZEthr", "Threshold for energy convergence",1e-10);
   // Initialize PZ-SIC with localized orbitals?
   add_bool("PZloc", "Initial localization before SIC calculation?", true);
   // Run stability analysis for PZ-SIC?
-  add_bool("PZstab", "Stability analysis for PZ-SIC?", false);
+  add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0);
   add_bool("PZreal", "Real degrees of freedom in PZ?", true);
   add_bool("PZimag", "Imaginary degrees of freedom in PZ?", true);
-  // Freeze orbitals in stability analysis
-  add_string("PZstabFz", "Orbitals to freeze for stability analysis (only oo!)", "");
   // Mode to use PZ-SIC
   add_string("PZmode", "Apply PZ to the operators (in addition to J): X C D", "XC");
   // PZ-SIC Hamiltonian
@@ -482,6 +484,7 @@ void Settings::parse(std::string filename, bool scf) {
 	  set_string(words[0],val);
 	} else {
 	  ERROR_INFO();
+	  print();
 	  std::ostringstream oss;
 	  oss << "\nCannot recognize keyword "<<words[0]<<"!\n";
 	  throw std::runtime_error(oss.str());
