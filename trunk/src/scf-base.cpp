@@ -1570,116 +1570,154 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       // Perdew-Zunger?
       bool pz=set.get_bool("PZ");
+      bool pzprec=set.get_bool("PZprec");
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
+      double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
-      double pzthr=set.get_double("PZthr");
-      bool pzreal=set.get_bool("PZreal");
+      double pzEthr=set.get_double("PZEthr");
+      double pzOOthr=set.get_double("PZOOthr");
+      double pzOVthr=set.get_double("PZOVthr");
+      double pzIthr=set.get_double("PZIthr");
       bool pzimag=set.get_bool("PZimag");
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
-      bool pzstab=set.get_bool("PZstab");
-      std::string pzstabfz=set.get_string("PZstabFz");
+      int pzstab=set.get_int("PZstab");
       int seed=set.get_int("PZseed");
             
-      if(dft.adaptive) {
-	// Solve restricted DFT problem first on a rough grid
-	solver.RDFT(sol,occs,initconv,initdft);
-	
-	if(verbose) {
-	  fprintf(stderr,"\n");
-	  fflush(stderr);
+      if(!pz) {
+	if(dft.adaptive) {
+	  // Solve restricted DFT problem first on a rough grid
+	  solver.RDFT(sol,occs,initconv,initdft);
+	  
+	  if(verbose) {
+	    fprintf(stderr,"\n");
+	    fflush(stderr);
+	  }
 	}
-      }
-
-      if(!pz)
+	
 	// ... and then on the more accurate grid
 	solver.do_force(force);
+	solver.RDFT(sol,occs,conv,dft);
 
-      solver.RDFT(sol,occs,conv,dft);
-
-      if(pz) {
+      } else {
 	// The localizing matrix
 	arma::cx_mat W;
 	if(chkpt.exist("CW.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
 	  
 	  // Get old localized orbitals
-
 	  chkpt.cread("CW",CW);
 	  // The starting guess is the unitarized version of the overlap
 	  W=unitarize(arma::trans(sol.C.cols(0,CW.n_cols-1))*basis.overlap()*CW);
+	  // Save the orbitals
+	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
+	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
+	  sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
 	}
 	// Check that it is sane
 	if(W.n_rows != (size_t) Nel_alpha || W.n_cols != (size_t) Nel_alpha) {
-	  // Initialize with a random unitary matrix.
-	  if(!pzimag)
-	    W=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
-	  else
-	    W=complex_unitary(Nel_alpha,seed);
-	  
-	  if(Nel_alpha>1) {
-	    Timer tloc;
+	  if(!pzoo) {
+	    W.eye(Nel_alpha,Nel_alpha);
+	  } else {
+	    // Initialize with a random unitary matrix.
+	    if(!pzimag)
+	      W=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
+	    else
+	      W=complex_unitary(Nel_alpha,seed);
 	    
-	    // Localize starting guess
-	    if(verbose) printf("\nInitial localization.\n");
-	    double measure;
-	    // Max 1e5 iterations, gradient norm <= 1e-3
-	    orbital_localization(PIPEK_IAO2,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,!pzimag,1e5,1e-3);
-	    if(verbose) {
-	      printf("\n");
+	    if(Nel_alpha>1) {
+	      Timer tloc;
 	      
-	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-	      fflush(stderr);
+	      // Localize starting guess
+	      if(verbose) printf("\nInitial localization.\n");
+	      double measure;
+	      // Max 1e5 iterations, gradient norm <= 1e-3
+	      orbital_localization(PIPEK_IAO2,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,!pzimag,1e5,1e-3);
+	      if(verbose) {
+		printf("\n");
+		
+		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+		fflush(stderr);
+	      }
 	    }
 	  }
-	}
 
-	// Save the orbitals
-	CW=sol.C.cols(0,Nel_alpha-1)*W;
-	chkpt.cwrite("CW",CW);
-	
-	// Complex orbitals
-	sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
-	sol.cC.cols(0,Nel_alpha-1)=CW;
-	sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
-	
-	PZStability stab(&solver,dft);
-	arma::uvec drop;
-
-	if(pzov && pzoo) {
-	  double dEoo, dEov;
-	  //	  do {
-	    // First, optimize OO transformations
-	    stab.set(sol,drop,pzreal,pzimag,false,true);
-	    dEoo=stab.optimize(pzmax,pzthr);
-	    sol=stab.get_rsol();
-	    // Then, optimize OV transformations
-	    stab.set(sol,drop,pzreal,pzimag,true,false);
-	    dEov=stab.optimize(pzmax,pzthr);
-	    sol=stab.get_rsol();
-	    //	  } while(std::max(std::abs(dEoo),std::abs(dEov))>0.0);
-
-	    // Redo the OO transformations
-	    stab.set(sol,drop,pzreal,pzimag,false,true);
-	    dEoo=stab.optimize(pzmax,pzthr);
-	    sol=stab.get_rsol();
-	    // and do the full optimization
-	    stab.set(sol,drop,pzreal,pzimag,pzov,pzoo);
-	    stab.optimize(pzmax,pzthr);
-	    sol=stab.get_rsol();
-	} else {
-	  // Just one transform to optimize
-	  stab.set(sol,drop,pzreal,pzimag,pzov,pzoo);
-	  stab.optimize(pzmax,pzthr);
-	  sol=stab.get_rsol();
-	}
-
-	if(pzstab) {
-	  if(pzstabfz.size())
-	    // Convert to C++ indexing
-	    drop=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
+	  // Save the complex orbitals
+	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
+	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
+	  sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
 	  
-	  stab.set(sol,drop,pzreal,pzimag,pzov,pzoo);
+	  // Initialize with Coulomb treatment
+	  if(pzoo && set.get_bool("DensityFitting") && (dft.x_func || dft.c_func)) {
+	    dft_t dum(dft);
+	    dum.x_func=dum.c_func=0;
+	    
+	    PZStability stab(&solver);
+	    stab.set_method(dum,1.0);
+	    stab.set(sol,true,pzimag,false,true);
+	    stab.optimize(pzmax,pzIthr,pzEthr,pzprec);
+	    sol=stab.get_rsol();
+	  }
+	}
+	
+	// Save the orbitals
+	chkpt.cwrite("CW",sol.cC.cols(0,Nel_alpha-1));
+	
+	PZStability stab(&solver);
+	stab.set_method(dft,pzw);
+
+	while(true) {
+	  double dEor=0.0, dEoi=0.0, dEvr=0.0, dEvi=0.0;
+	  if(pzoo) {
+	    // First, optimize the OO transformations
+	    stab.set(sol,true,pzimag,false,true);
+	    dEor=stab.optimize(pzmax,pzOOthr,pzEthr,pzprec);
+	    sol=stab.get_rsol();
+	  }
+	  if(pzov) {
+	    // Then, optimize the real OV transformations
+	    stab.set(sol,true,pzimag,true,false);
+	    dEvr=stab.optimize(pzmax,pzOVthr,pzEthr,pzprec);
+	    sol=stab.get_rsol();
+	  }
+	  if(dEor!=0.0 || dEoi!=0.0 || dEvr!=0.0 || dEvi!=0.0)
+	    continue;
+
+	  // Stability analysis
+	  bool instab=false;
+	  
+	  // Check stability of OO rotations
+	  if(pzoo && pzstab<0) {
+	    stab.set(sol,true,pzimag,false,true);
+	    instab=stab.check(true);
+	    if(instab) {
+	      stab.optimize(pzmax,pzOOthr,pzEthr,pzprec);
+	      sol=stab.get_rsol();
+	      continue;
+	    }
+	  }
+	  if(pzov && pzstab==-2) {
+	    // Check stability of OV rotations
+	    stab.set(sol,true,pzimag,true,false);
+	    instab=instab || stab.check(true);
+	    if(instab) {
+	      stab.optimize(pzmax,pzOVthr,pzEthr,pzprec);
+	      sol=stab.get_rsol();
+	      continue;
+	    }
+	  }
+	  if(!instab)
+	    break;
+	}
+
+	// Stability analysis?
+	if(pzoo && pzstab>0) {
+	  stab.set(sol,true,pzimag,false,true);
+	  stab.check();
+	}
+	if(pzov && pzstab==2) {
+	  // Check stability of OV rotations
+	  stab.set(sol,true,pzimag,true,false);
 	  stab.check();
 	}
       }
@@ -1810,35 +1848,39 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       // Perdew-Zunger?
       bool pz=set.get_bool("PZ");
+      bool pzprec=set.get_bool("PZprec");
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
+      double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
-      double pzthr=set.get_double("PZthr");
-      bool pzreal=set.get_bool("PZreal");
+      double pzEthr=set.get_double("PZEthr");
+      double pzOOthr=set.get_double("PZOOthr");
+      double pzOVthr=set.get_double("PZOVthr");
+      double pzIthr=set.get_double("PZIthr");
       bool pzimag=set.get_bool("PZimag");
       enum pzham pzh=parse_pzham(set.get_string("PZHam"));
 
-      bool pzstab=set.get_bool("PZstab");
-      std::string pzstabfz=set.get_string("PZstabFz");
+      int pzstab=set.get_int("PZstab");
       int seed=set.get_int("PZseed");
 
-      if(dft.adaptive) {
-	// Solve unrestricted DFT problem first on a rough grid
-	solver.UDFT(sol,occa,occb,initconv,initdft);
-	
-	if(verbose) {
-	  fprintf(stderr,"\n");
-	  fflush(stderr);
+      if(!pz) {
+	if(dft.adaptive) {
+	  // Solve unrestricted DFT problem first on a rough grid
+	  solver.UDFT(sol,occa,occb,initconv,initdft);
+	  
+	  if(verbose) {
+	    fprintf(stderr,"\n");
+	    fflush(stderr);
+	  }
 	}
-      }
-      // ... and then on the more accurate grid
-      if(!pz)
+	// ... and then on the more accurate grid
 	solver.do_force(force);
-      solver.UDFT(sol,occa,occb,conv,dft);
-      
-      if(pz) {
+	solver.UDFT(sol,occa,occb,conv,dft);
+
+      } else {
 	// The localizing matrices
 	arma::cx_mat Wa, Wb;
+	bool loc=false;
 	if(chkpt.exist("CWa.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
 	  
@@ -1846,30 +1888,44 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  chkpt.cread("CWa",CWa);
 	  // The starting guess is the unitarized version of the overlap
 	  Wa=unitarize(arma::trans(sol.Ca.cols(0,CWa.n_cols-1))*basis.overlap()*CWa);
+	  // Save the complex orbitals
+	  sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
+	  sol.cCa.cols(0,Nel_alpha-1)=sol.Ca.cols(0,Nel_alpha-1)*Wa;
+	  sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
 	}
 	// Check that it is sane
 	if(Wa.n_rows != (size_t) Nel_alpha || Wa.n_cols != (size_t) Nel_alpha) {
-	  // Initialize with a random unitary matrix.
-	  if(!pzimag)
-	    Wa=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
-	  else
-	    Wa=complex_unitary(Nel_alpha,seed);
-	  
-	  if(Nel_alpha>1) {
-	    Timer tloc;
+	  if(!pzoo)
+	    Wa.eye(Nel_alpha,Nel_alpha);
+	  else {
+	    // Initialize with a random unitary matrix.
+	    if(!pzimag)
+	      Wa=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
+	    else
+	      Wa=complex_unitary(Nel_alpha,seed);
 	    
-	    // Localize starting guess
-	    if(verbose) printf("\nInitial localization.\n");
-	    double measure;
-	    // Max 1e5 iterations, gradient norm <= 1e-3
-	    orbital_localization(PIPEK_IAO2,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,!pzimag,1e5,1e-3);
-	    if(verbose) {
-	      printf("\n");
+	    if(Nel_alpha>1) {
+	      Timer tloc;
 	      
-	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-	      fflush(stderr);
+	      // Localize starting guess
+	      if(verbose) printf("\nInitial localization.\n");
+	      double measure;
+	      // Max 1e5 iterations, gradient norm <= 1e-3
+	      orbital_localization(PIPEK_IAO2,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,!pzimag,1e5,1e-3);
+	      if(verbose) {
+		printf("\n");
+		
+		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+		fflush(stderr);
+	      }
 	    }
 	  }
+
+	  // Save the complex orbitals
+	  sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
+	  sol.cCa.cols(0,Nel_alpha-1)=sol.Ca.cols(0,Nel_alpha-1)*Wa;
+	  sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
+	  loc=true;
 	}
 
 	if(chkpt.exist("CWb.re")) {
@@ -1879,82 +1935,124 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  chkpt.cread("CWb",CWb);
 	  // The starting guess is the unitarized version of the overlap
 	  Wb=unitarize(arma::trans(sol.Cb.cols(0,CWb.n_cols-1))*basis.overlap()*CWb);
+	  // Save the complex orbitals
+	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
+	  sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
 	}
 	// Check that it is sane
 	if(Nel_beta && (Wb.n_rows != (size_t) Nel_beta || Wb.n_cols != (size_t) Nel_beta)) {
-	  // Initialize with a random unitary matrix.
-	  if(!pzimag)
-	    Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
-	  else
-	    Wb=complex_unitary(Nel_beta,seed);
-	  
-	  if(Nel_beta>1) {
-	    Timer tloc;
+	  // Initialize with a random orthogonal matrix.
+	  if(!pzoo)
+	    Wb.eye(Nel_beta,Nel_beta);
+	  else {
+	    if(!pzimag)
+	      Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
+	    else
+	      Wb=complex_unitary(Nel_beta,seed);
 	    
-	    // Localize starting guess
-	    if(verbose) printf("\nInitial localization.\n");
-	    double measure;
-	    // Max 1e5 iterations, gradient norm <= 1e-3
-	    orbital_localization(PIPEK_IAO2,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,!pzimag,1e5,1e-3);
-	    if(verbose) {
-	      printf("\n");
+	    if(Nel_beta>1) {
+	      Timer tloc;
 	      
-	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-	      fflush(stderr);
+	      // Localize starting guess
+	      if(verbose) printf("\nInitial localization.\n");
+	      double measure;
+	      // Max 1e5 iterations, gradient norm <= 1e-3
+	      orbital_localization(PIPEK_IAO2,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,!pzimag,1e5,1e-3);
+	      if(verbose) {
+		printf("\n");
+		
+		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+		fflush(stderr);
+	      }
 	    }
 	  }
-	}
 
-	// Save the orbitals
-	CWa=sol.Ca.cols(0,Nel_alpha-1)*Wa;
-	chkpt.cwrite("CWa",CWa);
-	if(Nel_beta) {
-	  CWb=sol.Cb.cols(0,Nel_beta-1)*Wb;
-	  chkpt.cwrite("CWb",CWb);
+	  // Save the complex orbitals
+	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
+	  sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
+	  loc=true;
 	}
-	
-	// Complex orbitals
-	sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
-	sol.cCa.cols(0,Nel_alpha-1)=CWa;
-	sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
+	// Sanity check
+	if(Nel_beta == 0)
+	  sol.cCb=sol.Cb*COMPLEX1;
 
-	sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
-	if(Nel_beta)
-	  sol.cCb.cols(0,Nel_beta-1)=CWb;
-	sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
-	
-	PZStability stab(&solver,dft);
-	arma::uvec dropa, dropb;
-	if(pzov && pzoo) {
-	  double dEoo, dEov;
-	  do {
-	    // First, optimize OO transformations
-	    stab.set(sol,dropa,dropb,pzreal,pzimag,false,true);
-	    dEoo=stab.optimize(pzmax,pzthr);
-	    sol=stab.get_usol();
-	    // Then, optimize OV transformations
-	    stab.set(sol,dropa,dropb,pzreal,pzimag,true,false);
-	    dEov=stab.optimize(pzmax,pzthr);
-	    sol=stab.get_usol();
-	  } while(std::max(std::abs(dEoo),std::abs(dEov))>0.0);
-	} else {
-	  // Just one transform to optimize
-	  stab.set(sol,dropa,dropb,pzreal,pzimag,pzov,pzoo);
-	  stab.optimize(pzmax,pzthr);
+	// Initialize with Coulomb treatment
+	if(loc && pzoo && set.get_bool("DensityFitting") && (dft.x_func || dft.c_func)) {
+	  dft_t dum(dft);
+	  dum.x_func=dum.c_func=0;
+	  
+	  PZStability stab(&solver);
+	  stab.set_method(dum,1.0);
+	  stab.set(sol,true,pzimag,false,true);
+	  stab.optimize(pzmax,pzIthr,pzEthr,pzprec);
 	  sol=stab.get_usol();
 	}
 	
-	if(pzstab) {
-	  if(pzstabfz.size()) {
-	    // Convert to C++ indexing
-	    dropa=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[0]))-1;
-	    dropb=arma::conv_to<arma::uvec>::from(parse_range(splitline(pzstabfz)[1]))-1;
+	// Save the orbitals
+	chkpt.cwrite("CWa",sol.cCa.cols(0,Nel_alpha-1));
+	chkpt.cwrite("CWb",sol.cCb.cols(0,Nel_alpha-1));
+	
+	PZStability stab(&solver);
+	stab.set_method(dft,pzw);
+	
+	while(true) {
+	  double dEor=0.0, dEoi=0.0, dEvr=0.0, dEvi=0.0;
+	  if(pzoo) {
+	    // First, optimize the OO transformations
+	    stab.set(sol,true,pzimag,false,true);
+	    dEor=stab.optimize(pzmax,pzOOthr,pzEthr,pzprec);
+	    sol=stab.get_usol();
 	  }
+	  if(pzov) {
+	    // Then, optimize the real OV transformations
+	    stab.set(sol,true,pzimag,true,false);
+	    dEvr=stab.optimize(pzmax,pzOVthr,pzEthr,pzprec);
+	    sol=stab.get_usol();
+	  }
+	  if(dEor!=0.0 || dEoi!=0.0 || dEvr!=0.0 || dEvi!=0.0)
+	    continue;
 	  
-	  stab.set(sol,dropa,dropb,pzreal,pzimag,pzov,pzoo);
+	  // Stability analysis
+	  bool instab=false;
+	  
+	  // Check stability of OO rotations
+	  if(pzoo && pzstab<0) {
+	    stab.set(sol,true,pzimag,false,true);
+	    instab=stab.check(true);
+	    if(instab) {
+	      stab.optimize(pzmax,pzOOthr,pzEthr,pzprec);
+	      sol=stab.get_usol();
+	      continue;
+	    }
+	  }
+	  if(pzov && pzstab==-2) {
+	    // Check stability of OV rotations
+	    stab.set(sol,true,pzimag,true,false);
+	    instab=instab || stab.check(true);
+	    if(instab) {
+	      stab.optimize(pzmax,pzOVthr,pzEthr,pzprec);
+	      sol=stab.get_usol();
+	      continue;
+	    }
+	  }
+	  if(!instab)
+	    break;
+	}
+
+	// Stability analysis?
+	if(pzoo && pzstab>0) {
+	  stab.set(sol,true,pzimag,false,true);
+	  stab.check();
+	}
+	if(pzov && pzstab==2) {
+	  // Check stability of OV rotations
+	  stab.set(sol,true,pzimag,true,false);
 	  stab.check();
 	}
       }
+
       // and update checkpoint file entries
       chkpt.write("Ca",sol.Ca);
       chkpt.write("Cb",sol.Cb);
