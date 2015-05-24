@@ -1233,22 +1233,6 @@ pzmet_t parse_pzmet(const std::string & pzmod) {
   return mode;
 }
 
-enum pzham parse_pzham(const std::string & pzh) {
-  enum pzham ham;
-
-  if(stricmp(pzh,"Symm")==0)
-    ham=PZSYMM;
-  else if(stricmp(pzh,"United")==0)
-    ham=PZUNITED;
-  else {
-    std::ostringstream oss;
-    oss << "Unknown PZ-SIC Hamiltonian \"" << pzh << "\"!\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  return ham;
-}
-
 dft_t parse_dft(const Settings & set, bool init) {
   dft_t dft;
   dft.gridtol=0.0;
@@ -1418,9 +1402,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   arma::cx_mat CW, CWa, CWb;
   bool doCW=false;
 
-  // Strict integrals?
-  bool strictint(set.get_bool("StrictIntegrals"));
-  
   // Which guess to use
   enum guess_t guess=parse_guess(set.get_string("Guess"));
   // Freeze core orbitals?
@@ -1429,6 +1410,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     throw std::runtime_error("Cannot freeze core orbitals with core guess!\n");
   if(freezecore && guess==GWHGUESS)
     throw std::runtime_error("Cannot freeze core orbitals with GWH guess!\n");
+
+  // Amount of electrons
+  int Nel_alpha;
+  int Nel_beta;
+  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
 
   if(doload) {
     Checkpoint load(loadname,false);
@@ -1451,7 +1437,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	arma::cx_mat CWold;
 	load.cread("CW",CWold);
 
-	basis.projectOMOs(oldbas,CWold,CW);
+	basis.projectOMOs(oldbas,CWold,CW,Nel_alpha);
 	doCW=true;
       }
     } else {
@@ -1466,8 +1452,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	load.cread("CWa",CWaold);
 	load.cread("CWb",CWbold);
 
-	basis.projectOMOs(oldbas,CWaold,CWa);
-	basis.projectOMOs(oldbas,CWbold,CWb);
+	basis.projectOMOs(oldbas,CWaold,CWa,Nel_alpha);
+	basis.projectOMOs(oldbas,CWbold,CWb,Nel_beta);
 	doCW=true;
       }
     }
@@ -1518,9 +1504,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     chkpt.write(basis);
 
     // Write number of electrons
-    int Nel_alpha;
-    int Nel_beta;
-    get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
     chkpt.write("Nel",Nel);
     chkpt.write("Nel-a",Nel_alpha);
     chkpt.write("Nel-b",Nel_beta);
@@ -1575,12 +1558,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       bool pzoo=set.get_bool("PZoo");
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
-      double pzEthr=set.get_double("PZEthr");
-      double pzOOthr=set.get_double("PZOOthr");
-      double pzOVthr=set.get_double("PZOVthr");
       double pzIthr=set.get_double("PZIthr");
+      double pzOthr=set.get_double("PZOthr");
+      double pzNRthr=set.get_double("PZNRthr");
+      double pzEthr=set.get_double("PZEthr");
+      double pzGthr=set.get_double("PZGthr");
       bool pzimag=set.get_bool("PZimag");
-      enum pzham pzh=parse_pzham(set.get_string("PZHam"));
       int pzstab=set.get_int("PZstab");
       int seed=set.get_int("PZseed");
             
@@ -1601,21 +1584,16 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       } else {
 	// The localizing matrix
-	arma::cx_mat W;
 	if(chkpt.exist("CW.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
 	  
 	  // Get old localized orbitals
 	  chkpt.cread("CW",CW);
-	  // The starting guess is the unitarized version of the overlap
-	  W=unitarize(arma::trans(sol.C.cols(0,CW.n_cols-1))*basis.overlap()*CW);
 	  // Save the orbitals
-	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
-	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
-	  sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
-	}
-	// Check that it is sane
-	if(W.n_rows != (size_t) Nel_alpha || W.n_cols != (size_t) Nel_alpha) {
+	  sol.cC=CW;
+	  
+	} else { // No entry in checkpoint
+	  arma::cx_mat W;
 	  if(!pzoo) {
 	    W.eye(Nel_alpha,Nel_alpha);
 	  } else {
@@ -1641,7 +1619,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      }
 	    }
 	  }
-
+	    
 	  // Save the complex orbitals
 	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
 	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
@@ -1655,69 +1633,58 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    PZStability stab(&solver);
 	    stab.set_method(dum,1.0);
 	    stab.set(sol,true,pzimag,false,true);
-	    stab.optimize(pzmax,pzIthr,pzEthr,pzprec);
+	    stab.optimize(pzmax,pzIthr,pzNRthr,pzEthr,pzprec);
 	    sol=stab.get_rsol();
 	  }
 	}
-	
+		
 	// Save the orbitals
-	chkpt.cwrite("CW",sol.cC.cols(0,Nel_alpha-1));
+	chkpt.cwrite("CW",sol.cC);
 	
 	PZStability stab(&solver);
 	stab.set_method(dft,pzw);
 
+	if(pzov && pzoo) {
+	  // First, optimize the OO transformations
+	  stab.set(sol,true,pzimag,false,true);
+	  stab.optimize(pzmax,pzOthr,pzNRthr,pzEthr,pzprec);
+	  sol=stab.get_rsol();
+	}
+	
 	while(true) {
-	  double dEor=0.0, dEoi=0.0, dEvr=0.0, dEvi=0.0;
-	  if(pzoo) {
-	    // First, optimize the OO transformations
-	    stab.set(sol,true,pzimag,false,true);
-	    dEor=stab.optimize(pzmax,pzOOthr,pzEthr,pzprec);
-	    sol=stab.get_rsol();
-	  }
-	  if(pzov) {
-	    // Then, optimize the real OV transformations
-	    stab.set(sol,true,pzimag,true,false);
-	    dEvr=stab.optimize(pzmax,pzOVthr,pzEthr,pzprec);
-	    sol=stab.get_rsol();
-	  }
-	  if(dEor!=0.0 || dEoi!=0.0 || dEvr!=0.0 || dEvi!=0.0)
-	    continue;
-
-	  // Stability analysis
-	  bool instab=false;
+	  stab.set(sol,true,pzimag,pzov,pzoo);
+	  stab.optimize(pzmax,pzGthr,0.0,pzEthr,pzprec);
+	  sol=stab.get_rsol();	    
 	  
 	  // Check stability of OO rotations
-	  if(pzoo && pzstab<0) {
+	  if(pzoo && pzstab==-1) {
 	    stab.set(sol,true,pzimag,false,true);
-	    instab=stab.check(true);
+	    bool instab=stab.check(true);
 	    if(instab) {
-	      stab.optimize(pzmax,pzOOthr,pzEthr,pzprec);
+	      sol=stab.get_rsol();
+	      continue;
+	    }
+	  } else if(pzstab==-2) {
+	    // Check stability of OO+OV rotations
+	    stab.set(sol,true,pzimag,pzov,pzoo);
+	    bool instab=stab.check(true);
+	    if(instab) {
 	      sol=stab.get_rsol();
 	      continue;
 	    }
 	  }
-	  if(pzov && pzstab==-2) {
-	    // Check stability of OV rotations
-	    stab.set(sol,true,pzimag,true,false);
-	    instab=instab || stab.check(true);
-	    if(instab) {
-	      stab.optimize(pzmax,pzOVthr,pzEthr,pzprec);
-	      sol=stab.get_rsol();
-	      continue;
-	    }
-	  }
-	  if(!instab)
-	    break;
+	  // No instabilities
+	  break;
 	}
 
 	// Stability analysis?
-	if(pzoo && pzstab>0) {
+	if(pzoo && pzstab==1) {
 	  stab.set(sol,true,pzimag,false,true);
 	  stab.check();
 	}
-	if(pzov && pzstab==2) {
-	  // Check stability of OV rotations
-	  stab.set(sol,true,pzimag,true,false);
+	if(pzstab==2) {
+	  // Check stability of OO+OV rotations
+	  stab.set(sol,true,pzimag,pzov,pzoo);
 	  stab.check();
 	}
       }
@@ -1780,9 +1747,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     chkpt.write(basis);
 
     // Write number of electrons
-    int Nel_alpha;
-    int Nel_beta;
-    get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
     chkpt.write("Nel",Nel);
     chkpt.write("Nel-a",Nel_alpha);
     chkpt.write("Nel-b",Nel_beta);
@@ -1853,13 +1817,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       bool pzoo=set.get_bool("PZoo");
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
-      double pzEthr=set.get_double("PZEthr");
-      double pzOOthr=set.get_double("PZOOthr");
-      double pzOVthr=set.get_double("PZOVthr");
       double pzIthr=set.get_double("PZIthr");
+      double pzOthr=set.get_double("PZOthr");
+      double pzEthr=set.get_double("PZEthr");
+      double pzGthr=set.get_double("PZGthr");
+      double pzNRthr=set.get_double("PZNRthr");
       bool pzimag=set.get_bool("PZimag");
-      enum pzham pzh=parse_pzham(set.get_string("PZHam"));
-
       int pzstab=set.get_int("PZstab");
       int seed=set.get_int("PZseed");
 
@@ -1879,22 +1842,16 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       } else {
 	// The localizing matrices
-	arma::cx_mat Wa, Wb;
 	bool loc=false;
 	if(chkpt.exist("CWa.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
 	  
 	  // Get old localized orbitals
 	  chkpt.cread("CWa",CWa);
-	  // The starting guess is the unitarized version of the overlap
-	  Wa=unitarize(arma::trans(sol.Ca.cols(0,CWa.n_cols-1))*basis.overlap()*CWa);
 	  // Save the complex orbitals
-	  sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
-	  sol.cCa.cols(0,Nel_alpha-1)=sol.Ca.cols(0,Nel_alpha-1)*Wa;
-	  sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
-	}
-	// Check that it is sane
-	if(Wa.n_rows != (size_t) Nel_alpha || Wa.n_cols != (size_t) Nel_alpha) {
+	  sol.cCa=CWa;
+	} else {
+	  arma::cx_mat Wa;
 	  if(!pzoo)
 	    Wa.eye(Nel_alpha,Nel_alpha);
 	  else {
@@ -1933,15 +1890,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  
 	  // Get old localized orbitals
 	  chkpt.cread("CWb",CWb);
-	  // The starting guess is the unitarized version of the overlap
-	  Wb=unitarize(arma::trans(sol.Cb.cols(0,CWb.n_cols-1))*basis.overlap()*CWb);
 	  // Save the complex orbitals
-	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
-	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
-	  sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
-	}
-	// Check that it is sane
-	if(Nel_beta && (Wb.n_rows != (size_t) Nel_beta || Wb.n_cols != (size_t) Nel_beta)) {
+	  sol.cCb=CWb;
+	} else {
+	  arma::cx_mat Wb;
 	  // Initialize with a random orthogonal matrix.
 	  if(!pzoo)
 	    Wb.eye(Nel_beta,Nel_beta);
@@ -1986,43 +1938,35 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  PZStability stab(&solver);
 	  stab.set_method(dum,1.0);
 	  stab.set(sol,true,pzimag,false,true);
-	  stab.optimize(pzmax,pzIthr,pzEthr,pzprec);
+	  stab.optimize(pzmax,pzIthr,pzNRthr,pzEthr,pzprec);
 	  sol=stab.get_usol();
 	}
 	
 	// Save the orbitals
-	chkpt.cwrite("CWa",sol.cCa.cols(0,Nel_alpha-1));
-	chkpt.cwrite("CWb",sol.cCb.cols(0,Nel_alpha-1));
+	chkpt.cwrite("CWa",sol.cCa);
+	chkpt.cwrite("CWb",sol.cCb);
 	
 	PZStability stab(&solver);
 	stab.set_method(dft,pzw);
+
+	if(pzoo && pzov) {
+	  // First, optimize the OO transformations
+	  stab.set(sol,true,pzimag,false,true);
+	  stab.optimize(pzmax,pzOthr,pzNRthr,pzEthr,pzprec);
+	  sol=stab.get_usol();
+	}
 	
 	while(true) {
-	  double dEor=0.0, dEoi=0.0, dEvr=0.0, dEvi=0.0;
-	  if(pzoo) {
-	    // First, optimize the OO transformations
-	    stab.set(sol,true,pzimag,false,true);
-	    dEor=stab.optimize(pzmax,pzOOthr,pzEthr,pzprec);
-	    sol=stab.get_usol();
-	  }
-	  if(pzov) {
-	    // Then, optimize the real OV transformations
-	    stab.set(sol,true,pzimag,true,false);
-	    dEvr=stab.optimize(pzmax,pzOVthr,pzEthr,pzprec);
-	    sol=stab.get_usol();
-	  }
-	  if(dEor!=0.0 || dEoi!=0.0 || dEvr!=0.0 || dEvi!=0.0)
-	    continue;
-	  
-	  // Stability analysis
-	  bool instab=false;
+	  // Run optimization
+	  stab.set(sol,true,pzimag,pzov,pzoo);
+	  stab.optimize(pzmax,pzGthr,0.0,pzEthr,pzprec);
+	  sol=stab.get_usol();
 	  
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab<0) {
 	    stab.set(sol,true,pzimag,false,true);
-	    instab=stab.check(true);
+	    bool instab=stab.check(true);
 	    if(instab) {
-	      stab.optimize(pzmax,pzOOthr,pzEthr,pzprec);
 	      sol=stab.get_usol();
 	      continue;
 	    }
@@ -2030,25 +1974,24 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  if(pzov && pzstab==-2) {
 	    // Check stability of OV rotations
 	    stab.set(sol,true,pzimag,true,false);
-	    instab=instab || stab.check(true);
+	    bool instab=stab.check(true);
 	    if(instab) {
-	      stab.optimize(pzmax,pzOVthr,pzEthr,pzprec);
 	      sol=stab.get_usol();
 	      continue;
 	    }
 	  }
-	  if(!instab)
-	    break;
+	  // No instabilities
+	  break;
 	}
 
 	// Stability analysis?
-	if(pzoo && pzstab>0) {
+	if(pzoo && pzstab==1) {
 	  stab.set(sol,true,pzimag,false,true);
 	  stab.check();
 	}
-	if(pzov && pzstab==2) {
-	  // Check stability of OV rotations
-	  stab.set(sol,true,pzimag,true,false);
+	else if(pzstab==2) {
+	  // Check stability of OO+OV rotations
+	  stab.set(sol,true,pzimag,pzov,pzoo);
 	  stab.check();
 	}
       }
