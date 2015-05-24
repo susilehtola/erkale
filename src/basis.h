@@ -454,8 +454,8 @@ class BasisSet {
 
   /// Project MOs to new basis set
   void projectMOs(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const;
-  /// Translate OMOs to new geometry, assuming same basis set
-  void projectOMOs(const BasisSet & old, const arma::cx_mat & oldOMOs, arma::cx_mat & OMOs) const;
+  /// Translate OMOs to new geometry, assuming same basis set. Virtuals are discarded and regenerated.
+  void projectOMOs(const BasisSet & old, const arma::cx_mat & oldOMOs, arma::cx_mat & OMOs, size_t nocc) const;
 
   /// Are the basis sets the same?
   bool operator==(const BasisSet & rhs) const;

@@ -154,19 +154,18 @@ void Settings::add_dft_settings() {
   add_bool("PZoo", "Optimize OO block?",true);
   add_bool("PZov", "Optimize OV block?",true);
   add_double("PZIthr", "Threshold for initialization convergence (not too small!)",1e-1);
-  add_double("PZOOthr", "Threshold for OO orbital gradient convergence",1e-3);
-  add_double("PZOVthr", "Threshold for OV orbital gradient convergence",1e-6);
+  add_double("PZOthr", "Threshold for initial OO optimization",1e-3);
+  add_double("PZGthr", "Threshold for PZ orbital gradient convergence",1e-3);
+  add_double("PZNRthr", "Threshold for use of NR method in OO optimization",0.0);
   add_double("PZEthr", "Threshold for energy convergence",1e-10);
   // Initialize PZ-SIC with localized orbitals?
   add_bool("PZloc", "Initial localization before SIC calculation?", true);
   // Run stability analysis for PZ-SIC?
-  add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0);
+  add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0,true);
   add_bool("PZreal", "Real degrees of freedom in PZ?", true);
   add_bool("PZimag", "Imaginary degrees of freedom in PZ?", true);
   // Mode to use PZ-SIC
   add_string("PZmode", "Apply PZ to the operators (in addition to J): X C D", "XC");
-  // PZ-SIC Hamiltonian
-  add_string("PZHam", "Hamiltonian to use in PZ-SIC: Symm, United", "Symm");
   // PZ-SIC maximum number of iterations in self-consistency cycle
   add_int("PZiter", "Max number of iterations in self-consistency iteration", 100);
   // PZ-SIC seed number

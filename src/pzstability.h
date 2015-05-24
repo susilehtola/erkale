@@ -5,8 +5,8 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Copyright © 2015 The Regents of the University of California 
- * All Rights Reserved 
+ * Copyright © 2015 The Regents of the University of California
+ * All Rights Reserved
  *
  * Written by Susi Lehtola, Lawrence Berkeley National Laboratory
  *
@@ -30,10 +30,10 @@ class FDHessian {
   double ss_fd;
   /// Line search step size
   double ss_ls;
-  
+
   /// Print optimization status
   virtual void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
-  
+
  public:
   /// Constructor
   FDHessian();
@@ -63,7 +63,7 @@ typedef struct {
   /// Degrees of freedom in block
   arma::uvec idx;
 } pz_rot_par_t;
-  
+
 class PZStability: public FDHessian {
  protected:
   /// SCF solver, used for energy calculations
@@ -103,7 +103,7 @@ class PZStability: public FDHessian {
 
   /// Maximum step size
   double Tmu;
-  
+
   /// Count amount of parameters for rotations
   size_t count_ov_params(size_t o, size_t v) const;
   /// Count amount of parameters for rotations
@@ -127,7 +127,7 @@ class PZStability: public FDHessian {
   arma::cx_mat unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const;
   /// Precondition OV gradient with approximate diagonal Hessian
   arma::cx_mat ov_precondition(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat H0, const arma::cx_mat & gOV) const;
-  
+
   /// Evaluate analytic gradient
   arma::vec gradient();
   /// Evaluate analytic gradient and preconditioned gradient direction
@@ -137,7 +137,7 @@ class PZStability: public FDHessian {
 
   /// Parallel transport
   void parallel_transport(arma::vec & gold, const arma::vec & sd, double step) const;
-  
+
   /// Update step size
   void update_step(const arma::vec & g);
   /// Perform quasicanonical diagonalisation
@@ -153,14 +153,14 @@ class PZStability: public FDHessian {
   /// Update solution
   void update(const arma::vec & x);
   /// Update reference
-  void update_reference();
+  void update_reference(bool sort);
 
   /// Print status of optimization
   void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
 
   /// Print information on solution
   void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb);
-  
+
  public:
   /// Constructor
   PZStability(SCF *solver);
@@ -178,7 +178,7 @@ class PZStability: public FDHessian {
   rscf_t get_rsol() const;
   /// Get updated solution
   uscf_t get_usol() const;
-  
+
   /// Check stability of solution.
   bool check(bool stability=false, double cutoff=-1e-3);
   /// Print out a line search
@@ -188,7 +188,7 @@ class PZStability: public FDHessian {
   void print_info();
 
   /// Run optimization
-  virtual double optimize(size_t maxiter=1000, double gthr=1e-4, double dEthr=1e-9, bool preconditioning=true);
+  virtual double optimize(size_t maxiter=1000, double gthr=1e-4, double nrthr=1e-4, double dEthr=1e-9, bool preconditioning=true);
 };
 
 #endif
