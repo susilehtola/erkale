@@ -1538,7 +1538,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 	Es=eval(step*sd);
 	printf(" %e % .10f backtrack\n",step,Es);
 	fflush(stdout);
-	if(Es>Es0)
+	if(Es>Es0 && Es<E0)
 	  break;
       }
       // Overstepped
