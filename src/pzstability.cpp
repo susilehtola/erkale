@@ -488,10 +488,10 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	ret.push_back(ovimag);
 	ioff+=np;
       }
-      if(real && imag) {
-	ov.idx.zeros(2*oa*va);
-	ov.idx.subvec(0,oa*va-1)=ovreal.idx;
-	ov.idx.subvec(oa*va,2*oa*va-1)=ovimag.idx;
+      if(ovreal.idx.n_elem>0 && ovimag.idx.n_elem>0) {
+	ov.idx.zeros(ovreal.idx.n_elem+ovimag.idx.n_elem);
+	ov.idx.subvec(0,ovreal.idx.n_elem-1)=ovreal.idx;
+	ov.idx.subvec(ovreal.idx.n_elem,ov.idx.n_elem-1)=ovimag.idx;
 	ret.push_back(ov);
       }
     }
@@ -613,17 +613,20 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 
 	np=oa*va;
 	ovareal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	ret.push_back(ovareal);
+	if(np)
+	  ret.push_back(ovareal);
 	ioff+=np;
 
 	np=ob*vb;
 	ovbreal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	ret.push_back(ovbreal);
+	if(np)
+	  ret.push_back(ovbreal);
 	ioff+=np;
 
 	ovreal.idx.zeros(ovareal.idx.n_elem+ovbreal.idx.n_elem);
 	ovreal.idx.subvec(0,ovareal.idx.n_elem-1)=ovareal.idx;
-	ovreal.idx.subvec(ovareal.idx.n_elem,ovreal.idx.n_elem-1)=ovbreal.idx;
+	if(ovbreal.idx.n_elem>0)
+	  ovreal.idx.subvec(ovareal.idx.n_elem,ovreal.idx.n_elem-1)=ovbreal.idx;
 	ret.push_back(ovreal);
       }
       if(imag) {
@@ -779,18 +782,25 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const {
   // Build effective Fock operator
   arma::cx_mat H(H0*COMPLEX1);
-
+  
   if(pzw!=0.0) {
-    // Virtual space density matrix
-    arma::cx_mat v(CV.n_rows,CV.n_rows);
-    v.zeros();
-    for(size_t io=0;io<CV.n_cols;io++)
-      v+=CV.col(io)*arma::trans(CV.col(io));
-
     arma::mat S(solverp->get_S());
     for(size_t io=0;io<CO.n_cols;io++) {
       arma::cx_mat Porb(CO.col(io)*arma::trans(CO.col(io)));
-      H-=pzw*S*(Porb*Forb[io]*Porb + v*Forb[io]*Porb + Porb*Forb[io]*v)*S;
+      H-=pzw*S*Porb*Forb[io]*Porb*S;
+    }
+
+    if(CV.n_cols) {
+      // Virtual space density matrix
+      arma::cx_mat v(CV.n_rows,CV.n_rows);
+      v.zeros();
+      for(size_t io=0;io<CV.n_cols;io++)
+	v+=CV.col(io)*arma::trans(CV.col(io));
+      
+      for(size_t io=0;io<CO.n_cols;io++) {
+	arma::cx_mat Porb(CO.col(io)*arma::trans(CO.col(io)));
+	H-=pzw*S*(v*Forb[io]*Porb + Porb*Forb[io]*v)*S;
+      }
     }
   }
 
@@ -869,7 +879,9 @@ void PZStability::print_info() {
     // Occupied orbitals
     arma::cx_mat CO=sol.cC.cols(0,oa-1);
     // Virtuals
-    arma::cx_mat CV=sol.cC.cols(oa,oa+va-1);
+    arma::cx_mat CV;
+    if(va)
+      CV=sol.cC.cols(oa,oa+va-1);
 
     // Diagonalize
     if(sol.K_im.n_rows == sol.H.n_rows && sol.K_im.n_cols == sol.H.n_cols)
@@ -890,8 +902,12 @@ void PZStability::print_info() {
     if(ob)
       COb=sol.cCb.cols(0,ob-1);
     // Virtuals
-    arma::cx_mat CVa=sol.cCa.cols(oa,oa+va-1);
-    arma::cx_mat CVb=sol.cCb.cols(ob,ob+vb-1);
+    arma::cx_mat CVa;
+    if(va)
+      CVa=sol.cCa.cols(oa,oa+va-1);
+    arma::cx_mat CVb;
+    if(vb)
+      CVb=sol.cCb.cols(ob,ob+vb-1);
 
     // Diagonalize
     printf("\n **** Alpha orbitals ****\n");
@@ -991,13 +1007,13 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
   // Use reference
   sol=rsol;
   // Rotate orbitals
-  if(arma::norm(x,2)!=0.0) {
+  if(arma::norm(x,2)!=0.0) 
     sol.cC=sol.cC*rotation(x,false);
-    // Update density matrix
-    arma::cx_mat P=2.0*sol.cC.cols(0,oa-1)*arma::trans(sol.cC.cols(0,oa-1));
-    sol.P=arma::real(P);
-    sol.P_im=arma::imag(P);
-  }
+
+  // Update density matrix
+  arma::cx_mat P=2.0*sol.cC.cols(0,oa-1)*arma::trans(sol.cC.cols(0,oa-1));
+  sol.P=arma::real(P);
+  sol.P_im=arma::imag(P);
 
   // Clear out any old data
   Forb.clear();
@@ -1028,26 +1044,24 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
     sol.cCa=sol.cCa*rotation(x,false);
     if(ob)
       sol.cCb=sol.cCb*rotation(x,true);
-
-    // Update density matrix
-    {
-      arma::cx_mat Pa=sol.cCa.cols(0,oa-1)*arma::trans(sol.cCa.cols(0,oa-1));
-      sol.Pa=arma::real(Pa);
-      sol.Pa_im=arma::imag(Pa);
-    }
-    if(ob) {
-      arma::cx_mat Pb=sol.cCb.cols(0,ob-1)*arma::trans(sol.cCb.cols(0,ob-1));
-      sol.Pb=arma::real(Pb);
-      sol.Pb_im=arma::imag(Pb);
-    } else {
-      sol.Pb.zeros(sol.cCb.n_rows,sol.cCb.n_rows);
-      arma::mat Pim;
-      sol.Pb_im=Pim;
-    }
-
-    sol.P=sol.Pa+sol.Pb;
   }
 
+  // Update density matrix
+  {
+    arma::cx_mat Pa=sol.cCa.cols(0,oa-1)*arma::trans(sol.cCa.cols(0,oa-1));
+    sol.Pa=arma::real(Pa);
+    sol.Pa_im=arma::imag(Pa);
+  }
+  if(ob) {
+    arma::cx_mat Pb=sol.cCb.cols(0,ob-1)*arma::trans(sol.cCb.cols(0,ob-1));
+    sol.Pb=arma::real(Pb);
+    sol.Pb_im=arma::imag(Pb);
+  } else {
+    sol.Pb.zeros(sol.cCb.n_rows,sol.cCb.n_rows);
+    arma::mat Pim;
+    sol.Pb_im=Pim;
+  }
+  sol.P=sol.Pa+sol.Pb;  
 
   // Clear out any old data
   Forba.clear();
@@ -1118,9 +1132,11 @@ arma::vec PZStability::gradient(arma::vec & sd) {
     // Occupied orbitals
     arma::cx_mat CO(sol.cC.cols(0,oa-1));
     // Virtual orbitals
-    arma::cx_mat CV(sol.cC.cols(oa,sol.cC.n_cols-1));
+    arma::cx_mat CV;
+    if(va)
+      CV=sol.cC.cols(oa,sol.cC.n_cols-1);
 
-    if(cancheck) {
+    if(cancheck && va) {
       // OV gradient is
       arma::cx_mat gOV(oa,va);
       if(pzw==0.0)
@@ -1156,6 +1172,7 @@ arma::vec PZStability::gradient(arma::vec & sd) {
 	  for(size_t j=0;j<oa;j++)
 	    gOO(i,j)=pzw*arma::as_scalar(arma::strans(CO.col(i))*(Forb[i]-Forb[j])*arma::conj(CO.col(j)));
       }
+
       // Collect values
       arma::vec pOO(gather_oo(gOO,real,imag));
       g.subvec(ioff,ioff+pOO.n_elem-1)=pOO;
@@ -1179,12 +1196,16 @@ arma::vec PZStability::gradient(arma::vec & sd) {
     if(ob)
       COb=sol.cCb.cols(0,ob-1);
     // Virtuals
-    arma::cx_mat CVa=sol.cCa.cols(oa,oa+va-1);
-    arma::cx_mat CVb=sol.cCb.cols(ob,ob+vb-1);
+    arma::cx_mat CVa;
+    if(va)
+      CVa=sol.cCa.cols(oa,oa+va-1);
+    arma::cx_mat CVb;
+    if(vb)
+      CVb=sol.cCb.cols(ob,ob+vb-1);
 
     size_t ioff=0;
 
-    if(cancheck) {
+    if(cancheck && va) {
       // OV alpha gradient is
       arma::cx_mat gOVa(oa,va);
       if(pzw==0.0)
@@ -1210,7 +1231,7 @@ arma::vec PZStability::gradient(arma::vec & sd) {
       sd.subvec(ioff,ioff+POVa.n_elem-1)=POVa;
       ioff+=pOVa.n_elem;
 
-      if(ob) {
+      if(ob && vb) {
 	// OV beta gradient is
 	arma::cx_mat gOVb(ob,vb);
 	if(pzw==0.0)
@@ -1672,7 +1693,9 @@ void PZStability::update_reference(bool sort) {
 
     if(sort) {
       arma::cx_mat CO(sol.cC.cols(0,oa-1));
-      arma::cx_mat CV(sol.cC.cols(oa,sol.cC.n_cols-1));
+      arma::cx_mat CV;
+      if(sol.cC.n_cols>oa)
+	CV=sol.cC.cols(oa,sol.cC.n_cols-1);
       arma::cx_mat H0=sol.H*COMPLEX1;
       if(sol.K_im.n_rows == sol.H.n_rows && sol.K_im.n_cols == sol.H.n_cols)
 	H0+=sol.K_im*COMPLEXI;
@@ -1680,14 +1703,18 @@ void PZStability::update_reference(bool sort) {
 
       // Calculate projected orbital energies
       arma::vec Eorbo=arma::real(arma::diagvec(arma::trans(CO)*H*CO));
-      arma::vec Eorbv=arma::real(arma::diagvec(arma::trans(CV)*H*CV));
+      arma::vec Eorbv;
+      if(CV.n_cols)
+	Eorbv=arma::real(arma::diagvec(arma::trans(CV)*H*CV));
       // Sort in ascending order
       arma::uvec idxo=arma::stable_sort_index(Eorbo,"ascend");
       for(arma::uword i=0;i<idxo.n_elem;i++)
 	rsol.cC.col(i)=CO.col(idxo(i));
-      arma::uvec idxv=arma::stable_sort_index(Eorbv,"ascend");
-      for(arma::uword i=0;i<idxv.n_elem;i++)
-	rsol.cC.col(i+oa)=CV.col(idxv(i));
+      if(CV.n_cols) {
+	arma::uvec idxv=arma::stable_sort_index(Eorbv,"ascend");
+	for(arma::uword i=0;i<idxv.n_elem;i++)
+	  rsol.cC.col(i+oa)=CV.col(idxv(i));
+      }
     }
   } else {
     uscf_t sol;
@@ -1704,8 +1731,12 @@ void PZStability::update_reference(bool sort) {
       arma::cx_mat COb;
       if(ob)
 	COb=sol.cCb.cols(0,ob-1);
-      arma::cx_mat CVa(sol.cCa.cols(oa,sol.cCa.n_cols-1));
-      arma::cx_mat CVb(sol.cCb.cols(ob,sol.cCb.n_cols-1));
+      arma::cx_mat CVa;
+      if(sol.cCa.n_cols>oa)
+	CVa=sol.cCa.cols(oa,sol.cCa.n_cols-1);
+      arma::cx_mat CVb;
+      if(sol.cCb.n_cols>ob)
+	CVb=sol.cCb.cols(ob,sol.cCb.n_cols-1);
 
       arma::cx_mat Ha0=sol.Ha*COMPLEX1;
       if(sol.Ka_im.n_rows == sol.Ha.n_rows && sol.Ka_im.n_cols == sol.Ha.n_cols)
@@ -1719,28 +1750,36 @@ void PZStability::update_reference(bool sort) {
 
       // Calculate projected orbital energies
       arma::vec Eorbao=arma::real(arma::diagvec(arma::trans(COa)*Ha*COa));
-      arma::vec Eorbav=arma::real(arma::diagvec(arma::trans(CVa)*Ha*CVa));
+      arma::vec Eorbav;
+      if(CVa.n_cols)
+	Eorbav=arma::real(arma::diagvec(arma::trans(CVa)*Ha*CVa));
       arma::vec Eorbbo;
       if(ob)
 	Eorbbo=arma::real(arma::diagvec(arma::trans(COb)*Hb*COb));
-      arma::vec Eorbbv=arma::real(arma::diagvec(arma::trans(CVb)*Hb*CVb));
+      arma::vec Eorbbv;
+      if(CVb.n_cols)
+	Eorbbv=arma::real(arma::diagvec(arma::trans(CVb)*Hb*CVb));
 
       // Sort in ascending order
       arma::uvec idxao=arma::stable_sort_index(Eorbao,"ascend");
       for(arma::uword i=0;i<idxao.n_elem;i++)
 	usol.cCa.col(i)=COa.col(idxao(i));
-      arma::uvec idxav=arma::stable_sort_index(Eorbav,"ascend");
-      for(arma::uword i=0;i<idxav.n_elem;i++)
-	usol.cCa.col(i+oa)=CVa.col(idxav(i));
+      if(CVa.n_cols) {
+	arma::uvec idxav=arma::stable_sort_index(Eorbav,"ascend");
+	for(arma::uword i=0;i<idxav.n_elem;i++)
+	  usol.cCa.col(i+oa)=CVa.col(idxav(i));
+      }
 
       if(ob) {
 	arma::uvec idxbo=arma::stable_sort_index(Eorbbo,"ascend");
 	for(arma::uword i=0;i<idxbo.n_elem;i++)
 	  usol.cCb.col(i)=COb.col(idxbo(i));
       }
-      arma::uvec idxbv=arma::stable_sort_index(Eorbbv,"ascend");
-      for(arma::uword i=0;i<idxbv.n_elem;i++)
-	usol.cCb.col(i+ob)=CVb.col(idxbv(i));
+      if(CVb.n_cols) {
+	arma::uvec idxbv=arma::stable_sort_index(Eorbbv,"ascend");
+	for(arma::uword i=0;i<idxbv.n_elem;i++)
+	  usol.cCb.col(i+ob)=CVb.col(idxbv(i));
+      }
     }
 
   }
@@ -1791,9 +1830,11 @@ arma::cx_mat PZStability::rotation_pars(const arma::vec & x, bool spin) const {
     if(spin)
       ioff0=count_ov_params(oa,va);
 
-    arma::cx_mat r(spread_ov(x.subvec(ioff0,ioff0+count_ov_params(o,v)-1),o,v,real,imag));
-    R.submat(0,o,o-1,o+v-1)=r;
-    R.submat(o,0,o+v-1,o-1)=-arma::trans(r);
+    if(v) {
+      arma::cx_mat r(spread_ov(x.subvec(ioff0,ioff0+count_ov_params(o,v)-1),o,v,real,imag));
+      R.submat(0,o,o-1,o+v-1)=r;
+      R.submat(o,0,o+v-1,o-1)=-arma::trans(r);
+    }
   }
 
   // OO part
@@ -2071,17 +2112,22 @@ void PZStability::print_status(size_t iiter, const arma::vec & g, const Timer & 
   }
 }
 
-void PZStability::linesearch(const std::string & fname, int Np) {
+void PZStability::linesearch(const std::string & fname, bool prec, int Np) {
   // Get gradient
-  arma::vec g(gradient());
+  arma::vec sd;
+  arma::vec g(gradient(sd));
 
+  // Use preconditioned direction
+  if(prec)
+    g=sd;
+  
   FILE *out=fopen(fname.c_str(),"w");
-
   // Do line search
   double dx=Tmu/Np;
   for(int i=-Np;i<=Np;i++) {
     printf("x = %e\n",i*dx);
     fprintf(out,"%e % e\n",i*dx,eval(i*dx*g));
+    fflush(out);
   }
   fclose(out);
 }

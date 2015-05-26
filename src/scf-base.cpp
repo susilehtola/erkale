@@ -1597,45 +1597,30 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  if(!pzoo) {
 	    W.eye(Nel_alpha,Nel_alpha);
 	  } else {
-	    // Initialize with a random unitary matrix.
 	    if(!pzimag)
 	      W=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
 	      W=complex_unitary(Nel_alpha,seed);
-	    
-	    if(Nel_alpha>1) {
-	      Timer tloc;
-	      
-	      // Localize starting guess
-	      if(verbose) printf("\nInitial localization.\n");
-	      double measure;
-	      // Max 1e5 iterations, gradient norm <= 1e-3
-	      orbital_localization(PIPEK_IAO2,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,!pzimag,1e5,1e-3);
-	      if(verbose) {
-		printf("\n");
 		
-		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-		fflush(stderr);
-	      }
+	    // Localize starting guess
+	    if(verbose) printf("\nInitial localization.\n");
+	    Timer tloc;
+	    double measure;
+	    // Max 1e5 iterations, gradient norm <= pzIthr
+	    orbital_localization(BOYS,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,!pzimag,1e5,pzIthr,DBL_MAX);
+	    if(verbose) {
+	      printf("\n");
+	      
+	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+	      fflush(stderr);
 	    }
 	  }
-	    
+	  
 	  // Save the complex orbitals
 	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
 	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
-	  sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
-	  
-	  // Initialize with Coulomb treatment
-	  if(pzoo && set.get_bool("DensityFitting") && (dft.x_func || dft.c_func)) {
-	    dft_t dum(dft);
-	    dum.x_func=dum.c_func=0;
-	    
-	    PZStability stab(&solver);
-	    stab.set_method(dum,1.0);
-	    stab.set(sol,true,pzimag,false,true);
-	    stab.optimize(pzmax,pzIthr,pzNRthr,pzEthr,pzprec);
-	    sol=stab.get_rsol();
-	  }
+	  if(sol.C.n_cols>(size_t) Nel_alpha)
+	    sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
 	}
 		
 	// Save the orbitals
@@ -1650,7 +1635,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  stab.optimize(pzmax,pzOthr,pzNRthr,pzEthr,pzprec);
 	  sol=stab.get_rsol();
 	}
-	
+
 	while(true) {
 	  stab.set(sol,true,pzimag,pzov,pzoo);
 	  stab.optimize(pzmax,pzGthr,0.0,pzEthr,pzprec);
@@ -1842,7 +1827,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       } else {
 	// The localizing matrices
-	bool loc=false;
 	if(chkpt.exist("CWa.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
 	  
@@ -1867,8 +1851,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      // Localize starting guess
 	      if(verbose) printf("\nInitial localization.\n");
 	      double measure;
-	      // Max 1e5 iterations, gradient norm <= 1e-3
-	      orbital_localization(PIPEK_IAO2,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,!pzimag,1e5,1e-3);
+	      // Max 1e5 iterations, gradient norm <= pzIthr
+	      orbital_localization(BOYS,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,!pzimag,1e5,pzIthr,DBL_MAX);
 	      if(verbose) {
 		printf("\n");
 		
@@ -1881,8 +1865,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Save the complex orbitals
 	  sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
 	  sol.cCa.cols(0,Nel_alpha-1)=sol.Ca.cols(0,Nel_alpha-1)*Wa;
-	  sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
-	  loc=true;
+	  if(sol.Ca.n_cols>(size_t) Nel_alpha)
+	    sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
 	}
 
 	if(chkpt.exist("CWb.re")) {
@@ -1909,8 +1893,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      // Localize starting guess
 	      if(verbose) printf("\nInitial localization.\n");
 	      double measure;
-	      // Max 1e5 iterations, gradient norm <= 1e-3
-	      orbital_localization(PIPEK_IAO2,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,!pzimag,1e5,1e-3);
+	      // Max 1e5 iterations, gradient norm <= pzIthr
+	      orbital_localization(BOYS,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,!pzimag,1e5,pzIthr,DBL_MAX);
 	      if(verbose) {
 		printf("\n");
 		
@@ -1923,25 +1907,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Save the complex orbitals
 	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
 	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
-	  sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
-	  loc=true;
+	  if(sol.Cb.n_cols>(size_t) Nel_beta)
+	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
 	}
 	// Sanity check
 	if(Nel_beta == 0)
 	  sol.cCb=sol.Cb*COMPLEX1;
 
-	// Initialize with Coulomb treatment
-	if(loc && pzoo && set.get_bool("DensityFitting") && (dft.x_func || dft.c_func)) {
-	  dft_t dum(dft);
-	  dum.x_func=dum.c_func=0;
-	  
-	  PZStability stab(&solver);
-	  stab.set_method(dum,1.0);
-	  stab.set(sol,true,pzimag,false,true);
-	  stab.optimize(pzmax,pzIthr,pzNRthr,pzEthr,pzprec);
-	  sol=stab.get_usol();
-	}
-	
 	// Save the orbitals
 	chkpt.cwrite("CWa",sol.cCa);
 	chkpt.cwrite("CWb",sol.cCb);
