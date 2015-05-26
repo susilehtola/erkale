@@ -98,8 +98,7 @@ std::vector<lebedev_point_t> lebedev_sphere(int order) {
 
   // We should not be here.
   std::ostringstream oss;
-  oss << "Wanted order of Lebedev quadrature " << order << " not implemented.\\
-n";
+  oss << "Wanted order of Lebedev quadrature " << order << " not implemented.\n";
   throw std::runtime_error(oss.str());
 
   std::vector<lebedev_point_t> dummy;

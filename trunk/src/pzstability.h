@@ -182,7 +182,7 @@ class PZStability: public FDHessian {
   /// Check stability of solution.
   bool check(bool stability=false, double cutoff=-1e-3);
   /// Print out a line search
-  void linesearch(const std::string & fname="pz_ls.dat", int Np=100);
+  void linesearch(const std::string & fname="pz_ls.dat", bool prec=true, int Np=100);
 
   /// Print information
   void print_info();
