@@ -170,9 +170,12 @@ class PZStability: public FDHessian {
   /// Set method and weight
   void set_method(const dft_t & method, double pzw);
   /// Set parameters. real: real rotations? imag: imaginary rotations? ov: ov rotations? oo: oo rotations?
-  void set(const rscf_t & sol, bool real, bool imag, bool ov, bool oo);
-  /// Set parameters. real: real rotations? imag: imaginary rotations? ov: ov rotations? oo: oo rotations?
-  void set(const uscf_t & sol, bool real, bool imag, bool ov, bool oo);
+  void set_params(bool real, bool imag, bool ov, bool oo);
+  
+  /// Set reference
+  void set(const rscf_t & sol);
+  /// Set reference
+  void set(const uscf_t & sol);
 
   /// Get updated solution
   rscf_t get_rsol() const;

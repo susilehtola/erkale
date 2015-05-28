@@ -1002,8 +1002,6 @@ void PZStability::update_step(const arma::vec & g) {
 }
 
 double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, bool can, bool fock, double pzweight) {
-  double focktol=ROUGHTOL;
-
   // Use reference
   sol=rsol;
   // Rotate orbitals
@@ -1024,7 +1022,7 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
 
   // Build global Fock operator
   if(can)
-    solverp->Fock_RDFT(sol,occa,method,grid,nlgrid,focktol);
+    solverp->Fock_RDFT(sol,occa,method,grid,nlgrid);
   if(pzweight==0.0)
     return sol.en.E;
 
@@ -1035,8 +1033,6 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
 }
 
 double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, bool can, bool fock, double pzweight) {
-  double focktol=ROUGHTOL;
-
   // Use reference
   sol=usol;
   // Rotate orbitals
@@ -1075,7 +1071,7 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
 
   // Build global Fock operator
   if(can)
-    solverp->Fock_UDFT(sol,occa,occb,method,grid,nlgrid,focktol);
+    solverp->Fock_UDFT(sol,occa,occb,method,grid,nlgrid);
   if(pzweight==0.0)
     return sol.en.E;
 
@@ -1402,6 +1398,9 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
   // Current value
   double E0(ival);
 
+  std::vector<arma::vec> gstack;
+  std::vector<arma::vec> sdstack;
+  
   for(size_t iiter=0;iiter<maxiter;iiter++) {
     // Evaluate gradient
     gold=g;
@@ -1569,6 +1568,15 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
     printf("Line search changed value by %e\n",Es-E0);
     update(step*sd);
+
+    gstack.push_back(sd);
+    sdstack.push_back(step*sd);
+    // Drop oldest entry
+    if(gstack.size()>10) {
+      gstack.erase(gstack.begin());
+      sdstack.erase(sdstack.begin());
+    }
+
     if(fabs(Es-E0)<dEthr)
       break;
 
@@ -1896,12 +1904,20 @@ void PZStability::set_method(const dft_t & method_, double pzw_) {
 
 }
 
-void PZStability::set(const rscf_t & sol, bool real_, bool imag_, bool can, bool oo) {
+void PZStability::set_params(bool real_, bool imag_, bool can, bool oo) {
   real=real_;
   imag=imag_;
   cancheck=can;
   oocheck=oo;
 
+  std::vector<std::string> truth(2);
+  truth[0]="false";
+  truth[1]="true";
+  fprintf(stderr,"oo = %s, ov = %s, real = %s, imag = %s\n",truth[oocheck].c_str(),truth[cancheck].c_str(),truth[real].c_str(),truth[imag].c_str());
+  fprintf(stderr,"There are %i parameters.\n",(int) count_params());
+}
+
+void PZStability::set(const rscf_t & sol) {
   Checkpoint *chkptp=solverp->get_checkpoint();
 
   chkptp->read(basis);
@@ -1923,14 +1939,12 @@ void PZStability::set(const rscf_t & sol, bool real_, bool imag_, bool can, bool
   truth[1]="true";
 
   fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
-  fprintf(stderr,"oo = %s, ov = %s, real = %s, imag = %s\n",truth[oocheck].c_str(),truth[cancheck].c_str(),truth[real].c_str(),truth[imag].c_str());
-  fprintf(stderr,"There are %i parameters.\n",(int) count_params());
 
   // Reconstruct DFT grid
   if(method.adaptive)
     grid.construct(sol.cC.cols(0,oa-1),method.gridtol,method.x_func,method.c_func);
   else {
-    bool strict(false);
+    bool strict(solverp->get_strictint());
     grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
     if(method.nl)
       nlgrid.construct(method.nlnrad,method.nllmax,true,false,strict,true);
@@ -1940,12 +1954,7 @@ void PZStability::set(const rscf_t & sol, bool real_, bool imag_, bool can, bool
   update_reference(true);
 }
 
-void PZStability::set(const uscf_t & sol, bool real_, bool imag_, bool can, bool oo) {
-  real=real_;
-  imag=imag_;
-  cancheck=can;
-  oocheck=oo;
-
+void PZStability::set(const uscf_t & sol) {
   Checkpoint *chkptp=solverp->get_checkpoint();
 
   // Update solution
@@ -1962,14 +1971,7 @@ void PZStability::set(const uscf_t & sol, bool real_, bool imag_, bool can, bool
   vb=usol.cCb.n_cols-ob;
 
   chkptp->write("Restricted",0);
-
-  std::vector<std::string> truth(2);
-  truth[0]="false";
-  truth[1]="true";
-
   fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
-  fprintf(stderr,"oo = %s, ov = %s, real = %s, imag = %s\n",truth[oocheck].c_str(),truth[cancheck].c_str(),truth[real].c_str(),truth[imag].c_str());
-  fprintf(stderr,"There are %i parameters.\n",(int) count_params());
   fflush(stderr);
 
   // Reconstruct DFT grid
@@ -1980,7 +1982,7 @@ void PZStability::set(const uscf_t & sol, bool real_, bool imag_, bool can, bool
       Ctilde.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
     grid.construct(Ctilde,method.gridtol,method.x_func,method.c_func);
   } else {
-    bool strict(false);
+    bool strict(solverp->get_strictint());
     grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
     if(method.nl)
       nlgrid.construct(method.nlnrad,method.nllmax,true,false,strict,true);

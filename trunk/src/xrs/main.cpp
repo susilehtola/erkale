@@ -240,17 +240,14 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
     }
 
-    // No need for extreme accuracy
-    double tol=ROUGHTOL;
-
     switch(method) {
     case(TP):
-      solver.Fock_half_hole(augsol,dft,occa,occb,grid,nlgrid,tol);
+      solver.Fock_half_hole(augsol,dft,occa,occb,grid,nlgrid);
       break;
 
     case(FCH):
     case(XCH):
-      solver.Fock_full_hole(augsol,dft,occa,occb,grid,nlgrid,tol);
+      solver.Fock_full_hole(augsol,dft,occa,occb,grid,nlgrid);
     }
   }
 

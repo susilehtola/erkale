@@ -40,26 +40,26 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   /// Formation of Fock matrix
 #ifdef RESTRICTED
 #if defined(HF)
-#define form_fock(sol) Fock_RHF(sol,occs,intthr); nfock++;
+#define form_fock(sol) Fock_RHF(sol,occs); nfock++;
 #elif defined(DFT)
-#define form_fock(sol) Fock_RDFT(sol,occs,dft,grid,nlgrid,intthr); nfock++;
+#define form_fock(sol) Fock_RDFT(sol,occs,dft,grid,nlgrid); nfock++;
 #endif
 
 #else
   // Unrestricted case: first core excited states
 
 #if defined(HALFHOLE)
-#define form_fock(sol) Fock_half_hole(sol,dft,occa,occb,grid,nlgrid,intthr); nfock++;
+#define form_fock(sol) Fock_half_hole(sol,dft,occa,occb,grid,nlgrid); nfock++;
 #elif defined(FULLHOLE)
-#define form_fock(sol) Fock_full_hole(sol,dft,occa,occb,grid,nlgrid,intthr); nfock++;
+#define form_fock(sol) Fock_full_hole(sol,dft,occa,occb,grid,nlgrid); nfock++;
 
   // Conventional HF and DFT
 #elif defined(HF)
-#define form_fock(sol) Fock_UHF(sol,occa,occb,intthr); nfock++;
+#define form_fock(sol) Fock_UHF(sol,occa,occb); nfock++;
 #elif defined(_ROHF)
-#define form_fock(sol) Fock_ROHF(sol,occa,occb,intthr); nfock++;
+#define form_fock(sol) Fock_ROHF(sol,occa,occb); nfock++;
 #elif defined(DFT)
-#define form_fock(sol) Fock_UDFT(sol,occa,occb,dft,grid,nlgrid,intthr); nfock++;
+#define form_fock(sol) Fock_UDFT(sol,occa,occb,dft,grid,nlgrid); nfock++;
 #endif
 #endif
 
@@ -722,42 +722,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
-      
-#ifdef RESTRICTED
-      if(verbose) {
-	double lost;
-	imag_lost(sol,S,lost);
-	if(fabs(lost)>10*DBL_EPSILON) {
-	  if(realcmos)
-	    printf("Use of real CMOs loses %e electrons.\n",lost);
-	  else
-	    printf("Use of real CMOs would lose %e electrons.\n",lost);
-	}
-      }
-      // Switch back to real CMOs
-      if(realcmos)
-	sol.cC=sol.C*std::complex<double>(1.0,0.0);
-#else
-      if(verbose) {
-	double losta, lostb;
-	imag_lost(sol,S,losta,lostb);
-	if(realcmos) {
-	  if(fabs(losta)>10*DBL_EPSILON)
-	    printf("Use of real CMOs loses %e alpha electrons.\n",losta);
-	  if(fabs(lostb)>10*DBL_EPSILON)
-	    printf("Use of real CMOs loses %e beta  electrons.\n",lostb);
-	} else {
-	  if(fabs(losta)>10*DBL_EPSILON)
-	    printf("Use of real CMOs would lose %e alpha electrons.\n",losta);
-	  if(fabs(lostb)>10*DBL_EPSILON)
-	    printf("Use of real CMOs would lose %e beta  electrons.\n",lostb);
-	}
-      }
-      if(realcmos) {
-	sol.cCa=sol.Ca*std::complex<double>(1.0,0.0);
-	sol.cCb=sol.Cb*std::complex<double>(1.0,0.0);
-      }
-#endif
     }
 
     // Form new density matrix
