@@ -1398,9 +1398,6 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
   // Current value
   double E0(ival);
 
-  std::vector<arma::vec> gstack;
-  std::vector<arma::vec> sdstack;
-  
   for(size_t iiter=0;iiter<maxiter;iiter++) {
     // Evaluate gradient
     gold=g;
@@ -1568,15 +1565,6 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
     printf("Line search changed value by %e\n",Es-E0);
     update(step*sd);
-
-    gstack.push_back(sd);
-    sdstack.push_back(step*sd);
-    // Drop oldest entry
-    if(gstack.size()>10) {
-      gstack.erase(gstack.begin());
-      sdstack.erase(sdstack.begin());
-    }
-
     if(fabs(Es-E0)<dEthr)
       break;
 
