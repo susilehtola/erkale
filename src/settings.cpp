@@ -77,8 +77,6 @@ void Settings::add_scf_settings() {
   add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);
   // Use Trust-Region Roothaan-Hall?
   add_bool("UseTRRH", "Use Trust-Region Roothaan-Hall?", false);
-  // Use trust-region DSM?
-  add_bool("UseTRDSM", "Use Trust-Region DSM?", false);
   // Do line search?
   add_bool("LineSearch", "Do line search in level shift (EXPENSIVE!)", false);
 
@@ -154,8 +152,8 @@ void Settings::add_dft_settings() {
   add_bool("PZoo", "Optimize OO block?",true);
   add_bool("PZov", "Optimize OV block?",true);
   add_double("PZIthr", "Threshold for initialization convergence (not too small!)",1e-1);
-  add_double("PZOthr", "Threshold for initial OO optimization",1e-3);
-  add_double("PZGthr", "Threshold for PZ orbital gradient convergence",1e-3);
+  add_double("PZOOthr", "Gradient threshold for OO optimization",1e-3);
+  add_double("PZOVthr", "Gradient threshold for OV optimization",1e-4);
   add_double("PZNRthr", "Threshold for use of NR method in OO optimization",0.0);
   add_double("PZEthr", "Threshold for energy convergence",1e-10);
   // Initialize PZ-SIC with localized orbitals?

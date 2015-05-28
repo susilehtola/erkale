@@ -83,8 +83,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   usetrrh=set.get_bool("UseTRRH");
   linesearch=set.get_bool("LineSearch");
 
-  realcmos=false;
-
   maxiter=set.get_int("MaxIter");
   shift=set.get_double("Shift");
   verbose=set.get_bool("Verbose");
@@ -362,6 +360,10 @@ arma::mat SCF::get_Hcore() const {
 
 Checkpoint *SCF::get_checkpoint() const {
   return chkptp;
+}
+
+bool SCF::get_strictint() const {
+  return strictint;
 }
 
 void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock) {
@@ -702,14 +704,6 @@ void SCF::gwh_guess(uscf_t & sol) const {
   }
   sol.Hb=sol.Ha;
   diagonalize(S,Sinvh,sol);
-}
-
-bool SCF::get_real_cmos() const {
-  return realcmos;
-}
-
-void SCF::set_real_cmos(bool real) {
-  realcmos=real;
 }
 
 void imag_lost(const rscf_t & sol, const arma::mat & S, double & d) {
@@ -1559,10 +1553,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
       double pzIthr=set.get_double("PZIthr");
-      double pzOthr=set.get_double("PZOthr");
+      double pzOOthr=set.get_double("PZOOthr");
+      double pzOVthr=set.get_double("PZOVthr");
       double pzNRthr=set.get_double("PZNRthr");
       double pzEthr=set.get_double("PZEthr");
-      double pzGthr=set.get_double("PZGthr");
       bool pzimag=set.get_bool("PZimag");
       int pzstab=set.get_int("PZstab");
       int seed=set.get_int("PZseed");
@@ -1628,22 +1622,28 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	
 	PZStability stab(&solver);
 	stab.set_method(dft,pzw);
-
-	if(pzov && pzoo) {
-	  // First, optimize the OO transformations
-	  stab.set(sol,true,pzimag,false,true);
-	  stab.optimize(pzmax,pzOthr,pzNRthr,pzEthr,pzprec);
-	  sol=stab.get_rsol();
-	}
+	stab.set(sol);
 
 	while(true) {
-	  stab.set(sol,true,pzimag,pzov,pzoo);
-	  stab.optimize(pzmax,pzGthr,0.0,pzEthr,pzprec);
-	  sol=stab.get_rsol();	    
+	  double dEo=0.0, dEv=0.0;
+	  if(pzoo) {
+	    // First, optimize the OO transformations
+	    stab.set_params(true,pzimag,false,true);
+	    dEo=stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
+	    sol=stab.get_rsol();
+	  }
+	  if(pzov) {
+	    // Then the OV transformations
+	    stab.set_params(true,pzimag,true,false);
+	    dEv=stab.optimize(pzmax,pzOVthr,0.0,pzEthr,pzprec);
+	    sol=stab.get_rsol();
+	  }
+	  if(dEo!=0.0 || dEv!=0.0)
+	    continue;
 	  
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
-	    stab.set(sol,true,pzimag,false,true);
+	    stab.set_params(true,pzimag,false,true);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_rsol();
@@ -1651,7 +1651,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    }
 	  } else if(pzstab==-2) {
 	    // Check stability of OO+OV rotations
-	    stab.set(sol,true,pzimag,pzov,pzoo);
+	    stab.set_params(true,pzimag,pzov,pzoo);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_rsol();
@@ -1664,12 +1664,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	// Stability analysis?
 	if(pzoo && pzstab==1) {
-	  stab.set(sol,true,pzimag,false,true);
+	  stab.set_params(true,pzimag,false,true);
 	  stab.check();
 	}
 	if(pzstab==2) {
 	  // Check stability of OO+OV rotations
-	  stab.set(sol,true,pzimag,pzov,pzoo);
+	  stab.set_params(true,pzimag,pzov,pzoo);
 	  stab.check();
 	}
       }
@@ -1803,9 +1803,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
       double pzIthr=set.get_double("PZIthr");
-      double pzOthr=set.get_double("PZOthr");
+      double pzOOthr=set.get_double("PZOOthr");
+      double pzOVthr=set.get_double("PZOVthr");
       double pzEthr=set.get_double("PZEthr");
-      double pzGthr=set.get_double("PZGthr");
       double pzNRthr=set.get_double("PZNRthr");
       bool pzimag=set.get_bool("PZimag");
       int pzstab=set.get_int("PZstab");
@@ -1920,23 +1920,28 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	
 	PZStability stab(&solver);
 	stab.set_method(dft,pzw);
+	stab.set(sol);
 
-	if(pzoo && pzov) {
-	  // First, optimize the OO transformations
-	  stab.set(sol,true,pzimag,false,true);
-	  stab.optimize(pzmax,pzOthr,pzNRthr,pzEthr,pzprec);
-	  sol=stab.get_usol();
-	}
-	
 	while(true) {
-	  // Run optimization
-	  stab.set(sol,true,pzimag,pzov,pzoo);
-	  stab.optimize(pzmax,pzGthr,0.0,pzEthr,pzprec);
-	  sol=stab.get_usol();
+	  double dEo=0.0, dEv=0.0;
+	  if(pzoo) {
+	    // First, optimize the OO transformations
+	    stab.set_params(true,pzimag,false,true);
+	    dEo=stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
+	    sol=stab.get_usol();
+	  }
+	  if(pzov) {
+	    // Then the OV transformations
+	    stab.set_params(true,pzimag,true,false);
+	    dEv=stab.optimize(pzmax,pzOVthr,0.0,pzEthr,pzprec);
+	    sol=stab.get_usol();
+	  }
+	  if(dEo!=0.0 || dEv!=0.0)
+	    continue;
 	  
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab<0) {
-	    stab.set(sol,true,pzimag,false,true);
+	    stab.set_params(true,pzimag,false,true);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_usol();
@@ -1945,7 +1950,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  }
 	  if(pzov && pzstab==-2) {
 	    // Check stability of OV rotations
-	    stab.set(sol,true,pzimag,true,false);
+	    stab.set_params(true,pzimag,true,false);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_usol();
@@ -1958,12 +1963,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	// Stability analysis?
 	if(pzoo && pzstab==1) {
-	  stab.set(sol,true,pzimag,false,true);
+	  stab.set_params(true,pzimag,false,true);
 	  stab.check();
 	}
 	else if(pzstab==2) {
 	  // Check stability of OO+OV rotations
-	  stab.set(sol,true,pzimag,pzov,pzoo);
+	  stab.set_params(true,pzimag,pzov,pzoo);
 	  stab.check();
 	}
       }

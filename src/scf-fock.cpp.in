@@ -18,25 +18,25 @@
 
 /* Restricted case */
 #if defined(RESTRICTED) && defined(DFT)
-void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
+void SCF::Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid) const
 
 #elif defined(RESTRICTED) && defined(HF)
-void SCF::Fock_RHF(rscf_t & sol, const std::vector<double> & occs, double tol) const
+void SCF::Fock_RHF(rscf_t & sol, const std::vector<double> & occs) const
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
+void SCF::Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid) const
 
 #elif defined(UNRESTRICTED) && defined(HF)
-void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol) const
+void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb) const
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-void SCF::Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol) const
+void SCF::Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
+void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid) const
 
 #elif defined(DFT) && defined(HALFHOLE)
-void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid, double tol) const
+void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid) const
 #endif
 {
   Timer t;
@@ -165,7 +165,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       if(kfull!=0.0) {
 #endif
 	if(verbose) {
-	  printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
+	  printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",intthr);
 	  fflush(stdout);
 	  t.set();
 	}
@@ -176,12 +176,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  arma::cx_mat cK;
 
 	  if(!decfock) {
-	    scr.calcJK(cP,sol.J,cK,tol);
+	    scr.calcJK(cP,sol.J,cK,intthr);
 	  } else {
 	    // Helper matrices
 	    arma::cx_mat Phlp=decconv*cP*arma::trans(decconv);
 	    // Calculate
-	    scr.calcJK(Phlp,sol.J,cK,tol);
+	    scr.calcJK(Phlp,sol.J,cK,intthr);
 	    // Convert back to contracted basis
 	    sol.J=arma::trans(decconv)*sol.J*decconv;
 	    cK=arma::trans(decconv)*cK*decconv;
@@ -191,12 +191,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  Kfull_im=arma::imag(cK);
 	} else {
 	  if(!decfock) {
-	    scr.calcJK(sol.P,sol.J,Kfull,tol);
+	    scr.calcJK(sol.P,sol.J,Kfull,intthr);
 	  } else {
 	    // Helper matrices
 	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
 	    // Calculate
-	    scr.calcJK(Phlp,sol.J,Kfull,tol);
+	    scr.calcJK(Phlp,sol.J,Kfull,intthr);
 	    // Convert back to contracted basis
 	    sol.J=arma::trans(decconv)*sol.J*decconv;
 	    Kfull=arma::trans(decconv)*Kfull*decconv;
@@ -212,16 +212,16 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       } else {
 
 	if(verbose) {
-	  printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
+	  printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",intthr);
 	  fflush(stdout);
 	  t.set();
 	}
 
 	if(!decfock)
-	  sol.J=scr.calcJ(sol.P,tol);
+	  sol.J=scr.calcJ(sol.P,intthr);
 	else {
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ(Phlp,tol);
+	  arma::mat Jhlp=scr.calcJ(Phlp,intthr);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	}
 
@@ -234,7 +234,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
       if(kshort!=0.0) {
 	if(verbose) {
-	  printf("Computing screened exchange matrix.\nScreening integrals with tolerance %.3e ... ",tol);
+	  printf("Computing screened exchange matrix.\nScreening integrals with tolerance %.3e ... ",intthr);
 	  fflush(stdout);
 	  t.set();
 	}
@@ -245,12 +245,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  arma::cx_mat cK;
 
 	  if(!decfock) {
-	    cK=scr_rs.calcK(cP,tol);
+	    cK=scr_rs.calcK(cP,intthr);
 	  } else {
 	    // Helper matrices
 	    arma::cx_mat Phlp=decconv*cP*arma::trans(decconv);
 	    // Calculate
-	    cK=scr_rs.calcK(Phlp,tol);
+	    cK=scr_rs.calcK(Phlp,intthr);
 	    // Convert back to contracted basis
 	    cK=arma::trans(decconv)*cK*decconv;
 	  }
@@ -260,12 +260,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 	} else {
 	  if(!decfock) {
-	    Kshort=scr_rs.calcK(sol.P,tol);
+	    Kshort=scr_rs.calcK(sol.P,intthr);
 	  } else {
 	    // Helper matrices
 	    arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
 	    // Calculate
-	    Kshort=scr_rs.calcK(Phlp,tol);
+	    Kshort=scr_rs.calcK(Phlp,intthr);
 	    // Convert back to contracted basis
 	    Kshort=arma::trans(decconv)*Kshort*decconv;
 	  }
@@ -285,7 +285,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       if(kfull!=0.0) {
 #endif
 	if(verbose) {
-	  printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",tol);
+	  printf("Computing HF Coulomb and exchange matrices.\nScreening integrals with tolerance %.3e ... ",intthr);
 	  fflush(stdout);
 	  t.set();
 	}
@@ -297,13 +297,13 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  arma::cx_mat cKa, cKb;
 
 	  if(!decfock) {
-	    scr.calcJK(cPa,cPb,sol.J,cKa,cKb,tol);
+	    scr.calcJK(cPa,cPb,sol.J,cKa,cKb,intthr);
 	  } else {
 	    // Helper matrices
 	    arma::cx_mat Pahlp=decconv*cPa*arma::trans(decconv);
 	    arma::cx_mat Pbhlp=decconv*cPb*arma::trans(decconv);
 	    // Calculate
-	    scr.calcJK(Pahlp,Pbhlp,sol.J,cKa,cKb,tol);
+	    scr.calcJK(Pahlp,Pbhlp,sol.J,cKa,cKb,intthr);
 	    // Convert back to contracted basis
 	    sol.J=arma::trans(decconv)*sol.J*decconv;
 	    cKa=arma::trans(decconv)*cKa*decconv;
@@ -317,13 +317,13 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 	} else {
 	  if(!decfock) {
-	    scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,tol);
+	    scr.calcJK(sol.Pa,sol.Pb,sol.J,Kafull,Kbfull,intthr);
 	  } else {
 	    // Helper matrices
 	    arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
 	    arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
 	    // Calculate
-	    scr.calcJK(Pahlp,Pbhlp,sol.J,Kafull,Kbfull,tol);
+	    scr.calcJK(Pahlp,Pbhlp,sol.J,Kafull,Kbfull,intthr);
 	    // Convert back to contracted basis
 	    sol.J=arma::trans(decconv)*sol.J*decconv;
 	    Kafull=arma::trans(decconv)*Kafull*decconv;
@@ -341,16 +341,16 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       } else {
 
 	if(verbose) {
-	  printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",tol);
+	  printf("Computing HF Coulomb matrix.\nScreening integrals with tolerance %.3e ... ",intthr);
 	  fflush(stdout);
 	  t.set();
 	}
 
 	if(!decfock)
-	  sol.J=scr.calcJ(sol.P,tol);
+	  sol.J=scr.calcJ(sol.P,intthr);
 	else {
 	  arma::mat Phlp=decconv*sol.P*arma::trans(decconv);
-	  arma::mat Jhlp=scr.calcJ(Phlp,tol);
+	  arma::mat Jhlp=scr.calcJ(Phlp,intthr);
 	  sol.J=arma::trans(decconv)*Jhlp*decconv;
 	}
 
@@ -364,7 +364,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
       if(kshort!=0.0) {
 	if(verbose) {
-	  printf("Computing screened exchange matrix.\nScreening integrals with tolerance %.3e ... ",tol);
+	  printf("Computing screened exchange matrix.\nScreening integrals with tolerance %.3e ... ",intthr);
 	  fflush(stdout);
 	  t.set();
 	}
@@ -376,13 +376,13 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	  arma::cx_mat cKa, cKb;
 
 	  if(!decfock) {
-	    scr_rs.calcK(cPa,cPb,cKa,cKb,tol);
+	    scr_rs.calcK(cPa,cPb,cKa,cKb,intthr);
 	  } else {
 	    // Helper matrices
 	    arma::cx_mat Pahlp=decconv*cPa*arma::trans(decconv);
 	    arma::cx_mat Pbhlp=decconv*cPb*arma::trans(decconv);
 	    // Calculate
-	    scr_rs.calcK(Pahlp,Pbhlp,cKa,cKb,tol);
+	    scr_rs.calcK(Pahlp,Pbhlp,cKa,cKb,intthr);
 	    // Convert back to contracted basis
 	    cKa=arma::trans(decconv)*cKa*decconv;
 	    cKb=arma::trans(decconv)*cKb*decconv;
@@ -395,13 +395,13 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
 	} else {
 	  if(!decfock) {
-	    scr_rs.calcK(sol.Pa,sol.Pb,Kashort,Kbshort,tol);
+	    scr_rs.calcK(sol.Pa,sol.Pb,Kashort,Kbshort,intthr);
 	  } else {
 	    // Helper matrices
 	    arma::mat Pahlp=decconv*sol.Pa*arma::trans(decconv);
 	    arma::mat Pbhlp=decconv*sol.Pb*arma::trans(decconv);
 	    // Calculate
-	    scr_rs.calcK(Pahlp,Pbhlp,Kashort,Kbshort,tol);
+	    scr_rs.calcK(Pahlp,Pbhlp,Kashort,Kbshort,intthr);
 	    // Convert back to contracted basis
 	    Kashort=arma::trans(decconv)*Kashort*decconv;
 	    Kbshort=arma::trans(decconv)*Kbshort*decconv;

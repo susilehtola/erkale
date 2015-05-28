@@ -254,8 +254,6 @@ class SCF {
   bool usetrrh;
   /// Do line search in level shift?
   bool linesearch;
-  /// Use real CMOs to do SIC?
-  bool realcmos;
 
   /// Maximum number of iterations
   int maxiter;
@@ -323,16 +321,16 @@ class SCF {
   void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
 
   /// Calculate restricted Hartree-Fock operator
-  void Fock_RHF(rscf_t & sol, const std::vector<double> & occs, double tol) const;
+  void Fock_RHF(rscf_t & sol, const std::vector<double> & occs) const;
   /// Calculate restricted open-shell Hartree-Fock operator
-  void Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol) const;
+  void Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb) const;
   /// Calculate unrestricted Hartree-Fock operator
-  void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double tol) const;
+  void Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb) const;
 
   /// Calculate restricted density-functional theory KS-Fock operator
-  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
+  void Fock_RDFT(rscf_t & sol, const std::vector<double> & occs, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid) const;
   /// Calculate unrestricted density-functional theory KS-Fock operator
-  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, double tol) const;
+  void Fock_UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const dft_t dft, DFTGrid & grid, DFTGrid & nlgrid) const;
 
   /// Helper for PZ-SIC: compute orbital-dependent Fock matrices
   void PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & C, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock);
@@ -370,11 +368,8 @@ class SCF {
   arma::mat get_Hcore() const;
   /// Get checkpoint file
   Checkpoint *get_checkpoint() const;
-
-  /// Use real CMOs to do SIC?
-  bool get_real_cmos() const;
-  /// Use real CMOs to do SIC?
-  void set_real_cmos(bool real);
+  /// Using strict integrals?
+  bool get_strictint() const;
   
   /// Do core guess
   void core_guess(rscf_t & sol) const;
