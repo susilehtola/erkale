@@ -21,6 +21,7 @@
 #include "checkpoint.h"
 #include "stringutil.h"
 #include "linalg.h"
+#include "lbfgs.h"
 #include "timer.h"
 #include "mathf.h"
 
@@ -338,9 +339,17 @@ double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
       //gamma=arma::dot(g,g)/arma::dot(gold,gold);
 
       // Update search direction
-      sd+=gamma*oldsd;
-
-      printf("CG step\n");
+      arma::vec sdnew=sd+gamma*oldsd;
+      
+      // Check that new SD is sane
+      if(arma::dot(sdnew,sd)<=0 || (iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(g,g)))
+	// This would take us into the wrong direction!
+	printf("Bad CG direction. SD step\n");
+      else {
+	// Update search direction
+	sd=sdnew;
+	printf("CG step\n");
+      }
     } else printf("SD step\n");
 
     while(true) {
@@ -946,7 +955,6 @@ arma::cx_mat PZStability::ov_precondition(const arma::cx_mat & CO, const arma::c
   arma::cx_mat GOV(arma::trans(Co)*gOV*Cv);
   for(size_t io=0;io<CO.n_cols;io++)
     for(size_t iv=0;iv<CV.n_cols;iv++)
-      //GOV(io,iv)/=sqrt(Ev(iv)-Eo(io)+dH);
       GOV(io,iv)/=Ev(iv)-Eo(io)+dH;
 
   // Transform back into the original coordinates
@@ -1397,6 +1405,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
   arma::vec sd;
   // Current value
   double E0(ival);
+  LBFGS lbfgs;
 
   for(size_t iiter=0;iiter<maxiter;iiter++) {
     // Evaluate gradient
@@ -1409,6 +1418,9 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     if(arma::norm(g,2)<gthr)
       break;
 
+    // Update BFGS
+    lbfgs.update(x0,g);
+    
     // Update search direction
     arma::vec oldsd(sd);
     sd = preconditioning ? -gsd : -g;
@@ -1467,6 +1479,25 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
       parallel_transport(g,sd,l);
       continue;
 
+    } else if(!cancheck) { // Use BFGS in OO optimization
+      // New search direction
+      sd=-lbfgs.solve();
+
+      // Check sanity
+      if(arma::dot(sd,-g)<0) {
+	printf("Bad BFGS direction, dot product % e. BFGS reset\n",arma::dot(sd,-g)/arma::dot(g,g));
+	lbfgs.clear();
+	lbfgs.update(x0,g);
+	sd=-lbfgs.solve();
+	
+      } else if(iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(gold,gold)) {
+	printf("Powell restart - SD step\n");
+	sd=-g;
+	
+      } else {
+	printf("BFGS step\n");
+	printf("Projection of search direction onto steepest descent direction is %e\n",arma::dot(sd,-g)/sqrt(arma::dot(sd,sd)*arma::dot(g,g)));
+      }
     } else {
       if((iiter % std::min(count_params(), (size_t) 10)!=0)) {
 	// Update factor
@@ -1481,7 +1512,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 	arma::vec sdnew(sd+gamma*oldsd);
 
 	// Check that new SD is sane
-	if(arma::dot(sdnew,sd)<=0)
+	if(arma::dot(sdnew,sd)<=0 || arma::dot(g,gold)>=0.2*arma::dot(g,g))
 	  // This would take us into the wrong direction!
 	  printf("Bad CG direction. SD step\n");
 	else {
@@ -1565,6 +1596,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
     printf("Line search changed value by %e\n",Es-E0);
     update(step*sd);
+    x0+=step*sd;
     if(fabs(Es-E0)<dEthr)
       break;
 
@@ -1574,11 +1606,14 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
   }
 
   printf("Final value is % .10f; optimization changed value by %e\n",E0,E0-ival);
+  // Sort orbitals
+  update_reference(true);
   print_info();
 
   // Return the change
   return E0-ival;
 }
+
 
 void PZStability::parallel_transport(arma::vec & gold, const arma::vec & sd, double step) const {
   if(restr || ob==0) {

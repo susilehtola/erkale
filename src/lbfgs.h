@@ -27,9 +27,9 @@ class LBFGS {
   /// Maximum number of matrices
   size_t nmax;
   
-  /// Coordinates
+  /// Coordinates x_k
   std::vector<arma::vec> xk;
-  /// Gradients
+  /// Gradients g_k
   std::vector<arma::vec> gk;
   
   /// Apply diagonal Hessian: r = H_0 q
@@ -37,14 +37,16 @@ class LBFGS {
 
  public:
   /// Constructor
-  LBFGS(size_t nmax=5);
+  LBFGS(size_t nmax=10);
   /// Destructor
   virtual ~LBFGS();
 
   /// Update
   void update(const arma::vec & x, const arma::vec & g);
-  /// Solve for new x
+  /// Solve for new search direction
   arma::vec solve() const;
+  /// Clear stack
+  void clear();
 };
 
 #endif
