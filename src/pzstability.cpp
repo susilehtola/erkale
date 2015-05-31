@@ -1312,9 +1312,6 @@ arma::vec PZStability::gradient(arma::vec & sd) {
   }
   */
 
-  // Update step size
-  update_step(g);
-
   return g;
 }
 
@@ -1529,6 +1526,8 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     printf(" %e % .10f\n",0.0,E0);
     fflush(stdout);
 
+    // Update step size
+    update_step(g);
     // Initial step size. Don't go too far so that the parabolic
     // approximation is valid
     //double d= cancheck ? Tmu/25.0 : Tmu/5.0;
