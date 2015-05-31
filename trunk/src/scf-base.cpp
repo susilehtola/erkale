@@ -1649,6 +1649,17 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      sol=stab.get_rsol();
 	      continue;
 	    }
+
+	    // Imaginary instability?
+	    if(!pzimag) {
+	      stab.set_params(false,true,false,true);
+	      instab=stab.check(true);
+	      if(instab) {
+		pzimag=true;
+		sol=stab.get_rsol();
+		continue;
+	      }
+	    }
 	  } else if(pzstab==-2) {
 	    // Check stability of OO+OV rotations
 	    stab.set_params(true,pzimag,pzov,pzoo);
@@ -1656,6 +1667,17 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    if(instab) {
 	      sol=stab.get_rsol();
 	      continue;
+	    }
+
+	    // Imaginary instability?
+	    if(!pzimag) {
+	      stab.set_params(false,true,pzov,pzoo);
+	      instab=stab.check(true);
+	      if(instab) {
+		pzimag=true;
+		sol=stab.get_rsol();
+		continue;
+	      }
 	    }
 	  }
 	  // No instabilities
@@ -1940,21 +1962,42 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    continue;
 	  
 	  // Check stability of OO rotations
-	  if(pzoo && pzstab<0) {
+	  if(pzoo && pzstab==-1) {
 	    stab.set_params(true,pzimag,false,true);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_usol();
 	      continue;
 	    }
-	  }
-	  if(pzov && pzstab==-2) {
-	    // Check stability of OV rotations
-	    stab.set_params(true,pzimag,true,false);
+
+	    // Imaginary instability?
+	    if(!pzimag) {
+	      stab.set_params(false,true,false,true);
+	      instab=stab.check(true);
+	      if(instab) {
+		pzimag=true;
+		sol=stab.get_usol();
+		continue;
+	      }
+	    }
+	  } else if(pzstab==-2) {
+	    // Check stability of OO+OV rotations
+	    stab.set_params(true,pzimag,pzov,pzoo);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_usol();
 	      continue;
+	    }
+
+	    // Imaginary instability?
+	    if(!pzimag) {
+	      stab.set_params(false,true,pzov,pzoo);
+	      instab=stab.check(true);
+	      if(instab) {
+		pzimag=true;
+		sol=stab.get_usol();
+		continue;
+	      }
 	    }
 	  }
 	  // No instabilities
