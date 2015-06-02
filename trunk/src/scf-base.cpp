@@ -2031,6 +2031,17 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     if(verbose) {
       population_analysis(basis,sol.Pa,sol.Pb);
+      
+      if(!set.get_string("Occupancies").size()) {
+	arma::mat Ca(sol.Ca.cols(0,Nel_alpha-1));
+	arma::mat Cb;
+	if(Nel_beta)
+	  Cb=sol.Cb.cols(0,Nel_beta-1);
+	double S2(spin_S2(basis,Ca,Cb));
+	printf("\nThe spin expectation value <S^2> is %f\n",S2);
+      } else {
+	printf("\nNot calculating spin expectation value since occupancies is set.\n");
+      }
     }
   }
 }
