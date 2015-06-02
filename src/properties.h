@@ -153,6 +153,9 @@ arma::mat bond_order(const BasisSet & basis, const arma::mat & Pa, const arma::m
 void population_analysis(const BasisSet & basis, const arma::mat & P);
 void population_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::mat & Pb);
 
+/// Calculate S^2 spin expectation value, given sets of occupied orbitals
+double spin_S2(const BasisSet & basis, const arma::mat & Ca, const arma::mat & Cb);
+
 /**
  * Get Darwin one-electron term.
  */
