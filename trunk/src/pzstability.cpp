@@ -1386,6 +1386,12 @@ double PZStability::eval(const arma::vec & x) {
   }
 }
 
+double PZStability::get_E() {
+  arma::vec x(count_params());
+  x.zeros();
+  return eval(x);
+}
+
 double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double dEthr, bool preconditioning) {
   arma::vec x0;
   if(!count_params())
@@ -1468,6 +1474,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
       fflush(stdout);
 
       update(l*sd);
+      x0+=l*sd;
       if(fabs(Etr-E0)<dEthr)
 	break;
 

@@ -309,25 +309,27 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   fflush(stdout);
 
 #ifdef DFT
-  if(dft.adaptive) {
+  if(dft.x_func>0 || dft.c_func>0) {
+    if(dft.adaptive) {
 #ifdef RESTRICTED
-    // Form DFT quadrature grid
-    grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
+      // Form DFT quadrature grid
+      grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
 #else
-    // Form DFT quadrature grid
-    grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
+      // Form DFT quadrature grid
+      grid.construct(sol.Pa,sol.Pb,dft.gridtol,dft.x_func,dft.c_func);
 #endif
-  } else {
-    // Fixed size grid
-    grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
-    // Nonlocal grid?
-    if(dft.nl)
-      nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
-  }
+    } else {
+      // Fixed size grid
+      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
+      // Nonlocal grid?
+      if(dft.nl)
+	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
+    }
 
-  if(verbose) {
-    fflush(stdout);
-    fprintf(stderr,"%-65s %10.3f\n","    DFT grid formation",t.get());
+    if(verbose) {
+      fflush(stdout);
+      fprintf(stderr,"%-65s %10.3f\n","    DFT grid formation",t.get());
+    }
   }
 #endif // DFT
 

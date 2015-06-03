@@ -559,40 +559,44 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #endif
 
 #ifdef DFT
-  if(verbose) {
-    printf("Computing DFT exchange and correlation ... ");
-    fflush(stdout);
-    t.set();
-  }
-
-  double Nelnum; // Numerically integrated density
+  sol.en.Exc=0.0;
+  if(dft.x_func>0 || dft.c_func>0) {
+    if(verbose) {
+      printf("Computing DFT exchange and correlation ... ");
+      fflush(stdout);
+      t.set();
+    }
+    
+    double Nelnum; // Numerically integrated density
 #ifdef RESTRICTED
-  grid.eval_Fxc(dft.x_func,dft.c_func,sol.P,sol.XC,sol.en.Exc,Nelnum);
+    grid.eval_Fxc(dft.x_func,dft.c_func,sol.P,sol.XC,sol.en.Exc,Nelnum);
 #else
-  grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,sol.XCa,sol.XCb,sol.en.Exc,Nelnum);
+    grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,sol.XCa,sol.XCb,sol.en.Exc,Nelnum);
 #endif
-
+    
 #if defined(FULLHOLE)
-  double rel_diff=(Nelnum+1.0-Nel)*100.0/Nel;
+    double rel_diff=(Nelnum+1.0-Nel)*100.0/Nel;
 #elif defined(HALFHOLE)
-  double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
+    double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
 #else
-  double rel_diff=(Nelnum-Nel)*100.0/Nel;
+    double rel_diff=(Nelnum-Nel)*100.0/Nel;
 #endif
-
-  if(verbose) {
-    printf("done (%s)\n",t.elapsed().c_str());
-    printf("Numerically integrated density is %.5f (%+.4f %%).\n",Nelnum,rel_diff);
+    
+    if(verbose) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      printf("Numerically integrated density is %.5f (%+.4f %%).\n",Nelnum,rel_diff);
+    }
+    
+    if(fabs(rel_diff)>1e-2) {
+      std::ostringstream oss;
+      //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
+      oss << "Warning - numerically integrated density seems inaccurate.\n";
+      if(verbose)
+	std::cout << oss.str();
+      //      throw std::runtime_error(oss.str());
+    }
   }
 
-  if(fabs(rel_diff)>1e-2) {
-    std::ostringstream oss;
-    //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
-    oss << "Warning - numerically integrated density seems inaccurate.\n";
-    if(verbose)
-      std::cout << oss.str();
-    //      throw std::runtime_error(oss.str());
-  }
 
   // Non-local correlation?
   if(dft.nl) {

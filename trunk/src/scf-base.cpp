@@ -1562,7 +1562,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int seed=set.get_int("PZseed");
             
       if(!pz) {
-	if(dft.adaptive) {
+	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve restricted DFT problem first on a rough grid
 	  solver.RDFT(sol,occs,initconv,initdft);
 	  
@@ -1834,7 +1834,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int seed=set.get_int("PZseed");
 
       if(!pz) {
-	if(dft.adaptive) {
+	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve unrestricted DFT problem first on a rough grid
 	  solver.UDFT(sol,occa,occb,initconv,initdft);
 	  
