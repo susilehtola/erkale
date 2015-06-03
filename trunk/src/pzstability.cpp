@@ -1970,11 +1970,13 @@ void PZStability::set(const rscf_t & sol) {
   fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
 
   // Reconstruct DFT grid
-  if(method.adaptive)
-    grid.construct(sol.cC.cols(0,oa-1),method.gridtol,method.x_func,method.c_func);
-  else {
+  if(method.adaptive) {
+    if (method.x_func>0 || method.c_func>0)
+      grid.construct(sol.cC.cols(0,oa-1),method.gridtol,method.x_func,method.c_func);
+  } else {
     bool strict(solverp->get_strictint());
-    grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
+    if (method.x_func>0 || method.c_func>0)
+      grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
     if(method.nl)
       nlgrid.construct(method.nlnrad,method.nllmax,true,false,strict,true);
   }
@@ -2009,10 +2011,12 @@ void PZStability::set(const uscf_t & sol) {
     Ctilde.cols(0,oa-1)=sol.cCa.cols(0,oa-1);
     if(ob)
       Ctilde.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
-    grid.construct(Ctilde,method.gridtol,method.x_func,method.c_func);
+    if (method.x_func>0 || method.c_func>0)
+      grid.construct(Ctilde,method.gridtol,method.x_func,method.c_func);
   } else {
     bool strict(solverp->get_strictint());
-    grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
+    if (method.x_func>0 || method.c_func>0)
+      grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
     if(method.nl)
       nlgrid.construct(method.nlnrad,method.nllmax,true,false,strict,true);
   }
