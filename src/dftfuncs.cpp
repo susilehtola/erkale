@@ -26,11 +26,18 @@ extern "C" {
 #include <xc.h>
 }
 
+#define ID_NONE 0
+#define ID_HF -1
+#define KW_NONE "none"
+#define KW_HF "hyb_x_hf"
+
 // Print keyword corresponding to functional.
 std::string get_keyword(int func_id) {
   // Check if none was specified. This is internal to ERKALE.
-  if(func_id==0)
-    return "none";
+  if(func_id==ID_NONE)
+    return KW_NONE;
+  else if(func_id==ID_HF)
+    return KW_HF;
 
   // Call libxc function
   char *keyword=XC(functional_get_name)(func_id);
@@ -58,8 +65,10 @@ int find_func(std::string name) {
     return atoi(name.c_str());
 
   // Check if 'none' was specified. This is internal to ERKALE
-  if(stricmp(name,"none")==0)
-    return 0;
+  if(stricmp(name,KW_NONE)==0)
+    return ID_NONE;
+  else if(stricmp(name,KW_HF)==0)
+    return ID_HF;
 
   // Otherwise, call libxc function.
   char help[strlen(name.c_str())+1];
@@ -179,8 +188,8 @@ void print_info(int func_id) {
 }
 
 bool is_exchange(int func_id) {
-  bool ans=0;
-
+  bool ans=false;
+  
   if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
@@ -189,7 +198,7 @@ bool is_exchange(int func_id) {
       oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
-
+    
     switch(func.info->kind)
       {
 	/* By default we assign exchange-correlation functionals as
@@ -197,22 +206,26 @@ bool is_exchange(int func_id) {
 	   exchange part includes exact exchange. */
       case XC_EXCHANGE:
       case XC_EXCHANGE_CORRELATION:
-	ans=1;
+	ans=true;
 	break;
       default:
-	ans=0;
+	ans=false;
       }
     // Free functional
     xc_func_end(&func);
+    
+  } else if(func_id==ID_HF) {
+    ans=true;
+  
   } else
     // Dummy exchange
-    ans=0;
+    ans=false;
 
   return ans;
 }
 
 bool is_exchange_correlation(int func_id) {
-  bool ans=0;
+  bool ans=false;
 
   if(func_id>0) {
     xc_func_type func;
@@ -229,22 +242,22 @@ bool is_exchange_correlation(int func_id) {
 	   the exchange functional, since we check whether the
 	   exchange part includes exact exchange. */
       case XC_EXCHANGE_CORRELATION:
-	ans=1;
+	ans=true;
 	break;
       default:
-	ans=0;
+	ans=false;
       }
     // Free functional
     xc_func_end(&func);
   } else
     // Dummy exchange
-    ans=0;
+    ans=false;
 
   return ans;
 }
 
 bool is_correlation(int func_id) {
-  bool ans=0;
+  bool ans=false;
 
   if(func_id>0) {
     xc_func_type func;
@@ -261,22 +274,22 @@ bool is_correlation(int func_id) {
 	   the exchange functional, since we check whether the
 	   exchange part includes exact exchange. */
       case XC_CORRELATION:
-	ans=1;
+	ans=true;
 	break;
       default:
-	ans=0;
+	ans=false;
       }
     // Free functional
     xc_func_end(&func);
   } else
     // Dummy correlation
-    ans=0;
+    ans=false;
 
   return ans;
 }
 
 bool is_kinetic(int func_id) {
-  bool ans=0;
+  bool ans=false;
 
   if(func_id>0) {
     xc_func_type func;
@@ -293,16 +306,16 @@ bool is_kinetic(int func_id) {
 	   the exchange functional, since we check whether the
 	   exchange part includes exact exchange. */
       case XC_KINETIC:
-	ans=1;
+	ans=true;
 	break;
       default:
-	ans=0;
+	ans=false;
       }
     // Free functional
     xc_func_end(&func);
   } else
     // Dummy correlation
-    ans=0;
+    ans=false;
 
   return ans;
 }
@@ -378,7 +391,8 @@ double exact_exchange(int func_id) {
       }
 
     xc_func_end(&func);
-  }
+  } else if(func_id==ID_HF)
+    f=1.0;
 
   //  printf("Fraction of exact exchange is %f.\n",f);
 
@@ -440,7 +454,8 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
       }
 
     xc_func_end(&func);
-  }
+  } else if(func_id==ID_HF)
+    alpha=1.0;
 
   bool ans=is_range_separated(func_id,false);
   if(check) {
@@ -545,7 +560,7 @@ bool laplacian_needed(int func_id) {
 }
 
 bool has_exc(int func_id) {
-  bool ans=false;
+  bool ans=true;
 
   if(func_id>0) {
     xc_func_type func;

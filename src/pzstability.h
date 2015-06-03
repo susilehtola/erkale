@@ -177,6 +177,9 @@ class PZStability: public FDHessian {
   /// Set reference
   void set(const uscf_t & sol);
 
+  /// Evaluate energy
+  double get_E();
+  
   /// Get updated solution
   rscf_t get_rsol() const;
   /// Get updated solution
