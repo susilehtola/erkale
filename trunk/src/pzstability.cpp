@@ -295,8 +295,11 @@ void FDHessian::print_status(size_t iiter, const arma::vec & g, const Timer & t)
 }
 
 double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
-  arma::vec x0(count_params());
-  x0.zeros();
+  arma::vec x0;
+  if(!count_params())
+    return 0.0;
+  else
+    x0.zeros(count_params());
 
   double ival=eval(x0);
   printf("Initial value is % .10f\n",ival);
@@ -1395,7 +1398,7 @@ double PZStability::get_E() {
 double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double dEthr, bool preconditioning) {
   arma::vec x0;
   if(!count_params())
-    return eval(x0);
+    return 0.0;
   else
     x0.zeros(count_params());
 
