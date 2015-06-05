@@ -161,7 +161,7 @@ void Settings::add_dft_settings() {
   // Run stability analysis for PZ-SIC?
   add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0,true);
   add_bool("PZreal", "Real degrees of freedom in PZ?", true);
-  add_bool("PZimag", "Imaginary degrees of freedom in PZ?", true);
+  add_string("PZimag", "Imaginary degrees of freedom in PZ?", "Auto");
   // Mode to use PZ-SIC
   add_string("PZmode", "Apply PZ to the operators (in addition to J): X C D", "XC");
   // PZ-SIC maximum number of iterations in self-consistency cycle

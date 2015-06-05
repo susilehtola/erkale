@@ -1227,6 +1227,19 @@ pzmet_t parse_pzmet(const std::string & pzmod) {
   return mode;
 }
 
+int parse_pzimag(const std::string & str) {
+  int ret;
+  if(stricmp(str,"true")==0 || stricmp(str,"yes")==0)
+    ret=1;
+  else if(stricmp(str,"auto")==0)
+    ret=-1;
+  else if(stricmp(str,"false")==0 || stricmp(str,"no")==0)
+    ret=0;
+  else
+    throw std::logic_error("Invalid value for PZimag\n");
+  return ret;
+}
+
 dft_t parse_dft(const Settings & set, bool init) {
   dft_t dft;
   dft.gridtol=0.0;
@@ -1557,7 +1570,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzOVthr=set.get_double("PZOVthr");
       double pzNRthr=set.get_double("PZNRthr");
       double pzEthr=set.get_double("PZEthr");
-      bool pzimag=set.get_bool("PZimag");
+      int pzimag=parse_pzimag(set.get_string("PZimag"));
       int pzstab=set.get_int("PZstab");
       int seed=set.get_int("PZseed");
             
@@ -1585,13 +1598,17 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  chkpt.cread("CW",CW);
 	  // Save the orbitals
 	  sol.cC=CW;
+
+	  // Imaginary treatment?
+	  if(pzimag==-1 && rms_norm(arma::imag(sol.cC))>10*DBL_EPSILON)
+	    pzimag=1;
 	  
 	} else { // No entry in checkpoint
 	  arma::cx_mat W;
 	  if(!pzoo) {
 	    W.eye(Nel_alpha,Nel_alpha);
 	  } else {
-	    if(!pzimag)
+	    if(pzimag!=1)
 	      W=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
 	      W=complex_unitary(Nel_alpha,seed);
@@ -1601,7 +1618,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    Timer tloc;
 	    double measure;
 	    // Max 1e5 iterations, gradient norm <= pzIthr
-	    orbital_localization(BOYS,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,!pzimag,1e5,pzIthr,DBL_MAX);
+	    orbital_localization(BOYS,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 	    if(verbose) {
 	      printf("\n");
 	      
@@ -1628,13 +1645,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  double dEo=0.0, dEv=0.0;
 	  if(pzoo) {
 	    // First, optimize the OO transformations
-	    stab.set_params(true,pzimag,false,true);
+	    stab.set_params(true,pzimag==1,false,true);
 	    dEo=stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
 	    sol=stab.get_rsol();
 	  }
 	  if(pzov) {
 	    // Then the OV transformations
-	    stab.set_params(true,pzimag,true,false);
+	    stab.set_params(true,pzimag==1,true,false);
 	    dEv=stab.optimize(pzmax,pzOVthr,0.0,pzEthr,pzprec);
 	    sol=stab.get_rsol();
 	  }
@@ -1643,7 +1660,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
-	    stab.set_params(true,pzimag,false,true);
+	    stab.set_params(true,pzimag==1,false,true);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_rsol();
@@ -1651,18 +1668,18 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    }
 
 	    // Imaginary instability?
-	    if(!pzimag) {
+	    if(pzimag==-1) {
 	      stab.set_params(false,true,false,true);
 	      instab=stab.check(true);
 	      if(instab) {
-		pzimag=true;
+		pzimag=1;
 		sol=stab.get_rsol();
 		continue;
 	      }
 	    }
 	  } else if(pzstab==-2) {
 	    // Check stability of OO+OV rotations
-	    stab.set_params(true,pzimag,pzov,pzoo);
+	    stab.set_params(true,pzimag==1,pzov,pzoo);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_rsol();
@@ -1670,11 +1687,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    }
 
 	    // Imaginary instability?
-	    if(!pzimag) {
+	    if(pzimag==-1) {
 	      stab.set_params(false,true,pzov,pzoo);
 	      instab=stab.check(true);
 	      if(instab) {
-		pzimag=true;
+		pzimag=1;
 		sol=stab.get_rsol();
 		continue;
 	      }
@@ -1686,12 +1703,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	// Stability analysis?
 	if(pzoo && pzstab==1) {
-	  stab.set_params(true,pzimag,false,true);
+	  stab.set_params(true,pzimag==1,false,true);
 	  stab.check();
 	}
 	if(pzstab==2) {
 	  // Check stability of OO+OV rotations
-	  stab.set_params(true,pzimag,pzov,pzoo);
+	  stab.set_params(true,pzimag==1,pzov,pzoo);
 	  stab.check();
 	}
       }
@@ -1829,7 +1846,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzOVthr=set.get_double("PZOVthr");
       double pzEthr=set.get_double("PZEthr");
       double pzNRthr=set.get_double("PZNRthr");
-      bool pzimag=set.get_bool("PZimag");
+      int pzimag=parse_pzimag(set.get_string("PZimag"));
       int pzstab=set.get_int("PZstab");
       int seed=set.get_int("PZseed");
 
@@ -1856,13 +1873,18 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  chkpt.cread("CWa",CWa);
 	  // Save the complex orbitals
 	  sol.cCa=CWa;
+
+	  // Imaginary treatment?
+	  if(pzimag==-1 && rms_norm(arma::imag(sol.cCa))>10*DBL_EPSILON)
+	    pzimag=1;
+
 	} else {
 	  arma::cx_mat Wa;
 	  if(!pzoo)
 	    Wa.eye(Nel_alpha,Nel_alpha);
 	  else {
 	    // Initialize with a random unitary matrix.
-	    if(!pzimag)
+	    if(pzimag!=1)
 	      Wa=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
 	      Wa=complex_unitary(Nel_alpha,seed);
@@ -1874,7 +1896,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      if(verbose) printf("\nInitial localization.\n");
 	      double measure;
 	      // Max 1e5 iterations, gradient norm <= pzIthr
-	      orbital_localization(BOYS,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,!pzimag,1e5,pzIthr,DBL_MAX);
+	      orbital_localization(BOYS,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 	      if(verbose) {
 		printf("\n");
 		
@@ -1898,13 +1920,18 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  chkpt.cread("CWb",CWb);
 	  // Save the complex orbitals
 	  sol.cCb=CWb;
+
+	  // Imaginary treatment?
+	  if(pzimag==-1 && rms_norm(arma::imag(sol.cCb))>10*DBL_EPSILON)
+	    pzimag=1;
+
 	} else {
 	  arma::cx_mat Wb;
 	  // Initialize with a random orthogonal matrix.
 	  if(!pzoo)
 	    Wb.eye(Nel_beta,Nel_beta);
 	  else {
-	    if(!pzimag)
+	    if(pzimag!=1)
 	      Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
 	    else
 	      Wb=complex_unitary(Nel_beta,seed);
@@ -1916,7 +1943,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      if(verbose) printf("\nInitial localization.\n");
 	      double measure;
 	      // Max 1e5 iterations, gradient norm <= pzIthr
-	      orbital_localization(BOYS,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,!pzimag,1e5,pzIthr,DBL_MAX);
+	      orbital_localization(BOYS,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 	      if(verbose) {
 		printf("\n");
 		
@@ -1948,13 +1975,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  double dEo=0.0, dEv=0.0;
 	  if(pzoo) {
 	    // First, optimize the OO transformations
-	    stab.set_params(true,pzimag,false,true);
+	    stab.set_params(true,pzimag==1,false,true);
 	    dEo=stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
 	    sol=stab.get_usol();
 	  }
 	  if(pzov) {
 	    // Then the OV transformations
-	    stab.set_params(true,pzimag,true,false);
+	    stab.set_params(true,pzimag==1,true,false);
 	    dEv=stab.optimize(pzmax,pzOVthr,0.0,pzEthr,pzprec);
 	    sol=stab.get_usol();
 	  }
@@ -1963,7 +1990,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
-	    stab.set_params(true,pzimag,false,true);
+	    stab.set_params(true,pzimag==1,false,true);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_usol();
@@ -1971,18 +1998,18 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    }
 
 	    // Imaginary instability?
-	    if(!pzimag) {
+	    if(pzimag==-1) {
 	      stab.set_params(false,true,false,true);
 	      instab=stab.check(true);
 	      if(instab) {
-		pzimag=true;
+		pzimag=1;
 		sol=stab.get_usol();
 		continue;
 	      }
 	    }
 	  } else if(pzstab==-2) {
 	    // Check stability of OO+OV rotations
-	    stab.set_params(true,pzimag,pzov,pzoo);
+	    stab.set_params(true,pzimag==1,pzov,pzoo);
 	    bool instab=stab.check(true);
 	    if(instab) {
 	      sol=stab.get_usol();
@@ -1990,11 +2017,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    }
 
 	    // Imaginary instability?
-	    if(!pzimag) {
+	    if(pzimag==-1) {
 	      stab.set_params(false,true,pzov,pzoo);
 	      instab=stab.check(true);
 	      if(instab) {
-		pzimag=true;
+		pzimag=1;
 		sol=stab.get_usol();
 		continue;
 	      }
@@ -2006,12 +2033,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	// Stability analysis?
 	if(pzoo && pzstab==1) {
-	  stab.set_params(true,pzimag,false,true);
+	  stab.set_params(true,pzimag==1,false,true);
 	  stab.check();
 	}
 	else if(pzstab==2) {
 	  // Check stability of OO+OV rotations
-	  stab.set_params(true,pzimag,pzov,pzoo);
+	  stab.set_params(true,pzimag==1,pzov,pzoo);
 	  stab.check();
 	}
       }
