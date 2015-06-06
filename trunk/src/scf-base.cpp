@@ -1485,7 +1485,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       }
 
       // Orbitals
-      basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C);
+      basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C,Nel_alpha);
     } else if(guess == ATOMGUESS) {
       atomic_guess(basis,sol.C,sol.E,set);
     } else if(guess == MOLGUESS) {
@@ -1733,13 +1733,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       // Running polarized calculation but given restricted guess
       if(oldrestr) {
 	// Project solution to new basis
-	basis.projectMOs(oldbas,Eold,Cold,sol.Ea,sol.Ca);
+	basis.projectMOs(oldbas,Eold,Cold,sol.Ea,sol.Ca,Nel_alpha);
 	sol.Eb=sol.Ea;
 	sol.Cb=sol.Ca;
       } else {
 	// Project to new basis.
-	basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca);
-	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb);
+	basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca,Nel_alpha);
+	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb,Nel_beta);
       }
     } else if(guess == ATOMGUESS) {
       atomic_guess(basis,sol.Ca,sol.Ea,set);

@@ -203,11 +203,6 @@ class BasisSet {
   /// Check for same shells
   bool same_shells(const BasisSet & rhs) const;
 
-  /// Translate orbitals to new geometry within same basis set
-  void MO_translate(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const;
-  /// Project orbitals to new basis set, assuming same geometry
-  void MO_project(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const;
-
  public:
   /// Dummy constructor
   BasisSet();
@@ -453,7 +448,7 @@ class BasisSet {
   double Enuc() const;
 
   /// Project MOs to new basis set
-  void projectMOs(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs) const;
+  void projectMOs(const BasisSet & old, const arma::colvec & oldE, const arma::mat & oldMOs, arma::colvec & E, arma::mat & MOs, size_t nocc) const;
   /// Translate OMOs to new geometry, assuming same basis set. Virtuals are discarded and regenerated.
   void projectOMOs(const BasisSet & old, const arma::cx_mat & oldOMOs, arma::cx_mat & OMOs, size_t nocc) const;
 
