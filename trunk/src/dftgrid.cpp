@@ -476,10 +476,12 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
     rho(0,ip)=da;
     rho(1,ip)=db;
 
+    /*
     double na=compute_density(Pa0,*basp,grid[ip].r);
     double nb=compute_density(Pb0,*basp,grid[ip].r);
     if(fabs(da-na)>1e-6 || fabs(db-nb)>1e-6)
       printf("Density at point % .3f % .3f % .3f: %e vs %e, %e vs %e\n",grid[ip].r.x,grid[ip].r.y,grid[ip].r.z,da,na,db,nb);
+    */
   }
 
   // Calculate gradient
