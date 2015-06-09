@@ -1981,12 +1981,12 @@ void PZStability::update_reference(bool sort) {
 	  usol.cCb.col(i)=COb.col(idxbo(i));
 
 	if(pzw) {
-	  ref_Eorbb.zeros(oa);
-	  for(size_t i=0;i<idxao.n_elem;i++)
-	    ref_Eorbb(i)=Eorbb(idxao(i));
-	  ref_Forbb.resize(oa);
-	  for(size_t i=0;i<idxao.n_elem;i++)
-	    ref_Forbb[i]=Forbb[idxao(i)];
+	  ref_Eorbb.zeros(ob);
+	  for(size_t i=0;i<idxbo.n_elem;i++)
+	    ref_Eorbb(i)=Eorbb(idxbo(i));
+	  ref_Forbb.resize(ob);
+	  for(size_t i=0;i<idxbo.n_elem;i++)
+	    ref_Forbb[i]=Forbb[idxbo(i)];
 	} else {
 	  ref_Eorbb.clear();
 	  ref_Forbb.clear();
