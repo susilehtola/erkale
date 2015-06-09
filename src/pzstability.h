@@ -23,7 +23,6 @@
 #include "dftgrid.h"
 class Timer;
 
-
 class FDHessian {
  protected:
   /// Finite difference derivative step size
@@ -64,6 +63,7 @@ typedef struct {
   arma::uvec idx;
 } pz_rot_par_t;
 
+/// PZ optimizer and stability analysis
 class PZStability: public FDHessian {
  protected:
   /// SCF solver, used for energy calculations
@@ -84,6 +84,10 @@ class PZStability: public FDHessian {
   rscf_t rsol;
   /// or unrestricted
   uscf_t usol;
+  /// Reference self-interaction energies
+  arma::vec ref_Eorb, ref_Eorba, ref_Eorbb;
+  /// Reference orbital Fock matrices
+  std::vector<arma::cx_mat> ref_Forb, ref_Forba, ref_Forbb;
 
   /// Real part of transformations?
   bool real;
@@ -130,8 +134,8 @@ class PZStability: public FDHessian {
 
   /// Evaluate analytic gradient
   arma::vec gradient();
-  /// Evaluate analytic gradient and preconditioned gradient direction
-  arma::vec gradient(arma::vec & sd);
+  /// Evaluate analytic gradient at point x
+  arma::vec gradient(const arma::vec & x, bool ref);
   /// Evaluate semi-analytic Hessian
   arma::mat hessian();
 
@@ -144,9 +148,9 @@ class PZStability: public FDHessian {
   void diagonalize();
 
   /// Evaluate function at x, and possibly orbital Fock matrices
-  double eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, bool ks, bool fock, double pzweight);
+  double eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, bool ks, bool fock, double pzweight, bool useref);
   /// Evaluate function at x, and possibly orbital Fock matrices
-  double eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, bool ks, bool fock, double pzweight);
+  double eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, bool ks, bool fock, double pzweight, bool useref);
   /// Evaluate function at x
   double eval(const arma::vec & x);
 
@@ -160,6 +164,9 @@ class PZStability: public FDHessian {
 
   /// Print information on solution
   void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb);
+
+  /// Precondition gradient vector
+  arma::vec precondition(const arma::vec & g) const;
 
  public:
   /// Constructor
