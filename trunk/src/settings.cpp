@@ -159,7 +159,8 @@ void Settings::add_dft_settings() {
   // Initialize PZ-SIC with localized orbitals?
   add_bool("PZloc", "Initial localization before SIC calculation?", true);
   // Run stability analysis for PZ-SIC?
-  add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0,true);
+  add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0, true);
+  add_double("PZstabThr", "Instability threshold", 1e-3);
   add_bool("PZreal", "Real degrees of freedom in PZ?", true);
   add_string("PZimag", "Imaginary degrees of freedom in PZ?", "Auto");
   // Mode to use PZ-SIC

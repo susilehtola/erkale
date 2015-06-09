@@ -1572,6 +1572,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzEthr=set.get_double("PZEthr");
       int pzimag=parse_pzimag(set.get_string("PZimag"));
       int pzstab=set.get_int("PZstab");
+      double pzstabthr=set.get_double("PZstabThr");
       int seed=set.get_int("PZseed");
             
       if(!pz) {
@@ -1661,7 +1662,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
 	    stab.set_params(true,pzimag==1,false,true);
-	    bool instab=stab.check(true);
+	    bool instab=stab.check(true,pzstabthr);
 	    if(instab) {
 	      sol=stab.get_rsol();
 	      continue;
@@ -1670,7 +1671,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    // Imaginary instability?
 	    if(pzimag==-1) {
 	      stab.set_params(false,true,false,true);
-	      instab=stab.check(true);
+	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
 		sol=stab.get_rsol();
@@ -1680,7 +1681,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  } else if(pzstab==-2) {
 	    // Check stability of OO+OV rotations
 	    stab.set_params(true,pzimag==1,pzov,pzoo);
-	    bool instab=stab.check(true);
+	    bool instab=stab.check(true,pzstabthr);
 	    if(instab) {
 	      sol=stab.get_rsol();
 	      continue;
@@ -1689,7 +1690,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    // Imaginary instability?
 	    if(pzimag==-1) {
 	      stab.set_params(false,true,pzov,pzoo);
-	      instab=stab.check(true);
+	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
 		sol=stab.get_rsol();
@@ -1848,6 +1849,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzNRthr=set.get_double("PZNRthr");
       int pzimag=parse_pzimag(set.get_string("PZimag"));
       int pzstab=set.get_int("PZstab");
+      double pzstabthr=set.get_double("PZstabThr");
       int seed=set.get_int("PZseed");
 
       if(!pz) {
@@ -1991,7 +1993,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
 	    stab.set_params(true,pzimag==1,false,true);
-	    bool instab=stab.check(true);
+	    bool instab=stab.check(true,pzstabthr);
 	    if(instab) {
 	      sol=stab.get_usol();
 	      continue;
@@ -2000,7 +2002,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    // Imaginary instability?
 	    if(pzimag==-1) {
 	      stab.set_params(false,true,false,true);
-	      instab=stab.check(true);
+	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
 		sol=stab.get_usol();
@@ -2010,7 +2012,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  } else if(pzstab==-2) {
 	    // Check stability of OO+OV rotations
 	    stab.set_params(true,pzimag==1,pzov,pzoo);
-	    bool instab=stab.check(true);
+	    bool instab=stab.check(true,pzstabthr);
 	    if(instab) {
 	      sol=stab.get_usol();
 	      continue;
@@ -2019,7 +2021,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    // Imaginary instability?
 	    if(pzimag==-1) {
 	      stab.set_params(false,true,pzov,pzoo);
-	      instab=stab.check(true);
+	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
 		sol=stab.get_usol();
