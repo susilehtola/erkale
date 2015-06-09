@@ -25,6 +25,9 @@
 #include "timer.h"
 #include "mathf.h"
 
+// Threshold for a changed orbital
+#define CHANGETHR (100*DBL_EPSILON)
+
 arma::cx_mat spread_ov(const arma::vec & x, size_t o, size_t v, bool real, bool imag) {
   // Sanity check
   if((real && !imag && x.n_elem != o*v) || (!real && imag && x.n_elem != o*v) || (real && imag && x.n_elem != 2*o*v))
@@ -886,7 +889,7 @@ void PZStability::print_info() {
     rscf_t sol;
     std::vector<arma::cx_mat> Forb;
     arma::vec Eorb;
-    eval(x,sol,Forb,Eorb,true,true,pzw);
+    eval(x,sol,Forb,Eorb,true,true,pzw,true);
 
     // Occupied orbitals
     arma::cx_mat CO=sol.cC.cols(0,oa-1);
@@ -906,7 +909,7 @@ void PZStability::print_info() {
     uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    eval(x,sol,Forba,Eorba,Forbb,Eorbb,true,true,pzw);
+    eval(x,sol,Forba,Eorba,Forbb,Eorbb,true,true,pzw,true);
 
     // Occupied orbitals
     arma::cx_mat COa=sol.cCa.cols(0,oa-1);
@@ -1012,12 +1015,31 @@ void PZStability::update_step(const arma::vec & g) {
   }
 }
 
-double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, bool can, bool fock, double pzweight) {
+double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, bool can, bool fock, double pzweight, bool useref) {
   // Use reference
   sol=rsol;
-  // Rotate orbitals
-  if(arma::norm(x,2)!=0.0) 
-    sol.cC=sol.cC*rotation(x,false);
+
+  // List of changed orbitals
+  std::vector<size_t> occlist, virtlist;
+  if(arma::norm(x,2)!=0.0) {
+    arma::cx_mat R(rotation(x,false));
+    sol.cC=sol.cC*R;
+
+    if(useref) {
+      // Remove unity
+      R-=arma::eye<arma::cx_mat>(sol.cC.n_cols,sol.cC.n_cols);
+      // Find orbitals that have changed
+      for(size_t ia=0;ia<oa;ia++)
+	for(size_t ja=ia+1;ja<R.n_cols;ja++)
+	  if(std::norm(R(ia,ja))>=CHANGETHR) {
+	    occlist.push_back(ia);
+	    if(ja<oa)
+	      occlist.push_back(ja);
+	    else
+	      virtlist.push_back(ja);
+	  }
+    }
+  }	
 
   // Update density matrix
   arma::cx_mat P=2.0*sol.cC.cols(0,oa-1)*arma::trans(sol.cC.cols(0,oa-1));
@@ -1032,27 +1054,79 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
   std::vector<double> occa(oa,2.0);
 
   // Build global Fock operator
-  if(can)
+  if(can && (!useref || (useref && virtlist.size()) ))
     solverp->Fock_RDFT(sol,occa,method,grid,nlgrid);
   if(pzweight==0.0)
     return sol.en.E;
-
+  
   // Build the SI part
-  arma::cx_mat CO=sol.cC.cols(0,oa-1);
-  solverp->PZSIC_Fock(Forb,Eorb,CO,method,grid,nlgrid,fock);
+  arma::cx_mat CO;
+  if(useref) {
+    CO.zeros(sol.cC.n_rows,occlist.size());
+    for(size_t i=0;i<occlist.size();i++)
+      CO.col(i)=sol.cC.col(occlist[i]);
+
+    std::vector<arma::cx_mat> Forb_hlp;
+    arma::vec Eorb_hlp;
+    solverp->PZSIC_Fock(Forb_hlp,Eorb_hlp,CO,method,grid,nlgrid,fock);
+    Eorb=ref_Eorb;
+    for(size_t i=0;i<occlist.size();i++)
+      Eorb(occlist[i])=Eorb_hlp(i);
+    
+    if(fock) {
+      Forb=ref_Forb;
+      for(size_t i=0;i<occlist.size();i++)
+	Forb[occlist[i]]=Forb_hlp[i];
+    }
+  } else {
+    CO=sol.cC.cols(0,oa-1);
+    solverp->PZSIC_Fock(Forb,Eorb,CO,method,grid,nlgrid,fock);
+  }
+  
   return sol.en.E - 2.0*pzweight*arma::sum(Eorb);
 }
 
-double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, bool can, bool fock, double pzweight) {
+double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, bool can, bool fock, double pzweight, bool useref) {
   // Use reference
   sol=usol;
-  // Rotate orbitals
-  if(arma::norm(x,2)!=0.0) {
-    sol.cCa=sol.cCa*rotation(x,false);
-    if(ob)
-      sol.cCb=sol.cCb*rotation(x,true);
-  }
 
+  // List of changed orbitals
+  std::vector<size_t> occlista, occlistb, virtlista, virtlistb;
+  if(arma::norm(x,2)!=0.0) {
+    arma::cx_mat Ra(rotation(x,false));
+    sol.cCa=sol.cCa*Ra;
+
+    if(useref) {
+      Ra-=arma::eye<arma::cx_mat>(sol.cCa.n_cols,sol.cCa.n_cols);
+      for(size_t ia=0;ia<oa;ia++)
+	for(size_t ja=ia+1;ja<Ra.n_cols;ja++)
+	  if(std::norm(Ra(ia,ja))>=CHANGETHR) {
+	    occlista.push_back(ia);
+	    if(ja<oa)
+	      occlista.push_back(ja);
+	    else
+	      virtlista.push_back(ja);
+	  }
+    }
+    
+    if(ob) {
+      arma::cx_mat Rb(rotation(x,true));
+      sol.cCb=sol.cCb*Rb;
+      if(useref) {
+	Rb-=arma::eye<arma::cx_mat>(sol.cCb.n_cols,sol.cCb.n_cols);
+	for(size_t ib=0;ib<ob;ib++)
+	  for(size_t jb=ib+1;jb<Rb.n_cols;jb++)
+	    if(std::norm(Rb(ib,jb))>=CHANGETHR) {
+	      occlistb.push_back(ib);
+	      if(jb<ob)
+		occlistb.push_back(jb);
+	      else
+		virtlistb.push_back(jb);
+	    }
+      }
+    }
+  }
+  
   // Update density matrix
   {
     arma::cx_mat Pa=sol.cCa.cols(0,oa-1)*arma::trans(sol.cCa.cols(0,oa-1));
@@ -1081,7 +1155,7 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   std::vector<double> occb(ob,1.0);
 
   // Build global Fock operator
-  if(can)
+  if(can && (!useref || (useref && (virtlista.size() || virtlistb.size())) ))
     solverp->Fock_UDFT(sol,occa,occb,method,grid,nlgrid);
   if(pzweight==0.0)
     return sol.en.E;
@@ -1089,43 +1163,145 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   // Build the SI part
   std::vector<arma::cx_mat> Forb;
   arma::vec Eorb;
-  arma::cx_mat Ct(sol.cCa.n_rows,oa+ob);
-  Ct.cols(0,oa-1)=sol.cCa.cols(0,oa-1);
-  if(ob)
-    Ct.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
-  solverp->PZSIC_Fock(Forb,Eorb,Ct,method,grid,nlgrid,fock);
+  
+  // Build the SI part
+  arma::cx_mat CO;
+  if(useref) {
+    CO.zeros(sol.cCa.n_rows,occlista.size()+occlistb.size());
+    for(size_t i=0;i<occlista.size();i++)
+      CO.col(i)=sol.cCa.col(occlista[i]);
+    for(size_t i=0;i<occlistb.size();i++)
+      CO.col(i+occlista.size())=sol.cCb.col(occlistb[i]);
+    
+    solverp->PZSIC_Fock(Forb,Eorb,CO,method,grid,nlgrid,fock);
 
-  Eorba=Eorb.subvec(0,oa-1);
-  if(ob)
-    Eorbb=Eorb.subvec(oa,oa+ob-1);
+    Eorba=ref_Eorba;
+    for(size_t i=0;i<occlista.size();i++)
+      Eorba(occlista[i])=Eorb(i);
+    Eorbb=ref_Eorbb;
+    for(size_t i=0;i<occlistb.size();i++)
+      Eorbb(occlistb[i])=Eorb(i+occlista.size());
+    
+    if(fock) {
+      Forba=ref_Forba;
+      for(size_t i=0;i<occlista.size();i++)
+	Forba[occlista[i]]=Forb[i];
+      Forbb=ref_Forbb;
+      for(size_t i=0;i<occlistb.size();i++)
+	Forbb[occlistb[i]]=Forb[i+occlista.size()];
+    }
+  } else {
+    CO.zeros(sol.cCa.n_rows,oa+ob);
+    CO.cols(0,oa-1)=sol.cCa.cols(0,oa-1);
+    if(ob)
+      CO.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
+    solverp->PZSIC_Fock(Forb,Eorb,CO,method,grid,nlgrid,fock);
 
-  if(fock) {
-    Forba.resize(oa);
-    for(size_t i=0;i<oa;i++)
-      Forba[i]=Forb[i];
-    if(ob) {
-      Forbb.resize(ob);
-      for(size_t i=0;i<ob;i++)
-	Forbb[i]=Forb[i+oa];
+    Eorba=Eorb.subvec(0,oa-1);
+    if(ob)
+      Eorbb=Eorb.subvec(oa,oa+ob-1);
+
+    if(fock) {
+      Forba.resize(oa);
+      for(size_t i=0;i<oa;i++)
+	Forba[i]=Forb[i];
+      if(ob) {
+	Forbb.resize(ob);
+	for(size_t i=0;i<ob;i++)
+	  Forbb[i]=Forb[i+oa];
+      }
     }
   }
 
   // Result is
-  return sol.en.E-pzweight*arma::sum(Eorb);
+  return sol.en.E-pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
 }
 
 arma::vec PZStability::gradient() {
-  arma::vec sd;
-  return gradient(sd);
+  arma::vec x;
+  x.zeros(count_params());
+  return gradient(x, true);
 }
 
-arma::vec PZStability::gradient(arma::vec & sd) {
+arma::vec PZStability::precondition(const arma::vec & g) const {
+  // Search direction
+  arma::vec sd(g);
+
+  // Offset
+  size_t ioff=0;
+  
+  if(restr) {
+    // Occupied orbitals
+    arma::cx_mat CO(rsol.cC.cols(0,oa-1));
+    // Virtual orbitals
+    arma::cx_mat CV;
+    if(va)
+      CV=rsol.cC.cols(oa,rsol.cC.n_cols-1);
+
+    if(cancheck && va) {
+      // Form OV gradient
+      arma::cx_mat gOV(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
+      
+      // Preconditioning
+      arma::cx_mat GOV;
+      if(rsol.K_im.n_rows == rsol.H.n_rows && rsol.K_im.n_cols == rsol.H.n_cols)
+	GOV=ov_precondition(CO,CV,ref_Forb,rsol.H*COMPLEX1 + rsol.K_im*COMPLEXI,gOV);
+      else
+	GOV=ov_precondition(CO,CV,ref_Forb,rsol.H*COMPLEX1,gOV);
+      
+      arma::vec POV(gather_ov(GOV,real,imag));
+      if(POV.n_elem != count_ov_params(oa,va))
+	throw std::logic_error("Amont of elements doesn't match!\n");
+      sd.subvec(ioff,ioff+POV.n_elem-1)=POV;
+      ioff+=POV.n_elem;
+    }
+  } else {
+    arma::cx_mat COa(usol.cCa.cols(0,oa-1));
+    arma::cx_mat COb;
+    if(ob)
+      COb=usol.cCb.cols(0,ob-1);
+    arma::cx_mat CVa;
+    if(usol.cCa.n_cols>oa)
+      CVa=usol.cCa.cols(oa,usol.cCa.n_cols-1);
+    arma::cx_mat CVb;
+    if(usol.cCb.n_cols>ob)
+      CVb=usol.cCb.cols(ob,usol.cCb.n_cols-1);
+    
+    if(cancheck && va) {
+      // Form OV gradient
+      arma::cx_mat gOVa(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
+      
+      // Preconditioning
+      arma::cx_mat GOVa;
+      if(usol.Ka_im.n_rows == usol.Ha.n_rows && usol.Ka_im.n_cols == usol.Ha.n_cols)
+	GOVa=ov_precondition(COa,CVa,ref_Forba,usol.Ha*COMPLEX1 + usol.Ka_im*COMPLEXI,gOVa);
+      else
+	GOVa=ov_precondition(COa,CVa,ref_Forba,usol.Ha*COMPLEX1,gOVa);
+      
+      arma::vec POVa(gather_ov(GOVa,real,imag));
+      sd.subvec(ioff,ioff+POVa.n_elem-1)=POVa;
+      ioff+=POVa.n_elem;
+      
+      // Form OV gradient
+      arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
+      // Preconditioning
+      arma::cx_mat GOVb;
+      if(usol.Kb_im.n_rows == usol.Hb.n_rows && usol.Kb_im.n_cols == usol.Hb.n_cols)
+	GOVb=ov_precondition(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1 + usol.Kb_im*COMPLEXI,gOVb);
+      else
+	GOVb=ov_precondition(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1,gOVb);
+      arma::vec POVb(gather_ov(GOVb,real,imag));
+      sd.subvec(ioff,ioff+POVb.n_elem-1)=POVb;
+      ioff+=POVb.n_elem;
+    }
+  }
+
+  return sd;
+}
+
+arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
   arma::vec g(count_params());
   g.zeros();
-  sd.zeros(count_params());
-
-  arma::vec x(count_params());
-  x.zeros();
 
   if(restr) {
     size_t ioff=0;
@@ -1134,7 +1310,7 @@ arma::vec PZStability::gradient(arma::vec & sd) {
     rscf_t sol;
     std::vector<arma::cx_mat> Forb;
     arma::vec Eorb;
-    eval(x,sol,Forb,Eorb,cancheck,true,pzw);
+    eval(x,sol,Forb,Eorb,cancheck,true,pzw,ref);
 
     // Occupied orbitals
     arma::cx_mat CO(sol.cC.cols(0,oa-1));
@@ -1155,18 +1331,9 @@ arma::vec PZStability::gradient(arma::vec & sd) {
 	  for(size_t j=0;j<va;j++)
 	    gOV(i,j)=-arma::as_scalar(arma::strans(CO.col(i))*(sol.H-pzw*Forb[i])*arma::conj(CV.col(j)));
 
-      // Preconditioning
-      arma::cx_mat GOV;
-      if(sol.K_im.n_rows == sol.H.n_rows && sol.K_im.n_cols == sol.H.n_cols)
-	GOV=ov_precondition(CO,CV,Forb,sol.H*COMPLEX1 + sol.K_im*COMPLEXI,gOV);
-      else
-	GOV=ov_precondition(CO,CV,Forb,sol.H*COMPLEX1,gOV);
-
       // Collect values
       arma::vec pOV(gather_ov(gOV,real,imag));
       g.subvec(ioff,ioff+pOV.n_elem-1)=pOV;
-      arma::vec POV(gather_ov(GOV,real,imag));
-      sd.subvec(ioff,ioff+pOV.n_elem-1)=POV;
       ioff+=pOV.n_elem;
     }
 
@@ -1183,7 +1350,6 @@ arma::vec PZStability::gradient(arma::vec & sd) {
       // Collect values
       arma::vec pOO(gather_oo(gOO,real,imag));
       g.subvec(ioff,ioff+pOO.n_elem-1)=pOO;
-      sd.subvec(ioff,ioff+pOO.n_elem-1)=pOO;
       ioff+=pOO.n_elem;
     }
 
@@ -1195,7 +1361,7 @@ arma::vec PZStability::gradient(arma::vec & sd) {
     uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    eval(x,sol,Forba,Eorba,Forbb,Eorbb,cancheck,true,pzw);
+    eval(x,sol,Forba,Eorba,Forbb,Eorbb,cancheck,true,pzw,ref);
 
     // Occupied orbitals
     arma::cx_mat COa=sol.cCa.cols(0,oa-1);
@@ -1224,18 +1390,9 @@ arma::vec PZStability::gradient(arma::vec & sd) {
 	  for(size_t j=0;j<va;j++)
 	    gOVa(i,j)=-arma::as_scalar(arma::strans(COa.col(i))*(sol.Ha-pzw*Forba[i])*arma::conj(CVa.col(j)));
 
-      // Preconditioning
-      arma::cx_mat GOVa;
-      if(sol.Ka_im.n_rows == sol.Ha.n_rows && sol.Ka_im.n_cols == sol.Ha.n_cols)
-	GOVa=ov_precondition(COa,CVa,Forba,sol.Ha*COMPLEX1 + sol.Ka_im*COMPLEXI,gOVa);
-      else
-	GOVa=ov_precondition(COa,CVa,Forba,sol.Ha*COMPLEX1,gOVa);
-
       // Collect values
       arma::vec pOVa(gather_ov(gOVa,real,imag));
       g.subvec(ioff,ioff+pOVa.n_elem-1)=pOVa;
-      arma::vec POVa(gather_ov(GOVa,real,imag));
-      sd.subvec(ioff,ioff+POVa.n_elem-1)=POVa;
       ioff+=pOVa.n_elem;
 
       if(ob && vb) {
@@ -1250,18 +1407,9 @@ arma::vec PZStability::gradient(arma::vec & sd) {
 	    for(size_t j=0;j<vb;j++)
 	      gOVb(i,j)=-arma::as_scalar(arma::strans(COb.col(i))*(sol.Hb-pzw*Forbb[i])*arma::conj(CVb.col(j)));
 
-	// Preconditioning
-	arma::cx_mat GOVb;
-	if(sol.Kb_im.n_rows == sol.Hb.n_rows && sol.Kb_im.n_cols == sol.Hb.n_cols)
-	  GOVb=ov_precondition(COb,CVb,Forbb,sol.Hb*COMPLEX1 + sol.Kb_im*COMPLEXI,gOVb);
-	else
-	  GOVb=ov_precondition(COb,CVb,Forbb,sol.Hb*COMPLEX1,gOVb);
-
 	// Collect values
 	arma::vec pOVb(gather_ov(gOVb,real,imag));
 	g.subvec(ioff,ioff+pOVb.n_elem-1)=pOVb;
-	arma::vec POVb(gather_ov(GOVb,real,imag));
-	sd.subvec(ioff,ioff+POVb.n_elem-1)=POVb;
 	ioff+=pOVb.n_elem;
       }
     }
@@ -1279,7 +1427,6 @@ arma::vec PZStability::gradient(arma::vec & sd) {
 	// Collect values
 	arma::vec pOOa(gather_oo(gOOa,real,imag));
 	g.subvec(ioff,ioff+pOOa.n_elem-1)=pOOa;
-	sd.subvec(ioff,ioff+pOOa.n_elem-1)=pOOa;
 	ioff+=pOOa.n_elem;
       }
 
@@ -1295,24 +1442,23 @@ arma::vec PZStability::gradient(arma::vec & sd) {
 	// Collect values
 	arma::vec pOOb(gather_oo(gOOb,real,imag));
 	g.subvec(ioff,ioff+pOOb.n_elem-1)=pOOb;
-	sd.subvec(ioff,ioff+pOOb.n_elem-1)=pOOb;
 	ioff+=pOOb.n_elem;
       }
     }
   }
 
   /*
-  arma::vec gn(FDHessian::gradient());
-  if(rms_norm(gn-g)>1e-6) {
+    arma::vec gn(FDHessian::gradient());
+    if(rms_norm(gn-g)>1e-6) {
     gn.t().print("Numerical gradient");
     g.t().print("Analytic gradient");
     fflush(stdout);
     g.save("g.dat",arma::raw_ascii);
     gn.save("gn.dat",arma::raw_ascii);
     throw std::logic_error("Problem in gradient.\n");
-  } else {
+    } else {
     printf("Analytic gradient is OK.\n");
-  }
+    }
   */
 
   return g;
@@ -1340,17 +1486,11 @@ arma::mat PZStability::hessian() {
 
     // RHS gradient
     x(i)=ss_fd;
-    rsol=rsol0;
-    usol=usol0;
-    update(x);
-    arma::vec gr=gradient();
+    arma::vec gr=gradient(x,true);
 
     // LHS value
     x(i)=-ss_fd;
-    rsol=rsol0;
-    usol=usol0;
-    update(x);
-    arma::vec gl=gradient();
+    arma::vec gl=gradient(x,true);
 
     // Finite difference derivative is
     for(size_t j=0;j<npar;j++) {
@@ -1380,12 +1520,12 @@ double PZStability::eval(const arma::vec & x) {
     rscf_t sol;
     std::vector<arma::cx_mat> Forb;
     arma::vec Eorb;
-    return eval(x,sol,Forb,Eorb,cancheck,false,pzw);
+    return eval(x,sol,Forb,Eorb,cancheck,false,pzw,false);
   } else {
     uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    return eval(x,sol,Forba,Eorba,Forbb,Eorbb,cancheck,false,pzw);
+    return eval(x,sol,Forba,Eorba,Forbb,Eorbb,cancheck,false,pzw,false);
   }
 }
 
@@ -1405,8 +1545,8 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
   double ival=eval(x0);
   printf("Initial value is % .10f\n",ival);
 
-  // Current, preconditioned and previous gradient
-  arma::vec g, gsd, gold;
+  // Current and previous gradient
+  arma::vec g, gold;
   // Search direction
   arma::vec sd;
   // Current value
@@ -1418,7 +1558,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     gold=g;
     {
       Timer t;
-      g=gradient(gsd);
+      g=gradient();
       print_status(iiter,g,t);
     }
     if(arma::norm(g,2)<gthr)
@@ -1429,7 +1569,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     
     // Update search direction
     arma::vec oldsd(sd);
-    sd = preconditioning ? -gsd : -g;
+    sd = preconditioning ? -precondition(g) : -g;
 
     if(arma::norm(g,2) < nrthr && !cancheck) {
       // Evaluate Hessian
@@ -1719,17 +1859,15 @@ void PZStability::update_reference(bool sort) {
   arma::vec x0(count_params());
   x0.zeros();
 
+  printf("Updating reference ... ");
+  fflush(stdout);
+  Timer t;
+  
   if(restr) {
     rscf_t sol;
     std::vector<arma::cx_mat> Forb;
     arma::vec Eorb;
-    if(sort)
-      eval(x0,sol,Forb,Eorb,true,true,pzw);
-    else
-      eval(x0,sol,Forb,Eorb,true,false,0.0);
-
-    // Store reference
-    rsol=sol;
+    eval(x0,sol,Forb,Eorb,true,true,pzw,false);
 
     if(sort) {
       arma::cx_mat CO(sol.cC.cols(0,oa-1));
@@ -1748,6 +1886,9 @@ void PZStability::update_reference(bool sort) {
 	Eorbv=arma::real(arma::diagvec(arma::trans(CV)*H*CV));
       // Sort in ascending order
       arma::uvec idxo=arma::stable_sort_index(Eorbo,"ascend");
+
+      // Store reference
+      rsol=sol;
       for(arma::uword i=0;i<idxo.n_elem;i++)
 	rsol.cC.col(i)=CO.col(idxo(i));
       if(CV.n_cols) {
@@ -1755,16 +1896,26 @@ void PZStability::update_reference(bool sort) {
 	for(arma::uword i=0;i<idxv.n_elem;i++)
 	  rsol.cC.col(i+oa)=CV.col(idxv(i));
       }
+      ref_Eorb.zeros(Eorb.n_elem);
+      for(size_t i=0;i<idxo.n_elem;i++)
+	ref_Eorb(i)=Eorb(idxo(i));
+
+      ref_Forb.resize(Forb.size());
+      for(size_t i=0;i<idxo.n_elem;i++)
+	ref_Forb[i]=Forb[idxo(i)];
+      
+    } else {
+      // Store reference
+      rsol=sol;
+      ref_Eorb=Eorb;
+      ref_Forb=Forb;
+
     }
   } else {
     uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    if(sort)
-      eval(x0,sol,Forba,Eorba,Forbb,Eorbb,true,true,pzw);
-    else
-      eval(x0,sol,Forba,Eorba,Forbb,Eorbb,true,false,0.0);
-    usol=sol;
+    eval(x0,sol,Forba,Eorba,Forbb,Eorbb,true,true,pzw,false);
 
     if(sort) {
       arma::cx_mat COa(sol.cCa.cols(0,oa-1));
@@ -1802,7 +1953,9 @@ void PZStability::update_reference(bool sort) {
 
       // Sort in ascending order
       arma::uvec idxao=arma::stable_sort_index(Eorbao,"ascend");
-      for(arma::uword i=0;i<idxao.n_elem;i++)
+
+      usol=sol;
+      for(size_t i=0;i<idxao.n_elem;i++)
 	usol.cCa.col(i)=COa.col(idxao(i));
       if(CVa.n_cols) {
 	arma::uvec idxav=arma::stable_sort_index(Eorbav,"ascend");
@@ -1810,19 +1963,52 @@ void PZStability::update_reference(bool sort) {
 	  usol.cCa.col(i+oa)=CVa.col(idxav(i));
       }
 
+      if(pzw) {
+	ref_Eorba.zeros(oa);
+	for(size_t i=0;i<idxao.n_elem;i++)
+	  ref_Eorba(i)=Eorba(idxao(i));
+	ref_Forba.resize(oa);
+	for(size_t i=0;i<idxao.n_elem;i++)
+	  ref_Forba[i]=Forba[idxao(i)];
+      } else {
+	ref_Eorba.clear();
+	ref_Forba.clear();
+      }
+
       if(ob) {
 	arma::uvec idxbo=arma::stable_sort_index(Eorbbo,"ascend");
 	for(arma::uword i=0;i<idxbo.n_elem;i++)
 	  usol.cCb.col(i)=COb.col(idxbo(i));
+
+	if(pzw) {
+	  ref_Eorbb.zeros(oa);
+	  for(size_t i=0;i<idxao.n_elem;i++)
+	    ref_Eorbb(i)=Eorbb(idxao(i));
+	  ref_Forbb.resize(oa);
+	  for(size_t i=0;i<idxao.n_elem;i++)
+	    ref_Forbb[i]=Forbb[idxao(i)];
+	} else {
+	  ref_Eorbb.clear();
+	  ref_Forbb.clear();
+	}
       }
       if(CVb.n_cols) {
 	arma::uvec idxbv=arma::stable_sort_index(Eorbbv,"ascend");
 	for(arma::uword i=0;i<idxbv.n_elem;i++)
 	  usol.cCb.col(i+ob)=CVb.col(idxbv(i));
       }
+    } else {
+      // Store reference
+      usol=sol;
+      ref_Eorba=Eorba;
+      ref_Forba=Forba;
+      ref_Eorbb=Eorbb;
+      ref_Forbb=Forbb;
     }
-
   }
+
+  printf("done (%s)\n",t.elapsed().c_str());
+  fflush(stdout);
 }
 
 arma::cx_mat PZStability::rotation(const arma::vec & x, bool spin) const {
@@ -2041,12 +2227,49 @@ bool PZStability::check(bool stability, double cutoff) {
 
   // Estimate runtime
   {
+    double ttot=0.0;
+    
     Timer t;
-    gradient();
-    double dt=t.get();
+    arma::vec x(count_params());
 
+    if(cancheck) {
+      // OV part
+      if(cancheck && vb) {
+        x.zeros();
+	x(0)=ss_fd;
+	t.set();
+	gradient(x,true);
+	double dt=t.get();
+
+	// Total number of OV calculations is
+	if(restr)
+	  ttot+=2*dt*count_ov_params(oa,va);
+	else
+	  ttot+=2*dt*(count_ov_params(oa,va)+count_ov_params(ob,vb));
+      }
+    }
+    if(oocheck && oa>1) {
+      x.zeros();
+      size_t ioff0=0;
+      // Canonical rotations
+      if(cancheck) {
+	ioff0=count_ov_params(oa,va);
+	if(!restr)
+	  ioff0+=count_ov_params(ob,vb);
+      }
+      x(ioff0)=ss_fd;
+      t.set();
+      gradient(x,true);
+      double dt=t.get();
+      
+      // Total number of OO calculations is
+      if(restr)
+	ttot+=2*dt*count_oo_params(oa);
+      else
+	ttot+=2*dt*(count_oo_params(oa)+count_oo_params(ob));
+    }
+    
     // Total time is
-    double ttot=2*count_params()*dt;
     fprintf(stderr,"\nComputing the Hessian will take approximately %s\n",t.parse(ttot).c_str());
     fflush(stderr);
   }
@@ -2152,12 +2375,11 @@ void PZStability::print_status(size_t iiter, const arma::vec & g, const Timer & 
 
 void PZStability::linesearch(const std::string & fname, bool prec, int Np) {
   // Get gradient
-  arma::vec sd;
-  arma::vec g(gradient(sd));
+  arma::vec g(gradient());
 
   // Use preconditioned direction
   if(prec)
-    g=sd;
+    g=precondition(g);
   
   FILE *out=fopen(fname.c_str(),"w");
   // Do line search
