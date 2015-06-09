@@ -1572,7 +1572,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzEthr=set.get_double("PZEthr");
       int pzimag=parse_pzimag(set.get_string("PZimag"));
       int pzstab=set.get_int("PZstab");
-      double pzstabthr=set.get_double("PZstabThr");
+      double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
       int seed=set.get_int("PZseed");
             
       if(!pz) {
@@ -1849,7 +1849,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzNRthr=set.get_double("PZNRthr");
       int pzimag=parse_pzimag(set.get_string("PZimag"));
       int pzstab=set.get_int("PZstab");
-      double pzstabthr=set.get_double("PZstabThr");
+      double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
       int seed=set.get_int("PZseed");
 
       if(!pz) {
