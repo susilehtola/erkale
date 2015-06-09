@@ -608,7 +608,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
   }
   
   // Exchange-correlation
-  if(dft.x_func != 0 || dft.c_func != 0) {
+  if(dft.x_func > 0 || dft.c_func > 0) {
     if(verbose) {
       if(fock)
 	printf("Constructing orbital XC matrices ... ");
