@@ -348,16 +348,18 @@ double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
       arma::vec sdnew=sd+gamma*oldsd;
       
       // Check that new SD is sane
-      if(arma::dot(sdnew,sd)<=0 || (iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(g,g)))
+      if(iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(gold,gold)) {
+	printf("Powell restart - SD step\n");
+      } else if(arma::dot(sdnew,sd)<=0) {
 	// This would take us into the wrong direction!
 	printf("Bad CG direction. SD step\n");
-      else {
+      } else {
 	// Update search direction
 	sd=sdnew;
 	printf("CG step\n");
       }
     } else printf("SD step\n");
-
+    
     while(true) {
       step.push_back(std::pow(stepfac,step.size())*initstep);
       val.push_back(eval(step[step.size()-1]*sd));
@@ -1255,6 +1257,7 @@ arma::vec PZStability::precondition(const arma::vec & g) const {
       sd.subvec(ioff,ioff+POV.n_elem-1)=POV;
       ioff+=POV.n_elem;
     }
+
   } else {
     arma::cx_mat COa(usol.cCa.cols(0,oa-1));
     arma::cx_mat COb;
@@ -1277,22 +1280,29 @@ arma::vec PZStability::precondition(const arma::vec & g) const {
 	GOVa=ov_precondition(COa,CVa,ref_Forba,usol.Ha*COMPLEX1 + usol.Ka_im*COMPLEXI,gOVa);
       else
 	GOVa=ov_precondition(COa,CVa,ref_Forba,usol.Ha*COMPLEX1,gOVa);
-      
+
       arma::vec POVa(gather_ov(GOVa,real,imag));
       sd.subvec(ioff,ioff+POVa.n_elem-1)=POVa;
       ioff+=POVa.n_elem;
+      if(POVa.n_elem != count_ov_params(oa,va))
+	throw std::logic_error("Amont of elements doesn't match!\n");
       
-      // Form OV gradient
-      arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
-      // Preconditioning
-      arma::cx_mat GOVb;
-      if(usol.Kb_im.n_rows == usol.Hb.n_rows && usol.Kb_im.n_cols == usol.Hb.n_cols)
-	GOVb=ov_precondition(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1 + usol.Kb_im*COMPLEXI,gOVb);
-      else
-	GOVb=ov_precondition(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1,gOVb);
-      arma::vec POVb(gather_ov(GOVb,real,imag));
-      sd.subvec(ioff,ioff+POVb.n_elem-1)=POVb;
-      ioff+=POVb.n_elem;
+      if(ob && vb) {
+	// Form OV gradient
+	arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
+	// Preconditioning
+	arma::cx_mat GOVb;
+	if(usol.Kb_im.n_rows == usol.Hb.n_rows && usol.Kb_im.n_cols == usol.Hb.n_cols)
+	  GOVb=ov_precondition(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1 + usol.Kb_im*COMPLEXI,gOVb);
+	else
+	  GOVb=ov_precondition(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1,gOVb);
+
+	arma::vec POVb(gather_ov(GOVb,real,imag));
+	sd.subvec(ioff,ioff+POVb.n_elem-1)=POVb;
+	ioff+=POVb.n_elem;
+	if(POVb.n_elem != count_ov_params(ob,vb))
+	  throw std::logic_error("Amont of elements doesn't match!\n");
+      }
     }
   }
 
@@ -1570,7 +1580,11 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     // Update search direction
     arma::vec oldsd(sd);
     sd = preconditioning ? -precondition(g) : -g;
-
+    if(preconditioning && arma::norm_dot(sd,-g)<0.0) {
+      printf("Projection of preconditioned search direction on gradient is %e, not using preconditioning.\n",arma::norm_dot(sd,-g));
+      sd=-g;
+    }
+    
     if(arma::norm(g,2) < nrthr && !cancheck) {
       // Evaluate Hessian
       Timer tp;
@@ -1628,6 +1642,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
     } else if(!cancheck) { // Use BFGS in OO optimization
       // New search direction
+      arma::vec sd0(sd);
       sd=-lbfgs.solve();
 
       // Check sanity
@@ -1639,7 +1654,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 	
       } else if(iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(gold,gold)) {
 	printf("Powell restart - SD step\n");
-	sd=-g;
+	sd=sd0;
 	
       } else {
 	printf("BFGS step\n");
@@ -1659,7 +1674,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 	arma::vec sdnew(sd+gamma*oldsd);
 
 	// Check that new SD is sane
-	if(arma::dot(sdnew,sd)<=0 || arma::dot(g,gold)>=0.2*arma::dot(g,g))
+	if(arma::dot(sdnew,-g)<=0)
 	  // This would take us into the wrong direction!
 	  printf("Bad CG direction. SD step\n");
 	else {
