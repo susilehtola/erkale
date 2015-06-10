@@ -981,35 +981,6 @@ void PZStability::print_info() {
   }
 }
 
-arma::cx_mat PZStability::ov_precondition(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat H0, const arma::cx_mat & gOV) const {
-  // Preconditioning. Form unified Hamiltonian
-  arma::cx_mat H(unified_H(CO,CV,Forb,H0));
-
-  arma::cx_mat Hoo(arma::trans(CO)*H*CO);
-  arma::cx_mat Hvv(arma::trans(CV)*H*CV);
-
-  arma::vec Eo;
-  arma::cx_mat Co;
-  eig_sym_ordered(Eo,Co,Hoo);
-
-  arma::vec Ev;
-  arma::cx_mat Cv;
-  eig_sym_ordered(Ev,Cv,Hvv);
-
-  // Minimum Hessian shift is
-  double minH=1e-4;
-  double dH=minH+std::max(arma::max(Eo)-arma::min(Ev),0.0);
-
-  // Transform OV gradient into pseudocanonical space and perform preconditioning
-  arma::cx_mat GOV(arma::trans(Co)*gOV*Cv);
-  for(size_t io=0;io<CO.n_cols;io++)
-    for(size_t iv=0;iv<CV.n_cols;iv++)
-      GOV(io,iv)/=Ev(iv)-Eo(io)+dH;
-
-  // Transform back into the original coordinates
-  return Co*GOV*arma::trans(Cv);
-}
-
 void PZStability::update_step(const arma::vec & g) {
   // Collect derivatives
   if(restr || ob==0) {
@@ -1285,16 +1256,36 @@ arma::vec PZStability::precondition(const arma::vec & g) const {
       // Form OV gradient
       arma::cx_mat gOV(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
       
-      // Preconditioning
-      arma::cx_mat GOV;
-      if(rsol.K_im.n_rows == rsol.H.n_rows && rsol.K_im.n_cols == rsol.H.n_cols)
-	GOV=ov_precondition(CO,CV,ref_Forb,rsol.H*COMPLEX1 + rsol.K_im*COMPLEXI,gOV);
-      else
-	GOV=ov_precondition(CO,CV,ref_Forb,rsol.H*COMPLEX1,gOV);
+      // Preconditioning. Form unified Hamiltonian
+      arma::cx_mat H=(rsol.K_im.n_rows == rsol.H.n_rows && rsol.K_im.n_cols == rsol.H.n_cols) ? unified_H(CO,CV,ref_Forb,rsol.H*COMPLEX1 + rsol.K_im*COMPLEXI) : unified_H(CO,CV,ref_Forb,rsol.H*COMPLEX1);
+
+      arma::cx_mat Hoo(arma::trans(CO)*H*CO);
+      arma::cx_mat Hvv(arma::trans(CV)*H*CV);
+
+      arma::vec Eo;
+      arma::cx_mat Co;
+      eig_sym_ordered(Eo,Co,Hoo);
+
+      arma::vec Ev;
+      arma::cx_mat Cv;
+      eig_sym_ordered(Ev,Cv,Hvv);
+
+      // Minimum Hessian shift is
+      double minH=1e-4;
+      double dH=minH+std::max(arma::max(Eo)-arma::min(Ev),0.0);
+
+      // Transform OV gradient into pseudocanonical space and perform preconditioning
+      arma::cx_mat GOV(arma::trans(Co)*gOV*Cv);
+      for(size_t io=0;io<CO.n_cols;io++)
+	for(size_t iv=0;iv<CV.n_cols;iv++)
+	  GOV(io,iv)/=Ev(iv)-Eo(io)+dH;
+
+      // Transform back into the original frame
+      GOV=Co*GOV*arma::trans(Cv);
       
       arma::vec POV(gather_ov(GOV,real,imag));
       if(POV.n_elem != count_ov_params(oa,va))
-	throw std::logic_error("Amont of elements doesn't match!\n");
+	throw std::logic_error("Amount of elements doesn't match!\n");
       sd.subvec(ioff,ioff+POV.n_elem-1)=POV;
       ioff+=POV.n_elem;
     }
@@ -1312,37 +1303,70 @@ arma::vec PZStability::precondition(const arma::vec & g) const {
       CVb=usol.cCb.cols(ob,usol.cCb.n_cols-1);
     
     if(cancheck && va) {
-      // Form OV gradient
+      // Preconditioning. Form unified Hamiltonian
+      arma::cx_mat Ha=(usol.Ka_im.n_rows == usol.Ha.n_rows && usol.Ka_im.n_cols == usol.Ha.n_cols) ? unified_H(COa,CVa,ref_Forba,usol.Ha*COMPLEX1 + usol.Ka_im*COMPLEXI) : unified_H(COa,CVa,ref_Forba,usol.Ha*COMPLEX1);
+      arma::cx_mat Hb=(usol.Kb_im.n_rows == usol.Hb.n_rows && usol.Kb_im.n_cols == usol.Hb.n_cols) ? unified_H(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1 + usol.Kb_im*COMPLEXI) : unified_H(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1);
+
+      arma::cx_mat Hooa(arma::trans(COa)*Ha*COa);
+      arma::cx_mat Hvva(arma::trans(CVa)*Ha*CVa);
+      arma::cx_mat Hoob;
+      if(ob)
+	Hoob=arma::trans(COb)*Hb*COb;
+      arma::cx_mat Hvvb(arma::trans(CVb)*Hb*CVb);
+
+      arma::vec Eoa;
+      arma::cx_mat Coa;
+      eig_sym_ordered(Eoa,Coa,Hooa);
+
+      arma::vec Eob;
+      arma::cx_mat Cob;
+      if(ob)
+	eig_sym_ordered(Eob,Cob,Hoob);
+
+      arma::vec Eva;
+      arma::cx_mat Cva;
+      eig_sym_ordered(Eva,Cva,Hvva);
+
+      arma::vec Evb;
+      arma::cx_mat Cvb;
+      eig_sym_ordered(Evb,Cvb,Hvvb);
+
+      // Minimum Hessian shift is
+      const double minH=1e-4;
+      double dH=std::max(arma::max(Eoa)-arma::min(Eva),0.0);
+      if(ob)
+	dH=std::max(arma::max(Eob)-arma::min(Evb),dH);
+      dH+=minH;
+
+      // Transform OV gradient into pseudocanonical space and perform preconditioning
       arma::cx_mat gOVa(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
-      
-      // Preconditioning
-      arma::cx_mat GOVa;
-      if(usol.Ka_im.n_rows == usol.Ha.n_rows && usol.Ka_im.n_cols == usol.Ha.n_cols)
-	GOVa=ov_precondition(COa,CVa,ref_Forba,usol.Ha*COMPLEX1 + usol.Ka_im*COMPLEXI,gOVa);
-      else
-	GOVa=ov_precondition(COa,CVa,ref_Forba,usol.Ha*COMPLEX1,gOVa);
+      arma::cx_mat GOVa(arma::trans(Coa)*gOVa*Cva);
+      for(size_t io=0;io<COa.n_cols;io++)
+	for(size_t iv=0;iv<CVa.n_cols;iv++)
+	  GOVa(io,iv)/=Eva(iv)-Eoa(io)+dH;
+      // Transform back into the original frame
+      GOVa=Coa*GOVa*arma::trans(Cva);
 
       arma::vec POVa(gather_ov(GOVa,real,imag));
       sd.subvec(ioff,ioff+POVa.n_elem-1)=POVa;
       ioff+=POVa.n_elem;
       if(POVa.n_elem != count_ov_params(oa,va))
-	throw std::logic_error("Amont of elements doesn't match!\n");
-      
-      if(ob && vb) {
-	// Form OV gradient
-	arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
-	// Preconditioning
-	arma::cx_mat GOVb;
-	if(usol.Kb_im.n_rows == usol.Hb.n_rows && usol.Kb_im.n_cols == usol.Hb.n_cols)
-	  GOVb=ov_precondition(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1 + usol.Kb_im*COMPLEXI,gOVb);
-	else
-	  GOVb=ov_precondition(COb,CVb,ref_Forbb,usol.Hb*COMPLEX1,gOVb);
+	throw std::logic_error("Amount of elements doesn't match!\n");
 
+      if(ob) {
+	arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
+	arma::cx_mat GOVb(arma::trans(Cob)*gOVb*Cvb);
+	for(size_t io=0;io<COb.n_cols;io++)
+	  for(size_t iv=0;iv<CVb.n_cols;iv++)
+	    GOVb(io,iv)/=Evb(iv)-Eob(io)+dH;
+	// Transform back into the original frame
+	GOVb=Cob*GOVb*arma::trans(Cvb);
+	
 	arma::vec POVb(gather_ov(GOVb,real,imag));
 	sd.subvec(ioff,ioff+POVb.n_elem-1)=POVb;
 	ioff+=POVb.n_elem;
 	if(POVb.n_elem != count_ov_params(ob,vb))
-	  throw std::logic_error("Amont of elements doesn't match!\n");
+	  throw std::logic_error("Amount of elements doesn't match!\n");
       }
     }
   }
@@ -1622,6 +1646,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     arma::vec oldsd(sd);
     sd = preconditioning ? -precondition(g) : -g;
     if(preconditioning && arma::norm_dot(sd,-g)<0.0) {
+      //printf("Projection of preconditioned search direction on gradient is %e.\n",arma::norm_dot(sd,-g));
       printf("Projection of preconditioned search direction on gradient is %e, not using preconditioning.\n",arma::norm_dot(sd,-g));
       sd=-g;
     }
