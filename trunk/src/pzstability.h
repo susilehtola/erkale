@@ -129,8 +129,6 @@ class PZStability: public FDHessian {
 
   /// Construct unified Hamiltonian
   arma::cx_mat unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const;
-  /// Precondition OV gradient with approximate diagonal Hessian
-  arma::cx_mat ov_precondition(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat H0, const arma::cx_mat & gOV) const;
 
   /// Evaluate analytic gradient
   arma::vec gradient();
