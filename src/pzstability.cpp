@@ -28,6 +28,11 @@
 // Threshold for a changed orbital
 #define CHANGETHR (100*DBL_EPSILON)
 
+// Conversion to proper gradient
+arma::cx_mat gradient_convert(const arma::cx_mat & M) {
+  return 2.0*arma::real(M)*COMPLEX1 - 2.0*arma::imag(M)*COMPLEXI;
+}
+
 arma::cx_mat spread_ov(const arma::vec & x, size_t o, size_t v, bool real, bool imag) {
   // Sanity check
   if((real && !imag && x.n_elem != o*v) || (!real && imag && x.n_elem != o*v) || (real && imag && x.n_elem != 2*o*v))
@@ -55,6 +60,7 @@ arma::cx_mat spread_ov(const arma::vec & x, size_t o, size_t v, bool real, bool 
 
   return r;
 }
+
 arma::vec gather_ov(const arma::cx_mat & Mov, bool real, bool imag) {
   // Matrix size
   size_t o(Mov.n_rows);
@@ -73,7 +79,7 @@ arma::vec gather_ov(const arma::cx_mat & Mov, bool real, bool imag) {
   if(real) {
     for(size_t i=0;i<o;i++)
       for(size_t j=0;j<v;j++)
-	x(i*v + j + ioff)=2.0*std::real(Mov(i,j));
+	x(i*v + j + ioff)=std::real(Mov(i,j));
     ioff+=o*v;
   }
 
@@ -81,7 +87,7 @@ arma::vec gather_ov(const arma::cx_mat & Mov, bool real, bool imag) {
   if(imag) {
     for(size_t i=0;i<o;i++)
       for(size_t j=0;j<v;j++)
-	x(i*v + j + ioff)=-2.0*std::imag(Mov(i,j));
+	x(i*v + j + ioff)=std::imag(Mov(i,j));
     ioff+=o*v;
   }
 
@@ -104,8 +110,8 @@ arma::cx_mat spread_oo(const arma::vec & x, size_t o, bool real, bool imag) {
       for(size_t j=0;j<i;j++) {
 	// Indexing requires j<i
 	size_t idx=i*(i-1)/2 + j;
+	R(j,i)= x(idx)*COMPLEX1;
 	R(i,j)=-x(idx)*COMPLEX1;
-	R(j,i)=x(idx)*COMPLEX1;
       }
     ioff+=o*(o-1)/2;
   }
@@ -117,8 +123,8 @@ arma::cx_mat spread_oo(const arma::vec & x, size_t o, bool real, bool imag) {
       for(size_t j=0;j<i;j++) {
 	// Indexing requires j<i
 	size_t idx=ioff + i*(i-1)/2 + j;
-	R(i,j)-=x(idx)*COMPLEXI;
 	R(j,i)+=x(idx)*COMPLEXI;
+	R(i,j)-=x(idx)*COMPLEXI;
       }
     ioff+=o*(o-1)/2;
   }
@@ -144,7 +150,7 @@ arma::vec gather_oo(const arma::cx_mat & M, bool real, bool imag) {
       for(size_t j=0;j<i;j++) {
 	// Indexing requires j<i
 	size_t idx=i*(i-1)/2 + j;
-	x(idx + ioff)=2.0*std::real(M(j,i));
+	x(idx + ioff)=std::real(M(j,i));
       }
     ioff+=o*(o-1)/2;
   }
@@ -156,7 +162,7 @@ arma::vec gather_oo(const arma::cx_mat & M, bool real, bool imag) {
       for(size_t j=0;j<i;j++) {
 	// Indexing requires j<i
 	size_t idx=i*(i-1)/2 + j;
-	x(idx + ioff)=-2.0*std::imag(M(j,i));
+	x(idx + ioff)=std::imag(M(j,i));
       }
     ioff+=o*(o-1)/2;
   }
@@ -1255,6 +1261,9 @@ arma::vec PZStability::precondition(const arma::vec & g) const {
     if(cancheck && va) {
       // Form OV gradient
       arma::cx_mat gOV(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
+      // Check
+      arma::vec gs(g.subvec(ioff,ioff+count_ov_params(oa,va)-1));
+      arma::vec gt(gather_ov(gOV,real,imag));
       
       // Preconditioning. Form unified Hamiltonian
       arma::cx_mat H=(rsol.K_im.n_rows == rsol.H.n_rows && rsol.K_im.n_cols == rsol.H.n_cols) ? unified_H(CO,CV,ref_Forb,rsol.H*COMPLEX1 + rsol.K_im*COMPLEXI) : unified_H(CO,CV,ref_Forb,rsol.H*COMPLEX1);
@@ -1406,6 +1415,9 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	  for(size_t j=0;j<va;j++)
 	    gOV(i,j)=-arma::as_scalar(arma::strans(CO.col(i))*(sol.H-pzw*Forb[i])*arma::conj(CV.col(j)));
 
+      // Convert to proper gradient
+      gOV=gradient_convert(gOV);
+
       // Collect values
       arma::vec pOV(gather_ov(gOV,real,imag));
       g.subvec(ioff,ioff+pOV.n_elem-1)=pOV;
@@ -1421,6 +1433,9 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	  for(size_t j=0;j<oa;j++)
 	    gOO(i,j)=pzw*arma::as_scalar(arma::strans(CO.col(i))*(Forb[i]-Forb[j])*arma::conj(CO.col(j)));
       }
+      
+      // Convert to proper gradient
+      gOO=gradient_convert(gOO);
 
       // Collect values
       arma::vec pOO(gather_oo(gOO,real,imag));
@@ -1465,6 +1480,9 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	  for(size_t j=0;j<va;j++)
 	    gOVa(i,j)=-arma::as_scalar(arma::strans(COa.col(i))*(sol.Ha-pzw*Forba[i])*arma::conj(CVa.col(j)));
 
+      // Convert to proper gradient
+      gOVa=gradient_convert(gOVa);
+      
       // Collect values
       arma::vec pOVa(gather_ov(gOVa,real,imag));
       g.subvec(ioff,ioff+pOVa.n_elem-1)=pOVa;
@@ -1482,6 +1500,9 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	    for(size_t j=0;j<vb;j++)
 	      gOVb(i,j)=-arma::as_scalar(arma::strans(COb.col(i))*(sol.Hb-pzw*Forbb[i])*arma::conj(CVb.col(j)));
 
+	// Convert to proper gradient
+	gOVb=gradient_convert(gOVb);
+	
 	// Collect values
 	arma::vec pOVb(gather_ov(gOVb,real,imag));
 	g.subvec(ioff,ioff+pOVb.n_elem-1)=pOVb;
@@ -1499,6 +1520,9 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	    for(size_t j=0;j<oa;j++)
 	      gOOa(i,j)=pzw*arma::as_scalar(arma::strans(COa.col(i))*(Forba[i]-Forba[j])*arma::conj(COa.col(j)));
 
+	// Convert to proper gradient
+	gOOa=gradient_convert(gOOa);
+
 	// Collect values
 	arma::vec pOOa(gather_oo(gOOa,real,imag));
 	g.subvec(ioff,ioff+pOOa.n_elem-1)=pOOa;
@@ -1514,6 +1538,9 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	    for(size_t j=0;j<ob;j++)
 	      gOOb(i,j)=pzw*arma::as_scalar(arma::strans(COb.col(i))*(Forbb[i]-Forbb[j])*arma::conj(COb.col(j)));
 
+	// Convert to proper gradient
+	gOOb=gradient_convert(gOOb);
+	
 	// Collect values
 	arma::vec pOOb(gather_oo(gOOb,real,imag));
 	g.subvec(ioff,ioff+pOOb.n_elem-1)=pOOb;
