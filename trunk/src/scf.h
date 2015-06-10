@@ -95,8 +95,6 @@ typedef struct {
   double Eel;
   /// Nuclear repulsion energy
   double Enucr;
-  /// Effective energy
-  double Eeff;
   /// Non-local energy
   double Enl;
 

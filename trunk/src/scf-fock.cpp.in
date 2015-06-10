@@ -92,6 +92,9 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   Kbshort_im.zeros(Nbf,Nbf);
 #endif
 
+  // Initialize energy
+  memset(&sol.en, 0, sizeof(energy_t));
+  
   // Form Coulomb and exchange matrices
   if(densityfit) {
 
@@ -697,7 +700,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   sol.en.Ecoul=0.5*arma::trace(sol.P*sol.J);
 
   // Compute total energies
-  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Eeff+sol.en.Enl;
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl;
   sol.en.E=sol.en.Eel+sol.en.Enucr;
 
   // Sanity checks
@@ -740,6 +743,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.C.print("C");
     sol.P.print("P");
     sol.H.print("H");
+    sol.P_im.print("P_im");
+    sol.K_im.print("K_im");
 #else
     sol.Ca.print("Ca");
     sol.Cb.print("Cb");
@@ -747,8 +752,18 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.Pb.print("Pb");
     sol.Ha.print("Ha");
     sol.Hb.print("Hb");
+    sol.Pa_im.print("Pa_im");
+    sol.Ka_im.print("Ka_im");
+    sol.Pb_im.print("Pb_im");
+    sol.Kb_im.print("Kb_im");
 #endif
 
+    printf("Coulomb      energy %e\n",sol.en.Ecoul);
+    printf("XC           energy %e\n",sol.en.Exc);
+    printf("One-electron energy %e\n",sol.en.Eone);
+    printf("Non-local    energy %e\n",sol.en.Enl);
+    printf("Nuclear repulsion energy %e\n",sol.en.Enucr);
+    
     std::ostringstream oss;
     oss << "\nSomething wrong with total energy " << sol.en.E <<"?\nEnding program.\n";
     throw std::runtime_error(oss.str());

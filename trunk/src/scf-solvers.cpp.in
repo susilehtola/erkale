@@ -896,8 +896,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #else
     printf("%-21s energy: % .16e\n","Exchange-correlation",sol.en.Exc);
     printf("%-21s energy: % .16e\n","Non-local correlation",sol.en.Enl);
-    if(sol.en.Eeff)
-      printf("%-21s energy: % .16e\n","SIC",sol.en.Eeff);
 #endif
     printf("-----------------------------------------------------\n");
     printf("%28s: % .16e\n","Total energy",sol.en.E);
