@@ -1408,13 +1408,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       arma::cx_mat gOV(oa,va);
       if(pzw==0.0)
 	for(size_t i=0;i<oa;i++)
-	  for(size_t j=0;j<va;j++)
-	    gOV(i,j)=-arma::as_scalar(arma::strans(CO.col(i))*sol.H*arma::conj(CV.col(j)));
+	  for(size_t a=0;a<va;a++)
+	    gOV(i,a)=-arma::as_scalar(arma::trans(CV.col(a))*sol.H*CO.col(i));
       else
 	for(size_t i=0;i<oa;i++)
-	  for(size_t j=0;j<va;j++)
-	    gOV(i,j)=-arma::as_scalar(arma::strans(CO.col(i))*(sol.H-pzw*Forb[i])*arma::conj(CV.col(j)));
-
+	  for(size_t a=0;a<va;a++)
+	    gOV(i,a)=-arma::as_scalar(arma::trans(CV.col(a))*(sol.H-Forb[i])*CO.col(i));
+      
       // Convert to proper gradient
       gOV=gradient_convert(gOV);
 
@@ -1431,7 +1431,7 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       if(pzw!=0.0) {
 	for(size_t i=0;i<oa;i++)
 	  for(size_t j=0;j<oa;j++)
-	    gOO(i,j)=pzw*arma::as_scalar(arma::strans(CO.col(i))*(Forb[i]-Forb[j])*arma::conj(CO.col(j)));
+	    gOO(i,j)=-pzw*arma::as_scalar(arma::trans(CO.col(j))*(Forb[j]-Forb[i])*CO.col(i));
       }
 
       // Convert to proper gradient
@@ -1473,12 +1473,12 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       arma::cx_mat gOVa(oa,va);
       if(pzw==0.0)
 	for(size_t i=0;i<oa;i++)
-	  for(size_t j=0;j<va;j++)
-	    gOVa(i,j)=-arma::as_scalar(arma::strans(COa.col(i))*sol.Ha*arma::conj(CVa.col(j)));
+	  for(size_t a=0;a<va;a++)
+	    gOVa(i,a)=-arma::as_scalar(arma::trans(CVa.col(a))*sol.Ha*COa.col(i));
       else
 	for(size_t i=0;i<oa;i++)
-	  for(size_t j=0;j<va;j++)
-	    gOVa(i,j)=-arma::as_scalar(arma::strans(COa.col(i))*(sol.Ha-pzw*Forba[i])*arma::conj(CVa.col(j)));
+	  for(size_t a=0;a<va;a++)
+	    gOVa(i,a)=-arma::as_scalar(arma::trans(CVa.col(a))*(sol.Ha-pzw*Forba[i])*COa.col(i));
 
       // Convert to proper gradient
       gOVa=gradient_convert(gOVa);
@@ -1493,13 +1493,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	arma::cx_mat gOVb(ob,vb);
 	if(pzw==0.0)
 	  for(size_t i=0;i<ob;i++)
-	    for(size_t j=0;j<vb;j++)
-	      gOVb(i,j)=-arma::as_scalar(arma::strans(COb.col(i))*sol.Hb*arma::conj(CVb.col(j)));
+	    for(size_t a=0;a<vb;a++)
+	      gOVb(i,a)=-arma::as_scalar(arma::trans(CVb.col(a))*sol.Hb*COb.col(i));
 	else
 	  for(size_t i=0;i<ob;i++)
-	    for(size_t j=0;j<vb;j++)
-	      gOVb(i,j)=-arma::as_scalar(arma::strans(COb.col(i))*(sol.Hb-pzw*Forbb[i])*arma::conj(CVb.col(j)));
-
+	    for(size_t a=0;a<vb;a++)
+	      gOVb(i,a)=-arma::as_scalar(arma::trans(CVb.col(a))*(sol.Hb-Forbb[i])*COb.col(i));
+	      	
 	// Convert to proper gradient
 	gOVb=gradient_convert(gOVb);
 
@@ -1518,7 +1518,7 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	if(pzw!=0.0)
 	  for(size_t i=0;i<oa;i++)
 	    for(size_t j=0;j<oa;j++)
-	      gOOa(i,j)=pzw*arma::as_scalar(arma::strans(COa.col(i))*(Forba[i]-Forba[j])*arma::conj(COa.col(j)));
+	      gOOa(i,j)=-pzw*arma::as_scalar(arma::trans(COa.col(j))*(Forba[j]-Forba[i])*COa.col(i));
 
 	// Convert to proper gradient
 	gOOa=gradient_convert(gOOa);
@@ -1536,7 +1536,7 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	if(pzw!=0.0)
 	  for(size_t i=0;i<ob;i++)
 	    for(size_t j=0;j<ob;j++)
-	      gOOb(i,j)=pzw*arma::as_scalar(arma::strans(COb.col(i))*(Forbb[i]-Forbb[j])*arma::conj(COb.col(j)));
+	      gOOb(i,j)=-pzw*arma::as_scalar(arma::trans(COb.col(j))*(Forbb[j]-Forbb[i])*COb.col(i));
 
 	// Convert to proper gradient
 	gOOb=gradient_convert(gOOb);
@@ -1559,14 +1559,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
     fflush(stdout);
     g.save("g.dat",arma::raw_ascii);
     gn.save("gn.dat",arma::raw_ascii);
-    gOO.print("OO gradient");
     throw std::logic_error("Problem in gradient.\n");
   } else {
     printf("Analytic gradient is OK, rms norm %e.\n",rms_norm(g-gn));
   }
 
   // Use numerical gradient
-  g=gn;
+  //g=gn;
   */
 
   return g;
