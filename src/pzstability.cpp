@@ -1075,7 +1075,7 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
 
   // Build global Fock operator
   if(can && (!useref || (useref && virtlist.size()) ))
-    solverp->Fock_RDFT(sol,occs,method,grid,nlgrid);
+    solverp->Fock_RDFT(sol,occs,ovmethod,grid,nlgrid);
 
   if(pzweight==0.0)
     return sol.en.E;
@@ -1089,7 +1089,7 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
 
     std::vector<arma::cx_mat> Forb_hlp;
     arma::vec Eorb_hlp;
-    solverp->PZSIC_Fock(Forb_hlp,Eorb_hlp,CO,method,grid,nlgrid,fock);
+    solverp->PZSIC_Fock(Forb_hlp,Eorb_hlp,CO,oomethod,grid,nlgrid,fock);
     Eorb=ref_Eorb;
     for(size_t i=0;i<occlist.size();i++)
       Eorb(occlist[i])=Eorb_hlp(i);
@@ -1101,7 +1101,7 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
     }
   } else {
     CO=sol.cC.cols(0,oa-1);
-    solverp->PZSIC_Fock(Forb,Eorb,CO,method,grid,nlgrid,fock);
+    solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
   }
 
   return sol.en.E - 2.0*pzweight*arma::sum(Eorb);
@@ -1176,7 +1176,7 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
 
   // Build global Fock operator
   if(can && (!useref || (useref && (virtlista.size() || virtlistb.size())) ))
-    solverp->Fock_UDFT(sol,occa,occb,method,grid,nlgrid);
+    solverp->Fock_UDFT(sol,occa,occb,ovmethod,grid,nlgrid);
   if(pzweight==0.0)
     return sol.en.E;
 
@@ -1193,7 +1193,7 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
     for(size_t i=0;i<occlistb.size();i++)
       CO.col(i+occlista.size())=sol.cCb.col(occlistb[i]);
 
-    solverp->PZSIC_Fock(Forb,Eorb,CO,method,grid,nlgrid,fock);
+    solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
 
     Eorba=ref_Eorba;
     for(size_t i=0;i<occlista.size();i++)
@@ -1215,7 +1215,7 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
     CO.cols(0,oa-1)=sol.cCa.cols(0,oa-1);
     if(ob)
       CO.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
-    solverp->PZSIC_Fock(Forb,Eorb,CO,method,grid,nlgrid,fock);
+    solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
 
     Eorba=Eorb.subvec(0,oa-1);
     if(ob)
@@ -2216,14 +2216,15 @@ arma::cx_mat PZStability::matexp(const arma::cx_mat & R) const {
   return rot;
 }
 
-void PZStability::set_method(const dft_t & method_, double pzw_) {
-  method=method_;
+void PZStability::set_method(const dft_t & ovmethod_, const dft_t & oomethod_, double pzw_) {
+  ovmethod=ovmethod_;
+  oomethod=oomethod_;
   pzw=pzw_;
 
   Checkpoint *chkptp=solverp->get_checkpoint();
   chkptp->read(basis);
-  grid=DFTGrid(&basis,true,method.lobatto);
-  nlgrid=DFTGrid(&basis,true,method.lobatto);
+  grid=DFTGrid(&basis,true,ovmethod.lobatto);
+  nlgrid=DFTGrid(&basis,true,ovmethod.lobatto);
 
 }
 
@@ -2264,15 +2265,15 @@ void PZStability::set(const rscf_t & sol) {
   fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
 
   // Reconstruct DFT grid
-  if(method.adaptive) {
-    if (method.x_func>0 || method.c_func>0)
-      grid.construct(sol.cC.cols(0,oa-1),method.gridtol,method.x_func,method.c_func);
+  if(ovmethod.adaptive) {
+    if (ovmethod.x_func>0 || ovmethod.c_func>0)
+      grid.construct(sol.cC.cols(0,oa-1),ovmethod.gridtol,ovmethod.x_func,ovmethod.c_func);
   } else {
     bool strict(solverp->get_strictint());
-    if (method.x_func>0 || method.c_func>0)
-      grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
-    if(method.nl)
-      nlgrid.construct(method.nlnrad,method.nllmax,true,false,strict,true);
+    if (ovmethod.x_func>0 || ovmethod.c_func>0)
+      grid.construct(ovmethod.nrad,ovmethod.lmax,ovmethod.x_func,ovmethod.c_func,strict);
+    if(ovmethod.nl)
+      nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,strict,true);
   }
 
   // Update reference
@@ -2300,19 +2301,19 @@ void PZStability::set(const uscf_t & sol) {
   fflush(stderr);
 
   // Reconstruct DFT grid
-  if(method.adaptive) {
+  if(ovmethod.adaptive) {
     arma::cx_mat Ctilde(sol.Ca.n_rows,oa+ob);
     Ctilde.cols(0,oa-1)=sol.cCa.cols(0,oa-1);
     if(ob)
       Ctilde.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
-    if (method.x_func>0 || method.c_func>0)
-      grid.construct(Ctilde,method.gridtol,method.x_func,method.c_func);
+    if (ovmethod.x_func>0 || ovmethod.c_func>0)
+      grid.construct(Ctilde,ovmethod.gridtol,ovmethod.x_func,ovmethod.c_func);
   } else {
     bool strict(solverp->get_strictint());
-    if (method.x_func>0 || method.c_func>0)
-      grid.construct(method.nrad,method.lmax,method.x_func,method.c_func,strict);
-    if(method.nl)
-      nlgrid.construct(method.nlnrad,method.nllmax,true,false,strict,true);
+    if (ovmethod.x_func>0 || ovmethod.c_func>0)
+      grid.construct(ovmethod.nrad,ovmethod.lmax,ovmethod.x_func,ovmethod.c_func,strict);
+    if(ovmethod.nl)
+      nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,strict,true);
   }
 
   // Update reference

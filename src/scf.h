@@ -186,7 +186,7 @@ typedef struct {
 } pzmet_t;
 
 // Parse PZ method
-pzmet_t parse_pzmet(const std::string & str);
+dft_t parse_pzmet(const std::string & str, const dft_t & ovmethod);
 
 /// P-Z Hamiltonian
 enum pzham {
