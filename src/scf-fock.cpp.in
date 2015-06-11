@@ -634,14 +634,14 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.H-=0.5*sol.K;
     sol.en.Exc-=0.25*arma::trace(sol.P*sol.K);
     if(sol.P.n_rows == sol.P_im.n_rows && sol.P.n_cols == sol.P_im.n_cols)
-      sol.en.Exc-=0.25*arma::trace(sol.P_im*sol.K_im);
+      sol.en.Exc+=0.25*arma::trace(sol.P_im*sol.K_im);
   }
 
 #else
   sol.H=Hcore+sol.J-0.5*sol.K;
   sol.en.Exc=-0.25*arma::trace(sol.P*sol.K);
   if(sol.P.n_rows == sol.P_im.n_rows && sol.P.n_cols == sol.P_im.n_cols)
-    sol.en.Exc-=0.25*arma::trace(sol.P_im*sol.K_im);
+    sol.en.Exc+=0.25*arma::trace(sol.P_im*sol.K_im);
 #endif
 
 
@@ -655,14 +655,14 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.Hb-=sol.Kb;
     sol.en.Exc-=0.5*(arma::trace(sol.Pa*sol.Ka)+arma::trace(sol.Pb*sol.Kb));
     if(sol.Pa.n_rows == sol.Pa_im.n_rows && sol.Pa.n_cols == sol.Pa_im.n_cols)
-      sol.en.Exc-=0.5*(arma::trace(sol.Pa_im*sol.Ka_im)+arma::trace(sol.Pb_im*sol.Kb_im));
+      sol.en.Exc+=0.5*(arma::trace(sol.Pa_im*sol.Ka_im)+arma::trace(sol.Pb_im*sol.Kb_im));
   }
 #else
   sol.Ha=Hcore+sol.J-sol.Ka;
   sol.Hb=Hcore+sol.J-sol.Kb;
   sol.en.Exc=-0.5*(arma::trace(sol.Pa*sol.Ka)+arma::trace(sol.Pb*sol.Kb));
   if(sol.Pa.n_rows == sol.Pa_im.n_rows && sol.Pa.n_cols == sol.Pa_im.n_cols)
-    sol.en.Exc-=0.5*(arma::trace(sol.Pa_im*sol.Ka_im)+arma::trace(sol.Pb_im*sol.Kb_im));
+    sol.en.Exc+=0.5*(arma::trace(sol.Pa_im*sol.Ka_im)+arma::trace(sol.Pb_im*sol.Kb_im));
 
 #ifdef _ROHF
   // Constrain Fock operators to correspond to ROHF
