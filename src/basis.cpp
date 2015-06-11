@@ -2738,6 +2738,11 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
   MOs.zeros(Sinvh.n_rows,Nind);
   E.zeros(Nind);
 
+  if(!nocc) {
+    MOs=Sinvh;
+    return;
+  }
+
   // Projected orbitals
   MOs.cols(0,nocc-1)=Sinv*S12*oldMOs.cols(0,nocc-1);
   // and energies
@@ -2816,7 +2821,6 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
   arma::vec Sval;
   eig_sym_ordered(Sval,Svec,S11);
 
-
   // Get number of basis functions
   const size_t Nbf=get_Nbf();
   // Cutoff
@@ -2847,6 +2851,11 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
   // New orbitals and orbital energies
   OMOs.zeros(Sinvh.n_rows,Nind);
 
+  if(!nocc) {
+    OMOs=Sinvh*COMPLEX1;
+    return;
+  }
+  
   // Projected orbitals
   OMOs.cols(0,nocc-1)=Sinv*S12*oldOMOs.cols(0,nocc-1);
   
