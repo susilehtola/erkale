@@ -1517,7 +1517,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     // Write OMOs
     if(doCW) {
       if(!oldrestr)
-	fprintf(stderr,"Projection of OMO matrix between restricted and unrestricted calculations is not supported.\n");
+	chkpt.cwrite("CW",CWa);
       else
 	chkpt.cwrite("CW",CW);
     }
@@ -1777,9 +1777,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Write OMOs
     if(doCW) {
-      if(oldrestr)
-	fprintf(stderr,"Projection of OMO matrix between restricted and unrestricted calculations is not supported.\n");
-      else {
+      if(oldrestr) {
+	chkpt.cwrite("CWa",CW);
+	chkpt.cwrite("CWb",CW);
+      } else {
 	chkpt.cwrite("CWa",CWa);
 	chkpt.cwrite("CWb",CWb);
       }
