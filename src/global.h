@@ -66,7 +66,7 @@
 #define ERKALE_GLOBAL
 
 // Disable bounds checking in Armadillo.
-//#define ARMA_NO_DEBUG
+#define ARMA_NO_DEBUG
 // We need BLAS
 #define ARMA_USE_BLAS
 // and LAPACK
