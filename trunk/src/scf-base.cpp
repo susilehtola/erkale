@@ -1928,42 +1928,44 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    pzimag=1;
 
 	} else {
-	  arma::cx_mat Wb;
-	  // Initialize with a random orthogonal matrix.
-	  if(!pzoo)
-	    Wb.eye(Nel_beta,Nel_beta);
-	  else {
-	    if(pzimag!=1)
-	      Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
-	    else
-	      Wb=complex_unitary(Nel_beta,seed);
-	    
-	    if(Nel_beta>1) {
-	      Timer tloc;
+	  if(Nel_beta>0) {
+	    arma::cx_mat Wb;
+	    // Initialize with a random orthogonal matrix.
+	    if(!pzoo)
+	      Wb.eye(Nel_beta,Nel_beta);
+	    else {
+	      if(pzimag!=1)
+		Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
+	      else
+		Wb=complex_unitary(Nel_beta,seed);
 	      
-	      // Localize starting guess
-	      if(verbose) printf("\nInitial localization.\n");
-	      double measure;
-	      // Max 1e5 iterations, gradient norm <= pzIthr
-	      orbital_localization(BOYS,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
-	      if(verbose) {
-		printf("\n");
+	      if(Nel_beta>1) {
+		Timer tloc;
 		
-		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-		fflush(stderr);
+		// Localize starting guess
+		if(verbose) printf("\nInitial localization.\n");
+		double measure;
+		// Max 1e5 iterations, gradient norm <= pzIthr
+		orbital_localization(BOYS,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+		if(verbose) {
+		  printf("\n");
+		  
+		  fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+		  fflush(stderr);
+		}
 	      }
 	    }
-	  }
+	    
+	    // Save the complex orbitals
+	    sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+	    sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
+	    if(sol.Cb.n_cols>(size_t) Nel_beta)
+	      sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
 
-	  // Save the complex orbitals
-	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
-	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
-	  if(sol.Cb.n_cols>(size_t) Nel_beta)
-	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
+	  } else
+	    // Nel_beta = 0
+	    sol.cCb=sol.Cb*COMPLEX1;
 	}
-	// Sanity check
-	if(Nel_beta == 0)
-	  sol.cCb=sol.Cb*COMPLEX1;
 
 	// Save the orbitals
 	chkpt.cwrite("CWa",sol.cCa);
