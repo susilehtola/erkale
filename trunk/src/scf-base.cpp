@@ -379,7 +379,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
   // Orbital density matrices
   std::vector<arma::cx_mat> Pcorb(Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
-    Pcorb[io]=Ctilde.col(io)*arma::trans(Ctilde.col(io));
+    Pcorb[io]=arma::conj(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
 
   std::vector<arma::mat> Porb(Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
@@ -642,8 +642,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
       // Parallellization inside VV10
       for(size_t i=0;i<Ctilde.n_cols;i++) {
 	double Enl=0.0;
-	arma::mat P(arma::real(Ctilde.col(i)*arma::trans(Ctilde.col(i))));
-	grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,P,XC[i],Enl,fock);
+	grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,Porb[i],XC[i],Enl,fock);
       }
 
       if(verbose) {
