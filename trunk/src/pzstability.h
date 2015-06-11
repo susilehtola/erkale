@@ -75,8 +75,10 @@ class PZStability: public FDHessian {
   /// NL grid
   DFTGrid nlgrid;
 
-  /// Method
-  dft_t method;
+  /// OV method
+  dft_t ovmethod;
+  /// OO method
+  dft_t oomethod;
   /// Weight for PZ correction
   double pzw;
 
@@ -173,7 +175,7 @@ class PZStability: public FDHessian {
   ~PZStability();
 
   /// Set method and weight
-  void set_method(const dft_t & method, double pzw);
+  void set_method(const dft_t & ovmethod, const dft_t & oomethod, double pzw);
   /// Set parameters. real: real rotations? imag: imaginary rotations? ov: ov rotations? oo: oo rotations?
   void set_params(bool real, bool imag, bool ov, bool oo);
   

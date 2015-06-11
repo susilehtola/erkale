@@ -1192,27 +1192,26 @@ void get_Nel_alpha_beta(int Nel, int mult, int & Nel_alpha, int & Nel_beta) {
   }
 }
 
-pzmet_t parse_pzmet(const std::string & pzmod) {
-  pzmet_t mode;
-  mode.X=false;
-  mode.C=false;
-  mode.D=false;
+dft_t parse_pzmet(const std::string & pzmod, const dft_t & method) {
+  bool X=false;
+  bool C=false;
+  bool D=false;
 
   for(size_t i=0;i<pzmod.size();i++)
     switch(pzmod[i]) {
     case('x'):
     case('X'):
-      mode.X=true;
+      X=true;
     break;
 
     case('c'):
     case('C'):
-      mode.C=true;
+      C=true;
     break;
 
     case('d'):
     case('D'):
-      mode.D=true;
+      D=true;
     break;
 
     case(' '):
@@ -1223,7 +1222,15 @@ pzmet_t parse_pzmet(const std::string & pzmod) {
       throw std::runtime_error("Invalid PZmode\n");
     }
 
-  return mode;
+  dft_t oomethod(method);
+  if(!X)
+    oomethod.x_func=0;
+  if(!C)
+    oomethod.c_func=0;
+  if(!D)
+    oomethod.nl=false;
+
+  return oomethod;
 }
 
 int parse_pzimag(const std::string & str) {
@@ -1573,6 +1580,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int pzstab=set.get_int("PZstab");
       double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
       int seed=set.get_int("PZseed");
+      dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
             
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
@@ -1638,7 +1646,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	chkpt.cwrite("CW",sol.cC);
 	
 	PZStability stab(&solver);
-	stab.set_method(dft,pzw);
+	stab.set_method(dft,oodft,pzw);
 	stab.set(sol);
 
 	while(true) {
@@ -1851,7 +1859,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int pzstab=set.get_int("PZstab");
       double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
       int seed=set.get_int("PZseed");
-
+      dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
+      
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve unrestricted DFT problem first on a rough grid
@@ -1972,7 +1981,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	chkpt.cwrite("CWb",sol.cCb);
 	
 	PZStability stab(&solver);
-	stab.set_method(dft,pzw);
+	stab.set_method(dft,oodft,pzw);
 	stab.set(sol);
 
 	while(true) {
