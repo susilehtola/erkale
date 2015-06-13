@@ -346,6 +346,63 @@ void SCF::set_verbose(bool verb) {
   verbose=verb;
 }
 
+void SCF::fill_rs(double omega) {
+  if(densityfit)
+    throw std::logic_error("Density fitting not supported with range-separated functionals.\n");
+  
+  if(!direct) {
+    // Compute range separated integrals if necessary
+    bool fill;
+    if(!tab_rs.get_N()) {
+      fill=true;
+    } else {
+      double o, kl, ks;
+      tab_rs.get_range_separation(o,kl,ks);
+      fill=(!(o==omega));
+    }
+    if(fill) {
+      Timer t;
+      if(verbose) {
+	printf("Computing short-range repulsion integrals ... ");
+	fflush(stdout);
+      }
+      tab_rs.set_range_separation(omega,0.0,1.0);
+      size_t Np=tab_rs.fill(basisp,intthr);
+      
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	printf("%i short-range shell pairs are significant.\n",(int) Np);
+	fflush(stdout);
+      }
+    }
+  } else {
+    bool fill;
+    if(!scr_rs.get_N()) {
+      fill=true;
+    } else {
+      double o, kl, ks;
+      scr_rs.get_range_separation(o,kl,ks);
+      fill=(!(o==omega));
+    }
+    if(fill) {
+      Timer t;
+      if(verbose) {
+	printf("Computing short-range repulsion integrals ... ");
+	fflush(stdout);
+      }
+      
+      scr_rs.set_range_separation(omega,0.0,1.0);
+      size_t Np=scr_rs.fill(basisp,intthr);
+      
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	printf("%i short-range shell pairs are significant.\n",(int) Np);
+	fflush(stdout);
+      }
+    }
+  }
+}
+
 arma::mat SCF::get_S() const {
   return S;
 }
@@ -419,35 +476,6 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
   } else {
     if(!direct) {
       // Tabled integrals
-
-      // Compute range separated integrals if necessary
-      if(is_range_separated(dft.x_func)) {
-	bool fill;
-	if(!tab_rs.get_N()) {
-	  fill=true;
-	} else {
-	  double o, kl, ks;
-	  tab_rs.get_range_separation(o,kl,ks);
-	  fill=(!(o==omega));
-	}
-	if(fill) {
-	  t.set();
-	  if(verbose) {
-	    printf("Computing short-range repulsion integrals ... ");
-	    fflush(stdout);
-	  }
-
-	  tab_rs.set_range_separation(omega,0.0,1.0);
-	  size_t Np=tab_rs.fill(basisp,intthr);
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    printf("%i short-range shell pairs are significant.\n",(int) Np);
-	    fflush(stdout);
-	  }
-	}
-      }
-
       if(verbose) {
 	if(fock)
 	  printf("Constructing orbital Coulomb matrices ... ");
