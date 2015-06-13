@@ -1243,7 +1243,7 @@ arma::vec PZStability::gradient() {
   return gradient(x, true);
 }
 
-arma::vec PZStability::precondition(const arma::vec & g) const {
+arma::vec PZStability::precondition_unified(const arma::vec & g) const {
   // Search direction
   arma::vec sd(g);
 
@@ -1380,6 +1380,147 @@ arma::vec PZStability::precondition(const arma::vec & g) const {
     }
   }
 
+  return sd;
+}
+
+arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
+  // Search direction
+  arma::vec sd(g);
+
+  // Offset
+  size_t ioff=0;
+
+  if(restr) {
+    // Occupied orbitals
+    arma::cx_mat CO(rsol.cC.cols(0,oa-1));
+    // Virtual orbitals
+    arma::cx_mat CV;
+    if(va)
+      CV=rsol.cC.cols(oa,rsol.cC.n_cols-1);
+
+    if(cancheck && va) {
+      // OV orbital energy differences
+      arma::mat dE(oa,va);
+      for(size_t io=0;io<oa;io++) {
+	// Orbital Hamiltonian is
+	arma::cx_mat Fo(rsol.H*COMPLEX1);
+	if(pzw!=0.0) Fo-=pzw*ref_Forb[io];
+	// Occupied energy is
+	double Eocc=std::real(arma::as_scalar(arma::trans(CO.col(io))*Fo*CO.col(io)));
+	// Loop over virtuals
+	for(size_t iv=0;iv<va;iv++) {
+	  // Virtual energy is
+	  double Evirt=std::real(arma::as_scalar(arma::trans(CV.col(iv))*Fo*CV.col(iv)));
+	  // Store
+	  dE(io,iv)=Evirt-Eocc;
+	}
+      }
+
+      // Minimal Hessian shift is
+      double minH=1e-4+std::max(-arma::min(arma::min(dE)),0.0);
+      dE+=minH*arma::ones<arma::mat>(oa,va);
+
+      // Form OV gradient
+      arma::cx_mat gOV(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
+
+      // Run element-wise division
+      arma::cx_mat GOV(gOV/dE);
+      
+      arma::vec POV(gather_ov(GOV,real,imag));
+      if(POV.n_elem != count_ov_params(oa,va))
+	throw std::logic_error("Amount of elements doesn't match!\n");
+      sd.subvec(ioff,ioff+POV.n_elem-1)=POV;
+      ioff+=POV.n_elem;
+    }
+  } else {
+    arma::cx_mat COa(usol.cCa.cols(0,oa-1));
+    arma::cx_mat COb;
+    if(ob)
+      COb=usol.cCb.cols(0,ob-1);
+    arma::cx_mat CVa;
+    if(usol.cCa.n_cols>oa)
+      CVa=usol.cCa.cols(oa,usol.cCa.n_cols-1);
+    arma::cx_mat CVb;
+    if(usol.cCb.n_cols>ob)
+      CVb=usol.cCb.cols(ob,usol.cCb.n_cols-1);
+
+    if(cancheck && va) {
+      // OV orbital energy differences
+      arma::mat dEa(oa,va);
+      for(size_t io=0;io<oa;io++) {
+	// Orbital Hamiltonian is
+	arma::cx_mat Fo(usol.Ha*COMPLEX1);
+	if(pzw!=0.0) Fo-=pzw*ref_Forba[io];
+	// Occupied energy is
+	double Eocc=std::real(arma::as_scalar(arma::trans(COa.col(io))*Fo*COa.col(io)));
+	// Loop over virtuals
+	for(size_t iv=0;iv<va;iv++) {
+	  // Virtual energy is
+	  double Evirt=std::real(arma::as_scalar(arma::trans(CVa.col(iv))*Fo*CVa.col(iv)));
+	  // Store
+	  dEa(io,iv)=Evirt-Eocc;
+	}
+      }
+
+      arma::mat dEb;
+      if(ob) {
+	dEb.zeros(ob,vb);
+	for(size_t io=0;io<ob;io++) {
+	  // Orbital Hamiltonian is
+	  arma::cx_mat Fo(usol.Hb*COMPLEX1);
+	  if(pzw!=0.0) Fo-=pzw*ref_Forbb[io];
+	  // Occupied energy is
+	  double Eocc=std::real(arma::as_scalar(arma::trans(COb.col(io))*Fo*COb.col(io)));
+	  // Loop over virtuals
+	  for(size_t iv=0;iv<vb;iv++) {
+	    // Virtual energy is
+	    double Evirt=std::real(arma::as_scalar(arma::trans(CVb.col(iv))*Fo*CVb.col(iv)));
+	    // Store
+	    dEb(io,iv)=Evirt-Eocc;
+	  }
+	}
+      }
+	    
+      // Minimal Hessian shift is
+      double minH=1e-4;
+      if(ob)
+	minH+=std::max(std::max(-arma::min(arma::min(dEa)),-arma::min(arma::min(dEb))),0.0);
+      else
+	minH+=std::max(-arma::min(arma::min(dEa)),0.0);
+
+      // Shift
+      dEa+=minH*arma::ones<arma::mat>(oa,va);
+      if(ob)
+	dEb+=minH*arma::ones<arma::mat>(ob,vb);
+
+      // Form OV gradient
+      arma::cx_mat gOVa(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
+
+      // Run element-wise division
+      arma::cx_mat GOVa(gOVa/dEa);
+      
+      arma::vec POVa(gather_ov(GOVa,real,imag));
+      if(POVa.n_elem != count_ov_params(oa,va))
+	throw std::logic_error("Amount of elements doesn't match!\n");
+      sd.subvec(ioff,ioff+POVa.n_elem-1)=POVa;
+      ioff+=POVa.n_elem;
+
+      if(ob) {
+	// Form OV gradient
+	arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
+	
+	// Run element-wise division
+	arma::cx_mat GOVb(gOVb/dEb);
+	
+	arma::vec POVb(gather_ov(GOVb,real,imag));
+	if(POVb.n_elem != count_ov_params(ob,vb))
+	  throw std::logic_error("Amount of elements doesn't match!\n");
+	sd.subvec(ioff,ioff+POVb.n_elem-1)=POVb;
+	ioff+=POVb.n_elem;
+      }
+    }
+  }
+  
   return sd;
 }
 
@@ -1635,7 +1776,7 @@ double PZStability::get_E() {
   return eval(x);
 }
 
-double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double dEthr, bool preconditioning) {
+double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double dEthr, int preconditioning) {
   arma::vec x0;
   if(!count_params())
     return 0.0;
@@ -1669,7 +1810,22 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
     // Update search direction
     arma::vec oldsd(sd);
-    sd = preconditioning ? -precondition(g) : -g;
+    switch(preconditioning) {
+    case(0):
+      break;
+
+    case(1):
+      sd = -precondition_unified(g);
+      break;
+
+    case(2):
+      sd = -precondition_orbital(g);
+      break;
+
+    default:
+      throw std::logic_error("Invalid value for PZprec.\n");
+    }
+
     if(preconditioning && arma::norm_dot(sd,-g)<0.0) {
       //printf("Projection of preconditioned search direction on gradient is %e.\n",arma::norm_dot(sd,-g));
       printf("Projection of preconditioned search direction on gradient is %e, not using preconditioning.\n",arma::norm_dot(sd,-g));
@@ -2480,13 +2636,15 @@ void PZStability::print_status(size_t iiter, const arma::vec & g, const Timer & 
   }
 }
 
-void PZStability::linesearch(const std::string & fname, bool prec, int Np) {
+void PZStability::linesearch(const std::string & fname, int prec, int Np) {
   // Get gradient
   arma::vec g(gradient());
 
   // Use preconditioned direction
-  if(prec)
-    g=precondition(g);
+  if(prec==1)
+    g=precondition_unified(g);
+  else if(prec==2)
+    g=precondition_orbital(g);
 
   FILE *out=fopen(fname.c_str(),"w");
   // Do line search

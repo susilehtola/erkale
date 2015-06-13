@@ -148,7 +148,7 @@ void Settings::add_dft_settings() {
   add_double("PZw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
   // Perturbative SIC?
   add_bool("PZ", "Perform Perdew-Zunger self-interaction correction?",false);
-  add_bool("PZprec", "Precondition OV block?",true);
+  add_int("PZprec", "Precondition OV block? 0: no, 1: unified, 2: orbital",1);
   add_bool("PZoo", "Optimize OO block?",true);
   add_bool("PZov", "Optimize OV block?",true);
   add_double("PZIthr", "Threshold for initialization convergence (not too small!)",1e-1);

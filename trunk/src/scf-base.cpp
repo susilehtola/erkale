@@ -1566,7 +1566,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       // Perdew-Zunger?
       bool pz=set.get_bool("PZ");
-      bool pzprec=set.get_bool("PZprec");
+      int pzprec=set.get_int("PZprec");
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
       double pzw=set.get_double("PZw");
@@ -1845,7 +1845,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       // Perdew-Zunger?
       bool pz=set.get_bool("PZ");
-      bool pzprec=set.get_bool("PZprec");
+      int pzprec=set.get_int("PZprec");
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
       double pzw=set.get_double("PZw");

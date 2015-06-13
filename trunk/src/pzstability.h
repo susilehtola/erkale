@@ -165,8 +165,10 @@ class PZStability: public FDHessian {
   /// Print information on solution
   void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb);
 
-  /// Precondition gradient vector
-  arma::vec precondition(const arma::vec & g) const;
+  /// Precondition gradient vector with unified Hamiltonian
+  arma::vec precondition_unified(const arma::vec & g) const;
+  /// Precondition gradient vector with orbital Hamiltonian
+  arma::vec precondition_orbital(const arma::vec & g) const;
 
  public:
   /// Constructor
@@ -195,13 +197,13 @@ class PZStability: public FDHessian {
   /// Check stability of solution.
   bool check(bool stability=false, double cutoff=-1e-3);
   /// Print out a line search
-  void linesearch(const std::string & fname="pz_ls.dat", bool prec=true, int Np=100);
+  void linesearch(const std::string & fname="pz_ls.dat", int prec=1, int Np=100);
 
   /// Print information
   void print_info();
 
   /// Run optimization
-  virtual double optimize(size_t maxiter=1000, double gthr=1e-4, double nrthr=1e-4, double dEthr=1e-9, bool preconditioning=true);
+  virtual double optimize(size_t maxiter=1000, double gthr=1e-4, double nrthr=1e-4, double dEthr=1e-9, int preconditioning=1);
 };
 
 #endif
