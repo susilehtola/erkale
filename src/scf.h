@@ -368,6 +368,9 @@ class SCF {
   Checkpoint *get_checkpoint() const;
   /// Using strict integrals?
   bool get_strictint() const;
+
+  /// Fill range-separated integrals
+  void fill_rs(double omega);
   
   /// Do core guess
   void core_guess(rscf_t & sol) const;
