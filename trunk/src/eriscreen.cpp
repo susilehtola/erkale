@@ -54,13 +54,14 @@ ERIscreen::ERIscreen() {
   omega=0.0;
   alpha=1.0;
   beta=0.0;
+  basp=NULL;
 }
 
 ERIscreen::~ERIscreen() {
 }
 
 size_t ERIscreen::get_N() const {
-  return basp ? basp->get_Nbf() : 0;
+  return (basp!=NULL) ? basp->get_Nbf() : 0;
 }
 
 void ERIscreen::set_range_separation(double w, double a, double b) {
