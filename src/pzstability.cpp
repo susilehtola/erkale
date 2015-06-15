@@ -1573,7 +1573,7 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       if(pzw!=0.0) {
 	for(size_t i=0;i<oa;i++)
 	  for(size_t j=0;j<oa;j++)
-	    gOO(i,j)=-pzw*arma::as_scalar(arma::trans(CO.col(j))*(Forb[j]-Forb[i])*CO.col(i));
+	    gOO(i,j)=-pzw*arma::as_scalar(arma::trans(CO.col(j))*arma::conj(Forb[j]-Forb[i])*CO.col(i));
       }
 
       // Convert to proper gradient
@@ -1660,7 +1660,7 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	if(pzw!=0.0)
 	  for(size_t i=0;i<oa;i++)
 	    for(size_t j=0;j<oa;j++)
-	      gOOa(i,j)=-pzw*arma::as_scalar(arma::trans(COa.col(j))*(Forba[j]-Forba[i])*COa.col(i));
+	      gOOa(i,j)=-pzw*arma::as_scalar(arma::trans(COa.col(j))*arma::conj(Forba[j]-Forba[i])*COa.col(i));
 
 	// Convert to proper gradient
 	gOOa=gradient_convert(gOOa);
@@ -1678,7 +1678,7 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	if(pzw!=0.0)
 	  for(size_t i=0;i<ob;i++)
 	    for(size_t j=0;j<ob;j++)
-	      gOOb(i,j)=-pzw*arma::as_scalar(arma::trans(COb.col(j))*(Forbb[j]-Forbb[i])*COb.col(i));
+	      gOOb(i,j)=-pzw*arma::as_scalar(arma::trans(COb.col(j))*arma::conj(Forbb[j]-Forbb[i])*COb.col(i));
 
 	// Convert to proper gradient
 	gOOb=gradient_convert(gOOb);
