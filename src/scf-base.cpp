@@ -551,34 +551,6 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
       }
 
     } else {
-      // Compute range separated integrals if necessary
-      if(is_range_separated(dft.x_func)) {
-	bool fill;
-	if(!scr_rs.get_N()) {
-	  fill=true;
-	} else {
-	  double o, kl, ks;
-	  scr_rs.get_range_separation(o,kl,ks);
-	  fill=(!(o==omega));
-	}
-	if(fill) {
-	  t.set();
-	  if(verbose) {
-	    printf("Computing short-range repulsion integrals ... ");
-	    fflush(stdout);
-	  }
-
-	  scr_rs.set_range_separation(omega,0.0,1.0);
-	  size_t Np=scr_rs.fill(basisp,intthr);
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    printf("%i short-range shell pairs are significant.\n",(int) Np);
-	    fflush(stdout);
-	  }
-	}
-      }
-
       if(verbose) {
 	std::string leg = (kfull==0.0) ? "Coulomb" : "Coulomb and exchange";
 	if(fock)
@@ -1676,7 +1648,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	PZStability stab(&solver);
 	stab.set_method(dft,oodft,pzw);
 	stab.set(sol);
-
+	
 	while(true) {
 	  double dEo=0.0, dEv=0.0;
 	  if(pzoo) {
@@ -1709,6 +1681,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
+		stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
+		if(pzov) {
+		  stab.set_params(false,true,true,false);
+		  stab.optimize(pzmax,pzOVthr,pzNRthr,0.0,pzprec);
+		}
 		sol=stab.get_rsol();
 		continue;
 	      }
@@ -1728,6 +1705,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
+		stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
 		sol=stab.get_rsol();
 		continue;
 	      }
@@ -2044,6 +2022,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
+		stab.optimize(pzmax,pzOOthr,pzNRthr,pzEthr,pzprec);
+		if(pzov) {
+		  stab.set_params(false,true,true,false);
+		  stab.optimize(pzmax,pzOVthr,pzNRthr,0.0,pzprec);
+		}
 		sol=stab.get_usol();
 		continue;
 	      }
@@ -2063,6 +2046,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      instab=stab.check(true,pzstabthr);
 	      if(instab) {
 		pzimag=1;
+		stab.optimize(pzmax,pzOOthr,0.0,pzEthr,pzprec);
 		sol=stab.get_usol();
 		continue;
 	      }
