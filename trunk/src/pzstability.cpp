@@ -2662,9 +2662,8 @@ bool PZStability::check(bool stability, double cutoff) {
       // Overstepped
       ds/=dfac;
 
-      // Update solutions
+      // Update solution
       x*=ds;
-      E0=Enew;
 
       // Update solution
       update(x);
