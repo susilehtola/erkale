@@ -270,20 +270,20 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       size_t Npairs;
       // Form decontracted basis set and get the screening matrix
       decbas=basis.decontract(decconv);
-      
+
       if(verbose) {
 	t.set();
 	printf("Forming ERI screening matrix ... ");
 	fflush(stdout);
       }
-      
+
       if(decfock)
 	// Use decontracted basis
 	Npairs=scr.fill(&decbas,intthr,verbose);
       else
 	// Use contracted basis
 	Npairs=scr.fill(&basis,intthr,verbose);
-      
+
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
 	if(decfock)
@@ -349,7 +349,7 @@ void SCF::set_verbose(bool verb) {
 void SCF::fill_rs(double omega) {
   if(densityfit)
     throw std::logic_error("Density fitting not supported with range-separated functionals.\n");
-  
+
   if(!direct) {
     // Compute range separated integrals if necessary
     bool fill;
@@ -368,7 +368,7 @@ void SCF::fill_rs(double omega) {
       }
       tab_rs.set_range_separation(omega,0.0,1.0);
       size_t Np=tab_rs.fill(basisp,intthr);
-      
+
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
 	printf("%i short-range shell pairs are significant.\n",(int) Np);
@@ -390,10 +390,10 @@ void SCF::fill_rs(double omega) {
 	printf("Computing short-range repulsion integrals ... ");
 	fflush(stdout);
       }
-      
+
       scr_rs.set_range_separation(omega,0.0,1.0);
       size_t Np=scr_rs.fill(basisp,intthr);
-      
+
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
 	printf("%i short-range shell pairs are significant.\n",(int) Np);
@@ -436,20 +436,20 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
   // Orbital density matrices
   std::vector<arma::cx_mat> Pcorb(Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
-    Pcorb[io]=arma::conj(Ctilde.col(io)*arma::trans(Ctilde.col(io)));
+    Pcorb[io]=arma::conj(Ctilde.col(io))*arma::strans(Ctilde.col(io));
 
   std::vector<arma::mat> Porb(Ctilde.n_cols);
   for(size_t io=0;io<Ctilde.n_cols;io++)
     Porb[io]=arma::real(Pcorb[io]);
 
   Timer t;
-  
+
   if(densityfit) {
     if(kfull!=0.0)
       throw std::runtime_error("PZ-SIC hybrid functionals not supported with density fitting.\n");
     if(kshort!=0.0)
       throw std::runtime_error("PZ-SIC range separated functionals not supported with density fitting.\n");
-    
+
     if(verbose) {
       if(fock)
 	printf("Constructing orbital Coulomb matrices ... ");
@@ -518,13 +518,13 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 	  if(fock)
 	    Forb[io]-=Korb;
 	}
-	
+
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  fflush(stdout);
 	}
       }
-      
+
       // Short-range part
       if(kshort!=0.0) {
 	if(verbose) {
@@ -571,12 +571,12 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 	    Forb[io]=JKorb[io];
 	}
       }
-      
+
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
 	fflush(stdout);
       }
-      
+
       // Short-range part
       if(kshort!=0.0) {
 	if(verbose) {
@@ -587,7 +587,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 	  fflush(stdout);
 	  t.set();
 	}
-	
+
 	// Calculate exchange term
 	{
 	  std::vector<arma::cx_mat> Korb=scr_rs.calcJK(Pcorb,0.0,kshort,intthr);
@@ -598,7 +598,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 	      Forb[io]+=Korb[io];
 	  }
 	}
-	
+
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  fflush(stdout);
@@ -606,7 +606,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
       }
     }
   }
-  
+
   // Exchange-correlation
   if(dft.x_func > 0 || dft.c_func > 0) {
     if(verbose) {
@@ -1272,7 +1272,7 @@ dft_t parse_dft(const Settings & set, bool init) {
     if(dft.nrad<1 || dft.lmax==0) {
       throw std::runtime_error("Invalid DFT radial grid specified.\n");
     }
-    
+
     // Check if l was given in number of points
     if(dft.lmax<0) {
       // Try to find corresponding Lebedev grid
@@ -1284,7 +1284,7 @@ dft_t parse_dft(const Settings & set, bool init) {
       if(dft.lmax<0)
 	throw std::runtime_error("Invalid DFT angular grid specified.\n");
     }
-    
+
   } else {
     dft.adaptive=true;
     dft.gridtol=set.get_double(tolkw);
@@ -1301,42 +1301,42 @@ dft_t parse_dft(const Settings & set, bool init) {
       dft.nl=needs_VV10(dft.x_func,dft.vv10_b,dft.vv10_C);
     if(!dft.nl && dft.c_func>0)
       dft.nl=needs_VV10(dft.c_func,dft.vv10_b,dft.vv10_C);
-    
+
   } else if(stricmp(vv10s,"True")==0 || stricmp(vv10s,"Yes")==0) {
     dft.nl=true;
-    
+
     std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
     if(vvopts.size()!=2)
       throw std::runtime_error("Invalid VV10Pars!\n");
-    
+
     dft.vv10_b=readdouble(vvopts[0]);
     dft.vv10_C=readdouble(vvopts[1]);
 
   } else if(stricmp(vv10s,"False")==0 || stricmp(vv10s,"No")==0) {
     // Do nothing
-    
+
   } else if(vv10s.size()) {
-    
+
     throw std::runtime_error("Error parsing VV10 setting.\n");
   }
-  
+
   if(dft.nl) {
     if(dft.vv10_b <= 0.0 || dft.vv10_C <= 0.0) {
       std::ostringstream oss;
       oss << "VV10 parameters given b = " << dft.vv10_b << ", C = " << dft.vv10_C << " are not valid.\n";
       throw std::runtime_error(oss.str());
     }
-    
+
     if(dft.adaptive)
       throw std::runtime_error("Adaptive DFT grids not supported with VV10.\n");
-    
+
     std::vector<std::string> opts=splitline(set.get_string("NLGrid"));
     dft.nlnrad=readint(opts[0]);
     dft.nllmax=readint(opts[1]);
     if(dft.nlnrad<1 || dft.nllmax==0) {
       throw std::runtime_error("Invalid DFT radial grid specified.\n");
     }
-    
+
     // Check if l was given in number of points
     if(dft.nllmax<0) {
       // Try to find corresponding Lebedev grid
@@ -1348,11 +1348,11 @@ dft_t parse_dft(const Settings & set, bool init) {
       if(dft.nllmax<0)
 	throw std::runtime_error("Invalid DFT angular grid specified.\n");
     }
-    
+
     // Check that xc grid is larger than nl grid
     if(dft.nrad < dft.nlnrad || dft.lmax < dft.nllmax)
       throw std::runtime_error("xc grid should be bigger than nl grid!\n");
-  }    
+  }
 
   return dft;
 }
@@ -1581,18 +1581,18 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
       int seed=set.get_int("PZseed");
       dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
-            
+
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve restricted DFT problem first on a rough grid
 	  solver.RDFT(sol,occs,initconv,initdft);
-	  
+
 	  if(verbose) {
 	    fprintf(stderr,"\n");
 	    fflush(stderr);
 	  }
 	}
-	
+
 	// ... and then on the more accurate grid
 	solver.do_force(force);
 	solver.RDFT(sol,occs,conv,dft);
@@ -1601,7 +1601,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// The localizing matrix
 	if(chkpt.exist("CW.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
-	  
+
 	  // Get old localized orbitals
 	  chkpt.cread("CW",CW);
 	  // Save the orbitals
@@ -1610,7 +1610,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Imaginary treatment?
 	  if(pzimag==-1 && rms_norm(arma::imag(sol.cC))>10*DBL_EPSILON)
 	    pzimag=1;
-	  
+
 	} else { // No entry in checkpoint
 	  arma::cx_mat W;
 	  if(!pzoo) {
@@ -1620,7 +1620,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      W=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
 	      W=complex_unitary(Nel_alpha,seed);
-		
+
 	    // Localize starting guess
 	    if(verbose) printf("\nInitial localization.\n");
 	    Timer tloc;
@@ -1629,26 +1629,26 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    orbital_localization(BOYS,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 	    if(verbose) {
 	      printf("\n");
-	      
+
 	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
 	      fflush(stderr);
 	    }
 	  }
-	  
+
 	  // Save the complex orbitals
 	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
 	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
 	  if(sol.C.n_cols>(size_t) Nel_alpha)
 	    sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
 	}
-		
+
 	// Save the orbitals
 	chkpt.cwrite("CW",sol.cC);
-	
+
 	PZStability stab(&solver);
 	stab.set_method(dft,oodft,pzw);
 	stab.set(sol);
-	
+
 	while(true) {
 	  double dEo=0.0, dEv=0.0;
 	  if(pzoo) {
@@ -1665,7 +1665,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  }
 	  if(dEo!=0.0 || dEv!=0.0)
 	    continue;
-	  
+
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
 	    stab.set_params(true,pzimag==1,false,true);
@@ -1866,12 +1866,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
       int seed=set.get_int("PZseed");
       dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
-      
+
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve unrestricted DFT problem first on a rough grid
 	  solver.UDFT(sol,occa,occb,initconv,initdft);
-	  
+
 	  if(verbose) {
 	    fprintf(stderr,"\n");
 	    fflush(stderr);
@@ -1885,7 +1885,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// The localizing matrices
 	if(chkpt.exist("CWa.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
-	  
+
 	  // Get old localized orbitals
 	  chkpt.cread("CWa",CWa);
 	  // Save the complex orbitals
@@ -1905,10 +1905,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      Wa=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
 	      Wa=complex_unitary(Nel_alpha,seed);
-	    
+
 	    if(Nel_alpha>1) {
 	      Timer tloc;
-	      
+
 	      // Localize starting guess
 	      if(verbose) printf("\nInitial localization.\n");
 	      double measure;
@@ -1916,7 +1916,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      orbital_localization(BOYS,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 	      if(verbose) {
 		printf("\n");
-		
+
 		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
 		fflush(stderr);
 	      }
@@ -1932,7 +1932,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	if(chkpt.exist("CWb.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
-	  
+
 	  // Get old localized orbitals
 	  chkpt.cread("CWb",CWb);
 	  // Save the complex orbitals
@@ -1953,10 +1953,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 		Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
 	      else
 		Wb=complex_unitary(Nel_beta,seed);
-	      
+
 	      if(Nel_beta>1) {
 		Timer tloc;
-		
+
 		// Localize starting guess
 		if(verbose) printf("\nInitial localization.\n");
 		double measure;
@@ -1964,13 +1964,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 		orbital_localization(BOYS,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 		if(verbose) {
 		  printf("\n");
-		  
+
 		  fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
 		  fflush(stderr);
 		}
 	      }
 	    }
-	    
+
 	    // Save the complex orbitals
 	    sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
 	    sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
@@ -1985,7 +1985,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// Save the orbitals
 	chkpt.cwrite("CWa",sol.cCa);
 	chkpt.cwrite("CWb",sol.cCb);
-	
+
 	PZStability stab(&solver);
 	stab.set_method(dft,oodft,pzw);
 	stab.set(sol);
@@ -2006,7 +2006,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  }
 	  if(dEo!=0.0 || dEv!=0.0)
 	    continue;
-	  
+
 	  // Check stability of OO rotations
 	  if(pzoo && pzstab==-1) {
 	    stab.set_params(true,pzimag==1,false,true);
@@ -2083,7 +2083,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     if(verbose) {
       population_analysis(basis,sol.Pa,sol.Pb);
-      
+
       if(!set.get_string("Occupancies").size()) {
 	arma::mat Ca(sol.Ca.cols(0,Nel_alpha-1));
 	arma::mat Cb;
