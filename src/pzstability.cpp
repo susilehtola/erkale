@@ -212,7 +212,7 @@ arma::vec FDHessian::gradient(const arma::vec & x0) {
 
     // LHS value
     x=x0;
-    x(i)=-ss_fd;
+    x(i)-=ss_fd;
     double yl=eval(x);
 
     // Derivative
@@ -1073,6 +1073,7 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
 
   // Update density matrix
   arma::cx_mat P(2.0*form_density(sol.cC.cols(0,oa-1)));
+  // Debug
   sol.P=arma::real(P);
   sol.P_im=arma::imag(P);
 
@@ -1560,10 +1561,10 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       // OV gradient is
       arma::cx_mat gOV(oa,va);
       if(pzw==0.0)
-	gOV=-arma::strans(arma::trans(CV.cols(0,va-1))*H*CO.cols(0,oa-1));
+	gOV=-arma::strans(arma::trans(CV.cols(0,va-1))*arma::conj(H)*CO.cols(0,oa-1));
       else
 	for(size_t i=0;i<oa;i++) {
-	  arma::cx_vec hlp((H-pzw*Forb[i])*CO.col(i));
+	  arma::cx_vec hlp(arma::conj(H-pzw*Forb[i])*CO.col(i));
 	  for(size_t a=0;a<va;a++)
 	    gOV(i,a)=-arma::cdot(CV.col(a),hlp);
 	}
@@ -1580,12 +1581,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
     if(oocheck && oa>1) {
       // OO gradient is
       arma::cx_mat gOO(oa,oa);
-      gOO.zeros();
       if(pzw!=0.0) {
+	arma::cx_mat FO(CO.n_rows,oa);
 	for(size_t i=0;i<oa;i++)
-	  for(size_t j=0;j<oa;j++)
-	    gOO(i,j)=-pzw*arma::as_scalar(arma::trans(CO.col(j))*(Forb[j]-Forb[i])*CO.col(i));
-      }
+	  FO.col(i)=arma::conj(Forb[i])*CO.col(i);
+	gOO=-pzw*arma::strans(-arma::trans(CO)*FO + arma::trans(FO)*CO);
+      } else
+	gOO.zeros();
 
       // Convert to proper gradient
       gOO=gradient_convert(gOO);
@@ -1628,10 +1630,10 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       // OV alpha gradient is
       arma::cx_mat gOVa(oa,va);
       if(pzw==0.0)
-	gOVa=-arma::strans(arma::trans(CVa.cols(0,va-1))*Ha*COa.cols(0,oa-1));
+	gOVa=-arma::strans(arma::trans(CVa.cols(0,va-1))*arma::conj(Ha)*COa.cols(0,oa-1));
       else
 	for(size_t i=0;i<oa;i++) {
-	  arma::cx_vec hlp((Ha-pzw*Forba[i])*COa.col(i));
+	  arma::cx_vec hlp(arma::conj(Ha-pzw*Forba[i])*COa.col(i));
 	  for(size_t a=0;a<va;a++)
 	    gOVa(i,a)=-arma::cdot(CVa.col(a),hlp);
 	}
@@ -1651,10 +1653,10 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	// OV beta gradient is
 	arma::cx_mat gOVb(ob,vb);
 	if(pzw==0.0)
-	  gOVb=-arma::strans(arma::trans(CVb.cols(0,vb-1))*Hb*COb.cols(0,ob-1));
+	  gOVb=-arma::strans(arma::trans(CVb.cols(0,vb-1))*arma::conj(Hb)*COb.cols(0,ob-1));
 	else
 	  for(size_t i=0;i<ob;i++) {
-	    arma::cx_vec hlp((Hb-pzw*Forbb[i])*COb.col(i));
+	    arma::cx_vec hlp(arma::conj(Hb-pzw*Forbb[i])*COb.col(i));
 	    for(size_t a=0;a<vb;a++)
 	      gOVb(i,a)=-arma::cdot(CVb.col(a),hlp);
 	  }
@@ -1673,11 +1675,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       if(oa>1) {
 	// OO alpha gradient is
 	arma::cx_mat gOOa(oa,oa);
-	gOOa.zeros();
-	if(pzw!=0.0)
+	if(pzw!=0.0) {
+	  arma::cx_mat FOa(COa.n_rows,oa);
 	  for(size_t i=0;i<oa;i++)
-	    for(size_t j=0;j<oa;j++)
-	      gOOa(i,j)=-pzw*arma::as_scalar(arma::trans(COa.col(j))*(Forba[j]-Forba[i])*COa.col(i));
+	    FOa.col(i)=arma::conj(Forba[i])*COa.col(i);
+	  gOOa=-pzw*arma::strans(-arma::trans(COa)*FOa + arma::trans(FOa)*COa);
+	} else
+	  gOOa.zeros();
 
 	// Convert to proper gradient
 	gOOa=gradient_convert(gOOa);
@@ -1691,11 +1695,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       if(ob>1) {
 	// OO beta gradient is
 	arma::cx_mat gOOb(ob,ob);
-	gOOb.zeros();
-	if(pzw!=0.0)
+	if(pzw!=0.0) {
+	  arma::cx_mat FOb(COb.n_rows,ob);
 	  for(size_t i=0;i<ob;i++)
-	    for(size_t j=0;j<ob;j++)
-	      gOOb(i,j)=-pzw*arma::as_scalar(arma::trans(COb.col(j))*(Forbb[j]-Forbb[i])*COb.col(i));
+	    FOb.col(i)=arma::conj(Forbb[i])*COb.col(i);
+	  gOOb=-pzw*arma::strans(-arma::trans(COb)*FOb + arma::trans(FOb)*COb);
+	} else
+	  gOOb.zeros();
 
 	// Convert to proper gradient
 	gOOb=gradient_convert(gOOb);
@@ -1710,19 +1716,21 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 
   /*
   arma::vec gn(FDHessian::gradient(x));
-  printf("Error rms norm %e\n",rms_norm(g-gn));
   fflush(stdout);
-  if(rms_norm(gn-g)>1e-6) {
+  if(rms_norm(g-gn)>1e-6) {
     g.t().print("Analytic gradient");
     gn.t().print("Numeric gradient");
     (g-gn).t().print("Difference");    
-    printf("Problem in analytic gradient.\n");
+    printf("Problem in analytic gradient, difference norm %e.\n",arma::norm(g-gn,2));
+    if(arma::norm(g+gn,2)<arma::norm(g-gn,2))
+      printf("Derivative has wrong sign? |g+gn|=%e, |g-gn|=%e\n",arma::norm(g+gn,2),arma::norm(g-gn,2));
+    //throw std::runtime_error("Problem in gradient\n");
   } else
-    printf("Analytic gradient is OK\n");
+    printf("Analytic gradient is OK, difference norm %e\n",arma::norm(g-gn,2));
+  */
   
   // Use numerical gradient
   //g=gn;
-  */
   
   return g;
 }
@@ -2007,7 +2015,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     // Did the search work? If not, backtracking line search
     if(Es>=E0) {
       double tau=0.7;
-      double Es0;
+      double Es0=Es;
       while(step>DBL_EPSILON) {
 	step*=tau;
 	Es0=Es;
@@ -2131,7 +2139,7 @@ void PZStability::update(const arma::vec & x) {
 arma::cx_mat PZStability::get_H(const rscf_t & sol) const {
   arma::cx_mat H=sol.H*COMPLEX1;
   if(sol.K_im.n_rows == sol.H.n_rows && sol.K_im.n_cols == sol.H.n_cols)
-    H+=sol.K_im*COMPLEXI;
+    H-=0.5*sol.K_im*COMPLEXI;
   return H;
 }
 
@@ -2139,12 +2147,12 @@ arma::cx_mat PZStability::get_H(const uscf_t & sol, bool spin) const {
   if(!spin) {
     arma::cx_mat Ha=sol.Ha*COMPLEX1;
     if(sol.Ka_im.n_rows == sol.Ha.n_rows && sol.Ka_im.n_cols == sol.Ha.n_cols)
-      Ha+=sol.Ka_im*COMPLEXI;
+      Ha-=sol.Ka_im*COMPLEXI;
     return Ha;
   } else {
     arma::cx_mat Hb=sol.Hb*COMPLEX1;
     if(sol.Kb_im.n_rows == sol.Hb.n_rows && sol.Kb_im.n_cols == sol.Hb.n_cols)
-      Hb+=sol.Kb_im*COMPLEXI;
+      Hb-=sol.Kb_im*COMPLEXI;
     return Hb;
   }
 }
@@ -2162,7 +2170,7 @@ void PZStability::update_reference(bool sort) {
     std::vector<arma::cx_mat> Forb;
     arma::vec Eorb;
     eval(x0,sol,Forb,Eorb,true,true,pzw,false);
-
+    
     if(sort) {
       arma::cx_mat CO(sol.cC.cols(0,oa-1));
       arma::cx_mat CV;
