@@ -1569,6 +1569,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int pzprec=set.get_int("PZprec");
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
+      bool pzloc=set.get_bool("PZloc");
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
       double pzIthr=set.get_double("PZIthr");
@@ -1621,17 +1622,19 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    else
 	      W=complex_unitary(Nel_alpha,seed);
 
-	    // Localize starting guess
-	    if(verbose) printf("\nInitial localization.\n");
-	    Timer tloc;
-	    double measure;
-	    // Max 1e5 iterations, gradient norm <= pzIthr
-	    orbital_localization(BOYS,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
-	    if(verbose) {
-	      printf("\n");
-
-	      fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-	      fflush(stderr);
+	    if(pzloc) {
+	      // Localize starting guess
+	      if(verbose) printf("\nInitial localization.\n");
+	      Timer tloc;
+	      double measure;
+	      // Max 1e5 iterations, gradient norm <= pzIthr
+	      orbital_localization(BOYS,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+	      if(verbose) {
+		printf("\n");
+		
+		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+		fflush(stderr);
+	      }
 	    }
 	  }
 
@@ -1854,6 +1857,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int pzprec=set.get_int("PZprec");
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
+      bool pzloc=set.get_bool("PZloc");
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
       double pzIthr=set.get_double("PZIthr");
@@ -1906,7 +1910,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    else
 	      Wa=complex_unitary(Nel_alpha,seed);
 
-	    if(Nel_alpha>1) {
+	    if(pzloc && Nel_alpha>1) {
 	      Timer tloc;
 
 	      // Localize starting guess
@@ -1954,7 +1958,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      else
 		Wb=complex_unitary(Nel_beta,seed);
 
-	      if(Nel_beta>1) {
+	      if(pzloc && Nel_beta>1) {
 		Timer tloc;
 
 		// Localize starting guess
