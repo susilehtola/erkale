@@ -3770,7 +3770,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
     }
   } // End parallel region
 
-  if(verbose) {
+  if(nl.verbose) {
     size_t n=0;
     for(size_t i=0;i<nldata.size();i++)
       n+=nldata[i].n_rows;
