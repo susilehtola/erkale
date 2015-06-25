@@ -655,20 +655,36 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
     size_t ioff=0;
     if(cancheck) {
       if(real) {
-	arma::uword np;
-
-	np=oa*va;
+	arma::uword np=oa*va;
 	ovareal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
 	if(np)
 	  ret.push_back(ovareal);
 	ioff+=np;
+      }
 
-	np=ob*vb;
+      if(imag) {
+	arma::uword np=oa*va;
+	ovaimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
+	ret.push_back(ovaimag);
+	ioff+=np;
+      }
+
+      if(real) {
+	arma::uword np=ob*vb;
 	ovbreal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
 	if(np)
 	  ret.push_back(ovbreal);
 	ioff+=np;
+      }
 
+      if(imag) {
+	arma::uword np=ob*vb;
+	ovbimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
+	ret.push_back(ovbimag);
+	ioff+=np;
+      }
+
+      if(real) {
 	ovreal.idx.zeros(ovareal.idx.n_elem+ovbreal.idx.n_elem);
 	if(ovareal.idx.n_elem)
 	  ovreal.idx.subvec(0,ovareal.idx.n_elem-1)=ovareal.idx;
@@ -676,19 +692,8 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	  ovreal.idx.subvec(ovareal.idx.n_elem,ovreal.idx.n_elem-1)=ovbreal.idx;
 	ret.push_back(ovreal);
       }
+      
       if(imag) {
-	arma::uword np;
-
-	np=oa*va;
-	ovaimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	ret.push_back(ovaimag);
-	ioff+=np;
-
-	np=ob*vb;
-	ovbimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	ret.push_back(ovbimag);
-	ioff+=np;
-
 	ovimag.idx.zeros(ovaimag.idx.n_elem+ovbimag.idx.n_elem);
 	if(ovaimag.idx.n_elem)
 	  ovimag.idx.subvec(0,ovaimag.idx.n_elem-1)=ovaimag.idx;
@@ -696,6 +701,7 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	  ovimag.idx.subvec(ovaimag.idx.n_elem,ovimag.idx.n_elem-1)=ovbimag.idx;
 	ret.push_back(ovimag);
       }
+      
       if(real && imag) {
 	ova.idx.zeros(ovareal.idx.n_elem+ovaimag.idx.n_elem);
 	if(ovareal.idx.n_elem)
@@ -703,14 +709,14 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	if(ovaimag.idx.n_elem)
 	  ova.idx.subvec(ovareal.idx.n_elem,ova.idx.n_elem-1)=ovaimag.idx;
 	ret.push_back(ova);
-
+	
 	ovb.idx.zeros(ovbreal.idx.n_elem+ovbimag.idx.n_elem);
 	if(ovbreal.idx.n_elem)
 	  ovb.idx.subvec(0,ovbreal.idx.n_elem-1)=ovbreal.idx;
 	if(ovbimag.idx.n_elem)
 	  ovb.idx.subvec(ovbreal.idx.n_elem,ovb.idx.n_elem-1)=ovbimag.idx;
 	ret.push_back(ovb);
-
+	
 	ov.idx.zeros(ova.idx.n_elem+ovb.idx.n_elem);
 	if(ova.idx.n_elem)
 	  ov.idx.subvec(0,ova.idx.n_elem-1)=ova.idx;
@@ -719,6 +725,7 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	ret.push_back(ov);
       }
     }
+    
     if(oocheck) {
       if(real) {
 	arma::uword np=oa*(oa-1)/2;
@@ -727,49 +734,53 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	  ret.push_back(ooareal);
 	}
 	ioff+=np;
-
-	np=ob*(ob-1)/2;
-	if(np>0) {
-	  oobreal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	  ret.push_back(oobreal);
-	}
-	ioff+=np;
-
-	if(oa>1 && ob>1) {
-	  ooreal.idx.zeros(ooareal.idx.n_elem+oobreal.idx.n_elem);
-	  if(ooareal.idx.n_elem)
-	    ooreal.idx.subvec(0,ooareal.idx.n_elem-1)=ooareal.idx;
-	  if(oobreal.idx.n_elem)
-	    ooreal.idx.subvec(ooareal.idx.n_elem,ooreal.idx.n_elem-1)=oobreal.idx;
-	  ret.push_back(ooreal);
-	}
       }
-      if(imag) {
-	arma::uword np;
 
-	np=oa*(oa-1)/2;
+      if(imag) {
+	arma::uword np=oa*(oa-1)/2;
 	if(np>0) {
 	  ooaimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
 	  ret.push_back(ooaimag);
 	}
 	ioff+=np;
+      }
 
-	np=ob*(ob-1)/2;
+      if(real) {
+	arma::uword np=ob*(ob-1)/2;
+	if(np>0) {
+	  oobreal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
+	  ret.push_back(oobreal);
+	}
+	ioff+=np;
+      }
+
+      if(imag) {
+	arma::uword np=ob*(ob-1)/2;
 	if(np>0) {
 	  oobimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
 	  ret.push_back(oobimag);
 	}
 	ioff+=np;
-
-	if(oa>1 && ob>1) {
-	  ooimag.idx.zeros(ooaimag.idx.n_elem+oobimag.idx.n_elem);
-	  if(ooaimag.idx.n_elem)
-	    ooimag.idx.subvec(0,ooaimag.idx.n_elem-1)=ooaimag.idx;
-	  if(oobimag.idx.n_elem)
-	    ooimag.idx.subvec(ooaimag.idx.n_elem,ooimag.idx.n_elem-1)=oobimag.idx;
-	  ret.push_back(ooimag);
-	}
       }
+
+      if(real && oa>1 && ob>1) {
+	ooreal.idx.zeros(ooareal.idx.n_elem+oobreal.idx.n_elem);
+	if(ooareal.idx.n_elem)
+	  ooreal.idx.subvec(0,ooareal.idx.n_elem-1)=ooareal.idx;
+	if(oobreal.idx.n_elem)
+	  ooreal.idx.subvec(ooareal.idx.n_elem,ooreal.idx.n_elem-1)=oobreal.idx;
+	ret.push_back(ooreal);
+      }
+
+      if(imag && oa>1 && ob>1) {
+	ooimag.idx.zeros(ooaimag.idx.n_elem+oobimag.idx.n_elem);
+	if(ooaimag.idx.n_elem)
+	  ooimag.idx.subvec(0,ooaimag.idx.n_elem-1)=ooaimag.idx;
+	if(oobimag.idx.n_elem)
+	  ooimag.idx.subvec(ooaimag.idx.n_elem,ooimag.idx.n_elem-1)=oobimag.idx;
+	ret.push_back(ooimag);
+      }
+
       if(real && imag) {
 	ooa.idx.zeros(ooareal.idx.n_elem+ooaimag.idx.n_elem);
 	if(ooareal.idx.n_elem)
@@ -786,7 +797,7 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	    oob.idx.subvec(oobreal.idx.n_elem,oob.idx.n_elem-1)=oobimag.idx;
 	  ret.push_back(oob);
 	}
-
+	
 	oo.idx.zeros(ooa.idx.n_elem+oob.idx.n_elem);
 	oo.idx.subvec(0,ooa.idx.n_elem-1)=ooa.idx;
 	if(ob>1) {
