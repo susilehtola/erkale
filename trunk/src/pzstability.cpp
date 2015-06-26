@@ -2656,7 +2656,7 @@ bool PZStability::check(bool stability, double cutoff) {
 
       // Do line search
       double ds=ss_ls;
-      const double dfac=1.2;
+      const double dfac=cbrt(10.0);
 
       double Enew=eval(x*ds);
       printf("\t%e % .10f % e\n",ds,Enew,Enew-Ei);
