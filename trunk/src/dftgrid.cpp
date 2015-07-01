@@ -800,8 +800,6 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
 void AngularGrid::init_VV10(double b, double C, bool pot) {
   if(!do_grad)
     throw std::runtime_error("Invalid do_grad setting for VV10!\n");
-  if(do_lapl)
-    throw std::runtime_error("Invalid do_lapl setting for VV10!\n");
   do_gga=true;
   do_mgga=false;
   VV10_thr=1e-8;
@@ -1754,7 +1752,6 @@ arma::vec AngularGrid::eval_force_u() const {
   return f;
 
 }
-
 
 arma::vec AngularGrid::eval_force_r() const {
   if(polarized) {
@@ -3829,9 +3826,6 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 #endif
   } // End parallel region
 
-  arma::vec fu(eval_force(x_func,c_func,P/2,P/2));
-  (f-fu).print("Difference r wr ur");
-  
   return f;
 }
 
@@ -3922,8 +3916,10 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
 #pragma omp for schedule(dynamic,1)
 #endif
     for(size_t i=0;i<nl.grids.size();i++) {
-      // Need gradient but no laplacian
+      // Need gradient for VV10 but no laplacian
       wrk[ith].set_grad_lapl(true,false);
+      // No need for Hessian or laplacian of gradient
+      wrk[ith].set_hess_lgrad(false,false);
       // Change atom and create grid
       wrk[ith].set_grid(nl.grids[i]);
       wrk[ith].form_grid();
@@ -3958,8 +3954,10 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
 #pragma omp for schedule(dynamic,1)
 #endif
     for(size_t i=0;i<grids.size();i++) {
-      // Need gradient but no laplacian
-      wrk[ith].set_grad_lapl(true,false);
+      // Need gradient for VV10 and laplacian for VV10 gradient
+      wrk[ith].set_grad_lapl(true,true);
+      // Need hessian for VV10 gradient
+      wrk[ith].set_hess_lgrad(true,false);
       // Change atom and create grid
       wrk[ith].set_grid(grids[i]);      
       wrk[ith].form_grid();
