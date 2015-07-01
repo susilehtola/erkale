@@ -1090,3 +1090,60 @@ double DensityFit::get_a_munu(size_t ia, size_t imu, size_t inu) const {
 arma::mat DensityFit::get_ab_inv() const {
   return ab_inv;
 }
+
+arma::mat DensityFit::mo_integrals(const arma::mat & Cl, const arma::mat & Cr) const {
+  if(direct)
+    throw std::runtime_error("Must run in tabulated mode!\n");
+
+  // Collect AO integrals
+  arma::mat B(Nbf*Nbf,Naux);
+  for(size_t ip=0;ip<orbpairs.size();ip++) {
+    size_t imus=orbpairs[ip].is;
+    size_t inus=orbpairs[ip].js;
+    size_t Nmu=orbshells[imus].get_Nbf();
+    size_t Nnu=orbshells[inus].get_Nbf();
+    size_t mu0=orbshells[imus].get_first_ind();
+    size_t nu0=orbshells[inus].get_first_ind();
+    
+    for(size_t ias=0;ias<auxshells.size();ias++) {
+      size_t Na=auxshells[ias].get_Nbf();
+      size_t a0=auxshells[ias].get_first_ind();
+      
+      for(size_t imu=0;imu<Nmu;imu++)
+	for(size_t inu=0;inu<Nnu;inu++)
+	  for(size_t ia=0;ia<Na;ia++) {
+	    size_t mu=imu+mu0;
+	    size_t nu=inu+nu0;
+	    size_t a=ia+a0;
+	    
+	    B(mu*Nbf+nu,a)=a_munu(ia+a0,idx(imu+mu0,inu+nu0));
+	    B(nu*Nbf+mu,a)=a_munu(ia+a0,idx(imu+mu0,inu+nu0));
+	  }
+    }
+  }
+  // Transform into proper B matrix
+  B=B*ab_invh;
+
+  // Do LH transform
+  B.reshape(Nbf,Nbf*Naux);
+  B=arma::trans(Cl)*B;
+
+  // Shuffle indices
+  arma::mat Bs(Cl.n_cols*Naux,Nbf);
+  for(size_t mu=0;mu<Nbf;mu++)
+    for(size_t a=0;a<Naux;a++)
+      for(size_t l=0;l<Cl.n_cols;l++)
+	Bs(l*Naux+a,mu)=B(l,mu*Naux+a);
+
+  // Do RH transform
+  Bs=Bs*Cr;
+
+  // Return array
+  B.resize(Cl.n_cols*Cr.n_cols,Naux);
+  for(size_t a=0;a<Naux;a++)
+    for(size_t l=0;l<Cl.n_cols;l++)
+      for(size_t r=0;r<Cr.n_cols;r++)
+	B(l*Cr.n_cols+r,a)=Bs(l*Naux+a,r);
+  
+  return B;
+}

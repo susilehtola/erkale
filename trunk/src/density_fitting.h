@@ -148,6 +148,9 @@ class DensityFit {
   double get_a_munu(size_t ia, size_t imu, size_t inu) const;
   /// Get ab_inv
   arma::mat get_ab_inv() const;
+
+  /// Get integrals in MO basis
+  arma::mat mo_integrals(const arma::mat & Cl, const arma::mat & Cr) const;
 };
 
 
