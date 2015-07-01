@@ -1115,9 +1115,10 @@ arma::mat DensityFit::mo_integrals(const arma::mat & Cl, const arma::mat & Cr) c
 	    size_t mu=imu+mu0;
 	    size_t nu=inu+nu0;
 	    size_t a=ia+a0;
-	    
-	    B(mu*Nbf+nu,a)=a_munu(ia+a0,idx(imu+mu0,inu+nu0));
-	    B(nu*Nbf+mu,a)=a_munu(ia+a0,idx(imu+mu0,inu+nu0));
+
+	    double el=a_munu(ia+a0,idx(imu+mu0,inu+nu0));
+	    B(mu*Nbf+nu,a)=el;
+	    B(nu*Nbf+mu,a)=el;
 	  }
     }
   }
@@ -1127,23 +1128,24 @@ arma::mat DensityFit::mo_integrals(const arma::mat & Cl, const arma::mat & Cr) c
   // Do LH transform
   B.reshape(Nbf,Nbf*Naux);
   B=arma::trans(Cl)*B;
-
+  
   // Shuffle indices
   arma::mat Bs(Cl.n_cols*Naux,Nbf);
   for(size_t mu=0;mu<Nbf;mu++)
     for(size_t a=0;a<Naux;a++)
       for(size_t l=0;l<Cl.n_cols;l++)
-	Bs(l*Naux+a,mu)=B(l,mu*Naux+a);
+	Bs(a*Cl.n_cols+l,mu)=B(l,a*Nbf+mu);
 
   // Do RH transform
   Bs=Bs*Cr;
 
   // Return array
-  B.resize(Cl.n_cols*Cr.n_cols,Naux);
+  B.resize(Naux,Cl.n_cols*Cr.n_cols);
   for(size_t a=0;a<Naux;a++)
     for(size_t l=0;l<Cl.n_cols;l++)
       for(size_t r=0;r<Cr.n_cols;r++)
-	B(l*Cr.n_cols+r,a)=Bs(l*Naux+a,r);
+	B(a,r*Cl.n_cols+l)=Bs(a*Cl.n_cols+l,r);
+
   
   return B;
 }
