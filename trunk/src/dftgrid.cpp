@@ -14,7 +14,6 @@
  * of the License, or (at your option) any later version.
  */
 
-
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
@@ -1566,452 +1565,331 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
   }
 }
 
-arma::vec AngularGrid::eval_force(const arma::mat & Pa, const arma::mat & Pb) const {
+arma::vec AngularGrid::eval_force_u() const {
   if(!polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute unrestricted force with restricted density.\n");
   }
 
-  arma::rowvec f(3*basp->get_Nnuc());
+  // Initialize force
+  arma::vec f(3*basp->get_Nnuc());
   f.zeros();
-
-  // Get functions in basis set
-  std::vector<GaussianShell> gshells=basp->get_shells();
-
+  
   // Loop over nuclei
   for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
+    // Grad rho in grid points wrt functions centered on nucleus
+    arma::mat gradrhoa(3,grid.size());
+    gradrhoa.zeros();
+    arma::mat gradrhob(3,grid.size());
+    gradrhob.zeros();
+    for(size_t iish=0;iish<shells.size();iish++)
+      if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	// Increment grad rho.
+	for(size_t ip=0;ip<grid.size();ip++)
+	  // Loop over functions on shell
+	  for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+	    gradrhoa(0,ip)+=bf_x(mu,ip)*Pav(mu,ip);
+	    gradrhoa(1,ip)+=bf_y(mu,ip)*Pav(mu,ip);
+	    gradrhoa(2,ip)+=bf_z(mu,ip)*Pav(mu,ip);
 
-    // LDA part. Loop over grid
-    for(size_t ip=0;ip<grid.size();ip++) {
-
-      // Grad rho in current point
-      arma::rowvec gradrhoa(3);
-      gradrhoa.zeros();
-      arma::rowvec gradrhob(3);
-      gradrhob.zeros();
-
-      // Loop over shells on the nucleus
-      for(size_t iish=0;iish<shells.size();iish++) {
-	if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	  continue;
-	size_t ish=shells[iish];
-
-	// First function on shell is
-	size_t mu0=gshells[ish].get_first_ind();
-
-	// Evaluate the gradient in the current grid point
-	arma::mat grad=gshells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-	// Increment sum. Loop over mu
-	for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
-	  // Function index is
-	  size_t mu=mu0+imu;
-
-	  // Loop over the functions on the grid point
-	  for(size_t inu=0;inu<bf_ind.size();inu++) {
-	    // Get index of function
-	    size_t nu(bf_ind(inu));
-
-	    gradrhoa+=Pa(mu,nu)*grad.row(imu)*bf(inu,ip);
-	    gradrhob+=Pb(mu,nu)*grad.row(imu)*bf(inu,ip);
+	    gradrhob(0,ip)+=bf_x(mu,ip)*Pbv(mu,ip);
+	    gradrhob(1,ip)+=bf_y(mu,ip)*Pbv(mu,ip);
+	    gradrhob(2,ip)+=bf_z(mu,ip)*Pbv(mu,ip);
 	  }
-	}
       }
-      // Plug in the factor 2 to get the total gradient
-      gradrhoa*=2.0;
-      gradrhob*=2.0;
+    
+    // LDA potential
+    arma::rowvec vrhoa(vxc.row(0));
+    arma::rowvec vrhob(vxc.row(1));
+    // Multiply weights into potential
+    vrhoa%=w;
+    vrhob%=w;
+    
+    // Force is
+    f.subvec(3*inuc,3*inuc+2) += 2.0 * (gradrhoa*arma::trans(vrhoa) + gradrhob*arma::trans(vrhob));
 
-      // Increment total force
-      f.subvec(3*inuc,3*inuc+2)+=w(ip)*(vxc(0,ip)*gradrhoa + vxc(1,ip)*gradrhob);
-    }
-  }
+    if(do_gga) {
+      // Calculate X = 2 \sum_{u'v} P(uv) [ x(v) d_ij x(u) + (d_i x(u)) (d_j x(v)) ]
+      //             = 2 \sum_u' Pv(u) d_ij x(u) + 2 \sum Pv_i(v) d_j x(v) 
+      arma::mat Xa(9,grid.size());
+      Xa.zeros();
+      arma::mat Xb(9,grid.size());
+      Xb.zeros();
 
-  // GGA part
-  if(do_gga) {
-
-    // Loop over nuclei
-    for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
-      // Loop over the grid
-      for(size_t ip=0;ip<grid.size();ip++) {
-
-	// X in the current grid point
-	arma::mat Xa(3,3);
-	Xa.zeros();
-
-	arma::mat Xb(3,3);
-	Xb.zeros();
-
-	// Loop over shells on the nucleus
-	for(size_t iish=0;iish<shells.size();iish++) {
-	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	    continue;
-	  size_t ish=shells[iish];
-
-	  // First function on shell is
-	  size_t mu0=gshells[ish].get_first_ind();
-
-	  // Evaluate the gradient in the current grid point
-	  arma::mat grad=gshells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	  // Evaluate the Hessian in the current grid point
-	  arma::mat hess=gshells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-	  // Increment sum. Loop over mu
-	  for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
-	    // Function index is
-	    size_t mu=mu0+imu;
-
-	    for(size_t inu=0;inu<bf_ind.size();inu++) {
-	      // Get index of function
-	      size_t nu=bf_ind(inu);
-
-	      double glist[3];
-	      glist[0]=bf_x(inu,ip);
-	      glist[1]=bf_y(inu,ip);
-	      glist[2]=bf_z(inu,ip);
-
-	      for(int ic=0;ic<3;ic++)
-		for(int jc=0;jc<3;jc++)
-		  Xa(ic,jc)+=Pa(mu,nu)*(bf(inu,ip)*hess(imu,3*ic+jc) + glist[jc]*grad(imu,ic));
-	      for(int ic=0;ic<3;ic++)
-		for(int jc=0;jc<3;jc++)
-		  Xb(ic,jc)+=Pb(mu,nu)*(bf(inu,ip)*hess(imu,3*ic+jc) + glist[jc]*grad(imu,ic));
+      for(size_t iish=0;iish<shells.size();iish++)
+	if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	  // First contribution
+	  for(size_t ip=0;ip<grid.size();ip++)
+	    for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+	      for(int c=0;c<9;c++) {
+		Xa(c,ip)+=bf_hess(9*mu+c,ip)*Pav(mu,ip);
+		Xb(c,ip)+=bf_hess(9*mu+c,ip)*Pbv(mu,ip);
+	      }
 	    }
-	  }
+	  // Second contribution
+	  for(size_t ip=0;ip<grid.size();ip++)
+	    for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+	      // X is stored in column order: xx, yx, zx, xy, yy, zy, xz, yz, zz; but it's symmetric
+	      Xa(0,ip)+=Pav_x(mu,ip)*bf_x(mu,ip);
+	      Xa(1,ip)+=Pav_x(mu,ip)*bf_y(mu,ip);
+	      Xa(2,ip)+=Pav_x(mu,ip)*bf_z(mu,ip);
+	      
+	      Xa(3,ip)+=Pav_y(mu,ip)*bf_x(mu,ip);
+	      Xa(4,ip)+=Pav_y(mu,ip)*bf_y(mu,ip);
+	      Xa(5,ip)+=Pav_y(mu,ip)*bf_z(mu,ip);
+	      
+	      Xa(6,ip)+=Pav_z(mu,ip)*bf_x(mu,ip);
+	      Xa(7,ip)+=Pav_z(mu,ip)*bf_y(mu,ip);
+	      Xa(8,ip)+=Pav_z(mu,ip)*bf_z(mu,ip);
+
+	      Xb(0,ip)+=Pbv_x(mu,ip)*bf_x(mu,ip);
+	      Xb(1,ip)+=Pbv_x(mu,ip)*bf_y(mu,ip);
+	      Xb(2,ip)+=Pbv_x(mu,ip)*bf_z(mu,ip);
+	      
+	      Xb(3,ip)+=Pbv_y(mu,ip)*bf_x(mu,ip);
+	      Xb(4,ip)+=Pbv_y(mu,ip)*bf_y(mu,ip);
+	      Xb(5,ip)+=Pbv_y(mu,ip)*bf_z(mu,ip);
+	      
+	      Xb(6,ip)+=Pbv_z(mu,ip)*bf_x(mu,ip);
+	      Xb(7,ip)+=Pbv_z(mu,ip)*bf_y(mu,ip);
+	      Xb(8,ip)+=Pbv_z(mu,ip)*bf_z(mu,ip);
+	    }
 	}
-	Xa*=2.0;
-	Xb*=2.0;
-
-	// The xc "vector" is
-	arma::vec xca(3);
-	for(int ic=0;ic<3;ic++)
-	  xca(ic)=2.0*vsigma(0,ip)*grho(ic,ip) + vsigma(1,ip)*grho(ic+3,ip);
-	arma::vec xcb(3);
-	for(int ic=0;ic<3;ic++)
-	  xcb(ic)=2.0*vsigma(2,ip)*grho(ic+3,ip) + vsigma(1,ip)*grho(ic,ip);
-
-	// Increment total force
-	f.subvec(3*inuc,3*inuc+2)+=grid[ip].w*arma::trans(Xa*xca+Xb*xcb);
-      }
-    }
-  }
-
-  // meta-GGA part
-  if(do_mgga) {
-
-    // First part. Loop over nuclei
-    for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
-      // Loop over the grid
-      for(size_t ip=0;ip<grid.size();ip++) {
-
-	// y in the current grid point
-	arma::vec ya(3);
-	ya.zeros();
-	arma::vec yb(3);
-	yb.zeros();
-
-	// Loop over shells on the nucleus
-	for(size_t iish=0;iish<shells.size();iish++) {
-	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	    continue;
-	  size_t ish=shells[iish];
-
-	  // First function on shell is
-	  size_t mu0=gshells[ish].get_first_ind();
-
-	  // Evaluate the Hessian in the current grid point
-	  arma::mat hess=gshells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-	  // Increment sum. Loop over mu
-	  for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
-	    // Function index is
-	    size_t mu=mu0+imu;
-
-	    for(size_t inu=0;inu<bf_ind.size();inu++) {
-	      // Get index of function
-	      size_t nu(bf_ind(inu));
-
-	      // Collect grad nu
-	      arma::vec gnu(3);
-	      gnu(0)=bf_x(inu,ip);
-	      gnu(1)=bf_y(inu,ip);
-	      gnu(2)=bf_z(inu,ip);
-
-	      for(int ic=0;ic<3;ic++)
-		for(int jc=0;jc<3;jc++) {
-		  ya(ic)+=Pa(mu,nu)*hess(imu,3*ic+jc)*gnu(jc);
-		  yb(ic)+=Pb(mu,nu)*hess(imu,3*ic+jc)*gnu(jc);
-		}
-	    }
-	  }
+      // Plug in factor
+      Xa*=2.0;
+      Xb*=2.0;
+      
+      // Get potential
+      arma::rowvec vs_aa(vsigma.row(0));
+      arma::rowvec vs_ab(vsigma.row(1));
+      arma::rowvec vs_bb(vsigma.row(2));
+      // Get grad rho
+      arma::uvec idxa(arma::linspace<arma::uvec>(0,2,3));
+      arma::uvec idxb(arma::linspace<arma::uvec>(3,5,3));
+      arma::mat gr_a0(arma::trans(grho.rows(idxa)));
+      arma::mat gr_b0(arma::trans(grho.rows(idxb)));
+      // Multiply grad rho by vsigma and the weights
+      arma::mat gr_a(gr_a0);
+      arma::mat gr_b(gr_b0);
+      for(size_t i=0;i<gr_a0.n_rows;i++)
+	for(size_t ic=0;ic<gr_a0.n_cols;ic++) {
+	  gr_a(i,ic)=w(i)*(2.0*vs_aa(i)*gr_a0(i,ic) + vs_ab(i)*gr_b0(i,ic));
+	  gr_b(i,ic)=w(i)*(2.0*vs_bb(i)*gr_b0(i,ic) + vs_ab(i)*gr_a0(i,ic));
 	}
 
-	// Increment total force
-	f.subvec(3*inuc,3*inuc+2)+=w(ip)*arma::trans((vtau(0,ip)+2.0*vlapl(0,ip))*ya + (vtau(1,ip)+2.0*vlapl(1,ip))*yb);
-      }
-    }
+      // f_x <- X_xx * g_x + X_xy * g_y + X_xz * g_z
+      f(3*inuc  )+=arma::as_scalar(Xa.row(0)*gr_a.col(0) + Xa.row(3)*gr_a.col(1) + Xa.row(6)*gr_a.col(2));
+      f(3*inuc  )+=arma::as_scalar(Xb.row(0)*gr_b.col(0) + Xb.row(3)*gr_b.col(1) + Xb.row(6)*gr_b.col(2));
+      // f_y <- X_yx * g_x + X_yy * g_y + X_yz * g_z
+      f(3*inuc+1)+=arma::as_scalar(Xa.row(1)*gr_a.col(0) + Xa.row(4)*gr_a.col(1) + Xa.row(7)*gr_a.col(2));
+      f(3*inuc+1)+=arma::as_scalar(Xb.row(1)*gr_b.col(0) + Xb.row(4)*gr_b.col(1) + Xb.row(7)*gr_b.col(2));
+      // f_z <- X_zx * g_x + X_zy * g_y + X_zz * g_z
+      f(3*inuc+2)+=arma::as_scalar(Xa.row(2)*gr_a.col(0) + Xa.row(5)*gr_a.col(1) + Xa.row(8)*gr_a.col(2));
+      f(3*inuc+2)+=arma::as_scalar(Xb.row(2)*gr_b.col(0) + Xb.row(5)*gr_b.col(1) + Xb.row(8)*gr_b.col(2));
 
-    // Second part. Loop over nuclei
-    for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
-      // Loop over the grid
-      for(size_t ip=0;ip<grid.size();ip++) {
+      if(do_mgga) {
+	// Kinetic energy and Laplacian terms
 
-	// z in the current grid point
-	arma::rowvec za(3);
-	za.zeros();
-	arma::rowvec zb(3);
-	zb.zeros();
+	// Y = P_uv (d_i d_j x(u)) d_j x(v)
+	arma::mat Ya(3,grid.size());
+	Ya.zeros();
+	arma::mat Yb(3,grid.size());
+	Yb.zeros();
+	for(size_t iish=0;iish<shells.size();iish++)
+	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	    for(size_t ip=0;ip<grid.size();ip++)
+	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+		// Y_x =  H_xx g_x + H_xy g_y + H_xz g_z
+		Ya(0,ip) += bf_hess(9*mu  ,ip) * Pav_x(mu,ip) + bf_hess(9*mu+3,ip) * Pav_y(mu,ip) + bf_hess(9*mu+6,ip) * Pav_z(mu,ip);
+		Ya(1,ip) += bf_hess(9*mu+1,ip) * Pav_x(mu,ip) + bf_hess(9*mu+4,ip) * Pav_y(mu,ip) + bf_hess(9*mu+7,ip) * Pav_z(mu,ip);
+		Ya(2,ip) += bf_hess(9*mu+2,ip) * Pav_x(mu,ip) + bf_hess(9*mu+5,ip) * Pav_y(mu,ip) + bf_hess(9*mu+8,ip) * Pav_z(mu,ip);
 
-	// Loop over shells on the nucleus
-	for(size_t iish=0;iish<shells.size();iish++) {
-	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	    continue;
-	  size_t ish=shells[iish];
-
-	  // First function on shell is
-	  size_t mu0=gshells[ish].get_first_ind();
-
-	  // Evaluate the gradient in the current grid point
-	  arma::mat grad=gshells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	  // Evaluate the laplacian of the gradient in the current grid point
-	  arma::mat laplgrad=gshells[ish].eval_laplgrad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-	  // Increment sum. Loop over mu
-	  for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
-	    // Function index is
-	    size_t mu=mu0+imu;
-
-	    for(size_t inu=0;inu<bf_ind.n_elem;inu++) {
-	      // Get index of function
-	      size_t nu(bf_ind(inu));
-
-	      za+=Pa(mu,nu)*(bf_lapl(inu,ip)*grad.row(imu)+bf(inu,ip)*laplgrad.row(imu));
-	      zb+=Pb(mu,nu)*(bf_lapl(inu,ip)*grad.row(imu)+bf(inu,ip)*laplgrad.row(imu));
-	    }
+		Yb(0,ip) += bf_hess(9*mu  ,ip) * Pbv_x(mu,ip) + bf_hess(9*mu+3,ip) * Pbv_y(mu,ip) + bf_hess(9*mu+6,ip) * Pbv_z(mu,ip);
+		Yb(1,ip) += bf_hess(9*mu+1,ip) * Pbv_x(mu,ip) + bf_hess(9*mu+4,ip) * Pbv_y(mu,ip) + bf_hess(9*mu+7,ip) * Pbv_z(mu,ip);
+		Yb(2,ip) += bf_hess(9*mu+2,ip) * Pbv_x(mu,ip) + bf_hess(9*mu+5,ip) * Pbv_y(mu,ip) + bf_hess(9*mu+8,ip) * Pbv_z(mu,ip);
+	      }
 	  }
-	}
-	za*=2.0;
-	zb*=2.0;
+	
+	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
+	arma::mat Za(3,grid.size());
+	Za.zeros();
+	arma::mat Zb(3,grid.size());
+	Zb.zeros();
+	for(size_t iish=0;iish<shells.size();iish++)
+	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	    for(size_t ip=0;ip<grid.size();ip++)
+	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+		// Z_x = 
+		Za(0,ip) += bf_lapl(mu,ip)*Pav_x(mu,ip) + Pav(mu)*bf_lx(mu,ip);
+		Za(1,ip) += bf_lapl(mu,ip)*Pav_y(mu,ip) + Pav(mu)*bf_ly(mu,ip);
+		Za(2,ip) += bf_lapl(mu,ip)*Pav_z(mu,ip) + Pav(mu)*bf_lz(mu,ip);
+		
+		Zb(0,ip) += bf_lapl(mu,ip)*Pbv_x(mu,ip) + Pbv(mu)*bf_lx(mu,ip);
+		Zb(1,ip) += bf_lapl(mu,ip)*Pbv_y(mu,ip) + Pbv(mu)*bf_ly(mu,ip);
+		Zb(2,ip) += bf_lapl(mu,ip)*Pbv_z(mu,ip) + Pbv(mu)*bf_lz(mu,ip);
+	      }
+	  }
+	// Put in the factor 2
+	Za*=2.0;
+	Zb*=2.0;
 
-	// Increment total force
-	f.subvec(3*inuc,3*inuc+2)+=w(ip)*(vlapl(0,ip)*za + vlapl(1,ip)*zb);
+	// Get vtau and vlapl
+	arma::rowvec vt_a(vtau.row(0));
+	arma::rowvec vt_b(vtau.row(1));
+	arma::rowvec vl_a(vlapl.row(0));
+	arma::rowvec vl_b(vlapl.row(1));
+	// Scale both with weights
+	vt_a%=w;
+	vt_b%=w;
+	vl_a%=w;
+	vl_b%=w;
+
+	// Increment force
+	f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(vt_a+2*vl_a) + Za*arma::trans(vl_a);
+	f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(vt_b+2*vl_b) + Zb*arma::trans(vl_b);
       }
     }
   }
+  
+  return f;
 
-
-  return arma::trans(f);
 }
 
 
-arma::vec AngularGrid::eval_force(const arma::mat & P) const {
+arma::vec AngularGrid::eval_force_r() const {
   if(polarized) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute restricted force with unrestricted density.\n");
   }
 
   // Initialize force
-  arma::rowvec f(3*basp->get_Nnuc());
+  arma::vec f(3*basp->get_Nnuc());
   f.zeros();
-
-  // Get functions centered on the atom
-  std::vector<GaussianShell> gshells=basp->get_shells();
-
+  
   // Loop over nuclei
   for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
-    // LDA part. Loop over grid
-    for(size_t ip=0;ip<grid.size();ip++) {
-
-      // Grad rho in current point
-      arma::rowvec gradrho(3);
-      gradrho.zeros();
-
-      // Loop over shells on the nucleus
-      for(size_t iish=0;iish<shells.size();iish++) {
-	if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	  continue;
-	size_t ish=shells[iish];
-
-	// First function on shell is
-	size_t mu0=gshells[ish].get_first_ind();
-
-	// Evaluate the gradient in the current grid point
-	arma::mat grad=gshells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-	// Increment sum. Loop over mu
-	for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
-	  // Function index is
-	  size_t mu=mu0+imu;
-
-	  for(size_t inu=0;inu<bf_ind.n_elem;inu++) {
-	    // Get index of function
-	    size_t nu(bf_ind(inu));
-
-	    gradrho+=P(mu,nu)*grad.row(imu)*bf(inu,ip);
+    // Grad rho in grid points wrt functions centered on nucleus
+    arma::mat gradrho(3,grid.size());
+    gradrho.zeros();
+    for(size_t iish=0;iish<shells.size();iish++)
+      if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	// Increment grad rho.
+	for(size_t ip=0;ip<grid.size();ip++)
+	  // Loop over functions on shell
+	  for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+	    gradrho(0,ip)+=bf_x(mu,ip)*Pv(mu,ip);
+	    gradrho(1,ip)+=bf_y(mu,ip)*Pv(mu,ip);
+	    gradrho(2,ip)+=bf_z(mu,ip)*Pv(mu,ip);
 	  }
-	}
       }
-      // Plug in the factor 2 to get the total gradient
-      gradrho*=2.0;
+    
+    // LDA potential
+    arma::rowvec vrho(vxc.row(0));
+    // Multiply weights into potential
+    vrho%=w;
+    
+    // Force is
+    f.subvec(3*inuc,3*inuc+2) += 2.0 * gradrho*arma::trans(vrho);
 
-      // Increment total force
-      f.subvec(3*inuc,3*inuc+2)+=w(ip)*vxc(0,ip)*gradrho;
-    }
-  }
+    if(do_gga) {
+      // Calculate X = 2 \sum_{u'v} P(uv) [ x(v) d_ij x(u) + (d_i x(u)) (d_j x(v)) ]
+      //             = 2 \sum_u' Pv(u) d_ij x(u) + 2 \sum Pv_i(v) d_j x(v) 
+      arma::mat X(9,grid.size());
+      X.zeros();
 
-  // GGA part
-  if(do_gga) {
-    // Loop over nuclei
-    for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
-
-      // Loop over the grid
-      for(size_t ip=0;ip<grid.size();ip++) {
-
-	// X in the current grid point
-	arma::mat X(3,3);
-	X.zeros();
-
-	// Loop over shells on the nucleus
-	for(size_t iish=0;iish<shells.size();iish++) {
-	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	    continue;
-	  size_t ish=shells[iish];
-
-	  // First function on shell is
-	  size_t mu0=gshells[ish].get_first_ind();
-
-	  // Evaluate the gradient in the current grid point
-	  arma::mat grad=gshells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	  // Evaluate the Hessian in the current grid point
-	  arma::mat hess=gshells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-	  // Increment sum. Loop over mu
-	  for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
-	    // Function index is
-	    size_t mu=mu0+imu;
-
-	    for(size_t inu=0;inu<bf_ind.n_elem;inu++) {
-	      // Get index of function
-	      size_t nu(bf_ind(inu));
-	      double glist[3];
-	      glist[0]=bf_x(inu,ip);
-	      glist[1]=bf_y(inu,ip);
-	      glist[2]=bf_z(inu,ip);
-
-	      for(int ic=0;ic<3;ic++)
-		for(int jc=0;jc<3;jc++)
-		  X(ic,jc)+=P(mu,nu)*(bf(inu,ip)*hess(imu,3*ic+jc) + glist[jc]*grad(imu,ic));
+      for(size_t iish=0;iish<shells.size();iish++)
+	if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	  // First contribution
+	  for(size_t ip=0;ip<grid.size();ip++)
+	    for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+	      for(int c=0;c<9;c++) {
+		X(c,ip)+=bf_hess(9*mu+c,ip)*Pv(mu,ip);
+	      }
 	    }
-	  }
-	}
-	X*=2.0;
-
-	// The xc "vector" is
-	arma::vec xc(3);
-	for(int ic=0;ic<3;ic++)
-	  xc(ic)=2.0*vsigma(ip)*grho(ic,ip);
-
-	// Increment total force
-	f.subvec(3*inuc,3*inuc+2)+=w(ip)*arma::trans(X*xc);
-      }
-    }
-  }
-
-  // meta-GGA part
-  if(do_mgga) {
-
-    // First part. Loop over nuclei
-    for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
-      // Loop over the grid
-      for(size_t ip=0;ip<grid.size();ip++) {
-
-	// y in the current grid point
-	arma::vec y(3);
-	y.zeros();
-
-	// Loop over shells on the nucleus
-	for(size_t iish=0;iish<shells.size();iish++) {
-	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	    continue;
-	  size_t ish=shells[iish];
-
-	  // First function on shell is
-	  size_t mu0=gshells[ish].get_first_ind();
-
-	  // Evaluate the Hessian in the current grid point
-	  arma::mat hess=gshells[ish].eval_hess(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-	  // Increment sum. Loop over mu
-	  for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
-	    // Function index is
-	    size_t mu=mu0+imu;
-
-	    for(size_t inu=0;inu<bf_ind.n_elem;inu++) {
-	      // Get index of function
-	      size_t nu(bf_ind(inu));
-
-	      // Collect grad nu
-	      arma::vec gnu(3);
-	      gnu(0)=bf_x(inu,ip);
-	      gnu(1)=bf_y(inu,ip);
-	      gnu(2)=bf_z(inu,ip);
-
-	      for(int ic=0;ic<3;ic++)
-		for(int jc=0;jc<3;jc++)
-		  y(ic)+=P(mu,nu)*hess(imu,3*ic+jc)*gnu(jc);
+	  // Second contribution
+	  for(size_t ip=0;ip<grid.size();ip++)
+	    for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+	      // X is stored in column order: xx, yx, zx, xy, yy, zy, xz, yz, zz; but it's symmetric
+	      X(0,ip)+=Pv_x(mu,ip)*bf_x(mu,ip);
+	      X(1,ip)+=Pv_x(mu,ip)*bf_y(mu,ip);
+	      X(2,ip)+=Pv_x(mu,ip)*bf_z(mu,ip);
+	      
+	      X(3,ip)+=Pv_y(mu,ip)*bf_x(mu,ip);
+	      X(4,ip)+=Pv_y(mu,ip)*bf_y(mu,ip);
+	      X(5,ip)+=Pv_y(mu,ip)*bf_z(mu,ip);
+	      
+	      X(6,ip)+=Pv_z(mu,ip)*bf_x(mu,ip);
+	      X(7,ip)+=Pv_z(mu,ip)*bf_y(mu,ip);
+	      X(8,ip)+=Pv_z(mu,ip)*bf_z(mu,ip);
 	    }
-	  }
 	}
+      // Plug in factor
+      X*=2.0;
+      
+      // Get potential
+      arma::rowvec vs(vsigma.row(0));
+      // Get grad rho
+      arma::uvec idx(arma::linspace<arma::uvec>(0,2,3));
+      arma::mat gr(arma::trans(grho.rows(idx)));
+      // Multiply grad rho by vsigma and the weights
+      for(size_t i=0;i<gr.n_rows;i++)
+	for(size_t ic=0;ic<gr.n_cols;ic++)
+	  gr(i,ic)=2.0*w(i)*vs(i)*gr(i,ic);
 
-	// Increment total force
-	f.subvec(3*inuc,3*inuc+2)+=grid[ip].w*(vtau(0,ip)+2.0*vlapl(0,ip))*arma::trans(y);
-      }
-    }
+      // f_x <- X_xx * g_x + X_xy * g_y + X_xz * g_z
+      f(3*inuc  )+=arma::as_scalar(X.row(0)*gr.col(0) + X.row(3)*gr.col(1) + X.row(6)*gr.col(2));
+      // f_y <- X_yx * g_x + X_yy * g_y + X_yz * g_z
+      f(3*inuc+1)+=arma::as_scalar(X.row(1)*gr.col(0) + X.row(4)*gr.col(1) + X.row(7)*gr.col(2));
+      // f_z <- X_zx * g_x + X_zy * g_y + X_zz * g_z
+      f(3*inuc+2)+=arma::as_scalar(X.row(2)*gr.col(0) + X.row(5)*gr.col(1) + X.row(8)*gr.col(2));
 
-    // Second part. Loop over nuclei
-    for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
-      // Loop over the grid
-      for(size_t ip=0;ip<grid.size();ip++) {
+      if(do_mgga) {
+	// Kinetic energy and Laplacian terms
 
-	// z in the current grid point
-	arma::rowvec z(3);
-	z.zeros();
-
-	// Loop over shells on the nucleus
-	for(size_t iish=0;iish<shells.size();iish++) {
-	  if(basp->get_shell_center_ind(shells[iish]) != inuc)
-	    continue;
-	  size_t ish=shells[iish];
-
-	  // First function on shell is
-	  size_t mu0=gshells[ish].get_first_ind();
-
-	  // Evaluate the gradient in the current grid point
-	  arma::mat grad=gshells[ish].eval_grad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	  // Evaluate the laplacian of the gradient in the current grid point
-	  arma::mat laplgrad=gshells[ish].eval_laplgrad(grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-
-	  // Increment sum. Loop over mu
-	  for(size_t imu=0;imu<gshells[ish].get_Nbf();imu++) {
-	    // Function index is
-	    size_t mu=mu0+imu;
-
-	    for(size_t inu=0;inu<bf_ind.n_elem;inu++) {
-	      // Get index of function
-	      size_t nu(bf_ind(inu));
-
-	      z+=P(mu,nu)*(bf_lapl(inu,ip)*grad.row(imu)+bf(inu,ip)*laplgrad.row(imu));
-	    }
+	// Y = P_uv (d_i d_j x(u)) d_j x(v)
+	arma::mat Y(3,grid.size());
+	Y.zeros();
+	for(size_t iish=0;iish<shells.size();iish++)
+	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	    for(size_t ip=0;ip<grid.size();ip++)
+	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+		// Y_x =  H_xx g_x + H_xy g_y + H_xz g_z
+		Y(0,ip) += bf_hess(9*mu  ,ip) * Pv_x(mu,ip) + bf_hess(9*mu+3,ip) * Pv_y(mu,ip) + bf_hess(9*mu+6,ip) * Pv_z(mu,ip);
+		Y(1,ip) += bf_hess(9*mu+1,ip) * Pv_x(mu,ip) + bf_hess(9*mu+4,ip) * Pv_y(mu,ip) + bf_hess(9*mu+7,ip) * Pv_z(mu,ip);
+		Y(2,ip) += bf_hess(9*mu+2,ip) * Pv_x(mu,ip) + bf_hess(9*mu+5,ip) * Pv_y(mu,ip) + bf_hess(9*mu+8,ip) * Pv_z(mu,ip);
+	      }
 	  }
-	}
-	z*=2.0;
 
-	// Increment total force
-	f.subvec(3*inuc,3*inuc+2)+=grid[ip].w*vlapl[ip]*z;
+	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
+	arma::mat Z(3,grid.size());
+	Z.zeros();
+	for(size_t iish=0;iish<shells.size();iish++)
+	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	    for(size_t ip=0;ip<grid.size();ip++)
+	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+		// Z_x = 
+		Z(0,ip) += bf_lapl(mu,ip)*Pv_x(mu,ip) + Pv(mu)*bf_lx(mu,ip);
+		Z(1,ip) += bf_lapl(mu,ip)*Pv_y(mu,ip) + Pv(mu)*bf_ly(mu,ip);
+		Z(2,ip) += bf_lapl(mu,ip)*Pv_z(mu,ip) + Pv(mu)*bf_lz(mu,ip);
+	      }
+	  }
+	// Put in the factor 2
+	Z*=2.0;
+
+	// Get vtau and vlapl
+	arma::rowvec vt(vtau.row(0));
+	arma::rowvec vl(vlapl.row(0));
+	// Scale both with weights
+	vt%=w;
+	vl%=w;
+
+	// Increment force
+	f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(vt+2*vl) + Z*arma::trans(vl);
       }
     }
   }
-
-  return arma::trans(f);
+  
+  return f;
 }
 
 void AngularGrid::check_grad_lapl(int x_func, int c_func) {
@@ -2038,6 +1916,11 @@ void AngularGrid::get_grad_lapl(bool & grad, bool & lap) const {
 void AngularGrid::set_grad_lapl(bool grad, bool lap) {
   do_grad=grad;
   do_lapl=lap;
+}
+
+void AngularGrid::set_hess_lgrad(bool hess, bool lgrad) {
+  do_hess=hess;
+  do_lgrad=lgrad;
 }
 
 // Fixed size shell
@@ -2500,14 +2383,20 @@ void AngularGrid::compute_bf() {
     }
   }
 
+  bf_i0.zeros(shells.size());
+  bf_N.zeros(shells.size());
+  
   // Store indices of functions
   bf_ind.zeros(Nbf);
   size_t ioff=0;
   for(size_t i=0;i<shells.size();i++) {
     // Amount of functions on shell is
     size_t Nsh=basp->get_Nbf(shells[i]);
+    bf_N(i)=Nsh;
     // Shell offset
     size_t sh0=basp->get_first_ind(shells[i]);
+    // Local offset
+    bf_i0(i)=ioff;
     // Indices
     arma::uvec ls=(arma::linspace<arma::uvec>(sh0,sh0+Nsh-1,Nsh));
     bf_ind.subvec(ioff,ioff+Nsh-1)=ls;
@@ -2575,6 +2464,43 @@ void AngularGrid::compute_bf() {
 	arma::vec lval=basp->eval_lapl(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
 	bf_lapl.submat(ioff,ip,ioff+lval.n_elem-1,ip)=lval;
 	ioff+=lval.n_elem;
+      }
+    }
+  }
+
+  if(do_hess) {
+    bf_hess.zeros(9*bf_ind.n_elem,grid.size());
+    // Loop over points
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Loop over shells. Offset
+      ioff=0;
+      for(size_t ish=0;ish<shells.size();ish++) {
+	// eval_hess returns Nbf x 9 matrix, transpose to 9 x Nbf
+	arma::mat hval=arma::trans(basp->eval_hess(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z));
+	// Store values
+	for(int c=0;c<9;c++)
+	  for(size_t f=0;f<hval.n_cols;f++) {
+	    bf_hess(ioff + 9*f + c,ip)=hval(c,f);
+	  }
+	ioff+=hval.n_elem;
+      }
+    }
+  }
+
+  if(do_lgrad) {
+    bf_lx.zeros(bf_ind.n_elem,grid.size());
+    bf_ly.zeros(bf_ind.n_elem,grid.size());
+    bf_lz.zeros(bf_ind.n_elem,grid.size());
+    // Loop over points
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Loop over shells. Offset
+      ioff=0;
+      for(size_t ish=0;ish<shells.size();ish++) {
+	arma::mat lgval=basp->eval_laplgrad(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
+	bf_lx.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(0);
+	bf_ly.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(1);
+	bf_lz.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(2);
+	ioff+=lgval.n_rows;
       }
     }
   }
@@ -3864,7 +3790,15 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 #endif
     // Loop over atoms
     for(size_t iat=0;iat<grids.size();iat++) {
+      bool grad, lapl;
+      wrk[ith].get_grad_lapl(grad,lapl);
+      // We need gradients for the LDA terms and Laplacian terms for the GGA terms (Pv_i really)
+      wrk[ith].set_grad_lapl(true,grad);
+      // Need bf Hessian for GGA and laplacian gradient for MGGA
+      wrk[ith].set_hess_lgrad(grad,lapl);
+      
       // Change atom and create grid
+      wrk[ith].set_grid(grids[iat]);
       wrk[ith].form_grid();
 
       // Update density
@@ -3880,11 +3814,11 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 
       // Calculate the force on the atom
 #ifdef _OPENMP
-      fwrk+=wrk[ith].eval_force(P);
+      fwrk+=wrk[ith].eval_force_r();
 #else
-      f+=wrk[ith].eval_force(P);
+      f+=wrk[ith].eval_force_r();
 #endif
-
+      
       // Free memory
       wrk[ith].free();
     }
@@ -3895,6 +3829,9 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 #endif
   } // End parallel region
 
+  arma::vec fu(eval_force(x_func,c_func,P/2,P/2));
+  (f-fu).print("Difference r wr ur");
+  
   return f;
 }
 
@@ -3920,7 +3857,15 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
 #endif
     // Loop over atoms
     for(size_t iat=0;iat<grids.size();iat++) {
+      // We need gradients for the LDA terms
+      bool grad, lapl;
+      wrk[ith].get_grad_lapl(grad,lapl);
+      wrk[ith].set_grad_lapl(true,lapl);
+      // Need bf Hessian for GGA and laplacian gradient for MGGA
+      wrk[ith].set_hess_lgrad(grad,lapl);
+
       // Change atom and create grid
+      wrk[ith].set_grid(grids[iat]);
       wrk[ith].form_grid();
 
       // Update density
@@ -3936,9 +3881,9 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
 
       // Calculate the force on the atom
 #ifdef _OPENMP
-      fwrk+=wrk[ith].eval_force(Pa,Pb);
+      fwrk+=wrk[ith].eval_force_u();
 #else
-      f+=wrk[ith].eval_force(Pa,Pb);
+      f+=wrk[ith].eval_force_u();
 #endif
 
       // Free memory
@@ -4016,6 +3961,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
       // Need gradient but no laplacian
       wrk[ith].set_grad_lapl(true,false);
       // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);      
       wrk[ith].form_grid();
 
       // Update density
@@ -4029,7 +3975,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
       // Evaluate the VV10 energy and potential and get the grid contribution
       fwrk.subvec(3*grids[i].atind,3*grids[i].atind+2)+=wrk[ith].compute_VV10_F(nldata,nl.grids,b,C);
       // and now evaluate the forces on the atoms
-      fwrk+=wrk[ith].eval_force(P);
+      fwrk+=wrk[ith].eval_force_r();
 
       // Free memory
       wrk[ith].free();
@@ -4073,8 +4019,8 @@ void DFTGrid::print_density(const arma::mat & P, std::string densname) {
 #endif
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
-
       // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);      
       wrk[ith].form_grid();
 
       // Update density
@@ -4125,6 +4071,7 @@ void DFTGrid::print_potential(int func_id, const arma::mat & Pa, const arma::mat
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);      
       wrk[ith].form_grid();
 
       // Update density

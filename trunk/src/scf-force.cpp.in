@@ -64,26 +64,26 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 #endif
 
   // Exact exchange and Coulomb
-  arma::vec fxc_full;
-  fxc_full.zeros(fnuc.n_elem);
+  arma::vec fx_full;
+  fx_full.zeros(fnuc.n_elem);
 
+#ifdef DFT      
   // Short-range exchange
   arma::vec fx_short;
   fx_short.zeros(fnuc.n_elem);
 
-#ifdef DFT      
   if(kfull==0.0) {
       
     if(densityfit) {
       if(kshort!=0.0)
 	throw std::runtime_error("Forces not implemented for range separation with density fitting.\n");
 	
-      fxc_full=dfit.force_J(sol.P);
+      fx_full=dfit.force_J(sol.P);
     } else {
       if(!direct)
 	scr.fill(basisp,intthr,verbose);
       
-      fxc_full=scr.forceJ(sol.P,tol);
+      fx_full=scr.forceJ(sol.P,tol);
     }
   } else {
 #endif
@@ -92,9 +92,9 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       scr.fill(basisp,intthr,verbose);
     
 #ifdef RESTRICTED
-    fxc_full=scr.forceJK(sol.P,tol,kfull);
+    fx_full=scr.forceJK(sol.P,tol,kfull);
 #else
-    fxc_full=scr.forceJK(sol.Pa,sol.Pb,tol,kfull);
+    fx_full=scr.forceJK(sol.Pa,sol.Pb,tol,kfull);
 #endif
 
 #ifdef DFT
@@ -115,6 +115,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
     
   // Get the DFT contribution
   arma::vec fxc;
+  fxc.zeros(fnuc.n_elem);
 #ifdef RESTRICTED
   fxc=grid.eval_force(dft.x_func,dft.c_func,sol.P);
 #else
@@ -122,18 +123,21 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 #endif
 
   // Non-local contribution to force
-  if(dft.nl)
-    fxc+=grid.eval_VV10_force(nlgrid,dft.vv10_b,dft.vv10_C,sol.P);
+  if(dft.nl) {
+    arma::vec vv10f(grid.eval_VV10_force(nlgrid,dft.vv10_b,dft.vv10_C,sol.P));
+    fxc+=vv10f;
+  }
 
 #endif // DFT
 
   arma::vec ftot=fpul_kin+fpul_nuc+fnuc+forth+frep;
-  arma::vec ffull=ftot+fxc_full;  
+  arma::vec ffull=ftot+fx_full;  
 #ifdef DFT
-  ffull+=kshort*fx_short;
+  // DFT contribution
+  ffull+=fxc+fx_short;
 #endif
 
-  //  interpret_force(fxc_full).print("Coulomb + exact exchange");
+  //  interpret_force(fx_full).print("Coulomb + exact exchange");
   //  interpret_force(ftot).print("Total (w.o. 2-electron)");
   //  interpret_force(ffull).print("Total");
     

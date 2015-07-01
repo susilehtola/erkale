@@ -180,6 +180,11 @@ class AngularGrid {
 
   /// List of important shells
   std::vector<size_t> shells;
+  /// Indices of first functions on shell
+  arma::uvec bf_i0;
+  /// Amount of functions on shell
+  arma::uvec bf_N;
+  
   /// List of important functions
   arma::uvec bf_ind;
   /// List of important functions in potentials' list
@@ -195,8 +200,18 @@ class AngularGrid {
   arma::mat bf_y;
   /// z gradient
   arma::mat bf_z;
-  /// Values of laplacians in grid points, Nbf * Ngrid * 3
+  /// Values of laplacians in grid points, (3*Nbf) * Ngrid
   arma::mat bf_lapl;
+
+  /// Values of Hessians in grid points, (9*Nbf) * Ngrid; used for GGA force
+  arma::mat bf_hess;
+  /// Values of x gradient of laplacian; used for MGGA force
+  arma::mat bf_lx;
+  /// Values of y gradient of laplacian; used for MGGA force
+  arma::mat bf_ly;
+  /// Values of z gradient of laplacian; used for MGGA force
+  arma::mat bf_lz;
+  
 
   /// Density helper matrices: P_{uv} chi_v, and P_{uv} nabla(chi_v)
   arma::mat Pv, Pv_x, Pv_y, Pv_z;
@@ -208,6 +223,10 @@ class AngularGrid {
   bool do_grad;
   /// Is laplacian needed?
   bool do_lapl;
+  /// Is Hessian needed? (For GGA force)
+  bool do_hess;
+  /// Is gradient of laplacian needed? (For MGGA force)
+  bool do_lgrad;
 
   /// Spin-polarized calculation?
   bool polarized;
@@ -291,6 +310,8 @@ class AngularGrid {
   void get_grad_lapl(bool & grad, bool & lapl) const;
   /// Set necessity of computing gradient and laplacians, necessary for compute_bf!
   void set_grad_lapl(bool grad, bool lapl);
+  /// Set necessity of computing Hessian and gradient of Laplacian
+  void set_hess_lgrad(bool hess, bool lgrad);
   
   /// Construct a fixed size grid
   angshell_t construct();
@@ -397,10 +418,10 @@ class AngularGrid {
   /// Evaluate diagonal elements of Fock matrix (for adaptive grid formation), unrestricted calculation
   void eval_diag_Fxc_SIC(arma::vec & H) const;
 
-  /// Evaluate force
-  arma::vec eval_force(const arma::mat & P) const;
-  /// Evaluate force
-  arma::vec eval_force(const arma::mat & Pa, const arma::mat & Pb) const;
+  /// Evaluate force, restricted
+  arma::vec eval_force_r() const;
+  /// Evaluate force, unrestricted
+  arma::vec eval_force_u() const;
 };
 
 /**
