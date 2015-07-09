@@ -601,6 +601,41 @@ arma::mat incomplete_cholesky(const arma::mat & A, size_t n) {
   return L;
 }
 
+arma::mat B_transform(arma::mat B, const arma::mat & Cl, const arma::mat & Cr) {
+  if(Cl.n_rows != Cr.n_rows)
+    throw std::logic_error("Orbital matrices aren't consistent!\n");
+  if(B.n_rows != Cl.n_rows * Cr.n_rows)
+    throw std::logic_error("B matrix does not correspond to orbital basis!\n");
+
+  // Amount of basis and auxiliary functions
+  size_t Nbf(Cl.n_rows);
+  size_t Naux(B.n_cols);
+  
+  // Do LH transform
+  B.reshape(Nbf,Nbf*Naux);
+  B=arma::trans(Cl)*B;
+  
+  // Shuffle indices
+  arma::mat Bs(Cl.n_cols*Naux,Nbf);
+  for(size_t mu=0;mu<Nbf;mu++)
+    for(size_t a=0;a<Naux;a++)
+      for(size_t l=0;l<Cl.n_cols;l++)
+	Bs(a*Cl.n_cols+l,mu)=B(l,a*Nbf+mu);
+
+  // Do RH transform
+  Bs=Bs*Cr;
+
+  // Return array
+  B.resize(Naux,Cl.n_cols*Cr.n_cols);
+  for(size_t a=0;a<Naux;a++)
+    for(size_t l=0;l<Cl.n_cols;l++)
+      for(size_t r=0;r<Cr.n_cols;r++)
+	B(a,r*Cl.n_cols+l)=Bs(a*Cl.n_cols+l,r);
+
+  return B;
+}
+
+
 void check_lapack_thread() {
 #ifdef _OPENMP
   // Size of problem
