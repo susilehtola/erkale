@@ -78,7 +78,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       if(kshort!=0.0)
 	throw std::runtime_error("Forces not implemented for range separation with density fitting.\n");
 	
-      fx_full=dfit.force_J(sol.P);
+      fx_full=dfit.forceJ(sol.P);
     } else {
       if(!direct)
 	scr.fill(basisp,intthr,verbose);
@@ -125,6 +125,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   // Non-local contribution to force
   if(dft.nl) {
     arma::vec vv10f(grid.eval_VV10_force(nlgrid,dft.vv10_b,dft.vv10_C,sol.P));
+    //interpret_force(vv10f).print("VV10 force");
     fxc+=vv10f;
   }
 
@@ -139,7 +140,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 
   //  interpret_force(fx_full).print("Coulomb + exact exchange");
   //  interpret_force(ftot).print("Total (w.o. 2-electron)");
-  //  interpret_force(ffull).print("Total");
+  interpret_force(ffull).t().print("Total force");
     
   return ffull;
 }

@@ -128,17 +128,17 @@ class DensityFit {
   std::vector<arma::vec> compute_expansion(const std::vector<arma::mat> & P) const;
 
   /// Get Coulomb matrix from P
-  arma::mat calc_J(const arma::mat & P) const;
+  arma::mat calcJ(const arma::mat & P) const;
   /// Get Coulomb matrix from P
-  std::vector<arma::mat> calc_J(const std::vector<arma::mat> & P) const;
+  std::vector<arma::mat> calcJ(const std::vector<arma::mat> & P) const;
 
   /// Calculate force from P
-  arma::vec force_J(const arma::mat & P);
+  arma::vec forceJ(const arma::mat & P);
 
   /// Get exchange matrix from orbitals with occupation numbers occs
-  arma::mat calc_K(const arma::mat & C, const std::vector<double> & occs, size_t memlimit) const;
+  arma::mat calcK(const arma::mat & C, const std::vector<double> & occs, size_t memlimit) const;
   /// Get exchange matrix from orbitals with occupation numbers occs
-  arma::cx_mat calc_K(const arma::cx_mat & C, const std::vector<double> & occs, size_t memlimit) const;
+  arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs, size_t memlimit) const;
 
   /// Get the number of orbital functions
   size_t get_Norb() const;
@@ -149,8 +149,8 @@ class DensityFit {
   /// Get ab_inv
   arma::mat get_ab_inv() const;
 
-  /// Get integrals in MO basis
-  arma::mat mo_integrals(const arma::mat & Cl, const arma::mat & Cr) const;
+  /// Get B matrix (must have HF enabled)
+  arma::mat B_matrix() const;
 };
 
 
