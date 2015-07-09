@@ -78,11 +78,11 @@ class ERIscreen {
   /// Set range separation
   void set_range_separation(double omega, double alpha, double beta);
   /// Get range separation
-  void get_range_separation(double & omega, double & alpha, double & beta);
+  void get_range_separation(double & omega, double & alpha, double & beta) const;
 
   /// Form screening matrix, return amount of significant shell pairs
   size_t fill(const BasisSet * basis, double shtol, bool verbose=true);
-
+  
   /// Calculate Coulomb matrix with tolerance tol for integrals
   arma::mat calcJ(const arma::mat & P, double tol) const;
   /// Calculate set of Coulomb and exchange matrices with tolerance tol for integrals (for PZ-SIC)

@@ -50,7 +50,7 @@ void ERItable::set_range_separation(double w, double a, double b) {
   beta=b;
 }
 
-void ERItable::get_range_separation(double & w, double & a, double & b) {
+void ERItable::get_range_separation(double & w, double & a, double & b) const {
   w=omega;
   a=alpha;
   b=beta;
