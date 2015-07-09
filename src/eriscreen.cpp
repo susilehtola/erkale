@@ -1,3 +1,4 @@
+
 /*
  *                This source code is part of
  *
@@ -18,6 +19,7 @@
 #include "eri_digest.h"
 #include "eriworker.h"
 #include "mathf.h"
+#include "timer.h"
 
 #include <cstdio>
 // For exceptions
@@ -70,7 +72,7 @@ void ERIscreen::set_range_separation(double w, double a, double b) {
   beta=b;
 }
 
-void ERIscreen::get_range_separation(double & w, double & a, double & b) {
+void ERIscreen::get_range_separation(double & w, double & a, double & b) const {
   w=omega;
   a=alpha;
   b=beta;
