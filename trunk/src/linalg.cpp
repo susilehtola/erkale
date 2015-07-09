@@ -518,17 +518,18 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps, arma::uvec & pivot) 
 
     // Pivot index
     size_t pim=pi(m);
-
+    //printf("Pivot index is %4i with error %e, error is %e\n",(int) pim, d(pim), error);
+    
     // Compute diagonal element
-    L(pim,m)=sqrt(d(pim));
+    L(m,pim)=sqrt(d(pim));
 
     // Off-diagonal elements
     for(size_t i=m+1;i<d.n_elem;i++) {
       size_t pii=pi(i);
       // Compute element
-      L(pii,m)=(A(pii,pim) - arma::dot(L.row(pim).subvec(0,m-1),L.row(pii).subvec(0,m-1)))/L(pim,m);
+      L(m,pii)= (m>0) ? (A(pim,pii) - arma::dot(L.col(pim).subvec(0,m-1),L.col(pii).subvec(0,m-1)))/L(m,pim) : (A(pim,pii))/L(m,pim);
       // Update d
-      d(pii)-=L(pii,m)*L(pii,m);
+      d(pii)-=L(m,pii)*L(m,pii);
     }
 
     // Update error
@@ -536,9 +537,14 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps, arma::uvec & pivot) 
     // Increase m
     m++;
   }
+  //printf("Final error is %e\n",error);
+
+  // Transpose to get Cholesky vectors as columns
+  arma::inplace_trans(L);
 
   // Drop unnecessary columns
   L=L.cols(0,m-1);
+
   // Store pivot
   pivot=pi.subvec(0,m-1);
 
