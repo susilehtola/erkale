@@ -17,7 +17,10 @@
 #include "eriworker.h"
 #include "linalg.h"
 #include "mathf.h"
+#include "integrals.h"
 #include <cfloat>
+
+//#define ERIDEBUG
 
 IntegralWorker::IntegralWorker() {
   input=&arrone;
@@ -142,7 +145,7 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
     (*input).resize(1);
     (*input)[0]=tmp;
   } else {
-    //    printf("Computing shell %i %i %i %i",shells[is].get_am(),shells[js].get_am(),shells[ks].get_am(),shells[ls].get_am());
+    //printf("Computing shell %i %i %i %i\n",is->get_am(),js->get_am(),ks->get_am(),ls->get_am());
     //    printf("which consists of basis functions (%i-%i)x(%i-%i)x(%i-%i)x(%i-%i).\n",(int) shells[is].get_first_ind(),(int) shells[is].get_last_ind(),(int) shells[js].get_first_ind(),(int) shells[js].get_last_ind(),(int) shells[ks].get_first_ind(),(int) shells[ks].get_last_ind(),(int) shells[ls].get_first_ind(),(int) shells[ls].get_last_ind());
 
     // Now we can compute the integrals using libint:
@@ -160,20 +163,20 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
     (*input).resize(ci.size()*cj.size()*ck.size()*cl.size());
 
     for(size_t ii=0;ii<ci.size();ii++) {
-      ind_i=ii*cj.size();
       norm_i=ci[ii].relnorm;
       for(size_t ji=0;ji<cj.size();ji++) {
-	ind_ij=(ind_i+ji)*ck.size();
+	ind_ij=ii*cj.size()+ji;
 	norm_ij=cj[ji].relnorm*norm_i;
 	for(size_t ki=0;ki<ck.size();ki++) {
-	  ind_ijk=(ind_ij+ki)*cl.size();
+	  ind_ijk=ind_ij*ck.size()+ki;
 	  norm_ijk=ck[ki].relnorm*norm_ij;
 	  for(size_t li=0;li<cl.size();li++) {
 	    // Index in computed integrals table
-	    ind=ind_ijk+li;
+	    ind=ind_ijk*cl.size()+li;
 	    // Total norm factor
 	    norm=cl[li].relnorm*norm_ijk;
-	    // Compute (*output) index
+	    // Store scaled integral
+	    //printf("Scaling integral (%i %i %i %i) = %i by % e % e % e % e\n",(int) ii,(int) ji, (int) ki, (int) li, (int) ind, ci[ii].relnorm,cj[ji].relnorm,ck[ki].relnorm,cl[li].relnorm);
 	    (*input)[ind]=norm*ints[ind];
 	  }
 	}
@@ -323,7 +326,7 @@ void dERIWorker::get_idx(int idx) {
   }
 
   // Reorder integrals
-  reorder(is,js,ks,ls,swap_ij,swap_kl,swap_ijkl);
+  reorder(is_orig,js_orig,ks_orig,ls_orig,swap_ij,swap_kl,swap_ijkl);
   // and transform them into the spherical basis
   spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
 }
@@ -1149,31 +1152,138 @@ void ERIWorker::compute(const GaussianShell *is_orig, const GaussianShell *js_or
   const GaussianShell *ls=ls_orig;
 
   // Did we need to swap the indices?
-  bool swap_ij=false;
-  bool swap_kl=false;
-  bool swap_ijkl=false;
+  bool swap_ij=(is->get_am()<js->get_am());
+  bool swap_kl=(ks->get_am()<ls->get_am());
+  bool swap_ijkl=(is->get_am()+js->get_am() > ks->get_am() + ls->get_am());
 
-  // Check order and swap shells if necessary
-  if(is->get_am()<js->get_am()) {
-    swap_ij=true;
+  // Swap shells if necessary
+  if(swap_ij)
     std::swap(is,js);
-  }
-
-  if(ks->get_am()<ls->get_am()) {
-    swap_kl=true;
+  if(swap_kl)
     std::swap(ks,ls);
-  }
-
-  if(is->get_am()+js->get_am() > ks->get_am() + ls->get_am()) {
-    swap_ijkl=true;
+  if(swap_ijkl) {
     std::swap(is,ks);
     std::swap(js,ls);
   }
 
   // Get the cartesian ERIs
   compute_cartesian(is,js,ks,ls);
-  // Reorder them
-  reorder(is,js,ks,ls,swap_ij,swap_kl,swap_ijkl);
+  // Restore the original order
+  reorder(is_orig,js_orig,ks_orig,ls_orig,swap_ij,swap_kl,swap_ijkl);
+
+#ifdef ERIDEBUG
+  //printf("New (%c %c | %c %c) integral block, swap_ijkl = %i, swap_kl = %i, swap_ij = %i\n",shell_types[is_orig->get_am()],shell_types[js_orig->get_am()],shell_types[ks_orig->get_am()],shell_types[ls_orig->get_am()],swap_ijkl,swap_kl,swap_ij);
+  /*
+  printf("is\n");
+  is_orig->print();
+  printf("js\n");
+  js_orig->print();
+  printf("ks\n");
+  ks_orig->print();
+  printf("ls\n");
+  ls_orig->print();
+  */
+  
+  std::vector<shellf_t> carti(is_orig->get_cart());
+  std::vector<shellf_t> cartj(js_orig->get_cart());
+  std::vector<shellf_t> cartk(ks_orig->get_cart());
+  std::vector<shellf_t> cartl(ls_orig->get_cart());
+
+  std::vector<contr_t> contri(is_orig->get_contr());
+  std::vector<contr_t> contrj(js_orig->get_contr());
+  std::vector<contr_t> contrk(ks_orig->get_contr());
+  std::vector<contr_t> contrl(ls_orig->get_contr());
+  
+  coords_t Ri(is_orig->get_center());
+  coords_t Rj(js_orig->get_center());
+  coords_t Rk(ks_orig->get_center());
+  coords_t Rl(ls_orig->get_center());
+
+  std::vector<double> debugints(carti.size()*cartj.size()*cartk.size()*cartl.size(),0.0);
+
+  for(size_t ic=0;ic<carti.size();ic++)
+    for(size_t jc=0;jc<cartj.size();jc++)
+      for(size_t kc=0;kc<cartk.size();kc++)
+	for(size_t lc=0;lc<cartl.size();lc++) {
+	  int li(carti[ic].l);
+	  int mi(carti[ic].m);
+	  int ni(carti[ic].n);
+	  double reli(carti[ic].relnorm);
+	  
+	  int lj(cartj[jc].l);
+	  int mj(cartj[jc].m);
+	  int nj(cartj[jc].n);
+	  double relj(cartj[jc].relnorm);
+	  
+	  int lk(cartk[kc].l);
+	  int mk(cartk[kc].m);
+	  int nk(cartk[kc].n);
+	  double relk(cartk[kc].relnorm);
+	  
+	  int ll(cartl[lc].l);
+	  int ml(cartl[lc].m);
+	  int nl(cartl[lc].n);
+	  double rell(cartl[lc].relnorm);
+
+	  double el=0.0;
+	  
+	  for(size_t xi=0;xi<contri.size();xi++)
+	    for(size_t xj=0;xj<contrj.size();xj++)
+	      for(size_t xk=0;xk<contrk.size();xk++)
+		for(size_t xl=0;xl<contrl.size();xl++) {
+		  double zi(contri[xi].z);
+		  double zj(contrj[xj].z);
+		  double zk(contrk[xk].z);
+		  double zl(contrl[xl].z);
+
+		  double ci(contri[xi].c);
+		  double cj(contrj[xj].c);
+		  double ck(contrk[xk].c);
+		  double cl(contrl[xl].c);
+
+		  el+=ci*cj*ck*cl*ERI_int(li,mi,ni,Ri.x,Ri.y,Ri.z,zi,	\
+					  lj,mj,nj,Rj.x,Rj.y,Rj.z,zj,	\
+					  lk,mk,nk,Rk.x,Rk.y,Rk.z,zk,	\
+					  ll,ml,nl,Rl.x,Rl.y,Rl.z,zl);
+		}
+	  
+	  debugints[((ic*cartj.size()+jc)*cartk.size()+kc)*cartl.size()+lc]=reli*relj*relk*rell*el;
+	}
+
+  // Compare integrals
+  if(debugints.size()!=input->size())
+    throw std::logic_error("Amount of integrals doesn't match!\n");
+
+  for(size_t ii=0;ii<carti.size();ii++)
+    for(size_t jj=0;jj<cartj.size();jj++)
+      for(size_t kk=0;kk<cartk.size();kk++)
+ 	for(size_t ll=0;ll<cartl.size();ll++) {
+	  size_t i=((ii*cartj.size()+jj)*cartk.size()+kk)*cartl.size()+ll;
+	  if(fabs((*input)[i]-debugints[i])>1e-6*std::max((*input)[i],debugints[i])) {
+	    printf("%4i %e %e %e\n",(int) i, (*input)[i], debugints[i], (*input)[i]-debugints[i]);
+	    printf("is, i = %i\n",ii);
+	    is_orig->print();
+	    printf("js, j = %i\n",jj);
+	    js_orig->print();
+	    printf("ks, k = %i\n",kk);
+	    ks_orig->print();
+	    printf("ls, l = %i\n",ll);
+	    ls_orig->print();
+	    printf("ints:");
+	    for(size_t j=0;j<(*input).size();j++)
+	      printf(" % e",(*input)[j]);
+	    printf("\n");
+	    fflush(stdout);
+
+	    
+	    throw std::runtime_error("Integrals are wrong.\n");
+	  }
+	}
+
+  // Switch
+  //*input=debugints;
+#endif
+  
   // and transform them into the spherical basis
   spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
 }
@@ -1248,7 +1358,9 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    (*output)[((jj*Ni+ii)*Nk+kk)*Nl+ll]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    size_t iout(((ii*Nj+jj)*Nk+kk)*Nl+ll);
+	    size_t iin(((jj*Ni+ii)*Nk+kk)*Nl+ll);
+	    (*output)[iout]=(*input)[iin];
 	  }
 
   } else if(!swap_ijkl && swap_kl && !swap_ij) { // 010
@@ -1258,7 +1370,9 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    (*output)[((ii*Nj+jj)*Nl+ll)*Nk+kk]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    size_t iout(((ii*Nj+jj)*Nk+kk)*Nl+ll);
+	    size_t iin(((ii*Nj+jj)*Nl+ll)*Nk+kk);
+	    (*output)[iout]=(*input)[iin];
 	  }
 
   } else if(!swap_ijkl && swap_kl && swap_ij) { // 011
@@ -1268,50 +1382,62 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    (*output)[((jj*Ni+ii)*Nl+ll)*Nk+kk]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    size_t iout(((ii*Nj+jj)*Nk+kk)*Nl+ll);
+	    size_t iin(((jj*Ni+ii)*Nl+ll)*Nk+kk);
+	    (*output)[iout]=(*input)[iin];
 	  }
 
-  } else if(swap_ijkl && !swap_ij && !swap_kl) { // 100
+  } else if(swap_ijkl && !swap_kl && !swap_ij) { // 100
     // Switch i <-> k, and j <-> l
 
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    (*output)[((kk*Nl+ll)*Ni+ii)*Nj+jj]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    size_t iout(((ii*Nj+jj)*Nk+kk)*Nl+ll);
+	    size_t iin(((kk*Nl+ll)*Ni+ii)*Nj+jj);
+	    (*output)[iout]=(*input)[iin];
 	  }
 
   } else if(swap_ijkl && !swap_kl && swap_ij) { // 101
-    // i -> j -> l, j -> i -> k, so i <-> l and j <-> k 
+    // i -> k, j -> l, k -> j, l -> i
 
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    (*output)[((ll*Nk+kk)*Nj+jj)*Ni+ii]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    size_t iout(((ii*Nj+jj)*Nk+kk)*Nl+ll);
+	    size_t iin(((kk*Nl+ll)*Nj+jj)*Ni+ii);
+	    (*output)[iout]=(*input)[iin];
+	  }
+
+  } else if(swap_ijkl && swap_kl && !swap_ij) { // 110
+    // i -> l, j -> k, k -> i, l -> j
+    
+    for(size_t ii=0;ii<Ni;ii++)
+      for(size_t jj=0;jj<Nj;jj++)
+	for(size_t kk=0;kk<Nk;kk++)
+	  for(size_t ll=0;ll<Nl;ll++) {
+	    size_t iout(((ii*Nj+jj)*Nk+kk)*Nl+ll);
+	    size_t iin(((ll*Nk+kk)*Ni+ii)*Nj+jj);
+	    (*output)[iout]=(*input)[iin];
 	  }
     
-  } else if(swap_ijkl && swap_kl && !swap_ij) { // 110
-    // k -> l -> j, l -> k -> i, so i <-> l and j <-> k
-
-    for(size_t ii=0;ii<Ni;ii++)
-      for(size_t jj=0;jj<Nj;jj++)
-	for(size_t kk=0;kk<Nk;kk++)
-	  for(size_t ll=0;ll<Nl;ll++) {
-	    (*output)[((ll*Nk+kk)*Nj+jj)*Ni+ii]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
-	  }
 
   } else if(swap_ijkl && swap_kl && swap_ij) { // 111
-    // i -> j -> l -> k, j -> i -> k -> l, so i <-> k and j <-> l
-
+    // i <-> l, j <-> k
+    
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++) {
-	    (*output)[((kk*Nl+ll)*Ni+ii)*Nj+jj]=(*input)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    size_t iout(((ii*Nj+jj)*Nk+kk)*Nl+ll);
+	    size_t iin(((ll*Nk+kk)*Nj+jj)*Ni+ii);
+	    (*output)[iout]=(*input)[iin];
 	  }
-
-  }
+    
+  } else
+    throw std::logic_error("Should not be here!\n");
 
   // Swap arrays
   std::swap(input,output);
