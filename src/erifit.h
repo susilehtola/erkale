@@ -42,6 +42,8 @@ namespace ERIfit {
   bool operator<(const bf_pair_t & lhs, const bf_pair_t & rhs);
 
   /// Compute the exact repulsion integrals
+  void compute_ERIs(const BasisSet & basis, arma::mat & eris);
+  /// Compute the exact repulsion integrals
   void compute_ERIs(const ElementBasisSet & orbel, arma::mat & eris);
   /// Compute the exact diagonal repulsion integrals
   void compute_diag_ERIs(const ElementBasisSet & orbel, arma::mat & eris);

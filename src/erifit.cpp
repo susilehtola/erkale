@@ -76,16 +76,8 @@ namespace ERIfit {
 	    trans(iao*Nbf+jao,imo*Nmo+jmo)=Sinvh(iao,imo)*Sinvh(jao,jmo);
   }
 
-    
-  void compute_ERIs(const ElementBasisSet & orbel, arma::mat & eris) {
-    // Form basis set library
-    BasisSetLibrary blib;
-    blib.add_element(orbel);
-
-    // Form basis set
-    BasisSet basis;
-    get_basis(basis,blib,orbel);
-    
+  void compute_ERIs(const BasisSet & basis, arma::mat & eris) {
+    // Amount of functions
     size_t Nbf(basis.get_Nbf());
 
     // Get shells in basis set
@@ -173,6 +165,19 @@ namespace ERIfit {
       // Free memory
       delete eri;
     }
+  }
+  
+  void compute_ERIs(const ElementBasisSet & orbel, arma::mat & eris) {
+    // Form basis set library
+    BasisSetLibrary blib;
+    blib.add_element(orbel);
+
+    // Form basis set
+    BasisSet basis;
+    get_basis(basis,blib,orbel);
+
+    // Calculate
+    compute_ERIs(basis,eris);
   }
 
   void compute_diag_ERIs(const ElementBasisSet & orbel, arma::mat & eris) {
