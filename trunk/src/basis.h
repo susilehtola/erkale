@@ -296,6 +296,9 @@ class BasisSet {
   /// Get index of last function on shell
   size_t get_last_ind(size_t shind) const;
 
+  /// Find shell index of basis function
+  size_t find_shell_ind(size_t find) const;
+  
   /// Get shells in basis set
   std::vector<GaussianShell> get_shells() const;
   /// Get ind:th shell
