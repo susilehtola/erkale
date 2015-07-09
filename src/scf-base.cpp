@@ -120,6 +120,13 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Linear dependence threshold
   fitthr=set.get_double("FittingThreshold");
 
+  // Use Cholesky?
+  cholesky=set.get_bool("Cholesky");
+  cholthr=set.get_double("CholeskyThr");
+  cholshthr=set.get_double("CholeskyShThr");
+  if(cholesky && densityfit)
+    throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
+  
   // Timer
   Timer t;
   Timer tinit;
@@ -266,51 +273,67 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     }
   } else  {
     // Compute ERIs
-    if(direct) {
-      size_t Npairs;
-      // Form decontracted basis set and get the screening matrix
-      decbas=basis.decontract(decconv);
-
+    if(cholesky) {	
       if(verbose) {
 	t.set();
-	printf("Forming ERI screening matrix ... ");
+	printf("Computing repulsion integrals.\n");
 	fflush(stdout);
       }
 
-      if(decfock)
-	// Use decontracted basis
-	Npairs=scr.fill(&decbas,intthr,verbose);
-      else
-	// Use contracted basis
-	Npairs=scr.fill(&basis,intthr,verbose);
+      size_t Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
 
       if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-	if(decfock)
-	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) decbas.get_unique_shellpairs().size());
-	else
-	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
-      }
-
-    } else {
-      // Compute memory requirement
-      size_t N;
-
-      if(verbose) {
-	N=tab.N_ints(&basis,intthr);
-	printf("Forming table of %u ERIs, requiring %s of memory ... ",(unsigned int) N,memory_size(N*sizeof(double)).c_str());
-	fflush(stdout);
-      }
-      // Don't compute small integrals
-      size_t Npairs=tab.fill(&basis,intthr);
-
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
+	printf("Repulsion integrals calculated in %s.\n",t.elapsed().c_str());
 	printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+	fflush(stdout);
+      }
+    } else {
+      if(direct) {
+	size_t Npairs;
+	// Form decontracted basis set and get the screening matrix
+	decbas=basis.decontract(decconv);
+	
+	if(verbose) {
+	  t.set();
+	  printf("Forming ERI screening matrix ... ");
+	  fflush(stdout);
+	}
+	
+	if(decfock)
+	  // Use decontracted basis
+	  Npairs=scr.fill(&decbas,intthr,verbose);
+	else
+	  // Use contracted basis
+	  Npairs=scr.fill(&basis,intthr,verbose);
+	
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  if(decfock)
+	    printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) decbas.get_unique_shellpairs().size());
+	  else
+	    printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+	}
+	
+      } else {
+	// Compute memory requirement
+	size_t N;
+	
+	if(verbose) {
+	  N=tab.N_ints(&basis,intthr);
+	  printf("Forming table of %u ERIs, requiring %s of memory ... ",(unsigned int) N,memory_size(N*sizeof(double)).c_str());
+	  fflush(stdout);
+	}
+	// Don't compute small integrals
+	size_t Npairs=tab.fill(&basis,intthr);
+	
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+	}
       }
     }
   }
-
+  
   if(verbose) {
     printf("\nInitialization of computation done in %s.\n\n",tinit.elapsed().c_str());
     fflush(stdout);
@@ -350,54 +373,82 @@ void SCF::fill_rs(double omega) {
   if(densityfit)
     throw std::logic_error("Density fitting not supported with range-separated functionals.\n");
 
-  if(!direct) {
+  if(cholesky) {
     // Compute range separated integrals if necessary
     bool fill;
-    if(!tab_rs.get_N()) {
+    if(!chol_rs.get_N()) {
       fill=true;
     } else {
       double o, kl, ks;
-      tab_rs.get_range_separation(o,kl,ks);
+      chol_rs.get_range_separation(o,kl,ks);
       fill=(!(o==omega));
     }
     if(fill) {
       Timer t;
       if(verbose) {
-	printf("Computing short-range repulsion integrals ... ");
+	printf("Computing short-range repulsion integrals.\n");
 	fflush(stdout);
       }
-      tab_rs.set_range_separation(omega,0.0,1.0);
-      size_t Np=tab_rs.fill(basisp,intthr);
-
+      chol_rs.set_range_separation(omega,0.0,1.0);
+      size_t Np=chol_rs.fill(*basisp,cholthr,cholshthr,intthr,verbose);
+      
       if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
+	printf("Short-range repulsion integrals calculated (%s).\n",t.elapsed().c_str());
 	printf("%i short-range shell pairs are significant.\n",(int) Np);
 	fflush(stdout);
       }
     }
+
   } else {
-    bool fill;
-    if(!scr_rs.get_N()) {
-      fill=true;
-    } else {
-      double o, kl, ks;
-      scr_rs.get_range_separation(o,kl,ks);
-      fill=(!(o==omega));
-    }
-    if(fill) {
-      Timer t;
-      if(verbose) {
-	printf("Computing short-range repulsion integrals ... ");
-	fflush(stdout);
+    if(!direct) {
+      // Compute range separated integrals if necessary
+      bool fill;
+      if(!tab_rs.get_N()) {
+	fill=true;
+      } else {
+	double o, kl, ks;
+	tab_rs.get_range_separation(o,kl,ks);
+	fill=(!(o==omega));
       }
+      if(fill) {
+	Timer t;
+	if(verbose) {
+	  printf("Computing short-range repulsion integrals ... ");
+	  fflush(stdout);
+	}
+	tab_rs.set_range_separation(omega,0.0,1.0);
+	size_t Np=tab_rs.fill(basisp,intthr);
 
-      scr_rs.set_range_separation(omega,0.0,1.0);
-      size_t Np=scr_rs.fill(basisp,intthr);
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  printf("%i short-range shell pairs are significant.\n",(int) Np);
+	  fflush(stdout);
+	}
+      }
+    } else {
+      bool fill;
+      if(!scr_rs.get_N()) {
+	fill=true;
+      } else {
+	double o, kl, ks;
+	scr_rs.get_range_separation(o,kl,ks);
+	fill=(!(o==omega));
+      }
+      if(fill) {
+	Timer t;
+	if(verbose) {
+	  printf("Computing short-range repulsion integrals ... ");
+	  fflush(stdout);
+	}
 
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-	printf("%i short-range shell pairs are significant.\n",(int) Np);
-	fflush(stdout);
+	scr_rs.set_range_separation(omega,0.0,1.0);
+	size_t Np=scr_rs.fill(basisp,intthr);
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  printf("%i short-range shell pairs are significant.\n",(int) Np);
+	  fflush(stdout);
+	}
       }
     }
   }
@@ -432,6 +483,8 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
   // Range separation constants
   double omega, kfull, kshort;
   range_separation(dft.x_func,omega,kfull,kshort);
+  if(omega!=0.0)
+    fill_rs(omega);
 
   // Orbital density matrices
   std::vector<arma::cx_mat> Pcorb(Ctilde.n_cols);
@@ -461,7 +514,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 
     // Coulomb matrices
     std::vector<arma::mat> Jorb;
-    Jorb=dfit.calc_J(Porb);
+    Jorb=dfit.calcJ(Porb);
     for(size_t io=0;io<Ctilde.n_cols;io++)
       Eorb[io]=0.5*arma::trace(Porb[io]*Jorb[io]);
     if(fock)
@@ -474,134 +527,212 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
     }
 
   } else {
-    if(!direct) {
-      // Tabled integrals
-      if(verbose) {
-	if(fock)
-	  printf("Constructing orbital Coulomb matrices ... ");
-	else
-	  printf("Computing    orbital Coulomb energies ... ");
-	fflush(stdout);
-	t.set();
-      }
-
-      for(size_t io=0;io<Ctilde.n_cols;io++) {
-	// Calculate Coulomb term
-	arma::mat Jorb=tab.calcJ(Porb[io]);
-	// and Coulomb energy
-	Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
-	if(fock)
-	  Forb[io]=Jorb*COMPLEX1;
-      }
-
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
-
-      // Full exchange
-      if(kfull!=0.0) {
+    if(cholesky) {
+	// Cholled integrals
 	if(verbose) {
 	  if(fock)
-	    printf("Constructing orbital exchange matrices ... ");
+	    printf("Constructing orbital Coulomb matrices ... ");
 	  else
-	    printf("Computing    orbital exchange energies ... ");
+	    printf("Computing    orbital Coulomb energies ... ");
 	  fflush(stdout);
 	  t.set();
 	}
 
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Fock matrix
-	  arma::cx_mat Korb=kfull*tab.calcK(Pcorb[io]);
-	  // and energy
-	  Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
+	  // Calculate Coulomb term
+	  arma::mat Jorb=chol.calcJ(Porb[io]);
+	  // and Coulomb energy
+	  Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
 	  if(fock)
-	    Forb[io]-=Korb;
+	    Forb[io]=Jorb*COMPLEX1;
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  fflush(stdout);
 	}
-      }
 
-      // Short-range part
-      if(kshort!=0.0) {
-	if(verbose) {
-	  if(fock)
-	    printf("Constructing orbital short-range exchange matrices ... ");
-	  else
-	    printf("Computing    orbital short-range exchange energies ... ");
-	  fflush(stdout);
-	  t.set();
+	// Full exchange
+	if(kfull!=0.0) {
+	  if(verbose) {
+	    if(fock)
+	      printf("Constructing orbital exchange matrices ... ");
+	    else
+	      printf("Computing    orbital exchange energies ... ");
+	    fflush(stdout);
+	    t.set();
+	  }
+
+	  for(size_t io=0;io<Ctilde.n_cols;io++) {
+	    // Fock matrix
+	    arma::cx_mat Korb=kfull*chol.calcK(Ctilde.col(io));
+	    // and energy
+	    Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
+	    if(fock)
+	      Forb[io]-=Korb;
+	  }
+
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    fflush(stdout);
+	  }
 	}
 
-	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Potential and energy
-	  arma::cx_mat Korb=kshort*tab_rs.calcK(Pcorb[io]);
-	  Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
-	  if(fock)
-	    Forb[io]-=Korb;
-	}
+	// Short-range part
+	if(kshort!=0.0) {
+	  if(verbose) {
+	    if(fock)
+	      printf("Constructing orbital short-range exchange matrices ... ");
+	    else
+	      printf("Computing    orbital short-range exchange energies ... ");
+	    fflush(stdout);
+	    t.set();
+	  }
 
-	if(verbose) {
-	  printf("done (%s)\n",t.elapsed().c_str());
-	  fflush(stdout);
+	  for(size_t io=0;io<Ctilde.n_cols;io++) {
+	    // Potential and energy
+	    arma::cx_mat Korb=kshort*chol_rs.calcK(Ctilde.col(io));
+	    Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
+	    if(fock)
+	      Forb[io]-=Korb;
+	  }
+
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    fflush(stdout);
+	  }
 	}
-      }
 
     } else {
-      if(verbose) {
-	std::string leg = (kfull==0.0) ? "Coulomb" : "Coulomb and exchange";
-	if(fock)
-	  printf("Constructing orbital %s matrices ... ",leg.c_str());
-	else
-	  printf("Computing    orbital %s energies ... ",leg.c_str());
-	fflush(stdout);
-	t.set();
-      }
-
-      // Calculate Coulomb and exchange terms
-      {
-	std::vector<arma::cx_mat> JKorb=scr.calcJK(Pcorb,1.0,kfull,intthr);
-	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Coulomb-exchange energy is
-	  Eorb[io]=0.5*std::real(arma::trace(Pcorb[io]*JKorb[io]));
-	  if(fock)
-	    Forb[io]=JKorb[io];
-	}
-      }
-
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
-
-      // Short-range part
-      if(kshort!=0.0) {
+      if(!direct) {
+	// Tabled integrals
 	if(verbose) {
 	  if(fock)
-	    printf("Constructing orbital short-range exchange matrices ... ");
+	    printf("Constructing orbital Coulomb matrices ... ");
 	  else
-	    printf("Computing    orbital short-range exchange energies ... ");
+	    printf("Computing    orbital Coulomb energies ... ");
 	  fflush(stdout);
 	  t.set();
 	}
 
-	// Calculate exchange term
-	{
-	  std::vector<arma::cx_mat> Korb=scr_rs.calcJK(Pcorb,0.0,kshort,intthr);
-	  for(size_t io=0;io<Ctilde.n_cols;io++) {
-	    // Short-range exchange energy is (sign already accounted for)
-	    Eorb[io]+=0.5*std::real(arma::trace(Pcorb[io]*Korb[io]));
+	for(size_t io=0;io<Ctilde.n_cols;io++) {
+	  // Calculate Coulomb term
+	  arma::mat Jorb=tab.calcJ(Porb[io]);
+	  // and Coulomb energy
+	  Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
+	  if(fock)
+	    Forb[io]=Jorb*COMPLEX1;
+	}
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  fflush(stdout);
+	}
+
+	// Full exchange
+	if(kfull!=0.0) {
+	  if(verbose) {
 	    if(fock)
-	      Forb[io]+=Korb[io];
+	      printf("Constructing orbital exchange matrices ... ");
+	    else
+	      printf("Computing    orbital exchange energies ... ");
+	    fflush(stdout);
+	    t.set();
+	  }
+
+	  for(size_t io=0;io<Ctilde.n_cols;io++) {
+	    // Fock matrix
+	    arma::cx_mat Korb=kfull*tab.calcK(Pcorb[io]);
+	    // and energy
+	    Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
+	    if(fock)
+	      Forb[io]-=Korb;
+	  }
+
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    fflush(stdout);
+	  }
+	}
+
+	// Short-range part
+	if(kshort!=0.0) {
+	  if(verbose) {
+	    if(fock)
+	      printf("Constructing orbital short-range exchange matrices ... ");
+	    else
+	      printf("Computing    orbital short-range exchange energies ... ");
+	    fflush(stdout);
+	    t.set();
+	  }
+
+	  for(size_t io=0;io<Ctilde.n_cols;io++) {
+	    // Potential and energy
+	    arma::cx_mat Korb=kshort*tab_rs.calcK(Pcorb[io]);
+	    Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
+	    if(fock)
+	      Forb[io]-=Korb;
+	  }
+
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    fflush(stdout);
+	  }
+	}
+
+      } else {
+	if(verbose) {
+	  std::string leg = (kfull==0.0) ? "Coulomb" : "Coulomb and exchange";
+	  if(fock)
+	    printf("Constructing orbital %s matrices ... ",leg.c_str());
+	  else
+	    printf("Computing    orbital %s energies ... ",leg.c_str());
+	  fflush(stdout);
+	  t.set();
+	}
+
+	// Calculate Coulomb and exchange terms
+	{
+	  std::vector<arma::cx_mat> JKorb=scr.calcJK(Pcorb,1.0,kfull,intthr);
+	  for(size_t io=0;io<Ctilde.n_cols;io++) {
+	    // Coulomb-exchange energy is
+	    Eorb[io]=0.5*std::real(arma::trace(Pcorb[io]*JKorb[io]));
+	    if(fock)
+	      Forb[io]=JKorb[io];
 	  }
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  fflush(stdout);
+	}
+
+	// Short-range part
+	if(kshort!=0.0) {
+	  if(verbose) {
+	    if(fock)
+	      printf("Constructing orbital short-range exchange matrices ... ");
+	    else
+	      printf("Computing    orbital short-range exchange energies ... ");
+	    fflush(stdout);
+	    t.set();
+	  }
+
+	  // Calculate exchange term
+	  {
+	    std::vector<arma::cx_mat> Korb=scr_rs.calcJK(Pcorb,0.0,kshort,intthr);
+	    for(size_t io=0;io<Ctilde.n_cols;io++) {
+	      // Short-range exchange energy is (sign already accounted for)
+	      Eorb[io]+=0.5*std::real(arma::trace(Pcorb[io]*Korb[io]));
+	      if(fock)
+		Forb[io]+=Korb[io];
+	    }
+	  }
+
+	  if(verbose) {
+	    printf("done (%s)\n",t.elapsed().c_str());
+	    fflush(stdout);
+	  }
 	}
       }
     }
@@ -703,6 +834,80 @@ void SCF::gwh_guess(uscf_t & sol) const {
   }
   sol.Hb=sol.Ha;
   diagonalize(S,Sinvh,sol);
+}
+
+arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0) const {
+  if(Cv0.n_cols<Co.n_cols)
+    throw std::runtime_error("Not enough virtuals given!\n");
+  if(Co.n_rows != Cv0.n_rows)
+    throw std::runtime_error("Orbital matrices not consistent!\n");
+  if(Co.n_rows != basisp->get_Nbf())
+    throw std::runtime_error("Orbital matrix does not match basis set!\n");
+
+  // Returned orbitals
+  arma::mat Cv(Cv0);
+  
+  // Loop over occupied orbitals
+  for(size_t io=0;io<Co.n_cols;io++) {
+    // Form exchange matrix
+    arma::mat K;
+    if(densityfit) {
+      std::vector<double> occs(1,1.0);
+      // Allow 100 MB of memory
+      K=dfit.calcK(Co.col(io),occs,1e8);
+    } else {
+      if(cholesky) {
+	K=chol.calcK(Co.col(io));
+      } else {
+	arma::mat P(Co.col(io)*arma::trans(Co.col(io)));
+	if(direct)
+	  K=scr.calcK(P,intthr);
+	else
+	  K=tab.calcK(P);
+      }
+    }
+
+    // Work block
+    arma::mat Cwrk(Cv.cols(io,Cv.n_cols-1));
+
+    // Convert to work space
+    arma::mat Kvv(arma::trans(Cwrk)*K*Cwrk);
+
+    // Eigendecomposition
+    arma::vec eval;
+    arma::mat evec;
+    arma::eig_sym(eval,evec,-Kvv);
+
+    // Rotate orbitals to new basis; orbital becomes lowest-lying orbital
+    Cv.cols(io,Cv.n_cols-1)=Cwrk*evec;
+  }
+
+  // Keep only active orbitals
+  Cv=Cv.cols(0,Co.n_cols-1);
+
+  /*
+  // Orbital overlap
+  arma::mat Svv(arma::trans(Cv)*S*Cv);
+  Svv.print("initial vv overlap");
+  
+  // Reorthogonalize
+  arma::vec sval;
+  arma::mat svec;
+  arma::eig_sym(sval,svec,Svv);
+
+  arma::vec sinvh(sval);
+  for(size_t i=0;i<sval.n_elem;i++)
+    sinvh(i)=1.0/sqrt(sval(i));
+
+  // Orthogonalizing matrix is
+  arma::mat O(svec*arma::diagmat(sinvh)*arma::trans(svec));
+  Cv=Cv*O;
+
+  Svv=arma::trans(Cv)*S*Cv;
+  Svv.print("vv overlap");
+  */
+  
+  return Cv;
 }
 
 void imag_lost(const rscf_t & sol, const arma::mat & S, double & d) {
@@ -1609,8 +1814,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  sol.cC=CW;
 
 	  // Imaginary treatment?
-	  if(pzimag==-1 && rms_norm(arma::imag(sol.cC))>10*DBL_EPSILON)
+	  if(pzimag==-1 && rms_norm(arma::imag(sol.cC))>10*DBL_EPSILON) {
+	    printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cC)));
 	    pzimag=1;
+	  }
 
 	} else { // No entry in checkpoint
 	  arma::cx_mat W;

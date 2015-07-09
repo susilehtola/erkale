@@ -1176,7 +1176,7 @@ void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat 
   if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
     // Compute orbital-dependent Fock matrices
     W=Wv;
-    Jorb=dfit.calc_J(Porb);
+    Jorb=dfit.calcJ(Porb);
   }
 
   // Compute self-repulsion

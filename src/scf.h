@@ -26,6 +26,7 @@
 class DFTGrid;
 #include "eritable.h"
 #include "eriscreen.h"
+#include "erichol.h"
 #include "density_fitting.h"
 class Settings;
 
@@ -276,6 +277,13 @@ class SCF {
   /// Threshold for density fitting
   double fitthr;
 
+  /// Cholesky calculation?
+  bool cholesky;
+  /// Cholesky threshold
+  double cholthr;
+  /// Cholesky shell threshold (for caching)
+  double cholshthr;
+  
   /// Calculate forces?
   bool doforce;
 
@@ -290,6 +298,10 @@ class SCF {
   ERIscreen scr;
   /// Electron repulsion screening table, range separation
   ERIscreen scr_rs;
+  /// Cholesky integrals
+  ERIchol chol;
+  /// Cholesky integrals, range separation
+  ERIchol chol_rs;
   /// Density fitting table
   DensityFit dfit;
 
@@ -381,6 +393,9 @@ class SCF {
   void gwh_guess(rscf_t & sol) const;
   /// Do GWH guess
   void gwh_guess(uscf_t & sol) const;
+
+  /// Exchange localization
+  arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv) const;
 };
 
 /// Determine effect of imaginary part of Fock operator on eigenvectors

@@ -411,7 +411,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
   return gamma;
 }
 
-arma::mat DensityFit::calc_J(const arma::mat & P) const {
+arma::mat DensityFit::calcJ(const arma::mat & P) const {
   // Get the expansion coefficients
   arma::vec c=compute_expansion(P);
 
@@ -490,7 +490,7 @@ arma::mat DensityFit::calc_J(const arma::mat & P) const {
   return J;
 }
 
-std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) const {
+std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const {
   // Get the expansion coefficients
   std::vector<arma::vec> c=compute_expansion(P);
 
@@ -576,7 +576,7 @@ std::vector<arma::mat> DensityFit::calc_J(const std::vector<arma::mat> & P) cons
   return J;
 }
 
-arma::vec DensityFit::force_J(const arma::mat & P) {
+arma::vec DensityFit::forceJ(const arma::mat & P) {
   // First, compute the expansion
   arma::vec c=compute_expansion(P);
 
@@ -763,7 +763,7 @@ arma::vec DensityFit::force_J(const arma::mat & P) {
   return f;
 }
 
-arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> & occo, size_t memlimit) const {
+arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> & occo, size_t memlimit) const {
   // Compute orbital block size. The memory required for one orbital
   // is (also need memory for the transformation)
   const size_t mem1=2*Nbf*Naux;
@@ -915,7 +915,7 @@ arma::mat DensityFit::calc_K(const arma::mat & Corig, const std::vector<double> 
   return K;
 }
 
-arma::cx_mat DensityFit::calc_K(const arma::cx_mat & Corig, const std::vector<double> & occo, size_t memlimit) const {
+arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<double> & occo, size_t memlimit) const {
   // Compute orbital block size. The memory required for one orbital
   // is (also need memory for the transformation)
   const size_t mem1=2*Nbf*Naux;
@@ -1091,9 +1091,11 @@ arma::mat DensityFit::get_ab_inv() const {
   return ab_inv;
 }
 
-arma::mat DensityFit::mo_integrals(const arma::mat & Cl, const arma::mat & Cr) const {
+arma::mat DensityFit::B_matrix() const {
   if(direct)
     throw std::runtime_error("Must run in tabulated mode!\n");
+  if(!hf)
+    throw std::runtime_error("Must be run in HF mode!\n");
 
   // Collect AO integrals
   arma::mat B(Nbf*Nbf,Naux);
@@ -1125,27 +1127,5 @@ arma::mat DensityFit::mo_integrals(const arma::mat & Cl, const arma::mat & Cr) c
   // Transform into proper B matrix
   B=B*ab_invh;
 
-  // Do LH transform
-  B.reshape(Nbf,Nbf*Naux);
-  B=arma::trans(Cl)*B;
-  
-  // Shuffle indices
-  arma::mat Bs(Cl.n_cols*Naux,Nbf);
-  for(size_t mu=0;mu<Nbf;mu++)
-    for(size_t a=0;a<Naux;a++)
-      for(size_t l=0;l<Cl.n_cols;l++)
-	Bs(a*Cl.n_cols+l,mu)=B(l,a*Nbf+mu);
-
-  // Do RH transform
-  Bs=Bs*Cr;
-
-  // Return array
-  B.resize(Naux,Cl.n_cols*Cr.n_cols);
-  for(size_t a=0;a<Naux;a++)
-    for(size_t l=0;l<Cl.n_cols;l++)
-      for(size_t r=0;r<Cr.n_cols;r++)
-	B(a,r*Cl.n_cols+l)=Bs(a*Cl.n_cols+l,r);
-
-  
   return B;
 }
