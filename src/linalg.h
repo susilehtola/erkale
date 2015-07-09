@@ -166,6 +166,9 @@ arma::mat pivoted_cholesky(const arma::mat & M, double thr);
 /// Incomplete Cholesky factorization of matrix M, use n vectors
 arma::mat incomplete_cholesky(const arma::mat & M, size_t n);
 
+/// Transform B matrix to MO basis
+arma::mat B_transform(arma::mat B, const arma::mat & Cl, const arma::mat & Cr);
+
 /// Check thread safety of LAPACK library
 void check_lapack_thread();
 
