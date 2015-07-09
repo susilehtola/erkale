@@ -1618,6 +1618,17 @@ size_t BasisSet::get_last_ind(size_t num) const {
   return shells[num].get_last_ind();
 }
 
+size_t BasisSet::find_shell_ind(size_t find) const {
+  // Find shell the function belongs to
+  for(size_t i=0;i<shells.size();i++)
+    if(find>=shells[i].get_first_ind() && find<=shells[i].get_last_ind())
+      return i;
+
+  std::ostringstream oss;
+  oss << "Basis function " << find << " not found in basis set!\n";
+  throw std::runtime_error(oss.str());
+}
+
 size_t BasisSet::get_shell_center_ind(size_t num) const {
   return shells[num].get_center_ind();
 }
