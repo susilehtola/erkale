@@ -44,11 +44,26 @@ class ERIchol {
   void set_range_separation(double w, double a, double b);
   void get_range_separation(double & w, double & a, double & b) const;
     
-  /// Fill matrix
-  void fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose);
+  /// Fill matrix, returns amount of significant pairs
+  size_t fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose);
 
+  /// Get amount of vectors
+  size_t get_N() const;
+  
   /// Get the matrix
   arma::mat get() const;
+
+  /// Form Coulomb matrix
+  arma::mat calcJ(const arma::mat & P) const;
+  /// Form exchange matrix
+  arma::mat calcK(const arma::vec & C) const;
+  /// Form exchange matrix
+  arma::mat calcK(const arma::mat & C, const std::vector<double> & occs) const;
+
+  /// Form exchange matrix
+  arma::cx_mat calcK(const arma::cx_vec & C) const;
+  /// Form exchange matrix
+  arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs) const;
 };
 
 #endif

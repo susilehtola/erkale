@@ -33,7 +33,7 @@ void ERIchol::get_range_separation(double & w, double & a, double & b) const {
   b=beta;
 }
 
-void ERIchol::fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose) {
+size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose) {
   // Screening matrix and pairs
   arma::mat screen;
   std::vector<eripair_t> shpairs=basis.get_eripairs(screen,shtol,omega,alpha,beta,verbose);
@@ -158,6 +158,10 @@ void ERIchol::fill(const BasisSet & basis, double tol, double shthr, double shto
       for(size_t ipair=0;ipair<shpairs.size();ipair++) {
 	size_t is=shpairs[ipair].is;
 	size_t js=shpairs[ipair].js;
+
+	// Do we need to compute the shell?
+	if(screen(is,js)*screen(max_ks,max_ls)<shtol)
+	  continue;
 	
 	// Compute integrals
 	eri->compute(&shells[is],&shells[js],&shells[max_ks],&shells[max_ls]);
@@ -267,13 +271,87 @@ void ERIchol::fill(const BasisSet & basis, double tol, double shthr, double shto
       t.set();
     }
   }
+  
+  // Transpose to get Cholesky vectors as columns
+  arma::inplace_trans(B);
+  
+  return shpairs.size();
+}
 
-  if(verbose) {
-     printf("Final error is %e\n",error);
-     fflush(stdout);
-  }
+size_t ERIchol::get_N() const {
+  return B.n_cols;
 }
 
 arma::mat ERIchol::get() const {
   return B;
+}
+
+arma::mat ERIchol::calcJ(const arma::mat & P) const {
+  if(P.n_elem != B.n_rows)
+    throw std::runtime_error("Density matrix does not match basis set!\n");
+
+  // Vectorize P
+  arma::rowvec Pv(arma::trans(arma::vectorise(P)));
+  // Calculate expansion coefficients
+  arma::rowvec g(Pv*B);
+  // Form Coulomb matrix
+  arma::vec Jv(B*arma::trans(g));
+  // and restore it
+  return arma::mat(Jv.memptr(),P.n_rows,P.n_cols);
+}
+  
+arma::mat ERIchol::calcK(const arma::vec & C) const {
+  if(B.n_rows != C.n_elem*C.n_elem)
+    throw std::runtime_error("Orbital not match basis set!\n");
+  size_t Nbf(C.n_elem);
+  size_t Naux(B.n_cols);
+
+  // Reshape B
+  arma::mat Br(arma::reshape(B,Nbf,Nbf*Naux));
+
+  // Do transform to (i,uP)
+  Br.reshape(Nbf,Nbf*Naux);
+  Br=arma::trans(C)*Br;
+
+  // Reshape to Nbf x Naux
+  Br.reshape(Nbf,Naux);
+  // so now we can get the exchange matrix as
+  return Br*arma::trans(Br);
+}
+
+arma::cx_mat ERIchol::calcK(const arma::cx_vec & C) const {
+  if(B.n_rows != C.n_elem*C.n_elem)
+    throw std::runtime_error("Orbital not match basis set!\n");
+  size_t Nbf(C.n_elem);
+  size_t Naux(B.n_cols);
+
+  // Reshape B
+  arma::mat Br(arma::reshape(B,Nbf,Nbf*Naux));
+
+  // Do transform to (i,uP)
+  Br.reshape(Nbf,Nbf*Naux);
+  arma::cx_mat Bc(arma::trans(C)*Br);
+
+  // Reshape to Nbf x Naux
+  Bc.reshape(Nbf,Naux);
+  // so now we can get the exchange matrix as
+  return Bc*arma::trans(Bc);
+}
+
+arma::mat ERIchol::calcK(const arma::mat & C, const std::vector<double> & occs) const {
+  arma::mat K(C.n_rows,C.n_rows);
+  K.zeros();
+  for(size_t i=0;i<occs.size();i++)
+    if(occs[i]!=0.0)
+      K+=occs[i]*calcK(C.col(i));
+  return K;
+}
+
+arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const std::vector<double> & occs) const {
+  arma::cx_mat K(C.n_rows,C.n_rows);
+  K.zeros();
+  for(size_t i=0;i<occs.size();i++)
+    if(occs[i]!=0.0)
+      K+=occs[i]*calcK(C.col(i));
+  return K;
 }
