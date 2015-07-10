@@ -43,6 +43,11 @@ class ERIchol {
   /// Set range separation
   void set_range_separation(double w, double a, double b);
   void get_range_separation(double & w, double & a, double & b) const;
+
+  /// Load B matrix
+  void load();
+  /// Save B matrix
+  void save() const;
     
   /// Fill matrix, returns amount of significant pairs
   size_t fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose);

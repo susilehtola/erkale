@@ -283,6 +283,8 @@ class SCF {
   double cholthr;
   /// Cholesky shell threshold (for caching)
   double cholshthr;
+  /// Cholesky mode
+  int cholmode;
   
   /// Calculate forces?
   bool doforce;

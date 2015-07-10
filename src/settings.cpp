@@ -121,6 +121,7 @@ void Settings::add_scf_settings() {
   add_bool("Cholesky", "Use Cholesky decomposition?", false);
   add_double("CholeskyThr", "Cholesky decomposition threshold", 1e-7);
   add_double("CholeskyShThr", "Cholesky cache threshold", 0.01);
+  add_int("CholeskyMode", "Save/load integrals? 0 no, 1 save, -1 load", 0, true);
   // Which basis to use as density fitting basis
   add_string("FittingBasis", "Basis to use for density fitting / RI (Auto for automatic)","Auto");
   // How much memory to allow for density fitting
