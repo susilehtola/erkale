@@ -543,7 +543,8 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps, arma::uvec & pivot) 
   arma::inplace_trans(L);
 
   // Drop unnecessary columns
-  L=L.cols(0,m-1);
+  if(m<L.n_cols)
+    L.shed_cols(m,L.n_cols-1);
 
   // Store pivot
   pivot=pi.subvec(0,m-1);
