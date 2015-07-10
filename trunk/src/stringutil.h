@@ -63,7 +63,7 @@ double readdouble(std::string num);
 void print_E(const arma::vec & E, const std::vector<double> & occ, bool all=false);
 
 /// Convert memory requirement to readable text
-std::string memory_size(size_t size);
+std::string memory_size(size_t size, bool approx=false);
 
 /// Pretty-print symmetric matrix
 void print_symmat(const arma::mat &mat, bool floatformat=0, double cutoff=1e-3);

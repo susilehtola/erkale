@@ -1,6 +1,7 @@
 #include "erichol.h"
 #include "eriworker.h"
 #include "mathf.h"
+#include "stringutil.h"
 #include "timer.h"
 
 #include <cstdio>
@@ -44,6 +45,9 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   std::vector<GaussianShell> shells=basis.get_shells();
 
   Timer t;
+
+  if(verbose)
+    printf("Computing Cholesky vectors. Estimated memory size is %s - %s.\n",memory_size(3*Nbf*Nbf*Nbf*sizeof(double),true).c_str(),memory_size(10*Nbf*Nbf*Nbf*sizeof(double),true).c_str());
 
   // Calculate diagonal element vector
   arma::vec d(Nbf*Nbf);
@@ -271,6 +275,9 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       t.set();
     }
   }
+
+  if(verbose)
+    printf("Cholesky decomposition finished, realized memory size is %s.\n",memory_size(B.n_elem*sizeof(double)).c_str());
   
   // Transpose to get Cholesky vectors as columns
   arma::inplace_trans(B);
