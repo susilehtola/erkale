@@ -27,7 +27,7 @@ Checkpoint::Checkpoint(const std::string & fname, bool writem, bool trunc) {
   filename=fname;
   opend=false;
 
-  if(writemode && trunc) {
+  if(writemode && (trunc || !file_exists(fname))) {
     // Truncate existing file, using default creation and access properties.
     file=H5Fcreate(fname.c_str(),H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
     opend=true;
