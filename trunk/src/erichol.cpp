@@ -48,6 +48,7 @@ void ERIchol::load() {
 }
 
 void ERIchol::save() const {
+  // Open in write mode, don't truncate
   Checkpoint chkpt("cholesky.chk",true,false);
 
   // Variable name in checkpoint?
@@ -70,10 +71,16 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   std::vector<GaussianShell> shells=basis.get_shells();
 
   Timer t;
+  Timer ttot;
 
   if(verbose)
     printf("Computing Cholesky vectors. Estimated memory size is %s - %s.\n",memory_size(3*Nbf*Nbf*Nbf*sizeof(double),true).c_str(),memory_size(10*Nbf*Nbf*Nbf*sizeof(double),true).c_str());
 
+  // Integral time
+  double t_int=0.0;
+  // Cholesky time
+  double t_chol=0.0;
+  
   // Calculate diagonal element vector
   arma::vec d(Nbf*Nbf);
   d.zeros();
@@ -117,13 +124,16 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 
     delete eri;
   }
+  t_int+=t.get();
+  t.set();
+  
   // Error is
   double error(arma::sum(d));
 
   // Pivot index
   arma::uvec pi(arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem));
-  // Clear Cholesky vectors
-  B.clear();
+  // Allocate memory
+  B.zeros(3*Nbf,Nbf*Nbf);
   // Loop index
   size_t m(0);
     
@@ -169,6 +179,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     // Compute integrals on the rows
     arma::mat A(Nbf*Nbf,max_Nk*max_Nl);
     A.zeros();
+    t.set();
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -216,8 +227,11 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       
       delete eri;
     }
+    t_int+=t.get();
+    t.set();
 
     size_t nb=0;
+    size_t b0=m;
     while(true) {
       // Find global largest error
       errs=d(pi);
@@ -270,22 +284,37 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       
       pim=pi(m);
       
-      // Insert new rows
-      if(m==0)
-	B.zeros(1,Nbf*Nbf);
-      else
-	B.insert_rows(B.n_rows,1,true);
+      // Insert new rows if necessary
+      if(m>=B.n_rows)
+	B.insert_rows(B.n_rows,100,true);
       
       // Compute diagonal element
       B(m,pim)=sqrt(d(pim));
       
       // Off-diagonal elements
-      for(size_t i=m+1;i<d.n_elem;i++) {
-	size_t pii=pi(i);
-	// Compute element
-	B(m,pii)= (m>0) ? (A(pii,Aind) - arma::dot(B.col(pim).subvec(0,m-1),B.col(pii).subvec(0,m-1)))/B(m,pim) : (A(pii,Aind))/B(m,pim);
-	// Update d
-	d(pii)-=B(m,pii)*B(m,pii);
+      if(m==0) {
+	// No B contribution here; avoid if clause in for loop
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+     	for(size_t i=m+1;i<d.n_elem;i++) {
+	  size_t pii=pi(i);
+	  // Compute element
+	  B(m,pii)=A(pii,Aind)/B(m,pim);
+	  // Update d
+	  d(pii)-=B(m,pii)*B(m,pii);
+	}
+      } else {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+	for(size_t i=m+1;i<d.n_elem;i++) {
+	  size_t pii=pi(i);
+	  // Compute element
+	  B(m,pii)=(A(pii,Aind) - arma::as_scalar(arma::trans(B.submat(0,pim,m-1,pim))*B.submat(0,pii,m-1,pii)))/B(m,pim);
+	  // Update d
+	  d(pii)-=B(m,pii)*B(m,pii);
+	}
       }
       
       // Update error
@@ -293,19 +322,26 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       // Increase m
       m++;
     }
+    t_chol+=t.get();
     
     if(verbose) {
-      printf("Cholesky vectors no %5i - %5i computed, error is %e (%s).\n",(int) (B.n_rows-nb+1),(int) B.n_rows,error,t.elapsed().c_str());
+      printf("Cholesky vectors no %5i - %5i computed, error is %e (%s).\n",(int) b0, (int) (b0+nb-1),error,t.elapsed().c_str());
       fflush(stdout);
       t.set();
     }
   }
 
-  if(verbose)
-    printf("Cholesky decomposition finished, realized memory size is %s.\n",memory_size(B.n_elem*sizeof(double)).c_str());
+  if(verbose) {
+    printf("Cholesky decomposition finished in %s. Realized memory size is %s.\n",ttot.elapsed().c_str(),memory_size(B.n_elem*sizeof(double)).c_str());
+    printf("Time use: integrals %3.1f %%, linear algebra %3.1f %%.\n",100*t_int/(t_int+t_chol),100*t_chol/(t_int+t_chol));
+  }
   
   // Transpose to get Cholesky vectors as columns
   arma::inplace_trans(B);
+
+  // Drop any unnecessary columns
+  if(m<B.n_cols)
+    B.shed_cols(m,B.n_cols-1);
   
   return shpairs.size();
 }
