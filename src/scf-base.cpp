@@ -124,6 +124,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   cholesky=set.get_bool("Cholesky");
   cholthr=set.get_double("CholeskyThr");
   cholshthr=set.get_double("CholeskyShThr");
+  cholmode=set.get_int("CholeskyMode");
   if(cholesky && densityfit)
     throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
   
@@ -280,12 +281,24 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	fflush(stdout);
       }
 
-      size_t Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
-
-      if(verbose) {
-	printf("Repulsion integrals calculated in %s.\n",t.elapsed().c_str());
-	printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
-	fflush(stdout);
+      if(cholmode==-1) {
+	chol.load();
+	if(verbose) {
+	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_N(),t.elapsed().c_str());
+	  fflush(stdout);
+	}
+      } else {
+	size_t Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
+	if(verbose) {
+	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+	  fflush(stdout);
+	}
+	if(cholmode==1) {
+	  t.set();
+	  chol.save();
+	  printf("Cholesky vectors saved to file in %s.\n",t.elapsed().c_str());
+	  fflush(stdout);
+	}
       }
     } else {
       if(direct) {
@@ -389,13 +402,26 @@ void SCF::fill_rs(double omega) {
 	printf("Computing short-range repulsion integrals.\n");
 	fflush(stdout);
       }
+
       chol_rs.set_range_separation(omega,0.0,1.0);
-      size_t Np=chol_rs.fill(*basisp,cholthr,cholshthr,intthr,verbose);
-      
-      if(verbose) {
-	printf("Short-range repulsion integrals calculated (%s).\n",t.elapsed().c_str());
-	printf("%i short-range shell pairs are significant.\n",(int) Np);
-	fflush(stdout);
+      if(cholmode==-1) {
+	chol_rs.load();
+	if(verbose) {
+	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_N(),t.elapsed().c_str());
+	  fflush(stdout);
+	}
+      } else {
+	size_t Npairs=chol_rs.fill(*basisp,cholthr,cholshthr,intthr,verbose);
+	if(verbose) {
+	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
+	  fflush(stdout);
+	}
+	if(cholmode==1) {
+	  t.set();
+	  chol_rs.save();
+	  printf("Cholesky vectors saved to file in %s.\n",t.elapsed().c_str());
+	  fflush(stdout);
+	}
       }
     }
 
