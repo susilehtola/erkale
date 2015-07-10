@@ -274,7 +274,7 @@ void print_E(const arma::vec & E, const std::vector<double> & occ, bool all) {
     printf("\n");
 }
 
-std::string memory_size(size_t memsize) {
+std::string memory_size(size_t memsize, bool approx) {
   std::ostringstream ret;
 
   // We need long unsigned integers, since 2GB is already over INT_MAX.
@@ -289,6 +289,8 @@ std::string memory_size(size_t memsize) {
     size-=gigs*giga;
     ret << gigs;
     ret << " Gi";
+    if(approx)
+      return ret.str();
   }
 
   // Number of megabytes
@@ -302,6 +304,8 @@ std::string memory_size(size_t memsize) {
       ret << " ";
 
     ret << megs << " Mi";
+    if(approx)
+      return ret.str();
   }
 
   // Number of kilobytes
@@ -313,9 +317,11 @@ std::string memory_size(size_t memsize) {
       ret << " ";
 
     ret << kilos << " ki";
+    if(approx)
+      return ret.str();
   }
 
-  return std::string(ret.str());
+  return ret.str();
 }
 
 void print_symmat(const arma::mat &mat, bool floatformat, double cutoff) {
