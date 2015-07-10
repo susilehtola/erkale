@@ -1,3 +1,4 @@
+#include "checkpoint.h"
 #include "erichol.h"
 #include "eriworker.h"
 #include "mathf.h"
@@ -32,6 +33,30 @@ void ERIchol::get_range_separation(double & w, double & a, double & b) const {
   w=omega;
   a=alpha;
   b=beta;
+}
+
+void ERIchol::load() {
+  Checkpoint chkpt("cholesky.chk",false);
+
+  // Variable name in checkpoint?
+  std::ostringstream oss;
+  oss << "B";
+  if(omega!=1.0)
+    oss << "_" << omega;
+  
+  chkpt.read(oss.str(),B);
+}
+
+void ERIchol::save() const {
+  Checkpoint chkpt("cholesky.chk",true,false);
+
+  // Variable name in checkpoint?
+  std::ostringstream oss;
+  oss << "B";
+  if(omega!=1.0)
+    oss << "_" << omega;
+  
+  chkpt.write(oss.str(),B);
 }
 
 size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose) {
