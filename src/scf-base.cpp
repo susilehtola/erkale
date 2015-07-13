@@ -284,10 +284,12 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       if(cholmode==-1) {
 	chol.load();
 	if(verbose) {
-	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_N(),t.elapsed().c_str());
+	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_Naux(),t.elapsed().c_str());
 	  fflush(stdout);
 	}
-      } else {
+      }
+
+      if(chol.get_Nbf()!=basisp->get_Nbf()) {
 	size_t Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
 	if(verbose) {
 	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
@@ -389,7 +391,7 @@ void SCF::fill_rs(double omega) {
   if(cholesky) {
     // Compute range separated integrals if necessary
     bool fill;
-    if(!chol_rs.get_N()) {
+    if(!chol_rs.get_Naux()) {
       fill=true;
     } else {
       double o, kl, ks;
@@ -407,10 +409,11 @@ void SCF::fill_rs(double omega) {
       if(cholmode==-1) {
 	chol_rs.load();
 	if(verbose) {
-	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_N(),t.elapsed().c_str());
+	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_Naux(),t.elapsed().c_str());
 	  fflush(stdout);
 	}
-      } else {
+      }
+      if(chol_rs.get_Nbf() != basisp->get_Nbf()) {
 	size_t Npairs=chol_rs.fill(*basisp,cholthr,cholshthr,intthr,verbose);
 	if(verbose) {
 	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
