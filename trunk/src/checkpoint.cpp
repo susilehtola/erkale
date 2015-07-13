@@ -314,6 +314,93 @@ void Checkpoint::read(const std::string & name, std::vector<double> & v) {
   if(cl) close();
 }
 
+void Checkpoint::write(const std::string & name, const std::vector<hsize_t> & v) {
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
+  // Remove possible existing entry
+  remove(name);
+
+  // Dimensions of the vector
+  hsize_t dims[1];
+  dims[0]=v.size();
+
+  // Create a dataspace.
+  hid_t dataspace=H5Screate_simple(1,dims,NULL);
+
+  // Create a datatype.
+  hid_t datatype=H5Tcopy(H5T_NATIVE_HSIZE);
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties.
+  hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Write the data to the file.
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &(v[0]));
+
+  // Close everything.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+  if(cl) close();
+}
+
+void Checkpoint::read(const std::string & name, std::vector<hsize_t> & v) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+  CHECK_EXIST();
+
+  // Open the dataset.
+  hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
+
+  // Get the data type
+  hid_t datatype  = H5Dget_type(dataset);
+
+  // Get the class info
+  hid_t hclass=H5Tget_class(datatype);
+
+  if(hclass!=H5T_INTEGER) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " is not an integer value!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
+
+  // Get dataspace
+  hid_t dataspace = H5Dget_space(dataset);
+  // Get number of dimensions
+  int ndim = H5Sget_simple_extent_ndims(dataspace);
+  if(ndim!=1) {
+    std::ostringstream oss;
+    oss << "Error - " << name << " should have dimension 1, instead dimension is " << ndim << "!\n";
+    ERROR_INFO();
+    throw std::runtime_error(oss.str());
+  }
+
+  // Get the size of the matrix
+  hsize_t dims[ndim];
+  H5Sget_simple_extent_dims(dataspace,dims,NULL);
+
+  // Allocate memory
+  v.resize(dims[0]);
+  H5Dread(dataset, H5T_NATIVE_HSIZE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &(v[0]));
+
+  // Close dataspace
+  H5Sclose(dataspace);
+  // Close datatype
+  H5Tclose(datatype);
+  // Close dataset
+  H5Dclose(dataset);
+  if(cl) close();
+}
+
 void Checkpoint::write(const BasisSet & basis) {
   CHECK_WRITE();
   bool cl=false;
@@ -831,6 +918,76 @@ void Checkpoint::read(const std::string & name, int & v) {
 
   // Read
   H5Dread(dataset, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
+
+  // Close dataspace
+  H5Sclose(dataspace);
+  // Close datatype
+  H5Tclose(datatype);
+  // Close dataset
+  H5Dclose(dataset);
+  if(cl) close();
+}
+
+void Checkpoint::write(const std::string & name, hsize_t val) {
+  CHECK_WRITE();
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+
+  // Remove possible existing entry
+  remove(name);
+
+  // Create a dataspace.
+  hid_t dataspace=H5Screate(H5S_SCALAR);
+
+  // Create a datatype.
+  hid_t datatype=H5Tcopy(H5T_NATIVE_HSIZE);
+
+  // Create the dataset using the defined dataspace and datatype, and
+  // default dataset creation properties.
+  hid_t dataset=H5Dcreate(file,name.c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+  // Write the data to the file.
+  H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &val);
+
+  // Close everything.
+  H5Dclose(dataset);
+  H5Tclose(datatype);
+  H5Sclose(dataspace);
+  if(cl) close();
+}
+
+void Checkpoint::read(const std::string & name, hsize_t & v) {
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
+  CHECK_EXIST();
+
+  // Open the dataset.
+  hid_t dataset = H5Dopen (file, name.c_str(), H5P_DEFAULT);
+
+  // Get the data type
+  hid_t datatype  = H5Dget_type(dataset);
+
+  // Get dataspace
+  hid_t dataspace = H5Dget_space(dataset);
+
+  // Get the class info
+  hid_t hclass=H5Tget_class(datatype);
+  if(hclass!=H5T_INTEGER)
+    throw std::runtime_error("Error - datatype is not integer!\n");
+
+  // Get type
+  H5S_class_t type = H5Sget_simple_extent_type(dataspace);
+  if(type!=H5S_SCALAR)
+    throw std::runtime_error("Error - dataspace is not of scalar type!\n");
+
+  // Read
+  H5Dread(dataset, H5T_NATIVE_HSIZE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &v);
 
   // Close dataspace
   H5Sclose(dataspace);
