@@ -1,5 +1,6 @@
 #include "checkpoint.h"
 #include "erichol.h"
+#include "linalg.h"
 #include "eriworker.h"
 #include "mathf.h"
 #include "stringutil.h"
@@ -13,6 +14,8 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
+#define CHOLFILE "cholesky.chk"
 
 ERIchol::ERIchol() {
   omega=0.0;
@@ -36,28 +39,103 @@ void ERIchol::get_range_separation(double & w, double & a, double & b) const {
 }
 
 void ERIchol::load() {
-  Checkpoint chkpt("cholesky.chk",false);
+  Checkpoint chkpt(CHOLFILE,false);
 
-  // Variable name in checkpoint?
-  std::ostringstream oss;
-  oss << "B";
-  if(omega!=1.0)
+  // Suffix in checkpoint
+  std::string suffix;
+  if(omega!=1.0) {
+    std::ostringstream oss;
     oss << "_" << omega;
-  
-  chkpt.read(oss.str(),B);
+    suffix=oss.str();
+  }
+
+  // Read B matrix
+  chkpt.read("B"+suffix,B);
+
+  // Read amount of basis functions
+  {
+    hsize_t Nbft;
+    chkpt.read("Nbf",Nbft);
+    Nbf=Nbft;
+  }
+
+  // Read product index
+  {
+    std::vector<hsize_t> prodidxv;
+    chkpt.read("prodidx"+suffix,prodidxv);
+    prodidx=arma::conv_to<arma::uvec>::from(prodidxv);
+  }
+  // and the off-diagonal index
+  {
+    std::vector<hsize_t> odiagidxv;
+    chkpt.read("odiagidx"+suffix,odiagidxv);
+    odiagidx=arma::conv_to<arma::uvec>::from(odiagidxv);
+  }
+  // the product map
+  {
+    std::vector<hsize_t> prodmapv;
+    chkpt.read("prodmap"+suffix,prodmapv);
+    prodmap=arma::reshape(arma::conv_to<arma::umat>::from(prodmapv),Nbf,Nbf);
+  }
+  // and the inverse map
+  {
+    std::vector<hsize_t> invmapv;
+    chkpt.read("invmap"+suffix,invmapv);
+    invmap=arma::reshape(arma::conv_to<arma::umat>::from(invmapv),2,prodidx.n_elem);
+  }
 }
 
 void ERIchol::save() const {
-  // Open in write mode, don't truncate
-  Checkpoint chkpt("cholesky.chk",true,false);
-
-  // Variable name in checkpoint?
-  std::ostringstream oss;
-  oss << "B";
-  if(omega!=1.0)
-    oss << "_" << omega;
+  // Check consistency. Default is to not truncate
+  bool trunc=false;
+  if(file_exists(CHOLFILE)) {
+    // Open in read-only mode and try to get Nbf
+    Checkpoint chkpt(CHOLFILE,false);
+    hsize_t Nbft;
+    chkpt.read("Nbf",Nbft);
+    if(Nbf!=Nbft)
+      trunc=true;
+  }
+  // Open in write mode
+  Checkpoint chkpt(CHOLFILE,true,trunc);
   
-  chkpt.write(oss.str(),B);
+  // Suffix in checkpoint
+  std::string suffix;
+  if(omega!=1.0) {
+    std::ostringstream oss;
+    oss << "_" << omega;
+    suffix=oss.str();
+  }
+
+  // Write B matrix
+  chkpt.write("B"+suffix,B);
+
+  // Save amount of basis functions
+  {
+    hsize_t Nbft(Nbf);
+    chkpt.write("Nbf",Nbft);
+  }
+  
+  // Save product index
+  {
+    std::vector<hsize_t> prodidxv(arma::conv_to< std::vector<hsize_t> >::from(prodidx));
+    chkpt.write("prodidx"+suffix,prodidxv);
+  }
+  // and the off-diagonal index
+  {
+    std::vector<hsize_t> odiagidxv(arma::conv_to< std::vector<hsize_t> >::from(odiagidx));
+    chkpt.write("odiagidx"+suffix,odiagidxv);
+  }
+  // the product map
+  {
+    std::vector<hsize_t> prodmapv(arma::conv_to< std::vector<hsize_t> >::from(arma::vectorise(prodmap)));
+    chkpt.write("prodmap"+suffix,prodmapv);
+  }
+  // and the inverse map
+  {
+    std::vector<hsize_t> invmapv(arma::conv_to< std::vector<hsize_t> >::from(arma::vectorise(invmap)));
+    chkpt.write("invmap"+suffix,invmapv);
+  }
 }
 
 size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose) {
@@ -66,15 +144,12 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   std::vector<eripair_t> shpairs=basis.get_eripairs(screen,shtol,omega,alpha,beta,verbose);
 
   // Amount of basis functions
-  const size_t Nbf(basis.get_Nbf());
+  Nbf=basis.get_Nbf();
   // Shells
   std::vector<GaussianShell> shells=basis.get_shells();
 
   Timer t;
   Timer ttot;
-
-  if(verbose)
-    printf("Computing Cholesky vectors. Estimated memory size is %s - %s.\n",memory_size(3*Nbf*Nbf*Nbf*sizeof(double),true).c_str(),memory_size(10*Nbf*Nbf*Nbf*sizeof(double),true).c_str());
 
   // Integral time
   double t_int=0.0;
@@ -126,14 +201,104 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   }
   t_int+=t.get();
   t.set();
-  
-  // Error is
-  double error(arma::sum(d));
 
+  // Amount of pairs surviving shell pair screening
+  size_t Nshp=0;
+  {
+    prodmap.ones(Nbf,Nbf);
+    prodmap*=-1; // Go to UINT_MAX
+    
+    size_t iprod=0;
+    size_t iodiag=0;
+    prodidx.resize(Nbf*Nbf);
+    odiagidx.resize(Nbf*Nbf);
+    invmap.zeros(2,Nbf*Nbf);
+    for(size_t ip=0;ip<shpairs.size();ip++) {
+      size_t is=shpairs[ip].is;
+      size_t js=shpairs[ip].js;
+      size_t Ni(shells[is].get_Nbf());
+      size_t Nj(shells[js].get_Nbf());
+      size_t i0(shells[is].get_first_ind());
+      size_t j0(shells[js].get_first_ind());
+      if(is==js) {
+	for(size_t i=i0;i<i0+Ni;i++) {
+	  for(size_t j=j0;j<i;j++) {
+	    // Function indices are
+	    invmap(0,iprod)=i;
+	    invmap(1,iprod)=j;
+	    // Global product index is
+	    prodidx(iprod)=i*Nbf+j;
+	    // Off-diagonal product
+	    odiagidx(iodiag)=iprod;
+
+	    // Significant product?
+	    Nshp++;
+	    if(d(prodidx(iprod))>=shtol) {
+	      // Product index mapping is
+	      prodmap(i,j)=iprod;
+	      prodmap(j,i)=iprod;
+	      iprod++;
+	      iodiag++;
+	    }
+	  }
+	  // Function indices are
+	  invmap(0,iprod)=i;
+	  invmap(1,iprod)=i;
+	  // Global product index is
+	  prodidx(iprod)=i*Nbf+i;
+	  // Significant product?
+	  Nshp++;
+	  if(d(prodidx(iprod))>=shtol) {
+	    // Product index mapping is
+	    prodmap(i,i)=iprod;
+	    
+	    iprod++;
+	  }
+	}
+      } else {
+      	for(size_t i=i0;i<i0+Ni;i++)
+	  for(size_t j=j0;j<j0+Nj;j++) {
+	    // Function indices are
+	    invmap(0,iprod)=i;
+	    invmap(1,iprod)=j;
+	    // Global product index is
+	    prodidx(iprod)=i*Nbf+j;
+	    // Off-diagonal product
+	    odiagidx(iodiag)=iprod;
+	    // Significant product?
+	    Nshp++;
+	    if(d(prodidx(iprod))>=shtol) {
+	      // Product index mapping is
+	      prodmap(i,j)=iprod;
+	      
+	      iprod++;
+	      iodiag++;
+	    }
+	  }
+      }
+    }
+    // Resize prodidx
+    prodidx.resize(iprod);
+    odiagidx.resize(iodiag);
+    invmap.shed_cols(iprod,invmap.n_cols-1);
+  }
+
+  if(verbose) {
+    printf("Screening by shell pairs and symmetry reduced dofs by factor %.2f.\n",d.n_elem*1.0/Nshp);
+    printf("Individual screening reduced dofs by a total factor %.2f.\n",d.n_elem*1.0/prodidx.n_elem);
+    printf("Computing Cholesky vectors. Estimated memory size is %s - %s.\n",memory_size(3*Nbf*prodidx.n_elem*sizeof(double),true).c_str(),memory_size(10*Nbf*prodidx.n_elem*sizeof(double),true).c_str());
+  }
+  
+  // Drop unnecessary vectors
+  d=d(prodidx);
+
+  // Error is
+  double error(arma::max(d));
+  
   // Pivot index
   arma::uvec pi(arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem));
   // Allocate memory
-  B.zeros(3*Nbf,Nbf*Nbf);
+  B.zeros(100,prodidx.n_elem);
   // Loop index
   size_t m(0);
     
@@ -150,7 +315,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 
     // Pivot index
     size_t pim=pi(m);
-    //printf("Pivot index is %4i with error %e, error is %e\n",(int) pim, d(pim), error);
+    //printf("Pivot index is %4i, corresponding to product %i, with error %e, error is %e\n",(int) pim, (int) prodidx(pim), d(pim), error);
     
     // Off-diagonal elements: find out which shells the pivot index
     // belongs to. The relevant function indices are
@@ -163,8 +328,8 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     size_t max_k0, max_l0;
     {
       // The corresponding functions are
-      max_k=pim/Nbf;
-      max_l=pim%Nbf;
+      max_k=invmap(0,pim);
+      max_l=invmap(1,pim);
       // which are on the shells
       max_ks=basis.find_shell_ind(max_k);
       max_ls=basis.find_shell_ind(max_l);
@@ -175,9 +340,10 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       max_k0=basis.get_first_ind(max_ks);
       max_l0=basis.get_first_ind(max_ls);
     }
+    //    printf("Pivot corresponds to functions %i and %i on shells %i and %i.\n",(int) max_k, (int) max_l, (int) max_ks, (int) max_ls);
 
     // Compute integrals on the rows
-    arma::mat A(Nbf*Nbf,max_Nk*max_Nl);
+    arma::mat A(d.n_elem,max_Nk*max_Nl);
     A.zeros();
     t.set();
 #ifdef _OPENMP
@@ -214,22 +380,26 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	size_t j0(shells[js].get_first_ind());
 
 	for(size_t ii=0;ii<Ni;ii++)
-	  for(size_t jj=0;jj<Nj;jj++)
+	  for(size_t jj=0;jj<Nj;jj++) {
+	    size_t i=i0+ii;
+	    size_t j=j0+jj;
+
+	    // Check if function pair is significant
+	    if(prodmap(i,j)>Nbf*Nbf)
+	      continue;
+	    
 	    for(size_t kk=0;kk<max_Nk;kk++)
 	      for(size_t ll=0;ll<max_Nl;ll++) {
-		size_t i=i0+ii;
-		size_t j=j0+jj;
-		
-		A(i*Nbf+j,kk*max_Nl+ll)=(*erip)[((ii*Nj+jj)*max_Nk+kk)*max_Nl+ll];
-		A(j*Nbf+i,kk*max_Nl+ll)=A(i*Nbf+j,kk*max_Nl+ll);
+		A(prodmap(i,j),kk*max_Nl+ll)=(*erip)[((ii*Nj+jj)*max_Nk+kk)*max_Nl+ll];
 	      }
+	  }
       }
       
       delete eri;
     }
     t_int+=t.get();
     t.set();
-
+    
     size_t nb=0;
     size_t b0=m;
     while(true) {
@@ -242,7 +412,11 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       size_t Aind=0;
       for(size_t kk=0;kk<max_Nk;kk++)
 	for(size_t ll=0;ll<max_Nl;ll++) {
-	  size_t ind=(kk+max_k0)*Nbf+ll+max_l0;
+	  // Function indices are
+	  size_t k=kk+max_k0;
+	  size_t l=ll+max_l0;
+	  // Corresponding index in the array is
+	  size_t ind = prodmap(k,l);
 	  if(d(ind)>blockerr) {
 	    // Check that the index is not in the old pivots
 	    bool found=false;
@@ -318,7 +492,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       }
       
       // Update error
-      error=arma::sum(d(pi.subvec(m+1,pi.n_elem-1)));
+      error=arma::max(d(pi.subvec(m+1,pi.n_elem-1)));
       // Increase m
       m++;
     }
@@ -346,8 +520,12 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   return shpairs.size();
 }
 
-size_t ERIchol::get_N() const {
+size_t ERIchol::get_Naux() const {
   return B.n_cols;
+}
+
+size_t ERIchol::get_Nbf() const {
+  return Nbf;
 }
 
 arma::mat ERIchol::get() const {
@@ -355,71 +533,168 @@ arma::mat ERIchol::get() const {
 }
 
 arma::mat ERIchol::calcJ(const arma::mat & P) const {
-  if(P.n_elem != B.n_rows)
-    throw std::runtime_error("Density matrix does not match basis set!\n");
-
   // Vectorize P
-  arma::rowvec Pv(arma::trans(arma::vectorise(P)));
+  arma::rowvec Pv(arma::trans(P(prodidx)));
+  // Twice the off-diagonal contribution
+  Pv(odiagidx)*=2.0;
   // Calculate expansion coefficients
   arma::rowvec g(Pv*B);
   // Form Coulomb matrix
   arma::vec Jv(B*arma::trans(g));
   // and restore it
-  return arma::mat(Jv.memptr(),P.n_rows,P.n_cols);
+  arma::mat J(P.n_rows,P.n_cols);
+  J.zeros();
+  for(size_t i=0;i<prodidx.size();i++)
+    J(invmap(0,i),invmap(1,i))=Jv(i);
+  for(size_t i=0;i<odiagidx.size();i++)
+    J(invmap(1,odiagidx(i)),invmap(0,odiagidx(i)))=Jv(odiagidx(i));
+  
+  return J;
 }
   
 arma::mat ERIchol::calcK(const arma::vec & C) const {
-  if(B.n_rows != C.n_elem*C.n_elem)
-    throw std::runtime_error("Orbital not match basis set!\n");
-  size_t Nbf(C.n_elem);
-  size_t Naux(B.n_cols);
+  // K_uv = C_r C_s (ur|vs) = (L^P_ur C_r) (L^P_vs Cs)
+  arma::mat v(C.n_rows,B.n_cols);
+  v.zeros();
 
-  // Reshape B
-  arma::mat Br(arma::reshape(B,Nbf,Nbf*Naux));
-
-  // Do transform to (i,uP)
-  Br.reshape(Nbf,Nbf*Naux);
-  Br=arma::trans(C)*Br;
-
-  // Reshape to Nbf x Naux
-  Br.reshape(Nbf,Naux);
-  // so now we can get the exchange matrix as
-  return Br*arma::trans(Br);
+  // First part: diagonal and above diagonal
+  for(size_t P=0;P<B.n_cols;P++)
+    for(size_t i=0;i<prodidx.size();i++)
+      v(invmap(0,i),P)+=B(i,P)*C(invmap(1,i));
+  // Below diagonal
+  for(size_t ii=0;ii<odiagidx.n_elem;ii++) {
+    size_t i=odiagidx(ii);
+    for(size_t P=0;P<B.n_cols;P++)
+      v(invmap(1,i),P)+=B(i,P)*C(invmap(0,i));
+  }
+  
+  return v*arma::trans(v);
 }
 
 arma::cx_mat ERIchol::calcK(const arma::cx_vec & C) const {
-  if(B.n_rows != C.n_elem*C.n_elem)
-    throw std::runtime_error("Orbital not match basis set!\n");
-  size_t Nbf(C.n_elem);
-  size_t Naux(B.n_cols);
+  // K_uv = C_r C_s (ur|vs) = (L^P_ur C_r) (L^P_vs Cs)
+  arma::cx_mat v(C.n_rows,B.n_cols);
+  v.zeros();
+  
+  // First part: diagonal and above diagonal
+  for(size_t P=0;P<B.n_cols;P++)
+    for(size_t i=0;i<prodidx.size();i++)
+      v(invmap(0,i),P)+=B(i,P)*C(invmap(1,i));
+  // Below diagonal
+  for(size_t ii=0;ii<odiagidx.n_elem;ii++) {
+    size_t i=odiagidx(ii);
+    for(size_t P=0;P<B.n_cols;P++)
+      v(invmap(1,i),P)+=B(i,P)*C(invmap(0,i));
+  }
+  
+  return v*arma::trans(v);
 
-  // Reshape B
-  arma::mat Br(arma::reshape(B,Nbf,Nbf*Naux));
-
-  // Do transform to (i,uP)
-  Br.reshape(Nbf,Nbf*Naux);
-  arma::cx_mat Bc(arma::trans(C)*Br);
-
-  // Reshape to Nbf x Naux
-  Bc.reshape(Nbf,Naux);
-  // so now we can get the exchange matrix as
-  return Bc*arma::trans(Bc);
 }
 
 arma::mat ERIchol::calcK(const arma::mat & C, const std::vector<double> & occs) const {
   arma::mat K(C.n_rows,C.n_rows);
   K.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
   for(size_t i=0;i<occs.size();i++)
-    if(occs[i]!=0.0)
+    if(occs[i]!=0.0) {
+#ifndef _OPENMP
       K+=occs[i]*calcK(C.col(i));
+#else
+      arma::mat wK(occs[i]*calcK(C.col(i)));
+#pragma omp critical
+      K+=wK;
+#endif
+    }
   return K;
 }
 
 arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const std::vector<double> & occs) const {
   arma::cx_mat K(C.n_rows,C.n_rows);
   K.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
   for(size_t i=0;i<occs.size();i++)
-    if(occs[i]!=0.0)
+    if(occs[i]!=0.0) {
+#ifndef _OPENMP
       K+=occs[i]*calcK(C.col(i));
+#else
+      arma::cx_mat wK(occs[i]*calcK(C.col(i)));
+#pragma omp critical
+      K+=wK;
+#endif
+    }
   return K;
 }
+
+arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose) const {
+  // Amount of basis and auxiliary functions
+  if(Cl.n_rows != Nbf || Cr.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Orbital matrices don't match basis set! N = " << Nbf << ", N(Cl) = " << Cl.n_rows << ", N(Cr) = " << Cr.n_rows << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  Timer t;
+  
+  // L_uv^P -> L_lv^P = L_uv^P C_lu
+  arma::mat Ll(Cl.n_cols,B.n_cols*Nbf);
+  Ll.zeros();
+  for(size_t P=0;P<B.n_cols;P++)
+    for(size_t i=0;i<prodidx.size();i++)
+      for(size_t l=0;l<Cl.n_cols;l++)
+	Ll(l,P*Nbf+invmap(0,i))+=B(invmap(1,i),P)*Cl(invmap(1,i),l);
+  // Off-diagonal contribution
+  for(size_t P=0;P<B.n_cols;P++)
+    for(size_t ii=0;ii<odiagidx.size();ii++) {
+      size_t i=odiagidx(ii);
+      for(size_t l=0;l<Cl.n_cols;l++)
+	Ll(l,P*Nbf+invmap(1,i))+=B(invmap(0,i),P)*Cl(invmap(0,i),l);
+    }
+
+  if(verbose) {
+    printf("First half-transform of B matrix done in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+    t.set();
+  }
+  
+  // Shuffle indices
+  arma::mat Bs(Cl.n_cols*B.n_cols,Nbf);
+  for(size_t mu=0;mu<Nbf;mu++)
+    for(size_t P=0;P<B.n_cols;P++)
+      for(size_t l=0;l<Cl.n_cols;l++)
+	Bs(P*Cl.n_cols+l,mu)=Ll(l,P*Nbf+mu);
+
+  if(verbose) {
+    printf("Index shuffle done in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+    t.set();
+  }
+    
+  // Do RH transform
+  Bs=Bs*Cr;
+
+  if(verbose) {
+    printf("Second half-transform done in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+    t.set();
+  }
+      
+  // Return array
+  arma::mat Br(B.n_cols,Cl.n_cols*Cr.n_cols);
+  for(size_t P=0;P<B.n_cols;P++)
+    for(size_t l=0;l<Cl.n_cols;l++)
+      for(size_t r=0;r<Cr.n_cols;r++)
+	Br(P,r*Cl.n_cols+l)=Bs(P*Cl.n_cols+l,r);
+
+  if(verbose) {
+    printf("Final index shuffle done in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+    t.set();
+  }
+
+  return Br;
+}
+

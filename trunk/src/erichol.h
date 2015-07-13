@@ -24,7 +24,17 @@
 
 /// Cholesky decomposition of ERIs
 class ERIchol {
-  /// Cholesky vectors, L x (Nbf x Nbf)
+  /// Amount of basis functions
+  size_t Nbf;
+  /// Map of product indices in full space (for getting density subvector)
+  arma::uvec prodidx;
+  /// Map to function indices, 2 x Nprod
+  arma::umat invmap;
+  /// Map to product index
+  arma::umat prodmap;
+  /// List of off-diagonal products
+  arma::uvec odiagidx;
+  /// Cholesky vectors, L x Nprod
   arma::mat B;
 
   /// Range separation constant
@@ -49,11 +59,13 @@ class ERIchol {
   /// Save B matrix
   void save() const;
     
-  /// Fill matrix, returns amount of significant pairs
-  size_t fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose);
+  /// Fill matrix, returns amount of significant pairs.
+  size_t fill(const BasisSet & basis, double cholesky_tol, double shell_reuse_thr, double shell_screen_tol, bool verbose);
 
   /// Get amount of vectors
-  size_t get_N() const;
+  size_t get_Naux() const;
+  /// Get basis set size
+  size_t get_Nbf() const;
   
   /// Get the matrix
   arma::mat get() const;
@@ -69,6 +81,9 @@ class ERIchol {
   arma::cx_mat calcK(const arma::cx_vec & C) const;
   /// Form exchange matrix
   arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs) const;
+
+  /// Get transformed B matrix
+  arma::mat B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose=false) const;
 };
 
 #endif
