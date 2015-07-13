@@ -132,6 +132,11 @@ class Checkpoint {
   /// Load array
   void read(const std::string & name, std::vector<double> & v);
 
+  /// Save array
+  void write(const std::string & name, const std::vector<hsize_t> & v);
+  /// Load array
+  void read(const std::string & name, std::vector<hsize_t> & v);
+
   /// Save basis set
   void write(const BasisSet & basis);
   /// Load basis set
@@ -151,6 +156,11 @@ class Checkpoint {
   void write(const std::string & name, int val);
   /// Read value
   void read(const std::string & name, int & val);
+  
+  /// Save value
+  void write(const std::string & name, hsize_t val);
+  /// Read value
+  void read(const std::string & name, hsize_t & val);
 
   /// Save value
   void write(const std::string & name, bool val);
