@@ -564,6 +564,9 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 	  t.set();
 	}
 
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
 	  // Calculate Coulomb term
 	  arma::mat Jorb=chol.calcJ(Porb[io]);
@@ -589,6 +592,9 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 	    t.set();
 	  }
 
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
 	  for(size_t io=0;io<Ctilde.n_cols;io++) {
 	    // Fock matrix
 	    arma::cx_mat Korb=kfull*chol.calcK(Ctilde.col(io));
@@ -615,6 +621,9 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 	    t.set();
 	  }
 
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
 	  for(size_t io=0;io<Ctilde.n_cols;io++) {
 	    // Potential and energy
 	    arma::cx_mat Korb=kshort*chol_rs.calcK(Ctilde.col(io));
