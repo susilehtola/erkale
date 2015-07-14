@@ -878,9 +878,41 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 		}
 	      }
 	    }
-	  }
+	  } // end aux loop
+	} // end parallel section
+      } // end shell loop
+
+      // Multiply by inverse overlap to get B_iv^Q
+      iuP=iuP*ab_invh;
+
+      // Increment K matrix
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+      {
+	// Temp vector
+	arma::mat vP(Nbf,Naux);
+
+	// Loop over orbitals
+#ifdef _OPENMP
+	arma::mat Kwrk(K);
+#pragma omp for
+#endif
+	for(size_t io=0;io<Norb;io++) {
+	  // Collect elements of vP
+	  for(size_t ia=0;ia<Naux;ia++)
+	    for(size_t mu=0;mu<Nbf;mu++)
+	      vP(mu,ia)=iuP(io*Nbf+mu,ia);
+	  // Increment K
+#ifdef _OPENMP
+	  Kwrk=vP*arma::trans(vP);
+#pragma omp critical
+	  K+=occs[orbstart+io]*Kwrk;
+#else
+	  K+=occs[orbstart+io]*(vP*arma::trans(vP));
+#endif
 	}
-      }
+      } // end parallel
     } // End loop over orbital blocks
     
   } else {
@@ -891,28 +923,28 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 #endif
     {
 
-      arma::mat iuP(Nbf,Naux);
+      arma::mat vP(Nbf,Naux);
 
 #ifdef _OPENMP
 #pragma omp for
 #endif
       for(size_t io=0;io<Nmo;io++) {
-      // Half-transformed \f $(\mu|P)$ \f
-	iuP.zeros();
+	// Half-transformed \f $(\mu|P)$ \f
+	vP.zeros();
 	
 	// Loop over functions
 	for(size_t mu=0;mu<Nbf;mu++)
 	  for(size_t nu=0;nu<Nbf;nu++) {
 	    size_t imunu(idx(mu,nu));
 	    for(size_t ia=0;ia<Naux;ia++)
-	      iuP(mu,ia)+=C(nu,io)*a_munu(ia,imunu);
+	      vP(mu,ia)+=C(nu,io)*a_munu(ia,imunu);
 	  }
 	
 	// Plug in the half inverse, so iuP -> BiuQ
-	iuP=iuP*ab_invh;
+	vP=vP*ab_invh;
 	
 	// K matrix
-	arma::mat Kw(iuP*arma::trans(iuP));
+	arma::mat Kw(vP*arma::trans(vP));
 #ifdef _OPENMP
 #pragma omp critical
 #endif
@@ -1039,9 +1071,42 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
 		}
 	      }
 	    }
-	  }
+	  } // end aux shell loop
+	} // end parallel
+      } // end orb shell loop
+
+
+      // Multiply by inverse overlap to get B_iv^Q
+      iuP=iuP*ab_invh;
+
+      // Increment K matrix
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+      {
+	// Temp vector
+	arma::cx_mat vP(Nbf,Naux);
+
+	// Loop over orbitals
+#ifdef _OPENMP
+	arma::cx_mat Kwrk(K);
+#pragma omp for
+#endif
+	for(size_t io=0;io<Norb;io++) {
+	  // Collect elements of vP
+	  for(size_t ia=0;ia<Naux;ia++)
+	    for(size_t mu=0;mu<Nbf;mu++)
+	      vP(mu,ia)=iuP(io*Nbf+mu,ia);
+	  // Increment K
+#ifdef _OPENMP
+	  Kwrk=vP*arma::trans(vP);
+#pragma omp critical
+	  K+=occs[orbstart+io]*Kwrk;
+#else
+	  K+=occs[orbstart+io]*(vP*arma::trans(vP));
+#endif
 	}
-      }
+      } // end parallel
     } // End loop over orbital blocks
     
   } else {
@@ -1052,28 +1117,28 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
 #endif
     {
 
-      arma::cx_mat iuP(Nbf,Naux);
+      arma::cx_mat vP(Nbf,Naux);
 
 #ifdef _OPENMP
 #pragma omp for
 #endif
       for(size_t io=0;io<Nmo;io++) {
       // Half-transformed \f $(\mu|P)$ \f
-	iuP.zeros();
+	vP.zeros();
 	
 	// Loop over functions
 	for(size_t mu=0;mu<Nbf;mu++)
 	  for(size_t nu=0;nu<Nbf;nu++) {
 	    size_t imunu(idx(mu,nu));
 	    for(size_t ia=0;ia<Naux;ia++)
-	      iuP(mu,ia)+=C(nu,io)*a_munu(ia,imunu);
+	      vP(mu,ia)+=C(nu,io)*a_munu(ia,imunu);
 	  }
 	
-	// Plug in the half inverse, so iuP -> BiuQ
-	iuP=iuP*ab_invh;
+	// Plug in the half inverse, so vP -> BiuQ
+	vP=vP*ab_invh;
 	
 	// K matrix
-	arma::cx_mat Kw(iuP*arma::trans(iuP));
+	arma::cx_mat Kw(vP*arma::trans(vP));
 #ifdef _OPENMP
 #pragma omp critical
 #endif
