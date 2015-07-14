@@ -1,0 +1,13 @@
+# Water cluster
+System water_cluster.xyz
+Method HF
+Basis aug-cc-pVDZ
+DensityFitting false
+Cholesky true
+CholeskyThr 1e-7
+IntegralThresh 1e-14
+
+
+
+Logfile water_cluster_cholesky.log
+SaveChk water_cluster_cholesky.chk
