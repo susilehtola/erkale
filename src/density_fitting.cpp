@@ -793,25 +793,25 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
       }
   }
 
-  // Three-center integrals \f $(i \mu|P)$ \f
-  arma::mat iuP(blocksize*Nbf,Naux);
-
   // Returned matrix
   arma::mat K(Nbf,Nbf);
   K.zeros();
 
-  // Loop over orbital blocks
-  for(size_t iblock=0;iblock<Nblocks;iblock++) {
-    iuP.zeros();
+  if(direct) {
+    // Three-center integrals \f $(i \mu|P)$ \f
+    arma::mat iuP(blocksize*Nbf,Naux);
 
-    // Starting orbital index in the current block
-    size_t orbstart=iblock*blocksize;
-    // How many orbitals in the current block
-    size_t Norb=std::min(blocksize,Nmo);
-
-    //    printf("Orbitals %i - %i\n",(int) orbstart+1,(int) (orbstart+Norb));
-
-    if(direct) {
+    // Loop over orbital blocks
+    for(size_t iblock=0;iblock<Nblocks;iblock++) {
+      iuP.zeros();
+      
+      // Starting orbital index in the current block
+      size_t orbstart=iblock*blocksize;
+      // How many orbitals in the current block
+      size_t Norb=std::min(blocksize,Nmo);
+      
+      //    printf("Orbitals %i - %i\n",(int) orbstart+1,(int) (orbstart+Norb));
+      
       // Loop over basis function pairs
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	size_t imus=orbpairs[ip].is;
@@ -881,36 +881,45 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 	  }
 	}
       }
-    } else {
-      // Loop over functions
-      for(size_t mu=0;mu<Nbf;mu++)
-	for(size_t io=0;io<Norb;io++)
-	  for(size_t nu=0;nu<Nbf;nu++)
+    } // End loop over orbital blocks
+    
+  } else {
+    
+    // Loop over orbitals
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+
+      arma::mat iuP(Nbf,Naux);
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+      for(size_t io=0;io<Nmo;io++) {
+      // Half-transformed \f $(\mu|P)$ \f
+	iuP.zeros();
+	
+	// Loop over functions
+	for(size_t mu=0;mu<Nbf;mu++)
+	  for(size_t nu=0;nu<Nbf;nu++) {
+	    size_t imunu(idx(mu,nu));
 	    for(size_t ia=0;ia<Naux;ia++)
-	      iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu(ia,idx(mu,nu));
-    }
-
-    // Plug in the half inverse, so iuP -> BiuQ
-    iuP=iuP*ab_invh;
-
-    // Increment the exchange matrix. Loop over functions
-    for(size_t mu=0;mu<Nbf;mu++)
-      for(size_t nu=0;nu<=mu;nu++) {
-
-	// Compute the matrix element
-	for(size_t io=0;io<Norb;io++) {
-	  // Kuv -> BiuQ*BivQ
-	  //  	  for(size_t ia=0;ia<Naux;ia++)
-	  //	    K(mu,nu)+=occs[orbstart+io]*iuP(io*Nbf+mu,ia)*iuP(io*Nbf+nu,ia);
-
-	  K(mu,nu)+=occs[orbstart+io]*arma::dot(iuP.row(io*Nbf+mu),iuP.row(io*Nbf+nu));
-	}
-
-	// and symmetrize
-	K(nu,mu)=K(mu,nu);
+	      iuP(mu,ia)+=C(nu,io)*a_munu(ia,imunu);
+	  }
+	
+	// Plug in the half inverse, so iuP -> BiuQ
+	iuP=iuP*ab_invh;
+	
+	// K matrix
+	arma::mat Kw(iuP*arma::trans(iuP));
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+	K+=occs[io]*Kw;
       }
-
-  } // End loop over orbital blocks
+    }
+  }
 
   return K;
 }
@@ -945,25 +954,25 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
       }
   }
 
-  // Three-center integrals \f $(i \mu|P)$ \f
-  arma::cx_mat iuP(blocksize*Nbf,Naux);
-
   // Returned matrix
   arma::cx_mat K(Nbf,Nbf);
   K.zeros();
 
-  // Loop over orbital blocks
-  for(size_t iblock=0;iblock<Nblocks;iblock++) {
-    iuP.zeros();
+  if(direct) {
+    // Three-center integrals \f $(i \mu|P)$ \f
+    arma::cx_mat iuP(blocksize*Nbf,Naux);
 
-    // Starting orbital index in the current block
-    size_t orbstart=iblock*blocksize;
-    // How many orbitals in the current block
-    size_t Norb=std::min(blocksize,Nmo);
-
-    //    printf("Orbitals %i - %i\n",(int) orbstart+1,(int) (orbstart+Norb));
-
-    if(direct) {
+    // Loop over orbital blocks
+    for(size_t iblock=0;iblock<Nblocks;iblock++) {
+      iuP.zeros();
+      
+      // Starting orbital index in the current block
+      size_t orbstart=iblock*blocksize;
+      // How many orbitals in the current block
+      size_t Norb=std::min(blocksize,Nmo);
+      
+      //    printf("Orbitals %i - %i\n",(int) orbstart+1,(int) (orbstart+Norb));
+      
       // Loop over basis function pairs
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	size_t imus=orbpairs[ip].is;
@@ -1033,36 +1042,45 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
 	  }
 	}
       }
-    } else {
-      // Loop over functions
-      for(size_t mu=0;mu<Nbf;mu++)
-	for(size_t io=0;io<Norb;io++)
-	  for(size_t nu=0;nu<Nbf;nu++)
+    } // End loop over orbital blocks
+    
+  } else {
+
+    // Loop over orbitals
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+
+      arma::cx_mat iuP(Nbf,Naux);
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+      for(size_t io=0;io<Nmo;io++) {
+      // Half-transformed \f $(\mu|P)$ \f
+	iuP.zeros();
+	
+	// Loop over functions
+	for(size_t mu=0;mu<Nbf;mu++)
+	  for(size_t nu=0;nu<Nbf;nu++) {
+	    size_t imunu(idx(mu,nu));
 	    for(size_t ia=0;ia<Naux;ia++)
-	      iuP(io*Nbf+mu,ia)+=C(nu,orbstart+io)*a_munu(ia,idx(mu,nu));
-    }
-
-    // Plug in the half inverse, so iuP -> BiuQ
-    iuP=iuP*ab_invh;
-
-    // Increment the exchange matrix. Loop over functions
-    for(size_t mu=0;mu<Nbf;mu++)
-      for(size_t nu=0;nu<=mu;nu++) {
-
-	// Compute the matrix element
-	for(size_t io=0;io<Norb;io++) {
-	  // Kuv -> BiuQ*BivQ
-	  //  	  for(size_t ia=0;ia<Naux;ia++)
-	  //	    K(mu,nu)+=occs[orbstart+io]*iuP(io*Nbf+mu,ia)*iuP(io*Nbf+nu,ia);
-
-	  K(mu,nu)+=occs[orbstart+io]*arma::cdot(iuP.row(io*Nbf+mu),iuP.row(io*Nbf+nu));
-	}
-
-	// and symmetrize
-	K(nu,mu)=std::conj(K(mu,nu));
+	      iuP(mu,ia)+=C(nu,io)*a_munu(ia,imunu);
+	  }
+	
+	// Plug in the half inverse, so iuP -> BiuQ
+	iuP=iuP*ab_invh;
+	
+	// K matrix
+	arma::cx_mat Kw(iuP*arma::trans(iuP));
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+	K+=occs[io]*Kw;
       }
-
-  } // End loop over orbital blocks
+    }
+  }
 
   return K;
 }
