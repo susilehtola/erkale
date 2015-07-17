@@ -60,15 +60,7 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
     
     // Virtual-virtual exchange matrix is
     arma::mat Kvv(Bp*arma::trans(Bp));
-    {
-      std::ostringstream oss;
-      oss << "K_" << io << ".dat";
-      arma::mat Ko;
-      Ko.load(oss.str(),arma::arma_binary);
-      printf("Orbital %i difference norm %e\n",(int) io,arma::norm(Ko-Kvv,2));
-      fflush(stdout);
-    }
-    
+
     // Eigendecomposition
     arma::vec eval;
     arma::mat evec;
