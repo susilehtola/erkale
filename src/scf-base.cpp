@@ -906,27 +906,30 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
     }
 
     // Work block
-    arma::mat Cwrk(Cv.cols(io,Cv.n_cols-1));
+    arma::mat Cwrk(Cv0.cols(0,Cv0.n_cols-1));
 
     // Convert to work space
     arma::mat Kvv(arma::trans(Cwrk)*K*Cwrk);
-
+    {
+      std::ostringstream oss;
+      oss << "K_" << io << ".dat";
+      Kvv.save(oss.str(),arma::arma_binary);
+    }
+    
     // Eigendecomposition
     arma::vec eval;
     arma::mat evec;
     arma::eig_sym(eval,evec,-Kvv);
-
+    
     // Rotate orbitals to new basis; orbital becomes lowest-lying orbital
-    Cv.cols(io,Cv.n_cols-1)=Cwrk*evec;
+    Cv.col(io)=Cwrk*evec.col(0);
   }
-
+  
   // Keep only active orbitals
   Cv=Cv.cols(0,Co.n_cols-1);
 
-  /*
-  // Orbital overlap
+  // Reorthonormalize
   arma::mat Svv(arma::trans(Cv)*S*Cv);
-  Svv.print("initial vv overlap");
   
   // Reorthogonalize
   arma::vec sval;
@@ -942,8 +945,6 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
   Cv=Cv*O;
 
   Svv=arma::trans(Cv)*S*Cv;
-  Svv.print("vv overlap");
-  */
   
   return Cv;
 }
