@@ -663,13 +663,13 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
   for(size_t P=0;P<B.n_cols;P++)
     for(size_t i=0;i<prodidx.size();i++)
       for(size_t l=0;l<Cl.n_cols;l++)
-	Ll(l,P*Nbf+invmap(0,i))+=B(invmap(1,i),P)*Cl(invmap(1,i),l);
+	Ll(l,P*Nbf+invmap(0,i))+=B(i,P)*Cl(invmap(1,i),l);
   // Off-diagonal contribution
   for(size_t P=0;P<B.n_cols;P++)
     for(size_t ii=0;ii<odiagidx.size();ii++) {
       size_t i=odiagidx(ii);
       for(size_t l=0;l<Cl.n_cols;l++)
-	Ll(l,P*Nbf+invmap(1,i))+=B(invmap(0,i),P)*Cl(invmap(0,i),l);
+	Ll(l,P*Nbf+invmap(1,i))+=B(i,P)*Cl(invmap(0,i),l);
     }
 
   if(verbose) {
