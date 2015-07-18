@@ -435,6 +435,9 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	  size_t l=ll+max_l0;
 	  // Corresponding index in the array is
 	  size_t ind = prodmap(k,l);
+	  if(ind > Nbf*Nbf)
+	    continue;
+	  
 	  if(d(ind)>blockerr) {
 	    // Check that the index is not in the old pivots
 	    bool found=false;
