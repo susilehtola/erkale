@@ -35,3 +35,22 @@ else()
   target_link_libraries(chkcompare ${LIBINT_LIBRARIES})
   target_link_libraries(chkcompare ${HDF5_LIBRARIES})
 endif()
+
+add_executable(integraltest integraltest.cpp)
+# The name of the executable is
+set_target_properties(integraltest PROPERTIES OUTPUT_NAME "integraltest${SUFFIX}")
+target_link_libraries(integraltest liberkale_emd)
+target_link_libraries(integraltest liberkale)
+
+# Link libraries
+if(BUILD_SHARED_LIBS)
+else()
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(integraltest -lrt)
+  endif()
+  target_link_libraries(integraltest ${GSL_LIBRARIES})
+  target_link_libraries(integraltest ${LAPACK_LIBRARIES})
+  target_link_libraries(integraltest ${LIBXC_LIBRARIES})
+  target_link_libraries(integraltest ${LIBINT_LIBRARIES})
+  target_link_libraries(integraltest ${HDF5_LIBRARIES})
+endif()
