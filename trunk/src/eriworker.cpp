@@ -20,8 +20,6 @@
 #include "integrals.h"
 #include <cfloat>
 
-//#define ERIDEBUG
-
 IntegralWorker::IntegralWorker() {
   input=&arrone;
   output=&arrtwo;
@@ -152,7 +150,7 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
     ints=build_eri[is->get_am()][js->get_am()][ks->get_am()][ls->get_am()](&libint,Ncomb);
 
     // and collect the results, plugging in the normalization factors
-    size_t ind_i, ind_ij, ind_ijk, ind;
+    size_t ind_ij, ind_ijk, ind;
     double norm_i, norm_ij, norm_ijk, norm;
 
     // Numbers of functions on each shell
@@ -1170,36 +1168,34 @@ void ERIWorker::compute(const GaussianShell *is_orig, const GaussianShell *js_or
   compute_cartesian(is,js,ks,ls);
   // Restore the original order
   reorder(is_orig,js_orig,ks_orig,ls_orig,swap_ij,swap_kl,swap_ijkl);
+  // and transform them into the spherical basis
+  spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
+}
 
-#ifdef ERIDEBUG
-  //printf("New (%c %c | %c %c) integral block, swap_ijkl = %i, swap_kl = %i, swap_ij = %i\n",shell_types[is_orig->get_am()],shell_types[js_orig->get_am()],shell_types[ks_orig->get_am()],shell_types[ls_orig->get_am()],swap_ijkl,swap_kl,swap_ij);
-  /*
-  printf("is\n");
-  is_orig->print();
-  printf("js\n");
-  js_orig->print();
-  printf("ks\n");
-  ks_orig->print();
-  printf("ls\n");
-  ls_orig->print();
-  */
+void ERIWorker::compute_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
+  // Get the cartesian ERIs
+  compute_cartesian_debug(is,js,ks,ls);
+  // and transform them into the spherical basis
+  spherical_transform(is,js,ks,ls);
+}
+
+void ERIWorker::compute_cartesian_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
+  std::vector<shellf_t> carti(is->get_cart());
+  std::vector<shellf_t> cartj(js->get_cart());
+  std::vector<shellf_t> cartk(ks->get_cart());
+  std::vector<shellf_t> cartl(ls->get_cart());
+
+  std::vector<contr_t> contri(is->get_contr());
+  std::vector<contr_t> contrj(js->get_contr());
+  std::vector<contr_t> contrk(ks->get_contr());
+  std::vector<contr_t> contrl(ls->get_contr());
   
-  std::vector<shellf_t> carti(is_orig->get_cart());
-  std::vector<shellf_t> cartj(js_orig->get_cart());
-  std::vector<shellf_t> cartk(ks_orig->get_cart());
-  std::vector<shellf_t> cartl(ls_orig->get_cart());
+  coords_t Ri(is->get_center());
+  coords_t Rj(js->get_center());
+  coords_t Rk(ks->get_center());
+  coords_t Rl(ls->get_center());
 
-  std::vector<contr_t> contri(is_orig->get_contr());
-  std::vector<contr_t> contrj(js_orig->get_contr());
-  std::vector<contr_t> contrk(ks_orig->get_contr());
-  std::vector<contr_t> contrl(ls_orig->get_contr());
-  
-  coords_t Ri(is_orig->get_center());
-  coords_t Rj(js_orig->get_center());
-  coords_t Rk(ks_orig->get_center());
-  coords_t Rl(ls_orig->get_center());
-
-  std::vector<double> debugints(carti.size()*cartj.size()*cartk.size()*cartl.size(),0.0);
+  input->assign(carti.size()*cartj.size()*cartk.size()*cartl.size(),0.0);
 
   for(size_t ic=0;ic<carti.size();ic++)
     for(size_t jc=0;jc<cartj.size();jc++)
@@ -1247,45 +1243,8 @@ void ERIWorker::compute(const GaussianShell *is_orig, const GaussianShell *js_or
 					  ll,ml,nl,Rl.x,Rl.y,Rl.z,zl);
 		}
 	  
-	  debugints[((ic*cartj.size()+jc)*cartk.size()+kc)*cartl.size()+lc]=reli*relj*relk*rell*el;
+	  (*input)[((ic*cartj.size()+jc)*cartk.size()+kc)*cartl.size()+lc]=reli*relj*relk*rell*el;
 	}
-
-  // Compare integrals
-  if(debugints.size()!=input->size())
-    throw std::logic_error("Amount of integrals doesn't match!\n");
-
-  for(size_t ii=0;ii<carti.size();ii++)
-    for(size_t jj=0;jj<cartj.size();jj++)
-      for(size_t kk=0;kk<cartk.size();kk++)
- 	for(size_t ll=0;ll<cartl.size();ll++) {
-	  size_t i=((ii*cartj.size()+jj)*cartk.size()+kk)*cartl.size()+ll;
-	  if(fabs((*input)[i]-debugints[i])>1e-6*std::max((*input)[i],debugints[i])) {
-	    printf("%4i %e %e %e\n",(int) i, (*input)[i], debugints[i], (*input)[i]-debugints[i]);
-	    printf("is, i = %i\n",ii);
-	    is_orig->print();
-	    printf("js, j = %i\n",jj);
-	    js_orig->print();
-	    printf("ks, k = %i\n",kk);
-	    ks_orig->print();
-	    printf("ls, l = %i\n",ll);
-	    ls_orig->print();
-	    printf("ints:");
-	    for(size_t j=0;j<(*input).size();j++)
-	      printf(" % e",(*input)[j]);
-	    printf("\n");
-	    fflush(stdout);
-
-	    
-	    throw std::runtime_error("Integrals are wrong.\n");
-	  }
-	}
-
-  // Switch
-  //*input=debugints;
-#endif
-  
-  // and transform them into the spherical basis
-  spherical_transform(is_orig,js_orig,ks_orig,ls_orig);
 }
 
 std::vector<double> ERIWorker::get() const {

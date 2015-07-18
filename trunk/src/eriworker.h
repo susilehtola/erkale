@@ -96,6 +96,8 @@ class ERIWorker: public IntegralWorker {
 
   /// Compute the cartesian ERIs
   void compute_cartesian(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+  /// Compute the cartesian ERIs using Huzinaga routines
+  void compute_cartesian_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Compute data for libint
   void compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax);
 
@@ -107,6 +109,8 @@ class ERIWorker: public IntegralWorker {
 
   /// Compute eris
   void compute(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
+  /// Compute eris using Huzinaga routines
+  void compute_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Get the eris
   std::vector<double> get() const;
   /// Get pointer to eris
