@@ -52,12 +52,12 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
     arma::mat Bp(Cv.n_cols,Bph.n_rows);
     // Loop over virtuals
     for(size_t iv=0;iv<Cv.n_cols;iv++)
-      for(size_t P=0;P<Bph.n_rows;P++)
-	Bp(iv,P)=Bph(P,io*Cv.n_cols+iv);
+      for(size_t a=0;a<Bph.n_rows;a++)
+	Bp(iv,a)=Bph(a,io*Cv.n_cols+iv);
 
     // Work block
     arma::mat Cwrk(Cv0.cols(0,Cv0.n_cols-1));
-    
+
     // Virtual-virtual exchange matrix is
     arma::mat Kvv(Bp*arma::trans(Bp));
 
@@ -65,7 +65,7 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
     arma::vec eval;
     arma::mat evec;
     arma::eig_sym(eval,evec,-Kvv);
-    
+
     // Rotate orbitals to new basis; orbital becomes lowest-lying orbital
     Cv.col(io)=Cwrk*evec.col(0);
   }
@@ -91,7 +91,7 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
 
   return Cv;
 }
-  
+
 int main(int argc, char **argv) {
 
 #ifdef _OPENMP
@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
 
   // Initialize libint
   init_libint_base();
-  
+
   Timer t;
 
   // Parse settings
@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
   set.add_int("NActive","Size of active space (0 for full transform)",0);
   set.add_bool("Localize","Localize active space orbitals?",false);
   set.add_bool("Binary","Use binary I/O?",true);
-  
+
   if(argc==2)
     set.parse(argv[1]);
   else printf("Using default settings.\n\n");
@@ -163,13 +163,13 @@ int main(int argc, char **argv) {
   // Density matrix
   arma::mat P;
   chkpt.read("P",P);
-  
+
   // File type
   arma::file_type atype = binary ? arma::arma_binary : arma::raw_ascii;
 
   ERIchol chol;
   DensityFit dfit;
-  
+
   if(densityfit) {
     // Construct fitting basis
     BasisSetLibrary fitlib;
@@ -181,10 +181,11 @@ int main(int argc, char **argv) {
     basset.add_bool("BasisRotate","",true);
     basset.add_bool("UseLM","",true);
     basset.add_double("BasisCutoff","",1e-8);
-        
+
     // Construct fitting basis
     BasisSet dfitbas;
     construct_basis(dfitbas,basis.get_nuclei(),fitlib,basset);
+    printf("Auxiliary basis set has %i functions.\n",(int) dfitbas.get_Nbf());
 
     // Calculate fitting integrals. In-core, with RI-K
     dfit.fill(basis,dfitbas,false,intthr,fitthr,true);
@@ -198,7 +199,7 @@ int main(int argc, char **argv) {
 	fflush(stdout);
       }
     }
-    
+
     if(chol.get_Nbf()!=basis.get_Nbf()) {
       chol.fill(basis,cholthr,cholshthr,intthr,true);
       if(cholmode==1) {
@@ -209,7 +210,7 @@ int main(int argc, char **argv) {
       }
     }
   }
-  
+
   if(restr) {
     arma::mat C;
     chkpt.read("C",C);
@@ -224,7 +225,7 @@ int main(int argc, char **argv) {
     if(Nact!=0) {
       // Sanity check
       Nact=std::min(Nact,std::min(Nela,(int) (C.n_cols-Nela)));
-      
+
       // Drop inactive orbitals
       Cah=Cah.cols(Cah.n_cols-Nact,Cah.n_cols-1);
 
@@ -234,7 +235,7 @@ int main(int argc, char **argv) {
 	arma::cx_mat W(Cah.n_cols,Cah.n_cols);
 	W.eye();
 	orbital_localization(PIPEK_IAO2,basis,Cah,P,measure,W);
-	
+
 	// Get ph B matrix
 	arma::mat Bph;
 	if(densityfit)
@@ -253,36 +254,48 @@ int main(int argc, char **argv) {
       printf("%i occupied and %i virtual orbitals\n",(int) Cah.n_cols,(int) Cap.n_cols);
     }
 
-    arma::mat Bhaha, Bpaha, Bpapa;
-    if(densityfit) {
-      arma::mat B(dfit.B_matrix());
-      Bhaha=B_transform(B,Cah,Cah);
-      Bpaha=B_transform(B,Cap,Cah);
-      Bpapa=B_transform(B,Cap,Cap);
-    } else {
-      Bhaha=chol.B_transform(Cah,Cah,true);
-      Bpaha=chol.B_transform(Cap,Cah,true);
-      Bpapa=chol.B_transform(Cap,Cap,true);
+    // Fock matrices
+    {
+      arma::mat Fahh(Cah.t()*H*Cah);
+      Fahh.save("Fhaha.dat",atype);
+    }
+    {
+      arma::mat Faph(Cap.t()*H*Cah);
+      Faph.save("Fpaha.dat",atype);
+    }
+    {
+      arma::mat Fapp(Cap.t()*H*Cap);
+      Fapp.save("Fpapa.dat",atype);
     }
 
-    Bhaha.save("Bhaha.dat",atype);
-    Bhaha.save("Bhbhb.dat",atype);
-    Bpaha.save("Bpaha.dat",atype);
-    Bpaha.save("Bpbhb.dat",atype);
-    Bpapa.save("Bpapa.dat",atype);
-    Bpapa.save("Bpbpb.dat",atype);
-
-    // Fock matrices
-    arma::mat Fahh(Cah.t()*H*Cah);
-    arma::mat Faph(Cap.t()*H*Cah);
-    arma::mat Fapp(Cap.t()*H*Cap);
-    Fahh.save("Fhaha.dat",atype);
-    Fahh.save("Fhbhb.dat",atype);
-    Faph.save("Fpaha.dat",atype);
-    Faph.save("Fpbhb.dat",atype);
-    Fapp.save("Fpapa.dat",atype);
-    Fapp.save("Fpbpb.dat",atype);
-    
+    // B matrices
+    if(densityfit) {
+      arma::mat B(dfit.B_matrix());
+      {
+	arma::mat Bhaha(B_transform(B,Cah,Cah));
+	Bhaha.save("Bhaha.dat",atype);
+      }
+      {
+	arma::mat Bpaha(B_transform(B,Cap,Cah));
+	Bpaha.save("Bpaha.dat",atype);
+      }
+      {
+	arma::mat Bpapa(B_transform(B,Cap,Cap));
+	Bpapa.save("Bpapa.dat",atype);
+      }
+    } else {
+      {
+	arma::mat Bhaha(chol.B_transform(Cah,Cah,true));
+      }
+      {
+	arma::mat Bpaha(chol.B_transform(Cap,Cah,true));
+	Bpaha.save("Bpaha.dat",atype);
+      }
+      {
+	arma::mat Bpapa(chol.B_transform(Cap,Cap,true));
+	Bpapa.save("Bpapa.dat",atype);
+      }
+    }
 
   } else {
     arma::mat Ca, Cb;
@@ -317,11 +330,11 @@ int main(int argc, char **argv) {
       // Drop inactive orbitals
       Cah=Cah.cols(Cah.n_cols-Nact,Cah.n_cols-1);
       Cbh=Cbh.cols(Cbh.n_cols-Nact,Cbh.n_cols-1);
-      
+
       if(loc) {
 	// Localize occupied orbitals
 	double measure;
-	
+
 	arma::cx_mat Wa(Cah.n_cols,Cah.n_cols);
 	Wa.eye();
 	orbital_localization(PIPEK_IAO2,basis,Cah,P,measure,Wa);
@@ -329,7 +342,7 @@ int main(int argc, char **argv) {
 	arma::cx_mat Wb(Cbh.n_cols,Cbh.n_cols);
 	Wb.eye();
 	orbital_localization(PIPEK_IAO2,basis,Cbh,P,measure,Wb);
-	
+
 	// Localize virtual orbitals
 	arma::mat S(basis.overlap());
 	{
@@ -355,49 +368,86 @@ int main(int argc, char **argv) {
       }
     }
 
-    arma::mat Bhaha, Bpaha, Bpapa;
-    arma::mat Bhbhb, Bpbhb, Bpbpb;
-    if(densityfit) {
-      arma::mat B(dfit.B_matrix());
-      Bhaha=B_transform(B,Cah,Cah);
-      Bpaha=B_transform(B,Cap,Cah);
-      Bpapa=B_transform(B,Cap,Cap);
-
-      Bhbhb=B_transform(B,Cbh,Cbh);
-      Bpbhb=B_transform(B,Cbp,Cbh);
-      Bpbpb=B_transform(B,Cbp,Cbp);
-    } else {
-      Bhaha=chol.B_transform(Cah,Cah,true);
-      Bpaha=chol.B_transform(Cap,Cah,true);
-      Bpapa=chol.B_transform(Cap,Cap,true);
-
-      Bhbhb=chol.B_transform(Cbh,Cbh,true);
-      Bpbhb=chol.B_transform(Cbp,Cbh,true);
-      Bpbpb=chol.B_transform(Cbp,Cbp,true);
+    // Fock matrices
+    {
+      arma::mat Fahh(Cah.t()*Ha*Cah);
+      Fahh.save("Fhaha.dat",atype);
+    }
+    {
+      arma::mat Faph(Cap.t()*Ha*Cah);
+      Faph.save("Fpaha.dat",atype);
+    }
+    {
+      arma::mat Fapp(Cap.t()*Ha*Cap);
+      Fapp.save("Fpapa.dat",atype);
     }
 
-    Bhaha.save("Bhaha.dat",atype);
-    Bhbhb.save("Bhbhb.dat",atype);
-    Bpaha.save("Bpaha.dat",atype);
-    Bpbhb.save("Bpbhb.dat",atype);
-    Bpapa.save("Bpapa.dat",atype);
-    Bpbpb.save("Bpbpb.dat",atype);
+    {
+      arma::mat Fbhh(Cbh.t()*Hb*Cbh);
+      Fbhh.save("Fhbhb.dat",atype);
+    }
+    {
+      arma::mat Fbph(Cbp.t()*Hb*Cbh);
+      Fbph.save("Fpbhb.dat",atype);
+    }
+    {
+      arma::mat Fbpp(Cbp.t()*Hb*Cbp);
+      Fbpp.save("Fpbpb.dat",atype);
+    }
 
-    // Fock matrices
-    arma::mat Fahh(Cah.t()*Ha*Cah);
-    arma::mat Faph(Cap.t()*Ha*Cah);
-    arma::mat Fapp(Cap.t()*Ha*Cap);
-
-    arma::mat Fbhh(Cbh.t()*Hb*Cbh);
-    arma::mat Fbph(Cbp.t()*Hb*Cbh);
-    arma::mat Fbpp(Cbp.t()*Hb*Cbp);
-    
-    Fahh.save("Fhaha.dat",atype);
-    Fbhh.save("Fhbhb.dat",atype);
-    Faph.save("Fpaha.dat",atype);
-    Fbph.save("Fpbhb.dat",atype);
-    Fapp.save("Fpapa.dat",atype);
-    Fbpp.save("Fpbpb.dat",atype);
+    // B matrices
+    if(densityfit) {
+      arma::mat B(dfit.B_matrix());
+      {
+	arma::mat Bhaha(B_transform(B,Cah,Cah));
+	Bhaha.save("Bhaha.dat",atype);
+      }
+      {
+	arma::mat Bpaha(B_transform(B,Cap,Cah));
+	Bpaha.save("Bpaha.dat",atype);
+      }
+      {
+	arma::mat Bpapa(B_transform(B,Cap,Cap));
+	Bpapa.save("Bpapa.dat",atype);
+      }
+      {
+	arma::mat Bhbhb(B_transform(B,Cbh,Cbh));
+	Bhbhb.save("Bhbhb.dat",atype);
+      }
+      {
+	arma::mat Bpbhb(B_transform(B,Cbp,Cbh));
+	Bpbhb.save("Bpbhb.dat",atype);
+      }
+      {
+	arma::mat Bpbpb(B_transform(B,Cbp,Cbp));
+	Bpbpb.save("Bpbpb.dat",atype);
+      }
+    } else {
+      {
+	arma::mat Bhaha(chol.B_transform(Cah,Cah,true));
+	Bhaha.save("Bhaha.dat",atype);
+      }
+      {
+	arma::mat Bpaha(chol.B_transform(Cap,Cah,true));
+	Bpaha.save("Bpaha.dat",atype);
+      }
+      {
+	arma::mat Bpapa(chol.B_transform(Cap,Cap,true));
+	Bpapa.save("Bpapa.dat",atype);
+      }
+      {
+	arma::mat Bhbhb(chol.B_transform(Cbh,Cbh,true));
+	Bhbhb.save("Bhbhb.dat",atype);
+      }
+      {
+	arma::mat Bpbhb(chol.B_transform(Cbp,Cbh,true));
+	Bpbhb.save("Bpbhb.dat",atype);
+      }
+      {
+	arma::mat Bpbpb(chol.B_transform(Cbp,Cbp,true));
+	Bpbpb.save("Bpbpb.dat",atype);
+      }
+    }
   }
 
   return 0;
