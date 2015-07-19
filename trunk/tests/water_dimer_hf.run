@@ -1,0 +1,14 @@
+# Water dimer
+System water_dimer.xyz
+Method HF
+Basis aug-cc-pVTZ
+DensityFitting false
+Direct false
+IntegralThresh 1e-14
+UseLM false
+
+
+
+
+Logfile water_dimer_hf.log
+SaveChk water_dimer_hf.chk

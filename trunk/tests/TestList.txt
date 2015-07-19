@@ -1,4 +1,4 @@
-# **** Tue Jul 14 00:20:03 PDT 2015 ****
+# **** Sat Jul 18 19:45:37 PDT 2015 ****
 run_test(H_dz) 
 run_test(He_dz) 
 run_test(H2_dz) 
@@ -82,5 +82,6 @@ run_test(water_cluster_rihf)
 run_xrs(water_cluster_fch water_cluster_chk) 
 run_xrs(water_cluster_xch water_cluster_chk) 
 run_xrs(water_cluster_xrs water_cluster_chk) 
+run_test(water_dimer_hf) 
 run_test(decanol) 
 # **** END ****
