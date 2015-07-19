@@ -92,6 +92,36 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
   return Cv;
 }
 
+void form_F(const arma::mat & H, const arma::mat & Cl, const arma::mat & Cr, const std::string & name, arma::file_type atype) {
+  arma::mat F(arma::trans(Cl)*H*Cr);
+  F.save(name+".dat",atype);
+}
+
+void form_B(const arma::mat & B, const arma::mat & Cl, const arma::mat & Cr, const std::string & name, arma::file_type atype) {
+  Timer t;
+  printf("Forming %s ... ",name.c_str());
+  fflush(stdout);
+
+  arma::mat Bt(B_transform(B,Cl,Cr));
+  Bt.save(name+".dat",atype);
+
+  printf("done (%s)\n",t.elapsed().c_str());
+  fflush(stdout);
+}
+
+void form_B(const ERIchol & chol, const arma::mat & Cl, const arma::mat & Cr, const std::string & name, arma::file_type atype) {
+  Timer t;
+  printf("Forming %s ... ",name.c_str());
+  fflush(stdout);
+
+  arma::mat Bt(chol.B_transform(Cl,Cr));
+  Bt.save(name+".dat",atype);
+
+  printf("done (%s)\n",t.elapsed().c_str());
+  fflush(stdout);
+}
+
+
 int main(int argc, char **argv) {
 
 #ifdef _OPENMP
@@ -255,46 +285,20 @@ int main(int argc, char **argv) {
     }
 
     // Fock matrices
-    {
-      arma::mat Fahh(Cah.t()*H*Cah);
-      Fahh.save("Fhaha.dat",atype);
-    }
-    {
-      arma::mat Faph(Cap.t()*H*Cah);
-      Faph.save("Fpaha.dat",atype);
-    }
-    {
-      arma::mat Fapp(Cap.t()*H*Cap);
-      Fapp.save("Fpapa.dat",atype);
-    }
+    form_F(H,Cah,Cah,"Fhaha",atype);
+    form_F(H,Cah,Cap,"Fpaha",atype);
+    form_F(H,Cap,Cap,"Fpapa",atype);
 
     // B matrices
     if(densityfit) {
       arma::mat B(dfit.B_matrix());
-      {
-	arma::mat Bhaha(B_transform(B,Cah,Cah));
-	Bhaha.save("Bhaha.dat",atype);
-      }
-      {
-	arma::mat Bpaha(B_transform(B,Cap,Cah));
-	Bpaha.save("Bpaha.dat",atype);
-      }
-      {
-	arma::mat Bpapa(B_transform(B,Cap,Cap));
-	Bpapa.save("Bpapa.dat",atype);
-      }
+      form_B(B,Cah,Cah,"Bhaha",atype);
+      form_B(B,Cap,Cah,"Bpaha",atype);
+      form_B(B,Cap,Cap,"Bpapa",atype);
     } else {
-      {
-	arma::mat Bhaha(chol.B_transform(Cah,Cah,true));
-      }
-      {
-	arma::mat Bpaha(chol.B_transform(Cap,Cah,true));
-	Bpaha.save("Bpaha.dat",atype);
-      }
-      {
-	arma::mat Bpapa(chol.B_transform(Cap,Cap,true));
-	Bpapa.save("Bpapa.dat",atype);
-      }
+      form_B(chol,Cah,Cah,"Bhaha",atype);
+      form_B(chol,Cap,Cah,"Bpaha",atype);
+      form_B(chol,Cap,Cap,"Bpapa",atype);
     }
 
   } else {
@@ -369,84 +373,30 @@ int main(int argc, char **argv) {
     }
 
     // Fock matrices
-    {
-      arma::mat Fahh(Cah.t()*Ha*Cah);
-      Fahh.save("Fhaha.dat",atype);
-    }
-    {
-      arma::mat Faph(Cap.t()*Ha*Cah);
-      Faph.save("Fpaha.dat",atype);
-    }
-    {
-      arma::mat Fapp(Cap.t()*Ha*Cap);
-      Fapp.save("Fpapa.dat",atype);
-    }
+    form_F(Ha,Cah,Cah,"Fhaha",atype);
+    form_F(Ha,Cap,Cah,"Fpaha",atype);
+    form_F(Ha,Cap,Cap,"Fpapa",atype);
 
-    {
-      arma::mat Fbhh(Cbh.t()*Hb*Cbh);
-      Fbhh.save("Fhbhb.dat",atype);
-    }
-    {
-      arma::mat Fbph(Cbp.t()*Hb*Cbh);
-      Fbph.save("Fpbhb.dat",atype);
-    }
-    {
-      arma::mat Fbpp(Cbp.t()*Hb*Cbp);
-      Fbpp.save("Fpbpb.dat",atype);
-    }
+    form_F(Hb,Cbh,Cbh,"Fhbhb",atype);
+    form_F(Hb,Cbp,Cbh,"Fpbhb",atype);
+    form_F(Hb,Cbp,Cbp,"Fpbpb",atype);
 
     // B matrices
     if(densityfit) {
       arma::mat B(dfit.B_matrix());
-      {
-	arma::mat Bhaha(B_transform(B,Cah,Cah));
-	Bhaha.save("Bhaha.dat",atype);
-      }
-      {
-	arma::mat Bpaha(B_transform(B,Cap,Cah));
-	Bpaha.save("Bpaha.dat",atype);
-      }
-      {
-	arma::mat Bpapa(B_transform(B,Cap,Cap));
-	Bpapa.save("Bpapa.dat",atype);
-      }
-      {
-	arma::mat Bhbhb(B_transform(B,Cbh,Cbh));
-	Bhbhb.save("Bhbhb.dat",atype);
-      }
-      {
-	arma::mat Bpbhb(B_transform(B,Cbp,Cbh));
-	Bpbhb.save("Bpbhb.dat",atype);
-      }
-      {
-	arma::mat Bpbpb(B_transform(B,Cbp,Cbp));
-	Bpbpb.save("Bpbpb.dat",atype);
-      }
+      form_B(B,Cah,Cah,"Bhaha",atype);
+      form_B(B,Cap,Cah,"Bpaha",atype);
+      form_B(B,Cap,Cap,"Bpapa",atype);
+      form_B(B,Cbh,Cbh,"Bhbhb",atype);
+      form_B(B,Cbp,Cbh,"Bpbhb",atype);
+      form_B(B,Cbp,Cbp,"Bpbpb",atype);
     } else {
-      {
-	arma::mat Bhaha(chol.B_transform(Cah,Cah,true));
-	Bhaha.save("Bhaha.dat",atype);
-      }
-      {
-	arma::mat Bpaha(chol.B_transform(Cap,Cah,true));
-	Bpaha.save("Bpaha.dat",atype);
-      }
-      {
-	arma::mat Bpapa(chol.B_transform(Cap,Cap,true));
-	Bpapa.save("Bpapa.dat",atype);
-      }
-      {
-	arma::mat Bhbhb(chol.B_transform(Cbh,Cbh,true));
-	Bhbhb.save("Bhbhb.dat",atype);
-      }
-      {
-	arma::mat Bpbhb(chol.B_transform(Cbp,Cbh,true));
-	Bpbhb.save("Bpbhb.dat",atype);
-      }
-      {
-	arma::mat Bpbpb(chol.B_transform(Cbp,Cbp,true));
-	Bpbpb.save("Bpbpb.dat",atype);
-      }
+      form_B(chol,Cah,Cah,"Bhaha",atype);
+      form_B(chol,Cap,Cah,"Bpaha",atype);
+      form_B(chol,Cap,Cap,"Bpapa",atype);
+      form_B(chol,Cbh,Cbh,"Bhbhb",atype);
+      form_B(chol,Cbp,Cbh,"Bpbhb",atype);
+      form_B(chol,Cbp,Cbp,"Bpbpb",atype);
     }
   }
 
