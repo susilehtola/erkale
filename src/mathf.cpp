@@ -98,7 +98,7 @@ double boysF(int m, double x) {
   // Compute Boys' function
 
   // Check whether we are operating in the range where the Taylor series is OK
-  if( x<=4.0 ) {
+  if( x<=1.0 ) {
 
     // Taylor series uses -x
     x=-x;
@@ -112,7 +112,7 @@ double boysF(int m, double x) {
     // index k
     int k=0;
 
-    while(k<=38) {
+    while(k<=15) {
       // \f$ F_m(x) = \sum_{k=0}^\infty \frac {(-x)^k} { k! (2m+2k+1)} \f$
       fm+=xk/(kf*(2*(m+k)+1));
 
@@ -123,9 +123,10 @@ double boysF(int m, double x) {
 
     return fm;
 
-  } else if(x>=40.0) {
+  } else if(x>=38.0) {
     // Use asymptotic expansion, which is precise to <1e-16 for F_n(x), n = 0 .. 60
     return doublefact(2*m-1)/pow(2,m+1)*sqrt(M_PI/pow(x,2*m+1));
+
   } else
     // Need to use the exact formula
     return 0.5*gsl_sf_gamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
@@ -134,14 +135,22 @@ double boysF(int m, double x) {
 void boysF_arr(int mmax, double x, arma::vec & F) {
   // Resize array
   F.zeros(mmax+1);
-
-  // Fill in highest value
-  F[mmax]=boysF(mmax,x);
-  // and fill in the rest with downward recursion
+  // Exp(-x) for recursion
   double emx=exp(-x);
 
-  for(int m=mmax-1;m>=0;m--)
-    F[m]=(2*x*F[m+1]+emx)/(2*m+1);
+  if(x<mmax) {
+    // Fill in highest value
+    F[mmax]=boysF(mmax,x);
+    // and fill in the rest with downward recursion
+    for(int m=mmax-1;m>=0;m--)
+      F[m]=(2*x*F[m+1]+emx)/(2*m+1);
+  } else {
+    // Fill in lowest value
+    F[0]=boysF(0,x);
+    // and fill in the rest with upward recursion
+    for(int m=1;m<=mmax;m++)
+      F[m]=((2*m-1)*F[m-1]-emx)/(2.0*x);
+  }
 }
 
 double hyperg_1F1(double a, double b, double x) {
