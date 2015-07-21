@@ -24,6 +24,7 @@
 #include <vector>
 // Needed to define contr_t
 #include "basis.h"
+#include "boys.h"
 
 #include <libint/libint.h>
 #include <libderiv/libderiv.h>
@@ -63,6 +64,8 @@ class IntegralWorker {
 
   /// Integral kernel (i.e. Boys' function for Coulomb integrals)
   arma::vec Gn;
+  /// Boys function table
+  BoysTable boys;
 
   /// Compute the integral kernel
   virtual void compute_G(double rho, double T, int nmax);
