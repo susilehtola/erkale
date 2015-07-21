@@ -249,7 +249,9 @@ int main(int argc, char **argv) {
 
     // Occ and virt orbitals
     arma::mat Cah(C.cols(0,Nela-1));
-    arma::mat Cap(C.cols(Nela,C.n_cols-1));
+    arma::mat Cap;
+    if(C.n_cols>(size_t) Nela)
+      Cap=C.cols(Nela,C.n_cols-1);
 
     // Size of active space
     if(Nact!=0) {
@@ -286,19 +288,25 @@ int main(int argc, char **argv) {
 
     // Fock matrices
     form_F(H,Cah,Cah,"Fhaha",atype);
-    form_F(H,Cah,Cap,"Fpaha",atype);
-    form_F(H,Cap,Cap,"Fpapa",atype);
-
+    if(Cap.n_cols) {
+      form_F(H,Cah,Cap,"Fpaha",atype);
+      form_F(H,Cap,Cap,"Fpapa",atype);
+    }
+    
     // B matrices
     if(densityfit) {
       arma::mat B(dfit.B_matrix());
       form_B(B,Cah,Cah,"Bhaha",atype);
-      form_B(B,Cap,Cah,"Bpaha",atype);
-      form_B(B,Cap,Cap,"Bpapa",atype);
+      if(Cap.n_cols) {
+	form_B(B,Cap,Cah,"Bpaha",atype);
+	form_B(B,Cap,Cap,"Bpapa",atype);
+      }
     } else {
       form_B(chol,Cah,Cah,"Bhaha",atype);
-      form_B(chol,Cap,Cah,"Bpaha",atype);
-      form_B(chol,Cap,Cap,"Bpapa",atype);
+      if(Cap.n_cols) {
+	form_B(chol,Cap,Cah,"Bpaha",atype);
+	form_B(chol,Cap,Cap,"Bpapa",atype);
+      }
     }
 
   } else {
@@ -312,10 +320,14 @@ int main(int argc, char **argv) {
 
     // Occ and virt orbitals
     arma::mat Cah(Ca.cols(0,Nela-1));
-    arma::mat Cap(Ca.cols(Nela,Ca.n_cols-1));
+    arma::mat Cap;
+    if(Ca.n_cols>(size_t) Nela)
+      Cap=Ca.cols(Nela,Ca.n_cols-1);
 
     arma::mat Cbh(Cb.cols(0,Nelb-1));
-    arma::mat Cbp(Cb.cols(Nelb,Cb.n_cols-1));
+    arma::mat Cbp;
+    if(Cb.n_cols>(size_t) Nelb)
+      Cbp=Cb.cols(Nelb,Cb.n_cols-1);
 
     // Size of active space
     if(Nact!=0) {
@@ -374,29 +386,41 @@ int main(int argc, char **argv) {
 
     // Fock matrices
     form_F(Ha,Cah,Cah,"Fhaha",atype);
-    form_F(Ha,Cap,Cah,"Fpaha",atype);
-    form_F(Ha,Cap,Cap,"Fpapa",atype);
+    if(Cap.n_cols) {
+      form_F(Ha,Cap,Cah,"Fpaha",atype);
+      form_F(Ha,Cap,Cap,"Fpapa",atype);
+    }
 
     form_F(Hb,Cbh,Cbh,"Fhbhb",atype);
-    form_F(Hb,Cbp,Cbh,"Fpbhb",atype);
-    form_F(Hb,Cbp,Cbp,"Fpbpb",atype);
+    if(Cbp.n_cols) {
+      form_F(Hb,Cbp,Cbh,"Fpbhb",atype);
+      form_F(Hb,Cbp,Cbp,"Fpbpb",atype);
+    }
 
     // B matrices
     if(densityfit) {
       arma::mat B(dfit.B_matrix());
       form_B(B,Cah,Cah,"Bhaha",atype);
-      form_B(B,Cap,Cah,"Bpaha",atype);
-      form_B(B,Cap,Cap,"Bpapa",atype);
+      if(Cap.n_cols) {
+	form_B(B,Cap,Cah,"Bpaha",atype);
+	form_B(B,Cap,Cap,"Bpapa",atype);
+      }
       form_B(B,Cbh,Cbh,"Bhbhb",atype);
-      form_B(B,Cbp,Cbh,"Bpbhb",atype);
-      form_B(B,Cbp,Cbp,"Bpbpb",atype);
+      if(Cbp.n_cols) {
+	form_B(B,Cbp,Cbh,"Bpbhb",atype);
+	form_B(B,Cbp,Cbp,"Bpbpb",atype);
+      }
     } else {
       form_B(chol,Cah,Cah,"Bhaha",atype);
-      form_B(chol,Cap,Cah,"Bpaha",atype);
-      form_B(chol,Cap,Cap,"Bpapa",atype);
+      if(Cap.n_cols) {
+	form_B(chol,Cap,Cah,"Bpaha",atype);
+	form_B(chol,Cap,Cap,"Bpapa",atype);
+      }
       form_B(chol,Cbh,Cbh,"Bhbhb",atype);
-      form_B(chol,Cbp,Cbh,"Bpbhb",atype);
-      form_B(chol,Cbp,Cbp,"Bpbpb",atype);
+      if(Cbp.n_cols) {
+	form_B(chol,Cbp,Cbh,"Bpbhb",atype);
+	form_B(chol,Cbp,Cbp,"Bpbpb",atype);
+      }
     }
   }
 
