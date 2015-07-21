@@ -7,30 +7,43 @@ extern "C" {
 #include <gsl/gsl_sf_gamma.h>
 }
 
-BoysTable::BoysTable() {
-}
+namespace BoysTable {
+  /// Table holding Boys function values
+  arma::mat data;
+  /// Table holding the constant prefactor for the asymptotic formula
+  arma::vec prefac;
 
-BoysTable::~BoysTable() {
+  /// Maximum m value
+  int mmax;
+  /// Order of expansion
+  int order;
+  /// Tabulation interval
+  double dx;
+  /// Upper limit of table
+  double xmax;
 }
 
 void BoysTable::fill(int mmax_, int order_, double dx_, double xmax_) {
+  if(data.n_rows==(arma::uword) (mmax_+order_+1))
+    return;
+  
   // Set values
   mmax=mmax_;
   order=order_;
   dx=dx_;
   xmax=xmax_;
-
+  
   // Calculate number of entries
   size_t N=ceil(xmax/dx+1);
-
+  
   // Calculate prefactors
   prefac.zeros(mmax+1);
   for(int m=0;m<=mmax;m++)
     prefac(m)=doublefact(2*m-1)/pow(2.0,m+1)*sqrt(M_PI);
-    
+  
   // Allocate table
   data.zeros(mmax+order+1,N);
-
+  
   // x=0
   for(int m=0;m<=mmax+order;m++)
     data(m,0)=1.0/(2*m+1);
@@ -49,7 +62,7 @@ void BoysTable::fill(int mmax_, int order_, double dx_, double xmax_) {
   }
 }
 
-double BoysTable::eval(int m, double x) const {
+double BoysTable::eval(int m, double x) {
   if(x>=xmax)
     // Use asymptotic expansion
     return prefac(m)/(sqrt(x)*std::pow(x,m));
@@ -75,7 +88,7 @@ double BoysTable::eval(int m, double x) const {
   return F;
 }
 
-void BoysTable::eval(int mx, double x, arma::vec & F) const {
+void BoysTable::eval(int mx, double x, arma::vec & F) {
   // Resize array
   F.zeros(mx+1);
   // Exp(-x) for recursion

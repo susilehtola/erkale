@@ -17,19 +17,23 @@
 #include "eriworker.h"
 #include "linalg.h"
 #include "mathf.h"
+#include "boys.h"
 #include "integrals.h"
 #include <cfloat>
 
 // No Boys function interpolation?
-//#define BOYSNOINTERP
+#define BOYSNOINTERP
 
 IntegralWorker::IntegralWorker() {
   input=&arrone;
   output=&arrtwo;
 
 #ifndef BOYSNOINTERP
-  // Maximum value of m for Boys function is 
-  boys.fill(4*LIBINT_MAX_AM);
+  // Maximum value of m for Boys function is
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+  BoysTable::fill(4*LIBINT_MAX_AM);
 #endif
 }
 
@@ -950,7 +954,7 @@ void IntegralWorker::compute_G(double rho, double T, int nmax) {
 #ifdef BOYSNOINTERP
   boysF_arr(nmax,T,Gn);
 #else
-  boys.eval(nmax,T,Gn);
+  BoysTable::eval(nmax,T,Gn);
 #endif
 }
 
@@ -1442,8 +1446,8 @@ void ERIWorker_srlr::compute_G(double rho, double T, int nmax) {
   boysF_arr(nmax,T,bf_long);
   boysF_arr(nmax,T*rhomegasq,bf_short);
 #else
-  boys.eval(nmax,T,bf_long);
-  boys.eval(nmax,T*rhomegasq,bf_short);
+  BoysTable::eval(nmax,T,bf_long);
+  BoysTable::eval(nmax,T*rhomegasq,bf_short);
 #endif
   
   // Store values
@@ -1467,8 +1471,8 @@ void dERIWorker_srlr::compute_G(double rho, double T, int nmax) {
   boysF_arr(nmax,T,bf_long);
   boysF_arr(nmax,T*rhomegasq,bf_short);
 #else
-  boys.eval(nmax,T,bf_long);
-  boys.eval(nmax,T*rhomegasq,bf_short);
+  BoysTable::eval(nmax,T,bf_long);
+  BoysTable::eval(nmax,T*rhomegasq,bf_short);
 #endif
 
   // Store values

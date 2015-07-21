@@ -20,34 +20,28 @@
 #include "global.h"
 #include <armadillo>
 
-class BoysTable {
+namespace BoysTable {
   /// Table holding Boys function values
-  arma::mat data;
+  extern arma::mat data;
   /// Table holding the constant prefactor for the asymptotic formula
-  arma::vec prefac;
+  extern arma::vec prefac;
 
   /// Maximum m value
-  int mmax;
+  extern int mmax;
   /// Order of expansion
-  int order;
+  extern int order;
   /// Tabulation interval
-  double dx;
+  extern double dx;
   /// Upper limit of table
-  double xmax;
-
- public:
-  /// Dummy constructor
-  BoysTable();
-  /// Destructor
-  ~BoysTable();
+  extern double xmax;
 
   /// Fill table
   void fill(int mmax, int order=6, double dx=0.01, double xmax=40.0);
   
   /// Evaluate
-  double eval(int m, double x) const;
+  double eval(int m, double x);
   /// Evaluate a bunch of values
-  void eval(int mmax, double x, arma::vec & Fval) const;
+  void eval(int mmax, double x, arma::vec & Fval);
 };
 
 #endif
