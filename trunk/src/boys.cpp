@@ -2,6 +2,11 @@
 #include "mathf.h"
 #include <cmath>
 
+extern "C" {
+  // For factorials and so on
+#include <gsl/gsl_sf_gamma.h>
+}
+
 BoysTable::BoysTable() {
 }
 
@@ -19,24 +24,28 @@ void BoysTable::fill(int mmax_, int order_, double dx_, double xmax_) {
   size_t N=ceil(xmax/dx+1);
 
   // Calculate prefactors
-  prefac.zeros(mmax);
+  prefac.zeros(mmax+1);
   for(int m=0;m<=mmax;m++)
     prefac(m)=doublefact(2*m-1)/pow(2.0,m+1)*sqrt(M_PI);
     
   // Allocate table
   data.zeros(mmax+order+1,N);
 
+  // x=0
+  for(int m=0;m<=mmax+order;m++)
+    data(m,0)=1.0/(2*m+1);
+  
   // Fill table
-  for(size_t ix=0;ix<N;ix++) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t ix=1;ix<N;ix++) {
     // x value is
     double x=ix*dx;
-
-    // Evaluate BoysTable function
-    arma::vec bf;
-    boysF_arr(mmax+order,x,bf);
-
-    // Store values
-    data.col(ix)=bf;
+    for(int m=0;m<=mmax+order;m++) {
+      // We don't use any recursion here to avoid numeric instabilities in the reference values
+      data(m,ix)=0.5*gsl_sf_gamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
+    }
   }
 }
 
@@ -69,12 +78,20 @@ double BoysTable::eval(int m, double x) const {
 void BoysTable::eval(int mx, double x, arma::vec & F) const {
   // Resize array
   F.zeros(mx+1);
-
-  // Fill in highest value
-  F[mmax]=eval(mx,x);
-  // and fill in the rest with downward recursion
+  // Exp(-x) for recursion
   double emx=exp(-x);
 
-  for(int m=mx-1;m>=0;m--)
-    F[m]=(2*x*F[m+1]+emx)/(2*m+1);
+  if(x<mx) {
+    // Fill in highest value
+    F[mx]=eval(mx,x);
+    // and fill in the rest with downward recursion
+    for(int m=mx-1;m>=0;m--)
+      F[m]=(2*x*F[m+1]+emx)/(2*m+1);
+  } else {
+    // Fill in lowest value
+    F[0]=eval(0,x);
+    // and fill in the rest with upward recursion
+    for(int m=1;m<=mx;m++)
+      F[m]=((2*m-1)*F[m-1]-emx)/(2.0*x);
+  }
 }
