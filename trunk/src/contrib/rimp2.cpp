@@ -129,12 +129,6 @@ double E_ss_MP2(const arma::mat & Bph, const arma::vec & Eo, const arma::vec & E
 	for(size_t b=0;b<a;b++) {
 	  // Antisymmetric wrt a and b
 
-    /*
-    for(size_t j=0;j<Eo.n_elem;j++)
-      for(size_t a=0;a<Ev.n_elem;a++)
-	for(size_t b=0;b<Ev.n_elem;b++) {
-    */
-
 	  // Get two-electron integral
 	  double tei=arma::dot(Bph.col(i*Ev.n_elem+a),Bph.col(j*Ev.n_elem+b)) - arma::dot(Bph.col(j*Ev.n_elem+a),Bph.col(i*Ev.n_elem+b));
 	  // Increment result
@@ -181,18 +175,25 @@ int main(void) {
   arma::mat Fhbhb, Fpbhb, Fpbpb;
   arma::mat Bhbhb, Bpbhb, Bpbpb;
   try {
-    Fhbhb.load("Fhbhb.dat",atype);
-    Fpbhb.load("Fpbhb.dat",atype);
-    Fpbpb.load("Fpbpb.dat",atype);
-    Bhbhb.load("Bhbhb.dat",atype);
-    Bpbhb.load("Bpbhb.dat",atype);
-    Bpbpb.load("Bpbpb.dat",atype);
+    if(!Fhbhb.quiet_load("Fhbhb.dat",atype)) throw std::runtime_error("Fhbhb does not exist!\n");
+    if(!Fhbhb.quiet_load("Fpbhb.dat",atype)) throw std::runtime_error("Fpbhb does not exist!\n");
+    if(!Fhbhb.quiet_load("Fpbpb.dat",atype)) throw std::runtime_error("Fpbpb does not exist!\n");
+    if(!Fhbhb.quiet_load("Bhbhb.dat",atype)) throw std::runtime_error("Bhbhb does not exist!\n");
+    if(!Fhbhb.quiet_load("Bpbhb.dat",atype)) throw std::runtime_error("Bpbhb does not exist!\n");
+    if(!Fhbhb.quiet_load("Bpbpb.dat",atype)) throw std::runtime_error("Bpbpb does not exist!\n");
     pol=true;
   } catch(std::runtime_error) {
     pol=false;
   }
 
-  printf("Matrices loaded in %s.\n",t.elapsed().c_str());
+  printf("Matrices loaded in %s.\n\n",t.elapsed().c_str());
+  if(pol) {
+    printf("alpha: %i occupied, %i virtual orbitals\n",Fhaha.n_rows,Fpapa.n_rows);
+    printf("beta : %i occupied, %i virtual orbitals\n",Fhbhb.n_rows,Fpbpb.n_rows);
+  } else {
+    printf("%i occupied and %i virtual orbitals.\n",Fhaha.n_rows,Fpapa.n_rows);
+  }
+
   fflush(stdout);
   t.set();
 
