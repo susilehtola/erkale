@@ -110,8 +110,11 @@ void ERIchol::save() const {
     // Open in read-only mode and try to get Nbf
     Checkpoint chkpt(CHOLFILE,false);
     hsize_t Nbft;
-    chkpt.read("Nbf",Nbft);
-    if(Nbf!=Nbft)
+    if(chkpt.exist("Nbf")) {
+      chkpt.read("Nbf",Nbft);
+      if(Nbf!=Nbft)
+	trunc=true;
+    } else
       trunc=true;
   }
   // Open in write mode
