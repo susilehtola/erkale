@@ -20,9 +20,17 @@
 #include "integrals.h"
 #include <cfloat>
 
+// No Boys function interpolation?
+//#define BOYSNOINTERP
+
 IntegralWorker::IntegralWorker() {
   input=&arrone;
   output=&arrtwo;
+
+#ifndef BOYSNOINTERP
+  // Maximum value of m for Boys function is 
+  boys.fill(4*LIBINT_MAX_AM);
+#endif
 }
 
 IntegralWorker::~IntegralWorker() {
@@ -939,7 +947,11 @@ eri_precursor_t IntegralWorker::compute_precursor(const GaussianShell *is, const
 void IntegralWorker::compute_G(double rho, double T, int nmax) {
   // Evaluate Boys' function
   (void) rho;
+#ifdef BOYSNOINTERP
   boysF_arr(nmax,T,Gn);
+#else
+  boys.eval(nmax,T,Gn);
+#endif
 }
 
 void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precursor_t & jp, int mmax) {
@@ -1426,9 +1438,14 @@ void ERIWorker_srlr::compute_G(double rho, double T, int nmax) {
   double rhomegasq=omegasq / (omegasq + rho);
 
   // Evaluate Boys' functions
+#ifdef BOYSNOINTERP
   boysF_arr(nmax,T,bf_long);
   boysF_arr(nmax,T*rhomegasq,bf_short);
-
+#else
+  boys.eval(nmax,T,bf_long);
+  boys.eval(nmax,T*rhomegasq,bf_short);
+#endif
+  
   // Store values
   Gn.zeros(nmax+1);
 
@@ -1446,8 +1463,13 @@ void dERIWorker_srlr::compute_G(double rho, double T, int nmax) {
   double rhomegasq=omegasq / (omegasq + rho);
 
   // Evaluate Boys' functions
+#ifdef BOYSNOINTERP
   boysF_arr(nmax,T,bf_long);
   boysF_arr(nmax,T*rhomegasq,bf_short);
+#else
+  boys.eval(nmax,T,bf_long);
+  boys.eval(nmax,T*rhomegasq,bf_short);
+#endif
 
   // Store values
   Gn.zeros(nmax+1);

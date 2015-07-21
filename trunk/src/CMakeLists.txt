@@ -22,7 +22,7 @@ LINK_DIRECTORIES(${HDF5_LIBRARY_DIRS})
 # Create the ERKALE base library "erkale" which includes the following
 #sources
 
-add_library (liberkale basis.cpp basislibrary.cpp stringutil.cpp
+add_library (liberkale basis.cpp basislibrary.cpp boys.cpp stringutil.cpp
 mathf.cpp integrals.cpp eri_digest.cpp eritable.cpp eriscreen.cpp
 timer.cpp linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp
 scf-base.cpp localization.cpp scf-solvers.cpp scf-fock.cpp
@@ -195,7 +195,7 @@ add_subdirectory(basistool)
 # Compile support programs for external programs
 add_subdirectory(external)
 
-# Compile the contributed programs
+# Compile the extra programs
 #add_subdirectory(contrib)
 
 # Recipe for compiling full ERIWorker file
