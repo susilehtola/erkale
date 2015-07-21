@@ -98,7 +98,7 @@ double boysF(int m, double x) {
   // Compute Boys' function
 
   // Check whether we are operating in the range where the Taylor series is OK
-  if( x<=5.5 ) {
+  if( x<=4.0 ) {
 
     // Taylor series uses -x
     x=-x;
