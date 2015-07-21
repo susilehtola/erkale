@@ -33,7 +33,7 @@ void SCF::Fock_UHF(uscf_t & sol, const std::vector<double> & occa, const std::ve
 void SCF::Fock_ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb) const
 
 #elif defined(DFT) && defined(FULLHOLE)
-void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid) const
+void XRSSCF::Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid, bool xch) const
 
 #elif defined(DFT) && defined(HALFHOLE)
 void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid) const
@@ -674,7 +674,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #endif
     
 #if defined(FULLHOLE)
-    double rel_diff=(Nelnum+1.0-Nel)*100.0/Nel;
+    double rel_diff=xch ? (Nelnum-Nel)*100.0/Nel : (Nelnum+1.0-Nel)*100.0/Nel;
 #elif defined(HALFHOLE)
     double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
 #else

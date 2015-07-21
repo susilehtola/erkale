@@ -247,7 +247,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
     case(FCH):
     case(XCH):
-      solver.Fock_full_hole(augsol,dft,occa,occb,grid,nlgrid);
+      solver.Fock_full_hole(augsol,dft,occa,occb,grid,nlgrid,method==XCH);
     }
   }
 
