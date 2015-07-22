@@ -22,21 +22,25 @@
 
 namespace BoysTable {
   /// Table holding Boys function values
-  extern arma::mat data;
+  extern arma::mat bfdata;
+  /// Table holding exp(-x) values for recursion relations
+  extern arma::vec expdata;
   /// Table holding the constant prefactor for the asymptotic formula
   extern arma::vec prefac;
 
   /// Maximum m value
   extern int mmax;
-  /// Order of expansion
-  extern int order;
+  /// Order of Boys function expansion
+  extern int bforder;
+  /// Order of exp(-x) expansion
+  extern int exporder;
   /// Tabulation interval
   extern double dx;
   /// Upper limit of table
   extern double xmax;
 
   /// Fill table
-  void fill(int mmax, int order=6, double dx=0.01, double xmax=40.0);
+  void fill(int mmax, int order=6, double dx=0.001, double xmax=40.0);
   
   /// Evaluate
   double eval(int m, double x);
