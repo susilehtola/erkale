@@ -176,11 +176,11 @@ int main(void) {
   arma::mat Bhbhb, Bpbhb, Bpbpb;
   try {
     if(!Fhbhb.quiet_load("Fhbhb.dat",atype)) throw std::runtime_error("Fhbhb does not exist!\n");
-    if(!Fhbhb.quiet_load("Fpbhb.dat",atype)) throw std::runtime_error("Fpbhb does not exist!\n");
-    if(!Fhbhb.quiet_load("Fpbpb.dat",atype)) throw std::runtime_error("Fpbpb does not exist!\n");
-    if(!Fhbhb.quiet_load("Bhbhb.dat",atype)) throw std::runtime_error("Bhbhb does not exist!\n");
-    if(!Fhbhb.quiet_load("Bpbhb.dat",atype)) throw std::runtime_error("Bpbhb does not exist!\n");
-    if(!Fhbhb.quiet_load("Bpbpb.dat",atype)) throw std::runtime_error("Bpbpb does not exist!\n");
+    if(!Fpbhb.quiet_load("Fpbhb.dat",atype)) throw std::runtime_error("Fpbhb does not exist!\n");
+    if(!Fpbpb.quiet_load("Fpbpb.dat",atype)) throw std::runtime_error("Fpbpb does not exist!\n");
+    if(!Bhbhb.quiet_load("Bhbhb.dat",atype)) throw std::runtime_error("Bhbhb does not exist!\n");
+    if(!Bpbhb.quiet_load("Bpbhb.dat",atype)) throw std::runtime_error("Bpbhb does not exist!\n");
+    if(!Bpbpb.quiet_load("Bpbpb.dat",atype)) throw std::runtime_error("Bpbpb does not exist!\n");
     pol=true;
   } catch(std::runtime_error) {
     pol=false;
