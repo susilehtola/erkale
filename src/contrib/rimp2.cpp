@@ -160,41 +160,28 @@ int main(void) {
   Timer t, ttot;
 
   // Fock and B matrices; alpha spin
-  arma::mat Fhaha, Fpaha, Fpapa;
-  arma::mat Bhaha, Bpaha, Bpapa;
+  arma::mat Fhaha, Fpapa;
+  arma::mat Bpaha;
   arma::vec Eref;
   
   Fhaha.load("Fhaha.dat",atype);
-  Fpaha.load("Fpaha.dat",atype);
   Fpapa.load("Fpapa.dat",atype);
-  Bhaha.load("Bhaha.dat",atype);
   Bpaha.load("Bpaha.dat",atype);
-  Bpapa.load("Bpapa.dat",atype);
   Eref.load("Eref.dat",atype);
 
   // Sanity check
   if(Fhaha.n_rows != Fhaha.n_cols) throw std::runtime_error("Fhaha is not square!\n");
-  if(Fpaha.n_rows != Fpapa.n_cols) throw std::runtime_error("Fpaha has wrong amount of rows!\n");
-  if(Fhaha.n_rows != Fpaha.n_cols) throw std::runtime_error("Fpaha has wrong amount of columns!\n");
   if(Fpapa.n_rows != Fpapa.n_cols) throw std::runtime_error("Fpapa is not square!\n");
-
-  if(Bhaha.n_rows != Bpaha.n_rows) throw std::runtime_error("Auxiliary basis sets for Bhaha and Bpaha don't match!\n");
-  if(Bpaha.n_rows != Bpapa.n_rows) throw std::runtime_error("Auxiliary basis sets for Bpaha and Bpapa don't match!\n");
-  if(Bhaha.n_cols != Fhaha.n_cols*Fhaha.n_cols) throw std::runtime_error("Bhaha does not correspond to F!\n");
   if(Bpaha.n_cols != Fpapa.n_cols*Fhaha.n_cols) throw std::runtime_error("Bpaha does not correspond to F!\n");
-  if(Bpapa.n_cols != Fpapa.n_cols*Fpapa.n_cols) throw std::runtime_error("Bpapa does not correspond to F!\n");
     
-  // beta spin
+  // Beta spin
   bool pol;
-  arma::mat Fhbhb, Fpbhb, Fpbpb;
-  arma::mat Bhbhb, Bpbhb, Bpbpb;
+  arma::mat Fhbhb, Fpbpb;
+  arma::mat Bpbhb;
   try {
     if(!Fhbhb.quiet_load("Fhbhb.dat",atype)) throw std::runtime_error("Fhbhb does not exist!\n");
-    if(!Fpbhb.quiet_load("Fpbhb.dat",atype)) throw std::runtime_error("Fpbhb does not exist!\n");
     if(!Fpbpb.quiet_load("Fpbpb.dat",atype)) throw std::runtime_error("Fpbpb does not exist!\n");
-    if(!Bhbhb.quiet_load("Bhbhb.dat",atype)) throw std::runtime_error("Bhbhb does not exist!\n");
     if(!Bpbhb.quiet_load("Bpbhb.dat",atype)) throw std::runtime_error("Bpbhb does not exist!\n");
-    if(!Bpbpb.quiet_load("Bpbpb.dat",atype)) throw std::runtime_error("Bpbpb does not exist!\n");
     pol=true;
   } catch(std::runtime_error) {
     pol=false;
@@ -203,15 +190,8 @@ int main(void) {
   // Sanity check
   if(pol) {
     if(Fhbhb.n_rows != Fhbhb.n_cols) throw std::runtime_error("Fhbhb is not square!\n");
-    if(Fpbhb.n_rows != Fpbpb.n_cols) throw std::runtime_error("Fpbhb has wrong amount of rows!\n");
-    if(Fhbhb.n_rows != Fpbhb.n_cols) throw std::runtime_error("Fpbhb has wrong amount of columns!\n");
     if(Fpbpb.n_rows != Fpbpb.n_cols) throw std::runtime_error("Fpbpb is not square!\n");
-
-    if(Bhbhb.n_rows != Bpbhb.n_rows) throw std::runtime_error("Auxiliary basis sets for Bhbhb and Bpbhb don't match!\n");
-    if(Bpbhb.n_rows != Bpbpb.n_rows) throw std::runtime_error("Auxiliary basis sets for Bpbhb and Bpbpb don't match!\n");
-    if(Bhbhb.n_cols != Fhbhb.n_cols*Fhbhb.n_cols) throw std::runtime_error("Bhbhb does not correspond to F!\n");
     if(Bpbhb.n_cols != Fpbpb.n_cols*Fhbhb.n_cols) throw std::runtime_error("Bpbhb does not correspond to F!\n");
-    if(Bpbpb.n_cols != Fpbpb.n_cols*Fpbpb.n_cols) throw std::runtime_error("Bpbpb does not correspond to F!\n");
   }
   
   printf("Matrices loaded in %s.\n\n",t.elapsed().c_str());
