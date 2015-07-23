@@ -150,7 +150,7 @@ class DensityFit {
   arma::mat get_ab_inv() const;
 
   /// Get B matrix (must have HF enabled)
-  arma::mat B_matrix() const;
+  void B_matrix(arma::mat & B) const;
 };
 
 

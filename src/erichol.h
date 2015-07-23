@@ -66,6 +66,8 @@ class ERIchol {
   size_t get_Naux() const;
   /// Get basis set size
   size_t get_Nbf() const;
+  /// Get basis set size
+  size_t get_Npairs() const;
   
   /// Get the matrix
   arma::mat get() const;
@@ -82,6 +84,8 @@ class ERIchol {
   /// Form exchange matrix
   arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs) const;
 
+  /// Get full B matrix
+  void B_matrix(arma::mat & B) const;
   /// Get transformed B matrix
   arma::mat B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose=false) const;
 };
