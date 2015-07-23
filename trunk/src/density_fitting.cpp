@@ -1174,14 +1174,14 @@ arma::mat DensityFit::get_ab_inv() const {
   return ab_inv;
 }
 
-arma::mat DensityFit::B_matrix() const {
+void DensityFit::B_matrix(arma::mat & B) const {
   if(direct)
     throw std::runtime_error("Must run in tabulated mode!\n");
   if(!hf)
     throw std::runtime_error("Must be run in HF mode!\n");
 
   // Collect AO integrals
-  arma::mat B(Nbf*Nbf,Naux);
+  B.zeros(Nbf*Nbf,Naux);
   for(size_t ip=0;ip<orbpairs.size();ip++) {
     size_t imus=orbpairs[ip].is;
     size_t inus=orbpairs[ip].js;
@@ -1208,7 +1208,5 @@ arma::mat DensityFit::B_matrix() const {
     }
   }
   // Transform into proper B matrix
-  B=B*ab_invh;
-
-  return B;
+  B*=ab_invh;
 }

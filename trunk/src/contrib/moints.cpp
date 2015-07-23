@@ -24,6 +24,7 @@
 #include "../linalg.h"
 #include "../eriworker.h"
 #include "../settings.h"
+#include "../stringutil.h"
 
 #include <cstdio>
 
@@ -34,6 +35,8 @@
 #ifdef SVNRELEASE
 #include "../version.h"
 #endif
+
+#define LOCMETHOD PIPEK_IAO2
 
 arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, const arma::mat & Bph, const arma::mat & S) {
   if(Cv0.n_cols<Co.n_cols)
@@ -71,10 +74,10 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
   }
 
   // Keep only active orbitals
-  Cv=Cv.cols(0,Co.n_cols-1);
+  arma::mat Cvact=Cv.cols(0,Co.n_cols-1);
 
-  // and reorthonormalize them
-  arma::mat Svv(arma::trans(Cv)*S*Cv);
+  // Reorthogonalize active orbitals
+  arma::mat Svv(arma::trans(Cvact)*S*Cvact);
 
   // Reorthogonalize
   arma::vec sval;
@@ -87,8 +90,24 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
 
   // Orthogonalizing matrix is
   arma::mat O(svec*arma::diagmat(sinvh)*arma::trans(svec));
-  Cv=Cv*O;
+  Cvact=Cvact*O;
+  Cv.cols(0,Co.n_cols-1)=Cvact;
 
+  // Remove overlap from frozen virtuals
+  if(Cv.n_cols>Co.n_cols) {
+    arma::mat Cvfrz(Cv.cols(Co.n_cols,Cv.n_cols-1));
+    Cvfrz-=Cvact*(arma::trans(Cvact)*S*Cvfrz);
+    Svv=arma::trans(Cvfrz)*S*Cvfrz;
+
+    arma::eig_sym(sval,svec,Svv);
+    sinvh.zeros(sval.n_elem);
+    for(size_t i=0;i<sval.n_elem;i++)
+      sinvh(i)=1.0/sqrt(sval(i));
+    O=svec*arma::diagmat(sinvh)*arma::trans(svec);
+    Cvfrz=Cvfrz*O;
+    Cv.cols(Co.n_cols,Cv.n_cols-1)=Cvfrz;
+  }
+  
   return Cv;
 }
 
@@ -156,6 +175,7 @@ int main(int argc, char **argv) {
   set.add_double("CholeskyShThr","Cholesky shell threshold to use",0.01);
   set.add_double("IntegralThresh","Integral threshold",1e-10);
   set.add_int("CholeskyMode","Cholesky mode",0,true);
+  set.add_bool("CholeskyInCore","Use more memory for Cholesky?",true);
   set.add_int("NActive","Size of active space (0 for full transform)",0);
   set.add_bool("Localize","Localize active space orbitals?",false);
   set.add_bool("Binary","Use binary I/O?",true);
@@ -173,6 +193,7 @@ int main(int argc, char **argv) {
   int cholmode=set.get_int("CholeskyMode");
   double cholthr=set.get_double("CholeskyThr");
   double cholshthr=set.get_double("CholeskyShThr");
+  bool cholincore=set.get_bool("CholeskyInCore");
   bool binary=set.get_bool("Binary");
   int Nact=set.get_int("NActive");
   bool loc=set.get_bool("Localize");
@@ -239,6 +260,16 @@ int main(int argc, char **argv) {
 	fflush(stdout);
       }
     }
+
+    // Size of memory for screened B matrix
+    size_t Nscr=chol.get_Npairs()*chol.get_Naux();
+    // Size of memory for full B matrix
+    size_t Nfull=chol.get_Nbf()*chol.get_Nbf()*chol.get_Naux();
+    if(cholincore) {
+      printf("In-core Cholesky toggled, memory use is %s vs %s\n",memory_size(Nfull*sizeof(double)).c_str(),memory_size(Nscr*sizeof(double)).c_str());
+    } else {
+      printf("Direct  Cholesky toggled, memory use is %s vs %s\n",memory_size(Nscr*sizeof(double)).c_str(),memory_size(Nfull*sizeof(double)).c_str());
+    }
   }
 
   if(restr) {
@@ -266,22 +297,26 @@ int main(int argc, char **argv) {
 	double measure;
 	arma::cx_mat W(Cah.n_cols,Cah.n_cols);
 	W.eye();
-	orbital_localization(PIPEK_IAO2,basis,Cah,P,measure,W);
+	orbital_localization(LOCMETHOD,basis,Cah,P,measure,W);
 
 	// Get ph B matrix
 	arma::mat Bph;
-	if(densityfit)
-	  Bph=B_transform(dfit.B_matrix(),Cap,Cah);
-	else
+	if(densityfit || cholincore) {
+	  arma::mat B;
+	  if(densityfit)
+	    dfit.B_matrix(B);
+	  else
+	    chol.B_matrix(B);
+	  Bph=B_transform(B,Cap,Cah);
+	} else
 	  Bph=chol.B_transform(Cap,Cah);
 
 	arma::mat S(basis.overlap());
 	Cap=exchange_localization(Cah,Cap,Bph,S);
-      } else {
-	// Just drop the extra virtuals
-	Cap=Cap.cols(0,Nact-1);
       }
-
+      // Drop the extra virtuals
+      Cap=Cap.cols(0,Nact-1);
+      
       printf("Size of active space is %i\n",(int) Nact);
       printf("%i occupied and %i virtual orbitals\n",(int) Cah.n_cols,(int) Cap.n_cols);
     }
@@ -294,8 +329,13 @@ int main(int argc, char **argv) {
     }
     
     // B matrices
-    if(densityfit) {
-      arma::mat B(dfit.B_matrix());
+    if(densityfit || cholincore) {
+      arma::mat B;
+      if(densityfit)
+	dfit.B_matrix(B);
+      else
+	chol.B_matrix(B);
+      
       form_B(B,Cah,Cah,"Bhaha",atype);
       if(Cap.n_cols) {
 	form_B(B,Cap,Cah,"Bpaha",atype);
@@ -353,27 +393,37 @@ int main(int argc, char **argv) {
 
 	arma::cx_mat Wa(Cah.n_cols,Cah.n_cols);
 	Wa.eye();
-	orbital_localization(PIPEK_IAO2,basis,Cah,P,measure,Wa);
+	orbital_localization(LOCMETHOD,basis,Cah,P,measure,Wa);
 
 	arma::cx_mat Wb(Cbh.n_cols,Cbh.n_cols);
 	Wb.eye();
-	orbital_localization(PIPEK_IAO2,basis,Cbh,P,measure,Wb);
+	orbital_localization(LOCMETHOD,basis,Cbh,P,measure,Wb);
 
 	// Localize virtual orbitals
 	arma::mat S(basis.overlap());
 	{
 	  arma::mat Bph;
-	  if(densityfit)
-	    Bph=B_transform(dfit.B_matrix(),Cap,Cah);
-	  else
+	  if(densityfit || cholincore) {
+	    arma::mat B;
+	    if(densityfit)
+	      dfit.B_matrix(B);
+	    else
+	      chol.B_matrix(B);
+	    Bph=B_transform(B,Cap,Cah);
+	  } else
 	    Bph=chol.B_transform(Cap,Cah);
 	  Cap=exchange_localization(Cah,Cap,Bph,S);
 	}
 	{
 	  arma::mat Bph;
-	  if(densityfit)
-	    Bph=B_transform(dfit.B_matrix(),Cbp,Cbh);
-	  else
+	  if(densityfit || cholincore) {
+	    arma::mat B;
+	    if(densityfit)
+	      dfit.B_matrix(B);
+	    else
+	      chol.B_matrix(B);
+	    Bph=B_transform(B,Cbp,Cbh);
+	  } else
 	    Bph=chol.B_transform(Cbp,Cbh);
 	  Cbp=exchange_localization(Cbh,Cbp,Bph,S);
 	}
@@ -398,8 +448,12 @@ int main(int argc, char **argv) {
     }
 
     // B matrices
-    if(densityfit) {
-      arma::mat B(dfit.B_matrix());
+    if(densityfit || cholincore) {
+      arma::mat B;
+      if(densityfit)
+	dfit.B_matrix(B);
+      else
+	chol.B_matrix(B);      
       form_B(B,Cah,Cah,"Bhaha",atype);
       if(Cap.n_cols) {
 	form_B(B,Cap,Cah,"Bpaha",atype);

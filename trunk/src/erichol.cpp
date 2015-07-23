@@ -552,6 +552,10 @@ size_t ERIchol::get_Nbf() const {
   return Nbf;
 }
 
+size_t ERIchol::get_Npairs() const {
+  return B.n_rows;
+}
+
 arma::mat ERIchol::get() const {
   return B;
 }
@@ -582,15 +586,21 @@ arma::mat ERIchol::calcK(const arma::vec & C) const {
   v.zeros();
 
   // First part: diagonal and above diagonal
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
   for(size_t P=0;P<B.n_cols;P++)
     for(size_t i=0;i<prodidx.size();i++)
       v(invmap(0,i),P)+=B(i,P)*C(invmap(1,i));
   // Below diagonal
-  for(size_t ii=0;ii<odiagidx.n_elem;ii++) {
-    size_t i=odiagidx(ii);
-    for(size_t P=0;P<B.n_cols;P++)
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t P=0;P<B.n_cols;P++)
+    for(size_t ii=0;ii<odiagidx.n_elem;ii++) {
+      size_t i=odiagidx(ii);
       v(invmap(1,i),P)+=B(i,P)*C(invmap(0,i));
-  }
+    }
   
   return v*arma::trans(v);
 }
@@ -601,15 +611,21 @@ arma::cx_mat ERIchol::calcK(const arma::cx_vec & C) const {
   v.zeros();
   
   // First part: diagonal and above diagonal
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
   for(size_t P=0;P<B.n_cols;P++)
     for(size_t i=0;i<prodidx.size();i++)
       v(invmap(0,i),P)+=B(i,P)*C(invmap(1,i));
   // Below diagonal
-  for(size_t ii=0;ii<odiagidx.n_elem;ii++) {
-    size_t i=odiagidx(ii);
-    for(size_t P=0;P<B.n_cols;P++)
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(size_t P=0;P<B.n_cols;P++)
+    for(size_t ii=0;ii<odiagidx.n_elem;ii++) {
+      size_t i=odiagidx(ii);
       v(invmap(1,i),P)+=B(i,P)*C(invmap(0,i));
-  }
+    }
   
   return v*arma::trans(v);
 
@@ -653,6 +669,17 @@ arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const std::vector<double> & 
   return K;
 }
 
+void ERIchol::B_matrix(arma::mat & Br) const {
+  Br.zeros(Nbf*Nbf,B.n_cols);
+  for(size_t P=0;P<B.n_cols;P++)
+    for(size_t i=0;i<prodidx.size();i++) {
+      size_t u=invmap(0,i);
+      size_t v=invmap(1,i);
+      Br(u*Nbf+v,P)=B(i,P);
+      Br(v*Nbf+u,P)=B(i,P);
+    }
+}
+
 arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose) const {
   // Amount of basis and auxiliary functions
   if(Cl.n_rows != Nbf || Cr.n_rows != Nbf) {
@@ -666,11 +693,17 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
   // L_uv^P -> L_lv^P = L_uv^P C_lu
   arma::mat Ll(Cl.n_cols,B.n_cols*Nbf);
   Ll.zeros();
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
   for(size_t P=0;P<B.n_cols;P++)
     for(size_t i=0;i<prodidx.size();i++)
       for(size_t l=0;l<Cl.n_cols;l++)
 	Ll(l,P*Nbf+invmap(0,i))+=B(i,P)*Cl(invmap(1,i),l);
   // Off-diagonal contribution
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
   for(size_t P=0;P<B.n_cols;P++)
     for(size_t ii=0;ii<odiagidx.size();ii++) {
       size_t i=odiagidx(ii);
