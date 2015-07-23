@@ -142,6 +142,15 @@ double E_ss_MP2(const arma::mat & Bph, const arma::vec & Eo, const arma::vec & E
   return E;
 }
 
+double E_singles_MP2(const arma::mat & Fph, const arma::vec & Eo, const arma::vec & Ev) {
+  double E=0.0;
+  for(size_t i=0;i<Eo.n_elem;i++)
+    for(size_t a=0;a<Ev.n_elem;a++)
+      E+=std::pow(Fph(a,i),2)/(Ev(a)-Eo(i));
+
+  return E;
+}
+
 int main(void) {
 #ifdef _OPENMP
   printf("ERKALE - RIMP2 from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
@@ -160,11 +169,12 @@ int main(void) {
   Timer t, ttot;
 
   // Fock and B matrices; alpha spin
-  arma::mat Fhaha, Fpapa;
+  arma::mat Fhaha, Fpaha, Fpapa;
   arma::mat Bpaha;
   arma::vec Eref;
   
   Fhaha.load("Fhaha.dat",atype);
+  Fpaha.load("Fpaha.dat",atype);
   Fpapa.load("Fpapa.dat",atype);
   Bpaha.load("Bpaha.dat",atype);
   Eref.load("Eref.dat",atype);
@@ -172,14 +182,17 @@ int main(void) {
   // Sanity check
   if(Fhaha.n_rows != Fhaha.n_cols) throw std::runtime_error("Fhaha is not square!\n");
   if(Fpapa.n_rows != Fpapa.n_cols) throw std::runtime_error("Fpapa is not square!\n");
+  if(Fpaha.n_rows != Fpapa.n_cols) throw std::runtime_error("Fpaha has wrong amount of rows!\n");
+  if(Fhaha.n_rows != Fpaha.n_cols) throw std::runtime_error("Fpaha has wrong amount of columns!\n");
   if(Bpaha.n_cols != Fpapa.n_cols*Fhaha.n_cols) throw std::runtime_error("Bpaha does not correspond to F!\n");
     
   // Beta spin
   bool pol;
-  arma::mat Fhbhb, Fpbpb;
+  arma::mat Fhbhb, Fpbhb, Fpbpb;
   arma::mat Bpbhb;
   try {
     if(!Fhbhb.quiet_load("Fhbhb.dat",atype)) throw std::runtime_error("Fhbhb does not exist!\n");
+    if(!Fpbhb.quiet_load("Fpbhb.dat",atype)) throw std::runtime_error("Fpbhb does not exist!\n");
     if(!Fpbpb.quiet_load("Fpbpb.dat",atype)) throw std::runtime_error("Fpbpb does not exist!\n");
     if(!Bpbhb.quiet_load("Bpbhb.dat",atype)) throw std::runtime_error("Bpbhb does not exist!\n");
     pol=true;
@@ -191,6 +204,8 @@ int main(void) {
   if(pol) {
     if(Fhbhb.n_rows != Fhbhb.n_cols) throw std::runtime_error("Fhbhb is not square!\n");
     if(Fpbpb.n_rows != Fpbpb.n_cols) throw std::runtime_error("Fpbpb is not square!\n");
+    if(Fpbhb.n_rows != Fpbpb.n_cols) throw std::runtime_error("Fpbhb has wrong amount of rows!\n");
+    if(Fhbhb.n_rows != Fpbhb.n_cols) throw std::runtime_error("Fpbhb has wrong amount of columns!\n");
     if(Bpbhb.n_cols != Fpbpb.n_cols*Fhbhb.n_cols) throw std::runtime_error("Bpbhb does not correspond to F!\n");
   }
   
@@ -206,7 +221,15 @@ int main(void) {
   fflush(stdout);
   t.set();
 
-  // Opposite spin energy
+  // Singles energies
+  double Es;
+  if(pol)
+    Es=E_singles_MP2(Fpaha,arma::diagvec(Fhaha),arma::diagvec(Fpapa)) + \
+       E_singles_MP2(Fpbhb,arma::diagvec(Fhbhb),arma::diagvec(Fpbpb));
+  else
+    Es=2.0*E_singles_MP2(Fpaha,arma::diagvec(Fhaha),arma::diagvec(Fpapa));
+  
+  // Correlation energies
   double Eaa=0.0, Eab=0.0, Ebb=0.0;
   bool osonly=false;
   if(osonly) {
@@ -249,13 +272,15 @@ int main(void) {
 
   printf("\n");
   if(!osonly)
-    printf(" alpha-alpha correlation energy is % 12.10f\n",Eaa);
-  printf("  alpha-beta correlation energy is % 12.10f\n",Eab);
+    printf(" alpha-alpha correlation energy is % 16.10f\n",Eaa);
+  printf("  alpha-beta correlation energy is % 16.10f\n",Eab);
   if(!osonly)
-    printf("   beta-beta correlation energy is % 12.10f\n",Ebb);
+    printf("   beta-beta correlation energy is % 16.10f\n",Ebb);
+  printf("   non-Brillouin singles energy is % 16.10f\n",Es);
   printf(" -----------------------------------------------\n");
-  printf(" Total       correlation energy is % 12.10f\n",Eaa+Eab+Ebb);
-  printf("\n Total energy is % .10f\n",Eref(0)+Eaa+Eab+Ebb);
+  printf(" Total       correlation energy is % 16.10f\n",Eaa+Eab+Ebb+Es);
+
+  printf("\n Total energy is % .10f\n",Eref(0)+Eaa+Eab+Ebb+Es);
 
   printf("\nCalculation finished in %s.\n",ttot.elapsed().c_str());
 
