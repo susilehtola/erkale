@@ -884,7 +884,9 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
 
   // Returned orbitals
   arma::mat Cv(Cv0);
-  
+  // Active space orbitals
+  arma::mat Cvact(Cv.cols(0,Co.n_cols-1));
+
   // Loop over occupied orbitals
   for(size_t io=0;io<Co.n_cols;io++) {
     // Form exchange matrix
@@ -905,35 +907,22 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
       }
     }
 
-    // Work block
-    arma::mat Cwrk(Cv0.cols(0,Cv0.n_cols-1));
-
-    // Convert to work space
-    arma::mat Kvv(arma::trans(Cwrk)*K*Cwrk);
-    {
-      std::ostringstream oss;
-      oss << "K_" << io << ".dat";
-      Kvv.save(oss.str(),arma::arma_binary);
-    }
+    // Virtual-virtual exchange matrix is
+    arma::mat Kvv(arma::trans(Cv)*K*Cv);
     
     // Eigendecomposition
     arma::vec eval;
     arma::mat evec;
     arma::eig_sym(eval,evec,-Kvv);
-    
-    // Rotate orbitals to new basis; orbital becomes lowest-lying orbital
-    Cv.col(io)=Cwrk*evec.col(0);
-  }
-  
-  // Keep only active orbitals
-  Cv=Cv.cols(0,Co.n_cols-1);
 
-  // Reorthonormalize
-  arma::mat Svv(arma::trans(Cv)*S*Cv);
-  
-  // Reorthogonalize
+    // Rotate orbitals to new basis; orbital becomes lowest-lying orbital
+    Cvact.col(io)=Cv*evec.col(0);
+  }
+
+  // Reorthogonalize active orbitals
   arma::vec sval;
   arma::mat svec;
+  arma::mat Svv(arma::trans(Cvact)*S*Cvact);
   arma::eig_sym(sval,svec,Svv);
 
   arma::vec sinvh(sval);
@@ -942,9 +931,23 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
 
   // Orthogonalizing matrix is
   arma::mat O(svec*arma::diagmat(sinvh)*arma::trans(svec));
-  Cv=Cv*O;
+  Cvact=Cvact*O;
 
-  Svv=arma::trans(Cv)*S*Cv;
+  // Build projection matrix
+  arma::mat Sv(arma::trans(Cvact)*S*Cv);  
+  arma::mat Pv(Cv.n_cols,Cv.n_cols);
+  Pv.eye();
+  Pv-=arma::trans(Sv)*Sv;
+
+  // Run eigendecomposition
+  arma::vec Pval;
+  arma::mat Pvec;
+  arma::eig_sym(Pval,Pvec,Pv);
+  
+  // Now, the inactive virtuals have eigenvalues 1.0, whereas the
+  // active orbitals have eigenvalues ~ 0.0. The localized virtual
+  // space is then given by
+  Cv=Cv*Pvec;
   
   return Cv;
 }
