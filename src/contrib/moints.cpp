@@ -48,6 +48,8 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
 
   // Returned orbitals
   arma::mat Cv(Cv0);
+  // Active space orbitals
+  arma::mat Cvact(Cv.cols(0,Co.n_cols-1));
 
   // Loop over occupied orbitals
   for(size_t io=0;io<Co.n_cols;io++) {
@@ -58,30 +60,22 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
       for(size_t a=0;a<Bph.n_rows;a++)
 	Bp(iv,a)=Bph(a,io*Cv.n_cols+iv);
 
-    // Work block
-    arma::mat Cwrk(Cv0.cols(0,Cv0.n_cols-1));
-
     // Virtual-virtual exchange matrix is
     arma::mat Kvv(Bp*arma::trans(Bp));
-
+    
     // Eigendecomposition
     arma::vec eval;
     arma::mat evec;
     arma::eig_sym(eval,evec,-Kvv);
 
     // Rotate orbitals to new basis; orbital becomes lowest-lying orbital
-    Cv.col(io)=Cwrk*evec.col(0);
+    Cvact.col(io)=Cv*evec.col(0);
   }
 
-  // Keep only active orbitals
-  arma::mat Cvact=Cv.cols(0,Co.n_cols-1);
-
   // Reorthogonalize active orbitals
-  arma::mat Svv(arma::trans(Cvact)*S*Cvact);
-
-  // Reorthogonalize
   arma::vec sval;
   arma::mat svec;
+  arma::mat Svv(arma::trans(Cvact)*S*Cvact);
   arma::eig_sym(sval,svec,Svv);
 
   arma::vec sinvh(sval);
@@ -91,22 +85,22 @@ arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv0, con
   // Orthogonalizing matrix is
   arma::mat O(svec*arma::diagmat(sinvh)*arma::trans(svec));
   Cvact=Cvact*O;
-  Cv.cols(0,Co.n_cols-1)=Cvact;
 
-  // Remove overlap from frozen virtuals
-  if(Cv.n_cols>Co.n_cols) {
-    arma::mat Cvfrz(Cv.cols(Co.n_cols,Cv.n_cols-1));
-    Cvfrz-=Cvact*(arma::trans(Cvact)*S*Cvfrz);
-    Svv=arma::trans(Cvfrz)*S*Cvfrz;
+  // Build projection matrix
+  arma::mat Sv(arma::trans(Cvact)*S*Cv);  
+  arma::mat Pv(Cv.n_cols,Cv.n_cols);
+  Pv.eye();
+  Pv-=arma::trans(Sv)*Sv;
 
-    arma::eig_sym(sval,svec,Svv);
-    sinvh.zeros(sval.n_elem);
-    for(size_t i=0;i<sval.n_elem;i++)
-      sinvh(i)=1.0/sqrt(sval(i));
-    O=svec*arma::diagmat(sinvh)*arma::trans(svec);
-    Cvfrz=Cvfrz*O;
-    Cv.cols(Co.n_cols,Cv.n_cols-1)=Cvfrz;
-  }
+  // Run eigendecomposition
+  arma::vec Pval;
+  arma::mat Pvec;
+  arma::eig_sym(Pval,Pvec,Pv);
+  
+  // Now, the inactive virtuals have eigenvalues 1.0, whereas the
+  // active orbitals have eigenvalues ~ 0.0. The localized virtual
+  // space is then given by
+  Cv=Cv*Pvec;
   
   return Cv;
 }
