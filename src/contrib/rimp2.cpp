@@ -162,13 +162,15 @@ int main(void) {
   // Fock and B matrices; alpha spin
   arma::mat Fhaha, Fpaha, Fpapa;
   arma::mat Bhaha, Bpaha, Bpapa;
-
+  arma::vec Eref;
+  
   Fhaha.load("Fhaha.dat",atype);
   Fpaha.load("Fpaha.dat",atype);
   Fpapa.load("Fpapa.dat",atype);
   Bhaha.load("Bhaha.dat",atype);
   Bpaha.load("Bpaha.dat",atype);
   Bpapa.load("Bpapa.dat",atype);
+  Eref.load("Eref.dat",atype);
 
   // Sanity check
   if(Fhaha.n_rows != Fhaha.n_cols) throw std::runtime_error("Fhaha is not square!\n");
@@ -261,6 +263,7 @@ int main(void) {
     printf("   beta-beta correlation energy is % 12.10f\n",Ebb);
   printf(" -----------------------------------------------\n");
   printf(" Total       correlation energy is % 12.10f\n",Eaa+Eab+Ebb);
+  printf("\n Total energy is % .10f\n",Eref(0)+Eaa+Eab+Ebb);
 
   printf("\nCalculation finished in %s.\n",ttot.elapsed().c_str());
 
