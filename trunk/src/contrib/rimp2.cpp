@@ -146,7 +146,7 @@ double E_singles_MP2(const arma::mat & Fph, const arma::vec & Eo, const arma::ve
   double E=0.0;
   for(size_t i=0;i<Eo.n_elem;i++)
     for(size_t a=0;a<Ev.n_elem;a++)
-      E+=std::pow(Fph(a,i),2)/(Ev(a)-Eo(i));
+      E+=std::pow(Fph(a,i),2)/(Eo(i)-Ev(a));
 
   return E;
 }
