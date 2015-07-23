@@ -170,6 +170,12 @@ int main(void) {
   Bpaha.load("Bpaha.dat",atype);
   Bpapa.load("Bpapa.dat",atype);
 
+  // Sanity check
+  if(Fhaha.n_rows != Fhaha.n_cols) throw std::runtime_error("Fhaha is not square!\n");
+  if(Fpaha.n_rows != Fpapa.n_cols) throw std::runtime_error("Fpaha has wrong amount of rows!\n");
+  if(Fhaha.n_rows != Fpaha.n_cols) throw std::runtime_error("Fpaha has wrong amount of columns!\n");
+  if(Fpapa.n_rows != Fpapa.n_cols) throw std::runtime_error("Fpapa is not square!\n");
+    
   // beta spin
   bool pol;
   arma::mat Fhbhb, Fpbhb, Fpbpb;
@@ -186,6 +192,14 @@ int main(void) {
     pol=false;
   }
 
+  // Sanity check
+  if(pol) {
+    if(Fhbhb.n_rows != Fhbhb.n_cols) throw std::runtime_error("Fhbhb is not square!\n");
+    if(Fpbhb.n_rows != Fpbpb.n_cols) throw std::runtime_error("Fpbhb has wrong amount of rows!\n");
+    if(Fhbhb.n_rows != Fpbhb.n_cols) throw std::runtime_error("Fpbhb has wrong amount of columns!\n");
+    if(Fpbpb.n_rows != Fpbpb.n_cols) throw std::runtime_error("Fpbpb is not square!\n");
+  }
+  
   printf("Matrices loaded in %s.\n\n",t.elapsed().c_str());
   if(pol) {
     printf("alpha: %i occupied, %i virtual orbitals\n",Fhaha.n_rows,Fpapa.n_rows);
@@ -193,6 +207,7 @@ int main(void) {
   } else {
     printf("%i occupied and %i virtual orbitals.\n",Fhaha.n_rows,Fpapa.n_rows);
   }
+  printf("\n");
 
   fflush(stdout);
   t.set();
