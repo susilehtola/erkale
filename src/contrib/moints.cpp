@@ -115,7 +115,9 @@ void form_B(const arma::mat & B, const arma::mat & Cl, const arma::mat & Cr, con
   printf("Forming %s ... ",name.c_str());
   fflush(stdout);
 
-  arma::mat Bt(B_transform(B,Cl,Cr));
+  arma::mat Bt;
+  if(Cl.n_cols && Cr.n_cols)
+    Bt=B_transform(B,Cl,Cr);
   Bt.save(name+".dat",atype);
 
   printf("done (%s)\n",t.elapsed().c_str());
@@ -127,7 +129,9 @@ void form_B(const ERIchol & chol, const arma::mat & Cl, const arma::mat & Cr, co
   printf("Forming %s ... ",name.c_str());
   fflush(stdout);
 
-  arma::mat Bt(chol.B_transform(Cl,Cr));
+  arma::mat Bt;
+  if(Cl.n_cols && Cr.n_cols)
+    Bt=chol.B_transform(Cl,Cr,true);
   Bt.save(name+".dat",atype);
 
   printf("done (%s)\n",t.elapsed().c_str());
@@ -173,6 +177,7 @@ int main(int argc, char **argv) {
   set.add_int("NActive","Size of active space (0 for full transform)",0);
   set.add_bool("Localize","Localize active space orbitals?",false);
   set.add_bool("Binary","Use binary I/O?",true);
+  set.add_bool("MP2","MP2 mode? (Dump only ph B matrix)",true);
 
   if(argc==2)
     set.parse(argv[1]);
@@ -191,6 +196,7 @@ int main(int argc, char **argv) {
   bool binary=set.get_bool("Binary");
   int Nact=set.get_int("NActive");
   bool loc=set.get_bool("Localize");
+  bool mp2=set.get_bool("MP2");
 
   // Load basis set
   BasisSet basis;
@@ -330,19 +336,15 @@ int main(int argc, char **argv) {
       else
 	chol.B_matrix(B);
       
-      form_B(B,Cah,Cah,"Bhaha",atype);
-      if(Cap.n_cols) {
-	form_B(B,Cap,Cah,"Bpaha",atype);
-	form_B(B,Cap,Cap,"Bpapa",atype);
-      }
+      if(!mp2) form_B(B,Cah,Cah,"Bhaha",atype);
+      form_B(B,Cap,Cah,"Bpaha",atype);
+      if(!mp2) form_B(B,Cap,Cap,"Bpapa",atype);
     } else {
-      form_B(chol,Cah,Cah,"Bhaha",atype);
-      if(Cap.n_cols) {
-	form_B(chol,Cap,Cah,"Bpaha",atype);
-	form_B(chol,Cap,Cap,"Bpapa",atype);
-      }
+      if(!mp2) form_B(chol,Cah,Cah,"Bhaha",atype);
+      form_B(chol,Cap,Cah,"Bpaha",atype);
+      if(!mp2) form_B(chol,Cap,Cap,"Bpapa",atype);
     }
-
+    
   } else {
     arma::mat Ca, Cb;
     chkpt.read("Ca",Ca);
@@ -448,27 +450,22 @@ int main(int argc, char **argv) {
 	dfit.B_matrix(B);
       else
 	chol.B_matrix(B);      
-      form_B(B,Cah,Cah,"Bhaha",atype);
-      if(Cap.n_cols) {
-	form_B(B,Cap,Cah,"Bpaha",atype);
-	form_B(B,Cap,Cap,"Bpapa",atype);
-      }
-      form_B(B,Cbh,Cbh,"Bhbhb",atype);
-      if(Cbp.n_cols) {
-	form_B(B,Cbp,Cbh,"Bpbhb",atype);
-	form_B(B,Cbp,Cbp,"Bpbpb",atype);
-      }
+
+      if(!mp2) form_B(B,Cah,Cah,"Bhaha",atype);
+      form_B(B,Cap,Cah,"Bpaha",atype);
+      if(!mp2) form_B(B,Cap,Cap,"Bpapa",atype);
+
+      if(!mp2) form_B(B,Cbh,Cbh,"Bhbhb",atype);
+      form_B(B,Cbp,Cbh,"Bpbhb",atype);
+      if(!mp2) form_B(B,Cbp,Cbp,"Bpbpb",atype);
     } else {
-      form_B(chol,Cah,Cah,"Bhaha",atype);
-      if(Cap.n_cols) {
-	form_B(chol,Cap,Cah,"Bpaha",atype);
-	form_B(chol,Cap,Cap,"Bpapa",atype);
-      }
-      form_B(chol,Cbh,Cbh,"Bhbhb",atype);
-      if(Cbp.n_cols) {
-	form_B(chol,Cbp,Cbh,"Bpbhb",atype);
-	form_B(chol,Cbp,Cbp,"Bpbpb",atype);
-      }
+      if(!mp2) form_B(chol,Cah,Cah,"Bhaha",atype);
+      form_B(chol,Cap,Cah,"Bpaha",atype);
+      if(!mp2) form_B(chol,Cap,Cap,"Bpapa",atype);
+
+      if(!mp2) form_B(chol,Cbh,Cbh,"Bhbhb",atype);
+      form_B(chol,Cbp,Cbh,"Bpbhb",atype);
+      if(!mp2) form_B(chol,Cbp,Cbp,"Bpbpb",atype);
     }
   }
 
