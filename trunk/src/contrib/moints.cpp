@@ -324,7 +324,7 @@ int main(int argc, char **argv) {
     // Fock matrices
     form_F(H,Cah,Cah,"Fhaha",atype);
     if(Cap.n_cols) {
-      form_F(H,Cah,Cap,"Fpaha",atype);
+      form_F(H,Cap,Cah,"Fpaha",atype);
       form_F(H,Cap,Cap,"Fpapa",atype);
     }
     
@@ -477,6 +477,12 @@ int main(int argc, char **argv) {
       }
     }
   }
+
+  energy_t en;
+  chkpt.read(en);  
+  arma::vec Eref(1);
+  Eref(0)=en.E;
+  Eref.save("Eref.dat",atype);
 
   return 0;
 }
