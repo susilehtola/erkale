@@ -999,6 +999,25 @@ void PZStability::print_info() {
     printf("\n **** Beta  orbitals ****\n");
     print_info(COb,CVb,Forbb,get_H(sol,true),Eorbb);
   }
+
+
+  // Print total energy and its components
+  energy_t en = restr ? rsol.en : usol.en;
+  printf("\n");
+  printf("%-21s energy: % .16e\n","Kinetic",en.Ekin);
+  printf("%-21s energy: % .16e\n","Nuclear attraction",en.Enuca);
+  printf("%-21s energy: % .16e\n","Total one-electron",en.Eone);
+  printf("%-21s energy: % .16e\n","Nuclear repulsion",en.Enucr);
+  printf("%-21s energy: % .16e\n","Coulomb",en.Ecoul);
+  #ifndef DFT
+  printf("%-21s energy: % .16e\n","Exchange",en.Exc);
+  #else
+  printf("%-21s energy: % .16e\n","Exchange-correlation",en.Exc);
+  printf("%-21s energy: % .16e\n","Non-local correlation",en.Enl);
+  #endif
+  printf("-----------------------------------------------------\n");
+  printf("%28s: % .16e\n","Total energy",en.E);
+  printf("%28s: % .16e\n","Virial factor",-en.E/en.Ekin);
 }
 
 void PZStability::perturb(double h) {
@@ -2135,12 +2154,18 @@ void PZStability::update(const arma::vec & x) {
 
   // Update orbitals in checkpoint file
   Checkpoint *chkptp=solverp->get_checkpoint();
-  if(restr)
+  if(restr) {
     chkptp->cwrite("CW",rsol.cC);
-  else {
+    chkptp->write(rsol.en);
+    chkptp->write("P",rsol.P);
+  } else {
     chkptp->cwrite("CWa",usol.cCa);
+    chkptp->write(usol.en);
     if(ob)
       chkptp->cwrite("CWb",usol.cCb);
+    chkptp->write("P",usol.P);
+    chkptp->write("Pa",usol.Pa);
+    chkptp->write("Pb",usol.Pb);
   }
 
   // Update reference, without sort
