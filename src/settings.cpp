@@ -156,9 +156,9 @@ void Settings::add_dft_settings() {
   add_int("PZprec", "Precondition OV block? 0: no, 1: unified, 2: orbital",1);
   add_bool("PZoo", "Optimize OO block?",true);
   add_bool("PZov", "Optimize OV block?",true);
-  add_double("PZIthr", "Threshold for initialization convergence (not too small!)",1e-1);
-  add_double("PZOOthr", "Gradient threshold for OO optimization",1e-3);
-  add_double("PZOVthr", "Gradient threshold for OV optimization",1e-4);
+  add_double("PZIthr", "Threshold for initialization convergence (not too small!)",1e-2);
+  add_double("PZOOthr", "Gradient threshold for OO optimization",1e-4);
+  add_double("PZOVthr", "Gradient threshold for OV optimization",1e-5);
   add_double("PZNRthr", "Threshold for use of NR method in OO optimization",0.0);
   add_double("PZEthr", "Threshold for energy convergence",1e-10);
   // Initialize PZ-SIC with localized orbitals?
@@ -166,12 +166,11 @@ void Settings::add_dft_settings() {
   // Run stability analysis for PZ-SIC?
   add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0, true);
   add_double("PZstabThr", "Instability threshold (interpreted as -thr)", 1e-3);
-  add_bool("PZreal", "Real degrees of freedom in PZ?", true);
   add_string("PZimag", "Imaginary degrees of freedom in PZ?", "Auto");
   // Mode to use PZ-SIC
   add_string("PZmode", "Apply PZ to the operators (in addition to J): X C D", "XC");
   // PZ-SIC maximum number of iterations in self-consistency cycle
-  add_int("PZiter", "Max number of iterations in self-consistency iteration", 100);
+  add_int("PZiter", "Max number of iterations in self-consistency iteration", 20);
   // PZ-SIC seed number
   add_int("PZseed", "Seed number for randomized matrices?", 0);
 }
