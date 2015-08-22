@@ -1969,12 +1969,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	// Stability analysis?
 	if(pzoo && pzstab==1) {
-	  stab.set_params(true,pzimag==1,false,true);
+	  stab.set_params(true,pzimag!=0,false,true);
 	  stab.check();
 	}
 	if(pzstab==2) {
 	  // Check stability of OO+OV rotations
-	  stab.set_params(true,pzimag==1,pzov,pzoo);
+	  stab.set_params(true,pzimag!=0,pzov,pzoo);
 	  stab.check();
 	}
       }
@@ -2311,12 +2311,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	// Stability analysis?
 	if(pzoo && pzstab==1) {
-	  stab.set_params(true,pzimag==1,false,true);
+	  stab.set_params(true,pzimag!=0,false,true);
 	  stab.check();
 	}
 	else if(pzstab==2) {
 	  // Check stability of OO+OV rotations
-	  stab.set_params(true,pzimag==1,pzov,pzoo);
+	  stab.set_params(true,pzimag!=0,pzov,pzoo);
 	  stab.check();
 	}
       }
