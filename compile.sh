@@ -264,14 +264,33 @@ fi
 # Check out ERKALE
 echo "Checking out source"
 cd ${builddir}
-svn checkout http://erkale.googlecode.com/svn/trunk/ erkale
+# Check for old svn checkout
+if [[ -d erkale/.svn ]]; then
+    echo "A subversion checkout detected. Archiving old data."
+    if [[ -d erkale.svn ]]; then
+	echo "Archival directory already exists. Please remove ${builddir}/erkale or ${builddir}/erkale.svn."
+	exit
+    fi
+    mv erkale erkale.svn
+fi
+# Check for old git checkout
+if [[ -d erkale ]]; then
+    cd erkale
+    git pull
+else
+    git clone https://github.com/susilehtola/erkale.git erkale
+fi
 echo "Done"
 
 # Generate version file
 cd erkale
+svnrev=$(git rev-list --count --first-parent HEAD)
+gitversion=$(git log --pretty=format:'%H' -n 1)
+gitshort=$(echo $gitversion|awk '{print substr($1,1,8)}')
 echo "#ifndef ERKALE_VERSION" > src/version.h
-svnrev=$(svnversion)
 echo "#define SVNREVISION \"$svnrev\"" >> src/version.h
+echo "#define GITVERSION \"$gitversion\"" >> src/version.h
+echo "#define GITSHORT \"$gitshort\"" >> src/version.h
 echo "#endif" >> src/version.h
 cd ..
 
