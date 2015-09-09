@@ -5,4 +5,4 @@ ERKALE -- HF/DFT from Hel
 
 * [**Users' guide**](http://theory.physics.helsinki.fi/~jzlehtol/erkale/doc/userguide.pdf)
 
-* [**List of functionals**](http://theory.physics.helsinki.fi/~jzlehtol/erkale/doc/functionals.pdf)
+* **List of functionals** [on libxc page](http://www.tddft.org/programs/octopus/wiki/index.php/Libxc_functionals) [list as a PDF](http://theory.physics.helsinki.fi/~jzlehtol/erkale/doc/functionals.pdf)
