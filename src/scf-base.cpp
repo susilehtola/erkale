@@ -1980,6 +1980,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       }
       // and update checkpoint file entries
       chkpt.write("C",sol.C);
+      chkpt.cwrite("CW",sol.cC);
       chkpt.write("E",sol.E);
       chkpt.write("P",sol.P);
       chkpt.write(sol.en);
@@ -2324,8 +2325,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       // and update checkpoint file entries
       chkpt.write("Ca",sol.Ca);
       chkpt.write("Cb",sol.Cb);
-      chkpt.cwrite("CCa",sol.cCa);
-      chkpt.cwrite("CCb",sol.cCb);
+      chkpt.cwrite("CWa",sol.cCa);
+      chkpt.cwrite("CWb",sol.cCb);
       chkpt.write("Ea",sol.Ea);
       chkpt.write("Eb",sol.Eb);
       chkpt.write("Pa",sol.Pa);
