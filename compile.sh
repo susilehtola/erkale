@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and 
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2011-11-12 Susi Lehtola
+# 2015-09-08 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -31,11 +31,18 @@ export CXXFLAGS="${CFLAGS}"
 export FFLAGS="${CFLAGS}"
 export FCFLAGS="${CFLAGS}"
 
-# LAPACK and BLAS library to use.
-LAPACK="-L/usr/lib64/atlas -llapack -lf77blas -lcblas -latlas"
-BLAS="-L/usr/lib64/atlas -lf77blas -lcblas -latlas"
-# Generic lapack and blas. Don't use these unless there is nothing
-# else available (e.g. on Cygwin)
+### LAPACK and BLAS library to use.
+
+## Newer versions of Fedora / RHEL
+LAPACK="-L/usr/lib64/atlas -lsatlas"
+BLAS="-L/usr/lib64/atlas -lsatlas"
+
+## Older versions of Fedora / RHEL
+#LAPACK="-L/usr/lib64/atlas -llapack -lf77blas -lcblas -latlas"
+#BLAS="-L/usr/lib64/atlas -lf77blas -lcblas -latlas"
+
+## Generic lapack and blas. Don't use these unless there is nothing
+## else available (e.g. on Cygwin)
 # LAPACK="-llapack -lblas -lgfortran"
 # BLAS="-lblas -lgfortran"
 
@@ -64,12 +71,12 @@ fi
 
 # Current versions of libraries, if they are to be compiled
 export GSLVER="1.16"
-export XCVER="2.2.1"
+export XCVER="2.2.2"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="4.650.0"
-export CMAKEVER="3.1.3"
-export HDF5VER="1.8.14"
+export ARMAVER="5.500.0"
+export CMAKEVER="3.3.1"
+export HDF5VER="1.8.15"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
