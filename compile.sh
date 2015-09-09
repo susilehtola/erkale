@@ -74,7 +74,7 @@ export GSLVER="1.16"
 export XCVER="2.2.2"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="5.500.0"
+export ARMAVER="5.500.2"
 export CMAKEVER="3.3.1"
 export HDF5VER="1.8.15"
 
