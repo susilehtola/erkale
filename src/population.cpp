@@ -167,11 +167,16 @@ int main(int argc, char **argv) {
       chkpt.read("Nel-a",Nela);
 
       // Get orbital coefficients
-      arma::mat C;
-      chkpt.read("C",C);
+      if(chkpt.exist("CW.re")) {
+	arma::cx_mat CW;
+	chkpt.cread("CW",CW);
+	IAO_analysis(basis,CW.cols(0,Nela-1),minbas);
+      } else {
+	arma::mat C;
+	chkpt.read("C",C);
+	IAO_analysis(basis,C.cols(0,Nela-1),minbas);
+      }
 
-      // Do analysis
-      IAO_analysis(basis,C.cols(0,Nela-1),P,minbas);
     } else {
       // Get amount of occupied orbitals
       int Nela, Nelb;
@@ -179,12 +184,17 @@ int main(int argc, char **argv) {
       chkpt.read("Nel-b",Nelb);
 
       // Get orbital coefficients
-      arma::mat Ca, Cb;
-      chkpt.read("Ca",Ca);
-      chkpt.read("Cb",Cb);
-
-      // Do analysis
-      IAO_analysis(basis,Ca.cols(0,Nela-1),Cb.cols(0,Nelb-1),Pa,Pb,minbas);
+      if(chkpt.exist("CWa.re")) {
+	arma::cx_mat CWa, CWb;
+	chkpt.cread("CWa",CWa);
+	chkpt.cread("CWb",CWb);
+	IAO_analysis(basis,CWa.cols(0,Nela-1),CWb.cols(0,Nelb-1),minbas);
+      } else {
+	arma::mat Ca, Cb;
+	chkpt.read("Ca",Ca);
+	chkpt.read("Cb",Cb);
+	IAO_analysis(basis,Ca.cols(0,Nela-1),Cb.cols(0,Nelb-1),minbas);
+      }
     }
   }
 
