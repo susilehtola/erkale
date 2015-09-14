@@ -375,6 +375,10 @@ void IAO_analysis(const BasisSet & basis, const arma::mat & Ca, const arma::mat 
   q.col(2)=add_nuclear_charges(basis,q.col(0)+q.col(1));
 
   print_analysis(basis,"IAO",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"IAO spin",qs);
 }
 
 void IAO_analysis(const BasisSet & basis, const arma::cx_mat & Ca, const arma::cx_mat & Cb, std::string minbas) {
@@ -389,6 +393,10 @@ void IAO_analysis(const BasisSet & basis, const arma::cx_mat & Ca, const arma::c
   q.col(2)=add_nuclear_charges(basis,q.col(0)+q.col(1));
 
   print_analysis(basis,"IAO",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"IAO spin",qs);
 }
 
 arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, std::string minbas) {
@@ -468,6 +476,10 @@ void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::ma
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Becke",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"Becke spin",qs);
 }
 
 arma::vec becke_charges(const BasisSet & basis, const arma::mat & P, double tol) {
@@ -514,6 +526,10 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Hirshfeld",q);
+  
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"Hirshfeld spin",qs);
 }
 
 arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double tol) {
@@ -574,6 +590,10 @@ void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, 
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Iterative Hirshfeld",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"Iterative Hirshfeld spin",qs);
 }
 
 arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double tol) {
@@ -634,6 +654,10 @@ void stockholder_analysis(const BasisSet & basis, const arma::mat & Pa, const ar
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Stockholder",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"Stockholder spin",qs);
 }
 
 arma::vec stockholder_charges(const BasisSet & basis, const arma::mat & P, double tol) {
@@ -687,6 +711,10 @@ void bader_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::ma
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Bader",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"Bader spin",qs);
 }
 
 arma::vec bader_charges(const BasisSet & basis, const arma::mat & P, double tol) {
@@ -730,6 +758,10 @@ void voronoi_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Voronoi",q);
+
+  // Get charges. Note that in charges above electrons have negative charge, so switch sign
+  arma::vec qs=-q.col(0)+q.col(1);
+  print_analysis(basis,"Voronoi spin",qs);
 }
 
 arma::vec voronoi_charges(const BasisSet & basis, const arma::mat & P, double tol) {
