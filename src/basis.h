@@ -670,5 +670,7 @@ double check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, dou
  * in idx.
  */
 arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, std::string minbas="MINAO.gbs");
+/// Same, but using complex coefficients
+arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, std::string minbas="MINAO.gbs");
 
 #endif

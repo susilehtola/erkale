@@ -3744,3 +3744,62 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
   // and orthonormalize them
   return orthonormalize(S1,A);
 }
+
+arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, std::string minbaslib) {
+  // Get minao library
+  BasisSetLibrary minao;
+  minao.load_gaussian94(minbaslib);
+  // Default settings
+  Settings set;
+  set.add_scf_settings();
+
+  // Construct minimal basis set
+  BasisSet minbas;
+  construct_basis(minbas,basis.get_nuclei(),minao,set);
+
+  // Get indices
+  idx.clear();
+  idx.resize(minbas.get_Nnuc());
+  for(size_t inuc=0;inuc<minbas.get_Nnuc();inuc++) {
+    // Get shells on nucleus
+    std::vector<GaussianShell> sh=minbas.get_funcs(inuc);
+    // Store indices
+    for(size_t si=0;si<sh.size();si++)
+      for(size_t fi=0;fi<sh[si].get_Nbf();fi++)
+	idx[inuc].push_back(sh[si].get_first_ind()+fi);
+  }
+
+  // Calculate S1, S12, S2, and S21
+  arma::mat S1=basis.overlap();
+  arma::mat S2=minbas.overlap();
+
+  arma::mat S12=basis.overlap(minbas);
+  arma::mat S21=arma::trans(S12);
+
+  // and inverse matrices
+  arma::mat S1inv_h=BasOrth(S1,set);
+  arma::mat S2inv_h=BasOrth(S2,set);
+  // Need to be OK for canonical as well
+  arma::mat S1inv=S1inv_h*arma::trans(S1inv_h);
+  arma::mat S2inv=S2inv_h*arma::trans(S2inv_h);
+
+  // Compute Ctilde.
+  arma::cx_mat Ctilde=S1inv*S12*S2inv*S21*C;
+
+  // and orthonormalize it
+  Ctilde=orthonormalize(S1,Ctilde);
+
+  // "Density matrices"
+  arma::cx_mat P=C*arma::trans(C);
+  arma::cx_mat Pt=Ctilde*arma::trans(Ctilde);
+
+  // Identity matrix
+  arma::cx_mat unit(S1.n_rows,S1.n_cols);
+  unit.eye();
+  
+  // Compute the non-orthonormal IAOs.
+  arma::cx_mat A=P*S1*Pt*S12 + (unit-P*S1)*(unit-Pt*S1)*S1inv*S12;
+
+  // and orthonormalize them
+  return orthonormalize(S1,A);
+}
