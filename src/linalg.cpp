@@ -437,13 +437,27 @@ arma::mat orthonormalize(const arma::mat & S, const arma::mat & C) {
   arma::mat ovec;
   eig_sym_ordered(oval,ovec,MOovl);
 
-  // New orbitals
-  arma::mat Cnew(C*ovec);
-  for(size_t io=0;io<C.n_cols;io++) {
-    Cnew.col(io)/=sqrt(oval(io));
-  }
+  // Orthogonalizing matrix
+  arma::mat O(ovec*diagmat(arma::pow(oval,-0.5))*arma::trans(ovec));
 
-  return Cnew;
+  // Returned orbitals
+  return C*O;
+}
+
+arma::cx_mat orthonormalize(const arma::mat & S, const arma::cx_mat & C) {
+  // Compute MO overlap
+  arma::cx_mat MOovl=arma::trans(C)*S*C;
+
+  // Perform eigendecomposition
+  arma::vec oval;
+  arma::cx_mat ovec;
+  eig_sym_ordered(oval,ovec,MOovl);
+
+  // Orthogonalizing matrix
+  arma::cx_mat O(ovec*diagmat(arma::pow(oval,-0.5))*arma::trans(ovec));
+
+  // Returned orbitals
+  return C*O;
 }
 
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {

@@ -141,6 +141,8 @@ arma::cx_mat unitarize(const arma::cx_mat & M);
 
 /// Orthonormalize vectors
 arma::mat orthonormalize(const arma::mat & S, const arma::mat & C);
+/// Orthonormalize vectors
+arma::cx_mat orthonormalize(const arma::mat & S, const arma::cx_mat & C);
 
 /**
  * Find natural orbitals from P. Orbitals returned in decreasing occupation number.
