@@ -160,6 +160,8 @@ class PZStability: public FDHessian {
   void update(const arma::vec & x);
   /// Update reference
   void update_reference(bool sort);
+  /// Update (adaptive) integration grid. If init=true, initialization is done for a static grid
+  void update_grid(bool init);
 
   /// Print status of optimization
   void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;

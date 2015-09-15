@@ -2072,10 +2072,13 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
   }
 
   printf("Final value is % .10f; optimization changed value by %e\n",E0,E0-ival);
-  // Sort orbitals
+  // Update grid
+  update_grid(false);
+  // Update reference
   update_reference(true);
+  // Print info
   print_info();
-
+  
   // Return the change
   return E0-ival;
 }
@@ -2509,21 +2512,33 @@ void PZStability::set(const rscf_t & sol) {
   fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
 
   // Reconstruct DFT grid
+  update_grid(true);
+  // Update reference
+  update_reference(true);
+}
+
+void PZStability::update_grid(bool init) {
   if(ovmethod.adaptive) {
+    arma::cx_mat Ctilde;
+    if(restr)
+      Ctilde=rsol.cC.cols(0,oa-1);
+    else {
+      Ctilde.zeros(usol.cCa.n_rows,oa+ob);
+      Ctilde.cols(0,oa-1)=usol.cCa.cols(0,oa-1);
+      if(ob)
+	Ctilde.cols(oa,oa+ob-1)=usol.cCb.cols(0,ob-1);
+    }
     if (ovmethod.x_func>0 || ovmethod.c_func>0)
-      grid.construct(sol.cC.cols(0,oa-1),ovmethod.gridtol,ovmethod.x_func,ovmethod.c_func);
-  } else {
+      grid.construct(Ctilde,ovmethod.gridtol,ovmethod.x_func,ovmethod.c_func);
+  } else if(init) {
     bool strict(solverp->get_strictint());
     if (ovmethod.x_func>0 || ovmethod.c_func>0)
       grid.construct(ovmethod.nrad,ovmethod.lmax,ovmethod.x_func,ovmethod.c_func,strict);
     if(ovmethod.nl)
       nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,strict,true);
   }
-
-  // Update reference
-  update_reference(true);
 }
-
+    
 void PZStability::set(const uscf_t & sol) {
   Checkpoint *chkptp=solverp->get_checkpoint();
 
@@ -2545,21 +2560,7 @@ void PZStability::set(const uscf_t & sol) {
   fflush(stderr);
 
   // Reconstruct DFT grid
-  if(ovmethod.adaptive) {
-    arma::cx_mat Ctilde(sol.cCa.n_rows,oa+ob);
-    Ctilde.cols(0,oa-1)=sol.cCa.cols(0,oa-1);
-    if(ob)
-      Ctilde.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
-    if (ovmethod.x_func>0 || ovmethod.c_func>0)
-      grid.construct(Ctilde,ovmethod.gridtol,ovmethod.x_func,ovmethod.c_func);
-  } else {
-    bool strict(solverp->get_strictint());
-    if (ovmethod.x_func>0 || ovmethod.c_func>0)
-      grid.construct(ovmethod.nrad,ovmethod.lmax,ovmethod.x_func,ovmethod.c_func,strict);
-    if(ovmethod.nl)
-      nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,strict,true);
-  }
-
+  update_grid(true);
   // Update reference
   update_reference(true);
 }
