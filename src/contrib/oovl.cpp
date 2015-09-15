@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
       //proj.print();
             
       if(lmat[il].n_cols == rmat[ir].n_cols) {
-	printf("Trace of density        projection  is % 10.6f, deviation from norm is %e\n",arma::sum(arma::sum(proj)),arma::sum(arma::sum(proj))-rmat[ir].n_cols);
+	printf("Trace of density        projection  is % 10.6f, deviation from norm is %e\n",arma::sum(arma::sum(proj)),rmat[ir].n_cols-arma::sum(arma::sum(proj)));
 
 	// Determine ordering
 	arma::uvec lorder(arma::linspace<arma::uvec>(0,lmat[il].n_cols-1,lmat[il].n_cols));
@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
 	// Sort projection matrix
 	arma::mat sproj(proj(lorder,rorder));
 	arma::vec osort(arma::sort(arma::diagvec(sproj),"descend"));
-	printf("Sum of diagonal orbital projections is % 10.6f, deviation from norm is %e\n",arma::sum(osort),arma::sum(osort)-rmat[ir].n_cols);	
+	printf("Sum of diagonal orbital projections is % 10.6f, deviation from norm is %e\n",arma::sum(osort),rmat[ir].n_cols-arma::sum(osort));	
 
 	osort-=arma::ones<arma::vec>(osort.n_elem);
 	osort.print("Minimal orbital differences");
