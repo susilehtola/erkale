@@ -101,6 +101,9 @@ enum locmet {
   EDMISTON
 };
 
+/// Parse method
+enum locmet parse_locmet(const std::string & met);
+
 /// Charge method methods
 enum chgmet {
   /// Mulliken charge
