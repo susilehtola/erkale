@@ -102,7 +102,9 @@
 #define COMPLEXI std::complex<double>(0.0,1.0)
 
 // Error info
-#define ERROR_INFO() printf("\nError in function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__)
+#define ERROR_INFO() printf("\nError in function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__);
+// Print out location
+#define LOC_INFO() {printf("Hello from function %s (file %s, near line %i)\n",__FUNCTION__,__FILE__,__LINE__); fflush(stdout);}
 
 // Check that matrix is of wanted size
 #define MAT_SIZE_CHECK(M,NR,NC) if(M.n_rows != NR || M.n_cols != NC) { \
