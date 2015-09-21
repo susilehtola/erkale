@@ -127,7 +127,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   cholmode=set.get_int("CholeskyMode");
   if(cholesky && densityfit)
     throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
-  
+
   // Timer
   Timer t;
   Timer tinit;
@@ -274,7 +274,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     }
   } else  {
     // Compute ERIs
-    if(cholesky) {	
+    if(cholesky) {
       if(verbose) {
 	t.set();
 	printf("Computing repulsion integrals.\n");
@@ -307,20 +307,20 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	size_t Npairs;
 	// Form decontracted basis set and get the screening matrix
 	decbas=basis.decontract(decconv);
-	
+
 	if(verbose) {
 	  t.set();
 	  printf("Forming ERI screening matrix ... ");
 	  fflush(stdout);
 	}
-	
+
 	if(decfock)
 	  // Use decontracted basis
 	  Npairs=scr.fill(&decbas,intthr,verbose);
 	else
 	  // Use contracted basis
 	  Npairs=scr.fill(&basis,intthr,verbose);
-	
+
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  if(decfock)
@@ -328,11 +328,11 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	  else
 	    printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
 	}
-	
+
       } else {
 	// Compute memory requirement
 	size_t N;
-	
+
 	if(verbose) {
 	  N=tab.N_ints(&basis,intthr);
 	  printf("Forming table of %u ERIs, requiring %s of memory ... ",(unsigned int) N,memory_size(N*sizeof(double)).c_str());
@@ -340,7 +340,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	}
 	// Don't compute small integrals
 	size_t Npairs=tab.fill(&basis,intthr);
-	
+
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
@@ -348,7 +348,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       }
     }
   }
-  
+
   if(verbose) {
     printf("\nInitialization of computation done in %s.\n\n",tinit.elapsed().c_str());
     fflush(stdout);
@@ -909,7 +909,7 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
 
     // Virtual-virtual exchange matrix is
     arma::mat Kvv(arma::trans(Cv)*K*Cv);
-    
+
     // Eigendecomposition
     arma::vec eval;
     arma::mat evec;
@@ -934,7 +934,7 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
   Cvact=Cvact*O;
 
   // Build projection matrix
-  arma::mat Sv(arma::trans(Cvact)*S*Cv);  
+  arma::mat Sv(arma::trans(Cvact)*S*Cv);
   arma::mat Pv(Cv.n_cols,Cv.n_cols);
   Pv.eye();
   Pv-=arma::trans(Sv)*Sv;
@@ -943,12 +943,12 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
   arma::vec Pval;
   arma::mat Pvec;
   arma::eig_sym(Pval,Pvec,Pv);
-  
+
   // Now, the inactive virtuals have eigenvalues 1.0, whereas the
   // active orbitals have eigenvalues ~ 0.0. The localized virtual
   // space is then given by
   Cv=Cv*Pvec;
-  
+
   return Cv;
 }
 
@@ -1696,7 +1696,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       if(load.exist("CW.re")) {
 	arma::cx_mat CWold;
 	load.cread("CW",CWold);
-
 	basis.projectOMOs(oldbas,CWold,CW,Nel_alpha);
 	doCW=true;
       }
@@ -1880,7 +1879,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      orbital_localization(BOYS,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 	      if(verbose) {
 		printf("\n");
-		
+
 		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
 		fflush(stderr);
 	      }
@@ -1980,7 +1979,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       }
       // and update checkpoint file entries
       chkpt.write("C",sol.C);
-      chkpt.cwrite("CW",sol.cC);
+      if(sol.cC.n_rows == sol.C.n_rows && sol.cC.n_cols == sol.C.n_cols)
+	chkpt.cwrite("CW",sol.cC);
       chkpt.write("E",sol.E);
       chkpt.write("P",sol.P);
       chkpt.write(sol.en);
@@ -2325,8 +2325,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       // and update checkpoint file entries
       chkpt.write("Ca",sol.Ca);
       chkpt.write("Cb",sol.Cb);
-      chkpt.cwrite("CWa",sol.cCa);
-      chkpt.cwrite("CWb",sol.cCb);
+      if(sol.cCa.n_rows == sol.Ca.n_rows && sol.cCa.n_cols == sol.Ca.n_cols)
+	chkpt.cwrite("CWa",sol.cCa);
+      if(sol.cCb.n_rows == sol.Cb.n_rows && sol.cCb.n_cols == sol.Cb.n_cols)
+	chkpt.cwrite("CWb",sol.cCb);
       chkpt.write("Ea",sol.Ea);
       chkpt.write("Eb",sol.Eb);
       chkpt.write("Pa",sol.Pa);
