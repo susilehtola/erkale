@@ -163,6 +163,7 @@ void Settings::add_dft_settings() {
   add_double("PZEthr", "Threshold for energy convergence",1e-10);
   // Initialize PZ-SIC with localized orbitals?
   add_bool("PZloc", "Initial localization before SIC calculation?", true);
+  add_string("PZlocmet", "Initial localization method (recommend FB or IAO)", "FB");
   // Run stability analysis for PZ-SIC?
   add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0, true);
   add_double("PZstabThr", "Instability threshold (interpreted as -thr)", 1e-3);

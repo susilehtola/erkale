@@ -1816,6 +1816,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
       bool pzloc=set.get_bool("PZloc");
+      enum locmet pzlocmet=parse_locmet(set.get_string("PZlocmet"));
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
       double pzIthr=set.get_double("PZIthr");
@@ -1876,7 +1877,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      Timer tloc;
 	      double measure;
 	      // Max 1e5 iterations, gradient norm <= pzIthr
-	      orbital_localization(BOYS,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+	      orbital_localization(pzlocmet,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 	      if(verbose) {
 		printf("\n");
 
@@ -2108,6 +2109,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
       bool pzloc=set.get_bool("PZloc");
+      enum locmet pzlocmet=parse_locmet(set.get_string("PZlocmet"));
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
       double pzIthr=set.get_double("PZIthr");
@@ -2167,7 +2169,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      if(verbose) printf("\nInitial localization.\n");
 	      double measure;
 	      // Max 1e5 iterations, gradient norm <= pzIthr
-	      orbital_localization(BOYS,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+	      orbital_localization(pzlocmet,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 	      if(verbose) {
 		printf("\n");
 
@@ -2215,7 +2217,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 		if(verbose) printf("\nInitial localization.\n");
 		double measure;
 		// Max 1e5 iterations, gradient norm <= pzIthr
-		orbital_localization(BOYS,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+		orbital_localization(pzlocmet,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
 		if(verbose) {
 		  printf("\n");
 
