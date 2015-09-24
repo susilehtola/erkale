@@ -2443,6 +2443,11 @@ arma::cx_mat PZStability::matexp(const arma::cx_mat & R) const {
   arma::cx_mat prod=arma::trans(rot)*rot-arma::eye(rot.n_cols,rot.n_cols);
   double norm=rms_cnorm(prod);
   if(norm>=sqrt(DBL_EPSILON)) {
+    arma::mat Rre(arma::real(R));
+    Rre.save("R.real.dat",arma::raw_ascii);
+    arma::mat Rim(arma::imag(R));
+    Rim.save("R.imag.dat",arma::raw_ascii);
+
     arma::mat rotre(arma::real(rot));
     rotre.save("rotation.real.dat",arma::raw_ascii);
     arma::mat rotim(arma::imag(rot));
