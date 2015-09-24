@@ -2442,8 +2442,15 @@ arma::cx_mat PZStability::matexp(const arma::cx_mat & R) const {
 
   arma::cx_mat prod=arma::trans(rot)*rot-arma::eye(rot.n_cols,rot.n_cols);
   double norm=rms_cnorm(prod);
-  if(norm>=sqrt(DBL_EPSILON))
-    throw std::runtime_error("Matrix is not unitary!\n");
+  if(norm>=sqrt(DBL_EPSILON)) {
+    arma::mat rotre(arma::real(rot));
+    rotre.save("rotation.real.dat",arma::raw_ascii);
+    arma::mat rotim(arma::imag(rot));
+    rotim.save("rotation.imag.dat",arma::raw_ascii);
+    std::ostringstream oss;
+    oss << "Matrix is not unitary! RMS deviation from unitarity is " << norm << "!\n";
+    throw std::runtime_error(oss.str());
+  }
 
   return rot;
 }
