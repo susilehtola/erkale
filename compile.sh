@@ -31,20 +31,25 @@ export CXXFLAGS="${CFLAGS}"
 export FFLAGS="${CFLAGS}"
 export FCFLAGS="${CFLAGS}"
 
-### LAPACK and BLAS library to use.
+### LAPACK (+ BLAS) library to use.
 
-## Newer versions of Fedora / RHEL
-LAPACK="-L/usr/lib64/atlas -lsatlas"
-BLAS="-L/usr/lib64/atlas -lsatlas"
 
-## Older versions of Fedora / RHEL
-#LAPACK="-L/usr/lib64/atlas -llapack -lf77blas -lcblas -latlas"
-#BLAS="-L/usr/lib64/atlas -lf77blas -lcblas -latlas"
+## OpenBLAS
+LAPACKOMP="-lopenblaso"
+LAPACKSER="-lopenblas"
+
+## ATLAS, newer versions of Fedora / RHEL
+LAPACKOMP="-L/usr/lib64/atlas -lsatlas"
+LAPACKSER="-L/usr/lib64/atlas -lsatlas"
+
+## ATLAS, older versions of Fedora / RHEL
+#LAPACKOMP="-L/usr/lib64/atlas -llapack -lf77blas -lcblas -latlas"
+#LAPACKSER="-L/usr/lib64/atlas -llapack -lf77blas -lcblas -latlas"
 
 ## Generic lapack and blas. Don't use these unless there is nothing
 ## else available (e.g. on Cygwin)
-# LAPACK="-llapack -lblas -lgfortran"
-# BLAS="-lblas -lgfortran"
+# LAPACKOMP="-llapack -lblas -lgfortran"
+# LAPACKSER="-llapack -lblas -lgfortran"
 
 # Use system packages?
 system_cmake=0
@@ -70,11 +75,15 @@ if [[ "$CYGWIN" != "" ]]; then
 fi
 
 # Current versions of libraries, if they are to be compiled
+# GSL
 export GSLVER="1.16"
-export XCVER="2.2.2"
+## LibXC
+#export XCVER="2.2.2"
+# Use newest svn snapshot
+export XCVER="svn"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="5.500.2"
+export ARMAVER="5.600.2"
 export CMAKEVER="3.3.1"
 export HDF5VER="1.8.15"
 
@@ -155,23 +164,35 @@ if(( ! ${system_libxc} )); then
     if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
 	echo -n "Compiling libxc ..."
 	
-	if [ ! -d ${builddir}/libxc-${XCVER} ]; then
-	    if [ ! -f ${srcdir}/libxc-${XCVER}.tar.gz ]; then
-		cd ${srcdir}
-		wget -O libxc-${XCVER}.tar.gz "http://www.tddft.org/programs/octopus/down.php?file=libxc/libxc-${XCVER}.tar.gz"
+	if [[ "$XCVER" == "svn" ]]; then
+	    cd $builddir
+	    svn co http://www.tddft.org/svn/libxc/trunk/ libxc
+	    cd libxc
+	    autoreconf -i
+	    ./configure --enable-static --disable-shared --disable-fortran --prefix=${topdir}/libxc --exec-prefix=${topdir}/libxc &>configure.log
+	    make -j ${nprocs} &> make.log
+	    make install &> install.log
+	    make clean &> clean.log
+	    echo " done"
+	else
+	    if [ ! -d ${builddir}/libxc-${XCVER} ]; then
+		if [ ! -f ${srcdir}/libxc-${XCVER}.tar.gz ]; then
+		    cd ${srcdir}
+		    wget -O libxc-${XCVER}.tar.gz "http://www.tddft.org/programs/octopus/down.php?file=libxc/libxc-${XCVER}.tar.gz"
+		fi
+		cd ${builddir}
+		tar zxf ${srcdir}/libxc-${XCVER}.tar.gz
 	    fi
-	    cd ${builddir}
-	    tar zxf ${srcdir}/libxc-${XCVER}.tar.gz
+	    
+	    cd ${builddir}/libxc-${XCVER}
+	    ./configure --enable-static --disable-shared --disable-fortran --prefix=${topdir}/libxc --exec-prefix=${topdir}/libxc &>configure.log
+	    make -j ${nprocs} &> make.log
+	    make install &> install.log
+	    make clean &> clean.log
+	    echo " done"
 	fi
-	
-	cd ${builddir}/libxc-${XCVER}
-	./configure --enable-static --disable-shared --disable-fortran --prefix=${topdir}/libxc --exec-prefix=${topdir}/libxc &>configure.log
-	make -j ${nprocs} &> make.log
-	make install &> install.log
-	make clean &> clean.log
-	echo " done"
     fi
-
+    
     if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
 	echo "Error compiling libxc."
 	exit
@@ -367,8 +388,8 @@ FC=${FC} CC=${CC} CXX=${CXX} \
  FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  ${cmake} .. \
  -DSVN_VERSION=ON -DUSE_OPENMP=ON \
- -DLAPACK_LIBRARIES="${LAPACK}" \
- -DBLAS_LIBRARIES="${BLAS}" \
+ -DLAPACK_LIBRARIES="${LAPACKOMP}" \
+ -DBLAS_LIBRARIES="${LAPACKOMP}" \
  -DCMAKE_INSTALL_PREFIX=${topdir}/erkale
 make -j ${nprocs} VERBOSE=1
 make install
@@ -382,8 +403,8 @@ FC=${FC} CC=${CC} CXX=${CXX} \
  FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
  ${cmake} .. \
  -DSVN_VERSION=ON -DUSE_OPENMP=OFF \
- -DLAPACK_LIBRARIES="${LAPACK}" \
- -DBLAS_LIBRARIES="${BLAS}" \
+ -DLAPACK_LIBRARIES="${LAPACKSER}" \
+ -DBLAS_LIBRARIES="${LAPACKSER}" \
  -DCMAKE_INSTALL_PREFIX=${topdir}/erkale
 make -j ${nprocs} VERBOSE=1
 make install
