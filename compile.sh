@@ -35,8 +35,8 @@ export FCFLAGS="${CFLAGS}"
 
 
 ## OpenBLAS
-LAPACKOMP="-lopenblaso"
-LAPACKSER="-lopenblas"
+#LAPACKOMP="-lopenblaso"
+#LAPACKSER="-lopenblas"
 
 ## ATLAS, newer versions of Fedora / RHEL
 LAPACKOMP="-L/usr/lib64/atlas -lsatlas"
