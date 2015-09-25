@@ -161,20 +161,20 @@ fi
 
 # libXC
 if(( ! ${system_libxc} )); then
-    if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
-	echo -n "Compiling libxc ..."
-	
-	if [[ "$XCVER" == "svn" ]]; then
-	    cd $builddir
-	    svn co http://www.tddft.org/svn/libxc/trunk/ libxc
-	    cd libxc
-	    autoreconf -i
-	    ./configure --enable-static --disable-shared --disable-fortran --prefix=${topdir}/libxc --exec-prefix=${topdir}/libxc &>configure.log
-	    make -j ${nprocs} &> make.log
-	    make install &> install.log
-	    make clean &> clean.log
-	    echo " done"
-	else
+    if [[ "$XCVER" == "svn" ]]; then
+	echo -n "Checking out and compiling libxc ..."
+	cd $builddir
+	svn co http://www.tddft.org/svn/libxc/trunk/ libxc
+	cd libxc
+	autoreconf -i
+	./configure --enable-static --disable-shared --disable-fortran --prefix=${topdir}/libxc --exec-prefix=${topdir}/libxc &>configure.log
+	make -j ${nprocs} &> make.log
+	make install &> install.log
+	make clean &> clean.log
+	echo " done"
+    else
+	if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
+	    echo -n "Compiling libxc ..."
 	    if [ ! -d ${builddir}/libxc-${XCVER} ]; then
 		if [ ! -f ${srcdir}/libxc-${XCVER}.tar.gz ]; then
 		    cd ${srcdir}
