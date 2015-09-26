@@ -2651,6 +2651,7 @@ bool PZStability::check(bool stability, double cutoff) {
   // Block-diagonalize Hessian
   for(size_t i=0;i<dof.size();i++) {
     // Helpers
+    Timer tdiag;
     arma::vec hval;
     bool diagok=arma::eig_sym(hval,h.submat(dof[i].idx,dof[i].idx));
     if(!diagok) {
@@ -2660,13 +2661,14 @@ bool PZStability::check(bool stability, double cutoff) {
     }
 
     std::ostringstream oss;
-    oss << "Eigenvalues in the " << dof[i].name << " block";
+    oss << "Eigenvalues in the " << dof[i].name << " block (" << tdiag.elapsed() << ")";
     hval.t().print(oss.str());
     fflush(stdout);
   }
 
   arma::mat I;
   if(stability) {
+    Timer tdiag;
     arma::vec hval;
     arma::mat hvec;
     bool diagok=arma::eig_sym(hval,hvec,h);
@@ -2675,6 +2677,7 @@ bool PZStability::check(bool stability, double cutoff) {
       oss << "Error diagonalizing full Hessian.\n";
       throw std::runtime_error(oss.str());
     }
+    printf("Full Hessian diagonalized in %s.\n",tdiag.elapsed().c_str());
 
     // Find instabilities
     I=hvec.cols(arma::find(hval<cutoff));
