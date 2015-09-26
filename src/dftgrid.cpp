@@ -2789,6 +2789,10 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
   for(size_t i=0;i<orbgrid.size();i++)
     orbgrid[i].resize(Ctilde.n_cols);
 
+  // Intel compiler complains about collapse...
+  const size_t Ngrid(grids.size());
+  const size_t Norb(Ctilde.n_cols);
+  
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -2805,8 +2809,8 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
 #pragma omp for schedule(dynamic,1)
 #endif
 #endif
-    for(size_t ig=0;ig<grids.size();ig++)
-      for(size_t iorb=0;iorb<Ctilde.n_cols;iorb++)
+    for(size_t ig=0;ig<Ngrid;ig++)
+      for(size_t iorb=0;iorb<Norb;iorb++)
 	{
 	  wrk[ith].set_grid(grids[ig]);
 	  orbgrid[ig][iorb]=wrk[ith].construct(Ctilde.col(iorb),ftoler/nrad[grids[ig].atind],x_func,c_func);
