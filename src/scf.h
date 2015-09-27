@@ -251,8 +251,6 @@ class SCF {
   bool usebroyden;
   /// Use Trust-Region Roothaan-Hall?
   bool usetrrh;
-  /// Do line search in level shift?
-  bool linesearch;
 
   /// Maximum number of iterations
   int maxiter;
@@ -371,6 +369,11 @@ class SCF {
 
   /// Toggle calculation of forces
   void do_force(bool val);
+
+  /// Get maximum iterations
+  size_t get_maxiter() const;
+  /// Set maximum iterations
+  void set_maxiter(size_t maxiter);
 
   /// Get overlap matrix
   arma::mat get_S() const;

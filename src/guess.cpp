@@ -174,7 +174,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   free(tmpname);
 }
 
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, bool dropshells, bool sphave) {
+arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bool sphave) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -224,9 +224,6 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
 
   Timer ttot;
 
-  // Approximate orbital energies
-  std::vector<double> orbE;
-
   // Loop over list of identical nuclei
   for(size_t i=0;i<idnuc.size();i++) {
 
@@ -249,11 +246,6 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     // Get the atomic shells
     std::vector<GaussianShell> shells=atbas.get_funcs(0);
     
-    // Store approximate energies
-    for(size_t iid=0;iid<idnuc[i].size();iid++)
-      for(size_t io=0;io<atE.size();io++)
-	orbE.push_back(atE(io));
-    
     // Loop over shells
     for(size_t ish=0;ish<shells.size();ish++)
       for(size_t jsh=0;jsh<shells.size();jsh++) {
@@ -274,15 +266,6 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     }
   }
   
-  Timer trest;
-  if(verbose) {
-    printf("Diagonalizing density matrix ... ");
-    fflush(stdout);
-  }
-
-  // Overlap matrix
-  arma::mat S=basis.overlap();
-
   /*
   // Check that density matrix contains the right amount of electrons
   int Neltot=basis.Ztot()-set.get_int("Charge");
@@ -291,22 +274,13 @@ void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings
     fprintf(stderr,"Nel = %i, P contains %f electrons, difference %e.\n",Neltot,Nel,Nel-Neltot);
   */
 
-  // Natural orbitals for orbital coefficients
-  arma::vec occs;
-  form_NOs(P,S,C,occs);
-
-  // Store energies
-  E.zeros(C.n_cols);
-  std::sort(orbE.begin(),orbE.end());
-  for(size_t i=0;i<std::min(orbE.size(),(size_t) C.n_cols);i++)
-    E(i)=orbE[i];
-
   if(verbose) {
-    printf("done (%s)\n",trest.elapsed().c_str());
     printf("Atomic guess formed in %s.\n\n",ttot.elapsed().c_str());
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
     fflush(stderr);
   }
+
+  return P;
 }
 
 void molecular_guess(const BasisSet & basis, const Settings & set, std::string & chkname) {

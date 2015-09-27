@@ -81,7 +81,6 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   useadiis=set.get_bool("UseADIIS");
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
-  linesearch=set.get_bool("LineSearch");
 
   maxiter=set.get_int("MaxIter");
   shift=set.get_double("Shift");
@@ -105,7 +104,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   }
 
-  if(!usediis && !useadiis && !usebroyden && !usetrrh && !linesearch && (shift==0.0)) {
+  if(!usediis && !useadiis && !usebroyden && !usetrrh && (shift==0.0)) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to run calculation without an update scheme.\n");
   }
@@ -374,6 +373,14 @@ void SCF::set_fitting(const BasisSet & fitbasv) {
 
 void SCF::do_force(bool val) {
   doforce=val;
+}
+
+size_t SCF::get_maxiter() const {
+  return maxiter;
+}
+
+void SCF::set_maxiter(size_t val) {
+  maxiter=val;
 }
 
 bool SCF::get_verbose() const {
@@ -1738,8 +1745,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       // Orbitals
       basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C,Nel_alpha);
+
     } else if(guess == ATOMGUESS) {
-      atomic_guess(basis,sol.C,sol.E,set);
+      sol.P=atomic_guess(basis,set);
+      
     } else if(guess == MOLGUESS) {
       // Need to generate the starting guess.
       std::string name;
@@ -1786,8 +1795,33 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       solver.core_guess(sol);
     else if(guess==GWHGUESS)
       solver.gwh_guess(sol);
+    else if(guess==ATOMGUESS) {
+      // Build Fock operator from SAD density matrix
+      bool NO=false;
+      if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
+	NO=true;
 
-    // Form density matrix
+      if(NO) {
+	// Use natural orbitals
+	arma::vec occ;
+	form_NOs(sol.P,solver.get_S(),sol.C,occ);
+      } else {
+	std::vector<double> occ;
+	size_t maxiter(solver.get_maxiter());
+	solver.set_maxiter(0);
+	if(hf || rohf)
+	  solver.RHF(sol,occ,conv);
+	else {
+	  dft_t nonl(dft);
+	  nonl.nl=false;
+	  solver.RDFT(sol,occ,conv,nonl);
+	}
+	solver.set_maxiter(maxiter);
+	
+	// Do the diagonalization
+	diagonalize(solver.get_S(),solver.get_Sinvh(),sol,0.0);
+      }
+    }
     sol.P=form_density(sol.C,occs);
 
     // Freeze core orbitals?
@@ -2009,10 +2043,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca,Nel_alpha);
 	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb,Nel_beta);
       }
+
     } else if(guess == ATOMGUESS) {
-      atomic_guess(basis,sol.Ca,sol.Ea,set);
-      sol.Cb=sol.Ca;
-      sol.Eb=sol.Ea;
+      sol.P=atomic_guess(basis,set);
+
     } else if(guess == MOLGUESS) {
       // Need to generate the starting guess.
       std::string name;
@@ -2062,6 +2096,38 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       solver.core_guess(sol);
     else if(guess==GWHGUESS)
       solver.gwh_guess(sol);
+    else if(guess==ATOMGUESS) {
+      // Build Fock operator from SAD density matrix
+      bool NO=false;
+      if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
+	NO=true;
+      
+      if(NO) {
+	// Use natural orbitals
+	arma::vec occs;
+	form_NOs(sol.P,solver.get_S(),sol.Ca,occs);
+	sol.Cb=sol.Ca;
+      } else {
+	std::vector<double> occs;
+	size_t maxiter(solver.get_maxiter());
+	solver.set_maxiter(0);
+
+	rscf_t rsol;
+	rsol.P=sol.P;
+	if(hf||rohf)
+	  solver.RHF(rsol,occs,conv);
+	else {
+	  dft_t nonl(dft);
+	  nonl.nl=false;
+	  solver.RDFT(rsol,occs,conv,nonl);
+	}
+	solver.set_maxiter(maxiter);
+	
+	// Do the diagonalization
+	diagonalize(solver.get_S(),solver.get_Sinvh(),rsol,0.0);
+	sol.Ca=sol.Cb=rsol.C;
+      }
+    }
     // Form density matrix
     sol.Pa=form_density(sol.Ca,occa);
     sol.Pb=form_density(sol.Cb,occb);

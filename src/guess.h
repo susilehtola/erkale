@@ -38,7 +38,7 @@ class Settings;
  *
  * Optional charge given as input.
  */
-void atomic_guess(const BasisSet & basis, arma::mat & C, arma::vec & E, Settings set, bool dropshells=true, bool sphave=true);
+arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells=true, bool sphave=true);
 
 /**
  * Worker routine - perform guess for inuc:th atom in basis, using given method.

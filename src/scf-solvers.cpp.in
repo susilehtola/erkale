@@ -170,9 +170,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 #endif
 
 #ifdef RESTRICTED
-  if(sol.C.n_rows!=Nbf)
+  if(sol.P.n_rows!=Nbf)
 #else
-    if(sol.Ca.n_rows!=Nbf || sol.Cb.n_rows!=Nbf)
+    if(sol.Pa.n_rows!=Nbf || sol.Pb.n_rows!=Nbf)
 #endif
       {
 	throw std::runtime_error("No starting guess provided for SCF solver!\n");
@@ -182,18 +182,18 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   size_t ixc_orb=0;
 #endif
 
-  // Form the density matrix
-  form_dens(sol);
-
   // Print orbital energies
   if(verbose) {
 #ifdef RESTRICTED
-    print_E(sol.E,occs,false);
+    if(sol.E.n_elem)
+      print_E(sol.E,occs,false);
 #else
-    printf("alpha: ");
-    print_E(sol.Ea,occa,false);
-    printf("beta:  ");
-    print_E(sol.Eb,occb,false);
+    if(sol.Ea.n_elem) {
+      printf("alpha: ");
+      print_E(sol.Ea,occa,false);
+      printf("beta:  ");
+      print_E(sol.Eb,occb,false);
+    }
 #endif
     fflush(stdout);
   }
@@ -223,7 +223,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
 
   // Sparse output to stderr
-  if(verbose) {
+  if(verbose && maxiter>0) {
     fprintf(stderr,"Running ");
 #if defined(RESTRICTED)
     fprintf(stderr,"restricted ");
@@ -356,6 +356,36 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   chkptp->write("Converged",converged);
   chkptp->close();
 
+  if(maxiter==0) {
+    Timer tg;
+    // Form the Fock operator.
+    form_fock(sol);
+    // Solve FC=ESC
+    if(verbose) {
+      if(shift==0.0)
+	printf("Solving SCF equations ... ");
+      else
+	printf("Solving SCF equations with level shift %.3f ... ",shift);
+      fflush(stdout);
+      t.set();
+    }
+    
+    // Do the diagonalization
+    diagonalize(S,Sinvh,sol,shift);
+    
+    if(verbose)
+      printf("done (%s)\n",t.elapsed().c_str());
+
+    printf("Atomic guess done in %s.\n\n",tg.elapsed().c_str());
+
+#if defined(HALFHOLE) || defined(FULLHOLE)
+    throw std::logic_error("XRS calculations can't be started from atomic guess.\n");
+    return 0;
+#else    
+    return;
+#endif
+  }
+  
   // Loop:
   int iiter=1;
   
@@ -443,192 +473,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     // Save old solution
     oldsol=sol;
 
-    if(linesearch) {
-      // Do line search in the level shift to find the update
-
-      // LH level shift
-      double lmu=0.0;
-      // RH level shift;
-      const double rmuin=0.5;
-      double rmu=rmuin;
-
-      bool mufound=false;
-
-      // Solutions
-#ifdef RESTRICTED
-      rscf_t lhsol(sol), oldrhsol, rhsol(sol);
-      const rscf_t refsol(sol);
-#else
-      uscf_t lhsol(sol), oldrhsol, rhsol(sol);
-      const uscf_t refsol(sol);
-#endif
-      // Form LH solution - no level shift
-      diagonalize(S,Sinvh,lhsol);
-      form_dens(lhsol);
-      form_fock(lhsol);
-      diagonalize(S,Sinvh,lhsol);
-
-      if(verbose) {
-	printf("\nLine search for level shift\n");
-	printf("\t%e\t%e\n",lmu,lhsol.en.E);
-      }
-
-      double minE=lhsol.en.E;
-
-      // Find RH level shift
-      while(true) {
-	// Store old RH solution
-	oldrhsol=rhsol;
-
-#ifdef RESTRICTED
-	rhsol.H=sol.H-rmu*S*sol.P*S;
-#else
-	rhsol.Ha=sol.Ha-rmu*S*sol.Pa*S;
-	rhsol.Hb=sol.Hb-rmu*S*sol.Pb*S;
-#endif
-	diagonalize(S,Sinvh,rhsol);
-	form_dens(rhsol);
-	form_fock(rhsol);
-
-	diagonalize(S,Sinvh,rhsol);
-
-	if(verbose) {
-	  printf("\t%e\t%e\t%e\n",rmu,rhsol.en.E,rhsol.en.E-lhsol.en.E);
-	  fflush(stdout);
-	}
-
-	if(fabs(rhsol.en.E-lhsol.en.E)<conv.deltaEmax) {
-	  sol=lhsol;
-	  mufound=true;
-	  break;
-	}
-
-
-	if(rhsol.en.E<minE) {
-	  minE=rhsol.en.E;
-	  // Update LH shift and solution
-	  if(rmu!=rmuin) {
-	    lhsol=oldrhsol;
-	    lmu=rmu/2.0;
-	  }
-	  // and increase RH shift
-	  rmu*=2.0;
-	} else
-	  break;
-      }
-
-      double Emin0=std::min(lhsol.en.E,rhsol.en.E);
-
-      double oldE=0.0;
-
-      // Use golden section search to find minimum
-      const double tau=(sqrt(5.0)-1.0)/2.0;
-
-      // Compute trials 1 and 2?
-      bool comp1=true;
-      bool comp2=true;
-
-#ifdef RESTRICTED
-      rscf_t sol1(sol), sol2(sol);
-#else
-      uscf_t sol1(sol), sol2(sol);
-#endif
-
-      if(!mufound)
-	for(int imu=0;imu<10;imu++) {
-	  // Compute new trials
-	  double mu1=lmu+(1-tau)*(rmu-lmu);
-	  double mu2=lmu+tau*(rmu-lmu);
-
-	  // Do level shifts
-#ifdef RESTRICTED
-	  if(comp1)
-	    sol1.H=refsol.H-mu1*S*refsol.P*S;
-	  if(comp2)
-	    sol2.H=refsol.H-mu2*S*refsol.P*S;
-#else
-	  if(comp1) {
-	    sol1.Ha=refsol.Ha-mu1*S*refsol.Pa*S;
-	    sol1.Hb=refsol.Hb-mu1*S*refsol.Pb*S;
-	  }
-	  if(comp2) {
-	    sol2.Ha=refsol.Ha-mu2*S*refsol.Pa*S;
-	    sol2.Hb=refsol.Hb-mu2*S*refsol.Pb*S;
-	  }
-#endif
-
-	  // Compute energies
-	  if(comp1) {
-	    diagonalize(S,Sinvh,sol1);
-	    form_dens(sol1);
-	    form_fock(sol1);
-	    diagonalize(S,Sinvh,sol1);
-	    if(verbose) {
-	      printf("\t%e\t%e\t%e\n",mu1,sol1.en.E,sol1.en.E-Emin0);
-	      fflush(stdout);
-	    }
-	  }
-
-	  if(comp2) {
-	    diagonalize(S,Sinvh,sol2);
-	    form_dens(sol2);
-	    form_fock(sol2);
-	    diagonalize(S,Sinvh,sol2);
-	    if(verbose) {
-	      printf("\t%e\t%e\t%e\n",mu2,sol2.en.E,sol2.en.E-Emin0);
-	      fflush(stdout);
-	    }
-	  }
-
-	  /*
-	    fprintf(stderr,"mu: %e %e %e %e\n",lmu,mu1,mu2,rmu);
-	    fprintf(stderr,"E: %e %e %e %e\n",lhsol.en.E,sol1.en.E,sol2.en.E,rhsol.en.E);
-	  */
-
-	  // Choose what to do
-	  minE=std::min(std::min(lhsol.en.E,rhsol.en.E),std::min(sol1.en.E,sol2.en.E));
-
-	  if(minE==lhsol.en.E) {
-	    // probably converged
-	    sol=lhsol;
-	    break;
-	  } else if(minE==rhsol.en.E) {
-	    // probably converged
-	    sol=rhsol;
-	    break;
-	  } else if(minE==sol1.en.E) {
-	    // Move right limit closer
-	    rmu=mu2;
-	    rhsol=sol2;
-
-	    // New solution 2 is old solution 1
-	    sol2=sol1;
-	    comp2=false;
-	    comp1=true;
-
-	    oldE=sol.en.E;
-	    sol=sol1;
-	  } else { // minE==sol2.en.E
-	    // Move left limit closer
-	    lmu=mu1;
-	    lhsol=sol1;
-
-	    // New solution 1 is old solution 2
-	    sol1=sol2;
-	    comp1=false;
-	    comp2=true;
-
-	    oldE=sol.en.E;
-	    sol=sol2;
-	  }
-
-	  // Check convergence
-	  if(oldE-sol.en.E<conv.deltaEmax)
-	    break;
-
-	}
-    } else if(usetrrh) {
-
+    if(usetrrh) {
       // Solve FC=ESC
       if(verbose) {
 	printf("\nSolving TRRH equations.\n");
@@ -672,7 +517,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 	printf("TRRH solved in %s.\n\n",t.elapsed().c_str());
 
     } else {
-
       // Solve FC=ESC
       if(verbose) {
 	if(shift==0.0)
@@ -841,11 +685,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       
       printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
       fprintf(stderr,"%s converged in %s.\n",method.c_str(),ttot.elapsed().c_str());
-
-      if(linesearch) {
-	printf("Fock matrix was built %i times.\n",nfock);
-	fprintf(stderr,"Fock matrix was built %i times.\n",nfock);
-      }
     }
 
     // Print total energy and its components
