@@ -46,7 +46,7 @@ arma::mat e_os_MP2(const arma::mat & Bph, const arma::mat & delta) {
   return e;
 }
 
-double E_os_MP2_Laplace(const arma::mat & Bpaha, const arma::mat & Bpbhb, const arma::vec & Eoa, const arma::mat & Eob, const arma::vec & Eva, const arma::mat & Evb) {
+double E_os_MP2_Laplace(const arma::mat & Bpaha, const arma::mat & Bpbhb, const arma::vec & Eoa, const arma::vec & Eob, const arma::vec & Eva, const arma::vec & Evb) {
   // Get integral nodes and weights
   static const size_t N=15;
   std::vector<double> xt, wt;
@@ -95,7 +95,7 @@ double E_os_MP2_Laplace(const arma::mat & Bpaha, const arma::mat & Bpbhb, const 
   return E;
 }
 
-double E_os_MP2(const arma::mat & Bpaha, const arma::mat & Bpbhb, const arma::vec & Eoa, const arma::mat & Eob, const arma::vec & Eva, const arma::mat & Evb) {
+double E_os_MP2(const arma::mat & Bpaha, const arma::mat & Bpbhb, const arma::vec & Eoa, const arma::vec & Eob, const arma::vec & Eva, const arma::vec & Evb) {
   // Energy
   double E=0.0;
 #ifdef _OPENMP
