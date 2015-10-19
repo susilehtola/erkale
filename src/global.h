@@ -67,6 +67,8 @@
 
 // Disable bounds checking in Armadillo.
 #define ARMA_NO_DEBUG
+// Don't use Armadillo wrapper library
+#define ARMA_DONT_USE_WRAPPER
 // We need BLAS
 #define ARMA_USE_BLAS
 // and LAPACK
