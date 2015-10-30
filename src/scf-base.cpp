@@ -1738,11 +1738,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// Find out natural orbitals
 	arma::vec occs;
 	form_NOs(Pold,oldbas.overlap(),Cold,occs);
-
+	
 	// Use alpha orbital energies
 	Eold=Eaold;
       }
-
+      
       // Orbitals
       basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C,Nel_alpha);
 
@@ -1790,36 +1790,38 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     // Solver
     SCF solver(basis,set,chkpt);
 
-    // Core guess?
-    if(guess==COREGUESS)
-      solver.core_guess(sol);
-    else if(guess==GWHGUESS)
-      solver.gwh_guess(sol);
-    else if(guess==ATOMGUESS) {
-      // Build Fock operator from SAD density matrix
-      bool NO=false;
-      if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-	NO=true;
-
-      if(NO) {
-	// Use natural orbitals
-	arma::vec occ;
-	form_NOs(sol.P,solver.get_S(),sol.C,occ);
-      } else {
-	std::vector<double> occ;
-	size_t maxiter(solver.get_maxiter());
-	solver.set_maxiter(0);
-	if(hf || rohf)
-	  solver.RHF(sol,occ,conv);
-	else {
-	  dft_t nonl(dft);
-	  nonl.nl=false;
-	  solver.RDFT(sol,occ,conv,nonl);
-	}
-	solver.set_maxiter(maxiter);
+    // Handle guesses
+    if(!doload) {
+      if(guess==COREGUESS)
+	solver.core_guess(sol);
+      else if(guess==GWHGUESS)
+	solver.gwh_guess(sol);
+      else if(guess==ATOMGUESS) {
+	// Build Fock operator from SAD density matrix
+	bool NO=false;
+	if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
+	  NO=true;
 	
-	// Do the diagonalization
-	diagonalize(solver.get_S(),solver.get_Sinvh(),sol,0.0);
+	if(NO) {
+	  // Use natural orbitals
+	  arma::vec occ;
+	  form_NOs(sol.P,solver.get_S(),sol.C,occ);
+	} else {
+	  std::vector<double> occ;
+	  size_t maxiter(solver.get_maxiter());
+	  solver.set_maxiter(0);
+	  if(hf || rohf)
+	    solver.RHF(sol,occ,conv);
+	  else {
+	    dft_t nonl(dft);
+	    nonl.nl=false;
+	    solver.RDFT(sol,occ,conv,nonl);
+	  }
+	  solver.set_maxiter(maxiter);
+	  
+	  // Do the diagonalization
+	  diagonalize(solver.get_S(),solver.get_Sinvh(),sol,0.0);
+	}
       }
     }
     sol.P=form_density(sol.C,occs);
@@ -2091,41 +2093,43 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     // Solver
     SCF solver(basis,set,chkpt);
 
-    // Core guess?
-    if(guess==COREGUESS)
-      solver.core_guess(sol);
-    else if(guess==GWHGUESS)
-      solver.gwh_guess(sol);
-    else if(guess==ATOMGUESS) {
-      // Build Fock operator from SAD density matrix
-      bool NO=false;
-      if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-	NO=true;
-      
-      if(NO) {
-	// Use natural orbitals
-	arma::vec occs;
-	form_NOs(sol.P,solver.get_S(),sol.Ca,occs);
-	sol.Cb=sol.Ca;
-      } else {
-	std::vector<double> occs;
-	size_t maxiter(solver.get_maxiter());
-	solver.set_maxiter(0);
-
-	rscf_t rsol;
-	rsol.P=sol.P;
-	if(hf||rohf)
-	  solver.RHF(rsol,occs,conv);
-	else {
-	  dft_t nonl(dft);
-	  nonl.nl=false;
-	  solver.RDFT(rsol,occs,conv,nonl);
-	}
-	solver.set_maxiter(maxiter);
+    // Handle guesses
+    if(!doload) {
+      if(guess==COREGUESS)
+	solver.core_guess(sol);
+      else if(guess==GWHGUESS)
+	solver.gwh_guess(sol);
+      else if(guess==ATOMGUESS) {
+	// Build Fock operator from SAD density matrix
+	bool NO=false;
+	if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
+	  NO=true;
 	
-	// Do the diagonalization
-	diagonalize(solver.get_S(),solver.get_Sinvh(),rsol,0.0);
-	sol.Ca=sol.Cb=rsol.C;
+	if(NO) {
+	  // Use natural orbitals
+	  arma::vec occs;
+	  form_NOs(sol.P,solver.get_S(),sol.Ca,occs);
+	  sol.Cb=sol.Ca;
+	} else {
+	  std::vector<double> occs;
+	  size_t maxiter(solver.get_maxiter());
+	  solver.set_maxiter(0);
+	  
+	  rscf_t rsol;
+	  rsol.P=sol.P;
+	  if(hf||rohf)
+	    solver.RHF(rsol,occs,conv);
+	  else {
+	    dft_t nonl(dft);
+	    nonl.nl=false;
+	    solver.RDFT(rsol,occs,conv,nonl);
+	  }
+	  solver.set_maxiter(maxiter);
+	  
+	  // Do the diagonalization
+	  diagonalize(solver.get_S(),solver.get_Sinvh(),rsol,0.0);
+	  sol.Ca=sol.Cb=rsol.C;
+	}
       }
     }
     // Form density matrix
