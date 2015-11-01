@@ -24,6 +24,7 @@
 #include <armadillo>
 #include <vector>
 #include <cfloat>
+#include <string>
 
 /// Computes the double factorial n!!
 double doublefact(int n);
@@ -72,6 +73,15 @@ template <class T> T max(const std::vector<T> & x) {
 /// Get maximum
 template <class T> T max4(const T & a, const T & b, const T & c, const T & d) {
   return std::max(std::max(a,b),std::max(c,d));
+}
+
+/// Find element
+template <typename T> size_t find(const std::vector<T> & list, const T & val) {
+  for(size_t i=0;i<list.size();i++)
+    if(list[i]==val)
+      return i;
+
+  return std::string::npos;
 }
 
 /// Get element with maximum absolute value
