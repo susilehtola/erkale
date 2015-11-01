@@ -172,6 +172,8 @@ void Settings::add_dft_settings() {
   add_int("PZiter", "Max number of iterations in self-consistency iteration", 20);
   // PZ-SIC seed number
   add_int("PZseed", "Seed number for randomized matrices?", 0);
+  // Orbitals to apply SIC to
+  add_string("PZorbs","Orbitals to apply SIC to","");
 }
 
 void Settings::add_double(std::string name, std::string comment, double val, bool negative) {
