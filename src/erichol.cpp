@@ -36,6 +36,7 @@
 #define CHOLFILE "cholesky.chk"
 
 ERIchol::ERIchol() {
+  Nbf=0;
   omega=0.0;
   alpha=1.0;
   beta=0.0;
