@@ -871,8 +871,11 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 }
 
 arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<size_t> & sicorb, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const {
-  if(sicorb.size() != Forb.size())
-    throw std::logic_error("Size of sicorb and Forb don't match!\n");
+  if((pzw!=0.0) && (sicorb.size() != Forb.size())) {
+    std::ostringstream oss;
+    oss << "Size of sicorb " << sicorb.size() << " and Forb " << Forb.size() << " don't match!\n";
+    throw std::logic_error(oss.str());
+  }
 
   // Build effective Fock operator
   arma::cx_mat H(H0*COMPLEX1);
@@ -2645,6 +2648,14 @@ void PZStability::set(const rscf_t & sol, const std::vector<size_t> & sicorbs) {
   sicorba=sicorbs;
   sicorbb.clear();
 
+  // Check orbitals are within allowed region
+  for(size_t i=0;i<sicorba.size();i++)
+    if(sicorba[i]>=oa) {
+      std::ostringstream oss;
+      oss << "SIC orbital " << sicorba[i] << " is outside of occupied space " << oa << "!\n";
+      throw std::runtime_error(oss.str());
+    }
+
   chkptp->write("Restricted",1);
 
   std::vector<std::string> truth(2);
@@ -2700,6 +2711,18 @@ void PZStability::set(const uscf_t & sol, const std::vector<size_t> & sicorba_, 
   // Set orbitals with SIC
   sicorba=sicorba_;
   sicorbb=sicorbb_;
+  for(size_t i=0;i<sicorba.size();i++)
+    if(sicorba[i]>=oa) {
+      std::ostringstream oss;
+      oss << "SIC orbital " << sicorba[i] << " is outside of occupied space " << oa << "!\n";
+      throw std::runtime_error(oss.str());
+    }
+  for(size_t i=0;i<sicorbb.size();i++)
+    if(sicorbb[i]>=ob) {
+      std::ostringstream oss;
+      oss << "SIC orbital " << sicorbb[i] << " is outside of occupied space " << ob << "!\n";
+      throw std::runtime_error(oss.str());
+    }
 
   chkptp->write("Restricted",0);
   fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
