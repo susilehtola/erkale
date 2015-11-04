@@ -732,7 +732,7 @@ int main(int argc, char **argv) {
 
     if(restr) {
       // Orbital indices, NOT IN C++ INDEXING!
-      std::vector<size_t> orbidx=parse_range(ranges[0]);
+      std::vector<size_t> orbidx=parse_range(ranges[0],false);
 
       printf("Calculating orbitals ... ");
       fflush(stdout); t.set();
@@ -745,8 +745,8 @@ int main(int argc, char **argv) {
 
     } else {
       // Orbital indices, NOT IN C++ INDEXING!
-      std::vector<size_t> orbidxa=parse_range(ranges[0]);
-      std::vector<size_t> orbidxb=parse_range(ranges[1]);
+      std::vector<size_t> orbidxa=parse_range(ranges[0],false);
+      std::vector<size_t> orbidxb=parse_range(ranges[1],false);
 
       printf("Calculating alpha orbitals ... ");
       fflush(stdout); t.set();

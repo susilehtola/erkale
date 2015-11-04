@@ -3390,11 +3390,9 @@ void construct_basis(BasisSet & basis, const std::vector<atom_t> & atoms, const 
     if(str.size()==1 && str[0]=='*')
       decall=true;
     else
-      dec=parse_range(set.get_string("Decontract"));
+      // Parse and convert to C++ indexing
+      dec=parse_range(set.get_string("Decontract"),true);
   }
-  // Convert to C++ indexing
-  for(size_t i=0;i<dec.size();i++)
-    dec[i]--;
 
   // Rotation?
   bool rotate=set.get_bool("BasisRotate");

@@ -417,7 +417,7 @@ std::vector<std::string> parse(std::string in, const std::string & separator) {
 }
 
 
-std::vector<size_t> parse_range(const std::string & in) {
+std::vector<size_t> parse_range(const std::string & in, bool convert) {
   std::vector<size_t> ret;
 
   // First break this wrt commas
@@ -461,6 +461,11 @@ std::vector<size_t> parse_range(const std::string & in) {
   // Sort in increasing order
   sort(ret.begin(),ret.end());
 
+  if(convert)
+    // Convert to C indexing
+    for(size_t i=0;i<ret.size();i++)
+      ret[i]--;
+  
   return ret;
 }
 

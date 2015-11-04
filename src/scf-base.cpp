@@ -1873,7 +1873,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	for(size_t i=0;i<pzorbsa.size();i++)
 	  pzorbsa[i]=i;
       } else if(pzorbs.size()==1)
-	pzorbsa=parse_range(pzorbs[0]);
+	pzorbsa=parse_range(pzorbs[0],true);
       else
 	throw std::runtime_error("Invalid value for PZorbs!\n");
       
@@ -2215,9 +2215,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  pzorbsb[i]=i;
       } else if(pzorbs.size()==2) {
 	if(!(pzorbs[0].size()==1 && pzorbs[0][0]=='-'))
-	  pzorbsa=parse_range(pzorbs[0]);
+	  pzorbsa=parse_range(pzorbs[0],true);
 	if(!(pzorbs[1].size()==1 && pzorbs[1][0]=='-'))
-	  pzorbsb=parse_range(pzorbs[1]);
+	  pzorbsb=parse_range(pzorbs[1],true);
       } else
 	throw std::runtime_error("Invalid value for PZorbs!\n");
 
