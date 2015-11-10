@@ -1,6 +1,8 @@
 ERKALE -- HF/DFT from Hel
 -----------------------------------
 
+* [**Binary packages for Fedora / Red Hat**](https://copr.fedoraproject.org/coprs/jussilehtola/erkale/)
+
 * [**Wiki page**](https://github.com/susilehtola/erkale/wiki/ERKALE)
 
 * [**Users' guide**](http://theory.physics.helsinki.fi/~jzlehtol/erkale/doc/userguide.pdf)
