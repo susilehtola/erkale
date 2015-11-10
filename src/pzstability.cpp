@@ -1145,7 +1145,10 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
     solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
   }
 
-  return sol.en.E - 2.0*pzweight*arma::sum(Eorb);
+  sol.en.Exc-=2.0*pzweight*arma::sum(Eorb);
+  sol.en.E-=2.0*pzweight*arma::sum(Eorb);
+  
+  return sol.en.E;
 }
 
 double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, bool can, bool fock, double pzweight, bool useref) {
@@ -1275,7 +1278,9 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   }
 
   // Result is
-  return sol.en.E-pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
+  sol.en.Exc-=pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
+  sol.en.E-=pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
+  return sol.en.E;
 }
 
 arma::vec PZStability::gradient() {
