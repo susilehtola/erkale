@@ -29,9 +29,6 @@
 // Threshold for a changed orbital
 #define CHANGETHR (100*DBL_EPSILON)
 
-// Save Hessian, and its eigenvectors and eigenvalues to file?
-//#define PZ_SAVE
-
 // Form orbital density matrix
 arma::cx_mat form_density(const arma::cx_mat & C) {
   return arma::conj(C)*arma::strans(C);
@@ -870,20 +867,14 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
   return ret;
 }
 
-arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<size_t> & sicorb, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const {
-  if((pzw!=0.0) && (sicorb.size() != Forb.size())) {
-    std::ostringstream oss;
-    oss << "Size of sicorb " << sicorb.size() << " and Forb " << Forb.size() << " don't match!\n";
-    throw std::logic_error(oss.str());
-  }
-
+arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const {
   // Build effective Fock operator
   arma::cx_mat H(H0*COMPLEX1);
 
   if(pzw!=0.0) {
     arma::mat S(solverp->get_S());
-    for(size_t io=0;io<Forb.size();io++) {
-      arma::cx_mat Porb(form_density(CO.col(sicorb[io])));
+    for(size_t io=0;io<CO.n_cols;io++) {
+      arma::cx_mat Porb(form_density(CO.col(io)));
       H-=pzw*S*Porb*Forb[io]*Porb*S;
     }
 
@@ -894,8 +885,8 @@ arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat 
       for(size_t io=0;io<CV.n_cols;io++)
 	v+=form_density(CV.col(io));
 
-      for(size_t io=0;io<Forb.size();io++) {
-	arma::cx_mat Porb(form_density(CO.col(sicorb[io])));
+      for(size_t io=0;io<CO.n_cols;io++) {
+	arma::cx_mat Porb(form_density(CO.col(io)));
 	H-=pzw*S*(v*Forb[io]*Porb + Porb*Forb[io]*v)*S;
       }
     }
@@ -904,9 +895,9 @@ arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat 
   return H;
 }
 
-void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<size_t> & sicorb, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb) {
+void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb) {
   // Form unified Hamiltonian
-  arma::cx_mat H(unified_H(CO,CV,sicorb,Forb,H0));
+  arma::cx_mat H(unified_H(CO,CV,Forb,H0));
 
   // Occupied block
   bool diagok;
@@ -981,7 +972,7 @@ void PZStability::print_info() {
       CV=sol.cC.cols(oa,oa+va-1);
 
     // Diagonalize
-    print_info(CO,CV,sicorba,Forb,get_H(sol),Eorb);
+    print_info(CO,CV,Forb,get_H(sol),Eorb);
   } else {
     // Evaluate orbital matrices
     uscf_t sol;
@@ -1004,9 +995,9 @@ void PZStability::print_info() {
 
     // Diagonalize
     printf("\n **** Alpha orbitals ****\n");
-    print_info(COa,CVa,sicorba,Forba,get_H(sol,false),Eorba);
+    print_info(COa,CVa,Forba,get_H(sol,false),Eorba);
     printf("\n **** Beta  orbitals ****\n");
-    print_info(COb,CVb,sicorbb,Forbb,get_H(sol,true),Eorbb);
+    print_info(COb,CVb,Forbb,get_H(sol,true),Eorbb);
   }
 
 
@@ -1101,22 +1092,10 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
       for(size_t ia=0;ia<oa;ia++)
 	for(size_t ja=ia+1;ja<R.n_cols;ja++)
 	  if(std::norm(R(ia,ja))>=CHANGETHR) {
-	    // Check if we are dealing with SIC orbitals
-	    size_t iidx=find<size_t>(sicorba,ia);
-	    if(iidx!=std::string::npos) {
-	      // Add to list
-	      if(find<size_t>(occlist,ia)==std::string::npos)
-		occlist.push_back(ia);
-	    }
-	    // Same for j
-	    if(ja<oa) {
-	      size_t jidx=find<size_t>(sicorba,ja);
-	      if(jidx!=std::string::npos) {
-		if(find<size_t>(occlist,ja)==std::string::npos)
-		  occlist.push_back(ja);
-	      }
-	    } else
-	      // This is a ov rotation, which changes the occupied space
+	    occlist.push_back(ia);
+	    if(ja<oa)
+	      occlist.push_back(ja);
+	    else
 	      virtlist.push_back(ja);
 	  }
     }
@@ -1147,24 +1126,22 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
   if(useref) {
     CO.zeros(sol.cC.n_rows,occlist.size());
     for(size_t i=0;i<occlist.size();i++)
-      CO.col(i)=sol.cC.col(sicorba[occlist[i]]);
+      CO.col(i)=sol.cC.col(occlist[i]);
 
     std::vector<arma::cx_mat> Forb_hlp;
     arma::vec Eorb_hlp;
     solverp->PZSIC_Fock(Forb_hlp,Eorb_hlp,CO,oomethod,grid,nlgrid,fock);
-    Eorb=ref_Eorba;
+    Eorb=ref_Eorb;
     for(size_t i=0;i<occlist.size();i++)
       Eorb(occlist[i])=Eorb_hlp(i);
 
     if(fock) {
-      Forb=ref_Forba;
+      Forb=ref_Forb;
       for(size_t i=0;i<occlist.size();i++)
 	Forb[occlist[i]]=Forb_hlp[i];
     }
   } else {
-    CO.zeros(sol.cC.n_rows,sicorba.size());
-    for(size_t i=0;i<sicorba.size();i++)
-      CO.col(i)=sol.cC.col(sicorba[i]);
+    CO=sol.cC.cols(0,oa-1);
     solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
   }
 
@@ -1186,22 +1163,10 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
       for(size_t ia=0;ia<oa;ia++)
 	for(size_t ja=ia+1;ja<Ra.n_cols;ja++)
 	  if(std::norm(Ra(ia,ja))>=CHANGETHR) {
-	    // Check if we are dealing with SIC orbitals
-	    size_t iidx=find<size_t>(sicorba,ia);
-	    if(iidx!=std::string::npos) {
-	      // Add to list
-	      if(find<size_t>(occlista,ia)==std::string::npos)
-		occlista.push_back(ia);
-	    }
-	    // Same for j
-	    if(ja<oa) {
-	      size_t jidx=find<size_t>(sicorba,ja);
-	      if(jidx!=std::string::npos) {
-		if(find<size_t>(occlista,ja)==std::string::npos)
-		  occlista.push_back(ja);
-	      }
-	    } else
-	      // This is a ov rotation, which changes the occupied space
+	    occlista.push_back(ia);
+	    if(ja<oa)
+	      occlista.push_back(ja);
+	    else
 	      virtlista.push_back(ja);
 	  }
     }
@@ -1214,22 +1179,10 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
 	for(size_t ib=0;ib<ob;ib++)
 	  for(size_t jb=ib+1;jb<Rb.n_cols;jb++)
 	    if(std::norm(Rb(ib,jb))>=CHANGETHR) {
-	      // Check if we are dealing with SIC orbitals
-	      size_t iidx=find<size_t>(sicorbb,ib);
-	      if(iidx!=std::string::npos) {
-		// Add to list
-		if(find<size_t>(occlistb,ib)==std::string::npos)
-		  occlistb.push_back(ib);
-	      }
-	      // Same for j
-	      if(jb<ob) {
-		size_t jidx=find<size_t>(sicorbb,jb);
-		if(jidx!=std::string::npos) {
-		  if(find<size_t>(occlistb,jb)==std::string::npos)
-		    occlistb.push_back(jb);
-		}
-	      } else
-		// This is a ov rotation, which changes the occupied space
+	      occlistb.push_back(ib);
+	      if(jb<ob)
+		occlistb.push_back(jb);
+	      else
 		virtlistb.push_back(jb);
 	    }
       }
@@ -1277,9 +1230,9 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   if(useref) {
     CO.zeros(sol.cCa.n_rows,occlista.size()+occlistb.size());
     for(size_t i=0;i<occlista.size();i++)
-      CO.col(i)=sol.cCa.col(sicorba[occlista[i]]);
+      CO.col(i)=sol.cCa.col(occlista[i]);
     for(size_t i=0;i<occlistb.size();i++)
-      CO.col(i+occlista.size())=sol.cCb.col(sicorbb[occlistb[i]]);
+      CO.col(i+occlista.size())=sol.cCb.col(occlistb[i]);
 
     solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
 
@@ -1299,25 +1252,24 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
 	Forbb[occlistb[i]]=Forb[i+occlista.size()];
     }
   } else {
-    CO.zeros(sol.cCa.n_rows,sicorba.size()+sicorbb.size());
-    for(size_t i=0;i<sicorba.size();i++)
-      CO.col(i)=sol.cCa.col(sicorba[i]);
-    for(size_t i=0;i<sicorbb.size();i++)
-      CO.col(i+sicorba.size())=sol.cCb.col(sicorbb[i]);
+    CO.zeros(sol.cCa.n_rows,oa+ob);
+    CO.cols(0,oa-1)=sol.cCa.cols(0,oa-1);
+    if(ob)
+      CO.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
     solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
 
-    Eorba=Eorb.subvec(0,sicorba.size()-1);
-    if(sicorbb.size())
-      Eorbb=Eorb.subvec(oa,sicorba.size()+sicorbb.size()-1);
+    Eorba=Eorb.subvec(0,oa-1);
+    if(ob)
+      Eorbb=Eorb.subvec(oa,oa+ob-1);
 
     if(fock) {
-      Forba.resize(sicorba.size());
-      for(size_t i=0;i<sicorba.size();i++)
+      Forba.resize(oa);
+      for(size_t i=0;i<oa;i++)
 	Forba[i]=Forb[i];
-      if(sicorbb.size()) {
-	Forbb.resize(sicorbb.size());
-	for(size_t i=0;i<sicorbb.size();i++)
-	  Forbb[i]=Forb[i+sicorba.size()];
+      if(ob) {
+	Forbb.resize(ob);
+	for(size_t i=0;i<ob;i++)
+	  Forbb[i]=Forb[i+oa];
       }
     }
   }
@@ -1355,7 +1307,7 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
       arma::vec gt(gather_ov(gOV,real,imag));
 
       // Preconditioning. Form unified Hamiltonian
-      arma::cx_mat H(unified_H(CO,CV,sicorba,ref_Forba,get_H(rsol)));
+      arma::cx_mat H(unified_H(CO,CV,ref_Forb,get_H(rsol)));
 
       arma::cx_mat Hoo(arma::trans(CO)*H*CO);
       arma::cx_mat Hvv(arma::trans(CV)*H*CV);
@@ -1402,8 +1354,8 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
 
     if(cancheck && va) {
       // Preconditioning. Form unified Hamiltonian
-      arma::cx_mat Ha(unified_H(COa,CVa,sicorba,ref_Forba,get_H(usol,false)));
-      arma::cx_mat Hb(unified_H(COb,CVb,sicorbb,ref_Forbb,get_H(usol,true)));
+      arma::cx_mat Ha(unified_H(COa,CVa,ref_Forba,get_H(usol,false)));
+      arma::cx_mat Hb(unified_H(COb,CVb,ref_Forbb,get_H(usol,true)));
 
       arma::cx_mat Hooa(arma::trans(COa)*Ha*COa);
       arma::cx_mat Hvva(arma::trans(CVa)*Ha*CVa);
@@ -1493,11 +1445,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
       for(size_t io=0;io<oa;io++) {
 	// Orbital Hamiltonian is
 	arma::cx_mat Fo(get_H(rsol));
-	if(pzw!=0.0) {
-	  size_t idx(find<size_t>(sicorba,io));
-	  if(idx!=std::string::npos)
-	    Fo-=pzw*ref_Forba[idx];
-	}
+	if(pzw!=0.0) Fo-=pzw*ref_Forb[io];
 	// Occupied energy is
 	double Eocc=std::real(arma::as_scalar(arma::trans(CO.col(io))*Fo*CO.col(io)));
 	// Loop over virtuals
@@ -1543,11 +1491,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
       for(size_t io=0;io<oa;io++) {
 	// Orbital Hamiltonian is
 	arma::cx_mat Fo(get_H(usol,false));
-	if(pzw!=0.0) {
-	  size_t idx(find<size_t>(sicorba,io));
-	  if(idx!=std::string::npos)
-	    Fo-=pzw*ref_Forba[idx];
-	}
+	if(pzw!=0.0) Fo-=pzw*ref_Forba[io];
 	// Occupied energy is
 	double Eocc=std::real(arma::as_scalar(arma::trans(COa.col(io))*Fo*COa.col(io)));
 	// Loop over virtuals
@@ -1565,11 +1509,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
 	for(size_t io=0;io<ob;io++) {
 	  // Orbital Hamiltonian is
 	  arma::cx_mat Fo(get_H(usol,true));
-	  if(pzw!=0.0) {
-	    size_t idx(find<size_t>(sicorbb,io));
-	    if(idx!=std::string::npos)
-	      Fo-=pzw*ref_Forbb[idx];
-	  }
+	  if(pzw!=0.0) Fo-=pzw*ref_Forbb[io];
 	  // Occupied energy is
 	  double Eocc=std::real(arma::as_scalar(arma::trans(COb.col(io))*Fo*COb.col(io)));
 	  // Loop over virtuals
@@ -1654,13 +1594,7 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	gOV=-arma::strans(arma::trans(CV.cols(0,va-1))*arma::conj(H)*CO.cols(0,oa-1));
       else
 	for(size_t i=0;i<oa;i++) {
-	  // Orbital Fock operator
-	  arma::cx_mat Horb(H);
-	  size_t idx(find<size_t>(sicorba,i));
-	  if(idx!=std::string::npos)
-	    Horb-=pzw*Forb[idx];
-	  
-	  arma::cx_vec hlp(arma::conj(Horb)*CO.col(i));
+	  arma::cx_vec hlp(arma::conj(H-pzw*Forb[i])*CO.col(i));
 	  for(size_t a=0;a<va;a++)
 	    gOV(i,a)=-arma::cdot(CV.col(a),hlp);
 	}
@@ -1679,9 +1613,8 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       arma::cx_mat gOO(oa,oa);
       if(pzw!=0.0) {
 	arma::cx_mat FO(CO.n_rows,oa);
-	FO.zeros();
-	for(size_t i=0;i<sicorba.size();i++)
-	  FO.col(sicorba[i])=arma::conj(Forb[i])*CO.col(sicorba[i]);
+	for(size_t i=0;i<oa;i++)
+	  FO.col(i)=arma::conj(Forb[i])*CO.col(i);
 	gOO=-pzw*arma::strans(-arma::trans(CO)*FO + arma::trans(FO)*CO);
       } else
 	gOO.zeros();
@@ -1730,13 +1663,7 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	gOVa=-arma::strans(arma::trans(CVa.cols(0,va-1))*arma::conj(Ha)*COa.cols(0,oa-1));
       else
 	for(size_t i=0;i<oa;i++) {
-	  // Orbital Fock operator
-	  arma::cx_mat Horb(Ha);
-	  size_t idx(find<size_t>(sicorba,i));
-	  if(idx!=std::string::npos)
-	    Horb-=pzw*Forba[idx];
-	  
-	  arma::cx_vec hlp(arma::conj(Horb)*COa.col(i));
+	  arma::cx_vec hlp(arma::conj(Ha-pzw*Forba[i])*COa.col(i));
 	  for(size_t a=0;a<va;a++)
 	    gOVa(i,a)=-arma::cdot(CVa.col(a),hlp);
 	}
@@ -1759,17 +1686,11 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	  gOVb=-arma::strans(arma::trans(CVb.cols(0,vb-1))*arma::conj(Hb)*COb.cols(0,ob-1));
 	else
 	  for(size_t i=0;i<ob;i++) {
-	    // Orbital Fock operator
-	    arma::cx_mat Horb(Hb);
-	    size_t idx(find<size_t>(sicorbb,i));
-	    if(idx!=std::string::npos)
-	    Horb-=pzw*Forbb[idx];
-	    
-	    arma::cx_vec hlp(arma::conj(Horb)*COb.col(i));
+	    arma::cx_vec hlp(arma::conj(Hb-pzw*Forbb[i])*COb.col(i));
 	    for(size_t a=0;a<vb;a++)
 	      gOVb(i,a)=-arma::cdot(CVb.col(a),hlp);
 	  }
-	
+
 	// Convert to proper gradient
 	gOVb=gradient_convert(gOVb);
 
@@ -1786,9 +1707,8 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	arma::cx_mat gOOa(oa,oa);
 	if(pzw!=0.0) {
 	  arma::cx_mat FOa(COa.n_rows,oa);
-	  FOa.zeros();
-	  for(size_t i=0;i<sicorba.size();i++)
-	    FOa.col(sicorba[i])=arma::conj(Forba[i])*COa.col(sicorba[i]);
+	  for(size_t i=0;i<oa;i++)
+	    FOa.col(i)=arma::conj(Forba[i])*COa.col(i);
 	  gOOa=-pzw*arma::strans(-arma::trans(COa)*FOa + arma::trans(FOa)*COa);
 	} else
 	  gOOa.zeros();
@@ -1806,10 +1726,9 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	// OO beta gradient is
 	arma::cx_mat gOOb(ob,ob);
 	if(pzw!=0.0) {
-	  arma::cx_mat FOb(COb.n_rows,oa);
-	  FOb.zeros();
-	  for(size_t i=0;i<sicorbb.size();i++)
-	    FOb.col(sicorbb[i])=arma::conj(Forbb[i])*COb.col(sicorbb[i]);
+	  arma::cx_mat FOb(COb.n_rows,ob);
+	  for(size_t i=0;i<ob;i++)
+	    FOb.col(i)=arma::conj(Forbb[i])*COb.col(i);
 	  gOOb=-pzw*arma::strans(-arma::trans(COb)*FOb + arma::trans(FOb)*COb);
 	} else
 	  gOOb.zeros();
@@ -2297,7 +2216,7 @@ void PZStability::update_reference(bool sort) {
       if(sol.cC.n_cols>oa)
 	CV=sol.cC.cols(oa,sol.cC.n_cols-1);
       // Unified Hamiltonian
-      arma::cx_mat H(unified_H(CO,CV,sicorba,Forb,get_H(sol)));
+      arma::cx_mat H(unified_H(CO,CV,Forb,get_H(sol)));
 
       // Calculate projected orbital energies
       arma::vec Eorbo=arma::real(arma::diagvec(arma::trans(CO)*H*CO));
@@ -2317,38 +2236,22 @@ void PZStability::update_reference(bool sort) {
 	  rsol.cC.col(i+oa)=CV.col(idxv(i));
       }
       if(pzw!=0.0) {
-	// Get mapping of orbitals
-	std::vector<size_t> idxv(arma::conv_to< std::vector<size_t> >::from(idxo));
-
-	std::vector<size_t> map(sicorba.size());
-	{
-	  size_t n=0;
-	  size_t i=0;
-	  while(n<sicorba.size()) {
-	    size_t idx=find<size_t>(sicorba,idxv[i]);
-	    if(idx!=std::string::npos) {
-	      // Orbital has SIC
-	      map[n++]=idx;
-	    }
-	    i++;
-	  }
-	}
-	ref_Eorba.zeros(Eorb.n_elem);
-	for(size_t i=0;i<Eorb.n_elem;i++)
-	  ref_Eorba(i)=Eorb(map[i]);
-	ref_Forba.resize(Forb.size());
-	for(size_t i=0;i<Forb.size();i++) {
-	  ref_Forba[i]=Forb[map[i]];
-	}
+	ref_Eorb.zeros(Eorb.n_elem);
+	for(size_t i=0;i<idxo.n_elem;i++)
+	  ref_Eorb(i)=Eorb(idxo(i));
+	ref_Forb.resize(Forb.size());
+	for(size_t i=0;i<idxo.n_elem;i++)
+	  ref_Forb[i]=Forb[idxo(i)];
       } else {
-	ref_Eorba.clear();
-	ref_Forba.clear();
+	ref_Eorb.clear();
+	ref_Forb.clear();
       }
     } else {
       // Store reference
       rsol=sol;
-      ref_Eorba=Eorb;
-      ref_Forba=Forb;
+      ref_Eorb=Eorb;
+      ref_Forb=Forb;
+
     }
 
   } else {
@@ -2370,8 +2273,8 @@ void PZStability::update_reference(bool sort) {
 	CVb=sol.cCb.cols(ob,sol.cCb.n_cols-1);
 
       // Unified Hamiltonians
-      arma::cx_mat Ha(unified_H(COa,CVa,sicorba,Forba,get_H(sol,false)));
-      arma::cx_mat Hb(unified_H(COb,CVb,sicorbb,Forbb,get_H(sol,true)));
+      arma::cx_mat Ha(unified_H(COa,CVa,Forba,get_H(sol,false)));
+      arma::cx_mat Hb(unified_H(COb,CVb,Forbb,get_H(sol,true)));
 
       // Calculate projected orbital energies
       arma::vec Eorbao=arma::real(arma::diagvec(arma::trans(COa)*Ha*COa));
@@ -2398,28 +2301,12 @@ void PZStability::update_reference(bool sort) {
       }
 
       if(pzw!=0.0) {
-	// Get mapping of orbitals
-	std::vector<size_t> idxav(arma::conv_to< std::vector<size_t> >::from(idxao));
-	std::vector<size_t> mapa(sicorba.size());
-	{
-	  size_t n=0;
-	  size_t i=0;
-	  while(n<sicorba.size()) {
-	    size_t idx=find<size_t>(sicorba,idxav[i]);
-	    if(idx!=std::string::npos) {
-	      // Orbital has SIC
-	      mapa[n++]=idx;
-	    }
-	    i++;
-	  }
-	}
-	ref_Eorba.zeros(Eorba.n_elem);
-	for(size_t i=0;i<Eorba.n_elem;i++)
-	  ref_Eorba(i)=Eorba(mapa[i]);
-	ref_Forba.resize(Forba.size());
-	for(size_t i=0;i<Forba.size();i++) {
-	  ref_Forba[i]=Forba[mapa[i]];
-	}
+	ref_Eorba.zeros(oa);
+	for(size_t i=0;i<idxao.n_elem;i++)
+	  ref_Eorba(i)=Eorba(idxao(i));
+	ref_Forba.resize(oa);
+	for(size_t i=0;i<idxao.n_elem;i++)
+	  ref_Forba[i]=Forba[idxao(i)];
       } else {
 	ref_Eorba.clear();
 	ref_Forba.clear();
@@ -2429,30 +2316,14 @@ void PZStability::update_reference(bool sort) {
 	arma::uvec idxbo=arma::stable_sort_index(Eorbbo,"ascend");
 	for(arma::uword i=0;i<idxbo.n_elem;i++)
 	  usol.cCb.col(i)=COb.col(idxbo(i));
-	
+
 	if(pzw!=0.0) {
-	  // Get mapping of orbitals
-	  std::vector<size_t> idxbv(arma::conv_to< std::vector<size_t> >::from(idxbo));
-	  std::vector<size_t> mapb(sicorbb.size());
-	  {
-	    size_t n=0;
-	    size_t i=0;
-	    while(n<sicorbb.size()) {
-	      size_t idx=find<size_t>(sicorbb,idxbv[i]);
-	      if(idx!=std::string::npos) {
-		// Orbital has SIC
-		mapb[n++]=idx;
-	      }
-	      i++;
-	    }
-	  }
-	  ref_Eorbb.zeros(Eorbb.n_elem);
-	  for(size_t i=0;i<Eorbb.n_elem;i++)
-	  ref_Eorbb(i)=Eorbb(mapb[i]);
-	  ref_Forbb.resize(Forbb.size());
-	  for(size_t i=0;i<Forbb.size();i++) {
-	    ref_Forbb[i]=Forbb[mapb[i]];
-	  }
+	  ref_Eorbb.zeros(ob);
+	  for(size_t i=0;i<idxbo.n_elem;i++)
+	    ref_Eorbb(i)=Eorbb(idxbo(i));
+	  ref_Forbb.resize(ob);
+	  for(size_t i=0;i<idxbo.n_elem;i++)
+	    ref_Forbb[i]=Forbb[idxbo(i)];
 	} else {
 	  ref_Eorbb.clear();
 	  ref_Forbb.clear();
@@ -2629,7 +2500,7 @@ void PZStability::set_params(bool real_, bool imag_, bool can, bool oo) {
   fprintf(stderr,"There are %i parameters.\n",(int) count_params());
 }
 
-void PZStability::set(const rscf_t & sol, const std::vector<size_t> & sicorbs) {
+void PZStability::set(const rscf_t & sol) {
   Checkpoint *chkptp=solverp->get_checkpoint();
 
   chkptp->read(basis);
@@ -2643,18 +2514,6 @@ void PZStability::set(const rscf_t & sol, const std::vector<size_t> & sicorbs) {
   chkptp->read("Nel-a",Na);
   ob=oa=Na;
   va=vb=rsol.cC.n_cols-oa;
-
-  // Set orbitals with SIC
-  sicorba=sicorbs;
-  sicorbb.clear();
-
-  // Check orbitals are within allowed region
-  for(size_t i=0;i<sicorba.size();i++)
-    if(sicorba[i]>=oa) {
-      std::ostringstream oss;
-      oss << "SIC orbital " << sicorba[i] << " is outside of occupied space " << oa << "!\n";
-      throw std::runtime_error(oss.str());
-    }
 
   chkptp->write("Restricted",1);
 
@@ -2692,7 +2551,7 @@ void PZStability::update_grid(bool init) {
   }
 }
     
-void PZStability::set(const uscf_t & sol, const std::vector<size_t> & sicorba_, const std::vector<size_t> & sicorbb_) {
+void PZStability::set(const uscf_t & sol) {
   Checkpoint *chkptp=solverp->get_checkpoint();
 
   // Update solution
@@ -2707,22 +2566,6 @@ void PZStability::set(const uscf_t & sol, const std::vector<size_t> & sicorba_, 
   ob=Nb;
   va=usol.cCa.n_cols-oa;
   vb=usol.cCb.n_cols-ob;
-
-  // Set orbitals with SIC
-  sicorba=sicorba_;
-  sicorbb=sicorbb_;
-  for(size_t i=0;i<sicorba.size();i++)
-    if(sicorba[i]>=oa) {
-      std::ostringstream oss;
-      oss << "SIC orbital " << sicorba[i] << " is outside of occupied space " << oa << "!\n";
-      throw std::runtime_error(oss.str());
-    }
-  for(size_t i=0;i<sicorbb.size();i++)
-    if(sicorbb[i]>=ob) {
-      std::ostringstream oss;
-      oss << "SIC orbital " << sicorbb[i] << " is outside of occupied space " << ob << "!\n";
-      throw std::runtime_error(oss.str());
-    }
 
   chkptp->write("Restricted",0);
   fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
@@ -2828,16 +2671,6 @@ bool PZStability::check(bool stability, double cutoff) {
     Timer tdiag;
     arma::vec hval;
     arma::mat hvec;
-
-#ifdef PZ_SAVE
-    {
-      // Save Hessian to file
-      std::ostringstream oss;
-      oss << "hessian_" << h.n_cols << ".dat";
-      h.save(oss.str(),arma::raw_ascii);
-    }
-#endif
-
     bool diagok=arma::eig_sym(hval,hvec,h);
     if(!diagok) {
       std::ostringstream oss;
@@ -2845,21 +2678,6 @@ bool PZStability::check(bool stability, double cutoff) {
       throw std::runtime_error(oss.str());
     }
     printf("Full Hessian diagonalized in %s.\n",tdiag.elapsed().c_str());
-
-#ifdef PZ_SAVE
-    {
-      // Save eigenvalues
-      std::ostringstream oss;
-      oss << "hval_" << h.n_cols << ".dat";
-      hval.save(oss.str(),arma::raw_ascii);
-    }
-    {
-      // Save eigenvectors
-      std::ostringstream oss;
-      oss << "hvec_" << h.n_cols << ".dat";
-      hvec.save(oss.str(),arma::raw_ascii);
-    }
-#endif
 
     // Find instabilities
     I=hvec.cols(arma::find(hval<cutoff));

@@ -1866,17 +1866,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int seed=set.get_int("PZseed");
       dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
 
-      std::vector<std::string> pzorbs(splitline(set.get_string("PZorbs")));
-      std::vector<size_t> pzorbsa;
-      if(!pzorbs.size()) {
-	pzorbsa.resize(Nel_alpha);
-	for(size_t i=0;i<pzorbsa.size();i++)
-	  pzorbsa[i]=i;
-      } else if(pzorbs.size()==1)
-	pzorbsa=parse_range(pzorbs[0],true);
-      else
-	throw std::runtime_error("Invalid value for PZorbs!\n");
-      
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve restricted DFT problem first on a rough grid
@@ -1946,7 +1935,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	PZStability stab(&solver);
 	stab.set_method(dft,oodft,pzw);
-	stab.set(sol,pzorbsa);
+	stab.set(sol);
 
 	while(true) {
 	  double dEo=0.0, dEv=0.0;
@@ -2204,23 +2193,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int seed=set.get_int("PZseed");
       dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
 
-      std::vector<std::string> pzorbs(splitline(set.get_string("PZorbs")));
-      std::vector<size_t> pzorbsa, pzorbsb;
-      if(!pzorbs.size()) {
-	pzorbsa.resize(Nel_alpha);
-	for(size_t i=0;i<pzorbsa.size();i++)
-	  pzorbsa[i]=i;
-	pzorbsb.resize(Nel_beta);
-	for(size_t i=0;i<pzorbsb.size();i++)
-	  pzorbsb[i]=i;
-      } else if(pzorbs.size()==2) {
-	if(!(pzorbs[0].size()==1 && pzorbs[0][0]=='-'))
-	  pzorbsa=parse_range(pzorbs[0],true);
-	if(!(pzorbs[1].size()==1 && pzorbs[1][0]=='-'))
-	  pzorbsb=parse_range(pzorbs[1],true);
-      } else
-	throw std::runtime_error("Invalid value for PZorbs!\n");
-
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve unrestricted DFT problem first on a rough grid
@@ -2342,7 +2314,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	PZStability stab(&solver);
 	stab.set_method(dft,oodft,pzw);
-	stab.set(sol,pzorbsa,pzorbsb);
+	stab.set(sol);
 
 	while(true) {
 	  double dEo=0.0, dEv=0.0;

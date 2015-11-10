@@ -88,13 +88,11 @@ class PZStability: public FDHessian {
   rscf_t rsol;
   /// or unrestricted
   uscf_t usol;
-  /// List of orbitals with SIC
-  std::vector<size_t> sicorba, sicorbb;
   /// Reference self-interaction energies
-  arma::vec ref_Eorba, ref_Eorbb;
+  arma::vec ref_Eorb, ref_Eorba, ref_Eorbb;
   /// Reference orbital Fock matrices
-  std::vector<arma::cx_mat> ref_Forba, ref_Forbb;
-  
+  std::vector<arma::cx_mat> ref_Forb, ref_Forba, ref_Forbb;
+
   /// Real part of transformations?
   bool real;
   /// Imaginary part of transformations?
@@ -134,7 +132,7 @@ class PZStability: public FDHessian {
   arma::cx_mat matexp(const arma::cx_mat & X) const;
 
   /// Construct unified Hamiltonian
-  arma::cx_mat unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<size_t> & sicorb, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const;
+  arma::cx_mat unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const;
 
   /// Evaluate analytic gradient
   arma::vec gradient();
@@ -169,7 +167,7 @@ class PZStability: public FDHessian {
   void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
 
   /// Print information on solution
-  void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<size_t> & sicorb, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb);
+  void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb);
 
   /// Get the full Fock matrix
   arma::cx_mat get_H(const rscf_t & sol) const;
@@ -193,9 +191,9 @@ class PZStability: public FDHessian {
   void set_params(bool real, bool imag, bool ov, bool oo);
   
   /// Set reference
-  void set(const rscf_t & sol, const std::vector<size_t> & sicorbs);
+  void set(const rscf_t & sol);
   /// Set reference
-  void set(const uscf_t & sol, const std::vector<size_t> & sicorba, const std::vector<size_t> & sicorbb);
+  void set(const uscf_t & sol);
 
   /// Evaluate energy
   double get_E();
