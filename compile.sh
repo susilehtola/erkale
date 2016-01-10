@@ -305,6 +305,7 @@ fi
 if [[ -d erkale ]]; then
     cd erkale
     git pull
+    cd ..
 else
     git clone https://github.com/susilehtola/erkale.git erkale
 fi
