@@ -34,393 +34,6 @@ arma::cx_mat form_density(const arma::cx_mat & C) {
   return arma::conj(C)*arma::strans(C);
 }
 
-// Conversion to proper gradient
-arma::cx_mat gradient_convert(const arma::cx_mat & M) {
-  return 2.0*arma::real(M)*COMPLEX1 - 2.0*arma::imag(M)*COMPLEXI;
-}
-
-arma::cx_mat spread_ov(const arma::vec & x, size_t o, size_t v, bool real, bool imag) {
-  // Sanity check
-  if((real && !imag && x.n_elem != o*v) || (!real && imag && x.n_elem != o*v) || (real && imag && x.n_elem != 2*o*v))
-    throw std::logic_error("Invalid vector length for ov rotation.\n");
-
-  // Rotation matrix
-  arma::cx_mat r(o,v);
-  r.zeros();
-
-  // Collect real part of rotation
-  size_t ioff=0;
-  if(real) {
-    for(size_t i=0;i<o;i++)
-      for(size_t j=0;j<v;j++)
-	r(i,j)=x(i*v + j + ioff)*COMPLEX1;
-    ioff+=o*v;
-  }
-  // Imaginary part
-  if(imag) {
-    for(size_t i=0;i<o;i++)
-      for(size_t j=0;j<v;j++)
-	r(i,j)+=x(i*v + j + ioff)*COMPLEXI;
-    ioff+=o*v;
-  }
-
-  return r;
-}
-
-arma::vec gather_ov(const arma::cx_mat & Mov, bool real, bool imag) {
-  // Matrix size
-  size_t o(Mov.n_rows);
-  size_t v(Mov.n_cols);
-
-  // Returned parameters
-  arma::vec x;
-  if(real && imag)
-    x.zeros(2*o*v);
-  else
-    x.zeros(o*v);
-
-  size_t ioff=0;
-
-  // Collect real part of rotation
-  if(real) {
-    for(size_t i=0;i<o;i++)
-      for(size_t j=0;j<v;j++)
-	x(i*v + j + ioff)=std::real(Mov(i,j));
-    ioff+=o*v;
-  }
-
-  // Imaginary part
-  if(imag) {
-    for(size_t i=0;i<o;i++)
-      for(size_t j=0;j<v;j++)
-	x(i*v + j + ioff)=std::imag(Mov(i,j));
-    ioff+=o*v;
-  }
-
-  return x;
-}
-
-arma::cx_mat spread_oo(const arma::vec & x, size_t o, bool real, bool imag) {
-  // Sanity check
-  if( (((real && !imag) || (!real && imag)) && x.size()!=o*(o-1)/2) || (real && imag && x.size()!=o*(o-1)) )
-    throw std::logic_error("Invalid vector length for oo rotation.\n");
-
-  // Rotation matrix
-  arma::cx_mat R(o,o);
-  R.zeros();
-
-  // Collect real part of rotation
-  size_t ioff=0;
-  if(real) {
-    for(size_t i=0;i<o;i++)
-      for(size_t j=0;j<i;j++) {
-	// Indexing requires j<i
-	size_t idx=i*(i-1)/2 + j;
-	R(j,i)= x(idx)*COMPLEX1;
-	R(i,j)=-x(idx)*COMPLEX1;
-      }
-    ioff+=o*(o-1)/2;
-  }
-
-  // Imaginary part of rotation.
-  if(imag) {
-    for(size_t i=0;i<o;i++)
-      // Diagonal part is just orbital phase which has no effect
-      for(size_t j=0;j<i;j++) {
-	// Indexing requires j<i
-	size_t idx=ioff + i*(i-1)/2 + j;
-	R(j,i)+=x(idx)*COMPLEXI;
-	R(i,j)-=x(idx)*COMPLEXI;
-      }
-    ioff+=o*(o-1)/2;
-  }
-
-  return R;
-}
-
-arma::vec gather_oo(const arma::cx_mat & M, bool real, bool imag) {
-  // Matrix size
-  size_t o=M.n_cols;
-
-  // Parameters
-  arma::vec x;
-  if(real && imag)
-    x.zeros(o*(o-1));
-  else
-    x.zeros(o*(o-1)/2);
-  size_t ioff=0;
-
-  // Collect real part of rotation
-  if(real) {
-    for(size_t i=0;i<o;i++)
-      for(size_t j=0;j<i;j++) {
-	// Indexing requires j<i
-	size_t idx=i*(i-1)/2 + j;
-	x(idx + ioff)=std::real(M(j,i));
-      }
-    ioff+=o*(o-1)/2;
-  }
-
-  // Imaginary part of rotation.
-  if(imag) {
-    for(size_t i=0;i<o;i++)
-      // Diagonal part is just orbital phase which has no effect
-      for(size_t j=0;j<i;j++) {
-	// Indexing requires j<i
-	size_t idx=i*(i-1)/2 + j;
-	x(idx + ioff)=std::imag(M(j,i));
-      }
-    ioff+=o*(o-1)/2;
-  }
-
-  return x;
-}
-
-FDHessian::FDHessian() {
-  ss_fd=cbrt(DBL_EPSILON);
-  ss_ls=1e-4;
-}
-
-FDHessian::~FDHessian() {
-}
-
-arma::vec FDHessian::gradient() {
-  arma::vec x0(count_params());
-  x0.zeros();
-  return gradient(x0);
-}
-  
-arma::vec FDHessian::gradient(const arma::vec & x0) {
-  // Amount of parameters
-  size_t npar=count_params();
-
-  // Compute gradient
-  arma::vec g(npar);
-  g.zeros();
-
-  /* This loop isn't OpenMP parallel, because parallellization is
-     already used in the energy evaluation. Parallellizing over trials
-     here would require use of thread-local DFT grids, and possibly
-     even thread-local SCF solver objects (for the Coulomb part).*/
-  for(size_t i=0;i<npar;i++) {
-    arma::vec x;
-
-    // RHS value
-    x=x0;
-    x(i)+=ss_fd;
-    double yr=eval(x);
-
-    // LHS value
-    x=x0;
-    x(i)-=ss_fd;
-    double yl=eval(x);
-
-    // Derivative
-    g(i)=(yr-yl)/(2.0*ss_fd);
-
-    if(std::isnan(g(i))) {
-      ERROR_INFO();
-      std::ostringstream oss;
-      oss << "Element " << i << " of gradient gives NaN.\n";
-      oss << "Step size is " << ss_fd << ", and left and right values are " << yl << " and " << yr << ".\n";
-      throw std::runtime_error(oss.str());
-    }
-  }
-
-  return g;
-}
-
-typedef struct {
-  size_t i;
-  size_t j;
-} loopidx_t;
-
-arma::mat FDHessian::hessian() {
-  // Amount of parameters
-  size_t npar=count_params();
-
-  // Compute gradient
-  arma::mat h(npar,npar);
-  h.zeros();
-
-  std::vector<loopidx_t> idx;
-  for(size_t i=0;i<npar;i++)
-    for(size_t j=0;j<=i;j++) {
-      loopidx_t t;
-      t.i=i;
-      t.j=j;
-      idx.push_back(t);
-    }
-
-  /* This loop isn't OpenMP parallel, because parallellization is
-     already used in the energy evaluation. Parallellizing over trials
-     here would require use of thread-local DFT grids, and possibly
-     even thread-local SCF solver objects (for the Coulomb part).*/
-  for(size_t ii=0;ii<idx.size();ii++) {
-    size_t i=idx[ii].i;
-    size_t j=idx[ii].j;
-
-    arma::vec x(npar);
-
-    // RH,RH value
-    x.zeros();
-    x(i)+=ss_fd;
-    x(j)+=ss_fd;
-    double yrr=eval(x);
-
-    // RH,LH
-    x.zeros();
-    x(i)+=ss_fd;
-    x(j)-=ss_fd;
-    double yrl=eval(x);
-
-    // LH,RH
-    x.zeros();
-    x(i)-=ss_fd;
-    x(j)+=ss_fd;
-    double ylr=eval(x);
-
-    // LH,LH
-    x.zeros();
-    x(i)-=ss_fd;
-    x(j)-=ss_fd;
-    double yll=eval(x);
-
-    // Values
-    h(i,j)=(yrr - yrl - ylr + yll)/(4.0*ss_fd*ss_fd);
-    // Symmetrize
-    h(j,i)=h(i,j);
-
-    if(std::isnan(h(i,j))) {
-      ERROR_INFO();
-      std::ostringstream oss;
-      oss << "Element (" << i << "," << j << ") of Hessian gives NaN.\n";
-      oss << "Step size is " << ss_fd << ". Stencil values\n";
-      oss << "yrr = " << yrr << "\n";
-      oss << "yrl = " << yrl << "\n";
-      oss << "ylr = " << ylr << "\n";
-      oss << "yll = " << yll << "\n";
-      throw std::runtime_error(oss.str());
-    }
-  }
-
-  return h;
-}
-
-void FDHessian::update(const arma::vec & x) {
-  (void) x;
-  throw std::runtime_error("Error - update function must be overloaded!\n");
-}
-
-void FDHessian::print_status(size_t iiter, const arma::vec & g, const Timer & t) const {
-  printf("\nIteration %i, gradient norm %e, max norm %e (%s)\n",(int) iiter,arma::norm(g,2),arma::max(arma::abs(g)),t.elapsed().c_str());
-}
-
-double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
-  arma::vec x0;
-  if(!count_params())
-    return 0.0;
-  else
-    x0.zeros(count_params());
-
-  double ival=eval(x0);
-  printf("Initial value is % .10f\n",ival);
-
-  // Current and previous gradient
-  arma::vec g, gold;
-  // Search direction
-  arma::vec sd;
-
-  for(size_t iiter=0;iiter<maxiter;iiter++) {
-    // Evaluate gradient
-    gold=g;
-    {
-      Timer t;
-      g=gradient();
-      print_status(iiter,g,t);
-    }
-    if(arma::norm(g,2)<gthr)
-      break;
-
-    // Initial step size
-    double initstep=ss_ls;
-    // Factor for increase of step size
-    double stepfac=2.0;
-
-    // Do line search
-    std::vector<double> step, val;
-
-    // Update search direction
-    arma::vec oldsd(sd);
-    sd = max ? g : -g;
-
-    if(iiter % std::min((size_t) round(sqrt(count_params())),(size_t) 5) !=0) {
-      // Update factor
-      double gamma;
-
-      // Polak-Ribiere
-      gamma=arma::dot(g,g-gold)/arma::dot(gold,gold);
-      // Fletcher-Reeves
-      //gamma=arma::dot(g,g)/arma::dot(gold,gold);
-
-      // Update search direction
-      arma::vec sdnew=sd+gamma*oldsd;
-
-      // Check that new SD is sane
-      if(iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(gold,gold)) {
-	printf("Powell restart - SD step\n");
-      } else if(arma::dot(sdnew,sd)<=0) {
-	// This would take us into the wrong direction!
-	printf("Bad CG direction. SD step\n");
-      } else {
-	// Update search direction
-	sd=sdnew;
-	printf("CG step\n");
-      }
-    } else printf("SD step\n");
-
-    while(true) {
-      step.push_back(std::pow(stepfac,step.size())*initstep);
-      val.push_back(eval(step[step.size()-1]*sd));
-
-      if(val.size()>=2)
-	printf(" %e % .10f % e % e\n",step[step.size()-1],val[val.size()-1],val[val.size()-1]-val[0],val[val.size()-1]-val[val.size()-2]);
-      else
-      	printf(" %e % .10f\n",step[step.size()-1],val[val.size()-1]);
-
-      double dval=val[val.size()-1]-val[val.size()-2];
-
-      // Check if converged
-      if(val.size()>=2) {
-	if(max && dval<0)
-	  break;
-	else if(!max && dval>0)
-	  break;
-      }
-    }
-
-    // Get optimal value
-    arma::vec vals=arma::conv_to<arma::vec>::from(val);
-    arma::uword iopt;
-    if(max)
-      vals.max(iopt);
-    else
-      vals.min(iopt);
-    printf("Line search changed value by %e\n",val[iopt]-val[0]);
-
-    // Optimal value is
-    double optstep=step[iopt];
-    // Update x
-    update(optstep*sd);
-  }
-
-  double fval=eval(x0);
-  printf("Final value is % .10f; optimization changed value by %e\n",fval,fval-ival);
-
-  // Return the change
-  return fval-ival;
-}
-
 PZStability::PZStability(SCF * solver) {
   solverp=solver;
   solverp->set_verbose(false);
@@ -430,441 +43,12 @@ PZStability::PZStability(SCF * solver) {
   oocheck=true;
 
   // Init sizes
-  restr=true;
+  restr=0;
   oa=ob=0;
   va=vb=0;
 }
 
 PZStability::~PZStability() {
-}
-
-size_t PZStability::count_oo_params(size_t o) const {
-  size_t n=0;
-  if(real)
-    n+=o*(o-1)/2;
-  if(imag)
-    n+=o*(o-1)/2;
-
-  return n;
-}
-
-size_t PZStability::count_ov_params(size_t o, size_t v) const {
-  size_t n=0;
-  // Real part
-  if(real)
-    n+=o*v;
-  // Complex part
-  if(imag)
-    n+=o*v;
-
-  return n;
-}
-
-size_t PZStability::count_params(size_t o, size_t v) const {
-  size_t n=0;
-
-  // Check canonicals?
-  if(cancheck) {
-    n+=count_ov_params(o,v);
-  }
-
-  // Check oo block?
-  if(oocheck) {
-    n+=count_oo_params(o);
-  }
-
-  return n;
-}
-
-size_t PZStability::count_params() const {
-  size_t npar=count_params(oa,va);
-  if(!restr)
-    npar+=count_params(ob,vb);
-
-  return npar;
-}
-
-std::vector<pz_rot_par_t> PZStability::classify() const {
-  std::vector<pz_rot_par_t> ret;
-  if(restr || ob==0) {
-    pz_rot_par_t ooreal;
-    ooreal.name="real OO";
-    pz_rot_par_t ooimag;
-    ooimag.name="imag OO";
-    pz_rot_par_t oo;
-    oo.name="OO";
-
-    pz_rot_par_t ovreal;
-    ovreal.name="real OV";
-    pz_rot_par_t ovimag;
-    ovimag.name="imag OV";
-    pz_rot_par_t ov;
-    ov.name="OV";
-
-    pz_rot_par_t rreal;
-    rreal.name="real OO+OV";
-    pz_rot_par_t rimag;
-    rimag.name="imag OO+OV";
-    pz_rot_par_t rfull;
-    rfull.name="OO+OV";
-
-    size_t ioff=0;
-    if(cancheck) {
-      if(real) {
-	arma::uword np=oa*va;
-	arma::uvec i(arma::linspace<arma::uvec>(ioff,ioff+np-1,np));
-	ovreal.idx=i;
-	ret.push_back(ovreal);
-	ioff+=np;
-      }
-      if(imag) {
-	arma::uword np=oa*va;
-	arma::uvec i(arma::linspace<arma::uvec>(ioff,ioff+np-1,np));
-	ovimag.idx=i;
-	ret.push_back(ovimag);
-	ioff+=np;
-      }
-      if(ovreal.idx.n_elem>0 && ovimag.idx.n_elem>0) {
-	ov.idx.zeros(ovreal.idx.n_elem+ovimag.idx.n_elem);
-	if(ovreal.idx.n_elem)
-	  ov.idx.subvec(0,ovreal.idx.n_elem-1)=ovreal.idx;
-	if(ovimag.idx.n_elem)
-	  ov.idx.subvec(ovreal.idx.n_elem,ov.idx.n_elem-1)=ovimag.idx;
-	ret.push_back(ov);
-      }
-    }
-    if(oocheck) {
-      if(real) {
-	arma::uword np=oa*(oa-1)/2;
-	arma::uvec i(arma::linspace<arma::uvec>(ioff,ioff+np-1,np));
-	ooreal.idx=i;
-	if(np)
-	  ret.push_back(ooreal);
-	ioff+=np;
-      }
-      if(imag) {
-	arma::uword np=oa*(oa-1)/2;
-	arma::uvec i(arma::linspace<arma::uvec>(ioff,ioff+np-1,np));
-	ooimag.idx=i;
-	if(np)
-	  ret.push_back(ooimag);
-	ioff+=np;
-      }
-      if(ooreal.idx.n_elem>0 && ooimag.idx.n_elem>0) {
-	oo.idx.zeros(ooreal.idx.n_elem+ooimag.idx.n_elem);
-	if(ooreal.idx.n_elem)
-	  oo.idx.subvec(0,ooreal.idx.n_elem-1)=ooreal.idx;
-	if(ooimag.idx.n_elem)
-	  oo.idx.subvec(ooreal.idx.n_elem,oo.idx.n_elem-1)=ooimag.idx;
-	ret.push_back(oo);
-      }
-    }
-    if(cancheck && oocheck) {
-      if(ooreal.idx.n_elem>0 && ovreal.idx.n_elem>0) {
-	rreal.idx.zeros(ooreal.idx.n_elem+ovreal.idx.n_elem);
-	if(ooreal.idx.n_elem)
-	  rreal.idx.subvec(0,ooreal.idx.n_elem-1)=ooreal.idx;
-	if(ovreal.idx.n_elem)
-	  rreal.idx.subvec(ooreal.idx.n_elem,rreal.idx.n_elem-1)=ovreal.idx;
-	ret.push_back(rreal);
-      }
-
-      if(ooimag.idx.n_elem>0 && ovimag.idx.n_elem>0) {
-	rimag.idx.zeros(ooimag.idx.n_elem+ovimag.idx.n_elem);
-	if(ooimag.idx.n_elem)
-	  rimag.idx.subvec(0,ooimag.idx.n_elem-1)=ooimag.idx;
-	if(ovimag.idx.n_elem)
-	  rimag.idx.subvec(ooimag.idx.n_elem,rimag.idx.n_elem-1)=ovimag.idx;
-	ret.push_back(rimag);
-      }
-
-      if(rreal.idx.n_elem>0 && rimag.idx.n_elem>0) {
-	rfull.idx.zeros(rreal.idx.n_elem+rimag.idx.n_elem);
-	if(rreal.idx.n_elem)
-	  rfull.idx.subvec(0,rreal.idx.n_elem-1)=rreal.idx;
-	if(rimag.idx.n_elem)
-	  rfull.idx.subvec(rreal.idx.n_elem,rfull.idx.n_elem-1)=rimag.idx;
-	ret.push_back(rfull);
-      }
-    }
-
-  } else {
-    pz_rot_par_t ooareal;
-    ooareal.name="real alpha OO";
-    pz_rot_par_t ooaimag;
-    ooaimag.name="imag alpha OO";
-    pz_rot_par_t ooa;
-    ooa.name="alpha OO";
-
-    pz_rot_par_t oobreal;
-    oobreal.name="real beta  OO";
-    pz_rot_par_t oobimag;
-    oobimag.name="imag beta  OO";
-    pz_rot_par_t oob;
-    oob.name="beta  OO";
-
-    pz_rot_par_t ooreal;
-    ooreal.name="real OO";
-    pz_rot_par_t ooimag;
-    ooimag.name="imag OO";
-    pz_rot_par_t oo;
-    oo.name="OO";
-
-    pz_rot_par_t ovareal;
-    ovareal.name="real alpha OV";
-    pz_rot_par_t ovaimag;
-    ovaimag.name="imag alpha OV";
-    pz_rot_par_t ova;
-    ova.name="alpha OV";
-
-    pz_rot_par_t ovbreal;
-    ovbreal.name="real beta  OV";
-    pz_rot_par_t ovbimag;
-    ovbimag.name="imag beta  OV";
-    pz_rot_par_t ovb;
-    ovb.name="beta  OV";
-
-    pz_rot_par_t ovreal;
-    ovreal.name="real OV";
-    pz_rot_par_t ovimag;
-    ovimag.name="imag OV";
-    pz_rot_par_t ov;
-    ov.name="OV";
-
-    pz_rot_par_t rareal;
-    rareal.name="real alpha O+V";
-    pz_rot_par_t raimag;
-    raimag.name="imag alpha O+V";
-    pz_rot_par_t rafull;
-    rafull.name="alpha O+V";
-
-    pz_rot_par_t rbreal;
-    rbreal.name="real beta  O+V";
-    pz_rot_par_t rbimag;
-    rbimag.name="imag beta  O+V";
-    pz_rot_par_t rbfull;
-    rbfull.name="beta  O+V";
-
-    pz_rot_par_t rreal;
-    rreal.name="real O+V";
-    pz_rot_par_t rimag;
-    rimag.name="imag O+V";
-    pz_rot_par_t rfull;
-    rfull.name="O+V";
-
-    size_t ioff=0;
-    if(cancheck) {
-      if(real) {
-	arma::uword np=oa*va;
-	ovareal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	if(np)
-	  ret.push_back(ovareal);
-	ioff+=np;
-      }
-
-      if(imag) {
-	arma::uword np=oa*va;
-	ovaimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	ret.push_back(ovaimag);
-	ioff+=np;
-      }
-
-      if(real) {
-	arma::uword np=ob*vb;
-	ovbreal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	if(np)
-	  ret.push_back(ovbreal);
-	ioff+=np;
-      }
-
-      if(imag) {
-	arma::uword np=ob*vb;
-	ovbimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	ret.push_back(ovbimag);
-	ioff+=np;
-      }
-
-      if(real) {
-	ovreal.idx.zeros(ovareal.idx.n_elem+ovbreal.idx.n_elem);
-	if(ovareal.idx.n_elem)
-	  ovreal.idx.subvec(0,ovareal.idx.n_elem-1)=ovareal.idx;
-	if(ovbreal.idx.n_elem)
-	  ovreal.idx.subvec(ovareal.idx.n_elem,ovreal.idx.n_elem-1)=ovbreal.idx;
-	ret.push_back(ovreal);
-      }
-      
-      if(imag) {
-	ovimag.idx.zeros(ovaimag.idx.n_elem+ovbimag.idx.n_elem);
-	if(ovaimag.idx.n_elem)
-	  ovimag.idx.subvec(0,ovaimag.idx.n_elem-1)=ovaimag.idx;
-	if(ovbimag.idx.n_elem)
-	  ovimag.idx.subvec(ovaimag.idx.n_elem,ovimag.idx.n_elem-1)=ovbimag.idx;
-	ret.push_back(ovimag);
-      }
-      
-      if(real && imag) {
-	ova.idx.zeros(ovareal.idx.n_elem+ovaimag.idx.n_elem);
-	if(ovareal.idx.n_elem)
-	  ova.idx.subvec(0,ovareal.idx.n_elem-1)=ovareal.idx;
-	if(ovaimag.idx.n_elem)
-	  ova.idx.subvec(ovareal.idx.n_elem,ova.idx.n_elem-1)=ovaimag.idx;
-	ret.push_back(ova);
-	
-	ovb.idx.zeros(ovbreal.idx.n_elem+ovbimag.idx.n_elem);
-	if(ovbreal.idx.n_elem)
-	  ovb.idx.subvec(0,ovbreal.idx.n_elem-1)=ovbreal.idx;
-	if(ovbimag.idx.n_elem)
-	  ovb.idx.subvec(ovbreal.idx.n_elem,ovb.idx.n_elem-1)=ovbimag.idx;
-	ret.push_back(ovb);
-	
-	ov.idx.zeros(ova.idx.n_elem+ovb.idx.n_elem);
-	if(ova.idx.n_elem)
-	  ov.idx.subvec(0,ova.idx.n_elem-1)=ova.idx;
-	if(ovb.idx.n_elem)
-	  ov.idx.subvec(ova.idx.n_elem,ov.idx.n_elem-1)=ovb.idx;
-	ret.push_back(ov);
-      }
-    }
-    
-    if(oocheck) {
-      if(real) {
-	arma::uword np=oa*(oa-1)/2;
-	if(np>0) {
-	  ooareal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	  ret.push_back(ooareal);
-	}
-	ioff+=np;
-      }
-
-      if(imag) {
-	arma::uword np=oa*(oa-1)/2;
-	if(np>0) {
-	  ooaimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	  ret.push_back(ooaimag);
-	}
-	ioff+=np;
-      }
-
-      if(real) {
-	arma::uword np=ob*(ob-1)/2;
-	if(np>0) {
-	  oobreal.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	  ret.push_back(oobreal);
-	}
-	ioff+=np;
-      }
-
-      if(imag) {
-	arma::uword np=ob*(ob-1)/2;
-	if(np>0) {
-	  oobimag.idx=arma::linspace<arma::uvec>(ioff,ioff+np-1,np);
-	  ret.push_back(oobimag);
-	}
-	ioff+=np;
-      }
-
-      if(real && oa>1 && ob>1) {
-	ooreal.idx.zeros(ooareal.idx.n_elem+oobreal.idx.n_elem);
-	if(ooareal.idx.n_elem)
-	  ooreal.idx.subvec(0,ooareal.idx.n_elem-1)=ooareal.idx;
-	if(oobreal.idx.n_elem)
-	  ooreal.idx.subvec(ooareal.idx.n_elem,ooreal.idx.n_elem-1)=oobreal.idx;
-	ret.push_back(ooreal);
-      }
-
-      if(imag && oa>1 && ob>1) {
-	ooimag.idx.zeros(ooaimag.idx.n_elem+oobimag.idx.n_elem);
-	if(ooaimag.idx.n_elem)
-	  ooimag.idx.subvec(0,ooaimag.idx.n_elem-1)=ooaimag.idx;
-	if(oobimag.idx.n_elem)
-	  ooimag.idx.subvec(ooaimag.idx.n_elem,ooimag.idx.n_elem-1)=oobimag.idx;
-	ret.push_back(ooimag);
-      }
-
-      if(real && imag) {
-	ooa.idx.zeros(ooareal.idx.n_elem+ooaimag.idx.n_elem);
-	if(ooareal.idx.n_elem)
-	  ooa.idx.subvec(0,ooareal.idx.n_elem-1)=ooareal.idx;
-	if(ooaimag.idx.n_elem)
-	  ooa.idx.subvec(ooareal.idx.n_elem,ooa.idx.n_elem-1)=ooaimag.idx;
-	ret.push_back(ooa);
-
-	if(ob>1) {
-	  oob.idx.zeros(oobreal.idx.n_elem+oobimag.idx.n_elem);
-	  if(oobreal.idx.n_elem)
-	    oob.idx.subvec(0,oobreal.idx.n_elem-1)=oobreal.idx;
-	  if(oobimag.idx.n_elem)
-	    oob.idx.subvec(oobreal.idx.n_elem,oob.idx.n_elem-1)=oobimag.idx;
-	  ret.push_back(oob);
-	}
-	
-	oo.idx.zeros(ooa.idx.n_elem+oob.idx.n_elem);
-	oo.idx.subvec(0,ooa.idx.n_elem-1)=ooa.idx;
-	if(ob>1) {
-	  oo.idx.subvec(ooa.idx.n_elem,oo.idx.n_elem-1)=oob.idx;
-	  ret.push_back(oo);
-	}
-      }
-    }
-    if(cancheck && oocheck) {
-      rareal.idx.zeros(ooareal.idx.n_elem+ovareal.idx.n_elem);
-      if(ooareal.idx.n_elem)
-	rareal.idx.subvec(0,ooareal.idx.n_elem-1)=ooareal.idx;
-      if(ovareal.idx.n_elem)
-	rareal.idx.subvec(ooareal.idx.n_elem,rareal.idx.n_elem-1)=ovareal.idx;
-      if(real && imag)
-	ret.push_back(rareal);
-
-      rbreal.idx.zeros(oobreal.idx.n_elem+ovbreal.idx.n_elem);
-      if(oobreal.idx.n_elem)
-	rbreal.idx.subvec(0,oobreal.idx.n_elem-1)=oobreal.idx;
-      if(ovbreal.idx.n_elem)
-	rbreal.idx.subvec(oobreal.idx.n_elem,rbreal.idx.n_elem-1)=ovbreal.idx;
-      if(real && imag)
-	ret.push_back(rbreal);
-
-      rreal.idx.zeros(rareal.idx.n_elem+rbreal.idx.n_elem);
-      if(rareal.idx.n_elem)
-	rreal.idx.subvec(0,rareal.idx.n_elem-1)=rareal.idx;
-      if(rbreal.idx.n_elem)
-	rreal.idx.subvec(rareal.idx.n_elem,rreal.idx.n_elem-1)=rbreal.idx;
-      if(real && imag)
-	ret.push_back(rreal);
-
-      raimag.idx.zeros(ooaimag.idx.n_elem+ovaimag.idx.n_elem);
-      if(ooaimag.idx.n_elem)
-	raimag.idx.subvec(0,ooaimag.idx.n_elem-1)=ooaimag.idx;
-      if(ovaimag.idx.n_elem)
-	raimag.idx.subvec(ooaimag.idx.n_elem,raimag.idx.n_elem-1)=ovaimag.idx;
-      if(imag && imag)
-	ret.push_back(raimag);
-
-      rbimag.idx.zeros(oobimag.idx.n_elem+ovbimag.idx.n_elem);
-      if(oobimag.idx.n_elem)
-	rbimag.idx.subvec(0,oobimag.idx.n_elem-1)=oobimag.idx;
-      if(ovbimag.idx.n_elem)
-	rbimag.idx.subvec(oobimag.idx.n_elem,rbimag.idx.n_elem-1)=ovbimag.idx;
-      if(real && imag)
-	ret.push_back(rbimag);
-
-      rimag.idx.zeros(raimag.idx.n_elem+rbimag.idx.n_elem);
-      if(raimag.idx.n_elem)
-	rimag.idx.subvec(0,raimag.idx.n_elem-1)=raimag.idx;
-      if(rbimag.idx.n_elem)
-	rimag.idx.subvec(raimag.idx.n_elem,rimag.idx.n_elem-1)=rbimag.idx;
-      if(real && imag)
-	ret.push_back(rimag);
-
-      rfull.idx.zeros(rreal.idx.n_elem+rimag.idx.n_elem);
-      if(rreal.idx.n_elem)
-	rfull.idx.subvec(0,rreal.idx.n_elem-1)=rreal.idx;
-      if(rimag.idx.n_elem)
-	rfull.idx.subvec(rreal.idx.n_elem,rfull.idx.n_elem-1)=rimag.idx;
-      ret.push_back(rfull);
-    }
-  }
-
-  return ret;
 }
 
 arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const {
@@ -1020,59 +204,8 @@ void PZStability::print_info() {
   printf("%28s: % .16e\n","Virial factor",-en.E/en.Ekin);
 }
 
-void PZStability::perturb(double h) {
-  // Form update vector
-  arma::vec x(count_params());
-  x.randn();
-  update(h*x);
-}
-
 void PZStability::update_step(const arma::vec & g) {
-  // Collect derivatives
-  if(restr || ob==0) {
-    arma::cx_mat G=rotation_pars(g,false);
-    if(oocheck && !cancheck)
-      // Only doing OO block, so we can take the first subblock
-      G=G.submat(0,0,oa-1,oa-1);
-
-    // Calculate eigendecomposition
-    arma::vec Gval;
-    arma::cx_mat Gvec;
-    bool diagok=arma::eig_sym(Gval,Gvec,-COMPLEXI*G);
-    if(!diagok) {
-      ERROR_INFO();
-      throw std::runtime_error("Error diagonalizing G.\n");
-    }
-
-    // Calculate maximum step size; cost function is 4th order in parameters
-    Tmu=0.5*M_PI/arma::max(arma::abs(Gval));
-
-  } else {
-    arma::cx_mat Ga=rotation_pars(g,false);
-    arma::cx_mat Gb=rotation_pars(g,true);
-    if(oocheck && !cancheck) {
-      // Only doing OO block, so we can take the OO subblocks
-      Ga=Ga.submat(0,0,oa-1,oa-1);
-      Gb=Gb.submat(0,0,ob-1,ob-1);
-    }
-
-    // Calculate eigendecompositions
-    arma::vec Gaval, Gbval;
-    arma::cx_mat Gavec, Gbvec;
-    bool diagok=arma::eig_sym(Gaval,Gavec,-COMPLEXI*Ga);
-    if(!diagok) {
-      ERROR_INFO();
-      throw std::runtime_error("Error diagonalizing Ga.\n");
-    }
-    diagok=arma::eig_sym(Gbval,Gbvec,-COMPLEXI*Gb);
-    if(!diagok) {
-      ERROR_INFO();
-      throw std::runtime_error("Error diagonalizing Gb.\n");
-    }
-
-    // Calculate maximum step size; cost function is 4th order in parameters
-    Tmu=0.5*M_PI/std::max(arma::max(arma::abs(Gaval)),arma::max(arma::abs(Gbval)));
-  }
+  return update_step(g,4);
 }
 
 double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, bool can, bool fock, double pzweight, bool useref) {
@@ -1081,26 +214,31 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
 
   // List of changed orbitals
   std::vector<size_t> occlist, virtlist;
-  if(arma::norm(x,2)!=0.0) {
-    arma::cx_mat R(rotation(x,false));
-    sol.cC=sol.cC*R;
-
-    if(useref) {
-      // Remove unity
-      R-=arma::eye<arma::cx_mat>(sol.cC.n_cols,sol.cC.n_cols);
-      // Find orbitals that have changed
-      for(size_t ia=0;ia<oa;ia++)
-	for(size_t ja=ia+1;ja<R.n_cols;ja++)
-	  if(std::norm(R(ia,ja))>=CHANGETHR) {
-	    occlist.push_back(ia);
-	    if(ja<oa)
-	      occlist.push_back(ja);
-	    else
-	      virtlist.push_back(ja);
-	  }
-    }
+  if(sol.cC.n_rows == C.n_rows && sol.cC.n_cols == C.n_cols) {
+    // Rotation matrix
+    arma::cx_mat R(arma::trans(sol.cC)*S*C);
+    // Remove unity
+    R-=arma::eye<arma::cx_mat>(sol.cC.n_cols,sol.cC.n_cols);
+    // Find orbitals that have changed
+    for(size_t ia=0;ia<oa;ia++)
+      for(size_t ja=ia+1;ja<R.n_cols;ja++)
+	if(std::norm(R(ia,ja))>=CHANGETHR) {
+	  occlist.push_back(ia);
+	  if(ja<oa)
+	    occlist.push_back(ja);
+	  else
+	    virtlist.push_back(ja);
+	}
+  } else {
+    for(size_t ia=0;ia<oa;ia++)
+      occlist.push_back(ia);
+    for(size_t ia=0;ia<va;ia++)
+      virtlist.push_back(ia+oa);
   }
 
+  // Update orbitals
+  sol.cC=C;
+   
   // Update density matrix
   arma::cx_mat P(2.0*form_density(sol.cC.cols(0,oa-1)));
   // Debug
@@ -1115,7 +253,7 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
   std::vector<double> occs(oa,2.0);
 
   // Build global Fock operator
-  if(can && (!useref || (useref && virtlist.size()) ))
+  if(enabled(1,2) && virtlist.size())
     solverp->Fock_RDFT(sol,occs,ovmethod,grid,nlgrid);
 
   if(pzweight==0.0)
@@ -1123,26 +261,21 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
 
   // Build the SI part
   arma::cx_mat CO;
-  if(useref) {
-    CO.zeros(sol.cC.n_rows,occlist.size());
+  CO.zeros(sol.cC.n_rows,occlist.size());
+  for(size_t i=0;i<occlist.size();i++)
+    CO.col(i)=sol.cC.col(occlist[i]);
+  
+  std::vector<arma::cx_mat> Forb_hlp;
+  arma::vec Eorb_hlp;
+  solverp->PZSIC_Fock(Forb_hlp,Eorb_hlp,CO,oomethod,grid,nlgrid,fock);
+  Eorb=ref_Eorba;
+  for(size_t i=0;i<occlist.size();i++)
+    Eorb(occlist[i])=Eorb_hlp(i);
+  
+  if(fock) {
+    Forb=ref_Forba;
     for(size_t i=0;i<occlist.size();i++)
-      CO.col(i)=sol.cC.col(occlist[i]);
-
-    std::vector<arma::cx_mat> Forb_hlp;
-    arma::vec Eorb_hlp;
-    solverp->PZSIC_Fock(Forb_hlp,Eorb_hlp,CO,oomethod,grid,nlgrid,fock);
-    Eorb=ref_Eorb;
-    for(size_t i=0;i<occlist.size();i++)
-      Eorb(occlist[i])=Eorb_hlp(i);
-
-    if(fock) {
-      Forb=ref_Forb;
-      for(size_t i=0;i<occlist.size();i++)
-	Forb[occlist[i]]=Forb_hlp[i];
-    }
-  } else {
-    CO=sol.cC.cols(0,oa-1);
-    solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
+      Forb[occlist[i]]=Forb_hlp[i];
   }
 
   sol.en.Exc-=2.0*pzweight*arma::sum(Eorb);
@@ -1156,127 +289,105 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   sol=usol;
 
   // List of changed orbitals
-  std::vector<size_t> occlista, occlistb, virtlista, virtlistb;
-  if(arma::norm(x,2)!=0.0) {
-    arma::cx_mat Ra(rotation(x,false));
-    sol.cCa=sol.cCa*Ra;
+  std::vector<size_t> occlista, virtlista;
+  std::vector<size_t> occlistb, virtlistb;
 
-    if(useref) {
-      Ra-=arma::eye<arma::cx_mat>(sol.cCa.n_cols,sol.cCa.n_cols);
-      for(size_t ia=0;ia<oa;ia++)
-	for(size_t ja=ia+1;ja<Ra.n_cols;ja++)
-	  if(std::norm(Ra(ia,ja))>=CHANGETHR) {
-	    occlista.push_back(ia);
-	    if(ja<oa)
-	      occlista.push_back(ja);
-	    else
-	      virtlista.push_back(ja);
-	  }
-    }
+  if(sol.cCa.n_rows == C.n_rows && sol.cCa.n_cols == C.n_cols/2 && sol.cCb.n_rows == C.n_rows && sol.cCb.n_cols == C.n_cols/2) {
+    // Rotation matrix
+    arma::cx_mat Ra(arma::trans(sol.cCa)*S*C.cols(0,C.n_cols/2-1));
+    arma::cx_mat Rb(arma::trans(sol.cCb)*S*C.cols(C.n_cols/2,C.n_cols-1));
+    // Remove unity
+    Ra-=arma::eye<arma::cx_mat>(sol.cC.n_cols,sol.cC.n_cols);
+    Rb-=arma::eye<arma::cx_mat>(sol.cC.n_cols,sol.cC.n_cols);
 
-    if(ob) {
-      arma::cx_mat Rb(rotation(x,true));
-      sol.cCb=sol.cCb*Rb;
-      if(useref) {
-	Rb-=arma::eye<arma::cx_mat>(sol.cCb.n_cols,sol.cCb.n_cols);
-	for(size_t ib=0;ib<ob;ib++)
-	  for(size_t jb=ib+1;jb<Rb.n_cols;jb++)
-	    if(std::norm(Rb(ib,jb))>=CHANGETHR) {
-	      occlistb.push_back(ib);
-	      if(jb<ob)
-		occlistb.push_back(jb);
-	      else
-		virtlistb.push_back(jb);
-	    }
-      }
-    }
-  }
-
-  // Update density matrix
-  {
-    arma::cx_mat Pa(form_density(sol.cCa.cols(0,oa-1)));
-    sol.Pa=arma::real(Pa);
-    sol.Pa_im=arma::imag(Pa);
-  }
-  if(ob) {
-    arma::cx_mat Pb(form_density(sol.cCb.cols(0,ob-1)));
-    sol.Pb=arma::real(Pb);
-    sol.Pb_im=arma::imag(Pb);
+    // Find orbitals that have changed
+    for(size_t ia=0;ia<oa;ia++)
+      for(size_t ja=ia+1;ja<Ra.n_cols;ja++)
+	if(std::norm(Ra(ia,ja))>=CHANGETHR) {
+	  occlista.push_back(ia);
+	  if(ja<oa)
+	    occlista.push_back(ja);
+	  else
+	    virtlista.push_back(ja);
+	}
+    for(size_t ib=0;ia<ob;ia++)
+      for(size_t jb=ia+1;ja<Rb.n_cols;ja++)
+	if(std::norm(Rb(ia,ja))>=CHANGETHR) {
+	  occlistb.push_back(ib);
+	  if(jb<ob)
+	    occlistb.push_back(jb);
+	  else
+	    virtlistb.push_back(jb);
+	}
   } else {
-    sol.Pb.zeros(sol.cCb.n_rows,sol.cCb.n_rows);
-    sol.Pb_im.zeros(sol.cCb.n_rows,sol.cCb.n_rows);
+    for(size_t ia=0;ia<oa;ia++)
+      occlista.push_back(ia);
+    for(size_t ia=0;ia<ob;ia++)
+      occlistb.push_back(ia);
+    for(size_t ia=0;ia<va;ia++)
+      virtlista.push_back(ia+oa);
+    for(size_t ia=0;ia<va;ia++)
+      virtlistb.push_back(ia+ob);
   }
-  sol.P=sol.Pa+sol.Pb;
 
+  // Update orbitals
+  C.zeros(sol.cCa.n_rows,sol.cCa.n_cols*2);
+  C.cols(0,sol.cCa.n_cols-1)=sol.cCa;
+  C.cols(sol.cCa.n_cols,C.n_cols-1)=sol.cCb;
+   
+  // Update density matrix
+  arma::cx_mat Pa(form_density(sol.cCa.cols(0,oa-1)));
+  arma::cx_mat Pb(form_density(sol.cCb.cols(0,ob-1)));
+  sol.Pa=arma::real(Pa);
+  sol.Pa_im=arma::imag(Pa);
+  sol.Pb=arma::real(Pb);
+  sol.Pb_im=arma::imag(Pb);
+  sol.P=sol.Pa+sol.Pb;
+  
   // Clear out any old data
   Forba.clear();
-  Eorba.clear();
   Forbb.clear();
+  Eorba.clear();
   Eorbb.clear();
 
   // Dummy occupation vector
-  std::vector<double> occa(oa,1.0);
-  std::vector<double> occb(ob,1.0);
+  std::vector<double> occa(oa,1.0), occb(ob,1.0);
 
   // Build global Fock operator
-  if(can && (!useref || (useref && (virtlista.size() || virtlistb.size())) ))
+  if((enabled(1,2) || enabled(4,5)) && virtlist.size())
     solverp->Fock_UDFT(sol,occa,occb,ovmethod,grid,nlgrid);
+
   if(pzweight==0.0)
     return sol.en.E;
 
   // Build the SI part
-  std::vector<arma::cx_mat> Forb;
-  arma::vec Eorb;
-
-  // Build the SI part
   arma::cx_mat CO;
-  if(useref) {
-    CO.zeros(sol.cCa.n_rows,occlista.size()+occlistb.size());
+  CO.zeros(sol.cC.n_rows,occlista.size()+occlistb.size());
+  for(size_t i=0;i<occlista.size();i++)
+    CO.col(i)=sol.cCa.col(occlista[i]);
+  for(size_t i=0;i<occlistb.size();i++)
+    CO.col(i+occlista.size())=sol.cCb.col(occlistb[i]);
+  
+  std::vector<arma::cx_mat> Forb_hlp;
+  arma::vec Eorb_hlp;
+  solverp->PZSIC_Fock(Forb_hlp,Eorb_hlp,CO,oomethod,grid,nlgrid,fock);
+  Eorba=ref_Eorba;
+  for(size_t i=0;i<occlista.size();i++)
+    Eorba(occlista[i])=Eorb_hlp(i);
+  Eorbb=ref_Eorbb;
+  for(size_t i=0;i<occlistb.size();i++)
+    Eorbb(occlistb[i])=Eorb_hlp(i+occlista.size());
+  
+  if(fock) {
+    Forba=ref_Forba;
     for(size_t i=0;i<occlista.size();i++)
-      CO.col(i)=sol.cCa.col(occlista[i]);
+      Forba[occlista[i]]=Forb_hlp[i];
+    
+    Forbb=ref_Forbb;
     for(size_t i=0;i<occlistb.size();i++)
-      CO.col(i+occlista.size())=sol.cCb.col(occlistb[i]);
-
-    solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
-
-    Eorba=ref_Eorba;
-    for(size_t i=0;i<occlista.size();i++)
-      Eorba(occlista[i])=Eorb(i);
-    Eorbb=ref_Eorbb;
-    for(size_t i=0;i<occlistb.size();i++)
-      Eorbb(occlistb[i])=Eorb(i+occlista.size());
-
-    if(fock) {
-      Forba=ref_Forba;
-      for(size_t i=0;i<occlista.size();i++)
-	Forba[occlista[i]]=Forb[i];
-      Forbb=ref_Forbb;
-      for(size_t i=0;i<occlistb.size();i++)
-	Forbb[occlistb[i]]=Forb[i+occlista.size()];
-    }
-  } else {
-    CO.zeros(sol.cCa.n_rows,oa+ob);
-    CO.cols(0,oa-1)=sol.cCa.cols(0,oa-1);
-    if(ob)
-      CO.cols(oa,oa+ob-1)=sol.cCb.cols(0,ob-1);
-    solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
-
-    Eorba=Eorb.subvec(0,oa-1);
-    if(ob)
-      Eorbb=Eorb.subvec(oa,oa+ob-1);
-
-    if(fock) {
-      Forba.resize(oa);
-      for(size_t i=0;i<oa;i++)
-	Forba[i]=Forb[i];
-      if(ob) {
-	Forbb.resize(ob);
-	for(size_t i=0;i<ob;i++)
-	  Forbb[i]=Forb[i+oa];
-      }
-    }
+      Forbb[occlistb[i]]=Forb_hlp(i+occlista.size());
   }
-
+  
   // Result is
   sol.en.Exc-=pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
   sol.en.E-=pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
@@ -1834,259 +945,7 @@ double PZStability::get_E() {
   return eval(x);
 }
 
-double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double dEthr, int preconditioning) {
-  arma::vec x0;
-  if(!count_params())
-    return 0.0;
-  else
-    x0.zeros(count_params());
 
-  double ival=eval(x0);
-  printf("Initial value is % .10f\n",ival);
-
-  // Current and previous gradient
-  arma::vec g, gold;
-  // Search direction
-  arma::vec sd;
-  // Current value
-  double E0(ival);
-  LBFGS lbfgs;
-
-  for(size_t iiter=0;iiter<maxiter;iiter++) {
-    // Evaluate gradient
-    gold=g;
-    {
-      Timer t;
-      g=gradient();
-      print_status(iiter,g,t);
-    }
-    if(arma::norm(g,2)<gthr)
-      break;
-
-    // Update BFGS
-    lbfgs.update(x0,g);
-
-    // Update search direction
-    arma::vec oldsd(sd);
-    switch(preconditioning) {
-    case(0):
-      sd = -g;
-      break;
-
-    case(1):
-      sd = -precondition_unified(g);
-      break;
-
-    case(2):
-      sd = -precondition_orbital(g);
-      break;
-
-    default:
-      throw std::logic_error("Invalid value for PZprec.\n");
-    }
-
-    if(preconditioning && arma::norm_dot(sd,-g)<0.0) {
-      //printf("Projection of preconditioned search direction on gradient is %e.\n",arma::norm_dot(sd,-g));
-      printf("Projection of preconditioned search direction on gradient is %e, not using preconditioning.\n",arma::norm_dot(sd,-g));
-      sd=-g;
-    }
-
-    if(arma::norm(g,2) < nrthr && !cancheck) {
-      // Evaluate Hessian
-      Timer tp;
-      printf("Calculating Hessian ... "); fflush(stdout);
-      arma::mat h(hessian());
-      printf("done (%s)\n",tp.elapsed().c_str()); fflush(stdout);
-
-      // Run eigendecomposition
-      arma::vec hval;
-      arma::mat hvec;
-      bool diagok=arma::eig_sym(hval,hvec,h);
-      if(!diagok)
-	throw std::runtime_error("Error diagonalizing orbital Hessian\n");
-      hval.t().print("Hessian eigenvalues");
-
-      // Enforce positive defitiveness
-      hval+=std::max(0.0,-arma::min(hval))+1e-4;
-
-      // Form new search direction: sd = - H^-1 g
-      sd.zeros(hvec.n_rows);
-      for(size_t i=0;i<hvec.n_cols;i++)
-	sd-=arma::dot(hvec.col(i),g)/hval(i)*hvec.col(i);
-
-      // Backtracking line search
-      double Etr=eval(sd);
-      printf(" %e % .10f\n",1.0,Etr);
-      fflush(stdout);
-
-      double tau=0.7;
-      double Enew=eval(tau*sd);
-      printf(" %e % .10f\n",tau,Enew);
-      fflush(stdout);
-
-      double l=1.0;
-      while(Enew<Etr) {
-	Etr=Enew;
-	l*=tau;
-	Enew=eval(l*tau*sd);
-	printf(" %e % .10f backtrack\n",l*tau,Enew);
-	fflush(stdout);
-      }
-
-      printf("Newton step changed value by %e\n",Etr-E0);
-      fflush(stdout);
-
-      update(l*sd);
-      x0+=l*sd;
-      if(fabs(Etr-E0)<dEthr)
-	break;
-
-      // Accept move
-      E0=Etr;
-      parallel_transport(g,sd,l);
-      continue;
-
-    } else if(!cancheck) { // Use BFGS in OO optimization
-      // New search direction
-      arma::vec sd0(sd);
-      sd=-lbfgs.solve();
-
-      // Check sanity
-      if(arma::dot(sd,-g)<0) {
-	printf("Bad BFGS direction, dot product % e. BFGS reset\n",arma::dot(sd,-g)/arma::dot(g,g));
-	lbfgs.clear();
-	lbfgs.update(x0,g);
-	sd=-lbfgs.solve();
-
-      } else if(iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(gold,gold)) {
-	printf("Powell restart - SD step\n");
-	sd=sd0;
-
-      } else {
-	printf("BFGS step\n");
-	printf("Projection of search direction onto steepest descent direction is %e\n",arma::dot(sd,-g)/sqrt(arma::dot(sd,sd)*arma::dot(g,g)));
-      }
-    } else {
-      if((iiter % std::min(count_params(), (size_t) 10)!=0)) {
-	// Update factor
-	double gamma;
-
-	// Polak-Ribiere
-	gamma=arma::dot(g,g-gold)/arma::dot(gold,gold);
-	// Fletcher-Reeves
-	//gamma=arma::dot(g,g)/arma::dot(gold,gold);
-
-	// Update search direction
-	arma::vec sdnew(sd+gamma*oldsd);
-
-	// Check that new SD is sane
-	if(arma::dot(sdnew,-g)<=0)
-	  // This would take us into the wrong direction!
-	  printf("Bad CG direction. SD step\n");
-	else {
-	  // Update search direction
-	  sd=sdnew;
-	  printf("CG step\n");
-	}
-      } else printf("SD step\n");
-    }
-
-    // Derivative is
-    double dE=arma::dot(sd,g);
-
-    printf(" %e % .10f\n",0.0,E0);
-    fflush(stdout);
-
-    // Update step size
-    update_step(sd);
-    
-    // Initial step size. Don't go too far so that the parabolic
-    // approximation is valid
-    //double d= cancheck ? Tmu/25.0 : Tmu/5.0;
-    double d=Tmu/5.0;
-    // Value at initial step
-    double Ed=eval(d*sd);
-    printf(" %e % .10f\n",d,Ed);
-    fflush(stdout);
-
-    // Optimal step length
-    double step;
-    // Energy for optimal step
-    double Es;
-    // Was fit succesful?
-    bool fitok;
-
-    // Fit parabola
-    double a=(Ed - dE*d - E0)/(d*d);
-    // Predicted energy
-    double Ep;
-    fitok=a>0;
-    if(fitok) {
-      // The optimal step is at
-      step=-dE/(2.0*a);
-      // Predicted energy is
-      Ep=a*step*step + dE*step + E0;
-    }
-
-    // Check step length
-    if(fitok) {
-      if(step>d || step<0.0)
-	fitok=false;
-    }
-
-    // If step is not OK, just use the trial step
-    if(!fitok) {
-      step=d;
-      Es=Ed;
-    } else {
-      // Evaluate energy at trial step
-      Es=eval(step*sd);
-      if(fitok) {
-	printf(" %e % .10f, % e difference from prediction\n",step,Es,Es-Ep);
-	fflush(stdout);
-      }
-    }
-
-    // Did the search work? If not, backtracking line search
-    if(Es>=E0) {
-      double tau=0.7;
-      double Es0=Es;
-      while(step>DBL_EPSILON) {
-	step*=tau;
-	Es0=Es;
-	Es=eval(step*sd);
-	printf(" %e % .10f backtrack\n",step,Es);
-	fflush(stdout);
-	if(Es>Es0 && Es<E0)
-	  break;
-      }
-      // Overstepped
-      step/=tau;
-      Es=Es0;
-    }
-
-    printf("Line search changed value by %e\n",Es-E0);
-    update(step*sd);
-    x0+=step*sd;
-    if(fabs(Es-E0)<dEthr)
-      break;
-
-    // Parallel transport the gradient in the search direction
-    E0=Es;
-    parallel_transport(g,sd,step);
-  }
-
-  printf("Final value is % .10f; optimization changed value by %e\n",E0,E0-ival);
-  // Update grid
-  update_grid(false);
-  // Update reference
-  update_reference(true);
-  // Print info
-  print_info();
-  
-  // Return the change
-  return E0-ival;
-}
 
 
 void PZStability::parallel_transport(arma::vec & gold, const arma::vec & sd, double step) const {
@@ -2505,7 +1364,11 @@ void PZStability::set_params(bool real_, bool imag_, bool can, bool oo) {
   fprintf(stderr,"There are %i parameters.\n",(int) count_params());
 }
 
+<<<<<<< Updated upstream
 void PZStability::set(const rscf_t & sol) {
+=======
+void PZStability::set(const rscf_t & sol, const arma::uvec & fzorbs) {
+>>>>>>> Stashed changes
   Checkpoint *chkptp=solverp->get_checkpoint();
 
   chkptp->read(basis);
@@ -2514,19 +1377,48 @@ void PZStability::set(const rscf_t & sol) {
   rsol=sol;
 
   // Update size parameters
-  restr=true;
+  restr=1;
   int Na;
   chkptp->read("Nel-a",Na);
+<<<<<<< Updated upstream
   ob=oa=Na;
   va=vb=rsol.cC.n_cols-oa;
 
+=======
+
+  // Store orbitals
+  C=sol.cC;
+  
+  // Create orbital groupings
+  orbgroups.resize(3);
+  orblegend.resize(3);
+  
+  orbgroups[0]=fzorbs;
+  orblegend[0]="frozen occupied";
+  // Sanity check
+  for(size_t i=0;i<fzorbs.n_elem;i++)
+    if(fzorbs(i)>=Na)
+      throw std::runtime_error("Can't freeze unoccupied orbital!\n");
+  // Active occupieds
+  std::vector<int> actocc; 
+  for(int io=0;io<Na;io++) {
+    size_t idx(find<arma::uword>(fzorbs,(arma::uword) io));
+    if(idx==std::string::npos)
+      actocc.push_back(io);
+  }
+  orbgroups[1]=arma::conv_to<arma::uvec>::from(inocc);
+  orblegend[1]="active occupied";
+  orbgroups[2]=arma::linspace<arma::uvec>(Na,sol.C.n_cols-1,sol.C.n_cols-Na);
+  orblegend[2]="virtual";
+  
+  // Initialize couplings
+  enabled.zeros(3,3);
+  
+  enabled(1,1)=1; // active - active
+  enabled(1,2)=enabled(2,1)=1; // active - virtual
+  
+>>>>>>> Stashed changes
   chkptp->write("Restricted",1);
-
-  std::vector<std::string> truth(2);
-  truth[0]="false";
-  truth[1]="true";
-
-  fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
 
   // Reconstruct DFT grid
   update_grid(true);
@@ -2556,14 +1448,18 @@ void PZStability::update_grid(bool init) {
   }
 }
     
+<<<<<<< Updated upstream
 void PZStability::set(const uscf_t & sol) {
+=======
+void PZStability::set(const uscf_t & sol, const std::vector<size_t> & fzorbsa, const std::vector<size_t> & fzorbsb) {
+>>>>>>> Stashed changes
   Checkpoint *chkptp=solverp->get_checkpoint();
 
   // Update solution
   usol=sol;
 
   // Update size parameters
-  restr=false;
+  restr=0;
   int Na, Nb;
   chkptp->read("Nel-a",Na);
   chkptp->read("Nel-b",Nb);
@@ -2572,6 +1468,65 @@ void PZStability::set(const uscf_t & sol) {
   va=usol.cCa.n_cols-oa;
   vb=usol.cCb.n_cols-ob;
 
+<<<<<<< Updated upstream
+=======
+  // Store orbitals
+  C.zeros(sol.cCa.n_rows,2*sol.cCa.n_cols);
+  C.cols(0,sol.cCa.n_cols-1)=sol.cCa;
+  C.cols(sol.cCa.n_cols,2*sol.cCa.n_cols-1)=sol.cCb;
+  
+  // Create orbital groupings
+  orbgroups.resize(6);
+  orblegend.resize(6);
+  
+  orbgroups[0]=fzorbsa;
+  orblegend[0]="frozen occupied alpha";
+  // Sanity check
+  for(size_t i=0;i<fzorbsa.n_elem;i++)
+    if(fzorbsa(i)>=Na)
+      throw std::runtime_error("Can't freeze unoccupied orbital!\n");
+    orbgroups[0]=fzorbsa;
+  orblegend[3]="frozen occupied beta";
+  // Sanity check
+  for(size_t i=0;i<fzorbsb.n_elem;i++)
+    if(fzorbsb(i)>=Nb)
+      throw std::runtime_error("Can't freeze unoccupied orbital!\n");
+
+  // Active occupieds
+  {
+    std::vector<int> actocc; 
+    for(int io=0;io<Na;io++) {
+      size_t idx(find<arma::uword>(fzorbsa,(arma::uword) io));
+      if(idx==std::string::npos)
+	actocc.push_back(io);
+    }
+    orbgroups[1]=arma::conv_to<arma::uvec>::from(actocc);
+    orblegend[1]="active occupied alpha";
+
+    actocc.clear();
+    for(int io=0;io<Nb;io++) {
+      size_t idx(find<arma::uword>(fzorbsb,(arma::uword) io));
+      if(idx==std::string::npos)
+	actocc.push_back(io);
+    }
+    orbgroups[4]=arma::conv_to<arma::uvec>::from(actocc);
+    orblegend[4]="active occupied beta";
+  }
+  orbgroups[2]=arma::linspace<arma::uvec>(Na,sol.cCa.n_cols-1,sol.cCa.n_cols-Na);
+  orblegend[2]="virtual alpha";
+  orbgroups[5]=arma::linspace<arma::uvec>(Nb,sol.cCa.n_cols-1,sol.cCa.n_cols-Nb);
+  orblegend[5]="virtual beta";
+  
+  // Initialize couplings
+  enabled.zeros(6,6);
+  
+  enabled(1,1)=1; // active alpha - active alpha
+  enabled(1,2)=enabled(2,1)=1; // active alpha - virtual alpha
+
+  enabled(4,4)=1; // active beta - active beta
+  enabled(4,5)=enabled(5,4)=1; // active beta - virtual beta
+
+>>>>>>> Stashed changes
   chkptp->write("Restricted",0);
   fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
   fflush(stderr);
