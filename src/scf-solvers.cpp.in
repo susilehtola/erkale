@@ -15,13 +15,13 @@
  */
 
 #if defined(RESTRICTED) && defined(DFT)
-void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft)
+void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft0)
 
 #elif defined(RESTRICTED) && defined(HF)
 void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv)
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft)
+void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft0)
 
 #elif defined(UNRESTRICTED) && defined(HF)
 void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
@@ -30,10 +30,10 @@ void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<
 void SCF::ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
 
 #elif defined(DFT) && defined(FULLHOLE)
-size_t XRSSCF::full_hole(uscf_t & sol, convergence_t conv, dft_t dft, bool xch)
+size_t XRSSCF::full_hole(uscf_t & sol, convergence_t conv, dft_t dft0, bool xch)
 
 #elif defined(DFT) && defined(HALFHOLE)
-size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
+size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
 #endif
 {
 
@@ -199,6 +199,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   }
 
 #ifdef DFT
+  // Run with non-local correlation?
+  dft_t dft(dft0);
+  
   // Range separation constants
   double omega, kfull, kshort;
   range_separation(dft.x_func,omega,kfull,kshort);
@@ -388,6 +391,13 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   
   // Loop:
   int iiter=1;
+
+#ifdef DFT
+  // Start out without non-local correlation since it's usually costly
+  // and of minor importance to the density
+  if(dft.nl)
+    dft.nl=false;
+#endif
   
   while(iiter<=maxiter) {
     Timer titer;
@@ -608,6 +618,18 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     }
 
     if(fabs(deltaE)<=conv.deltaEmax && maxdiff_cvd<=conv.deltaPmax && rmsdiff_cvd<=conv.deltaPrms) {
+#ifdef DFT
+      if(dft0.nl && !dft.nl) {
+	if(verbose) {
+	  printf("Turning on non-local correlation contributions\n");
+	  fprintf(stderr,"Turning on non-local correlation contributions\n");
+	}
+	dft.nl=true;
+	diis.clear();
+	continue;
+      }
+#endif
+      
       // Increment amount of converged iterations
       convd++;
 
