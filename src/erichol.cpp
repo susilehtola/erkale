@@ -606,11 +606,14 @@ arma::mat ERIchol::calcK(const arma::vec & C) const {
   return v*arma::trans(v);
 }
 
-arma::cx_mat ERIchol::calcK(const arma::cx_vec & C) const {
+arma::cx_mat ERIchol::calcK(const arma::cx_vec & C0) const {
+  // Need to complex conjugate C
+  arma::cx_vec C(arma::conj(C0));
+  
   // K_uv = C_r C_s (ur|vs) = (L^P_ur C_r) (L^P_vs Cs)
   arma::cx_mat v(C.n_rows,B.n_cols);
   v.zeros();
-  
+
   // First part: diagonal and above diagonal
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -667,6 +670,7 @@ arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const std::vector<double> & 
       K+=wK;
 #endif
     }
+  
   return K;
 }
 
