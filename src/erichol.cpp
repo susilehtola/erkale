@@ -583,7 +583,7 @@ arma::mat ERIchol::calcJ(const arma::mat & P) const {
   
 arma::mat ERIchol::calcK(const arma::vec & C) const {
   // K_uv = C_r C_s (ur|vs) = (L^P_ur C_r) (L^P_vs Cs)
-  arma::mat v(C.n_rows,B.n_cols);
+  arma::mat v(C.n_elem,B.n_cols);
   v.zeros();
 
   // First part: diagonal and above diagonal
@@ -611,7 +611,7 @@ arma::cx_mat ERIchol::calcK(const arma::cx_vec & C0) const {
   arma::cx_vec C(arma::conj(C0));
   
   // K_uv = C_r C_s (ur|vs) = (L^P_ur C_r) (L^P_vs Cs)
-  arma::cx_mat v(C.n_rows,B.n_cols);
+  arma::cx_mat v(C.n_elem,B.n_cols);
   v.zeros();
 
   // First part: diagonal and above diagonal
