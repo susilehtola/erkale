@@ -957,52 +957,52 @@ void PZStability::print_info() {
   arma::vec x(count_params());
   x.zeros();
 
+  rscf_t rsl;
+  uscf_t usl;
+  
   if(restr) {
     // Evaluate orbital matrices
-    rscf_t sol;
     std::vector<arma::cx_mat> Forb;
     arma::vec Eorb;
-    eval(x,sol,Forb,Eorb,true,true,pzw,true);
+    eval(x,rsl,Forb,Eorb,true,true,pzw,true);
 
     // Occupied orbitals
-    arma::cx_mat CO=sol.cC.cols(0,oa-1);
+    arma::cx_mat CO=rsl.cC.cols(0,oa-1);
     // Virtuals
     arma::cx_mat CV;
     if(va)
-      CV=sol.cC.cols(oa,oa+va-1);
+      CV=rsl.cC.cols(oa,oa+va-1);
 
     // Diagonalize
-    print_info(CO,CV,Forb,get_H(sol),Eorb);
+    print_info(CO,CV,Forb,get_H(rsl),Eorb);
   } else {
     // Evaluate orbital matrices
-    uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    eval(x,sol,Forba,Eorba,Forbb,Eorbb,true,true,pzw,true);
+    eval(x,usl,Forba,Eorba,Forbb,Eorbb,true,true,pzw,true);
 
     // Occupied orbitals
-    arma::cx_mat COa=sol.cCa.cols(0,oa-1);
+    arma::cx_mat COa=usl.cCa.cols(0,oa-1);
     arma::cx_mat COb;
     if(ob)
-      COb=sol.cCb.cols(0,ob-1);
+      COb=usl.cCb.cols(0,ob-1);
     // Virtuals
     arma::cx_mat CVa;
     if(va)
-      CVa=sol.cCa.cols(oa,oa+va-1);
+      CVa=usl.cCa.cols(oa,oa+va-1);
     arma::cx_mat CVb;
     if(vb)
-      CVb=sol.cCb.cols(ob,ob+vb-1);
+      CVb=usl.cCb.cols(ob,ob+vb-1);
 
     // Diagonalize
     printf("\n **** Alpha orbitals ****\n");
-    print_info(COa,CVa,Forba,get_H(sol,false),Eorba);
+    print_info(COa,CVa,Forba,get_H(usl,false),Eorba);
     printf("\n **** Beta  orbitals ****\n");
-    print_info(COb,CVb,Forbb,get_H(sol,true),Eorbb);
+    print_info(COb,CVb,Forbb,get_H(usl,true),Eorbb);
   }
 
-
   // Print total energy and its components
-  energy_t en = restr ? rsol.en : usol.en;
+  energy_t en = restr ? rsl.en : usl.en;
   printf("\n");
   printf("%-21s energy: % .16e\n","Kinetic",en.Ekin);
   printf("%-21s energy: % .16e\n","Nuclear attraction",en.Enuca);
