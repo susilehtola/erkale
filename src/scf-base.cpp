@@ -46,16 +46,18 @@ extern "C" {
 
 // Threshold for imaginary component in orbitals
 #define IMAGTHR 1e-12
+// Threshold for Cholesky decomposition of SAD density matrix
+#define CHOLCTHR 1e-6
 
 enum guess_t parse_guess(const std::string & val) {
   if(stricmp(val,"Core")==0)
-    return COREGUESS;
+    return CORE_GUESS;
+  else if(stricmp(val,"SAD")==0 || stricmp(val,"Atomic")==0)
+    return SAD_GUESS;
+  else if(stricmp(val,"NO")==0)
+    return NO_GUESS;
   else if(stricmp(val,"GWH")==0)
-    return GWHGUESS;
-  else if(stricmp(val,"Atomic")==0)
-    return ATOMGUESS;
-  else if(stricmp(val,"Molecular")==0)
-    return MOLGUESS;
+    return GWH_GUESS;
   else
     throw std::runtime_error("Guess type not supported.\n");
 }
@@ -1676,9 +1678,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   enum guess_t guess=parse_guess(set.get_string("Guess"));
   // Freeze core orbitals?
   bool freezecore=set.get_bool("FreezeCore");
-  if(freezecore && guess==COREGUESS)
+  if(freezecore && guess==CORE_GUESS)
     throw std::runtime_error("Cannot freeze core orbitals with core guess!\n");
-  if(freezecore && guess==GWHGUESS)
+  if(freezecore && guess==GWH_GUESS)
     throw std::runtime_error("Cannot freeze core orbitals with GWH guess!\n");
 
   // Amount of electrons
@@ -1749,22 +1751,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       // Orbitals
       basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C,Nel_alpha);
 
-    } else if(guess == ATOMGUESS) {
+    } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
       sol.P=atomic_guess(basis,set);
-
-    } else if(guess == MOLGUESS) {
-      // Need to generate the starting guess.
-      std::string name;
-      molecular_guess(basis,set,name);
-
-      // Load guess orbitals
-      {
-	Checkpoint guesschk(name,false);
-	guesschk.read("C",sol.C);
-	guesschk.read("E",sol.E);
-      }
-      // and remove the temporary file
-      remove(name.c_str());
     }
 
     // Get orbital occupancies
@@ -1795,33 +1783,32 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Handle guesses
     if(!doload) {
-      if(guess==COREGUESS)
+      if(guess==CORE_GUESS)
 	solver.core_guess(sol);
-      else if(guess==GWHGUESS)
+      else if(guess==GWH_GUESS)
 	solver.gwh_guess(sol);
-      else if(guess==ATOMGUESS) {
-	// Build Fock operator from SAD density matrix
-	bool NO=false;
-	if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-	  NO=true;
+      else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
+	// Build Fock operator from SAD density matrix. Get natural orbitals
+	arma::vec occ;
+	form_NOs(sol.P,solver.get_S(),sol.C,occ);
 
-	if(NO) {
-	  // Use natural orbitals
-	  arma::vec occ;
-	  form_NOs(sol.P,solver.get_S(),sol.C,occ);
-	} else {
-	  std::vector<double> occ;
+	
+	if(guess==SAD_GUESS) {
+	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
 	  size_t maxiter(solver.get_maxiter());
 	  solver.set_maxiter(0);
+
+
+
 	  if(hf || rohf)
-	    solver.RHF(sol,occ,conv);
+	    solver.RHF(sol,goccs,conv);
 	  else {
 	    dft_t nonl(dft);
 	    nonl.nl=false;
-	    solver.RDFT(sol,occ,conv,nonl);
+	    solver.RDFT(sol,goccs,conv,nonl);
 	  }
 	  solver.set_maxiter(maxiter);
-
+	  
 	  // Do the diagonalization
 	  diagonalize(solver.get_S(),solver.get_Sinvh(),sol,0.0);
 	}
@@ -1916,6 +1903,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    W.eye(Nel_alpha,Nel_alpha);
 	  }
 	} else { // No entry in checkpoint
+	  sol.cC=sol.C*COMPLEX1;
 	  if(!pzoo) {
 	    W.eye(Nel_alpha,Nel_alpha);
 	  } else {
@@ -2064,24 +2052,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb,Nel_beta);
       }
 
-    } else if(guess == ATOMGUESS) {
+    } else if(guess==SAD_GUESS || guess==NO_GUESS) {
       sol.P=atomic_guess(basis,set);
-
-    } else if(guess == MOLGUESS) {
-      // Need to generate the starting guess.
-      std::string name;
-      molecular_guess(basis,set,name);
-
-      // Load guess orbitals
-      {
-	Checkpoint guesschk(name,false);
-	guesschk.read("Ca",sol.Ca);
-	guesschk.read("Ea",sol.Ea);
-	guesschk.read("Cb",sol.Cb);
-	guesschk.read("Eb",sol.Eb);
-      }
-      // and remove the temporary file
-      remove(name.c_str());
     }
 
     // Get orbital occupancies
@@ -2113,37 +2085,32 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Handle guesses
     if(!doload) {
-      if(guess==COREGUESS)
+      if(guess==CORE_GUESS)
 	solver.core_guess(sol);
-      else if(guess==GWHGUESS)
+      else if(guess==GWH_GUESS)
 	solver.gwh_guess(sol);
-      else if(guess==ATOMGUESS) {
-	// Build Fock operator from SAD density matrix
-	bool NO=false;
-	if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-	  NO=true;
-
-	if(NO) {
-	  // Use natural orbitals
-	  arma::vec occs;
-	  form_NOs(sol.P,solver.get_S(),sol.Ca,occs);
-	  sol.Cb=sol.Ca;
-	} else {
-	  std::vector<double> occs;
+      else if((guess==SAD_GUESS) || (guess==NO_GUESS)) {
+	// Build Fock operator from SAD density matrix. Get natural orbitals
+	arma::vec occ;
+	form_NOs(sol.P,solver.get_S(),sol.Ca,occ);
+	sol.Cb=sol.Ca;
+	
+	if(guess==SAD_GUESS) {
+	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
 	  size_t maxiter(solver.get_maxiter());
 	  solver.set_maxiter(0);
-
 	  rscf_t rsol;
 	  rsol.P=sol.P;
-	  if(hf||rohf)
-	    solver.RHF(rsol,occs,conv);
+	  rsol.C=sol.Ca;
+	  if(hf || rohf)
+	    solver.RHF(rsol,goccs,conv);
 	  else {
 	    dft_t nonl(dft);
 	    nonl.nl=false;
-	    solver.RDFT(rsol,occs,conv,nonl);
+	    solver.RDFT(rsol,goccs,conv,nonl);
 	  }
 	  solver.set_maxiter(maxiter);
-
+	  
 	  // Do the diagonalization
 	  diagonalize(solver.get_S(),solver.get_Sinvh(),rsol,0.0);
 	  sol.Ca=sol.Cb=rsol.C;
@@ -2255,6 +2222,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    Wa.eye(Nel_alpha,Nel_alpha);
 	  }
 	} else { // No entry in checkpoint
+	  sol.cCa=sol.Ca*COMPLEX1;
 	  if(!pzoo) {
 	    Wa.eye(Nel_alpha,Nel_alpha);
 	  } else {
@@ -2316,6 +2284,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    Wb.eye(Nel_beta,Nel_beta);
 	  }
 	} else { // No entry in checkpoint
+	  sol.cCb=sol.Cb*COMPLEX1;
+	  
 	  if(!pzoo) {
 	    Wb.eye(Nel_beta,Nel_beta);
 	  } else {
