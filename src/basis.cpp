@@ -2756,9 +2756,10 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
 
   // Projected orbitals
   MOs.cols(0,nocc-1)=Sinv*S12*oldMOs.cols(0,nocc-1);
-  // and energies
-  E.subvec(0,nocc-1)=oldE.subvec(0,nocc-1);
-  
+  // and energies. PZ calculations might not have energies stored!
+  size_t nE=std::min((arma::uword) nocc,oldE.n_elem);
+  if(nE>0)
+    E.subvec(0,nE-1)=oldE.subvec(0,nE-1);
   // Overlap of projected orbitals is
   arma::mat SMO=arma::trans(MOs.cols(0,nocc-1))*S11*MOs.cols(0,nocc-1);
 
@@ -2796,7 +2797,8 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
     // eigenvectors.
     MOs.cols(nocc,Nind-1)=Cnew.cols(nocc,Nind-1);
     // Dummy energies
-    E.subvec(nocc,Nind-1)=1.1*std::max(E(nocc-1),0.0)*arma::ones(Nind-nocc,1);
+    if(nE==nocc)
+      E.subvec(nocc,Nind-1)=1.1*std::max(E(nocc-1),0.0)*arma::ones(Nind-nocc,1);
   }
   
   // Failsafe
