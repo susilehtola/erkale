@@ -83,9 +83,9 @@ export GSLVER="1.16"
 export XCVER="svn"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="5.600.2"
-export CMAKEVER="3.3.1"
-export HDF5VER="1.8.15"
+export ARMAVER="6.500.4"
+export CMAKEVER="3.4.1"
+export HDF5VER="1.8.16"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
