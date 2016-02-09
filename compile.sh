@@ -84,7 +84,7 @@ export XCVER="svn"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
 export ARMAVER="6.500.4"
-export CMAKEVER="3.4.1"
+export CMAKEVER="3.4.3"
 export HDF5VER="1.8.16"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
@@ -267,7 +267,7 @@ if(( ! ${system_cmake} )); then
 	if [ ! -d ${builddir}/cmake-${CMAKEVER} ]; then
 	    if [ ! -f ${srcdir}/cmake-${CMAKEVER}.tar.gz ]; then
 		cd ${srcdir}
-		wget -O cmake-${CMAKEVER}.tar.gz http://www.cmake.org/files/v3.1/cmake-${CMAKEVER}.tar.gz
+		wget -O cmake-${CMAKEVER}.tar.gz http://www.cmake.org/files/v3.4/cmake-${CMAKEVER}.tar.gz
 	    fi
 	    cd ${builddir}
 	    tar zxf ${srcdir}/cmake-${CMAKEVER}.tar.gz
