@@ -163,19 +163,31 @@ int main(int argc, char ** argv) {
     if(fabs(dE) > Etol) throw std::runtime_error("Total energies don't match!\n");
     
     // Densities
-    arma::mat Pref, Pcur;
-    ref.read("P",Pref);
-    cur.read("P",Pcur);
+    arma::cx_mat Pref, Pcur;
+    arma::mat Prefr, Prefi, Pcurr, Pcuri;
+    ref.read("P",Prefr);
+    if(ref.exist("P_im")) {
+      ref.read("P_im",Prefi);
+      Pref=Prefr*COMPLEX1 + Prefi*COMPLEXI;
+    } else
+      Pref=Prefr*COMPLEX1;
+    
+    cur.read("P",Pcurr);
+    if(cur.exist("P_im")) {
+      cur.read("P_im",Pcuri);
+      Pcur=Pcurr*COMPLEX1 + Pcuri*COMPLEXI;
+    } else
+      Pcur=Pcurr*COMPLEX1;
 
     // Check norm
-    double Nelnum=arma::trace(Pcur*S);
+    double Nelnum=std::real(arma::trace(Pcur*S));
     double dNel=Nelnum-Nelc;
     printf("Electron count difference %e\n",dNel);
     fflush(stdout);
     if(fabs(dNel)>dPtol) throw std::runtime_error("Norm of density matrix is wrong.\n");
     
     // Check difference
-    double dP=rms_norm(Pcur-Pref);
+    double dP=rms_cnorm(Pcur-Pref);
     printf("Density matrix difference %e\n",dP);
     if(dP>dPtol) throw std::runtime_error("Density matrices differ!\n");
     
@@ -216,7 +228,7 @@ int main(int argc, char ** argv) {
     arma::mat mom=emd.moments();
     
     // Compare <p^2> with T and <p^0> with tr(P*S)
-    double p0diff=mom(2,1)-arma::trace(Pcur*S);
+    double p0diff=mom(2,1)-std::real(arma::trace(Pcur*S));
     double p0err=mom(2,2);
     printf("<p^0> - N = % e, d<p^0> = %e\n",p0diff,p0err);
     double p2diff=mom(4,1)-2.0*Ec.Ekin;
@@ -249,19 +261,31 @@ int main(int argc, char ** argv) {
     if(fabs(dE) > Etol) throw std::runtime_error("Total energies don't match!\n");
     
     // Densities
-    arma::mat Paref, Pbref, Pref;
-    arma::mat Pacur, Pbcur, Pcur;
+    arma::mat Paref, Pbref, Prefr, Prefi;
+    arma::mat Pacur, Pbcur, Pcurr, Pcuri;
+    arma::cx_mat Pcur, Pref;
     ref.read("Pa",Paref);
     ref.read("Pb",Pbref);
-    ref.read("P",Pref);
+    ref.read("P",Prefr);
+    if(ref.exist("P_im")) {
+      ref.read("P_im",Prefi);
+      Pref=Prefr*COMPLEX1 + Prefi*COMPLEXI;
+    } else
+      Pref=Prefr*COMPLEX1;
+    
     cur.read("Pa",Pacur);
     cur.read("Pb",Pbcur);
-    cur.read("P",Pcur);
-
+    cur.read("P",Pcurr);
+    if(cur.exist("P_im")) {
+      cur.read("P_im",Pcuri);
+      Pcur=Pcurr*COMPLEX1 + Pcuri*COMPLEXI;
+    } else
+      Pcur=Pcurr*COMPLEX1;
+    
     // Check norm
     double Nelanum=arma::trace(Pacur*S);
     double Nelbnum=arma::trace(Pbcur*S);
-    double Nelnum=arma::trace(Pcur*S);
+    double Nelnum=std::real(arma::trace(Pcur*S));
 
     // XRS calculation?
     bool xrs, xrsspin;
@@ -318,7 +342,7 @@ int main(int argc, char ** argv) {
     printf("Beta  density matrix difference %e\n",dPb);
     if(dPb>dPtol) throw std::runtime_error("Density matrices differ!\n");
 
-    double dP=rms_norm(Pcur-Pref);
+    double dP=rms_cnorm(Pcur-Pref);
     printf("Total density matrix difference %e\n",dP);
     if(dP >dPtol) throw std::runtime_error("Total density matrices differ!\n");
 
@@ -379,7 +403,7 @@ int main(int argc, char ** argv) {
     arma::mat mom=emd.moments();
         
     // Compare <p^2> with T and <p^0> with tr(P*S)
-    double p0diff=mom(2,1)-arma::trace(Pcur*S);
+    double p0diff=mom(2,1)-std::real(arma::trace(Pcur*S));
     double p0err=mom(2,2);
     printf("<p^0> - N = %e, d<p^0> = %e\n",p0diff,p0err);
     double p2diff=mom(4,1)-2.0*Ec.Ekin;
