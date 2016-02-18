@@ -1009,12 +1009,9 @@ void PZStability::print_info() {
   printf("%-21s energy: % .16e\n","Total one-electron",en.Eone);
   printf("%-21s energy: % .16e\n","Nuclear repulsion",en.Enucr);
   printf("%-21s energy: % .16e\n","Coulomb",en.Ecoul);
-  #ifndef DFT
-  printf("%-21s energy: % .16e\n","Exchange",en.Exc);
-  #else
   printf("%-21s energy: % .16e\n","Exchange-correlation",en.Exc);
   printf("%-21s energy: % .16e\n","Non-local correlation",en.Enl);
-  #endif
+  printf("%-21s energy: % .16e\n","Self-interaction correction",en.Esic);
   printf("-----------------------------------------------------\n");
   printf("%28s: % .16e\n","Total energy",en.E);
   printf("%28s: % .16e\n","Virial factor",-en.E/en.Ekin);
@@ -1145,8 +1142,8 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
     solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
   }
 
-  sol.en.Exc-=2.0*pzweight*arma::sum(Eorb);
-  sol.en.E-=2.0*pzweight*arma::sum(Eorb);
+  sol.en.Esic=-2.0*pzweight*arma::sum(Eorb);
+  sol.en.E+=sol.en.Esic;
   
   return sol.en.E;
 }
@@ -1278,8 +1275,8 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   }
 
   // Result is
-  sol.en.Exc-=pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
-  sol.en.E-=pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
+  sol.en.Esic=-pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
+  sol.en.E+=sol.en.Esic;
   return sol.en.E;
 }
 
@@ -2160,12 +2157,16 @@ void PZStability::update(const arma::vec & x) {
     }
   }
 
+  // Update reference, without sort
+  update_reference(false);
+
   // Update orbitals in checkpoint file
   Checkpoint *chkptp=solverp->get_checkpoint();
   if(restr) {
     chkptp->cwrite("CW",rsol.cC);
     chkptp->write(rsol.en);
     chkptp->write("P",rsol.P);
+    chkptp->write("P_im",rsol.P_im);
   } else {
     chkptp->cwrite("CWa",usol.cCa);
     chkptp->write(usol.en);
@@ -2174,10 +2175,10 @@ void PZStability::update(const arma::vec & x) {
     chkptp->write("P",usol.P);
     chkptp->write("Pa",usol.Pa);
     chkptp->write("Pb",usol.Pb);
-  }
 
-  // Update reference, without sort
-  update_reference(false);
+    arma::mat P_im(arma::imag(usol.Pa+usol.Pb));
+    chkptp->write("P_im",P_im);
+  }
 }
 
 arma::cx_mat PZStability::get_H(const rscf_t & sol) const {
@@ -2256,7 +2257,6 @@ void PZStability::update_reference(bool sort) {
       rsol=sol;
       ref_Eorb=Eorb;
       ref_Forb=Forb;
-
     }
 
   } else {

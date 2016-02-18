@@ -98,6 +98,8 @@ typedef struct {
   double Enucr;
   /// Non-local energy
   double Enl;
+  /// Self-interaction energy
+  double Esic;
 
   /// Total energy
   double E;

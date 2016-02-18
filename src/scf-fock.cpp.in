@@ -696,6 +696,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     }
   }
 
+  // No self-interaction
+  sol.en.Esic=0.0;
 
   // Non-local correlation?
   if(dft.nl) {
