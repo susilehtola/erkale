@@ -139,7 +139,7 @@ class EMDEvaluator {
   std::vector< std::vector< std::complex<double> > > YLM;
 
   /// The density matrix
-  arma::mat P;
+  arma::cx_mat P;
 
   /// Maximum value of L
   int Lmax;
@@ -190,7 +190,7 @@ class EMDEvaluator {
    *
    * (lp,mp) is the final spherical harmonic value.
    */
-  EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv, int lp=0, int mp=0);
+  EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::cx_mat & Pv, int lp=0, int mp=0);
 
   /// Destructor
   ~EMDEvaluator();

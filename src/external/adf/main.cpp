@@ -273,7 +273,8 @@ SlaterEMDEvaluator get_eval(arma::mat & P) {
     printf("%3i % f % f % f\n",(int) i+1, coord[i].x, coord[i].y, coord[i].z);
   */
 
-  return SlaterEMDEvaluator(radf,idf,clm,loc,coord,P);
+  arma::cx_mat Phlp=P*COMPLEX1;
+  return SlaterEMDEvaluator(radf,idf,clm,loc,coord,Phlp);
 }
 
 arma::mat form_density() {

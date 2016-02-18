@@ -22,7 +22,7 @@
 #include <omp.h>
 #endif
 
-void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & px_arr, const std::vector<double> & py_arr, const std::vector<double> & pz_arr) {
+void emd_cube(const BasisSet & bas, const arma::cx_mat & P, const std::vector<double> & px_arr, const std::vector<double> & py_arr, const std::vector<double> & pz_arr) {
   // Get expansions of functions
   std::vector< std::vector<size_t> > idents;
   std::vector< std::vector<GTO_Fourier> > fourier=fourier_expand(bas,idents);

@@ -275,7 +275,7 @@ std::vector< std::vector<RadialGaussian> > form_radial(const BasisSet & bas) {
 GaussianEMDEvaluator::GaussianEMDEvaluator() {
 }
 
-GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat & Pv, int lp, int mp) {
+GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::cx_mat & Pv, int lp, int mp) {
   // Check size of P
   if(Pv.n_cols!=Pv.n_rows) {
     ERROR_INFO();
@@ -324,7 +324,7 @@ GaussianEMDEvaluator::GaussianEMDEvaluator(const BasisSet & bas, const arma::mat
   //  check_norm();
 }
 
-GaussianEMDEvaluator::GaussianEMDEvaluator(const std::vector< std::vector<RadialGaussian> > & radfv, const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv, int lp, int mp) : EMDEvaluator(idfuncsv,clm,locv,coord,Pv,lp,mp) {
+GaussianEMDEvaluator::GaussianEMDEvaluator(const std::vector< std::vector<RadialGaussian> > & radfv, const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::cx_mat & Pv, int lp, int mp) : EMDEvaluator(idfuncsv,clm,locv,coord,Pv,lp,mp) {
   // Set the radial functions
   radf=radfv;
   // and assign the necessary pointers

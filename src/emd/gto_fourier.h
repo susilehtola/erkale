@@ -190,6 +190,6 @@ class BasisSet;
 std::vector< std::vector<GTO_Fourier> > fourier_expand(const BasisSet & bas, std::vector< std::vector<size_t> > & idents);
 
 /// Evaluate EMD
-double eval_emd(const BasisSet & basis, const arma::mat & P, const std::vector< std::vector<GTO_Fourier> > & fourier, const std::vector< std::vector<size_t> > & idents, double px, double py, double pz);
+double eval_emd(const BasisSet & basis, const arma::cx_mat & P, const std::vector< std::vector<GTO_Fourier> > & fourier, const std::vector< std::vector<size_t> > & idents, double px, double py, double pz);
 
 #endif

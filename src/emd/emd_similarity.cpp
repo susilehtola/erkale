@@ -90,7 +90,7 @@ arma::vec emd_moments(const std::vector<double> & rad, const std::vector<double>
   return mom;
 }
 
-void fill_mesh(const BasisSet & basis, const arma::mat & P, const std::vector<double> & rad, const std::vector<lebedev_point_t> & angmesh, std::vector< std::vector<double> > & emd) {
+void fill_mesh(const BasisSet & basis, const arma::cx_mat & P, const std::vector<double> & rad, const std::vector<lebedev_point_t> & angmesh, std::vector< std::vector<double> > & emd) {
   // List of identical functions
   std::vector< std::vector<size_t> > idents;
   // Fourier transforms
@@ -114,7 +114,7 @@ void fill_mesh(const BasisSet & basis, const arma::mat & P, const std::vector<do
   }
 }
 
-arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const BasisSet & basis_b, const arma::mat & P_b, int nrad, int lmax, bool verbose) {
+arma::cube emd_overlap(const BasisSet & basis_a, const arma::cx_mat & P_a, const BasisSet & basis_b, const arma::cx_mat & P_b, int nrad, int lmax, bool verbose) {
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);
@@ -185,8 +185,8 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::mat & P_a, const Ba
   return ret;
 }
 
-std::vector<double> evaluate_projection(const BasisSet & basis, const arma::mat & P, const std::vector<double> rad, int l, int m) {
-  int Nel=round(arma::trace(P*basis.overlap()));
+std::vector<double> evaluate_projection(const BasisSet & basis, const arma::cx_mat & P, const std::vector<double> rad, int l, int m) {
+  int Nel=round(std::real(arma::trace(P*basis.overlap())));
 
   GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,P,l,std::abs(m));
   GaussianEMDEvaluator *negeval=NULL;
@@ -231,7 +231,7 @@ double similarity_quadrature_semi(const std::vector<double> & rad, const std::ve
   return sim;
 }
 
-arma::cube emd_overlap_semi(const BasisSet & basis_a, const arma::mat & P_a, const BasisSet & basis_b, const arma::mat & P_b, int nrad, int lmax, bool verbose) {
+arma::cube emd_overlap_semi(const BasisSet & basis_a, const arma::cx_mat & P_a, const BasisSet & basis_b, const arma::cx_mat & P_b, int nrad, int lmax, bool verbose) {
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;
   radial_chebyshev(nrad,rad,wrad);

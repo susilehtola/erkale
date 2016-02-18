@@ -25,7 +25,7 @@ class BasisSet;
 /**
  * Compute the EMD in a cube, save output to emdcube.dat
  */
-void emd_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & px, const std::vector<double> & py, const std::vector<double> & pz);
+void emd_cube(const BasisSet & bas, const arma::cx_mat & P, const std::vector<double> & px, const std::vector<double> & py, const std::vector<double> & pz);
 
 
 #endif

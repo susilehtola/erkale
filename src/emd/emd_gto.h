@@ -64,9 +64,9 @@ class GaussianEMDEvaluator : public EMDEvaluator {
   /// Dummy constructor
   GaussianEMDEvaluator();
   /// Constructor
-  GaussianEMDEvaluator(const BasisSet & bas, const arma::mat & P, int l=0, int m=0);
+  GaussianEMDEvaluator(const BasisSet & bas, const arma::cx_mat & P, int l=0, int m=0);
   /// Constructor
-  GaussianEMDEvaluator(const std::vector< std::vector<RadialGaussian> > & radf, const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv, int l=0, int m=0);
+  GaussianEMDEvaluator(const std::vector< std::vector<RadialGaussian> > & radf, const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::cx_mat & Pv, int l=0, int m=0);
   /// Destructor
   ~GaussianEMDEvaluator();
 

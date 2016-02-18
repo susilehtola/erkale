@@ -363,7 +363,7 @@ std::vector< std::vector<GTO_Fourier> > fourier_expand(const BasisSet & bas, std
   return fourier;
 }
 
-double eval_emd(const BasisSet & bas, const arma::mat & P, const std::vector< std::vector<GTO_Fourier> > & fourier, const std::vector< std::vector<size_t> > & idents, double px, double py, double pz) {
+double eval_emd(const BasisSet & bas, const arma::cx_mat & P, const std::vector< std::vector<GTO_Fourier> > & fourier, const std::vector< std::vector<size_t> > & idents, double px, double py, double pz) {
   if(fourier.size() != idents.size()) {
     ERROR_INFO();
     std::ostringstream oss;
@@ -411,9 +411,9 @@ double eval_emd(const BasisSet & bas, const arma::mat & P, const std::vector< st
   for(size_t i=0;i<Nbf;i++) {
     // Off-diagonal
     for(size_t j=0;j<i;j++)
-      emd+=2.0*P(i,j)*std::real(std::conj(fvals[i])*fvals[j]);
+      emd+=2.0*std::real(P(i,j)*std::conj(fvals[i])*fvals[j]);
     // Diagonal
-    emd+=P(i,i)*std::norm(fvals[i]);
+    emd+=std::real(P(i,i))*std::norm(fvals[i]);
   }
   
   return emd;
