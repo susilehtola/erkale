@@ -1011,7 +1011,7 @@ void PZStability::print_info() {
   printf("%-21s energy: % .16e\n","Coulomb",en.Ecoul);
   printf("%-21s energy: % .16e\n","Exchange-correlation",en.Exc);
   printf("%-21s energy: % .16e\n","Non-local correlation",en.Enl);
-  printf("%-21s energy: % .16e\n","Self-interaction correction",en.Esic);
+  printf("%-21s energy: % .16e\n","SI correction",en.Esic);
   printf("-----------------------------------------------------\n");
   printf("%28s: % .16e\n","Total energy",en.E);
   printf("%28s: % .16e\n","Virial factor",-en.E/en.Ekin);
