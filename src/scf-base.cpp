@@ -45,7 +45,7 @@ extern "C" {
 }
 
 // Threshold for imaginary component in orbitals
-#define IMAGTHR 1e-12
+#define IMAGTHR 1e-7
 // Threshold for Cholesky decomposition of SAD density matrix
 #define CHOLCTHR 1e-6
 
@@ -1856,8 +1856,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int seed=set.get_int("PZseed");
       dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
 
-      printf("pzloc = %i\n",pzloc);
-      
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve restricted DFT problem first on a rough grid
