@@ -1911,6 +1911,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      W=complex_unitary(Nel_alpha,seed);
 	  }
 	  if(pzloc==-1) pzloc=1;
+	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
+	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
+	  if(sol.C.n_cols>(size_t) Nel_alpha)
+	    sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
 	}
 
 	if(pzloc==1) {
@@ -2230,6 +2234,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      Wa=complex_unitary(Nel_alpha,seed);
 	  }
 	  if(pzloc==-1) pzloc=1;
+	  sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
+	  sol.cCa.cols(0,Nel_alpha-1)=sol.Ca.cols(0,Nel_alpha-1)*Wa;
+	  if(sol.Ca.n_cols>(size_t) Nel_alpha)
+	    sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
 	}
 
 	if(pzloc==1) {
@@ -2293,6 +2301,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      Wb=complex_unitary(Nel_beta,seed);
 	  }
 	  if(pzloc==-1) pzloc=1;
+	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
+	  if(sol.Cb.n_cols>(size_t) Nel_beta)
+	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
 	}
 
 	if(pzloc==1) {
