@@ -2142,6 +2142,21 @@ void PZStability::parallel_transport(arma::vec & gold, const arma::vec & sd, dou
   }
 }
 
+inline void orthonormalize(const arma::mat & S, arma::cx_mat & C) {
+  // Orbital overlap
+  arma::cx_mat So(arma::trans(C)*S*C);
+  // Difference from orthonormality
+  arma::cx_mat dS=So-arma::eye<arma::cx_mat>(So.n_rows,So.n_cols);
+  double d=arma::norm(dS,2);
+  if(d>=1e-9) {
+    printf("Difference from orbital orthonormality is %e, orthonormalizing\n",d);
+    orthonormalize(S,C);
+  } else {
+    //printf("Difference from orbital orthonormality is %e, OK\n",d);
+  }
+}
+
+      
 void PZStability::update(const arma::vec & x) {
   if(arma::norm(x,2)!=0.0)  {
     if(restr) {
@@ -2154,6 +2169,18 @@ void PZStability::update(const arma::vec & x) {
 	arma::cx_mat Rb=rotation(x,true);
 	usol.cCb=usol.cCb*Rb;
       }
+    }
+  }
+
+  // Check that orbitals are orthonormal and reorthonormalize if
+  // necessary
+  if(true) {
+    arma::mat S(basis.overlap());
+    if(restr) {
+      orthonormalize(S,rsol.cC);
+    } else {
+      orthonormalize(S,usol.cCa);
+      orthonormalize(S,usol.cCb);
     }
   }
 
