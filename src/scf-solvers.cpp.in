@@ -374,20 +374,13 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       t.set();
     }
     
+    // Calculate dipole moment
+    dipmom=dipole_moment(sol.P,*basisp);
     // Do the diagonalization
     diagonalize(S,Sinvh,sol,shift);
     
     if(verbose)
       printf("done (%s)\n",t.elapsed().c_str());
-
-    printf("Atomic guess done in %s.\n\n",tg.elapsed().c_str());
-
-#if defined(HALFHOLE) || defined(FULLHOLE)
-    throw std::logic_error("XRS calculations can't be started from atomic guess.\n");
-    return 0;
-#else    
-    return;
-#endif
   }
   
   // Loop:
@@ -595,7 +588,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       printf("\nIteration took %s.\n",titer.elapsed().c_str());
       fflush(stdout);
     }
-
+  
     // Sparse output
     if(verbose) {
       fprintf(stderr,"%4i % 16.8f",iiter,sol.en.E);
@@ -689,7 +682,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
   } // End SCF cycle
 
   if(verbose) {
-
+    
     if(converged) {
       std::string method=
 #ifdef RESTRICTED
@@ -709,7 +702,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
       fprintf(stderr,"%s converged in %s.\n",method.c_str(),ttot.elapsed().c_str());
     }
-
+  
     // Print total energy and its components
     printf("\n");
     printf("%-21s energy: % .16e\n","Kinetic",sol.en.Ekin);
@@ -764,7 +757,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       chkptp->write("Force",f);
     }
 
-  } else {
+  } else if(maxiter>0) {
     std::ostringstream oss;
     oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): SCF did not converge in "<<maxiter<<" iterations!\n";
     throw std::runtime_error(oss.str());
