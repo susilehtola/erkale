@@ -1143,7 +1143,8 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
   }
 
   sol.en.Esic=-2.0*pzweight*arma::sum(Eorb);
-  sol.en.E+=sol.en.Esic;
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl+sol.en.Esic;
+  sol.en.E=sol.en.Eel+sol.en.Enucr;
   
   return sol.en.E;
 }
@@ -1276,7 +1277,9 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
 
   // Result is
   sol.en.Esic=-pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
-  sol.en.E+=sol.en.Esic;
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl+sol.en.Esic;
+  sol.en.E=sol.en.Eel+sol.en.Enucr;
+
   return sol.en.E;
 }
 
