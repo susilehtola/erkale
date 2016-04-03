@@ -83,6 +83,14 @@ template <typename T> size_t find(const std::vector<T> & list, const T & val) {
 
   return std::string::npos;
 }
+/// Find element
+template <typename T> size_t find(const arma::Col<T> & list, const T & val) {
+  for(size_t i=0;i<list.n_elem;i++)
+    if(list[i]==val)
+      return i;
+  
+  return std::string::npos;
+}
 
 /// Get element with maximum absolute value
 double max_abs(const arma::mat & R);
