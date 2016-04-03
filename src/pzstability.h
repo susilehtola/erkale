@@ -19,9 +19,43 @@
 #ifndef ERKALE_PZSTAB
 #define ERKALE_PZSTAB
 
-#include "orbital_rotation.h"
 #include "scf.h"
 #include "dftgrid.h"
+class Timer;
+
+class FDHessian {
+ protected:
+  /// Finite difference derivative step size
+  double ss_fd;
+  /// Line search step size
+  double ss_ls;
+
+  /// Print optimization status
+  virtual void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
+
+ public:
+  /// Constructor
+  FDHessian();
+  /// Destructor
+  virtual ~FDHessian();
+
+  /// Get amount of parameters
+  virtual size_t count_params() const=0;
+  /// Evaluate function
+  virtual double eval(const arma::vec & x)=0;
+  /// Update solution
+  virtual void update(const arma::vec & x);
+
+  /// Evaluate finite difference gradient
+  virtual arma::vec gradient();
+  /// Evaluate finite difference gradient at point x
+  virtual arma::vec gradient(const arma::vec & x);
+  /// Evaluate finite difference Hessian
+  virtual arma::mat hessian();
+
+  /// Run optimization
+  virtual double optimize(size_t maxiter=1000, double gthr=1e-4, bool max=false);
+};
 
 /// Classify parameters
 typedef struct {
@@ -32,7 +66,7 @@ typedef struct {
 } pz_rot_par_t;
 
 /// PZ optimizer and stability analysis
-class PZStability: public OrbitalRotation {
+class PZStability: public FDHessian {
  protected:
   /// SCF solver, used for energy calculations
   SCF * solverp;
@@ -54,20 +88,48 @@ class PZStability: public OrbitalRotation {
   rscf_t rsol;
   /// or unrestricted
   uscf_t usol;
-
   /// Reference self-interaction energies
-  arma::vec ref_Eorba, ref_Eorbb;
+  arma::vec ref_Eorb, ref_Eorba, ref_Eorbb;
   /// Reference orbital Fock matrices
-  std::vector<arma::cx_mat> ref_Forba, ref_Forbb;
+  std::vector<arma::cx_mat> ref_Forb, ref_Forba, ref_Forbb;
+
+  /// Real part of transformations?
+  bool real;
+  /// Imaginary part of transformations?
+  bool imag;
+  /// Check stability of canonical orbitals?
+  bool cancheck;
+  /// Check stability of oo block
+  bool oocheck;
 
   /// Spin-restricted?
-  int restr;
+  bool restr;
+  /// Amount of occupied orbitals
+  size_t oa, ob;
+  /// Amount of virtual orbitals
+  size_t va, vb;
 
   /// Maximum step size
   double Tmu;
 
+  /// Count amount of parameters for rotations
+  size_t count_ov_params(size_t o, size_t v) const;
+  /// Count amount of parameters for rotations
+  size_t count_oo_params(size_t o) const;
+  /// Count amount of parameters for rotations
+  size_t count_params(size_t o, size_t v) const;
+  /// Count amount of parameters
+  size_t count_params() const;
+
   /// Classify parameters
   std::vector<pz_rot_par_t> classify() const;
+
+  /// Calculate rotation matrix
+  arma::cx_mat rotation(const arma::vec & x, bool spin=false) const;
+  /// Form rotation parameter matrix
+  arma::cx_mat rotation_pars(const arma::vec & x, bool spin=false) const;
+  /// Calculate matrix exponential
+  arma::cx_mat matexp(const arma::cx_mat & X) const;
 
   /// Construct unified Hamiltonian
   arma::cx_mat unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const;
@@ -149,6 +211,9 @@ class PZStability: public OrbitalRotation {
   /// Print information
   void print_info();
 
+  /// Add in a small random perturbation to the solution
+  void perturb(double h=1e-6);
+  
   /// Run optimization
   virtual double optimize(size_t maxiter=1000, double gthr=1e-4, double nrthr=1e-4, double dEthr=1e-9, int preconditioning=1);
 };
