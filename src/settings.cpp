@@ -86,7 +86,7 @@ void Settings::add_scf_settings() {
   add_string("Occupancies", "Orbital occupancies", "");
 
   // Use core guess? Default is atomic.
-  add_string("Guess","Used guess: atomic (default), core, or GWH","Atomic");
+  add_string("Guess","Used guess: SAD (default), NO, core, or GWH","Atomic");
 
   // Verbose run?
   add_bool("Verbose", "Verbose calculation?", true);
@@ -160,7 +160,7 @@ void Settings::add_dft_settings() {
   add_double("PZNRthr", "Threshold for use of NR method in OO optimization",0.0);
   add_double("PZEthr", "Threshold for energy convergence",1e-10);
   // Initialize PZ-SIC with localized orbitals?
-  add_bool("PZloc", "Initial localization before SIC calculation?", true);
+  add_string("PZloc", "Initial localization before SIC calculation?", "Auto");
   add_string("PZlocmet", "Initial localization method (recommend FB or IAO)", "FB");
   // Run stability analysis for PZ-SIC?
   add_int("PZstab", "Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV", 0, true);

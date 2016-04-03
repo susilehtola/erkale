@@ -676,7 +676,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #if defined(FULLHOLE)
     double rel_diff=xch ? (Nelnum-Nel)*100.0/Nel : (Nelnum+1.0-Nel)*100.0/Nel;
 #elif defined(HALFHOLE)
-    double rel_diff=(Nelnum+0.5-Nel)*100.0/Nel;
+    double rel_diff=(Nelnum+0.5-Nel)*100.0/(Nel-0.5);
 #else
     double rel_diff=(Nelnum-Nel)*100.0/Nel;
 #endif
@@ -696,6 +696,8 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     }
   }
 
+  // No self-interaction
+  sol.en.Esic=0.0;
 
   // Non-local correlation?
   if(dft.nl) {

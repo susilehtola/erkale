@@ -15,13 +15,13 @@
  */
 
 #if defined(RESTRICTED) && defined(DFT)
-void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft)
+void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft0)
 
 #elif defined(RESTRICTED) && defined(HF)
 void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv)
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft)
+void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft0)
 
 #elif defined(UNRESTRICTED) && defined(HF)
 void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
@@ -30,10 +30,10 @@ void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<
 void SCF::ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
 
 #elif defined(DFT) && defined(FULLHOLE)
-size_t XRSSCF::full_hole(uscf_t & sol, convergence_t conv, dft_t dft, bool xch)
+size_t XRSSCF::full_hole(uscf_t & sol, convergence_t conv, dft_t dft0, bool xch)
 
 #elif defined(DFT) && defined(HALFHOLE)
-size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
+size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
 #endif
 {
 
@@ -199,6 +199,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   }
 
 #ifdef DFT
+  // Run with non-local correlation?
+  dft_t dft(dft0);
+  
   // Range separation constants
   double omega, kfull, kshort;
   range_separation(dft.x_func,omega,kfull,kshort);
@@ -325,38 +328,39 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
 
   // Write current matrices to checkpoint.
   // To use the file effectively, we keep it open for the whole shebang.
-  chkptp->open();
-  chkptp->write("tol",intthr);
-  chkptp->write("P",sol.P);
-  chkptp->write("S",S);
-  chkptp->write("Sinvh",Sinvh);
-  chkptp->write(sol.en);
+  if(maxiter>0) {
+    chkptp->open();
+    chkptp->write("tol",intthr);
+    chkptp->write("P",sol.P);
+    chkptp->write("S",S);
+    chkptp->write("Sinvh",Sinvh);
+    chkptp->write(sol.en);
 #if !defined(RESTRICTED)
-  chkptp->write("Ca",sol.Ca);
-  chkptp->write("Cb",sol.Cb);
-
-  chkptp->write("Ea",sol.Ea);
-  chkptp->write("Eb",sol.Eb);
-
-  chkptp->write("Pa",sol.Pa);
-  chkptp->write("Pb",sol.Pb);
-
-  chkptp->write("occa",occar);
-  chkptp->write("occb",occbr);
-
-  // Restricted
-  chkptp->write("Restricted",0);
+    chkptp->write("Ca",sol.Ca);
+    chkptp->write("Cb",sol.Cb);
+    
+    chkptp->write("Ea",sol.Ea);
+    chkptp->write("Eb",sol.Eb);
+    
+    chkptp->write("Pa",sol.Pa);
+    chkptp->write("Pb",sol.Pb);
+    
+    chkptp->write("occa",occar);
+    chkptp->write("occb",occbr);
+    
+    // Restricted
+    chkptp->write("Restricted",0);
 #else
-  chkptp->write("C",sol.C);
-  chkptp->write("E",sol.E);
-  chkptp->write("occs",occr);
-  // Unrestricted
-  chkptp->write("Restricted",1);
+    chkptp->write("C",sol.C);
+    chkptp->write("E",sol.E);
+    chkptp->write("occs",occr);
+    // Unrestricted
+    chkptp->write("Restricted",1);
 #endif
-  chkptp->write("Converged",converged);
-  chkptp->close();
-
-  if(maxiter==0) {
+    chkptp->write("Converged",converged);
+    chkptp->close();
+    
+  } else {
     Timer tg;
     // Form the Fock operator.
     form_fock(sol);
@@ -370,24 +374,24 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       t.set();
     }
     
+    // Calculate dipole moment
+    dipmom=dipole_moment(sol.P,*basisp);
     // Do the diagonalization
     diagonalize(S,Sinvh,sol,shift);
     
     if(verbose)
       printf("done (%s)\n",t.elapsed().c_str());
-
-    printf("Atomic guess done in %s.\n\n",tg.elapsed().c_str());
-
-#if defined(HALFHOLE) || defined(FULLHOLE)
-    throw std::logic_error("XRS calculations can't be started from atomic guess.\n");
-    return 0;
-#else    
-    return;
-#endif
   }
   
   // Loop:
   int iiter=1;
+
+#ifdef DFT
+  // Start out without non-local correlation since it's usually costly
+  // and of minor importance to the density
+  if(dft.nl)
+    dft.nl=false;
+#endif
   
   while(iiter<=maxiter) {
     Timer titer;
@@ -584,7 +588,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       printf("\nIteration took %s.\n",titer.elapsed().c_str());
       fflush(stdout);
     }
-
+  
     // Sparse output
     if(verbose) {
       fprintf(stderr,"%4i % 16.8f",iiter,sol.en.E);
@@ -608,6 +612,18 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
     }
 
     if(fabs(deltaE)<=conv.deltaEmax && maxdiff_cvd<=conv.deltaPmax && rmsdiff_cvd<=conv.deltaPrms) {
+#ifdef DFT
+      if(dft0.nl && !dft.nl) {
+	if(verbose) {
+	  printf("Turning on non-local correlation contributions\n");
+	  fprintf(stderr,"Turning on non-local correlation contributions\n");
+	}
+	dft.nl=true;
+	diis.clear();
+	continue;
+      }
+#endif
+      
       // Increment amount of converged iterations
       convd++;
 
@@ -666,7 +682,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
   } // End SCF cycle
 
   if(verbose) {
-
+    
     if(converged) {
       std::string method=
 #ifdef RESTRICTED
@@ -686,7 +702,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
       fprintf(stderr,"%s converged in %s.\n",method.c_str(),ttot.elapsed().c_str());
     }
-
+  
     // Print total energy and its components
     printf("\n");
     printf("%-21s energy: % .16e\n","Kinetic",sol.en.Ekin);
@@ -741,7 +757,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft)
       chkptp->write("Force",f);
     }
 
-  } else {
+  } else if(maxiter>0) {
     std::ostringstream oss;
     oss << "Error in function " << __FUNCTION__ << " (file " << __FILE__ << ", near line " << __LINE__ << "): SCF did not converge in "<<maxiter<<" iterations!\n";
     throw std::runtime_error(oss.str());

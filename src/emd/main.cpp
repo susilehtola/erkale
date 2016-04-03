@@ -92,9 +92,15 @@ int main(int argc, char **argv) {
   chkpt.read(basis);
 
   // Load density matrix
-  arma::mat P;
-  chkpt.read("P",P);
-
+  arma::cx_mat P;
+  arma::mat Pr, Pi;
+  chkpt.read("P",Pr);
+  if(chkpt.exist("P_im")) {
+    chkpt.read("P_im",Pi);
+    P=Pr*COMPLEX1 + Pi*COMPLEXI;
+  } else
+    P=Pr*COMPLEX1;
+  
   // The projection to calculate
   int l=0, m=0;
   std::string lmstr=set.get_string("EMDlm");
@@ -173,7 +179,7 @@ int main(int argc, char **argv) {
 	}
 
 	// Generate dummy density matrix
-	arma::mat Pdum=C.col(idx[i])*arma::trans(C.col(idx[i]));
+	arma::cx_mat Pdum=C.col(idx[i])*arma::trans(C.col(idx[i]))*COMPLEX1;
 
 	Timer temd;
 
@@ -299,9 +305,15 @@ int main(int argc, char **argv) {
     simchk.read(simbas);
 
     // Load density matrix
-    arma::mat simP;
-    simchk.read("P",simP);
-
+    arma::mat simPr, simPi;
+    arma::cx_mat simP;
+    simchk.read("P",simPr);
+    if(simchk.exist("P_im")) {
+      simchk.read("P_im",simPi);
+      simP=simPr*COMPLEX1 + simPi*COMPLEXI;
+    } else
+      simP=simPr*COMPLEX1;
+    
     // Compute momentum density overlap
     arma::cube ovl;
     if(set.get_bool("SimilarityLM"))

@@ -128,7 +128,7 @@ void add_coupling_term(std::vector<total_coupl_t> & v, total_coupl_t & t) {
 EMDEvaluator::EMDEvaluator() {
 }
 
-EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv, int lp, int mp) {
+EMDEvaluator::EMDEvaluator(const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::cx_mat & Pv, int lp, int mp) {
 
   idfuncs=idfuncsv;
   loc=locv;

@@ -32,7 +32,7 @@ class BasisSet;
  * This algorithm uses a seminumerical routine to perform the integrals -
  * the momentum densities are expanded in spherical harmonics on a radial grid.
  */
-arma::cube emd_overlap_semi(const BasisSet & bas_a, const arma::mat & P_a, const BasisSet & bas_b, const arma::mat & P_b, int nrad=500, int lmax=6, bool verbose=true);
+arma::cube emd_overlap_semi(const BasisSet & bas_a, const arma::cx_mat & P_a, const BasisSet & bas_b, const arma::cx_mat & P_b, int nrad=500, int lmax=6, bool verbose=true);
 
 
 /**
@@ -47,7 +47,7 @@ arma::cube emd_overlap_semi(const BasisSet & bas_a, const arma::mat & P_a, const
  * Similarity Measures versus Moments of Momentum", JCTC 9 (2013),
  * 3908.
  */
-arma::cube emd_overlap(const BasisSet & bas_a, const arma::mat & P_a, const BasisSet & bas_b, const arma::mat & P_b, int nrad=500, int lmax=77, bool verbose=true);
+arma::cube emd_overlap(const BasisSet & bas_a, const arma::cx_mat & P_a, const BasisSet & bas_b, const arma::cx_mat & P_b, int nrad=500, int lmax=77, bool verbose=true);
 
 /**
  * Compute shape function similarity from EMD overlap integrals

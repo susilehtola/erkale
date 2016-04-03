@@ -60,7 +60,7 @@ class SlaterEMDEvaluator : public EMDEvaluator {
   void update_pointers();
  public:
   /// Constructor
-  SlaterEMDEvaluator(const std::vector< std::vector<RadialSlater> > & radf, const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::mat & Pv);
+  SlaterEMDEvaluator(const std::vector< std::vector<RadialSlater> > & radf, const std::vector< std::vector<size_t> > & idfuncsv, const std::vector< std::vector<ylmcoeff_t> > & clm, const std::vector<size_t> & locv, const std::vector<coords_t> & coord, const arma::cx_mat & Pv);
   /// Destructor
   ~SlaterEMDEvaluator();
 

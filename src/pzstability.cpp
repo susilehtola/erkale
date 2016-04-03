@@ -141,64 +141,61 @@ void PZStability::print_info() {
   arma::vec x(count_params());
   x.zeros();
 
+  rscf_t rsl;
+  uscf_t usl;
+  
   if(restr) {
     // Evaluate orbital matrices
-    rscf_t sol;
     std::vector<arma::cx_mat> Forb;
     arma::vec Eorb;
-    eval(x,sol,Forb,Eorb,true,true,pzw,true);
+    eval(x,rsl,Forb,Eorb,true,true,pzw,true);
 
     // Occupied orbitals
-    arma::cx_mat CO=sol.cC.cols(0,oa-1);
+    arma::cx_mat CO=rsl.cC.cols(0,oa-1);
     // Virtuals
     arma::cx_mat CV;
     if(va)
-      CV=sol.cC.cols(oa,oa+va-1);
+      CV=rsl.cC.cols(oa,oa+va-1);
 
     // Diagonalize
-    print_info(CO,CV,Forb,get_H(sol),Eorb);
+    print_info(CO,CV,Forb,get_H(rsl),Eorb);
   } else {
     // Evaluate orbital matrices
-    uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    eval(x,sol,Forba,Eorba,Forbb,Eorbb,true,true,pzw,true);
+    eval(x,usl,Forba,Eorba,Forbb,Eorbb,true,true,pzw,true);
 
     // Occupied orbitals
-    arma::cx_mat COa=sol.cCa.cols(0,oa-1);
+    arma::cx_mat COa=usl.cCa.cols(0,oa-1);
     arma::cx_mat COb;
     if(ob)
-      COb=sol.cCb.cols(0,ob-1);
+      COb=usl.cCb.cols(0,ob-1);
     // Virtuals
     arma::cx_mat CVa;
     if(va)
-      CVa=sol.cCa.cols(oa,oa+va-1);
+      CVa=usl.cCa.cols(oa,oa+va-1);
     arma::cx_mat CVb;
     if(vb)
-      CVb=sol.cCb.cols(ob,ob+vb-1);
+      CVb=usl.cCb.cols(ob,ob+vb-1);
 
     // Diagonalize
     printf("\n **** Alpha orbitals ****\n");
-    print_info(COa,CVa,Forba,get_H(sol,false),Eorba);
+    print_info(COa,CVa,Forba,get_H(usl,false),Eorba);
     printf("\n **** Beta  orbitals ****\n");
-    print_info(COb,CVb,Forbb,get_H(sol,true),Eorbb);
+    print_info(COb,CVb,Forbb,get_H(usl,true),Eorbb);
   }
 
-
   // Print total energy and its components
-  energy_t en = restr ? rsol.en : usol.en;
+  energy_t en = restr ? rsl.en : usl.en;
   printf("\n");
   printf("%-21s energy: % .16e\n","Kinetic",en.Ekin);
   printf("%-21s energy: % .16e\n","Nuclear attraction",en.Enuca);
   printf("%-21s energy: % .16e\n","Total one-electron",en.Eone);
   printf("%-21s energy: % .16e\n","Nuclear repulsion",en.Enucr);
   printf("%-21s energy: % .16e\n","Coulomb",en.Ecoul);
-  #ifndef DFT
-  printf("%-21s energy: % .16e\n","Exchange",en.Exc);
-  #else
   printf("%-21s energy: % .16e\n","Exchange-correlation",en.Exc);
   printf("%-21s energy: % .16e\n","Non-local correlation",en.Enl);
-  #endif
+  printf("%-21s energy: % .16e\n","SI correction",en.Esic);
   printf("-----------------------------------------------------\n");
   printf("%28s: % .16e\n","Total energy",en.E);
   printf("%28s: % .16e\n","Virial factor",-en.E/en.Ekin);
@@ -278,8 +275,9 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
       Forb[occlist[i]]=Forb_hlp[i];
   }
 
-  sol.en.Exc-=2.0*pzweight*arma::sum(Eorb);
-  sol.en.E-=2.0*pzweight*arma::sum(Eorb);
+  sol.en.Esic=-2.0*pzweight*arma::sum(Eorb);
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl+sol.en.Esic;
+  sol.en.E=sol.en.Eel+sol.en.Enucr;
   
   return sol.en.E;
 }
@@ -389,8 +387,10 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   }
   
   // Result is
-  sol.en.Exc-=pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
-  sol.en.E-=pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
+  sol.en.Esic=-pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl+sol.en.Esic;
+  sol.en.E=sol.en.Eel+sol.en.Enucr;
+
   return sol.en.E;
 }
 
@@ -1004,6 +1004,21 @@ void PZStability::parallel_transport(arma::vec & gold, const arma::vec & sd, dou
   }
 }
 
+inline void orthonormalize(const arma::mat & S, arma::cx_mat & C) {
+  // Orbital overlap
+  arma::cx_mat So(arma::trans(C)*S*C);
+  // Difference from orthonormality
+  arma::cx_mat dS=So-arma::eye<arma::cx_mat>(So.n_rows,So.n_cols);
+  double d=arma::norm(dS,2);
+  if(d>=1e-9) {
+    printf("Difference from orbital orthonormality is %e, orthonormalizing\n",d);
+    orthonormalize(S,C);
+  } else {
+    //printf("Difference from orbital orthonormality is %e, OK\n",d);
+  }
+}
+
+      
 void PZStability::update(const arma::vec & x) {
   if(arma::norm(x,2)!=0.0)  {
     if(restr) {
@@ -1019,12 +1034,28 @@ void PZStability::update(const arma::vec & x) {
     }
   }
 
+  // Check that orbitals are orthonormal and reorthonormalize if
+  // necessary
+  if(true) {
+    arma::mat S(basis.overlap());
+    if(restr) {
+      orthonormalize(S,rsol.cC);
+    } else {
+      orthonormalize(S,usol.cCa);
+      orthonormalize(S,usol.cCb);
+    }
+  }
+
+  // Update reference, without sort
+  update_reference(false);
+
   // Update orbitals in checkpoint file
   Checkpoint *chkptp=solverp->get_checkpoint();
   if(restr) {
     chkptp->cwrite("CW",rsol.cC);
     chkptp->write(rsol.en);
     chkptp->write("P",rsol.P);
+    chkptp->write("P_im",rsol.P_im);
   } else {
     chkptp->cwrite("CWa",usol.cCa);
     chkptp->write(usol.en);
@@ -1033,10 +1064,10 @@ void PZStability::update(const arma::vec & x) {
     chkptp->write("P",usol.P);
     chkptp->write("Pa",usol.Pa);
     chkptp->write("Pb",usol.Pb);
-  }
 
-  // Update reference, without sort
-  update_reference(false);
+    arma::mat P_im(arma::imag(usol.Pa+usol.Pb));
+    chkptp->write("P_im",P_im);
+  }
 }
 
 arma::cx_mat PZStability::get_H(const rscf_t & sol) const {
@@ -1115,7 +1146,6 @@ void PZStability::update_reference(bool sort) {
       rsol=sol;
       ref_Eorb=Eorb;
       ref_Forb=Forb;
-
     }
 
   } else {

@@ -44,15 +44,20 @@ extern "C" {
 #include <gsl/gsl_poly.h>
 }
 
+// Threshold for imaginary component in orbitals
+#define IMAGTHR 1e-7
+// Threshold for Cholesky decomposition of SAD density matrix
+#define CHOLCTHR 1e-6
+
 enum guess_t parse_guess(const std::string & val) {
   if(stricmp(val,"Core")==0)
-    return COREGUESS;
+    return CORE_GUESS;
+  else if(stricmp(val,"SAD")==0 || stricmp(val,"Atomic")==0)
+    return SAD_GUESS;
+  else if(stricmp(val,"NO")==0)
+    return NO_GUESS;
   else if(stricmp(val,"GWH")==0)
-    return GWHGUESS;
-  else if(stricmp(val,"Atomic")==0)
-    return ATOMGUESS;
-  else if(stricmp(val,"Molecular")==0)
-    return MOLGUESS;
+    return GWH_GUESS;
   else
     throw std::runtime_error("Guess type not supported.\n");
 }
@@ -1673,9 +1678,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   enum guess_t guess=parse_guess(set.get_string("Guess"));
   // Freeze core orbitals?
   bool freezecore=set.get_bool("FreezeCore");
-  if(freezecore && guess==COREGUESS)
+  if(freezecore && guess==CORE_GUESS)
     throw std::runtime_error("Cannot freeze core orbitals with core guess!\n");
-  if(freezecore && guess==GWHGUESS)
+  if(freezecore && guess==GWH_GUESS)
     throw std::runtime_error("Cannot freeze core orbitals with GWH guess!\n");
 
   // Amount of electrons
@@ -1738,30 +1743,16 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// Find out natural orbitals
 	arma::vec occs;
 	form_NOs(Pold,oldbas.overlap(),Cold,occs);
-	
+
 	// Use alpha orbital energies
 	Eold=Eaold;
       }
-      
+
       // Orbitals
       basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C,Nel_alpha);
 
-    } else if(guess == ATOMGUESS) {
+    } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
       sol.P=atomic_guess(basis,set);
-      
-    } else if(guess == MOLGUESS) {
-      // Need to generate the starting guess.
-      std::string name;
-      molecular_guess(basis,set,name);
-
-      // Load guess orbitals
-      {
-	Checkpoint guesschk(name,false);
-	guesschk.read("C",sol.C);
-	guesschk.read("E",sol.E);
-      }
-      // and remove the temporary file
-      remove(name.c_str());
     }
 
     // Get orbital occupancies
@@ -1792,30 +1783,29 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Handle guesses
     if(!doload) {
-      if(guess==COREGUESS)
+      if(guess==CORE_GUESS)
 	solver.core_guess(sol);
-      else if(guess==GWHGUESS)
+      else if(guess==GWH_GUESS)
 	solver.gwh_guess(sol);
-      else if(guess==ATOMGUESS) {
-	// Build Fock operator from SAD density matrix
-	bool NO=false;
-	if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-	  NO=true;
+      else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
+	// Build Fock operator from SAD density matrix. Get natural orbitals
+	arma::vec occ;
+	form_NOs(sol.P,solver.get_S(),sol.C,occ);
+
 	
-	if(NO) {
-	  // Use natural orbitals
-	  arma::vec occ;
-	  form_NOs(sol.P,solver.get_S(),sol.C,occ);
-	} else {
-	  std::vector<double> occ;
+	if(guess==SAD_GUESS) {
+	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
 	  size_t maxiter(solver.get_maxiter());
 	  solver.set_maxiter(0);
+
+
+
 	  if(hf || rohf)
-	    solver.RHF(sol,occ,conv);
+	    solver.RHF(sol,goccs,conv);
 	  else {
 	    dft_t nonl(dft);
 	    nonl.nl=false;
-	    solver.RDFT(sol,occ,conv,nonl);
+	    solver.RDFT(sol,goccs,conv,nonl);
 	  }
 	  solver.set_maxiter(maxiter);
 	  
@@ -1851,7 +1841,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int pzprec=set.get_int("PZprec");
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
-      bool pzloc=set.get_bool("PZloc");
+      int pzloc=parse_pzimag(set.get_string("PZloc"));
       enum locmet pzlocmet=parse_locmet(set.get_string("PZlocmet"));
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
@@ -1883,6 +1873,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       } else {
 	// The localizing matrix
+	arma::cx_mat W;
 	if(chkpt.exist("CW.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
 
@@ -1892,13 +1883,25 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  sol.cC=CW;
 
 	  // Imaginary treatment?
-	  if(pzimag==-1 && rms_norm(arma::imag(sol.cC))>10*DBL_EPSILON) {
-	    printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cC)));
-	    pzimag=1;
+	  if(rms_norm(arma::imag(sol.cC))>IMAGTHR) {
+	    if(pzimag==-1) {
+	      printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cC)));
+	      pzimag=1;
+	    } else if(pzimag==0) {
+	      throw std::runtime_error("Requesting calculation without imaginary dofs, but given orbitals have imaginary component!\n");
+	    }
+	    // Can't localize
+	    pzloc=0;
+	  } else {
+	    // Store real part in orbital matrix
+	    sol.C=arma::real(sol.cC);
+	    if(pzloc==-1)
+	      // Assume orbitals are already localized
+	      pzloc=0;
+	    W.eye(Nel_alpha,Nel_alpha);
 	  }
-
 	} else { // No entry in checkpoint
-	  arma::cx_mat W;
+	  sol.cC=sol.C*COMPLEX1;
 	  if(!pzoo) {
 	    W.eye(Nel_alpha,Nel_alpha);
 	  } else {
@@ -1906,21 +1909,26 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	      W=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
 	      W=complex_unitary(Nel_alpha,seed);
+	  }
+	  if(pzloc==-1) pzloc=1;
+	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
+	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
+	  if(sol.C.n_cols>(size_t) Nel_alpha)
+	    sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
+	}
 
-	    if(pzloc) {
-	      // Localize starting guess
-	      if(verbose) printf("\nInitial localization.\n");
-	      Timer tloc;
-	      double measure;
-	      // Max 1e5 iterations, gradient norm <= pzIthr
-	      orbital_localization(pzlocmet,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
-	      if(verbose) {
-		printf("\n");
+	if(pzloc==1) {
+	  // Localize starting guess
+	  if(verbose) printf("\nInitial localization.\n");
+	  Timer tloc;
+	  double measure;
+	  // Max 1e5 iterations, gradient norm <= pzIthr
+	  orbital_localization(pzlocmet,basis,sol.C.cols(0,Nel_alpha-1),sol.P,measure,W,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+	  if(verbose) {
+	    printf("\n");
 
-		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-		fflush(stderr);
-	      }
-	    }
+	    fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+	    fflush(stderr);
 	  }
 
 	  // Save the complex orbitals
@@ -2046,24 +2054,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb,Nel_beta);
       }
 
-    } else if(guess == ATOMGUESS) {
+    } else if(guess==SAD_GUESS || guess==NO_GUESS) {
       sol.P=atomic_guess(basis,set);
-
-    } else if(guess == MOLGUESS) {
-      // Need to generate the starting guess.
-      std::string name;
-      molecular_guess(basis,set,name);
-
-      // Load guess orbitals
-      {
-	Checkpoint guesschk(name,false);
-	guesschk.read("Ca",sol.Ca);
-	guesschk.read("Ea",sol.Ea);
-	guesschk.read("Cb",sol.Cb);
-	guesschk.read("Eb",sol.Eb);
-      }
-      // and remove the temporary file
-      remove(name.c_str());
     }
 
     // Get orbital occupancies
@@ -2095,34 +2087,29 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Handle guesses
     if(!doload) {
-      if(guess==COREGUESS)
+      if(guess==CORE_GUESS)
 	solver.core_guess(sol);
-      else if(guess==GWHGUESS)
+      else if(guess==GWH_GUESS)
 	solver.gwh_guess(sol);
-      else if(guess==ATOMGUESS) {
-	// Build Fock operator from SAD density matrix
-	bool NO=false;
-	if(set.get_bool("DensityFitting") && (hf || rohf || exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-	  NO=true;
+      else if((guess==SAD_GUESS) || (guess==NO_GUESS)) {
+	// Build Fock operator from SAD density matrix. Get natural orbitals
+	arma::vec occ;
+	form_NOs(sol.P,solver.get_S(),sol.Ca,occ);
+	sol.Cb=sol.Ca;
 	
-	if(NO) {
-	  // Use natural orbitals
-	  arma::vec occs;
-	  form_NOs(sol.P,solver.get_S(),sol.Ca,occs);
-	  sol.Cb=sol.Ca;
-	} else {
-	  std::vector<double> occs;
+	if(guess==SAD_GUESS) {
+	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
 	  size_t maxiter(solver.get_maxiter());
 	  solver.set_maxiter(0);
-	  
 	  rscf_t rsol;
 	  rsol.P=sol.P;
-	  if(hf||rohf)
-	    solver.RHF(rsol,occs,conv);
+	  rsol.C=sol.Ca;
+	  if(hf || rohf)
+	    solver.RHF(rsol,goccs,conv);
 	  else {
 	    dft_t nonl(dft);
 	    nonl.nl=false;
-	    solver.RDFT(rsol,occs,conv,nonl);
+	    solver.RDFT(rsol,goccs,conv,nonl);
 	  }
 	  solver.set_maxiter(maxiter);
 	  
@@ -2178,7 +2165,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       int pzprec=set.get_int("PZprec");
       bool pzov=set.get_bool("PZov");
       bool pzoo=set.get_bool("PZoo");
-      bool pzloc=set.get_bool("PZloc");
+      int pzloc=parse_pzimag(set.get_string("PZloc"));
       enum locmet pzlocmet=parse_locmet(set.get_string("PZlocmet"));
       double pzw=set.get_double("PZw");
       int pzmax=set.get_int("PZiter");
@@ -2208,45 +2195,63 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.UDFT(sol,occa,occb,conv,dft);
 
       } else {
-	// The localizing matrices
+	// The localizing matrix
+	arma::cx_mat Wa;
 	if(chkpt.exist("CWa.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
 
 	  // Get old localized orbitals
 	  chkpt.cread("CWa",CWa);
-	  // Save the complex orbitals
+	  // Save the orbitals
 	  sol.cCa=CWa;
 
 	  // Imaginary treatment?
-	  if(pzimag==-1 && rms_norm(arma::imag(sol.cCa))>10*DBL_EPSILON)
-	    pzimag=1;
-
-	} else {
-	  arma::cx_mat Wa;
-	  if(!pzoo)
+	  if(rms_norm(arma::imag(sol.cCa))>IMAGTHR) {
+	    if(pzimag==-1) {
+	      printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cCa)));
+	      pzimag=1;
+	    } else if(pzimag==0) {
+	      throw std::runtime_error("Requesting calculation without imaginary dofs, but given orbitals have imaginary component!\n");
+	    }
+	    // Can't localize
+	    pzloc=0;
+	  } else {
+	    // Store real part in orbital matrix
+	    sol.Ca=arma::real(sol.cCa);
+	    if(pzloc==-1)
+	      // Assume orbitals are already localized
+	      pzloc=0;
 	    Wa.eye(Nel_alpha,Nel_alpha);
-	  else {
-	    // Initialize with a random unitary matrix.
+	  }
+	} else { // No entry in checkpoint
+	  sol.cCa=sol.Ca*COMPLEX1;
+	  if(!pzoo) {
+	    Wa.eye(Nel_alpha,Nel_alpha);
+	  } else {
 	    if(pzimag!=1)
 	      Wa=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
 	      Wa=complex_unitary(Nel_alpha,seed);
+	  }
+	  if(pzloc==-1) pzloc=1;
+	  sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
+	  sol.cCa.cols(0,Nel_alpha-1)=sol.Ca.cols(0,Nel_alpha-1)*Wa;
+	  if(sol.Ca.n_cols>(size_t) Nel_alpha)
+	    sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
+	}
 
-	    if(pzloc && Nel_alpha>1) {
-	      Timer tloc;
+	if(pzloc==1) {
+	  // Localize starting guess
+	  if(verbose) printf("\nInitial localization.\n");
+	  Timer tloc;
+	  double measure;
+	  // Max 1e5 iterations, gradient norm <= pzIthr
+	  orbital_localization(pzlocmet,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+	  if(verbose) {
+	    printf("\n");
 
-	      // Localize starting guess
-	      if(verbose) printf("\nInitial localization.\n");
-	      double measure;
-	      // Max 1e5 iterations, gradient norm <= pzIthr
-	      orbital_localization(pzlocmet,basis,sol.Ca.cols(0,Nel_alpha-1),sol.P,measure,Wa,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
-	      if(verbose) {
-		printf("\n");
-
-		fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-		fflush(stderr);
-	      }
-	    }
+	    fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+	    fflush(stderr);
 	  }
 
 	  // Save the complex orbitals
@@ -2256,61 +2261,72 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
 	}
 
+	// The localizing matrix
+	arma::cx_mat Wb;
 	if(chkpt.exist("CWb.re")) {
 	  printf("Read localization matrix from checkpoint.\n");
 
 	  // Get old localized orbitals
 	  chkpt.cread("CWb",CWb);
-	  // Save the complex orbitals
+	  // Save the orbitals
 	  sol.cCb=CWb;
 
 	  // Imaginary treatment?
-	  if(pzimag==-1 && rms_norm(arma::imag(sol.cCb))>10*DBL_EPSILON)
-	    pzimag=1;
-
-	} else {
-	  if(Nel_beta>0) {
-	    arma::cx_mat Wb;
-	    // Initialize with a random orthogonal matrix.
-	    if(!pzoo)
-	      Wb.eye(Nel_beta,Nel_beta);
-	    else {
-	      if(pzimag!=1)
-		Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
-	      else
-		Wb=complex_unitary(Nel_beta,seed);
-
-	      if(pzloc && Nel_beta>1) {
-		Timer tloc;
-
-		// Localize starting guess
-		if(verbose) printf("\nInitial localization.\n");
-		double measure;
-		// Max 1e5 iterations, gradient norm <= pzIthr
-		orbital_localization(pzlocmet,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
-		if(verbose) {
-		  printf("\n");
-
-		  fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-		  fflush(stderr);
-		}
-	      }
+	  if(rms_norm(arma::imag(sol.cCb))>IMAGTHR) {
+	    if(pzimag==-1) {
+	      printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cCb)));
+	      pzimag=1;
+	    } else if(pzimag==0) {
+	      throw std::runtime_error("Requesting calculation without imaginary dofs, but given orbitals have imaginary component!\n");
 	    }
-
-	    // Save the complex orbitals
-	    sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
-	    sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
-	    if(sol.Cb.n_cols>(size_t) Nel_beta)
-	      sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
-
-	  } else
-	    // Nel_beta = 0
-	    sol.cCb=sol.Cb*COMPLEX1;
+	    // Can't localize
+	    pzloc=0;
+	  } else {
+	    // Store real part in orbital matrix
+	    sol.Cb=arma::real(sol.cCb);
+	    if(pzloc==-1)
+	      // Assume orbitals are already localized
+	      pzloc=0;
+	    Wb.eye(Nel_beta,Nel_beta);
+	  }
+	} else { // No entry in checkpoint
+	  sol.cCb=sol.Cb*COMPLEX1;
+	  
+	  if(!pzoo) {
+	    Wb.eye(Nel_beta,Nel_beta);
+	  } else {
+	    if(pzimag!=1)
+	      Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
+	    else
+	      Wb=complex_unitary(Nel_beta,seed);
+	  }
+	  if(pzloc==-1) pzloc=1;
+	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
+	  if(sol.Cb.n_cols>(size_t) Nel_beta)
+	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
 	}
 
-	// Save the orbitals
-	chkpt.cwrite("CWa",sol.cCa);
-	chkpt.cwrite("CWb",sol.cCb);
+	if(pzloc==1) {
+	  // Localize starting guess
+	  if(verbose) printf("\nInitial localization.\n");
+	  Timer tloc;
+	  double measure;
+	  // Max 1e5 iterations, gradient norm <= pzIthr
+	  orbital_localization(pzlocmet,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+	  if(verbose) {
+	    printf("\n");
+
+	    fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+	    fflush(stderr);
+	  }
+
+	  // Save the complex orbitals
+	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
+	  if(sol.Cb.n_cols>(size_t) Nel_beta)
+	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
+	}
 
 	PZStability stab(&solver);
 	stab.set_method(dft,oodft,pzw);

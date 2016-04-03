@@ -98,6 +98,8 @@ typedef struct {
   double Enucr;
   /// Non-local energy
   double Enl;
+  /// Self-interaction energy
+  double Esic;
 
   /// Total energy
   double E;
@@ -167,13 +169,13 @@ typedef struct {
 /// Possible guess types
 enum guess_t {
   /// Core guess
-  COREGUESS,
+  CORE_GUESS,
   /// Atomic guess
-  ATOMGUESS,
-  /// Molecular guess
-  MOLGUESS,
+  SAD_GUESS,
+  /// Natural orbitals from atomic guess
+  NO_GUESS,
   /// Generalized Wolfsberg--Helmholz
-  GWHGUESS
+  GWH_GUESS
 };
 
 /// Perdew-Zunger SIC mode
