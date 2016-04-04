@@ -134,12 +134,30 @@ int main(int argc, char **argv) {
 
       if(lmat.size()==2 && rmat.size()==2 && ((il && !ir) || (ir && !il)))
 	continue;
-      
-      arma::cx_mat Smo(lmat[il].t()*S12*rmat[ir]);
 
-      // Projections
-      arma::mat proj(arma::real(Smo%arma::conj(Smo)));
-      
+      // Orbital projections
+      arma::mat proj;
+      {
+	// With or without complex conjugate?
+	arma::cx_mat Smot(arma::trans(lmat[il])*S12*rmat[ir]);
+	arma::mat prot(arma::real(Smot%arma::conj(Smot)));
+
+	arma::cx_mat Smost(arma::strans(lmat[il])*S12*rmat[ir]);
+	arma::mat prost(arma::real(Smost%arma::conj(Smost)));
+
+	// Sums
+	double sumt(arma::sum(arma::sum(prot)));
+	double sumst(arma::sum(arma::sum(prost)));
+
+	if(sumt>sumst) {
+	  printf("Determinants do not differ by complex conjugation\n");
+	  proj=prot;
+	} else {
+	  printf("Determinants differ by complex conjugation\n");
+	  proj=prost;
+	}
+      }
+
       printf("%s - %s projection\n",getlegend(il,lmat.size()).c_str(),getlegend(ir,rmat.size()).c_str());
       //proj.print();
             
@@ -166,11 +184,13 @@ int main(int argc, char **argv) {
 	  std::swap(rorder(i),rorder(rind));
 	}
 
-	//lorder.print("Left  ordering");
-	//rorder.print("Right ordering");
+	lorder.t().print("Left  ordering");
+	rorder.t().print("Right ordering");
 
 	// Sort projection matrix
 	arma::mat sproj(proj(lorder,rorder));
+	sproj.print("Projection matrix");
+	
 	arma::vec osort(arma::sort(arma::diagvec(sproj),"descend"));
 	printf("Sum of diagonal orbital projections is % 10.6f, deviation from norm is %e\n",arma::sum(osort),rmat[ir].n_cols-arma::sum(osort));	
 
