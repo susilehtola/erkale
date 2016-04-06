@@ -47,7 +47,7 @@ int strcmp(const std::string &str1, const std::string& str2) {
   return strcmp(str1.c_str(),str2.c_str());
 }
 
-std::string readline(std::istream & in, bool skipempty, const std::string cchars) {
+std::string readline(std::istream & in, bool skipempty, const std::string & cchars) {
   std::string ret;
 
   // Get line from input
