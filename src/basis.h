@@ -368,7 +368,9 @@ class BasisSet {
 
   /// Get coordinates of all nuclei
   arma::mat get_nuclear_coords() const;
-
+  /// Set coordinates of all nuclei
+  void set_nuclear_coords(const arma::mat & coords);
+  
   /// Get coordinates of nucleus
   coords_t get_nuclear_coords(size_t inuc) const;
   /// Get charge of nucleus

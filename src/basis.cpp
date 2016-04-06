@@ -1704,6 +1704,25 @@ arma::mat BasisSet::get_nuclear_coords() const {
   return coords;
 }
 
+void BasisSet::set_nuclear_coords(const arma::mat & c) {
+  if(c.n_rows != nuclei.size() || c.n_cols != 3)
+    throw std::logic_error("Coordinates matrix does not match nuclei!\n");
+
+  for(size_t i=0;i<nuclei.size();i++) {
+    nuclei[i].r.x=c(i,0);
+    nuclei[i].r.y=c(i,1);
+    nuclei[i].r.z=c(i,2);
+  }
+
+  // Update shell centers
+  for(size_t i=0;i<shells.size();i++) {
+    size_t icen=shells[i].get_center_ind();
+    shells[i].set_center(nuclei[icen].r,icen);
+  }
+  // Update listings
+  finalize(false,false);
+}
+
 coords_t BasisSet::get_nuclear_coords(size_t inuc) const {
   return nuclei[inuc].r;
 }
