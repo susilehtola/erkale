@@ -2530,6 +2530,10 @@ DFTGrid::DFTGrid(const BasisSet * bas, bool ver, bool lobatto) {
 DFTGrid::~DFTGrid() {
 }
 
+void DFTGrid::set_verbose(bool ver) {
+  verbose=ver;
+}
+
 void DFTGrid::prune_shells() {
   for(size_t i=grids.size()-1;i<grids.size();i--)
     if(!grids[i].np || !grids[i].nfunc)

@@ -466,6 +466,9 @@ class DFTGrid {
   /// Destructor
   ~DFTGrid();
 
+  /// Set verbose operation
+  void set_verbose(bool ver);
+  
   /// Create fixed size grid
   void construct(int nrad, int lmax, int x_func, int c_func, bool strict);
   /// Create fixed size grid
