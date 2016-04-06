@@ -153,7 +153,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   set.set_string("Occupancies",occs.str());
 
   // Temporary file name
-  char *tmpname=tempnam("./",".chk");
+  std::string tmpname(tempname());
   set.set_string("SaveChk",tmpname);
   
   // Run calculation
@@ -169,9 +169,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   }
   
   // Remove temporary file
-  remove(tmpname);
-  // Free memory
-  free(tmpname);
+  remove(tmpname.c_str());
 }
 
 arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bool sphave) {

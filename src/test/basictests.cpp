@@ -137,7 +137,7 @@ void check_sph_orthonorm(int lmax) {
 /// Test checkpoints
 void test_checkpoint() {
   // Temporary file name
-  char *tmpfile=tempnam("./",".chk");
+  std::string tmpfile=tempname();
 
   {
     // Dummy checkpoint
@@ -190,8 +190,7 @@ void test_checkpoint() {
 
   }
 
-  remove(tmpfile);
-  free(tmpfile);
+  remove(tmpfile.c_str());
 }
 
 int main(void) {

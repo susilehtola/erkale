@@ -188,10 +188,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   bool delchk=false;
   if(stricmp(augchk,"")==0) {
     delchk=true;
-    // Get random file name
-    char *tmpname=tempnam("./",".chk");
-    augchk=std::string(tmpname);
-    free(tmpname);
+    augchk=tempname();
   }
 
   {
