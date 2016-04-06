@@ -176,9 +176,10 @@ arma::vec gather_oo(const arma::cx_mat & M, bool real, bool imag) {
   return x;
 }
 
-FDHessian::FDHessian() {
+FDHessian::FDHessian(bool ver) {
   ss_fd=cbrt(DBL_EPSILON);
   ss_ls=1e-4;
+  verbose=ver;
 }
 
 FDHessian::~FDHessian() {
@@ -313,7 +314,8 @@ void FDHessian::update(const arma::vec & x) {
 }
 
 void FDHessian::print_status(size_t iiter, const arma::vec & g, const Timer & t) const {
-  printf("\nIteration %i, gradient norm %e, max norm %e (%s)\n",(int) iiter,arma::norm(g,2),arma::max(arma::abs(g)),t.elapsed().c_str());
+  if(verbose)
+    printf("\nIteration %i, gradient norm %e, max norm %e (%s)\n",(int) iiter,arma::norm(g,2),arma::max(arma::abs(g)),t.elapsed().c_str());
 }
 
 double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
@@ -324,7 +326,8 @@ double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
     x0.zeros(count_params());
 
   double ival=eval(x0);
-  printf("Initial value is % .10f\n",ival);
+  if(verbose)
+    printf("Initial value is % .10f\n",ival);
 
   // Current and previous gradient
   arma::vec g, gold;
@@ -368,26 +371,27 @@ double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
 
       // Check that new SD is sane
       if(iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(gold,gold)) {
-	printf("Powell restart - SD step\n");
+	if(verbose) printf("Powell restart - SD step\n");
       } else if(arma::dot(sdnew,sd)<=0) {
 	// This would take us into the wrong direction!
-	printf("Bad CG direction. SD step\n");
+	if(verbose) printf("Bad CG direction. SD step\n");
       } else {
 	// Update search direction
 	sd=sdnew;
-	printf("CG step\n");
+	if(verbose) printf("CG step\n");
       }
-    } else printf("SD step\n");
+    } else if(verbose) printf("SD step\n");
 
     while(true) {
       step.push_back(std::pow(stepfac,step.size())*initstep);
       val.push_back(eval(step[step.size()-1]*sd));
 
-      if(val.size()>=2)
+      if(verbose) {
+	if(val.size()>=2)
 	printf(" %e % .10f % e % e\n",step[step.size()-1],val[val.size()-1],val[val.size()-1]-val[0],val[val.size()-1]-val[val.size()-2]);
-      else
-      	printf(" %e % .10f\n",step[step.size()-1],val[val.size()-1]);
-
+	else
+	  printf(" %e % .10f\n",step[step.size()-1],val[val.size()-1]);
+      }
       double dval=val[val.size()-1]-val[val.size()-2];
 
       // Check if converged
@@ -406,7 +410,7 @@ double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
       vals.max(iopt);
     else
       vals.min(iopt);
-    printf("Line search changed value by %e\n",val[iopt]-val[0]);
+    if(verbose) printf("Line search changed value by %e\n",val[iopt]-val[0]);
 
     // Optimal value is
     double optstep=step[iopt];
@@ -415,13 +419,13 @@ double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
   }
 
   double fval=eval(x0);
-  printf("Final value is % .10f; optimization changed value by %e\n",fval,fval-ival);
+  if(verbose) printf("Final value is % .10f; optimization changed value by %e\n",fval,fval-ival);
 
   // Return the change
   return fval-ival;
 }
 
-PZStability::PZStability(SCF * solver) {
+PZStability::PZStability(SCF * solver, bool ver) : FDHessian(ver) {
   solverp=solver;
   solverp->set_verbose(false);
 
@@ -896,6 +900,8 @@ arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat 
 }
 
 void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb) {
+  if(!verbose) return;
+  
   // Form unified Hamiltonian
   arma::cx_mat H(unified_H(CO,CV,Forb,H0));
 
@@ -954,6 +960,8 @@ void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, c
 }
 
 void PZStability::print_info() {
+  if(!verbose) return;
+  
   arma::vec x(count_params());
   x.zeros();
 
@@ -1842,7 +1850,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     x0.zeros(count_params());
 
   double ival=eval(x0);
-  printf("Initial value is % .10f\n",ival);
+  if(verbose) printf("Initial value is % .10f\n",ival);
 
   // Current and previous gradient
   arma::vec g, gold;
@@ -1886,17 +1894,16 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     }
 
     if(preconditioning && arma::norm_dot(sd,-g)<0.0) {
-      //printf("Projection of preconditioned search direction on gradient is %e.\n",arma::norm_dot(sd,-g));
-      printf("Projection of preconditioned search direction on gradient is %e, not using preconditioning.\n",arma::norm_dot(sd,-g));
+      if(verbose) printf("Projection of preconditioned search direction on gradient is %e, not using preconditioning.\n",arma::norm_dot(sd,-g));
       sd=-g;
     }
 
     if(arma::norm(g,2) < nrthr && !cancheck) {
       // Evaluate Hessian
       Timer tp;
-      printf("Calculating Hessian ... "); fflush(stdout);
+      if(verbose) printf("Calculating Hessian ... "); fflush(stdout);
       arma::mat h(hessian());
-      printf("done (%s)\n",tp.elapsed().c_str()); fflush(stdout);
+      if(verbose) printf("done (%s)\n",tp.elapsed().c_str()); fflush(stdout);
 
       // Run eigendecomposition
       arma::vec hval;
@@ -1904,7 +1911,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
       bool diagok=arma::eig_sym(hval,hvec,h);
       if(!diagok)
 	throw std::runtime_error("Error diagonalizing orbital Hessian\n");
-      hval.t().print("Hessian eigenvalues");
+      if(verbose) hval.t().print("Hessian eigenvalues");
 
       // Enforce positive defitiveness
       hval+=std::max(0.0,-arma::min(hval))+1e-4;
@@ -1916,12 +1923,12 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
       // Backtracking line search
       double Etr=eval(sd);
-      printf(" %e % .10f\n",1.0,Etr);
+      if(verbose) printf(" %e % .10f\n",1.0,Etr);
       fflush(stdout);
 
       double tau=0.7;
       double Enew=eval(tau*sd);
-      printf(" %e % .10f\n",tau,Enew);
+      if(verbose) printf(" %e % .10f\n",tau,Enew);
       fflush(stdout);
 
       double l=1.0;
@@ -1929,11 +1936,11 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 	Etr=Enew;
 	l*=tau;
 	Enew=eval(l*tau*sd);
-	printf(" %e % .10f backtrack\n",l*tau,Enew);
+	if(verbose) printf(" %e % .10f backtrack\n",l*tau,Enew);
 	fflush(stdout);
       }
 
-      printf("Newton step changed value by %e\n",Etr-E0);
+      if(verbose) printf("Newton step changed value by %e\n",Etr-E0);
       fflush(stdout);
 
       update(l*sd);
@@ -1953,18 +1960,18 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
       // Check sanity
       if(arma::dot(sd,-g)<0) {
-	printf("Bad BFGS direction, dot product % e. BFGS reset\n",arma::dot(sd,-g)/arma::dot(g,g));
+	if(verbose) printf("Bad BFGS direction, dot product % e. BFGS reset\n",arma::dot(sd,-g)/arma::dot(g,g));
 	lbfgs.clear();
 	lbfgs.update(x0,g);
 	sd=-lbfgs.solve();
 
       } else if(iiter>=1 && arma::dot(g,gold)>=0.2*arma::dot(gold,gold)) {
-	printf("Powell restart - SD step\n");
+	if(verbose) printf("Powell restart - SD step\n");
 	sd=sd0;
 
       } else {
-	printf("BFGS step\n");
-	printf("Projection of search direction onto steepest descent direction is %e\n",arma::dot(sd,-g)/sqrt(arma::dot(sd,sd)*arma::dot(g,g)));
+	if(verbose) printf("BFGS step\n");
+	if(verbose) printf("Projection of search direction onto steepest descent direction is %e\n",arma::dot(sd,-g)/sqrt(arma::dot(sd,sd)*arma::dot(g,g)));
       }
     } else {
       if((iiter % std::min(count_params(), (size_t) 10)!=0)) {
@@ -1980,21 +1987,21 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 	arma::vec sdnew(sd+gamma*oldsd);
 
 	// Check that new SD is sane
-	if(arma::dot(sdnew,-g)<=0)
+	if(arma::dot(sdnew,-g)<=0) {
 	  // This would take us into the wrong direction!
-	  printf("Bad CG direction. SD step\n");
-	else {
+	  if(verbose) printf("Bad CG direction. SD step\n");
+	} else {
 	  // Update search direction
 	  sd=sdnew;
-	  printf("CG step\n");
+	  if(verbose) printf("CG step\n");
 	}
-      } else printf("SD step\n");
+      } else if(verbose) printf("SD step\n");
     }
 
     // Derivative is
     double dE=arma::dot(sd,g);
 
-    printf(" %e % .10f\n",0.0,E0);
+    if(verbose) printf(" %e % .10f\n",0.0,E0);
     fflush(stdout);
 
     // Update step size
@@ -2006,7 +2013,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     double d=Tmu/5.0;
     // Value at initial step
     double Ed=eval(d*sd);
-    printf(" %e % .10f\n",d,Ed);
+    if(verbose) printf(" %e % .10f\n",d,Ed);
     fflush(stdout);
 
     // Optimal step length
@@ -2042,7 +2049,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
       // Evaluate energy at trial step
       Es=eval(step*sd);
       if(fitok) {
-	printf(" %e % .10f, % e difference from prediction\n",step,Es,Es-Ep);
+	if(verbose) printf(" %e % .10f, % e difference from prediction\n",step,Es,Es-Ep);
 	fflush(stdout);
       }
     }
@@ -2055,7 +2062,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 	step*=tau;
 	Es0=Es;
 	Es=eval(step*sd);
-	printf(" %e % .10f backtrack\n",step,Es);
+	if(verbose) printf(" %e % .10f backtrack\n",step,Es);
 	fflush(stdout);
 	if(Es>Es0 && Es<E0)
 	  break;
@@ -2065,7 +2072,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
       Es=Es0;
     }
 
-    printf("Line search changed value by %e\n",Es-E0);
+    if(verbose) printf("Line search changed value by %e\n",Es-E0);
     update(step*sd);
     x0+=step*sd;
     if(fabs(Es-E0)<dEthr)
@@ -2076,7 +2083,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     parallel_transport(g,sd,step);
   }
 
-  printf("Final value is % .10f; optimization changed value by %e\n",E0,E0-ival);
+  if(verbose) printf("Final value is % .10f; optimization changed value by %e\n",E0,E0-ival);
   // Update grid
   update_grid(false);
   // Update reference
@@ -2145,14 +2152,14 @@ void PZStability::parallel_transport(arma::vec & gold, const arma::vec & sd, dou
   }
 }
 
-inline void orthonormalize(const arma::mat & S, arma::cx_mat & C) {
+inline void orthonormalize(const arma::mat & S, arma::cx_mat & C, bool verbose) {
   // Orbital overlap
   arma::cx_mat So(arma::trans(C)*S*C);
   // Difference from orthonormality
   arma::cx_mat dS=So-arma::eye<arma::cx_mat>(So.n_rows,So.n_cols);
   double d=arma::norm(dS,2);
   if(d>=1e-9) {
-    printf("Difference from orbital orthonormality is %e, orthonormalizing\n",d);
+    if(verbose) printf("Difference from orbital orthonormality is %e, orthonormalizing\n",d);
     orthonormalize(S,C);
   } else {
     //printf("Difference from orbital orthonormality is %e, OK\n",d);
@@ -2180,10 +2187,10 @@ void PZStability::update(const arma::vec & x) {
   if(true) {
     arma::mat S(basis.overlap());
     if(restr) {
-      orthonormalize(S,rsol.cC);
+      orthonormalize(S,rsol.cC,verbose);
     } else {
-      orthonormalize(S,usol.cCa);
-      orthonormalize(S,usol.cCb);
+      orthonormalize(S,usol.cCa,verbose);
+      orthonormalize(S,usol.cCb,verbose);
     }
   }
 
@@ -2236,7 +2243,7 @@ void PZStability::update_reference(bool sort) {
   arma::vec x0(count_params());
   x0.zeros();
 
-  printf("Updating reference ... ");
+  if(verbose) printf("Updating reference ... ");
   fflush(stdout);
   Timer t;
 
@@ -2379,7 +2386,7 @@ void PZStability::update_reference(bool sort) {
     }
   }
 
-  printf("done (%s)\n",t.elapsed().c_str());
+  if(verbose) printf("done (%s)\n",t.elapsed().c_str());
   fflush(stdout);
 }
 
@@ -2508,15 +2515,17 @@ void PZStability::set_method(const dft_t & ovmethod_, const dft_t & oomethod_, d
   // Range separation constants
   double omega, kfull, kshort;
   range_separation(ovmethod.x_func,omega,kfull,kshort);
-  
-  if(omega!=0.0) {
-    printf("\nUsing range separated exchange with range separation constant omega = % .3f.\n",omega);
-    printf("Using % .3f %% short range and % .3f %% long range exchange.\n",(kfull+kshort)*100,kfull*100);
-  } else if(kfull!=0.0)
-    printf("\nUsing hybrid exchange with % .3f %% of exact exchange.\n",kfull*100);
-  else
-    printf("\nA pure exchange functional used, no exact exchange.\n");
 
+  if(verbose) {
+    if(omega!=0.0) {
+      printf("\nUsing range separated exchange with range separation constant omega = % .3f.\n",omega);
+      printf("Using % .3f %% short range and % .3f %% long range exchange.\n",(kfull+kshort)*100,kfull*100);
+    } else if(kfull!=0.0)
+      printf("\nUsing hybrid exchange with % .3f %% of exact exchange.\n",kfull*100);
+    else
+      printf("\nA pure exchange functional used, no exact exchange.\n");
+  }
+  
   // Compute range separated integrals if necessary
   if(is_range_separated(ovmethod.x_func))
     solverp->fill_rs(omega);
@@ -2528,11 +2537,13 @@ void PZStability::set_params(bool real_, bool imag_, bool can, bool oo) {
   cancheck=can;
   oocheck=oo;
 
-  std::vector<std::string> truth(2);
-  truth[0]="false";
-  truth[1]="true";
-  fprintf(stderr,"oo = %s, ov = %s, real = %s, imag = %s\n",truth[oocheck].c_str(),truth[cancheck].c_str(),truth[real].c_str(),truth[imag].c_str());
-  fprintf(stderr,"There are %i parameters.\n",(int) count_params());
+  if(verbose) {
+    std::vector<std::string> truth(2);
+    truth[0]="false";
+    truth[1]="true";
+    fprintf(stderr,"oo = %s, ov = %s, real = %s, imag = %s\n",truth[oocheck].c_str(),truth[cancheck].c_str(),truth[real].c_str(),truth[imag].c_str());
+    fprintf(stderr,"There are %i parameters.\n",(int) count_params());
+  }
 }
 
 void PZStability::set(const rscf_t & sol) {
@@ -2556,7 +2567,7 @@ void PZStability::set(const rscf_t & sol) {
   truth[0]="false";
   truth[1]="true";
 
-  fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
+  if(verbose) fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
 
   // Reconstruct DFT grid
   update_grid(true);
@@ -2565,6 +2576,8 @@ void PZStability::set(const rscf_t & sol) {
 }
 
 void PZStability::update_grid(bool init) {
+  grid.set_verbose(verbose);
+  nlgrid.set_verbose(verbose);
   if(ovmethod.adaptive) {
     arma::cx_mat Ctilde;
     if(restr)
@@ -2603,7 +2616,7 @@ void PZStability::set(const uscf_t & sol) {
   vb=usol.cCb.n_cols-ob;
 
   chkptp->write("Restricted",0);
-  fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
+  if(verbose) fprintf(stderr,"\noa = %i, ob = %i, va = %i, vb = %i\n",(int) oa, (int) ob, (int) va, (int) vb);
   fflush(stderr);
 
   // Reconstruct DFT grid
@@ -2671,35 +2684,36 @@ bool PZStability::check(bool stability, double cutoff) {
     }
 
     // Total time is
-    fprintf(stderr,"\nComputing the Hessian will take approximately %s\n",t.parse(ttot).c_str());
+    if(verbose) fprintf(stderr,"\nComputing the Hessian will take approximately %s\n",t.parse(ttot).c_str());
     fflush(stderr);
   }
 
   // Evaluate Hessian
   Timer t;
   arma::mat h(hessian());
-  printf("Hessian evaluated (%s)\n",t.elapsed().c_str()); fflush(stdout);
+  if(verbose) printf("Hessian evaluated (%s)\n",t.elapsed().c_str()); fflush(stdout);
   t.set();
 
   // Block the degrees of freedom
   std::vector<pz_rot_par_t> dof(classify());
   // Block-diagonalize Hessian
-  for(size_t i=0;i<dof.size();i++) {
-    // Helpers
-    Timer tdiag;
-    arma::vec hval;
-    bool diagok=arma::eig_sym(hval,h.submat(dof[i].idx,dof[i].idx));
-    if(!diagok) {
+  if(verbose)
+    for(size_t i=0;i<dof.size();i++) {
+      // Helpers
+      Timer tdiag;
+      arma::vec hval;
+      bool diagok=arma::eig_sym(hval,h.submat(dof[i].idx,dof[i].idx));
+      if(!diagok) {
+	std::ostringstream oss;
+	oss << "Error diagonalizing " << dof[i].name << " Hessian.\n";
+	throw std::runtime_error(oss.str());
+      }
+      
       std::ostringstream oss;
-      oss << "Error diagonalizing " << dof[i].name << " Hessian.\n";
-      throw std::runtime_error(oss.str());
+      oss << "Eigenvalues in the " << dof[i].name << " block (" << tdiag.elapsed() << ")";
+      hval.t().print(oss.str());
+      fflush(stdout);
     }
-
-    std::ostringstream oss;
-    oss << "Eigenvalues in the " << dof[i].name << " block (" << tdiag.elapsed() << ")";
-    hval.t().print(oss.str());
-    fflush(stdout);
-  }
 
   arma::mat I;
   if(stability) {
@@ -2712,7 +2726,7 @@ bool PZStability::check(bool stability, double cutoff) {
       oss << "Error diagonalizing full Hessian.\n";
       throw std::runtime_error(oss.str());
     }
-    printf("Full Hessian diagonalized in %s.\n",tdiag.elapsed().c_str());
+    if(verbose) printf("Full Hessian diagonalized in %s.\n",tdiag.elapsed().c_str());
 
     // Find instabilities
     I=hvec.cols(arma::find(hval<cutoff));
@@ -2735,13 +2749,13 @@ bool PZStability::check(bool stability, double cutoff) {
       const double dfac=cbrt(10.0);
 
       double Enew=eval(x*ds);
-      printf("\t%e % .10f % e\n",ds,Enew,Enew-Ei);
+      if(verbose) printf("\t%e % .10f % e\n",ds,Enew,Enew-Ei);
 
       while(true) {
 	ds*=dfac;
 	E0=Enew;
 	Enew=eval(x*ds);
-	printf("\t%e % .10f % e\n",ds,Enew,Enew-Ei);
+	if(verbose) printf("\t%e % .10f % e\n",ds,Enew,Enew-Ei);
 	fflush(stdout);
 	if(Enew>E0)
 	  break;
@@ -2754,18 +2768,18 @@ bool PZStability::check(bool stability, double cutoff) {
 
       // Update solution
       update(x);
-      printf("Stability analysis decreased energy by %e\n",E0-Ei);
+      if(verbose) printf("Stability analysis decreased energy by %e\n",E0-Ei);
     }
   }
 
-  fprintf(stderr,"Check completed in %s.\n",tfull.elapsed().c_str());
+  if(verbose) fprintf(stderr,"Check completed in %s.\n",tfull.elapsed().c_str());
 
   // Found instabilities?
   return stability && I.n_cols>0;
 }
 
 void PZStability::print_status(size_t iiter, const arma::vec & g, const Timer & t) const {
-  printf("\nIteration %i, gradient norm (%s):\n",(int) iiter,t.elapsed().c_str());
+  if(verbose) printf("\nIteration %i, gradient norm (%s):\n",(int) iiter,t.elapsed().c_str());
 
   // Get decomposition
   std::vector<pz_rot_par_t> dof(classify());
@@ -2774,7 +2788,7 @@ void PZStability::print_status(size_t iiter, const arma::vec & g, const Timer & 
     for(size_t k=0;k<dof[i].idx.n_elem;k++)
       gs(k)=g(dof[i].idx(k));
 
-    printf("%20s %e %e\n",dof[i].name.c_str(),arma::norm(gs,2),arma::norm(gs,"inf"));
+    if(verbose) printf("%20s %e %e\n",dof[i].name.c_str(),arma::norm(gs,2),arma::norm(gs,"inf"));
   }
 }
 

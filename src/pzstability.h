@@ -25,6 +25,8 @@ class Timer;
 
 class FDHessian {
  protected:
+  /// Verbose operation?
+  bool verbose;
   /// Finite difference derivative step size
   double ss_fd;
   /// Line search step size
@@ -35,7 +37,7 @@ class FDHessian {
 
  public:
   /// Constructor
-  FDHessian();
+  FDHessian(bool verbose=true);
   /// Destructor
   virtual ~FDHessian();
 
@@ -181,7 +183,7 @@ class PZStability: public FDHessian {
 
  public:
   /// Constructor
-  PZStability(SCF *solver);
+  PZStability(SCF *solver, bool verbose=true);
   /// Destructor
   ~PZStability();
 
