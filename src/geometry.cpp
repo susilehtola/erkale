@@ -166,7 +166,7 @@ enum calcd {
 };
 
 
-enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
+enum calcd run_calc(const BasisSet & basis, Settings & set, bool force, bool noskip) {
   bool pz=false;
   try {
     pz=set.get_bool("PZ");
@@ -181,7 +181,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
   std::string savename=set.get_string("SaveChk");
   bool strictint(set.get_bool("StrictIntegrals"));
   
-  if(stricmp(loadname,"")==0) {
+  if(stricmp(loadname,"")==0 || noskip) {
     // Nothing to load - run full calculation.
     calculate(basis,set,force);
     if(force)
@@ -320,12 +320,12 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
   return FORCECALC;
 }
 
-enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force) {
+enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool noskip) {
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
   
-  if(stricmp(loadname,"")==0) {
+  if(stricmp(loadname,"")==0 || noskip) {
     // Nothing to load - run full calculation.
     calculate(basis,set,force);
     if(force)
@@ -389,14 +389,6 @@ enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force) {
     Settings tempset(set);
     tempset.set_string("LoadChk",savename);
     tempset.set_string("SaveChk",".tempchk");
-    try {
-      // Don't localize, since it would screw up the converged guess
-      tempset.set_bool("PZloc",false);
-      // Don't run stability analysis, since we are only doing small displacements
-      tempset.set_int("PZstab",0);
-    } catch(std::runtime_error) {
-    }
-
     {
       // Calculate lh
       calculate(lhbas,tempset,false);
@@ -437,7 +429,7 @@ enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force) {
   return FORCECALC;
 }
 
-double calc_E(const gsl_vector *x, void *par) {
+double calc_E(const gsl_vector *x, void *par, bool noskip) {
   Timer t;
 
   // Get the helpers
@@ -452,7 +444,7 @@ double calc_E(const gsl_vector *x, void *par) {
   construct_basis(basis,atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,false) : run_calc(basis,p->set,false);
+  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,false,noskip) : run_calc(basis,p->set,false,noskip);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -473,7 +465,11 @@ double calc_E(const gsl_vector *x, void *par) {
   return en.E;
 }
 
-void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
+double calc_E(const gsl_vector *x, void *par) {
+  return calc_E(x,par,false);
+}
+
+void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g, bool noskip) {
   Timer t;
 
   // Get the helpers
@@ -488,7 +484,7 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   construct_basis(basis,atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,true) : run_calc(basis,p->set,true);
+  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,true,noskip) : run_calc(basis,p->set,true,noskip);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -523,6 +519,10 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   else if(mode==NOCALC)
     printf("Found energy and forces in checkpoint file.\n");
   fflush(stdout);
+}
+
+void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
+  return calc_Ef(x,par,E,g,false);
 }
 
 void calc_f(const gsl_vector *x, void *par, gsl_vector *g) {
@@ -717,13 +717,20 @@ int main(int argc, char **argv) {
     throw std::runtime_error("Unsupported minimizer\n");
   }
 
-  // Run an initial calculation
-  double oldE=calc_E(x,minimizer.params);
+  // Run an initial calculation, don't use reference!
+  double oldE=calc_E(x,minimizer.params,true);
 
   // Turn off verbose setting
   pars.set.set_bool("Verbose",false);
   // and load from old checkpoint
   pars.set.set_string("LoadChk",pars.set.get_string("SaveChk"));
+  try {
+    // Also, don't localize, since it would screw up the converged guess
+    pars.set.set_string("PZloc","false");
+    // And don't run stability analysis, since we are only doing small displacements
+    pars.set.set_int("PZstab",0);
+  } catch(std::runtime_error) {
+  }
 
   // Initialize minimizer
   s = gsl_multimin_fdfminimizer_alloc (T, minimizer.n);
