@@ -77,15 +77,15 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
     dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
 
   // Write out starting point
-  fprintf(out,"%7i % g % g % g\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  fprintf(out,"%7i % e % e % e\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
   // Print amount of points and step sizes in the directions
-  fprintf(out,"%7i % g % g % g\n",(int) x_arr.size(),dx,0.0,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) y_arr.size(),0.0,dy,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) z_arr.size(),0.0,0.0,dz);
+  fprintf(out,"%7i % e % e % e\n",(int) x_arr.size(),dx,0.0,0.0);
+  fprintf(out,"%7i % e % e % e\n",(int) y_arr.size(),0.0,dy,0.0);
+  fprintf(out,"%7i % e % e % e\n",(int) z_arr.size(),0.0,0.0,dz);
   // Print out atoms
   for(size_t i=0;i<bas.get_Nnuc();i++) {
     nucleus_t nuc=bas.get_nucleus(i);
-    fprintf(out,"%7i %g % g % g % g\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+    fprintf(out,"%7i %e % e % e % e\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
   }
 
   // The points in the batch
@@ -171,6 +171,145 @@ void density_cube(const BasisSet & bas, const arma::mat & P, const std::vector<d
   norm*=dx*dy*dz;
 }
 
+void densitydiff_cube(const BasisSet & bas, const arma::mat & P, const BasisSet & basref, const arma::mat & Pref, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, std::string fname, double & norm) {
+  // Open output file.
+  fname=fname+".cube";
+  FILE *out=fopen(fname.c_str(),"w");
+
+  // Compute the norm (assumes evenly spaced grid!)
+  norm=0.0;
+
+  // Compute the density in batches, allowing
+  // parallellization.
+#ifdef _OPENMP
+  // The number of points per batch
+  const size_t Nbatch_p=100*omp_get_max_threads();
+#else
+  const size_t Nbatch_p=100;
+#endif
+
+  // The total number of point is
+  const size_t N=x_arr.size()*y_arr.size()*z_arr.size();
+  // The necessary amount of batches is
+  size_t Nbatch=N/Nbatch_p;
+  if(N%Nbatch_p!=0)
+    Nbatch++;
+
+  // Write out comment fields
+  Timer t;
+  fprintf(out,"ERKALE electron density output\n");
+  fprintf(out,"Generated on %s.\n",t.current_time().c_str());
+
+  // Spacing
+  double dx=0.0;
+  if(x_arr.size()>1)
+    dx=(x_arr[x_arr.size()-1]-x_arr[0])/(x_arr.size()-1);
+  double dy=0.0;
+  if(y_arr.size()>1)
+    dy=(y_arr[y_arr.size()-1]-y_arr[0])/(y_arr.size()-1);
+  double dz=0.0;
+  if(z_arr.size()>1)
+    dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
+
+  // Write out starting point
+  fprintf(out,"%7i % e % e % e\n",(int) basref.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  // Print amount of points and step sizes in the directions
+  fprintf(out,"%7i % e % e % e\n",(int) x_arr.size(),dx,0.0,0.0);
+  fprintf(out,"%7i % e % e % e\n",(int) y_arr.size(),0.0,dy,0.0);
+  fprintf(out,"%7i % e % e % e\n",(int) z_arr.size(),0.0,0.0,dz);
+  // Print out atoms
+  for(size_t i=0;i<bas.get_Nnuc();i++) {
+    nucleus_t nuc=bas.get_nucleus(i);
+    fprintf(out,"%7i %g % e % e % e\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+  }
+
+  // The points in the batch
+  cubecoord_t r[Nbatch_p];
+  // The values of the density in the batch
+  double rho[Nbatch_p];
+
+  // Number of points to compute in the batch
+  size_t np;
+  // Total number of points computed
+  size_t ntot=0;
+  // Indices of x, y and z
+  size_t xind=0, yind=0, zind=0;
+
+  // Index of points written
+  size_t idx=0;
+
+  // Loop over batches.
+  for(size_t ib=0;ib<Nbatch;ib++) {
+    // Zero amount of points in current batch.
+    np=0;
+
+    // Form list of points to compute.
+    while(np<Nbatch_p && ntot+np<N) {
+      r[np].r.x=x_arr[xind];
+      r[np].r.y=y_arr[yind];
+      r[np].r.z=z_arr[zind];
+      r[np].newline=false;
+
+      // Increment number of points
+      np++;
+
+      // Determine next point.
+      if(zind+1<z_arr.size())
+	zind++;
+      else {
+	// z coordinate changes, break line here
+	zind=0;
+	r[np-1].newline=true;
+
+	if(yind+1<y_arr.size())
+	  yind++;
+	else {
+	  yind=0;
+	  xind++;
+	}
+      }
+    }
+    
+    if(bas == basref)
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+      // Loop over the points in the batch
+      for(size_t ip=0;ip<np;ip++)
+	rho[ip]=compute_density(P-Pref,bas,r[ip].r);
+    else
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+      // Loop over the points in the batch
+      for(size_t ip=0;ip<np;ip++)
+	rho[ip]=compute_density(P,bas,r[ip].r)-compute_density(Pref,basref,r[ip].r);
+    
+    // Save density values
+    for(size_t ip=0;ip<np;ip++) {
+      norm+=rho[ip];
+
+      fprintf(out," % .5e",rho[ip]);
+      idx++;
+      if(idx==6 || r[ip].newline) {
+	idx=0;
+	fprintf(out,"\n");
+      }
+    }
+
+    // Increment number of computed points
+    ntot+=np;
+  }
+
+  // Close output file.
+  if(idx!=0)
+    fprintf(out,"\n");
+  fclose(out);
+
+  // Plug in the spacing in the integral
+  norm*=dx*dy*dz;
+}
+
 void potential_cube(const BasisSet & bas, const arma::mat & P, const std::vector<double> & x_arr, const std::vector<double> & y_arr, const std::vector<double> & z_arr, std::string fname) {
   // Open output file.
   fname=fname+".cube";
@@ -209,15 +348,15 @@ void potential_cube(const BasisSet & bas, const arma::mat & P, const std::vector
     dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
 
   // Write out starting point
-  fprintf(out,"%7i % g % g % g\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  fprintf(out,"%7i % e % e % e\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
   // Print amount of points and step sizes in the directions
-  fprintf(out,"%7i % g % g % g\n",(int) x_arr.size(),dx,0.0,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) y_arr.size(),0.0,dy,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) z_arr.size(),0.0,0.0,dz);
+  fprintf(out,"%7i % e % e % e\n",(int) x_arr.size(),dx,0.0,0.0);
+  fprintf(out,"%7i % e % e % e\n",(int) y_arr.size(),0.0,dy,0.0);
+  fprintf(out,"%7i % e % e % e\n",(int) z_arr.size(),0.0,0.0,dz);
   // Print out atoms
   for(size_t i=0;i<bas.get_Nnuc();i++) {
     nucleus_t nuc=bas.get_nucleus(i);
-    fprintf(out,"%7i %g % g % g % g\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+    fprintf(out,"%7i %g % e % e % e\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
   }
 
   // The points in the batch
@@ -332,15 +471,15 @@ void elf_cube(const BasisSet & bas, const arma::mat & P, const std::vector<doubl
     dz=(z_arr[z_arr.size()-1]-z_arr[0])/(z_arr.size()-1);
 
   // Write out starting point
-  fprintf(out,"%7i % g % g % g\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
+  fprintf(out,"%7i % e % e % e\n",(int) bas.get_Nnuc(),x_arr[0],y_arr[0],z_arr[0]);
   // Print amount of points and step sizes in the directions
-  fprintf(out,"%7i % g % g % g\n",(int) x_arr.size(),dx,0.0,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) y_arr.size(),0.0,dy,0.0);
-  fprintf(out,"%7i % g % g % g\n",(int) z_arr.size(),0.0,0.0,dz);
+  fprintf(out,"%7i % e % e % e\n",(int) x_arr.size(),dx,0.0,0.0);
+  fprintf(out,"%7i % e % e % e\n",(int) y_arr.size(),0.0,dy,0.0);
+  fprintf(out,"%7i % e % e % e\n",(int) z_arr.size(),0.0,0.0,dz);
   // Print out atoms
   for(size_t i=0;i<bas.get_Nnuc();i++) {
     nucleus_t nuc=bas.get_nucleus(i);
-    fprintf(out,"%7i %g % g % g % g\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
+    fprintf(out,"%7i %g % e % e % e\n",nuc.Z,1.0*nuc.Z,nuc.r.x,nuc.r.y,nuc.r.z);
   }
 
   // The points in the batch
@@ -638,6 +777,7 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
+  set.add_string("RefChk","Checkpoint file to load reference density from","");
   set.add_string("Cube", "Cube to use, e.g. -10:.3:10 -5:.2:4 -2:.1:3", "Auto");
   set.add_double("AutoBuffer","Buffer zone in Å to add on each side of the cube",2.5);
   set.add_double("AutoSpacing","Spacing in Å to use",0.1);
@@ -939,5 +1079,22 @@ int main(int argc, char **argv) {
     }
   }
 
+  // Difference density?
+  std::string refstr(set.get_string("RefChk"));
+  if(refstr.size()) {
+    Checkpoint refchk(refstr,false);
+    BasisSet refbas;
+    refchk.read(refbas);
+    
+    arma::mat refP;
+    refchk.read("P",refP);
+
+    double norm;
+    printf("Calculating difference density ... ");
+    fflush(stdout); t.set();
+    densitydiff_cube(basis,P,refbas,refP,x,y,z,"densitydiff",norm);
+    printf("done (%s).\nNorm of difference is %e.\n",t.elapsed().c_str(),norm);
+  }
+  
   return 0;
 }
