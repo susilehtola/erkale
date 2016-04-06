@@ -2028,6 +2028,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	chkpt.cwrite("CW",sol.cC);
       chkpt.write("E",sol.E);
       chkpt.write("P",sol.P);
+      chkpt.write("Converged",1);
       chkpt.write(sol.en);
     }
 
@@ -2423,6 +2424,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       chkpt.write("Pb",sol.Pb);
       chkpt.write("P",sol.P);
       chkpt.write(sol.en);
+      chkpt.write("Converged",1);
     }
 
     if(verbose) {
