@@ -62,6 +62,9 @@ typedef struct {
   Settings set;
   // Indices of dofs
   std::vector<size_t> dofidx;
+
+  // Numeric gradient?
+  bool numgrad;
 } opthelper_t;
 
 enum minimizer {
@@ -162,10 +165,22 @@ enum calcd {
   NOCALC
 };
 
+
 enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
+  bool pz=false;
+  try {
+    pz=set.get_bool("PZ");
+  } catch(std::runtime_error) {
+  }
+  
+  if(pz)
+    throw std::logic_error("Analytic forces not implemented for PZ-SIC!\n");
+  
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
-
+  std::string savename=set.get_string("SaveChk");
+  bool strictint(set.get_bool("StrictIntegrals"));
+  
   if(stricmp(loadname,"")==0) {
     // Nothing to load - run full calculation.
     calculate(basis,set,force);
@@ -183,103 +198,9 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
     chkpt.read("Converged",convd);
     chkpt.read(oldbas);
   }
-  if(!convd) {
-    // Old calculation was not converged - run full calculation
-    set.set_string("LoadName","");
-    calculate(basis,set,force);
-    if(force)
-      return FULLCALC;
-    else
-      return ECALC;
-  }
-
-  // Copy the checkpoint if necessary
-  std::string savename=set.get_string("SaveChk");
-  if(stricmp(savename,loadname)!=0) {
-    // Copy the file
-    std::ostringstream oss;
-    oss << "cp " << loadname << " " << savename;
-    int cp=system(oss.str().c_str());
-    if(cp) {
-      ERROR_INFO();
-      throw std::runtime_error("Failed to copy checkpoint file.\n");
-    }
-  }
-
-  // Strict integrals?
-  bool strictint(set.get_bool("StrictIntegrals"));
-  
-  // Check if the basis set is different
-  if(!(basis==oldbas)) {
-    // Basis set is different or calculation was not converged - need
-    // to run calculation. Project Fock matrix to new basis and
-    // diagonalize to get new orbitals
-    {
-      // Open in write mode, don't truncate
-      Checkpoint chkpt(savename,true,false);
-
-      // Save basis
-      chkpt.write(basis);
-      // Overlap matrix
-      arma::mat S=basis.overlap();
-      chkpt.write("S",S);
-      arma::mat Sinvh=BasOrth(S,set);
-      chkpt.write("Sinvh",Sinvh);
-
-      // Restricted or unrestricted run?
-      bool restr;
-      chkpt.read("Restricted",restr);
-      chkpt.read(oldbas);
-
-      if(restr) {
-	rscf_t sol;
-	std::vector<double> occs;
-	chkpt.read("H",sol.H);
-	chkpt.read("occs",occs);
-
-	// Form new orbitals by diagonalizing H in new geometry
-	diagonalize(S,Sinvh,sol);
-
-	// Form new density
-	sol.P=form_density(sol.C,occs);
-
-	// Write basis set, orbitals and density
-	chkpt.write("C",sol.C);
-	chkpt.write("E",sol.E);
-	chkpt.write("P",sol.P);
-
-      } else {
-	uscf_t sol;
-	std::vector<double> occa, occb;
-	chkpt.read("Ha",sol.Ha);
-	chkpt.read("Hb",sol.Hb);
-	chkpt.read("occa",occa);
-	chkpt.read("occb",occb);
-
-	// Form new orbitals by diagonalizing H in new geometry
-	diagonalize(S,Sinvh,sol);
-
-	// Form new density
-	sol.Pa=form_density(sol.Ca,occa);
-	sol.Pb=form_density(sol.Cb,occb);
-	sol.P=sol.Pa+sol.Pb;
-
-	// Write basis set, orbitals and density
-	chkpt.write("Ca",sol.Ca);
-	chkpt.write("Cb",sol.Cb);
-	chkpt.write("Ea",sol.Ea);
-	chkpt.write("Eb",sol.Eb);
-	chkpt.write("Pa",sol.Pa);
-	chkpt.write("Pb",sol.Pb);
-	chkpt.write("P",sol.P);
-      }
-
-      // Calculation is now not converged
-      bool conv=false;
-      chkpt.write("Converged",conv);
-    }
-
-    // Now we can do the SCF calculation
+  if(!convd || !(basis == oldbas)) {
+    // Old calculation was not converged, or different basis used - run full calculation
+    if(!convd) set.set_string("LoadName","");
     calculate(basis,set,force);
     if(force)
       return FULLCALC;
@@ -391,12 +312,130 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force) {
     }
   }
 
+  interpret_force(f).t().print("Analytic force");
+  
   chkpt.write("Force",f);
   chkpt.close();
 
   return FORCECALC;
 }
 
+enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force) {
+  // Checkpoint file to load
+  std::string loadname=set.get_string("LoadChk");
+  std::string savename=set.get_string("SaveChk");
+  
+  if(stricmp(loadname,"")==0) {
+    // Nothing to load - run full calculation.
+    calculate(basis,set,force);
+    if(force)
+      return FULLCALC;
+    else
+      return ECALC;
+  }
+
+  // Was the calculation converged?
+  bool convd;
+  BasisSet oldbas;
+  {
+    Checkpoint chkpt(loadname,false);
+    chkpt.read("Converged",convd);
+    chkpt.read(oldbas);
+  }
+  if(!convd || !(basis == oldbas)) {
+    // Old calculation was not converged, or different basis used - run calculation
+    if(!convd) set.set_string("LoadName","");
+    calculate(basis,set,false);
+    
+    if(!force) return ECALC;
+  } else if(!force)
+    // No force required, can just read energy from file.
+    return NOCALC;
+  
+  // We have converged the energy, next compute force by finite
+  // differences.
+  arma::mat fm;
+  fm.zeros(3,basis.get_Nnuc());
+
+  // Nuclear coordinates. Take the transpose so that (x,y,z) are
+  // stored consecutively in memory
+  arma::mat nuccoord(basis.get_nuclear_coords().t());
+
+  // Step size
+  const double h=1e-6;
+  
+  // Loop over degrees of freedom
+  printf("Calculating %i displacements:",(int) (3*basis.get_Nnuc()-3));
+  fflush(stdout);
+  for(size_t idof=0;idof<3*basis.get_Nnuc()-3;idof++) {
+    // Coordinates of nuclei.
+    arma::mat lcoord(nuccoord), rcoord(nuccoord);
+    lcoord[idof]-=h;
+    rcoord[idof]+=h;
+    // Take the back-transposes
+    lcoord=lcoord.t();
+    rcoord=rcoord.t();
+
+    // Basis sets
+    BasisSet lhbas(basis);
+    lhbas.set_nuclear_coords(lcoord);
+    
+    BasisSet rhbas(basis);
+    rhbas.set_nuclear_coords(rcoord);
+
+    // Energies
+    energy_t lhen, rhen;
+    
+    Settings tempset(set);
+    tempset.set_string("LoadChk",savename);
+    tempset.set_string("SaveChk",".tempchk");
+    try {
+      // Don't localize, since it would screw up the converged guess
+      tempset.set_bool("PZloc",false);
+      // Don't run stability analysis, since we are only doing small displacements
+      tempset.set_int("PZstab",0);
+    } catch(std::runtime_error) {
+    }
+
+    {
+      // Calculate lh
+      calculate(lhbas,tempset,false);
+      Checkpoint solchk(tempset.get_string("SaveChk"),false);
+      // Current energy is
+      solchk.read(lhen);
+    }
+    {
+      // Calculate rh
+      calculate(rhbas,tempset,false);
+      Checkpoint solchk(tempset.get_string("SaveChk"),false);
+      // Current energy is
+      solchk.read(rhen);
+    }
+
+    // Calculate force: - grad E
+    fm(idof)=-(rhen.E-lhen.E)/(2.0*h);
+
+    printf(" %i",(int) idof+1);
+    fflush(stdout);
+  }
+  printf(" done\n");
+  fflush(stdout);
+
+  // Force on last nucleus is just the negative of the sum of all the
+  // forces on the other nuclei
+  fm.col(fm.n_cols-1)=-arma::sum(fm.cols(0,fm.n_cols-2),1);
+  //fm.print("Numerical forces");
+  
+  // Open the checkpoint in write mode, don't truncate it
+  Checkpoint chkpt(savename,true,false);
+  arma::vec f(arma::vectorise(fm));
+  chkpt.write("Force",f);
+  chkpt.close();
+  
+  interpret_force(f).t().print("Numerical force");
+
+  return FORCECALC;
+}
 
 double calc_E(const gsl_vector *x, void *par) {
   Timer t;
@@ -413,7 +452,7 @@ double calc_E(const gsl_vector *x, void *par) {
   construct_basis(basis,atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  enum calcd mode=run_calc(basis,p->set,false);
+  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,false) : run_calc(basis,p->set,false);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -449,7 +488,7 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
   construct_basis(basis,atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  enum calcd mode=run_calc(basis,p->set,true);
+  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,true) : run_calc(basis,p->set,true);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -542,6 +581,7 @@ int main(int argc, char **argv) {
   set.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
   set.add_string("Result","File to save optimized geometry in","optimized.xyz");
   set.set_string("Logfile","erkale_geom.log");
+  set.add_bool("NumGrad","Use finite-difference gradient?",false);
   set.parse(std::string(argv[1]),true);
   set.print();
 
@@ -549,6 +589,7 @@ int main(int argc, char **argv) {
   int maxiter=set.get_int("MaxSteps");
   std::string optmovie=set.get_string("OptMovie");
   std::string result=set.get_string("Result");
+  bool numgrad=set.get_bool("NumGrad");
 
   // Interpret optimizer
   enum minimizer alg;
@@ -632,6 +673,7 @@ int main(int argc, char **argv) {
   pars.baslib=baslib;
   pars.set=set;
   pars.dofidx=dofidx;
+  pars.numgrad=numgrad;
 
   /* Starting point */
   gsl_vector *x = gsl_vector_alloc (3*dofidx.size());

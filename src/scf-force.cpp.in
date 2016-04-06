@@ -140,7 +140,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 
   //  interpret_force(fx_full).print("Coulomb + exact exchange");
   //  interpret_force(ftot).print("Total (w.o. 2-electron)");
-  interpret_force(ffull).t().print("Total force");
+  // interpret_force(ffull).t().print("Total force");
     
   return ffull;
 }
