@@ -1622,7 +1622,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   std::string savename=set.get_string("SaveChk");
 
   bool verbose=set.get_bool("Verbose");
-
   // Print out settings
   if(verbose)
     set.print();
@@ -1875,7 +1874,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// The localizing matrix
 	arma::cx_mat W;
 	if(chkpt.exist("CW.re")) {
-	  printf("Read localization matrix from checkpoint.\n");
+	  if(verbose) printf("Read localization matrix from checkpoint.\n");
 
 	  // Get old localized orbitals
 	  chkpt.cread("CW",CW);
@@ -1885,7 +1884,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Imaginary treatment?
 	  if(rms_norm(arma::imag(sol.cC))>IMAGTHR) {
 	    if(pzimag==-1) {
-	      printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cC)));
+	      if(verbose) printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cC)));
 	      pzimag=1;
 	    } else if(pzimag==0) {
 	      throw std::runtime_error("Requesting calculation without imaginary dofs, but given orbitals have imaginary component!\n");
@@ -1941,7 +1940,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// Save the orbitals
 	chkpt.cwrite("CW",sol.cC);
 
-	PZStability stab(&solver);
+	PZStability stab(&solver,verbose);
 	stab.set_method(dft,oodft,pzw);
 	stab.set(sol);
 
@@ -2199,7 +2198,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// The localizing matrix
 	arma::cx_mat Wa;
 	if(chkpt.exist("CWa.re")) {
-	  printf("Read localization matrix from checkpoint.\n");
+	  if(verbose) printf("Read localization matrix from checkpoint.\n");
 
 	  // Get old localized orbitals
 	  chkpt.cread("CWa",CWa);
@@ -2209,7 +2208,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Imaginary treatment?
 	  if(rms_norm(arma::imag(sol.cCa))>IMAGTHR) {
 	    if(pzimag==-1) {
-	      printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cCa)));
+	      if(verbose) printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cCa)));
 	      pzimag=1;
 	    } else if(pzimag==0) {
 	      throw std::runtime_error("Requesting calculation without imaginary dofs, but given orbitals have imaginary component!\n");
@@ -2265,7 +2264,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	// The localizing matrix
 	arma::cx_mat Wb;
 	if(chkpt.exist("CWb.re")) {
-	  printf("Read localization matrix from checkpoint.\n");
+	  if(verbose) printf("Read localization matrix from checkpoint.\n");
 
 	  // Get old localized orbitals
 	  chkpt.cread("CWb",CWb);
@@ -2275,7 +2274,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Imaginary treatment?
 	  if(rms_norm(arma::imag(sol.cCb))>IMAGTHR) {
 	    if(pzimag==-1) {
-	      printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cCb)));
+	      if(verbose) printf("Norm of imaginary part %e, turning on imaginary dof.\n",rms_norm(arma::imag(sol.cCb)));
 	      pzimag=1;
 	    } else if(pzimag==0) {
 	      throw std::runtime_error("Requesting calculation without imaginary dofs, but given orbitals have imaginary component!\n");
@@ -2329,7 +2328,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
 	}
 
-	PZStability stab(&solver);
+	PZStability stab(&solver,verbose);
 	stab.set_method(dft,oodft,pzw);
 	stab.set(sol);
 
