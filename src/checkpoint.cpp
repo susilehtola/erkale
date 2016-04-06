@@ -1214,3 +1214,12 @@ void change_dir(std::string dir, bool create) {
     throw std::runtime_error(oss.str());
   }
 }
+
+std::string tempname() {
+  // Get random file name
+  char *tmpname=tempnam("./",".chk");
+  std::string name(tmpname);
+  free(tmpname);
+
+  return name;
+}

@@ -181,5 +181,7 @@ std::string get_cwd();
 /// Change to directory, create it first if wanted
 void change_dir(std::string dir, bool create=false);
 
+/// Get a temporary file name
+std::string tempname();
 
 #endif
