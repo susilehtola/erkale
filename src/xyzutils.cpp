@@ -32,6 +32,8 @@ std::vector<atom_t> load_xyz(std::string filename) {
   // Check if input is actually Z-Matrix
   {
     FILE *in=fopen(filename.c_str(),"r");
+    if(in==NULL)
+      throw std::runtime_error("Error opening geometry file \"" + filename + "\".\n");
     std::vector<std::string> words(splitline(readline(in)));
     fclose(in);
     if(stricmp(words[0],"#ZMATRIX")==0)
