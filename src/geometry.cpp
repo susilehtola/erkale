@@ -635,6 +635,9 @@ int main(int argc, char **argv) {
   set.parse(std::string(argv[1]),true);
   set.print();
 
+  // Don't try saving or loading Cholesky integrals
+  set.set_int("CholeskyMode",0);
+
   bool verbose=set.get_bool("Verbose");
   int maxiter=set.get_int("MaxSteps");
   std::string optmovie=set.get_string("OptMovie");
