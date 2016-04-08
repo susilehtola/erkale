@@ -68,7 +68,7 @@ typedef struct {
   // Step size for numeric gradient
   double step;
   // Order of stencil
-  int stencil;
+  int npoints;
 } opthelper_t;
 
 enum minimizer {
@@ -324,7 +324,7 @@ enum calcd run_calc(const BasisSet & basis, Settings & set, bool force, bool nos
   return FORCECALC;
 }
 
-enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool noskip, int stencil, double h) {
+enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool noskip, int npoints, double h) {
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
@@ -364,68 +364,51 @@ enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool
   // Nuclear coordinates. Take the transpose so that (x,y,z) are
   // stored consecutively in memory
   arma::mat nuccoord(basis.get_nuclear_coords().t());
+
+  // Get the stencil
+  if(npoints<2)
+    throw std::runtime_error("Invalid stencil, must be >=2.\n");
+  // Points to evaluate at
+  arma::vec dx=arma::linspace<arma::vec>(-(npoints-1)/2.0,(npoints-1)/2.0,npoints);
+  // Weights at the points
+  arma::vec w;
+  {
+    arma::mat c(dx.n_elem,2);
+    stencil(0.0,dx,c);
+    w=c.col(1);
+
+    // Eliminate any small weights
+    for(size_t i=0;i<w.n_elem;i++)
+      if(std::abs(w(i))<DBL_EPSILON*npoints) {
+	dx.subvec(i,dx.n_elem-2)=dx.subvec(i+1,dx.n_elem-1);
+	dx.resize(dx.n_elem-1);
+	
+	w.subvec(i,w.n_elem-2)=w.subvec(i+1,w.n_elem-1);
+	w.resize(w.n_elem-1);
+      }
+
+    static bool printout=true;
+    if(printout) {
+      // Only print out stencil once
+      printf("\n%13s %13s\n","xsten","wsten");
+      for(size_t i=0;i<w.n_elem;i++)
+	printf("% e % e\n",dx(i),w(i));
+      printout=false;
+    }
+    
+    // Put in spacing
+    dx*=h;
+    w/=h;
+  }
   
   // Loop over degrees of freedom
-  printf("Calculating %i displacements:",(int) (3*basis.get_Nnuc()-3));
+  printf("Calculating %i displacements with %i point stencil:",(int) (3*basis.get_Nnuc()-3),(int) dx.n_elem);
   fflush(stdout);
   for(size_t idof=0;idof<3*basis.get_Nnuc()-3;idof++) {
-    // Build stencil
-    arma::vec dx, w;
-    dx.zeros(stencil);
-    for(int n=0;n<stencil/2;n++)
-      dx(n)=(stencil/2-n)*h;
-    for(int n=stencil/2+1;n<=stencil;n++)
-      dx(n-1)=(stencil/2-n)*h;
-    
-    w.zeros(stencil);    
-    switch(stencil) {
-      /*
-	Stencils from B. Fornberg, "Generation of Finite Difference
-	Formulas on Arbitrarily Spaced Grids", Mathematics of
-	Computation 51, 699 (1988).
-      */
-    case(2):
-      w(0)=1/2.0;
-      w(1)=-1/2.0;
-      break;
-
-    case(4):
-      w(0)=-1/12.0;
-      w(1)=2/3.0;
-      w(2)=-2/3.0;
-      w(3)=1/12.0;
-      break;
-
-    case(6):
-      w(0)=1/60.0;
-      w(1)=-3/20.0;
-      w(2)=3/4.0;
-      w(3)=-3/4.0;
-      w(4)=3/20.0;
-      w(5)=-1/60.0;
-      break;
-
-    case(8):
-      w(0)=-1/280.0;
-      w(1)=4/105.0;
-      w(2)=-1/5.0;
-      w(3)=4/5.0;
-      w(4)=-4/5.0;
-      w(5)=1/5.0;
-      w(6)=-4/105.0;
-      w(7)=1/280.0;
-      break;
-
-    default:
-      throw std::runtime_error("Unsupported stencil\n");
-    }
-    // Put in the spacing
-    w/=h;
-      
     // Energies
-    arma::vec E(stencil);
+    arma::vec E(dx.n_elem);
 
-    for(int isten=0;isten<stencil;isten++) {
+    for(size_t isten=0;isten<dx.n_elem;isten++) {
       // Coordinates of nuclei.
       arma::mat dcoord(nuccoord);
       dcoord[idof]+=dx(isten);
@@ -492,7 +475,7 @@ double calc_E(const gsl_vector *x, void *par, bool noskip) {
   construct_basis(basis,atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,false,noskip,p->stencil,p->step) : run_calc(basis,p->set,false,noskip);
+  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,false,noskip,p->npoints,p->step) : run_calc(basis,p->set,false,noskip);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -532,7 +515,7 @@ void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g, bool nosk
   construct_basis(basis,atoms,p->baslib,p->set);
 
   // Perform the electronic structure calculation
-  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,true,noskip,p->stencil,p->step) : run_calc(basis,p->set,true,noskip);
+  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,true,noskip,p->npoints,p->step) : run_calc(basis,p->set,true,noskip);
 
   // Solution checkpoint
   Checkpoint solchk(p->set.get_string("SaveChk"),false);
@@ -630,7 +613,7 @@ int main(int argc, char **argv) {
   set.add_string("Result","File to save optimized geometry in","optimized.xyz");
   set.set_string("Logfile","erkale_geom.log");
   set.add_bool("NumGrad","Use finite-difference gradient?",false);
-  set.add_int("Stencil","Order of finite-difference stencil for numgrad (2, 4, 6, 8)",2);
+  set.add_int("Stencil","Order of finite-difference stencil for numgrad",2);
   set.add_double("Stepsize","Finite-difference stencil step size",1e-6);
   set.parse(std::string(argv[1]),true);
   set.print();
@@ -729,7 +712,7 @@ int main(int argc, char **argv) {
   pars.set=set;
   pars.dofidx=dofidx;
   pars.numgrad=numgrad;
-  pars.stencil=stencil;
+  pars.npoints=stencil+1;
   pars.step=step;
 
   /* Starting point */
