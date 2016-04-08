@@ -426,3 +426,52 @@ arma::vec find_minima(const arma::vec & x, const arma::vec & y, size_t runave, d
   
   return ret;
 }
+
+void stencil(double z, const arma::vec & x, arma::mat & w) {
+  /*
+    z: location where approximations are wanted
+    x: grid points at which value of function is known
+    w: matrix holding weights for grid points for different orders 
+       of the derivatives: w(x, order)
+
+       This implementation is based on B. Fornberg, "Calculation of
+       weights in finite difference formulas", SIAM Rev. 40, 685
+       (1998).
+   */
+
+  /* Extract variables */
+  size_t n = w.n_rows - 1;
+  size_t m = w.n_cols - 1;
+
+  /* Sanity check */
+  if(w.n_rows != x.n_elem)
+    throw std::logic_error("Grid points and weight matrix sizes aren't compatible!\n");
+
+  /* Initialize elements */
+  double c1 = 1.0;
+  double c4 = x(0)-z;
+  w.zeros();
+  w(0,0)=1.0;
+  
+  for(size_t i=1;i<=n;i++) {
+    size_t mn = std::min(i,m);
+    double c2 = 1.0;
+    double c5 = c4;
+    c4 = x(i) - z;
+    
+    for(size_t j=0;j<i;j++) {
+      double c3 = x(i) - x(j);
+      c2 *= c3;
+
+      if(j == i-1) {
+	for(size_t k=mn;k>0;k--)
+	  w(i,k) = c1*(k*w(i-1,k-1) - c5*w(i-1,k))/c2;
+	w(i,0)=-c1*c5*w(i-1,0)/c2;
+      }
+      for(size_t k=mn;k>0;k--)
+	w(j,k)=(c4*w(j,k) - k*w(j,k-1))/c3;
+      w(j,0)=c4*w(j,0)/c3;
+    }
+    c1 = c2;
+  }
+}

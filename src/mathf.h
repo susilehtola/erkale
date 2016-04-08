@@ -167,5 +167,15 @@ template<typename T> size_t sorted_insertion(std::vector<T> & v, T t) {
     return pos-v.begin();
   }
 }
-  
+
+/**
+ * Get n point stencil for derivatives up to m:th order evaluated at
+ * point z, with the values of the function known at points x
+ *
+ * This implementation is based on B. Fornberg, "Calculation of
+ * weights in finite difference formulas", SIAM Rev. 40, 685
+ * (1998).
+ */
+void stencil(double z, const arma::vec & x, arma::mat & w);
+
 #endif
