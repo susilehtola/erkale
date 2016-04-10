@@ -637,11 +637,7 @@ int main(int argc, char **argv) {
 
     // Macroiteration status
     printf("\n%s step\n",steptype.c_str());
-    if(iiter>0) {
-      printf("%4i % 18.10f %e % 7.3f % 7.3f\n",iiter,E,E-Eold,fmax,frms);
-    } else {
-      printf("%4i % 18.10f %13s % 7.3f % 7.3f\n",iiter,E,"",fmax,frms);
-    }
+    printf("%4i % 18.10f % 7.3f % 7.3f\n",iiter,E,fmax,frms);
     fflush(stdout);
     
     // Legend
