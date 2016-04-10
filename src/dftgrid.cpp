@@ -63,6 +63,10 @@ bool operator<(const dens_list_t &lhs, const dens_list_t & rhs) {
 }
 
 AngularGrid::AngularGrid(bool lobatto_) : use_lobatto(lobatto_) {
+  do_grad=false;
+  do_lapl=false;
+  do_hess=false;
+  do_lgrad=false;
 }
 
 AngularGrid::~AngularGrid() {
