@@ -189,7 +189,7 @@ void run_calc(const BasisSet & basis, Settings set, bool force) {
 
     double fmax, frms;
     get_forces(f, fmax, frms);
-    printf("Max force = %e, rms force = %e\n",fmax,frms);
+    printf("Max force = %.3e, rms force = %.3e\n",fmax,frms);
   }
 }
 
@@ -309,7 +309,7 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
   interpret_force(f).t().print("Numerical force");
   double fmax, frms;
   get_forces(f, fmax, frms);
-  printf("Max force = %e, rms force = %e\n",fmax,frms);
+  printf("Max force = %.3e, rms force = %.3e\n",fmax,frms);
 }
 
 void calculate(const arma::vec & x, const opthelper_t & p, double & E, arma::vec & g, bool force) {
@@ -407,7 +407,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","File to load old results from","");
   set.add_bool("ForcePol","Force polarized calculation",false);
   set.add_bool("FreezeCore","Freeze the atomic cores?",false);
-  set.add_string("Optimizer","Optimizer to use: CGFR, CGPR, BFGS, BFGS2 (default), SD","BFGS2");
+  set.add_string("Optimizer","Optimizer to use: CGFR, CGPR, BFGS, SD","BFGS");
   set.add_int("MaxSteps","Maximum amount of geometry steps",256);
   set.add_string("Criterion","Convergence criterion to use: LOOSE, NORMAL, TIGHT, VERYTIGHT","NORMAL");
   set.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
@@ -545,12 +545,6 @@ int main(int argc, char **argv) {
   // First step is steplen/fac
   steplen*=fac;
   
-  printf("\n\nStarting geometry optimization\n");
-  printf("%4s %19s %13s %8s %8s\n","iter","E","dE","fmax","frms");
-
-  fprintf(stderr,"\n%3s %19s %7s %7s %8s %8s %8s %8s %s\n", "it", "E", "dE", "dEfrac", "dmax", "drms", "fmax", "frms", "t");
-  fflush(stderr);
-  
   for(int iiter=0;iiter<maxiter;iiter++) {
     Timer titer;
     
@@ -576,6 +570,12 @@ int main(int argc, char **argv) {
     Eold=E;
     
     if(iiter==0) {
+      printf("\n\nStarting geometry optimization\n");
+      printf("%4s %18s %9s %9s\n","iter","E","fmax","frms");
+      
+      fprintf(stderr,"\n%3s %18s %10s %10s %10s %10s %10s %10s %s\n", "it", "E", "dE", "dEfrac", "dmax ", "drms ", "fmax ", "frms ", "t");
+      fflush(stderr);
+      
       // Turn off verbose setting for any later calcs
       pars.set.set_bool("Verbose",false);
       try {
@@ -637,7 +637,7 @@ int main(int argc, char **argv) {
 
     // Macroiteration status
     printf("\n%s step\n",steptype.c_str());
-    printf("%4i % 18.10f % 7.3f % 7.3f\n",iiter,E,fmax,frms);
+    printf("%4i % 18.10f %.3e %.3e\n",iiter,E,fmax,frms);
     fflush(stdout);
     
     // Legend
@@ -908,7 +908,7 @@ int main(int argc, char **argv) {
 
     const static char cconv[]=" *";
       
-    fprintf(stderr,"%3i % .10f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", iiter, E, dE, dEfrac, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
+    fprintf(stderr,"%3i % 18.10f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", iiter, E, dE, dEfrac, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
     fflush(stderr);
       
     bool convd=dmaxconv && drmsconv && fmaxconv && frmsconv;
