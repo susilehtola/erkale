@@ -721,17 +721,15 @@ int main(int argc, char **argv) {
 	// Need smaller step
 	linesearch_t p;
 	if(imin==0) {
-	  iref=0;
-	  p.s=steps[iref].s/fac;
+	  p.s=steps[imin].s/fac;
 	} else {
-	  iref=steps.size()-1;
-	  p.s=steps[iref].s*fac;
+	  p.s=steps[imin].s*fac;
 	}
 	p.icalc=ncalc;
 	
 	double Et;
 	arma::vec ft;
-	pars.set.set_string("LoadChk",getchk(steps[0].icalc));
+	pars.set.set_string("LoadChk",getchk(steps[imin].icalc));
 	pars.set.set_string("SaveChk",getchk(ncalc));
 	calculate(x+p.s*sd,pars,Et,ft,false);
 	chkstore.push_back(ncalc);
@@ -747,6 +745,73 @@ int main(int argc, char **argv) {
 	printf("\n");
 	fflush(stdout);
 	break;
+      }
+    }
+
+    {
+      // Interpolate: A b = y
+      arma::mat A(3,3);
+      arma::vec y(3);
+      for(size_t i=0;i<3;i++) {
+	A(i,0)=1.0;
+	A(i,1)=steps[imin+i-1].s;
+	A(i,2)=std::pow(A(i,1),2);
+	
+	y(i)=steps[imin+i-1].E;
+      }
+
+      arma::mat b;
+      if(arma::solve(b,A,y) && b(2)>sqrt(DBL_EPSILON)) {
+	// Success in solution and parabola gives minimum.
+
+	// The minimum of the parabola is at
+	double x0=-b(1)/(2*b(2));
+
+	// Is this an interpolation?
+	if(A(0,1) < x0 && x0 < A(2,1)) {
+	  Timer ts;
+
+	  // Figure out which reference is the closest
+	  iref=steps[imin-1].icalc;
+	  double dminv=std::abs(x0-A(0,1));
+	  for(size_t i=1;i<A.n_rows;i++) {
+	    double d=std::abs(x0-A(i,1));
+	    if(d<dminv) {
+	      dminv=d;
+	      iref=steps[imin+i-1].icalc;
+	    }
+	  }
+	  
+	  // Do the calculation with the interpolated step
+	  linesearch_t p;
+	  p.s=x0;
+	  p.icalc=ncalc;
+	
+	  double Et;
+	  arma::vec ft;
+	  pars.set.set_string("LoadChk",getchk(iref));
+	  pars.set.set_string("SaveChk",getchk(ncalc));
+	  calculate(x+p.s*sd,pars,Et,ft,false);
+	  chkstore.push_back(ncalc);
+	  ncalc++;
+	  
+	  p.E=Et;
+	  steps.push_back(p);
+	  printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
+	  fflush(stdout);
+
+	  // Resort the steps in length
+	  std::sort(steps.begin(),steps.end());
+	  
+	  // Find the minimum energy
+	  Emin=steps[0].E;
+	  imin=0;
+	  for(size_t i=1;i<steps.size();i++)
+	    if(steps[i].E < Emin) {
+	      Emin=steps[i].E;
+	      imin=i;
+	    }
+	}
       }
     }
     
