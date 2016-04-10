@@ -31,6 +31,7 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
+#include "lbfgs.h"
 
 // Needed for libint init
 #include "eriworker.h"
@@ -47,10 +48,6 @@
 #ifdef SVNRELEASE
 #include "version.h"
 #endif
-
-extern "C" {
-#include <gsl/gsl_multimin.h>
-}
 
 // Optimization helpers
 typedef struct {
@@ -78,8 +75,6 @@ enum minimizer {
   gCGPR,
   // Broyden-Fletcher-Goldfarb-Shanno
   gBFGS,
-  // Broyden-Fletcher-Goldfarb-Shanno, second version
-  gBFGS2,
   // Steepest descent
   gSD
 };
@@ -115,23 +110,23 @@ void get_displacement(const std::vector<atom_t> & g, const std::vector<atom_t> &
   dmax=sqrt(dmax);
 }
 
-double calculate_projection(const std::vector<atom_t> & g, const std::vector<atom_t> & o, const arma::mat & f, const std::vector<size_t> & dofidx) {
+double calculate_projection(const std::vector<atom_t> & g, const std::vector<atom_t> & o, const arma::vec & f, const std::vector<size_t> & dofidx) {
   double dE=0.0;
   for(size_t i=0;i<g.size();i++) {
     size_t j=dofidx[i];
-    dE+=f(i,0)*(g[j].x-o[j].x) + f(i,1)*(g[j].y-o[j].y) + f(i,2)*(g[j].z-o[j].z);
+    dE+=f(3*i)*(g[j].x-o[j].x) + f(3*i+1)*(g[j].y-o[j].y) + f(3*i+2)*(g[j].z-o[j].z);
   }
   return dE;
 }
 
-void get_forces(const gsl_vector *g, double & fmax, double & frms) {
+void get_forces(const arma::vec & g, double & fmax, double & frms) {
   fmax=0.0;
   frms=0.0;
 
-  for(size_t i=0;i<g->size/3;i++) {
-    double x=gsl_vector_get(g,3*i);
-    double y=gsl_vector_get(g,3*i+1);
-    double z=gsl_vector_get(g,3*i+2);
+  for(size_t i=0;i<g.n_elem/3;i++) {
+    double x=g(3*i);
+    double y=g(3*i+1);
+    double z=g(3*i+2);
 
     double fsq=x*x + y*y + z*z;
 
@@ -140,19 +135,19 @@ void get_forces(const gsl_vector *g, double & fmax, double & frms) {
       fmax=fsq;
   }
 
-  frms=sqrt(3*frms/g->size);
+  frms=sqrt(3*frms/g.n_elem);
   fmax=sqrt(fmax);
 }
 
-std::vector<atom_t> get_atoms(const gsl_vector * x, const opthelper_t & opts) {
+std::vector<atom_t> get_atoms(const arma::vec & x, const opthelper_t & opts) {
   // Update atomic positions
   std::vector<atom_t> atoms(opts.atoms);
 
   for(size_t i=0;i<opts.dofidx.size();i++) {
     size_t j=opts.dofidx[i];
-    atoms[j].x=gsl_vector_get(x,3*i);
-    atoms[j].y=gsl_vector_get(x,3*i+1);
-    atoms[j].z=gsl_vector_get(x,3*i+2);
+    atoms[j].x=x(3*i);
+    atoms[j].y=x(3*i+1);
+    atoms[j].z=x(3*i+2);
   }
 
   return atoms;
@@ -170,191 +165,47 @@ enum calcd {
 };
 
 
-enum calcd run_calc(const BasisSet & basis, Settings & set, bool force, bool noskip) {
+void run_calc(const BasisSet & basis, Settings set, bool force) {
   bool pz=false;
   try {
     pz=set.get_bool("PZ");
   } catch(std::runtime_error) {
   }
-  
+
   if(pz)
     throw std::logic_error("Analytic forces not implemented for PZ-SIC!\n");
-  
+
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
-  bool strictint(set.get_bool("StrictIntegrals"));
-  
-  if(stricmp(loadname,"")==0 || noskip) {
-    // Nothing to load - run full calculation.
-    calculate(basis,set,force);
-    if(force)
-      return FULLCALC;
-    else
-      return ECALC;
+
+  // Nothing to load - run full calculation.
+  calculate(basis,set,force);
+  if(force) {
+    Checkpoint solchk(set.get_string("SaveChk"),false);
+    arma::vec f;
+    solchk.read("Force",f);
+    interpret_force(f).t().print("Analytic force");
+
+    double fmax, frms;
+    get_forces(f, fmax, frms);
+    printf("Max force = %e, rms force = %e\n",fmax,frms);
   }
-
-  // Was the calculation converged?
-  bool convd;
-  BasisSet oldbas;
-  {
-    Checkpoint chkpt(loadname,false);
-    chkpt.read("Converged",convd);
-    chkpt.read(oldbas);
-  }
-  if(!convd || !(basis == oldbas)) {
-    // Old calculation was not converged, or different basis used - run full calculation
-    if(!convd) set.set_string("LoadName","");
-    calculate(basis,set,force);
-    if(force)
-      return FULLCALC;
-    else
-      return ECALC;
-  }
-
-  // Because we are here, the basis set is the same.
-  if(!force)
-    // No force required, can just read energy from file.
-    return NOCALC;
-
-  // Have converged energy, compute force.
-  // Open the checkpoint in write mode, don't truncate it
-  Checkpoint chkpt(savename,true,false);
-
-  // SCF structure
-  SCF solver(basis,set,chkpt);
-
-  // Do a plain Hartree-Fock calculation?
-  bool hf= (stricmp(set.get_string("Method"),"HF")==0);
-  bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
-
-  dft_t dft;
-  if(!hf && !rohf) {
-    // Get exchange and correlation functionals as well as grid settings
-    dft=parse_dft(set,false);
-  }
-    
-  // Force
-  arma::vec f;
-
-  double tol;
-  chkpt.read("tol",tol);
-
-  // Multiplicity
-  int mult=set.get_int("Multiplicity");
-  // Amount of electrons
-  int Nel=basis.Ztot()-set.get_int("Charge");
-
-  if(mult==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
-    rscf_t sol;
-    chkpt.read("C",sol.C);
-    chkpt.read("E",sol.E);
-    chkpt.read("H",sol.H);
-    chkpt.read("P",sol.P);
-
-    std::vector<double> occs;
-    chkpt.read("occs",occs);
-
-    // Restricted case
-    if(hf) {
-      f=solver.force_RHF(sol,occs,FINETOL);
-    } else {
-      DFTGrid grid(&basis,set.get_bool("Verbose"),dft.lobatto);
-      DFTGrid nlgrid(&basis,set.get_bool("Verbose"),dft.lobatto);
-
-      // Fixed grid?
-      if(dft.adaptive)
-	grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
-      else {
-	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
-	if(dft.nl)
-	  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
-      }
-      f=solver.force_RDFT(sol,occs,dft,grid,nlgrid,FINETOL);
-    }
-
-  } else {
-
-    uscf_t sol;
-    chkpt.read("Ca",sol.Ca);
-    chkpt.read("Ea",sol.Ea);
-    chkpt.read("Ha",sol.Ha);
-    chkpt.read("Pa",sol.Pa);
-
-    chkpt.read("Cb",sol.Cb);
-    chkpt.read("Eb",sol.Eb);
-    chkpt.read("Hb",sol.Hb);
-    chkpt.read("Pb",sol.Pb);
-    chkpt.read("P",sol.P);
-
-    std::vector<double> occa, occb;
-    chkpt.read("occa",occa);
-    chkpt.read("occb",occb);
-
-    if(hf) {
-      f=solver.force_UHF(sol,occa,occb,tol);
-    } else if(rohf) {
-      int Nela, Nelb;
-      chkpt.read("Nel-a",Nela);
-      chkpt.read("Nel-b",Nelb);
-
-      throw std::runtime_error("Not implemented!\n");
-      //      f=solver.force_ROHF(sol,Nela,Nelb,tol);
-    } else {
-      DFTGrid grid(&basis,set.get_bool("Verbose"),dft.lobatto);
-      DFTGrid nlgrid(&basis,set.get_bool("Verbose"),dft.lobatto);
-
-      // Fixed grid?
-      if(dft.adaptive)
-	grid.construct(sol.P,dft.gridtol,dft.x_func,dft.c_func);
-      else {
-	grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
-	if(dft.nl)
-	  nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
-      }
-      f=solver.force_UDFT(sol,occa,occb,dft,grid,nlgrid,tol);
-    }
-  }
-
-  interpret_force(f).t().print("Analytic force");
-  
-  chkpt.write("Force",f);
-  chkpt.close();
-
-  return FORCECALC;
 }
 
-enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool noskip, int npoints, double h) {
+void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints, double h) {
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
-  
-  if(stricmp(loadname,"")==0 || noskip) {
-    // Nothing to load - run full calculation.
-    calculate(basis,set,force);
-    if(force)
-      return FULLCALC;
-    else
-      return ECALC;
-  }
 
-  // Was the calculation converged?
-  bool convd;
-  BasisSet oldbas;
-  {
-    Checkpoint chkpt(loadname,false);
-    chkpt.read("Converged",convd);
-    chkpt.read(oldbas);
-  }
-  if(!convd || !(basis == oldbas)) {
-    // Old calculation was not converged, or different basis used - run calculation
-    if(!convd) set.set_string("LoadName","");
-    calculate(basis,set,false);
-    
-    if(!force) return ECALC;
-  } else if(!force)
-    // No force required, can just read energy from file.
-    return NOCALC;
+  // Run calculation
+  calculate(basis,set,false);
+
+  // All we needed was the energy.
+  if(!force)
+    return;
+  // Turn off verbose setting
+  set.set_bool("Verbose",false);
   
   // We have converged the energy, next compute force by finite
   // differences.
@@ -382,7 +233,7 @@ enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool
       if(std::abs(w(i))<DBL_EPSILON*npoints) {
 	dx.subvec(i,dx.n_elem-2)=dx.subvec(i+1,dx.n_elem-1);
 	dx.resize(dx.n_elem-1);
-	
+
 	w.subvec(i,w.n_elem-2)=w.subvec(i+1,w.n_elem-1);
 	w.resize(w.n_elem-1);
       }
@@ -395,12 +246,12 @@ enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool
 	printf("% e % e\n",dx(i),w(i));
       printout=false;
     }
-    
+
     // Put in spacing
     dx*=h;
     w/=h;
   }
-  
+
   // Loop over degrees of freedom
   printf("Calculating %i displacements with %i point stencil:",(int) (3*basis.get_Nnuc()-3),(int) dx.n_elem);
   fflush(stdout);
@@ -418,10 +269,10 @@ enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool
       // Basis set
       BasisSet dbas(basis);
       dbas.set_nuclear_coords(dcoord);
-      
+
       // Energy
       energy_t en;
-    
+
       Settings tempset(set);
       tempset.set_string("LoadChk",savename);
       tempset.set_string("SaveChk",".tempchk");
@@ -448,129 +299,79 @@ enum calcd run_calc_num(const BasisSet & basis, Settings & set, bool force, bool
   // forces on the other nuclei
   fm.col(fm.n_cols-1)=-arma::sum(fm.cols(0,fm.n_cols-2),1);
   //fm.print("Numerical forces");
-  
+
   // Open the checkpoint in write mode, don't truncate it
   Checkpoint chkpt(savename,true,false);
   arma::vec f(arma::vectorise(fm));
   chkpt.write("Force",f);
   chkpt.close();
-  
+
   interpret_force(f).t().print("Numerical force");
-
-  return FORCECALC;
+  double fmax, frms;
+  get_forces(f, fmax, frms);
+  printf("Max force = %e, rms force = %e\n",fmax,frms);
 }
 
-double calc_E(const gsl_vector *x, void *par, bool noskip) {
+void calculate(const arma::vec & x, const opthelper_t & p, double & E, arma::vec & g, bool force) {
   Timer t;
 
-  // Get the helpers
-  opthelper_t *p=(opthelper_t *) par;
-
   // Get the atomic positions
-  std::vector<atom_t> atoms=get_atoms(x,*p);
+  std::vector<atom_t> atoms=get_atoms(x,p);
   //  print_xyz(atoms);
 
   // Construct basis set
   BasisSet basis;
-  construct_basis(basis,atoms,p->baslib,p->set);
+  construct_basis(basis,atoms,p.baslib,p.set);
 
   // Perform the electronic structure calculation
-  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,false,noskip,p->npoints,p->step) : run_calc(basis,p->set,false,noskip);
-
-  // Solution checkpoint
-  Checkpoint solchk(p->set.get_string("SaveChk"),false);
-
-  // Current energy is
-  energy_t en;
-  solchk.read(en);
-
-  if(mode==FULLCALC) {
-    ERROR_INFO();
-    throw std::runtime_error("Should have not computed forces for energy.\n");
-  } else if(mode==ECALC)
-    printf("Computed energy % .8f in %s.\n",en.E,t.elapsed().c_str());
+  if(p.numgrad)
+    run_calc_num(basis,p.set,force,p.npoints,p.step);
   else
-    printf("Found    energy % .8f in checkpoint file.\n",en.E);
-  fflush(stdout);
-
-  return en.E;
-}
-
-double calc_E(const gsl_vector *x, void *par) {
-  return calc_E(x,par,false);
-}
-
-void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g, bool noskip) {
-  Timer t;
-
-  // Get the helpers
-  opthelper_t *p=(opthelper_t *) par;
-
-  // Get the atomic positions
-  std::vector<atom_t> atoms=get_atoms(x,*p);
-  //  print_xyz(atoms);
-
-  // Construct basis set
-  BasisSet basis;
-  construct_basis(basis,atoms,p->baslib,p->set);
-
-  // Perform the electronic structure calculation
-  enum calcd mode=(p->numgrad) ? run_calc_num(basis,p->set,true,noskip,p->npoints,p->step) : run_calc(basis,p->set,true,noskip);
+    run_calc(basis,p.set,force);
 
   // Solution checkpoint
-  Checkpoint solchk(p->set.get_string("SaveChk"),false);
+  Checkpoint solchk(p.set.get_string("SaveChk"),false);
 
   // Energy
   energy_t en;
   solchk.read(en);
-  *E=en.E;
+  E=en.E;
 
   // Force
   arma::vec f;
-  solchk.read("Force",f);
+  if(force) {
+    solchk.read("Force",f);
 
-  // Set components
-  for(size_t i=0;i<p->dofidx.size();i++) {
-    size_t j=p->dofidx[i];
-    gsl_vector_set(g,3*i  ,-f(3*j));
-    gsl_vector_set(g,3*i+1,-f(3*j+1));
-    gsl_vector_set(g,3*i+2,-f(3*j+2));
+    // Set components
+    g.zeros(3*p.dofidx.size());
+    for(size_t i=0;i<p.dofidx.size();i++) {
+      size_t j=p.dofidx[i];
+      g(3*i)=-f(3*j);
+      g(3*i+1)=-f(3*j+1);
+      g(3*i+2)=-f(3*j+2);
+    }
   }
-
-  double frms, fmax;
-  get_forces(g,fmax,frms);
-
-  if(mode==ECALC) {
-    ERROR_INFO();
-    throw std::runtime_error("Should have not computed just the energy for forces.\n");
-  } else if(mode==FULLCALC)
-    printf("Computed energy % .8f and forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
-  else if(mode==FORCECALC)
-    printf("Found    energy % .8f in checkpoint file and calculated forces (max = %.3e, rms = %.3e) in %s.\n",en.E,fmax,frms,t.elapsed().c_str());
-  else if(mode==NOCALC)
-    printf("Found energy and forces in checkpoint file.\n");
-  fflush(stdout);
 }
 
-void calc_Ef(const gsl_vector *x, void *par, double *E, gsl_vector *g) {
-  return calc_Ef(x,par,E,g,false);
+std::string getchk(size_t n) {
+  std::ostringstream oss;
+  oss << "geomcalc_" << n << ".chk";
+  return oss.str();
 }
 
-void calc_f(const gsl_vector *x, void *par, gsl_vector *g) {
+// Helper for line search
+typedef struct {
+  // Step length
+  double s;
+  // Energy
   double E;
-  calc_Ef(x,par,&E,g);
-}
+  // Calculation
+  size_t icalc;
+} linesearch_t;
 
-arma::mat interpret_force(const gsl_vector *x) {
-  arma::mat r(x->size/3,3);
-  for(size_t i=0;i<x->size/3;i++) {
-    r(i,0)=gsl_vector_get(x,3*i);
-    r(i,1)=gsl_vector_get(x,3*i+1);
-    r(i,2)=gsl_vector_get(x,3*i+2);
-  }
-  return r;
+bool operator<(const linesearch_t & lh, const linesearch_t & rh) {
+  return lh.s < rh.s;
 }
-
 
 int main(int argc, char **argv) {
 
@@ -621,7 +422,6 @@ int main(int argc, char **argv) {
   // Don't try saving or loading Cholesky integrals
   set.set_int("CholeskyMode",0);
 
-  bool verbose=set.get_bool("Verbose");
   int maxiter=set.get_int("MaxSteps");
   std::string optmovie=set.get_string("OptMovie");
   std::string result=set.get_string("Result");
@@ -638,8 +438,6 @@ int main(int argc, char **argv) {
     alg=gCGPR;
   else if(stricmp(method,"BFGS")==0)
     alg=gBFGS;
-  else if(stricmp(method,"BFGS2")==0)
-    alg=gBFGS2;
   else if(stricmp(method,"SD")==0)
     alg=gSD;
   else {
@@ -714,128 +512,284 @@ int main(int argc, char **argv) {
   pars.numgrad=numgrad;
   pars.npoints=stencil+1;
   pars.step=step;
-
+  
   /* Starting point */
-  gsl_vector *x = gsl_vector_alloc (3*dofidx.size());
+  arma::vec x(3*dofidx.size());
   for(size_t i=0;i<dofidx.size();i++) {
-    gsl_vector_set(x,3*i,atoms[dofidx[i]].x);
-    gsl_vector_set(x,3*i+1,atoms[dofidx[i]].y);
-    gsl_vector_set(x,3*i+2,atoms[dofidx[i]].z);
+    x(3*i)=atoms[dofidx[i]].x;
+    x(3*i+1)=atoms[dofidx[i]].y;
+    x(3*i+2)=atoms[dofidx[i]].z;
   }
 
-  // GSL status
-  int status;
+  // Steps taken in optimization, index of reference calc
+  size_t ncalc=0, iref=0;
+  // Stored checkpoints
+  std::vector<size_t> chkstore;
+  
+  // Energy and force, as well as old energy and force
+  double E=0.0, Eold;
+  arma::vec f, fold;
+  // Current and old search direction
+  arma::vec sd, sdold;
 
-  const gsl_multimin_fdfminimizer_type *T;
-  gsl_multimin_fdfminimizer *s;
-
-  gsl_multimin_function_fdf minimizer;
-
-  minimizer.n = x->size;
-  minimizer.f = calc_E;
-  minimizer.df = calc_f;
-  minimizer.fdf = calc_Ef;
-  minimizer.params = (void *) &pars;
-
-  if(alg==gCGFR) {
-    T = gsl_multimin_fdfminimizer_conjugate_fr;
-    if(verbose) printf("Using Fletcher-Reeves conjugate gradients.\n");
-  } else if(alg==gCGPR) {
-    T = gsl_multimin_fdfminimizer_conjugate_pr;
-    if(verbose) printf("Using Polak-Ribière conjugate gradients.\n");
-  } else if(alg==gBFGS) {
-    T = gsl_multimin_fdfminimizer_vector_bfgs;
-    if(verbose) printf("Using the BFGS minimizer.\n");
-  } else if(alg==gBFGS2) {
-    T = gsl_multimin_fdfminimizer_vector_bfgs2;
-    if(verbose) printf("Using the BFGS2 minimizer.\n");
-  } else if(alg==gSD) {
-    T = gsl_multimin_fdfminimizer_steepest_descent;
-    if(verbose) printf("Using the steepest descent minimizer.\n");
-  } else {
-    ERROR_INFO();
-    throw std::runtime_error("Unsupported minimizer\n");
-  }
-
-  // Run an initial calculation, don't use reference!
-  double oldE=calc_E(x,minimizer.params,true);
-
-  // Turn off verbose setting
-  pars.set.set_bool("Verbose",false);
-  // and load from old checkpoint
-  pars.set.set_string("LoadChk",pars.set.get_string("SaveChk"));
-  try {
-    // Also, don't localize, since it would screw up the converged guess
-    pars.set.set_string("PZloc","false");
-    // And don't run stability analysis, since we are only doing small displacements
-    pars.set.set_int("PZstab",0);
-  } catch(std::runtime_error) {
-  }
-
-  // Initialize minimizer
-  s = gsl_multimin_fdfminimizer_alloc (T, minimizer.n);
-
-  // Use initial step length of 0.02 bohr, and a line search accuracy
-  // 1e-1 (recommended in the GSL manual for BFGS)
-  gsl_multimin_fdfminimizer_set (s, &minimizer, x, 0.02, 1e-1);
-
-  // Store old force
-  arma::mat oldf=interpret_force(s->gradient);
-
-  fprintf(stderr,"Geometry optimizer initialized in %s.\n",tprog.elapsed().c_str());
-  fprintf(stderr,"Entering minimization loop with %s optimizer.\n",set.get_string("Optimizer").c_str());
-
-  fprintf(stderr,"%4s %16s %10s %10s %9s %9s %9s %9s %s\n","iter","E","dE","dE/dEproj","disp max","disp rms","f max","f rms", "titer");
-
+  // Old geometry
   std::vector<atom_t> oldgeom(atoms);
+  
+  // Helper
+  LBFGS bfgs;
 
-  bool convd=false;
-  int iter;
+  // Step size
+  double steplen=0.01;
+  const double fac=2.0;
 
-  for(iter=1;iter<=maxiter;iter++) {
-    printf("\nGeometry iteration %i\n",(int) iter);
-    fflush(stdout);
+  // First step is steplen/fac
+  steplen*=fac;
+  
+  printf("\n\nStarting geometry optimization\n");
+  printf("%4s %19s %13s %8s %8s\n","iter","E","dE","fmax","frms");
 
+  fprintf(stderr,"\n%3s %19s %7s %7s %8s %8s %8s %8s %s\n", "it", "E", "dE", "dEfrac", "dmax", "drms", "fmax", "frms", "t");
+  fflush(stderr);
+  
+  for(int iiter=0;iiter<maxiter;iiter++) {
     Timer titer;
+    
+    // Store old values of gradient and search direction
+    fold=f;
+    sdold=sd;
 
-    status = gsl_multimin_fdfminimizer_iterate (s);
-
-    if (status) {
-      fprintf(stderr,"GSL encountered error: \"%s\".\n",gsl_strerror(status));
-      break;
+    if(iiter!=0)
+      // Load reference from earlier calculation
+      pars.set.set_string("LoadChk",getchk(iref));
+    // Save calculation to
+    pars.set.set_string("SaveChk",getchk(ncalc));
+    
+    // Calculate energy and force at current position
+    calculate(x,pars,E,f,true);
+    chkstore.push_back(ncalc);
+    // Change reference
+    iref=ncalc;
+    // Increment step value
+    ncalc++;
+    
+    // Store old value of energy
+    Eold=E;
+    
+    if(iiter==0) {
+      // Turn off verbose setting for any later calcs
+      pars.set.set_bool("Verbose",false);
+      try {
+	// Also, don't localize, since it would screw up the converged guess
+	pars.set.set_string("PZloc","false");
+	// And don't run stability analysis, since we are only doing small displacements
+	pars.set.set_int("PZstab",0);
+      } catch(std::runtime_error) {
+      }
+    }
+    
+    // Save geometry step
+    {
+      char comment[80];
+      sprintf(comment,"Step %i",(int) iiter);
+      save_xyz(get_atoms(x,pars),comment,optmovie,true);
     }
 
-    // New geometry is
-    std::vector<atom_t> geom=get_atoms(s->x,pars);
+    // Search direction
+    sd=-f;
+    std::string steptype="SD";
+    
+    if(iiter>0) {
+      if(alg==gCGPR || alg==gCGFR) {
+	// Polak-Ribière
+	double gamma;
+	if(alg==gCGPR) {
+	  gamma=arma::dot(f,f-fold)/arma::dot(fold,fold);
+	  steptype="CGPR";
+	} else {
+	  gamma=arma::dot(f,f)/arma::dot(fold,fold);
+	  steptype="CGFR";
+	}
+	
+	arma::vec sdnew=sd+gamma*sdold;
+	if(arma::dot(f,fold)>=0.2*arma::dot(fold,fold)) {
+	  steptype="Powell restart - SD";
+	} else
+	  sd=sdnew;
+	
+      } else if(alg==gBFGS) {
+	// Update BFGS
+	bfgs.update(x,f);
+	// Get search direction
+	sd=-bfgs.solve();
+	steptype="BFGS";
+      }
 
-    // Calculate displacements
-    double dmax, drms;
-    get_displacement(geom, oldgeom, dmax, drms);
-
-    // Calculate projected change of energy
-    double dEproj=calculate_projection(geom,oldgeom,oldf,pars.dofidx);
-    // Actual change of energy is
-    double dE=s->f - oldE;
-
-    // Switch geometries
-    oldgeom=geom;
-    // Save old force
+      // Check we are still going downhill
+      if(arma::dot(sd,-f)<=0) {
+	steptype+=": Bad search direction. SD";
+	sd=-f;
+      }
+    }
 
     // Get forces
     double fmax, frms;
-    get_forces(s->gradient, fmax, frms);
+    get_forces(f, fmax, frms);
 
-    // Save geometry step
-    char comment[80];
-    sprintf(comment,"Step %i",(int) iter);
-    save_xyz(get_atoms(s->x,pars),comment,optmovie,true);
+    // Macroiteration status
+    printf("\n%s step\n",steptype.c_str());
+    if(iiter>0) {
+      printf("%4i % 18.10f %e % 7.3f % 7.3f\n",iiter,E,E-Eold,fmax,frms);
+    } else {
+      printf("%4i % 18.10f %13s % 7.3f % 7.3f\n",iiter,E,"",fmax,frms);
+    }
+    fflush(stdout);
+    
+    // Legend
+    printf("\t%2s %12s %13s\n","i","step","dE");
+    // Do a line search on the search direction
+    std::vector<linesearch_t> steps;
+    // First, we try a fraction of the current step length
+    {
+      Timer ts;
+      
+      // Step length and energy
+      linesearch_t p;
+      p.s=steplen/fac;
+      p.icalc=ncalc;
 
+      double Et;
+      arma::vec ft;
+      pars.set.set_string("LoadChk",getchk(iref));
+      pars.set.set_string("SaveChk",getchk(ncalc));
+      calculate(x+p.s*sd,pars,Et,ft,false);
+      iref=ncalc;
+      chkstore.push_back(ncalc);
+      ncalc++;
+      
+      p.E=Et;
+      steps.push_back(p);
+
+      printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
+      fflush(stdout);
+    }
+
+    // Next, we try the current step length
+    {
+      Timer ts;
+
+      // Step length and energy
+      linesearch_t p;
+      p.s=steplen;
+      p.icalc=ncalc;
+
+      double Et;
+      arma::vec ft;
+      pars.set.set_string("LoadChk",getchk(iref));
+      pars.set.set_string("SaveChk",getchk(ncalc));
+      calculate(x+p.s*sd,pars,Et,ft,false);
+      iref=ncalc;
+      chkstore.push_back(ncalc);
+      ncalc++;
+      
+      p.E=Et;
+      steps.push_back(p);
+      printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
+      fflush(stdout);
+    }
+
+    // Minimum energy and index
+    double Emin;
+    size_t imin;
+    
+    while(true) {
+      // Sort the steps in length
+      std::sort(steps.begin(),steps.end());
+
+      // Find the minimum energy
+      Emin=steps[0].E;
+      imin=0;
+      for(size_t i=1;i<steps.size();i++)
+	if(steps[i].E < Emin) {
+	  Emin=steps[i].E;
+	  imin=i;
+	}
+
+      // Where is the minimum?
+      if(imin==0 || imin==steps.size()-1) {
+	Timer ts;
+
+	// Need smaller step
+	linesearch_t p;
+	if(imin==0) {
+	  iref=0;
+	  p.s=steps[iref].s/fac;
+	} else {
+	  iref=steps.size()-1;
+	  p.s=steps[iref].s*fac;
+	}
+	p.icalc=ncalc;
+	
+	double Et;
+	arma::vec ft;
+	pars.set.set_string("LoadChk",getchk(steps[0].icalc));
+	pars.set.set_string("SaveChk",getchk(ncalc));
+	calculate(x+p.s*sd,pars,Et,ft,false);
+	chkstore.push_back(ncalc);
+	ncalc++;
+	
+	p.E=Et;
+	steps.push_back(p);
+	printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
+	fflush(stdout);
+	
+      } else {
+	// Optimum is somewhere in the middle
+	printf("\n");
+	fflush(stdout);
+	break;
+      }
+    }
+    
+    // Switch to the minimum geometry
+    x+=steps[imin].s*sd;
+    iref=steps[imin].icalc;
+
+    // Store optimal step length
+    steplen=steps[imin].s;
+    
+    // Copy checkpoint file
+    {
+      std::ostringstream oss;
+      oss << "\\cp " << getchk(iref) << " " << set.get_string("SaveChk");
+      if(system(oss.str().c_str()))
+	throw std::runtime_error("Error copying checkpoint.\n");
+    }
+    
+    // Erase all unnecessary calcs
+    for(size_t i=0;i<chkstore.size();i++)
+      if(chkstore[i]!=iref)
+	remove(getchk(chkstore[i]).c_str());
+    
+    // New geometry
+    std::vector<atom_t> geom=get_atoms(x,pars);
+    
+    // Calculate displacements
+    double dmax, drms;
+    get_displacement(geom, oldgeom, dmax, drms);
+    // Calculate projected change of energy
+    double dEproj=calculate_projection(geom,oldgeom,f,pars.dofidx);
+    // Actual change of energy is
+    double dE=steps[imin].E - Eold;
+
+    // Store new geometry
+    oldgeom=geom;
+    
     // Check convergence
     bool fmaxconv=false, frmsconv=false;
     bool dmaxconv=false, drmsconv=false;
-
+    
     switch(crit) {
-
+      
     case(LOOSE):
       if(fmax < 2.5e-3)
 	fmaxconv=true;
@@ -885,44 +839,30 @@ int main(int argc, char **argv) {
       throw std::runtime_error("Not implemented!\n");
     }
 
-    // Converged?
-    const static char cconv[]=" *";
-
     double dEfrac;
     if(dEproj!=0.0)
       dEfrac=dE/dEproj;
     else
       dEfrac=0.0;
 
-    fprintf(stderr,"%4d % 16.8f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", (int) iter, s->f, dE, dEfrac, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
+    const static char cconv[]=" *";
+      
+    fprintf(stderr,"%3i % .10f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", iiter, E, dE, dEfrac, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
     fflush(stderr);
-
-    convd=dmaxconv && drmsconv && fmaxconv && frmsconv;
-
+      
+    bool convd=dmaxconv && drmsconv && fmaxconv && frmsconv;
+      
     if(convd) {
       fprintf(stderr,"Converged.\n");
       break;
     }
-
-    // Store old energy
-    oldE=s->f;
-    // Store old force
-    oldf=interpret_force(s->gradient);
   }
-
-  if(convd)
-    save_xyz(get_atoms(s->x,pars),"Optimized geometry",result);
-
-  gsl_multimin_fdfminimizer_free (s);
-
-  gsl_vector_free (x);
-
-  if(iter==maxiter && !convd) {
-    printf("Geometry convergence was not achieved!\n");
-  }
-
-
+  
+  // Remove the rest
+  for(size_t i=0;i<chkstore.size();i++)
+    remove(getchk(chkstore[i]).c_str());
+  
   printf("Running program took %s.\n",tprog.elapsed().c_str());
-
+  
   return 0;
 }
