@@ -197,6 +197,7 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
+  std::string tempname=".tempchk";
 
   // Run calculation
   calculate(basis,set,false);
@@ -275,7 +276,7 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
 
       Settings tempset(set);
       tempset.set_string("LoadChk",savename);
-      tempset.set_string("SaveChk",".tempchk");
+      tempset.set_string("SaveChk",tempname);
       {
 	// Run calculation
 	calculate(dbas,tempset,false);
@@ -284,6 +285,7 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
 	solchk.read(en);
 	E(isten)=en.E;
       }
+      remove(tempname.c_str());
     }
 
     // Calculate force: - grad E
