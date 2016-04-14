@@ -175,6 +175,8 @@ void run_calc(const BasisSet & basis, Settings set, bool force) {
   if(pz)
     throw std::logic_error("Analytic forces not implemented for PZ-SIC!\n");
 
+  Timer t;
+  
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
@@ -189,7 +191,7 @@ void run_calc(const BasisSet & basis, Settings set, bool force) {
 
     double fmax, frms;
     get_forces(f, fmax, frms);
-    printf("Max force = %.3e, rms force = %.3e\n",fmax,frms);
+    printf("Max force = %.3e, rms force = %.3e, evaluated in %s\n",fmax,frms,t.elapsed().c_str());
   }
 }
 
@@ -200,8 +202,11 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
   std::string tempname=".tempchk";
 
   // Run calculation
+  Timer t;
   calculate(basis,set,false);
-
+  if(force)
+    printf("Energy evaluated in %s\n",t.elapsed().c_str());
+  
   // All we needed was the energy.
   if(!force)
     return;
@@ -253,9 +258,11 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
     w/=h;
   }
 
+  t.set();
+  
   // Loop over degrees of freedom
   size_t Ndof=3*basis.get_Nnuc()-3;
-  printf("Calculating %i displacements with %i point stencil:",(int) Ndof,(int) dx.n_elem);
+  printf("Calculating %i displacements with %i point stencil\n",(int) Ndof,(int) dx.n_elem);
   fflush(stdout);
   for(size_t idof=0;idof<Ndof;idof++) {
     Timer tdof;
@@ -311,7 +318,7 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
   interpret_force(f).t().print("Numerical force");
   double fmax, frms;
   get_forces(f, fmax, frms);
-  printf("Max force = %.3e, rms force = %.3e\n",fmax,frms);
+  printf("Max force = %.3e, rms force = %.3e, evaluated in %s\n",fmax,frms,t.elapsed().c_str());
 }
 
 void calculate(const arma::vec & x, const opthelper_t & p, double & E, arma::vec & g, bool force) {
