@@ -21,7 +21,6 @@
 #include "global.h"
 #include <armadillo>
 #include <vector>
-#include <gsl/gsl_multimin.h>
 
 /// Spin-polarized entry
 typedef struct {
@@ -152,12 +151,10 @@ class DIIS {
   /// Clear Fock matrices and errors
   virtual void clear()=0;
 
-  /// Compute energy and its derivative with contraction coefficients \f$ c_i = x_i^2 / \left[ \sum_j x_j^2 \right] \f$
-  double get_E_adiis(const gsl_vector * x) const;
-  /// Compute derivative wrt contraction coefficients
-  void get_dEdx_adiis(const gsl_vector * x, gsl_vector * dEdx) const;
-  /// Compute energy and derivative wrt contraction coefficients
-  void get_E_dEdx_adiis(const gsl_vector * x, double * E, gsl_vector * dEdx) const;
+  /// Compute energy with contraction coefficients \f$ c_i = x_i^2 / \left[ \sum_j x_j^2 \right] \f$
+  double get_E_adiis(const arma::vec & x) const;
+  /// Compute derivative of energy wrt contraction coefficients
+  arma::vec get_dEdx_adiis(const arma::vec & x) const;
 };
 
 /// Spin-restricted DIIS
@@ -225,20 +222,5 @@ class uDIIS: protected DIIS {
   /// Clear Fock matrices and errors
   void clear();
 };
-
-namespace adiis {
-  /// Compute weights
-  arma::vec compute_c(const gsl_vector * x);
-  /// Compute jacobian
-  arma::mat compute_jac(const gsl_vector * x);
-
-  /// Compute energy
-  double min_f(const gsl_vector * x, void * params);
-  /// Compute derivative
-  void min_df(const gsl_vector * x, void * params, gsl_vector * g);
-  /// Compute energy and derivative
-  void min_fdf(const gsl_vector * x, void * params, double * f, gsl_vector * g);
-};
-
 
 #endif
