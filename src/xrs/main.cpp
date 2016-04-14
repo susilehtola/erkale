@@ -994,17 +994,22 @@ int main(int argc, char **argv) {
 	load.read("C",sol.Ca);
 	load.read("E",sol.Ea);
 	load.read("H",sol.Ha);
+	load.read("P",sol.P);
 	sol.Eb=sol.Ea;
 	sol.Cb=sol.Ca;
 	sol.Hb=sol.Ha;
+	sol.Pa=sol.Pb=sol.P/2.0;
       } else {
 	// Load energies and orbitals
 	load.read("Ca",sol.Ca);
 	load.read("Ea",sol.Ea);
 	load.read("Ha",sol.Ha);
+	load.read("Pa",sol.Pa);
 	load.read("Cb",sol.Cb);
 	load.read("Eb",sol.Eb);
 	load.read("Hb",sol.Hb);
+	load.read("Pb",sol.Pb);
+	load.read("P",sol.P);
       }
 
       // Determine orbitals and update energies
@@ -1044,7 +1049,8 @@ int main(int argc, char **argv) {
 
     // Do calculation
     if(method==FCH || method==XCH) {
-      solver.full_hole(sol,init_conv,dft_init,method==XCH);
+      if(dft.adaptive)
+	solver.full_hole(sol,init_conv,dft_init,method==XCH);
       xcorb=solver.full_hole(sol,conv,dft,method==XCH);
 
       // Get excited state energy
@@ -1065,7 +1071,8 @@ int main(int argc, char **argv) {
 	fprintf(stderr,"Cannot estimate excitation energy without a ground state calculation.\n");
       }
     } else {
-      solver.half_hole(sol,init_conv,dft_init);
+      if(dft.adaptive)
+	solver.half_hole(sol,init_conv,dft_init);
       xcorb=solver.half_hole(sol,conv,dft);
     }
     printf("\n\n");
