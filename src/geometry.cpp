@@ -254,9 +254,11 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
   }
 
   // Loop over degrees of freedom
-  printf("Calculating %i displacements with %i point stencil:",(int) (3*basis.get_Nnuc()-3),(int) dx.n_elem);
+  size_t Ndof=3*basis.get_Nnuc()-3;
+  printf("Calculating %i displacements with %i point stencil:",(int) Ndof,(int) dx.n_elem);
   fflush(stdout);
-  for(size_t idof=0;idof<3*basis.get_Nnuc()-3;idof++) {
+  for(size_t idof=0;idof<Ndof;idof++) {
+    Timer tdof;
     // Energies
     arma::vec E(dx.n_elem);
 
@@ -291,11 +293,9 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
     // Calculate force: - grad E
     fm(idof)=-arma::dot(w,E);
 
-    printf(" %i",(int) idof+1);
+    printf("%i/%i done in %s\n",(int) idof+1,(int) Ndof,tdof.elapsed().c_str());
     fflush(stdout);
   }
-  printf(" done\n");
-  fflush(stdout);
 
   // Force on last nucleus is just the negative of the sum of all the
   // forces on the other nuclei
@@ -410,6 +410,7 @@ int main(int argc, char **argv) {
   set.add_bool("ForcePol","Force polarized calculation",false);
   set.add_bool("FreezeCore","Freeze the atomic cores?",false);
   set.add_string("Optimizer","Optimizer to use: CGFR, CGPR, BFGS, SD","BFGS");
+  set.add_int("CGReset","Reset CG direction to SD every N steps", 5);
   set.add_int("MaxSteps","Maximum amount of geometry steps",256);
   set.add_string("Criterion","Convergence criterion to use: LOOSE, NORMAL, TIGHT, VERYTIGHT","NORMAL");
   set.add_string("OptMovie","xyz movie to store progress in","optimize.xyz");
@@ -430,6 +431,7 @@ int main(int argc, char **argv) {
   bool numgrad=set.get_bool("NumGrad");
   int stencil=set.get_int("Stencil");
   double step=set.get_double("Stepsize");
+  int cgreset=set.get_int("CGReset");
 
   // Interpret optimizer
   enum minimizer alg;
@@ -546,6 +548,29 @@ int main(int argc, char **argv) {
 
   // First step is steplen/fac
   steplen*=fac;
+
+  // Save calculation to
+  pars.set.set_string("SaveChk",getchk(ncalc));
+
+  // Calculate energy at the starting point
+  calculate(x,pars,E,f,false);
+  chkstore.push_back(ncalc);
+  ncalc++;
+  // Turn off verbose setting for any later calcs
+  pars.set.set_bool("Verbose",false);
+  try {
+    // Also, don't localize, since it would screw up the converged guess
+    pars.set.set_string("PZloc","false");
+    // And don't run stability analysis, since we are only doing small displacements
+    pars.set.set_int("PZstab",0);
+  } catch(std::runtime_error) {
+  }
+  
+  printf("\n\nStarting geometry optimization\n");
+  printf("%4s %18s %9s %9s\n","iter","E","fmax","frms");
+  
+  fprintf(stderr,"\n%3s %18s %10s %10s %10s %10s %10s %10s %s\n", "it", "E", "dE", "dEfrac", "dmax ", "drms ", "fmax ", "frms ", "t");
+  fflush(stderr);
   
   for(int iiter=0;iiter<maxiter;iiter++) {
     Timer titer;
@@ -554,9 +579,8 @@ int main(int argc, char **argv) {
     fold=f;
     sdold=sd;
 
-    if(iiter!=0)
-      // Load reference from earlier calculation
-      pars.set.set_string("LoadChk",getchk(iref));
+    // Load reference from earlier calculation
+    pars.set.set_string("LoadChk",getchk(iref));
     // Save calculation to
     pars.set.set_string("SaveChk",getchk(ncalc));
     
@@ -572,21 +596,6 @@ int main(int argc, char **argv) {
     Eold=E;
     
     if(iiter==0) {
-      printf("\n\nStarting geometry optimization\n");
-      printf("%4s %18s %9s %9s\n","iter","E","fmax","frms");
-      
-      fprintf(stderr,"\n%3s %18s %10s %10s %10s %10s %10s %10s %s\n", "it", "E", "dE", "dEfrac", "dmax ", "drms ", "fmax ", "frms ", "t");
-      fflush(stderr);
-      
-      // Turn off verbose setting for any later calcs
-      pars.set.set_bool("Verbose",false);
-      try {
-	// Also, don't localize, since it would screw up the converged guess
-	pars.set.set_string("PZloc","false");
-	// And don't run stability analysis, since we are only doing small displacements
-	pars.set.set_int("PZstab",0);
-      } catch(std::runtime_error) {
-      }
     }
     
     // Save geometry step
@@ -601,7 +610,7 @@ int main(int argc, char **argv) {
     std::string steptype="SD";
     
     if(iiter>0) {
-      if(alg==gCGPR || alg==gCGFR) {
+      if((alg==gCGPR || alg==gCGFR) && (iiter%cgreset!=0)) {
 	// Polak-Ribière
 	double gamma;
 	if(alg==gCGPR) {
