@@ -1012,14 +1012,34 @@ int main(int argc, char **argv) {
 	load.read("P",sol.P);
       }
 
-      // Determine orbitals and update energies
+      // Determine orbitals, update energies and densities
       if(spin) {
 	icore=localize(basis,noccb,xcatom,sol.Cb,state,iorb);
 	sol.Eb=arma::diagvec(arma::trans(sol.Cb)*sol.Hb*sol.Cb);
+	
+	std::vector<double> occb;
+	if(method==XCH)
+	  occb=xch_occ(icore,noccb);
+	else if(method==FCH)
+	  occb=fch_occ(icore,noccb);
+	else if(method==TP)
+	  occb=tp_occ(icore,noccb);
+	sol.Pb=form_density(sol.Cb,occb);
+
       } else {
 	icore=localize(basis,nocca,xcatom,sol.Ca,state,iorb);
 	sol.Ea=arma::diagvec(arma::trans(sol.Ca)*sol.Ha*sol.Ca);
+
+	std::vector<double> occa;
+	if(method==XCH)
+	  occa=xch_occ(icore,nocca);
+	else if(method==FCH)
+	  occa=fch_occ(icore,nocca);
+	else if(method==TP)
+	  occa=tp_occ(icore,nocca);
+	sol.Pa=form_density(sol.Ca,occa);
       }
+      sol.P=sol.Pa+sol.Pb;
     }
 
     // Proceed with TP calculation. Initialize solver
