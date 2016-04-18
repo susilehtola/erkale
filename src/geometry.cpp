@@ -936,6 +936,8 @@ int main(int argc, char **argv) {
       break;
     }
   }
+
+  save_xyz(get_atoms(x,pars),"Optimized configuration",result,false);
   
   // Remove the rest
   for(size_t i=0;i<chkstore.size();i++)
