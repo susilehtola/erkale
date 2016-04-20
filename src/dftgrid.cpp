@@ -391,34 +391,20 @@ void AngularGrid::update_density(const arma::mat & P0) {
 
   // Calculate density
   rho.zeros(1,grid.size());
-  for(size_t ip=0;ip<grid.size();ip++) {
-    double d=0.0;
-    for(size_t j=0;j<bf.n_rows;j++)
-      d+=Pv(j,ip)*bf(j,ip);
-    rho(0,ip)=d;
-  }
-
+  for(size_t ip=0;ip<grid.size();ip++)
+    rho(0,ip)=arma::dot(Pv.col(ip),bf.col(ip));
+  
   // Calculate gradient
   if(do_grad) {
     grho.zeros(3,grid.size());
     sigma.zeros(1,grid.size());
     for(size_t ip=0;ip<grid.size();ip++) {
-      // Initialize
-      double gx=0.0, gy=0.0, gz=0.0;
-
-      // Calculate
-      for(size_t j=0;j<bf.n_rows;j++) {
-	gx+=Pv(j,ip)*bf_x(j,ip);
-	gy+=Pv(j,ip)*bf_y(j,ip);
-	gz+=Pv(j,ip)*bf_z(j,ip);
-      }
-
-      // Store values, including the missing factor 2
-      grho(0,ip)=2.0*gx;
-      grho(1,ip)=2.0*gy;
-      grho(2,ip)=2.0*gz;
+      // Calculate values
+      double gx=grho(0,ip)=2.0*arma::dot(Pv.col(ip),bf_x.col(ip));
+      double gy=grho(1,ip)=2.0*arma::dot(Pv.col(ip),bf_y.col(ip));
+      double gz=grho(2,ip)=2.0*arma::dot(Pv.col(ip),bf_z.col(ip));
       // Compute sigma as well
-      sigma(0,ip)=4.0*(gx*gx + gy*gy + gz*gz);
+      sigma(0,ip)=gx*gx + gy*gy + gz*gz;
     }
   }
 
@@ -436,15 +422,13 @@ void AngularGrid::update_density(const arma::mat & P0) {
     // Calculate values
     for(size_t ip=0;ip<grid.size();ip++) {
       // Laplacian term
-      double lap=0.0;
+      double lap=arma::dot(Pv.col(ip),bf_lapl.col(ip));
       // Gradient term
-      double grad=0.0;
-      // Calculate dot products
-      for(size_t j=0;j<bf_lapl.n_rows;j++) {
-	lap+=Pv(j,ip)*bf_lapl(j,ip);
-	grad+=Pv_x(j,ip)*bf_x(j,ip) + Pv_y(j,ip)*bf_y(j,ip) + Pv_z(j,ip)*bf_z(j,ip);
-      }
-
+      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
+      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
+      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
+      double grad(gradx+grady+gradz);
+      
       // Store values
       lapl(0,ip)=2.0*(lap+grad);
       tau(0,ip)=0.5*grad;
@@ -471,13 +455,9 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
   // Calculate density
   rho.zeros(2,grid.size());
   for(size_t ip=0;ip<grid.size();ip++) {
-    double da=0.0, db=0.0;
-    for(size_t j=0;j<bf.n_rows;j++) {
-      da+=Pav(j,ip)*bf(j,ip);
-      db+=Pbv(j,ip)*bf(j,ip);
-    }
-    rho(0,ip)=da;
-    rho(1,ip)=db;
+    rho(0,ip)=arma::dot(Pav.col(ip),bf.col(ip));
+    rho(1,ip)=arma::dot(Pbv.col(ip),bf.col(ip));
+    
 
     /*
     double na=compute_density(Pa0,*basp,grid[ip].r);
@@ -492,33 +472,19 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
     grho.zeros(6,grid.size());
     sigma.zeros(3,grid.size());
     for(size_t ip=0;ip<grid.size();ip++) {
-      // Initialize
-      double gax=0.0, gay=0.0, gaz=0.0;
-      double gbx=0.0, gby=0.0, gbz=0.0;
 
-      // Calculate
-      for(size_t j=0;j<bf.n_rows;j++) {
-	gax+=Pav(j,ip)*bf_x(j,ip);
-	gay+=Pav(j,ip)*bf_y(j,ip);
-	gaz+=Pav(j,ip)*bf_z(j,ip);
+      double gax=grho(0,ip)=2.0*arma::dot(Pav.col(ip),bf_x.col(ip));
+      double gay=grho(1,ip)=2.0*arma::dot(Pav.col(ip),bf_y.col(ip));
+      double gaz=grho(2,ip)=2.0*arma::dot(Pav.col(ip),bf_z.col(ip));
 
-	gbx+=Pbv(j,ip)*bf_x(j,ip);
-	gby+=Pbv(j,ip)*bf_y(j,ip);
-	gbz+=Pbv(j,ip)*bf_z(j,ip);
-      }
-
-      // Store values ang put in the missing factor 2
-      grho(0,ip)=2.0*gax;
-      grho(1,ip)=2.0*gay;
-      grho(2,ip)=2.0*gaz;
-      grho(3,ip)=2.0*gbx;
-      grho(4,ip)=2.0*gby;
-      grho(5,ip)=2.0*gbz;
+      double gbx=grho(3,ip)=2.0*arma::dot(Pbv.col(ip),bf_x.col(ip));
+      double gby=grho(4,ip)=2.0*arma::dot(Pbv.col(ip),bf_y.col(ip));
+      double gbz=grho(5,ip)=2.0*arma::dot(Pbv.col(ip),bf_z.col(ip));
 
       // Compute sigma as well
-      sigma(0,ip)=4.0*(gax*gax + gay*gay + gaz*gaz);
-      sigma(1,ip)=4.0*(gax*gbx + gay*gby + gaz*gbz);
-      sigma(2,ip)=4.0*(gbx*gbx + gby*gby + gbz*gbz);
+      sigma(0,ip)=gax*gax + gay*gay + gaz*gaz;
+      sigma(1,ip)=gax*gbx + gay*gby + gaz*gbz;
+      sigma(2,ip)=gbx*gbx + gby*gby + gbz*gbz;
     }
   }
 
@@ -540,17 +506,18 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
     // Calculate values
     for(size_t ip=0;ip<grid.size();ip++) {
       // Laplacian term
-      double lapa=0.0, lapb=0.0;
+      double lapa=arma::dot(Pav.col(ip),bf_lapl.col(ip));
+      double lapb=arma::dot(Pbv.col(ip),bf_lapl.col(ip));
       // Gradient term
-      double grada=0.0, gradb=0.0;
-      // Calculate dot products
-      for(size_t j=0;j<bf_lapl.n_rows;j++) {
-	lapa+=Pav(j,ip)*bf_lapl(j,ip);
-	grada+=Pav_x(j,ip)*bf_x(j,ip) + Pav_y(j,ip)*bf_y(j,ip) + Pav_z(j,ip)*bf_z(j,ip);
+      double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
+      double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
+      double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
+      double grada(gradax+graday+gradaz);
 
-	lapb+=Pbv(j,ip)*bf_lapl(j,ip);
-	gradb+=Pbv_x(j,ip)*bf_x(j,ip) + Pbv_y(j,ip)*bf_y(j,ip) + Pbv_z(j,ip)*bf_z(j,ip);
-      }
+      double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
+      double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
+      double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
+      double gradb(gradbx+gradby+gradbz);
 
       // Store values
       lapl(0,ip)=2.0*(lapa+grada);
