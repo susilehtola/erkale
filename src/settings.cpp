@@ -149,6 +149,8 @@ void Settings::add_dft_settings() {
 
   // Use Perdew-Zunger self-interaction correction?
   add_double("PZw", "Weight for Perdew-Zunger self-interaction correction", 1.0);
+  add_string("PZscale", "Scaling for PZ: Constant, Density or Kinetic", "Constant");
+  add_double("PZscaleExp", "Exponent in the dynamic scaling equation", 1.0);
   // Perturbative SIC?
   add_bool("PZ", "Perform Perdew-Zunger self-interaction correction?",false);
   add_int("PZprec", "Precondition OV block? 0: no, 1: unified, 2: orbital",1);

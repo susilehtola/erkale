@@ -406,6 +406,33 @@ class AngularGrid {
   /// Evaluate diagonal elements of overlap matrix
   void eval_diag_overlap(arma::vec & S) const;
 
+  /**
+   *
+   * Evaluate atomic contribution to weighted overlap matrix given by
+   *
+   * \f$ \int \frac
+   * {\rho_{i\sigma}^{k}(\mathbf{r})\chi_{\mu}(\mathbf{r})\chi_{\nu}(\mathbf{r})}
+   * {\rho_{\sigma}^{k}(\mathbf{r})} {\rm d}^{3}\mathbf{r} \f$
+   */
+  void eval_overlap(const arma::cx_mat & Cocc, size_t io, double k, arma::mat & S, double thr) const;
+  
+  /// Same thing, but do contraction over SI energies for derivatives
+  void eval_overlap(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, arma::mat & S, double thr) const;
+
+  /**
+   *
+   * Evaluate atomic contribution to weighted overlap matrix given by
+   *
+   * \f$ \int \left(
+   * \frac{\tau_{\sigma}^{\text{W}}(\mathbf{r})}{\tau_{\sigma}(\mathbf{r})}
+   * \right)^{k} \chi_{\mu} (\mathbf{r}) \chi_{\nu} (\mathbf{r})
+   * \mathrm{d}^{3} \mathbf{r} \f$
+   */
+  void eval_tau_overlap(const arma::cx_mat & Cocc, double k, arma::mat & S, double thr) const;
+
+  /// Calculate the GGA and meta-GGA type terms for the derivative
+  void eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, arma::mat & S, double thr) const;
+
   /// Evaluate Fock matrix, restricted calculation
   void eval_Fxc(arma::mat & H) const;
   /// Evaluate Fock matrix, unrestricted calculation
@@ -520,6 +547,16 @@ class DFTGrid {
   arma::mat eval_overlap(size_t inuc);
   /// Evaluate overlap matrices numerically
   std::vector<arma::mat> eval_overlaps();
+
+  /// Evaluate weighted overlap (for PZ-SIC)
+  arma::mat eval_overlap(const arma::cx_mat & Cocc, size_t io, double k, double thr=1e-10);
+  /// Evaluate weighted overlap derivative terms (for PZ-SIC)
+  arma::mat eval_overlap(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, double thr=1e-10);
+  /// Evaluate weighted overlap (for PZ-SIC)
+  arma::mat eval_tau_overlap(const arma::cx_mat & Cocc, double k, double thr=1e-10);
+  /// Evaluate weighted overlap derivative terms (for PZ-SIC)
+  arma::mat eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, double thr=1e-10);
+  
   /// Evaluate overlap matrices numerically
   arma::mat eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc);
   /// Evaluate overlap matrices numerically
@@ -583,6 +620,55 @@ template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & v
 }
 
 /// BLAS routine for GGA-type quadrature
+template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, const arma::Mat<T> & f, arma::Mat<T> f_x, arma::Mat<T> f_y, arma::Mat<T> f_z) {
+  if(gn.n_cols!=3) {
+    ERROR_INFO();
+    throw std::runtime_error("Grad rho must have three columns!\n");
+  }
+  if(f.n_rows != f_x.n_rows || f.n_cols != f_x.n_cols || f.n_rows != f_y.n_rows || f.n_cols != f_y.n_cols || f.n_rows != f_z.n_rows || f.n_cols != f_z.n_cols) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function and derivative matrices doesn't match!\n");
+  }
+  if(H.n_rows != f.n_rows || H.n_cols != f.n_rows) {
+    ERROR_INFO();
+    throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
+  }
+    
+  // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
+  //                 (N, Np)    =        (N Np; c)    (Np, 3)
+  arma::Mat<T> gamma(f.n_rows,f.n_cols);
+  gamma.zeros();
+  {
+    // Helper
+    arma::rowvec gc;
+    
+    // x gradient
+    gc=arma::trans(gn.col(0));
+    for(size_t j=0;j<f_x.n_cols;j++)
+      for(size_t i=0;i<f_x.n_rows;i++)
+	f_x(i,j)*=gc(j);
+    gamma+=f_x;
+    
+    // x gradient
+    gc=arma::trans(gn.col(1));
+    for(size_t j=0;j<f_y.n_cols;j++)
+      for(size_t i=0;i<f_y.n_rows;i++)
+	f_y(i,j)*=gc(j);
+    gamma+=f_y;
+    
+    // z gradient
+    gc=arma::trans(gn.col(2));
+    for(size_t j=0;j<f_z.n_cols;j++)
+      for(size_t i=0;i<f_z.n_rows;i++)
+	f_z(i,j)*=gc(j);
+    gamma+=f_z;
+  }
+  
+  // Form Fock matrix
+  H+=gamma*arma::trans(f) + f*arma::trans(gamma);
+}
+
+/// BLAS routine for GGA-type quadrature
 template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, const arma::Mat<T> & f, arma::Mat<T> f_x, arma::Mat<T> f_y, arma::Mat<T> f_z, const arma::uvec & screen) {
   if(gn.n_cols!=3) {
     ERROR_INFO();
@@ -632,6 +718,13 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
 }
 
 /// BLAS routine for meta-GGA kinetic energy type quadrature
+template<typename T> void increment_mgga_kin(arma::Mat<T> & H, const arma::rowvec & vtaul, const arma::Mat<T> & f_x, const arma::Mat<T> & f_y, const arma::Mat<T> & f_z) {
+  // This is equivalent to LDA incrementation on the three components!
+  increment_lda<T>(H,vtaul,f_x);
+  increment_lda<T>(H,vtaul,f_y);
+  increment_lda<T>(H,vtaul,f_z);
+}
+
 template<typename T> void increment_mgga_kin(arma::Mat<T> & H, const arma::rowvec & vtaul, const arma::Mat<T> & f_x, const arma::Mat<T> & f_y, const arma::Mat<T> & f_z, const arma::uvec & screen) {
   // This is equivalent to LDA incrementation on the three components!
   increment_lda<T>(H,vtaul,f_x,screen);

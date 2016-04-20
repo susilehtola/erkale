@@ -67,6 +67,16 @@ typedef struct {
   arma::uvec idx;
 } pz_rot_par_t;
 
+/// Orbital depedent scaling
+typedef enum {
+  /// Constant scaling
+  PZ_SCALE_CONSTANT,
+  /// Density based scaling
+  PZ_SCALE_DENSITY,
+  /// Kinetic energy based scaling
+  PZ_SCALE_KINETIC
+} pz_scaling_t;
+
 /// PZ optimizer and stability analysis
 class PZStability: public FDHessian {
  protected:
@@ -85,6 +95,10 @@ class PZStability: public FDHessian {
   dft_t oomethod;
   /// Weight for PZ correction
   double pzw;
+  /// or scaling method
+  pz_scaling_t scale;
+  /// and scaling exponent
+  double scaleexp;
 
   /// Reference solution. Spin-restricted
   rscf_t rsol;
@@ -94,6 +108,8 @@ class PZStability: public FDHessian {
   arma::vec ref_Eorb, ref_Eorba, ref_Eorbb;
   /// Reference orbital Fock matrices
   std::vector<arma::cx_mat> ref_Forb, ref_Forba, ref_Forbb;
+  /// Reference weighting factors
+  arma::vec ref_worb, ref_worba, ref_worbb;
 
   /// Real part of transformations?
   bool real;
@@ -134,7 +150,7 @@ class PZStability: public FDHessian {
   arma::cx_mat matexp(const arma::cx_mat & X) const;
 
   /// Construct unified Hamiltonian
-  arma::cx_mat unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const;
+  arma::cx_mat unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::vec & worb, const arma::cx_mat & H0) const;
 
   /// Evaluate analytic gradient
   arma::vec gradient();
@@ -151,10 +167,17 @@ class PZStability: public FDHessian {
   /// Perform quasicanonical diagonalisation
   void diagonalize();
 
+  /// Get orbital weights
+  arma::vec compute_worb(const arma::cx_mat & C);
+  /// Put in the scaling part of the OO gradient
+  void scaling_gradient_oo(arma::cx_mat & gOO, const arma::cx_mat & CO, const arma::vec & Eorb);
+  /// Put in the scaling part of the OV gradient
+  void scaling_gradient_ov(arma::cx_mat & gOV, const arma::cx_mat & CO, const arma::vec & Eorb, const arma::cx_mat & CV);
+
   /// Evaluate function at x, and possibly orbital Fock matrices
-  double eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, bool ks, bool fock, double pzweight, bool useref);
+  double eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, arma::vec & worb, bool ks, bool fock, bool useref);
   /// Evaluate function at x, and possibly orbital Fock matrices
-  double eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, bool ks, bool fock, double pzweight, bool useref);
+  double eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, arma::vec & worba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, arma::vec & worbb, bool ks, bool fock, bool useref);
   /// Evaluate function at x
   double eval(const arma::vec & x);
 
@@ -169,13 +192,13 @@ class PZStability: public FDHessian {
   void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
 
   /// Print information on solution
-  void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb);
+  void print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb, const arma::vec & worb);
 
   /// Get the full Fock matrix
   arma::cx_mat get_H(const rscf_t & sol) const;
   /// Get the full Fock matrix
   arma::cx_mat get_H(const uscf_t & sol, bool spin) const;
-  
+
   /// Precondition gradient vector with unified Hamiltonian
   arma::vec precondition_unified(const arma::vec & g) const;
   /// Precondition gradient vector with orbital Hamiltonian
@@ -188,10 +211,10 @@ class PZStability: public FDHessian {
   ~PZStability();
 
   /// Set method and weight
-  void set_method(const dft_t & ovmethod, const dft_t & oomethod, double pzw);
+  void set_method(const dft_t & ovmethod, const dft_t & oomethod, double pzw, pz_scaling_t scale, double scaleexp);
   /// Set parameters. real: real rotations? imag: imaginary rotations? ov: ov rotations? oo: oo rotations?
   void set_params(bool real, bool imag, bool ov, bool oo);
-  
+
   /// Set reference
   void set(const rscf_t & sol);
   /// Set reference
@@ -199,7 +222,7 @@ class PZStability: public FDHessian {
 
   /// Evaluate energy
   double get_E();
-  
+
   /// Get updated solution
   rscf_t get_rsol() const;
   /// Get updated solution
@@ -215,7 +238,7 @@ class PZStability: public FDHessian {
 
   /// Add in a small random perturbation to the solution
   void perturb(double h=1e-6);
-  
+
   /// Run optimization
   virtual double optimize(size_t maxiter=1000, double gthr=1e-4, double nrthr=1e-4, double dEthr=1e-9, int preconditioning=1);
 };

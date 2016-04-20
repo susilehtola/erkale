@@ -393,7 +393,7 @@ void AngularGrid::update_density(const arma::mat & P0) {
   rho.zeros(1,grid.size());
   for(size_t ip=0;ip<grid.size();ip++)
     rho(0,ip)=arma::dot(Pv.col(ip),bf.col(ip));
-  
+
   // Calculate gradient
   if(do_grad) {
     grho.zeros(3,grid.size());
@@ -428,7 +428,7 @@ void AngularGrid::update_density(const arma::mat & P0) {
       double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
       double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
       double grad(gradx+grady+gradz);
-      
+
       // Store values
       lapl(0,ip)=2.0*(lap+grad);
       tau(0,ip)=0.5*grad;
@@ -457,7 +457,6 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
   for(size_t ip=0;ip<grid.size();ip++) {
     rho(0,ip)=arma::dot(Pav.col(ip),bf.col(ip));
     rho(1,ip)=arma::dot(Pbv.col(ip),bf.col(ip));
-    
 
     /*
     double na=compute_density(Pa0,*basp,grid[ip].r);
@@ -472,7 +471,6 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
     grho.zeros(6,grid.size());
     sigma.zeros(3,grid.size());
     for(size_t ip=0;ip<grid.size();ip++) {
-
       double gax=grho(0,ip)=2.0*arma::dot(Pav.col(ip),bf_x.col(ip));
       double gay=grho(1,ip)=2.0*arma::dot(Pav.col(ip),bf_y.col(ip));
       double gaz=grho(2,ip)=2.0*arma::dot(Pav.col(ip),bf_z.col(ip));
@@ -1259,6 +1257,193 @@ void AngularGrid::eval_diag_overlap(arma::vec & S) const {
   }
 }
 
+static arma::mat calculate_rho(const arma::cx_mat & Cocc, const arma::mat & bf) {
+  // Transpose C to (norb,nbf)
+  arma::cx_mat C(arma::strans(Cocc));
+  // Calculate values of orbitals at grid points: (norb, ngrid)
+  arma::cx_mat orbvals(C*bf);
+
+  // Orbital densities at grid points (norb, ngrid)
+  return arma::real(orbvals%arma::conj(orbvals));
+}
+
+void AngularGrid::eval_overlap(const arma::cx_mat & Cocc, size_t io, double k, arma::mat & So, double thr) const {
+  // Calculate in subspace
+  arma::mat S(bf_ind.n_elem,bf_ind.n_elem);
+  S.zeros();
+
+  // Orbital densities at grid points (norb, ngrid)
+  arma::mat orbdens(calculate_rho(Cocc.rows(bf_ind),bf));
+
+  // Calculate weightings
+  arma::vec ww(w);
+  for(size_t ip=0;ip<grid.size();ip++) {
+    // Orbital density is
+    double rhois(orbdens(io,ip));
+    // Total density
+    double rhotot(arma::sum(orbdens.col(ip)));
+
+    // Screen for bad behavior
+    if(rhotot>=thr)
+      ww(ip)*=std::pow(rhois/rhotot,k);
+    else
+      ww(ip)=0.0;
+  }
+
+  increment_lda<double>(S,ww,bf);
+  // Increment
+  So.submat(bf_ind,bf_ind)+=S;
+}
+
+void AngularGrid::eval_overlap(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, arma::mat & So, double thr) const {
+  // Calculate in subspace
+  arma::mat S(bf_ind.n_elem,bf_ind.n_elem);
+  S.zeros();
+
+  // Orbital densities at grid points (norb, ngrid)
+  arma::mat orbdens(calculate_rho(Cocc.rows(bf_ind),bf));
+  arma::mat orbdenspk(arma::pow(orbdens,k));
+
+  // Calculate weightings
+  arma::vec ww(w);
+  for(size_t ip=0;ip<grid.size();ip++) {
+    // Total density
+    double rhotot(arma::sum(orbdens.col(ip)));
+
+    // Screen for bad behavior
+    if(rhotot>=thr)
+      ww(ip)*=arma::dot(Esi,orbdenspk.col(ip))/std::pow(rhotot,k);
+    else
+      ww(ip)=0.0;
+  }
+
+  increment_lda<double>(S,ww,bf);
+  // Increment
+  So.submat(bf_ind,bf_ind)+=S;
+}
+
+static void calculate_tau_grho_tauw(const arma::cx_mat & Cocc, const arma::mat & bf, const arma::mat & bf_x, const arma::mat & bf_y, const arma::mat & bf_z, arma::vec & tau, arma::mat & grho, arma::vec & tau_w) {
+  // Density matrix
+  arma::cx_mat P(Cocc*arma::trans(Cocc));
+  arma::cx_mat Pvec(P*bf);
+  arma::cx_mat Pvec_x(P*bf_x);
+  arma::cx_mat Pvec_y(P*bf_y);
+  arma::cx_mat Pvec_z(P*bf_z);
+
+  // Kinetic energy density
+  tau.zeros(bf.n_cols);
+  tau_w.zeros(bf.n_cols);
+  grho.zeros(3,bf.n_cols);
+
+  for(size_t ip=0;ip<tau.n_elem;ip++) {
+    double kinx(std::real(arma::dot(Pvec_x.col(ip),bf_x.col(ip))));
+    double kiny(std::real(arma::dot(Pvec_y.col(ip),bf_y.col(ip))));
+    double kinz(std::real(arma::dot(Pvec_z.col(ip),bf_z.col(ip))));
+    tau(ip)=0.5*(kinx+kiny+kinz);
+
+    // Density is
+    double n=std::real(arma::dot(Pvec.col(ip),bf.col(ip)));
+    // Density gradient
+    grho(0,ip)=2.0*std::real(arma::dot(Pvec.col(ip),bf_x.col(ip)));
+    grho(1,ip)=2.0*std::real(arma::dot(Pvec.col(ip),bf_y.col(ip)));
+    grho(2,ip)=2.0*std::real(arma::dot(Pvec.col(ip),bf_z.col(ip)));
+    double g=arma::dot(grho.col(ip),grho.col(ip));
+    tau_w(ip)=g/(8*n);
+  }
+
+  // Transpose grho
+  grho=arma::trans(grho);
+}
+
+void AngularGrid::eval_tau_overlap(const arma::cx_mat & Cocc, double k, arma::mat & So, double thr) const {
+  // Calculate in subspace
+  arma::mat S(bf_ind.n_elem,bf_ind.n_elem);
+  S.zeros();
+
+  if(!do_grad) throw std::logic_error("Must have gradients enabled to calculate tau overlap!\n");
+
+  // Get kinetic and Weiszäcker kinetic energy densities
+  arma::mat gr;
+  arma::vec t, tw;
+  calculate_tau_grho_tauw(Cocc.rows(bf_ind),bf,bf_x,bf_y,bf_z,t,gr,tw);
+
+  // Calculate weightings
+  arma::vec ww(w);
+  for(size_t ip=0;ip<grid.size();ip++) {
+    // Screen for bad behavior
+    if(t(ip)>=thr)
+      ww(ip)*=std::pow(tw(ip)/t(ip),k);
+    else
+      ww(ip)=0.0;
+  }
+
+  increment_lda<double>(S,ww,bf);
+  // Increment
+  So.submat(bf_ind,bf_ind)+=S;
+}
+
+void AngularGrid::eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, arma::mat & So, double thr) const {
+  if(!do_grad) throw std::logic_error("Must have gradients enabled to calculate tau overlap!\n");
+
+  // Get orbital densities
+  arma::mat orbdens(calculate_rho(Cocc.rows(bf_ind),bf));
+
+  // Get kinetic and Weiszäcker kinetic energy densities
+  arma::mat gr;
+  arma::vec t, tw;
+  calculate_tau_grho_tauw(Cocc.rows(bf_ind),bf,bf_x,bf_y,bf_z,t,gr,tw);
+
+  // Calculate in subspace
+  arma::mat S(bf_ind.n_elem,bf_ind.n_elem);
+  S.zeros();
+
+  // LDA part
+  {
+    // Calculate weightings
+    arma::vec ww(w);
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Screen for bad behavior
+      if(t(ip)>=thr)
+	ww(ip)*=-k*std::pow(tw(ip)/t(ip),k)*(arma::dot(Esi,orbdens.col(ip))/arma::sum(orbdens.col(ip)));
+      else
+	ww(ip)=0.0;
+    }
+
+    increment_lda<double>(S,ww,bf);
+  }
+
+  // meta-GGA part
+  {
+    // Calculate weightings
+    arma::vec ww(w);
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Screen for bad behavior
+      if(t(ip)>=thr)
+	ww(ip)*=-k/2*std::pow(tw(ip)/t(ip),k)*(arma::dot(Esi,orbdens.col(ip))/t(ip));
+      else
+	ww(ip)=0.0;
+    }
+
+    increment_mgga_kin<double>(S,ww,bf_x,bf_y,bf_z);
+  }
+
+  // GGA part
+  {
+    // Multiply grad rho by the weights and the integrand
+    for(size_t ip=0;ip<gr.n_rows;ip++)
+      for(size_t ic=0;ic<gr.n_cols;ic++)
+	if(t(ip)>=thr)
+	  gr(ip,ic)*=w(ip)*k/4*std::pow(tw(ip)/t(ip),k-1)*arma::dot(Esi,orbdens.col(ip))/(arma::sum(orbdens.col(ip))*t(ip));
+	else
+	  gr(ip,ic)=0;
+
+    increment_gga<double>(S,gr,bf,bf_x,bf_y,bf_z);
+  }
+
+  // Increment
+  So.submat(bf_ind,bf_ind)+=S;
+}
+
 void AngularGrid::eval_Fxc(arma::mat & Ho) const {
   if(polarized) {
     ERROR_INFO();
@@ -1543,7 +1728,7 @@ arma::vec AngularGrid::eval_force_u() const {
   // Initialize force
   arma::vec f(3*basp->get_Nnuc());
   f.zeros();
-  
+
   // Loop over nuclei
   for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
     // Grad rho in grid points wrt functions centered on nucleus
@@ -1566,20 +1751,20 @@ arma::vec AngularGrid::eval_force_u() const {
 	    gradrhob(2,ip)+=bf_z(mu,ip)*Pbv(mu,ip);
 	  }
       }
-    
+
     // LDA potential
     arma::rowvec vrhoa(vxc.row(0));
     arma::rowvec vrhob(vxc.row(1));
     // Multiply weights into potential
     vrhoa%=w;
     vrhob%=w;
-    
+
     // Force is
     f.subvec(3*inuc,3*inuc+2) += 2.0 * (gradrhoa*arma::trans(vrhoa) + gradrhob*arma::trans(vrhob));
 
     if(do_gga) {
       // Calculate X = 2 \sum_{u'v} P(uv) [ x(v) d_ij x(u) + (d_i x(u)) (d_j x(v)) ]
-      //             = 2 \sum_u' Pv(u) d_ij x(u) + 2 \sum Pv_i(v) d_j x(v) 
+      //             = 2 \sum_u' Pv(u) d_ij x(u) + 2 \sum Pv_i(v) d_j x(v)
       arma::mat Xa(9,grid.size());
       Xa.zeros();
       arma::mat Xb(9,grid.size());
@@ -1602,11 +1787,11 @@ arma::vec AngularGrid::eval_force_u() const {
 	      Xa(0,ip)+=Pav_x(mu,ip)*bf_x(mu,ip);
 	      Xa(1,ip)+=Pav_x(mu,ip)*bf_y(mu,ip);
 	      Xa(2,ip)+=Pav_x(mu,ip)*bf_z(mu,ip);
-	      
+
 	      Xa(3,ip)+=Pav_y(mu,ip)*bf_x(mu,ip);
 	      Xa(4,ip)+=Pav_y(mu,ip)*bf_y(mu,ip);
 	      Xa(5,ip)+=Pav_y(mu,ip)*bf_z(mu,ip);
-	      
+
 	      Xa(6,ip)+=Pav_z(mu,ip)*bf_x(mu,ip);
 	      Xa(7,ip)+=Pav_z(mu,ip)*bf_y(mu,ip);
 	      Xa(8,ip)+=Pav_z(mu,ip)*bf_z(mu,ip);
@@ -1614,11 +1799,11 @@ arma::vec AngularGrid::eval_force_u() const {
 	      Xb(0,ip)+=Pbv_x(mu,ip)*bf_x(mu,ip);
 	      Xb(1,ip)+=Pbv_x(mu,ip)*bf_y(mu,ip);
 	      Xb(2,ip)+=Pbv_x(mu,ip)*bf_z(mu,ip);
-	      
+
 	      Xb(3,ip)+=Pbv_y(mu,ip)*bf_x(mu,ip);
 	      Xb(4,ip)+=Pbv_y(mu,ip)*bf_y(mu,ip);
 	      Xb(5,ip)+=Pbv_y(mu,ip)*bf_z(mu,ip);
-	      
+
 	      Xb(6,ip)+=Pbv_z(mu,ip)*bf_x(mu,ip);
 	      Xb(7,ip)+=Pbv_z(mu,ip)*bf_y(mu,ip);
 	      Xb(8,ip)+=Pbv_z(mu,ip)*bf_z(mu,ip);
@@ -1627,7 +1812,7 @@ arma::vec AngularGrid::eval_force_u() const {
       // Plug in factor
       Xa*=2.0;
       Xb*=2.0;
-      
+
       // Get potential
       arma::rowvec vs_aa(vsigma.row(0));
       arma::rowvec vs_ab(vsigma.row(1));
@@ -1678,7 +1863,7 @@ arma::vec AngularGrid::eval_force_u() const {
 		Yb(2,ip) += bf_hess(9*mu+2,ip) * Pbv_x(mu,ip) + bf_hess(9*mu+5,ip) * Pbv_y(mu,ip) + bf_hess(9*mu+8,ip) * Pbv_z(mu,ip);
 	      }
 	  }
-	
+
 	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
 	arma::mat Za(3,grid.size());
 	Za.zeros();
@@ -1688,11 +1873,11 @@ arma::vec AngularGrid::eval_force_u() const {
 	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
 	    for(size_t ip=0;ip<grid.size();ip++)
 	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
-		// Z_x = 
+		// Z_x =
 		Za(0,ip) += bf_lapl(mu,ip)*Pav_x(mu,ip) + Pav(mu)*bf_lx(mu,ip);
 		Za(1,ip) += bf_lapl(mu,ip)*Pav_y(mu,ip) + Pav(mu)*bf_ly(mu,ip);
 		Za(2,ip) += bf_lapl(mu,ip)*Pav_z(mu,ip) + Pav(mu)*bf_lz(mu,ip);
-		
+
 		Zb(0,ip) += bf_lapl(mu,ip)*Pbv_x(mu,ip) + Pbv(mu)*bf_lx(mu,ip);
 		Zb(1,ip) += bf_lapl(mu,ip)*Pbv_y(mu,ip) + Pbv(mu)*bf_ly(mu,ip);
 		Zb(2,ip) += bf_lapl(mu,ip)*Pbv_z(mu,ip) + Pbv(mu)*bf_lz(mu,ip);
@@ -1719,7 +1904,7 @@ arma::vec AngularGrid::eval_force_u() const {
       }
     }
   }
-  
+
   return f;
 
 }
@@ -1733,7 +1918,7 @@ arma::vec AngularGrid::eval_force_r() const {
   // Initialize force
   arma::vec f(3*basp->get_Nnuc());
   f.zeros();
-  
+
   // Loop over nuclei
   for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
     // Grad rho in grid points wrt functions centered on nucleus
@@ -1750,18 +1935,18 @@ arma::vec AngularGrid::eval_force_r() const {
 	    gradrho(2,ip)+=bf_z(mu,ip)*Pv(mu,ip);
 	  }
       }
-    
+
     // LDA potential
     arma::rowvec vrho(vxc.row(0));
     // Multiply weights into potential
     vrho%=w;
-    
+
     // Force is
     f.subvec(3*inuc,3*inuc+2) += 2.0 * gradrho*arma::trans(vrho);
 
     if(do_gga) {
       // Calculate X = 2 \sum_{u'v} P(uv) [ x(v) d_ij x(u) + (d_i x(u)) (d_j x(v)) ]
-      //             = 2 \sum_u' Pv(u) d_ij x(u) + 2 \sum Pv_i(v) d_j x(v) 
+      //             = 2 \sum_u' Pv(u) d_ij x(u) + 2 \sum Pv_i(v) d_j x(v)
       arma::mat X(9,grid.size());
       X.zeros();
 
@@ -1781,11 +1966,11 @@ arma::vec AngularGrid::eval_force_r() const {
 	      X(0,ip)+=Pv_x(mu,ip)*bf_x(mu,ip);
 	      X(1,ip)+=Pv_x(mu,ip)*bf_y(mu,ip);
 	      X(2,ip)+=Pv_x(mu,ip)*bf_z(mu,ip);
-	      
+
 	      X(3,ip)+=Pv_y(mu,ip)*bf_x(mu,ip);
 	      X(4,ip)+=Pv_y(mu,ip)*bf_y(mu,ip);
 	      X(5,ip)+=Pv_y(mu,ip)*bf_z(mu,ip);
-	      
+
 	      X(6,ip)+=Pv_z(mu,ip)*bf_x(mu,ip);
 	      X(7,ip)+=Pv_z(mu,ip)*bf_y(mu,ip);
 	      X(8,ip)+=Pv_z(mu,ip)*bf_z(mu,ip);
@@ -1793,7 +1978,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	}
       // Plug in factor
       X*=2.0;
-      
+
       // Get potential
       arma::rowvec vs(vsigma.row(0));
       // Get grad rho
@@ -1835,7 +2020,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
 	    for(size_t ip=0;ip<grid.size();ip++)
 	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
-		// Z_x = 
+		// Z_x =
 		Z(0,ip) += bf_lapl(mu,ip)*Pv_x(mu,ip) + Pv(mu)*bf_lx(mu,ip);
 		Z(1,ip) += bf_lapl(mu,ip)*Pv_y(mu,ip) + Pv(mu)*bf_ly(mu,ip);
 		Z(2,ip) += bf_lapl(mu,ip)*Pv_z(mu,ip) + Pv(mu)*bf_lz(mu,ip);
@@ -1856,7 +2041,7 @@ arma::vec AngularGrid::eval_force_r() const {
       }
     }
   }
-  
+
   return f;
 }
 
@@ -2353,7 +2538,7 @@ void AngularGrid::compute_bf() {
 
   bf_i0.zeros(shells.size());
   bf_N.zeros(shells.size());
-  
+
   // Store indices of functions
   bf_ind.zeros(Nbf);
   size_t ioff=0;
@@ -2767,7 +2952,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
   // Intel compiler complains about collapse...
   const size_t Ngrid(grids.size());
   const size_t Norb(Ctilde.n_cols);
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -3106,6 +3291,200 @@ std::vector<arma::mat> DFTGrid::eval_overlaps() {
   return Sat;
 }
 
+arma::mat DFTGrid::eval_overlap(const arma::cx_mat & Cocc, size_t io, double k, double thr) {
+  // Amount of basis functions
+  size_t N=basp->get_Nbf();
+
+  // Returned matrices
+  arma::mat S(N,N);
+  S.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+
+    // Temporary matrix
+    arma::mat Swrk(N,N);
+    Swrk.zeros();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids.size();i++) {
+      // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);
+      wrk[ith].form_grid();
+      // Evaluate overlap
+#ifdef _OPENMP
+      wrk[ith].eval_overlap(Cocc,io,k,Swrk,thr);
+#else
+      wrk[ith].eval_overlap(Cocc,io,k,S,thr);
+#endif
+      // Free memory
+      wrk[ith].free();
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+    S+=Swrk;
+#endif
+  }
+
+  return S;
+}
+
+arma::mat DFTGrid::eval_overlap(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, double thr) {
+  // Amount of basis functions
+  size_t N=basp->get_Nbf();
+
+  // Returned matrices
+  arma::mat S(N,N);
+  S.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+
+    // Temporary matrix
+    arma::mat Swrk(N,N);
+    Swrk.zeros();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids.size();i++) {
+      // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);
+      wrk[ith].form_grid();
+      // Evaluate overlap
+#ifdef _OPENMP
+      wrk[ith].eval_overlap(Cocc,Esi,k,Swrk,thr);
+#else
+      wrk[ith].eval_overlap(Cocc,Esi,k,S,thr);
+#endif
+      // Free memory
+      wrk[ith].free();
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+    S+=Swrk;
+#endif
+  }
+
+  return S;
+}
+
+arma::mat DFTGrid::eval_tau_overlap(const arma::cx_mat & Cocc, double k, double thr) {
+  // Amount of basis functions
+  size_t N=basp->get_Nbf();
+
+  // Returned matrices
+  arma::mat S(N,N);
+  S.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+
+    // Temporary matrix
+    arma::mat Swrk(N,N);
+    Swrk.zeros();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids.size();i++) {
+      // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);
+      wrk[ith].set_grad_lapl(true,false);
+      wrk[ith].form_grid();
+      // Evaluate overlap
+#ifdef _OPENMP
+      wrk[ith].eval_tau_overlap(Cocc,k,Swrk,thr);
+#else
+      wrk[ith].eval_tau_overlap(Cocc,k,S,thr);
+#endif
+      // Free memory
+      wrk[ith].free();
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+    S+=Swrk;
+#endif
+  }
+
+  return S;
+}
+
+arma::mat DFTGrid::eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, double thr) {
+  // Amount of basis functions
+  size_t N=basp->get_Nbf();
+
+  // Returned matrices
+  arma::mat S(N,N);
+  S.zeros();
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+
+    // Temporary matrix
+    arma::mat Swrk(N,N);
+    Swrk.zeros();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids.size();i++) {
+      // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);
+      wrk[ith].set_grad_lapl(true,false);
+      wrk[ith].form_grid();
+      // Evaluate overlap
+#ifdef _OPENMP
+      wrk[ith].eval_tau_overlap_deriv(Cocc,Esi,k,Swrk,thr);
+#else
+      wrk[ith].eval_tau_overlap_deriv(Cocc,Esi,k,S,thr);
+#endif
+      // Free memory
+      wrk[ith].free();
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+    S+=Swrk;
+#endif
+  }
+
+  return S;
+}
+
 arma::mat DFTGrid::eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc) {
   // Amount of basis functions
   size_t N=basp->get_Nbf();
@@ -3303,7 +3682,7 @@ double DFTGrid::compute_Nel(const arma::mat & Pa, const arma::mat & Pb) {
 arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
   arma::vec Nel(grids.size());
   Nel.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -3345,7 +3724,7 @@ arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
 arma::vec DFTGrid::compute_atomic_Nel(const Hirshfeld & hirsh, const arma::mat & P) {
   arma::vec Nel(grids.size());
   Nel.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -3774,7 +4153,7 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
       wrk[ith].set_grad_lapl(true,grad);
       // Need bf Hessian for GGA and laplacian gradient for MGGA
       wrk[ith].set_hess_lgrad(grad,lapl);
-      
+
       // Change atom and create grid
       wrk[ith].set_grid(grids[iat]);
       wrk[ith].form_grid();
@@ -3796,7 +4175,7 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 #else
       f+=wrk[ith].eval_force_r();
 #endif
-      
+
       // Free memory
       wrk[ith].free();
     }
@@ -3940,7 +4319,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
       // Need hessian for VV10 gradient
       wrk[ith].set_hess_lgrad(true,false);
       // Change atom and create grid
-      wrk[ith].set_grid(grids[i]);      
+      wrk[ith].set_grid(grids[i]);
       wrk[ith].form_grid();
 
       // Update density
@@ -3999,7 +4378,7 @@ void DFTGrid::print_density(const arma::mat & P, std::string densname) {
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
-      wrk[ith].set_grid(grids[i]);      
+      wrk[ith].set_grid(grids[i]);
       wrk[ith].form_grid();
 
       // Update density
@@ -4050,7 +4429,7 @@ void DFTGrid::print_potential(int func_id, const arma::mat & Pa, const arma::mat
     // Loop over atoms
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
-      wrk[ith].set_grid(grids[i]);      
+      wrk[ith].set_grid(grids[i]);
       wrk[ith].form_grid();
 
       // Update density

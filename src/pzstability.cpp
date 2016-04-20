@@ -190,7 +190,7 @@ arma::vec FDHessian::gradient() {
   x0.zeros();
   return gradient(x0);
 }
-  
+
 arma::vec FDHessian::gradient(const arma::vec & x0) {
   // Amount of parameters
   size_t npar=count_params();
@@ -388,7 +388,7 @@ double FDHessian::optimize(size_t maxiter, double gthr, bool max) {
 
       if(verbose) {
 	if(val.size()>=2)
-	printf(" %e % .10f % e % e\n",step[step.size()-1],val[val.size()-1],val[val.size()-1]-val[0],val[val.size()-1]-val[val.size()-2]);
+	  printf(" %e % .10f % e % e\n",step[step.size()-1],val[val.size()-1],val[val.size()-1]-val[0],val[val.size()-1]-val[val.size()-2]);
 	else
 	  printf(" %e % .10f\n",step[step.size()-1],val[val.size()-1]);
       }
@@ -429,6 +429,7 @@ PZStability::PZStability(SCF * solver, bool ver) : FDHessian(ver) {
   solverp=solver;
   solverp->set_verbose(false);
 
+  real=true;
   imag=true;
   cancheck=false;
   oocheck=true;
@@ -696,7 +697,7 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	  ovreal.idx.subvec(ovareal.idx.n_elem,ovreal.idx.n_elem-1)=ovbreal.idx;
 	ret.push_back(ovreal);
       }
-      
+
       if(imag) {
 	ovimag.idx.zeros(ovaimag.idx.n_elem+ovbimag.idx.n_elem);
 	if(ovaimag.idx.n_elem)
@@ -705,7 +706,7 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	  ovimag.idx.subvec(ovaimag.idx.n_elem,ovimag.idx.n_elem-1)=ovbimag.idx;
 	ret.push_back(ovimag);
       }
-      
+
       if(real && imag) {
 	ova.idx.zeros(ovareal.idx.n_elem+ovaimag.idx.n_elem);
 	if(ovareal.idx.n_elem)
@@ -713,14 +714,14 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	if(ovaimag.idx.n_elem)
 	  ova.idx.subvec(ovareal.idx.n_elem,ova.idx.n_elem-1)=ovaimag.idx;
 	ret.push_back(ova);
-	
+
 	ovb.idx.zeros(ovbreal.idx.n_elem+ovbimag.idx.n_elem);
 	if(ovbreal.idx.n_elem)
 	  ovb.idx.subvec(0,ovbreal.idx.n_elem-1)=ovbreal.idx;
 	if(ovbimag.idx.n_elem)
 	  ovb.idx.subvec(ovbreal.idx.n_elem,ovb.idx.n_elem-1)=ovbimag.idx;
 	ret.push_back(ovb);
-	
+
 	ov.idx.zeros(ova.idx.n_elem+ovb.idx.n_elem);
 	if(ova.idx.n_elem)
 	  ov.idx.subvec(0,ova.idx.n_elem-1)=ova.idx;
@@ -729,7 +730,7 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	ret.push_back(ov);
       }
     }
-    
+
     if(oocheck) {
       if(real) {
 	arma::uword np=oa*(oa-1)/2;
@@ -801,7 +802,7 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
 	    oob.idx.subvec(oobreal.idx.n_elem,oob.idx.n_elem-1)=oobimag.idx;
 	  ret.push_back(oob);
 	}
-	
+
 	oo.idx.zeros(ooa.idx.n_elem+oob.idx.n_elem);
 	oo.idx.subvec(0,ooa.idx.n_elem-1)=ooa.idx;
 	if(ob>1) {
@@ -871,7 +872,7 @@ std::vector<pz_rot_par_t> PZStability::classify() const {
   return ret;
 }
 
-arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0) const {
+arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::vec & worb, const arma::cx_mat & H0) const {
   // Build effective Fock operator
   arma::cx_mat H(H0*COMPLEX1);
 
@@ -879,7 +880,7 @@ arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat 
     arma::mat S(solverp->get_S());
     for(size_t io=0;io<CO.n_cols;io++) {
       arma::cx_mat Porb(form_density(CO.col(io)));
-      H-=pzw*S*Porb*Forb[io]*Porb*S;
+      H-=worb(io)*S*Porb*Forb[io]*Porb*S;
     }
 
     if(CV.n_cols) {
@@ -891,7 +892,7 @@ arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat 
 
       for(size_t io=0;io<CO.n_cols;io++) {
 	arma::cx_mat Porb(form_density(CO.col(io)));
-	H-=pzw*S*(v*Forb[io]*Porb + Porb*Forb[io]*v)*S;
+	H-=worb(io)*S*(v*Forb[io]*Porb + Porb*Forb[io]*v)*S;
       }
     }
   }
@@ -899,11 +900,11 @@ arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat 
   return H;
 }
 
-void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb) {
+void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb, const arma::vec & worb) {
   if(!verbose) return;
-  
+
   // Form unified Hamiltonian
-  arma::cx_mat H(unified_H(CO,CV,Forb,H0));
+  arma::cx_mat H(unified_H(CO,CV,Forb,worb,H0));
 
   // Occupied block
   bool diagok;
@@ -951,9 +952,9 @@ void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, c
     // Print out optimal orbitals
     if(CO.n_cols) {
       printf("Decomposition of self-interaction energies:\n");
-      printf("\t%4s\t%8s\t%8s\n","io","E(orb)","E(SI)");
+      printf("\t%4s\t%8s\t%8s\t%8s\n","io","E(orb)","E(SI)","Scaling");
       for(size_t io=0;io<CO.n_cols;io++)
-	printf("\t%4i\t% 8.3f\t% 8.3f\n",(int) io+1,Ep(io),Eorb(io));
+	printf("\t%4i\t% 8.3f\t% 8.3f\t% 8.3f\n",(int) io+1,Ep(io),Eorb(io),worb(io));
       fflush(stdout);
     }
   }
@@ -961,18 +962,18 @@ void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, c
 
 void PZStability::print_info() {
   if(!verbose) return;
-  
+
   arma::vec x(count_params());
   x.zeros();
 
   rscf_t rsl;
   uscf_t usl;
-  
+
   if(restr) {
     // Evaluate orbital matrices
     std::vector<arma::cx_mat> Forb;
-    arma::vec Eorb;
-    eval(x,rsl,Forb,Eorb,true,true,pzw,true);
+    arma::vec Eorb, worb;
+    eval(x,rsl,Forb,Eorb,worb,true,true,true);
 
     // Occupied orbitals
     arma::cx_mat CO=rsl.cC.cols(0,oa-1);
@@ -982,12 +983,13 @@ void PZStability::print_info() {
       CV=rsl.cC.cols(oa,oa+va-1);
 
     // Diagonalize
-    print_info(CO,CV,Forb,get_H(rsl),Eorb);
+    print_info(CO,CV,Forb,get_H(rsl),Eorb,worb);
   } else {
     // Evaluate orbital matrices
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    eval(x,usl,Forba,Eorba,Forbb,Eorbb,true,true,pzw,true);
+    arma::vec worba, worbb;
+    eval(x,usl,Forba,Eorba,worba,Forbb,Eorbb,worbb,true,true,true);
 
     // Occupied orbitals
     arma::cx_mat COa=usl.cCa.cols(0,oa-1);
@@ -1004,9 +1006,9 @@ void PZStability::print_info() {
 
     // Diagonalize
     printf("\n **** Alpha orbitals ****\n");
-    print_info(COa,CVa,Forba,get_H(usl,false),Eorba);
+    print_info(COa,CVa,Forba,get_H(usl,false),Eorba,worba);
     printf("\n **** Beta  orbitals ****\n");
-    print_info(COb,CVb,Forbb,get_H(usl,true),Eorbb);
+    print_info(COb,CVb,Forbb,get_H(usl,true),Eorbb,worbb);
   }
 
   // Print total energy and its components
@@ -1080,7 +1082,147 @@ void PZStability::update_step(const arma::vec & g) {
   }
 }
 
-double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, bool can, bool fock, double pzweight, bool useref) {
+
+arma::vec PZStability::compute_worb(const arma::cx_mat & C) {
+  arma::vec w(C.n_cols);
+  w.ones();
+
+  switch(scale) {
+  case(PZ_SCALE_CONSTANT):
+    w*=pzw;
+    break;
+
+  case(PZ_SCALE_DENSITY):
+    {
+      for(size_t io=0;io<C.n_cols;io++) {
+	arma::mat S(grid.eval_overlap(C,io,scaleexp));
+	w(io)=std::real(arma::as_scalar(arma::trans(C.col(io))*S*C.col(io)));
+      }
+      break;
+    }
+
+  case(PZ_SCALE_KINETIC):
+    {
+      arma::mat S(grid.eval_tau_overlap(C,scaleexp));
+      for(size_t io=0;io<C.n_cols;io++)
+	w(io)=std::real(arma::as_scalar(arma::trans(C.col(io))*S*C.col(io)));
+      break;
+    }
+
+  default:
+    throw std::logic_error("Not implemented\n");
+  }
+
+  //w.t().print("Orbital weights");
+
+  return w;
+}
+
+void PZStability::scaling_gradient_oo(arma::cx_mat & gOO, const arma::cx_mat & CO, const arma::vec & Eorb) {
+  switch(scale) {
+  case(PZ_SCALE_CONSTANT):
+    return;
+
+  case(PZ_SCALE_DENSITY):
+    {
+      // Calculate the overlap matrices
+      std::vector<arma::mat> S(CO.n_cols);
+      for(size_t io=0;io<CO.n_cols;io++)
+	S[io]=grid.eval_overlap(CO,io,scaleexp);
+
+      // Increment gOO
+      for(size_t m=0;m<CO.n_cols;m++)
+	for(size_t n=0;n<CO.n_cols;n++)
+	  gOO(m,n) += (scaleexp+1)*arma::as_scalar(arma::trans(CO.col(n))*(Eorb(m)*S[m]-Eorb(n)*S[n])*CO.col(m));
+
+      return;
+    }
+
+  case(PZ_SCALE_KINETIC):
+    {
+      // Calculate the overlap
+      arma::mat S(grid.eval_tau_overlap(CO,scaleexp));
+
+      // Increment gOO
+      for(size_t m=0;m<CO.n_cols;m++)
+	for(size_t n=0;n<CO.n_cols;n++)
+	  gOO(m,n) += (Eorb(m)-Eorb(n))*arma::as_scalar(arma::trans(CO.col(n))*S*CO.col(m));
+
+      return;
+    }
+
+  default:
+    throw std::logic_error("Not implemented\n");
+  }
+}
+
+void PZStability::scaling_gradient_ov(arma::cx_mat & gOV, const arma::cx_mat & CO, const arma::vec & Eorb, const arma::cx_mat & CV) {
+  switch(scale) {
+  case(PZ_SCALE_CONSTANT):
+    return;
+
+  case(PZ_SCALE_DENSITY):
+    {
+      // First part
+      {
+	// Calculate the overlap matrices
+	std::vector<arma::mat> S(CO.n_cols);
+	for(size_t io=0;io<CO.n_cols;io++)
+	  S[io]=grid.eval_overlap(CO,io,scaleexp);
+
+	// Increment gOV
+	for(size_t m=0;m<CO.n_cols;m++)
+	  for(size_t a=0;a<CV.n_cols;a++)
+	    gOV(m,a) += (scaleexp+1)*Eorb(m)*arma::as_scalar(arma::trans(CV.col(a))*S[m]*CO.col(m));
+      }
+
+      // Second part
+      {
+	// Calculate the weighted overlap
+	arma::mat S(grid.eval_overlap(CO,Eorb,scaleexp+1));
+
+	// Increment gOV
+	for(size_t m=0;m<CO.n_cols;m++)
+	  for(size_t a=0;a<CV.n_cols;a++)
+	    gOV(m,a) -= scaleexp*arma::as_scalar(arma::trans(CV.col(a))*S*CO.col(m));
+      }
+
+      return;
+    }
+
+  case(PZ_SCALE_KINETIC):
+    {
+      // First part
+      {
+	// Calculate the overlap matrix
+	arma::mat S(grid.eval_tau_overlap(CO,scaleexp));
+
+	// Increment gOV
+	for(size_t m=0;m<CO.n_cols;m++)
+	  for(size_t a=0;a<CV.n_cols;a++)
+	    gOV(m,a) += Eorb(m)*arma::as_scalar(arma::trans(CV.col(a))*S*CO.col(m));
+      }
+
+      // Second part
+      {
+	// Calculate the weighted overlap
+	arma::mat S(grid.eval_tau_overlap_deriv(CO,Eorb,scaleexp));
+
+	// Increment gOV
+	for(size_t m=0;m<CO.n_cols;m++)
+	  for(size_t a=0;a<CV.n_cols;a++)
+	    gOV(m,a) += arma::as_scalar(arma::trans(CV.col(a))*S*CO.col(m));
+      }
+
+      return;
+    }
+
+  default:
+    throw std::logic_error("Not implemented\n");
+  }
+}
+
+double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, arma::vec & worb, bool can, bool fock, bool useref) {
   // Use reference
   sol=rsol;
 
@@ -1115,6 +1257,7 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
   // Clear out any old data
   Forb.clear();
   Eorb.clear();
+  worb.clear();
 
   // Dummy occupation vector
   std::vector<double> occs(oa,2.0);
@@ -1123,7 +1266,7 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
   if(can && (!useref || (useref && virtlist.size()) ))
     solverp->Fock_RDFT(sol,occs,ovmethod,grid,nlgrid);
 
-  if(pzweight==0.0)
+  if(pzw==0.0)
     return sol.en.E;
 
   // Build the SI part
@@ -1134,11 +1277,16 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
       CO.col(i)=sol.cC.col(occlist[i]);
 
     std::vector<arma::cx_mat> Forb_hlp;
-    arma::vec Eorb_hlp;
+    arma::vec Eorb_hlp, worb_hlp;
     solverp->PZSIC_Fock(Forb_hlp,Eorb_hlp,CO,oomethod,grid,nlgrid,fock);
     Eorb=ref_Eorb;
     for(size_t i=0;i<occlist.size();i++)
       Eorb(occlist[i])=Eorb_hlp(i);
+
+    worb=ref_worb;
+    worb_hlp=compute_worb(CO);
+    for(size_t i=0;i<occlist.size();i++)
+      worb(occlist[i])=worb_hlp(i);
 
     if(fock) {
       Forb=ref_Forb;
@@ -1147,17 +1295,18 @@ double PZStability::eval(const arma::vec & x, rscf_t & sol, std::vector<arma::cx
     }
   } else {
     CO=sol.cC.cols(0,oa-1);
+    worb=compute_worb(CO);
     solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
   }
 
-  sol.en.Esic=-2.0*pzweight*arma::sum(Eorb);
+  sol.en.Esic=-2.0*arma::sum(worb%Eorb);
   sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl+sol.en.Esic;
   sol.en.E=sol.en.Eel+sol.en.Enucr;
-  
+
   return sol.en.E;
 }
 
-double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, bool can, bool fock, double pzweight, bool useref) {
+double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx_mat> & Forba, arma::vec & Eorba, arma::vec & worba, std::vector<arma::cx_mat> & Forbb, arma::vec & Eorbb, arma::vec & worbb, bool can, bool fock, bool useref) {
   // Use reference
   sol=usol;
 
@@ -1217,8 +1366,10 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   // Clear out any old data
   Forba.clear();
   Eorba.clear();
+  worba.clear();
   Forbb.clear();
   Eorbb.clear();
+  worbb.clear();
 
   // Dummy occupation vector
   std::vector<double> occa(oa,1.0);
@@ -1227,12 +1378,13 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   // Build global Fock operator
   if(can && (!useref || (useref && (virtlista.size() || virtlistb.size())) ))
     solverp->Fock_UDFT(sol,occa,occb,ovmethod,grid,nlgrid);
-  if(pzweight==0.0)
+  if(pzw==0.0)
     return sol.en.E;
 
   // Build the SI part
   std::vector<arma::cx_mat> Forb;
   arma::vec Eorb;
+  arma::vec worba_hlp, worbb_hlp;
 
   // Build the SI part
   arma::cx_mat CO;
@@ -1244,6 +1396,10 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
       CO.col(i+occlista.size())=sol.cCb.col(occlistb[i]);
 
     solverp->PZSIC_Fock(Forb,Eorb,CO,oomethod,grid,nlgrid,fock);
+    if(occlista.size())
+      worba_hlp=compute_worb(CO.cols(0,occlista.size()-1));
+    if(occlistb.size())
+      worbb_hlp=compute_worb(CO.cols(occlista.size(),CO.n_cols-1));
 
     Eorba=ref_Eorba;
     for(size_t i=0;i<occlista.size();i++)
@@ -1251,6 +1407,13 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
     Eorbb=ref_Eorbb;
     for(size_t i=0;i<occlistb.size();i++)
       Eorbb(occlistb[i])=Eorb(i+occlista.size());
+
+    worba=ref_worba;
+    for(size_t i=0;i<occlista.size();i++)
+      worba(occlista[i])=worba_hlp(i);
+    worbb=ref_worbb;
+    for(size_t i=0;i<occlistb.size();i++)
+      worbb(occlistb[i])=worbb_hlp(i);
 
     if(fock) {
       Forba=ref_Forba;
@@ -1271,6 +1434,10 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
     if(ob)
       Eorbb=Eorb.subvec(oa,oa+ob-1);
 
+    worba=compute_worb(sol.cCa.cols(0,oa-1));
+    if(ob)
+      worbb=compute_worb(sol.cCb.cols(0,ob-1));
+
     if(fock) {
       Forba.resize(oa);
       for(size_t i=0;i<oa;i++)
@@ -1284,7 +1451,7 @@ double PZStability::eval(const arma::vec & x, uscf_t & sol, std::vector<arma::cx
   }
 
   // Result is
-  sol.en.Esic=-pzweight*(arma::sum(Eorba)+arma::sum(Eorbb));
+  sol.en.Esic=-(arma::sum(worba%Eorba)+arma::sum(worbb%Eorbb));
   sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl+sol.en.Esic;
   sol.en.E=sol.en.Eel+sol.en.Enucr;
 
@@ -1320,7 +1487,7 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
       arma::vec gt(gather_ov(gOV,real,imag));
 
       // Preconditioning. Form unified Hamiltonian
-      arma::cx_mat H(unified_H(CO,CV,ref_Forb,get_H(rsol)));
+      arma::cx_mat H(unified_H(CO,CV,ref_Forb,ref_worb,get_H(rsol)));
 
       arma::cx_mat Hoo(arma::trans(CO)*H*CO);
       arma::cx_mat Hvv(arma::trans(CV)*H*CV);
@@ -1367,8 +1534,8 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
 
     if(cancheck && va) {
       // Preconditioning. Form unified Hamiltonian
-      arma::cx_mat Ha(unified_H(COa,CVa,ref_Forba,get_H(usol,false)));
-      arma::cx_mat Hb(unified_H(COb,CVb,ref_Forbb,get_H(usol,true)));
+      arma::cx_mat Ha(unified_H(COa,CVa,ref_Forba,ref_worba,get_H(usol,false)));
+      arma::cx_mat Hb(unified_H(COb,CVb,ref_Forbb,ref_worbb,get_H(usol,true)));
 
       arma::cx_mat Hooa(arma::trans(COa)*Ha*COa);
       arma::cx_mat Hvva(arma::trans(CVa)*Ha*CVa);
@@ -1458,7 +1625,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
       for(size_t io=0;io<oa;io++) {
 	// Orbital Hamiltonian is
 	arma::cx_mat Fo(get_H(rsol));
-	if(pzw!=0.0) Fo-=pzw*ref_Forb[io];
+	if(pzw!=0.0) Fo-=ref_worb(io)*ref_Forb[io];
 	// Occupied energy is
 	double Eocc=std::real(arma::as_scalar(arma::trans(CO.col(io))*Fo*CO.col(io)));
 	// Loop over virtuals
@@ -1479,7 +1646,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
 
       // Run element-wise division
       arma::cx_mat GOV(gOV/dE);
-      
+
       arma::vec POV(gather_ov(GOV,real,imag));
       if(POV.n_elem != count_ov_params(oa,va))
 	throw std::logic_error("Amount of elements doesn't match!\n");
@@ -1504,7 +1671,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
       for(size_t io=0;io<oa;io++) {
 	// Orbital Hamiltonian is
 	arma::cx_mat Fo(get_H(usol,false));
-	if(pzw!=0.0) Fo-=pzw*ref_Forba[io];
+	if(pzw!=0.0) Fo-=ref_worba(io)*ref_Forba[io];
 	// Occupied energy is
 	double Eocc=std::real(arma::as_scalar(arma::trans(COa.col(io))*Fo*COa.col(io)));
 	// Loop over virtuals
@@ -1522,7 +1689,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
 	for(size_t io=0;io<ob;io++) {
 	  // Orbital Hamiltonian is
 	  arma::cx_mat Fo(get_H(usol,true));
-	  if(pzw!=0.0) Fo-=pzw*ref_Forbb[io];
+	  if(pzw!=0.0) Fo-=ref_worbb(io)*ref_Forbb[io];
 	  // Occupied energy is
 	  double Eocc=std::real(arma::as_scalar(arma::trans(COb.col(io))*Fo*COb.col(io)));
 	  // Loop over virtuals
@@ -1534,7 +1701,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
 	  }
 	}
       }
-	    
+
       // Minimal Hessian shift is
       double minH=1e-4;
       if(ob)
@@ -1552,7 +1719,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
 
       // Run element-wise division
       arma::cx_mat GOVa(gOVa/dEa);
-      
+
       arma::vec POVa(gather_ov(GOVa,real,imag));
       if(POVa.n_elem != count_ov_params(oa,va))
 	throw std::logic_error("Amount of elements doesn't match!\n");
@@ -1562,10 +1729,10 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
       if(ob) {
 	// Form OV gradient
 	arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
-	
+
 	// Run element-wise division
 	arma::cx_mat GOVb(gOVb/dEb);
-	
+
 	arma::vec POVb(gather_ov(GOVb,real,imag));
 	if(POVb.n_elem != count_ov_params(ob,vb))
 	  throw std::logic_error("Amount of elements doesn't match!\n");
@@ -1574,7 +1741,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
       }
     }
   }
-  
+
   return sd;
 }
 
@@ -1588,8 +1755,8 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
     // Evaluate orbital matrices
     rscf_t sol;
     std::vector<arma::cx_mat> Forb;
-    arma::vec Eorb;
-    eval(x,sol,Forb,Eorb,cancheck,true,pzw,ref);
+    arma::vec Eorb, worb;
+    eval(x,sol,Forb,Eorb,worb,cancheck,true,ref);
 
     // Occupied orbitals
     arma::cx_mat CO(sol.cC.cols(0,oa-1));
@@ -1607,11 +1774,14 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	gOV=-arma::strans(arma::trans(CV.cols(0,va-1))*arma::conj(H)*CO.cols(0,oa-1));
       else
 	for(size_t i=0;i<oa;i++) {
-	  arma::cx_vec hlp(arma::conj(H-pzw*Forb[i])*CO.col(i));
+	  arma::cx_vec hlp(arma::conj(H-worb(i)*Forb[i])*CO.col(i));
 	  for(size_t a=0;a<va;a++)
 	    gOV(i,a)=-arma::cdot(CV.col(a),hlp);
 	}
-      
+
+      // Put in scaling gradient
+      scaling_gradient_ov(gOV,CO,Eorb,CV);
+
       // Convert to proper gradient
       gOV=gradient_convert(gOV);
 
@@ -1627,10 +1797,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       if(pzw!=0.0) {
 	arma::cx_mat FO(CO.n_rows,oa);
 	for(size_t i=0;i<oa;i++)
-	  FO.col(i)=arma::conj(Forb[i])*CO.col(i);
-	gOO=-pzw*arma::strans(-arma::trans(CO)*FO + arma::trans(FO)*CO);
+	  FO.col(i)=worb(i)*arma::conj(Forb[i])*CO.col(i);
+	gOO=-arma::strans(-arma::trans(CO)*FO + arma::trans(FO)*CO);
       } else
 	gOO.zeros();
+
+      // Put in scaling gradient
+      scaling_gradient_oo(gOO,CO,Eorb);
 
       // Convert to proper gradient
       gOO=gradient_convert(gOO);
@@ -1649,7 +1822,8 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
     uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    eval(x,sol,Forba,Eorba,Forbb,Eorbb,cancheck,true,pzw,ref);
+    arma::vec worba, worbb;
+    eval(x,sol,Forba,Eorba,worba,Forbb,Eorbb,worbb,cancheck,true,ref);
 
     // Occupied orbitals
     arma::cx_mat COa=sol.cCa.cols(0,oa-1);
@@ -1669,17 +1843,21 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
     if(cancheck && va) {
       // Hamiltonian is
       arma::cx_mat Ha(get_H(sol,false));
-      
+
       // OV alpha gradient is
       arma::cx_mat gOVa(oa,va);
       if(pzw==0.0)
 	gOVa=-arma::strans(arma::trans(CVa.cols(0,va-1))*arma::conj(Ha)*COa.cols(0,oa-1));
       else
 	for(size_t i=0;i<oa;i++) {
-	  arma::cx_vec hlp(arma::conj(Ha-pzw*Forba[i])*COa.col(i));
+	  arma::cx_vec hlp(arma::conj(Ha-worba(i)*Forba[i])*COa.col(i));
 	  for(size_t a=0;a<va;a++)
 	    gOVa(i,a)=-arma::cdot(CVa.col(a),hlp);
 	}
+
+
+      // Put in scaling gradient
+      scaling_gradient_ov(gOVa,COa,Eorba,CVa);
 
       // Convert to proper gradient
       gOVa=gradient_convert(gOVa);
@@ -1692,17 +1870,20 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       if(ob && vb) {
 	// Hamiltonian is
 	arma::cx_mat Hb(get_H(sol,true));
-	
+
 	// OV beta gradient is
 	arma::cx_mat gOVb(ob,vb);
 	if(pzw==0.0)
 	  gOVb=-arma::strans(arma::trans(CVb.cols(0,vb-1))*arma::conj(Hb)*COb.cols(0,ob-1));
 	else
 	  for(size_t i=0;i<ob;i++) {
-	    arma::cx_vec hlp(arma::conj(Hb-pzw*Forbb[i])*COb.col(i));
+	    arma::cx_vec hlp(arma::conj(Hb-worbb(i)*Forbb[i])*COb.col(i));
 	    for(size_t a=0;a<vb;a++)
 	      gOVb(i,a)=-arma::cdot(CVb.col(a),hlp);
 	  }
+
+	// Put in scaling gradient
+	scaling_gradient_ov(gOVb,COb,Eorbb,CVb);
 
 	// Convert to proper gradient
 	gOVb=gradient_convert(gOVb);
@@ -1721,10 +1902,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	if(pzw!=0.0) {
 	  arma::cx_mat FOa(COa.n_rows,oa);
 	  for(size_t i=0;i<oa;i++)
-	    FOa.col(i)=arma::conj(Forba[i])*COa.col(i);
-	  gOOa=-pzw*arma::strans(-arma::trans(COa)*FOa + arma::trans(FOa)*COa);
+	    FOa.col(i)=worba(i)*arma::conj(Forba[i])*COa.col(i);
+	  gOOa=-arma::strans(-arma::trans(COa)*FOa + arma::trans(FOa)*COa);
 	} else
 	  gOOa.zeros();
+
+	// Put in scaling gradient
+	scaling_gradient_oo(gOOa,COa,Eorba);
 
 	// Convert to proper gradient
 	gOOa=gradient_convert(gOOa);
@@ -1741,10 +1925,13 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	if(pzw!=0.0) {
 	  arma::cx_mat FOb(COb.n_rows,ob);
 	  for(size_t i=0;i<ob;i++)
-	    FOb.col(i)=arma::conj(Forbb[i])*COb.col(i);
-	  gOOb=-pzw*arma::strans(-arma::trans(COb)*FOb + arma::trans(FOb)*COb);
+	    FOb.col(i)=worbb(i)*arma::conj(Forbb[i])*COb.col(i);
+	  gOOb=-arma::strans(-arma::trans(COb)*FOb + arma::trans(FOb)*COb);
 	} else
 	  gOOb.zeros();
+
+	// Put in scaling gradient
+	scaling_gradient_oo(gOOb,COb,Eorbb);
 
 	// Convert to proper gradient
 	gOOb=gradient_convert(gOOb);
@@ -1757,24 +1944,6 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
     }
   }
 
-  /*
-  arma::vec gn(FDHessian::gradient(x));
-  fflush(stdout);
-  if(rms_norm(g-gn)>1e-6) {
-    g.t().print("Analytic gradient");
-    gn.t().print("Numeric gradient");
-    (g-gn).t().print("Difference");    
-    printf("Problem in analytic gradient, difference norm %e.\n",arma::norm(g-gn,2));
-    if(arma::norm(g+gn,2)<arma::norm(g-gn,2))
-      printf("Derivative has wrong sign? |g+gn|=%e, |g-gn|=%e\n",arma::norm(g+gn,2),arma::norm(g-gn,2));
-    //throw std::runtime_error("Problem in gradient\n");
-  } else
-    printf("Analytic gradient is OK, difference norm %e\n",arma::norm(g-gn,2));
-  */
-  
-  // Use numerical gradient
-  //g=gn;
-  
   return g;
 }
 
@@ -1826,13 +1995,14 @@ double PZStability::eval(const arma::vec & x) {
   if(restr) {
     rscf_t sol;
     std::vector<arma::cx_mat> Forb;
-    arma::vec Eorb;
-    return eval(x,sol,Forb,Eorb,cancheck,false,pzw,false);
+    arma::vec Eorb, worb;
+    return eval(x,sol,Forb,Eorb,worb,cancheck,false,false);
   } else {
     uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    return eval(x,sol,Forba,Eorba,Forbb,Eorbb,cancheck,false,pzw,false);
+    arma::vec worba, worbb;
+    return eval(x,sol,Forba,Eorba,worba,Forbb,Eorbb,worbb,cancheck,false,false);
   }
 }
 
@@ -2006,7 +2176,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
     // Update step size
     update_step(sd);
-    
+
     // Initial step size. Don't go too far so that the parabolic
     // approximation is valid
     //double d= cancheck ? Tmu/25.0 : Tmu/5.0;
@@ -2090,7 +2260,7 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
   update_reference(true);
   // Print info
   print_info();
-  
+
   // Return the change
   return E0-ival;
 }
@@ -2166,7 +2336,7 @@ inline void orthonormalize(const arma::mat & S, arma::cx_mat & C, bool verbose) 
   }
 }
 
-      
+
 void PZStability::update(const arma::vec & x) {
   if(arma::norm(x,2)!=0.0)  {
     if(restr) {
@@ -2250,16 +2420,16 @@ void PZStability::update_reference(bool sort) {
   if(restr) {
     rscf_t sol;
     std::vector<arma::cx_mat> Forb;
-    arma::vec Eorb;
-    eval(x0,sol,Forb,Eorb,true,true,pzw,false);
-    
+    arma::vec Eorb, worb;
+    eval(x0,sol,Forb,Eorb,worb,true,true,false);
+
     if(sort) {
       arma::cx_mat CO(sol.cC.cols(0,oa-1));
       arma::cx_mat CV;
       if(sol.cC.n_cols>oa)
 	CV=sol.cC.cols(oa,sol.cC.n_cols-1);
       // Unified Hamiltonian
-      arma::cx_mat H(unified_H(CO,CV,Forb,get_H(sol)));
+      arma::cx_mat H(unified_H(CO,CV,Forb,worb,get_H(sol)));
 
       // Calculate projected orbital energies
       arma::vec Eorbo=arma::real(arma::diagvec(arma::trans(CO)*H*CO));
@@ -2282,17 +2452,24 @@ void PZStability::update_reference(bool sort) {
 	ref_Eorb.zeros(Eorb.n_elem);
 	for(size_t i=0;i<idxo.n_elem;i++)
 	  ref_Eorb(i)=Eorb(idxo(i));
+
+	ref_worb.zeros(worb.n_elem);
+	for(size_t i=0;i<idxo.n_elem;i++)
+	  ref_worb(i)=worb(idxo(i));
+
 	ref_Forb.resize(Forb.size());
 	for(size_t i=0;i<idxo.n_elem;i++)
 	  ref_Forb[i]=Forb[idxo(i)];
       } else {
 	ref_Eorb.clear();
+	ref_worb.clear();
 	ref_Forb.clear();
       }
     } else {
       // Store reference
       rsol=sol;
       ref_Eorb=Eorb;
+      ref_worb=worb;
       ref_Forb=Forb;
     }
 
@@ -2300,7 +2477,8 @@ void PZStability::update_reference(bool sort) {
     uscf_t sol;
     std::vector<arma::cx_mat> Forba, Forbb;
     arma::vec Eorba, Eorbb;
-    eval(x0,sol,Forba,Eorba,Forbb,Eorbb,true,true,pzw,false);
+    arma::vec worba, worbb;
+    eval(x0,sol,Forba,Eorba,worba,Forbb,Eorbb,worbb,true,true,false);
 
     if(sort) {
       arma::cx_mat COa(sol.cCa.cols(0,oa-1));
@@ -2315,8 +2493,8 @@ void PZStability::update_reference(bool sort) {
 	CVb=sol.cCb.cols(ob,sol.cCb.n_cols-1);
 
       // Unified Hamiltonians
-      arma::cx_mat Ha(unified_H(COa,CVa,Forba,get_H(sol,false)));
-      arma::cx_mat Hb(unified_H(COb,CVb,Forbb,get_H(sol,true)));
+      arma::cx_mat Ha(unified_H(COa,CVa,Forba,worba,get_H(sol,false)));
+      arma::cx_mat Hb(unified_H(COb,CVb,Forbb,worbb,get_H(sol,true)));
 
       // Calculate projected orbital energies
       arma::vec Eorbao=arma::real(arma::diagvec(arma::trans(COa)*Ha*COa));
@@ -2346,11 +2524,17 @@ void PZStability::update_reference(bool sort) {
 	ref_Eorba.zeros(oa);
 	for(size_t i=0;i<idxao.n_elem;i++)
 	  ref_Eorba(i)=Eorba(idxao(i));
+
+	ref_worba.zeros(oa);
+	for(size_t i=0;i<idxao.n_elem;i++)
+	  ref_worba(i)=worba(idxao(i));
+
 	ref_Forba.resize(oa);
 	for(size_t i=0;i<idxao.n_elem;i++)
 	  ref_Forba[i]=Forba[idxao(i)];
       } else {
 	ref_Eorba.clear();
+	ref_worba.clear();
 	ref_Forba.clear();
       }
 
@@ -2363,11 +2547,17 @@ void PZStability::update_reference(bool sort) {
 	  ref_Eorbb.zeros(ob);
 	  for(size_t i=0;i<idxbo.n_elem;i++)
 	    ref_Eorbb(i)=Eorbb(idxbo(i));
+
+	  ref_worbb.zeros(ob);
+	  for(size_t i=0;i<idxbo.n_elem;i++)
+	    ref_worbb(i)=worbb(idxbo(i));
+
 	  ref_Forbb.resize(ob);
 	  for(size_t i=0;i<idxbo.n_elem;i++)
 	    ref_Forbb[i]=Forbb[idxbo(i)];
 	} else {
 	  ref_Eorbb.clear();
+	  ref_worbb.clear();
 	  ref_Forbb.clear();
 	}
       }
@@ -2380,8 +2570,11 @@ void PZStability::update_reference(bool sort) {
       // Store reference
       usol=sol;
       ref_Eorba=Eorba;
+      ref_worba=worba;
       ref_Forba=Forba;
+
       ref_Eorbb=Eorbb;
+      ref_worbb=worbb;
       ref_Forbb=Forbb;
     }
   }
@@ -2502,10 +2695,15 @@ arma::cx_mat PZStability::matexp(const arma::cx_mat & R) const {
   return rot;
 }
 
-void PZStability::set_method(const dft_t & ovmethod_, const dft_t & oomethod_, double pzw_) {
+void PZStability::set_method(const dft_t & ovmethod_, const dft_t & oomethod_, double pzw_, pz_scaling_t scale_, double scaleexp_) {
   ovmethod=ovmethod_;
   oomethod=oomethod_;
   pzw=pzw_;
+  scale=scale_;
+  scaleexp=scaleexp_;
+  if(scale!=PZ_SCALE_CONSTANT)
+    // Override dummy value
+    pzw=1.0;
 
   Checkpoint *chkptp=solverp->get_checkpoint();
   chkptp->read(basis);
@@ -2525,7 +2723,7 @@ void PZStability::set_method(const dft_t & ovmethod_, const dft_t & oomethod_, d
     else
       printf("\nA pure exchange functional used, no exact exchange.\n");
   }
-  
+
   // Compute range separated integrals if necessary
   if(is_range_separated(ovmethod.x_func))
     solverp->fill_rs(omega);
@@ -2543,6 +2741,24 @@ void PZStability::set_params(bool real_, bool imag_, bool can, bool oo) {
     truth[1]="true";
     fprintf(stderr,"oo = %s, ov = %s, real = %s, imag = %s\n",truth[oocheck].c_str(),truth[cancheck].c_str(),truth[real].c_str(),truth[imag].c_str());
     fprintf(stderr,"There are %i parameters.\n",(int) count_params());
+  }
+
+  if(false) {
+    // Check that gradient is valid
+    arma::vec x0;
+    x0.zeros(count_params());
+
+    // Test gradient
+    arma::vec g(gradient(x0,true));
+    arma::vec gn(FDHessian::gradient(x0));
+    double norm(arma::norm(g-gn,2));
+    printf("Gradient error norm is  %e\n",norm);
+    if(norm>=1e-6) {
+      g.t().print("Analytic gradient");
+      gn.t().print("Numerical gradient");
+      fflush(stdout);
+      throw std::logic_error("Gradient is wrong.\n");
+    }
   }
 }
 
@@ -2598,7 +2814,7 @@ void PZStability::update_grid(bool init) {
       nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,strict,true);
   }
 }
-    
+
 void PZStability::set(const uscf_t & sol) {
   Checkpoint *chkptp=solverp->get_checkpoint();
 
@@ -2638,7 +2854,7 @@ bool PZStability::check(bool stability, double cutoff) {
 
   if(!count_params())
     return false;
-  
+
   // Estimate runtime
   {
     double ttot=0.0;
@@ -2649,7 +2865,7 @@ bool PZStability::check(bool stability, double cutoff) {
     if(cancheck) {
       // OV part
       if(cancheck && vb) {
-        x.zeros();
+	x.zeros();
 	x(0)=ss_fd;
 	t.set();
 	gradient(x,true);
@@ -2708,7 +2924,7 @@ bool PZStability::check(bool stability, double cutoff) {
 	oss << "Error diagonalizing " << dof[i].name << " Hessian.\n";
 	throw std::runtime_error(oss.str());
       }
-      
+
       std::ostringstream oss;
       oss << "Eigenvalues in the " << dof[i].name << " block (" << tdiag.elapsed() << ")";
       hval.t().print(oss.str());

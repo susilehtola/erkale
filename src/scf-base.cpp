@@ -1505,6 +1505,17 @@ int parse_pzimag(const std::string & str) {
   return ret;
 }
 
+pz_scaling_t parse_pzscale(const std::string & scale) {
+  if(stricmp(scale,"Const")==0 || stricmp(scale,"Constant")==0)
+    return PZ_SCALE_CONSTANT;
+  if(stricmp(scale,"Dens")==0 || stricmp(scale,"Density")==0)
+    return PZ_SCALE_DENSITY;
+  if(stricmp(scale,"Kin")==0 || stricmp(scale,"Kinetic")==0)
+    return PZ_SCALE_KINETIC;
+
+  throw std::runtime_error("Setting \"" + scale + "\" not recognized!\n");
+}
+
 dft_t parse_dft(const Settings & set, bool init) {
   dft_t dft;
   dft.gridtol=0.0;
@@ -1854,6 +1865,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
       int seed=set.get_int("PZseed");
       dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
+      pz_scaling_t pzscale(parse_pzscale(set.get_string("PZscale")));
+      double pzscaleexp(set.get_double("PZscaleExp"));
 
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
@@ -1941,7 +1954,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	chkpt.cwrite("CW",sol.cC);
 
 	PZStability stab(&solver,verbose);
-	stab.set_method(dft,oodft,pzw);
+	stab.set_method(dft,oodft,pzw,pzscale,pzscaleexp);
 	stab.set(sol);
 
 	while(true) {
@@ -2179,7 +2192,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
       int seed=set.get_int("PZseed");
       dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
-
+      pz_scaling_t pzscale(parse_pzscale(set.get_string("PZscale")));
+      double pzscaleexp(set.get_double("PZscaleExp"));
+      
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve unrestricted DFT problem first on a rough grid
@@ -2329,7 +2344,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	}
 
 	PZStability stab(&solver,verbose);
-	stab.set_method(dft,oodft,pzw);
+	stab.set_method(dft,oodft,pzw,pzscale,pzscaleexp);
 	stab.set(sol);
 
 	while(true) {
