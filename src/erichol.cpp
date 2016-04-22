@@ -120,7 +120,7 @@ void ERIchol::save() const {
   }
   // Open in write mode
   Checkpoint chkpt(CHOLFILE,true,trunc);
-  
+
   // Suffix in checkpoint
   std::string suffix;
   if(omega!=1.0) {
@@ -137,7 +137,7 @@ void ERIchol::save() const {
     hsize_t Nbft(Nbf);
     chkpt.write("Nbf",Nbft);
   }
-  
+
   // Save product index
   {
     std::vector<hsize_t> prodidxv(arma::conv_to< std::vector<hsize_t> >::from(prodidx));
@@ -177,7 +177,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   double t_int=0.0;
   // Cholesky time
   double t_chol=0.0;
-  
+
   // Calculate diagonal element vector
   arma::vec d(Nbf*Nbf);
   d.zeros();
@@ -187,19 +187,19 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   {
     ERIWorker *eri;
     const std::vector<double> * erip;
-    
+
     if(omega==0.0 && alpha==1.0 && beta==0.0)
       eri=new ERIWorker(basis.get_max_am(),basis.get_max_Ncontr());
     else
       eri=new ERIWorker_srlr(basis.get_max_am(),basis.get_max_Ncontr(),omega,alpha,beta);
-    
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++) {
       size_t is=shpairs[ip].is;
       size_t js=shpairs[ip].js;
-      
+
       // Compute integrals
       eri->compute(&shells[is],&shells[js],&shells[is],&shells[js]);
       erip=eri->getp();
@@ -209,7 +209,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       size_t Nj(shells[js].get_Nbf());
       size_t i0(shells[is].get_first_ind());
       size_t j0(shells[js].get_first_ind());
-      
+
       for(size_t ii=0;ii<Ni;ii++)
 	for(size_t jj=0;jj<Nj;jj++) {
 	  size_t i=i0+ii;
@@ -229,7 +229,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   {
     prodmap.ones(Nbf,Nbf);
     prodmap*=-1; // Go to UINT_MAX
-    
+
     size_t iprod=0;
     size_t iodiag=0;
     prodidx.resize(Nbf*Nbf);
@@ -273,7 +273,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	  if(d(prodidx(iprod))>=shtol) {
 	    // Product index mapping is
 	    prodmap(i,i)=iprod;
-	    
+
 	    iprod++;
 	  }
 	}
@@ -292,7 +292,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	    if(d(prodidx(iprod))>=shtol) {
 	      // Product index mapping is
 	      prodmap(i,j)=iprod;
-	      
+
 	      iprod++;
 	      iodiag++;
 	    }
@@ -310,20 +310,20 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     printf("Individual screening reduced dofs by a total factor %.2f.\n",d.n_elem*1.0/prodidx.n_elem);
     printf("Computing Cholesky vectors. Estimated memory size is %s - %s.\n",memory_size(3*Nbf*prodidx.n_elem*sizeof(double),true).c_str(),memory_size(10*Nbf*prodidx.n_elem*sizeof(double),true).c_str());
   }
-  
+
   // Drop unnecessary vectors
   d=d(prodidx);
 
   // Error is
   double error(arma::max(d));
-  
+
   // Pivot index
   arma::uvec pi(arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem));
   // Allocate memory
   B.zeros(100,prodidx.n_elem);
   // Loop index
   size_t m(0);
-    
+
   while(error>tol && m<d.n_elem-1) {
     // Errors in pivoted order
     arma::vec errs(d(pi));
@@ -331,14 +331,15 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     arma::uvec idx=arma::stable_sort_index(errs.subvec(m,d.n_elem-1),"descend");
 
     // Update the pivot index
-    arma::uvec pisub(pi.subvec(m,d.n_elem-1));
-    pisub=pisub(idx);
-    pi.subvec(m,d.n_elem-1)=pisub;
+    {
+      arma::uvec pisub(pi.subvec(m,d.n_elem-1));
+      pi.subvec(m,d.n_elem-1)=pisub(idx);
+    }
 
     // Pivot index
     size_t pim=pi(m);
     //printf("Pivot index is %4i, corresponding to product %i, with error %e, error is %e\n",(int) pim, (int) prodidx(pim), d(pim), error);
-    
+
     // Off-diagonal elements: find out which shells the pivot index
     // belongs to. The relevant function indices are
     size_t max_k, max_l;
@@ -374,12 +375,12 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     {
       ERIWorker *eri;
       const std::vector<double> * erip;
-      
+
       if(omega==0.0 && alpha==1.0 && beta==0.0)
 	eri=new ERIWorker(basis.get_max_am(),basis.get_max_Ncontr());
       else
 	eri=new ERIWorker_srlr(basis.get_max_am(),basis.get_max_Ncontr(),omega,alpha,beta);
-      
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
@@ -390,11 +391,11 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	// Do we need to compute the shell?
 	if(screen(is,js)*screen(max_ks,max_ls)<shtol)
 	  continue;
-	
+
 	// Compute integrals
 	eri->compute(&shells[is],&shells[js],&shells[max_ks],&shells[max_ls]);
 	erip=eri->getp();
-	
+
 	// and store them
 	size_t Ni(shells[is].get_Nbf());
 	size_t Nj(shells[js].get_Nbf());
@@ -409,22 +410,25 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	    // Check if function pair is significant
 	    if(prodmap(i,j)>Nbf*Nbf)
 	      continue;
-	    
+
 	    for(size_t kk=0;kk<max_Nk;kk++)
 	      for(size_t ll=0;ll<max_Nl;ll++) {
 		A(prodmap(i,j),kk*max_Nl+ll)=(*erip)[((ii*Nj+jj)*max_Nk+kk)*max_Nl+ll];
 	      }
 	  }
       }
-      
+
       delete eri;
     }
     t_int+=t.get();
     t.set();
-    
+
     size_t nb=0;
     size_t b0=m;
     while(true) {
+      // Did we already treat everything in the block?
+      if(nb==A.n_cols)
+	break;
       // Find global largest error
       errs=d(pi);
       double errmax=arma::max(errs.subvec(m,d.n_elem-1));
@@ -441,7 +445,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	  size_t ind = prodmap(k,l);
 	  if(ind > Nbf*Nbf)
 	    continue;
-	  
+
 	  if(d(ind)>blockerr) {
 	    // Check that the index is not in the old pivots
 	    bool found=false;
@@ -475,21 +479,22 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	  }
 	if(!found) {
 	  pi.t().print("Pivot");
+	  fflush(stdout);
 	  std::ostringstream oss;
 	  oss << "Pivot index " << blockind << " not found, m = " << m << " !\n";
 	  throw std::logic_error(oss.str());
 	}
       }
-      
+
       pim=pi(m);
-      
+
       // Insert new rows if necessary
       if(m>=B.n_rows)
 	B.insert_rows(B.n_rows,100,true);
-      
+
       // Compute diagonal element
       B(m,pim)=sqrt(d(pim));
-      
+
       // Off-diagonal elements
       if(m==0) {
 	// No B contribution here; avoid if clause in for loop
@@ -515,14 +520,14 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	  d(pii)-=B(m,pii)*B(m,pii);
 	}
       }
-      
+
       // Update error
       error=arma::max(d(pi.subvec(m+1,pi.n_elem-1)));
       // Increase m
       m++;
     }
     t_chol+=t.get();
-    
+
     if(verbose) {
       printf("Cholesky vectors no %5i - %5i computed, error is %e (%s).\n",(int) b0, (int) (b0+nb-1),error,t.elapsed().c_str());
       fflush(stdout);
@@ -534,14 +539,14 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     printf("Cholesky decomposition finished in %s. Realized memory size is %s.\n",ttot.elapsed().c_str(),memory_size(B.n_elem*sizeof(double)).c_str());
     printf("Time use: integrals %3.1f %%, linear algebra %3.1f %%.\n",100*t_int/(t_int+t_chol),100*t_chol/(t_int+t_chol));
   }
-  
+
   // Transpose to get Cholesky vectors as columns
   arma::inplace_trans(B);
 
   // Drop any unnecessary columns
   if(m<B.n_cols)
     B.shed_cols(m,B.n_cols-1);
-  
+
   return shpairs.size();
 }
 
@@ -577,10 +582,10 @@ arma::mat ERIchol::calcJ(const arma::mat & P) const {
     J(invmap(0,i),invmap(1,i))=Jv(i);
   for(size_t i=0;i<odiagidx.size();i++)
     J(invmap(1,odiagidx(i)),invmap(0,odiagidx(i)))=Jv(odiagidx(i));
-  
+
   return J;
 }
-  
+
 arma::mat ERIchol::calcK(const arma::vec & C) const {
   // K_uv = C_r C_s (ur|vs) = (L^P_ur C_r) (L^P_vs Cs)
   arma::mat v(C.n_elem,B.n_cols);
@@ -602,14 +607,14 @@ arma::mat ERIchol::calcK(const arma::vec & C) const {
       size_t i=odiagidx(ii);
       v(invmap(1,i),P)+=B(i,P)*C(invmap(0,i));
     }
-  
+
   return v*arma::trans(v);
 }
 
 arma::cx_mat ERIchol::calcK(const arma::cx_vec & C0) const {
   // Need to complex conjugate C
   arma::cx_vec C(arma::conj(C0));
-  
+
   // K_uv = C_r C_s (ur|vs) = (L^P_ur C_r) (L^P_vs Cs)
   arma::cx_mat v(C.n_elem,B.n_cols);
   v.zeros();
@@ -630,7 +635,7 @@ arma::cx_mat ERIchol::calcK(const arma::cx_vec & C0) const {
       size_t i=odiagidx(ii);
       v(invmap(1,i),P)+=B(i,P)*C(invmap(0,i));
     }
-  
+
   return v*arma::trans(v);
 
 }
@@ -670,7 +675,7 @@ arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const std::vector<double> & 
       K+=wK;
 #endif
     }
-  
+
   return K;
 }
 
@@ -694,7 +699,7 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
   }
 
   Timer t;
-  
+
   // L_uv^P -> L_lv^P = L_uv^P C_lu
   arma::mat Ll(Cl.n_cols,B.n_cols*Nbf);
   Ll.zeros();
@@ -721,7 +726,7 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
     fflush(stdout);
     t.set();
   }
-  
+
   // Shuffle indices
   arma::mat Bs(Cl.n_cols*B.n_cols,Nbf);
   for(size_t mu=0;mu<Nbf;mu++)
@@ -734,7 +739,7 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
     fflush(stdout);
     t.set();
   }
-    
+
   // Do RH transform
   Bs=Bs*Cr;
 
@@ -743,7 +748,7 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
     fflush(stdout);
     t.set();
   }
-      
+
   // Return array
   arma::mat Br(B.n_cols,Cl.n_cols*Cr.n_cols);
   for(size_t P=0;P<B.n_cols;P++)
@@ -759,4 +764,3 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
 
   return Br;
 }
-
