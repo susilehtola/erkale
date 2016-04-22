@@ -50,7 +50,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   set.set_bool("Direct",false);
   set.set_bool("DensityFitting",false);
   set.set_bool("Cholesky",true);
-  set.set_double("CholeskyThr",1e-7);
+  set.set_double("CholeskyThr",1e-5);
   // Use a rather large grid to make sure the calculation converges
   // even in cases where the functional requires a large grid to be
   // used. The other way would be to pass the user settings to this
