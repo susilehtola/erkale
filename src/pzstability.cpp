@@ -2710,21 +2710,21 @@ void PZStability::set_method(const dft_t & ovmethod_, const dft_t & oomethod_, d
   grid=DFTGrid(&basis,true,ovmethod.lobatto);
   nlgrid=DFTGrid(&basis,false,ovmethod.lobatto);
 
-  // Range separation constants
+  // Range-separation constants
   double omega, kfull, kshort;
   range_separation(ovmethod.x_func,omega,kfull,kshort);
 
   if(verbose) {
     if(omega!=0.0) {
-      printf("\nUsing range separated exchange with range separation constant omega = % .3f.\n",omega);
-      printf("Using % .3f %% short range and % .3f %% long range exchange.\n",(kfull+kshort)*100,kfull*100);
+      printf("\nUsing range-separated exchange with range-separation constant omega = % .3f.\n",omega);
+      printf("Using % .3f %% short-range and % .3f %% long-range exchange.\n",(kfull+kshort)*100,kfull*100);
     } else if(kfull!=0.0)
       printf("\nUsing hybrid exchange with % .3f %% of exact exchange.\n",kfull*100);
     else
       printf("\nA pure exchange functional used, no exact exchange.\n");
   }
 
-  // Compute range separated integrals if necessary
+  // Compute range-separated integrals if necessary
   if(is_range_separated(ovmethod.x_func))
     solverp->fill_rs(omega);
 }

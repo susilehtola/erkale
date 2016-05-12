@@ -14,8 +14,6 @@
  * of the License, or (at your option) any later version.
  */
 
-
-
 #include <armadillo>
 #include <cstdio>
 #include <cfloat>
@@ -1802,13 +1800,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	arma::vec occ;
 	form_NOs(sol.P,solver.get_S(),sol.C,occ);
 
-	
 	if(guess==SAD_GUESS) {
 	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
 	  size_t maxiter(solver.get_maxiter());
 	  solver.set_maxiter(0);
-
-
 
 	  if(hf || rohf)
 	    solver.RHF(sol,goccs,conv);
@@ -1818,7 +1813,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    solver.RDFT(sol,goccs,conv,nonl);
 	  }
 	  solver.set_maxiter(maxiter);
-	  
+
 	  // Do the diagonalization
 	  diagonalize(solver.get_S(),solver.get_Sinvh(),sol,0.0);
 	}
@@ -2109,7 +2104,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	arma::vec occ;
 	form_NOs(sol.P,solver.get_S(),sol.Ca,occ);
 	sol.Cb=sol.Ca;
-	
+
 	if(guess==SAD_GUESS) {
 	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
 	  size_t maxiter(solver.get_maxiter());
@@ -2125,7 +2120,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    solver.RDFT(rsol,goccs,conv,nonl);
 	  }
 	  solver.set_maxiter(maxiter);
-	  
+
 	  // Do the diagonalization
 	  diagonalize(solver.get_S(),solver.get_Sinvh(),rsol,0.0);
 	  sol.Ca=sol.Cb=rsol.C;
@@ -2194,7 +2189,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
       pz_scaling_t pzscale(parse_pzscale(set.get_string("PZscale")));
       double pzscaleexp(set.get_double("PZscaleExp"));
-      
+
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve unrestricted DFT problem first on a rough grid
@@ -2306,7 +2301,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  }
 	} else { // No entry in checkpoint
 	  sol.cCb=sol.Cb*COMPLEX1;
-	  
+
 	  if(!pzoo) {
 	    Wb.eye(Nel_beta,Nel_beta);
 	  } else {
