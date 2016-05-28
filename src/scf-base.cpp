@@ -2312,7 +2312,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  }
 	  if(pzloc==-1) pzloc=1;
 	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
-	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
+	  if(Nel_beta>0)
+	    sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
 	  if(sol.Cb.n_cols>(size_t) Nel_beta)
 	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
 	}
