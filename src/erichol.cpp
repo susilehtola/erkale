@@ -302,7 +302,8 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     // Resize prodidx
     prodidx.resize(iprod);
     odiagidx.resize(iodiag);
-    invmap.shed_cols(iprod,invmap.n_cols-1);
+    if(iprod<invmap.n_cols-1)
+      invmap.shed_cols(iprod,invmap.n_cols-1);
   }
 
   if(verbose) {
