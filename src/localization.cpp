@@ -1199,11 +1199,27 @@ void Pipek::cost_func_der(const arma::cx_mat & Wv, double & Dinv, arma::cx_mat &
   f=D;
 }
 
-Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, bool delocalize) : UnitaryFunction(4,!delocalize) {
+Edmiston::Edmiston(const BasisSet & basis, const BasisSet & fitbas, const arma::mat & Cv, bool delocalize) : UnitaryFunction(4,!delocalize) {
   // Store orbitals
   C=Cv;
   // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, use Hartree-Fock routine since it has better tolerance for linear dependencies
-  dfit.fill(basis,basis.density_fitting(),true,1e-8,false);
+  if(!fitbas.get_Nbf())
+    dfit.fill(basis,basis.density_fitting(),true,1e-8,false);
+  else
+    dfit.fill(basis,fitbas,true,1e-8,false);
+
+  use_chol=false;
+}
+
+Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, bool delocalize, double cholthr) : UnitaryFunction(4,!delocalize) {
+  // Store orbitals
+  C=Cv;
+  // Compute Cholesky
+  double shthr=0.01; // Shell re-use threshhold
+  double intthr=std::min(1e-10,cholthr/100.0); // Integrals threshold
+  chol.fill(basis,cholthr,shthr,intthr,false);
+
+  use_chol=true;
 }
 
 Edmiston::~Edmiston() {
@@ -1256,7 +1272,13 @@ void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat 
   if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
     // Compute orbital-dependent Fock matrices
     W=Wv;
-    Jorb=dfit.calcJ(Porb);
+
+    if(use_chol) {
+      Jorb.resize(Porb.size());
+      for(size_t io=0;io<Porb.size();io++)
+	Jorb[io]=chol.calcJ(Porb[io]);
+    } else
+      Jorb=dfit.calcJ(Porb);
   }
 
   // Compute self-repulsion

@@ -254,14 +254,22 @@ class Pipek : public UnitaryFunction {
 class Edmiston : public UnitaryFunction {
   /// Density fitting object
   DensityFit dfit;
+  /// ERI Cholesky
+  ERIchol chol;
+
+  /// Use Cholesky?
+  bool use_chol;
+  
   /// Orbitals
   arma::mat C;
   /// Orbital Coulomb matrices
   std::vector<arma::mat> Jorb;
 
  public:
-  /// Constructor
-  Edmiston(const BasisSet & basis, const arma::mat & C, bool delocalize=false);
+  /// Constructor: density fitting
+  Edmiston(const BasisSet & basis, const BasisSet & fitbas, const arma::mat & C, bool delocalize=false);
+  /// Constructor: Cholesky
+  Edmiston(const BasisSet & basis, const arma::mat & C, bool delocalize=false, double thr=1e-5);
   /// Destructor
   ~Edmiston();
   /// Copy
