@@ -1275,6 +1275,9 @@ void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat 
 
     if(use_chol) {
       Jorb.resize(Porb.size());
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
       for(size_t io=0;io<Porb.size();io++)
 	Jorb[io]=chol.calcJ(Porb[io]);
     } else
