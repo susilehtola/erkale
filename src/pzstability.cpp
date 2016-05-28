@@ -954,7 +954,7 @@ void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, c
       printf("Decomposition of self-interaction energies:\n");
       printf("\t%4s\t%8s\t%8s\t%8s\n","io","E(orb)","E(SI)","Scaling");
       for(size_t io=0;io<CO.n_cols;io++)
-	printf("\t%4i\t% 8.3f\t% 8.3f\t% 8.3f\n",(int) io+1,Ep(io),Eorb(io),worb(io));
+	printf("\t%4i\t% 8.3f\t% 8.6f\t% 8.6f\n",(int) io+1,Ep(io),Eorb(io),worb(io));
       fflush(stdout);
     }
   }
