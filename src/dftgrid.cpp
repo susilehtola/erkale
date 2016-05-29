@@ -1368,7 +1368,7 @@ void AngularGrid::eval_tau_overlap(const arma::cx_mat & Cocc, double k, arma::ma
   calculate_tau_grho_tauw(Cocc.rows(bf_ind),bf,bf_x,bf_y,bf_z,t,gr,tw);
 
   // Calculate weightings
-  arma::vec ww(w);
+  arma::rowvec ww(w);
   for(size_t ip=0;ip<grid.size();ip++) {
     // Screen for bad behavior
     if(t(ip)>=thr)
