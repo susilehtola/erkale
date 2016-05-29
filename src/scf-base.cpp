@@ -247,7 +247,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     } else {
       // Load basis library
       BasisSetLibrary fitlib;
-      fitlib.load_gaussian94(set.get_string("FittingBasis"));
+      fitlib.load_basis(set.get_string("FittingBasis"));
 
       // Construct fitting basis
       construct_basis(dfitbas,basisp->get_nuclei(),fitlib,set);

@@ -1144,7 +1144,7 @@ std::vector<coprof_t> generate_limits_old(const std::vector<int> & els, const st
 
   // Load basis set library
   BasisSetLibrary bas;
-  bas.load_gaussian94(basislib);
+  bas.load_basis(basislib);
 
   // Loop over elements.
   for(size_t iel=0;iel<els.size();iel++) {

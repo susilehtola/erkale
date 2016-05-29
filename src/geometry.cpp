@@ -508,7 +508,7 @@ int main(int argc, char **argv) {
   // Read in basis set
   BasisSetLibrary baslib;
   std::string basfile=set.get_string("Basis");
-  baslib.load_gaussian94(basfile);
+  baslib.load_basis(basfile);
   printf("\n");
 
   // Save to output

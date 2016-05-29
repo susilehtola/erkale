@@ -506,7 +506,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   else {
     // Load basis library
     BasisSetLibrary fitlib;
-    fitlib.load_gaussian94(set.get_string("FittingBasis"));
+    fitlib.load_basis(set.get_string("FittingBasis"));
 
     // Construct fitting basis
     construct_basis(dfitbas,basis.get_nuclei(),fitlib,set);

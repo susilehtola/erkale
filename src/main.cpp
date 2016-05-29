@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
     
     // Read in basis set
     BasisSetLibrary baslib;
-    baslib.load_gaussian94(basfile);
+    baslib.load_basis(basfile);
     
     // Construct basis set
     construct_basis(basis,atoms,baslib,set);

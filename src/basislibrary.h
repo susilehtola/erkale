@@ -241,6 +241,9 @@ class BasisSetLibrary {
   /// Destructor
   ~BasisSetLibrary();
 
+  /// Load basis set from file in Gaussian'94 format. Handles parsing for special Pople sets
+  void load_basis(const std::string & filename, bool verbose=true);
+  
   /// Load basis set from file in Gaussian'94 format
   void load_gaussian94(const std::string & filename, bool verbose=true);
   /// Save basis set to file in Gaussian'94 format

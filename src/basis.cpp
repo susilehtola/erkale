@@ -3708,7 +3708,7 @@ double check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, dou
 arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, std::string minbaslib) {
   // Get minao library
   BasisSetLibrary minao;
-  minao.load_gaussian94(minbaslib);
+  minao.load_basis(minbaslib);
   // Default settings
   Settings set;
   set.add_scf_settings();
@@ -3767,7 +3767,7 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
 arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, std::string minbaslib) {
   // Get minao library
   BasisSetLibrary minao;
-  minao.load_gaussian94(minbaslib);
+  minao.load_basis(minbaslib);
   // Default settings
   Settings set;
   set.add_scf_settings();

@@ -99,7 +99,7 @@ BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
 
   // Basis set for augmentation functions
   BasisSetLibrary augbaslib;
-  augbaslib.load_gaussian94(set.get_string("XRSDoubleBasis"));
+  augbaslib.load_basis(set.get_string("XRSDoubleBasis"));
 
   // Loop over excited atoms
   for(size_t iaug=0;iaug<augind.size();iaug++) {
@@ -883,7 +883,7 @@ int main(int argc, char **argv) {
   // Read in basis set
   BasisSetLibrary baslib;
   std::string basfile=set.get_string("Basis");
-  baslib.load_gaussian94(basfile);
+  baslib.load_basis(basfile);
 
   // Construct basis set
   BasisSet basis;

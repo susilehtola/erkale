@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
   std::string filein(argv[1]);
   // Load input
   BasisSetLibrary bas;
-  bas.load_gaussian94(filein);
+  bas.load_basis(filein);
 
   // Get command
   std::string cmd(argv[2]);

@@ -166,7 +166,7 @@ std::string find_basis(const std::string & basisname, bool verbose) {
       if(in.is_open()) {
 	// Found basis set!
 	if(verbose)
-	  printf("Basis set ""%s"" found in file %s in %s.\n\n",basisname.c_str(),trialnames[it].c_str(),dirs[id].c_str());
+	  printf("Basis set ""%s"" found in file %s in %s.\n",basisname.c_str(),trialnames[it].c_str(),dirs[id].c_str());
 	return fname;
       }
     }
@@ -193,13 +193,13 @@ FunctionShell::FunctionShell(int amval, const std::vector<contr_t> & c) {
       oss << "Negative gaussian exponent " << C[i].z << " in basis set!\n";
       throw std::runtime_error(oss.str());
     }
-    
+
     if(!std::isnormal(C[i].z)) {
       std::ostringstream oss;
       oss << "Abnormal gaussian exponent " << C[i].z << " in basis set!\n";
       throw std::runtime_error(oss.str());
     }
-    
+
     if(!std::isnormal(C[i].c)) {
       std::ostringstream oss;
       oss << "Abnormal contraction coefficient " << C[i].c << " in basis set!\n";
@@ -229,8 +229,8 @@ void FunctionShell::add_exponent(double Cv, double zv) {
     oss << "Abnormal contraction coefficient " << Cv << " in basis set!\n";
     throw std::runtime_error(oss.str());
   }
-  
-  
+
+
   contr_t tmp;
   tmp.c=Cv;
   tmp.z=zv;
@@ -404,7 +404,7 @@ void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int 
 	  exps.push_back(shc[iexp].z);
       }
     }
-  
+
   // Allocate room for exponents
   expsv.zeros(exps.size());
   for(size_t iexp=0;iexp<exps.size();iexp++)
@@ -419,7 +419,7 @@ void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int 
     oss << "Basis set has duplicate functions on the " << shell_types[am] << " shell!\n";
     throw std::runtime_error(oss.str());
   }
-  
+
   // Collect contraction coefficients. Loop over exponents
   for(size_t iexp=0;iexp<expsv.n_elem;iexp++) {
     int iish=0;
@@ -540,7 +540,7 @@ ElementBasisSet ElementBasisSet::density_fitting(int lmaxinc, double fsam) const
 	cand.push_back(c);
       }
     }
-  
+
   // Sort candidates in order of exponents
   std::stable_sort(cand.begin(),cand.end());
 
@@ -551,7 +551,7 @@ ElementBasisSet ElementBasisSet::density_fitting(int lmaxinc, double fsam) const
   while(cand.size()) {
     // Generate trial set.
     std::vector<candidate_t> trial;
-    
+
     // Candidate with largest exponent is moved to trial set (step 7)
     trial.push_back(cand[cand.size()-1]);
     cand.erase(cand.begin()+cand.size()-1);
@@ -600,7 +600,7 @@ ElementBasisSet ElementBasisSet::density_fitting(int lmaxinc, double fsam) const
     }
   // Sort the set
   ret.sort();
-  
+
   return ret;
 }
 
@@ -627,7 +627,7 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
 
   // Candidate exponents
   std::vector< std::vector<double> > cand;
-  
+
   // Loop over primitive ams
   for(size_t iam=0;iam<prims.size();iam++)
     for(size_t jam=0;jam<prims.size();jam++) {
@@ -640,7 +640,7 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
 	for(size_t jx=0;jx<prims[jam].n_elem;jx++) {
 	  // Exponent is
 	  double zeta=prims[iam](ix)+prims[jam](jx);
-	  
+
 	  // Loop over angular momentum
 	  for(size_t i=0;i<=am;i++) {
 	    // Check if exponent is on the list
@@ -653,11 +653,11 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
 	  }
 	}
     }
-  
+
   // Sort candidates
   for(size_t iam=0;iam<cand.size();iam++)
     std::stable_sort(cand[iam].begin(),cand[iam].end());
-  
+
   // Form final exponents by doing geometric averages
   std::vector< std::vector<double> > fitexp(cand.size());
   for(size_t iam=cand.size()-1;iam<cand.size();iam--)
@@ -709,33 +709,33 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
 ElementBasisSet ElementBasisSet::cholesky_set(double thr, int maxam, double ovlthr) const {
   ElementBasisSet orbbas(*this);
   orbbas.decontract();
-  
+
   // Fitting set
   ElementBasisSet fitel(orbbas.get_symbol());
-  
+
   // Loop over angular momentum
   for(int iam=0;iam<=orbbas.get_max_am();iam++)
     for(int jam=0;jam<=iam;jam++) {
       if(iam+jam>maxam)
 	break;
-      
+
       // Get the T matrix
       arma::mat T;
       arma::vec exps;
       arma::ivec am;
       ERIfit::compute_cholesky_T(orbbas,iam,jam,T,exps);
-      
+
       // Find out significant exponent pairs by a pivoted Cholesky decomposition of T
       arma::uvec sigexpidx;
       pivoted_cholesky(T,thr,sigexpidx);
-      
+
       // Significant exponents
       arma::vec sigexp(sigexpidx.size());
       for(size_t ii=0;ii<sigexpidx.size();ii++) {
 	sigexp(ii)=exps(sigexpidx[ii]);
       }
       sigexp=arma::sort(sigexp,"descend");
-      
+
       // Create the fitting set
       for(arma::uword i=0;i<sigexp.n_elem;i++) {
 	std::vector<contr_t> c(1);
@@ -746,7 +746,7 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, int maxam, double ovlt
     }
 
   fitel.prune(ovlthr,true);
-  
+
   return fitel;
 }
 
@@ -764,7 +764,7 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
     for(size_t ic=0;ic<coeffs.n_cols;ic++)
       if(coeffs(iexp,ic)!=0.0)
 	icontr.push_back(ic);
-      
+
     // Loop over contractions to check for free functions
     for(size_t ic=0;ic<icontr.size();ic++) {
       // Check if any other exponents appear in the contraction
@@ -781,7 +781,7 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
   }
   if(freex.size()>exps.size())
     throw std::runtime_error("Something has gone awry.\n");
-  
+
   // Collect free functions
   zfree.zeros(freex.size());
   for(size_t i=0;i<freex.size();i++)
@@ -790,7 +790,7 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
   // Collect generally contracted exponents and their coefficients
   zgen.zeros(exps.n_elem-freex.size());
   cgen.zeros(zgen.n_elem,coeffs.n_cols-freec.size());
-  
+
   size_t ix=0;
   for(size_t iexp=0;iexp<exps.n_elem;iexp++) {
     // Check if exponent is free
@@ -802,7 +802,7 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
 
     // Store exponent
     zgen(ix)=exps(iexp);
-    
+
     // Find coefficients for exponent
     size_t ic=0;
     for(size_t icontr=0;icontr<coeffs.n_cols;icontr++) {
@@ -812,10 +812,10 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
 	if(icontr == freec[i])
 	  free=true;
       if(free) continue;
-      
+
       cgen(ix,ic++)=coeffs(iexp,icontr);
     }
-    
+
     // Increment exponent
     ix++;
   }
@@ -823,7 +823,7 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
   /*
   arma::trans(exps).print("All exponents");
   coeffs.print("Contraction scheme");
-  
+
   arma::trans(zfree).print("Free exponents: ");
   arma::trans(zgen).print("General exponents");
   cgen.print("General contractions");
@@ -840,10 +840,10 @@ void ElementBasisSet::orthonormalize() {
     arma::vec freex, genx;
     arma::mat genc;
     get_primitives(freex,genx,genc,am);
-    
+
     // Get overlap of primitives
     arma::mat S=overlap(genx,genx,am);
-    
+
     // Normalize contractions
     for(size_t i=0;i<genc.n_cols;i++)
       genc.col(i)/=sqrt(arma::as_scalar(arma::trans(genc.col(i))*S*genc.col(i)));
@@ -913,7 +913,7 @@ bool treated_outin(const arma::mat & c, size_t i, size_t j) {
   }
 
   return empty;
-}	  
+}
 
 void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
   // Helper: orthogonalized basis
@@ -932,7 +932,7 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
     if(genc.n_cols) {
       // Get overlap of primitives
       arma::mat S=overlap(genx,genx,am);
-      
+
       // Compute overlap of functions. First normalize
       for(size_t i=0;i<genc.n_cols;i++)
 	genc.col(i)/=sqrt(arma::as_scalar(arma::trans(genc.col(i))*S*genc.col(i)));
@@ -940,7 +940,7 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
       /*
       arma::mat covl=arma::trans(genc)*S*genc;
       covl.print("Contraction overlap");
-      */      
+      */
 
       // Intermediate normalization
       for(size_t i=0;i<genc.n_cols;i++) {
@@ -954,7 +954,7 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 
       // arma::trans(genx).print("Exponents");
       // genc.print("Contraction scheme");
-      
+
       // Inside-out purification
       for(size_t i=0;i<genc.n_cols-1;i++) {
 	// P values
@@ -965,7 +965,7 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	  // Initially set P = M
 	  size_t P=genx.n_rows-1;
 	  //	  printf("in-out P: i = %3i, j = %3i\n",(int) i, (int) j);
-	  
+
 	  // Sanity check - is block of tight functions already empty?
 	  if(treated_inout(genc,i,j)) {
 	    continue;
@@ -975,13 +975,13 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	    Pval(iP++)=P;
 	    continue;
 	  }
-	  
+
 	  while(true) {
 	    // eqn (7): inner products
 	    double aii=P_innerprod_inout(genc.col(i),S,genc.col(i),P);
 	    double aij=P_innerprod_inout(genc.col(i),S,genc.col(j),P);
 	    double ajj=P_innerprod_inout(genc.col(j),S,genc.col(j),P);
-	  
+
 	    // Compute linear dependency
 	    double Op=fabs(aij)/sqrt(aii*ajj);
 	    //	    printf("\tP = %3i, Op = %e\n",(int) P, Op);
@@ -1022,17 +1022,17 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	  // eqn (7): inner products
 	  double aii=P_innerprod_inout(genc.col(i),S,genc.col(i),P);
 	  double aij=P_innerprod_inout(genc.col(i),S,genc.col(j),P);
-	
+
 	  // Factor to use in elimination, eqn (8)
 	  double xP=aij/aii;
-	
+
 	  // Orthogonalize: eqn (4)
 	  genc.col(j) -= xP*genc.col(i);
 	}
       }
 
       // genc.print("Inside-out purified");
-      
+
       // Outside-in purification
       for(size_t i=genc.n_cols-1;i>0;i--) {
 
@@ -1059,7 +1059,7 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	    double aii=P_innerprod_outin(genc.col(i),S,genc.col(i),P);
 	    double aij=P_innerprod_outin(genc.col(i),S,genc.col(j),P);
 	    double ajj=P_innerprod_outin(genc.col(j),S,genc.col(j),P);
-	  
+
 	    // Compute linear dependency
 	    double Op=fabs(aij)/sqrt(aii*ajj);
 	    //printf("\tP = %3i, Op = %e\n",(int) P, Op);
@@ -1067,7 +1067,7 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	    if(1-Op <= Cortho) {
 	      // Reached sufficient value of P
 	      break;
-	      
+
 	    } else if(P==0) {
 	      // arma::trans(genc.col(i)).print("ai");
 	      // arma::trans(genc.col(j)).print("aj");
@@ -1082,7 +1082,7 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	  // Store value
 	  Pval(iP++)=P;
 	}
-	
+
 	// Orthogonalize
 	size_t P=Pval.min();
 	for(size_t j=i-1;j<genc.n_cols;j--) {
@@ -1098,15 +1098,15 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	  // eqn (7): inner products
 	  double aii=P_innerprod_outin(genc.col(i),S,genc.col(i),P);
 	  double aij=P_innerprod_outin(genc.col(i),S,genc.col(j),P);
-	
+
 	  // Factor to use in elimination, eqn (8)
 	  double xP=aij/aii;
-	
+
 	  // Orthogonalize: eqn (4)
 	  genc.col(j) -= xP*genc.col(i);
 	}
       }
-      
+
       // Intermediate normalization
       for(size_t i=0;i<genc.n_cols;i++) {
 	// Find maximum coefficient
@@ -1119,7 +1119,7 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 
       //      genc.print("Refined scheme");
     }
-    
+
     // Add contracted functions
     for(size_t ic=0;ic<genc.n_cols;ic++) {
       // Create new shell
@@ -1194,18 +1194,18 @@ void ElementBasisSet::prune(double cutoff, bool coulomb) {
       size_t joff(ioff+1);
       while(joff < S.n_cols && S(ioff,joff)>cutoff)
 	joff++;
-      
+
       // Compute the geometric average of the current block
       double ave=exp(arma::mean(arma::log(exps.subvec(ioff,joff-1))));
-      
+
       // Add it to the pruned set
       pruned[am].push_back(ave);
-      
+
       // Increment offset
       ioff=joff;
     }
   }
-  
+
   // Replace shells
   bf.clear();
   for(size_t am=0;am<pruned.size();am++)
@@ -1233,7 +1233,7 @@ void ElementBasisSet::merge(double cutoff, bool verbose, bool coulomb) {
 
     // Original exponents
     const arma::vec E0(exps[am]);
-    
+
     // Prune the exponents
     while(true) {
       // Compute overlap matrix
@@ -1241,15 +1241,15 @@ void ElementBasisSet::merge(double cutoff, bool verbose, bool coulomb) {
       arma::mat S=overlap(exps[am],exps[am],Sam);
       // Remove diagonal part
       S-=arma::eye(S.n_rows,S.n_cols);
-      
+
       // Find maximum element
       arma::uword irow, icol;
       double Smax=S.max(irow,icol);
-      
+
       // Break loop?
       if(Smax<cutoff)
 	break;
-      
+
       // Too large overlap. Check for originality of exponents
       bool roworig=false, colorig=false;
       arma::uword rowix=0, colix=0;
@@ -1293,37 +1293,37 @@ void ElementBasisSet::merge(double cutoff, bool verbose, bool coulomb) {
 	    printf("%-2s: %c exponents %e and %e with overlap %e, dropped free primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](irow));
 	    fflush(stdout);
 	  }
-	  
+
 	  std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
 	  merged.erase(merged.begin()+irow);
 	  exps[am]=arma::conv_to<arma::vec>::from(merged);
 	  dropped=true;
 	}
-	
+
       } else if(roworig && !colorig) {
 	if(verbose) {
 	  printf("%-2s: %c exponents %e and %e with overlap %e, dropped merged primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](icol));
 	  fflush(stdout);
 	}
-	
+
 	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
 	merged.erase(merged.begin()+icol);
 	exps[am]=arma::conv_to<arma::vec>::from(merged);
 	dropped=true;
-	
+
       } else if(!roworig && colorig) {
 	// Drop row idx
 	if(verbose) {
 	  printf("%-2s: %c exponents %e and %e with overlap %e, dropped merged primitive %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,exps[am](irow));
 	  fflush(stdout);
 	}
-	
+
 	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
 	merged.erase(merged.begin()+irow);
 	exps[am]=arma::conv_to<arma::vec>::from(merged);
 	dropped=true;
       }
-      
+
       if(!dropped) {
 	// Merge exponents
 	std::vector<double> merged=arma::conv_to< std::vector<double> >::from(exps[am]);
@@ -1333,14 +1333,14 @@ void ElementBasisSet::merge(double cutoff, bool verbose, bool coulomb) {
 	  printf("%-2s: merged %c exponents %e and %e with overlap %e to %e.\n",get_symbol().c_str(),shell_types[am],exps[am](irow),exps[am](icol),Smax,merged[icol]);
 	  fflush(stdout);
 	}
-	
+
 	// Remove second value
 	merged.erase(merged.begin()+irow);
 	exps[am]=arma::conv_to<arma::vec>::from(merged);
       }
     }
   }
-  
+
   // Replace shells
   bf.clear();
   for(size_t am=0;am<exps.size();am++)
@@ -1355,6 +1355,90 @@ BasisSetLibrary::BasisSetLibrary() {
 }
 
 BasisSetLibrary::~BasisSetLibrary() {
+}
+
+static std::string pople_hydrogen_to_heavy(const std::string & in) {
+  std::string out(in);
+  for(size_t i=0;i<out.size();i++) {
+    if(out[i]=='p')
+      out[i]='d';
+    else if(out[i]=='d')
+      out[i]='f';
+  }
+  return out;
+}
+
+static std::string pople_heavy_to_hydrogen(const std::string & in) {
+  std::string out(in);
+  for(size_t i=0;i<out.size();i++) {
+    if(out[i]=='d')
+      out[i]='p';
+    else if(out[i]=='f')
+      out[i]='d';
+  }
+  return out;
+}
+
+static BasisSetLibrary combine_pople_basis(const BasisSetLibrary & hbas, const BasisSetLibrary & heavybas) {
+  BasisSetLibrary ret;
+  std::vector<ElementBasisSet> els;
+
+  // Hydrogen
+  els=hbas.get_elements();
+  for(size_t i=0;i<els.size();i++)
+    if(els[i].get_symbol().compare("H")==0 || els[i].get_symbol().compare("h")==0)
+      ret.add_element(els[i]);
+
+  // Heavy atoms
+  els=heavybas.get_elements();
+  for(size_t i=0;i<els.size();i++)
+    if(!(els[i].get_symbol().compare("H")==0 || els[i].get_symbol().compare("h")==0))
+      ret.add_element(els[i]);
+
+  return ret;
+}
+
+void BasisSetLibrary::load_basis(const std::string & basis, bool verbose) {
+  if(basis.size()>4 && basis.substr(0,4).compare("6-31")==0) {
+    // Check the polarization part
+    size_t ppos=basis.find_first_of("(");
+    size_t pepos=basis.find_first_of(")");
+    if(ppos!=std::string::npos) {
+      if(pepos==std::string::npos)
+	throw std::logic_error("Error parsing Pople style basis set speficication \"" + basis + "\".\n");
+
+      // A polarization has been specified. Original basis
+      std::string obas(basis.substr(0,ppos));
+      // Polarization
+      std::string ppart(basis.substr(ppos+1,pepos-ppos-1));
+
+      // Is there a comma?
+      size_t cpos=ppart.find_first_of(",");
+      if(cpos!=std::string::npos) {
+	// Heavy atoms basis
+	std::string apart(ppart.substr(0,cpos));
+	BasisSetLibrary heavybas;
+	heavybas.load_gaussian94(obas+"("+apart+","+pople_heavy_to_hydrogen(apart)+")");
+	// Hydrogen basis
+	std::string hpart(ppart.substr(cpos+1));
+	BasisSetLibrary hbas;
+	hbas.load_gaussian94(obas+"("+pople_hydrogen_to_heavy(hpart)+","+hpart+")");
+	*this=combine_pople_basis(hbas,heavybas);
+      } else {
+	// Heavy atoms basis
+	BasisSetLibrary heavybas;
+	heavybas.load_gaussian94(obas+"("+ppart+","+pople_heavy_to_hydrogen(ppart)+")");
+	// Hydrogen basis: original
+	BasisSetLibrary hbas;
+	hbas.load_gaussian94(obas,verbose);
+	*this=combine_pople_basis(hbas,heavybas);
+      }
+
+    } else
+      load_gaussian94(basis,verbose);
+
+  } else
+    load_gaussian94(basis,verbose);
 }
 
 void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
@@ -1395,7 +1479,7 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	std::string sym=line_split[0];
 	// Check element type
 	sym=element_symbols[get_Z(sym)];
-	
+
 	// and the atom number the basis is for is
 	size_t num=readint(line_split[1]);
 
@@ -1451,7 +1535,7 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 	      oss << "Error parsing input line \"" << line << "\".\nExpected a shell type and amount of functions.\n";
 	      throw std::runtime_error(oss.str());
 	    }
-	    
+
 	    // The shell type is
 	    std::string shelltype=words[0];
 	    // The amount of exponents is
@@ -1581,7 +1665,7 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
     }
   } else {
     out=fopen(filename.c_str(),"w");
-  
+
     if(!out) {
       std::ostringstream oss;
       oss << "Error opening basis set output file \"" << filename << "\".\n";
@@ -1591,7 +1675,7 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 
   // Group free exponents in shells of nfsh exponents
   int nfrsh=3;
-  
+
   // Loop over elements
   for(size_t iel=0;iel<elements.size();iel++) {
     // Get element
@@ -1617,19 +1701,19 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 
       nsh+=nfr;
     }
-    
+
     // Element and name of the basis set
     fprintf(out,"%s:%s\n",toupper(el.get_symbol()).c_str(),basname.c_str());
-    
+
     // Comment line
     Timer t;
     std::ostringstream oss;
     oss << "Generated by ERKALE on " << t.current_time() << ".";
     fprintf(out,"%-80s\n",oss.str().c_str());
-    
+
     // Blank line
     fprintf(out,"\n");
-    
+
     // Number of shells in the basis set
     fprintf(out,"%3i\n",nsh);
 
@@ -1650,7 +1734,7 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	fprintf(out,"%5i",am);
 	np++;
 	cl=false;
-	
+
 	if(np%nint==0) {
 	  fprintf(out,"\n");
 	  np=0;
@@ -1666,7 +1750,7 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	fprintf(out,"%5i",am);
 	np++;
 	cl=false;
-	
+
 	if(np%nint==0) {
 	  fprintf(out,"\n");
 	  np=0;
@@ -1684,10 +1768,10 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
       // Contracted exponents
       if(exps[am].n_elem) {
 	fprintf(out,"%5i",(int) coeffs[am].n_cols);
-	
+
 	np++;
 	cl=false;
-	
+
 	if(np%nint==0) {
 	  fprintf(out,"\n");
 	  np=0;
@@ -1703,7 +1787,7 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	fprintf(out,"%5i",(int) (ufr-ifr));
 	np++;
 	cl=false;
-	
+
 	if(np%nint==0) {
 	  fprintf(out,"\n");
 	  np=0;
@@ -1724,10 +1808,10 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
       // Contracted exponents
       if(exps[am].n_elem) {
 	fprintf(out,"%5i",(int) coeffs[am].n_rows);
-	
+
 	np++;
 	cl=false;
-	
+
 	if(np%nint==0) {
 	  fprintf(out,"\n");
 	  np=0;
@@ -1743,7 +1827,7 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	fprintf(out,"%5i",(int) (ufr-ifr));
 	np++;
 	cl=false;
-	
+
 	if(np%nint==0) {
 	  fprintf(out,"\n");
 	  np=0;
@@ -1775,7 +1859,7 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	    fprintf(out," %14.7f",exps[am](ix));
 	  cl=false;
 	  np++;
-	  
+
 	  if(np%ndbl==0) {
 	    fprintf(out,"\n");
 	    np=0;
@@ -1784,10 +1868,10 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	}
 	if(!cl)
 	  fprintf(out,"\n");
-	
+
 	// Blank line
 	fprintf(out,"\n");
-	
+
 	// Coefficients - contractions in columns
 	for(size_t ix=0;ix<coeffs[am].n_rows;ix++) {
 	  for(size_t ic=0;ic<coeffs[am].n_cols;ic++) {
@@ -1798,11 +1882,11 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	  }
 	  fprintf(out,"\n");
 	}
-	
+
 	// Blank line
 	fprintf(out,"\n");
       }
-      
+
 
       // Free exponents
       size_t ifr=0;
@@ -1820,7 +1904,7 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	    fprintf(out," %14.7f",frexps[am](ix));
 	  cl=false;
 	  np++;
-	  
+
 	  if(np%ndbl==0) {
 	    fprintf(out,"\n");
 	    np=0;
@@ -1829,10 +1913,10 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	}
 	if(!cl)
 	  fprintf(out,"\n");
-	
+
 	// Blank line
 	fprintf(out,"\n");
-	
+
 	// Coefficients - contractions in columns
 	for(size_t ix=ifr;ix<ufr;ix++) {
 	  for(size_t ic=ifr;ic<ufr;ic++) {
@@ -1850,16 +1934,16 @@ void BasisSetLibrary::save_cfour(const std::string & filename, const std::string
 	  }
 	  fprintf(out,"\n");
 	}
-	
+
 	// Blank line
 	fprintf(out,"\n");
-	
+
 	// Switch limits
 	ifr=ufr;
       }
     }
   }
-  
+
   fclose(out);
 }
 
@@ -1874,7 +1958,7 @@ void BasisSetLibrary::save_dalton(const std::string & filename, bool append) con
     }
   } else {
     out=fopen(filename.c_str(),"w");
-  
+
     if(!out) {
       std::ostringstream oss;
       oss << "Error opening basis set output file \"" << filename << "\".\n";
@@ -1885,7 +1969,7 @@ void BasisSetLibrary::save_dalton(const std::string & filename, bool append) con
     for(size_t i=0;i<elements.size();i++)
       fprintf(out," %s",elements[i].get_symbol().c_str());
     fprintf(out,"\n");
-    
+
     fprintf(out,"************************************************************************\n");
   }
 
@@ -1945,14 +2029,14 @@ void BasisSetLibrary::save_molpro(const std::string & filename, bool append) con
     }
   } else {
     out=fopen(filename.c_str(),"w");
-  
+
     if(!out) {
       std::ostringstream oss;
       oss << "Error opening basis set output file \"" << filename << "\".\n";
       throw std::runtime_error(oss.str());
     }
   }
-  
+
   // Loop over elements
   for(size_t iel=0;iel<elements.size();iel++) {
     // Get element
@@ -1985,7 +2069,7 @@ void BasisSetLibrary::save_molpro(const std::string & filename, bool append) con
 	  ilast--;
 
 	fprintf(out,"c,%i,%i",(int) ifirst+1,(int) ilast+1);
-	
+
 	// Coefficients
 	for(size_t ix=ifirst;ix<=ilast;ix++)
 	  fprintf(out,",%.10e",coeffs(ix,ic));
@@ -2064,7 +2148,6 @@ ElementBasisSet BasisSetLibrary::get_element(std::string el, size_t number) cons
       }
   }
 
-
   // If we are still here, it means the element was not found.
   //  ERROR_INFO(); // Don't print info, since we normally catch the error.
   std::ostringstream oss;
@@ -2127,4 +2210,3 @@ void BasisSetLibrary::merge(double cutoff, bool verbose) {
   for(size_t iel=0;iel<elements.size();iel++)
     elements[iel].merge(cutoff,verbose);
 }
-

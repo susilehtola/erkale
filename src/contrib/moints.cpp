@@ -208,7 +208,7 @@ int main(int argc, char **argv) {
   if(densityfit) {
     // Construct fitting basis
     BasisSetLibrary fitlib;
-    fitlib.load_gaussian94(fittingbasis);
+    fitlib.load_basis(fittingbasis);
 
     // Dummy settings
     Settings basset;
