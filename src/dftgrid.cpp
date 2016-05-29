@@ -1276,7 +1276,7 @@ void AngularGrid::eval_overlap(const arma::cx_mat & Cocc, size_t io, double k, a
   arma::mat orbdens(calculate_rho(Cocc.rows(bf_ind),bf));
 
   // Calculate weightings
-  arma::vec ww(w);
+  arma::rowvec ww(w);
   for(size_t ip=0;ip<grid.size();ip++) {
     // Orbital density is
     double rhois(orbdens(io,ip));
