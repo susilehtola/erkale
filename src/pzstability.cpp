@@ -1772,15 +1772,15 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       arma::cx_mat gOV(oa,va);
       if(pzw==0.0)
 	gOV=-arma::strans(arma::trans(CV.cols(0,va-1))*arma::conj(H)*CO.cols(0,oa-1));
-      else
+      else {
 	for(size_t i=0;i<oa;i++) {
 	  arma::cx_vec hlp(arma::conj(H-worb(i)*Forb[i])*CO.col(i));
 	  for(size_t a=0;a<va;a++)
 	    gOV(i,a)=-arma::cdot(CV.col(a),hlp);
 	}
-
-      // Put in scaling gradient
-      scaling_gradient_ov(gOV,CO,Eorb,CV);
+	// Put in scaling gradient
+	scaling_gradient_ov(gOV,CO,Eorb,CV);
+      }
 
       // Convert to proper gradient
       gOV=gradient_convert(gOV);
@@ -1799,11 +1799,11 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	for(size_t i=0;i<oa;i++)
 	  FO.col(i)=worb(i)*arma::conj(Forb[i])*CO.col(i);
 	gOO=-arma::strans(-arma::trans(CO)*FO + arma::trans(FO)*CO);
+
+	// Put in scaling gradient
+	scaling_gradient_oo(gOO,CO,Eorb);
       } else
 	gOO.zeros();
-
-      // Put in scaling gradient
-      scaling_gradient_oo(gOO,CO,Eorb);
 
       // Convert to proper gradient
       gOO=gradient_convert(gOO);
@@ -1848,16 +1848,16 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
       arma::cx_mat gOVa(oa,va);
       if(pzw==0.0)
 	gOVa=-arma::strans(arma::trans(CVa.cols(0,va-1))*arma::conj(Ha)*COa.cols(0,oa-1));
-      else
+      else {
 	for(size_t i=0;i<oa;i++) {
 	  arma::cx_vec hlp(arma::conj(Ha-worba(i)*Forba[i])*COa.col(i));
 	  for(size_t a=0;a<va;a++)
 	    gOVa(i,a)=-arma::cdot(CVa.col(a),hlp);
 	}
 
-
-      // Put in scaling gradient
-      scaling_gradient_ov(gOVa,COa,Eorba,CVa);
+	// Put in scaling gradient
+	scaling_gradient_ov(gOVa,COa,Eorba,CVa);
+      }
 
       // Convert to proper gradient
       gOVa=gradient_convert(gOVa);
@@ -1875,15 +1875,16 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	arma::cx_mat gOVb(ob,vb);
 	if(pzw==0.0)
 	  gOVb=-arma::strans(arma::trans(CVb.cols(0,vb-1))*arma::conj(Hb)*COb.cols(0,ob-1));
-	else
+	else {
 	  for(size_t i=0;i<ob;i++) {
 	    arma::cx_vec hlp(arma::conj(Hb-worbb(i)*Forbb[i])*COb.col(i));
 	    for(size_t a=0;a<vb;a++)
 	      gOVb(i,a)=-arma::cdot(CVb.col(a),hlp);
 	  }
 
-	// Put in scaling gradient
-	scaling_gradient_ov(gOVb,COb,Eorbb,CVb);
+	  // Put in scaling gradient
+	  scaling_gradient_ov(gOVb,COb,Eorbb,CVb);
+	}
 
 	// Convert to proper gradient
 	gOVb=gradient_convert(gOVb);
@@ -1904,11 +1905,11 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	  for(size_t i=0;i<oa;i++)
 	    FOa.col(i)=worba(i)*arma::conj(Forba[i])*COa.col(i);
 	  gOOa=-arma::strans(-arma::trans(COa)*FOa + arma::trans(FOa)*COa);
+
+	  // Put in scaling gradient
+	  scaling_gradient_oo(gOOa,COa,Eorba);
 	} else
 	  gOOa.zeros();
-
-	// Put in scaling gradient
-	scaling_gradient_oo(gOOa,COa,Eorba);
 
 	// Convert to proper gradient
 	gOOa=gradient_convert(gOOa);
@@ -1927,11 +1928,11 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
 	  for(size_t i=0;i<ob;i++)
 	    FOb.col(i)=worbb(i)*arma::conj(Forbb[i])*COb.col(i);
 	  gOOb=-arma::strans(-arma::trans(COb)*FOb + arma::trans(FOb)*COb);
+
+	  // Put in scaling gradient
+	  scaling_gradient_oo(gOOb,COb,Eorbb);
 	} else
 	  gOOb.zeros();
-
-	// Put in scaling gradient
-	scaling_gradient_oo(gOOb,COb,Eorbb);
 
 	// Convert to proper gradient
 	gOOb=gradient_convert(gOOb);
