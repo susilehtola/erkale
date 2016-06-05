@@ -1464,6 +1464,36 @@ arma::vec PZStability::gradient() {
   return gradient(x, true);
 }
 
+static arma::mat precondition_matrix(const arma::vec & Eo, const arma::vec & Ev, double dH) {
+  // Demand that all scalings are within this range
+  double min=1e-2;
+  double max=1/min;
+
+  arma::mat ret(Eo.n_elem,Ev.n_elem);
+  for(size_t io=0;io<ret.n_rows;io++)
+    for(size_t iv=0;iv<ret.n_cols;iv++) {
+      ret(io,iv)=1.0/(Ev(iv)-Eo(io)+dH);
+      if(ret(io,iv)<min) ret(io,iv)=min;
+      else if(ret(io,iv)>max) ret(io,iv)=max;
+    }
+  return ret;
+}
+
+static arma::mat precondition_matrix(const arma::mat & Ediff, double dH) {
+  // Demand that all scalings are within this range
+  double min=1e-2;
+  double max=1/min;
+
+  arma::mat ret(Ediff.n_rows,Ediff.n_cols);
+  for(size_t io=0;io<ret.n_rows;io++)
+    for(size_t iv=0;iv<ret.n_cols;iv++) {
+      ret(io,iv)=1.0/(Ediff(io,iv)+dH);
+      if(ret(io,iv)<min) ret(io,iv)=min;
+      else if(ret(io,iv)>max) ret(io,iv)=max;
+    }
+  return ret;
+}
+
 arma::vec PZStability::precondition_unified(const arma::vec & g) const {
   // Search direction
   arma::vec sd(g);
@@ -1501,14 +1531,12 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
       eig_sym_ordered(Ev,Cv,Hvv);
 
       // Minimum Hessian shift is
-      double minH=1e-4;
-      double dH=minH+std::max(arma::max(Eo)-arma::min(Ev),0.0);
+      double dH=std::max(arma::max(Eo)-arma::min(Ev),1e-4);
 
-      // Transform OV gradient into pseudocanonical space and perform preconditioning
+      // Transform OV gradient into pseudocanonical space
       arma::cx_mat GOV(arma::trans(Co)*gOV*Cv);
-      for(size_t io=0;io<CO.n_cols;io++)
-	for(size_t iv=0;iv<CV.n_cols;iv++)
-	  GOV(io,iv)/=Ev(iv)-Eo(io)+dH;
+      // and perform preconditioning
+      GOV=GOV%precondition_matrix(Eo,Ev,dH);
 
       // Transform back into the original frame
       GOV=Co*GOV*arma::trans(Cv);
@@ -1562,18 +1590,14 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
       eig_sym_ordered(Evb,Cvb,Hvvb);
 
       // Minimum Hessian shift is
-      const double minH=1e-4;
-      double dH=std::max(arma::max(Eoa)-arma::min(Eva),0.0);
+      double dH=std::max(arma::max(Eoa)-arma::min(Eva),1e-4);
       if(ob)
 	dH=std::max(arma::max(Eob)-arma::min(Evb),dH);
-      dH+=minH;
 
       // Transform OV gradient into pseudocanonical space and perform preconditioning
       arma::cx_mat gOVa(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
       arma::cx_mat GOVa(arma::trans(Coa)*gOVa*Cva);
-      for(size_t io=0;io<COa.n_cols;io++)
-	for(size_t iv=0;iv<CVa.n_cols;iv++)
-	  GOVa(io,iv)/=Eva(iv)-Eoa(io)+dH;
+      GOVa=GOVa%precondition_matrix(Eoa,Eva,dH);
       // Transform back into the original frame
       GOVa=Coa*GOVa*arma::trans(Cva);
 
@@ -1586,9 +1610,7 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
       if(ob) {
 	arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
 	arma::cx_mat GOVb(arma::trans(Cob)*gOVb*Cvb);
-	for(size_t io=0;io<COb.n_cols;io++)
-	  for(size_t iv=0;iv<CVb.n_cols;iv++)
-	    GOVb(io,iv)/=Evb(iv)-Eob(io)+dH;
+	GOVb=GOVb%precondition_matrix(Eob,Evb,dH);
 	// Transform back into the original frame
 	GOVb=Cob*GOVb*arma::trans(Cvb);
 
@@ -1637,15 +1659,14 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
 	}
       }
 
-      // Minimal Hessian shift is
-      double minH=1e-4+std::max(-arma::min(arma::min(dE)),0.0);
-      dE+=minH*arma::ones<arma::mat>(oa,va);
+      // Hessian shift is
+      double dH=std::max(-arma::min(arma::min(dE)),1e-4);
 
       // Form OV gradient
       arma::cx_mat gOV(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
 
-      // Run element-wise division
-      arma::cx_mat GOV(gOV/dE);
+      // Run element-wise scaling
+      arma::cx_mat GOV(gOV%precondition_matrix(dE,dH));
 
       arma::vec POV(gather_ov(GOV,real,imag));
       if(POV.n_elem != count_ov_params(oa,va))
@@ -1703,22 +1724,15 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
       }
 
       // Minimal Hessian shift is
-      double minH=1e-4;
+      double dH=std::max(-arma::min(arma::min(dEa)),1e-4);
       if(ob)
-	minH+=std::max(std::max(-arma::min(arma::min(dEa)),-arma::min(arma::min(dEb))),0.0);
-      else
-	minH+=std::max(-arma::min(arma::min(dEa)),0.0);
-
-      // Shift
-      dEa+=minH*arma::ones<arma::mat>(oa,va);
-      if(ob)
-	dEb+=minH*arma::ones<arma::mat>(ob,vb);
+	dH=std::max(dH,-arma::min(arma::min(dEb)));
 
       // Form OV gradient
       arma::cx_mat gOVa(spread_ov(g.subvec(ioff,ioff+count_ov_params(oa,va)-1),oa,va,real,imag));
 
       // Run element-wise division
-      arma::cx_mat GOVa(gOVa/dEa);
+      arma::cx_mat GOVa(gOVa%precondition_matrix(dEa,dH));
 
       arma::vec POVa(gather_ov(GOVa,real,imag));
       if(POVa.n_elem != count_ov_params(oa,va))
@@ -1731,7 +1745,7 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
 	arma::cx_mat gOVb(spread_ov(g.subvec(ioff,ioff+count_ov_params(ob,vb)-1),ob,vb,real,imag));
 
 	// Run element-wise division
-	arma::cx_mat GOVb(gOVb/dEb);
+	arma::cx_mat GOVb(gOVb%precondition_matrix(dEb,dH));
 
 	arma::vec POVb(gather_ov(GOVb,real,imag));
 	if(POVb.n_elem != count_ov_params(ob,vb))
