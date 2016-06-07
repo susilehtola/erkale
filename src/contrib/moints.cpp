@@ -37,7 +37,110 @@
 #include "../version.h"
 #endif
 
-arma::mat sano_guess(const arma::mat & Co, const arma::mat & Cv, const arma::mat & Bph) {
+arma::mat sano_guess_orig(const arma::mat & Co, const arma::mat & Cv, const arma::mat & Bph, double & eigenvalue) {
+  if(Co.n_rows != Cv.n_rows)
+    throw std::runtime_error("Orbital matrices not consistent!\n");
+  if(Bph.n_cols != Co.n_cols*Cv.n_cols)
+    throw std::runtime_error("B matrix is not in the vo space!\n");
+
+  // Number of orbitals to localize
+  size_t Nloc=std::min(Co.n_cols,Cv.n_cols);
+  // Localized virtuals
+  arma::mat Rloc(Cv.n_cols,Nloc);
+  Rloc.zeros();
+
+  // Loop over orbitals
+  for(size_t ii=0;ii<Nloc;ii++) {
+    // Reverse the order the orbitals are treated to maximize
+    // variational freedom for the HOMO
+    size_t io=Co.n_cols-1-ii;
+
+    // Collect the elements of the B matrix
+    arma::mat Bp(Bph.n_rows,Cv.n_cols);
+    for(size_t iv=0;iv<Cv.n_cols;iv++) {
+      Bp.col(iv)=Bph.col(io*Cv.n_cols+iv);
+    }
+
+    // Virtual-virtual exchange matrix is
+    arma::mat Kvv(arma::trans(Bp)*Bp);
+
+    // Eigendecomposition
+    arma::vec eval;
+    arma::mat evec;
+    arma::eig_sym(eval,evec,-Kvv);
+
+    printf("Orbital %3i/%-3i: eigenvalue %e\n",(int) io+1,(int) Nloc,-eval(0));
+
+    // Store virtual
+    Rloc.col(ii)=evec.col(0);
+  }
+
+  // Compute localized virtual - localized virtual overlap matrix
+  arma::mat Sloc=arma::trans(Rloc)*Rloc;
+
+  // Eigendecompose overlap matrix and form S^{-1/2}
+  arma::vec Sval;
+  arma::mat Svec;
+  if(!arma::eig_sym(Sval,Svec,Sloc)) {
+    eigenvalue=0;
+    throw std::runtime_error("Sano virtuals are linearly dependent.\n");
+  }
+
+  //Sval.t().print("Eigenvalues");
+
+  eigenvalue=arma::min(Sval);
+  if(eigenvalue<LINTHRES) {
+    throw std::runtime_error("Sano virtuals are linearly dependent.\n");
+  }
+
+  // Calculate reciprocal square root
+  arma::vec Sinvh(Sval);
+  for(size_t i=0;i<Sinvh.n_elem;i++)
+    Sinvh(i) = (Sinvh(i)>=LINTHRES) ? 1.0/sqrt(Sinvh(i)) : 0.0;
+
+  // Orthonormalizing matrix is
+  arma::mat O(Svec*arma::diagmat(Sinvh)*arma::trans(Svec));
+
+  // Orthonormalized localized virtuals are
+  arma::mat Rorth(Rloc*O);
+  if(false) {
+    // Check matrix is orthogonal
+    arma::mat test(arma::trans(Rorth)*Rorth);
+    test-=arma::eye<arma::mat>(test.n_cols,test.n_cols);
+    printf("Deviation from orthogonality in loc  space is %e\n",arma::norm(test,2));
+  }
+
+  arma::mat R(Cv.n_cols,Cv.n_cols);
+  R.cols(0,Nloc-1)=Rorth;
+  if(R.n_cols>Nloc) {
+    // Form inactive space projector: P_{ab} = delta_{ab} - sum_{i=1}^{n_p} <\psi_a|\psi_i^*> <\psi_i^*|\psi_b>
+    arma::mat P(Rorth.n_rows,Rorth.n_rows);
+    P.eye();
+    P-=Rorth*Rorth.t();
+
+    arma::vec Rval;
+    arma::mat Rvec;
+    if(!arma::eig_sym(Rval,Rvec,P))
+      throw std::runtime_error("Sano virtual projector is linearly dependent.\n");
+
+    Rvec.t().print("Projector eigenvalues");
+
+    // Final rotation matrix
+    R.cols(Nloc,Cv.n_cols-1)=Rvec.cols(Nloc,Rvec.n_cols-1);
+  }
+
+  // Check matrix is orthogonal
+  if(false) {
+    arma::mat test(R.t()*R);
+    test-=arma::eye<arma::mat>(test.n_cols,test.n_cols);
+    printf("Deviation from orthogonality in full space is %e\n",arma::norm(test,2));
+  }
+
+  // Now, the localized and inactive virtuals are obtained as
+  return Cv*R;
+}
+
+arma::mat sano_guess_failsafe(const arma::mat & Co, const arma::mat & Cv, const arma::mat & Bph) {
   if(Co.n_rows != Cv.n_rows)
     throw std::runtime_error("Orbital matrices not consistent!\n");
   if(Bph.n_cols != Co.n_cols*Cv.n_cols)
@@ -51,7 +154,6 @@ arma::mat sano_guess(const arma::mat & Co, const arma::mat & Cv, const arma::mat
   size_t Nloc=std::min(Co.n_cols,Cv.n_cols);
 
   // Loop over orbitals
-  printf("Sano guess running\n");
   for(size_t ii=0;ii<Nloc;ii++) {
     // Reverse the order the orbitals are treated to maximize
     // variational freedom for the HOMO
@@ -75,7 +177,7 @@ arma::mat sano_guess(const arma::mat & Co, const arma::mat & Cv, const arma::mat
     arma::mat evec;
     arma::eig_sym(eval,evec,-Kvv);
 
-    printf("Orbital %3i/%-3i: eigenvalue %e\n",(int) io+1,(int) Nloc,eval(0));
+    printf("Orbital %3i/%-3i: eigenvalue %e\n",(int) io+1,(int) Nloc,-eval(0));
 
     // Rotate orbitals to new basis; column ii becomes lowest eigenvector
     Rsub=Rsub*evec;
@@ -85,6 +187,20 @@ arma::mat sano_guess(const arma::mat & Co, const arma::mat & Cv, const arma::mat
 
   // Now, the localized and inactive virtuals are obtained as
   return Cv*Rvirt;
+}
+
+arma::mat sano_guess(const arma::mat & Co, const arma::mat & Cv, const arma::mat & Bph) {
+  arma::mat Cp;
+  double eval;
+  try {
+    Cp=sano_guess_orig(Co,Cv,Bph,eval);
+    printf("Default Sano guess was succesful, smallest eigenvalue of guess orbital overlap %e\n",eval);
+  } catch(std::runtime_error & err) {
+    printf("Default Sano guess failed due to linear dependencies (eigenvalue %e), switching to failsafe mode\n",eval);
+    Cp=sano_guess_failsafe(Co,Cv,Bph);
+  }
+
+  return Cp;
 }
 
 void form_F(const arma::mat & H, const arma::mat & Cl, const arma::mat & Cr, const std::string & name, arma::file_type atype) {
@@ -120,6 +236,67 @@ void form_B(const ERIchol & chol, const arma::mat & Cl, const arma::mat & Cr, co
   fflush(stdout);
 }
 
+arma::uvec get_group(int g, arma::uword Nel, bool occ) {
+  // Orbital numbers
+  arma::umat num;
+
+  // Load indices
+  std::ostringstream oss;
+  oss << "group_" << g << ".dat";
+  if(!num.load(oss.str(),arma::raw_ascii))
+    throw std::runtime_error("Failed to load orbital indices from file \"" + oss.str() + "\".\n");
+
+  // Separate into occupied and virtual orbitals
+  std::vector<arma::uword> list;
+  for(size_t i=0;i<num.n_elem;i++)
+    if(occ && num[i]<Nel)
+      list.push_back(num[i]);
+    else if(!occ && num[i]>=Nel)
+      list.push_back(num[i]);
+
+  return arma::conv_to<arma::uvec>::from(list);
+}
+
+void check_groups(int Ng) {
+  for(int ig=0;ig<Ng;ig++) {
+    arma::uvec il(get_group(ig,0,false));
+
+    // Check the group itself
+    for(size_t i=0;i<il.n_elem;i++)
+      for(size_t j=i+1;j<il.n_elem;j++)
+	if(il(i)==il(j)) {
+	  std::ostringstream oss;
+	  oss << "Orbital " << il(i) << " occurs twice in group " << ig << "!\n";
+	  throw std::logic_error(oss.str());
+	}
+
+    // Check other groups
+    for(int jg=0;jg<ig;jg++) {
+      arma::uvec jl(get_group(jg,0,false));
+
+      for(size_t i=0;i<il.n_elem;i++)
+	for(size_t j=0;j<jl.n_elem;j++)
+	  if(il(i)==jl(j)) {
+	    std::ostringstream oss;
+	    oss << "Orbital " << il(i) << " occurs in groups " << ig << " and " << jg << "!\n";
+	    throw std::logic_error(oss.str());
+	  }
+    }
+  }
+}
+
+arma::uvec sort_vecs(arma::mat & C, const arma::mat & H) {
+  // Orbital eigenvalues
+  arma::vec e(C.n_cols);
+  for(size_t i=0;i<C.n_cols;i++)
+    e(i)=arma::as_scalar(arma::trans(C.col(i))*H*C.col(i));
+
+  // Sort orbitals in ascending energy
+  arma::uvec order=arma::stable_sort_index(e,"ascend");
+  C=C.cols(order);
+
+  return order;
+}
 
 int main(int argc, char **argv) {
 
@@ -156,7 +333,9 @@ int main(int argc, char **argv) {
   set.add_double("IntegralThresh","Integral threshold",1e-10);
   set.add_int("CholeskyMode","Cholesky mode",0,true);
   set.add_bool("CholeskyInCore","Use more memory for Cholesky?",true);
-  set.add_string("Localize","Localize given set of orbitals","");
+  set.add_bool("Localize","Localize orbitals?",false);
+  set.add_int("LocNGroups","Number of groups of orbitals to localize and separate (only spin-restricted!)",0);
+  set.add_string("LocGroups","List of groups to localize","");
   set.add_string("LocMethod","Localization method to use","IAO2");
   set.add_bool("Binary","Use binary I/O?",true);
   set.add_bool("MP2","MP2 mode? (Dump only ph B matrix)",true);
@@ -177,7 +356,9 @@ int main(int argc, char **argv) {
   double cholshthr=set.get_double("CholeskyShThr");
   bool cholincore=set.get_bool("CholeskyInCore");
   bool binary=set.get_bool("Binary");
-  bool loc=(set.get_string("Localize").size() != 0);
+  bool loc=set.get_bool("Localize");
+  int locngrp=set.get_int("LocNGroups");
+  std::vector<size_t> locgrps=parse_range(set.get_string("LocGroups"));
   enum locmet locmethod(parse_locmet(set.get_string("LocMethod")));
   bool mp2=set.get_bool("MP2");
   bool sano=set.get_bool("Sano");
@@ -262,26 +443,45 @@ int main(int argc, char **argv) {
     chkpt.read("H",H);
 
     if(loc) {
-      // Localize orbitals. Get the indices
-      std::vector<size_t> orbs(parse_range(splitline(set.get_string("Localize"))[0]));
-      arma::mat Chlp(C.n_rows,orbs.size());
-      for(size_t i=0;i<orbs.size();i++)
-	Chlp.col(i)=C.col(orbs[i]);
+      // Localize orbitals. Localize in groups?
+      if(locgrps.size()>0) {
+	check_groups(locngrp);
+	for(size_t igrp=0;igrp<locgrps.size();igrp++) {
+	  arma::uvec list(get_group(locgrps[igrp],Nela,true));
+	  arma::mat Chlp(C.n_rows,list.n_elem);
+	  for(size_t i=0;i<list.size();i++)
+	    Chlp.col(i)=C.col(list[i]);
 
-      arma::mat Chlp0(Chlp);
+	  list.t().print("Localizing occupieds");
 
-      // Run the localization
-      double measure;
-      arma::cx_mat W(real_orthogonal(Chlp.n_cols)*COMPLEX1);
-      orbital_localization(locmethod,basis,Chlp,P,measure,W);
+	  // Run the localization
+	  double measure;
+	  arma::cx_mat W(real_orthogonal(Chlp.n_cols)*COMPLEX1);
+	  orbital_localization(locmethod,basis,Chlp,P,measure,W);
 
-      // Rotate orbitals
-      arma::mat Wr(arma::real(W));
-      Chlp=Chlp*Wr;
+	  // Rotate orbitals
+	  arma::mat Wr(arma::real(W));
+	  Chlp=Chlp*Wr;
 
-      // Put back the orbitals
-      for(size_t i=0;i<orbs.size();i++)
-	C.col(orbs[i])=Chlp.col(i);
+	  // Put back the orbitals
+	  for(size_t i=0;i<list.size();i++)
+	    C.col(list[i])=Chlp.col(i);
+	}
+      } else {
+	arma::mat Chlp(C.cols(0,Nela-1));
+
+	// Run the localization
+	double measure;
+	arma::cx_mat W(real_orthogonal(Chlp.n_cols)*COMPLEX1);
+	orbital_localization(locmethod,basis,Chlp,P,measure,W);
+
+	// Rotate orbitals
+	arma::mat Wr(arma::real(W));
+	Chlp=Chlp*Wr;
+
+	// Put back the orbitals
+	C.cols(0,Nela-1)=Chlp;
+      }
     }
 
     // Occ and virt orbitals
@@ -292,18 +492,65 @@ int main(int argc, char **argv) {
 
     // Get ph B matrix
     if(sano) {
-      arma::mat Bph;
-      if(densityfit || cholincore) {
-	arma::mat B;
-	if(densityfit)
-	  dfit.B_matrix(B);
-	else
-	  chol.B_matrix(B);
-	Bph=B_transform(B,Cap,Cah);
-      } else
-	Bph=chol.B_transform(Cap,Cah);
+      if(locngrp) {
+	check_groups(locngrp);
+	for(int igrp=0;igrp<locngrp;igrp++) {
+	  arma::uvec hlist(get_group(igrp,Nela,true));
+	  arma::uvec plist(get_group(igrp,Nela,false));
 
-      Cap=sano_guess(Cah,Cap,Bph);
+	  plist.t().print("Sano localizing virtuals");
+	  hlist.t().print("that match occupieds");
+
+	  arma::mat Chlp(C.n_rows,hlist.n_elem);
+	  for(size_t i=0;i<hlist.size();i++)
+	    Chlp.col(i)=C.col(hlist[i]);
+
+	  arma::mat Cplp(C.n_rows,plist.n_elem);
+	  for(size_t i=0;i<plist.size();i++)
+	    Cplp.col(i)=C.col(plist[i]);
+
+	  // Sort occupied and virtual orbitals
+	  if(loc) {
+	    sort_vecs(Chlp,H).t().print("Occupied orbital order");
+
+	    arma::uvec vord(sort_vecs(Cplp,H));
+	    for(arma::uword i=0;i<vord.n_elem;i++)
+	      if(vord(i)!=i)
+		throw std::logic_error("Indexing error in virtuals!\n");
+	  }
+
+	  arma::mat Bph;
+	  if(densityfit || cholincore) {
+	    arma::mat B;
+	    if(densityfit)
+	      dfit.B_matrix(B);
+	    else
+	      chol.B_matrix(B);
+	    Bph=B_transform(B,Cplp,Chlp);
+	  } else
+	    Bph=chol.B_transform(Cplp,Chlp);
+
+	  // Run the sano guess
+	  Cplp=sano_guess(Chlp,Cplp,Bph);
+
+	  // Restore virtuals
+	  for(size_t i=0;i<plist.size();i++)
+	    C.col(plist[i])=Cplp.col(i);
+	}
+      } else {
+	arma::mat Bph;
+	if(densityfit || cholincore) {
+	  arma::mat B;
+	  if(densityfit)
+	    dfit.B_matrix(B);
+	  else
+	    chol.B_matrix(B);
+	  Bph=B_transform(B,Cap,Cah);
+	} else
+	  Bph=chol.B_transform(Cap,Cah);
+
+	Cap=sano_guess(Cah,Cap,Bph);
+      }
     }
 
     // Fock matrices
@@ -342,10 +589,7 @@ int main(int argc, char **argv) {
     if(loc) {
       // Localize orbitals. Get the indices
       for(size_t is=0;is<2;is++) {
-	std::vector<size_t> orbs(parse_range(splitline(set.get_string("Localize"))[is]));
-	arma::mat Chlp(Ca.n_rows,orbs.size());
-	for(size_t i=0;i<orbs.size();i++)
-	  Chlp.col(i)=is ? Cb.col(orbs[i]) : Ca.col(orbs[i]);
+	arma::mat Chlp = (is==0) ? Ca.cols(0,Nela-1) : Cb.cols(0,Nelb-1);
 
 	// Run the localization
 	double measure;
@@ -357,12 +601,10 @@ int main(int argc, char **argv) {
 	Chlp=Chlp*Wr;
 
 	// Put back the orbitals
-	if(is)
-	  for(size_t i=0;i<orbs.size();i++)
-	    Cb.col(orbs[i])=Chlp.col(i);
+	if(is==0)
+	  Ca.cols(0,Nela-1)=Chlp;
 	else
-	  for(size_t i=0;i<orbs.size();i++)
-	    Ca.col(orbs[i])=Chlp.col(i);
+	  Cb.cols(0,Nelb-1)=Chlp;
       }
     }
 
