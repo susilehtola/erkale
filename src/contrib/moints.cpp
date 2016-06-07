@@ -257,8 +257,9 @@ arma::uvec get_group(int g, arma::uword Nel, bool occ) {
   return arma::conv_to<arma::uvec>::from(list);
 }
 
-void check_groups(int Ng) {
-  for(int ig=0;ig<Ng;ig++) {
+void check_groups(std::vector<size_t> grps) {
+  for(size_t iig=0;iig<grps.size();iig++) {
+    size_t ig=grps[iig];
     arma::uvec il(get_group(ig,0,false));
 
     // Check the group itself
@@ -271,7 +272,8 @@ void check_groups(int Ng) {
 	}
 
     // Check other groups
-    for(int jg=0;jg<ig;jg++) {
+    for(size_t jjg=0;jjg<iig;jjg++) {
+      size_t jg=grps[jjg];
       arma::uvec jl(get_group(jg,0,false));
 
       for(size_t i=0;i<il.n_elem;i++)
@@ -334,12 +336,12 @@ int main(int argc, char **argv) {
   set.add_int("CholeskyMode","Cholesky mode",0,true);
   set.add_bool("CholeskyInCore","Use more memory for Cholesky?",true);
   set.add_bool("Localize","Localize orbitals?",false);
-  set.add_int("LocNGroups","Number of groups of orbitals to localize and separate (only spin-restricted!)",0);
   set.add_string("LocGroups","List of groups to localize","");
   set.add_string("LocMethod","Localization method to use","IAO2");
   set.add_bool("Binary","Use binary I/O?",true);
   set.add_bool("MP2","MP2 mode? (Dump only ph B matrix)",true);
   set.add_bool("Sano","Run Sano guess for virtual orbitals?",true);
+  set.add_string("SanoGroups","List of groups to localize","");
 
   if(argc==2)
     set.parse(argv[1]);
@@ -357,11 +359,11 @@ int main(int argc, char **argv) {
   bool cholincore=set.get_bool("CholeskyInCore");
   bool binary=set.get_bool("Binary");
   bool loc=set.get_bool("Localize");
-  int locngrp=set.get_int("LocNGroups");
   std::vector<size_t> locgrps=parse_range(set.get_string("LocGroups"));
   enum locmet locmethod(parse_locmet(set.get_string("LocMethod")));
   bool mp2=set.get_bool("MP2");
   bool sano=set.get_bool("Sano");
+  std::vector<size_t> sanogrps=parse_range(set.get_string("SanoGroups"));
 
   // Load basis set
   BasisSet basis;
@@ -445,9 +447,10 @@ int main(int argc, char **argv) {
     if(loc) {
       // Localize orbitals. Localize in groups?
       if(locgrps.size()>0) {
-	check_groups(locngrp);
+	check_groups(locgrps);
 	for(size_t igrp=0;igrp<locgrps.size();igrp++) {
 	  arma::uvec list(get_group(locgrps[igrp],Nela,true));
+
 	  arma::mat Chlp(C.n_rows,list.n_elem);
 	  for(size_t i=0;i<list.size();i++)
 	    Chlp.col(i)=C.col(list[i]);
@@ -492,11 +495,11 @@ int main(int argc, char **argv) {
 
     // Get ph B matrix
     if(sano) {
-      if(locngrp) {
-	check_groups(locngrp);
-	for(int igrp=0;igrp<locngrp;igrp++) {
-	  arma::uvec hlist(get_group(igrp,Nela,true));
-	  arma::uvec plist(get_group(igrp,Nela,false));
+      if(sanogrps.size()) {
+	check_groups(sanogrps);
+	for(size_t igrp=0;igrp<locgrps.size();igrp++) {
+	  arma::uvec hlist(get_group(sanogrps[igrp],Nela,true));
+	  arma::uvec plist(get_group(sanogrps[igrp],Nela,false));
 
 	  plist.t().print("Sano localizing virtuals");
 	  hlist.t().print("that match occupieds");
