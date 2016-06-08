@@ -257,9 +257,8 @@ arma::uvec get_group(int g, arma::uword Nel, bool occ) {
   return arma::conv_to<arma::uvec>::from(list);
 }
 
-void check_groups(std::vector<size_t> grps) {
-  for(size_t iig=0;iig<grps.size();iig++) {
-    size_t ig=grps[iig];
+void check_groups(int ngrps) {
+  for(int ig=0;ig<ngrps;ig++) {
     arma::uvec il(get_group(ig,0,false));
 
     // Check the group itself
@@ -272,8 +271,7 @@ void check_groups(std::vector<size_t> grps) {
 	}
 
     // Check other groups
-    for(size_t jjg=0;jjg<iig;jjg++) {
-      size_t jg=grps[jjg];
+    for(int jg=0;jg<ig;jg++) {
       arma::uvec jl(get_group(jg,0,false));
 
       for(size_t i=0;i<il.n_elem;i++)
@@ -299,6 +297,13 @@ arma::uvec sort_vecs(arma::mat & C, const arma::mat & H) {
 
   return order;
 }
+
+typedef struct {
+  /// Hole orbitals
+  arma::mat Ch;
+  /// Particle orbitals
+  arma::mat Cp;
+} group_t;
 
 int main(int argc, char **argv) {
 
@@ -327,6 +332,7 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
+  set.add_string("SaveChk","Checkpoint file to save data to","");
   set.add_bool("DensityFitting","Use density fitting instead of Cholesky?",false);
   set.add_string("FittingBasis","Fitting basis to use","");
   set.add_double("FittingThr","Linear dependency threshold for fitting basis",1e-7);
@@ -342,13 +348,15 @@ int main(int argc, char **argv) {
   set.add_bool("MP2","MP2 mode? (Dump only ph B matrix)",true);
   set.add_bool("Sano","Run Sano guess for virtual orbitals?",true);
   set.add_string("SanoGroups","List of groups to localize","");
+  set.add_int("NGroups","Number of groups to divide the orbitals into",0);
 
   if(argc==2)
     set.parse(argv[1]);
   else printf("Using default settings.\n\n");
 
   // Load checkpoint
-  Checkpoint chkpt(set.get_string("LoadChk"),false);
+  std::string loadchk(set.get_string("LoadChk"));
+  std::string savechk(set.get_string("SaveChk"));
   bool densityfit=set.get_bool("DensityFitting");
   std::string fittingbasis=set.get_string("FittingBasis");
   double fitthr=set.get_double("FittingThr");
@@ -364,6 +372,17 @@ int main(int argc, char **argv) {
   bool mp2=set.get_bool("MP2");
   bool sano=set.get_bool("Sano");
   std::vector<size_t> sanogrps=parse_range(set.get_string("SanoGroups"));
+  int ngroups=set.get_int("NGroups");
+
+  if(savechk.size()) {
+    // Copy checkpoint data
+    std::ostringstream cmd;
+    cmd << "cp " << loadchk << " " << savechk;
+    if(system(cmd.str().c_str()))
+      throw std::runtime_error("Error copying checkpoint file.\n");
+  }
+
+  Checkpoint chkpt(loadchk,false);
 
   // Load basis set
   BasisSet basis;
@@ -444,18 +463,52 @@ int main(int argc, char **argv) {
     arma::mat H;
     chkpt.read("H",H);
 
+    /// Groups of orbitals
+    std::vector<group_t> groups;
+    arma::mat xtrah, xtrap;
+    if(ngroups) {
+      groups.resize(ngroups);
+
+      // Check all orbitals have been treated
+      arma::uvec treated(C.n_cols);
+      treated.zeros();
+
+      for(int igroup=0;igroup<ngroups;igroup++) {
+	// Get the hole and particle orbitals for the groups
+	arma::uvec hlist(get_group(igroup,Nela,true));
+	arma::uvec plist(get_group(igroup,Nela,false));
+	groups[igroup].Ch=C.cols(hlist);
+	groups[igroup].Cp=C.cols(plist);
+
+	treated(hlist).ones();
+	treated(plist).ones();
+      }
+
+      // Check that all orbitals have been treated
+      std::vector<arma::uword> hmiss, pmiss;
+      for(size_t i=0;i<treated.size();i++) {
+	if(!treated(i)) {
+	  if(i<(size_t) Nela)
+	    hmiss.push_back(i);
+	  else
+	    pmiss.push_back(i);
+	}
+      }
+      if(hmiss.size())
+	xtrah=C.cols(arma::conv_to<arma::uvec>::from(hmiss));
+      if(pmiss.size())
+	xtrap=C.cols(arma::conv_to<arma::uvec>::from(pmiss));
+    }
+
     if(loc) {
       // Localize orbitals. Localize in groups?
       if(locgrps.size()>0) {
-	check_groups(locgrps);
 	for(size_t igrp=0;igrp<locgrps.size();igrp++) {
-	  arma::uvec list(get_group(locgrps[igrp],Nela,true));
+	  if(locgrps[igrp]>=(size_t) ngroups)
+	    throw std::logic_error("LocGroups has element larger than ngroups.\n");
 
-	  arma::mat Chlp(C.n_rows,list.n_elem);
-	  for(size_t i=0;i<list.size();i++)
-	    Chlp.col(i)=C.col(list[i]);
-
-	  list.t().print("Localizing occupieds");
+	  // Get the orbitals
+	  arma::mat Chlp(groups[locgrps[igrp]].Ch);
 
 	  // Run the localization
 	  double measure;
@@ -467,8 +520,7 @@ int main(int argc, char **argv) {
 	  Chlp=Chlp*Wr;
 
 	  // Put back the orbitals
-	  for(size_t i=0;i<list.size();i++)
-	    C.col(list[i])=Chlp.col(i);
+	  groups[locgrps[igrp]].Ch=Chlp;
 	}
       } else {
 	arma::mat Chlp(C.cols(0,Nela-1));
@@ -487,30 +539,16 @@ int main(int argc, char **argv) {
       }
     }
 
-    // Occ and virt orbitals
-    arma::mat Cah(C.cols(0,Nela-1));
-    arma::mat Cap;
-    if(C.n_cols>(size_t) Nela)
-      Cap=C.cols(Nela,C.n_cols-1);
-
     // Get ph B matrix
     if(sano) {
       if(sanogrps.size()) {
-	check_groups(sanogrps);
-	for(size_t igrp=0;igrp<locgrps.size();igrp++) {
-	  arma::uvec hlist(get_group(sanogrps[igrp],Nela,true));
-	  arma::uvec plist(get_group(sanogrps[igrp],Nela,false));
 
-	  plist.t().print("Sano localizing virtuals");
-	  hlist.t().print("that match occupieds");
+	for(size_t igrp=0;igrp<sanogrps.size();igrp++) {
+	  if(sanogrps[igrp]>=(size_t) ngroups)
+	    throw std::logic_error("SanoGroups has element larger than ngroups.\n");
 
-	  arma::mat Chlp(C.n_rows,hlist.n_elem);
-	  for(size_t i=0;i<hlist.size();i++)
-	    Chlp.col(i)=C.col(hlist[i]);
-
-	  arma::mat Cplp(C.n_rows,plist.n_elem);
-	  for(size_t i=0;i<plist.size();i++)
-	    Cplp.col(i)=C.col(plist[i]);
+	  arma::mat Chlp(groups[sanogrps[igrp]].Ch);
+	  arma::mat Cplp(groups[sanogrps[igrp]].Cp);
 
 	  // Sort occupied and virtual orbitals
 	  if(loc) {
@@ -536,11 +574,13 @@ int main(int argc, char **argv) {
 	  // Run the sano guess
 	  Cplp=sano_guess(Chlp,Cplp,Bph);
 
-	  // Restore virtuals
-	  for(size_t i=0;i<plist.size();i++)
-	    C.col(plist[i])=Cplp.col(i);
+	  // Store the rotated virtuals
+	  groups[sanogrps[igrp]].Cp=Cplp;
 	}
+
       } else {
+	arma::mat Cah(C.cols(0,Nela-1));
+	arma::mat Cap(C.cols(Nela,C.n_cols-1));
 	arma::mat Bph;
 	if(densityfit || cholincore) {
 	  arma::mat B;
@@ -552,7 +592,100 @@ int main(int argc, char **argv) {
 	} else
 	  Bph=chol.B_transform(Cap,Cah);
 
+	// Rotate
 	Cap=sano_guess(Cah,Cap,Bph);
+	// and store
+	C.cols(Nela,C.n_cols-1)=Cap;
+      }
+    }
+
+    // Occ and virt orbitals
+    arma::mat Cah, Cap;
+    if(ngroups==0) {
+      Cah=C.cols(0,Nela-1);
+      if(C.n_cols>(size_t) Nela)
+	Cap=C.cols(Nela,C.n_cols-1);
+
+    } else {
+      /**
+       * If we are running in blocked mode, we need to make sure that
+       * the orbitals end up paired correctly. The code below stores
+       * the orbitals such that
+       *                            HOMO   LUMO
+       * -----\ /-----\ /-----\ /-----\ || /-------\ /-------\ /-------\ /-------\ /-------\ /-------\ /-------\
+       * xtrah| |grp 0| |grp 1| |grp 2| || |grp 2^T| |grp 1^T| |grp 0^T| | xtra 2| | xtra 1| | xtra 0| | xtrap |
+       * -----/ \-----/ \-----/ \-----/ || \-------/ \-------/ \-------/ \-------/ \-------/ \-------/ \-------/
+       *
+       * which yields the wanted pairing of the states.
+       */
+
+
+      // Fill in the occupied orbitals
+      Cah.zeros(C.n_rows,Nela);
+      {
+	size_t ih=0;
+	if(xtrah.n_cols) {
+	  Cah.cols(ih,ih+xtrah.n_cols-1)=xtrah;
+	  ih+=xtrah.n_cols;
+	}
+
+	for(int igrp=0;igrp<ngroups;igrp++) {
+	  if(groups[igrp].Ch.n_cols) {
+	    Cah.cols(ih,ih+groups[igrp].Ch.n_cols-1)=groups[igrp].Ch;
+	    ih+=groups[igrp].Ch.n_cols;
+	  }
+	}
+	if(ih != (size_t) Nela) {
+	  std::ostringstream oss;
+	  oss << "Something is wrong: hole counter is at " << ih << " but there are " << Nela << " occupieds!\n";
+	  throw std::logic_error(oss.str());
+	}
+      }
+
+      // Fill in the virtual orbitals. Remember to revert the order so that occ HOMO-i gets paired to LUMO+i
+      Cap.zeros(C.n_rows,C.n_cols-Nela);
+      {
+	size_t ip=0;
+	std::vector<size_t> ns(ngroups);
+	// First, fill the blocking for the matching occupieds
+	for(int igrp=ngroups-1;igrp>=0;igrp--) {
+	  if(groups[igrp].Cp.n_cols) {
+	    // Number of columns to store
+	    ns[igrp] = groups[igrp].Ch.n_cols;
+	    if(ns[igrp]>groups[igrp].Cp.n_cols)
+	      throw std::logic_error("A group shouldn't have more occs than virts!\n");
+
+	    if(ns[igrp]) {
+	      // OK, now flip the columns
+	      arma::mat Cflip(arma::fliplr(groups[igrp].Cp));
+	      // and store the submatrix
+	      Cap.cols(ip,ip+ns[igrp]-1)=Cflip.cols(0,ns[igrp]-1);
+	      ip+=ns[igrp];
+	    }
+	  }
+	}
+	// Next, fill in the extras
+	for(int igrp=ngroups-1;igrp>=0;igrp--) {
+	  if(groups[igrp].Cp.n_cols > ns[igrp]) {
+	    // Number of orbitals left
+	    size_t ol=groups[igrp].Cp.n_cols-ns[igrp];
+	    // OK, now flip the columns
+	    arma::mat Cflip(arma::fliplr(groups[igrp].Cp));
+	    // and store the submatrix
+	    Cap.cols(ip,ip+ol-1)=Cflip.cols(ns[igrp],Cflip.n_cols-1);
+	    ip+=ol;
+	  }
+	}
+	if(xtrap.n_cols) {
+	  // Store the extra virtuals
+	  Cap.cols(ip,ip+xtrap.n_cols-1)=xtrap;
+	  ip+=xtrap.n_cols;
+	}
+	if(ip != (size_t) (C.n_cols-Nela)) {
+	  std::ostringstream oss;
+	  oss << "Something is wrong: particle counter is at " << ip << " but there are " << C.n_cols-Nela << " virtuals!\n";
+	  throw std::logic_error(oss.str());
+	}
       }
     }
 
@@ -578,6 +711,21 @@ int main(int argc, char **argv) {
       if(!mp2) form_B(chol,Cah,Cah,"Bhaha",atype);
       form_B(chol,Cap,Cah,"Bpaha",atype);
       if(!mp2) form_B(chol,Cap,Cap,"Bpapa",atype);
+    }
+
+    if(savechk.size()) {
+      // Open in write mode but don't truncate
+      Checkpoint save(savechk,true,false);
+      save.write(basis);
+      save.write("C",C);
+      save.write("H",H);
+      {
+	// Calculate new energies
+	arma::vec En(C.n_cols);
+	for(size_t i=0;i<C.n_cols;i++)
+	  En(i)=arma::as_scalar(arma::trans(C.col(i))*H*C.col(i));
+	save.write("E",En);
+      }
     }
 
   } else {
@@ -676,6 +824,27 @@ int main(int argc, char **argv) {
       if(!mp2) form_B(chol,Cbh,Cbh,"Bhbhb",atype);
       form_B(chol,Cbp,Cbh,"Bpbhb",atype);
       if(!mp2) form_B(chol,Cbp,Cbp,"Bpbpb",atype);
+    }
+
+    if(savechk.size()) {
+      // Open in write mode but don't truncate
+      Checkpoint save(savechk,false);
+      save.write(basis);
+      save.write("Ca",Ca);
+      save.write("Ha",Ha);
+      save.write("Cb",Cb);
+      save.write("Hb",Hb);
+      {
+	// Calculate new energies
+	arma::vec En(Ca.n_cols);
+	for(size_t i=0;i<Ca.n_cols;i++)
+	  En(i)=arma::as_scalar(arma::trans(Ca.col(i))*Ha*Ca.col(i));
+	save.write("Ea",En);
+
+	for(size_t i=0;i<Ca.n_cols;i++)
+	  En(i)=arma::as_scalar(arma::trans(Cb.col(i))*Hb*Cb.col(i));
+	save.write("Eb",En);
+      }
     }
   }
 
