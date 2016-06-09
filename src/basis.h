@@ -656,10 +656,15 @@ double compute_potential(const arma::mat & P, const BasisSet & bas, const coords
  */
 double compute_elf(const arma::mat & P, const BasisSet & bas, const coords_t & r);
 
-/// Check orthonormality of real molecular orbitals
-double check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
+/// Calculate difference from orthogonality
+double orth_diff(const arma::mat & C, const arma::mat & S);
 /// Check orthonormality of complex molecular orbitals
-double check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
+double orth_diff(const arma::cx_mat & C, const arma::mat & S);
+
+/// Check orthonormality of real molecular orbitals
+void check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
+/// Check orthonormality of complex molecular orbitals
+void check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr=sqrt(DBL_EPSILON));
 
 /**
  * Construct intrinsic atomic orbitals.

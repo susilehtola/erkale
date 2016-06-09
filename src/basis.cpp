@@ -121,9 +121,9 @@ bool operator==(const contr_t & lhs, const contr_t & rhs) {
   bool same=(fabs(lhs.z-rhs.z)<tol) && (fabs(lhs.c-rhs.c)<tol);
 
   /*
-  if(!same) {
-       fprintf(stderr,"Contractions differ: %e %e vs %e %e, diff %e %e!\n",lhs.c,lhs.z,rhs.c,rhs.z,rhs.c-lhs.c,rhs.z-lhs.z);
-  }
+    if(!same) {
+    fprintf(stderr,"Contractions differ: %e %e vs %e %e, diff %e %e!\n",lhs.c,lhs.z,rhs.c,rhs.z,rhs.c-lhs.c,rhs.z-lhs.z);
+    }
   */
 
   return same;
@@ -505,8 +505,8 @@ void GaussianShell::print() const {
   }
 
   /*
-  printf("\t\tThe cartesian functions on this shell are:\n");
-  for(size_t i=0;i<cart.size();i++)
+    printf("\t\tThe cartesian functions on this shell are:\n");
+    for(size_t i=0;i<cart.size();i++)
     printf("\t\t\t%i %i %i\t%0.6f\n",cart[i].l,cart[i].m,cart[i].n,cart[i].relnorm);
   */
 }
@@ -1341,7 +1341,7 @@ void BasisSet::update_nuclear_shell_list() {
   // First, clear the list on all nuclei.
   for(size_t inuc=0;inuc<nuclei.size();inuc++)
     nuclei[inuc].shells.clear();
-  
+
   // Then, update the lists. Loop over shells
   for(size_t ish=0;ish<shells.size();ish++) {
     // Find out nuclear index
@@ -1429,13 +1429,13 @@ void BasisSet::form_unique_shellpairs() {
   // Print list
   printf("\nList of unique shell pairs (%lu pairs):\n",shellpairs.size());
   for(size_t ind=0;ind<shellpairs.size();ind++) {
-    size_t i=shellpairs[ind].is;
-    size_t j=shellpairs[ind].js;
+  size_t i=shellpairs[ind].is;
+  size_t j=shellpairs[ind].js;
 
-    int li=shells[i].get_am();
-    int lj=shells[j].get_am();
+  int li=shells[i].get_am();
+  int lj=shells[j].get_am();
 
-    printf("%i\t%i\t%i\t%i\t%i\n",(int) i,(int) j,li,lj,li+lj);
+  printf("%i\t%i\t%i\t%i\t%i\n",(int) i,(int) j,li,lj,li+lj);
   }
   */
 }
@@ -1458,11 +1458,11 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double 
     list[i].is=shellpairs[i].is;
     list[i].i0=shells[shellpairs[i].is].get_first_ind();
     list[i].Ni=shells[shellpairs[i].is].get_Nbf();
-    
+
     list[i].js=shellpairs[i].js;
     list[i].j0=shells[shellpairs[i].js].get_first_ind();
     list[i].Nj=shells[shellpairs[i].js].get_Nbf();
-    
+
     list[i].eri=screen(list[i].is,list[i].js);
   }
   // and sort it
@@ -1481,12 +1481,12 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double 
   (void) verbose;
   //if(verbose)
   // printf("%u shell pairs out of %u are significant.\n",(unsigned int) list.size(),(unsigned int) shellpairs.size());
-  
+
   /*
-  FILE *out=fopen("screen.dat","w");
-  for(size_t i=0;i<list.size();i++)
+    FILE *out=fopen("screen.dat","w");
+    for(size_t i=0;i<list.size();i++)
     fprintf(out,"%4i %4i %e\n",(int) list[i].is, (int) list[i].js, list[i].eri);
-  fclose(out);
+    fclose(out);
   */
 
   return list;
@@ -1947,7 +1947,7 @@ void BasisSet::print(bool verbose) const {
 
   if(nuclei.size()>1 && nuclei.size()<=13) {
     // Legend length is 7 + 6*(N-1) chars
-    
+
     // Print legend
     printf("\nInteratomic distance matrix:\n%7s","");
     for(size_t i=0;i<nuclei.size()-1;i++)
@@ -1962,7 +1962,7 @@ void BasisSet::print(bool verbose) const {
       printf("\n");
     }
   }
-  
+
   printf("\nList of basis functions:\n");
 
   if(verbose) {
@@ -2239,30 +2239,30 @@ arma::mat BasisSet::potential(coords_t r) const {
 #pragma omp parallel for schedule(dynamic)
 #endif
   for(size_t ip=0;ip<shellpairs.size();ip++) {
-      // Shells in pair
-      size_t i=shellpairs[ip].is;
-      size_t j=shellpairs[ip].js;
+    // Shells in pair
+    size_t i=shellpairs[ip].is;
+    size_t j=shellpairs[ip].js;
 
-      // Get subblock
-      arma::mat tmp=shells[i].nuclear(r.x,r.y,r.z,shells[j]);
-      
-      // On the off diagonal we fill out both sides of the matrix
-      if(i!=j) {
-	V.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
-	V.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
-      } else
-	// On the diagonal we just get it once
-	V.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+    // Get subblock
+    arma::mat tmp=shells[i].nuclear(r.x,r.y,r.z,shells[j]);
+
+    // On the off diagonal we fill out both sides of the matrix
+    if(i!=j) {
+      V.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
+      V.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+    } else
+      // On the diagonal we just get it once
+      V.submat(shells[i].get_first_ind(),shells[i].get_first_ind(),shells[i].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
   }
-  
+
   return V;
 }
 
 arma::mat BasisSet::eri_screening(double omega, double alpha, double beta) const {
- // Get unique pairs
- std::vector<shellpair_t> pairs=get_unique_shellpairs();
+  // Get unique pairs
+  std::vector<shellpair_t> pairs=get_unique_shellpairs();
 
- arma::mat screen(shells.size(),shells.size());
+  arma::mat screen(shells.size(),shells.size());
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -2270,12 +2270,12 @@ arma::mat BasisSet::eri_screening(double omega, double alpha, double beta) const
   {
     ERIWorker *eri;
     const std::vector<double> * erip;
-    
+
     if(omega==0.0 && alpha==1.0 && beta==0.0)
       eri=new ERIWorker(get_max_am(),get_max_Ncontr());
     else
       eri=new ERIWorker_srlr(get_max_am(),get_max_Ncontr(),omega,alpha,beta);
-    
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
@@ -2726,7 +2726,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
     transbas.shells[i].set_center(nuclei[idx].r,idx);
   }
   transbas.finalize(false,false);
-  
+
   // Get overlap matrix
   arma::mat S11=overlap();
   // and overlap with old basis
@@ -2741,7 +2741,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
   const size_t Nbf=get_Nbf();
   // Cutoff
   const double cutoff=LINTHRES;
-  
+
   // Count number of eigenvalues that are above cutoff
   size_t Nind=0;
   for(size_t i=0;i<Nbf;i++)
@@ -2751,19 +2751,19 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
   const size_t Ndep=Nbf-Nind;
   if(Nind<nocc)
     throw std::runtime_error("Basis set too small for occupied orbitals!\n");
-  
+
   // Get rid of linearly dependent eigenvalues and eigenvectors
   Sval=Sval.subvec(Ndep,Nbf-1);
   Svec=Svec.cols(Ndep,Nbf-1);
-  
+
   // Form canonical orthonormalization matrix
   arma::mat Sinvh(Nbf,Nind);
   for(size_t i=0;i<Nind;i++)
     Sinvh.col(i)=Svec.col(i)/sqrt(Sval(i));
-  
+
   // and the real S^-1
   arma::mat Sinv=Sinvh*arma::trans(Sinvh);
-  
+
   // New orbitals and orbital energies
   MOs.zeros(Sinvh.n_rows,Nind);
   E.zeros(Nind);
@@ -2788,10 +2788,10 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
   bool ok=arma::eig_sym(SMOval,SMOvec,SMO);
   if(!ok)
     throw std::runtime_error("Failed to diagonalize orbital overlap\n");
-  
+
   // Orthogonalizing matrix is
   arma::mat orthmat=SMOvec*arma::diagmat(1.0/sqrt(SMOval))*trans(SMOvec);
-  
+
   // Orthonormal projected orbitals are
   MOs.cols(0,nocc-1)=MOs.cols(0,nocc-1)*orthmat;
 
@@ -2819,7 +2819,7 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
     if(nE==nocc)
       E.subvec(nocc,Nind-1)=1.1*std::max(E(nocc-1),0.0)*arma::ones(Nind-nocc,1);
   }
-  
+
   // Failsafe
   try {
     // Check orthogonality of orbitals
@@ -2842,7 +2842,7 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
     transbas.shells[i].set_center(nuclei[idx].r,idx);
   }
   transbas.finalize(false,false);
-  
+
   // Get overlap matrix
   arma::mat S11=overlap();
   // and overlap with old basis
@@ -2857,7 +2857,7 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
   const size_t Nbf=get_Nbf();
   // Cutoff
   const double cutoff=LINTHRES;
-  
+
   // Count number of eigenvalues that are above cutoff
   size_t Nind=0;
   for(size_t i=0;i<Nbf;i++)
@@ -2867,19 +2867,19 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
   const size_t Ndep=Nbf-Nind;
   if(Nind<nocc)
     throw std::runtime_error("Basis set too small for occupied orbitals!\n");
-  
+
   // Get rid of linearly dependent eigenvalues and eigenvectors
   Sval=Sval.subvec(Ndep,Nbf-1);
   Svec=Svec.cols(Ndep,Nbf-1);
-  
+
   // Form canonical orthonormalization matrix
   arma::mat Sinvh(Nbf,Nind);
   for(size_t i=0;i<Nind;i++)
     Sinvh.col(i)=Svec.col(i)/sqrt(Sval(i));
-  
+
   // and the real S^-1
   arma::mat Sinv=Sinvh*arma::trans(Sinvh);
-  
+
   // New orbitals and orbital energies
   OMOs.zeros(Sinvh.n_rows,Nind);
 
@@ -2887,10 +2887,10 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
     OMOs=Sinvh*COMPLEX1;
     return;
   }
-  
+
   // Projected orbitals
   OMOs.cols(0,nocc-1)=Sinv*S12*oldOMOs.cols(0,nocc-1);
-  
+
   // Overlap of projected orbitals is
   arma::cx_mat SMO=arma::trans(OMOs.cols(0,nocc-1))*S11*OMOs.cols(0,nocc-1);
 
@@ -2900,10 +2900,10 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
   bool ok=arma::eig_sym(SMOval,SMOvec,SMO);
   if(!ok)
     throw std::runtime_error("Failed to diagonalize orbital overlap\n");
-  
+
   // Orthogonalizing matrix is
   arma::cx_mat orthmat=SMOvec*arma::diagmat(1.0/sqrt(SMOval))*trans(SMOvec);
-  
+
   // Orthonormal projected orbitals are
   OMOs.cols(0,nocc-1)=OMOs.cols(0,nocc-1)*orthmat;
 
@@ -3199,7 +3199,7 @@ BasisSet BasisSet::exchange_fitting() const {
 bool BasisSet::same_geometry(const BasisSet & rhs) const {
   if(nuclei.size() != rhs.nuclei.size())
     return false;
-  
+
   for(size_t i=0;i<nuclei.size();i++)
     if(!(nuclei[i]==rhs.nuclei[i])) {
       //      fprintf(stderr,"Nuclei %i differ!\n",(int) i);
@@ -3476,7 +3476,7 @@ void construct_basis(BasisSet & basis, const std::vector<atom_t> & atoms, const 
       elbas.decontract();
     else if(rotate)
       elbas.P_orthogonalize(cutoff);
-    
+
     basis.add_shells(i,elbas);
   }
 
@@ -3543,7 +3543,7 @@ double compute_potential(const arma::mat & P, const BasisSet & bas, const coords
   for(size_t i=0;i<nucs.size();i++)
     if(!nucs[i].bsse)
       nucphi+=nucs[i].Z/norm(r - nucs[i].r);
- 
+
   // Get potential energy matrix
   arma::mat V=bas.potential(r);
   // Electronic contribution is (minus sign is already in the definition of the potential matrix)
@@ -3641,47 +3641,25 @@ std::vector< std::vector<size_t> > BasisSet::find_identical_shells() const {
   return ret;
 }
 
-double check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double thr) {
-  // Compute overlap matrix
-  arma::mat MOovl=arma::trans(C)*S*C;
-  // and remove the unit from the diagonal
-  for(size_t i=0;i<MOovl.n_cols;i++)
-    MOovl(i,i)-=1.0;
-
+double orth_diff(const arma::mat & C, const arma::mat & S) {
+  // Compute difference from unit overlap
+  arma::mat d(arma::abs(arma::trans(C)*S*C-arma::eye<arma::mat>(C.n_cols,C.n_cols)));
   // Get maximum error
-  double maxerr=max(max(abs(MOovl)));
-
-  if(verbose) {
-    printf("Maximum deviation from orthogonality is %e.\n",maxerr);
-    fflush(stdout);
-  }
-
-  if(maxerr>thr) {
-    // Clean up
-    for(size_t i=0;i<MOovl.n_cols;i++)
-      for(size_t j=0;j<MOovl.n_cols;j++)
-	if(fabs(MOovl(i,j))<10*DBL_EPSILON)
-	  MOovl(i,j)=0.0;
-
-    MOovl.save("MOovl_diff.dat",arma::raw_ascii);
-
-    std::ostringstream oss;
-    oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality is " << maxerr <<".\nCheck the used LAPACK implementation.\n";
-    throw std::runtime_error(oss.str());
-  }
-
-  return maxerr;
+  return arma::max(arma::max(d));
 }
 
-double check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr) {
-  // Compute overlap matrix
-  arma::cx_mat MOovl=arma::trans(C)*S*C;
-  // and remove the unit from the diagonal
-  for(size_t i=0;i<MOovl.n_cols;i++)
-    MOovl(i,i)-=1.0;
-
+double orth_diff(const arma::cx_mat & C, const arma::mat & S) {
+  // Compute difference from unit overlap
+  arma::mat d(arma::abs(arma::trans(C)*S*C - arma::eye<arma::mat>(C.n_cols,C.n_cols)));
   // Get maximum error
-  double maxerr=max(max(abs(MOovl)));
+  return arma::max(arma::max(d));
+}
+
+void check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double thr) {
+  // Compute difference from unit overlap
+  arma::mat d(arma::abs(arma::trans(C)*S*C-arma::eye<arma::mat>(C.n_cols,C.n_cols)));
+  // Get maximum error
+  double maxerr(arma::max(arma::max(d)));
 
   if(verbose) {
     printf("Maximum deviation from orthogonality is %e.\n",maxerr);
@@ -3690,19 +3668,41 @@ double check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, dou
 
   if(maxerr>thr) {
     // Clean up
-    for(size_t i=0;i<MOovl.n_cols;i++)
-      for(size_t j=0;j<MOovl.n_cols;j++)
-	if(std::abs(MOovl(i,j))<10*DBL_EPSILON)
-	  MOovl(i,j)=0.0;
-    
-    MOovl.save("OMOovl_diff.dat",arma::raw_ascii);
+    for(size_t j=0;j<d.n_cols;j++)
+      for(size_t i=0;i<d.n_cols;i++)
+	if(fabs(d(i,j))<10*DBL_EPSILON)
+	  d(i,j)=0.0;
+
+    d.save("MOovl_diff.dat",arma::raw_ascii);
 
     std::ostringstream oss;
     oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality is " << maxerr <<".\nCheck the used LAPACK implementation.\n";
     throw std::runtime_error(oss.str());
   }
+}
 
-  return maxerr;
+void check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr) {
+  arma::mat d(arma::abs(arma::trans(C)*S*C - arma::eye<arma::cx_mat>(C.n_cols,C.n_cols)));
+  double maxerr(arma::max(arma::max(d)));
+
+  if(verbose) {
+    printf("Maximum deviation from orthogonality is %e.\n",maxerr);
+    fflush(stdout);
+  }
+
+  if(maxerr>thr) {
+    // Clean up
+    for(size_t i=0;i<d.n_cols;i++)
+      for(size_t j=0;j<d.n_cols;j++)
+	if(std::abs(d(i,j))<10*DBL_EPSILON)
+	  d(i,j)=0.0;
+
+    d.save("OMOovl_diff.dat",arma::raw_ascii);
+
+    std::ostringstream oss;
+    oss << "Generated orbitals are not orthonormal! Maximum deviation from orthonormality is " << maxerr <<".\nCheck the used LAPACK implementation.\n";
+    throw std::runtime_error(oss.str());
+  }
 }
 
 arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, std::string minbaslib) {
@@ -3756,7 +3756,7 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
   // Identity matrix
   arma::mat unit(S1);
   unit.eye();
-  
+
   // Compute the non-orthonormal IAOs.
   arma::mat A=P*S1*Pt*S12 + (unit-P*S1)*(unit-Pt*S1)*S1inv*S12;
 
@@ -3815,7 +3815,7 @@ arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::
   // Identity matrix
   arma::cx_mat unit(S1.n_rows,S1.n_cols);
   unit.eye();
-  
+
   // Compute the non-orthonormal IAOs.
   arma::cx_mat A=P*S1*Pt*S12 + (unit-P*S1)*(unit-Pt*S1)*S1inv*S12;
 
