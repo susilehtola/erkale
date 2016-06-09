@@ -194,6 +194,10 @@ class FMLoc : public UnitaryFunction {
   void cost_func_der(const arma::cx_mat & W, double & f, arma::cx_mat & der);
 };
 
+/// Some of the Pipek-Mezey routines store atomic/regional overlap
+/// matrices on disk to avoid recomputing them at every iteration. The
+/// format used for the storage is
+#define PIPEK_FILEMODE arma::arma_binary
 
 /// Pipek-Mezey localization
 class Pipek : public UnitaryFunction {
@@ -219,13 +223,6 @@ class Pipek : public UnitaryFunction {
   /// Shell list for Löwdin and Mulliken
   std::vector< std::vector<GaussianShell> > shells;
 
-  /// Integration grid for Becke, Hirshfeld or Stockholder localization
-  DFTGrid grid;
-  /// Hirshfeld / Stockholder density
-  Hirshfeld hirsh;
-  /// Bader localization grid
-  BaderGrid bader;
-
   /// Free-atom AOs for IAO localization
   arma::mat C_iao;
   /// Indices of centers for IAO localization
@@ -241,6 +238,9 @@ class Pipek : public UnitaryFunction {
   ~Pipek();
   /// Copy
   Pipek * copy() const;
+
+  /// Clean up files on disk
+  void cleanup_disk();
 
   /// Evaluate cost function
   double cost_func(const arma::cx_mat & W);
@@ -259,7 +259,7 @@ class Edmiston : public UnitaryFunction {
 
   /// Use Cholesky?
   bool use_chol;
-  
+
   /// Orbitals
   arma::mat C;
   /// Orbital Coulomb matrices

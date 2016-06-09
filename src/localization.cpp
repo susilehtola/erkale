@@ -172,7 +172,7 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
     metstack.push_back(FM_3);
     metstack.push_back(FM_4);
     break;
-    
+
   default:
     // Default - just do the one thing
     metstack.push_back(met0);
@@ -181,6 +181,9 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
   // Loop over localization
   for(size_t im=0;im<metstack.size();im++) {
     enum locmet met(metstack[im]);
+
+    // Pipek-Mezey?
+    bool pipek=false;
 
     if(met==BOYS || met==BOYS_2 || met==BOYS_3 || met==BOYS_4) {
       int n=0;
@@ -192,7 +195,7 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
 	n=3;
       else if(met==BOYS_4)
 	n=4;
-      
+
       func=new Boys(basis,C,n,verbose,delocalize);
 
     } else if(met==FM_1 || met==FM_2 || met==FM_3 || met==FM_4) {
@@ -235,42 +238,42 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
 	      met==PIPEK_VORONOIH     ||	\
 	      met==PIPEK_VORONOI2     ||	\
 	      met==PIPEK_VORONOI4) {
-      
+
       // Penalty exponent
       double p;
       enum chgmet chg;
-      
+
       switch(met) {
       case(PIPEK_MULLIKENH):
 	p=1.5;
 	chg=MULLIKEN;
 	break;
-	
+
       case(PIPEK_MULLIKEN2):
 	p=2.0;
 	chg=MULLIKEN;
 	break;
-	
+
       case(PIPEK_MULLIKEN4):
 	p=4.0;
 	chg=MULLIKEN;
 	break;
-	
+
       case(PIPEK_LOWDINH):
 	p=1.5;
 	chg=LOWDIN;
 	break;
-	
+
       case(PIPEK_LOWDIN2):
 	p=2.0;
 	chg=LOWDIN;
 	break;
-	
+
       case(PIPEK_LOWDIN4):
 	p=4.0;
 	chg=LOWDIN;
 	break;
-	
+
       case(PIPEK_BADERH):
 	p=1.5;
 	chg=BADER;
@@ -380,13 +383,14 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
 	ERROR_INFO();
 	throw std::runtime_error("Not implemented.\n");
       }
-      
+
       // If only one nucleus - nothing to do!
       if(basis.get_Nnuc()==1)
 	continue;
 
       func=new Pipek(chg,basis,C,P,p,verbose);
-    
+      pipek=true;
+
     } else if(met==EDMISTON) {
       func=new Edmiston(basis,C);
 
@@ -408,6 +412,13 @@ void orbital_localization(enum locmet met0, const BasisSet & basis, const arma::
     W=func->getW();
     // and cost function value
     measure=func->getf();
+
+    // Clean up after PM?
+    if(pipek) {
+      Pipek *p((Pipek *) func);
+      p->cleanup_disk();
+    }
+
     // Free worker
     delete func;
   }
@@ -504,7 +515,7 @@ double Boys::cost_func(const arma::cx_mat & Wv) {
     B+=pow(w,n);
   }
   f=B;
-  
+
   return f;
 }
 
@@ -651,7 +662,7 @@ void FMLoc::set_n(int nv) {
 
 double FMLoc::cost_func(const arma::cx_mat & Wv) {
   W=Wv;
-  
+
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
@@ -836,6 +847,11 @@ void FMLoc::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat & d
   der=cost_der(Wv);
 }
 
+static std::string pipek_filename(size_t iat) {
+  std::ostringstream oss;
+  oss << "atomic_overlap_" << iat << ".dat";
+  return oss.str();
+}
 
 Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, double pv, bool ver, bool delocalize) : UnitaryFunction(2*pv,!delocalize) {
   // Store used method
@@ -847,7 +863,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
   // Overlap matrix tolerance threshold
   double otol=1e-5;
 
-  Timer t;
+  Timer tinit;
   if(ver) {
     printf("Initializing Pipek-Mezey calculation with ");
     if(chg==BADER)
@@ -874,6 +890,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
 
   if(chg==BADER || chg==VORONOI) {
     // Helper. Non-verbose operation
+    BaderGrid bader;
     bader.set(basis,ver);
     // Construct integration grid
     if(chg==BADER)
@@ -883,40 +900,82 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Amount of regions
     N=bader.get_Nmax();
 
+    // Calculate the regional overlaps
+    Timer t;
+    if(ver) {
+      printf("Calculating regional overlap matrices on disk ... ");
+      fflush(stdout);
+    }
+    for(size_t iat=0;iat<N;iat++) {
+      arma::mat Sat(bader.regional_overlap(iat));
+      Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
+    }
+    if(ver) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
+
   } else if(chg==BECKE) {
     // Amount of regions
     N=basis.get_Nnuc();
     // Grid
-    grid=DFTGrid(&basis,ver);
+    DFTGrid grid(&basis,ver);
     // Construct integration grid
     grid.construct_becke(otol);
 
-  } else if(chg==HIRSHFELD) {
+    // Calculate the regional overlaps
+    Timer t;
+    if(ver) {
+      printf("Calculating regional overlap matrices on disk ... ");
+      fflush(stdout);
+    }
+    for(size_t iat=0;iat<N;iat++) {
+      arma::mat Sat(grid.eval_overlap(iat));
+      Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
+    }
+    if(ver) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
+
+  } else if(chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER ) {
     // Amount of regions
     N=basis.get_Nnuc();
-    // We don't know method here so just use HF.
-    hirsh.compute(basis,"HF");
+
+    Hirshfeld hirsh;
+    if(chg==HIRSHFELD)
+      // We don't know method here so just use HF.
+      hirsh.compute(basis,"HF");
+    else if(chg==ITERHIRSH) {
+      // Iterative Hirshfeld atomic charges
+      HirshfeldI hirshi;
+      hirshi.compute(basis,P);
+      hirsh=hirshi.get();
+    } else if(chg==STOCKHOLDER) {
+      // Stockholder atomic charges
+      Stockholder stock(basis,P);
+      hirsh=stock.get();
+    }
 
     // Helper. Non-verbose operation
     //      DFTGrid intgrid(&basis,false);
-    grid=DFTGrid(&basis,ver);
+    DFTGrid grid(&basis,ver);
     // Construct integration grid
     grid.construct_hirshfeld(hirsh,otol);
 
-  } else if(chg==ITERHIRSH) {
-    // Amount of regions
-    N=basis.get_Nnuc();
-    // Iterative Hirshfeld atomic charges
-    HirshfeldI hirshi;
-    hirshi.compute(basis,P);
-    // Helper
-    hirsh=hirshi.get();
-
-    // Helper. Non-verbose operation
-    //      DFTGrid intgrid(&basis,false);
-    grid=DFTGrid(&basis,ver);
-    // Construct integration grid
-    grid.construct_hirshfeld(hirsh,otol);
+    Timer t;
+    if(ver) {
+      printf("Calculating regional overlap matrices on disk ... ");
+      fflush(stdout);
+    }
+    for(size_t iat=0;iat<N;iat++) {
+      arma::mat Sat(grid.eval_hirshfeld_overlap(hirsh,iat));
+      Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
+    }
+    if(ver) {
+      printf("done (%s)\n",t.elapsed().c_str());
+      fflush(stdout);
+    }
 
   } else if(chg==IAO) {
     // Amount of regions
@@ -929,20 +988,6 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
 
     // Also need overlap matrix
     S=basis.overlap();
-
-  } else if(chg==STOCKHOLDER) {
-    // Amount of regions
-    N=basis.get_Nnuc();
-    // Stockholder atomic charges
-    Stockholder stock(basis,P);
-    // Helper
-    hirsh=stock.get();
-
-    // Helper. Non-verbose operation
-    //      DFTGrid intgrid(&basis,false);
-    grid=DFTGrid(&basis,ver);
-    // Construct integration grid
-    grid.construct_hirshfeld(hirsh,otol);
 
   } else if(chg==MULLIKEN) {
     // Amount of regions
@@ -975,7 +1020,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
   }
 
   if(ver) {
-    printf("Initialization of Pipek-Mezey took %s\n",t.elapsed().c_str());
+    printf("Initialization of Pipek-Mezey took %s\n",tinit.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -987,19 +1032,22 @@ Pipek* Pipek::copy() const {
   return new Pipek(*this);
 }
 
+void Pipek::cleanup_disk() {
+  if(chg==BADER || chg==VORONOI || chg==BECKE || chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER) {
+    // Delete the temporary files
+    for(size_t iat=0;iat<N;iat++)
+      remove(pipek_filename(iat).c_str());
+  }
+}
+
 arma::mat Pipek::get_charge(size_t iat) {
   arma::mat Q;
 
-  if(chg==BADER || chg==VORONOI) {
-    arma::mat Sat=bader.regional_overlap(iat);
-    Q=arma::trans(C)*Sat*C;
+  if(chg==BADER || chg==VORONOI || chg==BECKE || chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER) {
+    arma::mat Sat;
+    if(!Sat.load(pipek_filename(iat),PIPEK_FILEMODE))
+      throw std::runtime_error("Error loading precomputed atomic overlap matrix from file " + pipek_filename(iat) + "!\n");
 
-  } else if(chg==BECKE) {
-    arma::mat Sat=grid.eval_overlap(iat);
-    Q=arma::trans(C)*Sat*C;
-
-  } else if(chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER) {
-    arma::mat Sat=grid.eval_hirshfeld_overlap(hirsh,iat);
     Q=arma::trans(C)*Sat*C;
 
   } else if(chg==IAO) {
@@ -1073,7 +1121,7 @@ double Pipek::cost_func(const arma::cx_mat & Wv) {
 #pragma omp parallel for reduction(+:Dinv) schedule(dynamic,1)
 #endif
   for(size_t iat=0;iat<N;iat++) {
-      // Helper matrix
+    // Helper matrix
     arma::cx_mat qw=get_charge(iat)*W;
     for(size_t io=0;io<W.n_cols;io++) {
       std::complex<double> Qa=std::real(arma::as_scalar(arma::trans(W.col(io))*qw.col(io)));
@@ -1232,7 +1280,7 @@ Edmiston* Edmiston::copy() const {
 void Edmiston::setW(const arma::cx_mat & Wv) {
   // We need to update everything to match W
   arma::cx_mat der;
-  cost_func_der(Wv,f,der);  
+  cost_func_der(Wv,f,der);
 }
 
 double Edmiston::cost_func(const arma::cx_mat & Wv) {
@@ -1267,7 +1315,7 @@ void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat 
   std::vector<arma::mat> Porb(Wv.n_cols);
   for(size_t io=0;io<Wv.n_cols;io++)
     Porb[io]=arma::real( Ctilde.col(io)*arma::trans(Ctilde.col(io)) );
-  
+
   // Check if we need to do something
   if(W.n_rows != Wv.n_rows || W.n_cols != Wv.n_cols || rms_cnorm(W-Wv)>=DBL_EPSILON) {
     // Compute orbital-dependent Fock matrices
@@ -1306,18 +1354,18 @@ inline double complex_norm(double phi, const arma::mat & S, const arma::cx_vec &
 double analyze_orbital(const arma::mat & S, const arma::cx_vec & C) {
   // Just do a full scan
   arma::vec phi(arma::linspace(0.0,2*M_PI,201));
-  
+
   arma::vec cn(phi.n_elem);
   for(arma::uword i=0;i<cn.n_elem;i++)
     cn(i)=complex_norm(phi(i),S,C);
-  
+
   return cn.min();
 }
 
 void analyze_orbitals(const BasisSet & basis, const arma::cx_mat & C) {
   arma::mat S(basis.overlap());
   arma::vec cnorms(C.n_cols);
-  
+
   // Loop over orbitals
 #ifdef _OPENMP
 #pragma omp parallel for
