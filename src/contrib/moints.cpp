@@ -37,6 +37,38 @@
 #include "../version.h"
 #endif
 
+arma::vec sano_energies(const arma::mat & Co, const arma::mat & Cv, const arma::mat & R, const arma::mat & Bph) {
+  if(Co.n_rows != Cv.n_rows)
+    throw std::runtime_error("Orbital matrices not consistent!\n");
+  if(Bph.n_cols != Co.n_cols*Cv.n_cols)
+    throw std::runtime_error("B matrix is not in the vo space!\n");
+
+  // Number of orbitals to localize
+  size_t Nloc=std::min(Co.n_cols,Cv.n_cols);
+  arma::vec E(Nloc);
+
+  // Loop over orbitals
+  for(size_t ii=0;ii<Nloc;ii++) {
+    // Reverse the order the orbitals are treated to maximize
+    // variational freedom for the HOMO
+    size_t io=Co.n_cols-1-ii;
+
+    // Collect the elements of the B matrix
+    arma::mat Bp(Bph.n_rows,Cv.n_cols);
+    for(size_t iv=0;iv<Cv.n_cols;iv++) {
+      Bp.col(iv)=Bph.col(io*Cv.n_cols+iv);
+    }
+
+    // Virtual-virtual exchange matrix is
+    arma::mat Kvv(arma::trans(Bp)*Bp);
+
+    // so the energy for the orbital is just
+    E(ii)=arma::as_scalar(arma::trans(R.col(ii))*Kvv*R.col(ii));
+  }
+
+  return E;
+}
+
 arma::mat sano_guess_orig(const arma::mat & Co, const arma::mat & Cv, const arma::mat & Bph, double & eigenvalue) {
   if(Co.n_rows != Cv.n_rows)
     throw std::runtime_error("Orbital matrices not consistent!\n");
@@ -137,7 +169,7 @@ arma::mat sano_guess_orig(const arma::mat & Co, const arma::mat & Cv, const arma
   }
 
   // Now, the localized and inactive virtuals are obtained as
-  return Cv*R;
+  return R;
 }
 
 arma::mat sano_guess_failsafe(const arma::mat & Co, const arma::mat & Cv, const arma::mat & Bph) {
@@ -186,21 +218,23 @@ arma::mat sano_guess_failsafe(const arma::mat & Co, const arma::mat & Cv, const 
   }
 
   // Now, the localized and inactive virtuals are obtained as
-  return Cv*Rvirt;
+  return Rvirt;
 }
 
 arma::mat sano_guess(const arma::mat & Co, const arma::mat & Cv, const arma::mat & Bph) {
-  arma::mat Cp;
+  arma::mat R;
   double eval;
   try {
-    Cp=sano_guess_orig(Co,Cv,Bph,eval);
+    R=sano_guess_orig(Co,Cv,Bph,eval);
     printf("Default Sano guess was succesful, smallest eigenvalue of guess orbital overlap %e\n",eval);
   } catch(std::runtime_error & err) {
     printf("Default Sano guess failed due to linear dependencies (eigenvalue %e), switching to failsafe mode\n",eval);
-    Cp=sano_guess_failsafe(Co,Cv,Bph);
+    R=sano_guess_failsafe(Co,Cv,Bph);
   }
 
-  return Cp;
+  sano_energies(Co,Cv,R,Bph).print("Sano guess exchange energies");
+
+  return R;
 }
 
 void form_F(const arma::mat & H, const arma::mat & Cl, const arma::mat & Cr, const std::string & name, arma::file_type atype) {
@@ -305,8 +339,8 @@ typedef struct {
   arma::mat Cp;
 } group_t;
 
-int main(int argc, char **argv) {
 
+int main(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - MO integrals from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -503,12 +537,13 @@ int main(int argc, char **argv) {
     if(loc) {
       // Localize orbitals. Localize in groups?
       if(locgrps.size()>0) {
-	for(size_t igrp=0;igrp<locgrps.size();igrp++) {
-	  if(locgrps[igrp]>=(size_t) ngroups)
+	for(size_t iloc=0;iloc<locgrps.size();iloc++) {
+	  size_t igrp(locgrps[iloc]);
+	  if(igrp>=(size_t) ngroups)
 	    throw std::logic_error("LocGroups has element larger than ngroups.\n");
 
 	  // Get the orbitals
-	  arma::mat Chlp(groups[locgrps[igrp]].Ch);
+	  arma::mat Chlp(groups[igrp].Ch);
 
 	  // Run the localization
 	  double measure;
@@ -520,7 +555,7 @@ int main(int argc, char **argv) {
 	  Chlp=Chlp*Wr;
 
 	  // Put back the orbitals
-	  groups[locgrps[igrp]].Ch=Chlp;
+	  groups[igrp].Ch=Chlp;
 	}
       } else {
 	arma::mat Chlp(C.cols(0,Nela-1));
@@ -542,23 +577,23 @@ int main(int argc, char **argv) {
     // Get ph B matrix
     if(sano) {
       if(sanogrps.size()) {
-
-	for(size_t igrp=0;igrp<sanogrps.size();igrp++) {
-	  if(sanogrps[igrp]>=(size_t) ngroups)
+	for(size_t isano=0;isano<sanogrps.size();isano++) {
+	  size_t igrp(sanogrps[isano]);
+	  if(igrp>=(size_t) ngroups)
 	    throw std::logic_error("SanoGroups has element larger than ngroups.\n");
-
-	  arma::mat Chlp(groups[sanogrps[igrp]].Ch);
-	  arma::mat Cplp(groups[sanogrps[igrp]].Cp);
 
 	  // Sort occupied and virtual orbitals
 	  if(loc) {
-	    sort_vecs(Chlp,H).t().print("Occupied orbital order");
+	    sort_vecs(groups[igrp].Ch,H).t().print("Occupied orbital order");
 
-	    arma::uvec vord(sort_vecs(Cplp,H));
+	    arma::uvec vord(sort_vecs(groups[igrp].Cp,H));
 	    for(arma::uword i=0;i<vord.n_elem;i++)
 	      if(vord(i)!=i)
 		throw std::logic_error("Indexing error in virtuals!\n");
 	  }
+
+	  arma::mat Chlp(groups[igrp].Ch);
+	  arma::mat Cplp(groups[igrp].Cp);
 
 	  arma::mat Bph;
 	  if(densityfit || cholincore) {
@@ -572,10 +607,11 @@ int main(int argc, char **argv) {
 	    Bph=chol.B_transform(Cplp,Chlp);
 
 	  // Run the sano guess
-	  Cplp=sano_guess(Chlp,Cplp,Bph);
+	  arma::mat Rv(sano_guess(Chlp,Cplp,Bph));
+	  //arma::mat Rv(sano_guess_failsafe(Chlp,Cplp,Bph));
 
 	  // Store the rotated virtuals
-	  groups[sanogrps[igrp]].Cp=Cplp;
+	  groups[igrp].Cp=Cplp*Rv;
 	}
 
       } else {
@@ -593,9 +629,9 @@ int main(int argc, char **argv) {
 	  Bph=chol.B_transform(Cap,Cah);
 
 	// Rotate
-	Cap=sano_guess(Cah,Cap,Bph);
+	arma::mat R(sano_guess(Cah,Cap,Bph));
 	// and store
-	C.cols(Nela,C.n_cols-1)=Cap;
+	C.cols(Nela,C.n_cols-1)=Cap*R;
       }
     }
 
@@ -631,6 +667,7 @@ int main(int argc, char **argv) {
 
 	for(int igrp=0;igrp<ngroups;igrp++) {
 	  if(groups[igrp].Ch.n_cols) {
+	    //printf("Group %i: orbitals %i -- %i, i.e., HOMO%+i -- HOMO%+i\n",igrp,(int) ih, (int)(ih+groups[igrp].Ch.n_cols-1), ((int) ih) -(Nela-1),((int) ih) -(Nela-1) + (int) groups[igrp].Ch.n_cols-1);
 	    Cah.cols(ih,ih+groups[igrp].Ch.n_cols-1)=groups[igrp].Ch;
 	    ih+=groups[igrp].Ch.n_cols;
 	  }
@@ -642,7 +679,7 @@ int main(int argc, char **argv) {
 	}
       }
 
-      // Fill in the virtual orbitals. Remember to revert the order so that occ HOMO-i gets paired to LUMO+i
+      // Fill in the virtual orbitals.
       Cap.zeros(C.n_rows,C.n_cols-Nela);
       {
 	size_t ip=0;
@@ -656,10 +693,15 @@ int main(int argc, char **argv) {
 	      throw std::logic_error("A group shouldn't have more occs than virts!\n");
 
 	    if(ns[igrp]) {
-	      // OK, now flip the columns
-	      arma::mat Cflip(arma::fliplr(groups[igrp].Cp));
-	      // and store the submatrix
-	      Cap.cols(ip,ip+ns[igrp]-1)=Cflip.cols(0,ns[igrp]-1);
+	      // OK, now store the submatrix. The ordering is correct
+	      // both for Sano and canonical orbitals, because the
+	      // Sano guess works from the HOMO down (pairing to LUMO,
+	      // LUMO+1 and so on), while the canonical ordering
+	      // automatically pairs HOMO with LUMO, HOMO-1 with
+	      // LUMO+1 etc.
+	      //printf("Group %i: orbitals %i -- %i, i.e., LUMO%+i -- LUMO%+i\n",(int) igrp,(int) ip+Nela,(int) (ip+ns[igrp]-1)+Nela,(int) ip,(int) (ip+ns[igrp]-1));
+
+	      Cap.cols(ip,ip+ns[igrp]-1)=groups[igrp].Cp.cols(0,ns[igrp]-1);
 	      ip+=ns[igrp];
 	    }
 	  }
@@ -669,10 +711,7 @@ int main(int argc, char **argv) {
 	  if(groups[igrp].Cp.n_cols > ns[igrp]) {
 	    // Number of orbitals left
 	    size_t ol=groups[igrp].Cp.n_cols-ns[igrp];
-	    // OK, now flip the columns
-	    arma::mat Cflip(arma::fliplr(groups[igrp].Cp));
-	    // and store the submatrix
-	    Cap.cols(ip,ip+ol-1)=Cflip.cols(ns[igrp],Cflip.n_cols-1);
+	    Cap.cols(ip,ip+ol-1)=groups[igrp].Cp.cols(ns[igrp],ns[igrp]+ol-1);
 	    ip+=ol;
 	  }
 	}
@@ -687,6 +726,10 @@ int main(int argc, char **argv) {
 	  throw std::logic_error(oss.str());
 	}
       }
+
+      // Store orbitals in C for checkpoint saves
+      C.cols(0,Nela-1)=Cah;
+      C.cols(Nela,C.n_cols-1)=Cap;
     }
 
     // Fock matrices
@@ -707,6 +750,7 @@ int main(int argc, char **argv) {
       if(!mp2) form_B(B,Cah,Cah,"Bhaha",atype);
       form_B(B,Cap,Cah,"Bpaha",atype);
       if(!mp2) form_B(B,Cap,Cap,"Bpapa",atype);
+
     } else {
       if(!mp2) form_B(chol,Cah,Cah,"Bhaha",atype);
       form_B(chol,Cap,Cah,"Bpaha",atype);
@@ -785,8 +829,8 @@ int main(int argc, char **argv) {
 	Bpaha=chol.B_transform(Cap,Cah);
 	Bpbhb=chol.B_transform(Cbp,Cbh);
       }
-      Cap=sano_guess(Cah,Cap,Bpaha);
-      Cbp=sano_guess(Cbh,Cbp,Bpbhb);
+      Cap=Cap*sano_guess(Cah,Cap,Bpaha);
+      Cbp=Cbp*sano_guess(Cbh,Cbp,Bpbhb);
     }
 
     // Fock matrices
