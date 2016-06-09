@@ -350,10 +350,6 @@ void load_fchk(const Settings & set, double tol) {
   arma::mat S=basis.overlap();
   printf("done (%s)\n",t.elapsed().c_str());
 
-  check_orth(Ca,S,true,tol);
-  if(!restr)
-    check_orth(Cb,S,true,tol);
-
   double nelnum=arma::trace(P*S);
   double neldiff=nelnum-Nel;
   if(fabs(neldiff)/Nel>tol) {
@@ -417,6 +413,23 @@ void load_fchk(const Settings & set, double tol) {
 
       printf("done (%s).\nMaximum deviation from orthonormality was %e %e.\n",t.elapsed().c_str(),Camax,Cbmax);
     }
+  }
+
+  // Check the orbitals
+  try {
+    check_orth(Ca,S,true,tol);
+    if(!restr)
+      check_orth(Cb,S,true,tol);
+  } catch(std::runtime_error & err) {
+    std::ostringstream oss;
+
+    oss << "\nIt seems the orbitals in the checkpoint file are not orthonormal.\n";
+    if(restr)
+      oss << "The maximal deviation from orthonormality was found to be " << orth_diff(Ca,S) << ".\n";
+    else
+      oss << "The maximal deviation from orthonormality was found to be " << orth_diff(Ca,S) << " and " << orth_diff(Cb,S) << " for alpha and beta orbitals.\n";
+    oss << "Increase the tolerance or run the program with the reorthonormalize option.\n";
+    throw std::runtime_error(oss.str());
   }
 
   // Save the result
@@ -656,7 +669,7 @@ int main(int argc, char **argv) {
   Settings set;
   set.add_string("LoadFchk","Gaussian formatted checkpoint file to load","");
   set.add_string("SaveFchk","Gaussian formatted checkpoint file to load","");
-  set.add_double("FchkTol","Tolerance for deviation in density matrix",1e-8);
+  set.add_double("FchkTol","Tolerance for deviation in orbital orthonormality and density matrix",1e-8);
   set.add_bool("Renormalize","Renormalize density matrix?",false);
   set.add_bool("Reorthonormalize","Reorthonormalize orbitals?",false);
   set.add_string("LoadChk","Save results to ERKALE checkpoint","");
