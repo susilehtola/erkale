@@ -372,7 +372,7 @@ arma::mat BaderGrid::regional_overlap(size_t ireg) {
 
   // Function values in grid points
   arma::mat bf(basp->get_Nbf(),reggrid[ireg].size());
-  arma::vec w(reggrid[ireg].size());
+  arma::rowvec w(reggrid[ireg].size());
   for(size_t ip=0;ip<reggrid[ireg].size();ip++) {
     // Weight is
     w(ip)=reggrid[ireg][ip].w;
