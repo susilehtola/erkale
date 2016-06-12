@@ -667,7 +667,7 @@ int main(int argc, char **argv) {
 
 	for(int igrp=0;igrp<ngroups;igrp++) {
 	  if(groups[igrp].Ch.n_cols) {
-	    //printf("Group %i: orbitals %i -- %i, i.e., HOMO%+i -- HOMO%+i\n",igrp,(int) ih, (int)(ih+groups[igrp].Ch.n_cols-1), ((int) ih) -(Nela-1),((int) ih) -(Nela-1) + (int) groups[igrp].Ch.n_cols-1);
+	    printf("Group %2i: orbitals %4i -- %4i, i.e., HOMO%+4i -- HOMO%+4i\n",igrp,(int) ih, (int)(ih+groups[igrp].Ch.n_cols-1), ((int) ih) -(Nela-1),((int) ih) -(Nela-1) + (int) groups[igrp].Ch.n_cols-1);
 	    Cah.cols(ih,ih+groups[igrp].Ch.n_cols-1)=groups[igrp].Ch;
 	    ih+=groups[igrp].Ch.n_cols;
 	  }
@@ -699,7 +699,7 @@ int main(int argc, char **argv) {
 	      // LUMO+1 and so on), while the canonical ordering
 	      // automatically pairs HOMO with LUMO, HOMO-1 with
 	      // LUMO+1 etc.
-	      //printf("Group %i: orbitals %i -- %i, i.e., LUMO%+i -- LUMO%+i\n",(int) igrp,(int) ip+Nela,(int) (ip+ns[igrp]-1)+Nela,(int) ip,(int) (ip+ns[igrp]-1));
+	      printf("Group %2i: orbitals %4i -- %4i, i.e., LUMO%+4i -- LUMO%+4i\n",(int) igrp,(int) ip+Nela,(int) (ip+ns[igrp]-1)+Nela,(int) ip,(int) (ip+ns[igrp]-1));
 
 	      Cap.cols(ip,ip+ns[igrp]-1)=groups[igrp].Cp.cols(0,ns[igrp]-1);
 	      ip+=ns[igrp];
