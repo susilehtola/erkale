@@ -684,7 +684,7 @@ int main(int argc, char **argv) {
 
 	for(int igrp=0;igrp<ngroups;igrp++) {
 	  if(groups[igrp].Ch.n_cols) {
-	    printf("Group %2i: occupied orbitals %4i -- %4i, i.e., HOMO%+4i -- HOMO%+4i\n",igrp,(int) ih+1, (int)(ih+groups[igrp].Ch.n_cols), ((int) ih) -(Nela-1),((int) ih) -(Nela-1) + (int) groups[igrp].Ch.n_cols-1);
+	    printf("Group %2i: occupied orbitals %4i -- %4i i.e. HOMO %+4i -- HOMO %+4i\n",igrp,(int) ih+1, (int)(ih+groups[igrp].Ch.n_cols), ((int) ih) -(Nela-1),((int) ih) -(Nela-1) + (int) groups[igrp].Ch.n_cols-1);
 	    Cah.cols(ih,ih+groups[igrp].Ch.n_cols-1)=groups[igrp].Ch;
 	    ih+=groups[igrp].Ch.n_cols;
 	  }
@@ -716,7 +716,7 @@ int main(int argc, char **argv) {
 	      // LUMO+1 and so on), while the canonical ordering
 	      // automatically pairs HOMO with LUMO, HOMO-1 with
 	      // LUMO+1 etc.
-	      printf("Group %2i: virtual  orbitals %4i -- %4i, i.e., LUMO%+4i -- LUMO%+4i\n",(int) igrp,(int) ip+Nela+1,(int) (ip+ns[igrp])+Nela,(int) ip,(int) (ip+ns[igrp]-1));
+	      printf("Group %2i: virtual  orbitals %4i -- %4i i.e. LUMO %+4i -- LUMO %+4i\n",(int) igrp,(int) ip+Nela+1,(int) (ip+ns[igrp])+Nela,(int) ip,(int) (ip+ns[igrp]-1));
 
 	      Cap.cols(ip,ip+ns[igrp]-1)=groups[igrp].Cp.cols(0,ns[igrp]-1);
 	      ip+=ns[igrp];
@@ -728,7 +728,7 @@ int main(int argc, char **argv) {
 	  if(groups[igrp].Cp.n_cols > ns[igrp]) {
 	    // Number of orbitals left
 	    size_t ol=groups[igrp].Cp.n_cols-ns[igrp];
-	    printf("Group %2i: extra    virtuals %4i -- %4i, i.e., LUMO%+4i -- LUMO%+4i\n",(int) igrp,(int) (ip+Nela+1),(int) (ip+Nela+ol),(int) ip,(int) (ip+ol-1));
+	    printf("Group %2i: extra    virtuals %4i -- %4i i.e. LUMO %+4i -- LUMO %+4i\n",(int) igrp,(int) (ip+Nela+1),(int) (ip+Nela+ol),(int) ip,(int) (ip+ol-1));
 	    Cap.cols(ip,ip+ol-1)=groups[igrp].Cp.cols(ns[igrp],ns[igrp]+ol-1);
 	    ip+=ol;
 	  }
