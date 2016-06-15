@@ -1305,7 +1305,7 @@ void AngularGrid::eval_overlap(const arma::cx_mat & Cocc, const arma::vec & Esi,
   arma::mat orbdenspk(arma::pow(orbdens,k));
 
   // Calculate weightings
-  arma::vec ww(w);
+  arma::rowvec ww(w);
   for(size_t ip=0;ip<grid.size();ip++) {
     // Total density
     double rhotot(arma::sum(orbdens.col(ip)));
@@ -1400,7 +1400,7 @@ void AngularGrid::eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::
   // LDA part
   {
     // Calculate weightings
-    arma::vec ww(w);
+    arma::rowvec ww(w);
     for(size_t ip=0;ip<grid.size();ip++) {
       // Screen for bad behavior
       if(t(ip)>=thr)
@@ -1415,7 +1415,7 @@ void AngularGrid::eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::
   // meta-GGA part
   {
     // Calculate weightings
-    arma::vec ww(w);
+    arma::rowvec ww(w);
     for(size_t ip=0;ip<grid.size();ip++) {
       // Screen for bad behavior
       if(t(ip)>=thr)
