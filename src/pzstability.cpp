@@ -2864,7 +2864,7 @@ uscf_t PZStability::get_usol() const {
   return usol;
 }
 
-bool PZStability::check(bool stability, double cutoff) {
+bool PZStability::check(bool stability, double cutoff, double dEthr) {
   Timer tfull;
 
   if(!count_params())
@@ -2994,12 +2994,18 @@ bool PZStability::check(bool stability, double cutoff) {
       // Overstepped
       ds/=dfac;
 
-      // Update solution
-      x*=ds;
+      if(E0-Ei<dEthr) {
+	if(verbose) printf("Stability analysis decreased energy by %e\n",E0-Ei);
 
-      // Update solution
-      update(x);
-      if(verbose) printf("Stability analysis decreased energy by %e\n",E0-Ei);
+	// Update solution
+	x*=ds;
+
+	// Update solution
+	update(x);
+      } else {
+	I.clear();
+	if(verbose) printf("Stability analysis failed to decrease energy significantly, dE = %e\n",E0-Ei);
+      }
     }
   }
 
