@@ -389,10 +389,13 @@ int main(int argc, char **argv) {
   set.add_bool("Sano","Run Sano guess for virtual orbitals?",true);
   set.add_string("SanoGroups","List of groups to localize","");
   set.add_int("NGroups","Number of groups to divide the orbitals into",0);
+  set.add_int("Seed","Random seed",0);
 
   if(argc==2)
     set.parse(argv[1]);
   else printf("Using default settings.\n\n");
+
+  set.print();
 
   // Load checkpoint
   std::string loadchk(set.get_string("LoadChk"));
@@ -413,6 +416,7 @@ int main(int argc, char **argv) {
   bool sano=set.get_bool("Sano");
   std::vector<size_t> sanogrps=parse_range(set.get_string("SanoGroups"));
   int ngroups=set.get_int("NGroups");
+  int seed=set.get_int("Seed");
 
   if(savechk.size()) {
     // Copy checkpoint data
@@ -563,7 +567,7 @@ int main(int argc, char **argv) {
 
 	  // Run the localization
 	  double measure;
-	  arma::cx_mat W(real_orthogonal(Chlp.n_cols)*COMPLEX1);
+	  arma::cx_mat W(real_orthogonal(Chlp.n_cols,seed)*COMPLEX1);
 	  orbital_localization(locmethod,basis,Chlp,P,measure,W);
 
 	  // Rotate orbitals
@@ -578,7 +582,7 @@ int main(int argc, char **argv) {
 
 	// Run the localization
 	double measure;
-	arma::cx_mat W(real_orthogonal(Chlp.n_cols)*COMPLEX1);
+	arma::cx_mat W(real_orthogonal(Chlp.n_cols,seed)*COMPLEX1);
 	orbital_localization(locmethod,basis,Chlp,P,measure,W);
 
 	// Rotate orbitals
@@ -807,7 +811,7 @@ int main(int argc, char **argv) {
 
 	// Run the localization
 	double measure;
-	arma::cx_mat W(real_orthogonal(Chlp.n_cols)*COMPLEX1);
+	arma::cx_mat W(real_orthogonal(Chlp.n_cols,seed)*COMPLEX1);
 	orbital_localization(locmethod,basis,Chlp,P,measure,W);
 
 	// Rotate orbitals
