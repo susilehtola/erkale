@@ -68,7 +68,7 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
   size_t Nmem=array_size(0)*array_size(1)*array_size(2)*(sizeof(double)+sizeof(arma::sword));
 
   if(verbose) {
-    printf("\nBader grid is %i x %i x %i, totalling %s points.\n",array_size(0),array_size(1),array_size(2),space_number(array_size(0)*array_size(1)*array_size(2)).c_str());
+    printf("\nBader grid is %i x %i x %i, totalling %s points.\n",(int) array_size(0),(int) array_size(1),(int) array_size(2),space_number(array_size(0)*array_size(1)*array_size(2)).c_str());
     printf("Grid will require %s of memory.\n",memory_size(Nmem).c_str());
 
 #ifdef BADERDEBUG
@@ -221,7 +221,7 @@ void Bader::check_regions(std::string msg) const {
       for(size_t iy=0;iy<dens.n_cols;iy++)
 	if(region(ix,iy,iz)<0) {
 	  nfail++;
-	  fprintf(stderr,"Point %u %u %u is in region %i.\n",(unsigned) ix, (unsigned) iy, (unsigned) iz, region(ix,iy,iz));
+	  fprintf(stderr,"Point %u %u %u is in region %i.\n",(unsigned) ix, (unsigned) iy, (unsigned) iz, (int) region(ix,iy,iz));
 	}
 
   if(nfail) {
@@ -426,7 +426,7 @@ arma::vec Bader::gradient(const arma::ivec & p) const {
 }
 
 void Bader::print_neighbors(const arma::ivec & p) const {
-  printf("\nNeighbors of point %i %i %i in region %i\n",p(0),p(1),p(2),region(p(0),p(1),p(2)));
+  printf("\nNeighbors of point %i %i %i in region %i\n",(int) p(0),(int) p(1),(int) p(2),(int) region(p(0),p(1),p(2)));
 
   for(int dx=-1;dx<=1;dx++)
     for(int dy=-1;dy<=1;dy++)
@@ -445,7 +445,7 @@ void Bader::print_neighbors(const arma::ivec & p) const {
 	  continue;
 
 	// Check maximum value making sure that we don't run over
-	printf("\t%i %i %i region %i density %e\n",np(0),np(1),np(2),region(np(0),np(1),np(2)),dens(np(0),np(1),np(2)));
+	printf("\t%i %i %i region %i density %e\n",(int) np(0),(int) np(1),(int) np(2),(int) region(np(0),np(1),np(2)),dens(np(0),np(1),np(2)));
       }
 }
 
@@ -712,7 +712,7 @@ void Bader::analysis_neargrid() {
 		  region(points[ip](0),points[ip](1),points[ip](2))=0;
 
 	    } else {
-	      fprintf(stderr,"%i %i %i is not classified!.\n",pend(0),pend(1),pend(2)); fflush(stderr);
+	      fprintf(stderr,"%i %i %i is not classified!.\n",(int) pend(0),(int) pend(1),(int) pend(2)); fflush(stderr);
 	      print_neighbors(pend);
 
 	      ERROR_INFO();
@@ -723,7 +723,7 @@ void Bader::analysis_neargrid() {
 	} // End loop over grid
 
   if(verbose) {
-    printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
+    printf("done (%s). %i regions found.\n",t.elapsed().c_str(),(int) Nregions);
     fflush(stdout);
   }
 
@@ -967,7 +967,7 @@ void Bader::analysis_ongrid() {
 	} // End loop over grid
 
   if(verbose) {
-    printf("done (%s). %i regions found.\n",t.elapsed().c_str(),Nregions);
+    printf("done (%s). %i regions found.\n",t.elapsed().c_str(),(int) Nregions);
     fflush(stdout);
   }
 
@@ -1287,9 +1287,9 @@ void Bader::print_individual_regions(double space) const {
   size_t idx=1;
   
   // Print out region indices
-  fprintf(out,"%5i", Nregions);
+  fprintf(out,"%5i", (int) Nregions);
   for(arma::sword ireg=0;ireg<Nregions;ireg++) {
-    fprintf(out,"%5i", ireg+1);
+    fprintf(out,"%5i", (int) (ireg+1));
     idx++;
     if(idx==10) {
       idx=0;

@@ -215,7 +215,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     t.set();
 
     if(Sinvh.n_cols!=Sinvh.n_rows) {
-      printf("%i linear combinations of basis functions have been removed.\n",Sinvh.n_rows-Sinvh.n_cols);
+      printf("%i linear combinations of basis functions have been removed.\n",(int) (Sinvh.n_rows-Sinvh.n_cols));
     }
     printf("\n");
   }

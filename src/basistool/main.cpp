@@ -175,18 +175,18 @@ int main(int argc, char **argv) {
 	// Print primitives
 	for(int am=0;am<max_am;am++)
 	  if(Nsh(am,0)>0)
-	    printf("%i%c",Nsh(am,0),tolower(shell_types[am]));
+	    printf("%i%c",(int) Nsh(am,0),tolower(shell_types[am]));
 	// Print contractions
 	printf("|");
 	for(int am=0;am<max_am;am++)
 	  if(Nsh(am,0)!=Nsh(am,1))
-	    printf("%i%c",Nsh(am,1),tolower(shell_types[am]));
+	    printf("%i%c",(int) Nsh(am,1),tolower(shell_types[am]));
 	printf("]\n");
       } else {
 	printf("%10i  ",(int) nbf);
 	for(int am=0;am<max_am;am++)
 	  if(Nsh(am,0)>0)
-	    printf("%i%c",Nsh(am,0),tolower(shell_types[am]));
+	    printf("%i%c",(int) Nsh(am,0),tolower(shell_types[am]));
 	printf("\n");
       }
     }

@@ -289,13 +289,13 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
       ixc=iloc+iorb;
       for(int i=0;i<norb;i++) {
 	if(i==iorb)
-	  printf("\t%i%c %1i* %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
+	  printf("\t%i%c %1i* %8.6f %6.3f\n",(int) orbidx(am),tolower(shell_types[am]),(int) i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
 	else
-	  printf("\t%i%c %1i  %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
+	  printf("\t%i%c %1i  %8.6f %6.3f\n",(int) orbidx(am),tolower(shell_types[am]),(int) i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
       }
     } else {
       for(int i=0;i<norb;i++)
-	printf("\t%i%c %1i  %8.6f %6.3f\n",orbidx(am),tolower(shell_types[am]),i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
+	printf("\t%i%c %1i  %8.6f %6.3f\n",(int) orbidx(am),tolower(shell_types[am]),(int) i+1,dec(iloc+i,lval(iloc+i)),reig(iloc+i)/ANGSTROMINBOHR);
     }
 
     // Increment shell count

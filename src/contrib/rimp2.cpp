@@ -211,10 +211,10 @@ int main(void) {
   
   printf("Matrices loaded in %s.\n\n",t.elapsed().c_str());
   if(pol) {
-    printf("alpha: %i occupied, %i virtual orbitals\n",Fhaha.n_rows,Fpapa.n_rows);
-    printf("beta : %i occupied, %i virtual orbitals\n",Fhbhb.n_rows,Fpbpb.n_rows);
+    printf("alpha: %i occupied, %i virtual orbitals\n",(int) Fhaha.n_rows,(int) Fpapa.n_rows);
+    printf("beta : %i occupied, %i virtual orbitals\n",(int) Fhbhb.n_rows,(int) Fpbpb.n_rows);
   } else {
-    printf("%i occupied and %i virtual orbitals.\n",Fhaha.n_rows,Fpapa.n_rows);
+    printf("%i occupied and %i virtual orbitals.\n",(int) Fhaha.n_rows,(int) Fpapa.n_rows);
   }
   printf("\n");
 
