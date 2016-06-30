@@ -149,8 +149,8 @@ prod_fourier prod_fourier::conjugate() const {
     ret.p[i].zp*=-1.0;
 
     for(size_t j=0;j<ret.p[i].c.size();j++) {
-      // Complex part of factor changes sign
-      ret.p[i].c[j].c.imag()*=-1.0;
+      // Complex part of is also conjugated
+      ret.p[i].c[j].c=std::conj(ret.p[i].c[j].c);
     }
   }
 
@@ -204,8 +204,7 @@ prod_fourier prod_fourier::operator*(double fac) const {
 
   for(size_t i=0;i<ret.p.size();i++)
     for(size_t j=0;j<ret.p[i].c.size();j++) {
-      ret.p[i].c[j].c.imag()*=fac;
-      ret.p[i].c[j].c.real()*=fac;
+      ret.p[i].c[j].c*=fac;
     }
 
   return ret;

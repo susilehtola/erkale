@@ -79,11 +79,11 @@ arma::cx_mat momentum_transfer_series::get(const arma::vec & q, double rmstol, d
     if(l%2==0) // Real part
       for(size_t i=0;i<Nbf;i++)
 	for(size_t j=0;j<Nbf;j++)
-	  ret(i,j).real()+=diff(i,j);
+	  ret(i,j).real(ret(i,j).real()+diff(i,j));
     else // Imaginary part
       for(size_t i=0;i<Nbf;i++)
 	for(size_t j=0;j<Nbf;j++)
-	  ret(i,j).imag()+=diff(i,j);
+	  ret(i,j).imag(ret(i,j).imag()+diff(i,j));
 
     // Break now?
     if(l>=2)
