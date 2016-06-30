@@ -141,7 +141,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
   // Inverse overlap
   arma::mat Sinvh=BasOrth(S,verbose);
   if(Sinvh.n_cols!=Sinvh.n_rows && verbose) {
-    printf("%i nondegenerate basis functions.\n",Sinvh.n_cols);
+    printf("%i nondegenerate basis functions.\n",(int) Sinvh.n_cols);
     fflush(stdout);
   }
 
@@ -194,8 +194,8 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
       sol.Kb=tab.calcK(sol.Pb);
     } else {
       sol.J=coulomb(basis,sol.P);
-      sol.Ka=exchange(basis,sol.Pa);
-      sol.Kb=exchange(basis,sol.Pb);
+      sol.Ka=::exchange(basis,sol.Pa);
+      sol.Kb=::exchange(basis,sol.Pb);
     }
 
     oldHa=sol.Ha;
@@ -282,7 +282,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
   // Inverse overlap
   arma::mat Sinvh=BasOrth(S,verbose);
   if(Sinvh.n_cols!=Sinvh.n_rows && verbose) {
-    printf("%i nondegenerate basis functions.\n",Sinvh.n_cols);
+    printf("%i nondegenerate basis functions.\n",(int) Sinvh.n_cols);
     fflush(stdout);
   }
 
@@ -338,7 +338,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
       */
     } else {
       sol.J=coulomb(basis,sol.P);
-      sol.K=exchange(basis,sol.P);
+      sol.K=::exchange(basis,sol.P);
     }
 
     oldH=sol.H;
