@@ -114,9 +114,9 @@ void Settings::add_scf_settings() {
   add_double("Shift", "Level shift to use in Hartree", 0.0);
 
   // Use density fitting if possible?
-  add_bool("DensityFitting", "Use density fitting / RI?", true);
+  add_bool("DensityFitting", "Use density fitting / RI?", false);
   // Use Cholesky?
-  add_bool("Cholesky", "Use Cholesky decomposition?", false);
+  add_bool("Cholesky", "Use Cholesky decomposition?", true);
   add_double("CholeskyThr", "Cholesky decomposition threshold", 1e-7);
   add_double("CholeskyShThr", "Cholesky cache threshold", 0.01);
   add_int("CholeskyMode", "Save/load integrals? 0 no, 1 save, -1 load", 0, true);
