@@ -113,12 +113,19 @@ bool Checkpoint::exist(const std::string & name) {
 
 void Checkpoint::remove(const std::string & name) {
   CHECK_WRITE();
-  CHECK_OPEN();
+
+  bool cl=false;
+  if(!opend) {
+    open();
+    cl=true;
+  }
 
   if(exist(name)) {
     // Remove the entry from the file.
     H5Ldelete(file, name.c_str(), H5P_DEFAULT);
   }
+
+  if(cl) close();
 }
 
 void Checkpoint::write(const std::string & name, const arma::mat & m) {
