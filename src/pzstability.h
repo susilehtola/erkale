@@ -204,6 +204,19 @@ class PZStability: public FDHessian {
   /// Precondition gradient vector with orbital Hamiltonian
   arma::vec precondition_orbital(const arma::vec & g) const;
 
+  /// Get occupied orbitals (restricted)
+  arma::cx_mat get_CO(const rscf_t & sol) const;
+  arma::cx_mat get_CO() const;
+  /// Get occupied orbitals (unrestricted)
+  arma::cx_mat get_CO(bool spin, const uscf_t & sol) const;
+  arma::cx_mat get_CO(bool spin) const;
+  /// Get virtual orbitals (restricted)
+  arma::cx_mat get_CV(const rscf_t & sol) const;
+  arma::cx_mat get_CV() const;
+    /// Get virtual orbitals (unrestricted)
+  arma::cx_mat get_CV(bool spin, const uscf_t & sol) const;
+  arma::cx_mat get_CV(bool spin) const;
+
  public:
   /// Constructor
   PZStability(SCF *solver, bool verbose=true);

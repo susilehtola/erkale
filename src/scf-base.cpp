@@ -567,12 +567,40 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 
   } else {
     if(cholesky) {
-	// Cholled integrals
+      // Cholesky integrals
+      if(verbose) {
+	if(fock)
+	  printf("Constructing orbital Coulomb matrices ... ");
+	else
+	  printf("Computing    orbital Coulomb energies ... ");
+	fflush(stdout);
+	t.set();
+      }
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+      for(size_t io=0;io<Ctilde.n_cols;io++) {
+	// Calculate Coulomb term
+	arma::mat Jorb=chol.calcJ(Porb[io]);
+	// and Coulomb energy
+	Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
+	if(fock)
+	  Forb[io]=Jorb*COMPLEX1;
+      }
+
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	fflush(stdout);
+      }
+
+      // Full exchange
+      if(kfull!=0.0) {
 	if(verbose) {
 	  if(fock)
-	    printf("Constructing orbital Coulomb matrices ... ");
+	    printf("Constructing orbital exchange matrices ... ");
 	  else
-	    printf("Computing    orbital Coulomb energies ... ");
+	    printf("Computing    orbital exchange energies ... ");
 	  fflush(stdout);
 	  t.set();
 	}
@@ -581,75 +609,47 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 #pragma omp parallel for schedule(dynamic)
 #endif
 	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Calculate Coulomb term
-	  arma::mat Jorb=chol.calcJ(Porb[io]);
-	  // and Coulomb energy
-	  Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
+	  // Fock matrix
+	  arma::cx_mat Korb=kfull*chol.calcK(Ctilde.col(io));
+	  // and energy
+	  Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
 	  if(fock)
-	    Forb[io]=Jorb*COMPLEX1;
+	    Forb[io]-=Korb;
 	}
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
 	  fflush(stdout);
 	}
+      }
 
-	// Full exchange
-	if(kfull!=0.0) {
-	  if(verbose) {
-	    if(fock)
-	      printf("Constructing orbital exchange matrices ... ");
-	    else
-	      printf("Computing    orbital exchange energies ... ");
-	    fflush(stdout);
-	    t.set();
-	  }
+      // Short-range part
+      if(kshort!=0.0) {
+	if(verbose) {
+	  if(fock)
+	    printf("Constructing orbital short-range exchange matrices ... ");
+	  else
+	    printf("Computing    orbital short-range exchange energies ... ");
+	  fflush(stdout);
+	  t.set();
+	}
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-	  for(size_t io=0;io<Ctilde.n_cols;io++) {
-	    // Fock matrix
-	    arma::cx_mat Korb=kfull*chol.calcK(Ctilde.col(io));
-	    // and energy
-	    Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
-	    if(fock)
-	      Forb[io]-=Korb;
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
+	for(size_t io=0;io<Ctilde.n_cols;io++) {
+	  // Potential and energy
+	  arma::cx_mat Korb=kshort*chol_rs.calcK(Ctilde.col(io));
+	  Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
+	  if(fock)
+	    Forb[io]-=Korb;
 	}
 
-	// Short-range part
-	if(kshort!=0.0) {
-	  if(verbose) {
-	    if(fock)
-	      printf("Constructing orbital short-range exchange matrices ... ");
-	    else
-	      printf("Computing    orbital short-range exchange energies ... ");
-	    fflush(stdout);
-	    t.set();
-	  }
-
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-	  for(size_t io=0;io<Ctilde.n_cols;io++) {
-	    // Potential and energy
-	    arma::cx_mat Korb=kshort*chol_rs.calcK(Ctilde.col(io));
-	    Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
-	    if(fock)
-	      Forb[io]-=Korb;
-	  }
-
-	  if(verbose) {
-	    printf("done (%s)\n",t.elapsed().c_str());
-	    fflush(stdout);
-	  }
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  fflush(stdout);
 	}
+      }
 
     } else {
       if(!direct) {
@@ -1264,10 +1264,10 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
       ret[i]=readdouble(occvals[i]);
 
     /*
-    printf("Occupancies\n");
-    for(size_t i=0;i<ret.size();i++)
+      printf("Occupancies\n");
+      for(size_t i=0;i<ret.size();i++)
       printf("%.2f ",ret[i]);
-    printf("\n");
+      printf("\n");
     */
   } else {
     // Aufbau principle.
@@ -1315,14 +1315,14 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     }
 
     /*
-    printf("Occupancies\n");
-    printf("alpha\t");
-    for(size_t i=0;i<occa.size();i++)
+      printf("Occupancies\n");
+      printf("alpha\t");
+      for(size_t i=0;i<occa.size();i++)
       printf("%.2f ",occa[i]);
-    printf("\nbeta\t");
-    for(size_t i=0;i<occb.size();i++)
+      printf("\nbeta\t");
+      for(size_t i=0;i<occb.size();i++)
       printf("%.2f ",occb[i]);
-    printf("\n");
+      printf("\n");
     */
   } else {
     // Aufbau principle. Get amount of alpha and beta electrons.
@@ -1712,7 +1712,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       // Load energies and orbitals
       load.read("C",Cold);
       load.read("E",Eold);
-
       if(load.exist("CW.re")) {
 	arma::cx_mat CWold;
 	load.cread("CW",CWold);
@@ -1725,7 +1724,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       load.read("Ea",Eaold);
       load.read("Cb",Cbold);
       load.read("Eb",Ebold);
-
       if(load.exist("CWa.re") && load.exist("CWb.re")) {
 	arma::cx_mat CWaold, CWbold;
 	load.cread("CWa",CWaold);
@@ -1878,7 +1876,17 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.do_force(force);
 	solver.RDFT(sol,occs,conv,dft);
 
+	// Write out the results
+	chkpt.write("C",sol.C);
+	chkpt.write("E",sol.E);
+	chkpt.write("P",sol.P);
+	chkpt.write("Converged",1);
+	chkpt.write(sol.en);
+
       } else {
+	// Calculation has not yet converged
+	chkpt.write("Converged",0);
+
 	// The localizing matrix
 	arma::cx_mat W;
 	if(chkpt.exist("CW.re")) {
@@ -2029,14 +2037,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  stab.check();
 	}
       }
-      // and update checkpoint file entries
-      chkpt.write("C",sol.C);
-      if(sol.cC.n_rows == sol.C.n_rows && sol.cC.n_cols == sol.C.n_cols)
-	chkpt.cwrite("CW",sol.cC);
-      chkpt.write("E",sol.E);
-      chkpt.write("P",sol.P);
+
+      // Calculation has converged
       chkpt.write("Converged",1);
-      chkpt.write(sol.en);
     }
 
     // Do population analysis
@@ -2204,7 +2207,21 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.do_force(force);
 	solver.UDFT(sol,occa,occb,conv,dft);
 
+	// and update checkpoint file entries
+	chkpt.write("Ca",sol.Ca);
+	chkpt.write("Cb",sol.Cb);
+	chkpt.write("Ea",sol.Ea);
+	chkpt.write("Eb",sol.Eb);
+	chkpt.write("Pa",sol.Pa);
+	chkpt.write("Pb",sol.Pb);
+	chkpt.write("P",sol.P);
+	chkpt.write(sol.en);
+	chkpt.write("Converged",1);
+
+
       } else {
+	chkpt.write("Converged",0);
+
 	// The localizing matrix
 	arma::cx_mat Wa;
 	if(chkpt.exist("CWa.re")) {
@@ -2421,19 +2438,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	}
       }
 
-      // and update checkpoint file entries
-      chkpt.write("Ca",sol.Ca);
-      chkpt.write("Cb",sol.Cb);
-      if(sol.cCa.n_rows == sol.Ca.n_rows && sol.cCa.n_cols == sol.Ca.n_cols)
-	chkpt.cwrite("CWa",sol.cCa);
-      if(sol.cCb.n_rows == sol.Cb.n_rows && sol.cCb.n_cols == sol.Cb.n_cols)
-	chkpt.cwrite("CWb",sol.cCb);
-      chkpt.write("Ea",sol.Ea);
-      chkpt.write("Eb",sol.Eb);
-      chkpt.write("Pa",sol.Pa);
-      chkpt.write("Pb",sol.Pb);
-      chkpt.write("P",sol.P);
-      chkpt.write(sol.en);
+      // Calculation has converged.
       chkpt.write("Converged",1);
     }
 

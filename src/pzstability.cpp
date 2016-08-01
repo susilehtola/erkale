@@ -976,11 +976,8 @@ void PZStability::print_info() {
     eval(x,rsl,Forb,Eorb,worb,true,true,true);
 
     // Occupied orbitals
-    arma::cx_mat CO=rsl.cC.cols(0,oa-1);
-    // Virtuals
-    arma::cx_mat CV;
-    if(va)
-      CV=rsl.cC.cols(oa,oa+va-1);
+    arma::cx_mat CO=get_CO(rsl);
+    arma::cx_mat CV=get_CV(rsl);
 
     // Diagonalize
     print_info(CO,CV,Forb,get_H(rsl),Eorb,worb);
@@ -992,17 +989,11 @@ void PZStability::print_info() {
     eval(x,usl,Forba,Eorba,worba,Forbb,Eorbb,worbb,true,true,true);
 
     // Occupied orbitals
-    arma::cx_mat COa=usl.cCa.cols(0,oa-1);
-    arma::cx_mat COb;
-    if(ob)
-      COb=usl.cCb.cols(0,ob-1);
+    arma::cx_mat COa(get_CO(false,usl));
+    arma::cx_mat COb(get_CO(true,usl));
     // Virtuals
-    arma::cx_mat CVa;
-    if(va)
-      CVa=usl.cCa.cols(oa,oa+va-1);
-    arma::cx_mat CVb;
-    if(vb)
-      CVb=usl.cCb.cols(ob,ob+vb-1);
+    arma::cx_mat CVa(get_CV(false,usl));
+    arma::cx_mat CVb(get_CV(true,usl));
 
     // Diagonalize
     printf("\n **** Alpha orbitals ****\n");
@@ -1494,6 +1485,66 @@ static arma::mat precondition_matrix(const arma::mat & Ediff, double dH) {
   return ret;
 }
 
+arma::cx_mat PZStability::get_CO(const rscf_t & sol) const {
+  if(!restr)
+    throw std::logic_error("Called get_CO() using unrestricted orbitals!\n");
+
+  return sol.cC.cols(0,oa-1);
+}
+
+arma::cx_mat PZStability::get_CO() const {
+  return get_CO(rsol);
+}
+
+arma::cx_mat PZStability::get_CO(bool spin, const uscf_t & sol) const {
+  if(restr)
+    throw std::logic_error("Called get_CO(spin) using restricted orbitals!\n");
+
+  arma::cx_mat C;
+  if(spin && ob>0)
+    C=sol.cCb.cols(0,ob-1);
+  else if(!spin)
+    C=sol.cCa.cols(0,oa-1);
+
+  return C;
+}
+
+arma::cx_mat PZStability::get_CO(bool spin) const {
+  return get_CO(spin,usol);
+}
+
+arma::cx_mat PZStability::get_CV(const rscf_t & sol) const {
+  if(!restr)
+    throw std::logic_error("Called get_CV() using unrestricted orbitals!\n");
+
+  arma::cx_mat CV;
+  if(sol.cC.n_cols>oa)
+    CV=sol.cC.cols(oa,rsol.cC.n_cols-1);
+  return CV;
+}
+
+arma::cx_mat PZStability::get_CV() const {
+  return get_CV(rsol);
+}
+  
+arma::cx_mat PZStability::get_CV(bool spin, const uscf_t & sol) const {
+  if(restr)
+    throw std::logic_error("Called get_CV(spin) using restricted orbitals!\n");
+
+  size_t No = spin ? ob : oa;
+  const arma::cx_mat & C = spin ? sol.cCb : sol.cCa;
+
+  arma::cx_mat CV;
+  if(C.n_cols > No)
+    CV=C.cols(No,C.n_cols-1);
+
+  return CV;
+}
+
+arma::cx_mat PZStability::get_CV(bool spin) const {
+  return get_CV(spin,usol);
+}
+
 arma::vec PZStability::precondition_unified(const arma::vec & g) const {
   // Search direction
   arma::vec sd(g);
@@ -1503,11 +1554,9 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
 
   if(restr) {
     // Occupied orbitals
-    arma::cx_mat CO(rsol.cC.cols(0,oa-1));
+    arma::cx_mat CO(get_CO());
     // Virtual orbitals
-    arma::cx_mat CV;
-    if(va)
-      CV=rsol.cC.cols(oa,rsol.cC.n_cols-1);
+    arma::cx_mat CV(get_CV());
 
     if(cancheck && va) {
       // Form OV gradient
@@ -1549,16 +1598,10 @@ arma::vec PZStability::precondition_unified(const arma::vec & g) const {
     }
 
   } else {
-    arma::cx_mat COa(usol.cCa.cols(0,oa-1));
-    arma::cx_mat COb;
-    if(ob)
-      COb=usol.cCb.cols(0,ob-1);
-    arma::cx_mat CVa;
-    if(usol.cCa.n_cols>oa)
-      CVa=usol.cCa.cols(oa,usol.cCa.n_cols-1);
-    arma::cx_mat CVb;
-    if(usol.cCb.n_cols>ob)
-      CVb=usol.cCb.cols(ob,usol.cCb.n_cols-1);
+    arma::cx_mat COa(get_CO(false));
+    arma::cx_mat COb(get_CO(true));
+    arma::cx_mat CVa(get_CV(false));
+    arma::cx_mat CVb(get_CV(true));
 
     if(cancheck && va) {
       // Preconditioning. Form unified Hamiltonian
@@ -1635,11 +1678,9 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
 
   if(restr) {
     // Occupied orbitals
-    arma::cx_mat CO(rsol.cC.cols(0,oa-1));
+    arma::cx_mat CO(get_CO());
     // Virtual orbitals
-    arma::cx_mat CV;
-    if(va)
-      CV=rsol.cC.cols(oa,rsol.cC.n_cols-1);
+    arma::cx_mat CV(get_CV());
 
     if(cancheck && va) {
       // OV orbital energy differences
@@ -1675,16 +1716,10 @@ arma::vec PZStability::precondition_orbital(const arma::vec & g) const {
       ioff+=POV.n_elem;
     }
   } else {
-    arma::cx_mat COa(usol.cCa.cols(0,oa-1));
-    arma::cx_mat COb;
-    if(ob)
-      COb=usol.cCb.cols(0,ob-1);
-    arma::cx_mat CVa;
-    if(usol.cCa.n_cols>oa)
-      CVa=usol.cCa.cols(oa,usol.cCa.n_cols-1);
-    arma::cx_mat CVb;
-    if(usol.cCb.n_cols>ob)
-      CVb=usol.cCb.cols(ob,usol.cCb.n_cols-1);
+    arma::cx_mat COa(get_CO(false));
+    arma::cx_mat COb(get_CO(true));
+    arma::cx_mat CVa(get_CV(false));
+    arma::cx_mat CVb(get_CV(true));
 
     if(cancheck && va) {
       // OV orbital energy differences
@@ -1773,11 +1808,9 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
     eval(x,sol,Forb,Eorb,worb,cancheck,true,ref);
 
     // Occupied orbitals
-    arma::cx_mat CO(sol.cC.cols(0,oa-1));
+    arma::cx_mat CO(get_CO(sol));
     // Virtual orbitals
-    arma::cx_mat CV;
-    if(va)
-      CV=sol.cC.cols(oa,sol.cC.n_cols-1);
+    arma::cx_mat CV(get_CV(sol));
 
     if(cancheck && va) {
       // Hamiltonian is
@@ -1840,17 +1873,10 @@ arma::vec PZStability::gradient(const arma::vec & x, bool ref) {
     eval(x,sol,Forba,Eorba,worba,Forbb,Eorbb,worbb,cancheck,true,ref);
 
     // Occupied orbitals
-    arma::cx_mat COa=sol.cCa.cols(0,oa-1);
-    arma::cx_mat COb;
-    if(ob)
-      COb=sol.cCb.cols(0,ob-1);
-    // Virtuals
-    arma::cx_mat CVa;
-    if(va)
-      CVa=sol.cCa.cols(oa,oa+va-1);
-    arma::cx_mat CVb;
-    if(vb)
-      CVb=sol.cCb.cols(ob,ob+vb-1);
+    arma::cx_mat COa(get_CO(false,sol));
+    arma::cx_mat COb(get_CO(true,sol));
+    arma::cx_mat CVa(get_CV(false,sol));
+    arma::cx_mat CVb(get_CV(true,sol));
 
     size_t ioff=0;
 
@@ -2351,6 +2377,32 @@ inline void orthonormalize(const arma::mat & S, arma::cx_mat & C, bool verbose) 
   }
 }
 
+static void pseudocanonize(arma::mat & C, arma::vec & E, const arma::mat & H, size_t N) {
+  // Occupied orbitals
+  arma::mat Co(C.cols(0,N-1));
+  // Projections
+  arma::mat CoHCo(arma::trans(Co)*H*Co);
+  // Eigenvectors and eigenvalues
+  arma::vec eval;
+  arma::mat evec;
+  eig_sym_ordered(eval,evec,CoHCo);
+
+  // Rotate orbitals
+  Co=Co*evec;
+
+  // Store orbitals and energies
+  C.cols(0,N-1)=Co;
+  E.subvec(0,N-1)=eval;
+
+  if(N<C.n_cols) {
+    arma::mat Cv=C.cols(N,C.n_cols-1);
+    arma::mat CvHCv(arma::trans(Cv)*H*Cv);
+    eig_sym_ordered(eval,evec,CvHCv);
+    Cv=Cv*evec;
+    C.cols(N,C.n_cols-1)=Cv;
+    E.subvec(N,C.n_cols-1)=eval;
+  }
+}
 
 void PZStability::update(const arma::vec & x) {
   if(arma::norm(x,2)!=0.0)  {
@@ -2384,22 +2436,43 @@ void PZStability::update(const arma::vec & x) {
 
   // Update orbitals in checkpoint file
   Checkpoint *chkptp=solverp->get_checkpoint();
-  if(restr) {
-    chkptp->cwrite("CW",rsol.cC);
-    chkptp->write(rsol.en);
-    chkptp->write("P",rsol.P);
-    chkptp->write("P_im",rsol.P_im);
-  } else {
-    chkptp->cwrite("CWa",usol.cCa);
-    chkptp->write(usol.en);
-    if(ob)
-      chkptp->cwrite("CWb",usol.cCb);
-    chkptp->write("P",usol.P);
-    chkptp->write("Pa",usol.Pa);
-    chkptp->write("Pb",usol.Pb);
 
-    arma::mat P_im(arma::imag(usol.Pa+usol.Pb));
-    chkptp->write("P_im",P_im);
+  if(restr) {
+    // Generate dummy orbitals and orbital energies
+    arma::mat H(arma::real(unified_H(get_CO(),get_CV(),ref_Forb,ref_worb,get_H(rsol))));
+    arma::vec E;
+    arma::mat C;
+    eig_sym_ordered(E,C,H);
+
+    chkptp->write(rsol.en);
+    chkptp->write("C",C);
+    chkptp->write("E",E);
+
+    chkptp->write("P",rsol.P);
+    if(imag)
+      chkptp->write("P_im",rsol.P_im);
+      
+    if(imag || pzw!=0.0)
+      // Only save CW if PZ is in use or orbitals are complex
+      chkptp->cwrite("CW",rsol.cC);
+      
+  } else {
+    // Generate dummy orbitals and orbital energies
+    arma::mat Ha(arma::real(unified_H(get_CO(false),get_CV(false),ref_Forba,ref_worba,get_H(usol,false))));
+    arma::mat Hb(arma::real(unified_H(get_CO(true),get_CV(true),ref_Forbb,ref_worbb,get_H(usol,true))));
+    arma::vec Ea, Eb;
+    arma::mat Ca, Cb;
+    eig_sym_ordered(Ea,Ca,Ha);
+    eig_sym_ordered(Eb,Cb,Hb);
+    
+    if(imag)
+      chkptp->write("P_im",rsol.P_im);
+    
+    if(imag || pzw!=0.0) {
+      // Only save CW if PZ is in use or orbitals are complex
+      chkptp->cwrite("CWa",usol.cCa);
+      chkptp->cwrite("CWb",usol.cCb);
+    }
   }
 }
 
@@ -2439,10 +2512,8 @@ void PZStability::update_reference(bool sort) {
     eval(x0,sol,Forb,Eorb,worb,true,true,false);
 
     if(sort) {
-      arma::cx_mat CO(sol.cC.cols(0,oa-1));
-      arma::cx_mat CV;
-      if(sol.cC.n_cols>oa)
-	CV=sol.cC.cols(oa,sol.cC.n_cols-1);
+      arma::cx_mat CO(get_CO(sol));
+      arma::cx_mat CV(get_CV(sol));
       // Unified Hamiltonian
       arma::cx_mat H(unified_H(CO,CV,Forb,worb,get_H(sol)));
 
@@ -2496,16 +2567,10 @@ void PZStability::update_reference(bool sort) {
     eval(x0,sol,Forba,Eorba,worba,Forbb,Eorbb,worbb,true,true,false);
 
     if(sort) {
-      arma::cx_mat COa(sol.cCa.cols(0,oa-1));
-      arma::cx_mat COb;
-      if(ob)
-	COb=sol.cCb.cols(0,ob-1);
-      arma::cx_mat CVa;
-      if(sol.cCa.n_cols>oa)
-	CVa=sol.cCa.cols(oa,sol.cCa.n_cols-1);
-      arma::cx_mat CVb;
-      if(sol.cCb.n_cols>ob)
-	CVb=sol.cCb.cols(ob,sol.cCb.n_cols-1);
+      arma::cx_mat COa(get_CO(false,sol));
+      arma::cx_mat COb(get_CO(true,sol));
+      arma::cx_mat CVa(get_CV(false,sol));
+      arma::cx_mat CVb(get_CV(true,sol));
 
       // Unified Hamiltonians
       arma::cx_mat Ha(unified_H(COa,CVa,Forba,worba,get_H(sol,false)));
