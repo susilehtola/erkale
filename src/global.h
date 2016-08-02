@@ -116,20 +116,23 @@
 // Resize matrix if necessary
 #define MAT_RESIZE(M,NR,NC) if(M.n_rows != NR || M.n_cols != NC) { M.zeros(NR,NC);}
 
-#define print_copyright() \
-  printf("(c) Susi Lehtola, 2010-2015.\n");
+#define fprint_copyright(file) \
+  fprintf(file,"(c) Susi Lehtola, 2010-2016.\n");
+#define print_copyright() fprint_copyright(stdout)
 
-#define print_license() \
-  printf("\n%s%s%s%s\n",							\
+#define fprint_license(file) \
+  fprintf(file,"\n%s%s%s%s\n",						\
 	 "This program is free software; you can redistribute it and/or modify\n", \
 	 "it under the terms of the GNU General Public License as published by\n", \
 	 "the Free Software Foundation; either version 2 of the License, or\n", \
 	 "(at your option) any later version.\n")
+#define print_license() fprint_license(stdout)
 
-#define print_hostname()				\
+#define fprint_hostname(file)				\
   {char _hname[4096];					\
   int _herr=gethostname(_hname,4096);			\
-  if(! _herr) printf("Running on host %s.\n\n",_hname);	\
-  else fprintf(stderr,"Error getting hostname.\n");}
+  if(! _herr) fprintf(file,"Running on host %s.\n\n",_hname);	\
+  else fprintf(file,"Error: couldn't get hostname.\n");}
+#define print_hostname() fprint_hostname(stdout)
 
 #endif

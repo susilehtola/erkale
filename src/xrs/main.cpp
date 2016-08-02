@@ -771,8 +771,7 @@ enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & 
   return ok;
 }
 
-int main(int argc, char **argv) {
-
+void print_header() {
 #ifdef _OPENMP
   printf("ERKALE - XRS from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -784,6 +783,10 @@ int main(int argc, char **argv) {
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
   print_hostname();
+}
+
+int main(int argc, char **argv) {
+  print_header();
 
   if(argc!=2) {
     printf("Usage: $ %s runfile\n",argv[0]);
@@ -844,8 +847,11 @@ int main(int argc, char **argv) {
     if(outstream==NULL) {
       ERROR_INFO();
       throw std::runtime_error("Unable to redirect output!\n");
-    } else
-      fprintf(stderr,"\n");
+    }
+
+    // Print out the header in the logfile too
+    print_header();
+    fprintf(stderr,"\n");
   }
 
   // Get used settings

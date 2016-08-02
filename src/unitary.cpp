@@ -19,6 +19,10 @@
 #include "mathf.h"
 #include <cfloat>
 
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
 UnitaryFunction::UnitaryFunction(int qv, bool max): W(arma::cx_mat()), f(0.0), q(qv) {
   /// Maximize or minimize?
   sign = max ? 1 : -1;
@@ -96,8 +100,20 @@ void UnitaryOptimizer::open_log(const std::string & fname) {
   if(log!=NULL)
     fclose(log);
   
-  if(fname.length())
+  if(fname.length()) {
     log=fopen(fname.c_str(),"w");
+#ifdef _OPENMP
+    fprintf(log,"ERKALE - Localization from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
+#else
+    fprintf(log,"ERKALE - Localization from Hel, serial version.\n");
+#endif
+    fprint_copyright(log);
+    fprint_license(log);
+#ifdef SVNRELEASE
+    fprintf(log,"At svn revision %s.\n\n",SVNREVISION);
+#endif
+    fprint_hostname(log);
+  }
 }
 
 void UnitaryOptimizer::check_unitary(const arma::cx_mat & W) const {

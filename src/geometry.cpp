@@ -176,7 +176,7 @@ void run_calc(const BasisSet & basis, Settings set, bool force) {
     throw std::logic_error("Analytic forces not implemented for PZ-SIC!\n");
 
   Timer t;
-  
+
   // Checkpoint file to load
   std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
@@ -206,13 +206,13 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
   calculate(basis,set,false);
   if(force)
     printf("Energy evaluated in %s\n",t.elapsed().c_str());
-  
+
   // All we needed was the energy.
   if(!force)
     return;
   // Turn off verbose setting
   set.set_bool("Verbose",false);
-  
+
   // We have converged the energy, next compute force by finite
   // differences.
   arma::mat fm;
@@ -259,7 +259,7 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
   }
 
   t.set();
-  
+
   // Loop over degrees of freedom
   size_t Ndof=3*basis.get_Nnuc()-3;
   printf("Calculating %i displacements with %i point stencil\n",(int) Ndof,(int) dx.n_elem);
@@ -382,8 +382,7 @@ bool operator<(const linesearch_t & lh, const linesearch_t & rh) {
   return lh.s < rh.s;
 }
 
-int main(int argc, char **argv) {
-
+void print_header() {
 #ifdef _OPENMP
   printf("ERKALE - Geometry optimization from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -395,6 +394,10 @@ int main(int argc, char **argv) {
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
   print_hostname();
+}
+
+int main(int argc, char **argv) {
+  print_header();
 
   if(argc!=2) {
     printf("Usage: $ %s runfile\n",argv[0]);
@@ -479,8 +482,11 @@ int main(int argc, char **argv) {
     if(outstream==NULL) {
       ERROR_INFO();
       throw std::runtime_error("Unable to redirect output!\n");
-    } else
-      fprintf(stderr,"\n");
+    }
+
+    fprintf(stderr,"\n");
+    // Print out the header in the logfile as well
+    print_header();
   }
 
   // Read in atoms.
@@ -522,7 +528,7 @@ int main(int argc, char **argv) {
   pars.numgrad=numgrad;
   pars.npoints=stencil+1;
   pars.step=step;
-  
+
   /* Starting point */
   arma::vec x(3*dofidx.size());
   for(size_t i=0;i<dofidx.size();i++) {
@@ -535,7 +541,7 @@ int main(int argc, char **argv) {
   size_t ncalc=0, iref=0;
   // Stored checkpoints
   std::vector<size_t> chkstore;
-  
+
   // Energy and force, as well as old energy and force
   double E=0.0, Eold;
   arma::vec f, fold;
@@ -544,7 +550,7 @@ int main(int argc, char **argv) {
 
   // Old geometry
   std::vector<atom_t> oldgeom(atoms);
-  
+
   // Helper
   LBFGS bfgs;
 
@@ -571,16 +577,16 @@ int main(int argc, char **argv) {
     pars.set.set_int("PZstab",0);
   } catch(std::runtime_error) {
   }
-  
+
   printf("\n\nStarting geometry optimization\n");
   printf("%4s %18s %9s %9s\n","iter","E","fmax","frms");
-  
+
   fprintf(stderr,"\n%3s %18s %10s %10s %10s %10s %10s %10s %s\n", "it", "E", "dE", "dEfrac", "dmax ", "drms ", "fmax ", "frms ", "t");
   fflush(stderr);
-  
+
   for(int iiter=0;iiter<maxiter;iiter++) {
     Timer titer;
-    
+
     // Store old values of gradient and search direction
     fold=f;
     sdold=sd;
@@ -589,7 +595,7 @@ int main(int argc, char **argv) {
     pars.set.set_string("LoadChk",getchk(iref));
     // Save calculation to
     pars.set.set_string("SaveChk",getchk(ncalc));
-    
+
     // Calculate energy and force at current position
     calculate(x,pars,E,f,true);
     chkstore.push_back(ncalc);
@@ -597,13 +603,13 @@ int main(int argc, char **argv) {
     iref=ncalc;
     // Increment step value
     ncalc++;
-    
+
     // Store old value of energy
     Eold=E;
-    
+
     if(iiter==0) {
     }
-    
+
     // Save geometry step
     {
       char comment[80];
@@ -614,7 +620,7 @@ int main(int argc, char **argv) {
     // Search direction
     sd=-f;
     std::string steptype="SD";
-    
+
     if(iiter>0) {
       if((alg==gCGPR || alg==gCGFR) && (iiter%cgreset!=0)) {
 	// Polak-Ribière
@@ -626,13 +632,13 @@ int main(int argc, char **argv) {
 	  gamma=arma::dot(f,f)/arma::dot(fold,fold);
 	  steptype="CGFR";
 	}
-	
+
 	arma::vec sdnew=sd+gamma*sdold;
 	if(arma::dot(f,fold)>=0.2*arma::dot(fold,fold)) {
 	  steptype="Powell restart - SD";
 	} else
 	  sd=sdnew;
-	
+
       } else if(alg==gBFGS) {
 	// Update BFGS
 	bfgs.update(x,f);
@@ -656,7 +662,7 @@ int main(int argc, char **argv) {
     printf("\n%s step\n",steptype.c_str());
     printf("%4i % 18.10f %.3e %.3e\n",iiter,E,fmax,frms);
     fflush(stdout);
-    
+
     // Legend
     printf("\t%2s %12s %13s\n","i","step","dE");
     // Do a line search on the search direction
@@ -664,7 +670,7 @@ int main(int argc, char **argv) {
     // First, we try a fraction of the current step length
     {
       Timer ts;
-      
+
       // Step length and energy
       linesearch_t p;
       p.s=steplen/fac;
@@ -678,7 +684,7 @@ int main(int argc, char **argv) {
       iref=ncalc;
       chkstore.push_back(ncalc);
       ncalc++;
-      
+
       p.E=Et;
       steps.push_back(p);
 
@@ -703,7 +709,7 @@ int main(int argc, char **argv) {
       iref=ncalc;
       chkstore.push_back(ncalc);
       ncalc++;
-      
+
       p.E=Et;
       steps.push_back(p);
       printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
@@ -713,7 +719,7 @@ int main(int argc, char **argv) {
     // Minimum energy and index
     double Emin;
     size_t imin;
-    
+
     while(true) {
       // Sort the steps in length
       std::sort(steps.begin(),steps.end());
@@ -739,7 +745,7 @@ int main(int argc, char **argv) {
 	  p.s=steps[imin].s*fac;
 	}
 	p.icalc=ncalc;
-	
+
 	double Et;
 	arma::vec ft;
 	pars.set.set_string("LoadChk",getchk(steps[imin].icalc));
@@ -747,12 +753,12 @@ int main(int argc, char **argv) {
 	calculate(x+p.s*sd,pars,Et,ft,false);
 	chkstore.push_back(ncalc);
 	ncalc++;
-	
+
 	p.E=Et;
 	steps.push_back(p);
 	printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
 	fflush(stdout);
-	
+
       } else {
 	// Optimum is somewhere in the middle
 	printf("\n");
@@ -769,7 +775,7 @@ int main(int argc, char **argv) {
 	A(i,0)=1.0;
 	A(i,1)=steps[imin+i-1].s;
 	A(i,2)=std::pow(A(i,1),2);
-	
+
 	y(i)=steps[imin+i-1].E;
       }
 
@@ -794,12 +800,12 @@ int main(int argc, char **argv) {
 	      iref=steps[imin+i-1].icalc;
 	    }
 	  }
-	  
+
 	  // Do the calculation with the interpolated step
 	  linesearch_t p;
 	  p.s=x0;
 	  p.icalc=ncalc;
-	
+
 	  double Et;
 	  arma::vec ft;
 	  pars.set.set_string("LoadChk",getchk(iref));
@@ -807,7 +813,7 @@ int main(int argc, char **argv) {
 	  calculate(x+p.s*sd,pars,Et,ft,false);
 	  chkstore.push_back(ncalc);
 	  ncalc++;
-	  
+
 	  p.E=Et;
 	  steps.push_back(p);
 	  printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
@@ -815,7 +821,7 @@ int main(int argc, char **argv) {
 
 	  // Resort the steps in length
 	  std::sort(steps.begin(),steps.end());
-	  
+
 	  // Find the minimum energy
 	  Emin=steps[0].E;
 	  imin=0;
@@ -827,14 +833,14 @@ int main(int argc, char **argv) {
 	}
       }
     }
-    
+
     // Switch to the minimum geometry
     x+=steps[imin].s*sd;
     iref=steps[imin].icalc;
 
     // Store optimal step length
     steplen=steps[imin].s;
-    
+
     // Copy checkpoint file
     {
       std::ostringstream oss;
@@ -842,15 +848,15 @@ int main(int argc, char **argv) {
       if(system(oss.str().c_str()))
 	throw std::runtime_error("Error copying checkpoint.\n");
     }
-    
+
     // Erase all unnecessary calcs
     for(size_t i=0;i<chkstore.size();i++)
       if(chkstore[i]!=iref)
 	remove(getchk(chkstore[i]).c_str());
-    
+
     // New geometry
     std::vector<atom_t> geom=get_atoms(x,pars);
-    
+
     // Calculate displacements
     double dmax, drms;
     get_displacement(geom, oldgeom, dmax, drms);
@@ -861,13 +867,13 @@ int main(int argc, char **argv) {
 
     // Store new geometry
     oldgeom=geom;
-    
+
     // Check convergence
     bool fmaxconv=false, frmsconv=false;
     bool dmaxconv=false, drmsconv=false;
-    
+
     switch(crit) {
-      
+
     case(LOOSE):
       if(fmax < 2.5e-3)
 	fmaxconv=true;
@@ -924,12 +930,12 @@ int main(int argc, char **argv) {
       dEfrac=0.0;
 
     const static char cconv[]=" *";
-      
+
     fprintf(stderr,"%3i % 18.10f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", iiter, E, dE, dEfrac, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
     fflush(stderr);
-      
+
     bool convd=dmaxconv && drmsconv && fmaxconv && frmsconv;
-      
+
     if(convd) {
       fprintf(stderr,"Converged.\n");
       break;
@@ -937,12 +943,12 @@ int main(int argc, char **argv) {
   }
 
   save_xyz(get_atoms(x,pars),"Optimized configuration",result,false);
-  
+
   // Remove the rest
   for(size_t i=0;i<chkstore.size();i++)
     remove(getchk(chkstore[i]).c_str());
-  
+
   printf("Running program took %s.\n",tprog.elapsed().c_str());
-  
+
   return 0;
 }

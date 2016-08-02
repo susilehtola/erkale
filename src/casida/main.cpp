@@ -213,9 +213,7 @@ std::string parse_states(Checkpoint & chkpt, const std::string & stateset) {
   return state;
 }
 
-
-int main(int argc, char **argv) {
-
+void print_header() {
 #ifdef _OPENMP
   printf("ERKALE - Casida from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -227,6 +225,10 @@ int main(int argc, char **argv) {
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
   print_hostname();
+}
+
+int main(int argc, char **argv) {
+  print_header();
 
   if(argc!=1 && argc!=2) {
     printf("Usage: $ %s (runfile)\n",argv[0]);

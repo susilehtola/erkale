@@ -46,8 +46,7 @@
 #include "version.h"
 #endif
 
-int main(int argc, char **argv) {
-
+void print_header() {
 #ifdef _OPENMP
   printf("ERKALE - HF/DFT from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -59,6 +58,10 @@ int main(int argc, char **argv) {
   printf("At svn revision %s.\n\n",SVNREVISION);
 #endif
   print_hostname();
+}
+
+int main(int argc, char **argv) {
+  print_header();
 
   if(argc!=2) {
     printf("Usage: $ %s runfile\n",argv[0]);
@@ -89,13 +92,16 @@ int main(int argc, char **argv) {
     if(outstream==NULL) {
       ERROR_INFO();
       throw std::runtime_error("Unable to redirect output!\n");
-    } else
-      fprintf(stderr,"\n");
+    }
+
+    fprintf(stderr,"\n");
+    // Print header to log file too
+    print_header();
   }
 
   // Basis set
   BasisSet basis;
-  std::string basfile(set.get_string("Basis"));  
+  std::string basfile(set.get_string("Basis"));
   if(stricmp(basfile,"Read")==0) {
     // Get checkpoint file
     std::string chkf(set.get_string("LoadChk"));
@@ -105,7 +111,7 @@ int main(int argc, char **argv) {
       throw std::runtime_error("Can't find LoadChk!\n");
     Checkpoint chk(chkf,false);
     chk.read(basis);
-    
+
     printf("Basis set read in from checkpoint.\n\n");
 
   } else {
@@ -126,22 +132,22 @@ int main(int argc, char **argv) {
       } else
 	throw std::runtime_error("Unable to open xyz input file!\n");
     }
-    
+
     // Read in basis set
     BasisSetLibrary baslib;
     baslib.load_basis(basfile);
-    
+
     // Construct basis set
     construct_basis(basis,atoms,baslib,set);
   }
-  
+
   // Do the calculation
   calculate(basis,set);
-  
+
   if(set.get_bool("Verbose")) {
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
     t.print_time();
   }
-  
+
   return 0;
 }
