@@ -143,6 +143,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   }
 
   S=basis.overlap();
+  chkptp->write("S",S);
 
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
@@ -153,6 +154,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   }
 
   T=basis.kinetic();
+  chkptp->write("T",T);
 
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
@@ -163,6 +165,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   }
 
   Vnuc=basis.nuclear();
+  chkptp->write("Vnuc",Vnuc);
 
   if(verbose)
     printf("done (%s)\n",t.elapsed().c_str());
@@ -199,9 +202,11 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       // H_e = - E . qr
       H_E+=E[i]*dipint[i];
   }
+  chkptp->write("H_E",H_E);
 
   // Form core Hamiltonian
   Hcore=T+Vnuc+H_E;
+  chkptp->write("Hcore",Hcore);
 
   if(verbose) {
     printf("\n");
@@ -209,6 +214,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   }
 
   Sinvh=BasOrth(S,set);
+  chkptp->write("Sinvh",Sinvh);
 
   if(verbose) {
     printf("Basis set diagonalized in %s.\n",t.elapsed().c_str());

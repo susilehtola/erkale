@@ -332,8 +332,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
     chkptp->open();
     chkptp->write("tol",intthr);
     chkptp->write("P",sol.P);
-    chkptp->write("S",S);
-    chkptp->write("Sinvh",Sinvh);
     chkptp->write(sol.en);
 #if !defined(RESTRICTED)
     chkptp->write("Ca",sol.Ca);
@@ -643,8 +641,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
     // To use the file effectively, we keep it open for the whole shebang.
     chkptp->open();
     chkptp->write("P",sol.P);
-    chkptp->write("S",S);
-    chkptp->write("Sinvh",Sinvh);
     chkptp->write(sol.en);
 #if !defined(RESTRICTED)
     chkptp->write("Ca",sol.Ca);
