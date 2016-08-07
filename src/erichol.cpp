@@ -194,7 +194,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       eri=new ERIWorker_srlr(basis.get_max_am(),basis.get_max_Ncontr(),omega,alpha,beta);
 
 #ifdef _OPENMP
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic,1)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++) {
       size_t is=shpairs[ip].is;
@@ -383,7 +383,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	eri=new ERIWorker_srlr(basis.get_max_am(),basis.get_max_Ncontr(),omega,alpha,beta);
 
 #ifdef _OPENMP
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic,1)
 #endif
       for(size_t ipair=0;ipair<shpairs.size();ipair++) {
 	size_t is=shpairs[ipair].is;
