@@ -806,32 +806,32 @@ void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
   // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
   // Return array contains: nPhi, U, and W
 
-  if(xc.n_cols !=5) {
+  if(xc.n_rows !=5) {
     ERROR_INFO();
     throw std::runtime_error("xc matrix has the wrong size.\n");
   }
-  if(nl.n_cols !=7) {
+  if(nl.n_rows !=7) {
     ERROR_INFO();
     throw std::runtime_error("nl matrix has the wrong size.\n");
   }
-  if(ret.n_rows != xc.n_rows || ret.n_cols != 3) {
+  if(ret.n_cols != xc.n_cols || ret.n_rows != 3) {
     throw std::runtime_error("Error - invalid size output array!\n");
   }
 
   // Loop
-  for(size_t i=0;i<xc.n_rows;i++) {
+  for(size_t i=0;i<xc.n_cols;i++) {
     double nPhi=0.0, U=0.0, W=0.0;
 
-    for(size_t j=0;j<nl.n_rows;j++) {
+    for(size_t j=0;j<nl.n_cols;j++) {
       // Distance between the grid points
-      double dx=xc(i,0)-nl(j,0);
-      double dy=xc(i,1)-nl(j,1);
-      double dz=xc(i,2)-nl(j,2);
+      double dx=xc(0,i)-nl(0,j);
+      double dy=xc(1,i)-nl(1,j);
+      double dz=xc(2,i)-nl(2,j);
       double Rsq=dx*dx + dy*dy + dz*dz;
 
       // g factors
-      double gi=xc(i,3)*Rsq + xc(i,4);
-      double gj=nl(j,3)*Rsq + nl(j,4);
+      double gi=xc(3,i)*Rsq + xc(4,i);
+      double gj=nl(3,j)*Rsq + nl(4,j);
       // Sum of the factors
       double gs=gi+gj;
       // Reciprocal sum
@@ -840,7 +840,7 @@ void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
       // Integral kernel
       double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
       // Absorb grid point weight and density into kernel
-      Phi *= nl(j,5) * nl(j,6);
+      Phi *= nl(5,j) * nl(6,j);
 
       // Increment nPhi
       nPhi += Phi;
@@ -851,9 +851,9 @@ void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
     }
 
     // Store output
-    ret(i,0)+=nPhi;
-    ret(i,1)+=U;
-    ret(i,2)+=W;
+    ret(0,i)+=nPhi;
+    ret(1,i)+=U;
+    ret(2,i)+=W;
   }
 }
 
@@ -861,33 +861,33 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
   // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
   // Return array contains: nPhi, U, W, and fx, fy, fz
 
-  if(xc.n_cols !=5) {
+  if(xc.n_rows !=5) {
     ERROR_INFO();
     throw std::runtime_error("xc matrix has the wrong size.\n");
   }
-  if(nl.n_cols !=7) {
+  if(nl.n_rows !=7) {
     ERROR_INFO();
     throw std::runtime_error("nl matrix has the wrong size.\n");
   }
-  if(ret.n_rows != xc.n_rows || ret.n_cols != 6) {
+  if(ret.n_cols != xc.n_cols || ret.n_rows != 6) {
     throw std::runtime_error("Error - invalid size output array!\n");
   }
 
   // Loop
-  for(size_t i=0;i<xc.n_rows;i++) {
+  for(size_t i=0;i<xc.n_cols;i++) {
     double nPhi=0.0, U=0.0, W=0.0;
     double fpx=0.0, fpy=0.0, fpz=0.0;
 
-    for(size_t j=0;j<nl.n_rows;j++) {
+    for(size_t j=0;j<nl.n_cols;j++) {
       // Distance between the grid points
-      double dx=xc(i,0)-nl(j,0);
-      double dy=xc(i,1)-nl(j,1);
-      double dz=xc(i,2)-nl(j,2);
+      double dx=xc(0,i)-nl(0,j);
+      double dy=xc(1,i)-nl(1,j);
+      double dz=xc(2,i)-nl(2,j);
       double Rsq=dx*dx + dy*dy + dz*dz;
 
       // g factors
-      double gi=xc(i,3)*Rsq + xc(i,4);
-      double gj=nl(j,3)*Rsq + nl(j,4);
+      double gi=xc(3,i)*Rsq + xc(4,i);
+      double gj=nl(3,j)*Rsq + nl(4,j);
       // Sum of the factors
       double gs=gi+gj;
       // Reciprocal sum
@@ -896,7 +896,7 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
       // Integral kernel
       double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
       // Absorb grid point weight and density into kernel
-      Phi *= nl(j,5) * nl(j,6);
+      Phi *= nl(5,j) * nl(6,j);
 
       // Increment nPhi
       nPhi += Phi;
@@ -906,7 +906,7 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
       W    -= Phi * rgis * Rsq;
 
       // Q factor
-      double Q = -2.0 * Phi * (xc(i,3)/gi + nl(j,3)/gj + (xc(i,3)+nl(j,3))/gs );
+      double Q = -2.0 * Phi * (xc(3,i)/gi + nl(3,j)/gj + (xc(3,i)+nl(3,j))/gs );
       // Increment force
       fpx += Q * dx;
       fpy += Q * dy;
@@ -914,12 +914,12 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
     }
 
     // Store output
-    ret(i,0)+=nPhi;
-    ret(i,1)+=U;
-    ret(i,2)+=W;
-    ret(i,3)+=fpx;
-    ret(i,4)+=fpy;
-    ret(i,5)+=fpz;
+    ret(0,i)+=nPhi;
+    ret(1,i)+=U;
+    ret(2,i)+=W;
+    ret(3,i)+=fpx;
+    ret(4,i)+=fpy;
+    ret(5,i)+=fpz;
   }
 }
 
@@ -937,28 +937,28 @@ void AngularGrid::collect_VV10(arma::mat & data, std::vector<size_t> & idx, doub
 
   // Create input datas
   if(nl)
-    data.zeros(idx.size(),7);
+    data.zeros(7,idx.size());
   else
-    data.zeros(idx.size(),5);
+    data.zeros(5,idx.size());
 
   // Constants for omega and kappa
   const double oc=4.0*M_PI/3.0;
   const double kc=(3.0*M_PI*b)/2.0*std::pow(9.0*M_PI,-1.0/6.0);
   for(size_t ii=0;ii<idx.size();ii++) {
     size_t i=idx[ii];
-    data(ii,0)=grid[i].r.x;
-    data(ii,1)=grid[i].r.y;
-    data(ii,2)=grid[i].r.z;
+    data(0,ii)=grid[i].r.x;
+    data(1,ii)=grid[i].r.y;
+    data(2,ii)=grid[i].r.z;
     // omega_0[i]
-    data(ii,3)=sqrt(C * std::pow(sigma(0,i)/(rho(0,i)*rho(0,i)),2) + oc*rho(0,i));
+    data(3,ii)=sqrt(C * std::pow(sigma(0,i)/(rho(0,i)*rho(0,i)),2) + oc*rho(0,i));
     // kappa[i]
-    data(ii,4)=kc * cbrt(sqrt(rho(0,i)));
+    data(4,ii)=kc * cbrt(sqrt(rho(0,i)));
   }
   if(nl) {
     for(size_t ii=0;ii<idx.size();ii++) {
       size_t i=idx[ii];
-      data(ii,5)=w(i);
-      data(ii,6)=rho(0,i);
+      data(5,ii)=w(i);
+      data(6,ii)=rho(0,i);
     }
   }
 }
@@ -986,7 +986,7 @@ void AngularGrid::compute_VV10(const std::vector<arma::mat> & nldata, double b, 
   */
 
   // Calculate integral kernel
-  VV10_arr.zeros(xc.n_rows,3);
+  VV10_arr.zeros(3,xc.n_cols);
   for(size_t i=0;i<nldata.size();i++)
     VV10_Kernel(xc,nldata[i],VV10_arr);
 
@@ -996,18 +996,18 @@ void AngularGrid::compute_VV10(const std::vector<arma::mat> & nldata, double b, 
     size_t i=idx[ii];
 
     // Increment the energy density
-    exc[i] += 0.5 * VV10_arr(ii,0);
+    exc[i] += 0.5 * VV10_arr(0,ii);
 
     // Increment LDA and GGA parts of potential.
     double ri=rho(0,i);
     double ri4=std::pow(ri,4);
     double si=sigma(0,i);
-    double w0=xc(ii,3);
-    double dkdn  = xc(ii,4)/(6.0*ri); // d kappa / d n
+    double w0=xc(3,ii);
+    double dkdn  = xc(4,ii)/(6.0*ri); // d kappa / d n
     double dw0ds = C*si / ( w0 * ri4); // d omega0 / d sigma
     double dw0dn = 2.0/w0 * ( M_PI/3.0 - C*si*si / (ri*ri4)); // d omega0 / d n
-    vxc(0,i) += VV10_arr(ii,0) + ri *( dkdn * VV10_arr(ii,1) + dw0dn * VV10_arr(ii,2));
-    vsigma(0,i) += ri * dw0ds * VV10_arr(ii,2);
+    vxc(0,i) += VV10_arr(0,ii) + ri *( dkdn * VV10_arr(1,ii) + dw0dn * VV10_arr(2,ii));
+    vsigma(0,i) += ri * dw0ds * VV10_arr(2,ii);
   }
 
   /*
@@ -1032,16 +1032,16 @@ arma::vec AngularGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, con
   collect_VV10(xc, idx, b, C, false);
 
   // Calculate integral kernels
-  VV10_arr.zeros(xc.n_rows,6);
+  VV10_arr.zeros(6,xc.n_cols);
   for(size_t i=0;i<nldata.size();i++)
     if(nlgrids[i].atind==info.atind) {
       // No Q contribution!
       //VV10_Kernel(xc,nldata[i],VV10_arr.cols(0,2));
 
-      arma::mat Kat(xc.n_rows,3);
+      arma::mat Kat(3,xc.n_rows);
       Kat.zeros();
       VV10_Kernel(xc,nldata[i],Kat);
-      VV10_arr.cols(0,2)+=Kat;
+      VV10_arr.rows(0,2)+=Kat;
     } else
       // Full contribution
       VV10_Kernel_F(xc,nldata[i],VV10_arr);
@@ -1054,23 +1054,23 @@ arma::vec AngularGrid::compute_VV10_F(const std::vector<arma::mat> & nldata, con
     size_t i=idx[ii];
 
     // Increment the energy density
-    exc[i] += 0.5 * VV10_arr(ii,0);
+    exc[i] += 0.5 * VV10_arr(0,ii);
 
     // Increment LDA and GGA parts of potential.
     double ri=rho(0,i);
     double ri4=std::pow(ri,4);
     double si=sigma(0,i);
-    double w0=xc(ii,3);
-    double dkdn  = xc(ii,4)/(6.0*ri); // d kappa / d n
+    double w0=xc(3,ii);
+    double dkdn  = xc(4,ii)/(6.0*ri); // d kappa / d n
     double dw0ds = C*si / ( w0 * ri4); // d omega0 / d sigma
     double dw0dn = 2.0/w0 * ( M_PI/3.0 - C*si*si / (ri*ri4)); // d omega0 / d n
-    vxc(0,i) += VV10_arr(ii,0) + ri *( dkdn * VV10_arr(ii,1) + dw0dn * VV10_arr(ii,2));
-    vsigma(0,i) += ri * dw0ds * VV10_arr(ii,2);
+    vxc(0,i) += VV10_arr(0,ii) + ri *( dkdn * VV10_arr(1,ii) + dw0dn * VV10_arr(2,ii));
+    vsigma(0,i) += ri * dw0ds * VV10_arr(2,ii);
 
     // Increment total force
-    fx += grid[i].w*rho(0,i)*VV10_arr(ii,3);
-    fy += grid[i].w*rho(0,i)*VV10_arr(ii,4);
-    fz += grid[i].w*rho(0,i)*VV10_arr(ii,5);
+    fx += grid[i].w*rho(0,i)*VV10_arr(3,ii);
+    fy += grid[i].w*rho(0,i)*VV10_arr(4,ii);
+    fz += grid[i].w*rho(0,i)*VV10_arr(5,ii);
   }
 
   arma::vec F(3);
@@ -4056,7 +4056,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
   if(nl.verbose) {
     size_t n=0;
     for(size_t i=0;i<nldata.size();i++)
-      n+=nldata[i].n_rows;
+      n+=nldata[i].n_cols;
 
     printf("%i points ... ",(int) n);
     fflush(stdout);
