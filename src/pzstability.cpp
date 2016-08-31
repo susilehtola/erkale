@@ -1526,7 +1526,7 @@ arma::cx_mat PZStability::get_CV(const rscf_t & sol) const {
 arma::cx_mat PZStability::get_CV() const {
   return get_CV(rsol);
 }
-  
+
 arma::cx_mat PZStability::get_CV(bool spin, const uscf_t & sol) const {
   if(restr)
     throw std::logic_error("Called get_CV(spin) using restricted orbitals!\n");
@@ -2453,15 +2453,18 @@ void PZStability::update(const arma::vec & x) {
     chkptp->write(rsol.en);
     chkptp->write("C",C);
     chkptp->write("E",E);
-
     chkptp->write("P",rsol.P);
-    if(imag)
+    chkptp->write("H",rsol.H);
+
+    if(imag) {
       chkptp->write("P_im",rsol.P_im);
-      
+      chkptp->write("K_im",rsol.K_im);
+    }
+
     if(imag || pzw!=0.0)
       // Only save CW if PZ is in use or orbitals are complex
       chkptp->cwrite("CW",rsol.cC);
-      
+
   } else {
     // Generate dummy orbitals and orbital energies
     arma::mat Ha(arma::real(unified_H(get_CO(false),get_CV(false),ref_Forba,ref_worba,get_H(usol,false))));
@@ -2470,21 +2473,26 @@ void PZStability::update(const arma::vec & x) {
     arma::mat Ca, Cb;
     eig_sym_ordered(Ea,Ca,Ha);
     eig_sym_ordered(Eb,Cb,Hb);
-    
+
     chkptp->write(usol.en);
+
     chkptp->write("Ca",Ca);
     chkptp->write("Cb",Cb);
     chkptp->write("Ea",Ea);
     chkptp->write("Eb",Eb);
 
+    chkptp->write("Ha",usol.Ha);
+    chkptp->write("Hb",usol.Hb);
     chkptp->write("Pa",usol.Pa);
     chkptp->write("Pb",usol.Pb);
     chkptp->write("P",usol.P);
     if(imag) {
       chkptp->write("Pa_im",usol.Pa_im);
       chkptp->write("Pb_im",usol.Pb_im);
+      chkptp->write("Ka_im",usol.Ka_im);
+      chkptp->write("Kb_im",usol.Kb_im);
     }
-    
+
     if(imag || pzw!=0.0) {
       // Only save CW if PZ is in use or orbitals are complex
       chkptp->cwrite("CWa",usol.cCa);
