@@ -41,7 +41,6 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   set.add_bool("ForcePol","Force polarized calculation",true);
   set.add_string("SaveChk","Save calculation to","");
   set.add_string("LoadChk","Load calculation from","");
-  set.add_bool("FreezeCore","Freeze atomic cores",false);
 
   set.set_string("Guess","Core");
   set.set_int("MaxIter",200);

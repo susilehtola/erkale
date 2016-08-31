@@ -1690,12 +1690,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
   // Which guess to use
   enum guess_t guess=parse_guess(set.get_string("Guess"));
-  // Freeze core orbitals?
-  bool freezecore=set.get_bool("FreezeCore");
-  if(freezecore && guess==CORE_GUESS)
-    throw std::runtime_error("Cannot freeze core orbitals with core guess!\n");
-  if(freezecore && guess==GWH_GUESS)
-    throw std::runtime_error("Cannot freeze core orbitals with GWH guess!\n");
 
   // Amount of electrons
   int Nel_alpha;
@@ -1824,14 +1818,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       }
     }
     sol.P=form_density(sol.C,occs);
-
-    // Freeze core orbitals?
-    if(freezecore) {
-      // Localize the core orbitals within the occupied space
-      size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),sol.C,verbose);
-      // and freeze them
-      solver.set_frozen(sol.C.cols(0,nloc-1),0);
-    }
 
     if(hf || rohf) {
       // Solve restricted Hartree-Fock
@@ -2140,22 +2126,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     sol.Pa=form_density(sol.Ca,occa);
     sol.Pb=form_density(sol.Cb,occb);
     sol.P=sol.Pa+sol.Pb;
-
-    // Freeze core orbitals?
-    if(freezecore) {
-      // Get the natural orbitals
-      arma::mat natorb;
-      arma::vec occs;
-      form_NOs(sol.P,basis.overlap(),natorb,occs);
-
-      // Then, localize the core orbitals within the occupied space
-      size_t nloc=localize_core(basis,std::max(Nel_alpha,Nel_beta),natorb);
-      // and freeze them
-      solver.set_frozen(natorb.cols(0,nloc-1),0);
-      // Update the current orbitals as well
-      sol.Ca=natorb;
-      sol.Cb=natorb;
-    }
 
     if(hf) {
       // Solve restricted Hartree-Fock
