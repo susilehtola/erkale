@@ -2112,9 +2112,15 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
     if(arma::norm(g,2) < nrthr && !cancheck) {
       // Evaluate Hessian
       Timer tp;
-      if(verbose) printf("Calculating Hessian ... "); fflush(stdout);
+      if(verbose) {
+	printf("Calculating Hessian ... ");
+	fflush(stdout);
+      }
       arma::mat h(hessian());
-      if(verbose) printf("done (%s)\n",tp.elapsed().c_str()); fflush(stdout);
+      if(verbose) {
+	printf("done (%s)\n",tp.elapsed().c_str());
+	fflush(stdout);
+      }
 
       // Run eigendecomposition
       arma::vec hval;
@@ -2465,8 +2471,19 @@ void PZStability::update(const arma::vec & x) {
     eig_sym_ordered(Ea,Ca,Ha);
     eig_sym_ordered(Eb,Cb,Hb);
     
-    if(imag)
-      chkptp->write("P_im",rsol.P_im);
+    chkptp->write(usol.en);
+    chkptp->write("Ca",Ca);
+    chkptp->write("Cb",Cb);
+    chkptp->write("Ea",Ea);
+    chkptp->write("Eb",Eb);
+
+    chkptp->write("Pa",usol.Pa);
+    chkptp->write("Pb",usol.Pb);
+    chkptp->write("P",usol.P);
+    if(imag) {
+      chkptp->write("Pa_im",usol.Pa_im);
+      chkptp->write("Pb_im",usol.Pb_im);
+    }
     
     if(imag || pzw!=0.0) {
       // Only save CW if PZ is in use or orbitals are complex
@@ -2980,14 +2997,18 @@ bool PZStability::check(bool stability, double cutoff, double dEthr) {
     }
 
     // Total time is
-    if(verbose) fprintf(stderr,"\nComputing the Hessian will take approximately %s\n",t.parse(ttot).c_str());
-    fflush(stderr);
+    if(verbose) {
+      fprintf(stderr,"\nComputing the Hessian will take approximately %s\n",t.parse(ttot).c_str());
+      fflush(stderr);
+    }
   }
 
   // Evaluate Hessian
   Timer t;
   arma::mat h(hessian());
-  if(verbose) printf("Hessian evaluated (%s)\n",t.elapsed().c_str()); fflush(stdout);
+  if(verbose) {
+    printf("Hessian evaluated (%s)\n",t.elapsed().c_str()); fflush(stdout);
+  }
   t.set();
 
   // Block the degrees of freedom
