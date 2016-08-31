@@ -63,7 +63,7 @@ Checkpoint::~Checkpoint() {
 void Checkpoint::open() {
   // Check that file exists
   if(!file_exists(filename)) {
-    throw std::runtime_error("Trying to open nonexistent checkpoint file!\n");
+    throw std::runtime_error("Trying to open nonexistent checkpoint file \"" + filename + "\"!\n");
   }
 
   if(!opend) {
