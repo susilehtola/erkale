@@ -2410,6 +2410,13 @@ static void pseudocanonize(arma::mat & C, arma::vec & E, const arma::mat & H, si
   }
 }
 
+static void diagonalize(arma::vec & E, arma::mat & C, const arma::mat & H, const arma::mat & Sinvh) {
+  // Run eigendecomposition in orthonormal basis
+  eig_sym_ordered(E,C,arma::trans(Sinvh)*H*Sinvh);
+  // Back-transform the orbitals
+  C=Sinvh*C;
+}
+
 void PZStability::update(const arma::vec & x) {
   if(arma::norm(x,2)!=0.0)  {
     if(restr) {
@@ -2443,12 +2450,16 @@ void PZStability::update(const arma::vec & x) {
   // Update orbitals in checkpoint file
   Checkpoint *chkptp=solverp->get_checkpoint();
 
+  // Orthogonalizing matrix
+  arma::mat Sinvh;
+  chkptp->read("Sinvh",Sinvh);
+
   if(restr) {
     // Generate dummy orbitals and orbital energies
     arma::mat H(arma::real(unified_H(get_CO(),get_CV(),ref_Forb,ref_worb,get_H(rsol))));
     arma::vec E;
     arma::mat C;
-    eig_sym_ordered(E,C,H);
+    ::diagonalize(E,C,H,Sinvh);
 
     chkptp->write(rsol.en);
     chkptp->write("C",C);
@@ -2471,8 +2482,8 @@ void PZStability::update(const arma::vec & x) {
     arma::mat Hb(arma::real(unified_H(get_CO(true),get_CV(true),ref_Forbb,ref_worbb,get_H(usol,true))));
     arma::vec Ea, Eb;
     arma::mat Ca, Cb;
-    eig_sym_ordered(Ea,Ca,Ha);
-    eig_sym_ordered(Eb,Cb,Hb);
+    ::diagonalize(Ea,Ca,Ha,Sinvh);
+    ::diagonalize(Eb,Cb,Hb,Sinvh);
 
     chkptp->write(usol.en);
 
