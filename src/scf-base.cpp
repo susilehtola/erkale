@@ -1555,8 +1555,17 @@ dft_t parse_dft(const Settings & set, bool init) {
 	  dft.lmax=lebedev_orders[i];
 	  break;
 	}
-      if(dft.lmax<0)
-	throw std::runtime_error("Invalid DFT angular grid specified.\n");
+      if(dft.lmax<0) {
+	std::ostringstream oss;
+	oss << "Invalid DFT angular grid specified. Supported Lebedev grids:";
+	for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++) {
+	  if(i)
+	    oss << ",";
+	  oss << " " << lebedev_degrees[i];
+	}
+	oss << ".\n";
+	throw std::runtime_error(oss.str());
+      }
     }
 
   } else {
