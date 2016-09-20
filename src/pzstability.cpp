@@ -2462,7 +2462,7 @@ void PZStability::update(const arma::vec & x) {
     ::diagonalize(E,C,H,Sinvh);
 
     std::vector<double> occs(C.n_cols,0);
-    for(int i=0;i<Na;i++)
+    for(size_t i=0;i<oa;i++)
       occs[i]=2.0;
     chkptp->write("occ",occs);
 
@@ -2491,10 +2491,10 @@ void PZStability::update(const arma::vec & x) {
     ::diagonalize(Eb,Cb,Hb,Sinvh);
 
 
-    std::vector<double> occa(C.n_cols,0), occb(C.n_cols,0);
-    for(int i=0;i<Na;i++)
+    std::vector<double> occa(Ca.n_cols,0), occb(Cb.n_cols,0);
+    for(size_t i=0;i<oa;i++)
       occa[i]=1.0;
-    for(int i=0;i<Nb;i++)
+    for(size_t i=0;i<ob;i++)
       occb[i]=1.0;
     chkptp->write("occa",occa);
     chkptp->write("occb",occb);
