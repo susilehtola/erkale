@@ -782,6 +782,7 @@ int main(int argc, char **argv) {
   set.add_double("AutoBuffer","Buffer zone in Å to add on each side of the cube",2.5);
   set.add_double("AutoSpacing","Spacing in Å to use",0.1);
   set.add_bool("Density", "Compute density on the cube?", false);
+  set.add_bool("SpinDensity", "Compute spin density on the cube?", false);
   set.add_string("OrbIdx", "Indices of orbitals to compute, e.g. 1-10 1-2", "");
   set.add_bool("SplitOrbs", "Split orbital plots into different files?", false);
   set.add_bool("Potential", "Compute electrostatic potential on the cube?", false);
@@ -926,6 +927,15 @@ int main(int argc, char **argv) {
       density_cube(basis,Pb,x,y,z,"density-b",norm,false);
       printf("done (%s).\nNorm of beta  density is %e.\n",t.elapsed().c_str(),norm);
     }
+  }
+
+  // Calculate spin density on cube
+  if(set.get_bool("SpinDensity")) {
+    double norm;
+    printf("Calculating electron spin density ... ");
+    fflush(stdout); t.set();
+    density_cube(basis,Pa-Pb,x,y,z,"spindensity",norm,false);
+    printf("done (%s).\nNorm of spin density is %e.\n",t.elapsed().c_str(),norm);
   }
 
   // Calculate density on cube
