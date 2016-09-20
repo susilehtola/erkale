@@ -585,11 +585,15 @@ class DFTGrid {
 template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & vxc, const arma::Mat<T> & f) {
   if(f.n_cols != vxc.n_elem) {
     ERROR_INFO();
-    throw std::runtime_error("Sizes of matrices doesn't match!\n");
+    std::ostringstream oss;
+    oss << "Number of functions " << f.n_cols << " and potential values " << vxc.n_elem << " do not match!\n";
+    throw std::runtime_error(oss.str());
   }
   if(H.n_rows != f.n_rows || H.n_cols != f.n_rows) {
     ERROR_INFO();
-    throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
+    std::ostringstream oss;
+    oss << "Size of basis function (" << f.n_rows << "," << f.n_cols << ") and Fock matrix (" << H.n_rows << "," << H.n_cols << ") doesn't match!\n";
+    throw std::runtime_error(oss.str());
   }
   
   // Form helper matrix
