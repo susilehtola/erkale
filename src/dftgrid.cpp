@@ -3164,13 +3164,16 @@ arma::mat DFTGrid::eval_overlap() {
   arma::mat S(N,N);
   S.zeros();
 
-#ifndef _OPENMP
-  int ith=0;
-#else
-  int ith=omp_get_thread_num();
+#ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
+#ifndef _OPENMP
+    int ith=0;
+#else
+    int ith=omp_get_thread_num();
+#endif
+
     // Work array
     arma::mat Swrk(S);
     Swrk.zeros();
@@ -3206,13 +3209,16 @@ arma::mat DFTGrid::eval_overlap(size_t inuc) {
   arma::mat Sat(N,N);
   Sat.zeros();
 
-#ifndef _OPENMP
-  int ith=0;
-#else
-  int ith=omp_get_thread_num();
+#ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
+#ifndef _OPENMP
+    int ith=0;
+#else
+    int ith=omp_get_thread_num();
+#endif
+
     // Work array
     arma::mat Swrk(Sat);
     Swrk.zeros();
