@@ -55,7 +55,7 @@ void CasidaShell::compute_orbs(const std::vector<arma::mat> & C) {
 
   for(size_t ispin=0;ispin<C.size();ispin++) {
     // Orbital values are
-    arma::mat Cval=arma::trans(C[ispin])*bf;
+    arma::mat Cval=arma::trans(C[ispin].rows(bf_ind))*bf;
     // Store values
     for(size_t ip=0;ip<grid.size();ip++)
       for(size_t io=0;io<Cval.n_rows;io++)

@@ -330,7 +330,7 @@ void Casida::solve() {
 
 arma::mat Casida::transition(const std::vector<arma::mat> & m) const {
   // Transition rates for every transition
-  arma::vec tr(w_i.n_elem,3);
+  arma::mat tr(w_i.n_elem,3);
   tr.zeros();
 
   // Loop over transitions
