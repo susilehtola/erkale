@@ -325,7 +325,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   // Loop index
   size_t m(0);
 
-  while(error>tol && m<d.n_elem-1) {
+  while(error>tol && m<d.n_elem) {
     // Errors in pivoted order
     arma::vec errs(d(pi));
     // Sort the upcoming errors so that largest one is first
@@ -523,7 +523,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       }
 
       // Update error
-      error=arma::max(d(pi.subvec(m+1,pi.n_elem-1)));
+      error=(m+1<=pi.n_elem-1) ? arma::max(d(pi.subvec(m+1,pi.n_elem-1))) : 0.0;
       // Increase m
       m++;
     }
