@@ -23,7 +23,7 @@ export FCCPP="${FC} -E"
 
 # C flags to use. For older compilers you may need to specify the architecture
 # by hand.
-export CFLAGS="-Wall -g -O2 -fPIC -march=native"
+export CFLAGS="-Wall -g -O2 -fPIC"
 
 # C++ flags to use
 export CXXFLAGS="${CFLAGS}"
@@ -33,14 +33,17 @@ export FCFLAGS="${CFLAGS}"
 
 ### LAPACK (+ BLAS) library to use.
 
-
 ## OpenBLAS
-#LAPACKOMP="-lopenblaso"
-#LAPACKSER="-lopenblas"
+LAPACKOMP="-lopenblaso"
+LAPACKSER="-lopenblas"
+
+# MKL (with Intel compiler)
+#LAPACKOMP="-mkl=parallel"
+#LAPACKSER="-mkl=sequential"
 
 ## ATLAS, newer versions of Fedora / RHEL
-LAPACKOMP="-L/usr/lib64/atlas -lsatlas"
-LAPACKSER="-L/usr/lib64/atlas -lsatlas"
+#LAPACKOMP="-L/usr/lib64/atlas -lsatlas"
+#LAPACKSER="-L/usr/lib64/atlas -lsatlas"
 
 ## ATLAS, older versions of Fedora / RHEL
 #LAPACKOMP="-L/usr/lib64/atlas -llapack -lf77blas -lcblas -latlas"
@@ -76,16 +79,16 @@ fi
 
 # Current versions of libraries, if they are to be compiled
 # GSL
-export GSLVER="1.16"
+export GSLVER="2.2.1"
 ## LibXC
 #export XCVER="2.2.2"
 # Use newest svn snapshot
 export XCVER="svn"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="6.500.4"
-export CMAKEVER="3.4.3"
-export HDF5VER="1.8.16"
+export ARMAVER="7.500.1"
+export CMAKEVER="3.7.0"
+export HDF5VER="1.8.17"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -246,12 +249,12 @@ fi
 
 # Armadillo
 if [ ! -d ${topdir}/armadillo-${ARMAVER} ]; then
- if [ ! -f ${srcdir}/armadillo-${ARMAVER}.tar.gz ]; then
+ if [ ! -f ${srcdir}/armadillo-${ARMAVER}.tar.xz ]; then
   cd ${srcdir}
-  wget -O armadillo-${ARMAVER}.tar.gz http://sourceforge.net/projects/arma/files/armadillo-${ARMAVER}.tar.gz
+  wget -O armadillo-${ARMAVER}.tar.xz http://sourceforge.net/projects/arma/files/armadillo-${ARMAVER}.tar.xz
  fi
  cd ${topdir}
- tar zxf ${srcdir}/armadillo-${ARMAVER}.tar.gz
+ tar Jxf ${srcdir}/armadillo-${ARMAVER}.tar.xz
 
  # Create unversioned symlink
  if [ ! -h armadillo ]; then
