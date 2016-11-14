@@ -71,6 +71,8 @@ class ERIchol {
   
   /// Get the matrix
   arma::mat get() const;
+  /// Get basis function numbers
+  arma::umat get_invmap() const;
 
   /// Form Coulomb matrix
   arma::mat calcJ(const arma::mat & P) const;

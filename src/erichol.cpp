@@ -461,7 +461,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	  }
 	}
       // Move to next block.
-      if(blockerr<shthr*errmax) {
+      if(blockerr==0.0 || blockerr<shthr*errmax) {
 	//printf("Block error is %e compared to global error %e, stopping\n",blockerr,errmax);
 	break;
       }
@@ -565,6 +565,10 @@ size_t ERIchol::get_Npairs() const {
 
 arma::mat ERIchol::get() const {
   return B;
+}
+
+arma::umat ERIchol::get_invmap() const {
+  return invmap;
 }
 
 arma::mat ERIchol::calcJ(const arma::mat & P) const {
