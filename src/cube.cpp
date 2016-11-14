@@ -835,8 +835,8 @@ int main(int argc, char **argv) {
     double extra=set.get_double("AutoBuffer")*ANGSTROMINBOHR;
 
     // Minimum and maximum
-    arma::vec minc=arma::min(coords)-extra;
-    arma::vec maxc=arma::max(coords)+extra;
+    arma::rowvec minc=arma::min(coords)-extra;
+    arma::rowvec maxc=arma::max(coords)+extra;
 
     // Round to spacing
     for(int ic=0;ic<3;ic++) {
