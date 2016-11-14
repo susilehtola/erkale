@@ -74,6 +74,27 @@ bool operator==(const coords_t & lhs, const coords_t & rhs) {
   return (lhs.x == rhs.x) && (lhs.y == rhs.y) && (lhs.z == rhs.z);
 }
 
+arma::vec coords_to_vec(const coords_t & c) {
+  arma::vec r(3);
+  r(0)=c.x;
+  r(1)=c.y;
+  r(2)=c.z;
+  return r;
+}
+
+coords_t vec_to_coords(const arma::vec & v) {
+  if(v.n_elem != 3) {
+    std::ostringstream oss;
+    oss << "Expected a 3-element vector, got " << v.n_elem << "!\n";
+    throw std::logic_error(oss.str());
+  }
+  coords_t r;
+  r.x=v(0);
+  r.y=v(1);
+  r.z=v(2);
+  return r;
+}
+
 // Operators for computing displacements
 coords_t operator-(const coords_t & lhs, const coords_t & rhs) {
   coords_t ret;
@@ -1695,11 +1716,8 @@ std::vector<nucleus_t> BasisSet::get_nuclei() const {
 
 arma::mat BasisSet::get_nuclear_coords() const {
   arma::mat coords(nuclei.size(),3);
-  for(size_t i=0;i<nuclei.size();i++) {
-    coords(i,0)=nuclei[i].r.x;
-    coords(i,1)=nuclei[i].r.y;
-    coords(i,2)=nuclei[i].r.z;
-  }
+  for(size_t i=0;i<nuclei.size();i++)
+    coords.row(i)=arma::trans(coords_to_vec(nuclei[i].r));
 
   return coords;
 }
@@ -1708,11 +1726,8 @@ void BasisSet::set_nuclear_coords(const arma::mat & c) {
   if(c.n_rows != nuclei.size() || c.n_cols != 3)
     throw std::logic_error("Coordinates matrix does not match nuclei!\n");
 
-  for(size_t i=0;i<nuclei.size();i++) {
-    nuclei[i].r.x=c(i,0);
-    nuclei[i].r.y=c(i,1);
-    nuclei[i].r.z=c(i,2);
-  }
+  for(size_t i=0;i<nuclei.size();i++)
+    nuclei[i].r=vec_to_coords(arma::trans(c.row(i)));
 
   // Update shell centers
   for(size_t i=0;i<shells.size();i++) {

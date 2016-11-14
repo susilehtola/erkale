@@ -56,6 +56,9 @@ typedef struct {
   double z;
 } coords_t;
 
+arma::vec coords_to_vec(const coords_t & c);
+coords_t vec_to_coords(const arma::vec & v);
+
 // Forward declaration
 class GaussianShell;
 
