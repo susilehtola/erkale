@@ -467,6 +467,10 @@ void Settings::parse(std::string filename, bool scf) {
 	      value=true;
 	    else if(stricmp(words[1],"off")==0)
 	      value=false;
+	    else if(stricmp(words[1],"yes")==0)
+	      value=true;
+	    else if(stricmp(words[1],"no")==0)
+	      value=false;
 	    else {
 	      value=false;
 	      
