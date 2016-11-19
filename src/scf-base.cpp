@@ -827,7 +827,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
       // Parallellization inside VV10
       for(size_t i=0;i<Ctilde.n_cols;i++) {
 	double Enl=0.0;
-	grid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,Porb[i],XC[i],Enl,fock);
+	nlgrid.eval_VV10(nlgrid,dft.vv10_b,dft.vv10_C,Porb[i],XC[i],Enl,fock);
       }
 
       if(verbose) {
