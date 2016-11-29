@@ -22,10 +22,10 @@ LINK_DIRECTORIES(${HDF5_LIBRARY_DIRS})
 # Create the ERKALE base library "erkale" which includes the following
 #sources
 
-add_library (liberkale basis.cpp basislibrary.cpp boys.cpp stringutil.cpp
-mathf.cpp integrals.cpp eri_digest.cpp eritable.cpp eriscreen.cpp
-timer.cpp linalg.cpp obara-saika.cpp solidharmonics.cpp diis.cpp
-scf-base.cpp localization.cpp scf-solvers.cpp scf-fock.cpp
+add_library (liberkale basis.cpp basislibrary.cpp boys.cpp
+stringutil.cpp mathf.cpp integrals.cpp eri_digest.cpp eritable.cpp
+eriscreen.cpp timer.cpp linalg.cpp obara-saika.cpp solidharmonics.cpp
+diis.cpp scf-base.cpp localization.cpp scf-solvers.cpp scf-fock.cpp
 scf-force.cpp elements.cpp xyzutils.cpp zmatrix.cpp settings.cpp
 broyden.cpp tempered.cpp find_molecules.cpp properties.cpp
 checkpoint.cpp guess.cpp external/storage.cpp
@@ -33,9 +33,9 @@ external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp eriworker_routines.cpp unitary.cpp
 pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
-stockholder.cpp erifit.cpp erichol.cpp lbfgs.cpp slaterfit/solve_coefficients.cpp
-slaterfit/form_exponents.cpp atom/integrals.cpp atom/solvers.cpp
-atom/atomtable.cpp)
+stockholder.cpp erifit.cpp erichol.cpp lbfgs.cpp gdm.cpp
+slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
+atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")
