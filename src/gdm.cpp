@@ -18,26 +18,26 @@
 
 #include "lbfgs.h"
 #include "gdm.h"
+
 GDM::GDM(size_t nmax_) : nmax(nmax_) {
 }
 
 GDM::~GDM() {
 }
 
-arma::mat GDM::solve() {
+arma::vec GDM::solve() {
   LBFGS helper(nmax);
 
   // Convert steps and gradients into energy weighted coordinates (eqn
   // 29) in GDM paper
   for(size_t i=0;i<xk.size();i++)
-    helper.update(arma::vectorise(xk[i]%arma::sqrt(h)), arma::vectorise(gk[i]/arma::sqrt(h)));
+    helper.update(xk[i]%arma::sqrt(h), gk[i]/arma::sqrt(h));
  
   // Solve the parameters and do the back-transform
-  arma::mat pars(helper.solve().memptr(), xk[0].n_rows, xk[0].n_cols);
-  return pars/arma::sqrt(h);
+  return helper.solve()/arma::sqrt(h);
 }
 
-void GDM::update(const arma::mat & x, const arma::mat & g, const arma::mat & h_) {
+void GDM::update(const arma::vec & x, const arma::vec & g, const arma::vec & h_) {
   xk.push_back(x);
   gk.push_back(g);
   h=h_;
@@ -45,13 +45,6 @@ void GDM::update(const arma::mat & x, const arma::mat & g, const arma::mat & h_)
   if(xk.size()>nmax) {
     xk.erase(xk.begin());
     gk.erase(gk.begin());
-  }
-}
-
-void GDM::parallel_transport(const arma::mat & ehd) {
-  for(size_t i=0;i<xk.size();i++) {
-    xk[i]=arma::trans(ehd)*xk[i]*ehd;
-    gk[i]=arma::trans(ehd)*gk[i]*ehd;
   }
 }
 

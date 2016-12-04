@@ -25,12 +25,11 @@ class GDM {
   /// Maximum number of matrices
   size_t nmax;
   /// Coordinates
-  std::vector<arma::mat> xk;
+  std::vector<arma::vec> xk;
   /// Gradients
-  std::vector<arma::mat> gk;
-
+  std::vector<arma::vec> gk;
   /// Diagonal Hessian
-  arma::mat h;
+  arma::vec h;
 
  public:
   /// Constructor
@@ -39,11 +38,9 @@ class GDM {
   ~GDM();
 
   /// Update
-  void update(const arma::mat & x, const arma::mat & g, const arma::mat & h);
+  void update(const arma::vec & x, const arma::vec & g, const arma::vec & h);
   /// Solve the problem
-  arma::mat solve();
-  /// Apply the parallel transport tV = exp(-Delta/2) V exp(Delta/2)
-  void parallel_transport(const arma::mat & exphdelta);
+  arma::vec solve();
   /// Clear out history
   void clear();
 };
