@@ -2060,6 +2060,10 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
   else
     x0.zeros(count_params());
 
+  // Make sure all data is on the checkpoint file
+  update(x0);
+
+  // Evaluate energy
   double ival=eval(x0);
   if(verbose) printf("Initial value is % .10f\n",ival);
 
