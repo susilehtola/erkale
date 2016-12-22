@@ -1266,6 +1266,8 @@ Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, bool delocalize
   double shthr=0.01; // Shell re-use threshhold
   double intthr=std::min(1e-10,cholthr/100.0); // Integrals threshold
   chol.fill(basis,cholthr,shthr,intthr,false);
+  // NAF truncation
+  chol.naf_transform(1e-7,false);
 
   use_chol=true;
 }

@@ -34,7 +34,7 @@ class ERIchol {
   arma::umat prodmap;
   /// List of off-diagonal products
   arma::uvec odiagidx;
-  /// Cholesky vectors, L x Nprod
+  /// Cholesky vectors, Nprod x length
   arma::mat B;
 
   /// Range separation constant
@@ -43,7 +43,7 @@ class ERIchol {
   double alpha;
   /// Fraction of short-range Coulomb
   double beta;
-  
+
  public:
   /// Constructor
   ERIchol();
@@ -58,9 +58,12 @@ class ERIchol {
   void load();
   /// Save B matrix
   void save() const;
-    
+
   /// Fill matrix, returns amount of significant pairs.
   size_t fill(const BasisSet & basis, double cholesky_tol, double shell_reuse_thr, double shell_screen_tol, bool verbose);
+
+  /// Perform natural auxiliary function transform [M. Kallay, JCP 141, 244113 (2014)]
+  size_t naf_transform(double thr, bool verbose);
 
   /// Get amount of vectors
   size_t get_Naux() const;
@@ -68,7 +71,7 @@ class ERIchol {
   size_t get_Nbf() const;
   /// Get basis set size
   size_t get_Npairs() const;
-  
+
   /// Get the matrix
   arma::mat get() const;
   /// Get basis function numbers

@@ -126,6 +126,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   cholesky=set.get_bool("Cholesky");
   cholthr=set.get_double("CholeskyThr");
   cholshthr=set.get_double("CholeskyShThr");
+  cholnafthr=set.get_double("CholeskyNAFThr");
   cholmode=set.get_int("CholeskyMode");
   if(cholesky && densityfit)
     throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
@@ -303,6 +304,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
 	  fflush(stdout);
 	}
+	// Natural auxiliary function screening
+	if(cholnafthr>0.0)
+	  chol.naf_transform(cholnafthr,verbose);
 	if(cholmode==1) {
 	  t.set();
 	  chol.save();
@@ -435,6 +439,9 @@ void SCF::fill_rs(double omega) {
 	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
 	  fflush(stdout);
 	}
+	// Natural auxiliary function screening
+	if(cholnafthr>0.0)
+	  chol_rs.naf_transform(cholnafthr,verbose);
 	if(cholmode==1) {
 	  t.set();
 	  chol_rs.save();

@@ -551,6 +551,40 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   return shpairs.size();
 }
 
+size_t ERIchol::naf_transform(double thr, bool verbose) {
+  /**
+   * Mihály Kállay, "A systematic way for the cost reduction of density
+   * fitting methods", J. Chem. Phys. 141, 244113 (2014).
+   */
+
+  // Helper matrix
+  arma::mat W(arma::trans(B)*B);
+
+  // which is then diagonalized
+  arma::vec Wval;
+  arma::mat Wvec;
+  eig_sym_ordered(Wval,Wvec,W);
+
+  // Then, the eigenvectors that are smaller than the threshold are
+  // dropped. Remember that smallest eigenvalues come first
+  arma::uword p;
+  for(p=0;p<Wval.n_elem;p++)
+    if(Wval(p)>=thr)
+      break;
+
+  // Original and dropped number of functions
+  size_t norig(B.n_cols);
+  size_t ndrop(p-1);
+
+  // and the eigenvectors are rotated
+  B*=Wvec.cols(p,Wvec.n_cols-1);
+
+  if(verbose)
+    printf("%i out of %i natural auxiliary functions dropped.\n",(int) ndrop,(int) norig);
+
+  return ndrop;
+}
+
 size_t ERIchol::get_Naux() const {
   return B.n_cols;
 }

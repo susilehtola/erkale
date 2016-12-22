@@ -283,6 +283,8 @@ class SCF {
   double cholthr;
   /// Cholesky shell threshold (for caching)
   double cholshthr;
+  /// Cholesky natural auxiliary function threshold (for pruning)
+  double cholnafthr;
   /// Cholesky mode
   int cholmode;
   
