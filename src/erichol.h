@@ -91,6 +91,9 @@ class ERIchol {
 
   /// Get full B matrix
   void B_matrix(arma::mat & B) const;
+  /// Get partial B matrix
+  void B_matrix(arma::mat & B, arma::uword first, arma::uword last) const;
+
   /// Get transformed B matrix
   arma::mat B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose=false) const;
 };

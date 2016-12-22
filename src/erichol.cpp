@@ -729,6 +729,17 @@ void ERIchol::B_matrix(arma::mat & Br) const {
     }
 }
 
+void ERIchol::B_matrix(arma::mat & Br, arma::uword first, arma::uword last) const {
+  Br.zeros(Nbf*Nbf,last-first+1);
+  for(size_t P=first;P<=last;P++)
+    for(size_t i=0;i<prodidx.size();i++) {
+      size_t u=invmap(0,i);
+      size_t v=invmap(1,i);
+      Br(u*Nbf+v,P-first)=B(i,P);
+      Br(v*Nbf+u,P-first)=B(i,P);
+    }
+}
+
 arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose) const {
   // Amount of basis and auxiliary functions
   if(Cl.n_rows != Nbf || Cr.n_rows != Nbf) {
