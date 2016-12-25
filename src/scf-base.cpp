@@ -1815,6 +1815,17 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	form_NOs(sol.P,solver.get_S(),sol.C,occ);
 
 	if(guess==SAD_GUESS) {
+	  // Avoid computing exact exchange with all NOs by truncating
+	  // the occupations to the nonzero ones
+	  {
+	    double othr(sqrt(DBL_EPSILON));
+	    arma::uword pos;
+	    for(pos=0;pos<occ.n_elem;pos++)
+	      if(occ(pos)<=othr)
+		break;
+	    occ.subvec(pos,occ.n_elem-1).zeros();
+	  }
+
 	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
 	  size_t maxiter(solver.get_maxiter());
 	  solver.set_maxiter(0);
