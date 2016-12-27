@@ -17,6 +17,7 @@
 #include "unitary.h"
 #include "timer.h"
 #include "mathf.h"
+#include "linalg.h"
 #include <cfloat>
 
 #ifdef SVNRELEASE
@@ -116,17 +117,6 @@ void UnitaryOptimizer::open_log(const std::string & fname) {
   }
 }
 
-void UnitaryOptimizer::check_unitary(const arma::cx_mat & W) const {
-  arma::cx_mat prod=arma::trans(W)*W-arma::eye(W.n_cols,W.n_cols);
-  double norm=rms_cnorm(prod);
-  
-  if(norm>=sqrt(DBL_EPSILON)) {
-    std::ostringstream oss;
-    oss << "Matrix is not unitary: || W W^H -1 || = " << norm << "!\n";
-    throw std::runtime_error(oss.str());
-  }
-}
-
 arma::cx_mat UnitaryOptimizer::get_rotation(double step) const {
   // Rotation matrix is
   arma::cx_mat rot=Hvec*arma::diagmat(arma::exp(step*COMPLEXI*Hval))*arma::trans(Hvec);
@@ -192,7 +182,7 @@ double UnitaryOptimizer::optimize(UnitaryFunction* & f, enum unitmethod met, enu
   }
 
   // Check matrix
-  check_unitary(W);
+  ::check_unitarity(W);
   // Check derivative
   check_derivative(f);
 

@@ -396,6 +396,29 @@ arma::cx_mat expmat(const arma::cx_mat & M) {
   return evec*arma::diagmat(arma::exp(eval))*arma::trans(evec);
 }
 
+void check_unitarity(const arma::cx_mat & W) {
+  arma::cx_mat prod((arma::trans(W)*W)-arma::eye<arma::mat>(W.n_cols,W.n_cols));
+  double norm=rms_cnorm(prod);
+
+  if(norm>=sqrt(DBL_EPSILON)) {
+    std::ostringstream oss;
+    oss << "Matrix is not unitary: || W W^H -1 || = " << norm << "!\n";
+    oss << prod;
+    throw std::runtime_error(oss.str());
+  }
+}
+
+void check_orthogonality(const arma::mat & W) {
+  arma::mat prod((arma::trans(W)*W)-arma::eye<arma::mat>(W.n_cols,W.n_cols));
+  double norm=rms_norm(prod);
+
+  if(norm>=sqrt(DBL_EPSILON)) {
+    std::ostringstream oss;
+    oss << "Matrix is not orthogonal: || W W^T -1 || = " << norm << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+}
+
 arma::mat orthogonalize(const arma::mat & M) {
   // Decomposition: M = U s V'
   arma::mat U;
@@ -533,7 +556,7 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps, arma::uvec & pivot) 
     // Pivot index
     size_t pim=pi(m);
     //printf("Pivot index is %4i with error %e, error is %e\n",(int) pim, d(pim), error);
-    
+
     // Compute diagonal element
     L(m,pim)=sqrt(d(pim));
 
@@ -625,11 +648,11 @@ arma::mat B_transform(arma::mat B, const arma::mat & Cl, const arma::mat & Cr) {
   // Amount of basis and auxiliary functions
   size_t Nbf(Cl.n_rows);
   size_t Naux(B.n_cols);
-  
+
   // Do LH transform
   B.reshape(Nbf,Nbf*Naux);
   B=arma::trans(Cl)*B;
-  
+
   // Shuffle indices
   arma::mat Bs(Cl.n_cols*Naux,Nbf);
   for(size_t mu=0;mu<Nbf;mu++)

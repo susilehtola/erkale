@@ -134,6 +134,11 @@ arma::mat expmat(const arma::mat & M);
 /// Compute exponential of matrix
 arma::cx_mat expmat(const arma::cx_mat & M);
 
+/// Check that the matrix is unitary
+void check_unitarity(const arma::cx_mat & W);
+/// Check that the matrix is orthogonal
+void check_orthogonality(const arma::mat & W);
+
 /// Orthogonalize
 arma::mat orthogonalize(const arma::mat & M);
 /// Unitarize

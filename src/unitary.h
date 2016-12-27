@@ -153,8 +153,6 @@ class UnitaryOptimizer {
   /// Print chosen step length
   virtual void print_step(enum unitmethod & met, double step) const;
   
-  /// Check that the matrix is unitary
-  void check_unitary(const arma::cx_mat & W) const;
   /// Check that the programmed cost function and its derivative are OK
   void check_derivative(const UnitaryFunction *f);
   /// Classify matrix
