@@ -2731,6 +2731,12 @@ double BasisSet::Enuc() const {
 }
 
 void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const arma::mat & oldMOs, arma::vec & E, arma::mat & MOs, size_t nocc) const {
+  if(*this == oldbas) {
+    MOs=oldMOs;
+    E=oldE;
+    return;
+  }
+
   BasisSet transbas(oldbas);
   transbas.nuclei=nuclei;
   // Store new geometries
@@ -2847,6 +2853,11 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
 }
 
 void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs, arma::cx_mat & OMOs, size_t nocc) const {
+  if(*this == oldbas) {
+    OMOs=oldOMOs;
+    return;
+  }
+
   BasisSet transbas(oldbas);
   transbas.nuclei=nuclei;
   // Store new geometries
