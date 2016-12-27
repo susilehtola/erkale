@@ -34,7 +34,7 @@ void LBFGS::update(const arma::vec & x, const arma::vec & g) {
   }
 }
 
-arma::vec LBFGS::diagonal_hessian(const arma::vec & q) const {
+arma::vec LBFGS::apply_diagonal_hessian(const arma::vec & q) const {
   if(xk.size()>=2) {
     arma::vec s=xk[xk.size()-1]-xk[xk.size()-2];
     arma::vec y=gk[gk.size()-1]-gk[gk.size()-2];
@@ -70,7 +70,7 @@ arma::vec LBFGS::solve() const {
   }
   
   // Apply diagonal Hessian
-  arma::vec r(diagonal_hessian(q));
+  arma::vec r(apply_diagonal_hessian(q));
   
   // Second part
   for(size_t i=0;i<k;i++) {

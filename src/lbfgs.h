@@ -33,7 +33,7 @@ class LBFGS {
   std::vector<arma::vec> gk;
   
   /// Apply diagonal Hessian: r = H_0 q
-  virtual arma::vec diagonal_hessian(const arma::vec & q) const;
+  virtual arma::vec apply_diagonal_hessian(const arma::vec & q) const;
 
  public:
   /// Constructor
