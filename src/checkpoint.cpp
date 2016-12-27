@@ -231,7 +231,7 @@ void Checkpoint::cread(const std::string & name, arma::cx_mat & m) {
   arma::mat mreal, mim;
   read(name+".re",mreal);
   read(name+".im",mim);
-  m=mreal+std::complex<double>(0.0,1.0)*mim;
+  m=mreal*COMPLEX1+mim*COMPLEXI;
 }
 
 void Checkpoint::write(const std::string & name, const std::vector<double> & v) {
