@@ -63,6 +63,9 @@ class DensityFit {
   /// Hartree-Fock calculation?
   bool hf;
 
+  /// Range separation constants
+  double omega, alpha, beta;
+
   /// Amount of nuclei
   size_t Nnuc;
   /// Maximum angular momentum
@@ -108,6 +111,14 @@ class DensityFit {
   DensityFit();
   /// Destructor
   ~DensityFit();
+
+  /// Set range separation constants
+  void set_range_separation(double w, double a, double b);
+  /// Get range separation constants
+  void get_range_separation(double & w, double & a, double & b) const;
+
+  /// Running in Hartree-Fock mode?
+  bool hf_enabled() const;
 
   /**
    * Compute integrals, use given linear dependency threshold. The HF

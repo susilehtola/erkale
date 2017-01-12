@@ -24,11 +24,29 @@
 #define DELTA 1e-9
 
 DensityFit::DensityFit() {
+  omega=0.0;
+  alpha=1.0;
+  beta=0.0;
 }
 
 DensityFit::~DensityFit() {
 }
 
+void DensityFit::set_range_separation(double w, double a, double b) {
+  omega=w;
+  alpha=a;
+  beta=b;
+}
+
+void DensityFit::get_range_separation(double & w, double & a, double & b) const {
+  w=omega;
+  a=alpha;
+  b=beta;
+}
+
+bool DensityFit::hf_enabled() const {
+  return hf;
+}
 
 size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double erithr, double linthr, bool hartreefock) {
   // Construct density fitting basis
@@ -69,7 +87,11 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 #endif
   {
 
-    ERIWorker eri(maxauxam,maxauxcontr);
+    ERIWorker *eri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri=new ERIWorker(maxam,maxcontr);
+    else
+      eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -81,8 +103,8 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
       size_t js=auxpairs[ip].js;
 
       // Compute (a|b)
-      eri.compute(&auxshells[is],&dummy,&auxshells[js],&dummy);
-      erip=eri.getp();
+      eri->compute(&auxshells[is],&dummy,&auxshells[js],&dummy);
+      erip=eri->getp();
 
       // Store integrals
       size_t Ni=auxshells[is].get_Nbf();
@@ -135,7 +157,11 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 #pragma omp parallel
 #endif
     {
-      ERIWorker eri(maxam,maxcontr);
+      ERIWorker *eri;
+      if(omega==0.0 && alpha==1.0 && beta==0.0)
+	eri=new ERIWorker(maxam,maxcontr);
+      else
+	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
       const std::vector<double> * erip;
 
       for(size_t ia=0;ia<auxshells.size();ia++)
@@ -151,8 +177,8 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 	  size_t Nnu=orbshells[inu].get_Nbf();
 
 	  // Compute (a|mn)
-	  eri.compute(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
-	  erip=eri.getp();
+	  eri->compute(&auxshells[ia],&dummy,&orbshells[imu],&orbshells[inu]);
+	  erip=eri->getp();
 
 	  // Store integrals
 	  for(size_t af=0;af<Na;af++) {
@@ -227,7 +253,11 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 #endif
     {
 
-      ERIWorker eri(maxam,maxcontr);
+      ERIWorker *eri;
+      if(omega==0.0 && alpha==1.0 && beta==0.0)
+	eri=new ERIWorker(maxam,maxcontr);
+      else
+	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
       const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -255,8 +285,8 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 	  size_t Na=auxshells[ias].get_Nbf();
 
 	  // Compute (a|mn)
-	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-	  erip=eri.getp();
+	  eri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	  erip=eri->getp();
 
 	  // Increment gamma
 	  for(size_t iia=0;iia<Na;iia++) {
@@ -287,6 +317,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
       // Sum results together
       gamma+=gammawrk;
 #endif
+      delete eri;
     } // end parallel section
   }
 
@@ -328,7 +359,11 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 #pragma omp parallel
 #endif
     {
-      ERIWorker eri(maxam,maxcontr);
+      ERIWorker *eri;
+      if(omega==0.0 && alpha==1.0 && beta==0.0)
+	eri=new ERIWorker(maxam,maxcontr);
+      else
+	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
       const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -356,8 +391,8 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 	  size_t Na=auxshells[ias].get_Nbf();
 
 	  // Compute (a|mn)
-	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-	  erip=eri.getp();
+	  eri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	  erip=eri->getp();
 
 	  // Increment gamma
 	  for(size_t iia=0;iia<Na;iia++) {
@@ -391,6 +426,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
       for(size_t ig=0;ig<P.size();ig++)
 	gamma[ig]+=gammawrk[ig];
 #endif
+      delete eri;
     } // end parallel section
   }
 
@@ -438,8 +474,13 @@ arma::mat DensityFit::calcJ(const arma::mat & P) const {
 #pragma omp parallel
 #endif
     {
-      ERIWorker eri(maxam,maxcontr);
+      ERIWorker *eri;
+      if(omega==0.0 && alpha==1.0 && beta==0.0)
+	eri=new ERIWorker(maxam,maxcontr);
+      else
+	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
       const std::vector<double> * erip;
+
 
 #ifdef _OPENMP
 #pragma omp for
@@ -460,8 +501,8 @@ arma::mat DensityFit::calcJ(const arma::mat & P) const {
 	    symfac=0.0;
 
 	  // Compute (a|mn)
-	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-	  erip=eri.getp();
+	  eri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	  erip=eri->getp();
 
 	  // Increment J
 	  for(size_t iia=0;iia<Na;iia++) {
@@ -522,7 +563,11 @@ std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const
 #pragma omp parallel
 #endif
     {
-      ERIWorker eri(maxam,maxcontr);
+      ERIWorker *eri;
+      if(omega==0.0 && alpha==1.0 && beta==0.0)
+	eri=new ERIWorker(maxam,maxcontr);
+      else
+	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
       const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -544,8 +589,8 @@ std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const
 	    symfac=0.0;
 
 	  // Compute (a|mn)
-	  eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-	  erip=eri.getp();
+	  eri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	  erip=eri->getp();
 
 	  // Increment J
 	  for(size_t iia=0;iia<Na;iia++) {
@@ -589,7 +634,11 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
 #pragma omp parallel
 #endif
   {
-    dERIWorker deri(maxauxam,maxauxcontr);
+    dERIWorker *deri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      deri=new dERIWorker(maxam,maxcontr);
+    else
+      deri=new dERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -617,7 +666,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
 	  continue;
 
 	// Compute (a|b)
-	deri.compute(&auxshells[ias],&dummy,&auxshells[jas],&dummy);
+	deri->compute(&auxshells[ias],&dummy,&auxshells[jas],&dummy);
 
 	// Compute forces
 	const static int index[]={0, 1, 2, 6, 7, 8};
@@ -630,7 +679,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
 	  int ic=index[iid];
 
 	  // Increment force, anuc
-	  erip=deri.getp(ic);
+	  erip=deri->getp(ic);
 	  for(size_t iia=0;iia<Na;iia++) {
 	    size_t ia=auxshells[ias].get_first_ind()+iia;
 
@@ -663,6 +712,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
     // Sum results together
     f+=fwrk;
 #endif
+    delete deri;
   } // end parallel section
 
 
@@ -671,7 +721,11 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
 #pragma omp parallel
 #endif
   {
-    dERIWorker deri(maxam,maxcontr);
+    dERIWorker *deri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      deri=new dERIWorker(maxam,maxcontr);
+    else
+      deri=new dERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
     const std::vector<double> * erip;
 
 #ifdef _OPENMP
@@ -707,7 +761,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
 	  continue;
 
 	// Compute (a|mn)
-	deri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	deri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
 
 	// Expansion coefficients
 	arma::vec ca=c.subvec(auxshells[ias].get_first_ind(),auxshells[ias].get_last_ind());
@@ -722,7 +776,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
 	  int ic=index[iid];
 	  arma::vec hlp(Na);
 
-	  erip=deri.getp(ic);
+	  erip=deri->getp(ic);
 	  hlp.zeros();
 	  for(size_t iia=0;iia<Na;iia++)
 	    for(size_t iimu=0;iimu<Nmu;iimu++) {
@@ -758,6 +812,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
     // Sum results together
     f+=fwrk;
 #endif
+    delete deri;
   } // end parallel section
 
   return f;
@@ -822,9 +877,12 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 #pragma omp parallel
 #endif
 	{
-	  ERIWorker eri(maxam,maxcontr);
+	  ERIWorker *eri;
+	  if(omega==0.0 && alpha==1.0 && beta==0.0)
+	    eri=new ERIWorker(maxam,maxcontr);
+	  else
+	    eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
 	  const std::vector<double> * erip;
-
 	  
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -837,8 +895,8 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 	    size_t Nnu=orbshells[inus].get_Nbf();
 
 	    // Compute (a|mn)
-	    eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-	    erip=eri.getp();
+	    eri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	    erip=eri->getp();
 
 	    // Increment iuP. Loop over auxiliary functions.
 	    for(size_t iia=0;iia<Na;iia++) {
@@ -879,6 +937,7 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 	      }
 	    }
 	  } // end aux loop
+	  delete eri;
 	} // end parallel section
       } // end shell loop
 
@@ -1015,9 +1074,12 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
 #pragma omp parallel
 #endif
 	{
-	  ERIWorker eri(maxam,maxcontr);
+	  ERIWorker *eri;
+	  if(omega==0.0 && alpha==1.0 && beta==0.0)
+	    eri=new ERIWorker(maxam,maxcontr);
+	  else
+	    eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
 	  const std::vector<double> * erip;
-
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -1030,8 +1092,8 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
 	    size_t Nnu=orbshells[inus].get_Nbf();
 
 	    // Compute (a|mn)
-	    eri.compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-	    erip=eri.getp();
+	    eri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
+	    erip=eri->getp();
 
 	    // Increment iuP. Loop over auxiliary functions.
 	    for(size_t iia=0;iia<Na;iia++) {

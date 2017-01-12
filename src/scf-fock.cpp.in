@@ -94,14 +94,9 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 
   // Initialize energy
   memset(&sol.en, 0, sizeof(energy_t));
-  
+
   // Form Coulomb and exchange matrices
   if(densityfit) {
-
-#ifdef DFT
-    if(omega!=0.0)
-      throw std::runtime_error("Density fitting not implemented for range separated functionals.\n");
-#endif
 
     if(verbose) {
       printf("Forming density fitted Coulomb matrix ... ");
@@ -156,6 +151,46 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       }
 
 #ifdef DFT
+      if(kshort!=0.0) {
+
+	if(verbose) {
+	  printf("Forming density fitted short-range exchange matrix ... ");
+	  fflush(stdout);
+	  t.set();
+	}
+
+#ifdef RESTRICTED
+	if(sol.P_im.n_rows == sol.P.n_rows && sol.P_im.n_cols == sol.P.n_cols) {
+	  arma::cx_mat cK(dfit_rs.calcK(sol.cC,occs,fitmem));
+	  Kshort=arma::real(cK);
+	  Kshort_im=arma::imag(cK);
+	} else
+	  Kshort=dfit_rs.calcK(sol.C,occs,fitmem);
+#else
+	if(sol.Pa_im.n_rows == sol.Pa.n_rows && sol.Pa_im.n_cols == sol.Pa.n_cols) {
+	  arma::cx_mat cKa(dfit_rs.calcK(sol.cCa,occa,fitmem));
+	  Kashort=arma::real(cKa);
+	  Kashort_im=arma::imag(cKa);
+	} else
+	  Kashort=dfit_rs.calcK(sol.Ca,occa,fitmem);
+
+	if(sol.Pb_im.n_rows == sol.Pb.n_rows && sol.Pb_im.n_cols == sol.Pb.n_cols) {
+	  arma::cx_mat cKb(dfit_rs.calcK(sol.cCb,occb,fitmem));
+	  Kbshort=arma::real(cKb);
+	  Kbshort_im=arma::imag(cKb);
+	} else
+	  Kbshort=dfit_rs.calcK(sol.Cb,occb,fitmem);
+#endif
+
+	if(verbose) {
+	  printf("done (%s)\n",t.elapsed().c_str());
+	  fflush(stdout);
+	}
+      }
+#endif
+
+
+#ifdef DFT
     }
 #endif
 
@@ -178,7 +213,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #ifdef DFT
       if(kfull!=0.0) {
 #endif
-	
+
 	if(verbose) {
 	  printf("Forming Cholesky exchange matrix ... ");
 	  fflush(stdout);
@@ -254,11 +289,11 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 	}
       }
 #endif
-      
+
     } else {
       if(direct) {
 #ifdef RESTRICTED
-	
+
 #ifdef DFT
 	if(kfull!=0.0) {
 #endif
@@ -665,14 +700,14 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
       fflush(stdout);
       t.set();
     }
-    
+
     double Nelnum; // Numerically integrated density
 #ifdef RESTRICTED
     grid.eval_Fxc(dft.x_func,dft.c_func,sol.P,sol.XC,sol.en.Exc,Nelnum);
 #else
     grid.eval_Fxc(dft.x_func,dft.c_func,sol.Pa,sol.Pb,sol.XCa,sol.XCb,sol.en.Exc,Nelnum);
 #endif
-    
+
 #if defined(FULLHOLE)
     double rel_diff=xch ? (Nelnum-Nel)*100.0/Nel : (Nelnum+1.0-Nel)*100.0/Nel;
 #elif defined(HALFHOLE)
@@ -680,12 +715,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #else
     double rel_diff=(Nelnum-Nel)*100.0/Nel;
 #endif
-    
+
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
       printf("Numerically integrated density is %.5f (%+.4f %%).\n",Nelnum,rel_diff);
     }
-    
+
     if(fabs(rel_diff)>1e-2) {
       std::ostringstream oss;
       //      oss << "Density integrated over DFT grid differs from number of electrons by " << rel_diff << " %, i.e. " << Nelnum-Nel << " electrons.\n";
@@ -865,7 +900,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     printf("One-electron energy %e\n",sol.en.Eone);
     printf("Non-local    energy %e\n",sol.en.Enl);
     printf("Nuclear repulsion energy %e\n",sol.en.Enucr);
-    
+
     std::ostringstream oss;
     oss << "\nSomething wrong with total energy " << sol.en.E <<"?\nEnding program.\n";
     throw std::runtime_error(oss.str());

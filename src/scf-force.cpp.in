@@ -75,8 +75,8 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   if(kfull==0.0) {
       
     if(densityfit) {
-      if(kshort!=0.0)
-	throw std::runtime_error("Forces not implemented for range separation with density fitting.\n");
+      if(kshort!=0.0 || kfull!=0.0)
+	throw std::runtime_error("Forces not implemented for density fitting of exact exchange.\n");
 	
       fx_full=dfit.forceJ(sol.P);
     } else {

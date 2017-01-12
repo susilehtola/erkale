@@ -308,6 +308,8 @@ class SCF {
   ERIchol chol_rs;
   /// Density fitting table
   DensityFit dfit;
+  /// Density fitting table, range separation
+  DensityFit dfit_rs;
 
   /// Decontracted basis set
   BasisSet decbas;

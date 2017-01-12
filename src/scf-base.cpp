@@ -405,10 +405,42 @@ void SCF::set_verbose(bool verb) {
 }
 
 void SCF::fill_rs(double omega) {
-  if(densityfit)
-    throw std::logic_error("Density fitting not supported with range-separated functionals.\n");
+  if(densityfit) {
+    // Compute range separated integrals if necessary
+    bool fill;
+    if(!dfit_rs.get_Naux()) {
+      fill=true;
+    } else {
+      double o, kl, ks;
+      dfit_rs.get_range_separation(o,kl,ks);
+      fill=(!(o==omega));
+    }
+    if(fill) {
+      dfit_rs.set_range_separation(omega,0.0,1.0);
 
-  if(cholesky) {
+      // Compute memory estimate
+      std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,direct));
+
+      Timer t;
+      if(verbose) {
+	if(direct)
+	  printf("Initializing short-range density fitting calculation, requiring %s memory ... ",memest.c_str());
+	else
+	  printf("Computing short-range density fitting integrals, requiring %s memory ... ",memest.c_str());
+	fflush(stdout);
+      }
+
+      t.set();
+      size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,dfit.hf_enabled());
+      if(verbose) {
+	printf("done (%s)\n",t.elapsed().c_str());
+	printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
+	printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+	fflush(stdout);
+      }
+    }
+
+  } else if(cholesky) {
     // Compute range separated integrals if necessary
     bool fill;
     if(!chol_rs.get_Naux()) {
@@ -432,8 +464,9 @@ void SCF::fill_rs(double omega) {
 	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_Naux(),t.elapsed().c_str());
 	  fflush(stdout);
 	}
+	fill = (chol_rs.get_Nbf() != basisp->get_Nbf());
       }
-      if(chol_rs.get_Nbf() != basisp->get_Nbf()) {
+      if(fill) {
 	size_t Npairs=chol_rs.fill(*basisp,cholthr,cholshthr,intthr,verbose);
 	if(verbose) {
 	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
