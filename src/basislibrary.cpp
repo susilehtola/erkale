@@ -1398,7 +1398,24 @@ static BasisSetLibrary combine_pople_basis(const BasisSetLibrary & hbas, const B
   return ret;
 }
 
-void BasisSetLibrary::load_basis(const std::string & basis, bool verbose) {
+void BasisSetLibrary::load_basis(const std::string & basis0, bool verbose) {
+  std::string basis(basis0);
+
+   if(basis.size()>4 && basis.substr(0,4).compare("6-31")==0) {
+    // First, check if there is a * or ** polarization part and
+    // replace it with (d) or (d,p)
+    size_t spos(basis.find_first_of('*'));
+    if(spos!=std::string::npos) {
+      std::string polpart;
+      if(basis.size()>spos+1 && basis[spos+1]=='*') {
+       polpart="(d,p)";
+      } else
+       polpart="(d)";
+
+      std::string newbasis(basis.substr(0,spos)+polpart);
+      basis=newbasis;
+    }
+
   if(basis.size()>4 && basis.substr(0,4).compare("6-31")==0) {
     // Check the polarization part
     size_t ppos=basis.find_first_of("(");
