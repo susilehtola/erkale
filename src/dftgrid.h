@@ -110,8 +110,12 @@ typedef struct {
 
 /// Helper for getting data
 typedef struct {
+  /// Density
   libxc_dens_t dens;
+  /// Potential
   libxc_pot_t pot;
+  /// Energy density
+  double e;
 } libxc_debug_t;
 
 /**
@@ -376,6 +380,8 @@ class AngularGrid {
   void print_density(FILE *f) const;
   /// Print potential information
   void print_potential(int func_id, FILE *f) const;
+  /// Check potential data for NaNs
+  void check_potential(FILE *f) const;
 
   /// Initialize XC arrays
   void init_xc();
@@ -577,8 +583,12 @@ class DFTGrid {
   
   /// Print out density data
   void print_density(const arma::mat & P, std::string densname="density.dat");
+  /// Print out density data
+  void print_density(const arma::mat & Pa, const arma::mat & Pb, std::string densname="density.dat");
   /// Print out potential data
   void print_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string potname="potential.dat");
+  /// Check potential data
+  void check_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string potname="potential_nan.dat");
 };
 
 /// BLAS routine for LDA-type quadrature

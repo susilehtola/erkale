@@ -1097,6 +1097,7 @@ void AngularGrid::print_potential(int func_id, FILE *f) const {
   for(size_t i=0;i<grid.size();i++) {
     // Get data in point
     libxc_pot_t d=get_pot(i);
+    double e=exc(i);
 
     int nspin;
     if(polarized)
@@ -1105,8 +1106,24 @@ void AngularGrid::print_potential(int func_id, FILE *f) const {
       nspin=XC_POLARIZED;
 
     // Print out data
-    fprintf(f, "%3i %2i % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e\n",func_id,nspin,d.vrhoa,d.vrhob,d.vsigmaaa,d.vsigmaab,d.vsigmabb,d.vlapla,d.vlaplb,d.vtaua,d.vtaub);
+    fprintf(f, "%3i %2i % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e\n",func_id,nspin,e,d.vrhoa,d.vrhob,d.vsigmaaa,d.vsigmaab,d.vsigmabb,d.vlapla,d.vlaplb,d.vtaua,d.vtaub);
   }
+}
+
+void AngularGrid::check_potential(FILE *f) const {
+  // Loop over grid points
+  for(size_t i=0;i<grid.size();i++) {
+    // Get data in point
+    libxc_pot_t v=get_pot(i);
+    double e=exc(i);
+    if(std::isnan(e) || std::isnan(v.vrhoa) || std::isnan(v.vrhob) || std::isnan(v.vsigmaaa) || std::isnan(v.vsigmaab) || std::isnan(v.vsigmabb) || std::isnan(v.vlapla) || std::isnan(v.vlaplb) || std::isnan(v.vtaua) || std::isnan(v.vtaub)) {
+      libxc_dens_t d=get_dens(i);
+      fprintf(f,"***\n");
+      fprintf(f,"% .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e\n",d.rhoa,d.rhob,d.sigmaaa,d.sigmaab,d.sigmabb,d.lapla,d.laplb,d.taua,d.taub);
+      fprintf(f,"% .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e % .16e\n",e,v.vrhoa,v.vrhob,v.vsigmaaa,v.vsigmaab,v.vsigmabb,v.vlapla,v.vlaplb,v.vtaua,v.vtaub);
+    }
+  }
+  fflush(f);
 }
 
 void AngularGrid::get_weights() {
@@ -1173,6 +1190,7 @@ libxc_debug_t AngularGrid::get_data(size_t idx) const {
   libxc_debug_t d;
   d.dens=get_dens(idx);
   d.pot=get_pot(idx);
+  d.e=exc[idx];
   return d;
 }
 
@@ -4409,6 +4427,58 @@ void DFTGrid::print_density(const arma::mat & P, std::string densname) {
   printf("done (%s)\n",t.elapsed().c_str());
 }
 
+void DFTGrid::print_density(const arma::mat & Pa, const arma::mat & Pb, std::string densname) {
+  // Open output files
+  FILE *dens=fopen(densname.c_str(),"w");
+
+  fprintf(dens,"%i\n",(int) get_Npoints());
+
+  Timer t;
+  if(verbose) {
+    printf("\nSaving density data in %s ... ",densname.c_str());
+    fflush(stdout);
+  }
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  { // Begin parallel region
+
+#ifdef _OPENMP
+    // Current thread is
+    const int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#else
+    const int ith=0;
+#endif
+    // Loop over atoms
+    for(size_t i=0;i<grids.size();i++) {
+      // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);
+      wrk[ith].form_grid();
+
+      // Update density
+      wrk[ith].update_density(Pa,Pb);
+
+      // Write out density and potential data
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+      {
+	wrk[ith].print_density(dens);
+      }
+
+      // Free memory
+      wrk[ith].free();
+    }
+  } // End parallel region
+
+    // Close output files
+  fclose(dens);
+
+  printf("done (%s)\n",t.elapsed().c_str());
+}
+
 void DFTGrid::print_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string potname) {
   // Open output files
   FILE *pot=fopen(potname.c_str(),"w");
@@ -4461,6 +4531,65 @@ void DFTGrid::print_potential(int func_id, const arma::mat & Pa, const arma::mat
   } // End parallel region
 
     // Close output files
+  fclose(pot);
+
+  printf("done (%s)\n",t.elapsed().c_str());
+}
+
+void DFTGrid::check_potential(int func_id, const arma::mat & Pa, const arma::mat & Pb, std::string potname) {
+  // Open output files
+  FILE *pot=fopen(potname.c_str(),"w");
+
+  Timer t;
+  if(verbose) {
+    printf("\nRunning potential check. Saving output to %s ... ",potname.c_str());
+    fflush(stdout);
+  }
+
+  fprintf(pot,"%23s %23s %23s %23s %23s %23s %23s %23s %23s\n","rhoa","rhob","sigmaaa","sigmaab","sigmabb","lapla","laplb","taua","taub");
+  fprintf(pot,"%23s %23s %23s %23s %23s %23s %23s %23s %23s %23s\n","exc","vrhoa","vrhob","vsigmaaa","vsigmaab","vsigmabb","vlapla","vlaplb","vtaua","vtaub");
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  { // Begin parallel region
+
+#ifdef _OPENMP
+    // Current thread is
+    const int ith=omp_get_thread_num();
+#pragma omp for schedule(dynamic,1)
+#else
+    const int ith=0;
+#endif
+    // Loop over atoms
+    for(size_t i=0;i<grids.size();i++) {
+      // Change atom and create grid
+      wrk[ith].set_grid(grids[i]);
+      wrk[ith].form_grid();
+
+      // Update density
+      wrk[ith].update_density(Pa,Pb);
+
+      // Initialize the arrays
+      wrk[ith].init_xc();
+      // Compute the functionals
+      if(func_id>0)
+	wrk[ith].compute_xc(func_id,true);
+
+      // Write out density and potential data
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+      {
+	wrk[ith].check_potential(pot);
+      }
+
+      // Free memory
+      wrk[ith].free();
+    }
+  } // End parallel region
+
+  // Close output files
   fclose(pot);
 
   printf("done (%s)\n",t.elapsed().c_str());

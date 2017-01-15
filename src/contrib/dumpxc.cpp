@@ -61,7 +61,8 @@ int main(int argc, char **argv) {
   if(argc==2)
     set.parse(argv[1]);
   else printf("Using default settings.\n\n");
-
+  set.print();
+  
   // Load checkpoint
   Checkpoint chkpt(set.get_string("LoadChk"),false);
 
@@ -110,10 +111,14 @@ int main(int argc, char **argv) {
       grid.construct(nrad,lmax,x_func,c_func,false);
 
     grid.print_density(P);
-    if(x_func)
+    if(x_func) {
       grid.print_potential(x_func,P/2.0,P/2.0,"Vx.dat");
-    if(c_func)
+      grid.check_potential(x_func,P/2.0,P/2.0,"Vx_nan.dat");
+    }
+    if(c_func) {
       grid.print_potential(c_func,P/2.0,P/2.0,"Vc.dat");
+      grid.check_potential(c_func,P/2.0,P/2.0,"Vc_nan.dat");
+    }
 
   } else {
     arma::mat Pa, Pb;
@@ -125,11 +130,15 @@ int main(int argc, char **argv) {
     else
       grid.construct(nrad,lmax,x_func,c_func,false);
 
-    grid.print_density(Pa+Pb);
-    if(x_func)
-      grid.print_potential(x_func,Pa,Pb);
-    if(c_func)
-      grid.print_potential(c_func,Pa,Pb);
+    grid.print_density(Pa,Pb);
+    if(x_func) {
+      grid.print_potential(x_func,Pa,Pb,"Vx.dat");
+      grid.check_potential(x_func,Pa,Pb,"Vx_nan.dat");
+    }
+    if(c_func) {
+      grid.print_potential(c_func,Pa,Pb,"Vc.dat");
+      grid.check_potential(c_func,Pa,Pb,"Vc_nan.dat");
+    }
   }
 
   return 0;
