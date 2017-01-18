@@ -233,14 +233,15 @@ int main(void) {
   double Eaa=0.0, Eab=0.0, Ebb=0.0;
   bool osonly=false;
   if(osonly) {
-    if(pol)
+    if(pol) {
       Eab=E_os_MP2_Laplace(Bpaha,Bpbhb,arma::diagvec(Fhaha),arma::diagvec(Fhbhb),arma::diagvec(Fpapa),arma::diagvec(Fpbpb));
-    else
+    } else {
       Eab=E_os_MP2_Laplace(Bpaha,Bpaha,arma::diagvec(Fhaha),arma::diagvec(Fhaha),arma::diagvec(Fpapa),arma::diagvec(Fpapa));
+    }
 
-      printf("Laplace OS MP2 done in %s.\n",t.elapsed().c_str());
-      fflush(stdout);
-      t.set();
+    printf("Laplace OS MP2 done in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+    t.set();
   } else {
     if(!pol) {
       Ebb=Eaa=E_ss_MP2(Bpaha,arma::diagvec(Fhaha),arma::diagvec(Fpapa));
