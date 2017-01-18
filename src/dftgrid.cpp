@@ -361,12 +361,14 @@ arma::uvec AngularGrid::screen_density(double thr) const {
   std::vector<size_t> idx;
   // Loop over grid
   if(!polarized) {
+    if(rho.size() != grid.size()) throw std::logic_error("Wrong size density!\n");
     for(size_t i=0;i<grid.size();i++)
       if(rho(i)>=thr)
 	idx.push_back(i);
   } else {
+    if(rho.size() != 2*grid.size()) throw std::logic_error("Wrong size density!\n");
     for(size_t i=0;i<grid.size();i++)
-      if(rho(2*i)+rho(2*i+1)>=thr)
+      if((rho(2*i)+rho(2*i+1))>=thr)
 	idx.push_back(i);
   }
 
@@ -1247,16 +1249,13 @@ libxc_pot_t AngularGrid::get_pot(size_t idx) const {
 }
 
 double AngularGrid::eval_Exc() const {
-  double Exc=0.0;
+  arma::uvec screen(screen_density());
 
-  if(!polarized)
-    for(size_t i=0;i<grid.size();i++)
-      Exc+=w(i)*exc(i)*rho(0,i);
-  else
-    for(size_t i=0;i<grid.size();i++)
-      Exc+=w(i)*exc(i)*(rho(0,i)+rho(1,i));
+  arma::rowvec dens(rho.row(0));
+  if(polarized)
+    dens+=rho.row(1);
 
-  return Exc;
+  return arma::sum(w(screen)%exc(screen)%dens(screen));
 }
 
 void AngularGrid::eval_overlap(arma::mat & So) const {
@@ -1470,6 +1469,9 @@ void AngularGrid::eval_Fxc(arma::mat & Ho) const {
 
   // Screen quadrature points by small densities
   arma::uvec screen(screen_density());
+  // No important grid points, return
+  if(!screen.n_elem)
+    return;
 
   // Work matrix
   arma::mat H(bf_ind.n_elem,bf_ind.n_elem);
@@ -1522,15 +1524,23 @@ void AngularGrid::eval_diag_Fxc(arma::vec & H) const {
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
+  // Screen quadrature points by small densities
+  arma::uvec screen(screen_density());
+  // No important grid points, return
+  if(!screen.n_elem)
+    return;
+
   {
     // LDA potential
     arma::rowvec vrho(vxc.row(0));
     // Multiply weights into potential
     vrho%=w;
     // Increment matrix
-    for(size_t ip=0;ip<grid.size();ip++)
+    for(size_t iip=0;iip<screen.n_elem;iip++) {
+      size_t ip(screen(iip));
       for(size_t j=0;j<bf.n_rows;j++)
 	H(bf_potind(j))+=vrho(ip)*bf(j,ip)*bf(j,ip);
+    }
   }
 
   if(do_gga) {
@@ -1544,9 +1554,11 @@ void AngularGrid::eval_diag_Fxc(arma::vec & H) const {
       for(size_t ic=0;ic<gr.n_cols;ic++)
 	gr(i,ic)=2.0*w(i)*vs(i)*gr(i,ic);
     // Increment matrix
-    for(size_t ip=0;ip<grid.size();ip++)
+    for(size_t iip=0;iip<screen.n_elem;iip++) {
+      size_t ip(screen(iip));
       for(size_t j=0;j<bf.n_rows;j++)
 	H(bf_potind(j))+=2.0 * (gr(ip,0)*bf_x(j,ip) + gr(ip,1)*bf_y(j,ip) + gr(ip,2)*bf_z(j,ip)) * bf(j,ip);
+    }
 
     if(do_mgga) {
       // Get vtau and vlapl
@@ -1557,14 +1569,18 @@ void AngularGrid::eval_diag_Fxc(arma::vec & H) const {
       vl%=w;
 
       // Evaluate kinetic contribution
-      for(size_t ip=0;ip<grid.size();ip++)
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
 	for(size_t j=0;j<bf.n_rows;j++)
 	  H(bf_potind(j))+=(0.5*vt(ip)+2.0*vl(ip))*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
+      }
 
       // Evaluate laplacian contribution.
-      for(size_t ip=0;ip<grid.size();ip++)
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
 	for(size_t j=0;j<bf.n_rows;j++)
 	  H(bf_potind(j))+=2.0*vl(ip)*bf(j,ip)*bf_lapl(j,ip);
+      }
     }
   }
 }
@@ -1577,10 +1593,12 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
 
   // Screen quadrature points by small densities
   arma::uvec screen(screen_density());
+  // No important grid points, return
+  if(!screen.n_elem)
+    return;
 
-  arma::mat Ha(bf_ind.n_elem,bf_ind.n_elem);
-  Ha.zeros();
-  arma::mat Hb;
+  arma::mat Ha, Hb;
+  Ha.zeros(bf_ind.n_elem,bf_ind.n_elem);
   if(beta)
     Hb.zeros(bf_ind.n_elem,bf_ind.n_elem);
 
@@ -1598,6 +1616,8 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
       increment_lda<double>(Hb,vrhob,bf,screen);
     }
   }
+  if(Ha.has_nan() || (beta && Hb.has_nan()))
+    throw std::logic_error("NaN encountered!\n");
 
   if(do_gga) {
     // Get vsigma
@@ -1664,6 +1684,12 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
   }
 
+  // Screen quadrature points by small densities
+  arma::uvec screen(screen_density());
+  // No important grid points, return
+  if(!screen.n_elem)
+    return;
+
   {
     // LDA potential
     arma::rowvec vrhoa(vxc.row(0));
@@ -1672,11 +1698,13 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
     arma::rowvec vrhob(vxc.row(1));
     vrhob%=w;
     // Increment matrix
-    for(size_t ip=0;ip<grid.size();ip++)
+    for(size_t iip=0;iip<screen.n_elem;iip++) {
+      size_t ip(screen(iip));
       for(size_t j=0;j<bf.n_rows;j++) {
 	Ha(bf_potind(j))+=vrhoa(ip)*bf(j,ip)*bf(j,ip);
 	Hb(bf_potind(j))+=vrhob(ip)*bf(j,ip)*bf(j,ip);
       }
+    }
   }
 
   if(do_gga) {
@@ -1696,17 +1724,21 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
       for(size_t ic=0;ic<gra.n_cols;ic++)
 	gra(i,ic)=w(i)*(2.0*vs_aa(i)*gra0(i,ic)+vs_ab(i)*grb0(i,ic));
     // Increment matrix
-    for(size_t ip=0;ip<grid.size();ip++)
+    for(size_t iip=0;iip<screen.n_elem;iip++) {
+      size_t ip(screen(iip));
       for(size_t j=0;j<bf.n_rows;j++)
 	Ha(bf_potind(j))+=2.0 * (gra(ip,0)*bf_x(j,ip) + gra(ip,1)*bf_y(j,ip) + gra(ip,2)*bf_z(j,ip)) * bf(j,ip);
+    }
 
     arma::mat grb(grb0);
     for(size_t i=0;i<grb.n_rows;i++)
       for(size_t ic=0;ic<grb.n_cols;ic++)
 	grb(i,ic)=w(i)*(2.0*vs_bb(i)*grb0(i,ic)+vs_ab(i)*gra0(i,ic));
-    for(size_t ip=0;ip<grid.size();ip++)
+    for(size_t iip=0;iip<screen.n_elem;iip++) {
+      size_t ip(screen(iip));
       for(size_t j=0;j<bf.n_rows;j++)
 	Hb(bf_potind(j))+=2.0 * (grb(ip,0)*bf_x(j,ip) + grb(ip,1)*bf_y(j,ip) + grb(ip,2)*bf_z(j,ip)) * bf(j,ip);
+    }
 
     if(do_mgga) {
       // Get vtau and vlapl
@@ -1721,18 +1753,22 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
       vlb%=w;
 
       // Evaluate kinetic contribution
-      for(size_t ip=0;ip<grid.size();ip++)
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
 	for(size_t j=0;j<bf.n_rows;j++) {
 	  Ha(bf_potind(j))+=(0.5*vta(ip)+2.0*vla(ip))*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
 	  Hb(bf_potind(j))+=(0.5*vtb(ip)+2.0*vlb(ip))*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
 	}
+      }
 
       // Evaluate laplacian contribution.
-      for(size_t ip=0;ip<grid.size();ip++)
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
 	for(size_t j=0;j<bf.n_rows;j++) {
 	  Ha(bf_potind(j))+=2.0*vla(ip)*bf(j,ip)*bf_lapl(j,ip);
 	  Hb(bf_potind(j))+=2.0*vlb(ip)*bf(j,ip)*bf_lapl(j,ip);
 	}
+      }
     }
   }
 }
@@ -1757,7 +1793,8 @@ arma::vec AngularGrid::eval_force_u() const {
     for(size_t iish=0;iish<shells.size();iish++)
       if(basp->get_shell_center_ind(shells[iish])==inuc) {
 	// Increment grad rho.
-	for(size_t ip=0;ip<grid.size();ip++)
+	for(size_t iip=0;iip<screen.n_elem;iip++) {
+	  size_t ip(screen(iip));
 	  // Loop over functions on shell
 	  for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 	    gradrhoa(0,ip)+=bf_x(mu,ip)*Pav(mu,ip);
@@ -1768,6 +1805,7 @@ arma::vec AngularGrid::eval_force_u() const {
 	    gradrhob(1,ip)+=bf_y(mu,ip)*Pbv(mu,ip);
 	    gradrhob(2,ip)+=bf_z(mu,ip)*Pbv(mu,ip);
 	  }
+	}
       }
 
     // LDA potential
@@ -1791,15 +1829,18 @@ arma::vec AngularGrid::eval_force_u() const {
       for(size_t iish=0;iish<shells.size();iish++)
 	if(basp->get_shell_center_ind(shells[iish])==inuc) {
 	  // First contribution
-	  for(size_t ip=0;ip<grid.size();ip++)
+	  for(size_t iip=0;iip<screen.n_elem;iip++) {
+	    size_t ip(screen(iip));
 	    for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 	      for(int c=0;c<9;c++) {
 		Xa(c,ip)+=bf_hess(9*mu+c,ip)*Pav(mu,ip);
 		Xb(c,ip)+=bf_hess(9*mu+c,ip)*Pbv(mu,ip);
 	      }
 	    }
+	  }
 	  // Second contribution
-	  for(size_t ip=0;ip<grid.size();ip++)
+	  for(size_t iip=0;iip<screen.n_elem;iip++) {
+	    size_t ip(screen(iip));
 	    for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 	      // X is stored in column order: xx, yx, zx, xy, yy, zy, xz, yz, zz; but it's symmetric
 	      Xa(0,ip)+=Pav_x(mu,ip)*bf_x(mu,ip);
@@ -1826,6 +1867,7 @@ arma::vec AngularGrid::eval_force_u() const {
 	      Xb(7,ip)+=Pbv_z(mu,ip)*bf_y(mu,ip);
 	      Xb(8,ip)+=Pbv_z(mu,ip)*bf_z(mu,ip);
 	    }
+	  }
 	}
       // Plug in factor
       Xa*=2.0;
@@ -1869,7 +1911,8 @@ arma::vec AngularGrid::eval_force_u() const {
 	Yb.zeros();
 	for(size_t iish=0;iish<shells.size();iish++)
 	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
-	    for(size_t ip=0;ip<grid.size();ip++)
+	    for(size_t iip=0;iip<screen.n_elem;iip++) {
+	      size_t ip(screen(iip));
 	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 		// Y_x =  H_xx g_x + H_xy g_y + H_xz g_z
 		Ya(0,ip) += bf_hess(9*mu  ,ip) * Pav_x(mu,ip) + bf_hess(9*mu+3,ip) * Pav_y(mu,ip) + bf_hess(9*mu+6,ip) * Pav_z(mu,ip);
@@ -1880,6 +1923,7 @@ arma::vec AngularGrid::eval_force_u() const {
 		Yb(1,ip) += bf_hess(9*mu+1,ip) * Pbv_x(mu,ip) + bf_hess(9*mu+4,ip) * Pbv_y(mu,ip) + bf_hess(9*mu+7,ip) * Pbv_z(mu,ip);
 		Yb(2,ip) += bf_hess(9*mu+2,ip) * Pbv_x(mu,ip) + bf_hess(9*mu+5,ip) * Pbv_y(mu,ip) + bf_hess(9*mu+8,ip) * Pbv_z(mu,ip);
 	      }
+	    }
 	  }
 
 	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
@@ -1889,7 +1933,8 @@ arma::vec AngularGrid::eval_force_u() const {
 	Zb.zeros();
 	for(size_t iish=0;iish<shells.size();iish++)
 	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
-	    for(size_t ip=0;ip<grid.size();ip++)
+	    for(size_t iip=0;iip<screen.n_elem;iip++) {
+	      size_t ip(screen(iip));
 	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 		// Z_x =
 		Za(0,ip) += bf_lapl(mu,ip)*Pav_x(mu,ip) + Pav(mu)*bf_lx(mu,ip);
@@ -1900,6 +1945,7 @@ arma::vec AngularGrid::eval_force_u() const {
 		Zb(1,ip) += bf_lapl(mu,ip)*Pbv_y(mu,ip) + Pbv(mu)*bf_ly(mu,ip);
 		Zb(2,ip) += bf_lapl(mu,ip)*Pbv_z(mu,ip) + Pbv(mu)*bf_lz(mu,ip);
 	      }
+	    }
 	  }
 	// Put in the factor 2
 	Za*=2.0;
@@ -1945,7 +1991,8 @@ arma::vec AngularGrid::eval_force_r() const {
     for(size_t iish=0;iish<shells.size();iish++)
       if(basp->get_shell_center_ind(shells[iish])==inuc) {
 	// Increment grad rho.
-	for(size_t ip=0;ip<grid.size();ip++)
+	for(size_t iip=0;iip<screen.n_elem;iip++) {
+	  size_t ip(screen(iip));
 	  // Loop over functions on shell
 	  for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 	    gradrho(0,ip)+=bf_x(mu,ip)*Pv(mu,ip);
@@ -1971,14 +2018,17 @@ arma::vec AngularGrid::eval_force_r() const {
       for(size_t iish=0;iish<shells.size();iish++)
 	if(basp->get_shell_center_ind(shells[iish])==inuc) {
 	  // First contribution
-	  for(size_t ip=0;ip<grid.size();ip++)
+	  for(size_t iip=0;iip<screen.n_elem;iip++) {
+	    size_t ip(screen(iip));
 	    for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 	      for(int c=0;c<9;c++) {
 		X(c,ip)+=bf_hess(9*mu+c,ip)*Pv(mu,ip);
 	      }
 	    }
+	  }
 	  // Second contribution
-	  for(size_t ip=0;ip<grid.size();ip++)
+	  for(size_t iip=0;iip<screen.n_elem;iip++) {
+	    size_t ip(screen(iip));
 	    for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 	      // X is stored in column order: xx, yx, zx, xy, yy, zy, xz, yz, zz; but it's symmetric
 	      X(0,ip)+=Pv_x(mu,ip)*bf_x(mu,ip);
@@ -1993,6 +2043,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	      X(7,ip)+=Pv_z(mu,ip)*bf_y(mu,ip);
 	      X(8,ip)+=Pv_z(mu,ip)*bf_z(mu,ip);
 	    }
+	  }
 	}
       // Plug in factor
       X*=2.0;
@@ -2022,13 +2073,15 @@ arma::vec AngularGrid::eval_force_r() const {
 	Y.zeros();
 	for(size_t iish=0;iish<shells.size();iish++)
 	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
-	    for(size_t ip=0;ip<grid.size();ip++)
+	    for(size_t iip=0;iip<screen.n_elem;iip++) {
+	      size_t ip(screen(iip));
 	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 		// Y_x =  H_xx g_x + H_xy g_y + H_xz g_z
 		Y(0,ip) += bf_hess(9*mu  ,ip) * Pv_x(mu,ip) + bf_hess(9*mu+3,ip) * Pv_y(mu,ip) + bf_hess(9*mu+6,ip) * Pv_z(mu,ip);
 		Y(1,ip) += bf_hess(9*mu+1,ip) * Pv_x(mu,ip) + bf_hess(9*mu+4,ip) * Pv_y(mu,ip) + bf_hess(9*mu+7,ip) * Pv_z(mu,ip);
 		Y(2,ip) += bf_hess(9*mu+2,ip) * Pv_x(mu,ip) + bf_hess(9*mu+5,ip) * Pv_y(mu,ip) + bf_hess(9*mu+8,ip) * Pv_z(mu,ip);
 	      }
+	    }
 	  }
 
 	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
@@ -2036,13 +2089,15 @@ arma::vec AngularGrid::eval_force_r() const {
 	Z.zeros();
 	for(size_t iish=0;iish<shells.size();iish++)
 	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
-	    for(size_t ip=0;ip<grid.size();ip++)
+	    for(size_t iip=0;iip<screen.n_elem;iip++) {
+	      size_t ip(screen(iip));
 	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 		// Z_x =
 		Z(0,ip) += bf_lapl(mu,ip)*Pv_x(mu,ip) + Pv(mu)*bf_lx(mu,ip);
 		Z(1,ip) += bf_lapl(mu,ip)*Pv_y(mu,ip) + Pv(mu)*bf_ly(mu,ip);
 		Z(2,ip) += bf_lapl(mu,ip)*Pv_z(mu,ip) + Pv(mu)*bf_lz(mu,ip);
 	      }
+	    }
 	  }
 	// Put in the factor 2
 	Z*=2.0;
