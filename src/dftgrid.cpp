@@ -1783,6 +1783,12 @@ arma::vec AngularGrid::eval_force_u() const {
   arma::vec f(3*basp->get_Nnuc());
   f.zeros();
 
+  // Screen quadrature points by small densities
+  arma::uvec screen(screen_density());
+  // No important grid points, return
+  if(!screen.n_elem)
+    return f;
+
   // Loop over nuclei
   for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
     // Grad rho in grid points wrt functions centered on nucleus
@@ -1983,6 +1989,12 @@ arma::vec AngularGrid::eval_force_r() const {
   arma::vec f(3*basp->get_Nnuc());
   f.zeros();
 
+  // Screen quadrature points by small densities
+  arma::uvec screen(screen_density());
+  // No important grid points, return
+  if(!screen.n_elem)
+    return f;
+
   // Loop over nuclei
   for(size_t inuc=0;inuc<basp->get_Nnuc();inuc++) {
     // Grad rho in grid points wrt functions centered on nucleus
@@ -1999,6 +2011,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	    gradrho(1,ip)+=bf_y(mu,ip)*Pv(mu,ip);
 	    gradrho(2,ip)+=bf_z(mu,ip)*Pv(mu,ip);
 	  }
+	}
       }
 
     // LDA potential
