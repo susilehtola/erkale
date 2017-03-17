@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and 
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2015-09-08 Susi Lehtola
+# 2017-03-17 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -86,9 +86,12 @@ export GSLVER="2.3"
 export XCVER="svn"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="7.600.2"
-export CMAKEVER="3.7.1"
-export HDF5VER="1.8.18"
+export ARMAVER="7.800.1"
+export CMAKEVER="3.7.2"
+
+# HDF5 version: MAJOR.MINOR
+export HDF5MAJOR="1.10"
+export HDF5MINOR="0-patch1"
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -138,11 +141,12 @@ fi
 if(( ! ${system_hdf5} )); then
     if [ ! -f ${topdir}/hdf5/lib/libhdf5.a ]; then
 	echo -n "Compiling HDF5 ..."
-	
+
+	HDF5VER="${HDF5MAJOR}.${HDF5MINOR}"
 	if [ ! -d ${builddir}/hdf5-${HDF5VER} ]; then
 	    if [ ! -f ${srcdir}/hdf5-${HDF5VER}.tar.gz ]; then
 		cd ${srcdir}
-		wget -O hdf5-${HDF5VER}.tar.gz http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-${HDF5VER}/src/hdf5-${HDF5VER}.tar.gz
+		wget -O hdf5-${HDF5VER}.tar.gz http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-${HDF5MAJOR}/hdf5-${HDF5VER}/src/hdf5-${HDF5VER}.tar.gz
 	    fi
 	    cd ${builddir}
 	    tar zxf ${srcdir}/hdf5-${HDF5VER}.tar.gz
