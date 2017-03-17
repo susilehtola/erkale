@@ -1010,10 +1010,16 @@ void Checkpoint::read(const std::string & name, hsize_t & v) {
 void Checkpoint::write(const std::string & name, bool val) {
   hbool_t tmp;
   tmp=val;
-  write(name,tmp);
+  write_hbool(name,tmp);
 }
 
-void Checkpoint::write(const std::string & name, hbool_t val) {
+void Checkpoint::read(const std::string & name, bool & v) {
+  hbool_t tmp;
+  read_hbool(name,tmp);
+  v=tmp;
+}
+
+void Checkpoint::write_hbool(const std::string & name, hbool_t val) {
   CHECK_WRITE();
   bool cl=false;
   if(!opend) {
@@ -1044,13 +1050,7 @@ void Checkpoint::write(const std::string & name, hbool_t val) {
   if(cl) close();
 }
 
-void Checkpoint::read(const std::string & name, bool & v) {
-  hbool_t tmp;
-  read(name,tmp);
-  v=tmp;
-}
-
-void Checkpoint::read(const std::string & name, hbool_t & v) {
+void Checkpoint::read_hbool(const std::string & name, hbool_t & v) {
   bool cl=false;
   if(!opend) {
     open();

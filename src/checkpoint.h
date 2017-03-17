@@ -80,9 +80,9 @@ class Checkpoint {
   // *** Helper functions ***
 
   /// Save value
-  void write(const std::string & name, hbool_t val);
+  void write_hbool(const std::string & name, hbool_t val);
   /// Read value
-  void read(const std::string & name, hbool_t & val);
+  void read_hbool(const std::string & name, hbool_t & val);
 
  public:
   /// Create checkpoint file
