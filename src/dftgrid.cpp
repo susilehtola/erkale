@@ -698,17 +698,23 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   const size_t N=grid.size();
 
   // Work arrays - exchange and correlation are computed separately
-  arma::vec exc_wrk(exc);
-  arma::mat vxc_wrk(vxc);
-  arma::mat vsigma_wrk(vsigma);
-  arma::mat vlapl_wrk(vlapl);
-  arma::mat vtau_wrk(vtau);
+  arma::vec exc_wrk;
+  arma::mat vxc_wrk;
+  arma::mat vsigma_wrk;
+  arma::mat vlapl_wrk;
+  arma::mat vtau_wrk;
 
-  exc_wrk.zeros();
-  vxc_wrk.zeros();
-  vsigma_wrk.zeros();
-  vlapl_wrk.zeros();
-  vtau_wrk.zeros();
+  if(has_exc(func_id))
+    exc_wrk.zeros(exc.n_elem);
+  if(pot) {
+    vxc_wrk.zeros(vxc.n_rows,vxc.n_cols);
+    if(gga || mgga)
+      vsigma_wrk.zeros(vsigma.n_rows,vsigma.n_cols);
+    if(mgga) {
+      vlapl_wrk.zeros(vlapl.n_rows,vlapl.n_cols);
+      vtau_wrk.zeros(vtau.n_rows,vtau.n_cols);
+    }
+  }
 
   // Spin variable for libxc
   int nspin;
@@ -758,10 +764,13 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   // Sum to total arrays containing both exchange and correlation
   exc+=exc_wrk;
   if(pot) {
+    if(mgga) {
+      vlapl+=vlapl_wrk;
+      vtau+=vtau_wrk;
+    }
+    if(mgga || gga)
+      vsigma+=vsigma_wrk;
     vxc+=vxc_wrk;
-    vsigma+=vsigma_wrk;
-    vlapl+=vlapl_wrk;
-    vtau+=vtau_wrk;
   }
 
   // Free functional
