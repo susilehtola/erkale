@@ -64,6 +64,7 @@ bool operator<(const dens_list_t &lhs, const dens_list_t & rhs) {
 
 AngularGrid::AngularGrid(bool lobatto_) : use_lobatto(lobatto_) {
   do_grad=false;
+  do_tau=false;
   do_lapl=false;
   do_hess=false;
   do_lgrad=false;
@@ -411,7 +412,7 @@ void AngularGrid::update_density(const arma::mat & P0) {
   }
 
   // Calculate laplacian and kinetic energy density
-  if(do_lapl) {
+  if(do_tau && do_lapl) {
     // Adjust size of grid
     lapl.zeros(1,grid.size());
     tau.zeros(1,grid.size());
@@ -434,6 +435,48 @@ void AngularGrid::update_density(const arma::mat & P0) {
       // Store values
       lapl(0,ip)=2.0*(lap+grad);
       tau(0,ip)=0.5*grad;
+    }
+  } else if(do_tau) {
+    // Adjust size of grid
+    tau.zeros(1,grid.size());
+
+    // Update helpers
+    Pv_x=P*bf_x;
+    Pv_y=P*bf_y;
+    Pv_z=P*bf_z;
+
+    // Calculate values
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Gradient term
+      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
+      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
+      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
+      double grad(gradx+grady+gradz);
+
+      // Store values
+      tau(0,ip)=0.5*grad;
+    }
+  } else if(do_lapl) {
+    // Adjust size of grid
+    lapl.zeros(1,grid.size());
+
+    // Update helpers
+    Pv_x=P*bf_x;
+    Pv_y=P*bf_y;
+    Pv_z=P*bf_z;
+
+    // Calculate values
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Laplacian term
+      double lap=arma::dot(Pv.col(ip),bf_lapl.col(ip));
+      // Gradient term
+      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
+      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
+      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
+      double grad(gradx+grady+gradz);
+
+      // Store values
+      lapl(0,ip)=2.0*(lap+grad);
     }
   }
 }
@@ -489,10 +532,12 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
   }
 
   // Calculate laplacian and kinetic energy density
-  if(do_lapl) {
+  if(do_tau || do_lapl) {
     // Adjust size of grid
-    lapl.zeros(2,grid.size());
-    tau.resize(2,grid.size());
+    if(do_lapl)
+      lapl.zeros(2,grid.size());
+    if(do_tau)
+      tau.resize(2,grid.size());
 
     // Update helpers
     Pav_x=Pa*bf_x;
@@ -504,26 +549,65 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
     Pbv_z=Pb*bf_z;
 
     // Calculate values
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Laplacian term
-      double lapa=arma::dot(Pav.col(ip),bf_lapl.col(ip));
-      double lapb=arma::dot(Pbv.col(ip),bf_lapl.col(ip));
-      // Gradient term
-      double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
-      double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
-      double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
-      double grada(gradax+graday+gradaz);
+    if(do_tau && do_lapl) {
+      for(size_t ip=0;ip<grid.size();ip++) {
+	// Laplacian term
+	double lapa=arma::dot(Pav.col(ip),bf_lapl.col(ip));
+	double lapb=arma::dot(Pbv.col(ip),bf_lapl.col(ip));
+	// Gradient term
+	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
+	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
+	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
+	double grada(gradax+graday+gradaz);
 
-      double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
-      double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
-      double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
-      double gradb(gradbx+gradby+gradbz);
+	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
+	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
+	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
+	double gradb(gradbx+gradby+gradbz);
 
-      // Store values
-      lapl(0,ip)=2.0*(lapa+grada);
-      lapl(1,ip)=2.0*(lapb+gradb);
-      tau(0,ip)=0.5*grada;
-      tau(1,ip)=0.5*gradb;
+	// Store values
+	lapl(0,ip)=2.0*(lapa+grada);
+	lapl(1,ip)=2.0*(lapb+gradb);
+	tau(0,ip)=0.5*grada;
+	tau(1,ip)=0.5*gradb;
+      }
+    } else if(do_tau) {
+      for(size_t ip=0;ip<grid.size();ip++) {
+	// Gradient term
+	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
+	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
+	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
+	double grada(gradax+graday+gradaz);
+
+	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
+	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
+	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
+	double gradb(gradbx+gradby+gradbz);
+
+	// Store values
+	tau(0,ip)=0.5*grada;
+	tau(1,ip)=0.5*gradb;
+      }
+    } else if(do_lapl) {
+      for(size_t ip=0;ip<grid.size();ip++) {
+	// Laplacian term
+	double lapa=arma::dot(Pav.col(ip),bf_lapl.col(ip));
+	double lapb=arma::dot(Pbv.col(ip),bf_lapl.col(ip));
+	// Gradient term
+	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
+	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
+	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
+	double grada(gradax+graday+gradaz);
+
+	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
+	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
+	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
+	double gradb(gradbx+gradby+gradbz);
+
+	// Store values
+	lapl(0,ip)=2.0*(lapa+grada);
+	lapl(1,ip)=2.0*(lapb+gradb);
+      }
     }
   }
 }
@@ -570,7 +654,7 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
       sigma(0,ip) =std::pow(grho(0,ip),2) + std::pow(grho(1,ip),2) + std::pow(grho(2,ip),2);
     }
 
-    if(do_lapl) {
+    if(do_tau && do_lapl) {
       // Adjust size of grid
       lapl.zeros(2,grid.size());
       tau.zeros(2,grid.size());
@@ -588,6 +672,35 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
 	lapl(0,ip)=2.0*(lap+grad);
 	// Kinetic energy density is
 	tau(0,ip)=0.5*grad;
+      }
+    } else if(do_tau) {
+      // Adjust size of grid
+      tau.zeros(2,grid.size());
+
+      // Compute orbital laplacian
+      arma::cx_rowvec Cv_lapl=arma::strans(C)*bf_lapl;
+
+      for(size_t ip=0;ip<grid.size();ip++) {
+	// Gradient term
+	double grad=std::norm(Cv_x(ip)) + std::norm(Cv_y(ip)) + std::norm(Cv_z(ip));
+	// Kinetic energy density is
+	tau(0,ip)=0.5*grad;
+      }
+    } else if(do_lapl) {
+      // Adjust size of grid
+      lapl.zeros(2,grid.size());
+
+      // Compute orbital laplacian
+      arma::cx_rowvec Cv_lapl=arma::strans(C)*bf_lapl;
+
+      for(size_t ip=0;ip<grid.size();ip++) {
+	// Laplacian term
+	double lap=std::real(Cv_lapl(ip)*std::conj(Cv(ip)));
+	// Gradient term
+	double grad=std::norm(Cv_x(ip)) + std::norm(Cv_y(ip)) + std::norm(Cv_z(ip));
+
+	// Laplacian is (including degeneracy factors)
+	lapl(0,ip)=2.0*(lap+grad);
       }
     }
   }
@@ -637,24 +750,26 @@ void AngularGrid::init_xc() {
     vxc.zeros(1,N);
     if(do_grad)
       vsigma.zeros(1,N);
-    if(do_lapl) {
+    if(do_tau)
       vtau.zeros(1,N);
+    if(do_lapl)
       vlapl.zeros(1,N);
-    }
   } else {
     // Unrestricted case
     vxc.zeros(2,N);
     if(do_grad)
       vsigma.zeros(3,N);
+    if(do_tau)
+      vtau.zeros(2,N);
     if(do_lapl) {
       vlapl.zeros(2,N);
-      vtau.zeros(2,N);
     }
   }
 
   // Initial values
   do_gga=false;
-  do_mgga=false;
+  do_mgga_l=false;
+  do_mgga_t=false;
 }
 
 void check_array(const std::vector<double> & x, size_t n, std::vector<size_t> & idx) {
@@ -686,13 +801,14 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   // Compute exchange-correlation functional
 
   // Which functional is in question?
-  bool gga, mgga;
-  is_gga_mgga(func_id,gga,mgga);
+  bool gga, mgga_t, mgga_l;
+  is_gga_mgga(func_id,gga,mgga_t,mgga_l);
 
   // Update controlling flags for eval_Fxc (exchange and correlation
   // parts might be of different type)
-  do_gga=do_gga || gga || mgga;
-  do_mgga=do_mgga || mgga;
+  do_gga=do_gga || gga || mgga_t || mgga_l;
+  do_mgga_t=do_mgga_t || mgga_t;
+  do_mgga_l=do_mgga_l || mgga_l;
 
   // Amount of grid points
   const size_t N=grid.size();
@@ -708,12 +824,12 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
     exc_wrk.zeros(exc.n_elem);
   if(pot) {
     vxc_wrk.zeros(vxc.n_rows,vxc.n_cols);
-    if(gga || mgga)
+    if(gga || mgga_t || mgga_l)
       vsigma_wrk.zeros(vsigma.n_rows,vsigma.n_cols);
-    if(mgga) {
-      vlapl_wrk.zeros(vlapl.n_rows,vlapl.n_cols);
+    if(mgga_t)
       vtau_wrk.zeros(vtau.n_rows,vtau.n_cols);
-    }
+    if(mgga_l)
+      vlapl_wrk.zeros(vlapl.n_rows,vlapl.n_cols);
   }
 
   // Spin variable for libxc
@@ -735,16 +851,22 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   // Evaluate functionals.
   if(has_exc(func_id)) {
     if(pot) {
-      if(mgga) // meta-GGA
-	xc_mgga_exc_vxc(&func, N, rho.memptr(), sigma.memptr(), lapl.memptr(), tau.memptr(), exc_wrk.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr(), vlapl_wrk.memptr(), vtau_wrk.memptr());
-      else if(gga) // GGA
+      if(mgga_t || mgga_l) {// meta-GGA
+	double * laplp = mgga_t ? lapl.memptr() : NULL;
+	double * taup = mgga_t ? tau.memptr() : NULL;
+	double * vlaplp = mgga_t ? vlapl_wrk.memptr() : NULL;
+	double * vtaup = mgga_t ? vtau_wrk.memptr() : NULL;
+	xc_mgga_exc_vxc(&func, N, rho.memptr(), sigma.memptr(), laplp, taup, exc_wrk.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr(), vlaplp, vtaup);
+      } else if(gga) // GGA
 	xc_gga_exc_vxc(&func, N, rho.memptr(), sigma.memptr(), exc_wrk.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr());
       else // LDA
 	xc_lda_exc_vxc(&func, N, rho.memptr(), exc_wrk.memptr(), vxc_wrk.memptr());
     } else {
-      if(mgga) // meta-GGA
-	xc_mgga_exc(&func, N, rho.memptr(), sigma.memptr(), lapl.memptr(), tau.memptr(), exc_wrk.memptr());
-      else if(gga) // GGA
+      if(mgga_t || mgga_l) { // meta-GGA
+	double * laplp = mgga_t ? lapl.memptr() : NULL;
+	double * taup = mgga_t ? tau.memptr() : NULL;
+	xc_mgga_exc(&func, N, rho.memptr(), sigma.memptr(), laplp, taup, exc_wrk.memptr());
+      } else if(gga) // GGA
 	xc_gga_exc(&func, N, rho.memptr(), sigma.memptr(), exc_wrk.memptr());
       else // LDA
 	xc_lda_exc(&func, N, rho.memptr(), exc_wrk.memptr());
@@ -752,9 +874,13 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
 
   } else {
     if(pot) {
-      if(mgga) // meta-GGA
-	xc_mgga_vxc(&func, N, rho.memptr(), sigma.memptr(), lapl.memptr(), tau.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr(), vlapl_wrk.memptr(), vtau_wrk.memptr());
-      else if(gga) // GGA
+      if(mgga_t || mgga_l) { // meta-GGA
+	double * laplp = mgga_t ? lapl.memptr() : NULL;
+	double * taup = mgga_t ? tau.memptr() : NULL;
+	double * vlaplp = mgga_t ? vlapl_wrk.memptr() : NULL;
+	double * vtaup = mgga_t ? vtau_wrk.memptr() : NULL;
+	xc_mgga_vxc(&func, N, rho.memptr(), sigma.memptr(), laplp, taup, vxc_wrk.memptr(), vsigma_wrk.memptr(), vlaplp, vtaup);
+      } else if(gga) // GGA
 	xc_gga_vxc(&func, N, rho.memptr(), sigma.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr());
       else // LDA
 	xc_lda_vxc(&func, N, rho.memptr(), vxc_wrk.memptr());
@@ -762,13 +888,14 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   }
 
   // Sum to total arrays containing both exchange and correlation
-  exc+=exc_wrk;
+  if(has_exc(func_id))
+    exc+=exc_wrk;
   if(pot) {
-    if(mgga) {
+    if(mgga_l)
       vlapl+=vlapl_wrk;
+    if(mgga_t)
       vtau+=vtau_wrk;
-    }
-    if(mgga || gga)
+    if(mgga_t || mgga_l || gga)
       vsigma+=vsigma_wrk;
     vxc+=vxc_wrk;
   }
@@ -781,7 +908,8 @@ void AngularGrid::init_VV10(double b, double C, bool pot) {
   if(!do_grad)
     throw std::runtime_error("Invalid do_grad setting for VV10!\n");
   do_gga=true;
-  do_mgga=false;
+  do_mgga_t=false;
+  do_mgga_l=false;
   VV10_thr=1e-8;
 
   if(rho.size() != grid.size()) {
@@ -1182,15 +1310,20 @@ libxc_dens_t AngularGrid::get_dens(size_t idx) const {
     }
   }
 
-  if(do_mgga) {
+  if(do_mgga_t) {
     if(polarized) {
-      ret.lapla=lapl(0,idx);
-      ret.laplb=lapl(1,idx);
       ret.taua=tau(0,idx);
       ret.taub=tau(1,idx);
     } else {
-      ret.lapla=ret.laplb=lapl(0,idx)/2.0;
       ret.taua=ret.taub=tau(0,idx)/2.0;
+    }
+  }
+  if(do_mgga_l) {
+    if(polarized) {
+      ret.lapla=lapl(0,idx);
+      ret.laplb=lapl(1,idx);
+    } else {
+      ret.lapla=ret.laplb=lapl(0,idx)/2.0;
     }
   }
 
@@ -1242,15 +1375,21 @@ libxc_pot_t AngularGrid::get_pot(size_t idx) const {
     }
   }
 
-  if(do_mgga) {
+  if(do_mgga_t) {
     if(polarized) {
-      ret.vlapla=vlapl(0,idx);
-      ret.vlaplb=vlapl(1,idx);
       ret.vtaua=vtau(0,idx);
       ret.vtaub=vtau(1,idx);
     } else {
-      ret.vlapla=ret.vlaplb=vlapl(0,idx)/2.0;
       ret.vtaua=ret.vtaub=vtau(0,idx)/2.0;
+    }
+  }
+
+  if(do_mgga_l) {
+    if(polarized) {
+      ret.vlapla=vlapl(0,idx);
+      ret.vlaplb=vlapl(1,idx);
+    } else {
+      ret.vlapla=ret.vlaplb=vlapl(0,idx)/2.0;
     }
   }
 
@@ -1509,7 +1648,7 @@ void AngularGrid::eval_Fxc(arma::mat & Ho) const {
     increment_gga<double>(H,gr,bf,bf_x,bf_y,bf_z,screen);
   }
 
-  if(do_mgga) {
+  if(do_mgga_t && do_mgga_l) {
     // Get vtau and vlapl
     arma::rowvec vt(vtau.row(0));
     arma::rowvec vl(vlapl.row(0));
@@ -1521,6 +1660,17 @@ void AngularGrid::eval_Fxc(arma::mat & Ho) const {
     increment_mgga_kin<double>(H,0.5*vt + 2.0*vl,bf_x,bf_y,bf_z,screen);
 
     // Evaluate laplacian contribution. Get function laplacian
+    increment_mgga_lapl<double>(H,vl,bf,bf_lapl,screen);
+
+  } else if(do_mgga_t) {
+    arma::rowvec vt(vtau.row(0));
+    vt%=w;
+    increment_mgga_kin<double>(H,0.5*vt,bf_x,bf_y,bf_z,screen);
+
+  } else if(do_mgga_l) {
+    arma::rowvec vl(vlapl.row(0));
+    vl%=w;
+    increment_mgga_kin<double>(H,2.0*vl,bf_x,bf_y,bf_z,screen);
     increment_mgga_lapl<double>(H,vl,bf,bf_lapl,screen);
   }
 
@@ -1569,7 +1719,7 @@ void AngularGrid::eval_diag_Fxc(arma::vec & H) const {
 	H(bf_potind(j))+=2.0 * (gr(ip,0)*bf_x(j,ip) + gr(ip,1)*bf_y(j,ip) + gr(ip,2)*bf_z(j,ip)) * bf(j,ip);
     }
 
-    if(do_mgga) {
+    if(do_mgga_t && do_mgga_l) {
       // Get vtau and vlapl
       arma::rowvec vt(vtau.row(0));
       arma::rowvec vl(vlapl.row(0));
@@ -1582,6 +1732,35 @@ void AngularGrid::eval_diag_Fxc(arma::vec & H) const {
 	size_t ip(screen(iip));
 	for(size_t j=0;j<bf.n_rows;j++)
 	  H(bf_potind(j))+=(0.5*vt(ip)+2.0*vl(ip))*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
+      }
+
+      // Evaluate laplacian contribution.
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
+	for(size_t j=0;j<bf.n_rows;j++)
+	  H(bf_potind(j))+=2.0*vl(ip)*bf(j,ip)*bf_lapl(j,ip);
+      }
+
+    } else if(do_mgga_t) {
+      arma::rowvec vt(vtau.row(0));
+      vt%=w;
+
+      // Evaluate kinetic contribution
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
+	for(size_t j=0;j<bf.n_rows;j++)
+	  H(bf_potind(j))+=0.5*vt(ip)*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
+      }
+
+    } else if(do_mgga_l) {
+      arma::rowvec vl(vlapl.row(0));
+      vl%=w;
+
+      // Evaluate kinetic contribution
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
+	for(size_t j=0;j<bf.n_rows;j++)
+	  H(bf_potind(j))+=2.0*vl(ip)*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
       }
 
       // Evaluate laplacian contribution.
@@ -1657,7 +1836,7 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
     }
   }
 
-  if(do_mgga) {
+  if(do_mgga_t && do_mgga_l) {
     // Get vtau and vlapl
     arma::rowvec vt_a(vtau.row(0));
     arma::rowvec vl_a(vlapl.row(0));
@@ -1678,6 +1857,27 @@ void AngularGrid::eval_Fxc(arma::mat & Hao, arma::mat & Hbo, bool beta) const {
       vt_b%=w;
       vl_b%=w;
       increment_mgga_kin<double>(Hb,0.5*vt_b + 2.0*vl_b,bf_x,bf_y,bf_z,screen);
+      increment_mgga_lapl<double>(Hb,vl_b,bf,bf_lapl,screen);
+    }
+  } else if(do_mgga_t) {
+    arma::rowvec vt_a(vtau.row(0));
+    vt_a%=w;
+    increment_mgga_kin<double>(Ha,0.5*vt_a,bf_x,bf_y,bf_z,screen);
+    if(beta) {
+      arma::rowvec vt_b(vtau.row(1));
+      vt_b%=w;
+      increment_mgga_kin<double>(Hb,0.5*vt_b,bf_x,bf_y,bf_z,screen);
+    }
+  } else if(do_mgga_l) {
+    arma::rowvec vl_a(vlapl.row(0));
+    vl_a%=w;
+    increment_mgga_kin<double>(Ha,2.0*vl_a,bf_x,bf_y,bf_z,screen);
+    increment_mgga_lapl<double>(Ha,vl_a,bf,bf_lapl,screen);
+
+    if(beta) {
+      arma::rowvec vl_b(vlapl.row(1));
+      vl_b%=w;
+      increment_mgga_kin<double>(Hb,2.0*vl_b,bf_x,bf_y,bf_z,screen);
       increment_mgga_lapl<double>(Hb,vl_b,bf,bf_lapl,screen);
     }
   }
@@ -1749,7 +1949,7 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
 	Hb(bf_potind(j))+=2.0 * (grb(ip,0)*bf_x(j,ip) + grb(ip,1)*bf_y(j,ip) + grb(ip,2)*bf_z(j,ip)) * bf(j,ip);
     }
 
-    if(do_mgga) {
+    if(do_mgga_t && do_mgga_l) {
       // Get vtau and vlapl
       arma::rowvec vta(vtau.row(0));
       arma::rowvec vla(vlapl.row(0));
@@ -1767,6 +1967,45 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
 	for(size_t j=0;j<bf.n_rows;j++) {
 	  Ha(bf_potind(j))+=(0.5*vta(ip)+2.0*vla(ip))*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
 	  Hb(bf_potind(j))+=(0.5*vtb(ip)+2.0*vlb(ip))*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
+	}
+      }
+
+      // Evaluate laplacian contribution.
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
+	for(size_t j=0;j<bf.n_rows;j++) {
+	  Ha(bf_potind(j))+=2.0*vla(ip)*bf(j,ip)*bf_lapl(j,ip);
+	  Hb(bf_potind(j))+=2.0*vlb(ip)*bf(j,ip)*bf_lapl(j,ip);
+	}
+      }
+
+    } else if(do_mgga_t) {
+      arma::rowvec vta(vtau.row(0));
+      arma::rowvec vtb(vtau.row(1));
+      vta%=w;
+      vtb%=w;
+
+      // Evaluate kinetic contribution
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
+	for(size_t j=0;j<bf.n_rows;j++) {
+	  Ha(bf_potind(j))+=0.5*vta(ip)*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
+	  Hb(bf_potind(j))+=0.5*vtb(ip)*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
+	}
+      }
+
+    } else if(do_mgga_l) {
+      arma::rowvec vla(vlapl.row(0));
+      arma::rowvec vlb(vlapl.row(1));
+      vla%=w;
+      vlb%=w;
+
+      // Evaluate kinetic contribution
+      for(size_t iip=0;iip<screen.n_elem;iip++) {
+	size_t ip(screen(iip));
+	for(size_t j=0;j<bf.n_rows;j++) {
+	  Ha(bf_potind(j))+=2.0*vla(ip)*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
+	  Hb(bf_potind(j))+=2.0*vlb(ip)*(bf_x(j,ip)*bf_x(j,ip) + bf_y(j,ip)*bf_y(j,ip) + bf_z(j,ip)*bf_z(j,ip));
 	}
       }
 
@@ -1916,7 +2155,7 @@ arma::vec AngularGrid::eval_force_u() const {
       f(3*inuc+2)+=arma::as_scalar(Xa.row(2)*gr_a.col(0) + Xa.row(5)*gr_a.col(1) + Xa.row(8)*gr_a.col(2));
       f(3*inuc+2)+=arma::as_scalar(Xb.row(2)*gr_b.col(0) + Xb.row(5)*gr_b.col(1) + Xb.row(8)*gr_b.col(2));
 
-      if(do_mgga) {
+      if(do_mgga_t || do_mgga_l) {
 	// Kinetic energy and Laplacian terms
 
 	// Y = P_uv (d_i d_j x(u)) d_j x(v)
@@ -1942,44 +2181,65 @@ arma::vec AngularGrid::eval_force_u() const {
 	  }
 
 	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
-	arma::mat Za(3,grid.size());
-	Za.zeros();
-	arma::mat Zb(3,grid.size());
-	Zb.zeros();
-	for(size_t iish=0;iish<shells.size();iish++)
-	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
-	    for(size_t iip=0;iip<screen.n_elem;iip++) {
-	      size_t ip(screen(iip));
-	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
-		// Z_x =
-		Za(0,ip) += bf_lapl(mu,ip)*Pav_x(mu,ip) + Pav(mu)*bf_lx(mu,ip);
-		Za(1,ip) += bf_lapl(mu,ip)*Pav_y(mu,ip) + Pav(mu)*bf_ly(mu,ip);
-		Za(2,ip) += bf_lapl(mu,ip)*Pav_z(mu,ip) + Pav(mu)*bf_lz(mu,ip);
+	arma::mat Za, Zb;
+	if(do_mgga_l) {
+	  Za.zeros(3,grid.size());
+	  Zb.zeros(3,grid.size());
+	  for(size_t iish=0;iish<shells.size();iish++)
+	    if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	      for(size_t iip=0;iip<screen.n_elem;iip++) {
+		size_t ip(screen(iip));
+		for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+		  // Z_x =
+		  Za(0,ip) += bf_lapl(mu,ip)*Pav_x(mu,ip) + Pav(mu)*bf_lx(mu,ip);
+		  Za(1,ip) += bf_lapl(mu,ip)*Pav_y(mu,ip) + Pav(mu)*bf_ly(mu,ip);
+		  Za(2,ip) += bf_lapl(mu,ip)*Pav_z(mu,ip) + Pav(mu)*bf_lz(mu,ip);
 
-		Zb(0,ip) += bf_lapl(mu,ip)*Pbv_x(mu,ip) + Pbv(mu)*bf_lx(mu,ip);
-		Zb(1,ip) += bf_lapl(mu,ip)*Pbv_y(mu,ip) + Pbv(mu)*bf_ly(mu,ip);
-		Zb(2,ip) += bf_lapl(mu,ip)*Pbv_z(mu,ip) + Pbv(mu)*bf_lz(mu,ip);
+		  Zb(0,ip) += bf_lapl(mu,ip)*Pbv_x(mu,ip) + Pbv(mu)*bf_lx(mu,ip);
+		  Zb(1,ip) += bf_lapl(mu,ip)*Pbv_y(mu,ip) + Pbv(mu)*bf_ly(mu,ip);
+		  Zb(2,ip) += bf_lapl(mu,ip)*Pbv_z(mu,ip) + Pbv(mu)*bf_lz(mu,ip);
+		}
 	      }
 	    }
-	  }
-	// Put in the factor 2
-	Za*=2.0;
-	Zb*=2.0;
+	  // Put in the factor 2
+	  Za*=2.0;
+	  Zb*=2.0;
+	}
 
-	// Get vtau and vlapl
-	arma::rowvec vt_a(vtau.row(0));
-	arma::rowvec vt_b(vtau.row(1));
-	arma::rowvec vl_a(vlapl.row(0));
-	arma::rowvec vl_b(vlapl.row(1));
-	// Scale both with weights
-	vt_a%=w;
-	vt_b%=w;
-	vl_a%=w;
-	vl_b%=w;
+	if(do_mgga_t && do_mgga_l) {
+	  // Get vtau and vlapl
+	  arma::rowvec vt_a(vtau.row(0));
+	  arma::rowvec vt_b(vtau.row(1));
+	  arma::rowvec vl_a(vlapl.row(0));
+	  arma::rowvec vl_b(vlapl.row(1));
+	  // Scale both with weights
+	  vt_a%=w;
+	  vt_b%=w;
+	  vl_a%=w;
+	  vl_b%=w;
 
-	// Increment force
-	f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(vt_a+2*vl_a) + Za*arma::trans(vl_a);
-	f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(vt_b+2*vl_b) + Zb*arma::trans(vl_b);
+	  // Increment force
+	  f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(vt_a+2*vl_a) + Za*arma::trans(vl_a);
+	  f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(vt_b+2*vl_b) + Zb*arma::trans(vl_b);
+
+	} else if(do_mgga_t) {
+	  arma::rowvec vt_a(vtau.row(0));
+	  arma::rowvec vt_b(vtau.row(1));
+	  vt_a%=w;
+	  vt_b%=w;
+
+	  // Increment force
+	  f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(vt_a);
+	  f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(vt_b);
+
+	} else if(do_mgga_l) {
+	  arma::rowvec vl_a(vlapl.row(0));
+	  arma::rowvec vl_b(vlapl.row(1));
+	  vl_a%=w;
+	  vl_b%=w;
+	  f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(2*vl_a) + Za*arma::trans(vl_a);
+	  f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(2*vl_b) + Zb*arma::trans(vl_b);
+	}
       }
     }
   }
@@ -2087,7 +2347,7 @@ arma::vec AngularGrid::eval_force_r() const {
       // f_z <- X_zx * g_x + X_zy * g_y + X_zz * g_z
       f(3*inuc+2)+=arma::as_scalar(X.row(2)*gr.col(0) + X.row(5)*gr.col(1) + X.row(8)*gr.col(2));
 
-      if(do_mgga) {
+      if(do_mgga_t || do_mgga_l) {
 	// Kinetic energy and Laplacian terms
 
 	// Y = P_uv (d_i d_j x(u)) d_j x(v)
@@ -2107,32 +2367,46 @@ arma::vec AngularGrid::eval_force_r() const {
 	  }
 
 	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
-	arma::mat Z(3,grid.size());
-	Z.zeros();
-	for(size_t iish=0;iish<shells.size();iish++)
-	  if(basp->get_shell_center_ind(shells[iish])==inuc) {
-	    for(size_t iip=0;iip<screen.n_elem;iip++) {
-	      size_t ip(screen(iip));
-	      for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
-		// Z_x =
-		Z(0,ip) += bf_lapl(mu,ip)*Pv_x(mu,ip) + Pv(mu)*bf_lx(mu,ip);
-		Z(1,ip) += bf_lapl(mu,ip)*Pv_y(mu,ip) + Pv(mu)*bf_ly(mu,ip);
-		Z(2,ip) += bf_lapl(mu,ip)*Pv_z(mu,ip) + Pv(mu)*bf_lz(mu,ip);
+	arma::mat Z;
+	if(do_mgga_l) {
+	  Z.zeros(3,grid.size());
+	  for(size_t iish=0;iish<shells.size();iish++)
+	    if(basp->get_shell_center_ind(shells[iish])==inuc) {
+	      for(size_t iip=0;iip<screen.n_elem;iip++) {
+		size_t ip(screen(iip));
+		for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
+		  // Z_x =
+		  Z(0,ip) += bf_lapl(mu,ip)*Pv_x(mu,ip) + Pv(mu)*bf_lx(mu,ip);
+		  Z(1,ip) += bf_lapl(mu,ip)*Pv_y(mu,ip) + Pv(mu)*bf_ly(mu,ip);
+		  Z(2,ip) += bf_lapl(mu,ip)*Pv_z(mu,ip) + Pv(mu)*bf_lz(mu,ip);
+		}
 	      }
 	    }
-	  }
-	// Put in the factor 2
-	Z*=2.0;
+	  // Put in the factor 2
+	  Z*=2.0;
+	}
 
-	// Get vtau and vlapl
-	arma::rowvec vt(vtau.row(0));
-	arma::rowvec vl(vlapl.row(0));
-	// Scale both with weights
-	vt%=w;
-	vl%=w;
+	if(do_mgga_t && do_mgga_l) {
+	  // Get vtau and vlapl
+	  arma::rowvec vt(vtau.row(0));
+	  arma::rowvec vl(vlapl.row(0));
+	  // Scale both with weights
+	  vt%=w;
+	  vl%=w;
 
-	// Increment force
-	f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(vt+2*vl) + Z*arma::trans(vl);
+	  // Increment force
+	  f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(vt+2*vl) + Z*arma::trans(vl);
+
+	} else if(do_mgga_t) {
+	  arma::rowvec vt(vtau.row(0));
+	  vt%=w;
+	  f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(vt);
+
+	} else if(do_mgga_l) {
+	  arma::rowvec vl(vlapl.row(0));
+	  vl%=w;
+	  f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(2*vl) + Z*arma::trans(vl);
+	}
       }
     }
   }
@@ -2140,13 +2414,20 @@ arma::vec AngularGrid::eval_force_r() const {
   return f;
 }
 
-void AngularGrid::check_grad_lapl(int x_func, int c_func) {
+void AngularGrid::check_grad_tau_lapl(int x_func, int c_func) {
   // Do we need gradients?
   do_grad=false;
   if(x_func>0)
     do_grad=do_grad || gradient_needed(x_func);
   if(c_func>0)
     do_grad=do_grad || gradient_needed(c_func);
+
+  // Do we need laplacians?
+  do_tau=false;
+  if(x_func>0)
+    do_tau=do_tau || tau_needed(x_func);
+  if(c_func>0)
+    do_tau=do_tau || tau_needed(c_func);
 
   // Do we need laplacians?
   do_lapl=false;
@@ -2156,14 +2437,16 @@ void AngularGrid::check_grad_lapl(int x_func, int c_func) {
     do_lapl=do_lapl || laplacian_needed(c_func);
 }
 
-void AngularGrid::get_grad_lapl(bool & grad, bool & lap) const {
-  grad=do_grad;
-  lap=do_lapl;
+void AngularGrid::get_grad_tau_lapl(bool & grad_, bool & tau_, bool & lap_) const {
+  grad_=do_grad;
+  tau_=do_tau;
+  lap_=do_lapl;
 }
 
-void AngularGrid::set_grad_lapl(bool grad, bool lap) {
-  do_grad=grad;
-  do_lapl=lap;
+void AngularGrid::set_grad_tau_lapl(bool grad_, bool tau_, bool lap_) {
+  do_grad=grad_;
+  do_tau=tau_;
+  do_lapl=lap_;
 }
 
 void AngularGrid::set_hess_lgrad(bool hess, bool lgrad) {
@@ -2793,13 +3076,13 @@ void DFTGrid::prune_shells() {
 
 void DFTGrid::construct(int nrad, int lmax, int x_func, int c_func, bool strict) {
   // Check necessity of gradients and laplacians
-  bool grad, lapl;
-  wrk[0].check_grad_lapl(x_func,c_func);
-  wrk[0].get_grad_lapl(grad,lapl);
-  construct(nrad,lmax,grad,lapl,strict,false);
+  bool grad, tau, lapl;
+  wrk[0].check_grad_tau_lapl(x_func,c_func);
+  wrk[0].get_grad_tau_lapl(grad,tau,lapl);
+  construct(nrad,lmax,grad,tau,lapl,strict,false);
 }
 
-void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool strict, bool nl) {
+void DFTGrid::construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool strict, bool nl) {
   if(verbose) {
     if(nl)
       printf("Constructing static nrad=%i lmax=%i NL grid.\n",nrad,lmax);
@@ -2810,7 +3093,7 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool lapl, bool strict, b
 
   // Set necessity of gradienst and laplacian and grid
   for(size_t i=0;i<wrk.size();i++) {
-    wrk[i].set_grad_lapl(grad,lapl);
+    wrk[i].set_grad_tau_lapl(grad,tau,lapl);
   }
 
   // Set grid point screening tolerances
@@ -2880,7 +3163,7 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
 
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].check_grad_lapl(x_func,c_func);
+    wrk[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
@@ -2946,7 +3229,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
 
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].check_grad_lapl(x_func,c_func);
+    wrk[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
@@ -3011,7 +3294,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
 
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].check_grad_lapl(x_func,c_func);
+    wrk[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
@@ -3115,7 +3398,7 @@ void DFTGrid::construct_becke(double otoler) {
 
   // Only need function values
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_grad_lapl(false,false);
+    wrk[i].set_grad_tau_lapl(false,false,false);
 
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
@@ -3180,7 +3463,7 @@ void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otoler) {
 
   // Only need function values
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_grad_lapl(false,false);
+    wrk[i].set_grad_tau_lapl(false,false,false);
 
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
@@ -3516,7 +3799,7 @@ arma::mat DFTGrid::eval_tau_overlap(const arma::cx_mat & Cocc, double k, double 
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
       wrk[ith].set_grid(grids[i]);
-      wrk[ith].set_grad_lapl(true,false);
+      wrk[ith].set_grad_tau_lapl(true,false,false);
       wrk[ith].form_grid();
       // Evaluate overlap
 #ifdef _OPENMP
@@ -3565,7 +3848,7 @@ arma::mat DFTGrid::eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma:
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
       wrk[ith].set_grid(grids[i]);
-      wrk[ith].set_grad_lapl(true,false);
+      wrk[ith].set_grad_tau_lapl(true,false,false);
       wrk[ith].form_grid();
       // Evaluate overlap
 #ifdef _OPENMP
@@ -4119,8 +4402,8 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
   double Enl=0.0;
 
   // Original gradient and laplacian settings
-  bool grad, lapl;
-  wrk[0].get_grad_lapl(grad,lapl);
+  bool grad, tau, lapl;
+  wrk[0].get_grad_tau_lapl(grad,tau,lapl);
 
   // Collect nl grid data
   std::vector<arma::mat> nldata(nl.grids.size());
@@ -4138,7 +4421,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
     for(size_t i=0;i<nl.grids.size();i++) {
       // Change atom
       wrk[ith].set_grid(nl.grids[i]);
-      wrk[ith].set_grad_lapl(true,false);
+      wrk[ith].set_grad_tau_lapl(true,false,false);
       // Create grid
       wrk[ith].form_grid();
 
@@ -4189,7 +4472,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
     for(size_t i=0;i<grids.size();i++) {
       // Change atom
       wrk[ith].set_grid(grids[i]);
-      wrk[ith].set_grad_lapl(true,false);
+      wrk[ith].set_grad_tau_lapl(true,false,false);
       // Initialize worker
       wrk[ith].form_grid();
 
@@ -4223,7 +4506,7 @@ void DFTGrid::eval_VV10(DFTGrid & nl, double b, double C, const arma::mat & P, a
   Enl_=Enl;
 
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_grad_lapl(grad,lapl);
+    wrk[i].set_grad_tau_lapl(grad,tau,lapl);
 }
 
 arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
@@ -4248,10 +4531,10 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 #endif
     // Loop over atoms
     for(size_t iat=0;iat<grids.size();iat++) {
-      bool grad, lapl;
-      wrk[ith].get_grad_lapl(grad,lapl);
+      bool grad, tau, lapl;
+      wrk[ith].get_grad_tau_lapl(grad,tau,lapl);
       // We need gradients for the LDA terms and Laplacian terms for the GGA terms (Pv_i really)
-      wrk[ith].set_grad_lapl(true,grad);
+      wrk[ith].set_grad_tau_lapl(true,grad,grad);
       // Need bf Hessian for GGA and laplacian gradient for MGGA
       wrk[ith].set_hess_lgrad(grad,lapl);
 
@@ -4313,9 +4596,9 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
     // Loop over atoms
     for(size_t iat=0;iat<grids.size();iat++) {
       // We need gradients for the LDA terms
-      bool grad, lapl;
-      wrk[ith].get_grad_lapl(grad,lapl);
-      wrk[ith].set_grad_lapl(true,lapl);
+      bool grad, tau, lapl;
+      wrk[ith].get_grad_tau_lapl(grad,tau,lapl);
+      wrk[ith].set_grad_tau_lapl(true,grad,grad);
       // Need bf Hessian for GGA and laplacian gradient for MGGA
       wrk[ith].set_hess_lgrad(grad,lapl);
 
@@ -4360,8 +4643,8 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
   f.zeros();
 
   // Original gradient and laplacian settings
-  bool grad, lapl;
-  wrk[0].get_grad_lapl(grad,lapl);
+  bool grad, tau, lapl;
+  wrk[0].get_grad_tau_lapl(grad,tau,lapl);
 
   // Collect nl grid data
   std::vector<arma::mat> nldata(nl.grids.size());
@@ -4378,7 +4661,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
 #endif
     for(size_t i=0;i<nl.grids.size();i++) {
       // Need gradient for VV10 but no laplacian
-      wrk[ith].set_grad_lapl(true,false);
+      wrk[ith].set_grad_tau_lapl(true,false,false);
       // No need for Hessian or laplacian of gradient
       wrk[ith].set_hess_lgrad(false,false);
       // Change atom and create grid
@@ -4416,7 +4699,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
 #endif
     for(size_t i=0;i<grids.size();i++) {
       // Need gradient for VV10 and laplacian for VV10 gradient
-      wrk[ith].set_grad_lapl(true,true);
+      wrk[ith].set_grad_tau_lapl(true,true,true);
       // Need hessian for VV10 gradient
       wrk[ith].set_hess_lgrad(true,false);
       // Change atom and create grid
@@ -4447,7 +4730,7 @@ arma::vec DFTGrid::eval_VV10_force(DFTGrid & nl, double b, double C, const arma:
   }
 
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].set_grad_lapl(grad,lapl);
+    wrk[i].set_grad_tau_lapl(grad,tau,lapl);
 
   return f;
 }

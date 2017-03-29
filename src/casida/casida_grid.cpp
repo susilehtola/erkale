@@ -240,7 +240,7 @@ void CasidaGrid::construct(const std::vector<arma::mat> & P, double ftoler, int 
   
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
-    wrk[i].check_grad_lapl(x_func,c_func);
+    wrk[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());

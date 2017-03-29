@@ -320,10 +320,11 @@ bool is_kinetic(int func_id) {
   return ans;
 }
 
-void is_gga_mgga(int func_id, bool & gga, bool & mgga) {
+void is_gga_mgga(int func_id, bool & gga, bool & mgga_t, bool & mgga_l) {
   // Initialize
   gga=false;
-  mgga=false;
+  mgga_t=false;
+  mgga_l=false;
 
   // Correlation and exchange functionals
   xc_func_type func;
@@ -337,20 +338,21 @@ void is_gga_mgga(int func_id, bool & gga, bool & mgga) {
   switch(func.info->family)
     {
     case XC_FAMILY_LDA:
-      gga=false;
-      mgga=false;
       break;
 
     case XC_FAMILY_GGA:
     case XC_FAMILY_HYB_GGA:
       gga=true;
-      mgga=false;
       break;
 
     case XC_FAMILY_MGGA:
     case XC_FAMILY_HYB_MGGA:
-      gga=false;
-      mgga=true;
+      mgga_t=true;
+#if defined(XC_FLAGS_NEEDS_LAPLACIAN)
+      mgga_l=func.info->flags & XC_FLAGS_NEEDS_LAPLACIAN;
+#else
+      mgga_l=true;
+#endif
       break;
 
     default:
@@ -504,7 +506,7 @@ bool needs_VV10(int func_id, double & b, double & C) {
 bool gradient_needed(int func_id) {
   // Is gradient necessary?
 
-  bool grad=0;
+  bool grad=false;
 
   if(func_id>0) {
     xc_func_type func;
@@ -521,7 +523,7 @@ bool gradient_needed(int func_id) {
       case XC_FAMILY_HYB_GGA:
       case XC_FAMILY_MGGA:
       case XC_FAMILY_HYB_MGGA:
-	grad=1;
+	grad=true;
 	break;
       }
     // Free functional
@@ -531,10 +533,8 @@ bool gradient_needed(int func_id) {
   return grad;
 }
 
-bool laplacian_needed(int func_id) {
-  // Is gradient necessary?
-
-  bool lapl=0;
+bool tau_needed(int func_id) {
+  bool tau=false;
 
   if(func_id>0) {
     xc_func_type func;
@@ -549,7 +549,37 @@ bool laplacian_needed(int func_id) {
       {
       case XC_FAMILY_MGGA:
       case XC_FAMILY_HYB_MGGA:
-	lapl=1;
+	tau=true;
+	break;
+      }
+    // Free functional
+    xc_func_end(&func);
+  }
+
+  return tau;
+}
+
+bool laplacian_needed(int func_id) {
+  bool lapl=false;
+
+  if(func_id>0) {
+    xc_func_type func;
+    if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
+      ERROR_INFO();
+      std::ostringstream oss;
+      oss << "Functional "<<func_id<<" not found!";
+      throw std::runtime_error(oss.str());
+    }
+
+    switch(func.info->family)
+      {
+      case XC_FAMILY_MGGA:
+      case XC_FAMILY_HYB_MGGA:
+#if defined(XC_FLAGS_NEEDS_LAPLACIAN)
+	lapl=func.info->flags & XC_FLAGS_NEEDS_LAPLACIAN;
+#else
+	lapl=true;
+#endif
 	break;
       }
     // Free functional

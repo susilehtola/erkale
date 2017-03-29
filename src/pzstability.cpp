@@ -2945,7 +2945,7 @@ void PZStability::update_grid(bool init) {
     if (ovmethod.x_func>0 || ovmethod.c_func>0)
       grid.construct(ovmethod.nrad,ovmethod.lmax,ovmethod.x_func,ovmethod.c_func,strict);
     if(ovmethod.nl)
-      nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,strict,true);
+      nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,false,strict,true);
   }
 }
 

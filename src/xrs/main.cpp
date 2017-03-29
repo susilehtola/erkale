@@ -234,7 +234,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
       bool strictint(set.get_bool("StrictIntegrals"));
       grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
       if(dft.nl)
-	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
+	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,false,strictint,true);
     }
 
     switch(method) {

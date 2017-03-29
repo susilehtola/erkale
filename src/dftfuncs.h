@@ -51,7 +51,7 @@ bool is_exchange_correlation(int func_id);
 bool is_kinetic(int func_id);
 
 /// Is functional a gga / mgga functional?
-void is_gga_mgga(int func_id, bool & gga, bool & mgga);
+void is_gga_mgga(int func_id, bool & gga, bool & mgga_t, bool & mgga_l);
 
 /// Get fraction of exact exchange
 double exact_exchange(int func_id);
@@ -65,6 +65,8 @@ bool needs_VV10(int func_id, double & b, double & C);
 
 /// Is gradient necessary to use given functional?
 bool gradient_needed(int func);
+/// Is kinetic energy density necessary to use given functional?
+bool tau_needed(int func);
 /// Is laplacian necessary to use given functional?
 bool laplacian_needed(int func);
 

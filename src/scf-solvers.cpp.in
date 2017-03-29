@@ -201,7 +201,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
 #ifdef DFT
   // Run with non-local correlation?
   dft_t dft(dft0);
-  
+
   // Range separation constants
   double omega, kfull, kshort;
   range_separation(dft.x_func,omega,kfull,kshort);
@@ -290,7 +290,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
       // Nonlocal grid?
       if(dft.nl)
-	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,strictint,true);
+	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,false,strictint,true);
     }
 
     if(verbose) {
@@ -336,16 +336,16 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
 #if !defined(RESTRICTED)
     chkptp->write("Ca",sol.Ca);
     chkptp->write("Cb",sol.Cb);
-    
+
     chkptp->write("Ea",sol.Ea);
     chkptp->write("Eb",sol.Eb);
-    
+
     chkptp->write("Pa",sol.Pa);
     chkptp->write("Pb",sol.Pb);
-    
+
     chkptp->write("occa",occar);
     chkptp->write("occb",occbr);
-    
+
     // Restricted
     chkptp->write("Restricted",0);
 #else
@@ -357,7 +357,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
 #endif
     chkptp->write("Converged",converged);
     chkptp->close();
-    
+
   } else {
     Timer tg;
     // Form the Fock operator.
@@ -371,16 +371,16 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       fflush(stdout);
       t.set();
     }
-    
+
     // Calculate dipole moment
     dipmom=dipole_moment(sol.P,*basisp);
     // Do the diagonalization
     diagonalize(S,Sinvh,sol,shift);
-    
+
     if(verbose)
       printf("done (%s)\n",t.elapsed().c_str());
   }
-  
+
   // Loop:
   int iiter=1;
 
@@ -390,7 +390,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
   if(dft.nl)
     dft.nl=false;
 #endif
-  
+
   while(iiter<=maxiter) {
     Timer titer;
 
@@ -449,7 +449,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
 
     // Perform Broyden interpolation
     if(usebroyden && !diissucc && iiter>1) {
-      
+
       if(verbose) {
 	printf("Performing Broyden interpolation of Fock operator ... ");
 	fflush(stdout);
@@ -556,7 +556,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
     // Convergence checked against
     double maxdiff_cvd(maxdiff);
     double rmsdiff_cvd(maxdiff);
-    
+
 #ifndef RESTRICTED
     maxdiffa=max_abs(deltaPa);
     maxdiffb=max_abs(deltaPb);
@@ -583,11 +583,11 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       printf("%-30s: % e\n","Max rms   beta  density change",rmsdiffb);
 #endif
       printf("Dipole mu = (% 08.8f, % 08.8f, % 08.8f) D\n",dipmom(0)/AUINDEBYE,dipmom(1)/AUINDEBYE,dipmom(2)/AUINDEBYE);
-      
+
       printf("\nIteration took %s.\n",titer.elapsed().c_str());
       fflush(stdout);
     }
-  
+
     // Sparse output
     if(verbose) {
       fprintf(stderr,"%4i % 16.8f",iiter,sol.en.E);
@@ -610,19 +610,20 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       fprintf(stderr," %9.3e %10.3f\n",diiserr,titer.get());
     }
 
-    if(fabs(deltaE)<=conv.deltaEmax && maxdiff_cvd<=conv.deltaPmax && rmsdiff_cvd<=conv.deltaPrms) {
 #ifdef DFT
-      if(dft0.nl && !dft.nl) {
-	if(verbose) {
-	  printf("Turning on non-local correlation contributions\n");
-	  fprintf(stderr,"Turning on non-local correlation contributions\n");
-	}
-	dft.nl=true;
-	diis.clear();
-	continue;
+    if(dft0.nl && !dft.nl && diiserr<=1e-3) {
+      if(verbose) {
+	printf("Turning on non-local correlation contributions\n");
+	fprintf(stderr,"Turning on non-local correlation contributions\n");
       }
+      dft.nl=true;
+      diis.clear();
+      convd=0;
+      continue;
+    }
+    else
 #endif
-      
+    if(fabs(deltaE)<=conv.deltaEmax && maxdiff_cvd<=conv.deltaPmax && rmsdiff_cvd<=conv.deltaPrms) {
       // Increment amount of converged iterations
       convd++;
 
@@ -679,7 +680,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
   } // End SCF cycle
 
   if(verbose) {
-    
+
     if(converged) {
       std::string method=
 #ifdef RESTRICTED
@@ -695,11 +696,11 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
 	"HF"
 #endif
 	;
-      
+
       printf("Solution of %s took %s.\n",method.c_str(),ttot.elapsed().c_str());
       fprintf(stderr,"%s converged in %s.\n",method.c_str(),ttot.elapsed().c_str());
     }
-  
+
     // Print total energy and its components
     printf("\n");
     printf("%-21s energy: % .16e\n","Kinetic",sol.en.Ekin);
@@ -730,7 +731,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
     print_E(sol.Eb,occb,true);
 #endif
   }
-  
+
   if(converged) {
     if(doforce) {
       arma::vec f;

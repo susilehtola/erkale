@@ -225,6 +225,8 @@ class AngularGrid {
 
   /// Is gradient needed?
   bool do_grad;
+  /// Is kinetic energy density needed?
+  bool do_tau;
   /// Is laplacian needed?
   bool do_lapl;
   /// Is Hessian needed? (For GGA force)
@@ -237,8 +239,10 @@ class AngularGrid {
 
   /// GGA functional used? (Set in compute_xc, only affects eval_Fxc)
   bool do_gga;
-  /// Meta-GGA used? (Set in compute_xc, only affects eval_Fxc)
-  bool do_mgga;
+  /// Meta-GGA tau used? (Set in compute_xc, only affects eval_Fxc)
+  bool do_mgga_t;
+  /// Meta-GGA lapl used? (Set in compute_xc, only affects eval_Fxc)
+  bool do_mgga_l;
 
   // LDA stuff:
 
@@ -309,11 +313,11 @@ class AngularGrid {
   std::vector<gridpoint_t> get_grid() const;
 
   /// Check necessity of computing gradient and laplacians, necessary for compute_bf!
-  void check_grad_lapl(int x_func, int c_func);
+  void check_grad_tau_lapl(int x_func, int c_func);
   /// Get necessity of computing gradient and laplacians
-  void get_grad_lapl(bool & grad, bool & lapl) const;
+  void get_grad_tau_lapl(bool & grad, bool & tau, bool & lapl) const;
   /// Set necessity of computing gradient and laplacians, necessary for compute_bf!
-  void set_grad_lapl(bool grad, bool lapl);
+  void set_grad_tau_lapl(bool grad, bool tau, bool lapl);
   /// Set necessity of computing Hessian and gradient of Laplacian
   void set_hess_lgrad(bool hess, bool lgrad);
   
@@ -505,7 +509,7 @@ class DFTGrid {
   /// Create fixed size grid
   void construct(int nrad, int lmax, int x_func, int c_func, bool strict);
   /// Create fixed size grid
-  void construct(int nrad, int lmax, bool gga, bool mgga, bool strict, bool nl);
+  void construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool strict, bool nl);
   /// Create grid for restricted calculation
   void construct(const arma::mat & P, double ftol, int x_func, int c_func);
   /// Create grid for unrestricted calculation

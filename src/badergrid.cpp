@@ -49,7 +49,7 @@ void BaderGrid::set(const BasisSet & basis, bool ver, bool lobatto) {
   wrk.set_basis(basis);
   basp=&basis;
   // Only need function values
-  wrk.set_grad_lapl(false,false);
+  wrk.set_grad_tau_lapl(false,false,false);
 
   verbose=ver;
   basp=&basis;
