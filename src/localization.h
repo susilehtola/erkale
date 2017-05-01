@@ -208,7 +208,8 @@ class Pipek : public UnitaryFunction {
 
   /// Method
   enum chgmet chg;
-  /// Amount of charges
+
+  /// Number of centers
   size_t N;
 
   /// Penalty exponent, p=2 for conventional Pipek-Mezey
@@ -216,17 +217,6 @@ class Pipek : public UnitaryFunction {
 
   /// Orbitals
   arma::mat C;
-  /// Overlap matrix for Mulliken
-  arma::mat S;
-  /// Half-overlap matrix for Löwdin
-  arma::mat Sh;
-  /// Shell list for Löwdin and Mulliken
-  std::vector< std::vector<GaussianShell> > shells;
-
-  /// Free-atom AOs for IAO localization
-  arma::mat C_iao;
-  /// Indices of centers for IAO localization
-  std::vector< std::vector<size_t> > idx_iao;
 
   /// Get the charge matrix for the i:th region
   arma::mat get_charge(size_t i);

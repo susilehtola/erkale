@@ -856,16 +856,17 @@ static std::string pipek_filename(size_t iat) {
 Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, double pv, bool ver, bool delocalize) : UnitaryFunction(2*pv,!delocalize) {
   // Store used method
   chg=chgv;
-  C=Cv;
   // and penalty exponent
   p=pv;
+  // and canonical orbitals
+  C=Cv;
 
   // Overlap matrix tolerance threshold
   double otol=1e-5;
 
   Timer tinit;
   if(ver) {
-    printf("Initializing Pipek-Mezey calculation with ");
+    printf("Initializing generalized Pipek-Mezey calculation with ");
     if(chg==BADER)
       printf("Bader");
     else if(chg==BECKE)
@@ -884,9 +885,11 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
       printf("Stockholder");
     else if(chg==VORONOI)
       printf("Voronoi");
-    printf(" charges.\n");
+    printf(" charges...");
     fflush(stdout);
   }
+
+  Timer t;
 
   if(chg==BADER || chg==VORONOI) {
     // Helper. Non-verbose operation
@@ -901,18 +904,9 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     N=bader.get_Nmax();
 
     // Calculate the regional overlaps
-    Timer t;
-    if(ver) {
-      printf("Calculating regional overlap matrices on disk ... ");
-      fflush(stdout);
-    }
     for(size_t iat=0;iat<N;iat++) {
       arma::mat Sat(bader.regional_overlap(iat));
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
-    }
-    if(ver) {
-      printf("done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
     }
 
   } else if(chg==BECKE) {
@@ -924,18 +918,9 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     grid.construct_becke(otol);
 
     // Calculate the regional overlaps
-    Timer t;
-    if(ver) {
-      printf("Calculating regional overlap matrices on disk ... ");
-      fflush(stdout);
-    }
     for(size_t iat=0;iat<N;iat++) {
       arma::mat Sat(grid.eval_overlap(iat));
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
-    }
-    if(ver) {
-      printf("done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
     }
 
   } else if(chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER ) {
@@ -963,18 +948,9 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Construct integration grid
     grid.construct_hirshfeld(hirsh,otol);
 
-    Timer t;
-    if(ver) {
-      printf("Calculating regional overlap matrices on disk ... ");
-      fflush(stdout);
-    }
     for(size_t iat=0;iat<N;iat++) {
       arma::mat Sat(grid.eval_hirshfeld_overlap(hirsh,iat));
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
-    }
-    if(ver) {
-      printf("done (%s)\n",t.elapsed().c_str());
-      fflush(stdout);
     }
 
   } else if(chg==IAO) {
@@ -982,37 +958,84 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     N=basis.get_Nnuc();
 
     basis.print();
-
     // Construct IAO orbitals
-    C_iao=construct_IAO(basis,C,idx_iao);
-
+    std::vector< std::vector<size_t> > idx_iao;
+    arma::mat C_iao(construct_IAO(basis,C,idx_iao));
     // Also need overlap matrix
-    S=basis.overlap();
+    arma::mat S(basis.overlap());
+
+    for(size_t iat=0;iat<N;iat++) {
+      // Construct IAO density matrix for atom
+      arma::mat Piao(C.n_rows, C.n_rows);
+      Piao.zeros();
+      for(size_t fi=0;fi<idx_iao[iat].size();fi++) {
+	// Index of IAO is
+	size_t io=idx_iao[iat][fi];
+	// Add to IAO density
+	Piao+=C_iao.col(io)*arma::trans(C_iao.col(io));
+      }
+
+      // Atomic overlap matrix is then just
+      arma::mat Sat(S*Piao*S);
+      Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
+    }
 
   } else if(chg==MULLIKEN) {
     // Amount of regions
     N=basis.get_Nnuc();
+    size_t Nbf(basis.get_Nbf());
     // Get overlap matrix
-    S=basis.overlap();
+    arma::mat S(basis.overlap());
+
     // Get shells
-    shells.resize(N);
-    for(size_t i=0;i<N;i++)
-      shells[i]=basis.get_funcs(i);
+    for(size_t iat=0;iat<N;iat++) {
+      // List of shells on atom
+      std::vector<GaussianShell> shells(basis.get_funcs(iat));
+
+      // Atomic overlap
+      arma::mat Sat(C.n_rows,C.n_rows);
+      Sat.zeros();
+
+      // Increment charge
+      for(size_t is=0;is<shells.size();is++) {
+	for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
+	  for(size_t fj=0;fj<Nbf;fj++) {
+	    // Rows
+	    Sat(fi,fj)+=S(fi,fj)/2.0;
+	    // Columns
+	    Sat(fj,fi)+=S(fj,fi)/2.0;
+	  }
+
+	Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
+      }
+    }
 
   } else if(chg==LOWDIN) {
     // Amount of regions
     N=basis.get_Nnuc();
-    // Get overlap matrix
-    S=basis.overlap();
 
+    // Get overlap matrix
+    arma::mat S(basis.overlap());
     // Get S^1/2 (and S^-1/2)
-    arma::mat Sinvh;
+    arma::mat Sh, Sinvh;
     S_half_invhalf(S,Sh,Sinvh);
 
     // Get shells
-    shells.resize(N);
-    for(size_t i=0;i<N;i++)
-      shells[i]=basis.get_funcs(i);
+    for(size_t iat=0;iat<N;iat++) {
+      // List of shells on atom
+      std::vector<GaussianShell> shells(basis.get_funcs(iat));
+
+      // Atomic overlap
+      arma::mat Sat(C.n_rows,C.n_rows);
+      Sat.zeros();
+
+      // Increment charge
+      for(size_t is=0;is<shells.size();is++)
+	for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
+	  Sat+=Sh.col(fi)*arma::trans(Sh.col(fi));
+
+      Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
+    }
 
   } else {
     ERROR_INFO();
@@ -1020,7 +1043,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
   }
 
   if(ver) {
-    printf("Initialization of Pipek-Mezey took %s\n",tinit.elapsed().c_str());
+    printf(" done.\nInitialization of Pipek-Mezey took %s\n",tinit.elapsed().c_str());
     fflush(stdout);
   }
 }
@@ -1033,70 +1056,17 @@ Pipek* Pipek::copy() const {
 }
 
 void Pipek::cleanup_disk() {
-  if(chg==BADER || chg==VORONOI || chg==BECKE || chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER) {
-    // Delete the temporary files
-    for(size_t iat=0;iat<N;iat++)
-      remove(pipek_filename(iat).c_str());
-  }
+  // Delete the temporary files
+  for(size_t iat=0;iat<N;iat++)
+    remove(pipek_filename(iat).c_str());
 }
 
 arma::mat Pipek::get_charge(size_t iat) {
-  arma::mat Q;
+  arma::mat Sat;
+  if(!Sat.load(pipek_filename(iat),PIPEK_FILEMODE))
+    throw std::runtime_error("Error loading precomputed atomic overlap matrix from file " + pipek_filename(iat) + "!\n");
 
-  if(chg==BADER || chg==VORONOI || chg==BECKE || chg==HIRSHFELD || chg==ITERHIRSH || chg==STOCKHOLDER) {
-    arma::mat Sat;
-    if(!Sat.load(pipek_filename(iat),PIPEK_FILEMODE))
-      throw std::runtime_error("Error loading precomputed atomic overlap matrix from file " + pipek_filename(iat) + "!\n");
-
-    Q=arma::trans(C)*Sat*C;
-
-  } else if(chg==IAO) {
-
-    // Construct IAO density matrix
-    arma::mat Piao(C.n_rows, C.n_rows);
-    Piao.zeros();
-    for(size_t fi=0;fi<idx_iao[iat].size();fi++) {
-      // Index of IAO is
-      size_t io=idx_iao[iat][fi];
-      // Add to IAO density
-      Piao+=C_iao.col(io)*arma::trans(C_iao.col(io));
-    }
-    Q=arma::trans(C)*S*Piao*S*C;
-
-  } else if(chg==LOWDIN) {
-    Q.zeros(C.n_cols,C.n_cols);
-
-    // Helper matrix
-    arma::mat ShC=Sh*C;
-
-    for(size_t io=0;io<C.n_cols;io++)
-      for(size_t jo=0;jo<C.n_cols;jo++)
-	for(size_t is=0;is<shells[iat].size();is++)
-	  for(size_t fi=shells[iat][is].get_first_ind();fi<=shells[iat][is].get_last_ind();fi++)
-	    Q(io,jo)+=ShC(fi,io)*ShC(fi,jo);
-
-  } else if(chg==MULLIKEN) {
-    Q.zeros(C.n_cols,C.n_cols);
-
-    // Helper matrix
-    arma::mat SC=S*C;
-
-    // Increment charge
-    for(size_t io=0;io<C.n_cols;io++)
-      for(size_t jo=0;jo<C.n_cols;jo++)
-	for(size_t is=0;is<shells[iat].size();is++)
-	  for(size_t fi=shells[iat][is].get_first_ind();fi<=shells[iat][is].get_last_ind();fi++)
-	    Q(io,jo)+=C(fi,io)*SC(fi,jo);
-
-    // Symmetrize
-    Q=(Q+arma::trans(Q))/2.0;
-
-  } else {
-    ERROR_INFO();
-    throw std::runtime_error("Charge method not implemented.\n");
-  }
-
-  return Q;
+  return arma::trans(C)*Sat*C;
 }
 
 double Pipek::cost_func(const arma::cx_mat & Wv) {
