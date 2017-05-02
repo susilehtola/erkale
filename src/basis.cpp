@@ -3682,6 +3682,14 @@ double orth_diff(const arma::cx_mat & C, const arma::mat & S) {
 }
 
 void check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double thr) {
+  if(!C.n_cols)
+    throw std::logic_error("Error in check_orth: no orbitals!\n");
+  if(C.n_rows != S.n_rows) {
+    std::ostringstream oss;
+    oss << "Error in check_orth: got " << C.n_rows << " x " << C.n_cols << " C and " << S.n_rows << " x " << S.n_cols << " S!\n";
+    throw std::logic_error(oss.str());
+  }
+
   // Compute difference from unit overlap
   arma::mat d(arma::abs(arma::trans(C)*S*C-arma::eye<arma::mat>(C.n_cols,C.n_cols)));
   // Get maximum error
@@ -3708,6 +3716,14 @@ void check_orth(const arma::mat & C, const arma::mat & S, bool verbose, double t
 }
 
 void check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, double thr) {
+  if(!C.n_cols)
+    throw std::logic_error("Error in check_orth: no orbitals!\n");
+  if(C.n_rows != S.n_rows) {
+    std::ostringstream oss;
+    oss << "Error in check_orth: got " << C.n_rows << " x " << C.n_cols << " C and " << S.n_rows << " x " << S.n_cols << " S!\n";
+    throw std::logic_error(oss.str());
+  }
+
   arma::mat d(arma::abs(arma::trans(C)*S*C - arma::eye<arma::cx_mat>(C.n_cols,C.n_cols)));
   double maxerr(arma::max(arma::max(d)));
 
@@ -3731,13 +3747,14 @@ void check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, doubl
   }
 }
 
-arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, std::string minbaslib) {
+arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, bool verbose, std::string minbaslib) {
   // Get minao library
   BasisSetLibrary minao;
   minao.load_basis(minbaslib);
   // Default settings
   Settings set;
   set.add_scf_settings();
+  set.set_bool("Verbose",verbose);
 
   // Construct minimal basis set
   BasisSet minbas;
@@ -3790,13 +3807,14 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
   return orthonormalize(S1,A);
 }
 
-arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, std::string minbaslib) {
+arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, bool verbose, std::string minbaslib) {
   // Get minao library
   BasisSetLibrary minao;
   minao.load_basis(minbaslib);
   // Default settings
   Settings set;
   set.add_scf_settings();
+  set.set_bool("Verbose",verbose);
 
   // Construct minimal basis set
   BasisSet minbas;

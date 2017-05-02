@@ -853,13 +853,11 @@ static std::string pipek_filename(size_t iat) {
   return oss.str();
 }
 
-Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, const arma::mat & P, double pv, bool ver, bool delocalize) : UnitaryFunction(2*pv,!delocalize) {
+Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double pv, bool ver, bool delocalize) : UnitaryFunction(2*pv,!delocalize) {
   // Store used method
   chg=chgv;
   // and penalty exponent
   p=pv;
-  // and canonical orbitals
-  C=Cv;
 
   // Overlap matrix tolerance threshold
   double otol=1e-5;
@@ -906,6 +904,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Calculate the regional overlaps
     for(size_t iat=0;iat<N;iat++) {
       arma::mat Sat(bader.regional_overlap(iat));
+      Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
@@ -920,6 +919,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Calculate the regional overlaps
     for(size_t iat=0;iat<N;iat++) {
       arma::mat Sat(grid.eval_overlap(iat));
+      Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
@@ -950,6 +950,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
 
     for(size_t iat=0;iat<N;iat++) {
       arma::mat Sat(grid.eval_hirshfeld_overlap(hirsh,iat));
+      Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
@@ -957,10 +958,11 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
     // Amount of regions
     N=basis.get_Nnuc();
 
-    basis.print();
+    if(ver)
+      basis.print();
     // Construct IAO orbitals
     std::vector< std::vector<size_t> > idx_iao;
-    arma::mat C_iao(construct_IAO(basis,C,idx_iao));
+    arma::mat C_iao(construct_IAO(basis,C,idx_iao,ver));
     // Also need overlap matrix
     arma::mat S(basis.overlap());
 
@@ -977,6 +979,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
 
       // Atomic overlap matrix is then just
       arma::mat Sat(S*Piao*S);
+      Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
@@ -1006,7 +1009,8 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
 	    Sat(fj,fi)+=S(fj,fi)/2.0;
 	  }
 
-	Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
+      Sat=arma::trans(C)*Sat*C;
+      Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
       }
     }
 
@@ -1034,6 +1038,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & Cv, con
 	for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
 	  Sat+=Sh.col(fi)*arma::trans(Sh.col(fi));
 
+      Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
     }
 
@@ -1066,7 +1071,7 @@ arma::mat Pipek::get_charge(size_t iat) {
   if(!Sat.load(pipek_filename(iat),PIPEK_FILEMODE))
     throw std::runtime_error("Error loading precomputed atomic overlap matrix from file " + pipek_filename(iat) + "!\n");
 
-  return arma::trans(C)*Sat*C;
+  return Sat;
 }
 
 double Pipek::cost_func(const arma::cx_mat & Wv) {
@@ -1075,13 +1080,6 @@ double Pipek::cost_func(const arma::cx_mat & Wv) {
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
-  }
-
-  if(W.n_rows != C.n_cols) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << C.n_cols << "!\n";
-    throw std::runtime_error(oss.str());
   }
 
   double Dinv=0;
@@ -1109,13 +1107,6 @@ arma::cx_mat Pipek::cost_der(const arma::cx_mat & Wv) {
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
-  }
-
-  if(W.n_rows != C.n_cols) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << C.n_cols << "!\n";
-    throw std::runtime_error(oss.str());
   }
 
   // Returned matrix
@@ -1165,13 +1156,6 @@ void Pipek::cost_func_der(const arma::cx_mat & Wv, double & Dinv, arma::cx_mat &
   if(W.n_rows != W.n_cols) {
     ERROR_INFO();
     throw std::runtime_error("Matrix is not square!\n");
-  }
-
-  if(W.n_rows != C.n_cols) {
-    ERROR_INFO();
-    std::ostringstream oss;
-    oss << "Matrix does not match size of problem: " << W.n_rows << " vs " << C.n_cols << "!\n";
-    throw std::runtime_error(oss.str());
   }
 
   // Returned matrix

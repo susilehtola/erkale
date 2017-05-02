@@ -215,9 +215,6 @@ class Pipek : public UnitaryFunction {
   /// Penalty exponent, p=2 for conventional Pipek-Mezey
   double p;
 
-  /// Orbitals
-  arma::mat C;
-
   /// Get the charge matrix for the i:th region
   arma::mat get_charge(size_t i);
 

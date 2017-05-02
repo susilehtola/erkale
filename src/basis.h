@@ -679,8 +679,8 @@ void check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, doubl
  * The algorithm returns the IAO matrix, and stores the atomic indices
  * in idx.
  */
-arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, std::string minbas="MINAO.gbs");
+arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, bool verbose=true, std::string minbas="MINAO.gbs");
 /// Same, but using complex coefficients
-arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, std::string minbas="MINAO.gbs");
+arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, bool verbose=true, std::string minbas="MINAO.gbs");
 
 #endif

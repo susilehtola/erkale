@@ -405,7 +405,7 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, std::string m
 
   // Get IAO orbitals
   std::vector< std::vector<size_t> > idx;
-  arma::mat iao=construct_IAO(basis,C,idx,minbas);
+  arma::mat iao=construct_IAO(basis,C,idx,true,minbas);
 
   arma::vec q(basis.get_Nnuc());
   q.zeros();
@@ -432,7 +432,7 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::cx_mat & C, std::strin
 
   // Get IAO orbitals
   std::vector< std::vector<size_t> > idx;
-  arma::cx_mat iao=construct_IAO(basis,C,idx,minbas);
+  arma::cx_mat iao=construct_IAO(basis,C,idx,true,minbas);
 
   arma::vec q(basis.get_Nnuc());
   q.zeros();
