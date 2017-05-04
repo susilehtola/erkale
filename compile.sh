@@ -1,7 +1,7 @@
 #!/bin/bash
-# This is a script for downloading, compiling and 
+# This is a script for downloading, compiling and
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2017-03-17 Susi Lehtola
+# 2017-05-04 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -31,7 +31,10 @@ export CXXFLAGS="${CFLAGS}"
 export FFLAGS="${CFLAGS}"
 export FCFLAGS="${CFLAGS}"
 
-### LAPACK (+ BLAS) library to use.
+### If not using system LAPACK/BLAS, libraries to link OpenMP OpenBLAS with
+OMPLIBS="-fopenmp"
+
+### System LAPACK (+ BLAS) library to use.
 
 ## OpenBLAS
 LAPACKOMP="-lopenblaso"
@@ -60,6 +63,7 @@ system_gsl=0
 system_libxc=0
 system_libint=0
 system_hdf5=0
+system_blas=0
 
 # Maximum supported angular momentum (affects libint if it's compiled)
 MAXAM="6"
@@ -86,12 +90,18 @@ export GSLVER="2.3"
 export XCVER="svn"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="7.800.1"
+export ARMAVER="7.800.2"
 export CMAKEVER="3.7.2"
 
 # HDF5 version: MAJOR.MINOR
 export HDF5MAJOR="1.10"
-export HDF5MINOR="0-patch1"
+export HDF5MINOR="1"
+
+# Version of OpenBLAS
+export OPENBLASVER="0.2.19"
+# You may need to disable AVX flags for OpenBLAS with older compilers
+#export OPENBLASAVX="NO_AVX=1 NO_AVX2=1" # For very old
+#export OPENBLASAVX="NO_AVX2=1" # For a little less old
 
 ############### NO CHANGES NECESSARY HEREAFTER ##################
 
@@ -113,7 +123,7 @@ fi
 if(( ! ${system_gsl} )); then
     if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
 	echo -n "Compiling GSL ..."
-	
+
 	if [ ! -d ${builddir}/gsl-${GSLVER} ]; then
 	    if [ ! -f ${srcdir}/gsl-${GSLVER}.tar.gz ]; then
 		cd ${srcdir}
@@ -122,7 +132,7 @@ if(( ! ${system_gsl} )); then
 	    cd ${builddir}
 	    tar zxf ${srcdir}/gsl-${GSLVER}.tar.gz
 	fi
-	
+
 	cd ${builddir}/gsl-${GSLVER}/
 	./configure --enable-static --disable-shared --prefix=${topdir}/gsl --exec-prefix=${topdir}/gsl &>configure.log
 	make -j ${nprocs} &> make.log
@@ -143,22 +153,22 @@ if(( ! ${system_hdf5} )); then
 	echo -n "Compiling HDF5 ..."
 
 	HDF5VER="${HDF5MAJOR}.${HDF5MINOR}"
-	if [ ! -d ${builddir}/hdf5-${HDF5VER} ]; then
-	    if [ ! -f ${srcdir}/hdf5-${HDF5VER}.tar.gz ]; then
-		cd ${srcdir}
+        if [ ! -d ${builddir}/hdf5-${HDF5VER} ]; then
+            if [ ! -f ${srcdir}/hdf5-${HDF5VER}.tar.gz ]; then
+                cd ${srcdir}
 		wget -O hdf5-${HDF5VER}.tar.gz http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-${HDF5MAJOR}/hdf5-${HDF5VER}/src/hdf5-${HDF5VER}.tar.gz
 	    fi
 	    cd ${builddir}
 	    tar zxf ${srcdir}/hdf5-${HDF5VER}.tar.gz
 	fi
-	
+
 	cd ${builddir}/hdf5-${HDF5VER}/
 	./configure --enable-static --disable-shared --prefix=${topdir}/hdf5 --exec-prefix=${topdir}/hdf5 &>configure.log
 	make -j ${nprocs} VERBOSE=1 &> make.log
 	make install &> install.log
 	make clean &> clean.log
 	echo " done"
-    fi 
+    fi
 
     if [ ! -f ${topdir}/hdf5/lib/libhdf5.a ]; then
 	echo "Error compiling HDF5."
@@ -171,9 +181,11 @@ if(( ! ${system_libxc} )); then
     if [[ "$XCVER" == "svn" ]]; then
 	echo -n "Checking out and compiling libxc ..."
 	cd $builddir
-	svn co http://www.tddft.org/svn/libxc/trunk/ libxc
+        svn co http://www.tddft.org/svn/libxc/trunk/ libxc
 	cd libxc
-	autoreconf -i
+	if [[ ! -f configure ]]; then
+	    autoreconf -i
+	fi
 	./configure --enable-static --disable-shared --disable-fortran --prefix=${topdir}/libxc --exec-prefix=${topdir}/libxc &>configure.log
 	make -j ${nprocs} &> make.log
 	make install &> install.log
@@ -190,7 +202,7 @@ if(( ! ${system_libxc} )); then
 		cd ${builddir}
 		tar zxf ${srcdir}/libxc-${XCVER}.tar.gz
 	    fi
-	    
+
 	    cd ${builddir}/libxc-${XCVER}
 	    ./configure --enable-static --disable-shared --disable-fortran --prefix=${topdir}/libxc --exec-prefix=${topdir}/libxc &>configure.log
 	    make -j ${nprocs} &> make.log
@@ -199,7 +211,7 @@ if(( ! ${system_libxc} )); then
 	    echo " done"
 	fi
     fi
-    
+
     if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
 	echo "Error compiling libxc."
 	exit
@@ -210,7 +222,7 @@ fi
 if(( ! ${system_libint} )); then
     if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a ]]; then
 	echo -n "Compiling libint ..."
-	
+
 	if [ ! -d ${builddir}/libint-${INTVER} ]; then
 	    if [ ! -f ${srcdir}/libint-${INTVER}.tar.gz ]; then
 		cd ${srcdir}
@@ -219,7 +231,7 @@ if(( ! ${system_libint} )); then
 	    cd ${builddir}
 	    tar zxf ${srcdir}/libint-${INTVER}.tar.gz
 	fi
-	
+
 	cd ${builddir}/libint-${INTVER}
 	# Use more conservative optimization flags, since libint is already highly optimized.
 	export ICFLAGS=`echo ${CFLAGS} |sed 's|-O2|-O1|g'`
@@ -251,6 +263,52 @@ if(( ! ${system_libint} )); then
     fi
 fi
 
+# OpenBLAS
+if(( ! ${system_blas} )); then
+    if [ ! -d ${builddir}/OpenBLAS-${OPENBLASVER} ]; then
+	if [ ! -f ${srcdir}/OpenBLAS-${OPENBLASVER}.tar.gz ]; then
+	    cd ${srcdir}
+	    wget -O OpenBLAS-${OPENBLASVER}.tar.gz https://github.com/xianyi/OpenBLAS/archive/v${OPENBLASVER}.tar.gz
+	fi
+	cd ${builddir}
+	tar zxf ${srcdir}/OpenBLAS-${OPENBLASVER}.tar.gz
+    fi
+    cd ${builddir}
+
+	# Sequential binaries
+    if [[ ! -d OpenBLAS-${OPENBLASVER}-seq ]]; then
+	cp -pr OpenBLAS-${OPENBLASVER} OpenBLAS-${OPENBLASVER}-seq
+    fi
+    if [[ ! -d OpenBLAS-${OPENBLASVER}-omp ]]; then
+	cp -pr OpenBLAS-${OPENBLASVER} OpenBLAS-${OPENBLASVER}-omp
+    fi
+
+    if [ ! -f ${topdir}/openblas/lib/libopenblas.a ]; then
+	echo -n "Compiling openblas, sequential ..."
+        # Compile library
+	make -C OpenBLAS-${OPENBLASVER}-seq TARGET=CORE2 DYNAMIC_ARCH=1 USE_THREAD=0 USE_OPENMP=0 FC=$FC CC=$CC COMMON_OPT="$CFLAGS" FCOMMON_OPT="$FFLAGS" NUM_THREADS=128 LIBPREFIX="libopenblas" INTERFACE64=0 ${OPENBLASAVX} NO_SHARED=1 &> OpenBLAS-${OPENBLASVER}-seq/make.log
+	make -C OpenBLAS-${OPENBLASVER}-seq install NO_SHARED=1 PREFIX=${topdir}/openblas OPENBLAS_LIBRARY_DIR=${topdir}/openblas/lib OPENBLAS_INCLUDE_DIR=${topdir}/openblas/include OPENBLAS_BINARY_DIR=${topdir}/openblas/bin OPENBLAS_CMAKE_DIR=${topdir}/openblas/cmake
+	echo " done"
+    fi
+    if [ ! -f ${topdir}/openblas/lib/libopenblas.a ]; then
+	echo "Error building sequential OpenBLAS."
+	exit
+    fi
+
+    if [ ! -f ${topdir}/openblas/lib/libopenblaso.a ]; then
+	echo -n "Compiling openblas, parallel ..."
+	make -C OpenBLAS-${OPENBLASVER}-omp NO_SHARED=1 TARGET=CORE2 DYNAMIC_ARCH=1 USE_THREAD=1 USE_OPENMP=1 FC=$FC CC=$CC COMMON_OPT="$CFLAGS" FCOMMON_OPT="$FFLAGS" NUM_THREADS=128 LIBPREFIX="libopenblaso" INTERFACE64=0 ${OPENBLASAVX} EXTRALIB="${OMPLIBS}" &> OpenBLAS-${OPENBLASVER}-omp/make.log
+	make -C OpenBLAS-${OPENBLASVER}-omp install NO_SHARED=1 LIBPREFIX="libopenblaso" PREFIX=${topdir}/openblas OPENBLAS_LIBRARY_DIR=${topdir}/openblas/lib OPENBLAS_INCLUDE_DIR=${topdir}/openblas/include OPENBLAS_BINARY_DIR=${topdir}/openblas/bin OPENBLAS_CMAKE_DIR=${topdir}/openblas/cmake
+	echo " done"
+    fi
+    if [ ! -f ${topdir}/openblas/lib/libopenblaso.a ]; then
+	echo "Error building parallel OpenBLAS."
+	exit
+    fi
+fi
+
+
+
 # Armadillo
 if [ ! -d ${topdir}/armadillo-${ARMAVER} ]; then
  if [ ! -f ${srcdir}/armadillo-${ARMAVER}.tar.xz ]; then
@@ -279,7 +337,7 @@ if(( ! ${system_cmake} )); then
 	    cd ${builddir}
 	    tar zxf ${srcdir}/cmake-${CMAKEVER}.tar.gz
 	fi
-	
+
 	cd ${builddir}/cmake-${CMAKEVER}
 	./bootstrap --prefix=${topdir}/cmake &> bootstrap.log
 	make -j ${nprocs} &> make.log
@@ -383,6 +441,12 @@ else
     echo "set(LIBINT_LIBRARIES ${topdir}/libint/lib/libderiv.a ${topdir}/libint/lib/libint.a)"  >> erkale/config/libintConfig.cmake
 fi
 
+# BLAS
+if(( ! ${system_blas} )); then
+    LAPACKSER="-L${topdir}/openblas/lib/ -lopenblas -lgfortran"
+    LAPACKOMP="-L${topdir}/openblas/lib/ -lopenblaso -lgfortran"
+fi
+
 ## Build erkale
 
 cd ${builddir}/erkale
@@ -392,8 +456,8 @@ if [ ! -d openmp ]; then
  mkdir openmp
 fi
 cd openmp
-FC=${FC} CC=${CC} CXX=${CXX} \
- FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
+FC="${FC}" CC="${CC}" CXX="${CXX}" \
+ FCFLAGS="${FCFLAGS}" CFLAGS="${CFLAGS}" CXXFLAGS="${CXXFLAGS}" \
  ${cmake} .. \
  -DSVN_VERSION=ON -DUSE_OPENMP=ON \
  -DLAPACK_LIBRARIES="${LAPACKOMP}" \
@@ -407,8 +471,8 @@ if [ ! -d serial ]; then
  mkdir serial
 fi
 cd serial
-FC=${FC} CC=${CC} CXX=${CXX} \
- FCFLAGS=${FCFLAGS} CFLAGS=${CFLAGS} CXXFLAGS=${CXXFLAGS} \
+FC="${FC}" CC="${CC}" CXX="${CXX}" \
+ FCFLAGS="${FCFLAGS}" CFLAGS="${CFLAGS}" CXXFLAGS="${CXXFLAGS}" \
  ${cmake} .. \
  -DSVN_VERSION=ON -DUSE_OPENMP=OFF \
  -DLAPACK_LIBRARIES="${LAPACKSER}" \
