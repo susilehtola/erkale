@@ -394,6 +394,8 @@ class AngularGrid {
   void compute_xc(int func_id, bool pot);
   /// Evaluate exchange/correlation energy
   double eval_Exc() const;
+  /// Zero out energy
+  void zero_Exc();
 
   /// Initialize VV10 calculation
   void init_VV10(double b, double C, bool pot);

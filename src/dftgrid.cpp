@@ -742,8 +742,8 @@ void AngularGrid::init_xc() {
   // Size of grid.
   const size_t N=grid.size();
 
-  // Check allocation of arrays.
-  exc.zeros(N);
+  // Zero energy
+  zero_Exc();
 
   if(!polarized) {
     // Restricted case
@@ -770,6 +770,10 @@ void AngularGrid::init_xc() {
   do_gga=false;
   do_mgga_l=false;
   do_mgga_t=false;
+}
+
+void AngularGrid::zero_Exc() {
+  exc.zeros(grid.size());
 }
 
 void check_array(const std::vector<double> & x, size_t n, std::vector<size_t> & idx) {
@@ -4148,7 +4152,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
   // Clear Hamiltonian
   H.zeros(P.n_rows,P.n_cols);
   // Clear exchange-correlation energy
-  double Exc=0.0;
+  double Ex=0.0, Ec=0.0;
   // Clear number of electrons
   double Nel=0.0;
 
@@ -4164,7 +4168,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
     Hwrk[i].zeros();
   }
 
-#pragma omp parallel shared(Hwrk) reduction(+:Nel,Exc)
+#pragma omp parallel shared(Hwrk) reduction(+:Nel,Ex,Ec)
 #endif
   { // Begin parallel region
 
@@ -4193,13 +4197,23 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       // Initialize the arrays
       wrk[ith].init_xc();
       // Compute the functionals
-      if(x_func>0)
+      if(x_func>0) {
 	wrk[ith].compute_xc(x_func,true);
-      if(c_func>0)
+
+	// Increment exchange energy
+	Ex+=wrk[ith].eval_Exc();
+	// Zero out array
+	wrk[ith].zero_Exc();
+      }
+      if(c_func>0) {
 	wrk[ith].compute_xc(c_func,true);
 
-      // Evaluate the energy
-      Exc+=wrk[ith].eval_Exc();
+	// Increment exchange energy
+	Ec+=wrk[ith].eval_Exc();
+	// Zero out array
+	wrk[ith].zero_Exc();
+      }
+
       // and construct the Fock matrices
 
 #ifdef _OPENMP
@@ -4219,7 +4233,10 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
     H+=Hwrk[i];
 #endif
 
-  Excv=Exc;
+  //printf("Exchange    energy % .10f\n",Ex);
+  //printf("Correlation energy % .10f\n",Ec);
+
+  Excv=Ex+Ec;
   Nelv=Nel;
 }
 
@@ -4229,7 +4246,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
   Ha.zeros(Pa.n_rows,Pa.n_cols);
   Hb.zeros(Pb.n_rows,Pb.n_cols);
   // Clear exchange-correlation energy
-  double Exc=0.0;
+  double Ex=0.0, Ec=0.0;
   // Clear number of electrons
   double Nel=0.0;
 
@@ -4248,7 +4265,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
     Hbwrk[i].zeros();
   }
 
-#pragma omp parallel shared(Hawrk,Hbwrk) reduction(+:Nel,Exc)
+#pragma omp parallel shared(Hawrk,Hbwrk) reduction(+:Nel,Ex,Ec)
 #endif
   { // Begin parallel region
 
@@ -4277,13 +4294,19 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       // Initialize the arrays
       wrk[ith].init_xc();
       // Compute the functionals
-      if(x_func>0)
+      if(x_func>0) {
 	wrk[ith].compute_xc(x_func,true);
-      if(c_func>0)
+	// Evaluate the energy
+	Ex+=wrk[ith].eval_Exc();
+	wrk[ith].zero_Exc();
+      }
+      if(c_func>0) {
 	wrk[ith].compute_xc(c_func,true);
+	// Evaluate the energy
+	Ec+=wrk[ith].eval_Exc();
+	wrk[ith].zero_Exc();
+      }
 
-      // Evaluate the energy
-      Exc+=wrk[ith].eval_Exc();
       // and construct the Fock matrices
 #ifdef _OPENMP
       wrk[ith].eval_Fxc(Hawrk[ith],Hbwrk[ith]);
@@ -4304,7 +4327,10 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
   }
 #endif
 
-  Excv=Exc;
+  //printf("Exchange    energy % .10f\n",Ex);
+  //printf("Correlation energy % .10f\n",Ec);
+
+  Excv=Ex+Ec;
   Nelv=Nel;
 }
 
