@@ -4233,7 +4233,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
     H+=Hwrk[i];
 #endif
 
-  //printf("Exchange    energy % .10f\n",Ex);
+  //printf("\nExchange    energy % .10f\n",Ex);
   //printf("Correlation energy % .10f\n",Ec);
 
   Excv=Ex+Ec;
@@ -4327,7 +4327,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
   }
 #endif
 
-  //printf("Exchange    energy % .10f\n",Ex);
+  //printf("\nExchange    energy % .10f\n",Ex);
   //printf("Correlation energy % .10f\n",Ec);
 
   Excv=Ex+Ec;
@@ -5002,4 +5002,22 @@ void DFTGrid::print_grid(std::string met) const {
   printf("Composition of %s grid:\n %7s %7s %10s\n",met.c_str(),"atom","Npoints","Nfuncs");
   for(size_t i=0;i<basp->get_Nnuc();i++)
     printf(" %4i %-2s %7i %10i\n",(int) i+1, basp->get_symbol(i).c_str(), (int) np(i), (int) nf(i));
+}
+
+double DFTGrid::density_threshold(const arma::mat & P, double thr) {
+  // Get the list of orbital density values
+  std::vector<dens_list_t> list=eval_dens_list(P);
+
+  // Get cutoff
+  double itg=0.0;
+  size_t idx=0;
+  while(itg<thr && idx<list.size()) {
+    // Increment integral
+    itg+=list[idx].d*list[idx].w;
+    // Increment index
+    idx++;
+  }
+
+  // Cutoff is thus between idx and idx-1.
+  return (list[idx].d + list[idx-1].d)/2.0;
 }

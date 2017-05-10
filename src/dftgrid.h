@@ -57,7 +57,7 @@ typedef struct {
   size_t atind;
   /// Coordinates of center
   coords_t cen;
-  
+
   /// Radius of shell
   double R;
   /// Radial weight
@@ -188,12 +188,12 @@ class AngularGrid {
   arma::uvec bf_i0;
   /// Amount of functions on shell
   arma::uvec bf_N;
-  
+
   /// List of important functions
   arma::uvec bf_ind;
   /// List of important functions in potentials' list
   arma::uvec bf_potind;
-  
+
   /// Duplicate values of weights here
   arma::rowvec w;
   /// Values of important functions in grid points, Nbf * Ngrid
@@ -215,7 +215,7 @@ class AngularGrid {
   arma::mat bf_ly;
   /// Values of z gradient of laplacian; used for MGGA force
   arma::mat bf_lz;
-  
+
 
   /// Density helper matrices: P_{uv} chi_v, and P_{uv} nabla(chi_v)
   arma::mat Pv, Pv_x, Pv_y, Pv_z;
@@ -320,7 +320,7 @@ class AngularGrid {
   void set_grad_tau_lapl(bool grad, bool tau, bool lapl);
   /// Set necessity of computing Hessian and gradient of Laplacian
   void set_hess_lgrad(bool hess, bool lgrad);
-  
+
   /// Construct a fixed size grid
   angshell_t construct();
   /// Construct adaptively a grid centered on the cenind:th center, restricted calculation
@@ -427,7 +427,7 @@ class AngularGrid {
    * {\rho_{\sigma}^{k}(\mathbf{r})} {\rm d}^{3}\mathbf{r} \f$
    */
   void eval_overlap(const arma::cx_mat & Cocc, size_t io, double k, arma::mat & S, double thr) const;
-  
+
   /// Same thing, but do contraction over SI energies for derivatives
   void eval_overlap(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, arma::mat & S, double thr) const;
 
@@ -507,7 +507,7 @@ class DFTGrid {
 
   /// Set verbose operation
   void set_verbose(bool ver);
-  
+
   /// Create fixed size grid
   void construct(int nrad, int lmax, int x_func, int c_func, bool strict);
   /// Create fixed size grid
@@ -568,7 +568,7 @@ class DFTGrid {
   arma::mat eval_tau_overlap(const arma::cx_mat & Cocc, double k, double thr=1e-10);
   /// Evaluate weighted overlap derivative terms (for PZ-SIC)
   arma::mat eval_tau_overlap_deriv(const arma::cx_mat & Cocc, const arma::vec & Esi, double k, double thr=1e-10);
-  
+
   /// Evaluate overlap matrices numerically
   arma::mat eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc);
   /// Evaluate overlap matrices numerically
@@ -584,9 +584,12 @@ class DFTGrid {
   /// Evaluate NL force
   arma::vec eval_VV10_force(DFTGrid & nlgrid, double b, double C, const arma::mat & P);
 
+  /// Compute density cutoff threshold.
+  double density_threshold(const arma::mat & P, double thr);
+
   /// Print out grid information
   void print_grid(std::string met="XC") const;
-  
+
   /// Print out density data
   void print_density(const arma::mat & P, std::string densname="density.dat");
   /// Print out density data
@@ -611,7 +614,7 @@ template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & v
     oss << "Size of basis function (" << f.n_rows << "," << f.n_cols << ") and Fock matrix (" << H.n_rows << "," << H.n_cols << ") doesn't match!\n";
     throw std::runtime_error(oss.str());
   }
-  
+
   // Form helper matrix
   arma::Mat<T> fhlp(f);
   for(size_t i=0;i<fhlp.n_rows;i++)
@@ -630,7 +633,7 @@ template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & v
     ERROR_INFO();
     throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
   }
-  
+
   // Form helper matrix
   arma::Mat<T> fhlp(f);
   for(size_t i=0;i<fhlp.n_rows;i++)
@@ -653,7 +656,7 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
     ERROR_INFO();
     throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
   }
-    
+
   // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
   //                 (N, Np)    =        (N Np; c)    (Np, 3)
   arma::Mat<T> gamma(f.n_rows,f.n_cols);
@@ -661,21 +664,21 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
   {
     // Helper
     arma::rowvec gc;
-    
+
     // x gradient
     gc=arma::trans(gn.col(0));
     for(size_t j=0;j<f_x.n_cols;j++)
       for(size_t i=0;i<f_x.n_rows;i++)
 	f_x(i,j)*=gc(j);
     gamma+=f_x;
-    
+
     // x gradient
     gc=arma::trans(gn.col(1));
     for(size_t j=0;j<f_y.n_cols;j++)
       for(size_t i=0;i<f_y.n_rows;i++)
 	f_y(i,j)*=gc(j);
     gamma+=f_y;
-    
+
     // z gradient
     gc=arma::trans(gn.col(2));
     for(size_t j=0;j<f_z.n_cols;j++)
@@ -683,7 +686,7 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
 	f_z(i,j)*=gc(j);
     gamma+=f_z;
   }
-  
+
   // Form Fock matrix
   H+=gamma*arma::trans(f) + f*arma::trans(gamma);
 }
@@ -702,7 +705,7 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
     ERROR_INFO();
     throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
   }
-    
+
   // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
   //                 (N, Np)    =        (N Np; c)    (Np, 3)
   arma::Mat<T> gamma(f.n_rows,f.n_cols);
@@ -710,21 +713,21 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
   {
     // Helper
     arma::rowvec gc;
-    
+
     // x gradient
     gc=arma::trans(gn.col(0));
     for(size_t j=0;j<f_x.n_cols;j++)
       for(size_t i=0;i<f_x.n_rows;i++)
 	f_x(i,j)*=gc(j);
     gamma+=f_x;
-    
+
     // x gradient
     gc=arma::trans(gn.col(1));
     for(size_t j=0;j<f_y.n_cols;j++)
       for(size_t i=0;i<f_y.n_rows;i++)
 	f_y(i,j)*=gc(j);
     gamma+=f_y;
-    
+
     // z gradient
     gc=arma::trans(gn.col(2));
     for(size_t j=0;j<f_z.n_cols;j++)
@@ -732,7 +735,7 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
 	f_z(i,j)*=gc(j);
     gamma+=f_z;
   }
-  
+
   // Form Fock matrix
   H+=gamma.cols(screen)*arma::trans(f.cols(screen)) + f.cols(screen)*arma::trans(gamma.cols(screen));
 }
@@ -766,7 +769,7 @@ template<typename T> void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowv
     ERROR_INFO();
     throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
   }
-  
+
   // Absorb the potential into the function values
   arma::Mat<T> fhlp(f);
   for(size_t i=0;i<fhlp.n_rows;i++)

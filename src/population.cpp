@@ -35,31 +35,6 @@
 #include "version.h"
 #endif
 
-double compute_threshold(DFTGrid & intgrid, const arma::mat & Po, double thr, bool dens) {
-  // Get the list of orbital density values
-  std::vector<dens_list_t> list=intgrid.eval_dens_list(Po);
-
-  // Get cutoff
-  double itg=0.0;
-  size_t idx=0;
-  while(itg<thr && idx<list.size()) {
-    // Increment integral
-    itg+=list[idx].d*list[idx].w;
-    // Increment index
-    idx++;
-  }
-
-  // Cutoff is thus between idx and idx-1.
-  double cut=(list[idx].d + list[idx-1].d)/2.0;
-
-  if(dens)
-    return cut;
-  else
-    // Convert to orbital value
-    return sqrt(cut);
-}
-
-
 int main(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - population from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
@@ -251,7 +226,7 @@ int main(int argc, char **argv) {
 
 	// Orbital density matrix is
 	arma::mat Po=C.col(io)*arma::trans(C.col(io));
-	double val=compute_threshold(intgrid,Po,thr,false);
+	double val=sqrt(intgrid.density_threshold(Po,thr));
 
 	// Print out orbital threshold
 	printf("%4i %8.3e %8.3f\n", io+1, val, t.get());
@@ -275,11 +250,11 @@ int main(int argc, char **argv) {
 
 	// Orbital density matrix is
 	arma::mat Po=Ca.col(io)*arma::trans(Ca.col(io));
-	double vala=compute_threshold(intgrid,Po,thr,false);
+	double vala=sqrt(intgrid.density_threshold(Po,thr));
 
 	if(io<Nelb) {
 	  Po=Cb.col(io)*arma::trans(Cb.col(io));
-	  double valb=compute_threshold(intgrid,Po,thr,false);
+	  double valb=sqrt(intgrid.density_threshold(Po,thr));
 
 	  // Print out orbital threshold
 	  printf("%4i %8.3e %8.3e %8.3f\n", io+1, vala, valb, t.get());
@@ -314,7 +289,7 @@ int main(int argc, char **argv) {
 
 	// Orbital density matrix is
 	arma::mat Po=arma::real(CW.col(io)*arma::trans(CW.col(io)));
-	double val=compute_threshold(intgrid,Po,thr,false);
+	double val=sqrt(intgrid.density_threshold(Po,thr));
 
 	// Print out orbital threshold
 	printf("%4i %8.3e %8.3f\n", (int) io+1, val, t.get());
@@ -333,11 +308,11 @@ int main(int argc, char **argv) {
 
 	// Orbital density matrix is
 	arma::mat Po=arma::real(CWa.col(io)*arma::trans(CWa.col(io)));
-	double vala=compute_threshold(intgrid,Po,thr,false);
+	double vala=sqrt(intgrid.density_threshold(Po,thr));
 
 	if(io<CWb.n_cols) {
 	  Po=arma::real(CWb.col(io)*arma::trans(CWb.col(io)));
-	  double valb=compute_threshold(intgrid,Po,thr,false);
+	  double valb=sqrt(intgrid.density_threshold(Po,thr));
 
 	  // Print out orbital threshold
 	  printf("%4i %8.3e %8.3e %8.3f\n", (int) io+1, vala, valb, t.get());
@@ -351,7 +326,7 @@ int main(int argc, char **argv) {
   }
 
   if(set.get_bool("DensThr")) {
-    // Calculate SIC orbital density thresholds
+    // Calculate total density thresholds
 
     // Integration grid
     DFTGrid intgrid(&basis,true);
@@ -364,18 +339,18 @@ int main(int argc, char **argv) {
 
     printf("\n%10s %9s %8s\n","density","thr","t (s)");
     if(!restr) {
-      double aval=compute_threshold(intgrid,Pa,thr*arma::trace(P*basis.overlap()),true);
+      double aval=intgrid.density_threshold(Pa,thr*arma::trace(Pa*basis.overlap()));
       printf("%10s %8.3e %8.3f\n", "alpha", aval, t.get());
       fflush(stdout);
       t.set();
 
-      double bval=compute_threshold(intgrid,Pb,thr*arma::trace(P*basis.overlap()),true);
+      double bval=intgrid.density_threshold(Pb,thr*arma::trace(Pb*basis.overlap()));
       printf("%10s %8.3e %8.3f\n", "beta", bval, t.get());
       fflush(stdout);
       t.set();
     }
 
-    double val=compute_threshold(intgrid,P,thr*arma::trace(P*basis.overlap()),true);
+    double val=intgrid.density_threshold(P,thr*arma::trace(P*basis.overlap()));
     printf("%10s %8.3e %8.3f\n", "total", val, t.get());
     fflush(stdout);
   }
