@@ -269,7 +269,7 @@ void densitydiff_cube(const BasisSet & bas, const arma::mat & P, const BasisSet 
 	}
       }
     }
-    
+
     if(bas == basref)
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -284,7 +284,7 @@ void densitydiff_cube(const BasisSet & bas, const arma::mat & P, const BasisSet 
       // Loop over the points in the batch
       for(size_t ip=0;ip<np;ip++)
 	rho[ip]=compute_density(P,bas,r[ip].r)-compute_density(Pref,basref,r[ip].r);
-    
+
     // Save density values
     for(size_t ip=0;ip<np;ip++) {
       norm+=rho[ip];
@@ -659,8 +659,17 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
 
   // Collect orbitals
   arma::mat Cwrk(C.n_rows,orbidx.size());
-  for(size_t io=0;io<orbidx.size();io++)
-    Cwrk.col(io)=C.col(orbidx[io]-1); // Convert to C++ indexing
+  for(size_t io=0;io<orbidx.size();io++) {
+    // Convert to C++ indexing
+    size_t jo=orbidx[io]-1;
+    // Sanity check
+    if(jo>=C.n_cols) {
+      std::ostringstream oss;
+      oss << "There are only " << C.n_cols << " orbitals: orbital " << orbidx[io] << " does not exist!\n";
+      throw std::logic_error(oss.str());
+    }
+    Cwrk.col(io)=C.col(jo);
+  }
   // Orbital norms
   norms.zeros(orbidx.size());
 
@@ -868,42 +877,55 @@ int main(int argc, char **argv) {
     // Orbital norms
     arma::vec orbnorm;
 
-    if((ranges.size()==2 && restr) || (ranges.size()==1 && !restr))
+    if((ranges.size()==2 && restr) || (ranges.size()==1 && ranges[0]!="*" && !restr))
       throw std::runtime_error("Invalid orbital range specified.\n");
 
+    std::vector< std::vector<size_t> > orbidx;
+    std::vector<std::string> legend;
     if(restr) {
-      // Orbital indices, NOT IN C++ INDEXING!
-      std::vector<size_t> orbidx=parse_range(ranges[0],false);
+      orbidx.resize(1);
+      legend.resize(1);
+    } else {
+      orbidx.resize(2);
+      legend.resize(2);
+      legend[0]="alpha ";
+      legend[1]="beta ";
+    }
 
-      printf("Calculating orbitals ... ");
+    // Orbital indices, NOT IN C++ INDEXING!
+    if(ranges.size()==1 && ranges[0]=="*") {
+      for(size_t is=0;is<orbidx.size();is++) {
+	size_t Norb = Ca.n_cols;
+	std::vector<size_t> idx(Norb);
+	for(size_t i=0;i<Norb;i++)
+	  idx[i]=i+1;
+	orbidx[is]=idx;
+      }
+    } else {
+      for(size_t is=0;is<ranges.size();is++)
+	orbidx[is]=parse_range(ranges[is],false);
+    }
+
+    for(size_t is=0;is<orbidx.size();is++) {
+      printf("Calculating %sorbitals ... ",legend[is].c_str());
       fflush(stdout); t.set();
-      orbital_cube(basis,Ca,x,y,z,orbidx,"orbital",split,orbnorm);
+
+      const arma::mat * Cp;
+      std::string fnam;
+      if(restr) {
+	Cp = &Ca;
+	fnam="orbital";
+      } else {
+	Cp = is ? &Cb : &Ca;
+	fnam = is ? "orbital-b" : "orbital-a";
+      }
+
+      orbital_cube(basis,*Cp,x,y,z,orbidx[is],fnam,split,orbnorm);
       printf("done (%s)\n",t.elapsed().c_str());
 
       printf("Orbital norms on grid\n");
       for(size_t io=0;io<orbidx.size();io++)
-	printf("%4i %e\n",(int) orbidx[io],orbnorm(io));
-
-    } else {
-      // Orbital indices, NOT IN C++ INDEXING!
-      std::vector<size_t> orbidxa=parse_range(ranges[0],false);
-      std::vector<size_t> orbidxb=parse_range(ranges[1],false);
-
-      printf("Calculating alpha orbitals ... ");
-      fflush(stdout); t.set();
-      orbital_cube(basis,Ca,x,y,z,orbidxa,"orbital-a",split,orbnorm);
-      printf("done (%s)\n",t.elapsed().c_str());
-      printf("Orbital norms on grid\n");
-      for(size_t io=0;io<orbidxa.size();io++)
-	printf("%4i %e\n",(int) orbidxa[io],orbnorm(io));
-
-      printf("Calculating beta orbitals ... ");
-      fflush(stdout); t.set();
-      orbital_cube(basis,Cb,x,y,z,orbidxb,"orbital-b",split,orbnorm);
-      printf("done (%s)\n",t.elapsed().c_str());
-      printf("Orbital norms on grid\n");
-      for(size_t io=0;io<orbidxb.size();io++)
-	printf("%4i %e\n",(int) orbidxb[io],orbnorm(io));
+	printf("%4i %e\n",(int) orbidx[is][io],orbnorm(io));
     }
   }
 
@@ -1095,7 +1117,7 @@ int main(int argc, char **argv) {
     Checkpoint refchk(refstr,false);
     BasisSet refbas;
     refchk.read(refbas);
-    
+
     arma::mat refP;
     refchk.read("P",refP);
 
@@ -1105,6 +1127,6 @@ int main(int argc, char **argv) {
     densitydiff_cube(basis,P,refbas,refP,x,y,z,"densitydiff",norm);
     printf("done (%s).\nNorm of difference is %e.\n",t.elapsed().c_str(),norm);
   }
-  
+
   return 0;
 }
