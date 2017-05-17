@@ -69,6 +69,7 @@ int main(int argc, char **argv) {
   set.add_bool("Voronoi", "Run Voronoi analysis?", false);
   set.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
   set.add_bool("OrbThr", "Compute orbital density thresholds", false);
+  set.add_bool("VirtThr", "Also do the virtual orbitals?", false);
   set.add_bool("SICThr", "Compute SIC orbital density thresholds", false);
   set.add_bool("DensThr", "Compute total density thresholds", false);
   set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
@@ -210,6 +211,7 @@ int main(int argc, char **argv) {
 
     // Threshold is
     double thr=set.get_double("OrbThrVal");
+    bool virt=set.get_bool("VirtThr");
 
     if(restr) {
       // Get amount of occupied orbitals
@@ -220,8 +222,10 @@ int main(int argc, char **argv) {
       arma::mat C;
       chkpt.read("C",C);
 
+      int Nmo = virt ? C.n_cols : Nela;
+
       printf("\n%4s %9s %8s\n","orb","thr","t (s)");
-      for(int io=0;io<Nela;io++) {
+      for(int io=0;io<Nmo;io++) {
 	Timer t;
 
 	// Orbital density matrix is
@@ -244,15 +248,17 @@ int main(int argc, char **argv) {
       chkpt.read("Ca",Ca);
       chkpt.read("Cb",Cb);
 
+      int Nmo = virt ? Ca.n_cols : Nela;
+
       printf("\n%4s %9s %9s %8s\n","orb","thr-a","thr-b","t (s)");
-      for(int io=0;io<Nela;io++) {
+      for(int io=0;io<Nmo;io++) {
 	Timer t;
 
 	// Orbital density matrix is
 	arma::mat Po=Ca.col(io)*arma::trans(Ca.col(io));
 	double vala=sqrt(intgrid.density_threshold(Po,thr));
 
-	if(io<Nelb) {
+	if(virt || (!virt && io<Nelb)) {
 	  Po=Cb.col(io)*arma::trans(Cb.col(io));
 	  double valb=sqrt(intgrid.density_threshold(Po,thr));
 
