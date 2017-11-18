@@ -776,6 +776,45 @@ void AngularGrid::zero_Exc() {
   exc.zeros(grid.size());
 }
 
+void AngularGrid::check_xc() {
+  size_t nan=0;
+
+  for(arma::uword i=0;i<exc.n_elem;i++)
+    if(std::isnan(exc[i])) {
+      nan++;
+      exc[i]=0.0;
+    }
+
+  for(arma::uword i=0;i<vxc.n_elem;i++)
+    if(std::isnan(vxc[i])) {
+      nan++;
+      vxc[i]=0.0;
+    }
+
+  for(arma::uword i=0;i<vsigma.n_elem;i++)
+    if(std::isnan(vsigma[i])) {
+      nan++;
+      vsigma[i]=0.0;
+    }
+
+  for(arma::uword i=0;i<vlapl.n_elem;i++)
+    if(std::isnan(vlapl[i])) {
+      nan++;
+      vlapl[i]=0.0;
+    }
+
+
+  for(arma::uword i=0;i<vtau.n_elem;i++)
+    if(std::isnan(vtau[i])) {
+      nan++;
+      vtau[i]=0.0;
+    }
+
+  if(nan) {
+    printf("Warning - %i NaNs found in xc energy / potential.\n",(int) nan);
+  }
+}
+
 void check_array(const std::vector<double> & x, size_t n, std::vector<size_t> & idx) {
   if(x.size()%n!=0) {
     ERROR_INFO();
@@ -2512,6 +2551,8 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
       compute_xc(x_func,true);
     if(c_func>0)
       compute_xc(c_func,true);
+    // Clean up xc
+    check_xc();
     // Construct the Fock matrix
     Hnew.zeros();
     eval_diag_Fxc(Hnew);
@@ -2586,6 +2627,8 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
       compute_xc(x_func,true);
     if(c_func>0)
       compute_xc(c_func,true);
+    // Clean up xc
+    check_xc();
     // and construct the Fock matrices
     Hanew.zeros();
     Hbnew.zeros();
@@ -2661,6 +2704,8 @@ angshell_t AngularGrid::construct(const arma::cx_vec & C, double ftoler, int x_f
       compute_xc(x_func,true);
     if(c_func>0)
       compute_xc(c_func,true);
+    // Clean up xc
+    check_xc();
     // and construct the Fock matrices
     Hnew.zeros();
     eval_diag_Fxc(Hnew,Hdum);
@@ -4199,7 +4244,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       // Compute the functionals
       if(x_func>0) {
 	wrk[ith].compute_xc(x_func,true);
-
+        wrk[ith].check_xc();
 	// Increment exchange energy
 	Ex+=wrk[ith].eval_Exc();
 	// Zero out array
@@ -4207,7 +4252,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & P, arma::mat & 
       }
       if(c_func>0) {
 	wrk[ith].compute_xc(c_func,true);
-
+        wrk[ith].check_xc();
 	// Increment exchange energy
 	Ec+=wrk[ith].eval_Exc();
 	// Zero out array
@@ -4296,12 +4341,14 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::mat & Pa, const arma:
       // Compute the functionals
       if(x_func>0) {
 	wrk[ith].compute_xc(x_func,true);
+        wrk[ith].check_xc();
 	// Evaluate the energy
 	Ex+=wrk[ith].eval_Exc();
 	wrk[ith].zero_Exc();
       }
       if(c_func>0) {
 	wrk[ith].compute_xc(c_func,true);
+        wrk[ith].check_xc();
 	// Evaluate the energy
 	Ec+=wrk[ith].eval_Exc();
 	wrk[ith].zero_Exc();
@@ -4397,6 +4444,7 @@ void DFTGrid::eval_Fxc(int x_func, int c_func, const arma::cx_mat & CW, std::vec
 	  wrk[ith].compute_xc(x_func,fock);
 	if(c_func>0)
 	  wrk[ith].compute_xc(c_func,fock);
+        wrk[ith].check_xc();
 
 	// Evaluate the energy
 #ifdef _OPENMP
@@ -4578,6 +4626,7 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
 	wrk[ith].compute_xc(x_func,true);
       if(c_func>0)
 	wrk[ith].compute_xc(c_func,true);
+      wrk[ith].check_xc();
 
       // Calculate the force on the atom
 #ifdef _OPENMP
@@ -4642,6 +4691,7 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
 	wrk[ith].compute_xc(x_func,true);
       if(c_func>0)
 	wrk[ith].compute_xc(c_func,true);
+      wrk[ith].check_xc();
 
       // Calculate the force on the atom
 #ifdef _OPENMP
@@ -4902,6 +4952,7 @@ void DFTGrid::print_potential(int func_id, const arma::mat & Pa, const arma::mat
       // Compute the functionals
       if(func_id>0)
 	wrk[ith].compute_xc(func_id,true);
+      wrk[ith].check_xc();
 
       // Write out density and potential data
 #ifdef _OPENMP
@@ -4961,6 +5012,7 @@ void DFTGrid::check_potential(int func_id, const arma::mat & Pa, const arma::mat
       // Compute the functionals
       if(func_id>0)
 	wrk[ith].compute_xc(func_id,true);
+      wrk[ith].check_xc();
 
       // Write out density and potential data
 #ifdef _OPENMP

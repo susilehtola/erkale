@@ -396,6 +396,8 @@ class AngularGrid {
   double eval_Exc() const;
   /// Zero out energy
   void zero_Exc();
+  /// Numerical clean up of xc
+  void check_xc();
 
   /// Initialize VV10 calculation
   void init_VV10(double b, double C, bool pot);
