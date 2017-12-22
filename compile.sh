@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2017-05-04 Susi Lehtola
+# 2017-12-22 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -83,22 +83,22 @@ fi
 
 # Current versions of libraries, if they are to be compiled
 # GSL
-export GSLVER="2.3"
+export GSLVER="2.4"
 ## LibXC
-#export XCVER="2.2.2"
-# Use newest svn snapshot
-export XCVER="svn"
+#export XCVER="4.0.3"
+# Use newest git snapshot
+export XCVER="git"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="7.800.2"
-export CMAKEVER="3.7.2"
+export ARMAVER="8.300.2"
+export CMAKEVER="3.10.1"
 
 # HDF5 version: MAJOR.MINOR
 export HDF5MAJOR="1.10"
 export HDF5MINOR="1"
 
 # Version of OpenBLAS
-export OPENBLASVER="0.2.19"
+export OPENBLASVER="0.2.20"
 # You may need to disable AVX flags for OpenBLAS with older compilers
 #export OPENBLASAVX="NO_AVX=1 NO_AVX2=1" # For very old
 #export OPENBLASAVX="NO_AVX2=1" # For a little less old
@@ -178,10 +178,16 @@ fi
 
 # libXC
 if(( ! ${system_libxc} )); then
-    if [[ "$XCVER" == "svn" ]]; then
+    if [[ "$XCVER" == "git" ]]; then
 	echo -n "Checking out and compiling libxc ..."
 	cd $builddir
-        svn co http://www.tddft.org/svn/libxc/trunk/ libxc
+        if [[ ! -d libxc ]]; then
+            git clone https://gitlab.com/libxc/libxc.git libxc
+        else
+            cd libxc
+            git pull
+            cd ..
+        fi
 	cd libxc
 	if [[ ! -f configure ]]; then
 	    autoreconf -i
@@ -197,7 +203,8 @@ if(( ! ${system_libxc} )); then
 	    if [ ! -d ${builddir}/libxc-${XCVER} ]; then
 		if [ ! -f ${srcdir}/libxc-${XCVER}.tar.gz ]; then
 		    cd ${srcdir}
-		    wget -O libxc-${XCVER}.tar.gz "http://www.tddft.org/programs/octopus/down.php?file=libxc/libxc-${XCVER}.tar.gz"
+		    wget -O libxc-${XCVER}.tar.gz "http://www.tddft.org/programs/octopus/down.php?file=libxc/${XCVER}/libxc-${XCVER}.tar.gz"
+
 		fi
 		cd ${builddir}
 		tar zxf ${srcdir}/libxc-${XCVER}.tar.gz
