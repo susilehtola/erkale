@@ -24,6 +24,10 @@
 #include "version.h"
 #endif
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 UnitaryFunction::UnitaryFunction(int qv, bool max): W(arma::cx_mat()), f(0.0), q(qv) {
   /// Maximize or minimize?
   sign = max ? 1 : -1;
