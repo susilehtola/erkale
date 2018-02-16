@@ -986,7 +986,6 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
   } else if(chg==MULLIKEN) {
     // Amount of regions
     N=basis.get_Nnuc();
-    size_t Nbf(basis.get_Nbf());
     // Get overlap matrix
     arma::mat S(basis.overlap());
 
@@ -1000,18 +999,15 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
       Sat.zeros();
 
       // Increment charge
-      for(size_t is=0;is<shells.size();is++) {
+      for(size_t is=0;is<shells.size();is++)
 	for(size_t fi=shells[is].get_first_ind();fi<=shells[is].get_last_ind();fi++)
-	  for(size_t fj=0;fj<Nbf;fj++) {
-	    // Rows
-	    Sat(fi,fj)+=S(fi,fj)/2.0;
-	    // Columns
-	    Sat(fj,fi)+=S(fj,fi)/2.0;
-	  }
+          Sat.col(fi)=S.col(fi);
+
+      // Symmetrize
+      Sat=(Sat+arma::trans(Sat))/2.0;
 
       Sat=arma::trans(C)*Sat*C;
       Sat.save(pipek_filename(iat),PIPEK_FILEMODE);
-      }
     }
 
   } else if(chg==LOWDIN) {
