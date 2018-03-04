@@ -161,6 +161,11 @@ void ERIchol::save() const {
 }
 
 size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose) {
+  if(tol < shtol) {
+    fprintf(stderr,"Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
+    printf("Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
+  }
+  
   // Screening matrix and pairs
   arma::mat screen;
   std::vector<eripair_t> shpairs=basis.get_eripairs(screen,shtol,omega,alpha,beta,verbose);
@@ -245,57 +250,53 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       if(is==js) {
 	for(size_t i=i0;i<i0+Ni;i++) {
 	  for(size_t j=j0;j<i;j++) {
-	    // Function indices are
-	    invmap(0,iprod)=i;
-	    invmap(1,iprod)=j;
-	    // Global product index is
-	    prodidx(iprod)=i*Nbf+j;
-	    // Off-diagonal product
-	    odiagidx(iodiag)=iprod;
-
-	    // Significant product?
 	    Nshp++;
-	    if(d(prodidx(iprod))>=shtol) {
-	      // Product index mapping is
-	      prodmap(i,j)=iprod;
-	      prodmap(j,i)=iprod;
-	      iprod++;
-	      iodiag++;
-	    }
+	    // Global product index is
+	    size_t idx=i*Nbf+j;
+            prodidx(iprod)=idx;
+            // Function indices are
+            invmap(0,iprod)=i;
+            invmap(1,iprod)=j;
+            // Off-diagonal product
+            odiagidx(iodiag)=iprod;
+            // Product index mapping is
+            prodmap(i,j)=iprod;
+            prodmap(j,i)=iprod;
+            // Increment indices
+            iprod++;
+            iodiag++;
 	  }
-	  // Function indices are
-	  invmap(0,iprod)=i;
-	  invmap(1,iprod)=i;
-	  // Global product index is
-	  prodidx(iprod)=i*Nbf+i;
-	  // Significant product?
+
 	  Nshp++;
-	  if(d(prodidx(iprod))>=shtol) {
+	  // Global product index is
+          size_t idx=i*Nbf+i;
+	  if(true || d(idx)>=shtol) {
+            prodidx(iprod)=idx;
+            // Function indices are
+            invmap(0,iprod)=i;
+            invmap(1,iprod)=i;
 	    // Product index mapping is
 	    prodmap(i,i)=iprod;
-
+            // Increment index
 	    iprod++;
 	  }
 	}
       } else {
       	for(size_t i=i0;i<i0+Ni;i++)
 	  for(size_t j=j0;j<j0+Nj;j++) {
-	    // Function indices are
-	    invmap(0,iprod)=i;
-	    invmap(1,iprod)=j;
-	    // Global product index is
-	    prodidx(iprod)=i*Nbf+j;
-	    // Off-diagonal product
-	    odiagidx(iodiag)=iprod;
-	    // Significant product?
 	    Nshp++;
-	    if(d(prodidx(iprod))>=shtol) {
-	      // Product index mapping is
-	      prodmap(i,j)=iprod;
-
-	      iprod++;
-	      iodiag++;
-	    }
+            size_t idx=i*Nbf+j;
+            prodidx(iprod)=idx;
+            // Function indices are
+            invmap(0,iprod)=i;
+            invmap(1,iprod)=j;
+            // Product index mapping is
+            prodmap(i,j)=iprod;
+            // Off-diagonal product
+            odiagidx(iodiag)=iprod;
+              // Increment indices
+            iprod++;
+            iodiag++;
 	  }
       }
     }
@@ -326,18 +327,19 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   size_t m(0);
 
   while(error>tol && m<d.n_elem) {
-    // Errors in pivoted order
-    arma::vec errs(d(pi));
-    // Sort the upcoming errors so that largest one is first
-    arma::uvec idx=arma::stable_sort_index(errs.subvec(m,d.n_elem-1),"descend");
-
     // Update the pivot index
     {
-      arma::uvec pisub(pi.subvec(m,d.n_elem-1));
-      pi.subvec(m,d.n_elem-1)=pisub(idx);
+      // Remaining pivot is
+      arma::uvec pileft(pi.subvec(m,d.n_elem-1));
+      // Remaining errors in pivoted order
+      arma::vec errs(d(pileft));
+      // Sort the remaining errors so that largest one is first
+      arma::uvec idx=arma::stable_sort_index(errs,"descend");
+      // Store updated pivot
+      pi.subvec(m,d.n_elem-1)=pileft(idx);
     }
 
-    // Pivot index
+    // Pivot index to use is
     size_t pim=pi(m);
     //printf("Pivot index is %4i, corresponding to product %i, with error %e, error is %e\n",(int) pim, (int) prodidx(pim), d(pim), error);
 
@@ -430,9 +432,12 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
       // Did we already treat everything in the block?
       if(nb==A.n_cols)
 	break;
+      // Remaining pivot is
+      arma::uvec pileft(pi.subvec(m,d.n_elem-1));
+      // Remaining errors in pivoted order
+      arma::vec errs(d(pileft));
       // Find global largest error
-      errs=d(pi);
-      double errmax=arma::max(errs.subvec(m,d.n_elem-1));
+      double errmax=arma::max(errs);
       // and the largest error within the current block
       double blockerr=0;
       size_t blockind=0;
