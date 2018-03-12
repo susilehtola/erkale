@@ -51,6 +51,7 @@
 
 #include "global.h"
 #include "basis.h"
+#include "eriworker.h"
 
 /// Density fitting routines
 class DensityFit {
@@ -60,8 +61,8 @@ class DensityFit {
   size_t Naux;
   /// Direct calculation? (Compute three-center integrals on-the-fly)
   bool direct;
-  /// Hartree-Fock calculation?
-  bool hf;
+  /// B-matrix calculation?
+  bool Bmat;
 
   /// Range separation constants
   double omega, alpha, beta;
@@ -89,12 +90,8 @@ class DensityFit {
 
   /// List of unique orbital shell pairs
   std::vector<eripair_t> orbpairs;
-
-  /// Index helper
-  std::vector<size_t> iidx;
-
-  /// Integrals \f$ ( \alpha | \mu \nu) \f$
-  arma::mat a_munu;
+  /// Integrals \f$ ( \alpha | \mu \nu) \f$ stored by shell pair basis
+  std::vector<arma::mat> a_munu;
 
   /// \f$ ( \alpha | \beta) \f$
   arma::mat ab;
@@ -105,6 +102,18 @@ class DensityFit {
 
   /// Form screening matrix
   void form_screening();
+  /// Compute shell in (a|uv) matrix
+  arma::mat compute_a_munu(ERIWorker * eri, size_t ip) const;
+  /// Digest J expansion
+  void digest_Jexp(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const;
+  /// Digest J
+  void digest_J(const arma::mat & gamma, size_t ip, const arma::mat & amunu, arma::mat & J) const;
+  /// Digest K in-core
+  void digest_K_incore(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
+  /// Digest K in-core, complex orbitals
+  void digest_K_incore(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const;
+  /// Digest K in direct mode
+  void digest_K_direct(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
 
  public:
   /// Constructor
@@ -117,8 +126,8 @@ class DensityFit {
   /// Get range separation constants
   void get_range_separation(double & w, double & a, double & b) const;
 
-  /// Running in Hartree-Fock mode?
-  bool hf_enabled() const;
+  /// Running in B-matrix mode?
+  bool Bmat_enabled() const;
 
   /**
    * Compute integrals, use given linear dependency threshold. The HF
@@ -126,12 +135,10 @@ class DensityFit {
    * HF routine should be more tolerant of linear dependencies in the basis.
    * Returns amount of significant orbital shell pairs.
    */
-  size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, bool hf=false);
-  /// Compute index in integral table
-  size_t idx(size_t imu, size_t inu) const;
+  size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, bool bmat=false);
 
   /// Compute estimate of necessary memory
-  size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, bool direct) const;
+  size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double erithr, bool direct) const;
 
   /// Compute expansion coefficients c
   arma::vec compute_expansion(const arma::mat & P) const;
@@ -147,16 +154,14 @@ class DensityFit {
   arma::vec forceJ(const arma::mat & P);
 
   /// Get exchange matrix from orbitals with occupation numbers occs
-  arma::mat calcK(const arma::mat & C, const std::vector<double> & occs, size_t memlimit) const;
+  arma::mat calcK(const arma::mat & C, const std::vector<double> & occs, size_t fitmem) const;
   /// Get exchange matrix from orbitals with occupation numbers occs
-  arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs, size_t memlimit) const;
+  arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs, size_t fitmem) const;
 
   /// Get the number of orbital functions
   size_t get_Norb() const;
   /// Get the number of auxiliary functions
   size_t get_Naux() const;
-  /// Get the three-electron integral
-  double get_a_munu(size_t ia, size_t imu, size_t inu) const;
   /// Get ab_inv
   arma::mat get_ab_inv() const;
 

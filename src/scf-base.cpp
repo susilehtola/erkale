@@ -17,6 +17,7 @@
 #include <armadillo>
 #include <cstdio>
 #include <cfloat>
+#include <climits>
 
 #include "basis.h"
 #include "broyden.h"
@@ -261,7 +262,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     }
 
     // Compute memory estimate
-    std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,direct));
+    std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
 
     if(verbose) {
       if(direct)
@@ -272,8 +273,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       t.set();
     }
 
-    // Fill the basis
-    size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,rik);
+    // Calculate the fitting integrals, don't run in B-matrix mode
+    size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,false);
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
@@ -419,7 +420,7 @@ void SCF::fill_rs(double omega) {
       dfit_rs.set_range_separation(omega,0.0,1.0);
 
       // Compute memory estimate
-      std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,direct));
+      std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
 
       Timer t;
       if(verbose) {
@@ -431,7 +432,7 @@ void SCF::fill_rs(double omega) {
       }
 
       t.set();
-      size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,dfit.hf_enabled());
+      size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,dfit.Bmat_enabled());
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
 	printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
@@ -948,9 +949,11 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
     // Form exchange matrix
     arma::mat K;
     if(densityfit) {
+      // Because this is done an orbital at a time, it doesn't really
+      // matter how much fitting memory is given so we just allow
+      // however much
       std::vector<double> occs(1,1.0);
-      // Allow 100 MB of memory
-      K=dfit.calcK(Co.col(io),occs,1e8);
+      K=dfit.calcK(Co.col(io),occs,INT_MAX);
     } else {
       if(cholesky) {
 	K=chol.calcK(Co.col(io));
