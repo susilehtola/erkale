@@ -1859,7 +1859,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	    for(pos=0;pos<occ.n_elem;pos++)
 	      if(occ(pos)<=othr)
 		break;
-	    occ.subvec(pos,occ.n_elem-1).zeros();
+            if(pos<occ.n_elem)
+              occ.subvec(pos,occ.n_elem-1).zeros();
 	  }
 
 	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
