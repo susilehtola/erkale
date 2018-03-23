@@ -66,13 +66,21 @@
 #define ERKALE_GLOBAL
 
 // Disable bounds checking in Armadillo.
+#ifndef ARMA_NO_DEBUG
 #define ARMA_NO_DEBUG
+#endif
 // Don't use Armadillo wrapper library
+#ifndef ARMA_DONT_USE_WRAPPER
 #define ARMA_DONT_USE_WRAPPER
+#endif
 // We need BLAS
+#ifndef ARMA_USE_BLAS
 #define ARMA_USE_BLAS
+#endif
 // and LAPACK
+#ifndef ARMA_USE_LAPACK
 #define ARMA_USE_LAPACK
+#endif
 
 // Ångström in atomic units
 #define ANGSTROMINBOHR 1.8897261
