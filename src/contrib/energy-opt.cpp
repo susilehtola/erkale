@@ -46,7 +46,7 @@ void EnergyOptimizer::set_params(const arma::ivec & am, const arma::uvec & nfv, 
   nf=nfv;
   npar=nparv;
   optsh=optshv;
-  
+
   if(am.n_elem!=nf.n_elem)
     throw std::runtime_error("sham and nf are not of same size!\n");
   if(nf.n_elem!=npar.n_elem)
@@ -302,7 +302,7 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, bool check) {
       xrhrh(idx(i))+=fd_h;
       xrhrh(idx(j))+=fd_h;
       trials.push_back(form_basis(xrhrh));
-      
+
       // RH,LH value
       arma::vec xrhlh(x);
       xrhlh(idx(i))+=fd_h;
@@ -322,10 +322,10 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, bool check) {
       trials.push_back(form_basis(xlhlh));
     }
   }
-    
+
   // Get energies
   std::vector<double> Etr=calcE(trials);
-  
+
   // Hessian
   arma::vec h(idx.n_elem,idx.n_elem);
   for(arma::uword i=0;i<idx.n_elem;i++)
@@ -338,7 +338,7 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, bool check) {
       double rhlh=Etr[ioff+1];
       double lhrh=Etr[ioff+2];
       double lhlh=Etr[ioff+3];
-      
+
       // Values
       h(i,j)=(rhrh - rhlh - lhrh + lhlh)/(4.0*fd_h*fd_h);
       // Symmetrize
@@ -352,7 +352,7 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, bool check) {
 	if(!std::isnormal(h(i,j)))
 	  h(i,j)=0.0;
       }
-  
+
   return h;
 }
 
@@ -369,7 +369,7 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, arma::sword am, bool check
       xrhrh(idx(i))+=fd_h;
       xrhrh(idx(j))+=fd_h;
       trials.push_back(form_basis(xrhrh));
-      
+
       // RH,LH value
       arma::vec xrhlh(x);
       xrhlh(idx(i))+=fd_h;
@@ -389,10 +389,10 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, arma::sword am, bool check
       trials.push_back(form_basis(xlhlh));
     }
   }
-    
+
   // Get energies
   std::vector<double> Etr=calcE(trials);
-  
+
   // Hessian
   arma::mat h(idx.n_elem,idx.n_elem);
   for(arma::uword i=0;i<idx.n_elem;i++)
@@ -405,7 +405,7 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, arma::sword am, bool check
       double rhlh=Etr[ioff+1];
       double lhrh=Etr[ioff+2];
       double lhlh=Etr[ioff+3];
-      
+
       // Values
       h(i,j)=(rhrh - rhlh - lhrh + lhlh)/(4.0*fd_h*fd_h);
       // Symmetrize
@@ -419,7 +419,7 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, arma::sword am, bool check
 	if(!std::isnormal(h(i,j)))
 	  h(i,j)=0.0;
       }
-  
+
   return h;
 }
 
@@ -451,47 +451,47 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 
   // Energy value
   double Eval=0.0;
-      
+
   if(verbose)
     print_info(x,"Input parameters");
 
   // Convergence threshold
   double cthr=std::max(nrthr,gthr);
   while(true) {
-    
+
     // Loop over angular momentum
     for(size_t iamloop=0;iamloop<maxiter;iamloop++) {
       // Is any gradient significant?
       bool changed=false;
-      
+
       // Initial energy for macroiteration
       double Emacro=0.0;
-      
+
       if(verbose)
 	printf("\n****** Macroiteration %3i *******\n\n",(int) iamloop+1);
-      
+
       for(arma::sword am=0;am<=arma::max(arma::abs(sham(sh_vec())));am++) {
 	// Current and old gradient
 	arma::vec g, gold;
-	
+
 	// Search direction
 	arma::vec sd;
-	
+
 	// Minimization loop
 	for(size_t iloop=0;iloop<maxiter;iloop++) {
-	  
+
 	  // Get gradient
 	  Timer t;
 	  gold=g;
 	  g=calcG(x,am);
-	
+
 	  if(verbose) {
 	    printf("%c microiteration %i gradient, norm %e (%s)\n",shell_types[am],(int) iloop+1,arma::norm(g,2),t.elapsed().c_str());
 	    g.t().print();
 	    fflush(stdout);
 	    t.set();
 	  }
-	
+
 	  if(arma::norm(g,2)<cthr) {
 	    if(verbose)
 	      printf("Gradient is small, converged.\n\n");
@@ -506,21 +506,21 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 	    if(iloop % g.n_elem == 0) {
 	      // Steepest descent
 	      sd=-g;
-	    
+
 	      if(verbose)
 		printf("Using SD step.\n");
 	    } else {
 	      // Update factor
 	      double gamma;
-	    
+
 	      // Polak-Ribiere
 	      gamma=arma::dot(g,g-gold)/arma::dot(gold,gold);
 	      // Fletcher-Reeves
 	      //gamma=arma::dot(g,g)/arma::dot(gold,gold);
-	    
+
 	      // Update search direction
 	      sd=-g + gamma*sd;
-	    
+
 	      if(verbose)
 		printf("Using CG step.\n");
 	    }
@@ -533,15 +533,15 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 	      h.print();
 	      fflush(stdout);
 	    }
-	  
+
 	    // Get eigenvalues of h
 	    arma::vec hval;
 	    arma::mat hvec;
 	    eig_sym_ordered(hval,hvec,h);
-	  
+
 	    if(verbose)
 	      hval.t().print("Eigenvalues of Hessian");
-	  
+
 	    // Inverse matrix
 	    arma::mat hinv(h);
 	    hinv.zeros();
@@ -549,23 +549,23 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 	      // Shift negative eigenvalues to positive to assure
 	      // convergence to minimum
 	      hinv+=hvec.col(i)*arma::trans(hvec.col(i))/fabs(hval(i));
-	  
+
 	    // Search direction is
 	    sd=-hinv*g;
 	  }
-	
+
 	  std::vector<double> step, E;
-	
+
 	  // Trial step sizes
 	  std::vector<double> stepbatch;
 	  stepbatch.push_back(0.0);
-	
+
 	  // Index of optimum
 	  size_t optidx;
-	
+
 	  if(verbose)
 	    printf("Line search\n");
-	
+
 	  while(true) {
 	    // Generate new trials
 	    while(stepbatch.size() < ntr) {
@@ -582,15 +582,15 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 		stepbatch.push_back(ss);
 	      }
 	    }
-	  
+
 	    // Generate basis sets
 	    std::vector<BasisSetLibrary> basbatch(stepbatch.size());
 	    for(size_t i=0;i<stepbatch.size();i++)
 	      basbatch[i]=form_basis(x+pad_vec(stepbatch[i]*sd,am));
-	  
+
 	    // Get trial energies
 	    std::vector<double> batchE=calcE(basbatch);
-	  
+
 	    // Print out info
 	    if(verbose) {
 	      double refE=(E.size()==0) ? batchE[0] : E[0];
@@ -601,7 +601,7 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 		  printf("%2i %e % 18.10f % e\n",(int) (i+step.size()),stepbatch[i],batchE[i],batchE[i]-refE);
 	      fflush(stdout);
 	    }
-	  
+
 	    // Initial energy?
 	    if(iloop==0 && iamloop==0 && am==0 && E.size()==0)
 	      Einit=batchE[0];
@@ -613,18 +613,18 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 	      E.push_back(batchE[i]);
 	    }
 	    stepbatch.clear();
-	    
+
 	    // Check if converged
 	    bool convd=false;
 	    if(nr) {
 	      // Parameter value
 	      const double c=0.5;
-	    
+
 	      // m value is
 	      double m=arma::dot(sd,g);
 	      // t value is
 	      double tv=-c*m;
-	    
+
 	      for(size_t i=1;i<E.size();i++) {
 		if(E[0]-E[i] >= step[i]*tv) {
 		  convd=true;
@@ -642,11 +642,11 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 	    // Check for too small step
 	    if(step[step.size()-1]>0.0 && step[step.size()-1]*arma::norm(sd,2)<DBL_EPSILON*arma::norm(x,2))
 	      convd=true;
-	    
+
 	    if(convd)
 	      break;
 	  }
-	
+
 	  // Find the optimal step size
 	  optidx=0;
 	  for(size_t i=1;i<E.size();i++)
@@ -656,13 +656,13 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 	    printf("Error in %c line search - could not go downhill!\n",shell_types[am]);
 	    break;
 	  }
-	
+
 	  // Optimal energy
 	  Eval=E[optidx];
-	
+
 	  // Step size to use
 	  double ss=step[optidx];
-	
+
 	  x+=pad_vec(ss*sd,am);
 	  if(verbose) {
 	    printf("Optimal step size is %e, reducing the energy by %e.\n",ss,E[optidx]-E[0]);
@@ -673,7 +673,7 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
 
       if(verbose && Emacro!=0.0)
 	printf("Macroiteration reduced the energy by %e.\n",Eval-Emacro);
-    
+
       if(!changed)
 	break;
     }
@@ -684,7 +684,7 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
     else
       cthr=gthr;
   }
-  
+
   if(verbose)
     printf("Optimization reduced the energy by %e.\n",Eval-Einit);
 
@@ -694,7 +694,7 @@ double EnergyOptimizer::optimize(arma::vec & x, size_t maxiter, double nrthr, do
     blib.push_back(form_basis(x));
     Eval=calcE(blib)[0];
   }
-  
+
   return Eval;
 }
 
@@ -716,7 +716,7 @@ double EnergyOptimizer::optimize_full(arma::vec & x, size_t maxiter, double nrth
   // Convergence threshold
   double cthr=std::max(nrthr,gthr);
   while(true) {
-    
+
     // Minimization loop
     for(size_t iloop=0;iloop<maxiter;iloop++) {
       // Get gradient
@@ -744,21 +744,21 @@ double EnergyOptimizer::optimize_full(arma::vec & x, size_t maxiter, double nrth
 	if(iloop % g.n_elem == 0) {
 	  // Steepest descent
 	  sd=-g;
-	
+
 	  if(verbose)
 	    printf("Using SD step.\n");
 	} else {
 	  // Update factor
 	  double gamma;
-	
+
 	  // Polak-Ribiere
 	  gamma=arma::dot(g,g-gold)/arma::dot(gold,gold);
 	  // Fletcher-Reeves
 	  //gamma=arma::dot(g,g)/arma::dot(gold,gold);
-	
+
 	  // Update search direction
 	  sd=-g + gamma*sd;
-	
+
 	  if(verbose)
 	    printf("Using CG step.\n");
 	}
@@ -771,14 +771,14 @@ double EnergyOptimizer::optimize_full(arma::vec & x, size_t maxiter, double nrth
 	  h.print();
 	  fflush(stdout);
 	}
-      
+
 	// Get eigenvalues of h
 	arma::vec hval;
 	arma::mat hvec;
 	eig_sym_ordered(hval,hvec,h);
-      
+
 	hval.t().print("Eigenvalues of Hessian");
-      
+
 	// Inverse matrix
 	arma::mat hinv(h);
 	hinv.zeros();
@@ -786,7 +786,7 @@ double EnergyOptimizer::optimize_full(arma::vec & x, size_t maxiter, double nrth
 	  // Shift negative eigenvalues to positive to assure
 	  // convergence to minimum
 	  hinv+=hvec.col(i)*arma::trans(hvec.col(i))/fabs(hval(i));
-      
+
 	// Search direction is
 	sd=-hinv*g;
       }
@@ -904,7 +904,7 @@ double EnergyOptimizer::optimize_full(arma::vec & x, size_t maxiter, double nrth
     else
       cthr=gthr;
   }
-  
+
   if(verbose)
     printf("Optimization reduced the energy by %e.\n",Eval-Einit);
 
@@ -914,7 +914,7 @@ double EnergyOptimizer::optimize_full(arma::vec & x, size_t maxiter, double nrth
     blib.push_back(form_basis(x));
     Eval=calcE(blib)[0];
   }
-  
+
   return Eval;
 }
 
@@ -979,7 +979,7 @@ void EnergyOptimizer::print_info(const arma::vec & x, const std::string & msg) c
   std::vector<arma::vec> exps=get_exps(x);
   for(size_t am=0;am<exps.size();am++) {
     arma::vec ame=arma::log10(exps[am]);
-    
+
     printf("%c exponents\n",shell_types[am]);
     for(arma::uword ix=0;ix<ame.n_elem;ix++)
       printf("% 7.3f ",ame(ix));

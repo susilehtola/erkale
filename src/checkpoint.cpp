@@ -1191,7 +1191,7 @@ std::string get_cwd() {
     // Success?
     if(r==p)
       break;
-    
+
     // Failed, increase m
     m*=2;
     p=(char *) realloc(p,m);

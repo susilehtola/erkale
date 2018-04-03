@@ -5,8 +5,8 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Copyright © 2015 The Regents of the University of California 
- * All Rights Reserved 
+ * Copyright © 2015 The Regents of the University of California
+ * All Rights Reserved
  *
  * Written by Susi Lehtola, Lawrence Berkeley National Laboratory
  *
@@ -55,7 +55,7 @@ namespace ERIfit {
 
   /// Compute fitting integrals
   void compute_fitint(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, arma::mat & fitint);
-    
+
   /// Compute the fitted repulsion integrals using the supplied fitting integrals
   void compute_ERIfit(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, double linthr, const arma::mat & fitint, arma::mat & fiteri);
   /// Compute the diagonal fitted repulsion integrals using the supplied fitting integrals

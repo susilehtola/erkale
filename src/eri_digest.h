@@ -1,6 +1,6 @@
 /*
  *                This source code is part of
- * 
+ *
  *                     E  R  K  A  L  E
  *                             -
  *                       DFT from Hel
@@ -42,7 +42,7 @@ class JDigestor: public IntegralDigestor {
   JDigestor(const arma::mat & P);
   /// Destruct digestor
   ~JDigestor();
-  
+
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
   /// Get output
@@ -60,7 +60,7 @@ class KDigestor: public IntegralDigestor {
   KDigestor(const arma::mat & P);
   /// Destruct digestor
   ~KDigestor();
-  
+
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
   /// Get output
@@ -78,7 +78,7 @@ class cxKDigestor: public IntegralDigestor {
   cxKDigestor(const arma::cx_mat & P);
   /// Destruct digestor
   ~cxKDigestor();
-  
+
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, const std::vector<double> & ints, size_t ioff);
   /// Get output
@@ -105,7 +105,7 @@ class JFDigestor: public ForceDigestor {
   JFDigestor(const arma::mat & P);
   /// Destruct digestor
   ~JFDigestor();
-  
+
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, dERIWorker & deriw, arma::vec & f);
 };
@@ -118,13 +118,13 @@ class KFDigestor: public ForceDigestor {
   double kfrac;
   /// Degeneracy factor
   double fac;
-  
+
  public:
   /// Construct digestor
   KFDigestor(const arma::mat & P, double kfrac, bool restr);
   /// Destruct digestor
   ~KFDigestor();
-  
+
   /// Digest integrals
   void digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t jp, dERIWorker & deriw, arma::vec & f);
 };

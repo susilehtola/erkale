@@ -183,7 +183,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
 
   if(iorb<0 || iorb>=(2*lxc+1))
     throw std::runtime_error("Invalid number of initial orbital.\n");
-  
+
   // Charge of atom is
   int Z=basis.get_nucleus(xcatom).Z;
   // Pad to next noble atom to account for multiplicity and state
@@ -300,7 +300,7 @@ size_t localize(const BasisSet & basis, int nocc, size_t xcatom, arma::mat & C, 
 
     // Increment shell count
     orbidx(am)++;
-    
+
     // Increment localization count
     iloc+=norb;
   }

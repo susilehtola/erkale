@@ -39,7 +39,7 @@ class BaderGrid {
   const BasisSet *basp;
   /// Grid worker
   AngularGrid wrk;
-  
+
   /// Locations of maxima
   std::vector<coords_t> maxima;
   /// Grid points corresponding to the regions

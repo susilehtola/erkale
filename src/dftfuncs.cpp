@@ -189,7 +189,7 @@ void print_info(int func_id) {
 
 bool is_exchange(int func_id) {
   bool ans=false;
-  
+
   if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
@@ -198,7 +198,7 @@ bool is_exchange(int func_id) {
       oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
-    
+
     switch(func.info->kind)
       {
 	/* By default we assign exchange-correlation functionals as
@@ -213,10 +213,10 @@ bool is_exchange(int func_id) {
       }
     // Free functional
     xc_func_end(&func);
-    
+
   } else if(func_id==ID_HF) {
     ans=true;
-  
+
   } else
     // Dummy exchange
     ans=false;
@@ -333,7 +333,7 @@ void is_gga_mgga(int func_id, bool & gga, bool & mgga_t, bool & mgga_l) {
     std::ostringstream oss;
     oss << "Functional "<<func_id<<" not found!";
     throw std::runtime_error(oss.str());
-  }  
+  }
 
   switch(func.info->family)
     {
@@ -403,7 +403,7 @@ double exact_exchange(int func_id) {
 
 bool is_range_separated(int func_id, bool check) {
   bool ans=false;
-  
+
   if(func_id>0) {
     xc_func_type func;
     if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
@@ -422,13 +422,13 @@ bool is_range_separated(int func_id, bool check) {
     // Sanity check
     double w, a, b;
     range_separation(func_id,w,a,b);
-    
+
     if(ans && w==0.0)
       fprintf(stderr,"Error in libxc detected - functional is marked range separated but with vanishing omega!\n");
     else if(!ans && w!=0.0)
       fprintf(stderr,"Error in libxc detected - functional is not marked range separated but has nonzero omega!\n");
   }
-  
+
   return ans;
 }
 
@@ -480,7 +480,7 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
 bool needs_VV10(int func_id, double & b, double & C) {
   b=0.0;
   C=0.0;
-  
+
   bool ret=false;
 #ifdef XC_FLAGS_VV10
   if(func_id>0) {
@@ -499,7 +499,7 @@ bool needs_VV10(int func_id, double & b, double & C) {
     xc_func_end(&func);
   }
 #endif
-  
+
   return ret;
 }
 
@@ -605,6 +605,6 @@ bool has_exc(int func_id) {
     // Free functional
     xc_func_end(&func);
   }
-  
+
   return ans;
 }

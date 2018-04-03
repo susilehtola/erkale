@@ -56,12 +56,12 @@ double similarity_quadrature(const std::vector<double> & rad, const std::vector<
 #pragma omp parallel for reduction(+:sim)
 #endif
     for(size_t ir=0;ir<rad.size();ir++) {
-      
+
       // Contribution from current radial shell
       double c=0.0;
       for(size_t iang=0;iang<angmesh.size();iang++)
 	  c+=emd_a[ir][iang]*emd_b[ir][iang]*angmesh[iang].w;
-      
+
       // Increment measure
       sim+=std::pow(rad[ir],2*k+2)*c*wrad[ir];
     }
@@ -81,7 +81,7 @@ arma::vec emd_moments(const std::vector<double> & rad, const std::vector<double>
     double ave=0.0;
     for(size_t iang=0;iang<angmesh.size();iang++)
       ave+=emd[ir][iang]*angmesh[iang].w;
-    
+
     // Increment moments
     for(int k=-2;k<=4;k++)
       mom(k+2)+=std::pow(rad[ir],k+2)*ave*wrad[ir];
@@ -97,7 +97,7 @@ void fill_mesh(const BasisSet & basis, const arma::cx_mat & P, const std::vector
   std::vector< std::vector<GTO_Fourier> > fourier=fourier_expand(basis,idents);
 
   emd.resize(rad.size());
-  
+
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -108,7 +108,7 @@ void fill_mesh(const BasisSet & basis, const arma::cx_mat & P, const std::vector
       double px=rad[ir]*angmesh[iang].x;
       double py=rad[ir]*angmesh[iang].y;
       double pz=rad[ir]*angmesh[iang].z;
-      
+
       emd[ir][iang]=eval_emd(basis, P, fourier, idents, px, py, pz);
     }
   }
@@ -141,7 +141,7 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::cx_mat & P_a, const
     fflush(stdout);
     t.set();
   }
-  
+
   std::vector< std::vector<double> > emd_b;
   fill_mesh(basis_b,P_b,rad,angmesh,emd_b);
 
@@ -161,7 +161,7 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::cx_mat & P_a, const
     printf("\n");
     fflush(stdout);
 #endif
-    
+
     t.set();
   }
 
@@ -217,14 +217,14 @@ double similarity_quadrature_semi(const std::vector<double> & rad, const std::ve
     for(int m=-l;m<=l;m++)
       for(size_t ir=0;ir<rad.size();ir++)
 	proddens[ir]+=emd_a[lm_offset(l,m)][ir]*emd_b[lm_offset(l,m)][ir];
-  
+
   // Similarity
   double sim=0.0;
   for(size_t ir=0;ir<rad.size();ir++) {
     // Increment measure
     sim+=std::pow(rad[ir],2*k+2)*proddens[ir]*wrad[ir];
   }
-  
+
   // Remove extra 4pi factor
   sim/=4.0*M_PI;
 
@@ -259,50 +259,50 @@ arma::cube emd_overlap_semi(const BasisSet & basis_a, const arma::cx_mat & P_a, 
     fflush(stdout);
     for(int m=-l;m<=l;m++)
       emd_a[lm_offset(l,m)]=evaluate_projection(basis_a,P_a,rad,l,m);
-    
+
     if(verbose) {
       printf("done (%s).\n",t.elapsed().c_str());
       printf("Computing l = %-2i comparison EMD ... ",l);
       fflush(stdout);
       t.set();
     }
-    
+
     for(int m=-l;m<=l;m++)
       emd_b[lm_offset(l,m)]=evaluate_projection(basis_b,P_b,rad,l,m);
-    
+
     if(verbose) {
       printf("done (%s).\n",t.elapsed().c_str());
       fflush(stdout);
       t.set();
     }
   }
-    
+
   // Get the similarity measures
   for(int k=-1;k<=2;k++) {
     // Full result
     ret(1+k,0,0)=similarity_quadrature_semi(rad,wrad,emd_a,emd_a,k,lmax); // AA
     ret(1+k,1,0)=similarity_quadrature_semi(rad,wrad,emd_b,emd_b,k,lmax); // BB
     ret(1+k,2,0)=similarity_quadrature_semi(rad,wrad,emd_a,emd_b,k,lmax); // AB
-    
+
     // Spherical average
     ret(1+k,0,1)=similarity_quadrature_semi(rad,wrad,emd_a,emd_a,k,0); // AA
     ret(1+k,1,1)=similarity_quadrature_semi(rad,wrad,emd_b,emd_b,k,0); // BB
     ret(1+k,2,1)=similarity_quadrature_semi(rad,wrad,emd_a,emd_b,k,0); // AB
-    
+
     //      printf("k = %i, ave = %i: AA = %e, BB = %e, AB = %e\n",k,ave,ret(1+k,0,ave),ret(1+k,1,ave),ret(1+k,2,ave));
   }
-  
+
   if(verbose) {
     printf("Similarity moments computed in %s.\n\n",t.elapsed().c_str());
     fflush(stdout);
     t.set();
   }
-  
+
   return ret;
 }
 
 arma::cube emd_similarity(const arma::cube & emd, int Nela, int Nelb) {
-  // Compute shape function overlap                                                                                                                                                                              
+  // Compute shape function overlap
   arma::cube sh(4,7,2);
   sh.zeros();
   for(size_t s=0;s<sh.n_slices;s++)

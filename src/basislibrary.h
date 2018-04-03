@@ -151,7 +151,7 @@ class ElementBasisSet {
    * A refinement on the Davidson refinement (a.k.a. "Davidson rotation").
    *
    * The procedure is based on the article
-   * 
+   *
    * F. Jensen, "Unifying General and Segmented Contracted Basis
    * Sets. Segmented Polarization Consistent Basis Sets",
    * J. Chem. Theory Comput. 10, 1074 (2014).
@@ -160,7 +160,7 @@ class ElementBasisSet {
 
   /// Prune primitives with large overlap, replacing them with the geometric average
   void prune(double cutoff=0.9, bool coulomb=false);
-  
+
   /// Merge primitives with large overlap (also decontracts basis). This routine is intended to merging core-correlation functions
   void merge(double cutoff=0.9, bool verbose=true, bool coulomb=false);
 
@@ -196,7 +196,7 @@ class ElementBasisSet {
 
   /// Form compact Cholesky set
   ElementBasisSet cholesky_set(double thr, int maxam, double ovlthr) const;
-  
+
   /// Augment the basis
   void augment(int naug);
 
@@ -243,7 +243,7 @@ class BasisSetLibrary {
 
   /// Load basis set from file in Gaussian'94 format. Handles parsing for special Pople sets
   void load_basis(const std::string & filename, bool verbose=true);
-  
+
   /// Load basis set from file in Gaussian'94 format
   void load_gaussian94(const std::string & filename, bool verbose=true);
   /// Save basis set to file in Gaussian'94 format

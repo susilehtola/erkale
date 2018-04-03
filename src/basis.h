@@ -120,7 +120,7 @@ struct eripair_t {
   size_t j0;
   /// Amount of functions on shell
   size_t Nj;
-  
+
   /// Maximum integral on the shell
   double eri;
 };
@@ -301,7 +301,7 @@ class BasisSet {
 
   /// Find shell index of basis function
   size_t find_shell_ind(size_t find) const;
-  
+
   /// Get shells in basis set
   std::vector<GaussianShell> get_shells() const;
   /// Get ind:th shell
@@ -373,7 +373,7 @@ class BasisSet {
   arma::mat get_nuclear_coords() const;
   /// Set coordinates of all nuclei
   void set_nuclear_coords(const arma::mat & coords);
-  
+
   /// Get coordinates of nucleus
   coords_t get_nuclear_coords(size_t inuc) const;
   /// Get charge of nucleus

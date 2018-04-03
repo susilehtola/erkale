@@ -30,7 +30,7 @@ namespace BoysTable {
 void BoysTable::fill(int mmax_, int order_, double dx_, double xmax_) {
   if(bfdata.n_rows==(arma::uword) (mmax_+order_+1))
     return;
-  
+
   // Set values
   mmax=mmax_;
   bforder=order_;
@@ -41,22 +41,22 @@ void BoysTable::fill(int mmax_, int order_, double dx_, double xmax_) {
   for(exporder=0;;exporder++)
     if(fabs(std::pow(dx,exporder)/fact(exporder))<DBL_EPSILON)
       break;
-  
+
   // Calculate number of entries
   size_t N=ceil(xmax/dx+1);
-  
+
   // Calculate prefactors
   prefac.zeros(mmax+1);
   for(int m=0;m<=mmax;m++)
     prefac(m)=doublefact(2*m-1)/pow(2.0,m+1)*sqrt(M_PI);
-  
+
   // Allocate table
   bfdata.zeros(mmax+bforder+1,N);
-  
+
   // x=0
   for(int m=0;m<=mmax+bforder;m++)
     bfdata(m,0)=1.0/(2*m+1);
-  
+
   // Fill table
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -104,7 +104,7 @@ namespace BoysTable {
 
     return F;
   }
-  
+
   inline double eval_exp(double x) {
     if(x>=xmax)
       // Numerically zero

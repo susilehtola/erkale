@@ -413,17 +413,17 @@ void Settings::parse(std::string filename, bool scf) {
     // Read line and split it into words
     std::string line=readline(in);
     std::vector<std::string> words=splitline(line);
-    
+
     if(words.size()) {
       // Parse keywords
-      
+
       if(words.size()==1) {
 	ERROR_INFO();
 	std::ostringstream oss;
 	oss << "\nParse error: "<<words[0]<<" has no value!\n";
 	throw std::runtime_error(oss.str());
       }
-      
+
       if(scf && stricmp(words[0],"Method")==0) {
 	// Hartree-Fock or DFT?
 	if(stricmp(words[1],"Hartree-Fock")==0 || stricmp(words[1],"HF")==0) {
@@ -441,14 +441,14 @@ void Settings::parse(std::string filename, bool scf) {
 	    // Settings already added, as e.g. in xrs executable.
 	  }
 	  set_string("Method",words[1]);
-	  
+
 	  // Hybrid functional? Do we turn off density fitting by default?
 	  int xfunc, cfunc;
 	  parse_xc_func(xfunc,cfunc,words[1]);
 	  if(exact_exchange(xfunc)!=0.0 || is_range_separated(xfunc))
 	    set_bool("DensityFitting",false);
 	}
-	
+
       } else {
 	if(is_double(words[0])) {
 	  set_double(words[0],readdouble(words[1]));
@@ -457,7 +457,7 @@ void Settings::parse(std::string filename, bool scf) {
 	} else if(is_bool(words[0])) {
 	  // Was the value given as a number or as a string?
 	  if(isalpha(words[1][0])) {
-	    
+
 	    // As a string - parse it
 	    bool value;
 	    if(stricmp(words[1],"true")==0)
@@ -474,12 +474,12 @@ void Settings::parse(std::string filename, bool scf) {
 	      value=false;
 	    else {
 	      value=false;
-	      
+
 	      std::ostringstream oss;
 	      oss << "Could not parse the truth value " << words[1] << " for setting "<<words[0]<<"!\n";
 	      throw std::runtime_error(oss.str());
 	    }
-	    
+
 	    set_bool(words[0],value);
 	  } else
 	    set_bool(words[0],readint(words[1]));

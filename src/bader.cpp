@@ -97,7 +97,7 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
   //  std::vector<double> shran=basis.get_shell_ranges(sqrt(SMALLDENSITY));
   // but for the moment this causes problems in the near-grid algorithm...
   std::vector<double> shran=basis.get_shell_ranges(SMALLDENSITY);
-  
+
   // Fill array. Integrated charge
   double Q=0.0;
 #ifdef _OPENMP
@@ -119,7 +119,7 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
 
       // Get indices of shells centered on the nucleus
       std::vector<size_t> shellinds=basis.get_shell_inds(inuc);
-      
+
       // Do the shells contribute?
       for(size_t is=0;is<shellinds.size();is++)
 	if(shran[shellinds[is]]>=dist-dL)
@@ -129,10 +129,10 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
     // Skip density computation altogether if nothing is there.
     if(!compute_shells.size())
       continue;
-    
+
     // Function values
     std::vector<bf_f_t> flist;
-    
+
     // Loop over grid points
     for(arma::sword iiz=pt[ipt].start(2);iiz<pt[ipt].end(2);iiz++) // Loop over slices first, since they're stored continguously in memory
       for(arma::sword iix=pt[ipt].start(0);iix<pt[ipt].end(0);iix++)
@@ -152,7 +152,7 @@ void Bader::analyse(const BasisSet & basis, const arma::mat & P, bool neargrid, 
 	      flist.push_back(f);
 	    }
 	  }
-	  
+
 	  // Compute the density
 	  double d=0.0;
 	  for(size_t ii=0;ii<flist.size();ii++) {
@@ -240,7 +240,7 @@ std::vector<grid_partition_t> Bader::partitioning(double l) const {
   arma::ivec sl(3);
   for(int ic=0;ic<3;ic++)
     sl(ic)=(int) ceil(l/spacing(ic));
-  
+
   // Amount of slices in each direction
   arma::ivec Ns(3);
   for(int ic=0;ic<3;ic++) {
@@ -255,7 +255,7 @@ std::vector<grid_partition_t> Bader::partitioning(double l) const {
     for(arma::sword ys=0;ys<Ns(1);ys++)
       for(arma::sword zs=0;zs<Ns(2);zs++) {
 	grid_partition_t slice;
-	
+
 	// Start indices
 	slice.start.zeros(3);
 	slice.start(0)=xs*sl(0);
@@ -399,7 +399,7 @@ bool Bader::on_boundary(const arma::ivec & p) const {
   // We are on a boundary, if one or more of the neighboring points
   // doesn't share the same classification. Also, the point must have
   // some density assigned to it.
-  
+
   return region(p(0),p(1),p(2))>0 && !neighbors_assigned(p);
 }
 
@@ -483,7 +483,7 @@ std::vector<arma::ivec> Bader::classify_neargrid(arma::ivec p) const {
     // Check if gradient vanishes
     if(arma::norm(rgrad,2)==0.0)
       break;
-    
+
     // Determine step length by allowing at maximum displacement by
     // one grid point in any direction. This is done inversely to
     // Tang et al, because components of rgrad may vanish, but
@@ -491,7 +491,7 @@ std::vector<arma::ivec> Bader::classify_neargrid(arma::ivec p) const {
     arma::vec stepv=arma::abs(rgrad)/spacing;
     double c=1.0/arma::max(stepv);
     rgrad*=c;
-    
+
     // Determine what is the closest point on the grid to the displacement by rgrad
     arma::ivec dgrid(3);
     for(int ic=0;ic<3;ic++) {
@@ -545,7 +545,7 @@ std::vector<arma::ivec> Bader::classify_ongrid(arma::ivec p) const {
     if(region(p(0),p(1),p(2))!=-1 && neighbors_assigned(p)) {
       break;
     }
-    
+
     // Calculate maximal projected gradient.
     arma::ivec dir(3);
     dir.zeros();
@@ -578,7 +578,7 @@ std::vector<arma::ivec> Bader::classify_ongrid(arma::ivec p) const {
 	    maxgrad=drho/dr;
 	  }
 	}
-    
+
     // Converged?
     if(maxgrad==0.0)
       break;
@@ -609,7 +609,7 @@ void Bader::analysis_neargrid() {
 
   // Get partitioning
   std::vector<grid_partition_t> pt=partitioning();
-  
+
   // Loop over grid
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
@@ -619,7 +619,7 @@ void Bader::analysis_neargrid() {
     for(arma::sword iiz=pt[ipt].start(2);iiz<pt[ipt].end(2);iiz++) // Loop over slices first, since they're stored continguously in memory
       for(arma::sword iix=pt[ipt].start(0);iix<pt[ipt].end(0);iix++)
 	for(arma::sword iiy=pt[ipt].start(1);iiy<pt[ipt].end(1);iiy++) {
-	  
+
 	  // Check if point has already been classified
 	  if(region(iix,iiy,iiz)!=-1)
 	    continue;
@@ -628,17 +628,17 @@ void Bader::analysis_neargrid() {
 	    region(iix,iiy,iiz)=0;
 	  continue;
 	  }
-	  
+
 	  // Otherwise, continue with the trajectory analysis.
 	  // Current point is
 	  arma::ivec p(3);
 	  p(0)=iix;
 	  p(1)=iiy;
 	  p(2)=iiz;
-	  
+
 	  // Get the trajectory
 	  std::vector<arma::ivec> points=classify_neargrid(p);
-	  
+
 #ifdef _OPENMP
 #pragma omp critical
 #endif
@@ -749,7 +749,7 @@ void Bader::analysis_neargrid() {
     for(arma::sword iiz=pt[ipt].start(2);iiz<pt[ipt].end(2);iiz++) // Loop over slices first, since they're stored continguously in memory
       for(arma::sword iix=pt[ipt].start(0);iix<pt[ipt].end(0);iix++)
 	for(arma::sword iiy=pt[ipt].start(1);iiy<pt[ipt].end(1);iiy++) {
-	  
+
 	  // Current point
 	  arma::ivec p(3);
 	  p(0)=iix;
@@ -772,7 +772,7 @@ void Bader::analysis_neargrid() {
 	    }
 	  }
 	}
-  
+
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
@@ -855,12 +855,12 @@ void Bader::analysis_neargrid() {
 	      // We have already reclassified the central point.
 	      if(xs==0 && ys==0 && zs==0)
 		continue;
-	      
+
 	      arma::ivec dp(3);
 	      dp(0)=xs;
 	      dp(1)=ys;
 	      dp(2)=zs;
-	      
+
 	      arma::ivec np=reassigned[ip]+dp;
 	      // Once again, local maxima or vanishing densities
 	      // aren't allowed to be reclassified.
@@ -898,7 +898,7 @@ void Bader::analysis_ongrid() {
 
   // Get partitioning
   std::vector<grid_partition_t> pt=partitioning();
-  
+
   // Loop over grid
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
@@ -1049,7 +1049,7 @@ void Bader::reorder() {
 
   // Get partitioning
   std::vector<grid_partition_t> pt=partitioning();
-  
+
   // Loop over grid
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic,1)
@@ -1088,7 +1088,7 @@ arma::vec Bader::regional_charges() const {
 	    q(region(iix,iiy,iiz)-1)+=dens(iix,iiy,iiz);
 #endif
 	  }
-  
+
 #ifdef _OPENMP
 #pragma omp critical
     q+=qwrk;
@@ -1168,7 +1168,7 @@ void Bader::print_density(double space) const {
     }
   // Close file
   fclose(out);
-  
+
   if(verbose) {
     printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
@@ -1253,7 +1253,7 @@ void Bader::print_individual_regions(double space) const {
     printf("Printing out individual Bader region grids ... ");
     fflush(stdout);
   }
-  
+
   // Point increment will be
   arma::ivec incr(3);
   for(int ic=0;ic<3;ic++)
@@ -1285,7 +1285,7 @@ void Bader::print_individual_regions(double space) const {
 
   // Index of points written
   size_t idx=1;
-  
+
   // Print out region indices
   fprintf(out,"%5i", (int) Nregions);
   for(arma::sword ireg=0;ireg<Nregions;ireg++) {
@@ -1357,7 +1357,7 @@ arma::vec Bader::regional_charges(const BasisSet & basis, const arma::mat & P) c
     for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
       for(arma::sword iix=0;iix<array_size(0);iix++)
 	for(arma::sword iiy=0;iiy<array_size(1);iiy++) {
-	  
+
 	  // Skip zero-density volume elements
 	  if(region(iix,iiy,iiz)==0)
 	    continue;
@@ -1412,7 +1412,7 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
 #endif
   for(arma::sword ireg=0;ireg<Nregions;ireg++) {
     Sat[ireg].zeros(basis.get_Nbf(),basis.get_Nbf());
-  
+
     for(arma::sword iiz=0;iiz<array_size(2);iiz++) // Loop over slices first, since they're stored continguously in memory
       for(arma::sword iix=0;iix<array_size(0);iix++)
 	for(arma::sword iiy=0;iiy<array_size(1);iiy++)
@@ -1431,7 +1431,7 @@ std::vector<arma::mat> Bader::regional_overlap(const BasisSet & basis) const {
     printf("done (%s)\n",t.elapsed().c_str());
     fflush(stdout);
   }
-    
+
   return Sat;
 }
 

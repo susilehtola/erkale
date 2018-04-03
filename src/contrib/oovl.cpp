@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
 
   BasisSet lhbas;
   lhchk.read(lhbas);
-  
+
   BasisSet rhbas;
   rhchk.read(rhbas);
 
@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
 
       printf("%s - %s projection\n",getlegend(il,lmat.size()).c_str(),getlegend(ir,rmat.size()).c_str());
       //proj.print();
-            
+
       if(lmat[il].n_cols == rmat[ir].n_cols) {
 	printf("Trace of density        projection  is % 10.6f, deviation from norm is %e\n",arma::sum(arma::sum(proj)),rmat[ir].n_cols-arma::sum(arma::sum(proj)));
 
@@ -178,8 +178,8 @@ int main(int argc, char **argv) {
 	  sproj.max(lind,rind);
 	  lind+=i;
 	  rind+=i;
-	  
-	  // Swap indices	  
+
+	  // Swap indices
 	  std::swap(lorder(i),lorder(lind));
 	  std::swap(rorder(i),rorder(rind));
 	}
@@ -190,9 +190,9 @@ int main(int argc, char **argv) {
 	// Sort projection matrix
 	arma::mat sproj(proj(lorder,rorder));
 	sproj.print("Projection matrix");
-	
+
 	arma::vec osort(arma::sort(arma::diagvec(sproj),"descend"));
-	printf("Sum of diagonal orbital projections is % 10.6f, deviation from norm is %e\n",arma::sum(osort),rmat[ir].n_cols-arma::sum(osort));	
+	printf("Sum of diagonal orbital projections is % 10.6f, deviation from norm is %e\n",arma::sum(osort),rmat[ir].n_cols-arma::sum(osort));
 
 	osort-=arma::ones<arma::vec>(osort.n_elem);
 	osort.print("Minimal orbital differences");
@@ -205,4 +205,4 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-    
+

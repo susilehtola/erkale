@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
     P=Pr*COMPLEX1 + Pi*COMPLEXI;
   } else
     P=Pr*COMPLEX1;
-  
+
   // The projection to calculate
   int l=0, m=0;
   std::string lmstr=set.get_string("EMDlm");
@@ -313,7 +313,7 @@ int main(int argc, char **argv) {
       simP=simPr*COMPLEX1 + simPi*COMPLEXI;
     } else
       simP=simPr*COMPLEX1;
-    
+
     // Compute momentum density overlap
     arma::cube ovl;
     if(set.get_bool("SimilarityLM"))

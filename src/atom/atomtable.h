@@ -36,7 +36,7 @@ class AtomTable {
   std::vector<bfpair_t> pairs;
   /// Table of integrals
   std::vector<double> ints;
-  
+
  public:
   /// Consructor
   AtomTable();
@@ -47,7 +47,7 @@ class AtomTable {
   void fill(const std::vector<bf_t> & bas, bool verbose);
   /// Get ERI from table
   double getERI(size_t i, size_t j, size_t k, size_t l) const;
-  
+
   /// Form Coulomb matrix
   arma::mat calcJ(const arma::mat & P) const;
   /// Form exchange matrix

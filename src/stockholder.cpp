@@ -50,18 +50,18 @@ void StockholderAtom::compute(const BasisSet & basis, const arma::mat & P, const
   for(size_t ip=0;ip<grid[irad].size();ip++) {
     // Store weight
     weights[irad][ip]=leb[ip].w;
-    
+
     // and coordinates
     grid[irad][ip].x=nuc.x+rad*leb[ip].x;
     grid[irad][ip].y=nuc.y+rad*leb[ip].y;
     grid[irad][ip].z=nuc.z+rad*leb[ip].z;
-      
+
     // Compute functions at grid point
     std::vector<bf_f_t> flist;
     for(size_t i=0;i<compute_shells.size();i++) {
       // Shell is
       size_t ish=compute_shells[i];
-	
+
       // Center of shell is
       coords_t shell_center=basis.get_shell_center(ish);
       // Compute distance of point to center of shell
@@ -124,20 +124,20 @@ void StockholderAtom::fill_adaptive(const BasisSet & basis, const arma::mat & P,
   for(int irad=0;irad<nrad;irad++) {
     // Radius is
     double rad=irad*dr;
-  
+
     // Indices of shells to compute
     std::vector<size_t> compute_shells;
-    
+
     // Determine which shells might contribute to this radial shell
     for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
       // Determine closest distance of nucleus
       double dist=fabs(nucdist[inuc]-rad);
       // Get indices of shells centered on nucleus
       std::vector<size_t> shellinds=basis.get_shell_inds(inuc);
-      
+
       // Loop over shells on nucleus
       for(size_t ish=0;ish<shellinds.size();ish++) {
-	
+
 	// Shell is relevant if range is larger than minimal distance
 	if(dist<=shran[shellinds[ish]]) {
 	  // Add shell to list of shells to compute
@@ -170,7 +170,7 @@ void StockholderAtom::fill_adaptive(const BasisSet & basis, const arma::mat & P,
       lnext=next_lebedev(l);
       compute(basis,P,shran,compute_shells,dr,irad,lnext);
       avgnext=average(hirsh,irad);
-      
+
       // Difference is
       double diff=rad*rad*fabs(avg-avgnext)*dr;
 
@@ -219,20 +219,20 @@ void StockholderAtom::fill_static(const BasisSet & basis, const arma::mat & P, s
   for(int irad=0;irad<nrad;irad++) {
     // Radius is
     double rad=irad*dr;
-  
+
     // Indices of shells to compute
     std::vector<size_t> compute_shells;
-    
+
     // Determine which shells might contribute to this radial shell
     for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
       // Determine closest distance of nucleus
       double dist=fabs(nucdist[inuc]-rad);
       // Get indices of shells centered on nucleus
       std::vector<size_t> shellinds=basis.get_shell_inds(inuc);
-      
+
       // Loop over shells on nucleus
       for(size_t ish=0;ish<shellinds.size();ish++) {
-	
+
 	// Shell is relevant if range is larger than minimal distance
 	if(dist<=shran[shellinds[ish]]) {
 	  // Add shell to list of shells to compute
@@ -244,12 +244,12 @@ void StockholderAtom::fill_static(const BasisSet & basis, const arma::mat & P, s
     // Compute radial shell
     compute(basis,P,shran,compute_shells,dr,irad,l);
   }
-  
+
   // Count size of grid
   size_t N=0;
   for(size_t ir=0;ir<grid.size();ir++)
     N+=grid[ir].size();
-  
+
   if(verbose) {
     printf("%4i %7i\n",(int) atind+1,(int) N);
     fflush(stdout);
@@ -261,7 +261,7 @@ double StockholderAtom::average(const Hirshfeld & hirsh, size_t irad) const {
   double d=0.0;
   // and total weight
   double w=0.0;
-  
+
   // Loop over grid
   for(size_t ip=0;ip<grid[irad].size();ip++) {
     // Increment total angular weight
@@ -270,7 +270,7 @@ double StockholderAtom::average(const Hirshfeld & hirsh, size_t irad) const {
     double c=weights[irad][ip]*rho[irad][ip]*hirsh.get_weight(atind,grid[irad][ip]);
     d+=c;
   }
-  
+
   // Store spherically averaged density
   return d/w;
 }
@@ -326,7 +326,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
     fflush(stdout);
     t.set();
   }
-  
+
   // Evaluate new spherically averaged densities
   for(size_t i=0;i<atoms.size();i++)
     atoms[i].update(ISA,oldrho[i]);
@@ -356,7 +356,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
 
   // and use these as starting weights for the self-consistent iteration
   ISA.set(cen,dr,oldrho);
-  
+
   while(true) {
     // Compute molecular density
     if(verbose) {
@@ -368,7 +368,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
     // Adaptive generation of grid
     for(size_t i=0;i<basis.get_Nnuc();i++)
       atoms[i].fill_adaptive(basis,P,ISA,i,dr,nrad,lmax,tol,verbose);
-    
+
     if(verbose) {
       printf("Grid filled in %s. Grid iteration\n",t.elapsed().c_str());
       printf("%5s  %12s  %12s\n","iter","max","mean");
@@ -381,36 +381,36 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
       // Evaluate new spherically averaged densities
       for(size_t i=0;i<atoms.size();i++)
 	atoms[i].update(ISA,newrho[i]);
-      
+
       // Check for convergence
       arma::vec diff(atoms.size());
       diff.zeros();
-      
+
       for(size_t irad=0;irad<newrho[0].size();irad++) {
 	// Radius
 	double r=irad*dr;
-	
+
 	// Compute density difference
 	for(size_t iat=0;iat<atoms.size();iat++) {
 	  double d=fabs(newrho[iat][irad]-oldrho[iat][irad]);
 	  diff(iat)+=r*r*d*dr;
 	}
       }
-      
+
       // Swap densities
       std::swap(newrho,oldrho);
-      
+
       double maxdiff=arma::max(diff);
       double meandiff=arma::mean(diff);
-      
+
       if(verbose) {
-	printf("%5i  %e  %e\n",(int) iiter+1,maxdiff,meandiff);	     
+	printf("%5i  %e  %e\n",(int) iiter+1,maxdiff,meandiff);
 	fflush(stdout);
       }
-      
+
       if(maxdiff<tol)
 	break;
-      
+
       // Update weights
       ISA.set(cen,dr,oldrho);
     }
@@ -420,7 +420,7 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
     else if(verbose) {
       printf("Iteration converged within %e in %s.\n",tol,t.elapsed().c_str());
       fflush(stdout);
-      
+
       /*
       // Print out densities
       char fname[80];
@@ -434,14 +434,14 @@ Stockholder::Stockholder(const BasisSet & basis, const arma::mat & P, double fin
       }
       fclose(out);
       */
-    }	
-    
+    }
+
     // Reduce tolerance and check convergence
     tol/=sqrt(10.0);
     if(tol < (1-sqrt(DBL_EPSILON))*finaltol)
       break;
   }
-  
+
   if(verbose) {
     printf("Stockholder atoms solved in %s.\n",ttot.elapsed().c_str());
     fflush(stdout);

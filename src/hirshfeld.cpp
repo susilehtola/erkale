@@ -87,7 +87,7 @@ double HirshfeldAtom::get(double r) const {
   double rdr=r/dr;
   // Index of entry is
   size_t i=(size_t) floor(rdr);
-  
+
   // Check limit
   if(i>=rho.size()-1)
     return 0.0;
@@ -115,7 +115,7 @@ double HirshfeldAtom::compute_moment(int k) const {
   double m=0.0;
   for(size_t i=0;i<rho.size();i++)
     m+=std::pow(i*dr,k+2)*rho[i];
-  
+
   return m*dr;
 }
 
@@ -177,7 +177,7 @@ void Hirshfeld::load(const BasisSet & basis) {
       // Load checkpoint
       std::string chkname=element_symbols[Z]+"_0.chk";
       Checkpoint chkpt(chkname,false);
-      
+
       // Load basis set and density matrix
       BasisSet bas;
       chkpt.read(bas);
@@ -284,6 +284,6 @@ std::vector< std::vector<double> > Hirshfeld::get_rho() const {
   std::vector< std::vector<double> > ret(atoms.size());
   for(size_t i=0;i<ret.size();i++)
     ret[i]=atoms[i].get_rho();
-  
+
   return ret;
 }

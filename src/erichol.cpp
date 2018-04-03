@@ -165,7 +165,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     fprintf(stderr,"Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
     printf("Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
   }
-  
+
   // Screening matrix and pairs
   arma::mat screen;
   std::vector<eripair_t> shpairs=basis.get_eripairs(screen,shtol,omega,alpha,beta,verbose);
