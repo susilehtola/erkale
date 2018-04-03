@@ -41,7 +41,7 @@ namespace BoysTable {
 
   /// Fill table
   void fill(int mmax, int order=6, double dx=0.001, double xmax=40.0);
-  
+
   /// Evaluate
   double eval(int m, double x);
   /// Evaluate a bunch of values

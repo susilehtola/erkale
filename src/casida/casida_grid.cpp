@@ -237,21 +237,21 @@ void CasidaGrid::construct(const std::vector<arma::mat> & P, double ftoler, int 
   }
 
   Timer t;
-  
+
   // Check necessity of gradients and laplacians
   for(size_t i=0;i<wrk.size();i++)
     wrk[i].check_grad_tau_lapl(x_func,c_func);
 
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
-  
+
   // Form radial shells
   for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
     angshell_t sh;
     sh.atind=iat;
     sh.cen=basp->get_nuclear_coords(iat);
     sh.tol=ftoler*PRUNETHR;
-    
+
     // Compute necessary number of radial points for atom
     size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
     // Get Chebyshev nodes and weights for radial part
@@ -259,7 +259,7 @@ void CasidaGrid::construct(const std::vector<arma::mat> & P, double ftoler, int 
     radial_chebyshev(nr,rad,wrad);
     nr=rad.size(); // Sanity check
     nrad[iat]=nr;
-  
+
     // Loop over radii
     for(size_t irad=0;irad<nr;irad++) {
       sh.R=rad[irad];
@@ -267,7 +267,7 @@ void CasidaGrid::construct(const std::vector<arma::mat> & P, double ftoler, int 
       grids.push_back(sh);
     }
   }
-    
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -332,14 +332,14 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
     int ith=0;
 #else
     int ith=omp_get_thread_num();
-    
+
 #pragma omp for schedule(dynamic,1)
 #endif
     for(size_t i=0;i<grids.size();i++) {
       // Change atom and create grid
       wrk[ith].set_grid(grids[i]);
       wrk[ith].form_grid();
-      
+
       // Update the density
       if(P.size()==1)
 	wrk[ith].update_density(P[0]);
@@ -347,16 +347,16 @@ void CasidaGrid::Kxc(const std::vector<arma::mat> & P, double tol, int x_func, i
 	wrk[ith].update_density(P[0],P[1]);
       // and compute fxc
       wrk[ith].eval_fxc(x_func,c_func);
-      
+
       // Compute the values of the orbitals
       wrk[ith].compute_orbs(C);
-      
+
       // Compute Kxc's
 #ifdef _OPENMP
 #pragma omp critical
 #endif
       wrk[ith].Kxc(pairs, Kx);
-      
+
       // Free the memory
       wrk[ith].free();
     }

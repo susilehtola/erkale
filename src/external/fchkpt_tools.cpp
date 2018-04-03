@@ -687,11 +687,11 @@ BasisSet form_basis(const Storage & stor) {
       int am=abs(shtypes[ish]);
       // Use spherical harmonics on shell?
       bool lm=(shtypes[ish]<-1);
-      
+
       // Add shell
       bas.add_shell(nucind,am,lm,C,false);
     }
-      
+
     // Increment primitive index
     iprim+=nprim[ish];
   }

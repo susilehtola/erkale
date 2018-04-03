@@ -27,7 +27,7 @@ LBFGS::~LBFGS() {
 void LBFGS::update(const arma::vec & x, const arma::vec & g) {
   xk.push_back(x);
   gk.push_back(g);
-  
+
   if(xk.size()>nmax) {
     xk.erase(xk.begin());
     gk.erase(gk.begin());
@@ -38,7 +38,7 @@ arma::vec LBFGS::apply_diagonal_hessian(const arma::vec & q) const {
   if(xk.size()>=2) {
     arma::vec s=xk[xk.size()-1]-xk[xk.size()-2];
     arma::vec y=gk[gk.size()-1]-gk[gk.size()-2];
-    
+
     return arma::dot(s,y)/arma::dot(y,y)*q;
 
   } else
@@ -57,10 +57,10 @@ arma::vec LBFGS::solve() const {
   std::vector<arma::vec> yk(k);
   for(size_t i=0;i<k;i++)
     yk[i]=gk[i+1]-gk[i];
-  
+
   // Alpha_i
   std::vector<double> alphai(k);
-  
+
   // First part
   for(size_t i=k-1;i<k;i--) {
     // Alpha_i
@@ -68,10 +68,10 @@ arma::vec LBFGS::solve() const {
     // Update q
     q-=alphai[i]*yk[i];
   }
-  
+
   // Apply diagonal Hessian
   arma::vec r(apply_diagonal_hessian(q));
-  
+
   // Second part
   for(size_t i=0;i<k;i++) {
     // Beta

@@ -1046,7 +1046,7 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 	  // Store the integrals
 	  for(int i=0;i<=mmax;i++)
 	    data.F[i]=prefac*Gn(i);
-	  
+
 	  // We have all necessary data; store quartet.
 	  libint.PrimQuartet[ind++]=data;
 	}
@@ -1205,7 +1205,7 @@ void ERIWorker::compute_cartesian_debug(const GaussianShell *is, const GaussianS
   std::vector<contr_t> contrj(js->get_contr());
   std::vector<contr_t> contrk(ks->get_contr());
   std::vector<contr_t> contrl(ls->get_contr());
-  
+
   coords_t Ri(is->get_center());
   coords_t Rj(js->get_center());
   coords_t Rk(ks->get_center());
@@ -1221,24 +1221,24 @@ void ERIWorker::compute_cartesian_debug(const GaussianShell *is, const GaussianS
 	  int mi(carti[ic].m);
 	  int ni(carti[ic].n);
 	  double reli(carti[ic].relnorm);
-	  
+
 	  int lj(cartj[jc].l);
 	  int mj(cartj[jc].m);
 	  int nj(cartj[jc].n);
 	  double relj(cartj[jc].relnorm);
-	  
+
 	  int lk(cartk[kc].l);
 	  int mk(cartk[kc].m);
 	  int nk(cartk[kc].n);
 	  double relk(cartk[kc].relnorm);
-	  
+
 	  int ll(cartl[lc].l);
 	  int ml(cartl[lc].m);
 	  int nl(cartl[lc].n);
 	  double rell(cartl[lc].relnorm);
 
 	  double el=0.0;
-	  
+
 	  for(size_t xi=0;xi<contri.size();xi++)
 	    for(size_t xj=0;xj<contrj.size();xj++)
 	      for(size_t xk=0;xk<contrk.size();xk++)
@@ -1258,7 +1258,7 @@ void ERIWorker::compute_cartesian_debug(const GaussianShell *is, const GaussianS
 					  lk,mk,nk,Rk.x,Rk.y,Rk.z,zk,	\
 					  ll,ml,nl,Rl.x,Rl.y,Rl.z,zl);
 		}
-	  
+
 	  (*input)[((ic*cartj.size()+jc)*cartk.size()+kc)*cartl.size()+lc]=reli*relj*relk*rell*el;
 	}
 }
@@ -1340,7 +1340,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
 
   } else if(!swap_ijkl && swap_kl && !swap_ij) { // 010
     // Need to switch k and l
-    
+
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
@@ -1388,7 +1388,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
 
   } else if(swap_ijkl && swap_kl && !swap_ij) { // 110
     // i -> l, j -> k, k -> i, l -> j
-    
+
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
@@ -1397,11 +1397,11 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
 	    size_t iin(((ll*Nk+kk)*Ni+ii)*Nj+jj);
 	    (*output)[iout]=(*input)[iin];
 	  }
-    
+
 
   } else if(swap_ijkl && swap_kl && swap_ij) { // 111
     // i <-> l, j <-> k
-    
+
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
@@ -1410,7 +1410,7 @@ void IntegralWorker::reorder(const GaussianShell *is, const GaussianShell *js, c
 	    size_t iin(((ll*Nk+kk)*Nj+jj)*Ni+ii);
 	    (*output)[iout]=(*input)[iin];
 	  }
-    
+
   } else
     throw std::logic_error("Should not be here!\n");
 
@@ -1449,7 +1449,7 @@ void ERIWorker_srlr::compute_G(double rho, double T, int nmax) {
   BoysTable::eval(nmax,T,bf_long);
   BoysTable::eval(nmax,T*rhomegasq,bf_short);
 #endif
-  
+
   // Store values
   Gn.zeros(nmax+1);
 

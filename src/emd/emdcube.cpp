@@ -26,7 +26,7 @@ void emd_cube(const BasisSet & bas, const arma::cx_mat & P, const std::vector<do
   // Get expansions of functions
   std::vector< std::vector<size_t> > idents;
   std::vector< std::vector<GTO_Fourier> > fourier=fourier_expand(bas,idents);
-  
+
   // Open output file.
   FILE *out=fopen("emdcube.dat","w");
 
@@ -95,7 +95,7 @@ void emd_cube(const BasisSet & bas, const arma::cx_mat & P, const std::vector<do
 #pragma omp parallel
 #endif
     {
-      
+
 #ifdef _OPENMP
 #pragma omp for
 #endif

@@ -116,12 +116,12 @@ void rDIIS::update(const arma::mat & F, const arma::mat & P, double E, double & 
 void rDIIS::PiF_update() {
   arma::mat Fn=stack[stack.size()-1].F;
   arma::mat Pn=stack[stack.size()-1].P;
-  
+
   // Update matrices
   PiF.zeros(stack.size());
   for(size_t i=0;i<stack.size();i++)
     PiF(i)=arma::trace((stack[i].P-Pn)*Fn);
-  
+
   PiFj.zeros(stack.size(),stack.size());
   for(size_t i=0;i<stack.size();i++)
     for(size_t j=0;j<stack.size();j++)
@@ -182,7 +182,7 @@ arma::vec rDIIS::get_energies() const {
     E(i)=stack[i].E;
   return E;
 }
-  
+
 arma::mat rDIIS::get_diis_error() const {
   arma::mat err(stack[0].err.n_elem,stack.size());
   for(size_t i=0;i<stack.size();i++)
@@ -210,13 +210,13 @@ arma::vec DIIS::get_w() {
 
   // Weight
   arma::vec w;
-  
+
   if(useadiis && !usediis) {
     w=get_w_adiis();
     if(verbose) {
       printf("ADIIS weights\n");
       print_mat(w.t(),"% .2e ");
-    }    
+    }
   } else if(!useadiis && usediis) {
     // Use DIIS only if error is smaller than threshold
     if(err>diisthr)
@@ -227,7 +227,7 @@ arma::vec DIIS::get_w() {
     if(verbose) {
       printf("DIIS weights\n");
       print_mat(w.t(),"% .2e ");
-    }    
+    }
   } else if(useadiis && usediis) {
     // Sliding scale
     double diisw=std::max(std::min(1.0 - (err-diisthr)/(diiseps-diisthr), 1.0), 0.0);
@@ -248,7 +248,7 @@ arma::vec DIIS::get_w() {
     arma::vec wa=get_w_adiis();
     arma::vec wd=get_w_diis();
     w=diisw*wd + (1.0-diisw)*wa;
-    
+
     if(verbose) {
       printf("ADIIS weights\n");
       print_mat(wa.t(),"% .2e ");
@@ -256,11 +256,11 @@ arma::vec DIIS::get_w() {
       print_mat(wd.t(),"% .2e ");
       printf(" DIIS weights\n");
       print_mat(w.t(),"% .2e ");
-    }    
-    
+    }
+
   } else
     throw std::runtime_error("Nor DIIS or ADIIS has been turned on.\n");
-    
+
   return w;
 }
 
@@ -268,18 +268,18 @@ arma::vec DIIS::get_w_diis() const {
   arma::mat errs=get_diis_error();
   return get_w_diis_wrk(errs);
 }
-  
+
 arma::vec DIIS::get_w_diis_wrk(const arma::mat & errs) const {
   // Size of LA problem
   int N=(int) errs.n_cols;
-  
+
   // DIIS weights
   arma::vec sol(N);
   sol.zeros();
-  
+
   if(c1diis) {
     // Original, Pulay's DIIS (C1-DIIS)
-    
+
     // Array holding the errors
     arma::mat B(N+1,N+1);
     B.zeros();
@@ -293,27 +293,27 @@ arma::vec DIIS::get_w_diis_wrk(const arma::mat & errs) const {
       B(i,N)=-1.0;
       B(N,i)=-1.0;
     }
-    
+
     // RHS vector
     arma::vec A(N+1);
     A.zeros();
     A(N)=-1.0;
-    
+
     // Solve B*X = A
     arma::vec X;
     bool succ;
-    
+
     succ=arma::solve(X,B,A);
-    
+
     if(succ) {
       // Solution is (last element of X is DIIS error)
       sol=X.subvec(0,N-1);
-      
+
       // Check that weights are within tolerance
       if(arma::max(arma::abs(sol))>=MAXWEIGHT) {
 	printf("Large coefficient produced by DIIS. Reducing to %i matrices.\n",N-1);
 	arma::vec w0=get_w_diis_wrk(errs.submat(1,1,errs.n_rows-1,errs.n_cols-1));
-	
+
 	// Helper vector
 	arma::vec w(N);
 	w.zeros();
@@ -321,7 +321,7 @@ arma::vec DIIS::get_w_diis_wrk(const arma::mat & errs) const {
 	return w;
       }
     }
-    
+
     if(!succ) {
       // Failed to invert matrix. Use the two last iterations instead.
       printf("C1-DIIS was not succesful, mixing matrices instead.\n");
@@ -378,13 +378,13 @@ arma::vec DIIS::get_w_diis_wrk(const arma::mat & errs) const {
       sol=Q.col(minloc);
     } else {
       printf("C2-DIIS did not find a suitable solution. Mixing matrices instead.\n");
-      
+
       sol.zeros();
       sol(0)=0.5;
       sol(1)=0.5;
     }
   }
-  
+
   return sol;
 }
 
@@ -399,7 +399,7 @@ void rDIIS::solve_F(arma::mat & F) {
     } else
       break;
   }
- 
+
   // Form weighted Fock matrix
   F.zeros();
   for(size_t i=0;i<stack.size();i++)
@@ -417,7 +417,7 @@ void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb) {
     } else
       break;
   }
- 
+
   // Form weighted Fock matrix
   Fa.zeros();
   Fb.zeros();
@@ -438,7 +438,7 @@ void rDIIS::solve_P(arma::mat & P) {
     } else
       break;
   }
- 
+
   // Form weighted density matrix
   P.zeros();
   for(size_t i=0;i<stack.size();i++)
@@ -456,7 +456,7 @@ void uDIIS::solve_P(arma::mat & Pa, arma::mat & Pb) {
     } else
       break;
   }
-  
+
   // Form weighted density matrix
   Pa.zeros();
   Pb.zeros();
@@ -525,7 +525,7 @@ arma::vec DIIS::get_w_adiis() const {
 
   // Step size
   double steplen=0.01, fac=2.0;
-  
+
   for(size_t iiter=0;iiter<1000;iiter++) {
     // Get gradient
     //double E(get_E_adiis(x));
@@ -533,11 +533,11 @@ arma::vec DIIS::get_w_adiis() const {
     if(arma::norm(g,2)<=1e-7) {
       break;
     }
-    
+
     // Search direction
     bfgs.update(x,g);
     arma::vec sd(-bfgs.solve());
-    
+
     // Do a line search on the search direction
     std::vector< std::pair<double, double> > steps;
     // First, we try a fraction of the current step length
@@ -558,7 +558,7 @@ arma::vec DIIS::get_w_adiis() const {
     // Minimum energy and index
     double Emin;
     size_t imin;
-    
+
     while(true) {
       // Sort the steps in length
       std::sort(steps.begin(),steps.end());
@@ -593,7 +593,7 @@ arma::vec DIIS::get_w_adiis() const {
 	A(i,0)=1.0;
 	A(i,1)=steps[imin+i-1].first;
 	A(i,2)=std::pow(A(i,1),2);
-	
+
 	y(i)=steps[imin+i-1].second;
       }
 
@@ -611,7 +611,7 @@ arma::vec DIIS::get_w_adiis() const {
 	  p.first=x0;
 	  p.second=get_E_adiis(x+sd*p.first);
 	  steps.push_back(p);
-	  
+
 	  // Find the minimum energy
 	  find_minE(steps,Emin,imin);
 	}
@@ -620,7 +620,7 @@ arma::vec DIIS::get_w_adiis() const {
 
     if(steps[imin].first<DBL_EPSILON)
       break;
-    
+
     // Switch to the minimum geometry
     x+=steps[imin].first*sd;
     // Store optimal step length
@@ -646,7 +646,7 @@ double DIIS::get_E_adiis(const arma::vec & x) const {
   double Eval=0.0;
   Eval+=2.0*arma::dot(c,PiF);
   Eval+=arma::as_scalar(arma::trans(c)*PiFj*c);
-  
+
   return Eval;
 }
 

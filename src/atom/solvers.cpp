@@ -235,7 +235,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     diis.update(sol.Ha,sol.Hb,sol.Pa,sol.Pb,sol.en.E,diiserr);
     // and solve the updated matrices
     diis.solve_F(sol.Ha,sol.Hb);
-    
+
     // Solve new orbitals
     diagonalize(S,Sinvh,sol);
 
@@ -363,7 +363,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     diis.update(sol.H,sol.P,sol.en.E,diiserr);
     // and solve for the new matrices
     diis.solve_F(sol.H);
-    
+
     // Solve new orbitals
     diagonalize(S,Sinvh,sol);
 

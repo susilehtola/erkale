@@ -1022,7 +1022,7 @@ int main(int argc, char **argv) {
       if(spin) {
 	icore=localize(basis,noccb,xcatom,sol.Cb,state,iorb);
 	sol.Eb=arma::diagvec(arma::trans(sol.Cb)*sol.Hb*sol.Cb);
-	
+
 	std::vector<double> occb;
 	if(method==XCH)
 	  occb=xch_occ(icore,noccb);

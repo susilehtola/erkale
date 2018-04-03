@@ -468,7 +468,7 @@ void JFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++)
 	    el+=Pij(ii,jj)*Pkl(kk,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
-    
+
     // Increment the element
     f(idx)+=Jfac*el;
   }
@@ -544,10 +544,10 @@ void KFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++)
 	    el+=Pik(ii,kk)*Pjl(jj,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
-    
+
     // Increment the element
     f(idx)+=K1fac*el;
-    
+
     // Second contribution
     if(K2fac!=0.0) {
       el=0.0;
@@ -557,7 +557,7 @@ void KFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
 	  for(size_t kk=0;kk<Nk;kk++)
 	    for(size_t ll=0;ll<Nl;ll++)
 	      el+=Pjk(jj,kk)*Pil(ii,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
-      
+
       // Increment the element
       f(idx)+=K2fac*el;
     }

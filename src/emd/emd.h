@@ -20,7 +20,7 @@
  * evaluating the radial electron momentum density and its
  * moments. For the formalism see chapter 3.8 in Susi Lehtola's PhD
  * thesis "Computational Modeling of the Electron Momentum Density",
- * University of Helsinki 2013. 
+ * University of Helsinki 2013.
  *
  * A full electronic version is available at
  * http://urn.fi/URN:ISBN:978-952-10-8091-3
@@ -285,7 +285,7 @@ class EMD {
    *
    * h0   - spacing for the points in the first interval
    * l0   - length of the first interval
-   * 
+   *
    * hfac - factor to use in increasing the spacing
    * lfac - factor to use in increasing the interval length
    */

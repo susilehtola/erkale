@@ -201,7 +201,7 @@ static void parse_line(const std::vector<std::string> & words, std::vector<atom_
       oss << "Same reference atom cannot be used twice!\n";
       throw std::runtime_error(oss.str());
     }
-	
+
     // Reference coordinates
     arma::vec C(get_coords(atoms,Rind));
     arma::vec B(get_coords(atoms,thind));
@@ -220,10 +220,10 @@ static void parse_line(const std::vector<std::string> & words, std::vector<atom_
       throw std::runtime_error(oss.str());
     }
     u/=unorm;
-    
+
     // Helper
     arma::vec v(arma::cross(u,x2));
-    
+
     // Position
     arma::vec D(C);
     D -= R * (cos(th) * x2 + sin(th) * ( cos(phi) * u - sin(phi) * v ));

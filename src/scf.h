@@ -130,7 +130,7 @@ typedef struct {
   arma::mat P_im;
   /// Imaginary exchange
   arma::mat K_im;
-  
+
   /// Energy information
   energy_t en;
 } rscf_t;
@@ -155,12 +155,12 @@ typedef struct {
 
   /// Imaginary exchange
   arma::mat Ka_im, Kb_im;
-  
+
   /// Complex orbitals (for SIC)
   arma::cx_mat cCa, cCb;
   /// Imaginary part of complex-CMO density matrix (for complex exchange contribution)
   arma::mat Pa_im, Pb_im;
-  
+
   /// Energy information
   energy_t en;
 } uscf_t;
@@ -269,7 +269,7 @@ class SCF {
   bool strictint;
   /// Integral screening threshold
   double intthr;
-  
+
   /// Density fitting calculation?
   bool densityfit;
   /// Memory allocation for density fitting
@@ -287,7 +287,7 @@ class SCF {
   double cholnafthr;
   /// Cholesky mode
   int cholmode;
-  
+
   /// Calculate forces?
   bool doforce;
 
@@ -394,7 +394,7 @@ class SCF {
 
   /// Fill range-separated integrals
   void fill_rs(double omega);
-  
+
   /// Do core guess
   void core_guess(rscf_t & sol) const;
   /// Do core guess

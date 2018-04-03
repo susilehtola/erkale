@@ -970,13 +970,13 @@ class CompletenessOptimizer {
     printf("\nOptimal %c shell is: % .3f ... % .3f (%i funcs) with tolerance %e, mog = %e. (%s)\n",shell_types[addam],cpl[addam].start,cpl[addam].end,(int) cpl[addam].exps.size(),cpl[addam].tol,maxmog,tpol.elapsed().c_str());
     print_value(curval,"Polarized value");
     fflush(stdout);
-    
+
     if(forcesub)
       comply_subset(cpl,curval);
-    
+
     return maxmog;
   }
-  
+
   /// Reform to comply to subset requirement
   bool comply_subset(std::vector<coprof_t> & cpl, ValueType & curval) {
 
@@ -984,26 +984,26 @@ class CompletenessOptimizer {
     bool upd=false;
     // Message printed?
     bool printed=false;
-    
+
     for(int am=maxam(cpl);am>=0;am--) {
       // Move ends by
       double smove=0.0;
       double emove=0.0;
       coprof_t Yam(cpl[am]);
-      
+
       // Figure out moves
       for(int ham=am+1;ham<=maxam(cpl);ham++) {
 	double ds=cpl[am].start-cpl[ham].start;
 	double de=cpl[ham].end-cpl[am].end;
-	
+
 	smove=std::max(ds,smove);
 	emove=std::max(de,emove);
 	if(cpl[ham].tol<Yam.tol)
 	  Yam.tol=cpl[ham].tol;
       }
-      
+
       Timer tam;
-      
+
       // Move ends by
       double tmove=smove+emove;
       if(tmove==0.0 && Yam.tol==cpl[am].tol)
@@ -1015,16 +1015,16 @@ class CompletenessOptimizer {
 	fflush(stdout);
 	printed=true;
       }
-      
+
       // Current width is
       double curw=cpl[am].end-cpl[am].start;
       // Necessary width is
       double nw=curw+tmove;
-      
+
       // Get real width
       double realw(nw);
       arma::vec exps=span_width(am,Yam.tol,realw,Yam.exps.size());
-      
+
       // Adjust profile
       int nadd=(int) (exps.size()-cpl[am].exps.size());
       double sreal=(realw-curw)*smove/tmove;
@@ -1038,7 +1038,7 @@ class CompletenessOptimizer {
 	printf("%c tolerance reduced from %e to %e.\n",shell_types[am],cpl[am].tol,Yam.tol);
       printf("%i exponents added to %c shell (%s)\n\n",nadd,shell_types[am],tam.elapsed().c_str());
       fflush(stdout);
-      
+
       Yam.start-=sreal;
       Yam.end+=ereal;
       Yam.exps=move_exps(exps,Yam.start);
@@ -1059,7 +1059,7 @@ class CompletenessOptimizer {
 
     return upd;
   }
-  
+
   /**
    * Scan stability of an existing shell by placing in an additional exponent.
    *
@@ -1292,12 +1292,12 @@ class CompletenessOptimizer {
 	      // Get real width
 	      double realw(nw);
 	      arma::vec exps=span_width(am,cpl[am].tol,realw,cpl[am].exps.size());
-	      
+
 	      // Adjust profile
 	      cpl[am].start-=realw-curw;
 	      cpl[am].exps=move_exps(exps,cpl[am].start);
 	      moved=-(realw-curw);
-	      
+
 	    } else if(trexp[imax] > cpl[am].end) {
 	      // Current width is
 	      double curw=cpl[am].end-cpl[am].start;
@@ -1306,16 +1306,16 @@ class CompletenessOptimizer {
 	      // Get real width
 	      double realw(nw);
 	      arma::vec exps=span_width(am,cpl[am].tol,realw,cpl[am].exps.size());
-	      
+
 	      // Adjust profile
 	      cpl[am].end+=realw-curw;
 	      cpl[am].exps=move_exps(exps,cpl[am].start);
 	      moved=+(realw-curw);
-	      
+
 	    } else if(am==scanam) {
 	      throw std::runtime_error("Possible bug in scan_limits - maximum inside profile!\n");
 	    }
-	    
+
 	    if(moved>0.0)
 	      printf("%c upper limit should be moved by % .3f (% .3f spacings). (%s)\n",shell_types[am],moved,moved/spacing(am),tam.elapsed().c_str());
 	    else if(moved<0.0)
@@ -1450,7 +1450,7 @@ class CompletenessOptimizer {
 	print_value(curval,"Final value");
 	print_limits(cpl,"Final limits");
 	fflush(stdout);
-	
+
 	if(forcesub) {
 	  bool upd=comply_subset(cpl,curval);
 	  if(upd)
@@ -1861,7 +1861,7 @@ class CompletenessOptimizer {
       for(int am=0;am<=maxam(cpl);am++) {
 	if(!cpl[am].exps.size())
 	  continue;
-	
+
 	// Sanity check
 	bool tryred=true;
 	if(allelectron)
@@ -1923,7 +1923,7 @@ class CompletenessOptimizer {
 	    trcpl[am].start=cpl[am].start+(1.0-d)*step;
 	    trcpl[am].end=cpl[am].end-d*step;
 	    trcpl[am].exps=move_exps(exps,trcpl[am].start);
-	    
+
 	    bool dotrial=true;
 	    if(forcesub) {
 	      // Sanity check trial
@@ -1939,7 +1939,7 @@ class CompletenessOptimizer {
 	    if(dotrial) {
 	      trials.push_back(trcpl);
 	      tram.push_back(am);
-	      
+
 	      char msg[200];
 	      if(itr==0)
 		sprintf(msg,"Moved starting point of %c shell by %.3f",shell_types[am],step);
@@ -2228,7 +2228,7 @@ class CompletenessOptimizer {
 	    free=false;
 	  }
 	}
-	
+
 	if(free) {
 	  // We still have free functions left, form trial contraction
 	  std::vector<size_t> tr(contract);

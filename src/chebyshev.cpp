@@ -64,7 +64,7 @@ void radial_chebyshev(int nrad, std::vector<double> & rad, std::vector<double> &
     // Calculate value of radius
     double ixc=xc.size()-1-ir;
     double r=1.0/M_LN2*log(2.0/(1.0-xc[ixc]));
-    
+
     // Jacobian of transformation is
     double jac=1.0/M_LN2/(1.0-xc[ixc]);
     // so total quadrature weight (excluding r^2!) is
@@ -81,7 +81,7 @@ void radial_chebyshev(int nrad, std::vector<double> & rad, std::vector<double> &
 void radial_chebyshev_jac(int nrad, std::vector<double> & rad, std::vector<double> & wrad) {
   std::vector<double> rc, wc;
   radial_chebyshev(nrad,rc,wc);
-  
+
   // Returned arrays
   rad.clear();
   rad.reserve(rc.size());
@@ -96,4 +96,4 @@ void radial_chebyshev_jac(int nrad, std::vector<double> & rad, std::vector<doubl
     }
   }
 }
-       
+

@@ -198,12 +198,12 @@ arma::vec mulliken_charges(const BasisSet & basis, const arma::mat & P) {
   for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
     // Get shells on nucleus
     std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
-    
+
     // Loop over shells
     for(size_t fi=0;fi<ifuncs.size();fi++) {
       size_t ifirst=ifuncs[fi].get_first_ind();
       size_t ilast=ifuncs[fi].get_last_ind();
-      
+
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++)
 	q(ii)-=PS(i,i);
@@ -228,12 +228,12 @@ arma::mat mulliken_charges(const BasisSet & basis, const arma::mat & Pa, const a
   for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
     // Get shells on nucleus
     std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
-    
+
     // Loop over shells
     for(size_t fi=0;fi<ifuncs.size();fi++) {
       size_t ifirst=ifuncs[fi].get_first_ind();
       size_t ilast=ifuncs[fi].get_last_ind();
-      
+
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++) {
 	q(ii,0)-=PaS(i,i);
@@ -243,7 +243,7 @@ arma::mat mulliken_charges(const BasisSet & basis, const arma::mat & Pa, const a
 
     // Total charge
     q(ii,2)=q(ii,0)+q(ii,1);
-    
+
   }
 
   return q;
@@ -290,12 +290,12 @@ arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P) {
   for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
     // Get shells on nucleus
     std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
-    
+
     // Loop over shells
     for(size_t fi=0;fi<ifuncs.size();fi++) {
       size_t ifirst=ifuncs[fi].get_first_ind();
       size_t ilast=ifuncs[fi].get_last_ind();
-      
+
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++)
 	q(ii)-=SPS(i,i);
@@ -324,12 +324,12 @@ arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arm
   for(size_t ii=0;ii<basis.get_Nnuc();ii++) {
     // Get shells on nucleus
     std::vector<GaussianShell> ifuncs=basis.get_funcs(ii);
-    
+
     // Loop over shells
     for(size_t fi=0;fi<ifuncs.size();fi++) {
       size_t ifirst=ifuncs[fi].get_first_ind();
       size_t ilast=ifuncs[fi].get_last_ind();
-      
+
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++) {
 	q(ii,0)-=SPaS(i,i);
@@ -339,7 +339,7 @@ arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arm
 
     // Total charge
     q(ii,2)=q(ii,0)+q(ii,1);
-    
+
   }
 
   return q;
@@ -422,7 +422,7 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, std::string m
 
       q(ii)-=arma::as_scalar(arma::trans(iao.col(io))*S*P*S*iao.col(io));
     }
-  
+
   return q;
 }
 
@@ -449,7 +449,7 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::cx_mat & C, std::strin
 
       q(ii)-=std::real(arma::as_scalar(arma::trans(iao.col(io))*S*P*S*iao.col(io)));
     }
-  
+
   return q;
 }
 
@@ -526,7 +526,7 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma
   q.col(2)=add_nuclear_charges(basis,q.col(2));
 
   print_analysis(basis,"Hirshfeld",q);
-  
+
   // Get charges. Note that in charges above electrons have negative charge, so switch sign
   arma::vec qs=-q.col(0)+q.col(1);
   print_analysis(basis,"Hirshfeld spin",qs);
@@ -804,13 +804,13 @@ void nuclear_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::
   // Electron density at nuclei
   arma::vec nucd_a=nuclear_density(basis,Pa);
   arma::vec nucd_b=nuclear_density(basis,Pb);
-  
+
   // Total density
   arma::mat nucd(nucd_a.n_elem,3);
   nucd.col(0)=nucd_a;
   nucd.col(1)=nucd_b;
   nucd.col(2)=nucd_a+nucd_b;
-  
+
   printf("\nElectron density at nuclei: alpha, beta, total\n");
   for(size_t i=0;i<basis.get_Nnuc();i++)
     printf("%4i %-5s % 15.6f % 15.6f % 15.6f\n",(int) i+1, basis.get_symbol_hr(i).c_str(), nucd(i,0), nucd(i,1), nucd(i,2));

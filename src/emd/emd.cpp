@@ -209,7 +209,7 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
     std::ostringstream oss;
     oss << "Projection for l = " << lp << ", m = " << mp << ", but all projections for odd l vanish!\n";
     throw std::runtime_error(oss.str());
-  }    
+  }
 
   // Number of nonequivalent functions
   size_t N=clm.size();
@@ -271,15 +271,15 @@ void EMDEvaluator::compute_coefficients(const std::vector< std::vector<ylmcoeff_
 	    for(int L=std::max(abs(il-l1),abs(im-m1));L<=il+l1;L++) {
 	      // Coupling coefficient
 	      coupl_coeff_t tmp;
-	      
+
 	      // Set l indices
 	      tmp.l=il;
 	      tmp.lp=jl;
-	      
+
 	      // Coupled values
 	      tmp.L=L;
 	      tmp.M=im-m1;
-	      
+
 	      // Compute coefficient
 	      double g=gaunt.coeff(il,im,tmp.L,tmp.M,l1,m1);
 	      tmp.c=std::pow(4.0*M_PI,3.0/2.0)*std::conj(cmu)*cnu*g1*pow(std::complex<double>(0.0,1.0),L)*g;
@@ -525,7 +525,7 @@ std::complex<double> EMDEvaluator::get(double p) const {
     std::vector<total_coupl_t> totc;
     // Helper array
     std::vector<total_coupl_t> tmp;
-    
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
@@ -533,28 +533,28 @@ std::complex<double> EMDEvaluator::get(double p) const {
     for(size_t iii=0;iii<offd.size();iii++) {
       size_t iig=offd[iii].i;
       size_t jjg=offd[iii].j;
-      
+
       // Get the total coupling coefficient
       get_total_coupling(iig,jjg,p,totc,tmp);
       if(totc.size()==0)
 	continue;
-      
+
       // Loop over the individual functions
       for(size_t ii=0;ii<idfuncs[iig].size();ii++)
 	for(size_t jj=0;jj<idfuncs[jjg].size();jj++) {
 	  // The indices are
 	  size_t mu=idfuncs[iig][ii];
 	  size_t nu=idfuncs[jjg][jj];
-	  
+
 	  // and the functions are centered on
 	  size_t iat=loc[mu];
 	  size_t jat=loc[nu];
-	  
+
 	  // so the corresponding index in the Bessel and spherical harmonics arrays is
 	  size_t ibes;
 	  // Sign of spherical harmonics
 	  int ylmsign=1;
-	  
+
 	  //	  ibes=iat*Nat+jat;
 	  if(iat>jat)
 	    ibes=iat*(iat+1)/2+jat;
@@ -563,13 +563,13 @@ std::complex<double> EMDEvaluator::get(double p) const {
 	    ibes=jat*(jat+1)/2+iat;
 	    ylmsign=-1;
 	  }
-	  
+
 	  // Loop over coupling coefficient
 	  for(size_t ic=0;ic<totc.size();ic++) {
 	    // L and M are
 	    int L=totc[ic].L;
 	    int M=totc[ic].M;
-	    
+
 	    // Increment EMD; we get the increment twice since we are off-diagonal.
 	    std::complex<double> incr=2.0*P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
 	    npre+=incr.real();
@@ -579,7 +579,7 @@ std::complex<double> EMDEvaluator::get(double p) const {
     }
   }
   np+=std::complex<double>(npre,npim);
-  
+
   npre=0.0; npim=0.0;
 #ifdef _OPENMP
 #pragma omp parallel reduction(+:npre,npim)
@@ -594,24 +594,24 @@ std::complex<double> EMDEvaluator::get(double p) const {
       get_total_coupling(iig,iig,p,totc,tmp);
       if(totc.size()==0)
 	continue;
-      
+
       // Loop over the individual functions
       for(size_t ii=0;ii<idfuncs[iig].size();ii++)
 	for(size_t jj=0;jj<idfuncs[iig].size();jj++) {
-	  
+
 	  // The indices are
 	  size_t mu=idfuncs[iig][ii];
 	  size_t nu=idfuncs[iig][jj];
-	  
+
 	  // and the functions are centered on
 	  size_t iat=loc[mu];
 	  size_t jat=loc[nu];
-	  
+
 	  // so the corresponding index in the Bessel and spherical harmonics arrays is
 	  size_t ibes;
 	  // Sign of spherical harmonics
 	  int ylmsign=1;
-	  
+
 	  //	  ibes=iat*Nat+jat;
 	  if(iat>jat)
 	    ibes=iat*(iat+1)/2+jat;
@@ -620,13 +620,13 @@ std::complex<double> EMDEvaluator::get(double p) const {
 	    ibes=jat*(jat+1)/2+iat;
 	    ylmsign=-1;
 	  }
-	  
+
 	  // Loop over coupling coefficient
 	  for(size_t ic=0;ic<totc.size();ic++) {
 	    // L and M are
 	    int L=totc[ic].L;
 	    int M=totc[ic].M;
-	    
+
 	    // Increment EMD
 	    std::complex<double> incr=P(mu,nu)*totc[ic].c*YLM[ibes][lmind(L,M)]*pow(ylmsign,L)*jl(ibes,L);
 	    npre+=incr.real();
@@ -714,7 +714,7 @@ void EMD::initial_fill(bool verbose) {
   // Fill a grid with initial spacing 0.1 for q = 0 .. 1.0.  Multiply
   // upper limit and spacing by factor 10.0 at every interval.
   fixed_fill(false,0.01,1.0,10.0,10.0);
-  
+
   if(verbose)
     printf("done.\n");
 }
@@ -870,7 +870,7 @@ void EMD::optimize_moments(const std::vector<int> & moms, bool verbose, double t
 	}
       }
     }
-    
+
     // Find out which moment has maximum error and where it is
     errel=0;
     errelind=-1;
@@ -880,7 +880,7 @@ void EMD::optimize_moments(const std::vector<int> & moms, bool verbose, double t
         errel=fabs(momerr[imom]/momval[imom]);
         errelind=imom;
       }
-    
+
     // Print out current values if necessary
     if(verbose && (iter==1 || t.get()>MAXPRINTFREQ || errel<=tol)) {
       t.set();
@@ -893,13 +893,13 @@ void EMD::optimize_moments(const std::vector<int> & moms, bool verbose, double t
       for(size_t imom=0;imom<moms.size();imom++)
         printf("\t% i\t% e\t%e\t%e\n",moms[imom],momval[imom],momerr[imom],fabs(momerr[imom]/momval[imom]));
     }
-    
+
     // If tolerance has not been reached, add more points
     if(errel>tol)
       add4(mommaxerrloc[errelind]);
-    
+
   } while(errel>tol);
-  
+
   if(verbose) {
     t.set();
       if(l==0 && m==0)

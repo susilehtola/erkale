@@ -72,11 +72,11 @@ int main(int argc, char **argv) {
       printf("Setting maxam = %i because limitations in used version of LIBINT.\n",LIBINT_MAX_AM-1);
       maxam=LIBINT_MAX_AM-1;
     }
-			       
+
     init_libint_base();
     BasisSetLibrary ret=bas.cholesky_set(thr,maxam,ovlthr);
     ret.save_gaussian94(outfile);
-    
+
   } else if(stricmp(cmd,"completeness")==0) {
     // Print completeness profile.
 
@@ -415,7 +415,7 @@ int main(int argc, char **argv) {
 
   } else if(stricmp(cmd,"prodset")==0) {
     // Generate product set
-    
+
     if(argc!=6) {
       printf("\nUsage: %s input.gbs prodset lval fsam output.gbs\n",argv[0]);
       return 1;
@@ -426,7 +426,7 @@ int main(int argc, char **argv) {
     std::string fileout(argv[5]);
     BasisSetLibrary dfit(bas.product_set(lval,fsam));
     dfit.save_gaussian94(fileout);
-    
+
   } else if(stricmp(cmd,"save")==0) {
     // Save basis
 

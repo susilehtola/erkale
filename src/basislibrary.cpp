@@ -1415,7 +1415,7 @@ void BasisSetLibrary::load_basis(const std::string & basis0, bool verbose) {
       std::string newbasis(basis.substr(0,spos)+polpart);
       basis=newbasis;
     }
-   
+
     // Check the polarization part
     size_t ppos=basis.find_first_of("(");
     size_t pepos=basis.find_first_of(")");

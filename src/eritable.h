@@ -51,7 +51,7 @@ class ERItable {
   std::vector<double> ints;
   /// Offset lookup
   std::vector<size_t> shoff;
-  
+
   /// Range separation parameter
   double omega;
   /// Fraction of long-range (i.e. exact) exchange
@@ -61,7 +61,7 @@ class ERItable {
 
   /// Calculate offset in integrals table
   size_t offset(size_t ip, size_t jp) const;
-  
+
  public:
   /// Constructor
   ERItable();

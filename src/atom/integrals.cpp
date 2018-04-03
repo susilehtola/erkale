@@ -374,7 +374,7 @@ arma::mat coulomb_coul(const std::vector<bf_t> & basis, const std::vector<bf_t> 
       double el=ERI_unnormalized(fitbas[i],dummy,fitbas[j],dummy)/sqrt(ERI_unnormalized(fitbas[i],dummy,fitbas[i],dummy)*ERI_unnormalized(fitbas[j],dummy,fitbas[j],dummy));
       V(i,j)=el;
       V(j,i)=el;
-    }  
+    }
   arma::mat Vinvh=BasOrth(V,false);
   arma::mat Vinv=Vinvh*Vinvh;
 
@@ -456,7 +456,7 @@ arma::mat coulomb_ovl(const std::vector<bf_t> & basis, const std::vector<bf_t> &
       double el=coulomb_overlap(fitbas[i],fitbas[j]);
       V(i,j)=el;
       V(j,i)=el;
-    }  
+    }
 
   // Three-center integrals
   arma::cube thr(fitbas.size(),basis.size(),basis.size());
@@ -494,7 +494,7 @@ arma::mat coulomb_ovl(const std::vector<bf_t> & basis, const std::vector<bf_t> &
 
   // Translate coefficients
   gamma=Sinv*V*gamma;
-  
+
   // Collect Coulomb matrix
   arma::mat J(basis.size(),basis.size());
   J.zeros();

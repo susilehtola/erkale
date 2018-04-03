@@ -406,14 +406,14 @@ arma::vec find_minima(const arma::vec & x, const arma::vec & y, size_t runave, d
   std::vector<size_t> minloc;
   if(yave(0)<yave(1))
     minloc.push_back(0);
-  
+
   for(arma::uword i=1;i<yave.n_elem-1;i++)
     if(yave(i)<yave(i-1) && yave(i)<yave(i+1))
       minloc.push_back(i);
-  
+
   if(yave(yave.n_elem-1)<yave(yave.n_elem-2))
     minloc.push_back(yave.n_elem-1);
-  
+
   // Check the minimum values
   for(size_t i=minloc.size()-1;i<minloc.size();i--)
     if(yave(minloc[i]) >= thr)
@@ -423,7 +423,7 @@ arma::vec find_minima(const arma::vec & x, const arma::vec & y, size_t runave, d
   arma::vec ret(minloc.size());
   for(size_t i=0;i<minloc.size();i++)
     ret(i)=xave(minloc[i]);
-  
+
   return ret;
 }
 
@@ -431,7 +431,7 @@ void stencil(double z, const arma::vec & x, arma::mat & w) {
   /*
     z: location where approximations are wanted
     x: grid points at which value of function is known
-    w: matrix holding weights for grid points for different orders 
+    w: matrix holding weights for grid points for different orders
        of the derivatives: w(x, order)
 
        This implementation is based on B. Fornberg, "Calculation of
@@ -452,13 +452,13 @@ void stencil(double z, const arma::vec & x, arma::mat & w) {
   double c4 = x(0)-z;
   w.zeros();
   w(0,0)=1.0;
-  
+
   for(size_t i=1;i<=n;i++) {
     size_t mn = std::min(i,m);
     double c2 = 1.0;
     double c5 = c4;
     c4 = x(i) - z;
-    
+
     for(size_t j=0;j<i;j++) {
       double c3 = x(i) - x(j);
       c2 *= c3;

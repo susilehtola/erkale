@@ -142,39 +142,39 @@ void test_checkpoint() {
   {
     // Dummy checkpoint
     Checkpoint chkpt(tmpfile,true);
-    
+
     // Size of vectors and matrices
     size_t N=5000, M=300;
-    
+
     /* Vectors */
-    
+
     // Random vector
     arma::vec randvec=randu_mat(N,1);
     chkpt.write("randvec",randvec);
-    
+
     arma::vec randvec_load;
     chkpt.read("randvec",randvec_load);
-    
+
     double vecnorm=arma::norm(randvec-randvec_load,"fro")/N;
     if(vecnorm>DBL_EPSILON) {
       printf("Vector read/write norm %e.\n",vecnorm);
       ERROR_INFO();
       throw std::runtime_error("Error in vector read/write.\n");
     }
-    
+
     // Complex vector
     arma::cx_vec crandvec=randu_mat(N,1)+std::complex<double>(0.0,1.0)*randu_mat(N,1);
     chkpt.cwrite("crandvec",crandvec);
     arma::cx_vec crandvec_load;
     chkpt.cread("crandvec",crandvec_load);
-    
+
     double cvecnorm=arma::norm(crandvec-crandvec_load,"fro")/N;
     if(cvecnorm>DBL_EPSILON) {
       printf("Complex vector read/write norm %e.\n",cvecnorm);
       ERROR_INFO();
       throw std::runtime_error("Error in complex vector read/write.\n");
     }
-    
+
     /* Matrices */
     arma::mat randmat=randn_mat(N,M);
     chkpt.write("randmat",randmat);

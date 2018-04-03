@@ -172,7 +172,7 @@ int main(void) {
   arma::mat Fhaha, Fpaha, Fpapa;
   arma::mat Bpaha;
   arma::vec Eref;
-  
+
   Fhaha.load("Fhaha.dat",atype);
   Fpaha.load("Fpaha.dat",atype);
   Fpapa.load("Fpapa.dat",atype);
@@ -185,7 +185,7 @@ int main(void) {
   if(Fpaha.n_rows != Fpapa.n_cols) throw std::runtime_error("Fpaha has wrong amount of rows!\n");
   if(Fhaha.n_rows != Fpaha.n_cols) throw std::runtime_error("Fpaha has wrong amount of columns!\n");
   if(Bpaha.n_cols != Fpapa.n_cols*Fhaha.n_cols) throw std::runtime_error("Bpaha does not correspond to F!\n");
-    
+
   // Beta spin
   bool pol;
   arma::mat Fhbhb, Fpbhb, Fpbpb;
@@ -208,7 +208,7 @@ int main(void) {
     if(Fhbhb.n_rows != Fpbhb.n_cols) throw std::runtime_error("Fpbhb has wrong amount of columns!\n");
     if(Bpbhb.n_cols != Fpbpb.n_cols*Fhbhb.n_cols) throw std::runtime_error("Bpbhb does not correspond to F!\n");
   }
-  
+
   printf("Matrices loaded in %s.\n\n",t.elapsed().c_str());
   if(pol) {
     printf("alpha: %i occupied, %i virtual orbitals\n",(int) Fhaha.n_rows,(int) Fpapa.n_rows);
@@ -228,7 +228,7 @@ int main(void) {
        E_singles_MP2(Fpbhb,arma::diagvec(Fhbhb),arma::diagvec(Fpbpb));
   else
     Es=2.0*E_singles_MP2(Fpaha,arma::diagvec(Fhaha),arma::diagvec(Fpapa));
-  
+
   // Correlation energies
   double Eaa=0.0, Eab=0.0, Ebb=0.0;
   bool osonly=false;

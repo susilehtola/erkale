@@ -375,18 +375,18 @@ double eval_emd(const BasisSet & bas, const arma::cx_mat & P, const std::vector<
   std::vector< std::vector< std::complex<double> > > fpoly(fourier.size());
   for(size_t i=0;i<fourier.size();i++)
     fpoly[i].resize(fourier[i].size());
-  
+
   // Amount of basis functions
   const size_t Nbf=bas.get_Nbf();
   // Values of the basis functions, i.e. the above with the additional phase factor
   std::vector< std::complex<double> > fvals(Nbf);
-  
+
   // Compute values of Fourier polynomials at current value of p.
   for(size_t iid=0;iid<fourier.size();iid++)
     // Loop over the functions on the identical shells.
     for(size_t fi=0;fi<fourier[iid].size();fi++)
       fpoly[iid][fi]=fourier[iid][fi].eval(px,py,pz);
-  
+
   // Compute the values of the basis functions themselves.
   // Loop over list of groups of identical shells
   for(size_t ii=0;ii<idents.size();ii++)
@@ -398,14 +398,14 @@ double eval_emd(const BasisSet & bas, const arma::cx_mat & P, const std::vector<
       coords_t cen=bas.get_shell_center(is);
       // thus the phase factor we get is
       std::complex<double> phase=exp(std::complex<double>(0.0,-(px*cen.x+py*cen.y+pz*cen.z)));
-      
+
       // Now we just store the individual function values.
       size_t i0=bas.get_first_ind(is);
       size_t Ni=bas.get_Nbf(is);
       for(size_t fi=0;fi<Ni;fi++)
 	fvals[i0+fi]=phase*fpoly[ii][fi];
     }
-  
+
   // and now it's only a simple matter to compute the momentum density.
   double emd=0.0;
   for(size_t i=0;i<Nbf;i++) {
@@ -415,6 +415,6 @@ double eval_emd(const BasisSet & bas, const arma::cx_mat & P, const std::vector<
     // Diagonal
     emd+=std::real(P(i,i))*std::norm(fvals[i]);
   }
-  
+
   return emd;
 }

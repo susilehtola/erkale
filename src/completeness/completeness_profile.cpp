@@ -70,7 +70,7 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const arma::vec & s
       compprof_am_t profile;
       profile.am=am;
       profile.Y=arma::diagvec(hlp*arma::inv(S)*arma::trans(hlp));
-      
+
       ret.shells.push_back(profile);
 
     } else {

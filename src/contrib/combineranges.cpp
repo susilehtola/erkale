@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
       cpls[i-1][am].Nexp=0;
     }
   }
-  
+
   // Collect data
   std::vector<corange_t> cpl(cpls[0]);
   for(int am=0;am<=max_am;am++)
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
     if(cpl[am].Nexp)
       maxam=am;
   }
-  
+
   fprintf(stderr,"Input:\n");
   for(int am=0;am<=maxam;am++)
     fprintf(stderr,"%c % .3f % .3f %e %i\n",shell_types[am],cpl[am].min,cpl[am].max,cpl[am].tol,cpl[am].Nexp);
@@ -149,6 +149,6 @@ int main(int argc, char **argv) {
   printf("%i\n",maxam);
   for(int am=0;am<=maxam;am++)
     printf("%i % .16e % .16e % .16e %i\n",am,prof[am].start,prof[am].end,prof[am].tol,(int) prof[am].exps.size());
-  
+
   return 0;
 }
