@@ -45,16 +45,6 @@ class Checkpoint;
  * \date 2011/05/12 00:54
  */
 
-/// Convergence criteria
-typedef struct {
-  /// Convergence criterion for change of energy
-  double deltaEmax;
-  /// Convergence criterion for maximum change of an element of the density matrix
-  double deltaPmax;
-  /// Convergence criterion for the RMS change of the density matrix
-  double deltaPrms;
-} convergence_t;
-
 /// DFT settings
 typedef struct {
   /// Used exchange functional
@@ -247,6 +237,9 @@ class SCF {
   /// Threshold of enabling full use of DIIS
   double diisthr;
 
+  /// Dimer calculation?
+  bool dimcalc;
+
   /// Use ADIIS?
   bool useadiis;
   /// Use Broyden accelerator?
@@ -325,16 +318,16 @@ class SCF {
   ~SCF();
 
   /// Calculate restricted Hartree-Fock solution
-  void RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv);
+  void RHF(rscf_t & sol, const std::vector<double> & occs, double convthr);
   /// Calculate restricted open-shell Hartree-Fock solution
-  void ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv);
+  void ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double convthr);
   /// Calculate unrestricted Hartree-Fock solution
-  void UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv);
+  void UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double convthr);
 
   /// Calculate restricted density-functional theory solution
-  void RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft);
+  void RDFT(rscf_t & sol, const std::vector<double> & occs, double convthr, const dft_t dft);
   /// Calculate unrestricted density-functional theory solution
-  void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft);
+  void UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double convthr, const dft_t dft);
 
   /// Calculate restricted Hartree-Fock operator
   void Fock_RHF(rscf_t & sol, const std::vector<double> & occs) const;
@@ -407,6 +400,11 @@ class SCF {
 
   /// Exchange localization
   arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv) const;
+
+  /// Diagonalize Fock matrix
+  void diagonalize(rscf_t & sol, double shift=0.0) const;
+  /// Diagonalize Fock matrix
+  void diagonalize(uscf_t & sol, double shift=0.0) const;
 };
 
 /// Determine effect of imaginary part of Fock operator on eigenvectors

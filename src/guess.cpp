@@ -78,8 +78,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
 
   // Relax convergence requirements - open shell atoms may be hard to
   // converge
-  set.set_double("DeltaPmax",1e-5);
-  set.set_double("DeltaPrms",1e-6);
+  set.set_double("ConvThr",1e-4);
 
   // Construct the basis set
   atbas=BasisSet(1,set);

@@ -192,6 +192,8 @@ class BasisSet {
 
   /// Use spherical harmonics by default as basis?
   bool uselm;
+  /// Use cartesian s and p functions if spherical harmonics are used?
+  bool optlm;
 
   /// Internuclear distances
   arma::mat nucleardist;
@@ -324,6 +326,9 @@ class BasisSet {
   bool lm_in_use(size_t ind) const;
   /// Toggle the use of spherical harmonics on shell ind
   void set_lm(size_t ind, bool lm);
+
+  /// Get m values of basis functions
+  arma::ivec get_m_values() const;
 
   /// Get transformation matrix
   arma::mat get_trans(size_t ind) const;

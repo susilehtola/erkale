@@ -15,25 +15,25 @@
  */
 
 #if defined(RESTRICTED) && defined(DFT)
-void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv, const dft_t dft0)
+void SCF::RDFT(rscf_t & sol, const std::vector<double> & occs, double convthr, const dft_t dft0)
 
 #elif defined(RESTRICTED) && defined(HF)
-void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, const convergence_t conv)
+void SCF::RHF(rscf_t & sol, const std::vector<double> & occs, double convthr)
 
 #elif defined(UNRESTRICTED) && defined(DFT)
-void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv, const dft_t dft0)
+void SCF::UDFT(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double convthr, const dft_t dft0)
 
 #elif defined(UNRESTRICTED) && defined(HF)
-void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
+void SCF::UHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double convthr)
 
 #elif defined(UNRESTRICTED) && defined(_ROHF)
-void SCF::ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, const convergence_t conv)
+void SCF::ROHF(uscf_t & sol, const std::vector<double> & occa, const std::vector<double> & occb, double convthr)
 
 #elif defined(DFT) && defined(FULLHOLE)
-size_t XRSSCF::full_hole(uscf_t & sol, convergence_t conv, dft_t dft0, bool xch)
+size_t XRSSCF::full_hole(uscf_t & sol, double convthr, dft_t dft0, bool xch)
 
 #elif defined(DFT) && defined(HALFHOLE)
-size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
+size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #endif
 {
 
@@ -302,8 +302,6 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
 
   // Has calculation been converged?
   bool converged=false;
-  // How many consecutive iterations have seemed converged
-  int convd=0;
 
   // Solution of last iteration
 #ifdef RESTRICTED
@@ -375,7 +373,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
     // Calculate dipole moment
     dipmom=dipole_moment(sol.P,*basisp);
     // Do the diagonalization
-    diagonalize(S,Sinvh,sol,shift);
+    diagonalize(sol,shift);
 
     if(verbose)
       printf("done (%s)\n",t.elapsed().c_str());
@@ -530,7 +528,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       }
 
       // Do the diagonalization
-      diagonalize(S,Sinvh,sol,shift);
+      diagonalize(sol,shift);
 
       if(verbose)
 	printf("done (%s)\n",t.elapsed().c_str());
@@ -589,26 +587,8 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
     }
 
     // Sparse output
-    if(verbose) {
-      fprintf(stderr,"%4i % 16.8f",iiter,sol.en.E);
-
-      if(fabs(deltaE)<conv.deltaEmax)
-	fprintf(stderr," % 10.3e*",deltaE);
-      else
-	fprintf(stderr," % 10.3e ",deltaE);
-
-      if(rmsdiff_cvd<conv.deltaPrms)
-	fprintf(stderr," %9.3e*",rmsdiff_cvd);
-      else
-	fprintf(stderr," %9.3e ",rmsdiff_cvd);
-
-      if(maxdiff_cvd<conv.deltaPmax)
-	fprintf(stderr," %9.3e*",maxdiff_cvd);
-      else
-	fprintf(stderr," %9.3e ",maxdiff_cvd);
-
-      fprintf(stderr," %9.3e %10.3f\n",diiserr,titer.get());
-    }
+    if(verbose)
+      fprintf(stderr,"%4i % 16.8f % 10.3e %9.3e %9.3e %9.3e %10.3f\n",iiter,sol.en.E,deltaE,rmsdiff_cvd,maxdiff_cvd,diiserr,titer.get());
 
 #ifdef DFT
     if(dft0.nl && !dft.nl && diiserr<=1e-3) {
@@ -618,24 +598,14 @@ size_t XRSSCF::half_hole(uscf_t & sol, convergence_t conv, dft_t dft0)
       }
       dft.nl=true;
       diis.clear();
-      convd=0;
       continue;
     }
     else
 #endif
-    if(fabs(deltaE)<=conv.deltaEmax && maxdiff_cvd<=conv.deltaPmax && rmsdiff_cvd<=conv.deltaPrms) {
-      // Increment amount of converged iterations
-      convd++;
-
-      if(convd>=2) {
-	converged=true;
-
-	if(verbose)
-	  printf("\n ******* Convergence achieved ********\n");
-      }
-    } else {
-      // Reset number of consecutive converged iterations
-      convd=0;
+    if(diiserr < convthr) {
+      converged=true;
+      if(verbose)
+        printf("\n ******* Convergence achieved ********\n");
     }
 
     // Write current matrices to checkpoint.

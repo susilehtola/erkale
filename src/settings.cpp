@@ -56,6 +56,11 @@ void Settings::add_scf_settings() {
 
   // Use spherical harmonics.
   add_bool("UseLM", "Use a spherical harmonics basis set by default?", true);
+  // Optimized harmonics?
+  add_bool("OptLM", "If spherical harmonics used, use cartesian s and p functions?", true);
+
+  // Specialized dimer calculation?
+  add_bool("DimerSymmetry", "Do special calculation on dimer along z axis", false);
 
   // Decontract basis set?
   add_string("Decontract","Indices of atoms to decontract basis set for","");
@@ -103,10 +108,8 @@ void Settings::add_scf_settings() {
   // Default orthogonalization method
   add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");
 
-  // Convergence criteria
-  add_double("DeltaPrms", "Maximum allowed RMS difference of density matrix", 1e-8);
-  add_double("DeltaPmax", "Maximum allowed maximum difference of density matrix", 1e-6);
-  add_double("DeltaEmax", "Maximum allowed change of energy", 1e-6);
+  // Convergence criterion
+  add_double("ConvThr", "Orbital gradient convergence threshold", 1e-6);
 
   // Maximum iterations
   add_int("MaxIter", "Maximum number of iterations in SCF cycle", 100);
@@ -141,7 +144,7 @@ void Settings::add_dft_settings() {
   add_double("DFTInitialTol", "Tolerance of initial DFT grid", 1e-4);
   add_double("DFTFinalTol", "Tolerance of final DFT grid", 1e-5);
   // Relative factor for initialization
-  add_double("DFTDelta", "Switch to final DFT grid, relative to deltaE and deltaP", 5000.0);
+  add_double("DFTDelta", "Switch to final DFT grid has converged within factor X", 1e2);
 
   // VV10?
   add_string("VV10","Use VV10 non-local correlation?","Auto");

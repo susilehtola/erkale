@@ -54,14 +54,14 @@ class XRSSCF : public SCF {
   arma::vec get_core() const;
 
   /// Compute 1st core-excited state
-  size_t full_hole(uscf_t & sol, convergence_t conv, dft_t dft, bool xch);
+  size_t full_hole(uscf_t & sol, double convthr, dft_t dft, bool xch);
   /// Compute TP solution
-  size_t half_hole(uscf_t & sol, convergence_t conv, dft_t dft);
+  size_t half_hole(uscf_t & sol, double convthr, dft_t dft);
 
   /// Compute 1st core-excited state using line search (slow!)
-  size_t full_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft, bool xch);
+  size_t full_hole_ls(size_t xcatom, uscf_t & sol, double convthr, dft_t dft, bool xch);
   /// Compute TP solution using line search (slow!)
-  size_t half_hole_ls(size_t xcatom, uscf_t & sol, convergence_t conv, dft_t dft);
+  size_t half_hole_ls(size_t xcatom, uscf_t & sol, double convthr, dft_t dft);
 
   /// Get Fock operator for 1st core-excited state
   void Fock_full_hole(uscf_t & sol, dft_t dft, const std::vector<double> & occa, const std::vector<double> & occb, DFTGrid & grid, DFTGrid & nlgrid, bool xch) const;
