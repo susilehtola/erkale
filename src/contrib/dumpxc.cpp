@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     set.parse(argv[1]);
   else printf("Using default settings.\n\n");
   set.print();
-  
+
   // Load checkpoint
   Checkpoint chkpt(set.get_string("LoadChk"),false);
 

@@ -5,8 +5,8 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Copyright © 2015 The Regents of the University of California 
- * All Rights Reserved 
+ * Copyright © 2015 The Regents of the University of California
+ * All Rights Reserved
  *
  * Written by Susi Lehtola, Lawrence Berkeley National Laboratory
  *
@@ -56,7 +56,7 @@ namespace ERIfit {
     // Form basis set
     BasisSet basis;
     get_basis(basis,blib,orbel);
-    
+
     // Get orthonormal orbitals
     arma::mat S(basis.overlap());
     arma::mat Sinvh(CanonicalOrth(S,linthr));
@@ -91,14 +91,14 @@ namespace ERIfit {
     // Allocate memory for the integrals
     eris.zeros(Nbf*Nbf,Nbf*Nbf);
     printf("Size of integral matrix is %i x %i\n",(int) eris.n_rows,(int) eris.n_cols);
-    
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
     {
       // Integral worker
       ERIWorker *eri=new ERIWorker(basis.get_max_am(),basis.get_max_Ncontr());
-      
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
 #endif
@@ -109,24 +109,24 @@ namespace ERIfit {
 	  size_t js=shpairs[ip].js;
 	  size_t ks=shpairs[jp].is;
 	  size_t ls=shpairs[jp].js;
-	  
+
 	  // First functions on shells
 	  size_t i0=shells[is].get_first_ind();
 	  size_t j0=shells[js].get_first_ind();
 	  size_t k0=shells[ks].get_first_ind();
 	  size_t l0=shells[ls].get_first_ind();
-	  
+
 	  // Amount of functions
 	  size_t Ni=shells[is].get_Nbf();
 	  size_t Nj=shells[js].get_Nbf();
 	  size_t Nk=shells[ks].get_Nbf();
 	  size_t Nl=shells[ls].get_Nbf();
-	  
+
 	  // Compute integral block
 	  eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
 	  // Get array
 	  const std::vector<double> *erip=eri->getp();
-	  
+
 	  // Store integrals
 	  for(size_t ii=0;ii<Ni;ii++) {
 	    size_t i=i0+ii;
@@ -136,7 +136,7 @@ namespace ERIfit {
 		size_t k=k0+kk;
 		for(size_t ll=0;ll<Nl;ll++) {
 		  size_t l=l0+ll;
-		  
+
 		  // Go through the 8 permutation symmetries
 		  double mel=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 		  eris(i*Nbf+j,k*Nbf+l)=mel;
@@ -146,7 +146,7 @@ namespace ERIfit {
 		    eris(i*Nbf+j,l*Nbf+k)=mel;
 		  if(is!=js && ks!=ls)
 		    eris(j*Nbf+i,l*Nbf+k)=mel;
-		  
+
 		  if(ip!=jp) {
 		    eris(k*Nbf+l,i*Nbf+j)=mel;
 		    if(js!=is)
@@ -161,12 +161,12 @@ namespace ERIfit {
 	    }
 	  }
 	}
-      
+
       // Free memory
       delete eri;
     }
   }
-  
+
   void compute_ERIs(const ElementBasisSet & orbel, arma::mat & eris) {
     // Form basis set library
     BasisSetLibrary blib;
@@ -188,7 +188,7 @@ namespace ERIfit {
     // Form basis set
     BasisSet basis;
     get_basis(basis,blib,orbel);
-    
+
     size_t Nbf(basis.get_Nbf());
 
     // Get shells in basis set
@@ -202,14 +202,14 @@ namespace ERIfit {
     // Allocate memory for the integrals
     eris.zeros(Nbf,Nbf);
     printf("Size of integral matrix is %i x %i\n",(int) eris.n_rows,(int) eris.n_cols);
-    
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
     {
       // Integral worker
       ERIWorker *eri=new ERIWorker(basis.get_max_am(),basis.get_max_Ncontr());
-      
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
 #endif
@@ -221,16 +221,16 @@ namespace ERIfit {
 	// First functions on shells
 	size_t i0=shells[is].get_first_ind();
 	size_t j0=shells[js].get_first_ind();
-	
+
 	// Amount of functions
 	size_t Ni=shells[is].get_Nbf();
 	size_t Nj=shells[js].get_Nbf();
-	
+
 	// Compute integral block
 	eri->compute(&shells[is],&shells[js],&shells[is],&shells[js]);
 	// Get array
 	const std::vector<double> *erip=eri->getp();
-	
+
 	// Store integrals
 	for(size_t ii=0;ii<Ni;ii++) {
 	  size_t i=i0+ii;
@@ -240,7 +240,7 @@ namespace ERIfit {
 	  }
 	}
       }
-      
+
       // Free memory
       delete eri;
     }
@@ -250,7 +250,7 @@ namespace ERIfit {
     // Form orbital basis set library
     BasisSetLibrary orblib;
     orblib.add_element(orbel);
-    
+
     // Form orbital basis set
     BasisSet basis;
     get_basis(basis,orblib,orbel);
@@ -270,13 +270,13 @@ namespace ERIfit {
       // Check am
       if(!( (shells[is].get_am()==am1 && shells[js].get_am()==am2) || (shells[is].get_am()==am2 && shells[js].get_am()==am1)))
 	continue;
-      
+
       // Check that shells aren't contracted
       if(shells[is].get_Ncontr()!=1 || shells[js].get_Ncontr()!=1) {
 	ERROR_INFO();
 	throw std::runtime_error("Must use primitive basis set!\n");
       }
-      
+
       // Exponent value is
       double zeta=shells[is].get_contr()[0].z + shells[js].get_contr()[0].z;
       sorted_insertion<double>(exps,zeta);
@@ -292,16 +292,16 @@ namespace ERIfit {
       // Check am
       if(!( (shells[is].get_am()==am1 && shells[js].get_am()==am2) || (shells[is].get_am()==am2 && shells[js].get_am()==am1)))
 	continue;
-      
+
       // Pair is
       double zeta=shells[is].get_contr()[0].z + shells[js].get_contr()[0].z;
       size_t pos=sorted_insertion<double>(exps,zeta);
-      
+
       // Insert pair
       pairs[pos].push_back(shpairs[ip]);
     }
   }
-  
+
   void compute_cholesky_T(const ElementBasisSet & orbel, int am1, int am2, arma::mat & eris, arma::vec & exps_) {
     // Form basis set library
     BasisSetLibrary blib;
@@ -323,7 +323,7 @@ namespace ERIfit {
 
     // Store exponents
     exps_=arma::conv_to<arma::vec>::from(exps);
-    
+
     // Allocate memory for the integrals
     eris.zeros(exps.size(),exps.size());
 #ifdef _OPENMP
@@ -332,14 +332,14 @@ namespace ERIfit {
     {
       // Integral worker
       ERIWorker *eri=new ERIWorker(basis.get_max_am(),basis.get_max_Ncontr());
-      
+
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
 #endif
       // Loop over unique exponent pairs
       for(size_t iip=0;iip<upairs.size();iip++)
 	for(size_t jjp=0;jjp<=iip;jjp++) {
-	  
+
 	  // Loop over individual shell pairs in the group
 	  for(size_t ip=0;ip<upairs[iip].size();ip++)
 	    for(size_t jp=0;jp<upairs[jjp].size();jp++) {
@@ -354,12 +354,12 @@ namespace ERIfit {
 	      size_t Nj=shells[js].get_Nbf();
 	      size_t Nk=shells[ks].get_Nbf();
 	      size_t Nl=shells[ls].get_Nbf();
-	      
+
 	      // Compute integral block
 	      eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
 	      // Get array
 	      const std::vector<double> *erip=eri->getp();
-	      
+
 	      // Store integrals
 	      for(size_t ii=0;ii<Ni;ii++)
 		for(size_t jj=0;jj<Nj;jj++)
@@ -374,28 +374,28 @@ namespace ERIfit {
 		    }
 	    }
 	}
-      
+
       // Free memory
       delete eri;
     }
   }
-    
+
   void compute_fitint(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, arma::mat & fitint) {
     // Form orbital basis set library
     BasisSetLibrary orblib;
     orblib.add_element(orbel);
-    
+
     // Form orbital basis set
     BasisSet orbbas;
     get_basis(orbbas,orblib,orbel);
-    
+
     // and fitting basis set
     BasisSet fitbas;
     get_basis(fitbas,fitlib,orbel);
-    
+
     // Coulomb normalize the fitting set
     fitbas.coulomb_normalize();
-    
+
     // Get shells in basis sets
     std::vector<GaussianShell> orbsh(orbbas.get_shells());
     std::vector<GaussianShell> fitsh(fitbas.get_shells());
@@ -408,7 +408,7 @@ namespace ERIfit {
     // Problem sizes
     const size_t Norb(orbbas.get_Nbf());
     const size_t Nfit(fitbas.get_Nbf());
-    
+
     // Allocate memory
     fitint.zeros(Norb*Norb,Nfit);
 
@@ -428,22 +428,22 @@ namespace ERIfit {
 	  // Orbital shells are
 	  size_t is=orbpairs[ip].is;
 	  size_t js=orbpairs[ip].js;
-	  
+
 	  // First function is
 	  size_t i0=orbsh[is].get_first_ind();
 	  size_t j0=orbsh[js].get_first_ind();
 	  size_t a0=fitsh[as].get_first_ind();
-	  
+
 	  // Amount of functions
 	  size_t Ni=orbsh[is].get_Nbf();
 	  size_t Nj=orbsh[js].get_Nbf();
 	  size_t Na=fitsh[as].get_Nbf();
-	  
+
 	  // Compute integral block
 	  eri->compute(&orbsh[is],&orbsh[js],&dummy,&fitsh[as]);
 	  // Get array
 	  const std::vector<double> *erip=eri->getp();
-	  
+
 	  // Store integrals
 	  for(size_t ii=0;ii<Ni;ii++) {
 	    size_t i=i0+ii;
@@ -451,7 +451,7 @@ namespace ERIfit {
 	      size_t j=j0+jj;
 	      for(size_t aa=0;aa<Na;aa++) {
 		size_t a=a0+aa;
-		
+
 		// Go through the two permutation symmetries
 		double mel=(*erip)[(ii*Nj+jj)*Na+aa];
 		fitint(i*Norb+j,a)=mel;
@@ -460,21 +460,21 @@ namespace ERIfit {
 	    }
 	  }
 	}
-      
+
       // Free memory
       delete eri;
     }
   }
-  
+
   void compute_ERIfit(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, double linthr, const arma::mat & fitint, arma::mat & fiteri) {
     // Form orbital basis set library
     BasisSetLibrary orblib;
     orblib.add_element(orbel);
-    
+
     // Form orbital basis set
     BasisSet orbbas;
     get_basis(orbbas,orblib,orbel);
-    
+
     // and fitting basis set
     BasisSet fitbas;
     get_basis(fitbas,fitlib,orbel);
@@ -501,7 +501,7 @@ namespace ERIfit {
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-    { 
+    {
       // Integral worker
       int maxam=std::max(orbbas.get_max_am(),fitbas.get_max_am());
       ERIWorker *eri=new ERIWorker(maxam,orbbas.get_max_Ncontr());
@@ -528,7 +528,7 @@ namespace ERIfit {
 	      S(j0+jj,i0+ii)=mel;
 	    }
 	}
-    
+
       // Free memory
       delete eri;
     }
@@ -537,7 +537,7 @@ namespace ERIfit {
     arma::vec Sval;
     arma::mat Svec;
     eig_sym_ordered(Sval,Svec,S);
-    
+
     // Count linearly independent vectors
     size_t Nind=0;
     for(size_t i=0;i<Sval.n_elem;i++)
@@ -546,13 +546,13 @@ namespace ERIfit {
     // and drop the linearly dependent ones
     Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
     Svec=Svec.cols(Svec.n_cols-Nind,Svec.n_cols-1);
-    
+
     // Form inverse overlap matrix
     arma::mat S_inv;
     S_inv.zeros(Svec.n_rows,Svec.n_rows);
     for(size_t i=0;i<Sval.n_elem;i++)
       S_inv+=Svec.col(i)*arma::trans(Svec.col(i))/Sval(i);
-    
+
     // Fitted ERIs are
     fiteri=fitint*S_inv*arma::trans(fitint);
   }
@@ -561,11 +561,11 @@ namespace ERIfit {
     // Form orbital basis set library
     BasisSetLibrary orblib;
     orblib.add_element(orbel);
-    
+
     // Form orbital basis set
     BasisSet orbbas;
     get_basis(orbbas,orblib,orbel);
-    
+
     // and fitting basis set
     BasisSet fitbas;
     get_basis(fitbas,fitlib,orbel);
@@ -594,7 +594,7 @@ namespace ERIfit {
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-    { 
+    {
       // Integral worker
       int maxam=std::max(orbbas.get_max_am(),fitbas.get_max_am());
       ERIWorker *eri=new ERIWorker(maxam,orbbas.get_max_Ncontr());
@@ -621,7 +621,7 @@ namespace ERIfit {
 	      S(j0+jj,i0+ii)=mel;
 	    }
 	}
-    
+
       // Free memory
       delete eri;
     }
@@ -630,7 +630,7 @@ namespace ERIfit {
     arma::vec Sval;
     arma::mat Svec;
     eig_sym_ordered(Sval,Svec,S);
-    
+
     // Count linearly independent vectors
     size_t Nind=0;
     for(size_t i=0;i<Sval.n_elem;i++)
@@ -639,13 +639,13 @@ namespace ERIfit {
     // and drop the linearly dependent ones
     Sval=Sval.subvec(Sval.n_elem-Nind,Sval.n_elem-1);
     Svec=Svec.cols(Svec.n_cols-Nind,Svec.n_cols-1);
-    
+
     // Form inverse overlap matrix
     arma::mat S_inv;
     S_inv.zeros(Svec.n_rows,Svec.n_rows);
     for(size_t i=0;i<Sval.n_elem;i++)
       S_inv+=Svec.col(i)*arma::trans(Svec.col(i))/Sval(i);
-    
+
     // Fitted ERIs are
     size_t Nbf(orbbas.get_Nbf());
     fiteri.zeros(Nbf,Nbf);

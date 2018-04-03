@@ -120,7 +120,7 @@ struct eripair_t {
   size_t j0;
   /// Amount of functions on shell
   size_t Nj;
-  
+
   /// Maximum integral on the shell
   double eri;
 };
@@ -192,6 +192,8 @@ class BasisSet {
 
   /// Use spherical harmonics by default as basis?
   bool uselm;
+  /// Use cartesian s and p functions if spherical harmonics are used?
+  bool optlm;
 
   /// Internuclear distances
   arma::mat nucleardist;
@@ -301,7 +303,7 @@ class BasisSet {
 
   /// Find shell index of basis function
   size_t find_shell_ind(size_t find) const;
-  
+
   /// Get shells in basis set
   std::vector<GaussianShell> get_shells() const;
   /// Get ind:th shell
@@ -324,6 +326,9 @@ class BasisSet {
   bool lm_in_use(size_t ind) const;
   /// Toggle the use of spherical harmonics on shell ind
   void set_lm(size_t ind, bool lm);
+
+  /// Get m values of basis functions
+  arma::ivec get_m_values() const;
 
   /// Get transformation matrix
   arma::mat get_trans(size_t ind) const;
@@ -373,7 +378,7 @@ class BasisSet {
   arma::mat get_nuclear_coords() const;
   /// Set coordinates of all nuclei
   void set_nuclear_coords(const arma::mat & coords);
-  
+
   /// Get coordinates of nucleus
   coords_t get_nuclear_coords(size_t inuc) const;
   /// Get charge of nucleus

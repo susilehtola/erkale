@@ -810,9 +810,7 @@ int main(int argc, char **argv) {
 
   // Use convergence settings similar to StoBe. XCH calculations
   // are hard to converge to the otherwise default settings.
-  set.set_double("DeltaEmax",1e-6);
-  set.set_double("DeltaPmax",1e-5);
-  set.set_double("DeltaPrms",1e-6);
+  set.set_double("ConvThr",1e-5);
   set.set_double("DFTDelta",100);
 
   // Add xrs specific settings
@@ -900,19 +898,11 @@ int main(int argc, char **argv) {
   dft_t dft(parse_dft(set,false));
 
   // Final convergence settings
-  convergence_t conv;
-  // Make initialization parameters more relaxed
-  conv.deltaEmax=set.get_double("DeltaEmax");
-  conv.deltaPmax=set.get_double("DeltaPmax");
-  conv.deltaPrms=set.get_double("DeltaPrms");
+  double convthr(set.get_double("ConvThr"));
 
-  // Convergence settings for initialization
-  convergence_t init_conv(conv);
   // Make initialization parameters more relaxed
   double initfac=set.get_double("DFTDelta");
-  init_conv.deltaEmax*=initfac;
-  init_conv.deltaPmax*=initfac;
-  init_conv.deltaPrms*=initfac;
+  double init_convthr(convthr*initfac);
 
   // TP solution
   uscf_t sol;
@@ -1022,7 +1012,7 @@ int main(int argc, char **argv) {
       if(spin) {
 	icore=localize(basis,noccb,xcatom,sol.Cb,state,iorb);
 	sol.Eb=arma::diagvec(arma::trans(sol.Cb)*sol.Hb*sol.Cb);
-	
+
 	std::vector<double> occb;
 	if(method==XCH)
 	  occb=xch_occ(icore,noccb);
@@ -1076,8 +1066,8 @@ int main(int argc, char **argv) {
     // Do calculation
     if(method==FCH || method==XCH) {
       if(dft.adaptive)
-	solver.full_hole(sol,init_conv,dft_init,method==XCH);
-      xcorb=solver.full_hole(sol,conv,dft,method==XCH);
+	solver.full_hole(sol,init_convthr,dft_init,method==XCH);
+      xcorb=solver.full_hole(sol,convthr,dft,method==XCH);
 
       // Get excited state energy
       energy_t excen;
@@ -1098,8 +1088,8 @@ int main(int argc, char **argv) {
       }
     } else {
       if(dft.adaptive)
-	solver.half_hole(sol,init_conv,dft_init);
-      xcorb=solver.half_hole(sol,conv,dft);
+	solver.half_hole(sol,init_convthr,dft_init);
+      xcorb=solver.half_hole(sol,convthr,dft);
     }
     printf("\n\n");
 

@@ -58,7 +58,7 @@ std::string readline(std::istream & in, bool skipempty, const std::string & ccha
     // Skip empty lines?
     if(!skipempty)
       return ret;
-    
+
     // Check that line is not a comment
     if(ret.size()) {
       bool cmt=false;
@@ -70,7 +70,7 @@ std::string readline(std::istream & in, bool skipempty, const std::string & ccha
 	return ret;
     }
   }
-  
+
   // Reached end of file
   return std::string();
 }
@@ -205,7 +205,7 @@ void print_E(const arma::vec & E, const std::vector<double> & occ, bool all) {
   // Total amount of lines to print. Always print one additional line
   // of energies.
   size_t Ntot=all ? E.n_elem : (size_t) ceil(occ.size()*1.0/nelem+1)*nelem;
-  
+
   // Safety check:
   if(E.n_elem<Ntot){
     Ntot=E.n_elem;
@@ -221,7 +221,7 @@ void print_E(const arma::vec & E, const std::vector<double> & occ, bool all) {
   // Energy cutoff, determined from above
   double cutoff=1e7;
   const char fmt_cut[]="************* ";
-  
+
   // Compute gap. Find HOMO and LUMO
   if(occ.size()) {
     size_t homo, lumo;
@@ -465,7 +465,7 @@ std::vector<size_t> parse_range(const std::string & in, bool convert) {
     // Convert to C indexing
     for(size_t i=0;i<ret.size();i++)
       ret[i]--;
-  
+
   return ret;
 }
 
@@ -581,7 +581,7 @@ std::string space_number(int numb) {
 std::string print_bar(std::string msg, char pad, int width, bool upper) {
   // Trim message
   msg=trim(msg);
-  
+
   // Upper case?
   if(upper)
     msg=toupper(msg);
@@ -590,7 +590,7 @@ std::string print_bar(std::string msg, char pad, int width, bool upper) {
   int lpad, rpad;
   // Length of message (including white spaces)
   int msglen=(int) msg.size() + 2;
-  
+
   rpad = (width - msglen)/2;
   lpad = width - msglen - rpad;
 

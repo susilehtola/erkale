@@ -50,7 +50,7 @@ arma::vec welltempered_set(double alpha, double beta, double gamma, double delta
     ret(1)=alpha*beta;
   for(size_t i=2;i<Nf;i++)
     ret(i)=ret(i-1)*beta*(1.0 + gamma*pow((i+1.0)/Nf,delta));
-  
+
   return ret;
 }
 
@@ -92,7 +92,7 @@ arma::vec legendre_pars(const arma::vec & z, int Np) {
     ERROR_INFO();
     throw std::runtime_error("Unable to solve set of Legendre parameters.\n");
   }
-    
+
   return pars;
 }
 

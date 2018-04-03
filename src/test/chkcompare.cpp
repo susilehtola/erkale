@@ -78,7 +78,7 @@ double C_diff(const arma::mat & Cr, const arma::mat & S, arma::mat & Cc, const a
     // Next orbital
     io=jo+1;
   }
-  
+
   // Get norm
   return rms_norm(Cc-Cr);
 }
@@ -90,7 +90,7 @@ double E_diff(const arma::mat & Er, const arma::vec & Ec) {
 
   return arma::max(arma::abs((Er-Ec)/Enorm));
 }
-  
+
 int main(int argc, char ** argv) {
   // Get reference directory
   char * refdir=getenv("ERKALE_REFDIR");
@@ -114,7 +114,7 @@ int main(int argc, char ** argv) {
     throw std::runtime_error(oss.str());
   }
   Checkpoint cur(curfile,false);
-  
+
   // Reference file
   std::string reffile=std::string(refdir)+"/"+curfile;
   if(!file_exists(reffile)) {
@@ -161,7 +161,7 @@ int main(int argc, char ** argv) {
     printf("Total energy difference %e\n",dE);
     fflush(stdout);
     if(fabs(dE) > Etol) throw std::runtime_error("Total energies don't match!\n");
-    
+
     // Densities
     arma::cx_mat Pref, Pcur;
     arma::mat Prefr, Prefi, Pcurr, Pcuri;
@@ -171,7 +171,7 @@ int main(int argc, char ** argv) {
       Pref=Prefr*COMPLEX1 + Prefi*COMPLEXI;
     } else
       Pref=Prefr*COMPLEX1;
-    
+
     cur.read("P",Pcurr);
     if(cur.exist("P_im")) {
       cur.read("P_im",Pcuri);
@@ -185,13 +185,13 @@ int main(int argc, char ** argv) {
     printf("Electron count difference %e\n",dNel);
     fflush(stdout);
     if(fabs(dNel)>dPtol) throw std::runtime_error("Norm of density matrix is wrong.\n");
-    
+
     // Check difference
     double dP=rms_cnorm(Pcur-Pref);
     printf("Density matrix difference %e\n",dP);
     if(dP>dPtol) throw std::runtime_error("Density matrices differ!\n");
-    
-    // Orbitals    
+
+    // Orbitals
     arma::mat Cref, Ccur;
     ref.read("C",Cref);
     cur.read("C",Ccur);
@@ -204,7 +204,7 @@ int main(int argc, char ** argv) {
     arma::vec Eref, Ecur;
     ref.read("E",Eref);
     cur.read("E",Ecur);
-    
+
     // Calculate differences of nondegenerate orbitals
     double dC=C_diff(Cref,S,Ccur,Ecur);
     printf("Orbital matrix difference %e\n",dC);
@@ -223,10 +223,10 @@ int main(int argc, char ** argv) {
     emd.initial_fill(false);
     emd.find_electrons(false);
     emd.optimize_moments(false);
-    
+
     // Get moments
     arma::mat mom=emd.moments();
-    
+
     // Compare <p^2> with T and <p^0> with tr(P*S)
     double p0diff=mom(2,1)-std::real(arma::trace(Pcur*S));
     double p0err=mom(2,2);
@@ -250,7 +250,7 @@ int main(int argc, char ** argv) {
     cur.read("Nel",Nelc);
     if(Nelar != Nelac || Nelbr != Nelbc || Nelr != Nelc)
       throw std::runtime_error("Amount of electrons doesn't match!\n");
-    
+
     // Total energies
     energy_t Er, Ec;
     ref.read(Er);
@@ -259,7 +259,7 @@ int main(int argc, char ** argv) {
     printf("Total energy difference %e\n",dE);
     fflush(stdout);
     if(fabs(dE) > Etol) throw std::runtime_error("Total energies don't match!\n");
-    
+
     // Densities
     arma::mat Paref, Pbref, Prefr, Prefi;
     arma::mat Pacur, Pbcur, Pcurr, Pcuri;
@@ -272,7 +272,7 @@ int main(int argc, char ** argv) {
       Pref=Prefr*COMPLEX1 + Prefi*COMPLEXI;
     } else
       Pref=Prefr*COMPLEX1;
-    
+
     cur.read("Pa",Pacur);
     cur.read("Pb",Pbcur);
     cur.read("P",Pcurr);
@@ -281,7 +281,7 @@ int main(int argc, char ** argv) {
       Pcur=Pcurr*COMPLEX1 + Pcuri*COMPLEXI;
     } else
       Pcur=Pcurr*COMPLEX1;
-    
+
     // Check norm
     double Nelanum=arma::trace(Pacur*S);
     double Nelbnum=arma::trace(Pbcur*S);
@@ -333,7 +333,7 @@ int main(int argc, char ** argv) {
     fflush(stdout);
     if(fabs(dNel)>dPtol)
       throw std::runtime_error("Norm of total density matrix is wrong.\n");
-    
+
     // Check differences
     double dPa=rms_norm(Pacur-Paref);
     printf("Alpha density matrix difference %e\n",dPa);
@@ -346,7 +346,7 @@ int main(int argc, char ** argv) {
     printf("Total density matrix difference %e\n",dP);
     if(dP >dPtol) throw std::runtime_error("Total density matrices differ!\n");
 
-    // Orbitals    
+    // Orbitals
     arma::mat Caref, Cbref, Cacur, Cbcur;
     ref.read("Ca",Caref);
     ref.read("Cb",Cbref);
@@ -376,7 +376,7 @@ int main(int argc, char ** argv) {
     double dCb=C_diff(Cbref,S,Cbcur,Ebcur);
     printf("Beta  orbital matrix difference %e\n",dCb);
     // if(dCb>dCtol) throw std::runtime_error("Beta  orbital coefficients differ!\n");
-    
+
     double dEoa=E_diff(Earef,Eacur);
     printf("Alpha orbital energy difference %e\n",dEoa);
     if(dEoa > dEtol) throw std::runtime_error("Alpha orbital energies differ!\n");
@@ -391,7 +391,7 @@ int main(int argc, char ** argv) {
 	Pnel-=1.0;
       else if(stricmp(xrsmethod,"TP")==0)
 	Pnel-=0.5;
-    }    
+    }
 
     // Check EMD
     GaussianEMDEvaluator eval(bcur,Pcur);
@@ -401,7 +401,7 @@ int main(int argc, char ** argv) {
     emd.optimize_moments(false);
     // Get moments
     arma::mat mom=emd.moments();
-        
+
     // Compare <p^2> with T and <p^0> with tr(P*S)
     double p0diff=mom(2,1)-std::real(arma::trace(Pcur*S));
     double p0err=mom(2,2);

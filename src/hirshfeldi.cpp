@@ -61,14 +61,14 @@ void HirshfeldI::compute(const BasisSet & basis, const arma::mat & P, std::strin
       atoms[idnuc[i][j]].resize(2*dqmax+1);
       atQ[idnuc[i][j]].assign(2*dqmax+1,0.0);
     }
-    
+
     // Loop over electron count
     for(int nel=std::max(1,nuc.Z-dqmax);nel<=nuc.Z+dqmax;nel++) {
       Timer tatq;
 
       // Charge difference of system is
       int dq=nuc.Z-nel;
-      
+
       // Perform guess
       arma::vec atE;
       arma::mat atP;
@@ -125,7 +125,7 @@ void HirshfeldI::compute_load(const BasisSet & basis, const arma::mat & P, doubl
     atoms[i].resize(2*dqmax+1);
     atQ[i].assign(2*dqmax+1,0.0);
   }
-  
+
   // Get list of nuclei
   std::vector<nucleus_t> nuc=basis.get_nuclei();
   // Get list of elements in system
@@ -148,16 +148,16 @@ void HirshfeldI::compute_load(const BasisSet & basis, const arma::mat & P, doubl
 
 	// Charge difference of system is
 	int dq=Z-nel;
-	
+
 	// Load checkpoint
 	char chkname[80];
 	sprintf(chkname,"%s_%i.chk",element_symbols[Z].c_str(),dq);
 	Checkpoint chkpt(chkname,false);
-	
+
 	// Load basis set and density matrix
 	BasisSet bas;
 	chkpt.read(bas);
-	
+
 	arma::mat Pat;
 	chkpt.read("P",Pat);
 
@@ -175,10 +175,10 @@ void HirshfeldI::compute_load(const BasisSet & basis, const arma::mat & P, doubl
 	}
       }
     }
-  
+
   // Perform solution
   solve(basis,P,tol,verbose);
-  
+
   if(verbose)
     printf("Iterative Hirshfeld decomposition computed in %s.\n\n",ttot.elapsed().c_str());
 }
@@ -196,9 +196,9 @@ void HirshfeldI::solve(const BasisSet & basis, const arma::mat & P, double tol, 
       q[i]=nuc.Z;
   }
   ISA=get(q);
-  
+
   //  arma::trans(q).print("Starting guess");
-  
+
   // First iteration
   if(verbose) {
     printf("First iteration\n");
@@ -272,7 +272,7 @@ Hirshfeld HirshfeldI::get(const arma::vec & Q) {
     for(upl=1;upl<atoms[i].size();upl++)
       if(atQ[i][upl] >= Q[i])
 	break;
-    
+
     if(Q[i]<atQ[i][0] || upl==atoms[i].size()) {
       printf("Charge on atom %i is %e.\n",(int) i+1, Q[i]);
       printf("Charge array:");

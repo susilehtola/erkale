@@ -55,7 +55,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   // used. The other way would be to pass the user settings to this
   // routine..
   set.set_string("DFTGrid","100 -434");
-  
+
   // Don't do PZ-SIC for the initial guess.
   try {
     set.set_bool("PZ",false);
@@ -63,7 +63,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   }
   // Also, turn off non-local correlation for initial guess
   set.set_string("VV10","False");
-  
+
   // Use default convergence settings
   set.set_bool("UseDIIS",true);
   set.set_int("DIISOrder",20);
@@ -78,14 +78,13 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
 
   // Relax convergence requirements - open shell atoms may be hard to
   // converge
-  set.set_double("DeltaPmax",1e-5);
-  set.set_double("DeltaPrms",1e-6);
+  set.set_double("ConvThr",1e-4);
 
   // Construct the basis set
   atbas=BasisSet(1,set);
   // Add the nucleus
   atbas.add_nucleus(nuc);
-  
+
   // Add the shells relevant for a single atom.
   int ammax;
   if(dropshells) {
@@ -104,7 +103,7 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   } else {
     ammax=basis.get_max_am();
   }
-  
+
   std::vector<GaussianShell> shells=basis.get_funcs(inuc);
   // Indices of shells included
   shellidx.clear();
@@ -115,10 +114,10 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
       shellidx.push_back(ish);
     }
   }
-  
+
   // Finalize basis set
   atbas.finalize();
-  
+
   // Sanity check for "artificial" basis sets (e.g. only f functions)
   if(ammax < basis.get_max_am() && (int) atbas.get_Nbf()<nuc.Z-Q) {
     // Add the rest of the shells
@@ -130,10 +129,10 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
     // Refinalize
     atbas.finalize();
   }
-  
+
   // Determine ground state of charged species
   gs_conf_t gs=get_ground_state(nuc.Z-Q);
-  
+
   // Set multiplicity
   set.set_int("Multiplicity",gs.mult);
 
@@ -156,19 +155,19 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   // Temporary file name
   std::string tmpname(tempname());
   set.set_string("SaveChk",tmpname);
-  
+
   // Run calculation
   calculate(atbas,set);
-  
+
   // Load energies and density matrix
   {
     // Checkpoint
     Checkpoint chkpt(tmpname,false);
-    
+
     chkpt.read("Ea",atE);
     chkpt.read("P",atP);
   }
-  
+
   // Remove temporary file
   remove(tmpname.c_str());
 }
@@ -193,13 +192,13 @@ arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bo
   std::string method=set.get_string("Method");
   if(stricmp(set.get_string("AtomGuess"),"Auto")!=0)
     method=set.get_string("AtomGuess");
-  
+
   if(verbose) {
     // Parse method
     bool hf= (stricmp(method,"HF")==0);
     if(hf)
       method="HF";
-    else {   
+    else {
       bool rohf=(stricmp(method,"ROHF")==0);
       if(rohf)
 	method="ROHF";
@@ -214,7 +213,7 @@ arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bo
 	  method=get_keyword(dft.x_func);
       }
     }
-    
+
     printf("Performing %s guess for atoms:\n",method.c_str());
     fprintf(stderr,"Calculating initial atomic guess ... ");
     fflush(stdout);
@@ -244,27 +243,27 @@ arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bo
     atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,dropshells,sphave,basis.get_nucleus(idnuc[i][0]).Q);
     // Get the atomic shells
     std::vector<GaussianShell> shells=atbas.get_funcs(0);
-    
+
     // Loop over shells
     for(size_t ish=0;ish<shells.size();ish++)
       for(size_t jsh=0;jsh<shells.size();jsh++) {
-	
+
 	// Loop over identical nuclei
 	for(size_t iid=0;iid<idnuc[i].size();iid++) {
 	  // Get shells on nucleus
 	  std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
-	  
+
 	  // Store density
 	  P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=atP.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
 	}
       }
-    
+
     if(verbose) {
       printf(" (%s)\n",tsol.elapsed().c_str());
       fflush(stdout);
     }
   }
-  
+
   /*
   // Check that density matrix contains the right amount of electrons
   int Neltot=basis.Ztot()-set.get_int("Charge");

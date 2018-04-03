@@ -32,7 +32,7 @@ arma::vec GDM::solve() {
   // 29) in GDM paper
   for(size_t i=0;i<xk.size();i++)
     helper.update(xk[i]%arma::sqrt(h), gk[i]/arma::sqrt(h));
- 
+
   // Solve the parameters and do the back-transform
   return helper.solve()/arma::sqrt(h);
 }
@@ -41,7 +41,7 @@ void GDM::update(const arma::vec & x, const arma::vec & g, const arma::vec & h_)
   xk.push_back(x);
   gk.push_back(g);
   h=h_;
-  
+
   if(xk.size()>nmax) {
     xk.erase(xk.begin());
     gk.erase(gk.begin());

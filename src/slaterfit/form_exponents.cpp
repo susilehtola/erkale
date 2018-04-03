@@ -332,7 +332,7 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
 
   // Set starting point
   switch(par.method) {
-    
+
   case(2):
     // Legendre - same as for even tempered
   case(1):
@@ -343,7 +343,7 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
     if(dof>1)
       gsl_vector_set(x,1,2.0);
     break;
-  
+
     /*
   case(2):
     // Free minimization, set exponents to i
@@ -356,7 +356,7 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
     ERROR_INFO();
     throw std::runtime_error("Unknown Slater fitting method.\n");
   }
-  
+
   // Set minimizer
   gsl_multimin_fdfminimizer_set(min, &minfunc, x, 0.01, 1e-4);
 

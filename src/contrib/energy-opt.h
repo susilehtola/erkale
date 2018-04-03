@@ -71,7 +71,7 @@ class EnergyOptimizer {
   bool verbose;
   /// Initialization mode? (Sloppier convergence)
   bool init;
-  
+
  public:
   /// Constructor
   EnergyOptimizer(const std::string & el, bool verbose=true);

@@ -114,7 +114,7 @@ class DIIS {
   double diisthr;
   /// Counter for not using DIIS
   int cooloff;
-  
+
   /// Maximum amount of matrices to store
   size_t imax;
   /// Get energies
@@ -141,7 +141,7 @@ class DIIS {
 
   /// Solve coefficients
   arma::vec get_c_adiis(bool verbose=false) const;
-  
+
  public:
   /// Constructor
   DIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
@@ -170,7 +170,7 @@ class rDIIS: protected DIIS {
   void erase_last();
   /// ADIIS update
   void PiF_update();
-  
+
  public:
   /// Constructor
   rDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
@@ -203,7 +203,7 @@ class uDIIS: protected DIIS {
   void erase_last();
   /// ADIIS update
   void PiF_update();
-  
+
  public:
   /// Constructor
   uDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);

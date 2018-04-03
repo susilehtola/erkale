@@ -59,7 +59,7 @@ void ERItable::get_range_separation(double & w, double & a, double & b) const {
 size_t ERItable::N_ints(const BasisSet * basp, double thr) {
   // Get ERI pairs
   shpairs=basp->get_eripairs(screen, thr, omega, alpha, beta);
-  
+
   // Form offset table and calculate amount of integrals
   size_t N=0;
   shoff.resize(shpairs.size());
@@ -79,7 +79,7 @@ size_t ERItable::N_ints(const BasisSet * basp, double thr) {
   for(size_t jp=0;jp<=ip;jp++) {
     N+=Nij*shpairs[jp].Ni*shpairs[jp].Nj;
   }
-  
+
   return N;
 }
 
@@ -89,7 +89,7 @@ size_t ERItable::get_N() const {
 
 size_t ERItable::offset(size_t ip, size_t jp) const {
   // Calculate offset in integrals table
-  size_t ioff(shoff[ip]); 
+  size_t ioff(shoff[ip]);
   size_t Nij=shpairs[ip].Ni*shpairs[ip].Nj;
   for(size_t jj=0;jj<jp;jj++)
     ioff+=Nij*shpairs[jj].Ni*shpairs[jj].Nj;
@@ -100,14 +100,14 @@ size_t ERItable::offset(size_t ip, size_t jp) const {
 arma::mat ERItable::calcJ(const arma::mat & P) const {
   arma::mat J(P);
   J.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
     // Integral digestor
     JDigestor dig(P);
-    
+
 #ifdef _OPENMP
 #pragma omp for
 #endif
@@ -115,7 +115,7 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++)
 	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
-    
+
 #ifdef _OPENMP
 #pragma omp critical
 #endif
@@ -128,14 +128,14 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
 arma::mat ERItable::calcK(const arma::mat & P) const {
   arma::mat K(P);
   K.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
     // Integral digestor
     KDigestor dig(P);
-    
+
 #ifdef _OPENMP
 #pragma omp for
 #endif
@@ -143,7 +143,7 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++)
 	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
-    
+
 #ifdef _OPENMP
 #pragma omp critical
 #endif
@@ -156,16 +156,16 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
 arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
   arma::cx_mat K(P);
   K.zeros();
-  
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
     arma::cx_mat Kwrk(K);
-    
+
     // Integral digestor
     cxKDigestor dig(P);
-    
+
 #ifdef _OPENMP
 #pragma omp for
 #endif
@@ -173,7 +173,7 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
       // Loop over second pairs
       for(size_t jp=0;jp<=ip;jp++)
 	dig.digest(shpairs,ip,jp,ints,offset(ip,jp));
-    
+
 #ifdef _OPENMP
 #pragma omp critical
 #endif
@@ -190,18 +190,18 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
   // Compute memory requirements
   size_t N;
   N=N_ints(basp,tol);
-  
+
   // Don't do DOS
   if(N*sizeof(double)>14*1e9) {
     ERROR_INFO();
     throw std::out_of_range("Cowardly refusing to allocate more than 14 gigs of memory.\n");
   }
-  
+
   try {
     ints.resize(N);
   } catch(std::bad_alloc err) {
     std::ostringstream oss;
-    
+
     ERROR_INFO();
     oss << "Was unable to reserve " << memory_size(N*sizeof(double)) << " of memory.\n";
     throw std::runtime_error(oss.str());
@@ -232,7 +232,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 	// and those on the second pair
 	size_t ks=shpairs[jp].is;
 	size_t ls=shpairs[jp].js;
-	
+
 	// Amount of functions on the first pair
 	size_t Ni=shpairs[ip].Ni;
 	size_t Nj=shpairs[ip].Nj;
@@ -241,7 +241,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 	size_t Nl=shpairs[jp].Nj;
 	// Amount of integrals is
 	size_t Nints=Ni*Nj*Nk*Nl;
-	
+
 	// Initialize table
 	size_t ioff(offset(ip,jp));
 	for(size_t i=0;i<Nints;i++)

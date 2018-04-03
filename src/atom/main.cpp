@@ -176,17 +176,14 @@ int main(int argc, char **argv) {
     printf(" %3i: n=%i, zeta=%-8.5f, l=%i, m=% i\n",(int) i,basis[i].n,basis[i].zeta,basis[i].l,basis[i].m);
   printf("\n");
 
-  convergence_t conv;
-  conv.deltaEmax=1e-6;
-  conv.deltaPmax=1e-6;
-  conv.deltaPrms=1e-8;
+  double convthr(1e-6);
 
   if(get_ground_state(Z).mult==1) {
     rscf_t sol;
-    RHF(basis,Z,sol,conv,false);
+    RHF(basis,Z,sol,convthr,false);
   } else {
     uscf_t sol;
-    UHF(basis,Z,sol,conv,false,true);
+    UHF(basis,Z,sol,convthr,false,true);
   }
 
   return 0;

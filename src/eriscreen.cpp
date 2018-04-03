@@ -106,7 +106,7 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
   {
     // ERI worker
     ERIWorker *eri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(basp->get_max_am(),basp->get_max_Ncontr()) : new ERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
-    
+
     // Integral array
     const std::vector<double> * erip;
 
@@ -186,17 +186,17 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 	// and those on the second pair
 	size_t ks=shpairs[jp].is;
 	size_t ls=shpairs[jp].js;
-	
+
 	// Shell centers
 	inuc=shells[is].get_center_ind();
 	jnuc=shells[js].get_center_ind();
 	knuc=shells[ks].get_center_ind();
 	lnuc=shells[ls].get_center_ind();
-	
+
 	// Skip when all functions are on the same nucleus - force will vanish
 	if(inuc==jnuc && jnuc==knuc && knuc==lnuc)
 	  continue;
-	
+
 	{
 	  // Maximum value of the 2-electron integrals on this shell pair
 	  double intmax=screen(is,js)*screen(ks,ls);
@@ -207,10 +207,10 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 	    break;
 	  }
 	}
-	
+
 	// Compute the derivatives.
 	deri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
-	
+
 	// Digest the forces on the nuclei
 	arma::vec f(12);
 	f.zeros();
@@ -218,7 +218,7 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 	// Digest the integrals
 	for(size_t i=0;i<digest[ith].size();i++)
 	  digest[ith][i]->digest(shpairs,ip,jp,*deri,f);
-	
+
 	// Increment forces
 #ifdef _OPENMP
 	Fwrk.subvec(3*inuc,3*inuc+2)+=f.subvec(0,2);
@@ -270,12 +270,12 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
   arma::mat J(((JDigestor *) p[0][0])->get_J());
   for(int i=1;i<nth;i++)
     J+=((JDigestor *) p[i][0])->get_J();
-  
+
   // Free memory
   for(size_t i=0;i<p.size();i++)
     for(size_t j=0;j<p[i].size();j++)
       delete p[i][j];
-  
+
   return J;
 }
 
@@ -308,7 +308,7 @@ arma::mat ERIscreen::calcK(const arma::mat & P, double tol) const {
   for(size_t i=0;i<p.size();i++)
     for(size_t j=0;j<p[i].size();j++)
       delete p[i][j];
-  
+
   return K;
 }
 
@@ -341,7 +341,7 @@ arma::cx_mat ERIscreen::calcK(const arma::cx_mat & P, double tol) const {
   for(size_t i=0;i<p.size();i++)
     for(size_t j=0;j<p[i].size();j++)
       delete p[i][j];
-  
+
   return K;
 }
 
@@ -570,7 +570,7 @@ std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P,
 
   bool doj(jfrac!=0.0);
   bool dok(kfrac!=0.0);
-  
+
   // Get workers
   std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
@@ -609,12 +609,12 @@ std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P,
 	JK[j]-=kfrac*((cxKDigestor *) p[i][j+joff])->get_K();
     joff+=P.size();
   }
-  
+
   // Free memory
   for(size_t i=0;i<p.size();i++)
     for(size_t j=0;j<p[i].size();j++)
       delete p[i][j];
-  
+
   return JK;
 }
 

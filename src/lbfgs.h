@@ -26,12 +26,12 @@ class LBFGS {
  protected:
   /// Maximum number of matrices
   size_t nmax;
-  
+
   /// Coordinates x_k
   std::vector<arma::vec> xk;
   /// Gradients g_k
   std::vector<arma::vec> gk;
-  
+
   /// Apply diagonal Hessian: r = H_0 q
   virtual arma::vec apply_diagonal_hessian(const arma::vec & q) const;
 

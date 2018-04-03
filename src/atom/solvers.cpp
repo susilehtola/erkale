@@ -128,7 +128,7 @@ void print_E(const arma::vec & E, int Z) {
 }
 
 
-void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence_t conv, bool direct, bool ROHF, bool verbose) {
+void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, double convthr, bool direct, bool ROHF, bool verbose) {
   // Amount of basis function
   size_t Nbf=basis.size();
 
@@ -176,7 +176,9 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
   const double diisthr=0.01;
   bool useadiis=true;
   const int diisorder=10;
+
   uDIIS diis(S,Sinvh,usediis,diis_c1,diiseps,diisthr,useadiis,diisorder,verbose);
+  double diiserr;
 
   arma::mat oldHa, oldHb;
   sol.Ha.zeros();
@@ -231,11 +233,10 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     //    printf("Exc=%e, Ekin=%e, Enuc=%e, Ecoul=%e\n",Exc,Ekin,Enuc,Ecoul);
 
     // Update DIIS stacks
-    double diiserr;
     diis.update(sol.Ha,sol.Hb,sol.Pa,sol.Pb,sol.en.E,diiserr);
     // and solve the updated matrices
     diis.solve_F(sol.Ha,sol.Hb);
-    
+
     // Solve new orbitals
     diagonalize(S,Sinvh,sol);
 
@@ -250,26 +251,16 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence
     Pmax=max_abs(sol.P-Pold);
     Prms=rms_norm(sol.P-Pold);
 
-    char econv='*';
-    char pmax='*';
-    char prms='*';
-    if(fabs(sol.en.E-oldE)>conv.deltaEmax)
-      econv=' ';
-    if(Pmax>conv.deltaPmax)
-      pmax=' ';
-    if(Prms>conv.deltaPrms)
-      prms=' ';
-
     if(verbose) {
-      printf("%3i\t%.12f\t%e%c\t%e%c\t%e%c (%s)\n",(int) iiter,sol.en.E,sol.en.E-oldE,econv,Pmax,pmax,Prms,prms,t.elapsed().c_str());
+      printf("%3i\t%.12f\t%e\t%e\t%e (%s)\n",(int) iiter,sol.en.E,sol.en.E-oldE,Pmax,Prms,t.elapsed().c_str());
       fflush(stdout);
     }
-  } while(fabs(sol.en.E-oldE)>conv.deltaEmax || Pmax>conv.deltaPmax || Prms>conv.deltaPrms);
+  } while(diiserr>=convthr);
 
   if(verbose) print_E(sol.Ea,sol.Eb,Z);
 }
 
-void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence_t conv, bool direct, bool verbose) {
+void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, double convthr, bool direct, bool verbose) {
   // Amount of basis functions
   size_t Nbf=basis.size();
 
@@ -316,6 +307,7 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
   bool useadiis=true;
   const int diisorder=10;
   rDIIS diis(S,Sinvh,usediis,diis_c1,diiseps,diisthr,useadiis,diisorder,verbose);
+  double diiserr;
 
   arma::mat oldH;
   sol.H.zeros(Nbf,Nbf);
@@ -359,11 +351,10 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     //    printf("Exc=%e, Ekin=%e, Enuc=%e, Ecoul=%e\n",Exc,Ekin,Enuc,Ecoul);
 
     // Update DIIS stacks
-    double diiserr;
     diis.update(sol.H,sol.P,sol.en.E,diiserr);
     // and solve for the new matrices
     diis.solve_F(sol.H);
-    
+
     // Solve new orbitals
     diagonalize(S,Sinvh,sol);
 
@@ -375,21 +366,11 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence
     Pmax=max_abs(sol.P-Pold);
     Prms=rms_norm(sol.P-Pold);
 
-    char econv='*';
-    char pmax='*';
-    char prms='*';
-    if(fabs(sol.en.E-oldE)>conv.deltaEmax)
-      econv=' ';
-    if(Pmax>conv.deltaPmax)
-      pmax=' ';
-    if(Prms>conv.deltaPrms)
-      prms=' ';
-
     if(verbose) {
-      printf("%3i\t%.12f\t%e%c\t%e%c\t%e%c (%s)\n",(int) iiter,sol.en.E,sol.en.E-oldE,econv,Pmax,pmax,Prms,prms,t.elapsed().c_str());
+      printf("%3i\t%.12f\t%e\t%e\t%e (%s)\n",(int) iiter,sol.en.E,sol.en.E-oldE,Pmax,Prms,t.elapsed().c_str());
       fflush(stdout);
     }
-  } while(fabs(sol.en.E-oldE)>conv.deltaEmax || Pmax>conv.deltaPmax || Prms>conv.deltaPrms);
+  } while(diiserr>=convthr);
 
   if(verbose) print_E(sol.E,Z);
 }

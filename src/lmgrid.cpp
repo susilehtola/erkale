@@ -305,7 +305,7 @@ real_expansion_t expand_orbitals_real(const arma::mat & C, const BasisSet & bas,
 
 	  for(size_t ip=0;ip<grid.size();ip++)
 	    res+=grid[ip].w*Ylm[ip][lmind(l2,m2)]*Ylm[ip][lmind(l1,m1)];
-	  
+
 	  if( (l1==l2) && (m1==m2) )
 	    res-=1.0;
 
@@ -390,11 +390,11 @@ arma::mat weight_decomposition(const real_expansion_t & exp, bool total) {
         for(size_t irad=0;irad<exp.grid.size();irad++)
           angtype(m+l)+=std::pow(exp.clm[io][lmind(l,m)][irad],2)*exp.grid[irad].w;
       }
-      
+
       // l weight
       ret(io,l)=arma::sum(angtype);
     }
-    
+
     // Norm
     if(total)
       ret(io,lmax+1)=arma::sum(ret.row(io).subvec(0,lmax));
@@ -450,11 +450,11 @@ arma::mat weight_decomposition(const expansion_t & exp, bool total) {
         for(size_t irad=0;irad<exp.grid.size();irad++)
           angtype(m+l)+=std::norm(exp.clm[io][lmind(l,m)][irad])*exp.grid[irad].w;
       }
-      
+
       // l weight
       ret(io,l)=arma::sum(angtype);
     }
-    
+
     // Norm
     if(total)
       ret(io,lmax+1)=arma::sum(ret.row(io).subvec(0,lmax));

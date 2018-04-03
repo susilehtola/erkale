@@ -156,7 +156,7 @@ class Checkpoint {
   void write(const std::string & name, int val);
   /// Read value
   void read(const std::string & name, int & val);
-  
+
   /// Save value
   void write(const std::string & name, hsize_t val);
   /// Read value

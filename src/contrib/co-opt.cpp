@@ -132,7 +132,7 @@ arma::vec maxwidth_exps_table(int am, double tol, size_t nexp, double & width, i
     opt[am].tol=tol;
     opt[am].exps=maxwidth_exps(am,tol,nexp,opt[am].w,n);
   }
-  
+
   width=opt[am].w;
 
   if(opt[am].exps.size() != nexp) {
@@ -149,7 +149,7 @@ arma::vec span_width(int am, double tol, double & width, int nx, int n) {
   if(nx<0)
     nx=0;
 
-  // Determine necessary amount of exponents                                                                                                                                                                 
+  // Determine necessary amount of exponents
   arma::vec exps;
   double w=0.0;
 

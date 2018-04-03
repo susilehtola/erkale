@@ -49,7 +49,7 @@ arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t & p) {
   size_t nside=p.neven + p.nfull;
   arma::vec A(nside);
   A.zeros();
-  
+
   // Plug in the even-tempered exponents
   if(p.neven) {
     double lge=gsl_vector_get(xv,0);
@@ -64,11 +64,11 @@ arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t & p) {
     for(size_t i=1;i < p.neven;i++)
       A(i)=A(0)+i*lge;
   }
-  
+
   // x index offset
   size_t xoff = p.neven ? 1 : 0;
   size_t eoff = p.neven;
-  
+
   // Fully optimized exponents
   if(p.nfull) {
     if(p.neven)
@@ -76,7 +76,7 @@ arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t & p) {
       A(eoff)=gsl_vector_get(xv,xoff)+A(p.neven-1);
     else
       A(0)=gsl_vector_get(xv,xoff);
-    
+
     // Other exponents
     for(size_t i=1;i < p.nfull;i++) {
       A(i+eoff)=gsl_vector_get(xv,i+xoff)+A(i+eoff-1);
@@ -110,12 +110,12 @@ arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t & p) {
   if(p.odd) {
     exps(A.n_elem)=1.0;
     exps.subvec(A.n_elem+1,2*A.n_elem)=arma::exp10(A);
-  } else 
+  } else
     exps.subvec(A.n_elem,2*A.n_elem-1)=arma::exp10(A);
 
   //  arma::sort(arma::log10(exps)).t().print("Exponents");
   //  throw std::runtime_error("Debug");
-  
+
   return exps;
 }
 
@@ -282,9 +282,9 @@ void get_start(arma::vec exps, const completeness_scan_t & p, gsl_vector * x) {
   // Get the free parameter part
   int Np=exps.n_elem/2;
   exps=exps.subvec(exps.n_elem-Np,exps.n_elem-1);
-  
+
   //  exps.t().print("Free parameter part");
-    
+
   if(p.neven) {
     // Even-tempered parameter
     gsl_vector_set(x,0,exps(1)-exps(0));
@@ -363,7 +363,7 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
     double size;
 
     // Starting point exponents
-    arma::vec sp;   
+    arma::vec sp;
     /*    if(nfull>2) {
       // Run optimization with one free exponent
       double m;
@@ -522,7 +522,7 @@ arma::vec optimize_completeness_cg(int am, double min, double max, int Nf, int n
     int status;
 
     // Starting point
-    arma::vec sp;   
+    arma::vec sp;
     /*    if(nfull>2) {
       // Run optimization with one free exponent
       double m;
@@ -597,10 +597,10 @@ arma::vec optimize_completeness_cg(int am, double min, double max, int Nf, int n
       }
     while (status == GSL_CONTINUE && iter < maxiter);
 
-    
+
     //if (status != GSL_SUCCESS)
     //    printf ("encountered error \"%s\"\n",gsl_strerror(status));
-    
+
 
     // Save mog
     if(mog!=NULL)

@@ -139,7 +139,7 @@ class Bader {
   arma::vec regional_charges(const BasisSet & basis, const arma::mat & P) const;
   /// Get nuclear charges
   arma::vec nuclear_charges(const BasisSet & basis, const arma::mat & P) const;
-  
+
   /// Compute Bader regional overlap matrices
   std::vector<arma::mat> regional_overlap(const BasisSet & basis) const;
 };

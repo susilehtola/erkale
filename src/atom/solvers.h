@@ -20,7 +20,7 @@
 #include "integrals.h"
 #include "../scf.h"
 
-void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, const convergence_t conv, bool direct=false, bool verbose=true);
-void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, const convergence_t conv, bool direct=false, bool ROHF=false, bool verbose=true);
+void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, double convthr, bool direct=false, bool verbose=true);
+void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, double convthr, bool direct=false, bool ROHF=false, bool verbose=true);
 
 #endif

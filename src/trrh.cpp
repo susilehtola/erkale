@@ -203,11 +203,11 @@ template<typename T> void TRRH_update_wrk(const arma::Mat<T> & F_AO, const arma:
   bool refine=false;
   double lmu=0.0;
   double rmu=0.0;
-  
+
   while(true) {
     iit++;
     Timer t;
-    
+
     // Value of mu is
     if(!refine)
       mu*=fac;

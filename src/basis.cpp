@@ -1278,13 +1278,15 @@ arma::vec GaussianShell::integral() const {
 
 
 BasisSet::BasisSet() {
-  // Use spherical harmonics by default.
+  // Use spherical harmonics and cartesian functions by default.
   uselm=true;
+  optlm=true;
 }
 
 BasisSet::BasisSet(size_t Nat, const Settings & set) {
   // Use spherical harmonics?
   uselm=set.get_bool("UseLM");
+  optlm=set.get_bool("OptLM");
 
   shells.reserve(Nat);
   nuclei.reserve(Nat);
@@ -1339,7 +1341,7 @@ void BasisSet::add_shells(size_t nucind, ElementBasisSet el, bool dosort) {
   for(size_t i=0;i<bf.size();i++) {
     // Create shell
     GaussianShell sh;
-    if(bf[i].get_am()>=2)
+    if(!optlm || bf[i].get_am()>=2)
       sh=GaussianShell(bf[i].get_am(),uselm,bf[i].get_contr());
     else
       sh=GaussianShell(bf[i].get_am(),false,bf[i].get_contr());
@@ -1692,6 +1694,24 @@ void BasisSet::set_lm(size_t num, bool lm) {
   shells[num].set_lm(lm);
   // Check numbering of basis functions which may have changed
   check_numbering();
+}
+
+arma::ivec BasisSet::get_m_values() const {
+  arma::ivec ret(get_Nbf());
+  for(size_t is=0;is<get_Nshells();is++) {
+    // Angular momentum is
+    int am(get_am(is));
+    if(!lm_in_use(is))
+      throw std::logic_error("Set OptLM = false for dimer calculations!\n");
+
+    // First function on shell
+    size_t i0(get_first_ind(is));
+
+    // Functions are -m, -m+1, ..., m-1, m
+    ret.subvec(i0,i0+2*am)=arma::linspace<arma::ivec>(-am,am,2*am+1);
+  }
+
+  return ret;
 }
 
 arma::mat BasisSet::get_trans(size_t ind) const {

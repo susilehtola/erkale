@@ -39,7 +39,7 @@ std::vector<atom_t> load_xyz(std::string filename) {
     if(stricmp(words[0],"#ZMATRIX")==0)
       return load_zmat(filename);
   }
-  
+
   // Input file
   std::ifstream in(filename.c_str());
   // Returned array
@@ -104,7 +104,7 @@ std::vector<atom_t> load_xyz(std::string filename) {
       } else
 	// Given as symbol
 	tmp.el=words[0];
-      
+
       tmp.num=i; // Number of atom
       tmp.x=readdouble(words[1])*ANGSTROMINBOHR;
       tmp.y=readdouble(words[2])*ANGSTROMINBOHR;

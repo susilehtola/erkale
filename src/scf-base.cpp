@@ -77,6 +77,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // Parse guess
   guess=parse_guess(set.get_string("Guess"));
 
+  // Dimer calculation?
+  dimcalc=set.get_bool("DimerSymmetry");
+
   usediis=set.get_bool("UseDIIS");
   diis_c1=set.get_bool("C1-DIIS");
   diisorder=set.get_int("DIISOrder");
@@ -893,7 +896,7 @@ void SCF::core_guess(rscf_t & sol) const {
   // Get core Hamiltonian
   sol.H=Hcore;
   // and diagonalize it to get the orbitals
-  diagonalize(S,Sinvh,sol);
+  diagonalize(sol);
 }
 
 void SCF::core_guess(uscf_t & sol) const {
@@ -901,7 +904,7 @@ void SCF::core_guess(uscf_t & sol) const {
   sol.Ha=Hcore;
   sol.Hb=Hcore;
   // and diagonalize it to get the orbitals
-  diagonalize(S,Sinvh,sol);
+  diagonalize(sol);
 }
 
 void SCF::gwh_guess(rscf_t & sol) const {
@@ -914,7 +917,7 @@ void SCF::gwh_guess(rscf_t & sol) const {
       sol.H(j,i)=sol.H(i,j);
     }
   }
-  diagonalize(S,Sinvh,sol);
+  diagonalize(sol);
 }
 
 void SCF::gwh_guess(uscf_t & sol) const {
@@ -928,7 +931,7 @@ void SCF::gwh_guess(uscf_t & sol) const {
     }
   }
   sol.Hb=sol.Ha;
-  diagonalize(S,Sinvh,sol);
+  diagonalize(sol);
 }
 
 arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0) const {
@@ -1060,6 +1063,133 @@ template<typename T> void diagonalize_wrk(const arma::mat & S, const arma::mat &
   if(shift!=0.0) {
     // Orbital energies occupied by shift, so recompute these
     E=arma::real(arma::diagvec(arma::trans(C)*H*C));
+  }
+}
+
+static arma::mat block_m(const arma::mat & F, const arma::ivec & mv) {
+  arma::mat Fnew(F);
+  Fnew.zeros();
+  for(arma::sword m=0;m<=mv.max();m++) {
+    if(m==0) {
+      // Indices are
+      arma::uvec idx(arma::find(mv==m));
+      Fnew(idx,idx)=F(idx,idx);
+    } else {
+      // Indices for plus and minus values are
+      arma::uvec pidx(arma::find(mv==m));
+      arma::uvec nidx(arma::find(mv==-m));
+
+      // m=m and m=-m are equivalent
+      Fnew(pidx,pidx)=0.5*(F(pidx,pidx)+F(nidx,nidx));
+      Fnew(nidx,nidx)=Fnew(pidx,pidx);
+    }
+  }
+
+  return Fnew;
+}
+
+static arma::mat m_norm(const arma::mat & C, const arma::ivec & mv) {
+  arma::mat osym(mv.max()-mv.min()+1,C.n_cols);
+  for(arma::sword m=mv.min();m<=mv.max();m++) {
+    arma::uvec idx(arma::find(mv==m));
+    for(size_t io=0;io<C.n_cols;io++) {
+      arma::vec cv(C.col(io));
+      osym(m-mv.min(),io)=arma::norm(cv(idx),"fro");
+    }
+  }
+
+  return osym;
+}
+
+static std::vector<std::string> m_classify(const arma::mat & C, const arma::ivec & mv) {
+  // Orbital class
+  std::vector<std::string> oclass(C.n_cols);
+
+  // Get symmetries
+  arma::mat osym(m_norm(C,mv));
+
+  //osym.print("Orbital symmetry");
+
+  // Maximum angular momentum is
+  if(osym.n_rows%2 != 1) throw std::logic_error("Invalid number of rows!\n");
+  int maxam((osym.n_rows-1)/2);
+
+  for(size_t io=0;io<C.n_cols;io++) {
+    arma::vec s(osym.col(io));
+
+    // Get maximum
+    arma::uword idx;
+    s.max(idx);
+
+    // This corresponds to the m value
+    int m=idx;
+    m-=maxam;
+
+    std::ostringstream oss;
+    oss << "m=" << m;
+    oclass[io]=oss.str();
+  }
+
+  return oclass;
+}
+
+void SCF::diagonalize(rscf_t & sol, double sval) const {
+  if(!dimcalc) {
+    ::diagonalize(S,Sinvh,sol,sval);
+  } else {
+    // Check nuclei are on z axis
+    std::vector<nucleus_t> nuclei(basisp->get_nuclei());
+    for(size_t i=0;i<nuclei.size();i++)
+      if(nuclei[i].r.x!=0.0 || nuclei[i].r.y!=0.0)
+        throw std::logic_error("Nuclei must be on z axis for dimer calculation!\n");
+
+    // Collect m values
+    arma::ivec mvals(basisp->get_m_values());
+    // Clean up Fock operator
+    rscf_t sol0(sol);
+    sol.H=block_m(sol.H,mvals);
+    ::diagonalize(S,Sinvh,sol,sval);
+    sol.H=sol0.H;
+
+    if(verbose) {
+      std::vector<std::string> oclass(m_classify(sol.C,mvals));
+
+      printf("Orbital symmetries\n");
+      for(size_t io=0;io<sol.C.n_cols;io++)
+        printf("%i %4s\n",(int) io+1, oclass[io].c_str());
+    }
+  }
+}
+
+void SCF::diagonalize(uscf_t & sol, double sval) const {
+  if(!dimcalc) {
+    ::diagonalize(S,Sinvh,sol,sval);
+  } else {
+    // Check nuclei are on z axis
+    std::vector<nucleus_t> nuclei(basisp->get_nuclei());
+    for(size_t i=0;i<nuclei.size();i++)
+      if(nuclei[i].r.x!=0.0 || nuclei[i].r.y!=0.0)
+        throw std::logic_error("Nuclei must be on z axis for dimer calculation!\n");
+
+    // Collect m values
+    arma::ivec mvals(basisp->get_m_values());
+    // Clean up Fock operator
+    uscf_t sol0(sol);
+    sol.Ha=block_m(sol.Ha,mvals);
+    sol.Hb=block_m(sol.Hb,mvals);
+    ::diagonalize(S,Sinvh,sol,sval);
+    sol.Ha=sol0.Ha;
+    sol.Hb=sol0.Hb;
+
+    if(verbose) {
+      std::vector<std::string> aclass(m_classify(sol.Ca,mvals));
+      std::vector<std::string> bclass(m_classify(sol.Cb,mvals));
+
+      printf("Orbital symmetries\n");
+      for(size_t io=0;io<sol.Ca.n_cols;io++)
+        printf("%i %4s %4s\n",(int) io+1, aclass[io].c_str(), bclass[io].c_str());
+    }
+
   }
 }
 
@@ -1701,16 +1831,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
 
   // Final convergence settings
-  convergence_t conv;
-  conv.deltaEmax=set.get_double("DeltaEmax");
-  conv.deltaPmax=set.get_double("DeltaPmax");
-  conv.deltaPrms=set.get_double("DeltaPrms");
+  double convthr(set.get_double("ConvThr"));
 
   // Get exchange and correlation functionals
   dft_t dft;
   dft_t initdft;
   // Initial convergence settings
-  convergence_t initconv(conv);
+  double initconvthr(convthr);
 
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
@@ -1718,9 +1845,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     initdft=parse_dft(set,true);
     dft=parse_dft(set,false);
 
-    initconv.deltaEmax*=set.get_double("DFTDelta");
-    initconv.deltaPmax*=set.get_double("DFTDelta");
-    initconv.deltaPrms*=set.get_double("DFTDelta");
+    initconvthr*=set.get_double("DFTDelta");
   }
 
   // Check consistency of parameters
@@ -1868,16 +1993,16 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  solver.set_maxiter(0);
 
 	  if(hf || rohf)
-	    solver.RHF(sol,goccs,conv);
+	    solver.RHF(sol,goccs,convthr);
 	  else {
 	    dft_t nonl(dft);
 	    nonl.nl=false;
-	    solver.RDFT(sol,goccs,conv,nonl);
+	    solver.RDFT(sol,goccs,convthr,nonl);
 	  }
 	  solver.set_maxiter(maxiter);
 
 	  // Do the diagonalization
-	  diagonalize(solver.get_S(),solver.get_Sinvh(),sol,0.0);
+	  solver.diagonalize(sol,0.0);
 	}
       }
     }
@@ -1886,7 +2011,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     if(hf || rohf) {
       // Solve restricted Hartree-Fock
       solver.do_force(force);
-      solver.RHF(sol,occs,conv);
+      solver.RHF(sol,occs,convthr);
     } else {
       // Print information about used functionals
       if(verbose) {
@@ -1920,7 +2045,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve restricted DFT problem first on a rough grid
-	  solver.RDFT(sol,occs,initconv,initdft);
+	  solver.RDFT(sol,occs,initconvthr,initdft);
 
 	  if(verbose) {
 	    fprintf(stderr,"\n");
@@ -1930,7 +2055,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
 	// ... and then on the more accurate grid
 	solver.do_force(force);
-	solver.RDFT(sol,occs,conv,dft);
+	solver.RDFT(sol,occs,convthr,dft);
 
 	// Write out the results
 	chkpt.write("C",sol.C);
@@ -2172,16 +2297,16 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  rsol.P=sol.P;
 	  rsol.C=sol.Ca;
 	  if(hf || rohf)
-	    solver.RHF(rsol,goccs,conv);
+	    solver.RHF(rsol,goccs,convthr);
 	  else {
 	    dft_t nonl(dft);
 	    nonl.nl=false;
-	    solver.RDFT(rsol,goccs,conv,nonl);
+	    solver.RDFT(rsol,goccs,convthr,nonl);
 	  }
 	  solver.set_maxiter(maxiter);
 
 	  // Do the diagonalization
-	  diagonalize(solver.get_S(),solver.get_Sinvh(),rsol,0.0);
+	  solver.diagonalize(rsol,0.0);
 	  sol.Ca=sol.Cb=rsol.C;
 	}
       }
@@ -2194,12 +2319,12 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     if(hf) {
       // Solve restricted Hartree-Fock
       solver.do_force(force);
-      solver.UHF(sol,occa,occb,conv);
+      solver.UHF(sol,occa,occb,convthr);
     } else if(rohf) {
       // Solve restricted open-shell Hartree-Fock
 
       // Solve ROHF
-      solver.ROHF(sol,occa,occb,conv);
+      solver.ROHF(sol,occa,occb,convthr);
 
       // Set occupancies right
       get_unrestricted_occupancy(set,basis,occa,occb);
@@ -2236,7 +2361,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
 	  // Solve unrestricted DFT problem first on a rough grid
-	  solver.UDFT(sol,occa,occb,initconv,initdft);
+	  solver.UDFT(sol,occa,occb,initconvthr,initdft);
 
 	  if(verbose) {
 	    fprintf(stderr,"\n");
@@ -2245,7 +2370,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	}
 	// ... and then on the more accurate grid
 	solver.do_force(force);
-	solver.UDFT(sol,occa,occb,conv,dft);
+	solver.UDFT(sol,occa,occb,convthr,dft);
 
 	// and update checkpoint file entries
 	chkpt.write("Ca",sol.Ca);

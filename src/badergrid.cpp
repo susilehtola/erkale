@@ -40,7 +40,7 @@
 
 BaderGrid::BaderGrid() {
 }
-  
+
 BaderGrid::~BaderGrid() {
 }
 
@@ -58,11 +58,11 @@ void BaderGrid::set(const BasisSet & basis, bool ver, bool lobatto) {
 void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
-  
+
   Timer t;
 
   size_t nd=0, ng=0;
-  
+
   // Form radial shells
   std::vector<angshell_t> grids;
   for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
@@ -70,7 +70,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
     sh.atind=iat;
     sh.cen=basp->get_nuclear_coords(iat);
     sh.tol=otoler*PRUNETHR;
-    
+
     // Compute necessary number of radial points for atom
     size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
 
@@ -79,7 +79,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
     radial_chebyshev_jac(nr,rad,wrad);
     nr=rad.size(); // Sanity check
     nrad[iat]=nr;
-    
+
     // Loop over radii
     for(size_t irad=0;irad<nr;irad++) {
       sh.R=rad[irad];
@@ -101,12 +101,12 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
       std::vector<gridpoint_t> ghlp;
       reggrid.push_back(ghlp);
     }
-  }  
+  }
   Nnuc=maxima.size();
 
   // Block inside classification?
   std::vector<bool> block(maxima.size(),false);
-  
+
   // Index of last treated atom
   size_t oldatom=-1;
   for(size_t ig=0;ig<grids.size();ig++) {
@@ -115,7 +115,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
     grids[ig]=wrk.construct_becke(otoler/nrad[grids[ig].atind]);
     // Form the grid again
     wrk.form_grid();
-    
+
     // Extract the points on the shell
     std::vector<gridpoint_t> shellpoints(wrk.get_grid());
     if(!shellpoints.size())
@@ -125,7 +125,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
     bool inside=false;
     if(grids[ig].R<=TRUSTRAD && !(basp->get_nucleus(grids[ig].atind).bsse))
       inside=true;
-    
+
     else if(!block[grids[ig].atind] && oldatom==grids[ig].atind) {
       // Compute projection of density gradient of points on shell
       arma::vec proj(shellpoints.size());
@@ -138,7 +138,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
 	double d;
 	arma::vec g;
 	compute_density_gradient(P,*basp,shellpoints[ip].r,d,g);
-	
+
 	// Vector pointing to nucleus
 	coords_t dRc=nuccoord-shellpoints[ip].r;
 	arma::vec dR(3);
@@ -150,21 +150,21 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
       }
       // Increment amount of gradient evaluations
       ng+=shellpoints.size();
-      
+
       // Check if all points are inside
       const double cthcrit=cos(M_PI/4.0);
       inside=(arma::min(proj) >= cthcrit);
     }
-    
+
     // If we are not inside, we need to run a point by point classification.
     if(!inside) {
       Timer tc;
-      
+
       // Reset the trust atom
       oldatom=-1;
       // and the current atom
-      block[grids[ig].atind]=true;	
-      
+      block[grids[ig].atind]=true;
+
       // Loop over points
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -174,7 +174,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
 	  // Zero density - skip point
 	  continue;
 	}
-	
+
 	// Track the density to its maximum
 	coords_t r=track_to_maximum(*basp,P,shellpoints[ip].r,nd,ng);
 
@@ -190,7 +190,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
 	      reggrid[im].push_back(shellpoints[ip]);
 	      break;
 	    }
-	  
+
 	  // Maximum was not found, add it to the list
 	  if(!found) {
 	    maxima.push_back(r);
@@ -203,7 +203,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
 
       // Continue with the next radial shell
       continue;
-	
+
     } else {
       // If we are here, then all points belong to this nuclear maximum
       oldatom=grids[ig].atind;
@@ -211,7 +211,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
     }
   }
 
-  
+
   if(verbose) {
     printf("Bader grid constructed in %s, taking %i density and %i gradient evaluations.\n",t.elapsed().c_str(),(int) nd, (int) ng);
     print_maxima();
@@ -222,7 +222,7 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
     // Amount of function values
     arma::uvec nf(basp->get_Nnuc());
     nf.zeros();
-    
+
     for(size_t i=0;i<grids.size();i++) {
       np(grids[i].atind)+=grids[i].np;
       nf(grids[i].atind)+=grids[i].nfunc;
@@ -240,9 +240,9 @@ void BaderGrid::construct_bader(const arma::mat & P, double otoler) {
 void BaderGrid::construct_voronoi(double otoler) {
   // Amount of radial shells on the atoms
   std::vector<size_t> nrad(basp->get_Nnuc());
-  
+
   Timer t;
-  
+
   // Form radial shells
   std::vector<angshell_t> grids;
   for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
@@ -250,16 +250,16 @@ void BaderGrid::construct_voronoi(double otoler) {
     sh.atind=iat;
     sh.cen=basp->get_nuclear_coords(iat);
     sh.tol=otoler*PRUNETHR;
-    
+
     // Compute necessary number of radial points for atom
     size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
-    
+
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
     radial_chebyshev_jac(nr,rad,wrad);
     nr=rad.size(); // Sanity check
     nrad[iat]=nr;
-    
+
     // Loop over radii
     for(size_t irad=0;irad<nr;irad++) {
       sh.R=rad[irad];
@@ -283,14 +283,14 @@ void BaderGrid::construct_voronoi(double otoler) {
     }
   }
   Nnuc=maxima.size();
-  
+
   for(size_t ig=0;ig<grids.size();ig++) {
     // Construct the shell
     wrk.set_grid(grids[ig]);
     grids[ig]=wrk.construct_becke(otoler/nrad[grids[ig].atind]);
     // Form the grid again
     wrk.form_grid();
-    
+
     // Extract the points on the shell
     std::vector<gridpoint_t> shellpoints(wrk.get_grid());
 
@@ -302,7 +302,7 @@ void BaderGrid::construct_voronoi(double otoler) {
 	dist(ia)=normsq(shellpoints[ip].r-maxima[ia]);
       // Region is
       arma::uword idx;
-      dist.min(idx);    
+      dist.min(idx);
       // Assign point to atom
       reggrid[idx].push_back(shellpoints[ip]);
     }
@@ -316,7 +316,7 @@ void BaderGrid::construct_voronoi(double otoler) {
     // Amount of function values
     arma::uvec nf(basp->get_Nnuc());
     nf.zeros();
-    
+
     for(size_t i=0;i<grids.size();i++) {
       np(grids[i].atind)+=grids[i].np;
       nf(grids[i].atind)+=grids[i].nfunc;
@@ -353,7 +353,7 @@ void BaderGrid::print_maxima() const {
     if(!nuc)
       nonnuc.push_back(maxima[i]);
   }
-  
+
   printf("Found %i nuclear maxima.\n",(int) nuclear.size());
   for(size_t i=0;i<nuclear.size();i++)
     printf("%4i %4i %-2s % f % f % f\n",(int) i+1,(int) nuci[i]+1,basp->get_symbol(nuci[i]).c_str(),nuclear[i].x,nuclear[i].y,nuclear[i].z);
@@ -379,7 +379,7 @@ arma::mat BaderGrid::regional_overlap(size_t ireg) {
     // Basis function values are
     bf.col(ip)=basp->eval_func(reggrid[ireg][ip].r.x,reggrid[ireg][ip].r.y,reggrid[ireg][ip].r.z);
   }
-  
+
   // Overlap matrix is
   arma::mat Sreg(basp->get_Nbf(),basp->get_Nbf());
   Sreg.zeros();
@@ -432,30 +432,30 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
   // Amount of density and gradient evaluations
   size_t ndens=0;
   size_t ngrad=0;
-  
+
   // Nuclear coordinates
   arma::mat nuccoord=basis.get_nuclear_coords();
-    
+
   // Initial step size to use
   const double steplen=0.1;
   double dr(steplen);
   // Maximum amount of steps to take in line search
   const size_t nline=5;
-    
+
   // Density and gradient
   double d;
   arma::vec g;
-    
+
   while(true) {
     // Iteration number
     iiter++;
-      
+
     // Compute density and gradient
     compute_density_gradient(P,basis,r,d,g);
     double gnorm=arma::norm(g,2);
     fflush(stdout);
     ndens++; ngrad++;
-     
+
     // Normalize gradient and perform line search
     coords_t gn;
     gn.x=g(0)/gnorm;
@@ -499,10 +499,10 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
       dens.push_back(compute_density(P,basis,pt));
       ndens++;
 
-#ifdef BADERDEBUG	
+#ifdef BADERDEBUG
       printf("Step length %e: % f % f % f, density %e, difference %e\n",len[len.size()-1],pt.x,pt.y,pt.z,dens[dens.size()-1],dens[dens.size()-1]-dens[0]);
 #endif
-	
+
     } while(dens[dens.size()-1]>dens[dens.size()-2] && dens.size()<nline);
 
     // Optimal line length
@@ -514,12 +514,12 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
     else {
       // Interpolate
       arma::vec ilen(3), idens(3);
-      
+
       if(dens.size()==2) {
 	ilen(0)=len[len.size()-2];
 	ilen(2)=len[len.size()-1];
 	ilen(1)=(ilen(0)+ilen(2))/2.0;
-	
+
 	idens(0)=dens[dens.size()-2];
 	idens(2)=dens[dens.size()-1];
 	idens(1)=compute_density(P,basis,r+gn*ilen(1));
@@ -528,23 +528,23 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
 	ilen(0)=len[len.size()-3];
 	ilen(1)=len[len.size()-2];
 	ilen(2)=len[len.size()-1];
-	
+
 	idens(0)=dens[dens.size()-3];
 	idens(1)=dens[dens.size()-2];
 	idens(2)=dens[dens.size()-1];
       }
-      
-#ifdef BADERDEBUG	
+
+#ifdef BADERDEBUG
       arma::trans(ilen).print("Step lengths");
       arma::trans(idens).print("Densities");
 #endif
-      
+
       // Fit polynomial
       arma::vec p=fit_polynomial(ilen,idens);
-      
+
       // and solve for the roots of its derivative
       arma::vec roots=solve_roots(derivative_coefficients(p));
-      
+
       // The optimal step length is
       for(size_t i=0;i<roots.n_elem;i++)
 	if(roots(i)>=ilen(0) && roots(i)<=ilen(2)) {
@@ -553,7 +553,7 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
 	}
     }
 
-#ifdef BADERDEBUG      
+#ifdef BADERDEBUG
     printf("Optimal step length is %e.\n",optlen);
 #endif
 
@@ -576,7 +576,7 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
     } else if(optlen<=CONVTHR)
       // Converged
       break;
-      
+
     // Update point
     r=r+gn*optlen;
   }
@@ -586,7 +586,7 @@ coords_t track_to_maximum(const BasisSet & basis, const arma::mat & P, const coo
 
 #ifdef BADERDEBUG
   printf("Point % .3f % .3f %.3f tracked to maximum at % .3f % .3f % .3f with %s density evaluations.\n",r0.x,r0.y,r0.z,r.x,r.y,r.z,space_number(ndens).c_str());
-#endif  
-  
+#endif
+
   return r;
 }

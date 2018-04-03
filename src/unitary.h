@@ -69,7 +69,7 @@ class UnitaryFunction {
   int q;
   /// Maximization or minimization?
   int sign;
-  
+
  public:
   /// Constructor
   UnitaryFunction(int q, bool max);
@@ -152,7 +152,7 @@ class UnitaryOptimizer {
   virtual void print_time(const Timer & t) const;
   /// Print chosen step length
   virtual void print_step(enum unitmethod & met, double step) const;
-  
+
   /// Check that the programmed cost function and its derivative are OK
   void check_derivative(const UnitaryFunction *f);
   /// Classify matrix

@@ -7,7 +7,7 @@ int main(int argc, char **argv) {
     printf("Usage: %s checkpoint\n",argv[0]);
     return 1;
   }
-  
+
   // Initialize libint
   init_libint_base();
 
@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 
   // Get shells in basis set
   std::vector<GaussianShell> shells(basis.get_shells());
-  
+
   // Loop over shells
 #ifdef _OPENMP
 #pragma omp parallel
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
 			printf(" % e",libint[j]);
 		      printf("\n");
 		      fflush(stdout);
-		      
+
 		      throw std::runtime_error("Integrals are wrong.\n");
 		    }
 		  }
@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
       }
     }
   }
-  
+
   return 0;
 }
 

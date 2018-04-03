@@ -59,7 +59,7 @@ arma::mat form_S(const std::vector<double> & expns, int l) {
 
 arma::vec solve_coefficients(const arma::mat & S, const arma::vec & P) {
   //  return inv(S)*P;
-  
+
   arma::vec c;
   bool ok=arma::solve(c,S,P);
   if(!ok) {

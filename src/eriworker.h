@@ -66,7 +66,7 @@ class IntegralWorker {
 
   /// Compute the integral kernel
   virtual void compute_G(double rho, double T, int nmax);
-  
+
   /// Reorder integrals
   void reorder(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls, bool swap_ij, bool swap_kl, bool swap_ijkl);
 
