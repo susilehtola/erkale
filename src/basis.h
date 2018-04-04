@@ -688,4 +688,11 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
 /// Same, but using complex coefficients
 arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, bool verbose=true, std::string minbas="MINAO.gbs");
 
+/// Block matrix by m value
+arma::mat block_m(const arma::mat & F, const arma::ivec & mv);
+/// Get norm by m value block
+arma::mat m_norm(const arma::mat & C, const arma::ivec & mv);
+/// Classify by m value
+arma::ivec m_classify(const arma::mat & C, const arma::ivec & mv);
+
 #endif

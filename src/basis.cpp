@@ -3886,3 +3886,68 @@ arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::
   // and orthonormalize them
   return orthonormalize(S1,A);
 }
+
+arma::mat block_m(const arma::mat & F, const arma::ivec & mv) {
+  arma::mat Fnew(F);
+  Fnew.zeros();
+  for(arma::sword m=0;m<=mv.max();m++) {
+    if(m==0) {
+      // Indices are
+      arma::uvec idx(arma::find(mv==m));
+      Fnew(idx,idx)=F(idx,idx);
+    } else {
+      // Indices for plus and minus values are
+      arma::uvec pidx(arma::find(mv==m));
+      arma::uvec nidx(arma::find(mv==-m));
+
+      // m=m and m=-m are equivalent
+      Fnew(pidx,pidx)=0.5*(F(pidx,pidx)+F(nidx,nidx));
+      Fnew(nidx,nidx)=Fnew(pidx,pidx);
+    }
+  }
+
+  return Fnew;
+}
+
+arma::mat m_norm(const arma::mat & C, const arma::ivec & mv) {
+  arma::mat osym(mv.max()-mv.min()+1,C.n_cols);
+  for(arma::sword m=mv.min();m<=mv.max();m++) {
+    arma::uvec idx(arma::find(mv==m));
+    for(size_t io=0;io<C.n_cols;io++) {
+      arma::vec cv(C.col(io));
+      osym(m-mv.min(),io)=arma::norm(cv(idx),"fro");
+    }
+  }
+
+  return osym;
+}
+
+arma::ivec m_classify(const arma::mat & C, const arma::ivec & mv) {
+  // Orbital class
+  arma::ivec oclass(C.n_cols);
+
+  // Get symmetries
+  arma::mat osym(m_norm(C,mv));
+
+  //osym.print("Orbital symmetry");
+
+  // Maximum angular momentum is
+  if(osym.n_rows%2 != 1) throw std::logic_error("Invalid number of rows!\n");
+  int maxam((osym.n_rows-1)/2);
+
+  for(size_t io=0;io<C.n_cols;io++) {
+    arma::vec s(osym.col(io));
+
+    // Get maximum
+    arma::uword idx;
+    s.max(idx);
+
+    // This corresponds to the m value
+    int m=idx;
+    m-=maxam;
+
+    oclass(io)=m;
+  }
+
+  return oclass;
+}

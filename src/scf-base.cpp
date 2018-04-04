@@ -322,20 +322,20 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       if(direct) {
 	size_t Npairs;
 	// Form decontracted basis set and get the screening matrix
-	decbas=basis.decontract(decconv);
-
 	if(verbose) {
 	  t.set();
 	  printf("Forming ERI screening matrix ... ");
 	  fflush(stdout);
 	}
 
-	if(decfock)
+	if(decfock) {
 	  // Use decontracted basis
+          decbas=basis.decontract(decconv);
 	  Npairs=scr.fill(&decbas,intthr,verbose);
-	else
+        } else {
 	  // Use contracted basis
 	  Npairs=scr.fill(&basis,intthr,verbose);
+        }
 
 	if(verbose) {
 	  printf("done (%s)\n",t.elapsed().c_str());
@@ -1066,131 +1066,12 @@ template<typename T> void diagonalize_wrk(const arma::mat & S, const arma::mat &
   }
 }
 
-static arma::mat block_m(const arma::mat & F, const arma::ivec & mv) {
-  arma::mat Fnew(F);
-  Fnew.zeros();
-  for(arma::sword m=0;m<=mv.max();m++) {
-    if(m==0) {
-      // Indices are
-      arma::uvec idx(arma::find(mv==m));
-      Fnew(idx,idx)=F(idx,idx);
-    } else {
-      // Indices for plus and minus values are
-      arma::uvec pidx(arma::find(mv==m));
-      arma::uvec nidx(arma::find(mv==-m));
-
-      // m=m and m=-m are equivalent
-      Fnew(pidx,pidx)=0.5*(F(pidx,pidx)+F(nidx,nidx));
-      Fnew(nidx,nidx)=Fnew(pidx,pidx);
-    }
-  }
-
-  return Fnew;
-}
-
-static arma::mat m_norm(const arma::mat & C, const arma::ivec & mv) {
-  arma::mat osym(mv.max()-mv.min()+1,C.n_cols);
-  for(arma::sword m=mv.min();m<=mv.max();m++) {
-    arma::uvec idx(arma::find(mv==m));
-    for(size_t io=0;io<C.n_cols;io++) {
-      arma::vec cv(C.col(io));
-      osym(m-mv.min(),io)=arma::norm(cv(idx),"fro");
-    }
-  }
-
-  return osym;
-}
-
-static std::vector<std::string> m_classify(const arma::mat & C, const arma::ivec & mv) {
-  // Orbital class
-  std::vector<std::string> oclass(C.n_cols);
-
-  // Get symmetries
-  arma::mat osym(m_norm(C,mv));
-
-  //osym.print("Orbital symmetry");
-
-  // Maximum angular momentum is
-  if(osym.n_rows%2 != 1) throw std::logic_error("Invalid number of rows!\n");
-  int maxam((osym.n_rows-1)/2);
-
-  for(size_t io=0;io<C.n_cols;io++) {
-    arma::vec s(osym.col(io));
-
-    // Get maximum
-    arma::uword idx;
-    s.max(idx);
-
-    // This corresponds to the m value
-    int m=idx;
-    m-=maxam;
-
-    std::ostringstream oss;
-    oss << "m=" << m;
-    oclass[io]=oss.str();
-  }
-
-  return oclass;
-}
-
 void SCF::diagonalize(rscf_t & sol, double sval) const {
-  if(!dimcalc) {
-    ::diagonalize(S,Sinvh,sol,sval);
-  } else {
-    // Check nuclei are on z axis
-    std::vector<nucleus_t> nuclei(basisp->get_nuclei());
-    for(size_t i=0;i<nuclei.size();i++)
-      if(nuclei[i].r.x!=0.0 || nuclei[i].r.y!=0.0)
-        throw std::logic_error("Nuclei must be on z axis for dimer calculation!\n");
-
-    // Collect m values
-    arma::ivec mvals(basisp->get_m_values());
-    // Clean up Fock operator
-    rscf_t sol0(sol);
-    sol.H=block_m(sol.H,mvals);
-    ::diagonalize(S,Sinvh,sol,sval);
-    sol.H=sol0.H;
-
-    if(verbose) {
-      std::vector<std::string> oclass(m_classify(sol.C,mvals));
-
-      printf("Orbital symmetries\n");
-      for(size_t io=0;io<sol.C.n_cols;io++)
-        printf("%i %4s\n",(int) io+1, oclass[io].c_str());
-    }
-  }
+  ::diagonalize(S,Sinvh,sol,sval);
 }
 
 void SCF::diagonalize(uscf_t & sol, double sval) const {
-  if(!dimcalc) {
-    ::diagonalize(S,Sinvh,sol,sval);
-  } else {
-    // Check nuclei are on z axis
-    std::vector<nucleus_t> nuclei(basisp->get_nuclei());
-    for(size_t i=0;i<nuclei.size();i++)
-      if(nuclei[i].r.x!=0.0 || nuclei[i].r.y!=0.0)
-        throw std::logic_error("Nuclei must be on z axis for dimer calculation!\n");
-
-    // Collect m values
-    arma::ivec mvals(basisp->get_m_values());
-    // Clean up Fock operator
-    uscf_t sol0(sol);
-    sol.Ha=block_m(sol.Ha,mvals);
-    sol.Hb=block_m(sol.Hb,mvals);
-    ::diagonalize(S,Sinvh,sol,sval);
-    sol.Ha=sol0.Ha;
-    sol.Hb=sol0.Hb;
-
-    if(verbose) {
-      std::vector<std::string> aclass(m_classify(sol.Ca,mvals));
-      std::vector<std::string> bclass(m_classify(sol.Cb,mvals));
-
-      printf("Orbital symmetries\n");
-      for(size_t io=0;io<sol.Ca.n_cols;io++)
-        printf("%i %4s %4s\n",(int) io+1, aclass[io].c_str(), bclass[io].c_str());
-    }
-
-  }
+  ::diagonalize(S,Sinvh,sol,sval);
 }
 
 void diagonalize(const arma::mat & S, const arma::mat & Sinvh, rscf_t & sol, double shift) {
