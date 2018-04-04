@@ -72,9 +72,9 @@ template<typename T> inline void eig_sym_ordered_wrk(arma::vec & eigval, arma::M
   // Solve eigenvalues and eigenvectors
   bool ok=arma::eig_sym(eigval,eigvec,X);
   if(!ok) {
-    ERROR_INFO();
-    printf("Unable to diagonalize matrix!\n");
-    X.print("X");
+    //ERROR_INFO();
+    //printf("Unable to diagonalize matrix!\n");
+    //X.print("X");
     throw std::runtime_error("Error in eig_sym.\n");
   }
 
