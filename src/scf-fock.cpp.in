@@ -883,7 +883,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     sol.Ha.print("Ha");
     sol.Hb.print("Hb");
     fflush(stdout);
-#ifdef DEBUGPRINTOUT
+#endif
     throw std::runtime_error("Alpha Fock operator is not finite.\n");
   }
   if(!arma::is_finite(sol.Hb)) {
