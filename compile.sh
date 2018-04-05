@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2017-12-22 Susi Lehtola
+# 2018-04-05 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -90,8 +90,8 @@ export GSLVER="2.4"
 export XCVER="git"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="8.300.2"
-export CMAKEVER="3.10.1"
+export ARMAVER="8.400.0"
+export CMAKEVER="3.11.0"
 
 # HDF5 version: MAJOR.MINOR
 export HDF5MAJOR="1.10"
@@ -163,7 +163,7 @@ if(( ! ${system_hdf5} )); then
 	fi
 
 	cd ${builddir}/hdf5-${HDF5VER}/
-	./configure --enable-static --disable-shared --prefix=${topdir}/hdf5 --exec-prefix=${topdir}/hdf5 &>configure.log
+	./configure --enable-static --disable-shared --prefix=${topdir}/hdf5 --exec-prefix=${topdir}/hdf5 --enable-threadsafe --disable-hl --disable-fortran &>configure.log
 	make -j ${nprocs} VERBOSE=1 &> make.log
 	make install &> install.log
 	make clean &> clean.log
