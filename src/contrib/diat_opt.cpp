@@ -568,6 +568,8 @@ int main(int argc, char ** argv) {
   double E0;
   // Energy change
   double dE;
+  // Initialization ready?
+  bool initdone=false;
   
   // Initialize basis
   while(true) {
@@ -607,17 +609,19 @@ int main(int argc, char ** argv) {
 
     printf("Added %c function at % .6f with exponent % e, energy % .10e changed by % e. nbf = %i\n",shell_types[minam],zvals(minzi),std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs));
 
+    // Converged?
+    if(initdone)
+      break;
     // Do we have a minimal basis now?
     get_config(sys,funcs,set,Q,M);
     if(Q==set.get_int("Charge") && M==set.get_int("Multiplicity"))
-      break;
+      initdone=true;
   }
 
   // Current energy
-  printf("Calculation initialized, running now with target charge %i, multiplicity %i.\n",Q,M);
-  fflush(stdout);
   E0=get_energy(sys,funcs,set,Q,M,-1);
-  printf("Initial energy is % .16e\n\n",E0);
+  printf("Calculation initialized, initial energy is % .16e\n\n",E0);
+  fflush(stdout);
 
   while(true) {
     int nam(maxam(funcs)+2);
