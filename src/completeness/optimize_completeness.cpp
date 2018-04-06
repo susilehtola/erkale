@@ -443,7 +443,7 @@ arma::vec optimize_completeness_simplex(int am, double min, double max, int Nf, 
       *mog=pow(s->fval,1.0/n);
 
     // The optimized exponents in descending order
-    exps=arma::sort(get_exponents(s->x,pars),1);
+    exps=arma::sort(get_exponents(s->x,pars),"descend");
 
     gsl_vector_free(x);
     gsl_vector_free(ss);
@@ -607,7 +607,7 @@ arma::vec optimize_completeness_cg(int am, double min, double max, int Nf, int n
       *mog=pow(s->f,1.0/n);
 
     // The optimized exponents in descending order
-    exps=arma::sort(get_exponents(s->x,pars),1);
+    exps=arma::sort(get_exponents(s->x,pars),"descend");
 
     gsl_vector_free(x);
     gsl_multimin_fdfminimizer_free (s);
