@@ -82,8 +82,10 @@
 #define ARMA_USE_LAPACK
 #endif
 
+// Bohr in Ångström, CODATA 2014 value
+#define BOHRINANGSTROM 0.52917721067
 // Ångström in atomic units
-#define ANGSTROMINBOHR 1.8897261
+#define ANGSTROMINBOHR (1/BOHRINANGSTROM)
 // Atomic unit in eV, http://physics.nist.gov/cgi-bin/cuu/Value?threv
 #define HARTREEINEV 27.21138505
 // Atomic unit in debye, http://en.wikipedia.org/wiki/Debye
