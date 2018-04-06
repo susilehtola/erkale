@@ -184,8 +184,8 @@ void get_config(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, cons
   int Nela, Nelb;
   get_Nel_alpha_beta(Nel,M,Nela,Nelb);
 
-  // Do we have enough basis functions to describe all electrons?
-  int Nbf=nbf(funcs);
+  // Do we have enough basis functions to describe all electrons? Note next iteration will have one function more!
+  int Nbf=nbf(funcs)+1;
   if(Nbf<std::max(Nela,Nelb)) {
     // This is how many electrons we can fit in the system
     int Nocc=2*Nbf;
@@ -557,22 +557,15 @@ int main(int argc, char ** argv) {
 
   // Charge and multiplicity
   int Q, M;
-  {
-    // Dummy basis: one s function
-    std::vector<dim_bf_t> dumfuncs;
-    add_function(avals,zvals,0,0,0,dumfuncs);
-    get_config(sys,dumfuncs,set,Q,M);
-  }  
-
   // Current energy
   double E0;
   // Energy change
   double dE;
-  // Initialization ready?
-  bool initdone=false;
   
   // Initialize basis
   while(true) {
+    // Determine charge and multiplicity
+    get_config(sys,funcs,set,Q,M);
     // Form checkpoint
     printf("Running now with charge %i, multiplicity %i ",Q,M);
     fflush(stdout);
@@ -609,13 +602,9 @@ int main(int argc, char ** argv) {
 
     printf("Added %c function at % .6f with exponent % e, energy % .10e changed by % e. nbf = %i\n",shell_types[minam],zvals(minzi),std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs));
 
-    // Converged?
-    if(initdone)
-      break;
     // Do we have a minimal basis now?
-    get_config(sys,funcs,set,Q,M);
     if(Q==set.get_int("Charge") && M==set.get_int("Multiplicity"))
-      initdone=true;
+      break;
   }
 
   // Current energy
