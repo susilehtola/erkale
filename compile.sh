@@ -163,7 +163,7 @@ if(( ! ${system_hdf5} )); then
 	fi
 
 	cd ${builddir}/hdf5-${HDF5VER}/
-	./configure --enable-static --disable-shared --prefix=${topdir}/hdf5 --exec-prefix=${topdir}/hdf5 --enable-threadsafe --disable-hl --disable-fortran &>configure.log
+	./configure --enable-static --disable-shared --prefix=${topdir}/hdf5 --exec-prefix=${topdir}/hdf5 --disable-hl --disable-fortran &>configure.log
 	make -j ${nprocs} VERBOSE=1 &> make.log
 	make install &> install.log
 	make clean &> clean.log
