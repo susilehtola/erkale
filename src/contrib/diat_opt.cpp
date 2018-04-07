@@ -307,7 +307,7 @@ arma::vec energy_gradient(const dim_sys_t & sys, const std::vector<dim_bf_t> & f
 
 #ifdef H5_HAVE_THREADSAFE
 #ifdef _OPENMP
-#pragma omp parallel for schedule(guided)
+#pragma omp parallel for schedule(dynamic)
 #endif
 #endif
   for(size_t i=0;i<g.n_elem;i++) {
@@ -342,7 +342,7 @@ arma::mat energy_hessian(const dim_sys_t & sys, const std::vector<dim_bf_t> & fu
 
 #ifdef H5_HAVE_THREADSAFE
 #ifdef _OPENMP
-#pragma omp parallel for collapse(2) schedule(guided)
+#pragma omp parallel for schedule(dynamic)
 #endif
 #endif
   for(size_t i=0;i<x.n_elem;i++) {
@@ -451,7 +451,7 @@ arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const
 
 #ifdef H5_HAVE_THREADSAFE
 #ifdef _OPENMP
-#pragma omp parallel for collapse(2) schedule(guided)
+#pragma omp parallel for collapse(2) schedule(dynamic)
 #endif
 #endif
   for(size_t iz=0;iz<zvals.n_elem;iz++)
