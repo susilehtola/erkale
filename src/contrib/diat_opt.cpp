@@ -14,9 +14,6 @@
 
 #define ZTHR 1e-6
 
-// No z optimization?
-#define NOZOPT
-
 // Diatomic basis function
 typedef struct {
   int am; // l value
@@ -66,6 +63,11 @@ typedef struct {
   double R; // bond length
   int Z1; // nuclear charge at left hand
   int Z2; // nuclear charge at right hand
+
+  // Condition number penalty?
+  double gamma;
+  // z value optimization?
+  bool zopt;
 } dim_sys_t;
 
 inline size_t get_index(std::vector<double> atommap, double z) {
@@ -159,7 +161,7 @@ void get_system(std::vector<nucleus_t> & nuclei, std::vector<ElementBasisSet> & 
   }
 }
 
-void construct_basis(BasisSet & basis, const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, Settings & set) {
+void construct_basis(BasisSet & basis, const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set) {
   // Get the system
   std::vector<nucleus_t> nuclei;
   std::vector<ElementBasisSet> els;
@@ -196,12 +198,19 @@ void get_config(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, cons
   }
 }
 
+double condition_number(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set) {
+  // Get centers
+  BasisSet basis;
+  construct_basis(basis,sys,funcs,set);
+  return arma::cond(basis.overlap());
+}
+
 double get_energy(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set0, int Q, int M, int useref) {
   // Get centers
   BasisSet basis;
   Settings set(set0);
   construct_basis(basis,sys,funcs,set);
-  
+
   set.set_bool("Verbose",false);
   set.add_string("LoadChk","","");
 
@@ -235,124 +244,186 @@ double get_energy(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, co
   energy_t en;
   chkpt.read(en);
 
-  return en.E;
+  // Only look at electronic energy
+  double E=en.Eel;
+
+  // Condition number penalty?
+  if(sys.gamma!=0.0)
+    E+=sys.gamma*condition_number(sys,funcs,set);
+
+  return E;
 }
 
-arma::uword which_func(arma::uword i) {
-#ifdef NOZOPT
-  return i;
-#else
-  return i/2;
-#endif
+arma::uword which_func(const dim_sys_t & sys, arma::uword i) {
+  if(sys.zopt)
+    return i/2;
+  else
+    return i;
 }
 
-std::vector<dim_bf_t> interpret(const arma::vec & p, const std::vector<dim_bf_t> & funcs) {
+std::vector<dim_bf_t> interpret(const dim_sys_t & sys, const arma::vec & p, const std::vector<dim_bf_t> & funcs) {
   std::vector<dim_bf_t> ret(funcs);
-#ifdef NOZOPT
-  if(p.n_elem != funcs.size()) throw std::logic_error("Wrong vector length!\n");
-  for(size_t i=0;i<funcs.size();i++)
-    ret[i].a=p(i);
-#else
-  if(p.n_elem != 2*funcs.size()) throw std::logic_error("Wrong vector length!\n");
-  for(size_t i=0;i<funcs.size();i++) {
-    ret[i].a=p(2*i);
-    ret[i].z=p(2*i+1);
+  if(sys.zopt) {
+    if(p.n_elem != 2*funcs.size()) throw std::logic_error("Wrong vector length!\n");
+    for(size_t i=0;i<funcs.size();i++) {
+      ret[i].a=p(2*i);
+      ret[i].z=p(2*i+1);
+    }
+  } else {
+    if(p.n_elem != funcs.size()) throw std::logic_error("Wrong vector length!\n");
+    for(size_t i=0;i<funcs.size();i++)
+      ret[i].a=p(i);
   }
-#endif
+
   return ret;
 }
 
-arma::vec collect(const std::vector<dim_bf_t> & funcs) {
-#ifdef NOZOPT
-  arma::vec ret(funcs.size());
-  for(size_t i=0;i<funcs.size();i++)
-    ret(i)=funcs[i].a;
-#else
-  arma::vec ret(2*funcs.size());
-  for(size_t i=0;i<funcs.size();i++) {
-    ret(2*i)=funcs[i].a;
-    ret(2*i+1)=funcs[i].z;
+arma::vec collect(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs) {
+  arma::vec ret;
+  if(sys.zopt) {
+    ret.zeros(2*funcs.size());
+    for(size_t i=0;i<funcs.size();i++) {
+      ret(2*i)=funcs[i].a;
+      ret(2*i+1)=funcs[i].z;
+    }
+  } else {
+    ret.zeros(funcs.size());
+    for(size_t i=0;i<funcs.size();i++)
+      ret(i)=funcs[i].a;
   }
-#endif
-  
+
   return ret;
 }
 
 arma::vec energy_gradient(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set, int Q, int M, int mval) {
-  // Update reference
-  get_energy(sys,funcs,set,Q,M,-1);
-  
   // Step size
-  double h(sqrt(DBL_EPSILON));
+  double ss(sqrt(DBL_EPSILON));
   // Collect params
-  arma::vec x(collect(funcs));
-  
+  arma::vec x(collect(sys,funcs));
+
   // Gradient
-  arma::vec g(x.n_elem);
-  g.zeros();
+  arma::vec g;
+  g.zeros(x.n_elem);
+
+#ifdef H5_HAVE_THREADSAFE
+#ifdef _OPENMP
+#pragma omp parallel for schedule(guided)
+#endif
+#endif
   for(size_t i=0;i<g.n_elem;i++) {
     // Zero out all other blocks
-    if(mval>=0 && funcs[which_func(i)].am!=mval)
+    if(mval>=0 && funcs[which_func(sys,i)].am!=mval)
       continue;
 
     arma::vec xlh(x), xrh(x);
-    xlh(i)-=h;
-    xrh(i)+=h;
-      
-    double ylh(get_energy(sys,interpret(xlh,funcs),set,Q,M,1));
-    double yrh(get_energy(sys,interpret(xrh,funcs),set,Q,M,1));
-      
-    g(i)=(yrh-ylh)/(2.0*h);
+    xlh(i)-=ss;
+    xrh(i)+=ss;
+
+    double ylh(get_energy(sys,interpret(sys,xlh,funcs),set,Q,M,1));
+    double yrh(get_energy(sys,interpret(sys,xrh,funcs),set,Q,M,1));
+
+    g(i)=(yrh-ylh)/(2.0*ss);
   }
 
   return g;
 }
 
+arma::mat energy_hessian(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set, int Q, int M, int mval, arma::vec & g) {
+  // Step size
+  double ss(sqrt(DBL_EPSILON));
+  // Collect params
+  arma::vec x(collect(sys,funcs));
+  // Current energy
+  double y0(get_energy(sys,interpret(sys,x,funcs),set,Q,M,1));
+
+  // Gradient
+  arma::mat h;
+  h.zeros(x.n_elem,x.n_elem);
+
+#ifdef H5_HAVE_THREADSAFE
+#ifdef _OPENMP
+#pragma omp parallel for collapse(2) schedule(guided)
+#endif
+#endif
+  for(size_t i=0;i<x.n_elem;i++) {
+    if(mval>=0 && funcs[which_func(sys,i)].am!=mval)
+      continue;
+
+    for(size_t j=0;j<=i;j++) {
+      if(mval>=0 && funcs[which_func(sys,j)].am!=mval)
+        continue;
+
+      arma::vec xil(x), xir(x), xjl(x), xjr;
+      xil(i)-=ss;
+      xir(i)+=ss;
+      xjl(j)-=ss;
+      xjr(j)+=ss;
+
+      double yil(get_energy(sys,interpret(sys,xil,funcs),set,Q,M,1));
+      double yir(get_energy(sys,interpret(sys,xir,funcs),set,Q,M,1));
+      double yjl(get_energy(sys,interpret(sys,xjl,funcs),set,Q,M,1));
+      double yjr(get_energy(sys,interpret(sys,xjr,funcs),set,Q,M,1));
+
+      h(i,j) = h(j,i) = (yil + yir + yjl + yjr - 4.0*y0)/(ss*ss);
+    }
+  }
+
+  return h;
+}
+
 double optimize_energy(const dim_sys_t & sys, std::vector<dim_bf_t> & funcs, const Settings & set, int Q, int M, int mval=-1) {
   // Current parameters
-  arma::vec x(collect(funcs));
+  arma::vec x(collect(sys,funcs));
 
   // Get the initial energy
-  double E0(get_energy(sys,interpret(x,funcs),set,Q,M,0));
+  double E0(get_energy(sys,interpret(sys,x,funcs),set,Q,M,-1));
   // Current energy
   double E(E0);
-  
+
   int iit;
   for(iit=0;iit<10;iit++) {
-    // Evaluate gradient
-    arma::vec g(energy_gradient(sys,interpret(x,funcs),set,Q,M,mval));
+    // Evaluate gradient and diagonal hessian
+    arma::vec g=energy_gradient(sys,interpret(sys,x,funcs),set,Q,M,mval);
 
-    //printf("Gradient norm is %e. Line search\n",arma::norm(g,2));
+    printf("Iteration %i gradient norm is %e.\n",iit,arma::norm(g,2));
+
+    // Search direction
+    arma::vec ss(-g);
+
+    printf("Line search:\n");
 
     // Do line search
     std::vector<double> step, y;
     step.push_back(0.0);
-    y.push_back(get_energy(sys,interpret(x,funcs),set,Q,M,1));
-    //printf("\t%e % e\n",step[step.size()-1],y[y.size()-1]);
+    y.push_back(get_energy(sys,interpret(sys,x,funcs),set,Q,M,1));
+    printf("\t%e % e\n",step[step.size()-1],y[y.size()-1]);
 
     double h0=sqrt(DBL_EPSILON);
     step.push_back(h0);
-    y.push_back(get_energy(sys,interpret(x-g*step[step.size()-1],funcs),set,Q,M,1));
-    //printf("\t%e % e % e\n",step[step.size()-1],y[y.size()-1],y[y.size()-1]-y[y.size()-2]);
+    y.push_back(get_energy(sys,interpret(sys,x+ss*step[step.size()-1],funcs),set,Q,M,1));
+    printf("\t%e % e % e\n",step[step.size()-1],y[y.size()-1],y[y.size()-1]-y[y.size()-2]);
 
     if(y[1]>y[0]) {
-      //printf("Function value is not decreasing!\n");
+      printf("Function value is not decreasing!\n");
       break;
     }
 
     while(y[y.size()-1]<=y[y.size()-2]) {
       step.push_back(step[step.size()-1]*2);
-      y.push_back(get_energy(sys,interpret(x-g*step[step.size()-1],funcs),set,Q,M,1));
-      //printf("\t%e % e % e\n",step[step.size()-1],y[y.size()-1],y[y.size()-1]-y[y.size()-2]);
+      y.push_back(get_energy(sys,interpret(sys,x+ss*step[step.size()-1],funcs),set,Q,M,1));
+      printf("\t%e % e % e\n",step[step.size()-1],y[y.size()-1],y[y.size()-1]-y[y.size()-2]);
     }
 
     // Update x and E
-    x=x-g*step[step.size()-2];
-    E=y[y.size()-2];
+    if(y[y.size()-2]<E) {
+      x=x+ss*step[step.size()-2];
+      E=y[y.size()-2];
+    } else
+      break;
   }
 
   // Update functions
-  funcs=interpret(x,funcs);
+  funcs=interpret(sys,x,funcs);
   std::sort(funcs.begin(),funcs.end());
 
   printf("Optimization converged in %i step and decreased the value by %e\n",iit,E-E0);
@@ -377,7 +448,7 @@ arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const
 #ifndef _HDF5_H
 #error "HDF5 headers not included"
 #endif
-  
+
 #ifdef H5_HAVE_THREADSAFE
 #ifdef _OPENMP
 #pragma omp parallel for collapse(2) schedule(guided)
@@ -390,7 +461,7 @@ arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const
         ret(ia,iz)=0.0;
         continue;
       }
-      
+
       // Add function
       std::vector<dim_bf_t> testfuncs(funcs);
       add_function(avals,zvals,ia,iz,am,testfuncs);
@@ -418,13 +489,13 @@ void save_basis(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs) {
 
   // Iteration count
   static int iter=0;
-  
+
   // Output names
   std::ostringstream suffix;
   suffix << "_" << iter;
   std::string geom("opt_atoms"+suffix.str()+".xyz");
   std::string basis("opt_basis"+suffix.str()+".gbs");
-  
+
   {
     FILE *out=fopen(geom.c_str(),"w");
     fprintf(out,"%i\nOptimized basis set for %s-%s with distance R=%e\n",(int) nuclei.size(),element_symbols[sys.Z1].c_str(),element_symbols[sys.Z2].c_str(),sys.R);
@@ -434,12 +505,12 @@ void save_basis(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs) {
         sym="H-Bq";
       else
         sym=element_symbols[nuclei[i].Z];
-      
+
       fprintf(out,"%6s % .6f % .6f % .6f\n", sym.c_str(), nuclei[i].r.x, nuclei[i].r.y, nuclei[i].r.z);
     }
     fclose(out);
   }
-  
+
   BasisSetLibrary baslib;
   for(size_t i=0;i<els.size();i++)
     baslib.add_element(els[i]);
@@ -457,7 +528,7 @@ void update_allowed(arma::imat & allowed, const arma::mat & Eam) {
 
   if(allowed.n_rows != Eam.n_rows) throw std::logic_error("allowed and Eam not the same size!\n");
   if(allowed.n_cols != Eam.n_cols) throw std::logic_error("allowed and Eam not the same size!\n");
-  
+
   for(size_t i=0;i<allowed.n_rows;i++)
     for(size_t j=0;j<allowed.n_cols;j++)
       // E.g. if ammin is -1e-2, thresh will be -1e-5, and we thus
@@ -480,12 +551,15 @@ int main(int argc, char ** argv) {
   set.add_scf_settings();
   set.add_double("Tolerance","Convergence tolerance for addition of a function",1e-6);
   set.add_bool("ForcePol","Force polarized calculation",false);
-  set.add_bool("Optimize","Run final energy optimization?",false);
+  set.add_bool("Optimize","Run primitive energy optimization?",false);
+  set.add_bool("ZOptimize","Optimize centers of primitives?",false);
   set.add_int("MinLogExp","Minimum exponent value",-4);
   set.add_int("MaxLogExp","Maximum exponent value",9);
   set.add_int("NExp","Number of points on exponent grid",131);
+  set.add_int("NGeom","Number of points on geometry grid",3);
   set.add_int("ScanOutdate","Redo scans every N new functions",4);
   set.add_double("MapOutdate","Outdate scan maps when minimum increases by factor",10.0);
+  set.add_double("Gamma","Condition number penalizer",1e-3);
 
   set.parse(std::string(argv[1]),true);
   // Must use core guess
@@ -508,6 +582,8 @@ int main(int argc, char ** argv) {
   sys.Z1=readint(sysv[0]);
   sys.Z2=readint(sysv[1]);
   sys.R=readdouble(sysv[2]);
+  sys.gamma=set.get_double("Gamma");
+  sys.zopt=set.get_bool("ZOptimize");
   if(sysv.size()>3) {
     std::string spec(sysv[3]);
     if(stricmp(spec,"angstrom")==0)
@@ -515,6 +591,7 @@ int main(int argc, char ** argv) {
     else if(stricmp(spec,"bohr")!=0)
       throw std::logic_error("Invalid unit specification " + spec + "!\n");
   }
+
   double thr(set.get_double("Tolerance"));
 
   // Maximum and minimum exponent
@@ -526,13 +603,15 @@ int main(int argc, char ** argv) {
   int scanoutdate(set.get_int("ScanOutdate"));
   double mapoutdatefac(set.get_double("MapOutdate"));
   bool optimize(set.get_bool("Optimize"));
-  
+
   // Geometry grid: left, middle, right
-  const int Ngeom = (sys.Z1 == 0 || sys.Z2 == 0) ? 1 : 3;
-  if(Ngeom == 1)
+  int Ngeom(set.get_int("NGeom"));
+  if(sys.Z1 == 0 || sys.Z2 == 0) {
     // Fictitious bond length, set to zero so functions are centered
     // at the nucleus
+    Ngeom = 1;
     sys.R = 0.0;
+  }
 
   if(sys.Z1 == 0 || sys.Z2 == 0)
     printf("Optimizing basis set for %s atom\n",element_symbols[std::max(sys.Z1,sys.Z2)].c_str());
@@ -542,6 +621,8 @@ int main(int argc, char ** argv) {
   printf("Spacing exponents by factor %e.\n",std::pow(10.0,(maxa-mina)/Nexp));
   printf("Full exponent scans are made whenever the minimum increases by %e.\n",mapoutdatefac);
   printf("Exponent subscans are made at least every %i iterations.\n\n",scanoutdate);
+
+  printf("Nuclear repulsion energy is %.16e\n",sys.Z1*sys.Z2/sys.R);
 
   // Grids
   arma::vec avals(arma::linspace<arma::vec>(mina,maxa,Nexp));
@@ -561,13 +642,13 @@ int main(int argc, char ** argv) {
   double E0;
   // Energy change
   double dE;
-  
+
   // Initialize basis
   while(true) {
     // Determine charge and multiplicity
     get_config(sys,funcs,set,Q,M);
     // Form checkpoint
-    printf("Running now with charge %i, multiplicity %i ",Q,M);
+    printf("Running now for state Q=%+i M=%i ",Q,M);
     fflush(stdout);
     if(funcs.size())
       E0=get_energy(sys,funcs,set,Q,M,-1);
@@ -575,7 +656,7 @@ int main(int argc, char ** argv) {
       E0=0.0;
     printf("ref energy %e\n",E0);
     fflush(stdout);
-    
+
     // Values to scan
     int nam(maxam(funcs)+2);
     arma::cube Egrid(avals.n_elem,zvals.n_elem,nam);
@@ -584,13 +665,13 @@ int main(int argc, char ** argv) {
       Timer tam;
       //arma::mat Eam=scan(sys,funcs,avals,zvals,Q,M,am,E0,(funcs.size()>0));
       arma::mat Eam=scan(sys,funcs,set,avals,zvals,Q,M,am,E0,0);
-      
+
       std::ostringstream oss;
       oss << "Egrid_" << shell_types[am] << "_" << funcs.size() << ".dat";
       Eam.save(oss.str(),arma::raw_ascii);
-      
+
       Egrid.slice(am)=Eam;
-      
+
       printf("%c shell done in % .3f\n",shell_types[am],tam.get());
       fflush(stdout);
     }
@@ -600,7 +681,7 @@ int main(int argc, char ** argv) {
     dE=Egrid.min(minai,minzi,minam);
     add_function(avals,zvals,minai,minzi,minam,funcs);
 
-    printf("Added %c function at % .6f with exponent % e, energy % .10e changed by % e. nbf = %i\n",shell_types[minam],zvals(minzi),std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs));
+    printf("Added %c function at % .6f with exponent % e, energy % .10e changed by % e. nbf = %i, K = %e\n",shell_types[minam],zvals(minzi),std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs),condition_number(sys,funcs,set));
 
     // Do we have a minimal basis now?
     if(Q==set.get_int("Charge") && M==set.get_int("Multiplicity"))
@@ -609,7 +690,7 @@ int main(int argc, char ** argv) {
 
   // Current energy
   E0=get_energy(sys,funcs,set,Q,M,-1);
-  printf("Calculation initialized, initial energy is % .16e\n\n",E0);
+  printf("Calculation initialized, initial energy without penalty is % .16e\n\n",E0-sys.gamma*condition_number(sys,funcs,set));
   fflush(stdout);
 
   while(true) {
@@ -626,20 +707,20 @@ int main(int argc, char ** argv) {
     arma::icube allowed(avals.n_elem,zvals.n_elem,nam);
     // Are values up to date?
     std::vector<int> outdated;
-    
+
     while(true) {
       Timer t;
 
       if(mapoutdatefac<=1.0)
         // No map used
         mapupdate=true;
-      
+
       // Reset map?
       if(mapupdate) {
         allowed.ones();
         mapupdate=false;
       }
-      
+
       // Scan
       for(int am=0;am<nam;am++) {
         bool calcam=false;
@@ -650,16 +731,16 @@ int main(int argc, char ** argv) {
           calcam=true;
         }
 
-        if(calcam) {        
+        if(calcam) {
           Timer tam;
           arma::mat Eam(scan(sys,funcs,set,avals,zvals,Q,M,am,allowed.slice(am),E0));
-          
+
           std::ostringstream oss;
           oss << "Egrid_" << shell_types[am] << "_" << funcs.size() << ".dat";
           Eam.save(oss.str(),arma::raw_ascii);
-          
+
           Egrid.slice(am)=Eam;
-          
+
           printf("%c shell mog = %e done in % .3f (%i out of %i allowed)\n",shell_types[am],Eam.min(),tam.get(),(int) arma::sum(arma::sum(allowed.slice(am))),(int) (allowed.n_rows*allowed.n_cols));
           fflush(stdout);
           outdated[am]=false;
@@ -690,13 +771,13 @@ int main(int argc, char ** argv) {
         // Update minimum value
         Timer tam;
         arma::mat Eam(scan(sys,funcs,set,avals,zvals,Q,M,minam,allowed.slice(minam),E0));
-        
+
         std::ostringstream oss;
         oss << "Egrid_" << shell_types[minam] << "_" << funcs.size() << ".dat";
         Eam.save(oss.str(),arma::raw_ascii);
-        
+
         Egrid.slice(minam)=Eam;
-        
+
         printf("%c shell mog = %e done in % .3f (%i out of %i allowed)\n",shell_types[minam],Eam.min(),tam.get(),(int) arma::sum(arma::sum(allowed.slice(minam))),(int) (allowed.n_rows*allowed.n_cols));
         fflush(stdout);
 
@@ -710,14 +791,14 @@ int main(int argc, char ** argv) {
       if(newpol)
         // Yes, save the current basis set
         save_basis(sys,funcs);
-      
+
       add_function(avals,zvals,minai,minzi,minam,funcs);
 
       // None of the values are up to date.
       for(size_t i=0;i<outdated.size();i++)
         outdated[i]++;
 
-      printf("Added %c function at % .6f with exponent % e, energy % .10e changed by % e. nbf = %i\n",shell_types[minam],zvals(minzi),std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs));
+      printf("Added %c function at % .6f with exponent % e, energy % .10e changed by % e. nbf = %i, K = %e\n",shell_types[minam],zvals(minzi),std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs),condition_number(sys,funcs,set));
       fflush(stdout);
 
       // Update reference
@@ -737,7 +818,7 @@ int main(int argc, char ** argv) {
       if(newpol)
         break;
     }
-    
+
     if(std::abs(dE)<thr)
       break;
   }
@@ -746,10 +827,12 @@ int main(int argc, char ** argv) {
   save_basis(sys,funcs);
 
   // Run energy optimization?
-  if(optimize)
+  if(optimize) {
+    printf("Energy before primitive optimization is % .16e\n",get_energy(sys,funcs,set,Q,M,0));
     optimize_energy(sys,funcs,set,Q,M);
+  }
 
-  printf("Converged. Final energy is % .16e\n",get_energy(sys,funcs,set,Q,M,0));
-  
+  printf("Converged. Final energy without penalty is % .16e\n",get_energy(sys,funcs,set,Q,M,0)-sys.gamma*condition_number(sys,funcs,set));
+
   return 0;
 }
