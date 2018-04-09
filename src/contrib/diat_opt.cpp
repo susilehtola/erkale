@@ -325,7 +325,7 @@ arma::mat energy_hessian(const dim_sys_t & sys, const std::vector<dim_bf_t> & fu
   h.zeros(x.n_elem,x.n_elem);
 
   // No truly parallel HDF5!
-#ifdef 0
+#if 0
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
@@ -435,7 +435,7 @@ arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const
 #endif
 
   // No truly parallel HDF5!
-#ifdef 0
+#if 0
 #ifdef _OPENMP
 #pragma omp parallel for collapse(2) schedule(dynamic)
 #endif
