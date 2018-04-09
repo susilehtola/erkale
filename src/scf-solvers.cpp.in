@@ -700,6 +700,45 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
     printf("beta:  ");
     print_E(sol.Eb,occb,true);
 #endif
+
+#if !defined(FULLHOLE) && !defined(HALFHOLE)
+    if(dimcalc) {
+      // Classify occupied orbitals by symmetry
+      arma::ivec mv(basisp->get_m_values());
+      arma::umat occ;
+
+#ifdef RESTRICTED
+      occ.zeros(arma::max(arma::abs(mv))+1,1);
+
+      // m values of the orbitals
+      arma::ivec mc(m_classify(sol.C,basisp->get_m_values()));
+      for(size_t i=0;i<nocc;i++)
+        occ(std::abs(mc(i)),0)++;
+#else
+      occ.zeros(arma::max(arma::abs(mv))+1,2);
+
+      // m values of the orbitals
+      arma::ivec mca(m_classify(sol.Ca,mv));
+      for(size_t i=0;i<nocca;i++)
+        occ(std::abs(mca(i)),0)++;
+      arma::ivec mcb(m_classify(sol.Cb,mv));
+      for(size_t i=0;i<noccb;i++)
+        occ(std::abs(mcb(i)),1)++;
+#endif
+
+      printf("\nOrbital occupations by symmetry\n");
+      for(size_t m=0;m<occ.n_rows;m++) {
+#ifdef RESTRICTED
+        if(occ(m,0)>0)
+          printf("m = %i: %2i\n",(int) m,(int) occ(m,0));
+#else
+        if(occ(m,0)+occ(m,1)>0)
+          printf("m = %i: %2i %2i\n",(int) m,(int) occ(m,0),(int) occ(m,1));
+#endif
+      }
+    }
+#endif
+
   }
 
   if(converged) {
