@@ -677,9 +677,6 @@ void AngularGrid::update_density(const arma::cx_vec & C0) {
       // Adjust size of grid
       tau.zeros(2,grid.size());
 
-      // Compute orbital laplacian
-      arma::cx_rowvec Cv_lapl=arma::strans(C)*bf_lapl;
-
       for(size_t ip=0;ip<grid.size();ip++) {
 	// Gradient term
 	double grad=std::norm(Cv_x(ip)) + std::norm(Cv_y(ip)) + std::norm(Cv_z(ip));
