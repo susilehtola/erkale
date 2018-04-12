@@ -2757,6 +2757,15 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
     return;
   }
 
+  if(oldMOs.n_cols < nocc) {
+    oldbas.print();
+    fflush(stdout);
+
+    std::ostringstream oss;
+    oss << "Old basis doesn't have enough occupied orbitals: " << oldbas.get_Nbf() << " basis functions but " << nocc << " orbitals wanted!\n";
+    throw std::runtime_error(oss.str());
+  }
+
   BasisSet transbas(oldbas);
   transbas.nuclei=nuclei;
   // Store new geometries
@@ -2790,8 +2799,14 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
       Nind++;
   // Number of linearly dependent basis functions
   const size_t Ndep=Nbf-Nind;
-  if(Nind<nocc)
-    throw std::runtime_error("Basis set too small for occupied orbitals!\n");
+  if(Nind<nocc) {
+    print();
+    fflush(stdout);
+
+    std::ostringstream oss;
+    oss << "Basis set too small for occupied orbitals: " << Nind << " independent functions but " << nocc << " orbitals!\n";
+    throw std::runtime_error(oss.str());
+  }
 
   // Get rid of linearly dependent eigenvalues and eigenvectors
   Sval=Sval.subvec(Ndep,Nbf-1);
@@ -2878,6 +2893,15 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
     return;
   }
 
+  if(oldOMOs.n_cols < nocc) {
+    oldbas.print();
+    fflush(stdout);
+
+    std::ostringstream oss;
+    oss << "Old basis doesn't have enough occupied orbitals: " << oldbas.get_Nbf() << " basis functions but " << nocc << " orbitals wanted!\n";
+    throw std::runtime_error(oss.str());
+  }
+
   BasisSet transbas(oldbas);
   transbas.nuclei=nuclei;
   // Store new geometries
@@ -2911,8 +2935,14 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
       Nind++;
   // Number of linearly dependent basis functions
   const size_t Ndep=Nbf-Nind;
-  if(Nind<nocc)
-    throw std::runtime_error("Basis set too small for occupied orbitals!\n");
+  if(Nind<nocc) {
+    print();
+    fflush(stdout);
+
+    std::ostringstream oss;
+    oss << "Basis set too small for occupied orbitals: " << Nind << " independent functions but " << nocc << " orbitals!\n";
+    throw std::runtime_error(oss.str());
+  }
 
   // Get rid of linearly dependent eigenvalues and eigenvectors
   Sval=Sval.subvec(Ndep,Nbf-1);
