@@ -428,6 +428,7 @@ int main(int argc, char **argv) {
   set.add_bool("NumGrad","Use finite-difference gradient?",false);
   set.add_int("Stencil","Order of finite-difference stencil for numgrad",2);
   set.add_double("Stepsize","Finite-difference stencil step size",1e-6);
+  set.add_double("LineStepFac","Line search step length factor",sqrt(10.0));
   set.parse(std::string(argv[1]),true);
   set.print();
 
@@ -440,6 +441,7 @@ int main(int argc, char **argv) {
   bool numgrad=set.get_bool("NumGrad");
   int stencil=set.get_int("Stencil");
   double step=set.get_double("Stepsize");
+  double fac=set.get_double("LineStepFac");
   int cgreset=set.get_int("CGReset");
 
   // Interpret optimizer
@@ -555,11 +557,7 @@ int main(int argc, char **argv) {
   LBFGS bfgs;
 
   // Step size
-  double steplen=0.01;
-  const double fac=2.0;
-
-  // First step is steplen/fac
-  steplen*=fac;
+  double steplen=1e-2;
 
   // Save calculation to
   pars.set.set_string("SaveChk",getchk(ncalc));
@@ -607,9 +605,6 @@ int main(int argc, char **argv) {
     // Store old value of energy
     Eold=E;
 
-    if(iiter==0) {
-    }
-
     // Save geometry step
     {
       char comment[80];
@@ -647,8 +642,8 @@ int main(int argc, char **argv) {
 	steptype="BFGS";
       }
 
-      // Check we are still going downhill
-      if(arma::dot(sd,-f)<=0) {
+      // Check we are still going downhill / BFGS direction isn't nan
+      if(!(arma::dot(sd,f)<=0)) {
 	steptype+=": Bad search direction. SD";
 	sd=-f;
       }
@@ -665,34 +660,22 @@ int main(int argc, char **argv) {
 
     // Legend
     printf("\t%2s %12s %13s\n","i","step","dE");
-    // Do a line search on the search direction
-    std::vector<linesearch_t> steps;
-    // First, we try a fraction of the current step length
-    {
-      Timer ts;
 
+    // Do a line search on the search direction by bracketing the
+    // minimum
+    std::vector<linesearch_t> steps;
+
+    // Initial entry is
+    {
       // Step length and energy
       linesearch_t p;
-      p.s=steplen/fac;
-      p.icalc=ncalc;
-
-      double Et;
-      arma::vec ft;
-      pars.set.set_string("LoadChk",getchk(iref));
-      pars.set.set_string("SaveChk",getchk(ncalc));
-      calculate(x+p.s*sd,pars,Et,ft,false);
-      iref=ncalc;
-      chkstore.push_back(ncalc);
-      ncalc++;
-
-      p.E=Et;
+      p.s=0.0;
+      p.E=E;
+      p.icalc=iref;
       steps.push_back(p);
-
-      printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
-      fflush(stdout);
     }
 
-    // Next, we try the current step length
+    // First, try the step length as is
     {
       Timer ts;
 
@@ -712,6 +695,7 @@ int main(int argc, char **argv) {
 
       p.E=Et;
       steps.push_back(p);
+
       printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
       fflush(stdout);
     }
@@ -734,14 +718,15 @@ int main(int argc, char **argv) {
 	}
 
       // Where is the minimum?
-      if(imin==0 || imin==steps.size()-1) {
+      if(imin==0 || imin==1 || imin==steps.size()-1) {
 	Timer ts;
 
-	// Need smaller step
 	linesearch_t p;
-	if(imin==0) {
-	  p.s=steps[imin].s/fac;
+	if(imin==0 || (steps.size()>2 && imin==1)) {
+          // Need smaller step
+	  p.s=steps[1].s/fac;
 	} else {
+          // Need bigger step
 	  p.s=steps[imin].s*fac;
 	}
 	p.icalc=ncalc;
@@ -756,13 +741,11 @@ int main(int argc, char **argv) {
 
 	p.E=Et;
 	steps.push_back(p);
-	printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
+	printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
 	fflush(stdout);
 
       } else {
 	// Optimum is somewhere in the middle
-	printf("\n");
-	fflush(stdout);
 	break;
       }
     }
@@ -816,7 +799,7 @@ int main(int argc, char **argv) {
 
 	  p.E=Et;
 	  steps.push_back(p);
-	  printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
+	  printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
 	  fflush(stdout);
 
 	  // Resort the steps in length
@@ -830,7 +813,7 @@ int main(int argc, char **argv) {
 	      Emin=steps[i].E;
 	      imin=i;
 	    }
-	}
+        }
       }
     }
 
@@ -840,6 +823,8 @@ int main(int argc, char **argv) {
 
     // Store optimal step length
     steplen=steps[imin].s;
+
+    printf("Best step size %e changed energy by % e\n",steplen,steps[imin].E-E);
 
     // Copy checkpoint file
     {
