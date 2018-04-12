@@ -20,6 +20,10 @@
 #include "stringutil.h"
 #include <sstream>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 // \delta parameter in Eichkorn et al
 #define DELTA 1e-9
 
