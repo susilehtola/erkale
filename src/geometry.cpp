@@ -177,10 +177,6 @@ void run_calc(const BasisSet & basis, Settings set, bool force) {
 
   Timer t;
 
-  // Checkpoint file to load
-  std::string loadname=set.get_string("LoadChk");
-  std::string savename=set.get_string("SaveChk");
-
   // Nothing to load - run full calculation.
   calculate(basis,set,force);
   if(force) {
@@ -196,8 +192,6 @@ void run_calc(const BasisSet & basis, Settings set, bool force) {
 }
 
 void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints, double h) {
-  // Checkpoint file to load
-  std::string loadname=set.get_string("LoadChk");
   std::string savename=set.get_string("SaveChk");
   std::string tempname=".tempchk";
 
