@@ -690,7 +690,7 @@ int main(int argc, char **argv) {
       p.E=Et;
       steps.push_back(p);
 
-      printf("\t%2i %e % e %s\n",(int) steps.size(),p.s,Et-E,ts.elapsed().c_str());
+      printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
       fflush(stdout);
     }
 
