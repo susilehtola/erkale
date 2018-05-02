@@ -719,6 +719,11 @@ int main(int argc, char **argv) {
 	if(imin==0 || (steps.size()>2 && imin==1)) {
           // Need smaller step
 	  p.s=steps[1].s/fac;
+
+          if(p.s*arma::max(arma::abs(sd)) < DBL_EPSILON) {
+            printf("Step length too small, stopping line search.\n");
+            break;
+          }
 	} else {
           // Need bigger step
 	  p.s=steps[imin].s*fac;
@@ -742,6 +747,19 @@ int main(int argc, char **argv) {
 	// Optimum is somewhere in the middle
 	break;
       }
+    }
+
+    // Find the minimum energy
+    Emin=steps[0].E;
+    imin=0;
+    for(size_t i=1;i<steps.size();i++)
+      if(steps[i].E < Emin) {
+        Emin=steps[i].E;
+        imin=i;
+      }
+    if(imin == 0) {
+      printf("Energy not decreasing.\n");
+      break;
     }
 
     {
