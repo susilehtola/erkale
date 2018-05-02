@@ -47,6 +47,7 @@ void Settings::add_scf_settings() {
 
   // Input system
   add_string("System", "System as an xyz file", "atoms.xyz");
+  add_bool("InputBohr", "Use atomic units as input units instead of angstrom?", false);
 
   // Electric field
   add_string("EField", "Electric field", "0.0 0.0 0.0");

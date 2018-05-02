@@ -28,7 +28,7 @@
 #include <cstdio>
 
 
-std::vector<atom_t> load_xyz(std::string filename) {
+std::vector<atom_t> load_xyz(std::string filename, bool convert) {
   // Check if input is actually Z-Matrix
   {
     FILE *in=fopen(filename.c_str(),"r");
@@ -37,7 +37,7 @@ std::vector<atom_t> load_xyz(std::string filename) {
     std::vector<std::string> words(splitline(readline(in)));
     fclose(in);
     if(stricmp(words[0],"#ZMATRIX")==0)
-      return load_zmat(filename);
+      return load_zmat(filename, convert);
   }
 
   // Input file
@@ -106,9 +106,14 @@ std::vector<atom_t> load_xyz(std::string filename) {
 	tmp.el=words[0];
 
       tmp.num=i; // Number of atom
-      tmp.x=readdouble(words[1])*ANGSTROMINBOHR;
-      tmp.y=readdouble(words[2])*ANGSTROMINBOHR;
-      tmp.z=readdouble(words[3])*ANGSTROMINBOHR;
+      tmp.x=readdouble(words[1]);
+      tmp.y=readdouble(words[2]);
+      tmp.z=readdouble(words[3]);
+      if(convert) {
+        tmp.x*=ANGSTROMINBOHR;
+        tmp.y*=ANGSTROMINBOHR;
+        tmp.z*=ANGSTROMINBOHR;
+      }
       // Charge defined?
       tmp.Q=words.size()==5 ? readint(words[4]) : 0;
       // and add the atom to the list.

@@ -51,7 +51,7 @@ static int parsephiind(const std::vector<std::string> & words, const std::vector
   return parseind(words,atoms,5);
 }
 
-static double parseR(const std::vector<std::string> & words) {
+static double parseR(const std::vector<std::string> & words, bool convert) {
   double R(readdouble(words[2]));
   if(R<0.0) {
     std::ostringstream oss;
@@ -60,7 +60,10 @@ static double parseR(const std::vector<std::string> & words) {
   }
 
   // Convert to Bohr
-  return R*ANGSTROMINBOHR;
+  if(convert)
+    R*=ANGSTROMINBOHR;
+
+  return R;
 }
 
 static double parseang(const std::vector<std::string> & words, int idx) {
@@ -91,7 +94,7 @@ static arma::vec get_coords(const std::vector<atom_t> & atoms, int idx) {
   return ret;
 }
 
-static void parse_line(const std::vector<std::string> & words, std::vector<atom_t> & atoms) {
+static void parse_line(const std::vector<std::string> & words, std::vector<atom_t> & atoms, bool convert) {
   // Helper
   atom_t hlp;
 
@@ -123,7 +126,7 @@ static void parse_line(const std::vector<std::string> & words, std::vector<atom_
     int Rind(parseRind(words,atoms));
     (void) Rind;
     // Distance to atom is
-    double R(parseR(words));
+    double R(parseR(words,convert));
 
     hlp.el=words[0];
     hlp.num=atoms.size();
@@ -145,7 +148,7 @@ static void parse_line(const std::vector<std::string> & words, std::vector<atom_
     // Index of reference atom is
     int Rind(parseRind(words,atoms));
     // Distance to atom is
-    double R(parseR(words));
+    double R(parseR(words,convert));
     // Index of reference atom is
     int thind(parsethind(words,atoms));
     // Distance to atom is
@@ -185,7 +188,7 @@ static void parse_line(const std::vector<std::string> & words, std::vector<atom_
     // Index of reference atom is
     int Rind(parseRind(words,atoms));
     // Distance to atom is
-    double R(parseR(words));
+    double R(parseR(words,convert));
     // Index of reference atom is
     int thind(parsethind(words,atoms));
     // Distance to atom is
@@ -239,7 +242,7 @@ static void parse_line(const std::vector<std::string> & words, std::vector<atom_
   }
 }
 
-std::vector<atom_t> load_zmat(std::string filename) {
+std::vector<atom_t> load_zmat(std::string filename, bool convert) {
   // Input file
   std::ifstream in(filename.c_str());
   // Returned array
@@ -296,7 +299,7 @@ std::vector<atom_t> load_zmat(std::string filename) {
 
     // Parse the z-matrix
     for(size_t i=0;i<zmat.size();i++)
-      parse_line(zmat[i],atoms);
+      parse_line(zmat[i],atoms,convert);
 
   } else {
     std::ostringstream oss;

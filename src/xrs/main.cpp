@@ -867,14 +867,14 @@ int main(int argc, char **argv) {
   std::vector<atom_t> atoms;
   std::string atomfile=set.get_string("System");
   if(file_exists(atomfile))
-    atoms=load_xyz(atomfile);
+    atoms=load_xyz(atomfile,!set.get_bool("InputBohr"));
   else {
     // Check if a directory has been set
     char * libloc=getenv("ERKALE_SYSDIR");
     if(libloc) {
       std::string filename=std::string(libloc)+"/"+atomfile;
       if(file_exists(filename))
-	atoms=load_xyz(filename);
+	atoms=load_xyz(filename,!set.get_bool("InputBohr"));
       else
 	throw std::runtime_error("Unable to open xyz input file!\n");
     } else

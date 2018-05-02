@@ -22,7 +22,7 @@
 #include "xyzutils.h"
 #include <string>
 
-/// Load z matrix from file
-std::vector<atom_t> load_zmat(std::string filename);
+/// Load z matrix from file, converting angstrom to au
+std::vector<atom_t> load_zmat(std::string filename, bool convert);
 
 #endif

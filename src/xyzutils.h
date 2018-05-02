@@ -38,8 +38,8 @@ typedef struct {
   int Q;
 } atom_t;
 
-/// Load atoms from xyz file, return list of atoms. Returns everything in atomic units.
-std::vector<atom_t> load_xyz(std::string filename);
+/// Load atoms from xyz file, return list of atoms, converting angstrom to au. Returns everything in atomic units.
+std::vector<atom_t> load_xyz(std::string filename, bool convert);
 
 /// Save atoms to xyz file
 void save_xyz(const std::vector<atom_t> & at, const std::string & comment, const std::string & fname, bool append=false);

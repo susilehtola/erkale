@@ -283,7 +283,7 @@ int main(int argc, char **argv) {
     }
 
     // Load atoms from xyz file
-    std::vector<atom_t> atoms=load_xyz(argv[3]);
+    std::vector<atom_t> atoms=load_xyz(argv[3],false);
     // Output file
     std::string fileout(argv[4]);
     // Save output
