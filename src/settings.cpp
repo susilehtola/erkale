@@ -159,7 +159,6 @@ void Settings::add_dft_settings() {
   // Perturbative SIC?
   add_bool("PZ", "Perform Perdew-Zunger self-interaction correction?",false);
   add_int("PZprec", "Precondition OV block? 0: no, 1: unified, 2: orbital",1);
-  add_int("PZcore", "Number of frozen core orbitals in PZ", 0);
   add_bool("PZoo", "Optimize OO block?",true);
   add_bool("PZov", "Optimize OV block?",true);
   add_double("PZIthr", "Threshold for initialization convergence (not too small!)",1e-2);
