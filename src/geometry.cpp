@@ -487,7 +487,7 @@ int main(int argc, char **argv) {
 
   // Read in atoms.
   std::string atomfile=set.get_string("System");
-  const std::vector<atom_t> origgeom=load_xyz(atomfile);
+  const std::vector<atom_t> origgeom=load_xyz(atomfile,!set.get_bool("InputBohr"));
   std::vector<atom_t> atoms(origgeom);
 
   // Are any atoms fixed?
