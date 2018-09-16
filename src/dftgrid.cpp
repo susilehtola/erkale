@@ -5107,12 +5107,6 @@ arma::mat DFTGrid::eval_SAP() {
   arma::mat V(N,N);
   V.zeros();
 
-#ifdef _OPENMP
-  int ith=omp_get_thread_num();
-#else
-  int ith=0;
-#endif
-
   // SAPs
   SAP sap;
 
@@ -5123,7 +5117,14 @@ arma::mat DFTGrid::eval_SAP() {
   { // Begin parallel region
 
 #ifdef _OPENMP
-    arma::mat Vwrk(V);
+    int ith=omp_get_thread_num();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+    arma::mat Vwrk(N,N);
+    Vwrk.zeros();
 #pragma omp for schedule(dynamic,1)
 #endif
     for(size_t i=0;i<grids.size();i++) {
