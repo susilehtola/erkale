@@ -169,7 +169,7 @@ void run_calc(const BasisSet & basis, Settings set, bool force) {
   bool pz=false;
   try {
     pz=set.get_bool("PZ");
-  } catch(std::runtime_error) {
+  } catch(std::runtime_error *) {
   }
 
   if(pz)
@@ -567,7 +567,7 @@ int main(int argc, char **argv) {
     pars.set.set_string("PZloc","false");
     // And don't run stability analysis, since we are only doing small displacements
     pars.set.set_int("PZstab",0);
-  } catch(std::runtime_error) {
+  } catch(std::runtime_error *) {
   }
 
   printf("\n\nStarting geometry optimization\n");
