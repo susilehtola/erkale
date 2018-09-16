@@ -162,6 +162,8 @@ enum guess_t {
   CORE_GUESS,
   /// Atomic guess
   SAD_GUESS,
+  /// Atomic potential guess
+  SAP_GUESS,
   /// Natural orbitals from atomic guess
   NO_GUESS,
   /// Generalized Wolfsberg--Helmholz
@@ -397,6 +399,11 @@ class SCF {
   void gwh_guess(rscf_t & sol) const;
   /// Do GWH guess
   void gwh_guess(uscf_t & sol) const;
+
+  /// Do SAP guess
+  void sap_guess(rscf_t & sol) const;
+  /// Do SAP guess
+  void sap_guess(uscf_t & sol) const;
 
   /// Exchange localization
   arma::mat exchange_localization(const arma::mat & Co, const arma::mat & Cv) const;
