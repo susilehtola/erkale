@@ -286,7 +286,7 @@ void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & 
   // Debug
   try {
     check_orth(Cnew,S,false);
-  } catch(std::runtime_error err) {
+  } catch(std::runtime_error *) {
     ERROR_INFO();
     throw std::runtime_error("Orbitals updated by TRRH are not orthonormal!\n");
   }
@@ -298,7 +298,7 @@ void TRRH_update(const arma::cx_mat & F_AO, const arma::cx_mat & C, const arma::
   // Debug
   try {
     check_orth(Cnew,S,false);
-  } catch(std::runtime_error err) {
+  } catch(std::runtime_error *) {
     ERROR_INFO();
     throw std::runtime_error("Orbitals updated by TRRH are not orthonormal!\n");
   }

@@ -441,7 +441,7 @@ void Settings::parse(std::string filename, bool scf) {
 	  // Add dft related settings
 	  try {
 	    add_dft_settings();
-	  } catch(std::runtime_error) {
+	  } catch(std::runtime_error *) {
 	    // Settings already added, as e.g. in xrs executable.
 	  }
 	  set_string("Method",words[1]);

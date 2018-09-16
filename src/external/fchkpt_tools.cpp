@@ -119,7 +119,7 @@ Storage parse_fchk(const std::string & name) {
       line=readline(in);
       // Increment line number
       iline++;
-    } catch(std::runtime_error) {
+    } catch(std::runtime_error *) {
       break;
     }
 
@@ -548,7 +548,7 @@ arma::mat form_orbital_C(const Storage & stor, const std::string & name) {
   size_t Nmo;
   try {
     Nmo=stor.get_int("Number of independent functions");
-  } catch(std::runtime_error) {
+  } catch(std::runtime_error *) {
     // G03 has spelling error
     Nmo=stor.get_int("Number of independant functions");
   }
@@ -585,7 +585,7 @@ arma::vec form_orbital_E(const Storage & stor, const std::string & name) {
   size_t Nmo;
   try {
     Nmo=stor.get_int("Number of independent functions");
-  } catch(std::runtime_error) {
+  } catch(std::runtime_error *) {
     // G03 has spelling error
     Nmo=stor.get_int("Number of independant functions");
   }
@@ -624,7 +624,7 @@ BasisSet form_basis(const Storage & stor) {
   std::vector<double> spcoeff;
   try {
     spcoeff=stor.get_double_vec("P(S=P) Contraction coefficients");
-  } catch(std::runtime_error) {
+  } catch(std::runtime_error *) {
     // Not using SP coefficients.
   }
 
