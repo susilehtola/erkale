@@ -220,7 +220,7 @@ arma::vec DIIS::get_w() {
   } else if(!useadiis && usediis) {
     // Use DIIS only if error is smaller than threshold
     if(err>diisthr)
-      throw std::runtime_error("DIIS error too large.\n");
+      throw std::runtime_error("DIIS error too large for only DIIS to converge wave function.\n");
 
     w=get_w_diis();
 
