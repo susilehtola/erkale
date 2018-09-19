@@ -1567,7 +1567,9 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 		// Numbers
 		std::vector<std::string> nums=splitline(line);
 		if(nums.size()!=3) {
-		  throw std::runtime_error("Invalid specification for SP shell!\n");
+                  std::ostringstream oss;
+                  oss << "Invalid specification \"" << line << "\" for SP shell!\n";
+		  throw std::runtime_error(oss.str());
 		}
 		// Add functions
 		S.add_exponent(readdouble(nums[1]),readdouble(nums[0]));
@@ -1584,8 +1586,11 @@ void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
 		line=readline(in);
 		// Numbers
 		std::vector<std::string> nums=splitline(line);
-		if(nums.size()!=2)
-		  throw std::runtime_error("Invalid specification for shell!\n");
+		if(nums.size()!=2) {
+                  std::ostringstream oss;
+                  oss << "Invalid specification \"" << line << "\" for shell!\n";
+		  throw std::runtime_error(oss.str());
+                }
 		// Add functions
 		sh.add_exponent(readdouble(nums[1]),readdouble(nums[0]));
 	      }

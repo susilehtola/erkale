@@ -231,21 +231,27 @@ void print_E(const arma::vec & E, const std::vector<double> & occ, bool all) {
     for(lumo=0;lumo<occ.size();lumo++)
       if(occ[lumo]==0.0)
 	break;
+    bool occpd=false;
+    for(size_t i=0;i<occ.size();i++)
+      if(occ[i]>0.0)
+        occpd=true;
 
-    if(homo>E.n_elem) {
-      //    ERROR_INFO();
-      std::ostringstream oss;
-      oss << "Orbital " << homo+1 << " is occupied but only " << E.n_elem << " energies given!\n";
-      throw std::runtime_error(oss.str());
-    }
+    if(occpd) {
+      if(homo>E.n_elem) {
+        //    ERROR_INFO();
+        std::ostringstream oss;
+        oss << "Orbital " << homo+1 << " is occupied but only " << E.n_elem << " energies given!\n";
+        throw std::runtime_error(oss.str());
+      }
 
-    if(lumo<E.n_elem) {
+      if(lumo<E.n_elem) {
 
-      double gap=E(lumo)-E(homo);
-      // Convert it into eV
-      gap*=HARTREEINEV;
+        double gap=E(lumo)-E(homo);
+        // Convert it into eV
+        gap*=HARTREEINEV;
 
-      printf("HOMO-LUMO gap is %7.2f eV. ",gap);
+        printf("HOMO-LUMO gap is %7.2f eV. ",gap);
+      }
     }
   }
 
