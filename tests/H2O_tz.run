@@ -9,3 +9,4 @@ IntegralThresh 1e-14
 
 Logfile H2O_tz.log
 SaveChk H2O_tz.chk
+BasisRotate false

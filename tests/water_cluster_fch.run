@@ -11,3 +11,4 @@ SaveChk water_cluster_fch.chk
 DensityFitting true
 Direct true
 XRSMethod FCH
+BasisRotate false

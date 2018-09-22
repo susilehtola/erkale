@@ -307,7 +307,7 @@ void load_fchk(const Settings & set, double tol) {
       for(int i=0;i<Nelb;i++)
 	P+=Ca.col(i)*arma::trans(Ca.col(i));
     }
-  } catch(std::runtime_error *) {};
+  } catch(std::runtime_error &) {};
 
   // Form orbitals
   arma::mat Ca, Cb;
@@ -315,7 +315,7 @@ void load_fchk(const Settings & set, double tol) {
   Ca=form_orbital_C(stor,"Alpha MO coefficients");
   try {
     Cb=form_orbital_C(stor,"Beta MO coefficients");
-  } catch(std::runtime_error *) {
+  } catch(std::runtime_error &) {
     // Restricted checkpoint
     restr=true;
 
@@ -325,7 +325,7 @@ void load_fchk(const Settings & set, double tol) {
 	restr=false;
 	Cb=Ca;
       }
-    } catch(std::runtime_error *) {};
+    } catch(std::runtime_error &) {};
   }
 
   // Energies
@@ -420,7 +420,7 @@ void load_fchk(const Settings & set, double tol) {
     check_orth(Ca,S,true,tol);
     if(!restr)
       check_orth(Cb,S,true,tol);
-  } catch(std::runtime_error *) {
+  } catch(std::runtime_error &) {
     std::ostringstream oss;
 
     oss << "\nIt seems the orbitals in the checkpoint file are not orthonormal.\n";

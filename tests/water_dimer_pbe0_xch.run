@@ -11,3 +11,4 @@ XRSMethod xch
 LoadChk water_dimer_pbe0.chk
 Logfile water_dimer_pbe0_xch.log
 SaveChk water_dimer_pbe0_xch.chk
+BasisRotate false

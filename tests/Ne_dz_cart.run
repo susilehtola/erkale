@@ -10,3 +10,4 @@ Guess Core
 
 Logfile Ne_dz_cart.log
 SaveChk Ne_dz_cart.chk
+BasisRotate false

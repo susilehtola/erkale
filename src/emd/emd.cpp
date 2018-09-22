@@ -972,8 +972,8 @@ std::vector<emd_t> EMD::get() const {
   return dens;
 }
 
-void EMD::save(const char * fname) const {
-  FILE *out=fopen(fname,"w");
+void EMD::save(const std::string & fname) const {
+  FILE *out=fopen(fname.c_str(),"w");
   for(size_t i=0;i<dens.size();i++)
     fprintf(out,"%.15e\t%.15e\n",dens[i].p,dens[i].d);
   fclose(out);
@@ -1025,10 +1025,10 @@ arma::mat EMD::moments() const {
   return moms;
 }
 
-void EMD::moments(const char * fname) const {
+void EMD::moments(const std::string & fname) const {
   arma::mat moms=moments();
   // Print out the moments
-  FILE *out=fopen(fname,"w");
+  FILE *out=fopen(fname.c_str(),"w");
   for(size_t mi=0;mi<moms.n_rows;mi++)
     fprintf(out,"\t% i\t%.12e\t%.12e\n",(int) moms(mi,0),moms(mi,1),moms(mi,2));
   fclose(out);
@@ -1070,17 +1070,17 @@ arma::mat EMD::compton_profile() const {
   return J;
 }
 
-void EMD::compton_profile(const char * fname_raw) const {
+void EMD::compton_profile(const std::string & fname_raw) const {
   arma::mat J=compton_profile();
 
   // Print out profile
-  FILE *out=fopen(fname_raw,"w");
+  FILE *out=fopen(fname_raw.c_str(),"w");
   for(size_t n=0;n<J.n_rows;n++)
     fprintf(out,"%.12e\t%.12e\t%.12e\n",J(n,0),J(n,1),J(n,2));
   fclose(out);
 }
 
-void EMD::compton_profile_interp(const char * fname_interp) const {
+void EMD::compton_profile_interp(const std::string & fname_interp) const {
   // Get the profile.
   arma::mat Jv=compton_profile();
 
@@ -1119,7 +1119,7 @@ void EMD::compton_profile_interp(const char * fname_interp) const {
   std::vector<double> dJ_interp=spline_interpolation(p,dJ,p_interp);
 
   // Save output
-  FILE *out=fopen(fname_interp,"w");
+  FILE *out=fopen(fname_interp.c_str(),"w");
   for(size_t i=0;i<p_interp.size();i++)
     fprintf(out,"%.12e\t%.12e\t%.12e\n",p_interp[i],J_interp[i],dJ_interp[i]);
   fclose(out);

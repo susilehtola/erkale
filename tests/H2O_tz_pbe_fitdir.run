@@ -4,7 +4,9 @@ Method gga_x_pbe-gga_c_pbe
 Basis cc-pVTZ
 Direct true
 DensityFitting true
+Cholesky false
 IntegralThresh 1e-14
 
 Logfile H2O_tz_pbe_fitdir.log
 SaveChk H2O_tz_pbe_fitdir.chk
+BasisRotate false

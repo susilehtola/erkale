@@ -11,3 +11,4 @@ Guess Core
 
 Logfile Ne_tz.log
 SaveChk Ne_tz.chk
+BasisRotate false
