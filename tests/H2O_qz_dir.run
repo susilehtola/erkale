@@ -11,3 +11,4 @@ IntegralThresh 1e-14
 
 Logfile H2O_qz_dir.log
 SaveChk H2O_qz_dir.chk
+BasisRotate false

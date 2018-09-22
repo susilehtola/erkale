@@ -10,3 +10,4 @@ Multiplicity 2
 Guess Core
 Logfile Mg+_qz.log
 SaveChk Mg+_qz.chk
+BasisRotate false

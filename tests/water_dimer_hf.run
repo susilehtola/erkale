@@ -12,3 +12,4 @@ UseLM false
 
 Logfile water_dimer_hf.log
 SaveChk water_dimer_hf.chk
+BasisRotate false

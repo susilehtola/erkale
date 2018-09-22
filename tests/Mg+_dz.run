@@ -11,3 +11,4 @@ Charge 1
 Multiplicity 2
 Logfile Mg+_dz.log
 SaveChk Mg+_dz.chk
+BasisRotate false

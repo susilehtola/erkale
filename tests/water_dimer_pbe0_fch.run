@@ -12,3 +12,4 @@ LoadChk water_dimer_pbe0.chk
 Logfile water_dimer_pbe0_fch.log
 SaveChk water_dimer_pbe0_fch.chk
 
+BasisRotate false

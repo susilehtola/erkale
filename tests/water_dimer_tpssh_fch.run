@@ -11,3 +11,4 @@ XRSMethod fch
 LoadChk water_dimer_tpssh.chk
 Logfile water_dimer_tpssh_fch.log
 SaveChk water_dimer_tpssh_fch.chk
+BasisRotate false
