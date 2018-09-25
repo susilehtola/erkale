@@ -939,9 +939,9 @@ void SCF::gwh_guess(uscf_t & sol) const {
 void SCF::sap_guess(rscf_t & sol) const {
   DFTGrid grid(basisp);
 
-  // Use a (150,194) grid
-  int nrad=150;
-  int lmax=23;
+  // Use a (250,974) grid
+  int nrad=250;
+  int lmax=53;
   bool grad=false;
   bool tau=false;
   bool lapl=false;
@@ -960,9 +960,9 @@ void SCF::sap_guess(rscf_t & sol) const {
 void SCF::sap_guess(uscf_t & sol) const {
   DFTGrid grid(basisp);
 
-  // Use a (150,194) grid
-  int nrad=150;
-  int lmax=23;
+  // Use a (250,974) grid
+  int nrad=250;
+  int lmax=53;
   bool grad=false;
   bool tau=false;
   bool lapl=false;
