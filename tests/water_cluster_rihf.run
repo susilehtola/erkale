@@ -3,12 +3,12 @@ System water_cluster.xyz
 Method HF
 Basis aug-cc-pVDZ
 DensityFitting true
+Cholesky false
 FittingBasis aug-cc-pVDZ-JK
 Direct true
 IntegralThresh 1e-14
 
 
-
-
 Logfile water_cluster_rihf.log
 SaveChk water_cluster_rihf.chk
+BasisRotate false

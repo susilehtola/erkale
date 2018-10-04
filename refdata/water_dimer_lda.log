@@ -1,18 +1,34 @@
-Basis set aug-cc-pVDZ found in file aug-cc-pVDZ.gbs in /home/work/erkale/source/erkale/basis/.
+ERKALE - HF/DFT from Hel, OpenMP version, running on 4 cores.
+(c) Susi Lehtola, 2010-2016.
 
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+At svn revision 1938.
+
+Running on host dx7-lehtola.chem.helsinki.fi.
+
+Basis set aug-cc-pVDZ found in file aug-cc-pVDZ.gbs in /home/work/erkale/source/erkale.sap/basis/.
 
 Current Settings used by ERKALE:
      AtomGuess      	                Auto	Method used for atomic guess (Auto for same as method)
      Basis          	         aug-cc-pVDZ	Basis set used in calculation
      BasisCutoff    	           1.000e-08	Cutoff for dropping out small primitives from contraction
      BasisOrth      	                Auto	Method of orthonormalization of basis set
-     BasisRotate    	                true	Rotate basis set to remove redundant functions?
+     BasisRotate    	               false	Rotate basis set to remove redundant functions?
      C1-DIIS        	               false	Use older version of DIIS (C1-DIIS instead of C2-DIIS)?
      Charge         	                   0	Total charge of system
-     DFTDelta       	           5.000e+03	Switch to final DFT grid, relative to deltaE and deltaP
-     DFTDirect      	               false	Save memory by not storing values of basis functions in memory
+     Cholesky       	                true	Use Cholesky decomposition?
+     CholeskyMode   	                   0	Save/load integrals? 0 no, 1 save, -1 load
+     CholeskyNAFThr 	           0.000e+00	Cholesky natural auxiliary function threshold
+     CholeskyShThr  	           1.000e-02	Cholesky cache threshold
+     CholeskyThr    	           1.000e-07	Cholesky decomposition threshold
+     ConvThr        	           1.000e-06	Orbital gradient convergence threshold
+     DFTDelta       	           1.000e+02	Switch to final DFT grid has converged within factor X
      DFTFinalTol    	           1.000e-05	Tolerance of final DFT grid
-     DFTGrid        	                Auto	DFT integration grid to use: nrad lmax or Auto for adaptive
+     DFTGrid        	             50 -194	DFT integration grid to use: nrad lmax or Auto for adaptive
      DFTInitialTol  	           1.000e-04	Tolerance of initial DFT grid
      DFTLobatto     	               false	Use Lobatto quadrature instead of Lebedev quadrature?
      DIISEps        	           1.000e-01	Start mixing in DIIS when error is
@@ -20,20 +36,17 @@ Current Settings used by ERKALE:
      DIISThr        	           1.000e-02	DIIS error threshold for DIIS updates
      DecFock        	               false	Use decontracted basis to calculate Fock matrix (direct HF)
      Decontract     	                    	Indices of atoms to decontract basis set for
-     DeltaEmax      	           1.000e-06	Maximum allowed change of energy
-     DeltaPmax      	           1.000e-06	Maximum allowed maximum difference of density matrix
-     DeltaPrms      	           1.000e-08	Maximum allowed RMS difference of density matrix
      DensityFitting 	               false	Use density fitting / RI?
+     DimerSymmetry  	               false	Do special calculation on dimer along z axis
      Direct         	               false	Calculate two-electron integrals (or density fitting) on-the-fly?
      EField         	         0.0 0.0 0.0	Electric field
      FittingBasis   	                Auto	Basis to use for density fitting / RI (Auto for automatic)
      FittingMemory  	                1000	Amount of memory in MB to use for exchange fitting
      FittingThreshold	           1.000e-08	Linear dependence threshold for Coulomb integrals in density fitting
      ForcePol       	               false	Force polarized calculation
-     FreezeCore     	               false	Freeze the atomic cores?
-     Guess          	              Atomic	Used guess: atomic (default), core, or GWH
+     Guess          	              Atomic	Used guess: SAD (default), NO, core, or GWH
+     InputBohr      	               false	Use atomic units as input units instead of angstrom?
      IntegralThresh 	           1.000e-14	Integral screening threshold
-     LineSearch     	               false	Do line search in level shift (EXPENSIVE!)
      LoadChk        	                    	File to load old results from
      Logfile        	 water_dimer_lda.log	File to print out full information, stdout for screen
      MaxIter        	                 100	Maximum number of iterations in SCF cycle
@@ -41,21 +54,26 @@ Current Settings used by ERKALE:
      Multiplicity   	                   1	Spin multiplicity
      NLGrid         	             50 -194	Integration grid to use for nonlocal correlation: nrad lmax
      Occupancies    	                    	Orbital occupancies
-     PZ             	                  No	Perform Perdew-Zunger self-interaction correction? No, Pert, Full, OldFull, Real, Can, CanPert
-     PZEmax         	           1.000e-06	Threshold for energy change in unitary optimization
-     PZHam          	                Symm	Hamiltonian to use in PZ-SIC: Symm, United
-     PZKmax         	           1.000e-03	Threshold for kappa max in unitary optimization
-     PZKrms         	           1.000e-04	Threshold for kappa rms in unitary optimization
-     PZdEmax        	           1.000e-05	Tolerance threshold for energy convergence
-     PZdPmax        	           1.000e-05	Tolerance threshold for density convergence
-     PZdPrms        	           1.000e-06	Tolerance threshold for density convergence
+     OptLM          	                true	If spherical harmonics used, use cartesian s and p functions?
+     PZ             	               false	Perform Perdew-Zunger self-interaction correction?
+     PZEthr         	           1.000e-10	Threshold for energy convergence
+     PZIthr         	           1.000e-02	Threshold for initialization convergence (not too small!)
+     PZNRthr        	           0.000e+00	Threshold for use of NR method in OO optimization
+     PZOOthr        	           1.000e-04	Gradient threshold for OO optimization
+     PZOVthr        	           1.000e-05	Gradient threshold for OV optimization
+     PZimag         	                Auto	Imaginary degrees of freedom in PZ?
      PZiter         	                  20	Max number of iterations in self-consistency iteration
-     PZloc          	                true	Initial localization before SIC calculation?
+     PZloc          	                Auto	Initial localization before SIC calculation?
+     PZlocmet       	                  FB	Initial localization method (recommend FB or IAO)
      PZmode         	                  XC	Apply PZ to the operators (in addition to J): X C D
+     PZoo           	                true	Optimize OO block?
+     PZov           	                true	Optimize OV block?
+     PZprec         	                   1	Precondition OV block? 0: no, 1: unified, 2: orbital
+     PZscale        	            Constant	Scaling for PZ: Constant, Density or Kinetic
+     PZscaleExp     	           1.000e+00	Exponent in the dynamic scaling equation
      PZseed         	                   0	Seed number for randomized matrices?
-     PZstab         	                   0	Stability analysis for PZ-SIC? 0 for no, 1 for oo block, 2 for full analysis
-     PZstabFz       	                    	Orbitals to freeze for stability analysis (only oo!)
-     PZunit         	                  10	Max number of iterations in unitary optimization
+     PZstab         	                   0	Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV
+     PZstabThr      	           1.000e-03	Instability threshold (interpreted as -thr)
      PZw            	           1.000e+00	Weight for Perdew-Zunger self-interaction correction
      SaveChk        	 water_dimer_lda.chk	File to use as checkpoint
      Shift          	           0.000e+00	Level shift to use in Hartree
@@ -65,17 +83,15 @@ Current Settings used by ERKALE:
      UseBroyden     	               false	Use Broyden mixing of Fock matrices?
      UseDIIS        	                true	Use Pulay's Direct Inversion in the Iterative Subspace?
      UseLM          	                true	Use a spherical harmonics basis set by default?
-     UseTRDSM       	               false	Use Trust-Region DSM?
      UseTRRH        	               false	Use Trust-Region Roothaan-Hall?
      VV10           	                Auto	Use VV10 non-local correlation?
      VV10Pars       	                    	VV10 parameters: b C
      Verbose        	                true	Verbose calculation?
 
 Performing lda_x-lda_c_pw guess for atoms:
-	1 4  (0.05 s)
-	2 3 5 6  (0.02 s)
-Diagonalizing density matrix ... done (0.00 s)
-Atomic guess formed in 0.07 s.
+O : 1 4 (0.62 s)
+H : 2 3 5 6 (0.08 s)
+Atomic guess formed in 0.70 s.
 
 There are 38 shells and 6 nuclei in the basis set.
 
@@ -139,19 +155,199 @@ Shell   38	P cart shell at nucleus   6 with with basis functions   80-82
 Basis set contains 82 functions, maximum angular momentum is 2.
 Spherical harmonic Gaussians are used by default, there are 86 cartesians.
 
-Forming overlap matrix ... done (0.00 s)
-Forming kinetic energy matrix ... done (0.00 s)
-Forming nuclear attraction matrix ... done (0.00 s)
+Forming overlap matrix ... done (0.01 s)
+Forming kinetic energy matrix ... done (0.01 s)
+Forming nuclear attraction matrix ... done (0.01 s)
 
-Smallest eigenvalue of overlap matrix is 1.61e-03, ratio to largest is 2.11e-04.
+Smallest eigenvalue of overlap matrix is 1.69e-03, ratio to largest is 1.98e-04.
 Using symmetric orthogonalization.
-Basis set diagonalized in 0.00 s.
+Basis set diagonalized in 0.17 s.
 
-Forming table of 6085170 ERIs, requiring 46 Mi 436 ki of memory ... done (2.26 s)
-740 shell pairs out of 741 are significant.
+Computing repulsion integrals.
+Screening by shell pairs and symmetry reduced dofs by factor 1.98.
+Individual screening reduced dofs by a total factor 1.98.
+Computing Cholesky vectors. Estimated memory size is 6 Mi - 21 Mi.
+Cholesky vectors no     0 -     0 computed, error is 4.734640e+00 (0.01 s).
+Cholesky vectors no     1 -     1 computed, error is 7.301862e-01 (0.03 s).
+Cholesky vectors no     2 -     7 computed, error is 7.104012e-01 (0.00 s).
+Cholesky vectors no     8 -    13 computed, error is 6.018771e-01 (0.02 s).
+Cholesky vectors no    14 -    19 computed, error is 5.688391e-01 (0.03 s).
+Cholesky vectors no    20 -    25 computed, error is 3.039446e-01 (0.00 s).
+Cholesky vectors no    26 -    40 computed, error is 2.908685e-01 (0.01 s).
+Cholesky vectors no    41 -    55 computed, error is 1.163445e-01 (0.01 s).
+Cholesky vectors no    56 -    58 computed, error is 1.090000e-01 (0.00 s).
+Cholesky vectors no    59 -    68 computed, error is 9.642770e-02 (0.13 s).
+Cholesky vectors no    69 -    74 computed, error is 9.068693e-02 (0.09 s).
+Cholesky vectors no    75 -    80 computed, error is 7.952190e-02 (0.00 s).
+Cholesky vectors no    81 -    83 computed, error is 7.738001e-02 (0.00 s).
+Cholesky vectors no    84 -    86 computed, error is 7.038370e-02 (0.03 s).
+Cholesky vectors no    87 -    89 computed, error is 6.323953e-02 (0.00 s).
+Cholesky vectors no    90 -    95 computed, error is 5.373572e-02 (0.00 s).
+Cholesky vectors no    96 -   110 computed, error is 4.889783e-02 (0.01 s).
+Cholesky vectors no   111 -   113 computed, error is 3.812807e-02 (0.00 s).
+Cholesky vectors no   114 -   128 computed, error is 3.102447e-02 (0.02 s).
+Cholesky vectors no   129 -   138 computed, error is 2.552526e-02 (0.08 s).
+Cholesky vectors no   139 -   141 computed, error is 2.363380e-02 (0.00 s).
+Cholesky vectors no   142 -   144 computed, error is 2.282758e-02 (0.00 s).
+Cholesky vectors no   145 -   150 computed, error is 2.276639e-02 (0.03 s).
+Cholesky vectors no   151 -   156 computed, error is 2.258497e-02 (0.03 s).
+Cholesky vectors no   157 -   162 computed, error is 1.934409e-02 (0.02 s).
+Cholesky vectors no   163 -   172 computed, error is 1.511266e-02 (0.10 s).
+Cholesky vectors no   173 -   178 computed, error is 1.290242e-02 (0.03 s).
+Cholesky vectors no   179 -   184 computed, error is 1.051748e-02 (0.07 s).
+Cholesky vectors no   185 -   194 computed, error is 5.051526e-03 (0.12 s).
+Cholesky vectors no   195 -   197 computed, error is 3.484589e-03 (0.00 s).
+Cholesky vectors no   198 -   198 computed, error is 2.874160e-03 (0.00 s).
+Cholesky vectors no   199 -   199 computed, error is 2.164986e-03 (0.00 s).
+Cholesky vectors no   200 -   200 computed, error is 2.151835e-03 (0.01 s).
+Cholesky vectors no   201 -   201 computed, error is 1.853272e-03 (0.01 s).
+Cholesky vectors no   202 -   204 computed, error is 1.179373e-03 (0.07 s).
+Cholesky vectors no   205 -   207 computed, error is 1.153703e-03 (0.03 s).
+Cholesky vectors no   208 -   222 computed, error is 1.144779e-03 (0.14 s).
+Cholesky vectors no   223 -   237 computed, error is 9.440063e-04 (0.19 s).
+Cholesky vectors no   238 -   243 computed, error is 9.178672e-04 (0.04 s).
+Cholesky vectors no   244 -   257 computed, error is 8.599821e-04 (0.06 s).
+Cholesky vectors no   258 -   263 computed, error is 8.480366e-04 (0.11 s).
+Cholesky vectors no   264 -   273 computed, error is 7.458922e-04 (0.20 s).
+Cholesky vectors no   274 -   279 computed, error is 6.444152e-04 (0.01 s).
+Cholesky vectors no   280 -   282 computed, error is 6.107303e-04 (0.02 s).
+Cholesky vectors no   283 -   292 computed, error is 5.911555e-04 (0.06 s).
+Cholesky vectors no   293 -   306 computed, error is 5.398257e-04 (0.14 s).
+Cholesky vectors no   307 -   309 computed, error is 5.069870e-04 (0.00 s).
+Cholesky vectors no   310 -   315 computed, error is 4.719210e-04 (0.01 s).
+Cholesky vectors no   316 -   316 computed, error is 3.855182e-04 (0.01 s).
+Cholesky vectors no   317 -   319 computed, error is 3.563615e-04 (0.00 s).
+Cholesky vectors no   320 -   332 computed, error is 3.433314e-04 (0.03 s).
+Cholesky vectors no   333 -   335 computed, error is 2.727582e-04 (0.01 s).
+Cholesky vectors no   336 -   349 computed, error is 2.630355e-04 (0.04 s).
+Cholesky vectors no   350 -   363 computed, error is 2.386226e-04 (0.11 s).
+Cholesky vectors no   364 -   377 computed, error is 2.018423e-04 (0.11 s).
+Cholesky vectors no   378 -   387 computed, error is 1.568158e-04 (0.04 s).
+Cholesky vectors no   388 -   397 computed, error is 1.504953e-04 (0.02 s).
+Cholesky vectors no   398 -   411 computed, error is 1.110144e-04 (0.08 s).
+Cholesky vectors no   412 -   425 computed, error is 8.231380e-05 (0.03 s).
+Cholesky vectors no   426 -   426 computed, error is 8.182834e-05 (0.00 s).
+Cholesky vectors no   427 -   427 computed, error is 7.955393e-05 (0.00 s).
+Cholesky vectors no   428 -   428 computed, error is 7.920289e-05 (0.01 s).
+Cholesky vectors no   429 -   429 computed, error is 6.925240e-05 (0.01 s).
+Cholesky vectors no   430 -   437 computed, error is 6.294516e-05 (0.08 s).
+Cholesky vectors no   438 -   442 computed, error is 6.168977e-05 (0.01 s).
+Cholesky vectors no   443 -   447 computed, error is 6.064672e-05 (0.00 s).
+Cholesky vectors no   448 -   450 computed, error is 5.262770e-05 (0.00 s).
+Cholesky vectors no   451 -   458 computed, error is 4.791065e-05 (0.03 s).
+Cholesky vectors no   459 -   459 computed, error is 3.863687e-05 (0.00 s).
+Cholesky vectors no   460 -   462 computed, error is 3.553025e-05 (0.01 s).
+Cholesky vectors no   463 -   465 computed, error is 3.486498e-05 (0.02 s).
+Cholesky vectors no   466 -   479 computed, error is 2.894824e-05 (0.07 s).
+Cholesky vectors no   480 -   482 computed, error is 2.010003e-05 (0.01 s).
+Cholesky vectors no   483 -   489 computed, error is 1.812548e-05 (0.07 s).
+Cholesky vectors no   490 -   503 computed, error is 1.633542e-05 (0.18 s).
+Cholesky vectors no   504 -   516 computed, error is 1.230649e-05 (0.03 s).
+Cholesky vectors no   517 -   517 computed, error is 1.151344e-05 (0.01 s).
+Cholesky vectors no   518 -   518 computed, error is 1.144541e-05 (0.00 s).
+Cholesky vectors no   519 -   531 computed, error is 1.021148e-05 (0.05 s).
+Cholesky vectors no   532 -   539 computed, error is 7.646056e-06 (0.08 s).
+Cholesky vectors no   540 -   552 computed, error is 6.778937e-06 (0.06 s).
+Cholesky vectors no   553 -   564 computed, error is 6.494630e-06 (0.14 s).
+Cholesky vectors no   565 -   572 computed, error is 6.218035e-06 (0.09 s).
+Cholesky vectors no   573 -   580 computed, error is 6.104470e-06 (0.03 s).
+Cholesky vectors no   581 -   588 computed, error is 5.119927e-06 (0.05 s).
+Cholesky vectors no   589 -   589 computed, error is 4.893767e-06 (0.00 s).
+Cholesky vectors no   590 -   596 computed, error is 4.809475e-06 (0.04 s).
+Cholesky vectors no   597 -   597 computed, error is 4.461983e-06 (0.00 s).
+Cholesky vectors no   598 -   605 computed, error is 3.376966e-06 (0.07 s).
+Cholesky vectors no   606 -   614 computed, error is 3.113015e-06 (0.05 s).
+Cholesky vectors no   615 -   621 computed, error is 2.364671e-06 (0.06 s).
+Cholesky vectors no   622 -   622 computed, error is 2.142711e-06 (0.00 s).
+Cholesky vectors no   623 -   625 computed, error is 1.675458e-06 (0.00 s).
+Cholesky vectors no   626 -   632 computed, error is 1.329757e-06 (0.01 s).
+Cholesky vectors no   633 -   637 computed, error is 1.134731e-06 (0.01 s).
+Cholesky vectors no   638 -   642 computed, error is 9.964049e-07 (0.01 s).
+Cholesky vectors no   643 -   650 computed, error is 9.784747e-07 (0.02 s).
+Cholesky vectors no   651 -   653 computed, error is 9.166106e-07 (0.00 s).
+Cholesky vectors no   654 -   656 computed, error is 8.456417e-07 (0.01 s).
+Cholesky vectors no   657 -   661 computed, error is 7.044036e-07 (0.01 s).
+Cholesky vectors no   662 -   669 computed, error is 6.820910e-07 (0.03 s).
+Cholesky vectors no   670 -   670 computed, error is 6.649230e-07 (0.01 s).
+Cholesky vectors no   671 -   675 computed, error is 6.463042e-07 (0.02 s).
+Cholesky vectors no   676 -   683 computed, error is 5.939319e-07 (0.07 s).
+Cholesky vectors no   684 -   688 computed, error is 5.846155e-07 (0.01 s).
+Cholesky vectors no   689 -   696 computed, error is 5.794489e-07 (0.03 s).
+Cholesky vectors no   697 -   701 computed, error is 5.044640e-07 (0.11 s).
+Cholesky vectors no   702 -   706 computed, error is 4.456850e-07 (0.12 s).
+Cholesky vectors no   707 -   713 computed, error is 4.191903e-07 (0.17 s).
+Cholesky vectors no   714 -   716 computed, error is 4.091538e-07 (0.07 s).
+Cholesky vectors no   717 -   719 computed, error is 2.969878e-07 (0.07 s).
+Cholesky vectors no   720 -   726 computed, error is 2.833383e-07 (0.08 s).
+Cholesky vectors no   727 -   727 computed, error is 2.358534e-07 (0.00 s).
+Cholesky vectors no   728 -   728 computed, error is 1.981866e-07 (0.00 s).
+Cholesky vectors no   729 -   729 computed, error is 1.825291e-07 (0.01 s).
+Cholesky vectors no   730 -   730 computed, error is 1.762104e-07 (0.00 s).
+Cholesky vectors no   731 -   738 computed, error is 1.707163e-07 (0.05 s).
+Cholesky vectors no   739 -   748 computed, error is 1.675996e-07 (0.02 s).
+Cholesky vectors no   749 -   751 computed, error is 1.608340e-07 (0.00 s).
+Cholesky vectors no   752 -   766 computed, error is 1.480650e-07 (0.03 s).
+Cholesky vectors no   767 -   769 computed, error is 1.322665e-07 (0.00 s).
+Cholesky vectors no   770 -   772 computed, error is 1.262991e-07 (0.01 s).
+Cholesky vectors no   773 -   782 computed, error is 1.215857e-07 (0.02 s).
+Cholesky vectors no   783 -   790 computed, error is 1.167949e-07 (0.03 s).
+Cholesky vectors no   791 -   798 computed, error is 1.150561e-07 (0.03 s).
+Cholesky vectors no   799 -   799 computed, error is 1.075267e-07 (0.01 s).
+Cholesky vectors no   800 -   806 computed, error is 1.014243e-07 (0.05 s).
+Cholesky vectors no   807 -   814 computed, error is 9.944269e-08 (0.04 s).
+Cholesky decomposition finished in 6.55 s. Realized memory size is 23 Mi 375 ki.
+Time use: integrals 24.2 %, linear algebra 75.8 %.
+741 shell pairs out of 741 are significant.
 
-Initialization of computation done in 2.26 s.
+Initialization of computation done in 6.84 s.
 
+
+A pure exchange functional used, no exact exchange.
+Constructing static nrad=50 lmax=23 XC grid.
+Composition of XC grid:
+    atom Npoints     Nfuncs
+    1 O     8158     593911
+    2 H     8508     610154
+    3 H     8508     609925
+    4 O     8385     593651
+    5 H     8639     603224
+    6 H     8303     637838
+Forming Cholesky Coulomb matrix ... done (0.03 s)
+Computing DFT exchange and correlation ... done (0.12 s)
+Numerically integrated density is 20.00007 (+0.0004 %).
+Solving SCF equations ... done (0.01 s)
+
+Kinetic               energy:  1.5082085292396869e+02
+Nuclear attraction    energy: -4.2985731527344535e+02
+Total one-electron    energy: -2.7903646234947655e+02
+Nuclear repulsion     energy:  3.6502871607913640e+01
+Coulomb               energy:  1.0788408380429360e+02
+Exchange-correlation  energy: -1.7111398053223112e+01
+Non-local correlation energy:  0.0000000000000000e+00
+-----------------------------------------------------
+                Total energy: -1.5176090499049243e+02
+               Virial factor:  1.0062329051208698e+00
+
+Dipole mu = (-0.00000046,  0.00000118, -0.00000046) D
+
+HOMO-LUMO gap is    0.70 eV. Orbital energies:
+     -18.8516*     -18.8492*      -1.0839*      -1.0763*      -0.6222*
+      -0.6213*      -0.5113*      -0.4934*      -0.4358*      -0.4305*
+      -0.0759       -0.0399       -0.0061        0.0264        0.0503 
+       0.0650        0.0744        0.0852        0.0974        0.1037 
+       0.1115        0.1379        0.1432        0.1697        0.1954 
+       0.2001        0.2056        0.2330        0.2687        0.3143 
+       0.3508        0.3539        0.3998        0.4183        0.4429 
+       0.4537        0.4710        0.5517        0.5558        0.6195 
+       0.6769        0.7103        0.7724        0.8118        0.8258 
+       0.8565        0.8718        0.8896        0.9875        0.9971 
+       1.0562        1.0637        1.1321        1.1531        1.1948 
+       1.5407        1.5817        1.6257        1.6445        1.6740 
+       1.7886        1.8653        1.9746        1.9757        2.0320 
+       2.0859        2.1285        2.2299        2.2756        2.2994 
+       2.4980        2.6235        3.0454        3.0789        3.0861 
+       3.0910        3.1122        3.1805        3.4338        3.5037 
+       3.6560        3.7244 
 Used exchange functional is lda_x, 'Slater exchange', defined in the reference(s):
 P. A. M. Dirac, Math. Proc. Cambridge Philos. Soc. 26, 376 (1930) (DOI 10.1017/S0305004100016108)
 F. Bloch, Z. Phys. 57, 545 (1929) (DOI 10.1007/BF01340281)
@@ -159,249 +355,259 @@ F. Bloch, Z. Phys. 57, 545 (1929) (DOI 10.1007/BF01340281)
 Used correlation functional is lda_c_pw, 'Perdew & Wang', defined in the reference(s):
 J. P. Perdew and Y. Wang, Phys. Rev. B 45, 13244 (1992) (DOI 10.1103/PhysRevB.45.13244)
 
-HOMO-LUMO gap is    3.05 eV. Energies of lowest lying orbitals:
-     -18.7752*     -18.7752*      -0.9184*      -0.9184*      -0.3803*
-      -0.3803*      -0.3803*      -0.3803*      -0.3803*      -0.3803*
-      -0.2683       -0.2683       -0.2683       -0.2683        0.0314 
+HOMO-LUMO gap is    9.65 eV. Energies of lowest lying orbitals:
+     -18.8516*     -18.8492*      -1.0839*      -1.0763*      -0.6222*
+      -0.6213*      -0.5113*      -0.4934*      -0.4358*      -0.4305*
+      -0.0759       -0.0399       -0.0061        0.0264        0.0503 
 
 A pure exchange functional used, no exact exchange.
-Constructing XC grid.
-	atom  Npoints      Nfuncs  t
-	   2     2966      201510  0.10 s
-	   3     3078      208974  0.11 s
-	   4     3703      268050  0.14 s
-	   1     3669      279691  0.14 s
-	   5     3036      198972  0.09 s
-	   6     3182      254645  0.13 s
-DFT XC grid constructed in 0.24 s.
+Constructing static nrad=50 lmax=23 XC grid.
+Composition of XC grid:
+    atom Npoints     Nfuncs
+    1 O     8158     593911
+    2 H     8508     610154
+    3 H     8508     609925
+    4 O     8385     593651
+    5 H     8639     603224
+    6 H     8303     637838
 
  ******* Iteration    1 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.06 s)
-Numerically integrated density is 20.00003 (+0.0001 %).
-ADIIS weights
- 1.00e+00 
-CDIIS weights
- 1.00e+00 
- DIIS weights
- 1.00e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  6.477827e-01
-Energy change                 : -1.511721e+02
-Max total density change      :  2.205081e-01
-Max rms   density change      :  1.172503e-02
-Dipole mu = (-1.40463480, -0.23710622, -0.21116267) D
-
-Iteration took 0.14 s.
-
- ******* Iteration    2 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.08 s)
+Forming Cholesky Coulomb matrix ... done (0.01 s)
+Computing DFT exchange and correlation ... done (0.10 s)
 Numerically integrated density is 20.00003 (+0.0002 %).
 ADIIS weights
- 7.02e-17  1.00e+00 
+ 1.00e+00 
 CDIIS weights
- 1.80e-01  8.20e-01 
+ 1.00e+00 
  DIIS weights
- 7.02e-17  1.00e+00 
+ 1.00e+00 
 
 Solving SCF equations ... done (0.00 s)
 
-DIIS error                    :  1.719981e-01
-Energy change                 : -4.602835e-01
-Max total density change      :  1.717827e-01
-Max rms   density change      :  6.228223e-03
-Dipole mu = (-3.64204621,  0.15257739,  1.42674044) D
+Total energy                  : -1.5157133254372900e+02
+DIIS error                    :  2.959461e-01
+Energy change                 : -1.515713e+02
+Max total density change      :  5.482454e-01
+Max rms   density change      :  1.987630e-02
+Dipole mu = (-0.29050733, -0.15073994, -0.29257268) D
+
+Iteration took 0.12 s.
+
+ ******* Iteration    2 ********
+Forming Cholesky Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.08 s)
+Numerically integrated density is 20.00015 (+0.0008 %).
+ADIIS weights
+ 7.86e-01  2.14e-01 
+CDIIS weights
+ 6.93e-01  3.07e-01 
+ DIIS weights
+ 7.86e-01  2.14e-01 
+
+Solving SCF equations ... done (0.00 s)
+
+Total energy                  : -1.5076291069205857e+02
+DIIS error                    :  4.900820e-01
+Energy change                 :  8.084219e-01
+Max total density change      :  2.773340e-01
+Max rms   density change      :  9.728634e-03
+Dipole mu = (-2.19502951, -0.05760797,  0.47831951) D
+
+Iteration took 0.09 s.
+
+ ******* Iteration    3 ********
+Forming Cholesky Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.11 s)
+Numerically integrated density is 20.00009 (+0.0004 %).
+ADIIS weights
+ 3.03e-01  3.82e-18  6.97e-01 
+CDIIS weights
+ 3.22e-01 -5.75e-02  7.36e-01 
+ DIIS weights
+ 3.03e-01  3.82e-18  6.97e-01 
+
+Solving SCF equations ... done (0.10 s)
+
+Total energy                  : -1.5170146919686462e+02
+DIIS error                    :  1.587956e-01
+Energy change                 : -9.385585e-01
+Max total density change      :  1.349136e-01
+Max rms   density change      :  5.342849e-03
+Dipole mu = (-2.77246816, -0.07974094,  0.58018116) D
+
+Iteration took 0.28 s.
+
+ ******* Iteration    4 ********
+Forming Cholesky Coulomb matrix ... done (0.04 s)
+Computing DFT exchange and correlation ... done (0.12 s)
+Numerically integrated density is 20.00006 (+0.0003 %).
+ADIIS weights
+ 1.20e-19  1.05e-15  1.67e-01  8.33e-01 
+CDIIS weights
+ 9.64e-02 -3.17e-02  4.53e-01  4.82e-01 
+ DIIS weights
+ 1.20e-19  1.05e-15  1.67e-01  8.33e-01 
+
+Solving SCF equations ... done (0.08 s)
+
+Total energy                  : -1.5175936934278135e+02
+DIIS error                    :  7.051598e-02
+Energy change                 : -5.790015e-02
+Max total density change      :  7.845094e-02
+Max rms   density change      :  2.719891e-03
+Dipole mu = (-2.48906646, -0.03134200,  0.62788337) D
+
+Iteration took 0.38 s.
+
+ ******* Iteration    5 ********
+Forming Cholesky Coulomb matrix ... done (0.01 s)
+Computing DFT exchange and correlation ... done (0.13 s)
+Numerically integrated density is 20.00007 (+0.0004 %).
+ADIIS weights
+ 3.94e-14  8.27e-17  6.97e-15  4.27e-01  5.73e-01 
+CDIIS weights
+-3.20e-02 -3.87e-03  7.88e-02  5.98e-01  3.59e-01 
+ DIIS weights
+-1.33e-02 -1.60e-03  3.27e-02  4.98e-01  4.84e-01 
+
+Solving SCF equations ... done (0.02 s)
+
+Total energy                  : -1.5176259118861626e+02
+DIIS error                    :  6.268257e-02
+Energy change                 : -3.221846e-03
+Max total density change      :  4.202753e-02
+Max rms   density change      :  1.319583e-03
+Dipole mu = (-2.62088474, -0.07787572,  0.54318786) D
+
+Iteration took 0.19 s.
+
+ ******* Iteration    6 ********
+Forming Cholesky Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.11 s)
+Numerically integrated density is 20.00006 (+0.0003 %).
+ADIIS weights
+ 1.19e-14  6.22e-15  3.40e-14  1.00e-13  4.44e-12  1.00e+00 
+CDIIS weights
+ 1.36e-03 -5.27e-04 -4.86e-02  9.46e-02  3.19e-01  6.34e-01 
+ DIIS weights
+ 1.36e-03 -5.27e-04 -4.86e-02  9.46e-02  3.19e-01  6.34e-01 
+
+Solving SCF equations ... done (0.00 s)
+
+Total energy                  : -1.5176929252863098e+02
+DIIS error                    :  8.138258e-03
+Energy change                 : -6.701340e-03
+Max total density change      :  4.880597e-03
+Max rms   density change      :  1.618667e-04
+Dipole mu = (-2.61626037, -0.06348223,  0.57939026) D
+
+Iteration took 0.13 s.
+
+ ******* Iteration    7 ********
+Forming Cholesky Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.10 s)
+Numerically integrated density is 20.00006 (+0.0003 %).
+ADIIS weights
+ 4.88e-15  4.03e-16  3.01e-14  1.81e-12  8.92e-13  3.75e-11  1.00e+00 
+CDIIS weights
+ 1.98e-03 -1.98e-05 -1.50e-02  3.27e-04  6.79e-02  1.66e-01  7.79e-01 
+ DIIS weights
+ 1.98e-03 -1.98e-05 -1.50e-02  3.27e-04  6.79e-02  1.66e-01  7.79e-01 
+
+Solving SCF equations ... done (0.03 s)
+
+Total energy                  : -1.5176941762018203e+02
+DIIS error                    :  1.157989e-04
+Energy change                 : -1.250916e-04
+Max total density change      :  5.899835e-05
+Max rms   density change      :  3.352241e-06
+Dipole mu = (-2.61633193, -0.06364232,  0.57897727) D
+
+Iteration took 0.21 s.
+
+ ******* Iteration    8 ********
+Forming Cholesky Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.13 s)
+Numerically integrated density is 20.00006 (+0.0003 %).
+ADIIS weights
+ 1.79e-14  1.41e-16  1.45e-13  3.73e-13  7.16e-13  1.37e-13  5.00e-01  5.00e-01 
+CDIIS weights
+ 7.08e-05  3.53e-06 -7.70e-04  2.77e-04  3.64e-03  1.05e-02  1.06e-01  8.80e-01 
+ DIIS weights
+ 7.08e-05  3.53e-06 -7.70e-04  2.77e-04  3.64e-03  1.05e-02  1.06e-01  8.80e-01 
+
+Solving SCF equations ... done (0.01 s)
+
+Total energy                  : -1.5176941764713771e+02
+DIIS error                    :  1.537301e-05
+Energy change                 : -2.695569e-08
+Max total density change      :  8.732281e-06
+Max rms   density change      :  3.999675e-07
+Dipole mu = (-2.61630270, -0.06366947,  0.57890418) D
 
 Iteration took 0.16 s.
 
- ******* Iteration    3 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.06 s)
-Numerically integrated density is 20.00000 (-0.0000 %).
-ADIIS weights
- 1.78e-23  6.37e-01  3.63e-01 
-CDIIS weights
- 5.90e-02  5.85e-01  3.56e-01 
- DIIS weights
- 1.78e-23  6.37e-01  3.63e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  4.016233e-01
-Energy change                 :  1.157792e-01
-Max total density change      :  1.163040e-01
-Max rms   density change      :  3.773347e-03
-Dipole mu = (-2.79197262, -0.05087530,  0.66165692) D
-
-Iteration took 0.14 s.
-
- ******* Iteration    4 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.07 s)
-Numerically integrated density is 20.00002 (+0.0001 %).
-ADIIS weights
- 1.59e-15  6.73e-14  1.03e-14  1.00e+00 
-CDIIS weights
- 1.98e-03  2.17e-01  1.35e-01  6.46e-01 
- DIIS weights
- 1.59e-15  6.73e-14  1.03e-14  1.00e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  3.298314e-02
-Energy change                 : -2.483011e-01
-Max total density change      :  1.605587e-02
-Max rms   density change      :  8.721196e-04
-Dipole mu = (-2.57432532, -0.05782147,  0.58246848) D
-
-Iteration took 0.15 s.
-
- ******* Iteration    5 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.06 s)
-Numerically integrated density is 20.00002 (+0.0001 %).
-ADIIS weights
- 2.12e-16  1.22e-14  9.42e-16  2.87e-01  7.13e-01 
-CDIIS weights
- 2.94e-04  2.79e-02 -7.70e-03  4.26e-01  5.54e-01 
- DIIS weights
- 2.12e-16  1.22e-14  9.42e-16  2.87e-01  7.13e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  3.172876e-02
-Energy change                 : -2.152769e-03
-Max total density change      :  1.856502e-02
-Max rms   density change      :  6.175474e-04
-Dipole mu = (-2.56292771, -0.08567203,  0.50697296) D
-
-Iteration took 0.14 s.
-
- ******* Iteration    6 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.06 s)
-Numerically integrated density is 20.00002 (+0.0001 %).
-ADIIS weights
- 2.58e-16  3.49e-14  4.96e-15  5.42e-11  4.06e-01  5.94e-01 
-CDIIS weights
--1.35e-04  5.03e-03  1.25e-03  2.56e-01  4.69e-01  2.69e-01 
- DIIS weights
--1.01e-04  3.77e-03  9.39e-04  1.92e-01  4.53e-01  3.50e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  3.254446e-02
-Energy change                 : -7.494037e-04
-Max total density change      :  1.049924e-02
-Max rms   density change      :  3.320087e-04
-Dipole mu = (-2.62385737, -0.05838955,  0.59481103) D
-
-Iteration took 0.14 s.
-
- ******* Iteration    7 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.06 s)
-Numerically integrated density is 20.00002 (+0.0001 %).
-ADIIS weights
- 6.28e-18  5.88e-16  4.92e-16  1.47e-11  1.10e-12  1.66e-13  1.00e+00 
-CDIIS weights
--1.07e-04 -2.10e-03  1.24e-03  7.21e-02  1.99e-01  2.30e-01  4.99e-01 
- DIIS weights
--1.07e-04 -2.10e-03  1.24e-03  7.21e-02  1.99e-01  2.30e-01  4.99e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  4.175196e-03
-Energy change                 : -1.508080e-03
-Max total density change      :  1.228599e-03
-Max rms   density change      :  4.141292e-05
-Dipole mu = (-2.61683413, -0.06408492,  0.57810989) D
-
-Iteration took 0.14 s.
-
- ******* Iteration    8 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.06 s)
-Numerically integrated density is 20.00002 (+0.0001 %).
-ADIIS weights
- 2.33e-18  1.81e-15  2.73e-15  9.31e-17  5.85e-11  1.96e-11  1.13e-06  1.00e+00 
-CDIIS weights
- 1.06e-06  1.78e-04 -3.51e-04  1.14e-02  3.16e-02  4.13e-02  1.97e-01  7.19e-01 
- DIIS weights
- 1.06e-06  1.78e-04 -3.51e-04  1.14e-02  3.16e-02  4.13e-02  1.97e-01  7.19e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  2.048578e-04
-Energy change                 : -2.832867e-05
-Max total density change      :  6.739865e-05
-Max rms   density change      :  2.352575e-06
-Dipole mu = (-2.61652417, -0.06375915,  0.57887011) D
-
-Iteration took 0.14 s.
-
  ******* Iteration    9 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.06 s)
-Numerically integrated density is 20.00002 (+0.0001 %).
+Forming Cholesky Coulomb matrix ... done (0.00 s)
+Computing DFT exchange and correlation ... done (0.16 s)
+Numerically integrated density is 20.00006 (+0.0003 %).
 ADIIS weights
- 4.25e-16  1.40e-14  3.57e-15  1.27e-11  3.30e-11  2.62e-10  1.69e-07  1.02e-01  8.98e-01 
+ 1.21e-14  7.63e-17  2.89e-17  3.29e-13  5.47e-14  3.10e-12  3.33e-01  3.34e-01  3.33e-01 
 CDIIS weights
--1.63e-06 -7.77e-05 -2.34e-05  7.55e-04  5.57e-03  1.15e-02  5.65e-02  2.54e-01  6.72e-01 
+-2.19e-05  2.30e-06 -4.20e-05  2.67e-04  3.57e-04  1.12e-03  1.78e-02  2.12e-01  7.69e-01 
  DIIS weights
--1.63e-06 -7.77e-05 -2.34e-05  7.55e-04  5.57e-03  1.15e-02  5.65e-02  2.54e-01  6.72e-01 
+-2.19e-05  2.30e-06 -4.20e-05  2.67e-04  3.57e-04  1.12e-03  1.78e-02  2.12e-01  7.69e-01 
 
 Solving SCF equations ... done (0.00 s)
 
-DIIS error                    :  3.160284e-05
-Energy change                 : -6.713410e-08
-Max total density change      :  9.311410e-06
-Max rms   density change      :  5.238874e-07
-Dipole mu = (-2.61637582, -0.06370705,  0.57895982) D
+Total energy                  : -1.5176941764788640e+02
+DIIS error                    :  2.441719e-06
+Energy change                 : -7.486847e-10
+Max total density change      :  1.613485e-06
+Max rms   density change      :  6.490389e-08
+Dipole mu = (-2.61629861, -0.06366749,  0.57890609) D
 
-Iteration took 0.15 s.
+Iteration took 0.17 s.
 
  ******* Iteration   10 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.06 s)
-Numerically integrated density is 20.00002 (+0.0001 %).
+Forming Cholesky Coulomb matrix ... done (0.02 s)
+Computing DFT exchange and correlation ... done (0.15 s)
+Numerically integrated density is 20.00006 (+0.0003 %).
 ADIIS weights
- 3.54e-16  4.27e-15  4.58e-17  2.81e-12  2.25e-11  7.50e-11  9.74e-09  3.12e-03  5.09e-01  4.88e-01 
+ 1.14e-15  1.91e-16  1.05e-15  6.25e-15  9.85e-15  4.83e-13  2.50e-01  2.50e-01  2.50e-01  2.50e-01 
 CDIIS weights
- 2.08e-08 -4.32e-06 -4.15e-06 -5.36e-05  3.84e-04  1.22e-03  7.60e-03  4.26e-02  1.78e-01  7.71e-01 
+-3.82e-06  3.18e-07  7.94e-07  3.06e-05  1.60e-05  1.27e-04  1.46e-03  2.43e-02  1.73e-01  8.01e-01 
  DIIS weights
- 2.08e-08 -4.32e-06 -4.15e-06 -5.36e-05  3.84e-04  1.22e-03  7.60e-03  4.26e-02  1.78e-01  7.71e-01 
+-3.82e-06  3.18e-07  7.94e-07  3.06e-05  1.60e-05  1.27e-04  1.46e-03  2.43e-02  1.73e-01  8.01e-01 
 
-Solving SCF equations ... done (0.00 s)
+Solving SCF equations ... done (0.01 s)
 
-DIIS error                    :  2.611543e-06
-Energy change                 : -2.421189e-09
-Max total density change      :  1.299844e-06
-Max rms   density change      :  6.192555e-08
-Dipole mu = (-2.61638656, -0.06371742,  0.57893641) D
+Total energy                  : -1.5176941764790175e+02
+DIIS error                    :  4.454366e-07
+Energy change                 : -1.534772e-11
+Max total density change      :  2.294467e-07
+Max rms   density change      :  9.031413e-09
+Dipole mu = (-2.61629942, -0.06366851,  0.57890421) D
 
-Iteration took 0.15 s.
+Iteration took 0.27 s.
 
  ******* Convergence achieved ********
-Solution of RDFT took 1.72 s.
+Solution of RDFT took 2.08 s.
 
-Kinetic               energy:  1.5159455466377119e+02
-Nuclear attraction    energy: -4.3359171453928866e+02
-Total one-electron    energy: -2.8199715987551753e+02
-Nuclear repulsion     energy:  3.6502872099669482e+01
-Coulomb               energy:  1.1120629508979050e+02
-Exchange-correlation  energy: -1.7481386198569620e+01
+Kinetic               energy:  1.5159464948551263e+02
+Nuclear attraction    energy: -4.3359181515457499e+02
+Total one-electron    energy: -2.8199716566906113e+02
+Nuclear repulsion     energy:  3.6502871607913640e+01
+Coulomb               energy:  1.1120630343888837e+02
+Exchange-correlation  energy: -1.7481427025642631e+01
 Non-local correlation energy:  0.0000000000000000e+00
 -----------------------------------------------------
-                Total energy: -1.5176937888462717e+02
-               Virial factor:  1.0011532354921568e+00
+                Total energy: -1.5176941764790175e+02
+               Virial factor:  1.0011528649789569e+00
 
-Dipole mu = (-2.61638656, -0.06371742,  0.57893641) D
+Dipole mu = (-2.61629942, -0.06366851,  0.57890421) D
 
-HOMO-LUMO gap is    5.37 eV. Orbital energies:
+HOMO-LUMO gap is    5.36 eV. Orbital energies:
      -18.6502*     -18.5920*      -0.9547*      -0.8962*      -0.5145*
       -0.4626*      -0.3760*      -0.3182*      -0.2963*      -0.2446*
       -0.0475       -0.0019        0.0134        0.0507        0.0804 
@@ -410,250 +616,32 @@ HOMO-LUMO gap is    5.37 eV. Orbital energies:
        0.2301        0.2462        0.2854        0.3095        0.3465 
        0.3826        0.3952        0.4190        0.4587        0.4798 
        0.5028        0.5061        0.5873        0.6152        0.6921 
-       0.7243        0.7922        0.8684        0.8897        0.8978 
-       0.9300        0.9516        0.9671        1.0553        1.0913 
-       1.1297        1.1559        1.2439        1.2511        1.2953 
-       1.6334        1.6383        1.6972        1.7094        1.7449 
-       1.8245        1.9298        2.0225        2.0371        2.1364 
-       2.1680        2.1993        2.3332        2.3519        2.4026 
-       2.6220        2.7016        3.2116        3.2165        3.2318 
-       3.2572        3.2902        3.3118        3.5474        3.6638 
-       3.7670        3.8863 
-HOMO-LUMO gap is    5.37 eV. Energies of lowest lying orbitals:
-     -18.6502*     -18.5920*      -0.9547*      -0.8962*      -0.5145*
-      -0.4626*      -0.3760*      -0.3182*      -0.2963*      -0.2446*
-      -0.0475       -0.0019        0.0134        0.0507        0.0804 
-
-A pure exchange functional used, no exact exchange.
-Constructing XC grid.
-	atom  Npoints      Nfuncs  t
-	   2     6778      455635  0.25 s
-	   3     6794      455562  0.26 s
-	   4     7748      548298  0.31 s
-	   1     7596      576395  0.32 s
-	   5     7134      456423  0.25 s
-	   6     6953      550974  0.31 s
-DFT XC grid constructed in 0.57 s.
-
- ******* Iteration    1 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.15 s)
-Numerically integrated density is 20.00000 (+0.0000 %).
-ADIIS weights
- 1.00e+00 
-CDIIS weights
- 1.00e+00 
- DIIS weights
- 1.00e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  1.339707e-05
-Energy change                 : -1.517694e+02
-Max total density change      :  4.120105e-05
-Max rms   density change      :  2.123460e-06
-Dipole mu = (-2.61644909, -0.06383223,  0.57891001) D
-
-Iteration took 0.23 s.
-
- ******* Iteration    2 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.14 s)
-Numerically integrated density is 20.00000 (+0.0000 %).
-ADIIS weights
- 1.62e-01  8.38e-01 
-CDIIS weights
- 3.71e-01  6.29e-01 
- DIIS weights
- 3.71e-01  6.29e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  1.757002e-05
-Energy change                 : -8.060113e-10
-Max total density change      :  9.490089e-06
-Max rms   density change      :  3.696048e-07
-Dipole mu = (-2.61637033, -0.06380694,  0.57892008) D
-
-Iteration took 0.22 s.
-
- ******* Iteration    3 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.14 s)
-Numerically integrated density is 20.00000 (+0.0000 %).
-ADIIS weights
- 1.34e-03  5.64e-01  4.34e-01 
-CDIIS weights
- 2.07e-02  4.66e-01  5.13e-01 
- DIIS weights
- 2.07e-02  4.66e-01  5.13e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  1.579825e-05
-Energy change                 : -1.439560e-10
-Max total density change      :  4.611661e-06
-Max rms   density change      :  1.749813e-07
-Dipole mu = (-2.61640403, -0.06380794,  0.57891724) D
-
-Iteration took 0.22 s.
-
- ******* Iteration    4 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.14 s)
-Numerically integrated density is 20.00000 (+0.0000 %).
-ADIIS weights
- 5.14e-05  3.26e-01  2.70e-01  4.04e-01 
-CDIIS weights
- 1.00e-03  8.31e-02  9.77e-02  8.18e-01 
- DIIS weights
- 1.00e-03  8.31e-02  9.77e-02  8.18e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  2.024538e-07
-Energy change                 : -5.259722e-10
-Max total density change      :  1.074089e-07
-Max rms   density change      :  6.874021e-09
-Dipole mu = (-2.61640380, -0.06381179,  0.57891722) D
-
-Iteration took 0.22 s.
-
- ******* Iteration    5 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.13 s)
-Numerically integrated density is 20.00000 (+0.0000 %).
-ADIIS weights
- 5.54e-04  2.25e-01  1.96e-01  2.90e-01  2.90e-01 
-CDIIS weights
- 2.54e-04  3.38e-02  4.07e-02  3.96e-01  5.29e-01 
- DIIS weights
- 2.54e-04  3.38e-02  4.07e-02  3.96e-01  5.29e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  1.547450e-07
-Energy change                 : -1.136868e-13
-Max total density change      :  6.735836e-08
-Max rms   density change      :  2.450657e-09
-Dipole mu = (-2.61640386, -0.06381144,  0.57891634) D
-
-Iteration took 0.22 s.
-
- ******* Iteration    6 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.14 s)
-Numerically integrated density is 20.00000 (+0.0000 %).
-ADIIS weights
- 5.26e-04  1.70e-01  1.54e-01  2.25e-01  2.25e-01  2.25e-01 
-CDIIS weights
--3.66e-05  1.14e-02  1.44e-02  1.63e-01  3.66e-01  4.46e-01 
- DIIS weights
--3.66e-05  1.14e-02  1.44e-02  1.63e-01  3.66e-01  4.46e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  7.791125e-08
-Energy change                 : -5.684342e-14
-Max total density change      :  2.320750e-08
-Max rms   density change      :  9.833648e-10
-Dipole mu = (-2.61640393, -0.06381107,  0.57891685) D
-
-Iteration took 0.22 s.
-
- ******* Iteration    7 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.14 s)
-Numerically integrated density is 20.00000 (+0.0000 %).
-ADIIS weights
- 4.47e-04  1.37e-01  1.27e-01  1.84e-01  1.84e-01  1.84e-01  1.84e-01 
-CDIIS weights
--2.45e-05  8.76e-04  1.41e-03  1.90e-02  6.45e-02  1.30e-01  7.85e-01 
- DIIS weights
--2.45e-05  8.76e-04  1.41e-03  1.90e-02  6.45e-02  1.30e-01  7.85e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  7.153870e-09
-Energy change                 : -2.557954e-13
-Max total density change      :  2.113953e-09
-Max rms   density change      :  1.306729e-10
-Dipole mu = (-2.61640391, -0.06381114,  0.57891683) D
-
-Iteration took 0.23 s.
-
- ******* Iteration    8 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Computing DFT exchange and correlation ... done (0.16 s)
-Numerically integrated density is 20.00000 (+0.0000 %).
-ADIIS weights
- 3.70e-04  1.14e-01  1.09e-01  1.55e-01  1.55e-01  1.55e-01  1.55e-01  1.55e-01 
-CDIIS weights
--6.51e-06  1.06e-04  2.39e-04  3.40e-03  1.46e-02  3.44e-02  2.59e-01  6.88e-01 
- DIIS weights
--6.51e-06  1.06e-04  2.39e-04  3.40e-03  1.46e-02  3.44e-02  2.59e-01  6.88e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  7.777346e-10
-Energy change                 :  8.526513e-14
-Max total density change      :  3.574901e-10
-Max rms   density change      :  1.831446e-11
-Dipole mu = (-2.61640391, -0.06381113,  0.57891682) D
-
-Iteration took 0.25 s.
-
- ******* Convergence achieved ********
-Solution of RDFT took 2.38 s.
-
-Kinetic               energy:  1.5159468733976396e+02
-Nuclear attraction    energy: -4.3359194550481902e+02
-Total one-electron    energy: -2.8199725816505503e+02
-Nuclear repulsion     energy:  3.6502872099669482e+01
-Coulomb               energy:  1.1120640796387744e+02
-Exchange-correlation  energy: -1.7481435603210812e+01
-Non-local correlation energy:  0.0000000000000000e+00
------------------------------------------------------
-                Total energy: -1.5176941370471891e+02
-               Virial factor:  1.0011525889727477e+00
-
-Dipole mu = (-2.61640391, -0.06381113,  0.57891682) D
-
-HOMO-LUMO gap is    5.36 eV. Orbital energies:
-     -18.6502*     -18.5920*      -0.9547*      -0.8962*      -0.5145*
-      -0.4626*      -0.3760*      -0.3182*      -0.2962*      -0.2446*
-      -0.0475       -0.0019        0.0134        0.0507        0.0805 
-       0.0921        0.1118        0.1167        0.1312        0.1399 
-       0.1641        0.1694        0.1745        0.1997        0.2208 
-       0.2301        0.2463        0.2854        0.3095        0.3465 
-       0.3826        0.3952        0.4190        0.4587        0.4798 
-       0.5028        0.5061        0.5873        0.6152        0.6921 
        0.7243        0.7922        0.8684        0.8898        0.8978 
        0.9300        0.9516        0.9672        1.0553        1.0913 
        1.1297        1.1559        1.2439        1.2511        1.2953 
        1.6334        1.6383        1.6972        1.7094        1.7449 
-       1.8245        1.9298        2.0225        2.0371        2.1364 
+       1.8244        1.9298        2.0225        2.0371        2.1364 
        2.1680        2.1993        2.3332        2.3519        2.4026 
        2.6220        2.7016        3.2116        3.2165        3.2318 
        3.2572        3.2902        3.3118        3.5474        3.6638 
        3.7669        3.8863 
 
 Mulliken charges
-   1 O           -0.222696
-   2 H            0.123675
-   3 H            0.123048
-   4 O           -0.197673
-   5 H            0.072164
-   6 H            0.101482
-Sum of Mulliken charges 2.020606e-14
+   1 O           -0.222725
+   2 H            0.123695
+   3 H            0.123009
+   4 O           -0.197668
+   5 H            0.072147
+   6 H            0.101541
+Sum of Mulliken charges 8.770762e-15
 
 Electron density at nuclei
-   1 O          296.499959
-   2 H            0.359923
-   3 H            0.360347
-   4 O          296.530362
-   5 H            0.364928
-   6 H            0.348693
+   1 O          296.500006
+   2 H            0.359922
+   3 H            0.360344
+   4 O          296.530379
+   5 H            0.364929
+   6 H            0.348690
 
-Running program took 6.46 s.
-Current time is Wed 25 Feb 2015 01:24:06.
+Running program took 9.93 s.
+Current time is Sat 22 Sep 2018 22:41:34.

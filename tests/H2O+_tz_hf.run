@@ -11,3 +11,4 @@ Multiplicity 2
 
 Logfile H2O+_tz_hf.log
 SaveChk H2O+_tz_hf.chk
+BasisRotate false

@@ -11,3 +11,4 @@ DFTGrid 50 -302
 
 Logfile Mg_pbe_tz.log
 SaveChk Mg_pbe_tz.chk
+BasisRotate false

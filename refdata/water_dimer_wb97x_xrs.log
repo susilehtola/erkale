@@ -1,3 +1,15 @@
+ERKALE - XRS from Hel, OpenMP version, running on 4 cores.
+(c) Susi Lehtola, 2010-2016.
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+At svn revision 1938.
+
+Running on host dx7-lehtola.chem.helsinki.fi.
+
 
 Current Settings used by ERKALE:
      AtomGuess      	                Auto	Method used for atomic guess (Auto for same as method)
@@ -5,13 +17,18 @@ Current Settings used by ERKALE:
      Basis          	         aug-cc-pVDZ	Basis set used in calculation
      BasisCutoff    	           1.000e-08	Cutoff for dropping out small primitives from contraction
      BasisOrth      	                Auto	Method of orthonormalization of basis set
-     BasisRotate    	                true	Rotate basis set to remove redundant functions?
+     BasisRotate    	               false	Rotate basis set to remove redundant functions?
      C1-DIIS        	               false	Use older version of DIIS (C1-DIIS instead of C2-DIIS)?
      Charge         	                   0	Total charge of system
-     DFTDelta       	           1.000e+02	Switch to final DFT grid, relative to deltaE and deltaP
-     DFTDirect      	               false	Save memory by not storing values of basis functions in memory
+     Cholesky       	                true	Use Cholesky decomposition?
+     CholeskyMode   	                   0	Save/load integrals? 0 no, 1 save, -1 load
+     CholeskyNAFThr 	           0.000e+00	Cholesky natural auxiliary function threshold
+     CholeskyShThr  	           1.000e-02	Cholesky cache threshold
+     CholeskyThr    	           1.000e-07	Cholesky decomposition threshold
+     ConvThr        	           1.000e-05	Orbital gradient convergence threshold
+     DFTDelta       	           1.000e+02	Switch to final DFT grid has converged within factor X
      DFTFinalTol    	           1.000e-05	Tolerance of final DFT grid
-     DFTGrid        	                Auto	DFT integration grid to use: nrad lmax or Auto for adaptive
+     DFTGrid        	             50 -194	DFT integration grid to use: nrad lmax or Auto for adaptive
      DFTInitialTol  	           1.000e-04	Tolerance of initial DFT grid
      DFTLobatto     	               false	Use Lobatto quadrature instead of Lebedev quadrature?
      DIISEps        	           1.000e-01	Start mixing in DIIS when error is
@@ -19,18 +36,16 @@ Current Settings used by ERKALE:
      DIISThr        	           1.000e-02	DIIS error threshold for DIIS updates
      DecFock        	               false	Use decontracted basis to calculate Fock matrix (direct HF)
      Decontract     	                    	Indices of atoms to decontract basis set for
-     DeltaEmax      	           1.000e-06	Maximum allowed change of energy
-     DeltaPmax      	           1.000e-05	Maximum allowed maximum difference of density matrix
-     DeltaPrms      	           1.000e-06	Maximum allowed RMS difference of density matrix
      DensityFitting 	               false	Use density fitting / RI?
+     DimerSymmetry  	               false	Do special calculation on dimer along z axis
      Direct         	               false	Calculate two-electron integrals (or density fitting) on-the-fly?
      EField         	         0.0 0.0 0.0	Electric field
      FittingBasis   	                Auto	Basis to use for density fitting / RI (Auto for automatic)
      FittingMemory  	                1000	Amount of memory in MB to use for exchange fitting
      FittingThreshold	           1.000e-08	Linear dependence threshold for Coulomb integrals in density fitting
-     Guess          	              Atomic	Used guess: atomic (default), core, or GWH
+     Guess          	              Atomic	Used guess: SAD (default), NO, core, or GWH
+     InputBohr      	               false	Use atomic units as input units instead of angstrom?
      IntegralThresh 	           1.000e-14	Integral screening threshold
-     LineSearch     	               false	Do line search in level shift (EXPENSIVE!)
      LoadChk        	water_dimer_wb97x.chk	Initialize with ground state calculation from file
      Logfile        	water_dimer_wb97x_xrs.log	File to print out full information, stdout for screen
      MaxIter        	                 100	Maximum number of iterations in SCF cycle
@@ -38,21 +53,26 @@ Current Settings used by ERKALE:
      Multiplicity   	                   1	Spin multiplicity
      NLGrid         	             50 -194	Integration grid to use for nonlocal correlation: nrad lmax
      Occupancies    	                    	Orbital occupancies
-     PZ             	                  No	Perform Perdew-Zunger self-interaction correction? No, Pert, Full, OldFull, Real, Can, CanPert
-     PZEmax         	           1.000e-06	Threshold for energy change in unitary optimization
-     PZHam          	                Symm	Hamiltonian to use in PZ-SIC: Symm, United
-     PZKmax         	           1.000e-03	Threshold for kappa max in unitary optimization
-     PZKrms         	           1.000e-04	Threshold for kappa rms in unitary optimization
-     PZdEmax        	           1.000e-05	Tolerance threshold for energy convergence
-     PZdPmax        	           1.000e-05	Tolerance threshold for density convergence
-     PZdPrms        	           1.000e-06	Tolerance threshold for density convergence
+     OptLM          	                true	If spherical harmonics used, use cartesian s and p functions?
+     PZ             	               false	Perform Perdew-Zunger self-interaction correction?
+     PZEthr         	           1.000e-10	Threshold for energy convergence
+     PZIthr         	           1.000e-02	Threshold for initialization convergence (not too small!)
+     PZNRthr        	           0.000e+00	Threshold for use of NR method in OO optimization
+     PZOOthr        	           1.000e-04	Gradient threshold for OO optimization
+     PZOVthr        	           1.000e-05	Gradient threshold for OV optimization
+     PZimag         	                Auto	Imaginary degrees of freedom in PZ?
      PZiter         	                  20	Max number of iterations in self-consistency iteration
-     PZloc          	                true	Initial localization before SIC calculation?
+     PZloc          	                Auto	Initial localization before SIC calculation?
+     PZlocmet       	                  FB	Initial localization method (recommend FB or IAO)
      PZmode         	                  XC	Apply PZ to the operators (in addition to J): X C D
+     PZoo           	                true	Optimize OO block?
+     PZov           	                true	Optimize OV block?
+     PZprec         	                   1	Precondition OV block? 0: no, 1: unified, 2: orbital
+     PZscale        	            Constant	Scaling for PZ: Constant, Density or Kinetic
+     PZscaleExp     	           1.000e+00	Exponent in the dynamic scaling equation
      PZseed         	                   0	Seed number for randomized matrices?
-     PZstab         	                   0	Stability analysis for PZ-SIC? 0 for no, 1 for oo block, 2 for full analysis
-     PZstabFz       	                    	Orbitals to freeze for stability analysis (only oo!)
-     PZunit         	                  10	Max number of iterations in unitary optimization
+     PZstab         	                   0	Stability analysis for PZ-SIC? 1 or -1 for OO, 2 or -2 for OO+OV
+     PZstabThr      	           1.000e-03	Instability threshold (interpreted as -thr)
      PZw            	           1.000e+00	Weight for Perdew-Zunger self-interaction correction
      SaveChk        	water_dimer_wb97x_xrs.chk	Try initializing with and save results to file
      Shift          	           0.000e+00	Level shift to use in Hartree
@@ -62,7 +82,6 @@ Current Settings used by ERKALE:
      UseBroyden     	               false	Use Broyden mixing of Fock matrices?
      UseDIIS        	                true	Use Pulay's Direct Inversion in the Iterative Subspace?
      UseLM          	                true	Use a spherical harmonics basis set by default?
-     UseTRDSM       	               false	Use Trust-Region DSM?
      UseTRRH        	               false	Use Trust-Region Roothaan-Hall?
      VV10           	                Auto	Use VV10 non-local correlation?
      VV10Pars       	                    	VV10 parameters: b C
@@ -80,562 +99,8 @@ Current Settings used by ERKALE:
      XRSQval        	                    	List or range of Q values to compute
      XRSSpin        	               false	Spin to excite (false for alpha, true for beta)
 
-Basis set aug-cc-pVDZ found in file aug-cc-pVDZ.gbs in /home/work/erkale/source/erkale/basis/.
-
-Initializing with ground-state calculation from water_dimer_wb97x.chk.
-
-Localizing 2 orbitals on center 1.
-	sh i       occ  R [Å]
-	1s 1* 0.999983  0.028
-	2s 1  0.965045  0.937
-
-There are 38 shells and 6 nuclei in the basis set.
-
-List of nuclei, geometry in Ångström with three decimal places:
-		 Z	    x	    y	    z
-1	O	 8	 -1.464	  0.099	  0.300
-2	H	 1	 -1.956	  0.624	 -0.340
-3	H	 1	 -1.797	 -0.799	  0.206
-4	O	 8	  1.369	  0.146	 -0.395
-5	H	 1	  1.894	  0.486	  0.335
-6	H	 1	  0.451	  0.165	 -0.083
-
-Interatomic distance matrix:
-          1O    2H    3H    4O    5H 
-   2H  0.963
-   3H  0.962 1.532
-   4O  2.917 3.360 3.358
-   5H  3.380 3.911 3.910 0.961
-   6H  1.954 2.464 2.463 0.970 1.536
-
-List of basis functions:
-Shell    1	S cart shell at nucleus   1 with with basis functions    1-1   
-Shell    2	S cart shell at nucleus   1 with with basis functions    2-2   
-Shell    3	S cart shell at nucleus   1 with with basis functions    3-3   
-Shell    4	S cart shell at nucleus   1 with with basis functions    4-4   
-Shell    5	P cart shell at nucleus   1 with with basis functions    5-7   
-Shell    6	P cart shell at nucleus   1 with with basis functions    8-10  
-Shell    7	P cart shell at nucleus   1 with with basis functions   11-13  
-Shell    8	D  sph shell at nucleus   1 with with basis functions   14-18  
-Shell    9	D  sph shell at nucleus   1 with with basis functions   19-23  
-Shell   10	S cart shell at nucleus   2 with with basis functions   24-24  
-Shell   11	S cart shell at nucleus   2 with with basis functions   25-25  
-Shell   12	S cart shell at nucleus   2 with with basis functions   26-26  
-Shell   13	P cart shell at nucleus   2 with with basis functions   27-29  
-Shell   14	P cart shell at nucleus   2 with with basis functions   30-32  
-Shell   15	S cart shell at nucleus   3 with with basis functions   33-33  
-Shell   16	S cart shell at nucleus   3 with with basis functions   34-34  
-Shell   17	S cart shell at nucleus   3 with with basis functions   35-35  
-Shell   18	P cart shell at nucleus   3 with with basis functions   36-38  
-Shell   19	P cart shell at nucleus   3 with with basis functions   39-41  
-Shell   20	S cart shell at nucleus   4 with with basis functions   42-42  
-Shell   21	S cart shell at nucleus   4 with with basis functions   43-43  
-Shell   22	S cart shell at nucleus   4 with with basis functions   44-44  
-Shell   23	S cart shell at nucleus   4 with with basis functions   45-45  
-Shell   24	P cart shell at nucleus   4 with with basis functions   46-48  
-Shell   25	P cart shell at nucleus   4 with with basis functions   49-51  
-Shell   26	P cart shell at nucleus   4 with with basis functions   52-54  
-Shell   27	D  sph shell at nucleus   4 with with basis functions   55-59  
-Shell   28	D  sph shell at nucleus   4 with with basis functions   60-64  
-Shell   29	S cart shell at nucleus   5 with with basis functions   65-65  
-Shell   30	S cart shell at nucleus   5 with with basis functions   66-66  
-Shell   31	S cart shell at nucleus   5 with with basis functions   67-67  
-Shell   32	P cart shell at nucleus   5 with with basis functions   68-70  
-Shell   33	P cart shell at nucleus   5 with with basis functions   71-73  
-Shell   34	S cart shell at nucleus   6 with with basis functions   74-74  
-Shell   35	S cart shell at nucleus   6 with with basis functions   75-75  
-Shell   36	S cart shell at nucleus   6 with with basis functions   76-76  
-Shell   37	P cart shell at nucleus   6 with with basis functions   77-79  
-Shell   38	P cart shell at nucleus   6 with with basis functions   80-82  
-
-Basis set contains 82 functions, maximum angular momentum is 2.
-Spherical harmonic Gaussians are used by default, there are 86 cartesians.
-
-Forming overlap matrix ... done (0.00 s)
-Forming kinetic energy matrix ... done (0.00 s)
-Forming nuclear attraction matrix ... done (0.00 s)
-
-Smallest eigenvalue of overlap matrix is 1.61e-03, ratio to largest is 2.11e-04.
-Using symmetric orthogonalization.
-Basis set diagonalized in 0.00 s.
-
-Forming table of 6085170 ERIs, requiring 46 Mi 436 ki of memory ... done (2.55 s)
-740 shell pairs out of 741 are significant.
-
-Initialization of computation done in 2.56 s.
-
-alpha: HOMO-LUMO gap is   24.79 eV. Energies of lowest lying orbitals:
-     -19.2412o      -1.0818*      -0.4650*      -0.6341*      -0.6741*
-      -0.9001*     -19.1093*      -0.4033*      -0.5184*      -0.8775*
-       0.0334        0.0643        0.0646        0.0998        0.1595 
-beta:  HOMO-LUMO gap is   11.88 eV. Energies of lowest lying orbitals:
-     -19.2521*     -19.1961*      -1.1717*      -1.1147*      -0.6741*
-      -0.6250*      -0.5359*      -0.4798*      -0.4522*      -0.4032*
-       0.0334        0.0643        0.0646        0.0998        0.1595 
-
-Using range separated exchange with range separation constant omega =  0.300.
-Using  15.771 % short range and  100.000 % long range exchange.
-Computing short-range repulsion integrals ... done (4.07 s)
-740 short-range shell pairs are significant.
-	atom  Npoints      Nfuncs  t
-	   2     3101      211505  0.98 s
-	   3     3311      224628  1.10 s
-	   4     3294      235397  1.10 s
-	   1     3208      241309  1.15 s
-	   5     3040      198229  0.57 s
-	   6     3421      273846  0.77 s
-DFT XC grid constructed in 1.88 s.
-
- ******* Iteration    1 ********
-Forming HF Coulomb matrix ... done (0.10 s)
-Forming HF exchange matrix ... done (0.25 s)
-Forming short-range HF exchange matrix ... done (0.25 s)
-Computing DFT exchange and correlation ... done (0.48 s)
-Numerically integrated density is 19.50006 (+0.0003 %).
-ADIIS weights
- 1.00e+00 
-CDIIS weights
- 1.00e+00 
- DIIS weights
- 1.00e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  3.837194e-01
-Energy change                 : -1.428589e+02
-Max total density change      :  2.206911e-01
-Max rms   density change      :  6.191415e-03
-Max total alpha density change:  2.155583e-01
-Max rms   alpha density change:  5.985543e-03
-Max total beta  density change:  2.258240e-01
-Max rms   beta  density change:  6.409684e-03
-Dipole mu = (-6.39072867, -0.22657281,  0.32714062) D
-
-Iteration took 1.09 s.
-
- ******* Iteration    2 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.39 s)
-Numerically integrated density is 19.50000 (+0.0000 %).
-ADIIS weights
- 4.48e-01  5.52e-01 
-CDIIS weights
- 4.61e-01  5.39e-01 
- DIIS weights
- 4.48e-01  5.52e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  3.520010e-01
-Energy change                 : -2.989023e-02
-Max total density change      :  1.151529e-01
-Max rms   density change      :  3.262076e-03
-Max total alpha density change:  1.153286e-01
-Max rms   alpha density change:  3.265738e-03
-Max total beta  density change:  1.149772e-01
-Max rms   beta  density change:  3.259450e-03
-Dipole mu = (-6.01010977,  0.03925880,  0.91123537) D
-
-Iteration took 0.85 s.
-
- ******* Iteration    3 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.39 s)
-Numerically integrated density is 19.50003 (+0.0001 %).
-ADIIS weights
- 2.74e-23  1.17e-26  1.00e+00 
-CDIIS weights
--6.02e-03  3.34e-02  9.73e-01 
- DIIS weights
--5.76e-03  3.20e-02  9.74e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  1.389275e-02
-Energy change                 : -1.389398e-01
-Max total density change      :  5.208011e-03
-Max rms   density change      :  2.270984e-04
-Max total alpha density change:  3.880806e-03
-Max rms   alpha density change:  2.041500e-04
-Max total beta  density change:  6.535216e-03
-Max rms   beta  density change:  2.546034e-04
-Dipole mu = (-6.00178315,  0.01441280,  0.84409490) D
-
-Iteration took 0.85 s.
-
- ******* Iteration    4 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.39 s)
-Numerically integrated density is 19.50002 (+0.0001 %).
-ADIIS weights
- 3.47e-14  2.51e-14  1.52e-09  1.00e+00 
-CDIIS weights
--5.22e-03  7.66e-03  3.81e-01  6.17e-01 
- DIIS weights
--5.22e-03  7.66e-03  3.81e-01  6.17e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  5.747916e-03
-Energy change                 : -3.314069e-04
-Max total density change      :  2.035364e-03
-Max rms   density change      :  5.903035e-05
-Max total alpha density change:  2.037905e-03
-Max rms   alpha density change:  6.138104e-05
-Max total beta  density change:  2.032823e-03
-Max rms   beta  density change:  5.878785e-05
-Dipole mu = (-6.00244883,  0.02246997,  0.86516231) D
-
-Iteration took 0.85 s.
-
- ******* Iteration    5 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.39 s)
-Numerically integrated density is 19.50002 (+0.0001 %).
-ADIIS weights
- 6.98e-15  3.28e-15  1.91e-09  1.95e-07  1.00e+00 
-CDIIS weights
--6.51e-04 -4.13e-03 -5.58e-02  1.68e-01  8.93e-01 
- DIIS weights
--6.51e-04 -4.13e-03 -5.58e-02  1.68e-01  8.93e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  1.554270e-03
-Energy change                 : -4.447243e-05
-Max total density change      :  4.690951e-04
-Max rms   density change      :  2.132194e-05
-Max total alpha density change:  6.967114e-04
-Max rms   alpha density change:  2.513151e-05
-Max total beta  density change:  4.911409e-04
-Max rms   beta  density change:  2.439643e-05
-Dipole mu = (-5.99520057,  0.02218895,  0.86235959) D
-
-Iteration took 0.85 s.
-
- ******* Iteration    6 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.39 s)
-Numerically integrated density is 19.50002 (+0.0001 %).
-ADIIS weights
- 5.43e-21  2.76e-15  1.18e-11  1.27e-09  4.90e-06  1.00e+00 
-CDIIS weights
- 1.42e-04 -9.23e-04 -2.49e-02 -1.70e-02  8.61e-02  9.57e-01 
- DIIS weights
- 1.42e-04 -9.23e-04 -2.49e-02 -1.70e-02  8.61e-02  9.57e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  1.048179e-04
-Energy change                 : -5.949972e-06
-Max total density change      :  5.241145e-05
-Max rms   density change      :  3.945024e-06
-Max total alpha density change:  2.608943e-04
-Max rms   alpha density change:  7.205921e-06
-Max total beta  density change:  2.028407e-04
-Max rms   beta  density change:  7.133930e-06
-Dipole mu = (-5.99487262,  0.02207164,  0.86195499) D
-
-Iteration took 0.85 s.
-
- ******* Convergence achieved ********
-Solution of UDFT took 11.29 s.
-
-Kinetic               energy:  1.4036919425943466e+02
-Nuclear attraction    energy: -4.0807027404489514e+02
-Total one-electron    energy: -2.6770107978546071e+02
-Nuclear repulsion     energy:  3.6502872099669482e+01
-Coulomb               energy:  1.0565614459464959e+02
-Exchange-correlation  energy: -1.7486052306057779e+01
-Non-local correlation energy:  0.0000000000000000e+00
------------------------------------------------------
-                Total energy: -1.4302811539719943e+02
-               Virial factor:  1.0189423409587324e+00
-
-Dipole mu = (-5.99487262,  0.02207164,  0.86195499) D
-
-alpha: HOMO-LUMO gap is   11.38 eV. Orbital energies:
-     -20.0267o     -19.2868*      -1.4277*      -1.2071*      -0.9177*
-      -0.7902*      -0.7319*      -0.6942*      -0.5665*      -0.4925*
-      -0.0744       -0.0212        0.0017        0.0270        0.0528 
-       0.0720        0.0814        0.1224        0.1260        0.1402 
-       0.1645        0.1773        0.1816        0.2067        0.2338 
-       0.2352        0.2607        0.3088        0.3328        0.3471 
-       0.3879        0.4034        0.4061        0.4577        0.4806 
-       0.4836        0.5537        0.5804        0.6512        0.7101 
-       0.7405        0.8323        0.8826        0.9014        0.9438 
-       0.9553        0.9890        1.0346        1.0503        1.1225 
-       1.1506        1.1568        1.3003        1.3263        1.3406 
-       1.6386        1.6682        1.7214        1.7898        1.8295 
-       1.8296        1.9797        2.0094        2.0361        2.1546 
-       2.2279        2.2552        2.3234        2.4233        2.4818 
-       2.7033        2.7207        3.2116        3.2142        3.3180 
-       3.3384        3.3648        3.3967        3.5439        3.7638 
-       3.7706        3.9931 
-beta:  HOMO-LUMO gap is   11.35 eV. Orbital energies:
-     -20.9226*     -19.2868*      -1.4464*      -1.2071*      -0.9268*
-      -0.8015*      -0.7404*      -0.6986*      -0.5666*      -0.4925*
-      -0.0755       -0.0211        0.0016        0.0270        0.0520 
-       0.0716        0.0786        0.1220        0.1263        0.1409 
-       0.1651        0.1771        0.1809        0.2070        0.2341 
-       0.2354        0.2606        0.3087        0.3315        0.3472 
-       0.3877        0.4026        0.4064        0.4564        0.4808 
-       0.4837        0.5536        0.5812        0.6511        0.7110 
-       0.7397        0.8316        0.8837        0.9023        0.9442 
-       0.9554        0.9876        1.0343        1.0469        1.1177 
-       1.1474        1.1515        1.2978        1.3262        1.3388 
-       1.6392        1.6637        1.7223        1.7898        1.8297 
-       1.8307        1.9788        2.0029        2.0354        2.1448 
-       2.2278        2.2544        2.3242        2.4224        2.4818 
-       2.7026        2.7204        3.2092        3.2117        3.3158 
-       3.3384        3.3649        3.3967        3.5410        3.7606 
-       3.7705        3.9930 
-alpha: HOMO-LUMO gap is   11.38 eV. Energies of lowest lying orbitals:
-     -20.0267o     -19.2868*      -1.4277*      -1.2071*      -0.9177*
-      -0.7902*      -0.7319*      -0.6942*      -0.5665*      -0.4925*
-      -0.0744       -0.0212        0.0017        0.0270        0.0528 
-beta:  HOMO-LUMO gap is   11.35 eV. Energies of lowest lying orbitals:
-     -20.9226*     -19.2868*      -1.4464*      -1.2071*      -0.9268*
-      -0.8015*      -0.7404*      -0.6986*      -0.5666*      -0.4925*
-      -0.0755       -0.0211        0.0016        0.0270        0.0520 
-
-Using range separated exchange with range separation constant omega =  0.300.
-Using  15.771 % short range and  100.000 % long range exchange.
-	atom  Npoints      Nfuncs  t
-	   4     7179      507480  1.51 s
-	   1     7263      549746  1.68 s
-	   3     7289      486856  1.69 s
-	   2     7599      509599  1.80 s
-	   5     7336      479386  1.35 s
-	   6     8249      655566  2.10 s
-DFT XC grid constructed in 3.78 s.
-
- ******* Iteration    1 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.95 s)
-Numerically integrated density is 19.50000 (-0.0000 %).
-ADIIS weights
- 1.00e+00 
-CDIIS weights
- 1.00e+00 
- DIIS weights
- 1.00e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  8.497282e-04
-Energy change                 : -1.430281e+02
-Max total density change      :  5.241545e-04
-Max rms   density change      :  1.413086e-05
-Max total alpha density change:  5.206479e-04
-Max rms   alpha density change:  1.747910e-05
-Max total beta  density change:  5.276611e-04
-Max rms   beta  density change:  1.678820e-05
-Dipole mu = (-5.99457963,  0.02150727,  0.86056580) D
-
-Iteration took 1.41 s.
-
- ******* Iteration    2 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.92 s)
-Numerically integrated density is 19.50000 (-0.0000 %).
-ADIIS weights
- 8.30e-02  9.17e-01 
-CDIIS weights
- 3.79e-01  6.21e-01 
- DIIS weights
- 3.79e-01  6.21e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  4.843186e-04
-Energy change                 : -4.201727e-07
-Max total density change      :  1.723268e-04
-Max rms   density change      :  4.707959e-06
-Max total alpha density change:  1.728682e-04
-Max rms   alpha density change:  4.776431e-06
-Max total beta  density change:  1.717854e-04
-Max rms   beta  density change:  4.726334e-06
-Dipole mu = (-5.99524224,  0.02203434,  0.86213779) D
-
-Iteration took 1.38 s.
-
- ******* Iteration    3 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.95 s)
-Numerically integrated density is 19.50000 (-0.0000 %).
-ADIIS weights
- 1.60e-04  1.01e-02  9.90e-01 
-CDIIS weights
--5.83e-02  1.97e-01  8.61e-01 
- DIIS weights
--5.83e-02  1.97e-01  8.61e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  1.267671e-04
-Energy change                 : -2.463406e-07
-Max total density change      :  3.804618e-05
-Max rms   density change      :  1.092915e-06
-Max total alpha density change:  3.776716e-05
-Max rms   alpha density change:  1.241846e-06
-Max total beta  density change:  3.832520e-05
-Max rms   beta  density change:  1.237501e-06
-Dipole mu = (-5.99514077,  0.02192075,  0.86183128) D
-
-Iteration took 1.41 s.
-
- ******* Iteration    4 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.94 s)
-Numerically integrated density is 19.50000 (-0.0000 %).
-ADIIS weights
- 2.14e-08  2.58e-03  4.46e-01  5.51e-01 
-CDIIS weights
- 4.78e-03 -3.21e-02 -1.41e-01  1.17e+00 
- DIIS weights
- 4.78e-03 -3.21e-02 -1.41e-01  1.17e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  3.979887e-06
-Energy change                 : -2.652223e-08
-Max total density change      :  4.029703e-06
-Max rms   density change      :  2.029956e-07
-Max total alpha density change:  4.699376e-06
-Max rms   alpha density change:  2.745328e-07
-Max total beta  density change:  1.012068e-05
-Max rms   beta  density change:  3.020006e-07
-Dipole mu = (-5.99513006,  0.02193177,  0.86186306) D
-
-Iteration took 1.39 s.
-
- ******* Iteration    5 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (1.03 s)
-Numerically integrated density is 19.50000 (-0.0000 %).
-ADIIS weights
- 7.09e-05  1.56e-03  2.26e-01  3.87e-01  3.86e-01 
-CDIIS weights
- 5.23e-03 -2.32e-02 -1.05e-01  5.08e-01  6.15e-01 
- DIIS weights
- 5.23e-03 -2.32e-02 -1.05e-01  5.08e-01  6.15e-01 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  4.664807e-06
-Energy change                 : -4.525305e-10
-Max total density change      :  1.561111e-06
-Max rms   density change      :  5.080822e-08
-Max total alpha density change:  3.106034e-06
-Max rms   alpha density change:  7.904287e-08
-Max total beta  density change:  1.102535e-06
-Max rms   beta  density change:  4.496494e-08
-Dipole mu = (-5.99513616,  0.02192810,  0.86185652) D
-
-Iteration took 1.51 s.
-
- ******* Iteration    6 ********
-Forming HF Coulomb matrix ... done (0.08 s)
-Forming HF exchange matrix ... done (0.19 s)
-Forming short-range HF exchange matrix ... done (0.19 s)
-Computing DFT exchange and correlation ... done (0.95 s)
-Numerically integrated density is 19.50000 (-0.0000 %).
-ADIIS weights
- 1.52e-04  1.24e-04  1.69e-01  2.77e-01  2.77e-01  2.77e-01 
-CDIIS weights
- 4.41e-04 -4.77e-04 -2.98e-03 -6.57e-02  5.17e-02  1.02e+00 
- DIIS weights
- 4.41e-04 -4.77e-04 -2.98e-03 -6.57e-02  5.17e-02  1.02e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  5.225146e-07
-Energy change                 : -5.474021e-11
-Max total density change      :  3.951418e-07
-Max rms   density change      :  1.816928e-08
-Max total alpha density change:  1.255561e-06
-Max rms   alpha density change:  3.671364e-08
-Max total beta  density change:  1.635574e-06
-Max rms   beta  density change:  4.159721e-08
-Dipole mu = (-5.99513504,  0.02192851,  0.86185831) D
-
-Iteration took 1.41 s.
-
- ******* Convergence achieved ********
-Solution of UDFT took 12.31 s.
-
-Kinetic               energy:  1.4036596601818067e+02
-Nuclear attraction    energy: -4.0806522870192589e+02
-Total one-electron    energy: -2.6769926268374519e+02
-Nuclear repulsion     energy:  3.6502872099669482e+01
-Coulomb               energy:  1.0565408937270068e+02
-Exchange-correlation  energy: -1.7485788318890400e+01
-Non-local correlation energy:  0.0000000000000000e+00
------------------------------------------------------
-                Total energy: -1.4302808953026542e+02
-               Virial factor:  1.0189655910731235e+00
-
-Dipole mu = (-5.99513504,  0.02192851,  0.86185831) D
-
-alpha: HOMO-LUMO gap is   11.38 eV. Orbital energies:
-     -20.0256o     -19.2884*      -1.4281*      -1.2069*      -0.9179*
-      -0.7902*      -0.7318*      -0.6942*      -0.5665*      -0.4926*
-      -0.0745       -0.0213        0.0017        0.0270        0.0527 
-       0.0719        0.0813        0.1224        0.1260        0.1402 
-       0.1645        0.1773        0.1817        0.2067        0.2338 
-       0.2352        0.2607        0.3088        0.3328        0.3471 
-       0.3879        0.4033        0.4060        0.4577        0.4806 
-       0.4836        0.5537        0.5804        0.6512        0.7100 
-       0.7405        0.8323        0.8826        0.9014        0.9438 
-       0.9553        0.9890        1.0345        1.0503        1.1225 
-       1.1506        1.1568        1.3003        1.3263        1.3406 
-       1.6386        1.6682        1.7214        1.7898        1.8295 
-       1.8296        1.9797        2.0095        2.0360        2.1542 
-       2.2279        2.2553        2.3234        2.4236        2.4818 
-       2.7034        2.7207        3.2115        3.2141        3.3179 
-       3.3382        3.3647        3.3965        3.5437        3.7636 
-       3.7705        3.9931 
-beta:  HOMO-LUMO gap is   11.35 eV. Orbital energies:
-     -20.9229*     -19.2883*      -1.4460*      -1.2069*      -0.9267*
-      -0.8014*      -0.7404*      -0.6986*      -0.5666*      -0.4925*
-      -0.0754       -0.0211        0.0017        0.0270        0.0520 
-       0.0717        0.0786        0.1220        0.1264        0.1409 
-       0.1651        0.1771        0.1809        0.2070        0.2342 
-       0.2354        0.2606        0.3087        0.3316        0.3472 
-       0.3877        0.4027        0.4065        0.4565        0.4808 
-       0.4838        0.5537        0.5812        0.6511        0.7110 
-       0.7397        0.8316        0.8837        0.9023        0.9442 
-       0.9553        0.9875        1.0343        1.0469        1.1178 
-       1.1473        1.1514        1.2978        1.3262        1.3388 
-       1.6392        1.6635        1.7223        1.7898        1.8297 
-       1.8307        1.9788        2.0029        2.0355        2.1451 
-       2.2279        2.2546        2.3242        2.4228        2.4817 
-       2.7028        2.7205        3.2093        3.2118        3.3159 
-       3.3383        3.3647        3.3966        3.5411        3.7607 
-       3.7704        3.9929 
-
-
-
-Running program took 26.34 s.
-Current time is Wed 25 Feb 2015 01:33:12.
+Basis set aug-cc-pVDZ found in file aug-cc-pVDZ.gbs in /home/work/erkale/source/erkale.sap/basis/.
+Loaded initial state orbital from checkpoint.
+
+Running program took 0.01 s.
+Current time is Sat 22 Sep 2018 23:40:03.

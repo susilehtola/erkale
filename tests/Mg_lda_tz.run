@@ -12,3 +12,4 @@ DFTGrid 50 -302
 Logfile Mg_lda_tz.log
 SaveChk Mg_lda_tz.chk
 
+BasisRotate false

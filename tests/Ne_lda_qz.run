@@ -9,3 +9,4 @@ Guess Core
 DFTGrid 50 -302
 Logfile Ne_lda_qz.log
 SaveChk Ne_lda_qz.chk
+BasisRotate false

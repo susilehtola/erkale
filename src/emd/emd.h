@@ -295,19 +295,19 @@ class EMD {
   std::vector<emd_t> get() const;
 
   /// Save values of momentum density
-  void save(const char * fname) const;
+  void save(const std::string & fname) const;
 
   /// Calculate moments of momentum density
   arma::mat moments() const;
   /// Save moments of momentum density
-  void moments(const char * fname) const;
+  void moments(const std::string & fname) const;
 
   /// Calculate Compton profile
   arma::mat compton_profile() const;
   /// Save Compton profile in "raw" form
-  void compton_profile(const char * raw) const;
+  void compton_profile(const std::string & raw) const;
   /// Save Compton profile in interpolated form
-  void compton_profile_interp(const char * interp) const;
+  void compton_profile_interp(const std::string & interp) const;
 };
 
 #endif

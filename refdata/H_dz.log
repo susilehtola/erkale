@@ -1,39 +1,54 @@
-Basis set cc-pVDZ found in file cc-pVDZ.gbs in /home/work/erkale/source/erkale/basis/.
+ERKALE - HF/DFT from Hel, OpenMP version, running on 4 cores.
+(c) Susi Lehtola, 2010-2016.
 
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+At svn revision 1938.
+
+Running on host dx7-lehtola.chem.helsinki.fi.
+
+Basis set cc-pVDZ found in file cc-pVDZ.gbs in /home/work/erkale/source/erkale.sap/basis/.
 
 Current Settings used by ERKALE:
      AtomGuess      	                Auto	Method used for atomic guess (Auto for same as method)
      Basis          	             cc-pVDZ	Basis set used in calculation
      BasisCutoff    	           1.000e-08	Cutoff for dropping out small primitives from contraction
      BasisOrth      	                Auto	Method of orthonormalization of basis set
-     BasisRotate    	                true	Rotate basis set to remove redundant functions?
+     BasisRotate    	               false	Rotate basis set to remove redundant functions?
      C1-DIIS        	               false	Use older version of DIIS (C1-DIIS instead of C2-DIIS)?
      Charge         	                   0	Total charge of system
+     Cholesky       	                true	Use Cholesky decomposition?
+     CholeskyMode   	                   0	Save/load integrals? 0 no, 1 save, -1 load
+     CholeskyNAFThr 	           0.000e+00	Cholesky natural auxiliary function threshold
+     CholeskyShThr  	           1.000e-02	Cholesky cache threshold
+     CholeskyThr    	           1.000e-07	Cholesky decomposition threshold
+     ConvThr        	           1.000e-06	Orbital gradient convergence threshold
      DIISEps        	           1.000e-01	Start mixing in DIIS when error is
      DIISOrder      	                  10	How many DIIS iterations to keep in memory?
      DIISThr        	           1.000e-02	DIIS error threshold for DIIS updates
      DecFock        	               false	Use decontracted basis to calculate Fock matrix (direct HF)
      Decontract     	                    	Indices of atoms to decontract basis set for
-     DeltaEmax      	           1.000e-06	Maximum allowed change of energy
-     DeltaPmax      	           1.000e-06	Maximum allowed maximum difference of density matrix
-     DeltaPrms      	           1.000e-08	Maximum allowed RMS difference of density matrix
      DensityFitting 	               false	Use density fitting / RI?
+     DimerSymmetry  	               false	Do special calculation on dimer along z axis
      Direct         	               false	Calculate two-electron integrals (or density fitting) on-the-fly?
      EField         	         0.0 0.0 0.0	Electric field
      FittingBasis   	                Auto	Basis to use for density fitting / RI (Auto for automatic)
      FittingMemory  	                1000	Amount of memory in MB to use for exchange fitting
      FittingThreshold	           1.000e-08	Linear dependence threshold for Coulomb integrals in density fitting
      ForcePol       	               false	Force polarized calculation
-     FreezeCore     	               false	Freeze the atomic cores?
-     Guess          	                Core	Used guess: atomic (default), core, or GWH
+     Guess          	                Core	Used guess: SAD (default), NO, core, or GWH
+     InputBohr      	               false	Use atomic units as input units instead of angstrom?
      IntegralThresh 	           1.000e-14	Integral screening threshold
-     LineSearch     	               false	Do line search in level shift (EXPENSIVE!)
      LoadChk        	                    	File to load old results from
      Logfile        	            H_dz.log	File to print out full information, stdout for screen
      MaxIter        	                 100	Maximum number of iterations in SCF cycle
      Method         	                  HF	Method used in calculation (HF or a DFT functional)
      Multiplicity   	                   2	Spin multiplicity
      Occupancies    	                    	Orbital occupancies
+     OptLM          	                true	If spherical harmonics used, use cartesian s and p functions?
      SaveChk        	            H_dz.chk	File to use as checkpoint
      Shift          	           0.000e+00	Level shift to use in Hartree
      StrictIntegrals	               false	Use strict integrals?
@@ -42,7 +57,6 @@ Current Settings used by ERKALE:
      UseBroyden     	               false	Use Broyden mixing of Fock matrices?
      UseDIIS        	                true	Use Pulay's Direct Inversion in the Iterative Subspace?
      UseLM          	                true	Use a spherical harmonics basis set by default?
-     UseTRDSM       	               false	Use Trust-Region DSM?
      UseTRRH        	               false	Use Trust-Region Roothaan-Hall?
      Verbose        	                true	Verbose calculation?
 
@@ -62,16 +76,27 @@ Spherical harmonic Gaussians are used by default, there are 5 cartesians.
 
 Forming overlap matrix ... done (0.00 s)
 Forming kinetic energy matrix ... done (0.00 s)
-Forming nuclear attraction matrix ... done (0.00 s)
+Forming nuclear attraction matrix ... done (0.01 s)
 
-Smallest eigenvalue of overlap matrix is 3.15e-01, ratio to largest is 1.87e-01.
+Smallest eigenvalue of overlap matrix is 9.63e-02, ratio to largest is 5.06e-02.
 Using symmetric orthogonalization.
 Basis set diagonalized in 0.00 s.
 
-Forming table of 213 ERIs, requiring 1 ki of memory ... done (0.00 s)
+Computing repulsion integrals.
+Screening by shell pairs and symmetry reduced dofs by factor 1.67.
+Individual screening reduced dofs by a total factor 1.67.
+Computing Cholesky vectors. Estimated memory size is 1 ki - 5 ki.
+Cholesky vectors no     0 -     5 computed, error is 1.306097e-01 (0.00 s).
+Cholesky vectors no     6 -     8 computed, error is 5.992414e-02 (0.00 s).
+Cholesky vectors no     9 -     9 computed, error is 1.253460e-02 (0.00 s).
+Cholesky vectors no    10 -    10 computed, error is 2.077008e-03 (0.00 s).
+Cholesky vectors no    11 -    13 computed, error is 5.253628e-05 (0.00 s).
+Cholesky vectors no    14 -    14 computed, error is 0.000000e+00 (0.00 s).
+Cholesky decomposition finished in 0.00 s. Realized memory size is 11 ki.
+Time use: integrals 88.4 %, linear algebra 11.6 %.
 6 shell pairs out of 6 are significant.
 
-Initialization of computation done in 0.00 s.
+Initialization of computation done in 0.03 s.
 
 alpha: HOMO-LUMO gap is   18.54 eV. Energies of lowest lying orbitals:
       -0.4993*       0.1819        0.9104        0.9104        0.9104 
@@ -79,8 +104,8 @@ beta:  Energies of lowest lying orbitals:
       -0.4993        0.1819        0.9104        0.9104        0.9104 
 
  ******* Iteration    1 ********
-Forming HF Coulomb matrix ... done (0.00 s)
-Forming HF exchange matrix ... done (0.00 s)
+Forming Cholesky Coulomb matrix ... done (0.00 s)
+Forming Cholesky exchange matrix ... done (0.00 s)
 ADIIS weights
  1.00e+00 
 CDIIS weights
@@ -90,60 +115,13 @@ CDIIS weights
 
 Solving SCF equations ... done (0.00 s)
 
-DIIS error                    :  9.036419e-17
+Total energy                  : -4.9927840341958302e-01
+DIIS error                    :  2.162004e-16
 Energy change                 : -4.992784e-01
-Max total density change      :  5.551115e-17
-Max rms   density change      :  1.359740e-17
-Max total alpha density change:  1.110223e-16
-Max rms   alpha density change:  2.719480e-17
-Max total beta  density change:  0.000000e+00
-Max rms   beta  density change:  0.000000e+00
-Dipole mu = ( 0.00000000,  0.00000000,  0.00000000) D
-
-Iteration took 0.00 s.
-
- ******* Iteration    2 ********
-Forming HF Coulomb matrix ... done (0.00 s)
-Forming HF exchange matrix ... done (0.00 s)
-ADIIS weights
- 1.00e+00  4.44e-06 
-CDIIS weights
- 1.00e+00  0.00e+00 
- DIIS weights
- 1.00e+00  0.00e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  7.618101e-17
-Energy change                 :  1.110223e-16
-Max total density change      :  0.000000e+00
-Max rms   density change      :  0.000000e+00
-Max total alpha density change:  0.000000e+00
-Max rms   alpha density change:  0.000000e+00
-Max total beta  density change:  0.000000e+00
-Max rms   beta  density change:  0.000000e+00
-Dipole mu = ( 0.00000000,  0.00000000,  0.00000000) D
-
-Iteration took 0.00 s.
-
- ******* Iteration    3 ********
-Forming HF Coulomb matrix ... done (0.00 s)
-Forming HF exchange matrix ... done (0.00 s)
-ADIIS weights
- 9.89e-01  5.37e-03  5.37e-03 
-CDIIS weights
- 1.00e+00 -5.55e-17  0.00e+00 
- DIIS weights
- 1.00e+00 -5.55e-17  0.00e+00 
-
-Solving SCF equations ... done (0.00 s)
-
-DIIS error                    :  7.618101e-17
-Energy change                 :  0.000000e+00
-Max total density change      :  0.000000e+00
-Max rms   density change      :  0.000000e+00
-Max total alpha density change:  0.000000e+00
-Max rms   alpha density change:  0.000000e+00
+Max total density change      :  2.220446e-16
+Max rms   density change      :  5.415051e-17
+Max total alpha density change:  4.440892e-16
+Max rms   alpha density change:  1.083010e-16
 Max total beta  density change:  0.000000e+00
 Max rms   beta  density change:  0.000000e+00
 Dipole mu = ( 0.00000000,  0.00000000,  0.00000000) D
@@ -153,15 +131,15 @@ Iteration took 0.00 s.
  ******* Convergence achieved ********
 Solution of UHF took 0.00 s.
 
-Kinetic               energy:  4.9928963926716402e-01
-Nuclear attraction    energy: -9.9856804268674682e-01
-Total one-electron    energy: -4.9927840341958274e-01
+Kinetic               energy:  4.9928963926716419e-01
+Nuclear attraction    energy: -9.9856804268674726e-01
+Total one-electron    energy: -4.9927840341958302e-01
 Nuclear repulsion     energy:  0.0000000000000000e+00
-Coulomb               energy:  3.1263165256579617e-01
-Exchange              energy: -3.1263165256579617e-01
+Coulomb               energy:  3.1263165256579650e-01
+Exchange              energy: -3.1263165256579650e-01
 -----------------------------------------------------
-                Total energy: -4.9927840341958274e-01
-               Virial factor:  9.9997749633339528e-01
+                Total energy: -4.9927840341958302e-01
+               Virial factor:  9.9997749633339550e-01
 
 Dipole mu = ( 0.00000000,  0.00000000,  0.00000000) D
 
@@ -172,7 +150,7 @@ beta:  Orbital energies:
 
 Mulliken charges: alpha, beta, total (incl. nucleus)
    1 H           -1.000000        0.000000        0.000000
-Sum of Mulliken charges 4.440892e-16
+Sum of Mulliken charges 1.110223e-16
 
 Mulliken spin charges
    1 H            1.000000
@@ -181,5 +159,7 @@ Sum of Mulliken spin charges 1.000000e+00
 Electron density at nuclei: alpha, beta, total
    1 H            0.268755        0.000000        0.268755
 
-Running program took 0.02 s.
-Current time is Wed 25 Feb 2015 01:22:47.
+The spin expectation value <S^2> is 0.750000
+
+Running program took 0.04 s.
+Current time is Sat 22 Sep 2018 22:37:28.

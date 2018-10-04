@@ -441,7 +441,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
       diis.solve_F(sol.Ha,sol.Hb);
 #endif
       diissucc=true;
-    } catch(std::runtime_error *) {
+    } catch(std::runtime_error &) {
       diissucc=false;
     }
 
@@ -484,7 +484,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #ifdef RESTRICTED
       arma::mat Cnew;
       arma::vec Enew;
-      TRRH_update(sol.H,sol.C,S,Cnew,Enew,nocc,shift,verbose);
+      TRRH_update(sol.H,sol.C,S,Cnew,Enew,nocc,verbose,trrhmins);
 
       // Update solution
       sol.C=Cnew;
@@ -495,11 +495,11 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #else
       arma::mat Canew;
       arma::vec Eanew;
-      TRRH_update(sol.Ha,sol.Ca,S,Canew,Eanew,nocca,shift,verbose);
+      TRRH_update(sol.Ha,sol.Ca,S,Canew,Eanew,nocca,verbose,trrhmins);
 
       arma::mat Cbnew;
       arma::vec Ebnew;
-      TRRH_update(sol.Hb,sol.Cb,S,Cbnew,Ebnew,noccb,shift,verbose);
+      TRRH_update(sol.Hb,sol.Cb,S,Cbnew,Ebnew,noccb,verbose,trrhmins);
 
       // Update solutions
       sol.Ca=Canew;

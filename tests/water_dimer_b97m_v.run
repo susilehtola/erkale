@@ -5,9 +5,10 @@ Basis aug-cc-pVDZ
 DensityFitting false
 Direct false
 IntegralThresh 1e-14
-DFTGrid 50 -194
-NLGrid 25 -170
+DFTGrid 99 -590
+NLGrid 50 -194
 
 
 Logfile water_dimer_b97m_v.log
 SaveChk water_dimer_b97m_v.chk
+BasisRotate false

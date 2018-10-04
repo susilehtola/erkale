@@ -11,3 +11,4 @@ Guess Core
 DFTGrid 50 -302
 Logfile Mg+_tpss_tz.log
 SaveChk Mg+_tpss_tz.chk
+BasisRotate false

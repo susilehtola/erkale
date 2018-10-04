@@ -83,6 +83,8 @@ void Settings::add_scf_settings() {
   add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);
   // Use Trust-Region Roothaan-Hall?
   add_bool("UseTRRH", "Use Trust-Region Roothaan-Hall?", false);
+  // TRRH minimal overlap
+  add_double("TRRHminS", "Trust-Region Roothaan-Hall minimal occupied orbital overlap", 0.975);
 
   // Total charge of system
   add_int("Charge", "Total charge of system", 0, true);
@@ -134,9 +136,7 @@ void Settings::add_scf_settings() {
 }
 
 void Settings::add_dft_settings() {
-  // Store full DFT grid in memory?
-  add_bool("DFTDirect", "Save memory by not storing values of basis functions in memory", false);
-  // Store full DFT grid in memory?
+  // Use Lobatto quadrature?
   add_bool("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false);
 
   // Grid to use
@@ -441,7 +441,7 @@ void Settings::parse(std::string filename, bool scf) {
 	  // Add dft related settings
 	  try {
 	    add_dft_settings();
-	  } catch(std::runtime_error *) {
+	  } catch(std::runtime_error &) {
 	    // Settings already added, as e.g. in xrs executable.
 	  }
 	  set_string("Method",words[1]);

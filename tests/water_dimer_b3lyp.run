@@ -11,3 +11,4 @@ IntegralThresh 1e-14
 
 Logfile water_dimer_b3lyp.log
 SaveChk water_dimer_b3lyp.chk
+BasisRotate false

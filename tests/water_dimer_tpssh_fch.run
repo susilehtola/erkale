@@ -6,8 +6,9 @@ DensityFitting false
 Direct false
 IntegralThresh 1e-14
 XRSMethod fch
-
+DFTGrid 99 -590
 
 LoadChk water_dimer_tpssh.chk
 Logfile water_dimer_tpssh_fch.log
 SaveChk water_dimer_tpssh_fch.chk
+BasisRotate false

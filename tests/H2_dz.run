@@ -11,3 +11,4 @@ Guess Core
 
 Logfile H2_dz.log
 SaveChk H2_dz.chk
+BasisRotate false

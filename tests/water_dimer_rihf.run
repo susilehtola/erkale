@@ -12,3 +12,4 @@ IntegralThresh 1e-14
 
 Logfile water_dimer_rihf.log
 SaveChk water_dimer_rihf.chk
+BasisRotate false

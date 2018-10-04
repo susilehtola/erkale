@@ -5,9 +5,10 @@ Basis aug-cc-pVDZ
 DensityFitting false
 Direct false
 IntegralThresh 1e-14
-
+DFTGrid 99 -590
 
 
 
 Logfile water_dimer_tpssh.log
 SaveChk water_dimer_tpssh.chk
+BasisRotate false

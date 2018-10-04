@@ -11,3 +11,4 @@ IntegralThresh 1e-14
 
 Logfile H2_lda_dz.log
 SaveChk H2_lda_dz.chk
+BasisRotate false

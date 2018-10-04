@@ -11,3 +11,4 @@ Guess Core
 
 Logfile Mg+_rohf_tz.log
 SaveChk Mg+_rohf_tz.chk
+BasisRotate false

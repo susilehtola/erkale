@@ -199,7 +199,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 
   try {
     ints.resize(N);
-  } catch(std::bad_alloc *) {
+  } catch(std::bad_alloc &) {
     std::ostringstream oss;
 
     ERROR_INFO();

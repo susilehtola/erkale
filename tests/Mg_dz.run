@@ -11,3 +11,4 @@ Guess Core
 
 Logfile Mg_dz.log
 SaveChk Mg_dz.chk
+BasisRotate false

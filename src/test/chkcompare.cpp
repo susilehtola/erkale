@@ -294,7 +294,7 @@ int main(int argc, char ** argv) {
       cur.read("XRSMethod",xrsmethod);
       cur.read("XRSSpin",xrsspin);
       xrs=true;
-    } catch(std::runtime_error *) {
+    } catch(std::runtime_error &) {
       xrs=false;
     }
 

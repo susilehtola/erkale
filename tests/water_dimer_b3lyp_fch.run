@@ -12,3 +12,4 @@ LoadChk water_dimer_b3lyp.chk
 Logfile water_dimer_b3lyp_fch.log
 SaveChk water_dimer_b3lyp_fch.chk
 
+BasisRotate false

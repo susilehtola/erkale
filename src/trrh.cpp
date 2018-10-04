@@ -22,17 +22,6 @@
 
 #include <cfloat>
 
-/// Minimal allowed value for projection
-#define MINA 0.98
-
-/// Maximum allowed number of mu iterations
-#define NMU 50
-
-/// Mu increment
-#define DELTAMU 1.0
-/// Minimal allowed value for level shift
-#define EPSILONMU 1e-4
-
 /// Throw error if eigenvalues of K^2 are bigger than (should be negative!)
 #define MAXNEGEIG 1e-4
 
@@ -132,7 +121,34 @@ template<typename T> arma::Mat<T> make_expK(const arma::Mat<T> & kappa) {
   return cosKsq+sincKsq*K;
 }
 
-template<typename T> void TRRH_update_wrk(const arma::Mat<T> & F_AO, const arma::Mat<T> & C, const arma::mat & S, arma::Mat<T> & Cnew, arma::vec & Enew, size_t nocc, double minshift, bool verbose) {
+template<typename T> arma::Mat<T> get_rotation(const arma::Mat<T> & grad, const arma::mat & hess, size_t nocc, size_t nvirt, double mu) {
+  // Get (approximation to) smallest negative eigenvalue
+  double minhess=hess.min();
+
+  // Get rotation parameters
+  arma::Mat<T> kappa(nvirt,nocc);
+  for(size_t a=0;a<nvirt;a++)
+    for(size_t i=0;i<nocc;i++)
+      kappa(a,i)=-grad(a,i)/(hess(a,i)-minhess+mu);
+
+  // Get rotation matrix
+  return make_expK<T>(kappa);
+}
+
+template<typename T> double calculate_overlap(const arma::Mat<T> & grad, const arma::mat & hess, size_t nocc, size_t nvirt, double mu) {
+  // Grab the occupied-occupied block
+  arma::Mat<T> expK(get_rotation<T>(grad,hess,nocc,nvirt,mu).submat(0,0,nocc-1,nocc-1));
+
+  // Calculate projections
+  arma::vec proj(nocc);
+  for(size_t i=0;i<nocc;i++)
+    proj(i)=arma::norm(expK.col(i),2);
+
+  // Return minimal projection
+  return arma::min(proj);
+}
+
+template<typename T> void TRRH_update_wrk(const arma::Mat<T> & F_AO, const arma::Mat<T> & C, arma::Mat<T> & Cnew, arma::vec & Enew, size_t nocc, double minovl, bool verbose) {
   // Transform Fock matrix into MO basis
   const arma::Mat<T> F_MO=arma::trans(C)*F_AO*C;
 
@@ -181,89 +197,65 @@ template<typename T> void TRRH_update_wrk(const arma::Mat<T> & F_AO, const arma:
       hess(a,i)=4.0*(Enew(nocc+a)-Enew(i)); // eq (29b)
     }
 
-  // Get (approximation to) smallest negative eigenvalue
-  double minhess=hess.min();
-
   // Print legend
   if(verbose) {
     printf("\t%2s %12s %5s time\n","it","mu","Amin");
     fflush(stdout);
   }
 
-  // Check shift value is sane
-  if(minshift<EPSILONMU)
-    minshift=EPSILONMU;
-
+  // Tolerance for final overlap
+  const double Atol=1e-5;
   // Increase mu until the change is small enough
   const double fac=2.0;
-  double mu=minshift/fac;
-  size_t iit=0;
-  double amin;
+  // Need a finite value for preconditioning to work properly
+  double mu=1e-6;
 
-  bool refine=false;
+  // Bracket value
   double lmu=0.0;
   double rmu=0.0;
-
+  size_t iit=0;
+  double amin;
   while(true) {
     iit++;
     Timer t;
-
-    // Value of mu is
-    if(!refine)
-      mu*=fac;
-    else {
-      mu=(lmu+rmu)/2.0;
-    }
-
-    // Get rotation parameters
-    arma::Mat<T> kappa(nvirt,nocc);
-    for(size_t a=0;a<nvirt;a++)
-      for(size_t i=0;i<nocc;i++)
-	kappa(a,i)=-grad(a,i)/(hess(a,i)-minhess+mu);
-
-    // Get rotation matrix
-    arma::Mat<T> expK=make_expK<T>(kappa);
-
-    // New orbital coefficients are given by exp(-K)
-    Cnew=C_ov*arma::trans(expK);
-
-    // Calculate minimal projection.
-    amin=DBL_MAX;
-    arma::Mat<T> proj=arma::trans(C.cols(0,nocc-1))*S*Cnew.cols(0,nocc-1);
-    for(size_t i=0;i<nocc;i++) {
-      // Compute projection
-      double a=arma::norm(proj.row(i),2);
-      if(a<amin)
-	amin=a;
-    }
+    amin=calculate_overlap<T>(grad,hess,nocc,nvirt,mu);
 
     if(verbose) {
       printf("\t%2i %e %.3f %s\n",(int) iit,mu,amin,t.elapsed().c_str());
       fflush(stdout);
     }
 
-    // Have we reached the refine stage?
-    if(amin>=MINA && !refine) {
-      // Did we converge straight away?
-      if(mu==minshift)
-	break;
-
-      refine=true;
+    if(amin>=minovl) {
+      // Converged
       rmu=mu;
-      lmu=mu/fac;
-    } else if(refine) {
-      // Determine what to do.
-      if(amin<MINA)
-	lmu=mu;
-      else if(amin>MINA)
-	rmu=mu;
-      else
-	break;
-
-      // Have we determined the shift with the wanted accuracy?
-      if(fabs(amin-MINA) <= 1e-4)
-	break;
+      break;
+    } else {
+      // Not converged
+      lmu=mu;
+      mu*=fac;
     }
+  }
+
+  // Refine value
+  while(true) {
+    iit++;
+    Timer t;
+
+    mu=(lmu+rmu)/2.0;
+    amin=calculate_overlap<T>(grad,hess,nocc,nvirt,mu);
+
+    if(verbose) {
+      printf("\t%2i %e %.3f %s\n",(int) iit,mu,amin,t.elapsed().c_str());
+      fflush(stdout);
+    }
+
+    if(amin<minovl)
+      lmu=mu;
+    else
+      rmu=mu;
+
+    if(std::abs(amin-minovl)<=Atol)
+      break;
   }
 
   if(verbose) {
@@ -271,36 +263,30 @@ template<typename T> void TRRH_update_wrk(const arma::Mat<T> & F_AO, const arma:
     fflush(stdout);
   }
 
-  // Make absolutely sure orbitals stay orthonormal.
-  for(size_t i=0;i<norbs;i++) {
-    for(size_t j=0;j<i;j++)
-      Cnew.col(i)-=arma::as_scalar(arma::trans(Cnew.col(i))*S*Cnew.col(j))*Cnew.col(j);
-
-    Cnew.col(i)/=sqrt(arma::as_scalar(arma::trans(Cnew.col(i))*S*Cnew.col(i)));
-  }
+  // Update orbitals
+  Cnew=C_ov*get_rotation<T>(grad,hess,nocc,nvirt,mu);
 }
 
-void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, double minshift, bool verbose) {
-  TRRH_update_wrk<double>(F_AO,C,S,Cnew,Enew,nocc,minshift,verbose);
+void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, bool verbose, double minovl) {
+  TRRH_update_wrk<double>(F_AO,C,Cnew,Enew,nocc,minovl,verbose);
 
   // Debug
   try {
     check_orth(Cnew,S,false);
-  } catch(std::runtime_error *) {
+  } catch(std::runtime_error &) {
     ERROR_INFO();
     throw std::runtime_error("Orbitals updated by TRRH are not orthonormal!\n");
   }
 }
 
-void TRRH_update(const arma::cx_mat & F_AO, const arma::cx_mat & C, const arma::mat & S, arma::cx_mat & Cnew, arma::vec & Enew, size_t nocc, double minshift, bool verbose) {
-  TRRH_update_wrk< std::complex<double> >(F_AO,C,S,Cnew,Enew,nocc,minshift,verbose);
+void TRRH_update(const arma::cx_mat & F_AO, const arma::cx_mat & C, const arma::mat & S, arma::cx_mat & Cnew, arma::vec & Enew, size_t nocc, bool verbose, double minovl) {
+  TRRH_update_wrk< std::complex<double> >(F_AO,C,Cnew,Enew,nocc,minovl,verbose);
 
   // Debug
   try {
     check_orth(Cnew,S,false);
-  } catch(std::runtime_error *) {
+  } catch(std::runtime_error &) {
     ERROR_INFO();
     throw std::runtime_error("Orbitals updated by TRRH are not orthonormal!\n");
   }
 }
-

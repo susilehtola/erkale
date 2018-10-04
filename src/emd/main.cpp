@@ -148,33 +148,32 @@ int main(int argc, char **argv) {
 
       for(size_t i=0;i<idx.size();i++) {
 	// Names of output files
-	char emdname[80];
-	char momname[80];
-	char Jname[80];
-	char Jintname[80];
+        std::ostringstream emdname;
+        std::ostringstream momname;
+        std::ostringstream Jname;
+        std::ostringstream Jintname;
 
-	char suffix[80];
-	if(l==0)
-	  sprintf(suffix,".txt");
-	else
-	  sprintf(suffix,"_%i_%i.txt",l,m);
+        std::ostringstream suffix;
+	if(l>0)
+	  suffix << "_" << l << "_" << m;
+        suffix << ".txt";
 
 	if(restr) {
-	  sprintf(emdname,"emd-%i%s",(int) idx[i]+1,suffix);
-	  sprintf(momname,"moments-%i%s",(int) idx[i]+1,suffix);
-	  sprintf(Jname,"compton-%i%s",(int) idx[i]+1,suffix);
-	  sprintf(Jintname,"compton-interp-%i%s",(int) idx[i]+1,suffix);
+          emdname << "emd-" << idx[i]+1 << suffix.str();
+          momname << "moments-" << idx[i]+1 << suffix.str();
+          Jname << "compton-" << idx[i]+1 << suffix.str();
+          Jintname << "compton-interp-" << idx[i]+1 << suffix.str();
 	} else {
 	  if(ispin==0) {
-	    sprintf(emdname,"emd-a-%i%s",(int) idx[i]+1,suffix);
-	    sprintf(momname,"moments-a-%i%s",(int) idx[i]+1,suffix);
-	    sprintf(Jname,"compton-a-%i%s",(int) idx[i]+1,suffix);
-	    sprintf(Jintname,"compton-interp-a-%i%s",(int) idx[i]+1,suffix);
+            emdname << "emd-a-" << idx[i]+1 << suffix.str();
+            momname << "moments-a-" << idx[i]+1 << suffix.str();
+            Jname << "compton-a-" << idx[i]+1 << suffix.str();
+            Jintname << "compton-interp-a-" << idx[i]+1 << suffix.str();
 	  } else {
-	    sprintf(emdname,"emd-b-%i%s",(int) idx[i]+1,suffix);
-	    sprintf(momname,"moments-b-%i%s",(int) idx[i]+1,suffix);
-	    sprintf(Jname,"compton-b-%i%s",(int) idx[i]+1,suffix);
-	    sprintf(Jintname,"compton-interp-b-%i%s",(int) idx[i]+1,suffix);
+            emdname << "emd-b-" << idx[i]+1 << suffix.str();
+            momname << "moments-b-" << idx[i]+1 << suffix.str();
+            Jname << "compton-b-" << idx[i]+1 << suffix.str();
+            Jintname << "compton-interp-b-" << idx[i]+1 << suffix.str();
 	  }
 	}
 
@@ -198,11 +197,11 @@ int main(int argc, char **argv) {
 	} else
 	  emd.fixed_fill();
 
-	emd.save(emdname);
-	emd.moments(momname);
+	emd.save(emdname.str());
+	emd.moments(momname.str());
 	if(l==0 && m==0) {
-	  emd.compton_profile(Jname);
-	  emd.compton_profile_interp(Jintname);
+	  emd.compton_profile(Jname.str());
+	  emd.compton_profile_interp(Jintname.str());
 	}
 
 	delete poseval;

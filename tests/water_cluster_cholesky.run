@@ -11,3 +11,4 @@ IntegralThresh 1e-14
 
 Logfile water_cluster_cholesky.log
 SaveChk water_cluster_cholesky.chk
+BasisRotate false
