@@ -83,6 +83,8 @@ void Settings::add_scf_settings() {
   add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);
   // Use Trust-Region Roothaan-Hall?
   add_bool("UseTRRH", "Use Trust-Region Roothaan-Hall?", false);
+  // TRRH minimal overlap
+  add_double("TRRHminS", "Trust-Region Roothaan-Hall minimal occupied orbital overlap", 0.975);
 
   // Total charge of system
   add_int("Charge", "Total charge of system", 0, true);

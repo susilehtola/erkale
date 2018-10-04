@@ -88,6 +88,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   useadiis=set.get_bool("UseADIIS");
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
+  trrhmins=set.get_double("TRRHminS");
 
   maxiter=set.get_int("MaxIter");
   shift=set.get_double("Shift");

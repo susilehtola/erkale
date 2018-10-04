@@ -246,6 +246,7 @@ class SCF {
   bool usebroyden;
   /// Use Trust-Region Roothaan-Hall?
   bool usetrrh;
+  double trrhmins;
 
   /// Maximum number of iterations
   int maxiter;
