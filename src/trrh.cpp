@@ -207,42 +207,63 @@ template<typename T> void TRRH_update_wrk(const arma::Mat<T> & F_AO, const arma:
   const double Atol=1e-5;
   // Increase mu until the change is small enough
   const double fac=2.0;
-  // Need a finite value for preconditioning to work properly
-  double mu=1e-6;
-
-  // Bracket value
-  double lmu=0.0;
-  double rmu=0.0;
+  // Iteration count
   size_t iit=0;
-  double amin;
+
+  // Bracket value. First make sure that we are in the linear range
+  const double mu0=100.0;
+  double rmu=mu0;
   while(true) {
     iit++;
     Timer t;
-    amin=calculate_overlap<T>(grad,hess,nocc,nvirt,mu);
+    double amin=calculate_overlap<T>(grad,hess,nocc,nvirt,rmu);
 
     if(verbose) {
-      printf("\t%2i %e %.3f %s\n",(int) iit,mu,amin,t.elapsed().c_str());
+      printf("\t%2i %e %.3f %s\n",(int) iit,rmu,amin,t.elapsed().c_str());
       fflush(stdout);
     }
 
-    if(amin>=minovl) {
+    if(amin>minovl) {
       // Converged
-      rmu=mu;
       break;
     } else {
       // Not converged
-      lmu=mu;
-      mu*=fac;
+      rmu*=fac;
     }
   }
+
+  // Next, figure out the lower limit
+  double lmu=rmu/fac;
+  while(true) {
+    iit++;
+    Timer t;
+    double amin=calculate_overlap<T>(grad,hess,nocc,nvirt,lmu);
+
+    if(verbose) {
+      printf("\t%2i %e %.3f %s\n",(int) iit,lmu,amin,t.elapsed().c_str());
+      fflush(stdout);
+    }
+
+    if(amin<minovl) {
+      // Converged
+      break;
+    } else {
+      // Not converged
+      lmu/=fac;
+    }
+  }
+
+  // Make sure bracket is tight enough
+  if(rmu==mu0)
+    rmu=lmu*fac;
 
   // Refine value
   while(true) {
     iit++;
     Timer t;
 
-    mu=(lmu+rmu)/2.0;
-    amin=calculate_overlap<T>(grad,hess,nocc,nvirt,mu);
+    double mu=(lmu+rmu)/2.0;
+    double amin=calculate_overlap<T>(grad,hess,nocc,nvirt,mu);
 
     if(verbose) {
       printf("\t%2i %e %.3f %s\n",(int) iit,mu,amin,t.elapsed().c_str());
@@ -264,7 +285,7 @@ template<typename T> void TRRH_update_wrk(const arma::Mat<T> & F_AO, const arma:
   }
 
   // Update orbitals
-  Cnew=C_ov*get_rotation<T>(grad,hess,nocc,nvirt,mu);
+  Cnew=C_ov*get_rotation<T>(grad,hess,nocc,nvirt,(lmu+rmu)/2.0);
 }
 
 void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, bool verbose, double minovl) {
