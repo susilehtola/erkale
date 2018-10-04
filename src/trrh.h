@@ -30,8 +30,8 @@
  * Input: Fock matrix F, MO coefficients C, overlap matrix S, number of occupied states nocc
  * Output: new orbital coefficients Cnew and pseudo-orbital energies Enew
  */
-void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, double minshift=0.1, bool verbose=true);
+void TRRH_update(const arma::mat & F_AO, const arma::mat & C, const arma::mat & S, arma::mat & Cnew, arma::vec & Enew, size_t nocc, bool verbose, double minovl);
 /// Same, but for complex matrices
-void TRRH_update(const arma::cx_mat & F_AO, const arma::cx_mat & C, const arma::mat & S, arma::cx_mat & Cnew, arma::vec & Enew, size_t nocc, double minshift=0.1, bool verbose=true);
+void TRRH_update(const arma::cx_mat & F_AO, const arma::cx_mat & C, const arma::mat & S, arma::cx_mat & Cnew, arma::vec & Enew, size_t nocc, bool verbose, double minovl);
 
 #endif
