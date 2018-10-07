@@ -68,14 +68,14 @@ void Settings::add_scf_settings() {
 
   // Use DIIS.
   add_bool("UseDIIS", "Use Pulay's Direct Inversion in the Iterative Subspace?", true);
-  // Use old version of DIIS?
-  add_bool("C1-DIIS", "Use older version of DIIS (C1-DIIS instead of C2-DIIS)?", false);
   // Number of DIIS matrices to use?
   add_int("DIISOrder", "How many DIIS iterations to keep in memory?", 10);
   // DIIS threshold
   add_double("DIISEps", "Start mixing in DIIS when error is", 0.1);
   // DIIS threshold
   add_double("DIISThr", "DIIS error threshold for DIIS updates", 0.01);
+  // DIIS threshold
+  add_bool("DIISComb", "Combine alpha and beta errors in unrestricted calcs?", false);
   // Use ADIIS?
   add_bool("UseADIIS", "Use ADIIS for Fock matrix interpolation?", true);
 
