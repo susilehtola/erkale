@@ -83,10 +83,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   dimcalc=set.get_bool("DimerSymmetry");
 
   usediis=set.get_bool("UseDIIS");
-  diis_c1=set.get_bool("C1-DIIS");
   diisorder=set.get_int("DIISOrder");
   diiseps=set.get_double("DIISEps");
   diisthr=set.get_double("DIISThr");
+  diiscomb=set.get_bool("DIISComb");
   useadiis=set.get_bool("UseADIIS");
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
