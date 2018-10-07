@@ -75,11 +75,19 @@ bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs);
  * P. Pulay, "Improved SCF Convergence Acceleration", J. Comp. Chem. 3
  * (1982), pp. 556 - 560.
  *
- * Using C1-DIIS is, however, not recommended. What is used by
- * default, instead, is C2-DIIS, which is documented in the article
+ * Using C1-DIIS is, however, not recommended. An improved method that
+ * yields better convergence was suggested in
  *
  * H. Sellers, "The C2-DIIS convergence acceleration algorithm",
  * Int. J. Quant. Chem. 45 (1993), pp. 31 - 41
+ *
+ * which used to be the default method in ERKALE. However, C2-DIIS is
+ * still problematic when linear dependencies exist in the basis. The
+ * current implementation employs a singular value decomposition as
+ * suggested in
+ *
+ * Hans Henrik B. Sørensen, and Ole Østerby, "On One-Point Iterations
+ * and DIIS", AIP Conference Proceedings 1168 (2009), pp. 468 - 472.
  *
  *
  * The ADIIS algorithm is described in
@@ -101,8 +109,6 @@ class DIIS {
 
   /// Use DIIS?
   bool usediis;
-  /// C1-DIIS?
-  bool c1diis;
   /// Use ADIIS?
   bool useadiis;
   /// Verbose operation?
@@ -144,7 +150,7 @@ class DIIS {
 
  public:
   /// Constructor
-  DIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
+  DIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
   /// Destructor
   virtual ~DIIS();
 
@@ -173,17 +179,17 @@ class rDIIS: protected DIIS {
 
  public:
   /// Constructor
-  rDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
+  rDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
   /// Destructor
   ~rDIIS();
 
   /// Add matrices to stack
   void update(const arma::mat & F, const arma::mat & P, double E, double & error);
 
-  /// Compute new Fock matrix, use C1-DIIS if wanted
+  /// Compute new Fock matrix
   void solve_F(arma::mat & F);
 
-  /// Compute new density matrix, use C1-DIIS if wanted
+  /// Compute new density matrix
   void solve_P(arma::mat & P);
 
   /// Clear Fock matrices and errors
@@ -204,19 +210,22 @@ class uDIIS: protected DIIS {
   /// ADIIS update
   void PiF_update();
 
+  /// Combine alpha and beta errors?
+  bool combine;
+
  public:
   /// Constructor
-  uDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, bool c1diis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
+  uDIIS(const arma::mat & S, const arma::mat & Sinvh, bool combine, bool usediis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
   /// Destructor
   ~uDIIS();
 
   /// Add matrices to stack
   void update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & Pa, const arma::mat & Pb, double E, double & error);
 
-  /// Compute new Fock matrix, use C1-DIIS if wanted
+  /// Compute new Fock matrix
   void solve_F(arma::mat & Fa, arma::mat & Fb);
 
-  /// Compute new density matrix, use C1-DIIS if wanted
+  /// Compute new density matrix
   void solve_P(arma::mat & Pa, arma::mat & Pb);
 
   /// Clear Fock matrices and errors

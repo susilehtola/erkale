@@ -228,14 +228,14 @@ class SCF {
 
   /// Use DIIS?
   bool usediis;
-  /// Use C1-DIIS instead of C2-DIIS?
-  bool diis_c1;
   /// Number of DIIS matrices to use
   int diisorder;
   /// Threshold of enabling use of DIIS
   double diiseps;
   /// Threshold of enabling full use of DIIS
   double diisthr;
+  /// Combine alpha and beta errors in unrestricted calcs?
+  bool diiscomb;
 
   /// Dimer calculation?
   bool dimcalc;
