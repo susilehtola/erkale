@@ -56,7 +56,7 @@ DIIS::DIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool usediis_, double
 rDIIS::rDIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool verbose_, size_t imax_) : DIIS(S_,Sinvh_,usediis_,diiseps_,diisthr_,useadiis_,verbose_,imax_) {
 }
 
-uDIIS::uDIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool combine_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool verbose_, size_t imax_) : combine(combine_), DIIS(S_,Sinvh_,usediis_,diiseps_,diisthr_,useadiis_,verbose_,imax_) {
+uDIIS::uDIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool combine_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool verbose_, size_t imax_) : DIIS(S_,Sinvh_,usediis_,diiseps_,diisthr_,useadiis_,verbose_,imax_), combine(combine_) {
 }
 
 DIIS::~DIIS() {
@@ -350,8 +350,10 @@ arma::vec DIIS::get_w_diis_wrk(const arma::mat & errs) const {
     double invs=s/(s*s + t*t);
     sol += arma::dot(U.col(i),rh)*invs * V.col(i);
 #else
-    // Just cut out the problematic part
-    if(std::abs(sval(i))>DBL_EPSILON)
+    // Just cut out the problematic part. Weirdly, it appears that any
+    // kind of screening of the singular eigenvalues results in poorer
+    // convergence behavior(!)
+    if(sval(i) != 0.0)
       sol += arma::dot(U.col(i),rh)/sval(i) * V.col(i);
 #endif
   }
