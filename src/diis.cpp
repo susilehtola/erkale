@@ -350,9 +350,10 @@ arma::vec DIIS::get_w_diis_wrk(const arma::mat & errs) const {
     double invs=s/(s*s + t*t);
     sol += arma::dot(U.col(i),rh)*invs * V.col(i);
 #else
-    // Just cut out the problematic part
-    double thr(DBL_EPSILON*arma::max(arma::abs(sval)));
-    if(std::abs(sval(i))>=thr)
+    // Just cut out the problematic part. Weirdly, it appears that any
+    // kind of screening of the singular eigenvalues results in poorer
+    // convergence behavior(!)
+    if(sval(i) != 0.0)
       sol += arma::dot(U.col(i),rh)/sval(i) * V.col(i);
 #endif
   }
