@@ -182,29 +182,11 @@ int getind(int l, int m, int n) {
 }
 
 double max_abs(const arma::mat & R) {
-  // Find maximum absolute value of matrix
-  double m=0;
-  double tmp;
-  for(size_t i=0;i<R.n_rows;i++)
-    for(size_t j=0;j<R.n_cols;j++) {
-      tmp=fabs(R(i,j));
-      if(tmp>m)
-	m=tmp;
-    }
-  return m;
+  return arma::max(arma::max(arma::abs(R)));
 }
 
 double max_cabs(const arma::cx_mat & R) {
-  // Find maximum absolute value of matrix
-  double m=0;
-  double tmp;
-  for(size_t i=0;i<R.n_rows;i++)
-    for(size_t j=0;j<R.n_cols;j++) {
-      tmp=std::abs(R(i,j));
-      if(tmp>m)
-	m=tmp;
-    }
-  return m;
+  return arma::max(arma::max(arma::abs(R)));
 }
 
 double rms_norm(const arma::mat & R) {

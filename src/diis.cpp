@@ -92,7 +92,9 @@ void rDIIS::update(const arma::mat & F, const arma::mat & P, double E, double & 
   hlp.E=E;
 
   // Compute error matrix
-  arma::mat errmat=F*P*S-S*P*F;
+  arma::mat errmat(F*P*S);
+  // FPS - SPF
+  errmat-=arma::trans(errmat);
   // and transform it to the orthonormal basis (1982 paper, page 557)
   errmat=arma::trans(Sinvh)*errmat*Sinvh;
   // and store it
@@ -137,8 +139,11 @@ void uDIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat &
   hlp.E=E;
 
   // Compute error matrices
-  arma::mat errmata=Fa*Pa*S-S*Pa*Fa;
-  arma::mat errmatb=Fb*Pb*S-S*Pb*Fb;
+  arma::mat errmata(Fa*Pa*S);
+  arma::mat errmatb(Fb*Pb*S);
+  // FPS - SPF
+  errmata-=arma::trans(errmata);
+  errmatb-=arma::trans(errmatb);
   // and transform them to the orthonormal basis (1982 paper, page 557)
   errmata=arma::trans(Sinvh)*errmata*Sinvh;
   errmatb=arma::trans(Sinvh)*errmatb*Sinvh;
@@ -243,6 +248,7 @@ arma::vec DIIS::get_w() {
     // Determine cooloff
     if(cooloff>0) {
       diisw=0.0;
+      adiisw=1.0;
       cooloff--;
     } else {
       // Check if energy has increased
@@ -368,7 +374,7 @@ void rDIIS::solve_F(arma::mat & F) {
   arma::vec sol;
   while(true) {
     sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON) && stack.size()>1) {
       if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
       erase_last();
       PiF_update();
@@ -386,7 +392,7 @@ void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb) {
   arma::vec sol;
   while(true) {
     sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON) && stack.size()>1) {
       if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
       erase_last();
       PiF_update();
@@ -407,7 +413,7 @@ void rDIIS::solve_P(arma::mat & P) {
   arma::vec sol;
   while(true) {
     sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON) && stack.size()>1) {
       if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
       erase_last();
       PiF_update();
@@ -425,7 +431,7 @@ void uDIIS::solve_P(arma::mat & Pa, arma::mat & Pb) {
   arma::vec sol;
   while(true) {
     sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON) && stack.size()>1) {
       if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
       erase_last();
       PiF_update();
