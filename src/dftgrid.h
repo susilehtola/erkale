@@ -20,6 +20,7 @@
 
 #include "global.h"
 #include "basis.h"
+#include "sap.h"
 class Hirshfeld;
 
 /// Screen out points with Becke weights smaller than 1e-8 * tol
@@ -463,6 +464,9 @@ class AngularGrid {
   arma::vec eval_force_r() const;
   /// Evaluate force, unrestricted
   arma::vec eval_force_u() const;
+
+  /// Evaluate SAP
+  void eval_SAP(const SAP & sap, arma::mat & Vo) const;
 };
 
 /**
@@ -575,6 +579,9 @@ class DFTGrid {
   arma::mat eval_hirshfeld_overlap(const Hirshfeld & hirsh, size_t inuc);
   /// Evaluate overlap matrices numerically
   std::vector<arma::mat> eval_hirshfeld_overlaps(const Hirshfeld & hirsh);
+
+  /// Evaluate SAP
+  arma::mat eval_SAP();
 
   /// Evaluate density
   std::vector<dens_list_t> eval_dens_list(const arma::mat & P);
