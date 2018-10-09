@@ -216,36 +216,11 @@ void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, b
 
 
 arma::vec MatToVec(const arma::mat & m) {
-  // Size of vector to return
-  size_t N=m.n_cols*m.n_rows;
-
-  // Returned vector
-  arma::vec ret(N);
-
-  // Store matrix
-  for(size_t i=0;i<m.n_rows;i++)
-    for(size_t j=0;j<m.n_cols;j++)
-      ret(i*m.n_cols+j)=m(i,j);
-
-  return ret;
+  return arma::vectorise(m);
 }
 
 arma::mat VecToMat(const arma::vec & v, size_t nrows, size_t ncols) {
-
-  // Check size consistency
-  if(nrows*ncols!=v.n_elem) {
-    ERROR_INFO();
-    throw std::runtime_error("Cannot reshape a vector to a differently sized matrix.\n");
-  }
-
-  arma::mat m(nrows,ncols);
-  m.zeros();
-
-  for(size_t i=0;i<nrows;i++)
-    for(size_t j=0;j<ncols;j++)
-      m(i,j)=v(i*ncols+j);
-
-  return m;
+  return arma::reshape(v,nrows,ncols);
 }
 
 /// Get vector from cube: c(i,j,:)
