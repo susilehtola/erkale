@@ -35,7 +35,8 @@ density_fitting.cpp lebedev.cpp eriworker_routines.cpp unitary.cpp
 pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
 stockholder.cpp erifit.cpp erichol.cpp lbfgs.cpp gdm.cpp
 slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
-atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp)
+atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp
+sap.cpp)
 
 # The name of the executable is
 set_target_properties(liberkale PROPERTIES OUTPUT_NAME "erkale${SUFFIX}")

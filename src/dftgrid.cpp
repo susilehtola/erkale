@@ -3083,6 +3083,34 @@ void AngularGrid::compute_bf() {
   }
 }
 
+void AngularGrid::eval_SAP(const SAP & sap, arma::mat & Vo) const {
+  // List of nuclei
+  std::vector<nucleus_t> nuclei(basp->get_nuclei());
+
+  // Form the potential at every grid point
+  arma::rowvec vsap(grid.size());
+  vsap.zeros();
+  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+    // No potential from ghost atoms
+    if(nuclei[inuc].bsse)
+      continue;
+    for(size_t ip=0;ip<grid.size();ip++) {
+      // Distance from grid point is
+      double r=norm(nuclei[inuc].r-grid[ip].r);
+      // Increment potential
+      vsap(ip)+=sap.get(nuclei[inuc].Z,r);
+    }
+  }
+  vsap%=w;
+
+  // Calculate in subspace
+  arma::mat V(bf_ind.n_elem,bf_ind.n_elem);
+  V.zeros();
+  increment_lda<double>(V,vsap,bf);
+  // Increment
+  Vo.submat(bf_ind,bf_ind)+=V;
+}
+
 DFTGrid::DFTGrid() {
 }
 
@@ -5069,4 +5097,54 @@ double DFTGrid::density_threshold(const arma::mat & P, double thr) {
 
   // Cutoff is thus between idx and idx-1.
   return (list[idx].d + list[idx-1].d)/2.0;
+}
+
+arma::mat DFTGrid::eval_SAP() {
+  // Amount of basis functions
+  size_t N=basp->get_Nbf();
+
+  // Returned matrices
+  arma::mat V(N,N);
+  V.zeros();
+
+  // SAPs
+  SAP sap;
+
+  // Change atom and create grid
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  { // Begin parallel region
+
+#ifdef _OPENMP
+    int ith=omp_get_thread_num();
+#else
+    int ith=0;
+#endif
+
+#ifdef _OPENMP
+    arma::mat Vwrk(N,N);
+    Vwrk.zeros();
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t i=0;i<grids.size();i++) {
+      wrk[ith].set_grid(grids[i]);
+      wrk[ith].form_grid();
+      // Evaluate overlap
+#ifdef _OPENMP
+      wrk[ith].eval_SAP(sap,Vwrk);
+#else
+      wrk[ith].eval_SAP(sap,V);
+#endif
+      // Free memory
+      wrk[ith].free();
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+    V+=Vwrk;
+#endif
+  }
+
+  return V;
 }

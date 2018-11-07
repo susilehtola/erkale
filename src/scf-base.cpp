@@ -53,6 +53,8 @@ enum guess_t parse_guess(const std::string & val) {
     return CORE_GUESS;
   else if(stricmp(val,"SAD")==0 || stricmp(val,"Atomic")==0)
     return SAD_GUESS;
+  else if(stricmp(val,"SAP")==0)
+    return SAP_GUESS;
   else if(stricmp(val,"NO")==0)
     return NO_GUESS;
   else if(stricmp(val,"GWH")==0)
@@ -935,6 +937,49 @@ void SCF::gwh_guess(uscf_t & sol) const {
   diagonalize(sol);
 }
 
+void SCF::sap_guess(rscf_t & sol) const {
+  DFTGrid grid(basisp);
+
+  // Use a (150,194) grid
+  int nrad=150;
+  int lmax=23;
+  bool grad=false;
+  bool tau=false;
+  bool lapl=false;
+  bool strict=false;
+  bool nl=false;
+  grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+
+  // Get SAP potential
+  arma::mat Vsap(grid.eval_SAP());
+  // Approximate Hamiltonian is
+  sol.H=Hcore+Vsap;
+  // and diagonalize it to get the orbitals
+  diagonalize(sol);
+}
+
+void SCF::sap_guess(uscf_t & sol) const {
+  DFTGrid grid(basisp);
+
+  // Use a (150,194) grid
+  int nrad=150;
+  int lmax=23;
+  bool grad=false;
+  bool tau=false;
+  bool lapl=false;
+  bool strict=false;
+  bool nl=false;
+  grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+
+  // Get SAP potential
+  arma::mat Vsap(grid.eval_SAP());
+  // Approximate Hamiltonian is
+  sol.Ha=Hcore+Vsap;
+  sol.Hb=sol.Ha;
+  // and diagonalize it to get the orbitals
+  diagonalize(sol);
+}
+
 arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0) const {
   if(Cv0.n_cols<Co.n_cols)
     throw std::runtime_error("Not enough virtuals given!\n");
@@ -1193,7 +1238,8 @@ arma::mat form_density(const arma::mat & C, const arma::vec & occs0) {
   occs.zeros();
   if(occs0.n_elem) {
     size_t nel=std::min(occs.n_elem,occs0.n_elem);
-    occs.subvec(0,nel-1)=occs0.subvec(0,nel-1);
+    if(nel)
+      occs.subvec(0,nel-1)=occs0.subvec(0,nel-1);
   }
   return C*arma::diagmat(occs)*arma::trans(C);
 }
@@ -1850,6 +1896,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     if(!doload) {
       if(guess==CORE_GUESS)
 	solver.core_guess(sol);
+      else if(guess==SAP_GUESS)
+	solver.sap_guess(sol);
       else if(guess==GWH_GUESS)
 	solver.gwh_guess(sol);
       else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
@@ -1886,6 +1934,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  // Do the diagonalization
 	  solver.diagonalize(sol,0.0);
 	}
+      } else {
+        throw std::logic_error("Guess not handled!\n");
       }
     }
     sol.P=form_density(sol.C,occs);
@@ -2163,6 +2213,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     if(!doload) {
       if(guess==CORE_GUESS)
 	solver.core_guess(sol);
+      else if(guess==SAP_GUESS)
+	solver.sap_guess(sol);
       else if(guess==GWH_GUESS)
 	solver.gwh_guess(sol);
       else if((guess==SAD_GUESS) || (guess==NO_GUESS)) {
@@ -2171,13 +2223,26 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	form_NOs(sol.P,solver.get_S(),sol.Ca,occ);
 	sol.Cb=sol.Ca;
 
-	if(guess==SAD_GUESS) {
+        if(guess==SAD_GUESS) {
+	  // Avoid computing exact exchange with all NOs by truncating
+	  // the occupations to the nonzero ones
+	  {
+	    double othr(sqrt(DBL_EPSILON));
+	    arma::uword pos;
+	    for(pos=0;pos<occ.n_elem;pos++)
+	      if(occ(pos)<=othr)
+		break;
+            if(pos<occ.n_elem)
+              occ.subvec(pos,occ.n_elem-1).zeros();
+	  }
+
 	  std::vector<double> goccs(arma::conv_to< std::vector<double> >::from(occ));
 	  size_t maxiter(solver.get_maxiter());
 	  solver.set_maxiter(0);
-	  rscf_t rsol;
-	  rsol.P=sol.P;
-	  rsol.C=sol.Ca;
+          rscf_t rsol;
+          rsol.P=sol.P;
+          rsol.C=sol.Ca;
+
 	  if(hf || rohf)
 	    solver.RHF(rsol,goccs,convthr);
 	  else {
@@ -2191,6 +2256,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	  solver.diagonalize(rsol,0.0);
 	  sol.Ca=sol.Cb=rsol.C;
 	}
+      } else {
+        throw std::logic_error("Guess not handled!\n");
       }
     }
     // Form density matrix
