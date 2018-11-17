@@ -18,10 +18,10 @@
 
 #include <cfloat>
 #include "diis.h"
+#include "lbfgs.h"
 #include "linalg.h"
 #include "mathf.h"
 #include "stringutil.h"
-#include "lbfgs.h"
 
 // Maximum allowed absolute weight for a Fock matrix
 #define MAXWEIGHT 10.0
@@ -98,10 +98,10 @@ void rDIIS::update(const arma::mat & F, const arma::mat & P, double E, double & 
   // and transform it to the orthonormal basis (1982 paper, page 557)
   errmat=arma::trans(Sinvh)*errmat*Sinvh;
   // and store it
-  hlp.err=MatToVec(errmat);
+  hlp.err=arma::vectorise(errmat);
 
   // DIIS error is
-  error=max_abs(errmat);
+  error=arma::max(arma::max(arma::abs(errmat)));
 
   // Is stack full?
   if(stack.size()==imax) {
@@ -115,8 +115,8 @@ void rDIIS::update(const arma::mat & F, const arma::mat & P, double E, double & 
 }
 
 void rDIIS::PiF_update() {
-  arma::mat Fn=stack[stack.size()-1].F;
-  arma::mat Pn=stack[stack.size()-1].P;
+  const arma::mat & Fn=stack[stack.size()-1].F;
+  const arma::mat & Pn=stack[stack.size()-1].P;
 
   // Update matrices
   PiF.zeros(stack.size());
@@ -149,13 +149,13 @@ void uDIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat &
   errmatb=arma::trans(Sinvh)*errmatb*Sinvh;
   // and store it
   if(combine) {
-    hlp.err=MatToVec(errmata+errmatb);
+    hlp.err=arma::vectorise(errmata+errmatb);
   } else {
     hlp.err.zeros(errmata.n_elem+errmatb.n_elem);
-    hlp.err.subvec(0,errmata.n_elem-1)=MatToVec(errmata);
-    hlp.err.subvec(errmata.n_elem,hlp.err.n_elem-1)=MatToVec(errmatb);
+    hlp.err.subvec(0,errmata.n_elem-1)=arma::vectorise(errmata);
+    hlp.err.subvec(errmata.n_elem,hlp.err.n_elem-1)=arma::vectorise(errmatb);
   }
-  
+
   // DIIS error is
   error=arma::max(arma::abs(hlp.err));
 
@@ -171,10 +171,10 @@ void uDIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat &
 }
 
 void uDIIS::PiF_update() {
-  arma::mat Fan=stack[stack.size()-1].Fa;
-  arma::mat Fbn=stack[stack.size()-1].Fb;
-  arma::mat Pan=stack[stack.size()-1].Pa;
-  arma::mat Pbn=stack[stack.size()-1].Pb;
+  const arma::mat & Fan=stack[stack.size()-1].Fa;
+  const arma::mat & Fbn=stack[stack.size()-1].Fb;
+  const arma::mat & Pan=stack[stack.size()-1].Pa;
+  const arma::mat & Pbn=stack[stack.size()-1].Pb;
 
   // Update matrices
   PiF.zeros(stack.size());
@@ -248,7 +248,6 @@ arma::vec DIIS::get_w() {
     // Determine cooloff
     if(cooloff>0) {
       diisw=0.0;
-      adiisw=1.0;
       cooloff--;
     } else {
       // Check if energy has increased
@@ -363,6 +362,11 @@ arma::vec DIIS::get_w_diis_wrk(const arma::mat & errs) const {
       sol += arma::dot(U.col(i),rh)/sval(i) * V.col(i);
 #endif
   }
+
+  // Sanity check
+  if(arma::sum(sol)==0.0)
+    sol.ones();
+
   // Normalize solution
   //printf("Sum of weights is %e\n",arma::sum(sol));
   sol/=arma::sum(sol);
@@ -374,7 +378,7 @@ void rDIIS::solve_F(arma::mat & F) {
   arma::vec sol;
   while(true) {
     sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON) && stack.size()>1) {
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
       if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
       erase_last();
       PiF_update();
@@ -392,7 +396,7 @@ void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb) {
   arma::vec sol;
   while(true) {
     sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON) && stack.size()>1) {
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
       if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
       erase_last();
       PiF_update();
@@ -413,7 +417,7 @@ void rDIIS::solve_P(arma::mat & P) {
   arma::vec sol;
   while(true) {
     sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON) && stack.size()>1) {
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
       if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
       erase_last();
       PiF_update();
@@ -431,7 +435,7 @@ void uDIIS::solve_P(arma::mat & Pa, arma::mat & Pb) {
   arma::vec sol;
   while(true) {
     sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON) && stack.size()>1) {
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
       if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
       erase_last();
       PiF_update();
@@ -618,7 +622,6 @@ arma::vec DIIS::get_w_adiis() const {
 double DIIS::get_E_adiis(const arma::vec & x) const {
   // Consistency check
   if(x.n_elem != PiF.n_elem) {
-    ERROR_INFO();
     throw std::domain_error("Incorrect number of parameters.\n");
   }
 
