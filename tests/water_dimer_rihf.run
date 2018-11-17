@@ -2,11 +2,11 @@
 System water_dimer.xyz
 Method HF
 Basis aug-cc-pVDZ
+Cholesky false
 DensityFitting true
 FittingBasis aug-cc-pVDZ-JK
 Direct false
 IntegralThresh 1e-14
-
 
 
 
