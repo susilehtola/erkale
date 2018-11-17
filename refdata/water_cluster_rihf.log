@@ -6,7 +6,7 @@ it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
 (at your option) any later version.
 
-At svn revision 1938.
+At svn revision 1946.
 
 Running on host dx7-lehtola.chem.helsinki.fi.
 
@@ -18,7 +18,6 @@ Current Settings used by ERKALE:
      BasisCutoff    	           1.000e-08	Cutoff for dropping out small primitives from contraction
      BasisOrth      	                Auto	Method of orthonormalization of basis set
      BasisRotate    	               false	Rotate basis set to remove redundant functions?
-     C1-DIIS        	               false	Use older version of DIIS (C1-DIIS instead of C2-DIIS)?
      Charge         	                   0	Total charge of system
      Cholesky       	               false	Use Cholesky decomposition?
      CholeskyMode   	                   0	Save/load integrals? 0 no, 1 save, -1 load
@@ -26,6 +25,7 @@ Current Settings used by ERKALE:
      CholeskyShThr  	           1.000e-02	Cholesky cache threshold
      CholeskyThr    	           1.000e-07	Cholesky decomposition threshold
      ConvThr        	           1.000e-06	Orbital gradient convergence threshold
+     DIISComb       	               false	Combine alpha and beta errors in unrestricted calcs?
      DIISEps        	           1.000e-01	Start mixing in DIIS when error is
      DIISOrder      	                  10	How many DIIS iterations to keep in memory?
      DIISThr        	           1.000e-02	DIIS error threshold for DIIS updates
@@ -53,6 +53,7 @@ Current Settings used by ERKALE:
      Shift          	           0.000e+00	Level shift to use in Hartree
      StrictIntegrals	               false	Use strict integrals?
      System         	   water_cluster.xyz	System as an xyz file
+     TRRHminS       	           9.750e-01	Trust-Region Roothaan-Hall minimal occupied orbital overlap
      UseADIIS       	                true	Use ADIIS for Fock matrix interpolation?
      UseBroyden     	               false	Use Broyden mixing of Fock matrices?
      UseDIIS        	                true	Use Pulay's Direct Inversion in the Iterative Subspace?
@@ -61,9 +62,9 @@ Current Settings used by ERKALE:
      Verbose        	                true	Verbose calculation?
 
 Performing HF guess for atoms:
-O : 1 4 7 10 (1.13 s)
-H : 2 3 5 6 8 9 11 12 (0.14 s)
-Atomic guess formed in 1.27 s.
+O : 1 4 7 10 (0.02 s)
+H : 2 3 5 6 8 9 11 12 (0.00 s)
+Atomic guess formed in 0.02 s.
 
 There are 76 shells and 12 nuclei in the basis set.
 
@@ -178,40 +179,40 @@ Basis set contains 164 functions, maximum angular momentum is 2.
 Spherical harmonic Gaussians are used by default, there are 172 cartesians.
 
 Forming overlap matrix ... done (0.00 s)
-Forming kinetic energy matrix ... done (0.01 s)
-Forming nuclear attraction matrix ... done (0.03 s)
+Forming kinetic energy matrix ... done (0.00 s)
+Forming nuclear attraction matrix ... done (0.01 s)
 
 Smallest eigenvalue of overlap matrix is 1.20e-03, ratio to largest is 1.10e-04.
 Using symmetric orthogonalization.
-Basis set diagonalized in 0.02 s.
+Basis set diagonalized in 0.00 s.
 
 Basis set aug-cc-pVDZ-JK found in file aug-cc-pVDZ-JK.gbs in /home/work/erkale/source/erkale.sap/basis/.
-Initializing density fitting calculation, requiring 5 Mi 514 ki memory ... done (0.12 s)
+Initializing density fitting calculation, requiring 5 Mi 514 ki memory ... done (0.03 s)
 2911 shell pairs out of 2926 are significant.
 Auxiliary basis contains 600 functions.
 
-Initialization of computation done in 0.20 s.
+Initialization of computation done in 0.06 s.
 
-Forming density fitted Coulomb matrix ... done (2.07 s)
-Forming density fitted exchange matrix ... done (2.22 s)
-Solving SCF equations ... done (0.24 s)
+Forming density fitted Coulomb matrix ... done (0.79 s)
+Forming density fitted exchange matrix ... done (0.63 s)
+Solving SCF equations ... done (0.00 s)
 
-Kinetic               energy:  3.0218565932473530e+02
-Nuclear attraction    energy: -9.7078286237609655e+02
-Total one-electron    energy: -6.6859720305136091e+02
+Kinetic               energy:  3.0218611443494916e+02
+Nuclear attraction    energy: -9.7078360163409275e+02
+Total one-electron    energy: -6.6859748719914455e+02
 Nuclear repulsion     energy:  1.2862784408961625e+02
-Coulomb               energy:  2.7084054746307248e+02
-Exchange              energy: -3.4216464305578796e+01
+Coulomb               energy:  2.7084091067762660e+02
+Exchange              energy: -3.4216480400971285e+01
 -----------------------------------------------------
-                Total energy: -3.0334527580425095e+02
-               Virial factor:  1.0038374305455360e+00
+                Total energy: -3.0334521283287302e+02
+               Virial factor:  1.0038357103207447e+00
 
 Dipole mu = ( 0.00002805, -0.00001633, -0.00000067) D
 
 HOMO-LUMO gap is    0.52 eV. Orbital energies:
      -20.8574*     -20.8566*     -20.8563*     -20.8526*      -1.7061*
-      -1.6529*      -1.6402*      -1.6011*      -0.8397*      -0.7903*
-      -0.7794*      -0.7656*      -0.6730*      -0.6119*      -0.5951*
+      -1.6529*      -1.6402*      -1.6010*      -0.8397*      -0.7903*
+      -0.7794*      -0.7656*      -0.6730*      -0.6118*      -0.5951*
       -0.5586*      -0.5214*      -0.5146*      -0.5071*      -0.5003*
       -0.0245        0.0070        0.0151        0.0523        0.0576 
        0.0694        0.0862        0.0883        0.1218        0.1282 
@@ -230,270 +231,234 @@ HOMO-LUMO gap is    0.52 eV. Orbital energies:
        1.1295        1.1417        1.1769        1.1832        1.1984 
        1.2254        1.3019        1.3110        1.3343        1.3661 
        1.3876        1.4125        1.4352        1.4494        1.4685 
-       1.5050        1.5676        1.5889        1.6405        1.8048 
+       1.5051        1.5676        1.5889        1.6405        1.8048 
        1.8538        1.9091        1.9154        1.9310        1.9757 
        1.9774        1.9966        2.0023        2.0395        2.0628 
        2.0730        2.1495        2.1769        2.2070        2.3047 
        2.3133        2.3697        2.3770        2.4099        2.4240 
        2.4310        2.5137        2.6000        2.6564        2.7052 
        2.7485        2.7856        2.8173        2.8406        2.8603 
-       2.9131        2.9351        2.9767        3.3017        3.4901 
+       2.9131        2.9351        2.9767        3.3017        3.4902 
        3.5044        3.5185        3.5309        3.5510        3.5628 
-       3.5763        3.5888        3.6083        3.6300        3.6568 
+       3.5764        3.5888        3.6083        3.6300        3.6568 
        3.7751        3.8721        3.8760        3.9418        4.0349 
        4.0662        4.1737        4.2523        4.4010 
 HOMO-LUMO gap is   12.95 eV. Energies of lowest lying orbitals:
      -20.8574*     -20.8566*     -20.8563*     -20.8526*      -1.7061*
-      -1.6529*      -1.6402*      -1.6011*      -0.8397*      -0.7903*
-      -0.7794*      -0.7656*      -0.6730*      -0.6119*      -0.5951*
+      -1.6529*      -1.6402*      -1.6010*      -0.8397*      -0.7903*
+      -0.7794*      -0.7656*      -0.6730*      -0.6118*      -0.5951*
       -0.5586*      -0.5214*      -0.5146*      -0.5071*      -0.5003*
       -0.0245        0.0070        0.0151        0.0523        0.0576 
 
  ******* Iteration    1 ********
-Forming density fitted Coulomb matrix ... done (1.95 s)
-Forming density fitted exchange matrix ... done (1.49 s)
+Forming density fitted Coulomb matrix ... done (0.80 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 ADIIS weights
  1.00e+00 
-CDIIS weights
- 1.00e+00 
- DIIS weights
- 1.00e+00 
 
-Solving SCF equations ... done (0.01 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0397466595073763e+02
-DIIS error                    :  1.681459e-01
+Total energy                  : -3.0397467654481613e+02
+DIIS error                    :  1.681387e-01
 Energy change                 : -3.039747e+02
-Max total density change      :  1.924941e-01
-Max rms   density change      :  5.621064e-03
-Dipole mu = ( 0.31254559, -0.99621904,  6.42068666) D
+Max total density change      :  1.924906e-01
+Max rms   density change      :  5.620875e-03
+Dipole mu = ( 0.31253998, -0.99621662,  6.42070589) D
 
-Iteration took 3.48 s.
+Iteration took 1.24 s.
 
  ******* Iteration    2 ********
-Forming density fitted Coulomb matrix ... done (2.18 s)
-Forming density fitted exchange matrix ... done (1.72 s)
+Forming density fitted Coulomb matrix ... done (0.80 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 ADIIS weights
  1.51e-02  9.85e-01 
-CDIIS weights
- 3.50e-01  6.50e-01 
- DIIS weights
- 1.51e-02  9.85e-01 
 
-Solving SCF equations ... done (0.03 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0409229296470920e+02
-DIIS error                    :  1.266799e-01
-Energy change                 : -1.176270e-01
-Max total density change      :  1.329338e-01
-Max rms   density change      :  3.099171e-03
-Dipole mu = ( 0.00529648, -0.88353833,  7.11234876) D
+Total energy                  : -3.0409229748683316e+02
+DIIS error                    :  1.266752e-01
+Energy change                 : -1.176209e-01
+Max total density change      :  1.329313e-01
+Max rms   density change      :  3.099099e-03
+Dipole mu = ( 0.00529448, -0.88353723,  7.11234728) D
 
-Iteration took 3.97 s.
+Iteration took 1.24 s.
 
  ******* Iteration    3 ********
-Forming density fitted Coulomb matrix ... done (2.28 s)
-Forming density fitted exchange matrix ... done (1.48 s)
+Forming density fitted Coulomb matrix ... done (0.79 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 ADIIS weights
- 7.57e-19  1.65e-01  8.35e-01 
+ 8.89e-19  1.65e-01  8.35e-01 
 CDIIS weights
--7.56e-02  3.36e-01  7.40e-01 
+-5.67e-02  3.48e-01  7.09e-01 
  DIIS weights
--1.65e-02  2.02e-01  8.14e-01 
+-1.24e-02  2.05e-01  8.07e-01 
 
-Solving SCF equations ... done (0.08 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0412606284118851e+02
-DIIS error                    :  8.032340e-02
-Energy change                 : -3.376988e-02
-Max total density change      :  6.830966e-02
-Max rms   density change      :  1.560225e-03
-Dipole mu = ( 0.13586810, -0.91492541,  6.70510752) D
+Total energy                  : -3.0412606267371240e+02
+DIIS error                    :  8.032418e-02
+Energy change                 : -3.376519e-02
+Max total density change      :  6.826930e-02
+Max rms   density change      :  1.559110e-03
+Dipole mu = ( 0.13585308, -0.91505875,  6.70593232) D
 
-Iteration took 3.96 s.
+Iteration took 1.24 s.
 
  ******* Iteration    4 ********
-Forming density fitted Coulomb matrix ... done (2.21 s)
-Forming density fitted exchange matrix ... done (1.40 s)
+Forming density fitted Coulomb matrix ... done (0.82 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 ADIIS weights
- 1.24e-14  9.56e-14  1.40e-13  1.00e+00 
+ 1.29e-14  9.71e-14  1.51e-13  1.00e+00 
 CDIIS weights
--1.33e-02 -1.05e-01  1.38e-01  9.80e-01 
+-1.55e-02 -8.24e-02  1.66e-01  9.32e-01 
  DIIS weights
--1.12e-02 -8.80e-02  1.16e-01  9.84e-01 
+-1.30e-02 -6.93e-02  1.39e-01  9.43e-01 
 
-Solving SCF equations ... done (0.04 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0414360302597248e+02
-DIIS error                    :  2.441906e-02
-Energy change                 : -1.754018e-02
-Max total density change      :  1.776698e-02
-Max rms   density change      :  3.683768e-04
-Dipole mu = ( 0.09456668, -0.90092819,  6.76617423) D
+Total energy                  : -3.0414360658985635e+02
+DIIS error                    :  2.435782e-02
+Energy change                 : -1.754392e-02
+Max total density change      :  1.763863e-02
+Max rms   density change      :  3.674409e-04
+Dipole mu = ( 0.09495723, -0.90113341,  6.76774330) D
 
-Iteration took 3.67 s.
+Iteration took 1.26 s.
 
  ******* Iteration    5 ********
-Forming density fitted Coulomb matrix ... done (2.09 s)
-Forming density fitted exchange matrix ... done (1.47 s)
-ADIIS weights
- 2.13e-15  5.29e-16  3.19e-15  4.90e-14  1.00e+00 
+Forming density fitted Coulomb matrix ... done (0.80 s)
+Forming density fitted exchange matrix ... done (0.45 s)
 CDIIS weights
- 1.43e-03 -3.03e-02 -3.46e-02  1.57e-01  9.06e-01 
- DIIS weights
- 1.43e-03 -3.03e-02 -3.46e-02  1.57e-01  9.06e-01 
+-8.31e-04 -3.49e-02 -1.62e-02  2.22e-01  8.30e-01 
 
-Solving SCF equations ... done (0.05 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0414513871883804e+02
-DIIS error                    :  3.418924e-03
-Energy change                 : -1.535693e-03
-Max total density change      :  2.715209e-03
-Max rms   density change      :  4.828536e-05
-Dipole mu = ( 0.10153886, -0.90284251,  6.75350840) D
+Total energy                  : -3.0414513815502505e+02
+DIIS error                    :  3.323501e-03
+Energy change                 : -1.531565e-03
+Max total density change      :  2.491997e-03
+Max rms   density change      :  4.651044e-05
+Dipole mu = ( 0.10110763, -0.90272734,  6.75423978) D
 
-Iteration took 3.71 s.
+Iteration took 1.26 s.
 
  ******* Iteration    6 ********
-Forming density fitted Coulomb matrix ... done (2.02 s)
-Forming density fitted exchange matrix ... done (1.63 s)
-ADIIS weights
- 1.77e-16  3.63e-14  3.21e-15  1.33e-13  2.81e-12  1.00e+00 
+Forming density fitted Coulomb matrix ... done (0.81 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 CDIIS weights
- 2.11e-03  9.05e-03 -2.99e-02 -1.23e-01  2.00e-01  9.41e-01 
- DIIS weights
- 2.11e-03  9.05e-03 -2.99e-02 -1.23e-01  2.00e-01  9.41e-01 
+ 1.98e-03  8.46e-03 -2.83e-02 -1.24e-01  1.03e-01  1.04e+00 
 
-Solving SCF equations ... done (0.02 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0414516249083943e+02
-DIIS error                    :  6.552813e-04
-Energy change                 : -2.377200e-05
-Max total density change      :  5.046023e-04
-Max rms   density change      :  1.179090e-05
-Dipole mu = ( 0.09977465, -0.90222928,  6.75110095) D
+Total energy                  : -3.0414516251194669e+02
+DIIS error                    :  4.661986e-04
+Energy change                 : -2.435692e-05
+Max total density change      :  4.219251e-04
+Max rms   density change      :  1.252976e-05
+Dipole mu = ( 0.09981692, -0.90224377,  6.75121888) D
 
-Iteration took 3.71 s.
+Iteration took 1.25 s.
 
  ******* Iteration    7 ********
-Forming density fitted Coulomb matrix ... done (2.25 s)
-Forming density fitted exchange matrix ... done (1.92 s)
-ADIIS weights
- 2.20e-14  9.82e-14  2.84e-14  2.03e-12  8.86e-10  8.06e-10  1.00e+00 
+Forming density fitted Coulomb matrix ... done (0.80 s)
+Forming density fitted exchange matrix ... done (0.45 s)
 CDIIS weights
--4.74e-04 -6.59e-04  7.64e-03  1.79e-02 -8.89e-02 -2.00e-01  1.26e+00 
- DIIS weights
--4.74e-04 -6.59e-04  7.64e-03  1.79e-02 -8.89e-02 -2.00e-01  1.26e+00 
+-3.35e-04 -4.46e-04  5.95e-03  1.50e-02 -5.77e-02 -2.01e-01  1.24e+00 
 
-Solving SCF equations ... done (0.02 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0414516386414374e+02
-DIIS error                    :  7.452385e-05
-Energy change                 : -1.373304e-06
-Max total density change      :  7.408225e-05
-Max rms   density change      :  2.389227e-06
-Dipole mu = ( 0.09991407, -0.90241499,  6.75061175) D
+Total energy                  : -3.0414516385466078e+02
+DIIS error                    :  6.831367e-05
+Energy change                 : -1.342714e-06
+Max total density change      :  8.290888e-05
+Max rms   density change      :  2.587196e-06
+Dipole mu = ( 0.09991032, -0.90240559,  6.75064425) D
 
-Iteration took 4.22 s.
+Iteration took 1.26 s.
 
  ******* Iteration    8 ********
-Forming density fitted Coulomb matrix ... done (2.27 s)
-Forming density fitted exchange matrix ... done (1.96 s)
-ADIIS weights
- 4.77e-15  2.29e-14  7.22e-13  4.44e-12  3.22e-13  1.72e-10  2.62e-07  1.00e+00 
+Forming density fitted Coulomb matrix ... done (0.80 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 CDIIS weights
--7.09e-05 -3.32e-04  1.15e-03  4.76e-03 -8.14e-03 -3.87e-02  1.59e-02  1.03e+00 
- DIIS weights
--7.09e-05 -3.32e-04  1.15e-03  4.76e-03 -8.14e-03 -3.87e-02  1.59e-02  1.03e+00 
+-9.72e-05 -3.89e-04  1.59e-03  6.39e-03 -8.43e-03 -6.01e-02  8.27e-02  9.78e-01 
 
-Solving SCF equations ... done (0.04 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0414516390965838e+02
-DIIS error                    :  1.738718e-05
-Energy change                 : -4.551464e-08
-Max total density change      :  2.168426e-05
-Max rms   density change      :  4.661617e-07
-Dipole mu = ( 0.09994661, -0.90240441,  6.75053634) D
+Total energy                  : -3.0414516390939184e+02
+DIIS error                    :  1.851137e-05
+Energy change                 : -5.473106e-08
+Max total density change      :  2.289609e-05
+Max rms   density change      :  4.771842e-07
+Dipole mu = ( 0.09994248, -0.90240439,  6.75054735) D
 
-Iteration took 4.59 s.
+Iteration took 1.25 s.
 
  ******* Iteration    9 ********
-Forming density fitted Coulomb matrix ... done (1.97 s)
-Forming density fitted exchange matrix ... done (2.60 s)
-ADIIS weights
- 1.02e-14  3.71e-14  8.51e-14  8.62e-13  3.93e-10  5.54e-10  2.18e-08  5.10e-01  4.90e-01 
+Forming density fitted Coulomb matrix ... done (0.83 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 CDIIS weights
- 1.63e-05 -6.00e-05 -3.39e-04 -7.51e-06  6.28e-03  6.99e-03 -1.14e-01  2.67e-01  8.34e-01 
- DIIS weights
- 1.63e-05 -6.00e-05 -3.39e-04 -7.51e-06  6.28e-03  6.99e-03 -1.14e-01  2.67e-01  8.34e-01 
+ 5.90e-06 -7.30e-05 -2.08e-04  2.53e-04  4.39e-03  5.73e-03 -1.10e-01  2.37e-01  8.63e-01 
 
-Solving SCF equations ... done (0.82 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0414516391139523e+02
-DIIS error                    :  1.055698e-05
-Energy change                 : -1.736851e-09
-Max total density change      :  7.957952e-06
-Max rms   density change      :  1.781408e-07
-Dipole mu = ( 0.09991490, -0.90240303,  6.75053054) D
+Total energy                  : -3.0414516391182235e+02
+DIIS error                    :  8.679893e-06
+Energy change                 : -2.430511e-09
+Max total density change      :  8.313730e-06
+Max rms   density change      :  1.718173e-07
+Dipole mu = ( 0.09991660, -0.90240316,  6.75053218) D
 
-Iteration took 7.70 s.
+Iteration took 1.28 s.
 
  ******* Iteration   10 ********
-Forming density fitted Coulomb matrix ... done (2.04 s)
-Forming density fitted exchange matrix ... done (1.59 s)
-ADIIS weights
- 7.32e-15  5.47e-15  7.43e-14  2.14e-12  4.52e-09  1.00e-10  3.25e-09  3.36e-01  3.33e-01  3.31e-01 
+Forming density fitted Coulomb matrix ... done (0.80 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 CDIIS weights
- 1.15e-05  3.81e-05 -1.75e-04 -6.06e-04  1.39e-03  5.04e-03 -8.54e-03 -9.72e-02  3.78e-02  1.06e+00 
- DIIS weights
- 1.15e-05  3.81e-05 -1.75e-04 -6.06e-04  1.39e-03  5.04e-03 -8.54e-03 -9.72e-02  3.78e-02  1.06e+00 
+ 1.15e-05  4.10e-05 -1.78e-04 -6.80e-04  9.34e-04  6.16e-03 -7.71e-03 -1.01e-01  1.23e-02  1.09e+00 
 
-Solving SCF equations ... done (0.03 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0414516391187357e+02
-DIIS error                    :  1.813254e-06
-Energy change                 : -4.783374e-10
-Max total density change      :  1.724112e-06
-Max rms   density change      :  4.808144e-08
-Dipole mu = ( 0.09991984, -0.90240568,  6.75052864) D
+Total energy                  : -3.0414516391222355e+02
+DIIS error                    :  1.654920e-06
+Energy change                 : -4.012009e-10
+Max total density change      :  1.685349e-06
+Max rms   density change      :  5.299199e-08
+Dipole mu = ( 0.09991971, -0.90240556,  6.75052877) D
 
-Iteration took 4.01 s.
+Iteration took 1.25 s.
 
  ******* Iteration   11 ********
-Forming density fitted Coulomb matrix ... done (1.95 s)
-Forming density fitted exchange matrix ... done (1.73 s)
-ADIIS weights
- 8.46e-15  4.16e-13  4.12e-13  9.78e-11  2.21e-09  1.41e-07  2.48e-01  2.51e-01  2.51e-01  2.50e-01 
+Forming density fitted Coulomb matrix ... done (0.81 s)
+Forming density fitted exchange matrix ... done (0.44 s)
 CDIIS weights
--8.01e-07  1.71e-05  2.91e-05 -3.19e-04 -6.07e-04  4.55e-03  7.27e-03 -4.48e-02 -2.47e-01  1.28e+00 
- DIIS weights
--8.01e-07  1.71e-05  2.91e-05 -3.19e-04 -6.07e-04  4.55e-03  7.27e-03 -4.48e-02 -2.47e-01  1.28e+00 
+-4.11e-07  1.39e-05  2.68e-05 -2.18e-04 -6.22e-04  4.06e-03  7.18e-03 -3.26e-02 -2.20e-01  1.24e+00 
 
-Solving SCF equations ... done (0.01 s)
+Solving SCF equations ... done (0.00 s)
 
-Total energy                  : -3.0414516391128780e+02
-DIIS error                    :  3.111877e-07
-Energy change                 :  5.857714e-10
-Max total density change      :  5.586442e-07
-Max rms   density change      :  1.490753e-08
-Dipole mu = ( 0.09991827, -0.90240442,  6.75052779) D
+Total energy                  : -3.0414516391154257e+02
+DIIS error                    :  3.134736e-07
+Energy change                 :  6.809842e-10
+Max total density change      :  5.807199e-07
+Max rms   density change      :  1.493803e-08
+Dipole mu = ( 0.09991840, -0.90240451,  6.75052786) D
 
-Iteration took 3.71 s.
+Iteration took 1.26 s.
 
  ******* Convergence achieved ********
-Solution of RHF took 46.75 s.
+Solution of RHF took 13.78 s.
 
-Kinetic               energy:  3.0327824829813358e+02
-Nuclear attraction    energy: -9.7965887098752842e+02
-Total one-electron    energy: -6.7638062268939416e+02
+Kinetic               energy:  3.0327824838296453e+02
+Nuclear attraction    energy: -9.7965887107629624e+02
+Total one-electron    energy: -6.7638062269333182e+02
 Nuclear repulsion     energy:  1.2862784408961625e+02
-Coulomb               energy:  2.7925041088831267e+02
-Exchange              energy: -3.5642796199822584e+01
+Coulomb               energy:  2.7925041088187265e+02
+Exchange              energy: -3.5642796189699638e+01
 -----------------------------------------------------
-                Total energy: -3.0414516391128780e+02
-               Virial factor:  1.0028584826574902e+00
+                Total energy: -3.0414516391154257e+02
+               Virial factor:  1.0028584823778175e+00
 
-Dipole mu = ( 0.09991827, -0.90240442,  6.75052779) D
+Dipole mu = ( 0.09991840, -0.90240451,  6.75052786) D
 
 HOMO-LUMO gap is   12.51 eV. Orbital energies:
      -20.6139*     -20.6134*     -20.5161*     -20.5137*      -1.3748*
@@ -532,7 +497,7 @@ HOMO-LUMO gap is   12.51 eV. Orbital energies:
 
 Mulliken charges
    1 O           -0.652417
-   2 H            0.393310
+   2 H            0.393311
    3 H            0.374855
    4 O           -0.580572
    5 H            0.249777
@@ -543,7 +508,7 @@ Mulliken charges
   10 O           -0.524836
   11 H            0.236611
   12 H            0.232454
-Sum of Mulliken charges -1.942890e-14
+Sum of Mulliken charges -2.264855e-14
 
 Electron density at nuclei
    1 O          297.043712
@@ -559,5 +524,5 @@ Electron density at nuclei
   11 H            0.339804
   12 H            0.333248
 
-Running program took 52.99 s.
-Current time is Sat 22 Sep 2018 22:56:48.
+Running program took 15.31 s.
+Current time is Sat 17 Nov 2018 21:47:16.
