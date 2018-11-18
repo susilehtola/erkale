@@ -12,3 +12,4 @@ LoadChk water_dimer_wb97.chk
 Logfile water_dimer_wb97_xch.log
 SaveChk water_dimer_wb97_xch.chk
 BasisRotate false
+ConvThr 1e-6

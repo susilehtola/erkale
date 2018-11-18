@@ -12,3 +12,4 @@ DensityFitting true
 Direct true
 XRSMethod FCH
 BasisRotate false
+ConvThr 1e-6

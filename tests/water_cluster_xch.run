@@ -12,3 +12,4 @@ Logfile water_cluster_xch.log
 SaveChk water_cluster_xch.chk
 XRSMethod XCH
 BasisRotate false
+ConvThr 1e-6
