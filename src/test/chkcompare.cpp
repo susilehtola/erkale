@@ -31,6 +31,8 @@ const double dCtol=1e-5;
 /// Relative tolerance in orbital energies
 const double dEtol=1e-5;
 
+/// Tolerance for the number of electrons estimate
+const double P0TOL=50.0;
 /// Tolerance for the EMD error estimate
 const double P2TOL=50.0;
 /// Orbitals are deemed degenerate if the energy difference is less than
@@ -235,7 +237,7 @@ int main(int argc, char ** argv) {
     double p2err=mom(4,2);
     printf("<p^2> - T = % e, d<p^2> = %e\n",p2diff,p2err);
     fflush(stdout);
-    if(fabs(p0diff)>=2*p0err || fabs(p2diff)>P2TOL*p2err)
+    if(fabs(p0diff)>=P0TOL*p0err || fabs(p2diff)>P2TOL*p2err)
       throw std::runtime_error("EMD failed.\n");
 
   } else {
@@ -337,13 +339,16 @@ int main(int argc, char ** argv) {
     // Check differences
     double dPa=rms_norm(Pacur-Paref);
     printf("Alpha density matrix difference %e\n",dPa);
+    fflush(stdout);
     if(dPa>dPtol) throw std::runtime_error("Alpha density matrices differ!\n");
     double dPb=rms_norm(Pbcur-Pbref);
     printf("Beta  density matrix difference %e\n",dPb);
+    fflush(stdout);
     if(dPb>dPtol) throw std::runtime_error("Density matrices differ!\n");
 
     double dP=rms_cnorm(Pcur-Pref);
     printf("Total density matrix difference %e\n",dP);
+    fflush(stdout);
     if(dP >dPtol) throw std::runtime_error("Total density matrices differ!\n");
 
     // Orbitals
@@ -379,9 +384,11 @@ int main(int argc, char ** argv) {
 
     double dEoa=E_diff(Earef,Eacur);
     printf("Alpha orbital energy difference %e\n",dEoa);
+    fflush(stdout);
     if(dEoa > dEtol) throw std::runtime_error("Alpha orbital energies differ!\n");
     double dEob=E_diff(Ebref,Ebcur);
     printf("Beta  orbital energy difference %e\n",dEob);
+    fflush(stdout);
     if(dEob > dEtol) throw std::runtime_error("Beta orbital energies differ!\n");
 
     // Amount of electrons in density matrix
@@ -409,7 +416,8 @@ int main(int argc, char ** argv) {
     double p2diff=mom(4,1)-2.0*Ec.Ekin;
     double p2err=mom(4,2);
     printf("<p^2> - T = %e, d<p^2> = %e\n",p2diff,p2err);
-    if(fabs(p0diff)>=2*p0err || fabs(p2diff)>P2TOL*p2err)
+    fflush(stdout);
+    if(fabs(p0diff)>=P0TOL*p0err || fabs(p2diff)>P2TOL*p2err)
       throw std::runtime_error("EMD failed.\n");
   }
 }

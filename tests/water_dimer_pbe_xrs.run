@@ -12,3 +12,4 @@ LoadChk water_dimer_pbe.chk
 Logfile water_dimer_pbe_xrs.log
 SaveChk water_dimer_pbe_xrs.chk
 BasisRotate false
+ConvThr 1e-6

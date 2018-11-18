@@ -12,3 +12,4 @@ LoadChk water_dimer_b3lyp.chk
 Logfile water_dimer_b3lyp_xrs.log
 SaveChk water_dimer_b3lyp_xrs.chk
 BasisRotate false
+ConvThr 1e-6
