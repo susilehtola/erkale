@@ -233,7 +233,7 @@ int main(int argc, char ** argv) {
     double p0diff=mom(2,1)-std::real(arma::trace(Pcur*S));
     double p0err=mom(2,2);
     printf("<p^0> - N = % e, d<p^0> = %e\n",p0diff,p0err);
-    double p2diff=mom(4,1)-2.0*Ec.Ekin;
+    double p2diff=mom(4,1)-2.0*std::real(arma::trace(Pcur*bcur.kinetic()));
     double p2err=mom(4,2);
     printf("<p^2> - T = % e, d<p^2> = %e\n",p2diff,p2err);
     fflush(stdout);
@@ -413,7 +413,7 @@ int main(int argc, char ** argv) {
     double p0diff=mom(2,1)-std::real(arma::trace(Pcur*S));
     double p0err=mom(2,2);
     printf("<p^0> - N = %e, d<p^0> = %e\n",p0diff,p0err);
-    double p2diff=mom(4,1)-2.0*Ec.Ekin;
+    double p2diff=mom(4,1)-2.0*std::real(arma::trace(Pcur*bcur.kinetic()));
     double p2err=mom(4,2);
     printf("<p^2> - T = %e, d<p^2> = %e\n",p2diff,p2err);
     fflush(stdout);
