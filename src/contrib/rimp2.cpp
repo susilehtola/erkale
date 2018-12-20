@@ -196,7 +196,7 @@ int main(void) {
     if(!Fpbpb.quiet_load("Fpbpb.dat",atype)) throw std::runtime_error("Fpbpb does not exist!\n");
     if(!Bpbhb.quiet_load("Bpbhb.dat",atype)) throw std::runtime_error("Bpbhb does not exist!\n");
     pol=true;
-  } catch(std::runtime_error) {
+  } catch(std::runtime_error &) {
     pol=false;
   }
 
