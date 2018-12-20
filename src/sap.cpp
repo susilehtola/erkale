@@ -19,7 +19,12 @@
 
 SAP::SAP() {
   // Allocate memory
-  atoms.resize(sizeof(element_symbols)/sizeof(element_symbols[0]));
+  size_t Nelem(sizeof(element_symbols)/sizeof(element_symbols[0]));
+
+  // We only have up to Z=102
+  atoms.resize(102+1);
+  if(atoms.size()>=Nelem)
+    throw std::logic_error("Not enough element data!\n");
 
   // Location to get the files from
   std::string loc;
