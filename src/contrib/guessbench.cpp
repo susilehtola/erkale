@@ -63,6 +63,8 @@ void print_header() {
 void diag(arma::vec & E, arma::mat & C, const arma::mat & H, const arma::mat & Sinvh) {
   arma::eig_sym(E,C,Sinvh.t()*H*Sinvh);
   C=Sinvh*C;
+
+  //E.print("Eigenvalues");
 }
 
 int main(int argc, char **argv) {
@@ -152,7 +154,7 @@ int main(int argc, char **argv) {
 
   } else if(stricmp(guess,"sad")==0 || stricmp(guess,"no")==0) {
     // Get SAD guess
-    Pguess=atomic_guess(basis,set);
+    Pguess=sad_guess(basis,set);
     // Normalize
     Pguess/=2.0;
     
@@ -163,7 +165,14 @@ int main(int argc, char **argv) {
       // Recreate guess
       Pguess=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
     }
-  }
+
+  } else if(stricmp(guess,"gsap")==0) {
+    // Get SAP guess
+    diag(E,C,Hcore+sap_guess(basis,set),Sinvh);
+    // Guess density is
+    Pguess=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+  } else
+    throw std::logic_error("Unsupported guess!\n");
 
   // Calculate the projection
   double proj(arma::trace(P*S*Pguess*S));

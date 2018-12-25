@@ -38,7 +38,10 @@ class Settings;
  *
  * Optional charge given as input.
  */
-arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells=true, bool sphave=true);
+arma::mat sad_guess(const BasisSet & basis, Settings set, bool dropshells=true, bool sphave=true);
+
+/// Same, but do SAP guess by projecting Fock matrices. Not as good as the real-space version
+arma::mat sap_guess(const BasisSet & basis, Settings set, bool sphave=true);
 
 /**
  * Worker routine - perform guess for inuc:th atom in basis, using given method.
@@ -52,7 +55,7 @@ arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells=tru
  *
  * Optional charge given as input.
  */
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells, bool sphave, int Q);
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, arma::mat & atF, bool dropshells, bool sphave, int Q);
 
 /// Determine list of identical nuclei, determined by nucleus and basis set
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);

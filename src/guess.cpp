@@ -24,7 +24,7 @@
 #include "timer.h"
 #include <algorithm>
 
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, bool dropshells, bool sphave, int Q) {
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, arma::mat & atF, bool dropshells, bool sphave, int Q) {
   // Nucleus is
   nucleus_t nuc=basis.get_nucleus(inuc);
 
@@ -166,13 +166,29 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
 
     chkpt.read("Ea",atE);
     chkpt.read("P",atP);
+
+    int restr;
+    chkpt.read("Restricted",restr);
+    if (restr) {
+      chkpt.read("H",atF);
+    } else {
+      arma::mat Fa, Fb;
+      chkpt.read("Ha",Fa);
+      chkpt.read("Hb",Fb);
+      atF=(Fa+Fb)*0.5;
+    }
+    // Substract core Hamiltonian to leave only Coulomb and
+    // exchange-correlation part
+    arma::mat Hcore;
+    chkpt.read("Hcore",Hcore);
+    atF-=Hcore;
   }
 
   // Remove temporary file
   remove(tmpname.c_str());
 }
 
-arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bool sphave) {
+arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, bool dropshells, bool sphave, bool fock) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -182,7 +198,7 @@ arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bo
   // Amount of basis functions is
   size_t Nbf=basis.get_Nbf();
 
-  // Density matrix
+  // Density or Fock matrix
   arma::mat P(Nbf,Nbf);
   P.zeros();
 
@@ -237,10 +253,11 @@ arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bo
     BasisSet atbas;
     arma::vec atE;
     arma::mat atP;
+    arma::mat atF;
     std::vector<size_t> shellidx;
 
     // Perform the guess
-    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,dropshells,sphave,basis.get_nucleus(idnuc[i][0]).Q);
+    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,atF,dropshells,sphave,basis.get_nucleus(idnuc[i][0]).Q);
     // Get the atomic shells
     std::vector<GaussianShell> shells=atbas.get_funcs(0);
 
@@ -253,9 +270,10 @@ arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bo
 	  // Get shells on nucleus
 	  std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
 
-	  // Store density
-	  P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=atP.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
-	}
+	  // Store density / Fock matrix
+          const arma::mat & atM = fock ? atF : atP;
+          P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=atM.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
+        }
       }
 
     if(verbose) {
@@ -279,6 +297,17 @@ arma::mat atomic_guess(const BasisSet & basis, Settings set, bool dropshells, bo
   }
 
   return P;
+}
+
+arma::mat sad_guess(const BasisSet & basis, Settings set, bool dropshells, bool sphave) {
+  return atomic_guess_wrk(basis,set,dropshells,sphave,false);
+}
+
+arma::mat sap_guess(const BasisSet & basis, Settings set, bool sphave) {
+  // It's a bad idea to drop shells for the potential guess - we want
+  // the Coulomb and exchange effects on those orbitals as
+  // well. Otherwise polarization shells have no screening!!
+  return atomic_guess_wrk(basis,set,false,sphave,true);
 }
 
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {
