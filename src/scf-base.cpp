@@ -53,6 +53,8 @@ enum guess_t parse_guess(const std::string & val) {
     return CORE_GUESS;
   else if(stricmp(val,"SAD")==0 || stricmp(val,"Atomic")==0)
     return SAD_GUESS;
+  else if(stricmp(val,"GSAP")==0)
+    return GSAP_GUESS;
   else if(stricmp(val,"SAP")==0)
     return SAP_GUESS;
   else if(stricmp(val,"NO")==0)
@@ -1861,9 +1863,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
       // Orbitals
       basis.projectMOs(oldbas,Eold,Cold,sol.E,sol.C,Nel_alpha);
-
-    } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
-      sol.P=atomic_guess(basis,set);
     }
 
     // Get orbital occupancies
@@ -1900,8 +1899,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.sap_guess(sol);
       else if(guess==GWH_GUESS)
 	solver.gwh_guess(sol);
-      else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
-	// Build Fock operator from SAD density matrix. Get natural orbitals
+      else if(guess == GSAP_GUESS) {
+        sol.H=solver.get_Hcore()+sap_guess(basis,set);
+        solver.diagonalize(sol);
+      } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
+        sol.P=sad_guess(basis,set);
+
+        // Build Fock operator from SAD density matrix. Get natural orbitals
 	arma::vec occ;
 	form_NOs(sol.P,solver.get_S(),sol.C,occ);
 
@@ -2177,9 +2181,6 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	basis.projectMOs(oldbas,Eaold,Caold,sol.Ea,sol.Ca,Nel_alpha);
 	basis.projectMOs(oldbas,Ebold,Cbold,sol.Eb,sol.Cb,Nel_beta);
       }
-
-    } else if(guess==SAD_GUESS || guess==NO_GUESS) {
-      sol.P=atomic_guess(basis,set);
     }
 
     // Get orbital occupancies
@@ -2217,7 +2218,14 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.sap_guess(sol);
       else if(guess==GWH_GUESS)
 	solver.gwh_guess(sol);
-      else if((guess==SAD_GUESS) || (guess==NO_GUESS)) {
+      else if(guess == GSAP_GUESS) {
+        sol.Ha=solver.get_Hcore()+sap_guess(basis,set);
+        sol.Hb=sol.Ha;
+        solver.diagonalize(sol);
+      } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
+        // Form SAD density matrix
+        sol.P=sad_guess(basis,set);
+
 	// Build Fock operator from SAD density matrix. Get natural orbitals
 	arma::vec occ;
 	form_NOs(sol.P,solver.get_S(),sol.Ca,occ);

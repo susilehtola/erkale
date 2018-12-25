@@ -164,6 +164,8 @@ enum guess_t {
   SAD_GUESS,
   /// Atomic potential guess
   SAP_GUESS,
+  /// Atomic potential guess, using SAD solver and gaussian basis
+  GSAP_GUESS,
   /// Natural orbitals from atomic guess
   NO_GUESS,
   /// Generalized Wolfsberg--Helmholz
