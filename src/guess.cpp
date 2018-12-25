@@ -303,7 +303,7 @@ arma::mat sad_guess(const BasisSet & basis, Settings set, bool dropshells, bool 
   return atomic_guess_wrk(basis,set,dropshells,sphave,false);
 }
 
-arma::mat sap_guess(const BasisSet & basis, Settings set, bool dropshells, bool sphave) {
+arma::mat sap_guess(const BasisSet & basis, Settings set, bool sphave) {
   // It's a bad idea to drop shells for the potential guess - we want
   // the Coulomb and exchange effects on those orbitals as
   // well. Otherwise polarization shells have no screening!!

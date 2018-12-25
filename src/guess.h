@@ -40,8 +40,8 @@ class Settings;
  */
 arma::mat sad_guess(const BasisSet & basis, Settings set, bool dropshells=true, bool sphave=true);
 
-/// Same, but do SAP guess by projecting Fock matrices
-arma::mat sap_guess(const BasisSet & basis, Settings set, bool dropshells=true, bool sphave=true);
+/// Same, but do SAP guess by projecting Fock matrices. Not as good as the real-space version
+arma::mat sap_guess(const BasisSet & basis, Settings set, bool sphave=true);
 
 /**
  * Worker routine - perform guess for inuc:th atom in basis, using given method.
