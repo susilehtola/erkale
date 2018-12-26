@@ -97,18 +97,15 @@ int main(int argc, char **argv) {
   chk.read(basis);
 
   // Read in density matrix
-  arma::mat P;
-  chk.read("P",P);
-  // Divide by two to get occupations in [0,1]
-  P/=2.0;
+  arma::mat Pa, Pb;
+  chk.read("Pa",Pa);
+  chk.read("Pb",Pb);
   
   // Number of electrons
   int Nela;
   chk.read("Nel-a",Nela);
   int Nelb;
   chk.read("Nel-b",Nelb);
-  if(Nela!=Nelb)
-    throw std::logic_error("Expected a closed-shell system!\n");
 
   // Overlap matrix
   arma::mat S(basis.overlap());
@@ -119,7 +116,7 @@ int main(int argc, char **argv) {
   // Guess energy and orbitals
   arma::vec E;
   arma::mat C;
-  arma::mat Pguess;
+  arma::mat Pag, Pbg;
   // Form core Hamiltonian
   arma::mat T(basis.kinetic());
   arma::mat V(basis.nuclear());
@@ -130,7 +127,8 @@ int main(int argc, char **argv) {
   if(stricmp(guess,"core")==0) {
     // Diagonalize it
     diag(E,C,Hcore,Sinvh);
-    Pguess=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+    Pag=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+    Pbg=C.cols(0,Nelb-1)*C.cols(0,Nelb-1).t();
 
   } else if(stricmp(guess,"sap")==0) {
     DFTGrid grid(&basis);
@@ -150,34 +148,47 @@ int main(int argc, char **argv) {
     // Approximate Hamiltonian is
     diag(E,C,Hcore+Vsap,Sinvh);
     // Guess density is
-    Pguess=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+    Pag=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+    Pbg=C.cols(0,Nelb-1)*C.cols(0,Nelb-1).t();
 
   } else if(stricmp(guess,"sad")==0 || stricmp(guess,"no")==0) {
     // Get SAD guess
-    Pguess=sad_guess(basis,set);
-    // Normalize
-    Pguess/=2.0;
+    Pag=sad_guess(basis,set)/2.0;
+    Pbg=Pag;
     
     if(stricmp(guess,"no")==0) {
       // Build Fock operator from SAD density matrix. Get natural orbitals
       arma::vec occ;
-      form_NOs(Pguess,S,C,occ);
+      form_NOs(Pag,S,C,occ);
       // Recreate guess
-      Pguess=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+      Pag=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+      Pbg=C.cols(0,Nelb-1)*C.cols(0,Nelb-1).t();
+    } else {
+      if((Nela+Nelb)!=basis.Ztot()) {
+        printf("Warning: SAD density doesn't integrate to wanted number of electrons.\n");
+      }
+      if(Nela!=Nelb) {
+        printf("Warning: SAD density doesn't correspond to wanted spin state.\n");
+      }
     }
 
   } else if(stricmp(guess,"gsap")==0) {
     // Get SAP guess
     diag(E,C,Hcore+sap_guess(basis,set),Sinvh);
     // Guess density is
-    Pguess=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+    Pag=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
+    Pbg=C.cols(0,Nelb-1)*C.cols(0,Nelb-1).t();
   } else
     throw std::logic_error("Unsupported guess!\n");
 
   // Calculate the projection
-  double proj(arma::trace(P*S*Pguess*S));
-
-  printf("Projection of guess onto SCF density is %e i.e. %5.2f %%\n",proj,proj/Nela*100.0);
+  double aproj(arma::trace(Pa*S*Pag*S));
+  double bproj(arma::trace(Pb*S*Pbg*S));
+  if(std::abs(aproj-bproj)>=sqrt(DBL_EPSILON)) {
+    printf("Alpha projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj,aproj/Nela*100.0);
+    printf("Beta  projection of guess onto SCF density is %e i.e. %5.2f %%\n",bproj,bproj/Nelb*100.0);
+  }
+  printf("Projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela+Nelb)*100.0);
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
 
