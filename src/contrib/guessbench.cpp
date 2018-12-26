@@ -96,11 +96,20 @@ int main(int argc, char **argv) {
   Checkpoint chk(chkf,false);
   chk.read(basis);
 
+  int restr;
+  chk.read("Restricted",restr);
+
   // Read in density matrix
   arma::mat Pa, Pb;
-  chk.read("Pa",Pa);
-  chk.read("Pb",Pb);
-  
+  if(restr) {
+    chk.read("P",Pa);
+    Pa/=2.0;
+    Pb=Pa;
+  } else {
+    chk.read("Pa",Pa);
+    chk.read("Pb",Pb);
+  }
+
   // Number of electrons
   int Nela;
   chk.read("Nel-a",Nela);
@@ -155,7 +164,7 @@ int main(int argc, char **argv) {
     // Get SAD guess
     Pag=sad_guess(basis,set)/2.0;
     Pbg=Pag;
-    
+
     if(stricmp(guess,"no")==0) {
       // Build Fock operator from SAD density matrix. Get natural orbitals
       arma::vec occ;
