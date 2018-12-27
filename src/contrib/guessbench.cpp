@@ -68,6 +68,9 @@ void diag(arma::vec & E, arma::mat & C, const arma::mat & H, const arma::mat & S
 }
 
 inline arma::vec focc(const arma::vec & E, double B, double mu) {
+  if(!E.size())
+    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
+
   arma::vec focc(E);
   for(size_t i=0;i<focc.n_elem;i++)
     focc(i)=1.0/(1.0 + exp(B*(E(i)-mu)));
@@ -75,6 +78,8 @@ inline arma::vec focc(const arma::vec & E, double B, double mu) {
 }
 
 arma::vec FermiON(const arma::vec & E, int N, double T) {
+  if(!E.size())
+    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
   // Temperature factor: 1/(kB T) at T=1000K i.e.
   const double B(315775/T);
 
@@ -127,6 +132,9 @@ arma::vec FermiON(const arma::vec & E, int N, double T) {
 }
 
 arma::vec pFermiON(const arma::vec & E, int N, double T) {
+  if(!E.size())
+    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
+
   // Temperature factor: 1/(kB T) at T=1000K i.e.
   const double B(315775/T);
 
@@ -160,6 +168,7 @@ int main(int argc, char **argv) {
   set.add_string("LoadChk","File to load old results from","");
   set.add_double("LinDepThr","Linear dependency threshold",1e-5);
   set.add_bool("FON","Fermi occupation numbers",false);
+  set.add_string("FONscan","Fermi occupation scan","");
   set.add_double("T","Temperature in K",1000);
   set.add_int("nrad","Number of radial shells for SAP",99);
   set.add_int("lmax","Angular rule for SAP (defaults to l=41 i.e. 590 points)",41);
@@ -216,6 +225,7 @@ int main(int argc, char **argv) {
   // Compute guess density matrix
   std::string guess(set.get_string("Guess"));
   bool FON(set.get_bool("FON"));
+  std::string FONscan(set.get_string("FONscan"));
   double T(set.get_double("T"));
   if(stricmp(guess,"core")==0) {
     // Diagonalize it
@@ -264,6 +274,8 @@ int main(int argc, char **argv) {
   if(formP) {
     arma::vec occa(C.n_cols), occb(C.n_cols);
     if(FON) {
+      if(!formP)
+        throw std::logic_error("Can't do Fermi occupations without orbitals!\n");
       if(Nela)
         printf("Alpha gap is %e i.e. % 6.3f eV\n",(E(Nela)-E(Nela-1)),27.2114*(E(Nela)-E(Nela-1)));
       if(Nelb && Nela!=Nelb)
@@ -296,6 +308,29 @@ int main(int argc, char **argv) {
     printf("Beta  projection of guess onto SCF density is %e i.e. %5.2f %%\n",bproj,bproj/Nelb*100.0);
   }
   printf("Projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela+Nelb)*100.0);
+
+  if(FONscan.size()) {
+    if(!formP)
+      throw std::logic_error("Can't do Fermi temperature scan without orbitals!\n");
+
+    // Scan FONs
+    arma::vec Ts(arma::linspace<arma::vec>(0,20000,101));
+
+    // Data
+    arma::mat fon(Ts.n_elem,2);
+    fon.col(0)=Ts;
+    for(size_t i=0;i<Ts.n_elem;i++) {
+      arma::vec occa(FermiON(E,Nela,Ts(i)));
+      arma::vec occb(FermiON(E,Nelb,Ts(i)));
+      Pag=C*arma::diagmat(occa)*C.t();
+      Pbg=C*arma::diagmat(occb)*C.t();
+      aproj=arma::trace(Pa*S*Pag*S);
+      bproj=arma::trace(Pb*S*Pbg*S);
+      fon(i,1)=(aproj+bproj)/(Nela+Nelb)*100.0;
+    }
+    fon.save(FONscan,arma::raw_ascii);
+    printf("FON scan saved in %s\n",FONscan.c_str());
+  }
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
 
