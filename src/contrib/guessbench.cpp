@@ -67,6 +67,79 @@ void diag(arma::vec & E, arma::mat & C, const arma::mat & H, const arma::mat & S
   //E.print("Eigenvalues");
 }
 
+inline arma::vec focc(const arma::vec & E, double B, double mu) {
+  arma::vec focc(E);
+  for(size_t i=0;i<focc.n_elem;i++)
+    focc(i)=1.0/(1.0 + exp(B*(E(i)-mu)));
+  return focc;
+}
+
+arma::vec FermiON(const arma::vec & E, int N, double T) {
+  // Temperature factor: 1/(kB T) at T=1000K i.e.
+  const double B(315775/T);
+
+  arma::vec occ;
+  double occsum;
+  double Eleft, Eright;
+  {
+    int id=N-1;
+    while(true) {
+      occ=focc(E,B,E(id));
+      occsum=arma::sum(occ);
+      if(occsum>N)
+        id--;
+      else
+        break;
+    }
+    Eleft=E(id);
+
+    id=N;
+    while(true) {
+      occ=focc(E,B,E(id));
+      occsum=arma::sum(occ);
+      if(occsum<N)
+        id++;
+      else
+        break;
+    }
+    Eright=E(id);
+  }
+
+  size_t it=0;
+  do {
+    double Efermi((Eleft+Eright)/2);
+    occ=focc(E,B,Efermi);
+    occsum=arma::sum(occ);
+
+    if(occsum>N) {
+      Eright=Efermi;
+    } else if(occsum<N) {
+      Eleft=Efermi;
+    } else
+      break;
+
+    it++;
+
+  } while(std::abs(occsum-N)>N*sqrt(DBL_EPSILON));
+
+  // Rescale occupation numbers
+  return N*occ/arma::sum(occ);
+}
+
+arma::vec pFermiON(const arma::vec & E, int N, double T) {
+  // Temperature factor: 1/(kB T) at T=1000K i.e.
+  const double B(315775/T);
+
+  // Pseudo-FON: chemical potential is
+  double mu=0.5*(E(N)+E(N-1));
+
+  // Get occupation numbers
+  arma::vec occ=focc(E,B,mu);
+
+  // Rescale occupation numbers
+  return N*occ/arma::sum(occ);
+}
+
 int main(int argc, char **argv) {
   print_header();
 
@@ -86,8 +159,16 @@ int main(int argc, char **argv) {
   set.add_scf_settings();
   set.add_string("LoadChk","File to load old results from","");
   set.add_double("LinDepThr","Linear dependency threshold",1e-5);
+  set.add_bool("FON","Fermi occupation numbers",false);
+  set.add_double("T","Temperature in K",1000);
+  set.add_int("nrad","Number of radial shells for SAP",99);
+  set.add_int("lmax","Angular rule for SAP (defaults to l=41 i.e. 590 points)",41);
   set.parse(std::string(argv[1]),true);
   set.print();
+
+  // SAP quadrature rule
+  int nrad(set.get_int("nrad"));
+  int lmax(set.get_int("lmax"));
 
   // Basis set
   BasisSet basis;
@@ -127,24 +208,21 @@ int main(int argc, char **argv) {
   arma::mat C;
   arma::mat Pag, Pbg;
   // Form core Hamiltonian
-  arma::mat T(basis.kinetic());
-  arma::mat V(basis.nuclear());
-  arma::mat Hcore(T+V);
+  arma::mat Hcore(basis.nuclear()+basis.kinetic());
+
+  // Form density matrix from guess orbitals?
+  bool formP=true;
 
   // Compute guess density matrix
   std::string guess(set.get_string("Guess"));
+  bool FON(set.get_bool("FON"));
+  double T(set.get_double("T"));
   if(stricmp(guess,"core")==0) {
     // Diagonalize it
     diag(E,C,Hcore,Sinvh);
-    Pag=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
-    Pbg=C.cols(0,Nelb-1)*C.cols(0,Nelb-1).t();
 
   } else if(stricmp(guess,"sap")==0) {
     DFTGrid grid(&basis);
-
-    // Use a (99,590) grid
-    int nrad=99;
-    int lmax=41;
     bool grad=false;
     bool tau=false;
     bool lapl=false;
@@ -156,9 +234,6 @@ int main(int argc, char **argv) {
     arma::mat Vsap(grid.eval_SAP());
     // Approximate Hamiltonian is
     diag(E,C,Hcore+Vsap,Sinvh);
-    // Guess density is
-    Pag=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
-    Pbg=C.cols(0,Nelb-1)*C.cols(0,Nelb-1).t();
 
   } else if(stricmp(guess,"sad")==0 || stricmp(guess,"no")==0) {
     // Get SAD guess
@@ -169,9 +244,6 @@ int main(int argc, char **argv) {
       // Build Fock operator from SAD density matrix. Get natural orbitals
       arma::vec occ;
       form_NOs(Pag,S,C,occ);
-      // Recreate guess
-      Pag=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
-      Pbg=C.cols(0,Nelb-1)*C.cols(0,Nelb-1).t();
     } else {
       if((Nela+Nelb)!=basis.Ztot()) {
         printf("Warning: SAD density doesn't integrate to wanted number of electrons.\n");
@@ -179,16 +251,42 @@ int main(int argc, char **argv) {
       if(Nela!=Nelb) {
         printf("Warning: SAD density doesn't correspond to wanted spin state.\n");
       }
+      formP=false;
     }
 
   } else if(stricmp(guess,"gsap")==0) {
     // Get SAP guess
     diag(E,C,Hcore+sap_guess(basis,set),Sinvh);
-    // Guess density is
-    Pag=C.cols(0,Nela-1)*C.cols(0,Nela-1).t();
-    Pbg=C.cols(0,Nelb-1)*C.cols(0,Nelb-1).t();
-  } else
+  } else {
     throw std::logic_error("Unsupported guess!\n");
+  }
+
+  if(formP) {
+    arma::vec occa(C.n_cols), occb(C.n_cols);
+    if(FON) {
+      if(Nela)
+        printf("Alpha gap is %e i.e. % 6.3f eV\n",(E(Nela)-E(Nela-1)),27.2114*(E(Nela)-E(Nela-1)));
+      if(Nelb && Nela!=Nelb)
+        printf("Beta  gap is %e i.e. % 6.3f eV\n",(E(Nelb)-E(Nelb-1)),27.2114*(E(Nelb)-E(Nelb-1)));
+      occa=FermiON(E,Nela,T);
+      occb=FermiON(E,Nelb,T);
+
+      if(Nela)
+        printf("Alpha NOON gap is %e\n",(occa(Nela-1)-occa(Nela)));
+      if(Nelb && Nela!=Nelb)
+        printf("Beta  NOON gap is %e\n",(occb(Nelb-1)-occb(Nelb)));
+    } else {
+      occa.zeros();
+      occb.zeros();
+      occa.subvec(0,Nela-1).ones();
+      occb.subvec(0,Nelb-1).ones();
+    }
+    //E.print("Orbital energies");
+    //occa.print("Alpha occupation");
+    //occb.print("Beta  occupation");
+    Pag=C*arma::diagmat(occa)*C.t();
+    Pbg=C*arma::diagmat(occb)*C.t();
+  }
 
   // Calculate the projection
   double aproj(arma::trace(Pa*S*Pag*S));
