@@ -1331,26 +1331,54 @@ arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat 
 }
 
 std::vector<double> atomic_occupancy(int Nel) {
-  std::vector<double> ret;
+  // Number of fully occupied orbitals
+  int nfull = 0;
+  // Number of partially occupied orbitals
+  int norbpart = 0;
+  // Number of fractionally occupied electrons
+  int nelpart = 0;
 
   // Fill shells. Shell index
-  for(size_t is=0;is<sizeof(shell_order)/sizeof(shell_order[0]);is++) {
+  size_t is;
+  for(is=0;is<sizeof(shell_order)/sizeof(shell_order[0]);is++) {
     // am of current shell is
     int l=shell_order[is];
     // and it has 2l+1 orbitals
     int nsh=2*l+1;
-    // Amount of electrons to put is
-    int nput=std::min(nsh,Nel);
 
-    // and they are distributed equally
-    for(int i=0;i<nsh;i++)
-      ret.push_back(nput*1.0/nsh);
+    // Partial or full occupation?
+    if(Nel>nsh) {
+      nfull+=nsh;
+    } else {
+      nelpart = Nel;
+      norbpart = nsh;
+      break;
+    }
 
     // Reduce electron count
-    Nel-=nput;
-    if(Nel==0)
-      break;
+    Nel-=nsh;
   }
+
+  // Spread the occupation around on the whole valence shell to
+  // make sure the SCF converges nicely; we don't want the
+  // fractional occupation to flip e.g. between s and p
+  // orbitals.
+  if(shell_order[is]) {
+    do {
+      // Go to previous valence shell
+      --is;
+      // Take the orbitals on the shell out of the frozen core
+      int nshell = 2*shell_order[is]+1;
+      nfull -= nshell;
+      norbpart += nshell;
+      nelpart += nshell;
+    } while(shell_order[is]);
+  }
+
+  // Form occupations
+  std::vector<double> ret(nfull+norbpart,1.0);
+  for(int i=nfull;i<nfull+norbpart;i++)
+    ret[i]=nelpart*1.0/norbpart;
 
   return ret;
 }
