@@ -1331,49 +1331,24 @@ arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat 
 }
 
 std::vector<double> atomic_occupancy(int Nel) {
+  // The density is spread over the whole of the possible valence shell.
+  // Only the noble gas core is doubly occupied
+  static const int magic_values[] = {0, 2, 10, 18, 36, 54, 86, 118};
+  static const size_t Nmagic = sizeof(magic_values)/sizeof(magic_values[0]);
+  // Shell index
+  size_t imagic = 0;
+  while(Nel>magic_values[imagic+1]) {
+    imagic++;
+    if(imagic+1>=Nmagic)
+      throw std::logic_error("Noble elements beyond Oganesson not known\n");
+  }
+
   // Number of fully occupied orbitals
-  int nfull = 0;
+  int nfull = magic_values[imagic]/2;
   // Number of partially occupied orbitals
-  int norbpart = 0;
-  // Number of fractionally occupied electrons
-  int nelpart = 0;
-
-  // Fill shells. Shell index
-  size_t is;
-  for(is=0;is<sizeof(shell_order)/sizeof(shell_order[0]);is++) {
-    // am of current shell is
-    int l=shell_order[is];
-    // and it has 2l+1 orbitals
-    int nsh=2*l+1;
-
-    // Partial or full occupation?
-    if(Nel>nsh) {
-      nfull+=nsh;
-    } else {
-      nelpart = Nel;
-      norbpart = nsh;
-      break;
-    }
-
-    // Reduce electron count
-    Nel-=nsh;
-  }
-
-  // Spread the occupation around on the whole valence shell to
-  // make sure the SCF converges nicely; we don't want the
-  // fractional occupation to flip e.g. between s and p
-  // orbitals.
-  if(shell_order[is]) {
-    do {
-      // Go to previous valence shell
-      --is;
-      // Take the orbitals on the shell out of the frozen core
-      int nshell = 2*shell_order[is]+1;
-      nfull -= nshell;
-      norbpart += nshell;
-      nelpart += nshell;
-    } while(shell_order[is]);
-  }
+  int norbpart = magic_values[imagic+1]/2 - nfull;
+  // Number of partially occupied electrons
+  int nelpart = Nel - nfull;
 
   // Form occupations
   std::vector<double> ret(nfull+norbpart,1.0);
