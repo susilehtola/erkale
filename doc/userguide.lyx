@@ -1,5 +1,5 @@
-#LyX 2.2 created this file. For more info see http://www.lyx.org/
-\lyxformat 508
+#LyX 2.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 544
 \begin_document
 \begin_header
 \save_transient_properties true
@@ -22,6 +22,8 @@
 \font_osf false
 \font_sf_scale 100 100
 \font_tt_scale 100 100
+\use_microtype false
+\use_dash_ligatures false
 \graphics default
 \default_output_format default
 \output_sync 0
@@ -62,6 +64,7 @@
 \suppress_date false
 \justification true
 \use_refstyle 1
+\use_minted 0
 \index Index
 \shortcut idx
 \color #008000
@@ -75,7 +78,10 @@
 \tocdepth 3
 \paragraph_separation indent
 \paragraph_indentation default
-\quotes_language english
+\is_math_indent 0
+\math_numbering_side default
+\quotes_style english
+\dynamic_quotes 0
 \papercolumns 2
 \papersides 1
 \paperpagestyle default
@@ -276,6 +282,7 @@ libint
 \begin_inset CommandInset citation
 LatexCommand cite
 key "LIBINT"
+literal "true"
 
 \end_inset
 
@@ -287,6 +294,7 @@ libxc
 \begin_inset CommandInset citation
 LatexCommand cite
 key "LIBXC,Marques2012"
+literal "true"
 
 \end_inset
 
@@ -344,6 +352,7 @@ Erkale
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2010"
+literal "true"
 
 \end_inset
 
@@ -352,6 +361,7 @@ key "Lehtola2010"
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014a,Lehtola2016,Lehtola2015,Lehtola2011,Lehtola2013a,Lehtola2014"
+literal "true"
 
 \end_inset
 
@@ -593,6 +603,7 @@ BasisRotate Perform P-orthogonalization
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Jensen2014"
+literal "true"
 
 \end_inset
 
@@ -623,6 +634,7 @@ Cholesky Use the Cholesky decomposition
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Beebe1977"
+literal "true"
 
 \end_inset
 
@@ -660,6 +672,7 @@ CholeskyShThr The same-shell threshold to use in the Cholesky decomposition
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Koch2003"
+literal "true"
 
 \end_inset
 
@@ -686,6 +699,15 @@ key "Koch2003"
 \end_layout
 
 \begin_layout Description
+ConvThr The orbital gradient convergence threshold.
+ This is the same as the DIIS error, 
+\begin_inset Formula $\max\left\Vert [\boldsymbol{F},\boldsymbol{P}\right\Vert $
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
 DecFock When forming the Fock matrix in direct SCF, calculate the contributions
  in the decontracted basis.
  This may be useful when you have a small system with a very large contracted
@@ -695,6 +717,16 @@ DecFock When forming the Fock matrix in direct SCF, calculate the contributions
 False
 \emph default
  by default.
+\end_layout
+
+\begin_layout Description
+Decontract Indices of the atoms to decontract the basis set for, for example
+ 
+\emph on
+1,2,6-8
+\emph default
+, or * for all atoms.
+ Empty by default, meaning no decontraction.
 \end_layout
 
 \begin_layout Description
@@ -717,86 +749,12 @@ FittingBasis
 \end_layout
 
 \begin_layout Description
-DFTDelta Defines when to switch to final integration grid: 
-\begin_inset Formula $\left|\Delta P\right|_{\text{max}}<\delta\Delta P_{\text{max}}$
-\end_inset
-
-, 
-\begin_inset Formula $\left|\Delta P\right|_{\text{rms}}<\delta\Delta P_{\text{rms}}$
-\end_inset
-
- and 
-\begin_inset Formula $\left|\Delta E\right|<\delta\Delta E_{\text{max}}$
-\end_inset
-
+DFTDelta Defines when to switch to final integration grid, as a multiple
+ 
+\series bold
+ConvThr
+\series default
 .
- Here 
-\begin_inset Formula $\delta$
-\end_inset
-
- is the value of 
-\series bold
-DFTDelta
-\series default
-, 
-\begin_inset Formula $\left|\Delta P\right|_{\text{max}}$
-\end_inset
-
- and 
-\begin_inset Formula $\left|\Delta P\right|_{\text{rms}}$
-\end_inset
-
- are the maximum and rms change of the density matrix and 
-\begin_inset Formula $\left|\Delta E\right|$
-\end_inset
-
- the change of energy, 
-\begin_inset Formula $\Delta P_{\text{max}}$
-\end_inset
-
-, 
-\family roman
-\series medium
-\shape up
-\size normal
-\emph off
-\bar no
-\strikeout off
-\uuline off
-\uwave off
-\noun off
-\color none
-
-\begin_inset Formula $\Delta P_{\text{rms}}$
-\end_inset
-
- and 
-\begin_inset Formula $\Delta E_{\text{max}}$
-\end_inset
-
- being set by the keywords 
-\family default
-\series bold
-\shape default
-\size default
-\emph default
-\bar default
-\strikeout default
-\uuline default
-\uwave default
-\noun default
-\color inherit
-DeltaPmax
-\series default
-, 
-\series bold
-DeltaPrms
-\series default
- and 
-\series bold
-DeltaEmax
-\series default
-, respectively.
  The default value is 100.
 \end_layout
 
@@ -849,6 +807,37 @@ npts
 \emph default
  is the amount of points in the Lebedev quadrature of the wanted order.
  The default is 50 -194, for a (50,194) grid.
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\series bold
+N.B.
+ 
+\series default
+The default is aimed 
+\series bold
+for LDA and GGA calculations on light atoms
+\series default
+.
+ If you want to run heavier atoms and/or meta-GGAs, you should check that
+ the grid is converged! Standard choices for bigger grids are (75,302) and
+ (99,590).
+ If the basis set is large like UGBS, you may need many more radial points.
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+For preliminiary calculations one may be interested in smaller grids, for
+ which (30,170) might be okay.
+ This should not be used for any production runs.
 \end_layout
 
 \begin_layout Standard
@@ -2397,6 +2386,7 @@ tion integration grid, as determined by the convergence of the diagonal
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Koster2004"
+literal "true"
 
 \end_inset
 
@@ -2420,6 +2410,7 @@ lation integration grid, as determined by the convergence of the diagonal
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Koster2004"
+literal "true"
 
 \end_inset
 
@@ -2452,43 +2443,39 @@ DIISThr Error threshold for using DIIS interpolated Fock matrices.
 \end_layout
 
 \begin_layout Description
-Decontract Indices of the atoms to decontract the basis set for, for example
- 
+DimerSymmetry If running on a diatomic molecule placed along the 
+\begin_inset Formula $z$
+\end_inset
+
+ axis, this makes the calculation enforce the known orbital symmetries for
+ diatomic molecules, 
 \emph on
-1,2,6-8
+i.e.
+ 
 \emph default
-.
- None by default.
-\end_layout
-
-\begin_layout Description
-DeltaEmax Convergence criterion for maximum change of energy in a single
- SCF step.
- 
-\begin_inset Formula $10^{-8}$
+that the orbital behaves as 
+\begin_inset Formula $e^{im\phi}$
 \end_inset
 
- by default.
-\end_layout
-
-\begin_layout Description
-DeltaPmax Convergence criterion for maximum change of density matrix in
- a single SCF step.
- 
-\begin_inset Formula $10^{-6}$
+ with respect to the angle 
+\begin_inset Formula $\phi$
 \end_inset
 
- by default.
-\end_layout
-
-\begin_layout Description
-DeltaPrms Convergence criterion for rms change of density matrix in a single
- SCF step.
+ around the bond.
+ This option may be useful for setting up fully numerical calculations with
  
-\begin_inset Formula $10^{-8}$
+\shape smallcaps
+x2dhf
+\shape default
+ or 
+\shape smallcaps
+HelFEM
+\shape default
+, as the calculation yields the occupations for the different 
+\begin_inset Formula $m$
 \end_inset
 
- by default.
+ values.
 \end_layout
 
 \begin_layout Description
@@ -2525,31 +2512,88 @@ Guess (If an initial wavefunction was not given to the solver via
 \emph on
 LoadChk
 \emph default
-) Which guess to use for the calculation? Valid options are 
-\emph on
-Core
-\emph default
- for the core guess (very bad for polyatomic systems), 
+) Which guess to use for the calculation? The default is 
 \emph on
 Atomic
 \emph default
- for the atomic guess 
+; good alternatives are 
+\emph on
+NO, Huckel, 
+\emph default
+as well as 
+\emph on
+SAP
+\emph default
+ that needs precomputed atomic radial potentials, see below.
+ Valid options are
+\end_layout
+
+\begin_deeper
+\begin_layout Description
+Core for the core guess (very bad for polyatomic systems, especially in
+ the presence of heavy atoms),
+\end_layout
+
+\begin_layout Description
+Huckel for a Hückel-type guess 
 \begin_inset CommandInset citation
 LatexCommand cite
-key "vanLenthe2006"
+key "Norman2012"
+literal "false"
 
 \end_inset
 
-, or 
-\emph on
-NO
-\emph default
- for an atomic natural orbital guess.
- The default is 
-\emph on
-Atomic
-\emph default
+, where the program employs the orbital coefficients and energies from a
+ set of spin-averaged fractionally occupied atomic calculations to build
+ the guess orbitals,
+\end_layout
+
+\begin_layout Description
+SAD for the superposition of atomic densities (SAD) guess 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "vanLenthe2006"
+literal "true"
+
+\end_inset
+
+, which also employs spin-averaged fractionally occupied atomic calculations,
+\end_layout
+
+\begin_layout Description
+SAP for the superposition of atomic potentials (SAP) 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "LehtolaSAP"
+literal "false"
+
+\end_inset
+
+, which needs precomputed radial potentials, the location for which must
+ be specified with the ERKALE_SAP_LIBRARY environment variable,
+\end_layout
+
+\begin_layout Description
+GSAP for a SAP guess computed in the Gaussian basis set (this usually gives
+ poor results and shouldn't be used), and
+\end_layout
+
+\begin_layout Description
+NO for the purified SAD guess 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "LehtolaSAP"
+literal "false"
+
+\end_inset
+
 .
+\end_layout
+
+\end_deeper
+\begin_layout Description
+InputBohr Specifies that the geometry in the xyz file is in Bohr instead
+ of Ångström.
 \end_layout
 
 \begin_layout Description
@@ -2760,6 +2804,7 @@ PZ Use Perdew–Zunger self-interaction correction (PZ-SIC)
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Perdew1981,Lehtola2014a,Lehtola2016"
+literal "true"
 
 \end_inset
 
@@ -2929,6 +2974,7 @@ PZprec Preconditioning of the occupied–virtual block in PZ-SIC calculations
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2016"
+literal "true"
 
 \end_inset
 
@@ -2977,6 +3023,7 @@ PZstab Run stability analysis on the found solution
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2016"
+literal "true"
 
 \end_inset
 
@@ -3139,6 +3186,7 @@ VV10 Add in VV10 non-local correlation
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Vydrov2010"
+literal "true"
 
 \end_inset
 
@@ -3239,7 +3287,7 @@ To examine the composition of a basis set, use,
 \emph on
 e.g.
 \emph default
-, 
+,
 \end_layout
 
 \begin_layout LyX-Code
@@ -3255,6 +3303,7 @@ To plot the completeness profile
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Chong1995"
+literal "true"
 
 \end_inset
 
@@ -3391,6 +3440,7 @@ To perform P-orthogonalization
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Jensen2014"
+literal "true"
 
 \end_inset
 
@@ -3581,6 +3631,7 @@ The completeness optimization tool can be used to create completeness-optimized
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Manninen2006,Lehtola2015"
+literal "true"
 
 \end_inset
 
@@ -3590,6 +3641,7 @@ key "Manninen2006,Lehtola2015"
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2015"
+literal "true"
 
 \end_inset
 
@@ -3713,6 +3765,7 @@ n scheme detailed in reference
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Manninen2006"
+literal "true"
 
 \end_inset
 
@@ -3726,6 +3779,7 @@ Note that you should not in general generate basis sets by hand, but use
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2015,Lehtola2012,Lehtola2013"
+literal "true"
 
 \end_inset
 
@@ -3789,6 +3843,7 @@ e.g.
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Avogadro"
+literal "true"
 
 \end_inset
 
@@ -3796,6 +3851,7 @@ key "Avogadro"
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Jmol"
+literal "true"
 
 \end_inset
 
@@ -3853,6 +3909,7 @@ ELF Compute the electron localization function
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Becke1990"
+literal "true"
 
 \end_inset
 
@@ -3972,6 +4029,7 @@ Erkale
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Avogadro"
+literal "true"
 
 \end_inset
 
@@ -3979,6 +4037,7 @@ key "Avogadro"
 \begin_inset CommandInset citation
 LatexCommand cite
 key "IQmol"
+literal "true"
 
 \end_inset
 
@@ -4286,6 +4345,7 @@ To calculate the radial electron momentum density (isotropic EMD) and the
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2011"
+literal "true"
 
 \end_inset
 
@@ -4527,6 +4587,7 @@ Similarity
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Vandenbussche2013"
+literal "true"
 
 \end_inset
 
@@ -4573,6 +4634,7 @@ This is a tool for orbital localization.
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2013a"
+literal "true"
 
 \end_inset
 
@@ -4614,6 +4676,7 @@ ER Edmiston–Ruedenberg localization.
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Edmiston1963"
+literal "true"
 
 \end_inset
 
@@ -4630,6 +4693,7 @@ i.e.
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Foster1960"
+literal "true"
 
 \end_inset
 
@@ -4646,6 +4710,7 @@ FB2 FB with penalty exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Jansik2011"
+literal "true"
 
 \end_inset
 
@@ -4662,6 +4727,7 @@ FB3 FB with penalty exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Jansik2011"
+literal "true"
 
 \end_inset
 
@@ -4674,6 +4740,7 @@ FM fourth moment
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hoyvik2012"
+literal "true"
 
 \end_inset
 
@@ -4690,6 +4757,7 @@ FM2 FM with penalty exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hoyvik2012"
+literal "true"
 
 \end_inset
 
@@ -4706,6 +4774,7 @@ FM3 FM with penalty exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hoyvik2012"
+literal "true"
 
 \end_inset
 
@@ -4718,6 +4787,7 @@ MU Pipek–Mezey (PM) with Mulliken charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Pipek1989"
+literal "true"
 
 \end_inset
 
@@ -4738,6 +4808,7 @@ MUH PM with Mulliken charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hoyvik2013"
+literal "true"
 
 \end_inset
 
@@ -4758,6 +4829,7 @@ MU2 PM with Mulliken charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hoyvik2013"
+literal "true"
 
 \end_inset
 
@@ -4770,6 +4842,7 @@ LO PM with Löwdin charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hoyvik2013"
+literal "true"
 
 \end_inset
 
@@ -4790,6 +4863,7 @@ LOH PM with Löwdin charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hoyvik2013"
+literal "true"
 
 \end_inset
 
@@ -4810,6 +4884,7 @@ LO2 PM with Löwdin charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hoyvik2013"
+literal "true"
 
 \end_inset
 
@@ -4822,6 +4897,7 @@ BA PM with Bader charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Cioslowski1991"
+literal "true"
 
 \end_inset
 
@@ -4842,6 +4918,7 @@ BAH PM with Bader charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Cioslowski1991"
+literal "true"
 
 \end_inset
 
@@ -4862,6 +4939,7 @@ BA2 PM with Bader charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Cioslowski1991"
+literal "true"
 
 \end_inset
 
@@ -4874,6 +4952,7 @@ BE PM with Becke charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014"
+literal "true"
 
 \end_inset
 
@@ -4894,6 +4973,7 @@ BEH PM with Becke charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014"
+literal "true"
 
 \end_inset
 
@@ -4914,6 +4994,7 @@ BE2 PM with Becke charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014"
+literal "true"
 
 \end_inset
 
@@ -4926,6 +5007,7 @@ HI PM with Hirshfeld charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Hirshfeld1977"
+literal "true"
 
 \end_inset
 
@@ -4946,6 +5028,7 @@ HIH PM with Hirshfeld charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Hirshfeld1977"
+literal "true"
 
 \end_inset
 
@@ -4966,6 +5049,7 @@ HI2 PM with Hirshfeld charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Hirshfeld1977"
+literal "true"
 
 \end_inset
 
@@ -4978,6 +5062,7 @@ IHI PM with iterative Hirshfeld charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Bultinck2007,Bultinck2007a"
+literal "true"
 
 \end_inset
 
@@ -4998,6 +5083,7 @@ IHIH PM with iterative Hirshfeld charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Bultinck2007,Bultinck2007a"
+literal "true"
 
 \end_inset
 
@@ -5018,6 +5104,7 @@ IHI2 PM with iterative Hirshfeld charges, but with exponent
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Bultinck2007,Bultinck2007a"
+literal "true"
 
 \end_inset
 
@@ -5030,6 +5117,7 @@ IAO PM with intrinsic atomic orbital charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5037,6 +5125,7 @@ key "Knizia2013"
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5049,6 +5138,7 @@ IAOH PM with intrinsic atomic orbital charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5064,6 +5154,7 @@ key "Lehtola2014,Knizia2013"
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5076,6 +5167,7 @@ IAO2 PM with intrinsic atomic orbital charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5091,6 +5183,7 @@ key "Knizia2013"
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5103,6 +5196,7 @@ ST PM with iterative Stockholder charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Lillestolen2008,Lillestolen2008a,Lillestolen2009"
+literal "true"
 
 \end_inset
 
@@ -5115,6 +5209,7 @@ STH PM with iterative Stockholder charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Lillestolen2008,Lillestolen2008a,Lillestolen2009"
+literal "true"
 
 \end_inset
 
@@ -5135,6 +5230,7 @@ ST2 PM with iterative Stockholder charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Lillestolen2008,Lillestolen2008a,Lillestolen2009"
+literal "true"
 
 \end_inset
 
@@ -5155,6 +5251,7 @@ VO PM with Voronoi charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014"
+literal "true"
 
 \end_inset
 
@@ -5167,6 +5264,7 @@ VOH PM with Voronoi charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014"
+literal "true"
 
 \end_inset
 
@@ -5187,6 +5285,7 @@ VO2 PM with Voronoi charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014"
+literal "true"
 
 \end_inset
 
@@ -5198,7 +5297,7 @@ key "Lehtola2014"
 \begin_inset Formula $p=2$
 \end_inset
 
- 
+
 \end_layout
 
 \begin_layout Standard
@@ -5323,6 +5422,7 @@ Bader Calculate Bader charges, along the lines of reference
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Rodrigues2009"
+literal "true"
 
 \end_inset
 
@@ -5357,6 +5457,7 @@ DensThr Compute total density thresholds for orbital visualization
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5373,6 +5474,7 @@ Hirshfeld Calculate Hirshfeld charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Hirshfeld1977"
+literal "true"
 
 \end_inset
 
@@ -5410,6 +5512,7 @@ IterativeHirshfeld Calculate iterative Hirshfeld charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Bultinck2007,Bultinck2007a"
+literal "true"
 
 \end_inset
 
@@ -5426,6 +5529,7 @@ IAO Calculate intrinsic atomic orbital charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5469,6 +5573,7 @@ OrbThr Compute orbital density thresholds for orbital visualization
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5485,6 +5590,7 @@ OrbThrVal Orbital density thresholds for orbital or total density visualization
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5498,6 +5604,7 @@ OrbThrGrid DFT grid tolerance for numerical overlap matrix, for determining
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014,Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -5514,6 +5621,7 @@ Stockholder Calculate iterative Stockholder charges
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lillestolen2008,Lillestolen2008a,Lillestolen2009"
+literal "true"
 
 \end_inset
 
@@ -5540,6 +5648,7 @@ Tol Integration grid tolerance for the diagonal element of the overlap matrix
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Krack1998"
+literal "true"
 
 \end_inset
 
@@ -5600,6 +5709,7 @@ The current implementation (since revision 1262) of the localization of
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Iannuzzi2007"
+literal "true"
 
 \end_inset
 
@@ -5607,6 +5717,7 @@ key "Iannuzzi2007"
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2010"
+literal "true"
 
 \end_inset
 
@@ -5753,6 +5864,7 @@ Local
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Sakko2007"
+literal "true"
 
 \end_inset
 
@@ -5916,7 +6028,6 @@ Here, the -m
  option defines that the output from h5dump is to be in scientific notation
  with 10 decimals – the default precision of h5dump may not be enough for
  all purposes.
- 
 \end_layout
 
 \begin_layout Section
@@ -6281,6 +6392,7 @@ in the runfile is usually beneficial.
 \begin_inset CommandInset citation
 LatexCommand cite
 key "vanLenthe2006"
+literal "true"
 
 \end_inset
 
@@ -6294,7 +6406,7 @@ minimal
 \begin_inset Quotes erd
 \end_inset
 
- basis - with even a completely different method! 
+ basis - with even a completely different method!
 \end_layout
 
 \begin_layout LyX-Code
@@ -6379,6 +6491,7 @@ For cases that fail to converge using the default convergence settings,
 \begin_inset CommandInset citation
 LatexCommand cite
 key "Lehtola2014a,Lehtola2016"
+literal "true"
 
 \end_inset
 
@@ -6490,7 +6603,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Graphics
-	filename examples/cas.eps
+	filename cas.eps
 	display false
 	width 45text%
 
@@ -6585,7 +6698,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Graphics
-	filename examples/emd.eps
+	filename emd.eps
 	display false
 	width 45text%
 
@@ -6627,7 +6740,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Graphics
-	filename examples/compton.eps
+	filename compton.eps
 	display false
 	width 45text%
 
@@ -6814,7 +6927,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Graphics
-	filename examples/xrs.eps
+	filename xrs.eps
 	display false
 	width 45text%
 
@@ -6913,7 +7026,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Graphics
-	filename examples/densityplot/density.eps
+	filename density.eps
 	display false
 	width 45text%
 
@@ -6952,7 +7065,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Graphics
-	filename examples/densityplot/homo.eps
+	filename homo.eps
 	display false
 	width 45text%
 
@@ -7326,6 +7439,7 @@ susi.lehtola (at) alumni.helsinki.fi
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "LIBINT"
+literal "true"
 
 \end_inset
 
@@ -7351,6 +7465,7 @@ https://github.com/evaleev/libint/
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "LIBXC"
+literal "true"
 
 \end_inset
 
@@ -7377,6 +7492,7 @@ http://www.tddft.org/programs/octopus/wiki/index.php/Libxc
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Marques2012"
+literal "true"
 
 \end_inset
 
@@ -7399,6 +7515,7 @@ M.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2010"
+literal "true"
 
 \end_inset
 
@@ -7417,6 +7534,7 @@ J.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Jensen2014"
+literal "true"
 
 \end_inset
 
@@ -7432,6 +7550,7 @@ F.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Beebe1977"
+literal "true"
 
 \end_inset
 
@@ -7450,6 +7569,7 @@ N.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Koch2003"
+literal "true"
 
 \end_inset
 
@@ -7468,6 +7588,7 @@ H.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Koster2004"
+literal "true"
 
 \end_inset
 
@@ -7481,13 +7602,33 @@ A.
  Chem.
  Phys.
  121, 681 (2004).
- 
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Norman2012"
+literal "false"
+
+\end_inset
+
+P.
+ Norman and H.
+ J.
+ Aa.
+ Jensen, Phosphorescence parameters for platinum (II) organometallic chromophore
+s: A study at the non-collinear four-component Kohn–Sham level of theory,
+ Chem.
+ Phys.
+ Lett.
+ 531 (2012), 229.
 \end_layout
 
 \begin_layout Bibliography
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "vanLenthe2006"
+literal "true"
 
 \end_inset
 
@@ -7506,7 +7647,21 @@ et al.
 \begin_layout Bibliography
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
+key "LehtolaSAP"
+literal "false"
+
+\end_inset
+
+S.
+ Lehtola, Superposition of Atomic Potentials: a simple yet efficient orbital
+ guess for self-consistent field calculations, arXiv:1810.11659.
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
 key "Perdew1981"
+literal "true"
 
 \end_inset
 
@@ -7524,6 +7679,7 @@ J.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2014a"
+literal "true"
 
 \end_inset
 
@@ -7540,6 +7696,7 @@ S.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2016"
+literal "true"
 
 \end_inset
 
@@ -7558,6 +7715,7 @@ S.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Vydrov2010"
+literal "true"
 
 \end_inset
 
@@ -7575,6 +7733,7 @@ O.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Chong1995"
+literal "true"
 
 \end_inset
 
@@ -7590,6 +7749,7 @@ D.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Manninen2006"
+literal "true"
 
 \end_inset
 
@@ -7607,6 +7767,7 @@ P.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2015"
+literal "true"
 
 \end_inset
 
@@ -7623,6 +7784,7 @@ S.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2012"
+literal "true"
 
 \end_inset
 
@@ -7641,6 +7803,7 @@ J.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2013"
+literal "true"
 
 \end_inset
 
@@ -7659,6 +7822,7 @@ S.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Avogadro"
+literal "true"
 
 \end_inset
 
@@ -7681,6 +7845,7 @@ http://avogadro.openmolecules.net/
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Jmol"
+literal "true"
 
 \end_inset
 
@@ -7696,13 +7861,14 @@ http://www.jmol.org/
 
 \end_inset
 
- 
+
 \end_layout
 
 \begin_layout Bibliography
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Becke1990"
+literal "true"
 
 \end_inset
 
@@ -7721,6 +7887,7 @@ A.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "IQmol"
+literal "true"
 
 \end_inset
 
@@ -7743,6 +7910,7 @@ http://iqmol.org
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2011"
+literal "true"
 
 \end_inset
 
@@ -7762,6 +7930,7 @@ J.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Vandenbussche2013"
+literal "true"
 
 \end_inset
 
@@ -7779,6 +7948,7 @@ J.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2013a"
+literal "true"
 
 \end_inset
 
@@ -7794,6 +7964,7 @@ S.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Edmiston1963"
+literal "true"
 
 \end_inset
 
@@ -7809,6 +7980,7 @@ C.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Foster1960"
+literal "true"
 
 \end_inset
 
@@ -7826,6 +7998,7 @@ J.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Jansik2011"
+literal "true"
 
 \end_inset
 
@@ -7844,6 +8017,7 @@ B.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Hoyvik2012"
+literal "true"
 
 \end_inset
 
@@ -7861,6 +8035,7 @@ I.-M.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Pipek1989"
+literal "true"
 
 \end_inset
 
@@ -7879,6 +8054,7 @@ J.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Hoyvik2013"
+literal "true"
 
 \end_inset
 
@@ -7895,6 +8071,7 @@ I.M.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lehtola2014"
+literal "true"
 
 \end_inset
 
@@ -7911,6 +8088,7 @@ S.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Cioslowski1991"
+literal "true"
 
 \end_inset
 
@@ -7926,6 +8104,7 @@ J.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Hirshfeld1977"
+literal "true"
 
 \end_inset
 
@@ -7941,6 +8120,7 @@ F.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Bultinck2007"
+literal "true"
 
 \end_inset
 
@@ -7960,6 +8140,7 @@ P.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Bultinck2007a"
+literal "true"
 
 \end_inset
 
@@ -7980,6 +8161,7 @@ P.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Knizia2013"
+literal "true"
 
 \end_inset
 
@@ -7995,6 +8177,7 @@ G.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lillestolen2008"
+literal "true"
 
 \end_inset
 
@@ -8012,6 +8195,7 @@ T.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lillestolen2008a"
+literal "true"
 
 \end_inset
 
@@ -8029,6 +8213,7 @@ T.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Lillestolen2009"
+literal "true"
 
 \end_inset
 
@@ -8047,6 +8232,7 @@ T.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Rodrigues2009"
+literal "true"
 
 \end_inset
 
@@ -8061,13 +8247,13 @@ et al.
  Comput.
  Chem.
  30, 1082 (2009).
- 
 \end_layout
 
 \begin_layout Bibliography
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Krack1998"
+literal "true"
 
 \end_inset
 
@@ -8084,6 +8270,7 @@ M.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Iannuzzi2007"
+literal "true"
 
 \end_inset
 
@@ -8101,6 +8288,7 @@ M.
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
 key "Sakko2007"
+literal "true"
 
 \end_inset
 
@@ -8117,6 +8305,17 @@ A.
 
 \begin_layout Section*
 Changes
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2018-01-07 Documented change of convergence thresholds (DeltaPmax, DeltaEmax,
+ DeltaPrms 
+\begin_inset Formula $\to$
+\end_inset
+
+ ConvThr).
+ Documented new SCF guesses.
 \end_layout
 
 \begin_layout Labeling
