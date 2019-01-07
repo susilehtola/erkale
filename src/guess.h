@@ -30,32 +30,37 @@ class Settings;
  * "Starting SCF Calculations by Superposition of Atomic Densities"
  * by J. H. Van Lenthe et al., J. Comp. Chem. 27 (2006), pp. 926-932.
  *
- * However, contrary to the above paper, this version uses atomic
- * densities of the method used in the main calculation instead of ROHF.
+ * However, contrary to the above paper, this version computes the
+ * atomic electron density with the same method as the main
+ * calculation instead of HF.
  *
- * sphave toggles occupancy smearing over subshells, e.g. for boron
- * alpha electrons, px, py and pz have 1/3 occupation.
- *
- * Optional charge given as input.
+ * Optional charge can be given as input.
  */
-arma::mat sad_guess(const BasisSet & basis, Settings set, bool dropshells=true, bool sphave=true);
+arma::mat sad_guess(const BasisSet & basis, Settings set);
 
 /// Same, but do SAP guess by projecting Fock matrices. Not as good as the real-space version
-arma::mat sap_guess(const BasisSet & basis, Settings set, bool sphave=true);
+arma::mat sap_guess(const BasisSet & basis, Settings set);
+
+/**
+ * Form starting guess from a Huckel type calculation
+ *
+ * "Starting SCF Calculations by Superposition of Atomic Densities" by
+ * P. Norman and H. J. Aa. Jensen, Chem. Phys. Lett. 531 (2012),
+ * pp. 229-235.
+ */
+arma::mat huckel_guess(const BasisSet & basis, Settings set);
 
 /**
  * Worker routine - perform guess for inuc:th atom in basis, using given method.
  *
- * Returns the shells on the atom, with shellidx containing the original indices of the shells on the list obtained with get_funcs.
+ * Returns the shells on the atom, with shellidx containing the
+ * original indices of the shells on the list obtained with get_funcs.
  *
- * If dropshells is true, shells with large angular momentum are not included in the calcuation, e.g. the P shell for H and He.
- *
- * sphave toggles occupancy smearing over subshells, e.g. for boron
- * alpha electrons, px, py and pz have 1/3 occupation.
+ * Uses spherically averaged occupations.
  *
  * Optional charge given as input.
  */
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, arma::mat & atF, bool dropshells, bool sphave, int Q);
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atC, arma::mat & atP, arma::mat & atF, int Q);
 
 /// Determine list of identical nuclei, determined by nucleus and basis set
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);

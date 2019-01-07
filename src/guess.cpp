@@ -24,7 +24,7 @@
 #include "timer.h"
 #include <algorithm>
 
-void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atP, arma::mat & atF, bool dropshells, bool sphave, int Q) {
+void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atEocc, arma::mat & atCocc, arma::mat & atP, arma::mat & atF, int Q) {
   // Nucleus is
   nucleus_t nuc=basis.get_nucleus(inuc);
 
@@ -85,67 +85,27 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   // Add the nucleus
   atbas.add_nucleus(nuc);
 
-  // Add the shells relevant for a single atom.
-  int ammax;
-  if(dropshells) {
-    if(nuc.Z-Q<3)
-      // Only s electrons up to lithium
-      ammax=0;
-    else if(nuc.Z-Q<21)
-      // s and p electrons
-      ammax=1;
-    else if(nuc.Z-Q<57)
-      // s, p and d electrons
-      ammax=2;
-    else
-      // s, p, d and f electrons
-      ammax=3;
-  } else {
-    ammax=basis.get_max_am();
-  }
-
   std::vector<GaussianShell> shells=basis.get_funcs(inuc);
   // Indices of shells included
   shellidx.clear();
   for(size_t ish=0;ish<shells.size();ish++) {
-    if(shells[ish].get_am()<=ammax) {
-      // Add shell on zeroth atom, don't sort
-      atbas.add_shell(0,shells[ish],false);
-      shellidx.push_back(ish);
-    }
+    // Add shell on zeroth atom, don't sort
+    atbas.add_shell(0,shells[ish],false);
+    shellidx.push_back(ish);
   }
 
   // Finalize basis set
   atbas.finalize();
 
-  // Sanity check for "artificial" basis sets (e.g. only f functions)
-  if(ammax < basis.get_max_am() && (int) atbas.get_Nbf()<nuc.Z-Q) {
-    // Add the rest of the shells
-    for(size_t ish=0;ish<shells.size();ish++)
-      if(shells[ish].get_am()>ammax) {
-	atbas.add_shell(0,shells[ish],false);
-	shellidx.push_back(ish);
-      }
-    // Refinalize
-    atbas.finalize();
-  }
-
-  // Determine ground state of charged species
-  gs_conf_t gs=get_ground_state(nuc.Z-Q);
-
-  // Set multiplicity
-  set.set_int("Multiplicity",gs.mult);
+  // Set dummy multiplicity
+  set.set_int("Multiplicity",1);
 
   // Force polarized calculation
   set.set_bool("ForcePol",true);
 
   // Get occupancies
-  std::vector<double> occa, occb;
-  get_unrestricted_occupancy(set,atbas,occa,occb,sphave);
-
-  // Pad to same length
-  while(occb.size()<occa.size())
-    occb.push_back(0.0);
+  std::vector<double> occa(atomic_occupancy(0.5*(nuc.Z-Q),atbas.get_Nbf()));
+  std::vector<double> occb(occa);
 
   std::ostringstream occs;
   for(size_t i=0;i<occa.size();i++)
@@ -164,31 +124,50 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
     // Checkpoint
     Checkpoint chkpt(tmpname,false);
 
-    chkpt.read("Ea",atE);
     chkpt.read("P",atP);
 
     int restr;
     chkpt.read("Restricted",restr);
     if (restr) {
+      chkpt.read("E",atEocc);
+      chkpt.read("C",atCocc);
       chkpt.read("H",atF);
     } else {
       arma::mat Fa, Fb;
       chkpt.read("Ha",Fa);
       chkpt.read("Hb",Fb);
       atF=(Fa+Fb)*0.5;
+      chkpt.read("Ea",atEocc);
+      chkpt.read("Ca",atCocc);
     }
     // Substract core Hamiltonian to leave only Coulomb and
     // exchange-correlation part
     arma::mat Hcore;
     chkpt.read("Hcore",Hcore);
     atF-=Hcore;
+
+    // Drop virtual orbitals
+    atEocc=atEocc.subvec(0,occa.size()-1);
+    atCocc=atCocc.cols(0,occa.size()-1);
   }
 
   // Remove temporary file
   remove(tmpname.c_str());
 }
 
-arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, bool dropshells, bool sphave, bool fock) {
+typedef enum {
+              FORM_SAD,
+              FORM_SAP,
+              FORM_HUCKEL
+} atomic_guess_t;
+
+static const std::string guesstypes[]={
+                                       "SAD",
+                                       "GSAP",
+                                       "Huckel"
+};
+
+arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t type) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -197,10 +176,6 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, bool dropshells
 
   // Amount of basis functions is
   size_t Nbf=basis.get_Nbf();
-
-  // Density or Fock matrix
-  arma::mat P(Nbf,Nbf);
-  P.zeros();
 
   // Print out info?
   bool verbose=set.get_bool("Verbose");
@@ -238,11 +213,17 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, bool dropshells
 
   Timer ttot;
 
+  // Identical nuclei
+  std::vector< std::vector<size_t> > shellidx(idnuc.size());
+  std::vector<BasisSet> atbas(idnuc.size());
+  std::vector<arma::vec> atEocc(idnuc.size());
+  std::vector<arma::mat> atCocc(idnuc.size());
+  std::vector<arma::mat> atP(idnuc.size());
+  std::vector<arma::mat> atF(idnuc.size());
+
   // Loop over list of identical nuclei
   for(size_t i=0;i<idnuc.size();i++) {
-
     Timer tsol;
-
     if(verbose) {
       printf("%-2s:",basis.get_nucleus(idnuc[i][0]).symbol.c_str());
       for(size_t iid=0;iid<idnuc[i].size();iid++)
@@ -250,36 +231,149 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, bool dropshells
       fflush(stdout);
     }
 
-    BasisSet atbas;
-    arma::vec atE;
-    arma::mat atP;
-    arma::mat atF;
-    std::vector<size_t> shellidx;
-
     // Perform the guess
-    atomic_guess(basis,idnuc[i][0],method,shellidx,atbas,atE,atP,atF,dropshells,sphave,basis.get_nucleus(idnuc[i][0]).Q);
-    // Get the atomic shells
-    std::vector<GaussianShell> shells=atbas.get_funcs(0);
-
-    // Loop over shells
-    for(size_t ish=0;ish<shells.size();ish++)
-      for(size_t jsh=0;jsh<shells.size();jsh++) {
-
-	// Loop over identical nuclei
-	for(size_t iid=0;iid<idnuc[i].size();iid++) {
-	  // Get shells on nucleus
-	  std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
-
-	  // Store density / Fock matrix
-          const arma::mat & atM = fock ? atF : atP;
-          P.submat(idsh[shellidx[ish]].get_first_ind(),idsh[shellidx[jsh]].get_first_ind(),idsh[shellidx[ish]].get_last_ind(),idsh[shellidx[jsh]].get_last_ind())=atM.submat(shells[ish].get_first_ind(),shells[jsh].get_first_ind(),shells[ish].get_last_ind(),shells[jsh].get_last_ind());
-        }
-      }
+    atomic_guess(basis,idnuc[i][0],method,shellidx[i],atbas[i],atEocc[i],atCocc[i],atP[i],atF[i],basis.get_nucleus(idnuc[i][0]).Q);
 
     if(verbose) {
-      printf(" (%s)\n",tsol.elapsed().c_str());
+      printf(", %i orbitals (%s)\n",(int) atEocc[i].n_elem,tsol.elapsed().c_str());
       fflush(stdout);
     }
+  }
+
+  // Molecular density or Fock matrix
+  arma::mat M(Nbf,Nbf);
+  M.zeros();
+
+  // Form the molecular guess
+  if(type == FORM_SAD || type == FORM_SAP) {
+    for(size_t i=0;i<idnuc.size();i++) {
+      // Get the atomic shells
+      std::vector<GaussianShell> shells=atbas[i].get_funcs(0);
+
+      // Loop over shells
+      for(size_t ish=0;ish<shells.size();ish++)
+        for(size_t jsh=0;jsh<shells.size();jsh++) {
+
+          // Loop over identical nuclei
+          for(size_t iid=0;iid<idnuc[i].size();iid++) {
+            // Get shells on nucleus
+            std::vector<GaussianShell> idsh=basis.get_funcs(idnuc[i][iid]);
+
+            // Store density / Fock matrix
+            const arma::mat & atM = (type==FORM_SAP) ? atF[i] : atP[i];
+            size_t i_global_first(idsh[shellidx[i][ish]].get_first_ind());
+            size_t i_global_last(idsh[shellidx[i][ish]].get_last_ind());
+            size_t j_global_first(idsh[shellidx[i][jsh]].get_first_ind());
+            size_t j_global_last(idsh[shellidx[i][jsh]].get_last_ind());
+
+            size_t i_local_first(shells[ish].get_first_ind());
+            size_t i_local_last(shells[ish].get_last_ind());
+            size_t j_local_first(shells[jsh].get_first_ind());
+            size_t j_local_last(shells[jsh].get_last_ind());
+
+            M.submat(i_global_first, j_global_first, i_global_last, j_global_last) = atM.submat(i_local_first, j_local_first, i_local_last, j_local_last);
+          }
+        }
+    }
+
+  } else if(type == FORM_HUCKEL) {
+    // Number of functions on each nucleus
+    arma::uvec numorb(basis.get_Nnuc());
+    numorb.zeros();
+    for(size_t i=0;i<idnuc.size();i++) {
+      for(size_t iid=0;iid<idnuc[i].size();iid++) {
+        numorb(idnuc[i][iid])=atEocc[i].n_elem;
+
+        if(atEocc[i].n_elem != atCocc[i].n_cols) {
+          std::ostringstream oss;
+          oss << "Number of orbital energies does not match that of orbital coefficients!\n";
+          throw std::logic_error(oss.str());
+        }
+      }
+    }
+
+    // Index of irreducible nucleus
+    arma::uvec irrnuc(basis.get_Nnuc());
+    irrnuc.ones();
+    irrnuc*=-1;
+    for(size_t i=0;i<idnuc.size();i++) {
+      for(size_t iid=0;iid<idnuc[i].size();iid++) {
+        irrnuc(idnuc[i][iid])=i;
+      }
+    }
+
+    // Total dimension of Huckel basis
+    size_t n(arma::sum(numorb));
+
+    // Orbital coefficients and energies
+    std::vector<arma::vec> orbEat(basis.get_Nnuc());
+    std::vector<arma::mat> orbCat(basis.get_Nnuc());
+    for(size_t i=0;i<idnuc.size();i++) {
+      for(size_t iid=0;iid<idnuc[i].size();iid++) {
+        orbEat[idnuc[i][iid]]=atEocc[i];
+        orbCat[idnuc[i][iid]]=atCocc[i];
+      }
+    }
+
+    // Atomic orbitals in full basis
+    arma::mat HuC(Nbf,n);
+    HuC.zeros();
+    // Orbital energies in full basis
+    arma::vec HuE(n);
+    HuE.zeros();
+    // Orbital index
+    {
+      size_t io=0;
+      for(size_t inuc=0;inuc<basis.get_Nnuc();inuc++) {
+        // Skip ghost atoms
+        if(basis.get_nucleus(inuc).bsse)
+          continue;
+
+        // Get shells on nucleus
+        std::vector<GaussianShell> idsh=basis.get_funcs(inuc);
+        std::vector<GaussianShell> shells=atbas[irrnuc[inuc]].get_funcs(0);
+
+        // Loop over shells
+        for(size_t ish=0;ish<shells.size();ish++) {
+          // Global indices
+          size_t i_global_first(idsh[ish].get_first_ind());
+          size_t i_global_last(idsh[ish].get_last_ind());
+
+          // Local indices
+          size_t i_local_first(shells[ish].get_first_ind());
+          size_t i_local_last(shells[ish].get_last_ind());
+
+          // Store orbitals
+          HuC.submat(i_global_first, io, i_global_last, io+orbCat[inuc].n_cols-1) = orbCat[inuc].rows(i_local_first, i_local_last);
+        }
+        // Store energies
+        HuE.subvec(io, io+orbEat[inuc].n_elem-1) = orbEat[inuc];
+
+        // Increment orbital count
+        io+=orbCat[inuc].n_cols;
+      }
+      if(io!=n)
+        throw std::logic_error("Huckel orbital coefficient indexing error!\n");
+    }
+
+    // Overlap matrix
+    arma::mat S(basis.overlap());
+    // Overlap in Huckel basis
+    arma::mat ShuC(S*HuC);
+    arma::mat Shu(HuC.t()*ShuC);
+
+    // Form Huckel matrix in MO basis
+    arma::mat Hu(n,n);
+    Hu.zeros();
+    for(size_t i=0;i<n;i++) {
+      Hu(i,i)=HuE(i);
+      for(size_t j=0;j<i;j++) {
+        Hu(i,j) = Hu(j,i) = 1.75*Shu(i,j)*(HuE(i)+HuE(j))/2.0;
+      }
+    }
+
+    // Convert Huckel matrix to full AO basis
+    M=ShuC*Hu*ShuC.t();
   }
 
   /*
@@ -287,27 +381,28 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, bool dropshells
   int Neltot=basis.Ztot()-set.get_int("Charge");
   double Nel=arma::trace(P*S);
   if(fabs(Nel-Neltot)/Neltot*100>1e-10)
-    fprintf(stderr,"Nel = %i, P contains %f electrons, difference %e.\n",Neltot,Nel,Nel-Neltot);
+  fprintf(stderr,"Nel = %i, P contains %f electrons, difference %e.\n",Neltot,Nel,Nel-Neltot);
   */
 
   if(verbose) {
-    printf("Atomic guess formed in %s.\n\n",ttot.elapsed().c_str());
+    printf("%s guess formed in %s.\n\n",guesstypes[type].c_str(),ttot.elapsed().c_str());
     fprintf(stderr,"done (%s)\n\n",ttot.elapsed().c_str());
     fflush(stderr);
   }
 
-  return P;
+  return M;
 }
 
-arma::mat sad_guess(const BasisSet & basis, Settings set, bool dropshells, bool sphave) {
-  return atomic_guess_wrk(basis,set,dropshells,sphave,false);
+arma::mat sad_guess(const BasisSet & basis, Settings set) {
+  return atomic_guess_wrk(basis,set,FORM_SAD);
 }
 
-arma::mat sap_guess(const BasisSet & basis, Settings set, bool sphave) {
-  // It's a bad idea to drop shells for the potential guess - we want
-  // the Coulomb and exchange effects on those orbitals as
-  // well. Otherwise polarization shells have no screening!!
-  return atomic_guess_wrk(basis,set,false,sphave,true);
+arma::mat sap_guess(const BasisSet & basis, Settings set) {
+  return atomic_guess_wrk(basis,set,FORM_SAP);
+}
+
+arma::mat huckel_guess(const BasisSet & basis, Settings set) {
+  return atomic_guess_wrk(basis,set,FORM_HUCKEL);
 }
 
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {

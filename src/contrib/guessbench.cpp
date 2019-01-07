@@ -267,6 +267,11 @@ int main(int argc, char **argv) {
   } else if(stricmp(guess,"gsap")==0) {
     // Get SAP guess
     diag(E,C,Hcore+sap_guess(basis,set),Sinvh);
+
+  } else if(stricmp(guess,"huckel")==0) {
+    // Get Huckel guess
+    diag(E,C,huckel_guess(basis,set),Sinvh);
+
   } else {
     throw std::logic_error("Unsupported guess!\n");
   }

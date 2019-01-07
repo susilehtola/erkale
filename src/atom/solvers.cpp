@@ -32,8 +32,8 @@ void form_density(const arma::mat & Ca, const arma::mat & Cb, arma::mat & Pa, ar
   get_Nel_alpha_beta(Z,gs.mult,Nel_alpha,Nel_beta);
 
   // Get occupancies
-  std::vector<double> occa=atomic_occupancy(Nel_alpha);
-  std::vector<double> occb=atomic_occupancy(Nel_beta);
+  std::vector<double> occa=atomic_occupancy(Nel_alpha,Ca.n_rows);
+  std::vector<double> occb=atomic_occupancy(Nel_beta,Cb.n_rows);
 
   // Form density matrix
   size_t Nbf=Ca.n_rows;
@@ -56,7 +56,7 @@ void form_density(const arma::mat & C, arma::mat & P, int Z) {
   size_t Nbf=C.n_rows;
   P.zeros(Nbf,Nbf);
 
-  std::vector<double> occs=atomic_occupancy(Z/2);
+  std::vector<double> occs=atomic_occupancy(Z/2,C.n_rows);
   for(size_t i=0;i<occs.size();i++)
     P+=2*occs[i]*C.col(i)*arma::trans(C.col(i));
 }
@@ -70,8 +70,8 @@ void print_E(const arma::vec & Ea, const arma::vec & Eb, int Z) {
   get_Nel_alpha_beta(Z,gs.mult,Nel_alpha,Nel_beta);
 
   // Get occupancies
-  std::vector<double> occa=atomic_occupancy(Nel_alpha);
-  std::vector<double> occb=atomic_occupancy(Nel_beta);
+  std::vector<double> occa=atomic_occupancy(Nel_alpha,Ea.n_elem);
+  std::vector<double> occb=atomic_occupancy(Nel_beta,Eb.n_elem);
 
   printf("\nAlpha orbital energies\n");
   for(size_t i=0;i<occa.size();i++)
@@ -109,7 +109,7 @@ void print_E(const arma::vec & E, int Z) {
   get_Nel_alpha_beta(Z,gs.mult,Nel_alpha,Nel_beta);
 
   // Get occupancies
-  std::vector<double> occs=atomic_occupancy(Nel_alpha);
+  std::vector<double> occs=atomic_occupancy(Nel_alpha,E.n_elem);
 
   printf("\nOrbital energies\n");
   for(size_t i=0;i<occs.size();i++)
@@ -213,8 +213,8 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, double convthr, b
       int Nel_alpha;
       int Nel_beta;
       get_Nel_alpha_beta(Z,gs.mult,Nel_alpha,Nel_beta);
-      std::vector<double> occa=atomic_occupancy(Nel_alpha);
-      std::vector<double> occb=atomic_occupancy(Nel_beta);
+      std::vector<double> occa=atomic_occupancy(Nel_alpha,sol.P.n_rows);
+      std::vector<double> occb=atomic_occupancy(Nel_beta,sol.P.n_rows);
       ROHF_update(sol.Ha,sol.Hb,sol.P,S,occa,occb,verbose);
     }
 
