@@ -92,16 +92,23 @@ void parse_xc_func(int & x_func, int & c_func, const std::string & xc) {
   x_func=0;
   c_func=0;
 
-  // Check if there is a dash in the input.
+  // Check if there is a dash or plus in the input.
   size_t dpos=xc.find('-',0);
+  size_t ppos=xc.find('+',0);
 
-  if(dpos!=std::string::npos) {
+  size_t pos=std::string::npos;
+  if(ppos!=std::string::npos)
+    pos=ppos;
+  if(dpos!=std::string::npos)
+    pos=dpos;
+
+  if(pos!=std::string::npos) {
     // OK, there is a dash.
 
     // Exchange part is
-    std::string x=xc.substr(0,dpos);
+    std::string x=xc.substr(0,pos);
     // and correlation part is
-    std::string c=xc.substr(dpos+1,xc.size()-dpos);
+    std::string c=xc.substr(pos+1,xc.size()-pos);
 
     // Functionals are
     x_func=find_func(x);
