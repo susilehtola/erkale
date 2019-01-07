@@ -1,0 +1,8337 @@
+#LyX 2.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 508
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\options compress
+\use_default_options false
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "charter" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref true
+\pdf_title "ERKALE Users' Guide"
+\pdf_author "Susi Lehtola"
+\pdf_bookmarks true
+\pdf_bookmarksnumbered true
+\pdf_bookmarksopen false
+\pdf_bookmarksopenlevel 1
+\pdf_breaklinks false
+\pdf_pdfborder false
+\pdf_colorlinks true
+\pdf_backref section
+\pdf_pdfusetitle true
+\papersize default
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 0
+\use_package esint 0
+\use_package mathdots 1
+\use_package mathtools 0
+\use_package mhchem 1
+\use_package stackrel 0
+\use_package stmaryrd 0
+\use_package undertilde 0
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 1.5cm
+\topmargin 1.5cm
+\rightmargin 1.5cm
+\bottommargin 2cm
+\columnsep 1cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 2
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+
+\shape smallcaps
+Erkale
+\shape default
+ Users' Guide
+\end_layout
+
+\begin_layout Author
+Susi Lehtola
+\end_layout
+
+\begin_layout Standard
+\begin_inset CommandInset toc
+LatexCommand tableofcontents
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+renewcommand{
+\backslash
+figurename}{Fig.}
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+newref{fig}{name={Fig.~},names={Figs.~}}
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+newref{tab}{name={Table~},names={Tables~}}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset FormulaMacro
+\newcommand{\ket}[1][]{\left|#1\right\rangle }
+{\left|#1\right\rangle }
+\end_inset
+
+
+\begin_inset FormulaMacro
+\newcommand{\bra}[1][]{\left\langle #1\right|}
+{\left\langle #1\right|}
+\end_inset
+
+
+\begin_inset FormulaMacro
+\newcommand{\braket}[2][][]{\left\langle #1\left|#2\right.\right\rangle }
+{\left\langle #1\left|#2\right.\right\rangle }
+\end_inset
+
+
+\begin_inset FormulaMacro
+\newcommand{\expval}[3]{\left\langle #1\left|#2\right|#3\right\rangle }
+{\left\langle #1\left|#2\right|#3\right\rangle }
+\end_inset
+
+
+\begin_inset FormulaMacro
+\newcommand{\part}[2]{\frac{\partial#1}{\partial#2}}
+{\frac{\partial#1}{\partial#2}}
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Introduction
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Introduction"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+What is 
+\shape smallcaps
+Erkale
+\shape default
+?
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:What-is-ERKALE?"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\shape smallcaps
+Erkale
+\shape default
+ is a code for Hartree-Fock and density-functional theory calculations for
+ atoms and molecules.
+ It uses a Gaussian basis set for representing the molecular orbitals.
+ 
+\shape smallcaps
+Erkale
+\shape default
+ is written in C++ and uses the Armadillo template library for linear algebra
+ operations.
+ 
+\shape smallcaps
+Erkale
+\shape default
+ is designed to be as easily maintained and user friendly as possible, but
+ also to try to be reasonably fast for calculations to take place in practice.
+\end_layout
+
+\begin_layout Standard
+The speciality of 
+\shape smallcaps
+Erkale
+\shape default
+ is the computation of x-ray properties, such as electron momentum densities
+ and Compton profiles, x-ray absorption (XAS) and x-ray Raman scattering
+ (XRS) spectra for core electron excitations through the transition potential
+ approximation, and valence electron excitation spectra through the Casida
+ method.
+\end_layout
+
+\begin_layout Standard
+
+\shape smallcaps
+Erkale
+\shape default
+ is also the leading program used for completeness-optimization of basis
+ sets.
+\end_layout
+
+\begin_layout Subsection
+Why another code?
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:Why-another-code?"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+I wanted to do some research on the modeling of inelastic x-ray scattering.
+ This would require low-level access to a quantum chemical code.
+ The code would need to have a gentle learning curve, be reasonably fast
+ for "production" use - and be free, so that I and others could use the
+ code anywhere they liked.
+\end_layout
+
+\begin_layout Standard
+As I did not find suitable existing programs on the market, I decided to
+ write my own program.
+ This would mean spending more time in development, although with the benefit
+ of getting to grips with low level stuff.
+ The decision was made a lot simpler due to the availability of fast, free
+ libraries for computing electron repulsion integrals (
+\shape smallcaps
+libint
+\shape default
+
+\begin_inset CommandInset citation
+LatexCommand cite
+key "LIBINT"
+
+\end_inset
+
+) and exchange-correlation functionals (
+\shape smallcaps
+libxc
+\shape default
+
+\begin_inset CommandInset citation
+LatexCommand cite
+key "LIBXC,Marques2012"
+
+\end_inset
+
+), which meant that most of the requisite, but rather time consuming work
+ was already done by others.
+\end_layout
+
+\begin_layout Standard
+Being free is also important because scientific results need to be reproducible.
+ The path from equations to results is often very long in computational
+ science; the code used to implement the equations is (at least!) as important
+ as the equations themselves.
+ To guarantee that the code stays available, I have chosen the GNU General
+ Public License (GPL), which is commonly used in other scientific software
+ as well.
+\end_layout
+
+\begin_layout Subsection
+Citation
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:Citation"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The recommended citation for the use of 
+\shape smallcaps
+Erkale
+\shape default
+ in scientific publications is
+\end_layout
+
+\begin_layout Quotation
+
+\color blue
+S.
+ Lehtola
+\shape smallcaps
+, Erkale -
+\shape default
+ HF/DFT from Hel, 2016.
+ URL http://github.com/susilehtola/erkale
+\end_layout
+
+\begin_layout Standard
+There is also a scientific publication describing 
+\shape smallcaps
+Erkale
+\shape default
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2010"
+
+\end_inset
+
+, which you should cite as well, in addition to further publications relevant
+ to the pertinent functionality in ERKALE 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014a,Lehtola2016,Lehtola2015,Lehtola2011,Lehtola2013a,Lehtola2014"
+
+\end_inset
+
+, as detailed below.
+\end_layout
+
+\begin_layout Section
+Usage
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Usage"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\shape smallcaps
+Erkale
+\shape default
+ is divided into a set of programs, which each are designed to perform a
+ specific task.
+\end_layout
+
+\begin_layout Description
+erkale is the main program, which is mainly used for performing ground-state
+ SCF calculations.
+\end_layout
+
+\begin_layout Description
+erkale_bastool is a utility program for working with basis set and can be
+ used to decontract a basis, dump the basis for the wanted element or plot
+ completeness profiles.
+\end_layout
+
+\begin_layout Description
+erkale_casida performs time-dependent density-functional theory (TDDFT)
+ calculations in the Casida formalism as a postprocessing tool for 
+\shape smallcaps
+Erkale
+\shape default
+.
+\end_layout
+
+\begin_layout Description
+erkale_copt creates completeness-optimized primitive basis sets.
+\end_layout
+
+\begin_layout Description
+erkale_emd is the electronic momentum density (EMD) program that postprocesses
+ the results produced by
+\series bold
+ 
+\series default
+\shape smallcaps
+Erkale
+\shape default
+.
+\end_layout
+
+\begin_layout Description
+erkale_xrs performs XAS/XRS calculations in the transition potential approximati
+on.
+\end_layout
+
+\begin_layout Subsection
+erkale
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The first step in computing ground-state electronic momentum density properties
+ and Compton profiles, or non-resonant inelastic x-ray scattering (NRIXS)
+ spectra using time-dependent density-functional theory (DFT) through the
+ Casida method, or the transition potential (TP) approximation in 
+\shape smallcaps
+Erkale
+\shape default
+ is the solution of the ground-state electron density.
+ This is performed by the 
+\emph on
+erkale
+\emph default
+ program (
+\emph on
+erkale_omp
+\emph default
+ for the OpenMP parallelized version).
+\end_layout
+
+\begin_layout Standard
+The SCF solver is run with the syntax
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale runfile
+\end_layout
+
+\begin_layout Standard
+where 
+\emph on
+runfile
+\emph default
+ is the file containing the specifics of the calculation to run.
+\end_layout
+
+\begin_layout Standard
+The only keyword that you 
+\series bold
+have to
+\series default
+ define is 
+\emph on
+Method
+\emph default
+, which specifies the type of calculation you wish to run, everything else
+ is defaulted.
+ The full list of keywords is given below.
+\end_layout
+
+\begin_layout Description
+AtomGuess What method to use for the separated atoms when using the atomic
+ guess (see 
+\emph on
+Guess
+\emph default
+ section).
+ The default is 
+\emph on
+Auto
+\emph default
+, in which case 
+\emph on
+Method
+\emph default
+ will be used for the atomic guess as well.
+ In some cases (e.g.
+ meta-GGA functionals) the atomic calculations may not converge, and specifying
+ a different 
+\emph on
+AtomGuess 
+\emph default
+may prove helpful.
+\end_layout
+
+\begin_layout Description
+Basis The basis set to use.
+ This actually is the file name that 
+\shape smallcaps
+Erkale
+\shape default
+ will look for, and can be given with or without the 
+\emph on
+.gbs
+\emph default
+ filename extension.
+ 
+\shape smallcaps
+Erkale
+\shape default
+ will search for the file in the following order:
+\begin_inset Separator latexpar
+\end_inset
+
+
+\end_layout
+
+\begin_deeper
+\begin_layout Enumerate
+In the current directory.
+\end_layout
+
+\begin_layout Enumerate
+In the directory specified by the environmental variable 
+\emph on
+ERKALE_LIBRARY
+\emph default
+.
+\end_layout
+
+\begin_layout Enumerate
+In the system-wide basis set directory, defined at compile-time.
+ By default this is 
+\emph on
+/usr/share/erkale/basis
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+By default, the used basis set is aug-cc-pVTZ.
+\end_layout
+
+\end_deeper
+\begin_layout Description
+BasisCutoff When P-orthogonalization is enabled, the cutoff to use to drop
+ small primitives from contracted functions (in the intermediate normalization).
+ The default is 
+\begin_inset Formula $10^{-8}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+BasisOrth The method used to orthonormalize the basis set.
+ Can be 
+\emph on
+Can
+\emph default
+ for Canonical orthonormalization, 
+\emph on
+Sym
+\emph default
+ for symmetric orthonormalization or 
+\emph on
+Chol
+\emph default
+ for Cholesky orthonormalization.
+ The default is 
+\emph on
+Auto
+\emph default
+, which uses symmetric orthonormalization if possible (no near-linear dependenci
+es), and otherwise canonical orthonormalization.
+ You probably don't want to modify this setting.
+\end_layout
+
+\begin_layout Description
+BasisRotate Perform P-orthogonalization 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Jensen2014"
+
+\end_inset
+
+ of basis set? Default is 
+\emph on
+true
+\emph default
+.
+ To restore functionality to that before revision 1181, set this to 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+C1-DIIS When DIIS is used, use the original C1 formulation instead of the
+ newer, more flexible C2 formulation? False by default.
+\end_layout
+
+\begin_layout Description
+Charge The charge of the system, in units of elementary charge.
+ By default 0.
+\end_layout
+
+\begin_layout Description
+Cholesky Use the Cholesky decomposition 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Beebe1977"
+
+\end_inset
+
+ to treat two-electron integrals?
+\end_layout
+
+\begin_layout Description
+CholeskyMode Mode to run the Cholesky decomposition in, specified with an
+ integer.
+ The default is 0, indicating no special action.
+ Setting the value to 1 will save the generated Cholesky decomposition on
+ disk.
+ Setting the value to -1 will load the decomposition from disk, skipping
+ the potentially time consuming formation.
+ This option is useful for, 
+\emph on
+e.g.
+\emph default
+, running benchmarks on different functionals using the same basis set and
+ geometry.
+\end_layout
+
+\begin_layout Description
+CholeskyThr The threshold to use for the Cholesky decomposition.
+ The default is 
+\begin_inset Formula $10^{-7}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+CholeskyShThr The same-shell threshold to use in the Cholesky decomposition
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Koch2003"
+
+\end_inset
+
+.
+ The program calculates all two-electron integrals for a given shell, and
+ reuses the same integrals until the maximum Cholesky residual on the shell
+ 
+\begin_inset Formula $r_{\text{shell }}$
+\end_inset
+
+ is smaller than the global maximum 
+\begin_inset Formula $r_{\text{max}}$
+\end_inset
+
+ by the set threshold 
+\begin_inset Formula $\epsilon$
+\end_inset
+
+: 
+\begin_inset Formula $r_{\text{shell}}<\epsilon r_{\text{max}}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+DecFock When forming the Fock matrix in direct SCF, calculate the contributions
+ in the decontracted basis.
+ This may be useful when you have a small system with a very large contracted
+ basis set.
+ 
+\emph on
+False
+\emph default
+ by default.
+\end_layout
+
+\begin_layout Description
+DensityFitting Use density fitting to evaluate the Coulomb term (and exact
+ exchange if needed)? Default is 
+\emph on
+true
+\emph default
+ for DFT calculations and 
+\emph on
+false
+\emph default
+ for HF calculations.
+ When calculation of the exact exchange is needed, you need to define the
+ 
+\emph on
+FittingBasis
+\emph default
+ explicitly.
+\end_layout
+
+\begin_layout Description
+DFTDelta Defines when to switch to final integration grid: 
+\begin_inset Formula $\left|\Delta P\right|_{\text{max}}<\delta\Delta P_{\text{max}}$
+\end_inset
+
+, 
+\begin_inset Formula $\left|\Delta P\right|_{\text{rms}}<\delta\Delta P_{\text{rms}}$
+\end_inset
+
+ and 
+\begin_inset Formula $\left|\Delta E\right|<\delta\Delta E_{\text{max}}$
+\end_inset
+
+.
+ Here 
+\begin_inset Formula $\delta$
+\end_inset
+
+ is the value of 
+\series bold
+DFTDelta
+\series default
+, 
+\begin_inset Formula $\left|\Delta P\right|_{\text{max}}$
+\end_inset
+
+ and 
+\begin_inset Formula $\left|\Delta P\right|_{\text{rms}}$
+\end_inset
+
+ are the maximum and rms change of the density matrix and 
+\begin_inset Formula $\left|\Delta E\right|$
+\end_inset
+
+ the change of energy, 
+\begin_inset Formula $\Delta P_{\text{max}}$
+\end_inset
+
+, 
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula $\Delta P_{\text{rms}}$
+\end_inset
+
+ and 
+\begin_inset Formula $\Delta E_{\text{max}}$
+\end_inset
+
+ being set by the keywords 
+\family default
+\series bold
+\shape default
+\size default
+\emph default
+\bar default
+\strikeout default
+\uuline default
+\uwave default
+\noun default
+\color inherit
+DeltaPmax
+\series default
+, 
+\series bold
+DeltaPrms
+\series default
+ and 
+\series bold
+DeltaEmax
+\series default
+, respectively.
+ The default value is 100.
+\end_layout
+
+\begin_layout Description
+DFTGrid Integration grid to use for DFT calculations.
+ Can be 
+\emph on
+Auto
+\emph default
+ for adaptive grid (thus controlled by 
+\series bold
+DFTInitialTol
+\series default
+ and 
+\series bold
+DFTFinalTol
+\series default
+), or manually defined by 
+\emph on
+nrad lmax
+\emph default
+, 
+\emph on
+nrad
+\emph default
+ being the amount of radial shells and 
+\emph on
+lmax
+\emph default
+ the maximum order integrated exactly.
+ For Lobatto grids there is no limitation for 
+\emph on
+lmax
+\emph default
+; for Lebedev grids see 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "tab:Supported-Lebedev-grids."
+
+\end_inset
+
+ for supported values.
+ You can also define the angular quadrature with -
+\emph on
+npts
+\emph default
+, where 
+\emph on
+npts
+\emph default
+ is the amount of points in the Lebedev quadrature of the wanted order.
+ The default is 50 -194, for a (50,194) grid.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset space \hfill{}
+\end_inset
+
+
+\begin_inset Tabular
+<lyxtabular version="3" rows="17" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset Formula $l_{\text{max}}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset Formula $n_{\text{points}}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+3
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+6
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+5
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+14
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+7
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+26
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+9
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+38
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+11
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+50
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+13
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+74
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+15
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+86
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+17
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+110
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+19
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+146
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+21
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+170
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+23
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+194
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+25
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+230
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+27
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+266
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+29
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+302
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+31
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+350
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+35
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+434
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\begin_inset space \hfill{}
+\end_inset
+
+
+\begin_inset Tabular
+<lyxtabular version="3" rows="17" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="center" valignment="top">
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset Formula $l_{\text{max}}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset Formula $n_{\text{points}}$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+41
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+590
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+47
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+770
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+53
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+974
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+59
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+1202
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+65
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+1454
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+71
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+1730
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+77
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+2030
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+83
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+2354
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+89
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+2702
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+95
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+3074
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+101
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+3470
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+107
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+3890
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+113
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+4334
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+119
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+4802
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+125
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+5294
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+131
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+5810
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\begin_inset space \hfill{}
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Supported Lebedev grids.
+ 
+\begin_inset Formula $l_{\text{max}}$
+\end_inset
+
+ is the order of the rule, while 
+\begin_inset Formula $n_{\text{points}}$
+\end_inset
+
+ gives the amount of points on the grid.
+\begin_inset CommandInset label
+LatexCommand label
+name "tab:Supported-Lebedev-grids."
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Description
+DFTFinalTol (Available only when 
+\emph on
+Method
+\emph default
+ has been set to a DFT keyword) The final tolerance for the DFT exchange-correla
+tion integration grid, as determined by the convergence of the diagonal
+ values of the Kohn-Sham Fock matrix 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Koster2004"
+
+\end_inset
+
+.
+ By default 
+\begin_inset Formula $10^{-5}$
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Description
+DFTInitialTol (Available only when 
+\emph on
+Method
+\emph default
+ has been set to a DFT keyword) The initial tolerance for the DFT exchange-corre
+lation integration grid, as determined by the convergence of the diagonal
+ values of the Kohn-Sham Fock matrix 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Koster2004"
+
+\end_inset
+
+.
+ By default 
+\begin_inset Formula $10^{-4}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+DFTLobatto (Available only when 
+\emph on
+Method
+\emph default
+ has been set to a DFT keyword) Use Lobatto grids instead of Lebedev grids
+ for angular quadrature.
+ False by default.
+\end_layout
+
+\begin_layout Description
+DIISOrder When DIIS is used, how many Fock matrices to use for the interpolation
+? By default 20.
+\end_layout
+
+\begin_layout Description
+DIISThr Error threshold for using DIIS interpolated Fock matrices.
+ By default 0.05.
+\end_layout
+
+\begin_layout Description
+Decontract Indices of the atoms to decontract the basis set for, for example
+ 
+\emph on
+1,2,6-8
+\emph default
+.
+ None by default.
+\end_layout
+
+\begin_layout Description
+DeltaEmax Convergence criterion for maximum change of energy in a single
+ SCF step.
+ 
+\begin_inset Formula $10^{-8}$
+\end_inset
+
+ by default.
+\end_layout
+
+\begin_layout Description
+DeltaPmax Convergence criterion for maximum change of density matrix in
+ a single SCF step.
+ 
+\begin_inset Formula $10^{-6}$
+\end_inset
+
+ by default.
+\end_layout
+
+\begin_layout Description
+DeltaPrms Convergence criterion for rms change of density matrix in a single
+ SCF step.
+ 
+\begin_inset Formula $10^{-8}$
+\end_inset
+
+ by default.
+\end_layout
+
+\begin_layout Description
+Direct Compute two-electron integrals on-the-fly? You need to enable this
+ in order to compute large systems.
+ False by default.
+\end_layout
+
+\begin_layout Description
+FittingBasis The auxiliary basis set to use for density fitted calculation
+ of the Coulomb and exact exchange (for HF and hybrid DFT) matrices.
+ 
+\emph on
+Auto
+\emph default
+ for automatical formation.
+ 
+\series bold
+N.B.
+
+\series default
+ automatical formation is only supported for pure DFT calculations, as exchange
+ fitting necessary for HF and hybrid DFT has more stringent requirements
+ for the auxiliary basis set.
+ The default is 
+\emph on
+Auto
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Guess (If an initial wavefunction was not given to the solver via 
+\emph on
+LoadChk
+\emph default
+) Which guess to use for the calculation? Valid options are 
+\emph on
+Core
+\emph default
+ for the core guess (very bad for polyatomic systems), 
+\emph on
+Atomic
+\emph default
+ for the atomic guess 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "vanLenthe2006"
+
+\end_inset
+
+, or 
+\emph on
+NO
+\emph default
+ for an atomic natural orbital guess.
+ The default is 
+\emph on
+Atomic
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+LoadChk Initialize calculation with orbitals from checkpoint file.
+\end_layout
+
+\begin_layout Description
+Logfile Redirect standard output to file.
+ Set as 
+\emph on
+stdout
+\emph default
+ to retain in standard output.
+ By default 
+\emph on
+erkale.log
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+MaxIter Maximum number of SCF steps to perform before giving up.
+ By default 100.
+\end_layout
+
+\begin_layout Description
+Method Can be 
+\emph on
+HF
+\emph default
+ for (restricted or unrestricted) Hartree-Fock, 
+\emph on
+ROHF
+\emph default
+ for restricted open-shell Hartree-Fock or a keyword specifying the used
+ exchange-correlation functional.
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+The evaluation of the exchange-correlation functionals is performed by the
+ 
+\shape smallcaps
+libxc
+\shape default
+ library, so for a list of supported exchange, correlation and exchange-correlat
+ion functionals please refer to the attached list or the 
+\shape smallcaps
+libxc
+\shape default
+ documentation (e.g.
+ the file 
+\emph on
+xc_funcs.h
+\emph default
+ included in the 
+\shape smallcaps
+libxc
+\shape default
+ installation).
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+The exchange-correlation functionals are given in the format 
+\emph on
+exchange-correlation
+\emph default
+, for instance 
+\emph on
+lda_x-lda_c_vwn
+\emph default
+ for LDA exchange and Vosko-Wilk-Nusair correlation.
+ If you want, you can also give this in the format 1-7, where the numbers
+ are the relevant 
+\shape smallcaps
+libxc
+\shape default
+ functional identifiers.
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+If you want to run a calculation with just exchange, or just correlation,
+ you can do this by specifying, 
+\emph on
+e.g.
+\emph default
+, 
+\emph on
+lda_x-none
+\emph default
+ and 
+\emph on
+none-lda_c_vwn
+\emph default
+, respectively, as the method.
+ If you set the method to 
+\emph on
+none
+\emph default
+ or 
+\emph on
+none-none
+\emph default
+ (or substitute 0 for 
+\emph on
+none
+\emph default
+), you will get a calculation corresponding to Hartree level of theory.
+\end_layout
+
+\begin_layout Description
+Multiplicity Spin multiplicity 
+\begin_inset Formula $2S+1$
+\end_inset
+
+ of the system.
+ 1 by default (singlet 
+\begin_inset Formula $S=0$
+\end_inset
+
+).
+\end_layout
+
+\begin_layout Description
+NLGrid The grid used to evaluate the non-local correlation contribution
+ in VV10.
+ Same syntax as for 
+\emph on
+DFTGrid
+\emph default
+.
+ The default is a (50,194) grid, which typically gives results converged
+ to the grid limit.
+ Note that you will want to use a much bigger 
+\emph on
+DFTGrid
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Occupancies Orbital occupancies, given in the format 
+\begin_inset Formula $n_{1}$
+\end_inset
+
+ 
+\begin_inset Formula $n_{2}$
+\end_inset
+
+ 
+\begin_inset Formula $n_{3}$
+\end_inset
+
+ 
+\begin_inset Formula $\dots$
+\end_inset
+
+ 
+\begin_inset Formula $n_{N}$
+\end_inset
+
+ for closed shell and 
+\begin_inset Formula $n_{1\alpha}$
+\end_inset
+
+ 
+\begin_inset Formula $n_{1\beta}$
+\end_inset
+
+ 
+\begin_inset Formula $n_{2\alpha}$
+\end_inset
+
+ 
+\begin_inset Formula $n_{2\beta}$
+\end_inset
+
+ 
+\begin_inset Formula $\dots$
+\end_inset
+
+ 
+\begin_inset Formula $n_{N\alpha}$
+\end_inset
+
+ 
+\begin_inset Formula $n_{N\beta}$
+\end_inset
+
+ for open shell systems.
+ If occupancies are not specified, the Aufbau principle is used to form
+ the occupancies.
+\end_layout
+
+\begin_layout Description
+PZ Use Perdew–Zunger self-interaction correction (PZ-SIC) 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Perdew1981,Lehtola2014a,Lehtola2016"
+
+\end_inset
+
+? Default is 
+\emph on
+No
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+PZEthr The threshhold for energy convergence in the line search procedure.
+\end_layout
+
+\begin_layout Description
+PZimag Enable imaginary rotations? The default is 
+\emph on
+Auto
+\emph default
+, indicating the imaginary degrees are turned on by stability analysis (if
+ it is enabled).
+\end_layout
+
+\begin_layout Description
+PZiter The number of consecutive line search iterations to take in the occupied–
+occupied and occupied–virtual blocks.
+ The default is 
+\emph on
+20
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+PZIThr The threshhold for the initial localization procedure specified by
+ 
+\emph on
+PZlocmet
+\emph default
+.
+ The default is 
+\begin_inset Formula $10^{-3}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+PZloc Initial localization of the orbitals? The default is 
+\emph on
+Auto
+\emph default
+, meaning that canonical orbitals will be localized, but if a previous PZ
+ calculation is loaded in, the orbitals will not be touched.
+\end_layout
+
+\begin_layout Description
+PZlocmet The method used in the initial localization of the orbitals.
+ The possibilities are the same as for the 
+\emph on
+Method 
+\emph default
+keyword of 
+\emph on
+erkale_loc
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+PZmode The interactions to apply the PZ correction to.
+ The default is 
+\emph on
+XC, 
+\emph default
+standing for exchange and correlation.
+ Any combination of 
+\emph on
+X
+\emph default
+, 
+\emph on
+C
+\emph default
+, and 
+\emph on
+D
+\emph default
+ is allowed, where 
+\emph on
+X 
+\emph default
+stands for exchange, 
+\emph on
+C 
+\emph default
+for correlation and 
+\emph on
+D
+\emph default
+ for dispersion (i.e.
+ VV10 non-local correlation).
+\end_layout
+
+\begin_layout Description
+PZNRthr The gradient threshold to use to switch to a Newton–Raphson method
+ in the occupied–occupied optimization.
+ The default is 
+\emph on
+0
+\emph default
+, meaning that the Newton–Raphson procedure will not be used.
+ Since the Hessian is evaluated seminumerically, the procedure is rather
+ costly.
+\end_layout
+
+\begin_layout Description
+PZoo Enable rotations in the occupied–occupied block? 
+\emph on
+True
+\emph default
+ by default.
+ You can turn this off if you set 
+\emph on
+PZw
+\emph default
+ to 0 (with 
+\emph on
+PZScale Constant
+\emph default
+), in which case the model is invariant to rotations in the occupied–occupied
+ block.
+\end_layout
+
+\begin_layout Description
+PZOOThr The convergence threshold for the occupied–occupied gradient.
+ The default is 
+\begin_inset Formula $10^{-4}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+PZov Enable rotations in the occupied–virtual (and virtual–occupied) block?
+ 
+\emph on
+True
+\emph default
+ by default.
+ Turning this off is primarily useful if you use the PZ code to run Edmiston–Rue
+denberg localization.
+\end_layout
+
+\begin_layout Description
+PZOVThr The convergence threshold for the occupied–virtual gradient.
+ The default is 
+\begin_inset Formula $10^{-5}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+PZprec Preconditioning of the occupied–virtual block in PZ-SIC calculations
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2016"
+
+\end_inset
+
+.
+ Can be 0 for no preconditioning, 1 for preconditioning with the unified
+ Hamiltonian, or 2 for preconditioning with the orbital-dependent Hamiltonian.
+\end_layout
+
+\begin_layout Description
+PZScale Scaling of the Perdew–Zunger self-interaction correction.
+ Can be 
+\emph on
+Constant
+\emph default
+ (default), 
+\emph on
+Kinetic
+\emph default
+ or 
+\emph on
+Density
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+PZScaleExp The exponent in the kinetic or density scaling equation.
+ The default is 
+\emph on
+1.0
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+PZseed The random seed to use for the initial localization.
+ The default is 
+\emph on
+0
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+PZstab Run stability analysis on the found solution 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2016"
+
+\end_inset
+
+? Can be 0 for no stability analysis, 1 for stability analysis in the occupied–o
+ccupied block, or 2 for stability analysis in the occupied–occupied and
+ occupied–virtual blocks.
+ The orbital Hessian is formed by finite difference of analytic gradients,
+ and is diagonalized using dense matrix algebra.
+ The eigenvalues of the Hessian will be printed out.
+ 
+\begin_inset Newline newline
+\end_inset
+
+The program also accepts negative values which trigger following the instability.
+ E.g., 
+\emph on
+-1
+\emph default
+ means that stability analysis is run in the occupied–occupied block, and
+ if negative eigenvalues are found the solution will be displaced on the
+ direction of the largest instability and the optimization is restarted.
+ 
+\end_layout
+
+\begin_layout Description
+PZstabThr The threshold 
+\begin_inset Formula $\epsilon$
+\end_inset
+
+ for a negative eigenvalue 
+\begin_inset Formula $\omega$
+\end_inset
+
+, interpreted as 
+\begin_inset Formula $\omega<-\epsilon$
+\end_inset
+
+.
+ If this inequality holds, the wave function is deemed unstable.
+\end_layout
+
+\begin_layout Description
+PZw The weight used for the Perdew–Zunger self-interaction correction.
+ The default is 
+\emph on
+1.0
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+SaveChk Save results to checkpoint file.
+ Default is 
+\emph on
+erkale.chk
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Shift Level shift in Hartree to use when solving the SCF equations.
+ The default is 0, 
+\emph on
+i.e.
+
+\emph default
+ no level shift.
+\end_layout
+
+\begin_layout Description
+System The xyz file containing the nuclear coordinates of the system to
+ calculate.
+ By default 
+\emph on
+atoms.xyz
+\emph default
+.
+ Additionally, the fifth column in the file may be used to specify atomic
+ charges for the initial atomic guess, which may be useful for obtaining
+ different classes of solutions (e.g.
+ ionic vs non-ionic).
+ The file is searched in the current directory, and then in the directory
+ specified by the environment variable ERKALE_SYSDIR.
+\begin_inset Newline newline
+\end_inset
+
+The molecular geometry can also be specified as a Z matrix; in this case
+ the xyz file should start with the line #ZMATRIX.
+\end_layout
+
+\begin_layout Description
+StrictIntegrals Do tight screening of two-electron integrals in on-the-fly
+ calculations of the Hartree-Fock Coulomb and/or exchange matrices.
+ 
+\emph on
+False
+\emph default
+ by default, meaning that adaptive screening based on the change of the
+ density matrix is used to skip small products.
+\end_layout
+
+\begin_layout Description
+UseADIIS Use the ADIIS convergence acceleration algorithm? True by default.
+\end_layout
+
+\begin_layout Description
+UseDIIS Use the DIIS convergence acceleration algorithm? (Once the DIIS
+ error has dropped below 
+\series bold
+DIISThr
+\series default
+.) True by default.
+\end_layout
+
+\begin_layout Description
+UseBroyden Use the Broyden convergence accelerator algorithm? False by default.
+\end_layout
+
+\begin_layout Description
+UseLM Use pure spherical harmonics in the basis set, 
+\emph on
+i.e.
+\emph default
+, 5 
+\begin_inset Formula $d$
+\end_inset
+
+ functions instead of the 6 cartesians, 7
+\series bold
+ 
+\begin_inset Formula $f$
+\end_inset
+
+
+\series default
+ functions instead of the 10 cartesians, 
+\emph on
+etc
+\emph default
+.
+ True by default.
+\end_layout
+
+\begin_layout Description
+
+\series bold
+UseTRRH
+\series default
+ Use the Trust Region Roothaan-Hall method for orbital updates instead of
+ diagonalization of the Fock matrix.
+ False by default.
+\end_layout
+
+\begin_layout Description
+Verbose Be verbose in the calculation? True by default.
+\end_layout
+
+\begin_layout Description
+VV10 Add in VV10 non-local correlation 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Vydrov2010"
+
+\end_inset
+
+? 
+\emph on
+True 
+\emph default
+or 
+\emph on
+false
+\emph default
+.
+ The default is 
+\emph on
+Auto
+\emph default
+, triggering VV10 contributions when toggled by the functional definition
+ in 
+\shape smallcaps
+libxc
+\shape default
+.
+ If you set 
+\begin_inset Quotes eld
+\end_inset
+
+VV10 True
+\begin_inset Quotes erd
+\end_inset
+
+, you need to specify the parameters to be used with 
+\emph on
+VV10Pars
+\emph default
+.
+ Whether VV10 is enabled by 
+\emph on
+True
+\emph default
+ or 
+\emph on
+Auto
+\emph default
+, you need to check that the 
+\emph on
+NLGrid
+\emph default
+ is suitable.
+\end_layout
+
+\begin_layout Description
+VV10Pars The 
+\begin_inset Formula $b$
+\end_inset
+
+ and 
+\series bold
+
+\begin_inset Formula $C$
+\end_inset
+
+ 
+\series default
+parameters for the VV10 non-local correlation functional.
+ This is only used if VV10 is set to True, if VV10 is Auto the parameters
+ will be read in from 
+\shape smallcaps
+libxc
+\shape default
+.
+\end_layout
+
+\begin_layout Subsection
+erkale_bastool
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_bastool"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The basis set tool can be used to prepare basis sets for calculations by
+ decontracting the basis set (you can, however, accomplish the same thing
+ with the 
+\emph on
+Decontract
+\emph default
+ setting in the runfile) or dumping a specific element from the library.
+ The tool can also be used to plot the completeness profile of an element
+ in the basis set.
+\end_layout
+
+\begin_layout Standard
+To examine the composition of a basis set, use, 
+\emph on
+e.g.
+\emph default
+, 
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_bastool aug-cc-pVTZ composition
+\end_layout
+
+\begin_layout Standard
+which will print out the contraction scheme of the basis set.
+\end_layout
+
+\begin_layout Standard
+To plot the completeness profile 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Chong1995"
+
+\end_inset
+
+ of a basis set use, 
+\emph on
+e.g.
+\emph default
+,
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+
+\backslash
+ denotes line continuation; write the commands on a single line.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_bastool aug-cc-pVTZ completeness 
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+  O O-prof.dat
+\end_layout
+
+\begin_layout Standard
+which computes the completeness profile of the aug-cc-pVTZ oxygen basis
+ set and save it to the file 
+\emph on
+O-prof.dat
+\emph default
+.
+ The first column in the file contains the 10-base logarithm of the scanning
+ exponent, 
+\begin_inset Formula $\lg\alpha$
+\end_inset
+
+, whereas the following columns contain the 
+\begin_inset Formula $s$
+\end_inset
+
+, 
+\begin_inset Formula $p$
+\end_inset
+
+, 
+\begin_inset Formula $d$
+\end_inset
+
+, 
+\begin_inset Formula $\dots$
+\end_inset
+
+ space completenesses of the basis set.
+\end_layout
+
+\begin_layout Standard
+To decontract a basis set, use
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_bastool input.gbs decontract 
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+  output.gbs
+\end_layout
+
+\begin_layout Standard
+which will save the input basis set in decontracted form in the file 
+\emph on
+output.gbs
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+To dump the basis set for a specific element use
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_bastool input.gbs dump element 
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+  output.gbs
+\end_layout
+
+\begin_layout Standard
+Or, to dump the basis set for all the elements in a 
+\emph on
+xyz
+\emph default
+ file, use
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_bastool input.gbs genbas system.xyz 
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+  output.gbs
+\end_layout
+
+\begin_layout Standard
+To convert a basis set file into Dalton format, use
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_bastool input.gbs savedalton 
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+  output.dal
+\end_layout
+
+\begin_layout Standard
+To perform P-orthogonalization
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Jensen2014"
+
+\end_inset
+
+ of a basis set, use
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_bastool input.gbs Porth cutoff 
+\backslash
+ 
+\end_layout
+
+\begin_layout LyX-Code
+  Cortho output.gbs
+\end_layout
+
+\begin_layout Standard
+Here, 
+\emph on
+cutoff
+\emph default
+ is the cutoff for primitive coefficients in the intermediate normalization
+ (largest coefficient normalized to unity), and 
+\emph on
+Cortho
+\emph default
+ is the 
+\begin_inset Formula $C_{\text{ortho}}$
+\end_inset
+
+ parameter used in the rotation which controls linear dependencies, 
+\begin_inset Formula $C_{\text{ortho}}=0$
+\end_inset
+
+ being equivalent to Davidson rotation.
+\end_layout
+
+\begin_layout Subsection
+erkale_casida
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_casida"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+To compute NRIXS spectra with the Casida tool, you need to do first a ground-sta
+te calculation.
+\end_layout
+
+\begin_layout Standard
+The runfile format for a Casida calculation is as follows:
+\end_layout
+
+\begin_layout Description
+CasidaC The correlation functional to be used for the Casida calculation.
+ Only LDA functionals are currently supported.
+ By default 
+\emph on
+lda_c
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+CasidaCoupling The coupling mode for the Casida calculation.
+ Can be 0 for the independent particle approximation (IPA), 1 for the random
+ phase approximation (RPA) or 2 for the time-dependent local density approximati
+on (TDLDA).
+ By default 2.
+\end_layout
+
+\begin_layout Description
+CasidaPol Force a polarized Casida calculation, even if a restricted ground-stat
+e calculation is used.
+ False by default.
+\end_layout
+
+\begin_layout Description
+CasidaQval The values of momentum transfer that the spectra should be computed
+ for.
+ For example 
+\emph on
+0.1:0.1:1.0,2.5,7.4
+\end_layout
+
+\begin_layout Description
+CasidaStates The states to include in the Casida calculation, for instance
+ 
+\emph on
+1:10,14,16:48
+\emph default
+.
+ For unrestricted calculations the alpha and beta states need to be specified
+ separately (alpha first, then beta).
+ You can also use 
+\begin_inset Quotes eld
+\end_inset
+
+HOMO
+\begin_inset Quotes erd
+\end_inset
+
+ and 
+\begin_inset Quotes eld
+\end_inset
+
+LUMO
+\begin_inset Quotes erd
+\end_inset
+
+ as specifiers, 
+\emph on
+e.g.
+\emph default
+, 
+\emph on
+1:homo+20
+\emph default
+, which will include all of the occupied orbitals and the 20 lowest unoccupied
+ ones as well.
+\end_layout
+
+\begin_layout Description
+CasidaX The exchange functional to be used for the Casida calculation.
+ Only LDA functionals are currently supported.
+ By default 
+\emph on
+lda_x
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+DFTFittingBasis The basis set to use as the fitting basis.
+ Auto for automatical formation.
+\end_layout
+
+\begin_layout Description
+LoadChk The file containing the ground-state density.
+ By default 
+\emph on
+erkale.chk
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+As a result from the Casida executable you will get the file 
+\emph on
+casida.dat
+\emph default
+ that contains the dipole NRIXS spectrum.
+ The first column gives the transition energy and the second gives the transitio
+n speed.
+ If you also specified 
+\emph on
+CasidaQVal
+\emph default
+, then you will also get files named 
+\emph on
+casida-x.yy.dat
+\emph default
+ that contain the momentum transfer dependent spectra.
+\end_layout
+
+\begin_layout Standard
+If default settings are enough for you, you don't need to specify a runfile.
+\end_layout
+
+\begin_layout Subsection
+erkale_copt
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_copt"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The completeness optimization tool can be used to create completeness-optimized
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Manninen2006,Lehtola2015"
+
+\end_inset
+
+ primitive basis sets.
+ The optimization uses conjugate gradients with finite difference gradients
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2015"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The measure to optimize is
+\begin_inset Formula 
+\begin{align*}
+\tau_{n}= & \left(\frac{1}{\lg\alpha_{\text{high}}-\lg\alpha_{\text{low }}}\int_{\alpha_{\text{low}}}^{\alpha_{\text{high}}}\left[1-Y(\alpha)\right]^{n}d\lg\alpha\right)^{1/n},
+\end{align*}
+
+\end_inset
+
+where 
+\begin_inset Formula $n=1$
+\end_inset
+
+ corresponds to maximizing the area of completeness
+\begin_inset Formula 
+\begin{align*}
+\tau_{\text{area}}=1- & \frac{1}{\lg\alpha_{\text{high}}-\lg\alpha_{\text{low }}}\int_{\alpha_{\text{low}}}^{\alpha_{\text{high}}}Y(\alpha)d\lg\alpha
+\end{align*}
+
+\end_inset
+
+and 
+\begin_inset Formula $n=2$
+\end_inset
+
+ to minimizing the rms deviation from completeness
+\begin_inset Formula 
+\begin{align*}
+\tau_{\text{rms}}= & \sqrt{\frac{1}{\lg\alpha_{\text{high}}-\lg\alpha_{\text{low }}}\int_{\alpha_{\text{low}}}^{\alpha_{\text{high}}}\left[1-Y(\alpha)\right]^{2}d\lg\alpha}.
+\end{align*}
+
+\end_inset
+
+Here 
+\begin_inset Formula $Y(\alpha)$
+\end_inset
+
+ is the completeness profile, which measures the capability of the basis
+ set to represent the primitive Gaussian basis function the set is scanned
+ with,
+\begin_inset Formula 
+\begin{align*}
+Y\left(\alpha\right)= & \sum_{\mu\nu}\braket[\alpha][\mu]S_{\mu\nu}^{-1}\braket[\nu][\alpha].
+\end{align*}
+
+\end_inset
+
+When 
+\begin_inset Formula $\ket[\alpha]$
+\end_inset
+
+ can be expanded exactly in the basis set, 
+\begin_inset Formula $Y(\alpha)=1$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+The syntax of the program is
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_copt am n min max Nf
+\end_layout
+
+\begin_layout Standard
+where 
+\emph on
+am
+\emph default
+ is the angular momentum of the shell to optimize (0 for S, 1 for P, 
+\emph on
+etc.
+\emph default
+), 
+\begin_inset Formula $n$
+\end_inset
+
+ is the measure (
+\begin_inset Formula $n=0$
+\end_inset
+
+ for maximal area or 
+\begin_inset Formula $n=1$
+\end_inset
+
+ for minimal rms deviation), 
+\emph on
+min
+\emph default
+ and 
+\emph on
+max
+\emph default
+ are the lower and upper limits of the range (of 
+\begin_inset Formula $\lg\alpha$
+\end_inset
+
+) to optimize, and 
+\emph on
+Nf
+\emph default
+ is the number of exponents to use.
+ The result will be saved to 
+\emph on
+optimized.gbs
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+To generate basis sets for practical calculations you should use the optimizatio
+n scheme detailed in reference 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Manninen2006"
+
+\end_inset
+
+ to generate sufficient sets for all shells of all elements.
+ Note that will need to concatenate the shells by hand for each element.
+\end_layout
+
+\begin_layout Standard
+Note that you should not in general generate basis sets by hand, but use
+ an automated procedure such as the one I've used 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2015,Lehtola2012,Lehtola2013"
+
+\end_inset
+
+.
+ The 
+\shape smallcaps
+Erkale
+\shape default
+ source code includes the algorithms I've used, under 
+\emph on
+src/contrib
+\emph default
+.
+\end_layout
+
+\begin_layout Subsection
+erkale_cube
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_cube"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+erkale_cube 
+\emph default
+can calculate the electron density and/or the molecular orbitals on a grid.
+ To compute the electron momentum density on a grid, use 
+\emph on
+erkale_emd
+\emph default
+ (
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "subsec:erkale_emd"
+
+\end_inset
+
+).
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+erkale_cube
+\emph default
+ generates a file in the 
+\shape smallcaps
+Gaussian
+\shape default
+ cube format, which can be visualized, 
+\emph on
+e.g.
+\emph default
+, with Avogadro 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Avogadro"
+
+\end_inset
+
+ or JMol 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Jmol"
+
+\end_inset
+
+.
+ The settings are
+\end_layout
+
+\begin_layout Description
+AutoBuffer Buffer in Ångström to add in each side of the cube determined
+ by the extremal locations of the atoms.
+ The default is 2.5.
+\end_layout
+
+\begin_layout Description
+AutoSpacing Grid spacing in Ångström to use in automatic grid generation.
+ The default is 0.1.
+\end_layout
+
+\begin_layout Description
+Cube The geometry of the cube, same syntax as for 
+\series bold
+EMDCube
+\series default
+ in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "subsec:erkale_emd"
+
+\end_inset
+
+.
+ Alternatively, can be Auto for automatic generation (default).
+\end_layout
+
+\begin_layout Description
+Density A boolean stating whether the densities are to be calculated.
+ Output saved to 
+\emph on
+density.cube
+\emph default
+; if spin unrestricted also alpha and beta densities are computed and saved
+ in 
+\emph on
+density-a.cube
+\emph default
+ and 
+\emph on
+density-b.cube
+\emph default
+, respectively.
+\end_layout
+
+\begin_layout Description
+ELF Compute the electron localization function 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Becke1990"
+
+\end_inset
+
+? The default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+LoadChk File to load orbitals and densities from
+\end_layout
+
+\begin_layout Description
+OrbIdx Indices of orbitals to plot.
+ Same syntax as for 
+\series bold
+CasidaStates
+\series default
+ in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "subsec:erkale_casida"
+
+\end_inset
+
+, but the HOMO and LUMO specifiers are not supported.
+\end_layout
+
+\begin_layout Description
+Potential Compute the electrostatic potential? Saved in 
+\emph on
+potential.cube
+\emph default
+.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+SplitOrbs A boolean stating whether the orbitals are to be saved in a single
+ file 
+\emph on
+orbital.cube
+\emph default
+ (
+\emph on
+false
+\emph default
+, default), or to be split into single orbital-specific files 
+\emph on
+orbital.N.cube
+\emph default
+, where 
+\emph on
+N
+\emph default
+ is the orbital index.
+ If spin unrestricted, the corresponding files are 
+\emph on
+orbital-a.cube
+\emph default
+ and 
+\emph on
+orbital-b.cube
+\emph default
+, or 
+\emph on
+orbital-a.N.cube
+\emph default
+ and 
+\emph on
+orbital-b.N.cube
+\emph default
+.
+\end_layout
+
+\begin_layout Subsection
+erkale_fchkpt
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_fchkpt"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+For compatibility with other software, 
+\shape smallcaps
+Erkale
+\shape default
+ includes a tool for converting formatted checkpoint files into 
+\shape smallcaps
+Erkale
+\shape default
+ format, and vice versa: 
+\emph on
+erkale_fchkpt
+\emph default
+.
+ 
+\end_layout
+
+\begin_layout Standard
+The main purpose of this tool is to enable visualization of calculations
+ performed with 
+\shape smallcaps
+Erkale
+\shape default
+ using Avogadro
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Avogadro"
+
+\end_inset
+
+ (doesn't support spin polarized calculations) or IQmol
+\begin_inset CommandInset citation
+LatexCommand cite
+key "IQmol"
+
+\end_inset
+
+, and to analyze calculations performed with 
+\shape smallcaps
+Gaussian
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ or 
+\shape smallcaps
+Q-Chem
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark
+\end_layout
+
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+The accepted keywords for 
+\emph on
+erkale_fchkpt
+\emph default
+ are as follows:
+\end_layout
+
+\begin_layout Description
+LoadChk Load checkpoint in 
+\shape smallcaps
+Erkale
+\shape default
+ format from file.
+\end_layout
+
+\begin_layout Description
+LoadFchk Load formatted checkpoint from file.
+\end_layout
+
+\begin_layout Description
+SaveChk Save checkpoint in 
+\shape smallcaps
+Erkale
+\shape default
+ format in file.
+\end_layout
+
+\begin_layout Description
+SaveFchk Save formatted checkpoint from file.
+\end_layout
+
+\begin_layout Description
+FchkTol Tolerance for deviation of norm of density matrix.
+ The default is 
+\begin_inset Formula $10^{-8}$
+\end_inset
+
+.
+ (Only applicable to fchk 
+\begin_inset Formula $\to$
+\end_inset
+
+ chk)
+\end_layout
+
+\begin_layout Description
+Renormalize A boolean stating whether the density matrix should be renormalized
+ to the correct amount of electrons.
+ (Only applicable to fchk 
+\begin_inset Formula $\to$
+\end_inset
+
+ chk)
+\end_layout
+
+\begin_layout Description
+Reorthonormalize A boolean stating whether the orbitals are to be reorthonormali
+zed.
+ (Only applicable to fchk 
+\begin_inset Formula $\to$
+\end_inset
+
+ chk)
+\end_layout
+
+\begin_layout Subsection
+erkale_geom
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_geom"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+erkale_geom
+\emph default
+ performs ground-state geometry optimizations, using analytical derivatives.
+ The program is ran similar to the main executable 
+\emph on
+erkale
+\emph default
+.
+ Upon execution, the electronic structure is first solved in the starting
+ point structure verbosely, after which the executions proceeds in non-verbose
+ mode.
+ The optimization is performed in cartesian coordinates, which is suboptimal
+ for large molecules due to the suboptimal choice of the degrees of freedom.
+ ROHF geometry optimization is not currently supported.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+N.B.
+ Analytic VV10 forces are currently incorrect in ERKALE.
+ You should use numerical gradients instead for VV10 calculations, as well
+ as for PZ-SIC calculations.
+\end_layout
+
+\begin_layout Standard
+Additional settings compared to 
+\emph on
+erkale
+\emph default
+ are
+\end_layout
+
+\begin_layout Description
+Criterion The convergence criterion to use: LOOSE, NORMAL, TIGHT or VERYTIGHT.
+ The default is 
+\emph on
+NORMAL
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+CGReset If using conjugate gradients, reset the search direction every N
+ steps.
+ The default is 
+\emph on
+5
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+MaxSteps The maximum amount of geometry optimization steps to take.
+ Default is 
+\emph on
+256
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+NumGrad Use numerical gradients instead of analytic gradients? Default is
+ 
+\emph on
+False.
+ 
+\emph default
+You may want to set the 
+\emph on
+Stencil
+\emph default
+ and the 
+\emph on
+Stepsize
+\emph default
+ as well.
+\end_layout
+
+\begin_layout Description
+Optimizer The optimization algorithm to use.
+ Currently supported options are
+\begin_inset Separator latexpar
+\end_inset
+
+
+\end_layout
+
+\begin_deeper
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+CGFR Fletcher–Reeves conjugate gradients
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+CGPR Polak–Ribière conjugate gradients
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+BFGS Broyden–Fletcher–Goldfarb–Shanno optimizer (default)
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+SD Steepest descent
+\end_layout
+
+\end_deeper
+\begin_layout Description
+OptMovie The file to store the progress of the optimization in.
+ The file contains xyz snapshots of the system, and can be played as a movie
+ in, 
+\emph on
+e.g.
+\emph default
+, JMol.
+ Default is 
+\emph on
+optimize.xyz
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Result The file to store the final geometry in.
+ Default is 
+\emph on
+optimized.xyz
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Stencil The finite difference stencil to use for numerical gradients.
+ The default is 2, for a two-point central difference stencil.
+\end_layout
+
+\begin_layout Description
+Stepsize The step size for the finite difference stencil in bohr.
+ The default is 
+\begin_inset Formula $10^{-6}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+It is also possible to fix atoms during the geometry optimization.
+ This is done by adding a 
+\emph on
+-Fx
+\emph default
+ suffix to the element symbol in the input geometry file.
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Subsection
+erkale_emd
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_emd"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The EMD executable can be used to calculate the electron momentum density
+ and the Compton profile.
+ 
+\end_layout
+
+\begin_layout Standard
+To calculate the radial electron momentum density (isotropic EMD) and the
+ isotropic Compton profile with the algorithm from reference 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2011"
+
+\end_inset
+
+ from the checkpoint file called 
+\emph on
+erkale.chk
+\emph default
+, the runfile format is
+\end_layout
+
+\begin_layout LyX-Code
+LoadChk erkale.chk
+\end_layout
+
+\begin_layout LyX-Code
+DoEMD true
+\end_layout
+
+\begin_layout Standard
+The default relative tolerance for the radial 
+\begin_inset Formula $p$
+\end_inset
+
+ integral is 
+\begin_inset Formula $10^{-8}$
+\end_inset
+
+, which can be modified with the 
+\emph on
+EMDTol
+\emph default
+ keyword.
+\end_layout
+
+\begin_layout Standard
+As a result of the calculation, you will get the following files:
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\emph on
+emd.txt
+\emph default
+ The radial EMD.
+ The first column is 
+\begin_inset Formula $p$
+\end_inset
+
+, the second is the EMD 
+\begin_inset Formula $n\left(p\right)$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\emph on
+moments.txt
+\emph default
+ The moments of the radial EMD, 
+\begin_inset Formula $\left\langle p^{k}\right\rangle $
+\end_inset
+
+ for 
+\begin_inset Formula $k=-2,\dots,4$
+\end_inset
+
+.
+ 
+\begin_inset Formula $\left\langle p^{0}\right\rangle $
+\end_inset
+
+ is simply the number of electrons.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\emph on
+compton.txt
+\emph default
+ The isotropic Compton profile 
+\begin_inset Formula $J\left(q\right)$
+\end_inset
+
+.
+ The first column is 
+\begin_inset Formula $q$
+\end_inset
+
+, the second is 
+\begin_inset Formula $J\left(q\right)$
+\end_inset
+
+ and the third gives the error estimate of the numerical integration.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+
+\emph on
+compton-interp.txt
+\emph default
+ The isotropic Compton profile, interpolated on a fixed grid.
+ Contents otherwise same as in 
+\emph on
+compton.txt
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+Correspondingly, if you want to compute the EMD on a grid, you need to add
+ the 
+\emph on
+EMDCube
+\emph default
+ keyword.
+ The syntax is
+\end_layout
+
+\begin_layout LyX-Code
+EMDCube -10:.1:10
+\end_layout
+
+\begin_layout Standard
+for a cube from -10 bohr to 10 bohr with spacing 0.1 bohr in 
+\begin_inset Formula $p_{x}$
+\end_inset
+
+, 
+\begin_inset Formula $p_{y}$
+\end_inset
+
+ and 
+\begin_inset Formula $p_{z}$
+\end_inset
+
+, or, if you want a non-isotropic grid, the syntax is
+\end_layout
+
+\begin_layout LyX-Code
+EMDCube -3:.2:5 -2:.5:3 -1:.01:1
+\end_layout
+
+\begin_layout Standard
+where the spacings are given separately for 
+\begin_inset Formula $p_{x}$
+\end_inset
+
+, 
+\begin_inset Formula $p_{y}$
+\end_inset
+
+ and 
+\begin_inset Formula $p_{z}$
+\end_inset
+
+.
+ The result will then be saved in the file 
+\emph on
+emdcube.dat
+\emph default
+, where the first three columns contain 
+\begin_inset Formula $p_{x}$
+\end_inset
+
+, 
+\begin_inset Formula $p_{y}$
+\end_inset
+
+ and 
+\begin_inset Formula $p_{z}$
+\end_inset
+
+ and the fourth one contains the value of the EMD.
+\end_layout
+
+\begin_layout Standard
+You can also calculate momentum density overlap integrals
+\begin_inset Formula 
+\begin{align*}
+S_{AB}(k)= & \int p^{2k}n_{A}(\mathbf{p})n_{B}(\mathbf{p})d^{3}p
+\end{align*}
+
+\end_inset
+
+as well as the related similarity measures
+\begin_inset Formula 
+\begin{align*}
+I_{AB}(k)= & \int p^{2k}\pi_{A}(\mathbf{p})\pi_{B}(\mathbf{p})d^{3}p,
+\end{align*}
+
+\end_inset
+
+where the momentum shape functions are defined as
+\begin_inset Formula 
+\begin{align*}
+\pi_{A}(\mathbf{p})= & n_{A}(\mathbf{p})/N_{A},
+\end{align*}
+
+\end_inset
+
+
+\begin_inset Formula $N_{A}$
+\end_inset
+
+ being the amount of electrons
+\begin_inset Formula 
+\begin{align*}
+N_{A}= & \int n_{A}(\mathbf{p})d^{3}p.
+\end{align*}
+
+\end_inset
+
+Also the similarity integral 
+\begin_inset Formula 
+\begin{align*}
+D_{AB}(k)= & \sqrt{I_{AA}(k)+I_{BB}(k)-2I_{AB}(k)}
+\end{align*}
+
+\end_inset
+
+is calculated.
+ The reference is given with the 
+\emph on
+LoadChk
+\emph default
+ keyword, and the similarity calculation is triggered with the 
+\emph on
+Similarity
+\emph default
+ keyword, with an argument specifying the checkpoint used for the comparison.
+ The integrals are performed on a grid with 500 point radial points (Chebyshev
+ rule), and 2030 angular points (Lebedev), analogously to 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Vandenbussche2013"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsubsection
+erkale_adf_emd
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_adf_emd"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+As a supplementary feature, 
+\shape smallcaps
+Erkale
+\shape default
+ can also calculate momentum densities from calculations performed with
+ the Amsterdam Density Functional program (ADF) in the Slater type orbital
+ (STO) basis.
+ However, we do not recommend the use of ADF for EMD calculations as better
+ results can be obtained faster using GTO basis sets.
+\end_layout
+
+\begin_layout Subsection
+erkale_loc
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_loc"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This is a tool for orbital localization.
+ The used algorithms are described in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2013a"
+
+\end_inset
+
+, please cite it when you use
+\series bold
+ 
+\series default
+the program.
+ Accepted keywords
+\end_layout
+
+\begin_layout Description
+LoadChk Checkpoint to load calculation from.
+\end_layout
+
+\begin_layout Description
+SaveChk Checkpoint to which save calculation with localized orbitals.
+\end_layout
+
+\begin_layout Description
+Maxiter Maximum amount of iterations to take in the unitary optimization.
+ Default is 50000.
+\end_layout
+
+\begin_layout Description
+Method Method to use for orbital localization.
+ Can be:
+\begin_inset Separator latexpar
+\end_inset
+
+
+\end_layout
+
+\begin_deeper
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+ER Edmiston–Ruedenberg localization.
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Edmiston1963"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+FB Foster–Boys, 
+\emph on
+i.e.
+\emph default
+, second moment 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Foster1960"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+FB2 FB with penalty exponent 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Jansik2011"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+FB3 FB with penalty exponent 
+\begin_inset Formula $p=3$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Jansik2011"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+FM fourth moment 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hoyvik2012"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+FM2 FM with penalty exponent 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hoyvik2012"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+FM3 FM with penalty exponent 
+\begin_inset Formula $p=3$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hoyvik2012"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+MU Pipek–Mezey (PM) with Mulliken charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Pipek1989"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+MUH PM with Mulliken charges, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hoyvik2013"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+MU2 PM with Mulliken charges, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hoyvik2013"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+LO PM with Löwdin charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hoyvik2013"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+LOH PM with Löwdin charges, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hoyvik2013"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+LO2 PM with Löwdin charges, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hoyvik2013"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+BA PM with Bader charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Cioslowski1991"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+BAH PM with Bader charges, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Cioslowski1991"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+BA2 PM with Bader charges, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Cioslowski1991"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+BE PM with Becke charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+BEH PM with Becke charges, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+BE2 PM with Becke charges, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+HI PM with Hirshfeld charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Hirshfeld1977"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+HIH PM with Hirshfeld charges, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Hirshfeld1977"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+HI2 PM with Hirshfeld charges, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Hirshfeld1977"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+IHI PM with iterative Hirshfeld charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Bultinck2007,Bultinck2007a"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+IHIH PM with iterative Hirshfeld charges, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Bultinck2007,Bultinck2007a"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+IHI2 PM with iterative Hirshfeld charges, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Bultinck2007,Bultinck2007a"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+IAO PM with intrinsic atomic orbital charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Knizia2013"
+
+\end_inset
+
+ (This yields intrinsic bond orbitals, IBOs, in the nomenclature of 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Knizia2013"
+
+\end_inset
+
+)
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+IAOH PM with intrinsic atomic orbital charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Knizia2013"
+
+\end_inset
+
+, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ (This yields intrinsic bond orbitals, IBOs, in the nomenclature of 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Knizia2013"
+
+\end_inset
+
+)
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+IAO2 PM with intrinsic atomic orbital charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Knizia2013"
+
+\end_inset
+
+, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ (This yields intrinsic bond orbitals, IBOs, in the nomenclature of 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Knizia2013"
+
+\end_inset
+
+)
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+ST PM with iterative Stockholder charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Lillestolen2008,Lillestolen2008a,Lillestolen2009"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+STH PM with iterative Stockholder charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Lillestolen2008,Lillestolen2008a,Lillestolen2009"
+
+\end_inset
+
+, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+ST2 PM with iterative Stockholder charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Lillestolen2008,Lillestolen2008a,Lillestolen2009"
+
+\end_inset
+
+, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+VO PM with Voronoi charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+VOH PM with Voronoi charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014"
+
+\end_inset
+
+, but with exponent 
+\begin_inset Formula $p=1.5$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+VO2 PM with Voronoi charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014"
+
+\end_inset
+
+, but with exponent 
+\begin_inset Formula $p=4$
+\end_inset
+
+ instead of 
+\begin_inset Formula $p=2$
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+The default is FB.
+\end_layout
+
+\end_deeper
+\begin_layout Description
+Virtual In addition to occupied orbitals, localize virtual orbitals as well?
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Logfile Where the progress report is saved to.
+ The default is the standard output.
+\end_layout
+
+\begin_layout Description
+Accelerator The convergence accelerator to use.
+ Can be SDSA for steepest descent / steepest ascent, CGPR for Polak–Ribière
+ conjugate gradients, or CGFR for Fletcher–Reeves conjugate gradients.
+ The default is CGPR.
+ The use of CGFR is discouraged.
+\end_layout
+
+\begin_layout Description
+LineSearch Method to use for line searches.
+ Can be poly_df for fitting the derivative of the cost function, poly_fdf
+ for fitting both cost function and its derivative, armijo for an Armijo
+ line search or fourier_df for a Fourier transform method.
+\end_layout
+
+\begin_layout Description
+StartingPoint Where to start the optimization from.
+ Possibilities: 
+\emph on
+CAN
+\emph default
+ for canonical orbitals, 
+\emph on
+ORTH
+\emph default
+ for a random orthogonal matrix (default), or 
+\emph on
+UNIT
+\emph default
+ for a random complex unitary matrix.
+\end_layout
+
+\begin_layout Description
+Delocalize Instead of localizing, delocalize orbitals? Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Seed The random seed to use when starting from a random matrix.
+\end_layout
+
+\begin_layout Description
+FThreshold Determine convergence when relative change in function value
+ is less than this.
+ Default is 
+\begin_inset Formula $10^{-7}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+GThreshold Determine convergence when absolute value of the Riemannian derivativ
+e is smaller than this.
+ Default is 
+\begin_inset Formula $10^{-7}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection
+erkale_pop
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_pop"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+To perform additional population analyses in addition to the Mulliken analysis
+ ran by 
+\emph on
+erkale
+\emph default
+ by default, you can use 
+\emph on
+erkale_pop
+\emph default
+.
+ The accepted keywords are
+\end_layout
+
+\begin_layout Description
+LoadChk Checkpoint file to load densities from.
+ Default is 
+\emph on
+erkale.chk
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Bader Calculate Bader charges, along the lines of reference 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Rodrigues2009"
+
+\end_inset
+
+.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Becke Calculate Becke charges.
+ 
+\series bold
+N.B.
+
+\series default
+ 
+\series bold
+These are dependent on the used weighting scheme, which is not physical!
+\series default
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+DensThr Compute total density thresholds for orbital visualization
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Knizia2013"
+
+\end_inset
+
+.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Hirshfeld Calculate Hirshfeld charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Hirshfeld1977"
+
+\end_inset
+
+.
+ Default is 
+\emph on
+false.
+\end_layout
+
+\begin_layout Description
+HirshfeldMethod Method to use in computing reference densities for Hirshfeld
+ or iterative Hirshfeld analysis.
+ Default is 
+\emph on
+HF
+\emph default
+.
+ It is also possible to load reference densities from checkpoint files with
+ 
+\emph on
+Load
+\emph default
+, so the use of post-HF densities is also possible.
+ The checkpoint files should be in the current working directory and be
+ named el_Q.chk, el being the element symbol and Q the charge (only 0 for
+ Hirshfeld, 
+\begin_inset Formula $Q\in[-2,2]$
+\end_inset
+
+ for iterative Hirshfeld).
+\end_layout
+
+\begin_layout Description
+IterativeHirshfeld Calculate iterative Hirshfeld charges
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Bultinck2007,Bultinck2007a"
+
+\end_inset
+
+.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+IAO Calculate intrinsic atomic orbital charges
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Knizia2013"
+
+\end_inset
+
+.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+IAOBasis (Minimal) basis set to use for intrinsic atomic orbital analysis.
+ Default is 
+\emph on
+MINAO.gbs
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Mulliken Calculate Mulliken charges.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Lowdin Calculate Löwdin charges.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+OrbThr Compute orbital density thresholds for orbital visualization
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Knizia2013"
+
+\end_inset
+
+.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+OrbThrVal Orbital density thresholds for orbital or total density visualization
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Knizia2013"
+
+\end_inset
+
+.
+ Default is 0.85, corresponding to 85% of total charge within the threshold.
+\end_layout
+
+\begin_layout Description
+OrbThrGrid DFT grid tolerance for numerical overlap matrix, for determining
+ orbital or density thresholds for visualization
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014,Knizia2013"
+
+\end_inset
+
+.
+ Default is 
+\begin_inset Formula $10^{-3}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+Stockholder Calculate iterative Stockholder charges 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lillestolen2008,Lillestolen2008a,Lillestolen2009"
+
+\end_inset
+
+.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Voronoi Calculate Voronoi charges.
+ Default is 
+\emph on
+false
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+Tol Integration grid tolerance for the diagonal element of the overlap matrix
+ 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Krack1998"
+
+\end_inset
+
+.
+ Default is 
+\begin_inset Formula $10^{-5}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection
+erkale_xrs
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_xrs"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The runfile for the XRS executable contains the same directives as that
+ of the SCF executable (since the TP calculation involves an SCF calculation),
+ and in addition some directives that are specific to the XRS/XAS calculation.
+ To perform a XAS/XRS calculation, you first need to do a ground-state calculati
+on, from which the initial core state is then identified by localization.
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+Note:
+\emph default
+ in contrast to the other executables, 
+\emph on
+erkale_xrs
+\emph default
+ will check the SaveChk file whether a calculation has been already performed.
+ This can be used to initialize an XCH calculation with a TP calculation
+ (copy TP checkpoint to the SaveChk file of the XCH run), or to compute
+ more TP spectra (
+\emph on
+e.g.
+\emph default
+, different augmentation scheme, different Q values or different QMethod).
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+Note: 
+\emph default
+The current implementation (since revision 1262) of the localization of
+ the core hole is based on an algorithm similar to the one by Iannuzzi and
+ Hütter 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Iannuzzi2007"
+
+\end_inset
+
+, instead of the one described in 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2010"
+
+\end_inset
+
+.
+ This enables 
+\end_layout
+
+\begin_layout Description
+XRSAugment Asks for the double basis set method to be used: after the TP
+ calculation has converged, augment the basis set with diffuse functions
+ on the given atoms to improve the description of virtual orbitals, 
+\emph on
+e.g.
+\emph default
+, 1,2,5-10,13.
+ You should always augment the excited atom; others aren't normally necessary.
+ None by default.
+\end_layout
+
+\begin_layout Description
+XRSDoubleBasis (If the double basis set method is used) The basis set to
+ add on the augmented centers.
+ The default is 
+\emph on
+X-AUTO
+\emph default
+, which is 
+\emph on
+X-FIRST
+\emph default
+ for first-row atoms and 
+\emph on
+X-SECOND
+\emph default
+ for second-row atoms.
+\end_layout
+
+\begin_layout Description
+XRSGridTol The XC integration grid tolerance for the double basis set calculatio
+n.
+ 
+\begin_inset Formula $10^{-4}$
+\end_inset
+
+ by default.
+\end_layout
+
+\begin_layout Description
+XRSInitialState The core state to excite.
+ Default is 
+\emph on
+1s
+\emph default
+.
+ The program localizes a set of orbitals on the excited atom, from which
+ the core state is identified.
+ Only the inner core can be excited; the orbital must not be in the valence
+ or the iteration will not converge.
+\end_layout
+
+\begin_layout Description
+XRSInitialOrbital Index of initial orbital on the wanted shell.
+ Default is 1.
+ For excitations from higher than 
+\begin_inset Formula $s$
+\end_inset
+
+ shells, can be chosen from the range 
+\begin_inset Formula $1,\dots,2l+1$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+XRSLmax (If the local expansion method is used.) Defines the order of expansion
+ in the angular integrals.
+ 5 by default.
+\end_layout
+
+\begin_layout Description
+XRSLquad (If the local expansion method is used.) Determines how many points
+ are used in the angular integrals.
+ 30 by default.
+\end_layout
+
+\begin_layout Description
+XRSMethod Which type of calculation to run.
+ Can be 
+\emph on
+TP
+\emph default
+ for transition potential (for x-ray Raman and x-ray absorption spectra),
+ 
+\emph on
+FCH
+\emph default
+ for full core-hole (for computing vertical photoionization energy), or
+ 
+\emph on
+XCH
+\emph default
+ (for computing absolute energy correction to TP spectrum).
+ The default is 
+\emph on
+TP
+\emph default
+.
+\end_layout
+
+\begin_layout Description
+XRSNrad (If the local expansion method is used.) Gives the number of points
+ used in the radial integrals.
+ 200 by default.
+\end_layout
+
+\begin_layout Description
+XRSSpin Which spin to excite? Alpha by default.
+ (This setting is relevant for open-shell ground state systems.)
+\end_layout
+
+\begin_layout Description
+XRSQval The values of momentum transfer 
+\begin_inset Formula $q$
+\end_inset
+
+ the spectra should be calculated for.
+ For example 
+\emph on
+0.1:0.1:1.0,2.5,7.4
+\end_layout
+
+\begin_layout Description
+XRSQMethod The method of computing the 
+\begin_inset Formula $q$
+\end_inset
+
+ dependent spectra.
+ Can be 
+\emph on
+Local
+\emph default
+ for the local expansion method 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Sakko2007"
+
+\end_inset
+
+, 
+\emph on
+Fourier
+\emph default
+ for the Fourier transform based method or 
+\emph on
+Series
+\emph default
+ for a moment matrix based method (not recommended).
+ The default is 
+\emph on
+Fourier
+\emph default
+, which is also used for 
+\begin_inset Formula $q$
+\end_inset
+
+ dependent Casida.
+\end_layout
+
+\begin_layout Standard
+The excited atom is specified for 
+\emph on
+erkale
+\emph default
+_
+\emph on
+xrs
+\emph default
+ in
+\emph on
+ 
+\emph default
+the xyz file with the 
+\emph on
+-Xc
+\emph default
+ suffix.
+ You can use the same ground state calculation for studying excitations
+ at different centers, 
+\emph on
+e.g.
+\emph default
+, the nonequivalent carbons on phenol.
+\end_layout
+
+\begin_layout Subsection
+Checkpoint files
+\end_layout
+
+\begin_layout Standard
+
+\shape smallcaps
+Erkale
+\shape default
+uses the HDF5 library 
+\begin_inset Flex URL
+status collapsed
+
+\begin_layout Plain Layout
+
+http://www.hdfgroup.org/HDF5/
+\end_layout
+
+\end_inset
+
+ to perform checkpointing.
+ The method has both the advantage of the speed and accuracy of binary I/O,
+ and the cross-platform compatibility and easy visual inspection that formatted
+ text I/O is conventionally used for.
+\end_layout
+
+\begin_layout Standard
+You can inspect 
+\shape smallcaps
+Erkale
+\shape default
+ checkpoint files with the 
+\emph on
+h5dump
+\emph default
+ utility of HDF5.
+ For instance, you can see what entries the checkpoint file 
+\emph on
+erkale.chk
+\emph default
+ contains with
+\end_layout
+
+\begin_layout LyX-Code
+$ h5dump -n erkale.chk
+\end_layout
+
+\begin_layout Standard
+Sometimes you might want to get a hold on the orbital energies.
+ These are saved in the 
+\emph on
+E
+\emph default
+ entry (restricted runs) or the 
+\emph on
+Ea
+\emph default
+ and 
+\emph on
+Eb
+\emph default
+ entries (unrestricted runs), 
+\emph on
+e.g.
+\emph default
+,
+\end_layout
+
+\begin_layout LyX-Code
+$ h5dump -d E erkale.chk 
+\end_layout
+
+\begin_layout Standard
+will give you the orbital energies in Hartree.
+\end_layout
+
+\begin_layout Standard
+If you want just the orbital energies in eV, you can use, 
+\emph on
+e.g.
+\emph default
+,
+\end_layout
+
+\begin_layout LyX-Code
+$ h5dump -d E -m 
+\begin_inset Quotes eld
+\end_inset
+
+% .10e
+\begin_inset Quotes erd
+\end_inset
+
+ erkale.chk | 
+\backslash
+
+\end_layout
+
+\begin_layout LyX-Code
+awk '{if(NR>5 && NF==2) {print $2*27.21138505}}'
+\end_layout
+
+\begin_layout Standard
+Here, the -m 
+\begin_inset Quotes eld
+\end_inset
+
+% .10e
+\begin_inset Quotes erd
+\end_inset
+
+ option defines that the output from h5dump is to be in scientific notation
+ with 10 decimals – the default precision of h5dump may not be enough for
+ all purposes.
+ 
+\end_layout
+
+\begin_layout Section
+Basis set format
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Basis-set-format"
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Standard
+The basis set files use 
+\shape smallcaps
+Gaussian
+\shape default
+ '94 format.
+ As an example, the cc-pVDZ basis for hydrogen is
+\end_layout
+
+\begin_layout LyX-Code
+H     0
+\end_layout
+
+\begin_layout LyX-Code
+S   3   1.00
+\end_layout
+
+\begin_layout LyX-Code
+ 13.0100000              0.0196850
+\end_layout
+
+\begin_layout LyX-Code
+  1.9620000              0.1379770
+\end_layout
+
+\begin_layout LyX-Code
+  0.4446000              0.4781480
+\end_layout
+
+\begin_layout LyX-Code
+S   1   1.00
+\end_layout
+
+\begin_layout LyX-Code
+  0.1220000              1.0000000
+\end_layout
+
+\begin_layout LyX-Code
+P   1   1.00
+\end_layout
+
+\begin_layout LyX-Code
+  0.7270000              1.0000000
+\end_layout
+
+\begin_layout LyX-Code
+**** 
+\end_layout
+
+\begin_layout Standard
+The first row contains the element the basis is for (H) and the atom number
+ for the specific entry (0 for the default basis).
+ The second line indicates that an S shell is to follow with 3 primitives
+ and norm 1.00.
+ The next lines then contain the exponent and the contraction coefficient
+ of the normalized primitive, respectively.
+ **** on the last line marks that there are no more shells in the basis
+ set.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+N.B.
+
+\series default
+ The convention used in 
+\shape smallcaps
+Erkale
+\shape default
+ for the angular momenta symbols is: S (
+\begin_inset Formula $l=0$
+\end_inset
+
+), P (
+\begin_inset Formula $l=1$
+\end_inset
+
+), D (
+\begin_inset Formula $l=2$
+\end_inset
+
+), F (
+\begin_inset Formula $l=3$
+\end_inset
+
+), G (
+\begin_inset Formula $l=4$
+\end_inset
+
+), H (
+\begin_inset Formula $l=5$
+\end_inset
+
+), I (
+\begin_inset Formula $l=6$
+\end_inset
+
+), J (
+\begin_inset Formula $l=7$
+\end_inset
+
+), K (
+\begin_inset Formula $l=8$
+\end_inset
+
+), L (
+\begin_inset Formula $l=9$
+\end_inset
+
+), M (
+\begin_inset Formula $l=10$
+\end_inset
+
+), N (
+\begin_inset Formula $l=11$
+\end_inset
+
+).
+ 
+\series bold
+Basis sets from the EMSL basis set exchange don't have J shells, but denote
+ l=7 with K.
+
+\series default
+ To cope with this, you can also define the angular momentum of the shell
+ with, 
+\emph on
+e.g.
+\emph default
+,
+\end_layout
+
+\begin_layout LyX-Code
+l=1  1   1.00
+\end_layout
+
+\begin_layout LyX-Code
+  0.7270000              1.0000000
+\end_layout
+
+\begin_layout Standard
+If you want to mix basis sets in a calculation, 
+\emph on
+e.g.
+\emph default
+, in order to use a bigger basis set for the excited atom in a XAS/XRS calculati
+on, you can do this quite easily by preparing your own basis set file, which
+ contains a general basis (index 0) for all the atoms in the system, and
+ a specific basis for the atom(s) you want to treat differently.
+ For instance the basis set
+\end_layout
+
+\begin_layout LyX-Code
+H     0
+\end_layout
+
+\begin_layout LyX-Code
+S   3   1.00
+\end_layout
+
+\begin_layout LyX-Code
+ 13.0100000              0.0196850
+\end_layout
+
+\begin_layout LyX-Code
+  1.9620000              0.1379770
+\end_layout
+
+\begin_layout LyX-Code
+  0.4446000              0.4781480
+\end_layout
+
+\begin_layout LyX-Code
+**** 
+\end_layout
+
+\begin_layout LyX-Code
+H     1
+\end_layout
+
+\begin_layout LyX-Code
+S   3   1.00
+\end_layout
+
+\begin_layout LyX-Code
+ 13.0100000              0.0196850
+\end_layout
+
+\begin_layout LyX-Code
+  1.9620000              0.1379770
+\end_layout
+
+\begin_layout LyX-Code
+  0.4446000              0.4781480
+\end_layout
+
+\begin_layout LyX-Code
+S   1   1.00
+\end_layout
+
+\begin_layout LyX-Code
+  0.1220000              1.0000000
+\end_layout
+
+\begin_layout LyX-Code
+P   1   1.00
+\end_layout
+
+\begin_layout LyX-Code
+  0.7270000              1.0000000
+\end_layout
+
+\begin_layout LyX-Code
+**** 
+\end_layout
+
+\begin_layout Standard
+would define a minimal basis set (1 
+\begin_inset Formula $s$
+\end_inset
+
+ function) to be used for hydrogen by default, except for atom number 1
+ for which a 
+\begin_inset Formula $2s1p$
+\end_inset
+
+ basis is used.
+ 
+\shape smallcaps
+Erkale
+\shape default
+ will refuse to calculate if you screw up the index blatantly, 
+\emph on
+e.g.
+\emph default
+, in this case if atom number 1 in the xyz file is not hydrogen but, say,
+ oxygen.
+\end_layout
+
+\begin_layout Standard
+If you want to perform counterpoise calculations, then you simply mark the
+ ghost atoms with the 
+\emph on
+-Bq
+\emph default
+ suffix in the geometry file.
+\end_layout
+
+\begin_layout Section
+Parallelization
+\end_layout
+
+\begin_layout Standard
+The routines in ERKALE are parallelized using OpenMP statements in the source
+ code.
+ This allows for efficient use of multicore workstations and compute nodes.
+ The number of threads used by ERKALE is controlled as usual with the OMP_NUM_TH
+READS environment variable.
+ By default, the OpenMP executables will use all the cores available.
+\end_layout
+
+\begin_layout Standard
+It is recommended you compile ERKALE both as a sequential version and as
+ a parallel version, as the OpenMP version includes unnecessary overhead
+ for calculations running on a single core.
+\end_layout
+
+\begin_layout Section
+Examples
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Examples"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The geometry and the runfiles for the examples given here are shipped with
+ the 
+\shape smallcaps
+Erkale
+\shape default
+ source code.
+\end_layout
+
+\begin_layout Subsection
+SCF calculation
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:SCF-calculation"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+As an example we compute the water dimer with the coordinates given by the
+ following xyz file at Hartree-Fock level of theory and the aug-cc-pVTZ
+ basis set.
+\end_layout
+
+\begin_layout LyX-Code
+6
+\end_layout
+
+\begin_layout LyX-Code
+Water dimer
+\end_layout
+
+\begin_layout LyX-Code
+O       -1.464   0.099   0.300
+\end_layout
+
+\begin_layout LyX-Code
+H       -1.956   0.624  -0.340
+\end_layout
+
+\begin_layout LyX-Code
+H       -1.797  -0.799   0.206
+\end_layout
+
+\begin_layout LyX-Code
+O        1.369   0.146  -0.395
+\end_layout
+
+\begin_layout LyX-Code
+H        1.894   0.486   0.335
+\end_layout
+
+\begin_layout LyX-Code
+H        0.451   0.165  -0.083
+\end_layout
+
+\begin_layout Standard
+This is a rather small system, so using the core guess with
+\end_layout
+
+\begin_layout LyX-Code
+Guess Core
+\end_layout
+
+\begin_layout Standard
+in the runfile is usually beneficial.
+ The default, using the atomic guess 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "vanLenthe2006"
+
+\end_inset
+
+, is better in larger systems.
+ However, for demonstration purposes we use a third initialization method
+ - that of a 
+\begin_inset Quotes eld
+\end_inset
+
+minimal
+\begin_inset Quotes erd
+\end_inset
+
+ basis - with even a completely different method! 
+\end_layout
+
+\begin_layout LyX-Code
+System h2o-dimer.xyz
+\end_layout
+
+\begin_layout LyX-Code
+Method lda_x-lda_c_vwn
+\end_layout
+
+\begin_layout LyX-Code
+Basis cc-pVDZ
+\end_layout
+
+\begin_layout LyX-Code
+SaveChk lda.chk
+\end_layout
+
+\begin_layout LyX-Code
+Guess Core
+\end_layout
+
+\begin_layout Standard
+and run it with 
+\emph on
+erkale
+\emph default
+; on my desktop computer the calculation took a few seconds.
+ Out of the calculation we get the checkpoint file 
+\emph on
+lda.chk
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+Next, we use the minimal basis DFT calculation to seed the full HF calculation,
+ where we use the runfile
+\end_layout
+
+\begin_layout LyX-Code
+System h2o-dimer.xyz
+\end_layout
+
+\begin_layout LyX-Code
+Method HF
+\end_layout
+
+\begin_layout LyX-Code
+Basis aug-cc-pVTZ
+\end_layout
+
+\begin_layout LyX-Code
+LoadChk lda.chk
+\end_layout
+
+\begin_layout LyX-Code
+SaveChk hf.chk
+\end_layout
+
+\begin_layout Standard
+and run it once again.
+ For this example, HF converges with 16 iterations starting from the core
+ guess, in 15 iterations starting from atomic densities, and in 13 iterations
+ starting from the cc-pVDZ LDA calculation.
+\end_layout
+
+\begin_layout Subsubsection
+Tough convergence cases
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:Tough-convergence-cases"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+For cases that fail to converge using the default convergence settings,
+ you may want to try using the code developed for PZ-SIC calculations
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2014a,Lehtola2016"
+
+\end_inset
+
+ by using the settings
+\end_layout
+
+\begin_layout LyX-Code
+PZ true
+\end_layout
+
+\begin_layout LyX-Code
+PZscale const
+\end_layout
+
+\begin_layout LyX-Code
+PZw 0.0
+\end_layout
+
+\begin_layout LyX-Code
+PZoo false
+\end_layout
+
+\begin_layout LyX-Code
+PZov true
+\end_layout
+
+\begin_layout LyX-Code
+PZimag false
+\end_layout
+
+\begin_layout Standard
+The first line tells ERKALE to use the the PZ-SIC code, whereas the second
+ and third lines make sure that the PZ-SIC correction is turned off.
+ The fourth line turns off occupied–occupied rotations, which are unnecessary
+ for HF and Kohn–Sham DFT, and the fifth line makes sure that occupied–virtual
+ rotations are enabled, the last line making sure imaginary rotations are
+ not enabled.
+\end_layout
+
+\begin_layout Standard
+With these settings, the program will run using the given settings for PZ-SIC.
+ The orbitals saved to disk at every iteration are canonicalized orbitals.
+\end_layout
+
+\begin_layout Standard
+
+\series bold
+N.B.
+
+\series default
+ ROHF and XAS/XRS calculations aren't currently supported with the PZ-SIC
+ code.
+\end_layout
+
+\begin_layout Subsection
+Casida
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:Casida"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+We compute the valence photoabsorption spectrum of the water dimer with
+\end_layout
+
+\begin_layout LyX-Code
+LoadChk hf.chk
+\end_layout
+
+\begin_layout LyX-Code
+CasidaStates 1:70
+\end_layout
+
+\begin_layout Standard
+where we have only included the first 70 states in the calculation, giving
+ 600 pairs of occupied and unoccupied orbitals, whereas the full calculation
+ would have 1740 pairs.
+\end_layout
+
+\begin_layout Standard
+The Casida calculation gives the dipole NRIXS intensity, which can be converted
+ into the photoabsorption spectrum by multiplying the dipole intensity with
+ the energy.
+\end_layout
+
+\begin_layout Standard
+Furthermore, the calculation gives just delta peaks, so for plotting purposes
+ we have broadened the peaks with a Lorentzian with a FWHM of 0.05 eV.
+ The result is shown in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "fig:Photoabsorption-spectrum."
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename examples/cas.eps
+	display false
+	width 45text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Photoabsorption spectrum.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Photoabsorption-spectrum."
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+EMD
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:EMD"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+We compute the isotropic Compton profile by running 
+\emph on
+erkale_emd
+\emph default
+ with the runfile
+\end_layout
+
+\begin_layout LyX-Code
+LoadChk hf.chk
+\end_layout
+
+\begin_layout LyX-Code
+DoEMD true
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout Standard
+Out of the calculation we get the electron momentum density and Compton
+ profile shown in 
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+figref{emd,Compton}
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename examples/emd.eps
+	display false
+	width 45text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+The electron momentum density.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:emd"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename examples/compton.eps
+	display false
+	width 45text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+The Compton profile.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Compton"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+XAS/XRS
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:XAS/XRS"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Next, we compute the x-ray Raman spectrum.
+ First, we need to define which atom is excited.
+ This we do by creating a new xyz file
+\end_layout
+
+\begin_layout LyX-Code
+6
+\end_layout
+
+\begin_layout LyX-Code
+Water dimer
+\end_layout
+
+\begin_layout LyX-Code
+O       -1.464   0.099   0.300
+\end_layout
+
+\begin_layout LyX-Code
+H       -1.956   0.624  -0.340
+\end_layout
+
+\begin_layout LyX-Code
+H       -1.797  -0.799   0.206
+\end_layout
+
+\begin_layout LyX-Code
+O-Xc     1.369   0.146  -0.395
+\end_layout
+
+\begin_layout LyX-Code
+H        1.894   0.486   0.335
+\end_layout
+
+\begin_layout LyX-Code
+H        0.451   0.165  -0.083
+\end_layout
+
+\begin_layout Standard
+where we have defined the donor oxygen as the excited atom.
+\end_layout
+
+\begin_layout Standard
+As the input for the XAS/XRS calculation, we use the following input (in
+ reality, you 
+\emph on
+may
+\emph default
+ want to use a bigger basis set):
+\end_layout
+
+\begin_layout LyX-Code
+System h2o-dimer-xrs.xyz
+\end_layout
+
+\begin_layout LyX-Code
+Method lda_x-lda_c_vwn
+\end_layout
+
+\begin_layout LyX-Code
+Basis cc-pVDZ
+\end_layout
+
+\begin_layout LyX-Code
+LoadChk lda.chk
+\end_layout
+
+\begin_layout LyX-Code
+XRSAugment 4
+\end_layout
+
+\begin_layout LyX-Code
+XRSInitialState 1s
+\end_layout
+
+\begin_layout Standard
+The 
+\emph on
+XRSAugment
+\emph default
+ keyword asks for a double-basis set calculation to be performed.
+ Once the TP calculation has converged, you can play with the double basis
+ set method or the 
+\begin_inset Formula $q$
+\end_inset
+
+ values used for computing the spectra.
+\end_layout
+
+\begin_layout Standard
+The resulting XAS spectrum
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+As for Casida, 
+\emph on
+dipole.dat
+\emph default
+ contains the XRS spectrum, which you need to multiply with the transition
+ energy to get the XAS spectrum!
+\end_layout
+
+\end_inset
+
+ is shown in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "fig:XAS-spectrum-of"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+To perform an absolute energy scale correction, do another run with the
+ 
+\emph on
+XRSMethod XCH
+\emph default
+ setting.
+ You can use the TP result to initialize the calculation by copying the
+ TP checkpoint to the SaveChk file of the XCH run.
+\end_layout
+
+\begin_layout Standard
+Vertical photoionization energies can be obtained with the 
+\emph on
+XRSMethod FCH
+\emph default
+ setting.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename examples/xrs.eps
+	display false
+	width 45text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+XAS spectrum of donor oxygen.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:XAS-spectrum-of"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Visualization of orbitals and densities
+\end_layout
+
+\begin_layout Standard
+As an example, we visualize the aug-cc-pVTZ -level Hartree-Fock calculation
+ of the water dimer presented above in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "subsec:SCF-calculation"
+
+\end_inset
+
+ using Avogadro 1.0.3.
+\end_layout
+
+\begin_layout Standard
+Setting the resolution to 
+\begin_inset Quotes eld
+\end_inset
+
+High
+\begin_inset Quotes erd
+\end_inset
+
+ and leaving the isosurface value at 0.1 in Avogadro, we obtain the graphics
+ shown in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "fig:Electron-density-plot."
+
+\end_inset
+
+.
+ Correspondingly, plotting the HOMO using 
+\begin_inset Quotes eld
+\end_inset
+
+High
+\begin_inset Quotes erd
+\end_inset
+
+ resolution and the default isosurface value of 0.02, we obtain the plot
+ shown in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "fig:Orbital-plot-using"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename examples/densityplot/density.eps
+	display false
+	width 45text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Electron density plot using Avogadro.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Electron-density-plot."
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename examples/densityplot/homo.eps
+	display false
+	width 45text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Orbital plot using Avogadro.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Orbital-plot-using"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Interfacing with formatted checkpoint files
+\end_layout
+
+\begin_layout Standard
+To compute, 
+\emph on
+e.g.
+\emph default
+, EMD properties from calculations performed with 
+\shape smallcaps
+Gaussian
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+, do the following:
+\end_layout
+
+\begin_layout Enumerate
+At the beginning of the 
+\shape smallcaps
+Gaussian
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ run input file, specify the keyword
+\begin_inset Newline newline
+\end_inset
+
+
+\emph on
+
+\begin_inset Newline newline
+\end_inset
+
+%Chk=chkpt
+\begin_inset Newline newline
+\end_inset
+
+
+\emph default
+
+\begin_inset Newline newline
+\end_inset
+
+which will give you a binary checkpoint file, chkpt.chk, as a result of the
+ 
+\shape smallcaps
+Gaussian
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ run.
+\end_layout
+
+\begin_layout Enumerate
+If you use a post-HF level of theory, you need to specify in the route section
+ that the density matrix needs to be computed with 
+\emph on
+Density=Current
+\emph default
+, e.g.,
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\emph on
+#P CCSD/aug-cc-pVTZ Density=Current
+\end_layout
+
+\begin_layout Enumerate
+Run the calculation with 
+\shape smallcaps
+Gaussian
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark
+\end_layout
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Enumerate
+Convert the binary file into formatted checkpoint format (i.e.
+ an ASCII file) with the 
+\shape smallcaps
+Gaussian
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ 
+\emph on
+formchk
+\emph default
+ utility
+\begin_inset Newline newline
+\end_inset
+
+
+\emph on
+
+\begin_inset Newline newline
+\end_inset
+
+$ formchk chkpt.chk chkpt.fchk
+\end_layout
+
+\begin_layout Enumerate
+Convert the formatted checkpoint file into 
+\shape smallcaps
+Erkale
+\shape default
+ format with
+\begin_inset CommandInset label
+LatexCommand label
+name "enu:Convert-the-formatted"
+
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\emph on
+$ erkale_fchkpt runfile
+\emph default
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+where 
+\emph on
+runfile
+\emph default
+ contains the relevant 
+\emph on
+LoadFchk
+\emph default
+ and 
+\emph on
+SaveChk
+\emph default
+ directives.
+ Since the formatted checkpoint files may be quite big, you may want to
+ compress them with gzip, bzip2 or xz to save disk space.
+ 
+\shape smallcaps
+Erkale
+\shape default
+ can read compressed formatted checkpoint files as well; the need for decompress
+ion is determined by the filename extension.
+\end_layout
+
+\begin_layout Enumerate
+Calculate the properties as you would usually do using the newly obtained
+ ERKALE checkpoint file.
+\end_layout
+
+\begin_layout Standard
+Similar instructions starting from step 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "enu:Convert-the-formatted"
+
+\end_inset
+
+ apply for calculations performed with 
+\shape smallcaps
+Q-Chem
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+.
+ Here, one must only specify 
+\begin_inset Quotes eld
+\end_inset
+
+GUI 2
+\begin_inset Quotes erd
+\end_inset
+
+ in the 
+\shape smallcaps
+Q-Chem
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ runfile.
+ 
+\series bold
+N.B.
+ 
+\series default
+Presently, the usefulness of formatted checkpoint files produced by 
+\shape smallcaps
+Q-Chem
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ are limited to SCF (HF/DFT) level results.
+\end_layout
+
+\begin_layout Section
+Questions?
+\end_layout
+
+\begin_layout Standard
+If you want to know more about how 
+\shape smallcaps
+Erkale
+\shape default
+ works, or you are interested in contributing, you can contact me via email
+ at 
+\emph on
+susi.lehtola (at) alumni.helsinki.fi
+\emph default
+.
+ As the code is on GitHub, patches can be easily proposed using pull requests.
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "LIBINT"
+
+\end_inset
+
+E.
+ F.
+ Valeev, Libint — a high-performance library for computing Gaussian integrals
+ in quantum mechanics.
+ 
+\begin_inset Flex URL
+status open
+
+\begin_layout Plain Layout
+
+https://github.com/evaleev/libint/
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "LIBXC"
+
+\end_inset
+
+M.
+ A.
+ L.
+ Marques and others, Libxc – a library of exchange-correlation functionals
+ for density-functional theory.
+ 
+\begin_inset Flex URL
+status open
+
+\begin_layout Plain Layout
+
+http://www.tddft.org/programs/octopus/wiki/index.php/Libxc
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Marques2012"
+
+\end_inset
+
+M.
+ A.
+ L.
+ Marques, M.
+ J.
+ T.
+ Oliveira, and T.
+ Burnus, Libxc: a library of exchange and correlation functionals for density
+ functional theory, Comput.
+ Phys.
+ Commun.
+ 183, 2272 (2012) .
+ arXiv:1203.1739
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2010"
+
+\end_inset
+
+J.
+ Lehtola, M.
+ Hakala, A.
+ Sakko and K.
+ Hämäläinen, ERKALE — A Flexible Program Package for X-ray Properties of
+ Atoms and Molecules,  J.
+ Comput.
+ Chem.
+ 33, 1572 (2012).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Jensen2014"
+
+\end_inset
+
+F.
+ Jensen, Unifying General and Segmented Contracted Basis Sets.
+ Segmented Polarization Consistent Basis Sets, J.
+ Chem.
+ Theory Comput.
+ 10, 1074 (2014).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Beebe1977"
+
+\end_inset
+
+N.
+ H.
+ F.
+ Beebe and J.
+ Lindberg, Simplifications in the generation and transformation of two-electron
+ integrals in molecular calculations, Int.
+ J.
+ Quantum Chem.
+ 12, 683 (1977).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Koch2003"
+
+\end_inset
+
+H.
+ Koch, A.
+ Sánchez de Merás, and T.
+ B.
+ Pedersen, Reduced scaling in electronic structure calculations using Cholesky
+ decompositions, J.
+ Chem.
+ Phys.
+ 118, 9481 (2003).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Koster2004"
+
+\end_inset
+
+A.
+ M.
+ Köster, R.
+ Flores-Moreno, and J.
+ U.
+ Reveles, Efficient and reliable numerical integration of exchange-correlation
+ energies and potentials, J.
+ Chem.
+ Phys.
+ 121, 681 (2004).
+ 
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "vanLenthe2006"
+
+\end_inset
+
+J.
+ H.
+ Van Lenthe 
+\emph on
+et al.
+\emph default
+, Starting SCF calculations by superposition of atomic densities, J.
+ Comput.
+ Chem.
+ 27 (2006), 926.
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Perdew1981"
+
+\end_inset
+
+J.
+ P.
+ Perdew and A.
+ Zunger, Self-interaction correction to density-functional approximations
+ for many-electron systems, Phys.
+ Rev.
+ B.
+ 23, 5048 (1981).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2014a"
+
+\end_inset
+
+S.
+ Lehtola and H.
+ Jónsson, Variational, Self-Consistent Implementation of the Perdew–Zunger
+ Self-Interaction Correction with Complex Optimal Orbitals, J.
+ Chem.
+ Theory Comput.
+ 10, 5324 (2014).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2016"
+
+\end_inset
+
+S.
+ Lehtola, M.
+ Head-Gordon, and H.
+ Jónsson, Complex orbitals, multiple local minima and symmetry breaking
+ in Perdew--Zunger self-interaction corrected density-functional theory
+ calculations, J.
+ Chem.
+ Theory Comput.
+ 12, 3195 (2016).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Vydrov2010"
+
+\end_inset
+
+O.
+ A.
+ Vydrov and T.
+ Van Voorhis, Nonlocal van der Waals density functional: The simpler the
+ better, J.
+ Chem.
+ Phys.
+ 133, 244103 (2010).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Chong1995"
+
+\end_inset
+
+D.
+ P.
+ Chong, Completeness profiles of one-electron basis sets, Can.
+ J.
+ Chem.
+ 73, 79 (1995).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Manninen2006"
+
+\end_inset
+
+P.
+ Manninen and J.
+ Vaara, Systematic Gaussian basis-set limit using completeness-optimized
+ primitive sets.
+ A case for magnetic properties, J.
+ Comput.
+ Chem.
+ 27, 434 (2006).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2015"
+
+\end_inset
+
+S.
+ Lehtola, Automatic algorithms for completeness-optimization of Gaussian
+ basis sets, J.
+ Comput.
+ Chem.
+ 36, 335 (2015).
+ 
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2012"
+
+\end_inset
+
+J.
+ Lehtola, P.
+ Manninen, M.
+ Hakala and K.
+ Hämäläinen, Completeness-optimized basis sets.
+ Application to ground-state electron momentum densities, J.
+ Chem.
+ Phys.
+ 137, 104105 (2012).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2013"
+
+\end_inset
+
+S.
+ Lehtola, P.
+ Manninen, M.
+ Hakala and K.
+ Hämäläinen, Contraction of completeness-optimized basis sets.
+ Application to ground-state electron momentum densities, J.
+ Chem.
+ Phys.
+ 138, 044109 (2013).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Avogadro"
+
+\end_inset
+
+Avogadro: an open-source molecular builder and visualization tool.
+ 
+\begin_inset Flex URL
+status collapsed
+
+\begin_layout Plain Layout
+
+http://avogadro.openmolecules.net/
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Jmol"
+
+\end_inset
+
+Jmol: an open-source Java viewer for chemical structures in 3D.
+ 
+\begin_inset Flex URL
+status collapsed
+
+\begin_layout Plain Layout
+
+http://www.jmol.org/
+\end_layout
+
+\end_inset
+
+ 
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Becke1990"
+
+\end_inset
+
+A.
+ D.
+ Becke and K.
+ E.
+ Edgecombe, A simple measure of electron localization in atomic and molecular
+ systems, J.
+ Chem.
+ Phys.
+ 92, 5397 (1990).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "IQmol"
+
+\end_inset
+
+IQmol, a free open-source molecular editor and visualization package.
+ 
+\begin_inset Flex URL
+status collapsed
+
+\begin_layout Plain Layout
+
+http://iqmol.org
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2011"
+
+\end_inset
+
+J.
+ Lehtola, M.
+ Hakala, J.
+ Vaara, and K.
+ Hämäläinen, Calculation of isotropic Compton profiles with Gaussian basis
+ sets, Phys.
+ Chem.
+ Chem.
+ Phys.
+ 13, 5630 (2011) .
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Vandenbussche2013"
+
+\end_inset
+
+J.
+ Vandenbussche, G.
+ Acke, and P.
+ Bultinck, Performance of DFT methods in momentum space: quantum similarity
+ measures versus moments of momentum, J.
+ Chem.
+ Theory Comput.
+ 9, 3908 (2013).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2013a"
+
+\end_inset
+
+S.
+ Lehtola and H.
+ Jónsson, Unitary optimization of localized molecular orbitals, J.
+ Chem.
+ Theory Comput.
+ 9, 5365 (2013).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Edmiston1963"
+
+\end_inset
+
+C.
+ Edmiston and K.
+ Ruedenberg, Localized atomic and molecular orbitals, Rev.
+ Mod.
+ Phys.
+ 35, 457 (1963).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Foster1960"
+
+\end_inset
+
+J.
+ M.
+ Foster and S.
+ F.
+ Boys, Canonical Configuration Interaction Procedure, Rev.
+ Mod.
+ Phys.
+ 32, 300 (1960).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Jansik2011"
+
+\end_inset
+
+B.
+ Jansík, S.
+ Høst, K.
+ Kristensen, and P.
+ Jørgensen, Local orbitals by minimizing powers of the orbital variance,
+ J.
+ Chem.
+ Phys.
+ 134, 194104 (2011).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Hoyvik2012"
+
+\end_inset
+
+I.-M.
+ Høyvik, B.
+ Jansík, and P.
+ Jørgensen, Orbital localization using fourth central moment minimization,
+ J.
+ Chem.
+ Phys.
+ 137, 224114 (2012).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Pipek1989"
+
+\end_inset
+
+J.
+ Pipek and P.
+ G.
+ Mezey, A fast intrinsic localization procedure applicable for ab initio
+ and semiempirical linear combination of atomic orbital wave functions,
+ J.
+ Chem.
+ Phys.
+ 90, 4916 (1989).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Hoyvik2013"
+
+\end_inset
+
+I.M.
+ Høyvik, B.
+ Jansik, and P.
+ Jørgensen, Pipek–Mezey Localization of Occupied and Virtual Orbitals, J.
+ Comput.
+ Chem.
+ 34, 1456 (2013).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2014"
+
+\end_inset
+
+S.
+ Lehtola and H.
+ Jónsson, Pipek–Mezey orbital localization using various partial charge
+ estimates, J.
+ Chem.
+ Theory Comput.
+ 10, 642 (2014).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Cioslowski1991"
+
+\end_inset
+
+J.
+ Cioslowski, Partitioning of the orbital overlap matrix and the localization
+ criteria, J.
+ Math.
+ Chem.
+ 8, 169 (1991).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Hirshfeld1977"
+
+\end_inset
+
+F.
+ L.
+ Hirshfeld, Bonded-atom fragments for describing molecular charge densities,
+ Theor.
+ Chim.
+ Acta 44, 129 (1977).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Bultinck2007"
+
+\end_inset
+
+P.
+ Bultinck, Ch.
+ Van Alsenoy, P.
+ W.
+ Ayers, and R.
+ Carbó-Dorca, Critical analysis and extension of the Hirshfeld atoms in
+ molecules, J.
+ Chem.
+ Phys.
+ 126, 144111 (2007).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Bultinck2007a"
+
+\end_inset
+
+P.
+ Bultinck, P.
+ W.
+ Ayers, S.
+ Fias, K.
+ Tiels, and Ch.
+ Van Alsenoy, Uniqueness and basis set dependence of iterative Hirshfeld
+ charges, Chem.
+ Phys.
+ Lett.
+ 444, 205 (2007).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Knizia2013"
+
+\end_inset
+
+G.
+ Knizia, Intrinsic atomic orbitals: an unbiased bridge between quantum theory
+ and chemical concepts, J.
+ Chem.
+ Theory Comput.
+ 9, 4834 (2013).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lillestolen2008"
+
+\end_inset
+
+T.
+ C.
+ Lillestolen and R.
+ Wheatley, J.
+ Chem.
+ Commun.
+ (Cambridge, U.
+ K.) 7345, 5909 (2008).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lillestolen2008a"
+
+\end_inset
+
+T.
+ C.
+ Lillestolen and R.
+ J.
+ Wheatley, J.
+ Chem.
+ Phys.
+ 131, 144101 (2009).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lillestolen2009"
+
+\end_inset
+
+T.
+ C.
+ Lillestolen and R.
+ J.
+ Wheatley, Atomic charge densities generated using an iterative stockholder
+ procedure", J.
+ Chem.
+ Phys.
+ 131, 144101 (2009).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Rodrigues2009"
+
+\end_inset
+
+J.
+ I.
+ Rodríguez 
+\emph on
+et al.
+\emph default
+, An efficient grid-based scheme to compute QTAIM atomic properties without
+ explicit calculation of zero-flux surfaces, J.
+ Comput.
+ Chem.
+ 30, 1082 (2009).
+ 
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Krack1998"
+
+\end_inset
+
+M.
+ Krack and A.
+ M.
+ Köster, An adaptive numerical integrator for molecular integrals, J.
+ Chem.
+ Phys.
+ 108, 3226 (2008).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Iannuzzi2007"
+
+\end_inset
+
+M.
+ Iannuzzi and J.
+ Hütter, Inner-shell spectroscopy by the Gaussian and augmented plane wave
+ method, Phys.
+ Chem.
+ Chem.
+ Phys.
+ 9, 1599 (2007).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Sakko2007"
+
+\end_inset
+
+A.
+ Sakko, M.
+ Hakala, J.
+ A.
+ Soininen, and K.
+ Hämäläinen, Density functional study of x-ray Raman scattering from aromatic
+ hydrocarbons and polyfluorene, Phys.
+ Rev.
+ B 76, 1 (2007) .
+\end_layout
+
+\begin_layout Section*
+Changes
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2016-08-01 Dropped removed keywords Linesearch and UseTRDSM from manual.
+ TightIntegrals should be StrictIntegrals.
+ Document how to use PZ-SIC code for hard to converge cases.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2016-07-14 Specify charge can be specified for atomic guess in the xyz file.
+ Specify geometries can be loaded from ERKALE_SYSDIR.
+ Geometry can also be specified as a Z Matrix.
+ Document VV10 non-local correlation.
+ Documented 
+\emph on
+AtomGuess
+\emph default
+.
+ Documented the Cholesky decomposition.
+ Documented the new Perdew–Zunger self-interaction correction code.
+ XC fitting has been removed.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2015-01-22 Can define angular quadrature by amount of points in rule.
+ Documented Perdew–Zunger stability analysis.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2014-12-18 Documented more changes in the XRS calculation.
+ Documented Perdew–Zunger calculations.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2014-05-16 XRS calculations can now be done with non-1s initial states.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2014-05-03 Added orbital threshold calculations and P-orthogonalization.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2014-02-14 Added iterative Hirshfeld charges and localization.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-12-22 Added note about basis set angular momentum.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-12-13 Added citation to unitary optimization algorithm, and to Pipek–Mezey
+ methods.
+ Added mention of similarity integrals, and electrostatic potential cubes.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-11-06 Added intrinsic atomic orbital charges.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-11-05 Added Voronoi charges.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-10-30 Added genbas option of 
+\emph on
+erkale_bastool
+\emph default
+.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-09-30 Added entry on 
+\emph on
+erkale_pop
+\emph default
+.
+ Updated entries on 
+\emph on
+erkale
+\emph default
+ and 
+\emph on
+erkale_loc.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-07-24 Updated entries on 
+\emph on
+erkale_cube
+\emph default
+ and 
+\emph on
+erkale_fchkpt
+\emph default
+.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-06-05 Added the DFTGrid keyword for the use of a manually defined integrati
+on grid (mainly for more exact comparison to literacy values).
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-05-18 Added the geometry optimizer 
+\emph on
+erkale_geom
+\emph default
+.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-01-19 Can now initialize 
+\emph on
+erkale_xrs
+\emph default
+ runs by copying a previously computed checkpoint to the SaveChk file before
+ running.
+ Added section explaining checkpoint files.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2013-01-07 Added exchange-correlation fitting.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-09-04 TRDSM and line search minimization are now implemented.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-08-28 Changes to 
+\emph on
+erkale_xrs
+\emph default
+.
+ The 
+\emph on
+FullHole
+\emph default
+ keyword is now obsolete, having been replaced by the 
+\emph on
+XRSMethod
+\emph default
+ keyword.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-08-23 Added mention about 
+\emph on
+erkale_cube
+\emph default
+, 
+\emph on
+erkale_adf_emd
+\emph default
+ and customizable tolerance for the radial integrals in 
+\emph on
+erkale_emd
+\emph default
+.
+ RI-HF is now supported.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-07-30 Added basis set composition and tight integrals, updated orthogonaliz
+ation method.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-06-21 Fixed syntax for CasidaStates.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-03-02 The DFTDirect setting is now deprecated, as starting from revision
+ 428 all DFT calculations are done on-the-fly.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-02-23 Added UseTRRH setting for trust-region Roothaan-Hall updates.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-01-13 Choosing the density-fitting basis is now possible.
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2012-01-06 Updated completeness-optimization section.
+\end_layout
+
+\end_body
+\end_document
