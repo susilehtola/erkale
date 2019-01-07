@@ -61,6 +61,8 @@ enum guess_t parse_guess(const std::string & val) {
     return NO_GUESS;
   else if(stricmp(val,"GWH")==0)
     return GWH_GUESS;
+  else if(stricmp(val,"HUCKEL")==0)
+    return HUCKEL_GUESS;
   else
     throw std::runtime_error("Guess type not supported.\n");
 }
@@ -1330,7 +1332,7 @@ arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat 
   return form_density(C,Nel);
 }
 
-std::vector<double> atomic_occupancy(int Nel) {
+std::vector<double> atomic_occupancy(double Nel, int Nbf) {
   // The density is spread over the whole of the possible valence shell.
   // Only the noble gas core is doubly occupied
   static const int magic_values[] = {0, 2, 10, 18, 36, 54, 86, 118};
@@ -1347,8 +1349,12 @@ std::vector<double> atomic_occupancy(int Nel) {
   int nfull = magic_values[imagic]/2;
   // Number of partially occupied orbitals
   int norbpart = magic_values[imagic+1]/2 - nfull;
+  // Sanity check for minimal basis
+  if(nfull + norbpart > Nbf)
+    norbpart = Nbf-nfull;
+
   // Number of partially occupied electrons
-  int nelpart = Nel - nfull;
+  double nelpart = Nel - nfull;
 
   // Form occupations
   std::vector<double> ret(nfull+norbpart,1.0);
@@ -1390,7 +1396,7 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
 
     if(atomic && basis.get_Nnuc()==1) {
       // Atomic case.
-      ret=atomic_occupancy(Nel/2);
+      ret=atomic_occupancy(Nel/2,basis.get_Nbf());
       // Orbitals are doubly occupied
       for(size_t i=0;i<ret.size();i++)
 	ret[i]*=2.0;
@@ -1444,8 +1450,8 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
 
     if(atomic && basis.get_Nnuc()==1) {
       // Atomic case
-      occa=atomic_occupancy(Nel_alpha);
-      occb=atomic_occupancy(Nel_beta);
+      occa=atomic_occupancy(Nel_alpha,basis.get_Nbf());
+      occb=atomic_occupancy(Nel_beta,basis.get_Nbf());
     } else {
       // Resize output
       occa.resize(Nel_alpha);
@@ -1802,9 +1808,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   enum guess_t guess=parse_guess(set.get_string("Guess"));
 
   // Amount of electrons
-  int Nel_alpha;
-  int Nel_beta;
-  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+  int Nel_alpha=-1;
+  int Nel_beta=-1;
+  if(!set.get_string("Occupancies").size())
+    get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
 
   if(doload) {
     Checkpoint load(loadname,false);
@@ -1904,6 +1911,9 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.gwh_guess(sol);
       else if(guess == GSAP_GUESS) {
         sol.H=solver.get_Hcore()+sap_guess(basis,set);
+        solver.diagonalize(sol);
+      } else if(guess == HUCKEL_GUESS) {
+        sol.H=huckel_guess(basis,set);
         solver.diagonalize(sol);
       } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
         sol.P=sad_guess(basis,set);
@@ -2223,6 +2233,10 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.gwh_guess(sol);
       else if(guess == GSAP_GUESS) {
         sol.Ha=solver.get_Hcore()+sap_guess(basis,set);
+        sol.Hb=sol.Ha;
+        solver.diagonalize(sol);
+      } else if(guess == HUCKEL_GUESS) {
+        sol.Ha=huckel_guess(basis,set);
         sol.Hb=sol.Ha;
         solver.diagonalize(sol);
       } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {

@@ -169,7 +169,9 @@ enum guess_t {
   /// Natural orbitals from atomic guess
   NO_GUESS,
   /// Generalized Wolfsberg--Helmholz
-  GWH_GUESS
+  GWH_GUESS,
+  /// Huckel type guess
+  HUCKEL_GUESS
 };
 
 /// Perdew-Zunger SIC mode
@@ -462,7 +464,7 @@ arma::mat purify_density_NO(const arma::mat & P, const arma::mat & S);
 arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat & S);
 
 /// Get atomic occupancy (spherical average)
-std::vector<double> atomic_occupancy(int Nel);
+std::vector<double> atomic_occupancy(double Nel, int Nbf);
 /// Generate orbital occupancies
 std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis, bool atomic=false);
 /// Generate orbital occupancies
