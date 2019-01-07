@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2018-04-05 Susi Lehtola
+# 2019-01-07 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -83,22 +83,23 @@ fi
 
 # Current versions of libraries, if they are to be compiled
 # GSL
-export GSLVER="2.4"
+export GSLVER="2.5"
 ## LibXC
 #export XCVER="4.0.3"
 # Use newest git snapshot
 export XCVER="git"
 # libint 1.1.6
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
-export ARMAVER="8.400.0"
-export CMAKEVER="3.11.0"
+#export ARMAVER="9.200.6"
+export ARMAVER="git"
+export CMAKEVER="3.13.2"
 
 # HDF5 version: MAJOR.MINOR
 export HDF5MAJOR="1.10"
-export HDF5MINOR="1"
+export HDF5MINOR="4"
 
 # Version of OpenBLAS
-export OPENBLASVER="0.2.20"
+export OPENBLASVER="0.3.5"
 # You may need to disable AVX flags for OpenBLAS with older compilers
 #export OPENBLASAVX="NO_AVX=1 NO_AVX2=1" # For very old
 #export OPENBLASAVX="NO_AVX2=1" # For a little less old
@@ -318,19 +319,35 @@ fi
 
 # Armadillo
 if [ ! -d ${topdir}/armadillo-${ARMAVER} ]; then
- if [ ! -f ${srcdir}/armadillo-${ARMAVER}.tar.xz ]; then
-  cd ${srcdir}
-  wget -O armadillo-${ARMAVER}.tar.xz http://sourceforge.net/projects/arma/files/armadillo-${ARMAVER}.tar.xz
- fi
- cd ${topdir}
- tar Jxf ${srcdir}/armadillo-${ARMAVER}.tar.xz
+    if [[ "$ARMAVER" == "git" ]]; then
+	echo -n "Checking out Armadillo ..."
+	cd $topdir
+        if [[ ! -d armadillo-code ]]; then
+            git clone https://github.com/conradsnicta/armadillo-code.git
+        else
+            cd armadillo-code
+            git pull
+            cd ..
+        fi
 
- # Create unversioned symlink
- if [ ! -h armadillo ]; then
-  ln -sf armadillo-${ARMAVER} armadillo
- fi
+	# Create unversioned symlink
+	if [ ! -h armadillo ]; then
+	    ln -sf armadillo-code armadillo
+	fi
+    else
+	if [ ! -f ${srcdir}/armadillo-${ARMAVER}.tar.xz ]; then
+	    cd ${srcdir}
+	    wget -O armadillo-${ARMAVER}.tar.xz http://sourceforge.net/projects/arma/files/armadillo-${ARMAVER}.tar.xz
+	fi
+	cd ${topdir}
+	tar Jxf ${srcdir}/armadillo-${ARMAVER}.tar.xz
+
+	# Create unversioned symlink
+	if [ ! -h armadillo ]; then
+	    ln -sf armadillo-${ARMAVER} armadillo
+	fi
+    fi
 fi
-
 echo "Done compiling libraries."
 
 if(( ! ${system_cmake} )); then
