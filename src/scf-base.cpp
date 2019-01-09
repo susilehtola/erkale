@@ -1332,39 +1332,52 @@ arma::mat purify_density_NO(const arma::mat & P, arma::mat & C, const arma::mat 
   return form_density(C,Nel);
 }
 
-std::vector<double> atomic_occupancy(double Nel, int Nbf) {
-  // The density is spread over the whole of the possible valence shell.
-  // Only the noble gas core is doubly occupied
+static void get_active_space(int numel, int Nbf, int & nfull, int & nactive) {
+  // Get occupancies. The density is spread over the whole of the
+  // possible valence shell.  Only the noble gas core is doubly
+  // occupied.
   static const int magic_values[] = {0, 2, 10, 18, 36, 54, 86, 118};
   static const size_t Nmagic = sizeof(magic_values)/sizeof(magic_values[0]);
+
   // Shell index
   size_t imagic = 0;
-  while(Nel>magic_values[imagic+1]) {
+  while(magic_values[imagic+1]<numel) {
     imagic++;
     if(imagic+1>=Nmagic)
-      throw std::logic_error("Noble elements beyond Oganesson not known\n");
+      throw std::logic_error("Occupations beyond Oganesson not known\n");
   }
 
-  // Number of fully occupied orbitals
-  int nfull = magic_values[imagic]/2;
-  // Number of partially occupied orbitals
-  int norbpart = magic_values[imagic+1]/2 - nfull;
-  // Sanity check for minimal basis
-  if(nfull + norbpart > Nbf)
-    norbpart = Nbf-nfull;
-
-  // Number of partially occupied electrons
-  double nelpart = Nel - nfull;
-
-  // Form occupations
-  std::vector<double> ret(nfull+norbpart,1.0);
-  for(int i=nfull;i<nfull+norbpart;i++)
-    ret[i]=nelpart*1.0/norbpart;
-
-  return ret;
+  // Number of fully and partially occupied orbitals
+  if(numel == magic_values[imagic]) {
+    nfull=0;
+    nactive=magic_values[imagic]/2;
+  } else {
+    nfull=magic_values[imagic]/2;
+    nactive = std::min(magic_values[imagic+1]/2 - nfull, Nbf - nfull);
+  }
 }
 
-std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis, bool atomic) {
+std::vector<double> atomic_occupancy(double numel, int Nbf) {
+  // Active space operates with doubly occupied orbitals
+  int nfull, nactive;
+  get_active_space((int) 2*ceil(numel), Nbf, nfull, nactive);
+
+  // Number of partially occupied electrons
+  double nelpart = numel - nfull;
+  if(nelpart > nactive)
+    throw std::logic_error("Not enough orbitals for atom!\n");
+
+  //printf("Nel = %f: %i full and %f electrons in %i orbitals",numel,nfull,nelpart,nactive);
+
+  // Form occupations
+  std::vector<double> occs(nfull+nactive,1.0);
+  for(int i=nfull;i<nfull+nactive;i++)
+    occs[i]=nelpart*1.0/nactive;
+
+  return occs;
+}
+
+std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis) {
   // Returned value
   std::vector<double> ret;
 
@@ -1394,24 +1407,16 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
       throw std::runtime_error("Refusing to run restricted calculation on unrestricted system!\n");
     }
 
-    if(atomic && basis.get_Nnuc()==1) {
-      // Atomic case.
-      ret=atomic_occupancy(Nel/2,basis.get_Nbf());
-      // Orbitals are doubly occupied
-      for(size_t i=0;i<ret.size();i++)
-	ret[i]*=2.0;
-    } else {
-      // Resize output
-      ret.resize(Nel/2);
-      for(size_t i=0;i<ret.size();i++)
-	ret[i]=2.0; // All orbitals doubly occupied
-    }
+    // Resize output
+    ret.resize(Nel/2);
+    for(size_t i=0;i<ret.size();i++)
+      ret[i]=2.0; // All orbitals doubly occupied
   }
 
   return ret;
 }
 
-void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb, bool atomic) {
+void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb) {
   // Occupancies
   std::string occs=set.get_string("Occupancies");
 
@@ -1448,20 +1453,14 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     int Nel_alpha, Nel_beta;
     get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
 
-    if(atomic && basis.get_Nnuc()==1) {
-      // Atomic case
-      occa=atomic_occupancy(Nel_alpha,basis.get_Nbf());
-      occb=atomic_occupancy(Nel_beta,basis.get_Nbf());
-    } else {
-      // Resize output
-      occa.resize(Nel_alpha);
-      for(size_t i=0;i<occa.size();i++)
-	occa[i]=1.0;
+    // Resize output
+    occa.resize(Nel_alpha);
+    for(size_t i=0;i<occa.size();i++)
+      occa[i]=1.0;
 
-      occb.resize(Nel_beta);
-      for(size_t i=0;i<occb.size();i++)
-	occb[i]=1.0;
-    }
+    occb.resize(Nel_beta);
+    for(size_t i=0;i<occb.size();i++)
+      occb[i]=1.0;
   }
 }
 
