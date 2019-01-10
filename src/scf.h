@@ -517,6 +517,12 @@ size_t localize_core(const BasisSet & basis, int nocc, arma::mat & C, bool verbo
 /// Convert force vector to matrix
 arma::mat interpret_force(const arma::vec & f);
 
+/// Form Fermi occupations, temperature in Eh
+arma::vec FermiON(const arma::vec & E, double N, double T);
+
+/// Pseudo-Fermi occupations, temperature in Eh
+arma::vec pFermiON(const arma::vec & E, int N, double T);
+
 /// Needed to get solvers to compilex
 #include "checkpoint.h"
 

@@ -26,6 +26,7 @@
 #include "xyzutils.h"
 #include "properties.h"
 #include "sap.h"
+#include "scf.h"
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
@@ -65,87 +66,6 @@ void diag(arma::vec & E, arma::mat & C, const arma::mat & H, const arma::mat & S
   C=Sinvh*C;
 
   //E.print("Eigenvalues");
-}
-
-inline arma::vec focc(const arma::vec & E, double B, double mu) {
-  if(!E.size())
-    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
-
-  arma::vec focc(E);
-  for(size_t i=0;i<focc.n_elem;i++)
-    focc(i)=1.0/(1.0 + exp(B*(E(i)-mu)));
-  return focc;
-}
-
-arma::vec FermiON(const arma::vec & E, int N, double T) {
-  if(!E.size())
-    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
-  // Temperature factor: 1/(kB T) at T=1000K i.e.
-  const double B(315775/T);
-
-  arma::vec occ;
-  double occsum;
-  double Eleft, Eright;
-  {
-    int id=N-1;
-    while(true) {
-      occ=focc(E,B,E(id));
-      occsum=arma::sum(occ);
-      if(occsum>N)
-        id--;
-      else
-        break;
-    }
-    Eleft=E(id);
-
-    id=N;
-    while(true) {
-      occ=focc(E,B,E(id));
-      occsum=arma::sum(occ);
-      if(occsum<N)
-        id++;
-      else
-        break;
-    }
-    Eright=E(id);
-  }
-
-  size_t it=0;
-  do {
-    double Efermi((Eleft+Eright)/2);
-    occ=focc(E,B,Efermi);
-    occsum=arma::sum(occ);
-
-    if(occsum>N) {
-      Eright=Efermi;
-    } else if(occsum<N) {
-      Eleft=Efermi;
-    } else
-      break;
-
-    it++;
-
-  } while(std::abs(occsum-N)>N*sqrt(DBL_EPSILON));
-
-  // Rescale occupation numbers
-  return N*occ/arma::sum(occ);
-}
-
-arma::vec pFermiON(const arma::vec & E, int N, double T) {
-  if(!E.size())
-    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
-
-  // Temperature factor: 1/(kB T) at T=1000K i.e.
-  const double B(315775/T);
-
-  // Pseudo-FON: chemical potential is
-  double mu=0.5*(E(N)+E(N-1));
-
-  // Get occupation numbers
-  arma::vec occ=focc(E,B,mu);
-
-  // Rescale occupation numbers
-  return N*occ/arma::sum(occ);
 }
 
 int main(int argc, char **argv) {
@@ -296,13 +216,15 @@ int main(int argc, char **argv) {
       occa.zeros();
       occb.zeros();
       occa.subvec(0,Nela-1).ones();
-      occb.subvec(0,Nelb-1).ones();
+      if(Nelb)
+        occb.subvec(0,Nelb-1).ones();
     }
     //E.print("Orbital energies");
     //occa.print("Alpha occupation");
     //occb.print("Beta  occupation");
     Pag=C*arma::diagmat(occa)*C.t();
-    Pbg=C*arma::diagmat(occb)*C.t();
+    if(occb.n_elem)
+      Pbg=C*arma::diagmat(occb)*C.t();
   }
 
   // Calculate the projection

@@ -2865,3 +2865,88 @@ arma::mat interpret_force(const arma::vec & f) {
   force.reshape(3,f.n_elem/3);
   return force;
 }
+
+inline arma::vec focc(const arma::vec & E, double B, double mu) {
+  if(!E.size())
+    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
+
+  arma::vec focc(E.n_elem);
+  for(size_t i=0;i<E.n_elem;i++)
+    focc(i)=1.0/(1.0 + exp(B*(E(i)-mu)));
+  return focc;
+}
+
+arma::vec FermiON(const arma::vec & E, double N, double T) {
+  if(!E.size())
+    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
+
+  // Full occupation
+  if(std::fabs(E.size()-N)<=sqrt(DBL_EPSILON)) {
+    return arma::ones<arma::vec>(E.n_elem);
+  }
+  // Too many to occupy?
+  if(E.size() < N) {
+    std::ostringstream oss;
+    oss << "Want to place " << N << " electrons on " << E.size() << " orbitals!\n";
+    throw std::logic_error(oss.str());
+  }
+
+  // Temperature factor: 1/(kB T)
+  const double B(1.0/T);
+
+  arma::vec occ;
+  double occsum;
+
+  double Eleft(E(0));
+  double Eright(E(E.n_elem-1));
+
+  // Check that limiting values are okay
+  while(arma::sum(focc(E,B,Eleft))>N) {
+    Eleft=-2*std::abs(Eleft);
+  }
+  while(arma::sum(focc(E,B,Eright))<N) {
+    Eright=2*std::abs(Eright);
+  }
+
+  // Iterate
+  for(size_t it=1;it<100;it++) {
+    double Efermi((Eleft+Eright)/2);
+    occ=focc(E,B,Efermi);
+    occsum=arma::sum(occ);
+
+    //printf("it = %i, Efermi = %e, occsum = %e\n",(int)it,Efermi,occsum);
+
+    if(occsum>N) {
+      // Chemical potential is too large, move it to the left
+      Eright=Efermi;
+    } else if(occsum<N) {
+      // Chemical potential is too small, move it to the right
+      Eleft=Efermi;
+    }
+
+    if(std::abs(occsum-N)<=10*DBL_EPSILON*N)
+      break;
+  }
+
+  //printf("N = %e, sum(occ)-N = %e\n",N,occsum-N);
+
+  // Rescale occupation numbers
+  return N*occ/occsum;
+}
+
+arma::vec pFermiON(const arma::vec & E, int N, double T) {
+  if(!E.size())
+    throw std::logic_error("Can't do Fermi occupations without orbital energies!\n");
+
+  // Temperature factor: 1/(kB T)
+  const double B(1.0/T);
+
+  // Pseudo-FON: chemical potential is
+  double mu=0.5*(E(N)+E(N-1));
+
+  // Get occupation numbers
+  arma::vec occ=focc(E,B,mu);
+
+  // Rescale occupation numbers
+  return N*occ/arma::sum(occ);
+}
