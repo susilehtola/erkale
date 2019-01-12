@@ -57,6 +57,8 @@ enum guess_t parse_guess(const std::string & val) {
     return GSAP_GUESS;
   else if(stricmp(val,"SAP")==0)
     return SAP_GUESS;
+  else if(stricmp(val,"MINSAP")==0)
+    return MINSAP_GUESS;
   else if(stricmp(val,"NO")==0)
     return NO_GUESS;
   else if(stricmp(val,"GWH")==0)
@@ -902,16 +904,12 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
 void SCF::core_guess(rscf_t & sol) const {
   // Get core Hamiltonian
   sol.H=Hcore;
-  // and diagonalize it to get the orbitals
-  diagonalize(sol);
 }
 
 void SCF::core_guess(uscf_t & sol) const {
   // Get core Hamiltonian
   sol.Ha=Hcore;
   sol.Hb=Hcore;
-  // and diagonalize it to get the orbitals
-  diagonalize(sol);
 }
 
 void SCF::gwh_guess(rscf_t & sol) const {
@@ -924,7 +922,6 @@ void SCF::gwh_guess(rscf_t & sol) const {
       sol.H(j,i)=sol.H(i,j);
     }
   }
-  diagonalize(sol);
 }
 
 void SCF::gwh_guess(uscf_t & sol) const {
@@ -938,7 +935,6 @@ void SCF::gwh_guess(uscf_t & sol) const {
     }
   }
   sol.Hb=sol.Ha;
-  diagonalize(sol);
 }
 
 void SCF::sap_guess(rscf_t & sol) const {
@@ -958,8 +954,6 @@ void SCF::sap_guess(rscf_t & sol) const {
   arma::mat Vsap(grid.eval_SAP());
   // Approximate Hamiltonian is
   sol.H=Hcore+Vsap;
-  // and diagonalize it to get the orbitals
-  diagonalize(sol);
 }
 
 void SCF::sap_guess(uscf_t & sol) const {
@@ -980,8 +974,6 @@ void SCF::sap_guess(uscf_t & sol) const {
   // Approximate Hamiltonian is
   sol.Ha=Hcore+Vsap;
   sol.Hb=sol.Ha;
-  // and diagonalize it to get the orbitals
-  diagonalize(sol);
 }
 
 arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0) const {
@@ -1902,13 +1894,21 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Handle guesses
     if(!doload) {
-      if(guess==CORE_GUESS)
+      if(guess==CORE_GUESS) {
 	solver.core_guess(sol);
-      else if(guess==SAP_GUESS)
+        solver.diagonalize(sol);
+      } else if(guess==SAP_GUESS) {
 	solver.sap_guess(sol);
-      else if(guess==GWH_GUESS)
+        solver.diagonalize(sol);
+      } else if(guess==MINSAP_GUESS) {
+	solver.sap_guess(sol);
+        arma::mat proj(minimal_basis_projection(basis,set));
+        sol.H=proj*sol.H*proj;
+        solver.diagonalize(sol);
+      } else if(guess==GWH_GUESS) {
 	solver.gwh_guess(sol);
-      else if(guess == GSAP_GUESS) {
+        solver.diagonalize(sol);
+      } else if(guess == GSAP_GUESS) {
         sol.H=solver.get_Hcore()+sap_guess(basis,set);
         solver.diagonalize(sol);
       } else if(guess == HUCKEL_GUESS) {
@@ -2224,13 +2224,22 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Handle guesses
     if(!doload) {
-      if(guess==CORE_GUESS)
+      if(guess==CORE_GUESS) {
 	solver.core_guess(sol);
-      else if(guess==SAP_GUESS)
+        solver.diagonalize(sol);
+      } else if(guess==SAP_GUESS) {
 	solver.sap_guess(sol);
-      else if(guess==GWH_GUESS)
+        solver.diagonalize(sol);
+      } else if(guess==MINSAP_GUESS) {
+	solver.sap_guess(sol);
+        arma::mat proj(minimal_basis_projection(basis,set));
+        sol.Ha=proj*sol.Ha*proj;
+        sol.Hb=proj*sol.Hb*proj;
+        solver.diagonalize(sol);
+      } else if(guess==GWH_GUESS) {
 	solver.gwh_guess(sol);
-      else if(guess == GSAP_GUESS) {
+        solver.diagonalize(sol);
+      } else if(guess == GSAP_GUESS) {
         sol.Ha=solver.get_Hcore()+sap_guess(basis,set);
         sol.Hb=sol.Ha;
         solver.diagonalize(sol);

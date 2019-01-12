@@ -20,9 +20,11 @@
 #include "checkpoint.h"
 #include "linalg.h"
 #include "settings.h"
+#include "scf.h"
 #include "stringutil.h"
 #include "timer.h"
 #include <algorithm>
+
 
 void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atEocc, arma::mat & atCocc, arma::mat & atP, arma::mat & atF, int Q) {
   // Nucleus is
@@ -158,13 +160,15 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
 typedef enum {
               FORM_SAD,
               FORM_SAP,
-              FORM_HUCKEL
+              FORM_HUCKEL,
+              FORM_MINBAS
 } atomic_guess_t;
 
 static const std::string guesstypes[]={
                                        "SAD",
-                                       "GSAP",
-                                       "Huckel"
+                                       "SAP",
+                                       "Huckel",
+                                       "Minimal basis"
 };
 
 arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t type) {
@@ -276,7 +280,7 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t 
         }
     }
 
-  } else if(type == FORM_HUCKEL) {
+  } else if(type == FORM_HUCKEL || type == FORM_MINBAS) {
     // Number of functions on each nucleus
     arma::uvec numorb(basis.get_Nnuc());
     numorb.zeros();
@@ -373,7 +377,12 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t 
     }
 
     // Convert Huckel matrix to full AO basis
-    M=ShuC*Hu*ShuC.t();
+    if(type == FORM_HUCKEL)
+      M=ShuC*Hu*ShuC.t();
+    else if(type == FORM_MINBAS) {
+      M=ShuC*ShuC.t();
+    } else
+      throw std::logic_error("Case not handled!\n");
   }
 
   /*
@@ -403,6 +412,10 @@ arma::mat sap_guess(const BasisSet & basis, Settings set) {
 
 arma::mat huckel_guess(const BasisSet & basis, Settings set) {
   return atomic_guess_wrk(basis,set,FORM_HUCKEL);
+}
+
+arma::mat minimal_basis_projection(const BasisSet & basis, Settings set) {
+  return atomic_guess_wrk(basis,set,FORM_MINBAS);
 }
 
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {

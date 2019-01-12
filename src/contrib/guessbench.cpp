@@ -206,6 +206,26 @@ int main(int argc, char **argv) {
     // Get Huckel guess
     diag(E,C,huckel_guess(basis,set),Sinvh);
 
+  } else if(stricmp(guess,"minsap")==0) {
+    DFTGrid grid(&basis);
+    bool grad=false;
+    bool tau=false;
+    bool lapl=false;
+    bool strict=false;
+    bool nl=false;
+    grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+
+    // Get SAP potential
+    arma::mat Vsap(grid.eval_SAP());
+
+    // Get Huckel projection
+    arma::mat P(minimal_basis_projection(basis,set));
+
+    // Hamiltonian in Huckel basis is
+    arma::mat Hhu(P*(Hcore+Vsap)*P);
+    // Diagonalize it
+    diag(E,C,Hhu,Sinvh);
+
   } else {
     throw std::logic_error("Unsupported guess!\n");
   }

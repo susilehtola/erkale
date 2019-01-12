@@ -171,7 +171,9 @@ enum guess_t {
   /// Generalized Wolfsberg--Helmholz
   GWH_GUESS,
   /// Huckel type guess
-  HUCKEL_GUESS
+  HUCKEL_GUESS,
+  /// Minimal basis SAP
+  MINSAP_GUESS
 };
 
 /// Perdew-Zunger SIC mode

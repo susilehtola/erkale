@@ -44,11 +44,17 @@ arma::mat sap_guess(const BasisSet & basis, Settings set);
 /**
  * Form starting guess from a Huckel type calculation
  *
- * "Starting SCF Calculations by Superposition of Atomic Densities" by
- * P. Norman and H. J. Aa. Jensen, Chem. Phys. Lett. 531 (2012),
- * pp. 229-235.
+ * "Phosphorescence parameters for platinum (II) organometallic
+ * chromophores: A study at the non-collinear four-component Kohn–Sham
+ * level of theory" by P. Norman and H. J. Aa. Jensen,
+ * Chem. Phys. Lett. 531 (2012), pp. 229-235.
  */
 arma::mat huckel_guess(const BasisSet & basis, Settings set);
+
+/**
+ * Forms a projection to a minimal atomic basis set.
+ */
+arma::mat minimal_basis_projection(const BasisSet & basis, Settings set);
 
 /**
  * Worker routine - perform guess for inuc:th atom in basis, using given method.
