@@ -151,6 +151,20 @@ int main(int argc, char **argv) {
     // Diagonalize it
     diag(E,C,Hcore,Sinvh);
 
+  } else if(stricmp(guess,"gwh")==0) {
+
+    // Form GWH matrix
+    arma::mat Hgwh(Hcore);
+    for(size_t i=0;i<Hcore.n_rows;i++) {
+      Hgwh(i,i)=Hcore(i,i);
+      for(size_t j=0;j<Hcore.n_cols;j++) {
+        Hgwh(i,j)=0.875*S(i,j)*(Hcore(i,i)+Hcore(j,j));
+        Hgwh(j,i)=Hgwh(i,j);
+      }
+    }
+    // and diagonalize it
+    diag(E,C,Hgwh,Sinvh);
+
   } else if(stricmp(guess,"sap")==0) {
     DFTGrid grid(&basis);
     bool grad=false;
