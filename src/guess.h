@@ -49,7 +49,7 @@ arma::mat sap_guess(const BasisSet & basis, Settings set);
  * level of theory" by P. Norman and H. J. Aa. Jensen,
  * Chem. Phys. Lett. 531 (2012), pp. 229-235.
  */
-arma::mat huckel_guess(const BasisSet & basis, Settings set);
+arma::mat huckel_guess(const BasisSet & basis, Settings set, double Kgwh);
 
 /**
  * Forms a projection to a minimal atomic basis set.

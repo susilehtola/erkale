@@ -171,7 +171,7 @@ static const std::string guesstypes[]={
                                        "Minimal basis"
 };
 
-arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t type) {
+arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t type, double Kgwh) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -372,7 +372,7 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t 
     for(size_t i=0;i<n;i++) {
       Hu(i,i)=HuE(i);
       for(size_t j=0;j<i;j++) {
-        Hu(i,j) = Hu(j,i) = 1.75*Shu(i,j)*(HuE(i)+HuE(j))/2.0;
+        Hu(i,j) = Hu(j,i) = 0.5*Kgwh*Shu(i,j)*(HuE(i)+HuE(j));
       }
     }
 
@@ -380,7 +380,7 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t 
     if(type == FORM_HUCKEL)
       M=ShuC*Hu*ShuC.t();
     else if(type == FORM_MINBAS) {
-      M=ShuC*ShuC.t();
+      M=ShuC;
     } else
       throw std::logic_error("Case not handled!\n");
   }
@@ -403,19 +403,19 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t 
 }
 
 arma::mat sad_guess(const BasisSet & basis, Settings set) {
-  return atomic_guess_wrk(basis,set,FORM_SAD);
+  return atomic_guess_wrk(basis,set,FORM_SAD,0.0);
 }
 
 arma::mat sap_guess(const BasisSet & basis, Settings set) {
-  return atomic_guess_wrk(basis,set,FORM_SAP);
+  return atomic_guess_wrk(basis,set,FORM_SAP,0.0);
 }
 
-arma::mat huckel_guess(const BasisSet & basis, Settings set) {
-  return atomic_guess_wrk(basis,set,FORM_HUCKEL);
+arma::mat huckel_guess(const BasisSet & basis, Settings set, double Kgwh) {
+  return atomic_guess_wrk(basis,set,FORM_HUCKEL,Kgwh);
 }
 
 arma::mat minimal_basis_projection(const BasisSet & basis, Settings set) {
-  return atomic_guess_wrk(basis,set,FORM_MINBAS);
+  return atomic_guess_wrk(basis,set,FORM_MINBAS,0.0);
 }
 
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {

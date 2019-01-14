@@ -90,6 +90,7 @@ int main(int argc, char **argv) {
   set.add_bool("FON","Fermi occupation numbers",false);
   set.add_string("FONscan","Fermi occupation scan","");
   set.add_double("T","Temperature in K",1000);
+  set.add_double("K","GWH approximation scaling factor",1.75);
   set.add_int("nrad","Number of radial shells for SAP",99);
   set.add_int("lmax","Angular rule for SAP (defaults to l=41 i.e. 590 points)",41);
   set.parse(std::string(argv[1]),true);
@@ -98,6 +99,8 @@ int main(int argc, char **argv) {
   // SAP quadrature rule
   int nrad(set.get_int("nrad"));
   int lmax(set.get_int("lmax"));
+  // GWH constant
+  double K(set.get_double("K"));
 
   // Basis set
   BasisSet basis;
@@ -158,7 +161,7 @@ int main(int argc, char **argv) {
     for(size_t i=0;i<Hcore.n_rows;i++) {
       Hgwh(i,i)=Hcore(i,i);
       for(size_t j=0;j<Hcore.n_cols;j++) {
-        Hgwh(i,j)=0.875*S(i,j)*(Hcore(i,i)+Hcore(j,j));
+        Hgwh(i,j)=0.5*K*S(i,j)*(Hcore(i,i)+Hcore(j,j));
         Hgwh(j,i)=Hgwh(i,j);
       }
     }
@@ -204,7 +207,7 @@ int main(int argc, char **argv) {
 
   } else if(stricmp(guess,"huckel")==0) {
     // Get Huckel guess
-    diag(E,C,huckel_guess(basis,set),Sinvh);
+    diag(E,C,huckel_guess(basis,set,K),Sinvh);
 
   } else if(stricmp(guess,"minsap")==0) {
     DFTGrid grid(&basis);
@@ -217,14 +220,25 @@ int main(int argc, char **argv) {
 
     // Get SAP potential
     arma::mat Vsap(grid.eval_SAP());
+    // SAP Hamiltonian
+    arma::mat Hsap(Hcore+Vsap);
 
-    // Get Huckel projection
-    arma::mat P(minimal_basis_projection(basis,set));
+    // Get minimal basis
+    arma::mat Cmin(minimal_basis_projection(basis,set));
 
-    // Hamiltonian in Huckel basis is
-    arma::mat Hhu(P*(Hcore+Vsap)*P);
-    // Diagonalize it
-    diag(E,C,Hhu,Sinvh);
+    // Convert to minimal basis
+    Hsap=Cmin.t()*Hsap*Cmin;
+    // Scale off-diagonal elements
+    for(size_t j=0;j<Hsap.n_cols;j++)
+      for(size_t i=0;i<j;i++) {
+        Hsap(i,j) *= 0.5*K;
+        Hsap(j,i) *= 0.5*K;
+      }
+    // Go back to AO basis
+    Hsap=Cmin*Hsap*Cmin.t();
+
+    // Diagonalize
+    diag(E,C,Hsap,Sinvh);
 
   } else {
     throw std::logic_error("Unsupported guess!\n");

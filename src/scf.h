@@ -167,7 +167,7 @@ enum guess_t {
   /// Atomic potential guess, using SAD solver and gaussian basis
   GSAP_GUESS,
   /// Natural orbitals from atomic guess
-  NO_GUESS,
+  SADNO_GUESS,
   /// Generalized Wolfsberg--Helmholz
   GWH_GUESS,
   /// Huckel type guess
@@ -233,6 +233,8 @@ class SCF {
 
   /// Which guess to use
   enum guess_t guess;
+  /// GWH scaling constant
+  double Kgwh;
 
   /// Use DIIS?
   bool usediis;
@@ -403,9 +405,9 @@ class SCF {
   void core_guess(uscf_t & sol) const;
 
   /// Do GWH guess
-  void gwh_guess(rscf_t & sol) const;
+  void gwh_guess(rscf_t & sol, double Kgwh) const;
   /// Do GWH guess
-  void gwh_guess(uscf_t & sol) const;
+  void gwh_guess(uscf_t & sol, double Kgwh) const;
 
   /// Do SAP guess
   void sap_guess(rscf_t & sol) const;

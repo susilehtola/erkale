@@ -59,8 +59,8 @@ enum guess_t parse_guess(const std::string & val) {
     return SAP_GUESS;
   else if(stricmp(val,"MINSAP")==0)
     return MINSAP_GUESS;
-  else if(stricmp(val,"NO")==0)
-    return NO_GUESS;
+  else if(stricmp(val,"SADNO")==0 || stricmp(val,"NO")==0)
+    return SADNO_GUESS;
   else if(stricmp(val,"GWH")==0)
     return GWH_GUESS;
   else if(stricmp(val,"HUCKEL")==0)
@@ -84,6 +84,8 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
   // Parse guess
   guess=parse_guess(set.get_string("Guess"));
+  // GWH scaling constant
+  Kgwh=set.get_double("Kgwh");
 
   // Dimer calculation?
   dimcalc=set.get_bool("DimerSymmetry");
@@ -912,26 +914,22 @@ void SCF::core_guess(uscf_t & sol) const {
   sol.Hb=Hcore;
 }
 
-void SCF::gwh_guess(rscf_t & sol) const {
+void SCF::gwh_guess(rscf_t & sol, double K) const {
   // Initialize matrix
   sol.H=Hcore;
   for(size_t i=0;i<Hcore.n_rows;i++) {
-    sol.H(i,i)=Hcore(i,i);
-    for(size_t j=0;j<Hcore.n_cols;j++) {
-      sol.H(i,j)=0.875*S(i,j)*(Hcore(i,i)+Hcore(j,j));
-      sol.H(j,i)=sol.H(i,j);
+    for(size_t j=0;j<i;j++) {
+      sol.H(i,j) = sol.H(j,i) = 0.5*K*S(i,j)*(Hcore(i,i)+Hcore(j,j));
     }
   }
 }
 
-void SCF::gwh_guess(uscf_t & sol) const {
+void SCF::gwh_guess(uscf_t & sol, double K) const {
   // Initialize matrix
   sol.Ha=Hcore;
   for(size_t i=0;i<Hcore.n_rows;i++) {
-    sol.Ha(i,i)=Hcore(i,i);
     for(size_t j=0;j<i;j++) {
-      sol.Ha(i,j)=0.875*S(i,j)*(Hcore(i,i)+Hcore(j,j));
-      sol.Ha(j,i)=sol.Ha(i,j);
+      sol.Ha(i,j) = sol.Ha(j,i) = 0.5*K*S(i,j)*(Hcore(i,i)+Hcore(j,j));
     }
   }
   sol.Hb=sol.Ha;
@@ -1891,6 +1889,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Solver
     SCF solver(basis,set,chkpt);
+    double Kgwh(set.get_double("Kgwh"));
 
     // Handle guesses
     if(!doload) {
@@ -1901,20 +1900,35 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.sap_guess(sol);
         solver.diagonalize(sol);
       } else if(guess==MINSAP_GUESS) {
+        // Form SAP Hamiltonian
 	solver.sap_guess(sol);
+
+        // Get minimal basis projection
         arma::mat proj(minimal_basis_projection(basis,set));
-        sol.H=proj*sol.H*proj;
+
+        // Projection to minimal basis
+        sol.H=proj.t()*sol.H*proj;
+        // Scale off-diagonal elements
+        for(size_t j=0;j<sol.H.n_cols;j++)
+          for(size_t i=0;i<j;i++) {
+            sol.H(i,j)*=0.5*Kgwh;
+            sol.H(j,i)*=0.5*Kgwh;
+          }
+
+        // Project back to AO basis
+        sol.H=proj*sol.H*proj.t();
+
         solver.diagonalize(sol);
       } else if(guess==GWH_GUESS) {
-	solver.gwh_guess(sol);
+	solver.gwh_guess(sol,Kgwh);
         solver.diagonalize(sol);
       } else if(guess == GSAP_GUESS) {
         sol.H=solver.get_Hcore()+sap_guess(basis,set);
         solver.diagonalize(sol);
       } else if(guess == HUCKEL_GUESS) {
-        sol.H=huckel_guess(basis,set);
+        sol.H=huckel_guess(basis,set,Kgwh);
         solver.diagonalize(sol);
-      } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
+      } else if((guess == SAD_GUESS) || (guess == SADNO_GUESS)) {
         sol.P=sad_guess(basis,set);
 
         // Build Fock operator from SAD density matrix. Get natural orbitals
@@ -2221,6 +2235,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Solver
     SCF solver(basis,set,chkpt);
+    double Kgwh(set.get_double("Kgwh"));
 
     // Handle guesses
     if(!doload) {
@@ -2231,23 +2246,37 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.sap_guess(sol);
         solver.diagonalize(sol);
       } else if(guess==MINSAP_GUESS) {
+        // Form SAP Hamiltonian
 	solver.sap_guess(sol);
+
+        // Get minimal basis projection
         arma::mat proj(minimal_basis_projection(basis,set));
-        sol.Ha=proj*sol.Ha*proj;
-        sol.Hb=proj*sol.Hb*proj;
+
+        // Projection to minimal basis
+        sol.Ha=proj.t()*sol.Ha*proj;
+        // Scale off-diagonal elements
+        for(size_t j=0;j<sol.Ha.n_cols;j++)
+          for(size_t i=0;i<j;i++) {
+            sol.Ha(i,j)*=0.5*Kgwh;
+            sol.Ha(j,i)*=0.5*Kgwh;
+          }
+
+        // Project back to AO basis
+        sol.Ha=proj*sol.Ha*proj.t();
+        sol.Hb=sol.Ha;
         solver.diagonalize(sol);
       } else if(guess==GWH_GUESS) {
-	solver.gwh_guess(sol);
+	solver.gwh_guess(sol,Kgwh);
         solver.diagonalize(sol);
       } else if(guess == GSAP_GUESS) {
         sol.Ha=solver.get_Hcore()+sap_guess(basis,set);
         sol.Hb=sol.Ha;
         solver.diagonalize(sol);
       } else if(guess == HUCKEL_GUESS) {
-        sol.Ha=huckel_guess(basis,set);
+        sol.Ha=huckel_guess(basis,set,Kgwh);
         sol.Hb=sol.Ha;
         solver.diagonalize(sol);
-      } else if((guess == SAD_GUESS) || (guess == NO_GUESS)) {
+      } else if((guess == SAD_GUESS) || (guess == SADNO_GUESS)) {
         // Form SAD density matrix
         sol.P=sad_guess(basis,set);
 
