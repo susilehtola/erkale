@@ -22,7 +22,7 @@
 #include "../version.h"
 #endif
 
-int main(int argc, char **argv) {
+int main_guarded(int argc, char **argv) {
   print_copyright();
   print_license();
 #ifdef SVNRELEASE
@@ -74,4 +74,13 @@ int main(int argc, char **argv) {
   baslib.save_gaussian94("slater-uncontr.gbs");
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
 }

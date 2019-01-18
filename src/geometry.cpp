@@ -390,7 +390,7 @@ void print_header() {
   print_hostname();
 }
 
-int main(int argc, char **argv) {
+int main_guarded(int argc, char **argv) {
   print_header();
 
   if(argc!=2) {
@@ -948,4 +948,13 @@ int main(int argc, char **argv) {
   printf("Running program took %s.\n",tprog.elapsed().c_str());
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
 }

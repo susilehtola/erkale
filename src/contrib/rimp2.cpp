@@ -151,7 +151,7 @@ double E_singles_MP2(const arma::mat & Fph, const arma::vec & Eo, const arma::ve
   return E;
 }
 
-int main(void) {
+int main_guarded(void) {
 #ifdef _OPENMP
   printf("ERKALE - RIMP2 from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -286,4 +286,13 @@ int main(void) {
   printf("\nCalculation finished in %s.\n",ttot.elapsed().c_str());
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
 }

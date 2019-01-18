@@ -335,7 +335,7 @@ arma::mat form_density() {
   return P;
 }
 
-int main(int argc, char **argv) {
+int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - ADF interface from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -383,4 +383,13 @@ int main(int argc, char **argv) {
   printf("Computing EMD properties took %s.\n",t.elapsed().c_str());
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
 }
