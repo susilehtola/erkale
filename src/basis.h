@@ -329,6 +329,8 @@ class BasisSet {
 
   /// Get m values of basis functions
   arma::ivec get_m_values() const;
+  /// Get indices of basis functions with wanted m value
+  arma::uvec m_indices(int m) const;
 
   /// Get transformation matrix
   arma::mat get_trans(size_t ind) const;
