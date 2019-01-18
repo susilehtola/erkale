@@ -31,7 +31,7 @@ std::string getlegend(size_t i, size_t n) {
     throw std::logic_error("Should have not ended up here.\n");
 }
 
-int main(int argc, char **argv) {
+int main_guarded(int argc, char **argv) {
   if(argc!=3) {
     printf("Usage: %s chkpt1 chkpt2",argv[0]);
     return 1;
@@ -206,3 +206,11 @@ int main(int argc, char **argv) {
   return 0;
 }
 
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
+}

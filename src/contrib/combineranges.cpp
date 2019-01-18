@@ -23,7 +23,7 @@ typedef struct {
   int Nexp;
 } corange_t;
 
-int main(int argc, char **argv) {
+int main_guarded(int argc, char **argv) {
   if(argc<3) {
     printf("Usage: %s file1 file2 (file3) (file4) (...)\n",argv[0]);
     return 1;
@@ -151,4 +151,13 @@ int main(int argc, char **argv) {
     printf("%i % .16e % .16e % .16e %i\n",am,prof[am].start,prof[am].end,prof[am].tol,(int) prof[am].exps.size());
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
 }

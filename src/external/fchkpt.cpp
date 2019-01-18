@@ -648,7 +648,7 @@ void save_fchk(const Settings & set) {
 
 }
 
-int main(int argc, char **argv) {
+int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - Gaussian(TM) interface from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -693,4 +693,13 @@ int main(int argc, char **argv) {
     throw std::runtime_error("Conflicting settings!\n");
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
 }

@@ -2344,7 +2344,7 @@ int get_nfuncs(const std::vector<coprof_t> & cpl) {
   return n;
 }
 
-int main(int argc, char **argv) {
+int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - Completeness optimization from Hel. OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -2651,4 +2651,13 @@ int main(int argc, char **argv) {
   printf("\nRunning program took %s.\n",ttot.elapsed().c_str());
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
 }

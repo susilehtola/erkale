@@ -524,7 +524,7 @@ void update_allowed(arma::imat & allowed, const arma::mat & Eam) {
 }
 
 
-int main(int argc, char ** argv) {
+int main_guarded(int argc, char ** argv) {
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);
     return 1;
@@ -805,4 +805,13 @@ int main(int argc, char ** argv) {
   printf("Converged. Final energy without penalty is % .16e\n",get_energy(sys,funcs,set,Q,M,0)-sys.gamma*condition_number(sys,funcs,set));
 
   return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
 }
