@@ -534,6 +534,34 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 	printf("done (%s)\n",t.elapsed().c_str());
     }
 
+#if !defined(FULLHOLE) && !defined(HALFHOLE)
+    if(dimcalc && iiter<=readdimocc) {
+      arma::imat dimoccs;
+      dimoccs.load("dimoccs.dat",arma::raw_ascii);
+      if(dimoccs.n_cols < 3) {
+        throw std::logic_error("Must have at least three columns in occupation data.\n");
+      }
+
+      arma::ivec occnuma, occnumb;
+      // Number of occupied alpha orbitals is first column
+      occnuma=dimoccs.col(0);
+      // Number of occupied beta orbitals is second column
+      occnumb=dimoccs.col(1);
+      // m value is third column
+      std::vector<arma::uvec> occsym(dimoccs.n_rows);
+      for(size_t i=0;i<dimoccs.n_rows;i++)
+        occsym[i]=basisp->m_indices(dimoccs(i,2));
+
+      // Make sure wanted orbitals are occupied
+#ifdef RESTRICTED
+      enforce_occupations(sol.C,sol.E,S,occnuma,occsym);
+#else
+      enforce_occupations(sol.Ca,sol.Ea,S,occnuma,occsym);
+      enforce_occupations(sol.Cb,sol.Eb,S,occnumb,occsym);
+#endif
+    }
+#endif
+
     // Form new density matrix
     form_dens(sol);
 

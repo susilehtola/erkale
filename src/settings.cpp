@@ -62,6 +62,7 @@ void Settings::add_scf_settings() {
 
   // Specialized dimer calculation?
   add_bool("DimerSymmetry", "Do special calculation on dimer along z axis", false);
+  add_int("DimerOccupations", "Read in occupations for dimer calculations?", 0, true);
 
   // Decontract basis set?
   add_string("Decontract","Indices of atoms to decontract basis set for","");

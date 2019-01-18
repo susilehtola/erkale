@@ -89,6 +89,9 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
   // Dimer calculation?
   dimcalc=set.get_bool("DimerSymmetry");
+  readdimocc=set.get_int("DimerOccupations");
+  if(readdimocc<0)
+    readdimocc=INT_MAX;
 
   usediis=set.get_bool("UseDIIS");
   diisorder=set.get_int("DIISOrder");
@@ -229,7 +232,40 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     t.set();
   }
 
-  Sinvh=BasOrth(S,set);
+  if(dimcalc) {
+    // Basis set m values
+    arma::ivec mval(basisp->get_m_values());
+
+    // Find unique m values
+    arma::uvec muni_idx(arma::find_unique(mval));
+    arma::ivec muni(mval(muni_idx));
+    muni=arma::sort(muni);
+
+    // Basis function indices by m value
+    std::vector<arma::uvec> m_idx(muni.n_elem);
+    // as well as the half-inverse overlap matrices
+    std::vector<arma::mat> Sinvhs(muni.n_elem);
+    size_t nmo=0;
+    for(size_t i=0;i<muni.n_elem;i++) {
+      m_idx[i]=basisp->m_indices(muni[i]);
+
+      // Form S submatrix
+      arma::mat Ssub(S.submat(m_idx[i],m_idx[i]));
+      Sinvhs[i]=BasOrth(Ssub,set);
+      nmo+=Sinvhs[i].n_cols;
+    }
+
+    // Form the full matrix
+    Sinvh.zeros(S.n_rows,nmo);
+    size_t imo=0;
+    for(size_t i=0;i<muni.n_elem;i++) {
+      arma::uvec cidx(arma::linspace<arma::uvec>(imo,imo+Sinvhs[i].n_cols-1,Sinvhs[i].n_cols));
+      Sinvh.submat(m_idx[i],cidx)=Sinvhs[i];
+      imo+=Sinvhs[i].n_cols;
+    }
+  } else {
+    Sinvh=BasOrth(S,set);
+  }
   chkptp->write("Sinvh",Sinvh);
 
   if(verbose) {
@@ -2987,4 +3023,107 @@ arma::vec pFermiON(const arma::vec & E, int N, double T) {
 
   // Rescale occupation numbers
   return N*occ/arma::sum(occ);
+}
+
+void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, const arma::ivec & nocc, const std::vector<arma::uvec> & m_idx) {
+  if(nocc.n_elem != m_idx.size())
+    throw std::logic_error("nocc vector and symmetry indices don't match!\n");
+
+  // Make sure index vector doesn't have duplicates
+  {
+    // Collect all indices
+    arma::uvec fullidx;
+    for(size_t i=0;i<m_idx.size();i++) {
+      arma::uvec fidx(fullidx.n_elem+m_idx[i].n_elem);
+      if(fullidx.n_elem)
+        fidx.subvec(0,fullidx.n_elem-1)=fullidx;
+      fidx.subvec(fullidx.n_elem,fidx.n_elem-1)=m_idx[i];
+      fullidx=fidx;
+    }
+    // Get indices of unique elements
+    arma::uvec iunq(arma::find_unique(fullidx));
+    if(iunq.n_elem != fullidx.n_elem)
+      throw std::logic_error("Duplicate basis functions in symmetry list!\n");
+  }
+
+  // Indices of occupied orbitals
+  std::vector<arma::uword> occidx;
+
+  // C transpose
+  arma::mat Ct(C.t());
+
+  // Loop over symmetries
+  for(size_t isym=0;isym<m_idx.size();isym++) {
+    // Check for occupation
+    if(!nocc(isym))
+      continue;
+
+    // C submatrix
+    arma::mat Csub(C.rows(m_idx[isym]));
+    // S submatrix
+    arma::mat Ssub(S.submat(m_idx[isym],m_idx[isym]));
+
+    // Find basis vectors that belong to this symmetry: compute their norm
+    arma::vec Csubnrm(arma::diagvec(Csub.t()*Ssub*Csub));
+    // Clean up
+    Csubnrm(arma::find(Csubnrm <= 10*DBL_EPSILON)).zeros();
+
+    // Column indices of C that have non-zero elements
+    arma::uvec Cind(arma::find(Csubnrm));
+
+    // Add to list of occupied orbitals
+    for(arma::sword io=0;io<nocc(isym);io++)
+      occidx.push_back(Cind(io));
+  }
+
+  // Sort list
+  std::sort(occidx.begin(),occidx.end());
+
+  // Make sure orbital vector doesn't have duplicates
+  {
+    arma::uvec iunq(arma::find_unique(arma::conv_to<arma::uvec>::from(occidx)));
+    if(iunq.n_elem != occidx.size()) {
+      arma::conv_to<arma::uvec>::from(occidx).print("Occupied orbital list");
+      fflush(stdout);
+      throw std::logic_error("Duplicate basis functions in occupied orbital list!\n");
+    }
+  }
+
+  // Add in the rest of the orbitals
+  std::vector<arma::uword> virtidx;
+  for(arma::uword i=0;i<C.n_cols;i++) {
+    bool found=false;
+    for(size_t j=0;j<occidx.size();j++)
+      if(occidx[j]==i) {
+        found=true;
+        break;
+      }
+    if(!found)
+      virtidx.push_back(i);
+  }
+
+  // Make sure orbital energies are in order
+  arma::uvec occorder;
+  if(occidx.size()) {
+    occorder=arma::conv_to<arma::uvec>::from(occidx);
+    arma::vec Eocc(E(occorder));
+    arma::uvec occsort(arma::sort_index(Eocc,"ascend"));
+    occorder=occorder(occsort);
+  }
+
+  arma::uvec virtorder;
+  if(virtidx.size()) {
+    virtorder=arma::conv_to<arma::uvec>::from(virtidx);
+    arma::vec Evirt(E(virtorder));
+    arma::uvec virtsort(arma::sort_index(Evirt,"ascend"));
+    virtorder=virtorder(virtsort);
+  }
+
+  arma::uvec newidx(occorder.n_elem+virtorder.n_elem);
+  if(occorder.n_elem)
+    newidx.subvec(0,occorder.n_elem-1)=occorder;
+  if(virtorder.n_elem)
+    newidx.subvec(occorder.n_elem,newidx.n_elem-1)=virtorder;
+  C=C.cols(newidx);
+  E=E(newidx);
 }
