@@ -46,7 +46,7 @@ void AtomTable::fill(const std::vector<bf_t> & basis, bool verbose) {
   try {
     ints.reserve(N);
     ints.resize(N);
-  } catch(std::bad_alloc err) {
+  } catch(std::bad_alloc & err) {
     std::ostringstream oss;
 
     ERROR_INFO();
