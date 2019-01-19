@@ -18,6 +18,7 @@
 #include "optimize_completeness.h"
 #include "../basislibrary.h"
 #include "../global.h"
+#include "../settings.h"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -26,6 +27,8 @@
 #ifdef SVNRELEASE
 #include "../version.h"
 #endif
+
+Settings settings;
 
 int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
@@ -40,41 +43,50 @@ int main_guarded(int argc, char **argv) {
 #endif
   print_hostname();
 
-  if(argc!=7 && argc!=8) {
-    printf("Usage:   %s am n min max Nf/tol nfull (coulomb)\n",argv[0]);
-    printf("am:      angular momentum of shell to optimize for\n");
-    printf("n:       moment to optimize for.\n");
-    printf("         1 for maximal area, 2 for minimal rms deviation from unity.\n");
-    printf("min:     lower limit of exponent range to optimize, in log10\n");
-    printf("max:     upper limit of exponent range to optimize, in log10\n");
-    printf("Nf/tol:  number of functions to place on shell, or wanted tolerance.\n");
-    printf("nfull:   number of outermost functions to fully optimize\n");
-    printf("coulomb: use Coulomb metric?\n");
+  settings.add_int("am","angular momentum of shell to optimize for",0);
+  settings.add_int("n","moment to optimize for: 1 for maximal area, 2 for minimal rms deviation",0);
+  settings.add_double("min","lower limit of exponent range in log10",-2);
+  settings.add_double("max","upper limit of exponent range in log10",6);
+  settings.add_double("tol","Optimize and add functions until tolerance is achieved",0.0);
+  settings.add_int("nfunc","Fixed number of functions to optimize",0);
+  settings.add_int("nfull","Number of functions at each side to fully optimize",4);
+  settings.add_bool("coulomb","Use Coulomb metric? (Use only for RI basis sets)",false);
+  settings.add_double("LinDepThresh","Basis set linear dependence threshold",1e-5);
+
+  if(argc!=2) {
+    printf("Usage: %s runfile\n",argv[0]);
+    settings.print();
     return 1;
   }
+  settings.parse(std::string(argv[1]),true);
+  settings.print();
 
   // Get parameters
-  int am=atoi(argv[1]);
-  int n=atoi(argv[2]);
-  double min=atof(argv[3]);
-  double max=atof(argv[4]);
+  int am=settings.get_int("am");
+  int n=settings.get_int("n");
+  double min=settings.get_double("min");
+  double max=settings.get_double("max");
 
   // Form optimized set of primitives
   arma::vec exps;
 
   // Did we get a tolerance, or a number of functions?
-  double tol=atof(argv[5]);
-  int nfull=atoi(argv[6]);
-  bool coulomb=false;
-  if(argc==8)
-    coulomb=atoi(argv[7]);
-
+  double tol=settings.get_double("tol");
+  int nfunc=settings.get_int("nfunc");
+  int nfull=settings.get_int("nfull");
+  bool coulomb=settings.get_bool("coulomb");
   // The Coulomb metric is equivalent to the normal metric with am-1
   if(coulomb)
     am--;
 
   double tau;
-  if(tol<1) {
+
+  if(tol != 0.0 && nfunc != 0)
+    throw std::logic_error("Can't specify both wanted tolerance and number of functions!\n");
+  if(tol == 0.0 && nfunc == 0)
+    throw std::logic_error("Neither wanted tolerance or number of functions was given!\n");
+
+  if(tol!=0.0) {
     exps=get_exponents(am,min,max,tol,n,true,nfull);
   } else {
     // Number of functions given.

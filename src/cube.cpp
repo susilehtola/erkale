@@ -769,6 +769,7 @@ void orbital_cube(const BasisSet & bas, const arma::mat & C, const std::vector<d
     norms(io)*=dx*dy*dz;
 }
 
+Settings settings;
 
 int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
@@ -784,30 +785,29 @@ int main_guarded(int argc, char **argv) {
   print_hostname();
 
   // Parse settings
-  Settings set;
-  set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
-  set.add_string("RefChk","Checkpoint file to load reference density from","");
-  set.add_string("Cube", "Cube to use, e.g. -10:.3:10 -5:.2:4 -2:.1:3", "Auto");
-  set.add_double("AutoBuffer","Buffer zone in Å to add on each side of the cube",2.5);
-  set.add_double("AutoSpacing","Spacing in Å to use",0.1);
-  set.add_bool("Density", "Compute density on the cube?", false);
-  set.add_bool("SpinDensity", "Compute spin density on the cube?", false);
-  set.add_string("OrbIdx", "Indices of orbitals to compute, e.g. 1-10 1-2", "");
-  set.add_bool("SplitOrbs", "Split orbital plots into different files?", false);
-  set.add_bool("Potential", "Compute electrostatic potential on the cube?", false);
-  set.add_bool("SICOrbs", "Compute PZ-SIC orbitals on the cube?", false);
-  set.add_bool("ELF", "Compute electron localization function?", false);
+  settings.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
+  settings.add_string("RefChk","Checkpoint file to load reference density from","");
+  settings.add_string("Cube", "Cube to use, e.g. -10:.3:10 -5:.2:4 -2:.1:3", "Auto");
+  settings.add_double("AutoBuffer","Buffer zone in Å to add on each side of the cube",2.5);
+  settings.add_double("AutoSpacing","Spacing in Å to use",0.1);
+  settings.add_bool("Density", "Compute density on the cube?", false);
+  settings.add_bool("SpinDensity", "Compute spin density on the cube?", false);
+  settings.add_string("OrbIdx", "Indices of orbitals to compute, e.g. 1-10 1-2", "");
+  settings.add_bool("SplitOrbs", "Split orbital plots into different files?", false);
+  settings.add_bool("Potential", "Compute electrostatic potential on the cube?", false);
+  settings.add_bool("SICOrbs", "Compute PZ-SIC orbitals on the cube?", false);
+  settings.add_bool("ELF", "Compute electron localization function?", false);
 
   if(argc==2)
-    set.parse(argv[1]);
+    settings.parse(argv[1]);
   else
     printf("Using default settings.\n");
 
   // Print settings
-  set.print();
+  settings.print();
 
   // Load checkpoint
-  Checkpoint chkpt(set.get_string("LoadChk"),false);
+  Checkpoint chkpt(settings.get_string("LoadChk"),false);
 
   // Load basis set
   BasisSet basis;
@@ -833,15 +833,15 @@ int main_guarded(int argc, char **argv) {
 
   // Form grid in p space.
   std::vector<double> x, y, z;
-  if(stricmp(set.get_string("Cube"),"Auto")==0) {
+  if(stricmp(settings.get_string("Cube"),"Auto")==0) {
     // Automatical formation. Spacing to use
-    double spacing=set.get_double("AutoSpacing")*ANGSTROMINBOHR;
+    double spacing=settings.get_double("AutoSpacing")*ANGSTROMINBOHR;
 
     // Get coordinate matrix
     arma::mat coords=basis.get_nuclear_coords();
 
     // Buffer to put in each side
-    double extra=set.get_double("AutoBuffer")*ANGSTROMINBOHR;
+    double extra=settings.get_double("AutoBuffer")*ANGSTROMINBOHR;
 
     // Minimum and maximum
     arma::rowvec minc=arma::min(coords)-extra;
@@ -858,22 +858,22 @@ int main_guarded(int argc, char **argv) {
     dims << " " << minc(0) << ":" << spacing << ":" << maxc(0); // x
     dims << " " << minc(1) << ":" << spacing << ":" << maxc(1); // y
     dims << " " << minc(2) << ":" << spacing << ":" << maxc(2); // z
-    set.set_string("Cube",dims.str());
+    settings.set_string("Cube",dims.str());
 
     printf("Grid is %s.\n",dims.str().c_str());
   }
   // Parse cube
-  parse_cube(set.get_string("Cube"),x,y,z);
+  parse_cube(settings.get_string("Cube"),x,y,z);
 
   Timer t;
 
   // Calculate orbitals on cube
-  if(set.get_string("OrbIdx").length()) {
+  if(settings.get_string("OrbIdx").length()) {
     // Get ranges
-    std::vector<std::string> ranges=splitline(set.get_string("OrbIdx"));
+    std::vector<std::string> ranges=splitline(settings.get_string("OrbIdx"));
 
     // Split orbitals into many files?
-    bool split=set.get_bool("SplitOrbs");
+    bool split=settings.get_bool("SplitOrbs");
     // Orbital norms
     arma::vec orbnorm;
 
@@ -930,7 +930,7 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Calculate density on cube
-  if(set.get_bool("Density")) {
+  if(settings.get_bool("Density")) {
 
     double norm;
     printf("Calculating total electron density ... ");
@@ -952,7 +952,7 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Calculate spin density on cube
-  if(set.get_bool("SpinDensity")) {
+  if(settings.get_bool("SpinDensity")) {
     double norm;
     printf("Calculating electron spin density ... ");
     fflush(stdout); t.set();
@@ -961,7 +961,7 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Calculate density on cube
-  if(set.get_bool("SICOrbs")) {
+  if(settings.get_bool("SICOrbs")) {
     if(restr) {
       // Load orbitals
       arma::cx_mat CW;
@@ -1084,7 +1084,7 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Calculate electrostatic potential on cube
-  if(set.get_bool("Potential")) {
+  if(settings.get_bool("Potential")) {
     printf("Calculating electrostatic potential ... ");
     fflush(stdout); t.set();
     potential_cube(basis,P,x,y,z,"potential");
@@ -1092,7 +1092,7 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Calculate localization function on cube
-  if(set.get_bool("ELF")) {
+  if(settings.get_bool("ELF")) {
     if(restr) {
       printf("Calculating electron localization function ... ");
       fflush(stdout); t.set();
@@ -1112,7 +1112,7 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Difference density?
-  std::string refstr(set.get_string("RefChk"));
+  std::string refstr(settings.get_string("RefChk"));
   if(refstr.size()) {
     Checkpoint refchk(refstr,false);
     BasisSet refbas;

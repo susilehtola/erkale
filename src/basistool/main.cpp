@@ -17,6 +17,7 @@
 #include "../basislibrary.h"
 #include "../stringutil.h"
 #include "../eriworker.h"
+#include "../settings.h"
 #include "../completeness/completeness_profile.h"
 #ifdef SVNRELEASE
 #include "../version.h"
@@ -30,6 +31,8 @@ void help() {
   for(size_t i=0;i<sizeof(cmds)/sizeof(cmds[0]);i++)
     printf("\t%s\n",cmds[i].c_str());
 }
+
+Settings settings;
 
 int main_guarded(int argc, char **argv) {
   printf("ERKALE - Basis set tools from Hel.\n");

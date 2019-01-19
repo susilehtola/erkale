@@ -40,8 +40,9 @@
 #include "../version.h"
 #endif
 
-int main_guarded(int argc, char **argv) {
+Settings settings;
 
+int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - EMD from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
 #else
@@ -62,30 +63,29 @@ int main_guarded(int argc, char **argv) {
   Timer t;
 
   // Parse settings
-  Settings set;
-  set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
-  set.add_bool("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", true);
-  set.add_double("EMDTol", "Tolerance for the numerical integration of the radial EMD",1e-8);
-  set.add_string("EMDlm", "Which projection of the radial EMD to compute","");
-  set.add_bool("EMDAdapt", "Use adaptive grid to compute EMD?", true);
-  set.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
-  set.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4:6","");
-  set.add_string("Similarity", "Compute similarity measure to checkpoint","");
-  set.add_string("SimilarityGrid", "Grid to use for computing similarity integrals","500 77");
-  set.add_bool("SimilarityLM", "Seminumerical computation of similarity integrals?", false);
-  set.add_int("SimilarityLmax", "Maximum angular momentum for seminumerical computation", 6);
+  settings.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
+  settings.add_bool("DoEMD", "Perform calculation of isotropic EMD (moments of EMD, Compton profile)", true);
+  settings.add_double("EMDTol", "Tolerance for the numerical integration of the radial EMD",1e-8);
+  settings.add_string("EMDlm", "Which projection of the radial EMD to compute","");
+  settings.add_bool("EMDAdapt", "Use adaptive grid to compute EMD?", true);
+  settings.add_string("EMDCube", "Calculate EMD on a cube? e.g. -10:.3:10 -5:.2:4 -2:.1:3", "");
+  settings.add_string("EMDOrbitals", "Compute EMD of given orbitals, e.g. 1,2,4:6","");
+  settings.add_string("Similarity", "Compute similarity measure to checkpoint","");
+  settings.add_string("SimilarityGrid", "Grid to use for computing similarity integrals","500 77");
+  settings.add_bool("SimilarityLM", "Seminumerical computation of similarity integrals?", false);
+  settings.add_int("SimilarityLmax", "Maximum angular momentum for seminumerical computation", 6);
 
   if(argc==2)
-    set.parse(argv[1]);
+    settings.parse(argv[1]);
   else
     printf("Using default settings.\n");
-  set.print();
+  settings.print();
 
   // Get the tolerance
-  double tol=set.get_double("EMDTol");
+  double tol=settings.get_double("EMDTol");
 
   // Load checkpoint
-  Checkpoint chkpt(set.get_string("LoadChk"),false);
+  Checkpoint chkpt(settings.get_string("LoadChk"),false);
 
   // Load basis set
   BasisSet basis;
@@ -103,7 +103,7 @@ int main_guarded(int argc, char **argv) {
 
   // The projection to calculate
   int l=0, m=0;
-  std::string lmstr=set.get_string("EMDlm");
+  std::string lmstr=settings.get_string("EMDlm");
   if(lmstr.size()) {
     // Get l and m values
     std::vector<std::string> lmval=splitline(lmstr);
@@ -112,12 +112,12 @@ int main_guarded(int argc, char **argv) {
     l=readint(lmval[0]);
     m=readint(lmval[1]);
   }
-  bool adaptive=set.get_bool("EMDAdapt");
+  bool adaptive=settings.get_bool("EMDAdapt");
 
   // Compute orbital EMDs?
-  if(set.get_string("EMDOrbitals")!="") {
+  if(settings.get_string("EMDOrbitals")!="") {
     // Get orbitals
-    std::vector<std::string> orbs=splitline(set.get_string("EMDOrbitals"));
+    std::vector<std::string> orbs=splitline(settings.get_string("EMDOrbitals"));
 
     // Polarized calculation?
     bool restr;
@@ -210,7 +210,7 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
-  if(set.get_bool("DoEMD")) {
+  if(settings.get_bool("DoEMD")) {
     t.print_time();
 
     printf("\nCalculating EMD properties.\n");
@@ -270,13 +270,13 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Do EMD on a cube?
-  if(stricmp(set.get_string("EMDCube"),"")!=0) {
+  if(stricmp(settings.get_string("EMDCube"),"")!=0) {
     t.print_time();
     Timer temd;
 
     // Form grid in p space.
     std::vector<double> px, py, pz;
-    parse_cube(set.get_string("EMDCube"),px,py,pz);
+    parse_cube(settings.get_string("EMDCube"),px,py,pz);
 
     // Calculate EMD on cube
     emd_cube(basis,P,px,py,pz);
@@ -285,19 +285,19 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Compute similarity?
-  if(stricmp(set.get_string("Similarity"),"")!=0) {
+  if(stricmp(settings.get_string("Similarity"),"")!=0) {
 
     // Load checkpoint
-    Checkpoint simchk(set.get_string("Similarity"),false);
+    Checkpoint simchk(settings.get_string("Similarity"),false);
 
     // Get grid size
-    std::vector<std::string> gridsize=splitline(set.get_string("SimilarityGrid"));
+    std::vector<std::string> gridsize=splitline(settings.get_string("SimilarityGrid"));
     if(gridsize.size()!=2) {
       throw std::runtime_error("Invalid grid size!\n");
     }
     int nrad=readint(gridsize[0]);
     int lmax=readint(gridsize[1]);
-    int radlmax=set.get_int("SimilarityLmax");
+    int radlmax=settings.get_int("SimilarityLmax");
 
     // Load basis set
     BasisSet simbas;
@@ -315,7 +315,7 @@ int main_guarded(int argc, char **argv) {
 
     // Compute momentum density overlap
     arma::cube ovl;
-    if(set.get_bool("SimilarityLM"))
+    if(settings.get_bool("SimilarityLM"))
       ovl=emd_overlap_semi(basis,P,simbas,simP,nrad,radlmax);
     else
       ovl=emd_overlap(basis,P,simbas,simP,nrad,lmax);

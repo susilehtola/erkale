@@ -53,6 +53,9 @@
 #include "../version.h"
 #endif
 
+Settings settings;
+
+
 /**
  * Was loading a success?
  *
@@ -78,9 +81,9 @@ enum xrs_method parse_method(const std::string & method) {
 
 
 /// Augment the basis set with diffuse functions
-BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
+BasisSet augment_basis(const BasisSet & basis) {
   // Get indices of atoms to augment
-  std::vector<size_t> augind=parse_range(splitline(set.get_string("XRSAugment"))[0]);
+  std::vector<size_t> augind=parse_range(splitline(settings.get_string("XRSAugment"))[0]);
   // Convert to C++ indexing
   for(size_t i=0;i<augind.size();i++) {
     if(augind[i]==0)
@@ -88,7 +91,7 @@ BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
     augind[i]--;
   }
 
-  bool verbose=set.get_bool("Verbose");
+  bool verbose=settings.get_bool("Verbose");
   if(verbose) {
     printf("\nAugmenting basis set with diffuse functions.\n");
     fflush(stdout);
@@ -99,7 +102,7 @@ BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
 
   // Basis set for augmentation functions
   BasisSetLibrary augbaslib;
-  augbaslib.load_basis(set.get_string("XRSDoubleBasis"));
+  augbaslib.load_basis(settings.get_string("XRSDoubleBasis"));
 
   // Loop over excited atoms
   for(size_t iaug=0;iaug<augind.size();iaug++) {
@@ -142,10 +145,10 @@ BasisSet augment_basis(const BasisSet & basis, const Settings & set) {
  * matrix in the unoccupied space. The occupied orbitals and their
  * energies stay the same in the approximation.
  */
-void augmented_solution(const BasisSet & basis, const Settings & set, const uscf_t & sol, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin, enum xrs_method method) {
+void augmented_solution(const BasisSet & basis, const uscf_t & sol, size_t nocca, size_t noccb, dft_t dft, BasisSet & augbas, arma::mat & Caug, arma::vec & Eaug, bool spin, enum xrs_method method) {
   Timer ttot;
 
-  augbas=augment_basis(basis,set);
+  augbas=augment_basis(basis);
   // Need to update pointers in augbas
   augbas.update_nuclear_shell_list();
 
@@ -157,7 +160,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   // Amount of augmentation functions is
   const size_t Naug=Ntot-Nbf;
 
-  bool verbose=set.get_bool("Verbose");
+  bool verbose=settings.get_bool("Verbose");
 
   if(verbose) {
     printf("\nAugmented original basis (%i functions) with %i diffuse functions.\n",(int) Nbf,(int) Naug);
@@ -184,7 +187,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
   augsol.P=augsol.Pa+augsol.Pb;
 
   // Checkpoint
-  std::string augchk=set.get_string("AugChk");
+  std::string augchk=settings.get_string("AugChk");
   bool delchk=false;
   if(stricmp(augchk,"")==0) {
     delchk=true;
@@ -193,7 +196,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
   {
     // Copy base checkpoint to augmented checkpoint
-    std::string chk=set.get_string("SaveChk");
+    std::string chk=settings.get_string("SaveChk");
     char cmd[chk.size()+augchk.size()+5];
     sprintf(cmd,"cp %s %s",chk.c_str(),augchk.c_str());
     int cperr=system(cmd);
@@ -212,7 +215,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 
   {
     // Initialize solver
-    XRSSCF solver(augbas,set,chkpt,spin);
+    XRSSCF solver(augbas,chkpt,spin);
     // The fitting basis set from the non-augmented basis is enough,
     // since the density is restricted there.
     BasisSet fitbas=basis.density_fitting();
@@ -231,7 +234,7 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
       grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
     } else {
       // Fixed size grid
-      bool strictint(set.get_bool("StrictIntegrals"));
+      bool strictint(settings.get_bool("StrictIntegrals"));
       grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
       if(dft.nl)
 	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,false,strictint,true);
@@ -586,11 +589,11 @@ std::vector< std::vector<spectrum_t> > compute_qdep_transitions_fourier(const Ba
 }
 
 
-std::vector< std::vector<spectrum_t> > compute_qdep_transitions_local(const BasisSet & basis, const Settings & set, const arma::mat & C, const arma::vec & E, size_t iat, size_t ixc, size_t nocc, std::vector<double> q) {
+std::vector< std::vector<spectrum_t> > compute_qdep_transitions_local(const BasisSet & basis, const arma::mat & C, const arma::vec & E, size_t iat, size_t ixc, size_t nocc, std::vector<double> q) {
   // Get wanted quadrature info
-  int Nrad=set.get_int("XRSNrad");
-  int Lmax=set.get_int("XRSLmax");
-  int Lquad=set.get_int("XRSLquad");
+  int Nrad=settings.get_int("XRSNrad");
+  int Lmax=settings.get_int("XRSLmax");
+  int Lquad=settings.get_int("XRSLquad");
 
   if(Lquad<Lmax) {
     Lquad=Lmax;
@@ -668,7 +671,7 @@ void save_spectrum(const std::vector<spectrum_t> & sp, const char *fname="dipole
   fclose(out);
 }
 
-enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, uscf_t & sol, arma::vec & core) {
+enum loadresult load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol, arma::vec & core) {
   // Was the load a success?
   enum loadresult ok=LOAD_SUCC;
 
@@ -740,7 +743,7 @@ enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & 
   if(ok) {
     bool spin;
     chkpt.read("XRSSpin",spin);
-    if(spin!=set.get_bool("XRSSpin")) {
+    if(spin!=settings.get_bool("XRSSpin")) {
       //      fprintf(stderr,"Excited spin does not match.\n");
       ok=LOAD_FAIL;
     }
@@ -750,7 +753,7 @@ enum loadresult load(const BasisSet & basis, const Settings & set, Checkpoint & 
   if(ok) {
     std::string method;
     chkpt.read("XRSMethod",method);
-    if(stricmp(method,set.get_string("XRSMethod"))!=0) {
+    if(stricmp(method,settings.get_string("XRSMethod"))!=0) {
       ok=LOAD_DIFF;
       //      fprintf(stderr,"Calculation methods do not match.\n");
     }
@@ -807,44 +810,39 @@ int main_guarded(int argc, char **argv) {
   t.print_time();
 
   // Parse settings
-  Settings set;
-  set.add_scf_settings();
-  // Need to add DFT settings so that DFTDelta setting is available
-  set.add_dft_settings();
+  settings.add_scf_settings();
 
   // Change default log file
-  set.set_string("Logfile","erkale_xrs.log");
+  settings.set_string("Logfile","erkale_xrs.log");
 
   // Use convergence settings similar to StoBe. XCH calculations
   // are hard to converge to the otherwise default settings.
-  set.set_double("ConvThr",1e-5);
-  set.set_double("DFTDelta",100);
+  settings.set_double("ConvThr",1e-5);
+  settings.set_double("DFTDelta",100);
 
   // Add xrs specific settings
-  set.add_string("LoadChk","Initialize with ground state calculation from file","");
-  set.add_string("SaveChk","Try initializing with and save results to file","erkale_xrs.chk");
-  set.add_string("AugChk","Save augmented calculation to file (if applicable)","erkale_xrs_aug.chk");
+  settings.add_string("LoadChk","Initialize with ground state calculation from file","");
+  settings.add_string("SaveChk","Try initializing with and save results to file","erkale_xrs.chk");
+  settings.add_string("AugChk","Save augmented calculation to file (if applicable)","erkale_xrs_aug.chk");
 
-  set.add_string("XRSDoubleBasis","The augmentation basis to use for double-basis set calculations","X-AUTO");
+  settings.add_string("XRSDoubleBasis","The augmentation basis to use for double-basis set calculations","X-AUTO");
 
-  set.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false);
-  set.add_string("XRSInitialState","Initial atomic state to excite","1s");
-  set.add_int("XRSInitialOrbital","Index of orbital in state to excite", 1);
-  set.add_string("XRSMethod", "Which kind of calculation to perform: TP, XCH or FCH","TP");
+  settings.add_bool("XRSSpin","Spin to excite (false for alpha, true for beta)",false);
+  settings.add_string("XRSInitialState","Initial atomic state to excite","1s");
+  settings.add_int("XRSInitialOrbital","Index of orbital in state to excite", 1);
+  settings.add_string("XRSMethod", "Which kind of calculation to perform: TP, XCH or FCH","TP");
+  settings.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3:5,10","");
+  settings.add_string("XRSQval","List or range of Q values to compute","");
+  settings.add_string("XRSQMethod","Method of computing momentum transfer matrix: Local, Fourier or Series","Fourier");
 
-  set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3:5,10","");
+  settings.add_int("XRSNrad","Local: how many point to use in radial integration",200);
+  settings.add_int("XRSLmax","Local: expand orbitals up to Lmax",5);
+  settings.add_int("XRSLquad","Local: perform angular expansion using quadrature of Lquad order",30);
 
-  set.add_string("XRSQval","List or range of Q values to compute","");
-  set.add_string("XRSQMethod","Method of computing momentum transfer matrix: Local, Fourier or Series","Fourier");
-
-  set.add_int("XRSNrad","Local: how many point to use in radial integration",200);
-  set.add_int("XRSLmax","Local: expand orbitals up to Lmax",5);
-  set.add_int("XRSLquad","Local: perform angular expansion using quadrature of Lquad order",30);
-
-  set.parse(std::string(argv[1]),true);
+  settings.parse(std::string(argv[1]),true);
 
   // Redirect output?
-  std::string logfile=set.get_string("Logfile");
+  std::string logfile=settings.get_string("Logfile");
   if(stricmp(logfile,"stdout")!=0) {
     // Redirect stdout to file
     FILE *outstream=freopen(logfile.c_str(),"w",stdout);
@@ -859,28 +857,28 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Get used settings
-  const bool verbose=set.get_bool("Verbose");
-  const bool spin=set.get_bool("XRSSpin");
+  const bool verbose=settings.get_bool("Verbose");
+  const bool spin=settings.get_bool("XRSSpin");
 
   // Parse method
-  enum xrs_method method=parse_method(set.get_string("XRSMethod"));
+  enum xrs_method method=parse_method(settings.get_string("XRSMethod"));
 
   // Print out settings
   if(verbose)
-    set.print();
+    settings.print();
 
   // Read in atoms.
   std::vector<atom_t> atoms;
-  std::string atomfile=set.get_string("System");
+  std::string atomfile=settings.get_string("System");
   if(file_exists(atomfile))
-    atoms=load_xyz(atomfile,!set.get_bool("InputBohr"));
+    atoms=load_xyz(atomfile,!settings.get_bool("InputBohr"));
   else {
     // Check if a directory has been set
     char * libloc=getenv("ERKALE_SYSDIR");
     if(libloc) {
       std::string filename=std::string(libloc)+"/"+atomfile;
       if(file_exists(filename))
-	atoms=load_xyz(filename,!set.get_bool("InputBohr"));
+	atoms=load_xyz(filename,!settings.get_bool("InputBohr"));
       else
 	throw std::runtime_error("Unable to open xyz input file!\n");
     } else
@@ -892,22 +890,22 @@ int main_guarded(int argc, char **argv) {
 
   // Read in basis set
   BasisSetLibrary baslib;
-  std::string basfile=set.get_string("Basis");
+  std::string basfile=settings.get_string("Basis");
   baslib.load_basis(basfile);
 
   // Construct basis set
   BasisSet basis;
-  construct_basis(basis,atoms,baslib,set);
+  construct_basis(basis,atoms,baslib);
 
   // Get exchange and correlation functionals and grid settings
-  dft_t dft_init(parse_dft(set,true));
-  dft_t dft(parse_dft(set,false));
+  dft_t dft_init(parse_dft(true));
+  dft_t dft(parse_dft(false));
 
   // Final convergence settings
-  double convthr(set.get_double("ConvThr"));
+  double convthr(settings.get_double("ConvThr"));
 
   // Make initialization parameters more relaxed
-  double initfac=set.get_double("DFTDelta");
+  double initfac=settings.get_double("DFTDelta");
   double init_convthr(convthr*initfac);
 
   // TP solution
@@ -919,23 +917,23 @@ int main_guarded(int argc, char **argv) {
 
   // Number of occupied states
   int nocca, noccb;
-  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),nocca,noccb);
+  get_Nel_alpha_beta(basis.Ztot()-settings.get_int("Charge"),settings.get_int("Multiplicity"),nocca,noccb);
 
   // Ground state energy
   energy_t gsen;
   bool didgs=false;
 
   // Initial state
-  std::string state=set.get_string("XRSInitialState");
+  std::string state=settings.get_string("XRSInitialState");
   // Initial orbital
-  int iorb=set.get_int("XRSInitialOrbital")-1;
+  int iorb=settings.get_int("XRSInitialOrbital")-1;
 
   // Try to load orbitals and energies
   arma::vec core;
   enum loadresult loadok=LOAD_FAIL;
-  if(file_exists(set.get_string("SaveChk"))) {
-    Checkpoint testload(set.get_string("SaveChk"),false);
-    loadok=load(basis,set,testload,sol,core);
+  if(file_exists(settings.get_string("SaveChk"))) {
+    Checkpoint testload(settings.get_string("SaveChk"),false);
+    loadok=load(basis,testload,sol,core);
 
     if(loadok==LOAD_SUCC)
       fprintf(stderr,"Loaded converged calculation from checkpoint file.\n");
@@ -957,23 +955,23 @@ int main_guarded(int argc, char **argv) {
   if(loadok==LOAD_DIFF || loadok==LOAD_FAIL) {
 
     // Create checkpoint
-    Checkpoint chkpt(set.get_string("SaveChk"),true);
+    Checkpoint chkpt(settings.get_string("SaveChk"),true);
     chkpt.write(basis);
-    chkpt.write("XRSSpin",set.get_bool("XRSSpin"));
-    chkpt.write("XRSMethod",set.get_string("XRSMethod"));
+    chkpt.write("XRSSpin",settings.get_bool("XRSSpin"));
+    chkpt.write("XRSMethod",settings.get_string("XRSMethod"));
 
     // Index of core orbital
     int icore=-1;
 
     // Initialize calculation with ground state if necessary
     if(loadok==LOAD_FAIL) {
-      if(set.get_string("LoadChk").size()==0)
+      if(settings.get_string("LoadChk").size()==0)
 	throw std::runtime_error("Need a ground-state calculation in LoadChk to do calculation!\n");
 
-      printf("Initializing with ground-state calculation from %s.\n",set.get_string("LoadChk").c_str());
+      printf("Initializing with ground-state calculation from %s.\n",settings.get_string("LoadChk").c_str());
 
       // Read checkpoint file
-      Checkpoint load(set.get_string("LoadChk"),false);
+      Checkpoint load(settings.get_string("LoadChk"),false);
 
       // Restricted calculation?
       bool restr;
@@ -1045,7 +1043,7 @@ int main_guarded(int argc, char **argv) {
     }
 
     // Proceed with TP calculation. Initialize solver
-    XRSSCF solver(basis,set,chkpt,spin);
+    XRSSCF solver(basis,chkpt,spin);
 
     // Set initial state core orbital
     if(loadok==LOAD_FAIL) { // LOAD_FAIL
@@ -1113,8 +1111,8 @@ int main_guarded(int argc, char **argv) {
   arma::mat C_aug;
   arma::vec E_aug;
 
-  if(stricmp(set.get_string("XRSAugment"),"")!=0)
-    augmented_solution(basis,set,sol,nocca,noccb,dft,augbas,C_aug,E_aug,spin,method);
+  if(stricmp(settings.get_string("XRSAugment"),"")!=0)
+    augmented_solution(basis,sol,nocca,noccb,dft,augbas,C_aug,E_aug,spin,method);
   else {
     // No augmentation necessary, just copy the solutions
     augbas=basis;
@@ -1141,7 +1139,7 @@ int main_guarded(int argc, char **argv) {
   save_spectrum(sp);
 
   // Get values of q to compute for
-  std::vector<double> qvals=parse_range_double(set.get_string("XRSQval"));
+  std::vector<double> qvals=parse_range_double(settings.get_string("XRSQval"));
 
   // The q-dependent spectra
   std::vector< std::vector<spectrum_t> > qsp;
@@ -1150,20 +1148,20 @@ int main_guarded(int argc, char **argv) {
 
   if(qvals.size()) {
     // Series method
-    if(stricmp(set.get_string("XRSQMethod"),"Series")==0) {
+    if(stricmp(settings.get_string("XRSQMethod"),"Series")==0) {
       qsp=compute_qdep_transitions_series(augbas,C_aug,E_aug,xcorb,nocc,qvals);
       spname="trans_ser";
     }
 
     // Fourier method
-    if(stricmp(set.get_string("XRSQMethod"),"Fourier")==0) {
+    if(stricmp(settings.get_string("XRSQMethod"),"Fourier")==0) {
       qsp=compute_qdep_transitions_fourier(augbas,C_aug,E_aug,xcorb,nocc,qvals);
       spname="trans_four";
     }
 
     // Local method (Sakko et al)
-    if(stricmp(set.get_string("XRSQMethod"),"Local")==0) {
-      qsp=compute_qdep_transitions_local(augbas,set,C_aug,E_aug,xcatom,xcorb,nocc,qvals);
+    if(stricmp(settings.get_string("XRSQMethod"),"Local")==0) {
+      qsp=compute_qdep_transitions_local(augbas,C_aug,E_aug,xcatom,xcorb,nocc,qvals);
       spname="trans_loc";
     }
 

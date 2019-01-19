@@ -31,6 +31,8 @@
 #include "../version.h"
 #endif
 
+Settings settings;
+
 int main(int argc, char **argv) {
 
 #ifdef _OPENMP
@@ -53,18 +55,17 @@ int main(int argc, char **argv) {
   Timer t;
 
   // Parse settings
-  Settings set;
-  set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
-  set.add_string("Method","Functional to dump data for","mgga_x_tpss");
-  set.add_double("GridTol","DFT grid tolerance to use",1e-3);
-  set.add_string("DFTGrid","DFT grid to use","Auto");
+  settings.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
+  settings.add_string("Method","Functional to dump data for","mgga_x_tpss");
+  settings.add_double("GridTol","DFT grid tolerance to use",1e-3);
+  settings.add_string("DFTGrid","DFT grid to use","Auto");
   if(argc==2)
-    set.parse(argv[1]);
+    settings.parse(argv[1]);
   else printf("Using default settings.\n\n");
-  set.print();
+  settings.print();
 
   // Load checkpoint
-  Checkpoint chkpt(set.get_string("LoadChk"),false);
+  Checkpoint chkpt(settings.get_string("LoadChk"),false);
 
   // Load basis set
   BasisSet basis;
@@ -80,7 +81,7 @@ int main(int argc, char **argv) {
 
   // Functional id
   int x_func, c_func;
-  parse_xc_func(x_func,c_func,set.get_string("Method"));
+  parse_xc_func(x_func,c_func,settings.get_string("Method"));
 
   // DFT grid, verbose operation
   DFTGrid grid(&basis,true);
@@ -91,10 +92,10 @@ int main(int argc, char **argv) {
   double gridtol;
 
   // Determine grid
-  std::string dftgrid=set.get_string("DFTGrid");
+  std::string dftgrid=settings.get_string("DFTGrid");
   if(stricmp(dftgrid,"Auto")==0) {
     adaptive=true;
-    gridtol=set.get_double("GridTol");
+    gridtol=settings.get_double("GridTol");
   } else {
     adaptive=false;
     std::vector<std::string> gridsize=splitline(dftgrid);

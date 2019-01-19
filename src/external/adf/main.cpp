@@ -17,6 +17,7 @@
 #include "../../emd/emd_sto.h"
 #include "../../mathf.h"
 #include "../../stringutil.h"
+#include "../../settings.h"
 #include "../../lmgrid.h"
 #include "../../timer.h"
 #include "../storage.h"
@@ -334,6 +335,8 @@ arma::mat form_density() {
 
   return P;
 }
+
+Settings settings;
 
 int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP

@@ -1,6 +1,9 @@
 #include "../eriworker.h"
 #include "../integrals.h"
 #include "../checkpoint.h"
+#include "../settings.h"
+
+Settings settings;
 
 int main(int argc, char **argv) {
   if(argc!=2) {

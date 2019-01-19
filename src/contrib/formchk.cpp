@@ -37,6 +37,8 @@
 #include "../version.h"
 #endif
 
+Settings settings;
+
 int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - Checkpoints from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
@@ -61,24 +63,23 @@ int main_guarded(int argc, char **argv) {
   Timer t;
 
   // Parse settings
-  Settings set;
-  set.add_string("LoadChk","Checkpoint file that contains basis set etc","erkale.chk");
-  set.add_string("SaveChk","Checkpoint to which orbitals are saved","chkpt.chk");
-  set.add_string("Model","Model from which orbitals are","");
-  set.add_bool("Binary","Use binary I/O?",true);
-  set.add_string("Deleted","Add in deleted orbitals from file","");
-  set.add_bool("NO","Are these natural orbitals?",false);
+  settings.add_string("LoadChk","Checkpoint file that contains basis set etc","erkale.chk");
+  settings.add_string("SaveChk","Checkpoint to which orbitals are saved","chkpt.chk");
+  settings.add_string("Model","Model from which orbitals are","");
+  settings.add_bool("Binary","Use binary I/O?",true);
+  settings.add_string("Deleted","Add in deleted orbitals from file","");
+  settings.add_bool("NO","Are these natural orbitals?",false);
 
-  set.parse(argv[1]);
-  set.print();
+  settings.parse(argv[1]);
+  settings.print();
 
   // Load checkpoint
-  std::string loadchk(set.get_string("LoadChk"));
-  std::string savechk(set.get_string("SaveChk"));
-  std::string model(set.get_string("Model"));
-  std::string del(set.get_string("Deleted"));
-  bool binary(set.get_bool("Binary"));
-  bool NO(set.get_bool("NO"));
+  std::string loadchk(settings.get_string("LoadChk"));
+  std::string savechk(settings.get_string("SaveChk"));
+  std::string model(settings.get_string("Model"));
+  std::string del(settings.get_string("Deleted"));
+  bool binary(settings.get_bool("Binary"));
+  bool NO(settings.get_bool("NO"));
 
   if(savechk.size()) {
     // Copy checkpoint data

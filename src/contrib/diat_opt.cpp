@@ -167,14 +167,14 @@ void get_system(std::vector<nucleus_t> & nuclei, std::vector<ElementBasisSet> & 
   }
 }
 
-void construct_basis(BasisSet & basis, const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set) {
+void construct_basis(BasisSet & basis, const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs) {
   // Get the system
   std::vector<nucleus_t> nuclei;
   std::vector<ElementBasisSet> els;
   get_system(nuclei, els, sys, funcs);
 
   // Construct basis set
-  basis=BasisSet(nuclei.size(),set);
+  basis=BasisSet(nuclei.size());
   for(size_t i=0;i<els.size();i++) {
     basis.add_nucleus(nuclei[i]);
     basis.add_shells(i,els[i],true); // sort, always pure functions
@@ -182,10 +182,13 @@ void construct_basis(BasisSet & basis, const dim_sys_t & sys, const std::vector<
   basis.finalize(true);
 }
 
-void get_config(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set, int & Q, int & M) {
+
+Settings settings;
+
+void get_config(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, int & Q, int & M) {
   // Get charge and multiplicity
-  Q=set.get_int("Charge");
-  M=set.get_int("Multiplicity");
+  Q=settings.get_int("Charge");
+  M=settings.get_int("Multiplicity");
 
   // Total number of electrons is
   int Nel=(sys.Z1+sys.Z2)-Q;
@@ -204,21 +207,22 @@ void get_config(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, cons
   }
 }
 
-double condition_number(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set) {
+double condition_number(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs) {
   // Get centers
   BasisSet basis;
-  construct_basis(basis,sys,funcs,set);
+  construct_basis(basis,sys,funcs);
   return arma::cond(basis.overlap());
 }
 
-double get_energy(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set0, int Q, int M, int useref) {
+double get_energy(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, int Q, int M, int useref) {
   // Get centers
   BasisSet basis;
-  Settings set(set0);
-  construct_basis(basis,sys,funcs,set);
 
-  set.set_bool("Verbose",false);
-  set.add_string("LoadChk","","");
+  Settings settings0(settings);
+  construct_basis(basis,sys,funcs);
+
+  settings.set_bool("Verbose",false);
+  settings.add_string("LoadChk","","");
 
   {
     std::ostringstream chk;
@@ -227,26 +231,26 @@ double get_energy(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, co
     chk << "_" << omp_get_thread_num();
 #endif
     chk << ".chk";
-    set.add_string("SaveChk","",chk.str());
+    settings.add_string("SaveChk","",chk.str());
   }
 
   if(useref==1) {
     // Load reference calculation
-    set.set_string("LoadChk","erkale_ref.chk");
+    settings.set_string("LoadChk","erkale_ref.chk");
   } else if(useref==-1) {
     // Save reference calculation
-    set.set_string("SaveChk","erkale_ref.chk");
+    settings.set_string("SaveChk","erkale_ref.chk");
   }
 
   // Set charge and multiplicity
-  set.set_int("Charge",Q);
-  set.set_int("Multiplicity",M);
+  settings.set_int("Charge",Q);
+  settings.set_int("Multiplicity",M);
 
   // Run the calculation
-  calculate(basis,set,false);
+  calculate(basis,false);
 
   // Load the result
-  Checkpoint chkpt(set.get_string("SaveChk"),false,false);
+  Checkpoint chkpt(settings.get_string("SaveChk"),false,false);
   energy_t en;
   chkpt.read(en);
 
@@ -255,7 +259,9 @@ double get_energy(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, co
 
   // Condition number penalty?
   if(sys.gamma!=0.0)
-    E+=sys.gamma*condition_number(sys,funcs,set);
+    E+=sys.gamma*condition_number(sys,funcs);
+
+  settings=settings0;
 
   return E;
 }
@@ -278,7 +284,7 @@ arma::vec collect(const std::vector<dim_bf_t> & funcs) {
   return ret;
 }
 
-arma::vec energy_gradient(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set, int Q, int M, int mval) {
+arma::vec energy_gradient(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, int Q, int M, int mval) {
   // Step size
   double ss(sqrt(DBL_EPSILON));
   // Collect params
@@ -303,8 +309,8 @@ arma::vec energy_gradient(const dim_sys_t & sys, const std::vector<dim_bf_t> & f
     xlh(i)-=ss;
     xrh(i)+=ss;
 
-    double ylh(get_energy(sys,interpret(xlh,funcs),set,Q,M,1));
-    double yrh(get_energy(sys,interpret(xrh,funcs),set,Q,M,1));
+    double ylh(get_energy(sys,interpret(xlh,funcs),Q,M,1));
+    double yrh(get_energy(sys,interpret(xrh,funcs),Q,M,1));
 
     g(i)=(yrh-ylh)/(2.0*ss);
   }
@@ -312,13 +318,13 @@ arma::vec energy_gradient(const dim_sys_t & sys, const std::vector<dim_bf_t> & f
   return g;
 }
 
-arma::mat energy_hessian(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set, int Q, int M, int mval) {
+arma::mat energy_hessian(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, int Q, int M, int mval) {
   // Step size
   double ss(sqrt(DBL_EPSILON));
   // Collect params
   arma::vec x(collect(funcs));
   // Current energy
-  double y0(get_energy(sys,interpret(x,funcs),set,Q,M,1));
+  double y0(get_energy(sys,interpret(x,funcs),Q,M,1));
 
   // Gradient
   arma::mat h;
@@ -344,10 +350,10 @@ arma::mat energy_hessian(const dim_sys_t & sys, const std::vector<dim_bf_t> & fu
       xjl(j)-=ss;
       xjr(j)+=ss;
 
-      double yil(get_energy(sys,interpret(xil,funcs),set,Q,M,1));
-      double yir(get_energy(sys,interpret(xir,funcs),set,Q,M,1));
-      double yjl(get_energy(sys,interpret(xjl,funcs),set,Q,M,1));
-      double yjr(get_energy(sys,interpret(xjr,funcs),set,Q,M,1));
+      double yil(get_energy(sys,interpret(xil,funcs),Q,M,1));
+      double yir(get_energy(sys,interpret(xir,funcs),Q,M,1));
+      double yjl(get_energy(sys,interpret(xjl,funcs),Q,M,1));
+      double yjr(get_energy(sys,interpret(xjr,funcs),Q,M,1));
 
       h(i,j) = h(j,i) = (yil + yir + yjl + yjr - 4.0*y0)/(ss*ss);
     }
@@ -356,19 +362,19 @@ arma::mat energy_hessian(const dim_sys_t & sys, const std::vector<dim_bf_t> & fu
   return h;
 }
 
-double optimize_energy(const dim_sys_t & sys, std::vector<dim_bf_t> & funcs, const Settings & set, int Q, int M, int mval=-1) {
+double optimize_energy(const dim_sys_t & sys, std::vector<dim_bf_t> & funcs, int Q, int M, int mval=-1) {
   // Current parameters
   arma::vec x(collect(funcs));
 
   // Get the initial energy
-  double E0(get_energy(sys,interpret(x,funcs),set,Q,M,-1));
+  double E0(get_energy(sys,interpret(x,funcs),Q,M,-1));
   // Current energy
   double E(E0);
 
   int iit;
   for(iit=0;iit<10;iit++) {
     // Evaluate gradient and diagonal hessian
-    arma::vec g=energy_gradient(sys,interpret(x,funcs),set,Q,M,mval);
+    arma::vec g=energy_gradient(sys,interpret(x,funcs),Q,M,mval);
 
     printf("Iteration %i gradient norm is %e.\n",iit,arma::norm(g,2));
 
@@ -380,12 +386,12 @@ double optimize_energy(const dim_sys_t & sys, std::vector<dim_bf_t> & funcs, con
     // Do line search
     std::vector<double> step, y;
     step.push_back(0.0);
-    y.push_back(get_energy(sys,interpret(x,funcs),set,Q,M,1));
+    y.push_back(get_energy(sys,interpret(x,funcs),Q,M,1));
     printf("\t%e % e\n",step[step.size()-1],y[y.size()-1]);
 
     double h0=sqrt(DBL_EPSILON);
     step.push_back(h0);
-    y.push_back(get_energy(sys,interpret(x+ss*step[step.size()-1],funcs),set,Q,M,1));
+    y.push_back(get_energy(sys,interpret(x+ss*step[step.size()-1],funcs),Q,M,1));
     printf("\t%e % e % e\n",step[step.size()-1],y[y.size()-1],y[y.size()-1]-y[y.size()-2]);
 
     if(y[1]>y[0]) {
@@ -395,7 +401,7 @@ double optimize_energy(const dim_sys_t & sys, std::vector<dim_bf_t> & funcs, con
 
     while(y[y.size()-1]<=y[y.size()-2]) {
       step.push_back(step[step.size()-1]*2);
-      y.push_back(get_energy(sys,interpret(x+ss*step[step.size()-1],funcs),set,Q,M,1));
+      y.push_back(get_energy(sys,interpret(x+ss*step[step.size()-1],funcs),Q,M,1));
       printf("\t%e % e % e\n",step[step.size()-1],y[y.size()-1],y[y.size()-1]-y[y.size()-2]);
     }
 
@@ -427,7 +433,7 @@ void add_function(const arma::vec & avals, arma::uword minai, arma::uword atom, 
   std::sort(funcs.begin(),funcs.end());
 }
 
-arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set, const arma::vec & avals, int Q, int M, int am, const arma::imat & allow, double E0=0.0, int useref=1) {
+arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const arma::vec & avals, int Q, int M, int am, const arma::imat & allow, double E0=0.0, int useref=1) {
   arma::mat ret(avals.n_elem,sys.ncen);
 
 #ifndef _HDF5_H
@@ -452,7 +458,7 @@ arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const
       std::vector<dim_bf_t> testfuncs(funcs);
       add_function(avals,ia,iz,am,testfuncs);
       try {
-        ret(ia,iz)=get_energy(sys,testfuncs,set,Q,M,useref)-E0;
+        ret(ia,iz)=get_energy(sys,testfuncs,Q,M,useref)-E0;
       } catch (std::runtime_error & err) {
         ret(ia,iz)=DBL_MAX;
       }
@@ -461,10 +467,10 @@ arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const
   return ret;
 }
 
-arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const Settings & set, const arma::vec & avals, int Q, int M, int am, double E0=0.0, int useref=1) {
+arma::mat scan(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs, const arma::vec & avals, int Q, int M, int am, double E0=0.0, int useref=1) {
   arma::imat allow(avals.n_elem,sys.ncen);
   allow.ones();
-  return scan(sys,funcs,set,avals,Q,M,am,allow,E0,useref);
+  return scan(sys,funcs,avals,Q,M,am,allow,E0,useref);
 }
 
 void save_basis(const dim_sys_t & sys, const std::vector<dim_bf_t> & funcs) {
@@ -523,7 +529,6 @@ void update_allowed(arma::imat & allowed, const arma::mat & Eam) {
         allowed(i,j)=false;
 }
 
-
 int main_guarded(int argc, char ** argv) {
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);
@@ -533,31 +538,30 @@ int main_guarded(int argc, char ** argv) {
   // Initialize libint
   init_libint_base();
 
-  Settings set;
-  set.add_scf_settings();
-  set.add_double("Tolerance","Convergence tolerance for addition of a function",1e-6);
-  set.add_bool("ForcePol","Force polarized calculation",false);
-  set.add_bool("Optimize","Run primitive energy optimization?",false);
-  set.add_int("MinLogExp","Minimum exponent value",-4);
-  set.add_int("MaxLogExp","Maximum exponent value",9);
-  set.add_int("NExp","Number of points on exponent grid",131);
-  set.add_int("NGeom","Number of points on geometry grid",3);
-  set.add_int("ScanOutdate","Redo scans every N new functions",4);
-  set.add_double("MapOutdate","Outdate scan maps when minimum increases by factor",10.0);
-  set.add_double("Gamma","Condition number penalizer",1e-3);
+  settings.add_scf_settings();
+  settings.add_double("Tolerance","Convergence tolerance for addition of a function",1e-6);
+  settings.add_bool("ForcePol","Force polarized calculation",false);
+  settings.add_bool("Optimize","Run primitive energy optimization?",false);
+  settings.add_int("MinLogExp","Minimum exponent value",-4);
+  settings.add_int("MaxLogExp","Maximum exponent value",9);
+  settings.add_int("NExp","Number of points on exponent grid",131);
+  settings.add_int("NGeom","Number of points on geometry grid",3);
+  settings.add_int("ScanOutdate","Redo scans every N new functions",4);
+  settings.add_double("MapOutdate","Outdate scan maps when minimum increases by factor",10.0);
+  settings.add_double("Gamma","Condition number penalizer",1e-3);
 
-  set.parse(std::string(argv[1]),true);
+  settings.parse(std::string(argv[1]),true);
   // Must use core guess
-  set.set_string("Guess","Core");
+  settings.set_string("Guess","Core");
   // Use dimer symmetry
-  set.set_bool("DimerSymmetry",true);
+  settings.set_bool("DimerSymmetry",true);
   // .. which requires setting
-  set.set_bool("OptLM",false);
+  settings.set_bool("OptLM",false);
   // No basis set rotation
-  set.set_bool("BasisRotate",false);
-  set.print();
+  settings.set_bool("BasisRotate",false);
+  settings.print();
 
-  std::vector<std::string> sysv(splitline(set.get_string("System")));
+  std::vector<std::string> sysv(splitline(settings.get_string("System")));
   if(sysv.size() != 3 && sysv.size() != 4) {
     throw std::logic_error("System specification invalid: format Z1 Z2 R (angstrom)\n");
   }
@@ -567,7 +571,7 @@ int main_guarded(int argc, char ** argv) {
   sys.Z1=readint(sysv[0]);
   sys.Z2=readint(sysv[1]);
   sys.R=readdouble(sysv[2]);
-  sys.gamma=set.get_double("Gamma");
+  sys.gamma=settings.get_double("Gamma");
   if(sysv.size()>3) {
     std::string spec(sysv[3]);
     if(stricmp(spec,"angstrom")==0)
@@ -580,17 +584,17 @@ int main_guarded(int argc, char ** argv) {
   else
     sys.ncen=2;
 
-  double thr(set.get_double("Tolerance"));
+  double thr(settings.get_double("Tolerance"));
 
   // Maximum and minimum exponent
-  const double mina(set.get_int("MinLogExp"));
-  const double maxa(set.get_int("MaxLogExp"));
+  const double mina(settings.get_int("MinLogExp"));
+  const double maxa(settings.get_int("MaxLogExp"));
   // Exponent grid
-  const int Nexp(set.get_int("NExp"));
+  const int Nexp(settings.get_int("NExp"));
 
-  int scanoutdate(set.get_int("ScanOutdate"));
-  double mapoutdatefac(set.get_double("MapOutdate"));
-  bool optimize(set.get_bool("Optimize"));
+  int scanoutdate(settings.get_int("ScanOutdate"));
+  double mapoutdatefac(settings.get_double("MapOutdate"));
+  bool optimize(settings.get_bool("Optimize"));
 
   if(sys.Z1 == 0 || sys.Z2 == 0)
     printf("Optimizing basis set for %s atom\n",element_symbols[std::max(sys.Z1,sys.Z2)].c_str());
@@ -619,7 +623,7 @@ int main_guarded(int argc, char ** argv) {
   // Initialize basis
   while(true) {
     // Determine charge and multiplicity
-    get_config(sys,funcs,set,Q,M);
+    get_config(sys,funcs,Q,M);
     // Form checkpoint
     printf("Running now for state Q=%+i M=%i\n",Q,M);
     fflush(stdout);
@@ -634,7 +638,7 @@ int main_guarded(int argc, char ** argv) {
     for(int am=0;am<nam;am++) {
       // We don't have a reference because we don't have an old basis that's big enough
       Timer tam;
-      arma::mat Eam=scan(sys,funcs,set,avals,Q,M,am,E0,0);
+      arma::mat Eam=scan(sys,funcs,avals,Q,M,am,E0,0);
 
       std::ostringstream oss;
       oss << "Egrid_" << shell_types[am] << "_" << funcs.size() << ".dat";
@@ -651,16 +655,16 @@ int main_guarded(int argc, char ** argv) {
     dE=Egrid.min(minai,mincen,minam);
     add_function(avals,minai,mincen,minam,funcs);
 
-    printf("Added %c function at index %i with exponent % e, energy % .10e changed by % e. nbf = %i, K = %e\n",shell_types[minam],(int) mincen,std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs),condition_number(sys,funcs,set));
+    printf("Added %c function at index %i with exponent % e, energy % .10e changed by % e. nbf = %i, K = %e\n",shell_types[minam],(int) mincen,std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs),condition_number(sys,funcs));
 
     // Do we have a minimal basis now?
-    if(Q==set.get_int("Charge") && M==set.get_int("Multiplicity"))
+    if(Q==settings.get_int("Charge") && M==settings.get_int("Multiplicity"))
       break;
   }
 
   // Current energy
-  E0=get_energy(sys,funcs,set,Q,M,-1);
-  printf("Calculation initialized, initial energy without penalty is % .16e\n\n",E0-sys.gamma*condition_number(sys,funcs,set));
+  E0=get_energy(sys,funcs,Q,M,-1);
+  printf("Calculation initialized, initial energy without penalty is % .16e\n\n",E0-sys.gamma*condition_number(sys,funcs));
   fflush(stdout);
 
   while(true) {
@@ -703,7 +707,7 @@ int main_guarded(int argc, char ** argv) {
 
         if(calcam) {
           Timer tam;
-          arma::mat Eam(scan(sys,funcs,set,avals,Q,M,am,allowed.slice(am),E0));
+          arma::mat Eam(scan(sys,funcs,avals,Q,M,am,allowed.slice(am),E0));
 
           std::ostringstream oss;
           oss << "Egrid_" << shell_types[am] << "_" << funcs.size() << ".dat";
@@ -740,7 +744,7 @@ int main_guarded(int argc, char ** argv) {
 
         // Update minimum value
         Timer tam;
-        arma::mat Eam(scan(sys,funcs,set,avals,Q,M,minam,allowed.slice(minam),E0));
+        arma::mat Eam(scan(sys,funcs,avals,Q,M,minam,allowed.slice(minam),E0));
 
         std::ostringstream oss;
         oss << "Egrid_" << shell_types[minam] << "_" << funcs.size() << ".dat";
@@ -768,11 +772,11 @@ int main_guarded(int argc, char ** argv) {
       for(size_t i=0;i<outdated.size();i++)
         outdated[i]++;
 
-      printf("Added %c function at %i with exponent % e, energy % .10e changed by % e. nbf = %i, K = %e\n",shell_types[minam],(int) mincen,std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs),condition_number(sys,funcs,set));
+      printf("Added %c function at %i with exponent % e, energy % .10e changed by % e. nbf = %i, K = %e\n",shell_types[minam],(int) mincen,std::pow(10.0,avals(minai)),E0+dE,dE,nbf(funcs),condition_number(sys,funcs));
       fflush(stdout);
 
       // Update reference
-      double Enew=get_energy(sys,funcs,set,Q,M,-1);
+      double Enew=get_energy(sys,funcs,Q,M,-1);
       double Eold=E0+dE;
       if(std::abs(Enew-Eold)>=1e-7)
         printf("Energy doesn't match: new E0=%e, old E0=%e, difference %e!\n",Enew,Eold,Enew-Eold);
@@ -798,11 +802,11 @@ int main_guarded(int argc, char ** argv) {
 
   // Run energy optimization?
   if(optimize) {
-    printf("Energy before primitive optimization is % .16e\n",get_energy(sys,funcs,set,Q,M,0));
-    optimize_energy(sys,funcs,set,Q,M);
+    printf("Energy before primitive optimization is % .16e\n",get_energy(sys,funcs,Q,M,0));
+    optimize_energy(sys,funcs,Q,M);
   }
 
-  printf("Converged. Final energy without penalty is % .16e\n",get_energy(sys,funcs,set,Q,M,0)-sys.gamma*condition_number(sys,funcs,set));
+  printf("Converged. Final energy without penalty is % .16e\n",get_energy(sys,funcs,Q,M,0)-sys.gamma*condition_number(sys,funcs));
 
   return 0;
 }

@@ -106,9 +106,6 @@
 // Tolerance when screening is only wrt absolute value of integrals
 #define STRICTTOL 1e-16
 
-// Threshold for linear independence
-#define LINTHRES 1e-5
-
 // Shorthands
 #define COMPLEX1 std::complex<double>(1.0,0.0)
 #define COMPLEXI std::complex<double>(0.0,1.0)

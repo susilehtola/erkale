@@ -28,6 +28,7 @@
 #include "localization.h"
 #include "mathf.h"
 #include "properties.h"
+#include "settings.h"
 #include "stringutil.h"
 #include "stockholder.h"
 #include "timer.h"
@@ -853,6 +854,8 @@ static std::string pipek_filename(size_t iat) {
   return oss.str();
 }
 
+extern Settings settings;
+
 Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, const arma::mat & P, double pv, bool ver, bool delocalize) : UnitaryFunction(2*pv,!delocalize) {
   // Store used method
   chg=chgv;
@@ -1018,7 +1021,7 @@ Pipek::Pipek(enum chgmet chgv, const BasisSet & basis, const arma::mat & C, cons
     arma::mat S(basis.overlap());
     // Get S^1/2 (and S^-1/2)
     arma::mat Sh, Sinvh;
-    S_half_invhalf(S,Sh,Sinvh);
+    S_half_invhalf(S,Sh,Sinvh,settings.get_double("LinDepThresh"));
 
     // Get shells
     for(size_t iat=0;iat<N;iat++) {

@@ -38,6 +38,8 @@
 #include "../version.h"
 #endif
 
+Settings settings;
+
 arma::vec sano_energies(const arma::mat & Co, const arma::mat & Cv, const arma::mat & R, const arma::mat & Bph) {
   if(Co.n_rows != Cv.n_rows)
     throw std::runtime_error("Orbital matrices not consistent!\n");
@@ -122,14 +124,14 @@ arma::mat sano_guess_orig(const arma::mat & Co, const arma::mat & Cv, const arma
   //Sval.t().print("Eigenvalues");
 
   eigenvalue=arma::min(Sval);
-  if(eigenvalue<LINTHRES) {
+  if(eigenvalue<settings.get_double("LinDepThresh")) {
     throw std::runtime_error("Sano virtuals are linearly dependent.\n");
   }
 
   // Calculate reciprocal square root
   arma::vec Sinvh(Sval);
   for(size_t i=0;i<Sinvh.n_elem;i++)
-    Sinvh(i) = (Sinvh(i)>=LINTHRES) ? 1.0/sqrt(Sinvh(i)) : 0.0;
+    Sinvh(i) = (Sinvh(i)>=settings.get_double("LinDepThresh")) ? 1.0/sqrt(Sinvh(i)) : 0.0;
 
   // Orthonormalizing matrix is
   arma::mat O(Svec*arma::diagmat(Sinvh)*arma::trans(Svec));
@@ -470,48 +472,47 @@ int main_guarded(int argc, char **argv) {
   Timer t;
 
   // Parse settings
-  Settings set;
-  set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
-  set.add_string("SaveChk","Checkpoint file to save data to","");
-  set.add_bool("DensityFitting","Use density fitting instead of Cholesky?",false);
-  set.add_string("FittingBasis","Fitting basis to use","");
-  set.add_double("FittingThr","Linear dependency threshold for fitting basis",1e-7);
-  set.add_double("CholeskyThr","Cholesky threshold to use",1e-7);
-  set.add_double("CholeskyShThr","Cholesky shell threshold to use",0.01);
-  set.add_double("IntegralThresh","Integral threshold",1e-10);
-  set.add_int("CholeskyMode","Cholesky mode",0,true);
-  set.add_bool("CholeskyInCore","Use more memory for Cholesky?",true);
-  set.add_bool("Localize","Localize orbitals?",false);
-  set.add_string("LocGroups","List of groups to localize","");
-  set.add_string("LocMethod","Localization method to use","IAO2");
-  set.add_bool("Binary","Use binary I/O?",true);
-  set.add_bool("Sano","Run Sano guess for virtual orbitals?",true);
-  set.add_int("Seed","Random seed",0);
-  set.add_string("DropVirt","Drop sigma/pi virtuals on x/y/z axis, e.g. pi z","");
+  settings.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
+  settings.add_string("SaveChk","Checkpoint file to save data to","");
+  settings.add_bool("DensityFitting","Use density fitting instead of Cholesky?",false);
+  settings.add_string("FittingBasis","Fitting basis to use","");
+  settings.add_double("FittingThr","Linear dependency threshold for fitting basis",1e-7);
+  settings.add_double("CholeskyThr","Cholesky threshold to use",1e-7);
+  settings.add_double("CholeskyShThr","Cholesky shell threshold to use",0.01);
+  settings.add_double("IntegralThresh","Integral threshold",1e-10);
+  settings.add_int("CholeskyMode","Cholesky mode",0,true);
+  settings.add_bool("CholeskyInCore","Use more memory for Cholesky?",true);
+  settings.add_bool("Localize","Localize orbitals?",false);
+  settings.add_string("LocGroups","List of groups to localize","");
+  settings.add_string("LocMethod","Localization method to use","IAO2");
+  settings.add_bool("Binary","Use binary I/O?",true);
+  settings.add_bool("Sano","Run Sano guess for virtual orbitals?",true);
+  settings.add_int("Seed","Random seed",0);
+  settings.add_string("DropVirt","Drop sigma/pi virtuals on x/y/z axis, e.g. pi z","");
 
   if(argc==2)
-    set.parse(argv[1]);
+    settings.parse(argv[1]);
   else printf("Using default settings.\n\n");
 
-  set.print();
+  settings.print();
 
   // Load checkpoint
-  std::string loadchk(set.get_string("LoadChk"));
-  std::string savechk(set.get_string("SaveChk"));
-  bool densityfit=set.get_bool("DensityFitting");
-  std::string fittingbasis=set.get_string("FittingBasis");
-  double fitthr=set.get_double("FittingThr");
-  double intthr=set.get_double("IntegralThresh");
-  int cholmode=set.get_int("CholeskyMode");
-  double cholthr=set.get_double("CholeskyThr");
-  double cholshthr=set.get_double("CholeskyShThr");
-  bool cholincore=set.get_bool("CholeskyInCore");
-  bool binary=set.get_bool("Binary");
-  bool loc=set.get_bool("Localize");
-  enum locmet locmethod(parse_locmet(set.get_string("LocMethod")));
-  bool sano=set.get_bool("Sano");
-  int seed=set.get_int("Seed");
-  std::string dropvirt=set.get_string("DropVirt");
+  std::string loadchk(settings.get_string("LoadChk"));
+  std::string savechk(settings.get_string("SaveChk"));
+  bool densityfit=settings.get_bool("DensityFitting");
+  std::string fittingbasis=settings.get_string("FittingBasis");
+  double fitthr=settings.get_double("FittingThr");
+  double intthr=settings.get_double("IntegralThresh");
+  int cholmode=settings.get_int("CholeskyMode");
+  double cholthr=settings.get_double("CholeskyThr");
+  double cholshthr=settings.get_double("CholeskyShThr");
+  bool cholincore=settings.get_bool("CholeskyInCore");
+  bool binary=settings.get_bool("Binary");
+  bool loc=settings.get_bool("Localize");
+  enum locmet locmethod(parse_locmet(settings.get_string("LocMethod")));
+  bool sano=settings.get_bool("Sano");
+  int seed=settings.get_int("Seed");
+  std::string dropvirt=settings.get_string("DropVirt");
 
   if(savechk.size()) {
     // Copy checkpoint data
@@ -552,16 +553,19 @@ int main_guarded(int argc, char **argv) {
     fitlib.load_basis(fittingbasis);
 
     // Dummy settings
-    Settings basset;
-    basset.add_string("Decontract","","");
-    basset.add_bool("BasisRotate","",true);
-    basset.add_bool("UseLM","",true);
-    basset.add_double("BasisCutoff","",1e-8);
+    Settings settings0(settings);
+    settings=Settings();
+    settings.add_string("Decontract","","");
+    settings.add_bool("BasisRotate","",true);
+    settings.add_bool("UseLM","",true);
+    settings.add_double("BasisCutoff","",1e-8);
 
     // Construct fitting basis
     BasisSet dfitbas;
-    construct_basis(dfitbas,basis.get_nuclei(),fitlib,basset);
+    construct_basis(dfitbas,basis.get_nuclei(),fitlib);
     printf("Auxiliary basis set has %i functions.\n",(int) dfitbas.get_Nbf());
+
+    settings=settings0;
 
     // Calculate fitting integrals. In-core, with RI-K
     dfit.fill(basis,dfitbas,false,intthr,fitthr,true);

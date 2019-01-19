@@ -405,6 +405,8 @@ void print_header() {
   print_hostname();
 }
 
+Settings settings;
+
 int main_guarded(int argc, char **argv) {
   print_header();
 
@@ -416,42 +418,41 @@ int main_guarded(int argc, char **argv) {
   // Initialize libint
   init_libint_base();
 
-  Settings set;
-  set.add_string("LoadChk","Checkpoint to load","erkale.chk");
-  set.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
-  set.add_string("Method","Localization method: FB, FB2, FM, FM2, MU, MU2, LO, LO2, BA, BA2, BE, BE2, HI, HI2, IHI, IHI2, IAO, IAO2, ST, ST2, VO, VO2, ER","FB");
-  set.add_bool("Virtual","Localize virtual orbitals as well?",false);
-  set.add_string("Logfile","File to store output in","");
-  set.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR, CGHS","CGPR");
-  set.add_string("LineSearch","Line search to use: poly_df, poly_f, poly_fdf, armijo, fourier_df","poly_df");
-  set.add_string("StartingPoint","Starting point to use: CAN, NAT, CHOL, ORTH, UNIT?","ORTH");
-  set.add_bool("Delocalize","Run delocalization instead of localization",false);
-  set.add_string("SizeDistribution","File to save orbital size distribution in","");
-  set.add_double("GThreshold","Threshold for convergence: norm of Riemannian gradient",1e-7);
-  set.add_double("FThreshold","Threshold for convergence: absolute change in function",DBL_MAX);
-  set.add_int("Maxiter","Maximum number of iterations",50000);
-  set.add_int("Seed","Random number seed",0);
-  set.add_bool("Debug","Print out line search every iteration",false);
-  set.parse(argv[1]);
-  set.print();
+  settings.add_string("LoadChk","Checkpoint to load","erkale.chk");
+  settings.add_string("SaveChk","Checkpoint to save results to","erkale.chk");
+  settings.add_string("Method","Localization method: FB, FB2, FM, FM2, MU, MU2, LO, LO2, BA, BA2, BE, BE2, HI, HI2, IHI, IHI2, IAO, IAO2, ST, ST2, VO, VO2, ER","FB");
+  settings.add_bool("Virtual","Localize virtual orbitals as well?",false);
+  settings.add_string("Logfile","File to store output in","");
+  settings.add_string("Accelerator","Accelerator to use: SDSA, CGPR, CGFR, CGHS","CGPR");
+  settings.add_string("LineSearch","Line search to use: poly_df, poly_f, poly_fdf, armijo, fourier_df","poly_df");
+  settings.add_string("StartingPoint","Starting point to use: CAN, NAT, CHOL, ORTH, UNIT?","ORTH");
+  settings.add_bool("Delocalize","Run delocalization instead of localization",false);
+  settings.add_string("SizeDistribution","File to save orbital size distribution in","");
+  settings.add_double("GThreshold","Threshold for convergence: norm of Riemannian gradient",1e-7);
+  settings.add_double("FThreshold","Threshold for convergence: absolute change in function",DBL_MAX);
+  settings.add_int("Maxiter","Maximum number of iterations",50000);
+  settings.add_int("Seed","Random number seed",0);
+  settings.add_bool("Debug","Print out line search every iteration",false);
+  settings.parse(argv[1]);
+  settings.print();
 
   printf("Please read and cite the reference:\n%s\n%s\n%s\n\n", \
 	 "S. Lehtola and H. Jónsson",         \
 	 "Unitary Optimization of Localized Molecular Orbitals", \
 	 "J. Chem. Theory Comput. 9 (2013), pp. 5365 - 5372.");
 
-  std::string logfile=set.get_string("Logfile");
-  bool virt=set.get_bool("Virtual");
-  int seed=set.get_int("Seed");
+  std::string logfile=settings.get_string("Logfile");
+  bool virt=settings.get_bool("Virtual");
+  int seed=settings.get_int("Seed");
 
-  std::string loadname(set.get_string("LoadChk"));
-  std::string savename(set.get_string("SaveChk"));
-  std::string sizedist(set.get_string("SizeDistribution"));
+  std::string loadname(settings.get_string("LoadChk"));
+  std::string savename(settings.get_string("SaveChk"));
+  std::string sizedist(settings.get_string("SizeDistribution"));
   bool size=stricmp(sizedist,"");
-  bool debug=set.get_bool("Debug");
+  bool debug=settings.get_bool("Debug");
 
   // Determine method
-  enum locmet method(parse_locmet(set.get_string("Method")));
+  enum locmet method(parse_locmet(settings.get_string("Method")));
 
   if(method>=PIPEK_MULLIKENH && method<=PIPEK_VORONOI4) {
     printf("Please read and cite the reference:\n%s\n%s\n%s\n\n",	\
@@ -462,7 +463,7 @@ int main_guarded(int argc, char **argv) {
 
   // Determine accelerator
   enum unitacc acc;
-  std::string accs=set.get_string("Accelerator");
+  std::string accs=settings.get_string("Accelerator");
   if(stricmp(accs,"SDSA")==0)
     acc=SDSA;
   else if(stricmp(accs,"CGPR")==0)
@@ -475,7 +476,7 @@ int main_guarded(int argc, char **argv) {
 
   // Determine line search
   enum unitmethod umet;
-  std::string umets=set.get_string("LineSearch");
+  std::string umets=settings.get_string("LineSearch");
   if(stricmp(umets,"poly_df")==0)
     umet=POLY_DF;
   else if(stricmp(umets,"poly_f")==0)
@@ -498,12 +499,12 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Delocalize orbitals?
-  bool delocalize=set.get_bool("Delocalize");
+  bool delocalize=settings.get_bool("Delocalize");
   // Iteration count
-  int maxiter=set.get_int("Maxiter");
+  int maxiter=settings.get_int("Maxiter");
 
   // Starting point
-  std::string startp=set.get_string("StartingPoint");
+  std::string startp=settings.get_string("StartingPoint");
   enum startingpoint start;
   if(stricmp(startp,"CAN")==0)
     start=CANORB;
@@ -521,8 +522,8 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Convergence threshold
-  double Gthr=set.get_double("GThreshold");
-  double Fthr=set.get_double("FThreshold");
+  double Gthr=settings.get_double("GThreshold");
+  double Fthr=settings.get_double("FThreshold");
 
   // Open checkpoint in read-write mode, don't truncate
   Checkpoint chkpt(savename,true,false);

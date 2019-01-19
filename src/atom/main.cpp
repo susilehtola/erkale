@@ -22,6 +22,7 @@
 #include "../mathf.h"
 #include "../scf.h"
 #include "../timer.h"
+#include "../settings.h"
 #include "solvers.h"
 #include <armadillo>
 
@@ -142,6 +143,7 @@ void test() {
   printf("F (2s  2pz|2s  2pz) %.12f\n",ERI(F2s,F2pz,F2s,F2pz));
 }
 
+Settings settings;
 
 int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
@@ -159,16 +161,19 @@ int main_guarded(int argc, char **argv) {
   init_libint_base();
   //  test();
 
-  if(argc!=3) {
-    printf("Usage: %s Z basisfile\n",argv[0]);
-    printf("Basis set is read in in ADF format.\n");
+  settings.add_int("Z","Nucleus to study",0);
+  settings.add_string("Basis","Basis set file in ADF format","");
+  settings.add_double("LinDepThresh","Linear dependence threshold",1e-5);
+  if(argc!=2) {
+    printf("Usage: %s runfile\n",argv[0]);
+    settings.print();
     return 1;
   }
 
-  int Z=atoi(argv[1]);
+  int Z=settings.get_int("Z");
 
   // Construct basis set
-  std::vector<bf_t> basis=construct_basis(argv[2]);
+  std::vector<bf_t> basis=construct_basis(settings.get_string("Basis"));
 
   // Print out basis set
   printf("Basis set\n");

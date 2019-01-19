@@ -212,7 +212,7 @@ class BasisSet {
   /// Dummy constructor
   BasisSet();
   /// Construct basis set with Nat atoms, using given settings
-  BasisSet(size_t Nat, const Settings & set);
+  BasisSet(size_t Nat);
   /// Destructor
   ~BasisSet();
 
@@ -655,9 +655,9 @@ GaussianShell dummyshell();
 std::vector<size_t> i_idx(size_t N);
 
 /// Construct basis set from input
-void construct_basis(BasisSet & basis, const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set);
+void construct_basis(BasisSet & basis, const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib);
 /// Constuct basis set from input
-void construct_basis(BasisSet & basis, const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib, const Settings & set);
+void construct_basis(BasisSet & basis, const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib);
 
 /// Compute values of orbitals at given point
 arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r);
