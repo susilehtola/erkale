@@ -247,10 +247,10 @@ class SCF {
   /// Combine alpha and beta errors in unrestricted calcs?
   bool diiscomb;
 
-  /// Dimer calculation?
-  bool dimcalc;
-  /// Read orbital occupations for dimer calculations?
-  int readdimocc;
+  /// Calculation on linear molecule?
+  bool lincalc;
+  /// Read orbital occupations for calculations on linear molecules?
+  int readlinocc;
 
   /// Use ADIIS?
   bool useadiis;

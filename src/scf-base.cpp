@@ -87,11 +87,11 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   // GWH scaling constant
   Kgwh=set.get_double("Kgwh");
 
-  // Dimer calculation?
-  dimcalc=set.get_bool("DimerSymmetry");
-  readdimocc=set.get_int("DimerOccupations");
-  if(readdimocc<0)
-    readdimocc=INT_MAX;
+  // Linear molecule calculation?
+  lincalc=set.get_bool("LinearSymmetry");
+  readlinocc=set.get_int("LinearOccupations");
+  if(readlinocc<0)
+    readlinocc=INT_MAX;
 
   usediis=set.get_bool("UseDIIS");
   diisorder=set.get_int("DIISOrder");
@@ -232,7 +232,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     t.set();
   }
 
-  if(dimcalc) {
+  if(lincalc) {
     // Basis set m values
     arma::ivec mval(basisp->get_m_values());
 

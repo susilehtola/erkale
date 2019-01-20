@@ -1702,7 +1702,7 @@ arma::ivec BasisSet::get_m_values() const {
     // Angular momentum is
     int am(get_am(is));
     if(!lm_in_use(is))
-      throw std::logic_error("Set OptLM = false for dimer calculations!\n");
+      throw std::logic_error("Set OptLM = false for calculations using linear symmetry!\n");
 
     // First function on shell
     size_t i0(get_first_ind(is));
@@ -1720,7 +1720,7 @@ arma::uvec BasisSet::m_indices(int mwant) const {
     // Angular momentum is
     int am(get_am(is));
     if(!lm_in_use(is))
-      throw std::logic_error("Set OptLM = false for dimer calculations!\n");
+      throw std::logic_error("Set OptLM = false for calculations using linear symmetry!\n");
 
     // First function on shell
     size_t i0(get_first_ind(is));

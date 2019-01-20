@@ -61,8 +61,8 @@ void Settings::add_scf_settings() {
   add_bool("OptLM", "If spherical harmonics used, use cartesian s and p functions?", true);
 
   // Specialized dimer calculation?
-  add_bool("DimerSymmetry", "Do special calculation on dimer along z axis", false);
-  add_int("DimerOccupations", "Read in occupations for dimer calculations?", 0, true);
+  add_bool("LinearSymmetry", "Do special calculation on linear molecule along z axis", false);
+  add_int("LinearOccupations", "Read in occupations for linear molecule calculations?", 0, true);
 
   // Decontract basis set?
   add_string("Decontract","Indices of atoms to decontract basis set for","");

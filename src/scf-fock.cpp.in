@@ -831,12 +831,12 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #endif // end TP clause
   fflush(stdout);
 
-  if(dimcalc) {
+  if(lincalc) {
     // Check nuclei are on z axis
     std::vector<nucleus_t> nuclei(basisp->get_nuclei());
     for(size_t i=0;i<nuclei.size();i++)
       if(nuclei[i].r.x!=0.0 || nuclei[i].r.y!=0.0)
-        throw std::logic_error("Nuclei must be on z axis for dimer calculation!\n");
+        throw std::logic_error("Nuclei must be along z axis for calculation on linear molecules!\n");
 
     // Collect m values
     arma::ivec mvals(basisp->get_m_values());
