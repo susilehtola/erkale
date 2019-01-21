@@ -140,6 +140,14 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   ffull+=fxc+fx_short;
 #endif
 
+  if(lincalc) {
+    // Get rid of numerical noise for linear molecule restriction
+    for(size_t inuc=0;inuc<ffull.n_elem/3;inuc++) {
+      ffull(3*inuc)=0.0;
+      ffull(3*inuc+1)=0.0;
+    }
+  }
+
   //  interpret_force(fx_full).print("Coulomb + exact exchange");
   //  interpret_force(ftot).print("Total (w.o. 2-electron)");
   // interpret_force(ffull).t().print("Total force");
