@@ -58,7 +58,7 @@ void ERItable::get_range_separation(double & w, double & a, double & b) const {
 
 size_t ERItable::N_ints(const BasisSet * basp, double thr) {
   // Get ERI pairs
-  shpairs=basp->get_eripairs(screen, thr, omega, alpha, beta);
+  shpairs=basp->get_eripairs(Q, M, thr, omega, alpha, beta);
 
   // Form offset table and calculate amount of integrals
   size_t N=0;
@@ -198,7 +198,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
   }
 
   try {
-    ints.resize(N);
+    ints.assign(N,0.0);
   } catch(std::bad_alloc &) {
     std::ostringstream oss;
 
@@ -247,14 +247,22 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 	for(size_t i=0;i<Nints;i++)
 	  ints[ioff+i]=0.0;
 
-	// Maximum value of the 2-electron integrals on this shell pair
-	double intmax=screen(is,js)*screen(ks,ls);
-	if(intmax<tol) {
-	  // Skip due to small value of integral. Because the
-	  // integrals have been ordered, all the next ones will be
-	  // small as well!
-	  break;
-	}
+        // Schwarz screening estimate
+        double QQ=Q(is,js)*Q(ks,ls);
+        if(QQ<tol) {
+          // Skip due to small value of integral. Because the
+          // integrals have been ordered wrt Q, all the next ones
+          // will be small as well!
+          break;
+        }
+
+        // Distance screening estimate
+        double MM1=M(is,ks)*M(js,ls);
+        double MM2=M(is,ls)*M(js,ks);
+        if(MM1<tol || MM2<tol) {
+          // This pair is negligible
+          continue;
+        }
 
 	// Compute integrals
 	eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
@@ -269,4 +277,3 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 
   return shpairs.size();
 }
-

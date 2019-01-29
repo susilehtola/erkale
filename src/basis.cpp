@@ -1471,12 +1471,12 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   return shellpairs;
 }
 
-std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double tol, double omega, double alpha, double beta, bool verbose) const {
-  // Get the screening matrix
-  screen=eri_screening(omega,alpha,beta);
+std::vector<eripair_t> BasisSet::get_eripairs(arma::mat & Q, arma::mat & M, double tol, double omega, double alpha, double beta, bool verbose) const {
+  // Get the screening matrices
+  eri_screening(Q,M,omega,alpha,beta);
 
   // Fill out list
-  std::vector<struct eripair_t> list(shellpairs.size());
+  std::vector<eripair_t> list(shellpairs.size());
   for(size_t i=0;i<shellpairs.size();i++) {
     list[i].is=shellpairs[i].is;
     list[i].i0=shells[shellpairs[i].is].get_first_ind();
@@ -1486,7 +1486,7 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double 
     list[i].j0=shells[shellpairs[i].js].get_first_ind();
     list[i].Nj=shells[shellpairs[i].js].get_Nbf();
 
-    list[i].eri=screen(list[i].is,list[i].js);
+    list[i].eri=Q(list[i].is,list[i].js);
   }
   // and sort it
   std::stable_sort(list.begin(),list.end());
@@ -1515,7 +1515,7 @@ std::vector<struct eripair_t> BasisSet::get_eripairs(arma::mat & screen, double 
   return list;
 }
 
-bool operator<(const struct eripair_t & lhs, const struct eripair_t & rhs) {
+bool operator<(const eripair_t & lhs, const eripair_t & rhs) {
   // Sort in decreasing order!
   return lhs.eri > rhs.eri;
 }
@@ -2313,11 +2313,12 @@ arma::mat BasisSet::potential(coords_t r) const {
   return V;
 }
 
-arma::mat BasisSet::eri_screening(double omega, double alpha, double beta) const {
+void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double alpha, double beta) const {
   // Get unique pairs
   std::vector<shellpair_t> pairs=get_unique_shellpairs();
 
-  arma::mat screen(shells.size(),shells.size());
+  Q.zeros(shells.size(),shells.size());
+  M.zeros(shells.size(),shells.size());
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -2338,23 +2339,35 @@ arma::mat BasisSet::eri_screening(double omega, double alpha, double beta) const
       size_t i=pairs[ip].is;
       size_t j=pairs[ip].js;
 
-      // Compute integrals
-      eri->compute(&shells[i],&shells[j],&shells[i],&shells[j]);
-      erip=eri->getp();
-      // Get maximum value
-      double m=0.0;
-      for(size_t k=0;k<(*erip).size();k++)
-        if(fabs((*erip)[k])>m)
-          m=fabs((*erip)[k]);
-      m=sqrt(m);
-      screen(i,j)=m;
-      screen(j,i)=m;
+      // Compute (ij|ij) integrals
+      {
+        eri->compute(&shells[i],&shells[j],&shells[i],&shells[j]);
+        erip=eri->getp();
+        // Get maximum value
+        double m=0.0;
+        for(size_t k=0;k<erip->size();k++)
+          m=std::max(m,std::abs((*erip)[k]));
+        m=sqrt(m);
+        Q(i,j)=m;
+        Q(j,i)=m;
+      }
+
+      // Compute (ii|jj) integrals
+      {
+        eri->compute(&shells[i],&shells[i],&shells[j],&shells[j]);
+        erip=eri->getp();
+        // Get maximum value
+        double m=0.0;
+        for(size_t k=0;k<erip->size();k++)
+          m=std::max(m,std::abs((*erip)[k]));
+        m=sqrt(m);
+        M(i,j)=m;
+        M(j,i)=m;
+      }
     }
 
     delete eri;
   }
-
-  return screen;
 }
 
 arma::vec BasisSet::nuclear_pulay(const arma::mat & P) const {

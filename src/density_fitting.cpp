@@ -63,8 +63,8 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   Bmat=bmat;
 
   // Fill list of shell pairs
-  arma::mat screen;
-  orbpairs=orbbas.get_eripairs(screen,erithr);
+  arma::mat Q, M;
+  orbpairs=orbbas.get_eripairs(Q,M,erithr);
 
   // Get orbital shells, auxiliary shells and dummy shell
   orbshells=orbbas.get_shells();
@@ -511,8 +511,8 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
   // Memory taken up by  ( \alpha | \mu \nu)
   if(!dir) {
     // Form screening matrix
-    arma::mat screen;
-    std::vector<eripair_t> opairs=orbbas.get_eripairs(screen,thr);
+    arma::mat Q, M;
+    std::vector<eripair_t> opairs=orbbas.get_eripairs(Q,M,thr);
 
     // Count number of function pairs
     size_t np=0;

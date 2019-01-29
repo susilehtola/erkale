@@ -45,8 +45,8 @@ class ERItable {
  protected:
   /// Integral pairs sorted by value
   std::vector<eripair_t> shpairs;
-  /// Screening matrix
-  arma::mat screen;
+  /// Screening matrices
+  arma::mat Q, M;
   /// Table of integrals
   std::vector<double> ints;
   /// Offset lookup
