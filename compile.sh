@@ -323,7 +323,7 @@ if [ ! -d ${topdir}/armadillo-${ARMAVER} ]; then
 	echo -n "Checking out Armadillo ..."
 	cd $topdir
         if [[ ! -d armadillo-code ]]; then
-            git clone https://github.com/conradsnicta/armadillo-code.git
+            git clone https://gitlab.com/conradsnicta/armadillo-code.git
         else
             cd armadillo-code
             git pull
