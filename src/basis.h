@@ -106,7 +106,7 @@ typedef struct {
 bool operator<(const shellpair_t & lhs, const shellpair_t & rhs);
 
 /// Helper for integral sorts
-struct eripair_t {
+typedef struct {
   /// First shell
   size_t is;
   /// First function on shell
@@ -121,12 +121,12 @@ struct eripair_t {
   /// Amount of functions on shell
   size_t Nj;
 
-  /// Maximum integral on the shell
+  /// Maximum (uv|uv)^1/2 on shell
   double eri;
-};
+} eripair_t;
 
 /// Comparison operator
-bool operator<(const struct eripair_t & lhs, const struct eripair_t & rhs);
+bool operator<(const eripair_t & lhs, const eripair_t & rhs);
 
 // Forward declaration
 class BasisSetLibrary;
@@ -266,8 +266,8 @@ class BasisSet {
   /// Get list of unique shell pairs
   std::vector<shellpair_t> get_unique_shellpairs() const;
 
-  /// Get list of ERI pairs. Screening matrix will also be calculated
-  std::vector<eripair_t> get_eripairs(arma::mat & screen, double thr, double omega=0.0, double alpha=1.0, double beta=0.0, bool verbose=false) const;
+  /// Get list of ERI pairs
+  std::vector<eripair_t> get_eripairs(arma::mat & Q, arma::mat & M, double thr, double omega=0.0, double alpha=1.0, double beta=0.0, bool verbose=false) const;
 
   /// Convert contractions from normalized primitives to unnormalized primitives
   void convert_contractions();
@@ -436,8 +436,14 @@ class BasisSet {
   /// Calculate electric potential matrix
   arma::mat potential(coords_t r) const;
 
-  /// Calculate ERI screening matrix
-  arma::mat eri_screening(double omega=0.0, double alpha=1.0, double beta=0.0) const;
+  /**
+     Calculates the ERI screening matrices
+       \f$ Q_{\mu \nu} = (\mu \nu | \mu \nu)^{1/2} \f$
+     and
+       \f$ M_{\mu \nu} = (\mu \mu | \nu \nu)^{1/2} \f$
+     as described in J. Chem. Phys. 147, 144101 (2017).
+  */
+  void eri_screening(arma::mat & Q, arma::mat & M, double omega=0.0, double alpha=1.0, double beta=0.0) const;
 
   /// Calculate nuclear Pulay forces
   arma::vec nuclear_pulay(const arma::mat & P) const;

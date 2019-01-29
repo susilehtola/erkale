@@ -88,8 +88,8 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
   // Form index helper
   iidx=i_idx(basp->get_Nbf());
 
-  // Screening matrix and pairs
-  shpairs=basp->get_eripairs(screen,shtol,omega,alpha,beta,verbose);
+  // Shell-pair list
+  shpairs=basp->get_eripairs(Q,M,shtol,omega,alpha,beta,verbose);
 
   return shpairs.size();
 }
@@ -126,16 +126,22 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
 	size_t ks=shpairs[jp].is;
 	size_t ls=shpairs[jp].js;
 
-	{
-	  // Maximum value of the 2-electron integrals on this shell pair
-	  double intmax=screen(is,js)*screen(ks,ls);
-	  if(intmax<tol) {
-	    // Skip due to small value of integral. Because the
-	    // integrals have been ordered, all the next ones will be
-	    // small as well!
-	    break;
-	  }
-	}
+        // Schwarz screening estimate
+        double QQ=Q(is,js)*Q(ks,ls);
+        if(QQ<tol) {
+          // Skip due to small value of integral. Because the
+          // integrals have been ordered wrt Q, all the next ones
+          // will be small as well!
+          break;
+        }
+
+        // Distance screening estimate
+        double MM1=M(is,ks)*M(js,ls);
+        double MM2=M(is,ls)*M(js,ks);
+        if(MM1<tol || MM2<tol) {
+          // This pair is negligible
+          continue;
+        }
 
 	// Compute integrals
 	eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
@@ -197,16 +203,22 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 	if(inuc==jnuc && jnuc==knuc && knuc==lnuc)
 	  continue;
 
-	{
-	  // Maximum value of the 2-electron integrals on this shell pair
-	  double intmax=screen(is,js)*screen(ks,ls);
-	  if(intmax<tol) {
-	    // Skip due to small value of integral. Because the
-	    // integrals have been ordered, all the next ones will be
-	    // small as well!
-	    break;
-	  }
-	}
+        // Schwarz screening estimate
+        double QQ=Q(is,js)*Q(ks,ls);
+        if(QQ<tol) {
+          // Skip due to small value of integral. Because the
+          // integrals have been ordered wrt Q, all the next ones
+          // will be small as well!
+          break;
+        }
+
+        // Distance screening estimate
+        double MM1=M(is,ks)*M(js,ls);
+        double MM2=M(is,ls)*M(js,ks);
+        if(MM1<tol || MM2<tol) {
+          // This pair is negligible
+          continue;
+        }
 
 	// Compute the derivatives.
 	deri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);

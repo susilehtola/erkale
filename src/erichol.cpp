@@ -160,15 +160,15 @@ void ERIchol::save() const {
   }
 }
 
-size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double shtol, bool verbose) {
-  if(tol < shtol) {
+size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_reuse_thr, double shell_screen_tol, bool verbose) {
+  if(cholesky_tol < shell_screen_tol) {
     fprintf(stderr,"Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
     printf("Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
   }
 
   // Screening matrix and pairs
-  arma::mat screen;
-  std::vector<eripair_t> shpairs=basis.get_eripairs(screen,shtol,omega,alpha,beta,verbose);
+  arma::mat Q, M;
+  std::vector<eripair_t> shpairs=basis.get_eripairs(Q,M,shell_screen_tol,omega,alpha,beta,verbose);
 
   // Amount of basis functions
   Nbf=basis.get_Nbf();
@@ -204,6 +204,12 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
     for(size_t ip=0;ip<shpairs.size();ip++) {
       size_t is=shpairs[ip].is;
       size_t js=shpairs[ip].js;
+
+      // We have already computed the Schwarz screening
+      double QQ=Q(is,js)*Q(is,js);
+      if(QQ<shell_screen_tol) {
+        continue;
+      }
 
       // Compute integrals
       eri->compute(&shells[is],&shells[js],&shells[is],&shells[js]);
@@ -270,7 +276,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	  Nshp++;
 	  // Global product index is
           size_t idx=i*Nbf+i;
-	  if(true || d(idx)>=shtol) {
+	  if(true || d(idx)>=shell_screen_tol) {
             prodidx(iprod)=idx;
             // Function indices are
             invmap(0,iprod)=i;
@@ -326,7 +332,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
   // Loop index
   size_t m(0);
 
-  while(error>tol && m<d.n_elem) {
+  while(error>cholesky_tol && m<d.n_elem) {
     // Update the pivot index
     {
       // Remaining pivot is
@@ -391,9 +397,19 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	size_t is=shpairs[ipair].is;
 	size_t js=shpairs[ipair].js;
 
-	// Do we need to compute the shell?
-	if(screen(is,js)*screen(max_ks,max_ls)<shtol)
-	  continue;
+        // Schwarz screening estimates
+        double QQ=Q(is,js)*Q(max_ks,max_ls);
+        if(QQ<shell_screen_tol) {
+          continue;
+        }
+        double MM1=M(is,max_ks)*M(js,max_ls);
+        if(MM1<shell_screen_tol) {
+          continue;
+        }
+        double MM2=M(is,max_ls)*M(js,max_ks);
+        if(MM2<shell_screen_tol) {
+          continue;
+        }
 
 	// Compute integrals
 	eri->compute(&shells[is],&shells[js],&shells[max_ks],&shells[max_ls]);
@@ -466,7 +482,7 @@ size_t ERIchol::fill(const BasisSet & basis, double tol, double shthr, double sh
 	  }
 	}
       // Move to next block.
-      if(blockerr==0.0 || blockerr<shthr*errmax) {
+      if(blockerr==0.0 || blockerr<shell_reuse_thr*errmax) {
 	//printf("Block error is %e compared to global error %e, stopping\n",blockerr,errmax);
 	break;
       }

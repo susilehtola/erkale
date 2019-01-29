@@ -38,16 +38,14 @@ class ForceDigestor;
 #include <armadillo>
 #include <vector>
 
-// Forward declaration
-class BasisSet;
-struct eripair_t;
+#include "basis.h"
 
 /// Screening of electron repulsion integrals
 class ERIscreen {
-  /// Prescreening table of shell integrals
-  arma::mat screen;
   /// Integral pairs sorted by value
   std::vector<eripair_t> shpairs;
+  /// Shell-pair screening matrices
+  arma::mat Q, M;
 
   /// Pointer to the used basis set
   const BasisSet * basp;
@@ -119,7 +117,5 @@ class ERIscreen {
   /// Calculate Coulomb and exchange forces at the same time with tolerance tol for integrals, unrestricted calculation
   arma::vec forceJK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const;
 };
-
-#include "basis.h"
 
 #endif
