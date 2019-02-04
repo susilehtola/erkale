@@ -1715,23 +1715,8 @@ arma::ivec BasisSet::get_m_values() const {
 }
 
 arma::uvec BasisSet::m_indices(int mwant) const {
-  std::vector<size_t> ret;
-  for(size_t is=0;is<get_Nshells();is++) {
-    // Angular momentum is
-    int am(get_am(is));
-    if(!lm_in_use(is))
-      throw std::logic_error("Set OptLM = false for calculations using linear symmetry!\n");
-
-    // First function on shell
-    size_t i0(get_first_ind(is));
-
-    // Functions are -m, -m+1, ..., m-1, m
-    for(int m=-am;m<=am;m++)
-      if(m==mwant)
-        ret.push_back(i0+am+m);
-  }
-
-  return arma::conv_to<arma::uvec>::from(ret);
+  arma::ivec midx(get_m_values());
+  return arma::find(midx==mwant);
 }
 
 arma::mat BasisSet::get_trans(size_t ind) const {
