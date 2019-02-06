@@ -826,7 +826,6 @@ int main_guarded(int argc, char **argv) {
   set.add_string("XRSMethod", "Which kind of calculation to perform: TP, XCH or FCH","TP");
 
   set.add_string("XRSAugment","Which atoms to augment with diffuse functions? E.g. 1,3:5,10","");
-  set.add_double("XRSGridTol","DFT grid tolerance in double basis set calculation",1e-4);
 
   set.add_string("XRSQval","List or range of Q values to compute","");
   set.add_string("XRSQMethod","Method of computing momentum transfer matrix: Local, Fourier or Series","Fourier");
