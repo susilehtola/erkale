@@ -237,6 +237,13 @@ void augmented_solution(const BasisSet & basis, const Settings & set, const uscf
 	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,false,strictint,true);
     }
 
+    // Range separated functional?
+    double omega, kfull, kshort;
+    range_separation(dft.x_func,omega,kfull,kshort);
+    // Evaluators for range separated part
+    if(omega!=0.0)
+      solver.fill_rs(omega);
+
     switch(method) {
     case(TP):
       solver.Fock_half_hole(augsol,dft,occa,occb,grid,nlgrid);
