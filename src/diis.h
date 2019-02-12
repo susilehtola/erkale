@@ -60,9 +60,11 @@ bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs);
 /**
  * \class DIIS
  *
- * \brief DIIS - Direct Inversion in the Iterative Subspace and ADIIS
+ * \brief DIIS - Direct Inversion in the Iterative Subspace, as well
+ * as ADIIS and LCIIS.
  *
- * This class contains the DIIS and ADIIS convergence accelerators.
+ * This class contains the DIIS, ADIIS, and LCIIS convergence
+ * accelerators.
  *
  *
  * The original DIIS (C1-DIIS) is based on the articles
@@ -96,6 +98,13 @@ bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs);
  * with the augmented Roothaan–Hall energy function",
  * J. Chem. Phys. 132 (2010), 054109.
  *
+ *
+ * The LCIIS algorithm is described in
+ *
+ * Haichen Li and David J. Yaron, "A Least-Squares Commutator in the
+ * Iterative Subspace Method for Accelerating Self-Consistent Field
+ * Convergence", J. Chem. Theory Comput. 12 (2016), 5322.
+ *
  * \author Susi Lehtola
  * \date 2011/05/08 19:32
  */
@@ -106,11 +115,15 @@ class DIIS {
   arma::mat S;
   /// Half-inverse overlap matrix
   arma::mat Sinvh;
+  /// Half-overlap matrix
+  arma::mat Shalf;
 
   /// Use DIIS?
   bool usediis;
   /// Use ADIIS?
   bool useadiis;
+  /// Use LCIIS?
+  bool uselciis;
   /// Verbose operation?
   bool verbose;
 
@@ -136,6 +149,12 @@ class DIIS {
   /// < P_i - P_n | F(D_j) - F(D_n) >   or    < Pa_i - Pa_n | Fa(P_j) - Fa(P_n) > + < Pb_i - Pb_n | Fb(P_j) - Fb(P_n) >
   arma::mat PiFj;
 
+  // Helpers for LCIIS
+  /// FDcomm[ispin][i][j] = [F_i, D_j]
+  std::vector< std::vector< std::vector<arma::mat> > > FDcomm;
+  /// T_{ijkl} = Tr( [Fi, Dj] * [Fk, Dl] )
+  arma::vec T;
+
   /// Compute weights
   arma::vec get_w();
   /// Compute DIIS weights
@@ -145,12 +164,20 @@ class DIIS {
   /// Compute ADIIS weights
   arma::vec get_w_adiis() const;
 
-  /// Solve coefficients
-  arma::vec get_c_adiis(bool verbose=false) const;
+  /// Update LCIIS T tensor
+  void update_T();
+  /// Evaluate LCIIS value
+  double get_f_lciis(const arma::vec & c) const;
+  /// Evaluate LCIIS gradient
+  arma::vec get_g_lciis(const arma::vec & c) const;
+  /// Evaluate LCIIS Hessian
+  arma::mat get_H_lciis(const arma::vec & c) const;
+  /// Solve weights
+  arma::vec get_w_lciis() const;
 
  public:
   /// Constructor
-  DIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
+  DIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, double diiseps, double diisthr, bool useadiis, bool uselciis, bool verbose, size_t imax);
   /// Destructor
   virtual ~DIIS();
 
@@ -179,7 +206,7 @@ class rDIIS: protected DIIS {
 
  public:
   /// Constructor
-  rDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
+  rDIIS(const arma::mat & S, const arma::mat & Sinvh, bool usediis, double diiseps, double diisthr, bool useadiis, bool uselciis, bool verbose, size_t imax);
   /// Destructor
   ~rDIIS();
 
@@ -215,7 +242,7 @@ class uDIIS: protected DIIS {
 
  public:
   /// Constructor
-  uDIIS(const arma::mat & S, const arma::mat & Sinvh, bool combine, bool usediis, double diiseps, double diisthr, bool useadiis, bool verbose, size_t imax);
+  uDIIS(const arma::mat & S, const arma::mat & Sinvh, bool combine, bool usediis, double diiseps, double diisthr, bool useadiis, bool uselciis, bool verbose, size_t imax);
   /// Destructor
   ~uDIIS();
 

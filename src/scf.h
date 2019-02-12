@@ -254,6 +254,8 @@ class SCF {
 
   /// Use ADIIS?
   bool useadiis;
+  /// Use LCIIS?
+  bool uselciis;
   /// Use Broyden accelerator?
   bool usebroyden;
   /// Use Trust-Region Roothaan-Hall?

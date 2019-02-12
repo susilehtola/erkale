@@ -174,10 +174,11 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, double convthr, b
   const double diiseps=0.1;
   const double diisthr=0.01;
   bool useadiis=true;
+  bool uselciis=false;
   bool diiscomb=false;
   const int diisorder=10;
 
-  uDIIS diis(S,Sinvh,diiscomb,usediis,diiseps,diisthr,useadiis,diisorder,verbose);
+  uDIIS diis(S,Sinvh,diiscomb,usediis,diiseps,diisthr,useadiis,uselciis,diisorder,verbose);
   double diiserr;
 
   arma::mat oldHa, oldHb;
@@ -304,8 +305,9 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, double convthr, b
   const double diiseps=0.01;
   const double diisthr=0.01;
   bool useadiis=true;
+  bool uselciis=true;
   const int diisorder=10;
-  rDIIS diis(S,Sinvh,usediis,diiseps,diisthr,useadiis,diisorder,verbose);
+  rDIIS diis(S,Sinvh,usediis,diiseps,diisthr,useadiis,uselciis,diisorder,verbose);
   double diiserr;
 
   arma::mat oldH;

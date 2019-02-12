@@ -79,6 +79,8 @@ void Settings::add_scf_settings() {
   add_bool("DIISComb", "Combine alpha and beta errors in unrestricted calcs?", false);
   // Use ADIIS?
   add_bool("UseADIIS", "Use ADIIS for Fock matrix interpolation?", true);
+  // Use LCIIS?
+  add_bool("UseLCIIS", "Use LCIIS for Fock matrix interpolation?", false);
 
   // Use Broyden mixing?
   add_bool("UseBroyden", "Use Broyden mixing of Fock matrices?", false);

@@ -99,6 +99,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   diisthr=set.get_double("DIISThr");
   diiscomb=set.get_bool("DIISComb");
   useadiis=set.get_bool("UseADIIS");
+  uselciis=set.get_bool("UseLCIIS");
   usebroyden=set.get_bool("UseBroyden");
   usetrrh=set.get_bool("UseTRRH");
   trrhmins=set.get_double("TRRHminS");
@@ -125,7 +126,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     throw std::runtime_error("ADIIS and Broyden mixing cannot be used at the same time.\n");
   }
 
-  if(!usediis && !useadiis && !usebroyden && !usetrrh && (shift==0.0)) {
+  if(!usediis && !useadiis && !uselciis && !usebroyden && !usetrrh && (shift==0.0)) {
     ERROR_INFO();
     throw std::runtime_error("Refusing to run calculation without an update scheme.\n");
   }

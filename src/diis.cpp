@@ -28,6 +28,9 @@
 // Trigger cooloff if energy rises more than
 #define COOLTHR 0.1
 
+// T indexing
+#define TINDEX(i,j,k,l) T((((i)*N+j)*N+k)*N+l)
+
 bool operator<(const diis_pol_entry_t & lhs, const diis_pol_entry_t & rhs) {
   return lhs.E < rhs.E;
 }
@@ -36,11 +39,20 @@ bool operator<(const diis_unpol_entry_t & lhs, const diis_unpol_entry_t & rhs) {
   return lhs.E < rhs.E;
 }
 
-DIIS::DIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool verbose_, size_t imax_) {
+DIIS::DIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool uselciis_, bool verbose_, size_t imax_) {
   S=S_;
   Sinvh=Sinvh_;
-  usediis=usediis_;
-  useadiis=useadiis_;
+  Shalf=S*Sinvh;
+
+  uselciis=uselciis_;
+  if(!uselciis) {
+    usediis=usediis_;
+    useadiis=useadiis_;
+  } else {
+    usediis=false;
+    useadiis=false;
+  }
+
   verbose=verbose_;
   imax=imax_;
 
@@ -53,10 +65,10 @@ DIIS::DIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool usediis_, double
   cooloff=0;
 }
 
-rDIIS::rDIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool verbose_, size_t imax_) : DIIS(S_,Sinvh_,usediis_,diiseps_,diisthr_,useadiis_,verbose_,imax_) {
+rDIIS::rDIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool uselciis_, bool verbose_, size_t imax_) : DIIS(S_,Sinvh_,usediis_,diiseps_,diisthr_,useadiis_,uselciis_,verbose_,imax_) {
 }
 
-uDIIS::uDIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool combine_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool verbose_, size_t imax_) : DIIS(S_,Sinvh_,usediis_,diiseps_,diisthr_,useadiis_,verbose_,imax_), combine(combine_) {
+uDIIS::uDIIS(const arma::mat & S_, const arma::mat & Sinvh_, bool combine_, bool usediis_, double diiseps_, double diisthr_, bool useadiis_, bool uselciis_, bool verbose_, size_t imax_) : DIIS(S_,Sinvh_,usediis_,diiseps_,diisthr_,useadiis_,uselciis_,verbose_,imax_), combine(combine_) {
 }
 
 DIIS::~DIIS() {
@@ -66,6 +78,19 @@ rDIIS::~rDIIS() {
 }
 
 uDIIS::~uDIIS() {
+}
+
+void DIIS::update_T() {
+  size_t N=FDcomm[0].size();
+
+  T.zeros(N*N*N*N);
+  for(size_t is=0;is<FDcomm.size();is++)
+    for(size_t i=0;i<N;i++)
+      for(size_t j=0;j<N;j++)
+        for(size_t k=0;k<N;k++)
+          for(size_t l=0;l<N;l++)
+            // Open-shell systems handled here
+            TINDEX(i,j,k,l) += arma::trace(arma::trans(FDcomm[is][i][j]) * FDcomm[is][k][l]);
 }
 
 void rDIIS::clear() {
@@ -91,12 +116,14 @@ void rDIIS::update(const arma::mat & F, const arma::mat & P, double E, double & 
   hlp.P=P;
   hlp.E=E;
 
+  // Compute MO basis quantities
+  arma::mat Fmo(Sinvh.t()*F*Sinvh);
+  arma::mat Pmo(Shalf.t()*P*Shalf);
+
   // Compute error matrix
-  arma::mat errmat(F*P*S);
+  arma::mat errmat(Fmo*Pmo);
   // FPS - SPF
   errmat-=arma::trans(errmat);
-  // and transform it to the orthonormal basis (1982 paper, page 557)
-  errmat=arma::trans(Sinvh)*errmat*Sinvh;
   // and store it
   hlp.err=arma::vectorise(errmat);
 
@@ -115,18 +142,34 @@ void rDIIS::update(const arma::mat & F, const arma::mat & P, double E, double & 
 }
 
 void rDIIS::PiF_update() {
-  const arma::mat & Fn=stack[stack.size()-1].F;
-  const arma::mat & Pn=stack[stack.size()-1].P;
+  if(uselciis) {
+    FDcomm.resize(1);
+    FDcomm[0].resize(stack.size());
+    for(size_t i=0;i<stack.size();i++) {
+      FDcomm[0][i].resize(stack.size());
+      for(size_t j=0;j<stack.size();j++) {
+        arma::mat Pmo(Shalf.t()*stack[i].P*Shalf);
+        arma::mat Fmo(Sinvh.t()*stack[j].F*Sinvh);
+        arma::mat FP(Fmo*Pmo);
+        FDcomm[0][i][j]=FP-FP.t();
+      }
+    }
+    update_T();
 
-  // Update matrices
-  PiF.zeros(stack.size());
-  for(size_t i=0;i<stack.size();i++)
-    PiF(i)=arma::trace((stack[i].P-Pn)*Fn);
+  } else {
+    const arma::mat & Fn=stack[stack.size()-1].F;
+    const arma::mat & Pn=stack[stack.size()-1].P;
 
-  PiFj.zeros(stack.size(),stack.size());
-  for(size_t i=0;i<stack.size();i++)
-    for(size_t j=0;j<stack.size();j++)
-      PiFj(i,j)=arma::trace((stack[i].P-Pn)*(stack[j].F-Fn));
+    // Update matrices
+    PiF.zeros(stack.size());
+    for(size_t i=0;i<stack.size();i++)
+      PiF(i)=arma::trace((stack[i].P-Pn)*Fn);
+
+    PiFj.zeros(stack.size(),stack.size());
+    for(size_t i=0;i<stack.size();i++)
+      for(size_t j=0;j<stack.size();j++)
+        PiFj(i,j)=arma::trace((stack[i].P-Pn)*(stack[j].F-Fn));
+  }
 }
 
 void uDIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat & Pa, const arma::mat & Pb, double E, double & error) {
@@ -138,15 +181,17 @@ void uDIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat &
   hlp.Pb=Pb;
   hlp.E=E;
 
+  arma::mat Famo(Sinvh.t()*Fa*Sinvh);
+  arma::mat Pamo(Shalf.t()*Pa*Shalf);
+  arma::mat Fbmo(Sinvh.t()*Fb*Sinvh);
+  arma::mat Pbmo(Shalf.t()*Pb*Shalf);
+
   // Compute error matrices
-  arma::mat errmata(Fa*Pa*S);
-  arma::mat errmatb(Fb*Pb*S);
+  arma::mat errmata(Famo*Pamo);
+  arma::mat errmatb(Fbmo*Pbmo);
   // FPS - SPF
   errmata-=arma::trans(errmata);
   errmatb-=arma::trans(errmatb);
-  // and transform them to the orthonormal basis (1982 paper, page 557)
-  errmata=arma::trans(Sinvh)*errmata*Sinvh;
-  errmatb=arma::trans(Sinvh)*errmatb*Sinvh;
   // and store it
   if(combine) {
     hlp.err=arma::vectorise(errmata+errmatb);
@@ -171,20 +216,40 @@ void uDIIS::update(const arma::mat & Fa, const arma::mat & Fb, const arma::mat &
 }
 
 void uDIIS::PiF_update() {
-  const arma::mat & Fan=stack[stack.size()-1].Fa;
-  const arma::mat & Fbn=stack[stack.size()-1].Fb;
-  const arma::mat & Pan=stack[stack.size()-1].Pa;
-  const arma::mat & Pbn=stack[stack.size()-1].Pb;
+  if(uselciis) {
+    FDcomm.resize(2);
+    for(int is=0;is<2;is++) {
+      FDcomm[is].resize(stack.size());
+      for(size_t i=0;i<stack.size();i++) {
+        FDcomm[is][i].resize(stack.size());
+        for(size_t j=0;j<stack.size();j++) {
+          const arma::mat & P = is ? stack[i].Pb : stack[i].Pa;
+          const arma::mat & F = is ? stack[j].Fb : stack[j].Fa;
+          arma::mat Fmo(Sinvh.t()*F*Sinvh);
+          arma::mat Pmo(Shalf.t()*P*Shalf);
+          arma::mat FP(Fmo*Pmo);
+          FDcomm[is][i][j]=FP-FP.t();
+        }
+      }
+    }
+    update_T();
 
-  // Update matrices
-  PiF.zeros(stack.size());
-  for(size_t i=0;i<stack.size();i++)
-    PiF(i)=arma::trace((stack[i].Pa-Pan)*Fan) + arma::trace((stack[i].Pb-Pbn)*Fbn);
+  } else {
+    const arma::mat & Fan=stack[stack.size()-1].Fa;
+    const arma::mat & Fbn=stack[stack.size()-1].Fb;
+    const arma::mat & Pan=stack[stack.size()-1].Pa;
+    const arma::mat & Pbn=stack[stack.size()-1].Pb;
 
-  PiFj.zeros(stack.size(),stack.size());
-  for(size_t i=0;i<stack.size();i++)
-    for(size_t j=0;j<stack.size();j++)
-      PiFj(i,j)=arma::trace((stack[i].Pa-Pan)*(stack[j].Fa-Fan))+arma::trace((stack[i].Pb-Pbn)*(stack[j].Fb-Fbn));
+    // Update matrices
+    PiF.zeros(stack.size());
+    for(size_t i=0;i<stack.size();i++)
+      PiF(i)=arma::trace((stack[i].Pa-Pan)*Fan) + arma::trace((stack[i].Pb-Pbn)*Fbn);
+
+    PiFj.zeros(stack.size(),stack.size());
+    for(size_t i=0;i<stack.size();i++)
+      for(size_t j=0;j<stack.size();j++)
+        PiFj(i,j)=arma::trace((stack[i].Pa-Pan)*(stack[j].Fa-Fan))+arma::trace((stack[i].Pb-Pbn)*(stack[j].Fb-Fbn));
+  }
 }
 
 arma::vec rDIIS::get_energies() const {
@@ -222,7 +287,14 @@ arma::vec DIIS::get_w() {
   // Weight
   arma::vec w;
 
-  if(useadiis && !usediis) {
+  if(uselciis) {
+    w=get_w_lciis();
+    if(verbose) {
+      printf("LCIIS weights\n");
+      print_mat(w.t(),"% .2e ");
+    }
+
+  } else if(useadiis && !usediis) {
     w=get_w_adiis();
     if(verbose) {
       printf("ADIIS weights\n");
@@ -648,4 +720,136 @@ arma::vec DIIS::get_dEdx_adiis(const arma::vec & x) const {
   // Finally, compute dEdx by plugging in Jacobian of transformation
   // dE/dx_i = dc_j/dx_i dE/dc_j
   return arma::trans(jac)*dEdc;
+}
+
+double DIIS::get_f_lciis(const arma::vec & c) const {
+  size_t N(FDcomm[0].size());
+
+  // This is a dumb implementation since N is small
+  double f=0.0;
+  for(size_t i=0;i<N;i++)
+    for(size_t j=0;j<N;j++)
+      for(size_t k=0;k<N;k++)
+        for(size_t l=0;l<N;l++)
+          f += c(i)*c(j)*c(k)*c(l)*TINDEX(i,j,k,l);
+
+  return f;
+}
+
+arma::vec DIIS::get_g_lciis(const arma::vec & c) const {
+  size_t N(FDcomm[0].size());
+  arma::vec g(N);
+  g.zeros();
+
+  // This is a dumb implementation since N is small
+  for(size_t i=0;i<N;i++) {
+    double gi=0.0;
+    for(size_t j=0;j<N;j++)
+      for(size_t k=0;k<N;k++)
+        for(size_t l=0;l<N;l++)
+          gi += 2.0*c(j)*c(k)*c(l) * (TINDEX(i,j,k,l) + TINDEX(j,i,k,l));
+    g(i) = gi;
+  }
+
+  return g;
+}
+
+arma::mat DIIS::get_H_lciis(const arma::vec & c) const {
+  size_t N(FDcomm[0].size());
+  arma::mat H(N,N);
+  H.zeros();
+
+  // This is a dumb implementation since N is small
+  for(size_t i=0;i<N;i++)
+    for(size_t j=0;j<N;j++) {
+      double Hij = 0.0;
+      for(size_t k=0;k<N;k++)
+        for(size_t l=0;l<N;l++)
+          Hij += 2.0*c(k)*c(l) * (TINDEX(i,j,k,l) + TINDEX(i,k,j,l) + TINDEX(i,k,l,j) + TINDEX(j,i,k,l) + TINDEX(k,i,j,l) + TINDEX(k,i,l,j));
+      H(i,j) = Hij;
+    }
+
+  return H;
+}
+
+arma::vec DIIS::get_w_lciis() const {
+  // Number of parameters
+  size_t N=FDcomm[0].size();
+
+  if(N==1) {
+    // Trivial case.
+    arma::vec ret(1);
+    ret.ones();
+    return ret;
+  }
+
+  // Lagrange multiplier
+  double lambda=0.0;
+  double lambda0;
+
+  // Weights: start with DIIS
+  arma::vec w(get_w_diis());
+  w.print("Initial weights");
+  printf("Sum of weights is %e\n",arma::sum(w));
+  printf("Initial f_LCIIS = %e\n",get_f_lciis(w));
+  
+  arma::vec x, xold, wold;
+
+  for(int iiter=0;iiter<1000;iiter++) {
+    // Store old Lagrange multiplier
+    lambda0=lambda;
+
+    // Minimize L(c, lambda) = f(c) - lambda * (1 - sum_i c_i) with
+    // Newton-Raphson scheme: x = -invH * g. Right-hand side
+    arma::vec y(N+1);
+    y.zeros();
+
+#if 0
+    // dL/dc
+    y.subvec(0,N-1)=get_g_lciis(w);
+    y(N)=1;
+#else
+    // Version in the paper
+    y.subvec(0,N-1)=get_g_lciis(w) + lambda*arma::ones<arma::vec>(N);
+    y(N)=1; // has to be added, otherwise weights sum to zero
+#endif
+
+    // Left-hand side
+    arma::mat A(N+1,N+1);
+    A.zeros();
+    // d^2 L / dc_m dc_n
+    A.submat(0,0,N-1,N-1)=get_H_lciis(w);
+    // d^2 L / dc_m dlambda
+    A.submat(N,0,N,N-1)=arma::ones<arma::rowvec>(N);
+    // d^2 L / dlambda dc_m
+    A.submat(0,N,N-1,N)=arma::ones<arma::vec>(N);
+    // d^2 L / dlambda^2 is zero since L is linear in lambda
+
+    // Solve Ax = y
+    xold=x;
+    x=arma::inv(A)*y; // A can be ill-conditioned
+    //arma::solve(x, A, y);
+
+    printf("LCIIS iteration %i, f_LCIIS = %e\n",iiter,get_f_lciis(w));
+    A.print("A");
+    y.print("y");
+    x.print("x");
+
+    // Grab the new coefficients
+    wold = w;
+    w = x.subvec(0,N-1);
+    printf("Sum of weights is %e\n",arma::sum(w));
+
+    // and Lagrange multiplier
+    lambda=x(N);
+
+    printf("Weights changed by %e\n",arma::norm(w-wold,"fro"));
+
+    if(iiter) {
+      double dx=arma::norm(x-xold,"fro");
+      printf("Solution vector changed by %e\n",dx);
+    }
+  }
+
+  return w;
 }

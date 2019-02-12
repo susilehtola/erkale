@@ -138,7 +138,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 
 #ifdef RESTRICTED
   // DIIS iterator
-  rDIIS diis(S,Sinvh,usediis,diiseps,diisthr,useadiis,verbose,diisorder);
+  rDIIS diis(S,Sinvh,usediis,diiseps,diisthr,useadiis,uselciis,verbose,diisorder);
   // Broyden
   Broyden broyd(verbose);
 
@@ -148,7 +148,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
   K.zeros();
 #else
   // DIIS iterator
-  uDIIS diis(S,Sinvh,diiscomb,usediis,diiseps,diisthr,useadiis,verbose,diisorder);
+  uDIIS diis(S,Sinvh,diiscomb,usediis,diiseps,diisthr,useadiis,uselciis,verbose,diisorder);
 
   // Broyden
   Broyden broyd_sum(verbose);
