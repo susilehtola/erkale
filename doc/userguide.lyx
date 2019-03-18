@@ -6955,155 +6955,115 @@ name "fig:XAS-spectrum-of"
 
 \end_layout
 
-\begin_layout Plain Layout
-
-\end_layout
-
 \end_inset
 
 
 \end_layout
 
-\begin_layout Subsection
-Visualization of orbitals and densities
-\end_layout
-
-\begin_layout Standard
-As an example, we visualize the aug-cc-pVTZ -level Hartree-Fock calculation
- of the water dimer presented above in 
-\begin_inset CommandInset ref
-LatexCommand formatted
-reference "subsec:SCF-calculation"
-
-\end_inset
-
- using Avogadro 1.0.3.
-\end_layout
-
-\begin_layout Standard
-Setting the resolution to 
-\begin_inset Quotes eld
-\end_inset
-
-High
-\begin_inset Quotes erd
-\end_inset
-
- and leaving the isosurface value at 0.1 in Avogadro, we obtain the graphics
- shown in 
-\begin_inset CommandInset ref
-LatexCommand formatted
-reference "fig:Electron-density-plot."
-
-\end_inset
-
-.
- Correspondingly, plotting the HOMO using 
-\begin_inset Quotes eld
-\end_inset
-
-High
-\begin_inset Quotes erd
-\end_inset
-
- resolution and the default isosurface value of 0.02, we obtain the plot
- shown in 
-\begin_inset CommandInset ref
-LatexCommand formatted
-reference "fig:Orbital-plot-using"
-
-\end_inset
-
-.
-\end_layout
-
-\begin_layout Standard
-\begin_inset Float figure
-wide false
-sideways false
-status open
-
-\begin_layout Plain Layout
-\align center
-\begin_inset Graphics
-	filename density.eps
-	display false
-	width 45text%
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Plain Layout
-\begin_inset Caption Standard
-
-\begin_layout Plain Layout
-Electron density plot using Avogadro.
-\begin_inset CommandInset label
-LatexCommand label
-name "fig:Electron-density-plot."
-
-\end_inset
-
-
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\end_inset
-
-
-\begin_inset Float figure
-wide false
-sideways false
-status open
-
-\begin_layout Plain Layout
-\align center
-\begin_inset Graphics
-	filename homo.eps
-	display false
-	width 45text%
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Plain Layout
-\begin_inset Caption Standard
-
-\begin_layout Plain Layout
-Orbital plot using Avogadro.
-\begin_inset CommandInset label
-LatexCommand label
-name "fig:Orbital-plot-using"
-
-\end_inset
-
-
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Plain Layout
-
-\end_layout
-
-\end_inset
-
-
-\end_layout
-
-\begin_layout Subsection
+\begin_layout Section
 Interfacing with formatted checkpoint files
+\end_layout
+
+\begin_layout Subsection
+Reading in results from other codes
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:Reading-in-results"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+
+\shape smallcaps
+Erkale
+\shape default
+ can read in results from formatted checkpoint files produced by other codes.
+ Once you have the formatted checkpoint file (per-code instructions below),
+\end_layout
+
+\begin_layout Enumerate
+Convert the formatted checkpoint file into 
+\shape smallcaps
+Erkale
+\shape default
+ format with
+\begin_inset CommandInset label
+LatexCommand label
+name "enu:Convert-the-formatted"
+
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\emph on
+$ erkale_fchkpt runfile
+\emph default
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+where 
+\emph on
+runfile
+\emph default
+ contains the relevant 
+\emph on
+LoadFchk
+\emph default
+ and 
+\emph on
+SaveChk
+\emph default
+ directives.
+ Since the formatted checkpoint files may be quite big, you may want to
+ compress them with gzip, bzip2 or xz to save disk space; 
+\shape smallcaps
+Erkale
+\shape default
+ can read compressed formatted checkpoint files as well, the need for decompress
+ion is determined by the filename extension.
+\end_layout
+
+\begin_layout Enumerate
+Calculate the properties as you usually would using the newly obtained ERKALE
+ checkpoint file.
+\end_layout
+
+\begin_layout Subsubsection
+
+\shape smallcaps
+Gaussian
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Standard
@@ -7274,75 +7234,8 @@ formchk
 $ formchk chkpt.chk chkpt.fchk
 \end_layout
 
-\begin_layout Enumerate
-Convert the formatted checkpoint file into 
-\shape smallcaps
-Erkale
-\shape default
- format with
-\begin_inset CommandInset label
-LatexCommand label
-name "enu:Convert-the-formatted"
+\begin_layout Subsubsection
 
-\end_inset
-
-
-\begin_inset Newline newline
-\end_inset
-
-
-\begin_inset Newline newline
-\end_inset
-
-
-\emph on
-$ erkale_fchkpt runfile
-\emph default
-
-\begin_inset Newline newline
-\end_inset
-
-
-\begin_inset Newline newline
-\end_inset
-
-where 
-\emph on
-runfile
-\emph default
- contains the relevant 
-\emph on
-LoadFchk
-\emph default
- and 
-\emph on
-SaveChk
-\emph default
- directives.
- Since the formatted checkpoint files may be quite big, you may want to
- compress them with gzip, bzip2 or xz to save disk space.
- 
-\shape smallcaps
-Erkale
-\shape default
- can read compressed formatted checkpoint files as well; the need for decompress
-ion is determined by the filename extension.
-\end_layout
-
-\begin_layout Enumerate
-Calculate the properties as you would usually do using the newly obtained
- ERKALE checkpoint file.
-\end_layout
-
-\begin_layout Standard
-Similar instructions starting from step 
-\begin_inset CommandInset ref
-LatexCommand ref
-reference "enu:Convert-the-formatted"
-
-\end_inset
-
- apply for calculations performed with 
 \shape smallcaps
 Q-Chem
 \shape default
@@ -7361,8 +7254,11 @@ texttrademark
 
 \end_inset
 
-.
- Here, one must only specify 
+
+\end_layout
+
+\begin_layout Standard
+Specify 
 \begin_inset Quotes eld
 \end_inset
 
@@ -7415,6 +7311,262 @@ texttrademark
 \end_inset
 
  are limited to SCF (HF/DFT) level results.
+\end_layout
+
+\begin_layout Subsubsection
+
+\shape smallcaps
+Psi4
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+An example partial 
+\shape smallcaps
+Psi4
+\shape default
+
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+texttrademark 
+\backslash
+ 
+\end_layout
+
+\end_inset
+
+ input file to save the results in a formatted checkpoint file is as follows:
+\begin_inset Newline newline
+\end_inset
+
+energy, wfn = energy('scf', return_wfn=True)
+\begin_inset Newline newline
+\end_inset
+
+fchk_writer = psi4.core.FCHKWriter(wfn)
+\begin_inset Newline newline
+\end_inset
+
+fchk_writer.write('output.fchk')
+\end_layout
+
+\begin_layout Subsection
+Saving results from ERKALE for use in other codes
+\end_layout
+
+\begin_layout Standard
+Many visualization programs, such as 
+\shape smallcaps
+Avogadro
+\shape default
+ or 
+\shape smallcaps
+IQmol
+\shape default
+, support the use of formatted checkpoint files for visualization of e.g.
+ electron densities and molecular orbitals.
+ To achieve this, use the 
+\emph on
+erkale_fchkpt 
+\emph default
+tool as in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "subsec:Reading-in-results"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+, only now 
+\emph on
+LoadChk
+\emph default
+ the Erkale checkpoint and 
+\emph on
+SaveFchk
+\emph default
+ a formatted checkpoint.
+ Note that alternatively, electron densities and molecular orbitals can
+ also be visualized in 
+\shape smallcaps
+Avogadro
+\shape default
+ or 
+\shape smallcaps
+Jmol
+\shape default
+ using cube files which were described above in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "subsec:erkale_cube"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+As an example, we visualize the aug-cc-pVTZ -level Hartree–Fock calculation
+ of the water dimer presented above in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "subsec:SCF-calculation"
+
+\end_inset
+
+ using 
+\shape smallcaps
+Avogadro
+\shape default
+ 1.0.3.
+ Saving a formatted checkpoint and loading it in 
+\shape smallcaps
+Avogadro
+\shape default
+, setting the resolution to 
+\begin_inset Quotes eld
+\end_inset
+
+High
+\begin_inset Quotes erd
+\end_inset
+
+ and leaving the isosurface value at 0.1 in 
+\shape smallcaps
+Avogadro
+\shape default
+, we obtain the graphics shown in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "fig:Electron-density-plot."
+
+\end_inset
+
+.
+ Correspondingly, plotting the HOMO using 
+\begin_inset Quotes eld
+\end_inset
+
+High
+\begin_inset Quotes erd
+\end_inset
+
+ resolution and the default isosurface value of 0.02, we obtain the plot
+ shown in 
+\begin_inset CommandInset ref
+LatexCommand formatted
+reference "fig:Orbital-plot-using"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename density.eps
+	display false
+	width 45text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Electron density plot using Avogadro.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Electron-density-plot."
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename homo.eps
+	display false
+	width 45text%
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Orbital plot using Avogadro.
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Orbital-plot-using"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Section
@@ -8305,6 +8457,11 @@ A.
 
 \begin_layout Section*
 Changes
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2018-03-18 Better document visualization of orbitals.
 \end_layout
 
 \begin_layout Labeling
