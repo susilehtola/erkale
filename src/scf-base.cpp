@@ -3034,6 +3034,9 @@ void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, cons
     // Collect all indices
     arma::uvec fullidx;
     for(size_t i=0;i<m_idx.size();i++) {
+      if(!m_idx[i].n_elem)
+        continue;
+
       arma::uvec fidx(fullidx.n_elem+m_idx[i].n_elem);
       if(fullidx.n_elem)
         fidx.subvec(0,fullidx.n_elem-1)=fullidx;
@@ -3072,6 +3075,8 @@ void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, cons
     arma::uvec Cind(arma::find(Csubnrm));
 
     // Add to list of occupied orbitals
+    if(Cind.n_elem < nocc(isym))
+      throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
     for(arma::sword io=0;io<nocc(isym);io++)
       occidx.push_back(Cind(io));
   }
