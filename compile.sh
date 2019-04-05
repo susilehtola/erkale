@@ -33,6 +33,9 @@ export FCFLAGS="${CFLAGS}"
 
 ### If not using system LAPACK/BLAS, libraries to link OpenMP OpenBLAS with
 OMPLIBS="-fopenmp"
+### If not using system LAPACK/BLAS, the OpenMP version of OpenBLAS
+### needs to be compiled with -frecursive to make it thread safe.
+FRECURSIVE="-frecursive"
 
 ### System LAPACK (+ BLAS) library to use.
 
@@ -305,7 +308,7 @@ if(( ! ${system_blas} )); then
 
     if [ ! -f ${topdir}/openblas/lib/libopenblaso.a ]; then
 	echo -n "Compiling openblas, parallel ..."
-	make -C OpenBLAS-${OPENBLASVER}-omp NO_SHARED=1 TARGET=CORE2 DYNAMIC_ARCH=1 USE_THREAD=1 USE_OPENMP=1 FC=$FC CC=$CC COMMON_OPT="$CFLAGS" FCOMMON_OPT="$FFLAGS" NUM_THREADS=128 LIBPREFIX="libopenblaso" INTERFACE64=0 ${OPENBLASAVX} EXTRALIB="${OMPLIBS}" &> OpenBLAS-${OPENBLASVER}-omp/make.log
+	make -C OpenBLAS-${OPENBLASVER}-omp NO_SHARED=1 TARGET=CORE2 DYNAMIC_ARCH=1 USE_THREAD=1 USE_OPENMP=1 FC=$FC CC=$CC COMMON_OPT="$CFLAGS" FCOMMON_OPT="$FFLAGS $FRECURSIVE" NUM_THREADS=128 LIBPREFIX="libopenblaso" INTERFACE64=0 ${OPENBLASAVX} EXTRALIB="${OMPLIBS}" &> OpenBLAS-${OPENBLASVER}-omp/make.log
 	make -C OpenBLAS-${OPENBLASVER}-omp install NO_SHARED=1 LIBPREFIX="libopenblaso" PREFIX=${topdir}/openblas OPENBLAS_LIBRARY_DIR=${topdir}/openblas/lib OPENBLAS_INCLUDE_DIR=${topdir}/openblas/include OPENBLAS_BINARY_DIR=${topdir}/openblas/bin OPENBLAS_CMAKE_DIR=${topdir}/openblas/cmake
 	echo " done"
     fi
