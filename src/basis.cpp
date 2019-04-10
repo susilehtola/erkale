@@ -1701,14 +1701,24 @@ arma::ivec BasisSet::get_m_values() const {
   for(size_t is=0;is<get_Nshells();is++) {
     // Angular momentum is
     int am(get_am(is));
-    if(!lm_in_use(is))
-      throw std::logic_error("Set OptLM = false for calculations using linear symmetry!\n");
 
     // First function on shell
     size_t i0(get_first_ind(is));
 
     // Functions are -m, -m+1, ..., m-1, m
-    ret.subvec(i0,i0+2*am)=arma::linspace<arma::ivec>(-am,am,2*am+1);
+    if(lm_in_use(is)) {
+      ret.subvec(i0,i0+2*am)=arma::linspace<arma::ivec>(-am,am,2*am+1);
+    } else {
+      if(am==0)
+        ret(i0)=0;
+      else if(am==1) {
+        // Functions are in order x, y, z i.e. 1, -1, 0
+        ret(i0)=1;
+        ret(i0+1)=-1;
+        ret(i0+2)=0;
+      } else
+        throw std::logic_error("Need to use spherical basis for linear symmetry!\n");
+    }
   }
 
   return ret;
