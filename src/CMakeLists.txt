@@ -142,6 +142,24 @@ else()
  target_link_libraries(erkale_cube ${HDF5_LIBRARIES})
 endif()
 
+# Linear configurations
+add_executable (erkale_genlinconf genlinconf.cpp)
+# The name of the executable is
+set_target_properties(erkale_genlinconf PROPERTIES OUTPUT_NAME "erkale_genlinconf${SUFFIX}")
+target_link_libraries(erkale_genlinconf liberkale)
+
+# Link libraries
+if(BUILD_SHARED_LIBS)
+else()
+ if(UNIX AND NOT APPLE)
+  target_link_libraries(erkale_genlinconf -lrt)
+ endif()
+ target_link_libraries(erkale_genlinconf ${GSL_LIBRARIES})
+ target_link_libraries(erkale_genlinconf ${LAPACK_LIBRARIES})
+ target_link_libraries(erkale_genlinconf ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_genlinconf ${LIBINT_LIBRARIES})
+ target_link_libraries(erkale_genlinconf ${HDF5_LIBRARIES})
+endif()
 
 # Population analysis tool
 add_executable (erkale_pop population.cpp)
