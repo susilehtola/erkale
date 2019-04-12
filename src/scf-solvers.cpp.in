@@ -799,6 +799,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #endif
 
       printf("\nOrbital occupations by symmetry\n");
+      int msum=0;
       for(size_t im=0;im<muni.n_elem;im++) {
 #ifdef RESTRICTED
         if(occ(im,0)>0)
@@ -807,7 +808,21 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
         if(occ(im,0)+occ(im,1)>0)
           printf("m = % i: %2i %2i\n",(int) muni(im),(int) occ(im,0),(int) occ(im,1));
 #endif
+        msum+=muni(im)*arma::sum(occ.row(im));
       }
+      printf("Sum of m values is %i ",msum);
+
+      std::string termsymbol;
+      msum=std::abs(msum);
+      if(msum==0)
+        termsymbol="Sigma";
+      else if(msum==1)
+        termsymbol="Pi";
+      else if(msum==2)
+        termsymbol="Delta";
+      else if(msum==3)
+        termsymbol="Phi";
+      printf("i.e. this is a %s state\n",termsymbol.c_str());
     }
 #endif
   }
