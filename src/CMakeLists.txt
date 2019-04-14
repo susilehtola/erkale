@@ -187,6 +187,7 @@ install (TARGETS liberkale DESTINATION lib${LIB_SUFFIX})
 install (TARGETS erkale DESTINATION bin)
 install (TARGETS erkale_cube DESTINATION bin)
 install (TARGETS erkale_geom DESTINATION bin)
+install (TARGETS erkale_genlinconf DESTINATION bin)
 install (TARGETS erkale_loc DESTINATION bin)
 install (TARGETS erkale_pop DESTINATION bin)
 

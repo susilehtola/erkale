@@ -46,6 +46,7 @@ int main(int argc, char **argv) {
   set.add_string("Nuclei","Nuclei in molecule","");
   set.add_int("Nspin","Number of spin states to look at",1);
   set.add_int("Mmax","Maximum net angular momentum allowed",3);
+  set.add_int("Charge","Charge state for molecule",0,true);
   set.add_bool("saveconf","Save configurations to disk",true);
   set.add_bool("savegeom","Save geometry to disk",true);
   set.add_bool("largeactive","Use larger active space?",false);
@@ -53,11 +54,12 @@ int main(int argc, char **argv) {
   set.print();
   int nspin=set.get_int("Nspin");
   int netmmax=set.get_int("Mmax");
+  int Q=set.get_int("Charge");
   bool saveconf=set.get_bool("saveconf");
   bool savegeom=set.get_bool("savegeom");
   bool largeactive=set.get_bool("largeactive");
   std::string nucstr=set.get_string("Nuclei");
-  
+
   std::vector<std::string> nuclei(splitline(nucstr));
   // Translate to integers
   std::vector<int> Zs(nuclei.size());
@@ -69,7 +71,7 @@ int main(int argc, char **argv) {
     int Zmax=(int) (sizeof(covalent_radii)/sizeof(covalent_radii[0]));
     arma::vec zval(Zs.size());
     double z=0.0;
-    
+
     for(size_t i=0;i<Zs.size();i++) {
       if(Zs[i]>=Zmax)
         throw std::logic_error("No radius found for element\n");
@@ -84,12 +86,12 @@ int main(int argc, char **argv) {
     if(savegeom) {
       FILE *out=fopen("atoms.xyz","w");
       fprintf(out,"%i\n%s\n",(int) Zs.size(),nucstr.c_str());
-      for(size_t i=0;i<Zs.size();i++) 
+      for(size_t i=0;i<Zs.size();i++)
         fprintf(out,"%-2s %.3f %.3f %.3f\n",element_symbols[Zs[i]].c_str(),0.0,0.0,zval(i));
       fclose(out);
     } else {
       printf("Input geometry\n");
-      for(size_t i=0;i<Zs.size();i++) 
+      for(size_t i=0;i<Zs.size();i++)
         printf("%-2s %.3f %.3f %.3f\n",element_symbols[Zs[i]].c_str(),0.0,0.0,zval(i));
     }
   }
@@ -103,12 +105,11 @@ int main(int argc, char **argv) {
   int nelectrons=0;
   frozen.fill(0);
   active.fill(0);
-  
+
   for(size_t inuc=0;inuc<Zs.size();inuc++) {
     // Find noble gas core
     size_t imagic=0;
     while(imagic<sizeof(magicno)/sizeof(magicno[0])-1) {
-      printf("imagic = %i\n",(int)imagic);
       if(Zs[inuc]<=magicno[imagic+1])
         break;
       imagic++;
@@ -127,8 +128,6 @@ int main(int argc, char **argv) {
         int l(shell_order[ishell]);
         // increment frozen orbital occupation
         frozen.subvec(mmax-l,mmax+l)+=arma::ones<arma::ivec>(2*l+1);
-        printf("After filling l=%i\n",l);
-        frozen.print();      
         nfilled+=2*(2*l+1);
         if(nfilled==Znoble) {
           ishell++;
@@ -136,7 +135,7 @@ int main(int argc, char **argv) {
         }
       }
     }
-    
+
     // Number of electrons to distribute
     nelectrons+=Zs[inuc]-Znoble;
 
@@ -147,19 +146,41 @@ int main(int argc, char **argv) {
       int l(shell_order[ishell]);
       // increment frozen orbital occupation
       active.subvec(mmax-l,mmax+l)+=arma::ones<arma::ivec>(2*l+1);
-      printf("Active after filling l=%i\n",l);
-      active.print();      
       nfilled+=2*(2*l+1);
       if(nfilled>=Zfill)
         break;
     }
   }
 
-  frozen.print("Frozen orbitals");
-  active.print("Active orbitals");
-  
+  // Add in charge
+  nelectrons-=Q;
+
+  {
+    arma::imat oinfo(2*mmax+1,3);
+    oinfo.col(0)=mval;
+    oinfo.col(1)=frozen;
+    oinfo.col(2)=active;
+
+    arma::ivec nelec(2*mmax+1);
+    for(size_t i=0;i<oinfo.n_rows;i++)
+      nelec(i)=oinfo(i,1)+oinfo(i,2);
+    // Get rid of zero rows
+    arma::uvec idx(arma::find(nelec>0));
+    oinfo=oinfo.rows(idx);
+
+    printf("Orbital information\n%2s %6s %6s\n","m","frozen","active");
+    for(size_t ir=0;ir<oinfo.n_rows;ir++)
+      printf("% i %6i %6i\n",(int) oinfo(ir,0),(int) oinfo(ir,1),(int) oinfo(ir,2));
+  }
+
   // Generate configurations in active space
   printf("Need to distribute %i active electrons onto %i active orbitals\n",nelectrons,(int) arma::sum(active));
+
+  // Check that this is sane
+  if(nelectrons<0)
+    throw std::logic_error("No electrons to distribute!\n");
+  if(nelectrons>2*arma::sum(active))
+    throw std::logic_error("Too many electrons to fit in active space!\n");
 
   // Generate spin states
   size_t totnconf=0;
@@ -167,6 +188,12 @@ int main(int argc, char **argv) {
     int nelb=(nelectrons/2)-nx;
     int nela=nelectrons-nelb;
     int dnel=nela-nelb;
+
+    // Can we even have this spin state for this molecule?
+    if(nela>arma::sum(active))
+      continue;
+    if(nelb<0)
+      continue;
 
     printf("Spin state S = %i\n",1+dnel);
 
@@ -181,18 +208,7 @@ int main(int argc, char **argv) {
     std::vector<arma::ivec> beta_occs;
     std::vector<int> ohelper(orbitals);
     do {
-      // Calculate net value of m
-      int mnet=0;
-      for(int i=0;i<nelb;i++)
-        mnet+=ohelper[i];
-      if(mnet<0)
-        // Restrict to considering positive net values of m
-        continue;
-      if(mnet>netmmax)
-        // Too large net am
-        continue;
-
-      // Configuration is okay, generate beta occ vector
+      // Generate beta occ vector
       arma::ivec bocc(2*mmax+1);
       bocc.zeros();
       for(int i=0;i<nelb;i++)
@@ -221,12 +237,20 @@ int main(int argc, char **argv) {
         arma::imat occs(beta_occs[ibeta].n_elem,2);
         occs.col(0)=beta_occs[ibeta];
         occs.col(1)=beta_occs[ibeta];
+
         // Compute net value of m
         int mnet=0;
         for(int m=-mmax;m<=mmax;m++)
           mnet+=m*arma::sum(occs.row(m+mmax));
-        if(mnet<=netmmax)
-          occlist.push_back(occs);
+        if(mnet<0)
+          // Restrict to considering positive net values of m
+          continue;
+        if(mnet>netmmax)
+          // Too large net am
+          continue;
+
+        // Add to list
+        occlist.push_back(occs);
       }
     } else {
       for(size_t ibeta=0;ibeta<beta_occs.size();ibeta++) {
@@ -261,7 +285,7 @@ int main(int argc, char **argv) {
           if(mnet>netmmax)
             // Too large net am
             continue;
-                
+
           // Check that an identical one does not exist
           bool exist=false;
           for(size_t i=0;i<alpha_occs.size();i++) {
@@ -278,16 +302,11 @@ int main(int argc, char **argv) {
         } while(std::next_permutation(ohelper.begin(),ohelper.end()));
 
         // Form total configurations
-        for(size_t ialpha=0;ialpha<alpha_occs.size();ialpha++) {        
-          arma::imat occs(beta_occs[ialpha].n_elem,2);
+        for(size_t ialpha=0;ialpha<alpha_occs.size();ialpha++) {
+          arma::imat occs(beta_occs[ibeta].n_elem,2);
           occs.col(0)=alpha_occs[ialpha];
           occs.col(1)=beta_occs[ibeta];
-          // Compute net value of m
-          int mnet=0;
-          for(int m=-mmax;m<=mmax;m++)
-            mnet+=m*arma::sum(occs.row(m+mmax));
-          if(mnet<=netmmax)
-            occlist.push_back(occs);
+          occlist.push_back(occs);
         }
       }
     }
@@ -299,14 +318,14 @@ int main(int argc, char **argv) {
     for(size_t iconf=0;iconf<occlist.size();iconf++)
       for(size_t jconf=0;jconf<iconf;jconf++) {
         bool match=true;
-        for(size_t i=0;i<occlist[iconf].n_rows;i++) {
-          if(occlist[iconf](i,1)!=occlist[jconf](i,1))
-            match=false;
-          if(occlist[iconf](i,2)!=occlist[jconf](i,2))
-            match=false;
+        for(size_t j=0;j<occlist[iconf].n_cols;j++)
+          for(size_t i=0;i<occlist[iconf].n_rows;i++)
+            if(occlist[iconf](i,j)!=occlist[jconf](i,j))
+              match=false;
+        if(match) {
+          printf("Configurations %i and %i are the same!\n",(int) iconf, (int) jconf);
+          throw std::logic_error("Degenerate configs!\n");
         }
-        if(match)
-          printf("Configurations %i and %i are the same!\n",iconf,jconf);
       }
 
     // Print out configurations
@@ -329,7 +348,7 @@ int main(int argc, char **argv) {
       // Get rid of zero rows
       arma::uvec idx(arma::find(nelec>0));
       conf=conf.rows(idx);
-      
+
       if(saveconf) {
         std::ostringstream oss;
         oss << "linoccs_" << 1+dnel << "_" << iconf << ".dat";
@@ -342,7 +361,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  printf("%i possible configurations found in total.\n",totnconf);
-  
+  printf("%i possible configurations found in total.\n",(int) totnconf);
+
   return 0;
 }
