@@ -329,6 +329,7 @@ int main(int argc, char **argv) {
       }
 
     // Print out configurations
+    std::vector<size_t> numconf(netmmax+1,0);
     for(size_t iconf=0;iconf<occlist.size();iconf++) {
       arma::imat conf(2*mmax+1,3);
       // Plug in frozen core orbitals
@@ -351,13 +352,14 @@ int main(int argc, char **argv) {
 
       if(saveconf) {
         std::ostringstream oss;
-        oss << "linoccs_" << 1+dnel << "_" << iconf << ".dat";
+        oss << "linoccs_" << 1+dnel << "_" << mnet << "_" << numconf[mnet] << ".dat";
         conf.save(oss.str(),arma::raw_ascii);
         printf("Configuration %i with net angular momentum M=%i saved to file %s\n",(int) iconf,mnet,oss.str().c_str());
       } else {
         printf("Configuration %i with net angular momentum M=%i\n",(int) iconf,mnet);
         conf.print();
       }
+      numconf[mnet]++;
     }
   }
 
