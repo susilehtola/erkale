@@ -343,6 +343,35 @@ int main(int argc, char **argv) {
         }
       }
 
+    // Remove degenerate configs (switch +m/-m)
+    {
+      std::vector<arma::imat> newlist;
+      for(size_t iconf=0;iconf<occlist.size();iconf++) {
+        arma::imat testconf(occlist[iconf]);
+        bool duplicate=false;
+
+        for(size_t ic=0;ic<testconf.n_cols;ic++)
+          for(int m=1;m<=mmax;m++) {
+            // Swap m and -m
+            std::swap(testconf(m+mmax,ic),testconf(mmax-m,ic));
+          }
+        for(size_t jconf=0;jconf<newlist.size();jconf++) {
+          bool match=true;
+          for(size_t j=0;j<testconf.n_cols;j++)
+            for(size_t i=0;i<testconf.n_rows;i++)
+              if(testconf(i,j)!=newlist[jconf](i,j))
+                match=false;
+          if(match) {
+            duplicate=true;
+            break;
+          }
+        }
+        if(!duplicate)
+          newlist.push_back(occlist[iconf]);
+      }
+      std::swap(occlist,newlist);
+    }
+
     // Print out configurations
     std::vector<size_t> numconf(netmmax+1,0);
     for(size_t iconf=0;iconf<occlist.size();iconf++) {
