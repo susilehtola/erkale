@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
   set.add_int("Charge","Charge state for molecule",0,true);
   set.add_bool("saveconf","Save configurations to disk",true);
   set.add_bool("savegeom","Save geometry to disk",true);
+  set.add_bool("mrestr","Restrict m value imbalances",true);
   set.add_bool("largeactive","Use larger active space?",false);
   set.parse(std::string(argv[1]),true);
   set.print();
@@ -58,6 +59,7 @@ int main(int argc, char **argv) {
   bool saveconf=set.get_bool("saveconf");
   bool savegeom=set.get_bool("savegeom");
   bool largeactive=set.get_bool("largeactive");
+  bool mrestr=set.get_bool("mrestr");
   std::string nucstr=set.get_string("Nuclei");
 
   std::vector<std::string> nuclei(splitline(nucstr));
@@ -213,6 +215,19 @@ int main(int argc, char **argv) {
       bocc.zeros();
       for(int i=0;i<nelb;i++)
         bocc(mmax+ohelper[i])++;
+
+      if(mrestr) {
+        // Compute net value of m
+        int mnet=0;
+        for(int m=-mmax;m<=mmax;m++)
+          mnet+=m*bocc(m+mmax);
+        if(mnet<0)
+          // Restrict to considering positive net values of m
+          continue;
+        if(mnet>netmmax)
+          // Too large net am
+          continue;
+      }
 
       // Check that an identical one does not exist
       bool exist=false;
