@@ -62,6 +62,7 @@ void Settings::add_scf_settings() {
 
   // Specialized dimer calculation?
   add_bool("LinearSymmetry", "Do special calculation on linear molecule along z axis", false);
+  add_bool("LinearFreeze", "If using linear symmetry, freeze symmetry to input guess", false);
   add_int("LinearOccupations", "Read in occupations for linear molecule calculations?", 0, true);
 
   // Decontract basis set?

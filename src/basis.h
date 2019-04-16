@@ -329,6 +329,15 @@ class BasisSet {
 
   /// Get m values of basis functions
   arma::ivec get_m_values() const;
+  /// Unique m values in basis set
+  arma::ivec unique_m_values() const;
+  /// Mapping from m value to unique m value
+  std::map<int, arma::uword> unique_m_map() const;
+  /// Count occupied orbitals
+  arma::imat count_m_occupied(const arma::mat & C) const;
+  /// Count occupied orbitals
+  arma::imat count_m_occupied(const arma::mat & Ca, const arma::mat & Cb) const;
+
   /// Get indices of basis functions with wanted m value
   arma::uvec m_indices(int m) const;
 

@@ -1724,6 +1724,52 @@ arma::ivec BasisSet::get_m_values() const {
   return ret;
 }
 
+arma::ivec BasisSet::unique_m_values() const {
+  // Find unique m values
+  arma::ivec mval(get_m_values());
+  arma::uvec muni_idx(arma::find_unique(mval));
+  arma::ivec muni(mval(muni_idx));
+  return arma::sort(muni);
+}
+
+std::map<int, arma::uword> BasisSet::unique_m_map() const {
+  arma::ivec muni(unique_m_values());
+  std::map<int, arma::uword> mlook;
+  for(arma::uword i=0;i<muni.size();i++)
+    mlook[muni(i)]=i;
+  return mlook;
+}
+
+arma::imat BasisSet::count_m_occupied(const arma::mat & C) const {
+  arma::ivec mc(m_classify(C,get_m_values()));
+
+  std::map<int, arma::uword> mlook(unique_m_map());
+
+  arma::imat occ;
+  occ.zeros(mlook.size(),3);
+  for(size_t i=0;i<C.n_cols;i++)
+    occ(mlook[mc(i)],0)++;
+  occ.col(1)=occ.col(0);
+  occ.col(2)=unique_m_values();
+  return occ;
+}
+
+arma::imat BasisSet::count_m_occupied(const arma::mat & Ca, const arma::mat & Cb) const {
+  arma::ivec mca(m_classify(Ca,get_m_values()));
+  arma::ivec mcb(m_classify(Cb,get_m_values()));
+
+  std::map<int, arma::uword> mlook(unique_m_map());
+
+  arma::imat occ;
+  occ.zeros(mlook.size(),3);
+  for(size_t i=0;i<Ca.n_cols;i++)
+    occ(mlook[mca(i)],0)++;
+  for(size_t i=0;i<Cb.n_cols;i++)
+    occ(mlook[mcb(i)],1)++;
+  occ.col(2)=unique_m_values();
+  return occ;
+}
+
 arma::uvec BasisSet::m_indices(int mwant) const {
   arma::ivec midx(get_m_values());
   return arma::find(midx==mwant);

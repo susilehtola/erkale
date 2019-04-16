@@ -249,6 +249,8 @@ class SCF {
 
   /// Calculation on linear molecule?
   bool lincalc;
+  /// Freeze linear symmetry?
+  bool linfreeze;
   /// Read orbital occupations for calculations on linear molecules?
   int readlinocc;
 

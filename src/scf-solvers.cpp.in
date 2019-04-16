@@ -311,6 +311,18 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #endif
   oldsol.en.E=0.0;
 
+  // Linear symmetry?
+  if(lincalc && linfreeze) {
+#ifdef RESTRICTED
+    arma::imat occ(basisp->count_m_occupied(sol.C.cols(0,nocc-1)));
+#else
+    arma::imat occ(basisp->count_m_occupied(sol.Ca.cols(0,nocca-1),sol.Cb.cols(0,noccb-1)));
+#endif
+    occ.save("linoccs.dat",arma::raw_ascii);
+    if(verbose)
+      printf("Guess occupations saved in linoccs.dat\n");
+  }
+
   // Pad occupancies with zeros (needed e.g. in Casida routines)
 #if !defined(RESTRICTED)
   std::vector<double> occar(occa), occbr(occb);
@@ -763,52 +775,19 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 
 #if !defined(FULLHOLE) && !defined(HALFHOLE)
     if(lincalc) {
-      // Basis set m values
-      arma::ivec mval(basisp->get_m_values());
-
-      // Find unique m values
-      arma::uvec muni_idx(arma::find_unique(mval));
-      arma::ivec muni(mval(muni_idx));
-      muni=arma::sort(muni);
-
-      // Lookup table
-      std::map<int, arma::uword> mlook;
-      for(arma::uword i=0;i<muni.size();i++)
-        mlook[muni(i)]=i;
-
       // Classify occupied orbitals by symmetry
-      arma::mat occ;
-
 #ifdef RESTRICTED
-      occ.zeros(muni.n_elem,1);
-
-      // m values of the orbitals
-      arma::ivec mc(m_classify(sol.C,basisp->get_m_values()));
-      for(size_t i=0;i<nocc;i++)
-        occ(mlook[mc(i)],0)++;
+      arma::imat occ(basisp->count_m_occupied(sol.C.cols(0,nocc-1)));
 #else
-      occ.zeros(muni.n_elem,2);
-
-      // m values of the orbitals
-      arma::ivec mca(m_classify(sol.Ca,mval));
-      for(size_t i=0;i<nocca;i++)
-        occ(mlook[mca(i)],0)++;
-      arma::ivec mcb(m_classify(sol.Cb,mval));
-      for(size_t i=0;i<noccb;i++)
-        occ(mlook[mcb(i)],1)++;
+      arma::imat occ(basisp->count_m_occupied(sol.Ca.cols(0,nocca-1),sol.Cb.cols(0,noccb-1)));
 #endif
 
       printf("\nOrbital occupations by symmetry\n");
       int msum=0;
-      for(size_t im=0;im<muni.n_elem;im++) {
-#ifdef RESTRICTED
-        if(occ(im,0)>0)
-          printf("m = % i: %2i\n",(int) muni(im),(int) occ(im,0));
-#else
+      for(size_t im=0;im<occ.n_rows;im++) {
         if(occ(im,0)+occ(im,1)>0)
-          printf("m = % i: %2i %2i\n",(int) muni(im),(int) occ(im,0),(int) occ(im,1));
-#endif
-        msum+=muni(im)*arma::sum(occ.row(im));
+          printf("m = % i: %2i %2i\n",(int) occ(im,2),(int) occ(im,0),(int) occ(im,1));
+        msum+=occ(im,2)*(occ(im,0)+occ(im,1));
       }
       printf("Sum of m values is %i ",msum);
 
