@@ -259,6 +259,11 @@ void run_calc_num(const BasisSet & basis, Settings set, bool force, int npoints,
   printf("Calculating %i displacements with %i point stencil\n",(int) Ndof,(int) dx.n_elem);
   fflush(stdout);
   for(size_t idof=0;idof<Ndof;idof++) {
+    // No x or y force
+    if(set.get_bool("LinearSymmetry"))
+      if(idof%3!=2)
+	continue;
+
     Timer tdof;
     // Energies
     arma::vec E(dx.n_elem);
