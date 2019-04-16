@@ -822,6 +822,13 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
         termsymbol="Delta";
       else if(msum==3)
         termsymbol="Phi";
+      else if(msum==4)
+        termsymbol="Gamma";
+      else {
+        std::ostringstream oss;
+        oss << "M=" << msum;
+        termsymbol=oss.str();
+      }
       printf("i.e. this is a %s state\n",termsymbol.c_str());
     }
 #endif
