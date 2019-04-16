@@ -89,6 +89,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
   // Linear molecule calculation?
   lincalc=set.get_bool("LinearSymmetry");
+  linfreeze=set.get_bool("LinearFreeze");
   readlinocc=set.get_int("LinearOccupations");
   if(readlinocc<0)
     readlinocc=INT_MAX;
@@ -3075,7 +3076,7 @@ void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, cons
     arma::uvec Cind(arma::find(Csubnrm));
 
     // Add to list of occupied orbitals
-    if(Cind.n_elem < nocc(isym))
+    if(Cind.n_elem < (size_t) nocc(isym))
       throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
     for(arma::sword io=0;io<nocc(isym);io++)
       occidx.push_back(Cind(io));
