@@ -649,10 +649,19 @@ int main_guarded(int argc, char **argv) {
       find_minimum(steps,Emin,smin,imin);
     } while(imin < 2);
 
+    bool bound=true;
+
     size_t iright=0;
     do {
       p.s=(++iright)*steplen;
       p.icalc=ncalc++;
+
+      double Rlen=R0+p.s;
+      // System is not bound
+      if(Rlen>10) {
+        bound=false;
+        break;
+      }
 
       // Load reference from earlier calculation
       if(iright==1)
@@ -697,75 +706,76 @@ int main_guarded(int argc, char **argv) {
 
     // Minimum is bracketed, proceed with search
     double deltaR;
-    do {
-      // Sort the steps in length
-      std::sort(steps.begin(),steps.end());
+    if(bound) {
+      do {
+        // Sort the steps in length
+        std::sort(steps.begin(),steps.end());
 
-      // Find minimum position
-      find_minimum(steps,Emin,smin,imin);
+        // Find minimum position
+        find_minimum(steps,Emin,smin,imin);
 
-      // Do parabolic fit
-      double a=steps[imin-1].s;
-      double b=steps[imin].s;
-      double c=steps[imin+1].s;
-      double fa=steps[imin-1].E;
-      double fb=steps[imin].E;
-      double fc=steps[imin+1].E;
+        // Do parabolic fit
+        double a=steps[imin-1].s;
+        double b=steps[imin].s;
+        double c=steps[imin+1].s;
+        double fa=steps[imin-1].E;
+        double fb=steps[imin].E;
+        double fc=steps[imin+1].E;
 
-      // Is there any variation in the function value?
-      double fmin=std::min(std::min(fa,fb),fc);
-      double fmax=std::max(std::max(fa,fb),fc);
-      if(fmax-fmin<=functhr) {
-        printf("Function value converged within threshold\n");
-        break;
-      }
-
-      // New position is at
-      double xs = b - 0.5*((b-a)*(b-a)*(fb-fc) - (b-c)*(b-c)*(fb-fa))/((b-a)*(fb-fc) - (b-c)*(fb-fa));
-
-      // Length of search intervals are
-      double len1(b-a);
-      double len2(c-b);
-      deltaR=std::max(len1,len2);
-
-      // Is this within the search interval?
-      bool parafit = (deltaR <= parathr) && xs>=a && xs<=c;
-      if(!parafit) {
-        // No, use golden ratio search
-        const double golden =(sqrt(5.0)-1.0)/2.0;
-        // Split larger interval
-        if(len1 > len2) {
-          xs = a + golden*(b-a);
-        } else {
-          xs = b + golden*(c-b);
+        // Is there any variation in the function value?
+        double fmin=std::min(std::min(fa,fb),fc);
+        double fmax=std::max(std::max(fa,fb),fc);
+        if(fmax-fmin<=functhr) {
+          printf("Function value converged within threshold\n");
+          break;
         }
-      }
 
-      // Determine point closest to the minimum
-      size_t rmin=0;
-      double dRmin=std::abs(steps[0].s-xs);
-      for(size_t i=1;i<steps.size();i++) {
-        double dR=std::abs(steps[i].s-xs);
-        if(dR<dRmin) {
-          rmin=i;
-          dRmin=dR;
+        // New position is at
+        double xs = b - 0.5*((b-a)*(b-a)*(fb-fc) - (b-c)*(b-c)*(fb-fa))/((b-a)*(fb-fc) - (b-c)*(fb-fa));
+
+        // Length of search intervals are
+        double len1(b-a);
+        double len2(c-b);
+        deltaR=std::max(len1,len2);
+
+        // Is this within the search interval?
+        bool parafit = (deltaR <= parathr) && xs>=a && xs<=c;
+        if(!parafit) {
+          // No, use golden ratio search
+          const double golden =(sqrt(5.0)-1.0)/2.0;
+          // Split larger interval
+          if(len1 > len2) {
+            xs = a + golden*(b-a);
+          } else {
+            xs = b + golden*(c-b);
+          }
         }
-      }
-      pars.set.set_string("LoadChk",getchk(rmin));
-      p.s=xs;
-      p.icalc=ncalc++;
-      pars.set.set_string("SaveChk",getchk(p.icalc));
-      chkstore.push_back(p.icalc);
-      calculate(x+p.s*sd,pars,p.E,f,false);
-      steps.push_back(p);
 
-      printf("%8.5f % 14.6f %e\n",R0+p.s,p.E,deltaR);
-      fflush(stdout);
+        // Determine point closest to the minimum
+        size_t rmin=0;
+        double dRmin=std::abs(steps[0].s-xs);
+        for(size_t i=1;i<steps.size();i++) {
+          double dR=std::abs(steps[i].s-xs);
+          if(dR<dRmin) {
+            rmin=i;
+            dRmin=dR;
+          }
+        }
+        pars.set.set_string("LoadChk",getchk(rmin));
+        p.s=xs;
+        p.icalc=ncalc++;
+        pars.set.set_string("SaveChk",getchk(p.icalc));
+        chkstore.push_back(p.icalc);
+        calculate(x+p.s*sd,pars,p.E,f,false);
+        steps.push_back(p);
 
-      fprintf(stderr,"%8.5f % 14.6f %e\n",R0+p.s,p.E,deltaR);
-      fflush(stderr);
-    } while(deltaR > deltaRthr);
+        printf("%8.5f % 14.6f %e\n",R0+p.s,p.E,deltaR);
+        fflush(stdout);
 
+        fprintf(stderr,"%8.5f % 14.6f %e\n",R0+p.s,p.E,deltaR);
+        fflush(stderr);
+      } while(deltaR > deltaRthr);
+    }
     printf("Converged\n");
 
     // Update geometry
