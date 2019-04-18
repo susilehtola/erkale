@@ -441,6 +441,8 @@ int main_guarded(int argc, char **argv) {
   set.add_double("Stepsize","Finite-difference stencil step size",1e-6);
   set.add_double("LineStepFac","Line search step length factor",sqrt(10.0));
   set.add_double("InitialStep","Initial step size in bohr",0.2);
+  set.add_double("ParaThr","Threshold for parabolic fit interval in bohr (dimer only)",1e-2);
+  set.add_double("FuncThr","Threshold for function value change in search (dimer only)",1e-6);
   set.parse(std::string(argv[1]),true);
   set.print();
 
@@ -455,6 +457,8 @@ int main_guarded(int argc, char **argv) {
   double step=set.get_double("Stepsize");
   double steplen=set.get_double("InitialStep");
   double fac=set.get_double("LineStepFac");
+  double parathr=set.get_double("ParaThr");
+  double functhr=set.get_double("FuncThr");
   int cgreset=set.get_int("CGReset");
 
   // Interpret optimizer
@@ -708,6 +712,14 @@ int main_guarded(int argc, char **argv) {
       double fb=steps[imin].E;
       double fc=steps[imin+1].E;
 
+      // Is there any variation in the function value?
+      double fmin=std::min(std::min(fa,fb),fc);
+      double fmax=std::max(std::max(fa,fb),fc);
+      if(fmax-fmin<=functhr) {
+        printf("Function value converged within threshold\n");
+        break;
+      }
+
       // New position is at
       double xs = b - 0.5*((b-a)*(b-a)*(fb-fc) - (b-c)*(b-c)*(fb-fa))/((b-a)*(fb-fc) - (b-c)*(fb-fa));
 
@@ -717,7 +729,7 @@ int main_guarded(int argc, char **argv) {
       deltaR=std::max(len1,len2);
 
       // Is this within the search interval?
-      bool parafit = (deltaR <= 1e-2) && xs>=a && xs<=c;
+      bool parafit = (deltaR <= parathr) && xs>=a && xs<=c;
       if(!parafit) {
         // No, use golden ratio search
         const double golden =(sqrt(5.0)-1.0)/2.0;
