@@ -395,6 +395,18 @@ void print_header() {
   print_hostname();
 }
 
+void find_minimum(const std::vector<linesearch_t> & steps, double & Emin, double & smin, size_t & imin) {
+  Emin=steps[0].E;
+  smin=steps[0].s;
+  imin=0;
+  for(size_t i=1;i<steps.size();i++)
+    if(steps[i].E < Emin) {
+      Emin=steps[i].E;
+      smin=steps[i].s;
+      imin=i;
+    }
+}
+
 int main_guarded(int argc, char **argv) {
   print_header();
 
@@ -428,6 +440,7 @@ int main_guarded(int argc, char **argv) {
   set.add_int("Stencil","Order of finite-difference stencil for numgrad",2);
   set.add_double("Stepsize","Finite-difference stencil step size",1e-6);
   set.add_double("LineStepFac","Line search step length factor",sqrt(10.0));
+  set.add_double("InitialStep","Initial step size in bohr",0.2);
   set.parse(std::string(argv[1]),true);
   set.print();
 
@@ -440,6 +453,7 @@ int main_guarded(int argc, char **argv) {
   bool numgrad=set.get_bool("NumGrad");
   int stencil=set.get_int("Stencil");
   double step=set.get_double("Stepsize");
+  double steplen=set.get_double("InitialStep");
   double fac=set.get_double("LineStepFac");
   int cgreset=set.get_int("CGReset");
 
@@ -555,392 +569,564 @@ int main_guarded(int argc, char **argv) {
   // Helper
   LBFGS bfgs;
 
-  // Step size
-  double steplen=1e-2;
-
   // Save calculation to
   pars.set.set_string("SaveChk",getchk(ncalc));
 
-  // Calculate energy at the starting point
-  calculate(x,pars,E,f,false);
-  chkstore.push_back(ncalc);
-  ncalc++;
-  // Turn off verbose setting for any later calcs
-  pars.set.set_bool("Verbose",false);
-  try {
-    // Also, don't localize, since it would screw up the converged guess
-    pars.set.set_string("PZloc","false");
-    // And don't run stability analysis, since we are only doing small displacements
-    pars.set.set_int("PZstab",0);
-  } catch(std::runtime_error &) {
-  }
+  if(atoms.size()==2) {
+    // Specialized code for diatomic molecules
+    double R0=std::round(dist(atoms[0],atoms[1])/steplen)*steplen;
 
-  printf("\n\nStarting geometry optimization\n");
-  printf("%4s %18s %9s %9s\n","iter","E","fmax","frms");
+    // Nuclear coordinates
+    x.zeros(6);
+    x(2)=-R0/2;
+    x(5)=R0/2;
 
-  fprintf(stderr,"\n%3s %18s %10s %10s %10s %10s %10s %10s %s\n", "it", "E", "dE", "dEfrac", "dmax ", "drms ", "fmax ", "frms ", "t");
-  fflush(stderr);
-
-  for(int iiter=0;iiter<maxiter;iiter++) {
-    Timer titer;
-
-    // Store old values of gradient and search direction
-    fold=f;
-    sdold=sd;
-
-    // Load reference from earlier calculation
-    pars.set.set_string("LoadChk",getchk(iref));
-    // Save calculation to
-    pars.set.set_string("SaveChk",getchk(ncalc));
-
-    // Calculate energy and force at current position
-    calculate(x,pars,E,f,true);
+    // Calculate energy at the starting point
+    calculate(x,pars,E,f,false);
     chkstore.push_back(ncalc);
-    // Change reference
-    iref=ncalc;
-    // Increment step value
     ncalc++;
-
-    // Store old value of energy
-    Eold=E;
-
-    // Save geometry step
-    {
-      char comment[80];
-      sprintf(comment,"Step %i",(int) iiter);
-      save_xyz(get_atoms(x,pars),comment,optmovie,true);
+    // Turn off verbose setting for any later calcs
+    pars.set.set_bool("Verbose",false);
+    try {
+      // Also, don't localize, since it would screw up the converged guess
+      pars.set.set_string("PZloc","false");
+      // And don't run stability analysis, since we are only doing small displacements
+      pars.set.set_int("PZstab",0);
+    } catch(std::runtime_error &) {
     }
 
-    // Search direction
-    sd=-f;
-    std::string steptype="SD";
-
-    if(iiter>0) {
-      if((alg==gCGPR || alg==gCGFR) && (iiter%cgreset!=0)) {
-	// Polak-Ribière
-	double gamma;
-	if(alg==gCGPR) {
-	  gamma=arma::dot(f,f-fold)/arma::dot(fold,fold);
-	  steptype="CGPR";
-	} else {
-	  gamma=arma::dot(f,f)/arma::dot(fold,fold);
-	  steptype="CGFR";
-	}
-
-	arma::vec sdnew=sd+gamma*sdold;
-	if(arma::dot(f,fold)>=0.2*arma::dot(fold,fold)) {
-	  steptype="Powell restart - SD";
-	} else
-	  sd=sdnew;
-
-      } else if(alg==gBFGS) {
-	// Update BFGS
-	bfgs.update(x,f);
-	// Get search direction
-	sd=-bfgs.solve();
-	steptype="BFGS";
-      }
-
-      // Check we are still going downhill / BFGS direction isn't nan
-      if(!(arma::dot(sd,f)<=0)) {
-	steptype+=": Bad search direction. SD";
-	sd=-f;
-      }
-    }
-
-    // Get forces
-    double fmax, frms;
-    get_forces(f, fmax, frms);
-
-    // Macroiteration status
-    printf("\n%s step\n",steptype.c_str());
-    printf("%4i % 18.10f %.3e %.3e\n",iiter,E,fmax,frms);
-    fflush(stdout);
-
-    // Legend
-    printf("\t%2s %12s %13s\n","i","step","dE");
-
-    // Do a line search on the search direction by bracketing the
-    // minimum
+    // Bond distance search structure
     std::vector<linesearch_t> steps;
+    linesearch_t p;
+    p.s=0;
+    p.icalc=ncalc-1;
+    p.E=E;
+    steps.push_back(p);
 
-    // Initial entry is
-    {
-      // Step length and energy
-      linesearch_t p;
-      p.s=0.0;
-      p.E=E;
-      p.icalc=iref;
-      steps.push_back(p);
-    }
+    printf("\nDimer calculation\n");
+    printf("%8s %14s %12s\n","R (bohr)","Energy","Delta R");
+    printf("%8.5f % 14.6f\n",R0,E);
 
-    // First, try the step length as is
-    {
-      Timer ts;
+    fprintf(stderr,"%8s %14s %12s\n","R (bohr)","Energy","Delta R");
+    fprintf(stderr,"%8.5f % 14.6f\n",R0,E);
 
-      // Step length and energy
-      linesearch_t p;
-      p.s=steplen;
-      p.icalc=ncalc;
-
-      double Et;
-      arma::vec ft;
-      pars.set.set_string("LoadChk",getchk(iref));
-      pars.set.set_string("SaveChk",getchk(ncalc));
-      calculate(x+p.s*sd,pars,Et,ft,false);
-      iref=ncalc;
-      chkstore.push_back(ncalc);
-      ncalc++;
-
-      p.E=Et;
-      steps.push_back(p);
-
-      printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
-      fflush(stdout);
-    }
+    // Search direction is bond length
+    sd.zeros(6);
+    sd(2)=-0.5;
+    sd(5)=0.5;
 
     // Minimum energy and index
     double Emin;
+    double smin;
     size_t imin;
 
-    while(true) {
-      // Sort the steps in length
-      std::sort(steps.begin(),steps.end());
+    // Go closer
+    size_t ileft=0;
+    do {
+      p.s=-1.0*((++ileft)*steplen);
+      p.icalc=ncalc++;
+
+      // Load reference from earlier calculation
+      pars.set.set_string("LoadChk",getchk(p.icalc-1));
+      // Save calculation to
+      pars.set.set_string("SaveChk",getchk(p.icalc));
+
+      calculate(x+p.s*sd,pars,p.E,f,false);
+      chkstore.push_back(p.icalc);
+      steps.insert(steps.begin(),p);
+
+      printf("%8.5f % 14.6f\n",R0+p.s,p.E);
+      fflush(stdout);
+
+      fprintf(stderr,"%8.5f % 14.6f\n",R0+p.s,p.E);
+      fflush(stderr);
 
       // Find the minimum energy
-      Emin=steps[0].E;
-      imin=0;
-      for(size_t i=1;i<steps.size();i++)
-	if(steps[i].E < Emin) {
-	  Emin=steps[i].E;
-	  imin=i;
-	}
+      find_minimum(steps,Emin,smin,imin);
+    } while(imin < 2);
 
-      // Where is the minimum?
-      if(imin==0 || imin==1 || imin==steps.size()-1) {
-	Timer ts;
+    size_t iright=0;
+    do {
+      p.s=(++iright)*steplen;
+      p.icalc=ncalc++;
 
-	linesearch_t p;
-	if(imin==0 || (steps.size()>2 && imin==1)) {
-          // Need smaller step
-	  p.s=steps[1].s/fac;
+      // Load reference from earlier calculation
+      if(iright==1)
+        pars.set.set_string("LoadChk",getchk(0));
+      else
+        pars.set.set_string("LoadChk",getchk(p.icalc-1));
+      // Save calculation to
+      pars.set.set_string("SaveChk",getchk(p.icalc));
+      calculate(x+p.s*sd,pars,p.E,f,false);
+      chkstore.push_back(p.icalc);
+      steps.push_back(p);
 
-          if(p.s*arma::max(arma::abs(sd)) < DBL_EPSILON) {
-            printf("Step length too small, stopping line search.\n");
-            break;
-          }
-	} else {
-          // Need bigger step
-	  p.s=steps[imin].s*fac;
-	}
-	p.icalc=ncalc;
+      printf("%8.5f % 14.6f\n",R0+p.s,p.E);
+      fflush(stdout);
 
-	double Et;
-	arma::vec ft;
-	pars.set.set_string("LoadChk",getchk(steps[imin].icalc));
-	pars.set.set_string("SaveChk",getchk(ncalc));
-	calculate(x+p.s*sd,pars,Et,ft,false);
-	chkstore.push_back(ncalc);
-	ncalc++;
+      fprintf(stderr,"%8.5f % 14.6f\n",R0+p.s,p.E);
+      fflush(stderr);
 
-	p.E=Et;
-	steps.push_back(p);
-	printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
-	fflush(stdout);
+      // Find the minimum energy
+      find_minimum(steps,Emin,smin,imin);
+    } while(imin >= steps.size()-1);
 
-      } else {
-	// Optimum is somewhere in the middle
-	break;
-      }
-    }
-
-    // Find the minimum energy
-    Emin=steps[0].E;
-    imin=0;
-    for(size_t i=1;i<steps.size();i++)
-      if(steps[i].E < Emin) {
-        Emin=steps[i].E;
-        imin=i;
-      }
-    if(imin == 0) {
-      printf("Energy not decreasing.\n");
-      break;
-    }
-
-    {
-      // Interpolate: A b = y
-      arma::mat A(3,3);
-      arma::vec y(3);
-      for(size_t i=0;i<3;i++) {
-	A(i,0)=1.0;
-	A(i,1)=steps[imin+i-1].s;
-	A(i,2)=std::pow(A(i,1),2);
-
-	y(i)=steps[imin+i-1].E;
-      }
-
-      arma::mat b;
-      if(arma::solve(b,A,y) && b(2)>sqrt(DBL_EPSILON)) {
-	// Success in solution and parabola gives minimum.
-
-	// The minimum of the parabola is at
-	double x0=-b(1)/(2*b(2));
-
-	// Is this an interpolation?
-	if(A(0,1) < x0 && x0 < A(2,1)) {
-	  Timer ts;
-
-	  // Figure out which reference is the closest
-	  iref=steps[imin-1].icalc;
-	  double dminv=std::abs(x0-A(0,1));
-	  for(size_t i=1;i<A.n_rows;i++) {
-	    double d=std::abs(x0-A(i,1));
-	    if(d<dminv) {
-	      dminv=d;
-	      iref=steps[imin+i-1].icalc;
-	    }
-	  }
-
-	  // Do the calculation with the interpolated step
-	  linesearch_t p;
-	  p.s=x0;
-	  p.icalc=ncalc;
-
-	  double Et;
-	  arma::vec ft;
-	  pars.set.set_string("LoadChk",getchk(iref));
-	  pars.set.set_string("SaveChk",getchk(ncalc));
-	  calculate(x+p.s*sd,pars,Et,ft,false);
-	  chkstore.push_back(ncalc);
-	  ncalc++;
-
-	  p.E=Et;
-	  steps.push_back(p);
-	  printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
-	  fflush(stdout);
-
-	  // Resort the steps in length
-	  std::sort(steps.begin(),steps.end());
-
-	  // Find the minimum energy
-	  Emin=steps[0].E;
-	  imin=0;
-	  for(size_t i=1;i<steps.size();i++)
-	    if(steps[i].E < Emin) {
-	      Emin=steps[i].E;
-	      imin=i;
-	    }
-        }
-      }
-    }
-
-    // Switch to the minimum geometry
-    x+=steps[imin].s*sd;
-    iref=steps[imin].icalc;
-
-    // Store optimal step length
-    steplen=steps[imin].s;
-
-    printf("Best step size %e changed energy by % e\n",steplen,steps[imin].E-E);
-
-    // Copy checkpoint file
-    {
-      std::ostringstream oss;
-      oss << "\\cp " << getchk(iref) << " " << set.get_string("SaveChk");
-      if(system(oss.str().c_str()))
-	throw std::runtime_error("Error copying checkpoint.\n");
-    }
-
-    // Erase all unnecessary calcs
-    for(size_t i=0;i<chkstore.size();i++)
-      if(chkstore[i]!=iref)
-	remove(getchk(chkstore[i]).c_str());
-
-    // New geometry
-    std::vector<atom_t> geom=get_atoms(x,pars);
-
-    // Calculate displacements
-    double dmax, drms;
-    get_displacement(geom, oldgeom, dmax, drms);
-    // Calculate projected change of energy
-    double dEproj=calculate_projection(geom,oldgeom,f,pars.dofidx);
-    // Actual change of energy is
-    double dE=steps[imin].E - Eold;
-
-    // Store new geometry
-    oldgeom=geom;
-
-    // Check convergence
-    bool fmaxconv=false, frmsconv=false;
-    bool dmaxconv=false, drmsconv=false;
-
+    // Threshold
+    double deltaRthr;
     switch(crit) {
-
     case(LOOSE):
-      if(fmax < 2.5e-3)
-	fmaxconv=true;
-      if(frms < 1.7e-3)
-	frmsconv=true;
-      if(dmax < 1.0e-2)
-	dmaxconv=true;
-      if(drms < 6.7e-3)
-	drmsconv=true;
+      deltaRthr=1.0e-2;
       break;
-
     case(NORMAL):
-      if(fmax < 4.5e-4)
-	fmaxconv=true;
-      if(frms < 3.0e-4)
-	frmsconv=true;
-      if(dmax < 1.8e-3)
-	dmaxconv=true;
-      if(drms < 1.2e-3)
-	drmsconv=true;
+      deltaRthr=1.0e-3;
       break;
-
     case(TIGHT):
-      if(fmax < 1.5e-5)
-	fmaxconv=true;
-      if(frms < 1.0e-5)
-	frmsconv=true;
-      if(dmax < 6.0e-5)
-	dmaxconv=true;
-      if(drms < 4.0e-5)
-	drmsconv=true;
+      deltaRthr=1.0e-4;
       break;
-
     case(VERYTIGHT):
-      if(fmax < 2.0e-6)
-	fmaxconv=true;
-      if(frms < 1.0e-6)
-	frmsconv=true;
-      if(dmax < 6.0e-6)
-	dmaxconv=true;
-      if(drms < 4.0e-6)
-	drmsconv=true;
+      deltaRthr=1.0e-5;
       break;
 
     default:
-      ERROR_INFO();
-      throw std::runtime_error("Not implemented!\n");
+      throw std::logic_error("Case not handled.\n");
     }
 
-    double dEfrac;
-    if(dEproj!=0.0)
-      dEfrac=dE/dEproj;
-    else
-      dEfrac=0.0;
+    // Minimum is bracketed, proceed with search
+    double deltaR;
+    do {
+      // Sort the steps in length
+      std::sort(steps.begin(),steps.end());
 
-    const static char cconv[]=" *";
+      // Find minimum position
+      find_minimum(steps,Emin,smin,imin);
 
-    fprintf(stderr,"%3i % 18.10f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", iiter, E, dE, dEfrac, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
+      // Do parabolic fit
+      double a=steps[imin-1].s;
+      double b=steps[imin].s;
+      double c=steps[imin+1].s;
+      double fa=steps[imin-1].E;
+      double fb=steps[imin].E;
+      double fc=steps[imin+1].E;
+
+      // New position is at
+      double xs = b - 0.5*((b-a)*(b-a)*(fb-fc) - (b-c)*(b-c)*(fb-fa))/((b-a)*(fb-fc) - (b-c)*(fb-fa));
+
+      // Length of search intervals are
+      double len1(b-a);
+      double len2(c-b);
+      deltaR=std::max(len1,len2);
+
+      // Is this within the search interval?
+      bool parafit = (deltaR <= 1e-2) && xs>=a && xs<=c;
+      if(!parafit) {
+        // No, use golden ratio search
+        const double golden =(sqrt(5.0)-1.0)/2.0;
+        // Split larger interval
+        if(len1 > len2) {
+          xs = a + golden*(b-a);
+        } else {
+          xs = b + golden*(c-b);
+        }
+      }
+
+      // Determine point closest to the minimum
+      size_t rmin=0;
+      double dRmin=std::abs(steps[0].s-xs);
+      for(size_t i=1;i<steps.size();i++) {
+        double dR=std::abs(steps[i].s-xs);
+        if(dR<dRmin) {
+          rmin=i;
+          dRmin=dR;
+        }
+      }
+      pars.set.set_string("LoadChk",getchk(rmin));
+      p.s=xs;
+      p.icalc=ncalc++;
+      pars.set.set_string("SaveChk",getchk(p.icalc));
+      chkstore.push_back(p.icalc);
+      calculate(x+p.s*sd,pars,p.E,f,false);
+      steps.push_back(p);
+
+      printf("%8.5f % 14.6f %e\n",R0+p.s,p.E,deltaR);
+      fflush(stdout);
+
+      fprintf(stderr,"%8.5f % 14.6f %e\n",R0+p.s,p.E,deltaR);
+      fflush(stderr);
+    } while(deltaR > deltaRthr);
+
+    printf("Converged\n");
+
+    // Update geometry
+    find_minimum(steps,Emin,smin,imin);
+    x+=sd*smin;
+
+  } else {
+
+    // Calculate energy at the starting point
+    calculate(x,pars,E,f,false);
+    chkstore.push_back(ncalc);
+    ncalc++;
+    // Turn off verbose setting for any later calcs
+    pars.set.set_bool("Verbose",false);
+    try {
+      // Also, don't localize, since it would screw up the converged guess
+      pars.set.set_string("PZloc","false");
+      // And don't run stability analysis, since we are only doing small displacements
+      pars.set.set_int("PZstab",0);
+    } catch(std::runtime_error &) {
+    }
+
+    printf("\n\nStarting geometry optimization\n");
+    printf("%4s %18s %9s %9s\n","iter","E","fmax","frms");
+
+    fprintf(stderr,"\n%3s %18s %10s %10s %10s %10s %10s %10s %s\n", "it", "E", "dE", "dEfrac", "dmax ", "drms ", "fmax ", "frms ", "t");
     fflush(stderr);
 
-    bool convd=dmaxconv && drmsconv && fmaxconv && frmsconv;
+    for(int iiter=0;iiter<maxiter;iiter++) {
+      Timer titer;
 
-    if(convd) {
-      fprintf(stderr,"Converged.\n");
-      break;
+      // Store old values of gradient and search direction
+      fold=f;
+      sdold=sd;
+
+      // Load reference from earlier calculation
+      pars.set.set_string("LoadChk",getchk(iref));
+      // Save calculation to
+      pars.set.set_string("SaveChk",getchk(ncalc));
+
+      // Calculate energy and force at current position
+      calculate(x,pars,E,f,true);
+      chkstore.push_back(ncalc);
+      // Change reference
+      iref=ncalc;
+      // Increment step value
+      ncalc++;
+
+      // Store old value of energy
+      Eold=E;
+
+      // Save geometry step
+      {
+        char comment[80];
+        sprintf(comment,"Step %i",(int) iiter);
+        save_xyz(get_atoms(x,pars),comment,optmovie,true);
+      }
+
+      // Search direction
+      sd=-f;
+      std::string steptype="SD";
+
+      if(iiter>0) {
+        if((alg==gCGPR || alg==gCGFR) && (iiter%cgreset!=0)) {
+          // Polak-Ribière
+          double gamma;
+          if(alg==gCGPR) {
+            gamma=arma::dot(f,f-fold)/arma::dot(fold,fold);
+            steptype="CGPR";
+          } else {
+            gamma=arma::dot(f,f)/arma::dot(fold,fold);
+            steptype="CGFR";
+          }
+
+          arma::vec sdnew=sd+gamma*sdold;
+          if(arma::dot(f,fold)>=0.2*arma::dot(fold,fold)) {
+            steptype="Powell restart - SD";
+          } else
+            sd=sdnew;
+
+        } else if(alg==gBFGS) {
+          // Update BFGS
+          bfgs.update(x,f);
+          // Get search direction
+          sd=-bfgs.solve();
+          steptype="BFGS";
+        }
+
+        // Check we are still going downhill / BFGS direction isn't nan
+        if(!(arma::dot(sd,f)<=0)) {
+          steptype+=": Bad search direction. SD";
+          sd=-f;
+        }
+      }
+
+      // Get forces
+      double fmax, frms;
+      get_forces(f, fmax, frms);
+
+      // Macroiteration status
+      printf("\n%s step\n",steptype.c_str());
+      printf("%4i % 18.10f %.3e %.3e\n",iiter,E,fmax,frms);
+      fflush(stdout);
+
+      // Legend
+      printf("\t%2s %12s %13s\n","i","step","dE");
+
+      // Do a line search on the search direction by bracketing the
+      // minimum
+      std::vector<linesearch_t> steps;
+
+      // Initial entry is
+      {
+        // Step length and energy
+        linesearch_t p;
+        p.s=0.0;
+        p.E=E;
+        p.icalc=iref;
+        steps.push_back(p);
+      }
+
+      // First, try the step length as is
+      {
+        Timer ts;
+
+        // Step length and energy
+        linesearch_t p;
+        p.s=steplen;
+        p.icalc=ncalc;
+
+        double Et;
+        arma::vec ft;
+        pars.set.set_string("LoadChk",getchk(iref));
+        pars.set.set_string("SaveChk",getchk(ncalc));
+        calculate(x+p.s*sd,pars,Et,ft,false);
+        iref=ncalc;
+        chkstore.push_back(ncalc);
+        ncalc++;
+
+        p.E=Et;
+        steps.push_back(p);
+
+        printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
+        fflush(stdout);
+      }
+
+      // Minimum energy and index
+      double Emin;
+      size_t imin;
+
+      while(true) {
+        // Sort the steps in length
+        std::sort(steps.begin(),steps.end());
+
+        // Find the minimum energy
+        double smin;
+        find_minimum(steps,Emin,smin,imin);
+
+        // Where is the minimum?
+        if(imin==0 || imin==1 || imin==steps.size()-1) {
+          Timer ts;
+
+          linesearch_t p;
+          if(imin==0 || (steps.size()>2 && imin==1)) {
+            // Need smaller step
+            p.s=steps[1].s/fac;
+
+            if(p.s*arma::max(arma::abs(sd)) < DBL_EPSILON) {
+              printf("Step length too small, stopping line search.\n");
+              break;
+            }
+          } else {
+            // Need bigger step
+            p.s=steps[imin].s*fac;
+          }
+          p.icalc=ncalc;
+
+          double Et;
+          arma::vec ft;
+          pars.set.set_string("LoadChk",getchk(steps[imin].icalc));
+          pars.set.set_string("SaveChk",getchk(ncalc));
+          calculate(x+p.s*sd,pars,Et,ft,false);
+          chkstore.push_back(ncalc);
+          ncalc++;
+
+          p.E=Et;
+          steps.push_back(p);
+          printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
+          fflush(stdout);
+
+        } else {
+          // Optimum is somewhere in the middle
+          break;
+        }
+      }
+
+      // Find the minimum energy
+      double smin;
+      find_minimum(steps,Emin,smin,imin);
+      if(imin == 0) {
+        printf("Energy not decreasing.\n");
+        break;
+      }
+
+      {
+        // Interpolate: A b = y
+        arma::mat A(3,3);
+        arma::vec y(3);
+        for(size_t i=0;i<3;i++) {
+          A(i,0)=1.0;
+          A(i,1)=steps[imin+i-1].s;
+          A(i,2)=std::pow(A(i,1),2);
+
+          y(i)=steps[imin+i-1].E;
+        }
+
+        arma::mat b;
+        if(arma::solve(b,A,y) && b(2)>sqrt(DBL_EPSILON)) {
+          // Success in solution and parabola gives minimum.
+
+          // The minimum of the parabola is at
+          double x0=-b(1)/(2*b(2));
+
+          // Is this an interpolation?
+          if(A(0,1) < x0 && x0 < A(2,1)) {
+            Timer ts;
+
+            // Figure out which reference is the closest
+            iref=steps[imin-1].icalc;
+            double dminv=std::abs(x0-A(0,1));
+            for(size_t i=1;i<A.n_rows;i++) {
+              double d=std::abs(x0-A(i,1));
+              if(d<dminv) {
+                dminv=d;
+                iref=steps[imin+i-1].icalc;
+              }
+            }
+
+            // Do the calculation with the interpolated step
+            linesearch_t p;
+            p.s=x0;
+            p.icalc=ncalc;
+
+            double Et;
+            arma::vec ft;
+            pars.set.set_string("LoadChk",getchk(iref));
+            pars.set.set_string("SaveChk",getchk(ncalc));
+            calculate(x+p.s*sd,pars,Et,ft,false);
+            chkstore.push_back(ncalc);
+            ncalc++;
+
+            p.E=Et;
+            steps.push_back(p);
+            printf("\t%2i %e % e %s\n",(int) steps.size()-1,p.s,Et-E,ts.elapsed().c_str());
+            fflush(stdout);
+
+            // Resort the steps in length
+            std::sort(steps.begin(),steps.end());
+
+            // Find the minimum energy
+            find_minimum(steps,Emin,smin,imin);
+          }
+        }
+      }
+
+      // Switch to the minimum geometry
+      x+=steps[imin].s*sd;
+      iref=steps[imin].icalc;
+
+      // Store optimal step length
+      steplen=steps[imin].s;
+
+      printf("Best step size %e changed energy by % e\n",steplen,steps[imin].E-E);
+
+      // Copy checkpoint file
+      {
+        std::ostringstream oss;
+        oss << "\\cp " << getchk(iref) << " " << set.get_string("SaveChk");
+        if(system(oss.str().c_str()))
+          throw std::runtime_error("Error copying checkpoint.\n");
+      }
+
+      // Erase all unnecessary calcs
+      for(size_t i=0;i<chkstore.size();i++)
+        if(chkstore[i]!=iref)
+          remove(getchk(chkstore[i]).c_str());
+
+      // New geometry
+      std::vector<atom_t> geom=get_atoms(x,pars);
+
+      // Calculate displacements
+      double dmax, drms;
+      get_displacement(geom, oldgeom, dmax, drms);
+      // Calculate projected change of energy
+      double dEproj=calculate_projection(geom,oldgeom,f,pars.dofidx);
+      // Actual change of energy is
+      double dE=steps[imin].E - Eold;
+
+      // Store new geometry
+      oldgeom=geom;
+
+      // Check convergence
+      bool fmaxconv=false, frmsconv=false;
+      bool dmaxconv=false, drmsconv=false;
+
+      switch(crit) {
+
+      case(LOOSE):
+        if(fmax < 2.5e-3)
+          fmaxconv=true;
+        if(frms < 1.7e-3)
+          frmsconv=true;
+        if(dmax < 1.0e-2)
+          dmaxconv=true;
+        if(drms < 6.7e-3)
+          drmsconv=true;
+        break;
+
+      case(NORMAL):
+        if(fmax < 4.5e-4)
+          fmaxconv=true;
+        if(frms < 3.0e-4)
+          frmsconv=true;
+        if(dmax < 1.8e-3)
+          dmaxconv=true;
+        if(drms < 1.2e-3)
+          drmsconv=true;
+        break;
+
+      case(TIGHT):
+        if(fmax < 1.5e-5)
+          fmaxconv=true;
+        if(frms < 1.0e-5)
+          frmsconv=true;
+        if(dmax < 6.0e-5)
+          dmaxconv=true;
+        if(drms < 4.0e-5)
+          drmsconv=true;
+        break;
+
+      case(VERYTIGHT):
+        if(fmax < 2.0e-6)
+          fmaxconv=true;
+        if(frms < 1.0e-6)
+          frmsconv=true;
+        if(dmax < 6.0e-6)
+          dmaxconv=true;
+        if(drms < 4.0e-6)
+          drmsconv=true;
+        break;
+
+      default:
+        ERROR_INFO();
+        throw std::runtime_error("Not implemented!\n");
+      }
+
+      double dEfrac;
+      if(dEproj!=0.0)
+        dEfrac=dE/dEproj;
+      else
+        dEfrac=0.0;
+
+      const static char cconv[]=" *";
+
+      fprintf(stderr,"%3i % 18.10f % .3e % .3e %.3e%c %.3e%c %.3e%c %.3e%c %s\n", iiter, E, dE, dEfrac, dmax, cconv[dmaxconv], drms, cconv[drmsconv], fmax, cconv[fmaxconv], frms, cconv[frmsconv], titer.elapsed().c_str());
+      fflush(stderr);
+
+      bool convd=dmaxconv && drmsconv && fmaxconv && frmsconv;
+
+      if(convd) {
+        fprintf(stderr,"Converged.\n");
+        break;
+      }
     }
   }
 

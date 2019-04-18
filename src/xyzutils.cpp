@@ -27,6 +27,13 @@
 #include <fstream>
 #include <cstdio>
 
+double distsq(const atom_t & lh, const atom_t & rh) {
+  return std::pow(lh.x-rh.x,2) + std::pow(lh.y-rh.y,2) + std::pow(lh.z-rh.z,2);
+}
+
+double dist(const atom_t & lh, const atom_t & rh) {
+  return sqrt(distsq(lh,rh));
+}
 
 std::vector<atom_t> load_xyz(std::string filename, bool convert) {
   // Check if input is actually Z-Matrix

@@ -38,6 +38,11 @@ typedef struct {
   int Q;
 } atom_t;
 
+/// Squared distance between atoms
+double distsq(const atom_t & lh, const atom_t & rh);
+/// Distance between atoms
+double dist(const atom_t & lh, const atom_t & rh);
+
 /// Load atoms from xyz file, return list of atoms, converting angstrom to au. Returns everything in atomic units.
 std::vector<atom_t> load_xyz(std::string filename, bool convert);
 
