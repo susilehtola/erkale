@@ -442,6 +442,7 @@ int main_guarded(int argc, char **argv) {
   set.add_double("LineStepFac","Line search step length factor",sqrt(10.0));
   set.add_double("InitialStep","Initial step size in bohr",0.2);
   set.add_double("ParaThr","Threshold for parabolic fit interval in bohr (dimer only)",1e-2);
+  set.add_double("BoundThr","Threshold for bond distance of bound molecules (dimer only)",10.0);
   set.add_double("FuncThr","Threshold for function value change in search (dimer only)",1e-6);
   set.parse(std::string(argv[1]),true);
   set.print();
@@ -456,6 +457,7 @@ int main_guarded(int argc, char **argv) {
   int stencil=set.get_int("Stencil");
   double step=set.get_double("Stepsize");
   double steplen=set.get_double("InitialStep");
+  double Rcutoff=set.get_double("BoundThr");
   double fac=set.get_double("LineStepFac");
   double parathr=set.get_double("ParaThr");
   double functhr=set.get_double("FuncThr");
@@ -658,7 +660,7 @@ int main_guarded(int argc, char **argv) {
 
       double Rlen=R0+p.s;
       // System is not bound
-      if(Rlen>10) {
+      if(Rlen>Rcutoff) {
         bound=false;
         break;
       }
@@ -706,8 +708,10 @@ int main_guarded(int argc, char **argv) {
 
     // Minimum is bracketed, proceed with search
     double deltaR;
+    bool convd=false;
+    int nrefined=0;
     if(bound) {
-      do {
+      while(true) {
         // Sort the steps in length
         std::sort(steps.begin(),steps.end());
 
@@ -774,9 +778,25 @@ int main_guarded(int argc, char **argv) {
 
         fprintf(stderr,"%8.5f % 14.6f %e\n",R0+p.s,p.E,deltaR);
         fflush(stderr);
-      } while(deltaR > deltaRthr);
+
+        if(deltaR < deltaRthr) {
+          convd=true;
+          break;
+        }
+
+        // Increment iteration count
+        nrefined++;
+        if(nrefined>=maxiter) {
+          break;
+        }
+      }
     }
-    printf("Converged\n");
+    if(convd)
+      printf("Converged\n");
+    else {
+      printf("Failed to attain converge\n");
+      return 1;
+    }
 
     // Update geometry
     find_minimum(steps,Emin,smin,imin);
