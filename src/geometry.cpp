@@ -363,7 +363,7 @@ void calculate(const arma::vec & x, const opthelper_t & p, double & E, arma::vec
 
 std::string getchk(size_t n) {
   std::ostringstream oss;
-  oss << "geomcalc_" << n << ".chk";
+  oss << "geomcalc_" << getpid() << "_" << n << ".chk";
   return oss.str();
 }
 
