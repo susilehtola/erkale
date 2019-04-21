@@ -29,6 +29,36 @@
 #include "version.h"
 #endif
 
+bool check_configuration(const arma::imat & conf, int mrestr) {
+  int mmax=(conf.n_rows-1)/2;
+
+  // Calculate net value of m
+  int mnet=0;
+  for(int m=-mmax;m<=mmax;m++)
+    mnet+=m*(conf(m+mmax,0)+conf(m+mmax,1));
+  if(mnet<0)
+    // Restrict to considering positive net values of m
+    return false;
+
+  if(mrestr)
+    for(int m=1;m<=mmax;m++) {
+      int dna=conf(m+mmax,0)-conf(mmax-m,0);
+      int dnb=conf(m+mmax,1)-conf(mmax-m,1);
+      if(mrestr == 1 && (dna+dnb)<0) {
+        //printf("Configuration not allowed due to m=%i\n",m);
+        //conf.print();
+        return false;
+      }
+      if(mrestr == 2 && ((dna<0) || (dnb<0))) {
+        //printf("Configuration not allowed due to m=%i\n",m);
+        //conf.print();
+        return false;
+      }
+    }
+
+  return true;
+}
+
 int main(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - Linear symmetries from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
@@ -44,22 +74,18 @@ int main(int argc, char **argv) {
   // Parse settings
   Settings set;
   set.add_string("Nuclei","Nuclei in molecule","");
-  set.add_int("Nspin","Number of spin states to look at",1);
-  set.add_int("Mmax","Maximum net angular momentum allowed",3);
   set.add_int("Charge","Charge state for molecule",0,true);
   set.add_bool("saveconf","Save configurations to disk",true);
   set.add_bool("savegeom","Save geometry to disk",true);
-  set.add_bool("mrestr","Restrict m value imbalances",true);
+  set.add_int("mrestr","Restrict m value imbalances: 1 total, 2 within each spin channel",2);
   set.add_bool("largeactive","Use larger active space?",false);
   set.parse(std::string(argv[1]),true);
   set.print();
-  int nspin=set.get_int("Nspin");
-  int netmmax=set.get_int("Mmax");
   int Q=set.get_int("Charge");
   bool saveconf=set.get_bool("saveconf");
   bool savegeom=set.get_bool("savegeom");
   bool largeactive=set.get_bool("largeactive");
-  bool mrestr=set.get_bool("mrestr");
+  int mrestr=set.get_int("mrestr");
   std::string nucstr=set.get_string("Nuclei");
 
   std::vector<std::string> nuclei(splitline(nucstr));
@@ -186,16 +212,16 @@ int main(int argc, char **argv) {
 
   // Generate spin states
   size_t totnconf=0;
-  for(int nx=0;nx<nspin;nx++) {
+  for(int nx=0;;nx++) {
     int nelb=(nelectrons/2)-nx;
     int nela=nelectrons-nelb;
     int dnel=nela-nelb;
 
     // Can we even have this spin state for this molecule?
     if(nela>arma::sum(active))
-      continue;
+      break;
     if(nelb<0)
-      continue;
+      break;
 
     printf("Spin state S = %i\n",1+dnel);
 
@@ -215,19 +241,6 @@ int main(int argc, char **argv) {
       bocc.zeros();
       for(int i=0;i<nelb;i++)
         bocc(mmax+ohelper[i])++;
-
-      if(mrestr) {
-        // Compute net value of m
-        int mnet=0;
-        for(int m=-mmax;m<=mmax;m++)
-          mnet+=m*bocc(m+mmax);
-        if(mnet<0)
-          // Restrict to considering positive net values of m
-          continue;
-        if(mnet>netmmax)
-          // Too large net am
-          continue;
-      }
 
       // Check that an identical one does not exist
       bool exist=false;
@@ -253,19 +266,9 @@ int main(int argc, char **argv) {
         occs.col(0)=beta_occs[ibeta];
         occs.col(1)=beta_occs[ibeta];
 
-        // Compute net value of m
-        int mnet=0;
-        for(int m=-mmax;m<=mmax;m++)
-          mnet+=m*arma::sum(occs.row(m+mmax));
-        if(mnet<0)
-          // Restrict to considering positive net values of m
-          continue;
-        if(mnet>netmmax)
-          // Too large net am
-          continue;
-
         // Add to list
-        occlist.push_back(occs);
+        if(check_configuration(occs,mrestr))
+          occlist.push_back(occs);
       }
     } else {
       for(size_t ibeta=0;ibeta<beta_occs.size();ibeta++) {
@@ -290,17 +293,6 @@ int main(int argc, char **argv) {
           // Plug in the occupied beta background
           aocc+=beta_occs[ibeta];
 
-          // Calculate net value of m
-          int mnet=0;
-          for(int m=-mmax;m<=mmax;m++)
-            mnet+=m*(aocc(m+mmax)+beta_occs[ibeta](m+mmax));
-          if(mnet<0)
-            // Restrict to considering positive net values of m
-            continue;
-          if(mnet>netmmax)
-            // Too large net am
-            continue;
-
           // Check that an identical one does not exist
           bool exist=false;
           for(size_t i=0;i<alpha_occs.size();i++) {
@@ -321,7 +313,9 @@ int main(int argc, char **argv) {
           arma::imat occs(beta_occs[ibeta].n_elem,2);
           occs.col(0)=alpha_occs[ialpha];
           occs.col(1)=beta_occs[ibeta];
-          occlist.push_back(occs);
+
+          if(check_configuration(occs,mrestr))
+            occlist.push_back(occs);
         }
       }
     }
@@ -373,7 +367,7 @@ int main(int argc, char **argv) {
     }
 
     // Print out configurations
-    std::vector<size_t> numconf(netmmax+1,0);
+    std::vector<size_t> numconf;
     for(size_t iconf=0;iconf<occlist.size();iconf++) {
       arma::imat conf(2*mmax+1,3);
       // Plug in frozen core orbitals
@@ -389,10 +383,16 @@ int main(int argc, char **argv) {
       int mnet=0;
       for(int m=-mmax;m<=mmax;m++)
         mnet+=m*nelec(m+mmax);
+      if(mnet<0)
+        throw std::logic_error("Shouldn't have config with m<0^!\n");
 
       // Get rid of zero rows
       arma::uvec idx(arma::find(nelec>0));
       conf=conf.rows(idx);
+
+      // Check storage space
+      if(numconf.size() <= (size_t) mnet)
+        numconf.resize(mnet+1,0);
 
       if(saveconf) {
         std::ostringstream oss;
