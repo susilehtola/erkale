@@ -253,6 +253,8 @@ class SCF {
   bool linfreeze;
   /// Read orbital occupations for calculations on linear molecules?
   int readlinocc;
+  /// File where to read occupations from
+  std::string linoccfname;
 
   /// Use ADIIS?
   bool useadiis;

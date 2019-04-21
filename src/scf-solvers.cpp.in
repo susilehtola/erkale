@@ -318,9 +318,9 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #else
     arma::imat occ(basisp->count_m_occupied(sol.Ca.cols(0,nocca-1),sol.Cb.cols(0,noccb-1)));
 #endif
-    occ.save("linoccs.dat",arma::raw_ascii);
+    occ.save(linoccfname,arma::raw_ascii);
     if(verbose)
-      printf("Guess occupations saved in linoccs.dat\n");
+      printf("Guess occupations saved in %s\n",linoccfname.c_str());
   }
 
   // Pad occupancies with zeros (needed e.g. in Casida routines)
@@ -549,7 +549,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #if !defined(FULLHOLE) && !defined(HALFHOLE)
     if(lincalc && iiter<=readlinocc) {
       arma::imat linoccs;
-      linoccs.load("linoccs.dat",arma::raw_ascii);
+      linoccs.load(linoccfname,arma::raw_ascii);
       if(linoccs.n_cols < 3) {
         throw std::logic_error("Must have at least three columns in occupation data.\n");
       }
