@@ -731,6 +731,7 @@ int main_guarded(int argc, char **argv) {
         double fmax=std::max(std::max(fa,fb),fc);
         if(fmax-fmin<=functhr) {
           printf("Function value converged within threshold\n");
+          convd=true;
           break;
         }
 
