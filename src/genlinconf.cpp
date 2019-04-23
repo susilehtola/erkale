@@ -29,9 +29,8 @@
 #include "version.h"
 #endif
 
-bool check_configuration(const arma::imat & conf, int mrestr) {
+bool check_configuration(const arma::imat & conf) {
   int mmax=(conf.n_rows-1)/2;
-
   // Calculate net value of m
   int mnet=0;
   for(int m=-mmax;m<=mmax;m++)
@@ -40,23 +39,31 @@ bool check_configuration(const arma::imat & conf, int mrestr) {
     // Restrict to considering positive net values of m
     return false;
 
-  if(mrestr)
-    for(int m=1;m<=mmax;m++) {
-      int dna=conf(m+mmax,0)-conf(mmax-m,0);
-      int dnb=conf(m+mmax,1)-conf(mmax-m,1);
-      if(mrestr == 1 && (dna+dnb)<0) {
-        //printf("Configuration not allowed due to m=%i\n",m);
-        //conf.print();
-        return false;
-      }
-      if(mrestr == 2 && ((dna<0) || (dnb<0))) {
-        //printf("Configuration not allowed due to m=%i\n",m);
-        //conf.print();
-        return false;
+  return true;
+}
+
+int classify_m(const arma::imat & conf) {
+  int mmax=(conf.n_rows-1)/2;
+  // Classify configuration
+  int mval=0;
+  for(int m=1;m<=mmax;m++) {
+    // alpha and beta contributions to m
+    int dna=conf(m+mmax,0)-conf(mmax-m,0);
+    int dnb=conf(m+mmax,1)-conf(mmax-m,1);
+
+    // dna>=0 and dnb>=0: mval=0
+    // dna<0 or dnb<0 but dna+dnb>=0: mval=1
+    // dna<0 and dnb<0 and dna+dnb<0: mval=2
+    if((dna<0) || (dnb<0)) {
+      if(dna+dnb>=0) {
+        mval=std::max(mval,1);
+      } else {
+        mval=std::max(mval,2);
       }
     }
+  }
 
-  return true;
+  return mval;
 }
 
 int main(int argc, char **argv) {
@@ -77,7 +84,6 @@ int main(int argc, char **argv) {
   set.add_int("Charge","Charge state for molecule",0,true);
   set.add_bool("saveconf","Save configurations to disk",true);
   set.add_bool("savegeom","Save geometry to disk",true);
-  set.add_int("mrestr","Restrict m value imbalances: 1 total, 2 within each spin channel",2);
   set.add_bool("largeactive","Use larger active space?",false);
   set.parse(std::string(argv[1]),true);
   set.print();
@@ -85,7 +91,6 @@ int main(int argc, char **argv) {
   bool saveconf=set.get_bool("saveconf");
   bool savegeom=set.get_bool("savegeom");
   bool largeactive=set.get_bool("largeactive");
-  int mrestr=set.get_int("mrestr");
   std::string nucstr=set.get_string("Nuclei");
 
   std::vector<std::string> nuclei(splitline(nucstr));
@@ -267,7 +272,7 @@ int main(int argc, char **argv) {
         occs.col(1)=beta_occs[ibeta];
 
         // Add to list
-        if(check_configuration(occs,mrestr))
+        if(check_configuration(occs))
           occlist.push_back(occs);
       }
     } else {
@@ -314,7 +319,7 @@ int main(int argc, char **argv) {
           occs.col(0)=alpha_occs[ialpha];
           occs.col(1)=beta_occs[ibeta];
 
-          if(check_configuration(occs,mrestr))
+          if(check_configuration(occs))
             occlist.push_back(occs);
         }
       }
@@ -367,7 +372,7 @@ int main(int argc, char **argv) {
     }
 
     // Print out configurations
-    std::vector<size_t> numconf;
+    std::vector< std::vector<size_t> > numconf;
     for(size_t iconf=0;iconf<occlist.size();iconf++) {
       arma::imat conf(2*mmax+1,3);
       // Plug in frozen core orbitals
@@ -386,24 +391,30 @@ int main(int argc, char **argv) {
       if(mnet<0)
         throw std::logic_error("Shouldn't have config with m<0^!\n");
 
+      int mclass=classify_m(conf);
+
+      // File name
+      std::ostringstream fname;
+      fname << "linoccs_" << mclass << "_" << 1+dnel << "_" << mnet << "_";
+
+      // Check storage space
+      if(numconf.size() <= (size_t) mclass)
+        numconf.resize(mclass+1);
+      if(numconf[mclass].size() <= (size_t) mnet)
+        numconf[mclass].resize(mnet+1,0);
+      fname << numconf[mclass][mnet]++ << ".dat";
+
       // Get rid of zero rows
       arma::uvec idx(arma::find(nelec>0));
       conf=conf.rows(idx);
 
-      // Check storage space
-      if(numconf.size() <= (size_t) mnet)
-        numconf.resize(mnet+1,0);
-
       if(saveconf) {
-        std::ostringstream oss;
-        oss << "linoccs_" << 1+dnel << "_" << mnet << "_" << numconf[mnet] << ".dat";
-        conf.save(oss.str(),arma::raw_ascii);
-        printf("Configuration %i with net angular momentum M=%i saved to file %s\n",(int) iconf,mnet,oss.str().c_str());
+        conf.save(fname.str(),arma::raw_ascii);
+        printf("Configuration %i with net angular momentum M=%i saved to file %s\n",(int) iconf,mnet,fname.str().c_str());
       } else {
-        printf("Configuration %i with net angular momentum M=%i\n",(int) iconf,mnet);
+        printf("Configuration %i with net angular momentum M=%i is of class %i\n",(int) iconf,mnet,mclass);
         conf.print();
       }
-      numconf[mnet]++;
     }
   }
 
