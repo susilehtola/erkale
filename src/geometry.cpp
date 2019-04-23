@@ -576,6 +576,7 @@ int main_guarded(int argc, char **argv) {
   LBFGS bfgs;
 
   // Save calculation to
+  std::string savechk0(set.get_string("SaveChk"));
   pars.set.set_string("SaveChk",getchk(ncalc));
 
   if(atoms.size()==2) {
@@ -1173,6 +1174,10 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
+  // Run calculation to get final checkpoint
+  pars.set.set_bool("Verbose",true);
+  pars.set.set_string("SaveChk",savechk0);
+  calculate(x,pars,E,f,false);
   save_xyz(get_atoms(x,pars),"Optimized configuration",result,false);
 
   // Remove the rest
