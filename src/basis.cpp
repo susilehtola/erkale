@@ -1283,10 +1283,12 @@ BasisSet::BasisSet() {
   optlm=true;
 }
 
-BasisSet::BasisSet(size_t Nat, const Settings & set) {
+extern Settings settings;
+
+BasisSet::BasisSet(size_t Nat) {
   // Use spherical harmonics?
-  uselm=set.get_bool("UseLM");
-  optlm=set.get_bool("OptLM");
+  uselm=settings.get_bool("UseLM");
+  optlm=settings.get_bool("OptLM");
 
   shells.reserve(Nat);
   nuclei.reserve(Nat);
@@ -2863,13 +2865,11 @@ void BasisSet::projectMOs(const BasisSet & oldbas, const arma::vec & oldE, const
 
   // Get number of basis functions
   const size_t Nbf=get_Nbf();
-  // Cutoff
-  const double cutoff=LINTHRES;
 
   // Count number of eigenvalues that are above cutoff
   size_t Nind=0;
   for(size_t i=0;i<Nbf;i++)
-    if(Sval(i)>=cutoff)
+    if(Sval(i)>=settings.get_double("LinDepThresh"))
       Nind++;
   // Number of linearly dependent basis functions
   const size_t Ndep=Nbf-Nind;
@@ -2999,13 +2999,11 @@ void BasisSet::projectOMOs(const BasisSet & oldbas, const arma::cx_mat & oldOMOs
 
   // Get number of basis functions
   const size_t Nbf=get_Nbf();
-  // Cutoff
-  const double cutoff=LINTHRES;
 
   // Count number of eigenvalues that are above cutoff
   size_t Nind=0;
   for(size_t i=0;i<Nbf;i++)
-    if(Sval(i)>=cutoff)
+    if(Sval(i)>=settings.get_double("LinDepThresh"))
       Nind++;
   // Number of linearly dependent basis functions
   const size_t Ndep=Nbf-Nind;
@@ -3101,11 +3099,11 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
   // Coulomb fitting basis sets: Design and accuracy for systems
   // containing H to Kr", J. Chem. Phys. 127 (2007), 074102
 
-  Settings set;
-  set.add_scf_settings();
-  set.add_dft_settings();
+  bool uselm0(settings.get_bool("UseLM"));
+  settings.set_bool("UseLM",true);
   // Density fitting basis set
-  BasisSet dfit(1,set);
+  BasisSet dfit(1);
+  settings.set_bool("UseLM",uselm0);
 
   // Loop over nuclei
   for(size_t in=0;in<nuclei.size();in++) {
@@ -3259,8 +3257,11 @@ BasisSet BasisSet::density_fitting(double fsam, int lmaxinc) const {
 BasisSet BasisSet::exchange_fitting() const {
   // Exchange fitting basis set
 
-  Settings set;
-  BasisSet fit(nuclei.size(),set);
+  bool uselm0(settings.get_bool("UseLM"));
+  settings.set_bool("UseLM",true);
+  // Density fitting basis set
+  BasisSet fit(nuclei.size());
+  settings.set_bool("UseLM",uselm0);
 
   const int maxam=get_max_am();
 
@@ -3534,7 +3535,7 @@ std::vector<size_t> i_idx(size_t N) {
   return ret;
 }
 
-void construct_basis(BasisSet & basis, const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib, const Settings & set) {
+void construct_basis(BasisSet & basis, const std::vector<nucleus_t> & nuclei, const BasisSetLibrary & baslib) {
   std::vector<atom_t> atoms(nuclei.size());
   for(size_t i=0;i<nuclei.size();i++) {
     atoms[i].x=nuclei[i].r.x;
@@ -3545,32 +3546,32 @@ void construct_basis(BasisSet & basis, const std::vector<nucleus_t> & nuclei, co
     atoms[i].el=nuclei[i].symbol;
   }
 
-  construct_basis(basis,atoms,baslib,set);
+  construct_basis(basis,atoms,baslib);
 }
 
-void construct_basis(BasisSet & basis, const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib, const Settings & set) {
+void construct_basis(BasisSet & basis, const std::vector<atom_t> & atoms, const BasisSetLibrary & baslib) {
   // Number of atoms is
   size_t Nat=atoms.size();
 
   // Indices of atoms to decontract basis set for
   std::vector<size_t> dec;
   bool decall=false;
-  if(stricmp(set.get_string("Decontract"),"")!=0) {
+  if(stricmp(settings.get_string("Decontract"),"")!=0) {
     // Check for '*'
-    std::string str=set.get_string("Decontract");
+    std::string str=settings.get_string("Decontract");
     if(str.size()==1 && str[0]=='*')
       decall=true;
     else
       // Parse and convert to C++ indexing
-      dec=parse_range(set.get_string("Decontract"),true);
+      dec=parse_range(settings.get_string("Decontract"),true);
   }
 
   // Rotation?
-  bool rotate=set.get_bool("BasisRotate");
-  double cutoff=set.get_double("BasisCutoff");
+  bool rotate=settings.get_bool("BasisRotate");
+  double cutoff=settings.get_double("BasisCutoff");
 
   // Create basis set
-  basis=BasisSet(Nat,set);
+  basis=BasisSet(Nat);
   // and add atoms to basis set
   for(size_t i=0;i<Nat;i++) {
     // First we need to add the nucleus itself.
@@ -3882,7 +3883,7 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
 
   // Construct minimal basis set
   BasisSet minbas;
-  construct_basis(minbas,basis.get_nuclei(),minao,set);
+  construct_basis(minbas,basis.get_nuclei(),minao);
 
   // Get indices
   idx.clear();
@@ -3904,8 +3905,8 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
   arma::mat S21=arma::trans(S12);
 
   // and inverse matrices
-  arma::mat S1inv_h=BasOrth(S1,set);
-  arma::mat S2inv_h=BasOrth(S2,set);
+  arma::mat S1inv_h=BasOrth(S1);
+  arma::mat S2inv_h=BasOrth(S2);
   // Need to be OK for canonical as well
   arma::mat S1inv=S1inv_h*arma::trans(S1inv_h);
   arma::mat S2inv=S2inv_h*arma::trans(S2inv_h);
@@ -3942,7 +3943,7 @@ arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::
 
   // Construct minimal basis set
   BasisSet minbas;
-  construct_basis(minbas,basis.get_nuclei(),minao,set);
+  construct_basis(minbas,basis.get_nuclei(),minao);
 
   // Get indices
   idx.clear();
@@ -3964,8 +3965,8 @@ arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::
   arma::mat S21=arma::trans(S12);
 
   // and inverse matrices
-  arma::mat S1inv_h=BasOrth(S1,set);
-  arma::mat S2inv_h=BasOrth(S2,set);
+  arma::mat S1inv_h=BasOrth(S1);
+  arma::mat S2inv_h=BasOrth(S2);
   // Need to be OK for canonical as well
   arma::mat S1inv=S1inv_h*arma::trans(S1inv_h);
   arma::mat S2inv=S2inv_h*arma::trans(S2inv_h);

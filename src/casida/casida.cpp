@@ -42,10 +42,12 @@
 // Screening threshold
 #define SCREENTHR 1e-10
 
+extern Settings settings;
+
 Casida::Casida() {
 }
 
-Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ev, const arma::mat & Cv, const arma::mat & Pv, const std::vector<double> & occs) {
+Casida::Casida(const BasisSet & basis, const arma::vec & Ev, const arma::mat & Cv, const arma::mat & Pv, const std::vector<double> & occs) {
   E.push_back(Ev);
   C.push_back(Cv);
   P.push_back(Pv);
@@ -53,22 +55,22 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   // Form pairs
   std::vector< std::vector<double> > occ;
   occ.push_back(occs);
-  form_pairs(set,occ);
+  form_pairs(occ);
   // Sanity check
   if(pairs[0].size()==0)
     throw std::runtime_error("No pairs for Casida calculation! Please check your input.\n");
   printf("Casida calculation has %u pairs.\n",(unsigned int) pairs[0].size());
 
   // Parse coupling mode
-  parse_coupling(set);
+  parse_coupling();
 
   // Calculate K matrix
-  calc_K(set,basis);
+  calc_K(basis);
   // and solve Casida equation
   solve();
 }
 
-Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb, const std::vector<double> & occa, const std::vector<double> & occb) {
+Casida::Casida(const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb, const std::vector<double> & occa, const std::vector<double> & occb) {
 
   E.push_back(Ea);
   E.push_back(Eb);
@@ -81,24 +83,24 @@ Casida::Casida(const Settings & set, const BasisSet & basis, const arma::vec & E
   std::vector< std::vector<double> > occ;
   occ.push_back(occa);
   occ.push_back(occb);
-  form_pairs(set,occ);
+  form_pairs(occ);
   // Sanity check
   if(pairs[0].size()==0 && pairs[1].size()==0)
     throw std::runtime_error("No pairs for Casida calculation! Please check your input.\n");
   printf("Casida calculation has %u spin up and %u spin down pairs.\n",(unsigned int) pairs[0].size(),(unsigned int) pairs[1].size());
 
   // Parse coupling mode
-  parse_coupling(set);
+  parse_coupling();
 
   // Calculate K matrix
-  calc_K(set,basis);
+  calc_K(basis);
   // and solve Casida equation
   solve();
 }
 
-void Casida::parse_coupling(const Settings & set) {
+void Casida::parse_coupling() {
   // Determine coupling
-  switch(set.get_int("CasidaCoupling")) {
+  switch(settings.get_int("CasidaCoupling")) {
   case(0):
     // IPA.
     coupling=IPA;
@@ -119,11 +121,11 @@ void Casida::parse_coupling(const Settings & set) {
   }
 }
 
-void Casida::calc_K(const Settings & set, const BasisSet & basis) {
+void Casida::calc_K(const BasisSet & basis) {
   // Exchange and correlation functionals
-  int x_func=set.get_int("CasidaXfunc");
-  int c_func=set.get_int("CasidaCfunc");
-  double tol=set.get_double("CasidaTol");
+  int x_func=settings.get_int("CasidaXfunc");
+  int c_func=settings.get_int("CasidaCfunc");
+  double tol=settings.get_double("CasidaTol");
 
   // Allocate memory
   if(pairs.size()==1)
@@ -138,7 +140,7 @@ void Casida::calc_K(const Settings & set, const BasisSet & basis) {
   // Do we need to form K?
   if(coupling!=IPA) {
     // Compute Coulomb coupling
-    Kcoul(basis,set);
+    Kcoul(basis);
 
     // Compute XC coupling if necessary
     if(coupling==TDLDA) {
@@ -158,7 +160,7 @@ arma::cx_mat Casida::matrix_transform(bool ispin, const arma::cx_mat & m) const 
   return arma::trans(C[ispin])*m*C[ispin];
 }
 
-void Casida::form_pairs(const Settings & set, const std::vector< std::vector<double> > occs) {
+void Casida::form_pairs(const std::vector< std::vector<double> > occs) {
   // First, determine amount of occupied and virtual states.
 
   nocc.resize(occs.size());
@@ -192,7 +194,7 @@ void Casida::form_pairs(const Settings & set, const std::vector< std::vector<dou
   f.resize(nocc.size());
 
   // What orbitals are included in the calculation?
-  std::vector<std::string> states=splitline(set.get_string("CasidaStates"));
+  std::vector<std::string> states=splitline(settings.get_string("CasidaStates"));
   if(states.size()==0) {
     // Include all pairs in the calculation.
     for(size_t ispin=0;ispin<nocc.size();ispin++) {
@@ -497,19 +499,19 @@ arma::mat Casida::transition(const BasisSet & basis, double qr) const {
   return osc;
 }
 
-void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv, const Settings & set) const {
+void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const {
   // Get density fitting basis
   BasisSet dfitbas;
 
-  if(stricmp(set.get_string("FittingBasis"),"Auto")==0)
+  if(stricmp(settings.get_string("FittingBasis"),"Auto")==0)
     dfitbas=basis.density_fitting();
   else {
     // Load basis library
     BasisSetLibrary fitlib;
-    fitlib.load_basis(set.get_string("FittingBasis"));
+    fitlib.load_basis(settings.get_string("FittingBasis"));
 
     // Construct fitting basis
-    construct_basis(dfitbas,basis.get_nuclei(),fitlib,set);
+    construct_basis(dfitbas,basis.get_nuclei(),fitlib);
   }
 
   // Amount of auxiliary functions
@@ -702,7 +704,7 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
   }
 }
 
-void Casida::Kcoul(const BasisSet & basis, const Settings & set) {
+void Casida::Kcoul(const BasisSet & basis) {
   Timer t;
 
   if(!C.size())
@@ -714,7 +716,7 @@ void Casida::Kcoul(const BasisSet & basis, const Settings & set) {
   std::vector<arma::mat> munu_I;
 
   // Get density fitting integrals
-  coulomb_fit(basis,munu_I,ab_inv,set);
+  coulomb_fit(basis,munu_I,ab_inv);
 
   // Construct K
   for(size_t ispin=0;ispin<C.size();ispin++)

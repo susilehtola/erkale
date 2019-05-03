@@ -31,11 +31,13 @@
 #include "../trrh.h"
 #include "../lmgrid.h"
 
-XRSSCF::XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool sp) : SCF(basis,set,chkpt) {
+extern Settings settings;
+
+XRSSCF::XRSSCF(const BasisSet & basis, Checkpoint & chkpt, bool sp) : SCF(basis,chkpt) {
   spin=sp;
 
   // Get number of alpha and beta electrons
-  get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),nocca,noccb);
+  get_Nel_alpha_beta(basis.Ztot()-settings.get_int("Charge"),settings.get_int("Multiplicity"),nocca,noccb);
 }
 
 XRSSCF::~XRSSCF() {

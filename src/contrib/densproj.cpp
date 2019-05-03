@@ -60,6 +60,8 @@ void print_header() {
   print_hostname();
 }
 
+Settings settings;
+
 int main_guarded(int argc, char **argv) {
   print_header();
 
@@ -75,17 +77,16 @@ int main_guarded(int argc, char **argv) {
   t.print_time();
 
   // Parse settings
-  Settings set;
-  set.add_string("LoadChk","File to load old results from","");
-  set.add_string("LoadChk2","File to load old results from","");
-  set.parse(std::string(argv[1]),true);
-  set.print();
+  settings.add_string("LoadChk","File to load old results from","");
+  settings.add_string("LoadChk2","File to load old results from","");
+  settings.parse(std::string(argv[1]),true);
+  settings.print();
 
   // Get checkpoint files
-  std::string chk1f(set.get_string("LoadChk"));
+  std::string chk1f(settings.get_string("LoadChk"));
   Checkpoint chk1(chk1f,false);
 
-  std::string chk2f(set.get_string("LoadChk2"));
+  std::string chk2f(settings.get_string("LoadChk2"));
   Checkpoint chk2(chk2f,false);
 
   BasisSet basis1, basis2;

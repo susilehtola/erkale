@@ -19,7 +19,6 @@
 
 #include "global.h"
 class BasisSet;
-class Settings;
 
 #include <vector>
 #include <armadillo>
@@ -36,25 +35,30 @@ class Settings;
  *
  * Optional charge can be given as input.
  */
-arma::mat sad_guess(const BasisSet & basis, Settings set);
+arma::mat sad_guess(const BasisSet & basis);
 
 /// Same, but do SAP guess by projecting Fock matrices. Not as good as the real-space version
-arma::mat sap_guess(const BasisSet & basis, Settings set);
+arma::mat sap_guess(const BasisSet & basis);
 
 /**
- * Form starting guess from a Huckel type calculation
+ * Form starting guess from a Huckel type calculation. See
+ *
+ * "An assessment of initial guesses for self-consistent field
+ * calculations. Superposition of Atomic Potentials: simple yet
+ * efficient" by S. Lehtola, J. Chem. Theory Comput. (2019), 
+ * DOI: 10.1021/acs.jctc.8b01089.
  *
  * "Phosphorescence parameters for platinum (II) organometallic
  * chromophores: A study at the non-collinear four-component Kohn–Sham
  * level of theory" by P. Norman and H. J. Aa. Jensen,
  * Chem. Phys. Lett. 531 (2012), pp. 229-235.
  */
-arma::mat huckel_guess(const BasisSet & basis, Settings set, double Kgwh);
+arma::mat huckel_guess(const BasisSet & basis, double Kgwh);
 
 /**
  * Forms a projection to a minimal atomic basis set.
  */
-arma::mat minimal_basis_projection(const BasisSet & basis, Settings set);
+arma::mat minimal_basis_projection(const BasisSet & basis);
 
 /**
  * Worker routine - perform guess for inuc:th atom in basis, using given method.

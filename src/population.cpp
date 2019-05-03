@@ -35,6 +35,8 @@
 #include "version.h"
 #endif
 
+Settings settings;
+
 int main_guarded(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - population from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
@@ -54,38 +56,37 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Parse settings
-  Settings set;
-  set.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
-  set.add_bool("Bader", "Run Bader analysis?", false);
-  set.add_bool("Becke", "Run Becke analysis?", false);
-  set.add_bool("Mulliken", "Run Mulliken analysis?", false);
-  set.add_bool("Lowdin", "Run Löwdin analysis?", false);
-  set.add_bool("IAO", "Run Intrinsic Atomic Orbital analysis?", false);
-  set.add_string("IAOBasis", "Minimal basis set for IAO analysis", "MINAO.gbs");
-  set.add_bool("Hirshfeld", "Run Hirshfeld analysis?", false);
-  set.add_string("HirshfeldMethod", "Method to use for Hirshfeld(-I) analysis", "HF");
-  set.add_bool("IterativeHirshfeld", "Run iterative Hirshfeld analysis?", false);
-  set.add_bool("Stockholder", "Run Stockholder analysis?", false);
-  set.add_bool("Voronoi", "Run Voronoi analysis?", false);
-  set.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
-  set.add_bool("OrbThr", "Compute orbital density thresholds", false);
-  set.add_bool("VirtThr", "Also do the virtual orbitals?", false);
-  set.add_bool("SICThr", "Compute SIC orbital density thresholds", false);
-  set.add_bool("DensThr", "Compute total density thresholds", false);
-  set.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
-  set.add_double("OrbThrGrid", "Accuracy of orbital density threshold integration grid", 1e-3);
+  settings.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
+  settings.add_bool("Bader", "Run Bader analysis?", false);
+  settings.add_bool("Becke", "Run Becke analysis?", false);
+  settings.add_bool("Mulliken", "Run Mulliken analysis?", false);
+  settings.add_bool("Lowdin", "Run Löwdin analysis?", false);
+  settings.add_bool("IAO", "Run Intrinsic Atomic Orbital analysis?", false);
+  settings.add_string("IAOBasis", "Minimal basis set for IAO analysis", "MINAO.gbs");
+  settings.add_bool("Hirshfeld", "Run Hirshfeld analysis?", false);
+  settings.add_string("HirshfeldMethod", "Method to use for Hirshfeld(-I) analysis", "HF");
+  settings.add_bool("IterativeHirshfeld", "Run iterative Hirshfeld analysis?", false);
+  settings.add_bool("Stockholder", "Run Stockholder analysis?", false);
+  settings.add_bool("Voronoi", "Run Voronoi analysis?", false);
+  settings.add_double("Tol", "Grid tolerance to use for the charges", 1e-5);
+  settings.add_bool("OrbThr", "Compute orbital density thresholds", false);
+  settings.add_bool("VirtThr", "Also do the virtual orbitals?", false);
+  settings.add_bool("SICThr", "Compute SIC orbital density thresholds", false);
+  settings.add_bool("DensThr", "Compute total density thresholds", false);
+  settings.add_double("OrbThrVal", "Which density threshold to calculate", 0.85);
+  settings.add_double("OrbThrGrid", "Accuracy of orbital density threshold integration grid", 1e-3);
 
   // Parse settings
-  set.parse(argv[1]);
+  settings.parse(argv[1]);
 
   // Print settings
-  set.print();
+  settings.print();
 
   // Initialize libint
   init_libint_base();
 
   // Load checkpoint
-  Checkpoint chkpt(set.get_string("LoadChk"),false);
+  Checkpoint chkpt(settings.get_string("LoadChk"),false);
 
   // Load basis set
   BasisSet basis;
@@ -102,40 +103,40 @@ int main_guarded(int argc, char **argv) {
     chkpt.read("Pb",Pb);
   }
 
-  double tol=set.get_double("Tol");
+  double tol=settings.get_double("Tol");
 
-  if(set.get_bool("Bader")) {
+  if(settings.get_bool("Bader")) {
     if(restr)
       bader_analysis(basis,P,tol);
     else
       bader_analysis(basis,Pa,Pb,tol);
   }
 
-  if(set.get_bool("Becke")) {
+  if(settings.get_bool("Becke")) {
     if(restr)
       becke_analysis(basis,P,tol);
     else
       becke_analysis(basis,Pa,Pb,tol);
   }
 
-  std::string hmet=set.get_string("HirshfeldMethod");
+  std::string hmet=settings.get_string("HirshfeldMethod");
 
-  if(set.get_bool("Hirshfeld")) {
+  if(settings.get_bool("Hirshfeld")) {
     if(restr)
       hirshfeld_analysis(basis,P,hmet,tol);
     else
       hirshfeld_analysis(basis,Pa,Pb,hmet,tol);
   }
 
-  if(set.get_bool("IterativeHirshfeld")) {
+  if(settings.get_bool("IterativeHirshfeld")) {
     if(restr)
       iterative_hirshfeld_analysis(basis,P,hmet,tol);
     else
       iterative_hirshfeld_analysis(basis,Pa,Pb,hmet,tol);
   }
 
-  if(set.get_bool("IAO")) {
-    std::string minbas=set.get_string("IAOBasis");
+  if(settings.get_bool("IAO")) {
+    std::string minbas=settings.get_string("IAOBasis");
 
     if(restr) {
       // Get amount of occupied orbitals
@@ -174,44 +175,44 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
-  if(set.get_bool("Lowdin")) {
+  if(settings.get_bool("Lowdin")) {
     if(restr)
       lowdin_analysis(basis,P);
     else
       lowdin_analysis(basis,Pa,Pb);
   }
 
-  if(set.get_bool("Mulliken")) {
+  if(settings.get_bool("Mulliken")) {
     if(restr)
       mulliken_analysis(basis,P);
     else
       mulliken_analysis(basis,Pa,Pb);
   }
 
-  if(set.get_bool("Stockholder")) {
+  if(settings.get_bool("Stockholder")) {
     if(restr)
       stockholder_analysis(basis,P,tol);
     else
       stockholder_analysis(basis,Pa,Pb,tol);
   }
 
-  if(set.get_bool("Voronoi")) {
+  if(settings.get_bool("Voronoi")) {
     if(restr)
       voronoi_analysis(basis,P,tol);
     else
       voronoi_analysis(basis,Pa,Pb,tol);
   }
 
-  if(set.get_bool("OrbThr")) {
+  if(settings.get_bool("OrbThr")) {
     // Calculate orbital density thresholds
 
     // Integration grid
     DFTGrid intgrid(&basis,true);
-    intgrid.construct_becke(set.get_double("OrbThrGrid"));
+    intgrid.construct_becke(settings.get_double("OrbThrGrid"));
 
     // Threshold is
-    double thr=set.get_double("OrbThrVal");
-    bool virt=set.get_bool("VirtThr");
+    double thr=settings.get_double("OrbThrVal");
+    bool virt=settings.get_bool("VirtThr");
 
     if(restr) {
       // Get amount of occupied orbitals
@@ -274,15 +275,15 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
-  if(set.get_bool("SICThr")) {
+  if(settings.get_bool("SICThr")) {
     // Calculate SIC orbital density thresholds
 
     // Integration grid
     DFTGrid intgrid(&basis,true);
-    intgrid.construct_becke(set.get_double("OrbThrGrid"));
+    intgrid.construct_becke(settings.get_double("OrbThrGrid"));
 
     // Threshold is
-    double thr=set.get_double("OrbThrVal");
+    double thr=settings.get_double("OrbThrVal");
 
     if(restr) {
       // Get orbital coefficients
@@ -331,15 +332,15 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
-  if(set.get_bool("DensThr")) {
+  if(settings.get_bool("DensThr")) {
     // Calculate total density thresholds
 
     // Integration grid
     DFTGrid intgrid(&basis,true);
-    intgrid.construct_becke(set.get_double("OrbThrGrid"));
+    intgrid.construct_becke(settings.get_double("OrbThrGrid"));
 
     // Threshold is
-    double thr=set.get_double("OrbThrVal");
+    double thr=settings.get_double("OrbThrVal");
 
     Timer t;
 

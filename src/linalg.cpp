@@ -40,17 +40,18 @@ void eig_sym_ordered(arma::vec & eigval, arma::cx_mat & eigvec, const arma::cx_m
   eig_sym_ordered_wrk< std::complex<double> >(eigval,eigvec,X);
 }
 
-
 arma::mat CholeskyOrth(const arma::mat & S) {
   // Cholesky orthogonalization
   return inv(chol(S));
 }
 
+extern Settings settings;
+
 arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval) {
   // Compute inverse roots of eigenvalues
   arma::vec Sinvh(Sval);
   for(size_t i=0;i<Sinvh.n_elem;i++)
-    if(Sinvh(i)>=LINTHRES)
+    if(Sinvh(i)>=settings.get_double("LinDepThresh"))
       Sinvh(i)=1/sqrt(Sinvh(i));
     else
       Sinvh(i)=0.0;
@@ -111,7 +112,7 @@ arma::mat CanonicalOrth(const arma::mat & S, double cutoff) {
 
 arma::mat BasOrth(const arma::mat & S, bool verbose) {
   // Symmetric if possible, otherwise canonical. Default cutoff
-  const double tol=LINTHRES;
+  const double tol=settings.get_double("LinDepThresh");
 
   // Eigendecomposition of S: eigenvalues and eigenvectors
   arma::vec Sval;
@@ -137,19 +138,19 @@ arma::mat BasOrth(const arma::mat & S, bool verbose) {
   }
 }
 
-arma::mat BasOrth(const arma::mat & S, const Settings & set) {
+arma::mat BasOrth(const arma::mat & S) {
   // Orthogonalize basis
 
   // Get wanted method
-  std::string met=set.get_string("BasisOrth");
+  std::string met=settings.get_string("BasisOrth");
   // Verbose operation?
-  bool verbose=set.get_bool("Verbose");
+  bool verbose=settings.get_bool("Verbose");
 
   if(stricmp(met,"auto")==0) {
     return BasOrth(S,verbose);
   } else if(stricmp(met,"Can")==0) {
     // Canonical orthogonalization
-    double tol=LINTHRES;
+    double tol=settings.get_double("LinDepThresh");
     return CanonicalOrth(S,tol);
   } else if(stricmp(met,"Sym")==0) {
     // Symmetric orthogonalization
@@ -165,7 +166,7 @@ arma::mat BasOrth(const arma::mat & S, const Settings & set) {
   }
 }
 
-void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, bool canonical, double cutoff) {
+void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, double cutoff) {
   if(S.n_cols != S.n_rows) {
     ERROR_INFO();
     std::ostringstream oss;
@@ -192,28 +193,14 @@ void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvh, b
   size_t Ndep=Nbf-Nind;
 
   // Form Shalf and Sinvhalf
-  if(canonical) {
-    // Canonical matrices - asymmetric
-    Shalf.zeros(Nbf,Nind);
-    Sinvh.zeros(Nbf,Nind);
-    for(size_t i=0;i<Nind;i++) {
-      size_t idx=Ndep+i;
-      double ss=sqrt(Sval(idx));
-      Shalf.col(i)=Svec.col(idx)*ss;
-      Sinvh.col(i)=Svec.col(idx)/ss;
-    }
-  } else {
-    // Symmetric matrices
-    Shalf.zeros(Nbf,Nbf);
-    Sinvh.zeros(Nbf,Nbf);
-    for(size_t i=0;i<Nind;i++) {
-      size_t icol=Ndep+i;
-      Sinvh+=Svec.col(icol)*arma::trans(Svec.col(icol))/sqrt(Sval(icol));
-      Shalf+=Svec.col(icol)*arma::trans(Svec.col(icol))*sqrt(Sval(icol));
-    }
+  Shalf.zeros(Nbf,Nbf);
+  Sinvh.zeros(Nbf,Nbf);
+  for(size_t i=0;i<Nind;i++) {
+    size_t icol=Ndep+i;
+    Sinvh+=Svec.col(icol)*arma::trans(Svec.col(icol))/sqrt(Sval(icol));
+    Shalf+=Svec.col(icol)*arma::trans(Svec.col(icol))*sqrt(Sval(icol));
   }
 }
-
 
 arma::vec MatToVec(const arma::mat & m) {
   return arma::vectorise(m);
@@ -461,7 +448,7 @@ arma::cx_mat orthonormalize(const arma::mat & S, const arma::cx_mat & C) {
 void form_NOs(const arma::mat & P, const arma::mat & S, arma::mat & AO_to_NO, arma::mat & NO_to_AO, arma::vec & occs) {
   // Get canonical half-overlap and half-inverse overlap matrices
   arma::mat Sh, Sinvh;
-  S_half_invhalf(S,Sh,Sinvh,true);
+  S_half_invhalf(S,Sh,Sinvh,settings.get_double("LinDepThresh"));
 
   // P in orthonormal basis is
   arma::mat P_orth=arma::trans(Sh)*P*Sh;

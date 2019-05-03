@@ -31,6 +31,8 @@ std::string getlegend(size_t i, size_t n) {
     throw std::logic_error("Should have not ended up here.\n");
 }
 
+Settings settings;
+
 int main_guarded(int argc, char **argv) {
   if(argc!=3) {
     printf("Usage: %s chkpt1 chkpt2",argv[0]);

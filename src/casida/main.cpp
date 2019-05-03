@@ -227,6 +227,8 @@ void print_header() {
   print_hostname();
 }
 
+Settings settings;
+
 int main_guarded(int argc, char **argv) {
   print_header();
 
@@ -242,28 +244,27 @@ int main_guarded(int argc, char **argv) {
   t.print_time();
 
   // Parse settings
-  Settings set;
-  set.add_string("FittingBasis","Basis set to use for density fitting (Auto for automatic)","Auto");
-  set.add_string("CasidaX","Exchange functional for Casida","lda_x");
-  set.add_string("CasidaC","Correlation functional for Casida","lda_c_vwn");
-  set.add_bool("CasidaPol","Perform polarized Casida calculation (when using restricted wf)",false);
-  set.add_int("CasidaCoupling","Coupling mode: 0 for IPA, 1 for RPA and 2 for TDLDA",2);
-  set.add_double("CasidaTol","Tolerance for Casida grid",1e-4);
-  set.add_string("CasidaStates","States to include in Casida calculation, eg ""1,3:7,10,13"" ","");
-  set.add_string("CasidaQval","Values of Q to compute spectrum for","");
-  set.add_string("LoadChk","Checkpoint to load","erkale.chk");
+  settings.add_string("FittingBasis","Basis set to use for density fitting (Auto for automatic)","Auto");
+  settings.add_string("CasidaX","Exchange functional for Casida","lda_x");
+  settings.add_string("CasidaC","Correlation functional for Casida","lda_c_vwn");
+  settings.add_bool("CasidaPol","Perform polarized Casida calculation (when using restricted wf)",false);
+  settings.add_int("CasidaCoupling","Coupling mode: 0 for IPA, 1 for RPA and 2 for TDLDA",2);
+  settings.add_double("CasidaTol","Tolerance for Casida grid",1e-4);
+  settings.add_string("CasidaStates","States to include in Casida calculation, eg ""1,3:7,10,13"" ","");
+  settings.add_string("CasidaQval","Values of Q to compute spectrum for","");
+  settings.add_string("LoadChk","Checkpoint to load","erkale.chk");
 
   if(argc==2)
-    set.parse(std::string(argv[1]));
+    settings.parse(std::string(argv[1]));
   else
     printf("\nDefault settings used.");
 
   // Print settings
-  set.print();
+  settings.print();
 
   // Get functional strings
-  int xfunc=find_func(set.get_string("CasidaX"));
-  int cfunc=find_func(set.get_string("CasidaC"));
+  int xfunc=find_func(settings.get_string("CasidaX"));
+  int cfunc=find_func(settings.get_string("CasidaC"));
 
   if(is_correlation(xfunc))
     throw std::runtime_error("Refusing to use a correlation functional as exchange.\n");
@@ -273,17 +274,17 @@ int main_guarded(int argc, char **argv) {
     throw std::runtime_error("Refusing to use an exchange functional as correlation.\n");
   if(is_kinetic(cfunc))
     throw std::runtime_error("Refusing to use a kinetic energy functional as correlation.\n");
-  set.add_int("CasidaXfunc","Internal variable",xfunc);
-  set.add_int("CasidaCfunc","Internal variable",cfunc);
+  settings.add_int("CasidaXfunc","Internal variable",xfunc);
+  settings.add_int("CasidaCfunc","Internal variable",cfunc);
 
   // Print information about used functionals
   print_info(xfunc,cfunc);
 
   // Get values of q to compute spectrum for
-  std::vector<double> qvals=parse_range_double(set.get_string("CasidaQval"));
+  std::vector<double> qvals=parse_range_double(settings.get_string("CasidaQval"));
 
   // Load checkpoint
-  std::string fchk=set.get_string("LoadChk");
+  std::string fchk=settings.get_string("LoadChk");
   Checkpoint chkpt(fchk,false);
 
   // Check that calculation was converged
@@ -293,9 +294,9 @@ int main_guarded(int argc, char **argv) {
     throw std::runtime_error("Refusing to run Casida calculation based on a non-converged SCF density!\n");
 
   // Parse input states
-  std::string states=set.get_string("CasidaStates");
+  std::string states=settings.get_string("CasidaStates");
   std::string newstates=parse_states(chkpt,states);
-  set.set_string("CasidaStates",newstates);
+  settings.set_string("CasidaStates",newstates);
   if(states.compare(newstates)!=0)
     printf("CasidaStates has been parsed to \"%s\".\n",newstates.c_str());
 
@@ -321,15 +322,15 @@ int main_guarded(int argc, char **argv) {
     // Check orthonormality
     check_orth(C,basis.overlap(),false);
 
-    if(set.get_bool("CasidaPol")) {
+    if(settings.get_bool("CasidaPol")) {
       // Half occupancy (1.0 instead of 2.0)
       std::vector<double> hocc(occs);
       for(size_t i=0;i<hocc.size();i++)
 	hocc[i]/=2.0;
-      cas=Casida(set,basis,E,E,C,C,P/2.0,P/2.0,hocc,hocc);
+      cas=Casida(basis,E,E,C,C,P/2.0,P/2.0,hocc,hocc);
     }
     else
-      cas=Casida(set,basis,E,C,P,occs);
+      cas=Casida(basis,E,C,P,occs);
 
   } else {
     arma::mat Ca, Cb;
@@ -350,7 +351,7 @@ int main_guarded(int argc, char **argv) {
     check_orth(Ca,basis.overlap(),false);
     check_orth(Cb,basis.overlap(),false);
 
-    cas=Casida(set,basis,Ea,Eb,Ca,Cb,Pa,Pb,occa,occb);
+    cas=Casida(basis,Ea,Eb,Ca,Cb,Pa,Pb,occa,occb);
   }
 
   // Dipole transition

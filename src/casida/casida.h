@@ -113,7 +113,7 @@ class Casida {
    *
    * To save memory, the result is stored in the K matrix.
    */
-  void Kcoul(const BasisSet & basis, const Settings & set);
+  void Kcoul(const BasisSet & basis);
 
   /**
    * This routine constructs the exchange-correlation coupling matrix
@@ -135,7 +135,7 @@ class Casida {
   double fe(states_pair_t ip, bool ispin) const;
 
   /// Form pairs and occupations
-  void form_pairs(const Settings & set, const std::vector< std::vector<double> > occs);
+  void form_pairs(const std::vector< std::vector<double> > occs);
 
   /// Transform given AO matrix to MO
   arma::mat matrix_transform(bool ispin, const arma::mat & m) const;
@@ -144,13 +144,13 @@ class Casida {
 
 
   /// Common routines for constructors
-  void parse_coupling(const Settings & set);
+  void parse_coupling();
 
   /// Construct the K matrices
-  void calc_K(const Settings & set, const BasisSet & bas);
+  void calc_K(const BasisSet & bas);
 
   /// Compute the Coulomb fitting integrals \f$ (\mu \nu | a) \f$ and the matrix \f$ (a|b)^{-1} \f$
-  void coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv, const Settings & set) const;
+  void coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, arma::mat & ab_inv) const;
 
   /// Solve the Casida equation
   void solve();
@@ -164,9 +164,9 @@ class Casida {
   /// Dummy constructor
   Casida();
   /// Constructor for spin-unpolarized calculation
-  Casida(const Settings & set, const BasisSet & basis, const arma::vec & E, const arma::mat & C, const arma::mat & P, const std::vector<double> & occs);
+  Casida(const BasisSet & basis, const arma::vec & E, const arma::mat & C, const arma::mat & P, const std::vector<double> & occs);
   /// Constructor for spin-polarized calculation
-  Casida(const Settings & set, const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb, const std::vector<double> & occa, const std::vector<double> & occb);
+  Casida(const BasisSet & basis, const arma::vec & Ea, const arma::vec & Eb, const arma::mat & Ca, const arma::mat & Cb, const arma::mat & Pa, const arma::mat & Pb, const std::vector<double> & occa, const std::vector<double> & occb);
   /// Destructor
   ~Casida();
 

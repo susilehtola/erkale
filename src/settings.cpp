@@ -41,7 +41,7 @@ void Settings::add_scf_settings() {
   // Default basis set
   add_string("Basis", "Basis set used in calculation", "aug-cc-pVTZ");
   // Rotate basis set to drop out redundant functions?
-  add_bool("BasisRotate", "Rotate basis set to remove redundant functions?", true);
+  add_bool("BasisRotate", "Rotate basis set to remove redundant functions?", false);
   // Cutoff for redundant functions
   add_double("BasisCutoff", "Cutoff for dropping out small primitives from contraction", 1e-8);
 
@@ -114,6 +114,8 @@ void Settings::add_scf_settings() {
 
   // Default orthogonalization method
   add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");
+  // Linear dependence threshold
+  add_double("LinDepThresh", "Basis set linear dependency threshold", 1e-5);
 
   // Convergence criterion
   add_double("ConvThr", "Orbital gradient convergence threshold", 1e-6);
@@ -137,9 +139,7 @@ void Settings::add_scf_settings() {
   add_int("FittingMemory", "Amount of memory in MB to use for exchange fitting",1000);
   // Threshold for screening eigenvectors
   add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-8);
-}
 
-void Settings::add_dft_settings() {
   // Use Lobatto quadrature?
   add_bool("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false);
 
@@ -442,12 +442,6 @@ void Settings::parse(std::string filename, bool scf) {
 	  set_string("Method","ROHF");
 	  set_bool("DensityFitting",false);
 	} else {
-	  // Add dft related settings
-	  try {
-	    add_dft_settings();
-	  } catch(std::runtime_error &) {
-	    // Settings already added, as e.g. in xrs executable.
-	  }
 	  set_string("Method",words[1]);
 
 	  // Hybrid functional? Do we turn off density fitting by default?

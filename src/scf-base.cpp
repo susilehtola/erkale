@@ -69,7 +69,9 @@ enum guess_t parse_guess(const std::string & val) {
     throw std::runtime_error("Guess type not supported.\n");
 }
 
-SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
+extern Settings settings;
+
+SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   // Amount of basis functions
   Nbf=basis.get_Nbf();
 
@@ -77,43 +79,43 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   chkptp=&chkpt;
 
   // Multiplicity
-  mult=set.get_int("Multiplicity");
+  mult=settings.get_int("Multiplicity");
 
   // Amount of electrons
-  Nel=basis.Ztot()-set.get_int("Charge");
+  Nel=basis.Ztot()-settings.get_int("Charge");
 
   // Parse guess
-  guess=parse_guess(set.get_string("Guess"));
+  guess=parse_guess(settings.get_string("Guess"));
   // GWH scaling constant
-  Kgwh=set.get_double("Kgwh");
+  Kgwh=settings.get_double("Kgwh");
 
   // Linear molecule calculation?
-  lincalc=set.get_bool("LinearSymmetry");
-  linfreeze=set.get_bool("LinearFreeze");
-  readlinocc=set.get_int("LinearOccupations");
+  lincalc=settings.get_bool("LinearSymmetry");
+  linfreeze=settings.get_bool("LinearFreeze");
+  readlinocc=settings.get_int("LinearOccupations");
   if(readlinocc<0)
     readlinocc=INT_MAX;
-  linoccfname=set.get_string("LinearOccupationFile");
+  linoccfname=settings.get_string("LinearOccupationFile");
 
-  usediis=set.get_bool("UseDIIS");
-  diisorder=set.get_int("DIISOrder");
-  diiseps=set.get_double("DIISEps");
-  diisthr=set.get_double("DIISThr");
-  diiscomb=set.get_bool("DIISComb");
-  useadiis=set.get_bool("UseADIIS");
-  usebroyden=set.get_bool("UseBroyden");
-  usetrrh=set.get_bool("UseTRRH");
-  trrhmins=set.get_double("TRRHminS");
+  usediis=settings.get_bool("UseDIIS");
+  diisorder=settings.get_int("DIISOrder");
+  diiseps=settings.get_double("DIISEps");
+  diisthr=settings.get_double("DIISThr");
+  diiscomb=settings.get_bool("DIISComb");
+  useadiis=settings.get_bool("UseADIIS");
+  usebroyden=settings.get_bool("UseBroyden");
+  usetrrh=settings.get_bool("UseTRRH");
+  trrhmins=settings.get_double("TRRHminS");
 
-  maxiter=set.get_int("MaxIter");
-  shift=set.get_double("Shift");
-  verbose=set.get_bool("Verbose");
+  maxiter=settings.get_int("MaxIter");
+  shift=settings.get_double("Shift");
+  verbose=settings.get_bool("Verbose");
 
-  direct=set.get_bool("Direct");
-  decfock=set.get_bool("DecFock");
-  strictint=set.get_bool("StrictIntegrals");
+  direct=settings.get_bool("Direct");
+  decfock=settings.get_bool("DecFock");
+  strictint=settings.get_bool("StrictIntegrals");
   // Integral screening threshold
-  intthr=strictint ? DBL_EPSILON : set.get_double("IntegralThresh");
+  intthr=strictint ? DBL_EPSILON : settings.get_double("IntegralThresh");
   // Sanity check
   if(intthr>1e-6) {
     fprintf(stderr,"Warning - spuriously large integral threshold %e\n",intthr);
@@ -136,18 +138,18 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   Enuc=basis.Enuc();
 
   // Use density fitting?
-  densityfit=set.get_bool("DensityFitting");
+  densityfit=settings.get_bool("DensityFitting");
   // How much memory to allow (convert to bytes)
-  fitmem=1000000*set.get_int("FittingMemory");
+  fitmem=1000000*settings.get_int("FittingMemory");
   // Linear dependence threshold
-  fitthr=set.get_double("FittingThreshold");
+  fitthr=settings.get_double("FittingThreshold");
 
   // Use Cholesky?
-  cholesky=set.get_bool("Cholesky");
-  cholthr=set.get_double("CholeskyThr");
-  cholshthr=set.get_double("CholeskyShThr");
-  cholnafthr=set.get_double("CholeskyNAFThr");
-  cholmode=set.get_int("CholeskyMode");
+  cholesky=settings.get_bool("Cholesky");
+  cholthr=settings.get_double("CholeskyThr");
+  cholshthr=settings.get_double("CholeskyShThr");
+  cholnafthr=settings.get_double("CholeskyNAFThr");
+  cholmode=settings.get_int("CholeskyMode");
   if(cholesky && densityfit)
     throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
 
@@ -195,7 +197,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
   arma::mat H_E(T.n_rows,T.n_cols);
   H_E.zeros();
 
-  std::vector<std::string> Ef=splitline(set.get_string("EField"));
+  std::vector<std::string> Ef=splitline(settings.get_string("EField"));
   if(Ef.size()!=3)
     throw std::runtime_error("EField must have 3 components!\n");
   std::vector<double> E(Ef.size());
@@ -253,7 +255,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
       // Form S submatrix
       arma::mat Ssub(S.submat(m_idx[i],m_idx[i]));
-      Sinvhs[i]=BasOrth(Ssub,set);
+      Sinvhs[i]=BasOrth(Ssub);
       nmo+=Sinvhs[i].n_cols;
     }
 
@@ -266,7 +268,7 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
       imo+=Sinvhs[i].n_cols;
     }
   } else {
-    Sinvh=BasOrth(S,set);
+    Sinvh=BasOrth(S);
   }
   chkptp->write("Sinvh",Sinvh);
 
@@ -285,19 +287,19 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
 
     // Do we need RI-K, or is RI-J sufficient?
     bool rik=false;
-    if(stricmp(set.get_string("Method"),"HF")==0)
+    if(stricmp(settings.get_string("Method"),"HF")==0)
       rik=true;
-    else if(stricmp(set.get_string("Method"),"ROHF")==0)
+    else if(stricmp(settings.get_string("Method"),"ROHF")==0)
       rik=true;
     else {
       // No hartree-fock; check if functional has exact exchange part
       int xfunc, cfunc;
-      parse_xc_func(xfunc,cfunc,set.get_string("Method"));
+      parse_xc_func(xfunc,cfunc,settings.get_string("Method"));
       if(exact_exchange(xfunc)!=0.0)
 	rik=true;
     }
 
-    if(stricmp(set.get_string("FittingBasis"),"Auto")==0) {
+    if(stricmp(settings.get_string("FittingBasis"),"Auto")==0) {
       // Check used method
       if(rik)
 	throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nSet the FittingBasis.\n");
@@ -307,10 +309,10 @@ SCF::SCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt) {
     } else {
       // Load basis library
       BasisSetLibrary fitlib;
-      fitlib.load_basis(set.get_string("FittingBasis"));
+      fitlib.load_basis(settings.get_string("FittingBasis"));
 
       // Construct fitting basis
-      construct_basis(dfitbas,basisp->get_nuclei(),fitlib,set);
+      construct_basis(dfitbas,basisp->get_nuclei(),fitlib);
     }
 
     // Compute memory estimate
@@ -1405,12 +1407,12 @@ std::vector<double> atomic_occupancy(double numel, int Nbf) {
   return occs;
 }
 
-std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSet & basis) {
+std::vector<double> get_restricted_occupancy(const BasisSet & basis) {
   // Returned value
   std::vector<double> ret;
 
   // Occupancies
-  std::string occs=set.get_string("Occupancies");
+  std::string occs=settings.get_string("Occupancies");
 
   // Parse occupancies
   if(occs.size()) {
@@ -1430,7 +1432,7 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
     */
   } else {
     // Aufbau principle.
-    int Nel=basis.Ztot()-set.get_int("Charge");
+    int Nel=basis.Ztot()-settings.get_int("Charge");
     if(Nel%2!=0) {
       throw std::runtime_error("Refusing to run restricted calculation on unrestricted system!\n");
     }
@@ -1444,9 +1446,9 @@ std::vector<double> get_restricted_occupancy(const Settings & set, const BasisSe
   return ret;
 }
 
-void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb) {
+void get_unrestricted_occupancy(const BasisSet & basis, std::vector<double> & occa, std::vector<double> & occb) {
   // Occupancies
-  std::string occs=set.get_string("Occupancies");
+  std::string occs=settings.get_string("Occupancies");
 
   // Parse occupancies
   if(occs.size()) {
@@ -1479,7 +1481,7 @@ void get_unrestricted_occupancy(const Settings & set, const BasisSet & basis, st
     // Aufbau principle. Get amount of alpha and beta electrons.
 
     int Nel_alpha, Nel_beta;
-    get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+    get_Nel_alpha_beta(basis.Ztot()-settings.get_int("Charge"),settings.get_int("Multiplicity"),Nel_alpha,Nel_beta);
 
     // Resize output
     occa.resize(Nel_alpha);
@@ -1659,7 +1661,7 @@ pz_scaling_t parse_pzscale(const std::string & scale) {
   throw std::runtime_error("Setting \"" + scale + "\" not recognized!\n");
 }
 
-dft_t parse_dft(const Settings & set, bool init) {
+dft_t parse_dft(bool init) {
   dft_t dft;
   dft.gridtol=0.0;
   dft.nl=false;
@@ -1667,14 +1669,14 @@ dft_t parse_dft(const Settings & set, bool init) {
   dft.vv10_C=0.0;
 
   // Use Lobatto quadrature?
-  dft.lobatto=set.get_bool("DFTLobatto");
+  dft.lobatto=settings.get_bool("DFTLobatto");
 
   // Tolerance
   std::string tolkw = init ? "DFTInitialTol" : "DFTFinalTol";
 
   // Use static grid?
-  if(stricmp(set.get_string("DFTGrid"),"Auto")!=0) {
-    std::vector<std::string> opts=splitline(set.get_string("DFTGrid"));
+  if(stricmp(settings.get_string("DFTGrid"),"Auto")!=0) {
+    std::vector<std::string> opts=splitline(settings.get_string("DFTGrid"));
     if(opts.size()!=2) {
       throw std::runtime_error("Invalid DFT grid specified.\n");
     }
@@ -1709,14 +1711,14 @@ dft_t parse_dft(const Settings & set, bool init) {
 
   } else {
     dft.adaptive=true;
-    dft.gridtol=set.get_double(tolkw);
+    dft.gridtol=settings.get_double(tolkw);
   }
 
   // Parse functionals
-  parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
+  parse_xc_func(dft.x_func,dft.c_func,settings.get_string("Method"));
 
   // Parse VV10
-  std::string vv10s(set.get_string("VV10"));
+  std::string vv10s(settings.get_string("VV10"));
   if(stricmp(vv10s,"Auto")==0) {
     // Determine automatically if VV10 is necessary
     if(dft.x_func>0)
@@ -1727,7 +1729,7 @@ dft_t parse_dft(const Settings & set, bool init) {
   } else if(stricmp(vv10s,"True")==0 || stricmp(vv10s,"Yes")==0) {
     dft.nl=true;
 
-    std::vector<std::string> vvopts=splitline(set.get_string("VV10Pars"));
+    std::vector<std::string> vvopts=splitline(settings.get_string("VV10Pars"));
     if(vvopts.size()!=2)
       throw std::runtime_error("Invalid VV10Pars!\n");
 
@@ -1752,7 +1754,7 @@ dft_t parse_dft(const Settings & set, bool init) {
     if(dft.adaptive)
       throw std::runtime_error("Adaptive DFT grids not supported with VV10.\n");
 
-    std::vector<std::string> opts=splitline(set.get_string("NLGrid"));
+    std::vector<std::string> opts=splitline(settings.get_string("NLGrid"));
     dft.nlnrad=readint(opts[0]);
     dft.nllmax=readint(opts[1]);
     if(dft.nlnrad<1 || dft.nllmax==0) {
@@ -1779,25 +1781,25 @@ dft_t parse_dft(const Settings & set, bool init) {
   return dft;
 }
 
-void calculate(const BasisSet & basis, const Settings & set, bool force) {
+void calculate(const BasisSet & basis, bool force) {
   // Checkpoint files to load and save
-  std::string loadname=set.get_string("LoadChk");
-  std::string savename=set.get_string("SaveChk");
+  std::string loadname=settings.get_string("LoadChk");
+  std::string savename=settings.get_string("SaveChk");
 
-  bool verbose=set.get_bool("Verbose");
+  bool verbose=settings.get_bool("Verbose");
   // Print out settings
   if(verbose)
-    set.print();
+    settings.print();
 
   // Number of electrons is
-  int Nel=basis.Ztot()-set.get_int("Charge");
+  int Nel=basis.Ztot()-settings.get_int("Charge");
 
   // Do a plain Hartree-Fock calculation?
-  bool hf= (stricmp(set.get_string("Method"),"HF")==0);
-  bool rohf=(stricmp(set.get_string("Method"),"ROHF")==0);
+  bool hf= (stricmp(settings.get_string("Method"),"HF")==0);
+  bool rohf=(stricmp(settings.get_string("Method"),"ROHF")==0);
 
   // Final convergence settings
-  double convthr(set.get_double("ConvThr"));
+  double convthr(settings.get_double("ConvThr"));
 
   // Get exchange and correlation functionals
   dft_t dft;
@@ -1806,17 +1808,17 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   double initconvthr(convthr);
 
   if(!hf && !rohf) {
-    parse_xc_func(dft.x_func,dft.c_func,set.get_string("Method"));
+    parse_xc_func(dft.x_func,dft.c_func,settings.get_string("Method"));
 
-    initdft=parse_dft(set,true);
-    dft=parse_dft(set,false);
+    initdft=parse_dft(true);
+    dft=parse_dft(false);
 
-    initconvthr*=set.get_double("DFTDelta");
+    initconvthr*=settings.get_double("DFTDelta");
   }
 
   // Check consistency of parameters
   if(!hf && !rohf && (exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-    if(set.get_bool("DensityFitting") && (stricmp(set.get_string("FittingBasis"),"Auto")==0)) {
+    if(settings.get_bool("DensityFitting") && (stricmp(settings.get_string("FittingBasis"),"Auto")==0)) {
       throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
     }
 
@@ -1832,13 +1834,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
   bool doCW=false;
 
   // Which guess to use
-  enum guess_t guess=parse_guess(set.get_string("Guess"));
+  enum guess_t guess=parse_guess(settings.get_string("Guess"));
 
   // Amount of electrons
   int Nel_alpha=-1;
   int Nel_beta=-1;
-  if(!set.get_string("Occupancies").size())
-    get_Nel_alpha_beta(basis.Ztot()-set.get_int("Charge"),set.get_int("Multiplicity"),Nel_alpha,Nel_beta);
+  if(!settings.get_string("Occupancies").size())
+    get_Nel_alpha_beta(basis.Ztot()-settings.get_int("Charge"),settings.get_int("Multiplicity"),Nel_alpha,Nel_beta);
 
   if(doload) {
     Checkpoint load(loadname,false);
@@ -1880,7 +1882,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     }
   }
 
-  if(set.get_int("Multiplicity")==1 && Nel%2==0 && !set.get_bool("ForcePol")) {
+  if(settings.get_int("Multiplicity")==1 && Nel%2==0 && !settings.get_bool("ForcePol")) {
     // Closed shell case
     rscf_t sol;
     // Initialize energy
@@ -1903,7 +1905,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     }
 
     // Get orbital occupancies
-    std::vector<double> occs=get_restricted_occupancy(set,basis);
+    std::vector<double> occs=get_restricted_occupancy(basis);
 
     // Write checkpoint.
     Checkpoint chkpt(savename,true);
@@ -1923,11 +1925,11 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     }
 
     // Write method
-    chkpt.write("Method",set.get_string("Method"));
+    chkpt.write("Method",settings.get_string("Method"));
 
     // Solver
-    SCF solver(basis,set,chkpt);
-    double Kgwh(set.get_double("Kgwh"));
+    SCF solver(basis,chkpt);
+    double Kgwh(settings.get_double("Kgwh"));
 
     // Handle guesses
     if(!doload) {
@@ -1942,7 +1944,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.sap_guess(sol);
 
         // Get minimal basis projection
-        arma::mat proj(minimal_basis_projection(basis,set));
+        arma::mat proj(minimal_basis_projection(basis));
 
         // Projection to minimal basis
         sol.H=proj.t()*sol.H*proj;
@@ -1961,13 +1963,13 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.gwh_guess(sol,Kgwh);
         solver.diagonalize(sol);
       } else if(guess == GSAP_GUESS) {
-        sol.H=solver.get_Hcore()+sap_guess(basis,set);
+        sol.H=solver.get_Hcore()+sap_guess(basis);
         solver.diagonalize(sol);
       } else if(guess == HUCKEL_GUESS) {
-        sol.H=huckel_guess(basis,set,Kgwh);
+        sol.H=huckel_guess(basis,Kgwh);
         solver.diagonalize(sol);
       } else if((guess == SAD_GUESS) || (guess == SADNO_GUESS)) {
-        sol.P=sad_guess(basis,set);
+        sol.P=sad_guess(basis);
 
         // Build Fock operator from SAD density matrix. Get natural orbitals
 	arma::vec occ;
@@ -2021,26 +2023,26 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       }
 
       // Perdew-Zunger?
-      bool pz=set.get_bool("PZ");
-      int pzprec=set.get_int("PZprec");
-      bool pzov=set.get_bool("PZov");
-      bool pzoo=set.get_bool("PZoo");
-      int pzloc=parse_pzimag(set.get_string("PZloc"));
-      enum locmet pzlocmet=parse_locmet(set.get_string("PZlocmet"));
-      double pzw=set.get_double("PZw");
-      int pzmax=set.get_int("PZiter");
-      double pzIthr=set.get_double("PZIthr");
-      double pzOOthr=set.get_double("PZOOthr");
-      double pzOVthr=set.get_double("PZOVthr");
-      double pzNRthr=set.get_double("PZNRthr");
-      double pzEthr=set.get_double("PZEthr");
-      int pzimag=parse_pzimag(set.get_string("PZimag"));
-      int pzstab=set.get_int("PZstab");
-      double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
-      int seed=set.get_int("PZseed");
-      dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
-      pz_scaling_t pzscale(parse_pzscale(set.get_string("PZscale")));
-      double pzscaleexp(set.get_double("PZscaleExp"));
+      bool pz=settings.get_bool("PZ");
+      int pzprec=settings.get_int("PZprec");
+      bool pzov=settings.get_bool("PZov");
+      bool pzoo=settings.get_bool("PZoo");
+      int pzloc=parse_pzimag(settings.get_string("PZloc"));
+      enum locmet pzlocmet=parse_locmet(settings.get_string("PZlocmet"));
+      double pzw=settings.get_double("PZw");
+      int pzmax=settings.get_int("PZiter");
+      double pzIthr=settings.get_double("PZIthr");
+      double pzOOthr=settings.get_double("PZOOthr");
+      double pzOVthr=settings.get_double("PZOVthr");
+      double pzNRthr=settings.get_double("PZNRthr");
+      double pzEthr=settings.get_double("PZEthr");
+      int pzimag=parse_pzimag(settings.get_string("PZimag"));
+      int pzstab=settings.get_int("PZstab");
+      double pzstabthr=-settings.get_double("PZstabThr"); // Minus sign!
+      int seed=settings.get_int("PZseed");
+      dft_t oodft(parse_pzmet(settings.get_string("PZmode"),dft));
+      pz_scaling_t pzscale(parse_pzscale(settings.get_string("PZscale")));
+      double pzscaleexp(settings.get_double("PZscaleExp"));
 
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
@@ -2249,7 +2251,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 
     // Get orbital occupancies
     std::vector<double> occa, occb;
-    get_unrestricted_occupancy(set,basis,occa,occb);
+    get_unrestricted_occupancy(basis,occa,occb);
 
     // Write checkpoint.
     Checkpoint chkpt(savename,true);
@@ -2272,8 +2274,8 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     }
 
     // Solver
-    SCF solver(basis,set,chkpt);
-    double Kgwh(set.get_double("Kgwh"));
+    SCF solver(basis,chkpt);
+    double Kgwh(settings.get_double("Kgwh"));
 
     // Handle guesses
     if(!doload) {
@@ -2288,7 +2290,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.sap_guess(sol);
 
         // Get minimal basis projection
-        arma::mat proj(minimal_basis_projection(basis,set));
+        arma::mat proj(minimal_basis_projection(basis));
 
         // Projection to minimal basis
         sol.Ha=proj.t()*sol.Ha*proj;
@@ -2307,16 +2309,16 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	solver.gwh_guess(sol,Kgwh);
         solver.diagonalize(sol);
       } else if(guess == GSAP_GUESS) {
-        sol.Ha=solver.get_Hcore()+sap_guess(basis,set);
+        sol.Ha=solver.get_Hcore()+sap_guess(basis);
         sol.Hb=sol.Ha;
         solver.diagonalize(sol);
       } else if(guess == HUCKEL_GUESS) {
-        sol.Ha=huckel_guess(basis,set,Kgwh);
+        sol.Ha=huckel_guess(basis,Kgwh);
         sol.Hb=sol.Ha;
         solver.diagonalize(sol);
       } else if((guess == SAD_GUESS) || (guess == SADNO_GUESS)) {
         // Form SAD density matrix
-        sol.P=sad_guess(basis,set);
+        sol.P=sad_guess(basis);
 
 	// Build Fock operator from SAD density matrix. Get natural orbitals
 	arma::vec occ;
@@ -2376,7 +2378,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       solver.ROHF(sol,occa,occb,convthr);
 
       // Set occupancies right
-      get_unrestricted_occupancy(set,basis,occa,occb);
+      get_unrestricted_occupancy(basis,occa,occb);
     } else {
       // Print information about used functionals
       if(verbose) {
@@ -2386,26 +2388,26 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
       }
 
       // Perdew-Zunger?
-      bool pz=set.get_bool("PZ");
-      int pzprec=set.get_int("PZprec");
-      bool pzov=set.get_bool("PZov");
-      bool pzoo=set.get_bool("PZoo");
-      int pzloc=parse_pzimag(set.get_string("PZloc"));
-      enum locmet pzlocmet=parse_locmet(set.get_string("PZlocmet"));
-      double pzw=set.get_double("PZw");
-      int pzmax=set.get_int("PZiter");
-      double pzIthr=set.get_double("PZIthr");
-      double pzOOthr=set.get_double("PZOOthr");
-      double pzOVthr=set.get_double("PZOVthr");
-      double pzEthr=set.get_double("PZEthr");
-      double pzNRthr=set.get_double("PZNRthr");
-      int pzimag=parse_pzimag(set.get_string("PZimag"));
-      int pzstab=set.get_int("PZstab");
-      double pzstabthr=-set.get_double("PZstabThr"); // Minus sign!
-      int seed=set.get_int("PZseed");
-      dft_t oodft(parse_pzmet(set.get_string("PZmode"),dft));
-      pz_scaling_t pzscale(parse_pzscale(set.get_string("PZscale")));
-      double pzscaleexp(set.get_double("PZscaleExp"));
+      bool pz=settings.get_bool("PZ");
+      int pzprec=settings.get_int("PZprec");
+      bool pzov=settings.get_bool("PZov");
+      bool pzoo=settings.get_bool("PZoo");
+      int pzloc=parse_pzimag(settings.get_string("PZloc"));
+      enum locmet pzlocmet=parse_locmet(settings.get_string("PZlocmet"));
+      double pzw=settings.get_double("PZw");
+      int pzmax=settings.get_int("PZiter");
+      double pzIthr=settings.get_double("PZIthr");
+      double pzOOthr=settings.get_double("PZOOthr");
+      double pzOVthr=settings.get_double("PZOVthr");
+      double pzEthr=settings.get_double("PZEthr");
+      double pzNRthr=settings.get_double("PZNRthr");
+      int pzimag=parse_pzimag(settings.get_string("PZimag"));
+      int pzstab=settings.get_int("PZstab");
+      double pzstabthr=-settings.get_double("PZstabThr"); // Minus sign!
+      int seed=settings.get_int("PZseed");
+      dft_t oodft(parse_pzmet(settings.get_string("PZmode"),dft));
+      pz_scaling_t pzscale(parse_pzscale(settings.get_string("PZscale")));
+      double pzscaleexp(settings.get_double("PZscaleExp"));
 
       if(!pz) {
 	if(dft.adaptive && (initdft.x_func>0 || initdft.c_func>0)) {
@@ -2659,7 +2661,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
     if(verbose) {
       population_analysis(basis,sol.Pa,sol.Pb);
 
-      if(!set.get_string("Occupancies").size()) {
+      if(!settings.get_string("Occupancies").size()) {
 	arma::mat Ca(sol.Ca.cols(0,Nel_alpha-1));
 	arma::mat Cb;
 	if(Nel_beta)
@@ -2667,7 +2669,7 @@ void calculate(const BasisSet & basis, const Settings & set, bool force) {
 	double S2(spin_S2(basis,Ca,Cb));
 	printf("\nThe spin expectation value <S^2> is %f\n",S2);
       } else {
-	printf("\nNot calculating spin expectation value since occupancies is set.\n");
+	printf("\nNot calculating spin expectation value since occupancies is settings.\n");
       }
     }
   }
@@ -2725,7 +2727,7 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   // Count number of independent functions
   size_t Nind=0;
   for(size_t i=0;i<Ntot;i++)
-    if(Sval(i)>=LINTHRES)
+    if(Sval(i)>=settings.get_double("LinDepThresh"))
       Nind++;
 
   printf("Augmented basis has %i linearly independent and %i dependent functions.\n",(int) Nind,(int) (Ntot-Nind));

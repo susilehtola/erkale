@@ -68,6 +68,8 @@ void diag(arma::vec & E, arma::mat & C, const arma::mat & H, const arma::mat & S
   //E.print("Eigenvalues");
 }
 
+Settings settings;
+
 int main_guarded(int argc, char **argv) {
   print_header();
 
@@ -83,29 +85,28 @@ int main_guarded(int argc, char **argv) {
   t.print_time();
 
   // Parse settings
-  Settings set;
-  set.add_scf_settings();
-  set.add_string("LoadChk","File to load old results from","");
-  set.add_double("LinDepThr","Linear dependency threshold",1e-5);
-  set.add_bool("FON","Fermi occupation numbers",false);
-  set.add_string("FONscan","Fermi occupation scan","");
-  set.add_double("T","Temperature in K",1000);
-  set.add_double("K","GWH approximation scaling factor",1.75);
-  set.add_int("nrad","Number of radial shells for SAP",99);
-  set.add_int("lmax","Angular rule for SAP (defaults to l=41 i.e. 590 points)",41);
-  set.parse(std::string(argv[1]),true);
-  set.print();
+  settings.add_scf_settings();
+  settings.add_string("LoadChk","File to load old results from","");
+  settings.add_double("LinDepThr","Linear dependency threshold",1e-5);
+  settings.add_bool("FON","Fermi occupation numbers",false);
+  settings.add_string("FONscan","Fermi occupation scan","");
+  settings.add_double("T","Temperature in K",1000);
+  settings.add_double("K","GWH approximation scaling factor",1.75);
+  settings.add_int("nrad","Number of radial shells for SAP",99);
+  settings.add_int("lmax","Angular rule for SAP (defaults to l=41 i.e. 590 points)",41);
+  settings.parse(std::string(argv[1]),true);
+  settings.print();
 
   // SAP quadrature rule
-  int nrad(set.get_int("nrad"));
-  int lmax(set.get_int("lmax"));
+  int nrad(settings.get_int("nrad"));
+  int lmax(settings.get_int("lmax"));
   // GWH constant
-  double K(set.get_double("K"));
+  double K(settings.get_double("K"));
 
   // Basis set
   BasisSet basis;
   // Get checkpoint file
-  std::string chkf(set.get_string("LoadChk"));
+  std::string chkf(settings.get_string("LoadChk"));
   Checkpoint chk(chkf,false);
   chk.read(basis);
 
@@ -132,7 +133,7 @@ int main_guarded(int argc, char **argv) {
   // Overlap matrix
   arma::mat S(basis.overlap());
   // and its half-inverse
-  double linthr(set.get_double("LinDepThr"));
+  double linthr(settings.get_double("LinDepThr"));
   arma::mat Sinvh(CanonicalOrth(S,linthr));
 
   // Guess energy and orbitals
@@ -146,10 +147,10 @@ int main_guarded(int argc, char **argv) {
   bool formP=true;
 
   // Compute guess density matrix
-  std::string guess(set.get_string("Guess"));
-  bool FON(set.get_bool("FON"));
-  std::string FONscan(set.get_string("FONscan"));
-  double T(set.get_double("T"));
+  std::string guess(settings.get_string("Guess"));
+  bool FON(settings.get_bool("FON"));
+  std::string FONscan(settings.get_string("FONscan"));
+  double T(settings.get_double("T"));
   if(stricmp(guess,"core")==0) {
     // Diagonalize it
     diag(E,C,Hcore,Sinvh);
@@ -184,7 +185,7 @@ int main_guarded(int argc, char **argv) {
 
   } else if(stricmp(guess,"sad")==0 || stricmp(guess,"no")==0) {
     // Get SAD guess
-    Pag=sad_guess(basis,set)/2.0;
+    Pag=sad_guess(basis)/2.0;
     Pbg=Pag;
 
     if(stricmp(guess,"no")==0) {
@@ -203,11 +204,11 @@ int main_guarded(int argc, char **argv) {
 
   } else if(stricmp(guess,"gsap")==0) {
     // Get SAP guess
-    diag(E,C,Hcore+sap_guess(basis,set),Sinvh);
+    diag(E,C,Hcore+sap_guess(basis),Sinvh);
 
   } else if(stricmp(guess,"huckel")==0) {
     // Get Huckel guess
-    diag(E,C,huckel_guess(basis,set,K),Sinvh);
+    diag(E,C,huckel_guess(basis,K),Sinvh);
 
   } else if(stricmp(guess,"minsap")==0) {
     DFTGrid grid(&basis);
@@ -224,7 +225,7 @@ int main_guarded(int argc, char **argv) {
     arma::mat Hsap(Hcore+Vsap);
 
     // Get minimal basis
-    arma::mat Cmin(minimal_basis_projection(basis,set));
+    arma::mat Cmin(minimal_basis_projection(basis));
 
     // Convert to minimal basis
     Hsap=Cmin.t()*Hsap*Cmin;

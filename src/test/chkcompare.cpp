@@ -18,6 +18,7 @@
 #include "../mathf.h"
 #include "../emd/emd_gto.h"
 #include "../stringutil.h"
+#include "../settings.h"
 
 /// Absolute tolerance for normalization of basis functions
 const double normtol=1e-10;
@@ -92,6 +93,8 @@ double E_diff(const arma::mat & Er, const arma::vec & Ec) {
 
   return arma::max(arma::abs((Er-Ec)/Enorm));
 }
+
+Settings settings;
 
 int main(int argc, char ** argv) {
   // Get reference directory

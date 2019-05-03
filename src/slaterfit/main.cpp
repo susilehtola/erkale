@@ -16,11 +16,14 @@
 
 #include "form_exponents.h"
 #include "solve_coefficients.h"
+#include "settings.h"
 #include "../basis.h"
 
 #ifdef SVNRELEASE
 #include "../version.h"
 #endif
+
+Settings settings;
 
 int main_guarded(int argc, char **argv) {
   print_copyright();
@@ -30,20 +33,24 @@ int main_guarded(int argc, char **argv) {
 #endif
   print_hostname();
 
-  if(argc!=5) {
-    printf("Usage: %s zeta l Nf method\n",argv[0]);
-    printf("zeta is the STO exponent to fit\n");
-    printf("l is angular momentum to use\n");
-    printf("Nf is number of exponents to use\n");
-    printf("method is 0 for even-tempered, 1 for well-tempered and 2 for full optimization, or 3 for midpoint quadrature.\n");
+  settings.add_double("zeta","STO exponent to fit",1.0);
+  settings.add_int("l","angular momentum",0);
+  settings.add_int("nfunc","number of functions to use",3);
+  settings.add_int("method","method to use: 0 even-tempered, 1 well-tempered, 2 full optimization, 3 midpoint quadrature",3);
+
+  if(argc!=2) {
+    printf("Usage: %s runfile\n",argv[0]);
+    settings.print();
     return 1;
   }
+  settings.parse(std::string(argv[1]),true);
+  settings.print();
 
   // Read parameteres
-  double zeta=atof(argv[1]);
-  double am=atoi(argv[2]);
-  int Nf=atoi(argv[3]);
-  int method=atoi(argv[4]);
+  double zeta=settings.get_double("zeta");
+  double am=settings.get_int("l");
+  int Nf=settings.get_int("nfunc");
+  int method=settings.get_int("method");
 
   // Do the optimization
   std::vector<contr_t> contr;

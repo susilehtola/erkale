@@ -18,6 +18,7 @@
 #include "../checkpoint.h"
 #include "../linalg.h"
 #include "../mathf.h"
+#include "../settings.h"
 
 /// Check orthogonality of spherical harmonics up to
 const int Lmax=10;
@@ -193,7 +194,10 @@ void test_checkpoint() {
   remove(tmpfile.c_str());
 }
 
+Settings settings;
+
 int main(void) {
+  settings.add_scf_settings();
   // Test indices
   testind();
   // Then, check norms of spherical harmonics.

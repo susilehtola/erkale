@@ -273,14 +273,15 @@ void write_basis(const BasisSet & basis, FILE *out) {
   print("Contraction coefficients",contr,out);
 }
 
+Settings settings;
 
-void load_fchk(const Settings & set, double tol) {
+void load_fchk(double tol) {
   Timer t;
 
   // Read in checkpoint
   printf("Read in formatted checkpoint ... ");
   fflush(stdout);
-  Storage stor=parse_fchk(set.get_string("LoadFchk"));
+  Storage stor=parse_fchk(settings.get_string("LoadFchk"));
   printf("done (%s)\n",t.elapsed().c_str());
   //  stor.print(false);
 
@@ -383,7 +384,7 @@ void load_fchk(const Settings & set, double tol) {
 
 
   // Renormalize
-  if(set.get_bool("Renormalize")) {
+  if(settings.get_bool("Renormalize")) {
     P*=Nel/nelnum;
 
     if(!restr) {
@@ -392,7 +393,7 @@ void load_fchk(const Settings & set, double tol) {
     }
   }
 
-  if(set.get_bool("Reorthonormalize")) {
+  if(settings.get_bool("Reorthonormalize")) {
     printf("\nReorthonormalizing orbitals ... ");
     fflush(stdout);
     t.set();
@@ -434,7 +435,7 @@ void load_fchk(const Settings & set, double tol) {
 
   // Save the result
   t.set();
-  Checkpoint chkpt(set.get_string("SaveChk"),true);
+  Checkpoint chkpt(settings.get_string("SaveChk"),true);
   chkpt.write(basis);
   chkpt.write("P",P);
 
@@ -479,11 +480,11 @@ void load_fchk(const Settings & set, double tol) {
   printf("\nERKALE checkpoint saved in %s.\n",t.elapsed().c_str());
 }
 
-void save_fchk(const Settings & set) {
+void save_fchk() {
   Timer t;
 
   // Load checkpoint
-  Checkpoint chkpt(set.get_string("LoadChk"),false);
+  Checkpoint chkpt(settings.get_string("LoadChk"),false);
 
   // Construct basis
   BasisSet basis;
@@ -491,7 +492,7 @@ void save_fchk(const Settings & set) {
   //  basis.print(true);
 
   // File to save
-  std::string savename=set.get_string("SaveFchk");
+  std::string savename=settings.get_string("SaveFchk");
 
   // Handle also compressed files
   std::string gzcmd="gzip ";
@@ -515,7 +516,7 @@ void save_fchk(const Settings & set) {
     uselzma=true;
 
   // Open output file.
-  FILE *out=fopen(set.get_string("SaveFchk").c_str(),"w");
+  FILE *out=fopen(settings.get_string("SaveFchk").c_str(),"w");
 
   // Write comment
   fprintf(out,"%-80s\n","ERKALE formatted checkpoint for visualization purposes");
@@ -666,29 +667,28 @@ int main_guarded(int argc, char **argv) {
     return 1;
   }
 
-  Settings set;
-  set.add_string("LoadFchk","Gaussian formatted checkpoint file to load","");
-  set.add_string("SaveFchk","Gaussian formatted checkpoint file to load","");
-  set.add_double("FchkTol","Tolerance for deviation in orbital orthonormality and density matrix",1e-8);
-  set.add_bool("Renormalize","Renormalize density matrix?",false);
-  set.add_bool("Reorthonormalize","Reorthonormalize orbitals?",false);
-  set.add_string("LoadChk","Save results to ERKALE checkpoint","");
-  set.add_string("SaveChk","Save results to ERKALE checkpoint","");
+  settings.add_string("LoadFchk","Gaussian formatted checkpoint file to load","");
+  settings.add_string("SaveFchk","Gaussian formatted checkpoint file to load","");
+  settings.add_double("FchkTol","Tolerance for deviation in orbital orthonormality and density matrix",1e-8);
+  settings.add_bool("Renormalize","Renormalize density matrix?",false);
+  settings.add_bool("Reorthonormalize","Reorthonormalize orbitals?",false);
+  settings.add_string("LoadChk","Save results to ERKALE checkpoint","");
+  settings.add_string("SaveChk","Save results to ERKALE checkpoint","");
 
   // Parse settings
-  set.parse(argv[1]);
-  set.print();
+  settings.parse(argv[1]);
+  settings.print();
 
-  bool loadfchk=(set.get_string("LoadFchk")!="");
-  bool savefchk=(set.get_string("SaveFchk")!="");
-  bool loadchk=(set.get_string("LoadChk")!="");
-  bool savechk=(set.get_string("SaveChk")!="");
-  double tol=set.get_double("FchkTol");
+  bool loadfchk=(settings.get_string("LoadFchk")!="");
+  bool savefchk=(settings.get_string("SaveFchk")!="");
+  bool loadchk=(settings.get_string("LoadChk")!="");
+  bool savechk=(settings.get_string("SaveChk")!="");
+  double tol=settings.get_double("FchkTol");
 
   if(loadfchk && savechk && !loadchk && !savefchk)
-    load_fchk(set,tol);
+    load_fchk(tol);
   else if(!loadfchk && !savechk && loadchk && savefchk)
-    save_fchk(set);
+    save_fchk();
   else
     throw std::runtime_error("Conflicting settings!\n");
 

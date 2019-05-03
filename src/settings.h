@@ -89,8 +89,6 @@ class Settings {
 
   /// Add SCF related settings
   void add_scf_settings();
-  /// Add DFT related settings
-  void add_dft_settings();
 
   /// Add a double valued setting
   void add_double(std::string name, std::string comment, double val, bool negative=false);

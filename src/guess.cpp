@@ -25,6 +25,7 @@
 #include "timer.h"
 #include <algorithm>
 
+extern Settings settings;
 
 void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atEocc, arma::mat & atCocc, arma::mat & atP, arma::mat & atF, int Q) {
   // Nucleus is
@@ -37,53 +38,53 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   nuc.r.z=0.0;
 
   // Settings to use
-  Settings set;
-  set.add_scf_settings();
-  set.add_dft_settings();
-  set.add_bool("ForcePol","Force polarized calculation",true);
-  set.add_string("SaveChk","Save calculation to","");
-  set.add_string("LoadChk","Load calculation from","");
+  Settings settings0(settings);
+  settings=Settings();
+  settings.add_scf_settings();
+  settings.add_bool("ForcePol","Force polarized calculation",true);
+  settings.add_string("SaveChk","Save calculation to","");
+  settings.add_string("LoadChk","Load calculation from","");
 
-  set.set_string("Guess","Core");
-  set.set_int("MaxIter",200);
-  set.set_bool("DensityFitting",false);
-  set.set_bool("Verbose",false);
-  set.set_bool("Direct",false);
-  set.set_bool("DensityFitting",false);
-  set.set_bool("Cholesky",true);
-  set.set_double("CholeskyThr",1e-5);
+  settings.set_string("Guess","Core");
+  settings.set_int("MaxIter",200);
+  settings.set_bool("DensityFitting",false);
+  settings.set_bool("Verbose",false);
+  settings.set_bool("Direct",false);
+  settings.set_bool("DensityFitting",false);
+  settings.set_bool("Cholesky",true);
+  settings.set_double("CholeskyThr",1e-5);
   // Use a rather large grid to make sure the calculation converges
   // even in cases where the functional requires a large grid to be
   // used. The other way would be to pass the user settings to this
   // routine..
-  set.set_string("DFTGrid","100 -434");
+  settings.set_string("DFTGrid","100 -434");
 
   // Don't do PZ-SIC for the initial guess.
   try {
-    set.set_bool("PZ",false);
+    settings.set_bool("PZ",false);
   } catch(...) {
   }
   // Also, turn off non-local correlation for initial guess
-  set.set_string("VV10","False");
+  settings.set_string("VV10","False");
 
   // Use default convergence settings
-  set.set_bool("UseDIIS",true);
-  set.set_int("DIISOrder",20);
-  set.set_bool("UseADIIS",true);
-  set.set_bool("UseBroyden",false);
-  set.set_bool("UseTRRH",false);
+  settings.set_bool("UseDIIS",true);
+  settings.set_int("DIISOrder",20);
+  settings.set_bool("UseADIIS",true);
+  settings.set_bool("UseBroyden",false);
+  settings.set_bool("UseTRRH",false);
   // and default charge
-  set.set_int("Charge", Q);
+  settings.set_int("Charge", Q);
 
   // Method
-  set.set_string("Method",method);
+  settings.set_string("Method",method);
 
   // Relax convergence requirements - open shell atoms may be hard to
   // converge
-  set.set_double("ConvThr",1e-4);
+  settings.set_double("ConvThr",1e-4);
 
   // Construct the basis set
-  atbas=BasisSet(1,set);
+  atbas=BasisSet(1);
   // Add the nucleus
   atbas.add_nucleus(nuc);
 
@@ -100,10 +101,10 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   atbas.finalize();
 
   // Set dummy multiplicity
-  set.set_int("Multiplicity",1);
+  settings.set_int("Multiplicity",1);
 
   // Force polarized calculation
-  set.set_bool("ForcePol",true);
+  settings.set_bool("ForcePol",true);
 
   // Get occupancies
   std::vector<double> occa(atomic_occupancy(0.5*(nuc.Z-Q),atbas.get_Nbf()));
@@ -112,14 +113,14 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
   std::ostringstream occs;
   for(size_t i=0;i<occa.size();i++)
     occs << occa[i] << " " << occb[i] << " ";
-  set.set_string("Occupancies",occs.str());
+  settings.set_string("Occupancies",occs.str());
 
   // Temporary file name
   std::string tmpname(tempname());
-  set.set_string("SaveChk",tmpname);
+  settings.set_string("SaveChk",tmpname);
 
   // Run calculation
-  calculate(atbas,set);
+  calculate(atbas);
 
   // Load energies and density matrix
   {
@@ -155,6 +156,9 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
 
   // Remove temporary file
   remove(tmpname.c_str());
+
+  // Restore global settings
+  settings=settings0;
 }
 
 typedef enum {
@@ -171,7 +175,7 @@ static const std::string guesstypes[]={
                                        "Minimal basis"
 };
 
-arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t type, double Kgwh) {
+arma::mat atomic_guess_wrk(const BasisSet & basis, atomic_guess_t type, double Kgwh) {
   // First of all, we need to determine which atoms are identical in
   // the way that the basis sets coincide.
 
@@ -182,11 +186,11 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t 
   size_t Nbf=basis.get_Nbf();
 
   // Print out info?
-  bool verbose=set.get_bool("Verbose");
+  bool verbose=settings.get_bool("Verbose");
 
-  std::string method=set.get_string("Method");
-  if(stricmp(set.get_string("AtomGuess"),"Auto")!=0)
-    method=set.get_string("AtomGuess");
+  std::string method=settings.get_string("Method");
+  if(stricmp(settings.get_string("AtomGuess"),"Auto")!=0)
+    method=settings.get_string("AtomGuess");
 
   if(verbose) {
     // Parse method
@@ -387,7 +391,7 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t 
 
   /*
   // Check that density matrix contains the right amount of electrons
-  int Neltot=basis.Ztot()-set.get_int("Charge");
+  int Neltot=basis.Ztot()-settings.get_int("Charge");
   double Nel=arma::trace(P*S);
   if(fabs(Nel-Neltot)/Neltot*100>1e-10)
   fprintf(stderr,"Nel = %i, P contains %f electrons, difference %e.\n",Neltot,Nel,Nel-Neltot);
@@ -402,20 +406,20 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, Settings set, atomic_guess_t 
   return M;
 }
 
-arma::mat sad_guess(const BasisSet & basis, Settings set) {
-  return atomic_guess_wrk(basis,set,FORM_SAD,0.0);
+arma::mat sad_guess(const BasisSet & basis) {
+  return atomic_guess_wrk(basis,FORM_SAD,0.0);
 }
 
-arma::mat sap_guess(const BasisSet & basis, Settings set) {
-  return atomic_guess_wrk(basis,set,FORM_SAP,0.0);
+arma::mat sap_guess(const BasisSet & basis) {
+  return atomic_guess_wrk(basis,FORM_SAP,0.0);
 }
 
-arma::mat huckel_guess(const BasisSet & basis, Settings set, double Kgwh) {
-  return atomic_guess_wrk(basis,set,FORM_HUCKEL,Kgwh);
+arma::mat huckel_guess(const BasisSet & basis, double Kgwh) {
+  return atomic_guess_wrk(basis,FORM_HUCKEL,Kgwh);
 }
 
-arma::mat minimal_basis_projection(const BasisSet & basis, Settings set) {
-  return atomic_guess_wrk(basis,set,FORM_MINBAS,0.0);
+arma::mat minimal_basis_projection(const BasisSet & basis) {
+  return atomic_guess_wrk(basis,FORM_MINBAS,0.0);
 }
 
 std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {

@@ -23,6 +23,8 @@
 #include "settings.h"
 #include "eriworker.h"
 
+extern Settings settings;
+
 namespace ERIfit {
 
   bool operator<(const bf_pair_t & lhs, const bf_pair_t & rhs) {
@@ -31,11 +33,11 @@ namespace ERIfit {
 
   void get_basis(BasisSet & basis, const BasisSetLibrary & blib, const ElementBasisSet & orbel) {
     // Settings needed to form basis set
-    Settings set;
-    set.add_scf_settings();
-    set.set_bool("BasisRotate", false);
-    set.set_string("Decontract", "");
-    set.set_bool("UseLM", true);
+    Settings settings0(settings);
+    settings.add_scf_settings();
+    settings.set_bool("BasisRotate", false);
+    settings.set_string("Decontract", "");
+    settings.set_bool("UseLM", true);
 
     // Atoms
     std::vector<atom_t> atoms(1);
@@ -45,7 +47,7 @@ namespace ERIfit {
     atoms[0].Q=0;
 
     // Form basis set
-    construct_basis(basis,atoms,blib,set);
+    construct_basis(basis,atoms,blib);
   }
 
   void orthonormal_ERI_trans(const ElementBasisSet & orbel, double linthr, arma::mat & trans) {

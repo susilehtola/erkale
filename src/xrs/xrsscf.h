@@ -44,7 +44,7 @@ class XRSSCF : public SCF {
 
  public:
   /// Constructor
-  XRSSCF(const BasisSet & basis, const Settings & set, Checkpoint & chkpt, bool spin);
+  XRSSCF(const BasisSet & basis, Checkpoint & chkpt, bool spin);
   /// Destructor
   ~XRSSCF();
 

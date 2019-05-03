@@ -17,7 +17,6 @@
 
 
 #include "global.h"
-class Settings;
 
 #ifndef ERKALE_LINALG
 #define ERKALE_LINALG
@@ -101,17 +100,17 @@ arma::mat SymmetricOrth(const arma::mat & S);
 /// Same, but use computed decomoposition
 arma::mat SymmetricOrth(const arma::mat & Svec, const arma::vec & Sval);
 /// Canonical orthogonalization of basis set
-arma::mat CanonicalOrth(const arma::mat & S, double cutoff=LINTHRES);
+arma::mat CanonicalOrth(const arma::mat & S, double cutoff);
 /// Same, but use computed decomposition
 arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff);
 
 /// Automatic orthonormalization.
 arma::mat BasOrth(const arma::mat & S, bool verbose);
 /// Orthogonalize basis
-arma::mat BasOrth(const arma::mat & S, const Settings & set);
+arma::mat BasOrth(const arma::mat & S);
 
-/// Form matrices S^1/2 and S^-1/2. By default matrices are computed in symmetric form, but canonical form is also available.
-void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvhalf, bool canonical=false, double cutoff=LINTHRES);
+/// Form matrices S^1/2 and S^-1/2.
+void S_half_invhalf(const arma::mat & S, arma::mat & Shalf, arma::mat & Sinvhalf, double cutoff);
 
 /// Transform matrix to vector
 arma::vec MatToVec(const arma::mat & v);

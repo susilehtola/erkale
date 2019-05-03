@@ -22,6 +22,7 @@
 #include "stockholder.h"
 #include "hirshfeldi.h"
 #include "linalg.h"
+#include "settings.h"
 
 void print_analysis(const BasisSet & basis, const std::string & msg, const arma::vec & q) {
   printf("\n%s charges\n",msg.c_str());
@@ -272,13 +273,15 @@ void lowdin_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::m
   print_analysis(basis,"Löwdin spin",qs);
 }
 
+extern Settings settings;
+
 arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P) {
   // Get overlap matrix
   arma::mat S=basis.overlap();
 
   // Get half overlap
   arma::mat Sh, Sinvh;
-  S_half_invhalf(S,Sh,Sinvh);
+  S_half_invhalf(S,Sh,Sinvh,settings.get_double("LinDepThresh"));
 
   // Compute ShPSh
   arma::mat SPS=Sh*P*Sh;
@@ -311,7 +314,7 @@ arma::mat lowdin_charges(const BasisSet & basis, const arma::mat & Pa, const arm
 
   // Get half overlap
   arma::mat Sh, Sinvh;
-  S_half_invhalf(S,Sh,Sinvh);
+  S_half_invhalf(S,Sh,Sinvh,settings.get_double("LinDepThresh"));
 
   // Compute ShPSh
   arma::mat SPaS=Sh*Pa*Sh;
