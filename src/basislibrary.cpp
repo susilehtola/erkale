@@ -292,6 +292,21 @@ bool FunctionShell::operator<(const FunctionShell & rhs) const {
   return C.size() > rhs.C.size();
 }
 
+bool FunctionShell::operator==(const FunctionShell & rhs) const {
+  // First, check angular momentum
+  if(am!=rhs.am)
+    return false;
+
+  if(C.size() != rhs.C.size())
+    return false;
+
+  for(size_t i=0;i<C.size();i++)
+    if(C[i].z != rhs.C[i].z || C[i].c != rhs.C[i].c)
+      return false;
+
+  return true;
+}
+
 int FunctionShell::get_am() const {
   return am;
 }
@@ -315,7 +330,15 @@ ElementBasisSet::~ElementBasisSet() {
 }
 
 void ElementBasisSet::add_function(FunctionShell f) {
-  bf.push_back(f);
+  // Check that function doesn't exist yet
+  bool found=false;
+  for(size_t i=0;i<bf.size();i++)
+    if(bf[i]==f)
+      found=true;
+  if(!found)
+    bf.push_back(f);
+  else
+    fprintf(stderr,"Duplicate %c shell removed in %s basis set\n",shell_types[f.get_am()],symbol.c_str());
 }
 
 void ElementBasisSet::sort() {
@@ -416,7 +439,7 @@ void ElementBasisSet::get_primitives(arma::vec & expsv, arma::mat & coeffs, int 
   coeffs.zeros(exps.size(),nsh);
   if((size_t) nsh > exps.size()) {
     std::ostringstream oss;
-    oss << "Basis set has duplicate functions on the " << shell_types[am] << " shell!\n";
+    oss << "Basis set has duplicate functions on the " << shell_types[am] << " shell: got " << nsh << " shells but only " << exps.size() << " exponents!\n";
     throw std::runtime_error(oss.str());
   }
 

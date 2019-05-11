@@ -70,6 +70,8 @@ class FunctionShell {
   void add_exponent(double C, double z);
   /// Comparison operator for ordering in decreasing angular momentum and exponent
   bool operator<(const FunctionShell &rhs) const;
+  /// Comparison operator for identity
+  bool operator==(const FunctionShell &rhs) const;
 
   /// Get angular momentum
   int get_am() const;
