@@ -1,4 +1,4 @@
-2012-11-25
+2019-05-29
 Susi Lehtola
 
 
@@ -54,10 +54,8 @@ Here is an example input file:
  System ethanol.xyz
  SaveChk ethanol-hf.chk
  LoadChk ethanol-lda.chk
- Direct  1
- UseADIIS 0
- UseDIIS 0
- UseBroyden 1
+ Cholesky false
+ Direct true
 
 The first line specifies that a Hartree-Fock calculation is requested.
 
@@ -92,24 +90,20 @@ calculation with a more sane starting guess (density-fitted
 density-functional theory calculation), the necessary number of
 (costly) Hartree-Fock iterations can be brought down.
 
-The sixth line states that two-electron (and density-fitting)
-integrals are to be computed on the fly. By default, the integrals are
+The sixth line turns off the use of the Cholesky decomposition for
+two-electron integrals, which is used by default.
+
+The seventh line states that two-electron (and density-fitting)
+integrals should be computed on the fly. By default, the integrals are
 tabled in memory.
-
-The seventh line turns off ADIIS acceleration (incompatible with Broyden).
-
-The eigth line turns off DIIS acceleration (incompatible with Broyden).
-
-The nineth line turns on Broyden acceleration.
-
 
 ** Contact information **
 
-Mr Susi Lehtola
-Department of Appied Physics
-Aalto University
-P. O. Box 11100
-FI-00076 AALTO
+Dr Susi Lehtola
+Department of Chemistry
+University of Helsinki
+P. O. Box 55
+FI-00014 UNIVERSITY OF HELSINKI
 FINLAND
 
 susi (dot) lehtola (at) alumni (dot) helsinki (dot) fi
