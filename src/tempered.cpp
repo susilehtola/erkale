@@ -79,7 +79,7 @@ arma::vec legendre_set(const arma::vec & A, int Nf) {
   // Exponents are
   arma::vec exps=arma::exp10(Pk*A);
 
-  return exps;
+  return arma::sort(exps,"descend");
 }
 
 arma::vec legendre_pars(const arma::vec & z, int Np) {
