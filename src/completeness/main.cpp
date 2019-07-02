@@ -45,8 +45,8 @@ int main_guarded(int argc, char **argv) {
 
   settings.add_int("am","angular momentum of shell to optimize for",0);
   settings.add_int("n","moment to optimize for: 1 for maximal area, 2 for minimal rms deviation",1);
-  settings.add_double("min","lower limit of exponent range in log10",-2);
-  settings.add_double("max","upper limit of exponent range in log10",6);
+  settings.add_double("min","lower limit of exponent range in log10",-2,true);
+  settings.add_double("max","upper limit of exponent range in log10",6,true);
   settings.add_double("tol","Optimize and add functions until tolerance is achieved",0.0);
   settings.add_int("nfunc","Fixed number of functions to optimize",0);
   settings.add_int("nfull","Number of functions at each side to fully optimize",4);
@@ -91,7 +91,7 @@ int main_guarded(int argc, char **argv) {
     exps=get_exponents(am,min,max,tol,n,true,nfull);
   } else {
     // Number of functions given.
-    exps=optimize_completeness(am,min,max,atoi(argv[5]),n,true,&tau,nfull);
+    exps=optimize_completeness(am,min,max,nfunc,n,true,&tau,nfull);
   }
 
   // Sort into ascending order

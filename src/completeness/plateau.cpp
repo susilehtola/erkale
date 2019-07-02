@@ -46,7 +46,7 @@ int main_guarded(int argc, char **argv) {
 
   settings.add_int("am","angular momentum of shell to optimize for",0);
   settings.add_int("n","moment to optimize for: 1 for maximal area, 2 for minimal rms deviation",1);
-  settings.add_double("min","lower limit of exponent range in log10",-2);
+  settings.add_double("min","lower limit of exponent range in log10",-2,true);
   settings.add_double("tol","the tolerance to target in the optimization",1e-3);
   settings.add_int("nfunc","Fixed number of functions to optimize",0);
   settings.add_int("nfull","Number of functions at each side to fully optimize",4);
