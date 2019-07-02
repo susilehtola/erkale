@@ -3651,9 +3651,9 @@ literal "true"
 \begin_layout Standard
 The measure to optimize is
 \begin_inset Formula 
-\begin{align*}
-\tau_{n}= & \left(\frac{1}{\lg\alpha_{\text{high}}-\lg\alpha_{\text{low }}}\int_{\alpha_{\text{low}}}^{\alpha_{\text{high}}}\left[1-Y(\alpha)\right]^{n}d\lg\alpha\right)^{1/n},
-\end{align*}
+\begin{align}
+\tau_{n}= & \left(\frac{1}{\lg\alpha_{\text{high}}-\lg\alpha_{\text{low }}}\int_{\alpha_{\text{low}}}^{\alpha_{\text{high}}}\left[1-Y(\alpha)\right]^{n}d\lg\alpha\right)^{1/n},\label{eq:taun}
+\end{align}
 
 \end_inset
 
@@ -3711,23 +3711,56 @@ The syntax of the program is
 \end_layout
 
 \begin_layout LyX-Code
-$ erkale_copt am n min max Nf
+$ erkale_copt runfile
 \end_layout
 
 \begin_layout Standard
 where 
 \emph on
-am
+runfile 
 \emph default
- is the angular momentum of the shell to optimize (0 for S, 1 for P, 
+is the file that contains the wanted parameters:
+\end_layout
+
+\begin_layout Description
+LinDepThresh the linear dependence cutoff, 
+\begin_inset Formula $10^{-5}$
+\end_inset
+
+ by default
+\end_layout
+
+\begin_layout Description
+am the angular momentum of the shell to optimize (0 for S, 1 for P, 
 \emph on
 etc.
 \emph default
-), 
-\begin_inset Formula $n$
+)
+\end_layout
+
+\begin_layout Description
+coulomb use the Coulomb metric instead of the overlap metric? False by default.
+ Use True for optimizing auxiliary basis sets for density fitting.
+\end_layout
+
+\begin_layout Description
+max the upper limit of the range of 
+\begin_inset Formula $\lg\alpha$
 \end_inset
 
- is the measure (
+ to optimize for
+\end_layout
+
+\begin_layout Description
+min the lower limit of the range of 
+\begin_inset Formula $\lg\alpha$
+\end_inset
+
+ to optimize for
+\end_layout
+
+\begin_layout Description
+n the measure to use: 
 \begin_inset Formula $n=0$
 \end_inset
 
@@ -3735,24 +3768,22 @@ etc.
 \begin_inset Formula $n=1$
 \end_inset
 
- for minimal rms deviation), 
-\emph on
-min
-\emph default
- and 
-\emph on
-max
-\emph default
- are the lower and upper limits of the range (of 
-\begin_inset Formula $\lg\alpha$
-\end_inset
+ for minimal rms deviation
+\end_layout
 
-) to optimize, and 
-\emph on
-Nf
-\emph default
- is the number of exponents to use.
- The result will be saved to 
+\begin_layout Description
+nfull the number of functions on each side to fully optimize, the exponents
+ in the middle being represented by an even-tempered expansion.
+ 4 by default, which yields practically fully converged results
+\end_layout
+
+\begin_layout Description
+nfunc the number of primitives to use
+\end_layout
+
+\begin_layout Description
+output file to save the resulting basis to.
+ Default is 
 \emph on
 optimized.gbs
 \emph default
@@ -3793,6 +3824,120 @@ Erkale
 src/contrib
 \emph default
 .
+\end_layout
+
+\begin_layout Subsection
+erkale_copt_plateau
+\begin_inset CommandInset label
+LatexCommand label
+name "subsec:erkale_copt_plateau"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This is another variant of the completeness optimization program, where
+ instead of defining a number of funtions and limits for the wanted completeness
+ plateau, the width of the plateau is determined automatically by targetting
+ exact satisfaction of the specified value for the metric 
+\begin_inset Formula $\tau_{n}$
+\end_inset
+
+.
+ This is achieved in teh program by adjustment of the width of the plateau
+ by changing the upper limit of the integral 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2015"
+literal "false"
+
+\end_inset
+
+.
+ The syntax of the program is
+\end_layout
+
+\begin_layout LyX-Code
+$ erkale_copt_plateau runfile
+\end_layout
+
+\begin_layout Standard
+where 
+\emph on
+runfile 
+\emph default
+is the file that contains the wanted parameters:
+\end_layout
+
+\begin_layout Description
+LinDepThresh the linear dependence cutoff, 
+\begin_inset Formula $10^{-5}$
+\end_inset
+
+ by default
+\end_layout
+
+\begin_layout Description
+am the angular momentum of the shell to optimize (0 for S, 1 for P, 
+\emph on
+etc.
+\emph default
+)
+\end_layout
+
+\begin_layout Description
+coulomb use the Coulomb metric instead of the overlap metric? False by default.
+ Use True for optimizing auxiliary basis sets for density fitting.
+\end_layout
+
+\begin_layout Description
+min the lower limit of the range of 
+\begin_inset Formula $\lg\alpha$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Description
+n the measure to use: 
+\begin_inset Formula $n=0$
+\end_inset
+
+ for maximal area or 
+\begin_inset Formula $n=1$
+\end_inset
+
+ for minimal rms deviation
+\end_layout
+
+\begin_layout Description
+nfull the number of functions on each side to fully optimize, the exponents
+ in the middle being represented by an even-tempered expansion.
+ 4 by default, which yields practically fully converged results
+\end_layout
+
+\begin_layout Description
+nfunc the number of primitives to use
+\end_layout
+
+\begin_layout Description
+output file to save the resulting basis to.
+ Default is 
+\emph on
+optimized.gbs
+\emph default
+.
+\end_layout
+
+\begin_layout Standard
+Like 
+\emph on
+erkale_copt
+\emph default
+, this program also generates functions one shell at a time and so you will
+ need to concatenate the basis sets by hand.
 \end_layout
 
 \begin_layout Subsection
@@ -8457,6 +8602,11 @@ A.
 
 \begin_layout Section*
 Changes
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2019-07-02 Update documentation on the completeness-optimization tools.
 \end_layout
 
 \begin_layout Labeling

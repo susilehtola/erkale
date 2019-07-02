@@ -45,17 +45,18 @@ int main_guarded(int argc, char **argv) {
   print_hostname();
 
   settings.add_int("am","angular momentum of shell to optimize for",0);
-  settings.add_int("n","moment to optimize for: 1 for maximal area, 2 for minimal rms deviation",0);
+  settings.add_int("n","moment to optimize for: 1 for maximal area, 2 for minimal rms deviation",1);
   settings.add_double("min","lower limit of exponent range in log10",-2);
-  settings.add_double("tol","Optimize and add functions until tolerance is achieved",0.0);
+  settings.add_double("tol","the tolerance to target in the optimization",1e-3);
   settings.add_int("nfunc","Fixed number of functions to optimize",0);
   settings.add_int("nfull","Number of functions at each side to fully optimize",4);
   settings.add_bool("coulomb","Use Coulomb metric? (Use only for RI basis sets)",false);
   settings.add_double("LinDepThresh","Basis set linear dependence threshold",1e-5);
+  settings.add_string("Output","Output file to use","optimized.gbs");
 
   if(argc!=2) {
-    printf("Usage: %s runfile\n",argv[0]);
     settings.print();
+    printf("Usage: %s runfile\n",argv[0]);
     return 1;
   }
   settings.parse(std::string(argv[1]),true);
@@ -97,10 +98,10 @@ int main_guarded(int argc, char **argv) {
 
   BasisSetLibrary baslib;
   baslib.add_element(el);
-  baslib.save_gaussian94("optimized.gbs");
+  baslib.save_gaussian94(settings.get_string("Output"));
 
   printf("Optimization performed in %s.\n",t.elapsed().c_str());
-  printf("Completeness-optimized basis set saved to optimized.gbs.\n\n");
+  printf("\nCompleteness-optimized basis set saved to %s.\n",settings.get_string("Output").c_str());
 
   printf("Width of profile is %.10e.\n",w);
 
