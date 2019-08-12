@@ -66,6 +66,8 @@ int classify_m(const arma::imat & conf) {
   return mval;
 }
 
+Settings settings;
+
 int main(int argc, char **argv) {
 #ifdef _OPENMP
   printf("ERKALE - Linear symmetries from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
@@ -79,19 +81,18 @@ int main(int argc, char **argv) {
   }
 
   // Parse settings
-  Settings set;
-  set.add_string("Nuclei","Nuclei in molecule","");
-  set.add_int("Charge","Charge state for molecule",0,true);
-  set.add_bool("saveconf","Save configurations to disk",true);
-  set.add_bool("savegeom","Save geometry to disk",true);
-  set.add_bool("largeactive","Use larger active space?",false);
-  set.parse(std::string(argv[1]),true);
-  set.print();
-  int Q=set.get_int("Charge");
-  bool saveconf=set.get_bool("saveconf");
-  bool savegeom=set.get_bool("savegeom");
-  bool largeactive=set.get_bool("largeactive");
-  std::string nucstr=set.get_string("Nuclei");
+  settings.add_string("Nuclei","Nuclei in molecule","");
+  settings.add_int("Charge","Charge state for molecule",0,true);
+  settings.add_bool("saveconf","Save configurations to disk",true);
+  settings.add_bool("savegeom","Save geometry to disk",true);
+  settings.add_bool("largeactive","Use larger active space?",false);
+  settings.parse(std::string(argv[1]),true);
+  settings.print();
+  int Q=settings.get_int("Charge");
+  bool saveconf=settings.get_bool("saveconf");
+  bool savegeom=settings.get_bool("savegeom");
+  bool largeactive=settings.get_bool("largeactive");
+  std::string nucstr=settings.get_string("Nuclei");
 
   std::vector<std::string> nuclei(splitline(nucstr));
   // Translate to integers
