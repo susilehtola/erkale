@@ -31,6 +31,7 @@
 // Gauss-Chebyshev for radial integral
 #include "chebyshev.h"
 
+#include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
 
@@ -38,6 +39,8 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
+extern Settings settings;
 
 /* Partitioning functions */
 inline double f_p(double mu) {
@@ -886,6 +889,35 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
     std::ostringstream oss;
     oss << "Functional "<<func_id<<" not found!";
     throw std::runtime_error(oss.str());
+  }
+  // Set parameters
+  arma::vec pars;
+  std::string functype;
+  if(is_exchange(func_id)) {
+    pars=settings.get_vec("DFTXpars");
+    functype="exchange";
+  } else if(is_correlation(func_id)) {
+    pars=settings.get_vec("DFTCpars");
+    functype="correlation";
+  }
+  if(pars.n_elem) {
+    /*
+#if XC_MAJOR_VERSION >= 5
+    // This is what is in libxc master; to-be version 5 at the moment
+    size_t npars = xc_func_get_n_ext_params(&func);
+#else
+    size_t npars = xc_func_info_get_n_ext_params((xc_func_info_type*) func.info);
+#endif
+    */
+    // This appears to be the most portable way of doing it...
+    size_t npars = func.info->n_ext_params;
+    if(npars != pars.n_elem) {
+      std::ostringstream oss;
+      oss << "Inconsistent number of parameters for the " << functype << " functional.\n";
+      oss << "Expected " << npars << ", got " << pars.n_elem << ".\n";
+      throw std::logic_error(oss.str());
+    }
+    xc_func_set_ext_params(&func, pars.memptr());
   }
 
   // Evaluate functionals.

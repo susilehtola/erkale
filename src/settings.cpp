@@ -150,6 +150,9 @@ void Settings::add_scf_settings() {
   add_double("DFTFinalTol", "Tolerance of final DFT grid", 1e-5);
   // Relative factor for initialization
   add_double("DFTDelta", "Switch to final DFT grid has converged within factor X", 1e2);
+  // Override parameters of XC functional
+  add_string("DFTXpars", "Override parameters of exchange functional (expert)", "");
+  add_string("DFTCpars", "Override parameters of correlation functional (expert)", "");
 
   // VV10?
   add_string("VV10","Use VV10 non-local correlation?","Auto");
