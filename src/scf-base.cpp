@@ -3029,9 +3029,12 @@ arma::vec pFermiON(const arma::vec & E, int N, double T) {
   return N*occ/arma::sum(occ);
 }
 
-void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, const arma::ivec & nocc, const std::vector<arma::uvec> & m_idx) {
+arma::mat enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, const arma::vec & nocc, const std::vector<arma::uvec> & m_idx) {
   if(nocc.n_elem != m_idx.size())
     throw std::logic_error("nocc vector and symmetry indices don't match!\n");
+
+  arma::mat P;
+  P.zeros(C.n_rows,C.n_rows);
 
   // Make sure index vector doesn't have duplicates
   {
@@ -3060,6 +3063,7 @@ void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, cons
   arma::mat Ct(C.t());
 
   // Loop over symmetries
+  //printf("Linear symmetry restriction\n");
   for(size_t isym=0;isym<m_idx.size();isym++) {
     // Check for occupation
     if(!nocc(isym))
@@ -3081,8 +3085,19 @@ void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, cons
     // Add to list of occupied orbitals
     if(Cind.n_elem < (size_t) nocc(isym))
       throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
-    for(arma::sword io=0;io<nocc(isym);io++)
+
+    // Occupy orbital
+    double nleft=nocc(isym);
+    size_t io=0;
+    while(nleft>0.0) {
+      if(io==Cind.n_elem) throw std::logic_error("Index overflow!\n");
       occidx.push_back(Cind(io));
+      double occ=std::min(1.0,nleft);
+      P+=occ*C.col(Cind(io))*C.col(Cind(io)).t();
+      nleft-=occ;
+      io++;
+      //printf("Occupied orbital %3i in symmetry %i with % f electrons. Global index %3i energy % e\n",(int) io,(int) isym,occ,(int) Cind(io)+1,E(Cind(io)));
+    }
   }
 
   // Sort list
@@ -3107,8 +3122,10 @@ void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, cons
         found=true;
         break;
       }
-    if(!found)
+    if(!found) {
+      //printf("Orbital %3i with energy % e is a virtual\n",(int) i,E(i));
       virtidx.push_back(i);
+    }
   }
 
   // Make sure orbital energies are in order
@@ -3135,4 +3152,6 @@ void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, cons
     newidx.subvec(occorder.n_elem,newidx.n_elem-1)=virtorder;
   C=C.cols(newidx);
   E=E(newidx);
+
+  return P;
 }

@@ -548,66 +548,64 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 
 #if !defined(FULLHOLE) && !defined(HALFHOLE)
     if(lincalc && iiter<=readlinocc) {
-      arma::imat linoccs;
+      arma::mat linoccs;
       linoccs.load(linoccfname,arma::raw_ascii);
       if(linoccs.n_cols < 3) {
         throw std::logic_error("Must have at least three columns in occupation data.\n");
       }
 
-      arma::ivec occnuma, occnumb;
+      arma::vec occnuma, occnumb;
       // Number of occupied alpha orbitals is first column
       occnuma=linoccs.col(0);
       // Number of occupied beta orbitals is second column
       occnumb=linoccs.col(1);
       // m value is third column
       std::vector<arma::uvec> occsym(linoccs.n_rows);
-      for(size_t i=0;i<linoccs.n_rows;i++)
-        occsym[i]=basisp->m_indices(linoccs(i,2));
+      for(size_t i=0;i<linoccs.n_rows;i++) {
+        int m=std::round(linoccs(i,2));
+        occsym[i]=basisp->m_indices(m);
+      }
 
       // Check length of specifications
 #ifdef RESTRICTED
-      size_t nnumab=0;
+      double numab=0.0;
       for(size_t i=0;i<occnuma.size();i++) {
-        nnumab+=occnuma(i);
+        numab+=occnuma(i);
         if(occnuma(i) != occnumb(i)) {
           throw std::logic_error("Alpha occupations don't match beta occupations even though calculation is spin-restricted!\n");
         }
       }
-      if(nnumab != nocc) {
-        std::ostringstream oss;
-        oss << "Expected occupations for " << nocc << " orbitals, got " << nnumab << "!\n";
-        throw std::logic_error(oss.str());
+      if(std::abs(numab-nocc)>10*DBL_EPSILON) {
+        printf("Warning - occupations differ by %f electrons from expected!\n",numab-nocc);
       }
 #else
-      size_t numa=0, numb=0;
+      double numa=0.0, numb=0.0;
       for(size_t i=0;i<occnuma.size();i++)
         numa+=occnuma(i);
       for(size_t i=0;i<occnumb.size();i++)
         numb+=occnumb(i);
-      if(numa != nocca) {
-        std::ostringstream oss;
-        oss << "Expected occupations for " << nocca << " alpha orbitals, got " << numa << "!\n";
-        throw std::logic_error(oss.str());
+      if(std::abs(numa-nocca)>10*DBL_EPSILON) {
+        printf("Warning - alpha occupation differs by %f electrons from expected!\n",numa-nocca);
       }
-      if(numb != noccb) {
-        std::ostringstream oss;
-        oss << "Expected occupations for " << noccb << " beta orbitals, got " << numb << "!\n";
-        throw std::logic_error(oss.str());
+      if(std::abs(numb-noccb)>10*DBL_EPSILON) {
+        printf("Warning -  beta occupation differs by %f electrons from expected!\n",numb-noccb);
       }
 #endif
 
       // Make sure wanted orbitals are occupied
 #ifdef RESTRICTED
-      enforce_occupations(sol.C,sol.E,S,occnuma,occsym);
+      sol.P=2*enforce_occupations(sol.C,sol.E,S,occnuma,occsym);
 #else
-      enforce_occupations(sol.Ca,sol.Ea,S,occnuma,occsym);
-      enforce_occupations(sol.Cb,sol.Eb,S,occnumb,occsym);
+      sol.Pa=enforce_occupations(sol.Ca,sol.Ea,S,occnuma,occsym);
+      sol.Pb=enforce_occupations(sol.Cb,sol.Eb,S,occnumb,occsym);
+      sol.P=sol.Pa+sol.Pb;
 #endif
-    }
+    } else
 #endif
-
-    // Form new density matrix
-    form_dens(sol);
+      {
+        // Form new density matrix
+        form_dens(sol);
+      }
 
     // Change-of-density matrices
     arma::mat deltaP=sol.P-oldsol.P;

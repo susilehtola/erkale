@@ -532,8 +532,8 @@ arma::vec FermiON(const arma::vec & E, double N, double T);
 /// Pseudo-Fermi occupations, temperature in Eh
 arma::vec pFermiON(const arma::vec & E, int N, double T);
 
-/// Enforce occupation of wanted orbitals
-void enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, const arma::ivec & nocc, const std::vector<arma::uvec> & m_idx);
+/// Enforce occupation of wanted orbitals, build density matrix
+arma::mat enforce_occupations(arma::mat & C, arma::vec & E, const arma::mat & S, const arma::vec & nocc, const std::vector<arma::uvec> & m_idx);
 
 /// Needed to get solvers to compilex
 #include "checkpoint.h"
