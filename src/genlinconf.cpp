@@ -505,8 +505,7 @@ void fractional_occupations(const std::vector<int> & Zs, bool largeactive, int Q
         occs.col(1)=beta_occs[ibeta];
 
         // Add to list
-        if(check_configuration(occs))
-          occlist.push_back(occs);
+        occlist.push_back(occs);
       }
     } else {
       for(size_t ibeta=0;ibeta<beta_occs.size();ibeta++) {
