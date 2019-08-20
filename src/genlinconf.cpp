@@ -596,11 +596,11 @@ void fractional_occupations(const std::vector<int> & Zs, bool largeactive, int Q
       fname << numconf++ << ".dat";
 
       // Number of electrons per m channel
-      arma::ivec nelec(2*mmax+1);
+      arma::vec nelec(conf.n_rows);
       for(size_t i=0;i<nelec.n_elem;i++)
         nelec(i)=conf(i,0)+conf(i,1);
       // Get rid of zero rows
-      arma::uvec idx(arma::find(nelec>0));
+      arma::uvec idx(arma::find(nelec>0.0));
       conf=conf.rows(idx);
 
       if(saveconf) {
