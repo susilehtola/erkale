@@ -18,6 +18,7 @@
 
 #include "../chebyshev.h"
 #include "../timer.h"
+#include "../settings.h"
 #include <armadillo>
 #include <cstdio>
 
@@ -150,6 +151,8 @@ double E_singles_MP2(const arma::mat & Fph, const arma::vec & Eo, const arma::ve
 
   return E;
 }
+
+Settings settings;
 
 int main_guarded(void) {
 #ifdef _OPENMP
