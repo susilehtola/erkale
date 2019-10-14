@@ -583,7 +583,7 @@ int main_guarded(int argc, char **argv) {
 
   if(atoms.size()==2) {
     // Specialized code for diatomic molecules
-    double R0=std::round(dist(atoms[0],atoms[1])/steplen)*steplen;
+    double R0=round(dist(atoms[0],atoms[1])/steplen)*steplen;
 
     // Nuclear coordinates
     x.zeros(6);
