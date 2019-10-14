@@ -562,7 +562,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
       // m value is third column
       std::vector<arma::uvec> occsym(linoccs.n_rows);
       for(size_t i=0;i<linoccs.n_rows;i++) {
-        int m=std::round(linoccs(i,2));
+        int m=round(linoccs(i,2));
         occsym[i]=basisp->m_indices(m);
       }
 
