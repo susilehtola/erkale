@@ -186,10 +186,8 @@ void augmented_solution(const BasisSet & basis, const uscf_t & sol, size_t nocca
 
   augsol.P=augsol.Pa+augsol.Pb;
 
-  augsol.Ca.zeros(Ntot,sol.Ca.n_cols);
-  augsol.Ca.submat(0,0,Nbf-1,sol.Ca.n_cols-1)=sol.Ca;
-  augsol.Cb.zeros(Ntot,sol.Cb.n_cols);
-  augsol.Cb.submat(0,0,Nbf-1,sol.Cb.n_cols-1)=sol.Cb;
+  augsol.Ca=project_orbitals(sol.Ca,basis,augbas);
+  augsol.Cb=project_orbitals(sol.Cb,basis,augbas);
 
   // Checkpoint
   std::string augchk=settings.get_string("AugChk");
