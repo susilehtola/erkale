@@ -63,7 +63,7 @@ ERIscreen::~ERIscreen() {
 }
 
 size_t ERIscreen::get_N() const {
-  return (basp!=NULL) ? basp->get_Nbf() : 0;
+  return Nbf;
 }
 
 void ERIscreen::set_range_separation(double w, double a, double b) {
@@ -84,9 +84,10 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
     return 0;
 
   basp=basisv;
+  Nbf=basisv->get_Nbf();
 
   // Form index helper
-  iidx=i_idx(basp->get_Nbf());
+  iidx=i_idx(Nbf);
 
   // Shell-pair list
   shpairs=basp->get_eripairs(Q,M,shtol,omega,alpha,beta,verbose);
@@ -259,6 +260,12 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 }
 
 arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+  
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -292,6 +299,12 @@ arma::mat ERIscreen::calcJ(const arma::mat & P, double tol) const {
 }
 
 arma::mat ERIscreen::calcK(const arma::mat & P, double tol) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -325,6 +338,12 @@ arma::mat ERIscreen::calcK(const arma::mat & P, double tol) const {
 }
 
 arma::cx_mat ERIscreen::calcK(const arma::cx_mat & P, double tol) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -358,6 +377,17 @@ arma::cx_mat ERIscreen::calcK(const arma::cx_mat & P, double tol) const {
 }
 
 void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol) const {
+  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -393,6 +423,17 @@ void ERIscreen::calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka
 }
 
 void ERIscreen::calcK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const {
+  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -428,6 +469,12 @@ void ERIscreen::calcK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::cx
 }
 
 void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double tol) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -463,6 +510,12 @@ void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double
 }
 
 void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, double tol) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -498,6 +551,17 @@ void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, 
 }
 
 void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J, arma::mat & Ka, arma::mat & Kb, double tol) const {
+  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -536,6 +600,17 @@ void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J
 }
 
 void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::mat & J, arma::cx_mat & Ka, arma::cx_mat & Kb, double tol) const {
+  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -574,6 +649,14 @@ void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::m
 }
 
 std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P, double jfrac, double kfrac, double tol) const {
+  for(size_t i=0;i<P.size();i++) {
+    if(P[i].n_rows != Nbf || P[i].n_cols != Nbf) {
+      std::ostringstream oss;
+      oss << "Error in ERIscreen: Nbf = " << Nbf << ", P[" << i << "].n_rows = " << P[i].n_rows << ", P[" << i << "].n_cols = " << P[i].n_cols << "!\n";
+      throw std::logic_error(oss.str());
+    }
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -631,6 +714,12 @@ std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P,
 }
 
 arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -659,6 +748,12 @@ arma::vec ERIscreen::forceJ(const arma::mat & P, double tol) const {
 }
 
 arma::vec ERIscreen::forceK(const arma::mat & P, double tol, double kfrac) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -687,6 +782,17 @@ arma::vec ERIscreen::forceK(const arma::mat & P, double tol, double kfrac) const
 }
 
 arma::vec ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const {
+  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -717,6 +823,12 @@ arma::vec ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, double t
 }
 
 arma::vec ERIscreen::forceJK(const arma::mat & P, double tol, double kfrac) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else
@@ -746,6 +858,17 @@ arma::vec ERIscreen::forceJK(const arma::mat & P, double tol, double kfrac) cons
 }
 
 arma::vec ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, double tol, double kfrac) const {
+  if(Pa.n_rows != Nbf || Pa.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pa.n_rows = " << Pa.n_rows << ", Pa.n_cols = " << Pa.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+  if(Pb.n_rows != Nbf || Pb.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
 #else

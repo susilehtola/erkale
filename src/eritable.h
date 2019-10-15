@@ -47,6 +47,9 @@ class ERItable {
   std::vector<eripair_t> shpairs;
   /// Screening matrices
   arma::mat Q, M;
+  /// Number of basis functions
+  size_t Nbf;
+
   /// Table of integrals
   std::vector<double> ints;
   /// Offset lookup

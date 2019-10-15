@@ -46,6 +46,8 @@ class ERIscreen {
   std::vector<eripair_t> shpairs;
   /// Shell-pair screening matrices
   arma::mat Q, M;
+  /// Number of basis functions
+  size_t Nbf;
 
   /// Pointer to the used basis set
   const BasisSet * basp;

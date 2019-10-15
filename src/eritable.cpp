@@ -98,6 +98,12 @@ size_t ERItable::offset(size_t ip, size_t jp) const {
 }
 
 arma::mat ERItable::calcJ(const arma::mat & P) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERItable: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   arma::mat J(P);
   J.zeros();
 
@@ -126,6 +132,12 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
 }
 
 arma::mat ERItable::calcK(const arma::mat & P) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERItable: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   arma::mat K(P);
   K.zeros();
 
@@ -154,6 +166,12 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
 }
 
 arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in ERItable: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   arma::cx_mat K(P);
   K.zeros();
 
@@ -184,6 +202,8 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 }
 
 size_t ERItable::fill(const BasisSet * basp, double tol) {
+  Nbf=basp->get_Nbf();
+  
   // Shells
   std::vector<GaussianShell> shells=basp->get_shells();
 

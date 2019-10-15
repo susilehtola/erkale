@@ -627,6 +627,12 @@ arma::umat ERIchol::get_invmap() const {
 }
 
 arma::mat ERIchol::calcJ(const arma::mat & P) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Density matrix doesn't match basis set! N = " << Nbf << ", Nrows = " << P.n_rows << ", Ncols = " << P.n_cols << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
   // Vectorize P
   arma::rowvec Pv(arma::trans(P(prodidx)));
   // Twice the off-diagonal contribution
@@ -647,6 +653,12 @@ arma::mat ERIchol::calcJ(const arma::mat & P) const {
 }
 
 arma::mat ERIchol::calcK(const arma::vec & C) const {
+  if(C.n_elem != Nbf) {
+    std::ostringstream oss;
+    oss << "Orbital vector doesn't match basis set! N = " << Nbf << ", N(C) = " << C.n_elem << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
   // K_uv = C_r C_s (ur|vs) = (L^P_ur C_r) (L^P_vs Cs)
   arma::mat v(C.n_elem,B.n_cols);
   v.zeros();
@@ -672,6 +684,12 @@ arma::mat ERIchol::calcK(const arma::vec & C) const {
 }
 
 arma::cx_mat ERIchol::calcK(const arma::cx_vec & C0) const {
+  if(C0.n_elem != Nbf) {
+    std::ostringstream oss;
+    oss << "Orbital vector doesn't match basis set! N = " << Nbf << ", N(C) = " << C0.n_elem << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
   // Need to complex conjugate C
   arma::cx_vec C(arma::conj(C0));
 
@@ -701,6 +719,12 @@ arma::cx_mat ERIchol::calcK(const arma::cx_vec & C0) const {
 }
 
 arma::mat ERIchol::calcK(const arma::mat & C, const std::vector<double> & occs) const {
+  if(C.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Orbital matrix doesn't match basis set! N = " << Nbf << ", N(C) = " << C.n_rows << "!\n";
+    throw std::runtime_error(oss.str());
+  }
+
   arma::mat K(C.n_rows,C.n_rows);
   K.zeros();
 #ifdef _OPENMP

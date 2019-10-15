@@ -213,6 +213,12 @@ arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip) const {
 }
 
 void DensityFit::digest_Jexp(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   // Shells in question are
   size_t imus=orbpairs[ip].is;
   size_t inus=orbpairs[ip].js;
@@ -256,6 +262,12 @@ void DensityFit::digest_J(const arma::mat & gamma, size_t ip, const arma::mat & 
 }
 
 void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, arma::mat & K) const {
+  if(C.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   // a_munu contains (a,uv). We want to build the exchange
   // K_uv = \sum_i n_i (ui|vi) = \sum_i n_i (a|ui) (a|b)^-1 (b|vi)
   for(size_t io=0;io<C.n_cols;io++) {
@@ -331,6 +343,12 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
 }
 
 void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const {
+  if(C.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   // a_munu contains (a,uv). We want to build the exchange
   // K_uv = \sum_i n_i (ui|vi) = \sum_i n_i (a|ui) (a|b)^-1 (b|vi)
   for(size_t io=0;io<C.n_cols;io++) {
@@ -406,6 +424,12 @@ void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs,
 }
 
 void DensityFit::digest_K_direct(const arma::mat & C, const arma::vec & occs, arma::mat & K) const {
+  if(C.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   // a_munu contains (a,uv). We want to build the exchange
   // K_uv = \sum_i n_i (ui|vi) = \sum_i n_i (a|ui) (a|b)^-1 (b|vi)
 
@@ -534,6 +558,12 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
 }
 
 arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   arma::vec gamma(Naux);
   gamma.zeros();
 
@@ -605,6 +635,14 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 }
 
 std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat> & P) const {
+  for(size_t i=0;i<P.size();i++) {
+    if(P[i].n_rows != Nbf || P[i].n_cols != Nbf) {
+      std::ostringstream oss;
+      oss << "Error in DensityFit: Nbf = " << Nbf << ", P[" << i << "].n_rows = " << P[i].n_rows << ", P[" << i << "].n_cols = " << P[i].n_cols << "!\n";
+      throw std::logic_error(oss.str());
+    }
+  }
+
   std::vector<arma::vec> gamma(P.size());
   for(size_t i=0;i<P.size();i++)
     gamma[i].zeros(Naux);
@@ -688,6 +726,12 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 }
 
 arma::mat DensityFit::calcJ(const arma::mat & P) const {
+  if(P.n_rows != Nbf || P.n_cols != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   // Get the expansion coefficients
   arma::vec c=compute_expansion(P);
 
@@ -966,6 +1010,12 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
 }
 
 arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> & occo, size_t fitmem) const {
+  if(Corig.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", Corig.n_rows = " << Corig.n_rows << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   // Count number of orbitals
   size_t Nmo=0;
   for(size_t i=0;i<occo.size();i++)
@@ -1030,6 +1080,12 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 }
 
 arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<double> & occo, size_t fitmem) const {
+  if(Corig.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", Corig.n_rows = " << Corig.n_rows << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
   // Count number of orbitals
   size_t Nmo=0;
   for(size_t i=0;i<occo.size();i++)
