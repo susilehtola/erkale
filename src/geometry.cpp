@@ -1077,7 +1077,7 @@ int main_guarded(int argc, char **argv) {
       // Copy checkpoint file
       {
         std::ostringstream oss;
-        oss << "\\cp " << getchk(iref) << " " << settings.get_string("SaveChk");
+        oss << "\\cp " << getchk(iref) << " " << savechk0;
         if(system(oss.str().c_str()))
           throw std::runtime_error("Error copying checkpoint.\n");
       }
@@ -1178,7 +1178,8 @@ int main_guarded(int argc, char **argv) {
 
   // Run calculation to get final checkpoint
   settings=settings0;
-  settings.set_string("LoadChk",getchk(ncalc-1));
+  settings.set_string("LoadChk",savechk0);
+  settings.set_string("SaveChk",savechk0);
   calculate(x,pars,E,f,false);
   save_xyz(get_atoms(x,pars),"Optimized configuration",result,false);
 
