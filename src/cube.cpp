@@ -924,8 +924,8 @@ int main_guarded(int argc, char **argv) {
       printf("done (%s)\n",t.elapsed().c_str());
 
       printf("Orbital norms on grid\n");
-      for(size_t io=0;io<orbidx.size();io++)
-	printf("%4i %e\n",(int) orbidx[is][io],orbnorm(io));
+      for(size_t io=0;io<orbidx[is].size();io++)
+        printf("%4i %e\n",(int) orbidx[is][io],orbnorm(io));
     }
   }
 
