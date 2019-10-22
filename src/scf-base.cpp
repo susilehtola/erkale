@@ -2689,28 +2689,30 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
   // Amount of old orbitals is
   const size_t Nold=Cold.n_cols;
 
-  // Identify augmentation shells.
-  std::vector<size_t> augshellidx;
-  std::vector<size_t> origshellidx;
+  // Mapping from original shell to augmented basis
+  std::vector<GaussianShell> augshells(augbas.get_shells());
+  std::vector<GaussianShell> origshells(minbas.get_shells());
+  std::vector<size_t> mapping(origshells.size());
 
-  std::vector<GaussianShell> augshells=augbas.get_shells();
-  std::vector<GaussianShell> origshells=minbas.get_shells();
-
-  // Loop over shells in augmented set.
-  for(size_t i=0;i<augshells.size();i++) {
-    // Try to find the shell in the original set
+  // Loop over shells in original set
+  for(size_t io=0;io<origshells.size();io++) {
+    // Try to find the shell in the augmented set
     bool found=false;
-    for(size_t j=0;j<origshells.size();j++)
-      if(augshells[i]==origshells[j]) {
+    for(size_t ia=0;ia<augshells.size();ia++)
+      if(origshells[io]==augshells[ia]) {
 	found=true;
-	origshellidx.push_back(i);
+        mapping[io]=ia;
 	break;
       }
+    if(!found) {
+      minbas.print(true);
+      augbas.print(true);
+      fflush(stdout);
 
-    // If the shell was not found in the original set, it is an
-    // augmentation shell.
-    if(!found)
-      augshellidx.push_back(i);
+      std::ostringstream oss;
+      oss << "Augmented basis does not appear to be a superset of the non-augmented basis: shell " << io+1 << " was not found in augmented set!\n";
+      throw std::logic_error(oss.str());
+    }
   }
 
   // Overlap matrix in augmented basis
@@ -2747,8 +2749,19 @@ arma::mat project_orbitals(const arma::mat & Cold, const BasisSet & minbas, cons
 
   // The first vectors are simply the occupied states.
   for(size_t i=0;i<Nold;i++)
-    for(size_t ish=0;ish<origshellidx.size();ish++)
-      C.submat(augshells[origshellidx[ish]].get_first_ind(),i,augshells[origshellidx[ish]].get_last_ind(),i)=Cold.submat(origshells[ish].get_first_ind(),i,origshells[ish].get_last_ind(),i);
+    for(size_t ish=0;ish<origshells.size();ish++) {
+      // Augmented shell index
+      size_t aidx(mapping[ish]);
+      // First and last augmented function
+      size_t a_first(augshells[aidx].get_first_ind());
+      size_t a_last(augshells[aidx].get_last_ind());
+      // First and last input function
+      size_t i_first(origshells[ish].get_first_ind());
+      size_t i_last(origshells[ish].get_last_ind());
+
+      // Copy data
+      C.submat(a_first, i, a_last, i) = Cold.submat(i_first, i, i_last, i);
+    }
 
   // Determine the rest. Compute the overlap of the functions
   arma::mat X=arma::trans(Sinvh)*S*C.cols(0,Nold-1);
