@@ -137,9 +137,9 @@ bool operator==(const contr_t & lhs, const contr_t & rhs) {
   //  return (lhs.z==rhs.z) && (lhs.c==rhs.c);
 
   // Since this also needs to work for saved and reloaded basis sets, we need to relax the comparison.
-  const double tol=1e3*DBL_EPSILON;
+  const double tol=sqrt(DBL_EPSILON);
 
-  bool same=(fabs(lhs.z-rhs.z)<tol) && (fabs(lhs.c-rhs.c)<tol);
+  bool same=(fabs(lhs.z-rhs.z)<tol*std::max(1.0,fabs(lhs.z))) && (fabs(lhs.c-rhs.c)<tol*std::max(1.0,fabs(lhs.z)));
 
   /*
     if(!same) {
