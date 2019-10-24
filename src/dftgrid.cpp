@@ -4170,7 +4170,7 @@ double DFTGrid::compute_Nel(const arma::mat & Pa, const arma::mat & Pb) {
 }
 
 arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
-  arma::vec Nel(grids.size());
+  arma::vec Nel(basp->get_Nnuc());
   Nel.zeros();
 
 #ifdef _OPENMP
@@ -4212,7 +4212,7 @@ arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
 
 
 arma::vec DFTGrid::compute_atomic_Nel(const Hirshfeld & hirsh, const arma::mat & P) {
-  arma::vec Nel(grids.size());
+  arma::vec Nel(basp->get_Nnuc());
   Nel.zeros();
 
 #ifdef _OPENMP

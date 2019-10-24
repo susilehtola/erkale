@@ -41,7 +41,9 @@ void print_analysis(const BasisSet & basis, const std::string & msg, const arma:
 arma::vec add_nuclear_charges(const BasisSet & basis, const arma::vec & q) {
   if(basis.get_Nnuc()!=q.n_elem) {
     ERROR_INFO();
-    throw std::runtime_error("Nuclear charge vector does not match amount of nuclei in system.\n");
+    std::ostringstream oss;
+    oss << "Nuclear charge vector does not match amount of nuclei in system.\n" << "Nnuc = " << basis.get_Nnuc() << ", q.n_elem = " << q.n_elem << "\n";
+    throw std::runtime_error(oss.str());
   }
 
   arma::vec qr(q);
@@ -486,8 +488,6 @@ void becke_analysis(const BasisSet & basis, const arma::mat & Pa, const arma::ma
 }
 
 arma::vec becke_charges(const BasisSet & basis, const arma::mat & P, double tol) {
-  arma::vec q(basis.get_Nnuc());
-
   // Helper. Non-verbose operation
   DFTGrid intgrid(&basis,true);
   // Construct grid
@@ -664,8 +664,6 @@ void stockholder_analysis(const BasisSet & basis, const arma::mat & Pa, const ar
 }
 
 arma::vec stockholder_charges(const BasisSet & basis, const arma::mat & P, double tol) {
-  arma::vec q(basis.get_Nnuc(),1);
-
   // Stockholder atomic charges
   Stockholder stock(basis,P);
   // Helper

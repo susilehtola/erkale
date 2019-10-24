@@ -81,6 +81,8 @@ int main_guarded(int argc, char **argv) {
 
   // Print settings
   settings.print();
+  // Need to add scf keywords for basis set defaults
+  settings.add_scf_settings();
 
   // Initialize libint
   init_libint_base();
