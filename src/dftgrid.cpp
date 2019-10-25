@@ -65,6 +65,38 @@ bool operator<(const dens_list_t &lhs, const dens_list_t & rhs) {
   return lhs.d > rhs.d;
 }
 
+static int adaptive_l0() {
+  return 3;
+}
+
+static int krack_nrad(double stol, int Z) {
+  return std::max(20,(int) round(-5*(3*log10(stol)+8-(1+element_row[Z]))));
+}
+
+static int krack_lmax(double stol) {
+  /*
+    The default parameters in the paper
+
+    return (int) ceil(2.0-3.0*log10(stol));
+
+    give a very poor grid for e.g. CCl4: an 1e-5 tolerance yields a
+    grid with -3.7 electrons error even in def2-SVP. As a quick hack,
+    the parameters are re-chosen as the average of the old ones and of
+    the ones from Koster which are meant for integrating the Fock
+    matrix.
+  */
+
+  return (int) ceil(3.5-4.5*log10(stol));
+}
+
+static int koster_nrad(double ftol, int Z) {
+  return std::max(20,(int) round(-5*(3*log10(ftol)+6-(1+element_row[Z]))));
+}
+
+static int koster_lmax(double ftol) {
+  return (int) ceil(5.0-6.0*log10(ftol));
+}
+
 AngularGrid::AngularGrid(bool lobatto_) : use_lobatto(lobatto_) {
   do_grad=false;
   do_tau=false;
@@ -1488,10 +1520,11 @@ void AngularGrid::eval_overlap(arma::mat & So) const {
 }
 
 void AngularGrid::eval_diag_overlap(arma::vec & S) const {
-  for(size_t ip=0;ip<grid.size();ip++) {
-    for(size_t j=0;j<bf.n_rows;j++)
-      S(bf_potind(j))+=w(ip)*bf(j,ip)*bf(j,ip);
-  }
+  S.zeros(pot_bf_ind.n_elem);
+
+  arma::mat bft(bf.t());
+  for(size_t j=0;j<bf.n_rows;j++)
+    S(bf_potind(j))=arma::sum(arma::square(bft.col(j))%w.t());
 }
 
 static arma::mat calculate_rho(const arma::cx_mat & Cocc, const arma::mat & bf) {
@@ -1755,6 +1788,9 @@ void AngularGrid::eval_diag_Fxc(arma::vec & H) const {
     throw std::runtime_error("Refusing to compute restricted Fock matrix with unrestricted density.\n");
   }
 
+  // Initialize memory
+  H.zeros(pot_bf_ind.n_elem);
+
   // Screen quadrature points by small densities
   arma::uvec screen(screen_density());
   // No important grid points, return
@@ -1964,6 +2000,10 @@ void AngularGrid::eval_diag_Fxc(arma::vec & Ha, arma::vec & Hb) const {
     ERROR_INFO();
     throw std::runtime_error("Refusing to compute unrestricted Fock matrix with restricted density.\n");
   }
+
+  // Initialize memory
+  Ha.zeros(pot_bf_ind.n_elem);
+  Hb.zeros(pot_bf_ind.n_elem);
 
   // Screen quadrature points by small densities
   arma::uvec screen(screen_density());
@@ -2535,13 +2575,26 @@ angshell_t AngularGrid::construct() {
   return info;
 }
 
+void AngularGrid::next_grid() {
+  if(use_lobatto)
+    info.l+=2;
+  else {
+    // Need to determine what is next order of Lebedev
+    // quadrature that is supported.
+    info.l=next_lebedev(info.l);
+  }
+}
+
 angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_func) {
   // Construct a grid centered on (x0,y0,z0)
   // with nrad radial shells
   // See Köster et al for specifics.
 
   // Start with
-  info.l=3;
+  info.l=adaptive_l0();
+
+  // Determine limit for angular quadrature
+  int lmax=koster_lmax(ftoler);
 
   if(x_func == 0 && c_func == 0) {
     // No exchange or correlation!
@@ -2550,25 +2603,34 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
 
   // Update shell list size
   form_grid();
-  if(!info.nfunc)
+  if(!pot_bf_ind.n_elem)
     // No points!
     return info;
 
-  // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(ftoler));
-
   // Old and new diagonal elements of Hamiltonian
   arma::vec Hold, Hnew;
-
-  // Initialize vectors
-  Hold.zeros(pot_bf_ind.n_elem);
-  Hnew.zeros(pot_bf_ind.n_elem);
+  // Compute density
+  update_density(P);
+  // Compute exchange and correlation.
+  init_xc();
+  // Compute the functionals
+  if(x_func>0)
+    compute_xc(x_func,true);
+  if(c_func>0)
+    compute_xc(c_func,true);
+  // Clean up xc
+  check_xc();
+  // Construct the Fock matrix
+  eval_diag_Fxc(Hold);
 
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
 
   // Now, determine actual rule
+  int l_enough=info.l;
   do {
+    // Increment grid
+    next_grid();
     // Form the grid using the current settings
     form_grid();
     // Compute density
@@ -2583,7 +2645,6 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
     // Clean up xc
     check_xc();
     // Construct the Fock matrix
-    Hnew.zeros();
     eval_diag_Fxc(Hnew);
 
     // Compute maximum difference of diagonal elements of Fock matrix
@@ -2594,15 +2655,12 @@ angshell_t AngularGrid::construct(const arma::mat & P, double ftoler, int x_func
 
     // Increment order if tolerance not achieved.
     if(maxdiff>ftoler) {
-      if(use_lobatto)
-	info.l+=2;
-      else {
-	// Need to determine what is next order of Lebedev
-	// quadrature that is supported.
-	info.l=next_lebedev(info.l);
-      }
+      l_enough = info.l;
     }
   } while(maxdiff>ftoler && info.l<=lmax);
+
+  // This is the value we vant
+  info.l = l_enough;
 
   // Free memory
   free();
@@ -2616,7 +2674,7 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
   // See Köster et al for specifics.
 
   // Start with
-  info.l=3;
+  info.l=adaptive_l0();
 
   if(x_func == 0 && c_func == 0) {
     // No exchange or correlation!
@@ -2625,26 +2683,40 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
 
   // Update shell list size
   form_grid();
-  if(!info.nfunc)
+  if(!pot_bf_ind.n_elem)
     // No points!
     return info;
 
-  // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(ftoler));
-
   // Old and new diagonal elements of Hamiltonian
   arma::vec Haold, Hanew, Hbold, Hbnew;
-  // Initialize vectors
-  Haold.zeros(pot_bf_ind.n_elem);
-  Hanew.zeros(pot_bf_ind.n_elem);
-  Hbold.zeros(pot_bf_ind.n_elem);
-  Hbnew.zeros(pot_bf_ind.n_elem);
+
+  // Compute density
+  update_density(Pa,Pb);
+
+  // Compute exchange and correlation.
+  init_xc();
+  // Compute the functionals
+  if(x_func>0)
+    compute_xc(x_func,true);
+  if(c_func>0)
+    compute_xc(c_func,true);
+  // Clean up xc
+  check_xc();
+  // and construct the Fock matrices
+  eval_diag_Fxc(Haold,Hbold);
+
+  // Determine limit for angular quadrature
+  int lmax=koster_lmax(ftoler);
 
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
 
   // Now, determine actual quadrature limits
+  int l_enough=info.l;
   do {
+    // Increment grid
+    next_grid();
+    // Compute grid
     form_grid();
     // Compute density
     update_density(Pa,Pb);
@@ -2659,8 +2731,6 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
     // Clean up xc
     check_xc();
     // and construct the Fock matrices
-    Hanew.zeros();
-    Hbnew.zeros();
     eval_diag_Fxc(Hanew,Hbnew);
 
     // Compute maximum difference of diagonal elements of Fock matrix
@@ -2672,15 +2742,12 @@ angshell_t AngularGrid::construct(const arma::mat & Pa, const arma::mat & Pb, do
 
     // Increment order if tolerance not achieved.
     if(maxdiff>ftoler) {
-      if(use_lobatto) {
-	info.l+=2;
-      } else {
-	// Need to determine what is next order of Lebedev
-	// quadrature that is supported.
-	info.l=next_lebedev(info.l);
-      }
+      l_enough=info.l;
     }
   } while(maxdiff>ftoler && info.l<=lmax);
+
+  // This is the value we vant
+  info.l = l_enough;
 
   // Free memory
   free();
@@ -2694,7 +2761,7 @@ angshell_t AngularGrid::construct(const arma::cx_vec & C, double ftoler, int x_f
   // See Köster et al for specifics.
 
   // Start with
-  info.l=3;
+  info.l=adaptive_l0();
 
   if(x_func == 0 && c_func == 0) {
     // No exchange or correlation!
@@ -2703,24 +2770,38 @@ angshell_t AngularGrid::construct(const arma::cx_vec & C, double ftoler, int x_f
 
   // Update shell list size
   form_grid();
-  if(!info.nfunc)
+  if(!pot_bf_ind.n_elem)
     // No points!
     return info;
 
   // Determine limit for angular quadrature
-  int lmax=(int) ceil(5.0-6.0*log10(ftoler));
+  int lmax=koster_lmax(ftoler);
 
   // Old and new diagonal elements of Hamiltonian
   arma::vec Hold, Hnew, Hdum;
-  Hold.zeros(pot_bf_ind.n_elem);
-  Hnew.zeros(pot_bf_ind.n_elem);
-  Hdum.zeros(pot_bf_ind.n_elem);
+  // Compute density
+  update_density(C);
+
+  // Compute exchange and correlation.
+  init_xc();
+  // Compute the functionals
+  if(x_func>0)
+    compute_xc(x_func,true);
+  if(c_func>0)
+    compute_xc(c_func,true);
+  // Clean up xc
+  check_xc();
+  // and construct the Fock matrices
+  eval_diag_Fxc(Hold,Hdum);
 
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
 
   // Now, determine actual quadrature limits
+  int l_enough=info.l;
   do {
+    // Increment grid
+    next_grid();
     // Form the grid
     form_grid();
     // Compute density
@@ -2736,7 +2817,6 @@ angshell_t AngularGrid::construct(const arma::cx_vec & C, double ftoler, int x_f
     // Clean up xc
     check_xc();
     // and construct the Fock matrices
-    Hnew.zeros();
     eval_diag_Fxc(Hnew,Hdum);
 
     // Compute maximum difference of diagonal elements of Fock matrix
@@ -2747,15 +2827,12 @@ angshell_t AngularGrid::construct(const arma::cx_vec & C, double ftoler, int x_f
 
     // Increment order if tolerance not achieved.
     if(maxdiff>ftoler) {
-      if(use_lobatto)
-	info.l+=2;
-      else {
-	// Need to determine what is next order of Lebedev
-	// quadrature that is supported.
-	info.l=next_lebedev(info.l);
-      }
+      l_enough = info.l;
     }
   } while(maxdiff>ftoler && info.l<=lmax);
+
+  // This is the value we want
+  info.l = l_enough;
 
   // Free memory once more
   free();
@@ -2769,31 +2846,34 @@ angshell_t AngularGrid::construct_becke(double otoler) {
   // See Krack 1998 for details
 
   // Start with
-  info.l=3;
+  info.l=adaptive_l0();
+
+  // Determine limit for angular quadrature
+  int lmax=krack_lmax(otoler);
 
   // Update shell list size
   form_grid();
-  if(!info.nfunc)
+  if(!pot_bf_ind.n_elem)
     // No points!
     return info;
 
-  // Determine limit for angular quadrature
-  int lmax=(int) ceil(2.0-3.0*log10(otoler));
-
   // Old and new diagonal elements of overlap
-  arma::vec Sold(pot_bf_ind.n_elem), Snew(pot_bf_ind.n_elem);
-  Sold.zeros();
+  arma::vec Sold, Snew;
+  // Initial value
+  eval_diag_overlap(Sold);
 
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
 
   // Now, determine actual quadrature limits
+  int l_enough=info.l;
   do {
+    // Increase quadrature
+    next_grid();
     // Form grid
     form_grid();
 
     // Compute new overlap
-    Snew.zeros();
     eval_diag_overlap(Snew);
 
     // Compute maximum difference of diagonal elements
@@ -2804,15 +2884,13 @@ angshell_t AngularGrid::construct_becke(double otoler) {
 
     // Increment order if tolerance not achieved.
     if(maxdiff>otoler) {
-      if(use_lobatto)
-	info.l+=2;
-      else {
-	// Need to determine what is next order of Lebedev
-	// quadrature that is supported.
-	info.l=next_lebedev(info.l);
-      }
+      // Update value
+      l_enough=info.l;
     }
   } while(maxdiff>otoler && info.l<=lmax);
+
+  // This is the value we want
+  info.l=l_enough;
 
   // Free memory once more
   free();
@@ -2826,31 +2904,34 @@ angshell_t AngularGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otol
   // See Krack 1998 for details
 
   // Start with
-  info.l=3;
+  info.l=adaptive_l0();
 
-  // Update shell list size
-  form_grid();
-  if(!info.nfunc)
+  // Determine limit for angular quadrature
+  int lmax=krack_lmax(otoler);
+
+  // Old and new diagonal elements of overlap
+  arma::vec Sold, Snew;
+
+  // Form the grid
+  form_hirshfeld_grid(hirsh);
+  if(!pot_bf_ind.n_elem)
     // No points!
     return info;
 
-  // Determine limit for angular quadrature
-  int lmax=(int) ceil(2.0-3.0*log10(otoler));
-
-  // Old and new diagonal elements of overlap
-  arma::vec Sold(pot_bf_ind.n_elem), Snew(pot_bf_ind.n_elem);
-  Sold.zeros();
+  // Initial overlap
+  eval_diag_overlap(Sold);
 
   // Maximum difference of diagonal elements of Hamiltonian
   double maxdiff;
-
   // Now, determine actual quadrature limits
+  int l_enough=info.l;
   do {
+    // Increment grid
+    next_grid();
     // Form the grid
     form_hirshfeld_grid(hirsh);
 
     // Compute new overlap
-    Snew.zeros();
     eval_diag_overlap(Snew);
 
     // Compute maximum difference of diagonal elements
@@ -2861,15 +2942,12 @@ angshell_t AngularGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otol
 
     // Increment order if tolerance not achieved.
     if(maxdiff>otoler) {
-      if(use_lobatto)
-	info.l+=2;
-      else {
-	// Need to determine what is next order of Lebedev
-	// quadrature that is supported.
-	info.l=next_lebedev(info.l);
-      }
+      l_enough=info.l;
     }
   } while(maxdiff>otoler && info.l<=lmax);
+
+  // This is the value we want
+  info.l=l_enough;
 
   // Free memory once more
   free();
@@ -3262,6 +3340,7 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
   // Add all atoms
   if(verbose) {
     printf("Constructing adaptive XC grid with tolerance %e.\n",ftoler);
+    koster_grid_info(ftoler);
     fflush(stdout);
   }
 
@@ -3282,7 +3361,8 @@ void DFTGrid::construct(const arma::mat & P, double ftoler, int x_func, int c_fu
     sh.tol=ftoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
+    size_t nr=koster_nrad(ftoler,basp->get_Z(iat));
+
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
     radial_chebyshev_jac(nr,rad,wrad);
@@ -3328,6 +3408,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
   // Add all atoms
   if(verbose) {
     printf("Constructing adaptive XC grid with tolerance %e.\n",ftoler);
+    koster_grid_info(ftoler);
     fflush(stdout);
   }
 
@@ -3348,7 +3429,7 @@ void DFTGrid::construct(const arma::mat & Pa, const arma::mat & Pb, double ftole
     sh.tol=ftoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
+    size_t nr=koster_nrad(ftoler,basp->get_Z(iat));
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
     radial_chebyshev_jac(nr,rad,wrad);
@@ -3393,6 +3474,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
   // Add all atoms
   if(verbose) {
     printf("Constructing adaptive XC grid with tolerance %e.\n",ftoler);
+    koster_grid_info(ftoler);
     fflush(stdout);
   }
 
@@ -3413,7 +3495,7 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
     sh.tol=ftoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=std::max(20,(int) round(-5*(3*log10(ftoler)+6-element_row[basp->get_Z(iat)])));
+    size_t nr=koster_nrad(ftoler,basp->get_Z(iat));
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
     radial_chebyshev_jac(nr,rad,wrad);
@@ -3496,9 +3578,30 @@ void DFTGrid::construct(const arma::cx_mat & Ctilde, double ftoler, int x_func, 
   }
 }
 
+void DFTGrid::krack_grid_info(double otoler) const {
+  printf("Maximal composition of Krack adaptive grid\n");
+  printf("%3s %3s %4s %4s\n","idx","sym","nrad","lmax");
+  for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
+    int nr=krack_nrad(otoler,basp->get_Z(iat));
+    int nl=krack_lmax(otoler);
+    printf("%3i %-3s %4i %4i\n",(int) iat+1,basp->get_symbol(iat).c_str(),nr,nl);
+  }
+}
+
+void DFTGrid::koster_grid_info(double otoler) const {
+  printf("Maximal composition of Koster adaptive grid\n");
+  printf("%3s %3s %4s %4s\n","idx","sym","nrad","lmax");
+  for(size_t iat=0;iat<basp->get_Nnuc();iat++) {
+    int nr=koster_nrad(otoler,basp->get_Z(iat));
+    int nl=koster_lmax(otoler);
+    printf("%3i %-3s %4i %4i\n",(int) iat+1,basp->get_symbol(iat).c_str(),nr,nl);
+  }
+}
+
 void DFTGrid::construct_becke(double otoler) {
   if(verbose) {
     printf("Constructing adaptive Becke grid with tolerance %e.\n",otoler);
+    krack_grid_info(otoler);
     fflush(stdout);
   }
 
@@ -3519,7 +3622,7 @@ void DFTGrid::construct_becke(double otoler) {
     sh.tol=otoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
+    size_t nr=krack_nrad(otoler,basp->get_Z(iat));
 
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
@@ -3564,6 +3667,7 @@ void DFTGrid::construct_becke(double otoler) {
 void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otoler) {
   if(verbose) {
     printf("Constructing adaptive Hirshfeld grid with tolerance %e.\n",otoler);
+    krack_grid_info(otoler);
     fflush(stdout);
   }
 
@@ -3584,7 +3688,7 @@ void DFTGrid::construct_hirshfeld(const Hirshfeld & hirsh, double otoler) {
     sh.tol=otoler*PRUNETHR;
 
     // Compute necessary number of radial points for atom
-    size_t nr=std::max(20,(int) round(-5*(3*log10(otoler)+8-element_row[basp->get_Z(iat)])));
+    size_t nr=krack_nrad(otoler,basp->get_Z(iat));
 
     // Get Chebyshev nodes and weights for radial part
     std::vector<double> rad, wrad;
@@ -4194,13 +4298,13 @@ arma::vec DFTGrid::compute_atomic_Nel(const arma::mat & P) {
       wrk[ith].form_grid();
       // Update density
       wrk[ith].update_density(P);
-      // Integrate electrons
-      double dN=wrk[ith].compute_Nel();
 
+      // Integrate electron density
+      double dN(wrk[ith].compute_Nel());
 #ifdef _OPENMP
 #pragma omp critical
 #endif
-      Nel[grids[i].atind]+=dN;
+      Nel(grids[i].atind)+=dN;
 
       // Free memory
       wrk[ith].free();

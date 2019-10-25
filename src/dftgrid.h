@@ -297,6 +297,9 @@ class AngularGrid {
   /// Collect weights from grid into w array
   void get_weights();
 
+  /// Next angular grid
+  void next_grid();
+
  public:
   /**
    * Constructor. Need to set shell and basis set before using the
@@ -598,6 +601,11 @@ class DFTGrid {
 
   /// Print out grid information
   void print_grid(std::string met="XC") const;
+
+  /// Print out grid information for a Krack grid
+  void krack_grid_info(double otol) const;
+  /// Print out grid information for a Koster grid
+  void koster_grid_info(double ftol) const;
 
   /// Print out density data
   void print_density(const arma::mat & P, std::string densname="density.dat");
