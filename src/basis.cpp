@@ -3872,7 +3872,7 @@ void check_orth(const arma::cx_mat & C, const arma::mat & S, bool verbose, doubl
   }
 }
 
-arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, bool verbose, std::string minbaslib) {
+template<typename T> static arma::Mat<T> construct_IAO_wrk(const BasisSet & basis, const arma::Mat<T> & C, std::vector< std::vector<size_t> > & idx, bool verbose, std::string minbaslib) {
   // Get minao library
   BasisSetLibrary minao;
   minao.load_basis(minbaslib);
@@ -3880,6 +3880,8 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
   Settings set;
   set.add_scf_settings();
   set.set_bool("Verbose",verbose);
+  // Can't rotate basis or it will break the contractions
+  set.set_bool("BasisRotate",false);
 
   // Construct minimal basis set
   BasisSet minbas;
@@ -3898,98 +3900,44 @@ arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector
   }
 
   // Calculate S1, S12, S2, and S21
-  arma::mat S1=basis.overlap();
-  arma::mat S2=minbas.overlap();
+  arma::mat S1(basis.overlap());
+  arma::mat S2(minbas.overlap());
 
-  arma::mat S12=basis.overlap(minbas);
-  arma::mat S21=arma::trans(S12);
+  arma::mat S12(basis.overlap(minbas));
+  arma::mat S21(arma::trans(S12));
 
   // and inverse matrices
-  arma::mat S1inv_h=BasOrth(S1);
-  arma::mat S2inv_h=BasOrth(S2);
+  arma::mat S1inv_h(BasOrth(S1));
+  arma::mat S2inv_h(BasOrth(S2));
   // Need to be OK for canonical as well
-  arma::mat S1inv=S1inv_h*arma::trans(S1inv_h);
-  arma::mat S2inv=S2inv_h*arma::trans(S2inv_h);
+  arma::mat S1inv(S1inv_h*arma::trans(S1inv_h));
+  arma::mat S2inv(S2inv_h*arma::trans(S2inv_h));
 
   // Compute Ctilde.
-  arma::mat Ctilde=S1inv*S12*S2inv*S21*C;
+  arma::Mat<T> Ctilde(S1inv*S12*S2inv*S21*C);
 
   // and orthonormalize it
   Ctilde=orthonormalize(S1,Ctilde);
 
   // "Density matrices"
-  arma::mat P=C*arma::trans(C);
-  arma::mat Pt=Ctilde*arma::trans(Ctilde);
+  arma::Mat<T> P(C*arma::trans(C));
+  arma::Mat<T> Pt(Ctilde*arma::trans(Ctilde));
 
   // Identity matrix
-  arma::mat unit(S1);
+  arma::mat unit(S1.n_rows,S1.n_cols);
   unit.eye();
 
   // Compute the non-orthonormal IAOs.
-  arma::mat A=P*S1*Pt*S12 + (unit-P*S1)*(unit-Pt*S1)*S1inv*S12;
+  arma::Mat<T> A=P*S1*Pt*S12 + (unit-P*S1)*(unit-Pt*S1)*S1inv*S12;
 
   // and orthonormalize them
   return orthonormalize(S1,A);
 }
-
+arma::mat construct_IAO(const BasisSet & basis, const arma::mat & C, std::vector< std::vector<size_t> > & idx, bool verbose, std::string minbaslib) {
+  return construct_IAO_wrk<double>(basis,C,idx,verbose,minbaslib);
+}
 arma::cx_mat construct_IAO(const BasisSet & basis, const arma::cx_mat & C, std::vector< std::vector<size_t> > & idx, bool verbose, std::string minbaslib) {
-  // Get minao library
-  BasisSetLibrary minao;
-  minao.load_basis(minbaslib);
-  // Default settings
-  Settings set;
-  set.add_scf_settings();
-  set.set_bool("Verbose",verbose);
-
-  // Construct minimal basis set
-  BasisSet minbas;
-  construct_basis(minbas,basis.get_nuclei(),minao);
-
-  // Get indices
-  idx.clear();
-  idx.resize(minbas.get_Nnuc());
-  for(size_t inuc=0;inuc<minbas.get_Nnuc();inuc++) {
-    // Get shells on nucleus
-    std::vector<GaussianShell> sh=minbas.get_funcs(inuc);
-    // Store indices
-    for(size_t si=0;si<sh.size();si++)
-      for(size_t fi=0;fi<sh[si].get_Nbf();fi++)
-	idx[inuc].push_back(sh[si].get_first_ind()+fi);
-  }
-
-  // Calculate S1, S12, S2, and S21
-  arma::mat S1=basis.overlap();
-  arma::mat S2=minbas.overlap();
-
-  arma::mat S12=basis.overlap(minbas);
-  arma::mat S21=arma::trans(S12);
-
-  // and inverse matrices
-  arma::mat S1inv_h=BasOrth(S1);
-  arma::mat S2inv_h=BasOrth(S2);
-  // Need to be OK for canonical as well
-  arma::mat S1inv=S1inv_h*arma::trans(S1inv_h);
-  arma::mat S2inv=S2inv_h*arma::trans(S2inv_h);
-
-  // Compute Ctilde.
-  arma::cx_mat Ctilde=S1inv*S12*S2inv*S21*C;
-
-  // and orthonormalize it
-  Ctilde=orthonormalize(S1,Ctilde);
-
-  // "Density matrices"
-  arma::cx_mat P=C*arma::trans(C);
-  arma::cx_mat Pt=Ctilde*arma::trans(Ctilde);
-
-  // Identity matrix
-  arma::cx_mat unit(S1.n_rows,S1.n_cols);
-  unit.eye();
-
-  // Compute the non-orthonormal IAOs.
-  arma::cx_mat A=P*S1*Pt*S12 + (unit-P*S1)*(unit-Pt*S1)*S1inv*S12;
-
-  // and orthonormalize them
-  return orthonormalize(S1,A);
+  return construct_IAO_wrk< std::complex<double> >(basis,C,idx,verbose,minbaslib);
 }
 
 arma::mat block_m(const arma::mat & F, const arma::ivec & mv) {
