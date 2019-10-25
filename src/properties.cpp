@@ -286,7 +286,7 @@ arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P) {
   S_half_invhalf(S,Sh,Sinvh,settings.get_double("LinDepThresh"));
 
   // Compute ShPSh
-  arma::mat SPS=Sh*P*Sh;
+  arma::mat ShPSh=Sh*P*Sh;
 
   arma::vec q(basis.get_Nnuc());
   q.zeros();
@@ -303,7 +303,7 @@ arma::vec lowdin_charges(const BasisSet & basis, const arma::mat & P) {
 
       // Loop over functions
       for(size_t i=ifirst;i<=ilast;i++)
-	q(ii)-=SPS(i,i);
+	q(ii)-=ShPSh(i,i);
     }
   }
 
@@ -416,7 +416,7 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, std::string m
   q.zeros();
 
   // Construct density matrix
-  arma::mat P(C*arma::trans(C));
+  arma::mat SPS(S*C*arma::trans(C)*S);
 
   // Loop over nuclei
   for(size_t ii=0;ii<basis.get_Nnuc();ii++)
@@ -425,7 +425,7 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::mat & C, std::string m
       // IAO orbital index is
       size_t io=idx[ii][fi];
 
-      q(ii)-=arma::as_scalar(arma::trans(iao.col(io))*S*P*S*iao.col(io));
+      q(ii)-=arma::as_scalar(arma::trans(iao.col(io))*SPS*iao.col(io));
     }
 
   return q;
@@ -443,7 +443,7 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::cx_mat & C, std::strin
   q.zeros();
 
   // Construct density matrix
-  arma::cx_mat P(C*arma::trans(C));
+  arma::cx_mat SPS(S*C*arma::trans(C)*S);
 
   // Loop over nuclei
   for(size_t ii=0;ii<basis.get_Nnuc();ii++)
@@ -452,7 +452,7 @@ arma::vec IAO_charges(const BasisSet & basis, const arma::cx_mat & C, std::strin
       // IAO orbital index is
       size_t io=idx[ii][fi];
 
-      q(ii)-=std::real(arma::as_scalar(arma::trans(iao.col(io))*S*P*S*iao.col(io)));
+      q(ii)-=std::real(arma::as_scalar(arma::trans(iao.col(io))*SPS*iao.col(io)));
     }
 
   return q;
@@ -536,8 +536,6 @@ void hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, const arma
 }
 
 arma::vec hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double tol) {
-  arma::vec q(basis.get_Nnuc(),1);
-
   // Hirshfeld atomic charges
   Hirshfeld hirsh;
   if(stricmp(method,"Load")==0)
@@ -600,8 +598,6 @@ void iterative_hirshfeld_analysis(const BasisSet & basis, const arma::mat & Pa, 
 }
 
 arma::vec iterative_hirshfeld_charges(const BasisSet & basis, const arma::mat & P, std::string method, double tol) {
-  arma::vec q(basis.get_Nnuc(),1);
-
   // Iterative Hirshfeld atomic charges
   HirshfeldI hirshi;
   if(stricmp(method,"Load")==0)
