@@ -674,6 +674,17 @@ void save_spectrum(const std::vector<spectrum_t> & sp, const char *fname="dipole
   fclose(out);
 }
 
+void save_xas_spectrum(const std::vector<spectrum_t> & sp, const char *fname="dipole_xas.dat") {
+  // Compute transitions
+  FILE *out=fopen(fname,"w");
+
+  for(size_t i=0;i<sp.size();i++) {
+    // Print out energy in eV and transition amplitude
+    fprintf(out,"%e %e\n",sp[i].E*HARTREEINEV,sp[i].E*sp[i].w);
+  }
+  fclose(out);
+}
+
 enum loadresult load(const BasisSet & basis, Checkpoint & chkpt, uscf_t & sol, arma::vec & core) {
   // Was the load a success?
   enum loadresult ok=LOAD_SUCC;
@@ -1140,6 +1151,7 @@ int main_guarded(int argc, char **argv) {
   std::vector<spectrum_t> sp=compute_transitions(augbas,C_aug,E_aug,xcatom,xcorb,nocc);
   // Save spectrum
   save_spectrum(sp);
+  save_xas_spectrum(sp);
 
   // Get values of q to compute for
   std::vector<double> qvals=parse_range_double(settings.get_string("XRSQval"));
