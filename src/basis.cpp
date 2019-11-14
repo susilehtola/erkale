@@ -1643,6 +1643,13 @@ size_t BasisSet::get_last_ind(size_t num) const {
   return shells[num].get_last_ind();
 }
 
+arma::uvec BasisSet::shell_indices() const {
+  arma::uvec idx(get_Nbf());
+  for(size_t i=0;i<shells.size();i++)
+    idx.subvec(shells[i].get_first_ind(),shells[i].get_last_ind())=i*arma::ones<arma::uvec>(shells[i].get_Nbf());
+  return idx;
+}
+
 size_t BasisSet::find_shell_ind(size_t find) const {
   // Find shell the function belongs to
   for(size_t i=0;i<shells.size();i++)

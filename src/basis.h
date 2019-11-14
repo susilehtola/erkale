@@ -301,6 +301,8 @@ class BasisSet {
   /// Get index of last function on shell
   size_t get_last_ind(size_t shind) const;
 
+  /// Get shell indices of basis functions
+  arma::uvec shell_indices() const;
   /// Find shell index of basis function
   size_t find_shell_ind(size_t find) const;
 
