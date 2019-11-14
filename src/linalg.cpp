@@ -532,7 +532,8 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps, arma::uvec & pivot) 
     }
 
     // Update error
-    error=arma::max(d(pi.subvec(m+1,pi.n_elem-1)));
+    if(m+1<pi.n_elem)
+      error=arma::max(d(pi.subvec(m+1,pi.n_elem-1)));
     // Increase m
     m++;
   }
