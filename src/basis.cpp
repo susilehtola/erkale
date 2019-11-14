@@ -1643,6 +1643,26 @@ size_t BasisSet::get_last_ind(size_t num) const {
   return shells[num].get_last_ind();
 }
 
+arma::vec BasisSet::get_bf_Rsquared() const {
+  arma::vec Rsq(get_Nbf());
+  for(size_t i=0;i<shells.size();i++) {
+    // First function on shell
+    size_t i0=shells[i].get_first_ind();
+    // Number of functions
+    size_t nbf=shells[i].get_Nbf();
+
+    // Get coordinates of shell center
+    coords_t cen=shells[i].get_center();
+    // Calculate moment integrals
+    std::vector<arma::mat> mom2=shells[i].moment(2, cen.x, cen.y, cen.z, shells[i]);
+    // Compute spatial extents
+    for(size_t fi=0;fi<nbf;fi++)
+      Rsq(i0+fi)=mom2[getind(2,0,0)](fi,fi)+mom2[getind(0,2,0)](fi,fi)+mom2[getind(0,0,2)](fi,fi);
+  }
+
+  return Rsq;
+}
+
 arma::uvec BasisSet::shell_indices() const {
   arma::uvec idx(get_Nbf());
   for(size_t i=0;i<shells.size();i++)

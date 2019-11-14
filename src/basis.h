@@ -301,6 +301,8 @@ class BasisSet {
   /// Get index of last function on shell
   size_t get_last_ind(size_t shind) const;
 
+  /// Get R^2 expectation value (measure of basis function extent)
+  arma::vec get_bf_Rsquared() const;
   /// Get shell indices of basis functions
   arma::uvec shell_indices() const;
   /// Find shell index of basis function
