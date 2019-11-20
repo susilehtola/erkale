@@ -126,7 +126,7 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
     double FM=sqrt(sqrt(rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2)));
 
     // Print
-    fprintf(out,"%i %e %e\n",(int) iorb+1,SM,FM);
+    fprintf(out,"%i %e %e (%e, %e, %e)\n",(int) iorb+1,SM,FM,r_t(0),r_t(1),r_t(2));
   }
   fclose(out);
 }
