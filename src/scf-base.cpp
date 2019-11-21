@@ -978,15 +978,21 @@ void SCF::gwh_guess(uscf_t & sol, double K) const {
 void SCF::sap_guess(rscf_t & sol) const {
   DFTGrid grid(basisp);
 
-  // Use a (99,590) grid
-  int nrad=99;
-  int lmax=41;
-  bool grad=false;
-  bool tau=false;
-  bool lapl=false;
-  bool strict=false;
-  bool nl=false;
-  grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+  // Get the grid settings
+  dft_t dft=parse_dft(false);
+  // Use the same grid as for dft
+  if(dft.adaptive) {
+    grid.construct_becke(dft.gridtol);
+  } else {
+    int nrad=dft.nrad;
+    int lmax=dft.lmax;
+    bool grad=false;
+    bool tau=false;
+    bool lapl=false;
+    bool strict=false;
+    bool nl=false;
+    grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+  }
 
   // Get SAP potential
   arma::mat Vsap(grid.eval_SAP());
@@ -997,15 +1003,21 @@ void SCF::sap_guess(rscf_t & sol) const {
 void SCF::sap_guess(uscf_t & sol) const {
   DFTGrid grid(basisp);
 
-  // Use a (99,590) grid
-  int nrad=99;
-  int lmax=41;
-  bool grad=false;
-  bool tau=false;
-  bool lapl=false;
-  bool strict=false;
-  bool nl=false;
-  grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+  // Get the grid settings
+  dft_t dft=parse_dft(false);
+  // Use the same grid as for dft
+  if(dft.adaptive) {
+    grid.construct_becke(dft.gridtol);
+  } else {
+    int nrad=dft.nrad;
+    int lmax=dft.lmax;
+    bool grad=false;
+    bool tau=false;
+    bool lapl=false;
+    bool strict=false;
+    bool nl=false;
+    grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+  }
 
   // Get SAP potential
   arma::mat Vsap(grid.eval_SAP());
