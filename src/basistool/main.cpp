@@ -5,8 +5,8 @@
  *                             -
  *                       HF/DFT from Hel
  *
- * Written by Susi Lehtola, 2010-2011
- * Copyright (c) 2010-2011, Susi Lehtola
+ * Written by Susi Lehtola, 2010-2019
+ * Copyright (c) 2010-2019, Susi Lehtola
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,12 +18,13 @@
 #include "../stringutil.h"
 #include "../eriworker.h"
 #include "../settings.h"
+#include "pivoted_cholesky_basis.h"
 #include "../completeness/completeness_profile.h"
 #ifdef SVNRELEASE
 #include "../version.h"
 #endif
 
-std::string cmds[]={"cholesky", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"cholesky", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 
 void help() {
@@ -62,7 +63,7 @@ int main_guarded(int argc, char **argv) {
     // Print completeness profile.
 
     if(argc!=7) {
-      printf("\nUsage: %s input.gbs cholesky thr maxam ovlthr output.gbs\n",argv[0]);
+      printf("\nUsage: %s input.gbs cholesky thr maxam cholthr output.gbs\n",argv[0]);
       return 1;
     }
 
@@ -78,6 +79,22 @@ int main_guarded(int argc, char **argv) {
 
     init_libint_base();
     BasisSetLibrary ret=bas.cholesky_set(thr,maxam,ovlthr);
+    ret.save_gaussian94(outfile);
+
+  } else if(stricmp(cmd,"choleskybasis")==0) {
+    if(argc!=7) {
+      printf("\nUsage: %s input.gbs choleskybasis system.xyz thr uselm output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    std::vector<atom_t> atoms=load_xyz(argv[3],false);
+    double thr(atof(argv[4]));
+    int uselm(atof(argv[5]));
+    std::string outfile(argv[6]);
+    settings.add_scf_settings();
+    settings.set_bool("UseLM",uselm);
+
+    BasisSetLibrary ret=pivoted_cholesky_basis(atoms,bas,thr);
     ret.save_gaussian94(outfile);
 
   } else if(stricmp(cmd,"completeness")==0) {
@@ -332,6 +349,7 @@ int main_guarded(int argc, char **argv) {
 	throw std::runtime_error(oss.str());
       }
     }
+    elbas.sort();
     elbas.save_gaussian94(fileout);
 
   } else if(stricmp(cmd,"merge")==0) {

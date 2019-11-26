@@ -375,6 +375,12 @@ void ElementBasisSet::set_number(size_t num) {
 }
 
 bool ElementBasisSet::operator<(const ElementBasisSet &rhs) const {
+  // First sort by increasing atom number; then the special basis sets end up at the bottom.
+  if(number < rhs.number)
+    return true;
+  else if(number > rhs.number)
+    return false;
+
   return get_Z(symbol)<get_Z(rhs.symbol);
 }
 
