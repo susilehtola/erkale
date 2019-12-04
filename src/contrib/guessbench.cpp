@@ -87,6 +87,7 @@ int main_guarded(int argc, char **argv) {
   // Parse settings
   settings.add_scf_settings();
   settings.add_string("LoadChk","File to load old results from","");
+  settings.add_string("SaveChk","File to save guess to","");
   settings.add_double("LinDepThr","Linear dependency threshold",1e-5);
   settings.add_bool("FON","Fermi occupation numbers",false);
   settings.add_string("FONscan","Fermi occupation scan","");
@@ -107,6 +108,7 @@ int main_guarded(int argc, char **argv) {
   BasisSet basis;
   // Get checkpoint file
   std::string chkf(settings.get_string("LoadChk"));
+  std::string savef(settings.get_string("SaveChk"));
   Checkpoint chk(chkf,false);
   chk.read(basis);
 
@@ -141,7 +143,9 @@ int main_guarded(int argc, char **argv) {
   arma::mat C;
   arma::mat Pag, Pbg;
   // Form core Hamiltonian
-  arma::mat Hcore(basis.nuclear()+basis.kinetic());
+  arma::mat V(basis.nuclear());
+  arma::mat T(basis.kinetic());
+  arma::mat Hcore(T+V);
 
   // Form density matrix from guess orbitals?
   bool formP=true;
@@ -150,7 +154,7 @@ int main_guarded(int argc, char **argv) {
   std::string guess(settings.get_string("Guess"));
   bool FON(settings.get_bool("FON"));
   std::string FONscan(settings.get_string("FONscan"));
-  double T(settings.get_double("T"));
+  double temp(settings.get_double("T"));
   if(stricmp(guess,"core")==0) {
     // Diagonalize it
     diag(E,C,Hcore,Sinvh);
@@ -254,8 +258,8 @@ int main_guarded(int argc, char **argv) {
         printf("Alpha gap is %e i.e. % 6.3f eV\n",(E(Nela)-E(Nela-1)),27.2114*(E(Nela)-E(Nela-1)));
       if(Nelb && Nela!=Nelb)
         printf("Beta  gap is %e i.e. % 6.3f eV\n",(E(Nelb)-E(Nelb-1)),27.2114*(E(Nelb)-E(Nelb-1)));
-      occa=FermiON(E,Nela,T);
-      occb=FermiON(E,Nelb,T);
+      occa=FermiON(E,Nela,temp);
+      occb=FermiON(E,Nelb,temp);
 
       if(Nela)
         printf("Alpha NOON gap is %e\n",(occa(Nela-1)-occa(Nela)));
@@ -284,6 +288,23 @@ int main_guarded(int argc, char **argv) {
     printf("Beta  projection of guess onto SCF density is %e i.e. %5.2f %%\n",bproj,bproj/Nelb*100.0);
   }
   printf("Projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela+Nelb)*100.0);
+
+  // Save result?
+  if(savef.size()) {
+    std::string cmd("cp " + chkf + " " + savef);
+    (void) system(cmd.c_str());
+
+    Checkpoint save(savef,true,false);
+    save.write("P",Pag+Pbg);
+    if(restr) {
+      save.write("C",C);
+    } else {
+      save.write("Ca",C);
+      save.write("Cb",C);
+      save.write("Pa",Pag);
+      save.write("Pb",Pbg);
+    }
+  }
 
   if(FONscan.size()) {
     if(!formP)
