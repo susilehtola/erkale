@@ -92,6 +92,11 @@ void parse_xc_func(int & x_func, int & c_func, const std::string & xc) {
   x_func=0;
   c_func=0;
 
+  // No handling for Hartree-Fock here
+  if(stricmp(xc,"HF")==0 || stricmp(xc,"ROHF")==0) {
+    return;
+  }
+
   // Check if there is a dash or plus in the input.
   size_t dpos=xc.find('-',0);
   size_t ppos=xc.find('+',0);
