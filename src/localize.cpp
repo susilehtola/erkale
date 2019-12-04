@@ -248,12 +248,10 @@ arma::cx_mat cholesky_guess(const BasisSet & basis, const arma::mat & C) {
 }
 
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
-  // Orbitals to localize
-  std::vector<size_t> locorb;
-  for(size_t io=0;io<occs.size();io++)
-    if(occs[io]!=0.0)
-      locorb.push_back(io);
+void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subview_col<double> & E, const arma::mat & P, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
+
+  // assumed that all orbitals in the subview of C are included in the localization.
+  size_t norbs = C.n_cols;
 
   // Check that fname is ok
   if(fname.length()==2) // No, it's equal to .o or .v
@@ -264,56 +262,32 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       fname="";
   }
 
-  arma::cx_mat Cplx(C*std::complex<double>(1.0,0.0));
+  arma::cx_mat Cplx(C*std::complex<double>(1.0,0.0)); // purpose?
 
-  // Save indices
-  std::vector<size_t> printidx(locorb);
+  arma::mat Cwrk(C);
+  // and orbital energies
+  arma::vec Ewrk(norbs);
+  for(size_t io=0;io<norbs;io++)
+    Ewrk(io)=E(io);
 
-  // Loop over orbitals
-  while(locorb.size()) {
-    // Orbitals to treat in this run
-    std::vector<size_t> orbidx;
-
-    // Occupation number
-    double occno=occs[locorb[0]];
-
-    for(size_t io=locorb.size()-1;io<locorb.size();io--)
-      // Degeneracy in occupation?
-      if(fabs(occs[locorb[io]]-occno)<1e-6) {
-	// Orbitals are degenerate; add to current batch
-	orbidx.push_back(locorb[io]);
-	locorb.erase(locorb.begin()+io);
-      }
-
-    std::sort(orbidx.begin(),orbidx.end());
-
-    // Collect orbitals
-    arma::mat Cwrk(C.n_rows,orbidx.size());
-    for(size_t io=0;io<orbidx.size();io++)
-      Cwrk.col(io)=C.col(orbidx[io]);
-    // and orbital energies
-    arma::vec Ewrk(orbidx.size());
-    for(size_t io=0;io<orbidx.size();io++)
-      Ewrk(io)=E(orbidx[io]);
-
-    // Localizing matrix
-    arma::cx_mat U;
-    if(start==CANORB)
-      // Start with canonical orbitals
-      U.eye(orbidx.size(),orbidx.size());
-    else if(start==NATORB)
-      U=atomic_orbital_guess(basis,P,Cwrk);
-    else if(start==CHOLORB)
-      U=cholesky_guess(basis,Cwrk);
-    else if(start==ORTHMAT)
-      // Start with orthogonal matrix
-      U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),seed);
-    else if(start==UNITMAT)
-      // Start with unitary matrix
-      U=complex_unitary(orbidx.size(),seed);
-    else {
-      ERROR_INFO();
-      throw std::runtime_error("Starting point not implemented!\n");
+  // Localizing matrix
+  arma::cx_mat U;
+  if(start==CANORB)
+    // Start with canonical orbitals
+    U.eye(norbs,norbs);
+  else if(start==NATORB)
+    U=atomic_orbital_guess(basis,P,Cwrk);
+  else if(start==CHOLORB)
+    U=cholesky_guess(basis,Cwrk);
+  else if(start==ORTHMAT)
+    // Start with orthogonal matrix
+    U=std::complex<double>(1.0,0.0)*real_orthogonal(norbs,seed);
+  else if(start==UNITMAT)
+    // Start with unitary matrix
+    U=complex_unitary(norbs,seed);
+  else {
+    ERROR_INFO();
+    throw std::runtime_error("Starting point not implemented!\n");
     }
 
     // Measure
@@ -324,8 +298,8 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       printf("Delocalizing orbitals:");
     else
       printf("Localizing   orbitals:");
-    for(size_t io=0;io<orbidx.size();io++)
-      printf(" %i",(int) orbidx[io]+1);
+    //for(size_t io=0;io<orbidx.size();io++)
+    //  printf(" %i",(int) orbidx[io]+1);
     printf("\n");
 
     orbital_localization(method,basis,Cwrk,P,measure,U,true,!(start==UNITMAT),maxiter,Gthr,Fthr,umet,acc,delocalize,fname,debug);
@@ -333,9 +307,8 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
     if(start==UNITMAT) {
       // Update orbitals, complex case
       arma::cx_mat Cloc=Cwrk*U;
-      for(size_t io=0;io<orbidx.size();io++)
-	Cplx.col(orbidx[io])=Cloc.col(io);
-
+      for(size_t io=0;io<C.n_cols;io++)
+	Cplx.col(io)=Cloc.col(io);
     } else {
       // Update orbitals and energies, real case
 
@@ -358,27 +331,29 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       sort_eigvec(Eloc,Cloc);
 
       // Update orbitals and energies
-      for(size_t io=0;io<orbidx.size();io++)
-	C.col(orbidx[io])=Cloc.col(io);
-      for(size_t io=0;io<orbidx.size();io++)
-	E(orbidx[io])=Eloc(io);
-    }
+      for(size_t io=0;io<C.n_cols;io++)
+	C.col(io)=Cloc.col(io);
+      for(size_t io=0;io<C.n_cols;io++)
+	E(io)=Eloc(io);
   }
 
   // Compute size distribution
-  if(size) {
-    if(start==UNITMAT)
-      size_distribution(basis,Cplx,sizedist,printidx);
-    else {
-      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
-      size_distribution(basis,Chlp,sizedist,printidx);
-    }
-  }
+  //if(size) {
+  //  if(start==UNITMAT)
+  //    size_distribution(basis,Cplx,sizedist,printidx);
+  //  else {
+  //    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+  //   size_distribution(basis,Chlp,sizedist,printidx);
+  //}
 }
 
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug, int ncore, int nel) {
   // Run localization, occupied space
-  localize_wrk(basis,C,E,P,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o",Gthr,Fthr,maxiter,seed,debug);
+  arma::subview<double> C_occ = C.cols(0, nel-1);
+  arma::subview_col<double> E_occ = E.subvec(0,nel-1);
+  localize_wrk(basis,C_occ,E_occ,P,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o",Gthr,Fthr,maxiter,seed,debug);
+
+  //call size_distribution on occupied orbitals from here
 
   // Run localization, virtual space
   if(virt) {
@@ -387,8 +362,14 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	occs[i]=1.0;
       else
 	occs[i]=0.0;
-    localize_wrk(basis,C,E,P,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v",Gthr,Fthr,maxiter,seed,debug);
+	arma::subview<double> C_virt = C.cols(nel,C.n_cols-1);
+	arma::subview_col<double> E_virt = E.subvec(nel,C.n_cols-1);
+    localize_wrk(basis,C_virt,E_virt,P,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v",Gthr,Fthr,maxiter,seed,debug);
+
+    //call size_distribution on vitual orbitals from here
   }
+
+
 }
 
 void print_header() {
@@ -433,6 +414,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("Maxiter","Maximum number of iterations",50000);
   settings.add_int("Seed","Random number seed",0);
   settings.add_bool("Debug","Print out line search every iteration",false);
+  settings.add_int("NumCore","Number of atomic core orbitals (localized separately from valence)",0);
   settings.parse(argv[1]);
   settings.print();
 
@@ -444,6 +426,8 @@ int main_guarded(int argc, char **argv) {
   std::string logfile=settings.get_string("Logfile");
   bool virt=settings.get_bool("Virtual");
   int seed=settings.get_int("Seed");
+
+  int ncore=settings.get_int("NumCore");
 
   std::string loadname(settings.get_string("LoadChk"));
   std::string savename(settings.get_string("SaveChk"));
@@ -560,8 +544,13 @@ int main_guarded(int argc, char **argv) {
     std::vector<double> occs;
     chkpt.read("occs",occs);
 
+    // Electron Number
+    int nela;
+    chkpt.read("Nel-a",nela);
+
+
     // Run localization
-    localize(basis,C,E,P,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile,Gthr,Fthr,maxiter,seed,debug);
+    localize(basis,C,E,P,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile,Gthr,Fthr,maxiter,seed,debug,ncore,nela);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -592,9 +581,14 @@ int main_guarded(int argc, char **argv) {
     chkpt.read("occa",occa);
     chkpt.read("occb",occb);
 
+    // Electron Number
+    int nela,nelb;
+    chkpt.read("Nel-a",nela);
+    chkpt.read("Nel-b",nelb);
+
     // Run localization
-    localize(basis,Ca,Ea,P,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a",Gthr,Fthr,maxiter,seed,debug);
-    localize(basis,Cb,Eb,P,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b",Gthr,Fthr,maxiter,seed,debug);
+    localize(basis,Ca,Ea,P,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a",Gthr,Fthr,maxiter,seed,debug,ncore,nela);
+    localize(basis,Cb,Eb,P,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b",Gthr,Fthr,maxiter,seed,debug,ncore,nelb);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
