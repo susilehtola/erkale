@@ -294,10 +294,10 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
     double measure;
 
     // Run localization
-    if(delocalize)
-      printf("Delocalizing orbitals:");
-    else
-      printf("Localizing   orbitals:");
+    //if(delocalize)
+    //  printf("Delocalizing orbitals:");
+    //else
+    //  printf("Localizing   orbitals:");
     //for(size_t io=0;io<orbidx.size();io++)
     //  printf(" %i",(int) orbidx[io]+1);
     printf("\n");
@@ -308,7 +308,7 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
       // Update orbitals, complex case
       arma::cx_mat Cloc=Cwrk*U;
       for(size_t io=0;io<C.n_cols;io++)
-	Cplx.col(io)=Cloc.col(io);
+        Cplx.col(io)=Cloc.col(io); // These orbitals don't seem to make it the checkpoint file
     } else {
       // Update orbitals and energies, real case
 
@@ -348,28 +348,59 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
 }
 
 void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug, int ncore, int nel) {
+
+  //TODO: simplify the subviews, I had issues with compiling if the subviews are initialized in the call to localize_wrk
+  //TODO: simply function inputs (i.e. remove vars that are no longer used - occs etc.)
+
   // Run localization, occupied space
   arma::subview<double> C_occ = C.cols(0, nel-1);
   arma::subview_col<double> E_occ = E.subvec(0,nel-1);
+
+  // Run localization
+  if(delocalize)
+    printf("Delocalizing orbitals:");
+  else
+    printf("Localizing   orbitals:");
+    for(size_t io=0;io<nel;io++)
+      printf(" %i",(int) io+1);
+  printf("\n");
   localize_wrk(basis,C_occ,E_occ,P,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o",Gthr,Fthr,maxiter,seed,debug);
 
-  //call size_distribution on occupied orbitals from here
+  //TODO: call size_distribution on occupied orbitals from here
+  //Compute size distribution
+  if(size) {
+    std::vector<size_t> printidx;
+    for (int i=0; i<nel; i++){
+        printidx.push_back(i);
+    }
+    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+    size_distribution(basis,Chlp,sizedist+".o",printidx);
+  }
 
   // Run localization, virtual space
   if(virt) {
-    for(size_t i=0;i<occs.size();i++)
-      if(occs[i]==0.0)
-	occs[i]=1.0;
-      else
-	occs[i]=0.0;
 	arma::subview<double> C_virt = C.cols(nel,C.n_cols-1);
 	arma::subview_col<double> E_virt = E.subvec(nel,C.n_cols-1);
+	  // Run localization
+    if(delocalize)
+      printf("Delocalizing orbitals:");
+    else
+      printf("Localizing   orbitals:");
+      for(size_t io=nel;io<C.n_cols;io++)
+        printf(" %i",(int) io+1);
+      printf("\n");
     localize_wrk(basis,C_virt,E_virt,P,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v",Gthr,Fthr,maxiter,seed,debug);
 
-    //call size_distribution on vitual orbitals from here
+    //TODO: call size_distribution on vitual orbitals from here
+    if(size) {
+    std::vector<size_t> printidx;
+    for (int i=nel; i<C.n_cols; i++){
+        printidx.push_back(i);
+    }
+    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+    size_distribution(basis,Chlp,sizedist+".v",printidx);
   }
-
-
+  }
 }
 
 void print_header() {
