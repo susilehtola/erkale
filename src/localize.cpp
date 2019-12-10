@@ -248,7 +248,7 @@ arma::cx_mat cholesky_guess(const BasisSet & basis, const arma::mat & C) {
 }
 
 
-void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subview_col<double> & E, const arma::mat & P, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
+void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subview_col<double> & E, const arma::mat & P, const arma::mat & H, const std::vector<size_t> & orbidx, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
 
   // assumed that all orbitals in the subview of C are included in the localization.
   size_t norbs = C.n_cols;
@@ -293,13 +293,13 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
     // Measure
     double measure;
 
-    // Run localization
-    //if(delocalize)
-    //  printf("Delocalizing orbitals:");
-    //else
-    //  printf("Localizing   orbitals:");
-    //for(size_t io=0;io<orbidx.size();io++)
-    //  printf(" %i",(int) orbidx[io]+1);
+    	  // Run localization
+    if(delocalize)
+      printf("Delocalizing orbitals:");
+    else
+      printf("Localizing   orbitals:");
+    for(size_t io=0;io<orbidx.size();io++)
+      printf(" %i",(int) io+1);
     printf("\n");
 
     orbital_localization(method,basis,Cwrk,P,measure,U,true,!(start==UNITMAT),maxiter,Gthr,Fthr,umet,acc,delocalize,fname,debug);
@@ -337,90 +337,55 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
 	E(io)=Eloc(io);
   }
 
-  // Compute size distribution
-  //if(size) {
-  //  if(start==UNITMAT)
-  //    size_distribution(basis,Cplx,sizedist,printidx);
-  //  else {
-  //    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
-  //   size_distribution(basis,Chlp,sizedist,printidx);
-  //}
+   //Compute size distribution
+  if(size) {
+    if(start==UNITMAT)
+      size_distribution(basis,Cplx,sizedist,orbidx);
+    else {
+      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+     size_distribution(basis,Chlp,sizedist,orbidx);
+  }
 }
+}
+
 
 void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug, int ncore, int nel) {
 
   //TODO: simply function inputs (i.e. remove vars that are no longer used - occs etc.)
 
-    // Run localization, virtual space
+    // Run localization, occupied core space
   if(ncore) {
-	arma::subview<double> C_core = C.cols(0,ncore-1);
+    std::vector<size_t> core_idxs;
+    for (size_t i=0;i<ncore;i++)
+        core_idxs.push_back(i);
+
+    arma::subview<double> C_core = C.cols(0,ncore-1);
 	arma::subview_col<double> E_core = E.subvec(0,ncore-1);
-	  // Run localization
-    if(delocalize)
-      printf("Delocalizing orbitals:");
-    else
-      printf("Localizing   orbitals:");
-      for(size_t io=0;io<ncore;io++)
-        printf(" %i",(int) io+1);
-      printf("\n");
-    localize_wrk(basis,C_core,E_core,P,H,occs,method,umet,acc,start,delocalize,sizedist+".core",size,fname+".core",Gthr,Fthr,maxiter,seed,debug);
 
-    if(size) {
-    std::vector<size_t> printidx;
-    for (int i=nel; i<C.n_cols; i++){
-        printidx.push_back(i);
-    }
-    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
-    size_distribution(basis,Chlp,sizedist+".core",printidx);
-  }
+    localize_wrk(basis,C_core,E_core,P,H,core_idxs,method,umet,acc,start,delocalize,sizedist+".core",size,fname+".core",Gthr,Fthr,maxiter,seed,debug);
   }
 
-  // Run localization, occupied space
+  std::vector<size_t> val_idxs;
+  for (size_t i=ncore;i<nel;i++)
+    val_idxs.push_back(i);
+
+  // Run localization, occupied valence space
   arma::subview<double> C_occ = C.cols(0, nel-1);
   arma::subview_col<double> E_occ = E.subvec(0,nel-1);
 
-  // Run localization
-  if(delocalize)
-    printf("Delocalizing orbitals:");
-  else
-    printf("Localizing   orbitals:");
-    for(size_t io=0;io<nel;io++)
-      printf(" %i",(int) io+1);
-  printf("\n");
-  localize_wrk(basis,C_occ,E_occ,P,H,occs,method,umet,acc,start,delocalize,sizedist+".val",size,fname+".val",Gthr,Fthr,maxiter,seed,debug);
-
-  //Compute size distribution
-  if(size) {
-    std::vector<size_t> printidx;
-    for (int i=0; i<nel; i++){
-        printidx.push_back(i);
-    }
-    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
-    size_distribution(basis,Chlp,sizedist+".val",printidx);
-  }
+  localize_wrk(basis,C_occ,E_occ,P,H,val_idxs,method,umet,acc,start,delocalize,sizedist+".val",size,fname+".val",Gthr,Fthr,maxiter,seed,debug);
 
   // Run localization, virtual space
   if(virt) {
+    std::vector<size_t> virt_idxs;
+    for (size_t i=ncore;i<nel;i++)
+      virt_idxs.push_back(i);
+
 	arma::subview<double> C_virt = C.cols(nel,C.n_cols-1);
 	arma::subview_col<double> E_virt = E.subvec(nel,C.n_cols-1);
-	  // Run localization
-    if(delocalize)
-      printf("Delocalizing orbitals:");
-    else
-      printf("Localizing   orbitals:");
-      for(size_t io=nel;io<C.n_cols;io++)
-        printf(" %i",(int) io+1);
-      printf("\n");
-    localize_wrk(basis,C_virt,E_virt,P,H,occs,method,umet,acc,start,delocalize,sizedist+".virt",size,fname+".virt",Gthr,Fthr,maxiter,seed,debug);
 
-    if(size) {
-    std::vector<size_t> printidx;
-    for (int i=nel; i<C.n_cols; i++){
-        printidx.push_back(i);
-    }
-    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
-    size_distribution(basis,Chlp,sizedist+".virt",printidx);
-  }
+
+    localize_wrk(basis,C_virt,E_virt,P,H,virt_idxs,method,umet,acc,start,delocalize,sizedist+".virt",size,fname+".virt",Gthr,Fthr,maxiter,seed,debug);
   }
 }
 
