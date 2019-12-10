@@ -299,7 +299,7 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
     else
       printf("Localizing   orbitals:");
     for(size_t io=0;io<orbidx.size();io++)
-      printf(" %i",(int) io+1);
+      printf(" %i",(int) orbidx[io]+1);
     printf("\n");
 
     orbital_localization(method,basis,Cwrk,P,measure,U,true,!(start==UNITMAT),maxiter,Gthr,Fthr,umet,acc,delocalize,fname,debug);
@@ -378,7 +378,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
   // Run localization, virtual space
   if(virt) {
     std::vector<size_t> virt_idxs;
-    for (size_t i=ncore;i<nel;i++)
+    for (size_t i=nel;i<C.n_cols;i++)
       virt_idxs.push_back(i);
 
 	arma::subview<double> C_virt = C.cols(nel,C.n_cols-1);
