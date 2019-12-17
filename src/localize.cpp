@@ -39,7 +39,7 @@
 #include "version.h"
 #endif
 
-void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string filename, const std::vector<size_t> & printidx) {
+void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string filename, const size_t startidx, const size_t stopidx) {
   // Get the r_i^2 r_j^2 matrices
   std::vector<arma::mat> momstack=basis.moment(4);
   // Helper
@@ -92,9 +92,9 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
 
   // Output file
   FILE *out=fopen(filename.c_str(),"w");
-  for(size_t i=0;i<printidx.size();i++) {
+  for(size_t i=startidx;i<stopidx+1;i++) {
     // Orbital index is
-    size_t iorb=printidx[i];
+    //size_t iorb=printidx[i];
 
     // r^4 term
     double rfour_t=std::real(arma::as_scalar(arma::trans(C.col(i))*rfour*C.col(i)));
@@ -126,7 +126,7 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
     double FM=sqrt(sqrt(rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2)));
 
     // Print
-    fprintf(out,"%i %e %e (%e, %e, %e)\n",(int) iorb+1,SM,FM,r_t(0),r_t(1),r_t(2));
+    fprintf(out,"%i %e %e (%e, %e, %e)\n",(int) i+1,SM,FM,r_t(0),r_t(1),r_t(2));
   }
   fclose(out);
 }
@@ -336,14 +336,14 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
   }
 
    //Compute size distribution
-  if(size) {
-    if(start==UNITMAT)
-      size_distribution(basis,Cplx,sizedist,orbidx);
-    else {
-      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
-     size_distribution(basis,Chlp,sizedist,orbidx);
-  }
-}
+//  if(size) {
+//    if(start==UNITMAT)
+//      size_distribution(basis,Cplx,sizedist,orbidx);
+//    else {
+//      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+//     size_distribution(basis,Chlp,sizedist,orbidx);
+//  }
+//}
 }
 
 
@@ -351,7 +351,8 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 
   //TODO: simply function inputs (i.e. remove vars that are no longer used - occs etc.)
 
-    // Run localization, occupied core space
+
+  // Run localization, occupied core space
   if(ncore) {
     std::vector<size_t> core_idxs;
     for (size_t i=0;i<ncore;i++)
@@ -361,6 +362,11 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	arma::subview_col<double> E_core = E.subvec(0,ncore-1);
 
     localize_wrk(basis,C_core,E_core,P,H,core_idxs,method,umet,acc,start,delocalize,sizedist+".core",size,fname+".core",Gthr,Fthr,maxiter,seed,debug);
+
+    if(size) {
+      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+      size_distribution(basis,Chlp,sizedist+".core",0,ncore-1);
+    }
   }
 
   std::vector<size_t> val_idxs;
@@ -373,6 +379,11 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 
   localize_wrk(basis,C_occ,E_occ,P,H,val_idxs,method,umet,acc,start,delocalize,sizedist+".val",size,fname+".val",Gthr,Fthr,maxiter,seed,debug);
 
+  if(size) {
+    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+    size_distribution(basis,Chlp,sizedist+".val",ncore,nel-1);
+  }
+
   // Run localization, virtual space
   if(virt) {
     std::vector<size_t> virt_idxs;
@@ -382,8 +393,11 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	arma::subview<double> C_virt = C.cols(nel,C.n_cols-1);
 	arma::subview_col<double> E_virt = E.subvec(nel,C.n_cols-1);
 
-
     localize_wrk(basis,C_virt,E_virt,P,H,virt_idxs,method,umet,acc,start,delocalize,sizedist+".virt",size,fname+".virt",Gthr,Fthr,maxiter,seed,debug);
+    if(size) {
+      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+      size_distribution(basis,Chlp,sizedist+".virt",nel,C.n_cols-1);
+    }
   }
 }
 
