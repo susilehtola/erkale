@@ -97,28 +97,28 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
     size_t iorb=printidx[i];
 
     // r^4 term
-    double rfour_t=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rfour*C.col(iorb)));
+    double rfour_t=std::real(arma::as_scalar(arma::trans(C.col(i))*rfour*C.col(i)));
 
     // rr^2 term
     arma::vec rrsq_t(3);
     for(int ic=0;ic<3;ic++)
-      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rrsq[ic]*C.col(iorb)));
+      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(i))*rrsq[ic]*C.col(i)));
 
     // rr terms
     arma::mat rr_t(3,3);
     for(int ic=0;ic<3;ic++)
       for(int jc=0;jc<=ic;jc++) {
-	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rr[ic][jc]*C.col(iorb)));
+	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(C.col(i))*rr[ic][jc]*C.col(i)));
 	rr_t(jc,ic)=rr_t(ic,jc);
       }
 
     // <r^2> term
-    double rsq_t=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rsq*C.col(iorb)));
+    double rsq_t=std::real(arma::as_scalar(arma::trans(C.col(i))*rsq*C.col(i)));
 
     // <r> terms
     arma::vec r_t(3);
     for(int ic=0;ic<3;ic++)
-      r_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rmat[ic]*C.col(iorb)));
+      r_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(i))*rmat[ic]*C.col(i)));
 
     // Second moment is
     double SM=sqrt(rsq_t - arma::dot(r_t,r_t));
@@ -267,8 +267,9 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
   arma::mat Cwrk(C);
   // and orbital energies
   arma::vec Ewrk(norbs);
-  for(size_t io=0;io<norbs;io++)
-    Ewrk(io)=E(io);
+  //for(size_t io=0;io<norbs;io++)
+  //  Ewrk(io)=E(io);
+  Ewrk = E;
 
   // Localizing matrix
   arma::cx_mat U;
@@ -293,7 +294,7 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
     // Measure
     double measure;
 
-    	  // Run localization
+    // Run localization
     if(delocalize)
       printf("Delocalizing orbitals:");
     else
@@ -307,8 +308,7 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
     if(start==UNITMAT) {
       // Update orbitals, complex case
       arma::cx_mat Cloc=Cwrk*U;
-      for(size_t io=0;io<C.n_cols;io++)
-        Cplx.col(io)=Cloc.col(io); // These orbitals don't seem to make it the checkpoint file
+      Cplx = Cloc; // same dimension, no need for submatrix views
     } else {
       // Update orbitals and energies, real case
 
@@ -319,22 +319,20 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
       // and energies
       arma::vec Eloc(Cloc.n_cols);
       if(H.n_rows == Cwrk.n_rows) {
-	// We have Fock operator; use it to calculate energies (in case
-	// we don't have canonical orbitals here)
-	for(size_t io=0;io<Cloc.n_cols;io++)
-	  Eloc(io)=arma::as_scalar(arma::trans(Cloc.col(io))*H*Cloc.col(io));
+	  // We have Fock operator; use it to calculate energies (in case
+	  // we don't have canonical orbitals here)
+	  for(size_t io=0;io<Cloc.n_cols;io++)
+	    Eloc(io)=arma::as_scalar(arma::trans(Cloc.col(io))*H*Cloc.col(io));
       } else
-	// No Fock operator given
-	Eloc=arma::diagvec(arma::trans(Ur)*arma::diagmat(Ewrk)*Ur);
+	  // No Fock operator given
+	  Eloc=arma::diagvec(arma::trans(Ur)*arma::diagmat(Ewrk)*Ur);
 
       // and sort them in the new energy order
       sort_eigvec(Eloc,Cloc);
 
       // Update orbitals and energies
-      for(size_t io=0;io<C.n_cols;io++)
-	C.col(io)=Cloc.col(io);
-      for(size_t io=0;io<C.n_cols;io++)
-	E(io)=Eloc(io);
+      C=Cloc;
+      E=Eloc;
   }
 
    //Compute size distribution
