@@ -337,6 +337,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
     print_localize_msg(0,ncore-1,delocalize);
     localize_wrk(basis,C_core,E_core,P,H,method,umet,acc,start,delocalize,fname+".core",Gthr,Fthr,maxiter,seed,debug);
 
+    // Compute size distribution
     if(size) {
       arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
       size_distribution(basis,Chlp,sizedist+".core",0,ncore-1);
@@ -350,6 +351,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
   print_localize_msg(ncore,nel-1,delocalize);
   localize_wrk(basis,C_occ,E_occ,P,H,method,umet,acc,start,delocalize,fname+".val",Gthr,Fthr,maxiter,seed,debug);
 
+  // Compute size distribution
   if(size) {
     arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
     size_distribution(basis,Chlp,sizedist+".val",ncore,nel-1);
@@ -362,6 +364,8 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 
     print_localize_msg(nel,C.n_cols-1,delocalize);
     localize_wrk(basis,C_virt,E_virt,P,H,method,umet,acc,start,delocalize,fname+".virt",Gthr,Fthr,maxiter,seed,debug);
+
+    // Compute size distribution
     if(size) {
       arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
       size_distribution(basis,Chlp,sizedist+".virt",nel,C.n_cols-1);
