@@ -248,27 +248,16 @@ arma::cx_mat cholesky_guess(const BasisSet & basis, const arma::mat & C) {
 }
 
 
-void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subview_col<double> & E, const arma::mat & P, const arma::mat & H, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
+void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subview_col<double> & E, const arma::mat & P, const arma::mat & H, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
 
-  // assumed that all orbitals in the subview of C are included in the localization.
+  // assume that all orbitals in the subview of C are included in the localization.
   size_t norbs = C.n_cols;
 
-  // Check that fname is ok
-  //if(fname.length()==2) // No, it's equal to .o or .v
-  //  fname="";
-  //if(fname.length()==4) { // May be ok, or
-  //  std::string sub=fname.substr(0,2);
-  //  if(stricmp(sub,".a")==0 || stricmp(sub,".b")==0)
-  //    fname="";
-  //}
-
-  arma::cx_mat Cplx(C*std::complex<double>(1.0,0.0)); // purpose?
+  arma::cx_mat Cplx(C*std::complex<double>(1.0,0.0));
 
   arma::mat Cwrk(C);
   // and orbital energies
   arma::vec Ewrk(norbs);
-  //for(size_t io=0;io<norbs;io++)
-  //  Ewrk(io)=E(io);
   Ewrk = E;
 
   // Localizing matrix
@@ -295,8 +284,6 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
     double measure;
 
     // Run localization
-
-
     orbital_localization(method,basis,Cwrk,P,measure,U,true,!(start==UNITMAT),maxiter,Gthr,Fthr,umet,acc,delocalize,fname,debug);
 
     if(start==UNITMAT) {
@@ -328,16 +315,6 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
       C=Cloc;
       E=Eloc;
   }
-
-   //Compute size distribution
-//  if(size) {
-//    if(start==UNITMAT)
-//      size_distribution(basis,Cplx,sizedist,orbidx);
-//    else {
-//      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
-//     size_distribution(basis,Chlp,sizedist,orbidx);
-//  }
-//}
 }
 
 
@@ -352,15 +329,13 @@ void print_localize_msg(size_t start_idx, size_t stop_idx, bool delocalize){
 }
 
 void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug, int ncore, int nel) {
-  //TODO: simply function inputs (i.e. remove vars that are no longer used - occs etc.)
-
   // Run localization, occupied core space
   if(ncore) {
     arma::subview<double> C_core = C.cols(0,ncore-1);
 	arma::subview_col<double> E_core = E.subvec(0,ncore-1);
 
     print_localize_msg(0,ncore-1,delocalize);
-    localize_wrk(basis,C_core,E_core,P,H,method,umet,acc,start,delocalize,sizedist+".core",size,fname+".core",Gthr,Fthr,maxiter,seed,debug);
+    localize_wrk(basis,C_core,E_core,P,H,method,umet,acc,start,delocalize,fname+".core",Gthr,Fthr,maxiter,seed,debug);
 
     if(size) {
       arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
@@ -373,7 +348,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
   arma::subview_col<double> E_occ = E.subvec(ncore,nel-1);
 
   print_localize_msg(ncore,nel-1,delocalize);
-  localize_wrk(basis,C_occ,E_occ,P,H,method,umet,acc,start,delocalize,sizedist+".val",size,fname+".val",Gthr,Fthr,maxiter,seed,debug);
+  localize_wrk(basis,C_occ,E_occ,P,H,method,umet,acc,start,delocalize,fname+".val",Gthr,Fthr,maxiter,seed,debug);
 
   if(size) {
     arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
@@ -386,7 +361,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 	arma::subview_col<double> E_virt = E.subvec(nel,C.n_cols-1);
 
     print_localize_msg(nel,C.n_cols-1,delocalize);
-    localize_wrk(basis,C_virt,E_virt,P,H,method,umet,acc,start,delocalize,sizedist+".virt",size,fname+".virt",Gthr,Fthr,maxiter,seed,debug);
+    localize_wrk(basis,C_virt,E_virt,P,H,method,umet,acc,start,delocalize,fname+".virt",Gthr,Fthr,maxiter,seed,debug);
     if(size) {
       arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
       size_distribution(basis,Chlp,sizedist+".virt",nel,C.n_cols-1);
