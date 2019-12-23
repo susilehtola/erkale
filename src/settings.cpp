@@ -116,6 +116,8 @@ void Settings::add_scf_settings() {
   add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");
   // Linear dependence threshold
   add_double("LinDepThresh", "Basis set linear dependency threshold", 1e-5);
+  // Cholesky orthogonalization threshold
+  add_double("CholDepThresh", "Partial Cholesky decomposition threshold", 1e-7);
 
   // Convergence criterion
   add_double("ConvThr", "Orbital gradient convergence threshold", 1e-6);

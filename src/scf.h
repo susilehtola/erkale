@@ -200,8 +200,8 @@ enum pzham {
 enum pzham parse_pzham(const std::string & str);
 
 class SCF {
- protected:
- /// Overlap matrix
+protected:
+  /// Overlap matrix
   arma::mat S;
 
   /// Kinetic energy matrix
@@ -327,6 +327,8 @@ class SCF {
 
   /// List of frozen orbitals by symmetry group. index+1 is symmetry group, group 0 contains all non-frozen orbitals
   std::vector<arma::mat> freeze;
+  /// Helper for orthogonalization
+  arma::mat orthogonalization_helper(const arma::vec & Rsq, const arma::mat & S) const;
 
  public:
   /// Constructor

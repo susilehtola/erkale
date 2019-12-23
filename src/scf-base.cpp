@@ -236,6 +236,8 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
     t.set();
   }
 
+  // Basis function spatial extents
+  arma::vec Rsq(basisp->get_bf_Rsquared());
   if(lincalc) {
     // Basis set m values
     arma::ivec mval(basisp->get_m_values());
@@ -252,10 +254,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
     size_t nmo=0;
     for(size_t i=0;i<muni.n_elem;i++) {
       m_idx[i]=basisp->m_indices(muni[i]);
-
-      // Form S submatrix
-      arma::mat Ssub(S.submat(m_idx[i],m_idx[i]));
-      Sinvhs[i]=BasOrth(Ssub);
+      Sinvhs[i]=orthogonalization_helper(Rsq(m_idx[i]),S.submat(m_idx[i],m_idx[i]));
       nmo+=Sinvhs[i].n_cols;
     }
 
@@ -268,7 +267,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
       imo+=Sinvhs[i].n_cols;
     }
   } else {
-    Sinvh=BasOrth(S);
+    Sinvh=orthogonalization_helper(Rsq,S);
   }
   chkptp->write("Sinvh",Sinvh);
 
@@ -423,6 +422,22 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
 }
 
 SCF::~SCF() {
+}
+
+arma::mat SCF::orthogonalization_helper(const arma::vec & Rsq, const arma::mat & Smat) const {
+  // Sort basis functions from tight to diffuse
+  arma::uvec i_sort=arma::stable_sort_index(Rsq,"ascend");
+  // Inverse sort
+  arma::uvec i_inv=i_sort;
+  for(size_t i=0;i<i_sort.n_elem;i++)
+    i_inv[i_sort[i]]=i;
+
+  // Overlap matrix in the order from tight to diffuse
+  arma::mat S_sort(Smat(i_sort,i_sort));
+  // Run orthonormalization, e.g. with Cholesky
+  arma::mat Sinvh_sort(BasOrth(S_sort));
+  // Return the matrix in the original order
+  return Sinvh_sort.rows(i_inv);
 }
 
 void SCF::set_frozen(const arma::mat & C, size_t ind) {
