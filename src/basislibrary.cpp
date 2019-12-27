@@ -1172,7 +1172,35 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
   *this=orthbas;
 }
 
-void ElementBasisSet::augment(int naug) {
+void ElementBasisSet::augment_steep(int naug) {
+  // Loop over am
+  for(int am=0;am<=get_max_am();am++) {
+    // Get the current contraction pattern
+    arma::vec exps;
+    arma::mat coeffs;
+    get_primitives(exps,coeffs,am);
+
+    // If only one exponent, no augmentation
+    if(exps.size()<2)
+      continue;
+
+    // Compute the new exponents
+    double es=exps(0);
+    double el=exps(1);
+    for(int i=0;i<naug;i++) {
+      double aug=es*pow(es/el,i+1);
+
+      // Add the exponent
+      FunctionShell sh(am);
+      sh.add_exponent(1.0,aug);
+      add_function(sh);
+    }
+  }
+
+  sort();
+}
+
+void ElementBasisSet::augment_diffuse(int naug) {
   // Loop over am
   for(int am=0;am<=get_max_am();am++) {
     // Get the current contraction pattern
@@ -2248,12 +2276,20 @@ void BasisSetLibrary::P_orthogonalize(double Cortho, double cutoff) {
     elements[iel].P_orthogonalize(Cortho, cutoff);
 }
 
-void BasisSetLibrary::augment(int naug){
+void BasisSetLibrary::augment_steep(int naug){
   char tmp[80];
   sprintf(tmp," with %i augmentation functions",naug);
   name=name+tmp;
   for(size_t iel=0;iel<elements.size();iel++)
-    elements[iel].augment(naug);
+    elements[iel].augment_steep(naug);
+}
+
+void BasisSetLibrary::augment_diffuse(int naug){
+  char tmp[80];
+  sprintf(tmp," with %i augmentation functions",naug);
+  name=name+tmp;
+  for(size_t iel=0;iel<elements.size();iel++)
+    elements[iel].augment_diffuse(naug);
 }
 
 void BasisSetLibrary::merge(double cutoff, bool verbose) {

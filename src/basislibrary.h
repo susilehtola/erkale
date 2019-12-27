@@ -199,8 +199,10 @@ class ElementBasisSet {
   /// Form compact Cholesky set
   ElementBasisSet cholesky_set(double thr, int maxam, double ovlthr) const;
 
-  /// Augment the basis
-  void augment(int naug);
+  /// Augment the basis with steep functions
+  void augment_steep(int naug);
+  /// Augment the basis with diffuse functions
+  void augment_diffuse(int naug);
 
   friend class BasisSetLibrary;
 };
@@ -305,8 +307,10 @@ class BasisSetLibrary {
   /// Merge primitives with large overlap (also decontracts basis)
   void merge(double cutoff=0.9, bool verbose=true);
 
-  /// Augment the basis
-  void augment(int naug);
+  /// Augment the basis with steep functions
+  void augment_steep(int naug);
+  /// Augment the basis with diffuse functions
+  void augment_diffuse(int naug);
 
   /// Print out library
   void print() const;

@@ -24,7 +24,7 @@
 #include "../version.h"
 #endif
 
-std::string cmds[]={"cholesky", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"augdiffuse", "augsteep", "cholesky", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 
 void help() {
@@ -59,7 +59,35 @@ int main_guarded(int argc, char **argv) {
   // Get command
   std::string cmd(argv[2]);
   // and determine what to do.
-  if(stricmp(cmd,"cholesky")==0) {
+  if(stricmp(cmd,"augdiffuse")==0) {
+    // Augment basis set
+
+    if(argc!=5) {
+      printf("\nUsage: %s input.gbs %s nexp output.gbs\n",argv[0],tolower(cmd).c_str());
+      return 1;
+    }
+
+    int naug=atoi(argv[3]);
+    std::string fileout(argv[4]);
+
+    bas.augment_diffuse(naug);
+    bas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"augsteep")==0) {
+    // Augment basis set
+
+    if(argc!=5) {
+      printf("\nUsage: %s input.gbs %s nexp output.gbs\n",argv[0],tolower(cmd).c_str());
+      return 1;
+    }
+
+    int naug=atoi(argv[3]);
+    std::string fileout(argv[4]);
+
+    bas.augment_steep(naug);
+    bas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"cholesky")==0) {
     // Print completeness profile.
 
     if(argc!=7) {
@@ -225,7 +253,7 @@ int main_guarded(int argc, char **argv) {
       naug=2;
 
     std::string fileout(argv[3]);
-    bas.augment(naug);
+    bas.augment_diffuse(naug);
     bas.save_gaussian94(fileout);
   } else if(stricmp(cmd,"decontract")==0) {
   // Decontract basis set.
