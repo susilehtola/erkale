@@ -88,7 +88,7 @@ int main_guarded(int argc, char **argv) {
     bas.save_gaussian94(fileout);
 
   } else if(stricmp(cmd,"cholesky")==0) {
-    // Print completeness profile.
+    // Form Cholesky fitting basis set
 
     if(argc!=7) {
       printf("\nUsage: %s input.gbs cholesky thr maxam cholthr output.gbs\n",argv[0]);
@@ -143,7 +143,7 @@ int main_guarded(int argc, char **argv) {
     ElementBasisSet elbas=bas.get_element(el);
 
     // Compute completeness profile
-    compprof_t prof=compute_completeness(elbas,-10.0,10.0,2001,coulomb);
+    compprof_t prof=compute_completeness(elbas,-10.0,15.0,3001,coulomb);
 
     // Print profile in output file
     FILE *out=fopen(fileout.c_str(),"w");
