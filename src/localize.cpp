@@ -302,8 +302,7 @@ void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subvi
       if(H.n_rows == Cwrk.n_rows) {
 	  // We have Fock operator; use it to calculate energies (in case
 	  // we don't have canonical orbitals here)
-	  for(size_t io=0;io<Cloc.n_cols;io++)
-	    Eloc(io)=arma::as_scalar(arma::trans(Cloc.col(io))*H*Cloc.col(io));
+	  Eloc = arma::diagvec(arma::trans(Cloc)*H*Cloc);
       } else
 	  // No Fock operator given
 	  Eloc=arma::diagvec(arma::trans(Ur)*arma::diagmat(Ewrk)*Ur);
@@ -332,7 +331,7 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
   // Run localization, occupied core space
   if(ncore) {
     arma::subview<double> C_core = C.cols(0,ncore-1);
-	arma::subview_col<double> E_core = E.subvec(0,ncore-1);
+    arma::subview_col<double> E_core = E.subvec(0,ncore-1);
 
     print_localize_msg(0,ncore-1,delocalize);
     localize_wrk(basis,C_core,E_core,P,H,method,umet,acc,start,delocalize,fname+".core",Gthr,Fthr,maxiter,seed,debug);
@@ -359,8 +358,8 @@ void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::
 
   // Run localization, virtual space
   if(virt) {
-	arma::subview<double> C_virt = C.cols(nel,C.n_cols-1);
-	arma::subview_col<double> E_virt = E.subvec(nel,C.n_cols-1);
+    arma::subview<double> C_virt = C.cols(nel,C.n_cols-1);
+    arma::subview_col<double> E_virt = E.subvec(nel,C.n_cols-1);
 
     print_localize_msg(nel,C.n_cols-1,delocalize);
     localize_wrk(basis,C_virt,E_virt,P,H,method,umet,acc,start,delocalize,fname+".virt",Gthr,Fthr,maxiter,seed,debug);
