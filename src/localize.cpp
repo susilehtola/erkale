@@ -93,9 +93,7 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
   // Output file
   FILE *out=fopen(filename.c_str(),"w");
   for(size_t i=startidx;i<stopidx+1;i++) {
-    // Orbital index is
-    //size_t iorb=printidx[i];
-
+    
     // r^4 term
     double rfour_t=std::real(arma::as_scalar(arma::trans(C.col(i))*rfour*C.col(i)));
 
