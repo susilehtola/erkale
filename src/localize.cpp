@@ -39,7 +39,7 @@
 #include "version.h"
 #endif
 
-void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string filename, const std::vector<size_t> & printidx) {
+void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string filename, const size_t startidx, const size_t stopidx) {
   // Get the r_i^2 r_j^2 matrices
   std::vector<arma::mat> momstack=basis.moment(4);
   // Helper
@@ -92,33 +92,31 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
 
   // Output file
   FILE *out=fopen(filename.c_str(),"w");
-  for(size_t i=0;i<printidx.size();i++) {
-    // Orbital index is
-    size_t iorb=printidx[i];
-
+  for(size_t i=startidx;i<stopidx+1;i++) {
+    
     // r^4 term
-    double rfour_t=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rfour*C.col(iorb)));
+    double rfour_t=std::real(arma::as_scalar(arma::trans(C.col(i))*rfour*C.col(i)));
 
     // rr^2 term
     arma::vec rrsq_t(3);
     for(int ic=0;ic<3;ic++)
-      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rrsq[ic]*C.col(iorb)));
+      rrsq_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(i))*rrsq[ic]*C.col(i)));
 
     // rr terms
     arma::mat rr_t(3,3);
     for(int ic=0;ic<3;ic++)
       for(int jc=0;jc<=ic;jc++) {
-	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rr[ic][jc]*C.col(iorb)));
+	rr_t(ic,jc)=std::real(arma::as_scalar(arma::trans(C.col(i))*rr[ic][jc]*C.col(i)));
 	rr_t(jc,ic)=rr_t(ic,jc);
       }
 
     // <r^2> term
-    double rsq_t=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rsq*C.col(iorb)));
+    double rsq_t=std::real(arma::as_scalar(arma::trans(C.col(i))*rsq*C.col(i)));
 
     // <r> terms
     arma::vec r_t(3);
     for(int ic=0;ic<3;ic++)
-      r_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(iorb))*rmat[ic]*C.col(iorb)));
+      r_t(ic)=std::real(arma::as_scalar(arma::trans(C.col(i))*rmat[ic]*C.col(i)));
 
     // Second moment is
     double SM=sqrt(rsq_t - arma::dot(r_t,r_t));
@@ -126,7 +124,7 @@ void size_distribution(const BasisSet & basis, arma::cx_mat & C, std::string fil
     double FM=sqrt(sqrt(rfour_t - 4.0*arma::dot(rrsq_t,r_t) + 2.0*rsq_t*arma::dot(r_t,r_t) + 4.0 * arma::as_scalar(arma::trans(r_t)*rr_t*r_t) - 3.0*std::pow(arma::dot(r_t,r_t),2)));
 
     // Print
-    fprintf(out,"%i %e %e\n",(int) iorb+1,SM,FM);
+    fprintf(out,"%i %e %e (%e, %e, %e)\n",(int) i+1,SM,FM,r_t(0),r_t(1),r_t(2));
   }
   fclose(out);
 }
@@ -248,94 +246,48 @@ arma::cx_mat cholesky_guess(const BasisSet & basis, const arma::mat & C) {
 }
 
 
-void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, const std::vector<double> & occs, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
-  // Orbitals to localize
-  std::vector<size_t> locorb;
-  for(size_t io=0;io<occs.size();io++)
-    if(occs[io]!=0.0)
-      locorb.push_back(io);
+void localize_wrk(const BasisSet & basis, arma::subview<double> & C, arma::subview_col<double> & E, const arma::mat & P, const arma::mat & H, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
 
-  // Check that fname is ok
-  if(fname.length()==2) // No, it's equal to .o or .v
-    fname="";
-  if(fname.length()==4) { // May be ok, or
-    std::string sub=fname.substr(0,2);
-    if(stricmp(sub,".a")==0 || stricmp(sub,".b")==0)
-      fname="";
-  }
+  // assume that all orbitals in the subview of C are included in the localization.
+  size_t norbs = C.n_cols;
 
   arma::cx_mat Cplx(C*std::complex<double>(1.0,0.0));
 
-  // Save indices
-  std::vector<size_t> printidx(locorb);
+  arma::mat Cwrk(C);
+  // and orbital energies
+  arma::vec Ewrk(norbs);
+  Ewrk = E;
 
-  // Loop over orbitals
-  while(locorb.size()) {
-    // Orbitals to treat in this run
-    std::vector<size_t> orbidx;
-
-    // Occupation number
-    double occno=occs[locorb[0]];
-
-    for(size_t io=locorb.size()-1;io<locorb.size();io--)
-      // Degeneracy in occupation?
-      if(fabs(occs[locorb[io]]-occno)<1e-6) {
-	// Orbitals are degenerate; add to current batch
-	orbidx.push_back(locorb[io]);
-	locorb.erase(locorb.begin()+io);
-      }
-
-    std::sort(orbidx.begin(),orbidx.end());
-
-    // Collect orbitals
-    arma::mat Cwrk(C.n_rows,orbidx.size());
-    for(size_t io=0;io<orbidx.size();io++)
-      Cwrk.col(io)=C.col(orbidx[io]);
-    // and orbital energies
-    arma::vec Ewrk(orbidx.size());
-    for(size_t io=0;io<orbidx.size();io++)
-      Ewrk(io)=E(orbidx[io]);
-
-    // Localizing matrix
-    arma::cx_mat U;
-    if(start==CANORB)
-      // Start with canonical orbitals
-      U.eye(orbidx.size(),orbidx.size());
-    else if(start==NATORB)
-      U=atomic_orbital_guess(basis,P,Cwrk);
-    else if(start==CHOLORB)
-      U=cholesky_guess(basis,Cwrk);
-    else if(start==ORTHMAT)
-      // Start with orthogonal matrix
-      U=std::complex<double>(1.0,0.0)*real_orthogonal(orbidx.size(),seed);
-    else if(start==UNITMAT)
-      // Start with unitary matrix
-      U=complex_unitary(orbidx.size(),seed);
-    else {
-      ERROR_INFO();
-      throw std::runtime_error("Starting point not implemented!\n");
+  // Localizing matrix
+  arma::cx_mat U;
+  if(start==CANORB)
+    // Start with canonical orbitals
+    U.eye(norbs,norbs);
+  else if(start==NATORB)
+    U=atomic_orbital_guess(basis,P,Cwrk);
+  else if(start==CHOLORB)
+    U=cholesky_guess(basis,Cwrk);
+  else if(start==ORTHMAT)
+    // Start with orthogonal matrix
+    U=std::complex<double>(1.0,0.0)*real_orthogonal(norbs,seed);
+  else if(start==UNITMAT)
+    // Start with unitary matrix
+    U=complex_unitary(norbs,seed);
+  else {
+    ERROR_INFO();
+    throw std::runtime_error("Starting point not implemented!\n");
     }
 
     // Measure
     double measure;
 
     // Run localization
-    if(delocalize)
-      printf("Delocalizing orbitals:");
-    else
-      printf("Localizing   orbitals:");
-    for(size_t io=0;io<orbidx.size();io++)
-      printf(" %i",(int) orbidx[io]+1);
-    printf("\n");
-
     orbital_localization(method,basis,Cwrk,P,measure,U,true,!(start==UNITMAT),maxiter,Gthr,Fthr,umet,acc,delocalize,fname,debug);
 
     if(start==UNITMAT) {
       // Update orbitals, complex case
       arma::cx_mat Cloc=Cwrk*U;
-      for(size_t io=0;io<orbidx.size();io++)
-	Cplx.col(orbidx[io])=Cloc.col(io);
-
+      Cplx = Cloc; // same dimension, no need for submatrix views
     } else {
       // Update orbitals and energies, real case
 
@@ -346,50 +298,78 @@ void localize_wrk(const BasisSet & basis, arma::mat & C, arma::vec & E, const ar
       // and energies
       arma::vec Eloc(Cloc.n_cols);
       if(H.n_rows == Cwrk.n_rows) {
-	// We have Fock operator; use it to calculate energies (in case
-	// we don't have canonical orbitals here)
-	for(size_t io=0;io<Cloc.n_cols;io++)
-	  Eloc(io)=arma::as_scalar(arma::trans(Cloc.col(io))*H*Cloc.col(io));
+	  // We have Fock operator; use it to calculate energies (in case
+	  // we don't have canonical orbitals here)
+	  Eloc = arma::diagvec(arma::trans(Cloc)*H*Cloc);
       } else
-	// No Fock operator given
-	Eloc=arma::diagvec(arma::trans(Ur)*arma::diagmat(Ewrk)*Ur);
+	  // No Fock operator given
+	  Eloc=arma::diagvec(arma::trans(Ur)*arma::diagmat(Ewrk)*Ur);
 
       // and sort them in the new energy order
       sort_eigvec(Eloc,Cloc);
 
       // Update orbitals and energies
-      for(size_t io=0;io<orbidx.size();io++)
-	C.col(orbidx[io])=Cloc.col(io);
-      for(size_t io=0;io<orbidx.size();io++)
-	E(orbidx[io])=Eloc(io);
+      C=Cloc;
+      E=Eloc;
+  }
+}
+
+
+void print_localize_msg(size_t start_idx, size_t stop_idx, bool delocalize){
+    if(delocalize)
+      printf("Delocalizing orbitals:");
+    else
+      printf("Localizing orbitals:");
+    for(size_t io=start_idx;io<stop_idx+1;io++)
+      printf(" %i",(int) io+1);
+    printf("\n");
+}
+
+void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug, int ncore, int nel) {
+  // Run localization, occupied core space
+  if(ncore) {
+    arma::subview<double> C_core = C.cols(0,ncore-1);
+    arma::subview_col<double> E_core = E.subvec(0,ncore-1);
+
+    print_localize_msg(0,ncore-1,delocalize);
+    localize_wrk(basis,C_core,E_core,P,H,method,umet,acc,start,delocalize,fname+".core",Gthr,Fthr,maxiter,seed,debug);
+
+    // Compute size distribution
+    if(size) {
+      arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+      size_distribution(basis,Chlp,sizedist+".core",0,ncore-1);
     }
   }
+
+  // Run localization, occupied valence space
+  arma::subview<double> C_occ = C.cols(ncore, nel-1);
+  arma::subview_col<double> E_occ = E.subvec(ncore,nel-1);
+
+  print_localize_msg(ncore,nel-1,delocalize);
+  localize_wrk(basis,C_occ,E_occ,P,H,method,umet,acc,start,delocalize,fname+".val",Gthr,Fthr,maxiter,seed,debug);
 
   // Compute size distribution
   if(size) {
-    if(start==UNITMAT)
-      size_distribution(basis,Cplx,sizedist,printidx);
-    else {
+    arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
+    size_distribution(basis,Chlp,sizedist+".val",ncore,nel-1);
+  }
+
+  // Run localization, virtual space
+  if(virt) {
+    arma::subview<double> C_virt = C.cols(nel,C.n_cols-1);
+    arma::subview_col<double> E_virt = E.subvec(nel,C.n_cols-1);
+
+    print_localize_msg(nel,C.n_cols-1,delocalize);
+    localize_wrk(basis,C_virt,E_virt,P,H,method,umet,acc,start,delocalize,fname+".virt",Gthr,Fthr,maxiter,seed,debug);
+
+    // Compute size distribution
+    if(size) {
       arma::cx_mat Chlp=C*std::complex<double>(1.0,0.0);
-      size_distribution(basis,Chlp,sizedist,printidx);
+      size_distribution(basis,Chlp,sizedist+".virt",nel,C.n_cols-1);
     }
   }
 }
 
-void localize(const BasisSet & basis, arma::mat & C, arma::vec & E, const arma::mat & P, const arma::mat & H, std::vector<double> occs, bool virt, enum locmet method, enum unitmethod umet, enum unitacc acc, enum startingpoint start, bool delocalize, std::string sizedist, bool size, std::string fname, double Gthr, double Fthr, int maxiter, unsigned long int seed, bool debug) {
-  // Run localization, occupied space
-  localize_wrk(basis,C,E,P,H,occs,method,umet,acc,start,delocalize,sizedist+".o",size,fname+".o",Gthr,Fthr,maxiter,seed,debug);
-
-  // Run localization, virtual space
-  if(virt) {
-    for(size_t i=0;i<occs.size();i++)
-      if(occs[i]==0.0)
-	occs[i]=1.0;
-      else
-	occs[i]=0.0;
-    localize_wrk(basis,C,E,P,H,occs,method,umet,acc,start,delocalize,sizedist+".v",size,fname+".v",Gthr,Fthr,maxiter,seed,debug);
-  }
-}
 
 void print_header() {
 #ifdef _OPENMP
@@ -433,6 +413,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("Maxiter","Maximum number of iterations",50000);
   settings.add_int("Seed","Random number seed",0);
   settings.add_bool("Debug","Print out line search every iteration",false);
+  settings.add_int("NumCore","Number of atomic core orbitals (localized separately from valence)",0);
   settings.parse(argv[1]);
   settings.print();
 
@@ -444,6 +425,8 @@ int main_guarded(int argc, char **argv) {
   std::string logfile=settings.get_string("Logfile");
   bool virt=settings.get_bool("Virtual");
   int seed=settings.get_int("Seed");
+
+  int ncore=settings.get_int("NumCore");
 
   std::string loadname(settings.get_string("LoadChk"));
   std::string savename(settings.get_string("SaveChk"));
@@ -560,8 +543,15 @@ int main_guarded(int argc, char **argv) {
     std::vector<double> occs;
     chkpt.read("occs",occs);
 
+    // Electron Number
+    int nela;
+    chkpt.read("Nel-a",nela);
+
+    if (ncore > nela)
+      throw std::runtime_error("NumCore must not exceed the number of electrons\n");
+
     // Run localization
-    localize(basis,C,E,P,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile,Gthr,Fthr,maxiter,seed,debug);
+    localize(basis,C,E,P,H,occs,virt,method,umet,acc,start,delocalize,sizedist,size,logfile,Gthr,Fthr,maxiter,seed,debug,ncore,nela);
 
     chkpt.write("C",C);
     chkpt.write("E",E);
@@ -592,9 +582,17 @@ int main_guarded(int argc, char **argv) {
     chkpt.read("occa",occa);
     chkpt.read("occb",occb);
 
+    // Electron Number
+    int nela,nelb;
+    chkpt.read("Nel-a",nela);
+    chkpt.read("Nel-b",nelb);
+    
+    if (ncore > nelb)
+      throw std::runtime_error("NumCore must not exceed the number of electrons\n");
+
     // Run localization
-    localize(basis,Ca,Ea,P,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a",Gthr,Fthr,maxiter,seed,debug);
-    localize(basis,Cb,Eb,P,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b",Gthr,Fthr,maxiter,seed,debug);
+    localize(basis,Ca,Ea,P,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a",Gthr,Fthr,maxiter,seed,debug,ncore,nela);
+    localize(basis,Cb,Eb,P,Hb,occb,virt,method,umet,acc,start,delocalize,sizedist+".b",size,logfile+".b",Gthr,Fthr,maxiter,seed,debug,ncore,nelb);
 
     chkpt.write("Ca",Ca);
     chkpt.write("Cb",Cb);
