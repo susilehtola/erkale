@@ -588,7 +588,7 @@ int main_guarded(int argc, char **argv) {
     chkpt.read("Nel-b",nelb);
     
     if (ncore > nelb)
-      throw std::runtime_error("ncore must not exceed the number of electrons\n");
+      throw std::runtime_error("NumCore must not exceed the number of electrons\n");
 
     // Run localization
     localize(basis,Ca,Ea,P,Ha,occa,virt,method,umet,acc,start,delocalize,sizedist+".a",size,logfile+".a",Gthr,Fthr,maxiter,seed,debug,ncore,nela);
