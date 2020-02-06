@@ -231,6 +231,15 @@ void GaussianShell::convert_contraction() {
     c[i].c*=fac*pow(c[i].z,am/2.0+0.75);
 }
 
+void GaussianShell::convert_sap_contraction() {
+  // Convert contraction from contraction of normalized density
+  // gaussians to contraction of unnormalized gaussians.
+
+  if(am != 0) throw std::logic_error("SAP basis should only have S functions!\n");
+  for(size_t i=0;i<c.size();i++)
+    c[i].c*=pow(c[i].z/M_PI,1.5);
+}
+
 void GaussianShell::normalize(bool coeffs) {
   // Normalize contraction of unnormalized primitives wrt first function on shell
 
