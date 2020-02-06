@@ -556,6 +556,12 @@ class GaussianShell {
    */
   void convert_contraction();
 
+  /**
+   * Convert contraction from coefficients of normalized density
+   * primitives to those of unnormalized primitives.
+   */
+  void convert_sap_contraction();
+
   /// Normalize contractions
   void normalize(bool coeffs=true);
   /// Normalize contractions in Coulomb norm (for density fitting)

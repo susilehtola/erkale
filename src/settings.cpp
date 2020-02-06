@@ -142,11 +142,14 @@ void Settings::add_scf_settings() {
   // Threshold for screening eigenvectors
   add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-8);
 
+  // SAP basis
+  add_string("SAPBasis", "Tabulated atomic effective potential \"basis set\"","sap_potential.gbs");
   // Use Lobatto quadrature?
   add_bool("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false);
 
   // Grid to use
   add_string("DFTGrid", "DFT integration grid to use: nrad lmax or Auto for adaptive", "50 -194");
+  add_string("SAPGrid", "SAP integration grid to use: nrad lmax or leave empty", "");
   // Initial and final tolerances of DFT grid
   add_double("DFTInitialTol", "Tolerance of initial DFT grid", 1e-4);
   add_double("DFTFinalTol", "Tolerance of final DFT grid", 1e-5);

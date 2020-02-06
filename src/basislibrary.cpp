@@ -311,6 +311,10 @@ int FunctionShell::get_am() const {
   return am;
 }
 
+size_t FunctionShell::get_Ncontr() const {
+  return C.size();
+}
+
 std::vector<contr_t> FunctionShell::get_contr() const {
   return C;
 }
@@ -487,6 +491,13 @@ int ElementBasisSet::get_max_am() const {
     if(bf[i].get_am()>maxam)
       maxam=bf[i].get_am();
   return maxam;
+}
+
+size_t ElementBasisSet::get_max_Ncontr() const {
+  size_t Ncontr=0;
+  for(size_t i=0;i<bf.size();i++)
+    Ncontr=std::max(Ncontr, bf[i].get_Ncontr());
+  return Ncontr;
 }
 
 int ElementBasisSet::get_am(size_t ind) const {
@@ -2195,6 +2206,13 @@ int BasisSetLibrary::get_max_am() const {
     if(elements[i].get_max_am()>maxam)
       maxam=elements[i].get_max_am();
   return maxam;
+}
+
+size_t BasisSetLibrary::get_max_Ncontr() const {
+  size_t Ncontr=0;
+  for(size_t i=0;i<elements.size();i++)
+    Ncontr=std::max(Ncontr, elements[i].get_max_Ncontr());
+  return Ncontr;
 }
 
 void BasisSetLibrary::print() const {

@@ -20,6 +20,7 @@
 #include <climits>
 
 #include "basis.h"
+#include "basislibrary.h"
 #include "broyden.h"
 #include "checkpoint.h"
 #include "elements.h"
@@ -57,6 +58,8 @@ enum guess_t parse_guess(const std::string & val) {
     return GSAP_GUESS;
   else if(stricmp(val,"SAP")==0)
     return SAP_GUESS;
+  else if(stricmp(val,"SAPFIT")==0)
+    return SAPFIT_GUESS;
   else if(stricmp(val,"MINSAP")==0)
     return MINSAP_GUESS;
   else if(stricmp(val,"SADNO")==0 || stricmp(val,"NO")==0)
@@ -990,11 +993,17 @@ void SCF::gwh_guess(uscf_t & sol, double K) const {
   sol.Hb=sol.Ha;
 }
 
-void SCF::sap_guess(rscf_t & sol) const {
+arma::mat SCF::sap_potential() const {
+  Timer t;
+
   DFTGrid grid(basisp);
 
   // Get the grid settings
   dft_t dft=parse_dft(false);
+  // Check for SAP grid override
+  if(stricmp(settings.get_string("SAPGrid"),"")!=0) {
+    parse_grid(dft,settings.get_string("SAPGrid"),"SAP");
+  }
   // Use the same grid as for dft
   if(dft.adaptive) {
     grid.construct_becke(dft.gridtol);
@@ -1009,35 +1018,151 @@ void SCF::sap_guess(rscf_t & sol) const {
     grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
   }
 
-  // Get SAP potential
-  arma::mat Vsap(grid.eval_SAP());
-  // Approximate Hamiltonian is
-  sol.H=Hcore+Vsap;
+  // Get SAP potential by quadrature
+  arma::mat Jx(grid.eval_SAP());
+
+  if(verbose)
+    printf("SAP potential formed in %.3f s.\n",t.get());
+
+  return Jx;
+}
+
+void SCF::sap_guess(rscf_t & sol) const {
+  sol.H=Hcore+sap_potential();
 }
 
 void SCF::sap_guess(uscf_t & sol) const {
-  DFTGrid grid(basisp);
+  sol.Ha=Hcore+sap_potential();
+  sol.Hb=sol.Ha;
+}
 
-  // Get the grid settings
-  dft_t dft=parse_dft(false);
-  // Use the same grid as for dft
-  if(dft.adaptive) {
-    grid.construct_becke(dft.gridtol);
-  } else {
-    int nrad=dft.nrad;
-    int lmax=dft.lmax;
-    bool grad=false;
-    bool tau=false;
-    bool lapl=false;
-    bool strict=false;
-    bool nl=false;
-    grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+arma::mat SCF::sapfit_potential() const {
+  Timer t;
+
+  // Load SAP fitting basis
+  BasisSetLibrary sapfit;
+  sapfit.load_basis(settings.get_string("SAPBasis"));
+
+  // Get shells in orbital basis
+  std::vector<GaussianShell> shells=basisp->get_shells();
+  // Get list of shell pairs
+  double omega=0.0;
+  double alpha=1.0;
+  double beta=0.0;
+  arma::mat Q, M;
+  std::vector<eripair_t> shpairs=basisp->get_eripairs(Q,M,intthr,omega,alpha,beta,false);
+  // and nuclei
+  std::vector<nucleus_t> nuclei=basisp->get_nuclei();
+  printf("%i shell pairs and %i nuclei\n",(int) shpairs.size(), (int) nuclei.size());
+
+  // Construct repulsive potential
+  arma::mat Jx(Hcore.n_rows,Hcore.n_cols);
+  Jx.zeros();
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker *eri=new ERIWorker(basisp->get_max_am(),std::max(basisp->get_max_Ncontr(), sapfit.get_max_Ncontr()));
+    const std::vector<double> * erip;
+
+    // Dummy shell
+    GaussianShell dummy(dummyshell());
+
+    // Compute all repulsion integrals
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t ip=0;ip<shpairs.size();ip++) {
+      size_t is=shpairs[ip].is;
+      size_t js=shpairs[ip].js;
+
+      // We have already computed the Schwarz screening
+      double QQ=Q(is,js)*Q(is,js);
+      if(QQ<intthr)
+        // Small integral
+        continue;
+
+      // Loop over nuclei
+      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+        if(nuclei[inuc].bsse)
+          continue;
+
+        // Get the SAP basis for the element
+        ElementBasisSet sapbas;
+        try {
+          // Check first if a special set is wanted for given center
+          sapbas=sapfit.get_element(nuclei[inuc].symbol,inuc+1);
+        } catch(std::runtime_error & err) {
+          // Did not find a special basis, use the general one instead.
+          sapbas=sapfit.get_element(nuclei[inuc].symbol,0);
+        }
+
+        // Get the shells on the element
+        std::vector<FunctionShell> bf=sapbas.get_shells();
+        if(bf.size() != 1 || bf[0].get_am() != 0)
+          throw std::logic_error("SAP basis should only have a single contracted S function per element!\n");
+        // Check sum rule
+        std::vector<contr_t> contr(bf[0].get_contr());
+        double Zsap=0.0;
+        for(size_t i=0;i<contr.size();i++)
+          Zsap-=contr[i].c;
+        if(std::abs(Zsap - nuclei[inuc].Z) >= 1e-3) {
+          std::ostringstream oss;
+          oss << "SAP basis on nucleus " << inuc+1 << " violates sum rule: " << Zsap << " instead of expected " << nuclei[inuc].Z << "!\n";
+          throw std::logic_error(oss.str());
+        }
+
+        // Form the SAP shell
+        GaussianShell sapsh(GaussianShell(bf[0].get_am(),false,bf[0].get_contr()));
+        // and set its center
+        sapsh.set_center(nuclei[inuc].r,inuc);
+        // Convert the contraction to unnormalized primitives
+        sapsh.convert_sap_contraction();
+
+        // Compute integrals
+        eri->compute(&shells[is],&shells[js],&sapsh,&dummy);
+        erip=eri->getp();
+
+        // and store them
+        size_t Ni(shells[is].get_Nbf());
+        size_t Nj(shells[js].get_Nbf());
+        size_t i0(shells[is].get_first_ind());
+        size_t j0(shells[js].get_first_ind());
+
+        // Remember minus sign from V(r)=-Z(r)/r
+        for(size_t ii=0;ii<Ni;ii++)
+          for(size_t jj=0;jj<Nj;jj++) {
+            size_t i=i0+ii;
+            size_t j=j0+jj;
+            Jx(i,j) -= (*erip)[ii*Nj+jj];
+          }
+        if(is != js) {
+          // Symmetrize
+          for(size_t ii=0;ii<Ni;ii++)
+            for(size_t jj=0;jj<Nj;jj++) {
+              size_t i=i0+ii;
+              size_t j=j0+jj;
+              Jx(j,i) -= (*erip)[ii*Nj+jj];
+            }
+        }
+      }
+    }
+
+    delete eri;
   }
 
-  // Get SAP potential
-  arma::mat Vsap(grid.eval_SAP());
-  // Approximate Hamiltonian is
-  sol.Ha=Hcore+Vsap;
+  if(verbose)
+    printf("SAP potential formed in %.3f s.\n",t.get());
+
+  return Jx;
+}
+
+void SCF::sapfit_guess(rscf_t & sol) const {
+  sol.H=Hcore+sapfit_potential();
+}
+
+void SCF::sapfit_guess(uscf_t & sol) const {
+  sol.Ha=Hcore+sapfit_potential();
   sol.Hb=sol.Ha;
 }
 
@@ -1688,6 +1813,41 @@ pz_scaling_t parse_pzscale(const std::string & scale) {
   throw std::runtime_error("Setting \"" + scale + "\" not recognized!\n");
 }
 
+void parse_grid(dft_t & dft, const std::string & gridstr, const std::string & method) {
+  std::vector<std::string> opts=splitline(gridstr);
+  if(opts.size()!=2) {
+    throw std::runtime_error("Invalid " + method + " grid specified.\n");
+  }
+
+  dft.adaptive=false;
+  dft.nrad=readint(opts[0]);
+  dft.lmax=readint(opts[1]);
+  if(dft.nrad<1 || dft.lmax==0) {
+    throw std::runtime_error("Invalid " + method + " radial grid specified.\n");
+  }
+
+  // Check if l was given in number of points
+  if(dft.lmax<0) {
+    // Try to find corresponding Lebedev grid
+    for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
+      if(lebedev_degrees[i]==-dft.lmax) {
+        dft.lmax=lebedev_orders[i];
+        break;
+      }
+    if(dft.lmax<0) {
+      std::ostringstream oss;
+      oss << "Invalid DFT angular grid specified. Supported Lebedev grids:";
+      for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++) {
+        if(i)
+          oss << ",";
+        oss << " " << lebedev_degrees[i];
+      }
+      oss << ".\n";
+      throw std::runtime_error(oss.str());
+    }
+  }
+}
+
 dft_t parse_dft(bool init) {
   dft_t dft;
   dft.gridtol=0.0;
@@ -1703,39 +1863,7 @@ dft_t parse_dft(bool init) {
 
   // Use static grid?
   if(stricmp(settings.get_string("DFTGrid"),"Auto")!=0) {
-    std::vector<std::string> opts=splitline(settings.get_string("DFTGrid"));
-    if(opts.size()!=2) {
-      throw std::runtime_error("Invalid DFT grid specified.\n");
-    }
-
-    dft.adaptive=false;
-    dft.nrad=readint(opts[0]);
-    dft.lmax=readint(opts[1]);
-    if(dft.nrad<1 || dft.lmax==0) {
-      throw std::runtime_error("Invalid DFT radial grid specified.\n");
-    }
-
-    // Check if l was given in number of points
-    if(dft.lmax<0) {
-      // Try to find corresponding Lebedev grid
-      for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
-	if(lebedev_degrees[i]==-dft.lmax) {
-	  dft.lmax=lebedev_orders[i];
-	  break;
-	}
-      if(dft.lmax<0) {
-	std::ostringstream oss;
-	oss << "Invalid DFT angular grid specified. Supported Lebedev grids:";
-	for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++) {
-	  if(i)
-	    oss << ",";
-	  oss << " " << lebedev_degrees[i];
-	}
-	oss << ".\n";
-	throw std::runtime_error(oss.str());
-      }
-    }
-
+    parse_grid(dft, settings.get_string("DFTGrid"), "DFT");
   } else {
     dft.adaptive=true;
     dft.gridtol=settings.get_double(tolkw);
@@ -1965,6 +2093,9 @@ void calculate(const BasisSet & basis, bool force) {
         solver.diagonalize(sol);
       } else if(guess==SAP_GUESS) {
 	solver.sap_guess(sol);
+        solver.diagonalize(sol);
+      } else if(guess==SAPFIT_GUESS) {
+	solver.sapfit_guess(sol);
         solver.diagonalize(sol);
       } else if(guess==MINSAP_GUESS) {
         // Form SAP Hamiltonian
@@ -2311,6 +2442,9 @@ void calculate(const BasisSet & basis, bool force) {
         solver.diagonalize(sol);
       } else if(guess==SAP_GUESS) {
 	solver.sap_guess(sol);
+        solver.diagonalize(sol);
+      } else if(guess==SAPFIT_GUESS) {
+	solver.sapfit_guess(sol);
         solver.diagonalize(sol);
       } else if(guess==MINSAP_GUESS) {
         // Form SAP Hamiltonian
