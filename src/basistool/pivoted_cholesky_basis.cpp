@@ -22,11 +22,9 @@
 #include "../timer.h"
 #include "../settings.h"
 
-std::vector<size_t> shell_pivoted_cholesky(const arma::mat & S, double eps, const arma::uvec & shellidx, const arma::vec & Rsq) {
+std::vector<size_t> shell_pivoted_cholesky(const arma::mat & S, double eps, const arma::uvec & shellidx) {
   if(shellidx.n_elem != S.n_rows)
-    throw std::logic_error("Rsq does not correspond to basis!\n");
-  if(Rsq.n_elem != S.n_rows)
-    throw std::logic_error("Rsq does not correspond to basis!\n");
+    throw std::logic_error("Shell index does not correspond to basis!\n");
 
   // Error vector
   arma::vec d(arma::diagvec(S));
@@ -38,8 +36,12 @@ std::vector<size_t> shell_pivoted_cholesky(const arma::mat & S, double eps, cons
   // Allocate memory
   B.zeros(S.n_rows,S.n_rows);
 
-  // Pivot index: start with tight functions, then do diffuse ones
-  arma::uvec pi=arma::sort_index(Rsq,"ascend");
+  // Initialize pivot with Gershgorin theorem: off-diagonal S
+  arma::mat odS(arma::abs(S));
+  odS.diag().zeros();
+  arma::vec odSs(arma::sum(odS).t());
+  // Pivot index: start with functions with small off-diagonal
+  arma::uvec pi=arma::sort_index(odSs,"ascend");
 
   // Loop index
   size_t m(0);
@@ -213,7 +215,7 @@ BasisSetLibrary pivoted_cholesky_basis(const std::vector<atom_t> & atoms, const 
   printf("Reciprocal condition number of original basis is %e\n",arma::rcond(S));
 
   // Perform pivoted Cholesky decomposition
-  std::vector<size_t> shidx=shell_pivoted_cholesky(S,thresh,basis.shell_indices(),basis.get_bf_Rsquared());
+  std::vector<size_t> shidx=shell_pivoted_cholesky(S,thresh,basis.shell_indices());
 
   // Add the retained shells to the reduced basis
   for(size_t i=0;i<shidx.size();i++) {
