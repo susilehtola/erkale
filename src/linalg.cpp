@@ -119,8 +119,13 @@ arma::mat PartialCholeskyOrth(const arma::mat & S, double cholcut, double scut) 
     throw std::runtime_error(oss.str());
   }
 
+  // Off-diagonal S
+  arma::mat odS(arma::abs(S));
+  odS.diag().zeros();
+  // Column sum
+  arma::vec odSs(arma::sum(S).t());
+  arma::uvec pivot = arma::stable_sort_index(odSs,"ascend");
   // Find suitable basis by partial Cholesky decomposition
-  arma::uvec pivot;
   pivoted_cholesky(S,cholcut,pivot);
 
   // Canonical orthogonalization of subbasis
@@ -532,7 +537,7 @@ arma::mat pivoted_cholesky(const arma::mat & A, double eps, arma::uvec & pivot) 
   double error(arma::max(d));
 
   // Pivot index
-  arma::uvec pi(arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem));
+  arma::uvec pi=pivot;
 
   while(error>eps && m<d.n_elem) {
     // Errors in pivoted order
