@@ -671,6 +671,8 @@ void construct_basis(BasisSet & basis, const std::vector<nucleus_t> & nuclei, co
 
 /// Compute values of orbitals at given point
 arma::vec compute_orbitals(const arma::mat & C, const BasisSet & bas, const coords_t & r);
+/// Compute Fermi-Löwdin orbitals
+arma::mat fermi_lowdin_orbitals(const arma::mat & C, const BasisSet & bas, const arma::mat & r);
 
 /// Compute density at given point
 double compute_density(const arma::mat & P, const BasisSet & bas, const coords_t & r);

@@ -1771,7 +1771,7 @@ dft_t parse_pzmet(const std::string & pzmod, const dft_t & method) {
   return oomethod;
 }
 
-int parse_pzimag(const std::string & str) {
+int parse_pzimag(const std::string & str, const std::string & setting) {
   int ret;
   if(stricmp(str,"true")==0 || stricmp(str,"yes")==0)
     ret=1;
@@ -1779,8 +1779,15 @@ int parse_pzimag(const std::string & str) {
     ret=-1;
   else if(stricmp(str,"false")==0 || stricmp(str,"no")==0)
     ret=0;
-  else
-    throw std::logic_error("Invalid value for PZimag\n");
+  else {
+    // Try to parse number
+    int num;
+    if(sscanf(str.c_str(), "%d", &num)==1) {
+      ret=num;
+    } else {
+      throw std::logic_error("Invalid value \"" + str + "\" for " + setting + "\n");
+    }
+  }
   return ret;
 }
 
@@ -2167,7 +2174,7 @@ void calculate(const BasisSet & basis, bool force) {
       int pzprec=settings.get_int("PZprec");
       bool pzov=settings.get_bool("PZov");
       bool pzoo=settings.get_bool("PZoo");
-      int pzloc=parse_pzimag(settings.get_string("PZloc"));
+      int pzloc=parse_pzimag(settings.get_string("PZloc"),"PZloc");
       enum locmet pzlocmet=parse_locmet(settings.get_string("PZlocmet"));
       double pzw=settings.get_double("PZw");
       int pzmax=settings.get_int("PZiter");
@@ -2176,7 +2183,7 @@ void calculate(const BasisSet & basis, bool force) {
       double pzOVthr=settings.get_double("PZOVthr");
       double pzNRthr=settings.get_double("PZNRthr");
       double pzEthr=settings.get_double("PZEthr");
-      int pzimag=parse_pzimag(settings.get_string("PZimag"));
+      int pzimag=parse_pzimag(settings.get_string("PZimag"),"PZimag");
       int pzstab=settings.get_int("PZstab");
       double pzstabthr=-settings.get_double("PZstabThr"); // Minus sign!
       int seed=settings.get_int("PZseed");
@@ -2274,7 +2281,19 @@ void calculate(const BasisSet & basis, bool force) {
 	  sol.cC.cols(0,Nel_alpha-1)=sol.C.cols(0,Nel_alpha-1)*W;
 	  if(sol.C.n_cols>(size_t) Nel_alpha)
 	    sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
-	}
+	} else if(pzloc==2) {
+          // Initialize with Fermi-Lowdin orbitals
+          if(verbose) printf("\nInitializing with Fermi-Lowdin orbitals.\n");
+          arma::mat fod;
+          fod.load("fod.dat",arma::raw_ascii);
+          arma::mat Cocc(sol.C.cols(0,Nel_alpha-1));
+          arma::mat Wflo(fermi_lowdin_orbitals(Cocc,basis,fod));
+	  // Save the complex orbitals
+	  sol.cC.zeros(sol.C.n_rows,sol.C.n_cols);
+	  sol.cC.cols(0,Nel_alpha-1)=(Cocc*Wflo)*COMPLEX1;
+	  if(sol.C.n_cols>(size_t) Nel_alpha)
+	    sol.cC.cols(Nel_alpha,sol.C.n_cols-1)=sol.C.cols(Nel_alpha,sol.C.n_cols-1)*COMPLEX1;
+        }
 
 	// Save the orbitals
 	chkpt.cwrite("CW",sol.cC);
@@ -2535,7 +2554,7 @@ void calculate(const BasisSet & basis, bool force) {
       int pzprec=settings.get_int("PZprec");
       bool pzov=settings.get_bool("PZov");
       bool pzoo=settings.get_bool("PZoo");
-      int pzloc=parse_pzimag(settings.get_string("PZloc"));
+      int pzloc=parse_pzimag(settings.get_string("PZloc"),"PZloc");
       enum locmet pzlocmet=parse_locmet(settings.get_string("PZlocmet"));
       double pzw=settings.get_double("PZw");
       int pzmax=settings.get_int("PZiter");
@@ -2544,7 +2563,7 @@ void calculate(const BasisSet & basis, bool force) {
       double pzOVthr=settings.get_double("PZOVthr");
       double pzEthr=settings.get_double("PZEthr");
       double pzNRthr=settings.get_double("PZNRthr");
-      int pzimag=parse_pzimag(settings.get_string("PZimag"));
+      int pzimag=parse_pzimag(settings.get_string("PZimag"),"PZimag");
       int pzstab=settings.get_int("PZstab");
       double pzstabthr=-settings.get_double("PZstabThr"); // Minus sign!
       int seed=settings.get_int("PZseed");
@@ -2645,7 +2664,19 @@ void calculate(const BasisSet & basis, bool force) {
 	  sol.cCa.cols(0,Nel_alpha-1)=sol.Ca.cols(0,Nel_alpha-1)*Wa;
 	  if(sol.Ca.n_cols>(size_t) Nel_alpha)
 	    sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
-	}
+	} else if(pzloc==2) {
+          // Initialize with Fermi-Lowdin orbitals
+          if(verbose) printf("\nInitializing with Fermi-Lowdin orbitals.\n");
+          arma::mat fod;
+          fod.load("fod-a.dat",arma::raw_ascii);
+          arma::mat Cocc(sol.Ca.cols(0,Nel_alpha-1));
+          arma::mat Wflo(fermi_lowdin_orbitals(Cocc,basis,fod));
+	  // Save the complex orbitals
+	  sol.cCa.zeros(sol.Ca.n_rows,sol.Ca.n_cols);
+	  sol.cCa.cols(0,Nel_alpha-1)=(Cocc*Wflo)*COMPLEX1;
+	  if(sol.Ca.n_cols>(size_t) Nel_alpha)
+	    sol.cCa.cols(Nel_alpha,sol.Ca.n_cols-1)=sol.Ca.cols(Nel_alpha,sol.Ca.n_cols-1)*COMPLEX1;
+        }
 
 	// The localizing matrix
 	arma::cx_mat Wb;
@@ -2713,7 +2744,19 @@ void calculate(const BasisSet & basis, bool force) {
 	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
 	  if(sol.Cb.n_cols>(size_t) Nel_beta)
 	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
-	}
+	} else if(pzloc==2) {
+          // Initialize with Fermi-Lowdin orbitals
+          if(verbose) printf("\nInitializing with Fermi-Lowdin orbitals.\n");
+          arma::mat fod;
+          fod.load("fod-b.dat",arma::raw_ascii);
+          arma::mat Cocc(sol.Cb.cols(0,Nel_beta-1));
+          arma::mat Wflo(fermi_lowdin_orbitals(Cocc,basis,fod));
+	  // Save the complex orbitals
+	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+	  sol.cCb.cols(0,Nel_beta-1)=(Cocc*Wflo)*COMPLEX1;
+	  if(sol.Cb.n_cols>(size_t) Nel_beta)
+	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
+        }
 
 	PZStability stab(&solver,verbose);
 	stab.set_method(dft,oodft,pzw,pzscale,pzscaleexp);
