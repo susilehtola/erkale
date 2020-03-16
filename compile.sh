@@ -1,7 +1,7 @@
 #!/bin/bash
 # This is a script for downloading, compiling and
 # installing ERKALE with all of its prerequisite libraries and CMake.
-# 2019-01-07 Susi Lehtola
+# 2020-03-16 Susi Lehtola
 
 # Set this to the number of cores +1
 nprocs=9
@@ -86,7 +86,7 @@ fi
 
 # Current versions of libraries, if they are to be compiled
 # GSL
-export GSLVER="2.5"
+export GSLVER="2.6"
 ## LibXC
 #export XCVER="4.0.3"
 # Use newest git snapshot
@@ -95,14 +95,14 @@ export XCVER="git"
 export INTVER="0e0ffa7887e74e6ab1fb07c89be55f776c733731"
 #export ARMAVER="9.200.6"
 export ARMAVER="git"
-export CMAKEVER="3.13.2"
+export CMAKEVER="3.16.5"
 
 # HDF5 version: MAJOR.MINOR
-export HDF5MAJOR="1.10"
-export HDF5MINOR="4"
+export HDF5MAJOR="1.12"
+export HDF5MINOR="0"
 
 # Version of OpenBLAS
-export OPENBLASVER="0.3.5"
+export OPENBLASVER="0.3.9"
 # You may need to disable AVX flags for OpenBLAS with older compilers
 #export OPENBLASAVX="NO_AVX=1 NO_AVX2=1" # For very old
 #export OPENBLASAVX="NO_AVX2=1" # For a little less old
@@ -359,7 +359,8 @@ if(( ! ${system_cmake} )); then
 	if [ ! -d ${builddir}/cmake-${CMAKEVER} ]; then
 	    if [ ! -f ${srcdir}/cmake-${CMAKEVER}.tar.gz ]; then
 		cd ${srcdir}
-		wget -O cmake-${CMAKEVER}.tar.gz http://www.cmake.org/files/v${CMAKEVER:0:3}/cmake-${CMAKEVER}.tar.gz
+                majorrel=$(echo $CMAKEVER | awk --field-separator=. '{printf("%s.%s",$1,$2)}')
+		wget -O cmake-${CMAKEVER}.tar.gz http://www.cmake.org/files/v${majorrel}/cmake-${CMAKEVER}.tar.gz
 	    fi
 	    cd ${builddir}
 	    tar zxf ${srcdir}/cmake-${CMAKEVER}.tar.gz
