@@ -981,6 +981,12 @@ void PZStability::print_info() {
 
     // Diagonalize
     print_info(CO,CV,Forb,get_H(rsl),Eorb,worb);
+
+    // Density matrix
+    arma::mat P(arma::real(2.0*form_density(CO)));
+    arma::vec dipmom(dipole_moment(P,basis));
+    printf("Dipole mu = (% 08.8f, % 08.8f, % 08.8f) D\n",dipmom(0)/AUINDEBYE,dipmom(1)/AUINDEBYE,dipmom(2)/AUINDEBYE);
+
   } else {
     // Evaluate orbital matrices
     std::vector<arma::cx_mat> Forba, Forbb;
@@ -1000,6 +1006,11 @@ void PZStability::print_info() {
     print_info(COa,CVa,Forba,get_H(usl,false),Eorba,worba);
     printf("\n **** Beta  orbitals ****\n");
     print_info(COb,CVb,Forbb,get_H(usl,true),Eorbb,worbb);
+
+    // Density matrix
+    arma::mat P(arma::real(form_density(COa)+form_density(COb)));
+    arma::vec dipmom(dipole_moment(P,basis));
+    printf("Dipole mu = (% 08.8f, % 08.8f, % 08.8f) D\n",dipmom(0)/AUINDEBYE,dipmom(1)/AUINDEBYE,dipmom(2)/AUINDEBYE);
   }
 
   // Print total energy and its components
