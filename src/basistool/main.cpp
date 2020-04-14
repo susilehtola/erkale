@@ -380,7 +380,7 @@ int main_guarded(int argc, char **argv) {
     elbas.sort();
     elbas.save_gaussian94(fileout);
 
-  } else if(stricmp(cmd,"genbas")==0) {
+  } else if(stricmp(cmd,"gendecbas")==0) {
     // Generate decontracted basis set for xyz file
 
     if(argc!=5) {
