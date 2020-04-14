@@ -24,7 +24,7 @@
 #include "../version.h"
 #endif
 
-std::string cmds[]={"augdiffuse", "augsteep", "cholesky", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"augdiffuse", "augsteep", "cholesky", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 
 void help() {
@@ -377,6 +377,65 @@ int main_guarded(int argc, char **argv) {
 	throw std::runtime_error(oss.str());
       }
     }
+    elbas.sort();
+    elbas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"genbas")==0) {
+    // Generate decontracted basis set for xyz file
+
+    if(argc!=5) {
+      printf("\nUsage: %s input.gbs gendecbas system.xyz output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    // Load atoms from xyz file
+    std::vector<atom_t> atoms=load_xyz(argv[3],false);
+    // Output file
+    std::string fileout(argv[4]);
+    // Save output
+    BasisSetLibrary elbas;
+
+    // Collect elements
+    std::vector<ElementBasisSet> els=bas.get_elements();
+    // Loop over atoms in system
+    for(size_t iat=0;iat<atoms.size();iat++) {
+      bool found=false;
+
+      // First, check if there is a special basis for the atom.
+      for(size_t iel=0;iel<els.size();iel++)
+	if(stricmp(atoms[iat].el,els[iel].get_symbol())==0 && atoms[iat].num == els[iel].get_number()) {
+	  // Yes, add it.
+	  elbas.add_element(els[iel]);
+	  found=true;
+	  break;
+	}
+
+      // Otherwise, check if a general basis is already in the basis
+      if(!found) {
+	std::vector<ElementBasisSet> added=elbas.get_elements();
+	for(size_t j=0;j<added.size();j++)
+	  if(added[j].get_number()==0 && stricmp(atoms[iat].el,added[j].get_symbol())==0)
+	    found=true;
+      }
+
+      // If general basis not found, add it.
+      if(!found) {
+	for(size_t iel=0;iel<els.size();iel++)
+	  if(stricmp(atoms[iat].el,els[iel].get_symbol())==0 && els[iel].get_number()==0) {
+	    // Yes, add it.
+	    elbas.add_element(els[iel]);
+	    found=true;
+	    break;
+	  }
+      }
+
+      if(!found) {
+	std::ostringstream oss;
+	oss << "Basis set for element " << atoms[iat].el << " does not exist in " << filein << "!\n";
+	throw std::runtime_error(oss.str());
+      }
+    }
+    elbas.decontract();
     elbas.sort();
     elbas.save_gaussian94(fileout);
 
