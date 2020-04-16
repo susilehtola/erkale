@@ -1,4 +1,4 @@
-/*
+-/*
  *                This source code is part of
  *
  *                     E  R  K  A  L  E
@@ -52,6 +52,8 @@ bool is_kinetic(int func_id);
 
 /// Is functional a gga / mgga functional?
 void is_gga_mgga(int func_id, bool & gga, bool & mgga_t, bool & mgga_l);
+/// Is the functional supported?
+bool is_supported(int func_id);
 
 /// Get fraction of exact exchange
 double exact_exchange(int func_id);

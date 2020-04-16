@@ -193,6 +193,12 @@ void print_info(int func_id) {
 	printf("%s (DOI %s)\n",func.info->refs[i]->ref,func.info->refs[i]->doi);
 #endif
     xc_func_end(&func);
+
+    bool gga, mgga_t, mgga_l;
+    is_gga_mgga(func_id,gga,mgga_t,mgga_l);
+    if(gga) printf("Functional is a GGA\n");
+    if(mgga_t) printf("Functional is a tau-mGGA\n");
+    if(mgga_l) printf("Functional is a lapl-mGGA\n");
   }
   if(!has_exc(func_id)) {
     printf("The functional doesn't have an energy density, so the calculated energy is incorrect.");
@@ -356,12 +362,16 @@ void is_gga_mgga(int func_id, bool & gga, bool & mgga_t, bool & mgga_l) {
       break;
 
     case XC_FAMILY_GGA:
+#ifdef XC_FAMILY_HYB_GGA
     case XC_FAMILY_HYB_GGA:
+#endif
       gga=true;
       break;
 
     case XC_FAMILY_MGGA:
+#ifdef XC_FAMILY_HYB_MGGA
     case XC_FAMILY_HYB_MGGA:
+#endif
       mgga_t=true;
 #if defined(XC_FLAGS_NEEDS_LAPLACIAN)
       mgga_l=func.info->flags & XC_FLAGS_NEEDS_LAPLACIAN;
@@ -396,19 +406,31 @@ double exact_exchange(int func_id) {
       throw std::runtime_error(oss.str());
     }
 
+#if XC_MAJOR_VERSION >= 6
+    switch(xc_hyb_type(&func)) {
+    case(XC_HYB_HYBRID):
+      f=xc_hyb_exx_coef(&func);
+      break;
+    }
+#else
     switch(func.info->family)
       {
 #ifdef XC_FAMILY_HYB_LDA
     case XC_FAMILY_HYB_LDA:
 #endif
+#ifdef XC_FAMILY_HYB_GGA
       case XC_FAMILY_HYB_GGA:
+#endif
+#ifdef XC_FAMILY_HYB_MGGA
       case XC_FAMILY_HYB_MGGA:
+#endif
 	// libxc prior to 2.0.0
 	// f=xc_hyb_gga_exx_coef(func.gga);
 	// libxc 2.0.0
 	f=xc_hyb_exx_coef(&func);
 	break;
       }
+#endif
 
     xc_func_end(&func);
   } else if(func_id==ID_HF)
@@ -417,6 +439,40 @@ double exact_exchange(int func_id) {
   //  printf("Fraction of exact exchange is %f.\n",f);
 
   return f;
+}
+
+bool is_supported(int func_id) {
+  bool support=true;
+
+  if(func_id>0) {
+    xc_func_type func;
+    if(xc_func_init(&func, func_id, XC_UNPOLARIZED) != 0){
+      std::ostringstream oss;
+      oss << "Functional "<<func_id<<" not found!";
+      throw std::runtime_error(oss.str());
+    }
+    // Get flag
+#if XC_MAJOR_VERSION >= 6
+    switch(xc_hyb_type(&func)) {
+    case(XC_HYB_SEMILOCAL):
+    case(XC_HYB_HYBRID):
+    case(XC_HYB_CAM):
+      break;
+
+    default:
+      support=false;
+    }
+#else
+    if(func.info->flags & XC_FLAGS_HYB_CAMY)
+      support=false;
+    if(func.info->flags & XC_FLAGS_HYB_LCY)
+      support=false;
+#endif
+    // Free functional
+    xc_func_end(&func);
+  }
+
+  return support;
 }
 
 bool is_range_separated(int func_id, bool check) {
@@ -430,8 +486,12 @@ bool is_range_separated(int func_id, bool check) {
       oss << "Functional "<<func_id<<" not found!";
       throw std::runtime_error(oss.str());
     }
+#if XC_MAJOR_VERSION >= 6
+    ans=(xc_hyb_type(&func) == XC_HYB_CAM);
+#else
     // Get flag
     ans=func.info->flags & XC_FLAGS_HYB_CAM;
+#endif
     // Free functional
     xc_func_end(&func);
   }
@@ -465,16 +525,30 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
       throw std::runtime_error(oss.str());
     }
 
-    switch(func.info->family)
-      {
+#if XC_MAJOR_VERSION >= 6
+    switch(xc_hyb_type(&func)) {
+    case(XC_HYB_HYBRID):
+    case(XC_HYB_CAM):
+      XC(hyb_cam_coef(&func,&omega,&alpha,&beta));
+    break;
+    }
+#else
+
+    switch(func.info->family) {
 #ifdef XC_FAMILY_HYB_LDA
     case XC_FAMILY_HYB_LDA:
 #endif
-      case XC_FAMILY_HYB_GGA:
-      case XC_FAMILY_HYB_MGGA:
-	XC(hyb_cam_coef(&func,&omega,&alpha,&beta));
-	break;
-      }
+#ifdef XC_FAMILY_HYB_GGA
+    case XC_FAMILY_HYB_GGA:
+#endif
+#ifdef XC_FAMILY_HYB_MGGA
+    case XC_FAMILY_HYB_MGGA:
+#endif
+      XC(hyb_cam_coef(&func,&omega,&alpha,&beta));
+      break;
+    }
+#endif
+
 
     xc_func_end(&func);
   } else if(func_id==ID_HF)
@@ -541,9 +615,13 @@ bool gradient_needed(int func_id) {
     switch(func.info->family)
       {
       case XC_FAMILY_GGA:
+#ifdef XC_FAMILY_HYB_GGA
       case XC_FAMILY_HYB_GGA:
+#endif
       case XC_FAMILY_MGGA:
+#ifdef XC_FAMILY_HYB_MGGA
       case XC_FAMILY_HYB_MGGA:
+#endif
 	grad=true;
 	break;
       }
@@ -569,7 +647,9 @@ bool tau_needed(int func_id) {
     switch(func.info->family)
       {
       case XC_FAMILY_MGGA:
+#ifdef XC_FAMILY_HYB_MGGA
       case XC_FAMILY_HYB_MGGA:
+#endif
 	tau=true;
 	break;
       }
@@ -595,8 +675,10 @@ bool laplacian_needed(int func_id) {
     switch(func.info->family)
       {
       case XC_FAMILY_MGGA:
+#ifdef XC_FAMILY_HYB_MGGA
       case XC_FAMILY_HYB_MGGA:
-#if defined(XC_FLAGS_NEEDS_LAPLACIAN)
+#endif
+#ifdef XC_FLAGS_NEEDS_LAPLACIAN
 	lapl=func.info->flags & XC_FLAGS_NEEDS_LAPLACIAN;
 #else
 	lapl=true;

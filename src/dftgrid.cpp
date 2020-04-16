@@ -933,16 +933,7 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
     functype="correlation";
   }
   if(pars.n_elem) {
-    /*
-#if XC_MAJOR_VERSION >= 5
-    // This is what is in libxc master; to-be version 5 at the moment
-    size_t npars = xc_func_get_n_ext_params(&func);
-#else
     size_t npars = xc_func_info_get_n_ext_params((xc_func_info_type*) func.info);
-#endif
-    */
-    // This appears to be the most portable way of doing it...
-    size_t npars = func.info->n_ext_params;
     if(npars != pars.n_elem) {
       std::ostringstream oss;
       oss << "Inconsistent number of parameters for the " << functype << " functional.\n";

@@ -1953,6 +1953,10 @@ void calculate(const BasisSet & basis, bool force) {
 
   if(!hf && !rohf) {
     parse_xc_func(dft.x_func,dft.c_func,settings.get_string("Method"));
+    if(!is_supported(dft.x_func))
+      throw std::logic_error("The exchange functional is not supported in ERKALE.\n");
+    if(!is_supported(dft.c_func))
+      throw std::logic_error("The correlation functional is not supported in ERKALE.\n");
 
     initdft=parse_dft(true);
     dft=parse_dft(false);
