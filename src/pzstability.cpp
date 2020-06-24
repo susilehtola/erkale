@@ -1485,24 +1485,9 @@ arma::vec PZStability::gradient() {
   return gradient(x, true);
 }
 
-static arma::mat precondition_matrix(const arma::vec & Eo, const arma::vec & Ev, double dH) {
-  // Demand that all scalings are within this range
-  double min=1e-2;
-  double max=1/min;
-
-  arma::mat ret(Eo.n_elem,Ev.n_elem);
-  for(size_t io=0;io<ret.n_rows;io++)
-    for(size_t iv=0;iv<ret.n_cols;iv++) {
-      ret(io,iv)=1.0/(Ev(iv)-Eo(io)+dH);
-      if(ret(io,iv)<min) ret(io,iv)=min;
-      else if(ret(io,iv)>max) ret(io,iv)=max;
-    }
-  return ret;
-}
-
 static arma::mat precondition_matrix(const arma::mat & Ediff, double dH) {
   // Demand that all scalings are within this range
-  double min=1e-2;
+  double min=1e-6;
   double max=1/min;
 
   arma::mat ret(Ediff.n_rows,Ediff.n_cols);
@@ -1514,6 +1499,15 @@ static arma::mat precondition_matrix(const arma::mat & Ediff, double dH) {
     }
   return ret;
 }
+
+static arma::mat precondition_matrix(const arma::vec & Eo, const arma::vec & Ev, double dH) {
+  arma::mat Ediff(Eo.n_elem,Ev.n_elem);
+  for(size_t io=0;io<Eo.n_elem;io++)
+    for(size_t iv=0;iv<Ev.n_elem;iv++)
+      Ediff(io,iv)=Ev(iv)-Eo(io);
+  return precondition_matrix(Ediff,dH);
+}
+
 
 arma::cx_mat PZStability::get_CO(const rscf_t & sol) const {
   if(!restr)
