@@ -188,6 +188,9 @@ class PZStability: public FDHessian {
   /// Update (adaptive) integration grid. If init=true, initialization is done for a static grid
   void update_grid(bool init);
 
+  /// Calculate orbital centroids
+  arma::mat centroids(const arma::cx_mat & CO) const;
+
   /// Print status of optimization
   void print_status(size_t iiter, const arma::vec & g, const Timer & t) const;
 

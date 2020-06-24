@@ -900,6 +900,18 @@ arma::cx_mat PZStability::unified_H(const arma::cx_mat & CO, const arma::cx_mat 
   return H;
 }
 
+arma::mat PZStability::centroids(const arma::cx_mat & CO) const {
+  // Get moment matrix
+  std::vector<arma::mat> mommat=basis.moment(1);
+
+  arma::mat cen(mommat.size(),CO.n_cols);
+  for(size_t io=0;io<CO.n_cols;io++)
+    for(size_t ic=0;ic<mommat.size();ic++)
+      cen(ic,io)=arma::as_scalar(arma::real(CO.col(io).t()*mommat[ic]*CO.col(io)));
+
+  return cen;
+}
+
 void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, const std::vector<arma::cx_mat> & Forb, const arma::cx_mat & H0, const arma::vec & Eorb, const arma::vec & worb) {
   if(!verbose) return;
 
@@ -958,6 +970,13 @@ void PZStability::print_info(const arma::cx_mat & CO, const arma::cx_mat & CV, c
       fflush(stdout);
     }
   }
+
+  printf("Orbital centroids:\n");
+  arma::mat cen(centroids(CO));
+  // Convert to angstrom
+  cen*=BOHRINANGSTROM;
+  for(size_t io=0;io<cen.n_cols;io++)
+    printf("%3i % .6f % .6f % .6f\n",(int) io+1, cen(0,io), cen(1,io), cen(2,io));
 }
 
 void PZStability::print_info() {
@@ -2073,6 +2092,10 @@ double PZStability::optimize(size_t maxiter, double gthr, double nrthr, double d
 
   // Make sure all data is on the checkpoint file
   update(x0);
+  // Update reference
+  update_reference(true);
+  // Print info
+  print_info();
 
   // Evaluate energy
   double ival=eval(x0);
