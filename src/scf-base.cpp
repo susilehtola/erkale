@@ -2290,6 +2290,8 @@ void calculate(const BasisSet & basis, bool force) {
           if(verbose) printf("\nInitializing with Fermi-Lowdin orbitals.\n");
           arma::mat fod;
           fod.load("fod.dat",arma::raw_ascii);
+          // Convert to bohr
+          fod*=ANGSTROMINBOHR;
           arma::mat Cocc(sol.C.cols(0,Nel_alpha-1));
           arma::mat Wflo(fermi_lowdin_orbitals(Cocc,basis,fod));
 	  // Save the complex orbitals
@@ -2673,6 +2675,8 @@ void calculate(const BasisSet & basis, bool force) {
           if(verbose) printf("\nInitializing with Fermi-Lowdin orbitals.\n");
           arma::mat fod;
           fod.load("fod-a.dat",arma::raw_ascii);
+          // Convert to bohr
+          fod*=ANGSTROMINBOHR;
           arma::mat Cocc(sol.Ca.cols(0,Nel_alpha-1));
           arma::mat Wflo(fermi_lowdin_orbitals(Cocc,basis,fod));
 	  // Save the complex orbitals
@@ -2753,6 +2757,8 @@ void calculate(const BasisSet & basis, bool force) {
           if(verbose) printf("\nInitializing with Fermi-Lowdin orbitals.\n");
           arma::mat fod;
           fod.load("fod-b.dat",arma::raw_ascii);
+          // Convert to bohr
+          fod*=ANGSTROMINBOHR;
           arma::mat Cocc(sol.Cb.cols(0,Nel_beta-1));
           arma::mat Wflo(fermi_lowdin_orbitals(Cocc,basis,fod));
 	  // Save the complex orbitals
