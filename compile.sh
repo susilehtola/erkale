@@ -147,7 +147,7 @@ if(( ! ${system_gsl} )); then
 
     if [ ! -f ${topdir}/gsl/lib/libgsl.a ]; then
 	echo "Error compiling GSL."
-	exit
+	[ "$PS1" ] && return || exit
     fi
 fi
 
@@ -176,7 +176,7 @@ if(( ! ${system_hdf5} )); then
 
     if [ ! -f ${topdir}/hdf5/lib/libhdf5.a ]; then
 	echo "Error compiling HDF5."
-	exit
+	[ "$PS1" ] && return || exit
     fi
 fi
 
@@ -225,7 +225,7 @@ if(( ! ${system_libxc} )); then
 
     if [ ! -f ${topdir}/libxc/lib/libxc.a ]; then
 	echo "Error compiling libxc."
-	exit
+	[ "$PS1" ] && return || exit
     fi
 fi
 
@@ -270,7 +270,7 @@ if(( ! ${system_libint} )); then
 
     if [[ ! -f ${topdir}/libint/lib/libint.a || ! -f ${topdir}/libint/lib/libderiv.a ]]; then
 	echo "Error compiling libint."
-	exit
+	[ "$PS1" ] && return || exit
     fi
 fi
 
@@ -303,7 +303,7 @@ if(( ! ${system_blas} )); then
     fi
     if [ ! -f ${topdir}/openblas/lib/libopenblas.a ]; then
 	echo "Error building sequential OpenBLAS."
-	exit
+	[ "$PS1" ] && return || exit
     fi
 
     if [ ! -f ${topdir}/openblas/lib/libopenblaso.a ]; then
@@ -314,7 +314,7 @@ if(( ! ${system_blas} )); then
     fi
     if [ ! -f ${topdir}/openblas/lib/libopenblaso.a ]; then
 	echo "Error building parallel OpenBLAS."
-	exit
+	[ "$PS1" ] && return || exit
     fi
 fi
 
@@ -376,7 +376,7 @@ if(( ! ${system_cmake} )); then
 
     if [ ! -f ${topdir}/cmake/bin/cmake ]; then
 	echo "Error compiling CMake."
-	exit
+	[ "$PS1" ] && return || exit
     fi
 else
     cmake="cmake"
@@ -390,7 +390,7 @@ if [[ -d erkale/.svn ]]; then
     echo "A subversion checkout detected. Archiving old data."
     if [[ -d erkale.svn ]]; then
 	echo "Archival directory already exists. Please remove ${builddir}/erkale or ${builddir}/erkale.svn."
-	exit
+	[ "$PS1" ] && return || exit
     fi
     mv erkale erkale.svn
 fi
