@@ -254,22 +254,41 @@ std::vector<atom_t> load_zmat(std::string filename, bool convert) {
 
     // First, the atoms
     std::vector< std::vector<std::string> > zmat;
+    bool firstblock=false;
     while(!in.eof()) {
       std::string line(readline(in,false));
-      if(line.size() && !isblank(line))
-	zmat.push_back(splitline(line));
-      else
-	break;
+      if(isblank(line)) {
+        if(!firstblock) {
+          // If we haven't got to the system definition, skip ahead
+          continue;
+        } else {
+          // This is the separator between the system and the variables
+          break;
+        }
+      }
+      // We have got a non-blank line so we are in the system block
+      firstblock=true;
+      // Add to the zmatrix
+      zmat.push_back(splitline(line));
     }
 
-    // Then, the variables
+    // Then, read in the variables
     std::vector<std::string> vars;
+    bool secondblock=false;
     while(!in.eof()) {
       std::string line(readline(in,false));
-      if(line.size() && !isblank(line))
-	vars.push_back(line);
-      else
-	break;
+      if(isblank(line)) {
+        if(!secondblock) {
+          // If we haven't got to the system definition, skip ahead
+          continue;
+        } else {
+          // This is the end of the block
+          break;
+        }
+      }
+      // We have got a non-blank line so we are in the variables block
+      secondblock=true;
+      vars.push_back(line);
     }
 
     // Search and replace variables
@@ -281,8 +300,11 @@ std::vector<atom_t> load_zmat(std::string filename, bool convert) {
 
       // Split line
       std::vector<std::string> ass(splitline(vars[i]));
-      if(ass.size()!=2)
-	throw std::runtime_error("Error parsing variable assignments.\n");
+      if(ass.size()!=2) {
+        std::ostringstream oss;
+        oss << "Error parsing variable assignments \"" << vars[i] << "\".";
+        throw std::runtime_error(oss.str());
+      }
 
       // Search for variable in Z-Matrix
       for(size_t j=1;j<zmat.size();j++) {
