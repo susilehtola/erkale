@@ -143,7 +143,7 @@ void Settings::add_scf_settings() {
   add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-8);
 
   // SAP basis
-  add_string("SAPBasis", "Tabulated atomic effective potential \"basis set\"","sap_potential.gbs");
+  add_string("SAPBasis", "Tabulated atomic effective potential \"basis set\"","helfem_large.gbs");
   // Use Lobatto quadrature?
   add_bool("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false);
 
