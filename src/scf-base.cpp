@@ -2734,24 +2734,26 @@ void calculate(const BasisSet & basis, bool force) {
 	}
 
 	if(pzloc==1) {
-	  // Localize starting guess
-	  if(verbose) printf("\nInitial localization.\n");
-	  Timer tloc;
-	  double measure;
-	  // Max 1e5 iterations, gradient norm <= pzIthr
-	  orbital_localization(pzlocmet,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
-	  if(verbose) {
-	    printf("\n");
+          if(Nel_beta>1) {
+            // Localize starting guess
+            if(verbose) printf("\nInitial localization.\n");
+            Timer tloc;
+            double measure;
+            // Max 1e5 iterations, gradient norm <= pzIthr
+            orbital_localization(pzlocmet,basis,sol.Cb.cols(0,Nel_beta-1),sol.P,measure,Wb,verbose,pzimag!=1,1e5,pzIthr,DBL_MAX);
+            if(verbose) {
+              printf("\n");
 
-	    fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
-	    fflush(stderr);
-	  }
+              fprintf(stderr,"%-64s %10.3f\n","    Initial localization",tloc.get());
+              fflush(stderr);
+            }
 
-	  // Save the complex orbitals
-	  sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
-	  sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
-	  if(sol.Cb.n_cols>(size_t) Nel_beta)
-	    sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
+            // Save the complex orbitals
+            sol.cCb.zeros(sol.Cb.n_rows,sol.Cb.n_cols);
+            sol.cCb.cols(0,Nel_beta-1)=sol.Cb.cols(0,Nel_beta-1)*Wb;
+            if(sol.Cb.n_cols>(size_t) Nel_beta)
+              sol.cCb.cols(Nel_beta,sol.Cb.n_cols-1)=sol.Cb.cols(Nel_beta,sol.Cb.n_cols-1)*COMPLEX1;
+          }
 	} else if(pzloc==2) {
           // Initialize with Fermi-Lowdin orbitals
           if(verbose) printf("\nInitializing with Fermi-Lowdin orbitals.\n");
