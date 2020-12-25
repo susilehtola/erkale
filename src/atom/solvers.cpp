@@ -75,9 +75,9 @@ void print_atom_E(const arma::vec & Ea, const arma::vec & Eb, int Z) {
   std::vector<double> occb=atomic_occupancy(Nel_beta,Eb.n_elem);
 
   printf("\nAlpha orbital energies\n");
-  print_E(Ea,occa,true);
+  print_E(Ea,occa,false);
   printf("\nBeta orbital energies\n");
-  print_E(Eb,occb,true);
+  print_E(Eb,occb,false);
 
   fflush(stdout);
 }
@@ -94,18 +94,7 @@ void print_atom_E(const arma::vec & E, int Z) {
   std::vector<double> occs=atomic_occupancy(Nel_alpha,E.n_elem);
 
   printf("\nOrbital energies\n");
-  for(size_t i=0;i<occs.size();i++)
-    if(occs[i]==1.0)
-      printf("% .6f* ",E[i]);
-    else if(occs[i]>0)
-      printf("% .6f+ ",E[i]);
-    else
-      printf("% .6f  ",E[i]);
-
-  for(size_t i=occs.size();i<E.size();i++)
-    printf("% .6f  ",E[i]);
-  printf("\n");
-
+  print_E(E,occs,false);
   fflush(stdout);
 }
 
