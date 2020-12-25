@@ -59,7 +59,7 @@ std::vector<bf_t> construct_basis(const std::string & filename) {
   // Open input file
   FILE *in=fopen(filename.c_str(),"r");
   if(in==NULL)
-    throw std::runtime_error("Could not open basis file.\n");
+    throw std::runtime_error("Could not open basis file \"" + filename + "\".\n");
 
   // Locate BASIS keyword
   std::string line;
@@ -79,10 +79,15 @@ std::vector<bf_t> construct_basis(const std::string & filename) {
   while(!feof(in)) {
     // Read line
     line=readline(in);
-    //    printf("line: \"%s\"\n",line.c_str());
+    //printf("line: \"%s\"\n",line.c_str());
 
     // Check end of basis
-    if(strncmp(splitline(line)[0].c_str(),"END",3)==0)
+    std::vector<std::string> split(splitline(line));
+    if(!split.size())
+      continue;
+    if(strncmp(split[0].c_str(),"CORE",4)==0)
+      continue;
+    if(strncmp(split[0].c_str(),"END",3)==0)
       break;
 
     // Read in type of function
@@ -164,11 +169,14 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("Z","Nucleus to study",0);
   settings.add_string("Basis","Basis set file in ADF format","");
   settings.add_double("LinDepThresh","Linear dependence threshold",1e-5);
+  settings.add_double("CholDepThresh","Cholesky decomposition threshold",1e-6);
   if(argc!=2) {
     printf("Usage: %s runfile\n",argv[0]);
     settings.print();
     return 1;
   }
+  settings.parse(argv[1]);
+  settings.print();
 
   int Z=settings.get_int("Z");
 

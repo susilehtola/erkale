@@ -21,6 +21,7 @@
 #include "../diis.h"
 #include "../guess.h"
 #include "../mathf.h"
+#include "../stringutil.h"
 
 void form_density(const arma::mat & Ca, const arma::mat & Cb, arma::mat & Pa, arma::mat & Pb, int Z) {
   // Get ground state
@@ -61,7 +62,7 @@ void form_density(const arma::mat & C, arma::mat & P, int Z) {
     P+=2*occs[i]*C.col(i)*arma::trans(C.col(i));
 }
 
-void print_E(const arma::vec & Ea, const arma::vec & Eb, int Z) {
+void print_atom_E(const arma::vec & Ea, const arma::vec & Eb, int Z) {
   gs_conf_t gs=get_ground_state(Z);
 
   // Calculate amount of alpha and beta electrons
@@ -74,33 +75,14 @@ void print_E(const arma::vec & Ea, const arma::vec & Eb, int Z) {
   std::vector<double> occb=atomic_occupancy(Nel_beta,Eb.n_elem);
 
   printf("\nAlpha orbital energies\n");
-  for(size_t i=0;i<occa.size();i++)
-    if(occa[i]==1.0)
-      printf("% .6f* ",Ea[i]);
-    else if(occa[i]>0)
-      printf("% .6f+ ",Ea[i]);
-    else
-      printf("% .6f  ",Ea[i]);
-  for(size_t i=occa.size();i<Ea.size();i++)
-    printf("% .6f  ",Ea[i]);
-  printf("\n");
-
-  printf("Beta orbital energies:\n");
-  for(size_t i=0;i<occb.size();i++)
-    if(occb[i]==1.0)
-      printf("% .6f* ",Eb[i]);
-    else if(occb[i]>0)
-      printf("% .6f+ ",Eb[i]);
-    else
-      printf("% .6f  ",Eb[i]);
-  for(size_t i=occb.size();i<Eb.size();i++)
-    printf("% .6f  ",Eb[i]);
-  printf("\n");
+  print_E(Ea,occa,true);
+  printf("\nBeta orbital energies\n");
+  print_E(Eb,occb,true);
 
   fflush(stdout);
 }
 
-void print_E(const arma::vec & E, int Z) {
+void print_atom_E(const arma::vec & E, int Z) {
   gs_conf_t gs=get_ground_state(Z);
 
   // Calculate amount of alpha and beta electrons
@@ -177,7 +159,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, double convthr, b
   bool diiscomb=false;
   const int diisorder=10;
 
-  uDIIS diis(S,Sinvh,diiscomb,usediis,diiseps,diisthr,useadiis,diisorder,verbose);
+  uDIIS diis(S,Sinvh,diiscomb,usediis,diiseps,diisthr,useadiis,verbose,diisorder);
   double diiserr;
 
   arma::mat oldHa, oldHb;
@@ -257,7 +239,7 @@ void UHF(const std::vector<bf_t> & basis, int Z, uscf_t & sol, double convthr, b
     }
   } while(diiserr>=convthr);
 
-  if(verbose) print_E(sol.Ea,sol.Eb,Z);
+  if(verbose) print_atom_E(sol.Ea,sol.Eb,Z);
 }
 
 void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, double convthr, bool direct, bool verbose) {
@@ -301,11 +283,11 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, double convthr, b
   }
 
   bool usediis=true;
-  const double diiseps=0.01;
+  const double diiseps=0.1;
   const double diisthr=0.01;
   bool useadiis=true;
   const int diisorder=10;
-  rDIIS diis(S,Sinvh,usediis,diiseps,diisthr,useadiis,diisorder,verbose);
+  rDIIS diis(S,Sinvh,usediis,diiseps,diisthr,useadiis,verbose,diisorder);
   double diiserr;
 
   arma::mat oldH;
@@ -371,6 +353,6 @@ void RHF(const std::vector<bf_t> & basis, int Z, rscf_t & sol, double convthr, b
     }
   } while(diiserr>=convthr);
 
-  if(verbose) print_E(sol.E,Z);
+  if(verbose) print_atom_E(sol.E,Z);
 }
 
