@@ -192,6 +192,10 @@ arma::mat BasOrth(const arma::mat & S) {
     return SymmetricOrth(S);
   } else if(stricmp(met,"Chol")==0) {
     return CholeskyOrth(S);
+  } else if(stricmp(met,"PartialCholesky")==0 || stricmp(met,"PartialChol")==0) {
+    double tol=settings.get_double("LinDepThresh");
+    double chtol=settings.get_double("CholDepThresh");
+    return PartialCholeskyOrth(S,chtol,tol);
   } else {
     ERROR_INFO();
     std::ostringstream oss;
