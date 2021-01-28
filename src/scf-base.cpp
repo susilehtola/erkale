@@ -1803,14 +1803,35 @@ pz_scaling_t parse_pzscale(const std::string & scale) {
 }
 
 void parse_grid(dft_t & dft, const std::string & gridstr, const std::string & method) {
-  std::vector<std::string> opts=splitline(gridstr);
-  if(opts.size()!=2) {
-    throw std::runtime_error("Invalid " + method + " grid specified.\n");
-  }
-
   dft.adaptive=false;
-  dft.nrad=readint(opts[0]);
-  dft.lmax=readint(opts[1]);
+
+  if(stricmp(gridstr,"SG-0")==0) {
+    dft.nrad=25;
+    dft.lmax=-170;
+  } else if(stricmp(gridstr,"Coarse")==0) {
+    dft.nrad=35;
+    dft.lmax=-110;
+  } else if(stricmp(gridstr,"SG-1")==0) {
+    dft.nrad=50;
+    dft.lmax=-194;
+  } else if(stricmp(gridstr,"SG-2")==0 || stricmp(gridstr,"Fine")==0) {
+    dft.nrad=75;
+    dft.lmax=-302;
+  } else if(stricmp(gridstr,"SG-3")==0 || stricmp(gridstr,"UltraFine")==0) {
+    dft.nrad=100;
+    dft.lmax=-590;
+  } else if(stricmp(gridstr,"SuperFine")==0) {
+    dft.nrad=250;
+    dft.lmax=-974;
+  } else {
+    std::vector<std::string> opts=splitline(gridstr);
+    if(opts.size()!=2) {
+      throw std::runtime_error("Invalid " + method + " grid specified.\n");
+    }
+
+    dft.nrad=readint(opts[0]);
+    dft.lmax=readint(opts[1]);
+  }
   if(dft.nrad<1 || dft.lmax==0) {
     throw std::runtime_error("Invalid " + method + " radial grid specified.\n");
   }
@@ -1898,24 +1919,10 @@ dft_t parse_dft(bool init) {
     if(dft.adaptive)
       throw std::runtime_error("Adaptive DFT grids not supported with VV10.\n");
 
-    std::vector<std::string> opts=splitline(settings.get_string("NLGrid"));
-    dft.nlnrad=readint(opts[0]);
-    dft.nllmax=readint(opts[1]);
-    if(dft.nlnrad<1 || dft.nllmax==0) {
-      throw std::runtime_error("Invalid DFT radial grid specified.\n");
-    }
-
-    // Check if l was given in number of points
-    if(dft.nllmax<0) {
-      // Try to find corresponding Lebedev grid
-      for(size_t i=0;i<sizeof(lebedev_degrees)/sizeof(lebedev_degrees[0]);i++)
-	if(lebedev_degrees[i]==-dft.nllmax) {
-	  dft.nllmax=lebedev_orders[i];
-	  break;
-	}
-      if(dft.nllmax<0)
-	throw std::runtime_error("Invalid DFT angular grid specified.\n");
-    }
+    dft_t nldft;
+    parse_grid(nldft, settings.get_string("NLGrid"), "NL");
+    dft.nlnrad=nldft.nrad;
+    dft.nllmax=nldft.lmax;
 
     // Check that xc grid is larger than nl grid
     if(dft.nrad < dft.nlnrad || dft.lmax < dft.nllmax)
