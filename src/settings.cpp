@@ -97,7 +97,7 @@ void Settings::add_scf_settings() {
   add_string("Occupancies", "Orbital occupancies", "");
 
   // Use core guess? Default is atomic.
-  add_string("Guess","Used guess: SAD (default), SADNO, core, or GWH","SAD");
+  add_string("Guess","Used guess: SAD (default), SADNO, core, GWH, SAP, or SAPfit","SAD");
   add_double("Kgwh","Scaling constant for GWH",1.75);
 
   // Verbose run?
