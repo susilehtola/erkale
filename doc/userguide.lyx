@@ -337,9 +337,9 @@ Erkale
 S.
  Lehtola
 \shape smallcaps
-, Erkale -
+, Erkale
 \shape default
- HF/DFT from Hel, 2016.
+ - HF/DFT from Hel, 2016.
  URL http://github.com/susilehtola/erkale
 \end_layout
 
@@ -360,12 +360,29 @@ literal "true"
  to the pertinent functionality in ERKALE 
 \begin_inset CommandInset citation
 LatexCommand cite
-key "Lehtola2014a,Lehtola2016,Lehtola2015,Lehtola2011,Lehtola2013a,Lehtola2014"
+key "Lehtola2019a,Lehtola2019,Lehtola2020,Lehtola2014a,Lehtola2016,Lehtola2015,Lehtola2011,Lehtola2013a,Lehtola2014"
 literal "true"
 
 \end_inset
 
 , as detailed below.
+ If you run density functional calculations in 
+\shape smallcaps
+Erkale
+\shape default
+, you should cite 
+\shape smallcaps
+Libxc
+\shape default
+ as well 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2018"
+literal "false"
+
+\end_inset
+
+.
 \end_layout
 
 \begin_layout Section
@@ -584,17 +601,30 @@ Can
 \emph on
 Sym
 \emph default
- for symmetric orthonormalization or 
+ for symmetric orthonormalization, 
 \emph on
 Chol
 \emph default
- for Cholesky orthonormalization.
+ for full Cholesky orthonormalization, or 
+\emph on
+PartialCholesky
+\emph default
+ for the partial Cholesky orthonormalization procedure 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2019a"
+literal "false"
+
+\end_inset
+
+ that tolerates pathological linear dependencies in the basis.
  The default is 
 \emph on
 Auto
 \emph default
 , which uses symmetric orthonormalization if possible (no near-linear dependenci
-es), and otherwise canonical orthonormalization.
+es), partial Cholesky orthogonalization if pathological dependencies are
+ detected, and otherwise canonical orthonormalization.
  You probably don't want to modify this setting.
 \end_layout
 
@@ -806,7 +836,7 @@ npts
 npts
 \emph default
  is the amount of points in the Lebedev quadrature of the wanted order.
- The default is 50 -194, for a (50,194) grid.
+ The default is 75 -302, for a (75,302) grid.
 \begin_inset Newline newline
 \end_inset
 
@@ -814,20 +844,15 @@ npts
 \begin_inset Newline newline
 \end_inset
 
-
+The default should be sufficient for most types of calculations 
 \series bold
-N.B.
- 
+except those with self-interaction corrections
 \series default
-The default is aimed 
-\series bold
-for LDA and GGA calculations on light atoms
-\series default
-.
- If you want to run heavier atoms and/or meta-GGAs, you should check that
- the grid is converged! Standard choices for bigger grids are (75,302) and
- (99,590).
- If the basis set is large like UGBS, you may need many more radial points.
+ and some types of exchange-correlation functionals.
+ If you want to run a new functional, you should always check that the grid
+ is converged for your calculation! If the basis set is large like UGBS,
+ you may also need more radial points to ensure that the quadrature is sufficien
+tly accurate for all basis functions.
 \begin_inset Newline newline
 \end_inset
 
@@ -835,12 +860,81 @@ for LDA and GGA calculations on light atoms
 \begin_inset Newline newline
 \end_inset
 
-For preliminiary calculations one may be interested in smaller grids, for
- which (30,170) might be okay.
- This should not be used for any production runs.
-\end_layout
+For convenience, the grid can also be specified as 
+\begin_inset Quotes eld
+\end_inset
 
-\begin_layout Standard
+SG-0
+\begin_inset Quotes erd
+\end_inset
+
+ for a (25,170) grid, 
+\begin_inset Quotes eld
+\end_inset
+
+Coarse
+\begin_inset Quotes erd
+\end_inset
+
+ for a (35,110) grid, 
+\begin_inset Quotes eld
+\end_inset
+
+SG-1
+\begin_inset Quotes erd
+\end_inset
+
+ for a (50,194) grid, 
+\begin_inset Quotes eld
+\end_inset
+
+SG-2
+\begin_inset Quotes erd
+\end_inset
+
+ or 
+\begin_inset Quotes eld
+\end_inset
+
+Fine
+\begin_inset Quotes erd
+\end_inset
+
+ for a (75,302) grid, 
+\begin_inset Quotes eld
+\end_inset
+
+SG-3
+\begin_inset Quotes erd
+\end_inset
+
+ for a (100,590) grid, and 
+\begin_inset Quotes eld
+\end_inset
+
+SuperFine
+\begin_inset Quotes erd
+\end_inset
+
+ for a (250,974) grid.
+ These have a similar number of unpruned points as in other common approaches;
+ however, the grids aren't pruned in ERKALE.
+ Note also that the radial scheme used in ERKALE is different.
+ However, the differences in the radial schemes shouldn't be of practical
+ importance, since you should always check that the calculation is converged
+ to the grid limit, i.e.
+ that the quadratures are essentially exact.
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+Calculations with meta-GGAs (especially Minnesota functionals) should use
+ at least a SG-2 grid.
+ Some functionals like SCAN require even larger grids to attain a sufficient
+ level of convergence.
 \begin_inset Float table
 wide false
 sideways false
@@ -2397,6 +2491,13 @@ literal "true"
 
 .
  
+\series bold
+N.B.
+ 
+\series default
+The grid is tailored for well-behaving LDA and GGA functionals, and will
+ probably yield unreliable results for newer GGAs and meta-GGAs.
+ I recommend using a static grid.
 \end_layout
 
 \begin_layout Description
@@ -2420,6 +2521,14 @@ literal "true"
 \end_inset
 
 .
+ 
+\series bold
+N.B.
+ 
+\series default
+The grid is tailored for well-behaving LDA and GGA functionals, and will
+ probably yield unreliable results for newer GGAs and meta-GGAs.
+ I recommend using a static grid.
 \end_layout
 
 \begin_layout Description
@@ -2433,13 +2542,27 @@ Method
 \end_layout
 
 \begin_layout Description
-DIISOrder When DIIS is used, how many Fock matrices to use for the interpolation
-? By default 20.
+DIISEps Start to mix in a DIIS update when the error is smaller than this
+ threshold.
+ By default 
+\begin_inset Formula $10^{-1}$
+\end_inset
+
+
 \end_layout
 
 \begin_layout Description
-DIISThr Error threshold for using DIIS interpolated Fock matrices.
- By default 0.05.
+DIISOrder When DIIS is used, how many Fock matrices to use for the interpolation
+? By default 10.
+\end_layout
+
+\begin_layout Description
+DIISThr Error threshold for using DIIS interpolated Fock matrices exclusively.
+ By default 
+\begin_inset Formula $10^{-2}$
+\end_inset
+
+.
 \end_layout
 
 \begin_layout Description
@@ -2538,7 +2661,7 @@ Core for the core guess (very bad for polyatomic systems, especially in
 Huckel for a Hückel-type guess 
 \begin_inset CommandInset citation
 LatexCommand cite
-key "Norman2012"
+key "Lehtola2019,Norman2012"
 literal "false"
 
 \end_inset
@@ -2564,25 +2687,51 @@ literal "true"
 SAP for the superposition of atomic potentials (SAP) 
 \begin_inset CommandInset citation
 LatexCommand cite
-key "LehtolaSAP"
+key "Lehtola2019"
 literal "false"
 
 \end_inset
 
 , which needs precomputed radial potentials, the location for which must
- be specified with the ERKALE_SAP_LIBRARY environment variable,
+ be specified with the ERKALE_SAP_LIBRARY environment variable.
+ The quadrature grid is determined with the 
+\series bold
+SAPGrid
+\series default
+ keyword.
 \end_layout
 
 \begin_layout Description
-GSAP for a SAP guess computed in the Gaussian basis set (this usually gives
- poor results and shouldn't be used), and
+SAPfit for the fitted version 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2020"
+literal "false"
+
+\end_inset
+
+ of the SAP guess 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2019"
+literal "false"
+
+\end_inset
+
+, which avoids numerical quadrature by fitting the atomic potentials to
+ a Gaussian expansion.
+ The fitting basis is given with the 
+\series bold
+SAPBasis
+\series default
+ keyword.
 \end_layout
 
 \begin_layout Description
 NO for the purified SAD guess 
 \begin_inset CommandInset citation
 LatexCommand cite
-key "LehtolaSAP"
+key "Lehtola2019"
 literal "false"
 
 \end_inset
@@ -2642,8 +2791,16 @@ The evaluation of the exchange-correlation functionals is performed by the
 \shape smallcaps
 libxc
 \shape default
- library, so for a list of supported exchange, correlation and exchange-correlat
-ion functionals please refer to the attached list or the 
+ library 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2018"
+literal "false"
+
+\end_inset
+
+, so for a list of supported exchange, correlation and exchange-correlation
+ functionals please refer to the attached list or the 
 \shape smallcaps
 libxc
 \shape default
@@ -3072,6 +3229,32 @@ PZw The weight used for the Perdew–Zunger self-interaction correction.
 1.0
 \emph default
 .
+\end_layout
+
+\begin_layout Description
+SAPBasis Auxiliary basis set for the SAPfit initial guess.
+ Default is 
+\emph on
+helfem_large.gbs
+\emph default
+ that corresponds to the 
+\begin_inset Quotes eld
+\end_inset
+
+large
+\begin_inset Quotes erd
+\end_inset
+
+ fit of 
+\begin_inset CommandInset citation
+LatexCommand cite
+key "Lehtola2020"
+literal "false"
+
+\end_inset
+
+.
+ 
 \end_layout
 
 \begin_layout Description
@@ -7830,6 +8013,162 @@ J.
 \begin_layout Bibliography
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
+key "Lehtola2019a"
+literal "false"
+
+\end_inset
+
+S.
+ Lehtola, Curing basis set overcompleteness with pivoted Cholesky decompositions
+, J.
+ Chem.
+ Phys.
+ 151, 241102 (2019).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2019"
+literal "false"
+
+\end_inset
+
+S.
+ Lehtola, Assessment of initial guesses for self-consistent field calculations.
+ Superposition of Atomic Potentials: simple yet efficient, J.
+ Chem.
+ Theory Comput.
+ 15, 1593 (2019).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2020"
+literal "false"
+
+\end_inset
+
+S.
+ Lehtola, L.
+ Visscher, and E.
+ Engel, Efficient implementation of the superposition of atomic potentials
+ initial guess for electronic structure calculations in Gaussian basis sets,
+ J.
+ Chem.
+ Phys.
+ 152, 144105 (2020).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2014a"
+literal "true"
+
+\end_inset
+
+S.
+ Lehtola and H.
+ Jónsson, Variational, Self-Consistent Implementation of the Perdew–Zunger
+ Self-Interaction Correction with Complex Optimal Orbitals, J.
+ Chem.
+ Theory Comput.
+ 10, 5324 (2014).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2016"
+literal "true"
+
+\end_inset
+
+S.
+ Lehtola, M.
+ Head-Gordon, and H.
+ Jónsson, Complex orbitals, multiple local minima and symmetry breaking
+ in Perdew–Zunger self-interaction corrected density-functional theory calculati
+ons, J.
+ Chem.
+ Theory Comput.
+ 12, 3195 (2016).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2015"
+literal "true"
+
+\end_inset
+
+S.
+ Lehtola, Automatic algorithms for completeness-optimization of Gaussian
+ basis sets, J.
+ Comput.
+ Chem.
+ 36, 335 (2015).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2011"
+literal "true"
+
+\end_inset
+
+J.
+ Lehtola, M.
+ Hakala, J.
+ Vaara, and K.
+ Hämäläinen, Calculation of isotropic Compton profiles with Gaussian basis
+ sets, Phys.
+ Chem.
+ Chem.
+ Phys.
+ 13, 5630 (2011).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2013a"
+literal "true"
+
+\end_inset
+
+S.
+ Lehtola and H.
+ Jónsson, Unitary optimization of localized molecular orbitals, J.
+ Chem.
+ Theory Comput.
+ 9, 5365 (2013).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
+key "Lehtola2014"
+literal "true"
+
+\end_inset
+
+S.
+ Lehtola and H.
+ Jónsson, Pipek–Mezey orbital localization using various partial charge
+ estimates, J.
+ Chem.
+ Theory Comput.
+ 10, 642 (2014).
+\end_layout
+
+\begin_layout Bibliography
+\begin_inset CommandInset bibitem
+LatexCommand bibitem
 key "Jensen2014"
 literal "true"
 
@@ -7944,14 +8283,21 @@ et al.
 \begin_layout Bibliography
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
-key "LehtolaSAP"
+key "Lehtola2018"
 literal "false"
 
 \end_inset
 
 S.
- Lehtola, Superposition of Atomic Potentials: a simple yet efficient orbital
- guess for self-consistent field calculations, arXiv:1810.11659.
+ Lehtola, C.
+ Steigemann, M.
+ J.
+ T.
+ Oliveira, and M.
+ A.
+ L.
+ Marques, Recent developments in LIBXC – a comprehensive library of functionals
+ for density functional theory, SoftwareX 7, 1 (2018).
 \end_layout
 
 \begin_layout Bibliography
@@ -7970,42 +8316,6 @@ J.
  Rev.
  B.
  23, 5048 (1981).
-\end_layout
-
-\begin_layout Bibliography
-\begin_inset CommandInset bibitem
-LatexCommand bibitem
-key "Lehtola2014a"
-literal "true"
-
-\end_inset
-
-S.
- Lehtola and H.
- Jónsson, Variational, Self-Consistent Implementation of the Perdew–Zunger
- Self-Interaction Correction with Complex Optimal Orbitals, J.
- Chem.
- Theory Comput.
- 10, 5324 (2014).
-\end_layout
-
-\begin_layout Bibliography
-\begin_inset CommandInset bibitem
-LatexCommand bibitem
-key "Lehtola2016"
-literal "true"
-
-\end_inset
-
-S.
- Lehtola, M.
- Head-Gordon, and H.
- Jónsson, Complex orbitals, multiple local minima and symmetry breaking
- in Perdew--Zunger self-interaction corrected density-functional theory
- calculations, J.
- Chem.
- Theory Comput.
- 12, 3195 (2016).
 \end_layout
 
 \begin_layout Bibliography
@@ -8058,23 +8368,6 @@ P.
  Comput.
  Chem.
  27, 434 (2006).
-\end_layout
-
-\begin_layout Bibliography
-\begin_inset CommandInset bibitem
-LatexCommand bibitem
-key "Lehtola2015"
-literal "true"
-
-\end_inset
-
-S.
- Lehtola, Automatic algorithms for completeness-optimization of Gaussian
- basis sets, J.
- Comput.
- Chem.
- 36, 335 (2015).
- 
 \end_layout
 
 \begin_layout Bibliography
@@ -8206,26 +8499,6 @@ http://iqmol.org
 \begin_layout Bibliography
 \begin_inset CommandInset bibitem
 LatexCommand bibitem
-key "Lehtola2011"
-literal "true"
-
-\end_inset
-
-J.
- Lehtola, M.
- Hakala, J.
- Vaara, and K.
- Hämäläinen, Calculation of isotropic Compton profiles with Gaussian basis
- sets, Phys.
- Chem.
- Chem.
- Phys.
- 13, 5630 (2011) .
-\end_layout
-
-\begin_layout Bibliography
-\begin_inset CommandInset bibitem
-LatexCommand bibitem
 key "Vandenbussche2013"
 literal "true"
 
@@ -8239,22 +8512,6 @@ J.
  Chem.
  Theory Comput.
  9, 3908 (2013).
-\end_layout
-
-\begin_layout Bibliography
-\begin_inset CommandInset bibitem
-LatexCommand bibitem
-key "Lehtola2013a"
-literal "true"
-
-\end_inset
-
-S.
- Lehtola and H.
- Jónsson, Unitary optimization of localized molecular orbitals, J.
- Chem.
- Theory Comput.
- 9, 5365 (2013).
 \end_layout
 
 \begin_layout Bibliography
@@ -8362,23 +8619,6 @@ I.M.
  Comput.
  Chem.
  34, 1456 (2013).
-\end_layout
-
-\begin_layout Bibliography
-\begin_inset CommandInset bibitem
-LatexCommand bibitem
-key "Lehtola2014"
-literal "true"
-
-\end_inset
-
-S.
- Lehtola and H.
- Jónsson, Pipek–Mezey orbital localization using various partial charge
- estimates, J.
- Chem.
- Theory Comput.
- 10, 642 (2014).
 \end_layout
 
 \begin_layout Bibliography
@@ -8597,11 +8837,17 @@ A.
  Hämäläinen, Density functional study of x-ray Raman scattering from aromatic
  hydrocarbons and polyfluorene, Phys.
  Rev.
- B 76, 1 (2007) .
+ B 76, 1 (2007).
 \end_layout
 
 \begin_layout Section*
 Changes
+\end_layout
+
+\begin_layout Labeling
+\labelwidthstring 00.00.0000
+2021-01-27 Document the SAP guesses, and partial Cholesky orthogonalization.
+ Updated default grid, and added new grid shorthands.
 \end_layout
 
 \begin_layout Labeling
