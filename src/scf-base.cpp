@@ -54,8 +54,6 @@ enum guess_t parse_guess(const std::string & val) {
     return CORE_GUESS;
   else if(stricmp(val,"SAD")==0 || stricmp(val,"Atomic")==0)
     return SAD_GUESS;
-  else if(stricmp(val,"GSAP")==0)
-    return GSAP_GUESS;
   else if(stricmp(val,"SAP")==0)
     return SAP_GUESS;
   else if(stricmp(val,"SAPFIT")==0)
@@ -2120,9 +2118,6 @@ void calculate(const BasisSet & basis, bool force) {
       } else if(guess==GWH_GUESS) {
 	solver.gwh_guess(sol,Kgwh);
         solver.diagonalize(sol);
-      } else if(guess == GSAP_GUESS) {
-        sol.H=solver.get_Hcore()+sap_guess(basis);
-        solver.diagonalize(sol);
       } else if(guess == HUCKEL_GUESS) {
         sol.H=huckel_guess(basis,Kgwh);
         solver.diagonalize(sol);
@@ -2482,10 +2477,6 @@ void calculate(const BasisSet & basis, bool force) {
         solver.diagonalize(sol);
       } else if(guess==GWH_GUESS) {
 	solver.gwh_guess(sol,Kgwh);
-        solver.diagonalize(sol);
-      } else if(guess == GSAP_GUESS) {
-        sol.Ha=solver.get_Hcore()+sap_guess(basis);
-        sol.Hb=sol.Ha;
         solver.diagonalize(sol);
       } else if(guess == HUCKEL_GUESS) {
         sol.Ha=huckel_guess(basis,Kgwh);
