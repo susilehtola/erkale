@@ -148,7 +148,7 @@ void Settings::add_scf_settings() {
   add_bool("DFTLobatto", "Use Lobatto quadrature instead of Lebedev quadrature?", false);
 
   // Grid to use
-  add_string("DFTGrid", "DFT integration grid to use: nrad lmax or Auto for adaptive", "50 -194");
+  add_string("DFTGrid", "DFT integration grid to use: nrad lmax or Auto for adaptive", "75 -302");
   add_string("SAPGrid", "SAP integration grid to use: nrad lmax or leave empty", "");
   // Initial and final tolerances of DFT grid
   add_double("DFTInitialTol", "Tolerance of initial DFT grid", 1e-4);
