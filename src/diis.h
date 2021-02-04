@@ -129,6 +129,8 @@ class DIIS {
   virtual arma::mat get_diis_error() const=0;
   /// Reduce size of stack by one
   virtual void erase_last()=0;
+  /// Update the stacks
+  virtual void PiF_update()=0;
 
   // Helpers for speeding up ADIIS evaluation
   /// < P_i - P_n | F(D_n) >   or   < Pa_i - Pa_n | Fa(P_n) > + < Pb_i - Pb_n | Fb(P_n) >
@@ -138,6 +140,8 @@ class DIIS {
 
   /// Compute weights
   arma::vec get_w();
+  /// Compute weights
+  arma::vec get_w_wrk();
   /// Compute DIIS weights
   arma::vec get_w_diis() const;
   /// Compute DIIS weights, worker routine

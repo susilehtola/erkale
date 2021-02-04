@@ -214,7 +214,7 @@ arma::mat uDIIS::get_diis_error() const {
   return err;
 }
 
-arma::vec DIIS::get_w() {
+arma::vec DIIS::get_w_wrk() {
   // DIIS error
   arma::mat de=get_diis_error();
   double err=arma::max(arma::abs(de.col(de.n_cols-1)));
@@ -290,6 +290,31 @@ arma::vec DIIS::get_w() {
     throw std::runtime_error("Nor DIIS or ADIIS has been turned on.\n");
 
   return w;
+}
+
+arma::vec DIIS::get_w() {
+  arma::vec sol;
+  while(true) {
+    sol=get_w_wrk();
+    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
+      if(sol.n_elem > 2) {
+        if(verbose) printf("Weight on last matrix too small, dropping the oldest matrix.\n");
+        erase_last();
+        PiF_update();
+      } else {
+        if(verbose) printf("Weight on last matrix still too small; switching to damping.\n");
+        sol.zeros();
+
+        double damp=0.1;
+        sol(0)=1-damp;
+        sol(1)=damp;
+        break;
+      }
+    } else
+      break;
+  }
+
+  return sol;
 }
 
 arma::vec DIIS::get_w_diis() const {
@@ -375,17 +400,7 @@ arma::vec DIIS::get_w_diis_wrk(const arma::mat & errs) const {
 }
 
 void rDIIS::solve_F(arma::mat & F) {
-  arma::vec sol;
-  while(true) {
-    sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
-      if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
-      erase_last();
-      PiF_update();
-    } else
-      break;
-  }
-
+  arma::vec sol(get_w());
   // Form weighted Fock matrix
   F.zeros();
   for(size_t i=0;i<stack.size();i++)
@@ -393,16 +408,7 @@ void rDIIS::solve_F(arma::mat & F) {
 }
 
 void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb) {
-  arma::vec sol;
-  while(true) {
-    sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
-      if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
-      erase_last();
-      PiF_update();
-    } else
-      break;
-  }
+  arma::vec sol(get_w());
 
   // Form weighted Fock matrix
   Fa.zeros();
@@ -414,16 +420,7 @@ void uDIIS::solve_F(arma::mat & Fa, arma::mat & Fb) {
 }
 
 void rDIIS::solve_P(arma::mat & P) {
-  arma::vec sol;
-  while(true) {
-    sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
-      if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
-      erase_last();
-      PiF_update();
-    } else
-      break;
-  }
+  arma::vec sol(get_w());
 
   // Form weighted density matrix
   P.zeros();
@@ -432,16 +429,7 @@ void rDIIS::solve_P(arma::mat & P) {
 }
 
 void uDIIS::solve_P(arma::mat & Pa, arma::mat & Pb) {
-  arma::vec sol;
-  while(true) {
-    sol=get_w();
-    if(std::abs(sol(sol.n_elem-1))<=sqrt(DBL_EPSILON)) {
-      if(verbose) printf("Weight on last matrix too small, reducing to %i matrices.\n",(int) stack.size()-1);
-      erase_last();
-      PiF_update();
-    } else
-      break;
-  }
+  arma::vec sol(get_w());
 
   // Form weighted density matrix
   Pa.zeros();
