@@ -134,16 +134,15 @@ std::string find_basis(const std::string & basisname, bool verbose) {
   // Directories where the basis set file might be found
   std::vector<std::string> dirs;
 
-  // First, check if there is an environmental variable called
+  // Try local directory, first.
+  dirs.push_back("");
+  // Next, check if there is an environmental variable called
   // ERKALE_LIBRARY
   char * libloc=getenv("ERKALE_LIBRARY");
   if(libloc!=NULL) {
     // Variable exists! Add location to array
     dirs.push_back(libloc+std::string("/"));
   }
-
-  // Next, try local directory.
-  dirs.push_back("");
   // Finally, try system wide directory.
   dirs.push_back(ERKALE_SYSTEM_LIBRARY + std::string("/"));
 
