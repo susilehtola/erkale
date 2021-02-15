@@ -406,6 +406,25 @@ double exact_exchange(int func_id) {
       throw std::runtime_error(oss.str());
     }
 
+    /* Set tunings */
+    arma::vec pars;
+    if(is_exchange(func_id)) {
+      pars=settings.get_vec("DFTXpars");
+    } else if(is_correlation(func_id)) {
+      pars=settings.get_vec("DFTCpars");
+    }
+    if(pars.n_elem) {
+      size_t npars = xc_func_info_get_n_ext_params((xc_func_info_type*) func.info);
+      if(npars != pars.n_elem) {
+        std::ostringstream oss;
+        oss << "Inconsistent number of parameters for the " << functype << " functional.\n";
+        oss << "Expected " << npars << ", got " << pars.n_elem << ".\n";
+        throw std::logic_error(oss.str());
+      }
+      xc_func_set_ext_params(&func, pars.memptr());
+    }
+
+
 #if XC_MAJOR_VERSION >= 6
     switch(xc_hyb_type(&func)) {
     case(XC_HYB_HYBRID):
@@ -525,6 +544,24 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
       throw std::runtime_error(oss.str());
     }
 
+    /* Set tunings */
+    arma::vec pars;
+    if(is_exchange(func_id)) {
+      pars=settings.get_vec("DFTXpars");
+    } else if(is_correlation(func_id)) {
+      pars=settings.get_vec("DFTCpars");
+    }
+    if(pars.n_elem) {
+      size_t npars = xc_func_info_get_n_ext_params((xc_func_info_type*) func.info);
+      if(npars != pars.n_elem) {
+        std::ostringstream oss;
+        oss << "Inconsistent number of parameters for the " << functype << " functional.\n";
+        oss << "Expected " << npars << ", got " << pars.n_elem << ".\n";
+        throw std::logic_error(oss.str());
+      }
+      xc_func_set_ext_params(&func, pars.memptr());
+    }
+    
 #if XC_MAJOR_VERSION >= 6
     switch(xc_hyb_type(&func)) {
     case(XC_HYB_HYBRID):
