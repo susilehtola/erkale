@@ -228,8 +228,25 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   }
   chkptp->write("H_E",H_E);
 
+  // Confinement potential?
+  arma::mat H_conf(T.n_rows,T.n_cols);
+  H_conf.zeros();
+  std::vector<std::string> Econfs=splitline(settings.get_string("Confinement"));
+  if(Econfs.size()!=3)
+    throw std::runtime_error("Must have 3 coefficients for confinement potential!\n");
+  std::vector<double> Ec(Econfs.size());
+  for(size_t i=0;i<Econfs.size();i++)
+    Ec[i]=readdouble(Econfs[i]);
+  if(Ec[0]!=0.0 || Ec[1] != 0.0 || Ec[2] != 0.0) {
+    // Get moment integrals around origin
+    std::vector<arma::mat> dipint(basis.moment(2,0.0,0.0,0.0));
+    // Accumulate
+    H_conf=Ec[0]*dipint[getind(2,0,0)] + Ec[1]*dipint[getind(0,2,0)] + Ec[2]*dipint[getind(0,0,2)];
+  }
+  chkptp->write("H_conf",H_conf);
+
   // Form core Hamiltonian
-  Hcore=T+Vnuc+H_E;
+  Hcore=T+Vnuc+H_E+H_conf;
   chkptp->write("Hcore",Hcore);
 
   if(verbose) {
