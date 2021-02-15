@@ -237,10 +237,9 @@ void augmented_solution(const BasisSet & basis, const uscf_t & sol, size_t nocca
       grid.construct(augsol.Pa,augsol.Pb,dft.gridtol,dft.x_func,dft.c_func);
     } else {
       // Fixed size grid
-      bool strictint(settings.get_bool("StrictIntegrals"));
-      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
+      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
       if(dft.nl)
-	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,false,strictint,true);
+	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,false,true);
     }
 
     // Range separated functional?

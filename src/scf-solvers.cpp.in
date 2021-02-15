@@ -289,10 +289,10 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #endif
     } else {
       // Fixed size grid
-      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,strictint);
+      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
       // Nonlocal grid?
       if(dft.nl)
-	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,false,strictint,true);
+	nlgrid.construct(dft.nlnrad,dft.nllmax,true,false,false,true);
     }
 
     if(verbose) {

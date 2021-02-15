@@ -2971,11 +2971,10 @@ void PZStability::update_grid(bool init) {
     if (ovmethod.x_func>0 || ovmethod.c_func>0)
       grid.construct(Ctilde,ovmethod.gridtol,ovmethod.x_func,ovmethod.c_func);
   } else if(init) {
-    bool strict(solverp->get_strictint());
     if (ovmethod.x_func>0 || ovmethod.c_func>0)
-      grid.construct(ovmethod.nrad,ovmethod.lmax,ovmethod.x_func,ovmethod.c_func,strict);
+      grid.construct(ovmethod.nrad,ovmethod.lmax,ovmethod.x_func,ovmethod.c_func);
     if(ovmethod.nl)
-      nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,false,strict,true);
+      nlgrid.construct(ovmethod.nlnrad,ovmethod.nllmax,true,false,false,true);
   }
 }
 

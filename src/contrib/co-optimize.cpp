@@ -732,7 +732,6 @@ void compute_density_erkale(int Z, bool dimer, const BasisSetLibrary & baslib, c
   fprintf(out,"Guess Core\n");
   fprintf(out,"Maxiter 300\n");
   fprintf(out,"Direct true\n");
-  //  fprintf(out,"StrictIntegrals true\n");
   fprintf(out,"UseADIIS false\n");
   fprintf(out,"UseTRRH false\n");
   fprintf(out,"UseDIIS false\n");
@@ -765,7 +764,6 @@ void compute_density_erkale(int Z, bool dimer, const BasisSetLibrary & baslib, c
     fprintf(out,"Maxiter 300\n");
     fprintf(out,"Verbose true\n");
     fprintf(out,"Direct true\n");
-    // fprintf(out,"StrictIntegrals true\n");
     fclose(out);
 
     erkval=system(cmd);
@@ -786,7 +784,6 @@ void compute_density_erkale(int Z, bool dimer, const BasisSetLibrary & baslib, c
     fprintf(out,"UseTRRH false\n");
     fprintf(out,"Maxiter 300\n");
     fprintf(out,"Direct true\n");
-    //    fprintf(out,"StrictIntegrals true\n");
     fprintf(out,"Verbose true\n");
     fclose(out);
 
@@ -809,7 +806,6 @@ void compute_density_erkale(int Z, bool dimer, const BasisSetLibrary & baslib, c
     fprintf(out,"LineSearch true\n");
     fprintf(out,"Maxiter 300\n");
     fprintf(out,"Direct true\n");
-    fprintf(out,"StrictIntegrals true\n");
     fprintf(out,"Verbose true\n");
     fclose(out);
 

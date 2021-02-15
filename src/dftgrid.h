@@ -518,9 +518,9 @@ class DFTGrid {
   void set_verbose(bool ver);
 
   /// Create fixed size grid
-  void construct(int nrad, int lmax, int x_func, int c_func, bool strict);
+  void construct(int nrad, int lmax, int x_func, int c_func);
   /// Create fixed size grid
-  void construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool strict, bool nl);
+  void construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool nl);
   /// Create grid for restricted calculation
   void construct(const arma::mat & P, double ftol, int x_func, int c_func);
   /// Create grid for unrestricted calculation

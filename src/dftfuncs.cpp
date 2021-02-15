@@ -20,6 +20,7 @@
 #include "dftfuncs.h"
 #include "dftgrid.h"
 #include "stringutil.h"
+#include "settings.h"
 
 // LibXC
 extern "C" {
@@ -30,6 +31,8 @@ extern "C" {
 #define ID_HF -1
 #define KW_NONE "none"
 #define KW_HF "hyb_x_hf"
+
+extern Settings settings;
 
 // Print keyword corresponding to functional.
 std::string get_keyword(int func_id) {
@@ -417,7 +420,7 @@ double exact_exchange(int func_id) {
       size_t npars = xc_func_info_get_n_ext_params((xc_func_info_type*) func.info);
       if(npars != pars.n_elem) {
         std::ostringstream oss;
-        oss << "Inconsistent number of parameters for the " << functype << " functional.\n";
+        oss << "Inconsistent number of parameters for the " << std::string(xc_func_info_get_name(func.info)) << " functional.\n";
         oss << "Expected " << npars << ", got " << pars.n_elem << ".\n";
         throw std::logic_error(oss.str());
       }
@@ -555,7 +558,7 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
       size_t npars = xc_func_info_get_n_ext_params((xc_func_info_type*) func.info);
       if(npars != pars.n_elem) {
         std::ostringstream oss;
-        oss << "Inconsistent number of parameters for the " << functype << " functional.\n";
+        oss << "Inconsistent number of parameters for the " << std::string(xc_func_info_get_name(func.info)) << " functional.\n";
         oss << "Expected " << npars << ", got " << pars.n_elem << ".\n";
         throw std::logic_error(oss.str());
       }

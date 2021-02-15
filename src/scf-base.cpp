@@ -114,9 +114,8 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
 
   direct=settings.get_bool("Direct");
   decfock=settings.get_bool("DecFock");
-  strictint=settings.get_bool("StrictIntegrals");
   // Integral screening threshold
-  intthr=strictint ? DBL_EPSILON : settings.get_double("IntegralThresh");
+  intthr=settings.get_double("IntegralThresh");
   // Sanity check
   if(intthr>1e-6) {
     fprintf(stderr,"Warning - spuriously large integral threshold %e\n",intthr);
@@ -625,10 +624,6 @@ Checkpoint *SCF::get_checkpoint() const {
   return chkptp;
 }
 
-bool SCF::get_strictint() const {
-  return strictint;
-}
-
 void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const arma::cx_mat & Ctilde, dft_t dft, DFTGrid & grid, DFTGrid & nlgrid, bool fock) {
   // Compute the orbital-dependent Fock matrices
   Eorb.resize(Ctilde.n_cols);
@@ -1012,7 +1007,7 @@ arma::mat SCF::sap_potential() const {
     bool lapl=false;
     bool strict=false;
     bool nl=false;
-    grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+    grid.construct(nrad,lmax,grad,tau,lapl,nl);
   }
 
   // Get SAP potential by quadrature

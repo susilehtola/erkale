@@ -274,8 +274,6 @@ protected:
   bool direct;
   /// Use decontracted basis to construct Fock matrix? (Direct formation)
   bool decfock;
-  /// Strict integrals?
-  bool strictint;
   /// Integral screening threshold
   double intthr;
 
@@ -405,8 +403,6 @@ public:
   arma::mat get_Hcore() const;
   /// Get checkpoint file
   Checkpoint *get_checkpoint() const;
-  /// Using strict integrals?
-  bool get_strictint() const;
 
   /// Fill range-separated integrals
   void fill_rs(double omega);

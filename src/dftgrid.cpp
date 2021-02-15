@@ -3249,15 +3249,15 @@ void DFTGrid::prune_shells() {
       grids.erase(grids.begin()+i);
 }
 
-void DFTGrid::construct(int nrad, int lmax, int x_func, int c_func, bool strict) {
+void DFTGrid::construct(int nrad, int lmax, int x_func, int c_func) {
   // Check necessity of gradients and laplacians
   bool grad, tau, lapl;
   wrk[0].check_grad_tau_lapl(x_func,c_func);
   wrk[0].get_grad_tau_lapl(grad,tau,lapl);
-  construct(nrad,lmax,grad,tau,lapl,strict,false);
+  construct(nrad,lmax,grad,tau,lapl,false);
 }
 
-void DFTGrid::construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool strict, bool nl) {
+void DFTGrid::construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool nl) {
   if(verbose) {
     if(nl)
       printf("Constructing static nrad=%i lmax=%i NL grid.\n",nrad,lmax);
@@ -3272,7 +3272,7 @@ void DFTGrid::construct(int nrad, int lmax, bool grad, bool tau, bool lapl, bool
   }
 
   // Set grid point screening tolerances
-  double tol=strict ? 0.0 : DBL_EPSILON;
+  double tol=settings.get_double("DFTQuadThresh");
 
   // Get Chebyshev nodes and weights for radial part
   std::vector<double> rad, wrad;

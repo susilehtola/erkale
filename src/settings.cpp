@@ -23,7 +23,7 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
-
+#include <cfloat>
 
 Settings::Settings() {
   // Set default Settings
@@ -109,8 +109,6 @@ void Settings::add_scf_settings() {
   add_bool("Direct", "Calculate two-electron integrals (or density fitting) on-the-fly?", false);
   // Compute Fock matrix in decontracted basis
   add_bool("DecFock", "Use decontracted basis to calculate Fock matrix (direct HF)", false);
-  // Strict integrals?
-  add_bool("StrictIntegrals", "Use strict integrals?", false);
   // Integral threshold
   add_double("IntegralThresh", "Integral screening threshold", 1e-10);
 
@@ -151,6 +149,7 @@ void Settings::add_scf_settings() {
 
   // Grid to use
   add_string("DFTGrid", "DFT integration grid to use: nrad lmax or Auto for adaptive", "75 -302");
+  add_double("DFTQuadThresh", "Threshold for pruning points with small quadrature weight", DBL_EPSILON);
   add_string("SAPGrid", "SAP integration grid to use: nrad lmax or leave empty", "");
   // Initial and final tolerances of DFT grid
   add_double("DFTInitialTol", "Tolerance of initial DFT grid", 1e-4);
