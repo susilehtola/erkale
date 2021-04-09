@@ -20,12 +20,12 @@
 #include "../settings.h"
 #include "pivoted_cholesky_basis.h"
 #include "../completeness/completeness_profile.h"
+#include "../density_fitting.h"
 #ifdef SVNRELEASE
 #include "../version.h"
 #endif
 
-std::string cmds[]={"augdiffuse", "augsteep", "cholesky", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
-
+std::string cmds[]={"augdiffuse", "augsteep", "cholesky", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 void help() {
   printf("Valid commands:\n");
@@ -321,6 +321,49 @@ int main_guarded(int argc, char **argv) {
     bas.decontract();
     elbas.add_element(bas.get_element(el,no));
     elbas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"fiterr")==0) {
+    // Calculate fit error in auxiliary basis
+
+    if(argc!=5) {
+      printf("\nUsage: %s orbbas.gbs fiterr auxbas.gbs element\n",argv[0]);
+      return 1;
+    }
+
+    // Load auxiliary basis
+    BasisSetLibrary auxbas;
+    auxbas.load_gaussian94(argv[3]);
+    std::string element(argv[4]);
+
+    // Dummy atoms
+    std::vector<atom_t> atoms(1);
+    atoms[0].el=element;
+    atoms[0].num=0;
+    atoms[0].x=0.0;
+    atoms[0].y=0.0;
+    atoms[0].z=0.0;
+    atoms[0].Q=0;
+
+    settings.add_string("Decontract","","");
+    settings.add_bool("BasisRotate","",false);
+    settings.add_double("BasisCutoff","",1e-10);
+    settings.add_bool("UseLM","",true);
+    settings.add_bool("OptLM","",true);
+
+    init_libint_base();
+
+    // Construct basis sets
+    BasisSet orbbasis, auxbasis;
+    construct_basis(orbbasis, atoms, bas);
+    construct_basis(auxbasis, atoms, auxbas);
+
+    DensityFit dfit;
+    bool direct=false;
+    double erithr=1e-10;
+    double linthr=1e-6;
+    bool bmat=true;
+    dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, bmat);
+    dfit.fitting_error();
 
   } else if(stricmp(cmd,"genbas")==0) {
     // Generate basis set for xyz file

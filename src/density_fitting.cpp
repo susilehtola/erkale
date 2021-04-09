@@ -178,6 +178,75 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   return orbpairs.size();
 }
 
+double DensityFit::fitting_error() const {
+  arma::mat error_matrix(maxorbam+1, maxorbam+1, arma::fill::zeros);
+
+  // Loop over pairs
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    arma::mat wrk_error(error_matrix);
+
+    ERIWorker *eri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri=new ERIWorker(maxam,maxcontr);
+    else
+      eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<orbpairs.size();ip++) {
+      // Shells in question are
+      size_t imus=orbpairs[ip].is;
+      size_t inus=orbpairs[ip].js;
+      // Amount of functions
+      size_t Nmu=orbshells[imus].get_Nbf();
+      size_t Nnu=orbshells[inus].get_Nbf();
+
+      // Compute the (A|uv) integrals
+      arma::mat auv(compute_a_munu(eri,ip));
+
+      // This gives the density fitted (uv|uv) integrals as
+      arma::mat dfit_uvuv(arma::trans(auv) * ab_inv * auv);
+
+      // The correct integrals are, however
+      eri->compute(&orbshells[inus],&orbshells[imus],&orbshells[inus],&orbshells[imus]);
+      const std::vector<double> * erip(eri->getp());
+
+      double shell_error=0.0;
+      for(size_t mu=0;mu<Nmu;mu++)
+        for(size_t nu=0;nu<Nnu;nu++) {
+          size_t imunu = nu*Nmu+mu;
+          size_t ieri = imunu*(Nmu*Nnu) + imunu;
+          double delta= (*erip)[ieri] - dfit_uvuv(imunu, imunu);
+          //printf("(%c%c|%c%c): (%i %i|%i %i) = %e (fit) vs %e (exact), error %e\n", shell_types[orbshells[inus].get_am()], shell_types[orbshells[imus].get_am()], shell_types[orbshells[inus].get_am()], shell_types[orbshells[imus].get_am()], (int) (nu0+nu),(int) (mu0+mu),(int) (nu0+nu),(int) (mu0+mu),dfit_uvuv(imunu, imunu),(*erip)[ieri],delta);
+          shell_error += delta;
+        }
+
+      wrk_error(orbshells[imus].get_am(), orbshells[inus].get_am()) += shell_error;
+      if(imus != inus)
+        wrk_error(orbshells[inus].get_am(), orbshells[imus].get_am()) += shell_error;
+    }
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    error_matrix += wrk_error;
+  }
+
+  printf("\n");
+  for(int iam=0;iam<=maxorbam;iam++)
+    for(int jam=0;jam<=iam;jam++)
+      printf("Total (%c%c|%c%c) error %e\n",shell_types[jam],shell_types[iam],shell_types[jam],shell_types[iam],error_matrix(jam,iam));
+
+  double total_error = arma::sum(arma::sum(error_matrix));
+  printf("Total error is %.15e\n",total_error);
+
+  return total_error;
+}
+
 arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip) const {
   // Shells in question are
   size_t imus=orbpairs[ip].is;
