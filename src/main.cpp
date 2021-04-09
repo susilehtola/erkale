@@ -128,9 +128,9 @@ int main_guarded(int argc, char **argv) {
 	if(file_exists(filename))
 	  atoms=load_xyz(filename,!settings.get_bool("InputBohr"));
 	else
-	  throw std::runtime_error("Unable to open xyz input file!\n");
+	  throw std::runtime_error("Unable to open xyz input file \"" + atomfile + "\" !\n");
       } else
-	throw std::runtime_error("Unable to open xyz input file!\n");
+	throw std::runtime_error("Unable to open xyz input file \"" + atomfile + "\" !\n");
     }
 
     // Read in basis set
