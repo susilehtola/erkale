@@ -167,6 +167,9 @@ class DensityFit {
 
   /// Get B matrix (must have HF enabled)
   void B_matrix(arma::mat & B) const;
+
+  /// Compute error in (AB|AB) type integrals
+  double fitting_error() const;
 };
 
 
