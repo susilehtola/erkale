@@ -326,7 +326,10 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
       fitlib.load_basis(settings.get_string("FittingBasis"));
 
       // Construct fitting basis
+      bool uselm=settings.get_bool("UseLM");
+      settings.set_bool("UseLM",true);
       construct_basis(dfitbas,basisp->get_nuclei(),fitlib);
+      settings.set_bool("UseLM",uselm);
     }
 
     // Compute memory estimate
