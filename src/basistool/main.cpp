@@ -25,7 +25,7 @@
 #include "../version.h"
 #endif
 
-std::string cmds[]={"augdiffuse", "augsteep", "cholesky", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"augdiffuse", "augsteep", "choleskyaux", "fullcholeskyaux", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 void help() {
   printf("Valid commands:\n");
@@ -87,26 +87,54 @@ int main_guarded(int argc, char **argv) {
     bas.augment_steep(naug);
     bas.save_gaussian94(fileout);
 
-  } else if(stricmp(cmd,"cholesky")==0) {
+  } else if(stricmp(cmd,"choleskyaux")==0) {
     // Form Cholesky fitting basis set
 
-    if(argc!=7) {
-      printf("\nUsage: %s input.gbs cholesky thr maxam cholthr output.gbs\n",argv[0]);
+    if(argc!=5) {
+      printf("\nUsage: %s input.gbs choleskyaux thr output.gbs\n",argv[0]);
       return 1;
     }
 
-    double thr(atof(argv[3]));
-    int maxam(atoi(argv[4]));
-    double ovlthr(atof(argv[5]));
-    std::string outfile(argv[6]);
+    printf("Forming reduced auxiliary basis set by pivoted Cholesky decomposition\n");
+    printf("See arXiv:2106.11081\n\n");
 
-    if(maxam>=LIBINT_MAX_AM) {
-      printf("Setting maxam = %i because limitations in used version of LIBINT.\n",LIBINT_MAX_AM-1);
-      maxam=LIBINT_MAX_AM-1;
-    }
+    double thr(atof(argv[3]));
+    std::string outfile(argv[4]);
 
     init_libint_base();
-    BasisSetLibrary ret=bas.cholesky_set(thr,maxam,ovlthr);
+
+    settings.add_bool("UseLM","",true);
+    settings.add_bool("OptLM","",false);
+    settings.add_string("Decontract","","");
+    settings.add_bool("BasisRotate","",false);
+    settings.add_double("BasisCutoff","",0.0);
+
+    BasisSetLibrary ret=bas.cholesky_set(thr);
+    ret.save_gaussian94(outfile);
+
+  } else if(stricmp(cmd,"fullcholeskyaux")==0) {
+    // Form Cholesky fitting basis set
+
+    if(argc!=5) {
+      printf("\nUsage: %s input.gbs fullcholeskyaux thr output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    printf("Forming full auxiliary basis set by pivoted Cholesky decomposition\n");
+    printf("See arXiv:2106.11081\n\n");
+
+    double thr(atof(argv[3]));
+    std::string outfile(argv[4]);
+
+    init_libint_base();
+
+    settings.add_bool("UseLM","",true);
+    settings.add_bool("OptLM","",false);
+    settings.add_string("Decontract","","");
+    settings.add_bool("BasisRotate","",false);
+    settings.add_double("BasisCutoff","",0.0);
+
+    BasisSetLibrary ret=bas.cholesky_full_set(thr);
     ret.save_gaussian94(outfile);
 
   } else if(stricmp(cmd,"choleskybasis")==0) {
@@ -114,6 +142,9 @@ int main_guarded(int argc, char **argv) {
       printf("\nUsage: %s input.gbs choleskybasis system.xyz thr uselm output.gbs\n",argv[0]);
       return 1;
     }
+
+    printf("Forming system-specific Cholesky orthogonalized basis\n");
+    printf("See J. Chem. Phys. 151, 241102 (2019). DOI: 10.1063/1.5139948\n\n");
 
     std::vector<atom_t> atoms=load_xyz(argv[3],false);
     double thr(atof(argv[4]));

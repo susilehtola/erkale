@@ -22,6 +22,7 @@
 #include "linalg.h"
 #include "timer.h"
 #include "erifit.h"
+#include "erichol.h"
 
 #include <algorithm>
 #include <fstream>
@@ -33,6 +34,7 @@
 #include <sstream>
 #include <stdexcept>
 
+#include <gsl/gsl_sf_gamma.h>
 
 /// Compute overlap of normalized Gaussian primitives
 arma::mat overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
@@ -745,46 +747,221 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
   return ret;
 }
 
-ElementBasisSet ElementBasisSet::cholesky_set(double thr, int maxam, double ovlthr) const {
+ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
   ElementBasisSet orbbas(*this);
   orbbas.decontract();
 
-  // Fitting set
-  ElementBasisSet fitel(orbbas.get_symbol());
+  // Form dummy basis set for atom
+  std::vector<atom_t> atoms(1);
+  atoms[0].num = 0;
+  atoms[0].el = orbbas.get_symbol();
+  atoms[0].x = 0.0;
+  atoms[0].y = 0.0;
+  atoms[0].z = 0.0;
+  atoms[0].Q = 0;
 
-  // Loop over angular momentum
+  BasisSetLibrary dumlib;
+  dumlib.add_element(orbbas);
+
+  BasisSet dummy(1);
+  construct_basis(dummy, atoms, dumlib);
+
+  // Run Cholesky
+  ERIchol chol;
+  chol.fill(dummy, thr, 0.0, 0.0, true);
+
+  // Get the pivot shell pairs
+  std::set< std::pair<size_t, size_t> > pivot_shellpairs(chol.get_pivot_shellpairs());
+  std::vector<GaussianShell> shells(dummy.get_shells());
+  printf("%2s has %i significant auxiliary shell pairs\n",orbbas.get_symbol().c_str(), (int) pivot_shellpairs.size());
+
+  // Form list of reduced exponents
+  std::vector< std::vector<double> > reduced_exponents(2*orbbas.get_max_am()+1);
+  for(std::set< std::pair<size_t, size_t> >::iterator it=pivot_shellpairs.begin();it!=pivot_shellpairs.end();it++) {
+    // Shell indices
+    size_t is=it->first;
+    size_t js=it->second;
+    // Angular momenta
+    int li=shells[is].get_am();
+    int lj=shells[js].get_am();
+    // Exponents
+    double zi=shells[is].get_contr()[0].z;
+    double zj=shells[js].get_contr()[0].z;
+    double zsum=zi+zj;
+
+    // Form products
+    for(size_t L=std::abs(li-lj);L<=std::abs(li+lj);L++) {
+      // The basis function product has radial form r^(li+lj)
+      // exp(-zsum r^2). However, in each L channel the radial form is
+      // r^L exp(-zr^2). We match the radial expectation value <r>
+      // with this transformation
+      double scale = std::pow(gsl_sf_gamma(L+2)*gsl_sf_gamma(li+lj+1.5)/(gsl_sf_gamma(li+lj+2)*gsl_sf_gamma(L+1.5)),2);
+      double zeff = scale*zsum;
+      reduced_exponents[L].push_back(zeff);
+    }
+  }
+
+  // Sort in decreasing exponent
+  for(size_t L=0;L<reduced_exponents.size();L++) {
+    std::sort(reduced_exponents[L].begin(),reduced_exponents[L].end());
+    std::reverse(reduced_exponents[L].begin(),reduced_exponents[L].end());
+  }
+
+  /*
+  printf("Exponents from ERI Cholesky\n");
+  for(size_t L=0;L<reduced_exponents.size();L++)
+    for(size_t i=0;i<reduced_exponents[L].size();i++)
+      printf("L=%i %i: %e\n",(int) L, (int) i, reduced_exponents[L][i]);
+  */
+
+  // Now do another Cholesky to pick out a linearly independent set of auxiliary functions
+  std::vector< std::vector<double> > final_exponents(reduced_exponents.size());
+  for(size_t L=0;L<reduced_exponents.size();L++) {
+    size_t nprim=reduced_exponents[L].size();
+    if(!nprim) {
+      printf("L=%i: no functions\n",(int) L);
+      continue;
+    }
+
+    // Exponents
+    arma::vec exps(arma::conv_to<arma::vec>::from(reduced_exponents[L]));
+    // Coulomb overlap matrix
+    arma::mat S=overlap(exps,exps,L-1);
+
+    // Normalize overlap matrix
+    arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
+    S = normmat*S*normmat;
+    //S.print("Normalized overlap");
+
+    // Sort by off-diagonal
+    arma::mat odS(arma::abs(S));
+    odS.diag().zeros();
+    // Column sum
+    arma::vec odSs(arma::sum(S).t());
+    arma::uvec pivot = arma::stable_sort_index(odSs,"ascend");
+    // Find the auxiliary functions by pivoted Cholesky
+    pivoted_cholesky(S,thr,pivot);
+
+    // Cholesky to pick out the final exponents
+    for(size_t i=0;i<pivot.n_elem;i++)
+      final_exponents[L].push_back(exps[pivot[i]]);
+    std::sort(final_exponents[L].begin(), final_exponents[L].end());
+    std::reverse(final_exponents[L].begin(),final_exponents[L].end());
+
+    printf("L=%i: %i products => %i independent auxiliary functions\n",(int) L,(int) nprim,(int) final_exponents[L].size());
+  }
+
+  // Create fitting set
+  ElementBasisSet fitel(orbbas.get_symbol());
+  for(size_t L=0;L<final_exponents.size();L++) {
+    for(size_t ix=0;ix<final_exponents[L].size();ix++) {
+      std::vector<contr_t> c(1);
+      c[0].c=1.0;
+      c[0].z=final_exponents[L][ix];
+      fitel.add_function(FunctionShell(L,c));
+    }
+  }
+
+  return fitel;
+}
+
+ElementBasisSet ElementBasisSet::cholesky_full_set(double thr) const {
+  ElementBasisSet orbbas(*this);
+  orbbas.decontract();
+
+  // Form dummy basis set for atom
+  std::vector<atom_t> atoms(1);
+  atoms[0].num = 0;
+  atoms[0].el = orbbas.get_symbol();
+  atoms[0].x = 0.0;
+  atoms[0].y = 0.0;
+  atoms[0].z = 0.0;
+  atoms[0].Q = 0;
+
+  // Form list of candidate exponents
+  std::vector< std::set<double> > candidate_exponents(2*orbbas.get_max_am()+1);
   for(int iam=0;iam<=orbbas.get_max_am();iam++)
     for(int jam=0;jam<=iam;jam++) {
-      if(iam+jam>maxam)
-	break;
+      // Primitives and coefficients
+      arma::vec iexp, jexp;
+      arma::mat icoeff, jcoeff;
+      orbbas.get_primitives(iexp,icoeff,iam);
+      orbbas.get_primitives(jexp,jcoeff,jam);
 
-      // Get the T matrix
-      arma::mat T;
-      arma::vec exps;
-      arma::ivec am;
-      ERIfit::compute_cholesky_T(orbbas,iam,jam,T,exps);
-
-      // Find out significant exponent pairs by a pivoted Cholesky decomposition of T
-      arma::uvec sigexpidx;
-      pivoted_cholesky(T,thr,sigexpidx);
-
-      // Significant exponents
-      arma::vec sigexp(sigexpidx.size());
-      for(size_t ii=0;ii<sigexpidx.size();ii++) {
-	sigexp(ii)=exps(sigexpidx[ii]);
-      }
-      sigexp=arma::sort(sigexp,"descend");
-
-      // Create the fitting set
-      for(arma::uword i=0;i<sigexp.n_elem;i++) {
-	std::vector<contr_t> c(1);
-	c[0].c=1.0;
-	c[0].z=sigexp(i);
-	fitel.add_function(FunctionShell(iam+jam,c));
+      for(size_t iprim=0;iprim<iexp.n_elem;iprim++) {
+        size_t jmax = (iam==jam) ? iprim : jexp.n_elem-1;
+        for(size_t jprim=0;jprim<=jmax;jprim++) {
+          // Exponents
+          double zi=iexp[iprim];
+          double zj=jexp[jprim];
+          double zsum=zi+zj;
+          // Form products
+          for(size_t L=std::abs(iam-jam);L<=std::abs(iam+jam);L++) {
+            // The basis function product has radial form r^(li+lj)
+            // exp(-zsum r^2). However, in each L channel the radial form is
+            // r^L exp(-zr^2). We match the radial expectation value <r>
+            // with this transformation
+            double scale = std::pow(gsl_sf_gamma(L+2)*gsl_sf_gamma(iam+jam+1.5)/(gsl_sf_gamma(iam+jam+2)*gsl_sf_gamma(L+1.5)),2);
+            double zeff = scale*zsum;
+            candidate_exponents[L].insert(zeff);
+          }
+        }
       }
     }
 
-  fitel.prune(ovlthr,true);
+  // Now do a Cholesky decomposition to pick out a linearly independent set of auxiliary functions
+  std::vector< std::vector<double> > final_exponents(candidate_exponents.size());
+  for(size_t L=0;L<candidate_exponents.size();L++) {
+    // Get the candidate exponents
+    std::vector<double> candidates(candidate_exponents[L].begin(), candidate_exponents[L].end());
+    size_t nprim=candidates.size();
+    if(!nprim) {
+      printf("L=%i: no functions\n",(int) L);
+      continue;
+    }
+
+    // Sort in decreasing magnitude
+    std::sort(candidates.begin(),candidates.end());
+    std::reverse(candidates.begin(),candidates.end());
+
+    // Exponents
+    arma::vec exps(arma::conv_to<arma::vec>::from(candidates));
+    // Coulomb overlap matrix
+    arma::mat S=overlap(exps,exps,L-1);
+
+    // Normalize overlap matrix
+    arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
+    S = normmat*S*normmat;
+    //S.print("Normalized overlap");
+
+    // Sort by off-diagonal
+    arma::mat odS(arma::abs(S));
+    odS.diag().zeros();
+    // Column sum
+    arma::vec odSs(arma::sum(S).t());
+    arma::uvec pivot = arma::stable_sort_index(odSs,"ascend");
+    // Find the auxiliary functions by pivoted Cholesky
+    pivoted_cholesky(S,thr,pivot);
+
+    // Cholesky to pick out the final exponents
+    for(size_t i=0;i<pivot.n_elem;i++)
+      final_exponents[L].push_back(exps[pivot[i]]);
+    std::sort(final_exponents[L].begin(), final_exponents[L].end());
+    std::reverse(final_exponents[L].begin(),final_exponents[L].end());
+
+    printf("L=%i: %i products => %i independent auxiliary functions\n",(int) L,(int) nprim,(int) final_exponents[L].size());
+  }
+
+  // Create fitting set
+  ElementBasisSet fitel(orbbas.get_symbol());
+  for(size_t L=0;L<final_exponents.size();L++) {
+    for(size_t ix=0;ix<final_exponents[L].size();ix++) {
+      std::vector<contr_t> c(1);
+      c[0].c=1.0;
+      c[0].z=final_exponents[L][ix];
+      fitel.add_function(FunctionShell(L,c));
+    }
+  }
 
   return fitel;
 }
@@ -2275,11 +2452,19 @@ BasisSetLibrary BasisSetLibrary::product_set(int lvalinc, double fsam) const {
   return ret;
 }
 
-BasisSetLibrary BasisSetLibrary::cholesky_set(double thr, int maxam, double ovlthr) const {
+BasisSetLibrary BasisSetLibrary::cholesky_set(double thr) const {
   BasisSetLibrary ret(*this);
   ret.name="Product set "+name;
   for(size_t iel=0;iel<elements.size();iel++)
-    ret.elements[iel]=elements[iel].cholesky_set(thr,maxam,ovlthr);
+    ret.elements[iel]=elements[iel].cholesky_set(thr);
+  return ret;
+}
+
+BasisSetLibrary BasisSetLibrary::cholesky_full_set(double thr) const {
+  BasisSetLibrary ret(*this);
+  ret.name="Product set "+name;
+  for(size_t iel=0;iel<elements.size();iel++)
+    ret.elements[iel]=elements[iel].cholesky_full_set(thr);
   return ret;
 }
 

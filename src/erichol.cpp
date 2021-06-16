@@ -326,7 +326,7 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
   double error(arma::max(d));
 
   // Pivot index
-  arma::uvec pi(arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem));
+  pi = arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem);
   // Allocate memory
   B.zeros(100,prodidx.n_elem);
   // Loop index
@@ -569,8 +569,33 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
   if(m<B.n_cols)
     B.shed_cols(m,B.n_cols-1);
 
+  // and pivot vectors
+  pi=pi.subvec(0,m);
+  // Form the pivot shellpairs
+  form_pivot_shellpairs(basis);
+
   return shpairs.size();
 }
+
+arma::uvec ERIchol::get_pivot() const {
+  return pi;
+}
+
+void ERIchol::form_pivot_shellpairs(const BasisSet & basis) {
+  pivot_shellpairs.clear();
+  for(size_t i=0;i<pi.n_elem;i++) {
+    // The corresponding shell indices are
+    size_t is=basis.find_shell_ind(invmap(0,pi(i)));
+    size_t js=basis.find_shell_ind(invmap(1,pi(i)));
+    if(js<is) std::swap(is,js);
+    pivot_shellpairs.insert(std::pair<size_t,size_t>(is,js));
+  }
+}
+
+std::set< std::pair<size_t, size_t> > ERIchol::get_pivot_shellpairs() const {
+  return pivot_shellpairs;
+}
+
 
 size_t ERIchol::naf_transform(double thr, bool verbose) {
   /**
