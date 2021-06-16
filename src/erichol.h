@@ -21,6 +21,7 @@
 
 #include "global.h"
 #include "basis.h"
+#include <set>
 
 /// Cholesky decomposition of ERIs
 class ERIchol {
@@ -44,6 +45,13 @@ class ERIchol {
   /// Fraction of short-range Coulomb
   double beta;
 
+  /// Pivot indices
+  arma::uvec pi;
+  /// Pivot shell-pairs
+  std::set< std::pair<size_t, size_t> > pivot_shellpairs;
+  /// Get the pivot shell pairs
+  void form_pivot_shellpairs(const BasisSet & Basis);
+
  public:
   /// Constructor
   ERIchol();
@@ -61,6 +69,11 @@ class ERIchol {
 
   /// Fill matrix, returns amount of significant pairs.
   size_t fill(const BasisSet & basis, double cholesky_tol, double shell_reuse_thr, double shell_screen_tol, bool verbose);
+
+  /// Get the pivot vector
+  arma::uvec get_pivot() const;
+  /// Get the pivot shellpairs
+  std::set< std::pair<size_t, size_t> > get_pivot_shellpairs() const;
 
   /// Perform natural auxiliary function transform [M. Kallay, JCP 141, 244113 (2014)]
   size_t naf_transform(double thr, bool verbose);

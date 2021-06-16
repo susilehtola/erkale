@@ -201,7 +201,9 @@ class ElementBasisSet {
   ElementBasisSet product_set(int lmaxinc, double fsam) const;
 
   /// Form compact Cholesky set
-  ElementBasisSet cholesky_set(double thr, int maxam, double ovlthr) const;
+  ElementBasisSet cholesky_set(double cholthr) const;
+  /// Form Cholesky set from full set of products
+  ElementBasisSet cholesky_full_set(double cholthr) const;
 
   /// Augment the basis with steep functions
   void augment_steep(int naug);
@@ -299,7 +301,9 @@ class BasisSetLibrary {
   /// Generate product set
   BasisSetLibrary product_set(int lvalinc, double fsam) const;
   /// Generate compact Cholesky set
-  BasisSetLibrary cholesky_set(double thr, int maxam, double ovlthr) const;
+  BasisSetLibrary cholesky_set(double thr) const;
+  /// Generate Cholesky set from all orbital products
+  BasisSetLibrary cholesky_full_set(double thr) const;
 
   /**
    * P-orthogonalization [F. Jensen, JCTC 10, 1074 (2014)].
