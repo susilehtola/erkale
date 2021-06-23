@@ -12,6 +12,7 @@ else()
  target_link_libraries(erkale_bastool ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_bastool ${LIBINT_LIBRARIES})
  target_link_libraries(erkale_bastool ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_bastool ${HDF5_LIBRARIES})
 endif()
 
 install (TARGETS erkale_bastool DESTINATION bin)

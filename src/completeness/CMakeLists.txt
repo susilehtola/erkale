@@ -22,6 +22,7 @@ else()
  target_link_libraries(erkale_copt ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_copt ${LIBINT_LIBRARIES})
  target_link_libraries(erkale_copt ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_copt ${HDF5_LIBRARIES})
 endif()
 
 # Completeness optimization tool
@@ -39,6 +40,7 @@ else()
  target_link_libraries(erkale_copt_plateau ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_copt_plateau ${LIBINT_LIBRARIES})
  target_link_libraries(erkale_copt_plateau ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_copt_plateau ${HDF5_LIBRARIES})
 endif()
 
 

@@ -12,6 +12,7 @@ else()
  target_link_libraries(erkale_slaterfit ${LAPACK_LIBRARIES})
  target_link_libraries(erkale_slaterfit ${LIBINT_LIBRARIES})
  target_link_libraries(erkale_slaterfit ${LIBXC_LIBRARIES})
+ target_link_libraries(erkale_slaterfit ${HDF5_LIBRARIES})
 endif()
 
 
