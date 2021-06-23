@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Resolve dependencies
-        run: sudo apt-get install libarmadillo-dev cmake gfortran libgsl-dev libxc-dev libxc5 libint1 libint-dev
+        run: sudo apt-get install libarmadillo-dev cmake gfortran libgsl-dev libxc-dev libxc5 libint1 libint-dev libhdf5-serial-dev
 
       - name: Compile
         run: mkdir build && cd build && cmake -E env CXXFLAGS="-DARMA_DONT_USE_WRAPPER" cmake .. && make
