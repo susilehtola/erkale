@@ -842,6 +842,25 @@ double spin_S2(const BasisSet & basis, const arma::mat & Ca, const arma::mat & C
   return S2;
 }
 
+double spin_S2(const BasisSet & basis, const arma::cx_mat & Ca, const arma::cx_mat & Cb) {
+  arma::uword Na=Ca.n_cols;
+  arma::uword Nb=Cb.n_cols;
+
+  arma::mat S(basis.overlap());
+  double Sz=(Na-Nb)/2.0;
+
+  arma::cx_mat Sab;
+  if(Nb)
+    Sab=arma::trans(Ca)*S*Cb;
+
+  double S2=Sz*(Sz+1) + Nb;
+  for(arma::uword i=0;i<Na;i++)
+    for(arma::uword j=0;j<Nb;j++)
+      S2-=std::norm(Sab(i,j));
+
+  return S2;
+}
+
 double darwin_1e(const BasisSet & basis, const arma::mat & P) {
   // Energy
   double E=0.0;

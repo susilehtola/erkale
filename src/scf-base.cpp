@@ -2873,10 +2873,10 @@ void calculate(const BasisSet & basis, bool force) {
       population_analysis(basis,sol.Pa,sol.Pb);
 
       if(!settings.get_string("Occupancies").size()) {
-	arma::mat Ca(sol.Ca.cols(0,Nel_alpha-1));
-	arma::mat Cb;
+	arma::cx_mat Ca(sol.cCa.cols(0,Nel_alpha-1));
+	arma::cx_mat Cb;
 	if(Nel_beta)
-	  Cb=sol.Cb.cols(0,Nel_beta-1);
+	  Cb=sol.cCb.cols(0,Nel_beta-1);
 	double S2(spin_S2(basis,Ca,Cb));
 	printf("\nThe spin expectation value <S^2> is %f\n",S2);
       } else {
