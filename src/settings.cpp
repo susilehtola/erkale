@@ -174,6 +174,7 @@ void Settings::add_scf_settings() {
   add_int("PZprec", "Precondition OV block? 0: no, 1: unified, 2: orbital",1);
   add_bool("PZoo", "Optimize OO block?",true);
   add_bool("PZov", "Optimize OV block?",true);
+  add_bool("PZrand", "Apply random rotation in PZ initialization? (Should be true)",true);
   add_double("PZIthr", "Threshold for initialization convergence (not too small!)",1e-2);
   add_double("PZOOthr", "Gradient threshold for OO optimization",1e-4);
   add_double("PZOVthr", "Gradient threshold for OV optimization",1e-5);
