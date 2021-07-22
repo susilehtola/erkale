@@ -2195,6 +2195,7 @@ void calculate(const BasisSet & basis, bool force) {
       int pzprec=settings.get_int("PZprec");
       bool pzov=settings.get_bool("PZov");
       bool pzoo=settings.get_bool("PZoo");
+      bool pzrand=settings.get_bool("PZrand");
       int pzloc=parse_pzimag(settings.get_string("PZloc"),"PZloc");
       enum locmet pzlocmet=parse_locmet(settings.get_string("PZlocmet"));
       double pzw=settings.get_double("PZw");
@@ -2268,9 +2269,8 @@ void calculate(const BasisSet & basis, bool force) {
 	  }
 	} else { // No entry in checkpoint
 	  sol.cC=sol.C*COMPLEX1;
-	  if(!pzoo) {
-	    W.eye(Nel_alpha,Nel_alpha);
-	  } else {
+          W.eye(Nel_alpha,Nel_alpha);
+	  if(pzoo && pzrand) {
 	    if(pzimag!=1)
 	      W=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
@@ -2573,6 +2573,7 @@ void calculate(const BasisSet & basis, bool force) {
       int pzprec=settings.get_int("PZprec");
       bool pzov=settings.get_bool("PZov");
       bool pzoo=settings.get_bool("PZoo");
+      bool pzrand=settings.get_bool("PZrand");
       int pzloc=parse_pzimag(settings.get_string("PZloc"),"PZloc");
       enum locmet pzlocmet=parse_locmet(settings.get_string("PZlocmet"));
       double pzw=settings.get_double("PZw");
@@ -2649,9 +2650,8 @@ void calculate(const BasisSet & basis, bool force) {
 	  }
 	} else { // No entry in checkpoint
 	  sol.cCa=sol.Ca*COMPLEX1;
-	  if(!pzoo) {
-	    Wa.eye(Nel_alpha,Nel_alpha);
-	  } else {
+          Wa.eye(Nel_alpha,Nel_alpha);
+	  if(pzoo && pzrand) {
 	    if(pzimag!=1)
 	      Wa=real_orthogonal(Nel_alpha,seed)*std::complex<double>(1.0,0.0);
 	    else
@@ -2729,10 +2729,8 @@ void calculate(const BasisSet & basis, bool force) {
 	  }
 	} else { // No entry in checkpoint
 	  sol.cCb=sol.Cb*COMPLEX1;
-
-	  if(!pzoo) {
-	    Wb.eye(Nel_beta,Nel_beta);
-	  } else {
+          Wb.eye(Nel_beta,Nel_beta);
+          if(pzoo && pzrand) {
 	    if(pzimag!=1)
 	      Wb=real_orthogonal(Nel_beta,seed)*std::complex<double>(1.0,0.0);
 	    else
