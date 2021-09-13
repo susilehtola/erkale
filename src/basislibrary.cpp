@@ -747,6 +747,82 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
   return ret;
 }
 
+static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vector< std::vector<double> > & candidate_exponents, double thr, int nrandom=100) {
+  // Do a Cholesky decomposition to pick out a linearly independent set of auxiliary functions
+  std::vector< std::vector<double> > final_exponents(candidate_exponents.size());
+  for(size_t L=0;L<candidate_exponents.size();L++) {
+    // Get the candidate exponents
+    std::vector<double> candidates(candidate_exponents[L].begin(), candidate_exponents[L].end());
+    size_t nprim=candidates.size();
+    if(!nprim) {
+      printf("L=%i: no functions\n",(int) L);
+      continue;
+    }
+
+    // Sort in decreasing magnitude
+    std::sort(candidates.begin(),candidates.end());
+    std::reverse(candidates.begin(),candidates.end());
+
+    // Exponents
+    arma::vec exps(arma::conv_to<arma::vec>::from(candidates));
+    // Coulomb overlap matrix
+    arma::mat S=overlap(exps,exps,L-1);
+
+    // Normalize overlap matrix
+    arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
+    S = normmat*S*normmat;
+
+    // Figure out best pivoting strategy
+    arma::uvec best_pivot;
+
+    arma::uvec full_linear_pivot = arma::linspace<arma::uvec>(0,S.n_cols-1,S.n_cols);
+
+    // Try 1: linear ordering
+    arma::uvec linear_pivot = full_linear_pivot;
+    pivoted_cholesky(S,thr,linear_pivot);
+    best_pivot = linear_pivot;
+    printf("Linear ordering: %i pivot indices\n", (int) linear_pivot.n_elem);
+
+    // Try 2: sort by off-diagonal
+    arma::mat odS(arma::abs(S));
+    odS.diag().zeros();
+    // Column sum
+    arma::vec odSs(arma::sum(S).t());
+    arma::uvec odS_pivot = arma::stable_sort_index(odSs,"ascend");
+    pivoted_cholesky(S,thr,odS_pivot);
+    printf("Ordering by increasing off-diagonal overlap: %i pivot indices\n", (int) odS_pivot.n_elem);
+    if(odS_pivot.n_elem < best_pivot.n_elem)
+      best_pivot = odS_pivot;
+
+    // Try out random orderings
+    int iiter=0, titer=0;
+    std::vector<size_t> random_pivot(arma::conv_to< std::vector<size_t> >::from(full_linear_pivot));
+    while(iiter<nrandom) {
+      // Shuffle current pivot at random
+      std::random_shuffle ( random_pivot.begin(), random_pivot.end() );
+      arma::uvec rpiv(arma::conv_to<arma::uvec>::from(random_pivot));
+      pivoted_cholesky(S,thr,rpiv);
+      titer++;
+      iiter++;
+      if(rpiv.n_elem < best_pivot.n_elem) {
+        printf("Randomized order attempt %i: reduced to %i pivot indices\n", (int) titer, (int) rpiv.n_elem);
+        best_pivot = rpiv;
+        iiter=0;
+      }
+    }
+
+    // Pick out the auxiliary basis set exponents from the best pivot
+    for(size_t i=0;i<best_pivot.n_elem;i++)
+      final_exponents[L].push_back(exps[best_pivot[i]]);
+    std::sort(final_exponents[L].begin(), final_exponents[L].end());
+    std::reverse(final_exponents[L].begin(),final_exponents[L].end());
+
+    printf("L=%i: %i products => %i independent auxiliary functions\n",(int) L,(int) nprim,(int) final_exponents[L].size());
+  }
+
+  return final_exponents;
+}
+
 ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
   ElementBasisSet orbbas(*this);
   orbbas.decontract();
@@ -801,55 +877,8 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
     }
   }
 
-  // Sort in decreasing exponent
-  for(size_t L=0;L<reduced_exponents.size();L++) {
-    std::sort(reduced_exponents[L].begin(),reduced_exponents[L].end());
-    std::reverse(reduced_exponents[L].begin(),reduced_exponents[L].end());
-  }
-
-  /*
-  printf("Exponents from ERI Cholesky\n");
-  for(size_t L=0;L<reduced_exponents.size();L++)
-    for(size_t i=0;i<reduced_exponents[L].size();i++)
-      printf("L=%i %i: %e\n",(int) L, (int) i, reduced_exponents[L][i]);
-  */
-
-  // Now do another Cholesky to pick out a linearly independent set of auxiliary functions
-  std::vector< std::vector<double> > final_exponents(reduced_exponents.size());
-  for(size_t L=0;L<reduced_exponents.size();L++) {
-    size_t nprim=reduced_exponents[L].size();
-    if(!nprim) {
-      printf("L=%i: no functions\n",(int) L);
-      continue;
-    }
-
-    // Exponents
-    arma::vec exps(arma::conv_to<arma::vec>::from(reduced_exponents[L]));
-    // Coulomb overlap matrix
-    arma::mat S=overlap(exps,exps,L-1);
-
-    // Normalize overlap matrix
-    arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
-    S = normmat*S*normmat;
-    //S.print("Normalized overlap");
-
-    // Sort by off-diagonal
-    arma::mat odS(arma::abs(S));
-    odS.diag().zeros();
-    // Column sum
-    arma::vec odSs(arma::sum(S).t());
-    arma::uvec pivot = arma::stable_sort_index(odSs,"ascend");
-    // Find the auxiliary functions by pivoted Cholesky
-    pivoted_cholesky(S,thr,pivot);
-
-    // Cholesky to pick out the final exponents
-    for(size_t i=0;i<pivot.n_elem;i++)
-      final_exponents[L].push_back(exps[pivot[i]]);
-    std::sort(final_exponents[L].begin(), final_exponents[L].end());
-    std::reverse(final_exponents[L].begin(),final_exponents[L].end());
-
-    printf("L=%i: %i products => %i independent auxiliary functions\n",(int) L,(int) nprim,(int) final_exponents[L].size());
-  }
+  // Pick out the auxiliary functions by a Cholesky decomposition
+  std::vector< std::vector<double> > final_exponents = cholesky_pick_exponents(reduced_exponents, thr);
 
   // Create fitting set
   ElementBasisSet fitel(orbbas.get_symbol());
@@ -879,7 +908,7 @@ ElementBasisSet ElementBasisSet::cholesky_full_set(double thr) const {
   atoms[0].Q = 0;
 
   // Form list of candidate exponents
-  std::vector< std::set<double> > candidate_exponents(2*orbbas.get_max_am()+1);
+  std::vector< std::vector<double> > candidate_exponents(2*orbbas.get_max_am()+1);
   for(int iam=0;iam<=orbbas.get_max_am();iam++)
     for(int jam=0;jam<=iam;jam++) {
       // Primitives and coefficients
@@ -903,54 +932,14 @@ ElementBasisSet ElementBasisSet::cholesky_full_set(double thr) const {
             // with this transformation
             double scale = std::pow(gsl_sf_gamma(L+2)*gsl_sf_gamma(iam+jam+1.5)/(gsl_sf_gamma(iam+jam+2)*gsl_sf_gamma(L+1.5)),2);
             double zeff = scale*zsum;
-            candidate_exponents[L].insert(zeff);
+            candidate_exponents[L].push_back(zeff);
           }
         }
       }
     }
 
-  // Now do a Cholesky decomposition to pick out a linearly independent set of auxiliary functions
-  std::vector< std::vector<double> > final_exponents(candidate_exponents.size());
-  for(size_t L=0;L<candidate_exponents.size();L++) {
-    // Get the candidate exponents
-    std::vector<double> candidates(candidate_exponents[L].begin(), candidate_exponents[L].end());
-    size_t nprim=candidates.size();
-    if(!nprim) {
-      printf("L=%i: no functions\n",(int) L);
-      continue;
-    }
-
-    // Sort in decreasing magnitude
-    std::sort(candidates.begin(),candidates.end());
-    std::reverse(candidates.begin(),candidates.end());
-
-    // Exponents
-    arma::vec exps(arma::conv_to<arma::vec>::from(candidates));
-    // Coulomb overlap matrix
-    arma::mat S=overlap(exps,exps,L-1);
-
-    // Normalize overlap matrix
-    arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
-    S = normmat*S*normmat;
-    //S.print("Normalized overlap");
-
-    // Sort by off-diagonal
-    arma::mat odS(arma::abs(S));
-    odS.diag().zeros();
-    // Column sum
-    arma::vec odSs(arma::sum(S).t());
-    arma::uvec pivot = arma::stable_sort_index(odSs,"ascend");
-    // Find the auxiliary functions by pivoted Cholesky
-    pivoted_cholesky(S,thr,pivot);
-
-    // Cholesky to pick out the final exponents
-    for(size_t i=0;i<pivot.n_elem;i++)
-      final_exponents[L].push_back(exps[pivot[i]]);
-    std::sort(final_exponents[L].begin(), final_exponents[L].end());
-    std::reverse(final_exponents[L].begin(),final_exponents[L].end());
-
-    printf("L=%i: %i products => %i independent auxiliary functions\n",(int) L,(int) nprim,(int) final_exponents[L].size());
-  }
+  // Pick out the auxiliary functions by a Cholesky decomposition
+  std::vector< std::vector<double> > final_exponents = cholesky_pick_exponents(candidate_exponents, thr);
 
   // Create fitting set
   ElementBasisSet fitel(orbbas.get_symbol());
