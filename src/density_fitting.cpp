@@ -1230,7 +1230,7 @@ void DensityFit::B_matrix(arma::mat & B) const {
 	    size_t nu=inu+nu0;
 	    size_t a=ia+a0;
 
-	    double el(amunu(ia+a0,nu*Nmu+mu));
+            double el(amunu(ia+a0,inu*Nmu+imu));
 	    B(mu*Nbf+nu,a)=el;
 	    B(nu*Nbf+mu,a)=el;
 	  }
