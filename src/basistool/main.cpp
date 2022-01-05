@@ -21,11 +21,12 @@
 #include "pivoted_cholesky_basis.h"
 #include "../completeness/completeness_profile.h"
 #include "../density_fitting.h"
+#include "../linalg.h"
 #ifdef SVNRELEASE
 #include "../version.h"
 #endif
 
-std::string cmds[]={"augdiffuse", "augsteep", "choleskyaux", "fullcholeskyaux", "choleskydens", "choleskybasis", "completeness", "composition", "daug", "decontract", "densityfit", "dump", "dumpdec", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"augdiffuse", "augsteep", "choleskyaux", "fullcholeskyaux", "choleskydens", "choleskybasis", "completeness", "composition", "contractaux", "daug", "decontract", "densityfit", "dump", "dumpdec", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 void help() {
   printf("Valid commands:\n");
@@ -327,6 +328,280 @@ int main_guarded(int argc, char **argv) {
 	  if(Nsh(am,0)>0)
 	    printf("%i%c",(int) Nsh(am,0),tolower(shell_types[am]));
 	printf("\n");
+      }
+    }
+
+  } else if(stricmp(cmd,"contractaux")==0) {
+    // Contract auxiliary basis
+
+    if(argc!=6) {
+      printf("\nUsage: %s orbbas.gbs contractaux auxbas.gbs threshold output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    // Load auxiliary basis
+    BasisSetLibrary auxbas;
+    auxbas.load_gaussian94(argv[3]);
+    double threshold(atof(argv[4]));
+    std::string outname(argv[5]);
+
+    settings.add_string("Decontract","","");
+    settings.add_bool("BasisRotate","",false);
+    settings.add_double("BasisCutoff","",1e-10);
+    settings.add_bool("UseLM","",true);
+    settings.add_bool("OptLM","",false);
+
+    init_libint_base();
+
+    // Basis set library to write out
+    BasisSetLibrary contracted;
+
+    if(threshold<=0.0) {
+      printf("Contracting auxiliary basis set with threshold specified by highest angular momentum.\n",threshold);
+    } else {
+      printf("Contracting auxiliary basis set with threshold %e\n",threshold);
+    }
+
+    // Loop over elements in the auxiliary basis set
+    std::vector<ElementBasisSet> auxelements(auxbas.get_elements());
+    for(size_t iaux=0; iaux<auxelements.size(); iaux++) {
+      // Get the name of the element
+      std::string element = auxelements[iaux].get_symbol();
+
+      // Contracted auxiliary basis
+      ElementBasisSet contraux(element);
+
+      // Dummy atom
+      std::vector<atom_t> atoms(1);
+      atoms[0].el=element;
+      atoms[0].num=0;
+      atoms[0].x=0.0;
+      atoms[0].y=0.0;
+      atoms[0].z=0.0;
+      atoms[0].Q=0;
+
+      // Construct basis sets
+      BasisSet orbbasis, auxbasis;
+      construct_basis(orbbasis, atoms, bas);
+      construct_basis(auxbasis, atoms, auxbas);
+      auxbasis.coulomb_normalize();
+
+      size_t Naux = auxbasis.get_Nbf();
+
+      // Initialize density fitting code
+      DensityFit dfit;
+      bool direct=false;
+      double erithr=1e-10;
+      double linthr=1e-6;
+      bool bmat=true;
+      dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, bmat);
+
+      // Get the 3c integrals matrix
+      arma::mat I3c;
+      dfit.three_center_integrals(I3c);
+
+      // Form the W matrix in the non-orthogonal basis
+      arma::mat Wno(arma::trans(I3c)*I3c);
+
+      // Get the shells in the auxiliary basis set
+      std::vector<GaussianShell> auxshells(auxbasis.get_shells());
+      // List of shells with the wanted angular momentum
+      std::vector<arma::uvec> am_shells(auxbasis.get_max_am()+1);
+      for(int am=0;am<=auxbasis.get_max_am();am++) {
+        std::vector<size_t> shellidx;
+        for(size_t is=0; is<auxshells.size(); is++) {
+          // Check we have right angular momentum
+          if(auxshells[is].get_am() != am) continue;
+          // Check for pure angular momentum
+          if(!auxshells[is].lm_in_use()) {
+            throw std::logic_error("Must use spherical auxiliary basis!\n");
+          }
+          shellidx.push_back(is);
+        }
+        am_shells[am] = arma::conv_to<arma::uvec>::from(shellidx);
+      }
+
+      // Returns functions with wanted am
+      auto l_functions = [am_shells, auxshells](int l) {
+        std::vector<size_t> iidx;
+        for(auto is: am_shells[l]) {
+          for(int m=-l;m<=l;m++) {
+            iidx.push_back(auxshells[is].get_first_ind() + l+m);
+          }
+        }
+        return arma::conv_to<arma::uvec>::from(iidx);
+      };
+      auto lm_functions = [am_shells, auxshells](int l, int m) {
+        std::vector<size_t> iidx;
+        for(auto is: am_shells[l]) {
+          size_t iind(auxshells[is].get_first_ind() + l+m);
+          iidx.push_back(iind);
+        }
+        return arma::conv_to<arma::uvec>::from(iidx);
+      };
+
+#if 0
+      // Compute W norm
+      arma::mat Wnorm(auxbasis.get_max_am()+1,auxbasis.get_max_am()+1);
+      for(size_t iam=0;iam<=auxbasis.get_max_am();iam++) {
+        for(size_t jam=0;jam<=iam;jam++) {
+          arma::mat Wsub(Wno(l_functions(iam),l_functions(jam)));
+          Wnorm(iam,jam)=arma::norm(Wsub,"fro");
+          Wnorm(jam,iam)=Wnorm(iam,jam);
+        }
+      }
+      printf("Sum of l-diagonal norm W %e sum of off-diagonal l-l' %e\n",arma::sum(arma::abs(arma::diagvec(Wnorm))), arma::sum(arma::sum(arma::abs(Wnorm-arma::diagmat(arma::diagvec(Wnorm))))));
+
+      // Analyze l-l blocks
+      for(int am=0;am<=auxbasis.get_max_am();am++) {
+        arma::mat Wmnorm(2*am+1,2*am+1,arma::fill::zeros);
+        for(int im=-am;im<=am;im++) {
+          for(int jm=-am;jm<=im;jm++) {
+            arma::mat Wsub(Wno(lm_functions(am,im),lm_functions(am,jm)));
+            Wmnorm(im+am,jm+am) = arma::norm(Wsub,"fro");
+            Wmnorm(jm+am,im+am) = Wmnorm(im+am,jm+am);
+          }
+        }
+        int m0idx = am;
+        printf("%i-%i diagonal sum %e sum of other elements %e\n",am,am,arma::sum(arma::abs(arma::diagvec(Wmnorm))), arma::sum(arma::sum(arma::abs(Wmnorm-arma::diagmat(arma::diagvec(Wmnorm))))));
+      }
+#endif
+
+      // Get the (a|b) integrals
+      arma::mat ab = dfit.get_ab();
+
+      // Form contractions
+      std::vector<arma::vec> exps(auxbasis.get_max_am()+1);
+      std::vector<arma::mat> coeffs(auxbasis.get_max_am()+1);
+      std::vector<arma::vec> evals(auxbasis.get_max_am()+1);
+      for(int am=0;am<=auxbasis.get_max_am();am++) {
+        size_t Nprim = am_shells[am].n_elem;
+
+        // Extract W submatrix
+        auto iv = lm_functions(am,0);
+        arma::mat Wnosub(Wno.submat(iv,iv));
+
+        // Extract ab submatrix
+        arma::mat absub(ab.submat(iv,iv));
+        arma::vec abval;
+        arma::mat abvec;
+        eig_sym_ordered(abval, abvec, absub);
+
+        // Throw out vectors with small eigenvalues
+        arma::uvec indep(arma::find(abval >= 1e-7));
+        abval=abval(indep);
+        abvec=abvec.cols(indep);
+
+        // Symmetric orthogonalization
+        arma::mat X = abvec * arma::diagmat(arma::pow(abval, -0.5));
+
+        // Now extract the contraction coefficients from an eigendecomposition
+        arma::mat Wsub = X.t() * Wnosub * X;
+        arma::vec Wval;
+        arma::mat Wvec;
+        eig_sym_ordered(Wval, Wvec, Wsub);
+        // Convert vectors to the original non-orthogonal basis.
+        Wvec = X*Wvec;
+
+        // Collect exponents
+        exps[am].zeros(Nprim);
+        for(size_t ix=0;ix < Wvec.n_rows; ix++) {
+          exps[am][ix] = auxshells[am_shells[am][ix]].get_contr()[0].z;
+        }
+        coeffs[am] = Wvec;
+        evals[am] = Wval;
+
+        std::ostringstream legend;
+        legend << element << " l= " << am << " eigenvalues";
+        arma::reverse(Wval).print(legend.str());
+      }
+
+      double elthresh = threshold;
+      if(elthresh<0) {
+        elthresh = arma::max(evals[evals.size()-1]);
+        printf("Employing threshold %e for %s\n",elthresh,element.c_str());
+      }
+
+      // Number of basis functions
+      size_t norig=0, ncontr=0;
+
+      std::ostringstream ucomp, ccomp;
+      for(int am=0;am<=auxbasis.get_max_am();am++) {
+        // Keep the vectors above the threshold
+        arma::uvec keep_idx(arma::find(evals[am] >= elthresh));
+        arma::vec Wval(evals[am](keep_idx));
+        arma::mat Wvec(coeffs[am].cols(keep_idx));
+
+        // Number of basis functions
+        norig += evals[am].n_elem*(2*am+1);
+        ncontr += keep_idx.n_elem*(2*am+1);
+
+        if(evals[am].n_elem)
+          ucomp << evals[am].n_elem << char(tolower(shell_types[am]));
+        if(keep_idx.n_elem)
+          ccomp << keep_idx.n_elem << char(tolower(shell_types[am]));
+
+        // Add functions to basis
+        for(size_t ic=0;ic < Wvec.n_cols;ic++) {
+          std::vector<contr_t> C;
+          for(size_t ix=0;ix < Wvec.n_rows; ix++) {
+            contr_t entry;
+            // The exponent is just
+            entry.z = exps[am][ix];
+            // Our auxiliary basis functions are normalized in the
+            // Coulomb metric; however, library basis sets are in the
+            // overlap normalization. This means that we need to scale
+            // our contraction coefficient by the square root of the
+            // exponent: the one-center Coulomb overlap for angular
+            // momentum l is the same as the normal overlap for
+            // angular momentum l-1.
+            entry.c = Wvec(ix, ic)*sqrt(entry.z);
+            if(entry.c != 0) {
+              C.push_back(entry);
+            }
+          }
+          contraux.add_function(FunctionShell(am, C));
+        }
+      }
+      contracted.add_element(contraux);
+
+      printf("%s -> %s contraction reduces number of auxiliary functions for %s from %i to %i implying a % .1f %% reduction\n",ucomp.str().c_str(),ccomp.str().c_str(),element.c_str(),norig,ncontr,(norig-ncontr)*100.0/norig);
+
+    }
+    contracted.save_gaussian94(outname);
+
+    if(false) {
+      // Test that basis is ok
+      for(size_t iaux=0; iaux<auxelements.size(); iaux++) {
+        // Get the name of the element
+        std::string element = auxelements[iaux].get_symbol();
+
+        // Dummy atom
+        std::vector<atom_t> atoms(1);
+        atoms[0].el=element;
+        atoms[0].num=0;
+        atoms[0].x=0.0;
+        atoms[0].y=0.0;
+        atoms[0].z=0.0;
+        atoms[0].Q=0;
+
+        BasisSet orbbasis, auxbasis;
+        construct_basis(orbbasis, atoms, bas);
+        construct_basis(auxbasis, atoms, contracted);
+        auxbasis.coulomb_normalize();
+
+        DensityFit dfit;
+        bool direct=false;
+        double erithr=1e-10;
+        double linthr=1e-6;
+        bool bmat=false;
+        dfit.fill(orbbasis, auxbasis, direct, erithr, linthr, bmat);
+
+        // This matrix should be orthonormal, since the contracted functions are orthonormalized
+        arma::mat ab(dfit.get_ab());
+        ab -= arma::eye<arma::mat>(ab.n_rows,ab.n_cols);
+        double dnorm(arma::norm(ab,"fro"));
+        printf("%s aux basis non-orthonormality %e\n",element.c_str(),dnorm);
       }
     }
   } else if(stricmp(cmd,"daug")==0 || stricmp(cmd,"taug")==0) {
