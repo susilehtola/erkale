@@ -96,7 +96,7 @@ int main_guarded(int argc, char **argv) {
     }
 
     printf("Forming reduced auxiliary basis set by pivoted Cholesky decomposition\n");
-    printf("See arXiv:2106.11081\n\n");
+    printf("See J. Chem. Theory Comput. 17, 6886 (2021). DOI: 10.1021/acs.jctc.1c00607\n\n");
 
     double thr(atof(argv[3]));
     std::string outfile(argv[4]);
@@ -121,7 +121,7 @@ int main_guarded(int argc, char **argv) {
     }
 
     printf("Forming full auxiliary basis set by pivoted Cholesky decomposition\n");
-    printf("See arXiv:2106.11081\n\n");
+    printf("See J. Chem. Theory Comput. 17, 6886 (2021). DOI: 10.1021/acs.jctc.1c00607\n\n");
 
     double thr(atof(argv[3]));
     std::string outfile(argv[4]);
