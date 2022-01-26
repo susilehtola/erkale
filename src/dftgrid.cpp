@@ -412,8 +412,8 @@ arma::uvec AngularGrid::screen_density(double thr) const {
 }
 
 
-void AngularGrid::update_density(const arma::mat & P0) {
-  // Update values of densitty
+void AngularGrid::update_density(const arma::mat & P0, bool force) {
+  // Update values of density
 
   if(!P0.n_elem) {
     ERROR_INFO();
@@ -426,6 +426,8 @@ void AngularGrid::update_density(const arma::mat & P0) {
   // Update density vector
   arma::mat P(P0.submat(bf_ind,bf_ind));
   Pv=P*bf;
+  if(force && do_lapl)
+    Plapl=P*bf_lapl;
 
   // Calculate density
   rho.zeros(1,grid.size());
@@ -516,7 +518,7 @@ void AngularGrid::update_density(const arma::mat & P0) {
   }
 }
 
-void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
+void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, bool force) {
   if(!Pa0.n_elem || !Pb0.n_elem) {
     ERROR_INFO();
     throw std::runtime_error("Error - density matrix is empty!\n");
@@ -531,6 +533,10 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
 
   Pav=Pa*bf;
   Pbv=Pb*bf;
+  if(force && do_lapl) {
+    Palapl=Pa*bf_lapl;
+    Pblapl=Pb*bf_lapl;
+  }
 
   // Calculate density
   rho.zeros(2,grid.size());
@@ -648,7 +654,7 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0) {
 }
 
 void AngularGrid::update_density(const arma::cx_vec & C0) {
-  // Update values of densitty
+  // Update values of density
 
   if(!C0.n_elem) {
     ERROR_INFO();
@@ -2294,13 +2300,13 @@ arma::vec AngularGrid::eval_force_u() const {
 		size_t ip(screen(iip));
 		for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 		  // Z_x =
-		  Za(0,ip) += bf_lapl(mu,ip)*Pav_x(mu,ip) + Pav(mu,ip)*bf_lx(mu,ip);
-		  Za(1,ip) += bf_lapl(mu,ip)*Pav_y(mu,ip) + Pav(mu,ip)*bf_ly(mu,ip);
-		  Za(2,ip) += bf_lapl(mu,ip)*Pav_z(mu,ip) + Pav(mu,ip)*bf_lz(mu,ip);
+		  Za(0,ip) += bf_x(mu,ip)*Palapl(mu,ip) + Pav(mu,ip)*bf_lx(mu,ip);
+		  Za(1,ip) += bf_y(mu,ip)*Palapl(mu,ip) + Pav(mu,ip)*bf_ly(mu,ip);
+		  Za(2,ip) += bf_z(mu,ip)*Palapl(mu,ip) + Pav(mu,ip)*bf_lz(mu,ip);
 
-		  Zb(0,ip) += bf_lapl(mu,ip)*Pbv_x(mu,ip) + Pbv(mu,ip)*bf_lx(mu,ip);
-		  Zb(1,ip) += bf_lapl(mu,ip)*Pbv_y(mu,ip) + Pbv(mu,ip)*bf_ly(mu,ip);
-		  Zb(2,ip) += bf_lapl(mu,ip)*Pbv_z(mu,ip) + Pbv(mu,ip)*bf_lz(mu,ip);
+		  Zb(0,ip) += bf_x(mu,ip)*Pblapl(mu,ip) + Pbv(mu,ip)*bf_lx(mu,ip);
+		  Zb(1,ip) += bf_y(mu,ip)*Pblapl(mu,ip) + Pbv(mu,ip)*bf_ly(mu,ip);
+		  Zb(2,ip) += bf_z(mu,ip)*Pblapl(mu,ip) + Pbv(mu,ip)*bf_lz(mu,ip);
 		}
 	      }
 	    }
@@ -2322,8 +2328,8 @@ arma::vec AngularGrid::eval_force_u() const {
 	  vl_b%=w;
 
 	  // Increment force
-	  f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(vt_a+2*vl_a) + Za*arma::trans(vl_a);
-	  f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(vt_b+2*vl_b) + Zb*arma::trans(vl_b);
+	  f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(vt_a+4*vl_a) + Za*arma::trans(vl_a);
+	  f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(vt_b+4*vl_b) + Zb*arma::trans(vl_b);
 
 	} else if(do_mgga_t) {
 	  arma::rowvec vt_a(vtau.row(0));
@@ -2340,8 +2346,8 @@ arma::vec AngularGrid::eval_force_u() const {
 	  arma::rowvec vl_b(vlapl.row(1));
 	  vl_a%=w;
 	  vl_b%=w;
-	  f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(2*vl_a) + Za*arma::trans(vl_a);
-	  f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(2*vl_b) + Zb*arma::trans(vl_b);
+	  f.subvec(3*inuc, 3*inuc+2) += Ya*arma::trans(4*vl_a) + Za*arma::trans(vl_a);
+	  f.subvec(3*inuc, 3*inuc+2) += Yb*arma::trans(4*vl_b) + Zb*arma::trans(vl_b);
 	}
       }
     }
@@ -2479,9 +2485,9 @@ arma::vec AngularGrid::eval_force_r() const {
 		size_t ip(screen(iip));
 		for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 		  // Z_x =
-		  Z(0,ip) += bf_lapl(mu,ip)*Pv_x(mu,ip) + Pv(mu,ip)*bf_lx(mu,ip);
-		  Z(1,ip) += bf_lapl(mu,ip)*Pv_y(mu,ip) + Pv(mu,ip)*bf_ly(mu,ip);
-		  Z(2,ip) += bf_lapl(mu,ip)*Pv_z(mu,ip) + Pv(mu,ip)*bf_lz(mu,ip);
+		  Z(0,ip) += bf_x(mu,ip)*Plapl(mu,ip) + Pv(mu,ip)*bf_lx(mu,ip);
+		  Z(1,ip) += bf_y(mu,ip)*Plapl(mu,ip) + Pv(mu,ip)*bf_ly(mu,ip);
+		  Z(2,ip) += bf_z(mu,ip)*Plapl(mu,ip) + Pv(mu,ip)*bf_lz(mu,ip);
 		}
 	      }
 	    }
@@ -2498,7 +2504,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	  vl%=w;
 
 	  // Increment force
-	  f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(vt+2*vl) + Z*arma::trans(vl);
+	  f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(vt+4*vl) + Z*arma::trans(vl);
 
 	} else if(do_mgga_t) {
 	  arma::rowvec vt(vtau.row(0));
@@ -2508,7 +2514,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	} else if(do_mgga_l) {
 	  arma::rowvec vl(vlapl.row(0));
 	  vl%=w;
-	  f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(2*vl) + Z*arma::trans(vl);
+	  f.subvec(3*inuc, 3*inuc+2) += Y*arma::trans(4*vl) + Z*arma::trans(vl);
 	}
       }
     }
@@ -4769,7 +4775,7 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & P) {
       wrk[ith].form_grid();
 
       // Update density
-      wrk[ith].update_density(P);
+      wrk[ith].update_density(P,true);
 
       // Initialize the arrays
       wrk[ith].init_xc();
@@ -4834,7 +4840,7 @@ arma::vec DFTGrid::eval_force(int x_func, int c_func, const arma::mat & Pa, cons
       wrk[ith].form_grid();
 
       // Update density
-      wrk[ith].update_density(Pa,Pb);
+      wrk[ith].update_density(Pa,Pb,true);
 
       // Initialize the arrays
       wrk[ith].init_xc();
