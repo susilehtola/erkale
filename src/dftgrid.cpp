@@ -2176,8 +2176,8 @@ arma::vec AngularGrid::eval_force_u() const {
     f.subvec(3*inuc,3*inuc+2) += 2.0 * (gradrhoa*arma::trans(vrhoa) + gradrhob*arma::trans(vrhob));
 
     if(do_gga) {
-      // Calculate X = 2 \sum_{u'v} P(uv) [ x(v) d_ij x(u) + (d_i x(u)) (d_j x(v)) ]
-      //             = 2 \sum_u' Pv(u) d_ij x(u) + 2 \sum Pv_i(v) d_j x(v)
+      // Calculate X_ij = 2 \sum_{u'v} P(uv) [ x(v) d_ij x(u) + (d_i x(u)) (d_j x(v)) ]
+      //                = 2 \sum_u' Pv(u) d_ij x(u) + 2 \sum Pv_i(v) d_j x(v)
       arma::mat Xa(9,grid.size());
       Xa.zeros();
       arma::mat Xb(9,grid.size());
@@ -2261,7 +2261,7 @@ arma::vec AngularGrid::eval_force_u() const {
       if(do_mgga_t || do_mgga_l) {
 	// Kinetic energy and Laplacian terms
 
-	// Y = P_uv (d_i d_j x(u)) d_j x(v)
+	// Y_i = P_uv (d_i d_j x(u)) d_j x(v)
 	arma::mat Ya(3,grid.size());
 	Ya.zeros();
 	arma::mat Yb(3,grid.size());
@@ -2283,7 +2283,7 @@ arma::vec AngularGrid::eval_force_u() const {
 	    }
 	  }
 
-	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
+	// Z_i = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
 	arma::mat Za, Zb;
 	if(do_mgga_l) {
 	  Za.zeros(3,grid.size());
@@ -2294,13 +2294,13 @@ arma::vec AngularGrid::eval_force_u() const {
 		size_t ip(screen(iip));
 		for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 		  // Z_x =
-		  Za(0,ip) += bf_lapl(mu,ip)*Pav_x(mu,ip) + Pav(mu)*bf_lx(mu,ip);
-		  Za(1,ip) += bf_lapl(mu,ip)*Pav_y(mu,ip) + Pav(mu)*bf_ly(mu,ip);
-		  Za(2,ip) += bf_lapl(mu,ip)*Pav_z(mu,ip) + Pav(mu)*bf_lz(mu,ip);
+		  Za(0,ip) += bf_lapl(mu,ip)*Pav_x(mu,ip) + Pav(mu,ip)*bf_lx(mu,ip);
+		  Za(1,ip) += bf_lapl(mu,ip)*Pav_y(mu,ip) + Pav(mu,ip)*bf_ly(mu,ip);
+		  Za(2,ip) += bf_lapl(mu,ip)*Pav_z(mu,ip) + Pav(mu,ip)*bf_lz(mu,ip);
 
-		  Zb(0,ip) += bf_lapl(mu,ip)*Pbv_x(mu,ip) + Pbv(mu)*bf_lx(mu,ip);
-		  Zb(1,ip) += bf_lapl(mu,ip)*Pbv_y(mu,ip) + Pbv(mu)*bf_ly(mu,ip);
-		  Zb(2,ip) += bf_lapl(mu,ip)*Pbv_z(mu,ip) + Pbv(mu)*bf_lz(mu,ip);
+		  Zb(0,ip) += bf_lapl(mu,ip)*Pbv_x(mu,ip) + Pbv(mu,ip)*bf_lx(mu,ip);
+		  Zb(1,ip) += bf_lapl(mu,ip)*Pbv_y(mu,ip) + Pbv(mu,ip)*bf_ly(mu,ip);
+		  Zb(2,ip) += bf_lapl(mu,ip)*Pbv_z(mu,ip) + Pbv(mu,ip)*bf_lz(mu,ip);
 		}
 	      }
 	    }
@@ -2453,7 +2453,7 @@ arma::vec AngularGrid::eval_force_r() const {
       if(do_mgga_t || do_mgga_l) {
 	// Kinetic energy and Laplacian terms
 
-	// Y = P_uv (d_i d_j x(u)) d_j x(v)
+	// Y_i = P_uv (d_i d_j x(u)) d_j x(v)
 	arma::mat Y(3,grid.size());
 	Y.zeros();
 	for(size_t iish=0;iish<shells.size();iish++)
@@ -2469,7 +2469,7 @@ arma::vec AngularGrid::eval_force_r() const {
 	    }
 	  }
 
-	// Z = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
+	// Z_i = 2 P_uv (lapl x_v d_i x_u + x_v lapl (d_i x_u))
 	arma::mat Z;
 	if(do_mgga_l) {
 	  Z.zeros(3,grid.size());
@@ -2479,9 +2479,9 @@ arma::vec AngularGrid::eval_force_r() const {
 		size_t ip(screen(iip));
 		for(size_t mu=bf_i0(iish);mu<bf_i0(iish)+bf_N(iish);mu++) {
 		  // Z_x =
-		  Z(0,ip) += bf_lapl(mu,ip)*Pv_x(mu,ip) + Pv(mu)*bf_lx(mu,ip);
-		  Z(1,ip) += bf_lapl(mu,ip)*Pv_y(mu,ip) + Pv(mu)*bf_ly(mu,ip);
-		  Z(2,ip) += bf_lapl(mu,ip)*Pv_z(mu,ip) + Pv(mu)*bf_lz(mu,ip);
+		  Z(0,ip) += bf_lapl(mu,ip)*Pv_x(mu,ip) + Pv(mu,ip)*bf_lx(mu,ip);
+		  Z(1,ip) += bf_lapl(mu,ip)*Pv_y(mu,ip) + Pv(mu,ip)*bf_ly(mu,ip);
+		  Z(2,ip) += bf_lapl(mu,ip)*Pv_z(mu,ip) + Pv(mu,ip)*bf_lz(mu,ip);
 		}
 	      }
 	    }
