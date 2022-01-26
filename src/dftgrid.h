@@ -217,12 +217,14 @@ class AngularGrid {
   /// Values of z gradient of laplacian; used for MGGA force
   arma::mat bf_lz;
 
-
   /// Density helper matrices: P_{uv} chi_v, and P_{uv} nabla(chi_v)
   arma::mat Pv, Pv_x, Pv_y, Pv_z;
   /// Same for spin-polarized
   arma::mat Pav, Pav_x, Pav_y, Pav_z;
   arma::mat Pbv, Pbv_x, Pbv_y, Pbv_z;
+
+  /// Laplacian matrix; used for MGGA force
+  arma::mat Plapl, Palapl, Pblapl;
 
   /// Is gradient needed?
   bool do_grad;
@@ -370,9 +372,9 @@ class AngularGrid {
   arma::uvec screen_density(double thr=1e-10) const;
 
   /// Update values of density, restricted calculation
-  void update_density(const arma::mat & P);
+  void update_density(const arma::mat & P, bool lapl=false);
   /// Update values of density, unrestricted calculation
-  void update_density(const arma::mat & Pa, const arma::mat & Pb);
+  void update_density(const arma::mat & Pa, const arma::mat & Pb, bool lapl=false);
   /// Update values of density, self-interaction correction
   void update_density(const arma::cx_vec & C);
 
