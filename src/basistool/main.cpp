@@ -22,11 +22,12 @@
 #include "../completeness/completeness_profile.h"
 #include "../density_fitting.h"
 #include "../linalg.h"
+#include "../elements.h"
 #ifdef SVNRELEASE
 #include "../version.h"
 #endif
 
-std::string cmds[]={"augdiffuse", "augsteep", "choleskyaux", "fullcholeskyaux", "choleskydens", "choleskybasis", "completeness", "composition", "contractaux", "daug", "decontract", "densityfit", "dump", "dumpdec", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
+std::string cmds[]={"augdiffuse", "augsteep", "choleskyaux", "fullcholeskyaux", "choleskydens", "choleskybasis", "completeness", "composition", "contractaux", "daug", "decontract", "densityfit", "dump", "dumpdec", "dropaux_yang", "dropaux", "fiterr", "genbas", "gendecbas", "merge", "norm", "orth", "overlap", "Porth", "prodset", "save", "savecfour", "savedalton", "savemolpro", "sort", "taug"};
 
 void help() {
   printf("Valid commands:\n");
@@ -687,6 +688,84 @@ int main_guarded(int argc, char **argv) {
     bas.decontract();
     elbas.add_element(bas.get_element(el,no));
     elbas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"dropaux_yang")==0) {
+    // Drop high-angular-momentum functions in the style of Yang et al and Stoychev et al
+
+    if(argc!=6) {
+      printf("\nUsage: %s orbbas.gbs dropaux_yang auxbas.gbs linc truncauxbas.gbs\n",argv[0]);
+      return 1;
+    }
+
+    std::string auxfile(argv[3]);
+    int linc(atoi(argv[4]));
+    std::string fileout(argv[5]);
+
+    // Load auxiliary basis
+    BasisSetLibrary auxbas;
+    auxbas.load_basis(auxfile);
+
+    // Construct map of angular momenta
+    std::map<int, int> maxam;
+    std::vector<ElementBasisSet> elements(auxbas.get_elements());
+    for(size_t iel=0;iel<elements.size();iel++) {
+      int Z = get_Z(elements[iel].get_symbol());
+
+      // Occupied angular momentum
+      int locc = 0;
+      if(Z>=3)
+        locc=1;
+      if(Z>=19)
+        locc=2;
+      if(Z>=55)
+        locc=3;
+
+      // Orbital angular momentum
+      int lobs = bas.get_element(elements[iel].get_symbol()).get_max_am();
+
+      maxam[Z] = std::max(2*locc,lobs+linc);
+    }
+    auxbas.truncate_shells(maxam);
+    auxbas.save_gaussian94(fileout);
+
+  } else if(stricmp(cmd,"dropaux")==0) {
+    // Drop high-angular-momentum functions
+
+    if(argc!=6) {
+      printf("\nUsage: %s orbbas.gbs dropaux auxbas.gbs linc truncauxbas.gbs\n",argv[0]);
+      return 1;
+    }
+
+    std::string auxfile(argv[3]);
+    int linc(atoi(argv[4]));
+    std::string fileout(argv[5]);
+
+    // Load auxiliary basis
+    BasisSetLibrary auxbas;
+    auxbas.load_basis(auxfile);
+
+    // Construct map of angular momenta
+    std::map<int, int> maxam;
+    std::vector<ElementBasisSet> elements(auxbas.get_elements());
+    for(size_t iel=0;iel<elements.size();iel++) {
+      int Z = get_Z(elements[iel].get_symbol());
+
+      // Occupied angular momentum
+      int locc = 0;
+      if(Z>=3)
+        locc=1;
+      if(Z>=19)
+        locc=2;
+      if(Z>=55)
+        locc=3;
+
+      // Orbital angular momentum
+      int lobs = bas.get_element(elements[iel].get_symbol()).get_max_am();
+
+      maxam[Z] = std::max(2*locc,lobs+locc+linc);
+    }
+    auxbas.truncate_shells(maxam);
+    auxbas.save_gaussian94(fileout);
 
   } else if(stricmp(cmd,"fiterr")==0) {
     // Calculate fit error in auxiliary basis
