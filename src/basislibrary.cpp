@@ -340,6 +340,14 @@ void ElementBasisSet::normalize() {
     bf[i].normalize();
 }
 
+void ElementBasisSet::truncate_shells(const std::map<int, int> & maxorbam) {
+  int Z = get_Z(get_symbol());
+  int lcut = maxorbam.at(Z);
+  for(size_t ish=bf.size()-1;ish<bf.size();ish--)
+    if(bf[ish].get_am()>lcut)
+      bf.erase(bf.begin()+ish);
+}
+
 void ElementBasisSet::print() const {
   printf("%s %i:\n",symbol.c_str(),(int) number);
   for(size_t i=0;i<bf.size();i++) {
@@ -2329,6 +2337,11 @@ size_t BasisSetLibrary::get_max_Ncontr() const {
   for(size_t i=0;i<elements.size();i++)
     Ncontr=std::max(Ncontr, elements[i].get_max_Ncontr());
   return Ncontr;
+}
+
+void BasisSetLibrary::truncate_shells(const std::map<int, int> & maxorbam) {
+  for(size_t i=0;i<elements.size();i++)
+    elements[i].truncate_shells(maxorbam);
 }
 
 void BasisSetLibrary::print() const {

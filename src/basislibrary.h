@@ -219,6 +219,9 @@ class ElementBasisSet {
   /// Augment the basis with diffuse functions
   void augment_diffuse(int naug);
 
+  /// Drop high-angular-momentum functions
+  void truncate_shells(const std::map<int,int> & maxorbam);
+
   friend class BasisSetLibrary;
 };
 
@@ -328,6 +331,9 @@ class BasisSetLibrary {
   void augment_steep(int naug);
   /// Augment the basis with diffuse functions
   void augment_diffuse(int naug);
+
+  /// Drop high-angular-momentum shells
+  void truncate_shells(const std::map<int,int> & maxorbam);
 
   /// Print out library
   void print() const;
