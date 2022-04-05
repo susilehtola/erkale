@@ -377,7 +377,7 @@ void is_gga_mgga(int func_id, bool & gga, bool & mgga_t, bool & mgga_l) {
 #endif
 
 #if defined(XC_FLAGS_NEEDS_TAU)
-      mgga_l=func.info->flags & XC_FLAGS_NEEDS_TAU;
+      mgga_t=func.info->flags & XC_FLAGS_NEEDS_TAU;
 #else
       mgga_t=true;
 #endif
