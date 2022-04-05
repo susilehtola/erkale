@@ -953,9 +953,9 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   if(has_exc(func_id)) {
     if(pot) {
       if(mgga_t || mgga_l) {// meta-GGA
-	double * laplp = mgga_t ? lapl.memptr() : NULL;
+	double * laplp = mgga_l ? lapl.memptr() : NULL;
 	double * taup = mgga_t ? tau.memptr() : NULL;
-	double * vlaplp = mgga_t ? vlapl_wrk.memptr() : NULL;
+	double * vlaplp = mgga_l ? vlapl_wrk.memptr() : NULL;
 	double * vtaup = mgga_t ? vtau_wrk.memptr() : NULL;
 	xc_mgga_exc_vxc(&func, N, rho.memptr(), sigma.memptr(), laplp, taup, exc_wrk.memptr(), vxc_wrk.memptr(), vsigma_wrk.memptr(), vlaplp, vtaup);
       } else if(gga) // GGA
@@ -964,7 +964,7 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
 	xc_lda_exc_vxc(&func, N, rho.memptr(), exc_wrk.memptr(), vxc_wrk.memptr());
     } else {
       if(mgga_t || mgga_l) { // meta-GGA
-	double * laplp = mgga_t ? lapl.memptr() : NULL;
+	double * laplp = mgga_l ? lapl.memptr() : NULL;
 	double * taup = mgga_t ? tau.memptr() : NULL;
 	xc_mgga_exc(&func, N, rho.memptr(), sigma.memptr(), laplp, taup, exc_wrk.memptr());
       } else if(gga) // GGA
@@ -976,9 +976,9 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
   } else {
     if(pot) {
       if(mgga_t || mgga_l) { // meta-GGA
-	double * laplp = mgga_t ? lapl.memptr() : NULL;
+	double * laplp = mgga_l ? lapl.memptr() : NULL;
 	double * taup = mgga_t ? tau.memptr() : NULL;
-	double * vlaplp = mgga_t ? vlapl_wrk.memptr() : NULL;
+	double * vlaplp = mgga_l ? vlapl_wrk.memptr() : NULL;
 	double * vtaup = mgga_t ? vtau_wrk.memptr() : NULL;
 	xc_mgga_vxc(&func, N, rho.memptr(), sigma.memptr(), laplp, taup, vxc_wrk.memptr(), vsigma_wrk.memptr(), vlaplp, vtaup);
       } else if(gga) // GGA
