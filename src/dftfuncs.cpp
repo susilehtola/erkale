@@ -375,7 +375,13 @@ void is_gga_mgga(int func_id, bool & gga, bool & mgga_t, bool & mgga_l) {
 #ifdef XC_FAMILY_HYB_MGGA
     case XC_FAMILY_HYB_MGGA:
 #endif
+
+#if defined(XC_FLAGS_NEEDS_TAU)
+      mgga_l=func.info->flags & XC_FLAGS_NEEDS_TAU;
+#else
       mgga_t=true;
+#endif
+
 #if defined(XC_FLAGS_NEEDS_LAPLACIAN)
       mgga_l=func.info->flags & XC_FLAGS_NEEDS_LAPLACIAN;
 #else
@@ -564,7 +570,7 @@ void range_separation(int func_id, double & omega, double & alpha, double & beta
       }
       xc_func_set_ext_params(&func, pars.memptr());
     }
-    
+
 #if XC_MAJOR_VERSION >= 6
     switch(xc_hyb_type(&func)) {
     case(XC_HYB_HYBRID):
