@@ -747,7 +747,7 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
   return ret;
 }
 
-static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vector< std::vector<double> > & candidate_exponents, double thr, int nrandom=100) {
+static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vector< std::vector<double> > & candidate_exponents, double thr, bool do_overlap, int nrandom=100) {
   // Do a Cholesky decomposition to pick out a linearly independent set of auxiliary functions
   std::vector< std::vector<double> > final_exponents(candidate_exponents.size());
   for(size_t L=0;L<candidate_exponents.size();L++) {
@@ -765,8 +765,13 @@ static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vec
 
     // Exponents
     arma::vec exps(arma::conv_to<arma::vec>::from(candidates));
-    // Coulomb overlap matrix
-    arma::mat S=overlap(exps,exps,L-1);
+    arma::mat S;
+    if(do_overlap)
+      // Normal overlap matrix
+      S=overlap(exps,exps,L);
+    else
+      // Coulomb overlap matrix
+      S=overlap(exps,exps,L-1);
 
     // Normalize overlap matrix
     arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
@@ -823,7 +828,7 @@ static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vec
   return final_exponents;
 }
 
-ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
+ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, bool overlap) const {
   ElementBasisSet orbbas(*this);
   orbbas.decontract();
 
@@ -841,14 +846,32 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
 
   BasisSet dummy(1);
   construct_basis(dummy, atoms, dumlib);
-
-  // Run Cholesky
-  ERIchol chol;
-  chol.fill(dummy, thr, 0.0, 0.0, true);
-
-  // Get the pivot shell pairs
-  std::set< std::pair<size_t, size_t> > pivot_shellpairs(chol.get_pivot_shellpairs());
   std::vector<GaussianShell> shells(dummy.get_shells());
+
+  // If we use the overlap metric, we use all shells since there's no
+  // benefit to pre-screening
+  if(overlap)
+    full=true;
+
+  std::set< std::pair<size_t, size_t> > pivot_shellpairs;
+  if(full) {
+    // Generate list of all shell pairs
+    for(size_t is=0;is<shells.size();is++)
+      for(size_t js=0;js<=is;js++) {
+        pivot_shellpairs.insert(std::pair<size_t, size_t>(is,js));
+      }
+  } else {
+    if(overlap) {
+      throw std::logic_error("Should not be here.\n!");
+    } else {
+      // Run Cholesky
+      ERIchol chol;
+      chol.fill(dummy, thr, 0.0, 0.0, true);
+
+      // Get the pivot shell pairs
+      pivot_shellpairs = chol.get_pivot_shellpairs();
+    }
+  }
   printf("%2s has %i significant auxiliary shell pairs\n",orbbas.get_symbol().c_str(), (int) pivot_shellpairs.size());
 
   // Form list of reduced exponents
@@ -878,68 +901,7 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
   }
 
   // Pick out the auxiliary functions by a Cholesky decomposition
-  std::vector< std::vector<double> > final_exponents = cholesky_pick_exponents(reduced_exponents, thr);
-
-  // Create fitting set
-  ElementBasisSet fitel(orbbas.get_symbol());
-  for(size_t L=0;L<final_exponents.size();L++) {
-    for(size_t ix=0;ix<final_exponents[L].size();ix++) {
-      std::vector<contr_t> c(1);
-      c[0].c=1.0;
-      c[0].z=final_exponents[L][ix];
-      fitel.add_function(FunctionShell(L,c));
-    }
-  }
-
-  return fitel;
-}
-
-ElementBasisSet ElementBasisSet::cholesky_full_set(double thr) const {
-  ElementBasisSet orbbas(*this);
-  orbbas.decontract();
-
-  // Form dummy basis set for atom
-  std::vector<atom_t> atoms(1);
-  atoms[0].num = 0;
-  atoms[0].el = orbbas.get_symbol();
-  atoms[0].x = 0.0;
-  atoms[0].y = 0.0;
-  atoms[0].z = 0.0;
-  atoms[0].Q = 0;
-
-  // Form list of candidate exponents
-  std::vector< std::vector<double> > candidate_exponents(2*orbbas.get_max_am()+1);
-  for(int iam=0;iam<=orbbas.get_max_am();iam++)
-    for(int jam=0;jam<=iam;jam++) {
-      // Primitives and coefficients
-      arma::vec iexp, jexp;
-      arma::mat icoeff, jcoeff;
-      orbbas.get_primitives(iexp,icoeff,iam);
-      orbbas.get_primitives(jexp,jcoeff,jam);
-
-      for(size_t iprim=0;iprim<iexp.n_elem;iprim++) {
-        size_t jmax = (iam==jam) ? iprim : jexp.n_elem-1;
-        for(size_t jprim=0;jprim<=jmax;jprim++) {
-          // Exponents
-          double zi=iexp[iprim];
-          double zj=jexp[jprim];
-          double zsum=zi+zj;
-          // Form products
-          for(size_t L=std::abs(iam-jam);L<=std::abs(iam+jam);L++) {
-            // The basis function product has radial form r^(li+lj)
-            // exp(-zsum r^2). However, in each L channel the radial form is
-            // r^L exp(-zr^2). We match the radial expectation value <r>
-            // with this transformation
-            double scale = std::pow(gsl_sf_gamma(L+2)*gsl_sf_gamma(iam+jam+1.5)/(gsl_sf_gamma(iam+jam+2)*gsl_sf_gamma(L+1.5)),2);
-            double zeff = scale*zsum;
-            candidate_exponents[L].push_back(zeff);
-          }
-        }
-      }
-    }
-
-  // Pick out the auxiliary functions by a Cholesky decomposition
-  std::vector< std::vector<double> > final_exponents = cholesky_pick_exponents(candidate_exponents, thr);
+  std::vector< std::vector<double> > final_exponents = cholesky_pick_exponents(reduced_exponents, thr, overlap);
 
   // Create fitting set
   ElementBasisSet fitel(orbbas.get_symbol());
@@ -2441,19 +2403,11 @@ BasisSetLibrary BasisSetLibrary::product_set(int lvalinc, double fsam) const {
   return ret;
 }
 
-BasisSetLibrary BasisSetLibrary::cholesky_set(double thr) const {
+BasisSetLibrary BasisSetLibrary::cholesky_set(double thr, bool full, bool overlap) const {
   BasisSetLibrary ret(*this);
   ret.name="Product set "+name;
   for(size_t iel=0;iel<elements.size();iel++)
-    ret.elements[iel]=elements[iel].cholesky_set(thr);
-  return ret;
-}
-
-BasisSetLibrary BasisSetLibrary::cholesky_full_set(double thr) const {
-  BasisSetLibrary ret(*this);
-  ret.name="Product set "+name;
-  for(size_t iel=0;iel<elements.size();iel++)
-    ret.elements[iel]=elements[iel].cholesky_full_set(thr);
+    ret.elements[iel]=elements[iel].cholesky_set(thr, full, overlap);
   return ret;
 }
 
