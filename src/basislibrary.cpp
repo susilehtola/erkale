@@ -36,88 +36,55 @@
 
 #include <gsl/gsl_sf_gamma.h>
 
-/// Compute overlap of normalized Gaussian primitives
-arma::mat overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
+/// Compute overlap of unnormalized Gaussian primitives, S(a,b) = 0.5 * (a+b)^(-3/2-l) Gamma(l+3/2)
+arma::mat primitive_overlap(const arma::vec & iexps, const arma::vec & jexps, double am) {
   arma::mat S(iexps.size(),jexps.size());
-
-  switch(am) {
-  case(-1):
-    {
-      for(size_t i=0;i<iexps.n_elem;i++)
-	for(size_t j=0;j<jexps.n_elem;j++) {
-	  // Sum of exponents
-	  double zeta=iexps(i) + jexps(j);
-	  // Helpers
-	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
-	  double s_eta=sqrt(eta);
-	  S(i,j)=sqrt(s_eta);
-	}
+  for(size_t i=0;i<iexps.n_elem;i++)
+    for(size_t j=0;j<jexps.n_elem;j++) {
+      S(i,j) = std::pow(iexps(i)+jexps(j), -am -1.5);
     }
-    break;
-
-  case(0):
-    {
-      for(size_t i=0;i<iexps.n_elem;i++)
-	for(size_t j=0;j<jexps.n_elem;j++) {
-	  // Sum of exponents
-	  double zeta=iexps(i) + jexps(j);
-	  // Helpers
-	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
-	  double s_eta=sqrt(eta);
-	  S(i,j)=s_eta*sqrt(s_eta);
-	}
-    }
-    break;
-
-  case(1):
-    {
-      for(size_t i=0;i<iexps.n_elem;i++)
-	for(size_t j=0;j<jexps.n_elem;j++) {
-	  // Sum of exponents
-	  double zeta=iexps(i) + jexps(j);
-	  // Helpers
-	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
-	  double s_eta=sqrt(eta);
-	  S(i,j)=s_eta*s_eta*sqrt(s_eta);
-	}
-    }
-    break;
-
-  case(2):
-    {
-      for(size_t i=0;i<iexps.n_elem;i++)
-	for(size_t j=0;j<jexps.n_elem;j++) {
-	  // Sum of exponents
-	  double zeta=iexps(i) + jexps(j);
-	  // Helpers
-	  double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
-	  double s_eta=sqrt(eta);
-	  S(i,j)=s_eta*s_eta*s_eta*sqrt(s_eta);
-	}
-    }
-    break;
-
-  default:
-    for(size_t i=0;i<iexps.n_elem;i++)
-      for(size_t j=0;j<jexps.n_elem;j++) {
-	// Sum of exponents
-	double zeta=iexps(i) + jexps(j);
-	// Helpers
-	double eta=4.0*iexps(i)*jexps(j)/(zeta*zeta);
-	double s_eta=sqrt(eta);
-	double q_eta=sqrt(s_eta);
-
-	// Compute overlap
-	// S(i,j)=pow(eta,am/2.0+0.75)
-
-	// Calls pow(double,int) which should be pretty fast.
-	S(i,j)=pow(s_eta,am+1)*q_eta;
-      }
-  }
-
-  return S;
+  return 0.5*S*gsl_sf_gamma(am+1.5);
 }
 
+/// Normalize overlap
+arma::mat normalize(const arma::mat & S) {
+  arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
+  return normmat*S*normmat;
+}
+
+/// Compute overlap of normalized Gaussian primitives
+arma::mat overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
+  arma::mat S(primitive_overlap(iexps, jexps, am));
+  return normalize(S);
+}
+
+/// Compute Coulomb overlap of unnormalized Gaussian primitives
+arma::mat primitive_coulomb_overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
+  arma::mat Scoul(primitive_overlap(iexps,jexps,am));
+  for(size_t i=0;i<iexps.n_elem;i++)
+      for(size_t j=0;j<jexps.n_elem;j++)
+        Scoul(i,j) *= (iexps(i)+jexps(j))/(2*iexps(i)*jexps(j));
+  return Scoul;
+}
+
+/// Same but with normalization
+arma::mat coulomb_overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
+  return normalize(primitive_coulomb_overlap(iexps, jexps, am));
+}
+
+/// Compute nuclear attraction matrix of unnormalized Gaussian primitives
+arma::mat primitive_nuclear_attraction(const arma::vec & iexps, const arma::vec & jexps, int am) {
+  return primitive_overlap(iexps, jexps, am-0.5);
+}
+
+/// Compute nuclear attraction matrix of unnormalized Gaussian primitives
+arma::mat nuclear_attraction(const arma::vec & iexps, const arma::vec & jexps, int am) {
+  arma::mat S(primitive_overlap(iexps, jexps, am));
+  arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
+
+  arma::mat V(primitive_nuclear_attraction(iexps, jexps, am));
+  return normmat*V*normmat;
+}
 
 int find_am(char am) {
   for(int i=0;i<=max_am;i++)
@@ -747,7 +714,7 @@ ElementBasisSet ElementBasisSet::product_set(int lmaxinc, double fsam) const {
   return ret;
 }
 
-static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vector< std::vector<double> > & candidate_exponents, double thr, int nrandom=100) {
+static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vector< std::vector<double> > & candidate_exponents, double thr, int metric, int nrandom=100) {
   // Do a Cholesky decomposition to pick out a linearly independent set of auxiliary functions
   std::vector< std::vector<double> > final_exponents(candidate_exponents.size());
   for(size_t L=0;L<candidate_exponents.size();L++) {
@@ -765,12 +732,27 @@ static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vec
 
     // Exponents
     arma::vec exps(arma::conv_to<arma::vec>::from(candidates));
-    // Coulomb overlap matrix
-    arma::mat S=overlap(exps,exps,L-1);
+    arma::mat S;
+    switch(metric) {
+    case(0):
+      // Coulomb overlap matrix
+      S=coulomb_overlap(exps,exps,L);
+      printf("Using Coulomb overlap metric\n");
+      break;
+    case(1):
+      // Normal overlap matrix
+      S=overlap(exps,exps,L);
+      printf("Using normal overlap metric\n");
+      break;
+    case(2):
+      // Nuclear attraction matrix
+      S=nuclear_attraction(exps,exps,L);
+      printf("Using nuclear attraction matrix\n");
+      break;
 
-    // Normalize overlap matrix
-    arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
-    S = normmat*S*normmat;
+    default:
+      throw std::logic_error("Case not handled!\n");
+    }
 
     // Figure out best pivoting strategy
     arma::uvec best_pivot;
@@ -823,7 +805,7 @@ static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vec
   return final_exponents;
 }
 
-ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
+ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric) const {
   ElementBasisSet orbbas(*this);
   orbbas.decontract();
 
@@ -841,14 +823,32 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
 
   BasisSet dummy(1);
   construct_basis(dummy, atoms, dumlib);
-
-  // Run Cholesky
-  ERIchol chol;
-  chol.fill(dummy, thr, 0.0, 0.0, true);
-
-  // Get the pivot shell pairs
-  std::set< std::pair<size_t, size_t> > pivot_shellpairs(chol.get_pivot_shellpairs());
   std::vector<GaussianShell> shells(dummy.get_shells());
+
+  // If we use the overlap metric, we use all shells since there's no
+  // benefit to pre-screening
+  if(metric>0)
+    full=true;
+
+  std::set< std::pair<size_t, size_t> > pivot_shellpairs;
+  if(full) {
+    // Generate list of all shell pairs
+    for(size_t is=0;is<shells.size();is++)
+      for(size_t js=0;js<=is;js++) {
+        pivot_shellpairs.insert(std::pair<size_t, size_t>(is,js));
+      }
+  } else {
+    if(metric>0) {
+      throw std::logic_error("Should not be here.\n!");
+    } else {
+      // Run Cholesky
+      ERIchol chol;
+      chol.fill(dummy, thr, 0.0, 0.0, true);
+
+      // Get the pivot shell pairs
+      pivot_shellpairs = chol.get_pivot_shellpairs();
+    }
+  }
   printf("%2s has %i significant auxiliary shell pairs\n",orbbas.get_symbol().c_str(), (int) pivot_shellpairs.size());
 
   // Form list of reduced exponents
@@ -878,68 +878,7 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr) const {
   }
 
   // Pick out the auxiliary functions by a Cholesky decomposition
-  std::vector< std::vector<double> > final_exponents = cholesky_pick_exponents(reduced_exponents, thr);
-
-  // Create fitting set
-  ElementBasisSet fitel(orbbas.get_symbol());
-  for(size_t L=0;L<final_exponents.size();L++) {
-    for(size_t ix=0;ix<final_exponents[L].size();ix++) {
-      std::vector<contr_t> c(1);
-      c[0].c=1.0;
-      c[0].z=final_exponents[L][ix];
-      fitel.add_function(FunctionShell(L,c));
-    }
-  }
-
-  return fitel;
-}
-
-ElementBasisSet ElementBasisSet::cholesky_full_set(double thr) const {
-  ElementBasisSet orbbas(*this);
-  orbbas.decontract();
-
-  // Form dummy basis set for atom
-  std::vector<atom_t> atoms(1);
-  atoms[0].num = 0;
-  atoms[0].el = orbbas.get_symbol();
-  atoms[0].x = 0.0;
-  atoms[0].y = 0.0;
-  atoms[0].z = 0.0;
-  atoms[0].Q = 0;
-
-  // Form list of candidate exponents
-  std::vector< std::vector<double> > candidate_exponents(2*orbbas.get_max_am()+1);
-  for(int iam=0;iam<=orbbas.get_max_am();iam++)
-    for(int jam=0;jam<=iam;jam++) {
-      // Primitives and coefficients
-      arma::vec iexp, jexp;
-      arma::mat icoeff, jcoeff;
-      orbbas.get_primitives(iexp,icoeff,iam);
-      orbbas.get_primitives(jexp,jcoeff,jam);
-
-      for(size_t iprim=0;iprim<iexp.n_elem;iprim++) {
-        size_t jmax = (iam==jam) ? iprim : jexp.n_elem-1;
-        for(size_t jprim=0;jprim<=jmax;jprim++) {
-          // Exponents
-          double zi=iexp[iprim];
-          double zj=jexp[jprim];
-          double zsum=zi+zj;
-          // Form products
-          for(size_t L=std::abs(iam-jam);L<=std::abs(iam+jam);L++) {
-            // The basis function product has radial form r^(li+lj)
-            // exp(-zsum r^2). However, in each L channel the radial form is
-            // r^L exp(-zr^2). We match the radial expectation value <r>
-            // with this transformation
-            double scale = std::pow(gsl_sf_gamma(L+2)*gsl_sf_gamma(iam+jam+1.5)/(gsl_sf_gamma(iam+jam+2)*gsl_sf_gamma(L+1.5)),2);
-            double zeff = scale*zsum;
-            candidate_exponents[L].push_back(zeff);
-          }
-        }
-      }
-    }
-
-  // Pick out the auxiliary functions by a Cholesky decomposition
-  std::vector< std::vector<double> > final_exponents = cholesky_pick_exponents(candidate_exponents, thr);
+  std::vector< std::vector<double> > final_exponents = cholesky_pick_exponents(reduced_exponents, thr, metric);
 
   // Create fitting set
   ElementBasisSet fitel(orbbas.get_symbol());
@@ -1417,8 +1356,7 @@ void ElementBasisSet::prune(double cutoff, bool coulomb) {
       continue;
 
     // Compute overlap matrix
-    int Sam = coulomb ? am-1 : am;
-    arma::mat S=overlap(exps,exps,Sam);
+    arma::mat S = coulomb ? coulomb_overlap(exps, exps, am) : overlap(exps, exps, am);
 
     // Prune the exponents
     size_t ioff=0;
@@ -1470,8 +1408,7 @@ void ElementBasisSet::merge(double cutoff, bool verbose, bool coulomb) {
     // Prune the exponents
     while(true) {
       // Compute overlap matrix
-      int Sam = coulomb ? am-1 : am;
-      arma::mat S=overlap(exps[am],exps[am],Sam);
+      arma::mat S = coulomb ? coulomb_overlap(exps[am], exps[am], am) : overlap(exps[am],exps[am],am);
       // Remove diagonal part
       S-=arma::eye(S.n_rows,S.n_cols);
 
@@ -2441,19 +2378,11 @@ BasisSetLibrary BasisSetLibrary::product_set(int lvalinc, double fsam) const {
   return ret;
 }
 
-BasisSetLibrary BasisSetLibrary::cholesky_set(double thr) const {
+BasisSetLibrary BasisSetLibrary::cholesky_set(double thr, bool full, int metric) const {
   BasisSetLibrary ret(*this);
   ret.name="Product set "+name;
   for(size_t iel=0;iel<elements.size();iel++)
-    ret.elements[iel]=elements[iel].cholesky_set(thr);
-  return ret;
-}
-
-BasisSetLibrary BasisSetLibrary::cholesky_full_set(double thr) const {
-  BasisSetLibrary ret(*this);
-  ret.name="Product set "+name;
-  for(size_t iel=0;iel<elements.size();iel++)
-    ret.elements[iel]=elements[iel].cholesky_full_set(thr);
+    ret.elements[iel]=elements[iel].cholesky_set(thr, full, metric);
   return ret;
 }
 
