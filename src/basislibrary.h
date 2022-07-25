@@ -201,7 +201,7 @@ class ElementBasisSet {
   ElementBasisSet product_set(int lmaxinc, double fsam) const;
 
   /// Form compact or full Cholesky set
-  ElementBasisSet cholesky_set(double cholthr, bool full, bool overlap) const;
+  ElementBasisSet cholesky_set(double cholthr, bool full, int metric) const;
 
   /// Augment the basis with steep functions
   void augment_steep(int naug);
@@ -298,8 +298,8 @@ class BasisSetLibrary {
   BasisSetLibrary density_fitting(int lvalinc, double fsam) const;
   /// Generate product set
   BasisSetLibrary product_set(int lvalinc, double fsam) const;
-  /// Generate compact Cholesky set
-  BasisSetLibrary cholesky_set(double thr, bool full, bool overlap) const;
+  /// Generate compact Cholesky set. Metrics: 0 for Coulomb, 1 for overlap, 2 for nuclear attraction integral
+  BasisSetLibrary cholesky_set(double thr, bool full, int metric) const;
 
   /**
    * P-orthogonalization [F. Jensen, JCTC 10, 1074 (2014)].

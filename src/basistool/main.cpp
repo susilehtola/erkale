@@ -110,8 +110,8 @@ int main_guarded(int argc, char **argv) {
     settings.add_double("BasisCutoff","",0.0);
 
     bool full=false;
-    bool overlap=false;
-    BasisSetLibrary ret=bas.cholesky_set(thr,full,overlap);
+    int metric=0;
+    BasisSetLibrary ret=bas.cholesky_set(thr,full,metric);
     ret.save_gaussian94(outfile);
 
   } else if(stricmp(cmd,"fullcholeskyaux")==0) {
@@ -137,8 +137,8 @@ int main_guarded(int argc, char **argv) {
     settings.add_double("BasisCutoff","",0.0);
 
     bool full=true;
-    bool overlap=false;
-    BasisSetLibrary ret=bas.cholesky_set(thr,full,overlap);
+    int metric=0;
+    BasisSetLibrary ret=bas.cholesky_set(thr,full,metric);
     ret.save_gaussian94(outfile);
 
   } else if(stricmp(cmd,"choleskydens")==0) {
@@ -165,8 +165,36 @@ int main_guarded(int argc, char **argv) {
     settings.add_double("BasisCutoff","",0.0);
 
     bool full=true;
-    bool overlap=true;
-    BasisSetLibrary ret=bas.cholesky_set(thr,full,overlap);
+    int metric=1;
+    BasisSetLibrary ret=bas.cholesky_set(thr,full,metric);
+    ret.save_gaussian94(outfile);
+
+  } else if(stricmp(cmd,"choleskynuc")==0) {
+    // Form Cholesky fitting basis set
+
+    if(argc!=5) {
+      printf("\nUsage: %s input.gbs choleskynuc thr output.gbs\n",argv[0]);
+      return 1;
+    }
+
+    printf("Forming density fitting auxiliary basis using pivoted Cholesky decomposition\n");
+    printf("See J. Chem. Theory Comput. 17, 6886 (2021). DOI: 10.1021/acs.jctc.1c00607\n");
+    printf("NOTE: using nuclear attraction integrals instead of Coulomb metric!\n\n");
+
+    double thr(atof(argv[3]));
+    std::string outfile(argv[4]);
+
+    init_libint_base();
+
+    settings.add_bool("UseLM","",true);
+    settings.add_bool("OptLM","",false);
+    settings.add_string("Decontract","","");
+    settings.add_bool("BasisRotate","",false);
+    settings.add_double("BasisCutoff","",0.0);
+
+    bool full=true;
+    int metric=2;
+    BasisSetLibrary ret=bas.cholesky_set(thr,full,metric);
     ret.save_gaussian94(outfile);
 
   } else if(stricmp(cmd,"choleskybasis")==0) {
