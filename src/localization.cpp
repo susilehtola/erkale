@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "global.h"
 #include <armadillo>
 #include <cstdio>
 #include <cfloat>
@@ -21,7 +22,6 @@
 #include "elements.h"
 #include "dftfuncs.h"
 #include "dftgrid.h"
-#include "global.h"
 #include "guess.h"
 #include "hirshfeldi.h"
 #include "linalg.h"

@@ -19,6 +19,7 @@
 #ifndef ERKALE_GDM
 #define ERKALE_GDM
 
+#include "global.h"
 #include <armadillo>
 
 class GDM {

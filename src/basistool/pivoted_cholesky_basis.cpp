@@ -14,6 +14,7 @@
  * of the License, or (at your option) any later version.
  */
 
+#include "global.h"
 #include <armadillo>
 
 #include "../basislibrary.h"
