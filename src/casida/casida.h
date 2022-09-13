@@ -44,6 +44,7 @@
 class BasisSet;
 class Settings;
 
+#include "global.h"
 #include <armadillo>
 #include <cstdio>
 #include <cstdlib>

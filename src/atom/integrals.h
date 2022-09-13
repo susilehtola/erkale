@@ -17,6 +17,7 @@
 #ifndef INTEGRALS_H
 #define INTEGRALS_H
 
+#include "global.h"
 #include <armadillo>
 
 /// Basis function
