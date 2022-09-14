@@ -89,6 +89,8 @@ typedef struct {
   double Enl;
   /// Self-interaction energy
   double Esic;
+  /// Magnetic interaction energy
+  double Emag;
 
   /// Total energy
   double E;
@@ -254,6 +256,8 @@ protected:
   int readlinocc;
   /// File where to read occupations from
   std::string linoccfname;
+  /// Magnetic field
+  double linB;
 
   /// Use ADIIS?
   bool useadiis;

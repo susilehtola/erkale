@@ -750,6 +750,8 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
     printf("%-21s energy: % .16e\n","Total one-electron",sol.en.Eone);
     printf("%-21s energy: % .16e\n","Nuclear repulsion",sol.en.Enucr);
     printf("%-21s energy: % .16e\n","Coulomb",sol.en.Ecoul);
+    if(sol.en.Emag != 0.0)
+      printf("%-21s energy: % .16e\n","Magnetic interaction",sol.en.Emag);
 #ifndef DFT
     printf("%-21s energy: % .16e\n","Exchange",sol.en.Exc);
 #else
