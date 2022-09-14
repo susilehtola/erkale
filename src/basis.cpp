@@ -4031,10 +4031,8 @@ arma::mat block_m(const arma::mat & F, const arma::ivec & mv) {
       // Indices for plus and minus values are
       arma::uvec pidx(arma::find(mv==m));
       arma::uvec nidx(arma::find(mv==-m));
-
-      // m=m and m=-m are equivalent
-      Fnew(pidx,pidx)=0.5*(F(pidx,pidx)+F(nidx,nidx));
-      Fnew(nidx,nidx)=Fnew(pidx,pidx);
+      Fnew(pidx,pidx)=F(pidx,pidx);
+      Fnew(nidx,nidx)=F(nidx,nidx);
     }
   }
 
