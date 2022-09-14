@@ -97,6 +97,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   if(readlinocc<0)
     readlinocc=INT_MAX;
   linoccfname=settings.get_string("LinearOccupationFile");
+  linB=settings.get_double("LinearB");
 
   usediis=settings.get_bool("UseDIIS");
   diisorder=settings.get_int("DIISOrder");

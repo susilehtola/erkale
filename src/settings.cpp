@@ -67,6 +67,7 @@ void Settings::add_scf_settings() {
   add_bool("LinearFreeze", "If using linear symmetry, freeze symmetry to input guess", false);
   add_int("LinearOccupations", "Read in occupations for linear molecule calculations?", 0, true);
   add_string("LinearOccupationFile", "File to read linear occupations from", "linoccs.dat");
+  add_double("LinearB", "Magnetic field along bond axis", 0.0);
 
   // Decontract basis set?
   add_string("Decontract","Indices of atoms to decontract basis set for","");

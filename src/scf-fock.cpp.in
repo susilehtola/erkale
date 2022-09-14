@@ -809,6 +809,33 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #endif // end DFT clause
 #endif // End unrestricted case
 
+  if(lincalc && linB != 0.0) {
+    // Compute moment integrals around the origin
+    double cenx=0.0, ceny=0.0, cenz=0.0;
+    std::vector<arma::mat> momstack=basisp->moment(2,cenx,ceny,cenz);
+    arma::mat xymat=momstack[getind(2,0,0)]+momstack[getind(0,2,0)];
+
+    // Collect m values
+    arma::ivec mvals(basisp->get_m_values());
+
+    // Magnetic operator
+    arma::mat Hmag(Hcore.n_rows,Hcore.n_cols,arma::fill::zeros);
+    for(size_t i=0;i<Hmag.n_rows;i++)
+      for(size_t j=0;j<Hmag.n_cols;j++)
+        Hmag(i,j) = -0.5*linB*mvals(j)*S(i,j) + linB*linB*xymat(i,j)/8.0;
+
+#ifdef RESTRICTED
+    sol.H += Hmag;
+    sol.en.Emag = arma::trace(sol.P*Hmag);
+#else
+    double nela(arma::trace(S*sol.Pa));
+    double nelb(arma::trace(S*sol.Pb));
+
+    sol.Ha += Hmag - 0.5*linB*S;
+    sol.Hb += Hmag + 0.5*linB*S;
+    sol.en.Emag = arma::trace(sol.P*Hmag) - linB*0.5*(nela-nelb);
+#endif
+  }
 
 #if defined(FULLHOLE) || defined(HALFHOLE)
   if(freeze.size()>0) {
@@ -857,7 +884,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
   sol.en.Ecoul=0.5*arma::trace(sol.P*sol.J);
 
   // Compute total energies
-  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl;
+  sol.en.Eel=sol.en.Ecoul+sol.en.Exc+sol.en.Eone+sol.en.Enl+sol.en.Emag;
   sol.en.E=sol.en.Eel+sol.en.Enucr;
 
   // Sanity checks
@@ -930,6 +957,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
     printf("One-electron energy %e\n",sol.en.Eone);
     printf("Non-local    energy %e\n",sol.en.Enl);
     printf("Nuclear repulsion energy %e\n",sol.en.Enucr);
+    printf("Magnetic interaction energy %e\n",sol.en.Emag);
     fflush(stdout);
 #endif
 
