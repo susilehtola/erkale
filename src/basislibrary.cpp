@@ -37,7 +37,7 @@
 #include <gsl/gsl_sf_gamma.h>
 
 /// Compute overlap of unnormalized Gaussian primitives, S(a,b) = 0.5 * (a+b)^(-3/2-l) Gamma(l+3/2)
-arma::mat primitive_overlap(const arma::vec & iexps, const arma::vec & jexps, double am) {
+arma::mat primitive_overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
   arma::mat S(iexps.size(),jexps.size());
   for(size_t i=0;i<iexps.n_elem;i++)
     for(size_t j=0;j<jexps.n_elem;j++) {
@@ -46,30 +46,44 @@ arma::mat primitive_overlap(const arma::vec & iexps, const arma::vec & jexps, do
   return 0.5*S*gsl_sf_gamma(am+1.5);
 }
 
-/// Normalize overlap
-arma::mat normalize(const arma::mat & S) {
-  arma::mat normmat(arma::diagmat(arma::pow(arma::diagvec(S),-0.5)));
-  return normmat*S*normmat;
+arma::vec primitive_norm(const arma::vec & iexps, int am) {
+  arma::vec S(iexps.size());
+  for(size_t i=0;i<iexps.n_elem;i++)
+    S(i) = std::pow(2*iexps(i), -am -1.5);
+  return 0.5*S*gsl_sf_gamma(am+1.5);
 }
 
 /// Compute overlap of normalized Gaussian primitives
 arma::mat overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
   arma::mat S(primitive_overlap(iexps, jexps, am));
-  return normalize(S);
+  arma::vec inormz(arma::pow(primitive_norm(iexps, am), -0.5));
+  arma::vec jnormz(arma::pow(primitive_norm(jexps, am), -0.5));
+  return arma::diagmat(inormz) * S * arma::diagmat(jnormz);
 }
 
 /// Compute Coulomb overlap of unnormalized Gaussian primitives
 arma::mat primitive_coulomb_overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
   arma::mat Scoul(primitive_overlap(iexps,jexps,am));
   for(size_t i=0;i<iexps.n_elem;i++)
-      for(size_t j=0;j<jexps.n_elem;j++)
-        Scoul(i,j) *= (iexps(i)+jexps(j))/(2*iexps(i)*jexps(j));
+    for(size_t j=0;j<jexps.n_elem;j++)
+      Scoul(i,j) *= (iexps(i)+jexps(j))/(2*iexps(i)*jexps(j));
+  return Scoul;
+}
+
+arma::vec primitive_coulomb_norm(const arma::vec & iexps, int am) {
+  arma::vec Scoul(primitive_norm(iexps,am));
+  for(size_t i=0;i<iexps.n_elem;i++)
+    Scoul(i) /= iexps(i) ;
+
   return Scoul;
 }
 
 /// Same but with normalization
 arma::mat coulomb_overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
-  return normalize(primitive_coulomb_overlap(iexps, jexps, am));
+  arma::mat S(primitive_coulomb_overlap(iexps, jexps, am));
+  arma::vec inormz(arma::pow(primitive_coulomb_norm(iexps, am), -0.5));
+  arma::vec jnormz(arma::pow(primitive_coulomb_norm(jexps, am), -0.5));
+  return arma::diagmat(inormz) * S * arma::diagmat(jnormz);
 }
 
 /// Compute nuclear attraction matrix of unnormalized Gaussian primitives
@@ -965,12 +979,12 @@ void ElementBasisSet::get_primitives(arma::vec & zfree, arma::vec & zgen, arma::
   }
 
   /*
-  arma::trans(exps).print("All exponents");
-  coeffs.print("Contraction scheme");
+    arma::trans(exps).print("All exponents");
+    coeffs.print("Contraction scheme");
 
-  arma::trans(zfree).print("Free exponents: ");
-  arma::trans(zgen).print("General exponents");
-  cgen.print("General contractions");
+    arma::trans(zfree).print("Free exponents: ");
+    arma::trans(zgen).print("General exponents");
+    cgen.print("General contractions");
   */
 }
 
@@ -1082,8 +1096,8 @@ void ElementBasisSet::P_orthogonalize(double cutoff, double Cortho) {
 	genc.col(i)/=sqrt(arma::as_scalar(arma::trans(genc.col(i))*S*genc.col(i)));
 
       /*
-      arma::mat covl=arma::trans(genc)*S*genc;
-      covl.print("Contraction overlap");
+        arma::mat covl=arma::trans(genc)*S*genc;
+        covl.print("Contraction overlap");
       */
 
       // Intermediate normalization

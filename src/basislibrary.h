@@ -26,8 +26,19 @@
 
 #include "basis.h"
 
+/// Compute overlap of unnormalized Gaussian primitives
+arma::mat primitive_overlap(const arma::vec & z, const arma::vec & zp, int am);
+/// Compute norm of Gaussian primitives
+arma::vec primitive_norm(const arma::vec & z, int am);
 /// Compute overlap of normalized Gaussian primitives
 arma::mat overlap(const arma::vec & z, const arma::vec & zp, int am);
+
+/// Compute Coulomb overlap of unnormalized Gaussian primitives
+arma::mat primitive_coulomb_overlap(const arma::vec & z, const arma::vec & zp, int am);
+/// Compute Coulomb norm of Gaussian primitives
+arma::vec primitive_coulomb_norm(const arma::vec & z, int am);
+/// Compute Coulomb overlap of normalized Gaussian primitives
+arma::mat coulomb_overlap(const arma::vec & z, const arma::vec & zp, int am);
 
 /// Find angular momentum
 int find_am(char am);

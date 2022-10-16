@@ -50,17 +50,13 @@ compprof_t compute_completeness(const ElementBasisSet & bas, const arma::vec & s
 
     // Do we need to calculate something?
     if(exps.n_elem) {
-
-      int amval=am;
-      if(coulomb)
-	amval--;
-
       // Compute overlaps of scanning functions and primitives
-      arma::mat scanov=overlap(exps,scan_exp,amval);
+      arma::mat scanov = coulomb ? coulomb_overlap(exps,scan_exp,am) : overlap(exps,scan_exp,am);
+      arma::mat primov = coulomb ? coulomb_overlap(exps,exps,am) : overlap(exps,exps,am);
 
-      // Compute overlap matrix in used basis set
+      // Compute the overlap in the contracted basis
       arma::mat S;
-      S=arma::trans(contr)*overlap(exps,exps,amval)*contr;
+      S=arma::trans(contr)*primov*contr;
 
       // Helper: scan overlaps of contracted basis functions
       arma::mat hlp=arma::trans(scanov)*contr;
