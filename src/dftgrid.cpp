@@ -392,7 +392,9 @@ void AngularGrid::free() {
   VV10_arr.clear();
 }
 
-arma::uvec AngularGrid::screen_density(double thr) const {
+arma::uvec AngularGrid::screen_density() const {
+  double thr=settings.get_double("DFTDensityThr");
+
   // List of points
   std::vector<size_t> idx;
   // Loop over grid
@@ -928,6 +930,10 @@ void AngularGrid::compute_xc(int func_id, bool pot) {
     oss << "Functional "<<func_id<<" not found!";
     throw std::runtime_error(oss.str());
   }
+  // Set density threshold
+  double thr=settings.get_double("DFTDensityThr");
+  xc_func_set_dens_threshold(&func, thr);
+
   // Set parameters
   arma::vec pars;
   std::string functype;
