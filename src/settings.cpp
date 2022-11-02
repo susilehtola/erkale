@@ -160,6 +160,10 @@ void Settings::add_scf_settings() {
   // Override parameters of XC functional
   add_string("DFTXpars", "Override parameters of exchange functional (expert)", "");
   add_string("DFTCpars", "Override parameters of correlation functional (expert)", "");
+  // Basis set value threshold
+  add_double("DFTBasisThr", "Threshold for screening basis functions on grid", 1e-10);
+  // Density threshold
+  add_double("DFTDensityThr", "Threshold for screening density on grid", 1e-10);
 
   // VV10?
   add_string("VV10","Use VV10 non-local correlation?","Auto");
