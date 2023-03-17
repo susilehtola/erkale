@@ -29,6 +29,12 @@ else()
  message("Using default location for basis set repository.")
 endif()
 
+# Catch C++ exceptions?
+option(CATCH_EXCEPTIONS "Catch C++ exceptions?" OFF)
+if(CATCH_EXCEPTIONS)
+  add_definitions(-DCATCH_EXCEPTIONS)
+endif()
+
 # Compile SMP version?
 option(USE_OPENMP "Compile OpenMP enabled version (for parallel calculations)?" ON)
 # Find OpenMP support
