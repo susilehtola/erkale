@@ -1587,7 +1587,8 @@ size_t BasisSet::get_Nbf() const {
 }
 
 void BasisSet::compute_shell_ranges() {
-  compute_shell_ranges(settings.get_double("DFTBasisThr"));
+  if(settings.is_double("DFTBasisThr"))
+    compute_shell_ranges(settings.get_double("DFTBasisThr"));
 }
 
 void BasisSet::compute_shell_ranges(double eps) {
