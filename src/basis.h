@@ -449,6 +449,8 @@ class BasisSet {
   arma::mat nuclear() const;
   /// Calculate electric potential matrix
   arma::mat potential(coords_t r) const;
+  /// Calculate superposition of atomic potentials
+  arma::mat sap_potential(const BasisSetLibrary & sapfit) const;
 
   /**
      Calculates the ERI screening matrices

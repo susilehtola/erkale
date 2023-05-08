@@ -35,6 +35,7 @@
 #include "settings.h"
 #include "solidharmonics.h"
 #include "stringutil.h"
+#include "timer.h"
 
 // Debug LIBINT routines against Huzinaga integrals?
 //#define LIBINTDEBUG
@@ -2395,6 +2396,127 @@ arma::mat BasisSet::potential(coords_t r) const {
   }
 
   return V;
+}
+
+arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
+  bool verbose=settings.get_bool("Verbose");
+  double intthr=settings.get_double("IntegralThresh");
+
+  Timer t;
+
+  // Get shells in orbital basis
+  std::vector<GaussianShell> shells=get_shells();
+  // Get list of shell pairs
+  double omega=0.0;
+  double alpha=1.0;
+  double beta=0.0;
+  arma::mat Q, M;
+  std::vector<eripair_t> shpairs=get_eripairs(Q,M,intthr,omega,alpha,beta,false);
+  // and nuclei
+  std::vector<nucleus_t> nuclei=get_nuclei();
+  if(verbose)
+    printf("%i shell pairs and %i nuclei\n",(int) shpairs.size(), (int) nuclei.size());
+
+  // Construct repulsive potential
+  arma::mat Jx(get_Nbf(),get_Nbf());
+  Jx.zeros();
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker *eri=new ERIWorker(get_max_am(),std::max(get_max_Ncontr(), sapfit.get_max_Ncontr()));
+    const std::vector<double> * erip;
+
+    // Dummy shell
+    GaussianShell dummy(dummyshell());
+
+    // Compute all repulsion integrals
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t ip=0;ip<shpairs.size();ip++) {
+      size_t is=shpairs[ip].is;
+      size_t js=shpairs[ip].js;
+
+      // We have already computed the Schwarz screening
+      double QQ=Q(is,js)*Q(is,js);
+      if(QQ<intthr)
+        // Small integral
+        continue;
+
+      // Loop over nuclei
+      for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+        if(nuclei[inuc].bsse)
+          continue;
+
+        // Get the SAP basis for the element
+        ElementBasisSet sapbas;
+        try {
+          // Check first if a special set is wanted for given center
+          sapbas=sapfit.get_element(nuclei[inuc].symbol,inuc+1);
+        } catch(std::runtime_error & err) {
+          // Did not find a special basis, use the general one instead.
+          sapbas=sapfit.get_element(nuclei[inuc].symbol,0);
+        }
+
+        // Get the shells on the element
+        std::vector<FunctionShell> bf=sapbas.get_shells();
+        if(bf.size() != 1 || bf[0].get_am() != 0)
+          throw std::logic_error("SAP basis should only have a single contracted S function per element!\n");
+        // Check sum rule
+        std::vector<contr_t> contr(bf[0].get_contr());
+        double Zsap=0.0;
+        for(size_t i=0;i<contr.size();i++)
+          Zsap-=contr[i].c;
+        if(std::abs(Zsap - nuclei[inuc].Z) >= 1e-3) {
+          std::ostringstream oss;
+          oss << "SAP basis on nucleus " << inuc+1 << " violates sum rule: " << Zsap << " instead of expected " << nuclei[inuc].Z << "!\n";
+          throw std::logic_error(oss.str());
+        }
+
+        // Form the SAP shell
+        GaussianShell sapsh(GaussianShell(bf[0].get_am(),false,bf[0].get_contr()));
+        // and set its center
+        sapsh.set_center(nuclei[inuc].r,inuc);
+        // Convert the contraction to unnormalized primitives
+        sapsh.convert_sap_contraction();
+
+        // Compute integrals
+        eri->compute(&shells[is],&shells[js],&sapsh,&dummy);
+        erip=eri->getp();
+
+        // and store them
+        size_t Ni(shells[is].get_Nbf());
+        size_t Nj(shells[js].get_Nbf());
+        size_t i0(shells[is].get_first_ind());
+        size_t j0(shells[js].get_first_ind());
+
+        // Remember minus sign from V(r)=-Z(r)/r
+        for(size_t ii=0;ii<Ni;ii++)
+          for(size_t jj=0;jj<Nj;jj++) {
+            size_t i=i0+ii;
+            size_t j=j0+jj;
+            Jx(i,j) -= (*erip)[ii*Nj+jj];
+          }
+        if(is != js) {
+          // Symmetrize
+          for(size_t ii=0;ii<Ni;ii++)
+            for(size_t jj=0;jj<Nj;jj++) {
+              size_t i=i0+ii;
+              size_t j=j0+jj;
+              Jx(j,i) -= (*erip)[ii*Nj+jj];
+            }
+        }
+      }
+    }
+
+    delete eri;
+  }
+
+  if(verbose)
+    printf("SAP potential formed in %.3f s.\n",t.get());
+
+  return Jx;
 }
 
 void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double alpha, double beta) const {
