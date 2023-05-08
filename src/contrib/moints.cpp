@@ -16,7 +16,6 @@
  * of the License, or (at your option) any later version.
  */
 
-#include <armadillo>
 #include "../checkpoint.h"
 #include "../density_fitting.h"
 #include "../erichol.h"
@@ -28,6 +27,7 @@
 #include "../settings.h"
 #include "../stringutil.h"
 
+#include <armadillo>
 #include <cstdio>
 
 #ifdef _OPENMP
