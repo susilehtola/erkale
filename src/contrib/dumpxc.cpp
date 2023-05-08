@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
       // The adaptive routine does everything automatically
       grid.construct(P,dft.gridtol,dft.x_func,dft.c_func);
     } else{
-      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,false);
+      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
       // Need to compute the xc functional to make sure all fields are populated
       arma::mat F;
       double Exc, Nel;
@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
     if(dft.adaptive) {
       grid.construct(Pa,Pb,dft.gridtol,dft.x_func,dft.c_func);
     } else {
-      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func,false);
+      grid.construct(dft.nrad,dft.lmax,dft.x_func,dft.c_func);
       // Need to compute the xc functional to make sure all fields are populated
       arma::mat Fa, Fb;
       double Exc, Nel;
