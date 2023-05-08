@@ -178,9 +178,8 @@ int main_guarded(int argc, char **argv) {
     bool grad=false;
     bool tau=false;
     bool lapl=false;
-    bool strict=false;
     bool nl=false;
-    grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+    grid.construct(nrad,lmax,grad,tau,lapl,nl);
 
     // Get SAP potential
     arma::mat Vsap(grid.eval_SAP());
@@ -219,9 +218,8 @@ int main_guarded(int argc, char **argv) {
     bool grad=false;
     bool tau=false;
     bool lapl=false;
-    bool strict=false;
     bool nl=false;
-    grid.construct(nrad,lmax,grad,tau,lapl,strict,nl);
+    grid.construct(nrad,lmax,grad,tau,lapl,nl);
 
     // Get SAP potential
     arma::mat Vsap(grid.eval_SAP());
