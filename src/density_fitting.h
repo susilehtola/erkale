@@ -163,8 +163,14 @@ class DensityFit {
   /// Get the number of auxiliary functions
   size_t get_Naux() const;
   /// Get ab_inv
+  arma::mat get_ab() const;
+  /// Get ab_inv
   arma::mat get_ab_inv() const;
+  /// Get ab_invh
+  arma::mat get_ab_invh() const;
 
+  /// Get 3-center integrals (must have HF enabled)
+  void three_center_integrals(arma::mat & B) const;
   /// Get B matrix (must have HF enabled)
   void B_matrix(arma::mat & B) const;
 

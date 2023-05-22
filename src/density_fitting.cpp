@@ -1197,18 +1197,24 @@ size_t DensityFit::get_Naux() const {
   return Naux;
 }
 
+arma::mat DensityFit::get_ab() const {
+  return ab;
+}
+
 arma::mat DensityFit::get_ab_inv() const {
   return ab_inv;
 }
 
-void DensityFit::B_matrix(arma::mat & B) const {
+arma::mat DensityFit::get_ab_invh() const {
+  return ab_invh;
+}
+
+void DensityFit::three_center_integrals(arma::mat & ints) const {
   if(direct)
     throw std::runtime_error("Must run in tabulated mode!\n");
-  if(!Bmat)
-    throw std::runtime_error("Must be run in B-matrix mode!\n");
 
   // Collect AO integrals
-  B.zeros(Nbf*Nbf,Naux);
+  ints.zeros(Nbf*Nbf,Naux);
   for(size_t ip=0;ip<orbpairs.size();ip++) {
     size_t imus=orbpairs[ip].is;
     size_t inus=orbpairs[ip].js;
@@ -1231,11 +1237,20 @@ void DensityFit::B_matrix(arma::mat & B) const {
 	    size_t a=ia+a0;
 
             double el(amunu(ia+a0,inu*Nmu+imu));
-	    B(mu*Nbf+nu,a)=el;
-	    B(nu*Nbf+mu,a)=el;
+	    ints(mu*Nbf+nu,a)=el;
+	    ints(nu*Nbf+mu,a)=el;
 	  }
     }
   }
+}
+
+void DensityFit::B_matrix(arma::mat & B) const {
+  if(direct)
+    throw std::runtime_error("Must run in tabulated mode!\n");
+  if(!Bmat)
+    throw std::runtime_error("Must be run in B-matrix mode!\n");
+  // Compute the integrals
+  three_center_integrals(B);
   // Transform into proper B matrix
   B*=ab_invh;
 }
