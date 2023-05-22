@@ -330,6 +330,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
       bool uselm=settings.get_bool("UseLM");
       settings.set_bool("UseLM",true);
       construct_basis(dfitbas,basisp->get_nuclei(),fitlib);
+      dfitbas.coulomb_normalize();
       settings.set_bool("UseLM",uselm);
     }
 
