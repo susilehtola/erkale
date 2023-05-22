@@ -311,7 +311,7 @@ void GaussianShell::coulomb_normalize() {
     // Check that all factors are the same
     int diff=0;
     for(size_t i=1;i<Nbf;i++)
-      if(fabs((*erip)[i*Nbf+i]-(*erip)[0])>1000*DBL_EPSILON*(*erip)[0]) {
+      if(fabs((*erip)[i*Nbf+i]-(*erip)[0])>sqrt(DBL_EPSILON)*(*erip)[0]) {
 	printf("%e != %e, diff %e\n",(*erip)[i*Nbf+i],(*erip)[0],(*erip)[i*Nbf+i]-(*erip)[0]);
 	diff++;
       }
