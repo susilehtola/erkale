@@ -294,12 +294,12 @@ int main_guarded(void) {
 int main() {
 #ifdef CATCH_EXCEPTIONS
   try {
-    return main_guarded(argc, argv);
+    return main_guarded();
   } catch (const std::exception &e) {
     std::cerr << "error: " << e.what() << std::endl;
     return 1;
   }
 #else
-  return main_guarded(argc, argv);
+  return main_guarded();
 #endif
 }
