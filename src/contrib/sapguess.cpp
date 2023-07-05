@@ -107,8 +107,8 @@ Settings settings;
 int main_guarded(int argc, char **argv) {
   print_header();
 
-  if(argc!=4) {
-    printf("Usage: $ %s basis guessbasis geometry.xyz\n",argv[0]);
+  if(argc!=5) {
+    printf("Usage: $ %s basis guessbasis geometry.xyz outfile\n",argv[0]);
     return 0;
   }
 
@@ -129,6 +129,7 @@ int main_guarded(int argc, char **argv) {
   std::string basfile(argv[1]);
   std::string potfile(argv[2]);
   std::string geometry(argv[3]);
+  std::string outfile(argv[4]);
 
   // Read in basis set
   BasisSetLibrary baslib;
@@ -148,7 +149,7 @@ int main_guarded(int argc, char **argv) {
 
   arma::vec E(1);
   E(0)=Emol;
-  E.save("Emol.dat",arma::raw_ascii);
+  E.save(outfile,arma::raw_ascii);
 
   return 0;
 }
