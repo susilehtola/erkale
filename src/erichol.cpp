@@ -570,7 +570,7 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
     B.shed_cols(m,B.n_cols-1);
 
   // and pivot vectors
-  pi=pi.subvec(0,m);
+  pi=pi.subvec(0,m-1);
   // Form the pivot shellpairs
   form_pivot_shellpairs(basis);
 
