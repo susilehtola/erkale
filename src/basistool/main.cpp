@@ -362,6 +362,7 @@ int main_guarded(int argc, char **argv) {
     } else {
       printf("Contracting auxiliary basis set with threshold %e\n",threshold);
     }
+    printf("See J. Chem. Theory Comput. 19, 6242 (2023). DOI: 10.1021/acs.jctc.3c00670\n");
 
     // Loop over elements in the auxiliary basis set
     std::vector<ElementBasisSet> auxelements(auxbas.get_elements());
@@ -696,6 +697,7 @@ int main_guarded(int argc, char **argv) {
       printf("\nUsage: %s orbbas.gbs dropaux_yang auxbas.gbs linc truncauxbas.gbs\n",argv[0]);
       return 1;
     }
+    printf("Dropping high-angular momentum functions with the scheme of Yang et al.\nSee J. Chem. Theory Comput. 19, 6242 (2023). DOI: 10.1021/acs.jctc.3c00670\n");
 
     std::string auxfile(argv[3]);
     int linc(atoi(argv[4]));
@@ -735,6 +737,7 @@ int main_guarded(int argc, char **argv) {
       printf("\nUsage: %s orbbas.gbs dropaux auxbas.gbs linc truncauxbas.gbs\n",argv[0]);
       return 1;
     }
+    printf("Dropping high-angular momentum functions.\nSee J. Chem. Theory Comput. 19, 6242 (2023). DOI: 10.1021/acs.jctc.3c00670\n");
 
     std::string auxfile(argv[3]);
     int linc(atoi(argv[4]));
