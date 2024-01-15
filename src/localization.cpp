@@ -1203,11 +1203,11 @@ void Pipek::cost_func_der(const arma::cx_mat & Wv, double & Dinv, arma::cx_mat &
 Edmiston::Edmiston(const BasisSet & basis, const BasisSet & fitbas, const arma::mat & Cv, bool delocalize) : UnitaryFunction(4,!delocalize) {
   // Store orbitals
   C=Cv;
-  // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, use Hartree-Fock routine since it has better tolerance for linear dependencies
+  // Initialize fitting integrals. Direct computation, linear dependence threshold 1e-8, Cholesky threshold 1e-9, use Hartree-Fock routine since it has better tolerance for linear dependencies
   if(!fitbas.get_Nbf())
-    dfit.fill(basis,basis.density_fitting(),true,1e-8,false);
+    dfit.fill(basis,basis.density_fitting(),true,1e-8,1e-9,false);
   else
-    dfit.fill(basis,fitbas,true,1e-8,false);
+    dfit.fill(basis,fitbas,true,1e-8,1e-9,false);
 
   use_chol=false;
 }

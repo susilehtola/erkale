@@ -52,7 +52,7 @@ bool DensityFit::Bmat_enabled() const {
   return Bmat;
 }
 
-size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double erithr, double linthr, bool bmat) {
+size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double erithr, double linthr, double cholthr, bool bmat) {
   // Construct density fitting basis
 
   // Store amount of functions
@@ -125,28 +125,8 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   }
 
   if(Bmat) {
-    // Form ab^-1 and ab^-1/2
-    arma::mat abvec;
-    arma::vec abval;
-    eig_sym_ordered(abval,abvec,ab);
-
-    // Count linearly independent vectors
-    size_t Nind=0;
-    for(size_t i=0;i<abval.n_elem;i++)
-      if(abval(i)>=linthr)
-	Nind++;
-
-    // and drop the linearly dependent ones
-    abval=abval.subvec(abval.n_elem-Nind,abval.n_elem-1);
-    abvec=abvec.cols(abvec.n_cols-Nind,abvec.n_cols-1);
-
-    // Form matrices
-    ab_inv.zeros(abvec.n_rows,abvec.n_rows);
-    ab_invh.zeros(abvec.n_rows,abvec.n_rows);
-    for(size_t i=0;i<abval.n_elem;i++) {
-      ab_inv+=abvec.col(i)*arma::trans(abvec.col(i))/abval(i);
-      ab_invh+=abvec.col(i)*arma::trans(abvec.col(i))/sqrt(abval(i));
-    }
+    ab_invh = PartialCholeskyOrth(ab, cholthr, linthr);
+    ab_inv = ab_invh * ab_invh.t();
   } else {
     // Just RI-J(K), so use faster method from Eichkorn et al to form ab_inv only
     ab_inv=arma::inv(ab + DELTA*arma::eye(ab.n_rows,ab.n_cols));

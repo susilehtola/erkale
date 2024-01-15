@@ -144,6 +144,8 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   fitmem=1000000*settings.get_int("FittingMemory");
   // Linear dependence threshold
   fitthr=settings.get_double("FittingThreshold");
+  // Linear dependence threshold
+  fitcholthr=settings.get_double("FittingCholeskyThreshold");
 
   // Use Cholesky?
   cholesky=settings.get_bool("Cholesky");
@@ -347,7 +349,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
     }
 
     // Calculate the fitting integrals, don't run in B-matrix mode
-    size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,false);
+    size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr,false);
 
     if(verbose) {
       printf("done (%s)\n",t.elapsed().c_str());
@@ -505,7 +507,7 @@ void SCF::fill_rs(double omega) {
       }
 
       t.set();
-      size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,dfit.Bmat_enabled());
+      size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr,dfit.Bmat_enabled());
       if(verbose) {
 	printf("done (%s)\n",t.elapsed().c_str());
 	printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
