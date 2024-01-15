@@ -783,6 +783,15 @@ arma::mat DensityFit::calcJ(const arma::mat & P) const {
 
   // Get the expansion coefficients
   arma::vec c=compute_expansion(P);
+  return digestJ(c);
+}
+
+arma::mat DensityFit::calcJ(const arma::vec & c) const {
+  if(c.n_elem != Naux) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Naux = " << Naux << ", c.n_elem = " << c.n_elem << "!\n";
+    throw std::logic_error(oss.str());
+  }
 
   arma::mat J(Nbf,Nbf);
   J.zeros();
