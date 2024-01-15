@@ -2318,7 +2318,23 @@ arma::mat BasisSet::kinetic() const {
 }
 
 arma::mat BasisSet::nuclear() const {
-  // Form nuclear attraction matrix
+  std::vector<std::tuple<int,double,double,double>> nuclear_data;
+  for(size_t inuc=0;inuc<nuclei.size();inuc++) {
+    if(nuclei[inuc].bsse)
+      continue;
+    // Nuclear charge
+    int Z=nuclei[inuc].Z;
+
+    // Coordinates of nucleus
+    double cx=nuclei[inuc].r.x;
+    double cy=nuclei[inuc].r.y;
+    double cz=nuclei[inuc].r.z;
+    nuclear_data.push_back(std::make_tuple(Z,cx,cy,cz));
+  }
+  return nuclear(nuclear_data);
+}
+
+ arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,double>> & nuclear_data) const {
 
   // Size of basis set
   size_t N=get_Nbf();
@@ -2332,18 +2348,9 @@ arma::mat BasisSet::nuclear() const {
 #pragma omp parallel for schedule(dynamic)
 #endif
   for(size_t ip=0;ip<shellpairs.size();ip++)
-    for(size_t inuc=0;inuc<nuclei.size();inuc++) {
-      // If BSSE nucleus, do nothing
-      if(nuclei[inuc].bsse)
-	continue;
+    for(size_t inuc=0;inuc<nuclear_data.size();inuc++) {
 
-      // Nuclear charge
-      int Z=nuclei[inuc].Z;
-
-      // Coordinates of nucleus
-      double cx=nuclei[inuc].r.x;
-      double cy=nuclei[inuc].r.y;
-      double cz=nuclei[inuc].r.z;
+      auto [Z, cx, cy, cz] = nuclear_data[inuc];
 
       // Shells in pair
       size_t i=shellpairs[ip].is;
