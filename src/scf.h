@@ -287,6 +287,8 @@ protected:
   size_t fitmem;
   /// Threshold for density fitting
   double fitthr;
+  /// Pivoted Cholesky threshold for density fitting
+  double fitcholthr;
 
   /// Cholesky calculation?
   bool cholesky;

@@ -135,7 +135,7 @@ class DensityFit {
    * HF routine should be more tolerant of linear dependencies in the basis.
    * Returns amount of significant orbital shell pairs.
    */
-  size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, bool bmat=false);
+  size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, double cholthr, bool bmat=false);
 
   /// Compute estimate of necessary memory
   size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double erithr, bool direct) const;
