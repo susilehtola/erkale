@@ -150,7 +150,7 @@ class DensityFit {
   /// Get Coulomb matrix from P
   std::vector<arma::mat> calcJ(const std::vector<arma::mat> & P) const;
   /// Digest J matrix from computed expansion
-  arma::mat digest(const arma::vec & gamma) const;
+  arma::mat calcJ_vector(const arma::vec & gamma) const;
 
   /// Calculate force from P
   arma::vec forceJ(const arma::mat & P);

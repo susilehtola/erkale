@@ -783,10 +783,10 @@ arma::mat DensityFit::calcJ(const arma::mat & P) const {
 
   // Get the expansion coefficients
   arma::vec c=compute_expansion(P);
-  return digestJ(c);
+  return calcJ_vector(c);
 }
 
-arma::mat DensityFit::calcJ(const arma::vec & c) const {
+arma::mat DensityFit::calcJ_vector(const arma::vec & c) const {
   if(c.n_elem != Naux) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Naux = " << Naux << ", c.n_elem = " << c.n_elem << "!\n";
