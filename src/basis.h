@@ -447,6 +447,8 @@ class BasisSet {
   arma::mat kinetic() const;
   /// Calculate nuclear repulsion matrix
   arma::mat nuclear() const;
+  /// Calculate nuclear repulsion matrix with given nuclei
+  arma::mat nuclear(const std::vector<std::tuple<int,double,double,double>> & nuclei) const;
   /// Calculate electric potential matrix
   arma::mat potential(coords_t r) const;
   /// Calculate superposition of atomic potentials
