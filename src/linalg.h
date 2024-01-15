@@ -104,6 +104,9 @@ arma::mat CanonicalOrth(const arma::mat & S, double cutoff);
 /// Same, but use computed decomposition
 arma::mat CanonicalOrth(const arma::mat & Svec, const arma::vec & Sval, double cutoff);
 
+/// Pivoted Cholesky orthogonalization
+arma::mat PartialCholeskyOrth(const arma::mat & S, double cholcut, double scut);
+
 /// Automatic orthonormalization.
 arma::mat BasOrth(const arma::mat & S, bool verbose);
 /// Orthogonalize basis
