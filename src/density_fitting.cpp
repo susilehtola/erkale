@@ -127,9 +127,11 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   if(Bmat) {
     ab_invh = PartialCholeskyOrth(ab, cholthr, linthr);
     ab_inv = ab_invh * ab_invh.t();
+    //printf("%i auxiliary funtions out of %i are linearly independent\n",ab_invh.n_cols,ab_invh.n_rows);
   } else {
     // Just RI-J(K), so use faster method from Eichkorn et al to form ab_inv only
     ab_inv=arma::inv(ab + DELTA*arma::eye(ab.n_rows,ab.n_cols));
+    //printf("Using method of Eichkorn et al for ab_inv\n");
   }
 
   // Then, compute the three-center integrals
@@ -383,7 +385,7 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
 
     // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi)
     if(Bmat) {
-      aui = ab_invh*aui;
+      aui = ab_invh.t()*aui;
       K += occs[io]*arma::trans(aui)*aui;
     } else {
       K += occs[io]*arma::trans(aui)*ab_inv*aui;
@@ -464,7 +466,7 @@ void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs,
 
     // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi)
     if(Bmat) {
-      aui = ab_invh*aui;
+      aui = ab_invh.t()*aui;
       K += occs[io]*arma::trans(aui)*aui;
     } else {
       K += occs[io]*arma::trans(aui)*ab_inv*aui;
