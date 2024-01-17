@@ -98,14 +98,17 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ProtonBasis", "Protonic basis set", "");
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
+  settings.add_int("Verbosity", "Verboseness level", 5);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
   settings.print();
   int Q = settings.get_int("Charge");
   int M = settings.get_int("Multiplicity");
+  int verbosity = settings.get_int("Verbosity");
   double proton_mass = settings.get_double("ProtonMass");
   double intthr = settings.get_double("IntegralThresh");
+  double convergence_threshold = settings.get_double("ConvThr");
   bool verbose = settings.get_bool("Verbose");
   size_t fitmem = 1000000*settings.get_int("FittingMemory");
 
@@ -136,12 +139,14 @@ int main_guarded(int argc, char **argv) {
 
   // Collect quantum protons
   std::vector<atom_t> quantum_protons;
-  for(auto idx: proton_indices)
+  for(auto idx: proton_indices) {
     quantum_protons.push_back(atoms[idx]);
+    printf("adding atoms[%i] to list of quantum protons\n",idx);
+  }
   for(size_t i=0; i<quantum_protons.size(); i++)
     quantum_protons[i].num=i;
-  if(quantum_protons.size()==0)
-    throw std::runtime_error("No quantum protons!\n");
+  //if(quantum_protons.size()==0)
+  //  throw std::runtime_error("No quantum protons!\n");
 
   // Collect classical nuclei
   std::vector<std::tuple<int,double,double,double>> classical_nuclei;
@@ -150,11 +155,24 @@ int main_guarded(int argc, char **argv) {
     if(atoms[i].el.size()>3 && atoms[i].el.substr(atoms[i].el.size()-3,3)=="-Bq")
       continue;
     // Skip over quantum nuclei
-    for(size_t iq=0;iq<proton_indices.size();iq++)
-      if(proton_indices[iq]==i)
-        continue;
+    bool quantum=false;
+    for(auto proton_idx: proton_indices)
+      if(proton_idx==i)
+        quantum=true;
+    if(quantum)
+      continue;
     // Add to list
     classical_nuclei.push_back(std::make_tuple(get_Z(atoms[i].el), atoms[i].x, atoms[i].y, atoms[i].z));
+  }
+
+  // Classical nucleus repulsion energy
+  double Enucr=0.0;
+  for(size_t i=0;i<classical_nuclei.size();i++) {
+    auto [Qi, xi, yi, zi] = classical_nuclei[i];
+    for(size_t j=0;j<i;j++) {
+      auto [Qj, xj, yj, zj] = classical_nuclei[j];
+      Enucr+=Qi*Qj/sqrt(std::pow(xi-xj,2)+std::pow(yi-yj,2)+std::pow(zi-zj,2));
+    }
   }
 
   // Construct the basis set
@@ -162,6 +180,9 @@ int main_guarded(int argc, char **argv) {
   construct_basis(basis,atoms,baslib);
   BasisSet pbasis;
   construct_basis(pbasis,quantum_protons,pbaslib);
+
+  printf("Quantum proton basis\n");
+  pbasis.print();
 
   // Construct density fitting basis set
   BasisSetLibrary fitlib;
@@ -181,45 +202,50 @@ int main_guarded(int argc, char **argv) {
   arma::mat Sp(pbasis.overlap());
 
   arma::mat X(BasOrth(S));
-  arma::mat Xp(BasOrth(Sp));
+  arma::mat Xp;
+  if(Sp.n_elem)
+    Xp = BasOrth(Sp);
 
   // Calculate matrices
   arma::mat T(basis.kinetic());
   arma::mat V(basis.nuclear());
   arma::mat Vc(basis.nuclear(classical_nuclei));
-  arma::mat Vpc(-pbasis.nuclear(classical_nuclei));
-  arma::mat Tp(pbasis.kinetic()/proton_mass);
   arma::mat Vsap(basis.sap_potential(potlib));
-  arma::mat Vpsap(pbasis.sap_potential(potlib));
+  arma::mat Vpc, Tp, Vpsap;
+  if(Sp.n_elem) {
+    Vpc=-pbasis.nuclear(classical_nuclei);
+    Tp=pbasis.kinetic()/proton_mass;
+    Vpsap=pbasis.sap_potential(potlib);
+  }
 
   // Guess Fock
-  arma::mat Fguess(X.t()*(T+V+Vsap)*X);
-  arma::mat Fpguess(Xp.t()*(Tp-Vpsap)*Xp);
+  //arma::mat Fguess(X.t()*(T+V+Vsap)*X);
+  arma::mat Fguess(X.t()*(T+V)*X); //debug
+  printf("*** USING CORE GUESS FOR DEBUG PURPOSES ****\n");
+  arma::mat Fpguess;
+  if(Sp.n_elem)
+    Fpguess = Xp.t()*(Tp-Vpsap)*Xp;
   std::vector<arma::mat> fock_guess({Fguess, Fpguess});
 
-  // Guess orbitals
-  auto [E, C] = diagonalize(Fguess);
-  auto [Ep, Cp] = diagonalize(Fpguess);
-
-  E.t().print("Electronic energies");
-  Ep.t().print("Protonic energies");
-
   // Compute density fitting integrals
-  // Calculate the fitting integrals, don't run in B-matrix mode
+  // Calculate the fitting integrals, running in B-matrix mode
   bool direct=settings.get_bool("Direct");
   double fitthr=settings.get_double("FittingThreshold");
+  double cholfitthr=settings.get_double("FittingCholeskyThreshold");
   bool bmat=true;
 
   DensityFit dfit;
-  size_t Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,bmat);
+  size_t Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr,bmat);
   DensityFit pfit;
-  size_t Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,bmat);
+  size_t Npairs_p=0;
+  if(Sp.n_elem)
+    Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr,bmat);
 
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
   printf("%i protonic shell pairs out of %i are significant.\n",(int) Npairs_p, (int) pbasis.get_unique_shellpairs().size());
   printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
   fflush(stdout);
-  if(dfit.get_Naux() != pfit.get_Naux())
+  if(Sp.n_elem>0 and dfit.get_Naux() != pfit.get_Naux())
     throw std::logic_error("Electronic and protonic density fitting basis sets don't have the same number of functions!\n");
 
   // Number of blocks per particle type
@@ -256,33 +282,45 @@ int main_guarded(int argc, char **argv) {
     return J;
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder = [X, Xp, T, Tp, Vc, Vpc, dfit, pfit, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder = [X, Xp, T, Tp, Vc, Vpc, dfit, pfit, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, Enucr, verbosity](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
     // Get the electronic and protonic orbital coefficients
     arma::mat Ce = X*orbitals[0];
-    arma::mat Cp = Xp*orbitals[1];
+    arma::mat Cp;
+    if(Xp.n_elem)
+      Cp = Xp*orbitals[1];
 
     // and occupations
     arma::vec occe = occupations[0];
     arma::vec occp = occupations[1];
 
     // Compute the terms in the Fock matrices
-    auto [J, K] = electronic_terms(Ce, occe);
-    auto [Jp, Kp] = protonic_terms(Cp, occp);
-
-    arma::mat Jep = electron_proton_coulomb(Ce, occe);
-    arma::mat Jpe = proton_electron_coulomb(Cp, occp);
-
+    arma::mat J, K, Jp, Kp, Jep, Jpe;
+    std::tie(J, K) = electronic_terms(Ce, occe);
+    if(Xp.n_elem) {
+      std::tie(Jp, Kp) = protonic_terms(Cp, occp);
+      Jep = electron_proton_coulomb(Ce, occe);
+      Jpe = proton_electron_coulomb(Cp, occp);
+    }
     // Form the Fock matrices
-    arma::mat Fe = X.t() * (T + Vc + J + .5*K + Jpe) * X;
-    arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Jep) * Xp;
+    arma::mat Fe = T + Vc + J + .5*K;
+    if(Xp.n_elem) {
+      Fe += Jpe;
+    }
+    Fe = X.t() * Fe * X;
+
+    arma::mat Fp;
+    if(Xp.n_elem)
+      Fp = Xp.t() * (Tp + Vpc + Jp + Kp + Jep) * Xp;
     std::vector<arma::mat> fock({Fe,Fp});
 
     // Density matrices
-    arma::mat Pe(Ce * arma::diagmat(occe) * Ce.t());
-    arma::mat Pp(Cp * arma::diagmat(occp) * Cp.t());
+    arma::mat Pe, Pp;
+    Pe = Ce * arma::diagmat(occe) * Ce.t();
+    if(Xp.n_elem)
+      Pp = Cp * arma::diagmat(occp) * Cp.t();
 
     // Compute energy terms
     double Ekin = arma::trace(Pe*T);
@@ -293,30 +331,30 @@ int main_guarded(int argc, char **argv) {
     double Epcoul = 0.5*arma::trace(Jp*Pp);
     double Eexch = 0.25*arma::trace(K*Pe);
     double Epexch = 0.5*arma::trace(Kp*Pp);
-    double Epecoul = arma::trace(Jpe*Pe);
-    double Eepcoul = arma::trace(Jep*Pp);
-    double Etot = Ekin+Epkin+Enuc+Epnuc+Ecoul+Epcoul+Eexch+Epexch+Eepcoul;
+    double Eepcoul = Xp.n_elem>0 ? arma::trace(Jep*Pp) : 0.0;
+    double Etot = Ekin+Epkin+Enuc+Epnuc+Ecoul+Epcoul+Eexch+Epexch+Eepcoul+Enucr;
 
-    printf("e kinetic energy       % .10f\n",Ekin);
-    printf("p kinetic energy       % .10f\n",Epkin);
-    printf("e nuclear attraction   % .10f\n",Enuc);
-    printf("p nuclear repulsion    % .10f\n",Epnuc);
-    printf("e-e Coulomb energy     % .10f\n",Ecoul);
-    printf("p-p Coulomb energy     % .10f\n",Epcoul);
-    printf("e-p Coulomb energy     % .10f\n",Eepcoul);
-    //printf("p-e Coulomb energy     % .10f\n",Epecoul);
-    printf("e-e exchange energy    % .10f\n",Eexch);
-    printf("p-p exchange energy    % .10f\n",Epexch);
-    printf("Total energy           % .10f\n",Etot);
+    if(verbosity>=10) {
+      printf("e kinetic energy         % .10f\n",Ekin);
+      printf("p kinetic energy         % .10f\n",Epkin);
+      printf("e nuclear attraction     % .10f\n",Enuc);
+      printf("p nuclear repulsion      % .10f\n",Epnuc);
+      printf("e-e Coulomb energy       % .10f\n",Ecoul);
+      printf("p-p Coulomb energy       % .10f\n",Epcoul);
+      printf("e-p Coulomb energy       % .10f\n",Eepcoul);
+      printf("e-e exchange energy      % .10f\n",Eexch);
+      printf("p-p exchange energy      % .10f\n",Epexch);
+      printf("nuclear repulsion energy % .10f\n",Epexch);
+      printf("Total energy             % .10f\n",Etot);
+    }
 
     return std::make_pair(Etot,fock);
   };
 
   // Initialize SCF solver
   OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
-  //scfsolver.set_convergence_threshold(convergence_threshold);
-  //scfsolver.set_verbosity(verbosity);
-
+  scfsolver.set_convergence_threshold(convergence_threshold);
+  scfsolver.set_verbosity(verbosity);
   scfsolver.initialize_with_fock(fock_guess);
   scfsolver.run();
 
