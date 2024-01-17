@@ -1561,8 +1561,7 @@ int BasisSet::get_am(size_t ind) const {
 
 int BasisSet::get_max_am() const {
   if(shells.size()==0) {
-    ERROR_INFO();
-    throw std::domain_error("Cannot get maximum angular momentum of an empty basis set!\n");
+    return -1;
   }
 
   int maxam=shells[0].get_am();
