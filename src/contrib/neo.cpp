@@ -97,6 +97,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_scf_settings();
   settings.add_string("ProtonBasis", "Protonic basis set", "");
   settings.add_bool("SteepestDescentInit", "Start SCF with a steepest descent step", false);
+  settings.add_bool("SAPstart", "Start SCF directly from SAP guess", false);
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "fro");
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
@@ -114,6 +115,7 @@ int main_guarded(int argc, char **argv) {
   double intthr = settings.get_double("IntegralThresh");
   double convergence_threshold = settings.get_double("ConvThr");
   bool verbose = settings.get_bool("Verbose");
+  bool sapstart = settings.get_bool("SAPstart");
   bool steepest_descent_init = settings.get_bool("SteepestDescentInit");
   size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string error_norm = settings.get_string("ErrorNorm");
@@ -223,8 +225,7 @@ int main_guarded(int argc, char **argv) {
 
   // Guess Fock
   arma::mat Fguess(X.t()*(T+V+Vsap)*X);
-  //arma::mat Fguess(X.t()*(T+V)*X); //debug
-  //printf("*** USING CORE GUESS FOR DEBUG PURPOSES ****\n");
+  arma::mat Fpguess(Xp.t()*(Tp+Vpc+Vpsap)*Xp);
 
   // Compute density fitting integrals
   // Calculate the fitting integrals, running in B-matrix mode
@@ -361,7 +362,7 @@ int main_guarded(int argc, char **argv) {
       if(occp(ip)>0.0) {
         double r[3];
         for(int ic=0;ic<3;ic++)
-          r[ic]=arma::as_scalar(Cp.col(ip).t()*pr[ip]*Cp.col(ip));
+          r[ic]=arma::as_scalar(Cp.col(ip).t()*pr[ic]*Cp.col(ip));
         printf("Expected position for proton %i: % .6f % .6f % .6f\n",ip,r[0],r[1],r[2]);
       }
   };
@@ -507,6 +508,35 @@ int main_guarded(int argc, char **argv) {
   if(Nela<0 or Nelb<0)
     throw std::logic_error("Negative number of electrons!\n");
 
+  if(sapstart and Sp.n_elem) {
+    if(M==1) {
+      fock_guess = {Fguess, Fpguess};
+      number_of_blocks_per_particle_type = {1,1};
+      maximum_occupation = {2.0,1.0};
+      number_of_particles = {(double) (Nel),(double) proton_indices.size()};
+      block_descriptions = {"electronic", "protonic"};
+      fock_builder = restricted_neo_builder;
+    } else {
+      fock_guess = {Fguess, Fguess, Fpguess};
+      number_of_blocks_per_particle_type = {1,1,1};
+      maximum_occupation = {1.0,1.0,1.0};
+      number_of_particles = {(double) (Nela), (double) Nelb,(double) proton_indices.size()};
+      block_descriptions = {"electronic alpha", "electronic beta", "protonic"};
+      fock_builder = unrestricted_neo_builder;
+    }
+    OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+    scfsolver.initialize_with_fock(fock_guess);
+    scfsolver.set_error_norm(error_norm);
+    scfsolver.set_convergence_threshold(convergence_threshold);
+    scfsolver.set_verbosity(verbosity);
+    scfsolver.set_maximum_iterations(maxiter);
+    scfsolver.set_maximum_history_length(diisorder);
+    scfsolver.run(steepest_descent_init);
+
+    printf("\nRunning program took %s.\n",t.elapsed().c_str());
+    return 0;
+  }
+
   // Run electronic calculation
   if(M==1) {
     fock_guess={Fguess};
@@ -593,7 +623,6 @@ int main_guarded(int argc, char **argv) {
 
     arma::mat Fpguess;
     fock_guess={Xp.t()*(Tp+Vpc+frozen_Jep)*Xp};
-    //fock_guess={Xp.t()*(Tp+Vpc)*Xp};
     number_of_blocks_per_particle_type = {1};
     maximum_occupation = {1.0};
     number_of_particles = {(double) quantum_protons.size()};
