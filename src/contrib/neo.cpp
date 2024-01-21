@@ -283,10 +283,6 @@ int main_guarded(int argc, char **argv) {
   if(Sp.n_elem)
     Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
 
-  // Debug:
-  ERIscreen screen;
-  screen.fill(&basis,intthr,true);
-
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
   printf("%i protonic shell pairs out of %i are significant.\n",(int) Npairs_p, (int) pbasis.get_unique_shellpairs().size());
   printf("Electronic basis contains %i functions out of which %i are linearly dependent.\n",(int) X.n_rows, (int) (X.n_rows-X.n_cols));
@@ -296,34 +292,13 @@ int main_guarded(int argc, char **argv) {
   if(Sp.n_elem>0 and dfit.get_Naux() != pfit.get_Naux())
     throw std::logic_error("Electronic and protonic density fitting basis sets don't have the same number of functions!\n");
 
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & C, const arma::vec & occs)> electronic_terms_dfit = [dfit, fitmem](const arma::mat & C, const arma::vec & occs) {
+  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [dfit, fitmem](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J(dfit.calcJ(P));
     arma::mat K(-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem));
     return std::make_pair(J,K);
   };
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & C, const arma::vec & occs)> electronic_terms_scr = [screen, intthr](const arma::mat & C, const arma::vec & occs) {
-    arma::mat P(C*arma::diagmat(occs)*C.t());
-    arma::mat J(C.n_rows,C.n_rows,arma::fill::zeros), K(C.n_rows,C.n_rows,arma::fill::zeros);
-    screen.calcJK(P,J,K,intthr);
-    K=-K;
-    return std::make_pair(J,K);
-  };
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & C, const arma::vec & occs)> electronic_terms = [electronic_terms_dfit, electronic_terms_scr](const arma::mat & C, const arma::vec & occs) {
-    arma::mat Jf, Kf, Js, Ks;
-    std::tie(Jf,Kf) = electronic_terms_dfit(C,occs);
-#if 1
-    std::tie(Js,Ks) = electronic_terms_scr(C,occs);
-
-    arma::mat dJ=Jf-Js;
-    arma::mat dK=Kf-Ks;
-    printf("dJ norm %e\ndK norm %e\n",arma::norm(dJ,"fro"),arma::norm(dK,"fro"));
-#else
-    return std::make_pair(Js,Ks);
-#endif
-    return std::make_pair(Jf,Kf);
-  };
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & C, const arma::vec & occs)> protonic_terms = [pfit, fitmem](const arma::mat & C, const arma::vec & occs) {
+  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [pfit, fitmem](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J(pfit.calcJ(P));
     arma::mat K(-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem));
