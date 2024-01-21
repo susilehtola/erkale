@@ -272,18 +272,16 @@ int main_guarded(int argc, char **argv) {
 
 
   // Compute density fitting integrals
-  // Calculate the fitting integrals, running in B-matrix mode
   bool direct=settings.get_bool("Direct");
   double fitthr=settings.get_double("FittingThreshold");
   double cholfitthr=settings.get_double("FittingCholeskyThreshold");
-  bool bmat=true;
 
   DensityFit dfit;
-  size_t Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr,bmat);
+  size_t Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
   DensityFit pfit;
   size_t Npairs_p=0;
   if(Sp.n_elem)
-    Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr,bmat);
+    Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
 
   // Debug:
   ERIscreen screen;
