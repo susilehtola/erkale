@@ -98,8 +98,10 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ProtonBasis", "Protonic basis set", "");
   settings.add_bool("SteepestDescentInit", "Start SCF with a steepest descent step", false);
   settings.add_bool("SAPstart", "Start SCF directly from SAP guess", false);
+  settings.add_double("ProtonConfinementRadius", "Confinement radius for protonic initial guess", 0.0);
+  settings.add_double("EnergyUpdateThreshold", "Threshold for allowing positive energy updates", 0.0);
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
-  settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "fro");
+  settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "inf");
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
   settings.add_int("Verbosity", "Verboseness level", 5);
 
@@ -112,8 +114,10 @@ int main_guarded(int argc, char **argv) {
   int maxiter = settings.get_int("MaxIter");
   int diisorder = settings.get_int("DIISOrder");
   double proton_mass = settings.get_double("ProtonMass");
+  double proton_confinement_radius = settings.get_double("ProtonConfinementRadius");
   double intthr = settings.get_double("IntegralThresh");
   double convergence_threshold = settings.get_double("ConvThr");
+  double energy_update_threshold = settings.get_double("EnergyUpdateThreshold");
   bool verbose = settings.get_bool("Verbose");
   bool sapstart = settings.get_bool("SAPstart");
   bool steepest_descent_init = settings.get_bool("SteepestDescentInit");
@@ -124,7 +128,8 @@ int main_guarded(int argc, char **argv) {
   BasisSetLibrary baslib;
   baslib.load_basis(settings.get_string("Basis"));
   BasisSetLibrary pbaslib;
-  pbaslib.load_basis(settings.get_string("ProtonBasis"));
+  if(settings.get_string("ProtonBasis").size())
+    pbaslib.load_basis(settings.get_string("ProtonBasis"));
 
   // Read in SAP potential
   BasisSetLibrary potlib;
@@ -223,9 +228,48 @@ int main_guarded(int argc, char **argv) {
     pr=pbasis.moment(1);
   }
 
+  std::function<arma::mat(double)> protonic_confinement = [pbasis] (double r0) {
+    arma::mat pot(pbasis.get_Nbf(),pbasis.get_Nbf(),arma::fill::zeros);
+    for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
+      // Get nucleus
+      auto nuc = pbasis.get_nucleus(inuc);
+      // Get second moment around the atom
+      auto mom = pbasis.moment(2,nuc.r.x,nuc.r.y,nuc.r.z);
+      // Increment matrix
+      pot += mom[getind(2,0,0)] + mom[getind(0,2,0)] + mom[getind(0,0,2)];
+    }
+    // Apply localization radius
+    pot/=(r0*r0);
+    return pot;
+  };
+
+  std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [pbasis] (const arma::mat & F) {
+    arma::mat Fblock(F.n_rows,F.n_cols,arma::fill::zeros);
+    for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
+      // Get shells on nucleus
+      auto shells = pbasis.get_shell_inds(inuc);
+      // Accumulate list of functions on atom
+      std::vector<size_t> idx;
+      for(auto shell_idx: shells)
+        for(size_t ibf=pbasis.get_first_ind(shell_idx); ibf<=pbasis.get_last_ind(shell_idx); ibf++)
+          idx.push_back(ibf);
+      arma::uvec idxv(arma::conv_to<arma::uvec>::from(idx));
+      Fblock(idxv,idxv) = F(idxv,idxv);
+    }
+    return Fblock;
+  };
+
   // Guess Fock
   arma::mat Fguess(X.t()*(T+V+Vsap)*X);
-  arma::mat Fpguess(Xp.t()*(Tp+Vpc+Vpsap)*Xp);
+  arma::mat Fpguess = Tp+Vpc+Vpsap;
+  if(proton_confinement_radius != 0.0) {
+    // Add confinement
+    Fpguess += protonic_confinement(proton_confinement_radius);
+    // and also extract the atomic blocks
+    Fpguess = extract_atomic_block_diagonal(Fpguess);
+  }
+  Fpguess = Xp.t()*Fpguess*Xp;
+
 
   // Compute density fitting integrals
   // Calculate the fitting integrals, running in B-matrix mode
@@ -243,7 +287,9 @@ int main_guarded(int argc, char **argv) {
 
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
   printf("%i protonic shell pairs out of %i are significant.\n",(int) Npairs_p, (int) pbasis.get_unique_shellpairs().size());
-  printf("Auxiliary basis contains %i functions out of which %i are linearly independent.\n",(int) dfit.get_Naux(),(int) dfit.get_Naux_indep());
+  printf("Electronic basis contains %i functions out of which %i are linearly dependent.\n",(int) X.n_rows, (int) (X.n_rows-X.n_cols));
+  printf("Protonic basis contains %i functions out of which %i are linearly dependent.\n",(int) Xp.n_rows, (int) (Xp.n_rows-Xp.n_cols));
+  printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.get_Naux(),(int) (dfit.get_Naux()-dfit.get_Naux_indep()));
   fflush(stdout);
   if(Sp.n_elem>0 and dfit.get_Naux() != pfit.get_Naux())
     throw std::logic_error("Electronic and protonic density fitting basis sets don't have the same number of functions!\n");
@@ -363,7 +409,7 @@ int main_guarded(int argc, char **argv) {
         double r[3];
         for(int ic=0;ic<3;ic++)
           r[ic]=arma::as_scalar(Cp.col(ip).t()*pr[ic]*Cp.col(ip));
-        printf("Expected position for proton %i: % .6f % .6f % .6f\n",ip,r[0],r[1],r[2]);
+        printf("Expected position for proton %i: % .6f % .6f % .6f angstrom\n",ip,r[0]/ANGSTROMINBOHR,r[1]/ANGSTROMINBOHR,r[2]/ANGSTROMINBOHR);
       }
   };
 
@@ -526,11 +572,12 @@ int main_guarded(int argc, char **argv) {
     }
     OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
     scfsolver.initialize_with_fock(fock_guess);
-    scfsolver.set_error_norm(error_norm);
-    scfsolver.set_convergence_threshold(convergence_threshold);
-    scfsolver.set_verbosity(verbosity);
-    scfsolver.set_maximum_iterations(maxiter);
-    scfsolver.set_maximum_history_length(diisorder);
+    scfsolver.error_norm(error_norm);
+    scfsolver.convergence_threshold(convergence_threshold);
+    scfsolver.verbosity(verbosity);
+    scfsolver.maximum_iterations(maxiter);
+    scfsolver.maximum_history_length(diisorder);
+    scfsolver.energy_update_threshold(energy_update_threshold);
     scfsolver.run(steepest_descent_init);
 
     printf("\nRunning program took %s.\n",t.elapsed().c_str());
@@ -555,11 +602,12 @@ int main_guarded(int argc, char **argv) {
   }
   OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
   scfsolver.initialize_with_fock(fock_guess);
-  scfsolver.set_error_norm(error_norm);
-  scfsolver.set_convergence_threshold(convergence_threshold);
-  scfsolver.set_verbosity(verbosity);
-  scfsolver.set_maximum_iterations(maxiter);
-  scfsolver.set_maximum_history_length(diisorder);
+  scfsolver.error_norm(error_norm);
+  scfsolver.convergence_threshold(convergence_threshold);
+  scfsolver.verbosity(verbosity);
+  scfsolver.maximum_iterations(maxiter);
+  scfsolver.maximum_history_length(diisorder);
+  scfsolver.energy_update_threshold(energy_update_threshold);
   scfsolver.run(steepest_descent_init);
 
   OpenOrbitalOptimizer::DensityMatrix<double, double> electronic_dm = scfsolver.get_solution();
@@ -620,9 +668,14 @@ int main_guarded(int argc, char **argv) {
       return std::make_pair(Etot,fock);
     };
 
-
-    arma::mat Fpguess;
-    fock_guess={Xp.t()*(Tp+Vpc+frozen_Jep)*Xp};
+    Fpguess = Tp + Vpc + frozen_Jep;
+    if(proton_confinement_radius != 0.0) {
+      // Add confinement potential
+      Fpguess += protonic_confinement(proton_confinement_radius);
+      // and also extract the atomic blocks
+      Fpguess = extract_atomic_block_diagonal(Fpguess);
+    }
+    fock_guess={Xp.t()*Fpguess*Xp};
     number_of_blocks_per_particle_type = {1};
     maximum_occupation = {1.0};
     number_of_particles = {(double) quantum_protons.size()};
@@ -631,11 +684,12 @@ int main_guarded(int argc, char **argv) {
 
     scfsolver=OpenOrbitalOptimizer::SCFSolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
     scfsolver.initialize_with_fock(fock_guess);
-    scfsolver.set_error_norm(error_norm);
-    scfsolver.set_convergence_threshold(convergence_threshold);
-    scfsolver.set_verbosity(verbosity);
-    scfsolver.set_maximum_iterations(maxiter);
-    scfsolver.set_maximum_history_length(diisorder);
+    scfsolver.error_norm(error_norm);
+    scfsolver.convergence_threshold(convergence_threshold);
+    scfsolver.verbosity(verbosity);
+    scfsolver.maximum_iterations(maxiter);
+    scfsolver.maximum_history_length(diisorder);
+    scfsolver.energy_update_threshold(energy_update_threshold);
     scfsolver.run(steepest_descent_init);
 
     // Grab the proton density matrix
@@ -663,11 +717,12 @@ int main_guarded(int argc, char **argv) {
     }
     scfsolver=OpenOrbitalOptimizer::SCFSolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
     scfsolver.initialize_with_orbitals(guess_orbitals, guess_occupations);
-    scfsolver.set_error_norm(error_norm);
-    scfsolver.set_convergence_threshold(convergence_threshold);
-    scfsolver.set_verbosity(verbosity);
-    scfsolver.set_maximum_iterations(maxiter);
-    scfsolver.set_maximum_history_length(diisorder);
+    scfsolver.error_norm(error_norm);
+    scfsolver.convergence_threshold(convergence_threshold);
+    scfsolver.verbosity(verbosity);
+    scfsolver.maximum_iterations(maxiter);
+    scfsolver.maximum_history_length(diisorder);
+    scfsolver.energy_update_threshold(energy_update_threshold);
     scfsolver.run(steepest_descent_init);
 
   }
