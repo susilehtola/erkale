@@ -48,11 +48,7 @@ void DensityFit::get_range_separation(double & w, double & a, double & b) const 
   b=beta;
 }
 
-bool DensityFit::Bmat_enabled() const {
-  return Bmat;
-}
-
-size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double erithr, double linthr, double cholthr, bool bmat) {
+size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double erithr, double linthr, double cholthr) {
   // Construct density fitting basis
 
   // Store amount of functions
@@ -60,7 +56,6 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   Naux=auxbas.get_Nbf();
   Nnuc=orbbas.get_Nnuc();
   direct=dir;
-  Bmat=bmat;
 
   // Fill list of shell pairs
   arma::mat Q, M;
@@ -124,15 +119,8 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
     delete eri;
   }
 
-  if(Bmat) {
-    ab_invh = PartialCholeskyOrth(ab, cholthr, linthr);
-    ab_inv = ab_invh * ab_invh.t();
-    //printf("%i auxiliary funtions out of %i are linearly independent\n",ab_invh.n_cols,ab_invh.n_rows);
-  } else {
-    // Just RI-J(K), so use faster method from Eichkorn et al to form ab_inv only
-    ab_inv=arma::inv(ab + DELTA*arma::eye(ab.n_rows,ab.n_cols));
-    //printf("Using method of Eichkorn et al for ab_inv\n");
-  }
+  ab_invh = PartialCholeskyOrth(ab, cholthr, linthr);
+  ab_inv = ab_invh * ab_invh.t();
 
   // Then, compute the three-center integrals
   if(!direct) {
@@ -384,12 +372,8 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
     }
 
     // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi)
-    if(Bmat) {
-      aui = ab_invh.t()*aui;
-      K += occs[io]*arma::trans(aui)*aui;
-    } else {
-      K += occs[io]*arma::trans(aui)*ab_inv*aui;
-    }
+    aui = ab_invh.t()*aui;
+    K += occs[io]*arma::trans(aui)*aui;
   }
 }
 
@@ -465,12 +449,8 @@ void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs,
     }
 
     // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi)
-    if(Bmat) {
-      aui = ab_invh.t()*aui;
-      K += occs[io]*arma::trans(aui)*aui;
-    } else {
-      K += occs[io]*arma::trans(aui)*ab_inv*aui;
-    }
+    aui = ab_invh.t()*aui;
+    K += occs[io]*arma::trans(aui)*aui;
   }
 }
 
@@ -565,15 +545,9 @@ void DensityFit::digest_K_direct(const arma::mat & C, const arma::vec & occs, ar
   }
 
   // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi)
-  if(Bmat) {
-    for(size_t io=0;io<C.n_cols;io++) {
-      aui[io] = ab_invh*aui[io];
-      K += occs[io]*arma::trans(aui[io])*aui[io];
-    }
-  } else {
-    for(size_t io=0;io<C.n_cols;io++) {
-      K += occs[io]*arma::trans(aui[io])*ab_inv*aui[io];
-    }
+  for(size_t io=0;io<C.n_cols;io++) {
+    aui[io] = ab_invh*aui[io];
+    K += occs[io]*arma::trans(aui[io])*aui[io];
   }
 }
 
@@ -598,9 +572,8 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
 
   // Memory taken by (\alpha | \beta) and its inverse
   Nmem+=2*Na*Na*sizeof(double);
-  if(Bmat)
-    // We also have (a|b)^(-1/2)
-    Nmem+=Na*Na*sizeof(double);
+  // We also have (a|b)^(-1/2)
+  Nmem+=Na*Na*sizeof(double);
 
   // Memory taken by gamma and expansion coefficients
   Nmem+=2*Na*sizeof(double);
@@ -675,14 +648,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
   }
 
   // Compute and return c
-  if(Bmat) {
-    return ab_inv*gamma;
-  } else {
-    // Compute x0
-    arma::vec x0=ab_inv*gamma;
-    // Compute and return c
-    return x0+ab_inv*(gamma-ab*x0);
-  }
+  return ab_inv*gamma;
 }
 
 std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat> & P) const {
@@ -760,18 +726,8 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
   }
 
   // Compute and return c
-  if(Bmat) {
-    for(size_t ig=0;ig<P.size();ig++)
-      gamma[ig]=ab_inv*gamma[ig];
-
-  } else {
-    for(size_t ig=0;ig<P.size();ig++) {
-      // Compute x0
-      arma::vec x0=ab_inv*gamma[ig];
-      // Compute and return c
-      gamma[ig]=x0+ab_inv*(gamma[ig]-ab*x0);
-    }
-  }
+  for(size_t ig=0;ig<P.size();ig++)
+    gamma[ig]=ab_inv*gamma[ig];
 
   return gamma;
 }
@@ -1238,8 +1194,6 @@ void DensityFit::three_center_integrals(arma::mat & ints) const {
 void DensityFit::B_matrix(arma::mat & B) const {
   if(direct)
     throw std::runtime_error("Must run in tabulated mode!\n");
-  if(!Bmat)
-    throw std::runtime_error("Must be run in B-matrix mode!\n");
   // Compute the integrals
   three_center_integrals(B);
   // Transform into proper B matrix

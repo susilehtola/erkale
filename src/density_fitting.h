@@ -61,8 +61,6 @@ class DensityFit {
   size_t Naux;
   /// Direct calculation? (Compute three-center integrals on-the-fly)
   bool direct;
-  /// B-matrix calculation?
-  bool Bmat;
 
   /// Range separation constants
   double omega, alpha, beta;
@@ -126,16 +124,13 @@ class DensityFit {
   /// Get range separation constants
   void get_range_separation(double & w, double & a, double & b) const;
 
-  /// Running in B-matrix mode?
-  bool Bmat_enabled() const;
-
   /**
    * Compute integrals, use given linear dependency threshold. The HF
    * flag here controls formation of (a|b)^{-1/2} and (a|b)^{-1}; the
    * HF routine should be more tolerant of linear dependencies in the basis.
    * Returns amount of significant orbital shell pairs.
    */
-  size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, double cholthr, bool bmat=false);
+  size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, double cholthr);
 
   /// Compute estimate of necessary memory
   size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double erithr, bool direct) const;
