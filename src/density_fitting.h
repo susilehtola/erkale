@@ -159,6 +159,8 @@ class DensityFit {
   size_t get_Norb() const;
   /// Get the number of auxiliary functions
   size_t get_Naux() const;
+  /// Get the number of linearly independent auxiliary functions
+  size_t get_Naux_indep() const;
   /// Get ab_inv
   arma::mat get_ab() const;
   /// Get ab_inv

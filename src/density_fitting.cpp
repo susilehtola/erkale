@@ -1144,6 +1144,10 @@ size_t DensityFit::get_Naux() const {
   return Naux;
 }
 
+size_t DensityFit::get_Naux_indep() const {
+  return ab_invh.n_cols;
+}
+
 arma::mat DensityFit::get_ab() const {
   return ab;
 }
