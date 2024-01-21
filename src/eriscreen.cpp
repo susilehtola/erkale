@@ -474,6 +474,12 @@ void ERIscreen::calcJK(const arma::mat & P, arma::mat & J, arma::mat & K, double
     oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
+  if(J.n_rows != Nbf || J.n_cols != Nbf) {
+    J.zeros(Nbf,Nbf);
+  }
+  if(K.n_rows != Nbf || K.n_cols != Nbf) {
+    K.zeros(Nbf,Nbf);
+  }
 
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
@@ -515,6 +521,13 @@ void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, 
     oss << "Error in ERIscreen: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
+  if(J.n_rows != Nbf || J.n_cols != Nbf) {
+    J.zeros(Nbf,Nbf);
+  }
+  if(K.n_rows != Nbf || K.n_cols != Nbf) {
+    K.zeros(Nbf,Nbf);
+  }
+
 
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
@@ -561,6 +574,16 @@ void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J
     oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
+  if(J.n_rows != Nbf || J.n_cols != Nbf) {
+    J.zeros(Nbf,Nbf);
+  }
+  if(Ka.n_rows != Nbf || Ka.n_cols != Nbf) {
+    Ka.zeros(Nbf,Nbf);
+  }
+  if(Kb.n_rows != Nbf || Kb.n_cols != Nbf) {
+    Kb.zeros(Nbf,Nbf);
+  }
+
 
 #ifdef _OPENMP
   int nth=omp_get_max_threads();
@@ -609,6 +632,15 @@ void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::m
     std::ostringstream oss;
     oss << "Error in ERIscreen: Nbf = " << Nbf << ", Pb.n_rows = " << Pb.n_rows << ", Pb.n_cols = " << Pb.n_cols << "!\n";
     throw std::logic_error(oss.str());
+  }
+  if(J.n_rows != Nbf || J.n_cols != Nbf) {
+    J.zeros(Nbf,Nbf);
+  }
+  if(Ka.n_rows != Nbf || Ka.n_cols != Nbf) {
+    Ka.zeros(Nbf,Nbf);
+  }
+  if(Kb.n_rows != Nbf || Kb.n_cols != Nbf) {
+    Kb.zeros(Nbf,Nbf);
   }
 
 #ifdef _OPENMP
