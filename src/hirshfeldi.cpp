@@ -45,7 +45,7 @@ void HirshfeldI::compute(const BasisSet & basis, const arma::mat & P, std::strin
   atQ.resize(basis.get_Nnuc());
 
   // Get list of identical nuclei
-  std::vector< std::vector<size_t> > idnuc=identical_nuclei(basis);
+  std::vector< std::vector<size_t> > idnuc=basis.find_identical_nuclei();
 
   Timer t;
   if(verbose)

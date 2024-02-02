@@ -1770,9 +1770,17 @@ arma::ivec BasisSet::get_m_values() const {
 arma::ivec BasisSet::unique_m_values() const {
   // Find unique m values
   arma::ivec mval(get_m_values());
-  arma::uvec muni_idx(arma::find_unique(mval));
-  arma::ivec muni(mval(muni_idx));
-  return arma::sort(muni);
+  arma::sword mmin=0;
+  arma::sword mmax=arma::max(arma::abs(mval));
+
+  std::vector<arma::sword> mvals;
+  mvals.push_back(0);
+  for(int am=1;am<=mmax;am++) {
+    mvals.push_back(-am);
+    mvals.push_back(am);
+  }
+
+  return arma::conv_to<arma::ivec>::from(mvals);
 }
 
 std::map<int, arma::uword> BasisSet::unique_m_map() const {
@@ -4213,4 +4221,84 @@ arma::ivec m_classify(const arma::mat & C, const arma::ivec & mv) {
   }
 
   return oclass;
+}
+
+ std::vector< std::vector<size_t> > BasisSet::find_identical_nuclei() const {
+  // Index list
+  std::vector< std::vector<size_t> > ret;
+
+  // Loop over nuclei
+  for(size_t i=0;i<get_Nnuc();i++) {
+    // Check that nucleus isn't BSSE
+    nucleus_t nuc=get_nucleus(i);
+    if(nuc.bsse)
+      continue;
+
+    // Get the shells on the nucleus
+    std::vector<GaussianShell> shi=get_funcs(i);
+
+    // Check if there something already on the list
+    bool found=false;
+    for(size_t j=0;j<ret.size();j++) {
+      std::vector<GaussianShell> shj=get_funcs(ret[j][0]);
+
+      // Check nuclear type
+      if(get_symbol(i).compare(get_symbol(ret[j][0]))!=0)
+	continue;
+      // Check charge status
+      if(get_nucleus(i).Q != get_nucleus(ret[j][0]).Q)
+	continue;
+
+      // Do comparison
+      if(shi.size()!=shj.size())
+	continue;
+      else {
+
+	bool same=true;
+	for(size_t ii=0;ii<shi.size();ii++) {
+	  // Check angular momentum
+	  if(shi[ii].get_am()!=shj[ii].get_am()) {
+	    same=false;
+	    break;
+	  }
+
+	  // and exponents
+	  std::vector<contr_t> lhc=shi[ii].get_contr();
+	  std::vector<contr_t> rhc=shj[ii].get_contr();
+
+	  if(lhc.size() != rhc.size()) {
+	    same=false;
+	    break;
+	  }
+	  for(size_t ic=0;ic<lhc.size();ic++) {
+	    if(!(lhc[ic]==rhc[ic])) {
+	      same=false;
+	      break;
+	    }
+	  }
+
+	  if(!same)
+	    break;
+	}
+
+	if(same) {
+	  // Found identical atom.
+	  found=true;
+
+	  // Add it to the list.
+	  ret[j].push_back(i);
+	}
+      }
+    }
+
+    if(!found) {
+      // Didn't find the atom, add it to the list.
+      std::vector<size_t> tmp;
+      tmp.push_back(i);
+
+      ret.push_back(tmp);
+    }
+  }
+
+  return ret;
 }

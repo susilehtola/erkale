@@ -496,6 +496,8 @@ class BasisSet {
 
   /// Find "identical" shells in basis set.
   std::vector< std::vector<size_t> > find_identical_shells() const;
+  /// Find "identical" nuclei
+  std::vector< std::vector<size_t> > find_identical_nuclei() const;
 };
 
 /// Compute three-center overlap integral

@@ -132,7 +132,7 @@ void Hirshfeld::compute(const BasisSet & basis, std::string method) {
   atoms.resize(basis.get_Nnuc());
 
   // Get list of identical nuclei
-  std::vector< std::vector<size_t> > idnuc=identical_nuclei(basis);
+  std::vector< std::vector<size_t> > idnuc=basis.find_identical_nuclei();
 
   // Loop over list of identical nuclei
   for(size_t i=0;i<idnuc.size();i++) {
