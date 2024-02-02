@@ -1,0 +1,328 @@
+/*
+ *                This source code is part of
+ *
+ *                     E  R  K  A  L  E
+ *                             -
+ *                       HF/DFT from Hel
+ *
+ * Written by Susi Lehtola, 2010-2011
+ * Copyright (c) 2010-2011, Susi Lehtola
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ */
+
+#include "basislibrary.h"
+#include "basis.h"
+#include "checkpoint.h"
+#include "dftgrid.h"
+#include "elements.h"
+#include "find_molecules.h"
+#include "guess.h"
+#include "linalg.h"
+#include "mathf.h"
+#include "xyzutils.h"
+#include "properties.h"
+#include "sap.h"
+#include "settings.h"
+#include "stringutil.h"
+#include "timer.h"
+
+// Needed for libint init
+#include "eriworker.h"
+
+#include <armadillo>
+#include <cstdio>
+#include <cstdlib>
+#include <cfloat>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+#ifdef SVNRELEASE
+#include "version.h"
+#endif
+
+void print_H(const arma::mat & H, int num=10) {
+  size_t N=std::min(num,(int) H.n_rows);
+  for(size_t i=0;i<N;i++) {
+    for(size_t j=0;j<N;j++)
+      printf(" % .6f",H(i,j));
+    printf("\n");
+  }
+}
+
+void print_header() {
+#ifdef _OPENMP
+  printf("ERKALE - HF/DFT from Hel, OpenMP version, running on %i cores.\n",omp_get_max_threads());
+#else
+  printf("ERKALE - HF/DFT from Hel, serial version.\n");
+#endif
+  print_copyright();
+  print_license();
+#ifdef SVNRELEASE
+  printf("At svn revision %s.\n\n",SVNREVISION);
+#endif
+  print_hostname();
+}
+
+Settings settings;
+
+#define BFIDX(ie, ip) {((ip)*e_nbf+ie)}
+#define MOIDX(ie, ip) {((ip)*e_nmo+ie)}
+
+int main_guarded(int argc, char **argv) {
+  print_header();
+
+  if(argc!=2) {
+    printf("Usage: $ %s runfile\n",argv[0]);
+    return 0;
+  }
+
+  // Initialize libint
+  init_libint_base();
+
+  Timer t;
+  t.print_time();
+
+  settings.add_scf_settings();
+  settings.add_string("ProtonBasis", "Protonic basis set", "");
+  settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
+  settings.add_int("Verbosity", "Verboseness level", 5);
+
+  // Parse settings
+  settings.parse(std::string(argv[1]),true);
+  settings.print();
+
+  // Get parameters
+  double intthr=settings.get_double("IntegralThresh");
+  bool verbose=settings.get_bool("Verbose");
+  double proton_mass = settings.get_double("ProtonMass");
+
+  // Read in basis sets
+  BasisSetLibrary baslib;
+  baslib.load_basis(settings.get_string("Basis"));
+  BasisSetLibrary pbaslib;
+  pbaslib.load_basis(settings.get_string("ProtonBasis"));
+
+  std::vector<atom_t> atoms(1);
+  atoms[0].el="H";
+  atoms[0].num=0;
+  atoms[0].x=atoms[0].y=atoms[0].z=0.0;
+  atoms[0].Q=0;
+
+  // Construct the orbital basis sets
+  BasisSet basis;
+  construct_basis(basis,atoms,baslib);
+  BasisSet pbasis;
+  construct_basis(pbasis,atoms,pbaslib);
+
+  printf("%i electronic and %i protonic basis functions\n", basis.get_Nbf(), pbasis.get_Nbf());
+  printf("Hamiltonian is %i x %i\n", basis.get_Nbf()*pbasis.get_Nbf(), basis.get_Nbf()*pbasis.get_Nbf());
+
+  // Get the overlap matrices
+  arma::mat Se(basis.overlap());
+  arma::mat Sp(pbasis.overlap());
+
+  // Kinetic energy matrices
+  arma::mat T = basis.kinetic();
+  arma::mat Tp = pbasis.kinetic()/proton_mass;
+
+  // Orthogonalizing matrices
+  arma::mat Xe(BasOrth(Se,verbose));
+  arma::mat Xp(BasOrth(Sp,verbose));
+
+  // Solve the BO problem
+  //arma::mat H_bo = Xe.t() * (T + basis.nuclear()) * Xe;
+  arma::mat H_bo = Xe.t() * T * Xe;
+  arma::vec E_bo;
+  arma::mat C_bo;
+  arma::eig_sym(E_bo, C_bo, H_bo);
+
+  arma::mat Xe_bo = Xe * C_bo;
+  E_bo.print("Born-Oppenheimer spectrum");
+
+  // Solve the nuclear problem
+  arma::mat Tp_bo = Xp.t() * Tp * Xp;
+  arma::vec Ep_bo;
+  arma::mat Cp_bo;
+  arma::eig_sym(Ep_bo, Cp_bo, Tp_bo);
+  arma::mat Xp_bo = Xp * Cp_bo;
+  Ep_bo.print("Free nucleon spectrum");
+
+  // Compute the two-electron integrals
+  size_t e_nbf = basis.get_Nbf();
+  size_t p_nbf = pbasis.get_Nbf();
+  size_t e_nmo = Xe.n_cols;
+  size_t p_nmo = Xp.n_cols;
+
+  // Shells
+  std::vector<GaussianShell> eshells=basis.get_shells();
+  std::vector<GaussianShell> pshells=pbasis.get_shells();
+
+  // Compute shell pairs
+  arma::mat Qe, Qp, M;
+  double omega=0.0;
+  double alpha=1.0;
+  double beta=0.0;
+  auto epairs=basis.get_eripairs(Qe,M,intthr,omega,alpha,beta,verbose);
+  auto ppairs=pbasis.get_eripairs(Qp,M,intthr,omega,alpha,beta,verbose);
+
+  int max_am = std::max(basis.get_max_am(), pbasis.get_max_am());
+  int max_Ncontr = std::max(basis.get_max_Ncontr(), pbasis.get_max_Ncontr());
+
+  // Form AO matrix of proton-electron integrals
+  arma::mat V_ao(e_nbf*p_nbf,e_nbf*p_nbf,arma::fill::zeros);
+#pragma omp parallel
+  {
+    ERIWorker eri(max_am, max_Ncontr);
+
+#pragma omp for collapse(2)
+    for(size_t ep=0; ep<epairs.size(); ep++)
+      for(size_t pp=0; pp<ppairs.size(); pp++) {
+        // Shells are
+        size_t is = epairs[ep].is;
+        size_t js = epairs[ep].js;
+        size_t Is = ppairs[pp].is;
+        size_t Js = ppairs[pp].js;
+
+        // Check screening
+        double QQ = Qe(is,js)*Qp(Is,Js);
+        if(QQ<intthr)
+          continue;
+
+        // Start and end
+        size_t N_i = eshells[is].get_Nbf();
+        size_t i_start = eshells[is].get_first_ind();
+
+        size_t N_j = eshells[js].get_Nbf();
+        size_t j_start = eshells[js].get_first_ind();
+
+        size_t N_I = pshells[Is].get_Nbf();
+        size_t I_start = pshells[Is].get_first_ind();
+
+        size_t N_J = pshells[Js].get_Nbf();
+        size_t J_start = pshells[Js].get_first_ind();
+
+        // Compute the integrals
+        eri.compute(&eshells[is],&eshells[js],&pshells[Is],&pshells[Js]);
+        const std::vector<double> & eris=eri.rget();
+
+        // Store the integrals in the array
+        for(size_t ii=0;ii<N_i;ii++)
+          for(size_t jj=0;jj<N_j;jj++)
+            for(size_t II=0;II<N_I;II++)
+              for(size_t JJ=0;JJ<N_J;JJ++) {
+                size_t i = i_start+ii;
+                size_t j = j_start+jj;
+                size_t I = I_start+II;
+                size_t J = J_start+JJ;
+
+                //double element = -eris[((ii*N_j+jj)*N_I+II)*N_J+JJ];
+                double element = -eris[((ii*N_j+jj)*N_I+II)*N_J+JJ];
+                // (ij|IJ)
+                V_ao(BFIDX(i,I),BFIDX(j,J)) = element;
+                // (ij|JI)
+                V_ao(BFIDX(i,J),BFIDX(j,I)) = element;
+                // (ji|IJ)
+                V_ao(BFIDX(j,I),BFIDX(i,J)) = element;
+                // (ji|JI)
+                V_ao(BFIDX(j,J),BFIDX(i,I)) = element;
+              }
+      }
+  }
+  printf("Finished e-p integrals\n");
+  fflush(stdout);
+
+  // Compute transformation matrix to go to normalized AO basis
+  arma::mat ao_to_orth(e_nbf*p_nbf,e_nmo*p_nmo,arma::fill::zeros);
+#pragma omp parallel for collapse(4)
+  for(size_t u=0; u<e_nbf; u++)
+    for(size_t i=0; i<e_nmo; i++)
+      for(size_t U=0; U<p_nbf; U++)
+        for(size_t I=0; I<p_nmo; I++) {
+          ao_to_orth(BFIDX(u,U), MOIDX(i,I)) = Xe_bo(u,i) * Xp_bo(U,I);
+        }
+  printf("Finished forming ao to orthogonal transformation\n");
+  fflush(stdout);
+
+  arma::mat V_ci = ao_to_orth.t() * V_ao * ao_to_orth;
+  printf("Formed orthogonal Hamiltonian\n");
+  fflush(stdout);
+
+  // Add in kinetic energy terms
+  arma::mat T_mo = Xe_bo.t() * T * Xe_bo;
+  arma::mat Tp_mo = Xp_bo.t() * Tp * Xp_bo;
+
+  arma::mat T_ci(V_ci.n_rows, V_ci.n_cols);
+  for(size_t i=0; i<e_nmo; i++)
+    for(size_t j=0; j<e_nmo; j++)
+      for(size_t I=0; I<p_nmo; I++) {
+        T_ci(MOIDX(i,I), MOIDX(j,I)) += T_mo(i,j);
+      }
+  for(size_t i=0; i<e_nmo; i++)
+    for(size_t I=0; I<p_nmo; I++) {
+      for(size_t J=0; J<p_nmo; J++)
+        T_ci(MOIDX(i,I), MOIDX(i,J)) += Tp_mo(I,J);
+      }
+
+  arma::mat H_ci = T_ci + V_ci;
+
+  arma::vec E;
+  arma::mat C;
+  arma::eig_sym(E,C,H_ci);
+  //E.print("Eigenvalues");
+
+  // Compute electronic and protonic density matrices
+  arma::mat civec(C.col(0));
+  civec.reshape(e_nmo, p_nmo);
+  //civec.print("CI vector");
+
+  arma::mat Pe = -civec*civec.t();
+  arma::mat Pp = -civec.t()*civec;
+
+  arma::vec noon_e, noon_p;
+  arma::mat no_e, no_p;
+  arma::eig_sym(noon_e, no_e, Pe);
+  arma::eig_sym(noon_p, no_p, Pp);
+  noon_e *= -1;
+  noon_p *= -1;
+
+  // Go back to AO basis
+  Pe = -Xe_bo * Pe * Xe_bo.t();
+  Pp = -Xp_bo * Pp * Xp_bo.t();
+
+  noon_e.print("Electronic natural occupations");
+  noon_p.print("Protonic   natural occupations");
+
+  double Ekin_CI = arma::as_scalar(C.col(0).t() * T_ci * C.col(0));
+  double Enuc_CI = arma::as_scalar(C.col(0).t() * V_ci * C.col(0));
+
+  printf("CI energy % .15f\n",E(0));
+  printf("Electronic kinetic energy (dm) %.9f\n", arma::trace(Pe*T));
+  printf("Protonic   kinetic energy (dm) %.9f\n", arma::trace(Pp*Tp));
+  printf("Total      kinetic energy (dm) %.9f\n", arma::trace(Pe*T)+arma::trace(Pp*Tp));
+  printf("Total      kinetic energy (CI) %.9f\n", Ekin_CI);
+  printf("Electron-proton Coulomb energy %.9f\n", Enuc_CI);
+  printf("Virial ratio %e\n",-E(0)/Enuc_CI);
+
+  printf("\nRunning program took %s.\n",t.elapsed().c_str());
+
+  return 0;
+}
+
+int main(int argc, char **argv) {
+#ifdef CATCH_EXCEPTIONS
+  try {
+    return main_guarded(argc, argv);
+  } catch (const std::exception &e) {
+    std::cerr << "error: " << e.what() << std::endl;
+    return 1;
+  }
+#else
+  return main_guarded(argc, argv);
+#endif
+}
