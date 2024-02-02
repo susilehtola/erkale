@@ -1095,6 +1095,10 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
   return K;
 }
 
+arma::mat DensityFit::calcK(const arma::mat & Corig, const arma::vec & occo, size_t fitmem) const {
+  return calcK(Corig, arma::conv_to<std::vector<double>>::from(occo), fitmem);
+}
+
 arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<double> & occo, size_t fitmem) const {
   if(Corig.n_rows != Nbf) {
     std::ostringstream oss;
@@ -1134,6 +1138,10 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
   }
 
   return K;
+}
+
+arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const arma::vec & occo, size_t fitmem) const {
+  return calcK(Corig, arma::conv_to<std::vector<double>>::from(occo), fitmem);
 }
 
 size_t DensityFit::get_Norb() const {
