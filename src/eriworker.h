@@ -113,6 +113,8 @@ class ERIWorker: public IntegralWorker {
   void compute_debug(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls);
   /// Get the eris
   std::vector<double> get() const;
+  /// Get the eris
+  std::vector<double> & rget() const;
   /// Get pointer to eris
   const std::vector<double> * getp() const;
 };
