@@ -1267,6 +1267,10 @@ std::vector<double> ERIWorker::get() const {
   return *input;
 }
 
+std::vector<double> & ERIWorker::rget() const {
+  return *input;
+}
+
 const std::vector<double> * ERIWorker::getp() const {
   return input;
 }
