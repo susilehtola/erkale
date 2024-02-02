@@ -180,7 +180,7 @@ arma::mat atomic_guess_wrk(const BasisSet & basis, atomic_guess_t type, double K
   // the way that the basis sets coincide.
 
   // Get list of identical nuclei
-  std::vector< std::vector<size_t> > idnuc=identical_nuclei(basis);
+  std::vector< std::vector<size_t> > idnuc=basis.find_identical_nuclei();
 
   // Amount of basis functions is
   size_t Nbf=basis.get_Nbf();
@@ -422,85 +422,6 @@ arma::mat minimal_basis_projection(const BasisSet & basis) {
   return atomic_guess_wrk(basis,FORM_MINBAS,0.0);
 }
 
-std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis) {
-  // Returned list
-  std::vector< std::vector<size_t> > ret;
-
-  // Loop over nuclei
-  for(size_t i=0;i<basis.get_Nnuc();i++) {
-    // Check that nucleus isn't BSSE
-    nucleus_t nuc=basis.get_nucleus(i);
-    if(nuc.bsse)
-      continue;
-
-    // Get the shells on the nucleus
-    std::vector<GaussianShell> shi=basis.get_funcs(i);
-
-    // Check if there something already on the list
-    bool found=false;
-    for(size_t j=0;j<ret.size();j++) {
-      std::vector<GaussianShell> shj=basis.get_funcs(ret[j][0]);
-
-      // Check nuclear type
-      if(basis.get_symbol(i).compare(basis.get_symbol(ret[j][0]))!=0)
-	continue;
-      // Check charge status
-      if(basis.get_nucleus(i).Q != basis.get_nucleus(ret[j][0]).Q)
-	continue;
-
-      // Do comparison
-      if(shi.size()!=shj.size())
-	continue;
-      else {
-
-	bool same=true;
-	for(size_t ii=0;ii<shi.size();ii++) {
-	  // Check angular momentum
-	  if(shi[ii].get_am()!=shj[ii].get_am()) {
-	    same=false;
-	    break;
-	  }
-
-	  // and exponents
-	  std::vector<contr_t> lhc=shi[ii].get_contr();
-	  std::vector<contr_t> rhc=shj[ii].get_contr();
-
-	  if(lhc.size() != rhc.size()) {
-	    same=false;
-	    break;
-	  }
-	  for(size_t ic=0;ic<lhc.size();ic++) {
-	    if(!(lhc[ic]==rhc[ic])) {
-	      same=false;
-	      break;
-	    }
-	  }
-
-	  if(!same)
-	    break;
-	}
-
-	if(same) {
-	  // Found identical atom.
-	  found=true;
-
-	  // Add it to the list.
-	  ret[j].push_back(i);
-	}
-      }
-    }
-
-    if(!found) {
-      // Didn't find the atom, add it to the list.
-      std::vector<size_t> tmp;
-      tmp.push_back(i);
-
-      ret.push_back(tmp);
-    }
-  }
-
-  return ret;
-}
 
 
 bool operator<(const el_conf_t & lhs, const el_conf_t & rhs) {

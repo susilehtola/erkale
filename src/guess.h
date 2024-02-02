@@ -72,9 +72,6 @@ arma::mat minimal_basis_projection(const BasisSet & basis);
  */
 void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & method, std::vector<size_t> & shellidx, BasisSet & atbas, arma::vec & atE, arma::mat & atC, arma::mat & atP, arma::mat & atF, int Q);
 
-/// Determine list of identical nuclei, determined by nucleus and basis set
-std::vector< std::vector<size_t> > identical_nuclei(const BasisSet & basis);
-
 /// Electronic configuration
 typedef struct {
   /// Primary quantum number
