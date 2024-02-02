@@ -768,6 +768,10 @@ arma::mat ERIchol::calcK(const arma::mat & C, const std::vector<double> & occs) 
   return K;
 }
 
+arma::mat ERIchol::calcK(const arma::mat & C, const arma::vec & occs) const {
+  return calcK(C, arma::conv_to<std::vector<double>>::from(occs));
+}
+
 arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const std::vector<double> & occs) const {
   arma::cx_mat K(C.n_rows,C.n_rows);
   K.zeros();
@@ -786,6 +790,10 @@ arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const std::vector<double> & 
     }
 
   return K;
+}
+
+arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const arma::vec & occs) const {
+  return calcK(C, arma::conv_to<std::vector<double>>::from(occs));
 }
 
 void ERIchol::B_matrix(arma::mat & Br) const {

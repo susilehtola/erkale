@@ -96,11 +96,15 @@ class ERIchol {
   arma::mat calcK(const arma::vec & C) const;
   /// Form exchange matrix
   arma::mat calcK(const arma::mat & C, const std::vector<double> & occs) const;
+  /// Form exchange matrix
+  arma::mat calcK(const arma::mat & C, const arma::vec & occs) const;
 
   /// Form exchange matrix
   arma::cx_mat calcK(const arma::cx_vec & C) const;
   /// Form exchange matrix
   arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs) const;
+  /// Form exchange matrix
+  arma::cx_mat calcK(const arma::cx_mat & C, const arma::vec & occs) const;
 
   /// Get full B matrix
   void B_matrix(arma::mat & B) const;
