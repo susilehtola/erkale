@@ -329,12 +329,15 @@ int main_guarded(int argc, char **argv) {
   double Enuc_CI = arma::as_scalar(C.col(0).t() * V_ci * C.col(0));
 
   printf("CI energy % .15f\n",E(0));
-  printf("Electronic kinetic energy (dm) %.9f\n", arma::trace(Pe*T));
-  printf("Protonic   kinetic energy (dm) %.9f\n", arma::trace(Pp*Tp));
-  printf("Total      kinetic energy (dm) %.9f\n", arma::trace(Pe*T)+arma::trace(Pp*Tp));
+  double Ekine=arma::trace(Pe*T);
+  double Ekinp=arma::trace(Pp*Tp);
+  double Ekin=Ekine+Ekinp;
+  printf("Electronic kinetic energy (dm) %.9f\n", Ekine);
+  printf("Protonic   kinetic energy (dm) %.9f\n", Ekinp);
+  printf("Total      kinetic energy (dm) %.9f\n", Ekin);
   printf("Total      kinetic energy (CI) %.9f\n", Ekin_CI);
   printf("Electron-proton Coulomb energy %.9f\n", Enuc_CI);
-  printf("Virial ratio %e\n",-E(0)/Enuc_CI);
+  printf("Virial ratio %e\n",-E(0)/Ekin);
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
 
