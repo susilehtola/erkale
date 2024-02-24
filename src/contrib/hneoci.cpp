@@ -92,6 +92,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ProtonBasis", "Protonic basis set", "");
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
   settings.add_int("Verbosity", "Verboseness level", 5);
+  settings.add_bool("H2", "Run H2+ instead of H atom?", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -101,6 +102,7 @@ int main_guarded(int argc, char **argv) {
   double intthr=settings.get_double("IntegralThresh");
   bool verbose=settings.get_bool("Verbose");
   double proton_mass = settings.get_double("ProtonMass");
+  bool dimer = settings.get_bool("H2");
 
   // Read in basis sets
   BasisSetLibrary baslib;
@@ -140,12 +142,20 @@ int main_guarded(int argc, char **argv) {
   atoms[0].num=0;
   atoms[0].x=atoms[0].y=atoms[0].z=0.0;
   atoms[0].Q=0;
+  std::vector<atom_t> protons(atoms);
+
+  if(dimer) {
+    atoms.push_back(atoms[0]);
+    atoms[1].num=1;
+    atoms[1].z=2.0;
+    printf("Placed second atom at 2.0 bohr distance\n");
+  }
 
   // Construct the orbital basis sets
   BasisSet basis;
   construct_basis(basis,atoms,baslib);
   BasisSet pbasis;
-  construct_basis(pbasis,atoms,pbaslib);
+  construct_basis(pbasis,protons,pbaslib);
 
   printf("%i electronic and %i protonic basis functions\n", basis.get_Nbf(), pbasis.get_Nbf());
   printf("Hamiltonian is %i x %i\n", basis.get_Nbf()*pbasis.get_Nbf(), basis.get_Nbf()*pbasis.get_Nbf());
@@ -158,27 +168,42 @@ int main_guarded(int argc, char **argv) {
   arma::mat T = basis.kinetic();
   arma::mat Tp = pbasis.kinetic()/proton_mass;
 
+  // Nuclear attraction
+  arma::mat V(T.n_rows, T.n_cols, arma::fill::zeros);
+  arma::mat Vp(Tp.n_rows, Tp.n_cols, arma::fill::zeros);
+  if(dimer) {
+    std::vector<std::tuple<int, double, double, double>> classical_nuclei(1,std::make_tuple(1,atoms[1].x,atoms[1].y,atoms[1].z));
+    // Classical nucleus is attractive for electrons
+    V = basis.nuclear(classical_nuclei);
+    // and repulsive for protons
+    Vp = -pbasis.nuclear(classical_nuclei);
+  }
+
+  // Core Hamiltonian
+  arma::mat H0 = T + V;
+  arma::mat H0p = Tp + Vp;
+
   // Orthogonalizing matrices
   arma::mat Xe(BasOrth(Se,verbose));
   arma::mat Xp(BasOrth(Sp,verbose));
 
   // Solve the BO problem
   //arma::mat H_bo = Xe.t() * (T + basis.nuclear()) * Xe;
-  arma::mat H_bo = Xe.t() * T * Xe;
+  arma::mat H_bo = Xe.t() * H0 * Xe;
   arma::vec E_bo;
   arma::mat C_bo;
   arma::eig_sym(E_bo, C_bo, H_bo);
 
   arma::mat Xe_bo = Xe * C_bo;
-  E_bo.print("Born-Oppenheimer spectrum");
+  E_bo.print("Electronic spectrum without quantum proton");
 
   // Solve the nuclear problem
-  arma::mat Tp_bo = Xp.t() * Tp * Xp;
+  arma::mat Hp_bo = Xp.t() * H0p * Xp;
   arma::vec Ep_bo;
   arma::mat Cp_bo;
-  arma::eig_sym(Ep_bo, Cp_bo, Tp_bo);
+  arma::eig_sym(Ep_bo, Cp_bo, Hp_bo);
   arma::mat Xp_bo = Xp * Cp_bo;
-  Ep_bo.print("Free nucleon spectrum");
+  Ep_bo.print("Nucleon spectrum");
 
   // Compute the two-electron integrals
   size_t e_nbf = basis.get_Nbf();
@@ -280,23 +305,23 @@ int main_guarded(int argc, char **argv) {
   printf("Formed orthogonal Hamiltonian\n");
   fflush(stdout);
 
-  // Add in kinetic energy terms
-  arma::mat T_mo = Xe_bo.t() * T * Xe_bo;
-  arma::mat Tp_mo = Xp_bo.t() * Tp * Xp_bo;
+  // Add in one-particle terms
+  arma::mat H0_mo = Xe_bo.t() * H0 * Xe_bo;
+  arma::mat H0p_mo = Xp_bo.t() * H0p * Xp_bo;
 
-  arma::mat T_ci(V_ci.n_rows, V_ci.n_cols);
+  arma::mat H0_ci(V_ci.n_rows, V_ci.n_cols);
   for(size_t i=0; i<e_nmo; i++)
     for(size_t j=0; j<e_nmo; j++)
       for(size_t I=0; I<p_nmo; I++) {
-        T_ci(MOIDX(i,I), MOIDX(j,I)) += T_mo(i,j);
+        H0_ci(MOIDX(i,I), MOIDX(j,I)) += H0_mo(i,j);
       }
   for(size_t i=0; i<e_nmo; i++)
     for(size_t I=0; I<p_nmo; I++) {
       for(size_t J=0; J<p_nmo; J++)
-        T_ci(MOIDX(i,I), MOIDX(i,J)) += Tp_mo(I,J);
+        H0_ci(MOIDX(i,I), MOIDX(i,J)) += H0p_mo(I,J);
       }
 
-  arma::mat H_ci = T_ci + V_ci;
+  arma::mat H_ci = H0_ci + V_ci;
 
   arma::vec E;
   arma::mat C;
@@ -324,18 +349,23 @@ int main_guarded(int argc, char **argv) {
 
   noon_e.print("Electronic natural occupations");
   noon_p.print("Protonic   natural occupations");
-
-  double Ekin_CI = arma::as_scalar(C.col(0).t() * T_ci * C.col(0));
-  double Enuc_CI = arma::as_scalar(C.col(0).t() * V_ci * C.col(0));
-
   printf("CI energy % .15f\n",E(0));
+
+
+  double Enuc_CI = arma::as_scalar(C.col(0).t() * V_ci * C.col(0));
   double Ekine=arma::trace(Pe*T);
   double Ekinp=arma::trace(Pp*Tp);
+  double Enucel=arma::trace(Pe*V);
+  double Enucnuc=arma::trace(Pp*Vp);
+  double Enuc=arma::trace(Pp*Tp);
   double Ekin=Ekine+Ekinp;
   printf("Electronic kinetic energy (dm) %.9f\n", Ekine);
   printf("Protonic   kinetic energy (dm) %.9f\n", Ekinp);
   printf("Total      kinetic energy (dm) %.9f\n", Ekin);
-  printf("Total      kinetic energy (CI) %.9f\n", Ekin_CI);
+  if(dimer) {
+    printf("Electron-classical proton energy (dm) %.9f\n", Enucel);
+    printf("Quantum-classical proton energy (dm) %.9f\n", Enucnuc);
+  }
   printf("Electron-proton Coulomb energy %.9f\n", Enuc_CI);
   printf("Virial ratio %e\n",-E(0)/Ekin);
 
