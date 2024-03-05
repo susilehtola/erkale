@@ -74,6 +74,26 @@ Settings settings;
 #define BFIDX(ie, ip) {((ip)*e_nbf+ie)}
 #define MOIDX(ie, ip) {((ip)*e_nmo+ie)}
 
+void analyze_density(const BasisSet & basis, const arma::mat & P, const std::string & label) {
+  std::vector<arma::mat> dip(basis.moment(1));
+  std::vector<arma::mat> quad(basis.moment(2));
+
+  // Compute expected position
+  std::vector<double> dipval(dip.size());
+  double dipsq=0.0;
+  for(size_t i=0;i<dip.size();i++) {
+    dipval[i]=arma::trace(P*dip[i]);
+    dipsq += dipval[i]*dipval[i];
+  }
+
+  // Compute <(r-<r>)^2> = <r^2> - <r>^2
+  arma::mat Rsqmat = quad[getind(0,0,2)]+quad[getind(0,2,0)]+quad[getind(2,0,0)];
+  double rsq = arma::trace(P*Rsqmat);
+
+  printf("Expected position for %s wave packet: % .6f % .6f % .6f\n",label.c_str(),dipval[0],dipval[1],dipval[2]);
+  printf("Root-mean-square size of %s wave packet % .6f\n",label.c_str(),sqrt(rsq-dipsq));
+}
+
 int main_guarded(int argc, char **argv) {
   print_header();
 
@@ -353,7 +373,6 @@ int main_guarded(int argc, char **argv) {
   noon_p.print("Protonic   natural occupations");
   printf("CI energy % .15f\n",E(0));
 
-
   double Enuc_CI = arma::as_scalar(C.col(0).t() * V_ci * C.col(0));
   double Ekine=arma::trace(Pe*T);
   double Ekinp=arma::trace(Pp*Tp);
@@ -370,6 +389,10 @@ int main_guarded(int argc, char **argv) {
   }
   printf("Electron-proton Coulomb energy %.9f\n", Enuc_CI);
   printf("Virial ratio %e\n",-E(0)/Ekin);
+
+  printf("\n");
+  analyze_density(basis, Pe, "electronic");
+  analyze_density(pbasis, Pp, " protonic ");
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
 
