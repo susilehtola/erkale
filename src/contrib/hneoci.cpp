@@ -93,6 +93,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_bool("H2", "Run H2+ instead of H atom?", false);
+  settings.add_double("H2BondLength", "Bond length for H2+ in a.u.", 2.0);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -103,6 +104,7 @@ int main_guarded(int argc, char **argv) {
   bool verbose=settings.get_bool("Verbose");
   double proton_mass = settings.get_double("ProtonMass");
   bool dimer = settings.get_bool("H2");
+  double R = settings.get_double("H2BondLength");
 
   // Read in basis sets
   BasisSetLibrary baslib;
@@ -147,8 +149,8 @@ int main_guarded(int argc, char **argv) {
   if(dimer) {
     atoms.push_back(atoms[0]);
     atoms[1].num=1;
-    atoms[1].z=2.0;
-    printf("Placed second atom at 2.0 bohr distance\n");
+    atoms[1].z=R;
+    printf("Placed second atom at %e bohr distance\n",R);
   }
 
   // Construct the orbital basis sets
