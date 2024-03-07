@@ -329,6 +329,113 @@ arma::mat kinetic_int_os(double xa, double ya, double za, double zetaa, const st
   return T;
 }
 
+std::vector<arma::mat> gradient_int_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb) {
+  // Compute shell of kinetic energy integrals
+
+  // Angular momenta of shells
+  int am_a=carta[0].l+carta[0].m+carta[0].n;
+  int am_b=cartb[0].l+cartb[0].m+cartb[0].n;
+
+  // Returned matrix
+  std::vector<arma::mat> T(3);
+  for(size_t i=0;i<3;i++)
+    T[i].zeros(carta.size(),cartb.size());
+
+  // Get 1d overlap integrals
+  arma::mat ox_arr=overlap_ints_1d(xa,xb,zetaa,zetab,am_a,am_b);
+  arma::mat oy_arr=overlap_ints_1d(ya,yb,zetaa,zetab,am_a,am_b);
+  arma::mat oz_arr=overlap_ints_1d(za,zb,zetaa,zetab,am_a,am_b);
+
+  // Get kinetic energy integrals
+  arma::mat kx_arr=derivative_ints_1d(xa,xb,zetaa,zetab,am_a,am_b,1);
+  arma::mat ky_arr=derivative_ints_1d(ya,yb,zetaa,zetab,am_a,am_b,1);
+  arma::mat kz_arr=derivative_ints_1d(za,zb,zetaa,zetab,am_a,am_b,1);
+
+  double ox, oy, oz;
+  double kx, ky, kz;
+
+  int la, ma, na;
+  int lb, mb, nb;
+
+  double anorm, bnorm;
+
+  for(size_t i=0;i<carta.size();i++) {
+    anorm=carta[i].relnorm;
+
+    la=carta[i].l;
+    ma=carta[i].m;
+    na=carta[i].n;
+
+    for(size_t j=0;j<cartb.size();j++) {
+      lb=cartb[j].l;
+      mb=cartb[j].m;
+      nb=cartb[j].n;
+
+      bnorm=cartb[j].relnorm;
+
+      ox=ox_arr(la,lb);
+      oy=oy_arr(ma,mb);
+      oz=oz_arr(na,nb);
+
+      kx=kx_arr(la,lb);
+      ky=ky_arr(ma,mb);
+      kz=kz_arr(na,nb);
+
+      T[0](i,j)=anorm*bnorm*kx*oy*oz;
+      T[1](i,j)=anorm*bnorm*ox*ky*oz;
+      T[2](i,j)=anorm*bnorm*ox*oy*kz;
+    }
+  }
+
+#ifdef DEBUG
+
+  std::vector<arma::mat> huz(3);
+  for(size_t i=0;i<3;i++)
+    huz[i].zeros(carta.size(),cartb.size());
+
+  for(size_t i=0;i<carta.size();i++) {
+    la=carta[i].l;
+    ma=carta[i].m;
+    na=carta[i].n;
+    anorm=carta[i].relnorm;
+
+    for(size_t j=0;j<cartb.size();j++) {
+      lb=cartb[j].l;
+      mb=cartb[j].m;
+      nb=cartb[j].n;
+      bnorm=cartb[j].relnorm;
+
+      auto res = gradient_int(xa,ya,za,zetaa,la,ma,na,xb,yb,zb,zetab,lb,mb,nb);
+      huz[0](i,j)=anorm*bnorm*std::get<0>(res);
+      huz[1](i,j)=anorm*bnorm*std::get<1>(res);
+      huz[2](i,j)=anorm*bnorm*std::get<2>(res);
+    }
+  }
+
+  int diff=0;
+  for(size_t ic=0;ic<3;ic++)
+    for(size_t i=0;i<carta.size();i++)
+      for(size_t j=0;j<cartb.size();j++)
+        if(fabs(T[ic](i,j)-huz[ic](i,j))>10*DBL_EPSILON*fabs(huz[ic](i,j)))
+          diff++;
+
+  if(diff==0)
+    //printf("Computed shell of KE (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i), the results match.\n",xa,ya,za,xb,yb,zb,zetaa,zetab,am_a,am_b);
+    ;
+  else
+    for(size_t ic=0;ic<3;ic++)
+      for(size_t i=0;i<carta.size();i++)
+	for(size_t j=0;j<cartb.size();j++)
+	  if(fabs(T[ic](i,j)-huz[ic](i,j))>1000*DBL_EPSILON*fabs(huz[ic](i,j))) {
+	    printf("Computed gradient ic=%i (%e,%e,%e)-(%e,%e,%e) with zeta=(%e,%e) and am=(%i,%i,%i)-(%i,%i,%i)\n",ic,xa,ya,za,xb,yb,zb,zetaa,zetab,la,ma,na,lb,mb,nb);
+	    printf("Huzinaga gives %e, OS gives %e.\n",huz[ic](i,j),T[ic](i,j));
+	  }
+
+#endif
+
+  return T;
+}
+
 std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb) {
   // Compute shell of kinetic energy integrals
 

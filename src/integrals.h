@@ -17,6 +17,7 @@
 
 
 #include "global.h"
+#include <tuple>
 
 #ifndef ERKALE_INTEGRALS
 #define ERKALE_INTEGRALS
@@ -40,6 +41,8 @@ double overlap_int(double xa, double ya, double za, double zetaa, int la, int ma
 
 /// Calculate kinetic energy integral
 double kinetic_int(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xb, double yb, double zb, double zetab, int lb, int mb, int nb);
+/// Calculate gradient integral <u|nabla|v>
+std::tuple<double,double,double> gradient_int(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xb, double yb, double zb, double zetab, int lb, int mb, int nb);
 
 /// Calculate nuclear attraction integral
 double nuclear_int(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xnuc, double ynuc, double znuc, double xb, double yb, double zb, double zetab, int lb, int mb, int nb);
