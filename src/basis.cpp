@@ -974,6 +974,43 @@ arma::mat GaussianShell::kinetic(const GaussianShell & rhs) const {
   return T;
 }
 
+// Calculate gradient matrix element between basis functions
+std::vector<arma::mat> GaussianShell::gradient_integral(const GaussianShell & rhs) const {
+  // Gradient matrix
+  std::vector<arma::mat> T(3);
+  for(size_t i=0;i<3;i++)
+    T[i].zeros(cart.size(),rhs.cart.size());
+
+  // Coordinates
+  double xa=cen.x;
+  double ya=cen.y;
+  double za=cen.z;
+
+  double xb=rhs.cen.x;
+  double yb=rhs.cen.y;
+  double zb=rhs.cen.z;
+
+  for(size_t ixl=0;ixl<c.size();ixl++)
+    for(size_t ixr=0;ixr<rhs.c.size();ixr++) {
+      auto itg = gradient_int_os(xa,ya,za,c[ixl].z,cart,xb,yb,zb,rhs.c[ixr].z,rhs.cart);
+      for(size_t ic=0;ic<3;ic++)
+        T[ic]+=c[ixl].c*rhs.c[ixr].c*itg[ic];
+    }
+
+  // Transformation to spherical harmonics. Left side:
+  if(uselm) {
+    for(size_t ic=0;ic<3;ic++)
+      T[ic]=transmat*T[ic];
+  }
+  // Right side
+  if(rhs.uselm) {
+    for(size_t ic=0;ic<3;ic++)
+      T[ic]=T[ic]*arma::trans(rhs.transmat);
+  }
+
+  return T;
+}
+
 
 // Calculate nuclear attraction matrix element between basis functions
 arma::mat GaussianShell::nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const {
@@ -2319,6 +2356,39 @@ arma::mat BasisSet::kinetic() const {
     // Store result
     T.submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp;
     T.submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp);
+  }
+
+  return T;
+}
+
+std::vector<arma::mat> BasisSet::gradient_integral() const {
+  // Form gradient_integrals energy matrix
+
+  // Size of basis set
+  size_t N=get_Nbf();
+
+  // Initialize matrix
+  std::vector<arma::mat> T(3);
+  for(size_t ic=0; ic<3;ic++)
+    T[ic].zeros(N,N);
+
+  // Loop over shells
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for(size_t ip=0;ip<shellpairs.size();ip++) {
+    // Shells in pair
+    size_t i=shellpairs[ip].is;
+    size_t j=shellpairs[ip].js;
+
+    // Get partial gradient_integral energy matrix
+    std::vector<arma::mat> tmp=shells[i].gradient_integral(shells[j]);
+
+    // Store result
+    for(size_t ic=0;ic<3;ic++) {
+      T[ic].submat(shells[i].get_first_ind(),shells[j].get_first_ind(),shells[i].get_last_ind(),shells[j].get_last_ind())=tmp[ic];
+      T[ic].submat(shells[j].get_first_ind(),shells[i].get_first_ind(),shells[j].get_last_ind(),shells[i].get_last_ind())=arma::trans(tmp[ic]);
+    }
   }
 
   return T;

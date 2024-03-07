@@ -445,6 +445,8 @@ class BasisSet {
   arma::mat coulomb_overlap(const BasisSet & rhs) const;
   /// Calculate kinetic energy matrix
   arma::mat kinetic() const;
+  /// Calculate gradient integral matrix
+  std::vector<arma::mat> gradient_integral() const;
   /// Calculate nuclear repulsion matrix
   arma::mat nuclear() const;
   /// Calculate nuclear repulsion matrix with given nuclei
@@ -646,6 +648,8 @@ class GaussianShell {
   arma::mat coulomb_overlap(const GaussianShell & rhs) const;
   /// Calculate kinetic energy matrix between shells
   arma::mat kinetic(const GaussianShell & rhs) const;
+  /// Calculate gradient integral between shells
+  std::vector<arma::mat> gradient_integral(const GaussianShell & rhs) const;
   /// Calculate nuclear repulsion matrix between shells
   arma::mat nuclear(double cx, double cy, double cz, const GaussianShell & rhs) const;
 
