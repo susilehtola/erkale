@@ -176,6 +176,24 @@ double kinetic_int(double xa, double ya, double za, double zetaa, int la, int ma
 }
 
 
+std::tuple<double,double,double> gradient_int(double xa, double ya, double za, double zetaa, int la, int ma, int na, double xb, double yb, double zb, double zetab, int lb, int mb, int nb) {
+
+  // Acting on exponent gives -2 x alpha
+  double xint=2.0*zetab*overlap_int(xa,ya,za,zetaa,la,ma,na,xb,yb,zb,zetab,lb+1,mb,nb);
+  double yint=2.0*zetab*overlap_int(xa,ya,za,zetaa,la,ma,na,xb,yb,zb,zetab,lb,mb+1,nb);
+  double zint=2.0*zetab*overlap_int(xa,ya,za,zetaa,la,ma,na,xb,yb,zb,zetab,lb,mb,nb+1);
+  // Acting on polynomial gives a factor
+  if(lb>=1)
+    xint-=lb*overlap_int(xa,ya,za,zetaa,la,ma,na,xb,yb,zb,zetab,lb-1,mb,nb);
+  if(mb>=1)
+    yint-=mb*overlap_int(xa,ya,za,zetaa,la,ma,na,xb,yb,zb,zetab,lb,mb-1,nb);
+  if(nb>=1)
+    zint-=nb*overlap_int(xa,ya,za,zetaa,la,ma,na,xb,yb,zb,zetab,lb,mb,nb-1);
+
+  return std::make_tuple(xint,yint,zint);
+}
+
+
 // Compute A array for nucler attraction integral (THO 2.18)
 std::vector<double> A_array(int la, int lb, double PAx, double PBx, double PCx, double zeta) {
   // The idea behind the array is that although in principle it has three

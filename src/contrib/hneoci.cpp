@@ -114,6 +114,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_bool("H2", "Run H2+ instead of H atom?", false);
   settings.add_double("H2BondLength", "Bond length for H2+ in a.u.", 2.0);
+  settings.add_bool("RemoveCOM", "Remove COM terms", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -125,6 +126,10 @@ int main_guarded(int argc, char **argv) {
   double proton_mass = settings.get_double("ProtonMass");
   bool dimer = settings.get_bool("H2");
   double R = settings.get_double("H2BondLength");
+  bool removecom = settings.get_bool("RemoveCOM");
+
+  // Total mass of the system
+  double MT = 1+proton_mass;
 
   // Read in basis sets
   BasisSetLibrary baslib;
@@ -186,9 +191,19 @@ int main_guarded(int argc, char **argv) {
   arma::mat Se(basis.overlap());
   arma::mat Sp(pbasis.overlap());
 
+  // Get gradient integrals
+  std::vector<arma::mat> grade(basis.gradient_integral());
+  std::vector<arma::mat> gradp(pbasis.gradient_integral());
+
   // Kinetic energy matrices
-  arma::mat T = basis.kinetic();
-  arma::mat Tp = pbasis.kinetic()/proton_mass;
+  arma::mat T, Tp;
+  if(removecom) {
+    T = (1.0-1.0/MT) * basis.kinetic();
+    Tp = (1.0/proton_mass - 1.0/MT)* pbasis.kinetic();
+  } else {
+    T = basis.kinetic();
+    Tp = pbasis.kinetic()/proton_mass;
+  }
 
   // Nuclear attraction
   arma::mat V(T.n_rows, T.n_cols, arma::fill::zeros);
@@ -215,7 +230,6 @@ int main_guarded(int argc, char **argv) {
   arma::vec E_bo;
   arma::mat C_bo;
   arma::eig_sym(E_bo, C_bo, H_bo);
-
   arma::mat Xe_bo = Xe * C_bo;
   E_bo.print("Electronic spectrum without quantum proton");
 
@@ -225,7 +239,7 @@ int main_guarded(int argc, char **argv) {
   arma::mat Cp_bo;
   arma::eig_sym(Ep_bo, Cp_bo, Hp_bo);
   arma::mat Xp_bo = Xp * Cp_bo;
-  Ep_bo.print("Nucleon spectrum");
+  Ep_bo.print("Quantum proton spectrum");
 
   // Compute the two-electron integrals
   size_t e_nbf = basis.get_Nbf();
@@ -295,7 +309,6 @@ int main_guarded(int argc, char **argv) {
                 size_t I = I_start+II;
                 size_t J = J_start+JJ;
 
-                //double element = -eris[((ii*N_j+jj)*N_I+II)*N_J+JJ];
                 double element = -eris[((ii*N_j+jj)*N_I+II)*N_J+JJ];
                 // (ij|IJ)
                 V_ao(BFIDX(i,I),BFIDX(j,J)) = element;
@@ -310,6 +323,20 @@ int main_guarded(int argc, char **argv) {
   }
   printf("Finished e-p integrals\n");
   fflush(stdout);
+
+  if(removecom) {
+    for(size_t i=0; i<e_nbf; i++)
+      for(size_t j=0; j<e_nbf; j++)
+        for(size_t I=0; I<p_nbf; I++)
+          for(size_t J=0; J<p_nbf; J++) {
+            double el = 0.0;
+            for(size_t ic=0; ic<3; ic++)
+              el += grade[ic](i,j) * gradp[ic](I,J);
+            V_ao(BFIDX(j,J),BFIDX(i,I)) += 1.0/MT * el;
+          }
+    printf("Finished nabla.nabla terms\n");
+    fflush(stdout);
+  }
 
   // Compute transformation matrix to go to normalized AO basis
   arma::mat ao_to_orth(e_nbf*p_nbf,e_nmo*p_nmo,arma::fill::zeros);

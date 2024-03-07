@@ -50,6 +50,8 @@ double kinetic_int_1d(double xa, double xb, double zetaa, double zetab, int la, 
 /// Compute shell of kinetic energy integral derivatives (for Pulay force). Order same as in overlap_int_pulay_os
 std::vector<arma::mat> kinetic_int_pulay_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb);
 
+/// Compute shell of gradient integrals
+std::vector<arma::mat> gradient_int_os(double xa, double ya, double za, double zetaa, const std::vector<shellf_t> & carta, double xb, double yb, double zb, double zetab, const std::vector<shellf_t> & cartb);
 
 /// Compute matrix element of derivative operator
 double derivative_int_1d(double xa, double xb, double zetaa, double zetab, int la, int lb, int eval);
