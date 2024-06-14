@@ -408,7 +408,7 @@ void Checkpoint::read(const std::string & name, std::vector<hsize_t> & v) {
   if(cl) close();
 }
 
-void Checkpoint::write(const BasisSet & basis) {
+void Checkpoint::write(const BasisSet & basis, const std::string & role) {
   CHECK_WRITE();
   bool cl=false;
   if(!opend) {
@@ -417,9 +417,9 @@ void Checkpoint::write(const BasisSet & basis) {
   }
 
   // Remove possible existing entries
-  remove("basis.nucs");
-  remove("basis.contr");
-  remove("basis.data");
+  remove(role+".nucs");
+  remove(role+".contr");
+  remove(role+".data");
 
   // Get number of shells
   size_t Nsh=basis.get_Nshells();
@@ -468,7 +468,7 @@ void Checkpoint::write(const BasisSet & basis) {
   // Create dataspace
   dataspace = H5Screate_simple(1,dimsf,NULL);
   // Create dataset
-  dataset=H5Dcreate(file,"basis.nucs",datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  dataset=H5Dcreate(file,(role+".nucs").c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   // Write out the data
   H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, nucs);
 
@@ -511,7 +511,7 @@ void Checkpoint::write(const BasisSet & basis) {
 
   // Create the dataset using the defined dataspace and datatype, and
   // default dataset creation properties
-  dataset=H5Dcreate(file,"basis.contr",datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  dataset=H5Dcreate(file,(role+".contr").c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   // Write the data.
   H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, contrs);
 
@@ -542,7 +542,7 @@ void Checkpoint::write(const BasisSet & basis) {
   H5Tinsert(datatype, "cenind", HOFFSET(shell_data_t, cenind), H5T_NATIVE_HSIZE);
 
   // Write the data.
-  dataset=H5Dcreate(file,"basis.data",datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  dataset=H5Dcreate(file,(role+".data").c_str(),datatype,dataspace,H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   H5Dwrite(dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, shdata);
 
   H5Dclose(dataset);
@@ -552,17 +552,17 @@ void Checkpoint::write(const BasisSet & basis) {
 }
 
 
-void Checkpoint::read(BasisSet & basis) {
+void Checkpoint::read(BasisSet & basis, const std::string & role) {
   bool cl=false;
   if(!opend) {
     open();
     cl=true;
   }
-  if(!exist("basis.nucs"))
+  if(!exist(role+".nucs"))
     throw std::runtime_error("Checkpoint does not have nuclei!\n");
-  if(!exist("basis.contr"))
+  if(!exist(role+".contr"))
     throw std::runtime_error("Checkpoint does not have contractions!\n");
-  if(!exist("basis.data"))
+  if(!exist(role+".data"))
     throw std::runtime_error("Checkpoint does not have shell data!\n");
 
   hid_t dataset, datatype, dataspace;
@@ -571,7 +571,7 @@ void Checkpoint::read(BasisSet & basis) {
   // ***** First, read in the nuclei *****
 
   // Open the dataset.
-  dataset = H5Dopen (file, "basis.nucs", H5P_DEFAULT);
+  dataset = H5Dopen (file, (role+".nucs").c_str(), H5P_DEFAULT);
 
   // Create the datatype
   datatype = H5Tcreate(H5T_COMPOUND, sizeof(nuc_t));
@@ -606,7 +606,7 @@ void Checkpoint::read(BasisSet & basis) {
   // ***** Then, read the contrations *****
 
   // Open the dataset.
-  dataset = H5Dopen (file, "basis.contr", H5P_DEFAULT);
+  dataset = H5Dopen (file, (role+".contr").c_str(), H5P_DEFAULT);
 
   // Create datatype
   hid_t contrdata = H5Tcreate (H5T_COMPOUND, sizeof(contr_t));
@@ -633,7 +633,7 @@ void Checkpoint::read(BasisSet & basis) {
   // ***** and the shell info *****
 
   // Open the dataset.
-  dataset = H5Dopen (file, "basis.data", H5P_DEFAULT);
+  dataset = H5Dopen (file, (role+".data").c_str(), H5P_DEFAULT);
 
   // and the data type
   datatype = H5Tcreate(H5T_COMPOUND, sizeof(shell_data_t));
