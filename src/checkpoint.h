@@ -138,9 +138,9 @@ class Checkpoint {
   void read(const std::string & name, std::vector<hsize_t> & v);
 
   /// Save basis set
-  void write(const BasisSet & basis);
+  void write(const BasisSet & basis, const std::string & role = "basis");
   /// Load basis set
-  void read(BasisSet & basis);
+  void read(BasisSet & basis, const std::string & role = "basis");
 
   /// Save energies
   void write(const energy_t & en);

@@ -33,7 +33,7 @@
 // Needed for libint init
 #include "eriworker.h"
 
-#include "scfsolver.hpp"
+#include "openorbitaloptimizer/scfsolver.hpp"
 
 #include <armadillo>
 #include <cstdio>
@@ -97,13 +97,16 @@ int main_guarded(int argc, char **argv) {
   settings.add_scf_settings();
   settings.add_string("ProtonBasis", "Protonic basis set", "");
   settings.add_bool("SteepestDescentInit", "Start SCF with a steepest descent step", false);
-  settings.add_bool("SAPstart", "Start SCF directly from SAP guess", false);
-  settings.add_double("ProtonConfinementRadius", "Confinement radius for protonic initial guess", 0.0);
+  settings.add_int("StepwiseSCFIter", "Number of stepwise SCF macroiterations, 0 to skip to simultaneous solution", 0);
   settings.add_double("EnergyUpdateThreshold", "Threshold for allowing positive energy updates", 0.0);
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "inf");
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
+  settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
+  settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 50);
+  settings.add_string("SaveChk", "Checkpoint file to save to", "neo.chk");
+  settings.add_string("LoadChk", "Checkpoint file to load from", "");
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -112,17 +115,22 @@ int main_guarded(int argc, char **argv) {
   int M = settings.get_int("Multiplicity");
   int verbosity = settings.get_int("Verbosity");
   int maxiter = settings.get_int("MaxIter");
+  int maxinititer = settings.get_int("MaxInitIter");
   int diisorder = settings.get_int("DIISOrder");
   double proton_mass = settings.get_double("ProtonMass");
-  double proton_confinement_radius = settings.get_double("ProtonConfinementRadius");
   double intthr = settings.get_double("IntegralThresh");
+  double init_convergence_threshold = settings.get_double("InitConvThr");
   double convergence_threshold = settings.get_double("ConvThr");
   double energy_update_threshold = settings.get_double("EnergyUpdateThreshold");
   bool verbose = settings.get_bool("Verbose");
-  bool sapstart = settings.get_bool("SAPstart");
+  int nstepwise = settings.get_int("StepwiseSCFIter");
   bool steepest_descent_init = settings.get_bool("SteepestDescentInit");
   size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string error_norm = settings.get_string("ErrorNorm");
+  std::string loadchk = settings.get_string("LoadChk");
+  std::string savechk = settings.get_string("SaveChk");
+
+  Checkpoint chkpt(savechk,true);
 
   // Read in basis set
   BasisSetLibrary baslib;
@@ -178,11 +186,13 @@ int main_guarded(int argc, char **argv) {
   // Construct the basis set
   BasisSet basis;
   construct_basis(basis,atoms,baslib);
+  chkpt.write(basis);
+
   BasisSet pbasis;
   construct_basis(pbasis,quantum_protons,pbaslib);
+  chkpt.write(pbasis,"pbasis");
 
   // Classical nucleus repulsion energy
-  double Enucr=basis.Enuc();
   double Ecnucr=0.0;
   for(size_t i=0;i<classical_nuclei.size();i++) {
     auto [Qi, xi, yi, zi] = classical_nuclei[i];
@@ -216,7 +226,7 @@ int main_guarded(int argc, char **argv) {
 
   // Calculate matrices
   arma::mat T(basis.kinetic());
-  arma::mat V(basis.nuclear());
+  arma::mat Vfull(basis.nuclear());
   arma::mat Vc(basis.nuclear(classical_nuclei));
   arma::mat Vsap(basis.sap_potential(potlib));
   arma::mat Vpc, Tp, Vpsap;
@@ -224,26 +234,11 @@ int main_guarded(int argc, char **argv) {
   if(Sp.n_elem) {
     Vpc=-pbasis.nuclear(classical_nuclei);
     Tp=pbasis.kinetic()/proton_mass;
-    Vpsap=pbasis.sap_potential(potlib);
+    Vpsap=-pbasis.sap_potential(potlib);
     pr=pbasis.moment(1);
   }
 
-  std::function<arma::mat(double)> protonic_confinement = [pbasis] (double r0) {
-    arma::mat pot(pbasis.get_Nbf(),pbasis.get_Nbf(),arma::fill::zeros);
-    for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
-      // Get nucleus
-      auto nuc = pbasis.get_nucleus(inuc);
-      // Get second moment around the atom
-      auto mom = pbasis.moment(2,nuc.r.x,nuc.r.y,nuc.r.z);
-      // Increment matrix
-      pot += mom[getind(2,0,0)] + mom[getind(0,2,0)] + mom[getind(0,0,2)];
-    }
-    // Apply localization radius
-    pot/=(r0*r0);
-    return pot;
-  };
-
-  std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [pbasis] (const arma::mat & F) {
+  std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [&pbasis, &Xp, &Sp] (const arma::mat & F) {
     arma::mat Fblock(F.n_rows,F.n_cols,arma::fill::zeros);
     for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
       // Get shells on nucleus
@@ -260,16 +255,7 @@ int main_guarded(int argc, char **argv) {
   };
 
   // Guess Fock
-  arma::mat Fguess(X.t()*(T+V+Vsap)*X);
-  arma::mat Fpguess = Tp+Vpc+Vpsap;
-  if(proton_confinement_radius != 0.0) {
-    // Add confinement
-    Fpguess += protonic_confinement(proton_confinement_radius);
-    // and also extract the atomic blocks
-    Fpguess = extract_atomic_block_diagonal(Fpguess);
-  }
-  Fpguess = Xp.t()*Fpguess*Xp;
-
+  arma::mat Fguess(X.t()*(T+Vfull+Vsap)*X);
 
   // Compute density fitting integrals
   bool direct=settings.get_bool("Direct");
@@ -292,30 +278,34 @@ int main_guarded(int argc, char **argv) {
   if(Sp.n_elem>0 and dfit.get_Naux() != pfit.get_Naux())
     throw std::logic_error("Electronic and protonic density fitting basis sets don't have the same number of functions!\n");
 
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [dfit, fitmem](const arma::mat & C, const arma::vec & occs) {
+  arma::mat frozen_Jpe(T.n_rows, T.n_cols, arma::fill::zeros);
+  arma::mat frozen_Jep(Tp.n_rows, Tp.n_cols, arma::fill::zeros);
+  double frozen_Ee=0.0, frozen_Ep=0.0;
+
+  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&dfit, &fitmem](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J(dfit.calcJ(P));
     arma::mat K(-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem));
     return std::make_pair(J,K);
   };
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [pfit, fitmem](const arma::mat & C, const arma::vec & occs) {
+  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [&pfit, &fitmem](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J(pfit.calcJ(P));
     arma::mat K(-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem));
     return std::make_pair(J,K);
   };
-  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb = [dfit, pfit](const arma::mat & Pe) {
+  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb = [&dfit, &pfit](const arma::mat & Pe) {
     arma::vec c(dfit.compute_expansion(Pe));
     arma::mat J=-pfit.calcJ_vector(c);
     return J;
   };
-  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb = [dfit, pfit](const arma::mat & Pp) {
+  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb = [&dfit, &pfit](const arma::mat & Pp) {
     arma::vec c(pfit.compute_expansion(Pp));
     arma::mat J=-dfit.calcJ_vector(c);
     return J;
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_builder = [X, T, V, dfit, electronic_terms, Enucr, verbosity](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_builder = [&X, &T, &Vc, &dfit, electronic_terms, &Ecnucr, &verbosity, &frozen_Jpe, &frozen_Ep](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -332,29 +322,32 @@ int main_guarded(int argc, char **argv) {
     arma::mat J, K;
     std::tie(J, K) = electronic_terms(Ce, occe);
     // Form the Fock matrices
-    arma::mat Fe = X.t() * (T + V + J + .5*K) * X;
+    arma::mat Fe = X.t() * (T + Vc + J + .5*K + frozen_Jpe) * X;
     std::vector<arma::mat> fock({Fe});
 
     // Compute energy terms
     double Ekin = arma::trace(Pe*T);
-    double Enuc = arma::trace(Pe*V);
+    double Enuc = arma::trace(Pe*Vc);
     double Ecoul = 0.5*arma::trace(J*Pe);
     double Eexch = 0.25*arma::trace(K*Pe);
-    double Etot = Ekin+Enuc+Ecoul+Eexch+Enucr;
+    double Epe = arma::trace(Pe*frozen_Jpe);
+    double Etot = Ekin+Enuc+Ecoul+Eexch+Ecnucr+Epe+frozen_Ep;
 
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
       printf("e nuclear attraction     % .10f\n",Enuc);
+      printf("e-p frozen attraction    % .10f\n",Epe);
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("e-e exchange energy      % .10f\n",Eexch);
-      printf("nuclear repulsion energy % .10f\n",Enucr);
+      printf("nuclear repulsion energy % .10f\n",Ecnucr);
+      printf("frozen proton energy     % .10f\n",frozen_Ep);
       printf("Total energy             % .10f\n",Etot);
     }
 
     return std::make_pair(Etot,fock);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_builder = [X, T, V, dfit, electronic_terms, Enucr, verbosity](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_builder = [&X, &T, &Vc, &dfit, electronic_terms, &Ecnucr, &verbosity, &frozen_Jpe, &frozen_Ep](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -377,23 +370,26 @@ int main_guarded(int argc, char **argv) {
     std::tie(Ja, Ka) = electronic_terms(Ca, occa);
     std::tie(Jb, Kb) = electronic_terms(Cb, occb);
     // Form the Fock matrices
-    arma::mat Fa = X.t() * (T + V + Ja + Jb + Ka) * X;
-    arma::mat Fb = X.t() * (T + V + Ja + Jb + Kb) * X;
+    arma::mat Fa = X.t() * (T + Vc + Ja + Jb + Ka + frozen_Jpe) * X;
+    arma::mat Fb = X.t() * (T + Vc + Ja + Jb + Kb + frozen_Jpe) * X;
     std::vector<arma::mat> fock({Fa,Fb});
 
     // Compute energy terms
     double Ekin = arma::trace(Pe*T);
-    double Enuc = arma::trace(Pe*V);
+    double Enuc = arma::trace(Pe*Vc);
     double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
     double Eexch = 0.5*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
-    double Etot = Ekin+Enuc+Ecoul+Eexch+Enucr;
+    double Epe = arma::trace(Pe*frozen_Jpe);
+    double Etot = Ekin+Enuc+Ecoul+Eexch+Ecnucr+Epe+frozen_Ep;
 
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
       printf("e nuclear attraction     % .10f\n",Enuc);
+      printf("e-p frozen attraction    % .10f\n",Epe);
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("e-e exchange energy      % .10f\n",Eexch);
-      printf("nuclear repulsion energy % .10f\n",Enucr);
+      printf("nuclear repulsion energy % .10f\n",Ecnucr);
+      printf("frozen proton energy     % .10f\n",frozen_Ep);
       printf("Total energy             % .10f\n",Etot);
     }
 
@@ -401,7 +397,7 @@ int main_guarded(int argc, char **argv) {
   };
 
   // Compute expectation values for protonic coordinates
-  std::function<void(const arma::vec &, const arma::mat &)> print_protonic_coordinates = [pr](const arma::vec & occp, const arma::mat & Cp) {
+  std::function<void(const arma::vec &, const arma::mat &)> print_protonic_coordinates = [&pr](const arma::vec & occp, const arma::mat & Cp) {
     for(size_t ip=0;ip<occp.n_elem;ip++)
       if(occp(ip)>0.0) {
         double r[3];
@@ -411,7 +407,7 @@ int main_guarded(int argc, char **argv) {
       }
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_neo_builder = [X, Xp, T, Tp, Vc, Vpc, dfit, pfit, pr, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, Ecnucr, verbosity, print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_neo_builder = [&X, &Xp, &T, &Tp, &Vc, &Vpc, &dfit, &pfit, &pr, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, &Ecnucr, &verbosity, print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -428,7 +424,7 @@ int main_guarded(int argc, char **argv) {
     arma::mat Pp = Cp * arma::diagmat(occp) * Cp.t();
 
     // Print out locations of protons
-    print_protonic_coordinates(occp, Cp);
+    //print_protonic_coordinates(occp, Cp);
 
     // Compute the terms in the Fock matrices
     arma::mat J, K, Jp, Kp, Jep, Jpe;
@@ -471,7 +467,7 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(Etot,fock);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_neo_builder = [X, Xp, T, Tp, Vc, Vpc, dfit, pfit, pr, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, Ecnucr, verbosity, print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_neo_builder = [&X, &Xp, &T, &Tp, &Vc, &Vpc, &dfit, &pfit, &pr, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, &Ecnucr, &verbosity, &print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -492,7 +488,7 @@ int main_guarded(int argc, char **argv) {
     arma::mat Pp = Cp * arma::diagmat(occp) * Cp.t();
 
     // Print out locations of protons
-    print_protonic_coordinates(occp, Cp);
+    //print_protonic_coordinates(occp, Cp);
 
     // Compute the terms in the Fock matrices
     arma::mat Ja, Jb, Ka, Kb, Jp, Kp, Jep, Jpe;
@@ -539,67 +535,398 @@ int main_guarded(int argc, char **argv) {
 
   // Data for SCF solver
   arma::uvec number_of_blocks_per_particle_type;
-  std::vector<arma::mat> fock_guess;
   arma::vec maximum_occupation;
   arma::vec number_of_particles;
   std::vector<std::string> block_descriptions;
   OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder;
 
-  int Nel=basis.Ztot()-Q;
+  int Nel = basis.Ztot()-Q;
   int Nela = (Nel+M-1)/2;
   int Nelb = Nel-Nela;
+  int Np = (int) proton_indices.size();
   printf("Nela = %i Nelb = %i\n",Nela,Nelb);
   if(Nela<0 or Nelb<0)
     throw std::logic_error("Negative number of electrons!\n");
+  if(Nelb>Nela)
+    throw std::logic_error("Nelb > Nela, check your charge and multiplicity!\n");
 
-  if(sapstart and Sp.n_elem) {
-    if(M==1) {
-      fock_guess = {Fguess, Fpguess};
-      number_of_blocks_per_particle_type = {1,1};
-      maximum_occupation = {2.0,1.0};
-      number_of_particles = {(double) (Nel),(double) proton_indices.size()};
-      block_descriptions = {"electronic", "protonic"};
-      fock_builder = restricted_neo_builder;
-    } else {
-      fock_guess = {Fguess, Fguess, Fpguess};
-      number_of_blocks_per_particle_type = {1,1,1};
-      maximum_occupation = {1.0,1.0,1.0};
-      number_of_particles = {(double) (Nela), (double) Nelb,(double) proton_indices.size()};
-      block_descriptions = {"electronic alpha", "electronic beta", "protonic"};
-      fock_builder = unrestricted_neo_builder;
+  // We will need the density matrices in the calculation
+  OpenOrbitalOptimizer::DensityMatrix<double, double> electronic_dm;
+  OpenOrbitalOptimizer::DensityMatrix<double, double> protonic_dm;
+
+  // Set up protonic guess
+  if(loadchk != "") {
+    Checkpoint load(loadchk,false);
+
+    BasisSet oldpbasis;
+    load.read(oldpbasis,"pbasis");
+
+    // Protonic solution
+    arma::vec Ep;
+    arma::mat oldCp, Cp;
+    load.read("Ep",Ep);
+    load.read("Cp",oldCp);
+    Cp = arma::trans(Xp) * pbasis.overlap(oldpbasis) * oldCp;
+    if(Cp.n_rows < Cp.n_cols) {
+      Ep=Ep.subvec(0,Np-1);
+      Cp=Cp.cols(0,Np-1);
     }
+    arma::vec occs(Cp.n_cols,arma::fill::zeros);
+    occs.subvec(0,Np-1).ones();
+
+    protonic_dm = std::make_pair(std::vector<arma::mat>({Cp}),std::vector<arma::vec>({occs}));
+  } else {
+    // We need to use a nuclear guess to get the electronic wave function right
+    BasisSetLibrary spbaslib;
+    spbaslib.load_basis("pb-1s.gbs");
+
+    BasisSet spbasis;
+    construct_basis(spbasis,quantum_protons,spbaslib);
+
+    size_t Np=spbasis.get_Nbf();
+    arma::mat oldCp(Np,Np);
+    oldCp.eye();
+
+    arma::mat Cp;
+    Cp = arma::trans(Xp) * pbasis.overlap(spbasis) * oldCp;
+    arma::vec occs(Np,arma::fill::ones);
+
+    protonic_dm = std::make_pair(std::vector<arma::mat>({Cp}),std::vector<arma::vec>({occs}));
+  }
+
+
+  // Save the matrices to disk
+  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_proton_matrices = [&chkpt, &Xp](const OpenOrbitalOptimizer::DensityMatrix<double,double> & pdm, const OpenOrbitalOptimizer::FockMatrix<double> & pfock) {
+    const OpenOrbitalOptimizer::Orbitals<double> & porbitals = pdm.first;
+    const OpenOrbitalOptimizer::OrbitalOccupations<double> & poccupations = pdm.second;
+    arma::mat Cp = Xp*porbitals[0];
+    arma::vec Ep = arma::diagvec(porbitals[0].t()*pfock[0]*porbitals[0]);
+    chkpt.write("Cp",Cp);
+    chkpt.write("Ep",Ep);
+  };
+
+  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_electron_matrices = [&chkpt, &M, &X](const OpenOrbitalOptimizer::DensityMatrix<double,double> & eldm, const OpenOrbitalOptimizer::FockMatrix<double> & elfock) {
+    const OpenOrbitalOptimizer::Orbitals<double> & eorbitals = eldm.first;
+    const OpenOrbitalOptimizer::OrbitalOccupations<double> & eoccupations = eldm.second;
+    if(M==1) {
+      arma::mat Ce = X*eorbitals[0];
+      arma::vec Ee = arma::diagvec(eorbitals[0].t()*elfock[0]*eorbitals[0]);
+      chkpt.write("C",Ce);
+      chkpt.write("E",Ee);
+    } else {
+      arma::mat Ca = X*eorbitals[0];
+      arma::mat Cb = X*eorbitals[1];
+      arma::vec Ea = arma::diagvec(eorbitals[0].t()*elfock[0]*eorbitals[0]);
+      arma::vec Eb = arma::diagvec(eorbitals[1].t()*elfock[1]*eorbitals[1]);
+      chkpt.write("Ca",Ca);
+      chkpt.write("Cb",Cb);
+      chkpt.write("Ea",Ea);
+      chkpt.write("Eb",Eb);
+    }
+  };
+
+  // Set up electronic guess
+  if(loadchk != "") {
+    Checkpoint load(loadchk,false);
+
+    BasisSet oldbasis;
+    load.read(oldbasis);
+
+    if(M==1) {
+      arma::mat oldC, C;
+      load.read("C",oldC);
+      C = arma::trans(X) * basis.overlap(oldbasis) * oldC;
+      if(C.n_rows < C.n_cols) {
+        C=C.cols(0,Nela-1);
+      }
+      std::vector<arma::mat> old_orbs({C});
+
+      // Occupations
+      arma::vec occ(C.n_cols,arma::fill::zeros);
+      occ.subvec(0,Nela-1).ones();
+      occ *= 2.0;
+      std::vector<arma::vec> old_occs({occ});
+
+      electronic_dm = std::make_pair(old_orbs, old_occs);
+
+    } else {
+      arma::mat oldCa, oldCb, Ca, Cb;
+      load.read("Ca",oldCa);
+      load.read("Cb",oldCb);
+
+      Ca = arma::trans(X) * basis.overlap(oldbasis) * oldCa;
+      Cb = arma::trans(X) * basis.overlap(oldbasis) * oldCb;
+      if(Ca.n_rows < Ca.n_cols) {
+        Ca = Ca.cols(0,Nela-1);
+        Cb = Cb.cols(0,Nela-1);
+      }
+      std::vector<arma::mat> old_orbs({Ca, Cb});
+
+      // Occupations
+      arma::vec occa(Ca.n_cols,arma::fill::zeros);
+      arma::vec occb(Cb.n_cols,arma::fill::zeros);
+      occa.subvec(0,Nela-1).ones();
+      occb.subvec(0,Nelb-1).ones();
+      std::vector<arma::vec> old_occs({occa, occb});
+
+      electronic_dm = std::make_pair(old_orbs, old_occs);
+    }
+  } else {
+    // Guess from SAP
+    arma::vec E;
+    arma::mat C;
+    arma::eig_sym(E,C,Fguess);
+
+    if(M==1) {
+      std::vector<arma::mat> orbs({C});
+      std::vector<arma::vec> occs({arma::vec(C.n_cols,arma::fill::zeros)});
+      occs[0].subvec(0,Nela-1).ones();
+      occs[0]*=2;
+      electronic_dm=std::make_pair(orbs,occs);
+    } else {
+      std::vector<arma::mat> orbs({C, C});
+      std::vector<arma::vec> occs({arma::vec(C.n_cols,arma::fill::zeros), arma::vec(C.n_cols,arma::fill::zeros)});
+      occs[0].subvec(0,Nela-1).ones();
+      occs[1].subvec(0,Nelb-1).ones();
+      electronic_dm=std::make_pair(orbs,occs);
+    }
+  }
+
+  double Eold=0.0;
+  for(size_t istep=0;istep<nstepwise;istep++) {
+    // Run electronic calculation
+    if(M==1) {
+      number_of_blocks_per_particle_type = {1};
+      maximum_occupation = {2.0};
+      number_of_particles = {(double) (Nel)};
+      block_descriptions = {"electronic"};
+      fock_builder = restricted_builder;
+    } else {
+      number_of_blocks_per_particle_type = {1,1};
+      maximum_occupation = {1.0,1.0};
+      number_of_particles = {(double) (Nela), (double) Nelb};
+      block_descriptions = {"electronic alpha", "electronic beta"};
+      fock_builder = unrestricted_builder;
+    }
+
+    // Update protonic terms for electronic solution
+    arma::mat Pp(Xp.n_rows,Xp.n_rows,arma::fill::zeros);
+    {
+      const OpenOrbitalOptimizer::Orbitals<double> & orbitals = protonic_dm.first;
+      const OpenOrbitalOptimizer::OrbitalOccupations<double>  & occupations = protonic_dm.second;
+      for(size_t i=0;i<orbitals.size();i++) {
+        arma::mat Cp = Xp*orbitals[i];
+        arma::vec occp = occupations[i];
+        Pp += Cp * arma::diagmat(occp) * Cp.t();
+      }
+    }
+    frozen_Jpe = proton_electron_coulomb(Pp);
+
+    // Update the frozen proton energy
+    {
+      const OpenOrbitalOptimizer::Orbitals<double> & orbitals = protonic_dm.first;
+      const OpenOrbitalOptimizer::OrbitalOccupations<double>  & occupations = protonic_dm.second;
+
+      // Get the electronic and protonic orbital coefficients
+      arma::mat Cp = Xp*orbitals[0];
+      // and occupations
+      arma::vec occp = occupations[0];
+      // Density matrices
+      arma::mat Pp = Cp * arma::diagmat(occp) * Cp.t();
+
+      // Compute the terms in the Fock matrices
+      arma::mat Jp, Kp;
+      std::tie(Jp, Kp) = protonic_terms(Cp, occp);
+
+      // Compute energy terms
+      double Epkin = arma::trace(Pp*Tp);
+      double Epnuc = arma::trace(Pp*Vpc);
+      double Epcoul = 0.5*arma::trace(Jp*Pp);
+      double Epexch = 0.5*arma::trace(Kp*Pp);
+      frozen_Ep = Epkin+Epnuc+Epcoul+Epexch;
+    }
+
+    printf("\n\n\nIteration %i: solving electronic SCF\n", istep);
     OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
-    scfsolver.initialize_with_fock(fock_guess);
+    scfsolver.initialize_with_orbitals(electronic_dm.first, electronic_dm.second);
     scfsolver.error_norm(error_norm);
-    scfsolver.convergence_threshold(convergence_threshold);
+    scfsolver.convergence_threshold(convergence_threshold); // use full threshold here since the electronic part is easy
     scfsolver.verbosity(verbosity);
-    scfsolver.maximum_iterations(maxiter);
+    scfsolver.maximum_iterations(maxinititer);
     scfsolver.maximum_history_length(diisorder);
     scfsolver.energy_update_threshold(energy_update_threshold);
     scfsolver.run(steepest_descent_init);
 
-    printf("\nRunning program took %s.\n",t.elapsed().c_str());
-    return 0;
-  }
+    // Grab the new density matrix
+    electronic_dm = scfsolver.get_solution();
+    save_electron_matrices(electronic_dm, scfsolver.get_fock_matrix());
 
-  // Run electronic calculation
+    if(quantum_protons.size()) {
+      // Run protonic calculation.
+      arma::mat Pe(X.n_rows,X.n_rows,arma::fill::zeros);
+      {
+        const OpenOrbitalOptimizer::Orbitals<double> & orbitals = electronic_dm.first;
+        const OpenOrbitalOptimizer::OrbitalOccupations<double>  & occupations = electronic_dm.second;
+        for(size_t i=0;i<orbitals.size();i++) {
+          arma::mat Ce = X*orbitals[i];
+          arma::vec occe = occupations[i];
+          Pe += Ce * arma::diagmat(occe) * Ce.t();
+        }
+      }
+      frozen_Jep = electron_proton_coulomb(Pe);
+
+      // Update the frozen electron energy
+      {
+        const auto & orbitals = electronic_dm.first;
+        const auto & occupations = electronic_dm.second;
+
+        if(M==1) {
+          // Get the electronic and protonic orbital coefficients
+          arma::mat Ce = X*orbitals[0];
+
+          // and occupations
+          arma::vec occe = occupations[0];
+
+          // Density matrices
+          arma::mat Pe = Ce * arma::diagmat(occe) * Ce.t();
+
+          // Compute the terms in the Fock matrices
+          arma::mat J, K;
+          std::tie(J, K) = electronic_terms(Ce, occe);
+          // Form the Fock matrices
+          arma::mat Fe = X.t() * (T + Vc + J + .5*K + frozen_Jpe) * X;
+          std::vector<arma::mat> fock({Fe});
+
+          // Compute energy terms
+          double Ekin = arma::trace(Pe*T);
+          double Enuc = arma::trace(Pe*Vc);
+          double Ecoul = 0.5*arma::trace(J*Pe);
+          double Eexch = 0.25*arma::trace(K*Pe);
+          frozen_Ee = Ekin+Enuc+Ecoul+Eexch;
+
+        } else {
+          // Get the electronic and protonic orbital coefficients
+          arma::mat Ca = X*orbitals[0];
+          arma::mat Cb = X*orbitals[1];
+          // and occupations
+          arma::vec occa = occupations[0];
+          arma::vec occb = occupations[1];
+          // Density matrices
+          arma::mat Pa = Ca * arma::diagmat(occa) * Ca.t();
+          arma::mat Pb = Cb * arma::diagmat(occb) * Cb.t();
+          arma::mat Pe = Pa+Pb;
+
+          // Compute the terms in the Fock matrices
+          arma::mat Ja, Jb, Ka, Kb, Jp, Kp, Jep, Jpe;
+          std::tie(Ja, Ka) = electronic_terms(Ca, occa);
+          std::tie(Jb, Kb) = electronic_terms(Cb, occb);
+
+          // Compute energy terms
+          double Ekin = arma::trace(Pe*T);
+          double Enuc = arma::trace(Pe*Vc);
+          double Ecoul = 0.5*arma::trace((Ja+Jb)*Pe);
+          double Eexch = 0.5*(arma::trace(Ka*Pa)+arma::trace(Kb*Pb));
+          frozen_Ee = Ekin+Enuc+Ecoul+Eexch;
+        }
+      }
+
+      OpenOrbitalOptimizer::FockBuilder<double, double> nuclear_builder = [&Xp, &Tp, &Vpc, &pfit, &pr, &protonic_terms, &frozen_Jep, &frozen_Ee, &verbosity, print_protonic_coordinates, &Ecnucr](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+        const auto & orbitals = dm.first;
+        const auto & occupations = dm.second;
+
+        // Get the electronic and protonic orbital coefficients
+        arma::mat Cp = Xp*orbitals[0];
+        // and occupations
+        arma::vec occp = occupations[0];
+
+        // Density matrices
+        arma::mat Pp = Cp * arma::diagmat(occp) * Cp.t();
+        //print_protonic_coordinates(occp, Cp);
+
+        // Compute the terms in the Fock matrices
+        arma::mat Jp, Kp;
+        std::tie(Jp, Kp) = protonic_terms(Cp, occp);
+
+        // Form the Fock matrices
+        arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + frozen_Jep) * Xp;
+        std::vector<arma::mat> fock({Fp});
+
+        // Compute energy terms
+        double Epkin = arma::trace(Pp*Tp);
+        double Epnuc = arma::trace(Pp*Vpc);
+        double Epcoul = 0.5*arma::trace(Jp*Pp);
+        double Epexch = 0.5*arma::trace(Kp*Pp);
+        double Eepcoul = arma::trace(frozen_Jep*Pp);
+        double Etot = Epkin+Epnuc+Epcoul+Epexch+Eepcoul+frozen_Ee+Ecnucr;
+
+        if(verbosity>=10) {
+          printf("p kinetic energy         % .10f\n",Epkin);
+          printf("p nuclear repulsion      % .10f\n",Epnuc);
+          printf("p-p Coulomb energy       % .10f\n",Epcoul);
+          printf("e-p Coulomb energy       % .10f\n",Eepcoul);
+          printf("p-p exchange energy      % .10f\n",Epexch);
+          printf("frozen electron energy   % .10f\n",frozen_Ee);
+          printf("nuclear repulsion energy % .10f\n",Ecnucr);
+          printf("Total energy             % .10f\n",Etot);
+        }
+
+        return std::make_pair(Etot,fock);
+      };
+
+      number_of_blocks_per_particle_type = {1};
+      maximum_occupation = {1.0};
+      number_of_particles = {(double) quantum_protons.size()};
+      block_descriptions = {"protonic"};
+      fock_builder = nuclear_builder;
+
+      // Run protonic SCF
+      printf("\n\nContinuing with protonic SCF\n");
+      OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+      scfsolver.initialize_with_orbitals(protonic_dm.first, protonic_dm.second);
+      scfsolver.error_norm(error_norm);
+      scfsolver.convergence_threshold(init_convergence_threshold);
+      scfsolver.verbosity(verbosity);
+      scfsolver.maximum_iterations(maxinititer);
+      scfsolver.maximum_history_length(diisorder);
+      scfsolver.energy_update_threshold(energy_update_threshold);
+      scfsolver.run(steepest_descent_init);
+
+      // Grab the proton density matrix
+      protonic_dm = scfsolver.get_solution();
+      save_proton_matrices(protonic_dm, scfsolver.get_fock_matrix());
+
+      double Enew = scfsolver.get_energy();
+      if(std::abs(Enew-Eold) < init_convergence_threshold) {
+        printf("Stepwise SCF converged: energy changed by %e from last macroiteration!\n", Enew-Eold);
+        break;
+      }
+      Eold = Enew;
+    } else {
+      break;
+    }
+  }
+  // Proceed with nuclear-electronic calculation
+  OpenOrbitalOptimizer::Orbitals<double> guess_orbitals;
+  OpenOrbitalOptimizer::OrbitalOccupations<double> guess_occupations;
   if(M==1) {
-    fock_guess={Fguess};
-    number_of_blocks_per_particle_type = {1};
-    maximum_occupation = {2.0};
-    number_of_particles = {(double) (Nel)};
-    block_descriptions = {"electronic"};
-    fock_builder = restricted_builder;
-  } else {
-    fock_guess={Fguess, Fguess};
+    guess_orbitals={electronic_dm.first[0], protonic_dm.first[0]};
+    guess_occupations={electronic_dm.second[0], protonic_dm.second[0]};
     number_of_blocks_per_particle_type = {1,1};
-    maximum_occupation = {1.0,1.0};
-    number_of_particles = {(double) (Nela), (double) Nelb};
-    block_descriptions = {"electronic alpha", "electronic beta"};
-    fock_builder = unrestricted_builder;
+    maximum_occupation = {2.0,1.0};
+    number_of_particles = {(double) (Nel),(double) proton_indices.size()};
+    block_descriptions = {"electronic", "protonic"};
+    fock_builder = restricted_neo_builder;
+  } else {
+    guess_orbitals={electronic_dm.first[0], electronic_dm.first[1], protonic_dm.first[0]};
+    guess_occupations={electronic_dm.second[0], electronic_dm.second[1], protonic_dm.second[0]};
+    number_of_blocks_per_particle_type = {1,1,1};
+    maximum_occupation = {1.0,1.0,1.0};
+    number_of_particles = {(double) (Nela), (double) Nelb,(double) proton_indices.size()};
+    block_descriptions = {"electronic alpha", "electronic beta", "protonic"};
+    fock_builder = unrestricted_neo_builder;
   }
   OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
-  scfsolver.initialize_with_fock(fock_guess);
+  scfsolver.initialize_with_orbitals(guess_orbitals, guess_occupations);
   scfsolver.error_norm(error_norm);
   scfsolver.convergence_threshold(convergence_threshold);
   scfsolver.verbosity(verbosity);
@@ -608,125 +935,17 @@ int main_guarded(int argc, char **argv) {
   scfsolver.energy_update_threshold(energy_update_threshold);
   scfsolver.run(steepest_descent_init);
 
-  OpenOrbitalOptimizer::DensityMatrix<double, double> electronic_dm = scfsolver.get_solution();
-
-  if(quantum_protons.size()) {
-    // Run protonic calculation.
-    arma::mat Pe(X.n_rows,X.n_rows,arma::fill::zeros);
-    {
-      const OpenOrbitalOptimizer::Orbitals<double> & orbitals = electronic_dm.first;
-      const OpenOrbitalOptimizer::OrbitalOccupations<double>  & occupations = electronic_dm.second;
-      for(size_t i=0;i<orbitals.size();i++) {
-        arma::mat Ce = X*orbitals[i];
-        arma::vec occe = occupations[i];
-        Pe += Ce * arma::diagmat(occe) * Ce.t();
-      }
-    }
-    arma::mat frozen_Jep = electron_proton_coulomb(Pe);
-
-    OpenOrbitalOptimizer::FockBuilder<double, double> nuclear_builder = [Xp, Tp, Vpc, pfit, pr, protonic_terms, frozen_Jep, verbosity, print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
-      const auto & orbitals = dm.first;
-      const auto & occupations = dm.second;
-
-      // Get the electronic and protonic orbital coefficients
-      arma::mat Cp = Xp*orbitals[0];
-      // and occupations
-      arma::vec occp = occupations[0];
-
-      // Density matrices
-      arma::mat Pp = Cp * arma::diagmat(occp) * Cp.t();
-
-      print_protonic_coordinates(occp, Cp);
-
-      // Compute the terms in the Fock matrices
-      arma::mat Jp, Kp;
-      std::tie(Jp, Kp) = protonic_terms(Cp, occp);
-
-      // Form the Fock matrices
-      arma::mat Fp = Xp.t() * (Tp + Vpc + Jp + Kp + frozen_Jep) * Xp;
-      std::vector<arma::mat> fock({Fp});
-
-      // Compute energy terms
-      double Epkin = arma::trace(Pp*Tp);
-      double Epnuc = arma::trace(Pp*Vpc);
-      double Epcoul = 0.5*arma::trace(Jp*Pp);
-      double Epexch = 0.5*arma::trace(Kp*Pp);
-      double Eepcoul = arma::trace(frozen_Jep*Pp);
-      double Etot = Epkin+Epnuc+Epcoul+Epexch+Eepcoul;
-
-      if(verbosity>=10) {
-        printf("p kinetic energy         % .10f\n",Epkin);
-        printf("p nuclear repulsion      % .10f\n",Epnuc);
-        printf("p-p Coulomb energy       % .10f\n",Epcoul);
-        printf("e-p Coulomb energy       % .10f\n",Eepcoul);
-        printf("p-p exchange energy      % .10f\n",Epexch);
-        printf("Total energy             % .10f\n",Etot);
-      }
-
-      return std::make_pair(Etot,fock);
-    };
-
-    Fpguess = Tp + Vpc + frozen_Jep;
-    if(proton_confinement_radius != 0.0) {
-      // Add confinement potential
-      Fpguess += protonic_confinement(proton_confinement_radius);
-      // and also extract the atomic blocks
-      Fpguess = extract_atomic_block_diagonal(Fpguess);
-    }
-    fock_guess={Xp.t()*Fpguess*Xp};
-    number_of_blocks_per_particle_type = {1};
-    maximum_occupation = {1.0};
-    number_of_particles = {(double) quantum_protons.size()};
-    block_descriptions = {"protonic"};
-    fock_builder = nuclear_builder;
-
-    scfsolver=OpenOrbitalOptimizer::SCFSolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
-    scfsolver.initialize_with_fock(fock_guess);
-    scfsolver.error_norm(error_norm);
-    scfsolver.convergence_threshold(convergence_threshold);
-    scfsolver.verbosity(verbosity);
-    scfsolver.maximum_iterations(maxiter);
-    scfsolver.maximum_history_length(diisorder);
-    scfsolver.energy_update_threshold(energy_update_threshold);
-    scfsolver.run(steepest_descent_init);
-
-    // Grab the proton density matrix
-    OpenOrbitalOptimizer::DensityMatrix<double, double> protonic_dm = scfsolver.get_solution();
-
-    // Proceed with nuclear-electronic calculation
-    OpenOrbitalOptimizer::Orbitals<double> guess_orbitals;
-    OpenOrbitalOptimizer::OrbitalOccupations<double> guess_occupations;
-    if(M==1) {
-      guess_orbitals={electronic_dm.first[0], protonic_dm.first[0]};
-      guess_occupations={electronic_dm.second[0], protonic_dm.second[0]};
-      number_of_blocks_per_particle_type = {1,1};
-      maximum_occupation = {2.0,1.0};
-      number_of_particles = {(double) (Nel),(double) proton_indices.size()};
-      block_descriptions = {"electronic", "protonic"};
-      fock_builder = restricted_neo_builder;
-    } else {
-      guess_orbitals={electronic_dm.first[0], electronic_dm.first[1], protonic_dm.first[0]};
-      guess_occupations={electronic_dm.second[0], electronic_dm.second[1], protonic_dm.second[0]};
-      number_of_blocks_per_particle_type = {1,1,1};
-      maximum_occupation = {1.0,1.0,1.0};
-      number_of_particles = {(double) (Nela), (double) Nelb,(double) proton_indices.size()};
-      block_descriptions = {"electronic alpha", "electronic beta", "protonic"};
-      fock_builder = unrestricted_neo_builder;
-    }
-    scfsolver=OpenOrbitalOptimizer::SCFSolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
-    scfsolver.initialize_with_orbitals(guess_orbitals, guess_occupations);
-    scfsolver.error_norm(error_norm);
-    scfsolver.convergence_threshold(convergence_threshold);
-    scfsolver.verbosity(verbosity);
-    scfsolver.maximum_iterations(maxiter);
-    scfsolver.maximum_history_length(diisorder);
-    scfsolver.energy_update_threshold(energy_update_threshold);
-    scfsolver.run(steepest_descent_init);
-
+  auto dm = scfsolver.get_solution();
+  auto fock = scfsolver.get_fock_matrix();
+  size_t Nmat = fock.size();
+  save_proton_matrices(std::make_pair(std::vector<arma::mat>({dm.first[Nmat-1]}),std::vector<arma::vec>({dm.second[Nmat-1]})), std::vector<arma::mat>({fock[Nmat-1]}));
+  if(M==1) {
+    save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0]}),std::vector<arma::vec>({dm.second[0]})), std::vector<arma::mat>({fock[0]}));
+  } else {
+    save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0],dm.first[1]}),std::vector<arma::vec>({dm.second[0],dm.second[1]})), std::vector<arma::mat>({fock[0],fock[1]}));
   }
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
-
   return 0;
 }
 
