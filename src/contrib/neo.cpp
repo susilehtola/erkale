@@ -33,7 +33,7 @@
 // Needed for libint init
 #include "eriworker.h"
 
-#include "scfsolver.hpp"
+#include "openorbitaloptimizer/scfsolver.hpp"
 
 #include <armadillo>
 #include <cstdio>
