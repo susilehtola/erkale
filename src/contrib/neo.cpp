@@ -98,7 +98,6 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ProtonBasis", "Protonic basis set", "");
   settings.add_bool("SteepestDescentInit", "Start SCF with a steepest descent step", false);
   settings.add_bool("SAPstart", "Start SCF directly from SAP guess", false);
-  settings.add_double("ProtonConfinementRadius", "Confinement radius for protonic initial guess", 0.0);
   settings.add_double("EnergyUpdateThreshold", "Threshold for allowing positive energy updates", 0.0);
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "inf");
@@ -114,7 +113,6 @@ int main_guarded(int argc, char **argv) {
   int maxiter = settings.get_int("MaxIter");
   int diisorder = settings.get_int("DIISOrder");
   double proton_mass = settings.get_double("ProtonMass");
-  double proton_confinement_radius = settings.get_double("ProtonConfinementRadius");
   double intthr = settings.get_double("IntegralThresh");
   double convergence_threshold = settings.get_double("ConvThr");
   double energy_update_threshold = settings.get_double("EnergyUpdateThreshold");
@@ -228,21 +226,6 @@ int main_guarded(int argc, char **argv) {
     pr=pbasis.moment(1);
   }
 
-  std::function<arma::mat(double)> protonic_confinement = [pbasis] (double r0) {
-    arma::mat pot(pbasis.get_Nbf(),pbasis.get_Nbf(),arma::fill::zeros);
-    for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
-      // Get nucleus
-      auto nuc = pbasis.get_nucleus(inuc);
-      // Get second moment around the atom
-      auto mom = pbasis.moment(2,nuc.r.x,nuc.r.y,nuc.r.z);
-      // Increment matrix
-      pot += mom[getind(2,0,0)] + mom[getind(0,2,0)] + mom[getind(0,0,2)];
-    }
-    // Apply localization radius
-    pot/=(r0*r0);
-    return pot;
-  };
-
   std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [pbasis] (const arma::mat & F) {
     arma::mat Fblock(F.n_rows,F.n_cols,arma::fill::zeros);
     for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
@@ -262,12 +245,8 @@ int main_guarded(int argc, char **argv) {
   // Guess Fock
   arma::mat Fguess(X.t()*(T+V+Vsap)*X);
   arma::mat Fpguess = Tp+Vpc+Vpsap;
-  if(proton_confinement_radius != 0.0) {
-    // Add confinement
-    Fpguess += protonic_confinement(proton_confinement_radius);
-    // and also extract the atomic blocks
-    Fpguess = extract_atomic_block_diagonal(Fpguess);
-  }
+  // Extract the atomic blocks (Hasecke and Mata 2023)
+  Fpguess = extract_atomic_block_diagonal(Fpguess);
   Fpguess = Xp.t()*Fpguess*Xp;
 
 
@@ -667,12 +646,8 @@ int main_guarded(int argc, char **argv) {
     };
 
     Fpguess = Tp + Vpc + frozen_Jep;
-    if(proton_confinement_radius != 0.0) {
-      // Add confinement potential
-      Fpguess += protonic_confinement(proton_confinement_radius);
-      // and also extract the atomic blocks
-      Fpguess = extract_atomic_block_diagonal(Fpguess);
-    }
+    // Extract the atomic blocks (Hasecke and Mata 2023)
+    Fpguess = extract_atomic_block_diagonal(Fpguess);
     fock_guess={Xp.t()*Fpguess*Xp};
     number_of_blocks_per_particle_type = {1};
     maximum_occupation = {1.0};
