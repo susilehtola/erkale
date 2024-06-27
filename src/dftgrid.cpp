@@ -3007,6 +3007,8 @@ void AngularGrid::form_hirshfeld_grid(const Hirshfeld & hirsh) {
 void AngularGrid::update_shell_list() {
   // Form list of important basis functions. Shell ranges
   std::vector<double> shran=basp->get_shell_ranges();
+  if(shran.size() != basp->get_Nshells())
+    throw std::logic_error("Shell ranges not initialized\n");
   // Distances to other nuclei
   std::vector<double> nucdist=basp->get_nuclear_distances(info.atind);
 
@@ -3052,6 +3054,8 @@ void AngularGrid::update_shell_list() {
 void AngularGrid::compute_bf() {
   // Create list of shells that actually contribute. Shell ranges
   std::vector<double> shran=basp->get_shell_ranges();
+  if(shran.size() != basp->get_Nshells())
+    throw std::logic_error("Shell ranges not initialized\n");
 
   shells.clear();
   size_t Nbf=0;

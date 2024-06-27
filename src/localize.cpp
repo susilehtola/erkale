@@ -410,6 +410,8 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("SizeDistribution","File to save orbital size distribution in","");
   settings.add_double("GThreshold","Threshold for convergence: norm of Riemannian gradient",1e-7);
   settings.add_double("FThreshold","Threshold for convergence: absolute change in function",DBL_MAX);
+  settings.add_double("LinDepThresh","Linear dependence threshold",1e-5);
+  settings.add_double("DFTBasisThr","Basis function screening threshold",1e-10);
   settings.add_int("Maxiter","Maximum number of iterations",50000);
   settings.add_int("Seed","Random number seed",0);
   settings.add_bool("Debug","Print out line search every iteration",false);

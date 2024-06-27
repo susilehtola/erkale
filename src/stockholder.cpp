@@ -119,6 +119,8 @@ void StockholderAtom::fill_adaptive(const BasisSet & basis, const arma::mat & P,
   std::vector<double> nucdist=basis.get_nuclear_distances(atind);
   // Shell ranges
   std::vector<double> shran=basis.get_shell_ranges();
+  if(shran.size() != basis.get_Nshells())
+    throw std::logic_error("Shell ranges not initialized\n");
 
   // Add points
   for(int irad=0;irad<nrad;irad++) {
@@ -214,6 +216,8 @@ void StockholderAtom::fill_static(const BasisSet & basis, const arma::mat & P, s
   std::vector<double> nucdist=basis.get_nuclear_distances(atind);
   // Shell ranges
   std::vector<double> shran=basis.get_shell_ranges();
+  if(shran.size() != basis.get_Nshells())
+    throw std::logic_error("Shell ranges not initialized\n");
 
   // Add points
   for(int irad=0;irad<nrad;irad++) {
