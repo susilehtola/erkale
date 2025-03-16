@@ -124,25 +124,11 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 
   // Then, compute the three-center integrals
   if(!direct) {
-    a_munu.resize(orbpairs.size());
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-      ERIWorker *eri;
-      if(omega==0.0 && alpha==1.0 && beta==0.0)
-	eri=new ERIWorker(maxam,maxcontr);
-      else
-	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic)
-#endif
-      for(size_t ip=0;ip<orbpairs.size();ip++)
-	a_munu[ip]=compute_a_munu(eri,ip);
-
-      delete eri;
-    }
+    // Compute the three-center integrals
+    arma::mat ints;
+    three_center_integrals(ints);
+    // Transform into proper B matrix
+    B=ints*ab_invh;
   }
 
   return orbpairs.size();
@@ -301,257 +287,56 @@ void DensityFit::digest_J(const arma::mat & gamma, size_t ip, const arma::mat & 
 }
 
 void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, arma::mat & K) const {
+  if(direct)
+    throw std::logic_error("Code can only be run in non-direct mode!\n");
+
   if(C.n_rows != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
     throw std::logic_error(oss.str());
   }
 
-  // a_munu contains (a,uv). We want to build the exchange
-  // K_uv = \sum_i n_i (ui|vi) = \sum_i n_i (a|ui) (a|b)^-1 (b|vi)
-  for(size_t io=0;io<C.n_cols;io++) {
-    // Helper array
-    arma::mat aui(Naux,Nbf);
-    aui.zeros();
+  size_t Na = B.n_cols;
 
-    // Fill integrals
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-#ifdef _OPENMP
-      arma::mat hlp(aui);
-#pragma omp for schedule(dynamic)
-#endif
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
-	// Shells in question are
-	size_t imus=orbpairs[ip].is;
-	size_t inus=orbpairs[ip].js;
-	// First function on shell
-	size_t mu0=orbshells[imus].get_first_ind();
-	size_t nu0=orbshells[inus].get_first_ind();
-	// Amount of functions
-	size_t Nmu=orbshells[imus].get_Nbf();
-	size_t Nnu=orbshells[inus].get_Nbf();
-
-	// The array amunu is stored in the form amunu(a,nu*Nmu+mu) =
-	// amunu[(nu*Nmu+mu)*Naux+a], so we can reshape it to a
-	// (Naux*Nmu,Nnu) matrix. Half-transformed (a|u;i) is then
-	arma::mat ui(arma::reshape(a_munu[ip],Naux*Nmu,Nnu)*C.submat(nu0,io,nu0+Nnu-1,io));
-	ui.reshape(Naux,Nmu);
-
-#ifdef _OPENMP
-	hlp.cols(mu0,mu0+Nmu-1)+=ui;
-#else
-	aui.cols(mu0,mu0+Nmu-1)+=ui;
-#endif
-
-	if(imus != inus) {
-	  // Get (a|vu)
-	  arma::mat anumu(Naux,Nmu*Nnu);
-	  anumu.zeros();
-	  for(size_t mu=0;mu<Nmu;mu++)
-	    for(size_t nu=0;nu<Nnu;nu++)
-	      anumu.col(mu*Nnu+nu)=a_munu[ip].col(nu*Nmu+mu);
-
-	  // Half-transformed (a|v;i) is
-	  arma::mat vi(arma::reshape(anumu,Naux*Nnu,Nmu)*C.submat(mu0,io,mu0+Nmu-1,io));
-	  vi.reshape(Naux,Nnu);
-
-#ifdef _OPENMP
-	  hlp.cols(nu0,nu0+Nnu-1)+=vi;
-#else
-	  aui.cols(nu0,nu0+Nnu-1)+=vi;
-#endif
-	}
-      }
-#ifdef _OPENMP
-#pragma omp critical
-      aui+=hlp;
-#endif
-    }
-
-    // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi)
-    aui = ab_invh.t()*aui;
-    K += occs[io]*arma::trans(aui)*aui;
+  // Reshape B
+  const arma::mat Breshape((double *) B.memptr(), Nbf, Nbf*Na, false, true);
+  arma::mat Awork(Nbf,Na);
+  
+  for(size_t i=0;i<C.n_cols;i++) {
+    // A(s,Q) = B(r;sQ) C(r;i)
+    Awork = arma::reshape(arma::trans(Breshape)*C.col(i),Nbf,Na);
+    K+=occs[i]*Awork*arma::trans(Awork);
   }
 }
 
 void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const {
-  if(C.n_rows != Nbf) {
+  if(direct)
+    throw std::logic_error("Code can only be run in non-direct mode!\n");
+
+ if(C.n_rows != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
     throw std::logic_error(oss.str());
   }
 
-  // a_munu contains (a,uv). We want to build the exchange
-  // K_uv = \sum_i n_i (ui|vi) = \sum_i n_i (a|ui) (a|b)^-1 (b|vi)
-  for(size_t io=0;io<C.n_cols;io++) {
-    // Helper array
-    arma::cx_mat aui(Naux,Nbf);
-    aui.zeros();
-
-    // Fill integrals
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-#ifdef _OPENMP
-      arma::cx_mat hlp(aui);
-#pragma omp for schedule(dynamic)
-#endif
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
-	// Shells in question are
-	size_t imus=orbpairs[ip].is;
-	size_t inus=orbpairs[ip].js;
-	// First function on shell
-	size_t mu0=orbshells[imus].get_first_ind();
-	size_t nu0=orbshells[inus].get_first_ind();
-	// Amount of functions
-	size_t Nmu=orbshells[imus].get_Nbf();
-	size_t Nnu=orbshells[inus].get_Nbf();
-
-	// The array amunu is stored in the form amunu(a,nu*Nmu+mu) =
-	// amunu[(nu*Nmu+mu)*Naux+a], so we can reshape it to a
-	// (Naux*Nmu,Nnu) matrix. Half-transformed (a|u;i) is then
-	arma::cx_mat ui(arma::reshape(a_munu[ip],Naux*Nmu,Nnu)*C.submat(nu0,io,nu0+Nnu-1,io));
-	ui.reshape(Naux,Nmu);
-
-#ifdef _OPENMP
-	hlp.cols(mu0,mu0+Nmu-1)+=ui;
-#else
-	aui.cols(mu0,mu0+Nmu-1)+=ui;
-#endif
-
-	if(imus != inus) {
-	  // Get (a|vu)
-	  arma::mat anumu(Naux,Nmu*Nnu);
-	  anumu.zeros();
-	  for(size_t mu=0;mu<Nmu;mu++)
-	    for(size_t nu=0;nu<Nnu;nu++)
-	      anumu.col(mu*Nnu+nu)=a_munu[ip].col(nu*Nmu+mu);
-
-	  // Half-transformed (a|v;i) is
-	  arma::cx_mat vi(arma::reshape(anumu,Naux*Nnu,Nmu)*C.submat(mu0,io,mu0+Nmu-1,io));
-	  vi.reshape(Naux,Nnu);
-
-#ifdef _OPENMP
-	  hlp.cols(nu0,nu0+Nnu-1)+=vi;
-#else
-	  aui.cols(nu0,nu0+Nnu-1)+=vi;
-#endif
-	}
-      }
-#ifdef _OPENMP
-#pragma omp critical
-      aui+=hlp;
-#endif
-    }
-
-    // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi)
-    aui = ab_invh.t()*aui;
-    K += occs[io]*arma::trans(aui)*aui;
+  // Reshape B
+  const arma::mat Breshape((double *) B.memptr(), Nbf, Nbf*Naux, false, true);
+  arma::cx_mat Awork(Nbf,Naux);
+  
+  for(size_t i=0;i<C.n_cols;i++) {
+    // A(s,Q) = B(r;sQ) C(r;i)
+    Awork = arma::reshape(arma::trans(Breshape)*C.col(i),Nbf,Naux);
+    K+=occs[i]*arma::conj(Awork)*arma::strans(Awork);
   }
 }
 
 void DensityFit::digest_K_direct(const arma::mat & C, const arma::vec & occs, arma::mat & K) const {
-  if(C.n_rows != Nbf) {
-    std::ostringstream oss;
-    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
-    throw std::logic_error(oss.str());
-  }
-
-  // a_munu contains (a,uv). We want to build the exchange
-  // K_uv = \sum_i n_i (ui|vi) = \sum_i n_i (a|ui) (a|b)^-1 (b|vi)
-
-  // Stack of helper matrices
-  std::vector<arma::mat> aui(C.n_cols);
-  for(size_t i=0;i<aui.size();i++)
-    aui[i].zeros(Naux,Nbf);
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-    // Thread-private helper
-#ifdef _OPENMP
-    std::vector<arma::mat> auithr(aui);
-#endif
-
-    ERIWorker *eri;
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      eri=new ERIWorker(maxam,maxcontr);
-    else
-      eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic)
-#endif
-    for(size_t ip=0;ip<orbpairs.size();ip++) {
-      // Calculate integrals
-      arma::mat amunu(compute_a_munu(eri,ip));
-      // Shells in question are
-      size_t imus=orbpairs[ip].is;
-      size_t inus=orbpairs[ip].js;
-      // First function on shell
-      size_t mu0=orbshells[imus].get_first_ind();
-      size_t nu0=orbshells[inus].get_first_ind();
-      // Amount of functions
-      size_t Nmu=orbshells[imus].get_Nbf();
-      size_t Nnu=orbshells[inus].get_Nbf();
-
-      // Get (a|vu)
-      arma::mat anumu;
-      if(imus!=inus) {
-	anumu.zeros(Naux,Nmu*Nnu);
-	for(size_t mu=0;mu<Nmu;mu++)
-	  for(size_t nu=0;nu<Nnu;nu++)
-	    anumu.col(mu*Nnu+nu)=amunu.col(nu*Nmu+mu);
-      }
-
-      // Loop over orbitals
-      for(size_t io=0;io<C.n_cols;io++) {
-	// The array amunu is stored in the form amunu(a,nu*Nmu+mu) =
-	// amunu[(nu*Nmu+mu)*Naux+a], so we can reshape it to a
-	// (Naux*Nmu,Nnu) matrix. Half-transformed (a|u;i) is then
-	arma::mat ui(arma::reshape(amunu,Naux*Nmu,Nnu)*C.submat(nu0,io,nu0+Nnu-1,io));
-	ui.reshape(Naux,Nmu);
-
-#ifdef _OPENMP
-	auithr[io].cols(mu0,mu0+Nmu-1)+=ui;
-#else
-	aui[io].cols(mu0,mu0+Nmu-1)+=ui;
-#endif
-
-	if(imus != inus) {
-	  // Half-transformed (a|v;i) is
-	  arma::mat vi(arma::reshape(anumu,Naux*Nnu,Nmu)*C.submat(mu0,io,mu0+Nmu-1,io));
-	  vi.reshape(Naux,Nnu);
-
-#ifdef _OPENMP
-	  auithr[io].cols(nu0,nu0+Nnu-1)+=vi;
-#else
-	  aui[io].cols(nu0,nu0+Nnu-1)+=vi;
-#endif
-	}
-      }
-    }
-
-#ifdef _OPENMP
-#pragma omp critical
-    for(size_t io=0;io<C.n_cols;io++)
-      aui[io]+=auithr[io];
-#endif
-  }
-
-  // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi)
-  for(size_t io=0;io<C.n_cols;io++) {
-    aui[io] = ab_invh*aui[io];
-    K += occs[io]*arma::trans(aui[io])*aui[io];
-  }
+  throw std::logic_error("Direct K digestion not implemented\n");
 }
 
 size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double thr, bool dir) const {
+  // Amount of auxiliary functions (for representing the electron density)
+  size_t Nbf=orbbas.get_Nbf();
   // Amount of auxiliary functions (for representing the electron density)
   size_t Na=auxbas.get_Nbf();
   // Amount of memory required for calculation
@@ -559,15 +344,8 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
 
   // Memory taken up by  ( \alpha | \mu \nu)
   if(!dir) {
-    // Form screening matrix
-    arma::mat Q, M;
-    std::vector<eripair_t> opairs=orbbas.get_eripairs(Q,M,thr);
-
     // Count number of function pairs
-    size_t np=0;
-    for(size_t ip=0;ip<opairs.size();ip++)
-      np+=orbbas.get_Nbf(opairs[ip].is)*orbbas.get_Nbf(opairs[ip].js);
-    Nmem+=Na*np*sizeof(double);
+    Nmem+=Na*Nbf*Nbf*sizeof(double);
   }
 
   // Memory taken by (\alpha | \beta) and its inverse
@@ -588,31 +366,15 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
     throw std::logic_error(oss.str());
   }
 
+  // Compute gamma
+  if(!direct) {
+    // c(P) = B(st;P) P(st)
+    return arma::trans(B)*arma::vectorise(P);
+  }
+
   arma::vec gamma(Naux);
   gamma.zeros();
 
-  // Compute gamma
-  if(!direct) {
-#ifdef _OPENMP
-#pragma omp parallel
-    {
-      // Thread-private helper
-      arma::vec gv(Naux);
-      gv.zeros();
-#pragma omp for schedule(dynamic)
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
-	digest_Jexp(P,ip,a_munu[ip],gv);
-      }
-#pragma omp critical
-      gamma+=gv;
-    }
-#else
-    // Sequential code
-    for(size_t ip=0;ip<orbpairs.size();ip++)
-      digest_Jexp(P,ip,a_munu[ip],gamma);
-#endif
-
-  } else {
 #ifdef _OPENMP
 #pragma omp parallel
     {
@@ -645,7 +407,6 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
 
     delete eri;
 #endif
-  }
 
   // Compute and return c
   return ab_inv*gamma;
@@ -666,31 +427,13 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 
   // Compute gamma
   if(!direct) {
-    for(size_t iden=0;iden<P.size();iden++) {
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for
 #endif
-      {
-	// Thread-private helper
-#ifdef _OPENMP
-	arma::vec gv(Naux);
-	gv.zeros();
-#pragma omp for schedule(dynamic)
-#endif
-	for(size_t ip=0;ip<orbpairs.size();ip++) {
-#ifdef _OPENMP
-	  digest_Jexp(P[iden],ip,a_munu[ip],gv);
-#else
-	  digest_Jexp(P[iden],ip,a_munu[ip],gamma[iden]);
-#endif
-	}
-#ifdef _OPENMP
-#pragma omp critical
-	gamma[iden]+=gv;
-#endif
-      }
-    }
-
+    for(size_t iden=0;iden<P.size();iden++)
+      // c(P) = B(st;P) P(st)
+      gamma[iden] = arma::trans(B)*arma::vectorise(P[iden]);
+    
   } else {
     for(size_t iden=0;iden<P.size();iden++) {
 #ifdef _OPENMP
@@ -723,11 +466,10 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 	delete eri;
       }
     }
+    // Compute and return c
+    for(size_t ig=0;ig<P.size();ig++)
+      gamma[ig]=ab_inv*gamma[ig];
   }
-
-  // Compute and return c
-  for(size_t ig=0;ig<P.size();ig++)
-    gamma[ig]=ab_inv*gamma[ig];
 
   return gamma;
 }
@@ -745,23 +487,24 @@ arma::mat DensityFit::calcJ(const arma::mat & P) const {
 }
 
 arma::mat DensityFit::calcJ_vector(const arma::vec & c) const {
-  if(c.n_elem != Naux) {
-    std::ostringstream oss;
-    oss << "Error in DensityFit: Naux = " << Naux << ", c.n_elem = " << c.n_elem << "!\n";
-    throw std::logic_error(oss.str());
-  }
-
   arma::mat J(Nbf,Nbf);
   J.zeros();
 
   if(!direct) {
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-    for(size_t ip=0;ip<orbpairs.size();ip++)
-      digest_J(c,ip,a_munu[ip],J);
+    if(c.n_elem != B.n_cols) {
+      std::ostringstream oss;
+      oss << "Error in DensityFit: B.n_cols = " << B.n_cols << ", c.n_elem = " << c.n_elem << "!\n";
+      throw std::logic_error(oss.str());
+    }
+    J=arma::reshape(B*c,Nbf,Nbf);
 
   } else {
+    if(c.n_elem != Naux) {
+      std::ostringstream oss;
+      oss << "Error in DensityFit: Naux = " << Naux << ", c.n_elem = " << c.n_elem << "!\n";
+      throw std::logic_error(oss.str());
+    }
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -794,13 +537,10 @@ std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const
     J[iden].zeros(Nbf,Nbf);
 
   if(!direct) {
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-    for(size_t ip=0;ip<orbpairs.size();ip++)
-      for(size_t iden=0;iden<P.size();iden++)
-	digest_J(c[iden],ip,a_munu[ip],J[iden]);
-
+    for(size_t iden=0;iden<P.size();iden++) {
+      J[iden]=arma::reshape(B*c[iden],Nbf,Nbf);
+    }
+    
   } else {
 #ifdef _OPENMP
 #pragma omp parallel
@@ -1058,6 +798,7 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
 
   if(!direct) {
     digest_K_incore(C,occs,K);
+
   } else {
     // Determine how many orbitals we can handle at one go. Memory
     // needed for one orbital is
@@ -1174,40 +915,51 @@ void DensityFit::three_center_integrals(arma::mat & ints) const {
 
   // Collect AO integrals
   ints.zeros(Nbf*Nbf,Naux);
-  for(size_t ip=0;ip<orbpairs.size();ip++) {
-    size_t imus=orbpairs[ip].is;
-    size_t inus=orbpairs[ip].js;
-    size_t Nmu=orbshells[imus].get_Nbf();
-    size_t Nnu=orbshells[inus].get_Nbf();
-    size_t mu0=orbshells[imus].get_first_ind();
-    size_t nu0=orbshells[inus].get_first_ind();
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker *eri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri=new ERIWorker(maxam,maxcontr);
+    else
+      eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
 
-    const arma::mat & amunu(a_munu[ip]);
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0;ip<orbpairs.size();ip++) {
+      size_t imus=orbpairs[ip].is;
+      size_t inus=orbpairs[ip].js;
+      size_t Nmu=orbshells[imus].get_Nbf();
+      size_t Nnu=orbshells[inus].get_Nbf();
+      size_t mu0=orbshells[imus].get_first_ind();
+      size_t nu0=orbshells[inus].get_first_ind();
 
-    for(size_t ias=0;ias<auxshells.size();ias++) {
-      size_t Na=auxshells[ias].get_Nbf();
-      size_t a0=auxshells[ias].get_first_ind();
+      const arma::mat amunu(compute_a_munu(eri,ip));
 
-      for(size_t imu=0;imu<Nmu;imu++)
-	for(size_t inu=0;inu<Nnu;inu++)
-	  for(size_t ia=0;ia<Na;ia++) {
-	    size_t mu=imu+mu0;
-	    size_t nu=inu+nu0;
-	    size_t a=ia+a0;
+      for(size_t ias=0;ias<auxshells.size();ias++) {
+        size_t Na=auxshells[ias].get_Nbf();
+        size_t a0=auxshells[ias].get_first_ind();
 
-            double el(amunu(ia+a0,inu*Nmu+imu));
-	    ints(mu*Nbf+nu,a)=el;
-	    ints(nu*Nbf+mu,a)=el;
-	  }
+        for(size_t imu=0;imu<Nmu;imu++)
+          for(size_t inu=0;inu<Nnu;inu++)
+            for(size_t ia=0;ia<Na;ia++) {
+              size_t mu=imu+mu0;
+              size_t nu=inu+nu0;
+              size_t a=ia+a0;
+
+              double el(amunu(ia+a0,inu*Nmu+imu));
+              ints(mu*Nbf+nu,a)=el;
+              ints(nu*Nbf+mu,a)=el;
+            }
+      }
     }
+
+    delete eri;
   }
 }
 
-void DensityFit::B_matrix(arma::mat & B) const {
-  if(direct)
-    throw std::runtime_error("Must run in tabulated mode!\n");
-  // Compute the integrals
-  three_center_integrals(B);
-  // Transform into proper B matrix
-  B*=ab_invh;
+void DensityFit::B_matrix(arma::mat & B_) const {
+  B_=B;
 }
