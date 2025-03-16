@@ -88,8 +88,8 @@ class DensityFit {
 
   /// List of unique orbital shell pairs
   std::vector<eripair_t> orbpairs;
-  /// Integrals \f$ ( \alpha | \mu \nu) \f$ stored by shell pair basis
-  std::vector<arma::mat> a_munu;
+  /// B matrix (not stored in direct mode)
+  arma::mat B;
 
   /// \f$ ( \alpha | \beta) \f$
   arma::mat ab;
@@ -173,9 +173,9 @@ class DensityFit {
   /// Get ab_invh
   arma::mat get_ab_invh() const;
 
-  /// Get 3-center integrals (must have HF enabled)
+  /// Get 3-center integrals (must be in !direct mode)
   void three_center_integrals(arma::mat & B) const;
-  /// Get B matrix (must have HF enabled)
+  /// Get B matrix (must be in !direct mode)
   void B_matrix(arma::mat & B) const;
 
   /// Compute error in (AB|AB) type integrals
