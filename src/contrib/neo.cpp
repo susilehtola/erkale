@@ -98,7 +98,6 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ProtonBasis", "Protonic basis set", "");
   settings.add_bool("SteepestDescentInit", "Start SCF with a steepest descent step", false);
   settings.add_int("StepwiseSCFIter", "Number of stepwise SCF macroiterations, 0 to skip to simultaneous solution", 0);
-  settings.add_double("EnergyUpdateThreshold", "Threshold for allowing positive energy updates", 0.0);
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
@@ -121,7 +120,6 @@ int main_guarded(int argc, char **argv) {
   double intthr = settings.get_double("IntegralThresh");
   double init_convergence_threshold = settings.get_double("InitConvThr");
   double convergence_threshold = settings.get_double("ConvThr");
-  double energy_update_threshold = settings.get_double("EnergyUpdateThreshold");
   bool verbose = settings.get_bool("Verbose");
   int nstepwise = settings.get_int("StepwiseSCFIter");
   bool steepest_descent_init = settings.get_bool("SteepestDescentInit");
@@ -760,7 +758,6 @@ int main_guarded(int argc, char **argv) {
     scfsolver.verbosity(verbosity);
     scfsolver.maximum_iterations(maxinititer);
     scfsolver.maximum_history_length(diisorder);
-    scfsolver.energy_update_threshold(energy_update_threshold);
     scfsolver.run(steepest_descent_init);
 
     // Grab the new density matrix
@@ -894,7 +891,6 @@ int main_guarded(int argc, char **argv) {
       scfsolver.verbosity(verbosity);
       scfsolver.maximum_iterations(maxinititer);
       scfsolver.maximum_history_length(diisorder);
-      scfsolver.energy_update_threshold(energy_update_threshold);
       scfsolver.run(steepest_descent_init);
 
       // Grab the proton density matrix
@@ -939,7 +935,6 @@ int main_guarded(int argc, char **argv) {
     scfsolver.verbosity(verbosity);
     scfsolver.maximum_iterations(maxiter);
     scfsolver.maximum_history_length(diisorder);
-    scfsolver.energy_update_threshold(energy_update_threshold);
     scfsolver.run(steepest_descent_init);
 
     auto dm = scfsolver.get_solution();
