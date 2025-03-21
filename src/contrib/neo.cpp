@@ -908,6 +908,9 @@ int main_guarded(int argc, char **argv) {
     }
   }
   if(quantum_protons.size()) {
+    if(nstepwise)
+      printf("\n\nProceeding with simultaneous electron-proton SCF\n");
+
     // Proceed with nuclear-electronic calculation
     OpenOrbitalOptimizer::Orbitals<double> guess_orbitals;
     OpenOrbitalOptimizer::OrbitalOccupations<double> guess_occupations;
