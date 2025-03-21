@@ -31,6 +31,9 @@ DensityFit::DensityFit() {
   omega=0.0;
   alpha=1.0;
   beta=0.0;
+  Nbf=0;
+  Naux=0;
+  Nnuc=0;
 }
 
 DensityFit::~DensityFit() {
