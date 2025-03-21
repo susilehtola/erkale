@@ -100,7 +100,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("StepwiseSCFIter", "Number of stepwise SCF macroiterations, 0 to skip to simultaneous solution", 0);
   settings.add_double("EnergyUpdateThreshold", "Threshold for allowing positive energy updates", 0.0);
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
-  settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "inf");
+  settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
   settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
@@ -277,6 +277,10 @@ int main_guarded(int argc, char **argv) {
   fflush(stdout);
   if(Sp.n_elem>0 and dfit.get_Naux() != pfit.get_Naux())
     throw std::logic_error("Electronic and protonic density fitting basis sets don't have the same number of functions!\n");
+
+  if(nstepwise==0 and quantum_protons.size()==0) {
+    nstepwise=1;
+  }
 
   arma::mat frozen_Jpe(T.n_rows, T.n_cols, arma::fill::zeros);
   arma::mat frozen_Jep(Tp.n_rows, Tp.n_cols, arma::fill::zeros);
@@ -555,45 +559,46 @@ int main_guarded(int argc, char **argv) {
   OpenOrbitalOptimizer::DensityMatrix<double, double> protonic_dm;
 
   // Set up protonic guess
-  if(loadchk != "") {
-    Checkpoint load(loadchk,false);
+  if(quantum_protons.size()) {
+    if(loadchk != "") {
+      Checkpoint load(loadchk,false);
 
-    BasisSet oldpbasis;
-    load.read(oldpbasis,"pbasis");
+      BasisSet oldpbasis;
+      load.read(oldpbasis,"pbasis");
 
-    // Protonic solution
-    arma::vec Ep;
-    arma::mat oldCp, Cp;
-    load.read("Ep",Ep);
-    load.read("Cp",oldCp);
-    Cp = arma::trans(Xp) * pbasis.overlap(oldpbasis) * oldCp;
-    if(Cp.n_rows < Cp.n_cols) {
-      Ep=Ep.subvec(0,Np-1);
-      Cp=Cp.cols(0,Np-1);
+      // Protonic solution
+      arma::vec Ep;
+      arma::mat oldCp, Cp;
+      load.read("Ep",Ep);
+      load.read("Cp",oldCp);
+      Cp = arma::trans(Xp) * pbasis.overlap(oldpbasis) * oldCp;
+      if(Cp.n_rows < Cp.n_cols) {
+        Ep=Ep.subvec(0,Np-1);
+        Cp=Cp.cols(0,Np-1);
+      }
+      arma::vec occs(Cp.n_cols,arma::fill::zeros);
+      occs.subvec(0,Np-1).ones();
+
+      protonic_dm = std::make_pair(std::vector<arma::mat>({Cp}),std::vector<arma::vec>({occs}));
+    } else {
+      // We need to use a nuclear guess to get the electronic wave function right
+      BasisSetLibrary spbaslib;
+      spbaslib.load_basis("pb-1s.gbs");
+
+      BasisSet spbasis;
+      construct_basis(spbasis,quantum_protons,spbaslib);
+
+      size_t Np=spbasis.get_Nbf();
+      arma::mat oldCp(Np,Np);
+      oldCp.eye();
+
+      arma::mat Cp;
+      Cp = arma::trans(Xp) * pbasis.overlap(spbasis) * oldCp;
+      arma::vec occs(Np,arma::fill::ones);
+
+      protonic_dm = std::make_pair(std::vector<arma::mat>({Cp}),std::vector<arma::vec>({occs}));
     }
-    arma::vec occs(Cp.n_cols,arma::fill::zeros);
-    occs.subvec(0,Np-1).ones();
-
-    protonic_dm = std::make_pair(std::vector<arma::mat>({Cp}),std::vector<arma::vec>({occs}));
-  } else {
-    // We need to use a nuclear guess to get the electronic wave function right
-    BasisSetLibrary spbaslib;
-    spbaslib.load_basis("pb-1s.gbs");
-
-    BasisSet spbasis;
-    construct_basis(spbasis,quantum_protons,spbaslib);
-
-    size_t Np=spbasis.get_Nbf();
-    arma::mat oldCp(Np,Np);
-    oldCp.eye();
-
-    arma::mat Cp;
-    Cp = arma::trans(Xp) * pbasis.overlap(spbasis) * oldCp;
-    arma::vec occs(Np,arma::fill::ones);
-
-    protonic_dm = std::make_pair(std::vector<arma::mat>({Cp}),std::vector<arma::vec>({occs}));
   }
-
 
   // Save the matrices to disk
   std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_proton_matrices = [&chkpt, &Xp](const OpenOrbitalOptimizer::DensityMatrix<double,double> & pdm, const OpenOrbitalOptimizer::FockMatrix<double> & pfock) {
@@ -720,10 +725,11 @@ int main_guarded(int argc, char **argv) {
         Pp += Cp * arma::diagmat(occp) * Cp.t();
       }
     }
-    frozen_Jpe = proton_electron_coulomb(Pp);
+    if(quantum_protons.size())
+      frozen_Jpe = proton_electron_coulomb(Pp);
 
     // Update the frozen proton energy
-    {
+    if(quantum_protons.size()) {
       const OpenOrbitalOptimizer::Orbitals<double> & orbitals = protonic_dm.first;
       const OpenOrbitalOptimizer::OrbitalOccupations<double>  & occupations = protonic_dm.second;
 
@@ -905,44 +911,46 @@ int main_guarded(int argc, char **argv) {
       break;
     }
   }
-  // Proceed with nuclear-electronic calculation
-  OpenOrbitalOptimizer::Orbitals<double> guess_orbitals;
-  OpenOrbitalOptimizer::OrbitalOccupations<double> guess_occupations;
-  if(M==1) {
-    guess_orbitals={electronic_dm.first[0], protonic_dm.first[0]};
-    guess_occupations={electronic_dm.second[0], protonic_dm.second[0]};
-    number_of_blocks_per_particle_type = {1,1};
-    maximum_occupation = {2.0,1.0};
-    number_of_particles = {(double) (Nel),(double) proton_indices.size()};
-    block_descriptions = {"electronic", "protonic"};
-    fock_builder = restricted_neo_builder;
-  } else {
-    guess_orbitals={electronic_dm.first[0], electronic_dm.first[1], protonic_dm.first[0]};
-    guess_occupations={electronic_dm.second[0], electronic_dm.second[1], protonic_dm.second[0]};
-    number_of_blocks_per_particle_type = {1,1,1};
-    maximum_occupation = {1.0,1.0,1.0};
-    number_of_particles = {(double) (Nela), (double) Nelb,(double) proton_indices.size()};
-    block_descriptions = {"electronic alpha", "electronic beta", "protonic"};
-    fock_builder = unrestricted_neo_builder;
-  }
-  OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
-  scfsolver.initialize_with_orbitals(guess_orbitals, guess_occupations);
-  scfsolver.error_norm(error_norm);
-  scfsolver.convergence_threshold(convergence_threshold);
-  scfsolver.verbosity(verbosity);
-  scfsolver.maximum_iterations(maxiter);
-  scfsolver.maximum_history_length(diisorder);
-  scfsolver.energy_update_threshold(energy_update_threshold);
-  scfsolver.run(steepest_descent_init);
+  if(quantum_protons.size()) {
+    // Proceed with nuclear-electronic calculation
+    OpenOrbitalOptimizer::Orbitals<double> guess_orbitals;
+    OpenOrbitalOptimizer::OrbitalOccupations<double> guess_occupations;
+    if(M==1) {
+      guess_orbitals={electronic_dm.first[0], protonic_dm.first[0]};
+      guess_occupations={electronic_dm.second[0], protonic_dm.second[0]};
+      number_of_blocks_per_particle_type = {1,1};
+      maximum_occupation = {2.0,1.0};
+      number_of_particles = {(double) (Nel),(double) proton_indices.size()};
+      block_descriptions = {"electronic", "protonic"};
+      fock_builder = restricted_neo_builder;
+    } else {
+      guess_orbitals={electronic_dm.first[0], electronic_dm.first[1], protonic_dm.first[0]};
+      guess_occupations={electronic_dm.second[0], electronic_dm.second[1], protonic_dm.second[0]};
+      number_of_blocks_per_particle_type = {1,1,1};
+      maximum_occupation = {1.0,1.0,1.0};
+      number_of_particles = {(double) (Nela), (double) Nelb,(double) proton_indices.size()};
+      block_descriptions = {"electronic alpha", "electronic beta", "protonic"};
+      fock_builder = unrestricted_neo_builder;
+    }
+    OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+    scfsolver.initialize_with_orbitals(guess_orbitals, guess_occupations);
+    scfsolver.error_norm(error_norm);
+    scfsolver.convergence_threshold(convergence_threshold);
+    scfsolver.verbosity(verbosity);
+    scfsolver.maximum_iterations(maxiter);
+    scfsolver.maximum_history_length(diisorder);
+    scfsolver.energy_update_threshold(energy_update_threshold);
+    scfsolver.run(steepest_descent_init);
 
-  auto dm = scfsolver.get_solution();
-  auto fock = scfsolver.get_fock_matrix();
-  size_t Nmat = fock.size();
-  save_proton_matrices(std::make_pair(std::vector<arma::mat>({dm.first[Nmat-1]}),std::vector<arma::vec>({dm.second[Nmat-1]})), std::vector<arma::mat>({fock[Nmat-1]}));
-  if(M==1) {
-    save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0]}),std::vector<arma::vec>({dm.second[0]})), std::vector<arma::mat>({fock[0]}));
-  } else {
-    save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0],dm.first[1]}),std::vector<arma::vec>({dm.second[0],dm.second[1]})), std::vector<arma::mat>({fock[0],fock[1]}));
+    auto dm = scfsolver.get_solution();
+    auto fock = scfsolver.get_fock_matrix();
+    size_t Nmat = fock.size();
+    save_proton_matrices(std::make_pair(std::vector<arma::mat>({dm.first[Nmat-1]}),std::vector<arma::vec>({dm.second[Nmat-1]})), std::vector<arma::mat>({fock[Nmat-1]}));
+    if(M==1) {
+      save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0]}),std::vector<arma::vec>({dm.second[0]})), std::vector<arma::mat>({fock[0]}));
+    } else {
+      save_electron_matrices(std::make_pair(std::vector<arma::mat>({dm.first[0],dm.first[1]}),std::vector<arma::vec>({dm.second[0],dm.second[1]})), std::vector<arma::mat>({fock[0],fock[1]}));
+    }
   }
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
