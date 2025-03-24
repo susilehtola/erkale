@@ -141,8 +141,8 @@ void Settings::add_scf_settings() {
   // How much memory to allow for density fitting
   add_int("FittingMemory", "Amount of memory in MB to use for exchange fitting",1000);
   // Threshold for screening eigenvectors
-  add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-5);
-  add_double("FittingCholeskyThreshold", "Linear dependence threshold for pivoted Cholesky of Coulomb integrals in density fitting",1e-6);
+  add_double("FittingThreshold", "Linear dependence threshold for Coulomb integrals in density fitting",1e-7);
+  add_double("FittingCholeskyThreshold", "Linear dependence threshold for pivoted Cholesky of Coulomb integrals in density fitting",1e-8);
 
   // SAP basis
   add_string("SAPBasis", "Tabulated atomic effective potential \"basis set\"","helfem_large.gbs");
