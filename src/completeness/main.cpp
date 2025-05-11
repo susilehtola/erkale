@@ -52,6 +52,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("nfull","Number of functions at each side to fully optimize",4);
   settings.add_bool("coulomb","Use Coulomb metric? (Use only for RI basis sets)",false);
   settings.add_double("LinDepThresh","Basis set linear dependence threshold",1e-5);
+  settings.add_double("CholDepThresh","Basis set Cholesky decomposition threshold",1e-6);
   settings.add_string("Output","Output file to use","optimized.gbs");
 
   if(argc!=2) {
