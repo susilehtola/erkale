@@ -109,8 +109,9 @@ arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t & p) {
   // Bigger exponents
   if(p.odd) {
     exps(A.n_elem)=1.0;
-    exps.subvec(A.n_elem+1,2*A.n_elem)=arma::exp10(A);
-  } else
+    if(A.n_elem)
+      exps.subvec(A.n_elem+1,2*A.n_elem)=arma::exp10(A);
+  } else if(A.n_elem)
     exps.subvec(A.n_elem,2*A.n_elem-1)=arma::exp10(A);
 
   //  arma::sort(arma::log10(exps)).t().print("Exponents");
