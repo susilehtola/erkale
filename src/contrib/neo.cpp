@@ -96,7 +96,6 @@ int main_guarded(int argc, char **argv) {
 
   settings.add_scf_settings();
   settings.add_string("ProtonBasis", "Protonic basis set", "");
-  settings.add_bool("SteepestDescentInit", "Start SCF with a steepest descent step", false);
   settings.add_int("StepwiseSCFIter", "Number of stepwise SCF macroiterations, 0 to skip to simultaneous solution", 0);
   settings.add_string("QuantumProtons", "Indices of protons to make quantum", "");
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
@@ -122,7 +121,6 @@ int main_guarded(int argc, char **argv) {
   double convergence_threshold = settings.get_double("ConvThr");
   bool verbose = settings.get_bool("Verbose");
   int nstepwise = settings.get_int("StepwiseSCFIter");
-  bool steepest_descent_init = settings.get_bool("SteepestDescentInit");
   size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
@@ -758,7 +756,7 @@ int main_guarded(int argc, char **argv) {
     scfsolver.verbosity(verbosity);
     scfsolver.maximum_iterations(maxinititer);
     scfsolver.maximum_history_length(diisorder);
-    scfsolver.run(steepest_descent_init);
+    scfsolver.run();
 
     // Grab the new density matrix
     electronic_dm = scfsolver.get_solution();
@@ -891,7 +889,7 @@ int main_guarded(int argc, char **argv) {
       scfsolver.verbosity(verbosity);
       scfsolver.maximum_iterations(maxinititer);
       scfsolver.maximum_history_length(diisorder);
-      scfsolver.run(steepest_descent_init);
+      scfsolver.run();
 
       // Grab the proton density matrix
       protonic_dm = scfsolver.get_solution();
@@ -938,7 +936,7 @@ int main_guarded(int argc, char **argv) {
     scfsolver.verbosity(verbosity);
     scfsolver.maximum_iterations(maxiter);
     scfsolver.maximum_history_length(diisorder);
-    scfsolver.run(steepest_descent_init);
+    scfsolver.run();
 
     auto dm = scfsolver.get_solution();
     auto fock = scfsolver.get_fock_matrix();
