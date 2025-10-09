@@ -318,7 +318,10 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #ifdef RESTRICTED
     arma::imat occ(basisp->count_m_occupied(sol.C.cols(0,nocc-1)));
 #else
-    arma::imat occ(basisp->count_m_occupied(sol.Ca.cols(0,nocca-1),sol.Cb.cols(0,noccb-1)));
+    arma::mat Cbocc;
+    if(noccb>0)
+      Cbocc=sol.Cb.cols(0,noccb-1);
+    arma::imat occ(basisp->count_m_occupied(sol.Ca.cols(0,nocca-1),Cbocc));
 #endif
     occ.save(linoccfname,arma::raw_ascii);
     if(verbose)
@@ -781,7 +784,10 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 #ifdef RESTRICTED
       arma::imat occ(basisp->count_m_occupied(sol.C.cols(0,nocc-1)));
 #else
-      arma::imat occ(basisp->count_m_occupied(sol.Ca.cols(0,nocca-1),sol.Cb.cols(0,noccb-1)));
+      arma::mat Cbocc;
+      if(noccb>0)
+	Cbocc=sol.Cb.cols(0,noccb-1);
+      arma::imat occ(basisp->count_m_occupied(sol.Ca.cols(0,nocca-1),Cbocc));
 #endif
 
       printf("\nOrbital occupations by symmetry\n");

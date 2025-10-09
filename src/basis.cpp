@@ -4265,7 +4265,10 @@ arma::mat m_norm(const arma::mat & C, const arma::ivec & mv) {
 
 arma::ivec m_classify(const arma::mat & C, const arma::ivec & mv) {
   // Orbital class
-  arma::ivec oclass(C.n_cols);
+  arma::ivec oclass;
+  if(C.n_cols == 0)
+    return oclass;
+  oclass.zeros(C.n_cols);
 
   // Get symmetries
   arma::mat osym(m_norm(C,mv));
