@@ -17,7 +17,7 @@
 // Needed for libint init
 #include "eriworker.h"
 
-#include "openorbitaloptimizer/scfcolver.hpp"
+#include "openorbitaloptimizer/scfsolver.hpp"
 
 #include <armadillo>
 #include <cstdio>
@@ -112,74 +112,37 @@ int main_guarded(int argc, char **argv) {
   // Read in basis set
   BasisSetLibrary baslib;
   baslib.load_basis(settings.get_string("Basis"));
-  //BasisSetLibrary pbaslib;
-  //if(settings.get_string("ProtonBasis").size())
-  //pbaslib.load_basis(settings.get_string("ProtonBasis"));
 
   // Read in SAP potential
   BasisSetLibrary potlib;
   potlib.load_basis(settings.get_string("SAPBasis"));
 
   auto atoms=load_xyz(settings.get_string("System"),!settings.get_bool("InputBohr"));
-  /*std::vector<size_t> proton_indices;
-  //if(stricmp(settings.get_string("QuantumProtons"),"")!=0) {
-    // Check for '*'
-    //std::string str=settings.get_string("QuantumProtons");
-    if(str.size()==1 && str[0]=='*') {
-      for(size_t i=0;i<atoms.size();i++)
-        if(atoms[i].el.compare("H")==0)
-          proton_indices.push_back(i);
-    } else {
-      // Parse and convert to C++ indexing
-      proton_indices = parse_range(settings.get_string("QuantumProtons"),true);
-    }
-  }
-
-  // Collect quantum protons
-  std::vector<atom_t> quantum_protons;
-  for(auto idx: proton_indices) {
-    quantum_protons.push_back(atoms[idx]);
-  }
-  for(size_t i=0; i<quantum_protons.size(); i++)
-    quantum_protons[i].num=i;
-  */
   
   // Collect classical nuclei
   std::vector<std::tuple<int,double,double,double>> classical_nuclei;
-  for(size_t i=0;i<atoms.size();i++) {
+  for(size_t i = 0; i < atoms.size(); i++) {
     // Ghost nucleus
-    if(atoms[i].el.size()>3 && atoms[i].el.substr(atoms[i].el.size()-3,3)=="-Bq")
+    if(atoms[i].el.size()>3 && atoms[i].el.substr(atoms[i].el.size()-3, 3) == "-Bq")
       continue;
-    // Skip over quantum nuclei
-    /*bool quantum=false;
-    for(auto proton_idx: proton_indices)
-      if(proton_idx==i)
-        quantum=true;
-    if(quantum)
-      continue;
-    */
     // Add to list
     classical_nuclei.push_back(std::make_tuple(get_Z(atoms[i].el), atoms[i].x, atoms[i].y, atoms[i].z));
   }
 
   // Construct the basis set
   BasisSet basis;
-  construct_basis(basis,atoms,baslib);
+  construct_basis(basis, atoms, baslib);
   chkpt.write(basis);
 
-  /*
-  BasisSet pbasis;
-  construct_basis(pbasis,quantum_protons,pbaslib);
-  chkpt.write(pbasis,"pbasis");
-  */
+  printf(basis.get_m_values());
 
   // Classical nucleus repulsion energy
-  double Ecnucr=0.0;
-  for(size_t i=0;i<classical_nuclei.size();i++) {
+  double Enucr = 0.0;
+  for(size_t i = 0; i < classical_nuclei.size(); i++) {
     auto [Qi, xi, yi, zi] = classical_nuclei[i];
-    for(size_t j=0;j<i;j++) {
+    for(size_t j = 0; j < i; j++) {
       auto [Qj, xj, yj, zj] = classical_nuclei[j];
-      Ecnucr+=Qi*Qj/sqrt(std::pow(xi-xj,2)+std::pow(yi-yj,2)+std::pow(zi-zj,2));
+      Ecnucr += Qi * Qj / sqrt(std::pow(xi - xj, 2) + std::pow(yi - yj, 2) + std::pow(zi - zj, 2));
     }
   }
 
@@ -189,20 +152,28 @@ int main_guarded(int argc, char **argv) {
   BasisSet dfitbas;
   {
     // Construct fitting basis
-    bool uselm=settings.get_bool("UseLM");
-    settings.set_bool("UseLM",true);
-    construct_basis(dfitbas,basis.get_nuclei(),fitlib);
+    bool uselm = settings.get_bool("UseLM");
+    settings.set_bool("UseLM", true);
+    construct_basis(dfitbas,basis.get_nuclei(), fitlib);
     dfitbas.coulomb_normalize();
-    settings.set_bool("UseLM",uselm);
+    settings.set_bool("UseLM", uselm);
   }
   
   // Construct linearly independent basis
   arma::mat S(basis.overlap());
   arma::mat X(BasOrth(S));
 
+  // Calculate matrices
+
+  
+  
   // Guess Fock
   arma::mat Fguess(X.t() * (T) * X);
 
+  // Calculate density fitting integrals
+
+  // std::function electronic_terms{};
+  
   OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_fock_builder = [&X, &T](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
@@ -215,7 +186,7 @@ int main_guarded(int argc, char **argv) {
     arma::vec occa = occupations[0];
     arma::vec occb = occupations[1];
 
-    // Densirt matrices
+    // Density matrices
     arma::mat Pa, Pb;
     Pa = Ca * arma::diagmat(occa) * Ca.t();
     Pb = Cb * arma::diagmat(occb) * Cb.t();
