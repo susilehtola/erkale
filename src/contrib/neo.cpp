@@ -667,7 +667,8 @@ int main_guarded(int argc, char **argv) {
       arma::vec occa(Ca.n_cols,arma::fill::zeros);
       arma::vec occb(Cb.n_cols,arma::fill::zeros);
       occa.subvec(0,Nela-1).ones();
-      occb.subvec(0,Nelb-1).ones();
+      if(Nelb)
+        occb.subvec(0,Nelb-1).ones();
       std::vector<arma::vec> old_occs({occa, occb});
 
       electronic_dm = std::make_pair(old_orbs, old_occs);
@@ -688,7 +689,8 @@ int main_guarded(int argc, char **argv) {
       std::vector<arma::mat> orbs({C, C});
       std::vector<arma::vec> occs({arma::vec(C.n_cols,arma::fill::zeros), arma::vec(C.n_cols,arma::fill::zeros)});
       occs[0].subvec(0,Nela-1).ones();
-      occs[1].subvec(0,Nelb-1).ones();
+      if(Nelb)
+        occs[1].subvec(0,Nelb-1).ones();
       electronic_dm=std::make_pair(orbs,occs);
     }
   }
