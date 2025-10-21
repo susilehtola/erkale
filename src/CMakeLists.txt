@@ -216,7 +216,7 @@ add_subdirectory(basistool)
 add_subdirectory(external)
 
 # Compile the extra programs
-#add_subdirectory(contrib)
+add_subdirectory(contrib)
 
 # Recipe for compiling full ERIWorker file
 add_custom_command(
