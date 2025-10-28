@@ -29,6 +29,7 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
+#include "erichol.h"
 
 // Needed for libint init
 #include "eriworker.h"
@@ -105,6 +106,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 50);
   settings.add_string("SaveChk", "Checkpoint file to save to", "neo.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
+  settings.add_bool("FiniteProton", "Use a finite proton model", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -125,6 +127,8 @@ int main_guarded(int argc, char **argv) {
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
   std::string savechk = settings.get_string("SaveChk");
+  bool finiteproton = settings.get_bool("FiniteProton");
+  bool density_fitting = settings.get_bool("DensityFitting");
 
   Checkpoint chkpt(savechk,true);
 
@@ -198,19 +202,6 @@ int main_guarded(int argc, char **argv) {
     }
   }
 
-  // Construct density fitting basis set
-  BasisSetLibrary fitlib;
-  fitlib.load_basis(settings.get_string("FittingBasis"));
-  BasisSet dfitbas;
-  {
-    // Construct fitting basis
-    bool uselm=settings.get_bool("UseLM");
-    settings.set_bool("UseLM",true);
-    construct_basis(dfitbas,basis.get_nuclei(),fitlib);
-    dfitbas.coulomb_normalize();
-    settings.set_bool("UseLM",uselm);
-  }
-
   // Construct linearly independent basis
   arma::mat S(basis.overlap());
   arma::mat Sp(pbasis.overlap());
@@ -219,6 +210,66 @@ int main_guarded(int argc, char **argv) {
   arma::mat Xp;
   if(Sp.n_elem)
     Xp = BasOrth(Sp);
+
+  printf("Electronic basis contains %i functions out of which %i are linearly dependent.\n",(int) X.n_rows, (int) (X.n_rows-X.n_cols));
+  printf("Protonic basis contains %i functions out of which %i are linearly dependent.\n",(int) Xp.n_rows, (int) (Xp.n_rows-Xp.n_cols));
+
+  // Set up ERI evaluator data
+  double alpha = 1.0, beta = 0.0, omega = 0.0;
+  if(finiteproton) {
+    const double fwhm = 1.5900e-5; // 0.8414 fm = 1.5900e-5 bohr
+    double sigma = fwhm/sqrt(8.0*log(2.0));
+
+    alpha = 1.0;
+    beta = -1.0;
+    omega = 1.0/(sqrt(2.0)*sigma);
+    printf("Using finite protonic model with fwhm = %e bohr => omega = %e.\n",fwhm,omega);
+  }
+
+  // Construct density fitting basis set
+  BasisSetLibrary fitlib;
+  BasisSet dfitbas;
+  ERIchol chol, pchol;
+  DensityFit dfit, pfit;
+  size_t Npairs_p=0, Npairs_e=0;
+  bool direct=settings.get_bool("Direct");
+  double fitthr=settings.get_double("FittingThreshold");
+  double cholfitthr=settings.get_double("FittingCholeskyThreshold");
+
+  if(density_fitting) {
+    fitlib.load_basis(settings.get_string("FittingBasis"));
+    {
+      // Construct fitting basis
+      bool uselm=settings.get_bool("UseLM");
+      settings.set_bool("UseLM",true);
+      construct_basis(dfitbas,basis.get_nuclei(),fitlib);
+      dfitbas.coulomb_normalize();
+    settings.set_bool("UseLM",uselm);
+    }
+
+    if(finiteproton)
+      pfit.set_range_separation(omega, alpha, beta);
+    Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
+    if(Sp.n_elem)
+      Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
+
+    printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.get_Naux(),(int) (dfit.get_Naux()-dfit.get_Naux_indep()));
+    if(Sp.n_elem>0 and dfit.get_Naux() != pfit.get_Naux())
+      throw std::logic_error("Electronic and protonic density fitting basis sets don't have the same number of functions!\n");
+
+  } else {
+    double cholthr=settings.get_double("CholeskyThr");
+    double cholshthr=settings.get_double("CholeskyShThr");
+    double shtol=settings.get_double("IntegralThresh");
+    Npairs_e=chol.fill(basis,cholthr,cholshthr,shtol,verbose);
+    if(finiteproton)
+      pchol.set_range_separation(omega, alpha, beta);
+    Npairs_p=pchol.fill(pbasis,cholthr,cholshthr,shtol,verbose);
+  }
+
+  printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
+  printf("%i protonic shell pairs out of %i are significant.\n",(int) Npairs_p, (int) pbasis.get_unique_shellpairs().size());
+  fflush(stdout);
 
   // Calculate matrices
   arma::mat T(basis.kinetic());
@@ -253,27 +304,6 @@ int main_guarded(int argc, char **argv) {
   // Guess Fock
   arma::mat Fguess(X.t()*(T+Vfull+Vsap)*X);
 
-  // Compute density fitting integrals
-  bool direct=settings.get_bool("Direct");
-  double fitthr=settings.get_double("FittingThreshold");
-  double cholfitthr=settings.get_double("FittingCholeskyThreshold");
-
-  DensityFit dfit;
-  size_t Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
-  DensityFit pfit;
-  size_t Npairs_p=0;
-  if(Sp.n_elem)
-    Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
-
-  printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
-  printf("%i protonic shell pairs out of %i are significant.\n",(int) Npairs_p, (int) pbasis.get_unique_shellpairs().size());
-  printf("Electronic basis contains %i functions out of which %i are linearly dependent.\n",(int) X.n_rows, (int) (X.n_rows-X.n_cols));
-  printf("Protonic basis contains %i functions out of which %i are linearly dependent.\n",(int) Xp.n_rows, (int) (Xp.n_rows-Xp.n_cols));
-  printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.get_Naux(),(int) (dfit.get_Naux()-dfit.get_Naux_indep()));
-  fflush(stdout);
-  if(Sp.n_elem>0 and dfit.get_Naux() != pfit.get_Naux())
-    throw std::logic_error("Electronic and protonic density fitting basis sets don't have the same number of functions!\n");
-
   if(nstepwise==0 and quantum_protons.size()==0) {
     nstepwise=1;
   }
@@ -282,27 +312,177 @@ int main_guarded(int argc, char **argv) {
   arma::mat frozen_Jep(Tp.n_rows, Tp.n_cols, arma::fill::zeros);
   double frozen_Ee=0.0, frozen_Ep=0.0;
 
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&dfit, &fitmem](const arma::mat & C, const arma::vec & occs) {
+  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
-    arma::mat J(dfit.calcJ(P));
-    arma::mat K(-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem));
+    arma::mat J, K;
+    if(density_fitting) {
+      J=dfit.calcJ(P);
+      K=-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem);
+    } else {
+      J=chol.calcJ(P);
+      K=-chol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
+    }
     return std::make_pair(J,K);
   };
-  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [&pfit, &fitmem](const arma::mat & C, const arma::vec & occs) {
+  std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
-    arma::mat J(pfit.calcJ(P));
-    arma::mat K(-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem));
+    arma::mat J, K;
+    if(density_fitting) {
+      J=pfit.calcJ(P);
+      K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem);
+    } else {
+      J=pchol.calcJ(P);
+      K=-pchol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
+    }
     return std::make_pair(J,K);
   };
-  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb = [&dfit, &pfit](const arma::mat & Pe) {
+
+  std::function<arma::mat(const BasisSet &, const arma::mat &, const BasisSet &)> multicomponent_coulomb_tei = [&](const BasisSet & source_basis, const arma::mat & source_density, const BasisSet & target_basis) {
+    // Shells in the two basis sets
+    std::vector<GaussianShell> sshells=source_basis.get_shells();
+    std::vector<GaussianShell> tshells=target_basis.get_shells();
+
+    // Get shellpairs
+    arma::mat Qs, Qt, Ms, Mt;
+    double shtol=settings.get_double("IntegralThresh");
+    bool verbose=false;
+    auto spairs=source_basis.get_eripairs(Qs,Ms,shtol,omega,alpha,beta,verbose);
+    auto tpairs=target_basis.get_eripairs(Qt,Mt,shtol,omega,alpha,beta,verbose);
+
+    // Sanity check
+    if(source_density.n_rows != source_basis.get_Nbf() or source_density.n_cols != source_basis.get_Nbf())
+      throw std::logic_error("Density matrix does not correspond to basis set!\n");
+    // Target matrix
+    arma::mat Jt(target_basis.get_Nbf(), target_basis.get_Nbf(), arma::fill::zeros);
+
+    // Compute integrals
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+      // ERI worker
+      auto maxam = std::max(source_basis.get_max_am(),target_basis.get_max_am());
+      auto maxncontr = std::max(source_basis.get_max_Ncontr(), target_basis.get_max_Ncontr());
+      ERIWorker *eri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(maxam, maxncontr) : new ERIWorker_srlr(maxam,maxncontr,omega,alpha,beta);
+
+#ifndef _OPENMP
+      int ith=0;
+#else
+      int ith(omp_get_thread_num());
+#pragma omp for schedule(dynamic)
+#endif
+      for(size_t tp=0;tp<tpairs.size();tp++) {
+        // Shells on first pair
+        size_t it=tpairs[tp].is;
+        size_t jt=tpairs[tp].js;
+        // First functions on the first pair is
+        size_t it0=tpairs[tp].i0;
+        size_t jt0=tpairs[tp].j0;
+        // Number of functions
+        size_t Nti=tpairs[tp].Ni;
+        size_t Ntj=tpairs[tp].Nj;
+
+        // Target integral shell
+        arma::mat Jtij(Nti,Ntj,arma::fill::zeros);
+
+        for(size_t sp=0;sp<spairs.size();sp++) {
+          // and those on the second pair are analogously
+          size_t ks=spairs[sp].is;
+          size_t ls=spairs[sp].js;
+          size_t ks0=spairs[sp].i0;
+          size_t ls0=spairs[sp].j0;
+          size_t Nsk=spairs[sp].Ni;
+          size_t Nsl=spairs[sp].Nj;
+
+          // Schwarz screening estimate
+          double QQ=Qt(it,jt)*Qs(ks,ls);
+          if(QQ<shtol) {
+            // Skip due to small value of integral. Because the
+            // integrals have been ordered wrt Q, all the next ones
+            // will be small as well!
+            break;
+          }
+
+          // Compute integrals
+          eri->compute(&tshells[it],&tshells[jt],&sshells[ks],&sshells[ls]);
+
+          // Extract density
+          arma::mat Pskl = source_density.submat(ks0,ls0,ks0+Nsk-1,ls0+Nsl-1);
+
+          // Degeneracy factor
+          double fac=1.0;
+          if(ks!=ls)
+            fac=2.0;
+
+          // J_ij = (ij|kl) P_kl using matmul
+          arma::mat tei((double *)(eri->getp()->data()),Nsk*Nsl,Nti*Ntj,false,true);
+          arma::mat incr = fac*arma::vectorise(Pskl).t()*tei;
+          incr.reshape(Ntj,Nti);
+          Jtij += incr.t();
+
+          /*
+          arma::mat Jtest(Nti,Ntj,arma::fill::zeros);
+          const std::vector<double> & ints(*eri->getp());
+          // Increment matrix
+          for(size_t ii=0;ii<Nti;ii++)
+            for(size_t jj=0;jj<Ntj;jj++) {
+
+              // Matrix element
+              double el=0.0;
+              for(size_t kk=0;kk<Nsk;kk++)
+                for(size_t ll=0;ll<Nsl;ll++)
+                  el+=Pskl(kk,ll)*ints[((ii*Ntj+jj)*Nsk+kk)*Nsl+ll];
+
+              // Set the element
+              Jtest(ii,jj)+=fac*el;
+            }
+
+          // Check correctness
+          double dint = arma::max(arma::max(arma::abs(Jtest-Jtij)));
+          if(dint > 1e-5) {
+            printf("Error %e\n",dint);
+            Jtij.print("Jt");
+            Jtest.print("Jtest");
+          }
+          */
+        }
+
+        // Now that we've computed the block, store it in the full matrix
+        Jt.submat(it0,jt0,it0+Nti-1,jt0+Ntj-1) = Jtij;
+        if(it!=jt)
+          Jt.submat(jt0,it0,jt0+Ntj-1,it0+Nti-1) = arma::trans(Jtij);
+      }
+
+      delete eri;
+    }
+
+    return Jt;
+  };
+
+  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_ri = [&dfit, &pfit](const arma::mat & Pe) {
     arma::vec c(dfit.compute_expansion(Pe));
     arma::mat J=-pfit.calcJ_vector(c);
     return J;
   };
-  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb = [&dfit, &pfit](const arma::mat & Pp) {
+  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_exact = [&](const arma::mat & Pe) {
+    arma::mat J=-multicomponent_coulomb_tei(basis, Pe, pbasis);
+    return J;
+  };
+  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb = [&](const arma::mat & Pe) {
+    return density_fitting ? electron_proton_coulomb_ri(Pe) : electron_proton_coulomb_exact(Pe);
+  };
+
+  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_ri = [&dfit, &pfit](const arma::mat & Pp) {
     arma::vec c(pfit.compute_expansion(Pp));
     arma::mat J=-dfit.calcJ_vector(c);
     return J;
+  };
+  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb_exact = [&](const arma::mat & Pp) {
+    arma::mat J=-multicomponent_coulomb_tei(pbasis, Pp, basis);
+    return J;
+  };
+  std::function<arma::mat(const arma::mat & P)> proton_electron_coulomb = [&](const arma::mat & Pp) {
+    return density_fitting ? proton_electron_coulomb_ri(Pp) : proton_electron_coulomb_exact(Pp);
   };
 
   OpenOrbitalOptimizer::FockBuilder<double, double> restricted_builder = [&X, &T, &Vc, &dfit, electronic_terms, &Ecnucr, &verbosity, &frozen_Jpe, &frozen_Ep](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
@@ -723,8 +903,9 @@ int main_guarded(int argc, char **argv) {
         Pp += Cp * arma::diagmat(occp) * Cp.t();
       }
     }
-    if(quantum_protons.size())
+    if(quantum_protons.size()) {
       frozen_Jpe = proton_electron_coulomb(Pp);
+    }
 
     // Update the frozen proton energy
     if(quantum_protons.size()) {
