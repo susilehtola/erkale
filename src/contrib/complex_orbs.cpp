@@ -205,16 +205,17 @@ int main_guarded(int argc, char **argv) {
     arma::mat P(Nbf, Nbf, arma::fill::zeros);
     std::vector<arma::mat> fock(2 * maxam + 1);
     arma::mat J, K;
-    
+
     size_t imo=0;
     for (size_t m=0; m<X.size(); m++) {
       arma::mat Csub = X[m]*orbitals[m];
-      arma::vec occs = occupations[m];
-      P(m_indices[m], m_indices[m]) = Csub * arma::diagmat(occs) * Csub;
-      std::tie(J, K) = electronic_terms(P(m_indices[m], m_indices[m]), occs);
+      occs(m_indices[m]) = occupations[m];
+      P(m_indices[m], m_indices[m]) = Csub * arma::diagmat(occs(m_indices[m])) * Csub.t();
+      C(m_indices[m], m_indices[m]) = Csub;
+      std::tie(J, K) = electronic_terms(C, occs);
 
       // Form the Fock matrices
-      arma::mat F = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + J + K) * X[m];
+      arma::mat F = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + J(m_indices[m], m_indices[m]) + .5 * K(m_indices[m], m_indices[m])) * X[m];
       
       fock[m] = F;
     }
@@ -237,7 +238,7 @@ int main_guarded(int argc, char **argv) {
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * J);
-    double Eexch = 0.5 * arma::trace(P * K);
+    double Eexch = 0.25 * arma::trace(P * K);
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr;
 
     if(verbosity >= 10) {
@@ -351,8 +352,8 @@ int main_guarded(int argc, char **argv) {
     const OpenOrbitalOptimizer::OrbitalOccupations<double> & occupations = dm.second;
     if (M == 1) {
       for (size_t m=0; m<X.size(); m++) {
-	arma::mat C = X[m] * orbitals[0];
-	arma::vec E = arma::diagvec(orbitals[0].t() * fock[0][m] * orbitals[0]);
+	arma::mat C = X[m] * orbitals[m];
+	arma::vec E = arma::diagvec(orbitals[m].t() * fock[m] * orbitals[m]);
 	chkpt.write("C", C);
 	chkpt.write("E", E);
       }
@@ -484,7 +485,7 @@ int main_guarded(int argc, char **argv) {
       fock_builder = unrestricted_fock_builder;
     }
 
-    printf("\n\n\nIteration %i: solving electronic SCF\n", istep);
+    printf("\n\n\nSolving SCF\n");
     OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
     scfsolver.initialize_with_fock(Fguess);
     scfsolver.error_norm(error_norm);
