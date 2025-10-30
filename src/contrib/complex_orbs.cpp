@@ -78,7 +78,7 @@ int main_guarded(int argc, char **argv) {
   t.print_time();
 
   settings.add_scf_settings();
-  settings.add_int("StepwiseSCFIter", "Number of stepwise SCF macroiterations, 0 to skip to simultaneous solution", 0);
+  settings.add_int("StepwiseSCFIter", "Number of stepwise SCF macroiterations, 0 to skip to simultaneous solution", 1);
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
   settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
   settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
@@ -187,52 +187,35 @@ int main_guarded(int argc, char **argv) {
   DensityFit dfit;
   size_t Npairs = dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
 
-  std::function<std::pair<arma::mat, arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&dfit, &fitmem](const arma::mat & C, const arma::vec & occs) {
-	
-	arma::mat P(C * arma::diagmat(occs) * C.t());
-	arma::mat J(dfit.calcJ(P));
-	arma::mat K(-dfit.calcK(C, arma::conv_to<std::vector<double>>::from(occs), fitmem));
-
-	return std::make_pair(J, K);
+  std::function<std::vector<arma::mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
+    arma::vec occs(Nmo, arma::fill::zeros);
+    arma::mat C(Nbf, Nmo, arma::fill::zeros);
+    arma::mat P(Nbf, Nbf, arma::fill::zeros);
+    for (size_t m=0; m<X.size(); m++) {
+      arma::mat Csub = X[m]*orbitals[m];
+      occs(m_indices[m]) += occupations[m];
+      P(m_indices[m], m_indices[m]) = Csub * arma::diagmat(occs(m_indices[m])) * Csub.t();
+      C(m_indices[m], m_indices[m]) = Csub;
+    }
+    arma::mat J(dfit.calcJ(P));
+    arma::mat K(-dfit.calcK(C, arma::conv_to<std::vector<double>>::from(occs), fitmem));
+    std::vector terms = {P, J, K};
+    return terms;
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_fock_builder = [&X, &T, &V, &dfit, electronic_terms, &Enucr, &verbosity, &maxam, &Nbf, &Nmo, &m_indices](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
-    arma::mat C(Nbf, Nmo, arma::fill::zeros);
-    arma::vec occs(Nmo, arma::fill::zeros);    
-    arma::mat P(Nbf, Nbf, arma::fill::zeros);
     std::vector<arma::mat> fock(2 * maxam + 1);
-    arma::mat J, K;
+    arma::mat P(electronic_terms(orbitals, occupations)[0]);
+    arma::mat J(electronic_terms(orbitals, occupations)[1]);
+    arma::mat K(electronic_terms(orbitals, occupations)[2]);
 
-    size_t imo=0;
+    // Form the Fock matrices
     for (size_t m=0; m<X.size(); m++) {
-      arma::mat Csub = X[m]*orbitals[m];
-      occs(m_indices[m]) = occupations[m];
-      P(m_indices[m], m_indices[m]) = Csub * arma::diagmat(occs(m_indices[m])) * Csub.t();
-      C(m_indices[m], m_indices[m]) = Csub;
-      std::tie(J, K) = electronic_terms(C, occs);
-
-      // Form the Fock matrices
-      arma::mat F = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + J(m_indices[m], m_indices[m]) + .5 * K(m_indices[m], m_indices[m])) * X[m];
-      
-      fock[m] = F;
+      fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + J(m_indices[m], m_indices[m]) + .5 * K(m_indices[m], m_indices[m])) * X[m];
     }
-
-    /* Get the electronic orbital coefficients
-    arma::mat C = X * orbitals[0];
-
-    // and occupations
-    arma::vec occ = occupations[0];
-
-    // Density matrices
-    arma::mat P;
-    P = C * arma::diagmat(occ) * C.t();
-    */
-
-    // Compute the terms in the Fock matrices
-    
 
     // Compute energy terms
     double Ekin = arma::trace(P * T);
@@ -254,64 +237,24 @@ int main_guarded(int argc, char **argv) {
   }; //restrcted Fock builder
 
   
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_fock_builder = [&X, &T, &V, &dfit, electronic_terms, &Enucr, &verbosity, &maxam, &Nbf, &Nmo, &m_indices](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
-    arma::mat Ca(Nbf, Nmo, arma::fill::zeros);
-    arma::mat Cb(Nbf, Nmo, arma::fill::zeros);
-    arma::vec occa(Nmo, arma::fill::zeros);
-    arma::vec occb(Nmo, arma::fill::zeros);
-    arma::mat Pa(Nbf, Nbf, arma::fill::zeros);
-    arma::mat Pb(Nbf, Nbf, arma::fill::zeros);
     std::vector<arma::mat> fock(4 * maxam + 2);
-    arma::mat Ja, Ka, Jb, Kb;
+    arma::mat Pa(electronic_terms(orbitals, occupations)[0]);
+    arma::mat Ja(electronic_terms(orbitals, occupations)[1]);
+    arma::mat Ka(electronic_terms(orbitals, occupations)[2]);
+    arma::mat Pb(electronic_terms(orbitals, occupations)[0]);
+    arma::mat Jb(electronic_terms(orbitals, occupations)[1]);
+    arma::mat Kb(electronic_terms(orbitals, occupations)[2]);
+    arma::mat P = Pa + Pb;
     
-    size_t imo=0;
-    for (size_t m=0; m<X.size(); m++) {
-      arma::mat Casub = X[m]*orbitals[0][m];
-      arma::mat Cbsub = X[m]*orbitals[1][m];
-      arma::vec occa = occupations[m];
-      arma::vec occb = occupations[m];
-      Pa(m_indices[m], m_indices[m]) = Casub * arma::diagmat(occa) * Casub;
-      Pb(m_indices[m], m_indices[m]) = Cbsub * arma::diagmat(occb) * Cbsub;
-
-      std::tie(Ja, Ka) = electronic_terms(Pa(m_indices[m], m_indices[m]), occa);
-      std::tie(Jb, Kb) = electronic_terms(Pb(m_indices[m], m_indices[m]), occb);
-
-      // Form the Fock matrices
-      arma::mat Fa = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m])+ Ja + Ka) * X[m];
-      arma::mat Fb = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m])+ Jb + Kb) * X[m];
-
-      fock[m] = Fa;
-      fock[maxam + m] = Fb;
-    }
-
-    /* Get the electronic orbital coefficients
-    arma::mat Ca = X * orbitals[0];
-    arma::mat Cb = X * orbitals[1];
-
-    // and occupations
-    arma::vec occa = occupations[0];
-    arma::vec occb = occupations[1];
-
-    // Density matrices
-    arma::mat Pa, Pb;
-    Pa = Ca * arma::diagmat(occa) * Ca.t();
-    Pb = Cb * arma::diagmat(occb) * Cb.t();
-    arma::mat P = Pa + Pb;
-
-    // Compute the terms in the Fock matrices
-    arma::mat Ja, Jb, Ka, Kb;
-
     // Form the Fock matrices
-    arma::mat Fa = X.t() * (T + V + Ja + Jb + Ka) * X;
-    arma::mat Fb = X.t() * (T + V + Ja + Jb + Kb) * X;
-
-    std::vector<arma::mat> fock({Fa, Fb});
-    */
-
-    arma::mat P = Pa + Pb;
+    for (size_t m=0; m<X.size(); m++) {
+      fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Ka(m_indices[m], m_indices[m])) * X[m];
+      fock[X.size() + m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Kb(m_indices[m], m_indices[m])) * X[m];
+    }
     
     // Compute energy terms
     double Ekin = arma::trace(P * T);
@@ -347,7 +290,7 @@ int main_guarded(int argc, char **argv) {
 
 
   // Save matrices to disk
-  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double, double> &, const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&chkpt, &M, &X, &m_indices](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm, const OpenOrbitalOptimizer::FockMatrix<double> fock) {
+  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double, double> &, const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm, const OpenOrbitalOptimizer::FockMatrix<double> fock) {
     const OpenOrbitalOptimizer::Orbitals<double> & orbitals = dm.first;
     const OpenOrbitalOptimizer::OrbitalOccupations<double> & occupations = dm.second;
     if (M == 1) {
