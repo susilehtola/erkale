@@ -175,9 +175,13 @@ int main_guarded(int argc, char **argv) {
   size_t Nbf = basis.get_Nbf();
 
   // Guess Fock
-  std::vector<arma::mat> Fguess(2*maxam+1);
-  for (size_t m=0; m<X.size(); m++)
+  bool unrestricted = M - 1;
+  std::vector<arma::mat> Fguess((1 + unrestricted) * (2 * maxam + 1));
+  for (size_t m=0; m<X.size(); m++) {
     Fguess[m] = X[m].t() * fock_terms(m_indices[m], m_indices[m]) * X[m];
+    if (unrestricted)
+      Fguess[X.size() + m] = X[m].t() * fock_terms(m_indices[m], m_indices[m]) * X[m];
+  }
 
   // Calculate density fitting integrals
   bool direct = settings.get_bool("Direct");
@@ -187,16 +191,35 @@ int main_guarded(int argc, char **argv) {
   DensityFit dfit;
   size_t Npairs = dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
 
-  std::function<std::vector<arma::mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
+  std::function<std::pair<arma::mat,arma::vec>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> collect_orbitals = [&](const auto & orbitals, const auto & occupations) {
     arma::vec occs(Nmo, arma::fill::zeros);
     arma::mat C(Nbf, Nmo, arma::fill::zeros);
-    arma::mat P(Nbf, Nbf, arma::fill::zeros);
+    size_t imo=0;
     for (size_t m=0; m<X.size(); m++) {
       arma::mat Csub = X[m]*orbitals[m];
-      occs(m_indices[m]) += occupations[m];
-      P(m_indices[m], m_indices[m]) = Csub * arma::diagmat(occs(m_indices[m])) * Csub.t();
-      C(m_indices[m], m_indices[m]) = Csub;
+      arma::mat Cpad(Nbf,X[m].n_cols,arma::fill::zeros);
+      Cpad.rows(m_indices[m]) = Csub;
+      
+      occs.subvec(imo,imo+X[m].n_cols-1) = occupations[m];
+      C.cols(imo,imo+X[m].n_cols-1) = Cpad;
+      imo += X[m].n_cols;
     }
+    if(imo != Nmo)
+      throw std::logic_error("Indexing problem\n");
+    return std::make_pair(C,occs);
+  };
+  
+  std::function<std::vector<arma::mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
+    arma::mat C;
+    arma::vec occs;
+    std::tie(C,occs) = collect_orbitals(orbitals,occupations);
+
+    /*for (size_t m=0; m<orbitals.size(); m++)
+      std::cout << orbitals[m] << std::endl;
+    printf("!\n");
+    for (size_t m=0; m<occupations.size(); m++)
+    std::cout << occupations[m] << std::endl;*/
+    arma::mat P = C*arma::diagmat(occs)*C;
     arma::mat J(dfit.calcJ(P));
     arma::mat K(-dfit.calcK(C, arma::conv_to<std::vector<double>>::from(occs), fitmem));
     std::vector terms = {P, J, K};
@@ -284,10 +307,8 @@ int main_guarded(int argc, char **argv) {
   if (Nelb > Nela)
     throw std::logic_error("Nelb > Nela, check your charge and multiplicity!\n");
 
-
   // Density matrix
   OpenOrbitalOptimizer::DensityMatrix<double, double> dm;
-
 
   // Save matrices to disk
   std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double, double> &, const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm, const OpenOrbitalOptimizer::FockMatrix<double> fock) {
@@ -302,10 +323,10 @@ int main_guarded(int argc, char **argv) {
       }
     } else {
       for (size_t m=0; m<X.size(); m++) {
-	arma::mat Ca = X[m] * orbitals[0];
-	arma::mat Cb = X[m] * orbitals[1];
-	arma::vec Ea = arma::diagvec(orbitals[0].t() * fock[0][m] * orbitals[0]);
-	arma::vec Eb = arma::diagvec(orbitals[1].t() * fock[1][m] * orbitals[1]);
+	arma::mat Ca = X[m] * orbitals[m];
+	arma::mat Cb = X[m] * orbitals[m];
+	arma::vec Ea = arma::diagvec(orbitals[m].t() * fock[0][m] * orbitals[0]);
+	arma::vec Eb = arma::diagvec(orbitals[m].t() * fock[1][m] * orbitals[1]);
 	chkpt.write("Ca", Ca);
 	chkpt.write("Cb", Cb);
 	chkpt.write("Ea", Ea);
@@ -313,88 +334,6 @@ int main_guarded(int argc, char **argv) {
       }
     }
   }; // Save density matrix to disk
-
-  // Set up electronic guess
-  if (loadchk != "") {
-    Checkpoint load(loadchk, false);
-
-    BasisSet oldbasis;
-    load.read(oldbasis);
-
-    std::vector<arma::mat> old_orbs;
-    
-    if (M == 1) {
-      for (size_t m=0; m<X.size(); m++) {
-	arma::mat oldC, C;
-	load.read("C", oldC);
-	C = arma::trans(X[m]) * basis.overlap(oldbasis) * oldC;
-	if (C.n_rows < C.n_cols) {
-	  C = C.cols(0, Nela - 1);
-	}
-	old_orbs.push_back(C);
-
-	// Occupations
-	arma::vec occ(C.n_cols, arma::fill::zeros);
-	occ.subvec(0, Nela - 1).ones();
-	occ *= 2.0;
-	std::vector<arma::vec> old_occs({occ});
-
-	dm = std::make_pair(old_orbs, old_occs);
-      }
-      
-    } else {
-      for (size_t m=0; m<X.size(); m++) {
-	arma::mat oldCa, oldCb, Ca, Cb;
-	load.read("Ca", oldCa);
-	load.read("Cb", oldCb);
-
-	Ca = arma::trans(X[m]) * basis.overlap(oldbasis) * oldCa;
-	Cb = arma::trans(X[m]) * basis.overlap(oldbasis) * oldCb;
-	if (Ca.n_rows < Ca.n_cols) {
-	  Ca = Ca.cols(0, Nela - 1);
-	  if(Nelb)
-	    Cb = Cb.cols(0, Nelb - 1);
-	}
-	old_orbs.push_back(Ca);
-	old_orbs.push_back(Cb);
-
-      // Occupations
-      arma::vec occa(Ca.n_cols, arma::fill::zeros);
-      arma::vec occb(Cb.n_cols, arma::fill::zeros);
-      occa.subvec(0, Nela - 1).ones();
-      if(Nelb)
-	occb.subvec(0, Nelb - 1).ones();
-      std::vector<arma::vec> old_occs({occa, occb});
-
-      dm = std::make_pair(old_orbs, old_occs);
-      }
-    }
-  } else {//if loadchk
-    // Guess from SAP
-    // Core guess ?
-    for (size_t m=0; m<X.size(); m++) {
-      arma::vec E;
-      arma::mat C;
-      arma::eig_sym(E, C, Fguess[m]);
-
-      if (M == 1) {
-	std::vector<arma::mat> orbs({C});
-	std::vector<arma::vec> occs({arma::vec(C.n_cols, arma::fill::zeros)});
-	occs[0].subvec(0, Nela - 1).ones();
-	occs[0] *= 2;
-	dm = std::make_pair(orbs, occs);
-      } else {
-	std::vector<arma::mat> orbs({C, C});
-	std::vector<arma::vec> occs({arma::vec(C.n_cols, arma::fill::zeros), arma::vec(C.n_cols, arma::fill::zeros)});
-	occs[0].subvec(0, Nela - 1).ones();
-	if(Nelb)
-	  occs[1].subvec(0, Nelb - 1).ones();
-	dm = std::make_pair(orbs, occs);
-      }
-    }
-  }
-
-  double Eold = 0.0;
 
   // Data for SCF solver
   int nblocks = Fguess.size();
@@ -404,51 +343,44 @@ int main_guarded(int argc, char **argv) {
   std::vector<std::string> block_descriptions;
   OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder;
   
-  for (size_t istep = 0; istep < nstepwise; istep++) {
-    // Run SCF
-    if (M == 1) {
-      number_of_blocks_per_particle_type = {nblocks};
-      maximum_occupation.set_size(nblocks).fill(2.0);
-      number_of_particles = {(double) (Nel)};
-      for (int k=0; k<nblocks; k++) {
-	std::string str = std::to_string(k - maxam);
+  // Run SCF
+  if (M == 1) {
+    number_of_blocks_per_particle_type = {nblocks};
+    maximum_occupation.set_size(nblocks).fill(2.0);
+    number_of_particles = {(double) (Nel)};
+    for (int k=0; k<nblocks; k++) {
+      std::string str = "m=" + std::to_string(k - maxam);
+      block_descriptions.push_back(str);
+    }
+    fock_builder = restricted_fock_builder;
+  } else {
+    number_of_blocks_per_particle_type = {nblocks / 2, nblocks / 2};
+    maximum_occupation.set_size(nblocks).fill(1.0);
+    number_of_particles = {(double) (Nela), (double) (Nelb)};
+    for (int l=0; l<2; l++) {
+      for (int k=0; k<nblocks / 2; k++) {
+	std::string str = "m=" + std::to_string(k - maxam);
 	block_descriptions.push_back(str);
       }
-      fock_builder = restricted_fock_builder;
-    } else {
-      number_of_blocks_per_particle_type = {nblocks, nblocks};
-      maximum_occupation.set_size(2 * nblocks).fill(1.0);
-      number_of_particles = {(double) (Nela), (double) (Nelb)};
-      for (int l=0; l<2; l++) {
-	for (int k=0; k<nblocks; k++) {
-	  std::string str = std::to_string(k - maxam);
-	  block_descriptions.push_back(str);
-	}
-      }
-      fock_builder = unrestricted_fock_builder;
     }
-
-    printf("\n\n\nSolving SCF\n");
-    OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
-    scfsolver.initialize_with_fock(Fguess);
-    scfsolver.error_norm(error_norm);
-    scfsolver.convergence_threshold(convergence_threshold);
-    scfsolver.verbosity(verbosity);
-    scfsolver.maximum_iterations(maxinititer);
-    scfsolver.maximum_history_length(diisorder);
-    scfsolver.run();
-
-    // Grad the new density matrix
-    dm = scfsolver.get_solution();
-    save_matrices(dm, scfsolver.get_fock_matrix());
-
-    double Enew = scfsolver.get_energy();
-    if (std::abs(Enew - Eold) < init_convergence_threshold) {
-      printf("SCF converged: energy changed by %e from last iterations.\n", Enew - Eold);
-      break;
-    }
-    Eold = Enew;
+    fock_builder = unrestricted_fock_builder;
   }
+  
+  printf("\n\n\nSolving SCF\n");
+  OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
+  scfsolver.initialize_with_fock(Fguess);
+  scfsolver.error_norm(error_norm);
+  scfsolver.convergence_threshold(convergence_threshold);
+  scfsolver.verbosity(verbosity);
+  scfsolver.maximum_iterations(maxinititer);
+  scfsolver.maximum_history_length(diisorder);
+  scfsolver.run();
+
+  //dm = scfsolver.get_solution();
+  //save_matrices(dm, scfsolver.get_fock_matrix());
+  
+  double E = scfsolver.get_energy();
+  printf("SCF converged: energy is %e.\n", E);
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
   return 0;
