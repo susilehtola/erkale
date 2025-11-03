@@ -219,7 +219,7 @@ int main_guarded(int argc, char **argv) {
     printf("!\n");
     for (size_t m=0; m<occupations.size(); m++)
     std::cout << occupations[m] << std::endl;*/
-    arma::mat P = C*arma::diagmat(occs)*C;
+    arma::mat P = C*arma::diagmat(occs)*C.t();
     arma::mat J(dfit.calcJ(P));
     arma::mat K(-dfit.calcK(C, arma::conv_to<std::vector<double>>::from(occs), fitmem));
     std::vector terms = {P, J, K};
