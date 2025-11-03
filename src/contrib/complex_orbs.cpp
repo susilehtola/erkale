@@ -231,9 +231,10 @@ int main_guarded(int argc, char **argv) {
     const auto & occupations = dm.second;
 
     std::vector<arma::mat> fock(2 * maxam + 1);
-    arma::mat P(electronic_terms(orbitals, occupations)[0]);
-    arma::mat J(electronic_terms(orbitals, occupations)[1]);
-    arma::mat K(electronic_terms(orbitals, occupations)[2]);
+    std::vector<arma::mat> el_terms(electronic_terms(orbitals, occupations));
+    arma::mat P(el_terms[0]);
+    arma::mat J(el_terms[1]);
+    arma::mat K(el_terms[2]);
 
     // Form the Fock matrices
     for (size_t m=0; m<X.size(); m++) {
@@ -265,12 +266,13 @@ int main_guarded(int argc, char **argv) {
     const auto & occupations = dm.second;
 
     std::vector<arma::mat> fock(4 * maxam + 2);
-    arma::mat Pa(electronic_terms(orbitals, occupations)[0]);
-    arma::mat Ja(electronic_terms(orbitals, occupations)[1]);
-    arma::mat Ka(electronic_terms(orbitals, occupations)[2]);
-    arma::mat Pb(electronic_terms(orbitals, occupations)[0]);
-    arma::mat Jb(electronic_terms(orbitals, occupations)[1]);
-    arma::mat Kb(electronic_terms(orbitals, occupations)[2]);
+    std::vector<arma::mat> el_terms(electronic_terms(orbitals, occupations));
+    arma::mat Pa(el_terms[0]);
+    arma::mat Ja(el_terms[1]);
+    arma::mat Ka(el_terms[2]);
+    arma::mat Pb(el_terms[0]);
+    arma::mat Jb(el_terms[1]);
+    arma::mat Kb(el_terms[2]);
     arma::mat P = Pa + Pb;
     
     // Form the Fock matrices
