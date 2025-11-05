@@ -262,19 +262,36 @@ int main_guarded(int argc, char **argv) {
 
   
   OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
-
     std::vector<arma::mat> fock(4 * maxam + 2);
-    std::vector<arma::mat> el_terms(electronic_terms(orbitals, occupations));
-    arma::mat Pa(el_terms[0]);
-    arma::mat Ja(el_terms[1]);
-    arma::mat Ka(el_terms[2]);
-    arma::mat Pb(el_terms[0]);
-    arma::mat Jb(el_terms[1]);
-    arma::mat Kb(el_terms[2]);
+
+    // Alpha electrons
+    std::vector<arma::mat> a_orbs;
+    std::vector<arma::vec> a_occs;
+    for (size_t i = 0; i < occupations.size() / 2; i++) {
+      a_orbs.push_back(orbitals[i]);
+      a_occs.push_back(occupations[i]);
+    }
+    std::vector<arma::mat> a_el_terms(electronic_terms(a_orbs, a_occs));
+    arma::mat Pa(a_el_terms[0]);
+    arma::mat Ja(a_el_terms[1]);
+    arma::mat Ka(a_el_terms[2]);
+
+    // Beta electrons
+    std::vector<arma::mat> b_orbs;
+    std::vector<arma::vec> b_occs;
+    for (size_t i = occupations.size() / 2; i < occupations.size(); i++) {
+      b_orbs.push_back(orbitals[i]);
+      b_occs.push_back(occupations[i]);
+    }
+    std::vector<arma::mat> b_el_terms(electronic_terms(b_orbs, b_occs));
+    arma::mat Pb(b_el_terms[0]);
+    arma::mat Jb(b_el_terms[1]);
+    arma::mat Kb(b_el_terms[2]);
     arma::mat P = Pa + Pb;
-    
+
     // Form the Fock matrices
     for (size_t m=0; m<X.size(); m++) {
       fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Ka(m_indices[m], m_indices[m])) * X[m];
