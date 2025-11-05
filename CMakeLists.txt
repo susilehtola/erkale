@@ -70,6 +70,8 @@ endif()
 # Find cat
 find_program(CAT cat)
 
+include_directories("/home/abhugo/research/complex-basis/build/OpenOrbitalOptimizer")
+
 # Find LAPACK
 find_package(LAPACK REQUIRED)
 message("LAPACK headers are in ${LAPACK_INCLUDE_DIRS}")
