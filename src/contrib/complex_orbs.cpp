@@ -78,9 +78,7 @@ int main_guarded(int argc, char **argv) {
   t.print_time();
 
   settings.add_scf_settings();
-  settings.add_int("StepwiseSCFIter", "Number of stepwise SCF macroiterations, 0 to skip to simultaneous solution", 1);
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
-  settings.add_double("ProtonMass", "Protonic mass", 1836.15267389);
   settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 50);
@@ -93,15 +91,10 @@ int main_guarded(int argc, char **argv) {
   int Q = settings.get_int("Charge");
   int M = settings.get_int("Multiplicity");
   int verbosity = settings.get_int("Verbosity");
-  int maxiter = settings.get_int("MaxIter");
   int maxinititer = settings.get_int("MaxInitIter");
   int diisorder = settings.get_int("DIISOrder");
-  double proton_mass = settings.get_double("ProtonMass");
   double intthr = settings.get_double("IntegralThresh");
-  double init_convergence_threshold = settings.get_double("InitConvThr");
   double convergence_threshold = settings.get_double("ConvThr");
-  bool verbose = settings.get_bool("Verbose");
-  int nstepwise = settings.get_int("StepwiseSCFIter");
   size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
@@ -332,7 +325,6 @@ int main_guarded(int argc, char **argv) {
   // Save matrices to disk
   std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double, double> &, const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm, const OpenOrbitalOptimizer::FockMatrix<double> fock) {
     const OpenOrbitalOptimizer::Orbitals<double> & orbitals = dm.first;
-    const OpenOrbitalOptimizer::OrbitalOccupations<double> & occupations = dm.second;
     if (M == 1) {
       for (size_t m=0; m<X.size(); m++) {
 	arma::mat C = X[m] * orbitals[m];
