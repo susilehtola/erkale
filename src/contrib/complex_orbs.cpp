@@ -98,7 +98,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
   settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
-  settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 50);
+  settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 100);
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("Complexbas", "Use complex basis?", false);
@@ -154,7 +154,8 @@ int main_guarded(int argc, char **argv) {
   construct_basis(basis, atoms, baslib);
   chkpt.write(basis);
 
-  int maxam=basis.get_max_am();
+  int maxam = basis.get_max_am();
+  auto mvals = basis.get_m_values();
   std::vector<arma::uvec> m_indices(2*maxam+1);
   for (int m = -maxam; m <= maxam; m++) {
     m_indices[m+maxam]=basis.m_indices(m);
@@ -219,6 +220,17 @@ int main_guarded(int argc, char **argv) {
   DensityFit dfit;
   size_t Npairs = dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
 
+  int Nel = basis.Ztot() - Q;
+  int Nela = (Nel + M - 1) / 2;
+  int Nelb = Nel - Nela;
+  printf("Nela = %i Nelb = %i\n", Nela, Nelb);
+  if (Nela < 0 or Nelb < 0)
+    throw std::logic_error("Negative number of electrons!\n");
+  if (Nelb > Nela)
+    throw std::logic_error("Nelb > Nela, check your charge and multiplicity!\n");
+
+
+
   // Force occupations?
   arma::mat linoccs;
   linoccs.load(linoccfname,arma::raw_ascii);
@@ -264,11 +276,7 @@ int main_guarded(int argc, char **argv) {
       arma::mat Cpad(Nbf,X[m].n_cols,arma::fill::zeros);
       Cpad.rows(m_indices[m]) = Csub;
 
-      //if (readlinocc)
-      //occs.subvec(imo, imo + X[m].n_cols - 1) = set_occupations(occnum[m], m);
-      //else
       occs.subvec(imo, imo + X[m].n_cols - 1) = occupations[m];
-      //std::cout << m << std::endl << occupations[m] << std::endl << occs << std::endl;
       C.cols(imo,imo+X[m].n_cols-1) = Cpad;
       imo += X[m].n_cols;
     }
@@ -277,7 +285,7 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(C,occs);
   };
 
-  std::function<std::vector<arma::mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations, const arma::vec & occnum)> electronic_terms = [&](const auto & orbitals, const auto & occupations, const arma::vec & occnum) {
+  std::function<std::tuple<arma::mat, arma::mat, arma::mat, arma::mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations, const arma::vec & occnum)> electronic_terms = [&](const auto & orbitals, const auto & occupations, const arma::vec & occnum) {
     arma::mat C;
     arma::vec occs;
     std::tie(C,occs) = collect_orbitals(orbitals, occupations, occnum);
@@ -285,8 +293,18 @@ int main_guarded(int argc, char **argv) {
     arma::mat P = C*arma::diagmat(occs)*C.t();
     arma::mat J(dfit.calcJ(P));
     arma::mat K(-dfit.calcK(C, arma::conv_to<std::vector<double>>::from(occs), fitmem));
-    std::vector terms = {P, J, K};
-    return terms;
+    arma::mat B(P.n_rows, P.n_cols, arma::fill::zeros);
+    if (linB) {
+      double cenx = 0.0, ceny = 0.0, cenz = 0.0;
+      std::vector<arma::mat> momstack = basis.moment(2, cenx, ceny, cenz);
+      arma::mat xymat = momstack[getind(2, 0, 0)] + momstack[getind(0, 2, 0)];
+      for (size_t i = 0; i < B.n_rows; i++) {
+	for (size_t j = 0; j < B.n_rows; j++) {
+	  B(i, j) += -0.5 * linB * mvals(j) * S(i, j) + linB * linB * xymat(i, j) / 8.0;
+	}
+      }
+    }
+    return std::make_tuple(P, J, K, B);
   };
 
   OpenOrbitalOptimizer::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
@@ -297,14 +315,12 @@ int main_guarded(int argc, char **argv) {
       setocc = occnuma + occnumb;
 
     std::vector<arma::mat> fock(2 * maxam + 1);
-    std::vector<arma::mat> el_terms(electronic_terms(orbitals, occupations, setocc));
-    arma::mat P(el_terms[0]);
-    arma::mat J(el_terms[1]);
-    arma::mat K(el_terms[2]);
-
+    arma::mat P, J, K, B;
+    std::tie(P, J, K, B) = electronic_terms(orbitals, occupations, setocc);
+    
     // Form the Fock matrices
     for (size_t m=0; m<X.size(); m++)
-      fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + J(m_indices[m], m_indices[m]) + .5 * K(m_indices[m], m_indices[m])) * X[m];
+      fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + B(m_indices[m], m_indices[m]) + J(m_indices[m], m_indices[m]) + .5 * K(m_indices[m], m_indices[m])) * X[m];
     if (complexbas) {
       for (size_t m=0; m<X.size(); m++) {
 	fock[m] = arma::real(D(m_indices[m], m_indices[m]).t() * fock[m] * D(m_indices[m], m_indices[m]));
@@ -316,15 +332,17 @@ int main_guarded(int argc, char **argv) {
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * J);
     double Eexch = 0.25 * arma::trace(P * K);
-    double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr;
+    double Emag = arma::trace(P * B);
+    double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
     if(verbosity >= 10) {
-      printf("e kinetic energy         % .10f\n", Ekin);
-      printf("e nuclear attraction     % .10f\n", Enuc);
-      printf("e-e Coulomb energy       % .10f\n", Ecoul);
-      printf("e-e exchange energy      % .10f\n", Eexch);
-      printf("nuclear repulsion energy % .10f\n", Enucr);
-      printf("Total energy             % .10f\n", Etot);
+      printf("e kinetic energy            % .10f\n", Ekin);
+      printf("e nuclear attraction        % .10f\n", Enuc);
+      printf("e-e Coulomb energy          % .10f\n", Ecoul);
+      printf("e-e exchange energy         % .10f\n", Eexch);
+      printf("nuclear repulsion energy    % .10f\n", Enucr);
+      printf("magnetic interaction energy % .10f\n", Emag);
+      printf("Total energy                % .10f\n", Etot);
     }
 
     return std::make_pair(Etot, fock);
@@ -346,11 +364,9 @@ int main_guarded(int argc, char **argv) {
     }
     arma::vec setocca;
     if (readlinocc)
-      setocca = occnuma; 
-    std::vector<arma::mat> a_el_terms(electronic_terms(a_orbs, a_occs, setocca));
-    arma::mat Pa(a_el_terms[0]);
-    arma::mat Ja(a_el_terms[1]);
-    arma::mat Ka(a_el_terms[2]);
+      setocca = occnuma;
+    arma::mat Pa, Ja, Ka, Ba;
+    std::tie(Pa, Ja, Ka, Ba) = electronic_terms(a_orbs, a_occs, setocca);
 
     // Beta electrons
     std::vector<arma::mat> b_orbs;
@@ -361,17 +377,19 @@ int main_guarded(int argc, char **argv) {
     }
     arma::vec setoccb;
     if (readlinocc)
-      setoccb = occnumb; 
-    std::vector<arma::mat> b_el_terms(electronic_terms(b_orbs, b_occs, setoccb));
-    arma::mat Pb(b_el_terms[0]);
-    arma::mat Jb(b_el_terms[1]);
-    arma::mat Kb(b_el_terms[2]);
+      setoccb = occnumb;
+    arma::mat Pb, Jb, Kb, Bb;
+    std::tie(Pb, Jb, Kb, Bb) = electronic_terms(b_orbs, b_occs, setoccb);
+
     arma::mat P = Pa + Pb;
+
+    arma::mat Bspina = Ba - 0.5 * linB * S;
+    arma::mat Bspinb = Bb + 0.5 * linB * S;
 
     // Form the Fock matrices
     for (size_t m=0; m<X.size(); m++) {
-      fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Ka(m_indices[m], m_indices[m])) * X[m];
-      fock[X.size() + m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Kb(m_indices[m], m_indices[m])) * X[m];
+      fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Bspina(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Ka(m_indices[m], m_indices[m])) * X[m];
+      fock[X.size() + m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Bspinb(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Kb(m_indices[m], m_indices[m])) * X[m];
     }
     if (complexbas) {
       for (size_t m=0; m<X.size(); m++) {
@@ -379,34 +397,27 @@ int main_guarded(int argc, char **argv) {
 	fock[X.size() + m] = arma::real(D(m_indices[m], m_indices[m]).t() * fock[X.size() + m] * D(m_indices[m], m_indices[m]));
       }
     }
-    
+
     // Compute energy terms
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * (Ja + Jb));
     double Eexch = 0.5 * (arma::trace(Pa * Ka) + arma::trace(Pb * Kb));
-    double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr;
+    double Emag = arma::trace(P * (Ba + Bb)) - linB * 0.5 * (Nela - Nelb);
+    double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
     if(verbosity >= 10) {
-      printf("e kinetic energy         % .10f\n", Ekin);
-      printf("e nuclear attraction     % .10f\n", Enuc);
-      printf("e-e Coulomb energy       % .10f\n", Ecoul);
-      printf("e-e exchange energy      % .10f\n", Eexch);
-      printf("nuclear repulsion energy % .10f\n", Enucr);
-      printf("Total energy             % .10f\n", Etot);
+      printf("e kinetic energy            % .10f\n", Ekin);
+      printf("e nuclear attraction        % .10f\n", Enuc);
+      printf("e-e Coulomb energy          % .10f\n", Ecoul);
+      printf("e-e exchange energy         % .10f\n", Eexch);
+      printf("nuclear repulsion energy    % .10f\n", Enucr);
+      printf("magnetic interaction energy % .10f\n", Emag);
+      printf("Total energy                % .10f\n", Etot);
     }
 
     return std::make_pair(Etot, fock);
   }; //unrestricted Fock builder
-
-  int Nel = basis.Ztot() - Q;
-  int Nela = (Nel + M - 1) / 2;
-  int Nelb = Nel - Nela;
-  printf("Nela = %i Nelb = %i\n", Nela, Nelb);
-  if (Nela < 0 or Nelb < 0)
-    throw std::logic_error("Negative number of electrons!\n");
-  if (Nelb > Nela)
-    throw std::logic_error("Nelb > Nela, check your charge and multiplicity!\n");
 
   // Density matrix
   OpenOrbitalOptimizer::DensityMatrix<double, double> dm;
