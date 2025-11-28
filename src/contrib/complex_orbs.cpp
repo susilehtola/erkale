@@ -189,9 +189,10 @@ int main_guarded(int argc, char **argv) {
       D.submat(shells[i].get_first_ind(), shells[i].get_first_ind(), shells[i].get_last_ind(), shells[i].get_last_ind()) = basis_transform_mat(shells[i].get_am());
     }
   }
-  
+
   // Blocked matrices
   arma::mat S_c = arma::real(D.t() * S * D);
+  //std::cout << S << std::endl << D << std::endl << D.t() * S << std::endl << S_c << std::endl;
   size_t Nmo=0;
   std::vector<arma::mat> X(2*maxam+1);
   for (size_t m=0; m<X.size(); m++) {
@@ -221,15 +222,8 @@ int main_guarded(int argc, char **argv) {
   size_t Npairs = dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
 
   int Nel = basis.Ztot() - Q;
-  int Nela = (Nel + M - 1) / 2;
-  int Nelb = Nel - Nela;
-  printf("Nela = %i Nelb = %i\n", Nela, Nelb);
-  if (Nela < 0 or Nelb < 0)
-    throw std::logic_error("Negative number of electrons!\n");
-  if (Nelb > Nela)
-    throw std::logic_error("Nelb > Nela, check your charge and multiplicity!\n");
-
-
+  int Nela;
+  int Nelb;
 
   // Force occupations?
   arma::mat linoccs;
@@ -242,9 +236,19 @@ int main_guarded(int argc, char **argv) {
       occnuma(round(linoccs(i, 2) + maxam)) += linoccs(i, 0);
       occnumb(round(linoccs(i, 2) + maxam)) += linoccs(i, 1);
     }
-    if (!arma::accu(occnuma) == Nela || !arma::accu(occnumb) == Nelb)
+    Nela = arma::accu(occnuma);
+    Nelb = arma::accu(occnumb);
+    if (! (Nela - Nelb) * 2 + 1 == M)
       throw std::logic_error("Multiplicity does not match occupations!");
+  } else {
+    Nela = (Nel + M - 1) / 2;
+    Nelb = Nel - Nela;
   }
+  printf("Nela = %i Nelb = %i\n", Nela, Nelb);
+  if (Nela < 0 or Nelb < 0)
+    throw std::logic_error("Negative number of electrons!\n");
+  if (Nelb > Nela)
+    throw std::logic_error("Nelb > Nela, check your charge and multiplicity!\n");
 
   std::function<arma::vec(const int & nocc, const int & m)> set_occupations = [&](const int & nocc, const int & m) {    
 
@@ -319,14 +323,13 @@ int main_guarded(int argc, char **argv) {
     std::vector<arma::mat> fock(2 * maxam + 1);
     arma::mat P, J, K, B;
     std::tie(P, J, K, B) = electronic_terms(orbitals, occupations, setocc);
-    
+
     // Form the Fock matrices
     for (size_t m=0; m<X.size(); m++)
       fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + B(m_indices[m], m_indices[m]) + J(m_indices[m], m_indices[m]) + .5 * K(m_indices[m], m_indices[m])) * X[m];
     if (complexbas) {
-      for (size_t m=0; m<X.size(); m++) {
+      for (size_t m=0; m<X.size(); m++)
 	fock[m] = arma::real(D(m_indices[m], m_indices[m]).t() * fock[m] * D(m_indices[m], m_indices[m]));
-      }
     }
 
     // Compute energy terms
