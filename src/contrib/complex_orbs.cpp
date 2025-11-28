@@ -242,6 +242,8 @@ int main_guarded(int argc, char **argv) {
       occnuma(round(linoccs(i, 2) + maxam)) += linoccs(i, 0);
       occnumb(round(linoccs(i, 2) + maxam)) += linoccs(i, 1);
     }
+    if (!arma::accu(occnuma) == Nela || !arma::accu(occnumb) == Nelb)
+      throw std::logic_error("Multiplicity does not match occupations!");
   }
 
   std::function<arma::vec(const int & nocc, const int & m)> set_occupations = [&](const int & nocc, const int & m) {    
