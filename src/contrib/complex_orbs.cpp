@@ -63,7 +63,7 @@ std::pair<arma::vec,arma::mat> diagonalize(const arma::mat & F, const arma::mat 
 }
 
 // Construct matrices to transform orbitals from real to complex
-arma::cx_mat basis_transform_mat(const int l) {
+arma::cx_mat basis_transform_mat(int l) {
   arma::cx_mat Lmat(2 * l + 1, 2 * l + 1, arma::fill::zeros);
   for (int m=-l; m<=l; m++) {
     if (m < 0) {
@@ -291,7 +291,18 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(C,occs);
   };
 
-  std::function<std::tuple<arma::mat, arma::mat, arma::mat, arma::mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations, const arma::vec & occnum)> electronic_terms = [&](const auto & orbitals, const auto & occupations, const arma::vec & occnum) {
+  arma::mat Bterms(Nbf, Nbf, arma::fill::zeros);
+  if (linB) {
+    double cenx = 0.0, ceny = 0.0, cenz = 0.0;
+    std::vector<arma::mat> momstack = basis.moment(2, cenx, ceny, cenz);
+    arma::mat xymat = momstack[getind(2, 0, 0)] + momstack[getind(0, 2, 0)];
+
+    arma::mat & Smat = complexbas ? S_c : S;
+    for (size_t j = 0; j < Nbf; j++)
+      Bterms.col(j) = -0.5 * linB * mvals(j) * Smat.col(j) + 0.125 * linB * linB * xymat.col(j);
+  }
+
+  std::function<std::tuple<arma::mat, arma::mat, arma::mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations, const arma::vec & occnum)> electronic_terms = [&](const auto & orbitals, const auto & occupations, const arma::vec & occnum) {
     arma::mat C;
     arma::vec occs;
     std::tie(C,occs) = collect_orbitals(orbitals, occupations, occnum);
@@ -299,18 +310,7 @@ int main_guarded(int argc, char **argv) {
     arma::mat P = C*arma::diagmat(occs)*C.t();
     arma::mat J(dfit.calcJ(P));
     arma::mat K(-dfit.calcK(C, arma::conv_to<std::vector<double>>::from(occs), fitmem));
-    arma::mat B(P.n_rows, P.n_cols, arma::fill::zeros);
-    if (linB) {
-      double cenx = 0.0, ceny = 0.0, cenz = 0.0;
-      std::vector<arma::mat> momstack = basis.moment(2, cenx, ceny, cenz);
-      arma::mat xymat = momstack[getind(2, 0, 0)] + momstack[getind(0, 2, 0)];
-      for (size_t i = 0; i < B.n_rows; i++) {
-	for (size_t j = 0; j < B.n_rows; j++) {
-	  B(i, j) += -0.5 * linB * mvals(j) * S(i, j) + linB * linB * xymat(i, j) / 8.0;
-	}
-      }
-    }
-    return std::make_tuple(P, J, K, B);
+    return std::make_tuple(P, J, K);
   };
 
   OpenOrbitalOptimizer::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
@@ -321,12 +321,12 @@ int main_guarded(int argc, char **argv) {
       setocc = occnuma + occnumb;
 
     std::vector<arma::mat> fock(2 * maxam + 1);
-    arma::mat P, J, K, B;
-    std::tie(P, J, K, B) = electronic_terms(orbitals, occupations, setocc);
-
+    arma::mat P, J, K;
+    std::tie(P, J, K) = electronic_terms(orbitals, occupations, setocc);
     // Form the Fock matrices
+    arma::mat F = T + V + Bterms + J + 0.5*K;
     for (size_t m=0; m<X.size(); m++)
-      fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + B(m_indices[m], m_indices[m]) + J(m_indices[m], m_indices[m]) + .5 * K(m_indices[m], m_indices[m])) * X[m];
+      fock[m] = X[m].t() * F(m_indices[m], m_indices[m]) * X[m];
     if (complexbas) {
       for (size_t m=0; m<X.size(); m++)
 	fock[m] = arma::real(D(m_indices[m], m_indices[m]).t() * fock[m] * D(m_indices[m], m_indices[m]));
@@ -337,7 +337,7 @@ int main_guarded(int argc, char **argv) {
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * J);
     double Eexch = 0.25 * arma::trace(P * K);
-    double Emag = arma::trace(P * B);
+    double Emag = arma::trace(P * Bterms);
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
     if(verbosity >= 10) {
@@ -370,8 +370,8 @@ int main_guarded(int argc, char **argv) {
     arma::vec setocca;
     if (readlinocc)
       setocca = occnuma;
-    arma::mat Pa, Ja, Ka, Ba;
-    std::tie(Pa, Ja, Ka, Ba) = electronic_terms(a_orbs, a_occs, setocca);
+    arma::mat Pa, Ja, Ka;
+    std::tie(Pa, Ja, Ka) = electronic_terms(a_orbs, a_occs, setocca);
 
     // Beta electrons
     std::vector<arma::mat> b_orbs;
@@ -383,20 +383,23 @@ int main_guarded(int argc, char **argv) {
     arma::vec setoccb;
     if (readlinocc)
       setoccb = occnumb;
-    arma::mat Pb, Jb, Kb, Bb;
-    std::tie(Pb, Jb, Kb, Bb) = electronic_terms(b_orbs, b_occs, setoccb);
+    arma::mat Pb, Jb, Kb;
+    std::tie(Pb, Jb, Kb) = electronic_terms(b_orbs, b_occs, setoccb);
 
     arma::mat P = Pa + Pb;
 
-    arma::mat Bspina = Ba - 0.5 * linB * S;
-    arma::mat Bspinb = Bb + 0.5 * linB * S;
+    arma::mat Ba = Bterms - 0.5 * linB * S;
+    arma::mat Bb = Bterms + 0.5 * linB * S;
 
     // Form the Fock matrices
-    for (size_t m=0; m<X.size(); m++) {
-      fock[m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Bspina(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Ka(m_indices[m], m_indices[m])) * X[m];
-      fock[X.size() + m] = X[m].t() * (T(m_indices[m], m_indices[m]) + V(m_indices[m], m_indices[m]) + Bspinb(m_indices[m], m_indices[m]) + Ja(m_indices[m], m_indices[m]) + Jb(m_indices[m], m_indices[m]) + Kb(m_indices[m], m_indices[m])) * X[m];
-    }
+    arma::mat Fa = T + V + Ja + Jb + Ka + Ba;
+    arma::mat Fb = T + V + Ja + Jb + Kb + Bb;
     if (complexbas) {
+      for (size_t m=0; m<X.size(); m++) {
+        fock[m] = X[m].t() * Fa(m_indices[m], m_indices[m]) * X[m];
+        fock[X.size() + m] = X[m].t() * Fb(m_indices[m], m_indices[m]) * X[m];
+      }
+    } else {
       for (size_t m=0; m<X.size(); m++) {
 	fock[m] = arma::real(D(m_indices[m], m_indices[m]).t() * fock[m] * D(m_indices[m], m_indices[m]));
 	fock[X.size() + m] = arma::real(D(m_indices[m], m_indices[m]).t() * fock[X.size() + m] * D(m_indices[m], m_indices[m]));
