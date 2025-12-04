@@ -205,6 +205,28 @@ int main_guarded(int argc, char **argv) {
     Nmo += X[m].n_cols;
   }
 
+  /*
+  arma::cx_mat Dmo(Nbf, Nmo, arma::fill::zeros);
+  if (complexbas) {
+    size_t imo = 0;
+    for (int m = -maxam; m < maxam; m++) {
+      size_t m_minus = m + maxam;
+      size_t m_plus = -m + maxam;
+      arma::cx_mat D_tmp(Nbf, X[m_plus].n_cols, arma::fill::zeros);
+      if (m == 0)
+	D_tmp.rows(m_indices[m_plus]) += 1.0;
+      if (m < 0) {
+	D_tmp.rows(m_indices[m_plus]) += std::sqrt(0.5);
+	D_tmp.rows(m_indices[m_minus]) -= std::complex<double>(0.0, std::sqrt(0.5));
+      } else {
+	D_tmp.rows(m_indices[m_plus]) += std::sqrt(0.5) * (std::pow(-1.0, m));
+	D_tmp.rows(m_indices[m_minus]) += std::complex<double>(0.0, std::sqrt(0.5)) * (std::pow(-1.0, m));
+      }
+      Dmo.rows(imo, imo + X[m_plus].n_cols - 1) = arma::strans(D_tmp);
+      imo += X[m_plus].n_cols;
+    }
+    }*/
+
   // Guess Fock
   bool unrestricted = M - 1;
   std::vector<arma::mat> Fguess((1 + unrestricted) * (2 * maxam + 1));
@@ -280,8 +302,6 @@ int main_guarded(int argc, char **argv) {
     size_t imo=0;
     for (size_t m=0; m<X.size(); m++) {
       arma::mat Csub = X[m] * orbitals[m]; // Orthogonal orbitals with m value m - maxam
-      //int mm = m - maxam;
-      //std::cout << mm << std::endl << orbitals[m] << std::endl << D(m_indices[m], m_indices[m]) << std::endl;
       arma::mat Cpad(Nbf,X[m].n_cols,arma::fill::zeros);
       Cpad.rows(m_indices[m]) = Csub; // AO coefficients of MOs from orbitals with same m value in the correct rows
       occs.subvec(imo, imo + X[m].n_cols - 1) = occupations[m];
@@ -304,12 +324,43 @@ int main_guarded(int argc, char **argv) {
       Bterms.col(j) = -0.5 * linB * mvals(j) * Smat.col(j) + 0.125 * linB * linB * xymat.col(j);
   }
 
+  std::function<arma::cx_mat(const arma::mat & C)> complex_mo_matrix = [&](const arma::mat & C) {
+    arma::cx_mat C_c(Nbf, Nmo, arma::fill::zeros);
+    size_t imo = 0;
+    for (int m = -maxam; m <= maxam; m++) {
+      size_t m_plus = m + maxam;
+      size_t m_minus = -m + maxam;
+      size_t Nimo = X[m_plus].n_cols;
+      arma::cx_mat C_tmp;
+      arma::mat imag_part(Nbf, Nimo, arma::fill::zeros);
+      if (m < 0) {
+	arma::mat real_part = C.cols(imo, imo + Nimo - 1) + C.cols(Nmo - imo - Nimo, Nmo - imo - 1);
+	C_tmp = arma::cx_mat(real_part, imag_part);
+	C_tmp.rows(m_indices[m_plus]) *= std::complex<double>(0.0, -std::sqrt(0.5));
+	C_tmp.rows(m_indices[m_minus]) *= std::sqrt(0.5);
+      }
+      if (m > 0) {
+	arma::mat real_part = C.cols(imo, imo + Nimo - 1) + C.cols(Nmo - imo - Nimo, Nmo - imo - 1);
+	C_tmp = arma::cx_mat(real_part, imag_part);
+	C_tmp.rows(m_indices[m_minus]) *= std::pow(-1.0, m) * std::complex<double>(0.0, std::sqrt(0.5));
+	C_tmp.rows(m_indices[m_plus]) *= std::pow(-1.0, m) * std::sqrt(0.5);
+      }
+      if (m == 0) {
+	C_tmp = arma::cx_mat(C.cols(imo, imo + Nimo - 1), imag_part);
+      }
+      C_c.cols(imo, imo + Nimo - 1) = C_tmp;
+      std::cout << C << std::endl << C_c << std::endl;
+      imo += Nimo;
+    }
+    return C_c;
+  };
+
   std::function<std::tuple<arma::mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations, const arma::vec & occnum)> electronic_terms = [&](const auto & orbitals, const auto & occupations, const arma::vec & occnum) {
     arma::mat C;
     arma::vec occs;
     std::tie(C,occs) = collect_orbitals(orbitals, occupations, occnum);
-    arma::cx_mat C_c = D * C;
-    arma::mat P = arma::real(C * arma::diagmat(occs) * C.t());
+    arma::cx_mat C_c(complex_mo_matrix(C));
+    arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
     arma::mat J(dfit.calcJ(P));
     arma::cx_mat K(-dfit.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs), fitmem));
     return std::make_tuple(P, J, K);
