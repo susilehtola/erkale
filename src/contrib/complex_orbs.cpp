@@ -102,6 +102,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("Complexbas", "Use complex basis?", false);
+  settings.add_bool("Restricted", "Spin restricted?", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -121,6 +122,7 @@ int main_guarded(int argc, char **argv) {
   int readlinocc = settings.get_int("LinearOccupations");
   std::string linoccfname = settings.get_string("LinearOccupationFile");
   double linB = settings.get_double("LinearB");
+  bool unrestricted = !(settings.get_bool("Restricted"));
 
   Checkpoint chkpt(savechk,true);
 
@@ -205,37 +207,6 @@ int main_guarded(int argc, char **argv) {
     Nmo += X[m].n_cols;
   }
 
-  /*
-  arma::cx_mat Dmo(Nbf, Nmo, arma::fill::zeros);
-  if (complexbas) {
-    size_t imo = 0;
-    for (int m = -maxam; m < maxam; m++) {
-      size_t m_minus = m + maxam;
-      size_t m_plus = -m + maxam;
-      arma::cx_mat D_tmp(Nbf, X[m_plus].n_cols, arma::fill::zeros);
-      if (m == 0)
-	D_tmp.rows(m_indices[m_plus]) += 1.0;
-      if (m < 0) {
-	D_tmp.rows(m_indices[m_plus]) += std::sqrt(0.5);
-	D_tmp.rows(m_indices[m_minus]) -= std::complex<double>(0.0, std::sqrt(0.5));
-      } else {
-	D_tmp.rows(m_indices[m_plus]) += std::sqrt(0.5) * (std::pow(-1.0, m));
-	D_tmp.rows(m_indices[m_minus]) += std::complex<double>(0.0, std::sqrt(0.5)) * (std::pow(-1.0, m));
-      }
-      Dmo.rows(imo, imo + X[m_plus].n_cols - 1) = arma::strans(D_tmp);
-      imo += X[m_plus].n_cols;
-    }
-    }*/
-
-  // Guess Fock
-  bool unrestricted = M - 1;
-  std::vector<arma::mat> Fguess((1 + unrestricted) * (2 * maxam + 1));
-  for (size_t m=0; m<X.size(); m++) {
-    Fguess[m] = X[m].t() * fock_terms(m_indices[m], m_indices[m]) * X[m];
-    if (unrestricted)
-      Fguess[X.size() + m] = X[m].t() * fock_terms(m_indices[m], m_indices[m]) * X[m];
-  }
-
   // Calculate density fitting integrals
   bool direct = settings.get_bool("Direct");
   double fitthr = settings.get_double("FittingThreshold");
@@ -273,9 +244,25 @@ int main_guarded(int argc, char **argv) {
   if (Nelb > Nela)
     throw std::logic_error("Nelb > Nela, check your charge and multiplicity!\n");
 
+  if (!unrestricted) {
+    for (size_t occ = 0; occ < occnuma.size(); occ++) {
+      if (! occnuma(occ) == occnumb(occ))
+	throw std::logic_error("Alpha and beta occupations do not match even though calculation is spin retricted!");
+    }
+  }
+
+  // Guess Fock
+  std::vector<arma::mat> Fguess((1 + unrestricted) * (2 * maxam + 1));
+  for (size_t m=0; m<X.size(); m++) {
+    Fguess[m] = X[m].t() * fock_terms(m_indices[m], m_indices[m]) * X[m];
+    if (unrestricted)
+      Fguess[X.size() + m] = X[m].t() * fock_terms(m_indices[m], m_indices[m]) * X[m];
+  }
+
+
   std::function<arma::vec(const int & nocc, const int & m)> set_occupations = [&](const int & nocc, const int & m) {    
 
-    arma::vec occsub(X[m].n_cols);
+    arma::vec occsub(X[m].n_cols, arma::fill::zeros);
     if (nocc > occsub.size())
       throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
     
@@ -301,11 +288,11 @@ int main_guarded(int argc, char **argv) {
     arma::mat C(Nbf, Nmo, arma::fill::zeros);
     size_t imo=0;
     for (size_t m=0; m<X.size(); m++) {
-      arma::mat Csub = X[m] * orbitals[m]; // Orthogonal orbitals with m value m - maxam
+      arma::mat Csub = X[m] * orbitals[m];
       arma::mat Cpad(Nbf,X[m].n_cols,arma::fill::zeros);
-      Cpad.rows(m_indices[m]) = Csub; // AO coefficients of MOs from orbitals with same m value in the correct rows
+      Cpad.rows(m_indices[m]) = Csub;
       occs.subvec(imo, imo + X[m].n_cols - 1) = occupations[m];
-      C.cols(imo,imo+X[m].n_cols-1) = Cpad; // Columns with the MO coefficients
+      C.cols(imo,imo+X[m].n_cols-1) = Cpad;
       imo += X[m].n_cols;
     }
     if(imo != Nmo)
@@ -346,10 +333,10 @@ int main_guarded(int argc, char **argv) {
 	C_tmp.rows(m_indices[m_plus]) *= std::pow(-1.0, m) * std::sqrt(0.5);
       }
       if (m == 0) {
-	C_tmp = arma::cx_mat(C.cols(imo, imo + Nimo - 1), imag_part);
+	arma::mat real_part = C.cols(imo, imo + Nimo - 1);
+	C_tmp = arma::cx_mat(real_part, imag_part);
       }
       C_c.cols(imo, imo + Nimo - 1) = C_tmp;
-      std::cout << C << std::endl << C_c << std::endl;
       imo += Nimo;
     }
     return C_c;
@@ -359,7 +346,7 @@ int main_guarded(int argc, char **argv) {
     arma::mat C;
     arma::vec occs;
     std::tie(C,occs) = collect_orbitals(orbitals, occupations, occnum);
-    arma::cx_mat C_c(complex_mo_matrix(C));
+    arma::cx_mat C_c = D*C;//(complex_mo_matrix(C));
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
     arma::mat J(dfit.calcJ(P));
     arma::cx_mat K(-dfit.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs), fitmem));
@@ -377,13 +364,17 @@ int main_guarded(int argc, char **argv) {
     arma::mat P, J;
     arma::cx_mat K;
     std::tie(P, J, K) = electronic_terms(orbitals, occupations, setocc);
-    arma::cx_mat P_c = D.t() * P * D;
+
+    arma::cx_mat P_c = P*std::complex<double>(1.0,0.0);
+    //    if (complexbas)
+    P_c = D*P*D.t();
 
     // Form the Fock matrices
     arma::cx_mat F = T + V + Bterms + J + 0.5*K;
     if (complexbas) {
+      arma::cx_mat DFD = D.t()*F*D;
       for (size_t m=0; m<X.size(); m++)
-	fock[m] = arma::real(D(m_indices[m], m_indices[m]).t() * F(m_indices[m], m_indices[m]) * D(m_indices[m], m_indices[m]));
+	fock[m] = arma::real(DFD(m_indices[m], m_indices[m]));
     } else {
       for (size_t m=0; m<X.size(); m++)
 	fock[m] = arma::real(F(m_indices[m], m_indices[m]));
@@ -392,11 +383,11 @@ int main_guarded(int argc, char **argv) {
       fock[m] = X[m].t() * fock[m] * X[m];
 
     // Compute energy terms
-    double Ekin = arma::trace(P * T);
-    double Enuc = arma::trace(P * V);
-    double Ecoul = 0.5 * arma::trace(P * J);
+    double Ekin = std::real(arma::trace(P_c * T));
+    double Enuc = std::real(arma::trace(P * V));
+    double Ecoul = std::real(0.5 * arma::trace(P * J));
     double Eexch = 0.25 * std::real(arma::trace(P_c * K));
-    double Emag = arma::trace(P * Bterms);
+    double Emag = std::real(arma::trace(P * Bterms));
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
     if(verbosity >= 10) {
@@ -455,6 +446,13 @@ int main_guarded(int argc, char **argv) {
     arma::mat Ba = Bterms - 0.5 * linB * S;
     arma::mat Bb = Bterms + 0.5 * linB * S;
 
+    if (complexbas) {
+      T = arma::real(D.t() * T * D);
+      V = arma::real(D.t() * V * D);
+      Ba = arma::real(D.t() * Ba * D);
+      Bb = arma::real(D.t() * Bb * D);
+    }
+
     // Form the Fock matrices
     arma::cx_mat Fa = T + V + Ja + Jb + Ka + Ba;
     arma::cx_mat Fb = T + V + Ja + Jb + Kb + Bb;
@@ -478,7 +476,8 @@ int main_guarded(int argc, char **argv) {
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * (Ja + Jb));
-    double Eexch = 0.5 * std::real(arma::trace(Pa_c * Ka) + arma::trace(Pb_c * Kb));
+    //double Eexch = 0.5 * std::real(arma::trace(Pa_c * Ka) + arma::trace(Pb_c * Kb));
+    double Eexch = 0.5 * std::real(arma::trace(Pa * Ka) + arma::trace(Pb * Kb));
     double Emag = arma::trace(P * (Ba + Bb)) - linB * 0.5 * (Nela - Nelb);
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
@@ -501,7 +500,7 @@ int main_guarded(int argc, char **argv) {
   // Save matrices to disk
   std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double, double> &, const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm, const OpenOrbitalOptimizer::FockMatrix<double> fock) {
     const OpenOrbitalOptimizer::Orbitals<double> & orbitals = dm.first;
-    if (M == 1) {
+    if (!unrestricted) {
       for (size_t m=0; m<X.size(); m++) {
 	arma::mat C = X[m] * orbitals[m];
 	arma::vec E = arma::diagvec(orbitals[m].t() * fock[m] * orbitals[m]);
@@ -532,7 +531,7 @@ int main_guarded(int argc, char **argv) {
   OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder;
   
   // Run SCF
-  if (M == 1) {
+  if (!unrestricted) {
     number_of_blocks_per_particle_type = {nblocks};
     maximum_occupation.set_size(nblocks).fill(2.0);
     number_of_particles = {(double) (Nel)};
