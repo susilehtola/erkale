@@ -67,13 +67,15 @@ arma::cx_mat basis_transform_mat(int l) {
   arma::cx_mat Lmat(2 * l + 1, 2 * l + 1, arma::fill::zeros);
   for (int m=-l; m<=l; m++) {
     if (m < 0) {
-      Lmat(m+l, m+l) += std::complex<double>(0.0, -1.0 / std::sqrt(2.0));
-      Lmat(m+l, 2*l-(m+l)) += 1.0 / std::sqrt(2.0);
+      Lmat(m+l, m+l) -= std::complex<double>(0.0, std::sqrt(0.5));
+      //Lmat(m+l, 2*l-(m+l)) += std::sqrt(0.5);
+      Lmat(2*l-(m+l), m+l) += std::sqrt(0.5);
     } else if (m == 0)
       Lmat(l, l) += 1.0;
     else {
-      Lmat(m+l, 2*l-(m+l)) += std::complex<double>(0.0, std::pow(-1.0, m) / std::sqrt(2.0));
-      Lmat(m+l, m+l) += std::pow(-1.0, m) / std::sqrt(2.0);
+      //Lmat(m+l, 2*l-(m+l)) += std::complex<double>(0.0, std::pow(-1.0, m) * std::sqrt(0.5));
+      Lmat(2*l-(m+l), m+l) += std::complex<double>(0.0, std::pow(-1.0, m) * std::sqrt(0.5));
+      Lmat(m+l, m+l) += std::pow(-1.0, m) * std::sqrt(0.5);
     }
   }
   return Lmat;
@@ -191,11 +193,10 @@ int main_guarded(int argc, char **argv) {
       D.submat(shells[i].get_first_ind(), shells[i].get_first_ind(), shells[i].get_last_ind(), shells[i].get_last_ind()) = basis_transform_mat(shells[i].get_am());
     }
   } else
-    for (size_t i = 0; i < Nbf; i++)
-      D(i, i) += 1.0; // Identity matrix
-
+    D.eye();
+  
   // Blocked matrices
-  arma::mat S_c = arma::real(D.t() * S * D);
+  arma::mat S_c = arma::real(D * S * D.t());
   size_t Nmo=0;
   std::vector<arma::mat> X(2*maxam+1);
   for (size_t m=0; m<X.size(); m++) {
@@ -220,19 +221,19 @@ int main_guarded(int argc, char **argv) {
   int Nelb;
 
   // Force occupations?
-  arma::mat linoccs;
+  arma::imat linoccs;
   linoccs.load(linoccfname,arma::raw_ascii);
   arma::vec occnuma(X.size(), arma::fill::zeros);
   arma::vec occnumb(X.size(), arma::fill::zeros);
   std::vector<arma::uvec> occsym(linoccs.n_rows);
   if (readlinocc < 0) {
     for (size_t i=0; i<linoccs.n_rows; i++) {
-      occnuma(round(linoccs(i, 2) + maxam)) += linoccs(i, 0);
-      occnumb(round(linoccs(i, 2) + maxam)) += linoccs(i, 1);
+      occnuma(linoccs(i, 2) + maxam) += linoccs(i, 0);
+      occnumb(linoccs(i, 2) + maxam) += linoccs(i, 1);
     }
     Nela = arma::accu(occnuma);
     Nelb = arma::accu(occnumb);
-    if (! (Nela - Nelb) * 2 + 1 == M)
+    if ((Nela - Nelb) + 1 != M)
       throw std::logic_error("Multiplicity does not match occupations!");
   } else {
     Nela = (Nel + M - 1) / 2;
@@ -246,7 +247,7 @@ int main_guarded(int argc, char **argv) {
 
   if (!unrestricted) {
     for (size_t occ = 0; occ < occnuma.size(); occ++) {
-      if (! occnuma(occ) == occnumb(occ))
+      if (occnuma(occ) != occnumb(occ))
 	throw std::logic_error("Alpha and beta occupations do not match even though calculation is spin retricted!");
     }
   }
@@ -265,7 +266,7 @@ int main_guarded(int argc, char **argv) {
     arma::vec occsub(X[m].n_cols, arma::fill::zeros);
     if (nocc > occsub.size())
       throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
-    
+
     double nleft = nocc;
     size_t io = 0;
     while (nleft > 0.0) {
@@ -283,7 +284,7 @@ int main_guarded(int argc, char **argv) {
     return occsub;
   };
 
-  std::function<std::pair<arma::mat,arma::vec>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations, const arma::vec & occnum)> collect_orbitals = [&](const auto & orbitals, const auto & occupations, const arma::vec & occnum) {
+  std::function<std::pair<arma::mat,arma::vec>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> collect_orbitals = [&](const auto & orbitals, const auto & occupations) {
     arma::vec occs(Nmo, arma::fill::zeros);
     arma::mat C(Nbf, Nmo, arma::fill::zeros);
     size_t imo=0;
@@ -311,63 +312,34 @@ int main_guarded(int argc, char **argv) {
       Bterms.col(j) = -0.5 * linB * mvals(j) * Smat.col(j) + 0.125 * linB * linB * xymat.col(j);
   }
 
-  std::function<arma::cx_mat(const arma::mat & C)> complex_mo_matrix = [&](const arma::mat & C) {
-    arma::cx_mat C_c(Nbf, Nmo, arma::fill::zeros);
-    size_t imo = 0;
-    for (int m = -maxam; m <= maxam; m++) {
-      size_t m_plus = m + maxam;
-      size_t m_minus = -m + maxam;
-      size_t Nimo = X[m_plus].n_cols;
-      arma::cx_mat C_tmp;
-      arma::mat imag_part(Nbf, Nimo, arma::fill::zeros);
-      if (m < 0) {
-	arma::mat real_part = C.cols(imo, imo + Nimo - 1) + C.cols(Nmo - imo - Nimo, Nmo - imo - 1);
-	C_tmp = arma::cx_mat(real_part, imag_part);
-	C_tmp.rows(m_indices[m_plus]) *= std::complex<double>(0.0, -std::sqrt(0.5));
-	C_tmp.rows(m_indices[m_minus]) *= std::sqrt(0.5);
-      }
-      if (m > 0) {
-	arma::mat real_part = C.cols(imo, imo + Nimo - 1) + C.cols(Nmo - imo - Nimo, Nmo - imo - 1);
-	C_tmp = arma::cx_mat(real_part, imag_part);
-	C_tmp.rows(m_indices[m_minus]) *= std::pow(-1.0, m) * std::complex<double>(0.0, std::sqrt(0.5));
-	C_tmp.rows(m_indices[m_plus]) *= std::pow(-1.0, m) * std::sqrt(0.5);
-      }
-      if (m == 0) {
-	arma::mat real_part = C.cols(imo, imo + Nimo - 1);
-	C_tmp = arma::cx_mat(real_part, imag_part);
-      }
-      C_c.cols(imo, imo + Nimo - 1) = C_tmp;
-      imo += Nimo;
-    }
-    return C_c;
-  };
-
-  std::function<std::tuple<arma::mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations, const arma::vec & occnum)> electronic_terms = [&](const auto & orbitals, const auto & occupations, const arma::vec & occnum) {
+  std::function<std::tuple<arma::mat, arma::cx_mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
     arma::mat C;
     arma::vec occs;
-    std::tie(C,occs) = collect_orbitals(orbitals, occupations, occnum);
-    arma::cx_mat C_c = D*C;//(complex_mo_matrix(C));
+    std::tie(C,occs) = collect_orbitals(orbitals, occupations);
+
+    arma::cx_mat C_c = D * C;
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
+    arma::cx_mat Pc = C_c * arma::diagmat(occs) * C_c.t();
     arma::mat J(dfit.calcJ(P));
     arma::cx_mat K(-dfit.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs), fitmem));
-    return std::make_tuple(P, J, K);
+
+    // The code in ERKALE has a different convention for complex integrals; this modification makes it compatible with this code
+    K = arma::conj(K);
+    
+    return std::make_tuple(P, Pc, J, K); 
   };
 
   OpenOrbitalOptimizer::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
-    arma::vec setocc;
-    if (readlinocc)
-      setocc = occnuma + occnumb;
 
     std::vector<arma::mat> fock(2 * maxam + 1);
     arma::mat P, J;
-    arma::cx_mat K;
-    std::tie(P, J, K) = electronic_terms(orbitals, occupations, setocc);
+    arma::cx_mat Pc, K;
+    std::tie(P, Pc, J, K) = electronic_terms(orbitals, occupations);
 
-    arma::cx_mat P_c = P*std::complex<double>(1.0,0.0);
-    //    if (complexbas)
-    P_c = D*P*D.t();
+    /*arma::cx_mat P_c = P*std::complex<double>(1.0,0.0);
+      P_c = D*P*D.t();*/
 
     // Form the Fock matrices
     arma::cx_mat F = T + V + Bterms + J + 0.5*K;
@@ -383,10 +355,10 @@ int main_guarded(int argc, char **argv) {
       fock[m] = X[m].t() * fock[m] * X[m];
 
     // Compute energy terms
-    double Ekin = std::real(arma::trace(P_c * T));
+    double Ekin = std::real(arma::trace(P * T));
     double Enuc = std::real(arma::trace(P * V));
     double Ecoul = std::real(0.5 * arma::trace(P * J));
-    double Eexch = 0.25 * std::real(arma::trace(P_c * K));
+    double Eexch = 0.25 * std::real(arma::trace(P * K));
     double Emag = std::real(arma::trace(P * Bterms));
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
@@ -417,14 +389,6 @@ int main_guarded(int argc, char **argv) {
       a_orbs.push_back(orbitals[i]);
       a_occs.push_back(occupations[i]);
     }
-    arma::vec setocca;
-    if (readlinocc)
-      setocca = occnuma;
-    arma::mat Pa, Ja;
-    arma::cx_mat Ka;
-    std::tie(Pa, Ja, Ka) = electronic_terms(a_orbs, a_occs, setocca);
-    arma::cx_mat Pa_c = D.t() * Pa * D;
-
     // Beta electrons
     std::vector<arma::mat> b_orbs;
     std::vector<arma::vec> b_occs;
@@ -432,13 +396,16 @@ int main_guarded(int argc, char **argv) {
       b_orbs.push_back(orbitals[i]);
       b_occs.push_back(occupations[i]);
     }
-    arma::vec setoccb;
-    if (readlinocc)
-      setoccb = occnumb;
+
+    arma::mat Pa, Ja;
+    arma::cx_mat Pa_c, Ka;
+    std::tie(Pa, Pa_c, Ja, Ka) = electronic_terms(a_orbs, a_occs);
+    //arma::cx_mat Pa_c = D * Pa * D.t();
+
     arma::mat Pb, Jb;
-    arma::cx_mat Kb;
-    std::tie(Pb, Jb, Kb) = electronic_terms(b_orbs, b_occs, setoccb);
-    arma::cx_mat Pb_c = D.t() * Pb * D;
+    arma::cx_mat Pb_c, Kb;
+    std::tie(Pb, Pb_c, Jb, Kb) = electronic_terms(b_orbs, b_occs);
+    //arma::cx_mat Pb_c = D * Pb * D.t();
 
     arma::mat P = Pa + Pb;
     arma::cx_mat Pc = Pa_c + Pb_c;
@@ -446,20 +413,15 @@ int main_guarded(int argc, char **argv) {
     arma::mat Ba = Bterms - 0.5 * linB * S;
     arma::mat Bb = Bterms + 0.5 * linB * S;
 
-    if (complexbas) {
-      T = arma::real(D.t() * T * D);
-      V = arma::real(D.t() * V * D);
-      Ba = arma::real(D.t() * Ba * D);
-      Bb = arma::real(D.t() * Bb * D);
-    }
-
     // Form the Fock matrices
     arma::cx_mat Fa = T + V + Ja + Jb + Ka + Ba;
     arma::cx_mat Fb = T + V + Ja + Jb + Kb + Bb;
     if (complexbas) {
+      arma::cx_mat DFDa = D.t() * Fa * D;
+      arma::cx_mat DFDb = D.t() * Fb * D;
       for (size_t m=0; m<X.size(); m++) {
-	fock[m] = arma::real(D(m_indices[m], m_indices[m]).t() * Fa(m_indices[m], m_indices[m]) * D(m_indices[m], m_indices[m]));
-	fock[X.size() + m] = arma::real(D(m_indices[m], m_indices[m]).t() * Fb(m_indices[m], m_indices[m]) * D(m_indices[m], m_indices[m]));
+	fock[m] = arma::real(DFDa(m_indices[m], m_indices[m]));
+	fock[X.size() + m] = arma::real(DFDb(m_indices[m], m_indices[m]));
       }
     } else {
       for (size_t m=0; m<X.size(); m++) {
@@ -476,8 +438,7 @@ int main_guarded(int argc, char **argv) {
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * (Ja + Jb));
-    //double Eexch = 0.5 * std::real(arma::trace(Pa_c * Ka) + arma::trace(Pb_c * Kb));
-    double Eexch = 0.5 * std::real(arma::trace(Pa * Ka) + arma::trace(Pb * Kb));
+    double Eexch = 0.5 * std::real(arma::trace(Pa_c * Ka) + arma::trace(Pb_c * Kb));
     double Emag = arma::trace(P * (Ba + Bb)) - linB * 0.5 * (Nela - Nelb);
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
@@ -494,9 +455,6 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(Etot, fock);
   }; //unrestricted Fock builder
 
-  // Density matrix
-  OpenOrbitalOptimizer::DensityMatrix<double, double> dm;
-
   // Save matrices to disk
   std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double, double> &, const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm, const OpenOrbitalOptimizer::FockMatrix<double> fock) {
     const OpenOrbitalOptimizer::Orbitals<double> & orbitals = dm.first;
@@ -510,9 +468,9 @@ int main_guarded(int argc, char **argv) {
     } else {
       for (size_t m=0; m<X.size(); m++) {
 	arma::mat Ca = X[m] * orbitals[m];
-	arma::mat Cb = X[m] * orbitals[m];
-	arma::vec Ea = arma::diagvec(orbitals[m].t() * fock[0][m] * orbitals[0]);
-	arma::vec Eb = arma::diagvec(orbitals[m].t() * fock[1][m] * orbitals[1]);
+	arma::mat Cb = X[m] * orbitals[X.size()+m];
+	arma::vec Ea = arma::diagvec(orbitals[m].t() * fock[m] * orbitals[m]);
+	arma::vec Eb = arma::diagvec(orbitals[X.size()+m].t() * fock[X.size()+m] * orbitals[X.size()+m]);
 	chkpt.write("Ca", Ca);
 	chkpt.write("Cb", Cb);
 	chkpt.write("Ea", Ea);
@@ -548,15 +506,16 @@ int main_guarded(int argc, char **argv) {
     number_of_particles = {(double) (Nela), (double) (Nelb)};
     if (readlinocc)
       number_of_particles_per_block = arma::join_cols(occnuma, occnumb);
-    for (int l=0; l<2; l++) {
+    for (int s=0; s<2; s++) {
+      std::string spin = s ? "beta" : "alpha";
       for (int k=0; k<nblocks / 2; k++) {
-	std::string str = "m=" + std::to_string(k - maxam);
+	std::string str = spin + " m=" + std::to_string(k - maxam);
 	block_descriptions.push_back(str);
       }
     }
     fock_builder = unrestricted_fock_builder;
   }
-  
+
   printf("\n\n\nSolving SCF\n");
   OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
   if (readlinocc)
