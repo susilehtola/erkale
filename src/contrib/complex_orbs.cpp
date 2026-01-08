@@ -116,6 +116,7 @@ int main_guarded(int argc, char **argv) {
   int diisorder = settings.get_int("DIISOrder");
   double intthr = settings.get_double("IntegralThresh");
   double convergence_threshold = settings.get_double("ConvThr");
+  bool verbose = settings.get_bool("Verbose");
   size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
@@ -125,6 +126,7 @@ int main_guarded(int argc, char **argv) {
   std::string linoccfname = settings.get_string("LinearOccupationFile");
   double linB = settings.get_double("LinearB");
   bool unrestricted = !(settings.get_bool("Restricted"));
+  bool density_fitting = settings.get_bool("DensityFitting");
 
   Checkpoint chkpt(savechk,true);
 
@@ -167,15 +169,28 @@ int main_guarded(int argc, char **argv) {
 
   // Construct density fitting basis set
   BasisSetLibrary fitlib;
-  fitlib.load_basis(settings.get_string("FittingBasis"));
   BasisSet dfitbas;
-  {
+  ERIchol chol;
+  DensityFit dfit;
+  bool direct = settings.get_bool("Direct");
+  double fitthr = settings.get_double("FittingThreshold");
+  double cholfitthr = settings.get_double("FittingCholeskyThreshold");
+  size_t Npairs = 0;
+
+  if (density_fitting) {
+    fitlib.load_basis(settings.get_string("FittingBasis"));
     // Construct fitting basis
     bool uselm = settings.get_bool("UseLM");
     settings.set_bool("UseLM", true);
     construct_basis(dfitbas,basis.get_nuclei(), fitlib);
     dfitbas.coulomb_normalize();
     settings.set_bool("UseLM", uselm);
+    Npairs = dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
+  } else {
+    double cholthr = settings.get_double("CholeskyThr");
+    double cholshthr = settings.get_double("CholeskyShThr");
+    double shtol = settings.get_double("IntegralThresh");
+    Npairs = chol.fill(basis, cholthr, cholshthr, shtol, verbose);
   }
   size_t Nbf = basis.get_Nbf();
 
@@ -207,14 +222,6 @@ int main_guarded(int argc, char **argv) {
     }
     Nmo += X[m].n_cols;
   }
-
-  // Calculate density fitting integrals
-  bool direct = settings.get_bool("Direct");
-  double fitthr = settings.get_double("FittingThreshold");
-  double cholfitthr = settings.get_double("FittingCholeskyThreshold");
-
-  DensityFit dfit;
-  size_t Npairs = dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
 
   int Nel = basis.Ztot() - Q;
   int Nela;
@@ -320,8 +327,15 @@ int main_guarded(int argc, char **argv) {
     arma::cx_mat C_c = D * C;
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
     arma::cx_mat Pc = C_c * arma::diagmat(occs) * C_c.t();
-    arma::mat J(dfit.calcJ(P));
-    arma::cx_mat K(-dfit.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs), fitmem));
+    arma::mat J;
+    arma::cx_mat K;
+    if (density_fitting) {
+      J = dfit.calcJ(P);
+      K = -dfit.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs), fitmem);
+    } else {
+      J = chol.calcJ(P);
+      K = -chol.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs));
+    }
 
     // The code in ERKALE has a different convention for complex integrals; this modification makes it compatible with this code
     K = arma::conj(K);
