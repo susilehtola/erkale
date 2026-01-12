@@ -316,7 +316,7 @@ int main_guarded(int argc, char **argv) {
 
     arma::mat & Smat = complexbas ? S_c : S;
     for (size_t j = 0; j < Nbf; j++)
-      Bterms.col(j) = -0.5 * linB * mvals(j) * Smat.col(j) + 0.125 * linB * linB * xymat.col(j);
+      Bterms.col(j) = 0.5 * linB * mvals(j) * Smat.col(j) + 0.125 * linB * linB * xymat.col(j);
   }
 
   std::function<std::tuple<arma::mat, arma::cx_mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
@@ -351,9 +351,6 @@ int main_guarded(int argc, char **argv) {
     arma::mat P, J;
     arma::cx_mat Pc, K;
     std::tie(P, Pc, J, K) = electronic_terms(orbitals, occupations);
-
-    /*arma::cx_mat P_c = P*std::complex<double>(1.0,0.0);
-      P_c = D*P*D.t();*/
 
     // Form the Fock matrices
     arma::cx_mat F = T + V + Bterms + J + 0.5*K;
@@ -414,18 +411,17 @@ int main_guarded(int argc, char **argv) {
     arma::mat Pa, Ja;
     arma::cx_mat Pa_c, Ka;
     std::tie(Pa, Pa_c, Ja, Ka) = electronic_terms(a_orbs, a_occs);
-    //arma::cx_mat Pa_c = D * Pa * D.t();
 
     arma::mat Pb, Jb;
     arma::cx_mat Pb_c, Kb;
     std::tie(Pb, Pb_c, Jb, Kb) = electronic_terms(b_orbs, b_occs);
-    //arma::cx_mat Pb_c = D * Pb * D.t();
 
     arma::mat P = Pa + Pb;
     arma::cx_mat Pc = Pa_c + Pb_c;
 
-    arma::mat Ba = Bterms - 0.5 * linB * S;
-    arma::mat Bb = Bterms + 0.5 * linB * S;
+    arma::mat & Smat = complexbas ? S_c : S;
+    arma::mat Ba = Bterms - 0.5 * linB * Smat;
+    arma::mat Bb = Bterms + 0.5 * linB * Smat;
 
     // Form the Fock matrices
     arma::cx_mat Fa = T + V + Ja + Jb + Ka + Ba;
@@ -453,7 +449,9 @@ int main_guarded(int argc, char **argv) {
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * (Ja + Jb));
     double Eexch = 0.5 * std::real(arma::trace(Pa_c * Ka) + arma::trace(Pb_c * Kb));
-    double Emag = arma::trace(P * (Ba + Bb)) - linB * 0.5 * (Nela - Nelb);
+    //double Emag = arma::trace(P * (Ba + Bb)) - linB * 0.5 * (Nela - Nelb);
+    double Emag = arma::trace(P * Bterms) - linB * 0.5 * (Nela - Nelb);
+    std::cout << "B " << arma::trace(P * Bterms) << std::endl;
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
     if(verbosity >= 10) {
