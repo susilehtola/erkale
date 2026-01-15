@@ -139,7 +139,7 @@ int main_guarded(int argc, char **argv) {
   potlib.load_basis(settings.get_string("SAPBasis"));
 
   auto atoms=load_xyz(settings.get_string("System"),!settings.get_bool("InputBohr"));
-  
+
   // Nucleus repulsion energy
   double Enucr = 0.0;
   for(size_t i = 0; i < atoms.size(); i++) {
@@ -209,17 +209,14 @@ int main_guarded(int argc, char **argv) {
     }
   } else
     D.eye();
-  
+
   // Blocked matrices
   arma::mat S_c = arma::real(D * S * D.t());
   size_t Nmo=0;
   std::vector<arma::mat> X(2*maxam+1);
   for (size_t m=0; m<X.size(); m++) {
-    if (complexbas) {
-      X[m] = BasOrth(S_c(m_indices[m], m_indices[m]));
-    } else {
-      X[m] = BasOrth(S(m_indices[m], m_indices[m]));
-    }
+    const auto & Smat = complexbas ? S_c : S;
+    X[m] = BasOrth(Smat(m_indices[m], m_indices[m]));
     Nmo += X[m].n_cols;
   }
 
@@ -268,7 +265,7 @@ int main_guarded(int argc, char **argv) {
   }
 
 
-  std::function<arma::vec(const int & nocc, const int & m)> set_occupations = [&](const int & nocc, const int & m) {    
+  std::function<arma::vec(const int & nocc, const int & m)> set_occupations = [&](const int & nocc, const int & m) {
 
     arma::vec occsub(X[m].n_cols, arma::fill::zeros);
     if (nocc > occsub.size())
@@ -314,19 +311,25 @@ int main_guarded(int argc, char **argv) {
     std::vector<arma::mat> momstack = basis.moment(2, cenx, ceny, cenz);
     arma::mat xymat = momstack[getind(2, 0, 0)] + momstack[getind(0, 2, 0)];
 
-    arma::mat & Smat = complexbas ? S_c : S;
-    for (size_t j = 0; j < Nbf; j++)
-      Bterms.col(j) = 0.5 * linB * mvals(j) * Smat.col(j) + 0.125 * linB * linB * xymat.col(j);
+    if(complexbas) {
+      xymat = arma::real(D.t()*xymat*D);
+      for (size_t j = 0; j < Nbf; j++)
+	Bterms.col(j) = 0.5 * linB * mvals(j) * S_c.col(j) + 0.125 * linB * linB * xymat.col(j);
+
+    } else {
+      for (size_t j = 0; j < Nbf; j++)
+	Bterms.col(j) = 0.5 * linB * mvals(j) * S.col(j) + 0.125 * linB * linB * xymat.col(j);
+
+    }
   }
 
-  std::function<std::tuple<arma::mat, arma::cx_mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
+  std::function<std::tuple<arma::mat, arma::mat, arma::cx_mat>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> electronic_terms = [&](const auto & orbitals, const auto & occupations) {
     arma::mat C;
     arma::vec occs;
     std::tie(C,occs) = collect_orbitals(orbitals, occupations);
 
     arma::cx_mat C_c = D * C;
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
-    arma::cx_mat Pc = C_c * arma::diagmat(occs) * C_c.t();
     arma::mat J;
     arma::cx_mat K;
     if (density_fitting) {
@@ -339,8 +342,27 @@ int main_guarded(int argc, char **argv) {
 
     // The code in ERKALE has a different convention for complex integrals; this modification makes it compatible with this code
     K = arma::conj(K);
-    
-    return std::make_tuple(P, Pc, J, K); 
+
+    return std::make_tuple(P, J, K);
+  };
+
+  std::function<arma::cx_mat(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> complex_density = [&](const auto & orbitals, const auto & occupations) {
+    arma::mat C;
+    arma::vec occs;
+    std::tie(C,occs) = collect_orbitals(orbitals, occupations);
+
+    arma::cx_mat C_c = D * C;
+    arma::cx_mat Pc = C_c * arma::diagmat(occs) * C_c.t();
+    return Pc;
+  };
+
+  std::function<arma::mat(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> complex_basis_density = [&](const auto & orbitals, const auto & occupations) {
+    arma::mat C;
+    arma::vec occs;
+    std::tie(C,occs) = collect_orbitals(orbitals, occupations);
+
+    arma::mat P = C * arma::diagmat(occs) * C.t();
+    return P;
   };
 
   OpenOrbitalOptimizer::FockBuilder<double, double> restricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
@@ -349,28 +371,29 @@ int main_guarded(int argc, char **argv) {
 
     std::vector<arma::mat> fock(2 * maxam + 1);
     arma::mat P, J;
-    arma::cx_mat Pc, K;
-    std::tie(P, Pc, J, K) = electronic_terms(orbitals, occupations);
+    arma::cx_mat K;
+    std::tie(P, J, K) = electronic_terms(orbitals, occupations);
+    arma::cx_mat cP = complex_density(orbitals, occupations);
+    arma::mat cbP = complex_basis_density(orbitals, occupations);
 
     // Form the Fock matrices
-    arma::cx_mat F = T + V + Bterms + J + 0.5*K;
-    if (complexbas) {
-      arma::cx_mat DFD = D.t()*F*D;
-      for (size_t m=0; m<X.size(); m++)
-	fock[m] = arma::real(DFD(m_indices[m], m_indices[m]));
-    } else {
-      for (size_t m=0; m<X.size(); m++)
-	fock[m] = arma::real(F(m_indices[m], m_indices[m]));
-    }
+    arma::cx_mat F = T + V + J + 0.5*K;
+    arma::cx_mat DFD;
+    if(complexbas)
+      DFD = D.t()*F*D + Bterms;
+    else
+      DFD = (F + Bterms)*std::complex<double>(1.0,0.0);
+    for (size_t m=0; m<X.size(); m++)
+      fock[m] = arma::real(DFD(m_indices[m], m_indices[m]));
     for (size_t m=0; m<X.size(); m++)
       fock[m] = X[m].t() * fock[m] * X[m];
 
     // Compute energy terms
-    double Ekin = std::real(arma::trace(P * T));
-    double Enuc = std::real(arma::trace(P * V));
-    double Ecoul = std::real(0.5 * arma::trace(P * J));
-    double Eexch = 0.25 * std::real(arma::trace(P * K));
-    double Emag = std::real(arma::trace(P * Bterms));
+    double Ekin = arma::trace(P * T);
+    double Enuc = arma::trace(P * V);
+    double Ecoul = 0.5 * arma::trace(P * J);
+    double Eexch = 0.25 * std::real(arma::trace(cP * K));
+    double Emag = arma::trace(cbP * Bterms);
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
     if(verbosity >= 10) {
@@ -409,35 +432,36 @@ int main_guarded(int argc, char **argv) {
     }
 
     arma::mat Pa, Ja;
-    arma::cx_mat Pa_c, Ka;
-    std::tie(Pa, Pa_c, Ja, Ka) = electronic_terms(a_orbs, a_occs);
+    arma::cx_mat Ka;
+    std::tie(Pa, Ja, Ka) = electronic_terms(a_orbs, a_occs);
+    arma::cx_mat cPa = complex_density(a_orbs, a_occs);
+    arma::mat cbPa = complex_basis_density(a_orbs, a_occs);
 
     arma::mat Pb, Jb;
-    arma::cx_mat Pb_c, Kb;
-    std::tie(Pb, Pb_c, Jb, Kb) = electronic_terms(b_orbs, b_occs);
+    arma::cx_mat Kb;
+    std::tie(Pb, Jb, Kb) = electronic_terms(b_orbs, b_occs);
+    arma::cx_mat cPb = complex_density(b_orbs, b_occs);
+    arma::mat cbPb = complex_basis_density(b_orbs, b_occs);
 
     arma::mat P = Pa + Pb;
-    arma::cx_mat Pc = Pa_c + Pb_c;
 
-    arma::mat & Smat = complexbas ? S_c : S;
-    arma::mat Ba = Bterms - 0.5 * linB * Smat;
-    arma::mat Bb = Bterms + 0.5 * linB * Smat;
+    arma::mat Ba = - 0.5 * linB * S;
+    arma::mat Bb = + 0.5 * linB * S;
 
     // Form the Fock matrices
     arma::cx_mat Fa = T + V + Ja + Jb + Ka + Ba;
     arma::cx_mat Fb = T + V + Ja + Jb + Kb + Bb;
-    if (complexbas) {
-      arma::cx_mat DFDa = D.t() * Fa * D;
-      arma::cx_mat DFDb = D.t() * Fb * D;
-      for (size_t m=0; m<X.size(); m++) {
-	fock[m] = arma::real(DFDa(m_indices[m], m_indices[m]));
-	fock[X.size() + m] = arma::real(DFDb(m_indices[m], m_indices[m]));
-      }
+    arma::cx_mat DFDa, DFDb;
+    if(complexbas) {
+      DFDa = D.t() * Fa * D + Bterms;
+      DFDb = D.t() * Fb * D + Bterms;
     } else {
-      for (size_t m=0; m<X.size(); m++) {
-	fock[m] = arma::real(Fa(m_indices[m], m_indices[m]));
-	fock[X.size() + m] = arma::real(Fb(m_indices[m], m_indices[m]));
-      }
+      DFDa = Fa*std::complex<double>(1.0,0.0);
+      DFDb = Fb*std::complex<double>(1.0,0.0);
+    }
+    for (size_t m=0; m<X.size(); m++) {
+      fock[m] = arma::real(DFDa(m_indices[m], m_indices[m]));
+      fock[X.size() + m] = arma::real(DFDb(m_indices[m], m_indices[m]));
     }
     for (size_t m=0; m<X.size(); m++) {
       fock[m] = X[m].t() * fock[m] * X[m];
@@ -448,10 +472,8 @@ int main_guarded(int argc, char **argv) {
     double Ekin = arma::trace(P * T);
     double Enuc = arma::trace(P * V);
     double Ecoul = 0.5 * arma::trace(P * (Ja + Jb));
-    double Eexch = 0.5 * std::real(arma::trace(Pa_c * Ka) + arma::trace(Pb_c * Kb));
-    //double Emag = arma::trace(P * (Ba + Bb)) - linB * 0.5 * (Nela - Nelb);
-    double Emag = arma::trace(P * Bterms) - linB * 0.5 * (Nela - Nelb);
-    std::cout << "B " << arma::trace(P * Bterms) << std::endl;
+    double Eexch = 0.5 * std::real(arma::trace(cPa * Ka) + arma::trace(cPb * Kb));
+    double Emag = arma::trace((cbPa + cbPb) * Bterms) - linB * 0.5 * (Nela - Nelb);
     double Etot = Ekin + Enuc + Ecoul + Eexch + Enucr + Emag;
 
     if(verbosity >= 10) {
@@ -499,7 +521,7 @@ int main_guarded(int argc, char **argv) {
   arma::vec number_of_particles_per_block;
   std::vector<std::string> block_descriptions;
   OpenOrbitalOptimizer::FockBuilder<double, double> fock_builder;
-  
+
   // Run SCF
   if (!unrestricted) {
     number_of_blocks_per_particle_type = {nblocks};
