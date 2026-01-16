@@ -317,11 +317,11 @@ int main_guarded(int argc, char **argv) {
     if(complexbas) {
       xymat = arma::real(D.t()*xymat*D);
       for (size_t j = 0; j < Nbf; j++)
-	Bterms.col(j) = 0.5 * linB * mvals(j) * S_c.col(j) + 0.125 * linB * linB * xymat.col(j);
+	Bterms.col(j) = -0.5 * linB * mvals(j) * S_c.col(j) + 0.125 * linB * linB * xymat.col(j);
 
     } else {
       for (size_t j = 0; j < Nbf; j++)
-	Bterms.col(j) = 0.5 * linB * mvals(j) * S.col(j) + 0.125 * linB * linB * xymat.col(j);
+	Bterms.col(j) = -0.5 * linB * mvals(j) * S.col(j) + 0.125 * linB * linB * xymat.col(j);
 
     }
   }
