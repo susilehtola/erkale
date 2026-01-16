@@ -127,6 +127,7 @@ int main_guarded(int argc, char **argv) {
   double linB = settings.get_double("LinearB");
   bool unrestricted = !(settings.get_bool("Restricted"));
   bool density_fitting = settings.get_bool("DensityFitting");
+  std::string guess = settings.get_string("Guess");
 
   Checkpoint chkpt(savechk,true);
 
@@ -199,6 +200,8 @@ int main_guarded(int argc, char **argv) {
   arma::mat T(basis.kinetic());
   arma::mat V(basis.nuclear());
   arma::mat Vsap(basis.sap_potential(potlib));
+  if(guess=="core")
+    Vsap.zeros();
   arma::mat fock_terms = T + V + Vsap; // Helper
 
   arma::cx_mat D(Nbf, Nbf, arma::fill::zeros);
@@ -456,8 +459,8 @@ int main_guarded(int argc, char **argv) {
       DFDa = D.t() * Fa * D + Bterms;
       DFDb = D.t() * Fb * D + Bterms;
     } else {
-      DFDa = Fa*std::complex<double>(1.0,0.0);
-      DFDb = Fb*std::complex<double>(1.0,0.0);
+      DFDa = (Fa + Bterms)*std::complex<double>(1.0,0.0);
+      DFDb = (Fb + Bterms)*std::complex<double>(1.0,0.0);
     }
     for (size_t m=0; m<X.size(); m++) {
       fock[m] = arma::real(DFDa(m_indices[m], m_indices[m]));
