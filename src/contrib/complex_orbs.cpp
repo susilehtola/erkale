@@ -105,6 +105,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("Complexbas", "Use complex basis?", false);
   settings.add_bool("Restricted", "Spin restricted?", false);
+  settings.add_bool("ODA", "Use optimal damping algorithm?", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -128,6 +129,7 @@ int main_guarded(int argc, char **argv) {
   bool unrestricted = !(settings.get_bool("Restricted"));
   bool density_fitting = settings.get_bool("DensityFitting");
   std::string guess = settings.get_string("Guess");
+  bool oda = settings.get_bool("ODA");
 
   Checkpoint chkpt(savechk,true);
 
@@ -565,7 +567,10 @@ int main_guarded(int argc, char **argv) {
   scfsolver.verbosity(verbosity);
   scfsolver.maximum_iterations(maxinititer);
   scfsolver.maximum_history_length(diisorder);
-  scfsolver.run();
+  if(oda)
+    scfsolver.run_optimal_damping();
+  else
+    scfsolver.run();
 
   //dm = scfsolver.get_solution();
   //save_matrices(dm, scfsolver.get_fock_matrix());
