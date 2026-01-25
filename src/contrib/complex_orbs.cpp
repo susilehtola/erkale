@@ -529,7 +529,7 @@ int main_guarded(int argc, char **argv) {
 
   // Run SCF
   if (!unrestricted) {
-    number_of_blocks_per_particle_type = {nblocks};
+    number_of_blocks_per_particle_type = {(arma::uword) nblocks};
     maximum_occupation.set_size(nblocks).fill(2.0);
     number_of_particles = {(double) (Nel)};
     if (readlinocc)
@@ -540,7 +540,7 @@ int main_guarded(int argc, char **argv) {
     }
     fock_builder = restricted_fock_builder;
   } else {
-    number_of_blocks_per_particle_type = {nblocks / 2, nblocks / 2};
+    number_of_blocks_per_particle_type = {(arma::uword) nblocks / 2, (arma::uword) nblocks / 2};
     maximum_occupation.set_size(nblocks).fill(1.0);
     number_of_particles = {(double) (Nela), (double) (Nelb)};
     if (readlinocc)
