@@ -100,7 +100,6 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
   settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
-  settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 50);
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("Complexbas", "Use complex basis?", false);
@@ -113,7 +112,7 @@ int main_guarded(int argc, char **argv) {
   int Q = settings.get_int("Charge");
   int M = settings.get_int("Multiplicity");
   int verbosity = settings.get_int("Verbosity");
-  int maxinititer = settings.get_int("MaxInitIter");
+  int maxiter = settings.get_int("MaxIter");
   int diisorder = settings.get_int("DIISOrder");
   double intthr = settings.get_double("IntegralThresh");
   double convergence_threshold = settings.get_double("ConvThr");
@@ -565,7 +564,7 @@ int main_guarded(int argc, char **argv) {
   scfsolver.error_norm(error_norm);
   scfsolver.convergence_threshold(convergence_threshold);
   scfsolver.verbosity(verbosity);
-  scfsolver.maximum_iterations(maxinititer);
+  scfsolver.maximum_iterations(maxiter);
   scfsolver.maximum_history_length(diisorder);
   if(oda)
     scfsolver.run_optimal_damping();
