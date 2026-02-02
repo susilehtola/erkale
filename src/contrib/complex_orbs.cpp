@@ -100,11 +100,11 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
   settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
-  settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 50);
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("Complexbas", "Use complex basis?", false);
   settings.add_bool("Restricted", "Spin restricted?", false);
+  settings.add_bool("ODA", "Use optimal damping algorithm?", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -112,7 +112,7 @@ int main_guarded(int argc, char **argv) {
   int Q = settings.get_int("Charge");
   int M = settings.get_int("Multiplicity");
   int verbosity = settings.get_int("Verbosity");
-  int maxinititer = settings.get_int("MaxInitIter");
+  int maxiter = settings.get_int("MaxIter");
   int diisorder = settings.get_int("DIISOrder");
   double intthr = settings.get_double("IntegralThresh");
   double convergence_threshold = settings.get_double("ConvThr");
@@ -128,6 +128,7 @@ int main_guarded(int argc, char **argv) {
   bool unrestricted = !(settings.get_bool("Restricted"));
   bool density_fitting = settings.get_bool("DensityFitting");
   std::string guess = settings.get_string("Guess");
+  bool oda = settings.get_bool("ODA");
 
   Checkpoint chkpt(savechk,true);
 
@@ -527,7 +528,7 @@ int main_guarded(int argc, char **argv) {
 
   // Run SCF
   if (!unrestricted) {
-    number_of_blocks_per_particle_type = {nblocks};
+    number_of_blocks_per_particle_type = {(arma::uword) nblocks};
     maximum_occupation.set_size(nblocks).fill(2.0);
     number_of_particles = {(double) (Nel)};
     if (readlinocc)
@@ -538,7 +539,7 @@ int main_guarded(int argc, char **argv) {
     }
     fock_builder = restricted_fock_builder;
   } else {
-    number_of_blocks_per_particle_type = {nblocks / 2, nblocks / 2};
+    number_of_blocks_per_particle_type = {(arma::uword) nblocks / 2, (arma::uword) nblocks / 2};
     maximum_occupation.set_size(nblocks).fill(1.0);
     number_of_particles = {(double) (Nela), (double) (Nelb)};
     if (readlinocc)
@@ -563,9 +564,12 @@ int main_guarded(int argc, char **argv) {
   scfsolver.error_norm(error_norm);
   scfsolver.convergence_threshold(convergence_threshold);
   scfsolver.verbosity(verbosity);
-  scfsolver.maximum_iterations(maxinititer);
+  scfsolver.maximum_iterations(maxiter);
   scfsolver.maximum_history_length(diisorder);
-  scfsolver.run();
+  if(oda)
+    scfsolver.run_optimal_damping();
+  else
+    scfsolver.run();
 
   //dm = scfsolver.get_solution();
   //save_matrices(dm, scfsolver.get_fock_matrix());
