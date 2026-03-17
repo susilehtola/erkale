@@ -222,7 +222,7 @@ int main_guarded(int argc, char **argv) {
     X[m] = BasOrth(Smat(m_indices[m], m_indices[m]));
     Nmo += X[m].n_cols;
   }
-
+  
   int Nel = basis.Ztot() - Q;
   int Nela;
   int Nelb;
@@ -235,13 +235,18 @@ int main_guarded(int argc, char **argv) {
   std::vector<arma::uvec> occsym(linoccs.n_rows);
   if (readlinocc < 0) {
     for (size_t i=0; i<linoccs.n_rows; i++) {
-      occnuma(linoccs(i, 2) + maxam) += linoccs(i, 0);
-      occnumb(linoccs(i, 2) + maxam) += linoccs(i, 1);
+      int occa = linoccs(i, 0);
+      int occb = linoccs(i, 1);
+      int m = linoccs(i, 2);
+      if (std::abs(m) > maxam)
+	throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
+      occnuma(linoccs(i, 2) + maxam) += occa;
+      occnumb(linoccs(i, 2) + maxam) += occb;
     }
     Nela = arma::accu(occnuma);
     Nelb = arma::accu(occnumb);
     if ((Nela - Nelb) + 1 != M)
-      throw std::logic_error("Multiplicity does not match occupations!");
+      throw std::logic_error("Multiplicit does not match occupations!");
   } else {
     Nela = (Nel + M - 1) / 2;
     Nelb = Nel - Nela;
@@ -317,11 +322,11 @@ int main_guarded(int argc, char **argv) {
     if(complexbas) {
       xymat = arma::real(D.t()*xymat*D);
       for (size_t j = 0; j < Nbf; j++)
-	Bterms.col(j) = 0.5 * linB * mvals(j) * S_c.col(j) + 0.125 * linB * linB * xymat.col(j);
+	Bterms.col(j) = -0.5 * linB * mvals(j) * S_c.col(j) + 0.125 * linB * linB * xymat.col(j);
 
     } else {
       for (size_t j = 0; j < Nbf; j++)
-	Bterms.col(j) = 0.5 * linB * mvals(j) * S.col(j) + 0.125 * linB * linB * xymat.col(j);
+	Bterms.col(j) = -0.5 * linB * mvals(j) * S.col(j) + 0.125 * linB * linB * xymat.col(j);
 
     }
   }
