@@ -252,7 +252,8 @@ int main_guarded(int argc, char **argv) {
     if(finiteproton)
       pfit.set_range_separation(omega, alpha, beta);
     Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
-    if(Sp.n_elem and vpp)
+    if(Sp.n_elem)
+      // density fitting also used for e-p terms
       Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
 
     printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.get_Naux(),(int) (dfit.get_Naux()-dfit.get_Naux_indep()));
