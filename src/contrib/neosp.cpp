@@ -108,10 +108,6 @@ int main_guarded(int argc, char **argv) {
   if(settings.get_string("ProtonBasis").size())
     pbaslib.load_basis(settings.get_string("ProtonBasis"));
 
-  // Read in SAP potential
-  BasisSetLibrary potlib;
-  potlib.load_basis(settings.get_string("SAPBasis"));
-
   auto atoms=load_xyz(settings.get_string("System"),!settings.get_bool("InputBohr"));
   std::vector<size_t> proton_indices;
   if(stricmp(settings.get_string("QuantumProtons"),"")!=0) {
