@@ -107,6 +107,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("SaveChk", "Checkpoint file to save to", "neo.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("FiniteProton", "Use a finite proton model", false);
+  settings.add_bool("vpp", "Include JK terms for protons?", true);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -129,6 +130,7 @@ int main_guarded(int argc, char **argv) {
   std::string savechk = settings.get_string("SaveChk");
   bool finiteproton = settings.get_bool("FiniteProton");
   bool density_fitting = settings.get_bool("DensityFitting");
+  bool vpp = settings.get_bool("vpp");
 
   Checkpoint chkpt(savechk,true);
 
@@ -250,7 +252,7 @@ int main_guarded(int argc, char **argv) {
     if(finiteproton)
       pfit.set_range_separation(omega, alpha, beta);
     Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
-    if(Sp.n_elem)
+    if(Sp.n_elem and vpp)
       Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
 
     printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.get_Naux(),(int) (dfit.get_Naux()-dfit.get_Naux_indep()));
@@ -264,7 +266,8 @@ int main_guarded(int argc, char **argv) {
     Npairs_e=chol.fill(basis,cholthr,cholshthr,shtol,verbose);
     if(finiteproton)
       pchol.set_range_separation(omega, alpha, beta);
-    Npairs_p=pchol.fill(pbasis,cholthr,cholshthr,shtol,verbose);
+    if(vpp)
+      Npairs_p=pchol.fill(pbasis,cholthr,cholshthr,shtol,verbose);
   }
 
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
@@ -327,12 +330,17 @@ int main_guarded(int argc, char **argv) {
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J, K;
-    if(density_fitting) {
-      J=pfit.calcJ(P);
-      K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem);
+    if(vpp) {
+      if(density_fitting) {
+        J=pfit.calcJ(P);
+        K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem);
+      } else {
+        J=pchol.calcJ(P);
+        K=-pchol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
+      }
     } else {
-      J=pchol.calcJ(P);
-      K=-pchol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
+      J.zeros(P.n_rows, P.n_cols);
+      K.zeros(P.n_rows, P.n_cols);
     }
     return std::make_pair(J,K);
   };
