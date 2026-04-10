@@ -274,7 +274,7 @@ int main_guarded(int argc, char **argv) {
 
           // J_ij = (ij|kl) P_kl using matmul
           arma::mat tei((double *)(eri->getp()->data()),Nsk*Nsl,Nti*Ntj,false,true);
-          arma::mat incr = fac*arma::vectorise(Pskl).t()*tei;
+          arma::mat incr = fac*arma::vectorise(Pskl.t()).t()*tei;
           incr.reshape(Ntj,Nti);
           Jtij += incr.t();
         }

@@ -424,9 +424,9 @@ int main_guarded(int argc, char **argv) {
 
           // J_ij = (ij|kl) P_kl using matmul
           arma::mat tei((double *)(eri->getp()->data()),Nsk*Nsl,Nti*Ntj,false,true);
-          arma::mat incr = fac*arma::vectorise(Pskl).t()*tei;
+          arma::mat incr = fac*arma::vectorise(Pskl.t()).t()*tei;
           incr.reshape(Ntj,Nti);
-          Jtij += incr.t();
+          incr = incr.t();
 
           /*
           arma::mat Jtest(Nti,Ntj,arma::fill::zeros);
@@ -446,13 +446,15 @@ int main_guarded(int argc, char **argv) {
             }
 
           // Check correctness
-          double dint = arma::max(arma::max(arma::abs(Jtest-Jtij)));
-          if(dint > 1e-5) {
+          double dint = arma::max(arma::max(arma::abs(Jtest-incr)));
+          if(dint > 1e-6) {
             printf("Error %e\n",dint);
-            Jtij.print("Jt");
+            incr.print("Jt");
             Jtest.print("Jtest");
           }
           */
+
+          Jtij += incr;
         }
 
         // Now that we've computed the block, store it in the full matrix
