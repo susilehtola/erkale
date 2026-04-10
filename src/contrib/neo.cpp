@@ -288,7 +288,7 @@ int main_guarded(int argc, char **argv) {
     pr=pbasis.moment(1);
   }
 
-  std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [&pbasis, &Xp, &Sp] (const arma::mat & F) {
+  std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [&] (const arma::mat & F) {
     arma::mat Fblock(F.n_rows,F.n_cols,arma::fill::zeros);
     for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
       // Get shells on nucleus
@@ -469,7 +469,7 @@ int main_guarded(int argc, char **argv) {
     return Jt;
   };
 
-  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_ri = [&dfit, &pfit](const arma::mat & Pe) {
+  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_ri = [&](const arma::mat & Pe) {
     arma::vec c(dfit.compute_expansion(Pe));
     arma::mat J=-pfit.calcJ_vector(c);
     return J;
@@ -495,7 +495,7 @@ int main_guarded(int argc, char **argv) {
     return density_fitting ? proton_electron_coulomb_ri(Pp) : proton_electron_coulomb_exact(Pp);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_builder = [&X, &T, &Vc, &dfit, electronic_terms, &Ecnucr, &verbosity, &frozen_Jpe, &frozen_Ep](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -526,7 +526,7 @@ int main_guarded(int argc, char **argv) {
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
       printf("e nuclear attraction     % .10f\n",Enuc);
-      printf("e-p frozen attraction    % .10f\n",Epe);
+      printf("p-e frozen attraction    % .10f\n",Epe);
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("e-e exchange energy      % .10f\n",Eexch);
       printf("nuclear repulsion energy % .10f\n",Ecnucr);
@@ -537,7 +537,7 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(Etot,fock);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_builder = [&X, &T, &Vc, &dfit, electronic_terms, &Ecnucr, &verbosity, &frozen_Jpe, &frozen_Ep](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -575,7 +575,7 @@ int main_guarded(int argc, char **argv) {
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
       printf("e nuclear attraction     % .10f\n",Enuc);
-      printf("e-p frozen attraction    % .10f\n",Epe);
+      printf("p-e frozen attraction    % .10f\n",Epe);
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("e-e exchange energy      % .10f\n",Eexch);
       printf("nuclear repulsion energy % .10f\n",Ecnucr);
@@ -587,7 +587,7 @@ int main_guarded(int argc, char **argv) {
   };
 
   // Compute expectation values for protonic coordinates
-  std::function<void(const arma::vec &, const arma::mat &)> print_protonic_coordinates = [&pr](const arma::vec & occp, const arma::mat & Cp) {
+  std::function<void(const arma::vec &, const arma::mat &)> print_protonic_coordinates = [&](const arma::vec & occp, const arma::mat & Cp) {
     for(size_t ip=0;ip<occp.n_elem;ip++)
       if(occp(ip)>0.0) {
         double r[3];
@@ -597,7 +597,7 @@ int main_guarded(int argc, char **argv) {
       }
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_neo_builder = [&X, &Xp, &T, &Tp, &Vc, &Vpc, &dfit, &pfit, &pr, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, &Ecnucr, &verbosity, print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_neo_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -657,7 +657,7 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(Etot,fock);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_neo_builder = [&X, &Xp, &T, &Tp, &Vc, &Vpc, &dfit, &pfit, &pr, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, &Ecnucr, &verbosity, &print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_neo_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -787,7 +787,7 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Save the matrices to disk
-  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_proton_matrices = [&chkpt, &Xp](const OpenOrbitalOptimizer::DensityMatrix<double,double> & pdm, const OpenOrbitalOptimizer::FockMatrix<double> & pfock) {
+  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_proton_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double,double> & pdm, const OpenOrbitalOptimizer::FockMatrix<double> & pfock) {
     const OpenOrbitalOptimizer::Orbitals<double> & porbitals = pdm.first;
     const OpenOrbitalOptimizer::OrbitalOccupations<double> & poccupations = pdm.second;
     arma::mat Cp = Xp*porbitals[0];
@@ -796,7 +796,7 @@ int main_guarded(int argc, char **argv) {
     chkpt.write("Ep",Ep);
   };
 
-  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_electron_matrices = [&chkpt, &M, &X](const OpenOrbitalOptimizer::DensityMatrix<double,double> & eldm, const OpenOrbitalOptimizer::FockMatrix<double> & elfock) {
+  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_electron_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double,double> & eldm, const OpenOrbitalOptimizer::FockMatrix<double> & elfock) {
     const OpenOrbitalOptimizer::Orbitals<double> & eorbitals = eldm.first;
     const OpenOrbitalOptimizer::OrbitalOccupations<double> & eoccupations = eldm.second;
     if(M==1) {
@@ -1024,7 +1024,7 @@ int main_guarded(int argc, char **argv) {
         }
       }
 
-      OpenOrbitalOptimizer::FockBuilder<double, double> nuclear_builder = [&Xp, &Tp, &Vpc, &pfit, &pr, &protonic_terms, &frozen_Jep, &frozen_Ee, &verbosity, print_protonic_coordinates, &Ecnucr](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+      OpenOrbitalOptimizer::FockBuilder<double, double> nuclear_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
         const auto & orbitals = dm.first;
         const auto & occupations = dm.second;
 
@@ -1053,15 +1053,15 @@ int main_guarded(int argc, char **argv) {
         double Eepcoul = arma::trace(frozen_Jep*Pp);
         double Etot = Epkin+Epnuc+Epcoul+Epexch+Eepcoul+frozen_Ee+Ecnucr;
 
-        if(verbosity>=10) {
-          printf("p kinetic energy         % .10f\n",Epkin);
-          printf("p nuclear repulsion      % .10f\n",Epnuc);
-          printf("p-p Coulomb energy       % .10f\n",Epcoul);
-          printf("e-p Coulomb energy       % .10f\n",Eepcoul);
-          printf("p-p exchange energy      % .10f\n",Epexch);
-          printf("frozen electron energy   % .10f\n",frozen_Ee);
-          printf("nuclear repulsion energy % .10f\n",Ecnucr);
-          printf("Total energy             % .10f\n",Etot);
+        if(verbosity>=10)  {
+          printf("p kinetic energy          % .10f\n",Epkin);
+          printf("p nuclear repulsion       % .10f\n",Epnuc);
+          printf("p-p Coulomb energy        % .10f\n",Epcoul);
+          printf("e-p frozen attraction     % .10f\n",Eepcoul);
+          printf("p-p exchange energy       % .10f\n",Epexch);
+          printf("frozen electron energy    % .10f\n",frozen_Ee);
+          printf("nuclear repulsion energy  % .10f\n",Ecnucr);
+          printf("Total energy              % .10f\n",Etot);
         }
 
         return std::make_pair(Etot,fock);
