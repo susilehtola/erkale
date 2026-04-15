@@ -331,7 +331,10 @@ int main_guarded(int argc, char **argv) {
   arma::eig_sym(E, C, Fp);
   E.print("Protonic orbital energies");
 
-  printf("State average of %i first states is % .14e\n",arma::mean(E.subvec(0,navg-1)));
+  if(E.n_elem >= navg)
+    printf("State average of %i first states is % .14e\n",arma::mean(E.subvec(0,navg-1)));
+  else
+    printf("State average of %i first states is % .14e\n",E.n_elem,arma::mean(E));
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
   return 0;
