@@ -122,8 +122,13 @@ arma::mat PartialCholeskyOrth(const arma::mat & S, double cholcut, double scut) 
   // Off-diagonal S
   arma::mat odS(arma::abs(S));
   odS.diag().zeros();
-  // Column sum
-  arma::vec odSs(arma::sum(S).t());
+  // Column sum of |S| with the diagonal removed -- ranks columns by
+  // off-diagonal coupling strength so that the Cholesky pivot order
+  // tackles the most strongly coupled functions first. The earlier
+  // version summed raw S (with the diagonal retained), so the pivot
+  // ordering was dominated by S(i,i) ~ 1 rather than the off-diagonal
+  // structure odS was built to capture.
+  arma::vec odSs(arma::sum(odS).t());
   arma::uvec pivot = arma::stable_sort_index(odSs,"ascend");
   // Find suitable basis by partial Cholesky decomposition
   pivoted_cholesky(S,cholcut,pivot);

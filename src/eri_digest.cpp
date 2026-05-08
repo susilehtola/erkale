@@ -267,6 +267,13 @@ arma::mat KDigestor::get_K() const {
 }
 
 cxKDigestor::cxKDigestor(const arma::cx_mat & P_) : P(P_) {
+  // The symmetrisation in digest() uses arma::trans (Hermitian
+  // conjugate) on the off-diagonal Kij blocks; this is correct only
+  // when P is Hermitian, which is the case for HF/hybrid exchange in
+  // ERKALE today. If you ever need to feed a non-Hermitian P here,
+  // the K(k,i)/K(k,j)/K(l,i)/K(l,j) blocks must be computed directly
+  // rather than recovered from arma::trans of the corresponding K(i,*)
+  // block.
   K.zeros(P.n_rows,P.n_cols);
 }
 
