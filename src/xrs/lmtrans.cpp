@@ -30,7 +30,12 @@ lmtrans::lmtrans() {
 lmtrans::lmtrans(const arma::mat & C, const BasisSet & bas, const coords_t & cen, size_t Nrad, int l, int lquad) {
   exp=expand_orbitals(C,bas,cen,true,Nrad,l,lquad);
 
-  // Compute maximum value of l
+  // Compute maximum value of l. Bail out cleanly if the orbital
+  // expansion produced no angular components: lmax-- on 0 would
+  // underflow and the Gaunt table would be constructed with a
+  // negative size below.
+  if(exp.clm.empty() || exp.clm[0].size()==0)
+    throw std::runtime_error("lmtrans: orbital expansion has no angular components.\n");
   lmax=0;
   while(lmind(lmax,lmax)<exp.clm[0].size())
     lmax++;
