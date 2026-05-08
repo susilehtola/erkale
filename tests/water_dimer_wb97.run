@@ -13,3 +13,4 @@ Logfile water_dimer_wb97.log
 SaveChk water_dimer_wb97.chk
 
 BasisRotate false
+DFTGrid 50 -194

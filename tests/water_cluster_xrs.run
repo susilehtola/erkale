@@ -14,3 +14,4 @@ Logfile water_cluster_xrs.log
 SaveChk water_cluster_xrs.chk
 BasisRotate false
 ConvThr 1e-6
+DFTGrid 50 -194

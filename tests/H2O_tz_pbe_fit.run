@@ -10,3 +10,4 @@ IntegralThresh 1e-14
 Logfile H2O_tz_pbe_fit.log
 SaveChk H2O_tz_pbe_fit.chk
 BasisRotate false
+DFTGrid 50 -194
