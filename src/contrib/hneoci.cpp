@@ -358,7 +358,7 @@ int main_guarded(int argc, char **argv) {
   arma::mat H0_mo = Xe_bo.t() * H0 * Xe_bo;
   arma::mat H0p_mo = Xp_bo.t() * H0p * Xp_bo;
 
-  arma::mat H0_ci(V_ci.n_rows, V_ci.n_cols);
+  arma::mat H0_ci(V_ci.n_rows, V_ci.n_cols, arma::fill::zeros);
   for(size_t i=0; i<e_nmo; i++)
     for(size_t j=0; j<e_nmo; j++)
       for(size_t I=0; I<p_nmo; I++) {
