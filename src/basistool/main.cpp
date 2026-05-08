@@ -240,6 +240,11 @@ int main_guarded(int argc, char **argv) {
 
     // Print profile in output file
     FILE *out=fopen(fileout.c_str(),"w");
+    if(!out) {
+      std::ostringstream oss;
+      oss << "Could not open output file \"" << fileout << "\" for writing.\n";
+      throw std::runtime_error(oss.str());
+    }
     for(size_t i=0;i<prof.lga.size();i++) {
       // Value of scanning exponent
       fprintf(out,"%13e",prof.lga[i]);
