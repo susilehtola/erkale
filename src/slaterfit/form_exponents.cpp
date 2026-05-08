@@ -164,23 +164,22 @@ std::vector<contr_t> slater_fit_f(double zeta, int am, int nf, bool verbose, int
 
   int maxiter=1000;
 
-  // Degrees of freedom
+  // Degrees of freedom. The original code overwrote par.method to 2
+  // in the first else-branch unconditionally, so the second check for
+  // par.method==1 could never match and well-tempered fitting was
+  // silently degenerated into full optimisation. Use a single
+  // if/else-if chain so each method is considered against its own
+  // applicability condition.
   int dof;
-  if(par.method==0 && nf>=2)
+  if(par.method==0 && nf>=2) {
     dof=2;
-  else
-    // Full optimization
-    par.method=2;
-
-  if(par.method==1 && nf>=4)
+  } else if(par.method==1 && nf>=4) {
     dof=4;
-  else
+  } else {
     // Full optimization
     par.method=2;
-
-  // Full optimization
-  if(par.method==2)
     dof=par.Nf;
+  }
 
   gsl_multimin_function minfunc;
   minfunc.n=dof;
@@ -294,23 +293,22 @@ std::vector<contr_t> slater_fit(double zeta, int am, int nf, bool verbose, int m
 
   int maxiter=1000;
 
-  // Degrees of freedom
+  // Degrees of freedom. The original code overwrote par.method to 2
+  // in the first else-branch unconditionally, so the second check for
+  // par.method==1 could never match and well-tempered fitting was
+  // silently degenerated into full optimisation. Use a single
+  // if/else-if chain so each method is considered against its own
+  // applicability condition.
   int dof;
-  if(par.method==0 && nf>=2)
+  if(par.method==0 && nf>=2) {
     dof=2;
-  else
-    // Full optimization
-    par.method=2;
-
-  if(par.method==1 && nf>=4)
+  } else if(par.method==1 && nf>=4) {
     dof=4;
-  else
+  } else {
     // Full optimization
     par.method=2;
-
-  // Full optimization
-  if(par.method==2)
     dof=par.Nf;
+  }
 
   gsl_multimin_function_fdf minfunc;
   minfunc.n=dof;
