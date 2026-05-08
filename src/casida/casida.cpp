@@ -593,11 +593,14 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
       erip=eri.getp();
 
-      // Find out maximum value
+      // Find out maximum absolute value. The previous version compared
+      // fabs but stored the raw signed integral, so a large-magnitude
+      // negative integral landed in `max` as a negative number and the
+      // subsequent sqrt produced NaN.
       double max=0.0;
       for(size_t i=0;i<(*erip).size();i++)
 	if(fabs((*erip)[i])>max)
-	  max=(*erip)[i];
+	  max=fabs((*erip)[i]);
       max=sqrt(max);
 
       // Store value
