@@ -13,3 +13,4 @@ Direct true
 XRSMethod FCH
 BasisRotate false
 ConvThr 1e-6
+DFTGrid 50 -194

@@ -13,3 +13,4 @@ Logfile H2O_tz_pbe_dir.log
 SaveChk H2O_tz_pbe_dir.chk
 
 BasisRotate false
+DFTGrid 50 -194
