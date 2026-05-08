@@ -3,7 +3,7 @@
 #include <cmath>
 
 extern "C" {
-  // For factorials and so on
+  // For the regularized incomplete gamma function (no std equivalent in C++17)
 #include <gsl/gsl_sf_gamma.h>
 }
 
@@ -66,7 +66,7 @@ void BoysTable::fill(int mmax_, int order_, double dx_, double xmax_) {
     double x=ix*dx;
     for(int m=0;m<=mmax+bforder;m++) {
       // We don't use any recursion here to avoid numeric instabilities in the reference values
-      bfdata(m,ix)=0.5*gsl_sf_gamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
+      bfdata(m,ix)=0.5*std::tgamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
     }
   }
 

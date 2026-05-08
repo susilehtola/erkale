@@ -18,10 +18,9 @@
 #include "../global.h"
 #include "solve_coefficients.h"
 
-/* Hypergeometric functions */
+#include <cmath>
+/* Hypergeometric functions (no std equivalent in C++17) */
 #include <gsl/gsl_sf_hyperg.h>
-/* Gamma functions */
-#include <gsl/gsl_sf_gamma.h>
 
 
 arma::vec form_P(const std::vector<double> & expns, double zeta, int l) {
@@ -32,7 +31,7 @@ arma::vec form_P(const std::vector<double> & expns, double zeta, int l) {
 
   // Form elements
   for(size_t i=0;i<expns.size();i++)
-    ret(i)=pow(2.0,-l/2.0-1.25)*sqrt(gsl_sf_gamma(2*l+3)/gsl_sf_gamma(l+1.5))*pow(zeta,l+2.5)/pow(expns[i],l/2.0+1.25)*gsl_sf_hyperg_U(2.0+l,1.5,zeta*zeta/(4.0*expns[i]));
+    ret(i)=pow(2.0,-l/2.0-1.25)*sqrt(std::tgamma(2*l+3)/std::tgamma(l+1.5))*pow(zeta,l+2.5)/pow(expns[i],l/2.0+1.25)*gsl_sf_hyperg_U(2.0+l,1.5,zeta*zeta/(4.0*expns[i]));
   return ret;
 }
 

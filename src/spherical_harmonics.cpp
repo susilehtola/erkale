@@ -21,15 +21,11 @@
 
 #include <cmath>
 #include <cfloat>
-extern "C" {
-// Legendre polynomials
-#include <gsl/gsl_sf_legendre.h>
-}
 
-std::complex<double> spherical_harmonics(int l, int m, double cth, double phi) {
+std::complex<double> spherical_harmonics(int l, int m, double theta, double phi) {
   /* Calculate value of spherical harmonic Y_{lm} = N_{lm} P_{lm} (\cos \theta) e^{i m \phi} */
-  if(m<0) { // GSL doesn't handle m<0. Use the identity {Y_l}^{-m} = (-1)^m \overline{ {Y_l}^{m} }
-    return conj(pow(-1.0,m)*spherical_harmonics(l,-m,cth,phi));
+  if(m<0) { // std::sph_legendre requires m >= 0. Use the identity {Y_l}^{-m} = (-1)^m \overline{ {Y_l}^{m} }
+    return conj(pow(-1.0,m)*spherical_harmonics(l,-m,theta,phi));
   }
 
   std::complex<double> ylm;
@@ -37,16 +33,15 @@ std::complex<double> spherical_harmonics(int l, int m, double cth, double phi) {
   // First, calculate the exponential
   ylm=pow(M_E,std::complex<double>(0.0,m*phi)); // e^(im phi)
   // and then plug in the normalized associated Legendre polynomial,
-  // which already seems to take into account the Condon-Shortley
-  // phase factor.
-  ylm*=gsl_sf_legendre_sphPlm(l,m,cth);
+  // which already includes the Condon-Shortley phase factor.
+  ylm*=std::sph_legendre(l,m,theta);
 
   return ylm;
 }
 
-double solid_harmonics(int l, int m, double cth, double phi) {
+double solid_harmonics(int l, int m, double theta, double phi) {
   // Value of normalized Legendre polynomial is
-  double Plm=gsl_sf_legendre_sphPlm(l,abs(m),cth);
+  double Plm=std::sph_legendre(l,abs(m),theta);
 
   if(m>0)
     return sqrt(2)*Plm*cos(m*phi);

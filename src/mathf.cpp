@@ -19,26 +19,19 @@
 #include "mathf.h"
 #include <cmath>
 #include <cfloat>
+#include <random>
 
 // For exceptions
 #include <sstream>
 #include <stdexcept>
 
 extern "C" {
-  // For factorials and so on
+  // For the regularized incomplete gamma function (no std equivalent in C++17)
 #include <gsl/gsl_sf_gamma.h>
-  // For spline interpolation
+  // For cubic spline interpolation
 #include <gsl/gsl_spline.h>
-  // For Bessel functions
-#include <gsl/gsl_sf_bessel.h>
-  // For hypergeometric functions
+  // For confluent hypergeometric 1F1 (no std equivalent in C++17)
 #include <gsl/gsl_sf_hyperg.h>
-  // For trigonometric functions
-#include <gsl/gsl_sf_trig.h>
-  // Random number generation
-#include <gsl/gsl_rng.h>
-  // Random number distributions
-#include <gsl/gsl_randist.h>
 }
 
 double doublefact(int n) {
@@ -49,10 +42,10 @@ double doublefact(int n) {
     throw std::runtime_error(oss.str());
   }
 
-  if(n>=-1 && n<=1)
-    return 1.0;
-  else
-    return gsl_sf_doublefact(n);
+  double r=1.0;
+  for(int i=n;i>1;i-=2)
+    r*=i;
+  return r;
 }
 
 double fact(int n) {
@@ -64,34 +57,73 @@ double fact(int n) {
     throw std::runtime_error(oss.str());
   }
 
-  return gsl_sf_fact(n);
+  double r=1.0;
+  for(int i=2;i<=n;i++)
+    r*=i;
+  return r;
 }
 
 double fact_ratio(int i, int r) {
-  return gsl_sf_fact(i)/(gsl_sf_fact(r)*gsl_sf_fact(i-2*r));
+  return fact(i)/(fact(r)*fact(i-2*r));
 }
 
 double fgamma(double x) {
-  return gsl_sf_gamma(x);
+  return std::tgamma(x);
 }
 
 double sinc(double x) {
-  return gsl_sf_sinc(x/M_PI);
+  // For small x, evaluate sinc(x) = 1 - x^2/6 + x^4/120 - x^6/5040 + ...
+  // directly. The truncated five-term polynomial is accurate to under
+  // 1e-16 for |x| <= 0.1; outside that range sin(x)/x is well-conditioned.
+  if(std::abs(x) < 0.1) {
+    const double x2 = x*x;
+    return 1.0 + x2*(-1.0/6.0 + x2*(1.0/120.0 + x2*(-1.0/5040.0 + x2*(1.0/362880.0))));
+  }
+  return std::sin(x)/x;
 }
 
 double bessel_jl(int l, double x) {
-  // Small x: use series expansion
-  double series=pow(x,l)/doublefact(2*l+1);
-  if(fabs(series)<sqrt(DBL_EPSILON))
-    return series;
+  // Small x: sum the Taylor series about x=0
+  //   j_l(x) = sum_{k=0}^inf  (-1)^k  x^(l+2k) / [2^k k! (2l+2k+1)!!]
+  // with successive terms related by  t_{k+1} = t_k * (-x^2) /
+  // [2(k+1)(2l+2k+3)]. We invoke this branch when the leading term
+  // is below sqrt(eps), which is also the regime where std::sph_bessel
+  // wastes work on cancelling subtractions.
+  const double leading = pow(x,l)/doublefact(2*l+1);
+  if(fabs(leading) < sqrt(DBL_EPSILON)) {
+    double term = leading;
+    double sum = term;
+    for(int k = 0; k < 50; ++k) {
+      term *= -x*x / (2.0 * (k+1) * (2*l + 2*k + 3));
+      sum += term;
+      if(fabs(term) < DBL_EPSILON*fabs(sum)) break;
+    }
+    return sum;
+  }
 
-  // Large x: truncate due to incorrect GSL asymptotics
-  // (GSL bug https://savannah.gnu.org/bugs/index.php?36152)
-  if(x>1.0/DBL_EPSILON)
-    return 0.0;
+  // For large x, libstdc++'s std::sph_bessel throws ("Argument x too
+  // large in __bessel_jn; try asymptotic expansion."). At large x the
+  // asymptotic Taylor expansion in inverse powers of x is exact for
+  // spherical Bessel functions of integer order: starting from
+  //   j_0(x) = sin(x)/x
+  //   j_1(x) = sin(x)/x^2 - cos(x)/x
+  // the upward recurrence  j_{n+1}(x) = (2n+1)/x * j_n(x) - j_{n-1}(x)
+  // is numerically stable when x > l. We pick a conservative cutoff.
+  if(x > 200.0) {
+    const double sx=std::sin(x);
+    if(l==0) return sx/x;
+    const double cx=std::cos(x);
+    double jm1 = sx/x;                  // j_0
+    double j   = sx/(x*x) - cx/x;       // j_1
+    for(int n=1; n<l; ++n) {
+      double jp1 = (2*n+1)/x * j - jm1;
+      jm1 = j;
+      j = jp1;
+    }
+    return j;
+  }
 
-  // Default case: use GSL
-  return gsl_sf_bessel_jl(l,x);
+  return std::sph_bessel(l, x);
 }
 
 double boysF(int m, double x) {
@@ -129,7 +161,7 @@ double boysF(int m, double x) {
 
   } else
     // Need to use the exact formula
-    return 0.5*gsl_sf_gamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
+    return 0.5*std::tgamma(m+0.5)*pow(x,-m-0.5)*gsl_sf_gamma_inc_P(m+0.5,x);
 }
 
 void boysF_arr(int mmax, double x, arma::vec & F) {
@@ -167,8 +199,17 @@ double choose(int m, int n) {
     ERROR_INFO();
     throw std::domain_error("Choose called with a negative argument!\n");
   }
-
-  return gsl_sf_choose(m,n);
+  if(n>m)
+    return 0.0;
+  // Multiplicative form: C(m,n) = prod_{k=1..n} (m-k+1)/k. We pick the
+  // smaller of n and m-n to keep the loop short and the running product
+  // exact for small n.
+  if(n>m-n)
+    n=m-n;
+  double r=1.0;
+  for(int k=0;k<n;k++)
+    r=r*(m-k)/(k+1);
+  return r;
 }
 
 int getind(int l, int m, int n) {
@@ -269,38 +310,24 @@ double spline_interpolation(const std::vector<double> & xt, const std::vector<do
 }
 
 arma::mat randu_mat(size_t M, size_t N, unsigned long int seed) {
-  // Use Mersenne Twister algorithm
-  gsl_rng *r = gsl_rng_alloc(gsl_rng_mt19937);
-  // Set seed
-  gsl_rng_set(r,seed);
+  std::mt19937 rng(seed);
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
 
-  // Matrix
   arma::mat mat(M,N);
-  // Fill it
   for(size_t i=0;i<M;i++)
     for(size_t j=0;j<N;j++)
-      mat(i,j)=gsl_rng_uniform(r);
-
-  // Free rng
-  gsl_rng_free(r);
+      mat(i,j)=dist(rng);
   return mat;
 }
 
 arma::mat randn_mat(size_t M, size_t N, unsigned long int seed) {
-  // Use Mersenne Twister algorithm
-  gsl_rng *r = gsl_rng_alloc(gsl_rng_mt19937);
-  // Set seed
-  gsl_rng_set(r,seed);
+  std::mt19937 rng(seed);
+  std::normal_distribution<double> dist(0.0, 1.0);
 
-  // Matrix
   arma::mat mat(M,N);
-  // Fill it
   for(size_t i=0;i<M;i++)
     for(size_t j=0;j<N;j++)
-      mat(i,j)=gsl_ran_gaussian(r,1.0);
-
-  // Free rng
-  gsl_rng_free(r);
+      mat(i,j)=dist(rng);
   return mat;
 }
 

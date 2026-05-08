@@ -34,7 +34,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#include <gsl/gsl_sf_gamma.h>
+#include <cmath>
 
 /// Compute overlap of unnormalized Gaussian primitives, S(a,b) = 0.5 * (a+b)^(-3/2-l) Gamma(l+3/2)
 arma::mat primitive_overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
@@ -43,14 +43,14 @@ arma::mat primitive_overlap(const arma::vec & iexps, const arma::vec & jexps, in
     for(size_t j=0;j<jexps.n_elem;j++) {
       S(i,j) = std::pow(iexps(i)+jexps(j), -am -1.5);
     }
-  return 0.5*S*gsl_sf_gamma(am+1.5);
+  return 0.5*S*std::tgamma(am+1.5);
 }
 
 arma::vec primitive_norm(const arma::vec & iexps, int am) {
   arma::vec S(iexps.size());
   for(size_t i=0;i<iexps.n_elem;i++)
     S(i) = std::pow(2*iexps(i), -am -1.5);
-  return 0.5*S*gsl_sf_gamma(am+1.5);
+  return 0.5*S*std::tgamma(am+1.5);
 }
 
 /// Compute overlap of normalized Gaussian primitives
@@ -893,7 +893,7 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric)
       // exp(-zsum r^2). However, in each L channel the radial form is
       // r^L exp(-zr^2). We match the radial expectation value <r>
       // with this transformation
-      double scale = std::pow(gsl_sf_gamma(L+2)*gsl_sf_gamma(li+lj+1.5)/(gsl_sf_gamma(li+lj+2)*gsl_sf_gamma(L+1.5)),2);
+      double scale = std::pow(std::tgamma(L+2)*std::tgamma(li+lj+1.5)/(std::tgamma(li+lj+2)*std::tgamma(L+1.5)),2);
       double zeff = scale*zsum;
       reduced_exponents[L].push_back(zeff);
     }

@@ -24,7 +24,6 @@
 extern "C" {
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multimin.h>
-#include <gsl/gsl_sf_legendre.h>
 }
 
 #ifdef _OPENMP

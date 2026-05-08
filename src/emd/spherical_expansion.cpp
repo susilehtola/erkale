@@ -28,10 +28,7 @@
 #include "../mathf.h"
 #include "../timer.h"
 
-extern "C" {
-// 3j symbols
-#include <gsl/gsl_sf_coupling.h>
-}
+#include <wignernj.hpp>
 
 // Index of (l,m) in table
 #define lmind(l,m) ((l)*(l)+l+m)
@@ -257,11 +254,12 @@ SphericalExpansion SphericalExpansion::operator*(const SphericalExpansion & rhs)
 	  if(norm(c)==0.0)
 	    continue;
 
-	  // Real scaling factor: \sqrt{ \frac {(2j_1+1)(2j_2+1)(2j+1)} {4 \pi} } (-1)^m
-	  dc=sqrt((2.0*comb[i].l+1.0)*(2.0*rhs.comb[j].l+1.0)*(2.0*l+1.0)/(4.0*M_PI))*pow(-1.0,m);
-	  // Put in the 3j factors - GSL uses them as half integer units so multiply by two
-	  dc*=gsl_sf_coupling_3j(2*comb[i].l,2*rhs.comb[j].l,2*l,2*comb[i].m,2*rhs.comb[j].m,-2*m);
-	  dc*=gsl_sf_coupling_3j(2*comb[i].l,2*rhs.comb[j].l,2*l,0,0,0);
+	  // The product of the (-1)^m phase and the two 3j factors is the
+	  // Gaunt coefficient with the third magnetic argument flipped.
+	  // libwignernj computes ∫ Y_l1^m1 Y_l2^m2 Y_l3^m3 dΩ directly.
+	  dc=pow(-1.0,m)*wignernj::gaunt<double>(2*comb[i].l,2*comb[i].m,
+						 2*rhs.comb[j].l,2*rhs.comb[j].m,
+						 2*l,-2*m);
 
 	  // Add it to the list if the scaling factor is not zero
 	  if(dc!=0)

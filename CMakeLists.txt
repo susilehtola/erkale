@@ -4,10 +4,19 @@
 project (ERKALE)
 set(PROJECT_TYPE CXX)
 
-# Require CMake version 2.8 (might work with older ones, too)
-cmake_minimum_required(VERSION 2.6)
+# CMake 3.14 is required for FetchContent_MakeAvailable, used to
+# fetch libwignernj when no installed copy is detected.
+cmake_minimum_required(VERSION 3.14)
 # Enable Fortran for LAPACK
 enable_language (Fortran)
+
+# We use C++17 standard library facilities: std::tgamma, <random>,
+# std::sph_bessel, std::sph_legendre, std::legendre.
+if(NOT CMAKE_CXX_STANDARD)
+ set(CMAKE_CXX_STANDARD 17)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
 
 # Set version
 set(VERSION 0.1.0)
@@ -104,6 +113,37 @@ message("")
 find_package(HDF5 REQUIRED)
 message("HDF5 headers are in ${HDF5_INCLUDE_DIRS}")
 message("HDF5 linker flags are ${HDF5_LIBRARIES}")
+message("")
+
+# Find libwignernj for Wigner 3j symbols. If a system install is not
+# present, fetch and build from source. Either path exposes the
+# wignernj::wignernj imported target.
+find_package(wignernj 0.5.0 QUIET CONFIG)
+if(wignernj_FOUND)
+ message("Found libwignernj ${wignernj_VERSION}: ${wignernj_DIR}")
+else()
+ message("libwignernj not found; fetching v0.5.0 from GitHub.")
+ include(FetchContent)
+ # Disable libwignernj's own tests / examples / extra interfaces so the
+ # subbuild only produces the C library we link against.
+ set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+ set(BUILD_CXX_TESTS OFF CACHE BOOL "" FORCE)
+ set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+ set(BUILD_FORTRAN OFF CACHE BOOL "" FORCE)
+ FetchContent_Declare(
+   wignernj
+   GIT_REPOSITORY https://github.com/susilehtola/libwignernj.git
+   GIT_TAG        v0.5.0
+ )
+ FetchContent_MakeAvailable(wignernj)
+ # FetchContent's add_subdirectory only exposes the bare "wignernj"
+ # target; the "wignernj::wignernj" namespaced name only exists in the
+ # install/export path. Provide an alias so consumers can use the same
+ # name regardless of how libwignernj was acquired.
+ if(NOT TARGET wignernj::wignernj)
+   add_library(wignernj::wignernj ALIAS wignernj)
+ endif()
+endif()
 message("")
 
 
