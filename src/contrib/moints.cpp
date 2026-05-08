@@ -18,6 +18,7 @@
 
 #include "../checkpoint.h"
 #include "../density_fitting.h"
+#include <limits>
 #include "../erichol.h"
 #include "../localization.h"
 #include "../timer.h"
@@ -226,7 +227,12 @@ arma::mat sano_guess_failsafe(const arma::mat & Co, const arma::mat & Cv, const 
 
 arma::mat sano_guess(const arma::mat & Co, const arma::mat & Cv, const arma::mat & Bph) {
   arma::mat R;
-  double eval;
+  // Initialise to NaN so we can tell apart "sano_guess_orig assigned a
+  // real eigenvalue and then threw" (printed value will be a real
+  // number) from "sano_guess_orig threw before assigning eval"
+  // (printed as nan). The earlier code printed an uninitialised
+  // double in the latter case.
+  double eval=std::numeric_limits<double>::quiet_NaN();
   try {
     R=sano_guess_orig(Co,Cv,Bph,eval);
     printf("Default Sano guess was succesful, smallest eigenvalue of guess orbital overlap %e\n",eval);

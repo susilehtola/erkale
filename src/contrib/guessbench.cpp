@@ -269,7 +269,8 @@ int main_guarded(int argc, char **argv) {
     } else {
       occa.zeros();
       occb.zeros();
-      occa.subvec(0,Nela-1).ones();
+      if(Nela)
+        occa.subvec(0,Nela-1).ones();
       if(Nelb)
         occb.subvec(0,Nelb-1).ones();
     }
@@ -285,10 +286,19 @@ int main_guarded(int argc, char **argv) {
   double aproj(arma::trace(Pa*S*Pag*S));
   double bproj(arma::trace(Pb*S*Pbg*S));
   if(std::abs(aproj-bproj)>=sqrt(DBL_EPSILON)) {
-    printf("Alpha projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj,aproj/Nela*100.0);
-    printf("Beta  projection of guess onto SCF density is %e i.e. %5.2f %%\n",bproj,bproj/Nelb*100.0);
+    if(Nela)
+      printf("Alpha projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj,aproj/Nela*100.0);
+    else
+      printf("Alpha projection of guess onto SCF density is %e\n",aproj);
+    if(Nelb)
+      printf("Beta  projection of guess onto SCF density is %e i.e. %5.2f %%\n",bproj,bproj/Nelb*100.0);
+    else
+      printf("Beta  projection of guess onto SCF density is %e\n",bproj);
   }
-  printf("Projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela+Nelb)*100.0);
+  if(Nela+Nelb)
+    printf("Projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela+Nelb)*100.0);
+  else
+    printf("Projection of guess onto SCF density is %e\n",aproj+bproj);
 
   // Save result?
   if(savef.size()) {
