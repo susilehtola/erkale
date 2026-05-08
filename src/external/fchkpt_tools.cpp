@@ -94,6 +94,16 @@ Storage parse_fchk(const std::string & name) {
     throw std::runtime_error(oss.str());
   }
 
+  // Wrap the rest of the parse in a try/catch so any throw from
+  // readint/readdouble/etc. (e.g. on a malformed checkpoint line) still
+  // closes the input stream before propagating.
+  auto close_input = [&]() {
+    if(usegz || usexz || usebz2 || uselzma)
+      pclose(in);
+    else
+      fclose(in);
+  };
+
   // Line number
   size_t iline=0;
 
@@ -110,6 +120,7 @@ Storage parse_fchk(const std::string & name) {
   bool doublevec=false;
   std::vector<double> dblv;
 
+  try {
   while(true) {
     // Input line
     std::string line;
@@ -132,10 +143,13 @@ Storage parse_fchk(const std::string & name) {
 
     // Read in numbers?
     if(intvec) {
-      for(size_t i=0;i<words.size();i++)
+      // Bound the consumed count to N so a stray line with extra
+      // tokens doesn't cause N to wrap on size_t.
+      const size_t take = std::min(words.size(), N);
+      for(size_t i=0;i<take;i++)
 	intv.push_back(readint(words[i]));
 
-      N-=words.size();
+      N-=take;
       if(N==0) {
 	intvec=false;
 	// Add to stack
@@ -147,9 +161,10 @@ Storage parse_fchk(const std::string & name) {
 	intv.clear();
       }
     } else if(doublevec) {
-      for(size_t i=0;i<words.size();i++)
+      const size_t take = std::min(words.size(), N);
+      for(size_t i=0;i<take;i++)
 	dblv.push_back(readdouble(words[i]));
-      N-=words.size();
+      N-=take;
       if(N==0) {
 	doublevec=false;
 	// Add to stack
@@ -215,11 +230,13 @@ Storage parse_fchk(const std::string & name) {
     }
   }
 
+  } catch(...) {
+    close_input();
+    throw;
+  }
+
   // Close input
-  if(usegz || usexz || usebz2 || uselzma)
-    pclose(in);
-  else
-    fclose(in);
+  close_input();
 
   return ret;
 }

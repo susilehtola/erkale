@@ -29,6 +29,8 @@ void emd_cube(const BasisSet & bas, const arma::cx_mat & P, const std::vector<do
 
   // Open output file.
   FILE *out=fopen("emdcube.dat","w");
+  if(!out)
+    throw std::runtime_error("Could not open emdcube.dat for writing.\n");
 
   // Compute the norm (assumes evenly spaced grid!)
   double norm=0.0;

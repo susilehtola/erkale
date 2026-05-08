@@ -367,14 +367,18 @@ void load_fchk(double tol) {
     double nelnumb=arma::trace(Pb*S);
     double neldiffb=nelnumb-Nelb;
 
-    if(fabs(neldiffa)/Nela>tol) {
+    // Use absolute tolerance when the corresponding electron count is
+    // zero (e.g. fully spin-polarised cation with no beta electrons),
+    // since the relative-error denominator would otherwise be zero
+    // and the test would fire on numerical noise (or NaN).
+    if((Nela > 0 ? fabs(neldiffa)/Nela : fabs(neldiffa)) > tol) {
       std::ostringstream oss;
       oss << "\nNumber of alpha electrons and trace of alpha density matrix differ by " << neldiffa << "!\n";
       throw std::runtime_error(oss.str());
     }
     printf("tr PaS - Nela = %.e\n",neldiffa);
 
-    if(fabs(neldiffb)/Nelb>tol) {
+    if((Nelb > 0 ? fabs(neldiffb)/Nelb : fabs(neldiffb)) > tol) {
       std::ostringstream oss;
       oss << "\nNumber of beta electrons and trace of beta density matrix differ by " << neldiffb << "!\n";
       throw std::runtime_error(oss.str());
@@ -516,12 +520,20 @@ void save_fchk() {
     uselzma=true;
 
   // Open output file.
-  FILE *out=fopen(settings.get_string("SaveFchk").c_str(),"w");
+  const std::string savefchk = settings.get_string("SaveFchk");
+  FILE *out=fopen(savefchk.c_str(),"w");
+  if(!out) {
+    std::ostringstream oss;
+    oss << "Could not open output file \"" << savefchk << "\" for writing.\n";
+    throw std::runtime_error(oss.str());
+  }
 
   // Write comment
   fprintf(out,"%-80s\n","ERKALE formatted checkpoint for visualization purposes");
+  // Bound the timestamp string so we can't overflow the line buffer
+  // even with an unusually long current_time() result.
   char line[80];
-  sprintf(line,"Created on %s.",t.current_time().c_str());
+  snprintf(line,sizeof(line),"Created on %s.",t.current_time().c_str());
   fprintf(out,"%-80s\n",line);
 
   // Write the basis set info.
