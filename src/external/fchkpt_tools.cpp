@@ -25,6 +25,7 @@
 
 #include "../checkpoint.h"
 #include "../elements.h"
+#include <cstring>
 #include "../mathf.h"
 #include "../stringutil.h"
 #include "../timer.h"
@@ -39,6 +40,14 @@
 #endif
 
 
+/// True iff `s` ends with `suffix`. Replaces strstr-based extension
+/// detection that would also match the suffix anywhere in the path
+/// (e.g. a directory named `proj.gz/`).
+static bool ends_with(const std::string & s, const char * suffix) {
+  const size_t slen = std::strlen(suffix);
+  return s.size() >= slen && s.compare(s.size() - slen, slen, suffix) == 0;
+}
+
 /// Parse formatted checkpoint file
 Storage parse_fchk(const std::string & name) {
   // Returned storage
@@ -47,26 +56,20 @@ Storage parse_fchk(const std::string & name) {
   // Input file
   FILE *in;
 
-  // Handle also compressed files
+  // Handle also compressed files. Match the actual filename suffix
+  // rather than any substring; otherwise a path like `proj.gz/bin.fchk`
+  // would be misidentified as a gz-compressed file.
   const char gzcmd[]="zcat ";
-  bool usegz=false;
-  if(strstr(name.c_str(),".gz")!=NULL)
-    usegz=true;
+  bool usegz=ends_with(name, ".gz");
 
   const char xzcmd[]="xzcat ";
-  bool usexz=false;
-  if(strstr(name.c_str(),".xz")!=NULL)
-    usexz=true;
+  bool usexz=ends_with(name, ".xz");
 
   const char bz2cmd[]="bzcat ";
-  bool usebz2=false;
-  if(strstr(name.c_str(),".bz2")!=NULL)
-    usebz2=true;
+  bool usebz2=ends_with(name, ".bz2");
 
   const char lzmacmd[]="lzcat ";
-  bool uselzma=false;
-  if(strstr(name.c_str(),".lzma")!=NULL)
-    uselzma=true;
+  bool uselzma=ends_with(name, ".lzma");
 
   /* Open the file */
   if(usegz) {

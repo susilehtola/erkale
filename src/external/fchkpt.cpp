@@ -498,26 +498,25 @@ void save_fchk() {
   // File to save
   std::string savename=settings.get_string("SaveFchk");
 
-  // Handle also compressed files
+  // Handle also compressed files. Match the actual filename suffix
+  // rather than any substring; otherwise a path like `proj.gz/out.fchk`
+  // would be misidentified as a gz target.
+  auto ends_with = [&](const char * suffix) {
+    const size_t slen = std::strlen(suffix);
+    return savename.size() >= slen &&
+           savename.compare(savename.size() - slen, slen, suffix) == 0;
+  };
   std::string gzcmd="gzip ";
-  bool usegz=false;
-  if(strstr(savename.c_str(),".gz")!=NULL)
-    usegz=true;
+  bool usegz=ends_with(".gz");
 
   std::string xzcmd="xz ";
-  bool usexz=false;
-  if(strstr(savename.c_str(),".xz")!=NULL)
-    usexz=true;
+  bool usexz=ends_with(".xz");
 
   std::string bz2cmd="bzip2 ";
-  bool usebz2=false;
-  if(strstr(savename.c_str(),".bz2")!=NULL)
-    usebz2=true;
+  bool usebz2=ends_with(".bz2");
 
   std::string lzmacmd="lzma ";
-  bool uselzma=false;
-  if(strstr(savename.c_str(),".lzma")!=NULL)
-    uselzma=true;
+  bool uselzma=ends_with(".lzma");
 
   // Open output file.
   const std::string savefchk = settings.get_string("SaveFchk");
