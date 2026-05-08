@@ -322,13 +322,16 @@ void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs,
     throw std::logic_error(oss.str());
   }
 
-  // Reshape B
-  const arma::mat Breshape((double *) B.memptr(), Nbf, Nbf*Naux, false, true);
-  arma::cx_mat Awork(Nbf,Naux);
-  
+  // Reshape B. After PartialCholeskyOrth in fill(), B has B.n_cols
+  // linearly independent auxiliary columns (≤ Naux); using raw Naux
+  // here would read past the end of B's storage.
+  const size_t Na = B.n_cols;
+  const arma::mat Breshape((double *) B.memptr(), Nbf, Nbf*Na, false, true);
+  arma::cx_mat Awork(Nbf,Na);
+
   for(size_t i=0;i<C.n_cols;i++) {
     // A(s,Q) = B(r;sQ) C(r;i)
-    Awork = arma::reshape(arma::trans(Breshape)*C.col(i),Nbf,Naux);
+    Awork = arma::reshape(arma::trans(Breshape)*C.col(i),Nbf,Na);
     K+=occs[i]*arma::conj(Awork)*arma::strans(Awork);
   }
 }
