@@ -51,6 +51,14 @@ arma::vec welltempered_set(double alpha, double beta, double gamma, double delta
 }
 
 arma::mat legendre_P_mat(int Nprim, int kmax) {
+  // Maps the integer index j=1..Nprim to a Legendre argument in [-1, 1].
+  // Requires Nprim >= 2 to avoid dividing by zero at the (j-1)*2/(Nprim-1)
+  // step; a single-primitive Legendre expansion isn't well-defined here.
+  if(Nprim<2) {
+    ERROR_INFO();
+    throw std::runtime_error("legendre_P_mat requires at least two primitives.\n");
+  }
+
   // Compute the Legendre polynomials
   arma::mat Pk(Nprim, kmax);
   for(int j=1;j<=Nprim;j++) { // Loop over exponents

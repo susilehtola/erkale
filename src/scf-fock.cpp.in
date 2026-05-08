@@ -929,7 +929,7 @@ void XRSSCF::Fock_half_hole(uscf_t & sol, dft_t dft, const std::vector<double> &
 #endif
 
   if(!std::isfinite(sol.en.E)) {
-#if DEBUGPRINTOUT
+#ifdef DEBUGPRINTOUT
     ERROR_INFO();
 
     // Print out hamiltonians
