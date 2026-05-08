@@ -883,6 +883,8 @@ void UnitaryOptimizer::fourier_step_df(UnitaryFunction* & f) {
       if(minval==fv(i)) {
 	delete f;
 	f=fs[i];
+	// Detach from fs so the cleanup below doesn't free the new f.
+	fs[i]=nullptr;
 	break;
       }
   }

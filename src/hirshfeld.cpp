@@ -88,8 +88,9 @@ double HirshfeldAtom::get(double r) const {
   // Index of entry is
   size_t i=(size_t) floor(rdr);
 
-  // Check limit
-  if(i>=rho.size()-1)
+  // Check limit. Test against rho.size() rather than rho.size()-1 so
+  // that an empty rho (size 0) doesn't wrap on the unsigned subtraction.
+  if(i+1>=rho.size())
     return 0.0;
 
   // Perform linear intepolation

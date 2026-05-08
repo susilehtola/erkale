@@ -398,6 +398,14 @@ arma::vec find_minima(const arma::vec & x, const arma::vec & y, size_t runave, d
     throw std::runtime_error("Input vectors are of inconsistent size!\n");
   }
 
+  // The running average eats runave points off each end; bail out if
+  // the input is too short to leave at least 2 averaged samples (the
+  // boundary checks below dereference yave(0)..yave(1) and the last two
+  // entries; with size_t the 2*runave subtraction also wraps when the
+  // input is shorter).
+  if(x.n_elem < 2*runave + 2)
+    return arma::vec();
+
   // Create averaged vectors
   arma::vec xave(x.n_elem-2*runave);
   arma::vec yave(y.n_elem-2*runave);
@@ -416,7 +424,7 @@ arma::vec find_minima(const arma::vec & x, const arma::vec & y, size_t runave, d
   if(yave(0)<yave(1))
     minloc.push_back(0);
 
-  for(arma::uword i=1;i<yave.n_elem-1;i++)
+  for(arma::uword i=1;i+1<yave.n_elem;i++)
     if(yave(i)<yave(i-1) && yave(i)<yave(i+1))
       minloc.push_back(i);
 

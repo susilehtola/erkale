@@ -159,8 +159,12 @@ void StockholderAtom::fill_adaptive(const BasisSet & basis, const arma::mat & P,
     int lnext;
     double avgnext;
 
-    std::vector<double> oldrho, oldweights;
-    std::vector<coords_t> oldgrid;
+    // Seed with the current grid so that an early loop exit (e.g. the
+    // initial Lebedev rule already meets lmax) doesn't revert to empty
+    // vectors below.
+    std::vector<double> oldrho(rho[irad]);
+    std::vector<double> oldweights(weights[irad]);
+    std::vector<coords_t> oldgrid(grid[irad]);
 
     while(l<lmax) {
       // Get old rho, weight and grid
