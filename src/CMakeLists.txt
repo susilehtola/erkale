@@ -55,6 +55,11 @@ if(BUILD_SHARED_LIBS)
  target_link_libraries(liberkale ${HDF5_LIBRARIES})
 endif()
 
+# Wigner 3j symbols come from libwignernj (see top-level CMakeLists).
+# It is an imported target, so include directories and the link
+# requirement propagate transitively to consumers of liberkale.
+target_link_libraries(liberkale wignernj::wignernj)
+
 # Create the ERKALE main executable
 add_executable (erkale main.cpp)
 # The name of the executable is
@@ -216,7 +221,7 @@ add_subdirectory(basistool)
 add_subdirectory(external)
 
 # Compile the extra programs
-#add_subdirectory(contrib)
+add_subdirectory(contrib)
 
 # Recipe for compiling full ERIWorker file
 add_custom_command(
