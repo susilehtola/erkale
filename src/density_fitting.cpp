@@ -334,7 +334,162 @@ void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs,
 }
 
 void DensityFit::digest_K_direct(const arma::mat & C, const arma::vec & occs, arma::mat & K) const {
-  throw std::logic_error("Direct K digestion not implemented\n");
+  if(C.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
+  // For each orbital column C(:,i) build A(mu, a, i) = sum_nu (mu nu | a) C(nu, i)
+  // by looping over orbital-pair shell blocks and contracting the freshly
+  // computed (mu nu | a) integrals; off-diagonal pair blocks also contribute
+  // to A(nu, :) by integral symmetry.
+  const size_t Norb = C.n_cols;
+  std::vector<arma::mat> A(Norb, arma::mat(Nbf, Naux, arma::fill::zeros));
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker *eri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri = new ERIWorker(maxam, maxcontr);
+    else
+      eri = new ERIWorker_srlr(maxam, maxcontr, omega, alpha, beta);
+
+    std::vector<arma::mat> Awrk(Norb, arma::mat(Nbf, Naux, arma::fill::zeros));
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0; ip<orbpairs.size(); ++ip) {
+      // Layout: amunu(a, nu*Nmu+mu), with mu varying fastest within
+      // columns -- memory-equivalent to a column-major (Naux,Nmu,Nnu) cube.
+      arma::mat amunu(compute_a_munu(eri, ip));
+
+      const size_t imus = orbpairs[ip].is;
+      const size_t inus = orbpairs[ip].js;
+      const size_t mu0  = orbshells[imus].get_first_ind();
+      const size_t nu0  = orbshells[inus].get_first_ind();
+      const size_t Nmu  = orbshells[imus].get_Nbf();
+      const size_t Nnu  = orbshells[inus].get_Nbf();
+
+      // M_view(a + Naux*mu, nu) = (mu nu | a) under the cube reinterpretation;
+      // M_view * Cnu is a single GEMV that performs the contract-over-nu.
+      const arma::mat M_view((double*) amunu.memptr(), Naux*Nmu, Nnu, false, true);
+
+      for(size_t i=0; i<Norb; ++i) {
+        const arma::vec Cmu = C.col(i).subvec(mu0, mu0+Nmu-1);
+        const arma::vec Cnu = C.col(i).subvec(nu0, nu0+Nnu-1);
+
+        // sum_nu (mu nu | a) Cnu(nu) -> reshape (Naux, Nmu) -> transpose
+        // into the (Nmu, Naux) submat slot of A.
+        arma::vec rv = M_view * Cnu;
+        Awrk[i].submat(mu0, 0, mu0+Nmu-1, Naux-1) += arma::reshape(rv, Naux, Nmu).t();
+
+        // For off-diagonal blocks the swapped contribution A(nu, a) +=
+        // sum_mu (mu nu | a) Cmu(mu) needs to be computed too. The cube's
+        // middle axis isn't the slowest one, so we loop over nu for one
+        // GEMV per nu.
+        if(imus != inus) {
+          for(size_t nu=0; nu<Nnu; ++nu) {
+            arma::vec col = amunu.cols(nu*Nmu, (nu+1)*Nmu-1) * Cmu;
+            Awrk[i].submat(nu0+nu, 0, nu0+nu, Naux-1) += col.t();
+          }
+        }
+      }
+    }
+
+    delete eri;
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    {
+      for(size_t i=0; i<Norb; ++i)
+        A[i] += Awrk[i];
+    }
+  }
+
+  // K += sum_i occs[i] * (A * ab_invh) * (A * ab_invh)^T
+  for(size_t i=0; i<Norb; ++i) {
+    arma::mat A_h = A[i] * ab_invh;
+    K += occs[i] * A_h * A_h.t();
+  }
+}
+
+void DensityFit::digest_K_direct(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const {
+  if(C.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
+    throw std::logic_error(oss.str());
+  }
+
+  // Same algorithm as the real-valued path; only the orbital column
+  // carries complex values, so the integrals stay real but the
+  // contractions and the final accumulation pick up complex types.
+  const size_t Norb = C.n_cols;
+  std::vector<arma::cx_mat> A(Norb, arma::cx_mat(Nbf, Naux, arma::fill::zeros));
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker *eri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri = new ERIWorker(maxam, maxcontr);
+    else
+      eri = new ERIWorker_srlr(maxam, maxcontr, omega, alpha, beta);
+
+    std::vector<arma::cx_mat> Awrk(Norb, arma::cx_mat(Nbf, Naux, arma::fill::zeros));
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0; ip<orbpairs.size(); ++ip) {
+      arma::mat amunu(compute_a_munu(eri, ip));
+
+      const size_t imus = orbpairs[ip].is;
+      const size_t inus = orbpairs[ip].js;
+      const size_t mu0  = orbshells[imus].get_first_ind();
+      const size_t nu0  = orbshells[inus].get_first_ind();
+      const size_t Nmu  = orbshells[imus].get_Nbf();
+      const size_t Nnu  = orbshells[inus].get_Nbf();
+
+      const arma::mat M_view((double*) amunu.memptr(), Naux*Nmu, Nnu, false, true);
+
+      for(size_t i=0; i<Norb; ++i) {
+        const arma::cx_vec Cmu = C.col(i).subvec(mu0, mu0+Nmu-1);
+        const arma::cx_vec Cnu = C.col(i).subvec(nu0, nu0+Nnu-1);
+
+        arma::cx_vec rv = M_view * Cnu;
+        Awrk[i].submat(mu0, 0, mu0+Nmu-1, Naux-1) += arma::reshape(rv, Naux, Nmu).st();
+
+        if(imus != inus) {
+          for(size_t nu=0; nu<Nnu; ++nu) {
+            arma::cx_vec col = amunu.cols(nu*Nmu, (nu+1)*Nmu-1) * Cmu;
+            Awrk[i].submat(nu0+nu, 0, nu0+nu, Naux-1) += col.st();
+          }
+        }
+      }
+    }
+
+    delete eri;
+
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    {
+      for(size_t i=0; i<Norb; ++i)
+        A[i] += Awrk[i];
+    }
+  }
+
+  // Match digest_K_incore complex convention: K += sum_i occs[i] * conj(A_h) * A_h^T
+  for(size_t i=0; i<Norb; ++i) {
+    arma::cx_mat A_h = A[i] * ab_invh;
+    K += occs[i] * arma::conj(A_h) * arma::strans(A_h);
+  }
 }
 
 size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double thr, bool dir) const {
@@ -877,8 +1032,24 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
   if(!direct) {
     digest_K_incore(C,occs,K);
   } else {
-    (void) fitmem;
-    throw std::logic_error("Direct mode hasn't been implemented for density-fitted complex exchange!\n");
+    // Block over orbitals to bound peak memory, mirroring the real-valued
+    // path above; each block fires a single digest_K_direct call.
+    size_t oneorb(sizeof(std::complex<double>)*Naux*Nbf);
+#ifdef _OPENMP
+    oneorb*=omp_get_max_threads();
+#endif
+    size_t blocksize(floor(fitmem*1.0/oneorb));
+    if(blocksize<1) {
+      std::ostringstream oss;
+      oss << "Not enough fitting memory! Need at least " << memory_size(oneorb) << " per orbital!\n";
+      throw std::logic_error(oss.str());
+    }
+    size_t nblocks(ceil(C.n_cols*1.0/blocksize));
+    for(size_t iblock=0; iblock<nblocks; ++iblock) {
+      size_t iobeg(iblock*blocksize);
+      size_t ioend(std::min((iblock+1)*blocksize-1, (size_t) C.n_cols-1));
+      digest_K_direct(C.cols(iobeg,ioend), occs.subvec(iobeg,ioend), K);
+    }
   }
 
   return K;
