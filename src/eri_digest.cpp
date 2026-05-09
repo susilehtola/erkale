@@ -51,33 +51,29 @@ void JDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
   size_t k0=shpairs[jp].i0;
   size_t l0=shpairs[jp].j0;
 
+  // The (μν|λσ) integrals are stored in C-order with σ varying
+  // fastest:  ints[ioff + ((ii*Nj+jj)*Nk+kk)*Nl+ll]. Viewed as a
+  // column-major matrix with row index r = (kk*Nl+ll) and column
+  // index c = (ii*Nj+jj), this matches the offset c*(Nk*Nl) + r,
+  // so we can wrap it as an Nk*Nl × Ni*Nj armadillo matrix and let
+  // BLAS GEMV do the contractions.
+  const arma::mat ints_view(const_cast<double*>(&ints[ioff]), Nk*Nl, Ni*Nj, false, true);
+
   // J_ij = (ij|kl) P_kl
   {
-    // Work matrix
-    arma::mat Jij(Ni,Nj);
-    Jij.zeros();
     arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
-
-    // Degeneracy factor
     double fac=1.0;
     if(ks!=ls)
       fac=2.0;
 
-    // Increment matrix
-    for(size_t ii=0;ii<Ni;ii++)
-      for(size_t jj=0;jj<Nj;jj++) {
+    // ints_view.t() * vec(Pkl in row-major order)  -> length Ni*Nj.
+    // vectorise(Pkl.t()) gives the row-major flattening (Pkl(0,0),
+    // Pkl(0,1), ..., Pkl(0,Nl-1), Pkl(1,0), ...).
+    const arma::vec rv = ints_view.t() * arma::vectorise(Pkl.t());
+    // rv[ii*Nj+jj] = Σ_kl (ij|kl) P(k,l). reshape into (Nj, Ni)
+    // gives mat(jj,ii) = rv[ii*Nj+jj]; transpose to obtain Jij(ii,jj).
+    const arma::mat Jij = fac * arma::reshape(rv, Nj, Ni).t();
 
-	// Matrix element
-	double el=0.0;
-	for(size_t kk=0;kk<Nk;kk++)
-	  for(size_t ll=0;ll<Nl;ll++)
-	    el+=Pkl(kk,ll)*ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll];
-
-	// Set the element
-	Jij(ii,jj)+=fac*el;
-      }
-
-    // Store the matrix element
     J.submat(i0,j0,i0+Ni-1,j0+Nj-1)+=Jij;
     if(is!=js)
       J.submat(j0,i0,j0+Nj-1,i0+Ni-1)+=arma::trans(Jij);
@@ -85,33 +81,15 @@ void JDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
 
   // Permutation: J_kl = (ij|kl) P_ij
   if(ip!=jp) {
-    // Work matrix
-    arma::mat Jkl(Nk,Nl);
-    Jkl.zeros();
     arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
-
-    // Degeneracy factor
     double fac=1.0;
     if(is!=js)
       fac=2.0;
 
-    // Increment matrix
-    for(size_t kk=0;kk<Nk;kk++)
-      for(size_t ll=0;ll<Nl;ll++) {
+    // Same trick, contracting over (ij) instead of (kl).
+    const arma::vec rv = ints_view * arma::vectorise(Pij.t());
+    const arma::mat Jkl = fac * arma::reshape(rv, Nl, Nk).t();
 
-	// Matrix element
-	double el=0.0;
-	for(size_t ii=0;ii<Ni;ii++) {
-	  for(size_t jj=0;jj<Nj;jj++) {
-	    el+=Pij(ii,jj)*ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll];
-	  }
-	}
-
-	// Set the element
-	Jkl(kk,ll)+=fac*el;
-      }
-
-    // Store the matrix element
     J.submat(k0,l0,k0+Nk-1,l0+Nl-1)+=Jkl;
     if(ks!=ls)
       J.submat(l0,k0,l0+Nl-1,k0+Nk-1)+=arma::trans(Jkl);

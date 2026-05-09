@@ -214,12 +214,12 @@ arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip) const {
   size_t Nmu=orbshells[imus].get_Nbf();
   size_t Nnu=orbshells[inus].get_Nbf();
 
-  // Allocate storage
-  arma::mat amunu;
-  amunu.zeros(Naux,Nmu*Nnu);
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
+  // Allocate without zeroing -- every entry is written by the loop.
+  // Drop the inner `parallel for`: this routine is called from within
+  // an outer parallel region (calcJ direct, three_center_integrals),
+  // and most OpenMP runtimes serialise nested parallel loops by
+  // default, so the inner pragma adds overhead without parallelism.
+  arma::mat amunu(Naux,Nmu*Nnu,arma::fill::none);
   for(size_t ia=0;ia<auxshells.size();ia++) {
     // Number of functions on shell
     size_t Na=auxshells[ia].get_Nbf();
@@ -1115,22 +1115,20 @@ void DensityFit::three_center_integrals(arma::mat & ints) const {
 
       const arma::mat amunu(compute_a_munu(eri,ip));
 
-      for(size_t ias=0;ias<auxshells.size();ias++) {
-        size_t Na=auxshells[ias].get_Nbf();
-        size_t a0=auxshells[ias].get_first_ind();
-
-        for(size_t imu=0;imu<Nmu;imu++)
-          for(size_t inu=0;inu<Nnu;inu++)
-            for(size_t ia=0;ia<Na;ia++) {
-              size_t mu=imu+mu0;
-              size_t nu=inu+nu0;
-              size_t a=ia+a0;
-
-              double el(amunu(ia+a0,inu*Nmu+imu));
-              ints(mu*Nbf+nu,a)=el;
-              ints(nu*Nbf+mu,a)=el;
-            }
-      }
+      // amunu(a, inu*Nmu+imu) is the (a | μν) integral for the global
+      // aux index a. We can copy a whole Naux-long column of amunu
+      // into the (mu*Nbf+nu) row of ints in one armadillo assignment;
+      // the previous code walked aux shells explicitly and wrote
+      // element-by-element via a triple inner loop.
+      for(size_t imu=0;imu<Nmu;imu++)
+        for(size_t inu=0;inu<Nnu;inu++) {
+          const size_t mu=imu+mu0;
+          const size_t nu=inu+nu0;
+          const arma::rowvec col_t(amunu.col(inu*Nmu+imu).t());
+          ints.row(mu*Nbf+nu) = col_t;
+          if(mu!=nu)
+            ints.row(nu*Nbf+mu) = col_t;
+        }
     }
 
     delete eri;

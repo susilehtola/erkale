@@ -431,23 +431,21 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
   if(force && do_lapl)
     Plapl=P*bf_lapl;
 
-  // Calculate density
+  // Calculate density. Each per-grid-point dot product is replaced
+  // with a single column-wise reduction (Pv % bf), which arma can
+  // dispatch as a fused vectorised pass over contiguous memory rather
+  // than N separate length-Nbf dots.
   rho.zeros(1,grid.size());
-  for(size_t ip=0;ip<grid.size();ip++)
-    rho(0,ip)=arma::dot(Pv.col(ip),bf.col(ip));
+  rho.row(0) = arma::sum(Pv % bf, 0);
 
   // Calculate gradient
   if(do_grad) {
     grho.zeros(3,grid.size());
     sigma.zeros(1,grid.size());
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Calculate values
-      double gx=grho(0,ip)=2.0*arma::dot(Pv.col(ip),bf_x.col(ip));
-      double gy=grho(1,ip)=2.0*arma::dot(Pv.col(ip),bf_y.col(ip));
-      double gz=grho(2,ip)=2.0*arma::dot(Pv.col(ip),bf_z.col(ip));
-      // Compute sigma as well
-      sigma(0,ip)=gx*gx + gy*gy + gz*gz;
-    }
+    grho.row(0) = 2.0 * arma::sum(Pv % bf_x, 0);
+    grho.row(1) = 2.0 * arma::sum(Pv % bf_y, 0);
+    grho.row(2) = 2.0 * arma::sum(Pv % bf_z, 0);
+    sigma.row(0) = arma::square(grho.row(0)) + arma::square(grho.row(1)) + arma::square(grho.row(2));
   }
 
   // Calculate laplacian and kinetic energy density
@@ -461,20 +459,11 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     Pv_y=P*bf_y;
     Pv_z=P*bf_z;
 
-    // Calculate values
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Laplacian term
-      double lap=arma::dot(Pv.col(ip),bf_lapl.col(ip));
-      // Gradient term
-      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
-      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
-      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
-      double grad(gradx+grady+gradz);
-
-      // Store values
-      lapl(0,ip)=2.0*(lap+grad);
-      tau(0,ip)=0.5*grad;
-    }
+    // Vectorised column-wise reductions
+    const arma::rowvec lap_v(arma::sum(Pv % bf_lapl, 0));
+    const arma::rowvec grad_v(arma::sum(Pv_x % bf_x + Pv_y % bf_y + Pv_z % bf_z, 0));
+    lapl.row(0) = 2.0 * (lap_v + grad_v);
+    tau.row(0) = 0.5 * grad_v;
   } else if(do_tau) {
     // Adjust size of grid
     tau.zeros(1,grid.size());
@@ -484,17 +473,8 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     Pv_y=P*bf_y;
     Pv_z=P*bf_z;
 
-    // Calculate values
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Gradient term
-      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
-      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
-      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
-      double grad(gradx+grady+gradz);
-
-      // Store values
-      tau(0,ip)=0.5*grad;
-    }
+    // Vectorised column-wise reduction
+    tau.row(0) = 0.5 * arma::sum(Pv_x % bf_x + Pv_y % bf_y + Pv_z % bf_z, 0);
   } else if(do_lapl) {
     // Adjust size of grid
     lapl.zeros(1,grid.size());
@@ -504,19 +484,10 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     Pv_y=P*bf_y;
     Pv_z=P*bf_z;
 
-    // Calculate values
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Laplacian term
-      double lap=arma::dot(Pv.col(ip),bf_lapl.col(ip));
-      // Gradient term
-      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
-      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
-      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
-      double grad(gradx+grady+gradz);
-
-      // Store values
-      lapl(0,ip)=2.0*(lap+grad);
-    }
+    // Vectorised column-wise reductions
+    const arma::rowvec lap_v(arma::sum(Pv % bf_lapl, 0));
+    const arma::rowvec grad_v(arma::sum(Pv_x % bf_x + Pv_y % bf_y + Pv_z % bf_z, 0));
+    lapl.row(0) = 2.0 * (lap_v + grad_v);
   }
 }
 
@@ -542,36 +513,22 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
 
   // Calculate density
   rho.zeros(2,grid.size());
-  for(size_t ip=0;ip<grid.size();ip++) {
-    rho(0,ip)=arma::dot(Pav.col(ip),bf.col(ip));
-    rho(1,ip)=arma::dot(Pbv.col(ip),bf.col(ip));
-
-    /*
-    double na=compute_density(Pa0,*basp,grid[ip].r);
-    double nb=compute_density(Pb0,*basp,grid[ip].r);
-    if(fabs(da-na)>1e-6 || fabs(db-nb)>1e-6)
-      printf("Density at point % .3f % .3f % .3f: %e vs %e, %e vs %e\n",grid[ip].r.x,grid[ip].r.y,grid[ip].r.z,da,na,db,nb);
-    */
-  }
+  rho.row(0) = arma::sum(Pav % bf, 0);
+  rho.row(1) = arma::sum(Pbv % bf, 0);
 
   // Calculate gradient
   if(do_grad) {
     grho.zeros(6,grid.size());
     sigma.zeros(3,grid.size());
-    for(size_t ip=0;ip<grid.size();ip++) {
-      double gax=grho(0,ip)=2.0*arma::dot(Pav.col(ip),bf_x.col(ip));
-      double gay=grho(1,ip)=2.0*arma::dot(Pav.col(ip),bf_y.col(ip));
-      double gaz=grho(2,ip)=2.0*arma::dot(Pav.col(ip),bf_z.col(ip));
-
-      double gbx=grho(3,ip)=2.0*arma::dot(Pbv.col(ip),bf_x.col(ip));
-      double gby=grho(4,ip)=2.0*arma::dot(Pbv.col(ip),bf_y.col(ip));
-      double gbz=grho(5,ip)=2.0*arma::dot(Pbv.col(ip),bf_z.col(ip));
-
-      // Compute sigma as well
-      sigma(0,ip)=gax*gax + gay*gay + gaz*gaz;
-      sigma(1,ip)=gax*gbx + gay*gby + gaz*gbz;
-      sigma(2,ip)=gbx*gbx + gby*gby + gbz*gbz;
-    }
+    grho.row(0) = 2.0 * arma::sum(Pav % bf_x, 0);
+    grho.row(1) = 2.0 * arma::sum(Pav % bf_y, 0);
+    grho.row(2) = 2.0 * arma::sum(Pav % bf_z, 0);
+    grho.row(3) = 2.0 * arma::sum(Pbv % bf_x, 0);
+    grho.row(4) = 2.0 * arma::sum(Pbv % bf_y, 0);
+    grho.row(5) = 2.0 * arma::sum(Pbv % bf_z, 0);
+    sigma.row(0) = arma::square(grho.row(0)) + arma::square(grho.row(1)) + arma::square(grho.row(2));
+    sigma.row(1) = grho.row(0)%grho.row(3) + grho.row(1)%grho.row(4) + grho.row(2)%grho.row(5);
+    sigma.row(2) = arma::square(grho.row(3)) + arma::square(grho.row(4)) + arma::square(grho.row(5));
   }
 
   // Calculate laplacian and kinetic energy density
@@ -591,66 +548,27 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
     Pbv_y=Pb*bf_y;
     Pbv_z=Pb*bf_z;
 
-    // Calculate values
+    // Vectorised column-wise reductions across all grid points,
+    // replacing the per-ip arma::dot loops above.
     if(do_tau && do_lapl) {
-      for(size_t ip=0;ip<grid.size();ip++) {
-	// Laplacian term
-	double lapa=arma::dot(Pav.col(ip),bf_lapl.col(ip));
-	double lapb=arma::dot(Pbv.col(ip),bf_lapl.col(ip));
-	// Gradient term
-	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
-	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
-	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
-	double grada(gradax+graday+gradaz);
-
-	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
-	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
-	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
-	double gradb(gradbx+gradby+gradbz);
-
-	// Store values
-	lapl(0,ip)=2.0*(lapa+grada);
-	lapl(1,ip)=2.0*(lapb+gradb);
-	tau(0,ip)=0.5*grada;
-	tau(1,ip)=0.5*gradb;
-      }
+      const arma::rowvec lapa(arma::sum(Pav % bf_lapl, 0));
+      const arma::rowvec lapb(arma::sum(Pbv % bf_lapl, 0));
+      const arma::rowvec grada(arma::sum(Pav_x % bf_x + Pav_y % bf_y + Pav_z % bf_z, 0));
+      const arma::rowvec gradb(arma::sum(Pbv_x % bf_x + Pbv_y % bf_y + Pbv_z % bf_z, 0));
+      lapl.row(0) = 2.0 * (lapa + grada);
+      lapl.row(1) = 2.0 * (lapb + gradb);
+      tau.row(0)  = 0.5 * grada;
+      tau.row(1)  = 0.5 * gradb;
     } else if(do_tau) {
-      for(size_t ip=0;ip<grid.size();ip++) {
-	// Gradient term
-	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
-	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
-	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
-	double grada(gradax+graday+gradaz);
-
-	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
-	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
-	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
-	double gradb(gradbx+gradby+gradbz);
-
-	// Store values
-	tau(0,ip)=0.5*grada;
-	tau(1,ip)=0.5*gradb;
-      }
+      tau.row(0) = 0.5 * arma::sum(Pav_x % bf_x + Pav_y % bf_y + Pav_z % bf_z, 0);
+      tau.row(1) = 0.5 * arma::sum(Pbv_x % bf_x + Pbv_y % bf_y + Pbv_z % bf_z, 0);
     } else if(do_lapl) {
-      for(size_t ip=0;ip<grid.size();ip++) {
-	// Laplacian term
-	double lapa=arma::dot(Pav.col(ip),bf_lapl.col(ip));
-	double lapb=arma::dot(Pbv.col(ip),bf_lapl.col(ip));
-	// Gradient term
-	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
-	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
-	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
-	double grada(gradax+graday+gradaz);
-
-	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
-	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
-	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
-	double gradb(gradbx+gradby+gradbz);
-
-	// Store values
-	lapl(0,ip)=2.0*(lapa+grada);
-	lapl(1,ip)=2.0*(lapb+gradb);
-      }
+      const arma::rowvec lapa(arma::sum(Pav % bf_lapl, 0));
+      const arma::rowvec lapb(arma::sum(Pbv % bf_lapl, 0));
+      const arma::rowvec grada(arma::sum(Pav_x % bf_x + Pav_y % bf_y + Pav_z % bf_z, 0));
+      const arma::rowvec gradb(arma::sum(Pbv_x % bf_x + Pbv_y % bf_y + Pbv_z % bf_z, 0));
+      lapl.row(0) = 2.0 * (lapa + grada);
+      lapl.row(1) = 2.0 * (lapb + gradb);
     }
   }
 }
@@ -1555,6 +1473,12 @@ double AngularGrid::eval_Exc() const {
   if(polarized)
     dens+=rho.row(1);
 
+  // Fast path when nothing was screened: skip the indexed view
+  // copies. Note `exc` is stored as arma::vec (column) while w and
+  // dens are arma::rowvec, so transpose exc to align orientations
+  // before the element-wise multiply.
+  if(screen.n_elem == w.n_elem)
+    return arma::sum(w % exc.t() % dens);
   return arma::sum(w(screen)%exc(screen)%dens(screen));
 }
 

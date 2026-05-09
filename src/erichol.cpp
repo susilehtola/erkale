@@ -333,16 +333,20 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
   size_t m(0);
 
   while(error>cholesky_tol && m<d.n_elem) {
-    // Update the pivot index
+    // Update the pivot index. Only the maximum-error pivot at position
+    // m matters for the next step; sorting the entire tail every outer
+    // iteration was O(N log N) per step (O(M N log N) overall) for no
+    // benefit beyond identifying the max. Find the max with index_max
+    // and swap it into position m.
     {
-      // Remaining pivot is
-      arma::uvec pileft(pi.subvec(m,d.n_elem-1));
-      // Remaining errors in pivoted order
-      arma::vec errs(d(pileft));
-      // Sort the remaining errors so that largest one is first
-      arma::uvec idx=arma::stable_sort_index(errs,"descend");
-      // Store updated pivot
-      pi.subvec(m,d.n_elem-1)=pileft(idx);
+      arma::uword best=m;
+      double bestval=d(pi(m));
+      for(arma::uword i=m+1;i<d.n_elem;i++) {
+	const double v=d(pi(i));
+	if(v>bestval) { bestval=v; best=i; }
+      }
+      if(best!=m)
+	std::swap(pi(m),pi(best));
     }
 
     // Pivot index to use is
@@ -531,13 +535,18 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
 	  d(pii)-=B(m,pii)*B(m,pii);
 	}
       } else {
+	// One GEMV computes the inner-product correction t(j) =
+	// trans(B(0..m-1, pim)) * B(0..m-1, j) for every j in one go;
+	// the previous implementation did m * (n_elem) scalar dots
+	// inside the omp loop via arma::as_scalar.
+	const arma::vec t(arma::trans(B.submat(0,0,m-1,B.n_cols-1))*B.submat(0,pim,m-1,pim));
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
 	for(size_t i=m+1;i<d.n_elem;i++) {
 	  size_t pii=pi(i);
 	  // Compute element
-	  B(m,pii)=(A(pii,Aind) - arma::as_scalar(arma::trans(B.submat(0,pim,m-1,pim))*B.submat(0,pii,m-1,pii)))/B(m,pim);
+	  B(m,pii)=(A(pii,Aind) - t(pii))/B(m,pim);
 	  // Update d
 	  d(pii)-=B(m,pii)*B(m,pii);
 	}
@@ -750,21 +759,37 @@ arma::mat ERIchol::calcK(const arma::mat & C, const std::vector<double> & occs) 
     throw std::runtime_error(oss.str());
   }
 
-  arma::mat K(C.n_rows,C.n_rows);
-  K.zeros();
+  // Build the dense B once (Nbf*Nbf x Naux) and view it as
+  // Nbf x (Nbf*Naux); each per-orbital contribution is then a single
+  // GEMV + DSYRK rather than the indexed-scatter loops the
+  // single-orbital calcK(vec) used. Per-thread K accumulation
+  // replaces the per-orbital omp critical to remove serialisation
+  // for high thread counts.
+  arma::mat Bdense;
+  B_matrix(Bdense);
+  const size_t Naux = B.n_cols;
+  const arma::mat Breshape((double *) Bdense.memptr(), Nbf, Nbf*Naux, false, true);
+
+  arma::mat K(C.n_rows,C.n_rows,arma::fill::zeros);
 #ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel
 #endif
-  for(size_t i=0;i<occs.size();i++)
-    if(occs[i]!=0.0) {
-#ifndef _OPENMP
-      K+=occs[i]*calcK(C.col(i));
-#else
-      arma::mat wK(occs[i]*calcK(C.col(i)));
+  {
+    arma::mat Kloc(Nbf, Nbf, arma::fill::zeros);
+    arma::mat Awork(Nbf, Naux);
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic) nowait
+#endif
+    for(size_t i=0;i<occs.size();i++)
+      if(occs[i]!=0.0) {
+	Awork = arma::reshape(arma::trans(Breshape)*C.col(i), Nbf, Naux);
+	Kloc += occs[i] * Awork * arma::trans(Awork);
+      }
+#ifdef _OPENMP
 #pragma omp critical
-      K+=wK;
 #endif
-    }
+    K += Kloc;
+  }
   return K;
 }
 
@@ -773,22 +798,41 @@ arma::mat ERIchol::calcK(const arma::mat & C, const arma::vec & occs) const {
 }
 
 arma::cx_mat ERIchol::calcK(const arma::cx_mat & C, const std::vector<double> & occs) const {
-  arma::cx_mat K(C.n_rows,C.n_rows);
-  K.zeros();
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-  for(size_t i=0;i<occs.size();i++)
-    if(occs[i]!=0.0) {
-#ifndef _OPENMP
-      K+=occs[i]*calcK(C.col(i));
-#else
-      arma::cx_mat wK(occs[i]*calcK(C.col(i)));
-#pragma omp critical
-      K+=wK;
-#endif
-    }
+  if(C.n_rows != Nbf) {
+    std::ostringstream oss;
+    oss << "Orbital matrix doesn't match basis set! N = " << Nbf << ", N(C) = " << C.n_rows << "!\n";
+    throw std::runtime_error(oss.str());
+  }
 
+  // Mirror the real calcK reformulation: dense B once, GEMV+DSYRK
+  // per orbital, per-thread K accumulation. The complex orbital
+  // requires a conj() on C as in the per-orbital calcK(cx_vec).
+  arma::mat Bdense;
+  B_matrix(Bdense);
+  const size_t Naux = B.n_cols;
+  const arma::mat Breshape((double *) Bdense.memptr(), Nbf, Nbf*Naux, false, true);
+
+  arma::cx_mat K(C.n_rows,C.n_rows,arma::fill::zeros);
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    arma::cx_mat Kloc(Nbf, Nbf, arma::fill::zeros);
+    arma::cx_mat Awork(Nbf, Naux);
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic) nowait
+#endif
+    for(size_t i=0;i<occs.size();i++)
+      if(occs[i]!=0.0) {
+	const arma::cx_vec Cconj(arma::conj(C.col(i)));
+	Awork = arma::reshape(arma::trans(Breshape)*Cconj, Nbf, Naux);
+	Kloc += occs[i] * Awork * arma::trans(Awork);
+      }
+#ifdef _OPENMP
+#pragma omp critical
+#endif
+    K += Kloc;
+  }
   return K;
 }
 
@@ -828,64 +872,44 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
 
   Timer t;
 
-  // L_uv^P -> L_lv^P = L_uv^P C_lu
-  arma::mat Ll(Cl.n_cols,B.n_cols*Nbf);
-  Ll.zeros();
+  // Build the dense B matrix once (Nbf*Nbf x Naux). Each auxiliary
+  // column is then a small Nbf x Nbf block that we transform with two
+  // GEMMs per P, replacing the prodidx scatter loops + index-shuffle
+  // dance the previous implementation used.
+  arma::mat Bdense;
+  B_matrix(Bdense);
+
+  if(verbose) {
+    printf("Built dense B in %s.\n",t.elapsed().c_str());
+    fflush(stdout);
+    t.set();
+  }
+
+  const size_t Nl = Cl.n_cols;
+  const size_t Nr = Cr.n_cols;
+  arma::mat Br(B.n_cols, Nl*Nr);
+
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
 #endif
-  for(size_t P=0;P<B.n_cols;P++)
-    for(size_t i=0;i<prodidx.size();i++)
-      for(size_t l=0;l<Cl.n_cols;l++)
-	Ll(l,P*Nbf+invmap(0,i))+=B(i,P)*Cl(invmap(1,i),l);
-  // Off-diagonal contribution
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-  for(size_t P=0;P<B.n_cols;P++)
-    for(size_t ii=0;ii<odiagidx.size();ii++) {
-      size_t i=odiagidx(ii);
-      for(size_t l=0;l<Cl.n_cols;l++)
-	Ll(l,P*Nbf+invmap(1,i))+=B(i,P)*Cl(invmap(0,i),l);
-    }
+  for(size_t P=0; P<B.n_cols; P++) {
+    // View Bdense column P as a (Nbf, Nbf) matrix block_P(v, u) where
+    // block_P(v, u) = Bdense(u*Nbf+v, P): column-major view, with v
+    // varying fastest in memory.
+    const arma::mat block_P((double*) Bdense.colptr(P), Nbf, Nbf, false, true);
 
-  if(verbose) {
-    printf("First half-transform of B matrix done in %s.\n",t.elapsed().c_str());
-    fflush(stdout);
-    t.set();
+    // Two-sided transform: Tmo(l, r) = sum_{u,v} Cl(u,l) Cr(v,r) Bdense(u*Nbf+v, P)
+    //                                = (Cl.t() * block_P.t() * Cr)(l, r)
+    const arma::mat Tmo(Cl.t() * block_P.t() * Cr);
+
+    // Output layout (preserving the original convention):
+    //   Br(P, r*Nl + l) = Tmo(l, r)
+    // arma::vectorise of Tmo (column-major) gives flat[l + r*Nl] = Tmo(l, r).
+    Br.row(P) = arma::trans(arma::vectorise(Tmo));
   }
 
-  // Shuffle indices
-  arma::mat Bs(Cl.n_cols*B.n_cols,Nbf);
-  for(size_t mu=0;mu<Nbf;mu++)
-    for(size_t P=0;P<B.n_cols;P++)
-      for(size_t l=0;l<Cl.n_cols;l++)
-	Bs(P*Cl.n_cols+l,mu)=Ll(l,P*Nbf+mu);
-
   if(verbose) {
-    printf("Index shuffle done in %s.\n",t.elapsed().c_str());
-    fflush(stdout);
-    t.set();
-  }
-
-  // Do RH transform
-  Bs=Bs*Cr;
-
-  if(verbose) {
-    printf("Second half-transform done in %s.\n",t.elapsed().c_str());
-    fflush(stdout);
-    t.set();
-  }
-
-  // Return array
-  arma::mat Br(B.n_cols,Cl.n_cols*Cr.n_cols);
-  for(size_t P=0;P<B.n_cols;P++)
-    for(size_t l=0;l<Cl.n_cols;l++)
-      for(size_t r=0;r<Cr.n_cols;r++)
-	Br(P,r*Cl.n_cols+l)=Bs(P*Cl.n_cols+l,r);
-
-  if(verbose) {
-    printf("Final index shuffle done in %s.\n",t.elapsed().c_str());
+    printf("MO transform done in %s.\n",t.elapsed().c_str());
     fflush(stdout);
     t.set();
   }
