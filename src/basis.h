@@ -426,6 +426,15 @@ class BasisSet {
   arma::mat eval_hess(size_t ish, double x, double y, double z) const;
   /// Evaluate gradient of laplacian of shell ish at (x,y,z)
   arma::mat eval_laplgrad(size_t ish, double x, double y, double z) const;
+  /// Evaluate functions / gradients / laplacian of shell ish at
+  /// (x,y,z) in one pass, sharing the contracted-exponential
+  /// evaluation. fval is filled always, gval iff do_grad, lval iff
+  /// do_lapl.
+  void eval_func_grad_lapl(size_t ish, double x, double y, double z,
+                           arma::vec & fval,
+                           arma::mat & gval,
+                           arma::vec & lval,
+                           bool do_grad, bool do_lapl) const;
 
   /// Print out basis set
   void print(bool verbose=false) const;
@@ -641,6 +650,15 @@ class GaussianShell {
   arma::mat eval_hess(double x, double y, double z) const;
   /// Evaluate gradient of laplacian at (x,y,z)
   arma::mat eval_laplgrad(double x, double y, double z) const;
+  /// Evaluate functions, gradients and laplacian at (x,y,z) in one
+  /// pass, sharing the contracted-exponential evaluation and the
+  /// power tables. fval is always filled; gval is filled iff do_grad,
+  /// lval iff do_lapl.
+  void eval_func_grad_lapl(double x, double y, double z,
+                           arma::vec & fval,
+                           arma::mat & gval,
+                           arma::vec & lval,
+                           bool do_grad, bool do_lapl) const;
 
   /// Calculate block overlap matrix between shells
   arma::mat overlap(const GaussianShell & rhs) const;

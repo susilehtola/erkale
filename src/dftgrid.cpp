@@ -3088,46 +3088,37 @@ void AngularGrid::compute_bf() {
   info.nfunc=Nbf*grid.size();
 
   bf.zeros(bf_ind.n_elem,grid.size());
-  // Loop over points
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Loop over shells. Offset
-    ioff=0;
-    for(size_t ish=0;ish<shells.size();ish++) {
-      arma::vec fval=basp->eval_func(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-      bf.submat(ioff,ip,ioff+fval.n_elem-1,ip)=fval;
-      ioff+=fval.n_elem;
-    }
-  }
-
   if(do_grad) {
     bf_x.zeros(bf_ind.n_elem,grid.size());
     bf_y.zeros(bf_ind.n_elem,grid.size());
     bf_z.zeros(bf_ind.n_elem,grid.size());
-    // Loop over points
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Loop over shells. Offset
-      ioff=0;
-      for(size_t ish=0;ish<shells.size();ish++) {
-	arma::mat gval=basp->eval_grad(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	bf_x.submat(ioff,ip,ioff+gval.n_rows-1,ip)=gval.col(0);
-	bf_y.submat(ioff,ip,ioff+gval.n_rows-1,ip)=gval.col(1);
-	bf_z.submat(ioff,ip,ioff+gval.n_rows-1,ip)=gval.col(2);
-	ioff+=gval.n_rows;
-      }
-    }
   }
-
-  if(do_lapl) {
+  if(do_lapl)
     bf_lapl.zeros(bf_ind.n_elem,grid.size());
-    // Loop over points
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Loop over shells. Offset
-      ioff=0;
-      for(size_t ish=0;ish<shells.size();ish++) {
-	arma::vec lval=basp->eval_lapl(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	bf_lapl.submat(ioff,ip,ioff+lval.n_elem-1,ip)=lval;
-	ioff+=lval.n_elem;
+
+  // One pass over (ip, ish) that fuses the func / grad / lapl
+  // evaluations: the fused shell-level routine reuses the contracted
+  // exponentials and the power tables across all three outputs, so
+  // we save (do_grad ? 1 : 0) + (do_lapl ? 1 : 0) extra exp / power
+  // builds per shell-point.
+  arma::vec fval, lval;
+  arma::mat gval;
+  for(size_t ip=0;ip<grid.size();ip++) {
+    ioff=0;
+    for(size_t ish=0;ish<shells.size();ish++) {
+      basp->eval_func_grad_lapl(shells[ish],
+                                grid[ip].r.x, grid[ip].r.y, grid[ip].r.z,
+                                fval, gval, lval, do_grad, do_lapl);
+      const size_t Nf = fval.n_elem;
+      bf.submat(ioff, ip, ioff+Nf-1, ip) = fval;
+      if(do_grad) {
+        bf_x.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(0);
+        bf_y.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(1);
+        bf_z.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(2);
       }
+      if(do_lapl)
+        bf_lapl.submat(ioff, ip, ioff+Nf-1, ip) = lval;
+      ioff += Nf;
     }
   }
 
