@@ -363,7 +363,7 @@ int main_guarded(int argc, char **argv) {
     BasisSetLibrary contracted;
 
     if(threshold<=0.0) {
-      printf("Contracting auxiliary basis set with threshold specified by highest angular momentum.\n",threshold);
+      printf("Contracting auxiliary basis set with threshold specified by highest angular momentum.\n");
     } else {
       printf("Contracting auxiliary basis set with threshold %e\n",threshold);
     }
@@ -572,7 +572,7 @@ int main_guarded(int argc, char **argv) {
       }
       contracted.add_element(contraux);
 
-      printf("%s -> %s contraction reduces number of auxiliary functions for %s from %i to %i implying a % .1f %% reduction\n",ucomp.str().c_str(),ccomp.str().c_str(),element.c_str(),norig,ncontr,(norig-ncontr)*100.0/norig);
+      printf("%s -> %s contraction reduces number of auxiliary functions for %s from %zu to %zu implying a % .1f %% reduction\n",ucomp.str().c_str(),ccomp.str().c_str(),element.c_str(),(size_t) norig,(size_t) ncontr,(norig-ncontr)*100.0/norig);
 
     }
     contracted.save_gaussian94(outname);

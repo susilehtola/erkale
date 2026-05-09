@@ -514,9 +514,10 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
 
       pim=pi(m);
 
-      // Insert new rows if necessary
+      // Insert new rows if necessary. resize zero-extends and replaces
+      // the deprecated 3-arg insert_rows(row_num, N, set_to_zero).
       if(m>=B.n_rows)
-	B.insert_rows(B.n_rows,100,true);
+	B.resize(B.n_rows + 100, B.n_cols);
 
       // Compute diagonal element
       B(m,pim)=sqrt(d(pim));

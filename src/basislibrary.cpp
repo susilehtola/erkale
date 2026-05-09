@@ -29,6 +29,7 @@
 #include <cfloat>
 #include <cstdio>
 #include <cstdlib>
+#include <random>
 #include <vector>
 // For exceptions
 #include <sstream>
@@ -801,9 +802,10 @@ static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vec
     // Try out random orderings
     int iiter=0, titer=0;
     std::vector<size_t> random_pivot(arma::conv_to< std::vector<size_t> >::from(full_linear_pivot));
+    std::mt19937 rng{std::random_device{}()};
     while(iiter<nrandom) {
       // Shuffle current pivot at random
-      std::random_shuffle ( random_pivot.begin(), random_pivot.end() );
+      std::shuffle(random_pivot.begin(), random_pivot.end(), rng);
       arma::uvec rpiv(arma::conv_to<arma::uvec>::from(random_pivot));
       pivoted_cholesky(S,thr,rpiv);
       titer++;

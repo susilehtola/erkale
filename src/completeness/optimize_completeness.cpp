@@ -105,13 +105,15 @@ arma::vec get_exponents(const gsl_vector *xv, const completeness_scan_t & p) {
   for(size_t i=0;i<A.n_elem;i++)
     exps(i)=std::pow(10.0,-A(A.n_elem-1-i));
 
-  // Bigger exponents
-  if(p.odd) {
-    exps(A.n_elem)=1.0;
-    if(A.n_elem)
-      exps.subvec(A.n_elem+1,2*A.n_elem)=arma::exp10(A);
-  } else if(A.n_elem)
-    exps.subvec(A.n_elem,2*A.n_elem-1)=arma::exp10(A);
+  // Bigger exponents. Filled element-wise (matching the smaller-half
+  // loop above) instead of via subvec assignment to dodge a GCC 13+
+  // -Wstringop-overflow false-positive on Armadillo's subview memcpy
+  // path, which trips when the compiler cannot bound A.n_elem.
+  const size_t bigger_off = p.odd ? A.n_elem + 1 : A.n_elem;
+  if(p.odd)
+    exps(A.n_elem) = 1.0;
+  for(size_t i=0;i<A.n_elem;i++)
+    exps(bigger_off + i) = std::pow(10.0, A(i));
 
   //  arma::sort(arma::log10(exps)).t().print("Exponents");
   //  throw std::runtime_error("Debug");

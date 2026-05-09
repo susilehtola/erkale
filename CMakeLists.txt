@@ -44,6 +44,16 @@ if(CATCH_EXCEPTIONS)
   add_definitions(-DCATCH_EXCEPTIONS)
 endif()
 
+# Suppress GCC 13+ -Wfree-nonheap-object false-positives that fire from
+# inside Armadillo's small-vector destructor path. The warning's
+# inlined call chain crosses header boundaries, so a localised pragma
+# at the declaration site doesn't reach the destructor expansion.
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-Wno-free-nonheap-object HAS_NO_FREE_NONHEAP_OBJECT)
+if(HAS_NO_FREE_NONHEAP_OBJECT)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-free-nonheap-object")
+endif()
+
 # Compile SMP version?
 option(USE_OPENMP "Compile OpenMP enabled version (for parallel calculations)?" ON)
 # Find OpenMP support
