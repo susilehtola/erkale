@@ -141,7 +141,14 @@ if(NOT OPENORBITAL_HEADER)
     GIT_REPOSITORY https://github.com/susilehtola/OpenOrbitalOptimizer.git
     GIT_TAG        master
     GIT_SHALLOW    TRUE)
-  FetchContent_MakeAvailable(openorbitaloptimizer)
+  # Download-only — we use OpenOrbitalOptimizer as a header-only
+  # library and don't want its CMakeLists.txt to execute, since it
+  # expects an `armadillo` CMake target that erkale's bare
+  # find_package(Armadillo) (variable-style) doesn't create.
+  FetchContent_GetProperties(openorbitaloptimizer)
+  if(NOT openorbitaloptimizer_POPULATED)
+    FetchContent_Populate(openorbitaloptimizer)
+  endif()
   # Header lives in <src>/openorbitaloptimizer/, parent dir is the include root
   set(OPENORBITAL_HEADER "${openorbitaloptimizer_SOURCE_DIR}")
 endif()
