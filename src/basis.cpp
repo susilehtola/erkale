@@ -593,296 +593,187 @@ arma::vec GaussianShell::eval_func(double x, double y, double z) const {
 }
 
 arma::mat GaussianShell::eval_grad(double x, double y, double z) const {
-  // Evaluate gradients of functions at (x,y,z)
-
-  // Compute coordinates relative to center
-  double xrel=x-cen.x;
-  double yrel=y-cen.y;
-  double zrel=z-cen.z;
-
-  double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
-
-  // Power arrays, x^l, y^l, z^l
-  double xr[am+2], yr[am+2], zr[am+2];
-
-  xr[0]=1.0;
-  yr[0]=1.0;
-  zr[0]=1.0;
-
-  xr[1]=xrel;
-  yr[1]=yrel;
-  zr[1]=zrel;
-
-  for(int i=2;i<=am+1;i++) {
-    xr[i]=xr[i-1]*xrel;
-    yr[i]=yr[i-1]*yrel;
-    zr[i]=zr[i-1]*zrel;
-  }
-
-  // Gradient array, N_cart x 3
-  arma::mat ret(cart.size(),3);
-  ret.zeros();
-
-  // Helper variables
-  double expf;
-
-  // Loop over functions
-  for(size_t icart=0;icart<cart.size();icart++) {
-    // Get types
-    int l=cart[icart].l;
-    int m=cart[icart].m;
-    int n=cart[icart].n;
-
-    // Loop over exponential contraction
-    for(size_t iexp=0;iexp<c.size();iexp++) {
-      // Contracted exponent
-      expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
-
-      // x component of gradient:
-      ret(icart,0)+=_der1(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
-      // y component
-      ret(icart,1)+=xr[l]*_der1(yr,m,c[iexp].z)*zr[n]*expf;
-      // z component
-      ret(icart,2)+=xr[l]*yr[m]*_der1(zr,n,c[iexp].z)*expf;
-    }
-
-    // Plug in normalization constant
-    ret(icart,0)*=cart[icart].relnorm;
-    ret(icart,1)*=cart[icart].relnorm;
-    ret(icart,2)*=cart[icart].relnorm;
-  }
-
-  if(uselm)
-    // Need to transform into spherical harmonics
-    return transmat*ret;
-  else
-    return ret;
+  // Thin wrapper around the fused evaluator: same inner-loop order
+  // and per-iteration work as the original specialised
+  // implementation, but the contracted-exponential evaluation and
+  // power tables now share with eval_lapl/eval_hess/eval_laplgrad
+  // when more than one is requested.
+  arma::vec fval, lval;
+  arma::mat gval, hval, lgval;
+  eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval, true, false, false, false);
+  return gval;
 }
 
 arma::vec GaussianShell::eval_lapl(double x, double y, double z) const {
-  // Evaluate laplacian of basis functions at (x,y,z)
+  // Thin wrapper around the fused evaluator (cf. eval_grad).
+  arma::vec fval, lval;
+  arma::mat gval, hval, lgval;
+  eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval, false, true, false, false);
+  return lval;
+}
 
-  // Compute coordinates relative to center
-  double xrel=x-cen.x;
-  double yrel=y-cen.y;
-  double zrel=z-cen.z;
+void GaussianShell::eval_bf_derivs(double x, double y, double z,
+                                   arma::vec & fval,
+                                   arma::mat & gval,
+                                   arma::vec & lval,
+                                   arma::mat & hval,
+                                   arma::mat & lgval,
+                                   bool do_grad, bool do_lapl,
+                                   bool do_hess, bool do_lgrad) const {
+  // Evaluate the basis-function values plus any subset of gradient,
+  // laplacian, Hessian and gradient-of-laplacian in one pass. The
+  // five specialised eval_* siblings each rebuild xrel/yrel/zrel,
+  // the power arrays, and the per-primitive exp(-z * rrelsq); a
+  // fused pass amortises all of that across the requested outputs.
 
-  double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
+  const double xrel = x - cen.x;
+  const double yrel = y - cen.y;
+  const double zrel = z - cen.z;
+  const double rrelsq = xrel*xrel + yrel*yrel + zrel*zrel;
 
-  // Power arrays, x^l, y^l, z^l
-  double xr[am+3], yr[am+3], zr[am+3];
-
-  xr[0]=1.0;
-  yr[0]=1.0;
-  zr[0]=1.0;
-
-  xr[1]=xrel;
-  yr[1]=yrel;
-  zr[1]=zrel;
-
-  for(int i=2;i<=am+2;i++) {
-    xr[i]=xr[i-1]*xrel;
-    yr[i]=yr[i-1]*yrel;
-    zr[i]=zr[i-1]*zrel;
-  }
-
-  // Values of laplacians of functions
-  arma::vec ret(cart.size());
-  ret.zeros();
-
-  // Helper variables
-  double expf;
-
-  // Loop over functions
-  for(size_t icart=0;icart<cart.size();icart++) {
-    // Get types
-    int l=cart[icart].l;
-    int m=cart[icart].m;
-    int n=cart[icart].n;
-
-    // Loop over exponential contraction
-    for(size_t iexp=0;iexp<c.size();iexp++) {
-      // Contracted exponent
-      expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
-
-      // Derivative wrt x
-      ret(icart)+=_der2(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
-      // Derivative wrt y
-      ret(icart)+=xr[l]*_der2(yr,m,c[iexp].z)*zr[n]*expf;
-      // Derivative wrt z
-      ret(icart)+=xr[l]*yr[m]*_der2(zr,n,c[iexp].z)*expf;
+  // Power-array degree needed:
+  //   func only           -> am
+  //   grad                -> am + 1   (_der1 reads xr[l+1])
+  //   lapl, hess          -> am + 2   (_der2 reads xr[l+2])
+  //   laplgrad            -> am + 3   (_der3 reads xr[l+3])
+  int xpow_max = am;
+  if(do_grad) xpow_max = std::max(xpow_max, am + 1);
+  if(do_lapl || do_hess) xpow_max = std::max(xpow_max, am + 2);
+  if(do_lgrad) xpow_max = std::max(xpow_max, am + 3);
+  double xr[xpow_max+1], yr[xpow_max+1], zr[xpow_max+1];
+  xr[0] = 1.0; yr[0] = 1.0; zr[0] = 1.0;
+  if(xpow_max >= 1) {
+    xr[1] = xrel; yr[1] = yrel; zr[1] = zrel;
+    for(int i=2; i<=xpow_max; i++) {
+      xr[i] = xr[i-1]*xrel;
+      yr[i] = yr[i-1]*yrel;
+      zr[i] = zr[i-1]*zrel;
     }
-
-    // Plug in normalization constant
-    ret(icart)*=cart[icart].relnorm;
   }
 
-  if(uselm)
-    // Transform into spherical harmonics
-    return transmat*ret;
-  else
-    return ret;
+  // Cartesian-basis accumulators (allocated only if requested).
+  arma::vec fbuf;  fbuf.zeros(cart.size());
+  arma::mat gbuf;  if(do_grad) gbuf.zeros(cart.size(), 3);
+  arma::vec lbuf;  if(do_lapl) lbuf.zeros(cart.size());
+  arma::mat hbuf;  if(do_hess) hbuf.zeros(cart.size(), 9);
+  arma::mat lgbuf; if(do_lgrad) lgbuf.zeros(cart.size(), 3);
+
+  for(size_t iexp=0; iexp<c.size(); iexp++) {
+    const double z_i = c[iexp].z;
+    const double exp_i = c[iexp].c * std::exp(-z_i * rrelsq);
+
+    for(size_t icart=0; icart<cart.size(); icart++) {
+      const int l = cart[icart].l;
+      const int m = cart[icart].m;
+      const int n = cart[icart].n;
+      const double xl = xr[l];
+      const double ym = yr[m];
+      const double zn = zr[n];
+
+      fbuf(icart) += xl * ym * zn * exp_i;
+
+      // Pre-compute the first / second derivatives along each axis
+      // once if any of grad / lapl / hess / lgrad needs them. The
+      // compiler will fold dead-code paths away.
+      const bool need_d1 = do_grad || do_hess || do_lgrad;
+      const bool need_d2 = do_lapl || do_hess || do_lgrad;
+      const bool need_d3 = do_lgrad;
+      const double d1x = need_d1 ? _der1(xr, l, z_i) : 0.0;
+      const double d1y = need_d1 ? _der1(yr, m, z_i) : 0.0;
+      const double d1z = need_d1 ? _der1(zr, n, z_i) : 0.0;
+      const double d2x = need_d2 ? _der2(xr, l, z_i) : 0.0;
+      const double d2y = need_d2 ? _der2(yr, m, z_i) : 0.0;
+      const double d2z = need_d2 ? _der2(zr, n, z_i) : 0.0;
+      const double d3x = need_d3 ? _der3(xr, l, z_i) : 0.0;
+      const double d3y = need_d3 ? _der3(yr, m, z_i) : 0.0;
+      const double d3z = need_d3 ? _der3(zr, n, z_i) : 0.0;
+
+      if(do_grad) {
+        gbuf(icart, 0) += d1x * ym * zn * exp_i;
+        gbuf(icart, 1) += xl  * d1y * zn * exp_i;
+        gbuf(icart, 2) += xl  * ym * d1z * exp_i;
+      }
+
+      if(do_lapl) {
+        lbuf(icart) += (d2x * ym * zn
+                       + xl * d2y * zn
+                       + xl * ym * d2z) * exp_i;
+      }
+
+      if(do_hess) {
+        // Diagonal entries
+        hbuf(icart, 0) += d2x * ym * zn * exp_i;     // d/dx^2
+        hbuf(icart, 4) += xl * d2y * zn * exp_i;     // d/dy^2
+        hbuf(icart, 8) += xl * ym * d2z * exp_i;     // d/dz^2
+        // Off-diagonals (each appears twice by symmetry)
+        const double dxy = d1x * d1y * zn  * exp_i;
+        hbuf(icart, 1) += dxy;
+        hbuf(icart, 3) += dxy;
+        const double dxz = d1x * ym  * d1z * exp_i;
+        hbuf(icart, 2) += dxz;
+        hbuf(icart, 6) += dxz;
+        const double dyz = xl  * d1y * d1z * exp_i;
+        hbuf(icart, 5) += dyz;
+        hbuf(icart, 7) += dyz;
+      }
+
+      if(do_lgrad) {
+        // d^3/dx^3, d^2/dy^2 d/dx, d^2/dz^2 d/dx
+        lgbuf(icart, 0) += (d3x * ym * zn
+                           + d1x * d2y * zn
+                           + d1x * ym * d2z) * exp_i;
+        // d^2/dx^2 d/dy, d^3/dy^3, d^2/dz^2 d/dy
+        lgbuf(icart, 1) += (d2x * d1y * zn
+                           + xl * d3y * zn
+                           + xl * d1y * d2z) * exp_i;
+        // d^2/dx^2 d/dz, d^2/dy^2 d/dz, d^3/dz^3
+        lgbuf(icart, 2) += (d2x * ym * d1z
+                           + xl * d2y * d1z
+                           + xl * ym * d3z) * exp_i;
+      }
+    }
+  }
+
+  // Plug in the per-cartesian normalisation constant
+  for(size_t icart=0; icart<cart.size(); icart++) {
+    const double rn = cart[icart].relnorm;
+    fbuf(icart) *= rn;
+    if(do_grad)  for(int k=0;k<3;k++) gbuf(icart, k)  *= rn;
+    if(do_lapl)  lbuf(icart) *= rn;
+    if(do_hess)  for(int k=0;k<9;k++) hbuf(icart, k)  *= rn;
+    if(do_lgrad) for(int k=0;k<3;k++) lgbuf(icart, k) *= rn;
+  }
+
+  // Optionally project to spherical harmonics
+  if(uselm) {
+    fval = transmat * fbuf;
+    if(do_grad)  gval  = transmat * gbuf;
+    if(do_lapl)  lval  = transmat * lbuf;
+    if(do_hess)  hval  = transmat * hbuf;
+    if(do_lgrad) lgval = transmat * lgbuf;
+  } else {
+    fval = std::move(fbuf);
+    if(do_grad)  gval  = std::move(gbuf);
+    if(do_lapl)  lval  = std::move(lbuf);
+    if(do_hess)  hval  = std::move(hbuf);
+    if(do_lgrad) lgval = std::move(lgbuf);
+  }
 }
 
 arma::mat GaussianShell::eval_hess(double x, double y, double z) const {
-  // Evaluate gradients of functions at (x,y,z)
-
-  // Compute coordinates relative to center
-  double xrel=x-cen.x;
-  double yrel=y-cen.y;
-  double zrel=z-cen.z;
-
-  double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
-
-  // Power arrays, x^l, y^l, z^l
-  double xr[am+3], yr[am+3], zr[am+3];
-
-  xr[0]=1.0;
-  yr[0]=1.0;
-  zr[0]=1.0;
-
-  xr[1]=xrel;
-  yr[1]=yrel;
-  zr[1]=zrel;
-
-  for(int i=2;i<=am+2;i++) {
-    xr[i]=xr[i-1]*xrel;
-    yr[i]=yr[i-1]*yrel;
-    zr[i]=zr[i-1]*zrel;
-  }
-
-  // Gradient array, Ncart x 9
-  arma::mat ret(cart.size(),9);
-  ret.zeros();
-
-  // Helper variables
-  double expf, tmp;
-
-  // Loop over functions
-  for(size_t icart=0;icart<cart.size();icart++) {
-    // Get types
-    int l=cart[icart].l;
-    int m=cart[icart].m;
-    int n=cart[icart].n;
-
-    // Loop over exponential contraction
-    for(size_t iexp=0;iexp<c.size();iexp++) {
-      // Contracted exponent
-      expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
-
-      // d/dx^2
-      ret(icart,0)+=_der2(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
-      // d/dy^2
-      ret(icart,4)+=xr[l]*_der2(yr,m,c[iexp].z)*zr[n]*expf;
-      // d/dz^2
-      ret(icart,8)+=xr[l]*yr[m]*_der2(zr,n,c[iexp].z)*expf;
-
-      // dxdy = dydx
-      tmp=_der1(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
-      ret(icart,1)+=tmp;
-      ret(icart,3)+=tmp;
-
-      // dxdz = dzdx
-      tmp=_der1(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
-      ret(icart,2)+=tmp;
-      ret(icart,6)+=tmp;
-
-      // dydz = dzdy
-      tmp=xr[l]*_der1(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*expf;
-      ret(icart,5)+=tmp;
-      ret(icart,7)+=tmp;
-    }
-
-    // Plug in normalization constant
-    for(int ii=0;ii<9;ii++)
-      ret(icart,ii)*=cart[icart].relnorm;
-  }
-
-  if(uselm)
-    return transmat*ret;
-  else
-    return ret;
+  arma::vec fval, lval;
+  arma::mat gval, hval, lgval;
+  eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval,
+                 false, false, true, false);
+  return hval;
 }
 
 arma::mat GaussianShell::eval_laplgrad(double x, double y, double z) const {
-  // Evaluate laplacian of gradients of functions at (x,y,z)
-
-  // Compute coordinates relative to center
-  double xrel=x-cen.x;
-  double yrel=y-cen.y;
-  double zrel=z-cen.z;
-
-  double rrelsq=xrel*xrel+yrel*yrel+zrel*zrel;
-
-  // Power arrays, x^l, y^l, z^l
-  double xr[am+4], yr[am+4], zr[am+4];
-
-  xr[0]=1.0;
-  yr[0]=1.0;
-  zr[0]=1.0;
-
-  xr[1]=xrel;
-  yr[1]=yrel;
-  zr[1]=zrel;
-
-  for(int i=2;i<=am+3;i++) {
-    xr[i]=xr[i-1]*xrel;
-    yr[i]=yr[i-1]*yrel;
-    zr[i]=zr[i-1]*zrel;
-  }
-
-  // Returned array, N_cart x 3
-  arma::mat ret(cart.size(),3);
-  ret.zeros();
-
-  // Helper variables
-  double expf;
-
-  // Loop over functions
-  for(size_t icart=0;icart<cart.size();icart++) {
-    // Get types
-    int l=cart[icart].l;
-    int m=cart[icart].m;
-    int n=cart[icart].n;
-
-    // Loop over exponential contraction
-    for(size_t iexp=0;iexp<c.size();iexp++) {
-      // Contracted exponent
-      expf=c[iexp].c*exp(-c[iexp].z*rrelsq);
-
-      // dx^3
-      ret(icart,0)+=_der3(xr,l,c[iexp].z)*yr[m]*zr[n]*expf;
-      // dy^2 dx
-      ret(icart,0)+=_der1(xr,l,c[iexp].z)*_der2(yr,m,c[iexp].z)*zr[n]*expf;
-      // dz^2 dx
-      ret(icart,0)+=_der1(xr,l,c[iexp].z)*yr[m]*_der2(zr,n,c[iexp].z)*expf;
-
-      // dx^2 dy
-      ret(icart,1)+=_der2(xr,l,c[iexp].z)*_der1(yr,m,c[iexp].z)*zr[n]*expf;
-      // dy^3
-      ret(icart,1)+=xr[l]*_der3(yr,m,c[iexp].z)*zr[n]*expf;
-      // dz^2 dy
-      ret(icart,1)+=xr[l]*_der1(yr,m,c[iexp].z)*_der2(zr,n,c[iexp].z)*expf;
-
-      // dx^2 dz
-      ret(icart,2)+=_der2(xr,l,c[iexp].z)*yr[m]*_der1(zr,n,c[iexp].z)*expf;
-      // dy^2 dz
-      ret(icart,2)+=xr[l]*_der2(yr,m,c[iexp].z)*_der1(zr,n,c[iexp].z)*expf;
-      // dz^3
-      ret(icart,2)+=xr[l]*yr[m]*_der3(zr,n,c[iexp].z)*expf;
-    }
-
-    // Plug in normalization constant
-    ret(icart,0)*=cart[icart].relnorm;
-    ret(icart,1)*=cart[icart].relnorm;
-    ret(icart,2)*=cart[icart].relnorm;
-  }
-
-  if(uselm)
-    // Need to transform into spherical harmonics
-    return transmat*ret;
-  else
-    return ret;
+  arma::vec fval, lval;
+  arma::mat gval, hval, lgval;
+  eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval,
+                 false, false, false, true);
+  return lgval;
 }
 
 // Calculate overlaps between basis functions
@@ -2095,6 +1986,18 @@ arma::mat BasisSet::eval_hess(size_t ish, double x, double y, double z) const {
 
 arma::mat BasisSet::eval_laplgrad(size_t ish, double x, double y, double z) const {
   return shells[ish].eval_laplgrad(x,y,z);
+}
+
+void BasisSet::eval_bf_derivs(size_t ish, double x, double y, double z,
+                              arma::vec & fval,
+                              arma::mat & gval,
+                              arma::vec & lval,
+                              arma::mat & hval,
+                              arma::mat & lgval,
+                              bool do_grad, bool do_lapl,
+                              bool do_hess, bool do_lgrad) const {
+  shells[ish].eval_bf_derivs(x, y, z, fval, gval, lval, hval, lgval,
+                             do_grad, do_lapl, do_hess, do_lgrad);
 }
 
 void BasisSet::convert_contractions() {
