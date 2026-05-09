@@ -139,7 +139,7 @@ if(NOT OPENORBITAL_HEADER)
   include(FetchContent)
   FetchContent_Declare(openorbitaloptimizer
     GIT_REPOSITORY https://github.com/susilehtola/OpenOrbitalOptimizer.git
-    GIT_TAG        main
+    GIT_TAG        master
     GIT_SHALLOW    TRUE)
   FetchContent_MakeAvailable(openorbitaloptimizer)
   # Header lives in <src>/openorbitaloptimizer/, parent dir is the include root
