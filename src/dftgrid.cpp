@@ -3095,20 +3095,28 @@ void AngularGrid::compute_bf() {
   }
   if(do_lapl)
     bf_lapl.zeros(bf_ind.n_elem,grid.size());
+  if(do_hess)
+    bf_hess.zeros(9*bf_ind.n_elem,grid.size());
+  if(do_lgrad) {
+    bf_lx.zeros(bf_ind.n_elem,grid.size());
+    bf_ly.zeros(bf_ind.n_elem,grid.size());
+    bf_lz.zeros(bf_ind.n_elem,grid.size());
+  }
 
-  // One pass over (ip, ish) that fuses the func / grad / lapl
-  // evaluations: the fused shell-level routine reuses the contracted
-  // exponentials and the power tables across all three outputs, so
-  // we save (do_grad ? 1 : 0) + (do_lapl ? 1 : 0) extra exp / power
-  // builds per shell-point.
+  // One pass over (ip, ish) that fuses the func / grad / lapl / hess /
+  // lgrad evaluations: the fused shell-level routine reuses the
+  // contracted exponentials and the power tables across all requested
+  // outputs, saving the redundant exp / power builds per shell-point
+  // that the separate eval_* siblings would have performed.
   arma::vec fval, lval;
-  arma::mat gval;
+  arma::mat gval, hval, lgval;
   for(size_t ip=0;ip<grid.size();ip++) {
     ioff=0;
     for(size_t ish=0;ish<shells.size();ish++) {
-      basp->eval_func_grad_lapl(shells[ish],
-                                grid[ip].r.x, grid[ip].r.y, grid[ip].r.z,
-                                fval, gval, lval, do_grad, do_lapl);
+      basp->eval_bf_derivs(shells[ish],
+                           grid[ip].r.x, grid[ip].r.y, grid[ip].r.z,
+                           fval, gval, lval, hval, lgval,
+                           do_grad, do_lapl, do_hess, do_lgrad);
       const size_t Nf = fval.n_elem;
       bf.submat(ioff, ip, ioff+Nf-1, ip) = fval;
       if(do_grad) {
@@ -3118,44 +3126,19 @@ void AngularGrid::compute_bf() {
       }
       if(do_lapl)
         bf_lapl.submat(ioff, ip, ioff+Nf-1, ip) = lval;
+      if(do_hess) {
+        // hval is (Nf, 9) row-major (3x3); bf_hess is (9*Nbf, npts)
+        // packed as (cart, c) -> 9*ioff + 9*f + c.
+        for(size_t f=0;f<Nf;f++)
+          for(int c=0;c<9;c++)
+            bf_hess(9*ioff + 9*f + c, ip) = hval(f, c);
+      }
+      if(do_lgrad) {
+        bf_lx.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(0);
+        bf_ly.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(1);
+        bf_lz.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(2);
+      }
       ioff += Nf;
-    }
-  }
-
-  if(do_hess) {
-    bf_hess.zeros(9*bf_ind.n_elem,grid.size());
-    // Loop over points
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Loop over shells. Offset
-      ioff=0;
-      for(size_t ish=0;ish<shells.size();ish++) {
-	// eval_hess returns Nbf x 9 matrix, transpose to 9 x Nbf
-	arma::mat hval=arma::trans(basp->eval_hess(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z));
-	// Store values
-	for(int c=0;c<9;c++)
-	  for(size_t f=0;f<hval.n_cols;f++) {
-	    bf_hess(ioff + 9*f + c,ip)=hval(c,f);
-	  }
-	ioff+=hval.n_elem;
-      }
-    }
-  }
-
-  if(do_lgrad) {
-    bf_lx.zeros(bf_ind.n_elem,grid.size());
-    bf_ly.zeros(bf_ind.n_elem,grid.size());
-    bf_lz.zeros(bf_ind.n_elem,grid.size());
-    // Loop over points
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Loop over shells. Offset
-      ioff=0;
-      for(size_t ish=0;ish<shells.size();ish++) {
-	arma::mat lgval=basp->eval_laplgrad(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	bf_lx.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(0);
-	bf_ly.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(1);
-	bf_lz.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(2);
-	ioff+=lgval.n_rows;
-      }
     }
   }
 }
