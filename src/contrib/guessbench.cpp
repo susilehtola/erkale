@@ -303,7 +303,8 @@ int main_guarded(int argc, char **argv) {
   // Save result?
   if(savef.size()) {
     std::string cmd("cp " + chkf + " " + savef);
-    (void) system(cmd.c_str());
+    if(system(cmd.c_str()) != 0)
+      throw std::runtime_error("Failed to copy checkpoint via shell: " + cmd + "\n");
 
     Checkpoint save(savef,true,false);
     save.write("P",Pag+Pbg);
