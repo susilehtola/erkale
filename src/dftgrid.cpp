@@ -1048,22 +1048,6 @@ void AngularGrid::init_VV10(double b, double C, bool pot) {
   }
 }
 
-// Both VV10_Kernel and VV10_Kernel_F do an O(N_xc * N_nl) double loop
-// with ~12 fused-mul-adds plus three divides and 7 stride-1 reads of
-// per-(nl-point) data per inner iteration. With the original
-// arma::mat layout (5 rows for xc, 7 rows for nl, column-major), the
-// nl reads inside the j loop walked stride-7 column starts in memory
-// (nl.colptr(j) advances by 7 doubles per j) which compilers refuse
-// to auto-vectorise.
-//
-// Below we transpose xc/nl once at the top of each kernel so each
-// component (x, y, z, "a", "b", w, rho) is contiguous in memory.
-// The cost is O(N_xc + N_nl), negligible against the O(N_xc * N_nl)
-// inner work. With contiguous reads, gcc / clang vectorise the inner
-// loop under #pragma omp simd reduction; the divisions become the
-// remaining bottleneck and are typical 4-wide on AVX2 / 8-wide on
-// AVX-512.
-
 void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
   // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
   // Return array contains: nPhi, U, and W
@@ -1080,57 +1064,42 @@ void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
     throw std::runtime_error("Error - invalid size output array!\n");
   }
 
-  const arma::mat xc_t(xc.t());
-  const arma::mat nl_t(nl.t());
-
-  const double* xc_x = xc_t.colptr(0);
-  const double* xc_y = xc_t.colptr(1);
-  const double* xc_z = xc_t.colptr(2);
-  const double* xc_a = xc_t.colptr(3);
-  const double* xc_b = xc_t.colptr(4);
-
-  const double* nl_x   = nl_t.colptr(0);
-  const double* nl_y   = nl_t.colptr(1);
-  const double* nl_z   = nl_t.colptr(2);
-  const double* nl_a   = nl_t.colptr(3);
-  const double* nl_b   = nl_t.colptr(4);
-  const double* nl_w   = nl_t.colptr(5);
-  const double* nl_rho = nl_t.colptr(6);
-
-  const size_t Nxc = xc.n_cols;
-  const size_t Nnl = nl.n_cols;
-
-  for(size_t i=0;i<Nxc;i++) {
-    const double xi = xc_x[i];
-    const double yi = xc_y[i];
-    const double zi = xc_z[i];
-    const double ai = xc_a[i];
-    const double bi = xc_b[i];
-
+  // Loop
+  for(size_t i=0;i<xc.n_cols;i++) {
     double nPhi=0.0, U=0.0, W=0.0;
 
-#pragma omp simd reduction(+:nPhi,U,W)
-    for(size_t j=0;j<Nnl;j++) {
-      const double dx = xi - nl_x[j];
-      const double dy = yi - nl_y[j];
-      const double dz = zi - nl_z[j];
-      const double Rsq = dx*dx + dy*dy + dz*dz;
+    for(size_t j=0;j<nl.n_cols;j++) {
+      // Distance between the grid points
+      double dx=xc(0,i)-nl(0,j);
+      double dy=xc(1,i)-nl(1,j);
+      double dz=xc(2,i)-nl(2,j);
+      double Rsq=dx*dx + dy*dy + dz*dz;
 
-      const double gi = ai*Rsq + bi;
-      const double gj = nl_a[j]*Rsq + nl_b[j];
-      const double gs = gi + gj;
-      const double rgis = 1.0/gi + 1.0/gs;
+      // g factors
+      double gi=xc(3,i)*Rsq + xc(4,i);
+      double gj=nl(3,j)*Rsq + nl(4,j);
+      // Sum of the factors
+      double gs=gi+gj;
+      // Reciprocal sum
+      double rgis=1.0/gi + 1.0/gs;
 
-      const double Phi = -3.0/(2.0*gi*gj*gs) * nl_w[j] * nl_rho[j];
+      // Integral kernel
+      double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
+      // Absorb grid point weight and density into kernel
+      Phi *= nl(5,j) * nl(6,j);
 
+      // Increment nPhi
       nPhi += Phi;
+      // Increment U
       U    -= Phi * rgis;
+      // Increment W
       W    -= Phi * rgis * Rsq;
     }
 
-    ret(0,i) += nPhi;
-    ret(1,i) += U;
-    ret(2,i) += W;
+    // Store output
+    ret(0,i)+=nPhi;
+    ret(1,i)+=U;
+    ret(2,i)+=W;
   }
 }
 
@@ -1150,67 +1119,53 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
     throw std::runtime_error("Error - invalid size output array!\n");
   }
 
-  const arma::mat xc_t(xc.t());
-  const arma::mat nl_t(nl.t());
-
-  const double* xc_x = xc_t.colptr(0);
-  const double* xc_y = xc_t.colptr(1);
-  const double* xc_z = xc_t.colptr(2);
-  const double* xc_a = xc_t.colptr(3);
-  const double* xc_b = xc_t.colptr(4);
-
-  const double* nl_x   = nl_t.colptr(0);
-  const double* nl_y   = nl_t.colptr(1);
-  const double* nl_z   = nl_t.colptr(2);
-  const double* nl_a   = nl_t.colptr(3);
-  const double* nl_b   = nl_t.colptr(4);
-  const double* nl_w   = nl_t.colptr(5);
-  const double* nl_rho = nl_t.colptr(6);
-
-  const size_t Nxc = xc.n_cols;
-  const size_t Nnl = nl.n_cols;
-
-  for(size_t i=0;i<Nxc;i++) {
-    const double xi = xc_x[i];
-    const double yi = xc_y[i];
-    const double zi = xc_z[i];
-    const double ai = xc_a[i];
-    const double bi = xc_b[i];
-
+  // Loop
+  for(size_t i=0;i<xc.n_cols;i++) {
     double nPhi=0.0, U=0.0, W=0.0;
     double fpx=0.0, fpy=0.0, fpz=0.0;
 
-#pragma omp simd reduction(+:nPhi,U,W,fpx,fpy,fpz)
-    for(size_t j=0;j<Nnl;j++) {
-      const double dx = xi - nl_x[j];
-      const double dy = yi - nl_y[j];
-      const double dz = zi - nl_z[j];
-      const double Rsq = dx*dx + dy*dy + dz*dz;
+    for(size_t j=0;j<nl.n_cols;j++) {
+      // Distance between the grid points
+      double dx=xc(0,i)-nl(0,j);
+      double dy=xc(1,i)-nl(1,j);
+      double dz=xc(2,i)-nl(2,j);
+      double Rsq=dx*dx + dy*dy + dz*dz;
 
-      const double aj = nl_a[j];
-      const double gi = ai*Rsq + bi;
-      const double gj = aj*Rsq + nl_b[j];
-      const double gs = gi + gj;
-      const double rgis = 1.0/gi + 1.0/gs;
+      // g factors
+      double gi=xc(3,i)*Rsq + xc(4,i);
+      double gj=nl(3,j)*Rsq + nl(4,j);
+      // Sum of the factors
+      double gs=gi+gj;
+      // Reciprocal sum
+      double rgis=1.0/gi + 1.0/gs;
 
-      const double Phi = -3.0/(2.0*gi*gj*gs) * nl_w[j] * nl_rho[j];
+      // Integral kernel
+      double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
+      // Absorb grid point weight and density into kernel
+      Phi *= nl(5,j) * nl(6,j);
 
+      // Increment nPhi
       nPhi += Phi;
+      // Increment U
       U    -= Phi * rgis;
+      // Increment W
       W    -= Phi * rgis * Rsq;
 
-      const double Q = -2.0 * Phi * (ai/gi + aj/gj + (ai+aj)/gs);
+      // Q factor
+      double Q = -2.0 * Phi * (xc(3,i)/gi + nl(3,j)/gj + (xc(3,i)+nl(3,j))/gs );
+      // Increment force
       fpx += Q * dx;
       fpy += Q * dy;
       fpz += Q * dz;
     }
 
-    ret(0,i) += nPhi;
-    ret(1,i) += U;
-    ret(2,i) += W;
-    ret(3,i) += fpx;
-    ret(4,i) += fpy;
-    ret(5,i) += fpz;
+    // Store output
+    ret(0,i)+=nPhi;
+    ret(1,i)+=U;
+    ret(2,i)+=W;
+    ret(3,i)+=fpx;
+    ret(4,i)+=fpy;
+    ret(5,i)+=fpz;
   }
 }
 
