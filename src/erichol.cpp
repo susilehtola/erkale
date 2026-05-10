@@ -590,6 +590,462 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
   return shpairs.size();
 }
 
+size_t ERIchol::fill_two_step(const BasisSet & basis,
+                              double cholesky_tol,
+                              double shell_reuse_thr,
+                              double shell_screen_tol,
+                              double fit_cholesky_thr,
+                              bool verbose) {
+  if(cholesky_tol < shell_screen_tol) {
+    fprintf(stderr,"Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
+    printf("Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
+  }
+
+  // Screening matrix and pairs
+  arma::mat Q, M_screen;
+  std::vector<eripair_t> shpairs=basis.get_eripairs(Q,M_screen,shell_screen_tol,omega,alpha,beta,verbose);
+
+  // Amount of basis functions
+  Nbf=basis.get_Nbf();
+  // Shells
+  std::vector<GaussianShell> shells=basis.get_shells();
+
+  Timer t;
+  Timer ttot;
+
+  // Integral / linear-algebra timers
+  double t_int=0.0;
+  double t_chol=0.0;
+
+  // ===========================================================
+  // Phase A: compute the (mu nu | mu nu) diagonal
+  // ===========================================================
+  arma::vec d(Nbf*Nbf);
+  d.zeros();
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker *eri;
+    const std::vector<double> * erip;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri=new ERIWorker(basis.get_max_am(),basis.get_max_Ncontr());
+    else
+      eri=new ERIWorker_srlr(basis.get_max_am(),basis.get_max_Ncontr(),omega,alpha,beta);
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t ip=0;ip<shpairs.size();ip++) {
+      size_t is=shpairs[ip].is;
+      size_t js=shpairs[ip].js;
+      double QQ=Q(is,js)*Q(is,js);
+      if(QQ<shell_screen_tol)
+        continue;
+
+      eri->compute(&shells[is],&shells[js],&shells[is],&shells[js]);
+      erip=eri->getp();
+
+      size_t Ni(shells[is].get_Nbf());
+      size_t Nj(shells[js].get_Nbf());
+      size_t i0(shells[is].get_first_ind());
+      size_t j0(shells[js].get_first_ind());
+      for(size_t ii=0;ii<Ni;ii++)
+        for(size_t jj=0;jj<Nj;jj++) {
+          size_t i=i0+ii;
+          size_t j=j0+jj;
+          d(i*Nbf+j)=(*erip)[((ii*Nj+jj)*Ni+ii)*Nj+jj];
+          d(j*Nbf+i)=d(i*Nbf+j);
+        }
+    }
+    delete eri;
+  }
+  t_int+=t.get();
+
+  // ===========================================================
+  // Phase B: enumerate orbital pairs (mu <= nu) that pass
+  // shellpair screening and build prodidx / invmap / prodmap /
+  // odiagidx in this object. Identical layout to fill().
+  // ===========================================================
+  size_t Nshp=0;
+  {
+    prodmap.ones(Nbf,Nbf);
+    prodmap*=-1; // UINT_MAX
+
+    size_t iprod=0;
+    size_t iodiag=0;
+    prodidx.resize(Nbf*Nbf);
+    odiagidx.resize(Nbf*Nbf);
+    invmap.zeros(2,Nbf*Nbf);
+    for(size_t ip=0;ip<shpairs.size();ip++) {
+      size_t is=shpairs[ip].is;
+      size_t js=shpairs[ip].js;
+      size_t Ni(shells[is].get_Nbf());
+      size_t Nj(shells[js].get_Nbf());
+      size_t i0(shells[is].get_first_ind());
+      size_t j0(shells[js].get_first_ind());
+      if(is==js) {
+        for(size_t i=i0;i<i0+Ni;i++) {
+          for(size_t j=j0;j<i;j++) {
+            Nshp++;
+            size_t idx=i*Nbf+j;
+            prodidx(iprod)=idx;
+            invmap(0,iprod)=i;
+            invmap(1,iprod)=j;
+            odiagidx(iodiag)=iprod;
+            prodmap(i,j)=iprod;
+            prodmap(j,i)=iprod;
+            iprod++;
+            iodiag++;
+          }
+          Nshp++;
+          size_t idx=i*Nbf+i;
+          prodidx(iprod)=idx;
+          invmap(0,iprod)=i;
+          invmap(1,iprod)=i;
+          prodmap(i,i)=iprod;
+          iprod++;
+        }
+      } else {
+        for(size_t i=i0;i<i0+Ni;i++)
+          for(size_t j=j0;j<j0+Nj;j++) {
+            Nshp++;
+            size_t idx=i*Nbf+j;
+            prodidx(iprod)=idx;
+            invmap(0,iprod)=i;
+            invmap(1,iprod)=j;
+            odiagidx(iodiag)=iprod;
+            prodmap(i,j)=iprod;
+            prodmap(j,i)=iprod;
+            iprod++;
+            iodiag++;
+          }
+      }
+    }
+    prodidx.resize(iprod);
+    odiagidx.resize(iodiag);
+    if(iprod<invmap.n_cols-1)
+      invmap.shed_cols(iprod,invmap.n_cols-1);
+  }
+
+  if(verbose) {
+    printf("Two-step CD: screening reduced dofs by factor %.2f.\n",d.n_elem*1.0/prodidx.n_elem);
+  }
+
+  // Restrict the diagonal to significant pairs
+  d=d(prodidx);
+  double error(arma::max(d));
+
+  // ===========================================================
+  // Phase C: pivot selection. Identical to fill()'s loop:
+  // shellpair-batched libint call per max pivot, in-block addition
+  // gated by shell_reuse_thr, Schur update on d. We also save the
+  // selected pivot's column of A = (mu nu | shp_pivot) into B_raw
+  // so Phase F doesn't recompute integrals.
+  // ===========================================================
+  pi=arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem);
+  // Transient B-rows used for the Schur update only.
+  arma::mat B_temp;
+  B_temp.zeros(100,prodidx.n_elem);
+  // Saved columns of (mu nu | piv) for each retained pivot, in the
+  // pivot order pi(0..m-1).
+  arma::mat B_raw;
+  B_raw.zeros(prodidx.n_elem, 100);
+  size_t m=0;
+
+  while(error>cholesky_tol && m<d.n_elem) {
+    // Find max pivot, swap into position m
+    {
+      arma::uword best=m;
+      double bestval=d(pi(m));
+      for(arma::uword i=m+1;i<d.n_elem;i++) {
+        const double v=d(pi(i));
+        if(v>bestval) { bestval=v; best=i; }
+      }
+      if(best!=m)
+        std::swap(pi(m),pi(best));
+    }
+    size_t pim=pi(m);
+
+    // Identify the pivot's shellpair
+    size_t max_k=invmap(0,pim);
+    size_t max_l=invmap(1,pim);
+    size_t max_ks=basis.find_shell_ind(max_k);
+    size_t max_ls=basis.find_shell_ind(max_l);
+    size_t max_Nk=basis.get_Nbf(max_ks);
+    size_t max_Nl=basis.get_Nbf(max_ls);
+    size_t max_k0=basis.get_first_ind(max_ks);
+    size_t max_l0=basis.get_first_ind(max_ls);
+
+    // Compute integrals A = (mu nu | shp_pivot) for all (mu nu)
+    arma::mat A(d.n_elem,max_Nk*max_Nl);
+    A.zeros();
+    t.set();
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+      ERIWorker *eri;
+      const std::vector<double> * erip;
+      if(omega==0.0 && alpha==1.0 && beta==0.0)
+        eri=new ERIWorker(basis.get_max_am(),basis.get_max_Ncontr());
+      else
+        eri=new ERIWorker_srlr(basis.get_max_am(),basis.get_max_Ncontr(),omega,alpha,beta);
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+      for(size_t ipair=0;ipair<shpairs.size();ipair++) {
+        size_t is=shpairs[ipair].is;
+        size_t js=shpairs[ipair].js;
+        double QQ=Q(is,js)*Q(max_ks,max_ls);
+        if(QQ<shell_screen_tol) continue;
+        double MM1=M_screen(is,max_ks)*M_screen(js,max_ls);
+        if(MM1<shell_screen_tol) continue;
+        double MM2=M_screen(is,max_ls)*M_screen(js,max_ks);
+        if(MM2<shell_screen_tol) continue;
+
+        eri->compute(&shells[is],&shells[js],&shells[max_ks],&shells[max_ls]);
+        erip=eri->getp();
+        size_t Ni(shells[is].get_Nbf());
+        size_t Nj(shells[js].get_Nbf());
+        size_t i0(shells[is].get_first_ind());
+        size_t j0(shells[js].get_first_ind());
+        for(size_t ii=0;ii<Ni;ii++)
+          for(size_t jj=0;jj<Nj;jj++) {
+            size_t i=i0+ii;
+            size_t j=j0+jj;
+            if(prodmap(i,j)>Nbf*Nbf) continue;
+            for(size_t kk=0;kk<max_Nk;kk++)
+              for(size_t ll=0;ll<max_Nl;ll++) {
+                A(prodmap(i,j),kk*max_Nl+ll)=(*erip)[((ii*Nj+jj)*max_Nk+kk)*max_Nl+ll];
+              }
+          }
+      }
+      delete eri;
+    }
+    t_int+=t.get();
+    t.set();
+
+    // Block iteration: greedily pick pivots from this shellpair
+    // gated by shell_reuse_thr; same pattern as fill().
+    while(true) {
+      arma::uvec pileft(pi.subvec(m,d.n_elem-1));
+      arma::vec errs(d(pileft));
+      double errmax=arma::max(errs);
+      double blockerr=0;
+      size_t blockind=0;
+      size_t Aind=0;
+      for(size_t kk=0;kk<max_Nk;kk++)
+        for(size_t ll=0;ll<max_Nl;ll++) {
+          size_t k=kk+max_k0;
+          size_t l=ll+max_l0;
+          size_t ind=prodmap(k,l);
+          if(ind>Nbf*Nbf) continue;
+          if(d(ind)>blockerr) {
+            bool found=false;
+            for(size_t i=0;i<m;i++)
+              if(pi(i)==ind) { found=true; break; }
+            if(!found) {
+              Aind=kk*max_Nl+ll;
+              blockind=ind;
+              blockerr=d(ind);
+            }
+          }
+        }
+      if(blockerr==0.0 || blockerr<shell_reuse_thr*errmax)
+        break;
+
+      // Swap blockind into pi(m)
+      if(pi(m)!=blockind) {
+        bool found=false;
+        for(size_t i=m+1;i<pi.n_elem;i++)
+          if(pi(i)==blockind) {
+            found=true;
+            std::swap(pi(i),pi(m));
+            break;
+          }
+        if(!found) {
+          std::ostringstream oss;
+          oss << "Pivot index " << blockind << " not found, m = " << m << " !\n";
+          throw std::logic_error(oss.str());
+        }
+      }
+      pim=pi(m);
+
+      // Grow B_temp / B_raw if needed
+      if(m>=B_temp.n_rows)
+        B_temp.resize(B_temp.n_rows+100, B_temp.n_cols);
+      if(m>=B_raw.n_cols)
+        B_raw.resize(B_raw.n_rows, B_raw.n_cols+100);
+
+      // Save the (mu nu | piv) column for this newly-selected pivot.
+      B_raw.col(m) = A.col(Aind);
+
+      // Schur update on the diagonal d via a transient B row.
+      B_temp(m,pim)=sqrt(d(pim));
+      if(m==0) {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for(size_t i=m+1;i<d.n_elem;i++) {
+          size_t pii=pi(i);
+          B_temp(m,pii)=A(pii,Aind)/B_temp(m,pim);
+          d(pii)-=B_temp(m,pii)*B_temp(m,pii);
+        }
+      } else {
+        const arma::vec tdot(arma::trans(B_temp.submat(0,0,m-1,B_temp.n_cols-1))*B_temp.submat(0,pim,m-1,pim));
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for(size_t i=m+1;i<d.n_elem;i++) {
+          size_t pii=pi(i);
+          B_temp(m,pii)=(A(pii,Aind)-tdot(pii))/B_temp(m,pim);
+          d(pii)-=B_temp(m,pii)*B_temp(m,pii);
+        }
+      }
+
+      m++;
+    }
+    error=(m<=pi.n_elem-1) ? arma::max(d(pi.subvec(m,pi.n_elem-1))) : 0.0;
+    t_chol+=t.get();
+  }
+
+  const size_t Nselected=m;
+  pi=pi.subvec(0,Nselected-1);
+  if(Nselected<B_raw.n_cols)
+    B_raw.shed_cols(Nselected,B_raw.n_cols-1);
+  // Free the transient Schur-update workspace.
+  B_temp.reset();
+
+  if(verbose) {
+    printf("Two-step CD selected %i pivot orbital pairs after pivoting (%s).\n",
+           (int) Nselected, ttot.elapsed().c_str());
+    fflush(stdout);
+  }
+
+  // ===========================================================
+  // Phase D: build the metric M[p, q] = (piv_p | piv_q) over
+  // selected pivot orbital pairs via libint over pivot shellpair
+  // quadruples. Map (mu, nu) -> pivot index for the dispatch.
+  // ===========================================================
+  arma::umat pivot_to_index(Nbf,Nbf);
+  // Sentinel UINT64_MAX marks "not a pivot"; underflow of size_t.
+  pivot_to_index.fill(static_cast<arma::uword>(-1));
+  for(size_t i=0;i<Nselected;i++) {
+    size_t pii=pi(i);
+    pivot_to_index(invmap(0,pii),invmap(1,pii))=i;
+    pivot_to_index(invmap(1,pii),invmap(0,pii))=i;
+  }
+  form_pivot_shellpairs(basis);
+  // Vector of pivot shellpairs, each as (is, js) with is <= js.
+  std::vector<std::pair<size_t,size_t>> piv_shps(pivot_shellpairs.begin(), pivot_shellpairs.end());
+
+  arma::mat M_metric(Nselected,Nselected);
+  M_metric.zeros();
+  t.set();
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    ERIWorker *eri;
+    const std::vector<double> * erip;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri=new ERIWorker(basis.get_max_am(),basis.get_max_Ncontr());
+    else
+      eri=new ERIWorker_srlr(basis.get_max_am(),basis.get_max_Ncontr(),omega,alpha,beta);
+
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic,1)
+#endif
+    for(size_t ip=0;ip<piv_shps.size();ip++) {
+      size_t is=piv_shps[ip].first;
+      size_t js=piv_shps[ip].second;
+      size_t Ni=shells[is].get_Nbf();
+      size_t Nj=shells[js].get_Nbf();
+      size_t i0=shells[is].get_first_ind();
+      size_t j0=shells[js].get_first_ind();
+      for(size_t jp=0;jp<=ip;jp++) {
+        size_t ks=piv_shps[jp].first;
+        size_t ls=piv_shps[jp].second;
+        size_t Nk=shells[ks].get_Nbf();
+        size_t Nl=shells[ls].get_Nbf();
+        size_t k0=shells[ks].get_first_ind();
+        size_t l0=shells[ls].get_first_ind();
+
+        eri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
+        erip=eri->getp();
+        for(size_t ii=0;ii<Ni;ii++)
+          for(size_t jj=0;jj<Nj;jj++) {
+            size_t mu_p=ii+i0;
+            size_t nu_p=jj+j0;
+            arma::uword pidx=pivot_to_index(mu_p,nu_p);
+            if(pidx==static_cast<arma::uword>(-1)) continue;
+            for(size_t kk=0;kk<Nk;kk++)
+              for(size_t ll=0;ll<Nl;ll++) {
+                size_t mu_q=kk+k0;
+                size_t nu_q=ll+l0;
+                arma::uword qidx=pivot_to_index(mu_q,nu_q);
+                if(qidx==static_cast<arma::uword>(-1)) continue;
+                double val=(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+                // Write both triangles explicitly: pidx and qidx are
+                // unordered with respect to each other (they reflect
+                // pivot-selection order, not shellpair order), so a
+                // post-hoc symmatu/symmatl can't recover the missing
+                // half. Atomic writes are cheap relative to the libint
+                // call that produced `val`.
+#ifdef _OPENMP
+#pragma omp atomic write
+#endif
+                M_metric(pidx,qidx)=val;
+#ifdef _OPENMP
+#pragma omp atomic write
+#endif
+                M_metric(qidx,pidx)=val;
+              }
+          }
+      }
+    }
+    delete eri;
+  }
+  t_int+=t.get();
+
+  // ===========================================================
+  // Phase E: orthogonalise the metric. PartialCholeskyOrth(M) -> X
+  // such that X^T M X = I_eff over the lindep-cleaned subspace.
+  // ===========================================================
+  t.set();
+  arma::mat M_invh = PartialCholeskyOrth(M_metric, fit_cholesky_thr, 0.0);
+  t_chol+=t.get();
+
+  if(verbose) {
+    printf("Two-step CD: pivot metric orthogonalisation reduced %i -> %i Cholesky vectors (%s).\n",
+           (int) Nselected, (int) M_invh.n_cols, t.elapsed().c_str());
+    fflush(stdout);
+  }
+
+  // ===========================================================
+  // Phase F: build the final L vectors. B_raw[(mu nu), p] is
+  // (mu nu | piv_p); the standard ERI factorisation says
+  //   (mu nu | la si) = sum_{p,q} (mu nu | piv_p) (piv|piv)^{-1}_{p,q} (piv_q | la si)
+  //                   = sum_J L_J(mu nu) L_J(la si)
+  // with L = B_raw * X (where X = M_invh and X X^T = (piv|piv)^{-1}).
+  // ===========================================================
+  t.set();
+  B = B_raw * M_invh;
+  t_chol+=t.get();
+
+  if(verbose) {
+    printf("Two-step CD finished in %s. Realised memory size is %s.\n",
+           ttot.elapsed().c_str(), memory_size(B.n_elem*sizeof(double)).c_str());
+    printf("Time use: integrals %3.1f %%, linear algebra %3.1f %%.\n",
+           100*t_int/(t_int+t_chol),100*t_chol/(t_int+t_chol));
+    fflush(stdout);
+  }
+
+  return shpairs.size();
+}
+
 arma::uvec ERIchol::get_pivot() const {
   return pi;
 }

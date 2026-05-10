@@ -1,3 +1,6 @@
+# Each test is already designed to run in parallel so ctest should not parallellize
+set(CTEST_PARALLEL_LEVEL 1)
+
 function(run_test target)
   # Run ERKALE to get checkpoint file
   add_test(NAME ${target}_chk COMMAND erkale ${CMAKE_CURRENT_SOURCE_DIR}/${target}.run)# &> ${target}.stdout)

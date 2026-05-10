@@ -161,8 +161,6 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
       oss << "Unknown CholeskyAlgorithm '" << alg << "'; expected OneStep, CDFit, or TwoStep.\n";
       throw std::runtime_error(oss.str());
     }
-    if(alg=="TwoStep")
-      throw std::runtime_error("CholeskyAlgorithm=TwoStep is not yet implemented; use OneStep (default) or CDFit.\n");
   }
   if(cholesky && densityfit)
     throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
@@ -419,11 +417,18 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
         cholesky=false;
         densityfit=true;
       } else {
-        // OneStep (default): traditional one-step pivoted Cholesky on
-        // the molecular (uv|ls) ERI tensor.
+        // OneStep (default) or TwoStep: both populate the same
+        // ERIchol storage through the same downstream J/K kernels;
+        // they differ only in how fill() vs fill_two_step() compute
+        // the L vectors. cholmode (cache) and cholnafthr (NAF) apply
+        // to both.
+        const bool twostep = (cd_alg=="TwoStep");
         if(verbose) {
           t.set();
-          printf("Computing repulsion integrals.\n");
+          if(twostep)
+            printf("Computing repulsion integrals (two-step CD).\n");
+          else
+            printf("Computing repulsion integrals.\n");
           fflush(stdout);
         }
 
@@ -436,7 +441,11 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
         }
 
         if(chol.get_Nbf()!=basisp->get_Nbf()) {
-          size_t Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
+          size_t Npairs;
+          if(twostep)
+            Npairs=chol.fill_two_step(*basisp,cholthr,cholshthr,intthr,fitcholthr,verbose);
+          else
+            Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
           if(verbose) {
             printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
             fflush(stdout);

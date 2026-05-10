@@ -72,6 +72,25 @@ class ERIchol {
   /// significant (uv) pairs.
   size_t fill(const BasisSet & basis, double cholesky_tol, double shell_reuse_thr, double shell_screen_tol, bool verbose);
 
+  /// Fill matrix via two-step pivoted Cholesky decomposition. The
+  /// pivot-selection phase is identical to fill() (shellpair-batched
+  /// libint calls, shell_reuse_thr gating), so the kept pivots are
+  /// the same orbital-pair set as one-step CD at the same threshold.
+  /// The selected pivot columns of (mu nu | piv) are accumulated as
+  /// we go; after selection we build the small (Naux, Naux) metric
+  /// M[p, q] = (piv_p | piv_q) via libint, orthogonalize via
+  /// PartialCholeskyOrth(M, fit_cholesky_thr) to drop linearly
+  /// dependent pivots, and construct the final L vectors as
+  /// L_J(mu nu) = (mu nu | piv) * M^{-1/2}. Output L vectors are
+  /// stored in this object's standard layout (B / prodidx /
+  /// invmap / prodmap / odiagidx) so all downstream consumers --
+  /// calcJ / calcK / B_matrix / naf_transform / save / load -- work
+  /// unchanged.
+  ///
+  /// Cf. F. Folkestad, E. F. Kjonstad and H. Koch,
+  /// J. Chem. Phys. 150, 194112 (2019).
+  size_t fill_two_step(const BasisSet & basis, double cholesky_tol, double shell_reuse_thr, double shell_screen_tol, double fit_cholesky_thr, bool verbose);
+
   /// Get the pivot vector
   arma::uvec get_pivot() const;
   /// Get the pivot shellpairs
