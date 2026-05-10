@@ -117,4 +117,52 @@ class ERIchol {
   arma::mat B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose=false) const;
 };
 
+// ===========================================================================
+// ERIfit namespace -- merged in from src/erifit.{h,cpp}. The CD-based aux
+// basis construction in basislibrary.cpp uses the same Cholesky / fitting
+// machinery as ERIchol, so the two are folded into one translation unit
+// here. (Pure cosmetic merge; the API is unchanged.)
+// ===========================================================================
+namespace ERIfit {
+  /// Basis function pair
+  struct bf_pair_t {
+    /// Index
+    size_t idx;
+    /// lh function
+    size_t i;
+    /// shell index
+    size_t is;
+    /// rh function
+    size_t j;
+    /// shell index
+    size_t js;
+  };
+
+  /// Comparison operator
+  bool operator<(const bf_pair_t & lhs, const bf_pair_t & rhs);
+
+  /// Compute the exact repulsion integrals
+  void compute_ERIs(const BasisSet & basis, arma::mat & eris);
+  /// Compute the exact repulsion integrals
+  void compute_ERIs(const ElementBasisSet & orbel, arma::mat & eris);
+  /// Compute the exact diagonal repulsion integrals
+  void compute_diag_ERIs(const ElementBasisSet & orbel, arma::mat & eris);
+
+  /// Find unique exponent pairs
+  void unique_exponent_pairs(const ElementBasisSet & orbel, int am1, int am2, std::vector< std::vector<shellpair_t> > & pairs, std::vector<double> & exps);
+  /// Compute the T matrix needed for Cholesky decomposition
+  void compute_cholesky_T(const ElementBasisSet & orbel, int am1, int am2, arma::mat & eris, arma::vec & exps);
+
+  /// Compute fitting integrals
+  void compute_fitint(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, arma::mat & fitint);
+
+  /// Compute the fitted repulsion integrals using the supplied fitting integrals
+  void compute_ERIfit(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, double linthr, const arma::mat & fitint, arma::mat & fiteri);
+  /// Compute the diagonal fitted repulsion integrals using the supplied fitting integrals
+  void compute_diag_ERIfit(const BasisSetLibrary & fitlib, const ElementBasisSet & orbel, double linthr, const arma::mat & fitint, arma::mat & fiteri);
+
+  /// Compute the transformation matrix to orthonormal orbitals
+  void orthonormal_ERI_trans(const ElementBasisSet & orbel, double linthr, arma::mat & trans);
+}
+
 #endif
