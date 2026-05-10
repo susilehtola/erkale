@@ -136,6 +136,7 @@ void Settings::add_scf_settings() {
   add_double("CholeskyShThr", "Cholesky cache threshold", 0.01);
   add_double("CholeskyNAFThr", "Cholesky natural auxiliary function threshold", 0.0);
   add_int("CholeskyMode", "Save/load integrals? 0 no, 1 save, -1 load", 0, true);
+  add_string("CholeskyAlgorithm", "Cholesky/RI algorithm. OneStep (default): full pivoted CD on (uv|ls); exact at threshold. TwoStep: orbital-pair pivots on atom pairs evaluated via three-center machinery (Folkestad/Kjonstad/Koch JCP 150, 194112 (2019)); exact at threshold, same L vectors as OneStep. CDFit: density fitting with an atom-centered aux basis built by per-atom pivoted Cholesky on the orbital primitives (Lehtola JCTC 17, 6886 (2021)); only converges to the exact ERI tensor as the orbital basis becomes complete.", "OneStep");
   // Which basis to use as density fitting basis
   add_string("FittingBasis", "Basis to use for density fitting / RI (Auto for automatic)","Auto");
   // How much memory to allow for density fitting

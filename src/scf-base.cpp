@@ -153,6 +153,17 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   cholshthr=settings.get_double("CholeskyShThr");
   cholnafthr=settings.get_double("CholeskyNAFThr");
   cholmode=settings.get_int("CholeskyMode");
+  // Validate the algorithm string up front.
+  {
+    const std::string alg = settings.get_string("CholeskyAlgorithm");
+    if(alg!="OneStep" && alg!="CDFit" && alg!="TwoStep") {
+      std::ostringstream oss;
+      oss << "Unknown CholeskyAlgorithm '" << alg << "'; expected OneStep, CDFit, or TwoStep.\n";
+      throw std::runtime_error(oss.str());
+    }
+    if(alg=="TwoStep")
+      throw std::runtime_error("CholeskyAlgorithm=TwoStep is not yet implemented; use OneStep (default) or CDFit.\n");
+  }
   if(cholesky && densityfit)
     throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
 
@@ -360,35 +371,86 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   } else  {
     // Compute ERIs
     if(cholesky) {
-      if(verbose) {
-	t.set();
-	printf("Computing repulsion integrals.\n");
-	fflush(stdout);
-      }
+      const std::string cd_alg = settings.get_string("CholeskyAlgorithm");
+      if(cd_alg=="CDFit") {
+        // Density fitting with an atom-centered aux basis built by
+        // per-atom pivoted Cholesky on the orbital primitives
+        // (Lehtola JCTC 17, 6886 (2021)). Routes through the same
+        // DensityFit machinery as a regular RI run; only valid when
+        // the orbital basis is rich enough for the per-atom CD
+        // pivots to span the molecular ERI tensor faithfully.
+        if(verbose) {
+          t.set();
+          printf("Building auxiliary basis from pivoted Cholesky decomposition (CDFit) ... ");
+          fflush(stdout);
+        }
+        dfitbas = basisp->cholesky_aux_basis(cholthr);
+        if(verbose) {
+          printf("done (%s)\n",t.elapsed().c_str());
+          printf("Auxiliary basis contains %i functions.\n",(int) dfitbas.get_Nbf());
+          fflush(stdout);
+        }
+        if(verbose) {
+          if(cholmode!=0)
+            printf("Note: CholeskyMode is ignored under CDFit; the aux basis is reconstructed at every SCF run.\n");
+          if(cholnafthr>0.0)
+            printf("Note: CholeskyNAFThr is ignored under CDFit; NAF doesn't apply to DF storage.\n");
+        }
 
-      if(cholmode==-1) {
-	chol.load();
-	if(verbose) {
-	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_Naux(),t.elapsed().c_str());
-	  fflush(stdout);
-	}
-      }
+        // Drive density fitting on the CD-derived aux basis.
+        std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
+        if(verbose) {
+          if(direct)
+            printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
+          else
+            printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
+          fflush(stdout);
+          t.set();
+        }
+        size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
+        if(verbose) {
+          printf("done (%s)\n",t.elapsed().c_str());
+          printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+          fflush(stdout);
+        }
 
-      if(chol.get_Nbf()!=basisp->get_Nbf()) {
-	size_t Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
-	if(verbose) {
-	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
-	  fflush(stdout);
-	}
-	// Natural auxiliary function screening
-	if(cholnafthr>0.0)
-	  chol.naf_transform(cholnafthr,verbose);
-	if(cholmode==1) {
-	  t.set();
-	  chol.save();
-	  printf("Cholesky vectors saved to file in %s.\n",t.elapsed().c_str());
-	  fflush(stdout);
-	}
+        // Route the rest of the SCF dispatch through the densityfit
+        // arm; chol/chol_rs members are unused on this path.
+        cholesky=false;
+        densityfit=true;
+      } else {
+        // OneStep (default): traditional one-step pivoted Cholesky on
+        // the molecular (uv|ls) ERI tensor.
+        if(verbose) {
+          t.set();
+          printf("Computing repulsion integrals.\n");
+          fflush(stdout);
+        }
+
+        if(cholmode==-1) {
+          chol.load();
+          if(verbose) {
+            printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_Naux(),t.elapsed().c_str());
+            fflush(stdout);
+          }
+        }
+
+        if(chol.get_Nbf()!=basisp->get_Nbf()) {
+          size_t Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
+          if(verbose) {
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+            fflush(stdout);
+          }
+          // Natural auxiliary function screening
+          if(cholnafthr>0.0)
+            chol.naf_transform(cholnafthr,verbose);
+          if(cholmode==1) {
+            t.set();
+            chol.save();
+            printf("Cholesky vectors saved to file in %s.\n",t.elapsed().c_str());
+            fflush(stdout);
+          }
+        }
       }
     } else {
       if(direct) {

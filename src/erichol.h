@@ -67,7 +67,9 @@ class ERIchol {
   /// Save B matrix
   void save() const;
 
-  /// Fill matrix, returns amount of significant pairs.
+  /// Fill matrix via one-step pivoted Cholesky decomposition on the
+  /// full molecular (uv|ls) ERI tensor. Returns amount of
+  /// significant (uv) pairs.
   size_t fill(const BasisSet & basis, double cholesky_tol, double shell_reuse_thr, double shell_screen_tol, bool verbose);
 
   /// Get the pivot vector

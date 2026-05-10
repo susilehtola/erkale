@@ -339,8 +339,12 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
 #pragma omp parallel
 #endif
   {
-    // Helper array (allocated once per thread, reset per orbital below)
-    arma::mat aui(Naux,Nbf);
+    // Helper array (allocated once per thread, resized+zeroed per
+    // orbital below: aui = ab_invh.t()*aui at the bottom of the loop
+    // shrinks aui from (Naux, Nbf) to (Naux_eff, Nbf), and the next
+    // iteration must start at (Naux, Nbf) again or the per-shellpair
+    // (Naux, Nmu) accumulation hits a shape mismatch).
+    arma::mat aui;
 
     // Helper memory
     std::vector<double> scratch(Naux*Nmax*Nmax,0);
@@ -352,7 +356,7 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
 #pragma omp for
 #endif
     for(size_t io=0;io<C.n_cols;io++) {
-      aui.zeros();
+      aui.zeros(Naux,Nbf);
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	// Shells in question are
 	size_t imus=orbpairs[ip].is;
