@@ -88,8 +88,12 @@ class DensityFit {
 
   /// List of unique orbital shell pairs
   std::vector<eripair_t> orbpairs;
-  /// B matrix (not stored in direct mode)
-  arma::mat B;
+  /// Integrals \f$ ( \alpha | \mu \nu) \f$ stored by shell pair basis
+  std::vector<arma::mat> a_munu;
+  /// Memory for the storage of a_munu
+  std::vector<double> a_munu_storage;
+  /// Lookup table for the indices
+  std::vector<size_t> a_munu_lookup;
 
   /// \f$ ( \alpha | \beta) \f$
   arma::mat ab;
@@ -101,7 +105,7 @@ class DensityFit {
   /// Form screening matrix
   void form_screening();
   /// Compute shell in (a|uv) matrix
-  arma::mat compute_a_munu(ERIWorker * eri, size_t ip) const;
+  arma::mat compute_a_munu(ERIWorker * eri, size_t ip, double * memptr = nullptr) const;
   /// Digest J expansion
   void digest_Jexp(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const;
   /// Digest J
@@ -112,8 +116,6 @@ class DensityFit {
   void digest_K_incore(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const;
   /// Digest K in direct mode
   void digest_K_direct(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
-  /// Digest K in direct mode, complex orbitals
-  void digest_K_direct(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const;
 
  public:
   /// Constructor
@@ -157,11 +159,6 @@ class DensityFit {
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs, size_t fitmem) const;
 
-  /// Get exchange matrix from orbitals with occupation numbers occs
-  arma::mat calcK(const arma::mat & C, const arma::vec & occs, size_t fitmem) const;
-  /// Get exchange matrix from orbitals with occupation numbers occs
-  arma::cx_mat calcK(const arma::cx_mat & C, const arma::vec & occs, size_t fitmem) const;
-
   /// Get the number of orbital functions
   size_t get_Norb() const;
   /// Get the number of auxiliary functions
@@ -175,9 +172,9 @@ class DensityFit {
   /// Get ab_invh
   arma::mat get_ab_invh() const;
 
-  /// Get 3-center integrals (must be in !direct mode)
+  /// Get 3-center integrals (must have HF enabled)
   void three_center_integrals(arma::mat & B) const;
-  /// Get B matrix (must be in !direct mode)
+  /// Get B matrix (must have HF enabled)
   void B_matrix(arma::mat & B) const;
 
   /// Compute error in (AB|AB) type integrals
