@@ -237,6 +237,33 @@ class BasisSet {
    */
   BasisSet exchange_fitting() const;
 
+  /**
+   * Generate a molecular auxiliary basis via pivoted Cholesky
+   * decomposition on each atomic block. Per nucleus, the orbital
+   * shells are decontracted, pivoted CD selects the significant
+   * shell pairs, and those pairs are converted into auxiliary
+   * primitives. Delegates to ElementBasisSet::cholesky_set, which
+   * implements the algorithm of:
+   *
+   *   S. Lehtola, "Straightforward and accurate automatic auxiliary
+   *   basis set generation for molecular calculations with atomic
+   *   orbital basis sets", J. Chem. Theory Comput. 17, 6886 (2021).
+   *   doi:10.1021/acs.jctc.1c00607
+   *
+   * which builds on the Cholesky-DF / aCD work of
+   *   F. Aquilante, R. Lindh and T. B. Pedersen,
+   *   Theor. Chem. Acc. 124, 1 (2009).
+   *
+   * Used as the aux-basis source for density-fitted Fock builds
+   * when the SCF input requests Cholesky: standard DF on this
+   * aux basis is numerically equivalent to one-step pivoted CD
+   * within `thr` while operating through the three-center
+   * machinery rather than the four-index pivot path.
+   *
+   * @param thr  Cholesky / aux-pivot threshold (typical 1e-7).
+   */
+  BasisSet cholesky_aux_basis(double thr) const;
+
   /// Decontract basis set, m gives mapping from old functions to new ones
   BasisSet decontract(arma::mat & m) const;
 
