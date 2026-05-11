@@ -252,12 +252,15 @@ int main_guarded(int argc, char **argv) {
   std::vector<GaussianShell> pshells=pbasis.get_shells();
 
   // Compute shell pairs
-  arma::mat Qe, Qp, M;
   double omega=0.0;
   double alpha=1.0;
   double beta=0.0;
-  auto epairs=basis.get_eripairs(Qe,M,intthr,omega,alpha,beta,verbose);
-  auto ppairs=pbasis.get_eripairs(Qp,M,intthr,omega,alpha,beta,verbose);
+  ScreeningData e_scr=basis.compute_screening(intthr,omega,alpha,beta,verbose);
+  ScreeningData p_scr=pbasis.compute_screening(intthr,omega,alpha,beta,verbose);
+  const arma::mat & Qe = e_scr.Q;
+  const arma::mat & Qp = p_scr.Q;
+  const std::vector<eripair_t> & epairs = e_scr.shpairs;
+  const std::vector<eripair_t> & ppairs = p_scr.shpairs;
 
   int max_am = std::max(basis.get_max_am(), pbasis.get_max_am());
   int max_Ncontr = std::max(basis.get_max_Ncontr(), pbasis.get_max_Ncontr());

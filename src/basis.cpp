@@ -1411,48 +1411,43 @@ std::vector<shellpair_t> BasisSet::get_unique_shellpairs() const {
   return shellpairs;
 }
 
-std::vector<eripair_t> BasisSet::get_eripairs(arma::mat & Q, arma::mat & M, double tol, double omega, double alpha, double beta, bool verbose) const {
+ScreeningData BasisSet::compute_screening(double tol, double omega, double alpha, double beta, bool verbose) const {
+  ScreeningData s;
+
   // Get the screening matrices
-  eri_screening(Q,M,omega,alpha,beta);
+  eri_screening(s.Q,s.M,omega,alpha,beta);
 
   // Fill out list
-  std::vector<eripair_t> list(shellpairs.size());
+  s.shpairs.resize(shellpairs.size());
   for(size_t i=0;i<shellpairs.size();i++) {
-    list[i].is=shellpairs[i].is;
-    list[i].i0=shells[shellpairs[i].is].get_first_ind();
-    list[i].Ni=shells[shellpairs[i].is].get_Nbf();
+    s.shpairs[i].is=shellpairs[i].is;
+    s.shpairs[i].i0=shells[shellpairs[i].is].get_first_ind();
+    s.shpairs[i].Ni=shells[shellpairs[i].is].get_Nbf();
 
-    list[i].js=shellpairs[i].js;
-    list[i].j0=shells[shellpairs[i].js].get_first_ind();
-    list[i].Nj=shells[shellpairs[i].js].get_Nbf();
+    s.shpairs[i].js=shellpairs[i].js;
+    s.shpairs[i].j0=shells[shellpairs[i].js].get_first_ind();
+    s.shpairs[i].Nj=shells[shellpairs[i].js].get_Nbf();
 
-    list[i].eri=Q(list[i].is,list[i].js);
+    s.shpairs[i].eri=s.Q(s.shpairs[i].is,s.shpairs[i].js);
   }
   // and sort it
-  std::stable_sort(list.begin(),list.end());
+  std::stable_sort(s.shpairs.begin(),s.shpairs.end());
 
   // Find out which pairs are negligible.
-  size_t ulimit=list.size()-1;
+  size_t ulimit=s.shpairs.size()-1;
   // An integral (ij|kl) <= sqrt( (ij|ij) (kl|kl) ). Since the
   // integrals are in decreasing order, the integral threshold is
-  double thr=tol/list[0].eri;
-  while(list[ulimit].eri < thr)
+  double thr=tol/s.shpairs[0].eri;
+  while(s.shpairs[ulimit].eri < thr)
     ulimit--;
-  if(ulimit<list.size())
-    list.resize(ulimit+1);
+  if(ulimit<s.shpairs.size())
+    s.shpairs.resize(ulimit+1);
 
   (void) verbose;
   //if(verbose)
-  // printf("%u shell pairs out of %u are significant.\n",(unsigned int) list.size(),(unsigned int) shellpairs.size());
+  // printf("%u shell pairs out of %u are significant.\n",(unsigned int) s.shpairs.size(),(unsigned int) shellpairs.size());
 
-  /*
-    FILE *out=fopen("screen.dat","w");
-    for(size_t i=0;i<list.size();i++)
-    fprintf(out,"%4i %4i %e\n",(int) list[i].is, (int) list[i].js, list[i].eri);
-    fclose(out);
-  */
-
-  return list;
+  return s;
 }
 
 bool operator<(const eripair_t & lhs, const eripair_t & rhs) {
@@ -2397,8 +2392,9 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
   double omega=0.0;
   double alpha=1.0;
   double beta=0.0;
-  arma::mat Q, M;
-  std::vector<eripair_t> shpairs=get_eripairs(Q,M,intthr,omega,alpha,beta,false);
+  ScreeningData scr=compute_screening(intthr,omega,alpha,beta,false);
+  const arma::mat & Q = scr.Q;
+  const std::vector<eripair_t> & shpairs = scr.shpairs;
   // and nuclei
   std::vector<nucleus_t> nuclei=get_nuclei();
   if(verbose)

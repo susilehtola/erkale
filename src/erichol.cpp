@@ -176,8 +176,10 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
   }
 
   // Screening matrix and pairs
-  arma::mat Q, M;
-  std::vector<eripair_t> shpairs=basis.get_eripairs(Q,M,shell_screen_tol,omega,alpha,beta,verbose);
+  ScreeningData scr=basis.compute_screening(shell_screen_tol,omega,alpha,beta,verbose);
+  const arma::mat & Q = scr.Q;
+  const arma::mat & M = scr.M;
+  const std::vector<eripair_t> & shpairs = scr.shpairs;
 
   // Amount of basis functions
   Nbf=basis.get_Nbf();
@@ -609,8 +611,10 @@ size_t ERIchol::fill_two_step(const BasisSet & basis,
   }
 
   // Screening matrix and pairs
-  arma::mat Q, M_screen;
-  std::vector<eripair_t> shpairs=basis.get_eripairs(Q,M_screen,shell_screen_tol,omega,alpha,beta,verbose);
+  ScreeningData scr=basis.compute_screening(shell_screen_tol,omega,alpha,beta,verbose);
+  const arma::mat & Q = scr.Q;
+  const arma::mat & M_screen = scr.M;
+  const std::vector<eripair_t> & shpairs = scr.shpairs;
 
   // Amount of basis functions
   Nbf=basis.get_Nbf();
@@ -1518,11 +1522,8 @@ arma::vec ERIchol::forceJ(const BasisSet & basis, const arma::mat & P) const {
   // Same shape as DensityFit::forceJ Part 2 (which uses 3-center
   // derivatives), but routed via dERIWorker.compute on 4 real shells.
   // dERIWorker yields 12 components mapped to the 4 centers.
-  std::vector<eripair_t> orb_shps_;
-  {
-    arma::mat Q, MS;
-    orb_shps_ = basis.get_eripairs(Q, MS, /*tol*/0.0, omega, alpha, beta, false);
-  }
+  std::vector<eripair_t> orb_shps_ =
+    basis.compute_screening(/*tol*/0.0, omega, alpha, beta, false).shpairs;
 
 #ifdef _OPENMP
 #pragma omp parallel

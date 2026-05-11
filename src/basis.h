@@ -128,6 +128,22 @@ typedef struct {
 /// Comparison operator
 bool operator<(const eripair_t & lhs, const eripair_t & rhs);
 
+/// Bundle of Schwarz screening data for a basis: the shell-shell
+/// (uv|uv)^1/2 matrix Q, the distance estimate M (a |R_uv - R_ls|
+/// upper bound on (uv|ls) once a few prefactors are folded in), and
+/// the value-sorted list of significant shell pairs. Constructed
+/// once per (basis, range-separation, threshold) tuple via
+/// BasisSet::compute_screening; replaces the get_eripairs(out Q,
+/// out M) factory whose three outputs were always stored together.
+struct ScreeningData {
+  /// Shell-pair Schwarz matrix, Q(is,js) = sqrt((is js | is js)).
+  arma::mat Q;
+  /// Distance estimate matrix, M(is,js) -- upper bound prefactor.
+  arma::mat M;
+  /// Shell pairs sorted by value, truncated to those above threshold.
+  std::vector<eripair_t> shpairs;
+};
+
 // Forward declaration
 class BasisSetLibrary;
 class ElementBasisSet;
@@ -293,8 +309,11 @@ class BasisSet {
   /// Get list of unique shell pairs
   std::vector<shellpair_t> get_unique_shellpairs() const;
 
-  /// Get list of ERI pairs
-  std::vector<eripair_t> get_eripairs(arma::mat & Q, arma::mat & M, double thr, double omega=0.0, double alpha=1.0, double beta=0.0, bool verbose=false) const;
+  /// Build ScreeningData: Schwarz Q, distance estimate M, and a
+  /// value-sorted, threshold-truncated shell-pair list. Single
+  /// factory replacing the (Q, M, shpairs) triple that every J/K
+  /// path used to own as three separate fields.
+  ScreeningData compute_screening(double thr, double omega=0.0, double alpha=1.0, double beta=0.0, bool verbose=false) const;
 
   /// Convert contractions from normalized primitives to unnormalized primitives
   void convert_contractions();

@@ -58,7 +58,10 @@ void ERItable::get_range_separation(double & w, double & a, double & b) const {
 
 size_t ERItable::N_ints(const BasisSet * basp, double thr) {
   // Get ERI pairs
-  shpairs=basp->get_eripairs(Q, M, thr, omega, alpha, beta);
+  ScreeningData s = basp->compute_screening(thr, omega, alpha, beta);
+  Q = std::move(s.Q);
+  M = std::move(s.M);
+  shpairs = std::move(s.shpairs);
 
   // Form offset table and calculate amount of integrals
   size_t N=0;

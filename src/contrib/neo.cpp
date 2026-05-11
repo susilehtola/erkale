@@ -353,11 +353,14 @@ int main_guarded(int argc, char **argv) {
     std::vector<GaussianShell> tshells=target_basis.get_shells();
 
     // Get shellpairs
-    arma::mat Qs, Qt, Ms, Mt;
     double shtol=settings.get_double("IntegralThresh");
     bool verbose=false;
-    auto spairs=source_basis.get_eripairs(Qs,Ms,shtol,omega,alpha,beta,verbose);
-    auto tpairs=target_basis.get_eripairs(Qt,Mt,shtol,omega,alpha,beta,verbose);
+    ScreeningData s_scr = source_basis.compute_screening(shtol,omega,alpha,beta,verbose);
+    ScreeningData t_scr = target_basis.compute_screening(shtol,omega,alpha,beta,verbose);
+    const arma::mat & Qs = s_scr.Q;
+    const arma::mat & Qt = t_scr.Q;
+    const std::vector<eripair_t> & spairs = s_scr.shpairs;
+    const std::vector<eripair_t> & tpairs = t_scr.shpairs;
 
     // Sanity check
     if(source_density.n_rows != source_basis.get_Nbf() or source_density.n_cols != source_basis.get_Nbf())
