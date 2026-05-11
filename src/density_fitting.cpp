@@ -855,104 +855,80 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
   } // end parallel section
 
 
-    // Second part: f = 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a *#*
+  // Second part: f -= gamma_a' c_a (three-center derivative term).
+  // Routed through DirectDFPerturbedBlocks: for_each_pert streams
+  // (perturbation, aux_first, derivative_sub_block) tuples per
+  // orbital shellpair, identically to how the value-side
+  // DirectDFBlocks streams (alpha | mu nu) blocks. The libcholesky
+  // perturbation API uses the same shape; once we depend on
+  // libcholesky this construction becomes a thin adapter.
+  {
+    std::vector<std::pair<size_t,size_t>> sp_pairs(orbpairs.size());
+    std::vector<std::pair<size_t,size_t>> sp_firsts(orbpairs.size());
+    std::vector<std::pair<size_t,size_t>> sp_sizes(orbpairs.size());
+    for(size_t ip=0; ip<orbpairs.size(); ip++) {
+      const size_t imus = orbpairs[ip].is;
+      const size_t inus = orbpairs[ip].js;
+      sp_pairs[ip]  = std::make_pair(imus, inus);
+      sp_firsts[ip] = std::make_pair(orbshells[imus].get_first_ind(),
+                                     orbshells[inus].get_first_ind());
+      sp_sizes[ip]  = std::make_pair(orbshells[imus].get_Nbf(),
+                                     orbshells[inus].get_Nbf());
+    }
+    DirectDFPerturbedBlocks pblocks(Nbf, Naux, Nnuc,
+                                    std::move(sp_pairs),
+                                    std::move(sp_firsts),
+                                    std::move(sp_sizes),
+                                    orbshells, auxshells, dummy,
+                                    omega, alpha, beta, maxam, maxcontr);
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-  {
-    dERIWorker *deri;
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      deri=new dERIWorker(maxam,maxcontr);
-    else
-      deri=new dERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-    const std::vector<double> * erip;
-
+    {
 #ifdef _OPENMP
-    // Worker stack for each matrix
-    arma::vec fwrk(f);
-    fwrk.zeros();
-
+      arma::vec fwrk(f); fwrk.zeros();
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<orbpairs.size();ip++) {
-      size_t imus=orbpairs[ip].is;
-      size_t inus=orbpairs[ip].js;
+      for(size_t ip=0; ip<orbpairs.size(); ip++) {
+        const size_t imus = orbpairs[ip].is;
+        const size_t inus = orbpairs[ip].js;
+        const size_t mu0  = orbshells[imus].get_first_ind();
+        const size_t nu0  = orbshells[inus].get_first_ind();
+        const size_t Nmu  = orbshells[imus].get_Nbf();
+        const size_t Nnu  = orbshells[inus].get_Nbf();
+        // Off-diagonal pairs are counted only once in orbpairs;
+        // double-count the contribution.
+        const double fac  = (imus == inus) ? 1.0 : 2.0;
 
-      size_t Nmu=orbshells[imus].get_Nbf();
-      size_t Nnu=orbshells[inus].get_Nbf();
+        // P submatrix laid out as (mu fastest, nu slowest) so it
+        // pairs with the sub_block's column index inu*Nmu+imu.
+        arma::vec Psub(Nmu * Nnu);
+        for(size_t inu=0; inu<Nnu; inu++)
+          for(size_t imu=0; imu<Nmu; imu++)
+            Psub(inu*Nmu + imu) = P(mu0+imu, nu0+inu);
 
-      size_t inuc=orbshells[imus].get_center_ind();
-      size_t jnuc=orbshells[inus].get_center_ind();
-
-      // If imus==inus, we need to take care that we count
-      // every term only once; on the off-diagonal we get
-      // every term twice.
-      double fac=2.0;
-      if(imus==inus)
-	fac=1.0;
-
-      for(size_t ias=0;ias<auxshells.size();ias++) {
-	size_t Na=auxshells[ias].get_Nbf();
-	size_t anuc=auxshells[ias].get_center_ind();
-
-	if(inuc==jnuc && jnuc==anuc)
-	  // Contributions vanish
-	  continue;
-
-	// Compute (a|mn)
-	deri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-
-	// Expansion coefficients
-	arma::vec ca=c.subvec(auxshells[ias].get_first_ind(),auxshells[ias].get_last_ind());
-
-	// Compute forces
-	const static int index[]={0, 1, 2, 6, 7, 8, 9, 10, 11};
-	const size_t Nidx=sizeof(index)/sizeof(index[0]);
-	double ders[Nidx];
-
-	for(size_t iid=0;iid<Nidx;iid++) {
-	  // Index is
-	  int ic=index[iid];
-	  arma::vec hlp(Na);
-
-	  erip=deri->getp(ic);
-	  hlp.zeros();
-	  for(size_t iia=0;iia<Na;iia++)
-	    for(size_t iimu=0;iimu<Nmu;iimu++) {
-	      size_t imu=orbshells[imus].get_first_ind()+iimu;
-	      for(size_t iinu=0;iinu<Nnu;iinu++) {
-		size_t inu=orbshells[inus].get_first_ind()+iinu;
-
-		// The contracted integral
-		hlp(iia)+=(*erip)[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
-	      }
-	    }
-	  ders[iid]=fac*arma::dot(hlp,ca);
-	}
-
-	// Increment forces
-	for(int ic=0;ic<3;ic++) {
+        pblocks.for_each_pert(ip,
+            [&](const Perturbation & pert, size_t a0, const arma::mat & sub_block) {
+              // sub_block: (Na_aux x Nmu*Nnu). Contract with P over
+              // (mu, nu) and with c over a; the scalar derivative is
+              // accumulated into f at (atom = pert.p1, xyz = pert.p2).
+              const arma::vec hlp = sub_block * Psub;
+              const arma::vec ca  = c.subvec(a0, a0 + sub_block.n_rows - 1);
+              const double ders   = fac * arma::dot(hlp, ca);
 #ifdef _OPENMP
-	  fwrk(3*anuc+ic)-=ders[ic];
-	  fwrk(3*inuc+ic)-=ders[ic+3];
-	  fwrk(3*jnuc+ic)-=ders[ic+6];
+              fwrk(3 * pert.p1 + pert.p2) -= ders;
 #else
-	  f(3*anuc+ic)-=ders[ic];
-	  f(3*inuc+ic)-=ders[ic+3];
-	  f(3*jnuc+ic)-=ders[ic+6];
+              f(3 * pert.p1 + pert.p2)    -= ders;
 #endif
-	}
-
+            });
       }
-    }
-
 #ifdef _OPENMP
 #pragma omp critical
-    // Sum results together
-    f+=fwrk;
+      f += fwrk;
 #endif
-    delete deri;
-  } // end parallel section
+    } // end parallel
+  }
 
   return f;
 }

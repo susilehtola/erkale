@@ -21,6 +21,7 @@
 #include "basis.h"
 #include "eriworker.h"
 
+#include <functional>
 #include <memory>
 
 /**
@@ -185,6 +186,149 @@ public:
 
  private:
   ERIWorker * thread_eri() const;
+};
+
+// ===========================================================================
+// Perturbation / derivative-integral abstraction
+//
+// Layout chosen to match libcholesky's lc_perturbation_set (cf. memory
+// project_libcholesky_perturbation_compat): each perturbation carries a
+// `kind` tag and two integer parameters, and a derivative request is an
+// ordered list of such perturbations. v1 only implements first-order
+// LC_PERT_NUCLEAR_CARTESIAN; the API accepts arbitrary multi-indices and
+// other kinds, but unsupported requests throw.
+// ===========================================================================
+
+struct Perturbation {
+  /// Match libcholesky lc_perturbation_kind values bit-for-bit so the
+  /// eventual bridge to libcholesky is a memcpy on equivalent structs.
+  enum Kind : int {
+    NuclearCartesian = 0, // p1 = atom index, p2 = component (0..2)
+    ElectricField    = 1, // p1 unused,      p2 = component (0..2)
+    MagneticUniform  = 2, // reserved v1.x
+    NuclearMagnetic  = 3, // reserved v1.x
+    BasisParameter   = 4  // p1 = basis selector, p2 = parameter index
+  };
+  int kind;
+  int p1;
+  int p2;
+
+  static Perturbation nuclear(int atom, int xyz) {
+    return Perturbation{NuclearCartesian, atom, xyz};
+  }
+};
+
+/// Ordered list of perturbations of length n; derivative order = n.
+using PerturbationSet = std::vector<Perturbation>;
+
+/**
+ * Streaming view of derivative integrals (mu nu | aux) per orbital
+ * shellpair. The interface mirrors libcholesky's perturbed B-tensor
+ * model: each call to `for_each_pert(ip, fn)` invokes `fn` once for
+ * each (perturbation_set, aux_first, sub_block) tuple that has a
+ * non-zero contribution for shellpair `ip`. The consumer accumulates
+ * forces (or higher-order properties) by contracting `sub_block`
+ * with density / coefficient slices.
+ *
+ * For first-order nuclear-Cartesian: `fn` fires once per
+ * (touching_atom, xyz, contributing_aux_shell) -- that's typically
+ * O(3 * N_atoms_with_aux) callbacks per shellpair, each with a
+ * (Na_aux_shell x Nmu*Nnu) sub_block view of the derivative
+ * integrals. Lifetime contract on `sub_block` is identical to
+ * BTensorBlocks::get_block: valid until the next call on the same
+ * thread on the same object.
+ *
+ * Derivative-order / kind support is implementation-defined; v1
+ * implementations support first-order NuclearCartesian only and
+ * throw on other requests.
+ */
+class PerturbedBTensorBlocks {
+public:
+  virtual ~PerturbedBTensorBlocks() = default;
+
+  virtual size_t n_blocks() const = 0;
+  virtual size_t naux() const = 0;
+  virtual size_t nbf() const = 0;
+  virtual size_t nnuc() const = 0;
+
+  virtual std::pair<size_t, size_t> shellpair(size_t ip) const = 0;
+  virtual std::pair<size_t, size_t> shellpair_first(size_t ip) const = 0;
+  virtual std::pair<size_t, size_t> shellpair_size(size_t ip) const = 0;
+
+  /// Stream non-zero derivative contributions for shellpair `ip`. The
+  /// `fn` callback is invoked once per (Perturbation, aux_first,
+  /// sub_block) tuple. Sub-block shape: (aux_count, Nmu * Nnu) where
+  /// aux_count is the number of contributing aux functions in this
+  /// callback's slice (e.g. one aux shell's worth).
+  ///
+  /// Currently only order-1 NuclearCartesian is supported.
+  virtual void for_each_pert(
+      size_t ip,
+      const std::function<void(const Perturbation& pert,
+                              size_t aux_first,
+                              const arma::mat& sub_block)>& fn) const = 0;
+};
+
+/**
+ * Direct-mode subclass for density-fitting derivative integrals.
+ * Computes d(mu nu | aux_shell)/dR on demand via dERIWorker for each
+ * orbital shellpair and aux shell, and streams the resulting
+ * sub-blocks to the consumer through `for_each_pert`.
+ *
+ * Holds a per-thread dERIWorker cache + per-thread scratch buffer
+ * the same way DirectDFBlocks does for value integrals.
+ */
+class DirectDFPerturbedBlocks : public PerturbedBTensorBlocks {
+  size_t Nbf_;
+  size_t Naux_;
+  size_t Nnuc_;
+  std::vector<std::pair<size_t, size_t>> shellpairs_;
+  std::vector<std::pair<size_t, size_t>> firsts_;
+  std::vector<std::pair<size_t, size_t>> sizes_;
+
+  std::vector<GaussianShell> orb_shells_;
+  std::vector<GaussianShell> aux_shells_;
+  GaussianShell dummy_;
+  double omega_, alpha_, beta_;
+  int max_am_;
+  int max_contr_;
+
+  /// Per-thread dERIWorker cache (lazy).
+  mutable std::vector<std::unique_ptr<dERIWorker>> deri_cache_;
+  /// Per-thread scratch for a single (Na_aux x Nmu*Nnu) sub-block.
+  /// Sized to (max_Na_aux x max_NmuNnu) at construction.
+  mutable std::vector<arma::mat> scratch_;
+  size_t max_Na_;
+  size_t max_NmuNnu_;
+
+ public:
+  DirectDFPerturbedBlocks(size_t Nbf, size_t Naux, size_t Nnuc,
+                          std::vector<std::pair<size_t, size_t>> shellpairs,
+                          std::vector<std::pair<size_t, size_t>> firsts,
+                          std::vector<std::pair<size_t, size_t>> sizes,
+                          std::vector<GaussianShell> orb_shells,
+                          std::vector<GaussianShell> aux_shells,
+                          GaussianShell dummy,
+                          double omega, double alpha, double beta,
+                          int max_am, int max_contr);
+  ~DirectDFPerturbedBlocks() override = default;
+
+  size_t n_blocks() const override { return shellpairs_.size(); }
+  size_t naux() const override { return Naux_; }
+  size_t nbf() const override { return Nbf_; }
+  size_t nnuc() const override { return Nnuc_; }
+  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
+  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
+  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
+
+  void for_each_pert(
+      size_t ip,
+      const std::function<void(const Perturbation& pert,
+                              size_t aux_first,
+                              const arma::mat& sub_block)>& fn) const override;
+
+ private:
+  dERIWorker * thread_deri() const;
 };
 
 #endif
