@@ -64,6 +64,20 @@ class IntegralWorker {
   /// Integral kernel (i.e. Boys' function for Coulomb integrals)
   arma::vec Gn;
 
+  /// Per-position shellpair-precursor cache, keyed by shell pointer
+  /// pair. Each compute_precursor call site identifies itself with a
+  /// slot index (0 for the bra "ij" pair, 1 for the ket "kl" pair);
+  /// the slots are independent so a hit in one never invalidates the
+  /// other. Within a 4-index J/K build the outer (is,js) pair
+  /// repeats for many (ks,ls) inner iterations -- slot 0 stays
+  /// perfectly warm and slot 1 churns harmlessly. One worker per
+  /// thread under OpenMP, so no locking. Geometry steps rebuild the
+  /// basis and the workers, so stale shell pointers don't survive
+  /// across iterations.
+  const GaussianShell* cached_is_[2];
+  const GaussianShell* cached_js_[2];
+  eri_precursor_t cached_precursor_[2];
+
   /// Compute the integral kernel
   virtual void compute_G(double rho, double T, int nmax);
 
@@ -81,8 +95,15 @@ class IntegralWorker {
   /// Do spherical transform with respect to fourth index
   void transform_l(int am, size_t Ni, size_t Nj, size_t Nk);
 
-  /// Compute precursor
-  eri_precursor_t compute_precursor(const GaussianShell *is, const GaussianShell *js);
+  /// Get precursor for a shell pair, consulting the per-worker cache.
+  /// `slot` (0 or 1) identifies the cache bucket: callers must use a
+  /// distinct slot for each precursor that needs to coexist in one
+  /// computation (slot 0 for the bra ij pair, slot 1 for the ket kl
+  /// pair). The returned reference is valid until the next
+  /// compute_precursor() call on the *same* slot.
+  const eri_precursor_t & compute_precursor(const GaussianShell *is, const GaussianShell *js, int slot);
+  /// Fill an eri_precursor_t for a shell pair (uncached helper).
+  void fill_precursor(const GaussianShell *is, const GaussianShell *js, eri_precursor_t & r);
 
  public:
   IntegralWorker();

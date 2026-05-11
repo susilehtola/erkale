@@ -28,6 +28,10 @@ IntegralWorker::IntegralWorker() {
   input=&arrone;
   output=&arrtwo;
 
+  // Empty precursor cache.
+  cached_is_[0]=cached_is_[1]=nullptr;
+  cached_js_[0]=cached_js_[1]=nullptr;
+
 #ifndef BOYSNOINTERP
   // Maximum value of m for Boys function is
 #ifdef _OPENMP
@@ -102,8 +106,10 @@ dERIWorker::~dERIWorker() {
 }
 
 void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *js, const GaussianShell *ks, const GaussianShell *ls) {
-  eri_precursor_t ip=compute_precursor(is,js);
-  eri_precursor_t jp=compute_precursor(ks,ls);
+  // Per-worker precursor cache: slot 0 for the bra pair, slot 1 for
+  // the ket pair, so the two refs don't alias.
+  const eri_precursor_t & ip=compute_precursor(is,js,0);
+  const eri_precursor_t & jp=compute_precursor(ks,ls,1);
 
   // Compute shell of cartesian ERIs using libint
 
@@ -196,8 +202,8 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
 }
 
 void dERIWorker::compute_cartesian() {
-  eri_precursor_t ip=compute_precursor(is,js);
-  eri_precursor_t jp=compute_precursor(ks,ls);
+  const eri_precursor_t & ip=compute_precursor(is,js,0);
+  const eri_precursor_t & jp=compute_precursor(ks,ls,1);
 
   // Compute shell of cartesian ERI derivatives using libderiv
 
@@ -888,10 +894,18 @@ std::vector<double> dERIWorker::get_debug(int idx) {
   return *input;
 }
 
-eri_precursor_t IntegralWorker::compute_precursor(const GaussianShell *is, const GaussianShell *js) {
-  // Returned precursor
-  eri_precursor_t r;
+const eri_precursor_t & IntegralWorker::compute_precursor(const GaussianShell *is, const GaussianShell *js, int slot) {
+  if(cached_is_[slot]==is && cached_js_[slot]==js)
+    return cached_precursor_[slot];
+  // Miss: refill the slot in place. set_size in fill_precursor's
+  // zeros() calls reuses the existing allocation when sizes match.
+  cached_is_[slot]=is;
+  cached_js_[slot]=js;
+  fill_precursor(is, js, cached_precursor_[slot]);
+  return cached_precursor_[slot];
+}
 
+void IntegralWorker::fill_precursor(const GaussianShell *is, const GaussianShell *js, eri_precursor_t & r) {
   // Initialize arrays
   r.AB.zeros(3);
 
@@ -944,8 +958,6 @@ eri_precursor_t IntegralWorker::compute_precursor(const GaussianShell *is, const
   for(size_t i=0;i<r.ic.size();i++)
     for(size_t j=0;j<r.jc.size();j++)
       r.S(i,j)=r.ic[i].c*r.jc[j].c*(M_PI/r.zeta(i,j))*sqrt(M_PI/r.zeta(i,j))*exp(-r.ic[i].z*r.jc[j].z/r.zeta(i,j)*rabsq);
-
-  return r;
 }
 
 void IntegralWorker::compute_G(double rho, double T, int nmax) {
