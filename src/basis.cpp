@@ -3497,6 +3497,44 @@ BasisSet BasisSet::exchange_fitting() const {
   return fit;
 }
 
+BasisSet BasisSet::cholesky_aux_basis(double thr) const {
+  // Per-nucleus atomic Cholesky decomposition. A given element can
+  // carry different orbital bases on different centers (mixed-basis
+  // calculations), so we run cholesky_set per nucleus and tag each
+  // returned ElementBasisSet with the atom number; construct_basis
+  // then picks up the per-atom override via baslib.get_element(el,
+  // num+1) at line 3798.
+
+  BasisSetLibrary aux_lib;
+  for(size_t inuc=0; inuc<nuclei.size(); inuc++) {
+    // Build the orbital ElementBasisSet for this nucleus
+    ElementBasisSet el(nuclei[inuc].symbol);
+    std::vector<GaussianShell> shs(get_funcs(inuc));
+    for(size_t ish=0; ish<shs.size(); ish++)
+      el.add_function(FunctionShell(shs[ish].get_am(), shs[ish].get_contr()));
+
+    // metric=0  -> Coulomb metric (the right one for ERI fitting)
+    // full=false -> use one-step ERIchol pivoting per atom to skip
+    //              insignificant aux candidates before secondary CD
+    ElementBasisSet aux_el(el.cholesky_set(thr, false, 0));
+    // Tag with atom number so construct_basis routes the right aux
+    // basis to the right center even when atoms of the same element
+    // carry different orbital primitives.
+    aux_el.set_number(nuclei[inuc].ind + 1);
+    aux_lib.add_element(aux_el);
+  }
+
+  // Aux basis is always spherical-harmonic
+  bool uselm0 = settings.get_bool("UseLM");
+  settings.set_bool("UseLM", true);
+  BasisSet aux(1);
+  construct_basis(aux, nuclei, aux_lib);
+  aux.coulomb_normalize();
+  settings.set_bool("UseLM", uselm0);
+
+  return aux;
+}
+
 bool BasisSet::same_geometry(const BasisSet & rhs) const {
   if(nuclei.size() != rhs.nuclei.size())
     return false;

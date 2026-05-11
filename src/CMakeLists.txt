@@ -33,7 +33,7 @@ external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp eriworker_routines.cpp unitary.cpp
 pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
-stockholder.cpp erifit.cpp erichol.cpp lbfgs.cpp gdm.cpp
+stockholder.cpp erichol.cpp b_tensor.cpp lbfgs.cpp gdm.cpp
 slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
 atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp
 sap.cpp)

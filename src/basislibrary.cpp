@@ -21,7 +21,7 @@
 #include "stringutil.h"
 #include "linalg.h"
 #include "timer.h"
-#include "erifit.h"
+// erifit declarations have been folded into erichol.h
 #include "erichol.h"
 
 #include <algorithm>

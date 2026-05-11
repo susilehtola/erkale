@@ -122,26 +122,27 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
   ab_invh = PartialCholeskyOrth(ab, cholthr, linthr);
   ab_inv = ab_invh * ab_invh.t();
 
-  // Then, compute the three-center integrals
+  // Build the per-shellpair block descriptor; the same descriptor
+  // feeds either the cached or direct BTensorBlocks subclass below.
+  std::vector<std::pair<size_t, size_t>> sp_pairs(orbpairs.size());
+  std::vector<std::pair<size_t, size_t>> sp_firsts(orbpairs.size());
+  std::vector<std::pair<size_t, size_t>> sp_sizes(orbpairs.size());
+  for(size_t ip=0;ip<orbpairs.size();ip++) {
+    const size_t imus=orbpairs[ip].is;
+    const size_t inus=orbpairs[ip].js;
+    sp_pairs[ip] = std::make_pair(imus, inus);
+    sp_firsts[ip] = std::make_pair(orbshells[imus].get_first_ind(), orbshells[inus].get_first_ind());
+    sp_sizes[ip] = std::make_pair(orbshells[imus].get_Nbf(), orbshells[inus].get_Nbf());
+  }
+
   if(!direct) {
-    a_munu.resize(orbpairs.size());
-    // Compute the size of the lookup table
-    size_t ioff=0;
-    a_munu_lookup.resize(orbpairs.size());
-    for(size_t ip=0;ip<orbpairs.size();ip++) {
-      // Shells in question are
-      size_t imus=orbpairs[ip].is;
-      size_t inus=orbpairs[ip].js;
-      // Amount of functions
-      size_t Nmu=orbshells[imus].get_Nbf();
-      size_t Nnu=orbshells[inus].get_Nbf();
-      // Data starts at
-      a_munu_lookup[ip] = ioff;
-      // Increment ioff
-      ioff += Naux*Nmu*Nnu;
-    }
-    printf("(A|uv) integrals require %.3f GB\n",ioff*8*1e-9);
-    a_munu_storage.resize(ioff);
+    // Compute and store the (alpha | mu nu) integrals in a flat
+    // CachedBlocks backing store. Each block stores raw integrals;
+    // metric application happens in the J/K kernels via ab_invh /
+    // ab_inv as before.
+    auto cached = std::make_shared<CachedBlocks>(Nbf, Naux, sp_pairs, sp_firsts, sp_sizes);
+    printf("(A|uv) integrals require %.3f GB\n", cached->storage_size()*8*1e-9);
+    fflush(stdout);
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -156,11 +157,23 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
-      for(size_t ip=0;ip<orbpairs.size();ip++)
-	a_munu[ip]=compute_a_munu(eri,ip,&(a_munu_storage[a_munu_lookup[ip]]));
+      for(size_t ip=0;ip<orbpairs.size();ip++) {
+	// Write straight into the CachedBlocks-owned slot for this ip.
+	arma::mat slot = cached->block_mut(ip);
+	(void) compute_a_munu(eri, ip, slot.memptr());
+      }
 
       delete eri;
     }
+    blocks = cached;
+  } else {
+    // Direct mode: build a DirectDFBlocks that computes (alpha|mu nu)
+    // on demand. The J/K kernels see the same blocks->get_block(ip)
+    // interface as the cached path.
+    blocks = std::make_shared<DirectDFBlocks>(
+        Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
+        orbshells, auxshells, dummy,
+        omega, alpha, beta, maxam, maxcontr);
   }
 
   return orbpairs.size();
@@ -339,8 +352,12 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
 #pragma omp parallel
 #endif
   {
-    // Helper array (allocated once per thread, reset per orbital below)
-    arma::mat aui(Naux,Nbf);
+    // Helper array (allocated once per thread, resized+zeroed per
+    // orbital below: aui = ab_invh.t()*aui at the bottom of the loop
+    // shrinks aui from (Naux, Nbf) to (Naux_eff, Nbf), and the next
+    // iteration must start at (Naux, Nbf) again or the per-shellpair
+    // (Naux, Nmu) accumulation hits a shape mismatch).
+    arma::mat aui;
 
     // Helper memory
     std::vector<double> scratch(Naux*Nmax*Nmax,0);
@@ -352,7 +369,7 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
 #pragma omp for
 #endif
     for(size_t io=0;io<C.n_cols;io++) {
-      aui.zeros();
+      aui.zeros(Naux,Nbf);
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 	// Shells in question are
 	size_t imus=orbpairs[ip].is;
@@ -363,13 +380,15 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
 	// Amount of functions
 	size_t Nmu=orbshells[imus].get_Nbf();
 	size_t Nnu=orbshells[inus].get_Nbf();
+	// Block view (Naux x Nmu*Nnu); aux_mem view, cheap to bind once.
+	arma::mat amunu = blocks->get_block(ip);
 
-	// The array amunu is stored in the form amunu(a,nu*Nmu+mu) =
+	// amunu is stored in the form amunu(a,nu*Nmu+mu) =
 	// amunu[(nu*Nmu+mu)*Naux+a], so we can reshape it to a
 	// (Naux*Nmu,Nnu) matrix. Half-transformed (a|u;i) is then
         {
           arma::mat ui(&(scratch[0]),Naux*Nmu,1,false,true);
-          ui=arma::reshape(a_munu[ip],Naux*Nmu,Nnu)*C.submat(nu0,io,nu0+Nnu-1,io);
+          ui=arma::reshape(amunu,Naux*Nmu,Nnu)*C.submat(nu0,io,nu0+Nnu-1,io);
           ui.reshape(Naux,Nmu);
           aui.cols(mu0,mu0+Nmu-1)+=ui;
         }
@@ -380,7 +399,7 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
 	  anumu.zeros();
 	  for(size_t mu=0;mu<Nmu;mu++)
 	    for(size_t nu=0;nu<Nnu;nu++)
-	      anumu.col(mu*Nnu+nu)=a_munu[ip].col(nu*Nmu+mu);
+	      anumu.col(mu*Nnu+nu)=amunu.col(nu*Nmu+mu);
 
 	  // Half-transformed (a|v;i) is
 	  arma::mat vi(&(scratch2[0]),Naux*Nnu,1,false,true);
@@ -436,11 +455,13 @@ void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs,
 	// Amount of functions
 	size_t Nmu=orbshells[imus].get_Nbf();
 	size_t Nnu=orbshells[inus].get_Nbf();
+	// Block view (Naux x Nmu*Nnu); aux_mem view, cheap to bind once.
+	arma::mat amunu = blocks->get_block(ip);
 
-	// The array amunu is stored in the form amunu(a,nu*Nmu+mu) =
+	// amunu is stored in the form amunu(a,nu*Nmu+mu) =
 	// amunu[(nu*Nmu+mu)*Naux+a], so we can reshape it to a
 	// (Naux*Nmu,Nnu) matrix. Half-transformed (a|u;i) is then
-	arma::cx_mat ui(arma::reshape(a_munu[ip],Naux*Nmu,Nnu)*C.submat(nu0,io,nu0+Nnu-1,io));
+	arma::cx_mat ui(arma::reshape(amunu,Naux*Nmu,Nnu)*C.submat(nu0,io,nu0+Nnu-1,io));
 	ui.reshape(Naux,Nmu);
 
 #ifdef _OPENMP
@@ -455,7 +476,7 @@ void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs,
 	  anumu.zeros();
 	  for(size_t mu=0;mu<Nmu;mu++)
 	    for(size_t nu=0;nu<Nnu;nu++)
-	      anumu.col(mu*Nnu+nu)=a_munu[ip].col(nu*Nmu+mu);
+	      anumu.col(mu*Nnu+nu)=amunu.col(nu*Nmu+mu);
 
 	  // Half-transformed (a|v;i) is
 	  arma::cx_mat vi(arma::reshape(anumu,Naux*Nnu,Nmu)*C.submat(mu0,io,mu0+Nmu-1,io));
@@ -618,61 +639,23 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
   arma::vec gamma(Naux);
   gamma.zeros();
 
-  // Compute gamma
-  if(!direct) {
+  // Compute gamma; blocks->get_block(ip) routes to cached storage or
+  // recomputes on the fly depending on the BTensorBlocks subclass.
 #ifdef _OPENMP
 #pragma omp parallel
-    {
-      // Thread-private helper
-      arma::vec gv(Naux);
-      gv.zeros();
+  {
+    arma::vec gv(Naux);
+    gv.zeros();
 #pragma omp for schedule(dynamic)
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
-	digest_Jexp(P,ip,a_munu[ip],gv);
-      }
-#pragma omp critical
-      gamma+=gv;
-    }
-#else
-    // Sequential code
     for(size_t ip=0;ip<orbpairs.size();ip++)
-      digest_Jexp(P,ip,a_munu[ip],gamma);
-#endif
-
-  } else {
-#ifdef _OPENMP
-#pragma omp parallel
-    {
-      ERIWorker *eri;
-      if(omega==0.0 && alpha==1.0 && beta==0.0)
-	eri=new ERIWorker(maxam,maxcontr);
-      else
-	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-
-      arma::vec gv(gamma);
-#pragma omp for schedule(dynamic)
-      for(size_t ip=0;ip<orbpairs.size();ip++)
-	digest_Jexp(P,ip,compute_a_munu(eri,ip),gv);
+      digest_Jexp(P,ip,blocks->get_block(ip),gv);
 #pragma omp critical
-      gamma+=gv;
-
-      delete eri;
-    }
-#else
-    // Sequential code
-
-    ERIWorker *eri;
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      eri=new ERIWorker(maxam,maxcontr);
-    else
-      eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-
-    for(size_t ip=0;ip<orbpairs.size();ip++)
-      digest_Jexp(P,ip,compute_a_munu(eri,ip),gamma);
-
-    delete eri;
-#endif
+    gamma+=gv;
   }
+#else
+  for(size_t ip=0;ip<orbpairs.size();ip++)
+    digest_Jexp(P,ip,blocks->get_block(ip),gamma);
+#endif
 
   // Compute and return c
   return ab_inv*gamma;
@@ -691,64 +674,29 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
   for(size_t i=0;i<P.size();i++)
     gamma[i].zeros(Naux);
 
-  // Compute gamma
-  if(!direct) {
-    for(size_t iden=0;iden<P.size();iden++) {
+  // Compute gamma; blocks->get_block(ip) routes to cached storage or
+  // recomputes on the fly depending on the BTensorBlocks subclass.
+  for(size_t iden=0;iden<P.size();iden++) {
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-      {
-	// Thread-private helper
+    {
 #ifdef _OPENMP
-	arma::vec gv(Naux);
-	gv.zeros();
+      arma::vec gv(Naux);
+      gv.zeros();
 #pragma omp for schedule(dynamic)
 #endif
-	for(size_t ip=0;ip<orbpairs.size();ip++) {
+      for(size_t ip=0;ip<orbpairs.size();ip++) {
 #ifdef _OPENMP
-	  digest_Jexp(P[iden],ip,a_munu[ip],gv);
+	digest_Jexp(P[iden],ip,blocks->get_block(ip),gv);
 #else
-	  digest_Jexp(P[iden],ip,a_munu[ip],gamma[iden]);
-#endif
-	}
-#ifdef _OPENMP
-#pragma omp critical
-	gamma[iden]+=gv;
+	digest_Jexp(P[iden],ip,blocks->get_block(ip),gamma[iden]);
 #endif
       }
-    }
-
-  } else {
-    for(size_t iden=0;iden<P.size();iden++) {
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-      {
-	ERIWorker *eri;
-	if(omega==0.0 && alpha==1.0 && beta==0.0)
-	  eri=new ERIWorker(maxam,maxcontr);
-	else
-	  eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-
-#ifdef _OPENMP
-	// Worker stack for each matrix
-	arma::vec gv(gamma[iden]);
-#pragma omp for schedule(dynamic)
-#endif
-	for(size_t ip=0;ip<orbpairs.size();ip++) {
-#ifdef _OPENMP
-	  digest_Jexp(P[iden],ip,compute_a_munu(eri,ip),gv);
-#else
-	  digest_Jexp(P[iden],ip,compute_a_munu(eri,ip),gamma[iden]);
-#endif
-	}
 #ifdef _OPENMP
 #pragma omp critical
-	gamma[iden]+=gv;
+      gamma[iden]+=gv;
 #endif
-
-	delete eri;
-      }
     }
   }
 
@@ -781,33 +729,11 @@ arma::mat DensityFit::calcJ_vector(const arma::vec & c) const {
   arma::mat J(Nbf,Nbf);
   J.zeros();
 
-  if(!direct) {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<orbpairs.size();ip++)
-      digest_J(c,ip,a_munu[ip],J);
-
-  } else {
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-      ERIWorker *eri;
-      if(omega==0.0 && alpha==1.0 && beta==0.0)
-	eri=new ERIWorker(maxam,maxcontr);
-      else
-	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-
-#ifdef _OPENMP
-#pragma omp for
-#endif
-      for(size_t ip=0;ip<orbpairs.size();ip++)
-	digest_J(c,ip,compute_a_munu(eri,ip),J);
-
-      delete eri;
-    }
-  }
+  for(size_t ip=0;ip<orbpairs.size();ip++)
+    digest_J(c,ip,blocks->get_block(ip),J);
 
   return J;
 }
@@ -820,36 +746,15 @@ std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const
   for(size_t iden=0;iden<P.size();iden++)
     J[iden].zeros(Nbf,Nbf);
 
-  if(!direct) {
+  // One libint sweep over orbital shellpairs covers all densities;
+  // blocks->get_block(ip) is uniform across cached/direct backends.
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<orbpairs.size();ip++)
-      for(size_t iden=0;iden<P.size();iden++)
-	digest_J(c[iden],ip,a_munu[ip],J[iden]);
-
-  } else {
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-      ERIWorker *eri;
-      if(omega==0.0 && alpha==1.0 && beta==0.0)
-	eri=new ERIWorker(maxam,maxcontr);
-      else
-	eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic)
-#endif
-      for(size_t ip=0;ip<orbpairs.size();ip++) {
-	arma::mat amunu(compute_a_munu(eri,ip));
-	for(size_t iden=0;iden<P.size();iden++)
-	  digest_J(c[iden],ip,amunu,J[iden]);
-      }
-
-      delete eri;
-    }
+  for(size_t ip=0;ip<orbpairs.size();ip++) {
+    arma::mat amunu = blocks->get_block(ip);
+    for(size_t iden=0;iden<P.size();iden++)
+      digest_J(c[iden],ip,amunu,J[iden]);
   }
 
   return J;
@@ -950,104 +855,80 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
   } // end parallel section
 
 
-    // Second part: f = 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a *#*
+  // Second part: f -= gamma_a' c_a (three-center derivative term).
+  // Routed through DirectDFPerturbedBlocks: for_each_pert streams
+  // (perturbation, aux_first, derivative_sub_block) tuples per
+  // orbital shellpair, identically to how the value-side
+  // DirectDFBlocks streams (alpha | mu nu) blocks. The libcholesky
+  // perturbation API uses the same shape; once we depend on
+  // libcholesky this construction becomes a thin adapter.
+  {
+    std::vector<std::pair<size_t,size_t>> sp_pairs(orbpairs.size());
+    std::vector<std::pair<size_t,size_t>> sp_firsts(orbpairs.size());
+    std::vector<std::pair<size_t,size_t>> sp_sizes(orbpairs.size());
+    for(size_t ip=0; ip<orbpairs.size(); ip++) {
+      const size_t imus = orbpairs[ip].is;
+      const size_t inus = orbpairs[ip].js;
+      sp_pairs[ip]  = std::make_pair(imus, inus);
+      sp_firsts[ip] = std::make_pair(orbshells[imus].get_first_ind(),
+                                     orbshells[inus].get_first_ind());
+      sp_sizes[ip]  = std::make_pair(orbshells[imus].get_Nbf(),
+                                     orbshells[inus].get_Nbf());
+    }
+    DirectDFPerturbedBlocks pblocks(Nbf, Naux, Nnuc,
+                                    std::move(sp_pairs),
+                                    std::move(sp_firsts),
+                                    std::move(sp_sizes),
+                                    orbshells, auxshells, dummy,
+                                    omega, alpha, beta, maxam, maxcontr);
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-  {
-    dERIWorker *deri;
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      deri=new dERIWorker(maxam,maxcontr);
-    else
-      deri=new dERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-    const std::vector<double> * erip;
-
+    {
 #ifdef _OPENMP
-    // Worker stack for each matrix
-    arma::vec fwrk(f);
-    fwrk.zeros();
-
+      arma::vec fwrk(f); fwrk.zeros();
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0;ip<orbpairs.size();ip++) {
-      size_t imus=orbpairs[ip].is;
-      size_t inus=orbpairs[ip].js;
+      for(size_t ip=0; ip<orbpairs.size(); ip++) {
+        const size_t imus = orbpairs[ip].is;
+        const size_t inus = orbpairs[ip].js;
+        const size_t mu0  = orbshells[imus].get_first_ind();
+        const size_t nu0  = orbshells[inus].get_first_ind();
+        const size_t Nmu  = orbshells[imus].get_Nbf();
+        const size_t Nnu  = orbshells[inus].get_Nbf();
+        // Off-diagonal pairs are counted only once in orbpairs;
+        // double-count the contribution.
+        const double fac  = (imus == inus) ? 1.0 : 2.0;
 
-      size_t Nmu=orbshells[imus].get_Nbf();
-      size_t Nnu=orbshells[inus].get_Nbf();
+        // P submatrix laid out as (mu fastest, nu slowest) so it
+        // pairs with the sub_block's column index inu*Nmu+imu.
+        arma::vec Psub(Nmu * Nnu);
+        for(size_t inu=0; inu<Nnu; inu++)
+          for(size_t imu=0; imu<Nmu; imu++)
+            Psub(inu*Nmu + imu) = P(mu0+imu, nu0+inu);
 
-      size_t inuc=orbshells[imus].get_center_ind();
-      size_t jnuc=orbshells[inus].get_center_ind();
-
-      // If imus==inus, we need to take care that we count
-      // every term only once; on the off-diagonal we get
-      // every term twice.
-      double fac=2.0;
-      if(imus==inus)
-	fac=1.0;
-
-      for(size_t ias=0;ias<auxshells.size();ias++) {
-	size_t Na=auxshells[ias].get_Nbf();
-	size_t anuc=auxshells[ias].get_center_ind();
-
-	if(inuc==jnuc && jnuc==anuc)
-	  // Contributions vanish
-	  continue;
-
-	// Compute (a|mn)
-	deri->compute(&auxshells[ias],&dummy,&orbshells[imus],&orbshells[inus]);
-
-	// Expansion coefficients
-	arma::vec ca=c.subvec(auxshells[ias].get_first_ind(),auxshells[ias].get_last_ind());
-
-	// Compute forces
-	const static int index[]={0, 1, 2, 6, 7, 8, 9, 10, 11};
-	const size_t Nidx=sizeof(index)/sizeof(index[0]);
-	double ders[Nidx];
-
-	for(size_t iid=0;iid<Nidx;iid++) {
-	  // Index is
-	  int ic=index[iid];
-	  arma::vec hlp(Na);
-
-	  erip=deri->getp(ic);
-	  hlp.zeros();
-	  for(size_t iia=0;iia<Na;iia++)
-	    for(size_t iimu=0;iimu<Nmu;iimu++) {
-	      size_t imu=orbshells[imus].get_first_ind()+iimu;
-	      for(size_t iinu=0;iinu<Nnu;iinu++) {
-		size_t inu=orbshells[inus].get_first_ind()+iinu;
-
-		// The contracted integral
-		hlp(iia)+=(*erip)[(iia*Nmu+iimu)*Nnu+iinu]*P(imu,inu);
-	      }
-	    }
-	  ders[iid]=fac*arma::dot(hlp,ca);
-	}
-
-	// Increment forces
-	for(int ic=0;ic<3;ic++) {
+        pblocks.for_each_pert(ip,
+            [&](const Perturbation & pert, size_t a0, const arma::mat & sub_block) {
+              // sub_block: (Na_aux x Nmu*Nnu). Contract with P over
+              // (mu, nu) and with c over a; the scalar derivative is
+              // accumulated into f at (atom = pert.p1, xyz = pert.p2).
+              const arma::vec hlp = sub_block * Psub;
+              const arma::vec ca  = c.subvec(a0, a0 + sub_block.n_rows - 1);
+              const double ders   = fac * arma::dot(hlp, ca);
 #ifdef _OPENMP
-	  fwrk(3*anuc+ic)-=ders[ic];
-	  fwrk(3*inuc+ic)-=ders[ic+3];
-	  fwrk(3*jnuc+ic)-=ders[ic+6];
+              fwrk(3 * pert.p1 + pert.p2) -= ders;
 #else
-	  f(3*anuc+ic)-=ders[ic];
-	  f(3*inuc+ic)-=ders[ic+3];
-	  f(3*jnuc+ic)-=ders[ic+6];
+              f(3 * pert.p1 + pert.p2)    -= ders;
 #endif
-	}
-
+            });
       }
-    }
-
 #ifdef _OPENMP
 #pragma omp critical
-    // Sum results together
-    f+=fwrk;
+      f += fwrk;
 #endif
-    delete deri;
-  } // end parallel section
+    } // end parallel
+  }
 
   return f;
 }
@@ -1083,42 +964,24 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
   arma::mat K(Nbf,Nbf);
   K.zeros();
 
-  if(!direct) {
-    digest_K_incore(C,occs,K);
-  } else {
-    // Determine how many orbitals we can handle at one go. Memory
-    // needed for one orbital is
-    size_t oneorb(sizeof(double)*Naux*Nbf);
+  // digest_K_incore works against any BTensorBlocks subclass; in
+  // direct mode the blocks recompute (alpha | mu nu) on the fly per
+  // call. Peak memory is one (Naux x Nbf) aui per thread, well
+  // bounded; the old fitmem-blocked digest_K_direct path is gone.
+  {
+    const size_t need = sizeof(double) * Naux * Nbf
 #ifdef _OPENMP
-    // Each thread needs its own storage
-    oneorb*=omp_get_max_threads();
+                        * omp_get_max_threads()
 #endif
-
-    // Number of orbitals that can be handled in one block is
-    size_t blocksize(floor(fitmem*1.0/oneorb));
-    if(blocksize<1) {
+                        ;
+    if(need > fitmem) {
       std::ostringstream oss;
-      oss << "Not enough fitting memory! Need at least " << memory_size(oneorb) << " per orbital!\n";
+      oss << "Not enough fitting memory! K build needs " << memory_size(need)
+          << " for the per-thread aui buffers; FittingMemory is " << memory_size(fitmem) << ".\n";
       throw std::logic_error(oss.str());
     }
-    // Number of blocks is then
-    size_t nblocks(ceil(C.n_cols*1.0/blocksize));
-
-    //printf("Handling %i orbitals at once.\n",(int) blocksize);
-
-    // Loop over blocks
-    for(size_t iblock=0;iblock<nblocks;iblock++) {
-      // Block starts at
-      size_t iobeg(iblock*blocksize);
-      size_t ioend(std::min((iblock+1)*blocksize-1,(size_t) C.n_cols-1));
-
-      //printf("Treating orbitals %i-%i\n",(int) iobeg,(int) ioend);
-      //fflush(stdout);
-
-      digest_K_direct(C.cols(iobeg,ioend),occs.subvec(iobeg,ioend),K);
-    }
   }
-
+  digest_K_incore(C,occs,K);
   return K;
 }
 
@@ -1153,13 +1016,22 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
   arma::cx_mat K(Nbf,Nbf);
   K.zeros();
 
-  if(!direct) {
-    digest_K_incore(C,occs,K);
-  } else {
-    (void) fitmem;
-    throw std::logic_error("Direct mode hasn't been implemented for density-fitted complex exchange!\n");
+  {
+    const size_t need = sizeof(std::complex<double>) * Naux * Nbf
+#ifdef _OPENMP
+                        * omp_get_max_threads()
+#endif
+                        ;
+    if(need > fitmem) {
+      std::ostringstream oss;
+      oss << "Not enough fitting memory! K build needs " << memory_size(need)
+          << " for the per-thread aui buffers; FittingMemory is " << memory_size(fitmem) << ".\n";
+      throw std::logic_error(oss.str());
+    }
   }
-
+  // digest_K_incore consumes blocks->get_block(ip) uniformly; the
+  // direct-mode path now works for the complex case as well.
+  digest_K_incore(C,occs,K);
   return K;
 }
 
@@ -1188,8 +1060,8 @@ arma::mat DensityFit::get_ab_invh() const {
 }
 
 void DensityFit::three_center_integrals(arma::mat & ints) const {
-  if(direct)
-    throw std::runtime_error("Must run in tabulated mode!\n");
+  // blocks->get_block(ip) works in either cached or direct mode;
+  // no need to forbid direct here.
 
   // Collect AO integrals
   ints.zeros(Nbf*Nbf,Naux);
@@ -1201,7 +1073,7 @@ void DensityFit::three_center_integrals(arma::mat & ints) const {
     size_t mu0=orbshells[imus].get_first_ind();
     size_t nu0=orbshells[inus].get_first_ind();
 
-    const arma::mat & amunu(a_munu[ip]);
+    arma::mat amunu = blocks->get_block(ip);
 
     for(size_t ias=0;ias<auxshells.size();ias++) {
       size_t Na=auxshells[ias].get_Nbf();
@@ -1223,10 +1095,9 @@ void DensityFit::three_center_integrals(arma::mat & ints) const {
 }
 
 void DensityFit::B_matrix(arma::mat & B) const {
-  if(direct)
-    throw std::runtime_error("Must run in tabulated mode!\n");
-  // Compute the integrals
+  // three_center_integrals + the metric multiply now works in
+  // either cached or direct mode; the latter recomputes the
+  // shellpair blocks on demand via libint inside the iteration.
   three_center_integrals(B);
-  // Transform into proper B matrix
   B*=ab_invh;
 }

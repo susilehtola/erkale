@@ -50,10 +50,20 @@
 #define ERKALE_DENSITYFIT
 
 #include "global.h"
+#include "b_tensor.h"
 #include "basis.h"
 #include "eriworker.h"
 
-/// Density fitting routines
+#include <memory>
+
+/// Density fitting routines.
+///
+/// DensityFit holds the cached three-index integrals through a
+/// shared_ptr so the surrounding objects (Edmiston etc.) that copy
+/// a DensityFit by value end up sharing the heavy block storage
+/// rather than duplicating it. The ptr-by-value fields and the
+/// shared aux-metric matrices make a copy of *this O(handful of
+/// scalars and shared_ptr atomics).
 class DensityFit {
   /// Amount of orbital basis functions
   size_t Nbf;
@@ -88,12 +98,14 @@ class DensityFit {
 
   /// List of unique orbital shell pairs
   std::vector<eripair_t> orbpairs;
-  /// Integrals \f$ ( \alpha | \mu \nu) \f$ stored by shell pair basis
-  std::vector<arma::mat> a_munu;
-  /// Memory for the storage of a_munu
-  std::vector<double> a_munu_storage;
-  /// Lookup table for the indices
-  std::vector<size_t> a_munu_lookup;
+  /// Three-index (alpha | mu nu) block source, indexed per orbital
+  /// shellpair. In non-direct mode this is a CachedBlocks with the
+  /// integrals precomputed and stored; in direct mode this is a
+  /// DirectDFBlocks that computes blocks on demand via libint.
+  /// Either way, the J/K kernels consume blocks via the same
+  /// blocks->get_block(ip) interface. shared_ptr so DensityFit
+  /// copies (e.g. Edmiston) share the storage / state.
+  std::shared_ptr<BTensorBlocks> blocks;
 
   /// \f$ ( \alpha | \beta) \f$
   arma::mat ab;

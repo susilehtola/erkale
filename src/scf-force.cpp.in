@@ -79,6 +79,12 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 	throw std::runtime_error("Forces not implemented for density fitting of exact exchange.\n");
 
       fx_full=dfit.forceJ(sol.P);
+    } else if(cholesky) {
+      // Two-step CD path: ERIchol::forceJ uses the pivot orbital
+      // pairs as a fitting basis; same gradient structure as DF.
+      // One-step CD throws inside ERIchol::forceJ (no metric
+      // available).
+      fx_full=chol.forceJ(*basisp, sol.P);
     } else {
       if(!direct)
 	scr.fill(basisp,intthr,verbose);
