@@ -144,6 +144,20 @@ struct ScreeningData {
   std::vector<eripair_t> shpairs;
 };
 
+/// Range-separation parameters for Coulomb / exchange operators.
+/// The two-electron kernel decomposes as
+///   1/r12 = alpha * erf(omega r12) / r12 + beta * erfc(omega r12) / r12
+/// so for plain Coulomb / full-range exchange we have
+/// omega=0, alpha=1, beta=0 (default); pure short-range exchange is
+/// omega=omega, alpha=0, beta=1; etc. ERIscreen, ERIchol, DensityFit,
+/// ERItable and the libint workers all store and forward this triple.
+/// Bundle it so signatures stop carrying three loose doubles.
+struct RangeSeparation {
+  double omega = 0.0;
+  double alpha = 1.0;
+  double beta = 0.0;
+};
+
 // Forward declaration
 class BasisSetLibrary;
 class ElementBasisSet;

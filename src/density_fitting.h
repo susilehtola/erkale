@@ -137,8 +137,10 @@ class DensityFit {
 
   /// Set range separation constants
   void set_range_separation(double w, double a, double b);
+  void set_range_separation(const RangeSeparation & rs) { set_range_separation(rs.omega, rs.alpha, rs.beta); }
   /// Get range separation constants
   void get_range_separation(double & w, double & a, double & b) const;
+  RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
 
   /**
    * Compute integrals, use given linear dependency threshold. The HF

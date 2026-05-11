@@ -555,16 +555,9 @@ void SCF::set_verbose(bool verb) {
 void SCF::fill_rs(double omega) {
   if(densityfit) {
     // Compute range separated integrals if necessary
-    bool fill;
-    if(!dfit_rs.get_Naux()) {
-      fill=true;
-    } else {
-      double o, kl, ks;
-      dfit_rs.get_range_separation(o,kl,ks);
-      fill=(!(o==omega));
-    }
+    const bool fill = !dfit_rs.get_Naux() || dfit_rs.get_range_separation().omega != omega;
     if(fill) {
-      dfit_rs.set_range_separation(omega,0.0,1.0);
+      dfit_rs.set_range_separation({omega, 0.0, 1.0});
 
       // Compute memory estimate
       std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
@@ -590,14 +583,7 @@ void SCF::fill_rs(double omega) {
 
   } else if(cholesky) {
     // Compute range separated integrals if necessary
-    bool fill;
-    if(!chol_rs.get_Naux()) {
-      fill=true;
-    } else {
-      double o, kl, ks;
-      chol_rs.get_range_separation(o,kl,ks);
-      fill=(!(o==omega));
-    }
+    bool fill = !chol_rs.get_Naux() || chol_rs.get_range_separation().omega != omega;
     if(fill) {
       Timer t;
       if(verbose) {
@@ -605,7 +591,7 @@ void SCF::fill_rs(double omega) {
 	fflush(stdout);
       }
 
-      chol_rs.set_range_separation(omega,0.0,1.0);
+      chol_rs.set_range_separation({omega, 0.0, 1.0});
       if(cholmode==-1) {
 	chol_rs.load();
 	if(verbose) {
@@ -635,21 +621,14 @@ void SCF::fill_rs(double omega) {
   } else {
     if(!direct) {
       // Compute range separated integrals if necessary
-      bool fill;
-      if(!tab_rs.get_N()) {
-	fill=true;
-      } else {
-	double o, kl, ks;
-	tab_rs.get_range_separation(o,kl,ks);
-	fill=(!(o==omega));
-      }
+      const bool fill = !tab_rs.get_N() || tab_rs.get_range_separation().omega != omega;
       if(fill) {
 	Timer t;
 	if(verbose) {
 	  printf("Computing short-range repulsion integrals ... ");
 	  fflush(stdout);
 	}
-	tab_rs.set_range_separation(omega,0.0,1.0);
+	tab_rs.set_range_separation({omega, 0.0, 1.0});
 	size_t Np=tab_rs.fill(basisp,intthr);
 
 	if(verbose) {
@@ -659,14 +638,7 @@ void SCF::fill_rs(double omega) {
 	}
       }
     } else {
-      bool fill;
-      if(!scr_rs.get_N()) {
-	fill=true;
-      } else {
-	double o, kl, ks;
-	scr_rs.get_range_separation(o,kl,ks);
-	fill=(!(o==omega));
-      }
+      const bool fill = !scr_rs.get_N() || scr_rs.get_range_separation().omega != omega;
       if(fill) {
 	Timer t;
 	if(verbose) {
@@ -674,7 +646,7 @@ void SCF::fill_rs(double omega) {
 	  fflush(stdout);
 	}
 
-	scr_rs.set_range_separation(omega,0.0,1.0);
+	scr_rs.set_range_separation({omega, 0.0, 1.0});
 	size_t Np=scr_rs.fill(basisp,intthr);
 
 	if(verbose) {
