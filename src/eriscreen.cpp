@@ -71,6 +71,11 @@ void ERIscreen::set_range_separation(double w, double a, double b) {
   omega=w;
   alpha=a;
   beta=b;
+  // Workers in the pool were built against the previous omega /
+  // alpha / beta -- drop them so the next acquire_eri / acquire_deri
+  // rebuilds with the new parameters.
+  eri_pool_.clear();
+  deri_pool_.clear();
 }
 
 void ERIscreen::get_range_separation(double & w, double & a, double & b) const {
@@ -96,7 +101,40 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
   M = std::move(s.M);
   shpairs = std::move(s.shpairs);
 
+  // Worker pools are tied to (basis, omega/alpha/beta). Basis just
+  // changed, so reset; size to omp_get_max_threads() so threads can
+  // index by omp_get_thread_num() without locking.
+#ifdef _OPENMP
+  const int nth = omp_get_max_threads();
+#else
+  const int nth = 1;
+#endif
+  eri_pool_.clear();
+  eri_pool_.resize(nth);
+  deri_pool_.clear();
+  deri_pool_.resize(nth);
+
   return shpairs.size();
+}
+
+ERIWorker * ERIscreen::acquire_eri(int ith) const {
+  if(!eri_pool_[ith]) {
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      eri_pool_[ith].reset(new ERIWorker(basp->get_max_am(), basp->get_max_Ncontr()));
+    else
+      eri_pool_[ith].reset(new ERIWorker_srlr(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta));
+  }
+  return eri_pool_[ith].get();
+}
+
+dERIWorker * ERIscreen::acquire_deri(int ith) const {
+  if(!deri_pool_[ith]) {
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      deri_pool_[ith].reset(new dERIWorker(basp->get_max_am(), basp->get_max_Ncontr()));
+    else
+      deri_pool_[ith].reset(new dERIWorker_srlr(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta));
+  }
+  return deri_pool_[ith].get();
 }
 
 void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & digest, double tol) const {
@@ -109,16 +147,18 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
 #pragma omp parallel
 #endif
   {
-    // ERI worker
-    ERIWorker *eri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(basp->get_max_am(),basp->get_max_Ncontr()) : new ERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
-
-    // Integral array
-    const std::vector<double> * erip;
-
 #ifndef _OPENMP
     int ith=0;
 #else
     int ith(omp_get_thread_num());
+#endif
+    // ERI worker (per-thread pool; lazily built on first acquire).
+    ERIWorker *eri = acquire_eri(ith);
+
+    // Integral array
+    const std::vector<double> * erip;
+
+#ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<Npairs;ip++) {
@@ -157,8 +197,7 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
 	  digest[ith][i]->digest(shpairs,ip,jp,*erip,0);
       }
     }
-
-    delete eri;
+    // eri is owned by eri_pool_ -- do not delete.
   }
 }
 
@@ -176,17 +215,19 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 #pragma omp parallel
 #endif
   {
-    /// ERI derivative worker
-    dERIWorker *deri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new dERIWorker(basp->get_max_am(),basp->get_max_Ncontr()) : new dERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
-
-    // Shell centers
-    size_t inuc, jnuc, knuc, lnuc;
-
 #ifndef _OPENMP
     int ith=0;
 #else
     int ith(omp_get_thread_num());
     arma::vec Fwrk(F);
+#endif
+    /// ERI derivative worker (per-thread pool, lazily built).
+    dERIWorker *deri = acquire_deri(ith);
+
+    // Shell centers
+    size_t inuc, jnuc, knuc, lnuc;
+
+#ifdef _OPENMP
 #pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<Npairs;ip++) {
@@ -256,8 +297,7 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 #pragma omp critical
     F+=Fwrk;
 #endif
-
-    delete deri;
+    // deri is owned by deri_pool_ -- do not delete.
   }
 
   return F;
