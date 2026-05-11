@@ -43,6 +43,7 @@ ERIchol::ERIchol() {
   omega=0.0;
   alpha=1.0;
   beta=0.0;
+  two_step_=false;
 }
 
 ERIchol::~ERIchol() {
@@ -164,6 +165,11 @@ void ERIchol::save() const {
 }
 
 size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_reuse_thr, double shell_screen_tol, bool verbose) {
+  // Mark this object as one-step state; clear any stale two-step
+  // metric data from a previous fill_two_step call.
+  two_step_ = false;
+  two_step_metric_.reset();
+  two_step_metric_invh_.reset();
   if(cholesky_tol < shell_screen_tol) {
     fprintf(stderr,"Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
     printf("Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
@@ -1037,6 +1043,13 @@ size_t ERIchol::fill_two_step(const BasisSet & basis,
   B = B_raw * M_invh;
   t_chol+=t.get();
 
+  // Stash the pivot metric and its half-inverse for forceJ. Without
+  // these, the gradient pipeline can't reconstruct (dM/dR) /
+  // (d(mu nu | piv)/dR) contributions.
+  two_step_metric_ = std::move(M_metric);
+  two_step_metric_invh_ = std::move(M_invh);
+  two_step_ = true;
+
   if(verbose) {
     printf("Two-step CD finished in %s. Realised memory size is %s.\n",
            ttot.elapsed().c_str(), memory_size(B.n_elem*sizeof(double)).c_str());
@@ -1377,6 +1390,213 @@ arma::mat ERIchol::B_transform(const arma::mat & Cl, const arma::mat & Cr, bool 
   }
 
   return Br;
+}
+
+arma::vec ERIchol::forceJ(const BasisSet & basis, const arma::mat & P) const {
+  if(!two_step_)
+    throw std::runtime_error("ERIchol::forceJ requires the two-step pivot metric (fill_two_step). Forces are not implemented for one-step CD on this branch.\n");
+  if(P.n_rows != Nbf || P.n_cols != Nbf)
+    throw std::runtime_error("ERIchol::forceJ: density matrix dimension mismatch.\n");
+
+  const size_t Naux = pi.n_elem;
+  const size_t Nnuc = basis.get_Nnuc();
+
+  // === Set up pivot-pair / pivot-shellpair lookup ===========================
+  // pivot_to_index(mu, nu) -> pivot rank p in 0..Naux-1, or sentinel
+  // UINT64_MAX. Mirrors the same table fill_two_step builds during
+  // metric construction.
+  arma::umat pivot_to_index(Nbf, Nbf);
+  pivot_to_index.fill(static_cast<arma::uword>(-1));
+  for(size_t p=0; p<Naux; p++) {
+    const size_t pii = pi(p);
+    pivot_to_index(invmap(0,pii), invmap(1,pii)) = p;
+    pivot_to_index(invmap(1,pii), invmap(0,pii)) = p;
+  }
+  // Canonical vector of pivot shellpairs (lexicographic).
+  std::vector<std::pair<size_t,size_t>> piv_shps(pivot_shellpairs.begin(), pivot_shellpairs.end());
+
+  // === Compute gamma_J = (Pv * B) and c = M^{-1/2} gamma_J ==================
+  // c lives in pivot-orbital-pair space (Naux entries); the
+  // force contractions in Parts 1 and 2 are both c-on-c / P-on-c.
+  arma::rowvec Pv(arma::trans(P(prodidx)));
+  Pv(odiagidx) *= 2.0;
+  const arma::vec gamma_J = arma::trans(Pv * B);
+  const arma::vec c       = two_step_metric_invh_ * gamma_J;
+
+  // libint dispatcher constants
+  const std::vector<GaussianShell> shells = basis.get_shells();
+  const int max_am   = basis.get_max_am();
+  const int max_ncon = basis.get_max_Ncontr();
+
+  arma::vec f(3 * Nnuc);
+  f.zeros();
+
+  // === Part 1: f += 0.5 c (dM/dR) c =========================================
+  // d/dR_A (piv_p | piv_q) for pivot orbital pairs on pivot shellpairs.
+  // Iterate over the lower-triangular (jp <= ip) of pivot shellpair pairs;
+  // the ip == jp diagonal is included (off-diagonal contributions are
+  // symmetric, both pidx,qidx and qidx,pidx accumulate).
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    dERIWorker * deri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      deri = new dERIWorker(max_am, max_ncon);
+    else
+      deri = new dERIWorker_srlr(max_am, max_ncon, omega, alpha, beta);
+
+#ifdef _OPENMP
+    arma::vec fwrk(f); fwrk.zeros();
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ip=0; ip<piv_shps.size(); ip++) {
+      const size_t is = piv_shps[ip].first;
+      const size_t js = piv_shps[ip].second;
+      const size_t Ni = shells[is].get_Nbf();
+      const size_t Nj = shells[js].get_Nbf();
+      const size_t i0 = shells[is].get_first_ind();
+      const size_t j0 = shells[js].get_first_ind();
+      const size_t i_at = shells[is].get_center_ind();
+      const size_t j_at = shells[js].get_center_ind();
+
+      for(size_t jp=0; jp<=ip; jp++) {
+        const size_t ks = piv_shps[jp].first;
+        const size_t ls = piv_shps[jp].second;
+        const size_t Nk = shells[ks].get_Nbf();
+        const size_t Nl = shells[ls].get_Nbf();
+        const size_t k0 = shells[ks].get_first_ind();
+        const size_t l0 = shells[ls].get_first_ind();
+        const size_t k_at = shells[ks].get_center_ind();
+        const size_t l_at = shells[ls].get_center_ind();
+
+        // Off-diagonal pivot-shellpair contributions count twice.
+        const double fac_sp = (ip == jp) ? 0.5 : 1.0;
+
+        deri->compute(&shells[is], &shells[js], &shells[ks], &shells[ls]);
+
+        // dERIWorker gives 12 derivative components; map each to
+        // (atom_idx, xyz). Order: ic = 4*center + xyz, where
+        // center = 0..3 maps to (i, j, k, l).
+        const size_t atoms[4] = {i_at, j_at, k_at, l_at};
+        for(int ic=0; ic<12; ic++) {
+          const int center = ic / 3;
+          const int xyz    = ic % 3;
+          const size_t aA  = atoms[center];
+
+          const std::vector<double> * erip = deri->getp(ic);
+          double accum = 0.0;
+          for(size_t ii=0; ii<Ni; ii++)
+            for(size_t jj=0; jj<Nj; jj++) {
+              const arma::uword pidx = pivot_to_index(i0+ii, j0+jj);
+              if(pidx == static_cast<arma::uword>(-1)) continue;
+              for(size_t kk=0; kk<Nk; kk++)
+                for(size_t ll=0; ll<Nl; ll++) {
+                  const arma::uword qidx = pivot_to_index(k0+kk, l0+ll);
+                  if(qidx == static_cast<arma::uword>(-1)) continue;
+                  const double val = (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+                  accum += val * c(pidx) * c(qidx);
+                }
+            }
+#ifdef _OPENMP
+          fwrk(3*aA + xyz) += fac_sp * accum;
+#else
+          f(3*aA + xyz)    += fac_sp * accum;
+#endif
+        }
+      }
+    }
+#ifdef _OPENMP
+#pragma omp critical
+    f += fwrk;
+#endif
+    delete deri;
+  }
+
+  // === Part 2: f -= sum_munu P (d(mu nu | piv)/dR) c ========================
+  // 4-center derivatives over (orbital_shellpair, pivot_shellpair).
+  // Same shape as DensityFit::forceJ Part 2 (which uses 3-center
+  // derivatives), but routed via dERIWorker.compute on 4 real shells.
+  // dERIWorker yields 12 components mapped to the 4 centers.
+  std::vector<eripair_t> orb_shps_;
+  {
+    arma::mat Q, MS;
+    orb_shps_ = basis.get_eripairs(Q, MS, /*tol*/0.0, omega, alpha, beta, false);
+  }
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    dERIWorker * deri;
+    if(omega==0.0 && alpha==1.0 && beta==0.0)
+      deri = new dERIWorker(max_am, max_ncon);
+    else
+      deri = new dERIWorker_srlr(max_am, max_ncon, omega, alpha, beta);
+
+#ifdef _OPENMP
+    arma::vec fwrk(f); fwrk.zeros();
+#pragma omp for schedule(dynamic)
+#endif
+    for(size_t ipair=0; ipair<orb_shps_.size(); ipair++) {
+      const size_t is = orb_shps_[ipair].is;
+      const size_t js = orb_shps_[ipair].js;
+      const size_t Ni = shells[is].get_Nbf();
+      const size_t Nj = shells[js].get_Nbf();
+      const size_t i0 = shells[is].get_first_ind();
+      const size_t j0 = shells[js].get_first_ind();
+      const size_t i_at = shells[is].get_center_ind();
+      const size_t j_at = shells[js].get_center_ind();
+
+      const double fac_sp = (is == js) ? 1.0 : 2.0;
+
+      for(size_t jp=0; jp<piv_shps.size(); jp++) {
+        const size_t ks = piv_shps[jp].first;
+        const size_t ls = piv_shps[jp].second;
+        const size_t Nk = shells[ks].get_Nbf();
+        const size_t Nl = shells[ls].get_Nbf();
+        const size_t k0 = shells[ks].get_first_ind();
+        const size_t l0 = shells[ls].get_first_ind();
+        const size_t k_at = shells[ks].get_center_ind();
+        const size_t l_at = shells[ls].get_center_ind();
+
+        deri->compute(&shells[is], &shells[js], &shells[ks], &shells[ls]);
+
+        const size_t atoms[4] = {i_at, j_at, k_at, l_at};
+        for(int ic=0; ic<12; ic++) {
+          const int center = ic / 3;
+          const int xyz    = ic % 3;
+          const size_t aA  = atoms[center];
+
+          const std::vector<double> * erip = deri->getp(ic);
+          double accum = 0.0;
+          for(size_t ii=0; ii<Ni; ii++)
+            for(size_t jj=0; jj<Nj; jj++) {
+              const double Pval = P(i0+ii, j0+jj);
+              for(size_t kk=0; kk<Nk; kk++)
+                for(size_t ll=0; ll<Nl; ll++) {
+                  const arma::uword qidx = pivot_to_index(k0+kk, l0+ll);
+                  if(qidx == static_cast<arma::uword>(-1)) continue;
+                  const double val = (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+                  accum += val * Pval * c(qidx);
+                }
+            }
+#ifdef _OPENMP
+          fwrk(3*aA + xyz) -= fac_sp * accum;
+#else
+          f(3*aA + xyz)    -= fac_sp * accum;
+#endif
+        }
+      }
+    }
+#ifdef _OPENMP
+#pragma omp critical
+    f += fwrk;
+#endif
+    delete deri;
+  }
+
+  return f;
 }
 
 // ===========================================================================

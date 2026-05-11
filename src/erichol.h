@@ -52,6 +52,21 @@ class ERIchol {
   /// Get the pivot shell pairs
   void form_pivot_shellpairs(const BasisSet & Basis);
 
+  /// Two-step CD state. Filled by fill_two_step and used by
+  /// forceJ. Empty when populated via fill() (one-step CD).
+  /// two_step_metric_(p, q) = (piv_p | piv_q) over selected pivot
+  /// orbital pairs (size Nselected x Nselected).
+  arma::mat two_step_metric_;
+  /// two_step_metric_invh_ = PartialCholeskyOrth(metric, ...);
+  /// satisfies two_step_metric_invh_^T M two_step_metric_invh_ = I
+  /// (over the lindep-cleaned subspace). Used to map between raw
+  /// gamma vectors (length Nselected) and the orthonormalised L
+  /// indexing of B. Size (Nselected x Naux_eff).
+  arma::mat two_step_metric_invh_;
+  /// True iff this object was filled via fill_two_step (so the
+  /// metric / metric_invh members are valid).
+  bool two_step_;
+
  public:
   /// Constructor
   ERIchol();
@@ -134,6 +149,13 @@ class ERIchol {
 
   /// Get transformed B matrix
   arma::mat B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose=false) const;
+
+  /// Compute Coulomb forces via two-step CD: f = 0.5 c (dM/dR) c -
+  /// sum_munu P (d(mu nu|piv)/dR) c, where c is the expansion of
+  /// the density on the pivot orbital pairs. Only valid when the
+  /// object was filled via fill_two_step (i.e. two_step_ == true);
+  /// throws otherwise.
+  arma::vec forceJ(const BasisSet & basis, const arma::mat & P) const;
 };
 
 // ===========================================================================
