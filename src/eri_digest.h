@@ -37,6 +37,12 @@ class JDigestor: public IntegralDigestor {
   arma::mat P;
   /// Coulomb matrix
   arma::mat J;
+  /// Per-quartet scratch: row-major flat of the P submatrix
+  /// (Pkl flat for the first contraction, Pij flat for the
+  /// permutation) and the GEMV result vector. Grow-only via
+  /// set_size; same allocation strategy as KDigestor.
+  arma::vec scratch_Pflat;
+  arma::vec scratch_rv;
  public:
   /// Construct digestor
   JDigestor(const arma::mat & P);

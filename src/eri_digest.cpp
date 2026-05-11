@@ -59,40 +59,53 @@ void JDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
   // BLAS GEMV do the contractions.
   const arma::mat ints_view(const_cast<double*>(&ints[ioff]), Nk*Nl, Ni*Nj, false, true);
 
-  // J_ij = (ij|kl) P_kl
+  // J_ij = (ij|kl) P_kl. Reuses the digestor-member scratch
+  // buffers; set_size grows them monotonically. Replaces the
+  // previous arma::mat Pkl submat copy + vectorise(Pkl.t()) +
+  // arma::vec rv + arma::reshape(rv, ...).t() + arma::mat Jij
+  // chain, which allocated ~5 arma containers per quartet.
   {
-    arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
-    double fac=1.0;
-    if(ks!=ls)
-      fac=2.0;
+    const double fac = (ks!=ls) ? 2.0 : 1.0;
 
-    // ints_view.t() * vec(Pkl in row-major order)  -> length Ni*Nj.
-    // vectorise(Pkl.t()) gives the row-major flattening (Pkl(0,0),
-    // Pkl(0,1), ..., Pkl(0,Nl-1), Pkl(1,0), ...).
-    const arma::vec rv = ints_view.t() * arma::vectorise(Pkl.t());
-    // rv[ii*Nj+jj] = Σ_kl (ij|kl) P(k,l). reshape into (Nj, Ni)
-    // gives mat(jj,ii) = rv[ii*Nj+jj]; transpose to obtain Jij(ii,jj).
-    const arma::mat Jij = fac * arma::reshape(rv, Nj, Ni).t();
+    // Row-major flat of Pkl: scratch_Pflat(kk*Nl+ll) = P(k0+kk, l0+ll).
+    // ints_view.t() * scratch_Pflat then produces rv(ii*Nj+jj) =
+    // Σ_kl (ij|kl) P(k,l) via BLAS GEMV into pre-sized scratch_rv.
+    scratch_Pflat.set_size(Nk * Nl);
+    for(size_t kk=0; kk<Nk; kk++)
+      for(size_t ll=0; ll<Nl; ll++)
+        scratch_Pflat(kk*Nl + ll) = P(k0+kk, l0+ll);
+    scratch_rv.set_size(Ni * Nj);
+    scratch_rv = ints_view.t() * scratch_Pflat;
 
-    J.submat(i0,j0,i0+Ni-1,j0+Nj-1)+=Jij;
-    if(is!=js)
-      J.submat(j0,i0,j0+Nj-1,i0+Ni-1)+=arma::trans(Jij);
+    // Direct element-wise accumulate into J -- avoids the reshape
+    // + transpose + Jij temp + J.submat(...) += Jij chain.
+    for(size_t ii=0; ii<Ni; ii++)
+      for(size_t jj=0; jj<Nj; jj++) {
+        const double v = fac * scratch_rv(ii*Nj + jj);
+        J(i0+ii, j0+jj) += v;
+        if(is!=js)
+          J(j0+jj, i0+ii) += v;
+      }
   }
 
-  // Permutation: J_kl = (ij|kl) P_ij
+  // J_kl = (ij|kl) P_ij; same trick, contracting over (ij).
   if(ip!=jp) {
-    arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
-    double fac=1.0;
-    if(is!=js)
-      fac=2.0;
+    const double fac = (is!=js) ? 2.0 : 1.0;
 
-    // Same trick, contracting over (ij) instead of (kl).
-    const arma::vec rv = ints_view * arma::vectorise(Pij.t());
-    const arma::mat Jkl = fac * arma::reshape(rv, Nl, Nk).t();
+    scratch_Pflat.set_size(Ni * Nj);
+    for(size_t ii=0; ii<Ni; ii++)
+      for(size_t jj=0; jj<Nj; jj++)
+        scratch_Pflat(ii*Nj + jj) = P(i0+ii, j0+jj);
+    scratch_rv.set_size(Nk * Nl);
+    scratch_rv = ints_view * scratch_Pflat;
 
-    J.submat(k0,l0,k0+Nk-1,l0+Nl-1)+=Jkl;
-    if(ks!=ls)
-      J.submat(l0,k0,l0+Nl-1,k0+Nk-1)+=arma::trans(Jkl);
+    for(size_t kk=0; kk<Nk; kk++)
+      for(size_t ll=0; ll<Nl; ll++) {
+        const double v = fac * scratch_rv(kk*Nl + ll);
+        J(k0+kk, l0+ll) += v;
+        if(ks!=ls)
+          J(l0+ll, k0+kk) += v;
+      }
   }
 }
 
