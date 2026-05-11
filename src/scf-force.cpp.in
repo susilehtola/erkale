@@ -86,7 +86,10 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
       // available).
       fx_full=chol.forceJ(*basisp, sol.P);
     } else {
-      if(!direct)
+      // scr is filled in scf-base.cpp only on the four-index path
+      // (direct or table). On the Cholesky / DF paths it stays
+      // unfilled; ensure it's ready before any forceJ/forceJK call.
+      if(scr.get_N() != basisp->get_Nbf())
 	scr.fill(basisp,intthr,verbose);
 
       fx_full=scr.forceJ(sol.P,tol);
@@ -94,7 +97,7 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   } else {
 #endif
 
-    if(!direct)
+    if(scr.get_N() != basisp->get_Nbf())
       scr.fill(basisp,intthr,verbose);
 
 #ifdef RESTRICTED

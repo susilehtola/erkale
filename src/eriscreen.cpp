@@ -57,6 +57,7 @@ ERIscreen::ERIscreen() {
   alpha=1.0;
   beta=0.0;
   basp=NULL;
+  Nbf=0;
 }
 
 ERIscreen::~ERIscreen() {
