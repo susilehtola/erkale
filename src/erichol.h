@@ -153,9 +153,16 @@ class ERIchol {
   /// Compute Coulomb forces via two-step CD: f = 0.5 c (dM/dR) c -
   /// sum_munu P (d(mu nu|piv)/dR) c, where c is the expansion of
   /// the density on the pivot orbital pairs. Only valid when the
-  /// object was filled via fill_two_step (i.e. two_step_ == true);
+  /// object was filled via fill_two_step (i.e. is_force_capable());
   /// throws otherwise.
   arma::vec forceJ(const BasisSet & basis, const arma::mat & P) const;
+
+  /// True iff forceJ is available on this object. One-step CD has
+  /// no pivot metric and so cannot evaluate the gradient; two-step
+  /// CD stashes the metric in fill_two_step. Callers should query
+  /// this before dispatching to forceJ and fall back to the
+  /// four-index path otherwise.
+  bool is_force_capable() const { return two_step_; }
 };
 
 // ===========================================================================

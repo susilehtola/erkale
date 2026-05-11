@@ -79,12 +79,22 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
 	throw std::runtime_error("Forces not implemented for density fitting of exact exchange.\n");
 
       fx_full=dfit.forceJ(sol.P);
-    } else if(cholesky) {
-      // Two-step CD path: ERIchol::forceJ uses the pivot orbital
-      // pairs as a fitting basis; same gradient structure as DF.
-      // One-step CD throws inside ERIchol::forceJ (no metric
-      // available).
+    } else if(cholesky && chol.is_force_capable()) {
+      // Two-step CD: ERIchol::forceJ uses the pivot orbital pairs
+      // as a fitting basis; same gradient structure as DF.
       fx_full=chol.forceJ(*basisp, sol.P);
+    } else if(cholesky) {
+      // One-step CD has no pivot metric, so the algebraic gradient
+      // route is not available; fall through to the four-index path.
+      // scr is filled on demand below; print a one-line notice so
+      // the user knows where their wall time went.
+      if(verbose) {
+        printf("Note: nuclear gradients fall through to four-index ERIs because the Cholesky path is one-step (set CholeskyAlgorithm=TwoStep or DensityFitting to keep gradients on the fitting path).\n");
+        fflush(stdout);
+      }
+      if(scr.get_N() != basisp->get_Nbf())
+	scr.fill(basisp,intthr,verbose);
+      fx_full=scr.forceJ(sol.P,tol);
     } else {
       // scr is filled in scf-base.cpp only on the four-index path
       // (direct or table). On the Cholesky / DF paths it stays
