@@ -424,9 +424,17 @@ void JFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
   size_t k0=shpairs[jp].i0;
   size_t l0=shpairs[jp].j0;
 
-  // E_J = P_ij (ij|kl) P_kl. Work matrices
-  arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
-  arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
+  // E_J = P_ij (ij|kl) P_kl. Materialise the P submatrices into
+  // member-owned scratch (set_size grows monotonically) -- avoids
+  // two fresh arma::mat allocations per shellpair quartet.
+  scratch_Pij.set_size(Ni, Nj);
+  for(size_t jj=0; jj<Nj; jj++)
+    for(size_t ii=0; ii<Ni; ii++)
+      scratch_Pij(ii, jj) = P(i0+ii, j0+jj);
+  scratch_Pkl.set_size(Nk, Nl);
+  for(size_t ll=0; ll<Nl; ll++)
+    for(size_t kk=0; kk<Nk; kk++)
+      scratch_Pkl(kk, ll) = P(k0+kk, l0+ll);
 
   // Degeneracy factor
   double Jfac=-0.5;
@@ -448,7 +456,7 @@ void JFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++)
-	    el+=Pij(ii,jj)*Pkl(kk,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    el+=scratch_Pij(ii,jj)*scratch_Pkl(kk,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 
     // Increment the element
     f(idx)+=Jfac*el;
@@ -483,12 +491,26 @@ void KFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
   size_t k0=shpairs[jp].i0;
   size_t l0=shpairs[jp].j0;
 
-  // E_K = P_ik (ij|kl) P_jl
-  arma::mat Pik=P.submat(i0,k0,i0+Ni-1,k0+Nk-1);
-  arma::mat Pjl=P.submat(j0,l0,j0+Nj-1,l0+Nl-1);
-  //     + P_jk (ij|kl) P_il
-  arma::mat Pjk=P.submat(j0,k0,j0+Nj-1,k0+Nk-1);
-  arma::mat Pil=P.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+  // E_K = P_ik (ij|kl) P_jl  +  P_jk (ij|kl) P_il.
+  // Materialise the four P submatrices into member-owned scratch
+  // (set_size grows monotonically) -- avoids four fresh arma::mat
+  // allocations per shellpair quartet.
+  scratch_Pik.set_size(Ni, Nk);
+  for(size_t kk=0; kk<Nk; kk++)
+    for(size_t ii=0; ii<Ni; ii++)
+      scratch_Pik(ii, kk) = P(i0+ii, k0+kk);
+  scratch_Pjl.set_size(Nj, Nl);
+  for(size_t ll=0; ll<Nl; ll++)
+    for(size_t jj=0; jj<Nj; jj++)
+      scratch_Pjl(jj, ll) = P(j0+jj, l0+ll);
+  scratch_Pjk.set_size(Nj, Nk);
+  for(size_t kk=0; kk<Nk; kk++)
+    for(size_t jj=0; jj<Nj; jj++)
+      scratch_Pjk(jj, kk) = P(j0+jj, k0+kk);
+  scratch_Pil.set_size(Ni, Nl);
+  for(size_t ll=0; ll<Nl; ll++)
+    for(size_t ii=0; ii<Ni; ii++)
+      scratch_Pil(ii, ll) = P(i0+ii, l0+ll);
   double K1fac, K2fac;
   if(is!=js && ks!=ls) {
     // Get both twice.
@@ -524,7 +546,7 @@ void KFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++)
-	    el+=Pik(ii,kk)*Pjl(jj,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    el+=scratch_Pik(ii,kk)*scratch_Pjl(jj,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 
     // Increment the element
     f(idx)+=K1fac*el;
@@ -537,7 +559,7 @@ void KFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
 	for(size_t jj=0;jj<Nj;jj++)
 	  for(size_t kk=0;kk<Nk;kk++)
 	    for(size_t ll=0;ll<Nl;ll++)
-	      el+=Pjk(jj,kk)*Pil(ii,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	      el+=scratch_Pjk(jj,kk)*scratch_Pil(ii,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 
       // Increment the element
       f(idx)+=K2fac*el;

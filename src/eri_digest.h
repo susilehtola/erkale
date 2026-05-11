@@ -118,6 +118,12 @@ class ForceDigestor {
 class JFDigestor: public ForceDigestor {
   /// Density matrix
   arma::mat P;
+  /// Per-quartet scratch for the Pij and Pkl submatrices,
+  /// materialised once per shellpair quartet and reused across
+  /// the 12 derivative components. Contiguous storage is faster
+  /// than subview access in the inner quadruple loop. Grown
+  /// monotonically via set_size, same strategy as KDigestor.
+  arma::mat scratch_Pij, scratch_Pkl;
  public:
   /// Construct digestor
   JFDigestor(const arma::mat & P);
@@ -136,6 +142,8 @@ class KFDigestor: public ForceDigestor {
   double kfrac;
   /// Degeneracy factor
   double fac;
+  /// Per-quartet scratch (see JFDigestor).
+  arma::mat scratch_Pik, scratch_Pjl, scratch_Pjk, scratch_Pil;
 
  public:
   /// Construct digestor
