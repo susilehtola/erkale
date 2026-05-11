@@ -75,7 +75,9 @@ class ERIchol {
 
   /// Set range separation
   void set_range_separation(double w, double a, double b);
+  void set_range_separation(const RangeSeparation & rs) { set_range_separation(rs.omega, rs.alpha, rs.beta); }
   void get_range_separation(double & w, double & a, double & b) const;
+  RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
 
   /// Load B matrix
   void load();

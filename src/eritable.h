@@ -73,8 +73,10 @@ class ERItable {
 
   /// Set range separation
   void set_range_separation(double omega, double alpha, double beta);
+  void set_range_separation(const RangeSeparation & rs) { set_range_separation(rs.omega, rs.alpha, rs.beta); }
   /// Get range separation
   void get_range_separation(double & omega, double & alpha, double & beta) const;
+  RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
 
   /// Fill table, return amount of significant shell pairs
   size_t fill(const BasisSet * basis, double thr);
