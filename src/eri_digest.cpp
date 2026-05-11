@@ -59,40 +59,53 @@ void JDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
   // BLAS GEMV do the contractions.
   const arma::mat ints_view(const_cast<double*>(&ints[ioff]), Nk*Nl, Ni*Nj, false, true);
 
-  // J_ij = (ij|kl) P_kl
+  // J_ij = (ij|kl) P_kl. Reuses the digestor-member scratch
+  // buffers; set_size grows them monotonically. Replaces the
+  // previous arma::mat Pkl submat copy + vectorise(Pkl.t()) +
+  // arma::vec rv + arma::reshape(rv, ...).t() + arma::mat Jij
+  // chain, which allocated ~5 arma containers per quartet.
   {
-    arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
-    double fac=1.0;
-    if(ks!=ls)
-      fac=2.0;
+    const double fac = (ks!=ls) ? 2.0 : 1.0;
 
-    // ints_view.t() * vec(Pkl in row-major order)  -> length Ni*Nj.
-    // vectorise(Pkl.t()) gives the row-major flattening (Pkl(0,0),
-    // Pkl(0,1), ..., Pkl(0,Nl-1), Pkl(1,0), ...).
-    const arma::vec rv = ints_view.t() * arma::vectorise(Pkl.t());
-    // rv[ii*Nj+jj] = Σ_kl (ij|kl) P(k,l). reshape into (Nj, Ni)
-    // gives mat(jj,ii) = rv[ii*Nj+jj]; transpose to obtain Jij(ii,jj).
-    const arma::mat Jij = fac * arma::reshape(rv, Nj, Ni).t();
+    // Row-major flat of Pkl: scratch_Pflat(kk*Nl+ll) = P(k0+kk, l0+ll).
+    // ints_view.t() * scratch_Pflat then produces rv(ii*Nj+jj) =
+    // Σ_kl (ij|kl) P(k,l) via BLAS GEMV into pre-sized scratch_rv.
+    scratch_Pflat.set_size(Nk * Nl);
+    for(size_t kk=0; kk<Nk; kk++)
+      for(size_t ll=0; ll<Nl; ll++)
+        scratch_Pflat(kk*Nl + ll) = P(k0+kk, l0+ll);
+    scratch_rv.set_size(Ni * Nj);
+    scratch_rv = ints_view.t() * scratch_Pflat;
 
-    J.submat(i0,j0,i0+Ni-1,j0+Nj-1)+=Jij;
-    if(is!=js)
-      J.submat(j0,i0,j0+Nj-1,i0+Ni-1)+=arma::trans(Jij);
+    // Direct element-wise accumulate into J -- avoids the reshape
+    // + transpose + Jij temp + J.submat(...) += Jij chain.
+    for(size_t ii=0; ii<Ni; ii++)
+      for(size_t jj=0; jj<Nj; jj++) {
+        const double v = fac * scratch_rv(ii*Nj + jj);
+        J(i0+ii, j0+jj) += v;
+        if(is!=js)
+          J(j0+jj, i0+ii) += v;
+      }
   }
 
-  // Permutation: J_kl = (ij|kl) P_ij
+  // J_kl = (ij|kl) P_ij; same trick, contracting over (ij).
   if(ip!=jp) {
-    arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
-    double fac=1.0;
-    if(is!=js)
-      fac=2.0;
+    const double fac = (is!=js) ? 2.0 : 1.0;
 
-    // Same trick, contracting over (ij) instead of (kl).
-    const arma::vec rv = ints_view * arma::vectorise(Pij.t());
-    const arma::mat Jkl = fac * arma::reshape(rv, Nl, Nk).t();
+    scratch_Pflat.set_size(Ni * Nj);
+    for(size_t ii=0; ii<Ni; ii++)
+      for(size_t jj=0; jj<Nj; jj++)
+        scratch_Pflat(ii*Nj + jj) = P(i0+ii, j0+jj);
+    scratch_rv.set_size(Nk * Nl);
+    scratch_rv = ints_view * scratch_Pflat;
 
-    J.submat(k0,l0,k0+Nk-1,l0+Nl-1)+=Jkl;
-    if(ks!=ls)
-      J.submat(l0,k0,l0+Nl-1,k0+Nk-1)+=arma::trans(Jkl);
+    for(size_t kk=0; kk<Nk; kk++)
+      for(size_t ll=0; ll<Nl; ll++) {
+        const double v = fac * scratch_rv(kk*Nl + ll);
+        J(k0+kk, l0+ll) += v;
+        if(ks!=ls)
+          J(l0+ll, k0+kk) += v;
+      }
   }
 }
 
@@ -156,87 +169,81 @@ void KDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_t
     case K will get extra increments.
   */
 
-  // First, do the ik part: K(i,k) += (ij|kl) P(j,l)
+  // K(i,k) += (ij|kl) P(j,l). The Kik accumulator and the Pjl
+  // density slice both go through member-owned scratch storage
+  // (set_size grows monotonically; no allocation after the first
+  // largest shellpair has been seen). The Pjl materialisation gives
+  // the inner loop contiguous-array access rather than going through
+  // an arma::subview operator() per element.
   {
-    arma::mat Kik(Ni,Nk);
-    Kik.zeros();
-    arma::mat Pjl =P.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+    scratch_Kik.set_size(Ni, Nk);
+    scratch_Kik.zeros();
+    scratch_Pjl.set_size(Nj, Nl);
+    scratch_Pjl = P.submat(j0, l0, j0+Nj-1, l0+Nl-1);
 
-    // Increment Kik
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t kk=0;kk<Nk;kk++)
 	for(size_t ll=0;ll<Nl;ll++)
 	  for(size_t jj=0;jj<Nj;jj++)
-	    Kik (ii,kk)+=ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjl (jj,ll);
+	    scratch_Kik(ii,kk) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pjl(jj,ll);
 
-    // Set elements
-    K.submat(i0,k0,i0+Ni-1,k0+Nk-1)+=Kik;
-    // Symmetrize if necessary
+    K.submat(i0,k0,i0+Ni-1,k0+Nk-1) += scratch_Kik;
     if(ip!=jp)
-      K.submat(k0,i0,k0+Nk-1,i0+Ni-1)+=arma::trans(Kik);
+      K.submat(k0,i0,k0+Nk-1,i0+Ni-1) += arma::trans(scratch_Kik);
   }
 
-  // Then, the second part: K(j,k) += (ij|kl) P(i,l)
+  // K(j,k) += (ij|kl) P(i,l)
   if(is!=js) {
-    arma::mat Kjk(Nj,Nk);
-    Kjk.zeros();
-    arma::mat Pil=P.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+    scratch_Kjk.set_size(Nj, Nk);
+    scratch_Kjk.zeros();
+    scratch_Pil.set_size(Ni, Nl);
+    scratch_Pil = P.submat(i0, l0, i0+Ni-1, l0+Nl-1);
 
-    // Increment Kjk
     for(size_t jj=0;jj<Nj;jj++)
       for(size_t kk=0;kk<Nk;kk++)
 	for(size_t ll=0;ll<Nl;ll++)
 	  for(size_t ii=0;ii<Ni;ii++)
-	    Kjk(jj,kk)+=ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pil(ii,ll);
+	    scratch_Kjk(jj,kk) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pil(ii,ll);
 
-    // Set elements
-    K.submat(j0,k0,j0+Nj-1,k0+Nk-1)+=Kjk;
-    // Symmetrize if necessary (take care about possible overlap with next routine)
-    if(ip!=jp) {
-      K.submat(k0,j0,k0+Nk-1,j0+Nj-1)+=arma::trans(Kjk);
-    }
+    K.submat(j0,k0,j0+Nj-1,k0+Nk-1) += scratch_Kjk;
+    if(ip!=jp)
+      K.submat(k0,j0,k0+Nk-1,j0+Nj-1) += arma::trans(scratch_Kjk);
   }
 
-  // Third part: K(i,l) += (ij|kl) P(j,k)
+  // K(i,l) += (ij|kl) P(j,k)
   if(ks!=ls) {
-    arma::mat Kil(Ni,Nl);
-    Kil.zeros();
-    arma::mat Pjk=P.submat(j0,k0,j0+Nj-1,k0+Nk-1);
+    scratch_Kil.set_size(Ni, Nl);
+    scratch_Kil.zeros();
+    scratch_Pjk.set_size(Nj, Nk);
+    scratch_Pjk = P.submat(j0, k0, j0+Nj-1, k0+Nk-1);
 
-    // Increment Kil
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t ll=0;ll<Nl;ll++)
 	for(size_t jj=0;jj<Nj;jj++)
-	  for(size_t kk=0;kk<Nk;kk++) {
-	    Kil(ii,ll)+=ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjk(jj,kk);
-	  }
+	  for(size_t kk=0;kk<Nk;kk++)
+	    scratch_Kil(ii,ll) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pjk(jj,kk);
 
-    // Set elements
-    K.submat(i0,l0,i0+Ni-1,l0+Nl-1)+=Kil;
-    // Symmetrize if necessary
+    K.submat(i0,l0,i0+Ni-1,l0+Nl-1) += scratch_Kil;
     if(ip!=jp)
-      K.submat(l0,i0,l0+Nl-1,i0+Ni-1)+=arma::trans(Kil);
+      K.submat(l0,i0,l0+Nl-1,i0+Ni-1) += arma::trans(scratch_Kil);
   }
 
-  // Last permutation: K(j,l) += (ij|kl) P(i,k)
+  // K(j,l) += (ij|kl) P(i,k)
   if(is!=js && ks!=ls) {
-    arma::mat Kjl(Nj,Nl);
-    Kjl.zeros();
-    arma::mat Pik=P.submat(i0,k0,i0+Ni-1,k0+Nk-1);
+    scratch_Kjl.set_size(Nj, Nl);
+    scratch_Kjl.zeros();
+    scratch_Pik.set_size(Ni, Nk);
+    scratch_Pik = P.submat(i0, k0, i0+Ni-1, k0+Nk-1);
 
-    // Increment Kjl
     for(size_t jj=0;jj<Nj;jj++)
       for(size_t ll=0;ll<Nl;ll++)
 	for(size_t ii=0;ii<Ni;ii++)
-	  for(size_t kk=0;kk<Nk;kk++) {
-	    Kjl(jj,ll)+=ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pik(ii,kk);
-	  }
+	  for(size_t kk=0;kk<Nk;kk++)
+	    scratch_Kjl(jj,ll) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pik(ii,kk);
 
-    // Set elements
-    K.submat(j0,l0,j0+Nj-1,l0+Nl-1)+=Kjl;
-    // Symmetrize if necessary
+    K.submat(j0,l0,j0+Nj-1,l0+Nl-1) += scratch_Kjl;
     if (ip!=jp)
-      K.submat(l0,j0,l0+Nl-1,j0+Nj-1)+=arma::trans(Kjl);
+      K.submat(l0,j0,l0+Nl-1,j0+Nj-1) += arma::trans(scratch_Kjl);
   }
 }
 
@@ -307,87 +314,76 @@ void cxKDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size
     case K will get extra increments.
   */
 
-  // First, do the ik part: K(i,k) += (ij|kl) P(j,l)
+  // K(i,k) += (ij|kl) P(j,l). Same K/P scratch pattern as KDigestor.
   {
-    arma::cx_mat Kik(Ni,Nk);
-    Kik.zeros();
-    arma::cx_mat Pjl =P.submat(j0,l0,j0+Nj-1,l0+Nl-1);
+    scratch_Kik.set_size(Ni, Nk);
+    scratch_Kik.zeros();
+    scratch_Pjl.set_size(Nj, Nl);
+    scratch_Pjl = P.submat(j0, l0, j0+Nj-1, l0+Nl-1);
 
-    // Increment Kik
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t kk=0;kk<Nk;kk++)
 	for(size_t ll=0;ll<Nl;ll++)
 	  for(size_t jj=0;jj<Nj;jj++)
-	    Kik (ii,kk)+=ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjl (jj,ll);
+	    scratch_Kik(ii,kk) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pjl(jj,ll);
 
-    // Set elements
-    K.submat(i0,k0,i0+Ni-1,k0+Nk-1)+=Kik;
-    // Symmetrize if necessary
+    K.submat(i0,k0,i0+Ni-1,k0+Nk-1) += scratch_Kik;
     if(ip!=jp)
-      K.submat(k0,i0,k0+Nk-1,i0+Ni-1)+=arma::trans(Kik);
+      K.submat(k0,i0,k0+Nk-1,i0+Ni-1) += arma::trans(scratch_Kik);
   }
 
-  // Then, the second part: K(j,k) += (ij|kl) P(i,l)
+  // K(j,k) += (ij|kl) P(i,l)
   if(is!=js) {
-    arma::cx_mat Kjk(Nj,Nk);
-    Kjk.zeros();
-    arma::cx_mat Pil=P.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+    scratch_Kjk.set_size(Nj, Nk);
+    scratch_Kjk.zeros();
+    scratch_Pil.set_size(Ni, Nl);
+    scratch_Pil = P.submat(i0, l0, i0+Ni-1, l0+Nl-1);
 
-    // Increment Kjk
     for(size_t jj=0;jj<Nj;jj++)
       for(size_t kk=0;kk<Nk;kk++)
 	for(size_t ll=0;ll<Nl;ll++)
 	  for(size_t ii=0;ii<Ni;ii++)
-	    Kjk(jj,kk)+=ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pil(ii,ll);
+	    scratch_Kjk(jj,kk) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pil(ii,ll);
 
-    // Set elements
-    K.submat(j0,k0,j0+Nj-1,k0+Nk-1)+=Kjk;
-    // Symmetrize if necessary (take care about possible overlap with next routine)
-    if(ip!=jp) {
-      K.submat(k0,j0,k0+Nk-1,j0+Nj-1)+=arma::trans(Kjk);
-    }
+    K.submat(j0,k0,j0+Nj-1,k0+Nk-1) += scratch_Kjk;
+    if(ip!=jp)
+      K.submat(k0,j0,k0+Nk-1,j0+Nj-1) += arma::trans(scratch_Kjk);
   }
 
-  // Third part: K(i,l) += (ij|kl) P(j,k)
+  // K(i,l) += (ij|kl) P(j,k)
   if(ks!=ls) {
-    arma::cx_mat Kil(Ni,Nl);
-    Kil.zeros();
-    arma::cx_mat Pjk=P.submat(j0,k0,j0+Nj-1,k0+Nk-1);
+    scratch_Kil.set_size(Ni, Nl);
+    scratch_Kil.zeros();
+    scratch_Pjk.set_size(Nj, Nk);
+    scratch_Pjk = P.submat(j0, k0, j0+Nj-1, k0+Nk-1);
 
-    // Increment Kil
     for(size_t ii=0;ii<Ni;ii++)
       for(size_t ll=0;ll<Nl;ll++)
 	for(size_t jj=0;jj<Nj;jj++)
-	  for(size_t kk=0;kk<Nk;kk++) {
-	    Kil(ii,ll)+=ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pjk(jj,kk);
-	  }
+	  for(size_t kk=0;kk<Nk;kk++)
+	    scratch_Kil(ii,ll) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pjk(jj,kk);
 
-    // Set elements
-    K.submat(i0,l0,i0+Ni-1,l0+Nl-1)+=Kil;
-    // Symmetrize if necessary
+    K.submat(i0,l0,i0+Ni-1,l0+Nl-1) += scratch_Kil;
     if(ip!=jp)
-      K.submat(l0,i0,l0+Nl-1,i0+Ni-1)+=arma::trans(Kil);
+      K.submat(l0,i0,l0+Nl-1,i0+Ni-1) += arma::trans(scratch_Kil);
   }
 
-  // Last permutation: K(j,l) += (ij|kl) P(i,k)
+  // K(j,l) += (ij|kl) P(i,k)
   if(is!=js && ks!=ls) {
-    arma::cx_mat Kjl(Nj,Nl);
-    Kjl.zeros();
-    arma::cx_mat Pik=P.submat(i0,k0,i0+Ni-1,k0+Nk-1);
+    scratch_Kjl.set_size(Nj, Nl);
+    scratch_Kjl.zeros();
+    scratch_Pik.set_size(Ni, Nk);
+    scratch_Pik = P.submat(i0, k0, i0+Ni-1, k0+Nk-1);
 
-    // Increment Kjl
     for(size_t jj=0;jj<Nj;jj++)
       for(size_t ll=0;ll<Nl;ll++)
 	for(size_t ii=0;ii<Ni;ii++)
-	  for(size_t kk=0;kk<Nk;kk++) {
-	    Kjl(jj,ll)+=ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll]*Pik(ii,kk);
-	  }
+	  for(size_t kk=0;kk<Nk;kk++)
+	    scratch_Kjl(jj,ll) += ints[ioff+((ii*Nj+jj)*Nk+kk)*Nl+ll] * scratch_Pik(ii,kk);
 
-    // Set elements
-    K.submat(j0,l0,j0+Nj-1,l0+Nl-1)+=Kjl;
-    // Symmetrize if necessary
+    K.submat(j0,l0,j0+Nj-1,l0+Nl-1) += scratch_Kjl;
     if (ip!=jp)
-      K.submat(l0,j0,l0+Nl-1,j0+Nj-1)+=arma::trans(Kjl);
+      K.submat(l0,j0,l0+Nl-1,j0+Nj-1) += arma::trans(scratch_Kjl);
   }
 }
 
@@ -428,9 +424,17 @@ void JFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
   size_t k0=shpairs[jp].i0;
   size_t l0=shpairs[jp].j0;
 
-  // E_J = P_ij (ij|kl) P_kl. Work matrices
-  arma::mat Pij=P.submat(i0,j0,i0+Ni-1,j0+Nj-1);
-  arma::mat Pkl=P.submat(k0,l0,k0+Nk-1,l0+Nl-1);
+  // E_J = P_ij (ij|kl) P_kl. Materialise the P submatrices into
+  // member-owned scratch (set_size grows monotonically) -- avoids
+  // two fresh arma::mat allocations per shellpair quartet.
+  scratch_Pij.set_size(Ni, Nj);
+  for(size_t jj=0; jj<Nj; jj++)
+    for(size_t ii=0; ii<Ni; ii++)
+      scratch_Pij(ii, jj) = P(i0+ii, j0+jj);
+  scratch_Pkl.set_size(Nk, Nl);
+  for(size_t ll=0; ll<Nl; ll++)
+    for(size_t kk=0; kk<Nk; kk++)
+      scratch_Pkl(kk, ll) = P(k0+kk, l0+ll);
 
   // Degeneracy factor
   double Jfac=-0.5;
@@ -452,7 +456,7 @@ void JFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++)
-	    el+=Pij(ii,jj)*Pkl(kk,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    el+=scratch_Pij(ii,jj)*scratch_Pkl(kk,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 
     // Increment the element
     f(idx)+=Jfac*el;
@@ -487,12 +491,26 @@ void KFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
   size_t k0=shpairs[jp].i0;
   size_t l0=shpairs[jp].j0;
 
-  // E_K = P_ik (ij|kl) P_jl
-  arma::mat Pik=P.submat(i0,k0,i0+Ni-1,k0+Nk-1);
-  arma::mat Pjl=P.submat(j0,l0,j0+Nj-1,l0+Nl-1);
-  //     + P_jk (ij|kl) P_il
-  arma::mat Pjk=P.submat(j0,k0,j0+Nj-1,k0+Nk-1);
-  arma::mat Pil=P.submat(i0,l0,i0+Ni-1,l0+Nl-1);
+  // E_K = P_ik (ij|kl) P_jl  +  P_jk (ij|kl) P_il.
+  // Materialise the four P submatrices into member-owned scratch
+  // (set_size grows monotonically) -- avoids four fresh arma::mat
+  // allocations per shellpair quartet.
+  scratch_Pik.set_size(Ni, Nk);
+  for(size_t kk=0; kk<Nk; kk++)
+    for(size_t ii=0; ii<Ni; ii++)
+      scratch_Pik(ii, kk) = P(i0+ii, k0+kk);
+  scratch_Pjl.set_size(Nj, Nl);
+  for(size_t ll=0; ll<Nl; ll++)
+    for(size_t jj=0; jj<Nj; jj++)
+      scratch_Pjl(jj, ll) = P(j0+jj, l0+ll);
+  scratch_Pjk.set_size(Nj, Nk);
+  for(size_t kk=0; kk<Nk; kk++)
+    for(size_t jj=0; jj<Nj; jj++)
+      scratch_Pjk(jj, kk) = P(j0+jj, k0+kk);
+  scratch_Pil.set_size(Ni, Nl);
+  for(size_t ll=0; ll<Nl; ll++)
+    for(size_t ii=0; ii<Ni; ii++)
+      scratch_Pil(ii, ll) = P(i0+ii, l0+ll);
   double K1fac, K2fac;
   if(is!=js && ks!=ls) {
     // Get both twice.
@@ -528,7 +546,7 @@ void KFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
       for(size_t jj=0;jj<Nj;jj++)
 	for(size_t kk=0;kk<Nk;kk++)
 	  for(size_t ll=0;ll<Nl;ll++)
-	    el+=Pik(ii,kk)*Pjl(jj,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	    el+=scratch_Pik(ii,kk)*scratch_Pjl(jj,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 
     // Increment the element
     f(idx)+=K1fac*el;
@@ -541,7 +559,7 @@ void KFDigestor::digest(const std::vector<eripair_t> & shpairs, size_t ip, size_
 	for(size_t jj=0;jj<Nj;jj++)
 	  for(size_t kk=0;kk<Nk;kk++)
 	    for(size_t ll=0;ll<Nl;ll++)
-	      el+=Pjk(jj,kk)*Pil(ii,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
+	      el+=scratch_Pjk(jj,kk)*scratch_Pil(ii,ll)*(*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
 
       // Increment the element
       f(idx)+=K2fac*el;
