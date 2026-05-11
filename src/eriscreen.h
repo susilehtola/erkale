@@ -36,9 +36,11 @@ class IntegralDigestor;
 class ForceDigestor;
 #include "global.h"
 #include <armadillo>
+#include <memory>
 #include <vector>
 
 #include "basis.h"
+#include "eriworker.h"
 
 /// Screening of electron repulsion integrals
 class ERIscreen {
@@ -60,6 +62,24 @@ class ERIscreen {
   double alpha;
   /// Fraction of short-range exchange
   double beta;
+
+  /// Per-thread ERIWorker / dERIWorker pool. Sized to
+  /// omp_get_max_threads() in fill(); each thread lazily constructs
+  /// its slot on first use via acquire_eri / acquire_deri. Workers
+  /// are reused across calcJ / calcK / calcJK / forceJ / forceK
+  /// calls (workers' internal state is overwritten on every
+  /// compute() so cross-call reuse is safe). Pools are cleared
+  /// whenever set_range_separation or fill change the parameters
+  /// the constructors baked in.
+  ///
+  /// mutable so the const calc* / force* members can populate.
+  mutable std::vector< std::unique_ptr<ERIWorker> > eri_pool_;
+  mutable std::vector< std::unique_ptr<dERIWorker> > deri_pool_;
+
+  /// Lazily construct & return the per-thread ERI worker.
+  ERIWorker * acquire_eri(int ith) const;
+  /// Lazily construct & return the per-thread derivative ERI worker.
+  dERIWorker * acquire_deri(int ith) const;
 
   /// Run calculation with given digestor
   void calculate(std::vector< std::vector<IntegralDigestor *> > & digest, double tol) const;
