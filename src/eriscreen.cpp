@@ -91,7 +91,10 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
   iidx=i_idx(Nbf);
 
   // Shell-pair list
-  shpairs=basp->get_eripairs(Q,M,shtol,omega,alpha,beta,verbose);
+  ScreeningData s = basp->compute_screening(shtol,omega,alpha,beta,verbose);
+  Q = std::move(s.Q);
+  M = std::move(s.M);
+  shpairs = std::move(s.shpairs);
 
   return shpairs.size();
 }
