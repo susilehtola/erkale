@@ -98,11 +98,14 @@ class DensityFit {
 
   /// List of unique orbital shell pairs
   std::vector<eripair_t> orbpairs;
-  /// Cached three-index integrals (alpha | mu nu) per orbital
-  /// shellpair, indexed via the BTensorBlocks abstraction. Used in
-  /// non-direct mode; null in direct mode (compute on the fly).
-  /// shared_ptr so DensityFit copies share the heavy block storage.
-  std::shared_ptr<CachedBlocks> blocks;
+  /// Three-index (alpha | mu nu) block source, indexed per orbital
+  /// shellpair. In non-direct mode this is a CachedBlocks with the
+  /// integrals precomputed and stored; in direct mode this is a
+  /// DirectDFBlocks that computes blocks on demand via libint.
+  /// Either way, the J/K kernels consume blocks via the same
+  /// blocks->get_block(ip) interface. shared_ptr so DensityFit
+  /// copies (e.g. Edmiston) share the storage / state.
+  std::shared_ptr<BTensorBlocks> blocks;
 
   /// \f$ ( \alpha | \beta) \f$
   arma::mat ab;

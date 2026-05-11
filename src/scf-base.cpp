@@ -393,6 +393,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
             printf("Note: CholeskyMode is ignored under CDFit; the aux basis is reconstructed at every SCF run.\n");
           if(cholnafthr>0.0)
             printf("Note: CholeskyNAFThr is ignored under CDFit; NAF doesn't apply to DF storage.\n");
+          fflush(stdout);
         }
 
         // Drive density fitting on the CD-derived aux basis.

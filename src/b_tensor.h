@@ -21,6 +21,8 @@
 #include "basis.h"
 #include "eriworker.h"
 
+#include <memory>
+
 /**
  * Block-indexed view of a three-index tensor (mu nu | J), where mu nu
  * range over orbital pairs grouped by orbital shellpair, and J ranges
@@ -116,6 +118,73 @@ public:
 
   /// Total backing-store size in doubles
   size_t storage_size() const { return storage_.size(); }
+};
+
+/**
+ * Direct-mode block source for density fitting: each get_block(ip)
+ * call computes the (alpha | mu nu) three-center integrals for the
+ * ip-th orbital shellpair on demand via libint, returning an owning
+ * (Naux x Nmu*Nnu) matrix. No precomputed (alpha | mu nu) storage --
+ * the whole point of direct mode.
+ *
+ * Holds an internal per-thread ERIWorker cache so concurrent
+ * get_block() calls from an outer `#pragma omp parallel` region
+ * don't need to thread through their own worker. The cache is
+ * lazily populated by the first call from each thread; cleanup is
+ * automatic at destruction.
+ */
+class DirectDFBlocks : public BTensorBlocks {
+  size_t Nbf_;
+  size_t Naux_;
+  std::vector<std::pair<size_t, size_t>> shellpairs_;
+  std::vector<std::pair<size_t, size_t>> firsts_;
+  std::vector<std::pair<size_t, size_t>> sizes_;
+
+  /// Orbital and auxiliary shells, owned copies (cheap).
+  std::vector<GaussianShell> orb_shells_;
+  std::vector<GaussianShell> aux_shells_;
+  GaussianShell dummy_;
+  /// Range separation
+  double omega_, alpha_, beta_;
+  /// libint worker dimensions
+  int max_am_;
+  int max_contr_;
+
+  /// Per-thread ERIWorker cache (lazy). Mutable because get_block
+  /// is logically const but materialises a thread-local worker on
+  /// first use.
+  mutable std::vector<std::unique_ptr<ERIWorker>> eri_cache_;
+  /// Per-thread scratch buffer of shape (Naux, max_NmuNnu) where
+  /// max_NmuNnu is the worst-case across shellpairs. get_block(ip)
+  /// fills the first Nmu*Nnu columns and returns a non-owning view
+  /// of that slice. Avoids a fresh per-call arma::mat allocation in
+  /// the SCF hot path.
+  mutable std::vector<arma::mat> scratch_;
+  /// Worst-case Nmu*Nnu across shellpairs (column dim of scratch_).
+  size_t max_NmuNnu_;
+
+public:
+  DirectDFBlocks(size_t Nbf, size_t Naux,
+                 std::vector<std::pair<size_t, size_t>> shellpairs,
+                 std::vector<std::pair<size_t, size_t>> firsts,
+                 std::vector<std::pair<size_t, size_t>> sizes,
+                 std::vector<GaussianShell> orb_shells,
+                 std::vector<GaussianShell> aux_shells,
+                 GaussianShell dummy,
+                 double omega, double alpha, double beta,
+                 int max_am, int max_contr);
+  ~DirectDFBlocks() override = default;
+
+  size_t n_blocks() const override { return shellpairs_.size(); }
+  size_t naux() const override { return Naux_; }
+  size_t nbf() const override { return Nbf_; }
+  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
+  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
+  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
+  arma::mat get_block(size_t ip) const override;
+
+ private:
+  ERIWorker * thread_eri() const;
 };
 
 #endif

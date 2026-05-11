@@ -599,6 +599,7 @@ size_t ERIchol::fill_two_step(const BasisSet & basis,
   if(cholesky_tol < shell_screen_tol) {
     fprintf(stderr,"Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
     printf("Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
+    fflush(stdout);
   }
 
   // Screening matrix and pairs
@@ -730,6 +731,7 @@ size_t ERIchol::fill_two_step(const BasisSet & basis,
 
   if(verbose) {
     printf("Two-step CD: screening reduced dofs by factor %.2f.\n",d.n_elem*1.0/prodidx.n_elem);
+    fflush(stdout);
   }
 
   // Restrict the diagonal to significant pairs
