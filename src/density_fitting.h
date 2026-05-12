@@ -173,9 +173,9 @@ class DensityFit {
   arma::vec forceJ(const arma::mat & P);
 
   /// Get exchange matrix from orbitals with occupation numbers occs
-  arma::mat calcK(const arma::mat & C, const std::vector<double> & occs, size_t fitmem) const;
+  arma::mat calcK(const arma::mat & C, const std::vector<double> & occs) const;
   /// Get exchange matrix from orbitals with occupation numbers occs
-  arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs, size_t fitmem) const;
+  arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs) const;
 
   /// Get the number of orbital functions
   size_t get_Norb() const;

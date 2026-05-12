@@ -99,7 +99,6 @@ int main_guarded(int argc, char **argv) {
   double proton_mass = settings.get_double("ProtonMass");
   double intthr = settings.get_double("IntegralThresh");
   bool verbose = settings.get_bool("Verbose");
-  size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string loadchk = settings.get_string("LoadChk");
   bool finiteproton = settings.get_bool("FiniteProton");
   int navg = settings.get_int("NAvg");

@@ -833,7 +833,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
   return f;
 }
 
-arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> & occo, size_t fitmem) const {
+arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> & occo) const {
   if(Corig.n_rows != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", Corig.n_rows = " << Corig.n_rows << "!\n";
@@ -867,25 +867,12 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
   // accumulate_K_from_blocks works against any BTensorBlocks
   // subclass; in direct mode the blocks recompute (alpha | mu nu) on
   // the fly per call. Peak memory is one (Naux x Nbf) aui per
-  // thread, well bounded.
-  {
-    const size_t need = sizeof(double) * Naux * Nbf
-#ifdef _OPENMP
-                        * omp_get_max_threads()
-#endif
-                        ;
-    if(need > fitmem) {
-      std::ostringstream oss;
-      oss << "Not enough fitting memory! K build needs " << memory_size(need)
-          << " for the per-thread aui buffers; FittingMemory is " << memory_size(fitmem) << ".\n";
-      throw std::logic_error(oss.str());
-    }
-  }
+  // thread, bounded.
   accumulate_K_from_blocks(C,occs,K);
   return K;
 }
 
-arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<double> & occo, size_t fitmem) const {
+arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<double> & occo) const {
   if(Corig.n_rows != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", Corig.n_rows = " << Corig.n_rows << "!\n";
@@ -916,19 +903,6 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
   arma::cx_mat K(Nbf,Nbf);
   K.zeros();
 
-  {
-    const size_t need = sizeof(std::complex<double>) * Naux * Nbf
-#ifdef _OPENMP
-                        * omp_get_max_threads()
-#endif
-                        ;
-    if(need > fitmem) {
-      std::ostringstream oss;
-      oss << "Not enough fitting memory! K build needs " << memory_size(need)
-          << " for the per-thread aui buffers; FittingMemory is " << memory_size(fitmem) << ".\n";
-      throw std::logic_error(oss.str());
-    }
-  }
   // accumulate_K_from_blocks consumes blocks->get_block(ip) uniformly; the
   // direct-mode path now works for the complex case as well.
   accumulate_K_from_blocks(C,occs,K);
