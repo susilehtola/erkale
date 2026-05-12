@@ -118,16 +118,20 @@ class DensityFit {
   void form_screening();
   /// Compute shell in (a|uv) matrix
   arma::mat compute_a_munu(ERIWorker * eri, size_t ip, double * memptr = nullptr) const;
-  /// Digest J expansion
-  void digest_Jexp(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const;
-  /// Digest J
-  void digest_J(const arma::mat & gamma, size_t ip, const arma::mat & amunu, arma::mat & J) const;
-  /// Digest K in-core
-  void digest_K_incore(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
-  /// Digest K in-core, complex orbitals
-  void digest_K_incore(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const;
-  /// Digest K in direct mode
-  void digest_K_direct(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
+  /// Project P_munu onto the aux basis through one shellpair block:
+  /// gamma_a += (a|mu nu) P_munu, restricted to the (mu, nu) range
+  /// described by the block at index ip.
+  void project_density_to_aux(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const;
+  /// Contract the aux-space expansion gamma back to J through one
+  /// shellpair block: J_munu += (a|mu nu) gamma_a.
+  void contract_aux_to_J(const arma::vec & gamma, size_t ip, const arma::mat & amunu, arma::mat & J) const;
+  /// Build K by looping orbital shellpairs, half-transforming each
+  /// (a|mu nu) block against the occupied MOs, and accumulating
+  /// occ * aui^T aui. Backs onto BTensorBlocks::get_block, so in
+  /// direct mode the blocks recompute on the fly per call.
+  void accumulate_K_from_blocks(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
+  /// Complex-orbital overload (PZ-SIC etc.)
+  void accumulate_K_from_blocks(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const;
 
  public:
   /// Constructor
