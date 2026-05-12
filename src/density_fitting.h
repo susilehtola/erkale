@@ -126,8 +126,6 @@ class DensityFit {
   void digest_K_incore(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
   /// Digest K in-core, complex orbitals
   void digest_K_incore(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const;
-  /// Digest K in direct mode
-  void digest_K_direct(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
 
  public:
   /// Constructor
