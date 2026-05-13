@@ -140,8 +140,6 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
 
   // Use density fitting?
   densityfit=settings.get_bool("DensityFitting");
-  // How much memory to allow (convert to bytes)
-  fitmem=1000000*settings.get_int("FittingMemory");
   // Linear dependence threshold
   fitthr=settings.get_double("FittingThreshold");
   // Linear dependence threshold
@@ -1113,11 +1111,8 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
     // Form exchange matrix
     arma::mat K;
     if(densityfit) {
-      // Because this is done an orbital at a time, it doesn't really
-      // matter how much fitting memory is given so we just allow
-      // however much
       std::vector<double> occs(1,1.0);
-      K=dfit.calcK(Co.col(io),occs,INT_MAX);
+      K=dfit.calcK(Co.col(io),occs);
     } else {
       if(cholesky) {
 	K=chol.calcK(Co.col(io));

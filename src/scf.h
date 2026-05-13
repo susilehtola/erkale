@@ -283,8 +283,6 @@ protected:
 
   /// Density fitting calculation?
   bool densityfit;
-  /// Memory allocation for density fitting
-  size_t fitmem;
   /// Threshold for density fitting
   double fitthr;
   /// Pivoted Cholesky threshold for density fitting

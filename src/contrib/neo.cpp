@@ -125,7 +125,6 @@ int main_guarded(int argc, char **argv) {
   double convergence_threshold = settings.get_double("ConvThr");
   bool verbose = settings.get_bool("Verbose");
   int nstepwise = settings.get_int("StepwiseSCFIter");
-  size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
   std::string savechk = settings.get_string("SaveChk");
@@ -322,7 +321,7 @@ int main_guarded(int argc, char **argv) {
     arma::mat J, K;
     if(density_fitting) {
       J=dfit.calcJ(P);
-      K=-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem);
+      K=-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
     } else {
       J=chol.calcJ(P);
       K=-chol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
@@ -335,7 +334,7 @@ int main_guarded(int argc, char **argv) {
     if(vpp) {
       if(density_fitting) {
         J=pfit.calcJ(P);
-        K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem);
+        K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
       } else {
         J=pchol.calcJ(P);
         K=-pchol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));

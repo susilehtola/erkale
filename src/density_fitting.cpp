@@ -286,7 +286,7 @@ arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip, double *memptr) 
   return amunu;
 }
 
-void DensityFit::digest_Jexp(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const {
+void DensityFit::project_density_to_aux(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const {
   if(P.n_rows != Nbf || P.n_cols != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
@@ -315,7 +315,7 @@ void DensityFit::digest_Jexp(const arma::mat & P, size_t ip, const arma::mat & a
   gamma+=amunu*Psub;
 }
 
-void DensityFit::digest_J(const arma::mat & gamma, size_t ip, const arma::mat & amunu, arma::mat & J) const {
+void DensityFit::contract_aux_to_J(const arma::vec & gamma, size_t ip, const arma::mat & amunu, arma::mat & J) const {
   // Shells in question are
   size_t imus=orbpairs[ip].is;
   size_t inus=orbpairs[ip].js;
@@ -335,7 +335,7 @@ void DensityFit::digest_J(const arma::mat & gamma, size_t ip, const arma::mat & 
   J.submat(nu0,mu0,nu0+Nnu-1,mu0+Nmu-1)=arma::trans(Jsub);
 }
 
-void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, arma::mat & K) const {
+void DensityFit::accumulate_K_from_blocks(const arma::mat & C, const arma::vec & occs, arma::mat & K) const {
   if(C.n_rows != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
@@ -421,7 +421,7 @@ void DensityFit::digest_K_incore(const arma::mat & C, const arma::vec & occs, ar
   }
 }
 
-void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const {
+void DensityFit::accumulate_K_from_blocks(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const {
   if(C.n_rows != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
@@ -500,104 +500,6 @@ void DensityFit::digest_K_incore(const arma::cx_mat & C, const arma::vec & occs,
   }
 }
 
-void DensityFit::digest_K_direct(const arma::mat & C, const arma::vec & occs, arma::mat & K) const {
-  if(C.n_rows != Nbf) {
-    std::ostringstream oss;
-    oss << "Error in DensityFit: Nbf = " << Nbf << ", C.n_rows = " << C.n_rows << "!\n";
-    throw std::logic_error(oss.str());
-  }
-
-  // a_munu contains (a,uv). We want to build the exchange
-  // K_uv = \sum_i n_i (ui|vi) = \sum_i n_i (a|ui) (a|b)^-1 (b|vi)
-
-  // Stack of helper matrices
-  std::vector<arma::mat> aui(C.n_cols);
-  for(size_t i=0;i<aui.size();i++)
-    aui[i].zeros(Naux,Nbf);
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-    // Thread-private helper
-#ifdef _OPENMP
-    std::vector<arma::mat> auithr(aui);
-#endif
-
-    ERIWorker *eri;
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      eri=new ERIWorker(maxam,maxcontr);
-    else
-      eri=new ERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic)
-#endif
-    for(size_t ip=0;ip<orbpairs.size();ip++) {
-      // Calculate integrals
-      arma::mat amunu(compute_a_munu(eri,ip));
-      // Shells in question are
-      size_t imus=orbpairs[ip].is;
-      size_t inus=orbpairs[ip].js;
-      // First function on shell
-      size_t mu0=orbshells[imus].get_first_ind();
-      size_t nu0=orbshells[inus].get_first_ind();
-      // Amount of functions
-      size_t Nmu=orbshells[imus].get_Nbf();
-      size_t Nnu=orbshells[inus].get_Nbf();
-
-      // Get (a|vu)
-      arma::mat anumu;
-      if(imus!=inus) {
-	anumu.zeros(Naux,Nmu*Nnu);
-	for(size_t mu=0;mu<Nmu;mu++)
-	  for(size_t nu=0;nu<Nnu;nu++)
-	    anumu.col(mu*Nnu+nu)=amunu.col(nu*Nmu+mu);
-      }
-
-      // Loop over orbitals
-      for(size_t io=0;io<C.n_cols;io++) {
-	// The array amunu is stored in the form amunu(a,nu*Nmu+mu) =
-	// amunu[(nu*Nmu+mu)*Naux+a], so we can reshape it to a
-	// (Naux*Nmu,Nnu) matrix. Half-transformed (a|u;i) is then
-	arma::mat ui(arma::reshape(amunu,Naux*Nmu,Nnu)*C.submat(nu0,io,nu0+Nnu-1,io));
-	ui.reshape(Naux,Nmu);
-
-#ifdef _OPENMP
-	auithr[io].cols(mu0,mu0+Nmu-1)+=ui;
-#else
-	aui[io].cols(mu0,mu0+Nmu-1)+=ui;
-#endif
-
-	if(imus != inus) {
-	  // Half-transformed (a|v;i) is
-	  arma::mat vi(arma::reshape(anumu,Naux*Nnu,Nmu)*C.submat(mu0,io,mu0+Nmu-1,io));
-	  vi.reshape(Naux,Nnu);
-
-#ifdef _OPENMP
-	  auithr[io].cols(nu0,nu0+Nnu-1)+=vi;
-#else
-	  aui[io].cols(nu0,nu0+Nnu-1)+=vi;
-#endif
-	}
-      }
-    }
-
-#ifdef _OPENMP
-#pragma omp critical
-    for(size_t io=0;io<C.n_cols;io++)
-      aui[io]+=auithr[io];
-#endif
-  }
-
-  // K_uv = (ui|vi) = (a|ui) (a|b)^-1 (b|vi); see digest_K_incore for
-  // the X^T (rather than X) rationale.
-  for(size_t io=0;io<C.n_cols;io++) {
-    aui[io] = ab_invh.t()*aui[io];
-    K += occs[io]*arma::trans(aui[io])*aui[io];
-  }
-}
-
 size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double thr, bool dir) const {
   // Amount of auxiliary functions (for representing the electron density)
   size_t Na=auxbas.get_Nbf();
@@ -646,13 +548,13 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
     gv.zeros();
 #pragma omp for schedule(dynamic)
     for(size_t ip=0;ip<orbpairs.size();ip++)
-      digest_Jexp(P,ip,blocks->get_block(ip),gv);
+      project_density_to_aux(P,ip,blocks->get_block(ip),gv);
 #pragma omp critical
     gamma+=gv;
   }
 #else
   for(size_t ip=0;ip<orbpairs.size();ip++)
-    digest_Jexp(P,ip,blocks->get_block(ip),gamma);
+    project_density_to_aux(P,ip,blocks->get_block(ip),gamma);
 #endif
 
   // Compute and return c
@@ -686,9 +588,9 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 #endif
       for(size_t ip=0;ip<orbpairs.size();ip++) {
 #ifdef _OPENMP
-	digest_Jexp(P[iden],ip,blocks->get_block(ip),gv);
+	project_density_to_aux(P[iden],ip,blocks->get_block(ip),gv);
 #else
-	digest_Jexp(P[iden],ip,blocks->get_block(ip),gamma[iden]);
+	project_density_to_aux(P[iden],ip,blocks->get_block(ip),gamma[iden]);
 #endif
       }
 #ifdef _OPENMP
@@ -731,7 +633,7 @@ arma::mat DensityFit::calcJ_vector(const arma::vec & c) const {
 #pragma omp parallel for schedule(dynamic)
 #endif
   for(size_t ip=0;ip<orbpairs.size();ip++)
-    digest_J(c,ip,blocks->get_block(ip),J);
+    contract_aux_to_J(c,ip,blocks->get_block(ip),J);
 
   return J;
 }
@@ -752,7 +654,7 @@ std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const
   for(size_t ip=0;ip<orbpairs.size();ip++) {
     arma::mat amunu = blocks->get_block(ip);
     for(size_t iden=0;iden<P.size();iden++)
-      digest_J(c[iden],ip,amunu,J[iden]);
+      contract_aux_to_J(c[iden],ip,amunu,J[iden]);
   }
 
   return J;
@@ -931,7 +833,7 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
   return f;
 }
 
-arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> & occo, size_t fitmem) const {
+arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> & occo) const {
   if(Corig.n_rows != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", Corig.n_rows = " << Corig.n_rows << "!\n";
@@ -962,28 +864,15 @@ arma::mat DensityFit::calcK(const arma::mat & Corig, const std::vector<double> &
   arma::mat K(Nbf,Nbf);
   K.zeros();
 
-  // digest_K_incore works against any BTensorBlocks subclass; in
-  // direct mode the blocks recompute (alpha | mu nu) on the fly per
-  // call. Peak memory is one (Naux x Nbf) aui per thread, well
-  // bounded; the old fitmem-blocked digest_K_direct path is gone.
-  {
-    const size_t need = sizeof(double) * Naux * Nbf
-#ifdef _OPENMP
-                        * omp_get_max_threads()
-#endif
-                        ;
-    if(need > fitmem) {
-      std::ostringstream oss;
-      oss << "Not enough fitting memory! K build needs " << memory_size(need)
-          << " for the per-thread aui buffers; FittingMemory is " << memory_size(fitmem) << ".\n";
-      throw std::logic_error(oss.str());
-    }
-  }
-  digest_K_incore(C,occs,K);
+  // accumulate_K_from_blocks works against any BTensorBlocks
+  // subclass; in direct mode the blocks recompute (alpha | mu nu) on
+  // the fly per call. Peak memory is one (Naux x Nbf) aui per
+  // thread, bounded.
+  accumulate_K_from_blocks(C,occs,K);
   return K;
 }
 
-arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<double> & occo, size_t fitmem) const {
+arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<double> & occo) const {
   if(Corig.n_rows != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", Corig.n_rows = " << Corig.n_rows << "!\n";
@@ -1014,22 +903,9 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
   arma::cx_mat K(Nbf,Nbf);
   K.zeros();
 
-  {
-    const size_t need = sizeof(std::complex<double>) * Naux * Nbf
-#ifdef _OPENMP
-                        * omp_get_max_threads()
-#endif
-                        ;
-    if(need > fitmem) {
-      std::ostringstream oss;
-      oss << "Not enough fitting memory! K build needs " << memory_size(need)
-          << " for the per-thread aui buffers; FittingMemory is " << memory_size(fitmem) << ".\n";
-      throw std::logic_error(oss.str());
-    }
-  }
-  // digest_K_incore consumes blocks->get_block(ip) uniformly; the
+  // accumulate_K_from_blocks consumes blocks->get_block(ip) uniformly; the
   // direct-mode path now works for the complex case as well.
-  digest_K_incore(C,occs,K);
+  accumulate_K_from_blocks(C,occs,K);
   return K;
 }
 
