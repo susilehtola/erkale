@@ -100,11 +100,11 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
   settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
-  settings.add_int("MaxInitIter", "Maximum number of iterations in the stepwise solutions", 50);
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("Complexbas", "Use complex basis?", false);
   settings.add_bool("Restricted", "Spin restricted?", false);
+  settings.add_bool("ODA", "Use optimal damping algorithm?", false);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -112,7 +112,7 @@ int main_guarded(int argc, char **argv) {
   int Q = settings.get_int("Charge");
   int M = settings.get_int("Multiplicity");
   int verbosity = settings.get_int("Verbosity");
-  int maxinititer = settings.get_int("MaxInitIter");
+  int maxiter = settings.get_int("MaxIter");
   int diisorder = settings.get_int("DIISOrder");
   double intthr = settings.get_double("IntegralThresh");
   double convergence_threshold = settings.get_double("ConvThr");
@@ -128,6 +128,7 @@ int main_guarded(int argc, char **argv) {
   bool unrestricted = !(settings.get_bool("Restricted"));
   bool density_fitting = settings.get_bool("DensityFitting");
   std::string guess = settings.get_string("Guess");
+  bool oda = settings.get_bool("ODA");
 
   Checkpoint chkpt(savechk,true);
 
@@ -223,7 +224,7 @@ int main_guarded(int argc, char **argv) {
     X[m] = BasOrth(Smat(m_indices[m], m_indices[m]));
     Nmo += X[m].n_cols;
   }
-
+  
   int Nel = basis.Ztot() - Q;
   int Nela;
   int Nelb;
@@ -236,13 +237,18 @@ int main_guarded(int argc, char **argv) {
   std::vector<arma::uvec> occsym(linoccs.n_rows);
   if (readlinocc < 0) {
     for (size_t i=0; i<linoccs.n_rows; i++) {
-      occnuma(linoccs(i, 2) + maxam) += linoccs(i, 0);
-      occnumb(linoccs(i, 2) + maxam) += linoccs(i, 1);
+      int occa = linoccs(i, 0);
+      int occb = linoccs(i, 1);
+      int m = linoccs(i, 2);
+      if (std::abs(m) > maxam)
+	throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
+      occnuma(linoccs(i, 2) + maxam) += occa;
+      occnumb(linoccs(i, 2) + maxam) += occb;
     }
     Nela = arma::accu(occnuma);
     Nelb = arma::accu(occnumb);
     if ((Nela - Nelb) + 1 != M)
-      throw std::logic_error("Multiplicity does not match occupations!");
+      throw std::logic_error("Multiplicit does not match occupations!");
   } else {
     Nela = (Nel + M - 1) / 2;
     Nelb = Nel - Nela;
@@ -625,7 +631,7 @@ int main_guarded(int argc, char **argv) {
 
   // Run SCF
   if (!unrestricted) {
-    number_of_blocks_per_particle_type = {nblocks};
+    number_of_blocks_per_particle_type = {(arma::uword) nblocks};
     maximum_occupation.set_size(nblocks).fill(2.0);
     number_of_particles = {(double) (Nel)};
     if (readlinocc)
@@ -636,7 +642,7 @@ int main_guarded(int argc, char **argv) {
     }
     fock_builder = restricted_fock_builder;
   } else {
-    number_of_blocks_per_particle_type = {nblocks / 2, nblocks / 2};
+    number_of_blocks_per_particle_type = {(arma::uword) nblocks / 2, (arma::uword) nblocks / 2};
     maximum_occupation.set_size(nblocks).fill(1.0);
     number_of_particles = {(double) (Nela), (double) (Nelb)};
     if (readlinocc)
@@ -661,9 +667,12 @@ int main_guarded(int argc, char **argv) {
   scfsolver.error_norm(error_norm);
   scfsolver.convergence_threshold(convergence_threshold);
   scfsolver.verbosity(verbosity);
-  scfsolver.maximum_iterations(maxinititer);
+  scfsolver.maximum_iterations(maxiter);
   scfsolver.maximum_history_length(diisorder);
-  scfsolver.run();
+  if(oda)
+    scfsolver.run_optimal_damping();
+  else
+    scfsolver.run();
 
   auto dm = scfsolver.get_solution();
   auto fock = scfsolver.get_fock_matrix();
