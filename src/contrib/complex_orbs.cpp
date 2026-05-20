@@ -204,7 +204,7 @@ int main_guarded(int argc, char **argv) {
   if(guess=="core")
     Vsap.zeros();
   arma::mat fock_terms = T + V + Vsap; // Helper
-  std::vector<arma::mat> Fguess(4 * maxam + 2);
+  std::vector<arma::mat> Fguess((1 + unrestricted) * (2 * maxam + 1));
 
   arma::cx_mat D(Nbf, Nbf, arma::fill::zeros);
   if (complexbas) {
@@ -493,35 +493,20 @@ int main_guarded(int argc, char **argv) {
   }; //unrestricted Fock builder
 
   // Save matrices to disk
-  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double, double> &, const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm, const OpenOrbitalOptimizer::FockMatrix<double> fock) {
-    /*const auto & orbitals = dm.first;
-    if (!unrestricted) {
-      for (int m=0; m<X.size(); m++) {
-	arma::mat C = X[m] * orbitals[m];
-	arma::vec E = arma::diagvec(orbitals[m].t() * fock[m] * orbitals[m]);
-	std::string cm = "C" + std::to_string(m);
-	chkpt.write(cm, C);
-	chkpt.write("E", E);
+  std::function<void(const OpenOrbitalOptimizer::FockMatrix<double> &)> save_matrices = [&](const OpenOrbitalOptimizer::FockMatrix<double> fock) {
+
+    if(!unrestricted) {
+      for (size_t m=0; m<X.size(); m++) {
+	std::string fm = "F" + std::to_string(m);
+	chkpt.write(fm,Fguess[m]);
       }
     } else {
-      for (int m=0; m<X.size(); m++) {
-	arma::mat Ca = X[m] * orbitals[m];
-	arma::mat Cb = X[m] * orbitals[X.size()+m];
-	arma::vec Ea = arma::diagvec(orbitals[m].t() * fock[m] * orbitals[m]);
-	arma::vec Eb = arma::diagvec(orbitals[X.size()+m].t() * fock[X.size()+m] * orbitals[X.size()+m]);
-	std::string cam = "Ca" + std::to_string(m);
-	std::string cbm = "Cb" + std::to_string(m);
-	chkpt.write(cam, Ca);
-	chkpt.write(cbm, Cb);
-	chkpt.write("Ea", Ea);
-	chkpt.write("Eb", Eb);
+      for (size_t m=0; m<X.size(); m++) {
+	std::string fam = "Fa" + std::to_string(m);
+	chkpt.write(fam, fock[m]);
+	std::string fbm = "Fb" + std::to_string(m);
+	chkpt.write(fbm, fock[X.size() + m]);
       }
-      }*/
-    for (size_t m=0; m<X.size(); m++) {
-      std::string fam = "Fa" + std::to_string(m);
-      chkpt.write(fam, fock[m]);
-      std::string fbm = "Fb" + std::to_string(m);
-      chkpt.write(fbm, fock[X.size() + m]);
     }
   }; // Save matrices to disk
 
@@ -529,80 +514,15 @@ int main_guarded(int argc, char **argv) {
   if(loadchk != "") {
     Checkpoint load(loadchk,false);
 
-    BasisSet oldbasis;
-    load.read(oldbasis);
-    arma::mat oldS(oldbasis.overlap());
+    //BasisSet oldbasis;
+    //load.read(oldbasis);
 
     if(!unrestricted) {
-      arma::mat C(Nbf, Nmo, arma::fill::zeros);
-      size_t imo=0;
-      for (int m=0; m<X.size(); m++) {
-	arma::mat oldCsub, Csub;
-	std::string cm = "C" + std::to_string(m);
-	load.read(cm,oldCsub);
-	
-	Csub = arma::trans(X[m]) * oldS(m_indices[m], m_indices[m]) * oldCsub;	
-	arma::mat Cpad(Nbf,X[m].n_cols,arma::fill::zeros);
-	Cpad.rows(m_indices[m]) = Csub;
-	C.cols(imo,imo+X[m].n_cols-1) = Cpad;
-	imo += X[m].n_cols;
+      for (size_t m=0; m<X.size(); m++) {
+	std::string fm = "F" + std::to_string(m);
+	load.read(fm,Fguess[m]);
       }
-      if(C.n_rows < C.n_cols) {
-        C=C.cols(0,Nela-1);
-      }
-      std::vector<arma::mat> old_orbs({C});
-
-      // Occupations
-      arma::vec occ(C.n_cols,arma::fill::zeros);
-      occ.subvec(0,Nela-1).ones();
-      occ *= 2.0;
-      std::vector<arma::vec> old_occs({occ});
-
-      const OpenOrbitalOptimizer::DensityMatrix<double,double> dm = std::make_pair(old_orbs, old_occs);
-      std::vector<arma::mat> Fguess(2 * maxam + 1);
-      double E;
-      std::tie(E, Fguess) = restricted_fock_builder(dm);
-
     } else {
-      /*arma::mat Ca(Nbf, Nmo, arma::fill::zeros);
-      arma::mat Cb(Nbf, Nmo, arma::fill::zeros);
-      size_t imo=0;
-      for (int m=0; m<X.size(); m++) {
-	arma::mat oldCasub, oldCbsub, Casub, Cbsub;
-	std::string cam = "Ca" + std::to_string(m);
-	std::string cbm = "Cb" + std::to_string(m);
-	load.read(cam,oldCasub);
-	load.read(cbm,oldCbsub);
-
-	Casub = arma::trans(X[m]) * oldS(m_indices[m], m_indices[m]) * oldCasub;
-	Cbsub = arma::trans(X[m]) * oldS(m_indices[m], m_indices[m]) * oldCbsub;
-	arma::mat Capad(Nbf,X[m].n_cols, arma::fill::zeros);
-	arma::mat Cbpad(Nbf,X[m].n_cols, arma::fill::zeros);
-	Capad.rows(m_indices[m]) = Casub;
-	Cbpad.rows(m_indices[m]) = Cbsub;
-	Ca.cols(imo, imo + X[m].n_cols - 1) = Capad;
-	Cb.cols(imo, imo + X[m].n_cols - 1) = Cbpad;
-	imo += X[m].n_cols;
-      }
-      if(Ca.n_rows < Ca.n_cols) {
-        Ca = Ca.cols(0,Nela-1);
-        Cb = Cb.cols(0,Nela-1);
-      }
-      std::vector<arma::mat> old_orbs({Ca, Cb});
-
-      // Occupations
-      arma::vec occa(Ca.n_cols,arma::fill::zeros);
-      arma::vec occb(Cb.n_cols,arma::fill::zeros);
-      occa.subvec(0,Nela-1).ones();
-      if(Nelb)
-        occb.subvec(0,Nelb-1).ones();
-      std::vector<arma::vec> old_occs({occa, occb});
-
-      const OpenOrbitalOptimizer::DensityMatrix<double,double> dm = std::make_pair(old_orbs, old_occs);
-      std::vector<arma::mat> Fguess(4 * maxam + 2);
-      double E;
-      std::tie(E, Fguess) = unrestricted_fock_builder(dm);
-      }*/
       for (size_t m=0; m<X.size(); m++) {
 	std::string fam = "Fa" + std::to_string(m);
 	load.read(fam,Fguess[m]);
@@ -611,7 +531,6 @@ int main_guarded(int argc, char **argv) {
       }
     }
   } else { // Else guess Fock from SAP/core
-    std::vector<arma::mat> Fguess((1 + unrestricted) * (2 * maxam + 1));
     for (size_t m=0; m<X.size(); m++) {
       Fguess[m] = X[m].t() * fock_terms(m_indices[m], m_indices[m]) * X[m];
       if (unrestricted)
@@ -674,10 +593,9 @@ int main_guarded(int argc, char **argv) {
   else
     scfsolver.run();
 
-  auto dm = scfsolver.get_solution();
+  //auto dm = scfsolver.get_solution();
   auto fock = scfsolver.get_fock_matrix();
-  size_t Nmat = fock.size();
-  save_matrices(dm, fock);
+  save_matrices(fock);
 
   double E = scfsolver.get_energy();
   //printf("SCF converged: energy is %e.\n", E);
