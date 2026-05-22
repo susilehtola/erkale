@@ -650,6 +650,8 @@ class GaussianShell {
 
   /// Get the exponential contraction
   std::vector<contr_t> get_contr() const;
+  /// Get the exponential contraction (reference, no copy)
+  const std::vector<contr_t> & get_contr_ref() const;
   /// Get cartesians
   std::vector<shellf_t> get_cart() const;
   /// Get cartesians (reference, no copy)

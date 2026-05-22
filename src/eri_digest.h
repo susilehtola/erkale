@@ -68,6 +68,9 @@ class KDigestor: public IntegralDigestor {
   /// K(j,l) accumulators. Grow-only: arma::set_size keeps the
   /// existing allocation when the requested logical shape fits.
   arma::mat scratch_Kik, scratch_Kjk, scratch_Kil, scratch_Kjl;
+  /// Transposed K block, reused for the symmetric off-diagonal
+  /// accumulate so no temporary is allocated per quartet.
+  arma::mat scratch_KT;
   /// Per-quartet P submatrices materialised into contiguous
   /// member-owned storage. Faster inner-loop access than going
   /// through subviews; storage persists across calls so set_size
@@ -93,6 +96,8 @@ class cxKDigestor: public IntegralDigestor {
   arma::cx_mat K;
   /// Reusable scratch (see KDigestor).
   arma::cx_mat scratch_Kik, scratch_Kjk, scratch_Kil, scratch_Kjl;
+  /// Transposed K block (see KDigestor::scratch_KT).
+  arma::cx_mat scratch_KT;
   arma::cx_mat scratch_Pjl, scratch_Pil, scratch_Pjk, scratch_Pik;
  public:
   /// Construct digestor

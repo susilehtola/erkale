@@ -333,6 +333,10 @@ std::vector<contr_t> GaussianShell::get_contr() const {
   return c;
 }
 
+const std::vector<contr_t> & GaussianShell::get_contr_ref() const {
+  return c;
+}
+
 std::vector<shellf_t> GaussianShell::get_cart() const {
   return cart;
 }

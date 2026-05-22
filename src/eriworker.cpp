@@ -915,25 +915,23 @@ void IntegralWorker::fill_precursor(const GaussianShell *is, const GaussianShell
   r.PB.zeros(is->get_Ncontr(),js->get_Ncontr(),3);
   r.S.zeros(is->get_Ncontr(),js->get_Ncontr());
 
-  // Get data
-  r.ic=is->get_contr();
-  r.jc=js->get_contr();
+  // Get data. Copy-assignment into the existing r.ic / r.jc vectors
+  // reuses their storage (no heap allocation once they have grown to
+  // the largest contraction this worker has seen).
+  r.ic=is->get_contr_ref();
+  r.jc=js->get_contr_ref();
 
-  coords_t Ac=is->get_center();
-  arma::vec A(3);
-  A(0)=Ac.x;
-  A(1)=Ac.y;
-  A(2)=Ac.z;
-
-  coords_t Bc=js->get_center();
-  arma::vec B(3);
-  B(0)=Bc.x;
-  B(1)=Bc.y;
-  B(2)=Bc.z;
+  // Shell centers as plain stack arrays -- avoids two heap-allocated
+  // arma::vec(3) per shell pair on the integral hot path.
+  const coords_t Ac=is->get_center();
+  const double A[3]={Ac.x,Ac.y,Ac.z};
+  const coords_t Bc=js->get_center();
+  const double B[3]={Bc.x,Bc.y,Bc.z};
 
   // Compute AB
-  r.AB=A-B;
-  double rabsq=arma::dot(r.AB,r.AB);
+  for(int k=0;k<3;k++)
+    r.AB(k)=A[k]-B[k];
+  const double rabsq=r.AB(0)*r.AB(0)+r.AB(1)*r.AB(1)+r.AB(2)*r.AB(2);
 
   // Compute zeta
   for(size_t i=0;i<r.ic.size();i++)
@@ -944,14 +942,14 @@ void IntegralWorker::fill_precursor(const GaussianShell *is, const GaussianShell
   for(size_t i=0;i<r.ic.size();i++)
     for(size_t j=0;j<r.jc.size();j++)
       for(int k=0;k<3;k++)
-	r.P(i,j,k)=(r.ic[i].z*A(k) + r.jc[j].z*B(k))/r.zeta(i,j);
+	r.P(i,j,k)=(r.ic[i].z*A[k] + r.jc[j].z*B[k])/r.zeta(i,j);
 
   // Compute PA and PB
   for(size_t i=0;i<r.ic.size();i++)
     for(size_t j=0;j<r.jc.size();j++)
       for(int k=0;k<3;k++) {
-	r.PA(i,j,k)=r.P(i,j,k)-A(k);
-	r.PB(i,j,k)=r.P(i,j,k)-B(k);
+	r.PA(i,j,k)=r.P(i,j,k)-A[k];
+	r.PB(i,j,k)=r.P(i,j,k)-B[k];
       }
 
   // Compute S
