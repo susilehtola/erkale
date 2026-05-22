@@ -118,7 +118,7 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
     JDigestor dig(P);
 
 #ifdef _OPENMP
-#pragma omp for
+#pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs
@@ -152,7 +152,7 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
     KDigestor dig(P);
 
 #ifdef _OPENMP
-#pragma omp for
+#pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs
@@ -186,7 +186,7 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
     cxKDigestor dig(P);
 
 #ifdef _OPENMP
-#pragma omp for
+#pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs

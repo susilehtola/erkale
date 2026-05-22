@@ -1019,15 +1019,13 @@ size_t ERIchol::fill_two_step(const BasisSet & basis,
                 // unordered with respect to each other (they reflect
                 // pivot-selection order, not shellpair order), so a
                 // post-hoc symmatu/symmatl can't recover the missing
-                // half. Atomic writes are cheap relative to the libint
-                // call that produced `val`.
-#ifdef _OPENMP
-#pragma omp atomic write
-#endif
+                // half. No synchronisation is needed: every pivot
+                // orbital pair lives on exactly one pivot shellpair,
+                // so each (pidx,qidx) maps to a unique unordered
+                // shellpair pair, and the for(ip) for(jp<=ip) loop
+                // visits each of those once -- so each element is
+                // written by exactly one thread, exactly once.
                 M_metric(pidx,qidx)=val;
-#ifdef _OPENMP
-#pragma omp atomic write
-#endif
                 M_metric(qidx,pidx)=val;
               }
           }
