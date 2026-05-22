@@ -370,6 +370,8 @@ class BasisSet {
 
   /// Get shells in basis set
   std::vector<GaussianShell> get_shells() const;
+  /// Get shells in basis set (reference, no copy)
+  const std::vector<GaussianShell> & get_shells_ref() const;
   /// Get ind:th shell
   GaussianShell get_shell(size_t shind) const;
   /// Get index of the center of the ind'th shell
@@ -650,6 +652,8 @@ class GaussianShell {
   std::vector<contr_t> get_contr() const;
   /// Get cartesians
   std::vector<shellf_t> get_cart() const;
+  /// Get cartesians (reference, no copy)
+  const std::vector<shellf_t> & get_cart_ref() const;
 
   /**
    * Get contraction coefficients of normalized primitives. For some

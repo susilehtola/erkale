@@ -172,10 +172,10 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
     double norm_i, norm_ij, norm_ijk, norm;
 
     // Numbers of functions on each shell
-    std::vector<shellf_t> ci=is->get_cart();
-    std::vector<shellf_t> cj=js->get_cart();
-    std::vector<shellf_t> ck=ks->get_cart();
-    std::vector<shellf_t> cl=ls->get_cart();
+    const std::vector<shellf_t> & ci=is->get_cart_ref();
+    const std::vector<shellf_t> & cj=js->get_cart_ref();
+    const std::vector<shellf_t> & ck=ks->get_cart_ref();
+    const std::vector<shellf_t> & cl=ls->get_cart_ref();
     (*input).resize(ci.size()*cj.size()*ck.size()*cl.size());
 
     for(size_t ii=0;ii<ci.size();ii++) {
@@ -245,10 +245,10 @@ void dERIWorker::compute_cartesian() {
   double norm_i, norm_ij, norm_ijk, norm;
 
   // Numbers of functions on each shell
-  std::vector<shellf_t> ci=is->get_cart();
-  std::vector<shellf_t> cj=js->get_cart();
-  std::vector<shellf_t> ck=ks->get_cart();
-  std::vector<shellf_t> cl=ls->get_cart();
+  const std::vector<shellf_t> & ci=is->get_cart_ref();
+  const std::vector<shellf_t> & cj=js->get_cart_ref();
+  const std::vector<shellf_t> & ck=ks->get_cart_ref();
+  const std::vector<shellf_t> & cl=ls->get_cart_ref();
 
   // Integrals computed by libderiv
   const int idx[]={0, 1, 2, 6, 7, 8, 9, 10, 11};
@@ -1030,8 +1030,9 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 
 	  double rpqsq=pow(PQ[0],2) + pow(PQ[1],2) + pow(PQ[2],2);
 
-	  // Helper variable
-	  prim_data data;
+	  // Fill the quartet slot directly -- avoids copying a whole
+	  // prim_data struct out of a local per primitive quartet.
+	  prim_data & data=libint.PrimQuartet[ind++];
 
           // Store PA, QC, WP and WQ
           for(int i=0;i<3;i++) {
@@ -1058,9 +1059,6 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 	  // Store the integrals
 	  for(int i=0;i<=mmax;i++)
 	    data.F[i]=prefac*Gn(i);
-
-	  // We have all necessary data; store quartet.
-	  libint.PrimQuartet[ind++]=data;
 	}
     }
 }
@@ -1126,8 +1124,9 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 
 	  double rpqsq=pow(PQ[0],2) + pow(PQ[1],2) + pow(PQ[2],2);
 
-	  // Helper variable
-	  prim_data data;
+	  // Fill the quartet slot directly -- avoids copying a whole
+	  // prim_data struct out of a local per primitive quartet.
+	  prim_data & data=libderiv.PrimQuartet[ind++];
 
           // Store PA, PB, QC, QD, WP and WQ
           for(int i=0;i<3;i++) {
@@ -1161,9 +1160,6 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 	  // Store auxiliary integrals
 	  for(int i=0;i<=mmax+1;i++)
 	    data.F[i]=prefac*Gn[i];
-
-	  // We have all necessary data; store quartet.
-	  libderiv.PrimQuartet[ind++]=data;
 	}
     }
 }

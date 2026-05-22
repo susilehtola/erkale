@@ -33,8 +33,11 @@ class IntegralDigestor {
 
 /// Coulomb matrix digestor
 class JDigestor: public IntegralDigestor {
-  /// Density matrix
-  arma::mat P;
+  /// Density matrix. Held by reference: the caller owns it and must
+  /// keep it alive for the digestor's lifetime. Never construct a
+  /// digestor from a temporary (e.g. Pa+Pb) -- hoist it into a named
+  /// matrix first.
+  const arma::mat & P;
   /// Coulomb matrix
   arma::mat J;
   /// Per-quartet scratch: row-major flat of the P submatrix
@@ -57,8 +60,8 @@ class JDigestor: public IntegralDigestor {
 
 /// Exchange matrix digestor
 class KDigestor: public IntegralDigestor {
-  /// Density matrix
-  arma::mat P;
+  /// Density matrix (held by reference; see JDigestor).
+  const arma::mat & P;
   /// Exchange matrix
   arma::mat K;
   /// Reusable scratch for the per-quartet K(i,k), K(j,k), K(i,l),
@@ -84,8 +87,8 @@ class KDigestor: public IntegralDigestor {
 
 /// Complex exchange matrix digestor
 class cxKDigestor: public IntegralDigestor {
-  /// Density matrix
-  arma::cx_mat P;
+  /// Density matrix (held by reference; see JDigestor).
+  const arma::cx_mat & P;
   /// Exchange matrix
   arma::cx_mat K;
   /// Reusable scratch (see KDigestor).
@@ -116,8 +119,8 @@ class ForceDigestor {
 
 /// Coulomb force digestor
 class JFDigestor: public ForceDigestor {
-  /// Density matrix
-  arma::mat P;
+  /// Density matrix (held by reference; see JDigestor).
+  const arma::mat & P;
   /// Per-quartet scratch for the Pij and Pkl submatrices,
   /// materialised once per shellpair quartet and reused across
   /// the 12 derivative components. Contiguous storage is faster
@@ -136,8 +139,8 @@ class JFDigestor: public ForceDigestor {
 
 /// Exchange force digestor
 class KFDigestor: public ForceDigestor {
-  /// Density matrix
-  arma::mat P;
+  /// Density matrix (held by reference; see JDigestor).
+  const arma::mat & P;
   /// Fraction of exact exchange
   double kfrac;
   /// Degeneracy factor

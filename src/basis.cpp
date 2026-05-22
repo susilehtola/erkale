@@ -337,6 +337,10 @@ std::vector<shellf_t> GaussianShell::get_cart() const {
   return cart;
 }
 
+const std::vector<shellf_t> & GaussianShell::get_cart_ref() const {
+  return cart;
+}
+
 std::vector<contr_t> GaussianShell::get_contr_normalized() const {
   // Returned array
   std::vector<contr_t> cn(c);
@@ -1623,6 +1627,10 @@ size_t BasisSet::get_shell_center_ind(size_t num) const {
 }
 
 std::vector<GaussianShell> BasisSet::get_shells() const {
+  return shells;
+}
+
+const std::vector<GaussianShell> & BasisSet::get_shells_ref() const {
   return shells;
 }
 

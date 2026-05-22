@@ -182,8 +182,6 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 #pragma omp parallel
 #endif
   {
-    arma::cx_mat Kwrk(K);
-
     // Integral digestor
     cxKDigestor dig(P);
 
@@ -208,7 +206,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
   Nbf=basp->get_Nbf();
   
   // Shells
-  std::vector<GaussianShell> shells=basp->get_shells();
+  const std::vector<GaussianShell> & shells=basp->get_shells_ref();
 
   // Compute memory requirements
   size_t N;
@@ -296,6 +294,8 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 	  ints[ioff+ii]=(*erip)[ii];
       }
     }
+
+    delete eri;
   }
 
   return shpairs.size();

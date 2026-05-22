@@ -184,7 +184,7 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
   // Amount of basis functions
   Nbf=basis.get_Nbf();
   // Shells
-  std::vector<GaussianShell> shells=basis.get_shells();
+  const std::vector<GaussianShell> & shells=basis.get_shells_ref();
 
   Timer t;
   Timer ttot;
@@ -287,16 +287,14 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
 	  Nshp++;
 	  // Global product index is
           size_t idx=i*Nbf+i;
-	  if(true || d(idx)>=shell_screen_tol) {
-            prodidx(iprod)=idx;
-            // Function indices are
-            invmap(0,iprod)=i;
-            invmap(1,iprod)=i;
-	    // Product index mapping is
-	    prodmap(i,i)=iprod;
-            // Increment index
-	    iprod++;
-	  }
+          prodidx(iprod)=idx;
+          // Function indices are
+          invmap(0,iprod)=i;
+          invmap(1,iprod)=i;
+          // Product index mapping is
+          prodmap(i,i)=iprod;
+          // Increment index
+          iprod++;
 	}
       } else {
       	for(size_t i=i0;i<i0+Ni;i++)
@@ -463,12 +461,15 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
       // Did we already treat everything in the block?
       if(nb==A.n_cols)
 	break;
-      // Remaining pivot is
-      arma::uvec pileft(pi.subvec(m,d.n_elem-1));
-      // Remaining errors in pivoted order
-      arma::vec errs(d(pileft));
-      // Find global largest error
-      double errmax=arma::max(errs);
+      // Find global largest remaining error in pivoted order. Scan
+      // directly instead of materialising pi.subvec + d() gather
+      // copies, which allocated two O(d.n_elem) vectors per block
+      // iteration just to take a max.
+      double errmax=d(pi(m));
+      for(size_t i=m+1;i<d.n_elem;i++) {
+	const double v=d(pi(i));
+	if(v>errmax) errmax=v;
+      }
       // and the largest error within the current block
       double blockerr=0;
       size_t blockind=0;
@@ -564,8 +565,12 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
 	}
       }
 
-      // Update error
-      error=(m+1<=pi.n_elem-1) ? arma::max(d(pi.subvec(m+1,pi.n_elem-1))) : 0.0;
+      // Update error: largest remaining diagonal in pivoted order.
+      error=0.0;
+      for(size_t i=m+1;i<pi.n_elem;i++) {
+	const double v=d(pi(i));
+	if(v>error) error=v;
+      }
       // Increase m
       m++;
     }
@@ -619,7 +624,7 @@ size_t ERIchol::fill_two_step(const BasisSet & basis,
   // Amount of basis functions
   Nbf=basis.get_Nbf();
   // Shells
-  std::vector<GaussianShell> shells=basis.get_shells();
+  const std::vector<GaussianShell> & shells=basis.get_shells_ref();
 
   Timer t;
   Timer ttot;
@@ -842,9 +847,14 @@ size_t ERIchol::fill_two_step(const BasisSet & basis,
     // Block iteration: greedily pick pivots from this shellpair
     // gated by shell_reuse_thr; same pattern as fill().
     while(true) {
-      arma::uvec pileft(pi.subvec(m,d.n_elem-1));
-      arma::vec errs(d(pileft));
-      double errmax=arma::max(errs);
+      // Largest remaining error in pivoted order; scanned directly
+      // instead of allocating pi.subvec + d() gather copies per
+      // block iteration (see the matching loop in fill()).
+      double errmax=d(pi(m));
+      for(size_t i=m+1;i<d.n_elem;i++) {
+        const double v=d(pi(i));
+        if(v>errmax) errmax=v;
+      }
       double blockerr=0;
       size_t blockind=0;
       size_t Aind=0;
@@ -919,7 +929,12 @@ size_t ERIchol::fill_two_step(const BasisSet & basis,
 
       m++;
     }
-    error=(m<=pi.n_elem-1) ? arma::max(d(pi.subvec(m,pi.n_elem-1))) : 0.0;
+    // Largest remaining diagonal in pivoted order.
+    error=0.0;
+    for(size_t i=m;i<pi.n_elem;i++) {
+      const double v=d(pi(i));
+      if(v>error) error=v;
+    }
     t_chol+=t.get();
   }
 
@@ -1106,9 +1121,10 @@ size_t ERIchol::naf_transform(double thr, bool verbose) {
     if(Wval(p)>=thr)
       break;
 
-  // Original and dropped number of functions
+  // Original and dropped number of functions. Eigenvalues 0..p-1 are
+  // below threshold; B*=Wvec.cols(p,...) drops exactly p of them.
   size_t norig(B.n_cols);
-  size_t ndrop(p-1);
+  size_t ndrop(p);
 
   // and the eigenvectors are rotated
   B*=Wvec.cols(p,Wvec.n_cols-1);
@@ -1428,7 +1444,7 @@ arma::vec ERIchol::forceJ(const BasisSet & basis, const arma::mat & P) const {
   const arma::vec c       = two_step_metric_invh_ * gamma_J;
 
   // libint dispatcher constants
-  const std::vector<GaussianShell> shells = basis.get_shells();
+  const std::vector<GaussianShell> & shells = basis.get_shells_ref();
   const int max_am   = basis.get_max_am();
   const int max_ncon = basis.get_max_Ncontr();
 

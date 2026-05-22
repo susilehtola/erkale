@@ -73,9 +73,18 @@ void ERIscreen::set_range_separation(double w, double a, double b) {
   beta=b;
   // Workers in the pool were built against the previous omega /
   // alpha / beta -- drop them so the next acquire_eri / acquire_deri
-  // rebuilds with the new parameters.
+  // rebuilds with the new parameters. Keep the pools sized to the
+  // thread count: acquire_* indexes by thread number, so the slots
+  // must exist even if no fill() intervenes before the next calc.
+#ifdef _OPENMP
+  const int nth=omp_get_max_threads();
+#else
+  const int nth=1;
+#endif
   eri_pool_.clear();
+  eri_pool_.resize(nth);
   deri_pool_.clear();
+  deri_pool_.resize(nth);
 }
 
 void ERIscreen::get_range_separation(double & w, double & a, double & b) const {
@@ -139,7 +148,7 @@ dERIWorker * ERIscreen::acquire_deri(int ith) const {
 
 void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & digest, double tol) const {
   // Shells in basis set
-  std::vector<GaussianShell> shells=basp->get_shells();
+  const std::vector<GaussianShell> & shells=basp->get_shells_ref();
   // Get number of shell pairs
   const size_t Npairs=shpairs.size();
 
@@ -203,7 +212,7 @@ void ERIscreen::calculate(std::vector< std::vector<IntegralDigestor *> > & diges
 
 arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> > & digest, double tol) const {
   // Shells
-  std::vector<GaussianShell> shells=basp->get_shells();
+  const std::vector<GaussianShell> & shells=basp->get_shells_ref();
   // Get number of shell pairs
   const size_t Npairs=shpairs.size();
 
@@ -226,6 +235,10 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 
     // Shell centers
     size_t inuc, jnuc, knuc, lnuc;
+
+    // Per-quartet force accumulator; hoisted out of the loop so it is
+    // re-zeroed rather than reallocated on every shell quartet.
+    arma::vec f(12);
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -270,7 +283,6 @@ arma::vec ERIscreen::calculate_force(std::vector< std::vector<ForceDigestor *> >
 	deri->compute(&shells[is],&shells[js],&shells[ks],&shells[ls]);
 
 	// Digest the forces on the nuclei
-	arma::vec f(12);
 	f.zeros();
 
 	// Digest the integrals
@@ -579,6 +591,10 @@ void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, 
   int nth=1;
 #endif
 
+  // Real part of the density, hoisted so the JDigestor holds a
+  // reference rather than each thread copying a temporary.
+  arma::mat Preal(arma::real(P));
+
   // Get workers
   std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
@@ -586,7 +602,7 @@ void ERIscreen::calcJK(const arma::cx_mat & P, arma::mat & J, arma::cx_mat & K, 
 #endif
   for(int i=0;i<nth;i++) {
     p[i].resize(2);
-    p[i][0]=new JDigestor(arma::real(P));
+    p[i][0]=new JDigestor(Preal);
     p[i][1]=new cxKDigestor(P);
   }
 
@@ -635,6 +651,10 @@ void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J
   int nth=1;
 #endif
 
+  // Total density, hoisted so the JDigestor holds a reference rather
+  // than each thread copying a temporary.
+  arma::mat Psum(Pa+Pb);
+
   // Get workers
   std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
@@ -642,7 +662,7 @@ void ERIscreen::calcJK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & J
 #endif
   for(int i=0;i<nth;i++) {
     p[i].resize(3);
-    p[i][0]=new JDigestor(Pa+Pb);
+    p[i][0]=new JDigestor(Psum);
     p[i][1]=new KDigestor(Pa);
     p[i][2]=new KDigestor(Pb);
   }
@@ -693,6 +713,10 @@ void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::m
   int nth=1;
 #endif
 
+  // Real part of the total density, hoisted so the JDigestor holds a
+  // reference rather than each thread copying a temporary.
+  arma::mat Preal(arma::real(Pa+Pb));
+
   // Get workers
   std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
@@ -700,7 +724,7 @@ void ERIscreen::calcJK(const arma::cx_mat & Pa, const arma::cx_mat & Pb, arma::m
 #endif
   for(int i=0;i<nth;i++) {
     p[i].resize(3);
-    p[i][0]=new JDigestor(arma::real(Pa+Pb));
+    p[i][0]=new JDigestor(Preal);
     p[i][1]=new cxKDigestor(Pa);
     p[i][2]=new cxKDigestor(Pb);
   }
@@ -743,6 +767,15 @@ std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P,
   bool dok(kfrac!=0.0);
 
   // Get workers
+  // Real parts of the densities, hoisted so the JDigestors hold
+  // references rather than each thread copying temporaries.
+  std::vector<arma::mat> Preal;
+  if(doj) {
+    Preal.resize(P.size());
+    for(size_t j=0;j<P.size();j++)
+      Preal[j]=arma::real(P[j]);
+  }
+
   std::vector< std::vector<IntegralDigestor *> > p(nth);
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -750,7 +783,7 @@ std::vector<arma::cx_mat> ERIscreen::calcJK(const std::vector<arma::cx_mat> & P,
   for(int i=0;i<nth;i++) {
     if(doj) {
       for(size_t j=0;j<P.size();j++)
-	p[i].push_back(new JDigestor(arma::real(P[j])));
+	p[i].push_back(new JDigestor(Preal[j]));
     }
     if(dok) {
       for(size_t j=0;j<P.size();j++)
@@ -875,6 +908,10 @@ arma::vec ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, double t
   int nth=1;
 #endif
 
+  // Total density, hoisted so the JFDigestor holds a reference rather
+  // than each thread copying a temporary.
+  arma::mat Psum(Pa+Pb);
+
   // Get workers
   std::vector< std::vector<ForceDigestor *> > p(nth);
 #ifdef _OPENMP
@@ -882,7 +919,7 @@ arma::vec ERIscreen::forceK(const arma::mat & Pa, const arma::mat & Pb, double t
 #endif
   for(int i=0;i<nth;i++) {
     p[i].resize(3);
-    p[i][0]=new JFDigestor(Pa+Pb);
+    p[i][0]=new JFDigestor(Psum);
     p[i][1]=new KFDigestor(Pa,kfrac,false);
     p[i][2]=new KFDigestor(Pb,kfrac,false);
   }
@@ -951,6 +988,10 @@ arma::vec ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, double 
   int nth=1;
 #endif
 
+  // Total density, hoisted so the JFDigestor holds a reference rather
+  // than each thread copying a temporary.
+  arma::mat Psum(Pa+Pb);
+
   // Get workers
   std::vector< std::vector<ForceDigestor *> > p(nth);
 #ifdef _OPENMP
@@ -958,7 +999,7 @@ arma::vec ERIscreen::forceJK(const arma::mat & Pa, const arma::mat & Pb, double 
 #endif
   for(int i=0;i<nth;i++) {
     p[i].resize(3);
-    p[i][0]=new JFDigestor(Pa+Pb);
+    p[i][0]=new JFDigestor(Psum);
     p[i][1]=new KFDigestor(Pa,kfrac,false);
     p[i][2]=new KFDigestor(Pb,kfrac,false);
   }
