@@ -22,7 +22,7 @@ class dERIWorker;
 
 /// Integral digestor
 class IntegralDigestor {
- public:
+public:
   /// Constructor
   IntegralDigestor();
   /// Destructor
@@ -46,7 +46,7 @@ class JDigestor: public IntegralDigestor {
   /// set_size; same allocation strategy as KDigestor.
   arma::vec scratch_Pflat;
   arma::vec scratch_rv;
- public:
+public:
   /// Construct digestor
   JDigestor(const arma::mat & P);
   /// Destruct digestor
@@ -76,7 +76,7 @@ class KDigestor: public IntegralDigestor {
   /// through subviews; storage persists across calls so set_size
   /// stops reallocating once we've seen the largest shellpair.
   arma::mat scratch_Pjl, scratch_Pil, scratch_Pjk, scratch_Pik;
- public:
+public:
   /// Construct digestor
   KDigestor(const arma::mat & P);
   /// Destruct digestor
@@ -99,7 +99,7 @@ class cxKDigestor: public IntegralDigestor {
   /// Transposed K block (see KDigestor::scratch_KT).
   arma::cx_mat scratch_KT;
   arma::cx_mat scratch_Pjl, scratch_Pil, scratch_Pjk, scratch_Pik;
- public:
+public:
   /// Construct digestor
   cxKDigestor(const arma::cx_mat & P);
   /// Destruct digestor
@@ -113,7 +113,7 @@ class cxKDigestor: public IntegralDigestor {
 
 /// Force digestor
 class ForceDigestor {
- public:
+public:
   /// Constructor
   ForceDigestor();
   /// Destructor
@@ -132,7 +132,7 @@ class JFDigestor: public ForceDigestor {
   /// than subview access in the inner quadruple loop. Grown
   /// monotonically via set_size, same strategy as KDigestor.
   arma::mat scratch_Pij, scratch_Pkl;
- public:
+public:
   /// Construct digestor
   JFDigestor(const arma::mat & P);
   /// Destruct digestor
@@ -153,7 +153,7 @@ class KFDigestor: public ForceDigestor {
   /// Per-quartet scratch (see JFDigestor).
   arma::mat scratch_Pik, scratch_Pjl, scratch_Pjk, scratch_Pil;
 
- public:
+public:
   /// Construct digestor
   KFDigestor(const arma::mat & P, double kfrac, bool restr);
   /// Destruct digestor

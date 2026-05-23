@@ -112,6 +112,10 @@ void Settings::add_scf_settings() {
   add_bool("DecFock", "Use decontracted basis to calculate Fock matrix (direct HF)", false);
   // Integral threshold
   add_double("IntegralThresh", "Integral screening threshold", 1e-10);
+  // Density-weighted Fock-contribution screening threshold. Bounds the
+  // contribution of each ERI quartet to J/K by the integral times the
+  // largest coupled density element. Set to 0 to disable.
+  add_double("ScreeningThresh", "Density-weighted Fock-contribution screening threshold", 1e-10);
 
   // Default orthogonalization method
   add_string("BasisOrth", "Method of orthonormalization of basis set", "Auto");
@@ -351,7 +355,7 @@ int Settings::get_int(std::string name) const {
 }
 
 std::string Settings::get_string(std::string name) const {
- // Find setting in table
+  // Find setting in table
   for(size_t i=0;i<sset.size();i++)
     if(name==sset[i].name) {
       return sset[i].val;

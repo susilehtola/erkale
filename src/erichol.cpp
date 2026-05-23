@@ -309,7 +309,7 @@ size_t ERIchol::fill(const BasisSet & basis, double cholesky_tol, double shell_r
             prodmap(i,j)=iprod;
             // Off-diagonal product
             odiagidx(iodiag)=iprod;
-              // Increment indices
+            // Increment indices
             iprod++;
             iodiag++;
 	  }

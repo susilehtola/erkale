@@ -27,7 +27,7 @@
  *
  * \author Susi Lehtola
  * \date 2011/05/12 19:44
-*/
+ */
 
 #ifndef ERKALE_ERISCREEN
 #define ERKALE_ERISCREEN
@@ -63,6 +63,11 @@ class ERIscreen {
   /// Fraction of short-range exchange
   double beta;
 
+  /// Threshold for density-weighted Fock-contribution screening.
+  /// Zero disables density screening (calculate() then uses only the
+  /// integral-magnitude tests). Set via set_screen_thresh().
+  double screen_thresh_;
+
   /// Per-thread ERIWorker / dERIWorker pool. Sized to
   /// omp_get_max_threads() in fill(); each thread lazily constructs
   /// its slot on first use via acquire_eri / acquire_deri. Workers
@@ -81,12 +86,17 @@ class ERIscreen {
   /// Lazily construct & return the per-thread derivative ERI worker.
   dERIWorker * acquire_deri(int ith) const;
 
-  /// Run calculation with given digestor
-  void calculate(std::vector< std::vector<IntegralDigestor *> > & digest, double tol) const;
+  /// Build the shell-pair density bound matrix: D(i,j) = max |P| over
+  /// the (shell i, shell j) block. Used for density-weighted screening.
+  arma::mat density_bounds(const arma::mat & P) const;
+  /// Run calculation with given digestor. D is the shell-pair density
+  /// bound matrix (see density_bounds) used for density-weighted
+  /// screening of the integral contributions.
+  void calculate(std::vector< std::vector<IntegralDigestor *> > & digest, const arma::mat & D, double tol) const;
   /// Run force calculation with given digestor
   arma::vec calculate_force(std::vector< std::vector<ForceDigestor *> > & digest, double tol) const;
 
- public:
+public:
   /// Constructor
   ERIscreen();
   /// Destructor
@@ -102,6 +112,13 @@ class ERIscreen {
   void get_range_separation(double & omega, double & alpha, double & beta) const;
   RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
 
+  /// Set the density-weighted (Fock-contribution) screening threshold.
+  /// Zero disables density screening; calculate() then uses only the
+  /// integral-magnitude tests.
+  void set_screen_thresh(double t) { screen_thresh_ = t; }
+  /// Get the density-weighted screening threshold.
+  double get_screen_thresh() const { return screen_thresh_; }
+
   /// Form screening matrix, return amount of significant shell pairs
   size_t fill(const BasisSet * basis, double shtol, bool verbose=true);
 
@@ -112,7 +129,7 @@ class ERIscreen {
 
   /// Calculate exchange matrix with tolerance tol for integrals
   arma::mat calcK(const arma::mat & P, double tol) const;
-    /// Calculate exchange matrix with tolerance tol for integrals
+  /// Calculate exchange matrix with tolerance tol for integrals
   arma::cx_mat calcK(const arma::cx_mat & P, double tol) const;
   /// Calculate  exchange matrices with tolerance tol for integrals
   void calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol) const;

@@ -260,17 +260,17 @@ void dERIWorker::compute_cartesian() {
       ind_ij=(ind_i+ji)*ck.size();
       norm_ij=cj[ji].relnorm*norm_i;
       for(size_t ki=0;ki<ck.size();ki++) {
-	  ind_ijk=(ind_ij+ki)*cl.size();
-	  norm_ijk=ck[ki].relnorm*norm_ij;
-	  for(size_t li=0;li<cl.size();li++) {
-	    // Index in computed integrals table
-	    ind=ind_ijk+li;
-	    // Total norm factor
-	    norm=cl[li].relnorm*norm_ijk;
-	    // Normalize integrals
-	    for(size_t iidx=0;iidx<sizeof(idx)/sizeof(idx[0]);iidx++)
-	      libderiv.ABCD[idx[iidx]][ind]*=norm;
-	  }
+        ind_ijk=(ind_ij+ki)*cl.size();
+        norm_ijk=ck[ki].relnorm*norm_ij;
+        for(size_t li=0;li<cl.size();li++) {
+          // Index in computed integrals table
+          ind=ind_ijk+li;
+          // Total norm factor
+          norm=cl[li].relnorm*norm_ijk;
+          // Normalize integrals
+          for(size_t iidx=0;iidx<sizeof(idx)/sizeof(idx[0]);iidx++)
+            libderiv.ABCD[idx[iidx]][ind]*=norm;
+        }
       }
     }
   }
@@ -368,12 +368,12 @@ std::vector<double> dERIWorker::get(int idx) {
     /*
       is_orig->print();
       js_orig->print();
-    ks_orig->print();
-    ls_orig->print();
+      ks_orig->print();
+      ls_orig->print();
     */
 
     /*
-    for(size_t i=0;i<N;i++)
+      for(size_t i=0;i<N;i++)
       printf("%i % e % e % e\n",(int) i,ints[i],eris[i],ints[i]-eris[i]);
     */
     printf("%i integrals failed\n",(int) Nfail);
