@@ -19,6 +19,10 @@
 #include "../linalg.h"
 #include "../mathf.h"
 #include "../settings.h"
+#include "../basislibrary.h"
+
+#include <cstdio>
+#include <fstream>
 
 /// Check orthogonality of spherical harmonics up to
 const int Lmax=10;
@@ -194,6 +198,113 @@ void test_checkpoint() {
   remove(tmpfile.c_str());
 }
 
+// Load a minimal BSE-format JSON file and verify the parsed
+// BasisSetLibrary matches the well-known STO-3G hydrogen contraction.
+// Tolerance is set to DBL_EPSILON because BSE stores numbers as
+// strings and std::stod rounds to the nearest double.
+void test_bse_json() {
+  // STO-3G hydrogen: one s shell, three primitives. Exponents and
+  // coefficients are the canonical Pople-Hehre-Stewart values.
+  const std::string json_str = R"JSON({
+  "molssi_bse_schema": {"schema_type":"complete","schema_version":"0.1"},
+  "name": "STO-3G",
+  "elements": {
+    "1": {
+      "electron_shells": [
+        {
+          "function_type": "gto",
+          "region": "valence",
+          "angular_momentum": [0],
+          "exponents": ["3.42525091", "0.62391373", "0.16885540"],
+          "coefficients": [["0.15432897", "0.53532814", "0.44463454"]]
+        }
+      ]
+    }
+  }
+})JSON";
+
+  // Write to a tempfile and load through the public file-based API.
+  // We also test the load_basis dispatch -- if a "<name>.json" exists,
+  // load_basis must pick it up in preference to a legacy .gbs entry.
+  // find_basis searches cwd first so a bare filename without a path
+  // suffices for the dispatch leg.
+  const std::string tmpname = "bse_test_sto3g_h";
+  const std::string tmpfile = tmpname + ".json";
+  {
+    std::ofstream of(tmpfile);
+    of << json_str;
+  }
+
+  // Direct API
+  BasisSetLibrary lib;
+  lib.load_bse_json(tmpfile, false);
+  // Dispatch via load_basis (the Basis-keyword entry point)
+  BasisSetLibrary lib_dispatch;
+  lib_dispatch.load_basis(tmpname, false);
+  remove(tmpfile.c_str());
+
+  if(lib.get_Nel() != 1) {
+    ERROR_INFO();
+    printf("BSE JSON: expected 1 element, got %i.\n", (int) lib.get_Nel());
+    throw std::runtime_error("BSE JSON element-count check failed.\n");
+  }
+  ElementBasisSet H = lib.get_element("H");
+  std::vector<FunctionShell> shells = H.get_shells();
+  if(shells.size() != 1 || shells[0].get_am() != 0) {
+    ERROR_INFO();
+    throw std::runtime_error("BSE JSON: expected exactly one s shell on H.\n");
+  }
+  std::vector<contr_t> C = shells[0].get_contr();
+  if(C.size() != 3) {
+    ERROR_INFO();
+    throw std::runtime_error("BSE JSON: expected 3 primitives in H s shell.\n");
+  }
+  const double z_ref[] = {3.42525091, 0.62391373, 0.16885540};
+  const double c_ref[] = {0.15432897, 0.53532814, 0.44463454};
+  for(size_t k=0; k<3; k++) {
+    if(std::abs(C[k].z - z_ref[k]) > DBL_EPSILON*std::abs(z_ref[k]) ||
+       std::abs(C[k].c - c_ref[k]) > DBL_EPSILON*std::abs(c_ref[k])) {
+      ERROR_INFO();
+      printf("Primitive %i mismatch: got (z=%.17e, c=%.17e), expected (z=%.17e, c=%.17e).\n",
+             (int) k, C[k].z, C[k].c, z_ref[k], c_ref[k]);
+      throw std::runtime_error("BSE JSON: primitive mismatch.\n");
+    }
+  }
+  // The same checks for the dispatch path.
+  if(lib_dispatch.get_Nel() != 1) {
+    ERROR_INFO();
+    throw std::runtime_error("BSE JSON: load_basis dispatch returned the wrong number of elements.\n");
+  }
+  std::vector<contr_t> C_disp = lib_dispatch.get_element("H").get_shells().at(0).get_contr();
+  for(size_t k=0; k<3; k++) {
+    if(std::abs(C_disp[k].z - C[k].z) > DBL_EPSILON*std::abs(C[k].z) ||
+       std::abs(C_disp[k].c - C[k].c) > DBL_EPSILON*std::abs(C[k].c)) {
+      ERROR_INFO();
+      throw std::runtime_error("BSE JSON: load_basis dispatch yielded a different contraction.\n");
+    }
+  }
+
+  // Round-trip: save the just-loaded library back to JSON, re-load,
+  // and verify the contraction matches the original bit-for-bit. The
+  // writer uses %.17g (round-trip safe for IEEE doubles), so values
+  // are preserved exactly.
+  const std::string roundtrip_file = "bse_test_roundtrip.json";
+  lib.save_bse_json(roundtrip_file);
+  BasisSetLibrary lib_rt;
+  lib_rt.load_bse_json(roundtrip_file, false);
+  remove(roundtrip_file.c_str());
+  std::vector<contr_t> C_rt = lib_rt.get_element("H").get_shells().at(0).get_contr();
+  for(size_t k=0; k<3; k++) {
+    if(C_rt[k].z != C[k].z || C_rt[k].c != C[k].c) {
+      ERROR_INFO();
+      printf("Round-trip mismatch at primitive %i: got (z=%.17e, c=%.17e), expected (z=%.17e, c=%.17e).\n",
+             (int) k, C_rt[k].z, C_rt[k].c, C[k].z, C[k].c);
+      throw std::runtime_error("BSE JSON: round-trip is not bit-exact.\n");
+    }
+  }
+  printf("BSE JSON reader OK.\n");
+}
+
 Settings settings;
 
 int main(void) {
@@ -212,4 +323,6 @@ int main(void) {
   } catch(std::runtime_error &) {
     throw std::runtime_error("LAPACK library is not thread safe!\nThis might cause problems in some parts of ERKALE.\n");
   }
+  // BSE JSON basis-set reader
+  test_bse_json();
 }

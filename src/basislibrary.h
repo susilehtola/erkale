@@ -268,6 +268,18 @@ class BasisSetLibrary {
 
   /// Load basis set from file in Gaussian'94 format
   void load_gaussian94(const std::string & filename, bool verbose=true);
+
+  /// Load basis set from a Basis Set Exchange (BSE) JSON file. The
+  /// canonical BSE schema is documented at
+  /// https://molssi-bse.github.io/basis_set_exchange/ ; users generate
+  /// the JSON via the `basis_set_exchange` Python package or the BSE
+  /// web app and feed the file in. Numbers are parsed from BSE's
+  /// string form to give the best-rounded IEEE double.
+  void load_bse_json(const std::string & filename, bool verbose=true);
+  /// Save basis set to a file in BSE JSON form. Exponents and
+  /// coefficients are written with 17 significant digits (round-trip
+  /// safe for IEEE doubles).
+  void save_bse_json(const std::string & filename) const;
   /// Save basis set to file in Gaussian'94 format
   void save_gaussian94(const std::string & filename, bool append=false) const;
 

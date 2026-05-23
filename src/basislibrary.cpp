@@ -21,6 +21,8 @@
 #include "stringutil.h"
 #include "linalg.h"
 #include "timer.h"
+
+#include <nlohmann/json.hpp>
 // erifit declarations have been folded into erichol.h
 #include "erichol.h"
 
@@ -1592,7 +1594,39 @@ static BasisSetLibrary combine_pople_basis(const BasisSetLibrary & hbas, const B
   return ret;
 }
 
+namespace {
+  /// Search the same directories as find_basis for a BSE JSON file
+  /// by the given basis name. Returns the full path if found, or an
+  /// empty string otherwise (non-throwing complement to find_basis).
+  std::string find_bse_json(const std::string & basisname) {
+    std::vector<std::string> dirs;
+    dirs.push_back("");
+    if(const char * libloc = getenv("ERKALE_LIBRARY"))
+      dirs.push_back(libloc + std::string("/"));
+    dirs.push_back(ERKALE_SYSTEM_LIBRARY + std::string("/"));
+    for(const auto & d : dirs) {
+      const std::string fname = d + basisname + ".json";
+      std::ifstream in(fname.c_str());
+      if(in.is_open())
+        return fname;
+    }
+    return "";
+  }
+}
+
 void BasisSetLibrary::load_basis(const std::string & basis0, bool verbose) {
+  // Prefer a BSE JSON file by this name if present. JSON wins over the
+  // legacy Gaussian'94 (.gbs) entries, so the migration can proceed
+  // file by file: drop in cc-pVTZ.json next to cc-pVTZ.gbs and the
+  // JSON path takes over.
+  {
+    const std::string json_path = find_bse_json(basis0);
+    if(!json_path.empty()) {
+      load_bse_json(json_path, verbose);
+      return;
+    }
+  }
+
   std::string basis(basis0);
 
   if(basis.size()>4 && basis.substr(0,4).compare("6-31")==0) {
@@ -1649,6 +1683,186 @@ void BasisSetLibrary::load_basis(const std::string & basis0, bool verbose) {
 
   } else
     load_gaussian94(basis,verbose);
+}
+
+namespace {
+  /// Parse a BSE JSON number that may be encoded either as a string
+  /// (BSE's canonical high-precision form) or as a native JSON
+  /// number. std::stod rounds the decimal to the nearest representable
+  /// double, so the converted value is the best IEEE double available
+  /// regardless of how many digits the JSON carried.
+  double parse_bse_number(const nlohmann::json & j) {
+    if(j.is_string())
+      return std::stod(j.get<std::string>());
+    if(j.is_number())
+      return j.get<double>();
+    throw std::runtime_error("BSE JSON: expected a number, got " + std::string(j.type_name()));
+  }
+}
+
+void BasisSetLibrary::load_bse_json(const std::string & filename, bool verbose) {
+  // Read & parse the JSON.
+  std::ifstream is(filename);
+  if(!is.good()) {
+    std::ostringstream oss;
+    oss << "Failed to open BSE JSON file '" << filename << "'\n";
+    throw std::runtime_error(oss.str());
+  }
+  nlohmann::json j;
+  try {
+    is >> j;
+  } catch(const std::exception & e) {
+    std::ostringstream oss;
+    oss << "Failed to parse BSE JSON '" << filename << "': " << e.what() << "\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Top-level "name" field; fall back to the filename.
+  if(j.contains("name") && j["name"].is_string())
+    name = j["name"].get<std::string>();
+  else
+    name = filename;
+
+  if(!j.contains("elements"))
+    throw std::runtime_error("BSE JSON '" + filename + "' is missing the 'elements' section.\n");
+  const auto & elements_json = j["elements"];
+
+  for(auto it = elements_json.begin(); it != elements_json.end(); ++it) {
+    // BSE keys elements by their atomic-number string.
+    const int Z = std::stoi(it.key());
+    if(Z < 1 || Z >= maxZ) {
+      std::ostringstream oss;
+      oss << "BSE JSON '" << filename << "': element Z=" << Z << " out of range.\n";
+      throw std::runtime_error(oss.str());
+    }
+    ElementBasisSet el(element_symbols[Z]);
+
+    const auto & el_json = it.value();
+    if(!el_json.contains("electron_shells")) {
+      // Pure ECP entry (or empty); skip for orbital-basis loading.
+      add_element(el);
+      continue;
+    }
+
+    for(const auto & shell_json : el_json["electron_shells"]) {
+      // We accept "gto" / "gto_spherical" / "gto_cartesian" alike. The
+      // spherical-vs-Cartesian choice is a downstream BasisSet setting
+      // (UseLM), not a basis-library property.
+      const auto & am_arr   = shell_json.at("angular_momentum");
+      const auto & exp_arr  = shell_json.at("exponents");
+      const auto & coef_arr = shell_json.at("coefficients");
+
+      const size_t Nexp = exp_arr.size();
+      std::vector<double> exps(Nexp);
+      for(size_t k=0; k<Nexp; k++)
+        exps[k] = parse_bse_number(exp_arr[k]);
+
+      // BSE layout: coefficients is a 2D array.
+      //   len(angular_momentum)==1  -> each row is a separately
+      //     contracted shell at that single L (general contractions).
+      //   len(angular_momentum)==len(coefficients) -> row i is the
+      //     contraction for angular_momentum[i] (joint SP-style shells).
+      const size_t Nam  = am_arr.size();
+      const size_t Nrow = coef_arr.size();
+
+      auto build_shell = [&](int am, const nlohmann::json & coef_row) {
+        if(coef_row.size() != Nexp) {
+          std::ostringstream oss;
+          oss << "BSE JSON '" << filename << "': coefficient row length " << coef_row.size()
+              << " does not match the " << Nexp << " exponents.\n";
+          throw std::runtime_error(oss.str());
+        }
+        std::vector<contr_t> C(Nexp);
+        for(size_t k=0; k<Nexp; k++) {
+          C[k].z = exps[k];
+          C[k].c = parse_bse_number(coef_row[k]);
+        }
+        return FunctionShell(am, C);
+      };
+
+      if(Nam == 1) {
+        const int am = am_arr[0].get<int>();
+        for(size_t r=0; r<Nrow; r++)
+          el.add_function(build_shell(am, coef_arr[r]));
+      } else if(Nam == Nrow) {
+        for(size_t r=0; r<Nrow; r++)
+          el.add_function(build_shell(am_arr[r].get<int>(), coef_arr[r]));
+      } else {
+        std::ostringstream oss;
+        oss << "BSE JSON '" << filename << "': cannot interpret " << Nrow
+            << " coefficient rows with " << Nam << " angular momenta.\n";
+        throw std::runtime_error(oss.str());
+      }
+    }
+
+    add_element(el);
+  }
+
+  if(verbose) {
+    printf("Loaded BSE JSON basis '%s' from %s (%i elements).\n",
+           name.c_str(), filename.c_str(), (int) get_Nel());
+    fflush(stdout);
+  }
+}
+
+void BasisSetLibrary::save_bse_json(const std::string & filename) const {
+  nlohmann::json j;
+
+  // Schema header.
+  j["molssi_bse_schema"] = {
+    {"schema_type", "complete"},
+    {"schema_version", "0.1"}
+  };
+  j["name"] = name;
+  j["function_types"] = nlohmann::json::array({"gto"});
+
+  // Format a double with 17 significant digits -- round-trip safe for
+  // IEEE doubles. Numbers are written as strings to match BSE's
+  // canonical high-precision encoding.
+  auto fmt = [](double x) {
+    char buf[40];
+    std::snprintf(buf, sizeof(buf), "%.17g", x);
+    return std::string(buf);
+  };
+
+  j["elements"] = nlohmann::json::object();
+  for(const auto & el : elements) {
+    const int Z = get_Z(el.get_symbol());
+
+    nlohmann::json el_json;
+    el_json["electron_shells"] = nlohmann::json::array();
+
+    // Each ERKALE FunctionShell is a segmented contraction and is
+    // written as one BSE electron_shell with a single coefficient row.
+    // (BSE supports collapsing multiple ERKALE shells with shared
+    // exponents into a single electron_shell with multiple rows; the
+    // segmented form is semantically equivalent and round-trips
+    // exactly through load_bse_json.)
+    for(const auto & sh : el.get_shells()) {
+      const std::vector<contr_t> C = sh.get_contr();
+      nlohmann::json shell_json;
+      shell_json["function_type"] = "gto";
+      shell_json["region"] = "";
+      shell_json["angular_momentum"] = nlohmann::json::array({sh.get_am()});
+
+      nlohmann::json exps = nlohmann::json::array();
+      nlohmann::json coef_row = nlohmann::json::array();
+      for(const auto & c : C) {
+        exps.push_back(fmt(c.z));
+        coef_row.push_back(fmt(c.c));
+      }
+      shell_json["exponents"] = exps;
+      shell_json["coefficients"] = nlohmann::json::array({coef_row});
+      el_json["electron_shells"].push_back(shell_json);
+    }
+
+    j["elements"][std::to_string(Z)] = el_json;
+  }
+
+  std::ofstream of(filename);
+  if(!of.good())
+    throw std::runtime_error("Failed to open '" + filename + "' for writing BSE JSON.\n");
+  of << j.dump(2) << std::endl;
 }
 
 void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
