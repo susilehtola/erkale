@@ -283,6 +283,25 @@ void test_bse_json() {
       throw std::runtime_error("BSE JSON: load_basis dispatch yielded a different contraction.\n");
     }
   }
+
+  // Round-trip: save the just-loaded library back to JSON, re-load,
+  // and verify the contraction matches the original bit-for-bit. The
+  // writer uses %.17g (round-trip safe for IEEE doubles), so values
+  // are preserved exactly.
+  const std::string roundtrip_file = "bse_test_roundtrip.json";
+  lib.save_bse_json(roundtrip_file);
+  BasisSetLibrary lib_rt;
+  lib_rt.load_bse_json(roundtrip_file, false);
+  remove(roundtrip_file.c_str());
+  std::vector<contr_t> C_rt = lib_rt.get_element("H").get_shells().at(0).get_contr();
+  for(size_t k=0; k<3; k++) {
+    if(C_rt[k].z != C[k].z || C_rt[k].c != C[k].c) {
+      ERROR_INFO();
+      printf("Round-trip mismatch at primitive %i: got (z=%.17e, c=%.17e), expected (z=%.17e, c=%.17e).\n",
+             (int) k, C_rt[k].z, C_rt[k].c, C[k].z, C[k].c);
+      throw std::runtime_error("BSE JSON: round-trip is not bit-exact.\n");
+    }
+  }
   printf("BSE JSON reader OK.\n");
 }
 
