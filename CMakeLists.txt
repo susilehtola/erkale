@@ -156,6 +156,26 @@ else()
 endif()
 message("")
 
+# nlohmann/json for Basis Set Exchange (BSE) JSON parsing. If a system
+# install isn't present, fetch v3.11.3 from GitHub. Either path exposes
+# the nlohmann_json::nlohmann_json imported target.
+find_package(nlohmann_json 3.11 QUIET CONFIG)
+if(nlohmann_json_FOUND)
+ message("Found nlohmann_json ${nlohmann_json_VERSION}: ${nlohmann_json_DIR}")
+else()
+ message("nlohmann_json not found; fetching v3.11.3 from GitHub.")
+ include(FetchContent)
+ set(JSON_BuildTests OFF CACHE INTERNAL "")
+ set(JSON_Install OFF CACHE INTERNAL "")
+ FetchContent_Declare(
+   nlohmann_json
+   GIT_REPOSITORY https://github.com/nlohmann/json.git
+   GIT_TAG        v3.11.3
+ )
+ FetchContent_MakeAvailable(nlohmann_json)
+endif()
+message("")
+
 
 # Find out how to preprocess C++ source code files
 if(CMAKE_COMPILER_IS_GNUCXX)

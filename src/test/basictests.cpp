@@ -19,6 +19,10 @@
 #include "../linalg.h"
 #include "../mathf.h"
 #include "../settings.h"
+#include "../basislibrary.h"
+
+#include <cstdio>
+#include <fstream>
 
 /// Check orthogonality of spherical harmonics up to
 const int Lmax=10;
@@ -194,6 +198,72 @@ void test_checkpoint() {
   remove(tmpfile.c_str());
 }
 
+// Load a minimal BSE-format JSON file and verify the parsed
+// BasisSetLibrary matches the well-known STO-3G hydrogen contraction.
+// Tolerance is set to DBL_EPSILON because BSE stores numbers as
+// strings and std::stod rounds to the nearest double.
+void test_bse_json() {
+  // STO-3G hydrogen: one s shell, three primitives. Exponents and
+  // coefficients are the canonical Pople-Hehre-Stewart values.
+  const std::string json_str = R"JSON({
+  "molssi_bse_schema": {"schema_type":"complete","schema_version":"0.1"},
+  "name": "STO-3G",
+  "elements": {
+    "1": {
+      "electron_shells": [
+        {
+          "function_type": "gto",
+          "region": "valence",
+          "angular_momentum": [0],
+          "exponents": ["3.42525091", "0.62391373", "0.16885540"],
+          "coefficients": [["0.15432897", "0.53532814", "0.44463454"]]
+        }
+      ]
+    }
+  }
+})JSON";
+
+  // Write to a tempfile and load through the public file-based API.
+  const std::string tmpfile = "bse_test_sto3g_h.json";
+  {
+    std::ofstream of(tmpfile);
+    of << json_str;
+  }
+
+  BasisSetLibrary lib;
+  lib.load_bse_json(tmpfile, false);
+  remove(tmpfile.c_str());
+
+  if(lib.get_Nel() != 1) {
+    ERROR_INFO();
+    printf("BSE JSON: expected 1 element, got %i.\n", (int) lib.get_Nel());
+    throw std::runtime_error("BSE JSON element-count check failed.\n");
+  }
+  ElementBasisSet H = lib.get_element("H");
+  std::vector<FunctionShell> shells = H.get_shells();
+  if(shells.size() != 1 || shells[0].get_am() != 0) {
+    ERROR_INFO();
+    throw std::runtime_error("BSE JSON: expected exactly one s shell on H.\n");
+  }
+  std::vector<contr_t> C = shells[0].get_contr();
+  if(C.size() != 3) {
+    ERROR_INFO();
+    throw std::runtime_error("BSE JSON: expected 3 primitives in H s shell.\n");
+  }
+  const double z_ref[] = {3.42525091, 0.62391373, 0.16885540};
+  const double c_ref[] = {0.15432897, 0.53532814, 0.44463454};
+  for(size_t k=0; k<3; k++) {
+    if(std::abs(C[k].z - z_ref[k]) > DBL_EPSILON*std::abs(z_ref[k]) ||
+       std::abs(C[k].c - c_ref[k]) > DBL_EPSILON*std::abs(c_ref[k])) {
+      ERROR_INFO();
+      printf("Primitive %i mismatch: got (z=%.17e, c=%.17e), expected (z=%.17e, c=%.17e).\n",
+             (int) k, C[k].z, C[k].c, z_ref[k], c_ref[k]);
+      throw std::runtime_error("BSE JSON: primitive mismatch.\n");
+    }
+  }
+  printf("BSE JSON reader OK.\n");
+}
+
 Settings settings;
 
 int main(void) {
@@ -212,4 +282,6 @@ int main(void) {
   } catch(std::runtime_error &) {
     throw std::runtime_error("LAPACK library is not thread safe!\nThis might cause problems in some parts of ERKALE.\n");
   }
+  // BSE JSON basis-set reader
+  test_bse_json();
 }

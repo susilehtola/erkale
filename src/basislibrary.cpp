@@ -21,6 +21,8 @@
 #include "stringutil.h"
 #include "linalg.h"
 #include "timer.h"
+
+#include <nlohmann/json.hpp>
 // erifit declarations have been folded into erichol.h
 #include "erichol.h"
 
@@ -1649,6 +1651,126 @@ void BasisSetLibrary::load_basis(const std::string & basis0, bool verbose) {
 
   } else
     load_gaussian94(basis,verbose);
+}
+
+namespace {
+  /// Parse a BSE JSON number that may be encoded either as a string
+  /// (BSE's canonical high-precision form) or as a native JSON
+  /// number. std::stod rounds the decimal to the nearest representable
+  /// double, so the converted value is the best IEEE double available
+  /// regardless of how many digits the JSON carried.
+  double parse_bse_number(const nlohmann::json & j) {
+    if(j.is_string())
+      return std::stod(j.get<std::string>());
+    if(j.is_number())
+      return j.get<double>();
+    throw std::runtime_error("BSE JSON: expected a number, got " + std::string(j.type_name()));
+  }
+}
+
+void BasisSetLibrary::load_bse_json(const std::string & filename, bool verbose) {
+  // Read & parse the JSON.
+  std::ifstream is(filename);
+  if(!is.good()) {
+    std::ostringstream oss;
+    oss << "Failed to open BSE JSON file '" << filename << "'\n";
+    throw std::runtime_error(oss.str());
+  }
+  nlohmann::json j;
+  try {
+    is >> j;
+  } catch(const std::exception & e) {
+    std::ostringstream oss;
+    oss << "Failed to parse BSE JSON '" << filename << "': " << e.what() << "\n";
+    throw std::runtime_error(oss.str());
+  }
+
+  // Top-level "name" field; fall back to the filename.
+  if(j.contains("name") && j["name"].is_string())
+    name = j["name"].get<std::string>();
+  else
+    name = filename;
+
+  if(!j.contains("elements"))
+    throw std::runtime_error("BSE JSON '" + filename + "' is missing the 'elements' section.\n");
+  const auto & elements_json = j["elements"];
+
+  for(auto it = elements_json.begin(); it != elements_json.end(); ++it) {
+    // BSE keys elements by their atomic-number string.
+    const int Z = std::stoi(it.key());
+    if(Z < 1 || Z >= maxZ) {
+      std::ostringstream oss;
+      oss << "BSE JSON '" << filename << "': element Z=" << Z << " out of range.\n";
+      throw std::runtime_error(oss.str());
+    }
+    ElementBasisSet el(element_symbols[Z]);
+
+    const auto & el_json = it.value();
+    if(!el_json.contains("electron_shells")) {
+      // Pure ECP entry (or empty); skip for orbital-basis loading.
+      add_element(el);
+      continue;
+    }
+
+    for(const auto & shell_json : el_json["electron_shells"]) {
+      // We accept "gto" / "gto_spherical" / "gto_cartesian" alike. The
+      // spherical-vs-Cartesian choice is a downstream BasisSet setting
+      // (UseLM), not a basis-library property.
+      const auto & am_arr   = shell_json.at("angular_momentum");
+      const auto & exp_arr  = shell_json.at("exponents");
+      const auto & coef_arr = shell_json.at("coefficients");
+
+      const size_t Nexp = exp_arr.size();
+      std::vector<double> exps(Nexp);
+      for(size_t k=0; k<Nexp; k++)
+        exps[k] = parse_bse_number(exp_arr[k]);
+
+      // BSE layout: coefficients is a 2D array.
+      //   len(angular_momentum)==1  -> each row is a separately
+      //     contracted shell at that single L (general contractions).
+      //   len(angular_momentum)==len(coefficients) -> row i is the
+      //     contraction for angular_momentum[i] (joint SP-style shells).
+      const size_t Nam  = am_arr.size();
+      const size_t Nrow = coef_arr.size();
+
+      auto build_shell = [&](int am, const nlohmann::json & coef_row) {
+        if(coef_row.size() != Nexp) {
+          std::ostringstream oss;
+          oss << "BSE JSON '" << filename << "': coefficient row length " << coef_row.size()
+              << " does not match the " << Nexp << " exponents.\n";
+          throw std::runtime_error(oss.str());
+        }
+        std::vector<contr_t> C(Nexp);
+        for(size_t k=0; k<Nexp; k++) {
+          C[k].z = exps[k];
+          C[k].c = parse_bse_number(coef_row[k]);
+        }
+        return FunctionShell(am, C);
+      };
+
+      if(Nam == 1) {
+        const int am = am_arr[0].get<int>();
+        for(size_t r=0; r<Nrow; r++)
+          el.add_function(build_shell(am, coef_arr[r]));
+      } else if(Nam == Nrow) {
+        for(size_t r=0; r<Nrow; r++)
+          el.add_function(build_shell(am_arr[r].get<int>(), coef_arr[r]));
+      } else {
+        std::ostringstream oss;
+        oss << "BSE JSON '" << filename << "': cannot interpret " << Nrow
+            << " coefficient rows with " << Nam << " angular momenta.\n";
+        throw std::runtime_error(oss.str());
+      }
+    }
+
+    add_element(el);
+  }
+
+  if(verbose) {
+    printf("Loaded BSE JSON basis '%s' from %s (%i elements).\n",
+           name.c_str(), filename.c_str(), (int) get_Nel());
+    fflush(stdout);
+  }
 }
 
 void BasisSetLibrary::load_gaussian94(const std::string & basis, bool verbose) {
