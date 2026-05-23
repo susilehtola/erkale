@@ -1594,7 +1594,39 @@ static BasisSetLibrary combine_pople_basis(const BasisSetLibrary & hbas, const B
   return ret;
 }
 
+namespace {
+  /// Search the same directories as find_basis for a BSE JSON file
+  /// by the given basis name. Returns the full path if found, or an
+  /// empty string otherwise (non-throwing complement to find_basis).
+  std::string find_bse_json(const std::string & basisname) {
+    std::vector<std::string> dirs;
+    dirs.push_back("");
+    if(const char * libloc = getenv("ERKALE_LIBRARY"))
+      dirs.push_back(libloc + std::string("/"));
+    dirs.push_back(ERKALE_SYSTEM_LIBRARY + std::string("/"));
+    for(const auto & d : dirs) {
+      const std::string fname = d + basisname + ".json";
+      std::ifstream in(fname.c_str());
+      if(in.is_open())
+        return fname;
+    }
+    return "";
+  }
+}
+
 void BasisSetLibrary::load_basis(const std::string & basis0, bool verbose) {
+  // Prefer a BSE JSON file by this name if present. JSON wins over the
+  // legacy Gaussian'94 (.gbs) entries, so the migration can proceed
+  // file by file: drop in cc-pVTZ.json next to cc-pVTZ.gbs and the
+  // JSON path takes over.
+  {
+    const std::string json_path = find_bse_json(basis0);
+    if(!json_path.empty()) {
+      load_bse_json(json_path, verbose);
+      return;
+    }
+  }
+
   std::string basis(basis0);
 
   if(basis.size()>4 && basis.substr(0,4).compare("6-31")==0) {

@@ -224,14 +224,23 @@ void test_bse_json() {
 })JSON";
 
   // Write to a tempfile and load through the public file-based API.
-  const std::string tmpfile = "bse_test_sto3g_h.json";
+  // We also test the load_basis dispatch -- if a "<name>.json" exists,
+  // load_basis must pick it up in preference to a legacy .gbs entry.
+  // find_basis searches cwd first so a bare filename without a path
+  // suffices for the dispatch leg.
+  const std::string tmpname = "bse_test_sto3g_h";
+  const std::string tmpfile = tmpname + ".json";
   {
     std::ofstream of(tmpfile);
     of << json_str;
   }
 
+  // Direct API
   BasisSetLibrary lib;
   lib.load_bse_json(tmpfile, false);
+  // Dispatch via load_basis (the Basis-keyword entry point)
+  BasisSetLibrary lib_dispatch;
+  lib_dispatch.load_basis(tmpname, false);
   remove(tmpfile.c_str());
 
   if(lib.get_Nel() != 1) {
@@ -259,6 +268,19 @@ void test_bse_json() {
       printf("Primitive %i mismatch: got (z=%.17e, c=%.17e), expected (z=%.17e, c=%.17e).\n",
              (int) k, C[k].z, C[k].c, z_ref[k], c_ref[k]);
       throw std::runtime_error("BSE JSON: primitive mismatch.\n");
+    }
+  }
+  // The same checks for the dispatch path.
+  if(lib_dispatch.get_Nel() != 1) {
+    ERROR_INFO();
+    throw std::runtime_error("BSE JSON: load_basis dispatch returned the wrong number of elements.\n");
+  }
+  std::vector<contr_t> C_disp = lib_dispatch.get_element("H").get_shells().at(0).get_contr();
+  for(size_t k=0; k<3; k++) {
+    if(std::abs(C_disp[k].z - C[k].z) > DBL_EPSILON*std::abs(C[k].z) ||
+       std::abs(C_disp[k].c - C[k].c) > DBL_EPSILON*std::abs(C[k].c)) {
+      ERROR_INFO();
+      throw std::runtime_error("BSE JSON: load_basis dispatch yielded a different contraction.\n");
     }
   }
   printf("BSE JSON reader OK.\n");
