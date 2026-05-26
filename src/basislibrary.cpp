@@ -890,7 +890,14 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric)
     double zsum=zi+zj;
 
     // Form products
-    for(size_t L=std::abs(li-lj);L<=std::abs(li+lj);L++) {
+    //
+    // The shell-pair (li, lj) couples angular momenta L =
+    //   |li-lj|, |li-lj|+2, ..., li+lj
+    // by the real-spherical Gaunt parity rule (li+lj+L must be even).
+    // Parity-forbidden L give zero coupling to any orbital-product
+    // channel, so they are useless as auxiliary candidates; we step
+    // through the allowed L's only.
+    for(size_t L=std::abs(li-lj);L<=std::abs(li+lj);L+=2) {
       // The basis function product has radial form r^(li+lj)
       // exp(-zsum r^2). However, in each L channel the radial form is
       // r^L exp(-zr^2). We match the radial expectation value <r>
