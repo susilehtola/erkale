@@ -22,7 +22,7 @@ class dERIWorker;
 
 /// Integral digestor
 class IntegralDigestor {
- public:
+public:
   /// Constructor
   IntegralDigestor();
   /// Destructor
@@ -33,8 +33,11 @@ class IntegralDigestor {
 
 /// Coulomb matrix digestor
 class JDigestor: public IntegralDigestor {
-  /// Density matrix
-  arma::mat P;
+  /// Density matrix. Held by reference: the caller owns it and must
+  /// keep it alive for the digestor's lifetime. Never construct a
+  /// digestor from a temporary (e.g. Pa+Pb) -- hoist it into a named
+  /// matrix first.
+  const arma::mat & P;
   /// Coulomb matrix
   arma::mat J;
   /// Per-quartet scratch: row-major flat of the P submatrix
@@ -43,7 +46,7 @@ class JDigestor: public IntegralDigestor {
   /// set_size; same allocation strategy as KDigestor.
   arma::vec scratch_Pflat;
   arma::vec scratch_rv;
- public:
+public:
   /// Construct digestor
   JDigestor(const arma::mat & P);
   /// Destruct digestor
@@ -57,20 +60,23 @@ class JDigestor: public IntegralDigestor {
 
 /// Exchange matrix digestor
 class KDigestor: public IntegralDigestor {
-  /// Density matrix
-  arma::mat P;
+  /// Density matrix (held by reference; see JDigestor).
+  const arma::mat & P;
   /// Exchange matrix
   arma::mat K;
   /// Reusable scratch for the per-quartet K(i,k), K(j,k), K(i,l),
   /// K(j,l) accumulators. Grow-only: arma::set_size keeps the
   /// existing allocation when the requested logical shape fits.
   arma::mat scratch_Kik, scratch_Kjk, scratch_Kil, scratch_Kjl;
+  /// Transposed K block, reused for the symmetric off-diagonal
+  /// accumulate so no temporary is allocated per quartet.
+  arma::mat scratch_KT;
   /// Per-quartet P submatrices materialised into contiguous
   /// member-owned storage. Faster inner-loop access than going
   /// through subviews; storage persists across calls so set_size
   /// stops reallocating once we've seen the largest shellpair.
   arma::mat scratch_Pjl, scratch_Pil, scratch_Pjk, scratch_Pik;
- public:
+public:
   /// Construct digestor
   KDigestor(const arma::mat & P);
   /// Destruct digestor
@@ -84,14 +90,16 @@ class KDigestor: public IntegralDigestor {
 
 /// Complex exchange matrix digestor
 class cxKDigestor: public IntegralDigestor {
-  /// Density matrix
-  arma::cx_mat P;
+  /// Density matrix (held by reference; see JDigestor).
+  const arma::cx_mat & P;
   /// Exchange matrix
   arma::cx_mat K;
   /// Reusable scratch (see KDigestor).
   arma::cx_mat scratch_Kik, scratch_Kjk, scratch_Kil, scratch_Kjl;
+  /// Transposed K block (see KDigestor::scratch_KT).
+  arma::cx_mat scratch_KT;
   arma::cx_mat scratch_Pjl, scratch_Pil, scratch_Pjk, scratch_Pik;
- public:
+public:
   /// Construct digestor
   cxKDigestor(const arma::cx_mat & P);
   /// Destruct digestor
@@ -105,7 +113,7 @@ class cxKDigestor: public IntegralDigestor {
 
 /// Force digestor
 class ForceDigestor {
- public:
+public:
   /// Constructor
   ForceDigestor();
   /// Destructor
@@ -116,15 +124,15 @@ class ForceDigestor {
 
 /// Coulomb force digestor
 class JFDigestor: public ForceDigestor {
-  /// Density matrix
-  arma::mat P;
+  /// Density matrix (held by reference; see JDigestor).
+  const arma::mat & P;
   /// Per-quartet scratch for the Pij and Pkl submatrices,
   /// materialised once per shellpair quartet and reused across
   /// the 12 derivative components. Contiguous storage is faster
   /// than subview access in the inner quadruple loop. Grown
   /// monotonically via set_size, same strategy as KDigestor.
   arma::mat scratch_Pij, scratch_Pkl;
- public:
+public:
   /// Construct digestor
   JFDigestor(const arma::mat & P);
   /// Destruct digestor
@@ -136,8 +144,8 @@ class JFDigestor: public ForceDigestor {
 
 /// Exchange force digestor
 class KFDigestor: public ForceDigestor {
-  /// Density matrix
-  arma::mat P;
+  /// Density matrix (held by reference; see JDigestor).
+  const arma::mat & P;
   /// Fraction of exact exchange
   double kfrac;
   /// Degeneracy factor
@@ -145,7 +153,7 @@ class KFDigestor: public ForceDigestor {
   /// Per-quartet scratch (see JFDigestor).
   arma::mat scratch_Pik, scratch_Pjl, scratch_Pjk, scratch_Pil;
 
- public:
+public:
   /// Construct digestor
   KFDigestor(const arma::mat & P, double kfrac, bool restr);
   /// Destruct digestor

@@ -172,10 +172,10 @@ void ERIWorker::compute_cartesian(const GaussianShell *is, const GaussianShell *
     double norm_i, norm_ij, norm_ijk, norm;
 
     // Numbers of functions on each shell
-    std::vector<shellf_t> ci=is->get_cart();
-    std::vector<shellf_t> cj=js->get_cart();
-    std::vector<shellf_t> ck=ks->get_cart();
-    std::vector<shellf_t> cl=ls->get_cart();
+    const std::vector<shellf_t> & ci=is->get_cart_ref();
+    const std::vector<shellf_t> & cj=js->get_cart_ref();
+    const std::vector<shellf_t> & ck=ks->get_cart_ref();
+    const std::vector<shellf_t> & cl=ls->get_cart_ref();
     (*input).resize(ci.size()*cj.size()*ck.size()*cl.size());
 
     for(size_t ii=0;ii<ci.size();ii++) {
@@ -245,10 +245,10 @@ void dERIWorker::compute_cartesian() {
   double norm_i, norm_ij, norm_ijk, norm;
 
   // Numbers of functions on each shell
-  std::vector<shellf_t> ci=is->get_cart();
-  std::vector<shellf_t> cj=js->get_cart();
-  std::vector<shellf_t> ck=ks->get_cart();
-  std::vector<shellf_t> cl=ls->get_cart();
+  const std::vector<shellf_t> & ci=is->get_cart_ref();
+  const std::vector<shellf_t> & cj=js->get_cart_ref();
+  const std::vector<shellf_t> & ck=ks->get_cart_ref();
+  const std::vector<shellf_t> & cl=ls->get_cart_ref();
 
   // Integrals computed by libderiv
   const int idx[]={0, 1, 2, 6, 7, 8, 9, 10, 11};
@@ -260,17 +260,17 @@ void dERIWorker::compute_cartesian() {
       ind_ij=(ind_i+ji)*ck.size();
       norm_ij=cj[ji].relnorm*norm_i;
       for(size_t ki=0;ki<ck.size();ki++) {
-	  ind_ijk=(ind_ij+ki)*cl.size();
-	  norm_ijk=ck[ki].relnorm*norm_ij;
-	  for(size_t li=0;li<cl.size();li++) {
-	    // Index in computed integrals table
-	    ind=ind_ijk+li;
-	    // Total norm factor
-	    norm=cl[li].relnorm*norm_ijk;
-	    // Normalize integrals
-	    for(size_t iidx=0;iidx<sizeof(idx)/sizeof(idx[0]);iidx++)
-	      libderiv.ABCD[idx[iidx]][ind]*=norm;
-	  }
+        ind_ijk=(ind_ij+ki)*cl.size();
+        norm_ijk=ck[ki].relnorm*norm_ij;
+        for(size_t li=0;li<cl.size();li++) {
+          // Index in computed integrals table
+          ind=ind_ijk+li;
+          // Total norm factor
+          norm=cl[li].relnorm*norm_ijk;
+          // Normalize integrals
+          for(size_t iidx=0;iidx<sizeof(idx)/sizeof(idx[0]);iidx++)
+            libderiv.ABCD[idx[iidx]][ind]*=norm;
+        }
       }
     }
   }
@@ -368,12 +368,12 @@ std::vector<double> dERIWorker::get(int idx) {
     /*
       is_orig->print();
       js_orig->print();
-    ks_orig->print();
-    ls_orig->print();
+      ks_orig->print();
+      ls_orig->print();
     */
 
     /*
-    for(size_t i=0;i<N;i++)
+      for(size_t i=0;i<N;i++)
       printf("%i % e % e % e\n",(int) i,ints[i],eris[i],ints[i]-eris[i]);
     */
     printf("%i integrals failed\n",(int) Nfail);
@@ -915,25 +915,23 @@ void IntegralWorker::fill_precursor(const GaussianShell *is, const GaussianShell
   r.PB.zeros(is->get_Ncontr(),js->get_Ncontr(),3);
   r.S.zeros(is->get_Ncontr(),js->get_Ncontr());
 
-  // Get data
-  r.ic=is->get_contr();
-  r.jc=js->get_contr();
+  // Get data. Copy-assignment into the existing r.ic / r.jc vectors
+  // reuses their storage (no heap allocation once they have grown to
+  // the largest contraction this worker has seen).
+  r.ic=is->get_contr_ref();
+  r.jc=js->get_contr_ref();
 
-  coords_t Ac=is->get_center();
-  arma::vec A(3);
-  A(0)=Ac.x;
-  A(1)=Ac.y;
-  A(2)=Ac.z;
-
-  coords_t Bc=js->get_center();
-  arma::vec B(3);
-  B(0)=Bc.x;
-  B(1)=Bc.y;
-  B(2)=Bc.z;
+  // Shell centers as plain stack arrays -- avoids two heap-allocated
+  // arma::vec(3) per shell pair on the integral hot path.
+  const coords_t Ac=is->get_center();
+  const double A[3]={Ac.x,Ac.y,Ac.z};
+  const coords_t Bc=js->get_center();
+  const double B[3]={Bc.x,Bc.y,Bc.z};
 
   // Compute AB
-  r.AB=A-B;
-  double rabsq=arma::dot(r.AB,r.AB);
+  for(int k=0;k<3;k++)
+    r.AB(k)=A[k]-B[k];
+  const double rabsq=r.AB(0)*r.AB(0)+r.AB(1)*r.AB(1)+r.AB(2)*r.AB(2);
 
   // Compute zeta
   for(size_t i=0;i<r.ic.size();i++)
@@ -944,14 +942,14 @@ void IntegralWorker::fill_precursor(const GaussianShell *is, const GaussianShell
   for(size_t i=0;i<r.ic.size();i++)
     for(size_t j=0;j<r.jc.size();j++)
       for(int k=0;k<3;k++)
-	r.P(i,j,k)=(r.ic[i].z*A(k) + r.jc[j].z*B(k))/r.zeta(i,j);
+	r.P(i,j,k)=(r.ic[i].z*A[k] + r.jc[j].z*B[k])/r.zeta(i,j);
 
   // Compute PA and PB
   for(size_t i=0;i<r.ic.size();i++)
     for(size_t j=0;j<r.jc.size();j++)
       for(int k=0;k<3;k++) {
-	r.PA(i,j,k)=r.P(i,j,k)-A(k);
-	r.PB(i,j,k)=r.P(i,j,k)-B(k);
+	r.PA(i,j,k)=r.P(i,j,k)-A[k];
+	r.PB(i,j,k)=r.P(i,j,k)-B[k];
       }
 
   // Compute S
@@ -1030,8 +1028,9 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 
 	  double rpqsq=pow(PQ[0],2) + pow(PQ[1],2) + pow(PQ[2],2);
 
-	  // Helper variable
-	  prim_data data;
+	  // Fill the quartet slot directly -- avoids copying a whole
+	  // prim_data struct out of a local per primitive quartet.
+	  prim_data & data=libint.PrimQuartet[ind++];
 
           // Store PA, QC, WP and WQ
           for(int i=0;i<3;i++) {
@@ -1058,9 +1057,6 @@ void ERIWorker::compute_libint_data(const eri_precursor_t & ip, const eri_precur
 	  // Store the integrals
 	  for(int i=0;i<=mmax;i++)
 	    data.F[i]=prefac*Gn(i);
-
-	  // We have all necessary data; store quartet.
-	  libint.PrimQuartet[ind++]=data;
 	}
     }
 }
@@ -1126,8 +1122,9 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 
 	  double rpqsq=pow(PQ[0],2) + pow(PQ[1],2) + pow(PQ[2],2);
 
-	  // Helper variable
-	  prim_data data;
+	  // Fill the quartet slot directly -- avoids copying a whole
+	  // prim_data struct out of a local per primitive quartet.
+	  prim_data & data=libderiv.PrimQuartet[ind++];
 
           // Store PA, PB, QC, QD, WP and WQ
           for(int i=0;i<3;i++) {
@@ -1161,9 +1158,6 @@ void dERIWorker::compute_libderiv_data(const eri_precursor_t & ip, const eri_pre
 	  // Store auxiliary integrals
 	  for(int i=0;i<=mmax+1;i++)
 	    data.F[i]=prefac*Gn[i];
-
-	  // We have all necessary data; store quartet.
-	  libderiv.PrimQuartet[ind++]=data;
 	}
     }
 }

@@ -116,7 +116,7 @@ typedef struct {
 
   /// Second shell
   size_t js;
-    /// First function on shell
+  /// First function on shell
   size_t j0;
   /// Amount of functions on shell
   size_t Nj;
@@ -238,7 +238,7 @@ class BasisSet {
   /// Check for same shells
   bool same_shells(const BasisSet & rhs) const;
 
- public:
+public:
   /// Dummy constructor
   BasisSet();
   /// Construct basis set with Nat atoms, using given settings
@@ -370,6 +370,8 @@ class BasisSet {
 
   /// Get shells in basis set
   std::vector<GaussianShell> get_shells() const;
+  /// Get shells in basis set (reference, no copy)
+  const std::vector<GaussianShell> & get_shells_ref() const;
   /// Get ind:th shell
   GaussianShell get_shell(size_t shind) const;
   /// Get index of the center of the ind'th shell
@@ -528,9 +530,9 @@ class BasisSet {
 
   /**
      Calculates the ERI screening matrices
-       \f$ Q_{\mu \nu} = (\mu \nu | \mu \nu)^{1/2} \f$
+     \f$ Q_{\mu \nu} = (\mu \nu | \mu \nu)^{1/2} \f$
      and
-       \f$ M_{\mu \nu} = (\mu \mu | \nu \nu)^{1/2} \f$
+     \f$ M_{\mu \nu} = (\mu \mu | \nu \nu)^{1/2} \f$
      as described in J. Chem. Phys. 147, 144101 (2017).
   */
   void eri_screening(arma::mat & Q, arma::mat & M, double omega=0.0, double alpha=1.0, double beta=0.0) const;
@@ -613,7 +615,7 @@ class GaussianShell {
    */
   std::vector<shellf_t> cart;
 
- public:
+public:
   /// Dummy constructor
   GaussianShell();
   /// Constructor, need also to set index of first function and nucleus (see below)
@@ -648,8 +650,12 @@ class GaussianShell {
 
   /// Get the exponential contraction
   std::vector<contr_t> get_contr() const;
+  /// Get the exponential contraction (reference, no copy)
+  const std::vector<contr_t> & get_contr_ref() const;
   /// Get cartesians
   std::vector<shellf_t> get_cart() const;
+  /// Get cartesians (reference, no copy)
+  const std::vector<shellf_t> & get_cart_ref() const;
 
   /**
    * Get contraction coefficients of normalized primitives. For some

@@ -67,7 +67,7 @@ class ERIchol {
   /// metric / metric_invh members are valid).
   bool two_step_;
 
- public:
+public:
   /// Constructor
   ERIchol();
   /// Destructor

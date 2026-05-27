@@ -333,7 +333,15 @@ std::vector<contr_t> GaussianShell::get_contr() const {
   return c;
 }
 
+const std::vector<contr_t> & GaussianShell::get_contr_ref() const {
+  return c;
+}
+
 std::vector<shellf_t> GaussianShell::get_cart() const {
+  return cart;
+}
+
+const std::vector<shellf_t> & GaussianShell::get_cart_ref() const {
   return cart;
 }
 
@@ -696,8 +704,8 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
 
       if(do_lapl) {
         lbuf(icart) += (d2x * ym * zn
-                       + xl * d2y * zn
-                       + xl * ym * d2z) * exp_i;
+                        + xl * d2y * zn
+                        + xl * ym * d2z) * exp_i;
       }
 
       if(do_hess) {
@@ -720,16 +728,16 @@ void GaussianShell::eval_bf_derivs(double x, double y, double z,
       if(do_lgrad) {
         // d^3/dx^3, d^2/dy^2 d/dx, d^2/dz^2 d/dx
         lgbuf(icart, 0) += (d3x * ym * zn
-                           + d1x * d2y * zn
-                           + d1x * ym * d2z) * exp_i;
+                            + d1x * d2y * zn
+                            + d1x * ym * d2z) * exp_i;
         // d^2/dx^2 d/dy, d^3/dy^3, d^2/dz^2 d/dy
         lgbuf(icart, 1) += (d2x * d1y * zn
-                           + xl * d3y * zn
-                           + xl * d1y * d2z) * exp_i;
+                            + xl * d3y * zn
+                            + xl * d1y * d2z) * exp_i;
         // d^2/dx^2 d/dz, d^2/dy^2 d/dz, d^3/dz^3
         lgbuf(icart, 2) += (d2x * ym * d1z
-                           + xl * d2y * d1z
-                           + xl * ym * d3z) * exp_i;
+                            + xl * d2y * d1z
+                            + xl * ym * d3z) * exp_i;
       }
     }
   }
@@ -1626,6 +1634,10 @@ std::vector<GaussianShell> BasisSet::get_shells() const {
   return shells;
 }
 
+const std::vector<GaussianShell> & BasisSet::get_shells_ref() const {
+  return shells;
+}
+
 GaussianShell BasisSet::get_shell(size_t ind) const {
   return shells[ind];
 }
@@ -2309,7 +2321,7 @@ arma::mat BasisSet::nuclear() const {
   return nuclear(nuclear_data);
 }
 
- arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,double>> & nuclear_data) const {
+arma::mat BasisSet::nuclear(const std::vector<std::tuple<int,double,double,double>> & nuclear_data) const {
 
   // Size of basis set
   size_t N=get_Nbf();
@@ -4233,7 +4245,7 @@ arma::ivec m_classify(const arma::mat & C, const arma::ivec & mv) {
   return oclass;
 }
 
- std::vector< std::vector<size_t> > BasisSet::find_identical_nuclei() const {
+std::vector< std::vector<size_t> > BasisSet::find_identical_nuclei() const {
   // Index list
   std::vector< std::vector<size_t> > ret;
 

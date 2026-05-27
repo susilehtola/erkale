@@ -121,6 +121,13 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   if(intthr>1e-6) {
     fprintf(stderr,"Warning - spuriously large integral threshold %e\n",intthr);
   }
+  // Density-weighted Fock-contribution screening threshold. Bounds the
+  // contribution of each shell quartet by |(ij|kl)|*max|P| over the
+  // coupled blocks; tol on the actual Fock contribution rather than on
+  // the bare integral. Zero disables it.
+  const double screenthr=settings.get_double("ScreeningThresh");
+  scr.set_screen_thresh(screenthr);
+  scr_rs.set_screen_thresh(screenthr);
 
   doforce=false;
 
