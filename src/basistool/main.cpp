@@ -536,6 +536,7 @@ int main_guarded(int argc, char **argv) {
       for(int am=0;am<=auxbasis.get_max_am();am++) {
         // Keep the vectors above the threshold
         arma::uvec keep_idx(arma::find(evals[am] >= elthresh));
+        keep_idx = arma::reverse(keep_idx); // print largest eigenvalue first
         arma::vec Wval(evals[am](keep_idx));
         arma::mat Wvec(coeffs[am].cols(keep_idx));
 
