@@ -333,7 +333,9 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
   }
 
   d=d(prodidx);
-  double error(arma::max(d));
+  // Empty prodidx (e.g. atomic basis where everything screens out)
+  // would make arma::max throw; pretend there's nothing left to pivot.
+  double error(prodidx.n_elem == 0 ? 0.0 : arma::max(d));
 
   // Phase C: pivot selection.
   pi=arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem);
@@ -416,6 +418,11 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
     t.set();
 
     while(true) {
+      // Bail out if the Schur sweep has consumed every product pair.
+      // For tiny systems (e.g. atomic guess on H with cc-pVDZ) m can
+      // reach d.n_elem during the inner block iteration; the dereference
+      // d(pi(m)) below would then run off the end.
+      if(m >= d.n_elem) break;
       double errmax=d(pi(m));
       for(size_t i=m+1;i<d.n_elem;i++) {
         const double v=d(pi(i));
@@ -501,7 +508,12 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
   }
 
   const size_t Nselected=m;
-  pi=pi.subvec(0,Nselected-1);
+  // Guard against the empty-pivot case (tiny systems, very tight
+  // cholesky_tol vs. integrals): subvec(0, -1) would underflow.
+  if(Nselected==0)
+    pi.reset();
+  else
+    pi=pi.subvec(0,Nselected-1);
   if(b_raw_out && Nselected<b_raw_out->n_cols)
     b_raw_out->shed_cols(Nselected,b_raw_out->n_cols-1);
   B_temp.reset();
@@ -547,6 +559,7 @@ std::set<std::pair<size_t, size_t>> DensityFit::find_cholesky_pivots(const Basis
 }
 
 size_t DensityFit::fill_cholesky(const BasisSet & basis,
+                                 bool dir,
                                  double cholesky_tol,
                                  double shell_reuse_thr,
                                  double shell_screen_tol,
@@ -558,7 +571,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   cholesky_mode_ = true;
   Nbf  = basis.get_Nbf();
   Nnuc = basis.get_Nnuc();
-  direct = false;
+  direct = dir;
 
   orbshells   = basis.get_shells();
   auxshells.clear();
@@ -572,14 +585,18 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
 
   Timer ttot;
 
-  // Phases A-C: pivot selection. Also gives us B_raw = (mu nu | piv).
+  // Phases A-C: pivot selection. In cached mode also saves
+  // B_raw = (mu nu | piv) for the block-storage step below; in
+  // direct mode the integrals are recomputed on demand inside
+  // DirectCDBlocks::get_block, so we pass nullptr and skip the
+  // O(Nprod * Nselected) allocation.
   arma::uvec pi;
   arma::umat invmap, prodmap;
   arma::uvec prodidx, odiagidx;
   arma::mat B_raw;
   const size_t Nselected = select_two_step_pivots(basis, cholesky_tol, shell_reuse_thr, shell_screen_tol,
                                                   verbose, pi, invmap, prodmap, prodidx, odiagidx,
-                                                  pivot_shellpairs_, &B_raw);
+                                                  pivot_shellpairs_, direct ? nullptr : &B_raw);
   Naux = Nselected;
   cd_pivot_shellpairs_vec_.assign(pivot_shellpairs_.begin(), pivot_shellpairs_.end());
 
@@ -668,22 +685,10 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
     fflush(stdout);
   }
 
-  // Build the CachedBlocks containing (piv_p | mu nu) per orbital
-  // shellpair. The B_raw rows are indexed by orbital products
-  // (prodidx layout); we reshape to the same per-shellpair block
-  // layout DensityFit::fill uses for DF. Pairs ERIchol's pivoting
-  // dropped become zero-filled rows -- that's the right answer
-  // (their (mu nu | piv) integrals are below threshold).
+  // Build the (piv_p | mu nu) block storage. Per-shellpair block
+  // shape and layout match the DF path so the J/K kernels are
+  // insensitive to direct vs cached.
   orbpairs = basis.compute_screening(shell_screen_tol).shpairs;
-  const arma::uword sentinel = invmap.n_cols;
-  arma::umat prodlookup(Nbf, Nbf);
-  prodlookup.fill(sentinel);
-  for(arma::uword i=0; i<invmap.n_cols; i++) {
-    const arma::uword mu = invmap(0, i);
-    const arma::uword nu = invmap(1, i);
-    prodlookup(mu, nu) = i;
-    prodlookup(nu, mu) = i;
-  }
 
   std::vector<std::pair<size_t, size_t>> sp_pairs(orbpairs.size());
   std::vector<std::pair<size_t, size_t>> sp_firsts(orbpairs.size());
@@ -695,30 +700,54 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
     sp_firsts[ip] = std::make_pair(orbshells[imus].get_first_ind(), orbshells[inus].get_first_ind());
     sp_sizes[ip]  = std::make_pair(orbshells[imus].get_Nbf(), orbshells[inus].get_Nbf());
   }
-  auto cached = std::make_shared<CachedBlocks>(Nbf, Naux, sp_pairs, sp_firsts, sp_sizes);
 
+  if(direct) {
+    // DirectCDBlocks recomputes (piv | mu nu) from libint on every
+    // get_block(ip) call. Owns its own pivot bookkeeping copies so
+    // it outlives this DensityFit if needed.
+    blocks = std::make_shared<DirectCDBlocks>(
+        Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
+        orbshells, cd_pivot_shellpairs_vec_, cd_pivot_index_, cd_pivot_sentinel_,
+        omega, alpha, beta, maxam, maxcontr);
+  } else {
+    // Cached mode: scatter B_raw into per-shellpair blocks. B_raw
+    // is indexed by orbital products (prodidx layout); we walk each
+    // orbital shellpair and look up the row for each (mu, nu). Pairs
+    // the pivoting dropped become zero-filled rows (their integrals
+    // are below threshold).
+    const arma::uword prod_sentinel = invmap.n_cols;
+    arma::umat prodlookup(Nbf, Nbf);
+    prodlookup.fill(prod_sentinel);
+    for(arma::uword i=0; i<invmap.n_cols; i++) {
+      const arma::uword mu = invmap(0, i);
+      const arma::uword nu = invmap(1, i);
+      prodlookup(mu, nu) = i;
+      prodlookup(nu, mu) = i;
+    }
+
+    auto cached = std::make_shared<CachedBlocks>(Nbf, Naux, sp_pairs, sp_firsts, sp_sizes);
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for(size_t ip=0; ip<orbpairs.size(); ip++) {
-    arma::mat slot = cached->block_mut(ip);    // (Naux x Nmu*Nnu), zero-init
-    const size_t imus = orbpairs[ip].is;
-    const size_t inus = orbpairs[ip].js;
-    const size_t mu0  = orbshells[imus].get_first_ind();
-    const size_t nu0  = orbshells[inus].get_first_ind();
-    const size_t Nmu  = orbshells[imus].get_Nbf();
-    const size_t Nnu  = orbshells[inus].get_Nbf();
+    for(size_t ip=0; ip<orbpairs.size(); ip++) {
+      arma::mat slot = cached->block_mut(ip);
+      const size_t imus = orbpairs[ip].is;
+      const size_t inus = orbpairs[ip].js;
+      const size_t mu0  = orbshells[imus].get_first_ind();
+      const size_t nu0  = orbshells[inus].get_first_ind();
+      const size_t Nmu  = orbshells[imus].get_Nbf();
+      const size_t Nnu  = orbshells[inus].get_Nbf();
 
-    for(size_t inu=0; inu<Nnu; inu++) {
-      for(size_t imu=0; imu<Nmu; imu++) {
-        const arma::uword prow = prodlookup(mu0+imu, nu0+inu);
-        if(prow == sentinel) continue;  // pair below CD significance
-        slot.col(inu*Nmu + imu) = B_raw.row(prow).t();
+      for(size_t inu=0; inu<Nnu; inu++) {
+        for(size_t imu=0; imu<Nmu; imu++) {
+          const arma::uword prow = prodlookup(mu0+imu, nu0+inu);
+          if(prow == prod_sentinel) continue;
+          slot.col(inu*Nmu + imu) = B_raw.row(prow).t();
+        }
       }
     }
+    blocks = cached;
   }
-
-  blocks = cached;
 
   if(verbose) {
     printf("Two-step CD finished in %s.\n", ttot.elapsed().c_str());
@@ -731,26 +760,23 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   return orbpairs.size();
 }
 
-arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & P) const {
-  if(!cholesky_mode_)
-    throw std::runtime_error("DensityFit::forceJ_cholesky requires fill_cholesky to have been called.\n");
-  if(P.n_rows != Nbf || P.n_cols != Nbf)
-    throw std::runtime_error("DensityFit::forceJ_cholesky: density matrix dimension mismatch.\n");
-
-  // c is the standard DF expansion coefficient in the pivot-orbital
-  // basis: c = ab_inv * gamma_pivot = (X X^T) * gamma_pivot, with
-  // gamma_pivot_p = (piv_p | density). compute_expansion handles
-  // both the contraction and the metric-inverse multiplication.
-  const arma::vec c = compute_expansion(P);
-
-  const std::vector<GaussianShell> & shells = basis.get_shells_ref();
-  const int max_am   = basis.get_max_am();
-  const int max_ncon = basis.get_max_Ncontr();
-
-  arma::vec f(3 * Nnuc);
-  f.zeros();
-
-  // Part 1: f += 0.5 c (dM/dR) c on pivot shellpairs.
+// Helper for the two CD force loops. Both compute a 4-shell dERIWorker
+// derivative and accumulate into a per-thread fwrk; the only thing
+// that varies is the outer shellpair list and the per-quartet
+// contraction body. The helper handles dERIWorker construction +
+// per-thread fwrk + omp critical reduction; the caller writes only
+// the inner-loop math.
+//
+// `body(ip, deri, fout)` is invoked once per outer index ip with a
+// thread-local dERIWorker and an arma::vec reference to write into
+// (the per-thread accumulator under OMP, the shared f otherwise).
+namespace {
+template<typename Body>
+void run_force_loop(size_t Nouter,
+                    arma::vec & f,
+                    int max_am, int max_ncon,
+                    double omega, double alpha, double beta,
+                    Body && body) {
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -765,7 +791,95 @@ arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & 
     arma::vec fwrk(f); fwrk.zeros();
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ip=0; ip<cd_pivot_shellpairs_vec_.size(); ip++) {
+    for(size_t ip=0; ip<Nouter; ip++) {
+#ifdef _OPENMP
+      body(ip, deri, fwrk);
+#else
+      body(ip, deri, f);
+#endif
+    }
+#ifdef _OPENMP
+#pragma omp critical
+    f += fwrk;
+#endif
+    delete deri;
+  }
+}
+}
+
+template<typename M_lookup>
+void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double sign) const {
+  if(!cholesky_mode_) {
+    // DF dispatch: aux shellpair pairs (ias, jas <= ias). dERIWorker
+    // (aux, dummy, aux, dummy) gives 12 components, of which the
+    // physical ones are index[] = {0,1,2,6,7,8} (the dummy shells
+    // have no nuclear position). The same-atom (anuc == bnuc) case
+    // gives a vanishing (a|b)/dR and is skipped.
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+      dERIWorker * deri;
+      if(omega==0.0 && alpha==1.0 && beta==0.0)
+        deri = new dERIWorker(maxam, maxcontr);
+      else
+        deri = new dERIWorker_srlr(maxam, maxcontr, omega, alpha, beta);
+
+#ifdef _OPENMP
+      arma::vec fwrk(f); fwrk.zeros();
+#pragma omp for schedule(dynamic)
+#endif
+      for(size_t ias=0; ias<auxshells.size(); ias++)
+        for(size_t jas=0; jas<=ias; jas++) {
+          // Symmetry factor: off-diagonal aux-shellpair pair occurs
+          // once in the (jas <= ias) iteration but contributes both
+          // (ias, jas) and (jas, ias) via integral symmetry.
+          double fac = 0.5;
+          if(ias != jas) fac *= 2.0;
+          const size_t Na   = auxshells[ias].get_Nbf();
+          const size_t anuc = auxshells[ias].get_center_ind();
+          const size_t Nb   = auxshells[jas].get_Nbf();
+          const size_t bnuc = auxshells[jas].get_center_ind();
+          if(anuc == bnuc) continue;
+
+          deri->compute(&auxshells[ias], &dummy, &auxshells[jas], &dummy);
+          const static int index[]={0, 1, 2, 6, 7, 8};
+          double ders[6] = {0,0,0,0,0,0};
+          for(size_t iid=0; iid<6; iid++) {
+            const int ic = index[iid];
+            const std::vector<double> * erip = deri->getp(ic);
+            for(size_t iia=0; iia<Na; iia++) {
+              const size_t ia = auxshells[ias].get_first_ind() + iia;
+              for(size_t iib=0; iib<Nb; iib++) {
+                const size_t ib = auxshells[jas].get_first_ind() + iib;
+                ders[iid] += (*erip)[iia*Nb+iib] * M(ia, ib);
+              }
+            }
+            ders[iid] *= fac * sign;
+          }
+          for(int ic=0; ic<3; ic++) {
+#ifdef _OPENMP
+            fwrk(3*anuc + ic) += ders[ic];
+            fwrk(3*bnuc + ic) += ders[ic+3];
+#else
+            f(3*anuc + ic) += ders[ic];
+            f(3*bnuc + ic) += ders[ic+3];
+#endif
+          }
+        }
+#ifdef _OPENMP
+#pragma omp critical
+      f += fwrk;
+#endif
+      delete deri;
+    }
+  } else {
+    // CD dispatch: pivot shellpair pairs (ip, jp <= ip). 4-shell
+    // dERIWorker gives 12 derivative components mapped to 4 centers.
+    // M is looked up via cd_pivot_index_(orb_idx_1, orb_idx_2).
+    const std::vector<GaussianShell> & shells = orbshells;
+    run_force_loop(cd_pivot_shellpairs_vec_.size(), f, maxam, maxcontr, omega, alpha, beta,
+                   [&](size_t ip, dERIWorker * deri, arma::vec & fout) {
       const size_t is = cd_pivot_shellpairs_vec_[ip].first;
       const size_t js = cd_pivot_shellpairs_vec_[ip].second;
       const size_t Ni = shells[is].get_Nbf();
@@ -790,10 +904,7 @@ arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & 
 
         const size_t atoms[4] = {i_at, j_at, k_at, l_at};
         for(int ic=0; ic<12; ic++) {
-          const int center = ic / 3;
-          const int xyz    = ic % 3;
-          const size_t aA  = atoms[center];
-
+          const size_t aA = atoms[ic / 3];
           const std::vector<double> * erip = deri->getp(ic);
           double accum = 0.0;
           for(size_t ii=0; ii<Ni; ii++)
@@ -804,102 +915,341 @@ arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & 
                 for(size_t ll=0; ll<Nl; ll++) {
                   const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
                   if(qidx == cd_pivot_sentinel_) continue;
-                  const double val = (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
-                  accum += val * c(pidx) * c(qidx);
+                  accum += (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll] * M(pidx, qidx);
                 }
             }
-#ifdef _OPENMP
-          fwrk(3*aA + xyz) += fac_sp * accum;
-#else
-          f(3*aA + xyz)    += fac_sp * accum;
-#endif
+          fout(3*aA + ic%3) += fac_sp * sign * accum;
         }
       }
-    }
-#ifdef _OPENMP
-#pragma omp critical
-    f += fwrk;
-#endif
-    delete deri;
+    });
   }
+}
 
-  // Part 2: f -= sum_munu P (d(mu nu | piv)/dR) c.
-  const std::vector<eripair_t> orb_shps =
-    basis.compute_screening(/*tol*/0.0, omega, alpha, beta, false).shpairs;
+template<typename BuildQ>
+void DensityFit::accumulate_3c_force_DF(arma::vec & f, double sign, BuildQ && build_q) const {
+  // Build the per-shellpair descriptor once, hand it to a
+  // DirectDFPerturbedBlocks instance, then iterate. for_each_pert
+  // streams (perturbation, aux_first, sub_block) tuples; each
+  // contributes sign * <sub_block, Q_ip.rows(a0, a0+Na_sh-1)>.
+  std::vector<std::pair<size_t,size_t>> sp_pairs(orbpairs.size());
+  std::vector<std::pair<size_t,size_t>> sp_firsts(orbpairs.size());
+  std::vector<std::pair<size_t,size_t>> sp_sizes(orbpairs.size());
+  for(size_t ip=0; ip<orbpairs.size(); ip++) {
+    const size_t imus = orbpairs[ip].is;
+    const size_t inus = orbpairs[ip].js;
+    sp_pairs[ip]  = std::make_pair(imus, inus);
+    sp_firsts[ip] = std::make_pair(orbshells[imus].get_first_ind(), orbshells[inus].get_first_ind());
+    sp_sizes[ip]  = std::make_pair(orbshells[imus].get_Nbf(), orbshells[inus].get_Nbf());
+  }
+  DirectDFPerturbedBlocks pblocks(Nbf, Naux, Nnuc,
+                                  std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
+                                  orbshells, auxshells, dummy,
+                                  omega, alpha, beta, maxam, maxcontr);
 
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
   {
-    dERIWorker * deri;
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      deri = new dERIWorker(max_am, max_ncon);
-    else
-      deri = new dERIWorker_srlr(max_am, max_ncon, omega, alpha, beta);
-
 #ifdef _OPENMP
     arma::vec fwrk(f); fwrk.zeros();
 #pragma omp for schedule(dynamic)
 #endif
-    for(size_t ipair=0; ipair<orb_shps.size(); ipair++) {
-      const size_t is = orb_shps[ipair].is;
-      const size_t js = orb_shps[ipair].js;
-      const size_t Ni = shells[is].get_Nbf();
-      const size_t Nj = shells[js].get_Nbf();
-      const size_t i0 = shells[is].get_first_ind();
-      const size_t j0 = shells[js].get_first_ind();
-      const size_t i_at = shells[is].get_center_ind();
-      const size_t j_at = shells[js].get_center_ind();
-
-      const double fac_sp = (is == js) ? 1.0 : 2.0;
-
-      for(size_t jp=0; jp<cd_pivot_shellpairs_vec_.size(); jp++) {
-        const size_t ks = cd_pivot_shellpairs_vec_[jp].first;
-        const size_t ls = cd_pivot_shellpairs_vec_[jp].second;
-        const size_t Nk = shells[ks].get_Nbf();
-        const size_t Nl = shells[ls].get_Nbf();
-        const size_t k0 = shells[ks].get_first_ind();
-        const size_t l0 = shells[ls].get_first_ind();
-        const size_t k_at = shells[ks].get_center_ind();
-        const size_t l_at = shells[ls].get_center_ind();
-
-        deri->compute(&shells[is], &shells[js], &shells[ks], &shells[ls]);
-
-        const size_t atoms[4] = {i_at, j_at, k_at, l_at};
-        for(int ic=0; ic<12; ic++) {
-          const int center = ic / 3;
-          const int xyz    = ic % 3;
-          const size_t aA  = atoms[center];
-
-          const std::vector<double> * erip = deri->getp(ic);
-          double accum = 0.0;
-          for(size_t ii=0; ii<Ni; ii++)
-            for(size_t jj=0; jj<Nj; jj++) {
-              const double Pval = P(i0+ii, j0+jj);
-              for(size_t kk=0; kk<Nk; kk++)
-                for(size_t ll=0; ll<Nl; ll++) {
-                  const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
-                  if(qidx == cd_pivot_sentinel_) continue;
-                  const double val = (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
-                  accum += val * Pval * c(qidx);
-                }
-            }
+    for(size_t ip=0; ip<orbpairs.size(); ip++) {
+      const arma::mat Q_ip = build_q(ip);  // (Naux x Nmu*Nnu)
+      pblocks.for_each_pert(ip,
+          [&](const Perturbation & pert, size_t a0, const arma::mat & sub_block) {
+            const size_t Na_sh = sub_block.n_rows;
+            const arma::mat Qslice = Q_ip.rows(a0, a0 + Na_sh - 1);
+            const double ders = arma::dot(arma::vectorise(sub_block), arma::vectorise(Qslice));
 #ifdef _OPENMP
-          fwrk(3*aA + xyz) -= fac_sp * accum;
+            fwrk(3 * pert.p1 + pert.p2) += sign * ders;
 #else
-          f(3*aA + xyz)    -= fac_sp * accum;
+            f(3 * pert.p1 + pert.p2)    += sign * ders;
 #endif
-        }
-      }
+          });
     }
 #ifdef _OPENMP
 #pragma omp critical
     f += fwrk;
 #endif
-    delete deri;
   }
+}
+
+template<typename BuildQ>
+void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, double sign, BuildQ && build_q) const {
+  // Iterate (orbital_shellpair, pivot_shellpair) quartets. For each
+  // quartet, 4-shell dERIWorker gives 12 derivative components; the
+  // inner contraction with build_q(...)(qidx, ii*Nj+jj) is summed
+  // over (ii, jj, kk, ll) with cd_pivot_index_ deciding which (kk, ll)
+  // entries land on selected pivots.
+  //
+  // build_q signature: (size_t ipair, size_t is, size_t js, size_t Ni,
+  //                     size_t Nj, size_t i0, size_t j0) -> arma::mat
+  // returning a (Naux x Ni*Nj) matrix with column index = ii*Nj + jj.
+  const std::vector<eripair_t> orb_shps =
+    basis.compute_screening(/*tol*/0.0, omega, alpha, beta, false).shpairs;
+  const std::vector<GaussianShell> & shells = basis.get_shells_ref();
+
+  run_force_loop(orb_shps.size(), f, maxam, maxcontr, omega, alpha, beta,
+                 [&](size_t ipair, dERIWorker * deri, arma::vec & fout) {
+    const size_t is = orb_shps[ipair].is;
+    const size_t js = orb_shps[ipair].js;
+    const size_t Ni = shells[is].get_Nbf();
+    const size_t Nj = shells[js].get_Nbf();
+    const size_t i0 = shells[is].get_first_ind();
+    const size_t j0 = shells[js].get_first_ind();
+    const size_t i_at = shells[is].get_center_ind();
+    const size_t j_at = shells[js].get_center_ind();
+
+    const arma::mat Q_ip = build_q(ipair, is, js, Ni, Nj, i0, j0);  // (Naux x Ni*Nj), col = ii*Nj+jj
+
+    for(size_t jp=0; jp<cd_pivot_shellpairs_vec_.size(); jp++) {
+      const size_t ks = cd_pivot_shellpairs_vec_[jp].first;
+      const size_t ls = cd_pivot_shellpairs_vec_[jp].second;
+      const size_t Nk = shells[ks].get_Nbf();
+      const size_t Nl = shells[ls].get_Nbf();
+      const size_t k0 = shells[ks].get_first_ind();
+      const size_t l0 = shells[ls].get_first_ind();
+      const size_t k_at = shells[ks].get_center_ind();
+      const size_t l_at = shells[ls].get_center_ind();
+
+      deri->compute(&shells[is], &shells[js], &shells[ks], &shells[ls]);
+
+      const size_t atoms[4] = {i_at, j_at, k_at, l_at};
+      for(int ic=0; ic<12; ic++) {
+        const size_t aA = atoms[ic / 3];
+        const std::vector<double> * erip = deri->getp(ic);
+        double accum = 0.0;
+        for(size_t ii=0; ii<Ni; ii++)
+          for(size_t jj=0; jj<Nj; jj++) {
+            const size_t col = ii*Nj + jj;
+            for(size_t kk=0; kk<Nk; kk++)
+              for(size_t ll=0; ll<Nl; ll++) {
+                const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
+                if(qidx == cd_pivot_sentinel_) continue;
+                accum += (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll] * Q_ip(qidx, col);
+              }
+          }
+        fout(3*aA + ic%3) += sign * accum;
+      }
+    }
+  });
+}
+
+arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & P) const {
+  if(!cholesky_mode_)
+    throw std::runtime_error("DensityFit::forceJ_cholesky requires fill_cholesky to have been called.\n");
+  if(P.n_rows != Nbf || P.n_cols != Nbf)
+    throw std::runtime_error("DensityFit::forceJ_cholesky: density matrix dimension mismatch.\n");
+
+  // c is the standard DF expansion coefficient in the pivot-orbital
+  // basis: c = ab_inv * gamma_pivot = (X X^T) * gamma_pivot, with
+  // gamma_pivot_p = (piv_p | density). compute_expansion handles
+  // both the contraction and the metric-inverse multiplication.
+  const arma::vec c = compute_expansion(P);
+
+  const std::vector<GaussianShell> & shells = basis.get_shells_ref();
+  const int max_am   = basis.get_max_am();
+  const int max_ncon = basis.get_max_Ncontr();
+
+  arma::vec f(3 * Nnuc, arma::fill::zeros);
+
+  // Part 1: f += (1/2) c^T (dM/dR) c. accumulate_2c_metric_force
+  // handles the CD pivot-shellpair-pair scaffolding.
+  accumulate_2c_metric_force(f,
+      [&c](arma::uword a, arma::uword b) { return c(a) * c(b); },
+      +1.0);
+
+  // Part 2: f -= sum_munu P (d(mu nu | piv)/dR) c. accumulate_3c_force_CD
+  // handles the (orb_shellpair, pivot_shellpair) iteration; per
+  // orbital shellpair we hand it the rank-1 Q(qidx, ii*Nj+jj) =
+  // fac_sp * P(i0+ii, j0+jj) * c(qidx) tensor.
+  accumulate_3c_force_CD(basis, f, -1.0,
+      [&](size_t /*ipair*/, size_t is, size_t js,
+          size_t Ni, size_t Nj, size_t i0, size_t j0) {
+        const double fac_sp = (is == js) ? 1.0 : 2.0;
+        arma::mat Q(Naux, Ni*Nj);
+        for(size_t ii=0; ii<Ni; ii++)
+          for(size_t jj=0; jj<Nj; jj++) {
+            const double Pval = P(i0+ii, j0+jj);
+            Q.col(ii*Nj + jj) = fac_sp * Pval * c;
+          }
+        return Q;
+      });
 
   return f;
+}
+
+arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, const std::vector<double> & occo, double kfrac) const {
+  if(Corig.n_rows != Nbf)
+    throw std::runtime_error("DensityFit::forceK: orbital matrix doesn't match basis set.\n");
+
+  // Filter to occupied orbitals (drop columns with zero occupation).
+  size_t Nmo = 0;
+  for(size_t i=0; i<occo.size(); i++)
+    if(occo[i] > 0) Nmo++;
+  arma::mat C(Nbf, Nmo);
+  arma::vec occs(Nmo);
+  {
+    size_t io = 0;
+    for(size_t i=0; i<occo.size(); i++)
+      if(occo[i] > 0) {
+        C.col(io) = Corig.col(i);
+        occs(io)  = occo[i];
+        io++;
+      }
+  }
+  // Closed-shell density.
+  const arma::mat P = C * arma::diagmat(occs) * C.t();
+
+  // Per-orbital half-transform aui[io](a, mu) = sum_nu (a|mu nu) C(nu, io),
+  // then Z[io] = ab_inv * aui[io] (= M^{-1} aui in DF/CD aux space).
+  // Cube layout: Z.slice(io) is (Naux x Nbf).
+  arma::cube Z(Naux, Nbf, Nmo, arma::fill::zeros);
+
+  size_t Nmax = 0;
+  for(size_t s=0; s<orbshells.size(); s++)
+    Nmax = std::max(Nmax, orbshells[s].get_Nbf());
+
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+  {
+    arma::mat aui;
+    arma::mat ui_scratch(Naux*Nmax, 1);
+    arma::mat vi_scratch(Naux*Nmax, 1);
+    arma::mat anumu_scratch(Naux, Nmax*Nmax);
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+    for(size_t io=0; io<Nmo; io++) {
+      aui.zeros(Naux, Nbf);
+      for(size_t ip=0; ip<orbpairs.size(); ip++) {
+        const size_t imus = orbpairs[ip].is;
+        const size_t inus = orbpairs[ip].js;
+        const size_t mu0  = orbshells[imus].get_first_ind();
+        const size_t nu0  = orbshells[inus].get_first_ind();
+        const size_t Nmu  = orbshells[imus].get_Nbf();
+        const size_t Nnu  = orbshells[inus].get_Nbf();
+        arma::mat amunu = blocks->get_block(ip);
+
+        {
+          arma::mat ui(ui_scratch.memptr(), Naux*Nmu, 1, false, true);
+          ui = arma::reshape(amunu, Naux*Nmu, Nnu) * C.submat(nu0, io, nu0+Nnu-1, io);
+          ui.reshape(Naux, Nmu);
+          aui.cols(mu0, mu0+Nmu-1) += ui;
+        }
+        if(imus != inus) {
+          arma::mat anumu(anumu_scratch.memptr(), Naux, Nmu*Nnu, false, true);
+          for(size_t mu=0; mu<Nmu; mu++)
+            for(size_t nu=0; nu<Nnu; nu++)
+              anumu.col(mu*Nnu+nu) = amunu.col(nu*Nmu+mu);
+          arma::mat vi(vi_scratch.memptr(), Naux*Nnu, 1, false, true);
+          vi = arma::reshape(anumu, Naux*Nnu, Nmu) * C.submat(mu0, io, mu0+Nmu-1, io);
+          vi.reshape(Naux, Nnu);
+          aui.cols(nu0, nu0+Nnu-1) += vi;
+        }
+      }
+      Z.slice(io) = ab_inv * aui;
+    }
+  }
+
+  // V[io] = P Z[io]^T (Nbf x Naux). Used for both G and the 3-center
+  // contraction T(a, mu, nu) = sum_io n_io V[io](mu, a) C(nu, io).
+  arma::cube V(Nbf, Naux, Nmo);
+  for(size_t io=0; io<Nmo; io++)
+    V.slice(io) = P * Z.slice(io).t();
+
+  // G(a, b) = sum_io n_io (Z[io] P Z[io]^T)(a, b) = sum_io n_io (Z[io] V[io])(a, b).
+  arma::mat G(Naux, Naux, arma::fill::zeros);
+  for(size_t io=0; io<Nmo; io++)
+    G += occs(io) * Z.slice(io) * V.slice(io);
+
+  // Geometric force accumulator. kfrac applied at return.
+  // dE_K/dR = - 3c_term + (1/2) 2c_term, so f_K = -dE_K/dR
+  //         = + 3c_term - (1/2) 2c_term, scaled by kfrac.
+  arma::vec f_geom(3*Nnuc, arma::fill::zeros);
+
+  const std::vector<GaussianShell> & shells = basis.get_shells_ref();
+  const int max_am   = basis.get_max_am();
+  const int max_ncon = basis.get_max_Ncontr();
+
+  // ========================================================================
+  // 2-center derivative: f_geom -= (1/2) sum_ab (d_R M_ab) G(a, b)
+  // ========================================================================
+  // accumulate_2c_metric_force handles both DF and CD dispatch.
+  accumulate_2c_metric_force(f_geom,
+      [&G](arma::uword a, arma::uword b) { return G(a, b); },
+      -1.0);
+
+  // ========================================================================
+  // 3-center derivative: f_geom += sum_i n_i sum_aνλ d_R(a|νλ) C(λ,i) V_i(ν,a)
+  // ========================================================================
+  // Per orbital shellpair (s1, s2), build a Q_combined matrix that
+  // pre-mixes occupied orbitals into a single contraction tensor.
+  // The (s1 != s2) branch absorbs the (mu <-> nu) swap term that
+  // orbpairs doesn't double-count. accumulate_3c_force_{DF,CD}
+  // handles the integral dispatch.
+  auto build_Qcomb_DF = [&](size_t ip) -> arma::mat {
+    const size_t imus = orbpairs[ip].is;
+    const size_t inus = orbpairs[ip].js;
+    const size_t mu0  = orbshells[imus].get_first_ind();
+    const size_t nu0  = orbshells[inus].get_first_ind();
+    const size_t Nmu  = orbshells[imus].get_Nbf();
+    const size_t Nnu  = orbshells[inus].get_Nbf();
+    const bool   off_diag = (imus != inus);
+
+    // Q(a, inu*Nmu + imu) = sum_io n_io [
+    //   C(nu0+inu, io) * V_io(mu0+imu, a)
+    //   + (off_diag ? C(mu0+imu, io) * V_io(nu0+inu, a) : 0)
+    // ]
+    arma::mat Qcomb(Naux, Nmu*Nnu, arma::fill::zeros);
+    for(size_t io=0; io<Nmo; io++) {
+      const double n_io = occs(io);
+      for(size_t inu=0; inu<Nnu; inu++)
+        for(size_t imu=0; imu<Nmu; imu++) {
+          const size_t col = inu*Nmu + imu;
+          Qcomb.col(col) += n_io * C(nu0+inu, io) * V.slice(io).row(mu0+imu).t();
+          if(off_diag)
+            Qcomb.col(col) += n_io * C(mu0+imu, io) * V.slice(io).row(nu0+inu).t();
+        }
+    }
+    return Qcomb;
+  };
+
+  if(!cholesky_mode_) {
+    accumulate_3c_force_DF(f_geom, +1.0, build_Qcomb_DF);
+  } else {
+    // CD column layout uses ii*Nj+jj rather than DF's inu*Nmu+imu;
+    // the build function adapts accordingly.
+    accumulate_3c_force_CD(basis, f_geom, +1.0,
+        [&](size_t /*ipair*/, size_t is, size_t js,
+            size_t Ni, size_t Nj, size_t i0, size_t j0) {
+          const bool off_diag = (is != js);
+          arma::mat Qcomb(Naux, Ni*Nj, arma::fill::zeros);
+          for(size_t io=0; io<Nmo; io++) {
+            const double n_io = occs(io);
+            for(size_t ii=0; ii<Ni; ii++)
+              for(size_t jj=0; jj<Nj; jj++) {
+                const size_t col = ii*Nj + jj;
+                Qcomb.col(col) += n_io * C(j0+jj, io) * V.slice(io).row(i0+ii).t();
+                if(off_diag)
+                  Qcomb.col(col) += n_io * C(i0+ii, io) * V.slice(io).row(j0+jj).t();
+              }
+          }
+          return Qcomb;
+        });
+  }
+
+  // ERKALE's K matrix (from calcK) carries the closed-shell doubling
+  // explicitly (K = sum_i occs[i] aui_i^T M^-1 aui_i with occs[i]=2),
+  // and the Fock build correspondingly uses F = h + J - 0.5*K (see
+  // scf-fock.cpp.in:683). The exchange energy contribution to the
+  // total is therefore E_K = -(1/4) tr(P K), and the gradient
+  // f_geom assembled above corresponds to -(1/2) tr(P dK/dR), which
+  // is twice the actual gradient. Halve before returning.
+  return 0.5 * kfrac * f_geom;
 }
 
 double DensityFit::fitting_error() const {
@@ -1305,170 +1655,42 @@ arma::vec DensityFit::forceJ(const arma::mat & P) {
   arma::vec c=compute_expansion(P);
 
   // The force
-  arma::vec f(3*Nnuc);
-  f.zeros();
+  arma::vec f(3*Nnuc, arma::fill::zeros);
 
-  // First part: f = *#* 1/2 c_a (a|b)' c_b *#* - gamma_a' c_a
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-  {
-    dERIWorker *deri;
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      deri=new dERIWorker(maxam,maxcontr);
-    else
-      deri=new dERIWorker_srlr(maxam,maxcontr,omega,alpha,beta);
-    const std::vector<double> * erip;
-
-#ifdef _OPENMP
-    // Worker stack for each matrix
-    arma::vec fwrk(f);
-    fwrk.zeros();
-
-#pragma omp for schedule(dynamic)
-#endif
-    for(size_t ias=0;ias<auxshells.size();ias++)
-      for(size_t jas=0;jas<=ias;jas++) {
-
-	// Symmetry factor
-	double fac=0.5;
-	if(ias!=jas)
-	  fac*=2.0;
-
-	size_t Na=auxshells[ias].get_Nbf();
-	size_t anuc=auxshells[ias].get_center_ind();
-	size_t Nb=auxshells[jas].get_Nbf();
-	size_t bnuc=auxshells[jas].get_center_ind();
-
-	if(anuc==bnuc)
-	  // Contributions vanish
-	  continue;
-
-	// Compute (a|b)
-	deri->compute(&auxshells[ias],&dummy,&auxshells[jas],&dummy);
-
-	// Compute forces
-	const static int index[]={0, 1, 2, 6, 7, 8};
-	const size_t Nidx=sizeof(index)/sizeof(index[0]);
-	double ders[Nidx];
-
-	for(size_t iid=0;iid<Nidx;iid++) {
-	  ders[iid]=0.0;
-	  // Index is
-	  int ic=index[iid];
-
-	  // Increment force, anuc
-	  erip=deri->getp(ic);
-	  for(size_t iia=0;iia<Na;iia++) {
-	    size_t ia=auxshells[ias].get_first_ind()+iia;
-
-	    for(size_t iib=0;iib<Nb;iib++) {
-	      size_t ib=auxshells[jas].get_first_ind()+iib;
-
-	      // The integral is
-	      double res=(*erip)[iia*Nb+iib];
-
-	      ders[iid]+= res*c(ia)*c(ib);
-	    }
-	  }
-	  ders[iid]*=fac;
-	}
-
-	// Increment forces
-	for(int ic=0;ic<3;ic++) {
-#ifdef _OPENMP
-	  fwrk(3*anuc+ic)+=ders[ic];
-	  fwrk(3*bnuc+ic)+=ders[ic+3];
-#else
-	  f(3*anuc+ic)+=ders[ic];
-	  f(3*bnuc+ic)+=ders[ic+3];
-#endif
-	}
-      }
-
-#ifdef _OPENMP
-#pragma omp critical
-    // Sum results together
-    f+=fwrk;
-#endif
-    delete deri;
-  } // end parallel section
-
+  // First part: f += (1/2) c^T (dM/dR) c. accumulate_2c_metric_force
+  // handles the aux-shellpair-pair scaffolding (same helper as
+  // forceJ_cholesky and forceK use).
+  accumulate_2c_metric_force(f,
+      [&c](arma::uword a, arma::uword b) { return c(a) * c(b); },
+      +1.0);
 
   // Second part: f -= gamma_a' c_a (three-center derivative term).
-  // Routed through DirectDFPerturbedBlocks: for_each_pert streams
-  // (perturbation, aux_first, derivative_sub_block) tuples per
-  // orbital shellpair, identically to how the value-side
-  // DirectDFBlocks streams (alpha | mu nu) blocks. The libcholesky
-  // perturbation API uses the same shape; once we depend on
-  // libcholesky this construction becomes a thin adapter.
-  {
-    std::vector<std::pair<size_t,size_t>> sp_pairs(orbpairs.size());
-    std::vector<std::pair<size_t,size_t>> sp_firsts(orbpairs.size());
-    std::vector<std::pair<size_t,size_t>> sp_sizes(orbpairs.size());
-    for(size_t ip=0; ip<orbpairs.size(); ip++) {
-      const size_t imus = orbpairs[ip].is;
-      const size_t inus = orbpairs[ip].js;
-      sp_pairs[ip]  = std::make_pair(imus, inus);
-      sp_firsts[ip] = std::make_pair(orbshells[imus].get_first_ind(),
-                                     orbshells[inus].get_first_ind());
-      sp_sizes[ip]  = std::make_pair(orbshells[imus].get_Nbf(),
-                                     orbshells[inus].get_Nbf());
-    }
-    DirectDFPerturbedBlocks pblocks(Nbf, Naux, Nnuc,
-                                    std::move(sp_pairs),
-                                    std::move(sp_firsts),
-                                    std::move(sp_sizes),
-                                    orbshells, auxshells, dummy,
-                                    omega, alpha, beta, maxam, maxcontr);
-
-#ifdef _OPENMP
-#pragma omp parallel
-#endif
-    {
-#ifdef _OPENMP
-      arma::vec fwrk(f); fwrk.zeros();
-#pragma omp for schedule(dynamic)
-#endif
-      for(size_t ip=0; ip<orbpairs.size(); ip++) {
+  // accumulate_3c_force_DF runs the orbpair iteration and
+  // DirectDFPerturbedBlocks streaming; the build_q callable
+  // materialises the (Naux x Nmu*Nnu) per-shellpair Q matrix as
+  // the rank-1 outer product fac * c x Psub^T. The for_each_pert
+  // contraction then collapses to fac * (sub_block * Psub) . c on
+  // each pert, equivalent to the original kernel.
+  accumulate_3c_force_DF(f, -1.0,
+      [&](size_t ip) {
         const size_t imus = orbpairs[ip].is;
         const size_t inus = orbpairs[ip].js;
         const size_t mu0  = orbshells[imus].get_first_ind();
         const size_t nu0  = orbshells[inus].get_first_ind();
         const size_t Nmu  = orbshells[imus].get_Nbf();
         const size_t Nnu  = orbshells[inus].get_Nbf();
-        // Off-diagonal pairs are counted only once in orbpairs;
-        // double-count the contribution.
         const double fac  = (imus == inus) ? 1.0 : 2.0;
 
-        // P submatrix laid out as (mu fastest, nu slowest) so it
-        // pairs with the sub_block's column index inu*Nmu+imu.
-        arma::vec Psub(Nmu * Nnu);
+        // P submatrix vectorised with mu fastest, matching the
+        // value-side sub_block(a, inu*Nmu+imu) column layout.
+        arma::rowvec Psub(Nmu * Nnu);
         for(size_t inu=0; inu<Nnu; inu++)
           for(size_t imu=0; imu<Nmu; imu++)
             Psub(inu*Nmu + imu) = P(mu0+imu, nu0+inu);
 
-        pblocks.for_each_pert(ip,
-            [&](const Perturbation & pert, size_t a0, const arma::mat & sub_block) {
-              // sub_block: (Na_aux x Nmu*Nnu). Contract with P over
-              // (mu, nu) and with c over a; the scalar derivative is
-              // accumulated into f at (atom = pert.p1, xyz = pert.p2).
-              const arma::vec hlp = sub_block * Psub;
-              const arma::vec ca  = c.subvec(a0, a0 + sub_block.n_rows - 1);
-              const double ders   = fac * arma::dot(hlp, ca);
-#ifdef _OPENMP
-              fwrk(3 * pert.p1 + pert.p2) -= ders;
-#else
-              f(3 * pert.p1 + pert.p2)    -= ders;
-#endif
-            });
-      }
-#ifdef _OPENMP
-#pragma omp critical
-      f += fwrk;
-#endif
-    } // end parallel
-  }
+        // Rank-1 outer product fac * c * Psub.
+        return arma::mat(fac * c * Psub);
+      });
 
   return f;
 }

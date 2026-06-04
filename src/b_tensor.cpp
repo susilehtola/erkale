@@ -254,6 +254,108 @@ void DirectDFPerturbedBlocks::for_each_pert(
   }
 }
 
+DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
+                               std::vector<std::pair<size_t, size_t>> shellpairs,
+                               std::vector<std::pair<size_t, size_t>> firsts,
+                               std::vector<std::pair<size_t, size_t>> sizes,
+                               std::vector<GaussianShell> orb_shells,
+                               std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
+                               arma::umat pivot_index,
+                               arma::uword pivot_sentinel,
+                               double omega, double alpha, double beta,
+                               int max_am, int max_contr)
+    : Nbf_(Nbf), Naux_(Naux),
+      shellpairs_(std::move(shellpairs)),
+      firsts_(std::move(firsts)),
+      sizes_(std::move(sizes)),
+      orb_shells_(std::move(orb_shells)),
+      pivot_shellpairs_(std::move(pivot_shellpairs)),
+      pivot_index_(std::move(pivot_index)),
+      pivot_sentinel_(pivot_sentinel),
+      omega_(omega), alpha_(alpha), beta_(beta),
+      max_am_(max_am), max_contr_(max_contr) {
+  if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
+    throw std::logic_error("DirectCDBlocks: shellpair / first / size vectors disagree in length");
+
+  max_NmuNnu_ = 0;
+  for(size_t ip=0; ip<sizes_.size(); ip++)
+    max_NmuNnu_ = std::max(max_NmuNnu_, sizes_[ip].first * sizes_[ip].second);
+
+#ifdef _OPENMP
+  const int nthr = omp_get_max_threads();
+#else
+  const int nthr = 1;
+#endif
+  eri_cache_.resize(nthr);
+  scratch_.resize(nthr);
+  for(int t=0; t<nthr; t++)
+    scratch_[t].set_size(Naux_, max_NmuNnu_);
+}
+
+ERIWorker * DirectCDBlocks::thread_eri() const {
+#ifdef _OPENMP
+  const int tid = omp_get_thread_num();
+#else
+  const int tid = 0;
+#endif
+  if(!eri_cache_[tid]) {
+    if(omega_==0.0 && alpha_==1.0 && beta_==0.0)
+      eri_cache_[tid].reset(new ERIWorker(max_am_, max_contr_));
+    else
+      eri_cache_[tid].reset(new ERIWorker_srlr(max_am_, max_contr_, omega_, alpha_, beta_));
+  }
+  return eri_cache_[tid].get();
+}
+
+arma::mat DirectCDBlocks::get_block(size_t ip) const {
+  const size_t imus = shellpairs_[ip].first;
+  const size_t inus = shellpairs_[ip].second;
+  const size_t Nmu  = sizes_[ip].first;
+  const size_t Nnu  = sizes_[ip].second;
+
+  ERIWorker * eri = thread_eri();
+#ifdef _OPENMP
+  const int tid = omp_get_thread_num();
+#else
+  const int tid = 0;
+#endif
+
+  arma::mat & buf = scratch_[tid];
+  // Zero only the slice we'll use; pivots that map to no orbital
+  // shellpair contribution stay zero (CachedBlocks does the same).
+  std::memset(buf.memptr(), 0, sizeof(double) * Naux_ * Nmu * Nnu);
+
+  // Iterate over pivot shellpairs (ks, ls): one libint 4-center call
+  // per (mu_shell, nu_shell, ks, ls) gives Nmu*Nnu*Nk*Nl entries; we
+  // scatter only the (k, l) combinations that correspond to selected
+  // pivots into the block. Layout: buf(pidx, jj*Nmu + ii) =
+  // (mu_ii nu_jj | piv_pidx).
+  double * buf_ptr = buf.memptr();
+  for(size_t pp=0; pp<pivot_shellpairs_.size(); pp++) {
+    const size_t ks = pivot_shellpairs_[pp].first;
+    const size_t ls = pivot_shellpairs_[pp].second;
+    const size_t Nk = orb_shells_[ks].get_Nbf();
+    const size_t Nl = orb_shells_[ls].get_Nbf();
+    const size_t k0 = orb_shells_[ks].get_first_ind();
+    const size_t l0 = orb_shells_[ls].get_first_ind();
+
+    eri->compute(&orb_shells_[imus], &orb_shells_[inus], &orb_shells_[ks], &orb_shells_[ls]);
+    const std::vector<double> * erip = eri->getp();
+
+    for(size_t ii=0; ii<Nmu; ii++)
+      for(size_t jj=0; jj<Nnu; jj++) {
+        const size_t col = jj * Nmu + ii;
+        for(size_t kk=0; kk<Nk; kk++)
+          for(size_t ll=0; ll<Nl; ll++) {
+            const arma::uword pidx = pivot_index_(k0+kk, l0+ll);
+            if(pidx == pivot_sentinel_) continue;
+            buf_ptr[col * Naux_ + pidx] = (*erip)[((ii*Nnu+jj)*Nk+kk)*Nl+ll];
+          }
+      }
+  }
+  return arma::mat(buf_ptr, Naux_, Nmu * Nnu, /*copy_aux_mem*/false, /*strict*/true);
+}
+
 arma::mat DirectDFBlocks::get_block(size_t ip) const {
   const size_t imus = shellpairs_[ip].first;
   const size_t inus = shellpairs_[ip].second;

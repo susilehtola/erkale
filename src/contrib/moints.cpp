@@ -588,7 +588,7 @@ int main_guarded(int argc, char **argv) {
     // Re-use cholthr for both the CD threshold and the two-step
     // metric cleanup -- moints.cpp uses one user-facing knob
     // (CholeskyThr); pre-merge there was no separate metric step.
-    dfit.fill_cholesky(basis,cholthr,cholshthr,intthr,cholthr,true);
+    dfit.fill_cholesky(basis,/*direct*/false,cholthr,cholshthr,intthr,cholthr,true);
   }
 
   // Data dump

@@ -141,6 +141,44 @@ class DensityFit {
 
   /// Form screening matrix
   void form_screening();
+  /// Two-center metric-derivative force contribution. Iterates the
+  /// aux-shellpair (DF) or pivot-shellpair (CD) pair index space,
+  /// computes the corresponding dERIWorker derivative integrals,
+  /// and contracts each with M(ia, ib). The signed result is
+  /// added to f.
+  ///
+  /// sign = +1 reproduces forceJ's "f += (1/2) c^T (dM/dR) c"
+  /// (M_lookup = c(a)*c(b)); sign = -1 gives forceK's
+  /// "f -= (1/2) G : dM/dR" (M_lookup = G(a, b)). The 1/2 enters
+  /// via the symmetry factor that already lives in this loop.
+  ///
+  /// Definition in the .cpp -- template so the lookup lambda
+  /// inlines and we avoid materialising the c-outer-product for
+  /// the rank-1 forceJ case.
+  template<typename M_lookup>
+  void accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double sign) const;
+
+  /// Three-center derivative force contribution, DF aux dispatch.
+  /// Iterates orbital shellpairs through DirectDFPerturbedBlocks;
+  /// build_q(ip) returns the per-shellpair contraction matrix
+  /// Q_ip of shape (Naux x Nmu*Nnu) with column index = inu*Nmu + imu
+  /// (matching the value-side sub_block layout). For each
+  /// perturbation block delivered by for_each_pert, the
+  /// contribution to f at (pert.atom, pert.xyz) is
+  ///   sign * <sub_block, Q_ip.rows(a0, a0+Na_shell-1)>_F.
+  template<typename BuildQ>
+  void accumulate_3c_force_DF(arma::vec & f, double sign, BuildQ && build_q) const;
+
+  /// Three-center derivative force contribution, CD pivot dispatch.
+  /// Iterates orbital shellpairs (outer) x pivot shellpairs
+  /// (inner), computes 4-shell dERIWorker derivatives, and per
+  /// component contracts the integrals with build_q(ip)(qidx, ii*Nj+jj)
+  /// for each (ii, jj, kk, ll) on the (orb_shellpair, pivot_shellpair)
+  /// quartet. build_q(ip) returns a per-orbital-shellpair matrix
+  /// of shape (Naux x Ni*Nj) with column index = ii*Nj + jj.
+  template<typename BuildQ>
+  void accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, double sign, BuildQ && build_q) const;
+
   /// Two-step CD pivot selection (phases A-C: diagonal, pair
   /// enumeration, pivoted selection). Populates the by-ref output
   /// parameters with the pivoting machinery; b_raw_out is filled
@@ -217,6 +255,7 @@ class DensityFit {
   /// retired here -- TwoStep is mathematically equivalent at the
   /// same threshold but cheaper to construct.
   size_t fill_cholesky(const BasisSet & basis,
+                       bool direct,
                        double cholesky_tol,
                        double shell_reuse_thr,
                        double shell_screen_tol,
@@ -231,6 +270,14 @@ class DensityFit {
   /// fill_cholesky_twostep to have populated the pivot metric;
   /// throws otherwise. Returns f of size 3*Nnuc.
   arma::vec forceJ_cholesky(const BasisSet & basis, const arma::mat & P) const;
+
+  /// Algebraic exchange gradient, closed-shell, scaled by kfrac.
+  /// Works on both DF (aux Gaussian basis) and CD (pivot orbital
+  /// products) modes; cholesky_mode_ selects the integral dispatch
+  /// internally. C is (Nbf x Norb), occs has the same length as the
+  /// columns of C (zero entries are filtered). Returns f of size
+  /// 3*Nnuc.
+  arma::vec forceK(const BasisSet & basis, const arma::mat & C, const std::vector<double> & occs, double kfrac) const;
 
   /// Pivot shellpairs that the CD picked. Populated by both
   /// fill_cholesky and fill_cholesky_twostep. Returns an empty set

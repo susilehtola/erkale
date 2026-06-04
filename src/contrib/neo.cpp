@@ -266,11 +266,11 @@ int main_guarded(int argc, char **argv) {
     double cholshthr=settings.get_double("CholeskyShThr");
     double shtol=settings.get_double("IntegralThresh");
     double fitcholthr=settings.get_double("FittingCholeskyThreshold");
-    Npairs_e=dfit.fill_cholesky(basis,cholthr,cholshthr,shtol,fitcholthr,verbose);
+    Npairs_e=dfit.fill_cholesky(basis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
     if(finiteproton)
       pfit.set_range_separation(omega, alpha, beta);
     if(vpp)
-      Npairs_p=pfit.fill_cholesky(pbasis,cholthr,cholshthr,shtol,fitcholthr,verbose);
+      Npairs_p=pfit.fill_cholesky(pbasis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
   }
 
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());

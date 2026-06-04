@@ -441,7 +441,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
           fflush(stdout);
         }
 
-        size_t Npairs = dfit.fill_cholesky(*basisp, cholthr, cholshthr, intthr, fitcholthr, verbose);
+        size_t Npairs = dfit.fill_cholesky(*basisp, direct, cholthr, cholshthr, intthr, fitcholthr, verbose);
         if(verbose) {
           printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
           fflush(stdout);
@@ -560,7 +560,7 @@ void SCF::fill_rs(double omega) {
           fflush(stdout);
         }
         t.set();
-        size_t Npairs = dfit_rs.fill_cholesky(*basisp, cholthr, cholshthr, intthr, fitcholthr, verbose);
+        size_t Npairs = dfit_rs.fill_cholesky(*basisp, direct, cholthr, cholshthr, intthr, fitcholthr, verbose);
         if(verbose) {
           printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
           fflush(stdout);

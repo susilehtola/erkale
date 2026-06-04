@@ -1219,7 +1219,7 @@ Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, bool delocalize
   // single threshold, so keep the single-knob feel here).
   double shthr=0.01; // Shell re-use threshhold
   double intthr=std::min(1e-10,cholthr/100.0); // Integrals threshold
-  dfit.fill_cholesky(basis,cholthr,shthr,intthr,cholthr,false);
+  dfit.fill_cholesky(basis,/*direct*/false,cholthr,shthr,intthr,cholthr,false);
 }
 
 Edmiston::~Edmiston() {

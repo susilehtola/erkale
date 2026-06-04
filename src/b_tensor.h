@@ -134,6 +134,69 @@ public:
  * lazily populated by the first call from each thread; cleanup is
  * automatic at destruction.
  */
+/**
+ * Direct-mode block source for two-step Cholesky decomposition: each
+ * get_block(ip) call computes the (piv | mu nu) three-center integrals
+ * on demand, where the "aux functions" are the selected pivot orbital
+ * pairs and the integral is the 4-center ERI restricted to those
+ * pivot pairs. Returns a (Naux x Nmu*Nnu) matrix in the same layout
+ * as the cached path so the J/K/forceJ kernels are insensitive to
+ * whether storage is cached or direct.
+ *
+ * Same per-thread ERIWorker cache + scratch model as DirectDFBlocks.
+ * The class accepts the pivot bookkeeping (pivot_index lookup,
+ * shellpair list, sentinel) by value at construction so it
+ * outlives the DensityFit that built it.
+ */
+class DirectCDBlocks : public BTensorBlocks {
+  size_t Nbf_;
+  size_t Naux_;
+  std::vector<std::pair<size_t, size_t>> shellpairs_;
+  std::vector<std::pair<size_t, size_t>> firsts_;
+  std::vector<std::pair<size_t, size_t>> sizes_;
+
+  /// Orbital shells, owned copy.
+  std::vector<GaussianShell> orb_shells_;
+  /// Pivot shellpairs to iterate over inside get_block.
+  std::vector<std::pair<size_t, size_t>> pivot_shellpairs_;
+  /// (Nbf x Nbf) lookup: (mu, nu) -> pivot rank or pivot_sentinel_.
+  arma::umat pivot_index_;
+  /// Sentinel value used in pivot_index_ (== Naux_).
+  arma::uword pivot_sentinel_;
+
+  double omega_, alpha_, beta_;
+  int max_am_;
+  int max_contr_;
+
+  mutable std::vector<std::unique_ptr<ERIWorker>> eri_cache_;
+  mutable std::vector<arma::mat> scratch_;
+  size_t max_NmuNnu_;
+
+ public:
+  DirectCDBlocks(size_t Nbf, size_t Naux,
+                 std::vector<std::pair<size_t, size_t>> shellpairs,
+                 std::vector<std::pair<size_t, size_t>> firsts,
+                 std::vector<std::pair<size_t, size_t>> sizes,
+                 std::vector<GaussianShell> orb_shells,
+                 std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
+                 arma::umat pivot_index,
+                 arma::uword pivot_sentinel,
+                 double omega, double alpha, double beta,
+                 int max_am, int max_contr);
+  ~DirectCDBlocks() override = default;
+
+  size_t n_blocks() const override { return shellpairs_.size(); }
+  size_t naux() const override { return Naux_; }
+  size_t nbf() const override { return Nbf_; }
+  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
+  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
+  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
+  arma::mat get_block(size_t ip) const override;
+
+ private:
+  ERIWorker * thread_eri() const;
+};
+
 class DirectDFBlocks : public BTensorBlocks {
   size_t Nbf_;
   size_t Naux_;
