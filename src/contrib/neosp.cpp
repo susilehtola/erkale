@@ -30,7 +30,6 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
-#include "erichol.h"
 
 // Needed for libint init
 #include "eriworker.h"

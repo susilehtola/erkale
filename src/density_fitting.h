@@ -55,6 +55,8 @@
 #include "eriworker.h"
 
 #include <memory>
+#include <set>
+#include <utility>
 
 /// Density fitting routines.
 ///
@@ -114,8 +116,48 @@ class DensityFit {
   /// \f$ ( \alpha | \beta)^-1/2 \f$
   arma::mat ab_invh;
 
+  /// True when this object was filled via fill_cholesky. CD and DF
+  /// share the same J/K machinery; the only thing this flag affects
+  /// is which gradient path is available (forceJ for DF aux shells,
+  /// forceJ_cholesky for pivot-orbital-pair "aux") and the pivot
+  /// machinery exposed via get_pivot_shellpairs().
+  bool cholesky_mode_;
+
+  /// (Nbf x Nbf) lookup: (mu, nu) -> pivot rank in 0..Naux-1, or
+  /// cd_pivot_sentinel_ for non-pivot pairs. Built in fill_cholesky
+  /// and consumed by forceJ_cholesky for the dM/dR + d(mu nu | piv)/dR
+  /// contractions.
+  arma::umat cd_pivot_index_;
+  /// Sentinel value used in cd_pivot_index_ (== Naux).
+  arma::uword cd_pivot_sentinel_;
+  /// Pivot shellpairs in lexicographic order; enumerated to drive
+  /// the dM/dR sweep in forceJ_cholesky without re-sorting per call.
+  std::vector<std::pair<size_t, size_t>> cd_pivot_shellpairs_vec_;
+
+  /// Pivot shellpairs (set form) populated by fill_cholesky. Exposed
+  /// via get_pivot_shellpairs() for basistool / basislibrary atom-CD
+  /// aux basis construction.
+  std::set<std::pair<size_t, size_t>> pivot_shellpairs_;
+
   /// Form screening matrix
   void form_screening();
+  /// Two-step CD pivot selection (phases A-C: diagonal, pair
+  /// enumeration, pivoted selection). Populates the by-ref output
+  /// parameters with the pivoting machinery; b_raw_out is filled
+  /// with the (mu nu | piv) column for each selected pivot when
+  /// non-null, otherwise the columns are computed and discarded.
+  size_t select_two_step_pivots(const BasisSet & basis,
+                                double cholesky_tol,
+                                double shell_reuse_thr,
+                                double shell_screen_tol,
+                                bool verbose,
+                                arma::uvec & pi,
+                                arma::umat & invmap,
+                                arma::umat & prodmap,
+                                arma::uvec & prodidx,
+                                arma::uvec & odiagidx,
+                                std::set<std::pair<size_t, size_t>> & piv_shellpairs,
+                                arma::mat * b_raw_out) const;
   /// Compute shell in (a|uv) matrix
   arma::mat compute_a_munu(ERIWorker * eri, size_t ip, double * memptr = nullptr) const;
   /// Project P_munu onto the aux basis through one shellpair block:
@@ -127,11 +169,18 @@ class DensityFit {
   void contract_aux_to_J(const arma::vec & gamma, size_t ip, const arma::mat & amunu, arma::mat & J) const;
   /// Build K by looping orbital shellpairs, half-transforming each
   /// (a|mu nu) block against the occupied MOs, and accumulating
-  /// occ * aui^T aui. Backs onto BTensorBlocks::get_block, so in
-  /// direct mode the blocks recompute on the fly per call.
-  void accumulate_K_from_blocks(const arma::mat & C, const arma::vec & occs, arma::mat & K) const;
-  /// Complex-orbital overload (PZ-SIC etc.)
-  void accumulate_K_from_blocks(const arma::cx_mat & C, const arma::vec & occs, arma::cx_mat & K) const;
+  /// occ * aui^H aui (arma::trans is conjugate-transpose for complex
+  /// orbitals, plain transpose for real). Backs onto
+  /// BTensorBlocks::get_block, so in direct mode the blocks
+  /// recompute on the fly per call.
+  ///
+  /// Templated on the orbital scalar type so the same code services
+  /// the real (HF/DFT) and complex (PZ-SIC, complex-orbital
+  /// guesses) paths. Definition lives in the .cpp; specializations
+  /// for T = double and T = std::complex<double> are instantiated
+  /// implicitly via the calcK call sites.
+  template<typename T>
+  void accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::vec & occs, arma::Mat<T> & K) const;
 
  public:
   /// Constructor
@@ -153,6 +202,53 @@ class DensityFit {
    * Returns amount of significant orbital shell pairs.
    */
   size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, double cholthr);
+
+  /// Fill the B tensor via two-step pivoted Cholesky decomposition
+  /// (Folkestad/Kjonstad/Koch JCP 150, 194112 (2019)). Reshapes the
+  /// orthonormal L vectors into the block-shellpair layout the DF
+  /// J/K kernels consume; metric is identity (L vectors are
+  /// orthonormal by construction) so the same kernels handle CD and
+  /// DF transparently. The pivot metric is stashed so
+  /// forceJ_cholesky has the algebraic gradient available. Range
+  /// separation is honored from prior set_range_separation().
+  /// Returns amount of significant orbital shell pairs.
+  ///
+  /// One-step CD (full pivoted CD on the molecular tensor) was
+  /// retired here -- TwoStep is mathematically equivalent at the
+  /// same threshold but cheaper to construct.
+  size_t fill_cholesky(const BasisSet & basis,
+                       double cholesky_tol,
+                       double shell_reuse_thr,
+                       double shell_screen_tol,
+                       double fit_cholesky_thr,
+                       bool verbose);
+
+  /// True iff this object was filled via fill_cholesky (i.e. B holds
+  /// orthonormal CD vectors and there is no genuine aux basis).
+  bool is_cholesky() const { return cholesky_mode_; }
+
+  /// Algebraic two-step CD gradient of the Coulomb energy. Requires
+  /// fill_cholesky_twostep to have populated the pivot metric;
+  /// throws otherwise. Returns f of size 3*Nnuc.
+  arma::vec forceJ_cholesky(const BasisSet & basis, const arma::mat & P) const;
+
+  /// Pivot shellpairs that the CD picked. Populated by both
+  /// fill_cholesky and fill_cholesky_twostep. Returns an empty set
+  /// in non-cholesky mode.
+  std::set<std::pair<size_t, size_t>> get_pivot_shellpairs() const { return pivot_shellpairs_; }
+
+  /// Two-step CD pivot selection without building the metric or
+  /// L vectors. Returns the pivot shellpair set selected by phases
+  /// A-C of the two-step algorithm at the given threshold. Use when
+  /// downstream only needs the pivot list (e.g. atom-CD aux basis
+  /// construction in basislibrary.cpp). Range separation is honored
+  /// from prior set_range_separation(). Static because it doesn't
+  /// touch *this -- it's a pure utility on the basis.
+  static std::set<std::pair<size_t, size_t>> find_cholesky_pivots(const BasisSet & basis,
+                                                                   double cholesky_tol,
+                                                                   double shell_reuse_thr,
+                                                                   double shell_screen_tol,
+                                                                   bool verbose);
 
   /// Compute estimate of necessary memory
   size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double erithr, bool direct) const;
@@ -194,6 +290,11 @@ class DensityFit {
   void three_center_integrals(arma::mat & B) const;
   /// Get B matrix (must have HF enabled)
   void B_matrix(arma::mat & B) const;
+  /// Two-sided MO transform of the B tensor: returns Br with
+  /// Br(P, r*Nl + l) = sum_{u,v} Cl(u,l) Cr(v,r) B_dense(u*Nbf+v, P).
+  /// Used by post-HF consumers (moints.cpp); works equally for DF
+  /// and CD-mode storage because it builds on B_matrix.
+  arma::mat B_transform(const arma::mat & Cl, const arma::mat & Cr, bool verbose=false) const;
 
   /// Compute error in (AB|AB) type integrals
   double fitting_error() const;

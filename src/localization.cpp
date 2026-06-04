@@ -1208,21 +1208,18 @@ Edmiston::Edmiston(const BasisSet & basis, const BasisSet & fitbas, const arma::
     dfit.fill(basis,basis.density_fitting(),true,1e-8,1e-9,false);
   else
     dfit.fill(basis,fitbas,true,1e-8,1e-9,false);
-
-  use_chol=false;
 }
 
 Edmiston::Edmiston(const BasisSet & basis, const arma::mat & Cv, bool delocalize, double cholthr) : UnitaryFunction(4,!delocalize) {
   // Store orbitals
   C=Cv;
-  // Compute Cholesky
+  // Compute Cholesky via the merged CD/DF entry point. The
+  // two-step metric cleanup threshold gets the same value as the
+  // CD threshold (pre-merge Edmiston used one-step CD with a
+  // single threshold, so keep the single-knob feel here).
   double shthr=0.01; // Shell re-use threshhold
   double intthr=std::min(1e-10,cholthr/100.0); // Integrals threshold
-  chol.fill(basis,cholthr,shthr,intthr,false);
-  // NAF truncation
-  chol.naf_transform(1e-7,false);
-
-  use_chol=true;
+  dfit.fill_cholesky(basis,cholthr,shthr,intthr,cholthr,false);
 }
 
 Edmiston::~Edmiston() {
@@ -1276,15 +1273,7 @@ void Edmiston::cost_func_der(const arma::cx_mat & Wv, double & fv, arma::cx_mat 
     // Compute orbital-dependent Fock matrices
     W=Wv;
 
-    if(use_chol) {
-      Jorb.resize(Porb.size());
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-      for(size_t io=0;io<Porb.size();io++)
-	Jorb[io]=chol.calcJ(Porb[io]);
-    } else
-      Jorb=dfit.calcJ(Porb);
+    Jorb=dfit.calcJ(Porb);
   }
 
   // Compute self-repulsion

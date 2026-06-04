@@ -21,8 +21,9 @@
 #include "stringutil.h"
 #include "linalg.h"
 #include "timer.h"
-// erifit declarations have been folded into erichol.h
-#include "erichol.h"
+// erifit declarations were folded into erichol.h previously; the
+// erichol/density_fitting merge then collapsed CD onto DensityFit.
+#include "density_fitting.h"
 
 #include <algorithm>
 #include <fstream>
@@ -865,12 +866,10 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric)
     if(metric>0) {
       throw std::logic_error("Should not be here.\n!");
     } else {
-      // Run Cholesky
-      ERIchol chol;
-      chol.fill(dummy, thr, 0.0, 0.0, true);
-
-      // Get the pivot shell pairs
-      pivot_shellpairs = chol.get_pivot_shellpairs();
+      // Pivot-only CD entry point: skips the (mu nu | piv) column
+      // save and the metric / L-vector construction that the SCF
+      // path needs but cholesky_set doesn't.
+      pivot_shellpairs = DensityFit::find_cholesky_pivots(dummy, thr, 0.0, 0.0, true);
     }
   }
   printf("%2s has %i significant auxiliary shell pairs\n",orbbas.get_symbol().c_str(), (int) pivot_shellpairs.size());
