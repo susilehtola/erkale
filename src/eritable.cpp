@@ -236,7 +236,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 #endif // ifdef _OPENMP
   {
     // ERI worker
-    ERIWorker *eri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(basp->get_max_am(),basp->get_max_Ncontr()) : new ERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
+    auto eri = make_eri_worker(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta);
 
     // Integral array
     const std::vector<double> * erip;
@@ -294,8 +294,6 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 	  ints[ioff+ii]=(*erip)[ii];
       }
     }
-
-    delete eri;
   }
 
   return shpairs.size();

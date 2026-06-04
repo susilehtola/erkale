@@ -138,7 +138,8 @@ void Settings::add_scf_settings() {
   add_bool("Cholesky", "Use Cholesky decomposition?", true);
   add_double("CholeskyThr", "Cholesky decomposition threshold", 1e-7);
   add_double("CholeskyShThr", "Cholesky cache threshold", 0.01);
-  add_int("CholeskyMode", "Save/load integrals? 0 no, 1 save, -1 load (ignored: on-disk cache removed in the erichol/densityfit merge).", 0, true);
+  add_int("CholeskyMode", "Save/load the DF/CD integral cache? 0 no, 1 save after fill, -1 load before fill (falls back to fill on mismatch). Useful for repeated runs that share orbital + auxiliary basis. Ignored when Direct=true.", 0, true);
+  add_string("CholeskyFile", "Filename for the DF/CD integral cache (used when CholeskyMode != 0). Plain and range-separated entries coexist in the same file under distinct keys.", "cholesky.chk");
   add_string("CholeskyAlgorithm", "Cholesky/RI algorithm. TwoStep (default): orbital-pair pivots on atom pairs evaluated via three-center machinery (Folkestad/Kjonstad/Koch JCP 150, 194112 (2019)); exact at threshold. CDFit: density fitting with an atom-centered aux basis built by per-atom pivoted Cholesky on the orbital primitives (Lehtola JCTC 17, 6886 (2021)); only converges to the exact ERI tensor as the orbital basis becomes complete.", "TwoStep");
   // Which basis to use as density fitting basis
   add_string("FittingBasis", "Basis to use for density fitting / RI (Auto for automatic)","Auto");

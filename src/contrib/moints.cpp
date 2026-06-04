@@ -19,12 +19,10 @@
 #include "../checkpoint.h"
 #include "../density_fitting.h"
 #include <limits>
-#include "../density_fitting.h"
 #include "../localization.h"
 #include "../timer.h"
 #include "../mathf.h"
 #include "../linalg.h"
-#include "../eriworker.h"
 #include "../settings.h"
 #include "../stringutil.h"
 
@@ -486,8 +484,8 @@ int main_guarded(int argc, char **argv) {
   settings.add_double("CholeskyThr","Cholesky threshold to use",1e-7);
   settings.add_double("CholeskyShThr","Cholesky shell threshold to use",0.01);
   settings.add_double("IntegralThresh","Integral threshold",1e-10);
-  settings.add_int("CholeskyMode","Cholesky mode",0,true);
-  settings.add_bool("CholeskyInCore","Use more memory for Cholesky?",true);
+  settings.add_int("CholeskyMode","Cholesky cache mode: 0 off, 1 save, -1 load",0,true);
+  settings.add_string("CholeskyFile","Cholesky cache filename","cholesky.chk");
   settings.add_bool("Localize","Localize orbitals?",false);
   settings.add_string("LocGroups","List of groups to localize","");
   settings.add_string("LocMethod","Localization method to use","IAO2");
@@ -512,7 +510,6 @@ int main_guarded(int argc, char **argv) {
   int cholmode=settings.get_int("CholeskyMode");
   double cholthr=settings.get_double("CholeskyThr");
   double cholshthr=settings.get_double("CholeskyShThr");
-  bool cholincore=settings.get_bool("CholeskyInCore");
   bool binary=settings.get_bool("Binary");
   bool loc=settings.get_bool("Localize");
   enum locmet locmethod(parse_locmet(settings.get_string("LocMethod")));
@@ -577,18 +574,24 @@ int main_guarded(int argc, char **argv) {
     // Calculate fitting integrals. In-core, with RI-K
     dfit.fill(basis,dfitbas,false,intthr,fitthr,true);
   } else {
-    // Calculate Cholesky vectors. cholmode (on-disk cache) and
-    // cholincore no longer apply on the merged path; CD always
-    // recomputes here and the L vectors stay in core via DensityFit's
-    // BTensorBlocks (effectively cholincore=true).
-    if(cholmode!=0)
-      printf("Note: CholeskyMode is ignored on the merged Cholesky/DensityFit path.\n");
-    if(!cholincore)
-      printf("Note: in-core Cholesky storage is the only option on the merged Cholesky/DensityFit path.\n");
-    // Re-use cholthr for both the CD threshold and the two-step
-    // metric cleanup -- moints.cpp uses one user-facing knob
-    // (CholeskyThr); pre-merge there was no separate metric step.
-    dfit.fill_cholesky(basis,/*direct*/false,cholthr,cholshthr,intthr,cholthr,true);
+    // Two-step CD via the merged DensityFit. moints materialises the
+    // full B tensor below (dfit.B_matrix), so direct mode would just
+    // recompute every block at dump time -- always run cached here.
+    // CholeskyMode -1/+1 hits the same CholeskyFile the SCF driver
+    // uses, so an MO integral dump on top of a previous SCF skips
+    // the CD fill.
+    std::string cholfile = settings.get_string("CholeskyFile");
+    bool loaded = false;
+    if(cholmode == -1)
+      loaded = dfit.load(basis, /*auxbas*/nullptr, cholfile);
+    if(!loaded) {
+      // Re-use cholthr for both the CD threshold and the two-step
+      // metric cleanup -- moints.cpp uses one user-facing knob
+      // (CholeskyThr); pre-merge there was no separate metric step.
+      dfit.fill_cholesky(basis, /*direct*/false, cholthr, cholshthr, intthr, cholthr, true);
+      if(cholmode == 1)
+        dfit.save(cholfile);
+    }
   }
 
   // Data dump

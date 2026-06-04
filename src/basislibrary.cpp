@@ -21,8 +21,8 @@
 #include "stringutil.h"
 #include "linalg.h"
 #include "timer.h"
-// erifit declarations were folded into erichol.h previously; the
-// erichol/density_fitting merge then collapsed CD onto DensityFit.
+// CD pivot selection (used to build atom-CD auxiliary bases) lives
+// on DensityFit since the erichol/density_fitting merge.
 #include "density_fitting.h"
 
 #include <algorithm>

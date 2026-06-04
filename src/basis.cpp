@@ -2419,7 +2419,7 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
 #pragma omp parallel
 #endif
   {
-    ERIWorker *eri=new ERIWorker(get_max_am(),std::max(get_max_Ncontr(), sapfit.get_max_Ncontr()));
+    auto eri = std::make_unique<ERIWorker>(get_max_am(), std::max(get_max_Ncontr(), sapfit.get_max_Ncontr()));
     const std::vector<double> * erip;
 
     // Dummy shell
@@ -2504,8 +2504,6 @@ arma::mat BasisSet::sap_potential(const BasisSetLibrary & sapfit) const {
         }
       }
     }
-
-    delete eri;
   }
 
   if(verbose)
@@ -2525,13 +2523,8 @@ void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double 
 #pragma omp parallel
 #endif
   {
-    ERIWorker *eri;
+    auto eri = make_eri_worker(get_max_am(), get_max_Ncontr(), omega, alpha, beta);
     const std::vector<double> * erip;
-
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      eri=new ERIWorker(get_max_am(),get_max_Ncontr());
-    else
-      eri=new ERIWorker_srlr(get_max_am(),get_max_Ncontr(),omega,alpha,beta);
 
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic)
@@ -2566,8 +2559,6 @@ void BasisSet::eri_screening(arma::mat & Q, arma::mat & M, double omega, double 
         M(j,i)=m;
       }
     }
-
-    delete eri;
   }
 }
 

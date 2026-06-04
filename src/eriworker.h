@@ -222,5 +222,23 @@ class dERIWorker_srlr: public dERIWorker {
   ~dERIWorker_srlr();
 };
 
+#include <memory>
+
+/// Allocate an ERIWorker matching the given range-separation parameters.
+/// (omega, alpha, beta) == (0, 1, 0) is the plain-Coulomb default and
+/// gets a vanilla ERIWorker; everything else gets ERIWorker_srlr.
+inline std::unique_ptr<ERIWorker>
+make_eri_worker(int maxam, int maxcontr, double omega, double alpha, double beta) {
+  if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
+    return std::unique_ptr<ERIWorker>(new ERIWorker(maxam, maxcontr));
+  return std::unique_ptr<ERIWorker>(new ERIWorker_srlr(maxam, maxcontr, omega, alpha, beta));
+}
+
+inline std::unique_ptr<dERIWorker>
+make_deri_worker(int maxam, int maxcontr, double omega, double alpha, double beta) {
+  if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
+    return std::unique_ptr<dERIWorker>(new dERIWorker(maxam, maxcontr));
+  return std::unique_ptr<dERIWorker>(new dERIWorker_srlr(maxam, maxcontr, omega, alpha, beta));
+}
 
 #endif

@@ -22,7 +22,6 @@
 
 #include "basis.h"
 #include "basislibrary.h"
-#include "broyden.h"
 #include "checkpoint.h"
 #include "elements.h"
 #include "dftfuncs.h"
@@ -36,7 +35,6 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
-#include "trrh.h"
 #include "localization.h"
 #include "pzstability.h"
 
@@ -48,6 +46,37 @@ extern "C" {
 #define IMAGTHR 1e-7
 // Threshold for Cholesky decomposition of SAD density matrix
 #define CHOLCTHR 1e-6
+
+namespace {
+// CholeskyMode == -1: try to load dfit from cholfile for the given
+// basis (+ optional auxbas, null for CD-mode). Returns true if the
+// load succeeded. Direct mode bypasses the cache (no precomputed
+// storage to save anyway). Caller must have set range separation on
+// dfit beforehand if needed -- the load key depends on it.
+bool try_cache_load(DensityFit & dfit, const BasisSet & basis, const BasisSet * auxbas,
+                    int cholmode, bool direct, const std::string & cholfile,
+                    bool verbose, Timer & t) {
+  if(direct || cholmode != -1) return false;
+  if(verbose) t.set();
+  bool loaded = dfit.load(basis, auxbas, cholfile);
+  if(loaded && verbose) {
+    printf("Loaded integrals from %s (%s).\n", cholfile.c_str(), t.elapsed().c_str());
+    fflush(stdout);
+  }
+  return loaded;
+}
+
+// CholeskyMode == +1: save dfit to cholfile. Direct mode is skipped.
+void try_cache_save(const DensityFit & dfit, int cholmode, bool direct,
+                    const std::string & cholfile, bool verbose) {
+  if(direct || cholmode != 1) return;
+  dfit.save(cholfile);
+  if(verbose) {
+    printf("Saved integrals to %s.\n", cholfile.c_str());
+    fflush(stdout);
+  }
+}
+}
 
 enum guess_t parse_guess(const std::string & val) {
   if(stricmp(val,"Core")==0)
@@ -152,8 +181,10 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   // Linear dependence threshold
   fitcholthr=settings.get_double("FittingCholeskyThreshold");
 
-  // Use Cholesky?
-  cholesky=settings.get_bool("Cholesky");
+  // Use Cholesky? Local to the constructor -- after the merged
+  // CD/DF path, "cholesky" only chooses how dfit is filled; later
+  // SCF logic just checks densityfit and dfit.is_cholesky().
+  bool cholesky = settings.get_bool("Cholesky");
   cholthr=settings.get_double("CholeskyThr");
   cholshthr=settings.get_double("CholeskyShThr");
   cholmode=settings.get_int("CholeskyMode");
@@ -352,24 +383,26 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
       settings.set_bool("UseLM",uselm);
     }
 
-    // Compute memory estimate
-    std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
-
-    if(verbose) {
-      if(direct)
-	printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
-      else
-	printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
-      fflush(stdout);
-      t.set();
-    }
-
-    // Calculate the fitting integrals
-    size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
-
-    if(verbose) {
-      printf("done (%s)\n",t.elapsed().c_str());
-      printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+    const std::string cholfile = settings.get_string("CholeskyFile");
+    if(!try_cache_load(dfit, *basisp, &dfitbas, cholmode, direct, cholfile, verbose, t)) {
+      std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
+      if(verbose) {
+        if(direct)
+          printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
+        else
+          printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
+        fflush(stdout);
+        t.set();
+      }
+      size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
+      if(verbose) {
+        printf("done (%s)\n",t.elapsed().c_str());
+        printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+        printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+        fflush(stdout);
+      }
+      try_cache_save(dfit, cholmode, direct, cholfile, verbose);
+    } else if(verbose) {
       printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
       fflush(stdout);
     }
@@ -377,6 +410,7 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
     // Compute ERIs
     if(cholesky) {
       const std::string cd_alg = settings.get_string("CholeskyAlgorithm");
+      const std::string cholfile = settings.get_string("CholeskyFile");
       if(cd_alg=="CDFit") {
         // Density fitting with an atom-centered aux basis built by
         // per-atom pivoted Cholesky on the orbital primitives
@@ -395,62 +429,49 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
           printf("Auxiliary basis contains %i functions.\n",(int) dfitbas.get_Nbf());
           fflush(stdout);
         }
-        if(verbose) {
-          if(cholmode!=0)
-            printf("Note: CholeskyMode is ignored under CDFit; the aux basis is reconstructed at every SCF run.\n");
-          fflush(stdout);
-        }
 
         // Drive density fitting on the CD-derived aux basis.
-        std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
-        if(verbose) {
-          if(direct)
-            printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
-          else
-            printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
-          fflush(stdout);
-          t.set();
-        }
-        size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
-        if(verbose) {
-          printf("done (%s)\n",t.elapsed().c_str());
-          printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
-          fflush(stdout);
+        if(!try_cache_load(dfit, *basisp, &dfitbas, cholmode, direct, cholfile, verbose, t)) {
+          std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
+          if(verbose) {
+            if(direct)
+              printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
+            else
+              printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
+            fflush(stdout);
+            t.set();
+          }
+          size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
+          if(verbose) {
+            printf("done (%s)\n",t.elapsed().c_str());
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+            fflush(stdout);
+          }
+          try_cache_save(dfit, cholmode, direct, cholfile, verbose);
         }
 
-        // Route the rest of the SCF dispatch through the densityfit
-        // arm; the cholesky bool is just a switch the legacy code
-        // path used.
-        cholesky=false;
         densityfit=true;
       } else {
         // TwoStep CD: routed through DensityFit on the merged path.
-        // The L vectors are orthonormal by construction; DensityFit
+        // L vectors are orthonormal by construction; DensityFit
         // holds them in block-shellpair CachedBlocks layout with
         // metric (a|b) = I so the same J/K kernels handle CD and DF
         // transparently. The pivot metric is stashed for algebraic
         // forceJ.
-        //
-        // cholmode (on-disk cache) doesn't apply on the merged
-        // path; note that for the user.
-        if(verbose) {
-          t.set();
-          printf("Computing repulsion integrals (two-step CD).\n");
-          if(cholmode!=0)
-            printf("Note: CholeskyMode is ignored on the merged Cholesky/DensityFit path.\n");
-          fflush(stdout);
+        if(!try_cache_load(dfit, *basisp, /*auxbas*/nullptr, cholmode, direct, cholfile, verbose, t)) {
+          if(verbose) {
+            t.set();
+            printf("Computing repulsion integrals (two-step CD).\n");
+            fflush(stdout);
+          }
+          size_t Npairs = dfit.fill_cholesky(*basisp, direct, cholthr, cholshthr, intthr, fitcholthr, verbose);
+          if(verbose) {
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+            fflush(stdout);
+          }
+          try_cache_save(dfit, cholmode, direct, cholfile, verbose);
         }
 
-        size_t Npairs = dfit.fill_cholesky(*basisp, direct, cholthr, cholshthr, intthr, fitcholthr, verbose);
-        if(verbose) {
-          printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
-          fflush(stdout);
-        }
-
-        // Route the rest of the SCF dispatch through the densityfit
-        // arm; the cholesky bool is just a switch the legacy code
-        // path used.
-        cholesky=false;
         densityfit=true;
       }
     } else {
@@ -548,42 +569,52 @@ void SCF::fill_rs(double omega) {
     // Compute range separated integrals if necessary
     const bool fill = !dfit_rs.get_Naux() || dfit_rs.get_range_separation().omega != omega;
     if(fill) {
+      // dfit_rs.set_range_separation must happen before any load() --
+      // the cache key is built from (omega, alpha, beta) so the load
+      // only matches an entry stored with the exact same parameters
+      // (see df_cache_prefix() in density_fitting.cpp). The Nbf /
+      // Naux checks still apply on top of that.
       dfit_rs.set_range_separation({omega, 0.0, 1.0});
 
+      const std::string cholfile = settings.get_string("CholeskyFile");
+      const bool is_cd = dfit.is_cholesky();
       Timer t;
-      if(dfit.is_cholesky()) {
-        // Two-step CD on the merged path: build a fresh short-range
-        // B tensor via DensityFit's CD fill. No aux basis is in
-        // play (the L vectors are their own thing).
-        if(verbose) {
-          printf("Computing short-range repulsion integrals (two-step CD).\n");
-          fflush(stdout);
+      if(!try_cache_load(dfit_rs, *basisp, is_cd ? nullptr : &dfitbas, cholmode, direct, cholfile, verbose, t)) {
+        if(is_cd) {
+          // Two-step CD on the merged path: build a fresh short-range
+          // B tensor via DensityFit's CD fill. No aux basis is in
+          // play (the L vectors are their own thing).
+          if(verbose) {
+            printf("Computing short-range repulsion integrals (two-step CD).\n");
+            fflush(stdout);
+          }
+          t.set();
+          size_t Npairs = dfit_rs.fill_cholesky(*basisp, direct, cholthr, cholshthr, intthr, fitcholthr, verbose);
+          if(verbose) {
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
+            fflush(stdout);
+          }
+        } else {
+          // Real density fitting: same aux basis as the unscreened
+          // dfit, just with the range-separation kernel.
+          std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
+          if(verbose) {
+            if(direct)
+              printf("Initializing short-range density fitting calculation, requiring %s memory ... ",memest.c_str());
+            else
+              printf("Computing short-range density fitting integrals, requiring %s memory ... ",memest.c_str());
+            fflush(stdout);
+          }
+          t.set();
+          size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
+          if(verbose) {
+            printf("done (%s)\n",t.elapsed().c_str());
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
+            printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+            fflush(stdout);
+          }
         }
-        t.set();
-        size_t Npairs = dfit_rs.fill_cholesky(*basisp, direct, cholthr, cholshthr, intthr, fitcholthr, verbose);
-        if(verbose) {
-          printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
-          fflush(stdout);
-        }
-      } else {
-        // Real density fitting: same aux basis as the unscreened
-        // dfit, just with the range-separation kernel.
-        std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
-        if(verbose) {
-          if(direct)
-            printf("Initializing short-range density fitting calculation, requiring %s memory ... ",memest.c_str());
-          else
-            printf("Computing short-range density fitting integrals, requiring %s memory ... ",memest.c_str());
-          fflush(stdout);
-        }
-        t.set();
-        size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
-        if(verbose) {
-          printf("done (%s)\n",t.elapsed().c_str());
-          printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
-          printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
-          fflush(stdout);
-        }
+        try_cache_save(dfit_rs, cholmode, direct, cholfile, verbose);
       }
     }
 

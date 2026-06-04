@@ -129,22 +129,14 @@ size_t ERIscreen::fill(const BasisSet * basisv, double shtol, bool verbose) {
 }
 
 ERIWorker * ERIscreen::acquire_eri(int ith) const {
-  if(!eri_pool_[ith]) {
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      eri_pool_[ith].reset(new ERIWorker(basp->get_max_am(), basp->get_max_Ncontr()));
-    else
-      eri_pool_[ith].reset(new ERIWorker_srlr(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta));
-  }
+  if(!eri_pool_[ith])
+    eri_pool_[ith] = make_eri_worker(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta);
   return eri_pool_[ith].get();
 }
 
 dERIWorker * ERIscreen::acquire_deri(int ith) const {
-  if(!deri_pool_[ith]) {
-    if(omega==0.0 && alpha==1.0 && beta==0.0)
-      deri_pool_[ith].reset(new dERIWorker(basp->get_max_am(), basp->get_max_Ncontr()));
-    else
-      deri_pool_[ith].reset(new dERIWorker_srlr(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta));
-  }
+  if(!deri_pool_[ith])
+    deri_pool_[ith] = make_deri_worker(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta);
   return deri_pool_[ith].get();
 }
 

@@ -22,19 +22,13 @@
 #include <omp.h>
 #endif
 
-CachedBlocks::CachedBlocks() : Nbf_(0), Naux_(0) {}
+CachedBlocks::CachedBlocks() = default;
 
 CachedBlocks::CachedBlocks(size_t Nbf, size_t Naux,
                            std::vector<std::pair<size_t, size_t>> shellpairs,
                            std::vector<std::pair<size_t, size_t>> firsts,
                            std::vector<std::pair<size_t, size_t>> sizes)
-    : Nbf_(Nbf), Naux_(Naux),
-      shellpairs_(std::move(shellpairs)),
-      firsts_(std::move(firsts)),
-      sizes_(std::move(sizes)) {
-  if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
-    throw std::logic_error("CachedBlocks: shellpair / first / size vectors disagree in length");
-
+    : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)) {
   // Lay out per-block offsets into a single flat buffer.
   offsets_.resize(shellpairs_.size());
   size_t off = 0;
@@ -71,18 +65,12 @@ DirectDFBlocks::DirectDFBlocks(size_t Nbf, size_t Naux,
                                GaussianShell dummy,
                                double omega, double alpha, double beta,
                                int max_am, int max_contr)
-    : Nbf_(Nbf), Naux_(Naux),
-      shellpairs_(std::move(shellpairs)),
-      firsts_(std::move(firsts)),
-      sizes_(std::move(sizes)),
+    : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
       orb_shells_(std::move(orb_shells)),
       aux_shells_(std::move(aux_shells)),
       dummy_(std::move(dummy)),
       omega_(omega), alpha_(alpha), beta_(beta),
       max_am_(max_am), max_contr_(max_contr) {
-  if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
-    throw std::logic_error("DirectDFBlocks: shellpair / first / size vectors disagree in length");
-
   // Worst-case Nmu*Nnu across shellpairs; per-thread scratch is sized
   // to this at construction so get_block(ip) never reallocs.
   max_NmuNnu_ = 0;
@@ -112,12 +100,8 @@ ERIWorker * DirectDFBlocks::thread_eri() const {
   // The cache slot is owned by this thread for the lifetime of the
   // outer parallel region; lazily fill it the first time we hit a
   // get_block on this thread.
-  if(!eri_cache_[tid]) {
-    if(omega_==0.0 && alpha_==1.0 && beta_==0.0)
-      eri_cache_[tid].reset(new ERIWorker(max_am_, max_contr_));
-    else
-      eri_cache_[tid].reset(new ERIWorker_srlr(max_am_, max_contr_, omega_, alpha_, beta_));
-  }
+  if(!eri_cache_[tid])
+    eri_cache_[tid] = make_eri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
   return eri_cache_[tid].get();
 }
 
@@ -170,12 +154,8 @@ dERIWorker * DirectDFPerturbedBlocks::thread_deri() const {
 #else
   const int tid = 0;
 #endif
-  if(!deri_cache_[tid]) {
-    if(omega_==0.0 && alpha_==1.0 && beta_==0.0)
-      deri_cache_[tid].reset(new dERIWorker(max_am_, max_contr_));
-    else
-      deri_cache_[tid].reset(new dERIWorker_srlr(max_am_, max_contr_, omega_, alpha_, beta_));
-  }
+  if(!deri_cache_[tid])
+    deri_cache_[tid] = make_deri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
   return deri_cache_[tid].get();
 }
 
@@ -264,19 +244,13 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
                                arma::uword pivot_sentinel,
                                double omega, double alpha, double beta,
                                int max_am, int max_contr)
-    : Nbf_(Nbf), Naux_(Naux),
-      shellpairs_(std::move(shellpairs)),
-      firsts_(std::move(firsts)),
-      sizes_(std::move(sizes)),
+    : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
       orb_shells_(std::move(orb_shells)),
       pivot_shellpairs_(std::move(pivot_shellpairs)),
       pivot_index_(std::move(pivot_index)),
       pivot_sentinel_(pivot_sentinel),
       omega_(omega), alpha_(alpha), beta_(beta),
       max_am_(max_am), max_contr_(max_contr) {
-  if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
-    throw std::logic_error("DirectCDBlocks: shellpair / first / size vectors disagree in length");
-
   max_NmuNnu_ = 0;
   for(size_t ip=0; ip<sizes_.size(); ip++)
     max_NmuNnu_ = std::max(max_NmuNnu_, sizes_[ip].first * sizes_[ip].second);
@@ -298,12 +272,8 @@ ERIWorker * DirectCDBlocks::thread_eri() const {
 #else
   const int tid = 0;
 #endif
-  if(!eri_cache_[tid]) {
-    if(omega_==0.0 && alpha_==1.0 && beta_==0.0)
-      eri_cache_[tid].reset(new ERIWorker(max_am_, max_contr_));
-    else
-      eri_cache_[tid].reset(new ERIWorker_srlr(max_am_, max_contr_, omega_, alpha_, beta_));
-  }
+  if(!eri_cache_[tid])
+    eri_cache_[tid] = make_eri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
   return eri_cache_[tid].get();
 }
 

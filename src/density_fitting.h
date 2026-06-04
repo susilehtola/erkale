@@ -141,6 +141,21 @@ class DensityFit {
 
   /// Form screening matrix
   void form_screening();
+  /// Set Nbf, Nnuc, direct, orbshells, dummy, maxorbam, maxorbcontr
+  /// from the orbital basis. Shared by fill() and fill_cholesky();
+  /// aux-side state (Naux, auxshells, maxauxam/contr, maxam/contr)
+  /// and the cholesky_mode-specific bookkeeping are set by the
+  /// caller after this returns.
+  void init_orbital_state(const BasisSet & orbbas, bool dir);
+  /// Lay out the per-shellpair (shell pair, first-function pair, size
+  /// pair) descriptor triple consumed by every BTensorBlocks
+  /// constructor. The same descriptor is also passed to
+  /// DirectDFPerturbedBlocks, so the helper is on the class to keep
+  /// the layout in one place.
+  void build_shellpair_descriptor(
+      std::vector<std::pair<size_t, size_t>> & sp_pairs,
+      std::vector<std::pair<size_t, size_t>> & sp_firsts,
+      std::vector<std::pair<size_t, size_t>> & sp_sizes) const;
   /// Two-center metric-derivative force contribution. Iterates the
   /// aux-shellpair (DF) or pivot-shellpair (CD) pair index space,
   /// computes the corresponding dERIWorker derivative integrals,
@@ -205,6 +220,18 @@ class DensityFit {
   /// Contract the aux-space expansion gamma back to J through one
   /// shellpair block: J_munu += (a|mu nu) gamma_a.
   void contract_aux_to_J(const arma::vec & gamma, size_t ip, const arma::mat & amunu, arma::mat & J) const;
+  /// Filter the input orbital matrix Corig (Nbf x Norb) and
+  /// matching occupations occo down to the columns with non-zero
+  /// occupation. Returns C_out (Nbf x Nmo) and occs_out (Nmo);
+  /// shared by calcK / forceK so the wrappers stay trivial.
+  template<typename T>
+  void filter_occupied(const arma::Mat<T> & Corig, const std::vector<double> & occo,
+                       arma::Mat<T> & C_out, arma::vec & occs_out) const;
+  /// Templated calcK implementation; the real / complex public
+  /// overloads forward here.
+  template<typename T>
+  arma::Mat<T> calcK_impl(const arma::Mat<T> & Corig, const std::vector<double> & occo) const;
+
   /// Build K by looping orbital shellpairs, half-transforming each
   /// (a|mu nu) block against the occupied MOs, and accumulating
   /// occ * aui^H aui (arma::trans is conjugate-transpose for complex
@@ -345,6 +372,26 @@ class DensityFit {
 
   /// Compute error in (AB|AB) type integrals
   double fitting_error() const;
+
+  /// Save the (cached) DensityFit state to fname (HDF5, via the
+  /// Checkpoint wrapper). Direct mode and uninitialised objects are
+  /// rejected -- there's no precomputed integral storage to cache.
+  /// Range-separated and plain entries can coexist in one file under
+  /// distinct keys built from (omega, alpha, beta), so dfit and
+  /// dfit_rs can share a CholeskyFile. Use-case: repeated SCF runs
+  /// with different functionals on the same geometry / basis can
+  /// load a previously cached set of integrals and skip the fill.
+  void save(const std::string & fname) const;
+
+  /// Try to load a DensityFit state matching the current
+  /// (omega, alpha, beta) settings from fname. On success populates
+  /// *this and returns true; on a missing file, missing key, or
+  /// Nbf / Naux mismatch returns false and leaves *this unchanged.
+  /// `auxbas` selects DF (non-null) vs CD (null) entries; in DF mode
+  /// the loaded Naux is checked against auxbas.get_Nbf(). The basis
+  /// is the orbital basis for the run; it must match Nbf and is used
+  /// to repopulate orbpair / orbshell / aux-shell state.
+  bool load(const BasisSet & basis, const BasisSet * auxbas, const std::string & fname);
 };
 
 

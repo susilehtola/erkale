@@ -363,12 +363,12 @@ int main_guarded(int argc, char **argv) {
 #pragma omp parallel
 #endif
     {
-      // ERI worker. Wrap in unique_ptr so a throw inside the loop
-      // doesn't leak the allocation; .get() is used at every call
-      // site inside the loop (legacy raw-pointer API).
+      // ERI worker. unique_ptr so a throw inside the loop doesn't
+      // leak the allocation; .get() is used at every call site
+      // inside the loop (legacy raw-pointer API).
       auto maxam = std::max(source_basis.get_max_am(),target_basis.get_max_am());
       auto maxncontr = std::max(source_basis.get_max_Ncontr(), target_basis.get_max_Ncontr());
-      std::unique_ptr<ERIWorker> eri_owner((omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(maxam, maxncontr) : new ERIWorker_srlr(maxam,maxncontr,omega,alpha,beta));
+      auto eri_owner = make_eri_worker(maxam, maxncontr, omega, alpha, beta);
       ERIWorker *eri = eri_owner.get();
 
 #ifndef _OPENMP

@@ -287,8 +287,6 @@ protected:
   /// Pivoted Cholesky threshold for density fitting
   double fitcholthr;
 
-  /// Cholesky calculation?
-  bool cholesky;
   /// Cholesky threshold
   double cholthr;
   /// Cholesky shell threshold (for caching)

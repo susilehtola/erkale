@@ -69,6 +69,40 @@ public:
   virtual arma::mat get_block(size_t ip) const = 0;
 };
 
+/// Holds the (Nbf, Naux, shellpairs, firsts, sizes) descriptor every
+/// BTensorBlocks subclass needs, and supplies the six shellpair /
+/// dimension overrides. Subclasses derive from this instead of
+/// BTensorBlocks directly and only implement get_block.
+class BTensorBlocksBase : public BTensorBlocks {
+ protected:
+  size_t Nbf_;
+  size_t Naux_;
+  std::vector<std::pair<size_t, size_t>> shellpairs_;
+  std::vector<std::pair<size_t, size_t>> firsts_;
+  std::vector<std::pair<size_t, size_t>> sizes_;
+
+  BTensorBlocksBase() : Nbf_(0), Naux_(0) {}
+  BTensorBlocksBase(size_t Nbf, size_t Naux,
+                    std::vector<std::pair<size_t, size_t>> shellpairs,
+                    std::vector<std::pair<size_t, size_t>> firsts,
+                    std::vector<std::pair<size_t, size_t>> sizes)
+      : Nbf_(Nbf), Naux_(Naux),
+        shellpairs_(std::move(shellpairs)),
+        firsts_(std::move(firsts)),
+        sizes_(std::move(sizes)) {
+    if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
+      throw std::logic_error("BTensorBlocksBase: descriptor vectors disagree in length");
+  }
+
+ public:
+  size_t n_blocks() const override { return shellpairs_.size(); }
+  size_t naux() const override { return Naux_; }
+  size_t nbf() const override { return Nbf_; }
+  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
+  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
+  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
+};
+
 /**
  * Cached, in-memory block storage. Owns a single flat backing
  * std::vector<double> plus per-block (offset, nmu, nnu) lookup;
@@ -80,17 +114,7 @@ public:
  * vector<arma::mat> allocation churn that the previous DF storage
  * had before the block-shellpair refactor.
  */
-class CachedBlocks : public BTensorBlocks {
-  /// Total orbital basis size
-  size_t Nbf_;
-  /// Auxiliary dimension
-  size_t Naux_;
-  /// Per-block shell indices (mu_shell, nu_shell)
-  std::vector<std::pair<size_t, size_t>> shellpairs_;
-  /// Per-block first-function indices (mu0, nu0)
-  std::vector<std::pair<size_t, size_t>> firsts_;
-  /// Per-block sizes (Nmu, Nnu)
-  std::vector<std::pair<size_t, size_t>> sizes_;
+class CachedBlocks : public BTensorBlocksBase {
   /// Per-block offset into storage_
   std::vector<size_t> offsets_;
   /// Flat backing storage, naux*sum(Nmu*Nnu) doubles
@@ -104,12 +128,6 @@ public:
                std::vector<std::pair<size_t, size_t>> sizes);
   ~CachedBlocks() override = default;
 
-  size_t n_blocks() const override { return shellpairs_.size(); }
-  size_t naux() const override { return Naux_; }
-  size_t nbf() const override { return Nbf_; }
-  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
-  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
-  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
   arma::mat get_block(size_t ip) const override;
 
   /// Mutable access used by fill paths to write the ip-th block in
@@ -119,6 +137,14 @@ public:
 
   /// Total backing-store size in doubles
   size_t storage_size() const { return storage_.size(); }
+
+  /// Direct access to the flat backing store, exposed so DensityFit
+  /// can serialize / deserialize it through the Checkpoint HDF5
+  /// wrapper. Read-only and mutable forms; the layout is described
+  /// by the constructor (sum of Naux*Nmu*Nnu per shellpair, in the
+  /// shellpair order the descriptor was passed in).
+  const std::vector<double> & storage() const { return storage_; }
+  std::vector<double> & storage() { return storage_; }
 };
 
 /**
@@ -148,13 +174,7 @@ public:
  * shellpair list, sentinel) by value at construction so it
  * outlives the DensityFit that built it.
  */
-class DirectCDBlocks : public BTensorBlocks {
-  size_t Nbf_;
-  size_t Naux_;
-  std::vector<std::pair<size_t, size_t>> shellpairs_;
-  std::vector<std::pair<size_t, size_t>> firsts_;
-  std::vector<std::pair<size_t, size_t>> sizes_;
-
+class DirectCDBlocks : public BTensorBlocksBase {
   /// Orbital shells, owned copy.
   std::vector<GaussianShell> orb_shells_;
   /// Pivot shellpairs to iterate over inside get_block.
@@ -185,25 +205,13 @@ class DirectCDBlocks : public BTensorBlocks {
                  int max_am, int max_contr);
   ~DirectCDBlocks() override = default;
 
-  size_t n_blocks() const override { return shellpairs_.size(); }
-  size_t naux() const override { return Naux_; }
-  size_t nbf() const override { return Nbf_; }
-  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
-  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
-  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
   arma::mat get_block(size_t ip) const override;
 
  private:
   ERIWorker * thread_eri() const;
 };
 
-class DirectDFBlocks : public BTensorBlocks {
-  size_t Nbf_;
-  size_t Naux_;
-  std::vector<std::pair<size_t, size_t>> shellpairs_;
-  std::vector<std::pair<size_t, size_t>> firsts_;
-  std::vector<std::pair<size_t, size_t>> sizes_;
-
+class DirectDFBlocks : public BTensorBlocksBase {
   /// Orbital and auxiliary shells, owned copies (cheap).
   std::vector<GaussianShell> orb_shells_;
   std::vector<GaussianShell> aux_shells_;
@@ -239,12 +247,6 @@ public:
                  int max_am, int max_contr);
   ~DirectDFBlocks() override = default;
 
-  size_t n_blocks() const override { return shellpairs_.size(); }
-  size_t naux() const override { return Naux_; }
-  size_t nbf() const override { return Nbf_; }
-  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
-  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
-  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
   arma::mat get_block(size_t ip) const override;
 
  private:
@@ -342,6 +344,10 @@ public:
  * the same way DirectDFBlocks does for value integrals.
  */
 class DirectDFPerturbedBlocks : public PerturbedBTensorBlocks {
+  // Same descriptor as BTensorBlocksBase but PerturbedBTensorBlocks
+  // is a sibling interface (different get_block signature: streams
+  // sub-blocks via for_each_pert), so the fields are duplicated
+  // here rather than shared through inheritance.
   size_t Nbf_;
   size_t Naux_;
   size_t Nnuc_;
