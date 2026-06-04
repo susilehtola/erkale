@@ -123,6 +123,16 @@ class DensityFit {
   /// machinery exposed via get_pivot_shellpairs().
   bool cholesky_mode_;
 
+  /// CD-only half-inverse X = D^-1 X~ of the pivot metric M=(piv|piv).
+  /// Stored alongside the L-baked blocks so the force kernels
+  /// (forceJ_cholesky, forceK) can recover the pivot-space coefficient
+  /// c_raw = X * d from the indep-space expansion d that
+  /// compute_expansion returns under cholesky_mode_, and so
+  /// DirectCDBlocks can bake X into its on-the-fly blocks. The metric
+  /// M itself is not retained: the force kernels recompute its
+  /// nuclear derivatives on the fly via dERIWorker. Empty in DF mode.
+  arma::mat cd_X_;
+
   /// (Nbf x Nbf) lookup: (mu, nu) -> pivot rank in 0..Naux-1, or
   /// cd_pivot_sentinel_ for non-pivot pairs. Built in fill_cholesky
   /// and consumed by forceJ_cholesky for the dM/dR + d(mu nu | piv)/dR

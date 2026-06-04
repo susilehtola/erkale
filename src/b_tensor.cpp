@@ -242,6 +242,7 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
                                std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
                                arma::umat pivot_index,
                                arma::uword pivot_sentinel,
+                               arma::mat pivot_X,
                                double omega, double alpha, double beta,
                                int max_am, int max_contr)
     : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
@@ -249,8 +250,13 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
       pivot_shellpairs_(std::move(pivot_shellpairs)),
       pivot_index_(std::move(pivot_index)),
       pivot_sentinel_(pivot_sentinel),
+      pivot_X_(std::move(pivot_X)),
       omega_(omega), alpha_(alpha), beta_(beta),
       max_am_(max_am), max_contr_(max_contr) {
+  if(pivot_X_.n_cols != Naux_)
+    throw std::logic_error("DirectCDBlocks: pivot_X cleaned-subspace dim does not match Naux");
+  Nselected_ = pivot_X_.n_rows;
+
   max_NmuNnu_ = 0;
   for(size_t ip=0; ip<sizes_.size(); ip++)
     max_NmuNnu_ = std::max(max_NmuNnu_, sizes_[ip].first * sizes_[ip].second);
@@ -262,8 +268,11 @@ DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
 #endif
   eri_cache_.resize(nthr);
   scratch_.resize(nthr);
-  for(int t=0; t<nthr; t++)
-    scratch_[t].set_size(Naux_, max_NmuNnu_);
+  scratch_L_.resize(nthr);
+  for(int t=0; t<nthr; t++) {
+    scratch_[t].set_size(Nselected_, max_NmuNnu_);
+    scratch_L_[t].set_size(Naux_, max_NmuNnu_);
+  }
 }
 
 ERIWorker * DirectCDBlocks::thread_eri() const {
@@ -290,17 +299,13 @@ arma::mat DirectCDBlocks::get_block(size_t ip) const {
   const int tid = 0;
 #endif
 
-  arma::mat & buf = scratch_[tid];
-  // Zero only the slice we'll use; pivots that map to no orbital
-  // shellpair contribution stay zero (CachedBlocks does the same).
-  std::memset(buf.memptr(), 0, sizeof(double) * Naux_ * Nmu * Nnu);
-
-  // Iterate over pivot shellpairs (ks, ls): one libint 4-center call
-  // per (mu_shell, nu_shell, ks, ls) gives Nmu*Nnu*Nk*Nl entries; we
-  // scatter only the (k, l) combinations that correspond to selected
-  // pivots into the block. Layout: buf(pidx, jj*Nmu + ii) =
-  // (mu_ii nu_jj | piv_pidx).
-  double * buf_ptr = buf.memptr();
+  // First stage: build the raw (piv | mu nu) sub-block at
+  // shape (Nselected_ x Nmu*Nnu) into the thread's scratch.
+  // Pivots that map to no orbital shellpair contribution stay
+  // zero (CachedBlocks does the same).
+  arma::mat & buf_raw = scratch_[tid];
+  std::memset(buf_raw.memptr(), 0, sizeof(double) * Nselected_ * Nmu * Nnu);
+  double * buf_ptr = buf_raw.memptr();
   for(size_t pp=0; pp<pivot_shellpairs_.size(); pp++) {
     const size_t ks = pivot_shellpairs_[pp].first;
     const size_t ls = pivot_shellpairs_[pp].second;
@@ -319,11 +324,21 @@ arma::mat DirectCDBlocks::get_block(size_t ip) const {
           for(size_t ll=0; ll<Nl; ll++) {
             const arma::uword pidx = pivot_index_(k0+kk, l0+ll);
             if(pidx == pivot_sentinel_) continue;
-            buf_ptr[col * Naux_ + pidx] = (*erip)[((ii*Nnu+jj)*Nk+kk)*Nl+ll];
+            buf_ptr[col * Nselected_ + pidx] = (*erip)[((ii*Nnu+jj)*Nk+kk)*Nl+ll];
           }
       }
   }
-  return arma::mat(buf_ptr, Naux_, Nmu * Nnu, /*copy_aux_mem*/false, /*strict*/true);
+
+  // Second stage: bake the pivot metric into the block, matching what
+  // CachedBlocks stores. L_block = X^T B_raw_block, shape
+  // (Naux_indep x Nmu*Nnu). Without this multiply the J/K kernels
+  // (which assume identity metric in CD mode) would see raw integrals
+  // and produce wrong J/K; cf. fill_cholesky's L-bake.
+  arma::mat raw_view(buf_ptr, Nselected_, Nmu * Nnu, /*copy*/false, /*strict*/true);
+  arma::mat & buf_L = scratch_L_[tid];
+  arma::mat L_view(buf_L.memptr(), Naux_, Nmu * Nnu, /*copy*/false, /*strict*/true);
+  L_view = pivot_X_.t() * raw_view;
+  return L_view;
 }
 
 arma::mat DirectDFBlocks::get_block(size_t ip) const {

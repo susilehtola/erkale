@@ -181,16 +181,27 @@ class DirectCDBlocks : public BTensorBlocksBase {
   std::vector<std::pair<size_t, size_t>> pivot_shellpairs_;
   /// (Nbf x Nbf) lookup: (mu, nu) -> pivot rank or pivot_sentinel_.
   arma::umat pivot_index_;
-  /// Sentinel value used in pivot_index_ (== Naux_).
+  /// Sentinel value used in pivot_index_ (Nselected = pivot_index_xt.n_rows).
   arma::uword pivot_sentinel_;
+  /// X = M^{-1/2} on the pivot metric, shape (Nselected x Naux_indep).
+  /// Applied inside get_block as the final L = X^T B_raw multiply so
+  /// the J/K kernels see the same L-baked block shape the cached path
+  /// produces. naux() == Naux_indep == pivot_X_.n_cols.
+  arma::mat pivot_X_;
 
   double omega_, alpha_, beta_;
   int max_am_;
   int max_contr_;
 
   mutable std::vector<std::unique_ptr<ERIWorker>> eri_cache_;
+  /// Per-thread scratch sized (Nselected x max_NmuNnu_) for the raw
+  /// (piv|mu nu) block before the X^T multiply.
   mutable std::vector<arma::mat> scratch_;
+  /// Per-thread scratch sized (Naux_indep x max_NmuNnu_) holding the
+  /// post-multiply L block returned to the caller.
+  mutable std::vector<arma::mat> scratch_L_;
   size_t max_NmuNnu_;
+  size_t Nselected_;
 
  public:
   DirectCDBlocks(size_t Nbf, size_t Naux,
@@ -201,6 +212,7 @@ class DirectCDBlocks : public BTensorBlocksBase {
                  std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
                  arma::umat pivot_index,
                  arma::uword pivot_sentinel,
+                 arma::mat pivot_X,
                  double omega, double alpha, double beta,
                  int max_am, int max_contr);
   ~DirectCDBlocks() override = default;
