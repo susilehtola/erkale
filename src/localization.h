@@ -240,7 +240,7 @@ class Pipek : public UnitaryFunction {
 /// Edmiston-Ruedenberg localization
 class Edmiston : public UnitaryFunction {
   /// Coulomb-builder: holds either real DF (aux basis) or CD vectors
-  /// (cholesky_mode_) -- both expose the same calcJ interface.
+  /// (cholesky_mode) -- both expose the same calcJ interface.
   DensityFit dfit;
 
   /// Orbitals

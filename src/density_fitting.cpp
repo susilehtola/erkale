@@ -39,8 +39,8 @@ DensityFit::DensityFit() {
   omega=0.0;
   alpha=1.0;
   beta=0.0;
-  cholesky_mode_=false;
-  cd_pivot_sentinel_=0;
+  cholesky_mode=false;
+  cd_pivot_sentinel=0;
 }
 
 DensityFit::~DensityFit() {
@@ -85,10 +85,10 @@ void DensityFit::build_shellpair_descriptor(
 }
 
 size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool dir, double erithr, double linthr, double cholthr) {
-  cholesky_mode_=false;
-  cd_pivot_index_.reset();
-  cd_pivot_shellpairs_vec_.clear();
-  pivot_shellpairs_.clear();
+  cholesky_mode=false;
+  cd_pivot_index.reset();
+  cd_pivot_shellpairs_vec.clear();
+  pivot_shellpairs.clear();
 
   init_orbital_state(orbbas, dir);
   Naux = auxbas.get_Nbf();
@@ -203,11 +203,11 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
                                           bool verbose,
                                           arma::uvec & pi,
                                           arma::umat & invmap,
-                                          arma::umat & prodmap,
-                                          arma::uvec & prodidx,
-                                          arma::uvec & odiagidx,
                                           std::set<std::pair<size_t, size_t>> & piv_shellpairs,
                                           arma::mat * b_raw_out) const {
+  // prodmap ((mu,nu) -> product index) is internal scratch for the
+  // pivoted selection; the callers never need it.
+  arma::umat prodmap;
   if(cholesky_tol < shell_screen_tol) {
     fprintf(stderr,"Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
     printf("Warning - used Cholesky threshold is smaller than the integral screening threshold. Results may be inaccurate!\n");
@@ -259,14 +259,14 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
   }
   t_int+=t.get();
 
-  // Phase B: enumerate orbital pairs into prodidx / invmap / prodmap / odiagidx.
+  // Phase B: enumerate the significant orbital pairs into invmap
+  // (compact product index -> (i,j)) and prodmap ((i,j) -> compact
+  // index). The flat index i*Nbf+j is recovered from invmap when the
+  // diagonal is gathered below, so no separate prodidx is kept.
   {
     prodmap.ones(Nbf_local,Nbf_local);
     prodmap*=-1;
     size_t iprod=0;
-    size_t iodiag=0;
-    prodidx.resize(Nbf_local*Nbf_local);
-    odiagidx.resize(Nbf_local*Nbf_local);
     invmap.zeros(2,Nbf_local*Nbf_local);
     for(size_t ip=0;ip<shpairs.size();ip++) {
       size_t is=shpairs[ip].is;
@@ -278,18 +278,12 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
       if(is==js) {
         for(size_t i=i0;i<i0+Ni;i++) {
           for(size_t j=j0;j<i;j++) {
-            size_t idx=i*Nbf_local+j;
-            prodidx(iprod)=idx;
             invmap(0,iprod)=i;
             invmap(1,iprod)=j;
-            odiagidx(iodiag)=iprod;
             prodmap(i,j)=iprod;
             prodmap(j,i)=iprod;
             iprod++;
-            iodiag++;
           }
-          size_t idx=i*Nbf_local+i;
-          prodidx(iprod)=idx;
           invmap(0,iprod)=i;
           invmap(1,iprod)=i;
           prodmap(i,i)=iprod;
@@ -298,44 +292,43 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
       } else {
         for(size_t i=i0;i<i0+Ni;i++)
           for(size_t j=j0;j<j0+Nj;j++) {
-            size_t idx=i*Nbf_local+j;
-            prodidx(iprod)=idx;
             invmap(0,iprod)=i;
             invmap(1,iprod)=j;
-            odiagidx(iodiag)=iprod;
             prodmap(i,j)=iprod;
             prodmap(j,i)=iprod;
             iprod++;
-            iodiag++;
           }
       }
     }
-    prodidx.resize(iprod);
-    odiagidx.resize(iodiag);
-    // Fix off-by-one: shed any unused tail of invmap, including the
-    // n_cols-1 case the old guard skipped. Without this the trailing
-    // bogus column leaks into downstream consumers that iterate
-    // over invmap.n_cols (e.g. the cached B_raw scatter below).
+    // Trim invmap to the significant products. (Shed the whole unused
+    // tail, including the n_cols-1 column the old < n_cols-1 guard
+    // skipped, which would otherwise leak into the cached B_raw
+    // scatter that iterates over invmap.n_cols.)
     if(iprod < invmap.n_cols)
       invmap.shed_cols(iprod, invmap.n_cols-1);
   }
+  const size_t Nprod = invmap.n_cols;
 
   if(verbose) {
-    printf("Two-step CD: screening reduced dofs by factor %.2f.\n",d.n_elem*1.0/prodidx.n_elem);
+    printf("Two-step CD: screening reduced dofs by factor %.2f.\n",d.n_elem*1.0/Nprod);
     fflush(stdout);
   }
 
-  d=d(prodidx);
-  // Empty prodidx (e.g. atomic basis where everything screens out)
+  // Restrict the diagonal to the significant products: the flat index
+  // of compact product k is invmap(0,k)*Nbf + invmap(1,k).
+  d = d(arma::uvec(invmap.row(0).t()*Nbf_local + invmap.row(1).t()));
+  // Empty product set (e.g. atomic basis where everything screens out)
   // would make arma::max throw; pretend there's nothing left to pivot.
-  double error(prodidx.n_elem == 0 ? 0.0 : arma::max(d));
+  double error(Nprod == 0 ? 0.0 : arma::max(d));
 
-  // Phase C: pivot selection.
+  // Phase C: pivot selection. B_temp / b_raw_out grow in chunks of
+  // pivot_grow_chunk columns as pivots are accepted.
+  const size_t pivot_grow_chunk = 100;
   pi=arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem);
   arma::mat B_temp;
-  B_temp.zeros(100,prodidx.n_elem);
+  B_temp.zeros(pivot_grow_chunk,Nprod);
   if(b_raw_out) {
-    b_raw_out->set_size(prodidx.n_elem, 100);
+    b_raw_out->set_size(Nprod, pivot_grow_chunk);
     b_raw_out->zeros();
   }
   size_t m=0;
@@ -405,12 +398,11 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
     t_int+=t.get();
     t.set();
 
-    while(true) {
-      // Bail out if the Schur sweep has consumed every product pair.
-      // For tiny systems (e.g. atomic guess on H with cc-pVDZ) m can
-      // reach d.n_elem during the inner block iteration; the dereference
-      // d(pi(m)) below would then run off the end.
-      if(m >= d.n_elem) break;
+    // Inner block sweep. The m < d.n_elem guard matters for tiny
+    // systems (e.g. atomic guess on H with cc-pVDZ), where m can reach
+    // d.n_elem mid-sweep; without it the d(pi(m)) below runs off the
+    // end. The other exit is the shell-reuse test on blockerr.
+    while(m < d.n_elem) {
       double errmax=d(pi(m));
       for(size_t i=m+1;i<d.n_elem;i++) {
         const double v=d(pi(i));
@@ -456,9 +448,9 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
       pim=pi(m);
 
       if(m>=B_temp.n_rows)
-        B_temp.resize(B_temp.n_rows+100, B_temp.n_cols);
+        B_temp.resize(B_temp.n_rows+pivot_grow_chunk, B_temp.n_cols);
       if(b_raw_out && m>=b_raw_out->n_cols)
-        b_raw_out->resize(b_raw_out->n_rows, b_raw_out->n_cols+100);
+        b_raw_out->resize(b_raw_out->n_rows, b_raw_out->n_cols+pivot_grow_chunk);
 
       if(b_raw_out)
         b_raw_out->col(m) = A.col(Aind);
@@ -528,21 +520,19 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
 }
 
 std::set<std::pair<size_t, size_t>> DensityFit::find_cholesky_pivots(const BasisSet & basis,
-                                                                      double cholesky_tol,
-                                                                      double shell_reuse_thr,
-                                                                      double shell_screen_tol,
-                                                                      bool verbose) {
+                                                                     double cholesky_tol,
+                                                                     double shell_reuse_thr,
+                                                                     double shell_screen_tol,
+                                                                     bool verbose) const {
   // Pivots-only: run phases A-C with no (mu nu | piv) column save
   // and no metric / B construction. Used by basislibrary for atom-CD
-  // aux-basis construction.
-  DensityFit cd;
+  // aux-basis construction. Honors this object's range separation.
   arma::uvec pi;
-  arma::umat invmap, prodmap;
-  arma::uvec prodidx, odiagidx;
+  arma::umat invmap;
   std::set<std::pair<size_t, size_t>> piv_shellpairs;
-  cd.select_two_step_pivots(basis, cholesky_tol, shell_reuse_thr, shell_screen_tol,
-                            verbose, pi, invmap, prodmap, prodidx, odiagidx,
-                            piv_shellpairs, nullptr);
+  select_two_step_pivots(basis, cholesky_tol, shell_reuse_thr, shell_screen_tol,
+                         verbose, pi, invmap,
+                         piv_shellpairs, nullptr);
   return piv_shellpairs;
 }
 
@@ -556,7 +546,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   // Two-step CD = density fitting with an aux basis chosen by
   // pivoted Cholesky on orbital products. DF and CD share the
   // downstream J/K/forceJ kernels; only the aux selection differs.
-  cholesky_mode_ = true;
+  cholesky_mode = true;
   init_orbital_state(basis, dir);
   auxshells.clear();
   maxauxam    = 0;
@@ -572,23 +562,22 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   // DirectCDBlocks::get_block, so we pass nullptr and skip the
   // O(Nprod * Nselected) allocation.
   arma::uvec pi;
-  arma::umat invmap, prodmap;
-  arma::uvec prodidx, odiagidx;
+  arma::umat invmap;
   arma::mat B_raw;
   const size_t Nselected = select_two_step_pivots(basis, cholesky_tol, shell_reuse_thr, shell_screen_tol,
-                                                  verbose, pi, invmap, prodmap, prodidx, odiagidx,
-                                                  pivot_shellpairs_, direct ? nullptr : &B_raw);
+                                                  verbose, pi, invmap,
+                                                  pivot_shellpairs, direct ? nullptr : &B_raw);
   Naux = Nselected;
-  cd_pivot_shellpairs_vec_.assign(pivot_shellpairs_.begin(), pivot_shellpairs_.end());
+  cd_pivot_shellpairs_vec.assign(pivot_shellpairs.begin(), pivot_shellpairs.end());
 
   // (mu, nu) -> pivot rank lookup for forceJ_cholesky.
-  cd_pivot_sentinel_ = Nselected;
-  cd_pivot_index_.set_size(Nbf, Nbf);
-  cd_pivot_index_.fill(cd_pivot_sentinel_);
+  cd_pivot_sentinel = Nselected;
+  cd_pivot_index.set_size(Nbf, Nbf);
+  cd_pivot_index.fill(cd_pivot_sentinel);
   for(arma::uword p=0; p<Nselected; p++) {
     const arma::uword pii = pi(p);
-    cd_pivot_index_(invmap(0,pii), invmap(1,pii)) = p;
-    cd_pivot_index_(invmap(1,pii), invmap(0,pii)) = p;
+    cd_pivot_index(invmap(0,pii), invmap(1,pii)) = p;
+    cd_pivot_index(invmap(1,pii), invmap(0,pii)) = p;
   }
 
   // Phase D: build the two-center metric (piv | piv). This is the
@@ -607,16 +596,16 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
 #ifdef _OPENMP
 #pragma omp for schedule(dynamic,1)
 #endif
-    for(size_t ip=0; ip<cd_pivot_shellpairs_vec_.size(); ip++) {
-      const size_t is = cd_pivot_shellpairs_vec_[ip].first;
-      const size_t js = cd_pivot_shellpairs_vec_[ip].second;
+    for(size_t ip=0; ip<cd_pivot_shellpairs_vec.size(); ip++) {
+      const size_t is = cd_pivot_shellpairs_vec[ip].first;
+      const size_t js = cd_pivot_shellpairs_vec[ip].second;
       const size_t Ni = shells[is].get_Nbf();
       const size_t Nj = shells[js].get_Nbf();
       const size_t i0 = shells[is].get_first_ind();
       const size_t j0 = shells[js].get_first_ind();
       for(size_t jp=0; jp<=ip; jp++) {
-        const size_t ks = cd_pivot_shellpairs_vec_[jp].first;
-        const size_t ls = cd_pivot_shellpairs_vec_[jp].second;
+        const size_t ks = cd_pivot_shellpairs_vec[jp].first;
+        const size_t ls = cd_pivot_shellpairs_vec[jp].second;
         const size_t Nk = shells[ks].get_Nbf();
         const size_t Nl = shells[ls].get_Nbf();
         const size_t k0 = shells[ks].get_first_ind();
@@ -626,12 +615,12 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
         erip = eri->getp();
         for(size_t ii=0; ii<Ni; ii++)
           for(size_t jj=0; jj<Nj; jj++) {
-            const arma::uword pidx = cd_pivot_index_(i0+ii, j0+jj);
-            if(pidx == cd_pivot_sentinel_) continue;
+            const arma::uword pidx = cd_pivot_index(i0+ii, j0+jj);
+            if(pidx == cd_pivot_sentinel) continue;
             for(size_t kk=0; kk<Nk; kk++)
               for(size_t ll=0; ll<Nl; ll++) {
-                const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
-                if(qidx == cd_pivot_sentinel_) continue;
+                const arma::uword qidx = cd_pivot_index(k0+kk, l0+ll);
+                if(qidx == cd_pivot_sentinel) continue;
                 const double val = (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll];
                 // Each (pidx, qidx) pair maps to a unique unordered
                 // pivot-shellpair pair, which the outer for(ip)
@@ -696,16 +685,16 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   // it explicitly rounds badly; baking X into L sidesteps that.
   // forceJ_cholesky / forceK still need X to map the indep-space
   // expansion d back to a pivot-space coefficient (c = X d) and to
-  // build the per-orbital Z, so keep it in cd_X_; the metric M itself
+  // build the per-orbital Z, so keep it in cd_X; the metric M itself
   // is recomputed on the fly for derivatives, not stored. ab / ab_inv
   // / ab_invh become identity over the cleaned subspace. Applies to
   // both cached and direct paths so they share the L-baked convention.
   const size_t Naux_indep = ab_invh.n_cols;
   Naux = Naux_indep;
-  cd_X_ = std::move(ab_invh);
+  cd_X = std::move(ab_invh);
   // The metric is fully baked into the L blocks now, so the J/K
   // kernels need no (a|b) matrices in CD mode -- they branch on
-  // cholesky_mode_ and skip the multiply. Free ab / ab_inv / ab_invh
+  // cholesky_mode and skip the multiply. Free ab / ab_inv / ab_invh
   // rather than carry Naux_indep^2 identity matrices around.
   ab.reset();
   ab_inv.reset();
@@ -713,26 +702,24 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
 
   if(direct) {
     // DirectCDBlocks recomputes (piv | mu nu) from libint on every
-    // get_block(ip) call and applies cd_X_ before returning so the
+    // get_block(ip) call and applies cd_X before returning so the
     // J/K kernels see the same L = X^T B_raw blocks the cached
     // path emits. Owns its own pivot + X copies so it outlives this
     // DensityFit if needed.
     blocks = std::make_shared<DirectCDBlocks>(
         Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
-        orbshells, cd_pivot_shellpairs_vec_, cd_pivot_index_, cd_pivot_sentinel_,
-        cd_X_, omega, alpha, beta, maxam, maxcontr);
+        orbshells, cd_pivot_shellpairs_vec, cd_pivot_index, cd_pivot_sentinel,
+        cd_X, omega, alpha, beta, maxam, maxcontr);
   } else {
     // Cached mode: scatter L = X^T B_raw into per-shellpair blocks.
     // We do the multiply one shellpair at a time so the only
     // full-tensor allocations live during fill are B_raw and the
     // cached store itself (~2x the persistent footprint).
     //
-    // Use prodidx.n_elem as the entry count, not invmap.n_cols:
-    // select_two_step_pivots's shed_cols sometimes leaves invmap
-    // with one extra column (the iprod < n_cols-1 guard misses the
-    // n_cols-1 case), and reading that extra column would scatter
-    // a row index past prodidx into prodlookup.
-    const arma::uword n_prod = prodidx.n_elem;
+    // invmap is trimmed to exactly the significant products in
+    // select_two_step_pivots, so invmap.n_cols is the row count of
+    // B_raw and the right sentinel for "this (mu,nu) has no L vector".
+    const arma::uword n_prod = invmap.n_cols;
     const arma::uword prod_sentinel = n_prod;
     arma::umat prodlookup(Nbf, Nbf);
     prodlookup.fill(prod_sentinel);
@@ -760,7 +747,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
       // (mu, nu) pairs that this shellpair contributes to, then one
       // DGEMM gets the L sub-block. Pairs the pivoting dropped stay
       // zero-filled in slot (they're below threshold anyway).
-      arma::mat B_sub(cd_X_.n_rows, Nmu*Nnu, arma::fill::zeros);
+      arma::mat B_sub(cd_X.n_rows, Nmu*Nnu, arma::fill::zeros);
       bool any = false;
       for(size_t inu=0; inu<Nnu; inu++) {
         for(size_t imu=0; imu<Nmu; imu++) {
@@ -771,7 +758,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
         }
       }
       if(any)
-        slot = cd_X_.t() * B_sub;
+        slot = cd_X.t() * B_sub;
     }
     blocks = cached;
   }
@@ -831,7 +818,7 @@ void run_force_loop(size_t Nouter,
 
 template<typename M_lookup>
 void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double sign) const {
-  if(!cholesky_mode_) {
+  if(!cholesky_mode) {
     // DF dispatch: aux shellpair pairs (ias, jas <= ias). dERIWorker
     // (aux, dummy, aux, dummy) gives 12 components, of which the
     // physical ones are index[] = {0,1,2,6,7,8} (the dummy shells
@@ -877,12 +864,12 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
   } else {
     // CD dispatch: pivot shellpair pairs (ip, jp <= ip). 4-shell
     // dERIWorker gives 12 derivative components mapped to 4 centers.
-    // M is looked up via cd_pivot_index_(orb_idx_1, orb_idx_2).
+    // M is looked up via cd_pivot_index(orb_idx_1, orb_idx_2).
     const std::vector<GaussianShell> & shells = orbshells;
-    run_force_loop(cd_pivot_shellpairs_vec_.size(), f, maxam, maxcontr, omega, alpha, beta,
+    run_force_loop(cd_pivot_shellpairs_vec.size(), f, maxam, maxcontr, omega, alpha, beta,
                    [&](size_t ip, dERIWorker * deri, arma::vec & fout) {
-      const size_t is = cd_pivot_shellpairs_vec_[ip].first;
-      const size_t js = cd_pivot_shellpairs_vec_[ip].second;
+      const size_t is = cd_pivot_shellpairs_vec[ip].first;
+      const size_t js = cd_pivot_shellpairs_vec[ip].second;
       const size_t Ni = shells[is].get_Nbf();
       const size_t Nj = shells[js].get_Nbf();
       const size_t i0 = shells[is].get_first_ind();
@@ -891,8 +878,8 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
       const size_t j_at = shells[js].get_center_ind();
 
       for(size_t jp=0; jp<=ip; jp++) {
-        const size_t ks = cd_pivot_shellpairs_vec_[jp].first;
-        const size_t ls = cd_pivot_shellpairs_vec_[jp].second;
+        const size_t ks = cd_pivot_shellpairs_vec[jp].first;
+        const size_t ls = cd_pivot_shellpairs_vec[jp].second;
         const size_t Nk = shells[ks].get_Nbf();
         const size_t Nl = shells[ls].get_Nbf();
         const size_t k0 = shells[ks].get_first_ind();
@@ -910,12 +897,12 @@ void DensityFit::accumulate_2c_metric_force(arma::vec & f, M_lookup && M, double
           double accum = 0.0;
           for(size_t ii=0; ii<Ni; ii++)
             for(size_t jj=0; jj<Nj; jj++) {
-              const arma::uword pidx = cd_pivot_index_(i0+ii, j0+jj);
-              if(pidx == cd_pivot_sentinel_) continue;
+              const arma::uword pidx = cd_pivot_index(i0+ii, j0+jj);
+              if(pidx == cd_pivot_sentinel) continue;
               for(size_t kk=0; kk<Nk; kk++)
                 for(size_t ll=0; ll<Nl; ll++) {
-                  const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
-                  if(qidx == cd_pivot_sentinel_) continue;
+                  const arma::uword qidx = cd_pivot_index(k0+kk, l0+ll);
+                  if(qidx == cd_pivot_sentinel) continue;
                   accum += (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll] * M(pidx, qidx);
                 }
             }
@@ -973,7 +960,7 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
   // Iterate (orbital_shellpair, pivot_shellpair) quartets. For each
   // quartet, 4-shell dERIWorker gives 12 derivative components; the
   // inner contraction with build_q(...)(qidx, ii*Nj+jj) is summed
-  // over (ii, jj, kk, ll) with cd_pivot_index_ deciding which (kk, ll)
+  // over (ii, jj, kk, ll) with cd_pivot_index deciding which (kk, ll)
   // entries land on selected pivots.
   //
   // build_q signature: (size_t ipair, size_t is, size_t js, size_t Ni,
@@ -996,9 +983,9 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
 
     const arma::mat Q_ip = build_q(ipair, is, js, Ni, Nj, i0, j0);  // (Naux x Ni*Nj), col = ii*Nj+jj
 
-    for(size_t jp=0; jp<cd_pivot_shellpairs_vec_.size(); jp++) {
-      const size_t ks = cd_pivot_shellpairs_vec_[jp].first;
-      const size_t ls = cd_pivot_shellpairs_vec_[jp].second;
+    for(size_t jp=0; jp<cd_pivot_shellpairs_vec.size(); jp++) {
+      const size_t ks = cd_pivot_shellpairs_vec[jp].first;
+      const size_t ls = cd_pivot_shellpairs_vec[jp].second;
       const size_t Nk = shells[ks].get_Nbf();
       const size_t Nl = shells[ls].get_Nbf();
       const size_t k0 = shells[ks].get_first_ind();
@@ -1018,8 +1005,8 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
             const size_t col = ii*Nj + jj;
             for(size_t kk=0; kk<Nk; kk++)
               for(size_t ll=0; ll<Nl; ll++) {
-                const arma::uword qidx = cd_pivot_index_(k0+kk, l0+ll);
-                if(qidx == cd_pivot_sentinel_) continue;
+                const arma::uword qidx = cd_pivot_index(k0+kk, l0+ll);
+                if(qidx == cd_pivot_sentinel) continue;
                 accum += (*erip)[((ii*Nj+jj)*Nk+kk)*Nl+ll] * Q_ip(qidx, col);
               }
           }
@@ -1030,7 +1017,7 @@ void DensityFit::accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, d
 }
 
 arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & P) const {
-  if(!cholesky_mode_)
+  if(!cholesky_mode)
     throw std::runtime_error("DensityFit::forceJ_cholesky requires fill_cholesky to have been called.\n");
   if(P.n_rows != Nbf || P.n_cols != Nbf)
     throw std::runtime_error("DensityFit::forceJ_cholesky: density matrix dimension mismatch.\n");
@@ -1042,8 +1029,8 @@ arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & 
   // that goes against M, dM/dR and the 3-center derivatives, the
   // same c that the force kernels used before the L-baked storage.
   const arma::vec d = compute_expansion(P);
-  const arma::vec c = cd_X_ * d;
-  const size_t Naux_pivot = cd_X_.n_rows;  // == Nselected
+  const arma::vec c = cd_X * d;
+  const size_t Naux_pivot = cd_X.n_rows;  // == Nselected
 
   arma::vec f(3 * Nnuc, arma::fill::zeros);
 
@@ -1090,8 +1077,8 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
   // shape (Naux_DF x Nbf). In CD mode the blocks store L (indep-space
   // orthonormal), aui = L^T C is already in indep space, and the
   // dM/dR / 3-center derivative kernels iterate pivot space, so
-  // Z = cd_X_ * aui projects up to (Nselected x Nbf).
-  const size_t Naux_force = cholesky_mode_ ? cd_X_.n_rows : Naux;
+  // Z = cd_X * aui projects up to (Nselected x Nbf).
+  const size_t Naux_force = cholesky_mode ? cd_X.n_rows : Naux;
   arma::cube Z(Naux_force, Nbf, Nmo, arma::fill::zeros);
 
   size_t Nmax = 0;
@@ -1143,8 +1130,8 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
       //     dM/dR / 3-center derivative kernels iterate pivot space,
       //     so Z = X * aui = X X^T aui_raw = M^{-1} aui_raw lives
       //     in pivot space.
-      if(cholesky_mode_)
-        Z.slice(io) = cd_X_ * aui;
+      if(cholesky_mode)
+        Z.slice(io) = cd_X * aui;
       else
         Z.slice(io) = ab_inv * aui;
     }
@@ -1196,8 +1183,8 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
     //   C(nu0+inu, io) * V_io(mu0+imu, a)
     //   + (off_diag ? C(mu0+imu, io) * V_io(nu0+inu, a) : 0)
     // ]
-    // V.slice(io) lives in the force aux dimension (DF aux for !cholesky_mode_,
-    // pivot space Nselected for cholesky_mode_), which matches Naux_force.
+    // V.slice(io) lives in the force aux dimension (DF aux for !cholesky_mode,
+    // pivot space Nselected for cholesky_mode), which matches Naux_force.
     arma::mat Qcomb(Naux_force, Nmu*Nnu, arma::fill::zeros);
     for(size_t io=0; io<Nmo; io++) {
       const double n_io = occs(io);
@@ -1212,7 +1199,7 @@ arma::vec DensityFit::forceK(const BasisSet & basis, const arma::mat & Corig, co
     return Qcomb;
   };
 
-  if(!cholesky_mode_) {
+  if(!cholesky_mode) {
     accumulate_3c_force_DF(f_geom, +1.0, build_Qcomb_DF);
   } else {
     // CD column layout uses ii*Nj+jj rather than DF's inu*Nmu+imu;
@@ -1350,12 +1337,16 @@ arma::mat DensityFit::compute_a_munu(ERIWorker *eri, size_t ip, double *memptr) 
   return amunu;
 }
 
-void DensityFit::project_density_to_aux(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const {
+void DensityFit::check_density_dims(const arma::mat & P) const {
   if(P.n_rows != Nbf || P.n_cols != Nbf) {
     std::ostringstream oss;
     oss << "Error in DensityFit: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
     throw std::logic_error(oss.str());
   }
+}
+
+void DensityFit::project_density_to_aux(const arma::mat & P, size_t ip, const arma::mat & amunu, arma::vec & gamma) const {
+  check_density_dims(P);
 
   // Shells in question are
   size_t imus=orbpairs[ip].is;
@@ -1471,7 +1462,7 @@ void DensityFit::accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::ve
       // and the half-transform is X^T aui. In CD mode the blocks are
       // already L = X^T B_raw, so aui = sum_munu L C is the
       // half-transform directly -- no X^T multiply (ab_invh is empty).
-      if(!cholesky_mode_)
+      if(!cholesky_mode)
         aui = ab_invh.t() * aui;
       arma::Mat<T> K_io = occs[io] * arma::trans(aui) * aui;
 #ifdef _OPENMP
@@ -1515,11 +1506,7 @@ size_t DensityFit::memory_estimate(const BasisSet & orbbas, const BasisSet & aux
 }
 
 arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
-    std::ostringstream oss;
-    oss << "Error in DensityFit: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
-    throw std::logic_error(oss.str());
-  }
+  check_density_dims(P);
 
   arma::vec gamma(Naux);
   gamma.zeros();
@@ -1545,7 +1532,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
   // CD mode: the L blocks already carry the metric (L = X^T B_raw),
   // so the projection gamma_j = sum_munu L_{j,munu} P_munu is the
   // indep-space expansion directly -- no (a|b)^-1 multiply.
-  if(cholesky_mode_)
+  if(cholesky_mode)
     return gamma;
   return ab_inv*gamma;
 }
@@ -1591,7 +1578,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 
   // CD mode: L blocks carry the metric, gamma is already the
   // indep-space expansion (see single-density overload).
-  if(!cholesky_mode_)
+  if(!cholesky_mode)
     for(size_t ig=0;ig<P.size();ig++)
       gamma[ig]=ab_inv*gamma[ig];
 
@@ -1599,11 +1586,7 @@ std::vector<arma::vec> DensityFit::compute_expansion(const std::vector<arma::mat
 }
 
 arma::mat DensityFit::calcJ(const arma::mat & P) const {
-  if(P.n_rows != Nbf || P.n_cols != Nbf) {
-    std::ostringstream oss;
-    oss << "Error in DensityFit: Nbf = " << Nbf << ", P.n_rows = " << P.n_rows << ", P.n_cols = " << P.n_cols << "!\n";
-    throw std::logic_error(oss.str());
-  }
+  check_density_dims(P);
 
   // Get the expansion coefficients
   arma::vec c=compute_expansion(P);
@@ -1651,7 +1634,7 @@ std::vector<arma::mat> DensityFit::calcJ(const std::vector<arma::mat> & P) const
   return J;
 }
 
-arma::vec DensityFit::forceJ(const arma::mat & P) {
+arma::vec DensityFit::forceJ(const arma::mat & P) const {
   // First, compute the expansion
   arma::vec c=compute_expansion(P);
 
@@ -1741,10 +1724,6 @@ arma::cx_mat DensityFit::calcK(const arma::cx_mat & Corig, const std::vector<dou
   return calcK_impl(Corig, occo);
 }
 
-size_t DensityFit::get_Norb() const {
-  return Nbf;
-}
-
 size_t DensityFit::get_Naux() const {
   return Naux;
 }
@@ -1754,19 +1733,11 @@ size_t DensityFit::get_Naux_indep() const {
   // cleanup. CD: the cleanup already happened in fill_cholesky and
   // Naux was set to the cleaned-subspace size (ab_invh is empty), so
   // Naux is the independent count.
-  return cholesky_mode_ ? Naux : ab_invh.n_cols;
+  return cholesky_mode ? Naux : ab_invh.n_cols;
 }
 
-arma::mat DensityFit::get_ab() const {
+const arma::mat & DensityFit::get_ab() const {
   return ab;
-}
-
-arma::mat DensityFit::get_ab_inv() const {
-  return ab_inv;
-}
-
-arma::mat DensityFit::get_ab_invh() const {
-  return ab_invh;
 }
 
 void DensityFit::three_center_integrals(arma::mat & ints) const {
@@ -1809,7 +1780,7 @@ void DensityFit::B_matrix(arma::mat & B) const {
   // already L = X^T B_raw (metric baked in, ab_invh empty), so the
   // three-center integrals are the final B with no extra multiply.
   three_center_integrals(B);
-  if(!cholesky_mode_)
+  if(!cholesky_mode)
     B*=ab_invh;
 }
 
@@ -1841,7 +1812,7 @@ arma::mat DensityFit::B_transform(const arma::mat & Cl, const arma::mat & Cr, bo
 #pragma omp parallel for schedule(static)
 #endif
   for(size_t P=0; P<Naux; P++) {
-    const arma::mat block_P((double*) Bdense.colptr(P), Nbf, Nbf, false, true);
+    const arma::mat block_P(Bdense.colptr(P), Nbf, Nbf, false, true);
     const arma::mat Tmo(Cl.t() * block_P.t() * Cr);
     Br.row(P) = arma::trans(arma::vectorise(Tmo));
   }
@@ -1861,7 +1832,7 @@ arma::mat DensityFit::B_transform(const arma::mat & Cl, const arma::mat & Cr, bo
 // cached state. Plain DF and range-separated DF coexist in the same
 // file by keying every entry with a (omega, alpha, beta)-derived
 // prefix. CD entries use the same convention; DF and CD never share a
-// key (the cholesky_mode_ flag is the first thing checked on load).
+// key (the cholesky_mode flag is the first thing checked on load).
 // ===========================================================================
 namespace {
 std::string df_cache_prefix(double omega, double alpha, double beta) {
@@ -1896,7 +1867,7 @@ void DensityFit::save(const std::string & fname) const {
   Checkpoint chkpt(fname, true, trunc);
   const std::string P = df_cache_prefix(omega, alpha, beta);
 
-  chkpt.write(P+"cholesky_mode", (int) (cholesky_mode_ ? 1 : 0));
+  chkpt.write(P+"cholesky_mode", (int) (cholesky_mode ? 1 : 0));
   chkpt.write(P+"Nbf",  (hsize_t) Nbf);
   chkpt.write(P+"Naux", (hsize_t) Naux);
   chkpt.write(P+"Nnuc", (hsize_t) Nnuc);
@@ -1912,8 +1883,8 @@ void DensityFit::save(const std::string & fname) const {
 
   // DF keeps the (a|b) metric and its (half-)inverse; CD bakes the
   // metric into the L blocks and keeps only X for the force kernels.
-  if(cholesky_mode_) {
-    chkpt.write(P+"cd_X", cd_X_);
+  if(cholesky_mode) {
+    chkpt.write(P+"cd_X", cd_X);
   } else {
     chkpt.write(P+"ab",      ab);
     chkpt.write(P+"ab_inv",  ab_inv);
@@ -1932,14 +1903,14 @@ void DensityFit::save(const std::string & fname) const {
   // CachedBlocks flat backing storage.
   chkpt.write(P+"storage", cached->storage());
 
-  if(cholesky_mode_) {
-    chkpt.write(P+"cd_pivot_index", umat_to_hsize(cd_pivot_index_));
-    chkpt.write(P+"cd_pivot_sentinel", (hsize_t) cd_pivot_sentinel_);
-    std::vector<hsize_t> piv_is(cd_pivot_shellpairs_vec_.size());
-    std::vector<hsize_t> piv_js(cd_pivot_shellpairs_vec_.size());
-    for(size_t i=0; i<cd_pivot_shellpairs_vec_.size(); i++) {
-      piv_is[i] = cd_pivot_shellpairs_vec_[i].first;
-      piv_js[i] = cd_pivot_shellpairs_vec_[i].second;
+  if(cholesky_mode) {
+    chkpt.write(P+"cd_pivot_index", umat_to_hsize(cd_pivot_index));
+    chkpt.write(P+"cd_pivot_sentinel", (hsize_t) cd_pivot_sentinel);
+    std::vector<hsize_t> piv_is(cd_pivot_shellpairs_vec.size());
+    std::vector<hsize_t> piv_js(cd_pivot_shellpairs_vec.size());
+    for(size_t i=0; i<cd_pivot_shellpairs_vec.size(); i++) {
+      piv_is[i] = cd_pivot_shellpairs_vec[i].first;
+      piv_js[i] = cd_pivot_shellpairs_vec[i].second;
     }
     chkpt.write(P+"pivot_sp_is", piv_is);
     chkpt.write(P+"pivot_sp_js", piv_js);
@@ -1969,7 +1940,7 @@ bool DensityFit::load(const BasisSet & basis, const BasisSet * auxbas, const std
     return false;
 
   // Commit to populating *this -- past this point we mutate state.
-  cholesky_mode_ = (chol_mode_in != 0);
+  cholesky_mode = (chol_mode_in != 0);
   Nbf  = Nbf_in;
   Naux = Naux_in;
   Nnuc = Nnuc_in;
@@ -1987,14 +1958,14 @@ bool DensityFit::load(const BasisSet & basis, const BasisSet * auxbas, const std
   maxorbcontr = maxorbcontr_in;
   maxauxcontr = maxauxcontr_in;
 
-  if(cholesky_mode_) {
-    chkpt.read(P+"cd_X", cd_X_);
+  if(cholesky_mode) {
+    chkpt.read(P+"cd_X", cd_X);
     ab.reset(); ab_inv.reset(); ab_invh.reset();
   } else {
     chkpt.read(P+"ab",      ab);
     chkpt.read(P+"ab_inv",  ab_inv);
     chkpt.read(P+"ab_invh", ab_invh);
-    cd_X_.reset();
+    cd_X.reset();
   }
 
   orbshells = basis.get_shells();
@@ -2031,25 +2002,25 @@ bool DensityFit::load(const BasisSet & basis, const BasisSet * auxbas, const std
   cached->storage() = std::move(storage);
   blocks = cached;
 
-  if(cholesky_mode_) {
+  if(cholesky_mode) {
     hsize_t piv_sentinel_in;
     std::vector<hsize_t> piv_index, piv_is, piv_js;
     chkpt.read(P+"cd_pivot_index",    piv_index);
     chkpt.read(P+"cd_pivot_sentinel", piv_sentinel_in);
     chkpt.read(P+"pivot_sp_is",       piv_is);
     chkpt.read(P+"pivot_sp_js",       piv_js);
-    cd_pivot_index_     = hsize_to_umat(piv_index, Nbf, Nbf);
-    cd_pivot_sentinel_  = piv_sentinel_in;
-    cd_pivot_shellpairs_vec_.resize(piv_is.size());
-    pivot_shellpairs_.clear();
+    cd_pivot_index     = hsize_to_umat(piv_index, Nbf, Nbf);
+    cd_pivot_sentinel  = piv_sentinel_in;
+    cd_pivot_shellpairs_vec.resize(piv_is.size());
+    pivot_shellpairs.clear();
     for(size_t i=0; i<piv_is.size(); i++) {
-      cd_pivot_shellpairs_vec_[i] = std::make_pair((size_t) piv_is[i], (size_t) piv_js[i]);
-      pivot_shellpairs_.insert(cd_pivot_shellpairs_vec_[i]);
+      cd_pivot_shellpairs_vec[i] = std::make_pair((size_t) piv_is[i], (size_t) piv_js[i]);
+      pivot_shellpairs.insert(cd_pivot_shellpairs_vec[i]);
     }
   } else {
-    cd_pivot_index_.reset();
-    cd_pivot_shellpairs_vec_.clear();
-    pivot_shellpairs_.clear();
+    cd_pivot_index.reset();
+    cd_pivot_shellpairs_vec.clear();
+    pivot_shellpairs.clear();
   }
 
   return true;

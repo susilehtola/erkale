@@ -310,7 +310,7 @@ protected:
   /// Electron repulsion screening table, range separation
   ERIscreen scr_rs;
   /// Density fitting / Cholesky table (CD lives on the same object
-  /// since the erichol/densityfit merge; cholesky_mode_ flag selects
+  /// since the erichol/densityfit merge; cholesky_mode flag selects
   /// the storage layout)
   DensityFit dfit;
   /// Same, range separation

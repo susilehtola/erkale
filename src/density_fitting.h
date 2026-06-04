@@ -61,11 +61,11 @@
 /// Density fitting routines.
 ///
 /// DensityFit holds the cached three-index integrals through a
-/// shared_ptr so the surrounding objects (Edmiston etc.) that copy
-/// a DensityFit by value end up sharing the heavy block storage
-/// rather than duplicating it. The ptr-by-value fields and the
-/// shared aux-metric matrices make a copy of *this O(handful of
-/// scalars and shared_ptr atomics).
+/// shared_ptr, so objects that copy a DensityFit by value (e.g.
+/// Edmiston) share the heavy block storage rather than duplicating
+/// it. The aux-metric matrices (ab / ab_inv / ab_invh in DF mode,
+/// cd_X in CD mode) are still deep-copied, so a copy is O(Naux^2),
+/// not free -- cheap relative to the block tensor, but not nothing.
 class DensityFit {
   /// Amount of orbital basis functions
   size_t Nbf;
@@ -95,9 +95,6 @@ class DensityFit {
   /// Dummy shell
   GaussianShell dummy;
 
-  /// Index of dummy function
-  size_t dummyind;
-
   /// List of unique orbital shell pairs
   std::vector<eripair_t> orbpairs;
   /// Three-index (alpha | mu nu) block source, indexed per orbital
@@ -121,36 +118,39 @@ class DensityFit {
   /// is which gradient path is available (forceJ for DF aux shells,
   /// forceJ_cholesky for pivot-orbital-pair "aux") and the pivot
   /// machinery exposed via get_pivot_shellpairs().
-  bool cholesky_mode_;
+  bool cholesky_mode;
 
   /// CD-only half-inverse X = D^-1 X~ of the pivot metric M=(piv|piv).
   /// Stored alongside the L-baked blocks so the force kernels
   /// (forceJ_cholesky, forceK) can recover the pivot-space coefficient
   /// c_raw = X * d from the indep-space expansion d that
-  /// compute_expansion returns under cholesky_mode_, and so
+  /// compute_expansion returns under cholesky_mode, and so
   /// DirectCDBlocks can bake X into its on-the-fly blocks. The metric
   /// M itself is not retained: the force kernels recompute its
   /// nuclear derivatives on the fly via dERIWorker. Empty in DF mode.
-  arma::mat cd_X_;
+  arma::mat cd_X;
 
   /// (Nbf x Nbf) lookup: (mu, nu) -> pivot rank in 0..Naux-1, or
-  /// cd_pivot_sentinel_ for non-pivot pairs. Built in fill_cholesky
+  /// cd_pivot_sentinel for non-pivot pairs. Built in fill_cholesky
   /// and consumed by forceJ_cholesky for the dM/dR + d(mu nu | piv)/dR
   /// contractions.
-  arma::umat cd_pivot_index_;
-  /// Sentinel value used in cd_pivot_index_ (== Naux).
-  arma::uword cd_pivot_sentinel_;
+  arma::umat cd_pivot_index;
+  /// Sentinel value used in cd_pivot_index (== Naux).
+  arma::uword cd_pivot_sentinel;
   /// Pivot shellpairs in lexicographic order; enumerated to drive
   /// the dM/dR sweep in forceJ_cholesky without re-sorting per call.
-  std::vector<std::pair<size_t, size_t>> cd_pivot_shellpairs_vec_;
+  std::vector<std::pair<size_t, size_t>> cd_pivot_shellpairs_vec;
 
   /// Pivot shellpairs (set form) populated by fill_cholesky. Exposed
   /// via get_pivot_shellpairs() for basistool / basislibrary atom-CD
   /// aux basis construction.
-  std::set<std::pair<size_t, size_t>> pivot_shellpairs_;
+  std::set<std::pair<size_t, size_t>> pivot_shellpairs;
 
   /// Form screening matrix
   void form_screening();
+  /// Throw std::logic_error unless P has the Nbf x Nbf density-matrix
+  /// shape. Shared by the J / expansion entry points.
+  void check_density_dims(const arma::mat & P) const;
   /// Set Nbf, Nnuc, direct, orbshells, dummy, maxorbam, maxorbcontr
   /// from the orbital basis. Shared by fill() and fill_cholesky();
   /// aux-side state (Naux, auxshells, maxauxam/contr, maxam/contr)
@@ -209,6 +209,7 @@ class DensityFit {
   /// parameters with the pivoting machinery; b_raw_out is filled
   /// with the (mu nu | piv) column for each selected pivot when
   /// non-null, otherwise the columns are computed and discarded.
+  /// Honors the instance's range separation (set_range_separation).
   size_t select_two_step_pivots(const BasisSet & basis,
                                 double cholesky_tol,
                                 double shell_reuse_thr,
@@ -216,9 +217,6 @@ class DensityFit {
                                 bool verbose,
                                 arma::uvec & pi,
                                 arma::umat & invmap,
-                                arma::umat & prodmap,
-                                arma::uvec & prodidx,
-                                arma::uvec & odiagidx,
                                 std::set<std::pair<size_t, size_t>> & piv_shellpairs,
                                 arma::mat * b_raw_out) const;
   /// Compute shell in (a|uv) matrix
@@ -271,22 +269,24 @@ class DensityFit {
   RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
 
   /**
-   * Compute integrals, use given linear dependency threshold. The HF
-   * flag here controls formation of (a|b)^{-1/2} and (a|b)^{-1}; the
-   * HF routine should be more tolerant of linear dependencies in the basis.
-   * Returns amount of significant orbital shell pairs.
+   * Compute the density-fitting integrals against the auxiliary basis
+   * auxbas. linthr / cholthr are the linear-dependence and pivoted-
+   * Cholesky thresholds for orthogonalising the (a|b) metric; erithr
+   * screens the orbital shell pairs. Returns the number of
+   * significant orbital shell pairs.
    */
   size_t fill(const BasisSet & orbbas, const BasisSet & auxbas, bool direct, double erithr, double linthr, double cholthr);
 
   /// Fill the B tensor via two-step pivoted Cholesky decomposition
-  /// (Folkestad/Kjonstad/Koch JCP 150, 194112 (2019)). Reshapes the
-  /// orthonormal L vectors into the block-shellpair layout the DF
-  /// J/K kernels consume; metric is identity (L vectors are
-  /// orthonormal by construction) so the same kernels handle CD and
-  /// DF transparently. The pivot metric is stashed so
-  /// forceJ_cholesky has the algebraic gradient available. Range
-  /// separation is honored from prior set_range_separation().
-  /// Returns amount of significant orbital shell pairs.
+  /// (Folkestad/Kjonstad/Koch JCP 150, 194112 (2019)). The selected
+  /// pivot orbital products act as an auxiliary basis; the (piv|piv)
+  /// metric is normalised, canonical-orthogonalised, and baked into
+  /// the stored L blocks so the DF J/K kernels handle CD and DF
+  /// transparently (identity metric in CD mode). The metric
+  /// half-inverse X is stashed in cd_X so forceJ_cholesky / forceK
+  /// have the algebraic gradient available. Range separation is
+  /// honored from prior set_range_separation(). Returns the number
+  /// of significant orbital shell pairs.
   ///
   /// One-step CD (full pivoted CD on the molecular tensor) was
   /// retired here -- TwoStep is mathematically equivalent at the
@@ -299,40 +299,35 @@ class DensityFit {
                        double fit_cholesky_thr,
                        bool verbose);
 
-  /// True iff this object was filled via fill_cholesky (i.e. B holds
-  /// orthonormal CD vectors and there is no genuine aux basis).
-  bool is_cholesky() const { return cholesky_mode_; }
+  /// True iff this object was filled via fill_cholesky (i.e. the
+  /// blocks hold CD-derived L vectors, not a genuine aux basis).
+  bool is_cholesky() const { return cholesky_mode; }
 
   /// Algebraic two-step CD gradient of the Coulomb energy. Requires
-  /// fill_cholesky_twostep to have populated the pivot metric;
+  /// fill_cholesky to have populated cd_X / the pivot bookkeeping;
   /// throws otherwise. Returns f of size 3*Nnuc.
   arma::vec forceJ_cholesky(const BasisSet & basis, const arma::mat & P) const;
 
   /// Algebraic exchange gradient, closed-shell, scaled by kfrac.
   /// Works on both DF (aux Gaussian basis) and CD (pivot orbital
-  /// products) modes; cholesky_mode_ selects the integral dispatch
+  /// products) modes; cholesky_mode selects the integral dispatch
   /// internally. C is (Nbf x Norb), occs has the same length as the
   /// columns of C (zero entries are filtered). Returns f of size
   /// 3*Nnuc.
   arma::vec forceK(const BasisSet & basis, const arma::mat & C, const std::vector<double> & occs, double kfrac) const;
-
-  /// Pivot shellpairs that the CD picked. Populated by both
-  /// fill_cholesky and fill_cholesky_twostep. Returns an empty set
-  /// in non-cholesky mode.
-  std::set<std::pair<size_t, size_t>> get_pivot_shellpairs() const { return pivot_shellpairs_; }
 
   /// Two-step CD pivot selection without building the metric or
   /// L vectors. Returns the pivot shellpair set selected by phases
   /// A-C of the two-step algorithm at the given threshold. Use when
   /// downstream only needs the pivot list (e.g. atom-CD aux basis
   /// construction in basislibrary.cpp). Range separation is honored
-  /// from prior set_range_separation(). Static because it doesn't
-  /// touch *this -- it's a pure utility on the basis.
-  static std::set<std::pair<size_t, size_t>> find_cholesky_pivots(const BasisSet & basis,
-                                                                   double cholesky_tol,
-                                                                   double shell_reuse_thr,
-                                                                   double shell_screen_tol,
-                                                                   bool verbose);
+  /// from this object's set_range_separation() (default: plain
+  /// Coulomb).
+  std::set<std::pair<size_t, size_t>> find_cholesky_pivots(const BasisSet & basis,
+                                                           double cholesky_tol,
+                                                           double shell_reuse_thr,
+                                                           double shell_screen_tol,
+                                                           bool verbose) const;
 
   /// Compute estimate of necessary memory
   size_t memory_estimate(const BasisSet & orbbas, const BasisSet & auxbas, double erithr, bool direct) const;
@@ -349,26 +344,20 @@ class DensityFit {
   /// Digest J matrix from computed expansion
   arma::mat calcJ_vector(const arma::vec & gamma) const;
 
-  /// Calculate force from P
-  arma::vec forceJ(const arma::mat & P);
+  /// Calculate Coulomb (DF) force from P
+  arma::vec forceJ(const arma::mat & P) const;
 
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::mat calcK(const arma::mat & C, const std::vector<double> & occs) const;
   /// Get exchange matrix from orbitals with occupation numbers occs
   arma::cx_mat calcK(const arma::cx_mat & C, const std::vector<double> & occs) const;
 
-  /// Get the number of orbital functions
-  size_t get_Norb() const;
   /// Get the number of auxiliary functions
   size_t get_Naux() const;
   /// Get the number of linearly independent auxiliary functions
   size_t get_Naux_indep() const;
-  /// Get ab_inv
-  arma::mat get_ab() const;
-  /// Get ab_inv
-  arma::mat get_ab_inv() const;
-  /// Get ab_invh
-  arma::mat get_ab_invh() const;
+  /// Get the (a|b) metric
+  const arma::mat & get_ab() const;
 
   /// Get 3-center integrals (must have HF enabled)
   void three_center_integrals(arma::mat & B) const;

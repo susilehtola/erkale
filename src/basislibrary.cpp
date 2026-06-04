@@ -868,8 +868,10 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric)
     } else {
       // Pivot-only CD entry point: skips the (mu nu | piv) column
       // save and the metric / L-vector construction that the SCF
-      // path needs but cholesky_set doesn't.
-      pivot_shellpairs = DensityFit::find_cholesky_pivots(dummy, thr, 0.0, 0.0, true);
+      // path needs but cholesky_set doesn't. Default-constructed
+      // DensityFit => plain Coulomb pivots.
+      DensityFit cd;
+      pivot_shellpairs = cd.find_cholesky_pivots(dummy, thr, 0.0, 0.0, true);
     }
   }
   printf("%2s has %i significant auxiliary shell pairs\n",orbbas.get_symbol().c_str(), (int) pivot_shellpairs.size());
