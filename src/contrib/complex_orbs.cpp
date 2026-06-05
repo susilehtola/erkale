@@ -49,20 +49,6 @@ void print_header() {
 
 Settings settings;
 
-std::pair<arma::vec,arma::mat> diagonalize(const arma::mat & F) {
-  arma::vec E;
-  arma::mat C;
-  arma::eig_sym(E,C,F);
-  return std::make_pair(E,C);
-}
-
-std::pair<arma::vec,arma::mat> diagonalize(const arma::mat & F, const arma::mat & X) {
-  arma::mat Fo(X.t() * F * X);
-  auto [E, C] = diagonalize(Fo);
-  C = X*C;
-  return std::make_pair(E,C);
-}
-
 // Construct matrices to transform orbitals from real to complex
 arma::cx_mat basis_transform_mat(int l) {
   arma::cx_mat Lmat(2 * l + 1, 2 * l + 1, arma::fill::zeros);
@@ -99,7 +85,6 @@ int main_guarded(int argc, char **argv) {
 
   settings.add_scf_settings();
   settings.add_string("ErrorNorm", "Error norm to use in the SCF code", "rms");
-  settings.add_double("InitConvThr", "Initialization convergence threshold", 1e-5);
   settings.add_int("Verbosity", "Verboseness level", 5);
   settings.add_string("SaveChk", "Checkpoint file to save to", "complex_basis.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
@@ -231,31 +216,34 @@ int main_guarded(int argc, char **argv) {
   int Nela;
   int Nelb;
 
-  // Force occupations?
-  arma::imat linoccs;
-  linoccs.load(linoccfname,arma::raw_ascii);
+  // Force occupations? LinearOccupations < 0 reads per-symmetry
+  // alpha/beta occupations from LinearOccupationFile; otherwise fill by
+  // aufbau from the total electron count. (Only read the file when
+  // actually used, so normal runs don't depend on linoccs.dat.)
   arma::vec occnuma(X.size(), arma::fill::zeros);
   arma::vec occnumb(X.size(), arma::fill::zeros);
-  std::vector<arma::uvec> occsym(linoccs.n_rows);
   if (readlinocc < 0) {
+    arma::imat linoccs;
+    linoccs.load(linoccfname,arma::raw_ascii);
     for (size_t i=0; i<linoccs.n_rows; i++) {
       int occa = linoccs(i, 0);
       int occb = linoccs(i, 1);
       int m = linoccs(i, 2);
       if (std::abs(m) > maxam)
 	throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
-      occnuma(linoccs(i, 2) + maxam) += occa;
-      occnumb(linoccs(i, 2) + maxam) += occb;
+      occnuma(m + maxam) += occa;
+      occnumb(m + maxam) += occb;
     }
     Nela = arma::accu(occnuma);
     Nelb = arma::accu(occnumb);
     if ((Nela - Nelb) + 1 != M)
-      throw std::logic_error("Multiplicit does not match occupations!");
+      throw std::logic_error("Multiplicity does not match occupations!");
   } else {
     Nela = (Nel + M - 1) / 2;
     Nelb = Nel - Nela;
   }
   printf("Nela = %i Nelb = %i\n", Nela, Nelb);
+  fflush(stdout);
   if (Nela < 0 or Nelb < 0)
     throw std::logic_error("Negative number of electrons!\n");
   if (Nelb > Nela)
@@ -264,40 +252,15 @@ int main_guarded(int argc, char **argv) {
   if (!unrestricted) {
     for (size_t occ = 0; occ < occnuma.size(); occ++) {
       if (occnuma(occ) != occnumb(occ))
-	throw std::logic_error("Alpha and beta occupations do not match even though calculation is spin retricted!");
+	throw std::logic_error("Alpha and beta occupations do not match even though calculation is spin restricted!");
     }
   }
-
-
-  std::function<arma::vec(const int & nocc, const int & m)> set_occupations = [&](const int & nocc, const int & m) {
-
-    arma::vec occsub(X[m].n_cols, arma::fill::zeros);
-    if (nocc > occsub.size())
-      throw std::logic_error("Not enough basis functions to satisfy symmetry restrictions!\n");
-
-    double nleft = nocc;
-    size_t io = 0;
-    while (nleft > 0.0) {
-      if (io == occsub.size())
-	throw std::logic_error("Index overflow!\n");
-      double occ;
-      if (unrestricted)
-	occ = std::min(1.0, nleft);
-      else
-	occ = std::min(2.0, nleft);
-      occsub(io) = occ;
-      nleft -= occ;
-      io++;
-    }
-    return occsub;
-  };
 
   std::function<std::pair<arma::mat,arma::vec>(const std::vector<arma::mat> orbitals, const std::vector<arma::vec> & occupations)> collect_orbitals = [&](const auto & orbitals, const auto & occupations) {
     arma::vec occs(Nmo, arma::fill::zeros);
     arma::mat C(Nbf, Nmo, arma::fill::zeros);
     size_t imo=0;
     for (size_t m=0; m<X.size(); m++) {
-      //std::cout << X[m] << "\n" << orbitals[m] << "\n";
       arma::mat Csub = X[m] * orbitals[m];
       arma::mat Cpad(Nbf,X[m].n_cols,arma::fill::zeros);
       Cpad.rows(m_indices[m]) = Csub;
@@ -402,10 +365,11 @@ int main_guarded(int argc, char **argv) {
       printf("nuclear repulsion energy    % .10f\n", Enucr);
       printf("magnetic interaction energy % .10f\n", Emag);
       printf("Total energy                % .10f\n", Etot);
+      fflush(stdout);
     }
 
     return std::make_pair(Etot, fock);
-  }; //restrcted Fock builder
+  }; //restricted Fock builder
 
 
   OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_fock_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
@@ -482,6 +446,7 @@ int main_guarded(int argc, char **argv) {
       printf("nuclear repulsion energy    % .10f\n", Enucr);
       printf("magnetic interaction energy % .10f\n", Emag);
       printf("Total energy                % .10f\n", Etot);
+      fflush(stdout);
     }
 
     return std::make_pair(Etot, fock);
@@ -493,7 +458,7 @@ int main_guarded(int argc, char **argv) {
     if(!unrestricted) {
       for (size_t m=0; m<X.size(); m++) {
 	std::string fm = "F" + std::to_string(m);
-	chkpt.write(fm,Fguess[m]);
+	chkpt.write(fm,fock[m]);
       }
     } else {
       for (size_t m=0; m<X.size(); m++) {
@@ -508,9 +473,6 @@ int main_guarded(int argc, char **argv) {
 
   if(loadchk != "") {
     Checkpoint load(loadchk,false);
-
-    //BasisSet oldbasis;
-    //load.read(oldbasis);
 
     if(!unrestricted) {
       for (size_t m=0; m<X.size(); m++) {
@@ -548,7 +510,7 @@ int main_guarded(int argc, char **argv) {
     number_of_blocks_per_particle_type = {(arma::uword) nblocks};
     maximum_occupation.set_size(nblocks).fill(2.0);
     number_of_particles = {(double) (Nel)};
-    if (readlinocc)
+    if (readlinocc < 0)
       number_of_particles_per_block = occnuma + occnumb;
     for (int k=0; k<nblocks; k++) {
       std::string str = "m=" + std::to_string(k - maxam);
@@ -559,7 +521,7 @@ int main_guarded(int argc, char **argv) {
     number_of_blocks_per_particle_type = {(arma::uword) nblocks / 2, (arma::uword) nblocks / 2};
     maximum_occupation.set_size(nblocks).fill(1.0);
     number_of_particles = {(double) (Nela), (double) (Nelb)};
-    if (readlinocc)
+    if (readlinocc < 0)
       number_of_particles_per_block = arma::join_cols(occnuma, occnumb);
     for (int s=0; s<2; s++) {
       std::string spin = s ? "beta" : "alpha";
@@ -572,11 +534,12 @@ int main_guarded(int argc, char **argv) {
   }
 
   printf("\n\n\nSolving SCF\n");
+  fflush(stdout);
   OpenOrbitalOptimizer::SCFSolver scfsolver(number_of_blocks_per_particle_type, maximum_occupation, number_of_particles, fock_builder, block_descriptions);
-  if (readlinocc)
+  if (readlinocc < 0)
     scfsolver.fixed_number_of_particles_per_block(number_of_particles_per_block);
   scfsolver.initialize_with_fock(Fguess);
-  if (readlinocc)
+  if (readlinocc < 0)
     scfsolver.frozen_occupations(true);
   scfsolver.error_norm(error_norm);
   scfsolver.convergence_threshold(convergence_threshold);
@@ -588,14 +551,15 @@ int main_guarded(int argc, char **argv) {
   else
     scfsolver.run();
 
-  //auto dm = scfsolver.get_solution();
   auto fock = scfsolver.get_fock_matrix();
   save_matrices(fock);
 
   double E = scfsolver.get_energy();
-  //printf("SCF converged: energy is %e.\n", E);
-  
+  printf("SCF converged. Total energy is % .10f\n", E);
+  fflush(stdout);
+
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
+  fflush(stdout);
   return 0;
 }
 
