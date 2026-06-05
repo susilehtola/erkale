@@ -1,6 +1,7 @@
 #include "basislibrary.h"
 #include "basis.h"
 #include "checkpoint.h"
+#include "density_fitting.h"
 #include "dftgrid.h"
 #include "elements.h"
 #include "find_molecules.h"
@@ -117,7 +118,6 @@ int main_guarded(int argc, char **argv) {
   double intthr = settings.get_double("IntegralThresh");
   double convergence_threshold = settings.get_double("ConvThr");
   bool verbose = settings.get_bool("Verbose");
-  size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
   std::string savechk = settings.get_string("SaveChk");
@@ -169,15 +169,17 @@ int main_guarded(int argc, char **argv) {
     m_indices[m+maxam]=basis.m_indices(m);
   }
 
-  // Construct density fitting basis set
+  // ERIchol was merged into DensityFit (#126): both RI density fitting
+  // and two-step Cholesky are the same DensityFit object, differing
+  // only in how it is filled (fill() with an auxiliary Gaussian basis
+  // vs fill_cholesky() on pivoted orbital pairs). The calcJ/calcK
+  // kernels are then identical, so a single object serves both.
   BasisSetLibrary fitlib;
   BasisSet dfitbas;
-  ERIchol chol;
   DensityFit dfit;
   bool direct = settings.get_bool("Direct");
   double fitthr = settings.get_double("FittingThreshold");
   double cholfitthr = settings.get_double("FittingCholeskyThreshold");
-  size_t Npairs = 0;
 
   if (density_fitting) {
     fitlib.load_basis(settings.get_string("FittingBasis"));
@@ -187,12 +189,12 @@ int main_guarded(int argc, char **argv) {
     construct_basis(dfitbas,basis.get_nuclei(), fitlib);
     dfitbas.coulomb_normalize();
     settings.set_bool("UseLM", uselm);
-    Npairs = dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
+    dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
   } else {
     double cholthr = settings.get_double("CholeskyThr");
     double cholshthr = settings.get_double("CholeskyShThr");
     double shtol = settings.get_double("IntegralThresh");
-    Npairs = chol.fill(basis, cholthr, cholshthr, shtol, verbose);
+    dfit.fill_cholesky(basis, direct, cholthr, cholshthr, shtol, cholfitthr, verbose);
   }
   size_t Nbf = basis.get_Nbf();
 
@@ -333,15 +335,8 @@ int main_guarded(int argc, char **argv) {
 
     arma::cx_mat C_c = D * C;
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
-    arma::mat J;
-    arma::cx_mat K;
-    if (density_fitting) {
-      J = dfit.calcJ(P);
-      K = -dfit.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs), fitmem);
-    } else {
-      J = chol.calcJ(P);
-      K = -chol.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs));
-    }
+    arma::mat J = dfit.calcJ(P);
+    arma::cx_mat K = -dfit.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs));
 
     // The code in ERKALE has a different convention for complex integrals; this modification makes it compatible with this code
     K = arma::conj(K);
