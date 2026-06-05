@@ -58,7 +58,10 @@ void ERItable::get_range_separation(double & w, double & a, double & b) const {
 
 size_t ERItable::N_ints(const BasisSet * basp, double thr) {
   // Get ERI pairs
-  shpairs=basp->get_eripairs(Q, M, thr, omega, alpha, beta);
+  ScreeningData s = basp->compute_screening(thr, omega, alpha, beta);
+  Q = std::move(s.Q);
+  M = std::move(s.M);
+  shpairs = std::move(s.shpairs);
 
   // Form offset table and calculate amount of integrals
   size_t N=0;
@@ -115,7 +118,7 @@ arma::mat ERItable::calcJ(const arma::mat & P) const {
     JDigestor dig(P);
 
 #ifdef _OPENMP
-#pragma omp for
+#pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs
@@ -149,7 +152,7 @@ arma::mat ERItable::calcK(const arma::mat & P) const {
     KDigestor dig(P);
 
 #ifdef _OPENMP
-#pragma omp for
+#pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs
@@ -179,13 +182,11 @@ arma::cx_mat ERItable::calcK(const arma::cx_mat & P) const {
 #pragma omp parallel
 #endif
   {
-    arma::cx_mat Kwrk(K);
-
     // Integral digestor
     cxKDigestor dig(P);
 
 #ifdef _OPENMP
-#pragma omp for
+#pragma omp for schedule(dynamic)
 #endif
     for(size_t ip=0;ip<shpairs.size();ip++)
       // Loop over second pairs
@@ -205,7 +206,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
   Nbf=basp->get_Nbf();
   
   // Shells
-  std::vector<GaussianShell> shells=basp->get_shells();
+  const std::vector<GaussianShell> & shells=basp->get_shells_ref();
 
   // Compute memory requirements
   size_t N;
@@ -235,7 +236,7 @@ size_t ERItable::fill(const BasisSet * basp, double tol) {
 #endif // ifdef _OPENMP
   {
     // ERI worker
-    ERIWorker *eri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(basp->get_max_am(),basp->get_max_Ncontr()) : new ERIWorker_srlr(basp->get_max_am(),basp->get_max_Ncontr(),omega,alpha,beta);
+    auto eri = make_eri_worker(basp->get_max_am(), basp->get_max_Ncontr(), omega, alpha, beta);
 
     // Integral array
     const std::vector<double> * erip;

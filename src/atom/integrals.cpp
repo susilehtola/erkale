@@ -16,6 +16,7 @@
 
 #include "../eriworker.h"
 #include "../gaunt.h"
+#include <sstream>
 #include "../linalg.h"
 #include "../mathf.h"
 #include "integrals.h"
@@ -24,6 +25,17 @@
 
 /// A. Kumar and P. C. Mishra, Pramana 29 (1987), pp. 385-390.
 double Ul(int l, int n12, int n34, double z12, double z34) {
+  // The closed-form integrand requires n12 > l (so that n12-l-1 is a
+  // non-negative factorial argument) and n34 > l (similar role in the
+  // term3 prefactor fact(n34-l-1)). Reject earlier than the implicit
+  // fact() throw so callers get a clearly-attributable error.
+  if(n12 <= l || n34 <= l) {
+    std::ostringstream oss;
+    oss << "Ul: requires n12 > l and n34 > l, but got l=" << l
+        << ", n12=" << n12 << ", n34=" << n34 << ".\n";
+    throw std::runtime_error(oss.str());
+  }
+
   // Prefactor
   double prefac=fact(n34+l)/pow(z34,n34+l+1);
 

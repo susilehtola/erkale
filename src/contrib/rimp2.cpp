@@ -194,10 +194,13 @@ int main_guarded(void) {
   arma::mat Fhbhb, Fpbhb, Fpbpb;
   arma::mat Bpbhb;
   try {
-    if(!Fhbhb.quiet_load("Fhbhb.dat",atype)) throw std::runtime_error("Fhbhb does not exist!\n");
-    if(!Fpbhb.quiet_load("Fpbhb.dat",atype)) throw std::runtime_error("Fpbhb does not exist!\n");
-    if(!Fpbpb.quiet_load("Fpbpb.dat",atype)) throw std::runtime_error("Fpbpb does not exist!\n");
-    if(!Bpbhb.quiet_load("Bpbhb.dat",atype)) throw std::runtime_error("Bpbhb does not exist!\n");
+    // load() (non-deprecated; also returns bool); loss vs the old
+    // quiet_load is a one-line "couldn't open file" diagnostic on
+    // stderr, which is fine for these research executables.
+    if(!Fhbhb.load("Fhbhb.dat",atype)) throw std::runtime_error("Fhbhb does not exist!\n");
+    if(!Fpbhb.load("Fpbhb.dat",atype)) throw std::runtime_error("Fpbhb does not exist!\n");
+    if(!Fpbpb.load("Fpbpb.dat",atype)) throw std::runtime_error("Fpbpb does not exist!\n");
+    if(!Bpbhb.load("Bpbhb.dat",atype)) throw std::runtime_error("Bpbhb does not exist!\n");
     pol=true;
   } catch(std::runtime_error &) {
     pol=false;

@@ -22,7 +22,6 @@
 
 #include "basis.h"
 #include "basislibrary.h"
-#include "broyden.h"
 #include "checkpoint.h"
 #include "elements.h"
 #include "dftfuncs.h"
@@ -36,7 +35,6 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
-#include "trrh.h"
 #include "localization.h"
 #include "pzstability.h"
 
@@ -48,6 +46,37 @@ extern "C" {
 #define IMAGTHR 1e-7
 // Threshold for Cholesky decomposition of SAD density matrix
 #define CHOLCTHR 1e-6
+
+namespace {
+// CholeskyMode == -1: try to load dfit from cholfile for the given
+// basis (+ optional auxbas, null for CD-mode). Returns true if the
+// load succeeded. Direct mode bypasses the cache (no precomputed
+// storage to save anyway). Caller must have set range separation on
+// dfit beforehand if needed -- the load key depends on it.
+bool try_cache_load(DensityFit & dfit, const BasisSet & basis, const BasisSet * auxbas,
+                    int cholmode, bool direct, const std::string & cholfile,
+                    bool verbose, Timer & t) {
+  if(direct || cholmode != -1) return false;
+  if(verbose) t.set();
+  bool loaded = dfit.load(basis, auxbas, cholfile);
+  if(loaded && verbose) {
+    printf("Loaded integrals from %s (%s).\n", cholfile.c_str(), t.elapsed().c_str());
+    fflush(stdout);
+  }
+  return loaded;
+}
+
+// CholeskyMode == +1: save dfit to cholfile. Direct mode is skipped.
+void try_cache_save(const DensityFit & dfit, int cholmode, bool direct,
+                    const std::string & cholfile, bool verbose) {
+  if(direct || cholmode != 1) return;
+  dfit.save(cholfile);
+  if(verbose) {
+    printf("Saved integrals to %s.\n", cholfile.c_str());
+    fflush(stdout);
+  }
+}
+}
 
 enum guess_t parse_guess(const std::string & val) {
   if(stricmp(val,"Core")==0)
@@ -121,6 +150,13 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
   if(intthr>1e-6) {
     fprintf(stderr,"Warning - spuriously large integral threshold %e\n",intthr);
   }
+  // Density-weighted Fock-contribution screening threshold. Bounds the
+  // contribution of each shell quartet by |(ij|kl)|*max|P| over the
+  // coupled blocks; tol on the actual Fock contribution rather than on
+  // the bare integral. Zero disables it.
+  const double screenthr=settings.get_double("ScreeningThresh");
+  scr.set_screen_thresh(screenthr);
+  scr_rs.set_screen_thresh(screenthr);
 
   doforce=false;
 
@@ -140,19 +176,30 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
 
   // Use density fitting?
   densityfit=settings.get_bool("DensityFitting");
-  // How much memory to allow (convert to bytes)
-  fitmem=1000000*settings.get_int("FittingMemory");
   // Linear dependence threshold
   fitthr=settings.get_double("FittingThreshold");
   // Linear dependence threshold
   fitcholthr=settings.get_double("FittingCholeskyThreshold");
 
-  // Use Cholesky?
-  cholesky=settings.get_bool("Cholesky");
+  // Use Cholesky? Local to the constructor -- after the merged
+  // CD/DF path, "cholesky" only chooses how dfit is filled; later
+  // SCF logic just checks densityfit and dfit.is_cholesky().
+  bool cholesky = settings.get_bool("Cholesky");
   cholthr=settings.get_double("CholeskyThr");
   cholshthr=settings.get_double("CholeskyShThr");
-  cholnafthr=settings.get_double("CholeskyNAFThr");
   cholmode=settings.get_int("CholeskyMode");
+  // Validate the algorithm string up front. OneStep CD was removed
+  // when one-step was retired in favor of TwoStep (same accuracy at
+  // lower cost via Folkestad/Kjonstad/Koch); CDFit is the
+  // CD-derived-aux-basis variant of plain DF.
+  {
+    const std::string alg = settings.get_string("CholeskyAlgorithm");
+    if(alg!="CDFit" && alg!="TwoStep") {
+      std::ostringstream oss;
+      oss << "Unknown CholeskyAlgorithm '" << alg << "'; expected TwoStep or CDFit.\n";
+      throw std::runtime_error(oss.str());
+    }
+  }
   if(cholesky && densityfit)
     throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
 
@@ -336,59 +383,96 @@ SCF::SCF(const BasisSet & basis, Checkpoint & chkpt) {
       settings.set_bool("UseLM",uselm);
     }
 
-    // Compute memory estimate
-    std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
-
-    if(verbose) {
-      if(direct)
-	printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
-      else
-	printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
-      fflush(stdout);
-      t.set();
-    }
-
-    // Calculate the fitting integrals
-    size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
-
-    if(verbose) {
-      printf("done (%s)\n",t.elapsed().c_str());
-      printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+    const std::string cholfile = settings.get_string("CholeskyFile");
+    if(!try_cache_load(dfit, *basisp, &dfitbas, cholmode, direct, cholfile, verbose, t)) {
+      std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
+      if(verbose) {
+        if(direct)
+          printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
+        else
+          printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
+        fflush(stdout);
+        t.set();
+      }
+      size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
+      if(verbose) {
+        printf("done (%s)\n",t.elapsed().c_str());
+        printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+        printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+        fflush(stdout);
+      }
+      try_cache_save(dfit, cholmode, direct, cholfile, verbose);
+    } else if(verbose) {
       printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
       fflush(stdout);
     }
   } else  {
     // Compute ERIs
     if(cholesky) {
-      if(verbose) {
-	t.set();
-	printf("Computing repulsion integrals.\n");
-	fflush(stdout);
-      }
+      const std::string cd_alg = settings.get_string("CholeskyAlgorithm");
+      const std::string cholfile = settings.get_string("CholeskyFile");
+      if(cd_alg=="CDFit") {
+        // Density fitting with an atom-centered aux basis built by
+        // per-atom pivoted Cholesky on the orbital primitives
+        // (Lehtola JCTC 17, 6886 (2021)). Routes through the same
+        // DensityFit machinery as a regular RI run; only valid when
+        // the orbital basis is rich enough for the per-atom CD
+        // pivots to span the molecular ERI tensor faithfully.
+        if(verbose) {
+          t.set();
+          printf("Building auxiliary basis from pivoted Cholesky decomposition (CDFit) ... ");
+          fflush(stdout);
+        }
+        dfitbas = basisp->cholesky_aux_basis(cholthr);
+        if(verbose) {
+          printf("done (%s)\n",t.elapsed().c_str());
+          printf("Auxiliary basis contains %i functions.\n",(int) dfitbas.get_Nbf());
+          fflush(stdout);
+        }
 
-      if(cholmode==-1) {
-	chol.load();
-	if(verbose) {
-	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_Naux(),t.elapsed().c_str());
-	  fflush(stdout);
-	}
-      }
+        // Drive density fitting on the CD-derived aux basis.
+        if(!try_cache_load(dfit, *basisp, &dfitbas, cholmode, direct, cholfile, verbose, t)) {
+          std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
+          if(verbose) {
+            if(direct)
+              printf("Initializing density fitting calculation, requiring %s memory ... ",memest.c_str());
+            else
+              printf("Computing density fitting integrals, requiring %s memory ... ",memest.c_str());
+            fflush(stdout);
+            t.set();
+          }
+          size_t Npairs=dfit.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
+          if(verbose) {
+            printf("done (%s)\n",t.elapsed().c_str());
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+            fflush(stdout);
+          }
+          try_cache_save(dfit, cholmode, direct, cholfile, verbose);
+        }
 
-      if(chol.get_Nbf()!=basisp->get_Nbf()) {
-	size_t Npairs=chol.fill(*basisp,cholthr,cholshthr,intthr,verbose);
-	if(verbose) {
-	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
-	  fflush(stdout);
-	}
-	// Natural auxiliary function screening
-	if(cholnafthr>0.0)
-	  chol.naf_transform(cholnafthr,verbose);
-	if(cholmode==1) {
-	  t.set();
-	  chol.save();
-	  printf("Cholesky vectors saved to file in %s.\n",t.elapsed().c_str());
-	  fflush(stdout);
-	}
+        densityfit=true;
+      } else {
+        // TwoStep CD: routed through DensityFit on the merged path.
+        // L vectors are orthonormal by construction; DensityFit
+        // holds them in block-shellpair CachedBlocks layout with
+        // metric (a|b) = I so the same J/K kernels handle CD and DF
+        // transparently. The pivot metric is stashed for algebraic
+        // forceJ.
+        if(!try_cache_load(dfit, *basisp, /*auxbas*/nullptr, cholmode, direct, cholfile, verbose, t)) {
+          if(verbose) {
+            t.set();
+            printf("Computing repulsion integrals (two-step CD).\n");
+            fflush(stdout);
+          }
+          size_t Npairs = dfit.fill_cholesky(*basisp, direct, cholthr, cholshthr, intthr, fitcholthr, verbose);
+          if(verbose) {
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basis.get_unique_shellpairs().size());
+            fflush(stdout);
+          }
+          try_cache_save(dfit, cholmode, direct, cholfile, verbose);
+        }
+
+        densityfit=true;
       }
     } else {
       if(direct) {
@@ -462,6 +546,33 @@ void SCF::set_fitting(const BasisSet & fitbasv) {
 
 void SCF::do_force(bool val) {
   doforce=val;
+
+  // Two-step Cholesky selects orbital-pair pivots discretely, and the
+  // selection changes abruptly as the nuclei move. That makes the CD
+  // energy surface non-smooth, so the analytic gradient carries a
+  // noise floor (~1e-3 in fmax) that no threshold tightening removes:
+  // a geometry optimisation stalls on step size, not force, and the
+  // optimised geometry is biased (~mA bond lengths, ~0.1-0.3 deg). The
+  // per-geometry forces are fine -- it is the geometry-to-geometry
+  // discontinuity that breaks optimisation. CDFit (a smooth
+  // atom-centred Gaussian aux basis) or a regular DF basis do not have
+  // this problem. is_cholesky() is true only for two-step CD; CDFit
+  // routes through DensityFit::fill and reports false.
+  if(val && densityfit && dfit.is_cholesky()) {
+    static bool warned=false;
+    if(!warned) {
+      warned=true;
+      const char * msg =
+        "Warning: forces with two-step Cholesky (CholeskyAlgorithm TwoStep) are\n"
+        "unreliable -- the discrete, geometry-dependent pivot selection makes the\n"
+        "energy surface non-smooth, so geometry optimisation stalls and the optimised\n"
+        "geometry is biased. Use CholeskyAlgorithm CDFit or a Gaussian density-fitting\n"
+        "basis for gradient work; TwoStep is fine for single-point energies.\n";
+      fprintf(stderr, "%s", msg);
+      printf("%s", msg);
+      fflush(stdout);
+    }
+  }
 }
 
 size_t SCF::get_maxiter() const {
@@ -483,101 +594,68 @@ void SCF::set_verbose(bool verb) {
 void SCF::fill_rs(double omega) {
   if(densityfit) {
     // Compute range separated integrals if necessary
-    bool fill;
-    if(!dfit_rs.get_Naux()) {
-      fill=true;
-    } else {
-      double o, kl, ks;
-      dfit_rs.get_range_separation(o,kl,ks);
-      fill=(!(o==omega));
-    }
+    const bool fill = !dfit_rs.get_Naux() || dfit_rs.get_range_separation().omega != omega;
     if(fill) {
-      dfit_rs.set_range_separation(omega,0.0,1.0);
+      // dfit_rs.set_range_separation must happen before any load() --
+      // the cache key is built from (omega, alpha, beta) so the load
+      // only matches an entry stored with the exact same parameters
+      // (see df_cache_prefix() in density_fitting.cpp). The Nbf /
+      // Naux checks still apply on top of that.
+      dfit_rs.set_range_separation({omega, 0.0, 1.0});
 
-      // Compute memory estimate
-      std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
-
+      const std::string cholfile = settings.get_string("CholeskyFile");
+      const bool is_cd = dfit.is_cholesky();
       Timer t;
-      if(verbose) {
-	if(direct)
-	  printf("Initializing short-range density fitting calculation, requiring %s memory ... ",memest.c_str());
-	else
-	  printf("Computing short-range density fitting integrals, requiring %s memory ... ",memest.c_str());
-	fflush(stdout);
-      }
-
-      t.set();
-      size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-	printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
-	printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
-	fflush(stdout);
-      }
-    }
-
-  } else if(cholesky) {
-    // Compute range separated integrals if necessary
-    bool fill;
-    if(!chol_rs.get_Naux()) {
-      fill=true;
-    } else {
-      double o, kl, ks;
-      chol_rs.get_range_separation(o,kl,ks);
-      fill=(!(o==omega));
-    }
-    if(fill) {
-      Timer t;
-      if(verbose) {
-	printf("Computing short-range repulsion integrals.\n");
-	fflush(stdout);
-      }
-
-      chol_rs.set_range_separation(omega,0.0,1.0);
-      if(cholmode==-1) {
-	chol_rs.load();
-	if(verbose) {
-	  printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_Naux(),t.elapsed().c_str());
-	  fflush(stdout);
-	}
-	fill = (chol_rs.get_Nbf() != basisp->get_Nbf());
-      }
-      if(fill) {
-	size_t Npairs=chol_rs.fill(*basisp,cholthr,cholshthr,intthr,verbose);
-	if(verbose) {
-	  printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
-	  fflush(stdout);
-	}
-	// Natural auxiliary function screening
-	if(cholnafthr>0.0)
-	  chol_rs.naf_transform(cholnafthr,verbose);
-	if(cholmode==1) {
-	  t.set();
-	  chol_rs.save();
-	  printf("Cholesky vectors saved to file in %s.\n",t.elapsed().c_str());
-	  fflush(stdout);
-	}
+      if(!try_cache_load(dfit_rs, *basisp, is_cd ? nullptr : &dfitbas, cholmode, direct, cholfile, verbose, t)) {
+        if(is_cd) {
+          // Two-step CD on the merged path: build a fresh short-range
+          // B tensor via DensityFit's CD fill. No aux basis is in
+          // play (the L vectors are their own thing).
+          if(verbose) {
+            printf("Computing short-range repulsion integrals (two-step CD).\n");
+            fflush(stdout);
+          }
+          t.set();
+          size_t Npairs = dfit_rs.fill_cholesky(*basisp, direct, cholthr, cholshthr, intthr, fitcholthr, verbose);
+          if(verbose) {
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
+            fflush(stdout);
+          }
+        } else {
+          // Real density fitting: same aux basis as the unscreened
+          // dfit, just with the range-separation kernel.
+          std::string memest=memory_size(dfit.memory_estimate(*basisp,dfitbas,intthr,direct));
+          if(verbose) {
+            if(direct)
+              printf("Initializing short-range density fitting calculation, requiring %s memory ... ",memest.c_str());
+            else
+              printf("Computing short-range density fitting integrals, requiring %s memory ... ",memest.c_str());
+            fflush(stdout);
+          }
+          t.set();
+          size_t Npairs=dfit_rs.fill(*basisp,dfitbas,direct,intthr,fitthr,fitcholthr);
+          if(verbose) {
+            printf("done (%s)\n",t.elapsed().c_str());
+            printf("%i shell pairs out of %i are significant.\n",(int) Npairs, (int) basisp->get_unique_shellpairs().size());
+            printf("Auxiliary basis contains %i functions.\n",(int) dfit.get_Naux());
+            fflush(stdout);
+          }
+        }
+        try_cache_save(dfit_rs, cholmode, direct, cholfile, verbose);
       }
     }
 
   } else {
     if(!direct) {
       // Compute range separated integrals if necessary
-      bool fill;
-      if(!tab_rs.get_N()) {
-	fill=true;
-      } else {
-	double o, kl, ks;
-	tab_rs.get_range_separation(o,kl,ks);
-	fill=(!(o==omega));
-      }
+      const bool fill = !tab_rs.get_N() || tab_rs.get_range_separation().omega != omega;
       if(fill) {
 	Timer t;
 	if(verbose) {
 	  printf("Computing short-range repulsion integrals ... ");
 	  fflush(stdout);
 	}
-	tab_rs.set_range_separation(omega,0.0,1.0);
+	tab_rs.set_range_separation({omega, 0.0, 1.0});
 	size_t Np=tab_rs.fill(basisp,intthr);
 
 	if(verbose) {
@@ -587,14 +665,7 @@ void SCF::fill_rs(double omega) {
 	}
       }
     } else {
-      bool fill;
-      if(!scr_rs.get_N()) {
-	fill=true;
-      } else {
-	double o, kl, ks;
-	scr_rs.get_range_separation(o,kl,ks);
-	fill=(!(o==omega));
-      }
+      const bool fill = !scr_rs.get_N() || scr_rs.get_range_separation().omega != omega;
       if(fill) {
 	Timer t;
 	if(verbose) {
@@ -602,7 +673,7 @@ void SCF::fill_rs(double omega) {
 	  fflush(stdout);
 	}
 
-	scr_rs.set_range_separation(omega,0.0,1.0);
+	scr_rs.set_range_separation({omega, 0.0, 1.0});
 	size_t Np=scr_rs.fill(basisp,intthr);
 
 	if(verbose) {
@@ -684,92 +755,7 @@ void SCF::PZSIC_Fock(std::vector<arma::cx_mat> & Forb, arma::vec & Eorb, const a
     }
 
   } else {
-    if(cholesky) {
-      // Cholesky integrals
-      if(verbose) {
-	if(fock)
-	  printf("Constructing orbital Coulomb matrices ... ");
-	else
-	  printf("Computing    orbital Coulomb energies ... ");
-	fflush(stdout);
-	t.set();
-      }
-
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-      for(size_t io=0;io<Ctilde.n_cols;io++) {
-	// Calculate Coulomb term
-	arma::mat Jorb=chol.calcJ(Porb[io]);
-	// and Coulomb energy
-	Eorb[io]=0.5*arma::trace(Porb[io]*Jorb);
-	if(fock)
-	  Forb[io]=Jorb*COMPLEX1;
-      }
-
-      if(verbose) {
-	printf("done (%s)\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
-
-      // Full exchange
-      if(kfull!=0.0) {
-	if(verbose) {
-	  if(fock)
-	    printf("Constructing orbital exchange matrices ... ");
-	  else
-	    printf("Computing    orbital exchange energies ... ");
-	  fflush(stdout);
-	  t.set();
-	}
-
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Fock matrix
-	  arma::cx_mat Korb=kfull*chol.calcK(Ctilde.col(io));
-	  // and energy
-	  Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
-	  if(fock)
-	    Forb[io]-=Korb;
-	}
-
-	if(verbose) {
-	  printf("done (%s)\n",t.elapsed().c_str());
-	  fflush(stdout);
-	}
-      }
-
-      // Short-range part
-      if(kshort!=0.0) {
-	if(verbose) {
-	  if(fock)
-	    printf("Constructing orbital short-range exchange matrices ... ");
-	  else
-	    printf("Computing    orbital short-range exchange energies ... ");
-	  fflush(stdout);
-	  t.set();
-	}
-
-#ifdef _OPENMP
-#pragma omp parallel for schedule(dynamic)
-#endif
-	for(size_t io=0;io<Ctilde.n_cols;io++) {
-	  // Potential and energy
-	  arma::cx_mat Korb=kshort*chol_rs.calcK(Ctilde.col(io));
-	  Eorb[io]-=0.5*std::real(arma::trace(Pcorb[io]*Korb));
-	  if(fock)
-	    Forb[io]-=Korb;
-	}
-
-	if(verbose) {
-	  printf("done (%s)\n",t.elapsed().c_str());
-	  fflush(stdout);
-	}
-      }
-
-    } else {
+    {
       if(!direct) {
 	// Tabled integrals
 	if(verbose) {
@@ -1069,21 +1055,14 @@ arma::mat SCF::exchange_localization(const arma::mat & Co, const arma::mat & Cv0
     // Form exchange matrix
     arma::mat K;
     if(densityfit) {
-      // Because this is done an orbital at a time, it doesn't really
-      // matter how much fitting memory is given so we just allow
-      // however much
       std::vector<double> occs(1,1.0);
-      K=dfit.calcK(Co.col(io),occs,INT_MAX);
+      K=dfit.calcK(Co.col(io),occs);
     } else {
-      if(cholesky) {
-	K=chol.calcK(Co.col(io));
-      } else {
-	arma::mat P(Co.col(io)*arma::trans(Co.col(io)));
-	if(direct)
-	  K=scr.calcK(P,intthr);
-	else
-	  K=tab.calcK(P);
-      }
+      arma::mat P(Co.col(io)*arma::trans(Co.col(io)));
+      if(direct)
+        K=scr.calcK(P,intthr);
+      else
+        K=tab.calcK(P);
     }
 
     // Virtual-virtual exchange matrix is

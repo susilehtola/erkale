@@ -33,7 +33,7 @@ external/fchkpt_tools.cpp gaunt.cpp lmgrid.cpp spherical_harmonics.cpp
 trrh.cpp lobatto.cpp dftgrid.cpp dftfuncs.cpp chebyshev.cpp
 density_fitting.cpp lebedev.cpp eriworker_routines.cpp unitary.cpp
 pzstability.cpp hirshfeld.cpp hirshfeldi.cpp bader.cpp badergrid.cpp
-stockholder.cpp erifit.cpp erichol.cpp lbfgs.cpp gdm.cpp
+stockholder.cpp b_tensor.cpp lbfgs.cpp gdm.cpp
 slaterfit/solve_coefficients.cpp slaterfit/form_exponents.cpp
 atom/integrals.cpp atom/solvers.cpp atom/atomtable.cpp
 sap.cpp)
@@ -54,6 +54,11 @@ if(BUILD_SHARED_LIBS)
  target_link_libraries(liberkale ${LIBXC_LIBRARIES})
  target_link_libraries(liberkale ${HDF5_LIBRARIES})
 endif()
+
+# Wigner 3j symbols come from libwignernj (see top-level CMakeLists).
+# It is an imported target, so include directories and the link
+# requirement propagate transitively to consumers of liberkale.
+target_link_libraries(liberkale wignernj::wignernj)
 
 # Create the ERKALE main executable
 add_executable (erkale main.cpp)

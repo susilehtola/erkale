@@ -20,22 +20,14 @@
 #include "gaunt.h"
 #include "lmgrid.h"
 
-extern "C" {
-  // 3j symbols
-#include <gsl/gsl_sf_coupling.h>
-}
+#include <wignernj.hpp>
 
 double gaunt_coefficient(int L, int M, int l, int m, int lp, int mp) {
-  // First, compute square root factor
-  double res=sqrt((2*L+1)*(2*l+1)*(2*lp+1)/(4.0*M_PI));
-  // Plug in (l1 l2 l3 | 0 0 0), GSL uses half units
-  res*=gsl_sf_coupling_3j(2*L,2*l,2*lp,0,0,0);
-  // Plug in (l1 l2 l3 | m1 m2 m3)
-  res*=gsl_sf_coupling_3j(2*L,2*l,2*lp,-2*M,2*m,2*mp);
-  // and the phase factor
-  res*=pow(-1.0,M);
-
-  return res;
+  // ERKALE's "Gaunt coefficient" is the integral of Y_L^M* Y_l^m Y_lp^mp,
+  // which equals (-1)^M times the integral of Y_L^{-M} Y_l^m Y_lp^mp.
+  // libwignernj::gaunt computes the latter directly. Arguments are in
+  // half-integer units.
+  return std::pow(-1.0, M) * wignernj::gaunt<double>(2*L, -2*M, 2*l, 2*m, 2*lp, 2*mp);
 }
 
 Gaunt::Gaunt() {

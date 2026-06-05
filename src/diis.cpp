@@ -301,13 +301,18 @@ arma::vec DIIS::get_w() {
         if(verbose) printf("Weight on last matrix too small, dropping the oldest matrix.\n");
         erase_last();
         PiF_update();
-      } else {
+      } else if(sol.n_elem == 2) {
         if(verbose) printf("Weight on last matrix still too small; switching to damping.\n");
         sol.zeros();
 
         double damp=0.1;
         sol(0)=1-damp;
         sol(1)=damp;
+        break;
+      } else {
+        // Single matrix in the stack: the only valid weight is 1.0,
+        // damping has no second matrix to mix with.
+        sol.ones();
         break;
       }
     } else

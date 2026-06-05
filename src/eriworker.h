@@ -64,6 +64,20 @@ class IntegralWorker {
   /// Integral kernel (i.e. Boys' function for Coulomb integrals)
   arma::vec Gn;
 
+  /// Per-position shellpair-precursor cache, keyed by shell pointer
+  /// pair. Each compute_precursor call site identifies itself with a
+  /// slot index (0 for the bra "ij" pair, 1 for the ket "kl" pair);
+  /// the slots are independent so a hit in one never invalidates the
+  /// other. Within a 4-index J/K build the outer (is,js) pair
+  /// repeats for many (ks,ls) inner iterations -- slot 0 stays
+  /// perfectly warm and slot 1 churns harmlessly. One worker per
+  /// thread under OpenMP, so no locking. Geometry steps rebuild the
+  /// basis and the workers, so stale shell pointers don't survive
+  /// across iterations.
+  const GaussianShell* cached_is_[2];
+  const GaussianShell* cached_js_[2];
+  eri_precursor_t cached_precursor_[2];
+
   /// Compute the integral kernel
   virtual void compute_G(double rho, double T, int nmax);
 
@@ -81,8 +95,15 @@ class IntegralWorker {
   /// Do spherical transform with respect to fourth index
   void transform_l(int am, size_t Ni, size_t Nj, size_t Nk);
 
-  /// Compute precursor
-  eri_precursor_t compute_precursor(const GaussianShell *is, const GaussianShell *js);
+  /// Get precursor for a shell pair, consulting the per-worker cache.
+  /// `slot` (0 or 1) identifies the cache bucket: callers must use a
+  /// distinct slot for each precursor that needs to coexist in one
+  /// computation (slot 0 for the bra ij pair, slot 1 for the ket kl
+  /// pair). The returned reference is valid until the next
+  /// compute_precursor() call on the *same* slot.
+  const eri_precursor_t & compute_precursor(const GaussianShell *is, const GaussianShell *js, int slot);
+  /// Fill an eri_precursor_t for a shell pair (uncached helper).
+  void fill_precursor(const GaussianShell *is, const GaussianShell *js, eri_precursor_t & r);
 
  public:
   IntegralWorker();
@@ -201,5 +222,23 @@ class dERIWorker_srlr: public dERIWorker {
   ~dERIWorker_srlr();
 };
 
+#include <memory>
+
+/// Allocate an ERIWorker matching the given range-separation parameters.
+/// (omega, alpha, beta) == (0, 1, 0) is the plain-Coulomb default and
+/// gets a vanilla ERIWorker; everything else gets ERIWorker_srlr.
+inline std::unique_ptr<ERIWorker>
+make_eri_worker(int maxam, int maxcontr, double omega, double alpha, double beta) {
+  if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
+    return std::unique_ptr<ERIWorker>(new ERIWorker(maxam, maxcontr));
+  return std::unique_ptr<ERIWorker>(new ERIWorker_srlr(maxam, maxcontr, omega, alpha, beta));
+}
+
+inline std::unique_ptr<dERIWorker>
+make_deri_worker(int maxam, int maxcontr, double omega, double alpha, double beta) {
+  if(omega == 0.0 && alpha == 1.0 && beta == 0.0)
+    return std::unique_ptr<dERIWorker>(new dERIWorker(maxam, maxcontr));
+  return std::unique_ptr<dERIWorker>(new dERIWorker_srlr(maxam, maxcontr, omega, alpha, beta));
+}
 
 #endif

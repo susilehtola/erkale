@@ -161,11 +161,14 @@ int main_guarded(int argc, char **argv) {
 
   } else if(stricmp(guess,"gwh")==0) {
 
-    // Form GWH matrix
+    // Form GWH matrix. The diagonal is the bare core-Hamiltonian
+    // diagonal; off-diagonal entries are H_ij = 1/2 K S_ij (H_ii + H_jj).
+    // The previous implementation overwrote H(i,i) inside the inner
+    // loop (when j==i) with the GWH off-diagonal formula, so the
+    // diagonal ended up scaled by K*S(i,i) instead of being preserved.
     arma::mat Hgwh(Hcore);
     for(size_t i=0;i<Hcore.n_rows;i++) {
-      Hgwh(i,i)=Hcore(i,i);
-      for(size_t j=0;j<Hcore.n_cols;j++) {
+      for(size_t j=i+1;j<Hcore.n_cols;j++) {
         Hgwh(i,j)=0.5*K*S(i,j)*(Hcore(i,i)+Hcore(j,j));
         Hgwh(j,i)=Hgwh(i,j);
       }
@@ -266,7 +269,8 @@ int main_guarded(int argc, char **argv) {
     } else {
       occa.zeros();
       occb.zeros();
-      occa.subvec(0,Nela-1).ones();
+      if(Nela)
+        occa.subvec(0,Nela-1).ones();
       if(Nelb)
         occb.subvec(0,Nelb-1).ones();
     }
@@ -282,15 +286,25 @@ int main_guarded(int argc, char **argv) {
   double aproj(arma::trace(Pa*S*Pag*S));
   double bproj(arma::trace(Pb*S*Pbg*S));
   if(std::abs(aproj-bproj)>=sqrt(DBL_EPSILON)) {
-    printf("Alpha projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj,aproj/Nela*100.0);
-    printf("Beta  projection of guess onto SCF density is %e i.e. %5.2f %%\n",bproj,bproj/Nelb*100.0);
+    if(Nela)
+      printf("Alpha projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj,aproj/Nela*100.0);
+    else
+      printf("Alpha projection of guess onto SCF density is %e\n",aproj);
+    if(Nelb)
+      printf("Beta  projection of guess onto SCF density is %e i.e. %5.2f %%\n",bproj,bproj/Nelb*100.0);
+    else
+      printf("Beta  projection of guess onto SCF density is %e\n",bproj);
   }
-  printf("Projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela+Nelb)*100.0);
+  if(Nela+Nelb)
+    printf("Projection of guess onto SCF density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela+Nelb)*100.0);
+  else
+    printf("Projection of guess onto SCF density is %e\n",aproj+bproj);
 
   // Save result?
   if(savef.size()) {
     std::string cmd("cp " + chkf + " " + savef);
-    (void) system(cmd.c_str());
+    if(system(cmd.c_str()) != 0)
+      throw std::runtime_error("Failed to copy checkpoint via shell: " + cmd + "\n");
 
     Checkpoint save(savef,true,false);
     save.write("P",Pag+Pbg);

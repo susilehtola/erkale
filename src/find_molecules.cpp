@@ -26,42 +26,44 @@ std::vector< std::vector<size_t> > find_molecules(const std::vector<atom_t> & at
   // Loop over atoms
   for(size_t i=0;i<atoms.size();i++) {
 
-    // Check first, if atom should belong to a molecule.
-    bool found=0;
+    // Collect every existing molecule that contains an atom bonding
+    // to atom i. The earlier version stopped at the first match and
+    // moved on, which left previously-disjoint molecules separate
+    // even when atom i bridges them.
+    std::vector<size_t> matching_mols;
     for(size_t imol=0;imol<ret.size();imol++) {
-      // Loop over atoms in molecule
       for(size_t iat=0;iat<ret[imol].size();iat++) {
-	// The index of the other atom is
 	size_t j=ret[imol][iat];
 
-	// Compute the distance between the atoms.
 	double d=0.0;
 	d+=(atoms[i].x-atoms[j].x)*(atoms[i].x-atoms[j].x);
 	d+=(atoms[i].y-atoms[j].y)*(atoms[i].y-atoms[j].y);
 	d+=(atoms[i].z-atoms[j].z)*(atoms[i].z-atoms[j].z);
 	d=sqrt(d)/ANGSTROMINBOHR;
 
-	// Check if bond exists
 	if(check_bonds(d,atoms[i].el,atoms[j].el)) {
-	  // Yes, add to molecule
-	  ret[imol].push_back(i);
-	  found=1;
-	  // Stop loop
-	  break;
+	  matching_mols.push_back(imol);
+	  break; // a single bond into the molecule is enough
 	}
       }
-
-      if(found)
-	// Atom was already added to a molecule
-	break;
     }
 
-    if(!found) {
-      // Need to add new molecule.
+    if(matching_mols.empty()) {
+      // No existing molecule bonds to atom i; start a new one.
       std::vector<size_t> hlp;
       hlp.push_back(i);
-      // Add it to the list
       ret.push_back(hlp);
+    } else {
+      // Add atom i to the first matching molecule and merge any other
+      // matching molecules into it. Erase merged-in entries from the
+      // back so the surviving indices don't shift under us.
+      size_t target = matching_mols[0];
+      ret[target].push_back(i);
+      for(size_t k=matching_mols.size(); k-->1; ) {
+	size_t src = matching_mols[k];
+	ret[target].insert(ret[target].end(), ret[src].begin(), ret[src].end());
+	ret.erase(ret.begin()+src);
+      }
     }
   }
 

@@ -10,3 +10,4 @@ IntegralThresh 1e-14
 Logfile water_cluster.log
 SaveChk water_cluster.chk
 BasisRotate false
+DFTGrid 50 -194

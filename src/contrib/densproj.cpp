@@ -134,10 +134,19 @@ int main_guarded(int argc, char **argv) {
   double aproj(arma::trace(Pa1*S12*Pa2*S12.t()));
   double bproj(arma::trace(Pb1*S12*Pb2*S12.t()));
   if(std::abs(aproj-bproj)>=sqrt(DBL_EPSILON)) {
-    printf("Projection of alpha densities is %e i.e. %5.2f %%\n",aproj,aproj/Nela1*100.0);
-    printf("Projection of beta  densities is %e i.e. %5.2f %%\n",bproj,bproj/Nelb1*100.0);
+    if(Nela1)
+      printf("Projection of alpha densities is %e i.e. %5.2f %%\n",aproj,aproj/Nela1*100.0);
+    else
+      printf("Projection of alpha densities is %e\n",aproj);
+    if(Nelb1)
+      printf("Projection of beta  densities is %e i.e. %5.2f %%\n",bproj,bproj/Nelb1*100.0);
+    else
+      printf("Projection of beta  densities is %e\n",bproj);
   }
-  printf("Projection of density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela1+Nelb1)*100.0);
+  if(Nela1+Nelb1)
+    printf("Projection of density is %e i.e. %5.2f %%\n",aproj+bproj,(aproj+bproj)/(Nela1+Nelb1)*100.0);
+  else
+    printf("Projection of density is %e\n",aproj+bproj);
 
   printf("\nRunning program took %s.\n",t.elapsed().c_str());
 

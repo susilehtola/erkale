@@ -1,0 +1,21 @@
+# Water cluster, two-step Cholesky decomposition.
+# Same physics as water_cluster_cholesky but pivoted CD is routed
+# through three-center machinery (orbital-pair pivots on atom pairs;
+# metric Cholesky factor; B = (mu nu | piv) M^{-1/2}).
+# Cf. F. Folkestad, E. F. Kjonstad and H. Koch, J. Chem. Phys. 150,
+# 194112 (2019). Exact at threshold; reproduces water_cluster_cholesky
+# energies to within numerical precision.
+System water_cluster.xyz
+Method HF
+Basis aug-cc-pVDZ
+DensityFitting false
+Cholesky true
+CholeskyAlgorithm TwoStep
+CholeskyThr 1e-7
+IntegralThresh 1e-14
+
+
+
+Logfile water_cluster_cholesky_twostep.log
+SaveChk water_cluster_cholesky_twostep.chk
+BasisRotate false

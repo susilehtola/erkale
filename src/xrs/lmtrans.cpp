@@ -30,7 +30,12 @@ lmtrans::lmtrans() {
 lmtrans::lmtrans(const arma::mat & C, const BasisSet & bas, const coords_t & cen, size_t Nrad, int l, int lquad) {
   exp=expand_orbitals(C,bas,cen,true,Nrad,l,lquad);
 
-  // Compute maximum value of l
+  // Compute maximum value of l. Bail out cleanly if the orbital
+  // expansion produced no angular components: lmax-- on 0 would
+  // underflow and the Gaunt table would be constructed with a
+  // negative size below.
+  if(exp.clm.empty() || exp.clm[0].size()==0)
+    throw std::runtime_error("lmtrans: orbital expansion has no angular components.\n");
   lmax=0;
   while(lmind(lmax,lmax)<exp.clm[0].size())
     lmax++;
@@ -123,9 +128,9 @@ bessel_t lmtrans::compute_bessel(double q) const {
 
 
 arma::cx_mat lmtrans::transition_amplitude(const rad_int_t & rad, double qx, double qy, double qz) const {
-  // Compute cos theta and phi
+  // Compute theta and phi
   double q=sqrt(qx*qx+qy*qy+qz*qz);
-  double cth=qz/q;
+  double theta=std::acos(qz/q);
   double phi=atan2(qy,qx);
 
   // Returned array
@@ -135,7 +140,7 @@ arma::cx_mat lmtrans::transition_amplitude(const rad_int_t & rad, double qx, dou
   std::vector< std::complex<double> > conj_sphharm(lmind(2*lmax,2*lmax)+1);
   for(int l=0;l<=2*lmax;l++)
     for(int m=-l;m<=l;m++)
-      conj_sphharm[lmind(l,m)]=conj(spherical_harmonics(l,m,cth,phi));
+      conj_sphharm[lmind(l,m)]=conj(spherical_harmonics(l,m,theta,phi));
 
   // Loop over l_i, l_f
   for(int li=0;li<=lmax;li++)

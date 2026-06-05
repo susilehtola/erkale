@@ -252,12 +252,15 @@ int main_guarded(int argc, char **argv) {
   std::vector<GaussianShell> pshells=pbasis.get_shells();
 
   // Compute shell pairs
-  arma::mat Qe, Qp, M;
   double omega=0.0;
   double alpha=1.0;
   double beta=0.0;
-  auto epairs=basis.get_eripairs(Qe,M,intthr,omega,alpha,beta,verbose);
-  auto ppairs=pbasis.get_eripairs(Qp,M,intthr,omega,alpha,beta,verbose);
+  ScreeningData e_scr=basis.compute_screening(intthr,omega,alpha,beta,verbose);
+  ScreeningData p_scr=pbasis.compute_screening(intthr,omega,alpha,beta,verbose);
+  const arma::mat & Qe = e_scr.Q;
+  const arma::mat & Qp = p_scr.Q;
+  const std::vector<eripair_t> & epairs = e_scr.shpairs;
+  const std::vector<eripair_t> & ppairs = p_scr.shpairs;
 
   int max_am = std::max(basis.get_max_am(), pbasis.get_max_am());
   int max_Ncontr = std::max(basis.get_max_Ncontr(), pbasis.get_max_Ncontr());
@@ -358,7 +361,7 @@ int main_guarded(int argc, char **argv) {
   arma::mat H0_mo = Xe_bo.t() * H0 * Xe_bo;
   arma::mat H0p_mo = Xp_bo.t() * H0p * Xp_bo;
 
-  arma::mat H0_ci(V_ci.n_rows, V_ci.n_cols);
+  arma::mat H0_ci(V_ci.n_rows, V_ci.n_cols, arma::fill::zeros);
   for(size_t i=0; i<e_nmo; i++)
     for(size_t j=0; j<e_nmo; j++)
       for(size_t I=0; I<p_nmo; I++) {

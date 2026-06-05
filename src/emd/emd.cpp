@@ -177,19 +177,19 @@ void EMDEvaluator::distance_table(const std::vector<coords_t> & coord) {
 	dist[ind]=dr;
 
 	// Phi and cos(theta)
-	double phi, cth;
+	double phi, theta;
 	if(dr>0) {
 	  phi=atan2(dr_vec.y,dr_vec.x);
-	  cth=dr_vec.z/dr;
+	  theta=std::acos(dr_vec.z/dr);
 	} else {
 	  phi=-1;
-	  cth=-1;
+	  theta=std::acos(-1.0);
 	}
 
 	// Loop over L and M
 	for(int L=0;L<=Lmax;L++)
 	  for(int M=-L;M<=L;M++)
-	    YLM[ind][lmind(L,M)]=std::conj(spherical_harmonics(L,M,cth,phi));
+	    YLM[ind][lmind(L,M)]=std::conj(spherical_harmonics(L,M,theta,phi));
       }
     }
 }

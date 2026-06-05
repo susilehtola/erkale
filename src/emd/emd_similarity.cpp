@@ -20,6 +20,7 @@
 #include "../lebedev.h"
 #include "../chebyshev.h"
 #include "../timer.h"
+#include <memory>
 
 // Debug routines?
 //#define DEBUGSIM
@@ -188,18 +189,18 @@ arma::cube emd_overlap(const BasisSet & basis_a, const arma::cx_mat & P_a, const
 std::vector<double> evaluate_projection(const BasisSet & basis, const arma::cx_mat & P, const std::vector<double> rad, int l, int m) {
   int Nel=round(std::real(arma::trace(P*basis.overlap())));
 
-  GaussianEMDEvaluator *poseval=new GaussianEMDEvaluator(basis,P,l,std::abs(m));
-  GaussianEMDEvaluator *negeval=NULL;
+  // Use unique_ptr so a throw from the second GaussianEMDEvaluator
+  // construction (or anywhere later in the function) won't leak the
+  // first allocation.
+  std::unique_ptr<GaussianEMDEvaluator> poseval(new GaussianEMDEvaluator(basis,P,l,std::abs(m)));
+  std::unique_ptr<GaussianEMDEvaluator> negeval;
   if(m!=0)
-    negeval=new GaussianEMDEvaluator(basis,P,l,-std::abs(m));
-  EMD emd(poseval, negeval, Nel, l, m);
+    negeval.reset(new GaussianEMDEvaluator(basis,P,l,-std::abs(m)));
+  EMD emd(poseval.get(), negeval.get(), Nel, l, m);
 
   std::vector<double> ret(rad.size());
   for(size_t i=0;i<rad.size();i++)
     ret[i]=emd.eval(rad[i]);
-
-  delete poseval;
-  if(m!=0) delete negeval;
 
   return ret;
 }

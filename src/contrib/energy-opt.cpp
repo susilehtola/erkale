@@ -326,8 +326,11 @@ arma::mat EnergyOptimizer::calcH(const arma::vec & x, bool check) {
   // Get energies
   std::vector<double> Etr=calcE(trials);
 
-  // Hessian
-  arma::vec h(idx.n_elem,idx.n_elem);
+  // Hessian. The two-argument constructor on arma::vec is interpreted
+  // as (n_rows, n_cols) for the underlying arma::Col, with n_cols=1 silently
+  // dropping the second argument; the loop below then writes h(i,j)
+  // out of bounds when j>0. Use arma::mat so the (i,j) indexing matches.
+  arma::mat h(idx.n_elem,idx.n_elem);
   for(arma::uword i=0;i<idx.n_elem;i++)
     for(arma::uword j=0;j<=i;j++) {
       // Offset is 4 * i(i+1)/2

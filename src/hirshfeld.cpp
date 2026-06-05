@@ -88,8 +88,9 @@ double HirshfeldAtom::get(double r) const {
   // Index of entry is
   size_t i=(size_t) floor(rdr);
 
-  // Check limit
-  if(i>=rho.size()-1)
+  // Check limit. Test against rho.size() rather than rho.size()-1 so
+  // that an empty rho (size 0) doesn't wrap on the unsigned subtraction.
+  if(i+1>=rho.size())
     return 0.0;
 
   // Perform linear intepolation
@@ -255,12 +256,19 @@ void Hirshfeld::print_densities() const {
     std::ostringstream fname;
     fname << "hirshfeld_" << i << ".dat";
     FILE *out=fopen(fname.str().c_str(),"w");
+    if(!out) {
+      std::ostringstream oss;
+      oss << "Could not open \"" << fname.str() << "\" for writing.\n";
+      throw std::runtime_error(oss.str());
+    }
 
     // Spacing to use
     double dr=0.001;
     // Amount of points
     size_t N=1+ (size_t) round(atoms[i].get_range()/dr);
-    for(size_t ir=0;ir<=N;ir++)
+    // Iterate ir=0..N-1; the previous `<=N` upper bound walked one
+    // point past the radial range, where atoms[i].get returns 0.
+    for(size_t ir=0;ir<N;ir++)
       fprintf(out,"%e %e\n",ir*dr,atoms[i].get(ir*dr));
     fclose(out);
   }

@@ -634,11 +634,14 @@ template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & v
     throw std::runtime_error(oss.str());
   }
 
-  // Form helper matrix
+  // Column-scale f by vxc into fhlp using a vectorised each_row op.
+  // We need a Row<T> typed scaling vector so cx_mat *= cx_rowvec
+  // dispatches without a real-to-complex per-element fallback.
+  // H += fhlp * f^T is left as DGEMM; armadillo doesn't expose a
+  // DSYRK with diagonal scaling.
   arma::Mat<T> fhlp(f);
-  for(size_t i=0;i<fhlp.n_rows;i++)
-    for(size_t j=0;j<fhlp.n_cols;j++)
-      fhlp(i,j)*=vxc(j);
+  const arma::Row<T> vxc_T(arma::conv_to<arma::Row<T>>::from(vxc));
+  fhlp.each_row() %= vxc_T;
   H+=fhlp*arma::trans(f);
 }
 
@@ -653,11 +656,17 @@ template<typename T> void increment_lda(arma::Mat<T> & H, const arma::rowvec & v
     throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
   }
 
-  // Form helper matrix
+  // Fast path when nothing was screened: avoid the cols(screen)
+  // submatrix copies entirely, fall through to the unscreened version.
+  if(screen.n_elem == f.n_cols) {
+    increment_lda(H, vxc, f);
+    return;
+  }
+
+  // Form helper matrix and contract only over surviving points.
   arma::Mat<T> fhlp(f);
-  for(size_t i=0;i<fhlp.n_rows;i++)
-    for(size_t j=0;j<fhlp.n_cols;j++)
-      fhlp(i,j)*=vxc(j);
+  const arma::Row<T> vxc_T(arma::conv_to<arma::Row<T>>::from(vxc));
+  fhlp.each_row() %= vxc_T;
   H+=fhlp.cols(screen)*arma::trans(f.cols(screen));
 }
 
@@ -678,35 +687,17 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
 
   // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
   //                 (N, Np)    =        (N Np; c)    (Np, 3)
-  arma::Mat<T> gamma(f.n_rows,f.n_cols);
-  gamma.zeros();
-  {
-    // Helper
-    arma::rowvec gc;
+  // Column-scale f_x/f_y/f_z by the corresponding gradient component
+  // via vectorised each_row, then sum into gamma. The original code
+  // used scalar nested loops.
+  f_x.each_row() %= arma::conv_to<arma::Row<T>>::from(arma::trans(gn.col(0)));
+  f_y.each_row() %= arma::conv_to<arma::Row<T>>::from(arma::trans(gn.col(1)));
+  f_z.each_row() %= arma::conv_to<arma::Row<T>>::from(arma::trans(gn.col(2)));
+  arma::Mat<T> gamma(f_x + f_y + f_z);
 
-    // x gradient
-    gc=arma::trans(gn.col(0));
-    for(size_t j=0;j<f_x.n_cols;j++)
-      for(size_t i=0;i<f_x.n_rows;i++)
-	f_x(i,j)*=gc(j);
-    gamma+=f_x;
-
-    // x gradient
-    gc=arma::trans(gn.col(1));
-    for(size_t j=0;j<f_y.n_cols;j++)
-      for(size_t i=0;i<f_y.n_rows;i++)
-	f_y(i,j)*=gc(j);
-    gamma+=f_y;
-
-    // z gradient
-    gc=arma::trans(gn.col(2));
-    for(size_t j=0;j<f_z.n_cols;j++)
-      for(size_t i=0;i<f_z.n_rows;i++)
-	f_z(i,j)*=gc(j);
-    gamma+=f_z;
-  }
-
-  // Form Fock matrix
+  // Form Fock matrix. gamma * f^T + f * gamma^T is mathematically a
+  // symmetric rank-2 update (DSYR2K), but armadillo doesn't expose
+  // DSYR2K so we keep the two-DGEMM expression.
   H+=gamma*arma::trans(f) + f*arma::trans(gamma);
 }
 
@@ -725,35 +716,18 @@ template<typename T> void increment_gga(arma::Mat<T> & H, const arma::mat & gn, 
     throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
   }
 
-  // Compute helper: gamma_{ip} = \sum_c \chi_{ip;c} gr_{p;c}
-  //                 (N, Np)    =        (N Np; c)    (Np, 3)
-  arma::Mat<T> gamma(f.n_rows,f.n_cols);
-  gamma.zeros();
-  {
-    // Helper
-    arma::rowvec gc;
-
-    // x gradient
-    gc=arma::trans(gn.col(0));
-    for(size_t j=0;j<f_x.n_cols;j++)
-      for(size_t i=0;i<f_x.n_rows;i++)
-	f_x(i,j)*=gc(j);
-    gamma+=f_x;
-
-    // x gradient
-    gc=arma::trans(gn.col(1));
-    for(size_t j=0;j<f_y.n_cols;j++)
-      for(size_t i=0;i<f_y.n_rows;i++)
-	f_y(i,j)*=gc(j);
-    gamma+=f_y;
-
-    // z gradient
-    gc=arma::trans(gn.col(2));
-    for(size_t j=0;j<f_z.n_cols;j++)
-      for(size_t i=0;i<f_z.n_rows;i++)
-	f_z(i,j)*=gc(j);
-    gamma+=f_z;
+  // Fast path: nothing actually screened, fall through to the
+  // unscreened version so we avoid the cols() submatrix copies.
+  if(screen.n_elem == f.n_cols) {
+    increment_gga(H, gn, f, f_x, f_y, f_z);
+    return;
   }
+
+  // Column-scale derivatives by gradient components and accumulate.
+  f_x.each_row() %= arma::conv_to<arma::Row<T>>::from(arma::trans(gn.col(0)));
+  f_y.each_row() %= arma::conv_to<arma::Row<T>>::from(arma::trans(gn.col(1)));
+  f_z.each_row() %= arma::conv_to<arma::Row<T>>::from(arma::trans(gn.col(2)));
+  arma::Mat<T> gamma(f_x + f_y + f_z);
 
   // Form Fock matrix
   H+=gamma.cols(screen)*arma::trans(f.cols(screen)) + f.cols(screen)*arma::trans(gamma.cols(screen));
@@ -789,13 +763,15 @@ template<typename T> void increment_mgga_lapl(arma::Mat<T> & H, const arma::rowv
     throw std::runtime_error("Sizes of basis function and Fock matrices doesn't match!\n");
   }
 
-  // Absorb the potential into the function values
+  // Absorb the potential into the function values via vectorised
+  // each_row, then build the symmetric rank-2 update.
   arma::Mat<T> fhlp(f);
-  for(size_t i=0;i<fhlp.n_rows;i++)
-    for(size_t j=0;j<fhlp.n_cols;j++)
-      fhlp(i,j)*=vl(j);
-  // Fock matrix contribution is
-  H+=f_lapl.cols(screen)*arma::trans(fhlp.cols(screen)) + fhlp.cols(screen)*arma::trans(f_lapl.cols(screen));
+  fhlp.each_row() %= arma::conv_to<arma::Row<T>>::from(vl);
+  if(screen.n_elem == f.n_cols) {
+    H+=f_lapl*arma::trans(fhlp) + fhlp*arma::trans(f_lapl);
+  } else {
+    H+=f_lapl.cols(screen)*arma::trans(fhlp.cols(screen)) + fhlp.cols(screen)*arma::trans(f_lapl.cols(screen));
+  }
 }
 
 #endif

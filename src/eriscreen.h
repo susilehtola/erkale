@@ -27,7 +27,7 @@
  *
  * \author Susi Lehtola
  * \date 2011/05/12 19:44
-*/
+ */
 
 #ifndef ERKALE_ERISCREEN
 #define ERKALE_ERISCREEN
@@ -36,9 +36,11 @@ class IntegralDigestor;
 class ForceDigestor;
 #include "global.h"
 #include <armadillo>
+#include <memory>
 #include <vector>
 
 #include "basis.h"
+#include "eriworker.h"
 
 /// Screening of electron repulsion integrals
 class ERIscreen {
@@ -61,12 +63,40 @@ class ERIscreen {
   /// Fraction of short-range exchange
   double beta;
 
-  /// Run calculation with given digestor
-  void calculate(std::vector< std::vector<IntegralDigestor *> > & digest, double tol) const;
+  /// Threshold for density-weighted Fock-contribution screening.
+  /// Zero disables density screening (calculate() then uses only the
+  /// integral-magnitude tests). Set via set_screen_thresh().
+  double screen_thresh_;
+
+  /// Per-thread ERIWorker / dERIWorker pool. Sized to
+  /// omp_get_max_threads() in fill(); each thread lazily constructs
+  /// its slot on first use via acquire_eri / acquire_deri. Workers
+  /// are reused across calcJ / calcK / calcJK / forceJ / forceK
+  /// calls (workers' internal state is overwritten on every
+  /// compute() so cross-call reuse is safe). Pools are cleared
+  /// whenever set_range_separation or fill change the parameters
+  /// the constructors baked in.
+  ///
+  /// mutable so the const calc* / force* members can populate.
+  mutable std::vector< std::unique_ptr<ERIWorker> > eri_pool_;
+  mutable std::vector< std::unique_ptr<dERIWorker> > deri_pool_;
+
+  /// Lazily construct & return the per-thread ERI worker.
+  ERIWorker * acquire_eri(int ith) const;
+  /// Lazily construct & return the per-thread derivative ERI worker.
+  dERIWorker * acquire_deri(int ith) const;
+
+  /// Build the shell-pair density bound matrix: D(i,j) = max |P| over
+  /// the (shell i, shell j) block. Used for density-weighted screening.
+  arma::mat density_bounds(const arma::mat & P) const;
+  /// Run calculation with given digestor. D is the shell-pair density
+  /// bound matrix (see density_bounds) used for density-weighted
+  /// screening of the integral contributions.
+  void calculate(std::vector< std::vector<IntegralDigestor *> > & digest, const arma::mat & D, double tol) const;
   /// Run force calculation with given digestor
   arma::vec calculate_force(std::vector< std::vector<ForceDigestor *> > & digest, double tol) const;
 
- public:
+public:
   /// Constructor
   ERIscreen();
   /// Destructor
@@ -77,8 +107,17 @@ class ERIscreen {
 
   /// Set range separation
   void set_range_separation(double omega, double alpha, double beta);
+  void set_range_separation(const RangeSeparation & rs) { set_range_separation(rs.omega, rs.alpha, rs.beta); }
   /// Get range separation
   void get_range_separation(double & omega, double & alpha, double & beta) const;
+  RangeSeparation get_range_separation() const { RangeSeparation rs; get_range_separation(rs.omega, rs.alpha, rs.beta); return rs; }
+
+  /// Set the density-weighted (Fock-contribution) screening threshold.
+  /// Zero disables density screening; calculate() then uses only the
+  /// integral-magnitude tests.
+  void set_screen_thresh(double t) { screen_thresh_ = t; }
+  /// Get the density-weighted screening threshold.
+  double get_screen_thresh() const { return screen_thresh_; }
 
   /// Form screening matrix, return amount of significant shell pairs
   size_t fill(const BasisSet * basis, double shtol, bool verbose=true);
@@ -90,7 +129,7 @@ class ERIscreen {
 
   /// Calculate exchange matrix with tolerance tol for integrals
   arma::mat calcK(const arma::mat & P, double tol) const;
-    /// Calculate exchange matrix with tolerance tol for integrals
+  /// Calculate exchange matrix with tolerance tol for integrals
   arma::cx_mat calcK(const arma::cx_mat & P, double tol) const;
   /// Calculate  exchange matrices with tolerance tol for integrals
   void calcK(const arma::mat & Pa, const arma::mat & Pb, arma::mat & Ka, arma::mat & Kb, double tol) const;

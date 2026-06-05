@@ -93,9 +93,6 @@ void CasidaShell::eval_fxc(int x_func, int c_func) {
       throw std::runtime_error(oss.str());
     }
 
-    // Initialize the functional
-    xc_func_init(&xfunc, x_func, nspin);
-
     if(xfunc.info->family!=XC_FAMILY_LDA) {
       ERROR_INFO();
       throw std::runtime_error("Casida only supports LDA functionals.\n");
@@ -121,7 +118,6 @@ void CasidaShell::eval_fxc(int x_func, int c_func) {
       throw std::runtime_error(oss.str());
     }
 
-    xc_func_init(&cfunc, c_func, nspin);
     if(cfunc.info->family!=XC_FAMILY_LDA) {
       ERROR_INFO();
       throw std::runtime_error("Casida only supports LDA functionals.\n");
@@ -184,16 +180,19 @@ void CasidaShell::Kxc(const std::vector< std::vector<states_pair_t> > & pairs, a
 	  // Factor in common for all orbitals
 	  wxc=grid[ip].w*(fx[3*ip+1]+fc[3*ip+1]); // up-down and down-up
 
-	  // Loop over pairs
+	  // Cross-spin (ispin != jspin) block is rectangular: iterate
+	  // jpair over the full pairs[jspin] range, not the lower
+	  // triangle (which would be correct only for ispin == jspin).
 	  for(size_t ipair=0;ipair<pairs[ispin].size();ipair++) {
-	    for(size_t jpair=0;jpair<ipair;jpair++) {
+	    for(size_t jpair=0;jpair<pairs[jspin].size();jpair++) {
 	      double term=wxc*orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f]
-		*orbs[ispin][ip][pairs[jspin][jpair].i]*orbs[ispin][ip][pairs[jspin][jpair].f];
+		*orbs[jspin][ip][pairs[jspin][jpair].i]*orbs[jspin][ip][pairs[jspin][jpair].f];
 	      K(ioff+ipair,joff+jpair)+=term;
 	      K(joff+jpair,ioff+ipair)+=term;
 	    }
-	    K(ioff+ipair,ioff+ipair)+=wxc*orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f]
-	      *orbs[ispin][ip][pairs[ispin][ipair].i]*orbs[ispin][ip][pairs[ispin][ipair].f];
+	    // (No same-spin diagonal contribution from the cross-spin
+	    // block: K[i_σ a_σ, i_σ a_σ] is built from f^(σσ) only,
+	    // which is added in the ispin==jspin branch above.)
 	  }
 	}
       }

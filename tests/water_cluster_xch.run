@@ -13,3 +13,4 @@ SaveChk water_cluster_xch.chk
 XRSMethod XCH
 BasisRotate false
 ConvThr 1e-6
+DFTGrid 50 -194

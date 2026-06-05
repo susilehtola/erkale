@@ -16,6 +16,7 @@
 
 #include "basislibrary.h"
 #include "basis.h"
+#include <memory>
 #include "checkpoint.h"
 #include "dftgrid.h"
 #include "elements.h"
@@ -29,7 +30,7 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
-#include "erichol.h"
+#include "density_fitting.h"
 
 // Needed for libint init
 #include "eriworker.h"
@@ -107,6 +108,7 @@ int main_guarded(int argc, char **argv) {
   settings.add_string("SaveChk", "Checkpoint file to save to", "neo.chk");
   settings.add_string("LoadChk", "Checkpoint file to load from", "");
   settings.add_bool("FiniteProton", "Use a finite proton model", false);
+  settings.add_bool("vpp", "Include JK terms for protons?", true);
 
   // Parse settings
   settings.parse(std::string(argv[1]),true);
@@ -123,12 +125,12 @@ int main_guarded(int argc, char **argv) {
   double convergence_threshold = settings.get_double("ConvThr");
   bool verbose = settings.get_bool("Verbose");
   int nstepwise = settings.get_int("StepwiseSCFIter");
-  size_t fitmem = 1000000*settings.get_int("FittingMemory");
   std::string error_norm = settings.get_string("ErrorNorm");
   std::string loadchk = settings.get_string("LoadChk");
   std::string savechk = settings.get_string("SaveChk");
   bool finiteproton = settings.get_bool("FiniteProton");
   bool density_fitting = settings.get_bool("DensityFitting");
+  bool vpp = settings.get_bool("vpp");
 
   Checkpoint chkpt(savechk,true);
 
@@ -226,10 +228,11 @@ int main_guarded(int argc, char **argv) {
     printf("Using finite protonic model with fwhm = %e bohr => omega = %e.\n",fwhm,omega);
   }
 
-  // Construct density fitting basis set
+  // Coulomb/exchange machinery. The merged DensityFit class drives
+  // both regular DF and CD modes; which mode it's in is selected by
+  // the fill_*() call below.
   BasisSetLibrary fitlib;
   BasisSet dfitbas;
-  ERIchol chol, pchol;
   DensityFit dfit, pfit;
   size_t Npairs_p=0, Npairs_e=0;
   bool direct=settings.get_bool("Direct");
@@ -251,6 +254,7 @@ int main_guarded(int argc, char **argv) {
       pfit.set_range_separation(omega, alpha, beta);
     Npairs_e=dfit.fill(basis,dfitbas,direct,intthr,fitthr,cholfitthr);
     if(Sp.n_elem)
+      // density fitting also used for e-p terms
       Npairs_p=pfit.fill(pbasis,dfitbas,direct,intthr,fitthr,cholfitthr);
 
     printf("Auxiliary basis contains %i functions out of which %i are linearly dependent.\n",(int) dfit.get_Naux(),(int) (dfit.get_Naux()-dfit.get_Naux_indep()));
@@ -261,10 +265,12 @@ int main_guarded(int argc, char **argv) {
     double cholthr=settings.get_double("CholeskyThr");
     double cholshthr=settings.get_double("CholeskyShThr");
     double shtol=settings.get_double("IntegralThresh");
-    Npairs_e=chol.fill(basis,cholthr,cholshthr,shtol,verbose);
+    double fitcholthr=settings.get_double("FittingCholeskyThreshold");
+    Npairs_e=dfit.fill_cholesky(basis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
     if(finiteproton)
-      pchol.set_range_separation(omega, alpha, beta);
-    Npairs_p=pchol.fill(pbasis,cholthr,cholshthr,shtol,verbose);
+      pfit.set_range_separation(omega, alpha, beta);
+    if(vpp)
+      Npairs_p=pfit.fill_cholesky(pbasis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
   }
 
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
@@ -285,7 +291,7 @@ int main_guarded(int argc, char **argv) {
     pr=pbasis.moment(1);
   }
 
-  std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [&pbasis, &Xp, &Sp] (const arma::mat & F) {
+  std::function<arma::mat(const arma::mat &)> extract_atomic_block_diagonal = [&] (const arma::mat & F) {
     arma::mat Fblock(F.n_rows,F.n_cols,arma::fill::zeros);
     for(size_t inuc=0;inuc<pbasis.get_Nnuc();inuc++) {
       // Get shells on nucleus
@@ -314,25 +320,19 @@ int main_guarded(int argc, char **argv) {
 
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
-    arma::mat J, K;
-    if(density_fitting) {
-      J=dfit.calcJ(P);
-      K=-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem);
-    } else {
-      J=chol.calcJ(P);
-      K=-chol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
-    }
+    arma::mat J=dfit.calcJ(P);
+    arma::mat K=-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
     return std::make_pair(J,K);
   };
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J, K;
-    if(density_fitting) {
+    if(vpp) {
       J=pfit.calcJ(P);
-      K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs), fitmem);
+      K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
     } else {
-      J=pchol.calcJ(P);
-      K=-pchol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
+      J.zeros(P.n_rows, P.n_cols);
+      K.zeros(P.n_rows, P.n_cols);
     }
     return std::make_pair(J,K);
   };
@@ -343,11 +343,14 @@ int main_guarded(int argc, char **argv) {
     std::vector<GaussianShell> tshells=target_basis.get_shells();
 
     // Get shellpairs
-    arma::mat Qs, Qt, Ms, Mt;
     double shtol=settings.get_double("IntegralThresh");
     bool verbose=false;
-    auto spairs=source_basis.get_eripairs(Qs,Ms,shtol,omega,alpha,beta,verbose);
-    auto tpairs=target_basis.get_eripairs(Qt,Mt,shtol,omega,alpha,beta,verbose);
+    ScreeningData s_scr = source_basis.compute_screening(shtol,omega,alpha,beta,verbose);
+    ScreeningData t_scr = target_basis.compute_screening(shtol,omega,alpha,beta,verbose);
+    const arma::mat & Qs = s_scr.Q;
+    const arma::mat & Qt = t_scr.Q;
+    const std::vector<eripair_t> & spairs = s_scr.shpairs;
+    const std::vector<eripair_t> & tpairs = t_scr.shpairs;
 
     // Sanity check
     if(source_density.n_rows != source_basis.get_Nbf() or source_density.n_cols != source_basis.get_Nbf())
@@ -360,10 +363,13 @@ int main_guarded(int argc, char **argv) {
 #pragma omp parallel
 #endif
     {
-      // ERI worker
+      // ERI worker. unique_ptr so a throw inside the loop doesn't
+      // leak the allocation; .get() is used at every call site
+      // inside the loop (legacy raw-pointer API).
       auto maxam = std::max(source_basis.get_max_am(),target_basis.get_max_am());
       auto maxncontr = std::max(source_basis.get_max_Ncontr(), target_basis.get_max_Ncontr());
-      ERIWorker *eri = (omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(maxam, maxncontr) : new ERIWorker_srlr(maxam,maxncontr,omega,alpha,beta);
+      auto eri_owner = make_eri_worker(maxam, maxncontr, omega, alpha, beta);
+      ERIWorker *eri = eri_owner.get();
 
 #ifndef _OPENMP
       int ith=0;
@@ -416,9 +422,9 @@ int main_guarded(int argc, char **argv) {
 
           // J_ij = (ij|kl) P_kl using matmul
           arma::mat tei((double *)(eri->getp()->data()),Nsk*Nsl,Nti*Ntj,false,true);
-          arma::mat incr = fac*arma::vectorise(Pskl).t()*tei;
+          arma::mat incr = fac*arma::vectorise(Pskl.t()).t()*tei;
           incr.reshape(Ntj,Nti);
-          Jtij += incr.t();
+          incr = incr.t();
 
           /*
           arma::mat Jtest(Nti,Ntj,arma::fill::zeros);
@@ -438,13 +444,15 @@ int main_guarded(int argc, char **argv) {
             }
 
           // Check correctness
-          double dint = arma::max(arma::max(arma::abs(Jtest-Jtij)));
-          if(dint > 1e-5) {
+          double dint = arma::max(arma::max(arma::abs(Jtest-incr)));
+          if(dint > 1e-6) {
             printf("Error %e\n",dint);
-            Jtij.print("Jt");
+            incr.print("Jt");
             Jtest.print("Jtest");
           }
           */
+
+          Jtij += incr;
         }
 
         // Now that we've computed the block, store it in the full matrix
@@ -453,13 +461,13 @@ int main_guarded(int argc, char **argv) {
           Jt.submat(jt0,it0,jt0+Ntj-1,it0+Nti-1) = arma::trans(Jtij);
       }
 
-      delete eri;
+      // eri_owner releases automatically.
     }
 
     return Jt;
   };
 
-  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_ri = [&dfit, &pfit](const arma::mat & Pe) {
+  std::function<arma::mat(const arma::mat & P)> electron_proton_coulomb_ri = [&](const arma::mat & Pe) {
     arma::vec c(dfit.compute_expansion(Pe));
     arma::mat J=-pfit.calcJ_vector(c);
     return J;
@@ -485,7 +493,7 @@ int main_guarded(int argc, char **argv) {
     return density_fitting ? proton_electron_coulomb_ri(Pp) : proton_electron_coulomb_exact(Pp);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_builder = [&X, &T, &Vc, &dfit, electronic_terms, &Ecnucr, &verbosity, &frozen_Jpe, &frozen_Ep](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -516,7 +524,7 @@ int main_guarded(int argc, char **argv) {
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
       printf("e nuclear attraction     % .10f\n",Enuc);
-      printf("e-p frozen attraction    % .10f\n",Epe);
+      printf("p-e frozen attraction    % .10f\n",Epe);
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("e-e exchange energy      % .10f\n",Eexch);
       printf("nuclear repulsion energy % .10f\n",Ecnucr);
@@ -527,7 +535,7 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(Etot,fock);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_builder = [&X, &T, &Vc, &dfit, electronic_terms, &Ecnucr, &verbosity, &frozen_Jpe, &frozen_Ep](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -565,7 +573,7 @@ int main_guarded(int argc, char **argv) {
     if(verbosity>=10) {
       printf("e kinetic energy         % .10f\n",Ekin);
       printf("e nuclear attraction     % .10f\n",Enuc);
-      printf("e-p frozen attraction    % .10f\n",Epe);
+      printf("p-e frozen attraction    % .10f\n",Epe);
       printf("e-e Coulomb energy       % .10f\n",Ecoul);
       printf("e-e exchange energy      % .10f\n",Eexch);
       printf("nuclear repulsion energy % .10f\n",Ecnucr);
@@ -577,7 +585,7 @@ int main_guarded(int argc, char **argv) {
   };
 
   // Compute expectation values for protonic coordinates
-  std::function<void(const arma::vec &, const arma::mat &)> print_protonic_coordinates = [&pr](const arma::vec & occp, const arma::mat & Cp) {
+  std::function<void(const arma::vec &, const arma::mat &)> print_protonic_coordinates = [&](const arma::vec & occp, const arma::mat & Cp) {
     for(size_t ip=0;ip<occp.n_elem;ip++)
       if(occp(ip)>0.0) {
         double r[3];
@@ -587,7 +595,7 @@ int main_guarded(int argc, char **argv) {
       }
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_neo_builder = [&X, &Xp, &T, &Tp, &Vc, &Vpc, &dfit, &pfit, &pr, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, &Ecnucr, &verbosity, print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> restricted_neo_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -647,7 +655,7 @@ int main_guarded(int argc, char **argv) {
     return std::make_pair(Etot,fock);
   };
 
-  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_neo_builder = [&X, &Xp, &T, &Tp, &Vc, &Vpc, &dfit, &pfit, &pr, electronic_terms, protonic_terms, electron_proton_coulomb, proton_electron_coulomb, &Ecnucr, &verbosity, &print_protonic_coordinates](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+  OpenOrbitalOptimizer::FockBuilder<double, double> unrestricted_neo_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
     const auto & orbitals = dm.first;
     const auto & occupations = dm.second;
 
@@ -777,7 +785,7 @@ int main_guarded(int argc, char **argv) {
   }
 
   // Save the matrices to disk
-  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_proton_matrices = [&chkpt, &Xp](const OpenOrbitalOptimizer::DensityMatrix<double,double> & pdm, const OpenOrbitalOptimizer::FockMatrix<double> & pfock) {
+  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_proton_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double,double> & pdm, const OpenOrbitalOptimizer::FockMatrix<double> & pfock) {
     const OpenOrbitalOptimizer::Orbitals<double> & porbitals = pdm.first;
     const OpenOrbitalOptimizer::OrbitalOccupations<double> & poccupations = pdm.second;
     arma::mat Cp = Xp*porbitals[0];
@@ -786,7 +794,7 @@ int main_guarded(int argc, char **argv) {
     chkpt.write("Ep",Ep);
   };
 
-  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_electron_matrices = [&chkpt, &M, &X](const OpenOrbitalOptimizer::DensityMatrix<double,double> & eldm, const OpenOrbitalOptimizer::FockMatrix<double> & elfock) {
+  std::function<void(const OpenOrbitalOptimizer::DensityMatrix<double,double> &,const OpenOrbitalOptimizer::FockMatrix<double> &)> save_electron_matrices = [&](const OpenOrbitalOptimizer::DensityMatrix<double,double> & eldm, const OpenOrbitalOptimizer::FockMatrix<double> & elfock) {
     const OpenOrbitalOptimizer::Orbitals<double> & eorbitals = eldm.first;
     const OpenOrbitalOptimizer::OrbitalOccupations<double> & eoccupations = eldm.second;
     if(M==1) {
@@ -1014,7 +1022,7 @@ int main_guarded(int argc, char **argv) {
         }
       }
 
-      OpenOrbitalOptimizer::FockBuilder<double, double> nuclear_builder = [&Xp, &Tp, &Vpc, &pfit, &pr, &protonic_terms, &frozen_Jep, &frozen_Ee, &verbosity, print_protonic_coordinates, &Ecnucr](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
+      OpenOrbitalOptimizer::FockBuilder<double, double> nuclear_builder = [&](const OpenOrbitalOptimizer::DensityMatrix<double, double> & dm) {
         const auto & orbitals = dm.first;
         const auto & occupations = dm.second;
 
@@ -1043,15 +1051,15 @@ int main_guarded(int argc, char **argv) {
         double Eepcoul = arma::trace(frozen_Jep*Pp);
         double Etot = Epkin+Epnuc+Epcoul+Epexch+Eepcoul+frozen_Ee+Ecnucr;
 
-        if(verbosity>=10) {
-          printf("p kinetic energy         % .10f\n",Epkin);
-          printf("p nuclear repulsion      % .10f\n",Epnuc);
-          printf("p-p Coulomb energy       % .10f\n",Epcoul);
-          printf("e-p Coulomb energy       % .10f\n",Eepcoul);
-          printf("p-p exchange energy      % .10f\n",Epexch);
-          printf("frozen electron energy   % .10f\n",frozen_Ee);
-          printf("nuclear repulsion energy % .10f\n",Ecnucr);
-          printf("Total energy             % .10f\n",Etot);
+        if(verbosity>=10)  {
+          printf("p kinetic energy          % .10f\n",Epkin);
+          printf("p nuclear repulsion       % .10f\n",Epnuc);
+          printf("p-p Coulomb energy        % .10f\n",Epcoul);
+          printf("e-p frozen attraction     % .10f\n",Eepcoul);
+          printf("p-p exchange energy       % .10f\n",Epexch);
+          printf("frozen electron energy    % .10f\n",frozen_Ee);
+          printf("nuclear repulsion energy  % .10f\n",Ecnucr);
+          printf("Total energy              % .10f\n",Etot);
         }
 
         return std::make_pair(Etot,fock);

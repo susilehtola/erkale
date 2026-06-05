@@ -116,7 +116,7 @@ typedef struct {
 
   /// Second shell
   size_t js;
-    /// First function on shell
+  /// First function on shell
   size_t j0;
   /// Amount of functions on shell
   size_t Nj;
@@ -127,6 +127,36 @@ typedef struct {
 
 /// Comparison operator
 bool operator<(const eripair_t & lhs, const eripair_t & rhs);
+
+/// Bundle of Schwarz screening data for a basis: the shell-shell
+/// (uv|uv)^1/2 matrix Q, the distance estimate M (a |R_uv - R_ls|
+/// upper bound on (uv|ls) once a few prefactors are folded in), and
+/// the value-sorted list of significant shell pairs. Constructed
+/// once per (basis, range-separation, threshold) tuple via
+/// BasisSet::compute_screening; replaces the get_eripairs(out Q,
+/// out M) factory whose three outputs were always stored together.
+struct ScreeningData {
+  /// Shell-pair Schwarz matrix, Q(is,js) = sqrt((is js | is js)).
+  arma::mat Q;
+  /// Distance estimate matrix, M(is,js) -- upper bound prefactor.
+  arma::mat M;
+  /// Shell pairs sorted by value, truncated to those above threshold.
+  std::vector<eripair_t> shpairs;
+};
+
+/// Range-separation parameters for Coulomb / exchange operators.
+/// The two-electron kernel decomposes as
+///   1/r12 = alpha * erf(omega r12) / r12 + beta * erfc(omega r12) / r12
+/// so for plain Coulomb / full-range exchange we have
+/// omega=0, alpha=1, beta=0 (default); pure short-range exchange is
+/// omega=omega, alpha=0, beta=1; etc. ERIscreen, ERIchol, DensityFit,
+/// ERItable and the libint workers all store and forward this triple.
+/// Bundle it so signatures stop carrying three loose doubles.
+struct RangeSeparation {
+  double omega = 0.0;
+  double alpha = 1.0;
+  double beta = 0.0;
+};
 
 // Forward declaration
 class BasisSetLibrary;
@@ -208,7 +238,7 @@ class BasisSet {
   /// Check for same shells
   bool same_shells(const BasisSet & rhs) const;
 
- public:
+public:
   /// Dummy constructor
   BasisSet();
   /// Construct basis set with Nat atoms, using given settings
@@ -236,6 +266,33 @@ class BasisSet {
    * for LCAO-SCF calculations", Chem. Phys. Lett. 213, p. 514 - 518 (1993).
    */
   BasisSet exchange_fitting() const;
+
+  /**
+   * Generate a molecular auxiliary basis via pivoted Cholesky
+   * decomposition on each atomic block. Per nucleus, the orbital
+   * shells are decontracted, pivoted CD selects the significant
+   * shell pairs, and those pairs are converted into auxiliary
+   * primitives. Delegates to ElementBasisSet::cholesky_set, which
+   * implements the algorithm of:
+   *
+   *   S. Lehtola, "Straightforward and accurate automatic auxiliary
+   *   basis set generation for molecular calculations with atomic
+   *   orbital basis sets", J. Chem. Theory Comput. 17, 6886 (2021).
+   *   doi:10.1021/acs.jctc.1c00607
+   *
+   * which builds on the Cholesky-DF / aCD work of
+   *   F. Aquilante, R. Lindh and T. B. Pedersen,
+   *   Theor. Chem. Acc. 124, 1 (2009).
+   *
+   * Used as the aux-basis source for density-fitted Fock builds
+   * when the SCF input requests Cholesky: standard DF on this
+   * aux basis is numerically equivalent to one-step pivoted CD
+   * within `thr` while operating through the three-center
+   * machinery rather than the four-index pivot path.
+   *
+   * @param thr  Cholesky / aux-pivot threshold (typical 1e-7).
+   */
+  BasisSet cholesky_aux_basis(double thr) const;
 
   /// Decontract basis set, m gives mapping from old functions to new ones
   BasisSet decontract(arma::mat & m) const;
@@ -266,8 +323,11 @@ class BasisSet {
   /// Get list of unique shell pairs
   std::vector<shellpair_t> get_unique_shellpairs() const;
 
-  /// Get list of ERI pairs
-  std::vector<eripair_t> get_eripairs(arma::mat & Q, arma::mat & M, double thr, double omega=0.0, double alpha=1.0, double beta=0.0, bool verbose=false) const;
+  /// Build ScreeningData: Schwarz Q, distance estimate M, and a
+  /// value-sorted, threshold-truncated shell-pair list. Single
+  /// factory replacing the (Q, M, shpairs) triple that every J/K
+  /// path used to own as three separate fields.
+  ScreeningData compute_screening(double thr, double omega=0.0, double alpha=1.0, double beta=0.0, bool verbose=false) const;
 
   /// Convert contractions from normalized primitives to unnormalized primitives
   void convert_contractions();
@@ -310,6 +370,8 @@ class BasisSet {
 
   /// Get shells in basis set
   std::vector<GaussianShell> get_shells() const;
+  /// Get shells in basis set (reference, no copy)
+  const std::vector<GaussianShell> & get_shells_ref() const;
   /// Get ind:th shell
   GaussianShell get_shell(size_t shind) const;
   /// Get index of the center of the ind'th shell
@@ -426,6 +488,16 @@ class BasisSet {
   arma::mat eval_hess(size_t ish, double x, double y, double z) const;
   /// Evaluate gradient of laplacian of shell ish at (x,y,z)
   arma::mat eval_laplgrad(size_t ish, double x, double y, double z) const;
+  /// Evaluate functions / gradient / laplacian / Hessian / gradient
+  /// of laplacian for shell ish at (x,y,z) in one pass.
+  void eval_bf_derivs(size_t ish, double x, double y, double z,
+                      arma::vec & fval,
+                      arma::mat & gval,
+                      arma::vec & lval,
+                      arma::mat & hval,
+                      arma::mat & lgval,
+                      bool do_grad, bool do_lapl,
+                      bool do_hess, bool do_lgrad) const;
 
   /// Print out basis set
   void print(bool verbose=false) const;
@@ -458,9 +530,9 @@ class BasisSet {
 
   /**
      Calculates the ERI screening matrices
-       \f$ Q_{\mu \nu} = (\mu \nu | \mu \nu)^{1/2} \f$
+     \f$ Q_{\mu \nu} = (\mu \nu | \mu \nu)^{1/2} \f$
      and
-       \f$ M_{\mu \nu} = (\mu \mu | \nu \nu)^{1/2} \f$
+     \f$ M_{\mu \nu} = (\mu \mu | \nu \nu)^{1/2} \f$
      as described in J. Chem. Phys. 147, 144101 (2017).
   */
   void eri_screening(arma::mat & Q, arma::mat & M, double omega=0.0, double alpha=1.0, double beta=0.0) const;
@@ -543,7 +615,7 @@ class GaussianShell {
    */
   std::vector<shellf_t> cart;
 
- public:
+public:
   /// Dummy constructor
   GaussianShell();
   /// Constructor, need also to set index of first function and nucleus (see below)
@@ -578,8 +650,12 @@ class GaussianShell {
 
   /// Get the exponential contraction
   std::vector<contr_t> get_contr() const;
+  /// Get the exponential contraction (reference, no copy)
+  const std::vector<contr_t> & get_contr_ref() const;
   /// Get cartesians
   std::vector<shellf_t> get_cart() const;
+  /// Get cartesians (reference, no copy)
+  const std::vector<shellf_t> & get_cart_ref() const;
 
   /**
    * Get contraction coefficients of normalized primitives. For some
@@ -641,6 +717,21 @@ class GaussianShell {
   arma::mat eval_hess(double x, double y, double z) const;
   /// Evaluate gradient of laplacian at (x,y,z)
   arma::mat eval_laplgrad(double x, double y, double z) const;
+  /// Evaluate functions / gradient / laplacian / Hessian / gradient
+  /// of laplacian at (x,y,z) in one pass, sharing the
+  /// contracted-exponential evaluation and the power tables across
+  /// whichever outputs the caller has asked for. fval is always
+  /// filled; the others iff their corresponding do_* flag is set.
+  /// hval is laid out (Ncart, 9) with row-major (3x3) entries; lgval
+  /// is (Ncart, 3).
+  void eval_bf_derivs(double x, double y, double z,
+                      arma::vec & fval,
+                      arma::mat & gval,
+                      arma::vec & lval,
+                      arma::mat & hval,
+                      arma::mat & lgval,
+                      bool do_grad, bool do_lapl,
+                      bool do_hess, bool do_lgrad) const;
 
   /// Calculate block overlap matrix between shells
   arma::mat overlap(const GaussianShell & rhs) const;

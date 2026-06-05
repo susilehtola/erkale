@@ -21,20 +21,22 @@
 #include "stringutil.h"
 #include "linalg.h"
 #include "timer.h"
-#include "erifit.h"
-#include "erichol.h"
+// CD pivot selection (used to build atom-CD auxiliary bases) lives
+// on DensityFit since the erichol/density_fitting merge.
+#include "density_fitting.h"
 
 #include <algorithm>
 #include <fstream>
 #include <cfloat>
 #include <cstdio>
 #include <cstdlib>
+#include <random>
 #include <vector>
 // For exceptions
 #include <sstream>
 #include <stdexcept>
 
-#include <gsl/gsl_sf_gamma.h>
+#include <cmath>
 
 /// Compute overlap of unnormalized Gaussian primitives, S(a,b) = 0.5 * (a+b)^(-3/2-l) Gamma(l+3/2)
 arma::mat primitive_overlap(const arma::vec & iexps, const arma::vec & jexps, int am) {
@@ -43,14 +45,14 @@ arma::mat primitive_overlap(const arma::vec & iexps, const arma::vec & jexps, in
     for(size_t j=0;j<jexps.n_elem;j++) {
       S(i,j) = std::pow(iexps(i)+jexps(j), -am -1.5);
     }
-  return 0.5*S*gsl_sf_gamma(am+1.5);
+  return 0.5*S*std::tgamma(am+1.5);
 }
 
 arma::vec primitive_norm(const arma::vec & iexps, int am) {
   arma::vec S(iexps.size());
   for(size_t i=0;i<iexps.n_elem;i++)
     S(i) = std::pow(2*iexps(i), -am -1.5);
-  return 0.5*S*gsl_sf_gamma(am+1.5);
+  return 0.5*S*std::tgamma(am+1.5);
 }
 
 /// Compute overlap of normalized Gaussian primitives
@@ -801,9 +803,10 @@ static std::vector< std::vector<double> > cholesky_pick_exponents(const std::vec
     // Try out random orderings
     int iiter=0, titer=0;
     std::vector<size_t> random_pivot(arma::conv_to< std::vector<size_t> >::from(full_linear_pivot));
+    std::mt19937 rng{std::random_device{}()};
     while(iiter<nrandom) {
       // Shuffle current pivot at random
-      std::random_shuffle ( random_pivot.begin(), random_pivot.end() );
+      std::shuffle(random_pivot.begin(), random_pivot.end(), rng);
       arma::uvec rpiv(arma::conv_to<arma::uvec>::from(random_pivot));
       pivoted_cholesky(S,thr,rpiv);
       titer++;
@@ -863,12 +866,12 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric)
     if(metric>0) {
       throw std::logic_error("Should not be here.\n!");
     } else {
-      // Run Cholesky
-      ERIchol chol;
-      chol.fill(dummy, thr, 0.0, 0.0, true);
-
-      // Get the pivot shell pairs
-      pivot_shellpairs = chol.get_pivot_shellpairs();
+      // Pivot-only CD entry point: skips the (mu nu | piv) column
+      // save and the metric / L-vector construction that the SCF
+      // path needs but cholesky_set doesn't. Default-constructed
+      // DensityFit => plain Coulomb pivots.
+      DensityFit cd;
+      pivot_shellpairs = cd.find_cholesky_pivots(dummy, thr, 0.0, 0.0, true);
     }
   }
   printf("%2s has %i significant auxiliary shell pairs\n",orbbas.get_symbol().c_str(), (int) pivot_shellpairs.size());
@@ -888,12 +891,19 @@ ElementBasisSet ElementBasisSet::cholesky_set(double thr, bool full, int metric)
     double zsum=zi+zj;
 
     // Form products
-    for(size_t L=std::abs(li-lj);L<=std::abs(li+lj);L++) {
+    //
+    // The shell-pair (li, lj) couples angular momenta L =
+    //   |li-lj|, |li-lj|+2, ..., li+lj
+    // by the real-spherical Gaunt parity rule (li+lj+L must be even).
+    // Parity-forbidden L give zero coupling to any orbital-product
+    // channel, so they are useless as auxiliary candidates; we step
+    // through the allowed L's only.
+    for(size_t L=std::abs(li-lj);L<=std::abs(li+lj);L+=2) {
       // The basis function product has radial form r^(li+lj)
       // exp(-zsum r^2). However, in each L channel the radial form is
       // r^L exp(-zr^2). We match the radial expectation value <r>
       // with this transformation
-      double scale = std::pow(gsl_sf_gamma(L+2)*gsl_sf_gamma(li+lj+1.5)/(gsl_sf_gamma(li+lj+2)*gsl_sf_gamma(L+1.5)),2);
+      double scale = std::pow(std::tgamma(L+2)*std::tgamma(li+lj+1.5)/(std::tgamma(li+lj+2)*std::tgamma(L+1.5)),2);
       double zeff = scale*zsum;
       reduced_exponents[L].push_back(zeff);
     }

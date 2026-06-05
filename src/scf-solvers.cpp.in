@@ -628,7 +628,7 @@ size_t XRSSCF::half_hole(uscf_t & sol, double convthr, dft_t dft0)
 
     // Convergence checked against
     double maxdiff_cvd(maxdiff);
-    double rmsdiff_cvd(maxdiff);
+    double rmsdiff_cvd(rmsdiff);
 
 #ifndef RESTRICTED
     maxdiffa=max_abs(deltaPa);

@@ -431,23 +431,21 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
   if(force && do_lapl)
     Plapl=P*bf_lapl;
 
-  // Calculate density
+  // Calculate density. Each per-grid-point dot product is replaced
+  // with a single column-wise reduction (Pv % bf), which arma can
+  // dispatch as a fused vectorised pass over contiguous memory rather
+  // than N separate length-Nbf dots.
   rho.zeros(1,grid.size());
-  for(size_t ip=0;ip<grid.size();ip++)
-    rho(0,ip)=arma::dot(Pv.col(ip),bf.col(ip));
+  rho.row(0) = arma::sum(Pv % bf, 0);
 
   // Calculate gradient
   if(do_grad) {
     grho.zeros(3,grid.size());
     sigma.zeros(1,grid.size());
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Calculate values
-      double gx=grho(0,ip)=2.0*arma::dot(Pv.col(ip),bf_x.col(ip));
-      double gy=grho(1,ip)=2.0*arma::dot(Pv.col(ip),bf_y.col(ip));
-      double gz=grho(2,ip)=2.0*arma::dot(Pv.col(ip),bf_z.col(ip));
-      // Compute sigma as well
-      sigma(0,ip)=gx*gx + gy*gy + gz*gz;
-    }
+    grho.row(0) = 2.0 * arma::sum(Pv % bf_x, 0);
+    grho.row(1) = 2.0 * arma::sum(Pv % bf_y, 0);
+    grho.row(2) = 2.0 * arma::sum(Pv % bf_z, 0);
+    sigma.row(0) = arma::square(grho.row(0)) + arma::square(grho.row(1)) + arma::square(grho.row(2));
   }
 
   // Calculate laplacian and kinetic energy density
@@ -461,20 +459,11 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     Pv_y=P*bf_y;
     Pv_z=P*bf_z;
 
-    // Calculate values
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Laplacian term
-      double lap=arma::dot(Pv.col(ip),bf_lapl.col(ip));
-      // Gradient term
-      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
-      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
-      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
-      double grad(gradx+grady+gradz);
-
-      // Store values
-      lapl(0,ip)=2.0*(lap+grad);
-      tau(0,ip)=0.5*grad;
-    }
+    // Vectorised column-wise reductions
+    const arma::rowvec lap_v(arma::sum(Pv % bf_lapl, 0));
+    const arma::rowvec grad_v(arma::sum(Pv_x % bf_x + Pv_y % bf_y + Pv_z % bf_z, 0));
+    lapl.row(0) = 2.0 * (lap_v + grad_v);
+    tau.row(0) = 0.5 * grad_v;
   } else if(do_tau) {
     // Adjust size of grid
     tau.zeros(1,grid.size());
@@ -484,17 +473,8 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     Pv_y=P*bf_y;
     Pv_z=P*bf_z;
 
-    // Calculate values
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Gradient term
-      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
-      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
-      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
-      double grad(gradx+grady+gradz);
-
-      // Store values
-      tau(0,ip)=0.5*grad;
-    }
+    // Vectorised column-wise reduction
+    tau.row(0) = 0.5 * arma::sum(Pv_x % bf_x + Pv_y % bf_y + Pv_z % bf_z, 0);
   } else if(do_lapl) {
     // Adjust size of grid
     lapl.zeros(1,grid.size());
@@ -504,19 +484,10 @@ void AngularGrid::update_density(const arma::mat & P0, bool force) {
     Pv_y=P*bf_y;
     Pv_z=P*bf_z;
 
-    // Calculate values
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Laplacian term
-      double lap=arma::dot(Pv.col(ip),bf_lapl.col(ip));
-      // Gradient term
-      double gradx(arma::dot(Pv_x.col(ip),bf_x.col(ip)));
-      double grady(arma::dot(Pv_y.col(ip),bf_y.col(ip)));
-      double gradz(arma::dot(Pv_z.col(ip),bf_z.col(ip)));
-      double grad(gradx+grady+gradz);
-
-      // Store values
-      lapl(0,ip)=2.0*(lap+grad);
-    }
+    // Vectorised column-wise reductions
+    const arma::rowvec lap_v(arma::sum(Pv % bf_lapl, 0));
+    const arma::rowvec grad_v(arma::sum(Pv_x % bf_x + Pv_y % bf_y + Pv_z % bf_z, 0));
+    lapl.row(0) = 2.0 * (lap_v + grad_v);
   }
 }
 
@@ -542,36 +513,22 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
 
   // Calculate density
   rho.zeros(2,grid.size());
-  for(size_t ip=0;ip<grid.size();ip++) {
-    rho(0,ip)=arma::dot(Pav.col(ip),bf.col(ip));
-    rho(1,ip)=arma::dot(Pbv.col(ip),bf.col(ip));
-
-    /*
-    double na=compute_density(Pa0,*basp,grid[ip].r);
-    double nb=compute_density(Pb0,*basp,grid[ip].r);
-    if(fabs(da-na)>1e-6 || fabs(db-nb)>1e-6)
-      printf("Density at point % .3f % .3f % .3f: %e vs %e, %e vs %e\n",grid[ip].r.x,grid[ip].r.y,grid[ip].r.z,da,na,db,nb);
-    */
-  }
+  rho.row(0) = arma::sum(Pav % bf, 0);
+  rho.row(1) = arma::sum(Pbv % bf, 0);
 
   // Calculate gradient
   if(do_grad) {
     grho.zeros(6,grid.size());
     sigma.zeros(3,grid.size());
-    for(size_t ip=0;ip<grid.size();ip++) {
-      double gax=grho(0,ip)=2.0*arma::dot(Pav.col(ip),bf_x.col(ip));
-      double gay=grho(1,ip)=2.0*arma::dot(Pav.col(ip),bf_y.col(ip));
-      double gaz=grho(2,ip)=2.0*arma::dot(Pav.col(ip),bf_z.col(ip));
-
-      double gbx=grho(3,ip)=2.0*arma::dot(Pbv.col(ip),bf_x.col(ip));
-      double gby=grho(4,ip)=2.0*arma::dot(Pbv.col(ip),bf_y.col(ip));
-      double gbz=grho(5,ip)=2.0*arma::dot(Pbv.col(ip),bf_z.col(ip));
-
-      // Compute sigma as well
-      sigma(0,ip)=gax*gax + gay*gay + gaz*gaz;
-      sigma(1,ip)=gax*gbx + gay*gby + gaz*gbz;
-      sigma(2,ip)=gbx*gbx + gby*gby + gbz*gbz;
-    }
+    grho.row(0) = 2.0 * arma::sum(Pav % bf_x, 0);
+    grho.row(1) = 2.0 * arma::sum(Pav % bf_y, 0);
+    grho.row(2) = 2.0 * arma::sum(Pav % bf_z, 0);
+    grho.row(3) = 2.0 * arma::sum(Pbv % bf_x, 0);
+    grho.row(4) = 2.0 * arma::sum(Pbv % bf_y, 0);
+    grho.row(5) = 2.0 * arma::sum(Pbv % bf_z, 0);
+    sigma.row(0) = arma::square(grho.row(0)) + arma::square(grho.row(1)) + arma::square(grho.row(2));
+    sigma.row(1) = grho.row(0)%grho.row(3) + grho.row(1)%grho.row(4) + grho.row(2)%grho.row(5);
+    sigma.row(2) = arma::square(grho.row(3)) + arma::square(grho.row(4)) + arma::square(grho.row(5));
   }
 
   // Calculate laplacian and kinetic energy density
@@ -591,66 +548,27 @@ void AngularGrid::update_density(const arma::mat & Pa0, const arma::mat & Pb0, b
     Pbv_y=Pb*bf_y;
     Pbv_z=Pb*bf_z;
 
-    // Calculate values
+    // Vectorised column-wise reductions across all grid points,
+    // replacing the per-ip arma::dot loops above.
     if(do_tau && do_lapl) {
-      for(size_t ip=0;ip<grid.size();ip++) {
-	// Laplacian term
-	double lapa=arma::dot(Pav.col(ip),bf_lapl.col(ip));
-	double lapb=arma::dot(Pbv.col(ip),bf_lapl.col(ip));
-	// Gradient term
-	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
-	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
-	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
-	double grada(gradax+graday+gradaz);
-
-	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
-	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
-	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
-	double gradb(gradbx+gradby+gradbz);
-
-	// Store values
-	lapl(0,ip)=2.0*(lapa+grada);
-	lapl(1,ip)=2.0*(lapb+gradb);
-	tau(0,ip)=0.5*grada;
-	tau(1,ip)=0.5*gradb;
-      }
+      const arma::rowvec lapa(arma::sum(Pav % bf_lapl, 0));
+      const arma::rowvec lapb(arma::sum(Pbv % bf_lapl, 0));
+      const arma::rowvec grada(arma::sum(Pav_x % bf_x + Pav_y % bf_y + Pav_z % bf_z, 0));
+      const arma::rowvec gradb(arma::sum(Pbv_x % bf_x + Pbv_y % bf_y + Pbv_z % bf_z, 0));
+      lapl.row(0) = 2.0 * (lapa + grada);
+      lapl.row(1) = 2.0 * (lapb + gradb);
+      tau.row(0)  = 0.5 * grada;
+      tau.row(1)  = 0.5 * gradb;
     } else if(do_tau) {
-      for(size_t ip=0;ip<grid.size();ip++) {
-	// Gradient term
-	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
-	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
-	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
-	double grada(gradax+graday+gradaz);
-
-	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
-	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
-	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
-	double gradb(gradbx+gradby+gradbz);
-
-	// Store values
-	tau(0,ip)=0.5*grada;
-	tau(1,ip)=0.5*gradb;
-      }
+      tau.row(0) = 0.5 * arma::sum(Pav_x % bf_x + Pav_y % bf_y + Pav_z % bf_z, 0);
+      tau.row(1) = 0.5 * arma::sum(Pbv_x % bf_x + Pbv_y % bf_y + Pbv_z % bf_z, 0);
     } else if(do_lapl) {
-      for(size_t ip=0;ip<grid.size();ip++) {
-	// Laplacian term
-	double lapa=arma::dot(Pav.col(ip),bf_lapl.col(ip));
-	double lapb=arma::dot(Pbv.col(ip),bf_lapl.col(ip));
-	// Gradient term
-	double gradax=arma::dot(Pav_x.col(ip),bf_x.col(ip));
-	double graday=arma::dot(Pav_y.col(ip),bf_y.col(ip));
-	double gradaz=arma::dot(Pav_z.col(ip),bf_z.col(ip));
-	double grada(gradax+graday+gradaz);
-
-	double gradbx=arma::dot(Pbv_x.col(ip),bf_x.col(ip));
-	double gradby=arma::dot(Pbv_y.col(ip),bf_y.col(ip));
-	double gradbz=arma::dot(Pbv_z.col(ip),bf_z.col(ip));
-	double gradb(gradbx+gradby+gradbz);
-
-	// Store values
-	lapl(0,ip)=2.0*(lapa+grada);
-	lapl(1,ip)=2.0*(lapb+gradb);
-      }
+      const arma::rowvec lapa(arma::sum(Pav % bf_lapl, 0));
+      const arma::rowvec lapb(arma::sum(Pbv % bf_lapl, 0));
+      const arma::rowvec grada(arma::sum(Pav_x % bf_x + Pav_y % bf_y + Pav_z % bf_z, 0));
+      const arma::rowvec gradb(arma::sum(Pbv_x % bf_x + Pbv_y % bf_y + Pbv_z % bf_z, 0));
+      lapl.row(0) = 2.0 * (lapa + grada);
+      lapl.row(1) = 2.0 * (lapb + gradb);
     }
   }
 }
@@ -1048,6 +966,22 @@ void AngularGrid::init_VV10(double b, double C, bool pot) {
   }
 }
 
+// Both VV10_Kernel and VV10_Kernel_F do an O(N_xc * N_nl) double loop
+// with ~12 fused-mul-adds plus three divides and 7 stride-1 reads of
+// per-(nl-point) data per inner iteration. With the original
+// arma::mat layout (5 rows for xc, 7 rows for nl, column-major), the
+// nl reads inside the j loop walked stride-7 column starts in memory
+// (nl.colptr(j) advances by 7 doubles per j) which compilers refuse
+// to auto-vectorise.
+//
+// Below we transpose xc/nl once at the top of each kernel so each
+// component (x, y, z, "a", "b", w, rho) is contiguous in memory.
+// The cost is O(N_xc + N_nl), negligible against the O(N_xc * N_nl)
+// inner work. With contiguous reads, gcc / clang vectorise the inner
+// loop under #pragma omp simd reduction; the divisions become the
+// remaining bottleneck and are typical 4-wide on AVX2 / 8-wide on
+// AVX-512.
+
 void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
   // Input arrays contain grid[i].r, omega0(i), kappa(i) (and grid[i].w, rho[i] for nl)
   // Return array contains: nPhi, U, and W
@@ -1064,42 +998,57 @@ void VV10_Kernel(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) {
     throw std::runtime_error("Error - invalid size output array!\n");
   }
 
-  // Loop
-  for(size_t i=0;i<xc.n_cols;i++) {
+  const arma::mat xc_t(xc.t());
+  const arma::mat nl_t(nl.t());
+
+  const double* xc_x = xc_t.colptr(0);
+  const double* xc_y = xc_t.colptr(1);
+  const double* xc_z = xc_t.colptr(2);
+  const double* xc_a = xc_t.colptr(3);
+  const double* xc_b = xc_t.colptr(4);
+
+  const double* nl_x   = nl_t.colptr(0);
+  const double* nl_y   = nl_t.colptr(1);
+  const double* nl_z   = nl_t.colptr(2);
+  const double* nl_a   = nl_t.colptr(3);
+  const double* nl_b   = nl_t.colptr(4);
+  const double* nl_w   = nl_t.colptr(5);
+  const double* nl_rho = nl_t.colptr(6);
+
+  const size_t Nxc = xc.n_cols;
+  const size_t Nnl = nl.n_cols;
+
+  for(size_t i=0;i<Nxc;i++) {
+    const double xi = xc_x[i];
+    const double yi = xc_y[i];
+    const double zi = xc_z[i];
+    const double ai = xc_a[i];
+    const double bi = xc_b[i];
+
     double nPhi=0.0, U=0.0, W=0.0;
 
-    for(size_t j=0;j<nl.n_cols;j++) {
-      // Distance between the grid points
-      double dx=xc(0,i)-nl(0,j);
-      double dy=xc(1,i)-nl(1,j);
-      double dz=xc(2,i)-nl(2,j);
-      double Rsq=dx*dx + dy*dy + dz*dz;
+#pragma omp simd reduction(+:nPhi,U,W)
+    for(size_t j=0;j<Nnl;j++) {
+      const double dx = xi - nl_x[j];
+      const double dy = yi - nl_y[j];
+      const double dz = zi - nl_z[j];
+      const double Rsq = dx*dx + dy*dy + dz*dz;
 
-      // g factors
-      double gi=xc(3,i)*Rsq + xc(4,i);
-      double gj=nl(3,j)*Rsq + nl(4,j);
-      // Sum of the factors
-      double gs=gi+gj;
-      // Reciprocal sum
-      double rgis=1.0/gi + 1.0/gs;
+      const double gi = ai*Rsq + bi;
+      const double gj = nl_a[j]*Rsq + nl_b[j];
+      const double gs = gi + gj;
+      const double rgis = 1.0/gi + 1.0/gs;
 
-      // Integral kernel
-      double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
-      // Absorb grid point weight and density into kernel
-      Phi *= nl(5,j) * nl(6,j);
+      const double Phi = -3.0/(2.0*gi*gj*gs) * nl_w[j] * nl_rho[j];
 
-      // Increment nPhi
       nPhi += Phi;
-      // Increment U
       U    -= Phi * rgis;
-      // Increment W
       W    -= Phi * rgis * Rsq;
     }
 
-    // Store output
-    ret(0,i)+=nPhi;
-    ret(1,i)+=U;
-    ret(2,i)+=W;
+    ret(0,i) += nPhi;
+    ret(1,i) += U;
+    ret(2,i) += W;
   }
 }
 
@@ -1119,53 +1068,67 @@ void VV10_Kernel_F(const arma::mat & xc, const arma::mat & nl, arma::mat & ret) 
     throw std::runtime_error("Error - invalid size output array!\n");
   }
 
-  // Loop
-  for(size_t i=0;i<xc.n_cols;i++) {
+  const arma::mat xc_t(xc.t());
+  const arma::mat nl_t(nl.t());
+
+  const double* xc_x = xc_t.colptr(0);
+  const double* xc_y = xc_t.colptr(1);
+  const double* xc_z = xc_t.colptr(2);
+  const double* xc_a = xc_t.colptr(3);
+  const double* xc_b = xc_t.colptr(4);
+
+  const double* nl_x   = nl_t.colptr(0);
+  const double* nl_y   = nl_t.colptr(1);
+  const double* nl_z   = nl_t.colptr(2);
+  const double* nl_a   = nl_t.colptr(3);
+  const double* nl_b   = nl_t.colptr(4);
+  const double* nl_w   = nl_t.colptr(5);
+  const double* nl_rho = nl_t.colptr(6);
+
+  const size_t Nxc = xc.n_cols;
+  const size_t Nnl = nl.n_cols;
+
+  for(size_t i=0;i<Nxc;i++) {
+    const double xi = xc_x[i];
+    const double yi = xc_y[i];
+    const double zi = xc_z[i];
+    const double ai = xc_a[i];
+    const double bi = xc_b[i];
+
     double nPhi=0.0, U=0.0, W=0.0;
     double fpx=0.0, fpy=0.0, fpz=0.0;
 
-    for(size_t j=0;j<nl.n_cols;j++) {
-      // Distance between the grid points
-      double dx=xc(0,i)-nl(0,j);
-      double dy=xc(1,i)-nl(1,j);
-      double dz=xc(2,i)-nl(2,j);
-      double Rsq=dx*dx + dy*dy + dz*dz;
+#pragma omp simd reduction(+:nPhi,U,W,fpx,fpy,fpz)
+    for(size_t j=0;j<Nnl;j++) {
+      const double dx = xi - nl_x[j];
+      const double dy = yi - nl_y[j];
+      const double dz = zi - nl_z[j];
+      const double Rsq = dx*dx + dy*dy + dz*dz;
 
-      // g factors
-      double gi=xc(3,i)*Rsq + xc(4,i);
-      double gj=nl(3,j)*Rsq + nl(4,j);
-      // Sum of the factors
-      double gs=gi+gj;
-      // Reciprocal sum
-      double rgis=1.0/gi + 1.0/gs;
+      const double aj = nl_a[j];
+      const double gi = ai*Rsq + bi;
+      const double gj = aj*Rsq + nl_b[j];
+      const double gs = gi + gj;
+      const double rgis = 1.0/gi + 1.0/gs;
 
-      // Integral kernel
-      double Phi = - 3.0 / ( 2.0 * gi * gj * gs);
-      // Absorb grid point weight and density into kernel
-      Phi *= nl(5,j) * nl(6,j);
+      const double Phi = -3.0/(2.0*gi*gj*gs) * nl_w[j] * nl_rho[j];
 
-      // Increment nPhi
       nPhi += Phi;
-      // Increment U
       U    -= Phi * rgis;
-      // Increment W
       W    -= Phi * rgis * Rsq;
 
-      // Q factor
-      double Q = -2.0 * Phi * (xc(3,i)/gi + nl(3,j)/gj + (xc(3,i)+nl(3,j))/gs );
-      // Increment force
+      const double Q = -2.0 * Phi * (ai/gi + aj/gj + (ai+aj)/gs);
       fpx += Q * dx;
       fpy += Q * dy;
       fpz += Q * dz;
     }
 
-    // Store output
-    ret(0,i)+=nPhi;
-    ret(1,i)+=U;
-    ret(2,i)+=W;
-    ret(3,i)+=fpx;
-    ret(4,i)+=fpy;
-    ret(5,i)+=fpz;
+    ret(0,i) += nPhi;
+    ret(1,i) += U;
+    ret(2,i) += W;
+    ret(3,i) += fpx;
+    ret(4,i) += fpy;
+    ret(5,i) += fpz;
   }
 }
 
@@ -1510,6 +1473,12 @@ double AngularGrid::eval_Exc() const {
   if(polarized)
     dens+=rho.row(1);
 
+  // Fast path when nothing was screened: skip the indexed view
+  // copies. Note `exc` is stored as arma::vec (column) while w and
+  // dens are arma::rowvec, so transpose exc to align orientations
+  // before the element-wise multiply.
+  if(screen.n_elem == w.n_elem)
+    return arma::sum(w % exc.t() % dens);
   return arma::sum(w(screen)%exc(screen)%dens(screen));
 }
 
@@ -3119,83 +3088,57 @@ void AngularGrid::compute_bf() {
   info.nfunc=Nbf*grid.size();
 
   bf.zeros(bf_ind.n_elem,grid.size());
-  // Loop over points
-  for(size_t ip=0;ip<grid.size();ip++) {
-    // Loop over shells. Offset
-    ioff=0;
-    for(size_t ish=0;ish<shells.size();ish++) {
-      arma::vec fval=basp->eval_func(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-      bf.submat(ioff,ip,ioff+fval.n_elem-1,ip)=fval;
-      ioff+=fval.n_elem;
-    }
-  }
-
   if(do_grad) {
     bf_x.zeros(bf_ind.n_elem,grid.size());
     bf_y.zeros(bf_ind.n_elem,grid.size());
     bf_z.zeros(bf_ind.n_elem,grid.size());
-    // Loop over points
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Loop over shells. Offset
-      ioff=0;
-      for(size_t ish=0;ish<shells.size();ish++) {
-	arma::mat gval=basp->eval_grad(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	bf_x.submat(ioff,ip,ioff+gval.n_rows-1,ip)=gval.col(0);
-	bf_y.submat(ioff,ip,ioff+gval.n_rows-1,ip)=gval.col(1);
-	bf_z.submat(ioff,ip,ioff+gval.n_rows-1,ip)=gval.col(2);
-	ioff+=gval.n_rows;
-      }
-    }
   }
-
-  if(do_lapl) {
+  if(do_lapl)
     bf_lapl.zeros(bf_ind.n_elem,grid.size());
-    // Loop over points
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Loop over shells. Offset
-      ioff=0;
-      for(size_t ish=0;ish<shells.size();ish++) {
-	arma::vec lval=basp->eval_lapl(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	bf_lapl.submat(ioff,ip,ioff+lval.n_elem-1,ip)=lval;
-	ioff+=lval.n_elem;
-      }
-    }
-  }
-
-  if(do_hess) {
+  if(do_hess)
     bf_hess.zeros(9*bf_ind.n_elem,grid.size());
-    // Loop over points
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Loop over shells. Offset
-      ioff=0;
-      for(size_t ish=0;ish<shells.size();ish++) {
-	// eval_hess returns Nbf x 9 matrix, transpose to 9 x Nbf
-	arma::mat hval=arma::trans(basp->eval_hess(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z));
-	// Store values
-	for(int c=0;c<9;c++)
-	  for(size_t f=0;f<hval.n_cols;f++) {
-	    bf_hess(ioff + 9*f + c,ip)=hval(c,f);
-	  }
-	ioff+=hval.n_elem;
-      }
-    }
-  }
-
   if(do_lgrad) {
     bf_lx.zeros(bf_ind.n_elem,grid.size());
     bf_ly.zeros(bf_ind.n_elem,grid.size());
     bf_lz.zeros(bf_ind.n_elem,grid.size());
-    // Loop over points
-    for(size_t ip=0;ip<grid.size();ip++) {
-      // Loop over shells. Offset
-      ioff=0;
-      for(size_t ish=0;ish<shells.size();ish++) {
-	arma::mat lgval=basp->eval_laplgrad(shells[ish],grid[ip].r.x,grid[ip].r.y,grid[ip].r.z);
-	bf_lx.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(0);
-	bf_ly.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(1);
-	bf_lz.submat(ioff,ip,ioff+lgval.n_rows-1,ip)=lgval.col(2);
-	ioff+=lgval.n_rows;
+  }
+
+  // One pass over (ip, ish) that fuses the func / grad / lapl / hess /
+  // lgrad evaluations: the fused shell-level routine reuses the
+  // contracted exponentials and the power tables across all requested
+  // outputs, saving the redundant exp / power builds per shell-point
+  // that the separate eval_* siblings would have performed.
+  arma::vec fval, lval;
+  arma::mat gval, hval, lgval;
+  for(size_t ip=0;ip<grid.size();ip++) {
+    ioff=0;
+    for(size_t ish=0;ish<shells.size();ish++) {
+      basp->eval_bf_derivs(shells[ish],
+                           grid[ip].r.x, grid[ip].r.y, grid[ip].r.z,
+                           fval, gval, lval, hval, lgval,
+                           do_grad, do_lapl, do_hess, do_lgrad);
+      const size_t Nf = fval.n_elem;
+      bf.submat(ioff, ip, ioff+Nf-1, ip) = fval;
+      if(do_grad) {
+        bf_x.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(0);
+        bf_y.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(1);
+        bf_z.submat(ioff, ip, ioff+Nf-1, ip) = gval.col(2);
       }
+      if(do_lapl)
+        bf_lapl.submat(ioff, ip, ioff+Nf-1, ip) = lval;
+      if(do_hess) {
+        // hval is (Nf, 9) row-major (3x3); bf_hess is (9*Nbf, npts)
+        // packed as (cart, c) -> 9*ioff + 9*f + c.
+        for(size_t f=0;f<Nf;f++)
+          for(int c=0;c<9;c++)
+            bf_hess(9*ioff + 9*f + c, ip) = hval(f, c);
+      }
+      if(do_lgrad) {
+        bf_lx.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(0);
+        bf_ly.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(1);
+        bf_lz.submat(ioff, ip, ioff+Nf-1, ip) = lgval.col(2);
+      }
+      ioff += Nf;
     }
   }
 }

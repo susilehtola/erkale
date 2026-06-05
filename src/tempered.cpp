@@ -19,10 +19,6 @@
 #include "tempered.h"
 #include <cmath>
 
-extern "C" {
-#include <gsl/gsl_sf_legendre.h>
-}
-
 // Construct even-tempered set of exponents
 arma::vec eventempered_set(double alpha, double beta, int Nf) {
   arma::vec ret(Nf);
@@ -55,19 +51,23 @@ arma::vec welltempered_set(double alpha, double beta, double gamma, double delta
 }
 
 arma::mat legendre_P_mat(int Nprim, int kmax) {
+  // Maps the integer index j=1..Nprim to a Legendre argument in [-1, 1].
+  // Requires Nprim >= 2 to avoid dividing by zero at the (j-1)*2/(Nprim-1)
+  // step; a single-primitive Legendre expansion isn't well-defined here.
+  if(Nprim<2) {
+    ERROR_INFO();
+    throw std::runtime_error("legendre_P_mat requires at least two primitives.\n");
+  }
+
   // Compute the Legendre polynomials
   arma::mat Pk(Nprim, kmax);
   for(int j=1;j<=Nprim;j++) { // Loop over exponents
     // Argument for Legendre polynomial is
     double arg=(j-1)*2.0/(Nprim-1) - 1.0;
 
-    // Helper array
-    double Plarr[kmax];
-    gsl_sf_legendre_Pl_array(kmax-1, arg, Plarr);
-
-    // Store values
+    // Store values P_0, P_1, ..., P_{kmax-1}
     for(int k=0;k<kmax;k++)
-      Pk(j-1,k)=Plarr[k];
+      Pk(j-1,k)=std::legendre(k, arg);
   }
 
   return Pk;

@@ -367,14 +367,18 @@ void load_fchk(double tol) {
     double nelnumb=arma::trace(Pb*S);
     double neldiffb=nelnumb-Nelb;
 
-    if(fabs(neldiffa)/Nela>tol) {
+    // Use absolute tolerance when the corresponding electron count is
+    // zero (e.g. fully spin-polarised cation with no beta electrons),
+    // since the relative-error denominator would otherwise be zero
+    // and the test would fire on numerical noise (or NaN).
+    if((Nela > 0 ? fabs(neldiffa)/Nela : fabs(neldiffa)) > tol) {
       std::ostringstream oss;
       oss << "\nNumber of alpha electrons and trace of alpha density matrix differ by " << neldiffa << "!\n";
       throw std::runtime_error(oss.str());
     }
     printf("tr PaS - Nela = %.e\n",neldiffa);
 
-    if(fabs(neldiffb)/Nelb>tol) {
+    if((Nelb > 0 ? fabs(neldiffb)/Nelb : fabs(neldiffb)) > tol) {
       std::ostringstream oss;
       oss << "\nNumber of beta electrons and trace of beta density matrix differ by " << neldiffb << "!\n";
       throw std::runtime_error(oss.str());
@@ -494,34 +498,41 @@ void save_fchk() {
   // File to save
   std::string savename=settings.get_string("SaveFchk");
 
-  // Handle also compressed files
+  // Handle also compressed files. Match the actual filename suffix
+  // rather than any substring; otherwise a path like `proj.gz/out.fchk`
+  // would be misidentified as a gz target.
+  auto ends_with = [&](const char * suffix) {
+    const size_t slen = std::strlen(suffix);
+    return savename.size() >= slen &&
+           savename.compare(savename.size() - slen, slen, suffix) == 0;
+  };
   std::string gzcmd="gzip ";
-  bool usegz=false;
-  if(strstr(savename.c_str(),".gz")!=NULL)
-    usegz=true;
+  bool usegz=ends_with(".gz");
 
   std::string xzcmd="xz ";
-  bool usexz=false;
-  if(strstr(savename.c_str(),".xz")!=NULL)
-    usexz=true;
+  bool usexz=ends_with(".xz");
 
   std::string bz2cmd="bzip2 ";
-  bool usebz2=false;
-  if(strstr(savename.c_str(),".bz2")!=NULL)
-    usebz2=true;
+  bool usebz2=ends_with(".bz2");
 
   std::string lzmacmd="lzma ";
-  bool uselzma=false;
-  if(strstr(savename.c_str(),".lzma")!=NULL)
-    uselzma=true;
+  bool uselzma=ends_with(".lzma");
 
   // Open output file.
-  FILE *out=fopen(settings.get_string("SaveFchk").c_str(),"w");
+  const std::string savefchk = settings.get_string("SaveFchk");
+  FILE *out=fopen(savefchk.c_str(),"w");
+  if(!out) {
+    std::ostringstream oss;
+    oss << "Could not open output file \"" << savefchk << "\" for writing.\n";
+    throw std::runtime_error(oss.str());
+  }
 
   // Write comment
   fprintf(out,"%-80s\n","ERKALE formatted checkpoint for visualization purposes");
+  // Bound the timestamp string so we can't overflow the line buffer
+  // even with an unusually long current_time() result.
   char line[80];
-  sprintf(line,"Created on %s.",t.current_time().c_str());
+  snprintf(line,sizeof(line),"Created on %s.",t.current_time().c_str());
   fprintf(out,"%-80s\n",line);
 
   // Write the basis set info.

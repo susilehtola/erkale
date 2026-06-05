@@ -140,14 +140,14 @@ std::vector< std::vector< std::complex<double> > > compute_spherical_harmonics(c
 #pragma omp parallel for
 #endif
   for(size_t i=0;i<grid.size();i++) {
-    // Compute phi and cos(theta)
+    // Compute phi and theta. Grid points are unit vectors, so r.z = cos(theta).
     double phi=atan2(grid[i].r.y,grid[i].r.x);
-    double cth=grid[i].r.z;
+    double theta=std::acos(grid[i].r.z);
 
     // Compute spherical harmonics
     for(int l=0;l<=lmax;l++)
       for(int m=-l;m<=l;m++)
-	Ylm[i][lmind(l,m)]=spherical_harmonics(l,m,cth,phi);
+	Ylm[i][lmind(l,m)]=spherical_harmonics(l,m,theta,phi);
   }
 
   return Ylm;
@@ -165,14 +165,14 @@ std::vector< std::vector<double> > compute_solid_harmonics(const std::vector<ang
 #pragma omp parallel for
 #endif
   for(size_t i=0;i<grid.size();i++) {
-    // Compute phi and cos(theta)
+    // Compute phi and theta. Grid points are unit vectors, so r.z = cos(theta).
     double phi=atan2(grid[i].r.y,grid[i].r.x);
-    double cth=grid[i].r.z;
+    double theta=std::acos(grid[i].r.z);
 
     // Compute solid harmonics
     for(int l=0;l<=lmax;l++)
       for(int m=-l;m<=l;m++)
-	Ylm[i][lmind(l,m)]=solid_harmonics(l,m,cth,phi);
+	Ylm[i][lmind(l,m)]=solid_harmonics(l,m,theta,phi);
   }
 
   return Ylm;

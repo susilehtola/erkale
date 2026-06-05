@@ -13,3 +13,4 @@ Logfile water_dimer_wb97_xrs.log
 SaveChk water_dimer_wb97_xrs.chk
 BasisRotate false
 ConvThr 1e-6
+DFTGrid 50 -194

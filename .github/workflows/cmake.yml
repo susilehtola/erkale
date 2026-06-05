@@ -5,17 +5,17 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
-    name: Ubuntu 20.04 Build and Test
+    name: Ubuntu 24.04 Build and Test
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Resolve dependencies
-        run: sudo apt-get install libarmadillo-dev cmake gfortran libgsl-dev libxc-dev libxc5 libint1 libint-dev libhdf5-serial-dev
+        run: sudo apt-get update && sudo apt-get install -y libarmadillo-dev cmake gfortran libgsl-dev libxc-dev libint1 libint-dev libhdf5-serial-dev
 
       - name: Compile
-        run: mkdir build && cd build && cmake -E env CXXFLAGS="-DARMA_DONT_USE_WRAPPER" cmake .. && make
+        run: mkdir build && cd build && cmake -E env CXXFLAGS="-DARMA_DONT_USE_WRAPPER" cmake .. && make -j$(nproc)
 
       - name: Test
-        run: cd ./build/tests && make test
+        run: cd ./build && ctest --output-on-failure

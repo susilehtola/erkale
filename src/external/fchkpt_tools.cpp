@@ -25,6 +25,7 @@
 
 #include "../checkpoint.h"
 #include "../elements.h"
+#include <cstring>
 #include "../mathf.h"
 #include "../stringutil.h"
 #include "../timer.h"
@@ -39,6 +40,14 @@
 #endif
 
 
+/// True iff `s` ends with `suffix`. Replaces strstr-based extension
+/// detection that would also match the suffix anywhere in the path
+/// (e.g. a directory named `proj.gz/`).
+static bool ends_with(const std::string & s, const char * suffix) {
+  const size_t slen = std::strlen(suffix);
+  return s.size() >= slen && s.compare(s.size() - slen, slen, suffix) == 0;
+}
+
 /// Parse formatted checkpoint file
 Storage parse_fchk(const std::string & name) {
   // Returned storage
@@ -47,26 +56,20 @@ Storage parse_fchk(const std::string & name) {
   // Input file
   FILE *in;
 
-  // Handle also compressed files
+  // Handle also compressed files. Match the actual filename suffix
+  // rather than any substring; otherwise a path like `proj.gz/bin.fchk`
+  // would be misidentified as a gz-compressed file.
   const char gzcmd[]="zcat ";
-  bool usegz=false;
-  if(strstr(name.c_str(),".gz")!=NULL)
-    usegz=true;
+  bool usegz=ends_with(name, ".gz");
 
   const char xzcmd[]="xzcat ";
-  bool usexz=false;
-  if(strstr(name.c_str(),".xz")!=NULL)
-    usexz=true;
+  bool usexz=ends_with(name, ".xz");
 
   const char bz2cmd[]="bzcat ";
-  bool usebz2=false;
-  if(strstr(name.c_str(),".bz2")!=NULL)
-    usebz2=true;
+  bool usebz2=ends_with(name, ".bz2");
 
   const char lzmacmd[]="lzcat ";
-  bool uselzma=false;
-  if(strstr(name.c_str(),".lzma")!=NULL)
-    uselzma=true;
+  bool uselzma=ends_with(name, ".lzma");
 
   /* Open the file */
   if(usegz) {
@@ -94,6 +97,16 @@ Storage parse_fchk(const std::string & name) {
     throw std::runtime_error(oss.str());
   }
 
+  // Wrap the rest of the parse in a try/catch so any throw from
+  // readint/readdouble/etc. (e.g. on a malformed checkpoint line) still
+  // closes the input stream before propagating.
+  auto close_input = [&]() {
+    if(usegz || usexz || usebz2 || uselzma)
+      pclose(in);
+    else
+      fclose(in);
+  };
+
   // Line number
   size_t iline=0;
 
@@ -110,6 +123,7 @@ Storage parse_fchk(const std::string & name) {
   bool doublevec=false;
   std::vector<double> dblv;
 
+  try {
   while(true) {
     // Input line
     std::string line;
@@ -132,10 +146,13 @@ Storage parse_fchk(const std::string & name) {
 
     // Read in numbers?
     if(intvec) {
-      for(size_t i=0;i<words.size();i++)
+      // Bound the consumed count to N so a stray line with extra
+      // tokens doesn't cause N to wrap on size_t.
+      const size_t take = std::min(words.size(), N);
+      for(size_t i=0;i<take;i++)
 	intv.push_back(readint(words[i]));
 
-      N-=words.size();
+      N-=take;
       if(N==0) {
 	intvec=false;
 	// Add to stack
@@ -147,9 +164,10 @@ Storage parse_fchk(const std::string & name) {
 	intv.clear();
       }
     } else if(doublevec) {
-      for(size_t i=0;i<words.size();i++)
+      const size_t take = std::min(words.size(), N);
+      for(size_t i=0;i<take;i++)
 	dblv.push_back(readdouble(words[i]));
-      N-=words.size();
+      N-=take;
       if(N==0) {
 	doublevec=false;
 	// Add to stack
@@ -215,11 +233,13 @@ Storage parse_fchk(const std::string & name) {
     }
   }
 
+  } catch(...) {
+    close_input();
+    throw;
+  }
+
   // Close input
-  if(usegz || usexz || usebz2 || uselzma)
-    pclose(in);
-  else
-    fclose(in);
+  close_input();
 
   return ret;
 }

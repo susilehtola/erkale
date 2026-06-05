@@ -167,9 +167,11 @@ void Casida::form_pairs(const std::vector< std::vector<double> > occs) {
   nvirt.resize(occs.size());
 
   for(size_t ispin=0;ispin<nocc.size();ispin++) {
-    // Count number of occupied states.
+    // Count number of occupied states. Bound the walk by the actual
+    // occupation array size in case every entry is positive (no zero
+    // sentinel is guaranteed at the tail).
     nocc[ispin]=0;
-    while(occs[ispin][nocc[ispin]]>0)
+    while(nocc[ispin]<occs[ispin].size() && occs[ispin][nocc[ispin]]>0)
       nocc[ispin]++;
 
     // Check that all values are equal.
@@ -239,7 +241,7 @@ void Casida::form_pairs(const std::vector< std::vector<double> > occs) {
 	newC.col(i)=C[ispin].col(idx[i]);
       C[ispin]=newC;
 
-      arma::vec newE(C[ispin].n_elem);
+      arma::vec newE(idx.size());
       for(size_t i=0;i<idx.size();i++)
 	newE(i)=E[ispin](idx[i]);
       E[ispin]=newE;
@@ -591,11 +593,14 @@ void Casida::coulomb_fit(const BasisSet & basis, std::vector<arma::mat> & munu, 
       eri.compute(&orbshells[is],&orbshells[js],&orbshells[is],&orbshells[js]);
       erip=eri.getp();
 
-      // Find out maximum value
+      // Find out maximum absolute value. The previous version compared
+      // fabs but stored the raw signed integral, so a large-magnitude
+      // negative integral landed in `max` as a negative number and the
+      // subsequent sqrt produced NaN.
       double max=0.0;
       for(size_t i=0;i<(*erip).size();i++)
 	if(fabs((*erip)[i])>max)
-	  max=(*erip)[i];
+	  max=fabs((*erip)[i]);
       max=sqrt(max);
 
       // Store value

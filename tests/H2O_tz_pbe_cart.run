@@ -11,3 +11,4 @@ UseLM false
 Logfile H2O_tz_pbe_cart.log
 SaveChk H2O_tz_pbe_cart.chk
 BasisRotate false
+DFTGrid 50 -194

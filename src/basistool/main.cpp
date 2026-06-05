@@ -240,6 +240,11 @@ int main_guarded(int argc, char **argv) {
 
     // Print profile in output file
     FILE *out=fopen(fileout.c_str(),"w");
+    if(!out) {
+      std::ostringstream oss;
+      oss << "Could not open output file \"" << fileout << "\" for writing.\n";
+      throw std::runtime_error(oss.str());
+    }
     for(size_t i=0;i<prof.lga.size();i++) {
       // Value of scanning exponent
       fprintf(out,"%13e",prof.lga[i]);
@@ -358,7 +363,7 @@ int main_guarded(int argc, char **argv) {
     BasisSetLibrary contracted;
 
     if(threshold<=0.0) {
-      printf("Contracting auxiliary basis set with threshold specified by highest angular momentum.\n",threshold);
+      printf("Contracting auxiliary basis set with threshold specified by highest angular momentum.\n");
     } else {
       printf("Contracting auxiliary basis set with threshold %e\n",threshold);
     }
@@ -531,6 +536,7 @@ int main_guarded(int argc, char **argv) {
       for(int am=0;am<=auxbasis.get_max_am();am++) {
         // Keep the vectors above the threshold
         arma::uvec keep_idx(arma::find(evals[am] >= elthresh));
+        keep_idx = arma::reverse(keep_idx); // print largest eigenvalue first
         arma::vec Wval(evals[am](keep_idx));
         arma::mat Wvec(coeffs[am].cols(keep_idx));
 
@@ -567,7 +573,7 @@ int main_guarded(int argc, char **argv) {
       }
       contracted.add_element(contraux);
 
-      printf("%s -> %s contraction reduces number of auxiliary functions for %s from %i to %i implying a % .1f %% reduction\n",ucomp.str().c_str(),ccomp.str().c_str(),element.c_str(),norig,ncontr,(norig-ncontr)*100.0/norig);
+      printf("%s -> %s contraction reduces number of auxiliary functions for %s from %zu to %zu implying a % .1f %% reduction\n",ucomp.str().c_str(),ccomp.str().c_str(),element.c_str(),(size_t) norig,(size_t) ncontr,(norig-ncontr)*100.0/norig);
 
     }
     contracted.save_gaussian94(outname);

@@ -395,9 +395,10 @@ arma::vec compute_value_psi(int Z, bool dimer, std::vector<coprof_t> & cpl, cons
 
   // Get the energy
   arma::vec ret(1);
-  int readval;
   FILE *in=fopen("result.dat","r");
-  readval=fscanf(in,"%le",&ret(0));
+  if(!in)
+    throw std::runtime_error("Could not open result.dat to read calculation result.\n");
+  int readval=fscanf(in,"%le",&ret(0));
   fclose(in);
 
   if(readval!=1)

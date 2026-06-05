@@ -14,3 +14,4 @@ SaveChk water_dimer_pbe0_fch.chk
 
 BasisRotate false
 ConvThr 1e-6
+DFTGrid 50 -194
