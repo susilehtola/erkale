@@ -75,26 +75,14 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   if(kfull==0.0) {
 
     if(densityfit) {
-      if(kshort!=0.0 || kfull!=0.0)
-	throw std::runtime_error("Forces not implemented for density fitting of exact exchange.\n");
-
-      fx_full=dfit.forceJ(sol.P);
-    } else if(cholesky && chol.is_force_capable()) {
-      // Two-step CD: ERIchol::forceJ uses the pivot orbital pairs
-      // as a fitting basis; same gradient structure as DF.
-      fx_full=chol.forceJ(*basisp, sol.P);
-    } else if(cholesky) {
-      // One-step CD has no pivot metric, so the algebraic gradient
-      // route is not available; fall through to the four-index path.
-      // scr is filled on demand below; print a one-line notice so
-      // the user knows where their wall time went.
-      if(verbose) {
-        printf("Note: nuclear gradients fall through to four-index ERIs because the Cholesky path is one-step (set CholeskyAlgorithm=TwoStep or DensityFitting to keep gradients on the fitting path).\n");
-        fflush(stdout);
+      if(dfit.is_cholesky()) {
+        // Two-step CD via DensityFit: pivot orbital pairs are a
+        // fitting basis with a stashed metric, so the algebraic
+        // gradient is available.
+        fx_full=dfit.forceJ_cholesky(*basisp, sol.P);
+      } else {
+        fx_full=dfit.forceJ(sol.P);
       }
-      if(scr.get_N() != basisp->get_Nbf())
-	scr.fill(basisp,intthr,verbose);
-      fx_full=scr.forceJ(sol.P,tol);
     } else {
       // scr is filled in scf-base.cpp only on the four-index path
       // (direct or table). On the Cholesky / DF paths it stays
@@ -107,29 +95,60 @@ arma::vec SCF::force_ROHF(uscf_t & sol, int Nel_alpha, int Nel_beta, double tol)
   } else {
 #endif
 
-    if(scr.get_N() != basisp->get_Nbf())
-      scr.fill(basisp,intthr,verbose);
-
+    if(densityfit) {
+      // DF/CD: split into Coulomb and exchange gradients (no
+      // combined forceJK -- the J and K paths use different
+      // intermediaries). dfit.forceJ{,_cholesky} handles Coulomb;
+      // dfit.forceK adds the kfull-scaled exchange gradient.
+      arma::vec fxJ;
+      if(dfit.is_cholesky())
+        fxJ = dfit.forceJ_cholesky(*basisp, sol.P);
+      else
+        fxJ = dfit.forceJ(sol.P);
 #ifdef RESTRICTED
-    fx_full=scr.forceJK(sol.P,tol,kfull);
+      const arma::vec fxK = dfit.forceK(*basisp, sol.C, occs, kfull);
+      fx_full = fxJ + fxK;
 #else
-    fx_full=scr.forceJK(sol.Pa,sol.Pb,tol,kfull);
+      const arma::vec fxKa = dfit.forceK(*basisp, sol.Ca, occa, kfull);
+      const arma::vec fxKb = dfit.forceK(*basisp, sol.Cb, occb, kfull);
+      fx_full = fxJ + fxKa + fxKb;
 #endif
+    } else {
+      if(scr.get_N() != basisp->get_Nbf())
+        scr.fill(basisp,intthr,verbose);
+#ifdef RESTRICTED
+      fx_full=scr.forceJK(sol.P,tol,kfull);
+#else
+      fx_full=scr.forceJK(sol.Pa,sol.Pb,tol,kfull);
+#endif
+    }
 
 #ifdef DFT
   }
 
   if(omega != 0.0) {
-    // Set range separation and fill (low-cost compared to forces anyway)
-    scr_rs.set_range_separation({omega, 0.0, 1.0});
-    scr_rs.fill(basisp,intthr,verbose);
-
-    // Exchange forces
+    if(densityfit) {
+      // Short-range exchange gradient on the range-separated dfit
+      // (built by SCF::fill_rs at the chosen omega).
 #ifdef RESTRICTED
-    fx_short=scr_rs.forceK(sol.P,tol,kshort);
+      fx_short = dfit_rs.forceK(*basisp, sol.C, occs, kshort);
 #else
-    fx_short=scr_rs.forceK(sol.Pa,sol.Pb,tol,kshort);
+      const arma::vec fxKa = dfit_rs.forceK(*basisp, sol.Ca, occa, kshort);
+      const arma::vec fxKb = dfit_rs.forceK(*basisp, sol.Cb, occb, kshort);
+      fx_short = fxKa + fxKb;
 #endif
+    } else {
+      // Four-index fallback: set range separation and fill (low-cost
+      // compared to forces anyway).
+      scr_rs.set_range_separation({omega, 0.0, 1.0});
+      scr_rs.fill(basisp,intthr,verbose);
+
+#ifdef RESTRICTED
+      fx_short=scr_rs.forceK(sol.P,tol,kshort);
+#else
+      fx_short=scr_rs.forceK(sol.Pa,sol.Pb,tol,kshort);
+#endif
+    }
   }
 
   // Get the DFT contribution

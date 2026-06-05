@@ -22,19 +22,13 @@
 #include <omp.h>
 #endif
 
-CachedBlocks::CachedBlocks() : Nbf_(0), Naux_(0) {}
+CachedBlocks::CachedBlocks() = default;
 
 CachedBlocks::CachedBlocks(size_t Nbf, size_t Naux,
                            std::vector<std::pair<size_t, size_t>> shellpairs,
                            std::vector<std::pair<size_t, size_t>> firsts,
                            std::vector<std::pair<size_t, size_t>> sizes)
-    : Nbf_(Nbf), Naux_(Naux),
-      shellpairs_(std::move(shellpairs)),
-      firsts_(std::move(firsts)),
-      sizes_(std::move(sizes)) {
-  if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
-    throw std::logic_error("CachedBlocks: shellpair / first / size vectors disagree in length");
-
+    : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)) {
   // Lay out per-block offsets into a single flat buffer.
   offsets_.resize(shellpairs_.size());
   size_t off = 0;
@@ -71,18 +65,12 @@ DirectDFBlocks::DirectDFBlocks(size_t Nbf, size_t Naux,
                                GaussianShell dummy,
                                double omega, double alpha, double beta,
                                int max_am, int max_contr)
-    : Nbf_(Nbf), Naux_(Naux),
-      shellpairs_(std::move(shellpairs)),
-      firsts_(std::move(firsts)),
-      sizes_(std::move(sizes)),
+    : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
       orb_shells_(std::move(orb_shells)),
       aux_shells_(std::move(aux_shells)),
       dummy_(std::move(dummy)),
       omega_(omega), alpha_(alpha), beta_(beta),
       max_am_(max_am), max_contr_(max_contr) {
-  if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
-    throw std::logic_error("DirectDFBlocks: shellpair / first / size vectors disagree in length");
-
   // Worst-case Nmu*Nnu across shellpairs; per-thread scratch is sized
   // to this at construction so get_block(ip) never reallocs.
   max_NmuNnu_ = 0;
@@ -112,12 +100,8 @@ ERIWorker * DirectDFBlocks::thread_eri() const {
   // The cache slot is owned by this thread for the lifetime of the
   // outer parallel region; lazily fill it the first time we hit a
   // get_block on this thread.
-  if(!eri_cache_[tid]) {
-    if(omega_==0.0 && alpha_==1.0 && beta_==0.0)
-      eri_cache_[tid].reset(new ERIWorker(max_am_, max_contr_));
-    else
-      eri_cache_[tid].reset(new ERIWorker_srlr(max_am_, max_contr_, omega_, alpha_, beta_));
-  }
+  if(!eri_cache_[tid])
+    eri_cache_[tid] = make_eri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
   return eri_cache_[tid].get();
 }
 
@@ -170,12 +154,8 @@ dERIWorker * DirectDFPerturbedBlocks::thread_deri() const {
 #else
   const int tid = 0;
 #endif
-  if(!deri_cache_[tid]) {
-    if(omega_==0.0 && alpha_==1.0 && beta_==0.0)
-      deri_cache_[tid].reset(new dERIWorker(max_am_, max_contr_));
-    else
-      deri_cache_[tid].reset(new dERIWorker_srlr(max_am_, max_contr_, omega_, alpha_, beta_));
-  }
+  if(!deri_cache_[tid])
+    deri_cache_[tid] = make_deri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
   return deri_cache_[tid].get();
 }
 
@@ -252,6 +232,113 @@ void DirectDFPerturbedBlocks::for_each_pert(
       fn(pert, a0, sub);
     }
   }
+}
+
+DirectCDBlocks::DirectCDBlocks(size_t Nbf, size_t Naux,
+                               std::vector<std::pair<size_t, size_t>> shellpairs,
+                               std::vector<std::pair<size_t, size_t>> firsts,
+                               std::vector<std::pair<size_t, size_t>> sizes,
+                               std::vector<GaussianShell> orb_shells,
+                               std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
+                               arma::umat pivot_index,
+                               arma::uword pivot_sentinel,
+                               arma::mat pivot_X,
+                               double omega, double alpha, double beta,
+                               int max_am, int max_contr)
+    : BTensorBlocksBase(Nbf, Naux, std::move(shellpairs), std::move(firsts), std::move(sizes)),
+      orb_shells_(std::move(orb_shells)),
+      pivot_shellpairs_(std::move(pivot_shellpairs)),
+      pivot_index_(std::move(pivot_index)),
+      pivot_sentinel_(pivot_sentinel),
+      pivot_X_(std::move(pivot_X)),
+      omega_(omega), alpha_(alpha), beta_(beta),
+      max_am_(max_am), max_contr_(max_contr) {
+  if(pivot_X_.n_cols != Naux_)
+    throw std::logic_error("DirectCDBlocks: pivot_X cleaned-subspace dim does not match Naux");
+  Nselected_ = pivot_X_.n_rows;
+
+  max_NmuNnu_ = 0;
+  for(size_t ip=0; ip<sizes_.size(); ip++)
+    max_NmuNnu_ = std::max(max_NmuNnu_, sizes_[ip].first * sizes_[ip].second);
+
+#ifdef _OPENMP
+  const int nthr = omp_get_max_threads();
+#else
+  const int nthr = 1;
+#endif
+  eri_cache_.resize(nthr);
+  scratch_.resize(nthr);
+  scratch_L_.resize(nthr);
+  for(int t=0; t<nthr; t++) {
+    scratch_[t].set_size(Nselected_, max_NmuNnu_);
+    scratch_L_[t].set_size(Naux_, max_NmuNnu_);
+  }
+}
+
+ERIWorker * DirectCDBlocks::thread_eri() const {
+#ifdef _OPENMP
+  const int tid = omp_get_thread_num();
+#else
+  const int tid = 0;
+#endif
+  if(!eri_cache_[tid])
+    eri_cache_[tid] = make_eri_worker(max_am_, max_contr_, omega_, alpha_, beta_);
+  return eri_cache_[tid].get();
+}
+
+arma::mat DirectCDBlocks::get_block(size_t ip) const {
+  const size_t imus = shellpairs_[ip].first;
+  const size_t inus = shellpairs_[ip].second;
+  const size_t Nmu  = sizes_[ip].first;
+  const size_t Nnu  = sizes_[ip].second;
+
+  ERIWorker * eri = thread_eri();
+#ifdef _OPENMP
+  const int tid = omp_get_thread_num();
+#else
+  const int tid = 0;
+#endif
+
+  // First stage: build the raw (piv | mu nu) sub-block at
+  // shape (Nselected_ x Nmu*Nnu) into the thread's scratch.
+  // Pivots that map to no orbital shellpair contribution stay
+  // zero (CachedBlocks does the same).
+  arma::mat & buf_raw = scratch_[tid];
+  std::memset(buf_raw.memptr(), 0, sizeof(double) * Nselected_ * Nmu * Nnu);
+  double * buf_ptr = buf_raw.memptr();
+  for(size_t pp=0; pp<pivot_shellpairs_.size(); pp++) {
+    const size_t ks = pivot_shellpairs_[pp].first;
+    const size_t ls = pivot_shellpairs_[pp].second;
+    const size_t Nk = orb_shells_[ks].get_Nbf();
+    const size_t Nl = orb_shells_[ls].get_Nbf();
+    const size_t k0 = orb_shells_[ks].get_first_ind();
+    const size_t l0 = orb_shells_[ls].get_first_ind();
+
+    eri->compute(&orb_shells_[imus], &orb_shells_[inus], &orb_shells_[ks], &orb_shells_[ls]);
+    const std::vector<double> * erip = eri->getp();
+
+    for(size_t ii=0; ii<Nmu; ii++)
+      for(size_t jj=0; jj<Nnu; jj++) {
+        const size_t col = jj * Nmu + ii;
+        for(size_t kk=0; kk<Nk; kk++)
+          for(size_t ll=0; ll<Nl; ll++) {
+            const arma::uword pidx = pivot_index_(k0+kk, l0+ll);
+            if(pidx == pivot_sentinel_) continue;
+            buf_ptr[col * Nselected_ + pidx] = (*erip)[((ii*Nnu+jj)*Nk+kk)*Nl+ll];
+          }
+      }
+  }
+
+  // Second stage: bake the pivot metric into the block, matching what
+  // CachedBlocks stores. L_block = X^T B_raw_block, shape
+  // (Naux_indep x Nmu*Nnu). Without this multiply the J/K kernels
+  // (which assume identity metric in CD mode) would see raw integrals
+  // and produce wrong J/K; cf. fill_cholesky's L-bake.
+  arma::mat raw_view(buf_ptr, Nselected_, Nmu * Nnu, /*copy*/false, /*strict*/true);
+  arma::mat & buf_L = scratch_L_[tid];
+  arma::mat L_view(buf_L.memptr(), Naux_, Nmu * Nnu, /*copy*/false, /*strict*/true);
+  L_view = pivot_X_.t() * raw_view;
+  return L_view;
 }
 
 arma::mat DirectDFBlocks::get_block(size_t ip) const {

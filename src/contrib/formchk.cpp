@@ -18,7 +18,6 @@
 
 #include "../checkpoint.h"
 #include "../density_fitting.h"
-#include "../erichol.h"
 #include "../localization.h"
 #include "../timer.h"
 #include "../mathf.h"

@@ -19,12 +19,10 @@
 #include "../checkpoint.h"
 #include "../density_fitting.h"
 #include <limits>
-#include "../erichol.h"
 #include "../localization.h"
 #include "../timer.h"
 #include "../mathf.h"
 #include "../linalg.h"
-#include "../eriworker.h"
 #include "../settings.h"
 #include "../stringutil.h"
 
@@ -265,14 +263,14 @@ void form_B(const arma::mat & B, const arma::mat & Cl, const arma::mat & Cr, con
   fflush(stdout);
 }
 
-void form_B(const ERIchol & chol, const arma::mat & Cl, const arma::mat & Cr, const std::string & name, arma::file_type atype) {
+void form_B(const DensityFit & dfit, const arma::mat & Cl, const arma::mat & Cr, const std::string & name, arma::file_type atype) {
   Timer t;
   printf("Forming %s ... ",name.c_str());
   fflush(stdout);
 
   arma::mat Bt;
   if(Cl.n_cols && Cr.n_cols)
-    Bt=chol.B_transform(Cl,Cr,true);
+    Bt=dfit.B_transform(Cl,Cr,true);
   Bt.save(name+".dat",atype);
 
   printf("done (%s)\n",t.elapsed().c_str());
@@ -486,8 +484,8 @@ int main_guarded(int argc, char **argv) {
   settings.add_double("CholeskyThr","Cholesky threshold to use",1e-7);
   settings.add_double("CholeskyShThr","Cholesky shell threshold to use",0.01);
   settings.add_double("IntegralThresh","Integral threshold",1e-10);
-  settings.add_int("CholeskyMode","Cholesky mode",0,true);
-  settings.add_bool("CholeskyInCore","Use more memory for Cholesky?",true);
+  settings.add_int("CholeskyMode","Cholesky cache mode: 0 off, 1 save, -1 load",0,true);
+  settings.add_string("CholeskyFile","Cholesky cache filename","cholesky.chk");
   settings.add_bool("Localize","Localize orbitals?",false);
   settings.add_string("LocGroups","List of groups to localize","");
   settings.add_string("LocMethod","Localization method to use","IAO2");
@@ -512,7 +510,6 @@ int main_guarded(int argc, char **argv) {
   int cholmode=settings.get_int("CholeskyMode");
   double cholthr=settings.get_double("CholeskyThr");
   double cholshthr=settings.get_double("CholeskyShThr");
-  bool cholincore=settings.get_bool("CholeskyInCore");
   bool binary=settings.get_bool("Binary");
   bool loc=settings.get_bool("Localize");
   enum locmet locmethod(parse_locmet(settings.get_string("LocMethod")));
@@ -550,7 +547,8 @@ int main_guarded(int argc, char **argv) {
   // File type
   arma::file_type atype = binary ? arma::arma_binary : arma::raw_ascii;
 
-  ERIchol chol;
+  // The merged DensityFit class drives both regular DF and CD modes;
+  // which mode is in play is decided by the fill_*() call below.
   DensityFit dfit;
 
   if(densityfit) {
@@ -576,33 +574,23 @@ int main_guarded(int argc, char **argv) {
     // Calculate fitting integrals. In-core, with RI-K
     dfit.fill(basis,dfitbas,false,intthr,fitthr,true);
   } else {
-    // Calculate Cholesky vectors
-    if(cholmode==-1) {
-      chol.load();
-      if(true) {
-	printf("%i Cholesky vectors loaded from file in %s.\n",(int) chol.get_Naux(),t.elapsed().c_str());
-	fflush(stdout);
-      }
-    }
-
-    if(chol.get_Nbf()!=basis.get_Nbf()) {
-      chol.fill(basis,cholthr,cholshthr,intthr,true);
-      if(cholmode==1) {
-	t.set();
-	chol.save();
-	printf("Cholesky vectors saved to file in %s.\n",t.elapsed().c_str());
-	fflush(stdout);
-      }
-    }
-
-    // Size of memory for screened B matrix
-    size_t Nscr=chol.get_Npairs()*chol.get_Naux();
-    // Size of memory for full B matrix
-    size_t Nfull=chol.get_Nbf()*chol.get_Nbf()*chol.get_Naux();
-    if(cholincore) {
-      printf("In-core Cholesky toggled, memory use is %s vs %s\n",memory_size(Nfull*sizeof(double)).c_str(),memory_size(Nscr*sizeof(double)).c_str());
-    } else {
-      printf("Direct  Cholesky toggled, memory use is %s vs %s\n",memory_size(Nscr*sizeof(double)).c_str(),memory_size(Nfull*sizeof(double)).c_str());
+    // Two-step CD via the merged DensityFit. moints materialises the
+    // full B tensor below (dfit.B_matrix), so direct mode would just
+    // recompute every block at dump time -- always run cached here.
+    // CholeskyMode -1/+1 hits the same CholeskyFile the SCF driver
+    // uses, so an MO integral dump on top of a previous SCF skips
+    // the CD fill.
+    std::string cholfile = settings.get_string("CholeskyFile");
+    bool loaded = false;
+    if(cholmode == -1)
+      loaded = dfit.load(basis, /*auxbas*/nullptr, cholfile);
+    if(!loaded) {
+      // Re-use cholthr for both the CD threshold and the two-step
+      // metric cleanup -- moints.cpp uses one user-facing knob
+      // (CholeskyThr); pre-merge there was no separate metric step.
+      dfit.fill_cholesky(basis, /*direct*/false, cholthr, cholshthr, intthr, cholthr, true);
+      if(cholmode == 1)
+        dfit.save(cholfile);
     }
   }
 
@@ -612,10 +600,7 @@ int main_guarded(int argc, char **argv) {
   Hcore.save("H.dat",arma::arma_binary);
   {
     arma::mat B;
-    if(densityfit)
-      dfit.B_matrix(B);
-    else
-      chol.B_matrix(B);
+    dfit.B_matrix(B);
     B.save("B.dat",arma::arma_binary);
   }
 
@@ -694,15 +679,11 @@ int main_guarded(int argc, char **argv) {
     arma::mat Cah(C.cols(0,Nelb-1));
     arma::mat Cap(C.cols(Nela,C.n_cols-1));
     arma::mat Bph;
-    if(densityfit || cholincore) {
+    {
       arma::mat B;
-      if(densityfit)
-	dfit.B_matrix(B);
-      else
-	chol.B_matrix(B);
+      dfit.B_matrix(B);
       Bph=B_transform(B,Cap,Cah);
-    } else
-      Bph=chol.B_transform(Cap,Cah);
+    }
 
     // Rotate
     arma::mat R(sano_guess(Cah,Cap,Bph));

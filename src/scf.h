@@ -26,7 +26,6 @@
 class DFTGrid;
 #include "eritable.h"
 #include "eriscreen.h"
-#include "erichol.h"
 #include "density_fitting.h"
 
 class Checkpoint;
@@ -288,15 +287,12 @@ protected:
   /// Pivoted Cholesky threshold for density fitting
   double fitcholthr;
 
-  /// Cholesky calculation?
-  bool cholesky;
   /// Cholesky threshold
   double cholthr;
   /// Cholesky shell threshold (for caching)
   double cholshthr;
-  /// Cholesky natural auxiliary function threshold (for pruning)
-  double cholnafthr;
-  /// Cholesky mode
+  /// Cholesky mode (legacy; only used to issue an ignored-warning on
+  /// the merged Cholesky/DensityFit path).
   int cholmode;
 
   /// Calculate forces?
@@ -313,13 +309,11 @@ protected:
   ERIscreen scr;
   /// Electron repulsion screening table, range separation
   ERIscreen scr_rs;
-  /// Cholesky integrals
-  ERIchol chol;
-  /// Cholesky integrals, range separation
-  ERIchol chol_rs;
-  /// Density fitting table
+  /// Density fitting / Cholesky table (CD lives on the same object
+  /// since the erichol/densityfit merge; cholesky_mode flag selects
+  /// the storage layout)
   DensityFit dfit;
-  /// Density fitting table, range separation
+  /// Same, range separation
   DensityFit dfit_rs;
 
   /// Decontracted basis set

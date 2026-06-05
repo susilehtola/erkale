@@ -30,7 +30,7 @@
 #include "settings.h"
 #include "stringutil.h"
 #include "timer.h"
-#include "erichol.h"
+#include "density_fitting.h"
 
 // Needed for libint init
 #include "eriworker.h"
@@ -228,10 +228,11 @@ int main_guarded(int argc, char **argv) {
     printf("Using finite protonic model with fwhm = %e bohr => omega = %e.\n",fwhm,omega);
   }
 
-  // Construct density fitting basis set
+  // Coulomb/exchange machinery. The merged DensityFit class drives
+  // both regular DF and CD modes; which mode it's in is selected by
+  // the fill_*() call below.
   BasisSetLibrary fitlib;
   BasisSet dfitbas;
-  ERIchol chol, pchol;
   DensityFit dfit, pfit;
   size_t Npairs_p=0, Npairs_e=0;
   bool direct=settings.get_bool("Direct");
@@ -264,11 +265,12 @@ int main_guarded(int argc, char **argv) {
     double cholthr=settings.get_double("CholeskyThr");
     double cholshthr=settings.get_double("CholeskyShThr");
     double shtol=settings.get_double("IntegralThresh");
-    Npairs_e=chol.fill(basis,cholthr,cholshthr,shtol,verbose);
+    double fitcholthr=settings.get_double("FittingCholeskyThreshold");
+    Npairs_e=dfit.fill_cholesky(basis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
     if(finiteproton)
-      pchol.set_range_separation(omega, alpha, beta);
+      pfit.set_range_separation(omega, alpha, beta);
     if(vpp)
-      Npairs_p=pchol.fill(pbasis,cholthr,cholshthr,shtol,verbose);
+      Npairs_p=pfit.fill_cholesky(pbasis,direct,cholthr,cholshthr,shtol,fitcholthr,verbose);
   }
 
   printf("%i electronic shell pairs out of %i are significant.\n",(int) Npairs_e, (int) basis.get_unique_shellpairs().size());
@@ -318,27 +320,16 @@ int main_guarded(int argc, char **argv) {
 
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> electronic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
-    arma::mat J, K;
-    if(density_fitting) {
-      J=dfit.calcJ(P);
-      K=-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
-    } else {
-      J=chol.calcJ(P);
-      K=-chol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
-    }
+    arma::mat J=dfit.calcJ(P);
+    arma::mat K=-dfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
     return std::make_pair(J,K);
   };
   std::function<std::pair<arma::mat,arma::mat>(const arma::mat & P, const arma::vec & occs)> protonic_terms = [&](const arma::mat & C, const arma::vec & occs) {
     arma::mat P(C*arma::diagmat(occs)*C.t());
     arma::mat J, K;
     if(vpp) {
-      if(density_fitting) {
-        J=pfit.calcJ(P);
-        K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
-      } else {
-        J=pchol.calcJ(P);
-        K=-pchol.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
-      }
+      J=pfit.calcJ(P);
+      K=-pfit.calcK(C,arma::conv_to<std::vector<double>>::from(occs));
     } else {
       J.zeros(P.n_rows, P.n_cols);
       K.zeros(P.n_rows, P.n_cols);
@@ -372,12 +363,12 @@ int main_guarded(int argc, char **argv) {
 #pragma omp parallel
 #endif
     {
-      // ERI worker. Wrap in unique_ptr so a throw inside the loop
-      // doesn't leak the allocation; .get() is used at every call
-      // site inside the loop (legacy raw-pointer API).
+      // ERI worker. unique_ptr so a throw inside the loop doesn't
+      // leak the allocation; .get() is used at every call site
+      // inside the loop (legacy raw-pointer API).
       auto maxam = std::max(source_basis.get_max_am(),target_basis.get_max_am());
       auto maxncontr = std::max(source_basis.get_max_Ncontr(), target_basis.get_max_Ncontr());
-      std::unique_ptr<ERIWorker> eri_owner((omega==0.0 && alpha==1.0 && beta==0.0) ? new ERIWorker(maxam, maxncontr) : new ERIWorker_srlr(maxam,maxncontr,omega,alpha,beta));
+      auto eri_owner = make_eri_worker(maxam, maxncontr, omega, alpha, beta);
       ERIWorker *eri = eri_owner.get();
 
 #ifndef _OPENMP

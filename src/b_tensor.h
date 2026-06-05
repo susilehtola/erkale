@@ -69,6 +69,40 @@ public:
   virtual arma::mat get_block(size_t ip) const = 0;
 };
 
+/// Holds the (Nbf, Naux, shellpairs, firsts, sizes) descriptor every
+/// BTensorBlocks subclass needs, and supplies the six shellpair /
+/// dimension overrides. Subclasses derive from this instead of
+/// BTensorBlocks directly and only implement get_block.
+class BTensorBlocksBase : public BTensorBlocks {
+ protected:
+  size_t Nbf_;
+  size_t Naux_;
+  std::vector<std::pair<size_t, size_t>> shellpairs_;
+  std::vector<std::pair<size_t, size_t>> firsts_;
+  std::vector<std::pair<size_t, size_t>> sizes_;
+
+  BTensorBlocksBase() : Nbf_(0), Naux_(0) {}
+  BTensorBlocksBase(size_t Nbf, size_t Naux,
+                    std::vector<std::pair<size_t, size_t>> shellpairs,
+                    std::vector<std::pair<size_t, size_t>> firsts,
+                    std::vector<std::pair<size_t, size_t>> sizes)
+      : Nbf_(Nbf), Naux_(Naux),
+        shellpairs_(std::move(shellpairs)),
+        firsts_(std::move(firsts)),
+        sizes_(std::move(sizes)) {
+    if(shellpairs_.size() != firsts_.size() || shellpairs_.size() != sizes_.size())
+      throw std::logic_error("BTensorBlocksBase: descriptor vectors disagree in length");
+  }
+
+ public:
+  size_t n_blocks() const override { return shellpairs_.size(); }
+  size_t naux() const override { return Naux_; }
+  size_t nbf() const override { return Nbf_; }
+  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
+  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
+  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
+};
+
 /**
  * Cached, in-memory block storage. Owns a single flat backing
  * std::vector<double> plus per-block (offset, nmu, nnu) lookup;
@@ -80,17 +114,7 @@ public:
  * vector<arma::mat> allocation churn that the previous DF storage
  * had before the block-shellpair refactor.
  */
-class CachedBlocks : public BTensorBlocks {
-  /// Total orbital basis size
-  size_t Nbf_;
-  /// Auxiliary dimension
-  size_t Naux_;
-  /// Per-block shell indices (mu_shell, nu_shell)
-  std::vector<std::pair<size_t, size_t>> shellpairs_;
-  /// Per-block first-function indices (mu0, nu0)
-  std::vector<std::pair<size_t, size_t>> firsts_;
-  /// Per-block sizes (Nmu, Nnu)
-  std::vector<std::pair<size_t, size_t>> sizes_;
+class CachedBlocks : public BTensorBlocksBase {
   /// Per-block offset into storage_
   std::vector<size_t> offsets_;
   /// Flat backing storage, naux*sum(Nmu*Nnu) doubles
@@ -104,12 +128,6 @@ public:
                std::vector<std::pair<size_t, size_t>> sizes);
   ~CachedBlocks() override = default;
 
-  size_t n_blocks() const override { return shellpairs_.size(); }
-  size_t naux() const override { return Naux_; }
-  size_t nbf() const override { return Nbf_; }
-  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
-  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
-  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
   arma::mat get_block(size_t ip) const override;
 
   /// Mutable access used by fill paths to write the ip-th block in
@@ -119,6 +137,14 @@ public:
 
   /// Total backing-store size in doubles
   size_t storage_size() const { return storage_.size(); }
+
+  /// Direct access to the flat backing store, exposed so DensityFit
+  /// can serialize / deserialize it through the Checkpoint HDF5
+  /// wrapper. Read-only and mutable forms; the layout is described
+  /// by the constructor (sum of Naux*Nmu*Nnu per shellpair, in the
+  /// shellpair order the descriptor was passed in).
+  const std::vector<double> & storage() const { return storage_; }
+  std::vector<double> & storage() { return storage_; }
 };
 
 /**
@@ -134,13 +160,70 @@ public:
  * lazily populated by the first call from each thread; cleanup is
  * automatic at destruction.
  */
-class DirectDFBlocks : public BTensorBlocks {
-  size_t Nbf_;
-  size_t Naux_;
-  std::vector<std::pair<size_t, size_t>> shellpairs_;
-  std::vector<std::pair<size_t, size_t>> firsts_;
-  std::vector<std::pair<size_t, size_t>> sizes_;
+/**
+ * Direct-mode block source for two-step Cholesky decomposition: each
+ * get_block(ip) call computes the (piv | mu nu) three-center integrals
+ * on demand, where the "aux functions" are the selected pivot orbital
+ * pairs and the integral is the 4-center ERI restricted to those
+ * pivot pairs. Returns a (Naux x Nmu*Nnu) matrix in the same layout
+ * as the cached path so the J/K/forceJ kernels are insensitive to
+ * whether storage is cached or direct.
+ *
+ * Same per-thread ERIWorker cache + scratch model as DirectDFBlocks.
+ * The class accepts the pivot bookkeeping (pivot_index lookup,
+ * shellpair list, sentinel) by value at construction so it
+ * outlives the DensityFit that built it.
+ */
+class DirectCDBlocks : public BTensorBlocksBase {
+  /// Orbital shells, owned copy.
+  std::vector<GaussianShell> orb_shells_;
+  /// Pivot shellpairs to iterate over inside get_block.
+  std::vector<std::pair<size_t, size_t>> pivot_shellpairs_;
+  /// (Nbf x Nbf) lookup: (mu, nu) -> pivot rank or pivot_sentinel_.
+  arma::umat pivot_index_;
+  /// Sentinel value used in pivot_index_ (Nselected = pivot_index_xt.n_rows).
+  arma::uword pivot_sentinel_;
+  /// X = M^{-1/2} on the pivot metric, shape (Nselected x Naux_indep).
+  /// Applied inside get_block as the final L = X^T B_raw multiply so
+  /// the J/K kernels see the same L-baked block shape the cached path
+  /// produces. naux() == Naux_indep == pivot_X_.n_cols.
+  arma::mat pivot_X_;
 
+  double omega_, alpha_, beta_;
+  int max_am_;
+  int max_contr_;
+
+  mutable std::vector<std::unique_ptr<ERIWorker>> eri_cache_;
+  /// Per-thread scratch sized (Nselected x max_NmuNnu_) for the raw
+  /// (piv|mu nu) block before the X^T multiply.
+  mutable std::vector<arma::mat> scratch_;
+  /// Per-thread scratch sized (Naux_indep x max_NmuNnu_) holding the
+  /// post-multiply L block returned to the caller.
+  mutable std::vector<arma::mat> scratch_L_;
+  size_t max_NmuNnu_;
+  size_t Nselected_;
+
+ public:
+  DirectCDBlocks(size_t Nbf, size_t Naux,
+                 std::vector<std::pair<size_t, size_t>> shellpairs,
+                 std::vector<std::pair<size_t, size_t>> firsts,
+                 std::vector<std::pair<size_t, size_t>> sizes,
+                 std::vector<GaussianShell> orb_shells,
+                 std::vector<std::pair<size_t, size_t>> pivot_shellpairs,
+                 arma::umat pivot_index,
+                 arma::uword pivot_sentinel,
+                 arma::mat pivot_X,
+                 double omega, double alpha, double beta,
+                 int max_am, int max_contr);
+  ~DirectCDBlocks() override = default;
+
+  arma::mat get_block(size_t ip) const override;
+
+ private:
+  ERIWorker * thread_eri() const;
+};
+
+class DirectDFBlocks : public BTensorBlocksBase {
   /// Orbital and auxiliary shells, owned copies (cheap).
   std::vector<GaussianShell> orb_shells_;
   std::vector<GaussianShell> aux_shells_;
@@ -176,12 +259,6 @@ public:
                  int max_am, int max_contr);
   ~DirectDFBlocks() override = default;
 
-  size_t n_blocks() const override { return shellpairs_.size(); }
-  size_t naux() const override { return Naux_; }
-  size_t nbf() const override { return Nbf_; }
-  std::pair<size_t, size_t> shellpair(size_t ip) const override { return shellpairs_[ip]; }
-  std::pair<size_t, size_t> shellpair_first(size_t ip) const override { return firsts_[ip]; }
-  std::pair<size_t, size_t> shellpair_size(size_t ip) const override { return sizes_[ip]; }
   arma::mat get_block(size_t ip) const override;
 
  private:
@@ -279,6 +356,10 @@ public:
  * the same way DirectDFBlocks does for value integrals.
  */
 class DirectDFPerturbedBlocks : public PerturbedBTensorBlocks {
+  // Same descriptor as BTensorBlocksBase but PerturbedBTensorBlocks
+  // is a sibling interface (different get_block signature: streams
+  // sub-blocks via for_each_pert), so the fields are duplicated
+  // here rather than shared through inheritance.
   size_t Nbf_;
   size_t Naux_;
   size_t Nnuc_;
