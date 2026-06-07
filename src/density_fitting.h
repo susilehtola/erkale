@@ -205,11 +205,11 @@ class DensityFit {
   void accumulate_3c_force_CD(const BasisSet & basis, arma::vec & f, double sign, BuildQ && build_q) const;
 
   /// Two-step CD pivot selection (phases A-C: diagonal, pair
-  /// enumeration, pivoted selection). Populates the by-ref output
-  /// parameters with the pivoting machinery; b_raw_out is filled
-  /// with the (mu nu | piv) column for each selected pivot when
-  /// non-null, otherwise the columns are computed and discarded.
-  /// Honors the instance's range separation (set_range_separation).
+  /// enumeration, pivoted selection). Pivots-only: populates the
+  /// by-ref outputs (pivot list, product map, pivot shellpairs); the
+  /// (mu nu | piv) integrals are rebuilt per block by the cached/direct
+  /// block builders, not returned here. Honors the instance's range
+  /// separation (set_range_separation).
   size_t select_two_step_pivots(const BasisSet & basis,
                                 double cholesky_tol,
                                 double shell_reuse_thr,
@@ -217,8 +217,7 @@ class DensityFit {
                                 bool verbose,
                                 arma::uvec & pi,
                                 arma::umat & invmap,
-                                std::set<std::pair<size_t, size_t>> & piv_shellpairs,
-                                arma::mat * b_raw_out) const;
+                                std::set<std::pair<size_t, size_t>> & piv_shellpairs) const;
   /// Compute shell in (a|uv) matrix
   arma::mat compute_a_munu(ERIWorker * eri, size_t ip, double * memptr = nullptr) const;
   /// Project P_munu onto the aux basis through one shellpair block:

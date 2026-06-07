@@ -23,6 +23,7 @@
 #include "stringutil.h"
 #include "timer.h"
 #include <cstdio>
+#include <limits>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -186,11 +187,11 @@ size_t DensityFit::fill(const BasisSet & orbbas, const BasisSet & auxbas, bool d
 }
 
 // Two-step CD pivot selection (phases A-C: diagonal, pair
-// enumeration, pivoted selection). Populates the by-ref output
-// parameters with the pivoting machinery. b_raw_out non-null ->
-// save each pivot's (mu nu | piv) column; nullptr -> compute and
-// discard (used by find_cholesky_pivots when the caller only needs
-// the pivot set). Returns the number of pivots selected.
+// enumeration, pivoted selection). Pivots-only: it returns the pivot
+// list, the product map and the pivot shellpairs. The (mu nu | piv)
+// integrals are not returned -- both the cached and the direct block
+// builders recompute them per block, so nothing of size Nprod x Nsel
+// is held here. Returns the number of pivots selected.
 //
 // This is the engine that powers both fill_cholesky and
 // find_cholesky_pivots; the only difference between CD and DF in
@@ -203,8 +204,7 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
                                           bool verbose,
                                           arma::uvec & pi,
                                           arma::umat & invmap,
-                                          std::set<std::pair<size_t, size_t>> & piv_shellpairs,
-                                          arma::mat * b_raw_out) const {
+                                          std::set<std::pair<size_t, size_t>> & piv_shellpairs) const {
   // prodmap ((mu,nu) -> product index) is internal scratch for the
   // pivoted selection; the callers never need it.
   arma::umat prodmap;
@@ -317,34 +317,62 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
   // Restrict the diagonal to the significant products: the flat index
   // of compact product k is invmap(0,k)*Nbf + invmap(1,k).
   d = d(arma::uvec(invmap.row(0).t()*Nbf_local + invmap.row(1).t()));
-  // Empty product set (e.g. atomic basis where everything screens out)
-  // would make arma::max throw; pretend there's nothing left to pivot.
-  double error(Nprod == 0 ? 0.0 : arma::max(d));
-
-  // Phase C: pivot selection. B_temp / b_raw_out grow in chunks of
-  // pivot_grow_chunk columns as pivots are accepted.
+  // Phase C: pivoted selection of the Cholesky basis (paper step I).
+  // Only the pivots are needed, so a product whose residual diagonal
+  // (mu nu|mu nu) drops below tau can never be selected -- it is removed
+  // from the working set. The Cholesky-vector scratch is held compactly,
+  // following the active set rather than the full product list:
+  //   Lact(r, c) = vector r's component at the product of active col c
+  //   actprod[c] = product index of active column c
+  //   colof[p]   = active column of product p, or SENT
+  // Lact gains a row per accepted pivot and loses a column whenever a
+  // product is selected or shed (swap-with-last, with a periodic shrink
+  // of the allocation), so its footprint rises and then falls with the
+  // shrinking active set -- the memory curve of Folkestad/Kjonstad/Koch
+  // (JCP 150, 194112) Fig. 3.
+  const arma::uword SENT = std::numeric_limits<arma::uword>::max();
   const size_t pivot_grow_chunk = 100;
-  pi=arma::linspace<arma::uvec>(0,d.n_elem-1,d.n_elem);
-  arma::mat B_temp;
-  B_temp.zeros(pivot_grow_chunk,Nprod);
-  if(b_raw_out) {
-    b_raw_out->set_size(Nprod, pivot_grow_chunk);
-    b_raw_out->zeros();
-  }
-  size_t m=0;
-
-  while(error>cholesky_tol && m<d.n_elem) {
-    {
-      arma::uword best=m;
-      double bestval=d(pi(m));
-      for(arma::uword i=m+1;i<d.n_elem;i++) {
-        const double v=d(pi(i));
-        if(v>bestval) { bestval=v; best=i; }
-      }
-      if(best!=m)
-        std::swap(pi(m),pi(best));
+  arma::uvec colof(Nprod);
+  colof.fill(SENT);
+  std::vector<arma::uword> actprod;
+  actprod.reserve(Nprod);
+  for(arma::uword p=0; p<Nprod; p++)
+    if(d(p) >= cholesky_tol) {
+      colof(p) = actprod.size();
+      actprod.push_back(p);
     }
-    size_t pim=pi(m);
+
+  arma::mat Lact(pivot_grow_chunk, std::max<size_t>(actprod.size(),1), arma::fill::zeros);
+  size_t nvec = 0;
+  std::vector<arma::uword> sel;          // selected pivot products, in order
+  sel.reserve(actprod.size());
+
+  // Remove active column c: move the last active column into slot c
+  // (preserving its nvec built components) and drop the active count.
+  auto drop_col = [&](arma::uword c) {
+    const arma::uword last = actprod.size()-1;
+    const arma::uword removed = actprod[c];
+    if(c != last) {
+      if(nvec>0)
+        Lact.submat(0,c,nvec-1,c) = Lact.submat(0,last,nvec-1,last);
+      actprod[c] = actprod[last];
+      colof(actprod[c]) = c;
+    }
+    colof(removed) = SENT;
+    actprod.pop_back();
+  };
+
+  while(!actprod.empty()) {
+    // Paper step 4: largest residual diagonal among the active
+    // candidates defines the next pivot's shell pair.
+    arma::uword bestc=0;
+    double bestval=d(actprod[0]);
+    for(arma::uword c=1;c<actprod.size();c++) {
+      const double v=d(actprod[c]);
+      if(v>bestval) { bestval=v; bestc=c; }
+    }
+    if(bestval<=cholesky_tol) break;
+    arma::uword pim=actprod[bestc];
 
     size_t max_k=invmap(0,pim);
     size_t max_l=invmap(1,pim);
@@ -398,105 +426,90 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
     t_int+=t.get();
     t.set();
 
-    // Inner block sweep. The m < d.n_elem guard matters for tiny
-    // systems (e.g. atomic guess on H with cc-pVDZ), where m can reach
-    // d.n_elem mid-sweep; without it the d(pi(m)) below runs off the
-    // end. The other exit is the shell-reuse test on blockerr.
-    while(m < d.n_elem) {
-      double errmax=d(pi(m));
-      for(size_t i=m+1;i<d.n_elem;i++) {
-        const double v=d(pi(i));
-        if(v>errmax) errmax=v;
-      }
+    // Inner sweep (paper step 6): qualify the significant diagonals in
+    // this shell block -- the integrals are already in A -- build their
+    // Cholesky vectors over the (contiguous) active columns, and shed
+    // products that drop below tau. The shell pair is reused while its
+    // best residual stays within shell_reuse_thr (the span factor sigma)
+    // of the active maximum.
+    while(!actprod.empty()) {
+      double errmax=0.0;
+      for(arma::uword c=0;c<actprod.size();c++)
+        errmax=std::max(errmax, d(actprod[c]));
       double blockerr=0;
-      size_t blockind=0;
+      arma::uword blockc=SENT;
       size_t Aind=0;
       for(size_t kk=0;kk<max_Nk;kk++)
         for(size_t ll=0;ll<max_Nl;ll++) {
-          size_t k=kk+max_k0;
-          size_t l=ll+max_l0;
-          size_t ind=prodmap(k,l);
-          if(ind>Nbf_local*Nbf_local) continue;
+          const size_t ind=prodmap(kk+max_k0,ll+max_l0);
+          if(ind>Nbf_local*Nbf_local) continue;     // not a significant product
+          const arma::uword c=colof(ind);
+          if(c==SENT) continue;                     // already a pivot, or shed
           if(d(ind)>blockerr) {
-            bool found=false;
-            for(size_t i=0;i<m;i++)
-              if(pi(i)==ind) { found=true; break; }
-            if(!found) {
-              Aind=kk*max_Nl+ll;
-              blockind=ind;
-              blockerr=d(ind);
-            }
+            Aind=kk*max_Nl+ll;
+            blockc=c;
+            blockerr=d(ind);
           }
         }
       if(blockerr==0.0 || blockerr<shell_reuse_thr*errmax)
         break;
+      const arma::uword piv=actprod[blockc];
 
-      if(pi(m)!=blockind) {
-        bool found=false;
-        for(size_t i=m+1;i<pi.n_elem;i++)
-          if(pi(i)==blockind) {
-            found=true;
-            std::swap(pi(i),pi(m));
-            break;
-          }
-        if(!found) {
-          std::ostringstream oss;
-          oss << "Pivot index " << blockind << " not found, m = " << m << " !\n";
-          throw std::logic_error(oss.str());
-        }
-      }
-      pim=pi(m);
+      if(nvec>=Lact.n_rows)
+        Lact.resize(Lact.n_rows+pivot_grow_chunk, Lact.n_cols);
 
-      if(m>=B_temp.n_rows)
-        B_temp.resize(B_temp.n_rows+pivot_grow_chunk, B_temp.n_cols);
-      if(b_raw_out && m>=b_raw_out->n_cols)
-        b_raw_out->resize(b_raw_out->n_rows, b_raw_out->n_cols+pivot_grow_chunk);
-
-      if(b_raw_out)
-        b_raw_out->col(m) = A.col(Aind);
-
-      B_temp(m,pim)=sqrt(d(pim));
-      if(m==0) {
+      const double inv=1.0/sqrt(d(piv));
+      const arma::uword nact=actprod.size();
+      // New Cholesky vector nvec, over every active column c:
+      //   L_nvec(c) = ( (c|piv) - sum_{r<nvec} L_r(c) L_r(piv) ) / sqrt(d_piv)
+      // then the residual diagonal d(c) -= L_nvec(c)^2. The pivot's own
+      // column gets L_nvec(piv) = sqrt(d_piv), d(piv) -> 0; it is dropped
+      // immediately below. The loop is OpenMP-parallel and the dot runs
+      // on the contiguous first nvec entries of each (col-major) column.
+      if(nvec==0) {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-        for(size_t i=m+1;i<d.n_elem;i++) {
-          size_t pii=pi(i);
-          B_temp(m,pii)=A(pii,Aind)/B_temp(m,pim);
-          d(pii)-=B_temp(m,pii)*B_temp(m,pii);
+        for(arma::uword c=0;c<nact;c++) {
+          const arma::uword p=actprod[c];
+          Lact(0,c)=A(p,Aind)*inv;
+          d(p)-=Lact(0,c)*Lact(0,c);
         }
       } else {
-        const arma::vec tdot(arma::trans(B_temp.submat(0,0,m-1,B_temp.n_cols-1))*B_temp.submat(0,pim,m-1,pim));
+        const arma::vec bcol(Lact.submat(0,blockc,nvec-1,blockc));
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-        for(size_t i=m+1;i<d.n_elem;i++) {
-          size_t pii=pi(i);
-          B_temp(m,pii)=(A(pii,Aind)-tdot(pii))/B_temp(m,pim);
-          d(pii)-=B_temp(m,pii)*B_temp(m,pii);
+        for(arma::uword c=0;c<nact;c++) {
+          const arma::uword p=actprod[c];
+          const double tdot=arma::dot(Lact.submat(0,c,nvec-1,c), bcol);
+          Lact(nvec,c)=(A(p,Aind)-tdot)*inv;
+          d(p)-=Lact(nvec,c)*Lact(nvec,c);
         }
       }
+      nvec++;
+      sel.push_back(piv);
 
-      m++;
-    }
-    error=0.0;
-    for(size_t i=m;i<pi.n_elem;i++) {
-      const double v=d(pi(i));
-      if(v>error) error=v;
+      // The pivot's column is a finished vector (never read again); drop
+      // it, then shed any product whose residual fell below tau (their
+      // diagonals decrease monotonically, so they can never be pivots).
+      drop_col(blockc);
+      for(arma::uword c=0; c<actprod.size(); ) {
+        if(d(actprod[c])<cholesky_tol) drop_col(c);
+        else c++;
+      }
+
+      // Reclaim allocation once the stored width runs well ahead of the
+      // active set (active columns are compacted into [0, nact)).
+      if(Lact.n_cols > actprod.size() + actprod.size()/4 + pivot_grow_chunk)
+        Lact.resize(Lact.n_rows, std::max<size_t>(actprod.size(),1));
     }
     t_chol+=t.get();
   }
 
-  const size_t Nselected=m;
-  // Guard against the empty-pivot case (tiny systems, very tight
-  // cholesky_tol vs. integrals): subvec(0, -1) would underflow.
-  if(Nselected==0)
-    pi.reset();
-  else
-    pi=pi.subvec(0,Nselected-1);
-  if(b_raw_out && Nselected<b_raw_out->n_cols)
-    b_raw_out->shed_cols(Nselected,b_raw_out->n_cols-1);
-  B_temp.reset();
+  const size_t Nselected=nvec;
+  pi = arma::uvec(sel);
+  Lact.reset();
 
   // Form pivot shellpairs (small inline body -- no separate helper).
   piv_shellpairs.clear();
@@ -531,8 +544,7 @@ std::set<std::pair<size_t, size_t>> DensityFit::find_cholesky_pivots(const Basis
   arma::umat invmap;
   std::set<std::pair<size_t, size_t>> piv_shellpairs;
   select_two_step_pivots(basis, cholesky_tol, shell_reuse_thr, shell_screen_tol,
-                         verbose, pi, invmap,
-                         piv_shellpairs, nullptr);
+                         verbose, pi, invmap, piv_shellpairs);
   return piv_shellpairs;
 }
 
@@ -556,17 +568,14 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
 
   Timer ttot;
 
-  // Phases A-C: pivot selection. In cached mode also saves
-  // B_raw = (mu nu | piv) for the block-storage step below; in
-  // direct mode the integrals are recomputed on demand inside
-  // DirectCDBlocks::get_block, so we pass nullptr and skip the
-  // O(Nprod * Nselected) allocation.
+  // Phases A-C: pivot selection only. The (mu nu | piv) integrals are
+  // not materialised here -- both the cached and direct block builders
+  // recompute them per block (DirectCDBlocks::get_block), so no
+  // Nprod x Nselected tensor is held during fill.
   arma::uvec pi;
   arma::umat invmap;
-  arma::mat B_raw;
   const size_t Nselected = select_two_step_pivots(basis, cholesky_tol, shell_reuse_thr, shell_screen_tol,
-                                                  verbose, pi, invmap,
-                                                  pivot_shellpairs, direct ? nullptr : &B_raw);
+                                                  verbose, pi, invmap, pivot_shellpairs);
   Naux = Nselected;
   cd_pivot_shellpairs_vec.assign(pivot_shellpairs.begin(), pivot_shellpairs.end());
 
@@ -700,65 +709,30 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   ab_inv.reset();
   ab_invh.reset();
 
+  // Both modes build the same L blocks: DirectCDBlocks recomputes
+  // (piv | mu nu) from libint per block and bakes cd_X so the J/K
+  // kernels see L = X^T (piv|mu nu) with identity metric. In direct mode
+  // the builder *is* the block store (recomputed on each get_block); in
+  // cached mode we materialise it once into a CachedBlocks and keep the
+  // result. Either way nothing of size Nprod x Nselected is held -- the
+  // cached fill peak is the store itself, not store + B_raw -- at the
+  // cost of recomputing the (mu nu | piv) integrals once here (they are
+  // no longer saved during pivoting).
+  auto builder = std::make_shared<DirectCDBlocks>(
+      Nbf, Naux, sp_pairs, sp_firsts, sp_sizes,
+      orbshells, cd_pivot_shellpairs_vec, cd_pivot_index, cd_pivot_sentinel,
+      cd_X, omega, alpha, beta, maxam, maxcontr);
   if(direct) {
-    // DirectCDBlocks recomputes (piv | mu nu) from libint on every
-    // get_block(ip) call and applies cd_X before returning so the
-    // J/K kernels see the same L = X^T B_raw blocks the cached
-    // path emits. Owns its own pivot + X copies so it outlives this
-    // DensityFit if needed.
-    blocks = std::make_shared<DirectCDBlocks>(
-        Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes),
-        orbshells, cd_pivot_shellpairs_vec, cd_pivot_index, cd_pivot_sentinel,
-        cd_X, omega, alpha, beta, maxam, maxcontr);
+    blocks = builder;
   } else {
-    // Cached mode: scatter L = X^T B_raw into per-shellpair blocks.
-    // We do the multiply one shellpair at a time so the only
-    // full-tensor allocations live during fill are B_raw and the
-    // cached store itself (~2x the persistent footprint).
-    //
-    // invmap is trimmed to exactly the significant products in
-    // select_two_step_pivots, so invmap.n_cols is the row count of
-    // B_raw and the right sentinel for "this (mu,nu) has no L vector".
-    const arma::uword n_prod = invmap.n_cols;
-    const arma::uword prod_sentinel = n_prod;
-    arma::umat prodlookup(Nbf, Nbf);
-    prodlookup.fill(prod_sentinel);
-    for(arma::uword i=0; i<n_prod; i++) {
-      const arma::uword mu = invmap(0, i);
-      const arma::uword nu = invmap(1, i);
-      prodlookup(mu, nu) = i;
-      prodlookup(nu, mu) = i;
-    }
-
-    auto cached = std::make_shared<CachedBlocks>(Nbf, Naux_indep, sp_pairs, sp_firsts, sp_sizes);
+    auto cached = std::make_shared<CachedBlocks>(
+        Nbf, Naux, std::move(sp_pairs), std::move(sp_firsts), std::move(sp_sizes));
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
     for(size_t ip=0; ip<orbpairs.size(); ip++) {
       arma::mat slot = cached->block_mut(ip);
-      const size_t imus = orbpairs[ip].is;
-      const size_t inus = orbpairs[ip].js;
-      const size_t mu0  = orbshells[imus].get_first_ind();
-      const size_t nu0  = orbshells[inus].get_first_ind();
-      const size_t Nmu  = orbshells[imus].get_Nbf();
-      const size_t Nnu  = orbshells[inus].get_Nbf();
-
-      // Per-shellpair scratch: stage the relevant B_raw rows for the
-      // (mu, nu) pairs that this shellpair contributes to, then one
-      // DGEMM gets the L sub-block. Pairs the pivoting dropped stay
-      // zero-filled in slot (they're below threshold anyway).
-      arma::mat B_sub(cd_X.n_rows, Nmu*Nnu, arma::fill::zeros);
-      bool any = false;
-      for(size_t inu=0; inu<Nnu; inu++) {
-        for(size_t imu=0; imu<Nmu; imu++) {
-          const arma::uword prow = prodlookup(mu0+imu, nu0+inu);
-          if(prow == prod_sentinel) continue;
-          B_sub.col(inu*Nmu + imu) = B_raw.row(prow).t();
-          any = true;
-        }
-      }
-      if(any)
-        slot = cd_X.t() * B_sub;
+      slot = builder->get_block(ip);
     }
     blocks = cached;
   }
