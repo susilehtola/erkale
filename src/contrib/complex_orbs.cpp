@@ -54,15 +54,13 @@ arma::cx_mat basis_transform_mat(int l) {
   arma::cx_mat Lmat(2 * l + 1, 2 * l + 1, arma::fill::zeros);
   for (int m=-l; m<=l; m++) {
     if (m < 0) {
-      Lmat(m+l, m+l) -= std::complex<double>(0.0, std::sqrt(0.5));
-      //Lmat(m+l, 2*l-(m+l)) += std::sqrt(0.5);
-      Lmat(2*l-(m+l), m+l) += std::sqrt(0.5);
+      Lmat(l+m, l+m) = -std::complex<double>(0.0, std::sqrt(0.5));
+      Lmat(l-m, l+m) = std::sqrt(0.5);
     } else if (m == 0)
-      Lmat(l, l) += 1.0;
+      Lmat(l, m) = 1.0;
     else {
-      //Lmat(m+l, 2*l-(m+l)) += std::complex<double>(0.0, std::pow(-1.0, m) * std::sqrt(0.5));
-      Lmat(2*l-(m+l), m+l) += std::complex<double>(0.0, std::pow(-1.0, m) * std::sqrt(0.5));
-      Lmat(m+l, m+l) += std::pow(-1.0, m) * std::sqrt(0.5);
+      Lmat(l-m, l+m) = std::complex<double>(0.0, std::pow(-1.0, m) * std::sqrt(0.5));
+      Lmat(l+m, l+m) = std::pow(-1.0, m) * std::sqrt(0.5);
     }
   }
   return Lmat;
