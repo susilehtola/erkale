@@ -184,9 +184,9 @@ class DirectCDBlocks : public BTensorBlocksBase {
   /// Sentinel value used in pivot_index_ (Nselected = pivot_index_xt.n_rows).
   arma::uword pivot_sentinel_;
   /// X = M^{-1/2} on the pivot metric, shape (Nselected x Naux_indep).
-  /// Applied inside get_block as the final L = X^T B_raw multiply so
-  /// the J/K kernels see the same L-baked block shape the cached path
-  /// produces. naux() == Naux_indep == pivot_X_.n_cols.
+  /// Applied inside get_block as the final L = X^T (piv|mu nu) multiply,
+  /// giving the L-baked block the J/K kernels consume; the cached path
+  /// materialises these same blocks. naux() == Naux_indep == pivot_X_.n_cols.
   arma::mat pivot_X_;
 
   double omega_, alpha_, beta_;

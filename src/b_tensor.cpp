@@ -329,11 +329,12 @@ arma::mat DirectCDBlocks::get_block(size_t ip) const {
       }
   }
 
-  // Second stage: bake the pivot metric into the block, matching what
-  // CachedBlocks stores. L_block = X^T B_raw_block, shape
-  // (Naux_indep x Nmu*Nnu). Without this multiply the J/K kernels
-  // (which assume identity metric in CD mode) would see raw integrals
-  // and produce wrong J/K; cf. fill_cholesky's L-bake.
+  // Second stage: bake the pivot metric into the block.
+  // L_block = X^T (piv|mu nu), shape (Naux_indep x Nmu*Nnu). Without
+  // this multiply the J/K kernels (which assume identity metric in CD
+  // mode) would see raw integrals and produce wrong J/K; cf.
+  // fill_cholesky's L-bake. (The cached path stores exactly these
+  // blocks -- it materialises get_block.)
   arma::mat raw_view(buf_ptr, Nselected_, Nmu * Nnu, /*copy*/false, /*strict*/true);
   arma::mat & buf_L = scratch_L_[tid];
   arma::mat L_view(buf_L.memptr(), Naux_, Nmu * Nnu, /*copy*/false, /*strict*/true);

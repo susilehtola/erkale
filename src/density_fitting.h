@@ -116,8 +116,7 @@ class DensityFit {
   /// True when this object was filled via fill_cholesky. CD and DF
   /// share the same J/K machinery; the only thing this flag affects
   /// is which gradient path is available (forceJ for DF aux shells,
-  /// forceJ_cholesky for pivot-orbital-pair "aux") and the pivot
-  /// machinery exposed via get_pivot_shellpairs().
+  /// forceJ_cholesky for pivot-orbital-pair "aux").
   bool cholesky_mode;
 
   /// CD-only half-inverse X = D^-1 X~ of the pivot metric M=(piv|piv).
@@ -141,9 +140,9 @@ class DensityFit {
   /// the dM/dR sweep in forceJ_cholesky without re-sorting per call.
   std::vector<std::pair<size_t, size_t>> cd_pivot_shellpairs_vec;
 
-  /// Pivot shellpairs (set form) populated by fill_cholesky. Exposed
-  /// via get_pivot_shellpairs() for basistool / basislibrary atom-CD
-  /// aux basis construction.
+  /// Pivot shellpairs (set form) populated by fill_cholesky via
+  /// select_two_step_pivots; copied into cd_pivot_shellpairs_vec to
+  /// drive the metric build and the force sweeps.
   std::set<std::pair<size_t, size_t>> pivot_shellpairs;
 
   /// Form screening matrix
