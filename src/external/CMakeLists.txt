@@ -32,6 +32,36 @@ else()
  target_link_libraries(erkale_adf_emd ${LIBXC_LIBRARIES})
 endif()
 
+# Optional TREXIO (https://trex-coe.github.io/trexio/) interface.
+# Built only if libtrexio is found; set TREXIO_DIR to point at an install.
+set(TREXIO_DIR "" CACHE PATH "Path to a TREXIO install (containing include/trexio.h and lib/libtrexio)")
+find_path(TREXIO_INCLUDE_DIR trexio.h
+  HINTS ${TREXIO_DIR}/include /home/work/trexio/install/include /home/work/trexio/include)
+find_library(TREXIO_LIBRARY NAMES trexio
+  HINTS ${TREXIO_DIR}/lib ${TREXIO_DIR}/lib64 /home/work/trexio/install/lib /home/work/trexio/install/lib64)
+
+if(TREXIO_INCLUDE_DIR AND TREXIO_LIBRARY)
+  message(STATUS "TREXIO found (${TREXIO_LIBRARY}); building erkale_trexio")
+  add_executable (erkale_trexio trexio_tool.cpp trexio_interface.cpp)
+  set_target_properties(erkale_trexio PROPERTIES OUTPUT_NAME "erkale_trexio${SUFFIX}")
+  target_include_directories(erkale_trexio PRIVATE ${TREXIO_INCLUDE_DIR})
+  target_link_libraries(erkale_trexio liberkale ${TREXIO_LIBRARY})
+  if(BUILD_SHARED_LIBS)
+  else()
+   if(UNIX AND NOT APPLE)
+    target_link_libraries(erkale_trexio -lrt)
+   endif()
+   target_link_libraries(erkale_trexio ${GSL_LIBRARIES})
+   target_link_libraries(erkale_trexio ${LAPACK_LIBRARIES})
+   target_link_libraries(erkale_trexio ${HDF5_LIBRARIES})
+   target_link_libraries(erkale_trexio ${LIBINT_LIBRARIES})
+   target_link_libraries(erkale_trexio ${LIBXC_LIBRARIES})
+  endif()
+  install (TARGETS erkale_trexio DESTINATION bin)
+else()
+  message(STATUS "TREXIO not found; skipping erkale_trexio (set TREXIO_DIR to enable)")
+endif()
+
 install (TARGETS erkale_fchkpt erkale_adf_emd DESTINATION bin)
 # Install headers
 file(GLOB headers "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
