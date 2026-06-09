@@ -302,8 +302,8 @@ size_t DensityFit::select_two_step_pivots(const BasisSet & basis,
     }
     // Trim invmap to the significant products. (Shed the whole unused
     // tail, including the n_cols-1 column the old < n_cols-1 guard
-    // skipped, which would otherwise leak into the cached B_raw
-    // scatter that iterates over invmap.n_cols.)
+    // skipped; Nprod below is invmap.n_cols, so a stray column would
+    // inflate the product count and corrupt the pivoting.)
     if(iprod < invmap.n_cols)
       invmap.shed_cols(iprod, invmap.n_cols-1);
   }
@@ -688,7 +688,7 @@ size_t DensityFit::fill_cholesky(const BasisSet & basis,
   build_shellpair_descriptor(sp_pairs, sp_firsts, sp_sizes);
 
   // Bake the metric into the block storage so the J/K kernels see
-  // L = B_raw * X with identity metric. The on-the-fly form
+  // L = X^T (piv|mu nu) with identity metric. The on-the-fly form
   // (raw integrals + X X^T applied per call) loses precision because
   // X X^T = M^-1 has eigenvalues 1/lambda up to ~1e8-1e11, so forming
   // it explicitly rounds badly; baking X into L sidesteps that.
@@ -996,8 +996,8 @@ arma::vec DensityFit::forceJ_cholesky(const BasisSet & basis, const arma::mat & 
   if(P.n_rows != Nbf || P.n_cols != Nbf)
     throw std::runtime_error("DensityFit::forceJ_cholesky: density matrix dimension mismatch.\n");
 
-  // The blocks store L = B_raw * X (indep-space orthonormal vectors),
-  // so compute_expansion returns d = L^T Pv (with doubling),
+  // The blocks store L = X^T (piv|mu nu) (indep-space orthonormal
+  // vectors), so compute_expansion returns d = L^T Pv (with doubling),
   // which is the indep-space expansion. The force algebra is in
   // pivot space: c_raw = X * d gives the pivot-space coefficient
   // that goes against M, dM/dR and the 3-center derivatives, the
@@ -1434,7 +1434,7 @@ void DensityFit::accumulate_K_from_blocks(const arma::Mat<T> & C, const arma::ve
       // K_uv = (a|ui) (a|b)^-1 (b|vi); ab_invh is the canonical-orth
       // half-inverse X with X^T (a|b) X = I, so (a|b)^{-1} ≈ X X^T
       // and the half-transform is X^T aui. In CD mode the blocks are
-      // already L = X^T B_raw, so aui = sum_munu L C is the
+      // already L = X^T (piv|mu nu), so aui = sum_munu L C is the
       // half-transform directly -- no X^T multiply (ab_invh is empty).
       if(!cholesky_mode)
         aui = ab_invh.t() * aui;
@@ -1503,7 +1503,7 @@ arma::vec DensityFit::compute_expansion(const arma::mat & P) const {
     project_density_to_aux(P,ip,blocks->get_block(ip),gamma);
 #endif
 
-  // CD mode: the L blocks already carry the metric (L = X^T B_raw),
+  // CD mode: the L blocks already carry the metric (L = X^T (piv|mu nu)),
   // so the projection gamma_j = sum_munu L_{j,munu} P_munu is the
   // indep-space expansion directly -- no (a|b)^-1 multiply.
   if(cholesky_mode)
@@ -1751,7 +1751,7 @@ void DensityFit::B_matrix(arma::mat & B) const {
   // cached or direct mode; the latter recomputes the shellpair
   // blocks on demand via libint inside the iteration. In DF mode
   // ab_invh is the metric half-inverse; in CD mode the blocks are
-  // already L = X^T B_raw (metric baked in, ab_invh empty), so the
+  // already L = X^T (piv|mu nu) (metric baked in, ab_invh empty), so the
   // three-center integrals are the final B with no extra multiply.
   three_center_integrals(B);
   if(!cholesky_mode)
