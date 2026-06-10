@@ -18,6 +18,7 @@
 
 #include "../checkpoint.h"
 #include "../density_fitting.h"
+#include "../jkbuilder.h"
 #include <limits>
 #include "../localization.h"
 #include "../timer.h"
@@ -478,7 +479,7 @@ int main_guarded(int argc, char **argv) {
   // Parse settings
   settings.add_string("LoadChk","Checkpoint file to load density from","erkale.chk");
   settings.add_string("SaveChk","Checkpoint file to save data to","");
-  settings.add_bool("DensityFitting","Use density fitting instead of Cholesky?",false);
+  settings.add_string("JKMethod","Coulomb/exchange build method: RI (density fitting), Cholesky or CDFit","Cholesky");
   settings.add_string("FittingBasis","Fitting basis to use","");
   settings.add_double("FittingThr","Linear dependency threshold for fitting basis",1e-7);
   settings.add_double("CholeskyThr","Cholesky threshold to use",1e-7);
@@ -503,7 +504,10 @@ int main_guarded(int argc, char **argv) {
   // Load checkpoint
   std::string loadchk(settings.get_string("LoadChk"));
   std::string savechk(settings.get_string("SaveChk"));
-  bool densityfit=settings.get_bool("DensityFitting");
+  JKBuilder::Method jkmethod=JKBuilder::resolve_method(settings);
+  if(jkmethod==JKBuilder::Method::FourIndex)
+    throw std::runtime_error("erkale_moints needs a density-fitting JKMethod (RI, Cholesky or CDFit).\n");
+  bool densityfit=(jkmethod==JKBuilder::Method::DensityFitting);
   std::string fittingbasis=settings.get_string("FittingBasis");
   double fitthr=settings.get_double("FittingThr");
   double intthr=settings.get_double("IntegralThresh");
