@@ -68,6 +68,15 @@ namespace {
     throw std::runtime_error("TREXIO spherical export needs spherical d and higher shells (run with UseLM true; cartesian d+ unsupported).");
   }
 
+  // Signed m of the j-th spherical function in TREXIO storage order
+  // (0, +1, -1, +2, -2, ...), j in [0, 2l]. Inlined so the core path
+  // does not depend on the (non-upstream) trexio_sphe_m header helper,
+  // which lets the interface build against stock TREXIO.
+  int trexio_signed_m(int j) {
+    if(j == 0) return 0;
+    return (j & 1) ? (j + 1) / 2 : -(j / 2);
+  }
+
   // Per-shell permutation to TREXIO's storage order (m = 0,+1,-1,...).
   // perm[trexio_ao] = erkale_ao, so a quantity in ERKALE AO order is
   // read as q_erkale[perm[a]] at TREXIO position a. Shell order is
@@ -80,7 +89,7 @@ namespace {
       const int l    = shells[ish].get_am();
       const size_t f = shells[ish].get_first_ind();
       for(int j=0; j<2*l+1; j++)
-        perm[f + j] = f + erkale_local_index(shells[ish], trexio_sphe_m(j));
+        perm[f + j] = f + erkale_local_index(shells[ish], trexio_signed_m(j));
     }
     return perm;
   }
@@ -265,6 +274,12 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
   // built from the basis as TREXIO interprets it -- against ERKALE's,
   // reordered into TREXIO AO order. Catches any normalization or
   // ordering mismatch in the basis/MO export.
+  //
+  // trexio_compute_ao_overlap / trexio_check_mo_orthonormality are not
+  // part of upstream TREXIO; the build defines ERKALE_TREXIO_OVERLAP_HELPERS
+  // only when the linked libtrexio provides them. Without them the export
+  // still works and the round-trip test validates correctness.
+#ifdef ERKALE_TREXIO_OVERLAP_HELPERS
   {
     const std::vector<size_t> perm = erkale_to_trexio_perm(basis);
     trexio_exit_code orc;
@@ -311,6 +326,7 @@ void chk_to_trexio(const std::string & chkfile, const std::string & trexiofile, 
       trexio_close(rf);
     }
   }
+#endif // ERKALE_TREXIO_OVERLAP_HELPERS
 
   if(verbose) {
     printf("Wrote %s: %i nuclei, %i shells, %i AOs.\n",
