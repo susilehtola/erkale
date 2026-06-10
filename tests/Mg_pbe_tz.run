@@ -2,7 +2,6 @@
 System Mg.xyz
 Method gga_x_pbe-gga_c_pbe
 Basis cc-pVTZ
-DensityFitting false
 Direct false
 IntegralThresh 1e-14
 Guess Core

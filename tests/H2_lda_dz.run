@@ -3,7 +3,6 @@ System H2.xyz
 Method lda_x-lda_c_pw
 Basis cc-pVDZ
 Guess Core
-DensityFitting false
 Direct false
 IntegralThresh 1e-14
 

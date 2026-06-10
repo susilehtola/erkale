@@ -2,7 +2,6 @@
 System H2O.xyz
 Method gga_x_pbe-gga_c_pbe
 Basis aug-cc-pVTZ
-DensityFitting false
 Direct false
 IntegralThresh 1e-14
 

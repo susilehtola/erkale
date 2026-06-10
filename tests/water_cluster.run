@@ -2,8 +2,7 @@
 System water_cluster.xyz
 Method gga_x_pbe-gga_c_pbe
 Basis aug-cc-pVDZ
-DensityFitting true
-Cholesky false
+JKMethod RI
 Direct true
 IntegralThresh 1e-14
 

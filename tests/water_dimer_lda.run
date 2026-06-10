@@ -2,7 +2,6 @@
 System water_dimer.xyz
 Method lda_x-lda_c_pw
 Basis aug-cc-pVDZ
-DensityFitting false
 Direct false
 IntegralThresh 1e-14
 

@@ -47,11 +47,9 @@ void atomic_guess(const BasisSet & basis, size_t inuc, const std::string & metho
 
   settings.set_string("Guess","Core");
   settings.set_int("MaxIter",200);
-  settings.set_bool("DensityFitting",false);
   settings.set_bool("Verbose",false);
   settings.set_bool("Direct",false);
-  settings.set_bool("DensityFitting",false);
-  settings.set_bool("Cholesky",true);
+  settings.set_string("JKMethod","Cholesky");
   settings.set_double("CholeskyThr",1e-5);
   // Use a rather large grid to make sure the calculation converges
   // even in cases where the functional requires a large grid to be

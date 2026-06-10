@@ -2,6 +2,7 @@
 #include "basis.h"
 #include "checkpoint.h"
 #include "density_fitting.h"
+#include "jkbuilder.h"
 #include "dftgrid.h"
 #include "elements.h"
 #include "find_molecules.h"
@@ -109,7 +110,6 @@ int main_guarded(int argc, char **argv) {
   std::string linoccfname = settings.get_string("LinearOccupationFile");
   double linB = settings.get_double("LinearB");
   bool unrestricted = !(settings.get_bool("Restricted"));
-  bool density_fitting = settings.get_bool("DensityFitting");
   std::string guess = settings.get_string("Guess");
   bool oda = settings.get_bool("ODA");
 
@@ -152,33 +152,14 @@ int main_guarded(int argc, char **argv) {
     m_indices[m+maxam]=basis.m_indices(m);
   }
 
-  // ERIchol was merged into DensityFit (#126): both RI density fitting
-  // and two-step Cholesky are the same DensityFit object, differing
-  // only in how it is filled (fill() with an auxiliary Gaussian basis
-  // vs fill_cholesky() on pivoted orbital pairs). The calcJ/calcK
-  // kernels are then identical, so a single object serves both.
-  BasisSetLibrary fitlib;
-  BasisSet dfitbas;
-  DensityFit dfit;
-  bool direct = settings.get_bool("Direct");
-  double fitthr = settings.get_double("FittingThreshold");
-  double cholfitthr = settings.get_double("FittingCholeskyThreshold");
-
-  if (density_fitting) {
-    fitlib.load_basis(settings.get_string("FittingBasis"));
-    // Construct fitting basis
-    bool uselm = settings.get_bool("UseLM");
-    settings.set_bool("UseLM", true);
-    construct_basis(dfitbas,basis.get_nuclei(), fitlib);
-    dfitbas.coulomb_normalize();
-    settings.set_bool("UseLM", uselm);
-    dfit.fill(basis, dfitbas, direct, intthr, fitthr, cholfitthr);
-  } else {
-    double cholthr = settings.get_double("CholeskyThr");
-    double cholshthr = settings.get_double("CholeskyShThr");
-    double shtol = settings.get_double("IntegralThresh");
-    dfit.fill_cholesky(basis, direct, cholthr, cholshthr, shtol, cholfitthr, verbose);
-  }
+  // Coulomb/exchange via the unified driver: it resolves JKMethod
+  // (RI / Cholesky / CDFit / four-index), owns the integral engine and
+  // exposes the same calcJ/calcK routines used below.
+  JKBuilder jk;
+  jk.configure(settings);
+  if(!jk.is_densityfit())
+    throw std::runtime_error("erkale_complex_orbs needs a density-fitting JKMethod (RI, Cholesky or CDFit).\n");
+  jk.init(basis, verbose);
   size_t Nbf = basis.get_Nbf();
 
   // Calculate matrices
@@ -296,8 +277,8 @@ int main_guarded(int argc, char **argv) {
 
     arma::cx_mat C_c = D * C;
     arma::mat P = arma::real(C_c * arma::diagmat(occs) * C_c.t());
-    arma::mat J = dfit.calcJ(P);
-    arma::cx_mat K = -dfit.calcK(C_c, arma::conv_to<std::vector<double>>::from(occs));
+    arma::mat J = jk.densityfit().calcJ(P);
+    arma::cx_mat K = -jk.densityfit().calcK(C_c, arma::conv_to<std::vector<double>>::from(occs));
 
     // The code in ERKALE has a different convention for complex integrals; this modification makes it compatible with this code
     K = arma::conj(K);

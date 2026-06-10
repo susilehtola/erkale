@@ -2,7 +2,6 @@
 System H2O.xyz
 Method ROHF
 Basis cc-pVTZ
-DensityFitting false
 Direct false
 IntegralThresh 1e-14
 Charge 1

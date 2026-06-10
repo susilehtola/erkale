@@ -7,8 +7,7 @@ IntegralThresh 1e-14
 LoadChk water_cluster.chk
 Logfile water_cluster_fch.log
 SaveChk water_cluster_fch.chk
-Cholesky false
-DensityFitting true
+JKMethod RI
 Direct true
 XRSMethod FCH
 BasisRotate false

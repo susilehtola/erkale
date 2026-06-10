@@ -8,9 +8,6 @@
 System water_cluster.xyz
 Method HF
 Basis aug-cc-pVDZ
-DensityFitting false
-Cholesky true
-CholeskyAlgorithm TwoStep
 CholeskyThr 1e-7
 IntegralThresh 1e-14
 

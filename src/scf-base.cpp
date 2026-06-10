@@ -1538,7 +1538,7 @@ void calculate(const BasisSet & basis, bool force) {
 
   // Check consistency of parameters
   if(!hf && !rohf && (exact_exchange(dft.x_func)!=0.0 || is_range_separated(dft.x_func)))
-    if(settings.get_bool("DensityFitting") && (stricmp(settings.get_string("FittingBasis"),"Auto")==0)) {
+    if(JKBuilder::resolve_method(settings)==JKBuilder::Method::DensityFitting && (stricmp(settings.get_string("FittingBasis"),"Auto")==0)) {
       throw std::runtime_error("Automatical auxiliary basis set formation not implemented for exact exchange.\nChange the FittingBasis.\n");
     }
 

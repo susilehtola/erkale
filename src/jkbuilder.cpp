@@ -78,16 +78,18 @@ bool JKBuilder::is_cholesky() const {
 }
 
 JKBuilder::Method JKBuilder::resolve_method(const Settings & set) {
-  // Legacy keyword mapping. DensityFitting true requires Cholesky false
-  // (the two were mutually exclusive); the default is two-step Cholesky.
-  if(set.get_bool("DensityFitting"))
+  const std::string m = set.get_string("JKMethod");
+  if(stricmp(m,"4index")==0 || stricmp(m,"Exact")==0)
+    return Method::FourIndex;
+  if(stricmp(m,"RI")==0 || stricmp(m,"DensityFitting")==0)
     return Method::DensityFitting;
-  if(set.get_bool("Cholesky")) {
-    if(stricmp(set.get_string("CholeskyAlgorithm"),"CDFit")==0)
-      return Method::CDFit;
+  if(stricmp(m,"Cholesky")==0 || stricmp(m,"TwoStep")==0)
     return Method::CholeskyTwoStep;
-  }
-  return Method::FourIndex;
+  if(stricmp(m,"CDFit")==0)
+    return Method::CDFit;
+  std::ostringstream oss;
+  oss << "Unknown JKMethod '" << m << "'; expected 4index, RI, Cholesky or CDFit.\n";
+  throw std::runtime_error(oss.str());
 }
 
 std::string JKBuilder::method_name(Method m) {
@@ -101,22 +103,12 @@ std::string JKBuilder::method_name(Method m) {
 }
 
 void JKBuilder::configure(const Settings & set) {
-  // Validate the legacy mutually-exclusive selectors up front.
-  if(set.get_bool("Cholesky") && set.get_bool("DensityFitting"))
-    throw std::logic_error("Can't enable both Cholesky and density fitting!\n");
-  {
-    const std::string alg = set.get_string("CholeskyAlgorithm");
-    if(alg!="CDFit" && alg!="TwoStep") {
-      std::ostringstream oss;
-      oss << "Unknown CholeskyAlgorithm '" << alg << "'; expected TwoStep or CDFit.\n";
-      throw std::runtime_error(oss.str());
-    }
-  }
-
   method      = resolve_method(set);
   direct      = set.get_bool("Direct");
   decfock     = set.get_bool("DecFock");
-  occ_rik     = false;  // wired in via the unified keyword later
+  occ_rik     = set.get_bool("OccRIK");
+  if(occ_rik && method==Method::FourIndex)
+    throw std::runtime_error("OccRIK (occ-RI-K) requires a density-fitting method (JKMethod RI, Cholesky or CDFit).\n");
 
   intthr      = set.get_double("IntegralThresh");
   fitthr      = set.get_double("FittingThreshold");

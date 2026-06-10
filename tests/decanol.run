@@ -2,8 +2,7 @@
 System 1-decanol.xyz
 Method lda_x-lda_c_pw
 Basis cc-pVDZ
-Cholesky false
-DensityFitting true
+JKMethod RI
 Direct false
 IntegralThresh 1e-14
 
